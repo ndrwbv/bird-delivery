@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Установка «Птицы Пиццы» на Steam Deck (и любой Linux x86_64) одной командой.
 #
-#   curl -fsSL https://raw.githubusercontent.com/ndrwbv/bird-pizza/main/tools/install-deck.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/ndrwbv/bird-delivery/main/tools/install-deck.sh | bash
 #
 # Качает свежий релиз с GitHub, распаковывает игру в папку bird-pizza рядом с собой,
 # ставит права на запуск и делает ярлык «Птица Пицца», который видит Steam.
@@ -15,7 +15,7 @@
 #   --url АДРЕС    взять архив по своему адресу (или локальный file:///path)
 set -euo pipefail
 
-REPO="ndrwbv/bird-pizza"
+REPO="ndrwbv/bird-delivery"
 BIN="bird-pizza"
 ASSET="bird-pizza-deck.tar.gz"
 DIR="$PWD/bird-pizza"

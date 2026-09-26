@@ -21,7 +21,7 @@ Steam-бандл — это `vite build --mode steam` (→ `dist/steam`) вну�
 и версии `.exe` на Linux требует wine). В гит-релиз идут `bird-pizza-deck.tar.gz`,
 `bird-pizza-win.zip`, `install-deck.sh`; отдельно артефактом — zip для Яндекс Игр.
 
-**Сначала надо создать репозиторий релизов** `ndrwbv/bird-pizza` (или поменять константу
+**Сначала надо создать репозиторий релизов** `ndrwbv/bird-delivery` (уже создан; если сменится — поменять константу
 `REPO` в `electron/main.cjs` и `tools/install-deck.sh`). Автообновление читает
 `/releases/latest` оттуда, установщик качается с `raw.githubusercontent.com/<REPO>/main/tools/`.
 Если репозиторий приватный — обновления и `curl | bash` работать не будут.
@@ -178,7 +178,7 @@ TODO: завести достижения в Steamworks (App Admin → Stats & A
 В Konsole (десктоп-режим):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ndrwbv/bird-pizza/main/tools/install-deck.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ndrwbv/bird-delivery/main/tools/install-deck.sh | bash
 ```
 
 Игра встанет в `./bird-pizza`, ярлык «Птица Пицца» появится в меню; в Steam — Add a Non-Steam

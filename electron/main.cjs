@@ -102,7 +102,7 @@ ipcMain.handle('steam:textInput', async (e, desc, max, text) => {
    Сравниваем тег, запечённый CI в electron/build-tag.json, с последним релизом и, если игрок
    согласен, запускаем тот же install-deck.sh поверх. В Steam обновляет сам Steam.
    REPO — репозиторий с релизами; его ещё надо создать (см. docs/STEAM.md). */
-const REPO = 'ndrwbv/bird-pizza';
+const REPO = 'ndrwbv/bird-delivery';
 const INSTALLER = `https://raw.githubusercontent.com/${REPO}/main/tools/install-deck.sh`;
 const installDir = () => path.dirname(process.execPath);
 
