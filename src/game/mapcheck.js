@@ -125,6 +125,59 @@ function segCross (ax, az, bx, bz, cx, cz, dx, dz) {
   return { t, u, x: ax + rx * t, z: az + rz * t };
 }
 
+/* дома и парковки — одни на все пересборки контекста */
+const STATIC = new WeakMap();
+function staticPart (city) {
+  const HG = new Map(), HC = 40;
+  for (const b of city.buildings) {
+    let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+    for (const q of b.p) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); z0 = Math.min(z0, q[1]); z1 = Math.max(z1, q[1]); }
+    const e = { p: b.p, x0, z0, x1, z1 };
+    for (let i = Math.floor((x0 - 8) / HC); i <= Math.floor((x1 + 8) / HC); i++)
+      for (let j = Math.floor((z0 - 8) / HC); j <= Math.floor((z1 + 8) / HC); j++) {
+        const k = (i + 500) * 1000 + j + 500;
+        if (!HG.has(k)) HG.set(k, []);
+        HG.get(k).push(e);
+      }
+  }
+  const NOH = [];
+  const housesNear = (x, z) => HG.get((Math.floor(x / HC) + 500) * 1000 + Math.floor(z / HC) + 500) || NOH;
+  const inHouse = (x, z) => {
+    for (const b of housesNear(x, z)) if (x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1 && inPoly(x, z, b.p)) return true;
+    return false;
+  };
+  function wallDist (x, z) {
+    let d = Infinity;
+    for (const b of housesNear(x, z)) {
+      if (inPoly(x, z, b.p)) return 0;
+      const p = b.p;
+      for (let i = 0; i < p.length; i++) {
+        const a = p[i], c = p[(i + 1) % p.length];
+        d = Math.min(d, segDist(x, z, a[0], a[1], c[0], c[1]).d);
+      }
+    }
+    return d;
+  }
+  const parks = city.lots.filter(l => l.k === 'park');
+  function lotDist (x, z) {
+    let d = Infinity;
+    for (const l of parks) {
+      const p = l.p;
+      if (Math.abs(p[0][0] - x) > 250 || Math.abs(p[0][1] - z) > 250) continue;
+      if (inPoly(x, z, p)) return 0;
+      for (let i = 0; i < p.length; i++) {
+        const a = p[i], c = p[(i + 1) % p.length];
+        d = Math.min(d, segDist(x, z, a[0], a[1], c[0], c[1]).d);
+      }
+    }
+    return d;
+  }
+
+  const out = { housesNear, inHouse, wallDist, lotDist };
+  STATIC.set(city, out);
+  return out;
+}
+
 /* ── контекст: граф, сетки и высоты на текущих данных ──
    Строится заново после каждой починки — это миллисекунды. */
 export function mapContext (city, TH, o = {}) {
@@ -139,19 +192,21 @@ export function mapContext (city, TH, o = {}) {
   roads.forEach((r, ri) => {
     const w = roadWidth(r);
     for (let i = 1; i < r.p.length; i++) {
-      const s = { ri, i, r, x1: r.p[i - 1][0], z1: r.p[i - 1][1], x2: r.p[i][0], z2: r.p[i][1], w };
+      const s = { ri, i, r, x1: r.p[i - 1][0], z1: r.p[i - 1][1], x2: r.p[i][0], z2: r.p[i][1], w, id: 0 };
+      s.id = SEGS.length;
       SEGS.push(s);
       const m = w / 2 + 8;
       for (let a = Math.floor((Math.min(s.x1, s.x2) - m) / CELL); a <= Math.floor((Math.max(s.x1, s.x2) + m) / CELL); a++)
         for (let b = Math.floor((Math.min(s.z1, s.z2) - m) / CELL); b <= Math.floor((Math.max(s.z1, s.z2) + m) / CELL); b++) {
-          const k = a + ',' + b;
+          const k = (a + 500) * 1000 + b + 500;
           let l = SG.get(k);
           if (!l) SG.set(k, l = []);
           l.push(s);
         }
     }
   });
-  const segsNear = (x, z) => SG.get(Math.floor(x / CELL) + ',' + Math.floor(z / CELL)) || [];
+  const NONE = [];
+  const segsNear = (x, z) => SG.get((Math.floor(x / CELL) + 500) * 1000 + Math.floor(z / CELL) + 500) || NONE;
 
   // граф — как NODES в moscow.js: узел — точка карты, соседей считаем по проезжим
   const NODES = new Map();                  // "x,z" → { x, z, nb:Set, roads:[{ri,i}] }
@@ -197,46 +252,8 @@ export function mapContext (city, TH, o = {}) {
     return null;
   }
 
-  // дома, въезды, подъезды, парковки
-  const HG = new Map(), HC = 40;
-  for (const b of city.buildings) {
-    let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
-    for (const q of b.p) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); z0 = Math.min(z0, q[1]); z1 = Math.max(z1, q[1]); }
-    for (let i = Math.floor((x0 - 8) / HC); i <= Math.floor((x1 + 8) / HC); i++)
-      for (let j = Math.floor((z0 - 8) / HC); j <= Math.floor((z1 + 8) / HC); j++) {
-        const k = i + ',' + j;
-        if (!HG.has(k)) HG.set(k, []);
-        HG.get(k).push(b);
-      }
-  }
-  const housesNear = (x, z) => HG.get(Math.floor(x / HC) + ',' + Math.floor(z / HC)) || [];
-  const inHouse = (x, z) => housesNear(x, z).some(b => inPoly(x, z, b.p));
-  function wallDist (x, z) {
-    let d = Infinity;
-    for (const b of housesNear(x, z)) {
-      if (inPoly(x, z, b.p)) return 0;
-      const p = b.p;
-      for (let i = 0; i < p.length; i++) {
-        const a = p[i], c = p[(i + 1) % p.length];
-        d = Math.min(d, segDist(x, z, a[0], a[1], c[0], c[1]).d);
-      }
-    }
-    return d;
-  }
-  const parks = city.lots.filter(l => l.k === 'park');
-  function lotDist (x, z) {
-    let d = Infinity;
-    for (const l of parks) {
-      const p = l.p;
-      if (Math.abs(p[0][0] - x) > 250 || Math.abs(p[0][1] - z) > 250) continue;
-      if (inPoly(x, z, p)) return 0;
-      for (let i = 0; i < p.length; i++) {
-        const a = p[i], c = p[(i + 1) % p.length];
-        d = Math.min(d, segDist(x, z, a[0], a[1], c[0], c[1]).d);
-      }
-    }
-    return d;
-  }
+  // дома, въезды, подъезды, парковки: от улиц не зависят — строим один раз на city
+  const { housesNear, inHouse, wallDist, lotDist } = STATIC.get(city) || staticPart(city);
 
   /* ближайшее чужое полотно: не своя улица у этого конца */
   function nearestOther (x, z, skip, pred) {
@@ -316,7 +333,7 @@ export function checkMap (city, TH, o = {}) {
   const out = [];
   const add = (kind, x, z, severity, msg, fix) => out.push({ kind, x: r1(x), z: r1(z), severity, msg, ...(fix ? { fix } : {}) });
   checkBridges(ctx, add);
-  checkJoints(ctx, add);
+  checkJoints(ctx, add, o.tapers);
   checkHeights(ctx, add);
   checkDeadEnds(ctx, add, o.treated);
   checkMisc(ctx, add);
@@ -402,11 +419,13 @@ function bridgeCrossings (ctx, b) {
   const lines = [];
   ctx.roads.forEach((r, ri) => { if (!r.b) lines.push({ r, ri, p: r.p, w: sidewalkW(r), need: MC.CLEAR_ROAD }); });
   city.paths.forEach((q, qi) => lines.push({ path: true, qi, p: q, w: 2, need: MC.CLEAR_PATH }));
+  let bx0 = Infinity, bz0 = Infinity, bx1 = -Infinity, bz1 = -Infinity;
+  for (const [x, z] of p) { if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (z < bz0) bz0 = z; if (z > bz1) bz1 = z; }
   for (const L of lines) {
     const q = L.p;
     for (let j = 1; j < q.length; j++) {
       const ax = q[j - 1][0], az = q[j - 1][1], bx = q[j][0], bz = q[j][1];
-      if (Math.max(ax, bx) < Math.min(p[0][0], p[p.length - 1][0]) - 400) continue;
+      if ((ax < bx0 && bx < bx0) || (ax > bx1 && bx > bx1) || (az < bz0 && bz < bz0) || (az > bz1 && bz > bz1)) continue;
       for (let i = 1; i < p.length; i++) {
         const X = segCross(p[i - 1][0], p[i - 1][1], p[i][0], p[i][1], ax, az, bx, bz);
         if (!X) continue;
@@ -445,7 +464,7 @@ function junctionCut (ctx, b, end) {
   return Math.min(cut, b.L * 0.3, 24);
 }
 
-function checkJoints (ctx, add) {
+function checkJoints (ctx, add, tapers) {
   const { roads } = ctx;
   // обрывы: конец проезда у чужого полотна, но без общего узла
   for (const d of deadEnds(ctx)) {
@@ -466,8 +485,10 @@ function checkJoints (ctx, add) {
     const ra = roads[n.at[0].ri], rb = roads[n.at[1].ri];
     if (ra === rb || !drivable(ra) || !drivable(rb) || ra.b || rb.b) continue;
     const dw = Math.abs(roadWidth(ra) - roadWidth(rb));
-    if (dw > MC.WIDTH_JUMP && ctx.inBounds(n.x, n.z, -20))
-      add('width-jump', n.x, n.z, 'warn', `width jumps ${roadWidth(ra)} → ${roadWidth(rb)} m at a joint`, 'taper');
+    if (dw > MC.WIDTH_JUMP && ctx.inBounds(n.x, n.z, -20)) {
+      const done = tapers && tapers.some(t => Math.hypot(t.x - n.x, t.z - n.z) < 0.5);
+      add('width-jump', n.x, n.z, done ? 'info' : 'warn', `width jumps ${roadWidth(ra)} → ${roadWidth(rb)} m at a joint${done ? ' → tapered' : ''}`, 'taper');
+    }
   }
   // конец улицы на общем узле, где moscow.js не кладёт пятно (узел не в графе)
   for (const n of ctx.NODES.values()) {
@@ -477,7 +498,7 @@ function checkJoints (ctx, add) {
   }
   // одинаковые полотна друг на друге: осевые близко и параллельно, без общего узла
   for (const P of overlaps(ctx))
-    add('overlap', P.x, P.z, P.same ? 'info' : 'warn', `"${P.a.n || 'road'}" and "${P.b.n || 'road'}" ribbons overlap ${P.len.toFixed(0)} m (${P.same ? 'same class: z-fighting' : 'edge lines of one run on the other'})`);
+    add('overlap', P.x, P.z, 'info', `"${P.a.n || 'road'}" and "${P.b.n || 'road'}" ribbons overlap ${P.len.toFixed(0)} m (${P.same ? 'same class: z-fighting' : 'edge lines of one run on the other'})`);
 }
 
 /* куда пришить тупик: чужое проезжее полотно рядом и по ходу */
@@ -505,21 +526,23 @@ function joinTarget (ctx, d) {
 /* Пересечения в одном уровне без общего узла. Мосты и «только нарисовать»
    не считаем: над улицей мост — так и задумано. */
 function gradeCrossings (ctx) {
-  const out = [], seen = new Set();
+  const out = [], seen = new Set(), N = ctx.SEGS.length;
   for (const s of ctx.SEGS) {
     if (!drivable(s.r) || s.r.b) continue;
-    const cand = new Set([...ctx.segsNear(s.x1, s.z1), ...ctx.segsNear(s.x2, s.z2), ...ctx.segsNear((s.x1 + s.x2) / 2, (s.z1 + s.z2) / 2)]);
-    for (const q of cand) {
-      if (q === s || q.r === s.r || !drivable(q.r) || q.r.b) continue;
-      const k = s.ri < q.ri ? s.ri + ':' + s.i + '/' + q.ri + ':' + q.i : q.ri + ':' + q.i + '/' + s.ri + ':' + s.i;
-      if (seen.has(k)) continue;
-      seen.add(k);
-      const X = segCross(s.x1, s.z1, s.x2, s.z2, q.x1, q.z1, q.x2, q.z2);
-      if (!X) continue;
-      // на концах кусков — общий узел (или почти): это не наш случай
-      const near = (ax, az) => Math.hypot(X.x - ax, X.z - az) < 0.6;
-      if (near(s.x1, s.z1) || near(s.x2, s.z2) || near(q.x1, q.z1) || near(q.x2, q.z2)) continue;
-      out.push({ x: X.x, z: X.z, a: s.r, b: q.r, sa: s, sb: q, ta: X.t, tb: X.u });
+    const L = Math.hypot(s.x2 - s.x1, s.z2 - s.z1);
+    for (let t = 0; t <= 1.001; t += Math.min(1, 24 / (L || 1))) {
+      for (const q of ctx.segsNear(lerp(s.x1, s.x2, t), lerp(s.z1, s.z2, t))) {
+        if (q.id <= s.id || q.r === s.r || !drivable(q.r) || q.r.b) continue;
+        const k = s.id * N + q.id;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        const X = segCross(s.x1, s.z1, s.x2, s.z2, q.x1, q.z1, q.x2, q.z2);
+        if (!X) continue;
+        // на концах кусков — общий узел (или почти): это не наш случай
+        const near = (ax, az) => Math.hypot(X.x - ax, X.z - az) < 0.6;
+        if (near(s.x1, s.z1) || near(s.x2, s.z2) || near(q.x1, q.z1) || near(q.x2, q.z2)) continue;
+        out.push({ x: X.x, z: X.z, a: s.r, b: q.r, sa: s, sb: q, ta: X.t, tb: X.u });
+      }
     }
   }
   return out;
@@ -627,6 +650,18 @@ function checkMisc (ctx, add) {
       }
     }
   });
+  // дорожка сквозь дом: гуляющие проходят сквозь стену
+  const pin = [];
+  for (const q of ctx.city.paths)
+    for (let i = 1; i < q.length; i++) {
+      const [x1, z1] = q[i - 1], [x2, z2] = q[i], L = Math.hypot(x2 - x1, z2 - z1);
+      for (let s = 1; s < L - 1; s += 2) {
+        const x = lerp(x1, x2, s / L), z = lerp(z1, z2, s / L);
+        if (!ctx.inBounds(x, z) || !ctx.inHouse(x, z) || pin.some(p => Math.abs(p[0] - x) < 20 && Math.abs(p[1] - z) < 20)) continue;
+        pin.push([x, z]);
+        add('path-in-house', x, z, 'warn', 'footpath runs through a building (walkers go through the wall)', 'path');
+      }
+    }
   // асфальт под водой: край полотна на склоне к реке
   const wet = [];
   ctx.roads.forEach(r => {
@@ -660,19 +695,19 @@ export function fixMap (city, TH, o = {}) {
   const log = [];
   const note = (kind, x, z, msg) => log.push({ kind, x: r1(x), z: r1(z), msg });
   const before = o.before ? checkMap(city, TH) : null;       // для отчёта ?mapcheck: как было
-  let ctx = mapContext(city, TH);
-
-  fixJoints(ctx, note);
+  const T = {}, lap = (k, f) => { const t = now(); const r = f(); T[k] = Math.round((now() - t) * 10) / 10; return r; };
+  let ctx = lap('ctx', () => mapContext(city, TH));
+  lap('joints', () => fixJoints(ctx, note));
   ctx = mapContext(city, TH);
-  fixGradeCrossings(ctx, note);
+  lap('cross', () => fixGradeCrossings(ctx, note));
+  lap('paths', () => fixPaths(ctx, note));
+  // рельефу нужны только сами улицы (массивы те же) и высоты — контекст не пересобираем
+  ctx.report = !!o.report;
+  lap('terrain', () => fixTerrain(ctx, note));
   ctx = mapContext(city, TH);
-  fixTerrain(ctx, note);
-  ctx = mapContext(city, TH);
-  fixBridges(ctx, note);
+  ctx = lap('bridges', () => fixBridges(ctx, note));
   // после обрезки мостов у набережных — ещё раз: к новым кускам тоже пришиваем
-  ctx = mapContext(city, TH, { fade: true });
-  fixJoints(ctx, note);
-  ctx = mapContext(city, TH, { fade: true });
+  if (lap('joints2', () => fixJoints(ctx, note))) ctx = mapContext(city, TH, { fade: true });
 
   // план тупиков: кто без ничего — тому блоки или ремонт
   const plan = [];
@@ -697,7 +732,7 @@ export function fixMap (city, TH, o = {}) {
     tapers.push({ x: n.x, z: n.z, vx: (q[0] - n.x) / l, vz: (q[1] - n.z) / l, w1: roadWidth(nar), w2: roadWidth(wide), c: wide.c, c1: nar.c });
   }
   const ms = now() - t0;
-  return { log, deadEnds: plan, tapers, before, ms, ctx };
+  return { log, deadEnds: plan, tapers, before, ms, T, ctx };
 }
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
@@ -715,6 +750,7 @@ function splitAt (r, i, x, z, near = 1.2) {
    пришиваем к нему общим узлом. Улица получает перекрёсток, трафик —
    поворот, асфальт — пятно на стыке. */
 function fixJoints (ctx, note) {
+  let n = 0;
   const ends = deadEnds(ctx).filter(d => drivable(d.r) && ctx.inBounds(d.x, d.z, -5));
   for (const d of ends) {
     const j = joinTarget(ctx, d);
@@ -744,7 +780,9 @@ function fixJoints (ctx, note) {
     if (dd < 0.8) r.p[end] = pt;
     else if (d.end) r.p.push(pt); else r.p.unshift(pt);
     note('snap', d.x, d.z, `joined "${r.n || 'road'}" to "${q.n || 'road'}" (${j.edge < MC.SNAP_ON ? 'seam' : 'gap ' + j.edge.toFixed(1) + ' m'})`);
+    n++;
   }
+  return n;
 }
 
 /* 2. Улицы, пересекающиеся в одном уровне без узла: общий узел в обеих.
@@ -767,6 +805,38 @@ function fixGradeCrossings (ctx, note) {
   }
 }
 
+/* 2б. Дорожки сквозь дома. В выгрузке дворовая дорожка местами идёт через
+   корпус насквозь (проход в арку, которой у нас нет) — и гуляющий по ней
+   человек проходит сквозь стену. Режем дорожку по стенам. */
+function fixPaths (ctx, note) {
+  const out = [];
+  let cut = 0;
+  for (const q of ctx.city.paths) {
+    let cur = [], hit = false;
+    const flush = () => { if (cur.length >= 2 && polyLen(cur).at(-1) >= 3) out.push(cur); cur = []; };
+    for (let i = 0; i < q.length; i++) {
+      if (i === 0) { if (!ctx.inHouse(q[0][0], q[0][1])) cur.push(q[0]); continue; }
+      const [x1, z1] = q[i - 1], [x2, z2] = q[i], L = Math.hypot(x2 - x1, z2 - z1);
+      const n = Math.max(1, Math.ceil(L / 1.5));
+      let prevIn = ctx.inHouse(x1, z1);
+      for (let k = 1; k <= n; k++) {
+        const x = lerp(x1, x2, k / n), z = lerp(z1, z2, k / n), inn = ctx.inHouse(x, z);
+        if (inn && !prevIn) { hit = true; cur.push([r1(lerp(x1, x2, (k - 1) / n)), r1(lerp(z1, z2, (k - 1) / n))]); flush(); }
+        else if (!inn && prevIn) cur.push([r1(x), r1(z)]);
+        prevIn = inn;
+      }
+      if (!prevIn) cur.push(q[i]);
+    }
+    flush();
+    if (hit) { cut++; note('path', q[0][0], q[0][1], 'footpath through a building cut at the walls'); }
+  }
+  // вершины подряд могли совпасть — чистим
+  for (const p of out) for (let i = p.length - 1; i > 0; i--) if (p[i][0] === p[i - 1][0] && p[i][1] === p[i - 1][1]) p.splice(i, 1);
+  ctx.city.paths.length = 0;
+  for (const p of out) if (p.length >= 2) ctx.city.paths.push(p);
+  return cut;
+}
+
 /* 3. Рельеф под дорогами. Сетку высот TH сглаживаем только в коридоре
    проезжих улиц и только среди сухих вершин: соседи — такие же вершины
    коридора, поэтому берег набережной не тянет асфальт в реку. Кочки на
@@ -783,9 +853,12 @@ function fixTerrain (ctx, note) {
       const [x1, z1] = r.p[i - 1], [x2, z2] = r.p[i], m = hw + FAR;
       const i0 = Math.max(0, Math.floor((Math.min(x1, x2) - m - ter.x0) / TG)), i1 = Math.min(NX - 1, Math.ceil((Math.max(x1, x2) + m - ter.x0) / TG));
       const j0 = Math.max(0, Math.floor((Math.min(z1, z2) - m - ter.z0) / TG)), j1 = Math.min(NZ - 1, Math.ceil((Math.max(z1, z2) + m - ter.z0) / TG));
+      const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz || 1;
       for (let j = j0; j <= j1; j++)
         for (let ii = i0; ii <= i1; ii++) {
-          const k = j * NX + ii, d = segDist(ter.x0 + ii * TG, ter.z0 + j * TG, x1, z1, x2, z2).d - hw;
+          const px = ter.x0 + ii * TG - x1, pz = ter.z0 + j * TG - z1;
+          const t = clamp((px * dx + pz * dz) / l2, 0, 1), ex = px - dx * t, ez = pz - dz * t;
+          const k = j * NX + ii, d = Math.sqrt(ex * ex + ez * ez) - hw;
           if (d < edge[k]) edge[k] = d;
         }
     }
@@ -800,6 +873,13 @@ function fixTerrain (ctx, note) {
     const hw = sidewalkW(r) / 2;
     for (let i = 1; i < r.p.length; i++) {
       const [x1, z1] = r.p[i - 1], [x2, z2] = r.p[i], L = Math.hypot(x2 - x1, z2 - z1) || 1;
+      // рядом нет низких вершин — и проверять нечего (почти все улицы)
+      const m = hw + TG + 6;
+      const i0 = clamp(Math.floor((Math.min(x1, x2) - m - ter.x0) / TG), 0, NX - 1), i1 = clamp(Math.ceil((Math.max(x1, x2) + m - ter.x0) / TG), 0, NX - 1);
+      const j0 = clamp(Math.floor((Math.min(z1, z2) - m - ter.z0) / TG), 0, NZ - 1), j1 = clamp(Math.ceil((Math.max(z1, z2) + m - ter.z0) / TG), 0, NZ - 1);
+      let low = false;
+      for (let j = j0; j <= j1 && !low; j++) for (let ii = i0; ii <= i1; ii++) if (TH[j * NX + ii] < 0.75) { low = true; break; }
+      if (!low) continue;
       const nx = -(z2 - z1) / L, nz = (x2 - x1) / L;
       // на концах — ещё на пару метров вперёд: иначе сразу за тупиком обрыв в реку
       const sa = i === 1 ? -5 : 0, sb = i === r.p.length - 1 ? L + 5 : L;
@@ -814,26 +894,52 @@ function fixTerrain (ctx, note) {
     }
   }
   if (banks) note('bank', 0, 0, `${banks} grid points under roads lifted out of the river`);
-  let before = 0; roadProfileIssues(ctx, k => { if (k !== 'tilt') before++; });
+  let before = 0; if (ctx.report) roadProfileIssues(ctx, k => { if (k !== 'tilt') before++; });
   // низкие частоты рельефа: сглаживаем всю сухую сетку (мокрые соседи не в счёт —
   // иначе набережную тянет в реку), а применяем только у дорог, с плавным краем
+  // Поперёк полотна — ровно: вершины под асфальтом тянем к высоте осевой.
+  // Иначе улица вдоль склона к реке лежит с перекосом, и машину тянет вбок.
+  const flatten = k0 => {
+    const acc = new Float32Array(TH.length), cnt = new Float32Array(TH.length);
+    for (const r of ctx.roads) {
+      if (!drivable(r) || r.b) continue;
+      const hw = roadWidth(r) / 2, m = hw + 4;
+      for (let i = 1; i < r.p.length; i++) {
+        const [x1, z1] = r.p[i - 1], [x2, z2] = r.p[i];
+        const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz || 1;
+        const i0 = Math.max(1, Math.floor((Math.min(x1, x2) - m - ter.x0) / TG)), i1 = Math.min(NX - 2, Math.ceil((Math.max(x1, x2) + m - ter.x0) / TG));
+        const j0 = Math.max(1, Math.floor((Math.min(z1, z2) - m - ter.z0) / TG)), j1 = Math.min(NZ - 2, Math.ceil((Math.max(z1, z2) + m - ter.z0) / TG));
+        for (let j = j0; j <= j1; j++)
+          for (let ii = i0; ii <= i1; ii++) {
+            const k = j * NX + ii;
+            if (TH[k] < DRY) continue;
+            const px = ter.x0 + ii * TG - x1, pz = ter.z0 + j * TG - z1;
+            const t = clamp((px * dx + pz * dz) / l2, 0, 1), ex = px - dx * t, ez = pz - dz * t;
+            const d = Math.sqrt(ex * ex + ez * ez);
+            if (d > m) continue;
+            const wt = d < hw + 1 ? 1 : (m - d) / 3;
+            acc[k] += ctx.groundH(x1 + dx * t, z1 + dz * t) * wt; cnt[k] += wt;
+          }
+      }
+    }
+    for (let k = 0; k < TH.length; k++)
+      if (cnt[k] > 0) TH[k] = Math.max(DRY, lerp(TH[k], acc[k] / cnt[k], k0 * Math.min(1, cnt[k])));
+  };
+  flatten(0.75);
   const orig = Float32Array.from(TH), S = Float32Array.from(TH), T = new Float32Array(TH.length);
+  // сухие вершины у дорог — списком: в цикле сглаживания только они
+  const act = [], dryM = new Uint8Array(TH.length);
+  for (let k = 0; k < TH.length; k++) if (TH[k] >= DRY) dryM[k] = 1;
+  for (let j = 1; j < NZ - 1; j++) for (let i = 1; i < NX - 1; i++) { const k = j * NX + i; if (dryM[k] && edge[k] < FAR) act.push(k); }
+  const OFF = [-NX - 1, -NX, -NX + 1, -1, 1, NX - 1, NX, NX + 1], WT = [0.7, 1, 0.7, 1, 1, 0.7, 1, 0.7];
   for (let it = 0; it < 5; it++) {
     T.set(S);
-    for (let j = 1; j < NZ - 1; j++)
-      for (let i = 1; i < NX - 1; i++) {
-        const k = j * NX + i;
-        if (!dry(k) || edge[k] >= FAR) continue;
-        let s = T[k] * 2, w = 2;
-        for (let dj = -1; dj <= 1; dj++)
-          for (let di = -1; di <= 1; di++) {
-            const q = k + dj * NX + di;
-            if (q === k || !dry(q)) continue;
-            const wt = di && dj ? 0.7 : 1;
-            s += T[q] * wt; w += wt;
-          }
-        S[k] = s / w;
-      }
+    for (let a = 0; a < act.length; a++) {
+      const k = act[a];
+      let s = T[k] * 2, w = 2;
+      for (let o = 0; o < 8; o++) { const q = k + OFF[o]; if (dryM[q]) { s += T[q] * WT[o]; w += WT[o]; } }
+      S[k] = s / w;
+    }
   }
   let moved = 0, maxd = 0;
   for (let k = 0; k < TH.length; k++) {
@@ -845,8 +951,9 @@ function fixTerrain (ctx, note) {
     if (d > 0.05) moved++;
     if (d > maxd) maxd = d;
   }
-  let after = 0; roadProfileIssues(mapContext(ctx.city, TH), k => { if (k !== 'tilt') after++; });
-  note('smooth', 0, 0, `terrain under roads smoothed: ${moved} grid points moved (max ${maxd.toFixed(2)} m), bumpy/steep samples ${before} → ${after}`);
+  flatten(0.5);                                                   // и ещё раз, мягче: сглаживание вернуло часть перекоса
+  let after = 0; if (ctx.report) roadProfileIssues(mapContext(ctx.city, TH), k => { if (k !== 'tilt') after++; });
+  note('smooth', 0, 0, `terrain under roads smoothed: ${moved} grid points moved (max ${maxd.toFixed(2)} m)` + (ctx.report ? `, bumpy/steep samples ${before} → ${after}` : ''));
 }
 
 /* подъём не круче slope: низкие точки подтягиваем к соседям (только вверх),
@@ -940,10 +1047,11 @@ function fixBridges (ctx, note) {
   // г) пары настилов
   ctx = mapContext(ctx.city, ctx.TH);
   pairDecks(ctx, note);
+  ctx = mapContext(ctx.city, ctx.TH, { fade: true });
   // в) разрывы: что так и не пролезло под настил. По одному и заново —
-  // после разреза список дорог и дорожек уже другой
+  // после разреза список дорог и дорожек уже другой (мосты — те же, контекст не пересобираем)
+  let cuts = 0;
   for (let it = 0; it < 40; it++) {
-    ctx = mapContext(ctx.city, ctx.TH, { fade: true });
     let hit = null;
     for (const b of ctx.BR) {
       for (const c of bridgeCrossings(ctx, b)) {
@@ -960,7 +1068,9 @@ function fixBridges (ctx, note) {
     if (c.path) cutPolyline(ctx.city.paths, c.p, c.j, c.u, half);
     else roads.splice(roads.indexOf(c.r), 1, ...cutRoad(c.r, c.j, c.u, half));
     note('cut', c.x, c.z, `${c.path ? 'footpath' : '"' + (c.r.n || 'road') + '"'} under too-low "${b.r.n || 'bridge'}" deck split at the bridge`);
+    cuts++;
   }
+  return cuts ? mapContext(ctx.city, ctx.TH, { fade: true }) : ctx;
 }
 
 function angleBetween (b, c) {

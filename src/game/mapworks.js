@@ -108,7 +108,7 @@ export function buildWorks (fix, api) {
       for (let k = 0; k < n; k++) {
         const o = (k + 0.5) / n * W - W / 2;
         if (plastic) box(LIT, 1.15, 0.8, 0.5, k % 2 ? '#f2eee6' : '#d9342c', bx + nx * o, by + 0.4, bz + nz * o, ryA);
-        else box(LIT, 2.25, 0.8, 0.9, '#bdb6ab', bx + nx * o, by + 0.4, bz + nz * o, ryA);
+        else box(LIT, W / n - 0.12, 0.8, 0.9, hash(x + k, z) < 0.3 ? '#b3ab9f' : '#bdb6ab', bx + nx * o, by + 0.4, bz + nz * o, ryA);
       }
       // полосатый щит на двух стойках над блоками
       const px = bx + ux * 0.7, pz = bz + uz * 0.7, py = groundH(px, pz);
@@ -184,7 +184,7 @@ function works (api, d, W, face, sign, rollerG, shovelG) {
   const [ex, ez] = P(16.3, 0), ey = groundH(ex, ez), n = Math.max(2, Math.ceil(W / 2.4));
   for (let k = 0; k < n; k++) {
     const o = (k + 0.5) / n * W - W / 2;
-    box(LIT, 2.25, 0.8, 0.9, '#bdb6ab', ex + nx * o, ey + 0.4, ez + nz * o, ryA);
+    box(LIT, W / n - 0.12, 0.8, 0.9, '#bdb6ab', ex + nx * o, ey + 0.4, ez + nz * o, ryA);
   }
   const m = Math.max(3, Math.round(W / 1.4));
   for (let k = 0; k < m; k++) {
@@ -369,10 +369,12 @@ const DBG = { on: false, api: null, list: [], i: -1, cols: null, run: { t: 0, n:
 export function debug (fix, api) {
   DBG.on = true; DBG.api = api;
   const t0 = performance.now();
-  const after = checkMap(api.CITY, api.TH, { fade: true, treated: fix.deadEnds });
+  // ?nomapfix&mapcheck — без починки: «после» и есть «до»
+  if (!fix) fix = { log: [], deadEnds: [], ms: 0, before: null, raw: true };
+  const after = checkMap(api.CITY, api.TH, { fade: !fix.raw, treated: fix.deadEnds, tapers: fix.tapers });
   browserChecks(api, after);
   const ms = performance.now() - t0;
-  const before = fix.before || [];
+  const before = fix.before || (fix.raw ? after : []);
   const table = {};
   for (const [tag, list] of [['before', before], ['after', after]])
     for (const i of list) {
@@ -494,7 +496,7 @@ function watch (dt, api) {
       const dx = b.x2 - b.x1, dz = b.z2 - b.z1, t = ((x - b.x1) * dx + (z - b.z1) * dz) / (dx * dx + dz * dz || 1);
       if (t < 0 || t > 1 || Math.hypot(x - b.x1 - dx * t, z - b.z1 - dz * t) > b.ws / 2) continue;
       const deck = b.deck(lerp(b.s1, b.s2, t));
-      if (deck - 1.8 < y + h && deck + 0.5 > y + 0.3) return deck - y;
+      if (deck - 1.8 < y + h && deck > y + 0.4) return deck - y;       // низ балок ниже макушки, а настил — не под ногами
     }
     return null;
   };

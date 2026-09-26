@@ -17,8 +17,8 @@ const TH = decodeHeights(city.terrain);
 const t0 = performance.now();
 const before = checkMap(city, TH);
 const t1 = performance.now();
-const fx = fixMap(city, TH);
-const after = checkMap(city, TH, { fade: true, treated: fx.deadEnds });
+const fx = fixMap(city, TH, { report: true });
+const after = checkMap(city, TH, { fade: true, treated: fx.deadEnds, tapers: fx.tapers });
 const t2 = performance.now();
 
 if (asJson) {

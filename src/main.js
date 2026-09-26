@@ -10,4 +10,5 @@ await initI18n(Platform.lang);
 applyDom();
 document.documentElement.dataset.platform = Platform.id;
 await import('./game/moscow.js');
+document.title = (await import('./game/brands.js')).OWN.pizza();
 Platform.ready();

@@ -90,6 +90,9 @@ const STREET_WORDS = {
 };
 export function translit (s) {
   if (!s || isCyr() || !/[А-Яа-яЁё]/.test(s)) return s;
+  // «улица Ленинская Слобода, 19» → «Leninskaya Sloboda St., 19»: тип улицы — в конец названия
+  const m = s.match(/^(\S+)\s+([^,]+)(,.*)?$/);
+  if (m && STREET_WORDS[m[1].toLowerCase()] && m[1].toLowerCase() !== 'дом') s = m[2] + ' ' + m[1] + (m[3] || '');
   return s.replace(/[А-Яа-яЁё]+/g, w => {
     const low = w.toLowerCase();
     if (STREET_WORDS[low]) return STREET_WORDS[low];

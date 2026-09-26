@@ -3111,7 +3111,7 @@ function buildCity () {
   tm0('marks', osmMarkings);
   tm0('bridges', osmBridges);
   tm0('edge', osmEdgeBlocks);
-  if (MAPFIX) tm0('mapworks', () => MAPW.buildWorks(MAPFIX, mapApi()));   // тупики: блоки и ремонт
+  if (MAPFIX) { BUILD_T.mapfix = Math.round(MAPFIX.ms); BUILD_T.mapfixT = MAPFIX.T; tm0('mapworks', () => MAPW.buildWorks(MAPFIX, mapApi())); }   // тупики: блоки и ремонт
   { const t0 = performance.now(); osmBuildings(spot); BUILD_T.houses = Math.round(performance.now() - t0); }
   if (house) dodoFacade(house);
   else buildPizzeria(spot.x, spot.z, spot.ry);
@@ -4927,6 +4927,7 @@ function placeTraffic (t, rmin, rmax) {
     const e = pick(opts);
     t.e = e; t.s = rand(0, edgeRun(e) * 0.8); t.lane = (Math.random() * laneCount(e)) | 0; t.turn = null;
     t.rejoin = 0; t.pull = 0; t.stopT = 0;
+    t.gy = undefined;              // высота — с нового места: со старой машину на мосту сажало на землю под настилом
     poseTraffic(t, 0);
     // не рождаться внутри другой машины — но и без места не оставаться
     if (k < 23 && TRAFFIC.some(o => o !== t && Math.hypot(o.x - t.x, o.z - t.z) < 7)) continue;
@@ -9730,7 +9731,7 @@ function frame (now) {
   updatePeds(dt);
   updatePeople(dt);
   updateScoots(dt);
-  if (MAPFIX) MAPW.step(dt, MAPW_API || (MAPW_API = mapApi()));     // дорожники, каток, ?mapcheck
+  if (MAPFIX || MAPCHECK) MAPW.step(dt, MAPW_API || (MAPW_API = mapApi()));     // дорожники, каток, ?mapcheck
   updateDrivers(dt);
   updateAmb(dt);
   updateThief(dt);
@@ -9825,4 +9826,4 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) wi
   EDGES, SIG_GROUPS, ZEBRAS, SCOOTS, TL, IN, touches, lightOf, edgeOf,
   DRIVERS, SMOKERS, NITRO_CANS, NOS, DRINKITS, CREW, WAR, warStart, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, PIGEONS, AMB, INCIDENTS, scare, RIVALS, THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT };
 // ?mapcheck: сводка проблем карты, столбики над ними, «]» — к следующей (mapworks.js)
-if (MAPCHECK && MAPFIX) MAPW.debug(MAPFIX, MAPW_API || (MAPW_API = mapApi()));
+if (MAPCHECK) MAPW.debug(MAPFIX, MAPW_API || (MAPW_API = mapApi()));
