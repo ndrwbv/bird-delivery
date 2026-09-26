@@ -265,34 +265,10 @@ html, body {
 #lb-list b { color: #ffd85e; font-weight: normal; }
 #lb-list i { color: #fff3d6; font-style: normal; }
 
-#lb-form { display: flex; gap: 8px; }
-#lb-name {
-  flex: 1; min-width: 0;
-  padding: 9px;
-  background: #151b33;
-  border: 2px solid #33210c;
-  border-radius: 4px;
-  color: #fff3d6;
-  font-family: inherit; font-size: 8px;
-}
-#lb-name::placeholder { color: #5f6c99; }
-#lb-name[hidden] { display: none; }
 /* пустое имя на старте: поле вздрагивает и краснеет */
-#lb-name.need { border-color: #ff9a9a; animation: lb-need .35s; }
 @keyframes lb-need {
   25% { transform: translateX(-5px); } 75% { transform: translateX(5px); }
 }
-#lb-save {
-  padding: 9px 12px;
-  background: #ffd85e;
-  border: 2px solid #33210c;
-  border-radius: 4px;
-  color: #33210c;
-  font-family: inherit; font-size: 8px;
-  cursor: pointer;
-}
-#lb-save:disabled { opacity: .6; cursor: default; }
-#lb-name[hidden] + #lb-save { flex: 1; }   /* в конце смены кнопка — это статус записи */
 
 .ov-vic { color: #ff9a9a; }
 
@@ -348,18 +324,6 @@ body.w-show .w-inner { opacity: 1; }
 
 
 /* ── предупреждение про впн: без него смена не запишется ── */
-#lb-vpn {
-  padding: 9px 11px;
-  background: rgba(255, 216, 94, .92);
-  border: 2px solid #33210c;
-  border-radius: 4px;
-  color: #33210c;
-  font-size: 8px;
-  line-height: 1.9;
-  text-shadow: none;
-}
-#lb-vpn b { font-weight: normal; text-decoration: underline; }
-#lb-vpn.bad { background: #ff9a9a; }
 
 
 /* ── кнопки звука и паузы ── */
@@ -384,68 +348,7 @@ body.w-show .w-inner { opacity: 1; }
   #ctrls button { padding: 8px; font-size: 7px; }
 }
 
-/* ── катсцена-вступление (?intro) ──
-   Хада нет, сверху и снизу киношные полосы. Имена висят над головами,
-   в конце — две кнопки под открытой коробкой. */
-#intro { position: absolute; inset: 0; pointer-events: none; }
-#intro[hidden] { display: none; }
-body.intro .hud, body.intro #ctrls, body.intro #phone, body.intro #big, body.intro #wasted { display: none !important; }
 
-.in-bar {
-  position: absolute; left: 0; right: 0;
-  height: 9vh;
-  background: #06070f;
-  transition: transform .8s cubic-bezier(.3,.7,.2,1);
-}
-.in-top { top: 0; transform: translateY(-100%); }
-.in-bot { bottom: 0; transform: translateY(100%); }
-#intro.bars .in-bar { transform: none; }
-#intro.end .in-bar { transform: translateY(-100%); }
-#intro.end .in-bot { transform: translateY(100%); }
-
-#in-names .in-name {
-  position: absolute; left: 0; top: 0;
-  transform: translate(-50%, -100%);
-  white-space: nowrap;
-  font-size: clamp(7px, 1.1vw, 10px);
-  color: #fff3d6;
-  text-shadow: 2px 2px 0 #33210c, -2px 2px 0 #33210c, 2px -2px 0 #33210c, -2px -2px 0 #33210c;
-  opacity: 0;
-  transition: opacity .4s;
-}
-#in-names .in-name.on { opacity: 1; }
-
-#in-end {
-  position: absolute; left: 50%; bottom: 6vh;
-  transform: translateX(-50%);
-  display: flex; gap: 14px;
-  width: min(640px, calc(100% - 32px));
-  pointer-events: auto;
-  animation: in-rise .5s cubic-bezier(.2,.9,.3,1.2) both;
-}
-#in-end[hidden] { display: none; }
-@keyframes in-rise { from { opacity: 0; transform: translate(-50%, 24px); } to { opacity: 1; transform: translate(-50%, 0); } }
-#in-end button {
-  flex: 1 1 0;
-  font: inherit;
-  font-size: clamp(8px, 1.3vw, 11px);
-  line-height: 1.8;
-  padding: 16px 12px;
-  border: 3px solid #33210c;
-  border-radius: 6px;
-  cursor: pointer;
-  box-shadow: 0 5px 0 #33210c;
-  transition: transform .08s, box-shadow .08s;
-}
-#in-end button:active { transform: translateY(4px); box-shadow: 0 1px 0 #33210c; }
-/* акцент — на «читать»: вступление ведёт в выпуск, игра — второй вариант */
-#in-read { background: #f0522a; color: #fff3d6; }
-#in-play { background: #fff3d6; color: #33210c; }
-#in-read:hover { background: #ff7d22; }
-#in-play:hover { background: #fff; }
-@media (max-width: 560px) {
-  #in-end { flex-direction: column; gap: 12px; bottom: 5vh; }
-}
 
 /* ── Москва (?map=moscow): нитро, «без времени», полная карта ── */
 html:not([data-map="moscow"]) .msk-only { display: none !important; }
@@ -480,7 +383,6 @@ html[data-map="moscow"] #radar { cursor: zoom-in; pointer-events: auto; }
 #st-go:disabled { opacity: 0.38; cursor: not-allowed; }
 #st-note { font-size: 7px; line-height: 1.8; color: #fff3d6; opacity: 0.8; text-align: center; min-height: 9px; }
 #st-note.bad { color: #ff8a8a; opacity: 1; }
-html[data-map="moscow"] #lb-form, html[data-map="moscow"] #lb-vpn { display: none; }
 
 /* полная карта района */
 #fullmap {
@@ -614,8 +516,6 @@ body.brief #view { filter: blur(6px) brightness(0.72); transition: filter .25s; 
 .oc-note b { font-weight: normal; color: #7f8cc0; }
 /* пока открыта анкета, гайд ждёт: появится, как только нажал «принять» */
 body.brief #guide { display: none; }
-#st-digest { font-size: clamp(8px, 1.3vw, 11px); color: #ffd85e; text-decoration: none; padding: 8px 4px; opacity: 0.9; }
-#st-digest:hover { opacity: 1; text-decoration: underline; text-underline-offset: 4px; }
 #st-lvl { font-size: clamp(7px, 1.1vw, 9px); color: #ffd85e; opacity: .85; margin-top: -4px; }
 
 /* ── Москва: коллекция слева в меню ── */

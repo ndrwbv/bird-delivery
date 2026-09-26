@@ -1689,7 +1689,7 @@ function spawnCrewMember (c, i) {
   const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.055, 0.2, 8), new THREE.MeshLambertMaterial({ color: 0xffffff }));
   cup.position.set(0, -0.56, 0.08);
   grp.userData.armR.add(cup);
-  const bat = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.95), new THREE.MeshLambertMaterial({ color: 0x8a6b4e }));
+  const bat = warStick(0x8a6b4e);
   bat.position.set(0, -0.56, 0.45); bat.visible = false;
   grp.userData.armR.add(bat);
   if (name) {
@@ -1733,7 +1733,7 @@ function warStart () {
   WAR.side2 = [];
   for (let i = 0; i < 6; i++) {
     const grp = makeHuman(null, { shirt: WAR.hex, pants: '#2f3540', fat: chance(0.2) });
-    const bat = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.95), new THREE.MeshLambertMaterial({ color: 0x5c4a3a }));
+    const bat = warStick(0x5c4a3a);
     bat.position.set(0, -0.56, 0.45);
     grp.userData.armR.add(bat);
     // выходят с той стороны, где их кофейня, — сразу к полю боя
@@ -7650,9 +7650,17 @@ function drawFullMap () {
   x.restore();
 }
 
+/* чем дерутся в кофейной войне: в мягком режиме (Яндекс) — подушками,
+   иначе битами. Подушка — белый пухлый брусок, не оружие */
+function warStick (hex) {
+  if (GORE_ON) return new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.95), new THREE.MeshLambertMaterial({ color: hex }));
+  return new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.16, 0.62), new THREE.MeshLambertMaterial({ color: 0xf4f1ea }));
+}
+
 function setFullMap (on) {
   FM.open = on;
   elFull.hidden = !on;
+  if (isPlaying() && !S.paused) { if (on) Platform.gameplayStop(); else Platform.gameplayStart(); }
   if (on) { for (const k in IN) IN[k] = 0; touches.clear(); Snd.engine(0); drawFullMap(); }
 }
 $('radar').addEventListener('click', () => setFullMap(true));
