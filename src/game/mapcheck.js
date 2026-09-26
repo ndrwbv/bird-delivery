@@ -497,6 +497,8 @@ function joinTarget (ctx, d) {
     if ((dx * ux + dz * uz) / l < 0.55) return null;
     for (let t = 0.2; t < 1; t += 0.2) if (ctx.inHouse(lerp(x, o.x, t), lerp(z, o.z, t))) return null;
   }
+  // перемычка не должна подныривать под настил моста
+  for (let t = 0; t <= 1.001; t += 0.25) if (ctx.deckAt(lerp(x, o.x, t), lerp(z, o.z, t), 1.5)) return null;
   return o;
 }
 
@@ -657,6 +659,7 @@ export function fixMap (city, TH, o = {}) {
   const t0 = now();
   const log = [];
   const note = (kind, x, z, msg) => log.push({ kind, x: r1(x), z: r1(z), msg });
+  const before = o.before ? checkMap(city, TH) : null;       // для отчёта ?mapcheck: как было
   let ctx = mapContext(city, TH);
 
   fixJoints(ctx, note);
@@ -666,6 +669,9 @@ export function fixMap (city, TH, o = {}) {
   fixTerrain(ctx, note);
   ctx = mapContext(city, TH);
   fixBridges(ctx, note);
+  // после обрезки мостов у набережных — ещё раз: к новым кускам тоже пришиваем
+  ctx = mapContext(city, TH, { fade: true });
+  fixJoints(ctx, note);
   ctx = mapContext(city, TH, { fade: true });
 
   // план тупиков: кто без ничего — тому блоки или ремонт
@@ -678,8 +684,20 @@ export function fixMap (city, TH, o = {}) {
   }
   // ремонт — не на каждом углу: самые длинные улицы, остальным — блоки
   plan.filter(p => p.kind === 'works').sort((a, b) => b.len - a.len).slice(MC.WORKS_MAX).forEach(p => { p.kind = 'blocks'; });
+  // клинья на стыках улиц разной ширины (кладёт mapworks.js)
+  const tapers = [];
+  for (const n of ctx.NODES.values()) {
+    if (n.nb.size !== 2 || n.at.length !== 2 || !ctx.inBounds(n.x, n.z, -20)) continue;
+    const [A, Bq] = n.at, ra = ctx.roads[A.ri], rb = ctx.roads[Bq.ri];
+    if (ra === rb || !drivable(ra) || !drivable(rb) || ra.b || rb.b) continue;
+    if (Math.abs(roadWidth(ra) - roadWidth(rb)) <= MC.WIDTH_JUMP) continue;
+    const [wide, wa, nar, na] = roadWidth(ra) > roadWidth(rb) ? [ra, A, rb, Bq] : [rb, Bq, ra, A];
+    const q = nar.p[na.i === 0 ? 1 : na.i - 1], l = Math.hypot(q[0] - n.x, q[1] - n.z) || 1;
+    if (l < 6) continue;
+    tapers.push({ x: n.x, z: n.z, vx: (q[0] - n.x) / l, vz: (q[1] - n.z) / l, w1: roadWidth(nar), w2: roadWidth(wide), c: wide.c, c1: nar.c });
+  }
   const ms = now() - t0;
-  return { log, deadEnds: plan, ms, ctx };
+  return { log, deadEnds: plan, tapers, before, ms, ctx };
 }
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
@@ -783,7 +801,9 @@ function fixTerrain (ctx, note) {
     for (let i = 1; i < r.p.length; i++) {
       const [x1, z1] = r.p[i - 1], [x2, z2] = r.p[i], L = Math.hypot(x2 - x1, z2 - z1) || 1;
       const nx = -(z2 - z1) / L, nz = (x2 - x1) / L;
-      for (let s = 0; s <= L; s += 2)
+      // на концах — ещё на пару метров вперёд: иначе сразу за тупиком обрыв в реку
+      const sa = i === 1 ? -5 : 0, sb = i === r.p.length - 1 ? L + 5 : L;
+      for (let s = sa; s <= sb; s += 2)
         for (let o = -hw; o <= hw + 0.01; o += hw / 2) {
           const x = lerp(x1, x2, s / L) + nx * o, z = lerp(z1, z2, s / L) + nz * o;
           if (ctx.groundH(x, z) >= 0.7) continue;
@@ -894,6 +914,10 @@ function fixBridges (ctx, note) {
     const slope = hard ? MC.BRIDGE_SLOPE_HARD : MC.BRIDGE_SLOPE;
     for (const c of cr) {
       const top = ctx.groundH(c.x, c.z) + c.need + 0.3;
+      // до такой высоты от концов не подняться — этот переезд разорвём (в),
+      // а мост зря не задираем
+      const reach = Math.min(base[0] + slope * Math.max(0, c.s - c.half), base[N] + slope * Math.max(0, L - c.s - c.half));
+      if (top - 0.5 > reach && (c.path || c.r.c >= 4)) continue;
       for (let k = 0; k <= N; k++) {
         const out = Math.max(0, Math.abs(S[k] - c.s) - c.half);
         need[k] = Math.max(need[k], top - out * slope * 0.8);

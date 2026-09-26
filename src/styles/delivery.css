@@ -859,3 +859,7 @@ html[lang="ja"] #game, html[lang="zh"] #game { font-weight: 700; letter-spacing:
 .lang-grid button { font: inherit; font-size: 10px; cursor: pointer; padding: 12px 8px; color: #fff3d6; background: #2a3766; border: 3px solid #33210c; border-radius: 6px; }
 .lang-grid button.cur { background: #f0522a; }
 .lang-grid button[lang="ja"], .lang-grid button[lang="zh"] { font-family: "Hiragino Sans", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; font-size: 13px; }
+/* играют на геймпаде — гайд про кнопки пада, а не клавиатуры */
+#guide .gd-pad { display: none; }
+body.pad #guide .gd-pad { display: flex; }
+body.pad #guide .gd-keys, body.pad #guide .gd-touch { display: none; }

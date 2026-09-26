@@ -19,10 +19,13 @@
 import * as THREE from '../vendor/three.module.min.js';
 import CITY_DATA from './city-data.js';
 import Platform from '../platform/index.js';
-import { t as $t, tn as $tn, translit, lang as curLang, LANGS, LANG_NAMES } from '../i18n/index.js';
+import { t as $t, tn as $tn, N_, translit, lang as curLang, LANGS, LANG_NAMES } from '../i18n/index.js';
 import { sanitizePois, OWN } from './brands.js';
+import { makePerson, createHumanFactory, faceDataURL } from './people.js';
 import { pollPad, applyToIN, rumble, pad as PAD } from '../input/gamepad.js';
 import { makePadMenu } from '../input/padmenu.js';
+import { fixMap, profileFn } from './mapcheck.js';
+import * as MAPW from './mapworks.js';
 
 /* Сохранения — через площадку (облако Яндекса / localStorage). Значения
    хранятся как есть: числа, строки, массивы. */
@@ -290,6 +293,12 @@ const TH = (() => {
     a[i] = ((bin.charCodeAt(i * 2) | (bin.charCodeAt(i * 2 + 1) << 8)) - 1000) / 10;
   return a;
 })();
+/* Проверка и починка карты (mapcheck.js): до всего, что строится из улиц и
+   рельефа, — сшить обрывы, выровнять рельеф под дорогами, поднять мосты
+   над улицами и решить, чем закрыть тупики. ?nomapfix — как в выгрузке,
+   ?mapcheck — сводка проблем в консоли и столбики над ними. */
+const MAPCHECK = new URLSearchParams(location.search).has('mapcheck');
+const MAPFIX = new URLSearchParams(location.search).has('nomapfix') ? null : fixMap(CITY, TH, { before: MAPCHECK });
 
 function groundH (x, z) {
   const u = (x - TX0) / TG, v = (z - TZ0) / TG;
@@ -323,7 +332,8 @@ for (const r of CITY.roads) {
   const L = acc[acc.length - 1] || 1;
   const h0 = groundH(p[0][0], p[0][1]), h1 = groundH(p[p.length - 1][0], p[p.length - 1][1]);
   const arch = L > 120 ? Math.min(6, L * 0.01) : 0;
-  const deck = s => lerp(h0, h1, s / L) + arch * Math.sin(Math.PI * clamp(s / L, 0, 1));
+  // r.dk — профиль от починки карты: настил поднят над улицами под мостом
+  const deck = r.dk ? profileFn(r.dk) : s => lerp(h0, h1, s / L) + arch * Math.sin(Math.PI * clamp(s / L, 0, 1));
   for (let i = 1; i < p.length; i++) {
     const x1 = p[i - 1][0], z1 = p[i - 1][1], x2 = p[i][0], z2 = p[i][1];
     // настил шире полотна: тротуары до самых перил
@@ -334,7 +344,8 @@ for (const r of CITY.roads) {
     });
   }
 }
-const deckAt = (b, t, x, z) => Math.max(b.deck(lerp(b.s1, b.s2, t)), groundH(x, z) + 0.2);
+// у самых концов запас над землёй сходит на нет: иначе на въезде на мост ступенька
+const deckAt = (b, t, x, z) => { const s = lerp(b.s1, b.s2, t); return Math.max(b.deck(s), groundH(x, z) + (MAPFIX ? Math.min(0.2, 0.04 * Math.min(s, b.L - s)) : 0.2)); };
 
 /* По чему едет колесо: настил моста или земля. Под мостом у берега
    земля и настил близко, поэтому на настил переходим, только если уже
@@ -1602,7 +1613,7 @@ function drinkitSignMat () {
   const x = c.getContext('2d');
   x.fillStyle = '#1a3fb8'; x.fillRect(0, 0, 256, 64);
   x.fillStyle = '#ffffff'; x.font = 'bold 40px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.fillText('Drinkit', 128, 34);
+  x.fillText(OWN.coffee(), 128, 34);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return new THREE.MeshBasicMaterial({ map: t });
@@ -1663,20 +1674,16 @@ function placeDrinkits () {
 }
 
 /* ── команда Drinkit у кофейни ── */
-/* id в ростере lab/faces (оттуда лицо) и имя для таблички: подписываем
-   по имени, не по фамилии. Русева в ростере нет — ни фото, ни имени, —
-   поэтому пока без таблички и с лицом без фото */
-const CREW_IDS = [['a-golubev', 'Алексей'], [null, ''], ['n-laptev', 'Никита'], ['k-grishin', 'Кирилл'], ['v-kalinin', 'Виталий'], ['mariya-kalinina', 'Мария']];
+/* шестеро выдуманных бариста — одни и те же на всю смену (заводим при
+   первой встрече, когда язык игры уже выбран); на табличке — имя */
+const CREW_N = 6;
+let CREW_PEOPLE = null;
 const CREW = [];                                      // { grp, person, name, x, z, hx, hz, dead, deadT, mode, ... }
 let crewAt = null;
-function crewPerson (id, name) {
-  const p = id && ROSTER.find(q => q.id === id);
-  return p ? Object.assign({}, p, { short: name }) : { name: name || 'бариста Drinkit', short: name, acc: name };
-}
 function spawnCrewMember (c, i) {
-  const [id, name] = CREW_IDS[i];
-  const person = crewPerson(id, name);
-  const grp = makeHuman(person.img ? person : null, { shirt: DK_BLUE, pants: '#1b2a6b', fat: false, fem: person.img ? undefined : false });
+  if (!CREW_PEOPLE) CREW_PEOPLE = Array.from({ length: CREW_N }, () => makePerson());
+  const person = CREW_PEOPLE[i], name = person.first;
+  const grp = makeHuman(person, { shirt: DK_BLUE, pants: '#1b2a6b', fat: false });
   // стаканчик Drinkit в руке — белый с синей полосой
   const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.055, 0.2, 8), new THREE.MeshLambertMaterial({ color: 0xffffff }));
   cup.position.set(0, -0.56, 0.08);
@@ -1689,7 +1696,7 @@ function spawnCrewMember (c, i) {
     tag.scale.set(2.2, 0.55, 1); tag.position.set(0, 2.35, 0);
     grp.add(tag);
   }
-  const a = i / CREW_IDS.length * Math.PI * 1.4 - 0.7;
+  const a = i / CREW_N * Math.PI * 1.4 - 0.7;
   const hx = c.x + c.nx * (2.2 + Math.cos(a) * 1.6) + c.nz * Math.sin(a) * 2.4, hz = c.z + c.nz * (2.2 + Math.cos(a) * 1.6) - c.nx * Math.sin(a) * 2.4;
   grp.position.set(hx, groundH(hx, hz), hz);
   scene.add(grp);
@@ -1819,7 +1826,7 @@ function updateDrinkit (dt) {
   if (!WAR.on && nd < 170 && crewAt !== near) {
     dropCrew();
     crewAt = near;
-    for (let i = 0; i < CREW_IDS.length; i++) CREW.push(spawnCrewMember(near, i));
+    for (let i = 0; i < CREW_N; i++) CREW.push(spawnCrewMember(near, i));
   } else if (!WAR.on && nd > 240 && crewAt) dropCrew();
   if (!crewAt) return;
   const dV = Math.hypot(crewAt.x - V.x, crewAt.z - V.z);
@@ -1882,12 +1889,12 @@ function updateDrinkit (dt) {
   }
 }
 
-/* ─── бонус: Фёдор Овчинников на сёрфе ───
-   Изредка приходит заказ от Фёдора Овчинникова: он катается на сёрфе по
-   Москве-реке. Подъезжаешь к набережной, притормаживаешь — и коробка
-   летит прямо ему на доску. Плата вдвое. */
-const SURF = { f: null };
-function fyodorPlan () {
+/* ─── бонус: сёрфер на Москве-реке ───
+   Изредка приходит заказ от сёрфера: он катается на доске по реке.
+   Подъезжаешь к набережной, притормаживаешь — и коробка летит прямо ему
+   на доску. Плата вдвое. Сёрфер один и тот же на всю смену — завсегдатай. */
+const SURF = { f: null, person: null };
+function surfPlan () {
   if (SURF.f || INTRO) return null;
   // берег на нашей стороне: от середины реки к курьеру, до первой суши
   const side = V.x > riverX(V.z) ? 1 : -1;
@@ -1903,9 +1910,8 @@ function fyodorPlan () {
     if (d < 150 || d > 750) continue;
     const sx = x - side * 11;                          // на воде в одиннадцати метрах от берега
     if (groundH(sx, z) > -0.3) continue;
-    const person = Object.assign({}, ROSTER.find(q => q.id === 'fyodor-ovchinnikov') || {}, { name: 'Фёдор Овчинников', acc: 'Фёдора Овчинникова' });
-    if (!person.img) person.img = 'avatars/fyodor-ovchinnikov.jpg';
-    const grp = makeHuman(person, { fat: false, fem: false, shirt: '#ffd23f', pants: '#1f7a8a' });
+    const person = SURF.person || (SURF.person = makePerson({ fat: false }));
+    const grp = makeHuman(person, { fat: false, shirt: '#ffd23f', pants: '#1f7a8a' });
     const board = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.08, 2.3), new THREE.MeshLambertMaterial({ color: 0xf0522a }));
     board.position.y = -0.04;
     grp.add(board);
@@ -1913,7 +1919,7 @@ function fyodorPlan () {
     scene.add(grp);
     const f = { grp, person, x: sx, z, z0: z, bx: x, side, ph: 0, dead: 0, surf: 1, served: 0, freeT: 0, t: 0 };
     SURF.f = f;
-    return { kind: 'solo', surf: true, stops: [{ peds: [f], reach: 26, surf: true }], why: 'бонус: Фёдор Овчинников катается на сёрфе по Москве-реке — подъедь к набережной и притормози, пицца долетит прямо на доску' };
+    return { kind: 'solo', surf: true, stops: [{ peds: [f], reach: 26, surf: true }], why: $t('бонус: {name} катается на сёрфе по Москве-реке — подъедь к набережной и притормози, пицца долетит прямо на доску', { name: person.name }) };
   }
   return null;
 }
@@ -1932,7 +1938,7 @@ function updateSurf (dt) {
   if (f.served) {
     if ((f.freeT -= dt) <= 0) { dropMesh(f.grp); SURF.f = null; }
   } else if (!S.order || !S.order.stops.some(st => st.peds.includes(f))) {
-    // заказ отменился (смена кончилась) — Фёдор уплывает
+    // заказ отменился (смена кончилась) — сёрфер уплывает
     if (f.t > 3) { dropMesh(f.grp); SURF.f = null; }
   }
 }
@@ -3080,6 +3086,18 @@ function pizzaSpot () {
   return { x: p.p[0], z: p.p[1], ry: road ? Math.atan2(p.p[0] - road.x, p.p[1] - road.z) : 0, road };
 }
 
+/* что нужно mapworks.js (тупики, ремонт, ?mapcheck) из игры: сам он переменных
+   этого модуля не видит. Списки — геттерами: часть объявлена ниже по файлу */
+SM_WORD.cone = $t('конус');
+const mapApi = () => ({
+  THREE, scene, cam, V, S, CITY, TH, LIT, LITM, FLAT, box, put, mergeGeos, obb, smashAdd, makeHuman, gibHuman, toast,
+  groundH, surfaceAt, curbAt, inHouse, nearestRoad, ROAD_HEX, RAISED, SOLIDS, BRIDGES,
+  onRunOver: () => { S.people++; toast($t('минус дорожник')); },
+  get TRAFFIC () { return TRAFFIC; }, get PEOPLE () { return PEOPLE; }, get PEDS () { return PEDS; }, get SCOOTS () { return SCOOTS; },
+  get CROWDS () { return CROWDS; }, get DRIVERS () { return DRIVERS; }, get SMOKERS () { return SMOKERS; },
+});
+let MAPW_API = null;
+
 /* ─── сборка города ─── */
 const BUILD_T = {};                               // сколько собирался каждый кусок — для отладки
 function buildCity () {
@@ -3092,6 +3110,7 @@ function buildCity () {
   tm0('marks', osmMarkings);
   tm0('bridges', osmBridges);
   tm0('edge', osmEdgeBlocks);
+  if (MAPFIX) tm0('mapworks', () => { MAPW.fixCurbs(mapApi()); MAPW.buildWorks(MAPFIX, mapApi()); });   // тупики: блоки и ремонт
   { const t0 = performance.now(); osmBuildings(spot); BUILD_T.houses = Math.round(performance.now() - t0); }
   if (house) dodoFacade(house);
   else buildPizzeria(spot.x, spot.z, spot.ry);
@@ -3916,7 +3935,8 @@ function updateGibs (dt) {
    слева), следующий узел c и отрезок от угла до угла: углы — точки,
    где сходятся линии тротуаров двух улиц. */
 
-const walkable = e => !!e && e.c <= 5;
+// по мостам не гуляют: высоту людям берём с земли, и на мосту они шли бы по дну реки
+const walkable = e => !!e && e.c <= 5 && !(MAPFIX && e.road.b);
 const walkOff = (e, bike) => e.w / 2 + (bike ? 0.9 : 1.5);
 
 function walkNext (a, b, side) {
@@ -4144,33 +4164,16 @@ function updatePeds (dt) {
    Обычные люди рядом с бургерами: ходят теми же кольцами,
    от наезда улетают, и после них на асфальте остаётся пятно. */
 
-/* Люди на улицах — настоящие коллеги: ростер и аватарки берём
-   из соседней заготовки lab/faces, чтобы не держать семь мегабайт дважды.
-   Текстуры грузятся по требованию и кешируются. */
-const ROSTER = (window.FACES_ROSTER && window.FACES_ROSTER.people) || [];
-const texCache = new Map();
-const texLoader = new THREE.TextureLoader();
-
-function avatarTex (img) {
-  if (texCache.has(img)) return texCache.get(img);
-  const t = texLoader.load('../faces/' + img);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.magFilter = THREE.NearestFilter;
-  texCache.set(img, t);
-  return t;
-}
-
+/* Люди на улицах — выдуманные: имя, должность и внешность собирает
+   people.js из зерна (раньше тут ходили настоящие коллеги с фотографиями).
+   Внешность та же и в карточке заказа (faceDataURL), и на улице. */
 const PEOPLE = [];
 const GRACE = 18;        // столько ещё терпят после срока, потом смена кончена
-const SHIRTS = ['#d95d5d', '#4f7fd6', '#59b06a', '#e0b13f', '#8e6fd0', '#e08a4f', '#3fa8a0'];
-const SKIN = ['#f0c8a0', '#d9a878', '#a8764e', '#7a5436'];
 
-/* Люди разные: мужчины и женщины (у коллег пол из ростера, у
-   случайных — жребий), высокие и низкие, худые и толстые. Толстые и
-   низкие ходят медленнее — pace, множитель к скорости шага. У женщин
-   волосы до плеч и часто юбка. Туловище с юбкой — один меш, волосы —
-   один меш на голове: людей на улице полсотни, лишние вызовы ни к чему. */
-const HAIR = ['#2a1d16', '#5a3a22', '#c9a063', '#8a3b22', '#1a1a1a', '#b8b2aa'];
+/* Люди разные: мужчины и женщины, высокие и низкие, худые и толстые,
+   причёски, бороды, кепки, очки, лица. Толстые и низкие ходят медленнее —
+   pace, множитель к скорости шага. Руки, ноги, туловище и всё на голове —
+   по мешу с общим материалом: людей на улице полсотни, лишние вызовы ни к чему. */
 const HUMAN_VC = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
 /* Убрать человека (или любую группу) насовсем — и освободить память
    видеокарты. Раньше каждый сбитый, ушедший или сменившийся человек
@@ -4185,78 +4188,15 @@ function dropMesh (g) {
     if (o.isSprite) { o.material.dispose(); return; }
     if (!o.isMesh) return;
     o.geometry.dispose();
-    for (const m of [].concat(o.material)) if (m !== HUMAN_VC && m !== SMASH_MAT && m !== BURGER_MAT && m !== GLASS_MAT) m.dispose();
+    for (const m of [].concat(o.material)) if (m !== HUMAN_VC && m !== SMASH_MAT && m !== BURGER_MAT && m !== GLASS_MAT && !m.userData.keep) m.dispose();   // keep — общие текстуры лиц
   });
 }
+/* makeHuman(person, o): o — { fem, fat, h, skin, shirt, pants, cap, face: false }.
+   Фабрику заводим при первом вызове: HUMANS объявлен ниже. */
+let humanFactory = null;
 function makeHuman (person, o = {}) {
-  const g = new THREE.Group();
-  const mat = hex => new THREE.MeshLambertMaterial({ color: hex, flatShading: true });
-  const fem = o.fem !== undefined ? o.fem : person ? !!person.f : chance(0.5);
-  const fat = o.fat !== undefined ? o.fat : chance(0.18);
-  const hs = o.h || (fat ? rand(0.86, 1.0) : rand(0.86, 1.1)) * (fem ? 0.95 : 1);
-  const ws = fat ? rand(1.35, 1.6) : rand(0.92, 1.08);
-  const skin = o.skin || pick(SKIN), shirt = o.shirt || pick(SHIRTS);
-  const pants = o.pants || pick(['#39405c', '#2f3540', '#5a4a3a', '#46506b']);
-  const skirt = fem && !o.pants && chance(0.55);
-  const add = (w, h, d, hex, x, y, z) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(hex));
-    m.position.set(x, y, z); g.add(m); return m;
-  };
-  const lw = fat ? 0.2 : 0.16, lx = fat ? 0.15 : 0.12;
-  const legL = add(lw, 0.7, lw, skirt ? '#2b2a30' : pants, -lx, 0.35, 0);
-  const legR = add(lw, 0.7, lw, skirt ? '#2b2a30' : pants, lx, 0.35, 0);
-  legL.geometry.translate(0, -0.35, 0); legL.position.y = 0.7;
-  legR.geometry.translate(0, -0.35, 0); legR.position.y = 0.7;
-  const body = [];
-  const tw = 0.44 * ws, td = 0.26 * (fat ? ws * 1.15 : 1);
-  box(body, tw, 0.6, td, shirt, 0, 1.0, 0);
-  if (fat) box(body, tw * 0.86, 0.3, td + 0.12, shirt, 0, 0.9, 0.03);        // живот
-  if (skirt) put(body, new THREE.CylinderGeometry(tw * 0.55, tw * 0.78, 0.4, 4), pick(['#6b2e4a', '#2f3540', '#8a6b3a', '#3b5a8a']), 0, 0.6, 0, 0, Math.PI / 4);
-  const bodyM = new THREE.Mesh(mergeGeos(body), HUMAN_VC);
-  g.add(bodyM);
-  const ax = tw / 2 + 0.07;
-  const armL = add(0.13, 0.55, 0.13, shirt, -ax, 1.03, 0);
-  const armR = add(0.13, 0.55, 0.13, shirt, ax, 1.03, 0);
-  armL.geometry.translate(0, -0.27, 0); armL.position.y = 1.3;
-  armR.geometry.translate(0, -0.27, 0); armR.position.y = 1.3;
-  // голова: на передней грани лицо коллеги, остальные грани — кожа
-  const skinM = mat(skin);
-  const face = person ? new THREE.MeshLambertMaterial({ map: avatarTex(person.img) }) : skinM;
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.56, 0.3),
-    [skinM, skinM, skinM, skinM, face, skinM]);
-  head.position.set(0, 1.58, 0);
-  g.add(head);
-  // волосы: у женщин макушка и длинные сзади, у половины мужчин — ёжик
-  if (!o.cap && (fem || chance(0.5))) {
-    const hc = pick(HAIR), hair = [];
-    box(hair, 0.58, 0.12, 0.34, hc, 0, 0.32, -0.01);
-    if (fem) { box(hair, 0.58, 0.62, 0.1, hc, 0, 0.02, -0.19); for (const sx of [-1, 1]) box(hair, 0.06, 0.5, 0.3, hc, sx * 0.29, 0.06, -0.02); }
-    head.add(new THREE.Mesh(mergeGeos(hair), HUMAN_VC));
-  }
-  if (o.cap) {
-    const cap = [];
-    box(cap, 0.58, 0.14, 0.36, o.cap, 0, 0.34, 0);
-    box(cap, 0.5, 0.04, 0.2, o.cap, 0, 0.28, 0.25);
-    head.add(new THREE.Mesh(mergeGeos(cap), HUMAN_VC));
-  }
-  g.scale.setScalar(hs);
-  const pace = fat ? rand(0.5, 0.62) : hs < 0.92 ? 0.82 : 1;
-  // дальний вариант: весь человек одним мешем, без рук-ног по отдельности
-  // (дальше сорока пяти метров их движения при крупном пикселе не видно)
-  const lp = [];
-  const lc = skirt ? '#2b2a30' : pants;
-  box(lp, lw, 0.7, lw, lc, -lx, 0.35, 0); box(lp, lw, 0.7, lw, lc, lx, 0.35, 0);
-  box(lp, tw, 0.6, td, shirt, 0, 1.0, 0);
-  if (fat) box(lp, tw * 0.86, 0.3, td + 0.12, shirt, 0, 0.9, 0.03);
-  box(lp, 0.13, 0.55, 0.13, shirt, -ax, 1.03, 0); box(lp, 0.13, 0.55, 0.13, shirt, ax, 1.03, 0);
-  box(lp, 0.54, 0.56, 0.3, skin, 0, 1.58, 0);
-  const lod = new THREE.Mesh(mergeGeos(lp), HUMAN_VC);
-  lod.visible = false;
-  g.add(lod);
-  g.userData = { legL, legR, armL, armR, head, colors: { skin, shirt, pants }, person, fem, fat, pace,
-    lod, parts: [legL, legR, bodyM, armL, armR, head], far: false };
-  HUMANS.add(g);
-  return g;
+  if (!humanFactory) humanFactory = createHumanFactory({ THREE, HUMAN_VC, HUMANS });
+  return humanFactory(person, o);
 }
 /* все люди — для переключения ближний/дальний вариант (humanLod) */
 const HUMANS = new Set();
@@ -4275,18 +4215,8 @@ function humanLod () {
   }
 }
 
-let rosterBag = [];
-function nextPerson () {
-  if (!ROSTER.length) return null;
-  if (!rosterBag.length) {
-    rosterBag = ROSTER.filter(p => !SMOKE_IDS.includes(p.id));
-    for (let i = rosterBag.length - 1; i > 0; i--) {
-      const j = (Math.random() * (i + 1)) | 0;
-      [rosterBag[i], rosterBag[j]] = [rosterBag[j], rosterBag[i]];
-    }
-  }
-  return rosterBag.pop();
-}
+/* очередной клиент или прохожий — всегда новый выдуманный человек */
+function nextPerson () { return makePerson(); }
 
 function initPeople () {
   for (let k = 0; k < (INTRO ? 18 : 44); k++) {
@@ -4460,7 +4390,7 @@ function releaseIdle (p) {
 }
 
 function makeGuest (p, at) {
-  if (p.surf) { p.guest = true; return; }          // Фёдор на сёрфе — своим ходом (updateSurf)
+  if (p.surf) { p.guest = true; return; }          // сёрфер на реке — своим ходом (updateSurf)
   p.guest = true;
   p.sitting = 0;
   p.sitAt = null;
@@ -4583,7 +4513,7 @@ function updatePeople (dt) {
     if (p.dead) {
       if ((p.deadT -= dt) <= 0) {
         p.dead = 0; p.fly = null;
-        dropMesh(p.grp);                      // возвращается уже другим коллегой
+        dropMesh(p.grp);                      // возвращается уже другим человеком
         p.person = nextPerson();
         p.grp = makeHuman(p.person);
         p.speed = p.base * p.grp.userData.pace;
@@ -5345,12 +5275,13 @@ function updateTraffic (dt) {
    на месте встаёт другой: курилка не пустеет. */
 const SMOKERS = [];
 let SMOKE_SPOT = null;
-/* завсегдатаи курилки: всегда тут и всегда рядом друг с другом */
-const SMOKE_IDS = ['j-serova', 'a-boev'];
-const SMOKE_REGULARS = SMOKE_IDS.map(id => ROSTER.find(p => p.id === id)).filter(Boolean);
+/* завсегдатаи курилки: всегда тут и всегда рядом друг с другом —
+   двое выдуманных, одни и те же на всю смену */
+let SMOKE_REGULARS = null;
 
 function initSmokers () {
   if (!SMOKE_SPOT) return;
+  if (!SMOKE_REGULARS) SMOKE_REGULARS = [makePerson(), makePerson()];
   const { x, z } = SMOKE_SPOT;
   for (let i = 0; i < 5; i++) {
     const a = i / 5 * Math.PI * 2 + 0.4;
@@ -5914,23 +5845,25 @@ function updateAmb (dt) {
 }
 
 /* ─────────────── другие курьеры на смене ───────────────
-   Ты на смене не один: из той же пиццерии возят Ерлан, Чумабой,
-   Дилдобек и Жанна. Каждый по кругу берёт заказ, едет по улицам к
-   гостю, пару секунд отдаёт коробку и возвращается. Стиль вождения у
-   всех свой: Ерлан гонит и людей не видит, Чумабой лихачит в поворотах,
-   Дилдобек едет аккуратно и пропускает всех, а Жанна агрессивная:
-   увидела тебя впереди — идёт на таран и бодает.
+   Ты на смене не один: из той же пиццерии возят ещё четверо, имена им
+   раздаёт генератор людей при старте смены. Каждый по кругу берёт заказ,
+   едет по улицам к гостю, пару секунд отдаёт коробку и возвращается.
+   Стиль вождения у всех свой: первый гонит и людей не видит, второй
+   лихачит в поворотах, третий едет аккуратно и пропускает всех, а
+   четвёртая агрессивная: увидела тебя впереди — идёт на таран и бодает.
    Заработок копится, как у тебя, — сбоку висит рейтинг смены. Их можно
    таранить, взрывать и злить, как любые машины. */
 const RIVAL_SPEC = [
   // обычный трафик едет 9–14 м/с, такси до 17: курьеры — заметно злее
   // и людей не пропускает никто: кто не отскочил — тот под колёсами
-  { name: 'Ерлан', hex: '#2f8f5b', model: 'sedan', cruise: 29, corner: 0.85, acc: 9, gap: 0.2, peds: false, tip: 1.0, aggr: 1 },
-  { name: 'Чумабой', hex: '#8e5bd8', model: 'hatch', cruise: 27, corner: 0.8, acc: 8.5, gap: 0.3, peds: false, tip: 1.0, aggr: 1 },
-  { name: 'Дилдобек', hex: '#3f7fd6', model: 'suv', cruise: 23, corner: 0.65, acc: 6.5, gap: 0.6, peds: false, tip: 1.25, aggr: 0.8 },
-  { name: 'Жанна', hex: '#d9537a', model: 'smart', cruise: 28, corner: 0.85, acc: 9, gap: 0.2, peds: false, tip: 1.1, ram: true, aggr: 1 },
+  { hex: '#2f8f5b', model: 'sedan', cruise: 29, corner: 0.85, acc: 9, gap: 0.2, peds: false, tip: 1.0, aggr: 1 },
+  { hex: '#8e5bd8', model: 'hatch', cruise: 27, corner: 0.8, acc: 8.5, gap: 0.3, peds: false, tip: 1.0, aggr: 1 },
+  { hex: '#3f7fd6', model: 'suv', cruise: 23, corner: 0.65, acc: 6.5, gap: 0.6, peds: false, tip: 1.25, aggr: 0.8 },
+  { hex: '#d9537a', model: 'smart', cruise: 28, corner: 0.85, acc: 9, gap: 0.2, peds: false, tip: 1.1, ram: true, aggr: 1 },
 ];
 const RIVALS = [];
+/* имя той, что бодается (ram) — для реплик */
+const ramName = () => { const R = RIVALS.find(q => q.spec.ram); return R ? R.name : ''; };
 
 function nameTex (text, hex) {
   const c = document.createElement('canvas');
@@ -6003,7 +5936,8 @@ function initRivals () {
   clearRivals();
   restSlots();
   RIVAL_SPEC.forEach((spec, i) => {
-    const R = { spec, name: spec.name, money: 0, done: 0, t: null, tagTex: nameTex(spec.name, spec.hex), back: 0, slot: i };
+    const person = makePerson({ fem: !!spec.ram });        // бодается она — реплики в женском роде
+    const R = { spec, person, name: person.first, money: 0, done: 0, t: null, tagTex: nameTex(person.first, spec.hex), back: 0, slot: i };
     RIVALS.push(R);
     rivalSpawn(R, 6 + i * 3.5);                       // первыми трогаются передние, пока ты грузишься
   });
@@ -6072,7 +6006,7 @@ function guestTick (R, dt) {
     gibHuman(q, V.vx, V.vz);
     S.people++;
     Snd.squish();
-    toast('минус клиент ' + ({ 'Ерлан': 'Ерлана', 'Чумабой': 'Чумабоя', 'Дилдобек': 'Дилдобека', 'Жанна': 'Жанны' }[R.name] || R.name));
+    toast($t('минус клиент {who}', { who: R.person ? R.person.firstGen : R.name }));
     R.guest = null;
     R.lost = 1;
   }
@@ -6123,14 +6057,14 @@ function updateRivals (dt) {
     } else if (R.state === 'home') {
       if (t.arrived && t.speed < 0.6) { R.state = 'wait'; R.wait = rand(1.5, 3.5); }
     }
-    // Жанна бодается: ты впереди, близко и почти по курсу — таран
+    // четвёртая бодается: ты впереди, близко и почти по курсу — таран
     if (R.spec.ram && (R.state === 'go' || R.state === 'home') && !S.ride) {
       t.ramCd -= dt;
       const dx = V.x - t.x, dz = V.z - t.z, dV = Math.hypot(dx, dz);
       const off = Math.abs(Math.atan2(Math.sin(Math.atan2(dx, dz) - t.h), Math.cos(Math.atan2(dx, dz) - t.h)));
       if (t.ramCd <= 0 && !t.ramT && dV > 6 && dV < 28 && off < 0.8 && ['drive', 'back', 'side'].includes(S.state) && chance(dt * 1.5)) {
         t.ramT = 2.6; t.ramCd = rand(14, 24);
-        toast(pick(['Жанна идёт на таран!', 'Жанна: «с дороги!»', 'Жанна бодается']));
+        toast(pick([$t('{name} идёт на таран!', { name: R.name }), $t('{name}: «с дороги!»', { name: R.name }), $t('{name} бодается', { name: R.name })]));
         Snd.blip(330, 0.25, 'sawtooth', 0.1);
       }
     }
@@ -6199,7 +6133,7 @@ function rivalsStep (dt) {
   const rows = rivalBoard(), place = rows.findIndex(r => r.me) + 1;
   elRivals.innerHTML = rows.map((r, i) => '<li' + (r.me ? ' class="me"' : r.out ? ' class="out"' : '') + '><em>' + (i + 1) + '</em>' +
     (r.hex ? '<i style="background:' + r.hex + '"></i>' : '<i class="you"></i>') + '<b>' + (r.out ? '<s>' + r.n + '</s> <small>' + r.out + 'с</small>' : r.n) + '</b><span>' + r.m + ' ₽</span></li>').join('');
-  if (lastPlace && place < lastPlace) toast('ты обогнал ' + ({ 'Ерлан': 'Ерлана', 'Чумабой': 'Чумабоя', 'Дилдобек': 'Дилдобека', 'Жанна': 'Жанну' }[rows[place].n] || rows[place].n) + '!');
+  if (lastPlace && place < lastPlace) { const R = RIVALS.find(q => q.name === rows[place].n); toast($t('ты обогнал {who}!', { who: R && R.person ? R.person.firstAcc : rows[place].n })); }
   lastPlace = place;
 }
 
@@ -6353,7 +6287,7 @@ function sayBubble (grp, text, col, y = 2.7) {
 }
 function setSay (b, text, col) { b.material.map = lineTex(text, col); b.material.needsUpdate = true; }
 function spawnThief () {
-  const grp = makeHuman(null, { shirt: '#1b1a1f', pants: '#1b1a1f', cap: '#1b1a1f', fat: false, fem: false });
+  const grp = makeHuman(null, { shirt: '#1b1a1f', pants: '#1b1a1f', cap: '#1b1a1f', fat: false, fem: false, face: false });   // в маске — без лица
   const u = grp.userData;
   for (const m of [].concat(u.head.material)) if (!m.map) m.color.set('#2b2a30');
   const eyes = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.08, 0.02), new THREE.MeshBasicMaterial({ color: 0xfff3d6 }));
@@ -6599,7 +6533,7 @@ function takePickup (n) {
   if (n.kind === 'nos') {
     NOS.tank = Math.min(1, NOS.tank + NOS_CAN);
     Snd.nosPick();
-    toast(NOS.tank >= 1 ? $t('кофе Drinkit: полный бак · shift') : $t('кофе Drinkit + · shift'));
+    toast(NOS.tank >= 1 ? $t('кофе «Синего кита»: полный бак · {key}', { key: nitroKey() }) : $t('кофе «Синего кита» + · {key}', { key: nitroKey() }));
   } else if (n.kind === 'shield') {
     FXS.shieldT = 10;
     Snd.nosPick();
@@ -6612,7 +6546,7 @@ function takePickup (n) {
   } else {
     FXS.beastT = 15;
     Snd.nosFire();
-    toast($t('бист-мод: shift — вдвое быстрее, пятнадцать секунд'));
+    toast($t('бист-мод: {key} — вдвое быстрее, пятнадцать секунд', { key: nitroKey() }));
   }
 }
 
@@ -6923,8 +6857,13 @@ function closePanel () { elPanel.hidden = true; }
 const AD_EVERY = 3;
 const EXT = { paused: false };                     // пауза от площадки: реклама, свернули вкладку
 const isPlaying = () => ['drive', 'back', 'handover', 'side', 'loading', 'brief'].includes(S.state);
-const adDue = () => Platform.features.ads && !S.ride && (S.done || 0) > 0 && (S.done || 0) - (S.adDone || 0) >= AD_EVERY;
+/* плюс не чаще раза в три минуты своей игры: заказ — короткий «уровень»,
+   рекламу между заказами площадка терпит, но не каждые полторы минуты */
+const AD_GAP = 180000;
+let adLast = performance.now();
+const adDue = () => Platform.features.ads && !S.ride && (S.done || 0) > 0 && (S.done || 0) - (S.adDone || 0) >= AD_EVERY && performance.now() - adLast > AD_GAP;
 async function showAd () {
+  adLast = performance.now();
   Platform.gameplayStop();
   try { await Platform.showInterstitial(); } catch (e) { console.warn('[ad]', e); }
 }
@@ -7026,6 +6965,7 @@ function renderShop () {
         addWallet(-c.price);
         Store.set('dlv-msk-cars', owned().concat(c.id));
         Store.set('dlv-msk-car', c.id);
+        Platform.store.flush && Platform.store.flush();   // покупка — сохранить сразу
         resetCar();
         Snd.coin();
         renderShop();
@@ -7235,7 +7175,7 @@ function driveStep (dt) {
     Snd.spark();
     // Курьер-соперник, который сам налетел на тебя (на обгоне, из-за
     // спины), — не авария: мягко расталкиваемся, без урона и без злого
-    // водителя. Бьёт только таран Жанны, а злится — только если въехал ты.
+    // водителя. Бьёт только таран бодливой курьерши, а злится — только если въехал ты.
     const mine = -(V.vx * nx + V.vz * nz), theirs = tvx * nx + tvz * nz;
     const graze = t.svc === 'rival' && !(t.ramT > 0) && (hit < 20 || theirs > mine);
     if (graze) { t.passT = Math.max(t.passT || 0, 1.5); t.x -= nx * 0.4; t.z -= nz * 0.4; }
@@ -7250,7 +7190,7 @@ function driveStep (dt) {
         V.vx += nx * hit * 0.7; V.vz += nz * hit * 0.7;
         S.shake = Math.max(S.shake, 0.6);
         t.ramT = 0; t.repath = 1;
-        toast(pick([$t('Жанна боднула!'), $t('бодание засчитано'), $t('Жанна: «не благодари»')]));
+        toast(pick([$t('{name} боднула!', { name: ramName() }), $t('бодание засчитано'), $t('{name}: «не благодари»', { name: ramName() })]));
       } else if (!t.parked && hit > 6 && !t.driver) t.angry = 1;     // приземлится — выйдет разбираться
       hurtCar((hit - 5) * 0.14, hit, hx, hz);
       t.hitT = 0.5;
@@ -7699,6 +7639,7 @@ function drawFullMap () {
     x.beginPath(); x.arc(fmX(S.target.x), fmZ(S.target.z), 7 * s, 0, Math.PI * 2); x.fill();
     x.lineWidth = 2; x.strokeStyle = '#fff'; x.stroke();
   }
+  if (MAPW.MAP_DOTS.length) MAPW.drawMapDots(x, fmX, fmZ, s);      // ?mapcheck: проблемы карты
   // ты — стрелка по курсу
   x.save(); x.translate(fmX(V.x), fmZ(V.z)); x.rotate(-V.h + Math.PI);
   x.beginPath(); x.moveTo(0, -11 * s); x.lineTo(8 * s, 9 * s); x.lineTo(0, 4 * s); x.lineTo(-8 * s, 9 * s); x.closePath();
@@ -7859,7 +7800,7 @@ function showBig (title, sub, keys, go) {
   syncGo();
   closePanel();
   const xp = getXP(), l = levelOf(xp);
-  $('st-lvl').textContent = $t('уровень курьера {n}', { n: l }) + ' · ' + (l < 5 ? $tn(LVL_AT[l + 1] - xp, $t('до следующего {n} заказ|до следующего {n} заказа|до следующего {n} заказов')) : $t('максимальный'));
+  $('st-lvl').textContent = $t('уровень курьера {n}', { n: l }) + ' · ' + (l < 5 ? $tn(LVL_AT[l + 1] - xp, 'до следующего {n} заказ|до следующего {n} заказа|до следующего {n} заказов') : $t('максимальный'));
 }
 
 /* Имя — сразу на заставке: большое поле и «поехали», которая оживает,
@@ -7878,14 +7819,20 @@ $('start').addEventListener('submit', e => {
   S.name = Platform.features.nameInput ? elName.value.trim() : (Platform.player.name || '');
   elName.blur();
   Snd.boot(); Snd.resume();
-  startRun();
+  goRun();
 });
+/* «ещё раз» после смены — естественная пауза: здесь реклама (если пора) */
+function goRun () {
+  if (S.state === 'over' && Platform.features.ads && (S.delivered || 0) > 0) { S.state = 'title'; showAd().then(() => startRun()); }
+  else startRun();
+}
 const hideBig = () => { elBig.hidden = true; };
 const hideOver = hideBig;
 
 /* ── конец смены: за что закончилась, сколько заработал и где ты в общем зачёте ── */
 function showOver (why, victims) {
   const title = $t(OVER_TITLE[why] || why);
+  Platform.store.flush && Platform.store.flush();       // итоги смены — в облако сразу
   if (S.money > S.best) { S.best = S.money; Store.set('dlv-msk-best', String(S.money)); }
   const vic = victims.length
     ? '<span class="ov-vic">' + $t(GORE_ON ? $t('вместо пиццы ты задавил {who}') : $t('вместо пиццы ты сбил {who}'), { who: victims.map(accName).join(', ') }) + '</span><br>'
@@ -8052,7 +7999,7 @@ function setGate (fromX, fromZ, toX, toZ) {
    они ничего не объясняют, но их зачем-то пишут. */
 
 const COURIER_NOTES = [
-  $t('встречает в одних трусах'),
+  $t('встречает в пижаме с динозаврами'),
   $t('у него три пальца'),
   $t('не смотри в глаза собаке'),
   $t('звонить два раза, третий не работает'),
@@ -8078,21 +8025,21 @@ const COURIER_NOTES = [
   $t('не наступай на его самокат'),
   $t('оставить у двери, но не у этой'),
   $t('он в наушниках, махать руками'),
-  $t('пароль от домофона — «эджайл»'),
-  $t('встретит в худи с логотипом'),
-  $t('может быть в переговорке «Москва»'),
+  $t('пароль от домофона — «пицца123»'),
+  $t('встретит в худи с котиком'),
+  $t('может быть на балконе, машет рукой'),
   $t('заказал на всех, но съест сам'),
   $t('сдачу не надо, ему нужен фидбек'),
-  $t('разбудить, он после релиза'),
+  $t('разбудить, он после ночной смены'),
   $t('просил без ананасов, но с ананасами'),
   $t('поднимется, только если пицца горячая'),
   $t('передать лично в руки, руки две'),
   $t('стоит на парковке и делает вид, что не ждёт'),
-  $t('подтвердит получение в тикете'),
+  $t('подтвердит получение смайликом'),
   $t('не произносить слово «дедлайн»'),
   $t('если грустный — это не из-за пиццы'),
-  $t('уточнит заказ в треде'),
-  $t('подойдёт после ретро, ретро идёт третий час'),
+  $t('уточнит заказ голосовым на пять минут'),
+  $t('подойдёт после серии, серия идёт третий час'),
   $t('у него кот на клавиатуре, пицца не для кота'),
 ];
 
@@ -8105,7 +8052,7 @@ const KIND_LABEL = { group: $t('групповой заказ'), chain: $t('по
 function personRow (p) {
   const full = (p && p.name || $t('Иван Иванов')).split(/\s+/);
   return '<div class="ph-who">' +
-    (p ? '<img src="../faces/' + p.img + '" alt="">' : '<i></i>') +
+    (p ? '<img src="' + faceDataURL(p) + '" alt="">' : '<i></i>') +
     '<span class="ph-n">' + (full[0] || '') + '</span>' +
     '<span class="ph-s">' + (full.slice(1).join(' ') || '') + '</span>' +
     '<span class="ph-p">' + (p && p.pos ? p.pos : $t('коллега')) + '</span>' +
@@ -8122,7 +8069,7 @@ function showOrderCard (order) {
     const full = (p && p.name || $t('Иван Иванов')).split(/\s+/);
     return '<div class="oc-p">' +
       (n ? '<em>' + n + '</em>' : '') +
-      (p ? '<img src="../faces/' + p.img + '" alt="">' : '<i></i>') +
+      (p ? '<img src="' + faceDataURL(p) + '" alt="">' : '<i></i>') +
       '<b>' + (full[0] || '') + '</b><span>' + (full.slice(1).join(' ') || '') + '</span></div>';
   };
   const people = order.stops.flatMap((st, i) => st.persons.map(p => face(p, many ? i + 1 : 0))).join('');
@@ -8132,7 +8079,7 @@ function showOrderCard (order) {
     '<div class="oc-meta">' + st0.addr + (many ? ' → ещё ' + (order.stops.length - 1) : '') + ' · ' + order.items + '</div>' +
     '<div class="oc-note"><b>комментарий курьера:</b> «' + st0.note + '»</div>' +
     (order.rush ? '<div class="oc-rush">⏱ ' + order.rushText + '<span>после загрузки — полный бак кофе-нитро · оплата ×1,5</span></div>' : '') +
-    (order.surf ? $t('<div class="oc-rush oc-surf">🏄 бонус: Фёдор катается на сёрфе по Москве-реке<span>подъедь к набережной и притормози — пицца долетит прямо на доску · оплата ×2</span></div>') : '');
+    (order.surf ? $t('<div class="oc-rush oc-surf">🏄 бонус: {name} катается на сёрфе по Москве-реке<span>подъедь к набережной и притормози — пицца долетит прямо на доску · оплата ×2</span></div>', { name: SURF.person ? SURF.person.first : '' }) : '');
   elPhWhat.textContent = order.items;
   elPhWhy.textContent = order.why;
   elPhone.classList.add('on');
@@ -8404,8 +8351,8 @@ function planOrder () {
      смене: каждые три заказа — ступенька выше. На первой ступени — один
      гость рядом, дальше подключаются групповые, последовательные, за
      реку, и адреса всё дальше. */
-  // бонус: Фёдор на сёрфе — изредка, после третьего заказа
-  if (S.orders > 3 && !S.ride && chance(0.1)) { const f = fyodorPlan(); if (f) return f; }
+  // бонус: сёрфер на реке — изредка, после третьего заказа
+  if (S.orders > 3 && !S.ride && chance(0.1)) { const f = surfPlan(); if (f) return f; }
   const d = difficulty();
   const far = [0, 200, 280, 360, 430, 480, 520][d];
   const r = Math.random();
@@ -8429,7 +8376,7 @@ function planOrder () {
     const list = [pickNear(V, far * 0.5, far)];
     for (let i = 1; i < k; i++) list.push(pickNear(list[i - 1], 120, far * 0.8));
     const ok = list.filter(Boolean);
-    return { kind: 'chain', stops: ok.map(p => ({ peds: [p] })), why: $tn(ok.length, $t('последовательный: {n} адрес, везём по очереди|последовательный: {n} адреса подряд, везём по очереди|последовательный: {n} адресов подряд, везём по очереди')) };
+    return { kind: 'chain', stops: ok.map(p => ({ peds: [p] })), why: $tn(ok.length, 'последовательный: {n} адрес, везём по очереди|последовательный: {n} адреса подряд, везём по очереди|последовательный: {n} адресов подряд, везём по очереди') };
   }
   return { kind: 'solo', stops: [{ peds: [pickNear(V, d <= 1 ? 70 : far * 0.6, far)] }], why: pick(SOLO_WHY) };
 }
@@ -8536,6 +8483,7 @@ function newOrder () {
   }
   rebuildRoutePath();
   showOrderCard(S.order);
+  Platform.gameplayStop();                        // анкета — это меню: геймплей стоит до «принять»
   Snd.order();
 }
 
@@ -8703,7 +8651,7 @@ function checkArrival (dt) {
 const CH = { opts: [], t: 0, onTimeout: null, pause: false };
 function showChoice (o) {
   const el = $('choice');
-  $('ch-face').innerHTML = o.face ? '<img src="../faces/' + o.face.img + '" alt="">' : '';
+  $('ch-face').innerHTML = o.face ? '<img src="' + faceDataURL(o.face) + '" alt="">' : '';
   $('ch-t').textContent = o.title;
   $('ch-s').innerHTML = o.sub || '';
   CH.opts = o.opts; CH.t = o.timeout || 0; CH.onTimeout = o.onTimeout || null; CH.pause = !!o.pause;
@@ -8879,11 +8827,11 @@ const DEATH = { t: 0, x: 0, z: 0, h: 0, why: '', victims: [], burn: 0, fireT: 0 
 /* why — ключ причины (не переводится), дальше — что писать */
 const DEATH_WORD = {
   'не доставил': GORE_ON ? $t('задавил') : $t('сбил'),
-  'машина всё': GORE_ON ? $t('помер') : 'машина всё',
-  'утонул': 'утонул',
-  'не успел': 'не успел',
+  'машина всё': GORE_ON ? $t('помер') : N_('машина всё'),
+  'утонул': N_('утонул'),
+  'не успел': N_('не успел'),
 };
-const OVER_TITLE = { 'машина всё': GORE_ON ? $t('помер') : 'машина всё', 'не доставил': $t('клиент потерян'), 'утонул': 'утонул', 'не успел': 'не успел', 'смена окончена': 'смена окончена' };
+const OVER_TITLE = { 'машина всё': GORE_ON ? $t('помер') : N_('машина всё'), 'не доставил': $t('клиент потерян'), 'утонул': N_('утонул'), 'не успел': N_('не успел'), 'смена окончена': N_('смена окончена') };
 
 function gameOver (why, victims, focus) {
   if (S.state === 'over' || S.state === 'dying') return;
@@ -8995,7 +8943,7 @@ function startRun (ride) {
   hideOver();
   $('menu').hidden = !S.ride;
   lastPlace = 0;
-  if (S.ride) { clearRivals(); S.order = null; S.target = null; routePts = []; toast($t('просто катаемся: без заказов и рекордов · esc — пауза и выход')); }
+  if (S.ride) { clearRivals(); S.order = null; S.target = null; routePts = []; toast($t('просто катаемся: без заказов и рекордов · esc — пауза и выход')); Platform.gameplayStart(); }
   else { initRivals(); newOrder(); }
   showGuide();                                   // первый старт за всё время — как ехать
 }
@@ -9091,7 +9039,7 @@ addEventListener('keydown', e => {
   if (KEY[e.code]) { IN[KEY[e.code]] = 1; e.preventDefault(); }
   Snd.boot(); Snd.resume();
   if (e.code === 'Space' && (S.state === 'title' || S.state === 'over')) {
-    if (S.name) startRun(); else elName.focus();
+    if (S.name || !Platform.features.nameInput) goRun(); else elName.focus();
   }
   if (phoneT > 0 && e.code !== 'KeyM') hidePhone();
   if (e.code === 'KeyM' && !e.repeat) { Snd.set(!Snd.on); toast(Snd.on ? $t('звук вкл') : $t('звук выкл')); }
@@ -9715,6 +9663,7 @@ function padScreen () {
 }
 function padStep () {
   const p = pollPad();
+  document.body.classList.toggle('pad', !!p.active);
   if (!p.connected) return;
   if (EXT.paused) return;
   if (p.any) { Snd.boot(); Snd.resume(); }
@@ -9770,6 +9719,7 @@ function frame (now) {
   updatePeds(dt);
   updatePeople(dt);
   updateScoots(dt);
+  if (MAPFIX) MAPW.step(dt, MAPW_API || (MAPW_API = mapApi()));     // дорожники, каток, ?mapcheck
   updateDrivers(dt);
   updateAmb(dt);
   updateThief(dt);
@@ -9854,11 +9804,14 @@ function frame (now) {
 requestAnimationFrame(frame);
 
 /* отладочная ручка */
-window.__dlv = { S, V, TRAFFIC, PEDS, PEOPLE, PIZZA, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
+/* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { S, V, TRAFFIC, PEDS, PEOPLE, PIZZA, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта
   groundH, surfaceAt, BRIDGES, frame,
   // Москва: граф, светофоры, зебры, самокатчики, ввод
   EDGES, SIG_GROUPS, ZEBRAS, SCOOTS, TL, IN, touches, lightOf, edgeOf,
-  DRIVERS, SMOKERS, NITRO_CANS, NOS, DRINKITS, CREW, WAR, warStart, SURF, fyodorPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, PIGEONS, AMB, INCIDENTS, scare, RIVALS, THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT };
+  DRIVERS, SMOKERS, NITRO_CANS, NOS, DRINKITS, CREW, WAR, warStart, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, PIGEONS, AMB, INCIDENTS, scare, RIVALS, THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT };
+// ?mapcheck: сводка проблем карты, столбики над ними, «]» — к следующей (mapworks.js)
+if (MAPCHECK && MAPFIX) MAPW.debug(MAPFIX, MAPW_API || (MAPW_API = mapApi()));

@@ -31,6 +31,9 @@ export async function initI18n (want) {
 export const lang = () => LANG;
 export const isCyr = () => CYR.has(LANG);
 
+/* пометка «переведётся позже»: строка попадает в словарь, а $t() зовут над ней потом */
+export const N_ = s => s;
+
 const fill = (s, p) => (p ? s.replace(/\{(\w+)\}/g, (m, k) => (p[k] !== undefined ? p[k] : m)) : s);
 
 /* нет перевода — английский, нет и его — русский исходник */

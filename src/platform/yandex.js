@@ -10,8 +10,8 @@ import { SUPPORTED_LANGS, LANG_KEY, mapLang, lsGet, lsSet, lsDump, localBoard, p
 export const LB_NAME = 'shift';
 
 const INIT_MS = 8000;            // YaGames.init() дольше — играем без SDK
-const SAVE_DEBOUNCE_MS = 3000;   // setData не чаще раза в 3 с (у SDK свой лимит запросов)
-const AD_GAP_MS = 61000;         // полноэкранная не чаще раза в 60 с (SDK и сам отказывает)
+const SAVE_DEBOUNCE_MS = 3000;   // setData не чаще раза в 3 с: лимит SDK — 100 запросов за 5 мин, 200 КБ
+const AD_GAP_MS = 61000;         // своя страховка; настоящую частоту задаёт площадка (onClose(false) — не показала)
 const AD_WAIT_MS = 8000;         // реклама не открылась за это время — считаем, что её нет
 const TS_KEY = 'dlv-__ts';       // когда менялись сохранения: у кого новее — тот и прав
 
@@ -81,7 +81,7 @@ const player = {
 async function loadPlayer () {
   try {
     ypl = await timeout(ysdk.getPlayer({ scopes: false }), 5000, 'getPlayer');
-    player.authorized = typeof ypl.isAuthorized === 'function' ? ypl.isAuthorized() : ypl.getMode() !== 'lite';
+    player.authorized = typeof ypl.isAuthorized === 'function' ? ypl.isAuthorized() : ypl.getMode() !== 'lite';   // getMode устарел
     player.name = (player.authorized && ypl.getName()) || '';
     player.avatar = (player.authorized && ypl.getPhoto('medium')) || '';
     player.id = ypl.getUniqueID ? ypl.getUniqueID() : '';
@@ -102,7 +102,7 @@ async function loadBoards () {
       entries: o => n.getEntries(LB_NAME, o),
       mine: () => n.getPlayerEntry(LB_NAME),
     };
-  } else if (typeof ysdk.getLeaderboards === 'function') {
+  } else if (typeof ysdk.getLeaderboards === 'function') {        // устаревшее API, на старых SDK
     const lb = await timeout(ysdk.getLeaderboards(), 5000, 'getLeaderboards');
     lbApi = {
       set: (s, x) => lb.setLeaderboardScore(LB_NAME, s, x),
@@ -136,7 +136,7 @@ const leaderboard = {
   async top (n = 10) {
     if (!lbApi) return local.top(n);
     try {
-      const r = await timeout(lbApi.entries({ quantityTop: n, includeUser: player.authorized, quantityAround: player.authorized ? 1 : 0 }), 8000, 'getEntries');
+      const r = await timeout(lbApi.entries({ quantityTop: Math.min(20, Math.max(1, n)), includeUser: player.authorized, quantityAround: player.authorized ? 1 : 0 }), 8000, 'getEntries');
       const all = (r.entries || []).map(row);
       const top = all.filter(e => e.rank <= n);
       const me = all.find(e => e.me && e.rank > n);
