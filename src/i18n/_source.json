@@ -178,6 +178,11 @@
    "src/game/people.js:189"
   ]
  },
+ "АЗС": {
+  "ctx": [
+   "src/game/brands.js:92"
+  ]
+ },
  "актёр": {
   "ctx": [
    "src/game/people.js:191"
@@ -199,6 +204,11 @@
   ]
  },
  "Аптека «Витаминка»": {
+  "ctx": [
+   "src/game/brands.js:88"
+  ]
+ },
+ "Аптека «Здоровье»": {
   "ctx": [
    "src/game/brands.js:88"
   ]
@@ -240,6 +250,11 @@
   ]
  },
  "Банк «Копейка»": {
+  "ctx": [
+   "src/game/brands.js:89"
+  ]
+ },
+ "Банк «Монетка»": {
   "ctx": [
    "src/game/brands.js:89"
   ]
@@ -1125,6 +1140,11 @@
    "src/game/people.js:192"
   ]
  },
+ "Кафе «Лампа»": {
+  "ctx": [
+   "src/game/brands.js:85"
+  ]
+ },
  "Кафе «Ложка»": {
   "ctx": [
    "src/game/brands.js:85"
@@ -1430,6 +1450,11 @@
  "Магазин": {
   "ctx": [
    "src/game/brands.js:91"
+  ]
+ },
+ "Магазин «Кулёк»": {
+  "ctx": [
+   "src/game/brands.js:87"
   ]
  },
  "Магазин у дома": {
@@ -2126,6 +2151,11 @@
    "src/game/moscow.js:7963"
   ]
  },
+ "Подарки": {
+  "ctx": [
+   "src/game/brands.js:91"
+  ]
+ },
  "подкрепись кофейком · +кофе-нитро": {
   "ctx": [
    "src/game/moscow.js:8653"
@@ -2376,6 +2406,11 @@
   ]
  },
  "Пункт выдачи": {
+  "ctx": [
+   "src/game/brands.js:90"
+  ]
+ },
+ "Пункт выдачи «Коробка»": {
   "ctx": [
    "src/game/brands.js:90"
   ]
@@ -2643,6 +2678,11 @@
  "столик": {
   "ctx": [
    "src/game/moscow.js:1200"
+  ]
+ },
+ "Столовая № 1": {
+  "ctx": [
+   "src/game/brands.js:86"
   ]
  },
  "стоматолог": {

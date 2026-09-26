@@ -29,7 +29,7 @@ function scanJs (file) {
   for (const m of src.matchAll(/\/\*i18n\*\/\s*\[/g)) {
     let d = 0, e = m.index + m[0].length - 1;
     for (; e < src.length; e++) { if (src[e] === '[') d++; else if (src[e] === ']' && --d === 0) break; }
-    for (const k of toks) if (k.kind === 'str' && k.start > m.index && k.end < e) add(unq(k.value), rel + ':' + k.line);
+    for (const k of toks) if (k.kind === 'str' && k.start > m.index && k.end <= e) add(unq(k.value), rel + ':' + k.line);
   }
   for (let i = 0; i < toks.length; i++) {
     const k = toks[i];
