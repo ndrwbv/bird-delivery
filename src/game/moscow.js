@@ -818,6 +818,7 @@ function osmCurbs () {
           if (other && other.d < other.seg.w / 2 + 0.3 && other.seg.w !== w) continue;
           if (other && other.d < w / 2 - 0.1) continue;
           if (inHouse(cx, cz)) continue;
+          if (MAPFIX && MAPW.curbOnAsphalt(CITY, A.x, A.z, e, d, dd, sd, w, SW)) continue;   // и краем — тоже (mapworks.js)
           const o1 = sd * (w / 2), o2 = sd * (w / 2 + SW);
           const p = (dist, o) => [A.x + e.ux * dist + e.rx * o, A.z + e.uz * dist + e.rz * o];
           const [ax, az] = p(d, o1), [bx, bz] = p(dd, o1);
@@ -1669,7 +1670,7 @@ function placeDrinkits () {
     }
     obb(c.x, c.z, 2.6, 1.8, Math.atan2(tz, tx));
     // дверь — на тротуаре перед витриной; nx/nz — наружу, к дороге
-    DRINKITS.push({ x: c.x - c.nx * 2.2, z: c.z - c.nz * 2.2, nx: -c.nx, nz: -c.nz, cx: c.x, cz: c.z, n: 'Drinkit', k: 'cafe', drinkit: 1 });
+    DRINKITS.push({ x: c.x - c.nx * 2.2, z: c.z - c.nz * 2.2, nx: -c.nx, nz: -c.nz, cx: c.x, cz: c.z, n: OWN.coffee(), n0: 'drinkit', k: 'cafe', drinkit: 1 });
   }
 }
 
@@ -1713,13 +1714,13 @@ function dropCrew () { for (const m of CREW) if (!m.dead) dropMesh(m.grp); CREW.
    конца. Через полминуты-минуту или когда одна сторона легла — победители
    ликуют, чужие уходят, свои возвращаются к кофейне. */
 const WAR = { on: false, cd: 70, side2: [], pt: null, t: 0, rival: '', hex: '', sayT: 0, bubbles: [], helped: 0 };
-const RIVAL_HEX = { 'Cofix': '#1d1d1b', 'Surf Coffee': '#2b2a30', 'Stars coffee': '#00704a', 'Даблби White': '#e8e2d4', 'WakeCup Coffee': '#e0b13f' };
-const WAR_BLUE = ['за Drinkit!', 'наш раф лучше!', 'синие, вперёд!', 'кофе — только у нас!'];
+/* цвет формы соперников — цвет их вывески (пародийной, brands.js) */
+const WAR_BLUE = [$t('за {brand}!', { brand: OWN.coffee() }), $t('наш раф лучше!'), $t('синие, вперёд!'), $t('кофе — только у нас!')];
 function warStart () {
   const c = crewAt;
   let rival = null, bd = 380;
   for (const q of SIGNS) {
-    if (!COFFEE_RE.test(q.n) || /drinkit/i.test(q.n)) continue;
+    if (!COFFEE_RE.test(q.n0 || '') || /drinkit/i.test(q.n0 || '')) continue;
     const d = Math.hypot(q.x - c.x, q.z - c.z);
     if (d < bd && d > 40) { bd = d; rival = q; }
   }
@@ -1728,7 +1729,7 @@ function warStart () {
   const dx = rival.x - c.x, dz = rival.z - c.z, l = Math.hypot(dx, dz) || 1, k = Math.min(55, l / 2);
   let px = c.x + dx / l * k, pz = c.z + dz / l * k;
   for (let s = 0; s < 10 && inHouse(px, pz, 1.5); s++) { px -= dx / l * 4; pz -= dz / l * 4; }
-  WAR.on = true; WAR.t = rand(35, 55); WAR.helped = 0; WAR.pt = { x: px, z: pz }; WAR.rival = rival.n; WAR.hex = RIVAL_HEX[rival.n] || '#6b4a3a';
+  WAR.on = true; WAR.t = rand(35, 55); WAR.helped = 0; WAR.pt = { x: px, z: pz }; WAR.rival = rival.n; WAR.hex = (rival.c && rival.c[0]) || '#6b4a3a';
   WAR.side2 = [];
   for (let i = 0; i < 6; i++) {
     const grp = makeHuman(null, { shirt: WAR.hex, pants: '#2f3540', fat: chance(0.2) });
@@ -1742,7 +1743,7 @@ function warStart () {
     WAR.side2.push({ grp, x, z, dead: 0, side: 1, hp: 3, down: 0, swing: 0, swingCd: rand(0, 1), ph: rand(0, 6), shock: 0 });
   }
   for (const m of CREW) if (!m.dead) { m.mode = 'war'; m.hp = 3; m.down = 0; m.cup.visible = false; m.bat.visible = true; }
-  if (Math.hypot(px - V.x, pz - V.z) < 220) popBonus('кофейная война!', 'Drinkit против «' + rival.n + '» — помоги синим, будет респект');
+  if (Math.hypot(px - V.x, pz - V.z) < 220) popBonus($t('кофейная война!'), $t('{brand} против «{rival}» — помоги синим, будет респект', { brand: OWN.coffee(), rival: rival.n }));
 }
 function warEnd (winner) {
   WAR.on = false; WAR.cd = rand(100, 170);
@@ -1751,8 +1752,8 @@ function warEnd (winner) {
     // помог выиграть — команда благодарит
     S.burgers++; S.money += 500;
     if (!S.freeRun) addWallet(500);
-    popBonus('Drinkit благодарит!', 'помог выиграть кофейную войну · +500 ₽ и респект');
-  } else if (near) toast(winner === 0 ? 'кофейная война: победил Drinkit' : winner === 1 ? 'кофейная война: победил «' + WAR.rival + '»' : 'кофейная война: разошлись вничью');
+    popBonus($t('{brand} благодарит!', { brand: OWN.coffee() }), $t('помог выиграть кофейную войну · +{money} и респект', { money: money(500) }));
+  } else if (near) toast(winner === 0 ? $t('кофейная война: победил {brand}', { brand: OWN.coffee() }) : winner === 1 ? $t('кофейная война: победил «{rival}»', { rival: WAR.rival }) : $t('кофейная война: разошлись вничью'));
   for (const f of WAR.side2) if (!f.dead) dropMesh(f.grp);
   WAR.side2 = [];
   for (const b of WAR.bubbles) if (b.parent) { b.parent.remove(b); b.material.dispose(); }
@@ -1811,8 +1812,8 @@ function runOverCheck (f, what, good) {
       S.burgers++; S.money += 150;
       if (!S.freeRun) addWallet(150);
       WAR.helped++;
-      toast(pick(['респект от Drinkit · +150 ₽', 'за синих! респект · +150 ₽', 'минус ' + what + ' · респект']));
-    } else { S.people++; toast('минус ' + what); }
+      toast(pick([$t('респект от «{brand}» · +{money}', { brand: OWN.coffee(), money: money(150) }), $t('за синих! респект · +{money}', { money: money(150) }), $t('минус {what} · респект', { what })]));
+    } else { S.people++; toast($t('минус {what}', { what })); }
     return true;
   }
   return false;
@@ -1846,7 +1847,7 @@ function updateDrinkit (dt) {
       WAR.bubbles = [];
       const a = pick(crewAlive.filter(m => m.down <= 0) || []), b2 = pick(WAR.side2.filter(f => !f.dead && f.down <= 0) || []);
       if (a) WAR.bubbles.push(sayBubble(a.grp, pick(WAR_BLUE), '#1a3fb8', 2.8));
-      if (b2) WAR.bubbles.push(sayBubble(b2.grp, pick([WAR.rival + ' — сила!', 'ваш кофе — вода!', 'на районе один кофе!', 'синие, домой!']), '#d9342c', 2.8));
+      if (b2) WAR.bubbles.push(sayBubble(b2.grp, pick([$t('{rival} — сила!', { rival: WAR.rival }), $t('ваш кофе — вода!'), $t('на районе один кофе!'), $t('синие, домой!')]), '#d9342c', 2.8));
     }
   }
   for (const m of CREW) {
@@ -1876,7 +1877,7 @@ function updateDrinkit (dt) {
       }
       m.grp.position.set(m.x, groundH(m.x, m.z) + curbAt(m.x, m.z), m.z);
     }
-    if (runOverCheck(m, m.name || 'бариста Drinkit')) m.deadT = 30;
+    if (runOverCheck(m, m.name || $t('бариста «{brand}»', { brand: OWN.coffee() }))) m.deadT = 30;
   }
   if (WAR.on) {
     const dW = Math.hypot(WAR.pt.x - V.x, WAR.pt.z - V.z);
@@ -1884,7 +1885,7 @@ function updateDrinkit (dt) {
       if (f.dead) continue;
       f.grp.visible = dW < 150;
       fighterStep(f, CREW, dt, dW);
-      runOverCheck(f, 'боец «' + WAR.rival + '»', true);
+      runOverCheck(f, $t('боец «{rival}»', { rival: WAR.rival }), true);
     }
   }
 }
@@ -2730,7 +2731,7 @@ function osmSigns () {
     uv.push(u0, v0, u1, v0, u1, v1, u0, v1);
     idx.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
     cell++;
-    SIGNS.push({ x: wx, z: wz, nx, nz, n: poi.n, n0: poi.n0, k: poi.k });
+    SIGNS.push({ x: wx, z: wz, nx, nz, n: poi.n, n0: poi.n0, k: poi.k, c: poi.c });
     if (row) continue;
     // дверь со стеклом и козырёк в цвет вывески
     const ry = Math.atan2(nx, nz);
@@ -3091,7 +3092,7 @@ function pizzaSpot () {
 SM_WORD.cone = $t('конус');
 const mapApi = () => ({
   THREE, scene, cam, V, S, CITY, TH, LIT, LITM, FLAT, box, put, mergeGeos, obb, smashAdd, makeHuman, gibHuman, toast,
-  groundH, surfaceAt, curbAt, inHouse, nearestRoad, ROAD_HEX, RAISED, SOLIDS, BRIDGES,
+  groundH, surfaceAt, curbAt, inHouse, inBounds, nearestRoad, ROAD_HEX, RAISED, SOLIDS, BRIDGES,
   onRunOver: () => { S.people++; toast($t('минус дорожник')); },
   get TRAFFIC () { return TRAFFIC; }, get PEOPLE () { return PEOPLE; }, get PEDS () { return PEDS; }, get SCOOTS () { return SCOOTS; },
   get CROWDS () { return CROWDS; }, get DRIVERS () { return DRIVERS; }, get SMOKERS () { return SMOKERS; },
@@ -3110,7 +3111,7 @@ function buildCity () {
   tm0('marks', osmMarkings);
   tm0('bridges', osmBridges);
   tm0('edge', osmEdgeBlocks);
-  if (MAPFIX) tm0('mapworks', () => { MAPW.fixCurbs(mapApi()); MAPW.buildWorks(MAPFIX, mapApi()); });   // тупики: блоки и ремонт
+  if (MAPFIX) tm0('mapworks', () => MAPW.buildWorks(MAPFIX, mapApi()));   // тупики: блоки и ремонт
   { const t0 = performance.now(); osmBuildings(spot); BUILD_T.houses = Math.round(performance.now() - t0); }
   if (house) dodoFacade(house);
   else buildPizzeria(spot.x, spot.z, spot.ry);
@@ -4328,9 +4329,9 @@ function runOverScoot (p, vx, vz, by) {
   scene.add(m);
   GORE.push({ m, vx: vx * 0.6 + rand(-3, 3), vy: rand(4, 8), vz: vz * 0.6 + rand(-3, 3), spin: rand(-14, 14), life: 18, bleed: 1e9, rest: 0 });
   Snd.squish();
-  if (by) { if (Math.hypot(p.x - V.x, p.z - V.z) < 160) toast(by + ' сбил самокатчика'); return; }
+  if (by) { if (Math.hypot(p.x - V.x, p.z - V.z) < 160) toast($t('{who} сбил самокатчика', { who: by })); return; }
   S.scoots += pass ? 2 : 1;
-  toast(pass ? 'минус два самокатчика' : 'минус самокатчик');
+  toast(pass ? $t('минус два самокатчика') : $t('минус самокатчик'));
 }
 
 /* Гость перестаёт гулять: если рядом лавочка — доходит и садится,
@@ -5269,10 +5270,11 @@ function updateTraffic (dt) {
   for (let i = TRAFFIC.length - 1; i >= 0; i--) if (TRAFFIC[i].gone) TRAFFIC.splice(i, 1);
 }
 
-/* ─────────────── курилка у Омеги ───────────────
-   У входа в офис всегда стоит кружок коллег с сигаретами: затягиваются,
-   выдыхают дым и болтают. Заказов не делают, никуда не уходят. Задавил —
-   на месте встаёт другой: курилка не пустеет. */
+/* ─────────────── кофе у пиццерии ───────────────
+   У входа всегда стоит кружок сотрудников с горячим кофе: отпивают, от
+   стаканчиков идёт пар, болтают. Заказов не делают, никуда не уходят.
+   Сбил — на месте встаёт другой: кружок не пустеет. (Раньше тут была
+   курилка — табак площадки не пропускают.) */
 const SMOKERS = [];
 let SMOKE_SPOT = null;
 /* завсегдатаи курилки: всегда тут и всегда рядом друг с другом —
@@ -5296,9 +5298,12 @@ function initSmokers () {
 function smokerBody (p) {
   if (p.grp) dropMesh(p.grp);
   p.grp = makeHuman(p.person);
-  const cig = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.22), new THREE.MeshBasicMaterial({ color: 0xf4f1ea }));
-  cig.position.set(0, -0.5, 0.12);
-  p.grp.userData.armR.add(cig);
+  // стаканчик кофе: белый с красной крышкой «Птицы Пиццы»
+  const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.055, 0.2, 8), new THREE.MeshLambertMaterial({ color: 0xf4f1ea }));
+  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.04, 8), new THREE.MeshLambertMaterial({ color: 0xf0522a }));
+  lid.position.y = 0.11; cup.add(lid);
+  cup.position.set(0, -0.55, 0.1);
+  p.grp.userData.armR.add(cup);
   p.grp.position.set(p.x, groundH(p.x, p.z), p.z);
   p.grp.rotation.y = Math.atan2(SMOKE_SPOT.x - p.x, SMOKE_SPOT.z - p.z);   // лицом в кружок
   scene.add(p.grp);
@@ -5312,7 +5317,7 @@ function updateSmokers (dt) {
     }
     p.ph += dt;
     const u = p.grp.userData;
-    // затяжка: рука к лицу раз в несколько секунд
+    // глоток: рука к лицу раз в несколько секунд
     const drag = Math.max(0, Math.sin(p.ph * 0.9)) ** 6;
     u.armR.rotation.x = -0.5 - drag * 1.7;
     u.armL.rotation.x = -0.2;
@@ -5321,10 +5326,8 @@ function updateSmokers (dt) {
     if ((p.puffT -= dt) <= 0) {
       p.puffT = rand(1.4, 3.2);
       const fx = Math.sin(p.grp.rotation.y), fz = Math.cos(p.grp.rotation.y);
-      const m = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({ color: 0xe9e7e2, transparent: true, opacity: 0.5, depthWrite: false }));
-      m.position.set(p.x + fx * 0.4, groundH(p.x, p.z) + 1.6, p.z + fz * 0.4);
-      m.scale.setScalar(0.22);
-      fxAdd(m, { vy: rand(0.5, 0.9), vx: fx * 0.4 + rand(-0.2, 0.2), vz: fz * 0.4 + rand(-0.2, 0.2), life: rand(1.4, 2.2), max: 2.2, grow: 1.3 });
+      // пар от горячего кофе — маленький и у руки, а не облако у лица
+      steam(p.x + fx * 0.35 + Math.cos(p.grp.rotation.y) * 0.3, 1.25, p.z + fz * 0.35 - Math.sin(p.grp.rotation.y) * 0.3);
     }
     // под колёсами — как все
     const dx = p.x - V.x, dz = p.z - V.z, fx = Math.sin(V.h), fz = Math.cos(V.h);
@@ -5334,7 +5337,7 @@ function updateSmokers (dt) {
       gibHuman(p, V.vx, V.vz);
       S.people++;
       Snd.squish();
-      toast('минус ' + (p.person ? p.person.name : 'курильщик'));
+      toast($t('минус {what}', { what: p.person ? p.person.name : $t('сотрудник') }));
     }
   }
 }
@@ -5928,7 +5931,7 @@ function rivalSpawn (R, delay) {
   t.onBoom = () => {
     if (R.out) return;
     R.out = 1; R.outEnd = tG + 60;
-    if (Math.hypot(t.x - V.x, t.z - V.z) < 200) popBonus(R.name + ' вычеркнут', 'из смены на минуту — сгорел вместе с заказом');
+    if (Math.hypot(t.x - V.x, t.z - V.z) < 200) popBonus($t('{who} вычеркнут', { who: R.name }), $t('из смены на минуту — сгорел вместе с заказом'));
   };
 }
 
@@ -6016,7 +6019,7 @@ function updateRivals (dt) {
   for (const R of RIVALS) {
     guestTick(R, dt);
     if (!R.t) {
-      if ((R.back -= dt) <= 0) { R.out = 0; rivalSpawn(R, 2); toast(R.name + ' снова на смене'); }
+      if ((R.back -= dt) <= 0) { R.out = 0; rivalSpawn(R, 2); toast($t('{who} снова на смене', { who: R.name })); }
       continue;
     }
     const t = R.t;
@@ -6086,7 +6089,7 @@ function updateRivals (dt) {
         t.speed *= 0.75;
         if (Math.hypot(t.x - V.x, t.z - V.z) < 90) {
           Snd.crash(push);
-          toast(pick([R.name + ' снёс ' + (o.taxi ? 'такси' : 'машину'), R.name + ' расталкивает поток', R.name + ': «дорогу курьеру!»']));
+          toast(pick([o.taxi ? $t('{who} снёс такси', { who: R.name }) : $t('{who} снёс машину', { who: R.name }), $t('{who} расталкивает поток', { who: R.name }), $t('{who}: «дорогу курьеру!»', { who: R.name })]));
         }
         if (o.hp <= 0) wreckCar(o);
         break;
@@ -6100,7 +6103,7 @@ function updateRivals (dt) {
         if (p.dead || p.guest || !under(p)) continue;
         p.dead = 1; p.deadT = rand(18, 26); p.fly = null; p.grp.visible = false;
         gibHuman(p, hx * t.speed, hz * t.speed);
-        if (Math.hypot(t.x - V.x, t.z - V.z) < 160) toast(R.name + ' сбил ' + (p.person ? (p.person.acc || p.person.name) : 'прохожего'));
+        if (Math.hypot(t.x - V.x, t.z - V.z) < 160) toast($t('{who} сбил {whom}', { who: R.name, whom: p.person ? accName(p.person) : $t('прохожего') }));
       }
       for (const p of SCOOTS) {
         if (p.dead || !under(p)) continue;
@@ -6120,7 +6123,7 @@ const elRivals = $('rivals');
 let rivalsT = 0, lastPlace = 0;
 function rivalBoard () {
   const rows = RIVALS.map(R => ({ n: R.name, m: R.money, hex: R.spec.hex, out: R.out ? Math.max(1, Math.ceil(R.outEnd - tG)) : 0 }));
-  rows.push({ n: 'ты', m: S.money, me: true });
+  rows.push({ n: $t('ты'), m: S.money, me: true });
   rows.sort((a, b) => b.m - a.m || (a.me ? -1 : 1));
   return rows;
 }
@@ -6132,7 +6135,7 @@ function rivalsStep (dt) {
   rivalsT = 0.5;
   const rows = rivalBoard(), place = rows.findIndex(r => r.me) + 1;
   elRivals.innerHTML = rows.map((r, i) => '<li' + (r.me ? ' class="me"' : r.out ? ' class="out"' : '') + '><em>' + (i + 1) + '</em>' +
-    (r.hex ? '<i style="background:' + r.hex + '"></i>' : '<i class="you"></i>') + '<b>' + (r.out ? '<s>' + r.n + '</s> <small>' + r.out + 'с</small>' : r.n) + '</b><span>' + r.m + ' ₽</span></li>').join('');
+    (r.hex ? '<i style="background:' + r.hex + '"></i>' : '<i class="you"></i>') + '<b>' + (r.out ? '<s>' + r.n + '</s> <small>' + $t('{n} с', { n: r.out }) + '</small>' : r.n) + '</b><span>' + money(r.m) + '</span></li>').join('');
   if (lastPlace && place < lastPlace) { const R = RIVALS.find(q => q.name === rows[place].n); toast($t('ты обогнал {who}!', { who: R && R.person ? R.person.firstAcc : rows[place].n })); }
   lastPlace = place;
 }
@@ -6146,7 +6149,7 @@ function rivalsStep (dt) {
    задавить. Через полторы минуты (или если уехал далеко) всё
    рассасывается. */
 const ACCIDENTS = [];
-const FIGHT_LINES = ['ты чё?!', 'сам ты!', 'куда смотрел?!', 'страховка есть?', 'я тебя запомнил', 'ну всё!', 'выходи!', 'в глаза смотри!', 'гаишников жду'];
+const FIGHT_LINES = [$t('ты чё?!'), $t('сам ты!'), $t('куда смотрел?!'), $t('страховка есть?'), $t('я тебя запомнил'), $t('ну всё!'), $t('выходи!'), $t('в глаза смотри!'), $t('гаишников жду')];
 let accCd = 40;
 
 function raiseHood (mesh, a) {
@@ -8076,9 +8079,9 @@ function showOrderCard (order) {
   const st0 = order.stops[0];
   elPhList.innerHTML =
     '<div class="oc-people' + (order.stops.reduce((n, st) => n + st.persons.length, 0) > 2 ? ' small' : '') + '">' + people + '</div>' +
-    '<div class="oc-meta">' + st0.addr + (many ? ' → ещё ' + (order.stops.length - 1) : '') + ' · ' + order.items + '</div>' +
-    '<div class="oc-note"><b>комментарий курьера:</b> «' + st0.note + '»</div>' +
-    (order.rush ? '<div class="oc-rush">⏱ ' + order.rushText + '<span>после загрузки — полный бак кофе-нитро · оплата ×1,5</span></div>' : '') +
+    '<div class="oc-meta">' + st0.addr + (many ? ' → ' + $t('ещё {n}', { n: order.stops.length - 1 }) : '') + ' · ' + order.items + '</div>' +
+    '<div class="oc-note"><b>' + $t('комментарий курьера:') + '</b> «' + st0.note + '»</div>' +
+    (order.rush ? '<div class="oc-rush">⏱ ' + order.rushText + '<span>' + $t('после загрузки — полный бак кофе-нитро · оплата ×1,5') + '</span></div>' : '') +
     (order.surf ? $t('<div class="oc-rush oc-surf">🏄 бонус: {name} катается на сёрфе по Москве-реке<span>подъедь к набережной и притормози — пицца долетит прямо на доску · оплата ×2</span></div>', { name: SURF.person ? SURF.person.first : '' }) : '');
   elPhWhat.textContent = order.items;
   elPhWhy.textContent = order.why;
@@ -8750,9 +8753,9 @@ function offerSide (ped, person) {
   const { it, shop } = pick(opts);
   S.handT = 1e9;                                // пока думаешь — дальше не едем
   ped.freeT = 1e9;
-  const first = person.name.split(/\s+/)[0];
+  const first = person.first || person.name.split(/\s+/)[0];
   showChoice({
-    face: person, title: first + ':', sub: '«сгоняй ' + it.ask + ', даю косарь»',
+    face: person, title: first + ':', sub: $t('«сгоняй {what}, даю косарь»', { what: it.ask }),
     timeout: 10, onTimeout: () => declineSide(ped),
     opts: [{ label: $t('сгоняю'), sub: shop.n, fn: () => startSide(ped, person, shop, it) },
            { label: $t('не, работаю'), fn: () => declineSide(ped) }],

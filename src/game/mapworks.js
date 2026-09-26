@@ -310,8 +310,8 @@ export const onAsphalt = (CITY, x, z) => asphalt(CITY).at(x, z);
 /* кусок тротуара вдоль ребра от d до dd, сторона sd: лёг бы на асфальт? */
 export function curbOnAsphalt (CITY, ax, az, e, d, dd, sd, w, SW) {
   const A = asphalt(CITY);
-  for (const t of [d + 0.3, (d + dd) / 2, dd - 0.3])
-    for (const o of [w / 2 + 0.7, w / 2 + SW - 0.3]) {
+  for (let t = d; t <= dd + 0.01; t += Math.max(0.5, (dd - d) / 6))
+    for (const o of [w / 2 + 0.5, w / 2 + SW / 2, w / 2 + SW - 0.1]) {
       const x = ax + e.ux * t + e.rx * o * sd, z = az + e.uz * t + e.rz * o * sd;
       if (A.at(x, z)) { WORKS.n.curbs++; return true; }
     }
@@ -407,18 +407,20 @@ function browserChecks (api, out) {
   const seen = [];
   for (const s of SOLIDS) {
     if (s.deckY !== undefined || s.ramp || s.hw > 4 || s.hd > 4) continue;
+    if (!api.inBounds(s.cx, s.cz, 15)) continue;                  // блоки на рамке — нарочно
     const r = nearestRoad(s.cx, s.cz, 7, 1);
     if (!r || r.seg.x || r.seg.c > 7 || r.d > r.seg.w / 2 - 0.4 - Math.min(s.hw, s.hd)) continue;
     if (WORKS.sites.some(q => Math.hypot(q.x - s.cx, q.z - s.cz) < 20)) continue;
     if (seen.some(q => Math.hypot(q[0] - s.cx, q[1] - s.cz) < 6)) continue;
     seen.push([s.cx, s.cz]);
-    add('solid-on-road', s.cx, s.cz, 'warn', `obstacle ${(s.hw * 2).toFixed(1)}×${(s.hd * 2).toFixed(1)} m stands on the asphalt of "${r.seg.name || 'road'}"`);
+    const wall = Math.abs(s.hd - 0.5) < 0.01 && s.hw > 1;          // стена дома: проезд упёрся в дом
+    add(wall ? 'wall-on-road' : 'solid-on-road', s.cx, s.cz, wall ? 'info' : 'warn', `${wall ? 'building wall' : 'obstacle'} ${(s.hw * 2).toFixed(1)}×${(s.hd * 2).toFixed(1)} m stands on the asphalt of "${r.seg.name || 'road'}"`);
   }
   // бордюр на асфальте: после curbOnAsphalt в osmCurbs таких клеток нет
   let curbs = 0;
   for (const k of RAISED) {
     const x = Math.floor(k / 8000) - 4000, z = (k % 8000) - 4000;
-    if (onAsphalt(api.CITY, x, z) && curbs++ < 40) add('curb-on-road', x, z, 'warn', 'raised curb cell on asphalt (car hops, people float)');
+    if (onAsphalt(api.CITY, x, z) && curbs++ < 400) add('curb-on-road', x, z, 'warn', 'raised curb cell on asphalt (car hops, people float)');
   }
   // мост: настил в игре против модели проверок — не разошлись ли
   for (const b of BRIDGES) {
