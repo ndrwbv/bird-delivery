@@ -19,7 +19,8 @@
     "dist:deck": "npm run build:steam && electron-builder --linux dir --x64 && node tools/pack-deck.mjs",
     "mapcheck": "node tools/mapcheck.mjs",
     "i18n:extract": "node tools/i18n-extract.mjs",
-    "i18n:check": "node tools/i18n-check.mjs"
+    "i18n:check": "node tools/i18n-check.mjs",
+    "media": "npm run build:yandex && for l in ru en es; do electron tools/capture.cjs --lang=$l && electron tools/capture.cjs --lang=$l --mobile && electron tools/capture.cjs --lang=$l --video; done && node tools/media-post.mjs"
   },
   "build": {
     "appId": "ru.ndrwbv.birdpizza",

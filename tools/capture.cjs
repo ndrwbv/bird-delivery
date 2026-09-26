@@ -75,8 +75,9 @@ async function main () {
   const mobile = has('mobile');
   const W = mobile ? 1080 : 1920, H = mobile ? 1920 : 1080;
   const win = new BrowserWindow({
-    width: mobile ? 1080 : W, height: mobile ? 1920 : H, show: false, useContentSize: true,
-    webPreferences: { offscreen: true, backgroundThrottling: false, zoomFactor: mobile ? 1080 / 390 : 1      // телефон — 390 CSS-пикселей в ширину },
+    width: W, height: H, show: false, useContentSize: true,
+    // телефон — 390 CSS-пикселей в ширину, как у обычного смартфона
+    webPreferences: { offscreen: true, backgroundThrottling: false, zoomFactor: mobile ? W / 390 : 1 },
   });
   win.webContents.setFrameRate(30);
   let last = null;
@@ -103,6 +104,26 @@ async function main () {
   await sleep(1500);
   if (!has('video')) await shot(mobile ? 'm-order' : 'shot-1-order');
 
+  const STRAIGHT = `(() => { const D = __dlv; if (window.__ap) window.__ap.on = false; D.startPose(); D.V.vx = Math.sin(D.V.h) * 12; D.V.vz = Math.cos(D.V.h) * 12;
+    D.V.camX = D.V.x - Math.sin(D.V.h) * 12; D.V.camZ = D.V.z - Math.cos(D.V.h) * 12; D.V.camH = D.V.h; D.IN.joy = 0; D.IN.gas = 1; })()`;
+  // вручение: гостя ставим на тротуар впереди справа, машина подкатывает и тормозит
+  const deliver = async () => {
+    await js(STRAIGHT);
+    await js(`(() => { const D = __dlv, V = D.V, p = D.S.target && D.S.target.ped; if (!p) return;
+      const fx = Math.sin(V.h), fz = Math.cos(V.h);
+      p.x = V.x + fx * 11 + fz * -4.4; p.z = V.z + fz * 11 - fx * -4.4; p.sitAt = null; p.sitting = 0; p.waitAt = null;
+      D.S.target.x = p.x; D.S.target.z = p.z; D.S.time = D.S.timeMax; })()`);
+    for (let i = 0; i < 60 && (await js(`__dlv.S.state`)) === 'drive'; i++) {
+      await js(`(() => { const D = __dlv, d = Math.hypot(D.S.target.x - D.V.x, D.S.target.z - D.V.z), sp = Math.hypot(D.V.vx, D.V.vz);
+        D.IN.gas = d > 7 && sp < 8 ? 1 : 0; D.IN.brake = d <= 7 ? 1 : 0; })()`);
+      await sleep(80);
+    }
+    await js(`__dlv.IN.brake = 0`);
+    // гость иногда просит «сгоняй за…» — в кадре эта карточка лишняя, отказываемся
+    await sleep(250);
+    await js(`__dlv.CH.opts.length && __dlv.pickChoice(1)`);
+  };
+
   if (has('video')) {
     // видео: пишем кадры по таймеру — последний отрисованный, 30 в секунду
     const ff = spawn('ffmpeg', ['-y', '-f', 'rawvideo', '-pix_fmt', 'bgra', '-s', `${W}x${H}`, '-r', '30', '-i', '-',
@@ -114,14 +135,23 @@ async function main () {
       ff.stdin.write(b.toBitmap());
       frames++;
     }, 1000 / 30);
-    await sleep(1200);                                  // анкета заказа в кадре
+    // постановка: анкета → проспект с нитро → вручение → вечер → дождь. Всего ~26 с
+    await sleep(1800);                                  // анкета заказа в кадре
     await js(`document.getElementById('ph-accept').click()`);
     await js(AUTOPILOT);
-    await js(`window.__ap.nitro = true`);
-    for (let i = 0; i < 40 && !(await js(`__dlv.S.state === 'handover' || __dlv.S.state === 'back'`)); i++) await sleep(500);
-    await sleep(2500);                                  // сердечки и коробка в руках
-    await js(`__dlv.ENV.t = 0.8`);                      // вечер — фонари и фары
-    await sleep(6000);
+    await sleep(1500);
+    await js(`window.__ap.on = false`);
+    await js(STRAIGHT); await js(`__dlv.NOS.tank = 1; __dlv.IN.nitro = 1`);
+    await sleep(3500);
+    await js(`__dlv.IN.nitro = 0`);
+    await deliver();
+    await sleep(2500);
+    await js(`__dlv.S.target = { x: 1e5, z: 1e5, name: '' }; __dlv.ENV.t = 0.8`); await js(STRAIGHT);
+    await sleep(5000);
+    await js(`__dlv.ENV.t = 0.35; __dlv.ENV.rainWant = 1; __dlv.ENV.rain = 1`); await js(STRAIGHT);
+    await sleep(4500);
+    await js(`__dlv.ENV.rainWant = 0; __dlv.ENV.rain = 0; __dlv.IN.gas = 0; __dlv.setFullMap(true)`);
+    await sleep(2500);
     stop = true; clearInterval(tick);
     ff.stdin.end();
     await new Promise(r => ff.on('close', r));
@@ -135,38 +165,24 @@ async function main () {
   await shot(mobile ? 'm-drive' : 'shot-2-drive');
   await hud(false); await shot(mobile ? 'm-clean-drive' : 'clean-drive'); await hud(true);
   // дальше — постановка на проспекте у пиццерии: машина едет прямо, автопилот выключен
-  const straight = `(() => { const D = __dlv; window.__ap.on = false; D.startPose(); D.V.vx = Math.sin(D.V.h) * 12; D.V.vz = Math.cos(D.V.h) * 12;
-    D.V.camX = D.V.x - Math.sin(D.V.h) * 12; D.V.camZ = D.V.z - Math.cos(D.V.h) * 12; D.V.camH = D.V.h; D.IN.joy = 0; D.IN.gas = 1; })()`;
-  // вручение: гостя ставим на тротуар в шести метрах впереди, машина подкатывает и тормозит
-  await js(straight);
-  await js(`(() => { const D = __dlv, V = D.V, p = D.S.target && D.S.target.ped; if (!p) return;
-    const fx = Math.sin(V.h), fz = Math.cos(V.h);
-    p.x = V.x + fx * 11 + fz * -4.4; p.z = V.z + fz * 11 - fx * -4.4; p.sitAt = null; p.sitting = 0; p.waitAt = null;
-    D.S.target.x = p.x; D.S.target.z = p.z; D.S.time = D.S.timeMax; })()`);
-  // едем, пока гость не рядом, потом тормоз — вручение сработает само
-  for (let i = 0; i < 60 && (await js(`__dlv.S.state`)) === 'drive'; i++) {
-    await js(`(() => { const D = __dlv, d = Math.hypot(D.S.target.x - D.V.x, D.S.target.z - D.V.z), sp = Math.hypot(D.V.vx, D.V.vz);
-      D.IN.gas = d > 7 && sp < 8 ? 1 : 0; D.IN.brake = d <= 7 ? 1 : 0; })()`);
-    await sleep(80);
-  }
-  await js(`__dlv.IN.brake = 0`);
+  await deliver();
   await sleep(900);
   await shot(mobile ? 'm-deliver' : 'shot-3-deliver');
   // маркер адреса уводим подальше: в постановочных кадрах он не нужен
   await js(`__dlv.S.target = { x: 1e5, z: 1e5, name: '' }`);
   // нитро по проспекту
   await sleep(1500);
-  await js(straight); await js(`__dlv.NOS.tank = 1; __dlv.IN.nitro = 1`);
+  await js(STRAIGHT); await js(`__dlv.NOS.tank = 1; __dlv.IN.nitro = 1`);
   await sleep(1600);
   await shot(mobile ? 'm-nitro' : 'shot-4-nitro');
   await js(`__dlv.IN.nitro = 0`);
   // ночь
-  await js(`__dlv.ENV.t = 0.84`); await js(straight);
+  await js(`__dlv.ENV.t = 0.84`); await js(STRAIGHT);
   await sleep(2500);
   await shot(mobile ? 'm-night' : 'shot-5-night');
   await hud(false); await shot(mobile ? 'm-clean-night' : 'clean-night'); await hud(true);
   // дождь днём
-  await js(`__dlv.ENV.t = 0.35; __dlv.ENV.rainWant = 1; __dlv.ENV.rain = 1`); await js(straight);
+  await js(`__dlv.ENV.t = 0.35; __dlv.ENV.rainWant = 1; __dlv.ENV.rain = 1`); await js(STRAIGHT);
   await sleep(2500);
   await shot(mobile ? 'm-rain' : 'shot-6-rain');
   await js(`__dlv.ENV.rainWant = 0; __dlv.ENV.rain = 0; __dlv.IN.gas = 0; __dlv.setFullMap(true)`);

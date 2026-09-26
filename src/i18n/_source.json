@@ -499,6 +499,16 @@
    "src/game/brands.js:22"
   ]
  },
+ "вместо пиццы ты задавил {who}": {
+  "ctx": [
+   "src/game/moscow.js:7960"
+  ]
+ },
+ "вместо пиццы ты сбил {who}": {
+  "ctx": [
+   "src/game/moscow.js:7960"
+  ]
+ },
  "водитель бежит к тебе": {
   "ctx": [
    "src/game/moscow.js:5414"
@@ -2590,7 +2600,6 @@
  },
  "ручник": {
   "ctx": [
-   "index.html:134",
    "index.html:155",
    "index.html:163"
   ]
