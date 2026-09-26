@@ -434,12 +434,12 @@
  },
  "вечер": {
   "ctx": [
-   "src/game/moscow.js:9360"
+   "src/game/moscow.js:9362"
   ]
  },
  "вечереет": {
   "ctx": [
-   "src/game/moscow.js:9413"
+   "src/game/moscow.js:9415"
   ]
  },
  "вкл": {
@@ -650,7 +650,7 @@
  },
  "гитарист": {
   "ctx": [
-   "src/game/moscow.js:9603"
+   "src/game/moscow.js:9605"
   ]
  },
  "говорит шёпотом, не пугайся": {
@@ -700,7 +700,7 @@
  },
  "давай хором!": {
   "ctx": [
-   "src/game/moscow.js:9499"
+   "src/game/moscow.js:9501"
   ]
  },
  "дверь синяя, но покрашена": {
@@ -715,8 +715,8 @@
  },
  "день": {
   "ctx": [
-   "src/game/moscow.js:9360",
-   "src/game/moscow.js:9413"
+   "src/game/moscow.js:9362",
+   "src/game/moscow.js:9415"
   ]
  },
  "детский сад": {
@@ -752,7 +752,7 @@
  },
  "дождь кончился — снова солнце": {
   "ctx": [
-   "src/game/moscow.js:9376"
+   "src/game/moscow.js:9378"
   ]
  },
  "дождь, скользко": {
@@ -832,7 +832,7 @@
  },
  "ещё песню!": {
   "ctx": [
-   "src/game/moscow.js:9499"
+   "src/game/moscow.js:9501"
   ]
  },
  "ещё раз": {
@@ -1289,7 +1289,7 @@
  },
  "красиво поёшь!": {
   "ctx": [
-   "src/game/moscow.js:9499"
+   "src/game/moscow.js:9501"
   ]
  },
  "красная карточка": {
@@ -1354,7 +1354,7 @@
  },
  "ла-ла-ла": {
   "ctx": [
-   "src/game/moscow.js:9499"
+   "src/game/moscow.js:9501"
   ]
  },
  "лаборант": {
@@ -1811,7 +1811,7 @@
  },
  "не успел — клиент передумал": {
   "ctx": [
-   "src/game/moscow.js:9765"
+   "src/game/moscow.js:9767"
   ]
  },
  "не, работаю": {
@@ -1839,12 +1839,12 @@
  },
  "ночь": {
   "ctx": [
-   "src/game/moscow.js:9360"
+   "src/game/moscow.js:9362"
   ]
  },
  "ночь — включай фары": {
   "ctx": [
-   "src/game/moscow.js:9413"
+   "src/game/moscow.js:9415"
   ]
  },
  "ну всё, ты попал": {
@@ -1860,7 +1860,7 @@
  },
  "ну ты это…": {
   "ctx": [
-   "src/game/moscow.js:9499"
+   "src/game/moscow.js:9501"
   ]
  },
  "НЯМ-НЯМ": {
@@ -1870,7 +1870,7 @@
  },
  "о-о-о": {
   "ctx": [
-   "src/game/moscow.js:9499"
+   "src/game/moscow.js:9501"
   ]
  },
  "обед": {
@@ -1992,7 +1992,7 @@
  },
  "певец": {
   "ctx": [
-   "src/game/moscow.js:9603"
+   "src/game/moscow.js:9605"
   ]
  },
  "пейджер": {
@@ -2174,7 +2174,7 @@
  },
  "полуночник": {
   "ctx": [
-   "src/game/moscow.js:9603"
+   "src/game/moscow.js:9605"
   ]
  },
  "помер": {
@@ -2241,7 +2241,7 @@
  },
  "пошёл дождь — дорога скользкая": {
   "ctx": [
-   "src/game/moscow.js:9377"
+   "src/game/moscow.js:9379"
   ]
  },
  "предметы разбросаны по району, часть — во дворах у пиццерии. За каждый — {money}": {
@@ -2392,12 +2392,12 @@
  },
  "развози пиццу по Москве — быстро, но не задави клиентов!": {
   "ctx": [
-   "src/game/moscow.js:9646"
+   "src/game/moscow.js:9648"
   ]
  },
  "развози пиццу по Москве — быстро, но не сбей клиентов!": {
   "ctx": [
-   "src/game/moscow.js:9646"
+   "src/game/moscow.js:9648"
   ]
  },
  "резиновая уточка": {
@@ -2842,7 +2842,7 @@
  },
  "уважаю!": {
   "ctx": [
-   "src/game/moscow.js:9499"
+   "src/game/moscow.js:9501"
   ]
  },
  "удвоить заработок": {
@@ -2898,12 +2898,12 @@
  },
  "утро": {
   "ctx": [
-   "src/game/moscow.js:9360"
+   "src/game/moscow.js:9362"
   ]
  },
  "утро — светает": {
   "ctx": [
-   "src/game/moscow.js:9413"
+   "src/game/moscow.js:9415"
   ]
  },
  "участники OpenStreetMap": {

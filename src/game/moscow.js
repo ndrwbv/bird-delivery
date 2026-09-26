@@ -7760,7 +7760,7 @@ function hudHearts () {
 
 const elNitro = $('nitro'), elNitroBar = $('nitrobar'), elFx = $('fxs'), elRadarBox = $('radar');
 let toastT = 0;
-function toast (t) { elToast.textContent = t; elToast.style.opacity = 1; toastT = Math.max(1.6, t.length / 18); }
+function toast (t) { t = String(t || ""); if (!t) return; elToast.textContent = t; elToast.style.opacity = 1; toastT = Math.max(1.6, t.length / 18); }
 
 function hudStep (dt) {
   elMoney.textContent = money(S.money);
@@ -9357,7 +9357,9 @@ function placePigeons (grp) {
   }
 }
 
-function envPhaseName (t) { return t < 0.06 ? $t('утро') : t < 0.66 ? $t('день') : t < 0.75 ? $t('вечер') : t < 0.96 ? $t('ночь') : $t('утро'); }
+/* фаза — ключ (по-русски, не переводится), для показа — envPhaseName */
+function envPhase (t) { return t < 0.06 ? 'утро' : t < 0.66 ? 'день' : t < 0.75 ? 'вечер' : t < 0.96 ? 'ночь' : 'утро'; }
+function envPhaseName (t) { return $t({ утро: N_('утро'), день: N_('день'), вечер: N_('вечер'), ночь: N_('ночь') }[envPhase(t)]); }
 const envClock = () => { const h = (6 + ENV.t * 24) % 24; return String(Math.floor(h)).padStart(2, '0') + ':' + String(Math.floor((h % 1) * 60 / 10) * 10).padStart(2, '0'); };
 
 function updateEnv (dt) {
@@ -9408,7 +9410,7 @@ function updateEnv (dt) {
     headGlow.rotation.y = V.h;
   }
   // смена фазы — тостом, чтобы было видно, что время идёт
-  const ph = envPhaseName(ENV.t);
+  const ph = envPhase(ENV.t);
   if (ph !== ENV.phase) {
     if (ENV.phase && S.state !== 'title' && S.state !== 'over') toast({ утро: $t('утро — светает'), день: $t('день'), вечер: $t('вечереет'), ночь: $t('ночь — включай фары') }[ph]);
     ENV.phase = ph;

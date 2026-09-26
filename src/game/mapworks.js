@@ -450,11 +450,21 @@ function next (api, dir) {
   if (!L.length) return;
   DBG.i = (DBG.i + dir + L.length) % L.length;
   const i = L[DBG.i], V = api.V;
-  // встаём в пятнадцати метрах, лицом к месту
+  // встаём на улицу метрах в шестнадцати от места, лицом к нему, и так, чтобы
+  // камера за машиной не оказалась в доме
   const road = api.nearestRoad(i.x, i.z, 7, 2);
-  let x = i.x - 12, z = i.z - 12;
-  if (road && road.d < 25) { x = road.x; z = road.z; }
-  if (Math.hypot(x - i.x, z - i.z) < 6) { x -= 10; z -= 10; }
+  const cands = [];
+  if (road && road.d < 30) {
+    const sg = road.seg, l = Math.hypot(sg.x2 - sg.x1, sg.z2 - sg.z1) || 1, ux = (sg.x2 - sg.x1) / l, uz = (sg.z2 - sg.z1) / l;
+    for (const k of [16, -16, 24, -24, 10, -10]) cands.push([road.x + ux * k, road.z + uz * k]);
+  }
+  for (let a = 0; a < 6.28; a += 0.785) cands.push([i.x + Math.sin(a) * 16, i.z + Math.cos(a) * 16]);
+  let x = cands[0][0], z = cands[0][1];
+  for (const [cx, cz] of cands) {
+    const dx = i.x - cx, dz = i.z - cz, l = Math.hypot(dx, dz) || 1;
+    if (api.inHouse(cx, cz) || api.inHouse(cx - dx / l * 13, cz - dz / l * 13) || api.inHouse(cx - dx / l * 7, cz - dz / l * 7)) continue;
+    x = cx; z = cz; break;
+  }
   V.x = x; V.z = z; V.vx = V.vz = 0;
   V.h = Math.atan2(i.x - x, i.z - z);
   V.y = api.surfaceAt(x, z);
@@ -465,9 +475,11 @@ function next (api, dir) {
 /* точки на полной карте */
 export function drawMapDots (x, fmX, fmZ, s) {
   const col = { error: '#ff2d3c', warn: '#ffa010', info: '#3fa0ff' };
+  x.lineWidth = 1.5; x.strokeStyle = '#ffffff';
   for (const i of MAP_DOTS) {
     x.fillStyle = col[i.severity];
-    x.beginPath(); x.arc(fmX(i.x), fmZ(i.z), (i.severity === 'info' ? 2.5 : 4) * s, 0, Math.PI * 2); x.fill();
+    x.beginPath(); x.arc(fmX(i.x), fmZ(i.z), (i.severity === 'info' ? 3 : 6) * s, 0, Math.PI * 2); x.fill();
+    if (i.severity !== 'info') x.stroke();
   }
   for (const q of runtimeSpots()) {
     x.strokeStyle = '#ff00d0'; x.lineWidth = 2;
