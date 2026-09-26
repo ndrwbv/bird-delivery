@@ -16,7 +16,7 @@ const player = {
 const Platform = {
   id: 'web',
   lang: 'ru',
-  features: { ads: true, leaderboard: 'local', externalLinks: true, nameInput: true, gore: true, quit: false },
+  features: { ads: true, leaderboard: 'local', externalLinks: true, nameInput: true, gore: true, adult: true, quit: false },
 
   /** opts.langs — языки, для которых реально есть словари (по умолчанию SUPPORTED_LANGS). */
   async init (opts = {}) {

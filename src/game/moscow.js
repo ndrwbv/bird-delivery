@@ -33,9 +33,13 @@ const Store = {
   get: (k, d) => { const v = Platform.store.get(k); return v === undefined || v === null ? d : v; },
   set: (k, v) => Platform.store.set(k, v),
 };
-/* Кровь и куски тел. В Яндексе выключено (модерация и возраст), в Стиме —
-   включено, но переключается в настройках (dlv-gore) */
-const GORE_ON = Platform.features.gore && Store.get('dlv-gore', true) !== false;
+/* Две версии игры. Детская (12+) — Яндекс, всегда: без крови, алкоголя,
+   табака и бит. Взрослая (18+) — Стим по умолчанию: кровь и куски тел,
+   пиво и водка в поручениях, курилка у пиццерии, пьющие компании ночью,
+   биты в кофейной войне, «взрослые» находки. В Стиме версия переключается
+   в настройках (dlv-edition), ?kids — детская для проверки. */
+const ADULT = !!Platform.features.adult && Store.get('dlv-edition', 'adult') !== 'kids' && !new URLSearchParams(location.search).has('kids');
+const GORE_ON = ADULT;
 const NUMF = new Intl.NumberFormat(curLang() === 'zh' ? 'zh-CN' : curLang());
 const money = n => NUMF.format(Math.round(n || 0)) + ' ₽';
 /* винительный падеж имени — только в русском, в других языках имя как есть */
@@ -170,7 +174,11 @@ const Snd = {
 
 const canvas = $('view');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
-const PIXEL = 2;   // лица коллег должны читаться, поэтому кадр крупнее
+/* Размер «пикселя» игры в пикселях экрана. Раньше делили CSS-пиксели на
+   два: на телефоне это 195 точек в ширину — каша. Теперь по короткой
+   стороне в физических пикселях: примерно 540 точек, как на ноутбуке с
+   1080 по высоте, — пиксель одного размера и на телефоне, и на десктопе. */
+const PIXEL_SHORT = 540;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xa8daf4);
@@ -186,8 +194,10 @@ scene.add(new THREE.AmbientLight(0xdfeaff, 0.5));
 
 function resize () {
   const w = canvas.clientWidth || 640, h = canvas.clientHeight || 360;
+  const dpr = window.devicePixelRatio || 1;
+  const px = Math.max(1, Math.min(w, h) * dpr / PIXEL_SHORT);
   renderer.setPixelRatio(1);
-  renderer.setSize(Math.max(200, Math.round(w / PIXEL)), Math.max(112, Math.round(h / PIXEL)), false);
+  renderer.setSize(Math.max(200, Math.round(w * dpr / px)), Math.max(112, Math.round(h * dpr / px)), false);
   cam.aspect = w / h;
   cam.updateProjectionMatrix();
   sizeRadar();
@@ -1832,7 +1842,7 @@ function updateDrinkit (dt) {
   if (!crewAt) return;
   const dV = Math.hypot(crewAt.x - V.x, crewAt.z - V.z);
   // война: изредка, пока курьер поблизости
-  if (!WAR.on && ['drive', 'back', 'handover', 'side'].includes(S.state) && (WAR.cd -= dt) <= 0) {
+  if (!WAR.on && !calmStart() && ['drive', 'back', 'handover', 'side'].includes(S.state) && (WAR.cd -= dt) <= 0) {
     WAR.cd = rand(80, 140);
     if (dV < 200) warStart();
   }
@@ -5299,12 +5309,18 @@ function initSmokers () {
 function smokerBody (p) {
   if (p.grp) dropMesh(p.grp);
   p.grp = makeHuman(p.person);
-  // стаканчик кофе: белый с красной крышкой «Птицы Пиццы»
+  // взрослая версия — сигарета, детская — стаканчик кофе с красной крышкой
+  if (ADULT) {
+    const cig = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.22), new THREE.MeshBasicMaterial({ color: 0xf4f1ea }));
+    cig.position.set(0, -0.5, 0.12);
+    p.grp.userData.armR.add(cig);
+  } else {
   const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.055, 0.2, 8), new THREE.MeshLambertMaterial({ color: 0xf4f1ea }));
   const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.04, 8), new THREE.MeshLambertMaterial({ color: 0xf0522a }));
   lid.position.y = 0.11; cup.add(lid);
   cup.position.set(0, -0.55, 0.1);
   p.grp.userData.armR.add(cup);
+  }
   p.grp.position.set(p.x, groundH(p.x, p.z), p.z);
   p.grp.rotation.y = Math.atan2(SMOKE_SPOT.x - p.x, SMOKE_SPOT.z - p.z);   // лицом в кружок
   scene.add(p.grp);
@@ -5327,6 +5343,13 @@ function updateSmokers (dt) {
     if ((p.puffT -= dt) <= 0) {
       p.puffT = rand(1.4, 3.2);
       const fx = Math.sin(p.grp.rotation.y), fz = Math.cos(p.grp.rotation.y);
+      if (ADULT) {
+        // затяжка — облачко дыма у лица
+        const m = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({ color: 0xe9e7e2, transparent: true, opacity: 0.5, depthWrite: false }));
+        m.position.set(p.x + fx * 0.4, groundH(p.x, p.z) + 1.6, p.z + fz * 0.4);
+        m.scale.setScalar(0.22);
+        fxAdd(m, { vy: rand(0.5, 0.9), vx: fx * 0.4 + rand(-0.2, 0.2), vz: fz * 0.4 + rand(-0.2, 0.2), life: rand(1.4, 2.2), max: 2.2, grow: 1.3 });
+      } else
       // пар от горячего кофе — маленький и у руки, а не облако у лица
       steam(p.x + fx * 0.35 + Math.cos(p.grp.rotation.y) * 0.3, 1.25, p.z + fz * 0.35 - Math.sin(p.grp.rotation.y) * 0.3);
     }
@@ -5338,7 +5361,7 @@ function updateSmokers (dt) {
       gibHuman(p, V.vx, V.vz);
       S.people++;
       Snd.squish();
-      toast($t('минус {what}', { what: p.person ? p.person.name : $t('сотрудник') }));
+      toast($t('минус {what}', { what: p.person ? p.person.name : ADULT ? $t('курильщик') : $t('сотрудник') }));
     }
   }
 }
@@ -5888,6 +5911,9 @@ function rivalCar (R) {
   const m = makeCar(R.spec.hex, true, R.spec.model);
   const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: R.tagTex, transparent: true, depthWrite: false }));
   tag.scale.set(3.2, 0.8, 1); tag.position.set(0, 3.1, 0);
+  // вплотную к камере табличка закрывала полэкрана — у камеры она тает
+  const wp = new THREE.Vector3();
+  tag.onBeforeRender = () => { tag.getWorldPosition(wp); tag.material.opacity = clamp((wp.distanceTo(cam.position) - 9) / 8, 0, 1); };
   m.add(tag);
   return m;
 }
@@ -6027,6 +6053,7 @@ function updateRivals (dt) {
     if (t.wreck || t.knock || t.stalled) continue;
     if (R.state === 'wait') {
       t.speed = 0; t.path = null;
+      if (calmStart()) { R.wait = Math.max(R.wait, 1); continue; }    // первый заказ — стоят колонной и ждут
       if ((R.wait -= dt) <= 0) {
         R.goal = rivalGoal();
         if (!R.goal) { R.wait = 3; continue; }
@@ -6219,7 +6246,7 @@ function clearAccident (a) {
 
 function updateAccidents (dt) {
   const live = ['drive', 'back', 'handover', 'side'].includes(S.state) || S.ride && S.state === 'drive';
-  if (live && ACCIDENTS.length < 2 && (accCd -= dt) <= 0) { accCd = rand(50, 100); if (chance(0.7)) spawnAccident(); }
+  if (live && !calmStart() && ACCIDENTS.length < 2 && (accCd -= dt) <= 0) { accCd = rand(50, 100); if (chance(0.7)) spawnAccident(); }
   const blink = Math.floor(tG * 2.5) % 2 === 0;
   const fx = Math.sin(V.h), fz = Math.cos(V.h), vsp = Math.hypot(V.vx, V.vz);
   for (let i = ACCIDENTS.length - 1; i >= 0; i--) {
@@ -6370,7 +6397,7 @@ function ownerStep (dt) {
 function updateThief (dt) {
   const live = ['drive', 'back', 'handover', 'side'].includes(S.state);
   ownerStep(dt);
-  if (!THIEF.p) { if (live && (THIEF.cd -= dt) <= 0) spawnThief(); return; }
+  if (!THIEF.p) { if (live && !calmStart() && (THIEF.cd -= dt) <= 0) spawnThief(); return; }
   const p = THIEF.p, u = p.grp.userData;
   if (!live && S.state !== 'brief' && S.state !== 'loading') { dropThief(); dropOwner(); return; }
   if ((p.sayT -= dt) <= 0) { p.sayT = 1.1; p.line = (p.line + 1) % THIEF_LINES.length; setSay(p.bubble, THIEF_LINES[p.line], '#d9342c'); }
@@ -6598,7 +6625,19 @@ function updateNitro (dt) {
    навсегда в коллекции, с карты он пропадает. В меню — сетка: найденные с
    картинкой, остальные под вопросом. Все иконки нарисованы кодом (colIcon):
    чужих картинок в игре нет. */
-const COLLECT = [
+const COLLECT = ADULT ? [
+  // взрослая версия: половина находок — то, что в детской нельзя
+  { id: 'latte', name: $t('латте с медовой пенкой') },
+  { id: 'snus', name: $t('шайба снюса'), near: true },
+  { id: 'cig', name: $t('пачка «Шапмэн» с вишней'), near: true },
+  { id: 'cassette', name: $t('аудиокассета'), near: true },
+  { id: 'herb', name: $t('подозрительный свёрток'), near: true },
+  { id: 'beer', name: $t('пиво «Жигулёвочка»') },
+  { id: 'salmon', name: $t('пицца с лососем') },
+  { id: 'pager', name: $t('пейджер') },
+  { id: 'penguin', name: $t('плюшевый пингвин'), far: true },
+  { id: 'peel', name: $t('золотая лопата для пиццы'), far: true },
+] : [
   { id: 'latte', name: $t('латте с медовой пенкой') },
   { id: 'duck', name: $t('резиновая уточка'), near: true },
   { id: 'cactus', name: $t('кактус в горшке'), near: true },
@@ -6673,6 +6712,31 @@ function colIcon (c, done) {
       C('#1b1a1f', 64, 76, 36); C('#f4f4ee', 64, 82, 24); C('#1b1a1f', 64, 38, 24); C('#f4f4ee', 64, 42, 14);
       C('#1b1a1f', 58, 38, 3); C('#1b1a1f', 70, 38, 3); R('#ff8a2b', 60, 44, 8, 6);
       R('#ff8a2b', 44, 108, 14, 8); R('#ff8a2b', 70, 108, 14, 8); R('#e04836', 44, 58, 40, 6);   // лапы и шарф
+      break;
+    case 'herb':
+      x.fillStyle = '#c9a877'; x.beginPath(); x.moveTo(30, 110); x.lineTo(98, 110); x.lineTo(80, 40); x.lineTo(48, 40); x.closePath(); x.fill();
+      R('#a88859', 52, 30, 24, 12);
+      x.fillStyle = '#4fae3a';
+      for (const [a, b, r] of [[50, 22, 12], [66, 14, 13], [80, 24, 11], [60, 30, 10]]) { x.beginPath(); x.arc(a, b, r, 0, 7); x.fill(); }
+      T('?', 64, 80, '#6b4a3a', 30);
+      break;
+    case 'snus':
+      x.fillStyle = '#1f3f7a'; x.beginPath(); x.ellipse(64, 70, 46, 30, 0, 0, 7); x.fill();
+      x.fillStyle = '#2f5fd0'; x.beginPath(); x.ellipse(64, 60, 46, 30, 0, 0, 7); x.fill();
+      x.strokeStyle = '#fff3d6'; x.lineWidth = 4; x.beginPath(); x.ellipse(64, 60, 34, 20, 0, 0, 7); x.stroke();
+      T('SNUS', 64, 61, '#fff3d6', 14);
+      break;
+    case 'cig':
+      // пачка пародийной марки: сигареты торчат, вишня на пачке
+      R('#2b2a30', 36, 18, 56, 94); R('#8a1c3a', 38, 20, 52, 90); R('#ffd3dc', 38, 34, 52, 12);
+      T('ШАПМЭН', 64, 40, '#8a1c3a', 8);
+      C('#e8323c', 58, 74, 7); C('#e8323c', 70, 76, 7); R('#4fae3a', 62, 60, 4, 10);
+      R('#f3e9d8', 44, 10, 10, 14); R('#f3e9d8', 58, 8, 10, 16); R('#f3e9d8', 72, 11, 10, 13);
+      R('#d9832c', 44, 10, 10, 3); R('#d9832c', 58, 8, 10, 3); R('#d9832c', 72, 11, 10, 3);
+      break;
+    case 'beer':
+      R('#6b3f1c', 50, 40, 28, 74); R('#6b3f1c', 56, 12, 16, 30); R('#e8d7a8', 54, 8, 20, 8);
+      R('#f2e3b0', 50, 64, 28, 30); T('ЖИГ', 64, 79, '#6b3f1c', 12);
       break;
     case 'peel':
       R('#c8a15a', 58, 60, 12, 60); R('#ffd85e', 30, 10, 68, 56); R('#f2b441', 30, 58, 68, 8);
@@ -6802,7 +6866,7 @@ function rebuildRoutePath () {
 const CARS = [
   // каждая следующая — на сердце крепче и быстрее: vmax — максималка, м/с, acc — разгон
   { id: 'dodo', name: $t('Птица-седан'), note: $t('курьерская, своя'), model: 'sedan', hex: '#f0522a', hp: 5, price: 0, vmax: 48, acc: 36 },
-  { id: 'drista', name: $t('Мада Тень'), note: $t('тонированный заниженный седан'), model: 'sedan', hex: '#2b2d33', hp: 6, price: 2500, tint: true, low: true, vmax: 51, acc: 38 },
+  { id: 'drista', name: ADULT ? $t('Мада Дриста') : $t('Мада Тень'), note: $t('тонированный заниженный седан'), model: 'sedan', hex: '#2b2d33', hp: 6, price: 2500, tint: true, low: true, vmax: 51, acc: 38 },
   { id: 'malina', name: $t('Мада Малина'), note: $t('хэтчбек малинового цвета'), model: 'hatch', hex: '#c2185b', hp: 7, price: 5000, vmax: 54, acc: 40 },
   { id: 'shmolf', name: $t('Пельпаген Шмольф'), note: $t('хэтчбек, чёрный'), model: 'hatch', hex: '#17171b', hp: 8, price: 9000, vmax: 57, acc: 42 },
   { id: 'bladen', name: $t('Стрела Спорт'), note: $t('спортивное купе — самый быстрый'), model: 'coupe', hex: '#e0d2b0', hp: 9, price: 15000, vmax: 66, acc: 48 },
@@ -6926,11 +6990,11 @@ function renderSettings () {
   elPanelBody.innerHTML = '<div class="pn-t">' + $t('настройки') + '</div>' +
     row($t('звук'), Snd.on ? $t('вкл') : $t('выкл'), 'set-snd') +
     row('🌐 ' + $t('язык'), LANG_NAMES[curLang()], 'set-lang') +
-    (Platform.features.gore ? row($t('кровь'), GORE_ON ? $t('вкл') : $t('выкл'), 'set-gore') : '') +
+    (Platform.features.adult ? row($t('версия'), ADULT ? $t('взрослая 18+') : $t('детская'), 'set-ed') : '') +
     '<div class="pn-n">' + $t('карта — © участники OpenStreetMap, лицензия ODbL. Рельеф — SRTM (NASA).') + '</div>';
   $('set-snd').onclick = () => { Snd.set(!Snd.on); renderSettings(); };
   $('set-lang').onclick = () => renderLangs();
-  if ($('set-gore')) $('set-gore').onclick = () => { Store.set('dlv-gore', !GORE_ON); setTimeout(() => location.reload(), 150); };
+  if ($('set-ed')) $('set-ed').onclick = () => { Store.set('dlv-edition', ADULT ? 'kids' : 'adult'); Platform.store.flush && Platform.store.flush(); setTimeout(() => location.reload(), 150); };
 }
 $('st-lang').addEventListener('click', () => { elPanel.hidden = false; elPanel.dataset.kind = 'lang'; renderLangs(); });
 $('st-lang-n').textContent = LANG_NAMES[curLang()];
@@ -7388,20 +7452,41 @@ const camInWall = (x, z) => {
   return false;
 };
 
+/* мелочь (деревья, столбы, остановки) камеру не толкает — только дома и стены */
+const camClear = (x, z) => {
+  for (const s of solidsNear(x, z)) {
+    if (s.deckY !== undefined || (s.hw < 1.6 && s.hd < 1.6)) continue;
+    const dx = x - s.cx, dz = z - s.cz;
+    const lx = dx * s.cs + dz * s.sn, lz = -dx * s.sn + dz * s.cs;
+    if (Math.abs(lx) < s.hw + 0.9 && Math.abs(lz) < s.hd + 0.9) return false;
+  }
+  return !inHouse(x, z, 0.9);
+};
+
 function camStep (dt, vf) {
   // на нитро кадр расходится шире — скорость видно
   const fov = damp(cam.fov, NOS.burn ? 80 : FXS.beastT > 0 && IN.nitro ? 84 : 64, 3.5, dt);
   if (Math.abs(fov - cam.fov) > 0.02) { cam.fov = fov; cam.updateProjectionMatrix(); }
   V.camH = damp(V.camH, V.h, 4.5, dt);
-  let back = 12.5 + clamp(Math.abs(vf) / VMAX, 0, 1) * 4.5;
-  // камера подтягивается к машине, если сзади стена — иначе кадр уходит внутрь дома
-  while (back > 4.5 && camInWall(V.x - Math.sin(V.camH) * back, V.z - Math.cos(V.camH) * back)) back -= 1.5;
-  const tx = V.x - Math.sin(V.camH) * back;
-  const tz = V.z - Math.cos(V.camH) * back;
+  const full = 12.5 + clamp(Math.abs(vf) / VMAX, 0, 1) * 4.5;
+  /* Камера упирается в дом, а не входит в него: идём от машины назад по
+     линии взгляда и останавливаемся у первой стены. Чем ближе пришлось
+     подойти, тем выше камера поднимается и смотрит на машину сверху —
+     так её и улицу видно даже в узком проезде. Подходит к стене быстро,
+     отходит обратно плавно. */
+  const sx = Math.sin(V.camH), sz = Math.cos(V.camH);
+  let back = full;
+  for (let d = 2; d <= full; d += 0.75) if (!camClear(V.x - sx * d, V.z - sz * d)) { back = Math.max(2.5, d - 1.4); break; }
+  const pull = full - back;
+  V.camPull = damp(V.camPull || 0, pull, pull > (V.camPull || 0) ? 18 : 2.5, dt);
+  const eff = full - V.camPull;
+  const tx = V.x - sx * eff, tz = V.z - sz * eff;
   V.camX = damp(V.camX, tx, 9, dt);
   V.camZ = damp(V.camZ, tz, 9, dt);
-  // камера висит над машиной, но не ниже горки у себя за спиной
-  const want = Math.max(V.y + 6.2, groundH(V.camX, V.camZ) + 3);
+  // отстающая камера всё равно могла оказаться в стене — тогда сразу на место
+  if (!camClear(V.camX, V.camZ)) { V.camX = tx; V.camZ = tz; }
+  // камера висит над машиной, но не ниже горки у себя за спиной; у стены — выше
+  const want = Math.max(V.y + 6.2 + V.camPull * 0.6, groundH(V.camX, V.camZ) + 3);
   V.camY = damp(V.camY, want, 6, dt);
   const sh = S.shake;
   cam.position.set(V.camX + (sh ? rand(-sh, sh) : 0), V.camY + (sh ? rand(-sh, sh) : 0), V.camZ);
@@ -7654,7 +7739,7 @@ function drawFullMap () {
 /* чем дерутся в кофейной войне: в мягком режиме (Яндекс) — подушками,
    иначе битами. Подушка — белый пухлый брусок, не оружие */
 function warStick (hex) {
-  if (GORE_ON) return new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.95), new THREE.MeshLambertMaterial({ color: hex }));
+  if (ADULT) return new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.95), new THREE.MeshLambertMaterial({ color: hex }));
   return new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.16, 0.62), new THREE.MeshLambertMaterial({ color: 0xf4f1ea }));
 }
 
@@ -7764,6 +7849,10 @@ function toast (t) { t = String(t || ""); if (!t) return; elToast.textContent = 
 
 function hudStep (dt) {
   elMoney.textContent = money(S.money);
+  touchpadStep();
+  const es = $('endshift'), showEs = isPlaying() && !S.ride;
+  if (es.hidden === showEs) es.hidden = !showEs;
+  if (showEs) { const tt = fmtTime(S.shiftT); if ($('shift-t').textContent !== tt) $('shift-t').textContent = tt; }
   elBurgers.innerHTML = [S.burgers ? $t('респект {n}', { n: S.burgers }) : '', S.people ? $t('сбито {n}', { n: S.people }) : '',
     S.scoots ? $t('самокатов {n}', { n: S.scoots }) : '', S.wrecks ? $t('всмятку {n}', { n: S.wrecks }) : ''].filter(Boolean).join('<br>');
   elSpeed.textContent = $t('{n} км/ч', { n: Math.round(Math.hypot(V.vx, V.vz) * 3.6) });
@@ -7802,6 +7891,7 @@ function hudStep (dt) {
 
 
 function showBig (title, sub, keys, go) {
+  $('over').hidden = true;
   elBig.hidden = false;
   elBigT.textContent = title;
   elBigS.innerHTML = sub;
@@ -7811,18 +7901,33 @@ function showBig (title, sub, keys, go) {
   elName.value = S.name;
   syncGo();
   closePanel();
+  renderProfile();
+  Platform.gameplayStop();
+}
+
+/* Профиль на заставке: уровень цифрой в кружке, имя, место в таблице и
+   кошелёк, полоска — сколько осталось до следующего уровня */
+function renderProfile () {
   const xp = getXP(), l = levelOf(xp);
-  $('st-lvl').textContent = $t('уровень курьера {n}', { n: l }) + ' · ' + (l < 5 ? $tn(LVL_AT[l + 1] - xp, 'до следующего {n} заказ|до следующего {n} заказа|до следующего {n} заказов') : $t('максимальный'));
+  $('pf-lvl').textContent = l;
+  $('pf-lvl').title = $t('уровень курьера {n}', { n: l });
+  $('pf-name').textContent = S.name || Platform.player.name || $t('курьер');
+  const mine = (LB.cache || []).find(r => r.me);
+  $('pf-rank').textContent = (mine ? $t('#{n} в таблице', { n: mine.rank }) + ' · ' : '') + money(wallet());
+  const lo = LVL_AT[l], hi = LVL_AT[l + 1];
+  $('pf-xp').style.width = (l >= 5 ? 100 : Math.round(clamp((xp - lo) / (hi - lo), 0, 1) * 100)) + '%';
+  $('pf-xp').parentElement.title = l < 5 ? $tn(hi - xp, 'до следующего {n} заказ|до следующего {n} заказа|до следующего {n} заказов') : $t('максимальный');
 }
 
 /* Имя — сразу на заставке: большое поле и «поехали», которая оживает,
-   как только имя вписано. Под ним смена сама пишется в общий зачёт. */
-const elName = $('st-name'), elGo = $('st-go'), elNote = $('st-note');
+   как только имя вписано. Под ним смена сама пишется в таблицу. */
+const elName = $('st-name'), elGo = $('st-go'), elNote = $('st-note2');
 function syncGo () { elGo.disabled = Platform.features.nameInput && !elName.value.trim(); }
 elName.addEventListener('input', () => {
   syncGo();
   S.name = elName.value.trim();
   Store.set('dlv-name', S.name);
+  renderProfile();
 });
 for (const ev of ['keydown', 'keyup', 'keypress']) elName.addEventListener(ev, e => e.stopPropagation());
 $('start').addEventListener('submit', e => {
@@ -7835,31 +7940,71 @@ $('start').addEventListener('submit', e => {
 });
 /* «ещё раз» после смены — естественная пауза: здесь реклама (если пора) */
 function goRun () {
-  if (S.state === 'over' && Platform.features.ads && (S.delivered || 0) > 0) { S.state = 'title'; showAd().then(() => startRun()); }
+  if (S.state === 'over' && Platform.features.ads && (S.delivered || 0) > 0) { S.state = 'title'; $('over').hidden = true; showAd().then(() => startRun()); }
   else startRun();
 }
-const hideBig = () => { elBig.hidden = true; };
+const hideBig = () => { elBig.hidden = true; $('over').hidden = true; };
 const hideOver = hideBig;
+$('ov-again').addEventListener('click', () => { Snd.boot(); Snd.resume(); goRun(); });
+$('ov-menu').addEventListener('click', () => { S.state = 'title'; $('over').hidden = true; showTitle(); });
 
-/* ── конец смены: за что закончилась, сколько заработал и где ты в общем зачёте ── */
+/* время смены: 12:34 */
+const fmtTime = sec => { sec = Math.max(0, Math.floor(sec || 0)); const m = Math.floor(sec / 60), s = sec % 60; return m + ':' + String(s).padStart(2, '0'); };
+$('endshift').addEventListener('click', e => { e.currentTarget.blur(); if (isPlaying() && !S.ride) endShift(); });
+
+/* ── конец смены ──
+   Отдельный экран, а не простыня текста: крупно — чем кончилось
+   («ты проиграл» или «смена закончена»), строкой — почему, дальше цифры
+   смены набегают по очереди. Внизу — «ещё раз» и «в меню». */
+const OVER_WHY = {
+  'не доставил': victims => $t(GORE_ON ? 'вместо пиццы ты задавил {who}' : 'вместо пиццы ты сбил {who}', { who: victims.map(accName).join(', ') }),
+  'машина всё': () => $t('машина разбита — кончились сердца'),
+  'утонул': () => $t('машина ушла под воду — вплавь не довезёшь'),
+  'не успел': () => $t('заказ протух — клиент не дождался'),
+  'смена окончена': () => $t('ты сам закончил смену — результат сохранён'),
+};
+function countUp (el, to, fmt, ms) {
+  const t0 = performance.now();
+  const step = now => {
+    const k = Math.min(1, (now - t0) / ms), e = 1 - (1 - k) ** 3;
+    el.textContent = fmt(to * e);
+    if (k < 1) requestAnimationFrame(step); else el.textContent = fmt(to);
+  };
+  requestAnimationFrame(step);
+}
 function showOver (why, victims) {
-  const title = $t(OVER_TITLE[why] || why);
   Platform.store.flush && Platform.store.flush();       // итоги смены — в облако сразу
-  if (S.money > S.best) { S.best = S.money; Store.set('dlv-msk-best', String(S.money)); }
-  const vic = victims.length
-    ? '<span class="ov-vic">' + $t(GORE_ON ? $t('вместо пиццы ты задавил {who}') : $t('вместо пиццы ты сбил {who}'), { who: victims.map(accName).join(', ') }) + '</span><br>'
-    : '';
-  showBig(title,
-    vic +
-    $t('доставлено {n} · заработано {money}', { n: S.delivered, money: money(S.money) }) + '<br>' +
-    $t('респектов {a} · прохожих сбито {b} · самокатов {c}', { a: S.burgers, b: S.people, c: S.scoots }) + '<br>' +
-    $t('чужих машин всмятку {n}', { n: S.wrecks }) + '<br>' +
-    (RIVALS.length ? $t('место среди курьеров: {i} из {n}', { i: rivalBoard().findIndex(r => r.me) + 1, n: RIVALS.length + 1 }) + '<br>' : '') +
-    (S.money >= S.best ? $t('лучшая смена!') : $t('твой рекорд {money}', { money: money(S.best) })) + '<br>' +
-    $t('все деньги уже в кошельке: {money} — загляни в гараж', { money: money(wallet()) }),
-    '', $t('ещё раз'));
+  Platform.gameplayStop();
+  const best = S.money > S.best;
+  if (best) { S.best = S.money; Store.set('dlv-msk-best', String(S.money)); }
+  elBig.hidden = true;
+  closePanel();
+  const lost = why !== 'смена окончена';
+  $('ov-t').textContent = lost ? $t('ты проиграл') : $t('смена закончена');
+  $('ov-t').classList.toggle('win', !lost);
+  $('ov-why').textContent = (OVER_WHY[why] || (() => $t(OVER_TITLE[why] || why)))(victims || []);
+  const place = RIVALS.length ? rivalBoard().findIndex(r => r.me) + 1 : 0, nCour = RIVALS.length + 1;
+  const rows = [
+    [$t('заработано'), S.money, money, true],
+    [$t('доставлено заказов'), S.delivered, n => String(Math.round(n))],
+    [$t('время смены'), S.shiftT || 0, fmtTime],
+    place ? [$t('место среди курьеров'), place, n => $t('{i} из {n}', { i: Math.max(1, Math.round(n)), n: nCour })] : null,
+    [$t('респектов'), S.burgers, n => String(Math.round(n))],
+    [$t('прохожих сбито'), S.people, n => String(Math.round(n))],
+    [$t('машин всмятку'), S.wrecks, n => String(Math.round(n))],
+  ].filter(Boolean);
+  const box = $('ov-stats');
+  box.innerHTML = rows.map((r, i) => '<div class="ov-row' + (r[3] ? ' big' : '') + '" data-i="' + i + '"><span>' + r[0] + '</span><b>' + r[2](0) + '</b></div>').join('');
+  rows.forEach((r, i) => setTimeout(() => {
+    const row = box.children[i];
+    if (!row) return;
+    row.classList.add('on');
+    countUp(row.querySelector('b'), r[1], r[2], 700);
+    if (r[1]) Snd.blip(700 + i * 90, 0.06, 'square', 0.06);
+  }, 250 + i * 320));
+  $('ov-best').textContent = best && S.money > 0 ? $t('лучшая смена!') : S.best ? $t('твой рекорд {money}', { money: money(S.best) }) : '';
+  $('over').hidden = false;
   overExtras();
-  $('lb-wrap').hidden = false;
   LB.render(S.money);
   // смена сама пишется в таблицу; без времени любой бы собрал миллион —
   // такие не идут. ?nolb — прогоны при проверке: ничего не пишем
@@ -7947,7 +8092,7 @@ const LB = {
     $('board-me').textContent = line || (mine ? $t('ты — {n}-й, {money}', { n: mine.rank, money: money(mine.score) }) : '');
   },
 };
-LB.load().then(() => LB.render(0)).catch(() => {});
+LB.load().then(() => { LB.render(0); if (!elBig.hidden) renderProfile(); }).catch(() => {});
 
 /* ─────────────── умный трекер: кто, что и почему ───────────────
    Заказы назначает трекер: сам решает, кого объединить в один
@@ -8257,6 +8402,10 @@ function addXP () {
 
 /* учебный заказ был — больше не показываем, и стрелку тоже */
 const tutDone = () => String(Store.get('dlv-msk-tut', '')) === '1';
+/* Самое начало игры — спокойное: пока не отвезён учебный заказ, соперники
+   стоят колонной у пиццерии, нет ни аварий, ни похитителя, ни кофейной
+   войны. Только ты, прямая улица и клиент на углу. */
+const calmStart = () => !S.ride && !tutDone();
 
 /* Точка учебного заказа: от курьера прямо по своей улице до первого
    перекрёстка, там направо — и тридцать метров по правому тротуару. */
@@ -8269,6 +8418,14 @@ function tutorialSpot () {
   let dist = 0;
   for (let k = 0; k < 40 && dist < 360; k++) {
     const n = e.b;
+    /* Учебный клиент стоит прямо на углу первого перекрёстка, на правом
+       тротуаре, за несколько метров до стоп-линии: едешь прямо — и видишь
+       его справа. Поворачивать никуда не надо. */
+    if (nodeDeg(n) >= 3 && dist + e.len > 35) {
+      const B = NODES[n], back = (e.tB || 6) + 4, o = e.w / 2 + 1.8;
+      const x = B.x - e.ux * back + e.rx * o, z = B.z - e.uz * back + e.rz * o;
+      if (!inHouse(x, z, 1)) return { x, z };
+    }
     if (nodeDeg(n) >= 3 && dist > 15) {
       let best = null, ba = 0.7;
       for (const c of NODES[n].nb) {
@@ -8356,7 +8513,7 @@ function planOrder () {
       if (p.idle) releaseIdle(p);
       p.path = null; p.w = null;
       p.x = sp.x; p.z = sp.z;
-      return { kind: 'solo', tut: true, stops: [{ peds: [p] }], why: $t('первый заказ: прямо и направо') };
+      return { kind: 'solo', tut: true, stops: [{ peds: [p] }], why: $t('первый заказ: прямо до перекрёстка, клиент справа') };
     }
   }
   /* Сложность — от уровня курьера и от того, сколько заказов уже в этой
@@ -8735,6 +8892,12 @@ const ERRANDS = [
   { ask: $t('за сухариками'), what: $t('сухарики'), kinds: ['grocery'], prefer: /пят|дикси|вкусвилл|магнит|перекр|продукт/i, gotIt: $t('сухарики взял') },
   { ask: $t('за пластырем'), what: $t('пластырь'), kinds: ['pharm'], prefer: /аптек|36,6|столич|ригла/i, gotIt: $t('пластырь взял') },
   { ask: $t('за зарядкой для телефона'), what: $t('зарядка'), kinds: ['shop'], prefer: /мтс|билайн|мегафон|dns|связ|t2|samsung|store|видео/i, anyKind: true, gotIt: $t('зарядку взял') },
+  // взрослая версия: то, за чем на самом деле гоняют курьера
+  ...(ADULT ? [
+    { ask: $t('за пивом'), what: $t('пиво'), kinds: ['grocery'], prefer: /пив|beer|разлив|пят|дикси|магнит|продукт/i, gotIt: $t('пиво взял') },
+    { ask: $t('за снюсиком'), what: $t('снюс'), kinds: ['grocery', 'shop'], prefer: /табак|tobac|smoke|vape|вейп|кальян|красное|бристоль|продукт/i, anyKind: true, gotIt: $t('снюсик взял') },
+    { ask: $t('за водочкой'), what: $t('водочка'), kinds: ['grocery'], prefer: /вин|алко|wine|красное|бристоль|пят|продукт/i, gotIt: $t('водочку взял') },
+  ] : []),
 ];
 function errandShop (it, ped) {
   // латешка — только в Drinkit: ближайшая из наших синих кофеен
@@ -8941,7 +9104,7 @@ function startRun (ride) {
   S.done = 0; S.mealDone = 0; S.meals = 0; S.tipMul = 1; S.nosEff = 1; S.mealTime = 0; S.side = null;
   hideChoice();
   THIEF.cd = rand(35, 60);
-  S.state = 'drive'; S.hp = S.hpMax; S.money = 0; S.orders = 0; S.burgers = 0;
+  S.state = 'drive'; S.hp = S.hpMax; S.money = 0; S.orders = 0; S.burgers = 0; S.shiftT = 0;
   S.people = 0; S.wrecks = 0; S.delivered = 0; S.scoots = 0;
   S.hurt = 0; S.shake = 0;
   S.freeRun = S.free;
@@ -9085,11 +9248,35 @@ function joyApply () {
   IN.hand = JOY.hand !== null ? 1 : 0;
   elKnob.style.transform = 'translate(' + (JOY.x * JOY_R) + 'px, ' + (JOY.y * JOY_R) + 'px)';
 }
+/* ── телефон: кнопки вместо джойстика ──
+   Как в казуальных гонках: руль ◀ ▶ под левым большим пальцем, газ,
+   тормоз, нитро и ручник — под правым. Каждая кнопка держит свой палец
+   (pointer capture), поэтому газ с рулём жмутся одновременно. */
+const TOUCH = matchMedia('(pointer: coarse)').matches || (navigator.maxTouchPoints > 0 && 'ontouchstart' in window);
+document.body.classList.toggle('touch', TOUCH);
+const elTouch = $('touchpad');
+for (const b of elTouch.querySelectorAll('button[data-k]')) {
+  const k = b.dataset.k;
+  const on = e => { e.preventDefault(); Snd.boot(); Snd.resume(); try { b.setPointerCapture(e.pointerId); } catch (_) {} IN[k] = 1; IN.joy = 0; b.classList.add('on'); };
+  const off = () => { IN[k] = 0; b.classList.remove('on'); };
+  b.addEventListener('pointerdown', on);
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(ev, off);
+  b.addEventListener('contextmenu', e => e.preventDefault());
+}
+function touchpadStep () {
+  const show = TOUCH && isPlaying() && !S.paused && !FM.open && S.state !== 'brief' && S.state !== 'loading';
+  if (elTouch.hidden === show) {
+    elTouch.hidden = !show;
+    if (!show) for (const b of elTouch.querySelectorAll('.on')) { b.classList.remove('on'); IN[b.dataset.k] = 0; }
+  }
+}
+
 /* Палец считаем только если он лёг на саму картинку: кнопки хада и
-   «принять» в джойстик не уходят. */
+   «принять» в джойстик не уходят. На телефоне джойстика нет — там кнопки. */
 addEventListener('pointerdown', e => {
   Snd.boot(); Snd.resume();
   if (e.target !== canvas) return;              // поля и кнопки хада не трогаем
+  if (TOUCH && e.pointerType !== 'mouse') return;
   if (S.state === 'title' || S.state === 'over') return;       // стартуем кнопкой «поехали»
   if (JOY.id === null) {
     JOY.id = e.pointerId; JOY.ox = e.clientX; JOY.oy = e.clientY; JOY.x = JOY.y = 0;
@@ -9498,13 +9685,16 @@ function updateBirds (dt) {
    больше пяти сразу), остальные «ждут» в списке мест. */
 const PUB_SPOTS = [];
 const CROWDS = [];
-const BURPS = ['♪ ' + $t('ла-ла-ла') + ' ♪', '♪ ' + $t('о-о-о') + ' ♪', $t('ещё песню!'), $t('давай хором!'), $t('ну ты это…'), $t('уважаю!'), $t('красиво поёшь!'), '♪ ♫ ♪'];
+/* детская версия — поют с газировкой, взрослая — пьют и рыгают, как было */
+const BURPS = ADULT
+  ? [$t('*рыг*'), $t('БУЭЭЭ'), $t('ЫЫЫК'), $t('за здоровье!'), $t('ещё по одной'), $t('ну ты это…'), $t('уважаю!'), $t('*ик*')]
+  : ['♪ ' + $t('ла-ла-ла') + ' ♪', '♪ ' + $t('о-о-о') + ' ♪', $t('ещё песню!'), $t('давай хором!'), $t('ну ты это…'), $t('уважаю!'), $t('красиво поёшь!'), '♪ ♫ ♪'];
 function buildPubSpots () {
   const pubName = /бар|bar|паб|pub|пив|beer|вин|wine|разлив|двор|друзья|егерь|мясо|хинкал|швили|авлабар/i;
   const coffee = /coffee|кофе|cofix|шоколад|crepe|bakery|круассан|cinnabon|чай|морс|healthy|drinkit|даблби|wakecup/i;
   for (const poi of CITY.pois) {
     if (!poi.w) continue;
-    const ok = ((poi.k === 'food' || poi.k === 'cafe') && pubName.test(poi.n0)) || (poi.k === 'food' && !coffee.test(poi.n0) && chance(0.5));
+    const ok = (ADULT && poi.k === 'grocery' && /пив|beer|вин|разлив/i.test(poi.n0)) || ((poi.k === 'food' || poi.k === 'cafe') && pubName.test(poi.n0)) || (poi.k === 'food' && !coffee.test(poi.n0) && chance(0.5));
     if (!ok) continue;
     const [wx, wz, nx, nz] = poi.w;
     const x = wx + nx * 4.2, z = wz + nz * 4.2;
@@ -9541,8 +9731,10 @@ function spawnCrowd (sp) {
     if (inHouse(x, z, 0.4)) continue;
     const person = chance(0.35) ? nextPerson() : null;          // иногда среди них — коллега
     const grp = makeHuman(person, { fat: chance(0.35) });
-    // баночка газировки в правой руке — яркая, чтобы никто не принял за пиво
-    const bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.2, 8), new THREE.MeshLambertMaterial({ color: pick([0xe04836, 0x4f7fd6, 0x59b06a, 0xffd23f, 0xff8ad0]) }));
+    // во взрослой — бутылка тёмного стекла, в детской — яркая баночка газировки
+    const bottle = ADULT
+      ? new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.28, 6), new THREE.MeshLambertMaterial({ color: chance(0.5) ? 0x5a3a16 : 0x2f5a2a }))
+      : new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.2, 8), new THREE.MeshLambertMaterial({ color: pick([0xe04836, 0x4f7fd6, 0x59b06a, 0xffd23f, 0xff8ad0]) }));
     bottle.position.set(0, -0.55, 0.1);
     grp.userData.armR.add(bottle);
     grp.rotation.y = Math.atan2(sp.x - x, sp.z - z);
@@ -9602,7 +9794,7 @@ function updateCrowds (dt) {
           gibHuman(q, V.vx, V.vz);
           S.people++;
           Snd.squish();
-          toast($t('минус {what}', { what: q.person ? q.person.name : pick([$t('гитарист'), $t('певец'), $t('полуночник')]) }));
+          toast($t('минус {what}', { what: q.person ? q.person.name : ADULT ? pick([$t('любитель пива'), $t('собутыльник'), $t('тостующий')]) : pick([$t('гитарист'), $t('певец'), $t('полуночник')]) }));
         }
       }
     }
@@ -9614,9 +9806,10 @@ function updateCrowds (dt) {
       if (alive.length && dC < 140) {
         const q = pick(alive), txt = pick(BURPS);
         if (c.say) { c.say.parent && c.say.parent.remove(c.say); c.say.material.dispose(); }
-        c.say = sayBubble(q.grp, txt, '#5a4a9a', 2.6);
+        c.say = sayBubble(q.grp, txt, ADULT ? '#5a7a2a' : '#5a4a9a', 2.6);
         c.sayT = 1.6;
-        if (dC < 70 && txt.includes('♪')) { const v = 0.06 * (1 - dC / 70), f0 = rand(330, 520); [0, 1, 2].forEach(i => setTimeout(() => Snd.blip(f0 * [1, 1.25, 1.5][i], 0.18, 'triangle', v), i * 180)); }
+        if (dC < 70 && ADULT && [0, 1, 2, 7].includes(BURPS.indexOf(txt))) { const v = 0.1 * (1 - dC / 70); Snd.blip(rand(70, 110), 0.35, 'sawtooth', v); Snd.noise(0.2, v * 0.8); }
+        else if (dC < 70 && txt.includes('♪')) { const v = 0.06 * (1 - dC / 70), f0 = rand(330, 520); [0, 1, 2].forEach(i => setTimeout(() => Snd.blip(f0 * [1, 1.25, 1.5][i], 0.18, 'triangle', v), i * 180)); }
       }
     }
   }
@@ -9672,6 +9865,7 @@ function padScreen () {
   if (!$('choice').hidden && CH.pause) return $('choice');
   if (S.paused && elPause && !elPause.hidden) return elPause;
   if (elPhone.classList.contains('on')) return elPhone;
+  if (!$('over').hidden) return $('over');
   if (!elBig.hidden) return elBig;
   return null;
 }
@@ -9703,6 +9897,7 @@ function frame (now) {
   if (S.paused || EXT.paused) return;
   if (FM.open) { drawFullMap(); return; }        // на карте игра стоит
   tG += dt;
+  if (isPlaying() && !S.ride && S.state !== 'brief' && S.state !== 'loading') S.shiftT = (S.shiftT || 0) + dt;
 
   let vf = 0;
   if (S.state === 'dying') {
@@ -9819,7 +10014,7 @@ requestAnimationFrame(frame);
 
 /* отладочная ручка */
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { S, V, TRAFFIC, PEDS, PEOPLE, PIZZA, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { S, V, TRAFFIC, PEDS, PEOPLE, PIZZA, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта

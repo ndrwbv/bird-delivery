@@ -5,3 +5,4 @@ electron/build-tag.json
 scripts/.osm-cache/
 .DS_Store
 *.zip
+media/

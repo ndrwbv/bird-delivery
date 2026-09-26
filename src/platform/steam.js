@@ -31,7 +31,7 @@ const noop = async () => false;
 const Platform = {
   id: 'steam',
   lang: 'en',
-  features: { ads: false, leaderboard: 'local', externalLinks: false, nameInput: true, gore: true, quit: true },
+  features: { ads: false, leaderboard: 'local', externalLinks: false, nameInput: true, gore: true, adult: true, quit: true },
 
   /** opts.langs — языки, для которых реально есть словари (по умолчанию SUPPORTED_LANGS). */
   async init (opts = {}) {

@@ -448,10 +448,7 @@ html[data-map="moscow"] #lb-wrap { display: none !important; }
 @media (max-width: 1180px) {
   #board { position: static; transform: none; width: min(520px, 100%); max-height: none; margin-top: 6px; }
 }
-@media (min-width: 1181px) {
-  /* колонка заставки не лезет под скорборд справа */
-  html[data-map="moscow"] #big > :not(#board) { max-width: calc(100vw - 880px); min-width: 380px; }
-}
+
 
 /* ── Москва: анкета заказа — люди крупно, остальное мелко ── */
 html[data-map="moscow"] .ph-items, html[data-map="moscow"] #ph-why, html[data-map="moscow"] .ph-src { display: none; }
@@ -734,12 +731,12 @@ html[lang="ja"] #game, html[lang="zh"] #game { font-weight: 700; letter-spacing:
 #game input { -webkit-user-select: text; user-select: text; }
 
 #st-lang {
-  position: absolute; top: 52px; right: 14px; z-index: 2; pointer-events: auto; cursor: pointer;
+  pointer-events: auto; cursor: pointer; flex: none;
   font: inherit; font-size: 9px; color: #fff3d6; background: rgba(20, 16, 30, .8);
   border: 3px solid #33210c; border-radius: 8px; padding: 8px 10px;
 }
 #st-lang b { font-weight: normal; }
-#credits { position: absolute; left: 12px; bottom: 10px; font-size: 6px; color: #b9b4ab; opacity: .75; pointer-events: none; }
+#credits { font-size: 6px; color: #b9b4ab; opacity: .75; padding: 4px 0 8px; }
 #st-set, #st-quit { flex: 1; }
 #st-quit[hidden] { display: none; }
 #ov-extra { display: flex; flex-direction: column; gap: 10px; align-items: center; margin-top: 12px; pointer-events: auto; }
@@ -763,3 +760,119 @@ html[lang="ja"] #game, html[lang="zh"] #game { font-weight: 700; letter-spacing:
 #guide .gd-pad { display: none; }
 body.pad #guide .gd-pad { display: flex; }
 body.pad #guide .gd-keys, body.pad #guide .gd-touch { display: none; }
+/* анкета на низком или узком экране: не вылезает за край, «принять» всегда видно */
+#phone { max-height: calc(100% - 24px); overflow-y: auto; }
+@media (max-width: 420px), (max-height: 560px) {
+  .oc-people { gap: 10px; }
+  .oc-p { width: 96px; }
+  .oc-p img, .oc-p i { width: 84px; height: 84px; }
+  .oc-p b { font-size: 12px; }
+  html[data-map="moscow"] #ph-accept { padding: 14px; }
+}
+/* узкий экран: полоска времени — тонкой линией во всю ширину над хадом,
+   сердца и деньги — под ней (раньше полоска налезала на сердца) */
+@media (max-width: 700px) {
+  #timewrap { top: 8px; left: 12px; right: 12px; width: auto; transform: none; height: 8px; }
+  #hud-left, #hud-right { top: 24px; }
+}
+
+/* ── заставка: профиль сверху, колонка кнопок с воздухом, таблица — внизу ──
+   Экран прокручивается сам, если не влез: ничего ни на что не налезает */
+#big { justify-content: flex-start; overflow-y: auto; padding: 0 16px 24px; gap: 0; pointer-events: auto; }
+body:has(#big:not([hidden])) .hud, body:has(#big:not([hidden])) #ctrls,
+body:has(#over:not([hidden])) .hud, body:has(#over:not([hidden])) #ctrls { visibility: hidden; }
+#topbar { position: sticky; top: 0; z-index: 2; width: 100%; display: flex; justify-content: space-between; align-items: center;
+          gap: 12px; padding: 14px 0 10px; }
+#profile { display: flex; align-items: center; gap: 12px; text-align: left; min-width: 0;
+           padding: 8px 14px 8px 8px; background: rgba(20, 16, 30, .82); border: 3px solid #33210c; border-radius: 12px; }
+#profile .lvl, .lvl-badge {
+  flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  font-style: normal; font-size: 18px; color: #33210c; background: #ffd85e; border: 3px solid #33210c;
+  box-shadow: 0 3px 0 #33210c, inset 0 -4px 0 rgba(0, 0, 0, .15);
+}
+.pf-t { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.pf-t b { font-weight: normal; font-size: 11px; color: #fff3d6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 42vw; }
+.pf-t span { font-size: 7px; color: #ffb066; }
+.pf-bar { display: block; width: 120px; height: 6px; border-radius: 3px; background: #33210c; overflow: hidden; }
+.pf-bar i { display: block; height: 100%; width: 0; background: #6fd3ff; }
+#big-main { display: flex; flex-direction: column; align-items: center; gap: 22px; width: min(560px, 100%); margin: auto 0; padding: 12px 0; }
+#big-t { margin-top: 8px; }
+#big-k:empty, #big-s:empty { display: none; }
+#start { gap: 16px; margin: 4px auto 0; }
+#st-lvl { display: none; }                                     /* уровень теперь в профиле */
+#board { position: static !important; transform: none !important; width: 100% !important; max-height: none !important; margin-top: 8px; }
+#board-list li { font-size: 11px; padding: 8px 0; }
+#board-list li:nth-child(-n+3) { font-size: 12px; }
+#board .bd-t { font-size: 12px; }
+
+/* ── итоги смены ── */
+#over { position: absolute; inset: 0; z-index: 25; display: flex; align-items: center; justify-content: center; padding: 16px;
+        background: rgba(12, 18, 40, .62); overflow-y: auto; }
+#over[hidden] { display: none; }
+.ov-box { width: min(520px, 100%); display: flex; flex-direction: column; align-items: stretch; gap: 16px; text-align: center;
+          padding: 22px 20px 20px; background: rgba(20, 16, 30, .92); border: 4px solid #33210c; border-radius: 14px;
+          box-shadow: 0 8px 0 #33210c, 0 18px 40px rgba(0, 0, 0, .35); margin: auto; }
+#ov-t { font-size: clamp(18px, 4.5vw, 30px); color: #ff5d7a; letter-spacing: .04em;
+        text-shadow: 3px 3px 0 #33210c, -3px 3px 0 #33210c, 3px -3px 0 #33210c, -3px -3px 0 #33210c; }
+#ov-t.win { color: #ffd85e; }
+#ov-why { font-size: 9px; line-height: 1.9; color: #fff3d6; }
+#ov-stats { display: flex; flex-direction: column; gap: 2px; }
+.ov-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 9px 4px;
+          border-bottom: 2px dashed rgba(255, 243, 214, .14); opacity: 0; transform: translateY(6px); transition: opacity .25s, transform .25s; }
+.ov-row.on { opacity: 1; transform: none; }
+.ov-row span { font-size: 8px; color: #b9c3e6; text-align: left; }
+.ov-row b { font-weight: normal; font-size: 13px; color: #ffd85e; white-space: nowrap; }
+.ov-row.big b { font-size: 17px; color: #fff3d6; }
+#ov-best { font-size: 9px; color: #6fd3ff; min-height: 10px; }
+.ov-note { font-size: 7px; line-height: 1.8; color: #fff3d6; opacity: .8; min-height: 9px; }
+.ov-note.bad { color: #ff8a8a; }
+.ov-btns { display: flex; gap: 10px; }
+.ov-btns button { flex: 1; font: inherit; font-size: clamp(9px, 1.6vw, 12px); padding: 16px 8px; cursor: pointer; min-height: 48px;
+                  color: #33210c; background: #ffd85e; border: 3px solid #33210c; border-radius: 8px; box-shadow: 0 4px 0 #33210c; }
+.ov-btns #ov-again { color: #fff3d6; background: #f0522a; }
+
+/* ── «закончить смену» и время смены — под деньгами ── */
+#endshift { margin-top: 8px; pointer-events: auto; cursor: pointer; font: inherit; font-size: 7px; color: #fff3d6;
+            background: rgba(20, 16, 30, .7); border: 2px solid #33210c; border-radius: 6px; padding: 6px 8px; text-shadow: none; }
+#endshift b { font-weight: normal; color: #ffd85e; margin-left: 4px; }
+#endshift[hidden] { display: none; }
+
+/* ── телефон: кнопки руля слева, педали и нитро справа ──
+   Только на сенсорных экранах (body.touch ставит игра). Радар и кнопки
+   паузы и карты уезжают наверх — низ экрана отдан пальцам. */
+#touchpad { position: absolute; inset: auto 0 0 0; z-index: 12; display: flex; justify-content: space-between; align-items: flex-end;
+            padding: 0 max(14px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+            pointer-events: none; touch-action: none; }
+#touchpad[hidden] { display: none; }
+#touchpad button { pointer-events: auto; touch-action: none; font: inherit; color: #fff3d6; cursor: pointer;
+                   background: rgba(20, 16, 30, .55); border: 3px solid rgba(255, 243, 214, .55); border-radius: 50%;
+                   box-shadow: 0 4px 0 rgba(0, 0, 0, .35); -webkit-user-select: none; user-select: none; }
+#touchpad button.on { background: rgba(255, 216, 94, .55); border-color: #ffd85e; transform: translateY(2px); box-shadow: 0 2px 0 rgba(0, 0, 0, .35); }
+.tp-left { display: flex; gap: 14px; }
+.tp-left button { width: 84px; height: 84px; font-size: 26px; }
+.tp-right { display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; gap: 12px 14px; align-items: end; }
+.tp-right button { width: 74px; height: 74px; font-size: 9px; }
+.tp-right .tp-gas { width: 96px; height: 96px; font-size: 11px; background: rgba(89, 176, 106, .6); border-color: #b8f0c4; }
+.tp-right .tp-brake { background: rgba(224, 72, 54, .55); border-color: #ffb3a8; }
+.tp-right .tp-nos { color: #6fd3ff; border-color: #6fd3ff; justify-self: center; }
+.tp-right .tp-hand { width: 60px; height: 60px; font-size: 7px; justify-self: center; }
+@media (max-height: 460px) {                                    /* телефон боком */
+  .tp-left button { width: 72px; height: 72px; }
+  .tp-right button { width: 62px; height: 62px; }
+  .tp-right .tp-gas { width: 80px; height: 80px; }
+}
+body.touch #radar { left: auto; right: 12px; bottom: auto; top: 96px; width: 92px; }
+body.touch #ctrls { bottom: auto; top: 50%; right: 8px; transform: translateY(-50%); flex-direction: column; }
+body.touch #nos, body.touch #joy { display: none !important; }
+body.touch #hud-right #endshift { margin-top: 110px; }
+body.touch #hud-right #endshift { margin-top: 8px; }
+body.touch #radar { top: 132px; }
+@media (max-width: 440px) {                                     /* узкий телефон стоя */
+  #touchpad { padding-left: 10px; padding-right: 10px; }
+  .tp-left { gap: 8px; }
+  .tp-left button { width: 64px; height: 64px; font-size: 20px; }
+  .tp-right { gap: 8px 8px; }
+  .tp-right button { width: 56px; height: 56px; font-size: 7px; }
+  .tp-right .tp-gas { width: 74px; height: 74px; font-size: 9px; }
+  .tp-right .tp-hand { width: 48px; height: 48px; font-size: 6px; }
+}

@@ -196,7 +196,7 @@ hub.onResume(() => gp(wantPlay));
 const Platform = {
   id: 'yandex',
   lang: 'ru',
-  features: { ads: false, leaderboard: 'local', externalLinks: false, nameInput: false, gore: false, quit: false },
+  features: { ads: false, leaderboard: 'local', externalLinks: false, nameInput: false, gore: false, adult: false, quit: false },
   sdk: null,            // сырой ysdk — на крайний случай, игре лучше не трогать
 
   /** opts.langs — языки, для которых реально есть словари (по умолчанию SUPPORTED_LANGS). */

@@ -31,6 +31,8 @@
     <div id="nitro" class="msk-only"><span data-i18n>кофе</span><b><i id="nitrobar"></i></b></div>
     <!-- щит и бист-мод: сколько секунд осталось -->
     <div id="fxs" class="msk-only"></div>
+    <!-- закончить смену и записать результат; рядом — сколько уже едешь -->
+    <button id="endshift" type="button"><span data-i18n>закончить смену</span> <b id="shift-t">0:00</b></button>
   </div>
 
   <!-- ── время на заказ ── -->
@@ -122,18 +124,29 @@
     </div>
   </div>
 
-  <!-- джойстик под пальцем: где положил — там центр -->
+  <!-- телефон: руль — кнопками под левым пальцем, педали и нитро — под правым -->
+  <div id="touchpad" hidden>
+    <div class="tp-left">
+      <button type="button" data-k="left" aria-label="left">◀</button>
+      <button type="button" data-k="right" aria-label="right">▶</button>
+    </div>
+    <div class="tp-right">
+      <button type="button" data-k="hand" class="tp-hand" data-i18n>ручник</button>
+      <button type="button" data-k="nitro" class="tp-nos" data-i18n>нитро</button>
+      <button type="button" data-k="brake" class="tp-brake" data-i18n>тормоз</button>
+      <button type="button" data-k="gas" class="tp-gas" data-i18n>газ</button>
+    </div>
+  </div>
+  <!-- джойстик под пальцем: где положил — там центр (мышь; на телефоне — кнопки выше) -->
   <div id="joy" class="msk-only" hidden><i id="joy-k"></i></div>
   <div id="bonus" class="msk-only"></div>
   <div id="guide" class="msk-only" hidden>
     <div class="gd-t" data-i18n>как ехать</div>
     <ul class="gd-touch">
-      <li data-i18n>положи палец на экран и тяни:</li>
-      <li><kbd data-i18n>вверх</kbd> <span data-i18n>газ</span></li>
-      <li><kbd data-i18n>вниз</kbd> <span data-i18n>тормоз и назад</span></li>
-      <li><kbd data-i18n>влево</kbd><kbd data-i18n>вправо</kbd> <span data-i18n>руль</span></li>
-      <li><kbd data-i18n>второй палец</kbd> <span data-i18n>ручник</span></li>
-      <li><kbd data-i18n>нитро</kbd> <span data-i18n>кнопка внизу — зажал и полетел</span></li>
+      <li><kbd>◀</kbd><kbd>▶</kbd> <span data-i18n>руль — левой рукой</span></li>
+      <li><kbd data-i18n>газ</kbd> <span data-i18n>справа внизу — держи</span></li>
+      <li><kbd data-i18n>тормоз</kbd> <span data-i18n>тормоз и назад</span></li>
+      <li><kbd data-i18n>нитро</kbd> <span data-i18n>над газом — зажал и полетел</span></li>
     </ul>
     <ul class="gd-keys">
       <li><kbd>W</kbd><kbd>↑</kbd> <span data-i18n>газ</span></li>
@@ -164,49 +177,73 @@
 
   <!-- ── заставка и экран конца смены ── -->
   <div id="big" hidden>
-    <!-- язык: значок-глобус и названия языков на своих языках (рекомендация Яндекса) -->
-    <button id="st-lang" type="button" aria-label="language"><span aria-hidden="true">🌐</span> <b id="st-lang-n"></b></button>
-    <div id="credits">© <span data-i18n>участники OpenStreetMap</span> · ODbL</div>
-    <div id="big-t"></div>
-    <div id="big-s"></div>
-
-    <!-- ── таблица рекордов: площадки (Яндекс) или локальная ── -->
-    <div id="lb-wrap" hidden>
-      <div id="lb-place"></div>
-      <ol id="lb-list"></ol>
+    <!-- верхняя полоса: профиль курьера (уровень цифрой, имя, место в таблице) и язык -->
+    <div id="topbar">
+      <div id="profile">
+        <em id="pf-lvl" class="lvl">1</em>
+        <div class="pf-t">
+          <b id="pf-name"></b>
+          <span id="pf-rank"></span>
+          <i class="pf-bar"><i id="pf-xp"></i></i>
+        </div>
+      </div>
+      <!-- язык: значок-глобус и названия языков на своих языках (рекомендация Яндекса) -->
+      <button id="st-lang" type="button" aria-label="language"><span aria-hidden="true">🌐</span> <b id="st-lang-n"></b></button>
     </div>
 
-    <div id="big-k"></div>
-    <!-- после смены: видео за награду (только по кнопке, награда — бонус) и вход в Яндекс ради таблицы -->
-    <div id="ov-extra" hidden>
-      <button id="ov-x2" type="button" hidden><b data-i18n>удвоить заработок</b><span data-i18n>за просмотр рекламы</span></button>
-      <button id="ov-auth" type="button" hidden data-i18n>войти, чтобы попасть в общую таблицу</button>
+    <div id="big-main">
+      <div id="big-t"></div>
+      <div id="big-s"></div>
+      <div id="big-k"></div>
+
+      <!-- ── сначала имя (кроме Яндекса — там оно из профиля), потом «поехали» ── -->
+      <form id="start" class="msk-only" autocomplete="off">
+        <label for="st-name" data-i18n>как тебя зовут</label>
+        <input id="st-name" type="text" maxlength="24" data-i18n-ph="имя и фамилия" autocomplete="off" spellcheck="false">
+        <button id="st-go" type="submit" disabled data-i18n>поехали</button>
+        <div id="st-lvl"></div>
+        <button id="st-ride" type="button" data-i18n>просто покататься</button>
+        <div class="st-row">
+          <button id="st-col" type="button" data-i18n>мои находки</button>
+          <button id="st-shop" type="button" data-i18n>гараж</button>
+        </div>
+        <div class="st-row">
+          <button id="st-set" type="button" data-i18n>настройки</button>
+          <button id="st-quit" type="button" hidden data-i18n>выйти из игры</button>
+        </div>
+        <div id="st-note"></div>
+      </form>
+
+      <!-- ── таблица рекордов: внизу, под кнопками, ничего не перекрывает ── -->
+      <aside id="board" class="msk-only">
+        <div class="bd-t" data-i18n>таблица рекордов</div>
+        <ol id="board-list"></ol>
+        <div id="board-me"></div>
+      </aside>
+      <div id="credits">© <span data-i18n>участники OpenStreetMap</span> · ODbL</div>
     </div>
+    <!-- старые узлы, которые ещё читает код -->
+    <div id="lb-wrap" hidden><div id="lb-place"></div><ol id="lb-list"></ol></div>
+  </div>
 
-    <!-- ── сначала имя (кроме Яндекса — там оно из профиля), потом «поехали» ── -->
-    <form id="start" class="msk-only" autocomplete="off">
-      <label for="st-name" data-i18n>как тебя зовут</label>
-      <input id="st-name" type="text" maxlength="24" data-i18n-ph="имя и фамилия" autocomplete="off" spellcheck="false">
-      <button id="st-go" type="submit" disabled data-i18n>поехали</button>
-      <div id="st-lvl"></div>
-      <button id="st-ride" type="button" data-i18n>просто покататься</button>
-      <div class="st-row">
-        <button id="st-col" type="button" data-i18n>мои находки</button>
-        <button id="st-shop" type="button" data-i18n>гараж</button>
+  <!-- ── итоги смены: причина, цифры набегают, дальше — в меню или ещё раз ── -->
+  <div id="over" hidden>
+    <div class="ov-box">
+      <div id="ov-t"></div>
+      <div id="ov-why"></div>
+      <div id="ov-stats"></div>
+      <div id="ov-best"></div>
+      <div id="st-note2" class="ov-note"></div>
+      <!-- видео за награду (только по кнопке, награда — бонус) и вход в Яндекс ради таблицы -->
+      <div id="ov-extra" hidden>
+        <button id="ov-x2" type="button" hidden><b data-i18n>удвоить заработок</b><span data-i18n>за просмотр рекламы</span></button>
+        <button id="ov-auth" type="button" hidden data-i18n>войти, чтобы попасть в общую таблицу</button>
       </div>
-      <div class="st-row">
-        <button id="st-set" type="button" data-i18n>настройки</button>
-        <button id="st-quit" type="button" hidden data-i18n>выйти из игры</button>
+      <div class="ov-btns">
+        <button id="ov-again" type="button" data-i18n>ещё раз</button>
+        <button id="ov-menu" type="button" data-i18n>в меню</button>
       </div>
-      <div id="st-note"></div>
-    </form>
-
-    <!-- ── общий зачёт сбоку: виден и на заставке, и после смены ── -->
-    <aside id="board" class="msk-only">
-      <div class="bd-t" data-i18n>таблица рекордов</div>
-      <ol id="board-list"></ol>
-      <div id="board-me"></div>
-    </aside>
+    </div>
   </div>
 
 </div>
