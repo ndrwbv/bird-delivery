@@ -1,0 +1,60 @@
+{
+  "name": "bird-pizza-delivery",
+  "productName": "Bird Pizza Delivery",
+  "version": "0.1.0",
+  "description": "Аркадная доставка пиццы по Москве. Бандлы: web (dev), yandex (Яндекс Игры), steam (Electron).",
+  "main": "electron/main.cjs",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite --port 5190 --strictPort",
+    "dev:yandex": "vite --port 5191 --strictPort --mode yandex",
+    "dev:steam": "vite --port 5192 --strictPort --mode steam",
+    "build:web": "vite build --mode web",
+    "build:yandex": "vite build --mode yandex && node tools/zip-yandex.mjs",
+    "build:steam": "vite build --mode steam",
+    "electron": "npm run build:steam && electron .",
+    "dist:mac": "npm run build:steam && electron-builder --mac",
+    "dist:win": "npm run build:steam && electron-builder --win zip --x64",
+    "dist:deck": "npm run build:steam && electron-builder --linux dir --x64 && node tools/pack-deck.mjs",
+    "mapcheck": "node tools/mapcheck.mjs",
+    "i18n:extract": "node tools/i18n-extract.mjs",
+    "i18n:check": "node tools/i18n-check.mjs"
+  },
+  "build": {
+    "appId": "ru.ndrwbv.birdpizza",
+    "productName": "BirdPizza",
+    "files": [
+      "dist/steam/**/*",
+      "electron/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "category": "public.app-category.games",
+      "target": [
+        "dir"
+      ]
+    },
+    "win": {
+      "target": [
+        "dir"
+      ]
+    },
+    "linux": {
+      "target": [
+        "dir"
+      ]
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "vite": "^6.4.3"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true,
+    "electron": true
+  }
+}

@@ -1,0 +1,820 @@
+/* Рамка и хад. Картинка рендерится втрое меньше экрана и растягивается
+   без сглаживания — отсюда крупный пиксель, как в Hamster Rescue. */
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0a0d24;
+  color: #ffd85e;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#game {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+#view {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  touch-action: none;
+}
+
+/* ── хад ── */
+.hud {
+  position: absolute;
+  pointer-events: none;
+  text-shadow: 2px 2px 0 #33210c, -2px 2px 0 #33210c, 2px -2px 0 #33210c, -2px -2px 0 #33210c;
+  line-height: 1.7;
+  user-select: none;
+}
+
+#hud-left  { top: 14px; left: 16px; font-size: 10px; }
+#hud-right { top: 14px; right: 16px; font-size: 10px; text-align: right; }
+
+/* сердечко рисуем фигурой: в пиксельном шрифте такого символа нет */
+#hearts i {
+  display: inline-block;
+  width: 13px; height: 12px;
+  margin-right: 4px;
+  background: #ff5d7a;
+  clip-path: polygon(50% 100%, 0 45%, 0 20%, 18% 0, 50% 18%, 82% 0, 100% 20%, 100% 45%);
+  filter: drop-shadow(1px 1px 0 #33210c) drop-shadow(-1px -1px 0 #33210c);
+}
+#hearts i.off { background: #6b5560; opacity: .5; }
+
+#task { margin-top: 6px; }
+#addr { color: #fff3d6; }
+#money { font-size: 14px; }
+#dist  { color: #fff3d6; }
+#speed { color: #bcd0e8; font-size: 8px; }
+
+#timewrap {
+  top: 16px; left: 50%; transform: translateX(-50%);
+  width: min(280px, 42vw); height: 10px;
+  background: #33210c;
+  border: 2px solid #33210c;
+  border-radius: 2px;
+  overflow: hidden;
+}
+#timebar { height: 100%; width: 100%; background: #ffd85e; }
+
+#radar {
+  left: 16px; bottom: 16px;
+  width: min(148px, 22vw); aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid #33210c;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
+}
+#radar canvas { display: block; width: 100%; height: 100%; }
+
+#burgers { right: 16px; bottom: 56px; font-size: 9px; text-align: right; }
+
+#toast {
+  left: 50%; bottom: 58px; transform: translateX(-50%);
+  font-size: 11px; opacity: 0;
+  transition: opacity .25s;
+  white-space: nowrap;
+}
+
+/* ── заставка ── */
+#big {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 18px; padding: 24px;
+  text-align: center;
+  background: rgba(12, 18, 40, .38);
+  pointer-events: none;
+}
+#big[hidden] { display: none; }
+#big-t {
+  font-size: clamp(22px, 5vw, 46px);
+  letter-spacing: .06em;
+  text-shadow: 4px 4px 0 #33210c, -4px 4px 0 #33210c, 4px -4px 0 #33210c, -4px -4px 0 #33210c;
+}
+#big-s { font-size: clamp(8px, 1.5vw, 12px); line-height: 2.1; color: #fff3d6;
+         text-shadow: 2px 2px 0 #33210c, -2px 2px 0 #33210c, 2px -2px 0 #33210c, -2px -2px 0 #33210c; }
+#big-k { font-size: clamp(7px, 1.2vw, 10px); line-height: 2.1; color: #ffd85e; margin-top: 10px;
+         text-shadow: 2px 2px 0 #33210c, -2px 2px 0 #33210c, 2px -2px 0 #33210c, -2px -2px 0 #33210c; }
+
+@media (max-width: 560px) {
+  #hud-left, #hud-right { font-size: 8px; }
+  #money { font-size: 11px; }
+  #radar { width: 96px; }
+}
+
+
+/* ── анкета заказа ──
+   По центру экрана и крупно: мимо неё не проедешь, а кнопка «принять»
+   лежит внизу карточки, под всем содержимым. */
+#phone {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -46%) scale(.96);
+  width: min(720px, 94vw);
+  max-height: 88vh;
+  display: flex; flex-direction: column;
+  background: #1d2440;
+  border: 3px solid #33210c;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .55);
+  opacity: 0;
+  transition: opacity .22s ease, transform .28s cubic-bezier(.2, .9, .3, 1.2);
+  pointer-events: none;
+  overflow: hidden;
+}
+#phone.on { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
+
+.ph-top {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px;
+  background: #ff6900;
+  color: #fff;
+  font-size: 11px;
+  letter-spacing: .04em;
+}
+.ph-dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; opacity: .85; }
+.ph-src { margin-left: auto; font-size: 8px; opacity: .8; }
+
+.ph-body {
+  display: flex; flex-direction: column;
+  padding: 16px; gap: 14px;
+  overflow-y: auto;
+  min-height: 0;                 /* иначе список не сжимается и кнопка уходит за экран */
+}
+.ph-main { display: flex; flex-direction: column; gap: 13px; min-width: 0; }
+
+/* что везём — с иконкой пиццы */
+.ph-items { display: flex; align-items: center; gap: 12px; }
+.ph-pizza { width: 32px; height: 32px; flex: none; }
+#ph-what { color: #ffd85e; font-size: 16px; line-height: 1.4; }
+
+/* остановки: каждая со своим адресом и комментом */
+#ph-list { display: flex; flex-direction: column; gap: 10px; }
+.ph-stop {
+  padding: 12px;
+  border-radius: 6px;
+  background: #151b33;
+  opacity: .62;
+}
+.ph-stop.now { opacity: 1; box-shadow: inset 4px 0 0 #ff6900; }
+.ph-num { color: #7f8cc0; font-size: 8px; letter-spacing: .04em; margin-bottom: 9px; }
+
+/* человек: аватарка, имя, фамилия, должность */
+.ph-who {
+  display: grid;
+  grid-template-columns: 50px 1fr;
+  grid-template-areas: "img name" "img surname" "img pos";
+  gap: 0 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.ph-who + .ph-who { margin-top: -2px; }
+.ph-who img, .ph-who i {
+  grid-area: img;
+  width: 50px; height: 50px;
+  border-radius: 5px;
+  object-fit: cover;
+  background: #2b3455;
+  image-rendering: auto;
+}
+.ph-n { grid-area: name; color: #fff3d6; font-size: 12px; line-height: 1.5; }
+.ph-s { grid-area: surname; color: #fff3d6; font-size: 12px; line-height: 1.5; }
+.ph-p { grid-area: pos; color: #7f8cc0; font-size: 8px; line-height: 1.6; }
+
+/* адрес и коммент — те самые бесполезные поля из анкеты */
+.ph-fields { display: flex; flex-direction: column; gap: 9px; }
+.ph-fields div { display: flex; flex-direction: column; gap: 4px; }
+.ph-fields b { color: #7f8cc0; font-weight: normal; font-size: 8px; letter-spacing: .04em; }
+.ph-fields span { color: #ffe9c4; font-size: 11px; line-height: 1.8; }
+
+#ph-why {
+  padding: 11px;
+  background: #151b33;
+  border-left: 4px solid #ff6900;
+  color: #cdd6f5;
+  font-size: 9px;
+  line-height: 1.9;
+}
+
+/* кнопка снизу карточки, во всю ширину */
+#ph-accept {
+  flex: none;
+  margin: 0 16px 16px;
+  padding: 17px 12px;
+  background: #ffd85e;
+  border: 3px solid #33210c;
+  border-radius: 6px;
+  color: #33210c;
+  font-family: inherit; font-size: 16px;
+  letter-spacing: .04em;
+  cursor: pointer;
+}
+#ph-accept:hover { background: #ffe58a; }
+
+@media (max-width: 640px) {
+  #phone { width: 94vw; max-height: 90vh; }
+  .ph-body { padding: 12px; gap: 11px; }
+  #ph-what { font-size: 13px; }
+  .ph-n, .ph-s { font-size: 10px; }
+  .ph-fields span { font-size: 9px; }
+  #ph-accept { margin: 0 12px 12px; padding: 14px; font-size: 14px; }
+}
+
+
+/* ── общий зачёт на экране конца смены ── */
+#lb-wrap {
+  width: min(420px, 90vw);
+  display: flex; flex-direction: column; gap: 10px;
+  pointer-events: auto;
+}
+#lb-wrap[hidden] { display: none; }
+
+#lb-place { font-size: 8px; color: #ffd85e; text-align: center;
+            text-shadow: 2px 2px 0 #33210c, -2px 2px 0 #33210c, 2px -2px 0 #33210c, -2px -2px 0 #33210c; }
+
+#lb-list {
+  margin: 0; padding: 0; list-style: none;
+  display: flex; flex-direction: column; gap: 3px;
+  max-height: 34vh; overflow: auto;
+}
+#lb-list li {
+  display: grid; grid-template-columns: 24px 1fr auto;
+  align-items: center; gap: 8px;
+  padding: 6px 9px;
+  background: rgba(21, 27, 51, .85);
+  border-radius: 4px;
+  font-size: 8px; line-height: 1.7;
+  color: #cdd6f5;
+  text-shadow: none;
+}
+#lb-list li.me { background: #2a3766; color: #ffd85e; }
+#lb-list li.empty { grid-template-columns: 1fr; color: #7f8cc0; text-align: center; }
+#lb-list b { color: #ffd85e; font-weight: normal; }
+#lb-list i { color: #fff3d6; font-style: normal; }
+
+#lb-form { display: flex; gap: 8px; }
+#lb-name {
+  flex: 1; min-width: 0;
+  padding: 9px;
+  background: #151b33;
+  border: 2px solid #33210c;
+  border-radius: 4px;
+  color: #fff3d6;
+  font-family: inherit; font-size: 8px;
+}
+#lb-name::placeholder { color: #5f6c99; }
+#lb-name[hidden] { display: none; }
+/* пустое имя на старте: поле вздрагивает и краснеет */
+#lb-name.need { border-color: #ff9a9a; animation: lb-need .35s; }
+@keyframes lb-need {
+  25% { transform: translateX(-5px); } 75% { transform: translateX(5px); }
+}
+#lb-save {
+  padding: 9px 12px;
+  background: #ffd85e;
+  border: 2px solid #33210c;
+  border-radius: 4px;
+  color: #33210c;
+  font-family: inherit; font-size: 8px;
+  cursor: pointer;
+}
+#lb-save:disabled { opacity: .6; cursor: default; }
+#lb-name[hidden] + #lb-save { flex: 1; }   /* в конце смены кнопка — это статус записи */
+
+.ov-vic { color: #ff9a9a; }
+
+
+/* ── кино смерти ──
+   Надпись проявляется отдельно от итогов: сперва дают посмотреть,
+   как всё закончилось, и только потом приходят цифры. */
+#wasted {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 46%, rgba(20, 2, 8, 0) 16%, rgba(14, 2, 8, .7) 100%);
+}
+#wasted[hidden] { display: none; }
+
+.w-inner {
+  text-align: center;
+  padding: 40px 28px;
+  opacity: 0;
+  transition: opacity 1.4s ease;
+  background: radial-gradient(ellipse at 50% 50%, rgba(8, 0, 3, .78) 0%, rgba(8, 0, 3, .42) 58%, rgba(8, 0, 3, 0) 80%);
+}
+body.w-show .w-inner { opacity: 1; }
+
+#w-word {
+  font-size: clamp(30px, 8vw, 78px);
+  max-width: 92vw;
+  line-height: 1.35;
+  color: #ff3350;
+  letter-spacing: .1em;
+  text-shadow: 5px 5px 0 #2a0209, -5px 5px 0 #2a0209, 5px -5px 0 #2a0209, -5px -5px 0 #2a0209;
+  animation: w-in 2s ease both;
+}
+@keyframes w-in {
+  from { letter-spacing: .5em; opacity: 0; }
+  to   { letter-spacing: .1em; opacity: 1; }
+}
+
+/* длинная фраза с именем не должна лезть за экран */
+#w-word.long { font-size: clamp(18px, 4.4vw, 42px); letter-spacing: .06em; }
+
+#w-sub {
+  margin-top: 20px;
+  font-size: clamp(8px, 1.6vw, 12px);
+  line-height: 2;
+  color: #ffd0d6;
+  text-shadow: 2px 2px 0 #2a0209, -2px 2px 0 #2a0209, 2px -2px 0 #2a0209, -2px -2px 0 #2a0209;
+}
+
+
+/* второй строкой в хаде — тот самый выдуманный адрес */
+#addr .sub { color: #9fb4dd; font-size: 7px; }
+
+
+/* ── предупреждение про впн: без него смена не запишется ── */
+#lb-vpn {
+  padding: 9px 11px;
+  background: rgba(255, 216, 94, .92);
+  border: 2px solid #33210c;
+  border-radius: 4px;
+  color: #33210c;
+  font-size: 8px;
+  line-height: 1.9;
+  text-shadow: none;
+}
+#lb-vpn b { font-weight: normal; text-decoration: underline; }
+#lb-vpn.bad { background: #ff9a9a; }
+
+
+/* ── кнопки звука и паузы ── */
+#ctrls {
+  position: absolute;
+  right: 16px; bottom: 16px;
+  display: flex; gap: 8px;
+}
+#ctrls button {
+  padding: 9px 11px;
+  background: rgba(21, 27, 51, .9);
+  border: 2px solid #33210c;
+  border-radius: 4px;
+  color: #ffd85e;
+  font-family: inherit; font-size: 8px;
+  cursor: pointer;
+}
+#ctrls button:hover { background: #2a3766; }
+
+@media (max-width: 560px) {
+  #ctrls { right: 10px; bottom: 10px; }
+  #ctrls button { padding: 8px; font-size: 7px; }
+}
+
+/* ── катсцена-вступление (?intro) ──
+   Хада нет, сверху и снизу киношные полосы. Имена висят над головами,
+   в конце — две кнопки под открытой коробкой. */
+#intro { position: absolute; inset: 0; pointer-events: none; }
+#intro[hidden] { display: none; }
+body.intro .hud, body.intro #ctrls, body.intro #phone, body.intro #big, body.intro #wasted { display: none !important; }
+
+.in-bar {
+  position: absolute; left: 0; right: 0;
+  height: 9vh;
+  background: #06070f;
+  transition: transform .8s cubic-bezier(.3,.7,.2,1);
+}
+.in-top { top: 0; transform: translateY(-100%); }
+.in-bot { bottom: 0; transform: translateY(100%); }
+#intro.bars .in-bar { transform: none; }
+#intro.end .in-bar { transform: translateY(-100%); }
+#intro.end .in-bot { transform: translateY(100%); }
+
+#in-names .in-name {
+  position: absolute; left: 0; top: 0;
+  transform: translate(-50%, -100%);
+  white-space: nowrap;
+  font-size: clamp(7px, 1.1vw, 10px);
+  color: #fff3d6;
+  text-shadow: 2px 2px 0 #33210c, -2px 2px 0 #33210c, 2px -2px 0 #33210c, -2px -2px 0 #33210c;
+  opacity: 0;
+  transition: opacity .4s;
+}
+#in-names .in-name.on { opacity: 1; }
+
+#in-end {
+  position: absolute; left: 50%; bottom: 6vh;
+  transform: translateX(-50%);
+  display: flex; gap: 14px;
+  width: min(640px, calc(100% - 32px));
+  pointer-events: auto;
+  animation: in-rise .5s cubic-bezier(.2,.9,.3,1.2) both;
+}
+#in-end[hidden] { display: none; }
+@keyframes in-rise { from { opacity: 0; transform: translate(-50%, 24px); } to { opacity: 1; transform: translate(-50%, 0); } }
+#in-end button {
+  flex: 1 1 0;
+  font: inherit;
+  font-size: clamp(8px, 1.3vw, 11px);
+  line-height: 1.8;
+  padding: 16px 12px;
+  border: 3px solid #33210c;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 5px 0 #33210c;
+  transition: transform .08s, box-shadow .08s;
+}
+#in-end button:active { transform: translateY(4px); box-shadow: 0 1px 0 #33210c; }
+/* акцент — на «читать»: вступление ведёт в выпуск, игра — второй вариант */
+#in-read { background: #ff6900; color: #fff3d6; }
+#in-play { background: #fff3d6; color: #33210c; }
+#in-read:hover { background: #ff7d22; }
+#in-play:hover { background: #fff; }
+@media (max-width: 560px) {
+  #in-end { flex-direction: column; gap: 12px; bottom: 5vh; }
+}
+
+/* ── Москва (?map=moscow): нитро, «без времени», полная карта ── */
+html:not([data-map="moscow"]) .msk-only { display: none !important; }
+#nitro { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 6px;
+         font-size: 7px; color: #6fd3ff; }
+#nitro b { display: block; width: 84px; height: 8px; background: #33210c; border: 2px solid #33210c;
+           border-radius: 2px; overflow: hidden; }
+#nitro i { display: block; height: 100%; width: 50%; background: #6fd3ff; }
+#nitro.burn i { background: #e6f7ff; box-shadow: 0 0 8px #6fd3ff; }
+#timebar.free { background: #6fd3ff !important; }
+#ctrls button.on { color: #6fd3ff; border-color: #6fd3ff; }
+/* нитро кнопкой — для телефона; на компьютере есть Shift */
+#nos { color: #6fd3ff; touch-action: none; user-select: none; -webkit-user-select: none; }
+html[data-map="moscow"] #radar { cursor: zoom-in; pointer-events: auto; }
+
+/* Москва: имя и «поехали» — крупно, по центру заставки */
+#start { display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 10px auto 0; width: min(520px, 100%); pointer-events: auto; }
+#start label { font-size: clamp(8px, 1.3vw, 11px); color: #ffd85e; }
+#st-name {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: clamp(13px, 2.4vw, 20px); text-align: center;
+  padding: 16px 14px; color: #33210c; background: #fff3d6; border: 3px solid #33210c; border-radius: 8px;
+  box-shadow: 0 5px 0 #33210c; outline: none;
+}
+#st-name:focus { border-color: #ff6900; box-shadow: 0 5px 0 #ff6900; }
+#st-go {
+  width: 100%; font: inherit; font-size: clamp(11px, 2vw, 16px); padding: 16px; cursor: pointer;
+  color: #fff3d6; background: #ff6900; border: 3px solid #33210c; border-radius: 8px; box-shadow: 0 5px 0 #33210c;
+  transition: transform .08s, box-shadow .08s, opacity .15s;
+}
+#st-go:hover:not(:disabled) { background: #ff7d22; }
+#st-go:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 1px 0 #33210c; }
+#st-go:disabled { opacity: 0.38; cursor: not-allowed; }
+#st-note { font-size: 7px; line-height: 1.8; color: #fff3d6; opacity: 0.8; text-align: center; min-height: 9px; }
+#st-note.bad { color: #ff8a8a; opacity: 1; }
+html[data-map="moscow"] #lb-form, html[data-map="moscow"] #lb-vpn { display: none; }
+
+/* полная карта района */
+#fullmap {
+  position: absolute; inset: 0; z-index: 30;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(20, 16, 30, 0.72); cursor: zoom-out;
+}
+#fullmap[hidden] { display: none; }
+.fm-box { display: flex; flex-direction: column; gap: 8px; max-width: calc(100% - 32px); max-height: calc(100% - 32px); }
+.fm-top { display: flex; justify-content: space-between; gap: 12px; font-size: clamp(7px, 1.1vw, 10px); color: #fff3d6; }
+.fm-top span { color: #ffd85e; }
+#fullmapc {
+  display: block; max-width: 100%; max-height: calc(100vh - 110px);
+  border: 3px solid #33210c; border-radius: 6px; background: #a6d189; image-rendering: pixelated;
+}
+.fm-leg { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 7px; color: #fff3d6; }
+.fm-leg i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; vertical-align: -1px; border: 1px solid #33210c; }
+.lg-me { background: #fff; } .lg-dodo { background: #ff6900; } .lg-to { background: #ff2d6e; border-radius: 50%; }
+.lg-sig { background: #3fd15e; border-radius: 50%; } .lg-nos { background: #6fd3ff; } .lg-car { background: #5b6b80; }
+#fxs { margin-top: 6px; font-size: 7px; color: #ffb066; text-align: right; min-height: 8px; }
+/* узкий экран: адрес заказа длинный — хад справа не должен на него налезать */
+@media (max-width: 640px) {
+  html[data-map="moscow"] #hud-left { max-width: 58%; }
+  html[data-map="moscow"] #nitro b { width: 52px; }
+  html[data-map="moscow"] #nitro span { display: none; }
+}
+
+/* ── Москва: вторая кнопка, подсказка первого заказа, скорборд сбоку ── */
+#st-ride {
+  width: 100%; font: inherit; font-size: clamp(9px, 1.5vw, 12px); padding: 12px; cursor: pointer;
+  color: #fff3d6; background: transparent; border: 3px solid #fff3d6; border-radius: 8px; opacity: 0.85;
+}
+#st-ride:hover { opacity: 1; background: rgba(255, 243, 214, .12); }
+#big-k .keys { color: #fff3d6; background: #33210c; padding: 3px 6px; border-radius: 3px; }
+#ph-tip {
+  margin: 10px 0 0; padding: 10px 12px; font-size: 9px; line-height: 1.9; color: #33210c;
+  background: #ffd85e; border: 3px solid #33210c; border-radius: 6px;
+}
+#ph-tip b { background: #33210c; color: #ffd85e; padding: 2px 5px; border-radius: 3px; }
+#ph-tip[hidden] { display: none; }
+#menu[hidden] { display: none; }
+html[data-map="moscow"] #lb-wrap { display: none !important; }
+
+#board {
+  position: absolute; right: 28px; top: 50%; transform: translateY(-50%);
+  width: 380px; max-height: calc(100% - 120px); overflow-y: auto; box-sizing: border-box;
+  padding: 20px 22px 16px; pointer-events: auto; text-align: left;
+  background: rgba(20, 16, 30, .86); border: 4px solid #33210c; border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+}
+#board .bd-t { font-size: 15px; color: #ffd85e; margin-bottom: 14px; }
+#board-list { list-style: none; margin: 0; padding: 0; }
+#board-list li { display: flex; gap: 12px; align-items: baseline; font-size: 13px; line-height: 1.2; padding: 10px 0; color: #fff3d6;
+                 border-bottom: 2px dashed rgba(255, 243, 214, .15); }
+#board-list li b { width: 28px; color: #ffd85e; }
+#board-list li span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#board-list li i { font-style: normal; color: #ffb066; }
+#board-list li.me { color: #ff8a2b; }
+#board-list li:nth-child(-n+3) { font-size: 14px; }
+#board-list li.empty { color: #b9b4ab; font-size: 11px; line-height: 1.8; }
+#board-me { font-size: 12px; line-height: 1.6; color: #ff8a2b; margin-top: 12px; min-height: 12px; }
+#board .bd-n { font-size: 9px; line-height: 1.7; color: #b9b4ab; margin-top: 10px; }
+@media (max-width: 1180px) {
+  #board { position: static; transform: none; width: min(520px, 100%); max-height: none; margin-top: 6px; }
+}
+@media (min-width: 1181px) {
+  /* колонка заставки не лезет под скорборд справа */
+  html[data-map="moscow"] #big > :not(#board) { max-width: calc(100vw - 880px); min-width: 380px; }
+}
+
+/* ── Москва: анкета заказа — люди крупно, остальное мелко ── */
+html[data-map="moscow"] .ph-items, html[data-map="moscow"] #ph-why, html[data-map="moscow"] .ph-src { display: none; }
+html[data-map="moscow"] #phone { width: min(460px, 92vw); }
+html[data-map="moscow"] .ph-body { padding: 22px 20px 18px; gap: 16px; }
+.oc-people { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px; }
+.oc-p { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 132px; text-align: center; }
+.oc-p img, .oc-p i {
+  width: 124px; height: 124px; border-radius: 14px; object-fit: cover; display: block;
+  border: 4px solid #ff6900; background: #2a3766; box-shadow: 0 6px 0 #33210c;
+}
+.oc-p b { margin-top: 8px; font-weight: normal; font-size: 15px; line-height: 1.3; color: #fff3d6; }
+.oc-p span { font-size: 12px; line-height: 1.4; color: #fff3d6; }
+.oc-p em { position: absolute; top: -8px; left: 0; font-style: normal; font-size: 10px; color: #33210c;
+           background: #ffd85e; border: 2px solid #33210c; border-radius: 50%; width: 24px; height: 24px; line-height: 22px; }
+.oc-people.small .oc-p { width: 96px; }
+.oc-people.small .oc-p img, .oc-people.small .oc-p i { width: 88px; height: 88px; }
+.oc-people.small .oc-p b { font-size: 12px; }
+.oc-people.small .oc-p span { font-size: 10px; }
+.oc-meta { font-size: 8px; line-height: 1.8; color: #7f8cc0; text-align: center; }
+.oc-note { font-size: 7px; line-height: 1.8; color: #5f6a99; text-align: center; }
+html[data-map="moscow"] #ph-accept { font-size: 15px; padding: 18px; }
+/* пока висит анкета, мир за ней размыт */
+body.brief #view { filter: blur(6px) brightness(0.72); transition: filter .25s; }
+#view { transition: filter .25s; }
+
+/* ── Москва: бонус за скорость ── */
+#bonus {
+  position: absolute; left: 50%; top: 22%; transform: translate(-50%, -50%) scale(.6);
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  opacity: 0; pointer-events: none; text-align: center; z-index: 12;
+}
+#bonus b { font-weight: normal; font-size: clamp(22px, 4.5vw, 44px); color: #ffd85e;
+           text-shadow: 4px 4px 0 #33210c, -2px -2px 0 #33210c, 2px -2px 0 #33210c, -2px 2px 0 #33210c; }
+#bonus span { font-size: clamp(15px, 2.8vw, 28px); line-height: 1.4; color: #fff3d6; background: rgba(20, 16, 30, .78);
+               padding: 10px 18px; border: 3px solid #ffd85e; border-radius: 8px; text-shadow: 2px 2px 0 #33210c; }
+#bonus.on { animation: bonus-pop 4s cubic-bezier(.2, .9, .3, 1.2) both; }
+@keyframes bonus-pop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.6); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  22% { transform: translate(-50%, -50%) scale(1); }
+  88% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -80%) scale(1); }
+}
+
+/* ── Москва: гайд по управлению — по пунктам, один раз за сессию ── */
+#guide {
+  position: absolute; left: 16px; top: 50%; transform: translateY(-50%); z-index: 11;
+  width: 300px; padding: 18px 18px 14px; cursor: pointer;
+  background: rgba(20, 16, 30, .86); border: 4px solid #33210c; border-radius: 10px;
+  animation: gd-in .4s cubic-bezier(.2, .9, .3, 1.2) both;
+}
+@keyframes gd-in { from { opacity: 0; margin-left: -24px; } to { opacity: 1; margin-left: 0; } }
+#guide[hidden] { display: none; }
+#guide .gd-t { font-size: 13px; color: #ffd85e; margin-bottom: 12px; }
+#guide ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+#guide li { font-size: 10px; line-height: 1.5; color: #fff3d6; display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+#guide kbd { font: inherit; font-size: 9px; color: #33210c; background: #fff3d6; border-radius: 4px; padding: 4px 6px;
+             box-shadow: 0 3px 0 #b9b4ab; }
+#guide .gd-n { font-size: 7px; line-height: 1.8; color: #b9b4ab; margin-top: 12px; }
+@media (max-width: 640px) { #guide { top: auto; bottom: 150px; transform: none; width: auto; right: 16px; } }
+.oc-note b { font-weight: normal; color: #7f8cc0; }
+/* пока открыта анкета, гайд ждёт: появится, как только нажал «принять» */
+body.brief #guide { display: none; }
+#st-digest { font-size: clamp(8px, 1.3vw, 11px); color: #ffd85e; text-decoration: none; padding: 8px 4px; opacity: 0.9; }
+#st-digest:hover { opacity: 1; text-decoration: underline; text-underline-offset: 4px; }
+#st-lvl { font-size: clamp(7px, 1.1vw, 9px); color: #ffd85e; opacity: .85; margin-top: -4px; }
+
+/* ── Москва: коллекция слева в меню ── */
+#col-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.col-c {
+  position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden;
+  background: #2a2438; border: 2px dashed rgba(216, 140, 255, .35);
+  display: flex; align-items: center; justify-content: center;
+}
+.col-c b { font-weight: normal; font-size: 20px; color: rgba(216, 140, 255, .55); }
+.col-c.have { border: 2px solid #d88cff; background: #3a2f52; }
+.col-c img, .col-c canvas { width: 100%; height: 100%; object-fit: cover; display: block; image-rendering: pixelated; }
+.col-c span {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 3px 2px; font-size: 6px; line-height: 1.3; text-align: center;
+  color: #fff3d6; background: rgba(20, 16, 30, .78); opacity: 0; transition: opacity .15s;
+}
+.col-c:hover span { opacity: 1; }
+
+/* ── Москва: джойстик под пальцем ── */
+html[data-map="moscow"] #view { touch-action: none; }
+#joy {
+  position: absolute; z-index: 9; width: 132px; height: 132px; margin: -66px 0 0 -66px; pointer-events: none;
+  border-radius: 50%; border: 3px solid rgba(255, 243, 214, .55); background: rgba(20, 16, 30, .28);
+  box-shadow: inset 0 0 0 20px rgba(255, 243, 214, .06);
+}
+#joy[hidden] { display: none; }
+#joy::before, #joy::after { content: ''; position: absolute; left: 50%; top: 50%; background: rgba(255, 243, 214, .25); }
+#joy::before { width: 2px; height: 100px; margin: -50px 0 0 -1px; }
+#joy::after { width: 100px; height: 2px; margin: -1px 0 0 -50px; }
+#joy-k {
+  position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%;
+  background: #ff6900; border: 3px solid #33210c; box-shadow: 0 4px 0 #33210c;
+}
+/* гайд: на телефоне — жесты, с клавиатурой — клавиши */
+#guide .gd-touch { display: none; }
+@media (pointer: coarse) {
+  #guide .gd-touch { display: flex; }
+  #guide .gd-keys { display: none; }
+}
+/* уровень курьера в рейтинге — кружок рядом с именем */
+#board-list li em.lv {
+  flex: none; width: 22px; height: 22px; border-radius: 50%; font-style: normal; font-size: 10px; line-height: 20px;
+  text-align: center; color: #33210c; background: #ffd85e; border: 1px solid #33210c;
+}
+#board-list li em.lv.none { background: transparent; border-color: transparent; }
+
+/* ── Москва: кнопки «мои коллекции» и «магазин», окна меню ── */
+.st-row { display: flex; gap: 10px; width: 100%; }
+.st-row button {
+  flex: 1; font: inherit; font-size: clamp(9px, 1.4vw, 11px); padding: 12px 8px; cursor: pointer;
+  color: #33210c; background: #ffd85e; border: 3px solid #33210c; border-radius: 8px; box-shadow: 0 4px 0 #33210c;
+}
+.st-row button:hover { background: #ffe38a; }
+.st-row button:active { transform: translateY(3px); box-shadow: 0 1px 0 #33210c; }
+#panel {
+  position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center;
+  background: rgba(12, 10, 20, .55); backdrop-filter: blur(4px);
+}
+#panel[hidden] { display: none; }
+.pn-box {
+  position: relative; width: min(620px, calc(100% - 32px)); max-height: calc(100% - 40px); overflow-y: auto; box-sizing: border-box;
+  padding: 24px 22px 18px; background: #1d1830; border: 4px solid #33210c; border-radius: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+}
+#pn-close { position: absolute; right: 10px; top: 8px; font: inherit; font-size: 20px; color: #fff3d6; background: none; border: 0; cursor: pointer; }
+.pn-t { font-size: 16px; color: #ffd85e; margin-bottom: 16px; }
+.pn-t span { color: #d88cff; font-size: 11px; margin-left: 8px; }
+.pn-n { font-size: 9px; line-height: 1.7; color: #b9b4ab; margin-top: 14px; }
+#panel #col-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+#panel .col-c span { font-size: 7px; opacity: 1; }
+#shop { display: flex; flex-direction: column; gap: 10px; }
+.sh-c { display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 10px; background: #2a2438; border: 2px solid transparent; }
+.sh-c.cur { border-color: #ffd85e; }
+.sh-c canvas { width: 150px; height: auto; flex: none; }
+.sh-i { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.sh-i b { font-weight: normal; font-size: 12px; color: #fff3d6; }
+.sh-i span { font-size: 8px; color: #b9b4ab; line-height: 1.5; }
+.sh-i em { font-style: normal; font-size: 12px; color: #ff5d7a; letter-spacing: 2px; }
+.sh-c button {
+  flex: none; min-width: 110px; font: inherit; font-size: 10px; padding: 12px 10px; cursor: pointer;
+  color: #fff3d6; background: #ff6900; border: 3px solid #33210c; border-radius: 8px; box-shadow: 0 4px 0 #33210c;
+}
+.sh-c button:disabled { background: #4a4458; color: #b9b4ab; cursor: default; box-shadow: none; }
+.sh-c.cur button:disabled { background: #ffd85e; color: #33210c; }
+@media (max-width: 560px) {
+  .sh-c { flex-wrap: wrap; } .sh-c canvas { width: 120px; } .sh-c button { width: 100%; }
+  #panel #col-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* ── Москва: чистый экран ──
+   На экране во время езды только сердца, деньги, время на заказ и радар;
+   нитро — кольцом вокруг радара. Заказ, счёт сбитых, звук, карта и выход
+   — в меню паузы. Кнопка нитро — только на телефоне. */
+html[data-map="moscow"] #task, html[data-map="moscow"] #addr, html[data-map="moscow"] #speed,
+html[data-map="moscow"] #dist, html[data-map="moscow"] #nitro, html[data-map="moscow"] #burgers,
+html[data-map="moscow"] #sfx, html[data-map="moscow"] #mapbtn, html[data-map="moscow"] #menu { display: none !important; }
+html[data-map="moscow"] #nos { display: none; }
+@media (pointer: coarse) {
+  html[data-map="moscow"] #nos {
+    display: block; width: 68px; height: 68px; padding: 0; border-radius: 50%; font-size: 8px;
+    border: 3px solid #6fd3ff; background: rgba(21, 27, 51, .85); color: #6fd3ff;
+  }
+  html[data-map="moscow"] #ctrls { align-items: flex-end; }
+}
+html[data-map="moscow"] #radar {
+  padding: 7px; border: 2px solid #33210c; box-sizing: border-box;
+  background: conic-gradient(#6fd3ff calc(var(--nos, .5) * 360deg), #1d2440 0);
+  transition: box-shadow .15s;
+}
+html[data-map="moscow"] #radar canvas { border-radius: 50%; }
+html[data-map="moscow"] #radar.burn {
+  background: conic-gradient(#e6f7ff calc(var(--nos, .5) * 360deg), #1d2440 0);
+  box-shadow: 0 0 16px #6fd3ff, 0 6px 18px rgba(0, 0, 0, .35);
+}
+#pausem {
+  position: absolute; inset: 0; z-index: 28;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(12, 18, 40, .62); backdrop-filter: blur(3px);
+}
+#pausem[hidden] { display: none; }
+.pm-box {
+  width: min(420px, calc(100% - 32px)); box-sizing: border-box; padding: 22px 20px;
+  display: flex; flex-direction: column; gap: 16px; text-align: center;
+  background: #1d2440; border: 3px solid #33210c; border-radius: 10px; box-shadow: 0 6px 0 #33210c;
+}
+.pm-t { font-size: clamp(16px, 3vw, 24px); color: #ffd85e; text-shadow: 3px 3px 0 #33210c; }
+#pm-order { font-size: 9px; line-height: 1.9; color: #fff3d6; }
+#pm-order b { color: #ffd85e; font-weight: normal; }
+#pm-order .sub { color: #bcd0e8; font-size: 8px; }
+#pm-stats { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; font-size: 8px; color: #fff3d6; text-align: left;
+            padding: 12px; background: rgba(0, 0, 0, .22); border-radius: 6px; }
+#pm-stats span:nth-child(even) { color: #ffd85e; text-align: right; }
+.pm-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pm-btns button {
+  font: inherit; font-size: 9px; padding: 12px 8px; cursor: pointer; color: #33210c;
+  background: #ffd85e; border: 3px solid #33210c; border-radius: 6px; box-shadow: 0 4px 0 #33210c;
+}
+.pm-btns button:active { transform: translateY(3px); box-shadow: 0 1px 0 #33210c; }
+#pm-go { grid-column: 1 / -1; background: #ff6900; color: #fff3d6; font-size: 11px; }
+#pm-menu { grid-column: 1 / -1; background: #fff3d6; }
+.pm-k { font-size: 7px; color: #bcd0e8; opacity: .8; }
+@media (pointer: coarse) { .pm-k { display: none; } }
+
+/* карточка выбора: просьба клиента — сбоку сверху, игра идёт; обед — по центру, на паузе */
+#choice { position: absolute; z-index: 27; top: 44px; left: 50%; transform: translateX(-50%); width: min(460px, calc(100% - 24px)); pointer-events: auto; }
+#choice[hidden] { display: none; }
+#choice.big { inset: 0; top: 0; left: 0; transform: none; width: auto; display: flex; align-items: center; justify-content: center;
+              background: rgba(12, 18, 40, .6); backdrop-filter: blur(3px); }
+#choice.big[hidden] { display: none; }
+.ch-box { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: center; padding: 14px;
+          background: #fff3d6; color: #33210c; border: 3px solid #33210c; border-radius: 10px; box-shadow: 0 5px 0 #33210c; }
+#choice.big .ch-box { width: min(480px, calc(100% - 32px)); box-sizing: border-box; grid-template-columns: 1fr; text-align: center; padding: 20px; }
+#ch-face img { display: block; width: 58px; height: 58px; border-radius: 8px; border: 2px solid #33210c; object-fit: cover; }
+#ch-face:empty { display: none; }
+#ch-t { font-size: 11px; color: #ff6900; margin-bottom: 6px; }
+#choice.big #ch-t { font-size: clamp(18px, 3.4vw, 26px); }
+#ch-s { font-size: 10px; line-height: 1.7; }
+#choice.big #ch-s { font-size: 8px; color: #6b5560; }
+#ch-opts { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
+#choice.big #ch-opts { flex-direction: column; }
+#ch-opts button { flex: 1; display: flex; flex-direction: column; gap: 5px; align-items: center; font: inherit; font-size: 9px; padding: 10px 8px; cursor: pointer;
+                  color: #33210c; background: #ffd85e; border: 3px solid #33210c; border-radius: 6px; box-shadow: 0 4px 0 #33210c; position: relative; }
+#ch-opts button:first-child { background: #ff6900; color: #fff3d6; }
+#ch-opts button:active { transform: translateY(3px); box-shadow: 0 1px 0 #33210c; }
+#ch-opts button em { position: absolute; left: 7px; top: 6px; font-style: normal; font-size: 7px; opacity: .6; }
+#ch-opts button b { font-weight: normal; font-size: 10px; }
+#ch-opts button span { font-size: 7px; line-height: 1.6; opacity: .85; }
+#choice.big #ch-opts button { background: #ffd85e; color: #33210c; }
+@media (pointer: coarse) { #ch-opts button em { display: none; } }
+
+/* рейтинг смены: под сердцами, мелко */
+#rivals { list-style: none; margin: 8px 0 0; padding: 6px 8px; font-size: 7px; line-height: 1; display: flex; flex-direction: column; gap: 5px;
+          background: rgba(21, 27, 51, .55); border-radius: 6px; width: max-content; min-width: 150px; text-shadow: 1px 1px 0 #33210c; }
+#rivals[hidden] { display: none; }
+#rivals li { display: flex; align-items: center; gap: 6px; color: #fff3d6; }
+#rivals li em { font-style: normal; width: 10px; color: #bcd0e8; }
+#rivals li i { width: 8px; height: 8px; border-radius: 2px; border: 1px solid #33210c; }
+#rivals li i.you { background: #ff6900; }
+#rivals li b { font-weight: normal; flex: 1; }
+#rivals li span { color: #ffd85e; }
+#rivals li.me { color: #ffd85e; }
+#rivals li.me b { color: #ff9a3c; }
+@media (max-width: 560px) { #rivals { min-width: 124px; font-size: 6px; } }
+
+/* находки в легенде полной карты: фиолетовая точка */
+.lg-col { background: #b44dff; border-radius: 50%; box-shadow: 0 0 6px #c56cff; }
+
+/* курьер взорван — вычеркнут из смены на минуту */
+#rivals li.out { opacity: .55; }
+#rivals li.out s { text-decoration-thickness: 2px; text-decoration-color: #ff4d5e; }
+#rivals li.out small { font-size: 6px; color: #ff9a9a; }
+
+/* гарантия скорости: сжатый срок, красная плашка в карточке заказа */
+.oc-rush { margin-top: 10px; padding: 10px 12px; font-size: 10px; line-height: 1.7; color: #fff3d6; background: #d9342c;
+           border: 2px solid #33210c; border-radius: 6px; animation: rush-blink 0.9s steps(2) infinite; }
+.oc-rush span { display: block; font-size: 7px; opacity: .9; margin-top: 4px; }
+@keyframes rush-blink { 50% { background: #ff5a3c; } }
+
+/* магазин: максималка машины */
+.sh-i .sh-sp { display: block; font-style: normal; font-size: 8px; color: #ff6900; margin-top: 4px; }
+
+.lg-dk { background: #2f6fff; }
+.oc-rush.oc-surf { background: #1f7a8a; animation: none; }
