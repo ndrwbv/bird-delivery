@@ -1,12 +1,11 @@
 <!DOCTYPE html>
-<html lang="ru" data-map="moscow">
+<html lang="ru" data-map="moscow" translate="no">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <!-- заготовка: страница не в архиве и не в индексе, поисковикам не отдаём -->
-  <meta name="robots" content="noindex, nofollow">
-  <title>Доставка — заготовка</title>
-  
+  <meta name="theme-color" content="#2a3766">
+  <title>Птица Пицца</title>
+  <link rel="icon" type="image/png" href="./icon.png">
 </head>
 <body>
 
@@ -29,7 +28,7 @@
     <div id="dist"></div>
     <div id="speed"></div>
     <!-- бак нитро (только Москва): пополняется баллонами на улицах, жжётся на Shift -->
-    <div id="nitro" class="msk-only"><span>кофе</span><b><i id="nitrobar"></i></b></div>
+    <div id="nitro" class="msk-only"><span data-i18n>кофе</span><b><i id="nitrobar"></i></b></div>
     <!-- щит и бист-мод: сколько секунд осталось -->
     <div id="fxs" class="msk-only"></div>
   </div>
@@ -43,12 +42,12 @@
   <!-- ── полная карта района (только Москва): радар по клику, Tab ── -->
   <div id="fullmap" hidden>
     <div class="fm-box">
-      <div class="fm-top"><b>москва · омега-плаза</b><span>клик или esc — закрыть</span></div>
+      <div class="fm-top"><b data-i18n>Москва</b><span data-i18n>клик или esc — закрыть</span></div>
       <canvas id="fullmapc"></canvas>
       <div class="fm-leg">
-        <span><i class="lg-me"></i>ты</span><span><i class="lg-dodo"></i>пиццерия</span>
-        <span><i class="lg-to"></i>заказ</span><span><i class="lg-sig"></i>светофор</span>
-        <span><i class="lg-nos"></i>нитро</span><span><i class="lg-col"></i>находки</span><span><i class="lg-dk"></i>Drinkit</span><span><i class="lg-car"></i>машины</span>
+        <span><i class="lg-me"></i><em data-i18n>ты</em></span><span><i class="lg-dodo"></i><em data-i18n>пиццерия</em></span>
+        <span><i class="lg-to"></i><em data-i18n>заказ</em></span><span><i class="lg-sig"></i><em data-i18n>светофор</em></span>
+        <span><i class="lg-nos"></i><em data-i18n>нитро</em></span><span><i class="lg-col"></i><em data-i18n>находки</em></span><span><i class="lg-dk"></i><em data-i18n>Синий кит</em></span><span><i class="lg-car"></i><em data-i18n>машины</em></span>
       </div>
     </div>
   </div>
@@ -57,8 +56,8 @@
   <div id="phone">
     <div class="ph-top">
       <span class="ph-dot"></span>
-      <span id="ph-kind">заказ</span>
-      <span class="ph-src">умный трекер</span>
+      <span id="ph-kind" data-i18n>заказ</span>
+      <span class="ph-src" data-i18n>умный трекер</span>
     </div>
     <div class="ph-body">
       <div class="ph-main">
@@ -75,17 +74,17 @@
         <div id="ph-list"></div>
         <div id="ph-why"></div>
       </div>
-      <button id="ph-accept" type="button">принять</button>
+      <button id="ph-accept" type="button" data-i18n>принять</button>
     </div>
   </div>
 
   <!-- ── звук и пауза: не все догадаются про клавиши ── -->
   <div id="ctrls">
-    <button id="sfx" type="button">звук вкл</button>
-    <button id="pause" type="button">пауза</button>
-    <button id="mapbtn" class="msk-only" type="button">карта</button>
-    <button id="nos" class="msk-only" type="button">нитро</button>
-    <button id="menu" type="button" hidden>в меню</button>
+    <button id="sfx" type="button" data-i18n>звук вкл</button>
+    <button id="pause" type="button" data-i18n>пауза</button>
+    <button id="mapbtn" class="msk-only" type="button" data-i18n>карта</button>
+    <button id="nos" class="msk-only" type="button" data-i18n>нитро</button>
+    <button id="menu" type="button" hidden data-i18n>в меню</button>
   </div>
   <!-- ── Москва: карточка выбора — обед и просьбы клиентов ── -->
   <div id="choice" class="msk-only" hidden>
@@ -98,16 +97,16 @@
   <!-- ── Москва: меню паузы — всё, что не нужно на экране во время езды ── -->
   <div id="pausem" class="msk-only" hidden>
     <div class="pm-box">
-      <div class="pm-t">пауза</div>
+      <div class="pm-t" data-i18n>пауза</div>
       <div id="pm-order"></div>
       <div id="pm-stats"></div>
       <div class="pm-btns">
-        <button id="pm-go" type="button">продолжить</button>
-        <button id="pm-map" type="button">карта района</button>
-        <button id="pm-sfx" type="button">звук вкл</button>
-        <button id="pm-menu" type="button">в главное меню</button>
+        <button id="pm-go" type="button" data-i18n>продолжить</button>
+        <button id="pm-map" type="button" data-i18n>карта района</button>
+        <button id="pm-sfx" type="button" data-i18n>звук вкл</button>
+        <button id="pm-menu" type="button" data-i18n>в главное меню</button>
       </div>
-      <div class="pm-k">esc или P — продолжить</div>
+      <div class="pm-k" data-i18n>esc или P — продолжить</div>
     </div>
   </div>
 
@@ -118,7 +117,7 @@
   <!-- окна меню: коллекция и магазин машин -->
   <div id="panel" class="msk-only" hidden>
     <div class="pn-box">
-      <button id="pn-close" type="button" aria-label="закрыть">×</button>
+      <button id="pn-close" type="button" aria-label="close">×</button>
       <div id="pn-body"></div>
     </div>
   </div>
@@ -127,24 +126,24 @@
   <div id="joy" class="msk-only" hidden><i id="joy-k"></i></div>
   <div id="bonus" class="msk-only"></div>
   <div id="guide" class="msk-only" hidden>
-    <div class="gd-t">как ехать</div>
+    <div class="gd-t" data-i18n>как ехать</div>
     <ul class="gd-touch">
-      <li>положи палец на экран и тяни:</li>
-      <li><kbd>вверх</kbd> газ</li>
-      <li><kbd>вниз</kbd> тормоз и назад</li>
-      <li><kbd>влево</kbd><kbd>вправо</kbd> руль</li>
-      <li><kbd>второй палец</kbd> ручник</li>
-      <li><kbd>нитро</kbd> кнопка внизу — зажал и полетел</li>
+      <li data-i18n>положи палец на экран и тяни:</li>
+      <li><kbd data-i18n>вверх</kbd> <span data-i18n>газ</span></li>
+      <li><kbd data-i18n>вниз</kbd> <span data-i18n>тормоз и назад</span></li>
+      <li><kbd data-i18n>влево</kbd><kbd data-i18n>вправо</kbd> <span data-i18n>руль</span></li>
+      <li><kbd data-i18n>второй палец</kbd> <span data-i18n>ручник</span></li>
+      <li><kbd data-i18n>нитро</kbd> <span data-i18n>кнопка внизу — зажал и полетел</span></li>
     </ul>
     <ul class="gd-keys">
-      <li><kbd>W</kbd><kbd>↑</kbd> газ</li>
-      <li><kbd>S</kbd><kbd>↓</kbd> тормоз и назад</li>
-      <li><kbd>A</kbd><kbd>D</kbd><kbd>←</kbd><kbd>→</kbd> руль</li>
-      <li><kbd>пробел</kbd> ручник</li>
-      <li><kbd>Shift</kbd> нитро — зажал и полетел</li>
-      <li><kbd>Tab</kbd> карта района</li>
+      <li><kbd>W</kbd><kbd>↑</kbd> <span data-i18n>газ</span></li>
+      <li><kbd>S</kbd><kbd>↓</kbd> <span data-i18n>тормоз и назад</span></li>
+      <li><kbd>A</kbd><kbd>D</kbd><kbd>←</kbd><kbd>→</kbd> <span data-i18n>руль</span></li>
+      <li><kbd data-i18n>пробел</kbd> <span data-i18n>ручник</span></li>
+      <li><kbd>Shift</kbd> <span data-i18n>нитро — зажал и полетел</span></li>
+      <li><kbd>Tab</kbd> <span data-i18n>карта района</span></li>
     </ul>
-    <div class="gd-n">подъедь к гостю и притормози — пицца отдастся сама · клик — закрыть</div>
+    <div class="gd-n" data-i18n>подъедь к гостю и притормози — пицца отдастся сама · клик — закрыть</div>
   </div>
 
   <!-- ── кино смерти: надпись проявляется, пока камера уходит вверх ── -->
@@ -157,57 +156,49 @@
 
   <!-- ── заставка и экран конца смены ── -->
   <div id="big" hidden>
+    <!-- язык: значок-глобус и названия языков на своих языках (рекомендация Яндекса) -->
+    <button id="st-lang" type="button" aria-label="language"><span aria-hidden="true">🌐</span> <b id="st-lang-n"></b></button>
+    <div id="credits">© <span data-i18n>участники OpenStreetMap</span> · ODbL</div>
     <div id="big-t"></div>
     <div id="big-s"></div>
 
-    <!-- ── общий зачёт: та же таблица, что у «Схлопни коллегу» ── -->
+    <!-- ── таблица рекордов: площадки (Яндекс) или локальная ── -->
     <div id="lb-wrap" hidden>
       <div id="lb-place"></div>
       <ol id="lb-list"></ol>
-      <div id="lb-form">
-        <input id="lb-name" type="text" maxlength="24" placeholder="как тебя записать" autocomplete="off">
-        <button id="lb-save" type="button">записать смену</button>
-      </div>
-      <div id="lb-vpn" role="note">⚠️ чтобы смена попала в общую таблицу — <b>включи впн</b>: таблица живёт в Контентфуле, из России он не открывается</div>
     </div>
 
     <div id="big-k"></div>
+    <!-- после смены: видео за награду (только по кнопке, награда — бонус) и вход в Яндекс ради таблицы -->
+    <div id="ov-extra" hidden>
+      <button id="ov-x2" type="button" hidden><b data-i18n>удвоить заработок</b><span data-i18n>за просмотр рекламы</span></button>
+      <button id="ov-auth" type="button" hidden data-i18n>войти, чтобы попасть в общую таблицу</button>
+    </div>
 
-    <!-- ── Москва: сначала имя, потом «поехали». Под этим именем смена
-         сама пишется в общий зачёт ── -->
+    <!-- ── сначала имя (кроме Яндекса — там оно из профиля), потом «поехали» ── -->
     <form id="start" class="msk-only" autocomplete="off">
-      <label for="st-name">как тебя зовут</label>
-      <input id="st-name" type="text" maxlength="24" placeholder="имя и фамилия" autocomplete="off" spellcheck="false">
-      <button id="st-go" type="submit" disabled>поехали</button>
+      <label for="st-name" data-i18n>как тебя зовут</label>
+      <input id="st-name" type="text" maxlength="24" data-i18n-ph="имя и фамилия" autocomplete="off" spellcheck="false">
+      <button id="st-go" type="submit" disabled data-i18n>поехали</button>
       <div id="st-lvl"></div>
-      <button id="st-ride" type="button">просто покататься</button>
+      <button id="st-ride" type="button" data-i18n>просто покататься</button>
       <div class="st-row">
-        <button id="st-col" type="button">мои коллекции</button>
-        <button id="st-shop" type="button">магазин</button>
+        <button id="st-col" type="button" data-i18n>мои находки</button>
+        <button id="st-shop" type="button" data-i18n>гараж</button>
       </div>
-      <!-- корень сайта сам ведёт на свежий выпуск -->
-      <a id="st-digest" href="../../">читать дайджест →</a>
+      <div class="st-row">
+        <button id="st-set" type="button" data-i18n>настройки</button>
+        <button id="st-quit" type="button" hidden data-i18n>выйти из игры</button>
+      </div>
       <div id="st-note"></div>
     </form>
 
     <!-- ── общий зачёт сбоку: виден и на заставке, и после смены ── -->
     <aside id="board" class="msk-only">
-      <div class="bd-t">общий зачёт</div>
+      <div class="bd-t" data-i18n>таблица рекордов</div>
       <ol id="board-list"></ol>
       <div id="board-me"></div>
-      <div class="bd-n">таблица в Контентфуле — из России пишется с впн</div>
     </aside>
-  </div>
-
-  <!-- ── катсцена-вступление к выпуску (?intro): кино вместо хада ── -->
-  <div id="intro" hidden>
-    <div class="in-bar in-top"></div>
-    <div class="in-bar in-bot"></div>
-    <div id="in-names"></div>
-    <div id="in-end" hidden>
-      <button id="in-read" type="button">читать дайджест</button>
-      <button id="in-play" type="button">поехать доставлять заказы</button>
-    </div>
   </div>
 
 </div>

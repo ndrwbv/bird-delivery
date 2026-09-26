@@ -1,0 +1,164 @@
+# Ручной релиз: Steam Deck / Linux (x64) и Windows (x64) + zip для Яндекс Игр.
+# Запуск: Actions → «Релиз» → Run workflow.
+# В гит-релиз идут bird-pizza-deck.tar.gz, bird-pizza-win.zip и install-deck.sh.
+# Тег запекается в сборку (electron/build-tag.json): по нему установка с GitHub понимает,
+# что вышла версия свежее, и предлагает обновиться. Zip для Яндекса — только артефакт прогона:
+# его заливают руками в консоль разработчика.
+name: Релиз
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Тег релиза, например v0.1.1. Пусто — подставится дата.'
+        required: false
+        default: ''
+      notes:
+        description: 'Что нового — попадёт в описание релиза.'
+        required: false
+        default: ''
+      yandex:
+        description: 'Собрать ещё и zip для Яндекс Игр'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.t.outputs.tag }}
+    steps:
+      - id: t
+        env:
+          IN_TAG: ${{ inputs.tag }}
+        run: |
+          set -eu
+          TAG="$IN_TAG"
+          if [ -z "$TAG" ]; then TAG="build-$(date -u +%Y%m%d-%H%M)"; fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "тег: $TAG" >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    needs: meta
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux
+          - os: windows-latest
+            target: win
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Зависимости
+        run: npm ci
+
+      - name: Метка сборки
+        env:
+          TAG: ${{ needs.meta.outputs.tag }}
+        run: |
+          set -eu
+          printf '{"tag":"%s","sha":"%s","date":"%s"}\n' "$TAG" "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > electron/build-tag.json
+          cat electron/build-tag.json
+
+      - name: Сборка веб-части (steam)
+        run: npm run build:steam
+
+      - name: Пакет Electron linux-x64
+        if: matrix.target == 'linux'
+        run: |
+          npx electron-builder --linux dir --x64 --publish never
+          node tools/pack-deck.mjs
+          cp tools/install-deck.sh release/install-deck.sh
+
+      # zip-таргет — распакованная папка без инсталлятора: Steam раздаёт именно такие файлы.
+      # На windows-раннере, потому что правка иконки и версии .exe на Linux требует wine.
+      - name: Пакет Electron win-x64
+        if: matrix.target == 'win'
+        run: npx electron-builder --win zip --x64 --publish never -c.win.artifactName='bird-pizza-win.${ext}'
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.target == 'linux'
+        with:
+          name: bird-pizza-linux
+          path: |
+            release/bird-pizza-deck.tar.gz
+            release/install-deck.sh
+          if-no-files-found: error
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.target == 'win'
+        with:
+          name: bird-pizza-win
+          path: release/bird-pizza-win.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  yandex:
+    if: inputs.yandex
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Сборка для Яндекс Игр
+        run: npm run build:yandex
+      - uses: actions/upload-artifact@v4
+        with:
+          name: yandex-zip
+          path: release/yandex-*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    needs: [meta, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bird-pizza-*
+          path: assets
+          merge-multiple: true
+
+      - name: Выложить релиз
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.meta.outputs.tag }}
+          IN_NOTES: ${{ inputs.notes }}
+        run: |
+          set -eu
+          ls -l assets
+          NOTES="$IN_NOTES"
+          if [ -z "$NOTES" ]; then NOTES="Сборка из ${GITHUB_SHA:0:7}."; fi
+          {
+            printf '%s\n\n' "$NOTES"
+            printf '**Steam Deck / Linux** — одна команда в Konsole (десктоп-режим):\n\n'
+            printf '```bash\n'
+            printf 'curl -fsSL https://raw.githubusercontent.com/%s/main/tools/install-deck.sh | bash\n' "$GITHUB_REPOSITORY"
+            printf '```\n\n'
+            printf 'Игра встанет в папку `bird-pizza` там, где запущена команда, и дальше сама будет предлагать обновление.\n\n'
+            printf '**Windows** — распаковать `bird-pizza-win.zip` и запустить `BirdPizza.exe`.\n'
+          } > notes.md
+          gh release create "$TAG" \
+            assets/bird-pizza-deck.tar.gz assets/bird-pizza-win.zip assets/install-deck.sh \
+            --title "Птица Пицца $TAG" --notes-file notes.md --target "$GITHUB_SHA"
+          echo "релиз: $TAG" >> "$GITHUB_STEP_SUMMARY"

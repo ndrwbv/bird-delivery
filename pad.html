@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Птица Пицца — геймпад</title>
+  <style>
+    body { margin: 0; padding: 16px; background: #1b1712; color: #f1e7d6; font: 15px/1.5 "SF Mono", Menlo, Consolas, monospace; }
+    h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: .08em; }
+    h2 { font-size: 16px; margin: 16px 0 4px; }
+    .dim { color: #8d7f6c; }
+    .on { color: #ffd34d; }
+    table { border-collapse: collapse; margin: 6px 0 12px; }
+    td { padding: 2px 12px 2px 0; vertical-align: top; }
+    .bar { display: inline-block; width: 140px; height: 9px; background: #342a20; vertical-align: middle; }
+    .bar i { display: block; height: 100%; background: #e04836; }
+    #nav { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
+    #nav a, #nav button { font: inherit; color: #1b1712; background: #ffd34d; border: 0; border-radius: 6px; padding: 8px 14px; text-decoration: none; cursor: pointer; }
+    #log { white-space: pre-wrap; color: #c8b08a; min-height: 3em; }
+  </style>
+</head>
+<body>
+  <h1>ПРОВЕРКА ГЕЙМПАДА</h1>
+  <p class="dim">Нажми любую кнопку, чтобы браузер показал контроллер. Видно, что приезжает от устройства
+    и как это разбирает игра. Кнопки ниже листаются крестовиной, A — нажать.</p>
+  <div id="nav">
+    <a href="./index.html">← в игру</a>
+    <button id="rumble" type="button">проверить отдачу</button>
+  </div>
+  <div id="out"></div>
+  <h2>Что сработало</h2>
+  <div id="log" class="dim">—</div>
+  <script type="module" src="/src/input/pad-diag.js"></script>
+</body>
+</html>

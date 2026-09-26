@@ -1,0 +1,13 @@
+/* Выбранный геймпадом пункт меню (padmenu.js). Импортировать рядом с delivery.css. */
+.padsel {
+  outline: 3px solid #ffd34d !important;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(255, 211, 77, .28), 0 4px 18px rgba(0, 0, 0, .35) !important;
+  transform: scale(1.04);
+  transition: transform .08s ease-out, box-shadow .08s ease-out;
+  position: relative;
+  z-index: 1;
+}
+input.padsel, textarea.padsel { transform: none; }
+#ch-opts button.padsel, .pm-btns button.padsel { filter: brightness(1.12); }
+@media (prefers-reduced-motion: reduce) { .padsel { transform: none; transition: none; } }
