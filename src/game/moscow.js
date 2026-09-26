@@ -22,8 +22,7 @@ import CITY_DATA from './city-data.js';
 /* ─────────────── мелочь ─────────────── */
 const $ = id => document.getElementById(id);
 /* ?intro — вместо игры катсцена-вступление к выпуску (см. раздел «вступление») */
-const INTRO = new URLSearchParams(location.search).has('intro');
-if (INTRO) document.body.classList.add('intro');
+const INTRO = false;               // катсцена дайджеста вырезана; флаг держим, чтобы не трогать проверки
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[(Math.random() * a.length) | 0];
@@ -230,15 +229,6 @@ function mergeGeos (list) {
 const CITY = CITY_DATA;
 /* Во вступлении камера не отходит от Омеги дальше пары сотен метров —
    город строим только вокруг неё: сборка в разы короче, кино стартует быстрее. */
-if (INTRO) {
-  const [ox, oz] = CITY.meta.origin, R = 380;
-  const near = (x, z) => Math.abs(x - ox) < R && Math.abs(z - oz) < R;
-  const anyNear = p => p.some(q => near(q[0], q[1]));
-  for (const k of ['buildings', 'roads', 'green', 'lots']) CITY[k] = CITY[k].filter(o => anyNear(o.p));
-  CITY.paths = CITY.paths.filter(anyNear);
-  for (const k of ['trees', 'benches', 'entrances', 'gates', 'signals', 'crossings']) CITY[k] = CITY[k].filter(q => near(q[0], q[1]));
-  for (const k of ['pois', 'stops', 'metro']) CITY[k] = CITY[k].filter(q => near(q.p[0], q.p[1]));
-}
 const CW = CITY.meta.size[0], CD = CITY.meta.size[1];
 const BOUNDS = { x0: -CW / 2 + 12, x1: CW / 2 - 12, z0: -CD / 2 + 12, z1: CD / 2 - 12 };
 const LANE = 3.2;                              // смещение от осевой до центра полосы (запасное)
@@ -1044,7 +1034,7 @@ const WALLS = ['#e9bcc8', '#c7d9ef', '#f0dcae', '#c2e0cd', '#d9c8ea', '#eecfb4',
 
 /* пятно под кружок вступления: ни деревьев, ни фонарей, ни лавочек —
    иначе ствол встаёт между камерой и коробкой */
-const introClear = (x, z, r = 8) => INTRO && IF.set && Math.hypot(x - IF.x, z - IF.z) < r;
+const introClear = () => false;
 
 function tree (x, z) {
   if (introClear(x, z)) return;
@@ -3082,7 +3072,6 @@ function buildCity () {
   if (house) dodoFacade(house);
   else buildPizzeria(spot.x, spot.z, spot.ry);
   // во вступлении место под кружок знаем заранее — его держим пустым
-  if (INTRO) introPlace();
 
   const tm = (k, f) => { const t0 = performance.now(); f(); BUILD_T[k] = Math.round(performance.now() - t0); };
   tm('life', osmStreetLife);
@@ -9105,358 +9094,6 @@ function startPose () {
   V.y = surfaceAt(V.x, V.z);
 }
 
-/* ─────────────── вступление к выпуску (?intro) ───────────────
-   Катсцена вместо игры: у входа в Омегу, на месте курилки, стоит кружок —
-   Оля, Жанна, Андрей и Ваня. Жанна с Андреем рядом и курят. Курьер
-   влетает по Ленинской Слободе, тормозит у бордюра, коробка летит им в
-   руки, камера наезжает, крышка открывается — внутри дайджест. Дальше
-   две кнопки: поехать доставлять самому или читать. Выпуск грузит эту
-   страницу в рамку и слушает postMessage { dlvIntro: 'ready' | 'end' |
-   'read' | 'play' }.
-
-   Сцена считается в своих осях: a — вдоль улицы (плюс — откуда едет
-   курьер), b — поперёк (плюс — от кружка к дороге), ноль — центр кружка.
-   Так план по секундам остался прежним, а стоит он на настоящей улице. */
-
-/* углы от центра, 0° — к дороге. Болтают кружком, ловя коробку, расступаются
-   подковой к улице. Жанна и Андрей — соседи: 140° и −140° */
-const CAST_IDS = [
-  ['o-arbuzova', 50, 92, false], ['j-serova', 140, 152, true], ['a-boev', -140, -152, true], ['i-komantcev', -50, -92, false],
-];
-const T = { cut: 2, drive: 4, notice: 5.8, arrive: 6.9, shotC: 7.1, toss: 7.4, land: 8.5, shotD: 9.1, lid: 10.1, end: 11.2 };
-const R_TALK = 1.15, R_HOLD = 0.9;
-const IS = { t: -1, cast: [], box: null, done: false, landed: false, carV: 0 };
-const IF = { x: 0, z: 0, dx: 1, dz: 0, tx: 0, tz: 1, y: 0, bLane: 9, bCurb: 7.7, from: 44 };
-const L = (a, b) => [IF.x - IF.dx * a - IF.tx * b, IF.z - IF.dz * a - IF.tz * b];
-
-function introPost (ev) {
-  if (window.parent !== window) window.parent.postMessage({ dlvIntro: ev }, location.origin);
-}
-
-/* коробка, которая открывается: дно из пяти стенок и крышка на петле сзади */
-function introBox () {
-  const g = new THREE.Group();
-  const mat = hex => new THREE.MeshLambertMaterial({ color: hex, flatShading: true });
-  const W = 0.86, H = 0.2, th = 0.025;
-  const add = (w, h, d, hex, x, y, z) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(hex));
-    m.position.set(x, y, z); g.add(m); return m;
-  };
-  add(W, th, W, '#ff6900', 0, -H / 2, 0);
-  add(W, H, th, '#ff6900', 0, 0, W / 2);
-  add(W, H, th, '#ff6900', 0, 0, -W / 2);
-  add(th, H, W, '#ff6900', W / 2, 0, 0);
-  add(th, H, W, '#ff6900', -W / 2, 0, 0);
-  add(W - 0.06, 0.01, W - 0.06, '#f3e2c0', 0, -H / 2 + 0.02, 0);
-  const pz = new THREE.Mesh(new THREE.CylinderGeometry(0.37, 0.37, 0.05, 20), mat('#e8a94f'));
-  pz.position.set(0, -H / 2 + 0.05, 0); g.add(pz);
-  const cheese = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.02, 20), mat('#ffd35a'));
-  cheese.position.set(0, -H / 2 + 0.085, 0); g.add(cheese);
-  for (let k = 0; k < 9; k++) {
-    const a = k / 9 * Math.PI * 2 + 0.3, r = k % 3 ? 0.2 : 0.08;
-    const pep = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.02, 10), mat('#d2412f'));
-    pep.position.set(Math.cos(a) * r, -H / 2 + 0.1, Math.sin(a) * r); g.add(pep);
-  }
-  const lid = new THREE.Group();
-  lid.position.set(0, H / 2, -W / 2);
-  const top = new THREE.Mesh(new THREE.BoxGeometry(W + 0.02, th, W + 0.02), mat('#ff6900'));
-  top.position.set(0, 0, W / 2);
-  lid.add(top);
-  const logo = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.01, 0.12), mat('#fff3d6'));
-  logo.position.set(0, th / 2 + 0.004, W / 2);
-  lid.add(logo);
-  const inner = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.02, W - 0.02), new THREE.MeshBasicMaterial({ map: introText() }));
-  inner.rotation.x = Math.PI / 2;
-  inner.position.set(0, -th / 2 - 0.003, W / 2);
-  lid.add(inner);
-  g.add(lid);
-  g.userData.lid = lid;
-  return g;
-}
-
-/* надпись на изнанке крышки — пиксельным шрифтом, как весь хад */
-function introText () {
-  const c = document.createElement('canvas');
-  c.width = c.height = 512;
-  const x = c.getContext('2d');
-  x.fillStyle = '#fff3d6'; x.fillRect(0, 0, 512, 512);
-  x.strokeStyle = '#ff6900'; x.lineWidth = 16; x.strokeRect(20, 20, 472, 472);
-  x.fillStyle = '#33210c';
-  x.textAlign = 'center'; x.textBaseline = 'middle';
-  const font = s => `${s}px "Press Start 2P", ui-monospace, monospace`;
-  x.font = font(40);
-  x.fillText('привезли', 256, 150);
-  x.fillText('вам', 256, 214);
-  x.fillStyle = '#ff6900';
-  x.font = font(42);
-  x.fillText('дайджест!', 256, 284);
-  x.fillStyle = '#8a6b4e';
-  x.font = font(17);
-  x.fillText('xxx · 14–25 сентября', 256, 390);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.magFilter = THREE.NearestFilter;
-  return t;
-}
-
-/* где снимаем: кружок на тротуаре у курилки, улица — ближайшая к нему */
-function introPlace () {
-  const base = SMOKE_SPOT || { x: PIZZA.x, z: PIZZA.z };
-  const road = nearestRoad(base.x, base.z, 4, 2);
-  const s = road.seg, sl = Math.hypot(s.x2 - s.x1, s.z2 - s.z1) || 1;
-  let dx = (s.x2 - s.x1) / sl, dz = (s.z2 - s.z1) / sl;
-  let tx = base.x - road.x, tz = base.z - road.z;
-  const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl;
-  // едем так, чтобы кружок был справа по ходу: правая нормаль (−dz, dx)
-  if (-dz * tx + dx * tz < 0) { dx = -dx; dz = -dz; }
-  // кружок — на тротуаре в трёх метрах от бордюра, если до дома есть место
-  let D = Math.min(tl, s.w / 2 + 3.2);
-  let x = road.x + tx * D, z = road.z + tz * D;
-  if (inHouse(x, z, 1.8)) { x = base.x; z = base.z; D = tl; }
-  const e = s.na !== undefined ? edgeOf(s.na, s.nb) : null;
-  const lane = e ? laneOff(e, 0) : s.w / 4;
-  Object.assign(IF, { x, z, dx, dz, tx, tz, bLane: D - lane, bCurb: D - (s.w / 2 - 1.1), set: true });
-  IF.y = groundH(x, z) + curbAt(x, z);
-}
-
-function introSetup () {
-  S.state = 'intro';
-  cam.near = 0.05; cam.updateProjectionMatrix();
-  $('intro').hidden = false;
-  if (!IF.set) introPlace();
-  IF.y = groundH(IF.x, IF.z) + curbAt(IF.x, IF.z);
-
-  const byId = id => ROSTER.find(p => p.id === id);
-  for (const [id, deg, holdDeg, smokes] of CAST_IDS) {
-    const person = byId(id) || nextPerson();
-    const a = deg * Math.PI / 180;
-    const g = makeHuman(person);
-    if (smokes) {
-      const cig = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.22), new THREE.MeshBasicMaterial({ color: 0xf4f1ea }));
-      cig.position.set(0, -0.5, 0.12);
-      g.userData.armR.add(cig);
-    }
-    scene.add(g);
-    const tag = document.createElement('div');
-    tag.className = 'in-name';
-    tag.textContent = person ? person.name : '';
-    $('in-names').appendChild(tag);
-    IS.cast.push({ g, a, ha: holdDeg * Math.PI / 180, x: 0, z: 0, la: 0, lb: 0, h: 0, ph: Math.random() * 9, tag,
-                   talk: rand(0, 3), smokes, puffT: rand(0.3, 1.5) });
-  }
-  for (const c of IS.cast) {
-    [c.x, c.z] = L(Math.sin(c.a) * R_TALK, Math.cos(c.a) * R_TALK);
-    c.h = Math.atan2(IF.x - c.x, IF.z - c.z);
-  }
-
-  // машина ждёт за кадром, пока идёт первый план
-  [V.x, V.z] = L(IF.from, IF.bLane);
-  V.h = Math.atan2(IF.dx, IF.dz);
-  V.y = surfaceAt(V.x, V.z);
-  car.visible = false;
-  // полосу чистим: скриптовая машина никого не объезжает. Новые рождаются
-  // от курьера дальше ста двадцати метров
-  for (const t of TRAFFIC)
-    if (!t.parked && Math.hypot(t.x - IF.x, t.z - IF.z) < 110) respawnTraffic(t);
-  // кружок сплошной: прохожие обходят, а не пролезают насквозь
-  obb(IF.x, IF.z, 1.7, 1.7, 0);
-  indexSolids();
-
-  IS.box = introBox();
-  IS.box.visible = false;
-  scene.add(IS.box);
-
-  $('in-read').addEventListener('click', () => {
-    if (window.parent !== window) introPost('read');
-    else location.href = '../../';
-  });
-  $('in-play').addEventListener('click', () => {
-    if (window.parent !== window) introPost('play');
-    else location.href = './';
-  });
-
-  // стартуем, когда подъехали лица и шрифт — или через три секунды в любом случае
-  const faces = IS.cast.map(c => new Promise(res => {
-    const m = c.g.userData.head.material[4], tex = m && m.map;
-    const ok = () => !tex || (tex.image && tex.image.complete);
-    const poll = () => ok() ? res() : setTimeout(poll, 80);
-    poll();
-  }));
-  const font = document.fonts ? document.fonts.load('40px "Press Start 2P"') : Promise.resolve();
-  Promise.race([Promise.all([...faces, font]), new Promise(r => setTimeout(r, 3000))]).then(() => {
-    const inner = IS.box.userData.lid.children[2];
-    inner.material.map = introText(); inner.material.needsUpdate = true;
-    IS.t = 0;
-    $('intro').classList.add('bars');
-    introPost('ready');
-  });
-}
-
-const introFov = f => { if (cam.fov !== f) { cam.fov = f; cam.updateProjectionMatrix(); } };
-const smooth = t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
-const span = (t, a, b) => clamp((t - a) / (b - a), 0, 1);
-const tmpV = new THREE.Vector3();
-
-function introStep (dt) {
-  const Y = IF.y;
-  if (IS.t < 0) {                                  // ждём лица: общий план сверху
-    const [cx, cz] = L(-14, 14);
-    cam.position.set(cx, Y + 12, cz);
-    cam.lookAt(IF.x, Y + 1, IF.z);
-    return;
-  }
-  if (!IS.freeze) IS.t += dt;                     // freeze — отладочная пауза на кадре
-  const t = IS.t;
-
-  /* ── машина: влетает по улице, тормозит в пол и прижимается к бордюру ── */
-  if (t >= T.drive) {
-    car.visible = true;
-    const u = span(t, T.drive, T.arrive);
-    const e = 1 - (1 - u) * (1 - u);               // равнозамедленно
-    const px = V.x, pz = V.z;
-    [V.x, V.z] = L(lerp(IF.from, 1.2, e), lerp(IF.bLane, IF.bCurb, smooth(span(u, 0.45, 1))));
-    const vx = (V.x - px) / Math.max(dt, 1e-3), vz = (V.z - pz) / Math.max(dt, 1e-3);
-    IS.carV = Math.hypot(vx, vz);
-    const fin = Math.atan2(IF.dx, IF.dz);
-    if (IS.carV > 0.3) V.h = Math.atan2(vx, vz);
-    else V.h += Math.atan2(Math.sin(fin - V.h), Math.cos(fin - V.h)) * (1 - Math.exp(-4 * dt));
-    V.vx = vx; V.vz = vz;
-    V.y = surfaceAt(V.x, V.z);
-    car.position.set(V.x, V.y, V.z);
-    car.rotation.set(u < 1 ? -0.05 * smooth(span(u, 0.5, 0.9)) * (1 - span(u, 0.9, 1)) : 0, V.h, 0);
-    V.wheel += IS.carV * dt / 0.44;
-    for (const w of car.userData.wheels) w.rotation.x = V.wheel;
-    for (const s of car.userData.steer) s.rotation.y = u > 0.45 && u < 0.95 ? -0.35 : 0;
-    if (u > 0.6 && u < 0.95 && Math.random() < dt * 7)
-      puff(V.x - Math.sin(V.h) * 1.6 + rand(-0.6, 0.6), 0.15, V.z - Math.cos(V.h) * 1.6, false, rand(0.25, 0.4));
-  } else {
-    car.position.set(V.x, V.y, V.z);
-  }
-
-  /* ── коробка: из окна по дуге в середину кружка ── */
-  const B = IS.box;
-  if (t >= T.toss) {
-    B.visible = true;
-    const u = span(t, T.toss, T.land);
-    const fx = V.x + IF.tx * 0.9 + IF.dx * 0.2, fz = V.z + IF.tz * 0.9 + IF.dz * 0.2, fy = V.y + 1.35;
-    const ty = Y + 0.9;
-    B.position.set(lerp(fx, IF.x, u), lerp(fy, ty, u) + Math.sin(u * Math.PI) * 2.6, lerp(fz, IF.z, u));
-    // в конце полёта — петлёй от камеры: изнанка крышки смотрит на зрителя
-    const face = Math.atan2(-IF.tx, -IF.tz);
-    B.rotation.set(Math.sin(u * Math.PI) * 0.7, (1 - smooth(u)) * Math.PI * 2 + face, Math.sin(u * Math.PI * 2) * 0.25);
-    if (u >= 1 && !IS.landed) {
-      IS.landed = true;
-      for (let k = 0; k < 6; k++) emote(IF.x + rand(-0.8, 0.8), 2.2, IF.z + rand(-0.8, 0.8), 'heart', 1);
-    }
-    const lu = span(t, T.lid, T.lid + 0.9);
-    const ov = lu < 1 ? smooth(lu) * 1.08 - Math.sin(lu * Math.PI) * 0.05 : 1;
-    B.userData.lid.rotation.x = -1.82 * Math.min(1.04, ov);
-    if (lu > 0.2 && lu < 1 && Math.random() < dt * 14) steam(IF.x + rand(-0.2, 0.2), 1.3, IF.z + rand(-0.2, 0.2));
-  }
-
-  /* ── люди: болтают и курят, замечают машину, ловят коробку ── */
-  const carTarget = t >= T.notice && t < T.land - 0.3;
-  const hold = t >= T.land - 0.35;
-  for (const c of IS.cast) {
-    c.ph += dt;
-    const u = c.g.userData;
-    const k = smooth(span(t, T.land - 0.9, T.land));
-    const r = lerp(R_TALK, R_HOLD, k), a = lerp(c.a, c.ha, k);
-    c.la = Math.sin(a) * r; c.lb = Math.cos(a) * r;
-    [c.x, c.z] = L(c.la, c.lb);
-    const face = Math.atan2(IF.x - c.x, IF.z - c.z);
-    let want = face;
-    if (carTarget) want = Math.atan2(V.x - c.x, V.z - c.z);
-    const dh = Math.atan2(Math.sin(want - c.h), Math.cos(want - c.h));
-    c.h += dh * (1 - Math.exp(-6 * dt));
-    c.g.rotation.y = c.h + (hold || carTarget ? 0 : Math.sin(c.ph * 1.3) * 0.12);
-    c.g.position.set(c.x, Y + (carTarget ? Math.abs(Math.sin(c.ph * 9)) * 0.12 : 0), c.z);
-    u.head.rotation.y = hold ? 0 : Math.sin(c.ph * 0.9 + c.talk) * 0.25;
-    u.head.rotation.x = hold ? 0.28 : Math.sin(c.ph * 2.3) * 0.05;
-    let aL = 0, aR = 0, zL = 0, zR = 0;
-    if (hold) { aL = aR = -1.25; zL = -0.25; zR = 0.25; }
-    else if (carTarget) {
-      // курящие машут свободной левой, остальные — правой
-      if (c.smokes) { aL = -2.6 + Math.sin(c.ph * 14) * 0.35; zL = -0.3; aR = -0.6; }
-      else { aR = -2.6 + Math.sin(c.ph * 14) * 0.35; zR = 0.3; }
-    } else if (c.smokes) {
-      // затяжка: рука с сигаретой к лицу раз в несколько секунд
-      aR = -0.5 - Math.max(0, Math.sin(c.ph * 0.9 + c.talk)) ** 6 * 1.7;
-    } else if (Math.sin(c.ph * 0.8 + c.talk) > 0.55) aR = -0.7 + Math.sin(c.ph * 6) * 0.25;
-    u.armL.rotation.x = damp(u.armL.rotation.x, aL, 9, dt);
-    u.armR.rotation.x = damp(u.armR.rotation.x, aR, 9, dt);
-    u.armL.rotation.z = damp(u.armL.rotation.z, zL, 9, dt);
-    u.armR.rotation.z = damp(u.armR.rotation.z, zR, 9, dt);
-    // дым — пока не наехали на коробку: крупным планом он бы её закрыл
-    if (c.smokes && t < T.shotD && (c.puffT -= dt) <= 0) {
-      c.puffT = rand(1.1, 2.4);
-      const fx = Math.sin(c.h), fz = Math.cos(c.h);
-      const m = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({ color: 0xe9e7e2, transparent: true, opacity: 0.5, depthWrite: false }));
-      m.position.set(c.x + fx * 0.35, Y + 1.6, c.z + fz * 0.35);
-      m.scale.setScalar(0.18);
-      fxAdd(m, { vy: rand(0.4, 0.8), vx: fx * 0.3 + rand(-0.15, 0.15), vz: fz * 0.3 + rand(-0.15, 0.15), life: rand(1.2, 2), max: 2, grow: 1.2 });
-    }
-  }
-
-  /* ── камера ── */
-  const aspect = cam.aspect;
-  if (t < T.drive) {
-    // A: камера внутри кружка из-за плеч — два плана: сначала Оля с Жанной,
-    // потом Андрей с Ваней. На узком экране двое в кадр не лезут — тогда
-    // камера ведёт от одного к другому.
-    const second = t >= T.cut;
-    const u = second ? span(t, T.cut, T.drive) : span(t, 0, T.cut);
-    const sg = second ? -1 : 1;
-    const [p1, p2] = IS.cast.filter(c => Math.sign(c.la) === sg).sort((a, b) => b.lb - a.lb);
-    const k = clamp((1.5 - aspect) / 0.9, 0, 1) * 0.9;
-    const mx = (p1.x + p2.x) / 2, mz = (p1.z + p2.z) / 2;
-    const w = lerp(k, -k, smooth(u));
-    const tall = clamp(1 - aspect, 0, 0.6);
-    introFov(64 + tall * 30);
-    const [cx, cz] = L(-sg * (lerp(1.0, 1.35, u) + tall * 0.9), Math.sin(t * 0.7) * 0.05);
-    cam.position.set(cx, Y + lerp(1.83, 1.93, u) + tall * 0.3, cz);
-    cam.lookAt(mx + (p1.x - mx) * w, Y + 1.08, mz + (p1.z - mz) * w);
-  } else if (t < T.shotC) {
-    introFov(64);
-    // B: за машиной, чуть левее и выше — кружок справа по курсу
-    const hx = Math.sin(V.h), hz = Math.cos(V.h);
-    const back = lerp(10, 8, span(t, T.drive, T.shotC));
-    cam.position.set(V.x - hx * back - hz * 1.5, V.y + 3.4, V.z - hz * back + hx * 1.5);
-    cam.lookAt(V.x + hx * 8 + IF.tx * 2.2, V.y + 1.4, V.z + hz * 8 + IF.tz * 2.2);
-  } else {
-    // C → D: из-за машины со стороны улицы, потом наезд на коробку,
-    // в конце изнанка крышки во весь кадр
-    const u = smooth(span(t, T.shotD, T.lid + 0.6));
-    const need = Math.max(1.4, 1.05 / (1.25 * Math.min(1, aspect)));
-    const drift = span(t, T.shotC, T.shotD) * 0.6;
-    const breathe = Math.sin(t * 0.8) * 0.03;
-    const [cx, cz] = L(lerp(-3.2 + drift, breathe, u), lerp(8.4 - drift, need * 0.95, u));
-    cam.position.set(cx, Y + lerp(1.28, 0.88 + 0.62 * need, u), cz);
-    const [lx, lz] = L(lerp(0.4, 0, u), lerp(0.6, -0.3, u));
-    tmpV.set(lx, Y + lerp(2.08, 0.86 + 0.1 * need, u), lz);
-    cam.lookAt(tmpV);
-  }
-
-  /* ── имена над головами на первом плане ── */
-  const W = canvas.clientWidth, H = canvas.clientHeight;
-  for (const c of IS.cast) {
-    const facing = Math.sin(c.h) * (cam.position.x - c.x) + Math.cos(c.h) * (cam.position.z - c.z);
-    const on = t > 0.3 && t < T.drive - 0.15 && facing > 1.2;
-    c.tag.classList.toggle('on', on);
-    if (!on) continue;
-    tmpV.set(c.x, Y + 1.86, c.z).project(cam);
-    c.tag.style.left = ((tmpV.x + 1) / 2 * W) + 'px';
-    c.tag.style.top = ((1 - tmpV.y) / 2 * H) + 'px';
-  }
-
-  if (t >= T.end && !IS.done) {
-    IS.done = true;
-    $('intro').classList.add('end');
-    $('in-end').hidden = false;
-    introPost('end');
-  }
-}
-
 /* ─────────────── сборка мира ─────────────── */
 const T0 = performance.now();
 buildCity();
@@ -9970,8 +9607,7 @@ function showTitle () {
   showBig('москва',
     'сходи хоть тут в гембу — повози заказы около офиса и не задави клиентов!', '');
 }
-if (INTRO) introSetup();
-else showTitle();
+showTitle();
 
 /* Прохожие дальше ста семидесяти метров и машины дальше двухсот
    восьмидесяти — точки в тумане: рисовать их незачем. Считаются они
@@ -9996,9 +9632,7 @@ function frame (now) {
   tG += dt;
 
   let vf = 0;
-  if (S.state === 'intro') {
-    introStep(Math.min(raw, 0.1));               // кино идёт по часам, даже если кадров мало
-  } else if (S.state === 'dying') {
+  if (S.state === 'dying') {
     for (const k in IN) IN[k] = 0;              // руль из рук выпал, машина катится сама
     vf = driveStep(dt);
     deathTick(dt);
@@ -10114,7 +9748,7 @@ window.__dlv = { S, V, TRAFFIC, PEDS, PEOPLE, PIZZA, NODES, BENCHES, PROPS, SOLI
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта
-  groundH, surfaceAt, BRIDGES, frame, IS, IF,
+  groundH, surfaceAt, BRIDGES, frame,
   // Москва: граф, светофоры, зебры, самокатчики, ввод
   EDGES, SIG_GROUPS, ZEBRAS, SCOOTS, TL, IN, touches, lightOf, edgeOf,
   DRIVERS, SMOKERS, NITRO_CANS, NOS, DRINKITS, CREW, WAR, warStart, SURF, fyodorPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, PIGEONS, AMB, INCIDENTS, scare, RIVALS, THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT };
