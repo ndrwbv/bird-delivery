@@ -33,6 +33,9 @@ import * as LIFE from './life.js';               // парочки, богачи
 import * as RL from './roadlife.js';
 import * as PZ from './pizzeria.js';
 import * as LM from './landmarks.js';            // заправки и каток
+import * as ECON from './econ.js';               // карьера: все числа и формулы (docs/CAREER.md)
+import * as DLG from './dialog.js';              // диалог с головой и печатающимся текстом
+import * as ZN from './zones.js';                // районы города для заказов и событий
 import * as CULL from './cull.js';               // статика дальше камеры — со сцены, матрицы заморожены (Steam Deck)
 
 /* Сохранения — через площадку (облако Яндекса / localStorage). Значения
@@ -48,6 +51,11 @@ const Store = {
    в настройках (dlv-edition), ?kids — детская для проверки. */
 const ADULT = !!Platform.features.adult && Store.get('dlv-edition', 'adult') !== 'kids' && !new URLSearchParams(location.search).has('kids');
 const GORE_ON = ADULT;
+/* Карьера (Стим и dev): смена 9—24, экономика, машины, донаты. Только на карте,
+   у которой есть MAP.career (Северск); на Яндексе — прежняя игра. ?nocareer — выключить */
+const CAREER = Platform.id !== 'yandex' && !!MAP.career && !new URLSearchParams(location.search).has('nocareer');
+/* прогресс доната на цель города: 0…1 (econ.js DONATE) */
+const donated = k => clamp((+Store.get('dlv-don-' + k, 0) || 0) / ((ECON.DONATE[k] && ECON.DONATE[k].goal) || 1), 0, 1);
 const NUMF = new Intl.NumberFormat(curLang() === 'zh' ? 'zh-CN' : curLang());
 const money = n => NUMF.format(Math.round(n || 0)) + ' ₽';
 /* винительный падеж имени — только в русском, в других языках имя как есть */
@@ -7392,8 +7400,9 @@ function renderSettings () {
   if ($('set-ed')) $('set-ed').onclick = () => { Store.set('dlv-edition', ADULT ? 'kids' : 'adult'); Platform.store.flush && Platform.store.flush(); setTimeout(() => location.reload(), 150); };
 }
 $('st-lang').addEventListener('click', () => { elPanel.hidden = false; elPanel.dataset.kind = 'lang'; renderLangs(); });
-/* выбор карты — только где их больше одной (Стим, dev). Смена — перезагрузка */
-if (MAP_IDS.length > 1) {
+/* Выбор карты убран: Стим — это Северск, Яндекс — Москва. Для отладки кнопка
+   возвращается адресом ?maps. Смена — перезагрузка */
+if (MAP_IDS.length > 1 && new URLSearchParams(location.search).has('maps')) {
   $('st-map').hidden = false;
   $('st-map-n').textContent = $t(MAP.title);
   $('st-map').addEventListener('click', () => {
@@ -9816,6 +9825,8 @@ SEAS.initSeasons({ THREE, scene, cam, renderer, Store, MAP, CITY, V, S, groundH,
   get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get rainLines () { return rainLines; }, get hemi () { return hemi; } });
 const T0 = performance.now();
 buildCity();
+ZN.init({ CITY, MAP, donated });
+DLG.init({ pause: on => { for (const k in IN) IN[k] = 0; if (on) Snd.engine(0); }, face: (p, size) => faceDataURL(p, size) });
 const BUILD_MS = performance.now() - T0;          // сколько собирался город — для отладки
 /* реквизит склейки — тоже по клеткам: иначе снова один меш на весь город */
 function mergeChunked (list, mat) {
@@ -10397,7 +10408,7 @@ function frame (now) {
   last = now;
   CULL.govern(raw, isPlaying() && !S.paused && !EXT.paused && !FM.open && !document.hidden);
   padStep();
-  if (S.paused || EXT.paused) return;
+  if (S.paused || EXT.paused || DLG.isOpen()) return;     // диалог — мир стоит
   if (FM.open) { drawFullMap(); return; }        // на карте игра стоит
   tG += dt;
   if (isPlaying() && !S.ride && S.state !== 'brief' && S.state !== 'loading') S.shiftT = (S.shiftT || 0) + dt;
@@ -10526,7 +10537,7 @@ requestAnimationFrame(frame);
 
 /* отладочная ручка */
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { RL: RL.DEBUG, S, V, TRAFFIC, PEDS, PEOPLE, PIZZA, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { RL: RL.DEBUG, S, V, TRAFFIC, PEDS, PEOPLE, PIZZA, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта

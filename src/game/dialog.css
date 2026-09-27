@@ -1,0 +1,40 @@
+/* диалог: голова слева, облачко изо рта справа (на телефоне стоя — голова сверху) */
+#dlg { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center;
+       background: rgba(12, 18, 40, .45); opacity: 0; transition: opacity .18s; padding: 16px; box-sizing: border-box; }
+#dlg[hidden] { display: none; }
+#dlg.on { opacity: 1; }
+.dlg-box { width: min(720px, 100%); background: #1d2440; border: 3px solid #33210c; border-radius: 12px;
+           box-shadow: 0 8px 0 #141a33; overflow: hidden; transform: translateY(12px) scale(.97); transition: transform .18s; }
+#dlg.on .dlg-box { transform: none; }
+.dlg-bar { height: 10px; background: #ff8a2b; }
+.dlg-row { display: flex; align-items: flex-end; gap: 18px; padding: 20px 22px 8px; }
+.dlg-head { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.dlg-head img { width: 168px; height: 168px; image-rendering: pixelated; border-radius: 14px; border: 4px solid #33210c; background: #f3c9a0;
+                animation: dlg-talk .5s ease-in-out infinite alternate; }
+.dlg-head b { font-weight: normal; font-size: 11px; color: #ffd85e; text-align: center; max-width: 180px; }
+@keyframes dlg-talk { from { transform: translateY(0); } to { transform: translateY(-3px) rotate(-1deg); } }
+.dlg-bubble { position: relative; flex: 1; min-height: 120px; background: #fff3d6; color: #2a1d10; border: 3px solid #33210c;
+              border-radius: 14px; padding: 16px 18px 26px; margin-bottom: 40px; cursor: pointer; }
+.dlg-bubble::before { content: ''; position: absolute; left: -20px; bottom: 26px; border: 10px solid transparent; border-right: 12px solid #33210c; }
+.dlg-bubble::after { content: ''; position: absolute; left: -13px; bottom: 28px; border: 8px solid transparent; border-right: 10px solid #fff3d6; }
+.dlg-text { margin: 0; font-size: 13px; line-height: 1.9; white-space: pre-wrap; }
+.dlg-skip { position: absolute; right: 12px; bottom: 6px; font-size: 8px; color: #8a7556; }
+.dlg-timer { height: 8px; margin: 0 22px; background: #2a3766; border-radius: 4px; overflow: hidden; visibility: hidden; }
+.dlg-timer.on { visibility: visible; }
+.dlg-timer i { display: block; height: 100%; background: #ffd85e; transform-origin: left center; }
+.dlg-timer.low i { background: #ff5a4a; }
+.dlg-btns { display: flex; justify-content: flex-end; gap: 12px; padding: 12px 22px 18px; visibility: hidden; }
+.dlg-btns.on { visibility: visible; }
+.dlg-btns button { font: inherit; font-size: 12px; padding: 12px 20px; border-radius: 8px; border: 3px solid #33210c; cursor: pointer; box-shadow: 0 4px 0 #33210c; }
+.dlg-yes { background: #ffd85e; color: #2a1d10; }
+.dlg-no { background: #3a4570; color: #fff3d6; }
+.dlg-btns button:active { transform: translateY(2px); box-shadow: 0 2px 0 #33210c; }
+@media (max-width: 560px) {
+  .dlg-row { flex-direction: column; align-items: center; padding: 16px 14px 6px; }
+  .dlg-head img { width: 120px; height: 120px; }
+  .dlg-bubble { margin-bottom: 8px; width: 100%; box-sizing: border-box; }
+  .dlg-bubble::before { left: 50%; top: -20px; bottom: auto; border: 10px solid transparent; border-bottom: 12px solid #33210c; transform: translateX(-50%); }
+  .dlg-bubble::after { left: 50%; top: -13px; bottom: auto; border: 8px solid transparent; border-bottom: 10px solid #fff3d6; transform: translateX(-50%); }
+  .dlg-text { font-size: 11px; }
+  .dlg-btns { justify-content: stretch; } .dlg-btns button { flex: 1; }
+}

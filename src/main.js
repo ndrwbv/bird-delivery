@@ -1,7 +1,7 @@
 /* Точка входа: площадка → язык → карта → игра.
    Язык нужен до загрузки игры: её строки переводятся прямо при импорте.
    Карта — тоже: игра строит город при импорте. Выбор карты — ?map=, потом
-   сохранённый (меню Стима), по умолчанию Москва; на Яндексе — только Москва. */
+   иначе Стим и dev — Северск, Яндекс — Москва (выбора в меню больше нет). */
 import './styles/delivery.css';
 import './input/padmenu.css';
 import Platform from './platform/index.js';
@@ -14,7 +14,8 @@ await initI18n(Platform.lang);
 applyDom();
 document.documentElement.dataset.platform = Platform.id;
 
-const want = new URLSearchParams(location.search).get('map') || Platform.store.get('dlv-map', 'moscow');
+// Стим (и dev) — Северск, Яндекс — Москва; ?map= — для отладки
+const want = new URLSearchParams(location.search).get('map') || (Platform.id === 'yandex' ? 'moscow' : 'seversk');
 const mapId = MAP_IDS.includes(want) ? want : 'moscow';
 useMap(await loadMap(mapId));
 document.documentElement.dataset.city = mapId;
