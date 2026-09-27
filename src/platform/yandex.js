@@ -204,6 +204,9 @@ const Platform = {
     if (Array.isArray(opts.langs) && opts.langs.length) have = opts.langs;
     hardenPage();
     hub.watchVisibility();
+    // потеря фокуса без скрытия вкладки (кликнули мимо игры) — тоже тишина и пауза (§ 1.3)
+    addEventListener('blur', () => hub.pause('blur'));
+    addEventListener('focus', () => hub.resume('blur'));
     if (!window.YaGames && import.meta.env.DEV) await import('./yandex-mock.js');   // npm run dev:yandex без прокси
     try {
       if (!window.YaGames) throw new Error('нет window.YaGames — /sdk.js не загрузился');

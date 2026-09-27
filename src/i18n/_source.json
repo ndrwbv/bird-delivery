@@ -1,383 +1,414 @@
 {
  "«сгоняй {what}, даю косарь»": {
   "ctx": [
-   "src/game/game.js:9136"
+   "src/game/game.js:9326"
   ]
  },
  "{brand} благодарит!": {
   "ctx": [
-   "src/game/game.js:1848"
+   "src/game/game.js:1861"
   ]
  },
  "{brand} против «{rival}» — помоги синим, будет респект": {
   "ctx": [
-   "src/game/game.js:1839"
+   "src/game/game.js:1852"
   ]
  },
  "{got} — обратно к {who}": {
   "ctx": [
-   "src/game/game.js:9175"
+   "src/game/game.js:9365"
   ]
  },
  "{i} из {n}": {
   "ctx": [
-   "src/game/game.js:6975",
-   "src/game/game.js:6985",
-   "src/game/game.js:8087"
+   "src/game/game.js:7119",
+   "src/game/game.js:7129",
+   "src/game/game.js:8277"
   ]
  },
  "{n} заказа позади — перерыв. что берёшь? это буст до конца смены": {
   "ctx": [
-   "src/game/game.js:9076"
+   "src/game/game.js:9266"
   ]
  },
  "{n} км/ч": {
   "ctx": [
-   "src/game/game.js:7207",
-   "src/game/game.js:8064"
+   "src/game/game.js:7351",
+   "src/game/game.js:8250"
   ]
  },
  "{n} м": {
   "ctx": [
-   "src/game/game.js:8090",
-   "src/game/game.js:9356"
+   "src/game/game.js:8280",
+   "src/game/game.js:9547"
   ]
  },
  "{n} с": {
   "ctx": [
-   "src/game/game.js:6336"
+   "src/game/game.js:6478"
   ]
  },
  "{name} бодается": {
   "ctx": [
-   "src/game/game.js:6268"
+   "src/game/game.js:6410"
   ]
  },
  "{name} боднула!": {
   "ctx": [
-   "src/game/game.js:7448"
+   "src/game/game.js:7593"
   ]
  },
  "{name} идёт на таран!": {
   "ctx": [
-   "src/game/game.js:6268"
+   "src/game/game.js:6410"
   ]
  },
  "{name}: «не благодари»": {
   "ctx": [
-   "src/game/game.js:7448"
+   "src/game/game.js:7593"
   ]
  },
  "{name}: «с дороги!»": {
   "ctx": [
-   "src/game/game.js:6268"
+   "src/game/game.js:6410"
   ]
  },
  "{rival} — сила!": {
   "ctx": [
-   "src/game/game.js:1943"
+   "src/game/game.js:1956"
   ]
  },
  "{what} — в «{shop}», потом обратно": {
   "ctx": [
-   "src/game/game.js:9157"
+   "src/game/game.js:9347"
   ]
  },
  "{what} для {who}": {
   "ctx": [
-   "src/game/game.js:9152"
+   "src/game/game.js:9342"
   ]
  },
  "{who} вычеркнут": {
   "ctx": [
-   "src/game/game.js:6131"
+   "src/game/game.js:6267"
   ]
  },
  "{who} расталкивает поток": {
   "ctx": [
-   "src/game/game.js:6290"
+   "src/game/game.js:6432"
   ]
  },
  "{who} сбил {whom}": {
   "ctx": [
-   "src/game/game.js:6304"
+   "src/game/game.js:6446"
   ]
  },
  "{who} сбил самокатчика": {
   "ctx": [
-   "src/game/game.js:4512"
+   "src/game/game.js:4636"
   ]
  },
  "{who} снёс машину": {
   "ctx": [
-   "src/game/game.js:6290"
+   "src/game/game.js:6432"
   ]
  },
  "{who} снёс такси": {
   "ctx": [
-   "src/game/game.js:6290"
+   "src/game/game.js:6432"
   ]
  },
  "{who} снова на смене": {
   "ctx": [
-   "src/game/game.js:6219"
+   "src/game/game.js:6355"
   ]
  },
  "{who}: «дорогу курьеру!»": {
   "ctx": [
-   "src/game/game.js:6290"
+   "src/game/game.js:6432"
   ]
  },
  "*ик*": {
   "ctx": [
-   "src/game/game.js:9896"
+   "src/game/game.js:10098"
   ]
  },
  "*рыг*": {
   "ctx": [
-   "src/game/game.js:9896"
+   "src/game/game.js:10098"
   ]
  },
  "#{n} в таблице": {
   "ctx": [
-   "src/game/game.js:8122"
+   "src/game/game.js:8312"
   ]
  },
  "+1 сердце сверху": {
   "ctx": [
-   "src/game/game.js:9062"
+   "src/game/game.js:9252"
   ]
  },
  "+8 секунд на каждый заказ": {
   "ctx": [
-   "src/game/game.js:9066"
+   "src/game/game.js:9256"
   ]
  },
  "А ты харош!": {
   "ctx": [
-   "src/game/game.js:8981"
+   "src/game/game.js:9171"
+  ]
+ },
+ "А-а-а! Помогите!": {
+  "ctx": [
+   "src/game/life.js:188"
   ]
  },
  "ААА!": {
   "ctx": [
-   "src/game/game.js:6475"
+   "src/game/game.js:6619"
   ]
  },
  "авария впереди — водители дерутся": {
   "ctx": [
-   "src/game/game.js:6426"
+   "src/game/game.js:6570"
   ]
  },
  "авария: объезжай": {
   "ctx": [
-   "src/game/game.js:6426"
+   "src/game/game.js:6570"
   ]
  },
  "Авоська": {
   "ctx": [
-   "src/game/brands.js:46"
+   "src/game/brands.js:50"
   ]
  },
  "Автосалон «Колесо»": {
   "ctx": [
-   "src/game/brands.js:72"
+   "src/game/brands.js:76"
   ]
  },
  "администратор": {
   "ctx": [
-   "src/game/people.js:189"
+   "src/game/people.js:190"
   ]
  },
  "АЗС": {
   "ctx": [
-   "src/game/brands.js:92"
+   "src/game/brands.js:96",
+   "src/game/landmarks.js:73"
+  ]
+ },
+ "ай!": {
+  "ctx": [
+   "src/game/seasons.js:888"
   ]
  },
  "актёр": {
   "ctx": [
-   "src/game/people.js:191"
+   "src/game/people.js:192"
   ]
  },
  "актриса": {
   "ctx": [
-   "src/game/people.js:191"
+   "src/game/people.js:192"
   ]
  },
  "аналитик": {
   "ctx": [
-   "src/game/people.js:186"
+   "src/game/people.js:187"
+  ]
+ },
+ "Антилопа": {
+  "ctx": [
+   "src/game/brands.js:24"
   ]
  },
  "Аптека": {
   "ctx": [
-   "src/game/brands.js:88"
+   "src/game/brands.js:92"
   ]
  },
  "Аптека «Витаминка»": {
   "ctx": [
-   "src/game/brands.js:88"
+   "src/game/brands.js:92"
   ]
  },
  "Аптека «Здоровье»": {
   "ctx": [
-   "src/game/brands.js:88"
+   "src/game/brands.js:92"
   ]
  },
  "Аптека «Пилюля»": {
   "ctx": [
-   "src/game/brands.js:71",
-   "src/game/brands.js:88"
+   "src/game/brands.js:75",
+   "src/game/brands.js:92"
   ]
  },
  "аптечка: +1 сердце": {
   "ctx": [
-   "src/game/game.js:6746"
+   "src/game/game.js:6890"
   ]
  },
  "аптечка: машина как новая": {
   "ctx": [
-   "src/game/game.js:6746"
+   "src/game/game.js:6890"
   ]
  },
  "Аптечки": {
   "ctx": [
-   "src/game/brands.js:48"
+   "src/game/brands.js:52"
   ]
  },
  "архитектор": {
   "ctx": [
-   "src/game/people.js:186"
+   "src/game/people.js:187"
+  ]
+ },
+ "Атас!": {
+  "ctx": [
+   "src/game/life.js:781"
   ]
  },
  "аудиокассета": {
   "ctx": [
-   "src/game/game.js:6803",
-   "src/game/game.js:6814"
+   "src/game/game.js:6947",
+   "src/game/game.js:6958"
   ]
  },
  "Базар-Маркет": {
   "ctx": [
-   "src/game/brands.js:34"
+   "src/game/brands.js:38"
   ]
  },
  "Банк «Копейка»": {
   "ctx": [
-   "src/game/brands.js:89"
+   "src/game/brands.js:93"
   ]
  },
  "Банк «Монетка»": {
   "ctx": [
-   "src/game/brands.js:89"
+   "src/game/brands.js:93"
   ]
  },
  "Банк «Сундук»": {
   "ctx": [
-   "src/game/brands.js:89"
+   "src/game/brands.js:93"
   ]
  },
  "Банк «Эталон»": {
   "ctx": [
-   "src/game/brands.js:60"
+   "src/game/brands.js:64"
   ]
  },
  "Банк-Конверт": {
   "ctx": [
-   "src/game/brands.js:59"
+   "src/game/brands.js:63"
   ]
  },
  "Банкомат": {
   "ctx": [
-   "src/game/brands.js:89"
+   "src/game/brands.js:93"
   ]
  },
  "бариста": {
   "ctx": [
-   "src/game/people.js:185"
+   "src/game/people.js:186"
   ]
  },
  "бариста «{brand}»": {
   "ctx": [
-   "src/game/game.js:1973"
+   "src/game/game.js:1986"
   ]
  },
  "Башмачок": {
   "ctx": [
-   "src/game/brands.js:70"
+   "src/game/brands.js:74"
   ]
  },
  "без заказов и рекордов": {
   "ctx": [
-   "src/game/game.js:9354"
+   "src/game/game.js:9545"
   ]
  },
  "без заказов и рекордов · esc — в меню": {
   "ctx": [
-   "src/game/game.js:8081"
+   "src/game/game.js:8271"
+  ]
+ },
+ "Без сахара, я сказал": {
+  "ctx": [
+   "src/game/life.js:340"
   ]
  },
  "Бета-Банк": {
   "ctx": [
-   "src/game/brands.js:37"
+   "src/game/brands.js:41"
   ]
  },
  "Бибайн": {
   "ctx": [
-   "src/game/brands.js:29"
+   "src/game/brands.js:33"
   ]
  },
  "библиотекарь": {
   "ctx": [
-   "src/game/people.js:187"
+   "src/game/people.js:188"
   ]
  },
  "бизнес-ланч": {
   "ctx": [
-   "src/game/game.js:9063"
+   "src/game/game.js:9253"
   ]
  },
  "бизнес-центр": {
   "ctx": [
-   "src/game/brands.js:124"
+   "src/game/brands.js:128"
   ]
  },
  "Бизон": {
   "ctx": [
-   "src/game/brands.js:32"
+   "src/game/brands.js:36"
   ]
  },
  "бист-мод {n}": {
   "ctx": [
-   "src/game/game.js:8071"
+   "src/game/game.js:8261"
   ]
  },
  "бист-мод: {key} — вдвое быстрее, пятнадцать секунд": {
   "ctx": [
-   "src/game/game.js:6750"
+   "src/game/game.js:6894"
   ]
  },
  "Блеск": {
   "ctx": [
-   "src/game/brands.js:79"
+   "src/game/brands.js:83"
   ]
  },
  "Блинная «Сковородка»": {
   "ctx": [
-   "src/game/brands.js:86"
+   "src/game/brands.js:90"
   ]
  },
  "блогер": {
   "ctx": [
-   "src/game/people.js:192"
+   "src/game/people.js:193"
+  ]
+ },
+ "богач": {
+  "ctx": [
+   "src/game/life.js:370"
   ]
  },
  "бодание засчитано": {
   "ctx": [
-   "src/game/game.js:7448"
+   "src/game/game.js:7593"
   ]
  },
  "боец «{rival}»": {
   "ctx": [
-   "src/game/game.js:1981"
+   "src/game/game.js:1994"
   ]
  },
  "бонус: {name} катается на сёрфе по Москве-реке": {
@@ -392,166 +423,176 @@
  },
  "БУДУ КУШАТЬ": {
   "ctx": [
-   "src/game/game.js:6475"
+   "src/game/game.js:6619"
   ]
  },
  "Бургер Князь": {
   "ctx": [
-   "src/game/brands.js:23"
+   "src/game/brands.js:27"
   ]
  },
  "бухгалтер": {
   "ctx": [
-   "src/game/people.js:186"
+   "src/game/people.js:187"
   ]
  },
  "БУЭЭЭ": {
   "ctx": [
-   "src/game/game.js:9896"
+   "src/game/game.js:10098"
   ]
  },
  "в главное меню": {
   "ctx": [
-   "src/game/game.js:9368",
-   "index.html:109"
+   "src/game/game.js:9559",
+   "index.html:126"
   ]
  },
  "в глаза смотри!": {
   "ctx": [
-   "src/game/game.js:5546",
-   "src/game/game.js:6350"
+   "src/game/game.js:5680",
+   "src/game/game.js:6492"
   ]
  },
  "в кошелёк": {
   "ctx": [
-   "src/game/game.js:7134"
+   "src/game/game.js:7278"
   ]
  },
  "в кошельке {money}": {
   "ctx": [
-   "src/game/game.js:7197"
+   "src/game/game.js:7341"
   ]
  },
  "в меню": {
   "ctx": [
-   "index.html:89",
-   "index.html:245"
+   "index.html:106",
+   "index.html:262"
   ]
  },
  "в пиццерию": {
   "ctx": [
-   "src/game/game.js:8086",
-   "src/game/game.js:9358"
+   "src/game/game.js:8276",
+   "src/game/game.js:9549"
   ]
  },
  "в подъезде живёт кот, он главный": {
   "ctx": [
-   "src/game/game.js:8376"
+   "src/game/game.js:8566"
+  ]
+ },
+ "в тебя попали снежком": {
+  "ctx": [
+   "src/game/seasons.js:836"
+  ]
+ },
+ "Валим!": {
+  "ctx": [
+   "src/game/life.js:781"
   ]
  },
  "ваш кофе — вода!": {
   "ctx": [
-   "src/game/game.js:1943"
+   "src/game/game.js:1956"
   ]
  },
  "версия": {
   "ctx": [
-   "src/game/game.js:7163"
+   "src/game/game.js:7307"
   ]
  },
  "ветеринар": {
   "ctx": [
-   "src/game/people.js:188"
+   "src/game/people.js:189"
   ]
  },
  "ветчина и сыр": {
   "ctx": [
-   "src/game/game.js:8309"
+   "src/game/game.js:8499"
   ]
  },
  "вечер": {
   "ctx": [
-   "src/game/game.js:9755"
+   "src/game/game.js:9957"
   ]
  },
  "вечереет": {
   "ctx": [
-   "src/game/game.js:9808"
+   "src/game/game.js:10010"
   ]
  },
  "взрослая 18+": {
   "ctx": [
-   "src/game/game.js:7163"
+   "src/game/game.js:7307"
   ]
  },
  "вкл": {
   "ctx": [
-   "src/game/game.js:7161"
+   "src/game/game.js:7305"
   ]
  },
  "ВкусДеревня": {
   "ctx": [
-   "src/game/brands.js:21"
+   "src/game/brands.js:25"
   ]
  },
  "Вкусно — и запятая": {
   "ctx": [
-   "src/game/brands.js:22"
+   "src/game/brands.js:26"
   ]
  },
  "вместо пиццы ты задавил {who}": {
   "ctx": [
-   "src/game/game.js:8166"
+   "src/game/game.js:8356"
   ]
  },
  "вместо пиццы ты сбил {who}": {
   "ctx": [
-   "src/game/game.js:8166"
+   "src/game/game.js:8356"
   ]
  },
  "водитель бежит к тебе": {
   "ctx": [
-   "src/game/game.js:5584"
+   "src/game/game.js:5718"
   ]
  },
  "водитель вышел разбираться": {
   "ctx": [
-   "src/game/game.js:5584"
+   "src/game/game.js:5718"
   ]
  },
  "водочка": {
   "ctx": [
-   "src/game/game.js:9105"
+   "src/game/game.js:9295"
   ]
  },
  "водочку взял": {
   "ctx": [
-   "src/game/game.js:9105"
+   "src/game/game.js:9295"
   ]
  },
  "возвращайся в пиццерию": {
   "ctx": [
-   "src/game/game.js:8937"
+   "src/game/game.js:9127"
   ]
  },
  "войди в Яндекс, чтобы попасть в общую таблицу": {
   "ctx": [
-   "src/game/game.js:8227"
+   "src/game/game.js:8417"
   ]
  },
  "войти, чтобы попасть в общую таблицу": {
   "ctx": [
-   "index.html:241"
+   "index.html:258"
   ]
  },
  "Волна-кофе": {
   "ctx": [
-   "src/game/brands.js:40"
+   "src/game/brands.js:44"
   ]
  },
  "ворота": {
   "ctx": [
-   "src/game/game.js:1293"
+   "src/game/game.js:1306"
   ]
  },
  "вплавь не довезёшь": {
@@ -562,176 +603,191 @@
  },
  "ВПЛАВЬ НЕ ДОВЕЗЁШЬ": {
   "ctx": [
-   "src/game/game.js:9254"
+   "src/game/game.js:9444"
   ]
  },
  "врач": {
   "ctx": [
-   "src/game/people.js:185"
+   "src/game/people.js:186"
   ]
  },
  "время смены": {
   "ctx": [
-   "src/game/game.js:8196"
+   "src/game/game.js:8386"
   ]
  },
  "все сердца обратно": {
   "ctx": [
-   "src/game/game.js:9065"
+   "src/game/game.js:9255"
   ]
  },
  "всмятку {n}": {
   "ctx": [
-   "src/game/game.js:8063"
+   "src/game/game.js:8249"
   ]
  },
  "встретит в худи с котиком": {
   "ctx": [
-   "src/game/game.js:8392"
+   "src/game/game.js:8582"
   ]
  },
  "встречает в пижаме с динозаврами": {
   "ctx": [
-   "src/game/game.js:8365"
+   "src/game/game.js:8555"
   ]
  },
  "выбрать": {
   "ctx": [
-   "src/game/game.js:7212"
+   "src/game/game.js:7356"
   ]
  },
  "выйдет, когда закончит стендап": {
   "ctx": [
-   "src/game/game.js:8384"
+   "src/game/game.js:8574"
   ]
  },
  "выйти из игры": {
   "ctx": [
-   "index.html:213"
+   "index.html:230"
   ]
  },
  "выкл": {
   "ctx": [
-   "src/game/game.js:7161"
+   "src/game/game.js:7305"
   ]
  },
  "выходи!": {
   "ctx": [
-   "src/game/game.js:5546",
-   "src/game/game.js:6350"
+   "src/game/game.js:5680",
+   "src/game/game.js:6492"
   ]
  },
  "гавайская": {
   "ctx": [
-   "src/game/game.js:8308"
+   "src/game/game.js:8498"
   ]
  },
  "Гаджетария": {
   "ctx": [
-   "src/game/brands.js:69"
+   "src/game/brands.js:73"
   ]
  },
  "газ": {
   "ctx": [
-   "index.html:137",
-   "index.html:147",
-   "index.html:152"
+   "index.html:154",
+   "index.html:164",
+   "index.html:169"
   ]
  },
  "Газбанкомат": {
   "ctx": [
-   "src/game/brands.js:56"
+   "src/game/brands.js:60"
+  ]
+ },
+ "Газпромнефтик": {
+  "ctx": [
+   "src/game/brands.js:21"
+  ]
+ },
+ "гаишников вызвали?": {
+  "ctx": [
+   "src/game/roadlife.js:486"
   ]
  },
  "гаишников жду": {
   "ctx": [
-   "src/game/game.js:6350"
+   "src/game/game.js:6492"
   ]
  },
  "гараж": {
   "ctx": [
-   "src/game/game.js:7197",
-   "index.html:208"
+   "src/game/game.js:7341",
+   "index.html:225"
   ]
  },
  "гарантия скорости посчитала, что доставить надо {when}. Поторопись!": {
   "ctx": [
-   "src/game/game.js:8856"
+   "src/game/game.js:9046"
   ]
  },
  "Гастроном": {
   "ctx": [
-   "src/game/brands.js:87"
+   "src/game/brands.js:91"
   ]
  },
  "ГДЕ-Банк": {
   "ctx": [
-   "src/game/brands.js:36"
+   "src/game/brands.js:40"
   ]
  },
  "геолог": {
   "ctx": [
-   "src/game/people.js:191"
+   "src/game/people.js:192"
   ]
  },
  "Гигафон": {
   "ctx": [
-   "src/game/brands.js:30"
+   "src/game/brands.js:34"
   ]
  },
  "гитарист": {
   "ctx": [
-   "src/game/game.js:10003"
+   "src/game/game.js:10205"
   ]
  },
  "говорит шёпотом, не пугайся": {
   "ctx": [
-   "src/game/game.js:8372"
+   "src/game/game.js:8562"
   ]
  },
  "ГОООЛ!": {
   "ctx": [
-   "src/game/game.js:1622"
+   "src/game/game.js:1635"
   ]
  },
  "Горбанк": {
   "ctx": [
-   "src/game/brands.js:61"
+   "src/game/brands.js:65"
   ]
  },
  "горка": {
   "ctx": [
-   "src/game/game.js:1293"
+   "src/game/game.js:1306"
   ]
  },
  "Горошек": {
   "ctx": [
-   "src/game/brands.js:64"
+   "src/game/brands.js:68"
+  ]
+ },
+ "графитист": {
+  "ctx": [
+   "src/game/life.js:775"
   ]
  },
  "групповой заказ": {
   "ctx": [
-   "src/game/game.js:8413"
+   "src/game/game.js:8603"
   ]
  },
  "групповой: {who}, заказали на всех": {
   "ctx": [
-   "src/game/game.js:8709"
+   "src/game/game.js:8899"
   ]
  },
  "групповой: заказали на всех сразу": {
   "ctx": [
-   "src/game/game.js:8709"
+   "src/game/game.js:8899"
   ]
  },
  "Д.Звук": {
   "ctx": [
-   "src/game/brands.js:53"
+   "src/game/brands.js:57"
   ]
  },
  "давай хором!": {
   "ctx": [
-   "src/game/game.js:9897"
+   "src/game/game.js:10099"
   ]
  },
  "дальше забор и КПП — из закрытого города без пропуска не выехать": {
@@ -741,79 +797,85 @@
  },
  "дверь синяя, но покрашена": {
   "ctx": [
-   "src/game/game.js:8378"
+   "src/game/game.js:8568"
   ]
  },
  "двойной раф в «Синем ките»": {
   "ctx": [
-   "src/game/game.js:9064"
+   "src/game/game.js:9254"
   ]
  },
  "день": {
   "ctx": [
-   "src/game/game.js:9755",
-   "src/game/game.js:9808"
+   "src/game/game.js:9957",
+   "src/game/game.js:10010"
   ]
  },
  "детская": {
   "ctx": [
-   "src/game/game.js:7163"
+   "src/game/game.js:7307"
   ]
  },
  "детский сад": {
   "ctx": [
-   "src/game/brands.js:128"
+   "src/game/brands.js:132"
   ]
  },
  "диабло": {
   "ctx": [
-   "src/game/game.js:8309"
+   "src/game/game.js:8499"
   ]
  },
  "дизайнер": {
   "ctx": [
-   "src/game/people.js:185"
+   "src/game/people.js:186"
   ]
  },
  "Дикая ягода": {
   "ctx": [
-   "src/game/brands.js:33"
+   "src/game/brands.js:37"
   ]
  },
  "диспетчер": {
   "ctx": [
-   "src/game/people.js:193"
+   "src/game/people.js:194"
   ]
  },
  "до следующего {n} заказ|до следующего {n} заказа|до следующего {n} заказов": {
   "ctx": [
-   "src/game/game.js:8125"
+   "src/game/game.js:8315"
   ],
   "plural": true
  },
  "дождь кончился — снова солнце": {
   "ctx": [
-   "src/game/game.js:9771"
+   "src/game/game.js:9973"
   ]
  },
  "дождь, скользко": {
   "ctx": [
-   "src/game/game.js:9363"
+   "src/game/game.js:9554"
   ]
  },
  "домофон кусается": {
   "ctx": [
-   "src/game/game.js:8369"
+   "src/game/game.js:8559"
   ]
  },
  "ДОРОГА": {
   "ctx": [
-   "src/game/game.js:1007"
+   "src/game/game.js:1022"
   ]
  },
  "ДОРОГА ЗАКРЫТА": {
   "ctx": [
-   "src/game/mapworks.js:43"
+   "src/game/mapworks.js:43",
+   "src/game/roadlife.js:675"
+  ]
+ },
+ "дорогу закрыли на ремонт · навигатор не в курсе — ищи объезд": {
+  "ctx": [
+   "src/game/roadlife.js:946"
   ]
  },
  "ДОРОЖНЫЕ РАБОТЫ": {
@@ -823,137 +885,137 @@
  },
  "доставлено": {
   "ctx": [
-   "src/game/game.js:9364"
+   "src/game/game.js:9555"
   ]
  },
  "доставлено заказов": {
   "ctx": [
-   "src/game/game.js:8195"
+   "src/game/game.js:8385"
   ]
  },
  "доставляй заказы — деньги сразу падают в кошелёк и не пропадут, даже если смена сорвётся. Каждая следующая машина — на одно сердце крепче и быстрее": {
   "ctx": [
-   "src/game/game.js:7198"
+   "src/game/game.js:7342"
   ]
  },
  "драка окончена": {
   "ctx": [
-   "src/game/game.js:6459"
+   "src/game/game.js:6603"
   ]
  },
  "ДТП: выясняют, кто прав": {
   "ctx": [
-   "src/game/game.js:6426"
+   "src/game/game.js:6570"
   ]
  },
  "если грустный — это не из-за пиццы": {
   "ctx": [
-   "src/game/game.js:8403"
+   "src/game/game.js:8593"
   ]
  },
  "если не открыл — значит открыл": {
   "ctx": [
-   "src/game/game.js:8379"
+   "src/game/game.js:8569"
   ]
  },
  "если спросит про сроки — ты курьер": {
   "ctx": [
-   "src/game/game.js:8387"
+   "src/game/game.js:8577"
   ]
  },
  "ещё {n}": {
   "ctx": [
-   "src/game/game.js:8442"
+   "src/game/game.js:8632"
   ]
  },
  "ещё не нашёл": {
   "ctx": [
-   "src/game/game.js:6992"
+   "src/game/game.js:7136"
   ]
  },
  "ещё песню!": {
   "ctx": [
-   "src/game/game.js:9897"
+   "src/game/game.js:10099"
   ]
  },
  "ещё по одной": {
   "ctx": [
-   "src/game/game.js:9896"
+   "src/game/game.js:10098"
   ]
  },
  "ещё раз": {
   "ctx": [
-   "index.html:244"
+   "index.html:261"
   ]
  },
  "журналист": {
   "ctx": [
-   "src/game/people.js:188"
+   "src/game/people.js:189"
   ]
  },
  "журналистка": {
   "ctx": [
-   "src/game/people.js:188"
+   "src/game/people.js:189"
   ]
  },
  "за {brand}!": {
   "ctx": [
-   "src/game/game.js:1811"
+   "src/game/game.js:1824"
   ]
  },
  "за {n} секунд": {
   "ctx": [
-   "src/game/game.js:8855"
+   "src/game/game.js:9045"
   ]
  },
  "за 1 минуту": {
   "ctx": [
-   "src/game/game.js:8855"
+   "src/game/game.js:9045"
   ]
  },
  "за водочкой": {
   "ctx": [
-   "src/game/game.js:9105"
+   "src/game/game.js:9295"
   ]
  },
  "за зарядкой для телефона": {
   "ctx": [
-   "src/game/game.js:9100"
+   "src/game/game.js:9290"
   ]
  },
  "за здоровье!": {
   "ctx": [
-   "src/game/game.js:9896"
+   "src/game/game.js:10098"
   ]
  },
  "за латешкой из «Синего кита»": {
   "ctx": [
-   "src/game/game.js:9097"
+   "src/game/game.js:9287"
   ]
  },
  "за лимонадом": {
   "ctx": [
-   "src/game/game.js:9095"
+   "src/game/game.js:9285"
   ]
  },
  "за пивом": {
   "ctx": [
-   "src/game/game.js:9103"
+   "src/game/game.js:9293"
   ]
  },
  "за пластырем": {
   "ctx": [
-   "src/game/game.js:9099"
+   "src/game/game.js:9289"
   ]
  },
  "за полторы минуты": {
   "ctx": [
-   "src/game/game.js:8855"
+   "src/game/game.js:9045"
   ]
  },
  "за просмотр рекламы": {
   "ctx": [
-   "index.html:240"
+   "index.html:257"
   ]
  },
  "за рекой, на набережной: через мост": {
@@ -963,81 +1025,81 @@
  },
  "за синих! респект · +{money}": {
   "ctx": [
-   "src/game/game.js:1908"
+   "src/game/game.js:1921"
   ]
  },
  "за снюсиком": {
   "ctx": [
-   "src/game/game.js:9104"
+   "src/game/game.js:9294"
   ]
  },
  "за сухариками": {
   "ctx": [
-   "src/game/game.js:9098"
+   "src/game/game.js:9288"
   ]
  },
  "за шаурмой": {
   "ctx": [
-   "src/game/game.js:9096"
+   "src/game/game.js:9286"
   ]
  },
  "заборчик": {
   "ctx": [
-   "src/game/game.js:1293"
+   "src/game/game.js:1306"
   ]
  },
  "задавил": {
   "ctx": [
-   "src/game/game.js:9210"
+   "src/game/game.js:9400"
   ]
  },
  "задавил {who}": {
   "ctx": [
-   "src/game/game.js:9250"
+   "src/game/game.js:9440"
   ]
  },
  "заказ": {
   "ctx": [
-   "src/game/game.js:8413",
-   "src/game/game.js:8429",
-   "index.html:51"
+   "src/game/game.js:8603",
+   "src/game/game.js:8619",
+   "index.html:68"
   ]
  },
  "заказ {n}": {
   "ctx": [
-   "src/game/game.js:8087",
-   "src/game/game.js:9359"
+   "src/game/game.js:8277",
+   "src/game/game.js:9550"
   ]
  },
  "ЗАКАЗ ПРОТУХ": {
   "ctx": [
-   "src/game/game.js:9254"
+   "src/game/game.js:9444"
   ]
  },
  "заказ протух — клиент не дождался": {
   "ctx": [
-   "src/game/game.js:8169"
+   "src/game/game.js:8359"
   ]
  },
  "заказа пока нет": {
   "ctx": [
-   "src/game/game.js:9355"
+   "src/game/game.js:9546"
   ]
  },
  "заказал на всех, но съест сам": {
   "ctx": [
-   "src/game/game.js:8394"
+   "src/game/game.js:8584"
   ]
  },
  "закончить смену": {
   "ctx": [
-   "src/game/game.js:9368",
-   "index.html:35"
+   "src/game/game.js:9559",
+   "index.html:52"
   ]
  },
  "ЗАКРЫТА": {
   "ctx": [
-   "src/game/game.js:1007"
+   "src/game/game.js:1022"
   ]
  },
  "закрытый город целиком: КПП, гаражи, промзона, железная дорога": {
@@ -1047,324 +1109,349 @@
  },
  "записываю смену в таблицу рекордов…": {
   "ctx": [
-   "src/game/game.js:8222"
+   "src/game/game.js:8412"
   ]
  },
  "заработано": {
   "ctx": [
-   "src/game/game.js:8194",
-   "src/game/game.js:9364"
+   "src/game/game.js:8384",
+   "src/game/game.js:9555"
   ]
  },
  "заработок удвоен!": {
   "ctx": [
-   "src/game/game.js:7134"
+   "src/game/game.js:7278"
   ]
  },
  "зарядка": {
   "ctx": [
-   "src/game/game.js:9100"
+   "src/game/game.js:9290"
   ]
  },
  "зарядку взял": {
   "ctx": [
-   "src/game/game.js:9100"
+   "src/game/game.js:9290"
   ]
  },
  "заслужил": {
   "ctx": [
-   "src/game/game.js:7535"
+   "src/game/game.js:7680"
   ]
  },
  "звонить два раза, третий не работает": {
   "ctx": [
-   "src/game/game.js:8368"
+   "src/game/game.js:8558"
   ]
  },
  "звук": {
   "ctx": [
-   "src/game/game.js:7161"
+   "src/game/game.js:7305"
   ]
  },
  "звук вкл": {
   "ctx": [
-   "src/game/game.js:111",
-   "src/game/game.js:9344",
-   "src/game/game.js:9426"
+   "src/game/game.js:116",
+   "src/game/game.js:9535",
+   "src/game/game.js:9617"
   ]
  },
  "звук выкл": {
   "ctx": [
-   "src/game/game.js:111",
-   "src/game/game.js:9344",
-   "src/game/game.js:9426"
+   "src/game/game.js:116",
+   "src/game/game.js:9535",
+   "src/game/game.js:9617"
   ]
  },
  "звук: вкл": {
   "ctx": [
-   "src/game/game.js:9367"
+   "src/game/game.js:9558"
   ]
  },
  "звук: выкл": {
   "ctx": [
-   "src/game/game.js:9367"
+   "src/game/game.js:9558"
+  ]
+ },
+ "знак": {
+  "ctx": [
+   "src/game/roadlife.js:248"
   ]
  },
  "золотая лопата для пиццы": {
   "ctx": [
-   "src/game/game.js:6809",
-   "src/game/game.js:6820"
+   "src/game/game.js:6953",
+   "src/game/game.js:6964"
+  ]
+ },
+ "золотая осень": {
+  "ctx": [
+   "src/game/seasons.js:63"
+  ]
+ },
+ "и душой": {
+  "ctx": [
+   "src/game/pizzeria.js:19"
   ]
  },
  "Иван Иванов": {
   "ctx": [
-   "src/game/game.js:8416",
-   "src/game/game.js:8432"
+   "src/game/game.js:8606",
+   "src/game/game.js:8622"
   ]
  },
  "Игрушки": {
   "ctx": [
-   "src/game/brands.js:91"
+   "src/game/brands.js:95"
   ]
  },
  "из смены на минуту — сгорел вместе с заказом": {
   "ctx": [
-   "src/game/game.js:6131"
+   "src/game/game.js:6267"
   ]
  },
  "Избушка": {
   "ctx": [
-   "src/game/brands.js:24"
+   "src/game/brands.js:28"
   ]
  },
  "имя и фамилия": {
   "ctx": [
-   "index.html:202"
+   "index.html:219"
   ]
  },
  "инженер": {
   "ctx": [
-   "src/game/people.js:186"
+   "src/game/people.js:187"
   ]
  },
  "как ехать": {
   "ctx": [
-   "index.html:144"
+   "index.html:161"
   ]
  },
  "как тебя зовут": {
   "ctx": [
-   "index.html:201"
+   "index.html:218"
   ]
  },
  "Какао и точка": {
   "ctx": [
-   "src/game/brands.js:85"
+   "src/game/brands.js:89"
   ]
  },
  "Какаошница": {
   "ctx": [
-   "src/game/brands.js:39"
+   "src/game/brands.js:43"
   ]
  },
  "кактус в горшке": {
   "ctx": [
-   "src/game/game.js:6813"
+   "src/game/game.js:6957"
   ]
  },
  "Канцтовары": {
   "ctx": [
-   "src/game/brands.js:91"
+   "src/game/brands.js:95"
   ]
  },
  "карбонара": {
   "ctx": [
-   "src/game/game.js:8309"
+   "src/game/game.js:8499"
   ]
  },
  "карта": {
   "ctx": [
-   "src/game/game.js:7176",
-   "index.html:87"
+   "src/game/game.js:7320",
+   "index.html:104"
   ]
  },
  "карта — © участники OpenStreetMap, лицензия ODbL. Рельеф — SRTM (NASA).": {
   "ctx": [
-   "src/game/game.js:7164"
+   "src/game/game.js:7308"
   ]
  },
  "карта района": {
   "ctx": [
-   "index.html:107",
-   "index.html:157",
-   "index.html:165"
+   "index.html:124",
+   "index.html:174",
+   "index.html:182"
   ]
  },
  "кассир": {
   "ctx": [
-   "src/game/people.js:192"
+   "src/game/people.js:193"
   ]
  },
  "Кафе «Лампа»": {
   "ctx": [
-   "src/game/brands.js:85"
+   "src/game/brands.js:89"
   ]
  },
  "Кафе «Ложка»": {
   "ctx": [
-   "src/game/brands.js:85"
+   "src/game/brands.js:89"
   ]
  },
  "Кафе «Пенка»": {
   "ctx": [
-   "src/game/brands.js:85"
+   "src/game/brands.js:89"
   ]
  },
  "Киоск «Газеты»": {
   "ctx": [
-   "src/game/brands.js:76"
+   "src/game/brands.js:80"
   ]
  },
  "клиент": {
   "ctx": [
-   "src/game/game.js:8923",
-   "src/game/game.js:8924"
+   "src/game/game.js:9113",
+   "src/game/game.js:9114"
   ]
  },
  "клиент потерян": {
   "ctx": [
-   "src/game/game.js:9215"
+   "src/game/game.js:9405"
   ]
  },
  "КЛИЕНТ ПОТЕРЯН": {
   "ctx": [
-   "src/game/game.js:9251"
+   "src/game/game.js:9441"
   ]
  },
  "клиенту уже не до этого": {
   "ctx": [
-   "src/game/game.js:9163"
+   "src/game/game.js:9353"
   ]
  },
  "клик или esc — закрыть": {
   "ctx": [
-   "index.html:47"
+   "index.html:64"
   ]
  },
  "Книги": {
   "ctx": [
-   "src/game/brands.js:91"
+   "src/game/brands.js:95"
   ]
  },
  "кнопку нитро": {
   "ctx": [
-   "src/game/game.js:7108"
+   "src/game/game.js:7252"
   ]
  },
  "коллега": {
   "ctx": [
-   "src/game/game.js:8421"
+   "src/game/game.js:8611"
   ]
  },
  "Кометы кофе": {
   "ctx": [
-   "src/game/brands.js:41"
+   "src/game/brands.js:45"
   ]
  },
  "комментарий курьера:": {
   "ctx": [
-   "src/game/game.js:8443"
+   "src/game/game.js:8633"
+  ]
+ },
+ "конец зимы": {
+  "ctx": [
+   "src/game/seasons.js:64"
+  ]
+ },
+ "конец лета": {
+  "ctx": [
+   "src/game/seasons.js:63"
   ]
  },
  "конус": {
   "ctx": [
-   "src/game/game.js:3261"
+   "src/game/game.js:3305"
   ]
  },
  "Копибанк": {
   "ctx": [
-   "src/game/brands.js:35"
+   "src/game/brands.js:39"
   ]
  },
  "косарь!": {
   "ctx": [
-   "src/game/game.js:9186"
+   "src/game/game.js:9376"
   ]
  },
  "Котлетная": {
   "ctx": [
-   "src/game/brands.js:86"
+   "src/game/brands.js:90"
   ]
  },
  "кофе": {
   "ctx": [
-   "index.html:31"
+   "index.html:48"
   ]
  },
  "кофе — только у нас!": {
   "ctx": [
-   "src/game/game.js:1811"
+   "src/game/game.js:1824"
   ]
  },
  "кофе «Синего кита» + · {key}": {
   "ctx": [
-   "src/game/game.js:6737"
+   "src/game/game.js:6881"
   ]
  },
  "кофе «Синего кита»: полный бак · {key}": {
   "ctx": [
-   "src/game/game.js:6737"
+   "src/game/game.js:6881"
   ]
  },
  "Кофе за сотку": {
   "ctx": [
-   "src/game/brands.js:65"
+   "src/game/brands.js:69"
   ]
  },
  "Кофе с собой": {
   "ctx": [
-   "src/game/brands.js:85"
+   "src/game/brands.js:89"
   ]
  },
  "кофе-нитро жжётся вдвое медленнее, бак полный": {
   "ctx": [
-   "src/game/game.js:9064"
+   "src/game/game.js:9254"
   ]
  },
  "Кофе-Фикус": {
   "ctx": [
-   "src/game/brands.js:26"
+   "src/game/brands.js:30"
   ]
  },
  "кофейная война: победил «{rival}»": {
   "ctx": [
-   "src/game/game.js:1849"
+   "src/game/game.js:1862"
   ]
  },
  "кофейная война: победил {brand}": {
   "ctx": [
-   "src/game/game.js:1849"
+   "src/game/game.js:1862"
   ]
  },
  "кофейная война: разошлись вничью": {
   "ctx": [
-   "src/game/game.js:1849"
+   "src/game/game.js:1862"
   ]
  },
  "кофейная война!": {
   "ctx": [
-   "src/game/game.js:1839"
+   "src/game/game.js:1852"
   ]
  },
  "Кофейня «Зерно»": {
   "ctx": [
-   "src/game/brands.js:73",
-   "src/game/brands.js:85"
+   "src/game/brands.js:77",
+   "src/game/brands.js:89"
   ]
  },
  "Кофейня «Турка»": {
   "ctx": [
-   "src/game/brands.js:85"
+   "src/game/brands.js:89"
   ]
  },
  "КПП": {
@@ -1374,422 +1461,458 @@
  },
  "красиво поёшь!": {
   "ctx": [
-   "src/game/game.js:9897"
+   "src/game/game.js:10099"
   ]
  },
  "красная карточка": {
   "ctx": [
-   "src/game/game.js:1688"
+   "src/game/game.js:1701"
   ]
  },
  "кричать «пицца» три раза, потом ещё раз": {
   "ctx": [
-   "src/game/game.js:8385"
+   "src/game/game.js:8575"
+  ]
+ },
+ "кто там встал?!": {
+  "ctx": [
+   "src/game/roadlife.js:486"
   ]
  },
  "кубик-головоломка": {
   "ctx": [
-   "src/game/game.js:6815"
+   "src/game/game.js:6959"
   ]
  },
  "куда прёшь!": {
   "ctx": [
-   "src/game/game.js:5546"
+   "src/game/game.js:5680"
   ]
  },
  "куда смотрел?!": {
   "ctx": [
-   "src/game/game.js:6350"
+   "src/game/game.js:6492"
   ]
  },
  "Кудахтыч": {
   "ctx": [
-   "src/game/brands.js:25"
+   "src/game/brands.js:29"
   ]
  },
  "Кулинария братьев Батоновых": {
   "ctx": [
-   "src/game/brands.js:63"
+   "src/game/brands.js:67"
   ]
  },
  "курильщик": {
   "ctx": [
-   "src/game/game.js:5534"
+   "src/game/game.js:5668"
   ]
  },
  "курьер": {
   "ctx": [
-   "src/game/game.js:8120",
-   "src/game/game.js:8290"
+   "src/game/game.js:8310",
+   "src/game/game.js:8480"
   ]
  },
  "курьер растёт — заказы сложнее": {
   "ctx": [
-   "src/game/game.js:8606"
+   "src/game/game.js:8796"
+  ]
+ },
+ "курьеров": {
+  "ctx": [
+   "src/game/pizzeria.js:35"
   ]
  },
  "курьерская, своя": {
   "ctx": [
-   "src/game/game.js:7038"
+   "src/game/game.js:7182"
   ]
  },
  "куст": {
   "ctx": [
-   "src/game/game.js:1293"
+   "src/game/game.js:1306"
   ]
  },
  "ла-ла-ла": {
   "ctx": [
-   "src/game/game.js:9897"
+   "src/game/game.js:10099"
   ]
  },
  "лаборант": {
   "ctx": [
-   "src/game/people.js:192"
+   "src/game/people.js:193"
   ]
  },
  "Лавка «Корзинка»": {
   "ctx": [
-   "src/game/brands.js:87"
+   "src/game/brands.js:91"
   ]
  },
  "лапша в подсобке": {
   "ctx": [
-   "src/game/game.js:9066"
+   "src/game/game.js:9256"
   ]
  },
  "Лапшичная": {
   "ctx": [
-   "src/game/brands.js:86"
+   "src/game/brands.js:90"
   ]
  },
  "латешка": {
   "ctx": [
-   "src/game/game.js:9097"
+   "src/game/game.js:9287"
   ]
  },
  "латешку взял": {
   "ctx": [
-   "src/game/game.js:9097"
+   "src/game/game.js:9287"
   ]
  },
  "латте с медовой пенкой": {
   "ctx": [
-   "src/game/game.js:6800",
-   "src/game/game.js:6811"
+   "src/game/game.js:6944",
+   "src/game/game.js:6955"
+  ]
+ },
+ "ледяная горка": {
+  "ctx": [
+   "src/game/seasons.js:277"
   ]
  },
  "лимонад": {
   "ctx": [
-   "src/game/game.js:9095"
+   "src/game/game.js:9285"
   ]
  },
  "лимонад взял": {
   "ctx": [
-   "src/game/game.js:9095"
+   "src/game/game.js:9285"
   ]
  },
  "Лимонадная": {
   "ctx": [
-   "src/game/brands.js:75"
+   "src/game/brands.js:79"
   ]
  },
  "лифт едет только вниз": {
   "ctx": [
-   "src/game/game.js:8370"
+   "src/game/game.js:8560"
+  ]
+ },
+ "Лукоед": {
+  "ctx": [
+   "src/game/brands.js:23"
   ]
  },
  "лучшая смена!": {
   "ctx": [
-   "src/game/game.js:8211"
+   "src/game/game.js:8401"
   ]
  },
  "любитель пива": {
   "ctx": [
-   "src/game/game.js:10003"
+   "src/game/game.js:10205"
   ]
  },
  "Ля Звезда": {
   "ctx": [
-   "src/game/brands.js:51"
+   "src/game/brands.js:55"
   ]
  },
  "М": {
   "ctx": [
-   "src/game/game.js:2820"
+   "src/game/game.js:2866"
   ]
  },
  "Магазин": {
   "ctx": [
-   "src/game/brands.js:91"
+   "src/game/brands.js:95"
   ]
  },
  "Магазин «Кулёк»": {
   "ctx": [
-   "src/game/brands.js:87"
+   "src/game/brands.js:91"
   ]
  },
  "Магазин у дома": {
   "ctx": [
-   "src/game/brands.js:87"
+   "src/game/brands.js:91"
   ]
  },
  "Мада Дриста": {
   "ctx": [
-   "src/game/game.js:7039"
+   "src/game/game.js:7183"
   ]
  },
  "Мада Малина": {
   "ctx": [
-   "src/game/game.js:7040"
+   "src/game/game.js:7184"
   ]
  },
  "Мада Тень": {
   "ctx": [
-   "src/game/game.js:7039"
+   "src/game/game.js:7183"
   ]
  },
  "максимальный": {
   "ctx": [
-   "src/game/game.js:8125"
+   "src/game/game.js:8315"
   ]
  },
  "маргарита": {
   "ctx": [
-   "src/game/game.js:8308"
+   "src/game/game.js:8498"
   ]
  },
  "маркетолог": {
   "ctx": [
-   "src/game/people.js:187"
+   "src/game/people.js:188"
   ]
  },
  "Матрасик": {
   "ctx": [
-   "src/game/brands.js:50"
+   "src/game/brands.js:54"
   ]
  },
  "машин всмятку": {
   "ctx": [
-   "src/game/game.js:8200",
-   "src/game/game.js:9365"
+   "src/game/game.js:8390",
+   "src/game/game.js:9556"
   ]
  },
  "машина всё": {
   "ctx": [
-   "src/game/game.js:9211",
-   "src/game/game.js:9215"
+   "src/game/game.js:9401",
+   "src/game/game.js:9405"
   ]
  },
  "машина разбита — кончились сердца": {
   "ctx": [
-   "src/game/game.js:8167"
+   "src/game/game.js:8357"
   ]
  },
  "машина ушла под воду — вплавь не довезёшь": {
   "ctx": [
-   "src/game/game.js:8168"
+   "src/game/game.js:8358"
   ]
  },
  "машины": {
   "ctx": [
-   "index.html:52"
+   "index.html:69"
   ]
  },
  "Мебель": {
   "ctx": [
-   "src/game/brands.js:91"
+   "src/game/brands.js:95"
   ]
  },
  "медбрат": {
   "ctx": [
-   "src/game/people.js:190"
+   "src/game/people.js:191"
   ]
  },
  "медсестра": {
   "ctx": [
-   "src/game/people.js:190"
+   "src/game/people.js:191"
   ]
  },
  "менеджер": {
   "ctx": [
-   "src/game/people.js:186"
+   "src/game/people.js:187"
   ]
  },
  "место среди курьеров": {
   "ctx": [
-   "src/game/game.js:8197"
+   "src/game/game.js:8387"
   ]
  },
  "механик": {
   "ctx": [
-   "src/game/people.js:193"
+   "src/game/people.js:194"
   ]
  },
  "Микси": {
   "ctx": [
-   "src/game/brands.js:44"
+   "src/game/brands.js:48"
+  ]
+ },
+ "Милая, ты как?!": {
+  "ctx": [
+   "src/game/life.js:188"
+  ]
+ },
+ "Милый, ты как?!": {
+  "ctx": [
+   "src/game/life.js:188"
   ]
  },
  "Минимаркет": {
   "ctx": [
-   "src/game/brands.js:87"
+   "src/game/brands.js:91"
   ]
  },
  "минус {what}": {
   "ctx": [
-   "src/game/game.js:1343",
-   "src/game/game.js:1909",
-   "src/game/game.js:2183"
+   "src/game/game.js:1356",
+   "src/game/game.js:1922",
+   "src/game/game.js:2196"
   ]
  },
  "минус {what} · респект": {
   "ctx": [
-   "src/game/game.js:1908"
+   "src/game/game.js:1921"
   ]
  },
  "минус {what}. и пиццы тоже": {
   "ctx": [
-   "src/game/game.js:6563"
+   "src/game/game.js:6707"
   ]
  },
  "минус веранда «{name}»": {
   "ctx": [
-   "src/game/game.js:2120"
+   "src/game/game.js:2133"
   ]
  },
  "минус витрина": {
   "ctx": [
-   "src/game/game.js:2120"
+   "src/game/game.js:2133"
   ]
  },
  "минус водитель": {
   "ctx": [
-   "src/game/game.js:5667"
+   "src/game/game.js:5801"
   ]
  },
  "минус водитель — спор решён": {
   "ctx": [
-   "src/game/game.js:6459"
+   "src/game/game.js:6603"
   ]
  },
  "минус вратарь": {
   "ctx": [
-   "src/game/game.js:1688"
+   "src/game/game.js:1701"
   ]
  },
  "минус два самокатчика": {
   "ctx": [
-   "src/game/game.js:4514"
+   "src/game/game.js:4638"
   ]
  },
  "минус дорожник": {
   "ctx": [
-   "src/game/game.js:3265"
+   "src/game/game.js:3309",
+   "src/game/game.js:3319"
   ]
  },
  "минус драчун": {
   "ctx": [
-   "src/game/game.js:6459"
+   "src/game/game.js:6603"
+  ]
+ },
+ "минус зевака": {
+  "ctx": [
+   "src/game/game.js:3319"
   ]
  },
  "минус игрок — замена!": {
   "ctx": [
-   "src/game/game.js:1688"
+   "src/game/game.js:1701"
   ]
  },
  "минус клиент {who}": {
   "ctx": [
-   "src/game/game.js:6209"
+   "src/game/game.js:6345"
   ]
  },
  "минус лавочка": {
   "ctx": [
-   "src/game/game.js:4932"
+   "src/game/game.js:5057"
   ]
  },
  "минус машина": {
   "ctx": [
-   "src/game/game.js:7454"
+   "src/game/game.js:7599"
   ]
  },
  "минус нападающий": {
   "ctx": [
-   "src/game/game.js:1688"
+   "src/game/game.js:1701"
   ]
  },
  "минус прохожий": {
   "ctx": [
-   "src/game/game.js:4906"
+   "src/game/game.js:5031"
   ]
  },
  "минус самокатчик": {
   "ctx": [
-   "src/game/game.js:4514"
+   "src/game/game.js:4638"
   ]
  },
  "минус светофор": {
   "ctx": [
-   "src/game/game.js:4945"
+   "src/game/game.js:5070"
   ]
  },
  "минус такси": {
   "ctx": [
-   "src/game/game.js:7454"
+   "src/game/game.js:7599"
   ]
  },
  "минус таксист": {
   "ctx": [
-   "src/game/game.js:5667"
+   "src/game/game.js:5801"
   ]
  },
  "минус фельдшер": {
   "ctx": [
-   "src/game/game.js:6039"
+   "src/game/game.js:6173"
   ]
  },
  "минус фельдшер. вызов уже на него": {
   "ctx": [
-   "src/game/game.js:6039"
+   "src/game/game.js:6173"
   ]
  },
  "минус фонарь": {
   "ctx": [
-   "src/game/game.js:4945"
+   "src/game/game.js:5070"
   ]
  },
  "может быть на балконе, машет рукой": {
   "ctx": [
-   "src/game/game.js:8393"
+   "src/game/game.js:8583"
   ]
  },
  "мои находки": {
   "ctx": [
-   "src/game/game.js:7083",
-   "index.html:207"
+   "src/game/game.js:7227",
+   "index.html:224"
   ]
  },
  "молодец!": {
   "ctx": [
-   "src/game/game.js:9016",
-   "src/game/game.js:9017"
+   "src/game/game.js:9206",
+   "src/game/game.js:9207"
   ]
  },
  "молодец! вот новый заказ": {
   "ctx": [
-   "src/game/game.js:9017"
+   "src/game/game.js:9207"
   ]
  },
  "молодец! забирай следующий": {
   "ctx": [
-   "src/game/game.js:9017"
+   "src/game/game.js:9207"
   ]
  },
  "Москва": {
   "ctx": [
    "src/maps/index.js:17",
    "src/maps/moscow/index.js:9",
-   "index.html:47"
+   "index.html:64"
   ]
  },
  "Москва-река": {
@@ -1809,659 +1932,734 @@
  },
  "мою пиццу…": {
   "ctx": [
-   "src/game/game.js:6476"
+   "src/game/game.js:6620"
   ]
  },
  "МОЯ!": {
   "ctx": [
-   "src/game/game.js:6475"
+   "src/game/game.js:6619"
   ]
  },
  "музыкант": {
   "ctx": [
-   "src/game/people.js:189"
+   "src/game/people.js:190"
   ]
  },
  "мусорка": {
   "ctx": [
-   "src/game/game.js:1293"
+   "src/game/game.js:1306"
   ]
  },
  "мусорный бак": {
   "ctx": [
-   "src/game/game.js:1293"
+   "src/game/game.js:1306"
   ]
  },
  "мясная": {
   "ctx": [
-   "src/game/game.js:8308"
+   "src/game/game.js:8498"
   ]
  },
  "мяч улетел — достали новый": {
   "ctx": [
-   "src/game/game.js:1637"
+   "src/game/game.js:1650"
+  ]
+ },
+ "на дворе {s}": {
+  "ctx": [
+   "src/game/seasons.js:290"
   ]
  },
  "на звонок не отвечает, он в созвоне": {
   "ctx": [
-   "src/game/game.js:8383"
+   "src/game/game.js:8573"
   ]
  },
  "на ковёр не смотреть": {
   "ctx": [
-   "src/game/game.js:8373"
+   "src/game/game.js:8563"
   ]
  },
  "на парковку шлагбаум, объезжай": {
   "ctx": [
-   "src/game/game.js:8833"
+   "src/game/game.js:9023"
   ]
  },
  "на районе один кофе!": {
   "ctx": [
-   "src/game/game.js:1943"
+   "src/game/game.js:1956"
   ]
  },
  "на районе похититель пиццы — сбей, будет респект": {
   "ctx": [
-   "src/game/game.js:6514"
+   "src/game/game.js:6658"
   ]
  },
  "на смене": {
   "ctx": [
-   "src/game/game.js:7211"
+   "src/game/game.js:7355"
   ]
  },
  "над газом — зажал и полетел": {
   "ctx": [
-   "index.html:149"
+   "index.html:166"
+  ]
+ },
+ "надолго встали": {
+  "ctx": [
+   "src/game/roadlife.js:486"
   ]
  },
  "настройки": {
   "ctx": [
-   "src/game/game.js:7160",
-   "index.html:212"
+   "src/game/game.js:7304",
+   "index.html:229"
   ]
  },
  "находка!": {
   "ctx": [
-   "src/game/game.js:6975"
+   "src/game/game.js:7119"
   ]
  },
  "находки": {
   "ctx": [
-   "index.html:52"
+   "index.html:69"
+  ]
+ },
+ "начало зимы": {
+  "ctx": [
+   "src/game/seasons.js:64"
+  ]
+ },
+ "начало лета": {
+  "ctx": [
+   "src/game/seasons.js:63"
   ]
  },
  "наш раф лучше!": {
   "ctx": [
-   "src/game/game.js:1811"
+   "src/game/game.js:1824"
   ]
  },
  "не записалось — нет связи с таблицей": {
   "ctx": [
-   "src/game/game.js:8226"
+   "src/game/game.js:8416"
   ]
  },
  "не здоровайся, он стесняется": {
   "ctx": [
-   "src/game/game.js:8381"
+   "src/game/game.js:8571"
   ]
  },
  "не наступай на его самокат": {
   "ctx": [
-   "src/game/game.js:8388"
+   "src/game/game.js:8578"
+  ]
+ },
+ "Не наш уровень": {
+  "ctx": [
+   "src/game/life.js:340"
   ]
  },
  "не произносить слово «дедлайн»": {
   "ctx": [
-   "src/game/game.js:8402"
+   "src/game/game.js:8592"
   ]
  },
  "не смотри в глаза собаке": {
   "ctx": [
-   "src/game/game.js:8367"
+   "src/game/game.js:8557"
   ]
  },
  "не спрашивай, как дела на проекте": {
   "ctx": [
-   "src/game/game.js:8386"
+   "src/game/game.js:8576"
   ]
  },
  "не успел": {
   "ctx": [
-   "src/game/game.js:9213",
-   "src/game/game.js:9215"
+   "src/game/game.js:9403",
+   "src/game/game.js:9405"
   ]
  },
  "не успел — клиент передумал": {
   "ctx": [
-   "src/game/game.js:10168"
+   "src/game/game.js:10383"
   ]
  },
  "не, работаю": {
   "ctx": [
-   "src/game/game.js:9139"
+   "src/game/game.js:9329"
+  ]
+ },
+ "Нет!..": {
+  "ctx": [
+   "src/game/life.js:188"
   ]
  },
  "нитро": {
   "ctx": [
-   "index.html:52",
-   "index.html:88",
-   "index.html:135"
+   "index.html:69",
+   "index.html:105",
+   "index.html:152"
   ]
  },
  "нитро — зажал и полетел": {
   "ctx": [
-   "index.html:156",
-   "index.html:164"
+   "index.html:173",
+   "index.html:181"
   ]
  },
  "ночной дожор": {
   "ctx": [
-   "src/game/game.js:9071"
+   "src/game/game.js:9261"
   ]
  },
  "ночь": {
   "ctx": [
-   "src/game/game.js:9755"
+   "src/game/game.js:9957"
   ]
  },
  "ночь — включай фары": {
   "ctx": [
-   "src/game/game.js:9808"
+   "src/game/game.js:10010"
   ]
  },
  "ну всё, ты попал": {
   "ctx": [
-   "src/game/game.js:5584"
+   "src/game/game.js:5718"
   ]
  },
  "ну всё!": {
   "ctx": [
-   "src/game/game.js:5546",
-   "src/game/game.js:6350"
+   "src/game/game.js:5680",
+   "src/game/game.js:6492"
   ]
  },
  "ну ты это…": {
   "ctx": [
-   "src/game/game.js:9896",
-   "src/game/game.js:9897"
+   "src/game/game.js:10098",
+   "src/game/game.js:10099"
+  ]
+ },
+ "ну чё там?": {
+  "ctx": [
+   "src/game/roadlife.js:486"
   ]
  },
  "НЯМ-НЯМ": {
   "ctx": [
-   "src/game/game.js:6475"
+   "src/game/game.js:6619"
   ]
  },
  "о-о-о": {
   "ctx": [
-   "src/game/game.js:9897"
+   "src/game/game.js:10099"
   ]
  },
  "обед": {
   "ctx": [
-   "src/game/game.js:9071"
+   "src/game/game.js:9261"
   ]
  },
  "Обувь": {
   "ctx": [
-   "src/game/brands.js:91"
+   "src/game/brands.js:95"
   ]
  },
  "Овощи-фрукты": {
   "ctx": [
-   "src/game/brands.js:87"
+   "src/game/brands.js:91"
   ]
  },
  "Огородбанк": {
   "ctx": [
-   "src/game/brands.js:58"
+   "src/game/brands.js:62"
   ]
  },
  "Одежда": {
   "ctx": [
-   "src/game/brands.js:91"
+   "src/game/brands.js:95"
   ]
  },
  "один адрес, ближе никого не нашлось": {
   "ctx": [
-   "src/game/game.js:8311"
+   "src/game/game.js:8501"
   ]
  },
  "он бьёт машину!": {
   "ctx": [
-   "src/game/game.js:5620"
+   "src/game/game.js:5754"
   ]
  },
  "он в наушниках, махать руками": {
   "ctx": [
-   "src/game/game.js:8390"
+   "src/game/game.js:8580"
   ]
  },
  "операционист банка": {
   "ctx": [
-   "src/game/people.js:188"
+   "src/game/people.js:189"
   ]
  },
  "опоздал": {
   "ctx": [
-   "src/game/game.js:8989"
+   "src/game/game.js:9179"
   ]
  },
  "Оптика": {
   "ctx": [
-   "src/game/brands.js:91"
+   "src/game/brands.js:95"
+  ]
+ },
+ "опять авария…": {
+  "ctx": [
+   "src/game/roadlife.js:486"
+  ]
+ },
+ "Опять пробки…": {
+  "ctx": [
+   "src/game/life.js:340"
   ]
  },
  "оставить у двери, но не у этой": {
   "ctx": [
-   "src/game/game.js:8389"
+   "src/game/game.js:8579"
   ]
  },
  "отдай мою пиццу…": {
   "ctx": [
-   "src/game/game.js:6476"
+   "src/game/game.js:6620"
   ]
  },
  "отдай…": {
   "ctx": [
-   "src/game/game.js:6476"
+   "src/game/game.js:6620"
   ]
  },
  "открывает не сразу, а потом сразу": {
   "ctx": [
-   "src/game/game.js:8375"
+   "src/game/game.js:8565"
   ]
  },
  "официант": {
   "ctx": [
-   "src/game/people.js:193"
+   "src/game/people.js:194"
   ]
  },
  "официантка": {
   "ctx": [
-   "src/game/people.js:193"
+   "src/game/people.js:194"
   ]
  },
  "оценка поездки: 1 звезда": {
   "ctx": [
-   "src/game/game.js:7455"
+   "src/game/game.js:7600"
   ]
  },
  "парикмахер": {
   "ctx": [
-   "src/game/people.js:189"
+   "src/game/people.js:190"
+  ]
+ },
+ "парковка": {
+  "ctx": [
+   "src/game/pizzeria.js:35"
   ]
  },
  "пароль от домофона — «пицца123»": {
   "ctx": [
-   "src/game/game.js:8391"
+   "src/game/game.js:8581"
   ]
  },
  "Паста-Баста": {
   "ctx": [
-   "src/game/brands.js:80"
+   "src/game/brands.js:84"
   ]
  },
  "пауза": {
   "ctx": [
-   "src/game/game.js:9373",
-   "index.html:86",
-   "index.html:102"
+   "src/game/game.js:9564",
+   "index.html:103",
+   "index.html:119"
   ]
  },
  "пахнет борщом, это нормально": {
   "ctx": [
-   "src/game/game.js:8382"
+   "src/game/game.js:8572"
   ]
  },
  "пачка «Шапмэн» с вишней": {
   "ctx": [
-   "src/game/game.js:6802"
+   "src/game/game.js:6946"
   ]
  },
  "певец": {
   "ctx": [
-   "src/game/game.js:10003"
+   "src/game/game.js:10205"
   ]
  },
  "пейджер": {
   "ctx": [
-   "src/game/game.js:6807",
-   "src/game/game.js:6818"
+   "src/game/game.js:6951",
+   "src/game/game.js:6962"
   ]
  },
  "Пекарня «Булка»": {
   "ctx": [
-   "src/game/brands.js:74"
+   "src/game/brands.js:78"
   ]
  },
  "пекарь": {
   "ctx": [
-   "src/game/people.js:191"
+   "src/game/people.js:192"
   ]
  },
  "Пельменная": {
   "ctx": [
-   "src/game/brands.js:86"
+   "src/game/brands.js:90"
   ]
  },
  "Пельпаген Шмольф": {
   "ctx": [
-   "src/game/game.js:7041"
+   "src/game/game.js:7185"
   ]
  },
  "пенсионер": {
   "ctx": [
-   "src/game/people.js:190"
+   "src/game/people.js:191"
   ]
  },
  "пенсионерка": {
   "ctx": [
-   "src/game/people.js:190"
+   "src/game/people.js:191"
   ]
  },
  "пепперони": {
   "ctx": [
-   "src/game/game.js:8308"
+   "src/game/game.js:8498"
   ]
  },
  "первый заказ: прямо до перекрёстка, клиент справа": {
   "ctx": [
-   "src/game/game.js:8722"
+   "src/game/game.js:8912"
   ]
  },
  "переводчик": {
   "ctx": [
-   "src/game/people.js:188"
+   "src/game/people.js:189"
   ]
  },
  "переводчица": {
   "ctx": [
-   "src/game/people.js:188"
+   "src/game/people.js:189"
   ]
  },
  "передать лично в руки, руки две": {
   "ctx": [
-   "src/game/game.js:8399"
+   "src/game/game.js:8589"
   ]
  },
  "песочница": {
   "ctx": [
-   "src/game/game.js:1293"
+   "src/game/game.js:1306"
   ]
  },
  "пиво": {
   "ctx": [
-   "src/game/game.js:9103"
+   "src/game/game.js:9293"
   ]
  },
  "пиво «Жигулёвочка»": {
   "ctx": [
-   "src/game/game.js:6805"
+   "src/game/game.js:6949"
   ]
  },
  "пиво взял": {
   "ctx": [
-   "src/game/game.js:9103"
+   "src/game/game.js:9293"
   ]
  },
  "пицца в машине — поехали": {
   "ctx": [
-   "src/game/game.js:8910"
+   "src/game/game.js:9100"
+  ]
+ },
+ "пицца дня": {
+  "ctx": [
+   "src/game/pizzeria.js:18"
   ]
  },
  "пицца с лососем": {
   "ctx": [
-   "src/game/game.js:6806",
-   "src/game/game.js:6817"
+   "src/game/game.js:6950",
+   "src/game/game.js:6961"
   ]
  },
  "пицца с работы": {
   "ctx": [
-   "src/game/game.js:9065"
+   "src/game/game.js:9255"
   ]
  },
  "ПИЦЦА!": {
   "ctx": [
-   "src/game/game.js:6475"
+   "src/game/game.js:6619"
   ]
  },
  "пиццерия": {
   "ctx": [
-   "src/game/game.js:3239",
-   "index.html:50"
+   "src/game/game.js:3283",
+   "index.html:67"
   ]
  },
  "пластырь": {
   "ctx": [
-   "src/game/game.js:9099"
+   "src/game/game.js:9289"
   ]
  },
  "пластырь взял": {
   "ctx": [
-   "src/game/game.js:9099"
+   "src/game/game.js:9289"
   ]
  },
  "плюс респект": {
   "ctx": [
-   "src/game/game.js:7535"
+   "src/game/game.js:7680"
   ]
  },
  "плюшевый пингвин": {
   "ctx": [
-   "src/game/game.js:6808",
-   "src/game/game.js:6819"
+   "src/game/game.js:6952",
+   "src/game/game.js:6963"
   ]
  },
  "по капоту, по капоту!": {
   "ctx": [
-   "src/game/game.js:5620"
+   "src/game/game.js:5754"
   ]
  },
  "по пути от пиццерии": {
   "ctx": [
-   "src/game/game.js:8313"
+   "src/game/game.js:8503"
   ]
  },
  "повар": {
   "ctx": [
-   "src/game/people.js:186"
+   "src/game/people.js:187"
   ]
  },
  "повторный заказ, клиент лояльный": {
   "ctx": [
-   "src/game/game.js:8314"
+   "src/game/game.js:8504"
   ]
  },
  "Подарки": {
   "ctx": [
-   "src/game/brands.js:91"
+   "src/game/brands.js:95"
   ]
  },
  "подкрепись кофейком · +кофе-нитро": {
   "ctx": [
-   "src/game/game.js:9016"
+   "src/game/game.js:9206"
   ]
  },
  "поднимется, только если пицца горячая": {
   "ctx": [
-   "src/game/game.js:8398"
+   "src/game/game.js:8588"
   ]
  },
  "подозрительный свёрток": {
   "ctx": [
-   "src/game/game.js:6804"
+   "src/game/game.js:6948"
   ]
  },
  "подойдёт после серии, серия идёт третий час": {
   "ctx": [
-   "src/game/game.js:8405"
+   "src/game/game.js:8595"
   ]
  },
  "подтвердит получение смайликом": {
   "ctx": [
-   "src/game/game.js:8401"
+   "src/game/game.js:8591"
   ]
  },
  "подъедь к набережной и притормози — пицца долетит прямо на доску · оплата ×2": {
   "ctx": [
-   "src/game/game.js:8445"
+   "src/game/game.js:8635"
   ]
  },
  "поехали": {
   "ctx": [
-   "src/game/game.js:8106",
-   "index.html:203"
+   "src/game/game.js:8296",
+   "index.html:220"
+  ]
+ },
+ "поздняя весна": {
+  "ctx": [
+   "src/game/seasons.js:64"
+  ]
+ },
+ "поздняя осень": {
+  "ctx": [
+   "src/game/seasons.js:63"
   ]
  },
  "пока пусто — съезди смену, и ты первый": {
   "ctx": [
-   "src/game/game.js:8291"
+   "src/game/game.js:8481"
   ]
  },
  "полдник": {
   "ctx": [
-   "src/game/game.js:9071"
+   "src/game/game.js:9261"
   ]
  },
  "полный бак кофе-нитро — жми {key}": {
   "ctx": [
-   "src/game/game.js:8909"
+   "src/game/game.js:9099"
   ]
  },
  "полуночник": {
   "ctx": [
-   "src/game/game.js:10003"
+   "src/game/game.js:10205"
   ]
  },
  "помер": {
   "ctx": [
-   "src/game/game.js:9211",
-   "src/game/game.js:9215"
+   "src/game/game.js:9401",
+   "src/game/game.js:9405"
   ]
  },
  "помог выиграть кофейную войну · +{money} и респект": {
   "ctx": [
-   "src/game/game.js:1848"
+   "src/game/game.js:1861"
   ]
  },
  "Пончиковая": {
   "ctx": [
-   "src/game/brands.js:86"
+   "src/game/brands.js:90"
   ]
  },
  "посетитель": {
   "ctx": [
-   "src/game/game.js:2183"
+   "src/game/game.js:2196"
   ]
  },
  "после загрузки — полный бак кофе-нитро · оплата ×1,5": {
   "ctx": [
-   "src/game/game.js:8444"
+   "src/game/game.js:8634"
   ]
  },
  "последовательный заказ": {
   "ctx": [
-   "src/game/game.js:8413"
+   "src/game/game.js:8603"
   ]
  },
  "последовательный: {n} адрес, везём по очереди|последовательный: {n} адреса подряд, везём по очереди|последовательный: {n} адресов подряд, везём по очереди": {
   "ctx": [
-   "src/game/game.js:8754"
+   "src/game/game.js:8944"
   ],
   "plural": true
  },
  "Посылочная": {
   "ctx": [
-   "src/game/brands.js:90"
+   "src/game/brands.js:94"
   ]
  },
  "поторопись!": {
   "ctx": [
-   "src/game/game.js:8909"
+   "src/game/game.js:9099"
   ]
  },
  "похититель пиццы наказан · +300 ₽": {
   "ctx": [
-   "src/game/game.js:6602"
+   "src/game/game.js:6746"
   ]
  },
  "похититель скрылся во дворах": {
   "ctx": [
-   "src/game/game.js:6575"
+   "src/game/game.js:6719"
   ]
  },
  "почтальон": {
   "ctx": [
-   "src/game/people.js:192"
+   "src/game/people.js:193"
   ]
  },
  "пошёл дождь — дорога скользкая": {
   "ctx": [
-   "src/game/game.js:9772"
+   "src/game/game.js:9974"
+  ]
+ },
+ "пошёл снег — дорога скользкая": {
+  "ctx": [
+   "src/game/game.js:9974"
   ]
  },
  "предметы разбросаны по району, часть — во дворах у пиццерии. За каждый — {money}": {
   "ctx": [
-   "src/game/game.js:7084"
+   "src/game/game.js:7228"
   ]
  },
  "преподаватель": {
   "ctx": [
-   "src/game/people.js:190"
+   "src/game/people.js:191"
   ]
  },
  "преподавательница": {
   "ctx": [
-   "src/game/people.js:190"
+   "src/game/people.js:191"
   ]
  },
  "Прима": {
   "ctx": [
-   "src/game/brands.js:66"
+   "src/game/brands.js:70"
   ]
  },
  "принять": {
   "ctx": [
-   "index.html:79"
+   "index.html:96"
   ]
  },
  "пробел": {
   "ctx": [
-   "index.html:155"
+   "index.html:172"
   ]
  },
  "проверочный прогон — в таблицу не пишется": {
   "ctx": [
-   "src/game/game.js:8218"
+   "src/game/game.js:8408"
   ]
  },
  "программист": {
   "ctx": [
-   "src/game/people.js:185"
+   "src/game/people.js:186"
+  ]
+ },
+ "Продавай всё!": {
+  "ctx": [
+   "src/game/life.js:340"
   ]
  },
  "продавец": {
   "ctx": [
-   "src/game/people.js:189"
+   "src/game/people.js:190"
   ]
  },
  "продавщица": {
   "ctx": [
-   "src/game/people.js:189"
+   "src/game/people.js:190"
   ]
  },
  "продолжить": {
   "ctx": [
-   "src/game/game.js:9373",
-   "index.html:106"
+   "src/game/game.js:9564",
+   "index.html:123"
   ]
  },
  "Продукты": {
   "ctx": [
-   "src/game/brands.js:87"
+   "src/game/brands.js:91"
   ]
  },
  "проезд по пропускам": {
@@ -2471,58 +2669,69 @@
  },
  "Промсвязка": {
   "ctx": [
-   "src/game/brands.js:57"
+   "src/game/brands.js:61"
+  ]
+ },
+ "пропустите!": {
+  "ctx": [
+   "src/game/roadlife.js:486"
   ]
  },
  "просил без ананасов, но с ананасами": {
   "ctx": [
-   "src/game/game.js:8397"
+   "src/game/game.js:8587"
   ]
  },
  "просил приехать молча": {
   "ctx": [
-   "src/game/game.js:8377"
+   "src/game/game.js:8567"
   ]
  },
  "просто катаемся: без заказов и рекордов · esc — пауза и выход": {
   "ctx": [
-   "src/game/game.js:9327"
+   "src/game/game.js:9518"
   ]
  },
  "просто катаешься": {
   "ctx": [
-   "src/game/game.js:9354"
+   "src/game/game.js:9545"
   ]
  },
  "просто катались — в таблицу не пишется": {
   "ctx": [
-   "src/game/game.js:8219"
+   "src/game/game.js:8409"
   ]
  },
  "просто катаюсь": {
   "ctx": [
-   "src/game/game.js:8080"
+   "src/game/game.js:8270"
   ]
  },
  "просто покататься": {
   "ctx": [
-   "index.html:205"
+   "index.html:222"
   ]
  },
  "прохожего": {
   "ctx": [
-   "src/game/game.js:6304"
+   "src/game/game.js:6446"
+  ]
+ },
+ "прохожий": {
+  "ctx": [
+   "src/game/life.js:181",
+   "src/game/life.js:904"
   ]
  },
  "прохожих сбито": {
   "ctx": [
-   "src/game/game.js:8199",
-   "src/game/game.js:9365"
+   "src/game/game.js:8389",
+   "src/game/game.js:9556"
   ]
  },
  "психолог": {
   "ctx": [
-   "src/game/people.js:193"
+   "src/game/people.js:194"
   ]
  },
  "Птица Пицца": {
@@ -2532,32 +2741,32 @@
  },
  "Птица-седан": {
   "ctx": [
-   "src/game/game.js:7038"
+   "src/game/game.js:7182"
   ]
  },
  "птичий микс": {
   "ctx": [
-   "src/game/game.js:8309"
+   "src/game/game.js:8499"
   ]
  },
  "Пункт выдачи": {
   "ctx": [
-   "src/game/brands.js:90"
+   "src/game/brands.js:94"
   ]
  },
  "Пункт выдачи «Коробка»": {
   "ctx": [
-   "src/game/brands.js:90"
+   "src/game/brands.js:94"
   ]
  },
  "Пуфф": {
   "ctx": [
-   "src/game/brands.js:43"
+   "src/game/brands.js:47"
   ]
  },
  "разбудить, он после ночной смены": {
   "ctx": [
-   "src/game/game.js:8396"
+   "src/game/game.js:8586"
   ]
  },
  "развози пиццу по закрытому городу — пропуск есть только у тебя!": {
@@ -2575,152 +2784,192 @@
    "src/maps/moscow/index.js:10"
   ]
  },
+ "разгар весны": {
+  "ctx": [
+   "src/game/seasons.js:64"
+  ]
+ },
+ "разгар зимы": {
+  "ctx": [
+   "src/game/seasons.js:64"
+  ]
+ },
+ "разгар лета": {
+  "ctx": [
+   "src/game/seasons.js:63"
+  ]
+ },
  "район у Ленинской Слободы · демо": {
   "ctx": [
    "src/maps/index.js:17"
   ]
  },
+ "ранняя весна": {
+  "ctx": [
+   "src/game/seasons.js:64"
+  ]
+ },
+ "ранняя осень": {
+  "ctx": [
+   "src/game/seasons.js:63"
+  ]
+ },
  "резиновая уточка": {
   "ctx": [
-   "src/game/game.js:6812"
+   "src/game/game.js:6956"
+  ]
+ },
+ "РЕМОНТ": {
+  "ctx": [
+   "src/game/roadlife.js:688"
   ]
  },
  "Ремонт телефонов": {
   "ctx": [
-   "src/game/brands.js:91"
+   "src/game/brands.js:95"
   ]
  },
  "респект": {
   "ctx": [
-   "src/game/game.js:7535"
+   "src/game/game.js:7680"
   ]
  },
  "респект {n}": {
   "ctx": [
-   "src/game/game.js:8062"
+   "src/game/game.js:8248"
   ]
  },
  "респект от «{brand}» · +{money}": {
   "ctx": [
-   "src/game/game.js:1908"
+   "src/game/game.js:1921"
   ]
  },
  "респект!": {
   "ctx": [
-   "src/game/game.js:6602"
+   "src/game/game.js:6746"
   ]
  },
  "респектов": {
   "ctx": [
-   "src/game/game.js:8198",
-   "src/game/game.js:9364"
+   "src/game/game.js:8388",
+   "src/game/game.js:9555"
   ]
  },
  "риелтор": {
   "ctx": [
-   "src/game/people.js:193"
+   "src/game/people.js:194"
   ]
  },
  "Роллы-Ток": {
   "ctx": [
-   "src/game/brands.js:45"
+   "src/game/brands.js:49"
   ]
  },
  "Росбонк": {
   "ctx": [
-   "src/game/brands.js:54"
+   "src/game/brands.js:58"
+  ]
+ },
+ "Роснефтик": {
+  "ctx": [
+   "src/game/brands.js:22"
   ]
  },
  "руль": {
   "ctx": [
-   "index.html:154",
-   "index.html:162"
+   "index.html:171",
+   "index.html:179"
   ]
  },
  "руль — левой рукой": {
   "ctx": [
-   "index.html:146"
+   "index.html:163"
   ]
  },
  "ручник": {
   "ctx": [
-   "index.html:155",
-   "index.html:163"
+   "index.html:172",
+   "index.html:180"
   ]
  },
  "рынок": {
   "ctx": [
-   "src/game/brands.js:129"
+   "src/game/brands.js:133"
+  ]
+ },
+ "с грибами": {
+  "ctx": [
+   "src/game/pizzeria.js:19"
   ]
  },
  "садовник": {
   "ctx": [
-   "src/game/people.js:193"
+   "src/game/people.js:194"
   ]
  },
  "садовый гном": {
   "ctx": [
-   "src/game/game.js:6816"
+   "src/game/game.js:6960"
   ]
  },
  "Салон связи": {
   "ctx": [
-   "src/game/brands.js:91"
+   "src/game/brands.js:95"
   ]
  },
  "сам ты!": {
   "ctx": [
-   "src/game/game.js:6350"
+   "src/game/game.js:6492"
   ]
  },
  "самокатов {n}": {
   "ctx": [
-   "src/game/game.js:8063"
+   "src/game/game.js:8249"
   ]
  },
  "самокатчиков": {
   "ctx": [
-   "src/game/game.js:9365"
+   "src/game/game.js:9556"
   ]
  },
  "сантехник": {
   "ctx": [
-   "src/game/people.js:191"
+   "src/game/people.js:192"
   ]
  },
  "сбил": {
   "ctx": [
-   "src/game/game.js:9210"
+   "src/game/game.js:9400"
   ]
  },
  "сбил {who}": {
   "ctx": [
-   "src/game/game.js:9250"
+   "src/game/game.js:9440"
   ]
  },
  "сбито {n}": {
   "ctx": [
-   "src/game/game.js:8062"
+   "src/game/game.js:8248"
   ]
  },
  "светофор": {
   "ctx": [
-   "index.html:51"
+   "index.html:68"
   ]
  },
  "Связь-Ок": {
   "ctx": [
-   "src/game/brands.js:28"
+   "src/game/brands.js:32"
   ]
  },
  "сгоняю": {
   "ctx": [
-   "src/game/game.js:9138"
+   "src/game/game.js:9328"
   ]
  },
  "сдачу не надо, ему нужен фидбек": {
   "ctx": [
-   "src/game/game.js:8395"
+   "src/game/game.js:8585"
   ]
  },
  "Северск": {
@@ -2731,229 +2980,249 @@
  },
  "Синабулка": {
   "ctx": [
-   "src/game/brands.js:68"
+   "src/game/brands.js:72"
   ]
  },
  "синие, вперёд!": {
   "ctx": [
-   "src/game/game.js:1811"
+   "src/game/game.js:1824"
   ]
  },
  "синие, домой!": {
   "ctx": [
-   "src/game/game.js:1943"
+   "src/game/game.js:1956"
   ]
  },
  "Синий кит": {
   "ctx": [
    "src/game/brands.js:15",
-   "index.html:52"
+   "index.html:69"
   ]
  },
  "следующий: {who}": {
   "ctx": [
-   "src/game/game.js:8998"
+   "src/game/game.js:9188"
   ]
  },
  "смена в таблице рекордов": {
   "ctx": [
-   "src/game/game.js:8226"
+   "src/game/game.js:8416"
   ]
  },
  "смена закончена": {
   "ctx": [
-   "src/game/game.js:8189"
+   "src/game/game.js:8379"
   ]
  },
  "смена окончена": {
   "ctx": [
-   "src/game/game.js:9215"
+   "src/game/game.js:9405"
+  ]
+ },
+ "снег перестал": {
+  "ctx": [
+   "src/game/game.js:9973"
+  ]
+ },
+ "снег, скользко": {
+  "ctx": [
+   "src/game/game.js:9554"
+  ]
+ },
+ "снеговик": {
+  "ctx": [
+   "src/game/seasons.js:278"
+  ]
+ },
+ "снежный снайпер": {
+  "ctx": [
+   "src/game/seasons.js:873"
   ]
  },
  "снюс": {
   "ctx": [
-   "src/game/game.js:9104"
+   "src/game/game.js:9294"
   ]
  },
  "снюсик взял": {
   "ctx": [
-   "src/game/game.js:9104"
+   "src/game/game.js:9294"
   ]
  },
  "собутыльник": {
   "ctx": [
-   "src/game/game.js:10003"
+   "src/game/game.js:10205"
   ]
  },
  "Совкотбанк": {
   "ctx": [
-   "src/game/brands.js:55"
+   "src/game/brands.js:59"
   ]
  },
  "Соколаб": {
   "ctx": [
-   "src/game/brands.js:47"
+   "src/game/brands.js:51"
   ]
  },
  "сосед снизу — это не он": {
   "ctx": [
-   "src/game/game.js:8374"
+   "src/game/game.js:8564"
   ]
  },
  "сотрудник": {
   "ctx": [
-   "src/game/game.js:5534"
+   "src/game/game.js:5668"
   ]
  },
  "Спалона": {
   "ctx": [
-   "src/game/brands.js:49"
+   "src/game/brands.js:53"
   ]
  },
  "спасибо!!!": {
   "ctx": [
-   "src/game/game.js:6526"
+   "src/game/game.js:6670"
   ]
  },
  "спортивное купе — самый быстрый": {
   "ctx": [
-   "src/game/game.js:7042"
+   "src/game/game.js:7186"
   ]
  },
  "Спорттовары": {
   "ctx": [
-   "src/game/brands.js:91"
+   "src/game/brands.js:95"
   ]
  },
  "справа внизу — держи": {
   "ctx": [
-   "index.html:147"
+   "index.html:164"
   ]
  },
  "срочный": {
   "ctx": [
-   "src/game/game.js:8844"
+   "src/game/game.js:9034"
   ]
  },
  "срочный: ждёт дольше всех": {
   "ctx": [
-   "src/game/game.js:8312"
+   "src/game/game.js:8502"
   ]
  },
  "стекло всмятку": {
   "ctx": [
-   "src/game/game.js:2120"
+   "src/game/game.js:2133"
   ]
  },
  "стоит на парковке и делает вид, что не ждёт": {
   "ctx": [
-   "src/game/game.js:8400"
+   "src/game/game.js:8590"
   ]
  },
  "столик": {
   "ctx": [
-   "src/game/game.js:1293"
+   "src/game/game.js:1306"
   ]
  },
  "Столовая № 1": {
   "ctx": [
-   "src/game/brands.js:86"
+   "src/game/brands.js:90"
   ]
  },
  "стоматолог": {
   "ctx": [
-   "src/game/people.js:187"
+   "src/game/people.js:188"
   ]
  },
  "стоять!": {
   "ctx": [
-   "src/game/game.js:5546"
+   "src/game/game.js:5680"
   ]
  },
  "страховка есть?": {
   "ctx": [
-   "src/game/game.js:5546",
-   "src/game/game.js:6350"
+   "src/game/game.js:5680",
+   "src/game/game.js:6492"
   ]
  },
  "Стрела Спорт": {
   "ctx": [
-   "src/game/game.js:7042"
+   "src/game/game.js:7186"
   ]
  },
  "студент": {
   "ctx": [
-   "src/game/people.js:185"
+   "src/game/people.js:186"
   ]
  },
  "студентка": {
   "ctx": [
-   "src/game/people.js:185"
+   "src/game/people.js:186"
   ]
  },
  "стучать ногой, руками нельзя": {
   "ctx": [
-   "src/game/game.js:8371"
+   "src/game/game.js:8561"
   ]
  },
  "Суп-бар": {
   "ctx": [
-   "src/game/brands.js:86"
+   "src/game/brands.js:90"
   ]
  },
  "сухарики": {
   "ctx": [
-   "src/game/game.js:9098"
+   "src/game/game.js:9288"
   ]
  },
  "сухарики взял": {
   "ctx": [
-   "src/game/game.js:9098"
+   "src/game/game.js:9288"
   ]
  },
  "Т3": {
   "ctx": [
-   "src/game/brands.js:31"
+   "src/game/brands.js:35"
   ]
  },
  "таблица рекордов": {
   "ctx": [
-   "index.html:220"
+   "index.html:237"
   ]
  },
  "так ему": {
   "ctx": [
-   "src/game/game.js:7535"
+   "src/game/game.js:7680"
   ]
  },
  "ТАКСИ": {
   "ctx": [
-   "src/game/game.js:3866"
+   "src/game/game.js:3936"
   ]
  },
  "таксист": {
   "ctx": [
-   "src/game/people.js:191"
+   "src/game/people.js:192"
   ]
  },
  "таксист вышел разбираться": {
   "ctx": [
-   "src/game/game.js:5583"
+   "src/game/game.js:5717"
   ]
  },
  "таксист: «куда прёшь»": {
   "ctx": [
-   "src/game/game.js:7455"
+   "src/game/game.js:7600"
   ]
  },
  "таксист: «ты чё, слепой?»": {
   "ctx": [
-   "src/game/game.js:5583"
+   "src/game/game.js:5717"
   ]
  },
  "таксист: «я по навигатору»": {
   "ctx": [
-   "src/game/game.js:7455"
+   "src/game/game.js:7600"
   ]
  },
  "там Москва-река": {
@@ -2968,27 +3237,27 @@
  },
  "твой рекорд {money}": {
   "ctx": [
-   "src/game/game.js:8211"
+   "src/game/game.js:8401"
   ]
  },
  "тестировщик": {
   "ctx": [
-   "src/game/people.js:189"
+   "src/game/people.js:190"
   ]
  },
  "тестировщица": {
   "ctx": [
-   "src/game/people.js:189"
+   "src/game/people.js:190"
   ]
  },
  "Ткани": {
   "ctx": [
-   "src/game/brands.js:91"
+   "src/game/brands.js:95"
   ]
  },
  "Товары для дома": {
   "ctx": [
-   "src/game/brands.js:91"
+   "src/game/brands.js:95"
   ]
  },
  "Томь": {
@@ -3003,40 +3272,40 @@
  },
  "тонированный заниженный седан": {
   "ctx": [
-   "src/game/game.js:7039"
+   "src/game/game.js:7183"
   ]
  },
  "торговый центр": {
   "ctx": [
-   "src/game/brands.js:125"
+   "src/game/brands.js:129"
   ]
  },
  "тормоз": {
   "ctx": [
-   "index.html:136",
-   "index.html:148"
+   "index.html:153",
+   "index.html:165"
   ]
  },
  "тормоз и назад": {
   "ctx": [
-   "index.html:148",
-   "index.html:153",
-   "index.html:161"
+   "index.html:165",
+   "index.html:170",
+   "index.html:178"
   ]
  },
  "тостующий": {
   "ctx": [
-   "src/game/game.js:10003"
+   "src/game/game.js:10205"
   ]
  },
  "тренер": {
   "ctx": [
-   "src/game/people.js:187"
+   "src/game/people.js:188"
   ]
  },
  "Турагентство «Пальма»": {
   "ctx": [
-   "src/game/brands.js:78"
+   "src/game/brands.js:82"
   ]
  },
  "тут карта кончается · дальше ТТК и промзона": {
@@ -3046,226 +3315,231 @@
  },
  "ты": {
   "ctx": [
-   "src/game/game.js:6324",
-   "index.html:50"
+   "src/game/game.js:6466",
+   "index.html:67"
   ]
  },
  "ты — {n}-й, {money}": {
   "ctx": [
-   "src/game/game.js:8298"
+   "src/game/game.js:8488"
   ]
  },
  "ты обогнал {who}!": {
   "ctx": [
-   "src/game/game.js:6337"
+   "src/game/game.js:6479"
   ]
  },
  "ты проиграл": {
   "ctx": [
-   "src/game/game.js:8189"
+   "src/game/game.js:8379"
   ]
  },
  "ты сам закончил смену — результат сохранён": {
   "ctx": [
-   "src/game/game.js:8170"
+   "src/game/game.js:8360"
   ]
  },
  "ты чё?!": {
   "ctx": [
-   "src/game/game.js:5546",
-   "src/game/game.js:6350"
+   "src/game/game.js:5680",
+   "src/game/game.js:6492"
   ]
  },
  "у двери стоит стул, это его стул": {
   "ctx": [
-   "src/game/game.js:8380"
+   "src/game/game.js:8570"
   ]
  },
  "у него кот на клавиатуре, пицца не для кота": {
   "ctx": [
-   "src/game/game.js:8406"
+   "src/game/game.js:8596"
   ]
  },
  "у него три пальца": {
   "ctx": [
-   "src/game/game.js:8366"
+   "src/game/game.js:8556"
   ]
  },
  "уважаю!": {
   "ctx": [
-   "src/game/game.js:9896",
-   "src/game/game.js:9897"
+   "src/game/game.js:10098",
+   "src/game/game.js:10099"
   ]
  },
  "удвоить заработок": {
   "ctx": [
-   "index.html:240"
+   "index.html:257"
   ]
  },
  "уезжай или дави": {
   "ctx": [
-   "src/game/game.js:5620"
+   "src/game/game.js:5754"
   ]
  },
  "ужин": {
   "ctx": [
-   "src/game/game.js:9071"
+   "src/game/game.js:9261"
   ]
  },
  "УКРАЛ ПИЦЦУ!": {
   "ctx": [
-   "src/game/game.js:6475"
+   "src/game/game.js:6619"
   ]
  },
  "умный трекер": {
   "ctx": [
-   "index.html:62"
+   "index.html:79"
   ]
  },
  "уровень {n}!": {
   "ctx": [
-   "src/game/game.js:8606"
+   "src/game/game.js:8796"
   ]
  },
  "уровень курьера": {
   "ctx": [
-   "src/game/game.js:8289"
+   "src/game/game.js:8479"
   ]
  },
  "уровень курьера {n}": {
   "ctx": [
-   "src/game/game.js:8119"
+   "src/game/game.js:8309"
   ]
  },
  "утонул": {
   "ctx": [
-   "src/game/game.js:9212",
-   "src/game/game.js:9215"
+   "src/game/game.js:9402",
+   "src/game/game.js:9405"
   ]
  },
  "уточнит заказ голосовым на пять минут": {
   "ctx": [
-   "src/game/game.js:8404"
+   "src/game/game.js:8594"
   ]
  },
  "утро": {
   "ctx": [
-   "src/game/game.js:9755"
+   "src/game/game.js:9957"
   ]
  },
  "утро — светает": {
   "ctx": [
-   "src/game/game.js:9808"
+   "src/game/game.js:10010"
   ]
  },
  "участники OpenStreetMap": {
   "ctx": [
-   "index.html:224"
+   "index.html:241"
   ]
  },
  "учитель": {
   "ctx": [
-   "src/game/people.js:185"
+   "src/game/people.js:186"
   ]
  },
  "учительница": {
   "ctx": [
-   "src/game/people.js:185"
+   "src/game/people.js:186"
   ]
  },
  "фармацевт": {
   "ctx": [
-   "src/game/people.js:187"
+   "src/game/people.js:188"
   ]
  },
  "Фикс-Прикс": {
   "ctx": [
-   "src/game/brands.js:38"
+   "src/game/brands.js:42"
   ]
  },
  "флорист": {
   "ctx": [
-   "src/game/people.js:187"
+   "src/game/people.js:188"
   ]
  },
  "фотограф": {
   "ctx": [
-   "src/game/people.js:186"
+   "src/game/people.js:187"
+  ]
+ },
+ "ха-ха!": {
+  "ctx": [
+   "src/game/seasons.js:888"
   ]
  },
  "ХАХАХАХ": {
   "ctx": [
-   "src/game/game.js:6475"
+   "src/game/game.js:6619"
   ]
  },
  "Хвост и Лапа": {
   "ctx": [
-   "src/game/brands.js:77"
+   "src/game/brands.js:81"
   ]
  },
  "Хозтовары": {
   "ctx": [
-   "src/game/brands.js:91"
+   "src/game/brands.js:95"
   ]
  },
  "хозяин пиццы": {
   "ctx": [
-   "src/game/game.js:6563"
+   "src/game/game.js:6707"
   ]
  },
  "храм": {
   "ctx": [
-   "src/game/brands.js:126"
+   "src/game/brands.js:130"
   ]
  },
  "художник": {
   "ctx": [
-   "src/game/people.js:192"
+   "src/game/people.js:193"
   ]
  },
  "художница": {
   "ctx": [
-   "src/game/people.js:192"
+   "src/game/people.js:193"
   ]
  },
  "хэтчбек малинового цвета": {
   "ctx": [
-   "src/game/game.js:7040"
+   "src/game/game.js:7184"
   ]
  },
  "хэтчбек, чёрный": {
   "ctx": [
-   "src/game/game.js:7041"
+   "src/game/game.js:7185"
   ]
  },
  "Цветочкин": {
   "ctx": [
-   "src/game/brands.js:62"
+   "src/game/brands.js:66"
   ]
  },
  "Цветы": {
   "ctx": [
-   "src/game/brands.js:91"
+   "src/game/brands.js:95"
   ]
  },
  "чаевые ×2 до конца смены": {
   "ctx": [
-   "src/game/game.js:9063"
+   "src/game/game.js:9253"
   ]
  },
  "чаевые накинули +{money}": {
   "ctx": [
-   "src/game/game.js:8981"
+   "src/game/game.js:9171"
   ]
  },
  "Чашка": {
   "ctx": [
-   "src/game/brands.js:85"
+   "src/game/brands.js:89"
   ]
  },
  "Чебуречная": {
   "ctx": [
-   "src/game/brands.js:86"
+   "src/game/brands.js:90"
   ]
  },
  "Четвёрочка": {
@@ -3275,119 +3549,139 @@
  },
  "четыре сыра": {
   "ctx": [
-   "src/game/game.js:8308"
+   "src/game/game.js:8498"
   ]
  },
  "шайба снюса": {
   "ctx": [
-   "src/game/game.js:6801"
+   "src/game/game.js:6945"
   ]
  },
  "Шалаш": {
   "ctx": [
-   "src/game/brands.js:67"
+   "src/game/brands.js:71"
   ]
  },
  "шаурма": {
   "ctx": [
-   "src/game/game.js:9096"
+   "src/game/game.js:9286"
   ]
  },
  "шаурма у метро": {
   "ctx": [
-   "src/game/game.js:9062"
+   "src/game/game.js:9252"
   ]
  },
  "Шаурма-Мастер": {
   "ctx": [
-   "src/game/brands.js:86"
+   "src/game/brands.js:90"
   ]
  },
  "шаурму взял": {
   "ctx": [
-   "src/game/game.js:9096"
+   "src/game/game.js:9286"
   ]
  },
  "школа": {
   "ctx": [
-   "src/game/brands.js:127"
+   "src/game/brands.js:131"
   ]
  },
  "школьник": {
   "ctx": [
-   "src/game/people.js:191"
+   "src/game/people.js:192"
   ]
  },
  "школьница": {
   "ctx": [
-   "src/game/people.js:191"
+   "src/game/people.js:192"
+  ]
+ },
+ "шофёр": {
+  "ctx": [
+   "src/game/life.js:468"
+  ]
+ },
+ "Шофёр, машину!": {
+  "ctx": [
+   "src/game/life.js:340"
   ]
  },
  "Шустро!": {
   "ctx": [
-   "src/game/game.js:8981"
+   "src/game/game.js:9171"
+  ]
+ },
+ "Шухер!": {
+  "ctx": [
+   "src/game/life.js:781"
   ]
  },
  "щит {n}": {
   "ctx": [
-   "src/game/game.js:8071"
+   "src/game/game.js:8261"
   ]
  },
  "щит: десять секунд машину не бьёт": {
   "ctx": [
-   "src/game/game.js:6741"
+   "src/game/game.js:6885"
   ]
  },
  "ЫЫЫК": {
   "ctx": [
-   "src/game/game.js:9896"
+   "src/game/game.js:10098"
+  ]
+ },
+ "Эй! Это машина шефа!": {
+  "ctx": [
+   "src/game/life.js:450"
   ]
  },
  "экономист": {
   "ctx": [
-   "src/game/people.js:192"
+   "src/game/people.js:193"
   ]
  },
  "электрик": {
   "ctx": [
-   "src/game/people.js:187"
+   "src/game/people.js:188"
   ]
  },
  "Электроша": {
   "ctx": [
-   "src/game/brands.js:27"
+   "src/game/brands.js:31"
   ]
  },
  "Эльдоразно": {
   "ctx": [
-   "src/game/brands.js:52"
+   "src/game/brands.js:56"
   ]
  },
  "это {n}-е место в таблице": {
   "ctx": [
-   "src/game/game.js:8295"
+   "src/game/game.js:8485"
   ]
  },
  "эх…": {
   "ctx": [
-   "src/game/game.js:6526"
+   "src/game/game.js:6670"
   ]
  },
  "юрист": {
   "ctx": [
-   "src/game/people.js:186"
+   "src/game/people.js:187"
   ]
  },
  "я тебя запомнил": {
   "ctx": [
-   "src/game/game.js:5546",
-   "src/game/game.js:6350"
+   "src/game/game.js:5680",
+   "src/game/game.js:6492"
   ]
  },
  "язык": {
   "ctx": [
-   "src/game/game.js:7149",
-   "src/game/game.js:7162"
+   "src/game/game.js:7293",
+   "src/game/game.js:7306"
   ]
  }
 }

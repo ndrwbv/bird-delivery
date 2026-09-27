@@ -19,6 +19,14 @@ const mapId = MAP_IDS.includes(want) ? want : 'moscow';
 useMap(await loadMap(mapId));
 document.documentElement.dataset.city = mapId;
 
+// город строится синхронно при импорте: сначала даём браузеру нарисовать экран загрузки
+await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
 await import('./game/game.js');
 document.title = (await import('./game/brands.js')).OWN.pizza();
 Platform.ready();
+// первый кадр игры готов — загрузка плавно уходит, интерфейс плавно проявляется
+requestAnimationFrame(() => requestAnimationFrame(() => {
+  document.body.classList.remove('booting');
+  const boot = document.getElementById('boot');
+  if (boot) { boot.classList.add('gone'); setTimeout(() => boot.remove(), 600); }
+}));

@@ -400,7 +400,7 @@ html[data-map="moscow"] #radar { cursor: zoom-in; pointer-events: auto; }
 }
 .fm-leg { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 7px; color: #fff3d6; }
 .fm-leg i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; vertical-align: -1px; border: 1px solid #33210c; }
-.lg-me { background: #fff; } .lg-dodo { background: #f0522a; } .lg-to { background: #ff2d6e; border-radius: 50%; }
+.lg-me { background: #ffd85e; box-shadow: 0 0 0 2px #33210c; } .lg-dodo { background: #f0522a; } .lg-to { background: #ff2d6e; border-radius: 50%; }
 .lg-sig { background: #3fd15e; border-radius: 50%; } .lg-nos { background: #6fd3ff; } .lg-car { background: #5b6b80; }
 #fxs { margin-top: 6px; font-size: 7px; color: #ffb066; text-align: right; min-height: 8px; }
 /* узкий экран: адрес заказа длинный — хад справа не должен на него налезать */
@@ -844,7 +844,7 @@ body:has(#over:not([hidden])) .hud, body:has(#over:not([hidden])) #ctrls { visib
             padding: 0 max(14px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
             pointer-events: none; touch-action: none; }
 #touchpad[hidden] { display: none; }
-#touchpad button { pointer-events: auto; touch-action: none; font: inherit; color: #fff3d6; cursor: pointer;
+#touchpad button { pointer-events: auto; touch-action: none; font-family: inherit; line-height: 1; white-space: nowrap; padding: 0; color: #fff3d6; cursor: pointer;
                    background: rgba(20, 16, 30, .55); border: 3px solid rgba(255, 243, 214, .55); border-radius: 50%;
                    box-shadow: 0 4px 0 rgba(0, 0, 0, .35); -webkit-user-select: none; user-select: none; }
 #touchpad button.on { background: rgba(255, 216, 94, .55); border-color: #ffd85e; transform: translateY(2px); box-shadow: 0 2px 0 rgba(0, 0, 0, .35); }
@@ -854,19 +854,32 @@ body:has(#over:not([hidden])) .hud, body:has(#over:not([hidden])) #ctrls { visib
 .tp-right button { width: 74px; height: 74px; font-size: 9px; }
 .tp-right .tp-gas { width: 96px; height: 96px; font-size: 11px; background: rgba(89, 176, 106, .6); border-color: #b8f0c4; }
 .tp-right .tp-brake { background: rgba(224, 72, 54, .55); border-color: #ffb3a8; }
-.tp-right .tp-nos { color: #6fd3ff; border-color: #6fd3ff; justify-self: center; }
+.tp-right .tp-nos { justify-self: center; position: relative; z-index: 0; color: #fff; border: 0;
+                    /* синяя кнопка, по краю — кольцо: сколько нитро осталось (--nos ставит игра) */
+                    background: conic-gradient(#8fe3ff calc(var(--nos, .5) * 360deg), rgba(20, 16, 30, .6) 0); }
+.tp-right .tp-nos::before { content: ''; position: absolute; inset: 5px; z-index: -1; border-radius: 50%; background: #2b6fe0; }
+.tp-right .tp-nos.burn { background: conic-gradient(#e6f7ff calc(var(--nos, .5) * 360deg), rgba(20, 16, 30, .6) 0); box-shadow: 0 0 14px #6fd3ff, 0 4px 0 rgba(0, 0, 0, .35); }
+.tp-right .tp-nos.burn::before { background: #4a8cff; }
+#touchpad .tp-nos.on { background: conic-gradient(#e6f7ff calc(var(--nos, .5) * 360deg), rgba(20, 16, 30, .6) 0); }
 .tp-right .tp-hand { width: 60px; height: 60px; font-size: 7px; justify-self: center; }
 @media (max-height: 460px) {                                    /* телефон боком */
   .tp-left button { width: 72px; height: 72px; }
   .tp-right button { width: 62px; height: 62px; }
   .tp-right .tp-gas { width: 80px; height: 80px; }
 }
-body.touch #radar { left: auto; right: 12px; bottom: auto; top: 96px; width: 92px; }
-body.touch #ctrls { bottom: auto; top: 50%; right: 8px; transform: translateY(-50%); flex-direction: column; }
+/* радар — в правом верхнем углу, без кольца нитро (оно на кнопке);
+   деньги и «закончить смену» — столбиком под ним, пауза — ниже */
+body.touch #radar { left: auto; right: max(10px, env(safe-area-inset-right)); bottom: auto; top: max(10px, env(safe-area-inset-top)); width: 96px; }
+html[data-map="moscow"] body.touch #radar, body.touch #radar { padding: 0; border: 3px solid #33210c; background: #1d2440; box-shadow: 0 4px 12px rgba(0, 0, 0, .35); }
+body.touch #hud-right { top: calc(max(10px, env(safe-area-inset-top)) + 106px); right: max(10px, env(safe-area-inset-right)); }
+body.touch #ctrls { bottom: auto; top: calc(max(10px, env(safe-area-inset-top)) + 186px); right: max(10px, env(safe-area-inset-right)); transform: none; flex-direction: column; }
+@media (max-height: 460px) {                                    /* боком: столбик — слева от радара */
+  body.touch #hud-right { top: max(10px, env(safe-area-inset-top)); right: calc(max(10px, env(safe-area-inset-right)) + 108px); }
+  body.touch #ctrls { top: calc(max(10px, env(safe-area-inset-top)) + 70px); right: calc(max(10px, env(safe-area-inset-right)) + 108px); }
+}
 body.touch #nos, body.touch #joy { display: none !important; }
 body.touch #hud-right #endshift { margin-top: 110px; }
 body.touch #hud-right #endshift { margin-top: 8px; }
-body.touch #radar { top: 132px; }
 @media (max-width: 440px) {                                     /* узкий телефон стоя */
   #touchpad { padding-left: 10px; padding-right: 10px; }
   .tp-left { gap: 8px; }
@@ -876,3 +889,19 @@ body.touch #radar { top: 132px; }
   .tp-right .tp-gas { width: 74px; height: 74px; font-size: 9px; }
   .tp-right .tp-hand { width: 48px; height: 48px; font-size: 6px; }
 }
+
+/* телефон: подсказки — над кнопками руля и педалей, а не на них */
+body.touch #toast { bottom: calc(max(16px, env(safe-area-inset-bottom)) + 196px); white-space: normal; width: min(92vw, 360px); text-align: center; line-height: 1.6; }
+@media (max-height: 460px) { body.touch #toast { bottom: auto; top: 44px; } }
+
+/* телефон: подробная карта — на весь экран, крупно, двигается пальцем;
+   при открытии встаёт так, что ты посередине */
+.fm-view { min-height: 0; }
+body.touch #fullmap { align-items: stretch; justify-content: stretch; }
+body.touch .fm-box { max-width: none; max-height: none; width: 100%; height: 100%; box-sizing: border-box;
+                     padding: max(10px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+body.touch .fm-view { flex: 1; overflow: auto; touch-action: pan-x pan-y; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+                      border: 3px solid #33210c; border-radius: 6px; background: #a6d189; }
+body.touch #fullmapc { max-width: none; max-height: none; height: 165%; width: auto; border: 0; border-radius: 0; image-rendering: auto; }
+@media (orientation: landscape) { body.touch #fullmapc { height: 220%; } }
+body.touch .fm-leg { font-size: 8px; }

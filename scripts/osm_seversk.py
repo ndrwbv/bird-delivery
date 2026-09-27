@@ -125,6 +125,7 @@ MALL_STYLE = [
     ("дружба", {"facade": "#e9e1cf", "glass": False, "stripe": "#c8423b"}),
     ("гранд", {"facade": "#dcd8d0", "glass": True, "stripe": "#7a3fa0"}),
     ("стройся", {"facade": "#e3e0d8", "glass": True, "stripe": "#f28c00"}),     # Коммунистический 46
+    ("лето", {"facade": "#f3ead6", "glass": True, "stripe": "#f5a300"}),        # Солнечная 2 ст4, ТРК «Лето»
 ]
 
 QUERIES = {
@@ -158,6 +159,8 @@ SMALL = {
               'way["railway"="platform"]({bbox});way["public_transport"="platform"]["railway"]({bbox}););'),
     "water": ('(way["natural"="water"]({bbox});way["waterway"="riverbank"]({bbox});way["landuse"="reservoir"]({bbox});'
               'way["waterway"~"^(river|stream|canal)$"]({bbox}););'),
+    # отдельные тротуары: где они отнесены от полотна — между ними газон с деревьями
+    "sidewalks": 'way["highway"~"^(footway|path)$"]["footway"="sidewalk"]({bbox});',
     "kpp": None,               # свой вывод: out center
 }
 KPP_Q = ('[out:json][timeout:200];(node["barrier"="checkpoint"]({bbox});way["barrier"="checkpoint"]({bbox});'
@@ -1495,6 +1498,80 @@ def build():
         if w < r["w"]:
             r["w"] = round(max(w, 3.4), 1)
             narrowed += 1
+
+    # ── бульвары: газон с деревьями между полотном и тротуаром ──
+    # Где в карте есть отдельный тротуар — берём, насколько он отнесён от
+    # полотна. Где нет (таких в Северске почти все улицы) — на больших
+    # улицах, если до домов и чужих дорог с обеих сторон хватает места,
+    # тротуар отводим за полосу деревьев: так в Северске и строили.
+    sw_idx = SegIndex()
+    for el in load("sidewalks"):
+        g = geom(el)
+        if g and len(g) >= 2:
+            for a, b in zip(g, g[1:]):
+                sw_idx.add(a, b, 1)
+    rd_idx = SegIndex()
+    for ri, r in enumerate(roads):
+        for a, b in zip(r["p"], r["p"][1:]):
+            rd_idx.add(a, b, ri)
+    boul_osm = boul_free = 0
+    for ri, r in enumerate(roads):
+        if r.get("b") or r["c"] > 5 or r.get("s"):
+            continue
+        w = r["w"]
+        L_all = sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(r["p"], r["p"][1:]))
+        if L_all < 40:
+            continue
+        ds, free, n = [], 0, 0
+        for (x1, z1), (x2, z2) in zip(r["p"], r["p"][1:]):
+            L = math.hypot(x2 - x1, z2 - z1)
+            if L < 1:
+                continue
+            ux, uz = (x2 - x1) / L, (z2 - z1) / L
+            sx, sz = -uz, ux
+            k = 6.0
+            while k < L - 6:
+                cx, cz = x1 + ux * k, z1 + uz * k
+                n += 1
+                for sd in (1, -1):
+                    for a, b, _ in sw_idx.near(cx, cz, w / 2 + 16):
+                        bl = math.hypot(b[0] - a[0], b[1] - a[1]) or 1
+                        if abs(((b[0] - a[0]) * ux + (b[1] - a[1]) * uz) / bl) < 0.94:
+                            continue
+                        d, _t = seg_dist(cx, cz, a[0], a[1], b[0], b[1])
+                        side = (a[0] + (b[0] - a[0]) * _t - cx) * sx + (a[1] + (b[1] - a[1]) * _t - cz) * sz
+                        if d < w / 2 + 16 and side * sd > 0:
+                            ds.append(d)
+                ok = True
+                for sd in (1, -1):
+                    for o in (w / 2 + 3, w / 2 + 6, w / 2 + 9, w / 2 + 11):
+                        px, pz = cx + sx * o * sd, cz + sz * o * sd
+                        if house_at(px, pz, 1.0) >= 0:
+                            ok = False
+                            break
+                        other = rd_idx.nearest(px, pz, 12, lambda it: it != ri)
+                        if other and other[0] < roads[other[4]]["w"] / 2 + 1.5:
+                            ok = False
+                            break
+                    if not ok:
+                        break
+                free += ok
+                k += 10.0
+        if not n:
+            continue
+        gs = 0.0
+        if len(ds) >= max(2, n // 3):
+            ds.sort()
+            gap = ds[len(ds) // 2] - w / 2 - 1.5
+            if gap >= 2.5:
+                gs = min(gap, 9.0)
+                boul_osm += 1
+        if not gs and r["c"] <= 3 and free >= 0.8 * n and rnd(str(r["p"][0]), "boul") < 0.8:
+            gs = 3.5
+            boul_free += 1
+        if gs:
+            r["g"] = round(gs, 1)
+    print(f"бульвары: по тротуарам карты {boul_osm}, по свободному месту {boul_free}")
 
     def through_house(r):
         for (x1, z1), (x2, z2) in zip(r["p"], r["p"][1:]):

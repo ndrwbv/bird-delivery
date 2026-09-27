@@ -12,6 +12,7 @@
    createHumanFactory()  — makeHuman(person, o) для игры: три.js-группа
    faceDataURL(person)   — портрет в PNG для HTML-карточек
    setPeopleLocale(lang) — какие имена раздавать (по умолчанию язык игры)
+   setPeopleSeason(w)    — как одеваться: 0 лето … 1 зима (seasons.js)
    ────────────────────────────────────────────────────────────────────────── */
 
 import { t, lang } from '../i18n/index.js';
@@ -284,6 +285,32 @@ function makeLook (seed, o = {}) {
   };
 }
 
+/* ─────────────── одежда по сезону ───────────────
+   setPeopleSeason(w): насколько на улице холодно, 0 — лето, 1 — зима
+   (считает seasons.js). Каждый новый человек одевается по погоде: у
+   каждого своя зябкость от зерна, поэтому в межсезонье на одной улице
+   кто-то ещё в футболке, а кто-то уже в куртке. */
+let WARM = 0;
+export function setPeopleSeason (w) { WARM = Math.max(0, Math.min(1, +w || 0)); }
+const COATS = ['#2b2a30', '#3b4a5a', '#1f2328', '#5a3a2e', '#6b2e2e', '#2e4a6b', '#3f5a3a', '#8a2a3a', '#d9d2c2', '#4a4550', '#c9476b', '#e0b13f', '#3fa8a0'];
+const SCARVES = ['#d95d5d', '#e0b13f', '#f4f1ea', '#4f7fd6', '#59b06a', '#c9476b', '#8e6fd0', '#2b2a30'];
+const FURS = ['#5a4a3a', '#3a3036', '#6b5a48', '#8a7a68', '#2b2a30'];
+/* уровень: 0 — лето, 1 — прохладно (длинный рукав, без шорт), 2 — куртка, 3 — зима (пуховик, шапка, шарф) */
+function wearOf (Lk, o) {
+  const r = rng(Lk.seed ^ 0x5EA5011);
+  const cold = WARM + (r() - 0.5) * 0.36 + (Lk.age === 'old' ? 0.08 : 0);
+  const lvl = WARM < 0.04 ? 0 : cold < 0.22 ? 0 : cold < 0.48 ? 1 : cold < 0.76 ? 2 : 3;
+  const coat = o.shirt || P(r, COATS), scarf = r() < 0.7 ? P(r, SCARVES) : null, fur = P(r, FURS);
+  const hx = r();
+  let head = null;
+  if (!o.cap) {
+    if (lvl === 3) head = hx < (Lk.age === 'young' ? 0.12 : 0.34) ? 'ushanka' : hx < 0.8 ? 'beanie' : hx < 0.9 ? 'hood' : Lk.head === 'hat' ? 'hat' : 'beanie';
+    else if (lvl === 2 && Lk.head === 'none' && hx < 0.28) head = 'beanie';
+    else if (lvl === 0 && Lk.head === 'beanie') head = 'cap';               // летом без шапки
+  }
+  return { lvl, coat, scarf, fur, head, mitt: P(r, ['#2b2a30', '#6b2e2e', '#3b4a5a', '#e0b13f', '#f4f1ea']) };
+}
+
 /* ─────────────── цвета ─────────────── */
 const hexRgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 function mix (a, b, k) {
@@ -310,10 +337,14 @@ function buildSpec (Lk, o = {}) {
   const skin = o.skin || Lk.skin;
   const shirt = o.shirt || Lk.shirt, pants = o.pants || Lk.pants;
   const uniform = !!o.shirt;
-  const top = uniform ? (Lk.top === 'long' ? 'long' : 'tee') : Lk.top;
-  const bottom = o.pants ? 'pants' : Lk.bottom;
-  const topC = top === 'jacket' ? Lk.jacket : top === 'dress' ? Lk.skirt : shirt;
-  const legC = bottom === 'skirt' ? Lk.legs : pants;
+  const Wr = wearOf(Lk, o);
+  let top = uniform ? (Lk.top === 'long' ? 'long' : 'tee') : Lk.top;
+  let bottom = o.pants ? 'pants' : Lk.bottom;
+  if (Wr.lvl >= 1) { if (bottom === 'shorts') bottom = 'pants'; if (top === 'tee' || (uniform && Wr.lvl >= 1)) top = 'long'; }
+  if (Wr.lvl === 2 && !uniform) top = 'jacket';
+  const coat = Wr.lvl === 3;                     // пуховик до бёдер, шарф, варежки
+  const topC = coat ? Wr.coat : top === 'jacket' ? Lk.jacket : top === 'dress' ? Lk.skirt : shirt;
+  const legC = bottom === 'skirt' ? (Wr.lvl >= 1 && Lk.legs === skin ? '#3a3036' : Lk.legs) : pants;
   const Wp = HEAD_W[fat && Lk.shape === 'thin' ? 'normal' : Lk.shape], Wd = Wp * U, D = HEAD_D[Lk.shape], F = D / 2;
   const parts = [[], [], [], [], [], [], []];
   const bx = (p, w, h, d, x, y, z, c) => parts[p].push([w, h, d, x, y, z, c]);
@@ -323,33 +354,48 @@ function buildSpec (Lk, o = {}) {
   for (const p of [0, 1]) {
     if (bottom === 'shorts') { bx(p, lw + 0.02, 0.3, lw + 0.02, 0, -0.15, 0, pants); bx(p, lw - 0.03, 0.4, lw - 0.03, 0, -0.5, 0, skin); }
     else bx(p, lw, 0.7, lw, 0, -0.35, 0, legC);
-    bx(p, lw + 0.03, 0.1, lw + 0.1, 0, -0.65, 0.035, Lk.shoes);
+    if (coat) bx(p, lw + 0.05, 0.24, lw + 0.1, 0, -0.6, 0.025, Lk.shoes === '#f4f1ea' ? '#5a3a22' : Lk.shoes);   // зимние ботинки
+    else bx(p, lw + 0.03, 0.1, lw + 0.1, 0, -0.65, 0.035, Lk.shoes);
   }
   // туловище
-  bx(2, tw, 0.6, td, 0, 1.0, 0, topC);
-  if (fat) bx(2, tw * 0.86, 0.3, td + 0.12, 0, 0.9, 0.03, topC);                 // живот
-  if (bottom !== 'skirt') bx(2, tw + 0.01, 0.08, td + 0.01, 0, 0.74, 0, pants);  // пояс брюк
-  if (top === 'jacket') {                                                        // распахнутая куртка, под ней футболка
+  if (coat) {
+    // пуховик: шире и ниже пояса, стёжка полосами, шарф
+    const cw = tw + 0.1, cd = td + 0.1, dk = mix(Wr.coat, '#000000', 0.22);
+    bx(2, cw, 0.82, cd, 0, 0.92, 0, Wr.coat);
+    if (fat) bx(2, cw * 0.88, 0.34, cd + 0.1, 0, 0.86, 0.03, Wr.coat);
+    for (const y of [1.08, 0.84, 0.62]) bx(2, cw + 0.02, 0.035, cd + (fat && y < 1 ? 0.12 : 0.02), 0, y, fat && y < 1 ? 0.03 : 0, dk);
+    bx(2, 0.03, 0.76, 0.02, 0, 0.93, cd / 2 + (fat ? 0.06 : 0.01), dk);          // молния
+    if (Wr.scarf) { bx(2, tw * 0.66, 0.12, cd + 0.06, 0, 1.33, 0, Wr.scarf); bx(2, 0.1, 0.32, 0.04, tw * 0.16, 1.14, cd / 2 + (fat ? 0.1 : 0.03), Wr.scarf); }
+    else bx(2, tw * 0.62, 0.1, cd * 0.9, 0, 1.33, 0, Wr.coat);                  // воротник
+  } else {
+    bx(2, tw, 0.6, td, 0, 1.0, 0, topC);
+    if (fat) bx(2, tw * 0.86, 0.3, td + 0.12, 0, 0.9, 0.03, topC);                 // живот
+    if (bottom !== 'skirt') bx(2, tw + 0.01, 0.08, td + 0.01, 0, 0.74, 0, pants);  // пояс брюк
+    if (Wr.lvl === 2 && Wr.scarf && !uniform && Lk.seed % 3 === 0) bx(2, tw * 0.62, 0.1, td + 0.05, 0, 1.3, 0, Wr.scarf);
+  }
+  if (top === 'jacket' && !coat) {                                              // распахнутая куртка, под ней футболка
     if (fat) { bx(2, tw * 0.3, 0.3, 0.02, 0, 1.15, td / 2 + 0.01, shirt); bx(2, tw * 0.26, 0.28, 0.02, 0, 0.9, td / 2 + 0.1, shirt); }
     else bx(2, tw * 0.3, 0.56, 0.02, 0, 1.01, td / 2 + 0.01, shirt);
   }
-  if (top === 'stripe') for (const y of [1.12, 0.96, 0.82]) bx(2, tw + 0.01, 0.06, td + (fat && y < 1.05 ? 0.13 : 0.01), 0, y, fat && y < 1.05 ? 0.03 : 0, Lk.stripe);
+  if (top === 'stripe' && !coat) for (const y of [1.12, 0.96, 0.82]) bx(2, tw + 0.01, 0.06, td + (fat && y < 1.05 ? 0.13 : 0.01), 0, y, fat && y < 1.05 ? 0.03 : 0, Lk.stripe);
   if (bottom === 'skirt') { bx(2, tw * 0.95, 0.2, td * 1.1, 0, 0.7, 0, Lk.skirt); bx(2, tw * 1.15, 0.22, td * 1.35, 0, 0.5, 0, Lk.skirt); }
   if (Lk.pack && !uniform) {
-    bx(2, tw * 0.7, 0.4, 0.14, 0, 1.03, -td / 2 - 0.07, Lk.pack);
-    if (!fat) for (const s of [-1, 1]) bx(2, 0.05, 0.5, 0.02, s * tw * 0.26, 1.05, td / 2 + 0.005, mix(Lk.pack, '#000000', 0.3));
+    const pz = td / 2 + (coat ? 0.05 : 0);
+    bx(2, tw * 0.7, 0.4, 0.14, 0, 1.03, -pz - 0.07, Lk.pack);
+    if (!fat) for (const s of [-1, 1]) bx(2, 0.05, 0.5, 0.02, s * tw * 0.26, 1.05, pz + 0.005, mix(Lk.pack, '#000000', 0.3));
   }
   // руки: короткий рукав и голое предплечье или длинный рукав и кисть
-  const sleeve = top === 'jacket' ? Lk.jacket : topC;
+  const sleeve = coat ? Wr.coat : top === 'jacket' ? Lk.jacket : topC;
   for (const p of [3, 4]) {
-    if (top === 'tee' || top === 'dress') { bx(p, 0.14, 0.2, 0.14, 0, -0.1, 0, sleeve); bx(p, 0.11, 0.35, 0.11, 0, -0.375, 0, skin); }
+    if (coat) { bx(p, 0.16, 0.48, 0.16, 0, -0.235, 0, sleeve); bx(p, 0.12, 0.1, 0.13, 0, -0.52, 0, Wr.mitt); }   // варежки
+    else if (top === 'tee' || top === 'dress') { bx(p, 0.14, 0.2, 0.14, 0, -0.1, 0, sleeve); bx(p, 0.11, 0.35, 0.11, 0, -0.375, 0, skin); }
     else { bx(p, 0.13, 0.47, 0.13, 0, -0.235, 0, sleeve); bx(p, 0.11, 0.08, 0.11, 0, -0.51, 0, skin); }
   }
   // голова: волосы, убор, борода, нос, уши
-  const hw = o.cap ? 'cap' : Lk.head, hc = o.cap || Lk.headC;
+  const hw = o.cap ? 'cap' : Wr.head || Lk.head, hc = o.cap || Lk.headC;
   const H = [];
   hairBoxes(Lk, Wd, D, r, H);
-  const covers = hw === 'cap' || hw === 'beanie' || hw === 'bandana' || hw === 'hood';
+  const covers = hw === 'cap' || hw === 'beanie' || hw === 'bandana' || hw === 'hood' || hw === 'ushanka';
   for (const b of H) {
     const k = b[0];
     if ((covers || hw === 'hat') && k === 'top') continue;
@@ -364,10 +410,15 @@ function buildSpec (Lk, o = {}) {
     if (Lk.pompom) bx(5, 0.1, 0.1, 0.1, 0, T + 0.2, 0, Lk.tieC);
   }
   if (hw === 'hat') { bx(5, Wd + 0.3, 0.03, D + 0.3, 0, T, 0, hc); bx(5, Wd - 0.04, 0.2, D - 0.04, 0, T + 0.11, 0, hc); bx(5, Wd - 0.02, 0.05, D - 0.02, 0, T + 0.04, 0, mix(hc, '#000000', 0.45)); }
+  if (hw === 'ushanka') {                        // ушанка: мех, отворот спереди, уши вниз
+    const fd = mix(Wr.fur, '#000000', 0.25);
+    bx(5, Wd + 0.1, 0.2, D + 0.1, 0, T + 0.07, 0, Wr.fur); bx(5, Wd + 0.14, 0.11, 0.06, 0, T + 0.02, F + 0.06, fd);
+    for (const s of [-1, 1]) bx(5, 0.07, 0.3, D * 0.62, s * (Wd / 2 + 0.05), T - 0.16, -0.01, Wr.fur);
+  }
   if (hw === 'headband') bx(5, Wd + 0.03, 0.05, D + 0.03, 0, T - 0.07, 0, hc);
   if (hw === 'bandana') { bx(5, Wd + 0.04, 0.12, D + 0.04, 0, T + 0.02, 0, hc); bx(5, 0.08, 0.14, 0.06, 0, T - 0.08, -F - 0.04, hc); }
   if (hw === 'hood') {
-    const c = top === 'jacket' ? Lk.jacket : topC;
+    const c = coat ? Wr.coat : top === 'jacket' ? Lk.jacket : topC;
     bx(5, Wd + 0.12, 0.08, D + 0.14, 0, T + 0.06, -0.02, c); bx(5, Wd + 0.12, 0.66, 0.08, 0, T - 0.28, -F - 0.06, c);
     for (const s of [-1, 1]) bx(5, 0.06, 0.6, D + 0.1, s * (Wd / 2 + 0.05), T - 0.28, -0.01, c);
   }
@@ -383,7 +434,7 @@ function buildSpec (Lk, o = {}) {
   // материалом цвета кожи: игра перекрашивает голову целиком
   bx(6, Wd, 0.56, D, 0, 0, 0, skin);
   bx(6, NS[0], NS[1], NS[2], 0, -NS[1] / 2, F + NS[2] / 2, mix(skin, '#7a3a2a', 0.12));
-  const hid = hw === 'hood' || ['long', 'bangs', 'bob', 'afro'].includes(Lk.hair);          // уши под волосами
+  const hid = hw === 'hood' || hw === 'ushanka' || ['long', 'bangs', 'bob', 'afro'].includes(Lk.hair);          // уши под волосами
   if (!hid) {
     const E = { normal: [0.05, 0.12, 0.08], big: [0.07, 0.16, 0.09], small: [0.04, 0.09, 0.06] }[Lk.ears];
     for (const s of [-1, 1]) bx(6, E[0], E[1], E[2], s * (Wd / 2 + E[0] / 2), 0, -0.01, skin);
@@ -391,7 +442,7 @@ function buildSpec (Lk, o = {}) {
   if (Lk.shape === 'chubby') bx(6, Wd - 0.12, 0.06, D - 0.08, 0, -T - 0.02, 0.01, skin);   // второй подбородок
   const piv = [[-lx, 0.7, 0], [lx, 0.7, 0], [0, 0, 0], [-ax, 1.3, 0], [ax, 1.3, 0], [0, HY, 0], [0, HY, 0]];
   const pace = fat ? Lk.pace0 : hs < 0.92 ? 0.82 : 1;
-  return { parts, piv, Wp, W: Wd, D, skin, shirt, pants, hs, fat, pace, fem: Lk.f, face: faceKey(Lk, skin, Wp) };
+  return { parts, piv, Wp, W: Wd, D, skin, shirt: coat ? Wr.coat : shirt, pants, hs, fat, pace, fem: Lk.f, face: faceKey(Lk, skin, Wp) };
 }
 
 /* Причёски — коробки в осях головы: [вид, w, h, d, x, y, z, цвет].
