@@ -306,6 +306,8 @@ function asphalt (CITY) {
   return (ASPH = { M, X0, Z0, NX, NZ, at: (x, z) => { const ix = Math.round(x) - X0, iz = Math.round(z) - Z0; return ix >= 0 && iz >= 0 && ix < NX && iz < NZ && M[iz * NX + ix] === 1; } });
 }
 export const onAsphalt = (CITY, x, z) => asphalt(CITY).at(x, z);
+/* растр по метру нужен только на сборке — после неё отпускаем (в Северске это сто мегабайт) */
+export function freeAsphalt () { ASPH = null; }
 
 /* кусок тротуара вдоль ребра от d до dd, сторона sd: лёг бы на асфальт? */
 export function curbOnAsphalt (CITY, ax, az, e, d, dd, sd, w, SW) {

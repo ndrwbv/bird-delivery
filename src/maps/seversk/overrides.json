@@ -1,0 +1,3 @@
+{
+  "_doc": "Правки домов руками поверх угадайки scripts/osm_seversk.py. Ключ — OSM id дома (строкой), значение — поля дома в city-data.js: lv, k, st, col, roof, rc, h, n, a. null удаляет поле, {\"drop\": 1} выкидывает дом. Пример: \"123456789\": {\"lv\": 9, \"st\": \"panel\", \"col\": \"#d9d2c4\"}. Ключи с «_» — комментарии. После правки: python3 scripts/osm_seversk.py build"
+}

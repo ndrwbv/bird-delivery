@@ -230,7 +230,7 @@ export function churchTop (A, p, h, cx, cz, area, seed) {
   let far = null, fd = 0;
   for (const q of p) { const d = Math.hypot(q[0] - cx, q[1] - cz); if (d > fd) { fd = d; far = q; } }
   if (far && fd > R * 3) {
-    const bx = cx + (far[0] - cx) * 0.7, bz = cz + (far[1] - cz) * 0.7, s = R * 1.1;
+    const bx = cx + (far[0] - cx) * 0.72, bz = cz + (far[1] - cz) * 0.72, s = R * 0.72;
     A.box(A.LIT, s * 2, s * 3, s * 2, '#f3eee3', bx, h + s * 1.5, bz);
     A.put(A.LIT, new THREE.ConeGeometry(s * 1.2, s * 3.2, 8), '#5f7f5a', bx, h + s * 3 + s * 1.6, bz);
     A.box(A.LIT, 0.12, 1.6, 0.12, '#e2b53e', bx, h + s * 6.4, bz);

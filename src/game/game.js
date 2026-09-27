@@ -270,6 +270,11 @@ function mergeGeos (list) {
 
 const CITY = MAP.data;
 sanitizePois(CITY.pois);                       // чужие вывески → пародии и выдуманные (brands.js)
+/* ТЦ: подсказки стиля из генератора карты (malls[].style) — на сам дом */
+for (const m of CITY.malls || []) {
+  const b = CITY.buildings.find(q => q.id === m.id);
+  if (b && m.style) b.style = { stripe: m.style.stripe, sign: m.style.stripe, glass: m.style.glass };
+}
 /* Во вступлении камера не отходит от Омеги дальше пары сотен метров —
    город строим только вокруг неё: сборка в разы короче, кино стартует быстрее. */
 const CW = CITY.meta.size[0], CD = CITY.meta.size[1];
@@ -299,6 +304,12 @@ const inBorder = (x, z) => {
   if (!BMASK) return true;
   const i = Math.round((x - BMASK.x0) / BMASK.C), j = Math.round((z - BMASK.z0) / BMASK.C);
   return i >= 0 && j >= 0 && i < BMASK.nx && j < BMASK.nz && BMASK.a[j * BMASK.nx + i] === 1;
+};
+/* точка далеко за границей: ни одна из восьми точек в 240 м вокруг не внутри */
+const farOut = (x, z) => {
+  if (!BMASK || inBorder(x, z)) return false;
+  for (let a = 0; a < 8; a++) if (inBorder(x + Math.cos(a * 0.785) * 240, z + Math.sin(a * 0.785) * 240)) return false;
+  return true;
 };
 const inBorderM = (x, z, m) => inBorder(x, z) && (m <= 0 || (inBorder(x + m, z) && inBorder(x - m, z) && inBorder(x, z + m) && inBorder(x, z - m)));
 const LANE = 3.2;                              // смещение от осевой до центра полосы (запасное)
@@ -513,24 +524,27 @@ function nearestRoad (x, z, maxCls = DRIVE_MAX, rings = 2) {
    плоскость объект three.js слишком дорого, поэтому пишем вершины прямо
    в типизированные массивы и отдаём один меш на весь город. */
 
+/* Вершина — только позиция и цвет байтами: нормали не храним, склейки
+   рисуются плоским затенением (flatShading), и нормаль грани шейдер считает
+   сам. Так статика Северска (4 млн треугольников) весит втрое меньше. */
 function Mesher () {
   let cap = 1 << 14, n = 0;
-  let pos = new Float32Array(cap * 3), nor = new Float32Array(cap * 3), col = new Float32Array(cap * 3);
+  let pos = new Float32Array(cap * 3), col = new Uint8Array(cap * 3);
   const C = new THREE.Color();
+  let cr = 0, cg = 0, cb = 0;
 
   function room (add) {
     if (n + add <= cap) return;
     while (n + add > cap) cap *= 2;
-    const p2 = new Float32Array(cap * 3), n2 = new Float32Array(cap * 3), c2 = new Float32Array(cap * 3);
-    p2.set(pos); n2.set(nor); c2.set(col);
-    pos = p2; nor = n2; col = c2;
+    const p2 = new Float32Array(cap * 3), c2 = new Uint8Array(cap * 3);
+    p2.set(pos); c2.set(col);
+    pos = p2; col = c2;
   }
 
-  function vert (x, y, z, nx, ny, nz) {
+  function vert (x, y, z) {
     const i = n * 3;
     pos[i] = x; pos[i + 1] = y; pos[i + 2] = z;
-    nor[i] = nx; nor[i + 1] = ny; nor[i + 2] = nz;
-    col[i] = C.r; col[i + 1] = C.g; col[i + 2] = C.b;
+    col[i] = cr; col[i + 1] = cg; col[i + 2] = cb;
     n++;
   }
 
@@ -559,7 +573,7 @@ function Mesher () {
 
   const V2 = [];
   const api = {
-    color (hex) { C.set(hex); return api; },
+    color (hex) { C.set(hex); cr = Math.round(C.r * 255); cg = Math.round(C.g * 255); cb = Math.round(C.b * 255); return api; },
     tri (ax, ay, az, bx, by, bz, cx, cy, cz, nx, ny, nz) {
       room(3);
       vert(ax, ay, az, nx, ny, nz); vert(bx, by, bz, nx, ny, nz); vert(cx, cy, cz, nx, ny, nz);
@@ -679,19 +693,26 @@ function Mesher () {
       const grp = new THREE.Group();
       for (const tris of buckets.values()) {
         const m = tris.length * 3;
-        const P = new Float32Array(m * 3), N = new Float32Array(m * 3), Cc = new Float32Array(m * 3);
+        const P = new Float32Array(m * 3), Cc = new Uint8Array(m * 3);
         let o = 0;
         for (const t of tris) {
-          P.set(pos.subarray(t * 3, t * 3 + 9), o); N.set(nor.subarray(t * 3, t * 3 + 9), o); Cc.set(col.subarray(t * 3, t * 3 + 9), o);
+          P.set(pos.subarray(t * 3, t * 3 + 9), o); Cc.set(col.subarray(t * 3, t * 3 + 9), o);
           o += 9;
         }
         const g = new THREE.BufferGeometry();
-        g.setAttribute('position', new THREE.BufferAttribute(P, 3));
-        g.setAttribute('normal', new THREE.BufferAttribute(N, 3));
-        g.setAttribute('color', new THREE.BufferAttribute(Cc, 3));
+        const pa = new THREE.BufferAttribute(P, 3), ca = new THREE.BufferAttribute(Cc, 3, true);
+        g.setAttribute('position', pa);
+        g.setAttribute('color', ca);
         g.computeBoundingSphere();
+        // после загрузки в видеокарту копия в памяти JS не нужна
+        pa.onUpload(dropArr); ca.onUpload(dropArr);
         grp.add(new THREE.Mesh(g, mat));
       }
+      // исходные массивы больше не нужны: меши собраны по клеткам. В Северске
+      // они весили за гигабайт и держались в памяти всю игру
+      BUILT_TRIS += n / 3;
+      cap = 1 << 10; n = 0;
+      pos = new Float32Array(cap * 3); col = new Uint8Array(cap * 3);
       return grp;
     },
     verts () { return n; },
@@ -699,6 +720,8 @@ function Mesher () {
   return api;
 }
 
+let BUILT_TRIS = 0;         // сколько треугольников статики собрано (для отладки)
+function dropArr () { this.array = null; }
 const CHUNK = 100;          // клетка статики, метров: по ним отсекается то, что не в кадре
 const LITM = Mesher();      // всё материальное: земля, дороги, дома
 const FLATM = Mesher();     // разметка, окна, вывески — света не ловят
@@ -721,17 +744,30 @@ function osmGround () {
   // сама сетка рельефа: по два треугольника на клетку, диагональ та же,
   // что в groundH
   const hAt = (i, j) => TH[j * TNX + i];
-  for (let j = 0; j < TNZ - 1; j++) {
-    const z0 = TZ0 + j * TG, z1 = z0 + TG;
-    for (let i = 0; i < TNX - 1; i++) {
-      const x0 = TX0 + i * TG, x1 = x0 + TG;
-      const h00 = hAt(i, j), h10 = hAt(i + 1, j), h01 = hAt(i, j + 1), h11 = hAt(i + 1, j + 1);
-      LITM.color(groundHex((h00 + h10 + h01) / 3));
-      LITM.up(x0, h00, z0, x1, h10, z0, x0, h01, z1);
-      LITM.color(groundHex((h11 + h10 + h01) / 3));
-      LITM.up(x1, h11, z1, x0, h01, z1, x1, h10, z0);
+  const cell = (i, j) => {
+    const x0 = TX0 + i * TG, x1 = x0 + TG, z0 = TZ0 + j * TG, z1 = z0 + TG;
+    const h00 = hAt(i, j), h10 = hAt(i + 1, j), h01 = hAt(i, j + 1), h11 = hAt(i + 1, j + 1);
+    LITM.color(groundHex((h00 + h10 + h01) / 3));
+    LITM.up(x0, h00, z0, x1, h10, z0, x0, h01, z1);
+    LITM.color(groundHex((h11 + h10 + h01) / 3));
+    LITM.up(x1, h11, z1, x0, h01, z1, x1, h10, z0);
+  };
+  /* Далеко за забором (карта с границей) земля — крупными кусками по
+     четыре клетки: туда не проехать, а мелкая сетка на полгорода за
+     оградой весила миллион треугольников. */
+  const K = 4;
+  for (let bj = 0; bj < TNZ - 1; bj += K)
+    for (let bi = 0; bi < TNX - 1; bi += K) {
+      const ei = Math.min(bi + K, TNX - 1), ej = Math.min(bj + K, TNZ - 1);
+      const x0 = TX0 + bi * TG, z0 = TZ0 + bj * TG, x1 = TX0 + ei * TG, z1 = TZ0 + ej * TG;
+      if (BMASK && farOut(x0, z0) && farOut(x1, z0) && farOut(x0, z1) && farOut(x1, z1) && farOut((x0 + x1) / 2, (z0 + z1) / 2)) {
+        const h00 = hAt(bi, bj) - 0.3, h10 = hAt(ei, bj) - 0.3, h01 = hAt(bi, ej) - 0.3, h11 = hAt(ei, ej) - 0.3;
+        LITM.color(groundHex((h00 + h10 + h01) / 3)); LITM.up(x0, h00, z0, x1, h10, z0, x0, h01, z1);
+        LITM.color(groundHex((h11 + h10 + h01) / 3)); LITM.up(x1, h11, z1, x0, h01, z1, x1, h10, z0);
+        continue;
+      }
+      for (let j = bj; j < ej; j++) for (let i = bi; i < ei; i++) cell(i, j);
     }
-  }
   // Юбка до горизонта: край сетки тянем наружу на той же высоте,
   // иначе за городом земля обрывается ступенькой в пустоту.
   const far = 1400;
@@ -767,6 +803,7 @@ function osmGround () {
   LITM.up(wx0, 0, wz1, wx1, 0, wz0, wx0, 0, wz0);
 
   for (const g of CITY.green) {
+    if (BMASK && g.p.every(q => farOut(q[0], q[1]))) continue;      // за забором далеко — не рисуем
     LITM.color(GREEN_HEX[g.k] || '#95c579');
     LITM.poly(g.p, g.k === 'water' ? 0.03 : 0.04);
   }
@@ -787,7 +824,7 @@ const SIDEWALK = r => roadWidth(r) + (r.c <= 5 ? 5.5 : 2);
 function osmRoads () {
   // промзоны и площадки — чуть другим цветом земли, под всем остальным
   for (const lot of CITY.lots) {
-    if (lot.k === 'park') continue;
+    if (lot.k === 'park' || (BMASK && lot.p.every(q => farOut(q[0], q[1])))) continue;
     LITM.color(lot.k === 'ind' ? '#c9c8bb' : '#cfcabd');
     LITM.poly(lot.p, 0.025);
   }
@@ -2304,11 +2341,11 @@ function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch) {
   }
 
   // крыша: двускатная / вальмовая, если так в карте (частный сектор, сталинки)
+  if (k === 'church') CBITS.churchTop(cityApi(), p, h + (b.roof === 'g' || b.roof === 'h' ? 2.5 : 0), cx, cz, area, seed);
   if (b.roof === 'g' || b.roof === 'h') {
     const roofHex = b.rc || PITCH[seed % PITCH.length];
     if (CBITS.gableRoof(cityApi(), p, h, hexOf(b), roofHex, b.roof === 'h')) return;
   }
-  if (k === 'church') CBITS.churchTop(cityApi(), p, h, cx, cz, area, seed);
   const pitched = b.roof && b.roof !== 'f' && area < 420 && n <= 10 && lv <= 4;
   if (k === 'gar') {
     LITM.color('#57524d');                                          // рубероид
@@ -3266,12 +3303,20 @@ function buildCity () {
   tm('yard', () => { osmPitches(); osmYardBits(); osmVerandas(); smashBuild(); });
 
   const tq = performance.now();
-  scene.add(LITM.mesh(new THREE.MeshLambertMaterial({
-    vertexColors: true, flatShading: true, side: THREE.DoubleSide,
-  })));
-  scene.add(FLATM.mesh(new THREE.MeshBasicMaterial({
-    vertexColors: true, side: THREE.DoubleSide,
-  })));  BUILD_T.mesh = Math.round(performance.now() - tq);
+  const litG = LITM.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }));
+  const flatG = FLATM.mesh(new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+  BUILD_T.mesh = Math.round(performance.now() - tq);
+  /* Всю статику — сразу в видеокарту, одним кадром в крохотную цель:
+     иначе куски, которых ещё не было в кадре, держат свои вершины и в
+     памяти JS (onUpload их отпускает только после загрузки) */
+  const tu = performance.now();
+  const tmp = new THREE.Scene(), rt = new THREE.WebGLRenderTarget(4, 4);
+  for (const g of [litG, flatG]) { for (const m of g.children) m.frustumCulled = false; tmp.add(g); }
+  renderer.setRenderTarget(rt); renderer.render(tmp, cam); renderer.setRenderTarget(null); rt.dispose();
+  for (const g of [litG, flatG]) { for (const m of g.children) m.frustumCulled = true; scene.add(g); }
+  BUILD_T.upload = Math.round(performance.now() - tu);
+  BUILD_T.tris = Math.round(BUILT_TRIS);
+  MAPW.freeAsphalt();
 }
 
 /* ─────────────── граф улиц: маршрут, полосы, светофоры, зебры ───────────────
@@ -7597,7 +7642,7 @@ const camInWall = (x, z) => {
 /* мелочь (деревья, столбы, остановки) камеру не толкает — только дома и стены */
 const camClear = (x, z) => {
   for (const s of solidsNear(x, z)) {
-    if (s.deckY !== undefined || (s.hw < 1.6 && s.hd < 1.6)) continue;
+    if (s.deckY !== undefined || Math.max(s.hw, s.hd) < 3) continue;   // машины, деревья, столбы — не стены
     const dx = x - s.cx, dz = z - s.cz;
     const lx = dx * s.cs + dz * s.sn, lz = -dx * s.sn + dz * s.cs;
     if (Math.abs(lx) < s.hw + 0.9 && Math.abs(lz) < s.hd + 0.9) return false;
@@ -10175,7 +10220,7 @@ requestAnimationFrame(frame);
 
 /* отладочная ручка */
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { S, V, TRAFFIC, PEDS, PEOPLE, PIZZA, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { S, V, TRAFFIC, PEDS, PEOPLE, PIZZA, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта
