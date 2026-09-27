@@ -25,6 +25,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 import { t } from '../i18n/index.js';
+import * as MOPEDS from './mopeds.js';
 
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -1027,10 +1028,11 @@ function stepWorks (dt, A) {
 let API = null;
 export function hold (c, dt) {
   if (c.rlOut) return 0;                      // водитель вышел
+  if (c.mp && API && !MOPEDS.lane(c, dt, API)) return 0;     // мопед: правый край полосы, межполосье в пробке; без седока — стоит
   if (c.turn || !c.e || (!JAM_BY.size && !CLOSED.size)) return 1;
   let slow = 1;
   const e = c.e, J = JAM_BY.get(e);
-  if (J && !J.done && API) {
+  if (J && !J.done && API && !(c.mp && c.mp.weave > 0)) {    // мопед между рядами пробку объезжает
     const lane = Math.min(c.lane, API.laneCount(e) - 1), stop = J.stops.get(e);   // стоп-точка — перед аварией или на ребре до неё
     if (stop !== undefined && c.s < stop + 2) {
       if (J.lanes.has(lane)) slow = clamp((stop - c.s) / 7, 0, 1);
@@ -1148,7 +1150,8 @@ function stepGlow (dt, A) {
     if (Math.abs(c.x - cx) > 110 || Math.abs(c.z - cz) > 110) continue;
     GP.set(c.x, (c.gy || 0) + 0.22, c.z);
     GQ.setFromAxisAngle(GY, c.h);
-    GS.set(c.model === 'cn' ? 1.15 : 1, 1, c.model === 'cn' ? 1.1 : 1);
+    const gk = c.model === 'cn' ? 1.12 : c.model === 'moped' ? 0.45 : 1;
+    GS.set(gk, 1, gk);
     GM.compose(GP, GQ, GS);
     GLOW.mesh.setMatrixAt(n++, GM);
   }
@@ -1164,6 +1167,7 @@ export function step (dt, A) {
   stepJams(dt, A);
   stepWorks(dt, A);
   stepGlow(dt, A);
+  MOPEDS.step(dt, A);
 }
 
 /* хвост пробки на радаре и карте: куски рёбер, посчитанные в makeJam */
@@ -1197,4 +1201,4 @@ export function drawMap (x, fmX, fmZ, s) {
 }
 
 /* для отладки: __dlv.RL */
-export const DEBUG = { RL, JAMS, WORKS, CLOSED, SG, spawnOnRoute: () => API && spawnOnRoute(API), spawnSomewhere: () => API && spawnSomewhere(API) };
+export const DEBUG = { MOPEDS: MOPEDS.DEBUG, RL, JAMS, WORKS, CLOSED, SG, spawnOnRoute: () => API && spawnOnRoute(API), spawnSomewhere: () => API && spawnSomewhere(API) };

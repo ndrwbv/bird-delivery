@@ -732,5 +732,12 @@
  "Эй! Это машина шефа!": "Hej! To auto szefa!",
  "сдачи не надо": "reszty nie trzeba",
  "Сдачи не надо!": "Reszty nie trzeba!",
- "чаевые от богача +{money}": "napiwek od bogacza +{money}"
+ "чаевые от богача +{money}": "napiwek od bogacza +{money}",
+ "Жуй-Еда": "Żuj-Jedzenie",
+ "Клуб Доставки": "Klub Dostaw",
+ "Самокатик": "Hulajnożka",
+ "курьер «{brand}» слетел с мопеда": "kurier «{brand}» spadł z motorowera",
+ "курьер «{brand}» улетел с мопеда": "kurier «{brand}» wyleciał z motorowera",
+ "минус курьер «{brand}»": "minus kurier «{brand}»",
+ "эй, мой мопед!": "ej, mój motorower!"
 }

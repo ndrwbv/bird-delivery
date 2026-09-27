@@ -728,5 +728,12 @@
  "Эй! Это машина шефа!": "Hey! That's the boss's car!",
  "сдачи не надо": "keep the change",
  "Сдачи не надо!": "Keep the change!",
- "чаевые от богача +{money}": "tip from a rich guy +{money}"
+ "чаевые от богача +{money}": "tip from a rich guy +{money}",
+ "Жуй-Еда": "Chew Eats",
+ "Клуб Доставки": "Delivery Club-ish",
+ "Самокатик": "Scootie",
+ "курьер «{brand}» слетел с мопеда": "{brand} courier fell off the moped",
+ "курьер «{brand}» улетел с мопеда": "{brand} courier flew off the moped",
+ "минус курьер «{brand}»": "minus a {brand} courier",
+ "эй, мой мопед!": "hey, my moped!"
 }

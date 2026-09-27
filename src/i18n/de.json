@@ -728,5 +728,12 @@
  "Эй! Это машина шефа!": "Hey! Das ist der Wagen vom Chef!",
  "сдачи не надо": "Stimmt so",
  "Сдачи не надо!": "Stimmt so!",
- "чаевые от богача +{money}": "Trinkgeld vom Reichen +{money}"
+ "чаевые от богача +{money}": "Trinkgeld vom Reichen +{money}",
+ "Жуй-Еда": "Kau-Essen",
+ "Клуб Доставки": "Lieferklub",
+ "Самокатик": "Rollerchen",
+ "курьер «{brand}» слетел с мопеда": "«{brand}»-Kurier ist vom Moped gefallen",
+ "курьер «{brand}» улетел с мопеда": "«{brand}»-Kurier ist vom Moped geflogen",
+ "минус курьер «{brand}»": "minus ein «{brand}»-Kurier",
+ "эй, мой мопед!": "hey, mein Moped!"
 }

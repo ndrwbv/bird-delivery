@@ -2790,9 +2790,85 @@ function osmEntrances () {
     entranceAt(x, z, nx, nz, false);
     if (chance(0.4)) {
       const s = chance(0.5) ? 1 : -1;
-      bench(x + nx * 1.9 + tx * 2.8 * s, z + nz * 1.9 + tz * 2.8 * s, ry);      // вдоль стены, спинкой к дому
+      bench(x + nx * 3.0 + tx * 2.8 * s, z + nz * 3.0 + tz * 2.8 * s, ry);      // у дорожки, спинкой к дому
     }
   }
+  houseWalks();
+}
+
+/* Дорожка у подъездов: вдоль всей стены, где двери, — плитка в два метра
+   шириной (как отмостка с тротуаром у настоящих домов), с заходом за углы.
+   От её конца, что ближе к улице, — тропинка до тротуара. Кусок, что лёг бы
+   на асфальт или в соседний дом, пропускаем. Дорожки — и в список дворовых
+   (по ним гуляют прохожие, их видно на карте). */
+function houseWalks () {
+  const walls = new Map();                           // дом → стены с подъездами
+  for (const [x, z, nx, nz] of CITY.entrances) {
+    if (!inBounds(x, z, -40)) continue;
+    const ix = x - nx * 0.6, iz = z - nz * 0.6;
+    let hb = null;
+    for (const b of HOUSE_GRID.get(Math.floor(ix / 40) + ',' + Math.floor(iz / 40)) || []) if (inPoly(ix, iz, b.p)) { hb = b; break; }
+    if (!hb) continue;
+    const p = hb.p;
+    let bi = -1, bd = 3;
+    for (let i = 0; i < p.length; i++) {
+      const a = p[i], c = p[(i + 1) % p.length], dx = c[0] - a[0], dz = c[1] - a[1], l2 = dx * dx + dz * dz || 1;
+      const t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / l2, 0, 1), d = Math.hypot(x - a[0] - dx * t, z - a[1] - dz * t);
+      if (d < bd) { bd = d; bi = i; }
+    }
+    if (bi < 0) continue;
+    let set = walls.get(hb);
+    if (!set) walls.set(hb, set = new Map());
+    if (!set.has(bi)) set.set(bi, [nx, nz]);
+  }
+  const W = 2.0, OFF = 1.35, STEP = 3;
+  const onAsphalt = (x, z) => { const r = nearestRoad(x, z, 7, 1); return !!r && r.d < r.seg.w / 2 + 0.6; };
+  let n = 0;
+  LITM.color('#d9d0c0');
+  for (const [b, set] of walls) {
+    const p = b.p;
+    for (const [i, [nx, nz]] of set) {
+      const a = p[i], c = p[(i + 1) % p.length], dx = c[0] - a[0], dz = c[1] - a[1], len = Math.hypot(dx, dz);
+      if (len < 4) continue;
+      const ux = dx / len, uz = dz / len;
+      // стена наружу — в сторону двери (у кривого контура нормаль ребра и двери совпадают)
+      const ox = nx, oz = nz;
+      const pts = [];
+      for (let d = -0.8; d < len + 0.8 - 0.01; d += STEP) {
+        const d2 = Math.min(len + 0.8, d + STEP);
+        const x1 = a[0] + ux * d + ox * OFF, z1 = a[1] + uz * d + oz * OFF;
+        const x2 = a[0] + ux * d2 + ox * OFF, z2 = a[1] + uz * d2 + oz * OFF;
+        const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
+        if (onAsphalt(mx, mz) || inHouse(mx, mz, 0.3)) { if (pts.length > 1) { YARD_PATHS.push(pts.slice()); CITY.paths.push(pts.slice()); } pts.length = 0; continue; }
+        LITM.ribbon(x1, z1, x2, z2, W, 0.08);
+        if (!pts.length) pts.push([x1, z1]);
+        pts.push([x2, z2]);
+      }
+      if (pts.length > 1) { YARD_PATHS.push(pts.slice()); CITY.paths.push(pts.slice()); }
+      n++;
+      // тропинка до тротуара — от того конца дорожки, что ближе к улице
+      let best = null;
+      for (const d of [-0.4, len / 2, len + 0.4]) {
+        const sx = a[0] + ux * d + ox * (OFF + W / 2), sz = a[1] + uz * d + oz * (OFF + W / 2);
+        const r = nearestRoad(sx, sz, DRIVE_MAX, 2);
+        if (!r || r.d > 40) continue;
+        if (!best || r.d < best.r.d) best = { sx, sz, r };
+      }
+      if (!best) continue;
+      const { sx, sz, r } = best;
+      const ddx = sx - r.x, ddz = sz - r.z, dl = Math.hypot(ddx, ddz) || 1;
+      const edge = r.seg.w / 2 + (r.seg.c <= 5 ? 2.4 + (r.seg.g || 0) : 0.6);
+      const ex = r.x + ddx / dl * edge, ez = r.z + ddz / dl * edge, L = Math.hypot(ex - sx, ez - sz);
+      if (L < 1.5 || L > 38) continue;
+      let clear = true;
+      for (let t = 0.1; clear && t < 0.96; t += 0.08) { const qx = lerp(sx, ex, t), qz = lerp(sz, ez, t); if (inHouse(qx, qz, 0.4) || (t < 0.9 && onAsphalt(qx, qz))) clear = false; }
+      if (!clear) continue;
+      LITM.ribbon(sx, sz, ex, ez, 1.5, 0.085);
+      LITM.disc(ex, ez, 0.75, 0.085, 6);
+      YARD_PATHS.push([[sx, sz], [ex, ez]]); CITY.paths.push([[sx, sz], [ex, ez]]);
+    }
+  }
+  BUILD_T.walks = n;
 }
 
 /* Деревья: настоящие точки и ряды из карты, а вдоль улиц — липы по
@@ -3318,7 +3394,7 @@ const roadApi = () => ({
   THREE, scene, cam, V, S, CITY, box, put, mergeGeos, obb, smashAdd, SMASH, SM_WORD, SOLIDS, SOLID_GRID, SCELL, PARKED, DRIVE_MAX,
   groundH, curbAt, inHouse, inPoly, inBounds, nearestRoad, NODES, NODE_IDX, edgeOf, edgeRun, laneCount, laneOff, routeNodes, nodeNear, nearestNode,
   walkLeg, walkSpawn, walkersAll,
-  ZEBRAS, SIG_GROUPS, TRAFFIC, ACCIDENTS, newCar, placeTraffic, poseTraffic, svcGone, makeHuman, dropMesh, gibHuman, sayBubble, Snd, toast, calmStart,
+  ZEBRAS, SIG_GROUPS, TRAFFIC, ACCIDENTS, newCar, placeTraffic, poseTraffic, poseOnSlope, svcGone, makeHuman, dropMesh, gibHuman, sayBubble, Snd, toast, calmStart,
   onRunOver: w => { S.people++; toast(w === 'driver' ? $t('минус зевака') : $t('минус дорожник')); },
   get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get tG () { return tG; },
 });

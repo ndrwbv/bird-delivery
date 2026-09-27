@@ -728,5 +728,12 @@
  "Эй! Это машина шефа!": "Hey! Bu patronun arabası!",
  "сдачи не надо": "para üstü kalsın",
  "Сдачи не надо!": "Üstü kalsın!",
- "чаевые от богача +{money}": "zenginden bahşiş +{money}"
+ "чаевые от богача +{money}": "zenginden bahşiş +{money}",
+ "Жуй-Еда": "Çiğne-Ye",
+ "Клуб Доставки": "Teslimat Kulübü",
+ "Самокатик": "Scootcuk",
+ "курьер «{brand}» слетел с мопеда": "«{brand}» kuryesi mopetten düştü",
+ "курьер «{brand}» улетел с мопеда": "«{brand}» kuryesi mopetten uçtu",
+ "минус курьер «{brand}»": "eksi bir «{brand}» kuryesi",
+ "эй, мой мопед!": "hey, mopedim!"
 }

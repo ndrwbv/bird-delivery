@@ -730,5 +730,12 @@
  "Эй! Это машина шефа!": "Ehi! È la macchina del capo!",
  "сдачи не надо": "tenga il resto",
  "Сдачи не надо!": "Tenga il resto!",
- "чаевые от богача +{money}": "mancia dal riccone +{money}"
+ "чаевые от богача +{money}": "mancia dal riccone +{money}",
+ "Жуй-Еда": "Mastica-Mangia",
+ "Клуб Доставки": "Club Consegne",
+ "Самокатик": "Monopattino",
+ "курьер «{brand}» слетел с мопеда": "il rider «{brand}» è caduto dal motorino",
+ "курьер «{brand}» улетел с мопеда": "il rider «{brand}» è volato giù dal motorino",
+ "минус курьер «{brand}»": "un rider «{brand}» in meno",
+ "эй, мой мопед!": "ehi, il mio motorino!"
 }

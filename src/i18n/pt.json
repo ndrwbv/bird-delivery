@@ -730,5 +730,12 @@
  "Эй! Это машина шефа!": "Ei! É o carro do chefe!",
  "сдачи не надо": "pode ficar com o troco",
  "Сдачи не надо!": "Fica com o troco!",
- "чаевые от богача +{money}": "gorjeta de ricaço +{money}"
+ "чаевые от богача +{money}": "gorjeta de ricaço +{money}",
+ "Жуй-Еда": "Mastiga-Já",
+ "Клуб Доставки": "Clube da Entrega",
+ "Самокатик": "Patinetinho",
+ "курьер «{brand}» слетел с мопеда": "o entregador da «{brand}» caiu da mobilete",
+ "курьер «{brand}» улетел с мопеда": "o entregador da «{brand}» voou da mobilete",
+ "минус курьер «{brand}»": "menos um entregador da «{brand}»",
+ "эй, мой мопед!": "ei, minha mobilete!"
 }

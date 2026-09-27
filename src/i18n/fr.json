@@ -730,5 +730,12 @@
  "Эй! Это машина шефа!": "Hé ! C'est la voiture du patron !",
  "сдачи не надо": "gardez la monnaie",
  "Сдачи не надо!": "Gardez la monnaie !",
- "чаевые от богача +{money}": "pourboire d'un riche +{money}"
+ "чаевые от богача +{money}": "pourboire d'un riche +{money}",
+ "Жуй-Еда": "Mâche-Miam",
+ "Клуб Доставки": "Club Livraison",
+ "Самокатик": "Trottinou",
+ "курьер «{brand}» слетел с мопеда": "le livreur «{brand}» est tombé du scooter",
+ "курьер «{brand}» улетел с мопеда": "le livreur «{brand}» s'est envolé du scooter",
+ "минус курьер «{brand}»": "un livreur «{brand}» en moins",
+ "эй, мой мопед!": "hé, mon scooter !"
 }

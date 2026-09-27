@@ -728,5 +728,12 @@
  "Эй! Это машина шефа!": "Hoy! Bu xoʻjayinning mashinasi!",
  "сдачи не надо": "qaytimi kerak emas",
  "Сдачи не надо!": "Qaytimi kerak emas!",
- "чаевые от богача +{money}": "boydan choychaqa +{money}"
+ "чаевые от богача +{money}": "boydan choychaqa +{money}",
+ "Жуй-Еда": "Chayna-Ovqat",
+ "Клуб Доставки": "Yetkazish Klubi",
+ "Самокатик": "Samokatcha",
+ "курьер «{brand}» слетел с мопеда": "«{brand}» kuryeri mopeddan yiqildi",
+ "курьер «{brand}» улетел с мопеда": "«{brand}» kuryeri mopeddan uchib ketdi",
+ "минус курьер «{brand}»": "minus «{brand}» kuryeri",
+ "эй, мой мопед!": "hey, mopedim!"
 }
