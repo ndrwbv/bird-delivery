@@ -725,5 +725,8 @@
  "шофёр": "shofyor",
  "Шофёр, машину!": "Shofyor, mashinani!",
  "Шухер!": "Tez, qoch!",
- "Эй! Это машина шефа!": "Hoy! Bu xoʻjayinning mashinasi!"
+ "Эй! Это машина шефа!": "Hoy! Bu xoʻjayinning mashinasi!",
+ "сдачи не надо": "qaytimi kerak emas",
+ "Сдачи не надо!": "Qaytimi kerak emas!",
+ "чаевые от богача +{money}": "boydan choychaqa +{money}"
 }

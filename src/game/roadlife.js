@@ -123,7 +123,23 @@ const SGC = 20;                                   // клетка сетки с�
 const sgKey = (x, z) => Math.floor(x / SGC) + ',' + Math.floor(z / SGC);
 
 /* поставить табличку kind в точке x,z лицом к (fx, fz) — к тем, кому она адресована */
-function placeSign (A, kind, x, z, fx, fz) {
+/* повтор: тот же знак тем же лицом на той же улице ближе 60 м (переход — 220, скорость — 250) — не ставим */
+const REP = new Map();
+const repList = (street, kind) => {
+  let m = REP.get(street);
+  if (!m) REP.set(street, m = new Map());
+  let l = m.get(kind);
+  if (!l) m.set(kind, l = []);
+  return l;
+};
+function placeSign (A, kind, x, z, fx, fz, street) {
+  const rep = street ? repList(street, kind) : null, rd = kind === K.S40 || kind === K.S60 ? 250 : kind === K.ZEB ? 220 : 60;
+  if (rep && rep.some(q => q[2] * fx + q[3] * fz > 0.7 && Math.abs(q[0] - x) < rd && Math.abs(q[1] - z) < rd && Math.hypot(q[0] - x, q[1] - z) < rd)) return false;
+  if (!putSign(A, kind, x, z, fx, fz)) return false;
+  if (rep) rep.push([x, z, fx, fz]);
+  return true;
+}
+function putSign (A, kind, x, z, fx, fz) {
   const ci = Math.floor(x / SGC), cj = Math.floor(z / SGC);
   for (let i = ci - 1; i <= ci + 1; i++)
     for (let j = cj - 1; j <= cj + 1; j++)
@@ -157,15 +173,12 @@ function buildSigns (A) {
   const OFF = e => e.w / 2 + 1.05;
   // зебры: справа по ходу — лицом к подъезжающим, с обеих сторон
   for (const zb of ZEBRAS) {
-    if (zb.sig) continue;
+    if (zb.sig || zb.e.c > 4) continue;           // во дворах и на тихих улочках переход без знака — иначе лес столбов
     const e = zb.e, back = edgeOf(e.b, e.a), off = zb.w / 2 + 1.05, rx = -zb.uz, rz = zb.ux;
     const fwd = e.ok, bwd = back && back.ok;
-    if (fwd) placeSign(A, K.ZEB, zb.x + rx * off - zb.ux * 1.2, zb.z + rz * off - zb.uz * 1.2, -zb.ux, -zb.uz);
-    if (bwd) placeSign(A, K.ZEB, zb.x - rx * off + zb.ux * 1.2, zb.z - rz * off + zb.uz * 1.2, zb.ux, zb.uz);
-    if (fwd !== bwd) {           // одностороннее: второй знак — слева, тем же лицом
-      const s = fwd ? 1 : -1;
-      placeSign(A, K.ZEB, zb.x - rx * off * s - zb.ux * 1.2 * s, zb.z - rz * off * s - zb.uz * 1.2 * s, -zb.ux * s, -zb.uz * s);
-    }
+    const st = e.road.n || e.road;
+    if (fwd) placeSign(A, K.ZEB, zb.x + rx * off - zb.ux * 1.2, zb.z + rz * off - zb.uz * 1.2, -zb.ux, -zb.uz, st);
+    if (bwd) placeSign(A, K.ZEB, zb.x - rx * off + zb.ux * 1.2, zb.z - rz * off + zb.uz * 1.2, zb.ux, zb.uz, st);
   }
   for (let n = 0; n < NODES.length; n++) {
     const N = NODES[n];
@@ -182,7 +195,7 @@ function buildSigns (A) {
           const main = e.c === minC;
           if (main && hash(N.x, N.z, 1) > 0.55) continue;
           const [x, z] = at(e, e.len - e.tB - 2.5, 1, OFF(e));
-          placeSign(A, main ? K.MAIN : K.GIVE, x, z, -e.ux, -e.uz);
+          placeSign(A, main ? K.MAIN : K.GIVE, x, z, -e.ux, -e.uz, e.road.n || e.road);
         }
     }
     if (deg < 3) continue;
@@ -192,18 +205,18 @@ function buildSigns (A) {
       // въезд против одностороннего — «кирпич»; по шерсти — «одностороннее»
       if (!e.ok && back.ok) {
         const [x, z] = at(e, e.tA + 1.6, 1, OFF(e));
-        placeSign(A, K.NOENT, x, z, -e.ux, -e.uz);
+        placeSign(A, K.NOENT, x, z, -e.ux, -e.uz, e.road.n || e.road);
         continue;
       }
-      if (e.ok && e.oneway && hash(N.x, N.z, 2 + m) < 0.6) {
+      if (e.ok && e.oneway && hash(N.x, N.z, 2 + m) < 0.35) {
         const [x, z] = at(e, e.tA + 4, 1, OFF(e));
-        placeSign(A, K.ONEW, x, z, -e.ux, -e.uz);
+        placeSign(A, K.ONEW, x, z, -e.ux, -e.uz, e.road.n || e.road);
       }
       // ограничение скорости сразу за перекрёстком
-      if (e.ok && e.c <= 4 && e.len > 70 && hash(N.x, N.z, 7 + m) < 0.3) {
+      if (e.ok && e.c <= 4 && e.len > 90 && hash(N.x, N.z, 7 + m) < 0.06) {
         const k = e.c <= 1 ? K.S60 : e.c >= 3 ? K.S40 : hash(N.x, N.z, 9) < 0.5 ? K.S60 : K.S40;
         const [x, z] = at(e, e.tA + 11, 1, OFF(e));
-        placeSign(A, k, x, z, -e.ux, -e.uz);
+        placeSign(A, k, x, z, -e.ux, -e.uz, e.road.n || e.road);
       }
     }
   }
@@ -216,7 +229,8 @@ function buildSigns (A) {
     const dx = s.p[0] - road.x, dz = s.p[1] - road.z, dl = Math.hypot(dx, dz) || 1;
     if (-uz * dx + ux * dz < 0) { ux = -ux; uz = -uz; }         // едем так, чтобы остановка была справа
     const o = sg.w / 2 + 1.0;
-    placeSign(A, K.BUS, road.x + dx / dl * o + ux * 3.4, road.z + dz / dl * o + uz * 3.4, -ux, -uz);
+    const be = sg.na !== undefined && sg.nb !== undefined ? edgeOf(sg.na, sg.nb) : null;
+    placeSign(A, K.BUS, road.x + dx / dl * o + ux * 3.4, road.z + dz / dl * o + uz * 3.4, -ux, -uz, be ? be.road.n || be.road : sg.name);
   }
   // «дети» у школ и садов: с обеих сторон улицы метров за тридцать
   const KIDS = /школ|детск|сад\b|сад |гимназ|лице|school|kinder/i;
@@ -233,7 +247,7 @@ function buildSigns (A) {
       const N = NODES[e.a], d = (road.x - N.x) * e.ux + (road.z - N.z) * e.uz - 28;
       if (d < e.tA + 2) continue;
       const [x, z] = at(e, d, 1, OFF(e));
-      placeSign(A, K.KIDS, x, z, -e.ux, -e.uz);
+      placeSign(A, K.KIDS, x, z, -e.ux, -e.uz, e.road.n || e.road);
     }
   }
   // столбы — в сбиваемое, таблички — одной склейкой
@@ -342,17 +356,26 @@ function buildFences (A) {
   const ENTR = CITY.entrances || [];
   // ответ по точке — в кэш по полметра: стороны и секции спрашивают одно и то же
   const BADC = new Map();
-  const bad = (x, z) => {
+  // hm — запас от стен: у самого фасада (отступ меньше полуметра) свой дом не в счёт
+  const bad = (x, z, hm = 0.5) => {
     if (TAKEN.has(tk(x, z))) return true;
     const key = Math.round(x * 2) * 100003 + Math.round(z * 2);
     let v = BADC.get(key);
     if (v === undefined) {
       v = !A.inBounds(x, z, 10) || groundH(x, z) < 0.3;
-      if (!v) { const r = nearestRoad(x, z, 7, 1); v = !!r && r.d < r.seg.w / 2 + (r.seg.c <= 5 ? 3.0 : 0.9); }   // не через улицу, тротуар и проезд
-      if (!v) v = inHouse(x, z, 0.5) || nearPath(x, z, 1.3) || near(A.PARKED, x, z, 3) || near(ENTR, x, z, 2);
+      if (!v) { const r = nearestRoad(x, z, 7, 1); v = !!r && r.d < r.seg.w / 2 + (r.seg.c <= 5 ? 2.85 : 0.9); }   // не через улицу, тротуар и проезд
+      if (!v) v = nearPath(x, z, 1.3) || near(A.PARKED, x, z, 3) || near(ENTR, x, z, 2);
       BADC.set(key, v);
     }
-    return v;
+    return v || inHouse(x, z, hm);
+  };
+  // сторона вплотную к фасаду у самого тротуара: полотно и тротуар по-прежнему нельзя,
+  // а запас от бордюра — поменьше (пешеходы идут в полутора метрах от него)
+  const badTight = (x, z) => {
+    if (TAKEN.has(tk(x, z)) || !A.inBounds(x, z, 10) || groundH(x, z) < 0.3) return true;
+    const r = nearestRoad(x, z, 7, 1);
+    if (r && r.d < r.seg.w / 2 + (r.seg.c <= 5 ? 2.2 : 0.9)) return true;
+    return nearPath(x, z, 1.3) || near(A.PARKED, x, z, 3) || near(ENTR, x, z, 1.2) || inHouse(x, z, 0);
   };
   const KIDS = /школ|детск|сад\b|сад |гимназ|лице|school|kinder/i;
   const P = [], N = [], U = [], I = [];
@@ -386,21 +409,27 @@ function buildFences (A) {
     const X = (u, v) => [u * R.ux - v * R.uz, u * R.uz + v * R.ux];
     const M = b.k === 'priv' ? 4 : kids ? 10 : 7;
     // отступ каждой стороны: самый широкий, при котором линия ничего не задевает
-    const sideBad = (fixU, c0, a0, a1) => {       // fixU: сторона вдоль v при u = c0, иначе вдоль u при v = c0
+    const sideBad = (fixU, c0, a0, a1, hm) => {   // fixU: сторона вдоль v при u = c0, иначе вдоль u при v = c0
       let nb = 0;
-      for (let s = a0; s <= a1 + 0.01; s += 2) { const [x, z] = fixU ? X(c0, s) : X(s, c0); if (bad(x, z)) nb++; }
+      for (let s = a0; s <= a1 + 0.01; s += 2) { const [x, z] = fixU ? X(c0, s) : X(s, c0); if (bad(x, z, hm)) nb++; }
       return nb;
     };
-    const m = [0, 0, 0, 0];                         // u0, u1, v0, v1
-    const cand = [M, M * 0.55, 1.8, 0.9];
+    // Отступ каждой стороны — самый широкий, при котором линия ничего не задевает.
+    // Дом у самого тротуара (частный сектор) — забор по краю тротуара, хоть в
+    // тридцати сантиметрах от фасада: иначе сторона к улице выпадала целиком.
+    const m = [0, 0, 0, 0], tight = [0, 0, 0, 0];   // u0, u1, v0, v1
+    const cand = [M, M * 0.75, M * 0.55, 2.4, 1.8, 1.3, 0.9, 0.6, 0.35];
     for (let sd = 0; sd < 4; sd++) {
       let best = 1.8, bn = Infinity;
       for (const mm of cand) {
-        const nb = sd < 2 ? sideBad(true, sd ? R.u1 + mm : R.u0 - mm, R.v0 - M, R.v1 + M) : sideBad(false, sd === 3 ? R.v1 + mm : R.v0 - mm, R.u0 - M, R.u1 + M);
+        const hm = Math.min(0.5, mm * 0.6);
+        const nb = sd < 2 ? sideBad(true, sd ? R.u1 + mm : R.u0 - mm, R.v0 - M, R.v1 + M, hm) : sideBad(false, sd === 3 ? R.v1 + mm : R.v0 - mm, R.u0 - M, R.u1 + M, hm);
         if (nb < bn) { bn = nb; best = mm; }
         if (!nb) break;
       }
       m[sd] = best;
+      // и так задевает — фасад стоит на краю тротуара: забор в линию фасада, от углов дома к боковым
+      if (bn > 0) { m[sd] = 0.08; tight[sd] = 1; }
     }
     const U0 = R.u0 - m[0], U1 = R.u1 + m[1], V0 = R.v0 - m[2], V1 = R.v1 + m[3];
     const sides = [[U0, V0, U1, V0], [U1, V0, U1, V1], [U1, V1, U0, V1], [U0, V1, U0, V0]];
@@ -408,10 +437,11 @@ function buildFences (A) {
     let gate = 0, gd = Infinity;
     sides.forEach(([a0, b0, a1, b1], i) => {
       const [x, z] = X((a0 + a1) / 2, (b0 + b1) / 2), r = nearestRoad(x, z, 5, 2), len = Math.hypot(a1 - a0, b1 - b0);
-      if (r && len > 7 && r.d < gd) { gd = r.d; gate = i; }
+      const sd = i === 0 ? 2 : i === 1 ? 1 : i === 2 ? 3 : 0;         // вдоль фасада въезда нет — ворота на соседней стороне
+      if (r && len > 7 && !tight[sd] && r.d < gd) { gd = r.d; gate = i; }
     });
     let panels = 0;
-    const runs = [], mine = [];
+    const runs = [], mine = [], sidePanels = [0, 0, 0, 0];
     sides.forEach(([a0, b0, a1, b1], si) => {
       const len = Math.hypot(a1 - a0, b1 - b0), n = Math.max(1, Math.round(len / 2.5));
       let run = null;
@@ -419,7 +449,9 @@ function buildFences (A) {
         const q0 = k / n, q1 = (k + 1) / n, qm = (q0 + q1) / 2;
         const [x1, z1] = X(lerp(a0, a1, q0), lerp(b0, b1, q0)), [x2, z2] = X(lerp(a0, a1, q1), lerp(b0, b1, q1));
         const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
-        const skip = (si === gate && Math.abs(qm - 0.5) * len < 2.7) || bad(mx, mz) || bad(lerp(x1, x2, 0.1), lerp(z1, z2, 0.1)) || bad(lerp(x1, x2, 0.9), lerp(z1, z2, 0.9));
+        const sd = si === 0 ? 2 : si === 1 ? 1 : si === 2 ? 3 : 0, hm = Math.min(0.5, m[sd] * 0.6);    // side 0 — v0, 1 — u1, 2 — v1, 3 — u0
+        const B = tight[sd] ? badTight : (x, z) => bad(x, z, hm);
+        const skip = (si === gate && Math.abs(qm - 0.5) * len < 2.7) || B(mx, mz) || B(lerp(x1, x2, 0.1), lerp(z1, z2, 0.1)) || B(lerp(x1, x2, 0.9), lerp(z1, z2, 0.9));
         if (skip) { if (run) { runs.push(run); run = null; } continue; }
         if (!run) run = { x1, z1, x2, z2 }; else { run.x2 = x2; run.z2 = z2; }
         const y1 = groundH(x1, z1) - 0.06, y2 = groundH(x2, z2) - 0.06, vi = P.length / 3;
@@ -429,7 +461,7 @@ function buildFences (A) {
         U.push(0, 0, 1, 0, 1, 1, 0, 1);
         I.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
         mine.push(tk(mx, mz), tk(x1, z1), tk(x2, z2));
-        panels++;
+        panels++; sidePanels[si]++;
       }
       if (run) runs.push(run);
     });
@@ -438,6 +470,7 @@ function buildFences (A) {
       if (l > 0.5) obb((r.x1 + r.x2) / 2, (r.z1 + r.z2) / 2, l / 2, 0.12, Math.atan2(dz, dx));
     }
     for (const k of mine) TAKEN.add(k);            // чужой забор поверх этого не встанет
+    if (panels) RL.n.openSides = (RL.n.openSides || 0) + sidePanels.filter(v => !v).length;   // стороны без единой секции — для отладки
     if (panels) { houses++; RL.n.panels += panels; const [a0, b0, a1, b1] = sides[gate], [gx, gz] = X((a0 + a1) / 2, (b0 + b1) / 2); RL.fenceAt.push([Math.round(cx), Math.round(cz), b.k, Math.round(gx), Math.round(gz)]); }
   }
   RL.n.fences = houses;
@@ -882,6 +915,13 @@ function spawnWorks (A, e, at) {
   if (r) CLOSED.set(r, { sBar: (e.len - sMid) - HL - r.tA, w: W, len: HL * 2 });
   for (const q of A.TRAFFIC)
     if ((q.e === e || q.e === r) && !q.parked && !q.svc && Math.abs((q.x - cx) * ux + (q.z - cz) * uz) < HL + 3) A.placeTraffic(q, 120, 340);
+  for (const q of A.TRAFFIC) if (q.svc && q.goal) q.repath = 1;
+  for (const list of A.walkersAll())
+    for (const p of list || []) {
+      if (!p || p.dead || !p.w) continue;
+      const dx = p.x - cx, dz = p.z - cz;
+      if (Math.abs(dx * ux + dz * uz) < HL + 1.5 && Math.abs(dx * nx + dz * nz) < W / 2 + 14) A.walkSpawn(p, 60, 300);
+    }
   WORKS.push(W8);
   RL.n.works++;
 }
@@ -1018,6 +1058,66 @@ function uturn (c) {
   c.jx = c.x; c.jz = c.z; c.jh = c.h; c.rejoin = 1;
   c.e = r; c.turn = null; c.lane = 0; c.pull = 0; c.speed = 0;
   c.s = clamp(A.edgeRun(e) - c.s, 0, A.edgeRun(r) * 0.98);
+}
+
+/* ═════════════════ скорая и курьеры-соперники ═════════════════
+   У них свой маршрут (lanePath в game.js). Навигатор курьера про ремонт не
+   знает, а они — местные: путь в обход закрытых рёбер. Не нашёлся — null,
+   и game.js берёт обычный routeNodes; тогда у щитов встают (svcHold). */
+export function svcNodes (x0, z0, x1, z1) {
+  if (!CLOSED.size || !API) return null;
+  const A = API, N = A.NODES, a = A.nearestNode(x0, z0), b = A.nearestNode(x1, z1);
+  if (a === b) return [N[a]];
+  const prev = new Int32Array(N.length).fill(-1), seen = new Uint8Array(N.length), q = [a];
+  seen[a] = 1;
+  for (let h = 0; h < q.length; h++) {
+    const cur = q[h];
+    if (cur === b) break;
+    for (const nb of N[cur].nb) {
+      if (seen[nb]) continue;
+      const e = A.edgeOf(cur, nb);
+      if (e && e.closed) continue;
+      seen[nb] = 1; prev[nb] = cur; q.push(nb);
+    }
+  }
+  if (!seen[b]) return null;
+  const path = [];
+  for (let k = b; k !== -1; k = prev[k]) { path.unshift(N[k]); if (k === a) break; }
+  return path;
+}
+/* щиты впереди по курсу — тормозим перед ними; встали — ищем путь заново.
+   Протиснуться «призраком» (ghost) сквозь блоки не даём: это отдельно от ahead. */
+export function svcHold (t, dt) {
+  if (!WORKS.length) return 1;
+  let slow = 1;
+  const hx = Math.sin(t.h), hz = Math.cos(t.h);
+  for (const W of WORKS) {
+    const dx = t.x - W.x, dz = t.z - W.z;
+    if (Math.abs(dx) > 45 || Math.abs(dz) > 45) continue;
+    const a = dx * W.ux + dz * W.uz, l = dx * W.e.rx + dz * W.e.rz;
+    if (Math.abs(l) > W.W / 2 + 1.5 || Math.abs(a) < W.HL - 0.5) continue;     // сбоку или уже внутри — пусть выезжает
+    if (-Math.sign(a) * (hx * W.ux + hz * W.uz) < 0.3) continue;                // едет не к щитам
+    const gap = Math.abs(a) - W.HL - (t.hl || 2.2) - 1.5;
+    if (gap > 18) continue;
+    slow = Math.min(slow, clamp(gap / 7, 0, 1));
+    if (t.speed < 0.6 && gap < 3) { if ((t.rlWait = (t.rlWait || 0) + dt) > 1) { t.rlWait = 0; t.repath = 1; } }
+  }
+  return slow;
+}
+
+/* ═════════════════ пешеходы у забора стройки ═════════════════
+   По тротуару закрытой улицы идут до синего забора и поворачивают назад —
+   сквозь него не ходят. Вызывается из walkerStep для идущих по тротуару. */
+export function walkGuard (p) {
+  if (!CLOSED.size || !API || !p.w || p.cross) return;
+  const W = p.w, e = API.edgeOf(W.a, W.b);
+  if (!e || !e.closed) return;
+  const C = CLOSED.get(e);
+  if (!C) return;
+  const A0 = API.NODES[W.a], al = (p.x - A0.x) * e.ux + (p.z - A0.z) * e.uz, fl = C.sBar + e.tA - 0.8;
+  if (al > fl || al < fl - 2.2) return;
+  W.a = e.b; W.b = e.a; W.side = -W.side;                  // та же сторона улицы, обратным ходом
+  API.walkLeg(p, p.x, p.z);
 }
 
 /* ═════════════════ фары потока ночью ═════════════════ */

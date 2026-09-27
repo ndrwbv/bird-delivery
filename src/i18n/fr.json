@@ -727,5 +727,8 @@
  "шофёр": "chauffeur",
  "Шофёр, машину!": "Chauffeur, la voiture !",
  "Шухер!": "Barrez-vous !",
- "Эй! Это машина шефа!": "Hé ! C'est la voiture du patron !"
+ "Эй! Это машина шефа!": "Hé ! C'est la voiture du patron !",
+ "сдачи не надо": "gardez la monnaie",
+ "Сдачи не надо!": "Gardez la monnaie !",
+ "чаевые от богача +{money}": "pourboire d'un riche +{money}"
 }

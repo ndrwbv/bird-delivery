@@ -727,5 +727,8 @@
  "шофёр": "autista",
  "Шофёр, машину!": "Autista, la macchina!",
  "Шухер!": "Filiamo!",
- "Эй! Это машина шефа!": "Ehi! È la macchina del capo!"
+ "Эй! Это машина шефа!": "Ehi! È la macchina del capo!",
+ "сдачи не надо": "tenga il resto",
+ "Сдачи не надо!": "Tenga il resto!",
+ "чаевые от богача +{money}": "mancia dal riccone +{money}"
 }

@@ -725,5 +725,8 @@
  "шофёр": "şoför",
  "Шофёр, машину!": "Şoför, arabayı getir!",
  "Шухер!": "Kaçın!",
- "Эй! Это машина шефа!": "Hey! Bu patronun arabası!"
+ "Эй! Это машина шефа!": "Hey! Bu patronun arabası!",
+ "сдачи не надо": "para üstü kalsın",
+ "Сдачи не надо!": "Üstü kalsın!",
+ "чаевые от богача +{money}": "zenginden bahşiş +{money}"
 }

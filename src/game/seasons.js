@@ -26,7 +26,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 
 import { t } from '../i18n/index.js';
-import { setPeopleSeason } from './people.js';
+import { setPeopleSeason, redressHumans } from './people.js';
 
 export const SEASON_STEP = 0.125;          // на столько сдвигает сезон одна смена: сезон — восемь смен
 const CH = 100;                             // клетка склейки, как у статики
@@ -68,6 +68,8 @@ export const seasonValue = () => SEA;
 export const slip = () => (A.snow || 0) * 0.32;
 /* идёт ли вместо дождя снег */
 export const snowy = () => (A.snow || 0) > 0.45;
+/* река во льду (сёрферу там не место) */
+export const iced = () => (A.snow || 0) > 0.25;
 
 /* ─── юниформы: общие для всех сезонных материалов ─── */
 const U = {
@@ -118,6 +120,32 @@ export function seasonMat (m, dryK = 1) {
     sh.fragmentShader = TINT + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = seasonTint(diffuseColor.rgb, ' + dryK.toFixed(2) + ', 1.0);');
   };
   m.customProgramCacheKey = () => 'season' + dryK;
+  return m;
+}
+
+/* Мелочь дворов (SMASH): как статика, но у кустов (aux.x = 1) листва
+   своя: осенью желтеет и краснеет, к зиме — голые бурые прутья под
+   снежной шапкой, весной — свежая зелень. Листвой считаем только
+   зелёные вершины: кашпо и цветы у пиццерии не перекрашиваются. */
+function smashMat (m) {
+  m.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, U);
+    sh.vertexShader = 'attribute vec4 aux;\nvarying vec3 vSW;\nvarying float vK, vP, vSeed;\n' +
+      sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvK = floor(aux.x * 255.0 + 0.5); vSeed = aux.y; vP = floor(aux.z * 255.0 + 0.5);')
+        .replace('#include <project_vertex>', '#include <project_vertex>\n' + WPOS);
+    sh.fragmentShader = 'uniform float uYellow, uLeaf;\nvarying float vK, vP, vSeed;\n' + TINT + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+      if (vK == 1.0) {
+        vec3 c0 = diffuseColor.rgb;
+        float leafy = smoothstep(0.03, 0.12, c0.g - max(c0.r, c0.b));
+        vec3 pal = vP < 0.5 ? vec3(0.52, 0.33, 0.02) : vP < 1.5 ? vec3(0.55, 0.17, 0.02) : vec3(0.4, 0.05, 0.02);
+        vec3 c = mix(c0, pal, clamp(uYellow * 1.7 - vSeed * 0.7, 0.0, 1.0));
+        c = mix(c, vec3(0.13, 0.09, 0.06), clamp((1.0 - uLeaf) * 1.4 - vSeed * 0.4, 0.0, 1.0));
+        c = mix(c, vec3(0.2, 0.5, 0.08), uFresh * 0.5);
+        diffuseColor.rgb = mix(c0, c, leafy);
+      }
+      diffuseColor.rgb = seasonTint(diffuseColor.rgb, vK == 1.0 ? 0.0 : 0.6, 1.0);`);
+  };
+  m.customProgramCacheKey = () => 'seasonSmash';
   return m;
 }
 
@@ -273,7 +301,7 @@ export function initSeasons (ctx) {
   if (q !== null && q !== '' && !Number.isNaN(+q)) { SEA = wrap(+q); FORCED = true; }
   else SEA = wrap(+C.Store.get('dlv-season', 0) || 0);
   PILE = Pile(); GARL = Pile();
-  seasonMat(C.SMASH_MAT, 0.6);
+  smashMat(C.SMASH_MAT);
   C.SM_WORD.ice = t('ледяная горка');
   C.SM_WORD.snowman = t('снеговик');
   apply();
@@ -299,6 +327,8 @@ function apply () {
   U.uNY.value = A.ny; U.uIce.value = A.ice;
   setPeopleSeason(A.warm);
   for (const m of MESH_GARL) m.visible = A.ny > 0.001;
+  // новогодние ёлки стоят, пока видны (шейдер: зерно 4/255 < uNY)
+  for (const f of FIRS) if (f.solid) f.solid.hw = f.solid.hd = A.ny > 0.016 ? f.hw : -50;     // -50 — «препятствия нет», как в игре
   // ледяные горки и снеговики: вне зимы вершины — в точку
   for (const it of SEA_ITEMS) {
     if (!it.mesh || !it.seaPos) continue;
@@ -325,7 +355,15 @@ const W_MSK = { lime: 34, maple: 14, birch: 14, poplar: 11, spruce: 11, pine: 4,
 const W_SVK = { birch: 34, spruce: 22, pine: 17, lime: 8, poplar: 8, bush: 11 };
 const GREENS = ['#5aa04a', '#6fb05a', '#4f9443', '#62a84f'];
 
+let PZ_NEAR = null;
 export function seasonTree (x, z, y) {
+  // у пиццерии: не в столиках, кашпо и заборчике и не на парковке курьеров
+  const PZ = C.PIZZA;
+  if (PZ && Math.hypot(x - PZ.bx, z - PZ.bz) < 90) {
+    if (!PZ_NEAR) PZ_NEAR = C.SMASH.filter(it => Math.hypot(it.x - PZ.bx, it.z - PZ.bz) < 100);
+    if (PZ_NEAR.some(it => Math.hypot(it.x - x, it.z - z) < (it.r || 1) + 1.6) || (C.COURIER_SLOTS || []).some(q => Math.hypot(q.x - x, q.z - z) < 4)) return false;
+    if (startViewBlocked(PZ, x, z, 3.5)) return false;              // не заслоняет стартовый кадр
+  }
   const T = tpls(), r = rngAt(x, z, 7), P = PILE;
   const kind = weighted(r, C.MAP.id === 'seversk' ? W_SVK : W_MSK);
   const s = 0.82 + r() * 0.4, yaw = r() * 6.283;
@@ -477,10 +515,28 @@ export function seasonBuild () {
   const svk = C.MAP.id === 'seversk';
   // копии вершин горок и снеговиков: чтобы вернуть их к зиме
   for (const it of SEA_ITEMS) if (it.mesh) it.seaPos = it.mesh.geometry.attributes.position.array.slice(it.v0 * 3, (it.v0 + it.nv) * 3);
+  // кусты: вид 1 и зерно в aux склеек мелочи — их листву красит smashMat
+  const SMA = new Map();
+  for (const it of C.SMASH) {
+    if (!it.mesh || it.mesh.material !== C.SMASH_MAT) continue;
+    let a = SMA.get(it.mesh);
+    if (!a) { a = new Uint8Array(it.mesh.geometry.attributes.position.count * 4); SMA.set(it.mesh, a); }
+    if (it.kind !== 'bush') continue;
+    const sd = 1 + ((hsh(it.x, it.z, 61) * 253) | 0), pal = hsh(it.x, it.z, 62) < 0.5 ? 0 : hsh(it.x, it.z, 63) < 0.5 ? 1 : 2;
+    for (let i = it.v0; i < it.v0 + it.nv; i++) { a[i * 4] = 1; a[i * 4 + 1] = sd; a[i * 4 + 2] = pal; }
+    BUILT.bushes = (BUILT.bushes || 0) + 1;
+  }
+  for (const [m, a] of SMA) m.geometry.setAttribute('aux', new THREE.BufferAttribute(a, 4, true));
 
   // ── сугробы вдоль улиц: за тротуаром, у перекрёстков и зебр не наваливаем
   const DRIFT_HEX = '#e6ebf2';
+  // у пиццерии — не на парковке курьеров и не в столиках с заборчиком
+  const PZ0 = C.PIZZA, SL = C.COURIER_SLOTS || [];
+  const PZT = PZ0 ? C.SMASH.filter(it => Math.hypot(it.x - PZ0.bx, it.z - PZ0.bz) < 80) : [];
+  const busy = (x, z) => PZ0 && Math.hypot(x - PZ0.bx, z - PZ0.bz) < 75 &&
+    (SL.some(q => Math.hypot(q.x - x, q.z - z) < 9) || PZT.some(it => Math.hypot(it.x - x, it.z - z) < (it.r || 1) + 2.5));
   const drift = (x, z, L, H, W, ry, seed) => {
+    if (busy(x, z)) return;
     P.add(T.ico, x, groundH(x, z) + 0.08, z, W, H, L, 0, ry, 0, DRIFT_HEX, 3, seed);
     const k = Math.floor(x / 20) + ',' + Math.floor(z / 20);
     if (!DRIFTS.has(k)) DRIFTS.set(k, []);
@@ -538,13 +594,10 @@ export function seasonBuild () {
   };
   const PZ = C.PIZZA;
   if (PZ) {
-    let best = null;
-    for (let rr = 18; rr <= 44 && !best; rr += 4)
-      for (let k = 0; k < 16; k++) {
-        const a = k / 16 * 6.283, x = PZ.bx + Math.cos(a) * rr, z = PZ.bz + Math.sin(a) * rr;
-        if (firSpot(x, z, 5)) { best = [x, z]; break; }
-      }
-    if (best) bigFir(best[0], best[1], 1.15);
+    // тесно — ёлка поменьше, зато рядом и видна со старта
+    let b = pizzaFirSpot(PZ, firSpot, 1.15), k = 1.15;
+    if (!b || b[2] > 30) { const b2 = pizzaFirSpot(PZ, firSpot, 0.8); if (b2 && (!b || b2[2] < b[2])) { b = b2; k = 0.8; } }
+    if (b) bigFir(b[0], b[1], k);
   }
   const parks = CITY.green.filter(g => g.k === 'park' || (g.k === 'green' && g.p.length > 6)).map(g => {
     let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity, cx = 0, cz = 0;
@@ -623,6 +676,48 @@ export function seasonBuild () {
   apply();
   initSky();
 }
+/* Стартовый кадр (V.hero в camStep): камера в 10 м перед машиной на месте 0
+   и в 6 м вбок, смотрит на машину и пиццерию. */
+function heroViews () {
+  const s0 = (C.COURIER_SLOTS || [])[0];
+  if (!s0) return [];
+  const fx = Math.sin(s0.h), fz = Math.cos(s0.h), rx = Math.cos(s0.h), rz = -Math.sin(s0.h);
+  return [1, -1].map(sd => [s0.x + fx * 10 + rx * 6 * sd, s0.z + fz * 10 + rz * 6 * sd]);
+}
+const segD = (px, pz, ax, az, bx, bz) => {
+  const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / l2));
+  return Math.hypot(px - ax - dx * t, pz - az - dz * t);
+};
+function startViewBlocked (PZ, x, z, r) {
+  const s0 = (C.COURIER_SLOTS || [])[0];
+  if (!s0) return false;
+  return heroViews().some(([cx, cz]) => segD(x, z, cx, cz, PZ.bx, PZ.bz) < r || segD(x, z, cx, cz, s0.x, s0.z) < r);
+}
+/* Ёлка у пиццерии: не на парковке курьеров, не в столиках и заборчике,
+   не в чужом препятствии и не между стартовой камерой и машиной с
+   пиццерией. Из годных — та, что ближе к пиццерии и видна со старта. */
+function pizzaFirSpot (PZ, firSpot, k) {
+  const R = 4.9 * k, slots = C.COURIER_SLOTS || [];
+  const near = (x, z, d) => Math.hypot(x - PZ.bx, z - PZ.bz) < d;
+  const things = C.SMASH.filter(it => near(it.x, it.z, 90));
+  const solids = C.SOLIDS.filter(q => near(q.cx, q.cz, 110) && q.deckY === undefined);
+  const s0 = slots[0], views = heroViews();
+  let best = null, bs = Infinity;
+  for (let rr = 14; rr <= 46; rr += 3)
+    for (let k = 0; k < 24; k++) {
+      const a = k / 24 * 6.283, x = PZ.bx + Math.cos(a) * rr, z = PZ.bz + Math.sin(a) * rr;
+      if (!firSpot(x, z, 3.5 + k * 1.5)) continue;
+      if (things.some(it => Math.hypot(it.x - x, it.z - z) < R + (it.r || 1) + 1)) continue;
+      if (slots.some(q => Math.hypot(q.x - x, q.z - z) < R + 4)) continue;
+      if (solids.some(q => { const dx = x - q.cx, dz = z - q.cz, lx = dx * q.cs + dz * q.sn, lz = -dx * q.sn + dz * q.cs; return Math.abs(lx) < q.hw + R + 1 && Math.abs(lz) < q.hd + R + 1; })) continue;
+      if (startViewBlocked(PZ, x, z, R + 2)) continue;
+      // видна со старта: в конусе от камеры к машине
+      let sc = rr;
+      if (s0) { const [cx, cz] = views[0], ux = s0.x - cx, uz = s0.z - cz, vx = x - cx, vz = z - cz; const cs = (ux * vx + uz * vz) / (Math.hypot(ux, uz) * Math.hypot(vx, vz) || 1); if (cs < 0.8) sc += 25; }
+      if (sc < bs) { bs = sc; best = [x, z, sc]; }
+    }
+  return best;
+}
 function spiral (x, z, y0, H, r0, r1, n, seed, pal) {
   const T = tpls();
   for (let i = 0; i < n; i++) {
@@ -645,7 +740,8 @@ function bigFir (x, z, k) {
   // звезда: два ромба крестом
   for (const ry of [0, Math.PI / 2]) GARL.add(T.quad, x, y + 12.2 * k, z, 1.1 * k, 1.1 * k, 1, 0, ry, Math.PI / 4, '#ffcf3a', 4, 0.01, 0);
   spiral(x, z, y + 1.2 * k, 9.4 * k, 4.7 * k, 0.9 * k, 150, 0.01, ['#ff5a4a', '#ffd23f', '#5aff7a', '#5aa8ff', '#ffe6a0']);
-  FIRS.push({ x, z, r: 4.2 * k + 1.4 });
+  // настоящее препятствие; вне праздников его уносим прочь (apply)
+  FIRS.push({ x, z, hw: 3.1 * k, solid: C.obb ? C.obb(x, z, 3.1 * k, 3.1 * k, 0) : null });
 }
 
 /* ─────────────── живое: снег с неба, снежки, сугробы под колёсами ─────────────── */
@@ -657,6 +753,7 @@ function initSky () {
   for (let i = 0; i < SF_N; i++) { p[i * 3] = rnd(-40, 40); p[i * 3 + 1] = rnd(-6, 34); p[i * 3 + 2] = rnd(-40, 40); }
   g.setAttribute('position', new THREE.BufferAttribute(p, 3));
   const m = new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false });
+  CAM_DIR = new THREE.Vector3();
   SNOWF = new THREE.Points(g, m);
   SNOWF.frustumCulled = false; SNOWF.visible = false;
   C.scene.add(SNOWF);
@@ -727,17 +824,10 @@ function stepSky (dt) {
   SNOWF.geometry.attributes.position.needsUpdate = true;
 }
 
-/* ёлки не пускают машину, сугробы тормозят и разлетаются */
-let driftT = 0;
+/* сугробы тормозят и разлетаются */
+let driftT = 0, redressT = 0, CAM_DIR = null;
 function stepCar (dt) {
   const V = C.V, sp = Math.hypot(V.vx, V.vz);
-  if (A.ny > 0.01) for (const f of FIRS) {
-    const dx = V.x - f.x, dz = V.z - f.z, d = Math.hypot(dx, dz);
-    if (d >= f.r || d < 0.01) continue;
-    const nx = dx / d, nz = dz / d, vin = V.vx * nx + V.vz * nz;
-    V.x = f.x + nx * f.r; V.z = f.z + nz * f.r;
-    if (vin < 0) { V.vx -= nx * vin * 1.4; V.vz -= nz * vin * 1.4; if (-vin > 4) { C.Snd.noise(0.15, 0.2); splash(V.x - nx, 2.5, V.z - nz, 14, 1.2); } }
-  }
   driftT -= dt;
   if (A.drift < 0.01 || sp < 3) return;
   const ci = Math.floor(V.x / 20), cj = Math.floor(V.z / 20);
@@ -925,6 +1015,8 @@ export function updateSeasons (dt) {
   stepFights(dt);
   stepBalls(dt);
   stepSplash(dt);
+  // кто уже на улице — переодеваются понемногу, пока их не видно
+  if ((redressT -= dt) <= 0) { redressT = 0.3; C.cam.getWorldDirection(CAM_DIR); redressHumans(C.cam.position.x, C.cam.position.z, CAM_DIR.x, CAM_DIR.z, 2); }
   if (window.__dlv && !window.__dlv.season) window.__dlv.season = DEBUG;
 }
 

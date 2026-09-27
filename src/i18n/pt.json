@@ -727,5 +727,8 @@
  "шофёр": "chofer",
  "Шофёр, машину!": "Motorista, o carro!",
  "Шухер!": "Corre!",
- "Эй! Это машина шефа!": "Ei! É o carro do chefe!"
+ "Эй! Это машина шефа!": "Ei! É o carro do chefe!",
+ "сдачи не надо": "pode ficar com o troco",
+ "Сдачи не надо!": "Fica com o troco!",
+ "чаевые от богача +{money}": "gorjeta de ricaço +{money}"
 }

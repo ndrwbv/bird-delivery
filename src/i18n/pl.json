@@ -729,5 +729,8 @@
  "шофёр": "szofer",
  "Шофёр, машину!": "Szoferze, wóz!",
  "Шухер!": "Wiejemy!",
- "Эй! Это машина шефа!": "Hej! To auto szefa!"
+ "Эй! Это машина шефа!": "Hej! To auto szefa!",
+ "сдачи не надо": "reszty nie trzeba",
+ "Сдачи не надо!": "Reszty nie trzeba!",
+ "чаевые от богача +{money}": "napiwek od bogacza +{money}"
 }

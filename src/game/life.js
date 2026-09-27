@@ -12,6 +12,7 @@
 import { t } from '../i18n/index.js';
 import { makePerson } from './people.js';
 import { MAP } from './map.js';
+import * as SEAS from './seasons.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[(Math.random() * a.length) | 0];
@@ -28,25 +29,20 @@ const COUPLES = [], RICH = [], ARTISTS = [], FLYERS = [], LUX = [], WALLS = [], 
 export const STATE = { COUPLES, RICH, ARTISTS, FLYERS, LUX, WALLS, PARKS, TAGS, CAP: null, stats: { tags: 0, spawned: 0, ms: 0, setupMs: 0 } };
 let CAP = null;
 
-/* сезон: если рядом есть seasons.js — спрашиваем его, нет — сезона нет */
-const SEAS_LOAD = import.meta.glob('./seasons.js');
-let SEAS = null;
-function winter () {
-  const E = A.ENV;
-  if (E && typeof E.season === 'string') return /winter|зим/i.test(E.season);
-  if (!SEAS) return false;
-  try {
-    // seasons.js: 0 — лето, 1 — осень, 2 — зима, 3 — весна
-    if (typeof SEAS.seasonValue === 'function') { const v = ((SEAS.seasonValue() % 4) + 4) % 4; return (v >= 2 && v < 3) || (typeof SEAS.snowy === 'function' && SEAS.snowy()); }
-    for (const k of ['season', 'getSeason', 'currentSeason', 'seasonNow']) {
-      if (typeof SEAS[k] !== 'function') continue;
-      const v = SEAS[k]();
-      return /winter|зим/i.test(String(typeof v === 'string' ? v : v && (v.id || v.name || v.key) || ''));
-    }
-    if (SEAS.SEASON) return /winter|зим/i.test(String(SEAS.SEASON.id || SEAS.SEASON));
-  } catch (e) { /* чужой модуль — не наша забота */ }
-  return false;
+/* сезон — из seasons.js: 0 лето, 1 осень, 2 зима, 3 весна. Насколько
+   холодно (0…1) — по той же кривой, по которой там одеваются люди (warm) */
+const COLD = [[0, 0], [0.82, 0], [1.3, 0.45], [1.8, 0.78], [2.02, 1], [2.8, 1], [3.2, 0.62], [3.6, 0.3], [3.9, 0], [4, 0]];
+function cold () {
+  let v;
+  try { v = ((SEAS.seasonValue() % 4) + 4) % 4; } catch (e) { return 0; }
+  for (let i = 1; i < COLD.length; i++) {
+    const [x0, y0] = COLD[i - 1], [x1, y1] = COLD[i];
+    if (v <= x1) return y0 + (y1 - y0) * (v - x0) / (x1 - x0 || 1);
+  }
+  return 0;
 }
+const winter = () => cold() > 0.6 || (SEAS.snowy && SEAS.snowy());
+const deepWinter = () => cold() > 0.9;
 
 /* ─── общее для людей ─── */
 const gy = (x, z) => A.groundH(x, z) + A.curbAt(x, z);
@@ -114,7 +110,9 @@ function spawnCouple () {
   const a = member(makePerson({ fem: fa })), b = member(makePerson({ fem: fb }));
   const c = { a, b, x: 0, z: 0, h: 0, ph: rand(0, 9), crossT: rand(20, 90), yard: chance(0.3),
     speed: rand(1.0, 1.3) * Math.min(a.u.pace, b.u.pace), hands: chance(0.65),
-    chat: 0, chatT: rand(10, 35), lookT: rand(2, 5), look: 0, heartT: rand(4, 10), shock: 0, react: null, fresh: 1 };
+    chat: 0, chatT: rand(10, 35), lookT: rand(2, 5), look: 0, heartT: rand(4, 10), shock: 0, react: null, fresh: 1, huddle: winter() };
+  // зимой идут медленнее, прижавшись друг к другу, и не останавливаются болтать на морозе
+  if (c.huddle) { c.speed *= 0.78; c.hands = true; c.chatT = rand(60, 120); }
   A.walkSpawn(c, 45, 170);
   COUPLES.push(c);
 }
@@ -133,17 +131,18 @@ function coupleStep (c, dt) {
   else {
     if (pair && (c.chatT -= dt) <= 0 && !c.cross && !c.goTo) { c.chat = rand(4, 9); c.chatT = rand(25, 60); }
     if (!walkable(c)) return;
-    ang = A.walkerStep(c, dt, 6.5);
+    ang = A.walkerStep(c, dt, c.huddle ? 5.2 : 6.5);
     A.pushOut(c, pair ? 0.8 : 0.45);
     moving = true;
   }
   if (!Number.isNaN(ang)) c.h = c.fresh ? ang : dampAng(c.h, ang, 6, dt);
   c.fresh = 0;
-  const off = pair ? 0.42 : 0, rx = Math.cos(c.h), rz = -Math.sin(c.h);
+  const off = pair ? (c.huddle ? 0.3 : 0.42) : 0, rx = Math.cos(c.h), rz = -Math.sin(c.h);
   a.x = c.x - rx * off; a.z = c.z - rz * off; b.x = c.x + rx * off; b.z = c.z + rz * off;
   const alive = pair ? [a, b] : [solo];
   for (const m of alive) place(m, moving ? Math.abs(Math.sin(c.ph)) * 0.04 : 0);
   hitCheck(c);
+  if (!moving || !pair) for (const m of alive) m.grp.rotation.z = damp(m.grp.rotation.z, 0, 8, dt);
   if (c.shock > 0) {
     for (const m of alive) { if (m.gone) continue; A.handsUp(m.u, dt); m.u.legL.rotation.x = damp(m.u.legL.rotation.x, 0, 10, dt); m.u.legR.rotation.x = damp(m.u.legR.rotation.x, 0, 10, dt); }
     return;
@@ -168,6 +167,13 @@ function coupleStep (c, dt) {
   if (pair && c.hands) {
     a.u.armR.rotation.x = b.u.armL.rotation.x = -0.1 + sw * 0.18;
     a.u.armR.rotation.z = 0.26; b.u.armL.rotation.z = -0.26;
+  }
+  if (pair && c.huddle) {
+    // прижались: внутренние руки — за спину друг другу, корпус наклонён к соседу, головы в плечи
+    a.u.armR.rotation.x = b.u.armL.rotation.x = 0.35;
+    a.u.armR.rotation.z = 0.5; b.u.armL.rotation.z = -0.5;
+    a.grp.rotation.z = damp(a.grp.rotation.z, -0.07, 6, dt); b.grp.rotation.z = damp(b.grp.rotation.z, 0.07, 6, dt);
+    a.u.head.rotation.x = b.u.head.rotation.x = 0.15;
   }
   if ((c.lookT -= dt) <= 0) { c.look = pair && !c.look ? 1 : 0; c.lookT = c.look ? rand(1.2, 2.4) : rand(3, 8); }
   a.u.head.rotation.y = damp(a.u.head.rotation.y, c.look ? 0.75 : 0, 6, dt);
@@ -544,6 +550,7 @@ function drawGraffiti (cv, style) {
     x.moveTo(L.x - w / 2, by); x.lineTo(L.x - w / 2, by - w * 0.5); x.lineTo(L.x - w / 6, by - w * 0.2); x.lineTo(L.x, by - w * 0.6);
     x.lineTo(L.x + w / 6, by - w * 0.2); x.lineTo(L.x + w / 2, by - w * 0.5); x.lineTo(L.x + w / 2, by); x.closePath(); x.stroke();
   }
+  return [c1, c2];
 }
 
 /* стены: у каждого подходящего дома — одна-две стены, где есть где встать */
@@ -579,6 +586,16 @@ function buildWalls () {
     }
     for (let j = 0; j < (k === 'ind' ? 2 : 1) && cand.length; j++) WALLS.push(cand.splice((Math.random() * cand.length) | 0, 1)[0]);
   }
+  // сквозные арки во дворы: стена тоннеля изнутри, с одной стороны
+  for (const R of A.ARCHES || []) {
+    if (R.ux === undefined || R.t < 5 || !chance(0.6)) continue;
+    const sd = chance(0.5) ? 1 : -1, hw = 2.6;                  // полширины проезда (ARCH_W / 2)
+    const x = R.mx + R.ux * sd * hw + R.ix * R.t / 2, z = R.mz + R.uz * sd * hw + R.iz * R.t / 2;
+    const nx = -R.ux * sd, nz = -R.uz * sd, g = A.groundH(x + nx, z + nz);
+    const w = Math.min(R.t - 1.4, rand(3, 4.5)), h = Math.min(w * 0.5, 2.0, R.top - 0.5 - (g + 0.3));
+    if (h < 1 || !A.inBounds(x, z, 10)) continue;
+    WALLS.push({ x, z, nx, nz, tx: nz, tz: -nx, w, h, y0: g + 0.3, k: 'arch', tag: null, busy: 0, cd: 0, seen: 0 });
+  }
 }
 
 const CELL = 3, PXM = 22;
@@ -587,7 +604,7 @@ function makeTag (W, old) {
   const fin = document.createElement('canvas');
   fin.width = cw; fin.height = ch;
   const style = old ? pick(['tag', 'tag', 'throw', 'piece']) : pick(['tag', 'throw', 'piece', 'piece']);
-  drawGraffiti(fin, style);
+  const pal = drawGraffiti(fin, style);
   const img = fin.getContext('2d').getImageData(0, 0, cw, ch).data;
   // пятна, по которым проявляется: полосами слева направо, змейкой сверху вниз
   const cells = [];
@@ -613,7 +630,7 @@ function makeTag (W, old) {
   mesh.position.set(W.x + W.nx * 0.11, W.y0 + W.h / 2, W.z + W.nz * 0.11);
   mesh.rotation.y = Math.atan2(W.nx, W.nz);
   A.scene.add(mesh);
-  const T = { W, mesh, tex, fin, disp, img, cw, ch, cells, i: old ? cells.length : 0, done: !!old, dur: style === 'piece' ? rand(28, 40) : style === 'throw' ? rand(14, 20) : rand(8, 13), updT: 0 };
+  const T = { W, mesh, tex, fin, disp, img, cw, ch, cells, i: old ? cells.length : 0, done: !!old, pal, mistC: pal.map(h => new THREE.Color(h)), dur: style === 'piece' ? rand(28, 40) : style === 'throw' ? rand(14, 20) : rand(8, 13), updT: 0 };
   W.tag = T;
   TAGS.push(T);
   STATE.stats.tags++;
@@ -641,19 +658,22 @@ function cellWorld (T, idx, out) {
   const u = (c[0] + CELL / 2) / T.cw - 0.5, v = (c[1] + CELL / 2) / T.ch;
   out.u = u * W.w; out.x = W.x + W.tx * out.u + W.nx * 0.12; out.z = W.z + W.tz * out.u + W.nz * 0.12; out.y = W.y0 + (1 - v) * W.h;
   const p = (((c[1] + 1) * T.cw + c[0] + 1) * 4);
-  out.r = T.img[p] / 255; out.g = T.img[p + 1] / 255; out.b = T.img[p + 2] / 255;
+  // облако — цвета краски: светлое пятно как есть (в линейный цвет), тёмный контур и подложка — цвет баллончика
+  const r = T.img[p] / 255, g = T.img[p + 1] / 255, b = T.img[p + 2] / 255;
+  if (r + g + b > 1.2) { out.r = r * r; out.g = g * g; out.b = b * b; }
+  else { const C = T.mistC[idx & 1]; out.r = C.r; out.g = C.g; out.b = C.b; }
   return out;
 }
 
 /* облачко краски: одно облако точек на всех */
-const MIST_N = 160;
+const MIST_N = 200;
 let MIST = null;
 function mistInit () {
   const g = new THREE.BufferGeometry();
   const pos = new Float32Array(MIST_N * 3).fill(-1000), col = new Float32Array(MIST_N * 3);
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const pts = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.16, vertexColors: true, transparent: true, opacity: 0.75, depthWrite: false }));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.42, vertexColors: true, transparent: true, opacity: 0.92, depthWrite: false }));
   pts.frustumCulled = false;
   A.scene.add(pts);
   MIST = { pts, pos, col, vel: new Float32Array(MIST_N * 3), life: new Float32Array(MIST_N), next: 0, live: 0 };
@@ -664,7 +684,7 @@ function mistEmit (x, y, z, vx, vy, vz, r, g, b) {
   M.pos[i * 3] = x; M.pos[i * 3 + 1] = y; M.pos[i * 3 + 2] = z;
   M.vel[i * 3] = vx; M.vel[i * 3 + 1] = vy; M.vel[i * 3 + 2] = vz;
   M.col[i * 3] = r; M.col[i * 3 + 1] = g; M.col[i * 3 + 2] = b;
-  M.life[i] = rand(0.3, 0.6);
+  M.life[i] = rand(0.2, 0.4);                                // короткий пшик
   M.live = 1;
 }
 function mistStep (dt) {
@@ -690,10 +710,9 @@ function spawnArtist (W) {
   L.pants = pick(['#2e4a6b', '#1f2328', '#39405c', '#5a4a3a']); L.shoes = pick(['#f4f1ea', '#1f1c1a', '#8a2a2a']);
   L.pack = chance(0.6) ? pick(['#2b2a30', '#e04836', '#4f7fd6']) : null;
   const m = member(person, { fat: false });
-  const canC = pick(PAL)[0];
+  const T = W.tag || makeTag(W, false), canC = T.pal[0];
   m.can = bits(b => { b(0.08, 0.2, 0.08, canC, 0, -0.62, 0.03); b(0.05, 0.04, 0.05, '#f4f1ea', 0, -0.74, 0.03); });
   m.u.armR.add(m.can);
-  const T = W.tag || makeTag(W, false);
   W.busy = 1;
   const at = cellWorld(T, T.i, {});
   m.x = W.x + W.tx * at.u + W.nx * 0.95; m.z = W.z + W.tz * at.u + W.nz * 0.95;
@@ -739,9 +758,11 @@ function artistStep (a, dt) {
     place(m);
     // краска летит из баллончика к стене
     if (d < 70 && (a.mistT -= dt) <= 0) {
-      a.mistT = 0.03;
+      // струя от баллончика к стене и облачко у самой стены — его и видно с дороги
+      a.mistT = 0.05;
       const h = handWorld(m, 'armR', -0.76);
-      for (let k = 0; k < 2; k++) mistEmit(h.x, h.y, h.z, (H.x - h.x) * rand(2, 3.5) + rand(-0.3, 0.3), (H.y - h.y) * rand(2, 3.5) + rand(-0.2, 0.3), (H.z - h.z) * rand(2, 3.5) + rand(-0.3, 0.3), H.r, H.g, H.b);
+      for (let k = 0; k < 2; k++) mistEmit(h.x, h.y, h.z, (H.x - h.x) * rand(2.5, 4) + rand(-0.3, 0.3), (H.y - h.y) * rand(2.5, 4) + rand(-0.2, 0.3), (H.z - h.z) * rand(2.5, 4) + rand(-0.3, 0.3), H.r, H.g, H.b);
+      for (let k = 0; k < 2; k++) mistEmit(H.x + W.nx * 0.1, H.y, H.z + W.nz * 0.1, W.nx * rand(0.4, 1.2) + rand(-0.6, 0.6), rand(-0.3, 0.6), W.nz * rand(0.4, 1.2) + rand(-0.6, 0.6), H.r, H.g, H.b);
     }
     if (d < 22 && (a.hissT -= dt) <= 0 && A.Snd) { a.hissT = rand(0.5, 1.2); A.Snd.noise(0.22, 0.025 * (1 - d / 22)); }
     if (T.done) { T.tex.needsUpdate = true; a.st = 'admire'; a.t = 0; W.cd = 60; }
@@ -999,14 +1020,31 @@ function flyerStep (f, dt) {
   }
 }
 
+/* ── чаевые от богача ──
+   Заказ у богача: рядом гуляет богач (или стоит его машина), либо дом
+   солидный — сталинка, офис. И то не каждый раз: примерно один из восьми.
+   Возвращает сумму чаевых (0 — обычный клиент); game.js кладёт её в оплату. */
+let POSH = null;
+export function richTip (peds, share) {
+  const p = peds && peds[0];
+  if (!A || !p) return 0;
+  if (!POSH) POSH = A.CITY.buildings.filter(b => b.st === 'stalin' || b.k === 'off').map(b => b.p.reduce((a, q) => [a[0] + q[0] / b.p.length, a[1] + q[1] / b.p.length], [0, 0]));
+  const near = (x, z, r) => Math.abs(x - p.x) < r && Math.abs(z - p.z) < r;
+  const ok = RICH.some(r => !r.m.dead && near(r.m.x, r.m.z, 70)) || LUX.some(l => near(l.x, l.z, 90)) || POSH.some(q => near(q[0], q[1], 40));
+  if (!ok || !chance(1 / 8)) return 0;
+  if (p.grp) {
+    const b = A.sayBubble(p.grp, t('Сдачи не надо!'), '#8a6a1a', 2.7);
+    setTimeout(() => { if (b.parent) b.parent.remove(b); b.material.dispose(); }, 2600);
+  }
+  return Math.max(300, Math.round(share * rand(1.5, 3) / 50) * 50);
+}
+
 /* ═════════════════ цикл ═════════════════ */
 function setup () {
   THREE = A.THREE; V3 = new THREE.Vector3(); V3b = new THREE.Vector3();
   const sev = MAP.id === 'seversk';
   CAP = STATE.CAP = { couples: 4, rich: sev ? 2 : 3, lux: sev ? 1 : 2, artists: sev ? 3 : 2, flyers: 4 };
   buildWalls(); buildParks(); mistInit();
-  const f = SEAS_LOAD['./seasons.js'];
-  if (f) f().then(mod => { SEAS = mod; }).catch(() => {});
 }
 
 function sweep (list, bad, drop) {
@@ -1030,13 +1068,13 @@ function scan () {
   for (const W of WALLS) {
     const d = Math.hypot(W.x - V.x, W.z - V.z);
     if (d > 200) continue;
-    if (!W.seen && olds < 3) { W.seen = 1; if (chance(W.k === 'gar' ? 0.3 : 0.15)) { makeTag(W, true); olds++; } }   // не больше трёх холстов за раз — без рывка
+    if (!W.seen && olds < 3) { W.seen = 1; if (chance(W.k === 'gar' || W.k === 'arch' ? 0.35 : 0.15)) { makeTag(W, true); olds++; } }   // не больше трёх холстов за раз — без рывка
     if (W.cd > 0) { W.cd -= 1; continue; }
     if (W.busy || (W.tag && W.tag.done) || d < 35 || d > 150) continue;
-    const s = d + rand(0, 60);
+    const s = d + rand(0, 60) - (W.k === 'arch' ? 35 : 0);       // арки-тоннели — любимое место
     if (s < fd) { fd = s; free = W; }
   }
-  if (free && ARTISTS.length < CAP.artists && !E.rainWant && chance(0.5)) spawnArtist(free);
+  if (free && ARTISTS.length < CAP.artists && !E.rainWant && chance(deepWinter() ? 0.08 : winter() ? 0.25 : 0.5)) spawnArtist(free);   // в лютый мороз не рисуют
   if (day && PARKS.length && FLYERS.length < CAP.flyers && chance(0.5)) { const at = parkSpot(); if (at) spawnFlyer(at[0], at[1]); }
 }
 
@@ -1058,7 +1096,7 @@ export function step (dt, api) {
   const V = A.V;
   for (const T of TAGS) T.mesh.visible = Math.abs(T.W.x - V.x) < 220 && Math.abs(T.W.z - V.z) < 220;
   STATE.stats.ms = STATE.stats.ms * 0.98 + (performance.now() - t0) * 0.02;       // сколько стоит кадр жизни, в среднем
-  if (window.__dlv && !window.__dlv.LIFE) window.__dlv.LIFE = Object.assign(STATE, { debug: { spawnCouple, spawnRich, spawnLux, spawnArtist, spawnFlyer, parkSpot, makeTag, winter } });
+  if (window.__dlv && !window.__dlv.LIFE) window.__dlv.LIFE = Object.assign(STATE, { debug: { spawnCouple, spawnRich, spawnLux, spawnArtist, spawnFlyer, parkSpot, makeTag, winter, deepWinter, cold, richTip } });
 }
 
 /* рядом кого-то сбили или взорвалось: парочки и богачи — руки вверх,

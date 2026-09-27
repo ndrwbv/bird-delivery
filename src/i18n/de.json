@@ -725,5 +725,8 @@
  "шофёр": "Chauffeur",
  "Шофёр, машину!": "Chauffeur, den Wagen!",
  "Шухер!": "Abflug!",
- "Эй! Это машина шефа!": "Hey! Das ist der Wagen vom Chef!"
+ "Эй! Это машина шефа!": "Hey! Das ist der Wagen vom Chef!",
+ "сдачи не надо": "Stimmt so",
+ "Сдачи не надо!": "Stimmt so!",
+ "чаевые от богача +{money}": "Trinkgeld vom Reichen +{money}"
 }

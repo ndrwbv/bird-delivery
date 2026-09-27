@@ -725,5 +725,8 @@
  "шофёр": "chauffeur",
  "Шофёр, машину!": "Driver, the car!",
  "Шухер!": "Scram!",
- "Эй! Это машина шефа!": "Hey! That's the boss's car!"
+ "Эй! Это машина шефа!": "Hey! That's the boss's car!",
+ "сдачи не надо": "keep the change",
+ "Сдачи не надо!": "Keep the change!",
+ "чаевые от богача +{money}": "tip from a rich guy +{money}"
 }

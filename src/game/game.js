@@ -33,6 +33,7 @@ import * as LIFE from './life.js';               // парочки, богачи
 import * as RL from './roadlife.js';
 import * as PZ from './pizzeria.js';
 import * as LM from './landmarks.js';            // заправки и каток
+import * as CULL from './cull.js';               // статика дальше камеры — со сцены, матрицы заморожены (Steam Deck)
 
 /* Сохранения — через площадку (облако Яндекса / localStorage). Значения
    хранятся как есть: числа, строки, массивы. */
@@ -1192,7 +1193,7 @@ function tree (x, z, strip = 0) {
   // было бы стеной посреди дороги; на газоне бульвара — ближе к бордюру
   const road = nearestRoad(x, z, DRIVE_MAX + 2, 1);
   if (road && road.d < road.seg.w / 2 + (strip ? 1 : 2.5)) return;
-  SEAS.seasonTree(x, z, y);                     // вид дерева и сезон — seasons.js
+  if (SEAS.seasonTree(x, z, y) === false) return;   // вид дерева и сезон — seasons.js (у столиков пиццерии не сажает)
   solid(x - 0.55, z - 0.55, x + 0.55, z + 0.55);
 }
 
@@ -2002,7 +2003,7 @@ function updateDrinkit (dt) {
    на доску. Плата вдвое. Сёрфер один и тот же на всю смену — завсегдатай. */
 const SURF = { f: null, person: null };
 function surfPlan () {
-  if (SURF.f || INTRO) return null;
+  if (SURF.f || INTRO || SEAS.iced()) return null;   // зимой река во льду — сёрфера нет
   // берег на нашей стороне: от середины реки к курьеру, до первой суши
   const side = V.x > riverX(V.z) ? 1 : -1;
   for (let k = 0; k < 25; k++) {
@@ -2033,6 +2034,7 @@ function surfPlan () {
 function updateSurf (dt) {
   const f = SURF.f;
   if (!f) return;
+  f.grp.visible = !SEAS.iced();
   f.t += dt; f.ph += dt;
   // катается вдоль берега туда-обратно, качается на волне
   const sway = Math.sin(f.ph * 0.35) * 18;
@@ -2600,7 +2602,7 @@ function osmBuildings (skip) {
       }
       LITM.color('#57525c');
       LITM.poly([pts[0], pts[1], pts[3], pts[2]], arch.top, true);
-      ARCHES.push({ x: arch.mx + arch.ix * arch.t / 2, z: arch.mz + arch.iz * arch.t / 2, mx: arch.mx, mz: arch.mz, ix: arch.ix, iz: arch.iz, t: arch.t });
+      ARCHES.push({ x: arch.mx + arch.ix * arch.t / 2, z: arch.mz + arch.iz * arch.t / 2, mx: arch.mx, mz: arch.mz, ix: arch.ix, iz: arch.iz, t: arch.t, ux: arch.ux, uz: arch.uz, top: arch.top });   // ux/top — стены тоннеля для граффити (life.js)
     }
     facade(b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch);
     genEntrances(b, p, ccw, lv, area, arch, bestEdge);
@@ -3314,7 +3316,8 @@ let MAPW_API = null;
 /* что нужно roadlife.js (знаки, заборы, пробки за авариями, ремонт) */
 const roadApi = () => ({
   THREE, scene, cam, V, S, CITY, box, put, mergeGeos, obb, smashAdd, SMASH, SM_WORD, SOLIDS, SOLID_GRID, SCELL, PARKED, DRIVE_MAX,
-  groundH, curbAt, inHouse, inPoly, inBounds, nearestRoad, NODES, NODE_IDX, edgeOf, edgeRun, laneCount, laneOff, routeNodes, nodeNear,
+  groundH, curbAt, inHouse, inPoly, inBounds, nearestRoad, NODES, NODE_IDX, edgeOf, edgeRun, laneCount, laneOff, routeNodes, nodeNear, nearestNode,
+  walkLeg, walkSpawn, walkersAll,
   ZEBRAS, SIG_GROUPS, TRAFFIC, ACCIDENTS, newCar, placeTraffic, poseTraffic, svcGone, makeHuman, dropMesh, gibHuman, sayBubble, Snd, toast, calmStart,
   onRunOver: w => { S.people++; toast(w === 'driver' ? $t('минус зевака') : $t('минус дорожник')); },
   get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get tG () { return tG; },
@@ -4346,6 +4349,7 @@ function walkerStep (p, dt, legSwing) {
     return ang;
   }
 
+  RL.walkGuard(p);                                  // у забора стройки — назад (roadlife.js)
   const d0 = W.d;
   W.d += p.speed * dt;
   if (W.d >= W.L) {
@@ -5817,7 +5821,7 @@ const rightOf = (a, b) => {
 };
 
 function lanePath (x0, z0, x1, z1) {
-  const nodes = routeNodes(x0, z0, x1, z1);
+  const nodes = RL.svcNodes(x0, z0, x1, z1) || routeNodes(x0, z0, x1, z1);   // в объезд ремонта (roadlife.js)
   const r0 = nearestRoad(x0, z0, DRIVE_MAX, 2), r1 = nearestRoad(x1, z1, DRIVE_MAX, 3);
   const st = r0 ? [r0.x, r0.z] : [x0, z0], en = r1 ? [r1.x, r1.z] : [x1, z1];
   // узел за точкой назначения (или за спиной на старте) не нужен: иначе
@@ -5885,7 +5889,7 @@ function svcDrive (t, dt) {
     // таран: прямо на курьера, на полном ходу, ни на кого не глядя
     t.ramT -= dt;
     const a1 = Math.atan2(V.x - t.x, V.z - t.z), dh = Math.atan2(Math.sin(a1 - t.h), Math.cos(a1 - t.h));
-    t.speed = damp(t.speed, t.cruise * 1.2, t.acc, dt);
+    t.speed = damp(t.speed, t.cruise * 1.2 * RL.svcHold(t, dt), t.acc, dt);   // и на таран — не сквозь щиты ремонта
     t.h += clamp(dh, -3 * dt, 3 * dt);
     t.x += Math.sin(t.h) * t.speed * dt; t.z += Math.cos(t.h) * t.speed * dt;
     t.wheel += t.speed * dt / 0.46;
@@ -5952,6 +5956,7 @@ function svcDrive (t, dt) {
         ahead(p.x, p.z, t.aggr ? 1.8 : 3.2, 1.8, 12);
       }
   }
+  slow = Math.min(slow, RL.svcHold(t, dt));        // щиты ремонта: встать, найти объезд (roadlife.js)
   const goal = want * slow;
   t.dbg = [+want.toFixed(1), +slow.toFixed(2), +dh.toFixed(2)];   // для отладки: чего хочет и что держит
   t.speed = damp(t.speed, goal, goal > t.speed ? t.acc : 5, dt);
@@ -9169,7 +9174,10 @@ function checkArrival (dt) {
     const tier = S.free ? 0 : left >= 0.5 ? 2 : left >= 0.25 ? 1 : 0;
     const bonus = tier ? Math.round(share * (tier === 2 ? 0.6 : 0.3) * (S.tipMul || 1)) : 0;
     if (bonus) popBonus(tier === 2 ? $t('А ты харош!') : $t('Шустро!'), $t('чаевые накинули +{money}', { money: money(bonus) }));
-    const part = onTime ? share + bonus : Math.round(share * 0.45);
+    // клиент-богач (рядом гуляет богач или дом солидный) — изредка крупные чаевые, см. LIFE.richTip
+    const rich = onTime ? LIFE.richTip(st.peds, share) : 0;
+    if (rich) popBonus($t('чаевые от богача +{money}', { money: money(rich) }), $t('сдачи не надо'));
+    const part = onTime ? share + bonus + rich : Math.round(share * 0.45);
     S.money += part;
     // оплата — сразу в кошелёк: умер или закрыл вкладку — деньги уже твои
     if (!S.freeRun) addWallet(part);
@@ -9728,6 +9736,7 @@ function startPose () {
 /* времена года: что им нужно от игры (ENV, дождь и небо заводятся ниже — геттерами) */
 SEAS.initSeasons({ THREE, scene, cam, renderer, Store, MAP, CITY, V, S, groundH, curbAt, nearestRoad, roadWidth, drivable, inHouse, inPoly, inBounds,
   put, smashAdd, SMASH, SM_WORD, SMASH_MAT, LAMP_SPOTS, ZEBRAS, NODE_IDX, nodeDeg, makeHuman, dropMesh, gibHuman, toast, Snd, CAR_L, CAR_W, isPlaying, sayBubble,
+  obb, SOLIDS, get COURIER_SLOTS () { return COURIER_SLOTS; },
   get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get rainLines () { return rainLines; }, get hemi () { return hemi; } });
 const T0 = performance.now();
 buildCity();
@@ -9981,7 +9990,7 @@ function updateEnv (dt) {
   FOG_C.copy(mix(A[2], B[2])).lerp(RAIN_SKY, R * 0.6 * (1 - ENV.night * 0.6));
   scene.background.copy(SKY_C);
   scene.fog.color.copy(FOG_C);
-  scene.fog.far = 470 - R * 170;
+  scene.fog.far = (470 - R * 170) * CULL.Q.k;      // CULL.Q — страховка дальности на слабом железе
   sun.color.copy(mix(A[3], B[3]));
   sun.intensity = lerp(A[4], B[4], k) * (1 - R * 0.55);
   if (hemi) { hemi.color.copy(mix(A[5], B[5])); hemi.groundColor.copy(mix(A[6], B[6])); hemi.intensity = lerp(A[7], B[7], k) * (1 - R * 0.25); }
@@ -10298,7 +10307,7 @@ function padStep () {
 const LIFE_API = {
   THREE, scene, cam, V, S, ENV, CITY, ADULT, HUMAN_VC, CAR_L, CAR_W, TRAFFIC, Snd,
   groundH, curbAt, inHouse, inPoly, inBounds, nearestRoad, pushOut, walkerStep, walkSpawn, walkBack,
-  makeHuman, dropMesh, makeCar, newCar, poseOnSlope, gibHuman, handsUp, emote, puff, sayBubble, toast, put, mergeGeos,
+  ARCHES, makeHuman, dropMesh, makeCar, newCar, poseOnSlope, gibHuman, handsUp, emote, puff, sayBubble, toast, put, mergeGeos,
   onKill: () => { S.people++; Snd.squish(); },
 };
 
@@ -10310,6 +10319,7 @@ function frame (now) {
   const raw = Math.max(0, (now - last) / 1000);
   const dt = clamp(raw, 0, 1 / 20);     // назад время не идёт
   last = now;
+  CULL.govern(raw, isPlaying() && !S.paused && !EXT.paused && !FM.open && !document.hidden);
   padStep();
   if (S.paused || EXT.paused) return;
   if (FM.open) { drawFullMap(); return; }        // на карте игра стоит
@@ -10429,13 +10439,18 @@ function frame (now) {
     }
   }
 
+  CULL.step();
   renderer.render(scene, cam);
 }
+// шейдеры всех материалов города — сейчас, под экраном загрузки, а не рывком
+// в первый раз, когда кусок попадёт в кадр (зимой на Деке это было 150 мс)
+try { renderer.compile(scene, cam); } catch (e) { /* — */ }
+CULL.freeze(scene, cam, PROPS);                   // город собран: неподвижное — в заморозку и отсечение
 requestAnimationFrame(frame);
 
 /* отладочная ручка */
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { RL: RL.DEBUG, S, V, TRAFFIC, PEDS, PEOPLE, PIZZA, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { RL: RL.DEBUG, S, V, TRAFFIC, PEDS, PEOPLE, PIZZA, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта

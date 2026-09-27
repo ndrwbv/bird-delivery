@@ -290,8 +290,32 @@ function makeLook (seed, o = {}) {
    (считает seasons.js). Каждый новый человек одевается по погоде: у
    каждого своя зябкость от зерна, поэтому в межсезонье на одной улице
    кто-то ещё в футболке, а кто-то уже в куртке. */
-let WARM = 0;
-export function setPeopleSeason (w) { WARM = Math.max(0, Math.min(1, +w || 0)); }
+let WARM = 0, DIRTY = false, REDRESS = null, HSET = null;
+export function setPeopleSeason (w) {
+  const v = Math.max(0, Math.min(1, +w || 0));
+  if (Math.abs(v - WARM) > 0.005) DIRTY = true;
+  WARM = v;
+}
+/* Переодеть тех, кто уже на улице, — понемногу и только вне кадра: дальше
+   dFar от камеры или за спиной. За вызов — не больше max человек.
+   cam — позиция камеры, fx/fz — куда она смотрит. */
+export function redressHumans (cx, cz, fx, fz, max = 3, dFar = 60) {
+  if (!DIRTY || !REDRESS || !HSET) return 0;
+  let n = 0, stale = 0;
+  for (const g of HSET) {
+    const u = g.userData;
+    if (!u.look || Math.abs((u.warm || 0) - WARM) < 0.005) continue;
+    stale++;
+    if (n >= max) continue;
+    const p = g.parent && !g.parent.isScene ? g.parent.position : g.position;
+    const dx = p.x - cx, dz = p.z - cz, d = Math.hypot(dx, dz);
+    if (d < dFar && !(d > 10 && dx * fx + dz * fz < 0)) continue;
+    REDRESS(g);
+    n++;
+  }
+  if (!stale) DIRTY = false;
+  return n;
+}
 const COATS = ['#2b2a30', '#3b4a5a', '#1f2328', '#5a3a2e', '#6b2e2e', '#2e4a6b', '#3f5a3a', '#8a2a3a', '#d9d2c2', '#4a4550', '#c9476b', '#e0b13f', '#3fa8a0'];
 const SCARVES = ['#d95d5d', '#e0b13f', '#f4f1ea', '#4f7fd6', '#59b06a', '#c9476b', '#8e6fd0', '#2b2a30'];
 const FURS = ['#5a4a3a', '#3a3036', '#6b5a48', '#8a7a68', '#2b2a30'];
@@ -635,6 +659,16 @@ export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
     return m;
   }
   /* o: { fem, fat, h, skin, shirt, pants, cap, face: false — без лица (маска) } */
+  HSET = HUMANS;
+  /* та же фигура и лицо, одежда — по нынешнему сезону */
+  REDRESS = g => {
+    const u = g.userData, S = buildSpec(u.look, u.o || {});
+    for (let i = 0; i < 5; i++) { const m = u.parts[i]; m.geometry.dispose(); m.geometry = geo([[S.parts[i], 0, 0, 0]]); }
+    if (u.hair) { u.hair.geometry.dispose(); if (S.parts[5].length) u.hair.geometry = geo([[S.parts[5], 0, 0, 0]]); else { u.head.remove(u.hair); u.hair = null; } }
+    else if (S.parts[5].length) { u.hair = new THREE.Mesh(geo([[S.parts[5], 0, 0, 0]]), HUMAN_VC); u.head.add(u.hair); }
+    u.lod.geometry.dispose(); u.lod.geometry = geo(S.parts.map((l, i) => [l, ...S.piv[i]]));
+    u.colors.shirt = S.shirt; u.colors.pants = S.pants; u.warm = WARM;
+  };
   return function makeHuman (person, o = {}) {
     const Lk = person && person.look ? person.look : makeLook(newSeed(), { fem: o.fem });
     const S = buildSpec(Lk, o);
@@ -655,14 +689,15 @@ export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
       face.position.z = S.D / 2 + 0.002;
       head.add(face);
     }
-    if (S.parts[5].length) head.add(new THREE.Mesh(geo([[S.parts[5], 0, 0, 0]]), HUMAN_VC));
+    const hair = S.parts[5].length ? new THREE.Mesh(geo([[S.parts[5], 0, 0, 0]]), HUMAN_VC) : null;
+    if (hair) head.add(hair);
     // дальний вариант: весь человек одним мешем
     const lod = new THREE.Mesh(geo(S.parts.map((l, i) => [l, ...S.piv[i]])), HUMAN_VC);
     lod.visible = false;
     g.add(lod);
     g.scale.setScalar(S.hs);
     g.userData = { legL, legR, armL, armR, head, colors: { skin: S.skin, shirt: S.shirt, pants: S.pants }, person, fem: S.fem, fat: S.fat, pace: S.pace,
-      lod, parts: [legL, legR, bodyM, armL, armR, head], far: false, look: Lk };
+      lod, parts: [legL, legR, bodyM, armL, armR, head], far: false, look: Lk, o, hair, warm: WARM };
     HUMANS.add(g);
     return g;
   };
