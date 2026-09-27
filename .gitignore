@@ -6,3 +6,8 @@ scripts/.osm-cache/
 .DS_Store
 *.zip
 media/
+tools/steam/content/
+tools/steam/output/
+tools/steam/dl/
+tools/steam/*.vdf
+steam_appid.txt

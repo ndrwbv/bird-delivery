@@ -1,0 +1,117 @@
+# Как залить игру в Steam — по шагам
+
+Коротко: партнёрский аккаунт → приложение и App ID → страница магазина → сборка (GitHub
+Actions) → `tools/steam-upload.sh` → проверка на ветке `beta` → выпуск. Подробности про
+Electron, Steamworks в игре и Steam Deck — в [STEAM.md](STEAM.md).
+
+Суммы, сроки и размеры картинок ниже — на 09.2026; перед оплатой сверь на
+<https://partner.steamgames.com/doc/gettingstarted>.
+
+## 1. Аккаунт Steamworks — разово
+
+1. Зайти на <https://partner.steamgames.com> своим Steam-аккаунтом (личным) → «Join Steamworks».
+2. Заполнить юрлицо или себя как физлицо, банк для выплат, налоговую анкету (W-8BEN для не-США).
+3. Оплатить **Steam Direct — 100 $** за одну игру (вернётся после 1000 $ выручки).
+4. Пройти проверку личности. После оплаты — **30 дней** до первой возможности выпустить игру.
+   Эти дни как раз уходят на страницу магазина.
+
+## 2. Приложение и App ID
+
+1. Steamworks → **Create new app** → получаешь **App ID** (число).
+2. Записать его в `steam_appid.txt` в корне репозитория (файл в `.gitignore`) — по нему
+   скрипт заливки и локальный запуск через Steam.
+3. **App Admin → SteamPipe → Depots**: два депота —
+   - `App ID + 1` — Windows (Operating System: Windows);
+   - `App ID + 2` — Linux + SteamOS (Operating System: Linux).
+   Номера так и оставить: скрипт заливки рассчитывает именно на них.
+4. **Installation → General → Launch Options**, две строки:
+
+   | ОС | Executable | Arguments |
+   |---|---|---|
+   | Windows | `BirdPizza.exe` | `--steam` |
+   | Linux | `bird-pizza.sh` | `--steam` |
+
+5. **Steam Cloud** — по таблице в [STEAM.md](STEAM.md), раздел 2, пункт 5.
+6. Нажать **Publish** в App Admin, чтобы настройки вступили в силу.
+
+## 3. Страница магазина
+
+Store Admin → заполнить и отправить на проверку (**3—5 рабочих дней**). Страница должна
+провисеть в «Скоро выйдет» **не меньше двух недель** до выпуска — чем раньше, тем больше
+вишлистов.
+
+- **Тексты** — из [STORE-LISTING.md](STORE-LISTING.md) (ru/en/es), короткое описание ≤ 300 знаков.
+- **Картинки** (PNG/JPG):
+
+  | что | размер |
+  |---|---|
+  | Header capsule | 920×430 |
+  | Small capsule | 462×174 |
+  | Main capsule | 1232×706 |
+  | Vertical capsule | 748×896 |
+  | Page background | 1438×810 |
+  | Library capsule | 600×900 |
+  | Library hero | 3840×1240 |
+  | Library logo | 1280×720, прозрачный фон |
+  | Скриншоты | от 5 штук, 1920×1080 |
+
+  Скриншоты и трейлер снимаются автоматически — [MEDIA.md](MEDIA.md) (для Стима — взрослая
+  версия и Северск).
+- **Опрос о контенте (Mature Content Survey)** — честно: насилие и кровь (сбитые прохожие),
+  упоминание алкоголя и табака (поручения), **имитация азартных игр** (слот-машина в конце
+  смены). В игре есть «детский режим» — можно упомянуть в описании.
+- **Языки** — 15 интерфейса, озвучки нет.
+- **Steam Deck** — после выпуска можно попросить проверку совместимости (App Admin → Steam Deck).
+
+## 4. Сборка
+
+Сборка — GitHub Actions, руками ничего собирать не нужно:
+
+1. GitHub → репозиторий `ndrwbv/bird-delivery` → **Actions → «Релиз» → Run workflow**.
+2. Тег, например `v0.2.0`, и «что нового». Через ~10 минут в **Releases** появятся
+   `bird-pizza-win.zip` и `bird-pizza-deck.tar.gz`.
+
+Собрать локально тоже можно: `npm run dist:deck` (Linux; с Mac обычно собирается) и
+`npm run dist:win` (на Windows) — тогда при заливке `LOCAL=1`.
+
+## 5. Заливка — одной командой
+
+Разово поставить **steamcmd**:
+
+```bash
+brew install --cask steamcmd
+```
+
+Если такого пакета нет — скачать с <https://developer.valvesoftware.com/wiki/SteamCMD> (macOS),
+распаковать и положить `steamcmd` в `PATH`. Первый вход спросит пароль и код Steam Guard,
+дальше помнит.
+
+Залить последний релиз и сразу выкатить на закрытую ветку `beta`:
+
+```bash
+STEAM_USER=твой_логин tools/steam-upload.sh --live beta
+```
+
+Другие варианты: `tools/steam-upload.sh v0.2.0` — конкретный тег; `LOCAL=1` — из папки
+`release/`; `--preview` — прогон без заливки. Скрипт качает оба архива, раскладывает
+по `tools/steam/content/{win,linux}`, пишет `.vdf` из шаблонов в `tools/steam/` и зовёт
+`steamcmd +run_app_build`.
+
+Ветку `beta` сначала создать: App Admin → SteamPipe → **Builds → Add new branch** (с паролем —
+для тестеров).
+
+## 6. Проверка
+
+1. В своём Steam-клиенте: игра → Свойства → Бета-версии → `beta` (пароль ветки).
+2. Проверить на **Windows** и на **Steam Deck**, игровой режим, только геймпадом — чек-лист
+   в [STEAM.md](STEAM.md), раздел 5: запуск, язык Steam, сохранение и облако, 60 fps (`?debug` →
+   `__dlv.CULL.q` = 0).
+3. Steamworks → **Builds** → у проверенной сборки **Set build live on default**. Это и есть
+   обновление для всех, кто купил.
+
+## 7. Выпуск
+
+Первый выпуск Steam тоже проверяет — **Request Review** для сборки (несколько дней). После
+одобрения на странице появится кнопка **Release App** — жмёшь в день выпуска.
+
+Дальше каждое обновление: шаг 4 → шаг 5 → шаг 6.

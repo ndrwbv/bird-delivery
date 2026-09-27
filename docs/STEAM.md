@@ -1,5 +1,7 @@
 # Steam и Steam Deck
 
+**Как залить в Steam по шагам — [STEAM-UPLOAD.md](STEAM-UPLOAD.md).**
+
 Steam-бандл — это `vite build --mode steam` (→ `dist/steam`) внутри Electron-оболочки
 `electron/`. Платформенный слой — `src/platform/steam.js`, мост в Electron — `window.birdSteam`
 из `electron/preload.cjs`. Рекламы нет, таблица лидеров локальная, есть «выйти из игры».
