@@ -1,0 +1,27 @@
+/* катсцена сюжетного заказа: чёрные полосы, плашка главы, «пропустить» (story.js) */
+#story-cut { position: absolute; inset: 0; z-index: 38; pointer-events: none; }
+#story-cut .sc-bar { position: absolute; left: 0; right: 0; height: 13vh; background: #07080d; transition: transform .45s cubic-bezier(.3, .8, .3, 1); }
+#story-cut .sc-top { top: 0; transform: translateY(-101%); display: flex; align-items: center; justify-content: center; }
+#story-cut .sc-bot { bottom: 0; transform: translateY(101%); }
+#story-cut.on .sc-bar { transform: none; }
+#story-cut .sc-title { display: flex; flex-direction: column; align-items: center; gap: 8px; opacity: 0; transform: translateY(6px); }
+#story-cut .sc-title.on { animation: sc-title 4.2s ease both; }
+#story-cut .sc-title em { font-style: normal; font-size: 9px; color: #ff9fcf; letter-spacing: .08em; text-transform: uppercase; }
+#story-cut .sc-title b { font-weight: normal; font-size: clamp(12px, 2.2vw, 20px); color: #fff3d6; text-shadow: 3px 3px 0 #33210c; }
+@keyframes sc-title { 0% { opacity: 0; transform: translateY(6px); } 12%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+#story-cut .sc-skip { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); pointer-events: auto; font: inherit; font-size: 8px;
+  color: #c9c2b4; background: rgba(255, 255, 255, .06); border: 2px solid #3a3346; border-radius: 6px; padding: 8px 10px; cursor: pointer; }
+#story-cut .sc-skip:hover { color: #fff3d6; border-color: #ff3ea5; }
+
+/* во время катсцены хад прячем, а диалог — внизу, поверх нижней полосы, без затемнения кадра */
+body.story-cut .hud, body.story-cut #ctrls, body.story-cut #toast, body.story-cut #touchpad, body.story-cut #guide, body.story-cut #cr-clock { opacity: 0 !important; pointer-events: none !important; transition: opacity .3s; }
+body.story-cut #dlg { align-items: flex-end; background: none; padding-bottom: calc(13vh - 34px); }
+body.story-cut .dlg-box { width: min(760px, 100%); }
+body.story-cut .dlg-row { padding: 14px 18px 4px; }
+body.story-cut .dlg-head img { width: 104px; height: 104px; }
+body.story-cut .dlg-bubble { min-height: 84px; margin-bottom: 18px; }
+body.story-cut .dlg-btns { padding: 6px 18px 12px; }
+@media (max-width: 560px) {
+  #story-cut .sc-skip { top: auto; bottom: 8px; transform: none; }
+  body.story-cut .dlg-head img { width: 72px; height: 72px; }
+}

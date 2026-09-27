@@ -1,0 +1,906 @@
+/* Заказы карьеры (Стим): очередь, план смены, без повторов, оплата и
+   чаевые, поручения, развоз смены, сюжетные заказы. Что бывает — в
+   orders.config.js, сколько стоит — econ.js, как собирается — docs/ORDERS.md.
+   Работает только при CAREER (game.js); Яндекс и ?nocareer идут старым путём.
+
+   Из game.js:
+     ORD.init(api)                   — один раз после ZN.init
+     ORD.nextPlan()                  — очередной заказ вместо planOrder() → { kind, stops: [{ peds }], why, ord }
+     ORD.setup(plan)                 — после S.order: цена, срок, цвет
+     ORD.card(order)                 — полоса цвета и очередь на карточке
+     ORD.arrive(o, st, onTime)       — подъехал к клиенту; true — дальше не идти (развоз смены, ждём onArrive)
+     ORD.payStop(o, st, onTime, tier) → сколько заплатили за остановку (ECON.orderPay / tipFor)
+     ORD.delivered(o, st, onTime)    — заказ весь отдан: поручение, STORY.onDeliver
+     ORD.step(dt)                    — каждый кадр: HUD очереди, посадка работников
+     ORD.targetColor(), ORD.tintMarker(marker), ORD.drawMapQueue(ctx, fmX, fmZ, u), ORD.bagMesh(bag)
+   Для других модулей:
+     ORD.onArrive(cb)   — «только подъехал к клиенту, до вручения»: cb({ order, stop, zone, type, x, z, hour });
+                          вернул Promise — вручение ждёт, пока он не решится (бандиты, катсцена)
+     ORD.staffRide()    — развоз смены (career.js в 24:00): Promise → { ok, people, pay, stars } или false (отказался)
+     ORD.resetShift()   — новая смена (career.js onShiftStart; сам ловит и по S.orders)
+     ORD.force(spec)    — песочница: сделать заказ текущим сейчас. spec — сюжетная (STORY.orderFor)
+                          или { kind: 'urgent' | 'edge' | 'gang' | 'pizza', zone?, near?: { x, z }, r?, dist? }
+     ORD.forceSide(id)  — песочница: диалог поручения id из SIDE_ORDERS с клиентом или ближайшим прохожим
+   Сюжет (story.js, если есть): STORY.nextOrder({ shift, hour, x, z, … }) → спецификация или null —
+   спрашиваем перед каждой обычной пиццей. Заказ стал текущим — STORY.stage(spec), отдали —
+   STORY.onDeliver(spec) (катсцена и награда — его), сорвался или выпал из очереди — STORY.onCancel(spec).
+   Спецификация (всё необязательно): { storyId, x, z | zone, dist: { min, max }, person, addr, items,
+   note, why, pay, time, color, reach, noGuest }. why/items/note — уже переведённые; noGuest — человека
+   у двери ставит story.js, прохожего не зовём (иначе ждёт прохожий, person — его лицо). */
+import { t, tn } from '../i18n/index.js';
+import * as ECON from './econ.js';
+import * as DLG from './dialog.js';
+import * as ZN from './zones.js';
+import { makePerson } from './people.js';
+import { ORDER_TYPES, SHIFT_PLAN, SIDE_ORDERS, STAFF_RIDE } from './orders.config.js';
+
+const N_ = s => s;
+const { PAY, ORDERS, TIPS } = ECON;
+
+/* необязательные соседи: карьера (часы, звёзды) и сюжет — их пишут отдельно */
+const OPT = import.meta.glob(['./career.js', './story.js']);
+let CAR = null, STORY = null;
+
+let A = null, S = null, V = null;
+const rand = (a, b) => a + Math.random() * (b - a);
+const rint = r => Array.isArray(r) ? Math.round(rand(r[0], r[1])) : r;
+const chance = p => Math.random() < p;
+const pick = a => a[(Math.random() * a.length) | 0];
+const wpick = w => {                                    // { key: вес } → ключ
+  let sum = 0;
+  for (const k in w) sum += Math.max(0, w[k]);
+  if (sum <= 0) return null;
+  let r = Math.random() * sum;
+  for (const k in w) if ((r -= Math.max(0, w[k])) <= 0) return k;
+  return Object.keys(w)[0];
+};
+const typeColor = k => (ORDER_TYPES[k] && ORDER_TYPES[k].color) || ORDERS.COLORS[k] || ORDER_TYPES.pizza.color;
+
+export const ZONE_LABEL = {
+  rich: N_('особняки'), gang: N_('бандитский район'), garage: N_('гаражи'),
+  ind: N_('промзона'), poor: N_('частный сектор'), normal: N_('город'),
+};
+
+/* ─────────────── init ─────────────── */
+export function init (api) {
+  A = api; S = api.S; V = api.V;
+  for (const [k, f] of Object.entries(OPT)) f().then(m => { if (k.includes('career')) hookCareer(m); else STORY = m; }).catch(e => console.warn('[orders]', k, e));
+  loadUsed();
+  css();
+}
+
+/* смена началась — новый план; кончилась — развоз, если висит, снимаем */
+function hookCareer (m) {
+  CAR = m;
+  if (typeof m.onShiftStart === 'function') m.onShiftStart(() => { staffAbort(); resetShift(); });
+  if (typeof m.onShiftEnd === 'function') m.onShiftEnd(() => staffAbort());
+}
+
+/* ─────────────── часы смены ─────────────── */
+let HOUR_OVERRIDE = null, SIM = false;                              // для прогона смен без езды (DEBUG.simShift)
+function hourNow () {
+  if (HOUR_OVERRIDE !== null) return HOUR_OVERRIDE;
+  try { if (CAR && typeof CAR.hour === 'function') { const h = CAR.hour(); if (Number.isFinite(h)) return h; } } catch (e) { /* — */ }
+  return ECON.hourOf(A.ENV.t);
+}
+
+/* ─────────────── без повторов за всю игру ───────────────
+   Ключ адреса — точка, округлённая до 4 м, в base36: «1k3.-9f». Массив в
+   сохранении — от давнего к свежему: кончились адреса — берём самый давний. */
+const USED_KEY = (SHIFT_PLAN.noRepeat && SHIFT_PLAN.noRepeat.key) || 'dlv-used-addr';
+let USED = [], UIDX = new Map();
+const keyOf = (x, z) => Math.round(x / 4).toString(36) + '.' + Math.round(z / 4).toString(36);
+function loadUsed () {
+  const v = A.Store.get(USED_KEY, []);
+  USED = Array.isArray(v) ? v.filter(k => typeof k === 'string') : typeof v === 'string' ? v.split(' ').filter(Boolean) : [];
+  reindex();
+}
+function reindex () { UIDX = new Map(); USED.forEach((k, i) => UIDX.set(k, i)); }
+function markUsed (key) {
+  if (!key || (SHIFT_PLAN.noRepeat && SHIFT_PLAN.noRepeat.wholeGame === false)) return;
+  if (UIDX.has(key)) { USED.splice(UIDX.get(key), 1); USED.push(key); reindex(); }
+  else { UIDX.set(key, USED.length); USED.push(key); }
+  A.Store.set(USED_KEY, USED);
+}
+
+/* ─────────────── пул адресов ───────────────
+   Все точки SPOTS; подъезды (точка в трёх метрах перед дверью) — в первую
+   очередь, дворовые дорожки — когда свежих подъездов не осталось. Район и
+   расстояние считаем раз за смену: круги бандитов сжимаются донатом.
+   ZMIN — ближайший к пиццерии адрес района (дальше dist.min). */
+let POOL = [], ENTR = null, ZMIN = {};
+function buildPool () {
+  const P = A.PIZZA || { x: 0, z: 0 };
+  if (!ENTR) {
+    ENTR = new Set();
+    for (const [x, z, nx, nz] of A.CITY.entrances) ENTR.add(Math.round((x + nx * 3) * 4) + ',' + Math.round((z + nz * 3) * 4));
+  }
+  const D = SHIFT_PLAN.dist || { min: 300, max: 1500 };
+  POOL = A.SPOTS.map(s => ({ x: s.x, z: s.z, entr: ENTR.has(Math.round(s.x * 4) + ',' + Math.round(s.z * 4)), key: keyOf(s.x, s.z), zone: ZN.zoneAt(s.x, s.z), d: Math.hypot(s.x - P.x, s.z - P.z) }));
+  ZMIN = {};
+  for (const q of POOL) if (q.d >= D.min && !(q.d >= ZMIN[q.zone])) ZMIN[q.zone] = q.d;
+  return POOL;
+}
+
+/* ─────────────── смена ─────────────── */
+const SH = { last: 0, gen: 0, pizzas: 0, sideAt: 4, zones: new Set(), must: {}, h0: 9, done: 0, log: [], reserved: new Set(), pts: [] };
+const Q = [];                                          // следующие заказы (спецификации, без людей)
+let QV = 0;                                            // версия очереди — перерисовать список
+
+export function resetShift () {
+  staffAbort();
+  dropQueue();
+  SH.last = 0;
+  SH.gen = 0; SH.pizzas = 0; SH.sideAt = rint(SHIFT_PLAN.sideEvery || ORDERS.SIDE_EVERY);
+  SH.zones = new Set(); SH.must = {}; SH.done = 0; SH.log = []; SH.reserved = new Set(); SH.pts = [];
+  SH.h0 = hourNow();
+  buildPool();
+}
+
+/* сколько заказов в час смены: по факту, а пока данных нет — прикидка по часам
+   смены: туда и обратно ~1,1 км на RUN_V 19 м/с плюс погрузка (≈ 0,2 в час) */
+function rate () {
+  const h = hourNow() - SH.h0;
+  const hps = (24 - ECON.SHIFT.KEYS[0][1]) / ((ECON.SHIFT.T_END - ECON.SHIFT.T0) * (A.DAY_LEN || 480));   // часов смены в секунду
+  const prior = 1 / ((2 * 1100 / 19 + 18) * hps);
+  const est = h > 1 && SH.done > 0 ? (SH.done + prior) / (h + 1) : prior;
+  return Math.min(1.5, Math.max(0.1, est));
+}
+
+/* подходящий адрес: район, кольцо от точки, не был, не в очереди.
+   Кончились — самый давний из подходящих; нет и таких — ослабляем условия */
+function pickSpot (o = {}) {
+  if ((o.grow || 0) > 6) return null;
+  const c = o.from || A.PIZZA;
+  const fit = s => (!o.zone || s.zone === o.zone) && !SH.reserved.has(s.key) &&
+    (o.near ? Math.hypot(s.x - o.near.x, s.z - o.near.z) <= o.r : true) &&
+    (o.dmin === undefined || Math.hypot(s.x - c.x, s.z - c.z) >= o.dmin) &&
+    (o.dmax === undefined || Math.hypot(s.x - c.x, s.z - c.z) <= o.dmax);
+  const ok = POOL.filter(fit);
+  if (!ok.length) {
+    if (o.zone && o.relax !== false) return pickSpot({ ...o, zone: null });
+    if (o.near && o.r < 3000) return pickSpot({ ...o, r: o.r * 1.8 });
+    if (o.dmin !== undefined || o.dmax !== undefined) return pickSpot({ ...o, dmin: o.dmin !== undefined ? o.dmin * 0.6 : undefined, dmax: o.dmax !== undefined ? o.dmax * 1.5 : undefined, zone: null, grow: (o.grow || 0) + 1 });
+    return null;
+  }
+  let fresh = ok.filter(s => !UIDX.has(s.key));
+  // не в соседний подъезд того же дома, где уже был за смену: заметно как повтор
+  const apart = fresh.filter(s => !SH.pts.some(q => Math.abs(q.x - s.x) < 45 && Math.abs(q.z - s.z) < 45));
+  if (apart.length) fresh = apart;
+  const door = fresh.filter(s => s.entr);                // подъезд лучше дорожки во дворе
+  if (door.length) return pick(door);
+  if (fresh.length) return pick(fresh);
+  let best = null, bi = Infinity;                        // все были — самый давний
+  for (const s of ok) { const i = UIDX.get(s.key); if (i < bi) { bi = i; best = s; } }
+  return best;
+}
+
+/* веса районов. Район, до которого в кольце dist не дотянуться (бандитские
+   круги в Северске — за 4 км), остаётся, но с весом ×(dist.max / до него)²:
+   иногда туда всё же ведёт заказ — на ближайшие его адреса */
+function zoneWeights (dmin, dmax, only) {
+  const w = {};
+  for (const z in SHIFT_PLAN.zoneWeights) {
+    if (only && !only(z)) continue;
+    if (!(ZMIN[z] >= 0)) continue;
+    const k = ZMIN[z] <= dmax ? 1 : (dmax / ZMIN[z]) ** 2;
+    // все адреса района уже видели — реже: повторы только когда совсем некуда
+    const lo = ZMIN[z] <= dmax ? dmin : ZMIN[z], hi = ZMIN[z] <= dmax ? dmax : ZMIN[z] + 600;
+    const fresh = POOL.some(s => s.zone === z && s.d >= lo && s.d <= hi && !UIDX.has(s.key) && !SH.reserved.has(s.key));
+    w[z] = SHIFT_PLAN.zoneWeights[z] * k * (fresh ? 1 : 0.15);
+  }
+  return w;
+}
+
+function stopOf (s, n = 1) {
+  return { x: s.x, z: s.z, key: s.key, zone: s.zone, n, addr: A.realAddress(s.x, s.z) };
+}
+
+/* одна спецификация заказа: кто, куда, какой вид */
+function genSpec () {
+  if (SH.gen === 0 && !POOL.length) buildPool();
+  const D = SHIFT_PLAN.dist || { min: 300, max: 1500 };
+  const ahead = (A.S.order ? 1 : 0) + Q.length;          // сколько заказов до этого
+  const hAt = hourNow() + ahead / rate();
+  let forced = null;
+  for (const r of SHIFT_PLAN.must || []) {
+    const have = r.what === 'zones' ? SH.zones.size : SH.must[r.what] || 0;
+    if (have >= r.count) continue;
+    const need = r.count - have, slots = (r.byHour - hAt) * rate();
+    if (slots <= need + 0.5 || chance(need / Math.max(1, slots))) { forced = r.what; break; }
+  }
+  let spec = null;
+  if (forced === 'edge' && A.MAP.career && A.MAP.career.edge) {
+    const s = pickSpot({ near: A.MAP.career.edge, r: 350 });
+    if (s) spec = { type: 'pizza', kind: 'solo', edge: true, stops: [stopOf(s)] };
+  } else if (forced === 'urgent') {
+    // далеко — по дорогам не ближе URGENT_MIN_M; из нескольких кандидатов берём самый дальний
+    let best = null, bl = 0;
+    for (let k = 0; k < 6; k++) {
+      const s = pickSpot({ dmin: PAY.URGENT_MIN_M * 0.8 });
+      if (!s) break;
+      const L = A.routeLen(A.PIZZA.x, A.PIZZA.z, s.x, s.z);
+      if (L > bl) { bl = L; best = s; }
+      if (L >= PAY.URGENT_MIN_M) break;
+    }
+    if (best) spec = { type: 'urgent', kind: 'solo', urgent: true, stops: [stopOf(best)] };
+  }
+  if (!spec && !forced && !SIM && STORY && typeof STORY.nextOrder === 'function') {
+    let s = null;
+    try { s = STORY.nextOrder(storyCtx()); } catch (e) { console.warn('[orders] STORY.nextOrder', e); }
+    if (s && typeof s.then !== 'function') spec = storySpec(s);
+  }
+  if (!spec) {
+    // обычная пицца: район по весам (или новый, если надо добрать районы), вид по kinds
+    const w = forced === 'zones' ? zoneWeights(D.min, D.max, z => !SH.zones.has(z)) : zoneWeights(D.min, D.max);
+    const zone = wpick(w) || wpick(zoneWeights(D.min, D.max)) || null;
+    const kind = wpick(SHIFT_PLAN.kinds || { solo: 1 }) || 'solo';
+    const far = zone && ZMIN[zone] > D.max;                // район за кольцом — его ближние адреса
+    const s = far ? pickSpot({ zone, dmin: ZMIN[zone], dmax: ZMIN[zone] + 600 }) : pickSpot({ zone, dmin: D.min, dmax: D.max });
+    if (!s) return null;
+    spec = { type: 'pizza', kind, stops: [] };
+    if (kind === 'group') spec.stops.push(stopOf(s, rint(SHIFT_PLAN.groupSize || [2, 3])));
+    else spec.stops.push(stopOf(s));
+    if (kind === 'chain') {
+      const n = rint(SHIFT_PLAN.chainLen || [2, 3]);
+      SH.reserved.add(s.key);
+      for (let i = 1; i < n; i++) {
+        const prev = spec.stops[i - 1];
+        const q = pickSpot({ from: prev, dmin: 150, dmax: 520, zone: prev.zone }) || pickSpot({ from: prev, dmin: 120, dmax: 700 });
+        if (!q) break;
+        SH.reserved.add(q.key);
+        spec.stops.push(stopOf(q));
+      }
+      if (spec.stops.length < 2) spec.kind = 'solo';
+    }
+    // поручение — раз в sideEvery пицц; клиент попросит при вручении
+    if (++SH.pizzas >= SH.sideAt) { spec.side = true; SH.pizzas = 0; SH.sideAt = rint(SHIFT_PLAN.sideEvery || ORDERS.SIDE_EVERY); }
+  }
+  // считаем сразу: очередь — это уже план смены
+  for (const st of spec.stops) { SH.reserved.add(st.key); SH.zones.add(st.zone); SH.pts.push({ x: st.x, z: st.z }); }
+  if (spec.edge) SH.must.edge = (SH.must.edge || 0) + 1;
+  if (spec.urgent) SH.must.urgent = (SH.must.urgent || 0) + 1;
+  // метры по дорогам: от пиццерии до первого, дальше — от прошлого адреса
+  spec.m = spec.stops.map((st, i) => {
+    const a = i ? spec.stops[i - 1] : A.PIZZA;
+    return Math.round(A.routeLen(a.x, a.z, st.x, st.z));
+  });
+  spec.zone = spec.stops[0].zone;
+  spec.color = spec.color || typeColor(spec.type);
+  spec.forced = forced;
+  spec.n = ++SH.gen;
+  spec.hour = +hAt.toFixed(2);
+  SH.log.push({ n: spec.n, h: spec.hour, type: spec.type, kind: spec.kind, zone: spec.zone, edge: !!spec.edge, urgent: !!spec.urgent, side: !!spec.side, story: !!spec.story, m: spec.m.reduce((a, b) => a + b, 0), keys: spec.stops.map(s => s.key), forced });
+  return spec;
+}
+
+function storyCtx () {
+  return {
+    shift: (+A.Store.get('dlv-shifts', 0) || 0) + 1, hour: hourNow(), x: V.x, z: V.z, shiftOrders: SH.gen, queue: Q.map(q => ({ type: q.type, zone: q.zone })),
+    level: A.level(), adult: A.ADULT, pizza: A.PIZZA ? { x: A.PIZZA.x, z: A.PIZZA.z } : null,
+    zoneAt: ZN.zoneAt, pickSpot: o => pickSpot(o || {}),
+  };
+}
+function storySpec (s) {
+  const D = SHIFT_PLAN.dist || { min: 300, max: 1500 };
+  let sp = null;
+  if (Number.isFinite(s.x) && Number.isFinite(s.z)) sp = { x: s.x, z: s.z, key: keyOf(s.x, s.z), zone: ZN.zoneAt(s.x, s.z) };
+  else sp = pickSpot({ zone: s.zone || null, dmin: (s.dist && s.dist.min) || D.min, dmax: (s.dist && s.dist.max) || D.max });
+  if (!sp) return null;
+  const st = stopOf(sp);
+  if (s.addr) st.addr = s.addr;
+  return { type: 'story', kind: 'solo', story: s, color: s.color || typeColor('story'), stops: [st] };
+}
+
+/* очередь выбросили (новая смена, развоз): сюжетные главы — обратно story.js */
+function dropQueue () {
+  for (const q of Q) if (q.story) storyCancel(q.story);
+  Q.length = 0; QV++;
+}
+function storyCancel (s) {
+  try { if (STORY && typeof STORY.onCancel === 'function') STORY.onCancel(s); } catch (e) { console.warn('[orders] STORY.onCancel', e); }
+}
+
+function refill () {
+  const want = ORDERS.QUEUE_SHOW || 2;
+  let guard = 0;
+  while (Q.length < want && guard++ < 6) { const s = genSpec(); if (s) Q.push(s); else break; }
+  QV++;
+}
+
+/* ─────────────── очередной заказ: спецификация → живые люди ─────────────── */
+export function nextPlan () {
+  if (!A) return null;
+  if (S.orders <= SH.last) resetShift();                // S.orders сбросился — новая смена
+  SH.last = S.orders;
+  let spec;
+  if (FORCE) { spec = FORCE; FORCE = null; }
+  else {
+    if (!Q.length) refill();
+    spec = Q.shift();
+    refill();
+  }
+  return bindSpec(spec);
+}
+function bindSpec (spec) {
+  if (!spec) return null;
+  if (spec.story && (spec.story.noGuest || !A.alive().length)) return { story: true, kind: 'solo', stops: [], why: whyOf(spec), ord: spec };
+  const all = A.alive().filter(p => !p.guest);
+  if (!all.length) return null;
+  const taken = new Set();
+  const d2 = (p, c) => (p.x - c.x) ** 2 + (p.z - c.z) ** 2;
+  const place = (p, x, z) => {
+    if (p.idle) A.releaseIdle(p);
+    p.path = null; p.w = null; p.x = x; p.z = z;
+    taken.add(p);
+    return p;
+  };
+  const free = () => all.filter(p => !taken.has(p));
+  const stops = [];
+  for (const st of spec.stops) {
+    const f = free();
+    if (!f.length) break;
+    f.sort((a, b) => d2(a, st) - d2(b, st));
+    const p = place(f[(Math.random() * Math.min(4, f.length)) | 0], st.x, st.z);
+    if (spec.story && spec.story.person && stops.length === 0) A.rehuman(p, spec.story.person);
+    const peds = [p];
+    for (let i = 1; i < st.n; i++) {                   // групповой: остальные — рядом с первым, не на асфальте
+      const b = free().sort((a, c) => d2(a, st) - d2(c, st))[0];
+      if (!b) break;
+      place(b, st.x, st.z);
+      for (let k = 0; k < 8; k++) {
+        b.x = st.x + rand(-2.5, 2.5); b.z = st.z + rand(-2.5, 2.5);
+        const r = A.nearestRoad(b.x, b.z, 7, 1);
+        if (!r || r.d > r.seg.w / 2 + 1) break;
+      }
+      A.pushOut(b, 0.5);
+      peds.push(b);
+    }
+    stops.push({ peds, key: st.key, zone: st.zone });
+  }
+  if (!stops.length) return null;
+  spec.stops = spec.stops.slice(0, stops.length);
+  return { kind: stops.length > 1 ? 'chain' : spec.kind === 'chain' ? 'solo' : spec.kind, stops, why: whyOf(spec), ord: spec };
+}
+
+function whyOf (sp) {
+  if (sp.story) return sp.story.why || t('особый заказ');
+  const z = t(ZONE_LABEL[sp.zone] || ZONE_LABEL.normal);
+  if (sp.urgent) return t('срочно: далеко, а времени в обрез · оплата ×{k}', { k: fmtK(PAY.URGENT) });
+  if (sp.edge) return t('в самый конец города · оплата ×{k}', { k: fmtK(PAY.EDGE) });
+  if (sp.kind === 'group') return t('групповой: заказали на всех сразу') + ' · ' + z;
+  if (sp.kind === 'chain') return tn(sp.stops.length, 'цепочка: {n} адрес по очереди|цепочка: {n} адреса по очереди|цепочка: {n} адресов по очереди') + ' · ' + z;
+  const mul = PAY.ZONE[sp.zone] || 1;
+  return mul !== 1 ? t('{zone} · оплата ×{k}', { zone: z, k: fmtK(mul) }) : pick([t('один адрес'), t('по пути из пиццерии'), t('клиент ждёт')]) + ' · ' + z;
+}
+const fmtK = k => String(+k.toFixed(2)).replace('.', ',');
+
+/* цена и срок: после того, как game.js собрал S.order */
+export function setup (plan) {
+  const o = S.order, sp = plan.ord;
+  o.ord = sp;
+  const level = A.level();
+  const opts = { urgent: !!sp.urgent, edge: !!sp.edge, level };
+  sp.fees = o.stops.map((st, i) => {
+    const m = sp.m[i] || 0, zone = sp.stops[i] ? sp.stops[i].zone : sp.zone, n = Math.max(1, st.peds.length);
+    if (sp.story && Number.isFinite(sp.story.pay)) return Math.round(sp.story.pay / o.stops.length);
+    // групповой: за каждого следующего — ещё одна база
+    return ECON.orderPay(m, zone, opts) + (n - 1) * ECON.orderPay(0, zone, opts);
+  });
+  S.fee = sp.fees.reduce((a, b) => a + b, 0);
+  const L = A.routeLen(V.x, V.z, S.target.x, S.target.z);
+  S.timeMax = sp.story && Number.isFinite(sp.story.time) ? sp.story.time
+    : sp.urgent ? A.orderTime(L, 1, 1) * PAY.URGENT_TIME
+      : A.orderTime(L, 1, S.orders);
+  S.time = S.timeMax;
+  QV++;
+}
+
+/* сюжетный заказ без прохожего: у двери его человек (story.js), game.js зовёт вместо сборки S.order */
+const CUR = { order: null, story: null, done: false };
+export function startStory (plan) {
+  const sp = plan.ord, s = sp.story, stp = sp.stops[0];
+  const st = { peds: [], persons: s.person ? [s.person] : [], at: { x: stp.x, z: stp.z }, key: stp.key, zone: stp.zone,
+    addr: stp.addr, note: s.note || '', reach: s.reach || 6 };
+  S.order = { kind: 'solo', tut: false, surf: false, stops: [st], idx: 0, why: plan.why, items: s.items || '1 × ' + t('пицца'), ord: sp };
+  S.state = 'brief';
+  A.syncTarget();
+  setup(plan);
+  A.rebuildRoutePath();
+  A.showOrderCard(S.order);
+  A.gameplayStop();
+  A.Snd.order();
+}
+function trackStory () {
+  const sp = S.order && S.order.ord;
+  if (sp && sp.story && CUR.order !== S.order) {
+    CUR.order = S.order; CUR.story = sp.story; CUR.done = false;
+    try { if (STORY && typeof STORY.stage === 'function') STORY.stage(sp.story); } catch (e) { console.warn('[orders] STORY.stage', e); }
+  } else if (CUR.order && CUR.order !== S.order) {
+    if (!CUR.done) storyCancel(CUR.story);
+    CUR.order = null; CUR.story = null;
+  }
+}
+
+/* ─────────────── карточка ─────────────── */
+const fmtDist = m => m >= 1000 ? t('{n} км', { n: (Math.round(m / 100) / 10).toLocaleString(A.lang ? A.lang() : undefined) }) : t('{n} м', { n: Math.round(m / 10) * 10 });
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function queueHTML (cls) {
+  if (!Q.length) return '';
+  const rows = Q.slice(0, ORDERS.QUEUE_SHOW || 2).map(q => '<div class="oq-r"><i style="background:' + q.color + '"></i><span>' + esc(q.stops[0].addr) + '</span><em>' +
+    esc(t(ZONE_LABEL[q.zone] || ZONE_LABEL.normal)) + ' · ' + fmtDist(q.m[0] || 0) + '</em></div>').join('');
+  return '<div class="' + cls + '"><b>' + t('дальше') + '</b>' + rows + '</div>';
+}
+export function card (order) {
+  const el = document.getElementById('phone');
+  if (!el) return;
+  const sp = order.ord;
+  el.classList.add('ord-typed');
+  el.classList.toggle('ord-urgent', !!(sp && sp.urgent));
+  el.style.setProperty('--ord', sp ? sp.color : typeColor('pizza'));
+  if (!sp) return;
+  const kind = document.getElementById('ph-kind');
+  if (kind && sp.type !== 'pizza') kind.textContent = t(ORDER_TYPES[sp.type] ? ORDER_TYPES[sp.type].label : sp.type) + ' · ' + kind.textContent;
+  const list = document.getElementById('ph-list');
+  if (list) list.insertAdjacentHTML('beforeend',
+    '<div class="oc-pay">' + esc(t(ZONE_LABEL[sp.zone] || ZONE_LABEL.normal)) + ' · ' + A.money(S.fee) + (sp.urgent ? ' · <b>' + t('срочно') + '</b>' : '') + '</div>' + queueHTML('oq oq-card'));
+}
+
+/* ─────────────── подъехал ─────────────── */
+const ARRIVE = [];
+export function onArrive (cb) { if (typeof cb === 'function') ARRIVE.push(cb); return () => { const i = ARRIVE.indexOf(cb); if (i >= 0) ARRIVE.splice(i, 1); }; }
+
+export function arrive (o, st, onTime) {
+  if (o.ord && o.ord.type === 'staff') { staffArrive(o, st); return true; }
+  if (st.hold) return true;
+  if (!st.arrived) {
+    st.arrived = true;
+    const at = st.at || st.peds[0];
+    const ev = { order: o, stop: st, zone: st.zone || o.ord.zone, type: o.ord.type, x: at.x, z: at.z, hour: hourNow(), onTime };
+    const wait = [];
+    for (const cb of ARRIVE.slice()) {
+      try { const r = cb(ev); if (r && typeof r.then === 'function') wait.push(r); } catch (e) { console.warn('[orders] onArrive', e); }
+    }
+    if (wait.length) {
+      st.hold = Promise.allSettled(wait).then(() => { st.hold = null; });
+      return true;
+    }
+  }
+  return false;
+}
+
+/* оплата остановки: ECON.orderPay (посчитана в setup), скорость, чаевые */
+export function payStop (o, st, onTime, tier) {
+  const sp = o.ord, fee = (sp.fees && sp.fees[o.idx]) || Math.round(S.fee / o.stops.length);
+  const zone = st.zone || sp.zone;
+  markUsed(st.key);
+  SH.done += o.idx === o.stops.length - 1 ? 1 : 0;
+  if (!onTime) return Math.round(fee * PAY.LATE);
+  const bonus = tier ? Math.round(fee * (PAY.SPEED_BONUS[tier] || 0)) : 0;
+  const lunch = S.lunch === 'tips';
+  let tip = ECON.tipFor(fee, zone, { lunch, clean: A.donated('trash') }), rich = zone === 'rich' && tip > 0;
+  // богач рядом (LIFE.richTip) — клиент считается как из особняков: чаевые по-богатому
+  if (!tip && zone !== 'rich' && A.LIFE && A.LIFE.richTip(st.peds, fee)) {
+    const [a, b] = TIPS.RICH_AMOUNT;
+    tip = Math.round(fee * rand(a, b) * (lunch ? TIPS.LUNCH_MUL : 1) / 10) * 10;
+    rich = true;
+  }
+  const sub = [bonus ? t('за скорость +{money}', { money: A.money(bonus) }) : '', tip ? (rich ? t('чаевые от богача +{money}', { money: A.money(tip) }) : t('чаевые +{money}', { money: A.money(tip) })) : ''].filter(Boolean).join(' · ');
+  if (sp.story) { /* сюжет: катсцена сама покажет награду */ }
+  else if (bonus) A.popBonus(tier === 2 ? t('А ты харош!') : t('Шустро!'), sub);
+  else if (tip) A.popBonus(rich ? t('сдачи не надо!') : t('чаевые!'), sub);
+  return fee + bonus + tip;
+}
+
+/* весь заказ отдан: сюжет, поручение */
+export function delivered (o, st, onTime) {
+  const sp = o.ord;
+  QV++;
+  if (sp.story && STORY && typeof STORY.onDeliver === 'function') {
+    if (CUR.order === o) CUR.done = true;
+    if (A.marker) A.marker.visible = false;               // в катсцене столб маркера не нужен
+    try { STORY.onDeliver(sp.story); } catch (e) { console.warn('[orders] STORY.onDeliver', e); }
+  }
+  if (sp.side) {
+    if (onTime && !S.ride && st.persons[0] && st.peds[0] && !st.peds[0].dead && offerSide(st.peds[0], st.persons[0])) return;
+    SH.pizzas = SH.sideAt;                                // не вышло — попросит следующий
+  }
+}
+
+/* ─────────────── поручения ─────────────── */
+function sideOpts (ped) {
+  return SIDE_ORDERS.filter(s => (!s.adult || A.ADULT) && (!s.kids || !A.ADULT))
+    .map(s => ({ s, shop: A.errandShop({ kinds: s.shop.kinds || [], prefer: s.shop.prefer || /$^/, anyKind: !!s.shop.anyKind }, ped) }))
+    .filter(o => o.shop);
+}
+function offerSide (ped, person, only) {
+  const opts = sideOpts(ped).filter(o => !only || o.s.id === only);
+  if (!opts.length) return false;
+  const { s, shop } = pick(opts);
+  S.handT = 1e9;                                          // пока думаешь — дальше не едем
+  ped.freeT = 1e9;
+  const pay = rint(s.pay || ORDERS.SIDE_PAY);
+  const what = t(s.what);
+  DLG.say({
+    person, name: person.first || person.name.split(/\s+/)[0], text: t(s.ask) + ' (+' + A.money(pay) + ')',
+    accept: t(s.accept), decline: t(s.decline), mood: s.mood || 'calm', color: typeColor('side'),
+    timer: s.timer || 8, timeoutText: t(s.timeout || N_('ну лан ((')),
+  }).then(r => {
+    if (r === true && S.state === 'handover' && !ped.dead) A.startSide(ped, person, shop, { id: s.id, ask: what, what, gotIt: t('купил: {what}', { what }), pay, bag: s.bag, side: true });
+    else A.declineSide(ped);
+  });
+  return true;
+}
+
+/* ── пакет-майка: полупрозрачный, в нём видно, что везём ──
+   Геометрии и материалы — общие на всех, группа — новая (её уносит flyBox). */
+let BAG = null;
+const ITEM_HEX = { bottle: '#5fb86a', bottle2: '#c07a2a', wrap: '#e6cf9a', box: '#e4e6ea', tin: '#3a6fd8' };
+export function bagMesh (bag = {}) {
+  const T = A.THREE;
+  if (!BAG) {
+    BAG = {
+      body: new T.BoxGeometry(0.46, 0.5, 0.26), top: new T.BoxGeometry(0.46, 0.06, 0.26),
+      handle: new T.TorusGeometry(0.09, 0.016, 4, 10, Math.PI),
+      bottle: new T.CylinderGeometry(0.065, 0.065, 0.3, 8), neck: new T.CylinderGeometry(0.022, 0.04, 0.12, 6),
+      wrap: new T.CylinderGeometry(0.075, 0.07, 0.34, 8), box: new T.BoxGeometry(0.28, 0.18, 0.14), tin: new T.CylinderGeometry(0.1, 0.1, 0.045, 14),
+      mats: new Map(),
+    };
+  }
+  const mat = (hex, op = 1) => {
+    const k = hex + op;
+    if (!BAG.mats.has(k)) {
+      const m = new T.MeshLambertMaterial({ color: hex, transparent: op < 1, opacity: op, depthWrite: op >= 1, side: op < 1 ? T.DoubleSide : T.FrontSide });
+      m.userData.keep = true;
+      BAG.mats.set(k, m);
+    }
+    return BAG.mats.get(k);
+  };
+  const g = new T.Group();
+  const col = bag.color || '#f4f4f0', dark = /^#[0-3]/.test(col);
+  const body = new T.Mesh(BAG.body, mat(col, dark ? 0.72 : 0.42));
+  body.position.y = 0.25;
+  const rim = new T.Mesh(BAG.top, mat(col, dark ? 0.85 : 0.6));
+  rim.position.y = 0.5;
+  g.add(body, rim);
+  for (const s of [-1, 1]) {                             // ручки-«майка»
+    const h = new T.Mesh(BAG.handle, mat(col, dark ? 0.85 : 0.6));
+    h.position.set(0.14 * s, 0.53, 0);
+    g.add(h);
+  }
+  const it = bag.item || 'box', hex = bag.itemColor || ITEM_HEX[it] || '#e4e6ea';
+  const put = (geo, x, y, z, rx = 0, rz = 0, h = hex) => { const m = new T.Mesh(geo, mat(h)); m.position.set(x, y, z); m.rotation.set(rx, 0, rz); g.add(m); };
+  if (it === 'bottle' || it === 'bottle2') {
+    const xs = it === 'bottle2' ? [-0.09, 0.09] : [0];
+    for (const x of xs) { put(BAG.bottle, x, 0.17, 0); put(BAG.neck, x, 0.38, 0); }
+  } else if (it === 'wrap') put(BAG.wrap, 0, 0.2, 0, 0, 0.35);
+  else if (it === 'tin') { put(BAG.tin, 0, 0.05, 0); put(BAG.tin, 0, 0.1, 0, 0, 0, '#dfe3ea'); }
+  else put(BAG.box, 0, 0.1, 0);
+  g.scale.setScalar(1.25);
+  return g;
+}
+
+/* ─────────────── развоз смены ─────────────── */
+const STAFF = { p: null, res: null, crew: null, board: null, drops: [], pay: 0 };
+export function staffRide () {
+  if (!A) return Promise.resolve(false);
+  if (STAFF.p) return STAFF.p;
+  STAFF.p = new Promise(res => { STAFF.res = res; });
+  const n = rint(STAFF_RIDE.people || [2, 3]);
+  const crew = Array.from({ length: n }, () => makePerson());
+  STAFF.crew = crew; STAFF.pay = 0;
+  DLG.say({
+    person: crew[0], name: crew[0].first + ' · ' + t('пиццерия'), text: t(STAFF_RIDE.ask),
+    accept: t(STAFF_RIDE.accept), decline: t(STAFF_RIDE.decline), mood: 'shy', color: typeColor('staff'),
+  }).then(r => { if (r === true) beginStaff(crew); else staffDone(false); });
+  return STAFF.p;
+}
+/* смена оборвалась (снялся, новая смена): развоз снимаем, обещание — false */
+function staffAbort () {
+  if (!STAFF.p) return;
+  if (STAFF.board) for (const p of STAFF.board.peds) { A.clearGuest(p); if (!p.dead) { A.rehuman(p); A.walkSpawn(p, 150, 400); } }
+  if (S.order && S.order.ord && S.order.ord.type === 'staff') { S.order = null; S.target = null; }
+  staffDone(false);
+}
+function staffDone (r) {
+  const res = STAFF.res;
+  STAFF.p = null; STAFF.res = null; STAFF.board = null; STAFF.crew = null;
+  if (res) res(r);
+}
+function beginStaff (crew) {
+  // что было — снимаем: смена кончилась
+  if (S.side) { if (!S.side.ped.dead) S.side.ped.freeT = 3; S.side = null; }
+  if (S.order) for (const st of S.order.stops) for (const p of st.peds) if (!p.served) A.clearGuest(p);
+  A.hidePhone(); A.clearGate();
+  dropQueue();
+  if (!POOL.length) buildPool();
+  const homes = [];
+  for (let i = 0; i < crew.length; i++) {
+    const prev = homes[i - 1];
+    const s = prev ? pickSpot({ from: prev, dmin: 200, dmax: 750 }) : pickSpot({ dmin: 300, dmax: 1400 });
+    if (!s) break;
+    SH.reserved.add(s.key);
+    homes.push(s);
+  }
+  if (!homes.length) { staffDone(false); return; }
+  crew.length = homes.length;
+  const P = A.PIZZA;
+  const far = Math.hypot(V.x - P.x, V.z - P.z) > 25;
+  const stops = [];
+  if (far) stops.push({ peds: [], persons: crew.slice(), at: { x: P.x, z: P.z }, pickup: true, addr: P.name, note: '' });
+  homes.forEach((h, i) => stops.push({ peds: [], persons: [crew[i]], at: { x: h.x, z: h.z }, key: h.key, zone: h.zone, addr: A.realAddress(h.x, h.z), note: '', reach: 7 }));
+  S.order = { kind: 'chain', stops, idx: 0, why: t('развоз смены'), items: '', ord: { type: 'staff', kind: 'chain', color: typeColor('staff'), zone: homes[0].zone, stops: homes.map(h => ({ key: h.key, zone: h.zone })), m: [] } };
+  S.timeMax = S.time = 900;
+  QV++;
+  if (far) {
+    S.state = 'drive';
+    A.syncTarget(); A.rebuildRoutePath();
+    A.toast(t('заедь за ними в пиццерию'));
+  } else boardCrew();
+}
+/* работники выходят из пиццерии, доходят до машины и «садятся» — пропадают */
+function boardCrew () {
+  const P = A.PIZZA, crew = STAFF.crew || [];
+  S.state = 'loading';
+  V.vx = V.vz = 0;
+  const free = A.alive().filter(p => !p.guest && !p.dead).sort((a, b) => ((a.x - P.x) ** 2 + (a.z - P.z) ** 2) - ((b.x - P.x) ** 2 + (b.z - P.z) ** 2));
+  const peds = [];
+  crew.forEach((person, i) => {
+    const p = free[i];
+    if (!p) return;
+    if (p.idle) A.releaseIdle(p);
+    p.path = null; p.w = null;
+    A.rehuman(p, person);
+    p.x = (P.wx !== undefined ? P.wx : P.x) + rand(-1.2, 1.2); p.z = (P.wz !== undefined ? P.wz : P.z) + rand(-1.2, 1.2);
+    A.pushOut(p, 0.5);
+    A.makeGuest(p, { x: V.x + rand(-1, 1), z: V.z + rand(-1, 1) });
+    peds.push(p);
+  });
+  STAFF.board = { peds, t: 0 };
+  A.toast(t('садитесь — развезу'));
+}
+function staffArrive (o, st) {
+  if (st.pickup) { o.idx++; boardCrew(); return; }
+  const pay = ORDERS.STAFF_PAY;
+  S.money += pay; STAFF.pay += pay;
+  if (!S.freeRun) A.addWallet(pay);
+  markUsed(st.key);
+  // выходит у своего подъезда
+  const P = st.persons[0];
+  const p = A.alive().filter(q => !q.guest && !q.dead).sort((a, b) => ((a.x - V.x) ** 2 + (a.z - V.z) ** 2) - ((b.x - V.x) ** 2 + (b.z - V.z) ** 2))[0];
+  const line = t(pick(STAFF_RIDE.lines));
+  if (p) {
+    if (p.idle) A.releaseIdle(p);
+    p.path = null; p.w = null;
+    A.rehuman(p, P);
+    p.x = V.x + Math.cos(V.h) * 1.9; p.z = V.z - Math.sin(V.h) * 1.9;
+    A.pushOut(p, 0.5);
+    A.makeGuest(p, { x: st.at.x, z: st.at.z });
+    const b = A.sayBubble(p.grp, line, '#8a6a00', 2.7);
+    STAFF.drops.push({ p, b, t: 7 });
+  }
+  A.toast(line + ' · +' + A.money(pay));
+  A.Snd.coin();
+  o.idx++;
+  if (o.idx < o.stops.length) {
+    A.syncTarget(); A.rebuildRoutePath();
+    return;
+  }
+  const stars = rint(ORDERS.STAFF_STARS);
+  try { if (CAR && typeof CAR.addStars === 'function') CAR.addStars(stars); } catch (e) { console.warn('[orders] addStars', e); }
+  A.popBonus(t('развёз смену!'), t('+{money} · +{n} ★', { money: A.money(STAFF.pay), n: stars }));
+  const n = o.stops.filter(s => !s.pickup).length, total = STAFF.pay;
+  S.order = null; S.target = null;
+  // в полночь career.js сразу закрывает смену; если развоз позвали посреди смены (песочница) — следующий заказ
+  S.state = 'handover'; S.handT = 0.8;
+  A.rebuildRoutePath();
+  staffDone({ ok: true, people: n, pay: total, stars });
+}
+
+/* ─────────────── каждый кадр ─────────────── */
+let hudEl = null, hudV = -1, hudOn = null, urgOn = null;
+export function step (dt) {
+  if (!A) return;
+  if (window.__dlv && !window.__dlv.ORD) window.__dlv.ORD = DEBUG;
+  // посадка работников: дошёл до машины — пропал (в машине)
+  const B = STAFF.board;
+  if (B) {
+    B.t += dt;
+    for (let i = B.peds.length - 1; i >= 0; i--) {
+      const p = B.peds[i];
+      if (p.dead || Math.hypot(p.x - V.x, p.z - V.z) < 1.8 || B.t > 6) {
+        A.clearGuest(p);
+        if (!p.dead) { A.rehuman(p); A.walkSpawn(p, 150, 400); }
+        B.peds.splice(i, 1);
+      }
+    }
+    if (!B.peds.length) {
+      STAFF.board = null;
+      S.state = 'drive';
+      A.syncTarget(); A.rebuildRoutePath();
+      A.toast(t('все сели — по домам'));
+      A.Snd.blip(760, 0.1, 'square', 0.13);
+    }
+  }
+  for (let i = STAFF.drops.length - 1; i >= 0; i--) {
+    const d = STAFF.drops[i];
+    if ((d.t -= dt) > 0 && !d.p.dead) continue;
+    if (d.b.parent) d.b.parent.remove(d.b);
+    d.b.material.dispose();
+    A.clearGuest(d.p);
+    STAFF.drops.splice(i, 1);
+  }
+  // смена оборвалась посреди развоза
+  if (STAFF.p && STAFF.crew && (S.state === 'over' || S.state === 'title' || S.state === 'dying') && !(S.order && S.order.ord && S.order.ord.type === 'staff')) staffDone(false);
+  trackStory();
+  hud();
+}
+
+function hud () {
+  if (!hudEl) {
+    const host = document.getElementById('hud-left');
+    if (!host) return;
+    hudEl = document.createElement('div');
+    hudEl.id = 'oq-hud';
+    hudEl.className = 'oq oq-hud';
+    host.appendChild(hudEl);
+  }
+  const on = !S.ride && ['drive', 'back', 'handover', 'side'].includes(S.state) && Q.length > 0;
+  if (on !== hudOn) { hudOn = on; hudEl.hidden = !on; }
+  if (on && hudV !== QV) { hudV = QV; hudEl.innerHTML = queueHTML('oq-in'); }
+  const urg = !!(S.state === 'drive' && S.order && S.order.ord && S.order.ord.urgent);
+  if (urg !== urgOn) { urgOn = urg; document.body.classList.toggle('ord-urgent', urg); }
+}
+
+/* ─────────────── цвета: радар, карта, кольцо ─────────────── */
+export function targetColor () {
+  if (S.state === 'side') return typeColor('side');
+  if (S.state === 'back') return '#f0522a';
+  const sp = S.order && S.order.ord;
+  return sp ? sp.color : typeColor('pizza');
+}
+let tintHex = '';
+const TMP = { c: null };
+export function tintMarker (marker) {
+  const hex = targetColor();
+  if (hex === tintHex) return;
+  tintHex = hex;
+  const T = A.THREE;
+  TMP.c = TMP.c || new T.Color();
+  const u = marker.userData, beam = marker.children[2];
+  TMP.c.set(hex);
+  u.pin.material.color.copy(TMP.c);
+  u.ring.material.color.copy(TMP.c);
+  u.ball.material.color.copy(TMP.c).lerp(new T.Color(0xffffff), 0.25);
+  if (beam && beam.material) beam.material.color.copy(TMP.c).lerp(new T.Color(0xffffff), 0.45);
+}
+/* следующие заказы на полной карте: полые кружки цвета вида */
+export function drawMapQueue (x, fmX, fmZ, u) {
+  for (const q of Q.slice(0, ORDERS.QUEUE_SHOW || 2)) {
+    const s = q.stops[0];
+    x.beginPath(); x.arc(fmX(s.x), fmZ(s.z), 5 * u, 0, Math.PI * 2);
+    x.lineWidth = 2.5 * u; x.strokeStyle = q.color; x.stroke();
+  }
+}
+/* красная обводка срочного на радаре */
+export function radarRing (ctx, a, b) {
+  const sp = S.order && S.order.ord;
+  if (!sp || !sp.urgent || S.state !== 'drive') return;
+  const k = (performance.now() / 700) % 1;
+  ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255, 45, 74, ' + (1 - k).toFixed(2) + ')';
+  ctx.beginPath(); ctx.arc(a, b, 5 + k * 6, 0, Math.PI * 2); ctx.stroke();
+  ctx.lineWidth = 1.2; ctx.strokeStyle = '#fff';
+  ctx.strokeRect(a - 4.6, b - 4.6, 9.2, 9.2);
+}
+
+/* ─────────────── стили: одна вставка, без правки delivery.css ─────────────── */
+function css () {
+  if (document.getElementById('orders-css')) return;
+  const s = document.createElement('style');
+  s.id = 'orders-css';
+  s.textContent = `
+#phone.ord-typed { border-top: 6px solid var(--ord, #ff8a2b); }
+#phone.ord-typed .ph-top { box-shadow: inset 0 -5px 0 var(--ord, #ff8a2b); }
+#phone.ord-typed .ph-dot { background: var(--ord, #ff8a2b); }
+#phone.ord-urgent { outline: 3px solid #ff2d4a; outline-offset: 2px; }
+.oc-pay { font-size: 8px; line-height: 1.8; color: #7f8cc0; text-align: center; }
+.oc-pay b { color: #ff2d4a; font-weight: normal; }
+.oq { font-size: 7px; line-height: 1.7; color: #9fb4dd; }
+.oq b { display: block; font-weight: normal; opacity: .7; }
+.oq-r { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; overflow: hidden; }
+.oq-r i { flex: none; width: 6px; height: 6px; border-radius: 50%; display: inline-block; transform: translateY(-1px); }
+.oq-r span { overflow: hidden; text-overflow: ellipsis; }
+.oq-r em { font-style: normal; opacity: .7; flex: none; }
+.oq-card { margin: 8px auto 0; max-width: 92%; color: #7f8cc0; border-top: 1px dashed rgba(127,140,192,.35); padding-top: 6px; }
+.oq-hud { margin-top: 6px; max-width: 260px; opacity: .85; }
+body.ord-urgent #timewrap { outline: 2px solid #ff2d4a; box-shadow: 0 0 10px #ff2d4a; animation: ord-urg 0.9s ease-in-out infinite; }
+@keyframes ord-urg { 50% { box-shadow: 0 0 2px #ff2d4a; } }
+`;
+  document.head.appendChild(s);
+}
+
+/* ─────────────── песочница: заказ и поручение прямо сейчас ─────────────── */
+let FORCE = null;
+function dropCurrent () {
+  if (S.side) { if (!S.side.ped.dead) S.side.ped.freeT = 3; S.side = null; }
+  if (S.order) for (const st of S.order.stops) for (const p of st.peds) if (!p.served) A.clearGuest(p);
+  S.order = null;
+  A.hidePhone(); A.clearGate();
+}
+export function force (spec = {}) {
+  if (!A || !['drive', 'back', 'handover', 'brief', 'loading', 'side'].includes(S.state)) return null;
+  if (!POOL.length) buildPool();
+  const D = SHIFT_PLAN.dist || { min: 300, max: 1500 };
+  let sp = null;
+  if (spec.storyId || spec.type === 'story' || spec.kind === 'story') sp = storySpec(spec);
+  else {
+    const k = spec.kind || 'pizza';
+    let s = null;
+    if (spec.near) s = pickSpot({ near: spec.near, r: spec.r || 350, zone: spec.zone || null });
+    else if (k === 'edge' && A.MAP.career && A.MAP.career.edge) s = pickSpot({ near: A.MAP.career.edge, r: 350 });
+    else if (k === 'urgent') s = pickSpot({ dmin: PAY.URGENT_MIN_M * 0.8, zone: spec.zone || null });
+    else if (k === 'gang' || spec.zone) {
+      const z = spec.zone || 'gang';
+      s = ZMIN[z] >= 0 ? pickSpot({ zone: z, relax: false, dmin: ZMIN[z], dmax: ZMIN[z] + 800 }) : null;
+      if (!s && z === 'gang') { const g = ZN.gangZones()[0]; if (g) s = pickSpot({ near: g, r: g.r }); }
+    } else s = pickSpot({ dmin: (spec.dist && spec.dist.min) || D.min, dmax: (spec.dist && spec.dist.max) || D.max });
+    if (s) sp = { type: k === 'urgent' ? 'urgent' : 'pizza', kind: 'solo', urgent: k === 'urgent', edge: k === 'edge', stops: [stopOf(s)] };
+  }
+  if (!sp) { A.toast(t('нет подходящего адреса')); return null; }
+  sp.m = sp.stops.map(st => Math.round(A.routeLen(A.PIZZA.x, A.PIZZA.z, st.x, st.z)));
+  sp.zone = sp.stops[0].zone; sp.color = sp.color || typeColor(sp.type); sp.n = ++SH.gen; sp.forced = 'force';
+  for (const st of sp.stops) SH.reserved.add(st.key);
+  dropCurrent();
+  A.Store.set('dlv-msk-tut', '1');                       // учебный не нужен: карьерный план
+  FORCE = sp;
+  if (S.orders <= SH.last) SH.last = S.orders - 1;       // не считать это новой сменой
+  A.newOrder();
+  return S.order;
+}
+export function forceSide (id) {
+  if (!A || !['drive', 'back', 'handover', 'brief', 'side'].includes(S.state)) return false;
+  let ped = null, person = null;
+  const st = S.order && S.order.stops[S.order.idx];
+  if (st && st.peds[0] && !st.peds[0].dead) { ped = st.peds[0]; person = st.persons[0] || ped.person; }
+  else {
+    const near = A.alive().filter(p => !p.guest && !p.dead).sort((a, b) => ((a.x - V.x) ** 2 + (a.z - V.z) ** 2) - ((b.x - V.x) ** 2 + (b.z - V.z) ** 2))[0];
+    if (near) { ped = near; person = near.person; }
+  }
+  if (!ped || !person) return false;
+  const keep = S.order && S.order.stops.some(q => q.peds.includes(ped));
+  if (keep) { for (const q of S.order.stops) for (const p of q.peds) if (p !== ped && !p.served) A.clearGuest(p); S.order = null; A.hidePhone(); A.clearGate(); }
+  else { dropCurrent(); A.makeGuest(ped); }
+  if (S.side) S.side = null;
+  S.state = 'handover';
+  if (!offerSide(ped, person, id)) { A.toast(t('рядом нет нужного магазина')); S.handT = 0.2; return false; }
+  return true;
+}
+
+/* ─────────────── отладка: __dlv.ORD ─────────────── */
+/* simShift(n, h0, h1): прогнать смену без езды — n заказов с часами от h0 до h1,
+   каждый «доставлен» (адрес — в dlv-used-addr). Возвращает журнал. */
+function simShift (n = 10, h0 = 9, h1 = 23.5) {
+  HOUR_OVERRIDE = h0; SIM = true;
+  resetShift();
+  const out = [];
+  refill();
+  for (let i = 0; i < n; i++) {
+    HOUR_OVERRIDE = h0 + (h1 - h0) * i / Math.max(1, n - 1);
+    const sp = Q.shift();
+    refill();
+    if (!sp) break;
+    for (const st of sp.stops) markUsed(st.key);
+    SH.done++;
+    out.push({ n: sp.n, h: +HOUR_OVERRIDE.toFixed(1), type: sp.type, kind: sp.kind, zone: sp.zone, stops: sp.stops.length, edge: !!sp.edge, urgent: !!sp.urgent, side: !!sp.side, forced: sp.forced, m: sp.m, keys: sp.stops.map(s => s.key),
+      fee: ECON.orderPay(sp.m[0] || 0, sp.zone, { urgent: !!sp.urgent, edge: !!sp.edge, level: A.level() }) });
+  }
+  HOUR_OVERRIDE = null; SIM = false;
+  dropQueue();
+  SH.last = 0;
+  return out;
+}
+export const DEBUG = {
+  Q, SH, get POOL () { return POOL; }, get USED () { return USED; }, STAFF, ARRIVE, simShift, resetShift, genSpec, pickSpot, staffRide, bagMesh,
+  get CAR () { return CAR; }, get STORY () { return STORY; }, hourNow, offerSide, sideOpts, force, forceSide, nextPlan, card, onArrive,
+  clearUsed () { USED = []; reindex(); A.Store.set(USED_KEY, USED); },
+};

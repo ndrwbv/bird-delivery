@@ -803,7 +803,9 @@ function flee (a) {
 }
 
 /* ═════════════════ парки: воздушные змеи и дроны ═════════════════
-   Только днём и без дождя. Змей — ромб на нитке, с хвостом, качается на
+   Только днём и без дождя — и не всегда: волнами (flyWant). Бывают дни и
+   часы, когда в парках ни одного, бывает — сразу несколько; безветренный
+   день — только дроны. Змей — ромб на нитке, с хвостом, качается на
    ветру; зимой их меньше. Дрон висит перед хозяином, куда тот смотрит,
    мигает огоньками и иногда резко улетает вдаль и возвращается. */
 function buildParks () {
@@ -822,6 +824,23 @@ function buildParks () {
   }
 }
 let WIND = rand(0, Math.PI * 2);
+/* Сколько сейчас хочется змеев и дронов: три синусоиды с несоизмеримыми
+   периодами (полторы, четыре и десять минут игры) — волны то чаще, то реже,
+   плюс жребий на «сутки»: четверть дней безветренные, десятая — пустые. */
+const FLY = { T: rand(0, 5000), day: 0, lastT: -1, ph: [rand(0, 6.3), rand(0, 6.3), rand(0, 6.3)], want: 0, calm: false };
+function flyWant (dt) {
+  const E = A.ENV;
+  if (FLY.lastT >= 0 && E.t < FLY.lastT - 0.5) FLY.day++;
+  FLY.lastT = E.t;
+  FLY.T += dt;
+  const d = FLY.day + FLY.T / 480, h = (Math.sin(Math.floor(d) * 91.7 + 3.1) * 43758.5453) % 1, hd = Math.abs(h);
+  FLY.calm = hd < 0.25;
+  if (hd > 0.9) { FLY.want = 0; return 0; }
+  const P = FLY.ph, T = FLY.T;
+  const v = 0.5 * Math.sin(T / 14 + P[0]) + 0.35 * Math.sin(T / 38 + P[1]) + 0.3 * Math.sin(T / 97 + P[2]);
+  FLY.want = clamp(Math.round((v - 0.12) * 4.2), 0, CAP.flyers);
+  return FLY.want;
+}
 const KMAT = { kite: null, str: null, tails: new Map(), dBody: null, dRot: null, dLed: null };
 function kiteMats () {
   if (KMAT.kite) return;
@@ -894,7 +913,7 @@ function parkSpot () {
 }
 function spawnFlyer (x, z) {
   kiteMats();
-  const kite = chance(winter() ? 0.12 : 0.55);
+  const kite = !FLY.calm && chance(winter() ? 0.12 : 0.55);
   const m = member(makePerson());
   m.x = x; m.z = z; place(m);
   const f = { m, kind: kite ? 'kite' : 'drone', t: rand(0, 60), seed: rand(0, 9), L: 1.5, Lmax: rand(18, 26), pack: 0, fall: null, gaze: rand(0, Math.PI * 2),
@@ -1059,7 +1078,11 @@ function scan () {
   sweep(LUX, l => Math.hypot(l.x - V.x, l.z - V.z) > 260, dropLux);
   sweep(ARTISTS, a => a.gone || Math.hypot(a.m.x - V.x, a.m.z - V.z) > 230, dropArtist);
   sweep(FLYERS, f => f.gone || Math.hypot(f.m.x - V.x, f.m.z - V.z) > 240, dropFlyer);
+  const want = flyWant(1);
   for (const f of FLYERS) if (!day && !f.pack) f.pack = 1;
+  // волна схлынула — лишние сворачиваются (змей сматывают, дрон садится)
+  let live = FLYERS.filter(f => !f.pack && !f.fall).length;
+  for (const f of FLYERS) if (live > want && !f.pack && !f.fall) { f.pack = 1; live--; }
   if (COUPLES.length < CAP.couples && chance(0.6)) spawnCouple();
   if (RICH.length < CAP.rich && chance(0.3)) spawnRich();
   if (LUX.length < CAP.lux && chance(0.2)) spawnLux();
@@ -1075,7 +1098,7 @@ function scan () {
     if (s < fd) { fd = s; free = W; }
   }
   if (free && ARTISTS.length < CAP.artists && !E.rainWant && chance(deepWinter() ? 0.08 : winter() ? 0.25 : 0.5)) spawnArtist(free);   // в лютый мороз не рисуют
-  if (day && PARKS.length && FLYERS.length < CAP.flyers && chance(0.5)) { const at = parkSpot(); if (at) spawnFlyer(at[0], at[1]); }
+  if (day && PARKS.length && FLYERS.length < want && chance(0.5)) { const at = parkSpot(); if (at) spawnFlyer(at[0], at[1]); }
 }
 
 const OFF = new URLSearchParams(location.search).has('nolife');     // ?nolife — без жизни улиц: сравнить кадр
@@ -1096,7 +1119,7 @@ export function step (dt, api) {
   const V = A.V;
   for (const T of TAGS) T.mesh.visible = Math.abs(T.W.x - V.x) < 220 && Math.abs(T.W.z - V.z) < 220;
   STATE.stats.ms = STATE.stats.ms * 0.98 + (performance.now() - t0) * 0.02;       // сколько стоит кадр жизни, в среднем
-  if (window.__dlv && !window.__dlv.LIFE) window.__dlv.LIFE = Object.assign(STATE, { debug: { spawnCouple, spawnRich, spawnLux, spawnArtist, spawnFlyer, parkSpot, makeTag, winter, deepWinter, cold, richTip } });
+  if (window.__dlv && !window.__dlv.LIFE) window.__dlv.LIFE = Object.assign(STATE, { debug: { spawnCouple, spawnRich, spawnLux, spawnArtist, spawnFlyer, parkSpot, FLY, makeTag, winter, deepWinter, cold, richTip } });
 }
 
 /* рядом кого-то сбили или взорвалось: парочки и богачи — руки вверх,

@@ -17,7 +17,7 @@
    | крестовина ← ↑ →    | ответ 1 / 2 / 3 на карточке     | choice1..3            | выбор (menu*)              |
    | крестовина ↓        | —                              | —                     | вниз (menuDown)            |
    | R3 (нажать правый)  | звук вкл/выкл                  | sound                 | —                          |
-   | LB, правый стик     | свободны                       | rx, ry (сырые)        | —                          |
+   | LB, правый стик     | свободны                       | rx, ry (сырые)        | LB/RB — листать (pageL/R) |
 
    Руль: мёртвая зона 12 %, внешняя 3 %, кривая |x|^1.6 — точнее в центре, полный замок у края.
    Курки: мёртвая зона 6 %. Удержания (hand, nitro, gas…) — состояние кадра; всё остальное —
@@ -43,7 +43,7 @@ export function setPadConfig (o) { Object.assign(CFG, o); }
 
 const HOLD = ['hand', 'nitro'];
 const EDGES = ['pause', 'map', 'accept', 'choice1', 'choice2', 'choice3', 'sound', 'any',
-  'menuUp', 'menuDown', 'menuLeft', 'menuRight', 'menuOk', 'menuBack'];
+  'menuUp', 'menuDown', 'menuLeft', 'menuRight', 'menuOk', 'menuBack', 'pageL', 'pageR'];
 
 // один объект на всё время: не мусорим каждый кадр
 export const pad = {
@@ -52,6 +52,7 @@ export const pad = {
   hand: false, nitro: false,
   pause: false, map: false, accept: false, choice1: false, choice2: false, choice3: false, sound: false, any: false,
   menuUp: false, menuDown: false, menuLeft: false, menuRight: false, menuOk: false, menuBack: false,
+  pageL: false, pageR: false,   // LB / RB — листать страницы (гараж карьеры)
   lastUse: 0,               // performance.now() последнего касания — чтобы прятать подсказки мыши/тача
 };
 
@@ -145,6 +146,8 @@ export function pollPad () {
   if (edge('back', btn(B.back))) pad.map = true;
   if (edge('start', btn(B.start))) pad.pause = true;
   if (edge('r3', btn(B.r3))) pad.sound = true;
+  if (edge('lb', btn(B.lb))) pad.pageL = true;
+  if (edge('rb', rb)) pad.pageR = true;
   if (edge('up', dUp)) { pad.choice2 = true; pad.menuUp = true; }
   if (edge('left', dLeft)) { pad.choice1 = true; pad.menuLeft = true; }
   if (edge('right', dRight)) { pad.choice3 = true; pad.menuRight = true; }

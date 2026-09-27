@@ -30,12 +30,17 @@ import * as MAPW from './mapworks.js';
 import * as CBITS from './citybits.js';
 import * as SEAS from './seasons.js';
 import * as LIFE from './life.js';               // парочки, богачи, графитисты, змеи и дроны в парках
+import * as WORLD from './world.js';             // плитка, аллеи; в карьере — мусор, бандиты, особняки, шашлыки
 import * as RL from './roadlife.js';
 import * as PZ from './pizzeria.js';
 import * as LM from './landmarks.js';            // заправки и каток
 import * as ECON from './econ.js';               // карьера: все числа и формулы (docs/CAREER.md)
 import * as DLG from './dialog.js';              // диалог с головой и печатающимся текстом
 import * as ZN from './zones.js';                // районы города для заказов и событий
+import * as ORD from './orders.js';              // карьера: очередь заказов, поручения, развоз смены, оплата (docs/ORDERS.md)
+import * as CAREERM from './career.js';          // карьера: смена 9—24, обед, итоги, донаты, слот, звёзды
+import * as STORY from './story.js';             // сюжетные заказы и катсцены (баба Зина)
+import * as AUTO from './cars.js';               // карьера: 10 машин, ломучесть, заглохла, ямы, гараж Дяди Жени
 import * as CULL from './cull.js';               // статика дальше камеры — со сцены, матрицы заморожены (Steam Deck)
 
 /* Сохранения — через площадку (облако Яндекса / localStorage). Значения
@@ -289,6 +294,7 @@ for (const m of CITY.malls || []) {
   const b = CITY.buildings.find(q => q.id === m.id);
   if (b && m.style) b.style = { stripe: m.style.stripe, sign: m.style.stripe, glass: m.style.glass };
 }
+WORLD.prepCity(CITY, MAP, CAREER);               // карьера: дома в круге MAP.career.rich — особняки (world.js)
 /* Во вступлении камера не отходит от Омеги дальше пары сотен метров —
    город строим только вокруг неё: сборка в разы короче, кино стартует быстрее. */
 const CW = CITY.meta.size[0], CD = CITY.meta.size[1];
@@ -852,13 +858,14 @@ function osmRoads () {
     LITM.color(lot.k === 'ind' ? '#c9c8bb' : '#cfcabd');
     LITM.poly(lot.p, 0.025);
   }
-  // дорожки во дворах и парках: светлая плитка, по ним гуляют коллеги
-  LITM.color('#ddd5c6');
-  for (const q of CITY.paths)
+  // дорожки во дворах и парках: светлая плитка, по ним гуляют коллеги; вид плитки — world.js
+  for (const q of CITY.paths) {
+    LITM.color(WORLD.pavePath(q));
     for (let i = 1; i < q.length; i++) {
       LITM.ribbon(q[i - 1][0], q[i - 1][1], q[i][0], q[i][1], 2.0, 0.07);
       if (i < q.length - 1) LITM.disc(q[i][0], q[i][1], 1, 0.07, 6);
     }
+  }
   for (const pass of [0, 1]) {
     for (const r of CITY.roads) {
       if (r.b) continue;                          // мосты кладутся отдельно, над водой
@@ -866,7 +873,7 @@ function osmRoads () {
       // На перекрёстке два полотна лежат в одной плоскости и мерцают.
       // Главная чуть выше второстепенной — поверх и рисуется.
       const y = (pass ? 0.14 : 0.09) + (7 - r.c) * 0.004;
-      LITM.color(pass ? ROAD_HEX[r.c] : '#e3ded4');
+      LITM.color(pass ? ROAD_HEX[r.c] : WORLD.paveRoad(r));   // тротуар: гладкий, брусчатка или в крапинку (world.js)
       const p = r.p;
       for (let i = 1; i < p.length; i++) {
         LITM.ribbon(p[i - 1][0], p[i - 1][1], p[i][0], p[i][1], w, y);
@@ -924,7 +931,7 @@ function osmCurbs () {
           const [ax, az] = p(d, o1), [bx, bz] = p(dd, o1);
           const mid = (o1 + o2) / 2;
           const [sx1, sz1] = p(d, mid), [sx2, sz2] = p(dd, mid);
-          LITM.color(r.g ? groundHex(groundH(sx1, sz1)) : '#e3ded4');
+          LITM.color(r.g ? groundHex(groundH(sx1, sz1)) : WORLD.paveRoad(r));
           flat(sx1, sz1, sx2, sz2, SW, CURB_H + 0.02);
           // бордюрный камень: светлая кромка сверху и грань к дороге
           const [kx1, kz1] = p(d, sd * (w / 2 + 0.12)), [kx2, kz2] = p(dd, sd * (w / 2 + 0.12));
@@ -1201,6 +1208,7 @@ function tree (x, z, strip = 0) {
   // было бы стеной посреди дороги; на газоне бульвара — ближе к бордюру
   const road = nearestRoad(x, z, DRIVE_MAX + 2, 1);
   if (road && road.d < road.seg.w / 2 + (strip ? 1 : 2.5)) return;
+  if (WORLD.onAlley(x, z)) return;                 // на аллее парка (world.js) — не сажаем
   if (SEAS.seasonTree(x, z, y) === false) return;   // вид дерева и сезон — seasons.js (у столиков пиццерии не сажает)
   solid(x - 0.55, z - 0.55, x + 0.55, z + 0.55);
 }
@@ -1281,6 +1289,7 @@ function wallFace (x, z, maxD) {
 function benchSpotOk (x, z) {
   const road = nearestRoad(x, z, 7, 1);
   if (road && road.d < road.seg.w / 2 + 1.0) return false;
+  if (WORLD.onAlley(x, z, 0.6)) return false;          // посреди аллеи (world.js) — нет
   return !inHouse(x, z, 1.4);
 }
 
@@ -2485,7 +2494,11 @@ function entranceAt (x, z, nx, nz, grand) {
    подъезды тоже становятся точками доставки. */
 const GEN_ENTR = [];
 function genEntrances (b, p, ccw, lv, area, arch, bestEdge) {
-  if (INTRO || area < 250 || (b.k && b.k !== 'res' && b.k !== 'pub')) return;
+  // В карьере адреса нужны и в особняках, частном секторе, гаражах и промзоне —
+  // иначе заказы туда повторяются: двери и там (у гаражей и цехов — одна, не у всех)
+  const small = CAREER && (b.st === 'villa' || b.k === 'priv' || b.st === 'priv');
+  const work = CAREER && (b.k === 'gar' || b.k === 'ind') && area > 60 && (Math.abs(Math.sin(p[0][0] * 12.9 + p[0][1] * 78.2)) * 43758 % 1) < (b.k === 'gar' ? 0.3 : 0.5);
+  if (INTRO || (area < 250 && !small && !(work && area > 60)) || (b.k && b.k !== 'res' && b.k !== 'pub' && !small && !work)) return;
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
   for (const q of p) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); z0 = Math.min(z0, q[1]); z1 = Math.max(z1, q[1]); }
   if (CITY.entrances.some(e => e[0] > x0 - 3 && e[0] < x1 + 3 && e[1] > z0 - 3 && e[1] < z1 + 3)) return;
@@ -2816,7 +2829,7 @@ function houseWalks () {
     const ix = x - nx * 0.6, iz = z - nz * 0.6;
     let hb = null;
     for (const b of HOUSE_GRID.get(Math.floor(ix / 40) + ',' + Math.floor(iz / 40)) || []) if (inPoly(ix, iz, b.p)) { hb = b; break; }
-    if (!hb) continue;
+    if (!hb || hb.k === 'gar' || hb.k === 'ind') continue;          // у гаражей и цехов дорожек-отмосток нет
     const p = hb.p;
     let bi = -1, bd = 3;
     for (let i = 0; i < p.length; i++) {
@@ -3417,6 +3430,19 @@ const pizzaApi = () => ({
 /* места на парковке курьеров: [0] — твоё, дальше — соперников */
 let COURIER_SLOTS = null;
 const cityApi = () => ({ THREE, scene, LIT, FLAT, LITM, FLATM, LAMPH, LAMP_SPOTS, box, put, obb, groundH, nearestRoad, makeHuman });
+/* что нужно world.js (плитка, аллеи, мусор, бандиты, особняки, шашлыки) */
+const worldApi = () => ({
+  THREE, scene, cam, V, S, CITY, MAP, CAREER, ADULT, LITM, LIT, LAMPH, LAMP_SPOTS, BENCHES, TRAFFIC, HUMAN_VC, SMASH, SM_WORD, GEN_ENTR,
+  box, put, mergeGeos, smashAdd, groundH, curbAt, inHouse, inPoly, inBounds, nearestRoad, pushOut, tree,
+  makeHuman, dropMesh, gibHuman, handsUp, sayBubble, puff, sparks, toast, Snd, newCar, makeCarLite, poseOnSlope, donated, money,
+  shiftN: () => +Store.get('dlv-shifts', 0) || 0,
+  pay: n => { const p = Math.max(0, Math.min(wallet(), Math.round(n))); if (p) addWallet(-p); return p; },   // мзда — из кошелька
+  hurt: n => { S.hurt = 0; hurtCar(n, 9, V.x + rand(-1, 1), V.z + rand(-1, 1)); },
+  dent: (x, z, f) => dentCar(car, x, z, f),
+  onRunOver: label => { S.people++; Snd.squish(); toast(label); },
+  get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get fenceAt () { return RL.RL.fenceAt; },
+});
+let WORLD_API = null;
 const landApi = () => ({ ...cityApi(), inHouse, makePerson });
 let RINK = null;                                  // каток с катающимися (landmarks.js), если он есть в карте
 
@@ -3440,6 +3466,7 @@ function buildCity () {
   // во вступлении место под кружок знаем заранее — его держим пустым
 
   const tm = (k, f) => { const t0 = performance.now(); f(); BUILD_T[k] = Math.round(performance.now() - t0); };
+  tm('world', () => WORLD.build(worldApi()));     // аллеи; в карьере — газоны особняков, мусор, гаражи (world.js) — до деревьев и лавочек
   tm('life', osmStreetLife);
   tm('entr', osmEntrances);
   tm('signs', osmSigns);
@@ -3455,11 +3482,12 @@ function buildCity () {
     if (MAP.landmarks && MAP.landmarks.rink) RINK = LM.buildRink(landApi(), CITY.green, MAP.landmarks.rink);
   });
   tm('roadlife', () => RL.build(roadApi()));      // знаки и заборы (roadlife.js) — до smashBuild
+  if (CAREER) tm('cars', () => { BUILD_T.carsInfo = AUTO.build(); });   // ямы в статику дорог, гараж Дяди Жени (cars.js)
   tm('yard', () => { osmPitches(); osmYardBits(); osmVerandas(); SEAS.seasonYard(); smashBuild(); });
   tm('seasons', SEAS.seasonBuild);                // сугробы, ёлки, гирлянды
 
   const tq = performance.now();
-  const litG = LITM.mesh(SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide })));
+  const litG = LITM.mesh(WORLD.paveMat(SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }))));   // + узор плитки (world.js)
   const flatG = FLATM.mesh(new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }));
   BUILD_T.mesh = Math.round(performance.now() - tq);
   /* Всю статику — сразу в видеокарту, одним кадром в крохотную цель:
@@ -4031,8 +4059,8 @@ function taxiSignMat () {
    сантиметров ниже, колёса уходят в арки), lux — хромированные бамперы
    при любой тонировке (чёрная машина богача, life.js) */
 function makeCar (bodyHex, roofSign, model = 'sedan', taxi = false, opts = {}) {
-  const S = CAR_SPEC[model] || CAR_SPEC.sedan;
-  const dy = opts.low ? -0.13 : 0;
+  const S = opts.spec || CAR_SPEC[model] || CAR_SPEC.sedan;   // spec, lift, dress, chrome, roofHex — машины карьеры (cars.js)
+  const dy = opts.low ? -0.13 : opts.lift || 0;
   const g = new THREE.Group();
   g.rotation.order = 'YXZ';          // курс, потом тангаж по склону, потом крен
   const mat = hex => new THREE.MeshLambertMaterial({ color: hex, flatShading: true });
@@ -4052,11 +4080,11 @@ function makeCar (bodyHex, roofSign, model = 'sedan', taxi = false, opts = {}) {
   };
 
   const dark = '#' + new THREE.Color(bodyHex).multiplyScalar(0.78).getHexString();
-  const CHR = (model === 'sedan' && !opts.tint) || opts.lux ? '#cfd3d8' : '#3a3940', GLASS = opts.tint ? '#16181e' : '#5b7ea3';
+  const CHR = opts.chrome || ((model === 'sedan' && !opts.tint) || opts.lux ? '#cfd3d8' : '#3a3940'), GLASS = opts.tint ? '#16181e' : '#5b7ea3';
   const L = S.L, W = S.W, hl = L / 2;
   const y0 = 0.2 + S.h / 2 + 0.22;                 // середина нижней коробки
   const top = y0 + S.h / 2;                         // верх крыльев, от него растёт салон
-  const frame = model === 'smart' ? (bodyHex === '#3c4048' ? '#c9ccd2' : '#2b2a30') : bodyHex;
+  const frame = opts.roofHex || (model === 'smart' ? (bodyHex === '#3c4048' ? '#c9ccd2' : '#2b2a30') : bodyHex);
 
   // днище и крылья
   add(new THREE.BoxGeometry(W, S.h, L), bodyHex, 0, y0, 0);
@@ -4088,7 +4116,8 @@ function makeCar (bodyHex, roofSign, model = 'sedan', taxi = false, opts = {}) {
   add(new THREE.BoxGeometry(W + 0.14, 0.16, 0.22), CHR, 0, y0 - 0.04, -hl + 0.03, 'bumperR');
   // решётка, фары, фонари
   add(new THREE.BoxGeometry(W * 0.6, 0.2, 0.1), '#2b2530', 0, top - 0.08, hl - 0.02);
-  if (model === 'cn') RL.cnCar(g, add, { S, W, L, hl, top, y0, bodyHex });   // узкие LED во всю ширину — вместо фар
+  if (opts.dress) opts.dress(g, add, { S, W, L, hl, top, y0, bodyHex, CHR, GLASS, dy });   // своя морда и фары (cars.js)
+  else if (model === 'cn') RL.cnCar(g, add, { S, W, L, hl, top, y0, bodyHex });   // узкие LED во всю ширину — вместо фар
   else for (const s of [-1, 1]) {
     const h = new THREE.Mesh(model === 'sedan' ? new THREE.CylinderGeometry(0.2, 0.2, 0.1, 10) : new THREE.BoxGeometry(0.4, 0.1, 0.16),
       new THREE.MeshBasicMaterial({ color: 0xfff1c8 }));
@@ -5115,7 +5144,9 @@ function runOver (p, vx, vz) {
   gibHuman(p, vx, vz);
   S.people++;
   Snd.squish();
-  if (wasTarget) gameOver('не доставил', victim ? [victim] : [], { x: p.x, z: p.z });
+  // карьера: сбил своего клиента — минус доля заработанного (CLIENT_KILL); со смены снимают, только если END_SHIFT
+  if (wasTarget && CAREER) { CAREERM.clientKilled(victim); if (ECON.CLIENT_KILL.END_SHIFT) gameOver('сбил клиента', victim ? [victim] : [], { x: p.x, z: p.z }); }
+  else if (wasTarget) gameOver('не доставил', victim ? [victim] : [], { x: p.x, z: p.z });
   else toast(victim ? $t('минус {what}', { what: victim.name }) : $t('минус прохожий'));
 }
 
@@ -6361,7 +6392,7 @@ function initRivals () {
   clearRivals();
   restSlots();
   RIVAL_SPEC.forEach((spec, i) => {
-    const person = makePerson({ fem: !!spec.ram });        // бодается она — реплики в женском роде
+    const person = makePerson({ fem: !!spec.ram, seed: CAREER ? CAREERM.crewSeed(i) : undefined });   // бодается она — реплики в женском роде; в карьере — те же люди, что в рейтинге пиццерии
     const R = { spec, person, name: person.first, money: 0, done: 0, t: null, tagTex: nameTex(person.first, spec.hex), back: 0, slot: i };
     RIVALS.push(R);
     rivalSpawn(R, 6 + i * 3.5);                       // первыми трогаются передние, пока ты грузишься
@@ -7277,8 +7308,14 @@ const CARS = [
 const wallet = () => +Store.get('dlv-msk-wallet', 0) || 0;
 const addWallet = n => Store.set('dlv-msk-wallet', wallet() + n);
 const owned = () => { const v = Store.get('dlv-msk-cars', ['dodo']); return Array.isArray(v) ? v : ['dodo']; };
-const curCar = () => CARS.find(c => c.id === Store.get('dlv-msk-car', 'dodo') && owned().includes(c.id)) || CARS[0];
-const makeCourier = () => { const c = curCar(); return makeCar(c.hex, true, c.model, false, c); };
+const curCar = () => CAREER ? AUTO.current() : CARS.find(c => c.id === Store.get('dlv-msk-car', 'dodo') && owned().includes(c.id)) || CARS[0];
+const makeCourier = () => { const c = curCar(); return CAREER ? AUTO.makeModel(c.id) : makeCar(c.hex, true, c.model, false, c); };
+/* карьера: десять машин, поломки, ямы и гараж Дяди Жени — cars.js. Кошелёк
+   career.js может подменить: AUTO.init({ wallet, addWallet }) */
+if (CAREER) AUTO.init({ THREE, scene, MAP, CITY, Store, Platform, Snd, DLG, ZN, donated, money, wallet, addWallet, rumble,
+  makeCar, put, box, mergeGeos, obb, LIT, LITM, FLAT, LAMPH, LAMP_SPOTS, HUMAN_VC, groundH, nearestRoad, roadWidth, inBounds,
+  makeHuman, makePerson, toast, puff, inHouse, SOLIDS, resetCar: () => resetCar(),
+  get S () { return S; }, get V () { return V; }, get car () { return car; }, get PIZZA () { return PIZZA; } });
 
 /* машина сбоку — для витрины магазина: силуэт по модели, цвет, стёкла */
 function carPic (c) {
@@ -7391,11 +7428,13 @@ function renderLangs () {
 function renderSettings () {
   const row = (label, val, id) => '<div class="set-row"><span>' + label + '</span><button type="button" id="' + id + '">' + val + '</button></div>';
   elPanelBody.innerHTML = '<div class="pn-t">' + $t('настройки') + '</div>' +
+    (CAREER ? row($t('имя'), String(S.name || '—').replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';'), 'set-name') : '') +
     row($t('звук'), Snd.on ? $t('вкл') : $t('выкл'), 'set-snd') +
     row('🌐 ' + $t('язык'), LANG_NAMES[curLang()], 'set-lang') +
     (Platform.features.adult ? row($t('версия'), ADULT ? $t('взрослая 18+') : $t('детская'), 'set-ed') : '') +
     '<div class="pn-n">' + $t('карта — © участники OpenStreetMap, лицензия ODbL. Рельеф — SRTM (NASA).') + '</div>';
   $('set-snd').onclick = () => { Snd.set(!Snd.on); renderSettings(); };
+  if ($('set-name')) $('set-name').onclick = () => CAREERM.askName(() => renderSettings());
   $('set-lang').onclick = () => renderLangs();
   if ($('set-ed')) $('set-ed').onclick = () => { Store.set('dlv-edition', ADULT ? 'kids' : 'adult'); Platform.store.flush && Platform.store.flush(); setTimeout(() => location.reload(), 150); };
 }
@@ -7529,8 +7568,9 @@ function driveStep (dt) {
   const slope = (hN - hT) / 2.85;
   if (IN.gas || IN.brake || Math.abs(vf) > 1.2) vf -= slope * SLOPE_G * dt;
 
-  const beast = FXS.beastT > 0 && !!IN.nitro;
-  NOS.burn = !!IN.nitro && NOS.tank > 0 && !beast;
+  const dead = CAREER && AUTO.stalled();          // заглохла: ни газа, ни нитро, катится накатом (cars.js)
+  const beast = !dead && FXS.beastT > 0 && !!IN.nitro;
+  NOS.burn = !!IN.nitro && NOS.tank > 0 && !beast && !dead;
   if (beast) vf += ACC * Math.max(0.2, 1 - vf / (VMAX * 2)) * dt;
   if (NOS.burn) {
     NOS.tank = Math.max(0, NOS.tank - NOS_BURN * (S.nosEff || 1) * dt);
@@ -7539,9 +7579,10 @@ function driveStep (dt) {
   }
   NOS.was = NOS.burn;
 
-  if (IN.gas && !V.air) vf += ACC * Math.max(0.25, 1 - vf / VMAX) * dt;
+  if (IN.gas && !V.air && !dead) vf += ACC * Math.max(0.25, 1 - vf / VMAX) * dt;
   const wet = Math.min(1, ENV.rain + SEAS.slip());   // дождь, а зимой и снег
-  if (IN.brake) vf -= (vf > 0.4 ? BRK * (1 - wet * 0.45) : ACC * 0.5) * dt;
+  if (IN.brake) vf -= (vf > 0.4 ? BRK * (1 - wet * 0.45) : dead ? 0 : ACC * 0.5) * dt;
+  if (dead) vf -= vf * 0.55 * dt;                 // без мотора — накатом до остановки
   vf = clamp(vf, -15, beast ? VMAX * 2 : VBOOST);
   if (!NOS.burn && !beast && vf > VMAX) vf -= (vf - VMAX) * 1.4 * dt;   // после нитро сбрасывает, а не упирается
   vf -= vf * 0.3 * dt;
@@ -7828,7 +7869,7 @@ function driveStep (dt) {
     nosFlame(V.x - fx * 2.35 + sx * 0.45, V.y + 0.5, V.z - fz * 2.35 + sz * 0.45, -fx, -fz);
   }
 
-  Snd.engine(vf * (NOS.burn ? 1.12 : 1), IN.gas || NOS.burn);
+  Snd.engine(dead ? 0 : vf * (NOS.burn ? 1.12 : 1), !dead && (IN.gas || NOS.burn));
   return vf;
 }
 
@@ -7848,8 +7889,9 @@ function hurtCar (dmg, vn, hx, hz) {
   if (FXS.shieldT > 0) { sparks(hx === undefined ? V.x : hx, 1, hz === undefined ? V.z : hz, 6); return; }
   dentCar(car, hx === undefined ? V.x : hx, hz === undefined ? V.z : hz, vn);   // мятина видна на кузове
   if (S.hurt > 0) return;
+  if (CAREER) AUTO.onHit(vn);                     // удар: 40 %, что машина станет хуже заводиться
   rumble(dmg > 1 ? 0.9 : 0.6, 240);
-  S.hp -= clamp(Math.round(dmg), 1, 2);
+  S.hp -= SBX.god ? 0 : clamp(Math.round(dmg), 1, 2);   // SBX.god — песочница: бесконечное здоровье (мятины остаются)
   S.hurt = 0.9;
   S.shake = Math.max(S.shake, 0.5);
   Snd.crash(vn);
@@ -7993,6 +8035,7 @@ function drawRadar () {
       }
     }
   RL.drawRadar(rctx, tr, s);                        // пробки — красным
+  WORLD.drawRadar(rctx, tr, s);                     // бандитские районы — красные круги (world.js)
   // проложенный маршрут
   if (routePts.length > 1) {
     rctx.strokeStyle = '#ff8a2b'; rctx.lineWidth = 3; rctx.lineJoin = 'round';
@@ -8019,8 +8062,12 @@ function drawRadar () {
   };
   if (PIZZA) blip(PIZZA.x, PIZZA.z, '#ffffff', 3.4);
   for (const c of DRINKITS) blip(c.cx, c.cz, '#2f6fff', 3.2);
+  if (CAREER) AUTO.radar(rctx, tr, R);             // гараж Дяди Жени
   if (THIEF.p && Math.floor(tG * 4) % 2 === 0) blip(THIEF.p.x, THIEF.p.z, '#ff2d6e', 3.6);
-  if (S.target) blip(S.target.x, S.target.z, '#f0522a', 4);
+  if (S.target) {
+    blip(S.target.x, S.target.z, CAREER ? ORD.targetColor() : '#f0522a', 4);   // карьера: цвет вида заказа
+    if (CAREER) { let [a, b] = tr(S.target.x, S.target.z); const l = Math.hypot(a, b); if (l > R - 7) { a *= (R - 7) / l; b *= (R - 7) / l; } ORD.radarRing(rctx, a, b); }
+  }
   // находки — фиолетовые, мерцают и пульсируют кольцом (colPing)
   for (const o of COL_ON_MAP) {
     const [a, b] = tr(o.x, o.z);
@@ -8160,6 +8207,7 @@ function drawFullMap () {
   const u = Math.max(s, fullC.width / Math.max(1, fullC.clientWidth));
   x.drawImage(FM.base, 0, 0);
   RL.drawMap(x, fmX, fmZ, s);                       // пробки — красным
+  WORLD.drawMap(x, fmX, fmZ, s);                    // бандитские районы (world.js)
   if (routePts.length > 1) {
     x.beginPath();
     routePts.forEach((p, i) => (i ? x.lineTo(fmX(p[0]), fmZ(p[1])) : x.moveTo(fmX(p[0]), fmZ(p[1]))));
@@ -8189,11 +8237,13 @@ function drawFullMap () {
     x.fillStyle = '#f0522a'; x.fillRect(fmX(PIZZA.x) - 5 * u, fmZ(PIZZA.z) - 5 * u, 10 * u, 10 * u);
     x.lineWidth = 1.5 * u; x.strokeStyle = '#fff'; x.strokeRect(fmX(PIZZA.x) - 5 * u, fmZ(PIZZA.z) - 5 * u, 10 * u, 10 * u);
   }
+  if (CAREER) ORD.drawMapQueue(x, fmX, fmZ, u);   // следующие заказы — полыми кружками
   if (S.target) {
-    x.fillStyle = '#ff2d6e';
+    x.fillStyle = CAREER ? ORD.targetColor() : '#ff2d6e';
     x.beginPath(); x.arc(fmX(S.target.x), fmZ(S.target.z), 6 * u, 0, Math.PI * 2); x.fill();
     x.lineWidth = 1.5 * u; x.strokeStyle = '#fff'; x.stroke();
   }
+  if (CAREER) AUTO.mapMark(x, fmX, fmZ, u);       // гараж Дяди Жени
   if (MAPW.MAP_DOTS.length) MAPW.drawMapDots(x, fmX, fmZ, s);      // ?mapcheck: проблемы карты
   // ты — крупная стрелка по курсу с пульсирующим кольцом: видно сразу на всей карте
   const px = fmX(V.x), pz = fmZ(V.z), pulse = (performance.now() / 900) % 1;
@@ -8399,7 +8449,7 @@ function renderProfile () {
   $('pf-lvl').title = $t('уровень курьера {n}', { n: l });
   $('pf-name').textContent = S.name || Platform.player.name || $t('курьер');
   const mine = (LB.cache || []).find(r => r.me);
-  $('pf-rank').textContent = (mine ? $t('#{n} в таблице', { n: mine.rank }) + ' · ' : '') + money(wallet()) + ' · ' + SEAS.seasonName();
+  $('pf-rank').textContent = (CAREER ? $t('#{n} в пиццерии', { n: CAREERM.crewPlace() }) + ' · ' : mine ? $t('#{n} в таблице', { n: mine.rank }) + ' · ' : '') + money(wallet()) + (CAREER ? ' · ★ ' + CAREERM.stars() : '') + ' · ' + SEAS.seasonName();
   const lo = LVL_AT[l], hi = LVL_AT[l + 1];
   $('pf-xp').style.width = (l >= 5 ? 100 : Math.round(clamp((xp - lo) / (hi - lo), 0, 1) * 100)) + '%';
   $('pf-xp').parentElement.title = l < 5 ? $tn(hi - xp, 'до следующего {n} заказ|до следующего {n} заказа|до следующего {n} заказов') : $t('максимальный');
@@ -8465,6 +8515,8 @@ function showOver (why, victims) {
   if (best) { S.best = S.money; Store.set('dlv-msk-best', String(S.money)); }
   elBig.hidden = true;
   closePanel();
+  // карьера: свой экран итогов — цифры смены, гараж, донаты, слот-машина (career.js)
+  if (CAREER) { CAREERM.showEnd(why, (OVER_WHY[why] || (() => $t(OVER_TITLE[why] || why)))(victims || [])); return; }
   const lost = why !== 'смена окончена';
   $('ov-t').textContent = lost ? $t('ты проиграл') : $t('смена закончена');
   $('ov-t').classList.toggle('win', !lost);
@@ -8514,8 +8566,8 @@ function showOver (why, victims) {
    в руки гостю. Цель может быть функцией — тогда она едет с машиной. */
 const FLY = [];
 
-function flyBox (from, to, dur, onDone) {
-  const g = pizzaBox();
+function flyBox (from, to, dur, onDone, mesh) {
+  const g = mesh || pizzaBox();                  // mesh — вместо коробки (пакет из магазина, ORD.bagMesh)
   g.position.set(from.x, from.y, from.z);
   scene.add(g);
   FLY.push({ g, from: { x: from.x, y: from.y, z: from.z }, to, t: 0, dur: dur || 0.8, onDone });
@@ -8725,6 +8777,8 @@ function showOrderCard (order) {
     (order.surf ? '<div class="oc-rush oc-surf">🏄 ' + $t(MAP.river.surfCard, { name: SURF.person ? SURF.person.first : '' }) + '<span>' + $t('подъедь к набережной и притормози — пицца долетит прямо на доску · оплата ×2') + '</span></div>' : '');
   elPhWhat.textContent = order.items;
   elPhWhy.textContent = order.why;
+  if (order.ord) ORD.card(order);                 // карьера: полоса цвета вида, оплата, очередь «дальше»
+  else elPhone.classList.remove('ord-typed', 'ord-urgent');
   elPhone.classList.add('on');
   document.body.classList.add('brief');
   phoneT = 0;                 // висит, пока не нажмут «принять»
@@ -9063,8 +9117,10 @@ const orderTime = (L, stops, n) => Math.max(16, L / RUN_V * slackFor(n) + 5 + st
 function newOrder () {
   S.orders++;
   clearGate();
-  const plan = planOrder();
+  // карьера: очередь, план смены, без повторов (orders.js); учебный — по-старому
+  const plan = CAREER && tutDone() ? ORD.nextPlan() : planOrder();
   if (!plan) { backToBase(); return; }
+  if (plan.story) { ORD.startStory(plan); return; }   // сюжетный: у двери человек из story.js
 
   for (const st of plan.stops) {
     st.persons = st.peds.map(p => p.person);
@@ -9114,27 +9170,30 @@ function newOrder () {
     }
   }
 
-  const d = Math.hypot(S.target.x - V.x, S.target.z - V.z);
-  S.fee = 120 * total + Math.round(d * 1.7);
-  if (plan.surf) S.fee *= 2;
-  // срок — по длине пути по дорогам и по ритму волны (см. slackFor)
-  S.timeMax = orderTime(routeLen(V.x, V.z, S.target.x, S.target.z), 1, S.orders);
-  if (plan.tut) S.timeMax += 20;
-  S.time = S.timeMax;
-  if ((S.orders - 1) % 3 === 2 && !plan.tut && !S.order.why.startsWith($t('срочный'))) S.order.why = $t('срочный') + ' · ' + S.order.why;
-  /* Гарантия скорости: иногда срок режут почти до предела — без нитро не
-     успеть, с нитро реально. Зато после загрузки дают полный бак кофе,
-     а за заказ платят в полтора раза больше. */
-  if (!plan.tut && !S.ride && S.orders > 2 && plan.stops.length === 1 && chance(0.18)) {
-    const L = routeLen(V.x, V.z, S.target.x, S.target.z);
-    S.timeMax = clamp(L / RUN_V * 0.88 + 4, 22, 95);
+  if (plan.ord) ORD.setup(plan);                  // карьера: ECON.orderPay, срок, срочный — ×PAY.URGENT_TIME
+  else {
+    const d = Math.hypot(S.target.x - V.x, S.target.z - V.z);
+    S.fee = 120 * total + Math.round(d * 1.7);
+    if (plan.surf) S.fee *= 2;
+    // срок — по длине пути по дорогам и по ритму волны (см. slackFor)
+    S.timeMax = orderTime(routeLen(V.x, V.z, S.target.x, S.target.z), 1, S.orders);
+    if (plan.tut) S.timeMax += 20;
     S.time = S.timeMax;
-    S.fee = Math.round(S.fee * 1.5);
-    S.order.rush = true;
-    const tm = S.timeMax;
-    const when = tm < 50 ? $t('за {n} секунд', { n: Math.round(tm / 5) * 5 }) : tm < 75 ? $t('за 1 минуту') : $t('за полторы минуты');
-    S.order.rushText = $t('гарантия скорости посчитала, что доставить надо {when}. Поторопись!', { when });
-    S.order.why = S.order.rushText;
+    if ((S.orders - 1) % 3 === 2 && !plan.tut && !S.order.why.startsWith($t('срочный'))) S.order.why = $t('срочный') + ' · ' + S.order.why;
+    /* Гарантия скорости: иногда срок режут почти до предела — без нитро не
+       успеть, с нитро реально. Зато после загрузки дают полный бак кофе,
+       а за заказ платят в полтора раза больше. */
+    if (!plan.tut && !S.ride && S.orders > 2 && plan.stops.length === 1 && chance(0.18)) {
+      const L = routeLen(V.x, V.z, S.target.x, S.target.z);
+      S.timeMax = clamp(L / RUN_V * 0.88 + 4, 22, 95);
+      S.time = S.timeMax;
+      S.fee = Math.round(S.fee * 1.5);
+      S.order.rush = true;
+      const tm = S.timeMax;
+      const when = tm < 50 ? $t('за {n} секунд', { n: Math.round(tm / 5) * 5 }) : tm < 75 ? $t('за 1 минуту') : $t('за полторы минуты');
+      S.order.rushText = $t('гарантия скорости посчитала, что доставить надо {when}. Поторопись!', { when });
+      S.order.why = S.order.rushText;
+    }
   }
   rebuildRoutePath();
   showOrderCard(S.order);
@@ -9199,8 +9258,8 @@ function syncTarget () {
   const o = S.order;
   if (!o || o.idx >= o.stops.length) { S.target = null; return; }
   const st = o.stops[o.idx];
-  const ped = st.peds[0];
-  S.target = { x: ped.x, z: ped.z, name: st.persons[0] ? st.persons[0].name : $t('клиент'), ped };
+  const ped = st.peds[0], at = st.at || ped;       // at — точка без ждущего прохожего (развоз смены, сюжет)
+  S.target = { x: at.x, z: at.z, name: st.persons[0] ? st.persons[0].name : $t('клиент'), ped };
   S.addr = st.persons.map(p => p ? p.name : $t('клиент')).join(', ');
   S.addrLine = st.addr;
 }
@@ -9252,17 +9311,22 @@ function checkArrival (dt) {
     const o = S.order;
     const st = o.stops[o.idx];
     const onTime = S.free || S.time > 0;
+    if (o.ord && ORD.arrive(o, st, onTime)) return;   // карьера: развоз смены, ORD.onArrive (бандиты и т. п.) — ждём
     const share = Math.round(S.fee / o.stops.length);
     // бонус за скорость: осталось больше шестидесяти процентов срока —
     // «молния», больше тридцати пяти — «быстро»
     const left = clamp(S.time / S.timeMax, 0, 1);
     const tier = S.free ? 0 : left >= 0.5 ? 2 : left >= 0.25 ? 1 : 0;
-    const bonus = tier ? Math.round(share * (tier === 2 ? 0.6 : 0.3) * (S.tipMul || 1)) : 0;
-    if (bonus) popBonus(tier === 2 ? $t('А ты харош!') : $t('Шустро!'), $t('чаевые накинули +{money}', { money: money(bonus) }));
-    // клиент-богач (рядом гуляет богач или дом солидный) — изредка крупные чаевые, см. LIFE.richTip
-    const rich = onTime ? LIFE.richTip(st.peds, share) : 0;
-    if (rich) popBonus($t('чаевые от богача +{money}', { money: money(rich) }), $t('сдачи не надо'));
-    const part = onTime ? share + bonus + rich : Math.round(share * 0.45);
+    let part;
+    if (o.ord) part = ORD.payStop(o, st, onTime, tier);   // карьера: ECON.orderPay, PAY.SPEED_BONUS, ECON.tipFor
+    else {
+      const bonus = tier ? Math.round(share * (tier === 2 ? 0.6 : 0.3) * (S.tipMul || 1)) : 0;
+      if (bonus) popBonus(tier === 2 ? $t('А ты харош!') : $t('Шустро!'), $t('чаевые накинули +{money}', { money: money(bonus) }));
+      // клиент-богач (рядом гуляет богач или дом солидный) — изредка крупные чаевые, см. LIFE.richTip
+      const rich = onTime ? LIFE.richTip(st.peds, share) : 0;
+      if (rich) popBonus($t('чаевые от богача +{money}', { money: money(rich) }), $t('сдачи не надо'));
+      part = onTime ? share + bonus + rich : Math.round(share * 0.45);
+    }
     S.money += part;
     // оплата — сразу в кошелёк: умер или закрыл вкладку — деньги уже твои
     if (!S.freeRun) addWallet(part);
@@ -9285,6 +9349,7 @@ function checkArrival (dt) {
       addXP();
       S.done = (S.done || 0) + 1;
       if (o.tut) Store.set('dlv-msk-tut', '1');
+      else if (o.ord) ORD.delivered(o, st, onTime);   // карьера: поручение по SIDE_ORDERS, STORY.onDeliver
       else if (!S.ride && onTime && st.persons[0] && chance(0.45)) offerSide(st.peds[0], st.persons[0]);
     }
   } else if (S.state === 'side') {
@@ -9348,7 +9413,7 @@ const MEALS = [
   { t: $t('пицца с работы'), s: $t('все сердца обратно'), ok: () => S.hp < S.hpMax, fn () { S.hp = S.hpMax; hudHearts(); } },
   { t: $t('лапша в подсобке'), s: $t('+8 секунд на каждый заказ'), fn () { S.mealTime = (S.mealTime || 0) + 8; } },
 ];
-const mealDue = () => !S.ride && (S.done || 0) - (S.mealDone || 0) >= MEAL_EVERY;
+const mealDue = () => !CAREER && !S.ride && (S.done || 0) - (S.mealDone || 0) >= MEAL_EVERY;
 function showMeal () {
   S.mealDone = S.done;
   const name = [$t('обед'), $t('полдник'), $t('ужин'), $t('ночной дожор')][Math.min(S.meals || 0, 3)];
@@ -9448,7 +9513,7 @@ function sideArrival (d, speed) {
   if (Sd.stage === 'shop') {
     Sd.stage = 'back';
     setTrunk(true);
-    flyBox({ x: Sd.shop.x + Sd.shop.nx, y: groundH(Sd.shop.x, Sd.shop.z) + 1.2, z: Sd.shop.z + Sd.shop.nz }, trunkPoint, 0.8, () => setTrunk(false));
+    flyBox({ x: Sd.shop.x + Sd.shop.nx, y: groundH(Sd.shop.x, Sd.shop.z) + 1.2, z: Sd.shop.z + Sd.shop.nz }, trunkPoint, 0.8, () => setTrunk(false), Sd.it.bag && ORD.bagMesh(Sd.it.bag));
     S.target = { x: Sd.ped.x, z: Sd.ped.z, name: Sd.person.name, ped: Sd.ped };
     S.addr = Sd.it.what + ' → ' + Sd.person.name;
     S.addrLine = realAddress(Sd.ped.x, Sd.ped.z);
@@ -9463,10 +9528,11 @@ function sideArrival (d, speed) {
     flyBox(trunkPoint(), { x: ped.x, y: groundH(ped.x, ped.z) + 1.15, z: ped.z }, 0.6, () => {
       setTrunk(false);
       if (!ped.dead) emote(ped.x, 2.1, ped.z, 'heart', 6);
-    });
-    S.money += 1000;
-    if (!S.freeRun) addWallet(1000);
-    popBonus($t('косарь!'), Sd.it.ask + ' · +' + money(1000));
+    }, Sd.it.bag && ORD.bagMesh(Sd.it.bag));
+    const pay = Sd.it.pay || 1000;                // карьера: pay из SIDE_ORDERS
+    S.money += pay;
+    if (!S.freeRun) addWallet(pay);
+    popBonus(Sd.it.pay ? $t('поручение выполнено!') : $t('косарь!'), Sd.it.ask + ' · +' + money(pay));
     sideEnd(true);
   }
 }
@@ -9531,7 +9597,7 @@ function gameOver (why, victims, focus) {
   if (DEATH.victims.length) {
     const who = DEATH.victims.map(accName).join(', ');
     el.textContent = $t(GORE_ON ? $t('задавил {who}') : $t('сбил {who}'), { who }).toUpperCase();
-    $('w-sub').textContent = $t('КЛИЕНТ ПОТЕРЯН');
+    $('w-sub').textContent = why === 'сбил клиента' ? $t('СНЯЛИ СО СМЕНЫ') : $t('КЛИЕНТ ПОТЕРЯН');
   } else {
     el.textContent = $t(DEATH_WORD[why] || 'смена окончена').toUpperCase();
     $('w-sub').textContent = why === 'машина всё' ? '' : why === 'утонул' ? $t('ВПЛАВЬ НЕ ДОВЕЗЁШЬ') : $t('ЗАКАЗ ПРОТУХ');
@@ -9599,6 +9665,7 @@ function startRun (ride) {
   S.hurt = 0; S.shake = 0;
   S.freeRun = S.free;
   S.lvl0 = levelOf(getXP());
+  if (CAREER && !S.ride) CAREERM.startShift();   // часы — на 9:00, обед, звёзды за смену
   NOS.tank = 0.5; NOS.burn = false;
   for (const n of NITRO_CANS) { n.t = 0; }
   FXS.shieldT = 0; FXS.beastT = 0;
@@ -9619,6 +9686,18 @@ function toMenu () {
   S.state = 'title'; S.ride = false; S.free = false;
   $('menu').hidden = true;
   showTitle();
+}
+/* карьера: после итогов смены — катаемся дальше с того же места (сгорела или утонула — заново у пиццерии) */
+function rideOn () {
+  if (S.hp <= 0 || V.sink !== undefined) { startRun(true); return; }
+  hideOver();
+  S.ride = true; S.free = true; S.freeRun = true; S.money = 0;
+  S.order = null; S.target = null; S.side = null; routePts = [];
+  S.state = 'drive';
+  $('menu').hidden = false;
+  clearRivals();
+  Platform.gameplayStart();
+  toast($t('просто катаемся: без заказов и рекордов · esc — пауза и выход'));
 }
 $('menu').addEventListener('click', toMenu);
 $('st-ride').addEventListener('click', () => { Snd.boot(); Snd.resume(); elName.blur(); startRun(true); });
@@ -9644,12 +9723,12 @@ function orderInfo () {
     S.addr + (S.addrLine ? '<br><span class="sub">' + S.addrLine + '</span>' : '');
 }
 function renderPause () {
-  $('pm-order').innerHTML = orderInfo() + '<br><span class="sub">' + envClock() + ' · ' + envPhaseName(ENV.t) + ' · ' + SEAS.seasonName() + (ENV.rainWant ? ' · ' + (SEAS.snowy() ? $t('снег, скользко') : $t('дождь, скользко')) : '') + '</span>';
+  $('pm-order').innerHTML = orderInfo() + '<br><span class="sub">' + (CAREER && CAREERM.shiftOn() ? CAREERM.clockText() : envClock()) + ' · ' + envPhaseName(ENV.t) + ' · ' + SEAS.seasonName() + (ENV.rainWant ? ' · ' + (SEAS.snowy() ? $t('снег, скользко') : $t('дождь, скользко')) : '') + '</span>';
   const rows = [[$t('доставлено'), S.delivered], [$t('заработано'), money(S.money)], [$t('респектов'), S.burgers],
     [$t('прохожих сбито'), S.people], [$t('самокатчиков'), S.scoots], [$t('машин всмятку'), S.wrecks]];
   $('pm-stats').innerHTML = rows.map(([k, v]) => '<span>' + k + '</span><span>' + v + '</span>').join('');
   $('pm-sfx').textContent = Snd.on ? $t('звук: вкл') : $t('звук: выкл');
-  $('pm-menu').textContent = S.ride ? $t('в главное меню') : $t('закончить смену');
+  $('pm-menu').textContent = S.ride ? $t('в главное меню') : CAREER ? $t('сняться со смены') : $t('закончить смену');
 }
 function setPause (on) {
   if (on && (S.meal || !['drive', 'back', 'handover', 'brief', 'loading', 'side'].includes(S.state))) return;
@@ -9660,7 +9739,7 @@ function setPause (on) {
   if (on) { Snd.engine(0); renderPause(); for (const k in IN) IN[k] = 0; joyReset(); }
 }
 /* выйти в меню посреди смены: заработанное уже в кошельке, итоги — как в конце */
-function endShift () {
+function endShift (why) {
   setPause(false);
   if (S.side) { S.side.ped.freeT = 3; S.side = null; }
   hideChoice();
@@ -9669,7 +9748,7 @@ function endShift () {
   marker.visible = false;
   hidePhone(); clearGate();
   if (S.ride) { S.state = 'title'; S.ride = false; S.free = false; $('menu').hidden = true; showTitle(); }
-  else { S.state = 'over'; showOver('смена окончена', []); }
+  else { S.state = 'over'; showOver(typeof why === 'string' ? why : 'смена окончена', []); }   // why — «время» из career.js (полночь)
   Platform.gameplayStop();
   clearRivals();
 }
@@ -9703,7 +9782,7 @@ addEventListener('keydown', e => {
   if (FM.open) { if (e.code === 'Escape' || e.code === 'Space') setFullMap(false); return; }
   if (KEY[e.code]) { IN[KEY[e.code]] = 1; e.preventDefault(); }
   Snd.boot(); Snd.resume();
-  if (e.code === 'Space' && (S.state === 'title' || S.state === 'over')) {
+  if (e.code === 'Space' && (S.state === 'title' || (S.state === 'over' && !CAREER))) {   // в карьере на итогах пробел жмёт кнопку, а не «ещё раз»
     if (S.name || !Platform.features.nameInput) goRun(); else elName.focus();
   }
   if (phoneT > 0 && e.code !== 'KeyM') hidePhone();
@@ -9821,12 +9900,34 @@ function startPose () {
 /* времена года: что им нужно от игры (ENV, дождь и небо заводятся ниже — геттерами) */
 SEAS.initSeasons({ THREE, scene, cam, renderer, Store, MAP, CITY, V, S, groundH, curbAt, nearestRoad, roadWidth, drivable, inHouse, inPoly, inBounds,
   put, smashAdd, SMASH, SM_WORD, SMASH_MAT, LAMP_SPOTS, ZEBRAS, NODE_IDX, nodeDeg, makeHuman, dropMesh, gibHuman, toast, Snd, CAR_L, CAR_W, isPlaying, sayBubble,
-  obb, SOLIDS, get COURIER_SLOTS () { return COURIER_SLOTS; },
+  obb, SOLIDS, PARKED, get COURIER_SLOTS () { return COURIER_SLOTS; },
   get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get rainLines () { return rainLines; }, get hemi () { return hemi; } });
 const T0 = performance.now();
 buildCity();
 ZN.init({ CITY, MAP, donated });
 DLG.init({ pause: on => { for (const k in IN) IN[k] = 0; if (on) Snd.engine(0); }, face: (p, size) => faceDataURL(p, size) });
+/* заказы карьеры (orders.js): очередь, поручения, развоз смены — через это */
+if (CAREER) ORD.init({ S, V, CITY, MAP, THREE, Store, ADULT, SPOTS, LIFE, Snd, get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get DAY_LEN () { return DAY_LEN; }, lang: curLang,
+  alive, releaseIdle, pushOut, walkSpawn, nearestRoad, makeGuest, clearGuest, realAddress, routeLen, orderTime, rebuildRoutePath, syncTarget,
+  errandShop, startSide, declineSide, popBonus, toast, money, sayBubble, addWallet, donated, hidePhone, clearGate, showOrderCard,
+  newOrder, marker, level: () => levelOf(getXP()), gameplayStop: () => Platform.gameplayStop(),
+  rehuman: (p, person) => { dropMesh(p.grp); p.person = person || nextPerson(); p.grp = makeHuman(p.person); p.speed = p.base * p.grp.userData.pace; scene.add(p.grp); } });
+if (CAREER) CAREERM.init({ S, NOS, Snd, ADULT, get DAY_LEN () { return DAY_LEN; }, env: () => ENV, donated, money, wallet, addWallet, toast, popBonus, showChoice, hideChoice, hudHearts, isPlaying, countUp,
+  Store: { get: Store.get, set: Store.set, flush: () => Platform.store.flush && Platform.store.flush() },
+  choiceOpen: () => CH.opts.length > 0, endShift, rideOn, dropOrder: () => backToBase(), carChanged: () => { resetCar(); carStats(); },
+  openShop: cb => { openPanel('shop'); const iv = setInterval(() => { if (elPanel.hidden) { clearInterval(iv); if (cb) cb(); } }, 300); },
+  // главное меню карьеры (menu.js) и рейтинг пиццерии
+  menuGo: () => { Snd.boot(); Snd.resume(); goRun(); }, menuRide: () => { Snd.boot(); Snd.resume(); startRun(true); },
+  openCollect: () => openPanel('collect'), openSettings: () => { elPanel.hidden = false; elPanel.dataset.kind = 'settings'; renderSettings(); },
+  panelOpen: () => !elPanel.hidden, quit: () => Platform.quit(), canQuit: !!Platform.features.quit, playerName: () => Platform.player.name || '',
+  setName: n => { S.name = n; Store.set('dlv-name', n); elName.value = n; renderProfile(); },
+  rivalSpec: () => RIVAL_SPEC.map(q => ({ hex: q.hex, fem: !!q.ram })), rivals: () => RIVALS.map(R => ({ i: R.slot, money: R.money || 0 })),
+  person: o => makePerson(o), face: (p, size) => faceDataURL(p, size) });
+/* сюжетные заказы (story.js): люди, кот, камера катсцены — через это */
+STORY.init({ THREE, scene, cam, V, S, IN, CITY, MAP, Store, SPOTS, groundH, surfaceAt, inHouse, nearestRoad, makeHuman, dropMesh, emote, sayBubble, pizzaBox, realAddress, popBonus, money, Snd,
+  get car () { return car; }, addMoney: n => { S.money += n; if (!S.freeRun) addWallet(n); }, addStars: CAREER ? CAREERM.addStars : null, shift: () => (+Store.get('dlv-shifts', 0) || 0) + 1,
+  // гость, который ждал бабушку у точки, после катсцены уходит в другой квартал другим человеком
+  retirePed: p => { if (!p || p.dead || p.base === undefined) return; clearGuest(p); dropMesh(p.grp); p.person = nextPerson(); p.grp = makeHuman(p.person); p.speed = p.base * p.grp.userData.pace; p.hold = null; scene.add(p.grp); walkSpawn(p, 120, 380); } });
 const BUILD_MS = performance.now() - T0;          // сколько собирался город — для отладки
 /* реквизит склейки — тоже по клеткам: иначе снова один меш на весь город */
 function mergeChunked (list, mat) {
@@ -9903,7 +10004,22 @@ const glowTex = (() => {
 })();
 const POOL_MAT = new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0,
   polygonOffset: true, polygonOffsetFactor: -4 });
-const WIN_MAT = new THREE.MeshBasicMaterial({ color: 0xffe2a0, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+const WIN_MAT = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+/* Окна живые: у каждого своё зерно (aSeed), по нему шейдер раз в 40—120 с решает,
+   горит ли свет сейчас (~7 из 10), и какого он цвета: тёплый, холодный белый, а
+   в каждом двадцатом — фиолетовый, как от фитоламп для рассады. Меш — тот же, вызовов
+   не прибавляется; время — WIN_U.uT, крутится в updateEnv. */
+const WIN_U = { uT: { value: 0 } };
+WIN_MAT.onBeforeCompile = sh => {
+  sh.uniforms.uT = WIN_U.uT;
+  sh.vertexShader = 'attribute float aSeed;\nuniform float uT;\nvarying float vOn;\nvarying vec3 vWc;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+    float per = 40.0 + aSeed * 80.0;
+    float slot = floor(uT / per + aSeed * 13.0);
+    float h = fract(sin((slot + aSeed * 91.7) * 12.9898) * 43758.5453);
+    vOn = step(0.3, h);
+    vWc = aSeed < 0.05 ? vec3(0.72, 0.32, 1.0) : aSeed < 0.14 ? vec3(0.86, 0.93, 1.0) : mix(vec3(1.0, 0.86, 0.58), vec3(1.0, 0.93, 0.72), fract(aSeed * 7.0));`);
+  sh.fragmentShader = 'varying float vOn;\nvarying vec3 vWc;\n' + sh.fragmentShader.replace('vec4 diffuseColor = vec4( diffuse, opacity );', 'vec4 diffuseColor = vec4( diffuse * vWc, opacity * vOn );');
+};
 const NIGHT_OBJ = [];
 function buildNight () {
   const pools = [];
@@ -9938,6 +10054,14 @@ function buildNight () {
   for (const arr of winBy.values()) {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(arr), 3));
+    // зерно окна — от его середины: одно и то же при каждой загрузке
+    const seed = new Float32Array(arr.length / 3);
+    for (let w = 0; w < arr.length; w += 18) {
+      const cx = (arr[w] + arr[w + 3]) / 2, cy = (arr[w + 1] + arr[w + 7]) / 2, cz = (arr[w + 2] + arr[w + 5]) / 2;
+      const v = Math.abs(Math.sin(cx * 12.9898 + cy * 78.233 + cz * 37.719) * 43758.5453) % 1;
+      seed.fill(v, w / 3, w / 3 + 6);
+    }
+    g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
     g.computeBoundingSphere();
     const m = new THREE.Mesh(g, WIN_MAT);
     m.visible = false;
@@ -10055,7 +10179,8 @@ const envClock = () => { const h = (6 + ENV.t * 24) % 24; return String(Math.flo
 
 function updateEnv (dt) {
   if (INTRO) return;
-  ENV.t = (ENV.t + dt / DAY_LEN) % 1;
+  // в карьере смена идёт медленнее (ECON.SHIFT.SLOW): небо и фазы те же, смена ~15 мин
+  ENV.t = (ENV.t + dt / (DAY_LEN * (CAREER && CAREERM.shiftOn() ? ECON.SHIFT.SLOW : 1))) % 1;
   // ключевые точки суток
   let i = 0;
   while (i < SKY_KEYS.length - 2 && ENV.t >= SKY_KEYS[i + 1][0]) i++;
@@ -10091,6 +10216,7 @@ function updateEnv (dt) {
   for (const m of FLAT_MATS) m.color.setRGB(dk, dk, dk * (1 + ENV.night * 0.12));
   const nOn = ENV.night > 0.05;
   POOL_MAT.opacity = ENV.night * 0.75; WIN_MAT.opacity = clamp(ENV.night * 1.1, 0, 0.95);
+  WIN_U.uT.value = performance.now() / 1000;
   for (const m of NIGHT_OBJ) m.visible = nOn;
   // фары
   HEAD_MAT.opacity = clamp((ENV.night - 0.15) * 0.9 + R * 0.25, 0, 0.7);
@@ -10343,6 +10469,7 @@ function showTitle () {
   if (INTRO) return;
   showBig(OWN.pizza(),
     $t(GORE_ON ? MAP.tagline.adult : MAP.tagline.kids), '');
+  if (CAREER) CAREERM.menu();                     // карьера: своё главное меню (menu.js)
 }
 showTitle();
 
@@ -10360,10 +10487,17 @@ function cullFar () {
    Меню листаются крестовиной или стиком: какое сейчас открыто — то и
    листаем, остальное игнорируем. */
 const padMenu = makePadMenu({
-  onBack: () => { if (!elPanel.hidden) closePanel(); else if (S.paused) setPause(false); else if (FM.open) setFullMap(false); },
-  onText: el => { if (Platform.steam && Platform.steam.textInput) Platform.steam.textInput(el); },
+  onBack: () => { if (CAREER && CAREERM.back()) return; if (!elPanel.hidden) closePanel(); else if (S.paused) setPause(false); else if (FM.open) setFullMap(false); },
+  // экранная клавиатура Steam (Deck): что ввёл — обратно в поле
+  onText: el => {
+    if (!(Platform.steam && Platform.steam.textInput)) return;
+    Promise.resolve(Platform.steam.textInput(el.placeholder || $t('имя'), el.maxLength > 0 ? el.maxLength : 24, el.value || ''))
+      .then(v => { if (typeof v === 'string') { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); } }).catch(() => {});
+  },
 });
 function padScreen () {
+  const cr = CAREER && CAREERM.padRoot();         // карьера: окно имени, гараж, «потратить» — поверх всего
+  if (cr) return cr;
   if (!elPanel.hidden) return elPanel;
   if (FM.open) return null;
   if (!$('choice').hidden && CH.pause) return $('choice');
@@ -10385,6 +10519,7 @@ function padStep () {
   if (p.map && !S.paused && isPlaying()) setFullMap(!FM.open);
   if (p.sound) Snd.set(!Snd.on);
   if (CH.opts.length && !CH.pause) { if (p.choice1) pickChoice(0); else if (p.choice2) pickChoice(1); else if (p.choice3) pickChoice(2); }
+  if (screen && CAREER) CAREERM.padPre(p);      // гараж: ←→ и LB/RB листают машины
   if (screen) padMenu(p, screen);
   else if (!S.paused && !FM.open) applyToIN(IN, p);
 }
@@ -10408,6 +10543,10 @@ function frame (now) {
   last = now;
   CULL.govern(raw, isPlaying() && !S.paused && !EXT.paused && !FM.open && !document.hidden);
   padStep();
+  if (CAREER && CAREERM.covered()) return;         // гараж и «потратить» закрывают весь экран — город не рисуем
+  if (SBX.nitro) NOS.tank = 1;                     // песочница: бесконечное нитро
+  // катсцена сюжетного заказа: мир стоит, ходят только актёры, камера — своя (story.js)
+  if (!S.paused && !EXT.paused && STORY.frame(dt, car)) { updateFX(dt); updateFly(dt); updateTrunk(dt); SEAS.updateSeasons(dt); humanLod(); CULL.step(); renderer.render(scene, cam); return; }
   if (S.paused || EXT.paused || DLG.isOpen()) return;     // диалог — мир стоит
   if (FM.open) { drawFullMap(); return; }        // на карте игра стоит
   tG += dt;
@@ -10427,8 +10566,11 @@ function frame (now) {
     // На заставке камера облетает пиццерию поверх крыш: в настоящем городе
     // дома вокруг выше, и на прежней высоте кадр уезжал внутрь стены.
     const a = tG * 0.16;
-    cam.position.set(PIZZA.bx + Math.sin(a) * 64, PIZZA.by + 42 + Math.sin(a * 0.7) * 4, PIZZA.bz + Math.cos(a) * 64);
-    cam.lookAt(PIZZA.bx, PIZZA.by + 3, PIZZA.bz);
+    if (CAREER && S.state === 'title') CAREERM.menuCam(cam, PIZZA, tG);   // меню карьеры: медленный облёт, пиццерия справа
+    else {
+      cam.position.set(PIZZA.bx + Math.sin(a) * 64, PIZZA.by + 42 + Math.sin(a * 0.7) * 4, PIZZA.bz + Math.cos(a) * 64);
+      cam.lookAt(PIZZA.bx, PIZZA.by + 3, PIZZA.bz);
+    }
     car.position.set(V.x, V.y, V.z);
     car.rotation.y = V.h;
   } else {
@@ -10451,6 +10593,7 @@ function frame (now) {
   updateRivals(dt);
   updateVerandas(dt);
   choiceStep(dt);
+  if (CAREER) ORD.step(dt);                       // очередь на HUD, посадка работников (orders.js)
   updateSmokers(dt);
   updateParties(dt);
   updateCollect(dt);
@@ -10464,13 +10607,16 @@ function frame (now) {
   updateNitro(dt);
   updateFX(dt);
   updateEnv(dt);
+  if (CAREER) CAREERM.step(dt);                   // часы смены, обед в 14:00, полночь
   SEAS.updateSeasons(dt);                         // снег, небо, снежки
   updateCrowds(dt);
   LIFE.step(dt, LIFE_API);
+  WORLD.step(dt, WORLD_API || (WORLD_API = worldApi()));   // мусор, бандиты, шашлыки (world.js)
   LM.stepRink(RINK, dt, V.x, V.z);
   updateDrinkit(dt);
   updateSurf(dt);
   updateFootball(dt);
+  if (CAREER) AUTO.step(dt, vf);                  // заглохла, ямы, гараж Дяди Жени
   S.hurt = Math.max(0, S.hurt - dt);
 
   if (S.state === 'drive') syncTarget();          // цель идёт по улице сама
@@ -10502,6 +10648,7 @@ function frame (now) {
   // маркер адреса: пульсирует и крутится, его видно издалека
   if (S.target && S.state !== 'title' && S.state !== 'over') {
     marker.visible = true;
+    if (CAREER) ORD.tintMarker(marker);            // цвет вида заказа: пицца, срочно, поручение, развоз, сюжет
     marker.position.set(S.target.x, groundH(S.target.x, S.target.z), S.target.z);
     marker.rotation.y = tG * 1.2;
     marker.userData.ball.position.y = 6.6 + Math.sin(tG * 3) * 0.45;
@@ -10537,13 +10684,17 @@ requestAnimationFrame(frame);
 
 /* отладочная ручка */
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { RL: RL.DEBUG, S, V, TRAFFIC, PEDS, PEOPLE, PIZZA, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
+/* песочница (sandbox.html): бесконечное здоровье, нитро, «не глохнет» (noStall читает cars.js) */
+const SBX = { god: false, nitro: false, noStall: false };
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { RL: RL.DEBUG, S, V, TRAFFIC, PEDS, PEOPLE, PIZZA, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта
   groundH, surfaceAt, BRIDGES, frame,
   // Москва: граф, светофоры, зебры, самокатчики, ввод
   EDGES, SIG_GROUPS, ZEBRAS, SCOOTS, TL, IN, touches, lightOf, edgeOf,
+  // песочница: сюжет, карта, сохранения, старт смены, кошелёк, читы
+  STORY, STORY_DBG: STORY.DEBUG, MAP, Store, SBX, CARSM: AUTO, startRun, goRun, endShift, wallet, addWallet, hudHearts, marker, updateEnv, humanLod, get SPOTS_N () { return SPOTS.length; },
   DRIVERS, SMOKERS, NITRO_CANS, NOS, DRINKITS, CREW, WAR, warStart, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, PIGEONS, AMB, INCIDENTS, scare, RIVALS, THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT };
 // ?mapcheck: сводка проблем карты, столбики над ними, «]» — к следующей (mapworks.js)
 if (MAPCHECK) MAPW.debug(MAPFIX, MAPW_API || (MAPW_API = mapApi()));

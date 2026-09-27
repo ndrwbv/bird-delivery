@@ -20,6 +20,11 @@
      «ДОРОГА ЗАКРЫТА», «РЕМОНТ», яма, конусы, дорожники. Проехать нельзя,
      а навигатор ведёт прямо туда (routeNodes не трогаем) — ищи объезд.
      Трафик туда не сворачивает, а кто уже едет — разворачивается.
+   • Ремонт полосы (lane): закрыта только правая полоса — клин конусов,
+     блоки, щит со стрелкой, латают асфальт. Где в эту сторону две полосы и
+     больше — поток перестраивается в соседнюю и ползёт; где одна — объезжают
+     по встречке по очереди, пропуская встречных. Навигатор ведёт как вёл.
+     Полоса или вся улица — жребий при каждом новом ремонте.
 
    Всё, что нужно из игры, приходит объектом api (roadApi в game.js).
    ────────────────────────────────────────────────────────────────────────── */
@@ -31,6 +36,7 @@ const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[(Math.random() * a.length) | 0];
 const lerp = (a, b, k) => a + (b - a) * k;
+const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 /* жребий по месту: один и тот же дом огорожен всегда одинаково */
 const hash = (x, z, k = 0) => { const s = Math.sin(x * 12.9898 + z * 78.233 + k * 37.719) * 43758.5453; return s - Math.floor(s); };
 
@@ -382,13 +388,13 @@ function buildFences (A) {
   const P = [], N = [], U = [], I = [];
   let houses = 0;
   for (const b of CITY.buildings) {
-    if (houses >= 200 || RL.n.panels > 7000) break;
+    if ((houses >= 200 || RL.n.panels > 7000) && !b.rich) continue;      // особняки (world.js) — за забором всегда
     const p = b.p;
     let cx = 0, cz = 0;
     for (const q of p) { cx += q[0] / p.length; cz += q[1] / p.length; }
     const h = hash(cx, cz, 5);
     const kids = b.k === 'pub' && b.n && KIDS.test(b.n);
-    const want = b.k === 'priv' ? 0.6 : kids ? 1 : b.k === 'pub' && (b.lv || 0) <= 4 ? 0.35 : b.k === 'res' ? ((b.lv || 0) >= 12 || (b.lv || 0) <= 3 ? 0.4 : 0.2) : 0;
+    const want = b.rich ? 1 : b.k === 'priv' ? 0.6 : kids ? 1 : b.k === 'pub' && (b.lv || 0) <= 4 ? 0.35 : b.k === 'res' ? ((b.lv || 0) >= 12 || (b.lv || 0) <= 3 ? 0.4 : 0.2) : 0;
     if (h >= want) continue;
     if (PIZ && Math.hypot(cx - PIZ.x, cz - PIZ.z) < 80) continue;
     // прямоугольник наименьшей площади вокруг дома
@@ -408,7 +414,7 @@ function buildFences (A) {
     if (!R || R.u1 - R.u0 > 90 || R.v1 - R.v0 > 90 || R.u1 - R.u0 < 4 || R.v1 - R.v0 < 4) continue;
     if ((CITY.pois || []).some(q => A.inPoly(q.p[0], q.p[1], p) || Math.hypot(q.p[0] - cx, q.p[1] - cz) < 6)) continue;   // магазин в доме — двор открытый
     const X = (u, v) => [u * R.ux - v * R.uz, u * R.uz + v * R.ux];
-    const M = b.k === 'priv' ? 4 : kids ? 10 : 7;
+    const M = b.rich ? 6 : b.k === 'priv' ? 4 : kids ? 10 : 7;
     // отступ каждой стороны: самый широкий, при котором линия ничего не задевает
     const sideBad = (fixU, c0, a0, a1, hm) => {   // fixU: сторона вдоль v при u = c0, иначе вдоль u при v = c0
       let nb = 0;
@@ -787,6 +793,11 @@ function spawnOnRoute (A) {
     if (e) cands.push({ e, ia, ib, pref: Math.abs(a0 - 200) });
   }
   cands.sort((p, q) => p.pref - q.pref);
+  if (Math.random() < LANE_P)
+    for (const c of cands.slice(0, 8)) {
+      const ok = laneOk(A, c.e);
+      if (ok) { spawnLane(A, c.e, ok); return true; }
+    }
   for (const c of cands.slice(0, 8)) {
     const ok = worksOk(A, c.e, c.ia, c.ib);
     if (ok) { spawnWorks(A, c.e, ok); return true; }
@@ -794,11 +805,13 @@ function spawnOnRoute (A) {
   return false;
 }
 function spawnSomewhere (A) {
+  const lane = Math.random() < LANE_P;
   for (let k = 0; k < 12; k++) {
     const ia = A.nodeNear(A.V.x, A.V.z, 160, 360), N = A.NODES[ia];
     if (!N || !N.nb.length) continue;
     const ib = pick(N.nb), e = A.edgeOf(ia, ib);
     if (!e) continue;
+    if (lane) { const ol = laneOk(A, e); if (ol) { spawnLane(A, e, ol); return true; } if (k < 8) continue; }
     const ok = worksOk(A, e, ia, ib);
     if (ok) { spawnWorks(A, e, ok); return true; }
   }
@@ -951,8 +964,176 @@ function removeWorks (A, W8) {
   });
   for (const m of W8.men) if (!m.dead) A.dropMesh(m.grp);
   for (const s of W8.solids) delSolid(A, s);
+  if (W8.lane) { LANES.delete(W8.e); if (W8.opp) LANES.delete(W8.opp); return; }
   W8.e.closed = 0; if (W8.r) W8.r.closed = 0;
   CLOSED.delete(W8.e); if (W8.r) CLOSED.delete(W8.r);
+}
+
+/* ═════════════════ ремонт одной полосы ═════════════════ */
+const LANES = new Map();                       // направленное ребро → { lane, to, s0, s1, pull, r, run } или { opp } у встречки
+const LANE_P = 0.55;                           // доля ремонтов «в одну полосу»
+let ARROW_TEX = null;
+function arrowTex () {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 64;
+  const x = c.getContext('2d');
+  x.fillStyle = '#16171b'; x.fillRect(0, 0, 128, 64);
+  x.fillStyle = '#ffd21f'; x.fillRect(4, 4, 120, 56);
+  x.fillStyle = '#16171b';
+  for (let i = 0; i < 3; i++) {               // «<<<» — объезд левее
+    const cx = 28 + i * 34;
+    x.beginPath(); x.moveTo(cx - 14, 32); x.lineTo(cx + 6, 10); x.lineTo(cx + 18, 10); x.lineTo(cx - 2, 32); x.lineTo(cx + 18, 54); x.lineTo(cx + 6, 54); x.closePath(); x.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+/* годится ли ребро: две полосы в эту сторону — или одна, но со встречкой для объезда */
+function laneOk (A, e) {
+  if (!e || !e.ok || e.c > 5 || !e.road || e.road.b || e.closed || LANES.has(e) || CLOSED.has(e)) return null;
+  const run = A.edgeRun(e), n = A.laneCount(e), r = A.edgeOf(e.b, e.a);
+  if (run < 42) return null;
+  if (n < 2 && (e.oneway || !r || r.closed || LANES.has(r))) return null;
+  const L = Math.min(46, run - 22), s0 = (run - L) / 2, s1 = s0 + L;
+  const N = A.NODES[e.a], sm = e.tA + (s0 + s1) / 2, o = A.laneOff(e, 0);
+  const x = N.x + e.ux * sm + e.rx * o, z = N.z + e.uz * sm + e.rz * o;
+  if (!A.inBounds(x, z, 30) || Math.hypot(A.V.x - x, A.V.z - z) < 60) return null;
+  const tg = A.S.target;
+  if (tg && Math.hypot(tg.x - x, tg.z - z) < 45) return null;
+  if (A.PIZZA && Math.hypot(A.PIZZA.x - x, A.PIZZA.z - z) < 60) return null;
+  if (A.ACCIDENTS.some(a => Math.hypot(a.x - x, a.z - z) < 70)) return null;
+  if (WORKS.some(w => Math.hypot(w.x - x, w.z - z) < 90)) return null;
+  if (A.TRAFFIC.some(q => (q.parked || q.svc || q.accident) && Math.abs((q.x - x) * e.ux + (q.z - z) * e.uz) < L / 2 + 14 && Math.abs((q.x - x) * e.rx + (q.z - z) * e.rz) < e.w / 2 + 3)) return null;
+  return { x, z, s0, s1, n, r, run };
+}
+function spawnLane (A, e, at) {
+  const { groundH, box } = A, { s0, s1, n, r, run } = at;
+  const N = A.NODES[e.a], lw = (e.oneway ? e.w : e.w / 2) / n;
+  const o0 = A.laneOff(e, 0), oIn = o0 - lw / 2, oOut = o0 + lw / 2;          // граница с соседней полосой и бордюр
+  const P = (s, o) => [N.x + e.ux * (e.tA + s) + e.rx * o, N.z + e.uz * (e.tA + s) + e.rz * o];
+  const ryA = Math.atan2(e.ux, e.uz), ryN = Math.atan2(e.rz, e.rx), taper = 12;
+  const L = [], FL = [], solids = [], signQ = [];
+  const W8 = { e, r: null, lane: 1, opp: null, x: at.x, z: at.z, ux: e.ux, uz: e.uz, W: lw, HL: (s1 - s0) / 2, t: rand(150, 230), warned: 1,
+    grp: new THREE.Group(), solids, men: [], cones: [], blink: null };
+  // конусы: клин от бордюра к границе полосы, вдоль неё и обратно на выезде
+  for (let s = s0 - taper; s <= s1 + 4.5; s += 3) {
+    const o = s < s0 ? (oOut - 0.35) + (oIn + 0.3 - (oOut - 0.35)) * ((s - (s0 - taper)) / taper)
+      : s > s1 ? (oIn + 0.3) + (oOut - 0.35 - oIn - 0.3) * ((s - s1) / 4.5) : oIn + 0.3;
+    W8.cones.push(cone(A, W8, ...P(s, o)));
+  }
+  // блоки поперёк полосы — в начале и в конце; на въезде мигалки и щит «объезд левее»
+  for (const s of [s0 + 0.4, s1 - 0.4]) {
+    const m = Math.max(2, Math.round((lw - 0.6) / 1.2));
+    for (let i = 0; i < m; i++) {
+      const o = oIn + 0.4 + (i + 0.5) / m * (lw - 0.7), [x, z] = P(s, o);
+      box(L, (lw - 0.7) / m - 0.08, 0.8, 0.5, i % 2 ? '#f2eee6' : '#d9342c', x, groundH(x, z) + 0.4, z, ryA);
+      if (s < s1 - 1) box(FL, 0.18, 0.14, 0.18, '#ffb020', x, groundH(x, z) + 0.88, z, ryA);
+    }
+    const [mx, mz] = P(s, o0 + 0.05);
+    solids.push(A.obb(mx, mz, (lw - 0.7) / 2, 0.3, ryN));
+  }
+  {
+    const [x, z] = P(s0 - 1.4, o0), y = groundH(x, z);
+    for (const d of [-0.6, 0.6]) { const [px, pz] = P(s0 - 1.4, o0 + d); box(L, 0.08, 1.5, 0.08, '#585460', px, groundH(px, pz) + 0.75, pz, ryA); }
+    signQ.push([x - e.ux * 0.06, y + 1.75, z - e.uz * 0.06, -e.ux, -e.uz, 1.6, 0.8, 'arrow']);
+    // «РЕМОНТ» — у бордюра перед клином
+    const [sx, sz] = P(s0 - taper - 8, oOut + 0.7), sy = groundH(sx, sz) + A.curbAt(sx, sz);
+    box(L, 0.1, 2.5, 0.1, '#9aa0a8', sx, sy + 1.25, sz, ryA);
+    signQ.push([sx - e.ux * 0.08, sy + 2.2, sz - e.uz * 0.08, -e.ux, -e.uz, 1.7, 0.43, 'low']);
+  }
+  // латают: срезанный асфальт вдоль полосы, яма с отвалом, бочка
+  const sp = (s0 + s1) / 2, patchL = s1 - s0 - 6;
+  { const [x, z] = P(sp, o0); box(L, lw - 1.0, 0.04, patchL, '#2c292e', x, groundH(x, z) + 0.18, z, ryA); }
+  const sPit = sp + rand(-patchL / 4, patchL / 4);
+  { const [x, z] = P(sPit, o0), y = groundH(x, z);
+    box(L, lw - 1.4, 0.06, 2.8, '#5b4a3e', x, y + 0.2, z, ryA); box(L, lw - 1.9, 0.07, 2.3, '#241c18', x, y + 0.22, z, ryA);
+    solids.push(A.obb(x, z, (lw - 1.4) / 2, 1.4, ryN)); }
+  { const [x, z] = P(sPit + 2.4, oOut - 0.8); A.put(L, new THREE.IcosahedronGeometry(0.7, 0), '#6e5646', x, groundH(x, z) + 0.3, z); }
+  { const [x, z] = P(s1 - 3.5, o0 + 0.3); box(L, 0.7, 0.9, 0.7, '#e0a526', x, groundH(x, z) + 0.45, z, ryA); }
+  const stat = new THREE.Mesh(A.mergeGeos(L), WK_MAT || (WK_MAT = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })));
+  W8.grp.add(stat);
+  if (FL.length) { W8.blink = new THREE.Mesh(A.mergeGeos(FL), new THREE.MeshBasicMaterial({ vertexColors: true })); W8.grp.add(W8.blink); }
+  for (const kind of ['arrow', 'low']) {
+    const Pp = [], Uu = [], Ii = [];
+    for (const [x, y, z, fx, fz, w, h, k] of signQ) {
+      if (k !== kind) continue;
+      const rx = fz * w / 2, rz = -fx * w / 2, vi = Pp.length / 3;
+      Pp.push(x - rx, y - h / 2, z - rz, x + rx, y - h / 2, z + rz, x + rx, y + h / 2, z + rz, x - rx, y + h / 2, z - rz);
+      if (kind === 'low') Uu.push(0, 0, 1, 0, 1, 0.5, 0, 0.5); else Uu.push(0, 0, 1, 0, 1, 1, 0, 1);
+      Ii.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(Pp, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(Uu, 2));
+    g.setIndex(Ii);
+    g.computeBoundingSphere();
+    const map = kind === 'arrow' ? (ARROW_TEX || (ARROW_TEX = arrowTex())) : (WK_TEX || (WK_TEX = worksTex()));
+    W8.grp.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map, side: THREE.DoubleSide })));
+  }
+  // дорожники: один-два с лопатами у ямы
+  SHOVEL_GEO = SHOVEL_GEO || (() => { const S = []; box(S, 0.05, 1.1, 0.05, '#8a6b4e', 0, -0.35, 0.05); box(S, 0.26, 0.3, 0.04, '#6e6a72', 0, -0.95, 0.12); return A.mergeGeos(S); })();
+  for (let i = 0; i < 1 + (Math.random() < 0.6 ? 1 : 0); i++) {
+    const s = i ? -1 : 1, [x, z] = P(sPit + s * 1.9, o0 + rand(-0.4, 0.4));
+    const grp = A.makeHuman(null, { cap: '#ff8a00', shirt: '#ff8a00', pants: '#2f3540' });
+    const u = grp.userData;
+    if (u.armR) { const sh = new THREE.Mesh(SHOVEL_GEO, WK_MAT); sh.rotation.x = 0.4; u.armR.add(sh); }
+    grp.rotation.y = Math.atan2(-e.ux * s, -e.uz * s);
+    grp.position.set(x, groundH(x, z) + 0.18, z);
+    A.scene.add(grp);
+    W8.men.push({ grp, x, z, ph: rand(0, 6), dead: 0 });
+  }
+  A.scene.add(W8.grp);
+  for (const q of solids) addSolid(A, q);
+  // поток: две полосы — перестроиться в соседнюю; одна — объезд по встречке по очереди, встречка жмётся к бордюру
+  if (n >= 2) LANES.set(e, { lane: 0, to: 1, s0: s0 - taper, s1: s1 + 2, run });
+  else {
+    LANES.set(e, { lane: 0, to: -1, s0: s0 - taper, s1: s1 + 3, run, r, pull: -(e.w / 4) - 1.25 });
+    LANES.set(r, { opp: 1, s0: run - s1 - 4, s1: run - s0 + taper + 2, pull: 0.55 });
+    W8.opp = r;
+  }
+  // кто уже стоит в закрытой полосе на месте работ — в другое место
+  for (const q of A.TRAFFIC)
+    if (q.e === e && !q.parked && !q.svc && q.lane === 0 && q.s > s0 - 3 && q.s < s1 + 3) A.placeTraffic(q, 120, 340);
+  WORKS.push(W8);
+  RL.n.works++;
+  RL.n.lanes = (RL.n.lanes || 0) + 1;
+}
+/* машина потока у сужения: вернуть 0…1 — во сколько раз сбавить */
+function laneHold (c, dt) {
+  const Z = LANES.get(c.e);
+  if (!Z) return 1;
+  if (Z.opp) {
+    if (c.s > Z.s0 - 25 && c.s < Z.s1) { c.pull = damp(c.pull || 0, Z.pull, 1.5, dt); c.rlPull = 2; return 0.7; }
+    return 1;
+  }
+  if (c.s < Z.s0 - 45 || c.s > Z.s1) return 1;
+  if (Z.to >= 0) {
+    if (c.lane === Z.lane) {
+      const d0 = API.laneOff(c.e, c.lane) - API.laneOff(c.e, Z.to);
+      c.lane = Z.to;
+      c.pull = c.s > Z.s0 ? 0 : (c.pull || 0) + d0;     // родилась прямо в зоне — сразу в соседней, иначе плавно
+      c.rlPull = 1;
+    }
+    return c.s > Z.s0 - 20 ? 0.5 : 0.75;
+  }
+  let slow = c.s > Z.s0 - 18 ? 0.45 : 0.8;
+  const inZone = c.s > Z.s0 - 2;
+  if (!inZone && !c.rlGo) {
+    // встречный в сужении — ждём у клина
+    const rs0 = Z.run - Z.s1 - 6, rs1 = Z.run - Z.s0 + 8;
+    const busy = API.TRAFFIC.some(q => q.e === Z.r && !q.parked && !q.turn && q.s > rs0 && q.s < rs1);
+    if (busy) slow = Math.min(slow, clamp((Z.s0 - (c.hl || 2.2) - 2.5 - c.s) / 8, 0, 1));
+    else if (c.s > Z.s0 - 18) c.rlGo = 1;
+  }
+  if (c.rlGo || inZone) { c.pull = damp(c.pull || 0, Z.pull, 1.8, dt); c.rlPull = 3; }
+  return slow;
+}
+/* после сужения — плавно назад в свою полосу */
+function pullBack (c, dt) {
+  const Z = LANES.get(c.e);
+  if (Z && ((Z.opp && c.s > Z.s0 - 25 && c.s < Z.s1) || (Z.to < 0 && c.s > Z.s0 - 45 && c.s < Z.s1))) return;
+  c.pull = damp(c.pull || 0, 0, 1.3, dt);
+  if (Math.abs(c.pull) < 0.03) { c.pull = 0; c.rlPull = 0; c.rlGo = 0; }
 }
 
 function stepWorks (dt, A) {
@@ -1029,7 +1210,9 @@ let API = null;
 export function hold (c, dt) {
   if (c.rlOut) return 0;                      // водитель вышел
   if (c.mp && API && !MOPEDS.lane(c, dt, API)) return 0;     // мопед: правый край полосы, межполосье в пробке; без седока — стоит
-  if (c.turn || !c.e || (!JAM_BY.size && !CLOSED.size)) return 1;
+  if (c.turn || !c.e) return 1;
+  if (c.rlPull && API) pullBack(c, dt);          // ремонт полосы позади — назад в свою полосу
+  if (!JAM_BY.size && !CLOSED.size && !LANES.size) return 1;
   let slow = 1;
   const e = c.e, J = JAM_BY.get(e);
   if (J && !J.done && API && !(c.mp && c.mp.weave > 0)) {    // мопед между рядами пробку объезжает
@@ -1049,6 +1232,7 @@ export function hold (c, dt) {
       } else c.rlWait = 0;
     } else if (c.s < C.sBar + C.len + 1) API.placeTraffic(c, 120, 340);     // оказалась на месте работ
   }
+  if (LANES.size && API) slow = Math.min(slow, laneHold(c, dt));
   return slow;
 }
 /* развернуться у ремонта: встать на встречное ребро и доехать до полосы дугой */
@@ -1094,6 +1278,7 @@ export function svcHold (t, dt) {
   let slow = 1;
   const hx = Math.sin(t.h), hz = Math.cos(t.h);
   for (const W of WORKS) {
+    if (W.lane) continue;                                      // ремонт полосы — проезд есть
     const dx = t.x - W.x, dz = t.z - W.z;
     if (Math.abs(dx) > 45 || Math.abs(dz) > 45) continue;
     const a = dx * W.ux + dz * W.uz, l = dx * W.e.rx + dz * W.e.rz;
@@ -1201,4 +1386,4 @@ export function drawMap (x, fmX, fmZ, s) {
 }
 
 /* для отладки: __dlv.RL */
-export const DEBUG = { MOPEDS: MOPEDS.DEBUG, RL, JAMS, WORKS, CLOSED, SG, spawnOnRoute: () => API && spawnOnRoute(API), spawnSomewhere: () => API && spawnSomewhere(API) };
+export const DEBUG = { MOPEDS: MOPEDS.DEBUG, RL, JAMS, WORKS, CLOSED, LANES, SG, spawnLane: () => { if (!API) return false; for (let k = 0; k < 40; k++) { const ia = API.nodeNear(API.V.x, API.V.z, 70, 220), N = API.NODES[ia]; if (!N || !N.nb.length) continue; const e = API.edgeOf(ia, pick(N.nb)), ok = laneOk(API, e); if (ok) { spawnLane(API, e, ok); return ok; } } return false; }, spawnOnRoute: () => API && spawnOnRoute(API), spawnSomewhere: () => API && spawnSomewhere(API) };

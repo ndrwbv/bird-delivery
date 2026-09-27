@@ -197,8 +197,19 @@ function Pile () {
   function cell (x, z) {
     const k = Math.floor(x / CH) + ',' + Math.floor(z / CH);
     let c = cells.get(k);
-    if (!c) cells.set(k, c = { n: 0, cap: 2048, p: new Float32Array(2048 * 3), c: new Uint8Array(2048 * 3), a: new Uint8Array(2048 * 4) });
+    if (!c) cells.set(k, c = { k, n: 0, cap: 2048, p: new Float32Array(2048 * 3), c: new Uint8Array(2048 * 3), a: new Uint8Array(2048 * 4) });
     return c;
+  }
+  /* вершины шаблона после сдвига, поворота и масштаба — в массив out с o */
+  function write (tpl, out, o, x, y, z, sx, sy, sz, rx, ry, rz) {
+    M.compose(P.set(x, y, z), Q.setFromEuler(E.set(rx, ry, rz, 'YZX')), Sc.set(sx, sy, sz));
+    const e = M.elements, nv = tpl.length / 3;
+    for (let i = 0; i < nv; i++) {
+      const vx = tpl[i * 3], vy = tpl[i * 3 + 1], vz = tpl[i * 3 + 2], q = o + i * 3;
+      out[q] = e[0] * vx + e[4] * vy + e[8] * vz + e[12];
+      out[q + 1] = e[1] * vx + e[5] * vy + e[9] * vz + e[13];
+      out[q + 2] = e[2] * vx + e[6] * vy + e[10] * vz + e[14];
+    }
   }
   function room (c, add) {
     if (c.n + add <= c.cap) return;
@@ -209,38 +220,39 @@ function Pile () {
   }
   return {
     /* tpl — неиндексированные вершины шаблона; поворот: X, потом Z, потом Y */
+    /* возвращает, где лежат вершины: клетка и первая вершина */
     add (tpl, x, y, z, sx, sy, sz, rx, ry, rz, hex, kind = 0, seed = 0, pal = 0) {
-      const c = cell(x, z), nv = tpl.length / 3;
+      const c = cell(x, z), nv = tpl.length / 3, v0 = c.n;
       room(c, nv);
-      M.compose(P.set(x, y, z), Q.setFromEuler(E.set(rx, ry, rz, 'YZX')), Sc.set(sx, sy, sz));
-      const e = M.elements;
+      write(tpl, c.p, v0 * 3, x, y, z, sx, sy, sz, rx, ry, rz);
       col.set(hex);
       const r = Math.round(col.r * 255), g = Math.round(col.g * 255), b = Math.round(col.b * 255);
       const sd = Math.max(1, Math.min(254, Math.round(seed * 253) + 1));
-      for (let i = 0; i < nv; i++) {
-        const vx = tpl[i * 3], vy = tpl[i * 3 + 1], vz = tpl[i * 3 + 2], o = c.n * 3, q = c.n * 4;
-        c.p[o] = e[0] * vx + e[4] * vy + e[8] * vz + e[12];
-        c.p[o + 1] = e[1] * vx + e[5] * vy + e[9] * vz + e[13];
-        c.p[o + 2] = e[2] * vx + e[6] * vy + e[10] * vz + e[14];
+      for (let i = v0; i < v0 + nv; i++) {
+        const o = i * 3, q = i * 4;
         c.c[o] = r; c.c[o + 1] = g; c.c[o + 2] = b;
         c.a[q] = kind; c.a[q + 1] = sd; c.a[q + 2] = pal; c.a[q + 3] = 0;
-        c.n++;
       }
+      c.n += nv;
       tris += nv / 3;
+      return { key: c.k, v0, nv };
     },
+    write,
     tris: () => tris,
-    build (mat) {
+    /* keep — позиции остаются в памяти: их правят на ходу (сугробы) */
+    build (mat, keep) {
       const out = [];
+      out.byKey = new Map();
       for (const c of cells.values()) {
         if (!c.n) continue;
         const g = new THREE.BufferGeometry();
         const pa = new THREE.BufferAttribute(c.p.slice(0, c.n * 3), 3), ca = new THREE.BufferAttribute(c.c.slice(0, c.n * 3), 3, true), aa = new THREE.BufferAttribute(c.a.slice(0, c.n * 4), 4, true);
         g.setAttribute('position', pa); g.setAttribute('color', ca); g.setAttribute('aux', aa);
         g.computeBoundingSphere();
-        for (const at of [pa, ca, aa]) at.onUpload(dropArr);
+        for (const at of keep ? [ca, aa] : [pa, ca, aa]) at.onUpload(dropArr);
         const m = new THREE.Mesh(g, mat);
         C.scene.add(m);
-        out.push(m);
+        out.push(m); out.byKey.set(c.k, m);
       }
       cells.clear();
       return out;
@@ -258,8 +270,31 @@ function tpls () {
     box: arr(new THREE.BoxGeometry(1, 1, 1)), ico: arr(new THREE.IcosahedronGeometry(1, 0)),
     cone: arr(new THREE.ConeGeometry(1, 1, 7, 1, true)), quad: arr(new THREE.PlaneGeometry(1, 1)),
     flat: arr(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)),
+    mound: moundTpl(),
   };
   return TPL;
+}
+
+/* Сугроб: пятиугольник у земли, кольцо выше и уже, макушка. Обход граней —
+   наружу (снизу его не видно, дна нет). */
+function moundTpl () {
+  const rim = [], ring = [], out = [];
+  for (let i = 0; i < 5; i++) {
+    const a = i / 5 * Math.PI * 2, b = a + Math.PI / 5;
+    rim.push([Math.cos(a), -0.08, Math.sin(a)]); ring.push([Math.cos(b) * 0.62, 0.7, Math.sin(b) * 0.62]);
+  }
+  const top = [0, 1, 0];
+  const tri = (a, b, c) => {
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const mx = (a[0] + b[0] + c[0]) / 3, my = (a[1] + b[1] + c[1]) / 3 - 0.2, mz = (a[2] + b[2] + c[2]) / 3;
+    out.push(...a, ...(nx * mx + ny * my + nz * mz > 0 ? [...b, ...c] : [...c, ...b]));
+  };
+  for (let i = 0; i < 5; i++) {
+    const j = (i + 1) % 5;
+    tri(rim[i], rim[j], ring[i]); tri(ring[i], rim[j], ring[j]); tri(ring[i], ring[j], top);
+  }
+  return Float32Array.from(out);
 }
 
 /* детерминированный шум от точки: одно и то же дерево на одном месте */
@@ -287,7 +322,7 @@ function weighted (r, o) {
 }
 
 /* ─────────────── инициализация ─────────────── */
-let PILE = null, GARL = null;
+let PILE = null, GARL = null, DRIFTP = null, DRIFT_MESH = [];
 const DECID = [], SPRUCES = [], SEA_ITEMS = [], DRIFTS = new Map(), FIRS = [], FIGHT_SPOTS = [];
 let MESH_GARL = [], MESH_PILE = [];
 const BUILT = { trees: 0, pile: 0, garl: 0, drifts: 0, bulbs: 0, items: 0 };
@@ -300,7 +335,7 @@ export function initSeasons (ctx) {
   const q = new URLSearchParams(location.search).get('season');
   if (q !== null && q !== '' && !Number.isNaN(+q)) { SEA = wrap(+q); FORCED = true; }
   else SEA = wrap(+C.Store.get('dlv-season', 0) || 0);
-  PILE = Pile(); GARL = Pile();
+  PILE = Pile(); GARL = Pile(); DRIFTP = Pile();
   smashMat(C.SMASH_MAT);
   C.SM_WORD.ice = t('ледяная горка');
   C.SM_WORD.snowman = t('снеговик');
@@ -312,6 +347,7 @@ export function advanceSeason () {
   if (FORCED) return;
   const was = seasonName();
   SEA = wrap(SEA + SEASON_STEP);
+  healDrifts();
   C.Store.set('dlv-season', SEA);
   apply();
   const now = seasonName();
@@ -327,6 +363,7 @@ function apply () {
   U.uNY.value = A.ny; U.uIce.value = A.ice;
   setPeopleSeason(A.warm);
   for (const m of MESH_GARL) m.visible = A.ny > 0.001;
+  for (const m of DRIFT_MESH) m.visible = A.drift > 0.004;
   // новогодние ёлки стоят, пока видны (шейдер: зерно 4/255 < uNY)
   for (const f of FIRS) if (f.solid) f.solid.hw = f.solid.hd = A.ny > 0.016 ? f.hw : -50;     // -50 — «препятствия нет», как в игре
   // ледяные горки и снеговики: вне зимы вершины — в точку
@@ -537,37 +574,79 @@ export function seasonBuild () {
     (SL.some(q => Math.hypot(q.x - x, q.z - z) < 9) || PZT.some(it => Math.hypot(it.x - x, it.z - z) < (it.r || 1) + 2.5));
   const drift = (x, z, L, H, W, ry, seed) => {
     if (busy(x, z)) return;
-    P.add(T.ico, x, groundH(x, z) + 0.08, z, W, H, L, 0, ry, 0, DRIFT_HEX, 3, seed);
+    const y = groundH(x, z) + C.curbAt(x, z) + 0.02;
+    const at = DRIFTP.add(T.mound, x, y, z, W, H, L, 0, ry, 0, DRIFT_HEX, 3, seed);
     const k = Math.floor(x / 20) + ',' + Math.floor(z / 20);
     if (!DRIFTS.has(k)) DRIFTS.set(k, []);
-    DRIFTS.get(k).push({ x, z, r: Math.min(L, W) * 0.9 + 0.3, seed: Math.max(1, Math.min(254, Math.round(seed * 253) + 1)) / 255 });
+    DRIFTS.get(k).push({ x, y, z, L, H, W, ry, cs: Math.cos(ry), sn: Math.sin(ry), s: 1, t: 0, ...at,
+      seed: Math.max(1, Math.min(254, Math.round(seed * 253) + 1)) / 255 });
     BUILT.drifts++;
   };
-  const CAP = svk ? 2200 : 1100;
+  const PK = new Map();                                   // припаркованные — у бордюра вал не насыпаем
+  for (const q of C.PARKED || []) { const k = Math.floor(q[0] / 10) + ',' + Math.floor(q[1] / 10); if (!PK.has(k)) PK.set(k, []); PK.get(k).push(q); }
+  const parkedNear = (x, z) => { const i = Math.floor(x / 10), j = Math.floor(z / 10); for (let a = i - 1; a <= i + 1; a++) for (let b = j - 1; b <= j + 1; b++) for (const q of PK.get(a + ',' + b) || []) if (Math.hypot(q[0] - x, q[1] - z) < 4.5) return true; return false; };
+  const onAsphalt = (x, z, m) => { const n = nearestRoad(x, z, 7, 1); return n && n.d < n.seg.w / 2 + m; };
+  const nearZebra = (x, z, d) => ZEBRAS.some(q => Math.abs(q.x - x) < d && Math.abs(q.z - z) < d);
+  const nearStop = (x, z) => (CITY.stops || []).some(q => Math.abs(q.p[0] - x) < 9 && Math.abs(q.p[1] - z) < 9);
+  const RIDGES = svk ? 9000 : 3600, HEAPS = svk ? 1800 : 900, BANKS = svk ? 1300 : 650;
+  let nRidge = 0, nHeap = 0, nBank = 0;
+  const heapCells = new Set();
   for (const rd of CITY.roads) {
-    if (BUILT.drifts > CAP) break;
     if (!drivable(rd) || rd.b || rd.c > 5) continue;
-    const off = roadWidth(rd) / 2 + 2.75 + 1.1;
+    const w = roadWidth(rd), off = w / 2 + 2.75 + 1.1;
     for (let i = 1; i < rd.p.length; i++) {
       const [x1, z1] = rd.p[i - 1], [x2, z2] = rd.p[i];
       const len = Math.hypot(x2 - x1, z2 - z1) || 1, ux = (x2 - x1) / len, uz = (z2 - z1) / len, ry = Math.atan2(ux, uz);
       const nA = NODE_IDX.get(x1 + ',' + z1), nB = NODE_IDX.get(x2 + ',' + z2);
       const endA = nA !== undefined && nodeDeg(nA) >= 3, endB = nB !== undefined && nodeDeg(nB) >= 3;
-      for (let d = 4; d < len - 3; d += 8) {
+      // вал вдоль бордюра: что счистил грейдер, лежит длинной грядой на кромке
+      for (let d = 3; d < len - 2.5 && nRidge < RIDGES; d += 5.2) {
+        if ((endA && d < 10) || (endB && len - d < 10)) continue;
+        for (const sd of [-1, 1]) {
+          const o = w / 2 + 0.4, x = x1 + ux * d - uz * o * sd, z = z1 + uz * d + ux * o * sd;
+          if (hsh(x, z, 71) > 0.82 || !inBounds(x, z, -20) || inHouse(x, z, 0.8)) continue;
+          const n = nearestRoad(x, z, 7, 1);
+          if (n && n.d < n.seg.w / 2 - 0.2) continue;               // чужое полотно
+          if (nearZebra(x, z, 7) || nearStop(x, z) || parkedNear(x, z)) continue;
+          const r = rngAt(x, z, 72);
+          drift(x, z, 2.2 + r() * 1.6, 0.3 + r() * 0.28, 0.55 + r() * 0.3, ry + (r() - 0.5) * 0.08, r());
+          nRidge++;
+        }
+      }
+      // за тротуаром — сугробы побольше
+      for (let d = 4; d < len - 3 && nBank < BANKS; d += 11) {
         if ((endA && d < 13) || (endB && len - d < 13)) continue;
         for (const sd of [-1, 1]) {
-          const x = x1 + ux * d - uz * off * sd, z = z1 + uz * d + ux * off * sd, h = hsh(x, z, 1);
-          if (h > 0.72 || !inBounds(x, z, -20) || inHouse(x, z, 1.4)) continue;
-          const n = nearestRoad(x, z, 7, 1);
-          if (n && n.d < n.seg.w / 2 + 3.2) continue;
-          if (ZEBRAS.some(q => Math.abs(q.x - x) < 9 && Math.abs(q.z - z) < 9)) continue;
+          const x = x1 + ux * d - uz * off * sd, z = z1 + uz * d + ux * off * sd;
+          if (hsh(x, z, 1) > 0.6 || !inBounds(x, z, -20) || inHouse(x, z, 1.4) || onAsphalt(x, z, 3.2) || nearZebra(x, z, 9)) continue;
           const r = rngAt(x, z, 6);
-          drift(x, z, 1.5 + r() * 1.6, 0.45 + r() * 0.45, 0.8 + r() * 0.5, ry, r());
-          if (r() < 0.4) drift(x + ux * 2.2, z + uz * 2.2, 0.9 + r() * 0.7, 0.35 + r() * 0.3, 0.7 + r() * 0.3, ry + 0.4, r());
+          drift(x, z, 1.5 + r() * 1.6, 0.5 + r() * 0.45, 0.9 + r() * 0.5, ry, r());
+          nBank++;
+        }
+      }
+    }
+    // кучи на углах перекрёстков и у въездов во дворы: туда сгребают всё
+    for (let i = 0; i < rd.p.length && nHeap < HEAPS; i++) {
+      const [ex, ez] = rd.p[i], nd = NODE_IDX.get(ex + ',' + ez);
+      if (nd === undefined || nodeDeg(nd) < 3) continue;
+      for (const j of [i - 1, i + 1]) {
+        if (j < 0 || j >= rd.p.length) continue;
+        const dx = rd.p[j][0] - ex, dz = rd.p[j][1] - ez, l = Math.hypot(dx, dz);
+        if (l < 12) continue;
+        const ux = dx / l, uz = dz / l, along = 6.5 + w / 2, big = rd.c >= 4 ? 1.25 : 1;
+        for (const sd of [-1, 1]) {
+          const o = w / 2 + 1.9, x = ex + ux * along - uz * o * sd, z = ez + uz * along + ux * o * sd;
+          const hk = Math.round(x / 4) + ',' + Math.round(z / 4);
+          if (heapCells.has(hk) || !inBounds(x, z, -20) || inHouse(x, z, 1.2) || onAsphalt(x, z, 0.5) || nearZebra(x, z, 5) || parkedNear(x, z)) continue;
+          heapCells.add(hk);
+          const r = rngAt(x, z, 73);
+          drift(x, z, (1.7 + r() * 1.1) * big, (0.75 + r() * 0.5) * big, (1.3 + r() * 0.7) * big, Math.atan2(ux, uz) + r() * 0.6, r() * 0.55);
+          nHeap++;
         }
       }
     }
   }
+  BUILT.ridges = nRidge; BUILT.heaps = nHeap; BUILT.banks = nBank;
   // во дворах и парках
   let yd = 0;
   for (const pl of CITY.green) {
@@ -671,10 +750,18 @@ export function seasonBuild () {
   BUILT.pile = PILE.tris(); BUILT.garl = GARL.tris();
   MESH_PILE = PILE.build(pileMat());
   MESH_GARL = GARL.build(garlandMat());
-  // гирлянды впервые появятся посреди зимы — программы собираем сразу
-  C.renderer.compile(C.scene, C.cam);
-  apply();
+  // сугробы — отдельно: их позиции живые (разбиваются и отрастают)
+  DRIFT_MESH = DRIFTP.build(MESH_PILE[0] ? MESH_PILE[0].material : pileMat(), true);
+  for (const list of DRIFTS.values()) for (const d of list) d.mesh = DRIFT_MESH.byKey.get(d.key);
+  // гирлянды, сугробы, снег и комья впервые появятся посреди зимы — программы собираем сразу
   initSky();
+  chunks(0, -500, 0, 1, 0, 0);
+  const warm = [...MESH_GARL, ...DRIFT_MESH, SNOWF, SPLASH.pts, ...CHUNKS.map(c => c.m)];
+  for (const m of warm) m.visible = true;
+  C.renderer.compile(C.scene, C.cam);
+  for (const c of CHUNKS) { c.life = 0; c.m.visible = false; }
+  SNOWF.visible = false;
+  apply();
 }
 /* Стартовый кадр (V.hero в camStep): камера в 10 м перед машиной на месте 0
    и в 6 м вбок, смотрит на машину и пиццерию. */
@@ -746,13 +833,27 @@ function bigFir (x, z, k) {
 
 /* ─────────────── живое: снег с неба, снежки, сугробы под колёсами ─────────────── */
 let SNOWF = null, SPLASH = null, SKY = null;
-const SF_N = 1600, SP_N = 260;
+const SF_N = 3200, SP_N = 420, SF_R = 38, SF_IN = 1400, SF_RI = 15;   // первые SF_IN — ближняя коробка: крупные хлопья у камеры
 function initSky () {
   const g = new THREE.BufferGeometry();
+  // хлопья — в мировых координатах, в коробке вокруг камеры (чуть впереди);
+  // ушедшие из коробки переносим на другой её край: едешь — снег летит навстречу
   const p = new Float32Array(SF_N * 3);
-  for (let i = 0; i < SF_N; i++) { p[i * 3] = rnd(-40, 40); p[i * 3 + 1] = rnd(-6, 34); p[i * 3 + 2] = rnd(-40, 40); }
+  for (let i = 0; i < SF_N; i++) { p[i * 3] = rnd(-SF_R, SF_R); p[i * 3 + 1] = rnd(-10, 30); p[i * 3 + 2] = rnd(-SF_R, SF_R); }
   g.setAttribute('position', new THREE.BufferAttribute(p, 3));
-  const m = new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false });
+  /* Своя точка: ближние крупнее, с серо-голубой каймой — иначе белое на
+     белом поле и бледном небе не видно; дальние — по пикселю. */
+  const m = new THREE.ShaderMaterial({
+    uniforms: { uOp: { value: 0 }, uNight: U.uNight, uS: { value: 64 } },
+    vertexShader: `uniform float uS; varying float vD;
+      void main () { vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; vD = -mv.z; gl_PointSize = clamp(uS / max(vD, 0.5), 2.0, 6.0); }`,
+    fragmentShader: `uniform float uOp, uNight; varying float vD;
+      void main () { vec2 q = abs(gl_PointCoord * 2.0 - 1.0); float r = max(q.x, q.y);
+        vec3 c = r > 0.52 && vD < 16.0 ? vec3(0.58, 0.66, 0.78) : vec3(1.0);
+        c *= mix(1.0, 0.5, uNight);
+        gl_FragColor = vec4(c, uOp * clamp(1.25 - vD / 60.0, 0.35, 1.0)); }`,
+    transparent: true, depthWrite: false,
+  });
   CAM_DIR = new THREE.Vector3();
   SNOWF = new THREE.Points(g, m);
   SNOWF.frustumCulled = false; SNOWF.visible = false;
@@ -762,7 +863,8 @@ function initSky () {
   SPLASH = { pts: new THREE.Points(g2, new THREE.PointsMaterial({ color: 0xf4f8fc, size: 3, sizeAttenuation: false })), v: new Float32Array(SP_N * 3), life: new Float32Array(SP_N), i: 0, on: 0 };
   SPLASH.pts.frustumCulled = false;
   C.scene.add(SPLASH.pts);
-  SKY = { want: 0, amt: 0, t: rnd(10, 40), bg: new THREE.Color('#c6d0da'), fog: new THREE.Color('#e0e6ec'), gnd: new THREE.Color('#e4ebf2'), aut: new THREE.Color('#b8c6d0') };
+  const forceSnow = new URLSearchParams(location.search).has('snow');              // ?snow — снег идёт сразу (проверка)
+  SKY = { want: forceSnow ? 0.8 : 0, amt: forceSnow ? 0.8 : 0, t: forceSnow ? 9999 : rnd(10, 40), bg: new THREE.Color('#c6d0da'), fog: new THREE.Color('#e0e6ec'), gnd: new THREE.Color('#e4ebf2'), aut: new THREE.Color('#b8c6d0') };
   BALL_GEO = new THREE.IcosahedronGeometry(0.13, 0);
   BALL_MAT = new THREE.MeshLambertMaterial({ color: 0xf4f7fa, flatShading: true });
 }
@@ -809,36 +911,122 @@ function stepSky (dt) {
   if (hemi) hemi.groundColor.lerp(SKY.gnd, sn * 0.55);
   SNOWF.visible = SKY.amt > 0.02;
   if (!SNOWF.visible) return;
-  SNOWF.material.opacity = Math.min(1, SKY.amt * 1.3);
-  const cam = C.cam, p = SNOWF.geometry.attributes.position.array, n = Math.floor(SF_N * Math.min(1, 0.25 + SKY.amt));
-  SNOWF.position.set(cam.position.x, cam.position.y - 6, cam.position.z);
-  SNOWF.geometry.setDrawRange(0, n);
-  const fall = (2.2 + SKY.amt * 1.5) * dt, tt = U.uTime.value;
+  SNOWF.material.uniforms.uOp.value = Math.min(1, SKY.amt * 1.4);
+  const cam = C.cam, p = SNOWF.geometry.attributes.position.array, n = SF_N;
+  cam.getWorldDirection(CAM_DIR);
+  const hl = Math.hypot(CAM_DIR.x, CAM_DIR.z) || 1;
+  const cx = cam.position.x + CAM_DIR.x / hl * 14, cz = cam.position.z + CAM_DIR.z / hl * 14, cy = cam.position.y, R2 = SF_R * 2;
+  const fall = (2.0 + SKY.amt * 1.6) * dt, tt = U.uTime.value;
+  SNOWF.geometry.setDrawRange(0, Math.floor(SF_N * Math.min(1, 0.35 + SKY.amt)));
   for (let i = 0; i < n; i++) {
     const o = i * 3;
-    p[o + 1] -= fall * (0.7 + (i % 5) * 0.12);
-    p[o] += Math.sin(tt * 0.9 + i) * 0.4 * dt + 0.5 * dt;
-    if (p[o + 1] < -6) { p[o + 1] = 34; p[o] = rnd(-40, 40); p[o + 2] = rnd(-40, 40); }
-    if (p[o] > 40) p[o] -= 80;
+    let x = p[o], y = p[o + 1] - fall * (0.7 + (i % 5) * 0.12), z = p[o + 2];
+    x += (Math.sin(tt * 0.9 + i) * 0.4 + 0.5) * dt;
+    const R = i < SF_IN ? SF_RI : SF_R, RR = R * 2, ox = i < SF_IN ? cam.position.x + CAM_DIR.x / hl * 6 : cx, oz = i < SF_IN ? cam.position.z + CAM_DIR.z / hl * 6 : cz;
+    if (x < ox - R || x >= ox + R) x = ox - R + (((x - ox + R) % RR) + RR) % RR;
+    if (z < oz - R || z >= oz + R) z = oz - R + (((z - oz + R) % RR) + RR) % RR;
+    if (i < SF_IN) { if (y < cy - 8) y += 22; else if (y > cy + 14) y -= 22; }
+    else if (y < cy - 12) y += 42; else if (y > cy + 30) y -= 42;
+    p[o] = x; p[o + 1] = y; p[o + 2] = z;
   }
   SNOWF.geometry.attributes.position.needsUpdate = true;
 }
 
-/* сугробы тормозят и разлетаются */
-let driftT = 0, redressT = 0, CAM_DIR = null;
+/* Сугробы. Врезался на скорости — сугроб взрывается: белые комья,
+   снежная пыль, мягкий глухой удар, машину ненадолго тормозит. От него
+   остаётся плоский след, через минуту-полторы он отрастает (новая смена —
+   все снова целые). Правим только вершины этого сугроба в его склейке. */
+let driftT = 0, dragT = 0, redressT = 0, CAM_DIR = null, growT = 0;
+const GROW = [];                                          // разбитые — ждут, пока отрастут
+function driftShape (d, s) {
+  const m = d.mesh;
+  if (!m) return;
+  const pa = m.geometry.attributes.position;
+  if (!pa.array) return;
+  DRIFTP.write(tpls().mound, pa.array, d.v0 * 3, d.x, d.y - (1 - s) * 0.05, d.z, d.W * (1 + (1 - s) * 0.25), d.H * s, d.L * (1 + (1 - s) * 0.15), 0, d.ry, 0);
+  pa.addUpdateRange(d.v0 * 3, d.nv * 3);
+  pa.needsUpdate = true;
+  d.s = s;
+}
+function burstDrift (d, sp) {
+  const V = C.V;
+  driftShape(d, 0.18);
+  d.t = rnd(55, 95);
+  GROW.push(d);
+  const vol = Math.min(1.6, d.L * d.W * d.H);
+  splash(d.x, d.y + d.H * 0.6, d.z, 18 + (vol * 14 | 0), 1.3 + sp / 18);
+  chunks(d.x, d.y + d.H * 0.5, d.z, 5 + (vol * 5 | 0), V.vx, V.vz);
+  C.Snd.blip(70 + Math.random() * 25, 0.22, 'sine', 0.2);
+  C.Snd.noise(0.22, 0.13);
+  C.S.shake = Math.max(C.S.shake || 0, 0.1 + Math.min(0.15, sp / 120));
+  const k = 0.84 - Math.min(0.12, vol * 0.08);
+  V.vx *= k; V.vz *= k;
+  dragT = 0.28;
+}
 function stepCar (dt) {
   const V = C.V, sp = Math.hypot(V.vx, V.vz);
   driftT -= dt;
-  if (A.drift < 0.01 || sp < 3) return;
+  if (dragT > 0) { dragT -= dt; const k = Math.exp(-1.8 * dt); V.vx *= k; V.vz *= k; }
+  // отрастают понемногу
+  if (GROW.length && (growT -= dt) <= 0) {
+    growT = 0.25;
+    for (let i = GROW.length - 1; i >= 0; i--) {
+      const d = GROW[i];
+      if ((d.t -= 0.25) > 0) continue;
+      const s = Math.min(1, d.s + 0.06);
+      driftShape(d, s);
+      if (s >= 1) GROW.splice(i, 1);
+    }
+  }
+  if (A.drift < 0.01 || sp < 2.5) return;
   const ci = Math.floor(V.x / 20), cj = Math.floor(V.z / 20);
   for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
     for (const d of DRIFTS.get(i + ',' + j) || []) {
-      if (d.seed >= A.drift || Math.hypot(V.x - d.x, V.z - d.z) > d.r + 0.8) continue;
-      const k = Math.exp(-1.6 * dt);
-      V.vx *= k; V.vz *= k;
-      if (driftT <= 0) { driftT = 0.12; splash(V.x + V.vx * 0.08, 0.5, V.z + V.vz * 0.08, 10, 1 + sp / 20); }
-      return;
+      if (d.seed >= A.drift || d.s < 0.5) continue;
+      const dx = V.x - d.x, dz = V.z - d.z;
+      if (Math.abs(dx) > d.L + 2.5 || Math.abs(dz) > d.L + 2.5) continue;
+      const lx = dx * d.cs - dz * d.sn, lz = dx * d.sn + dz * d.cs;         // в осях сугроба
+      const ex = lx / (d.W + 1.0), ez = lz / (d.L + 1.2);
+      if (ex * ex + ez * ez > 1) continue;
+      if (sp > 5) burstDrift(d, sp);
+      else { const k = Math.exp(-1.4 * dt); V.vx *= k; V.vz *= k; if (driftT <= 0) { driftT = 0.15; splash(V.x, 0.4 + d.y, V.z, 5, 0.6); } }
     }
+  }
+}
+/* новая смена: все сугробы снова целые */
+function healDrifts () {
+  for (const d of GROW) driftShape(d, 1);
+  GROW.length = 0;
+}
+/* комья снега: несколько коробочек из пула, летят, падают, тают */
+const CHUNKS = [];
+let CHUNK_GEO = null, CHUNK_MAT = null;
+function chunks (x, y, z, n, vx, vz) {
+  if (!CHUNK_GEO) { CHUNK_GEO = new THREE.BoxGeometry(1, 1, 1); CHUNK_MAT = seasonMat(new THREE.MeshLambertMaterial({ color: 0xe8eef5, flatShading: true }), 0); }
+  for (let i = 0; i < n; i++) {
+    let c = CHUNKS.find(q => q.life <= 0);
+    if (!c) { if (CHUNKS.length >= 40) break; c = { m: new THREE.Mesh(CHUNK_GEO, CHUNK_MAT), life: 0 }; C.scene.add(c.m); CHUNKS.push(c); }
+    const sz = rnd(0.18, 0.42);
+    c.m.scale.setScalar(sz); c.sz = sz; c.m.visible = true;
+    c.m.position.set(x + rnd(-0.6, 0.6), y + rnd(0, 0.4), z + rnd(-0.6, 0.6));
+    c.vx = vx * rnd(0.3, 0.7) + rnd(-3, 3); c.vz = vz * rnd(0.3, 0.7) + rnd(-3, 3); c.vy = rnd(2.5, 6.5);
+    c.spin = rnd(-8, 8); c.life = rnd(1.6, 2.6); c.rest = 0;
+  }
+}
+function stepChunks (dt) {
+  for (const c of CHUNKS) {
+    if (c.life <= 0) continue;
+    c.life -= dt;
+    const p = c.m.position;
+    if (!c.rest) {
+      c.vy -= 14 * dt;
+      p.x += c.vx * dt; p.y += c.vy * dt; p.z += c.vz * dt;
+      c.m.rotation.x += c.spin * dt; c.m.rotation.z += c.spin * 0.7 * dt;
+      const gy = C.groundH(p.x, p.z) + C.curbAt(p.x, p.z) + c.sz * 0.4;
+      if (p.y < gy) { p.y = gy; if (c.vy < -3) { c.vy *= -0.25; c.vx *= 0.4; c.vz *= 0.4; } else c.rest = 1; }
+    }
+    if (c.life < 0.6) c.m.scale.setScalar(c.sz * Math.max(0.01, c.life / 0.6));    // тает
+    if (c.life <= 0) c.m.visible = false;
   }
 }
 
@@ -1015,6 +1203,7 @@ export function updateSeasons (dt) {
   stepFights(dt);
   stepBalls(dt);
   stepSplash(dt);
+  stepChunks(dt);
   // кто уже на улице — переодеваются понемногу, пока их не видно
   if ((redressT -= dt) <= 0) { redressT = 0.3; C.cam.getWorldDirection(CAM_DIR); redressHumans(C.cam.position.x, C.cam.position.z, CAM_DIR.x, CAM_DIR.z, 2); }
   if (window.__dlv && !window.__dlv.season) window.__dlv.season = DEBUG;
@@ -1023,5 +1212,6 @@ export function updateSeasons (dt) {
 /* для ?debug: __dlv.season */
 const DEBUG = {
   get value () { return SEA; }, get name () { return seasonName(); }, get amounts () { return { ...A }; }, BUILT, set: setSeason, advance: advanceSeason,
-  FIGHTS, FIRS, SEA_ITEMS, DECID, SPRUCES, get meshes () { return [...MESH_PILE, ...MESH_GARL]; }, get drifts () { return BUILT.drifts; }, get ENV () { return C.ENV; },
+  snowNow (a = 0.8) { SKY.want = a; SKY.amt = a; SKY.t = 9999; }, DRIFTS, GROW, burstDrift,
+  FIGHTS, FIRS, SEA_ITEMS, DECID, SPRUCES, get meshes () { return [...MESH_PILE, ...MESH_GARL, ...DRIFT_MESH]; }, get drifts () { return BUILT.drifts; }, get ENV () { return C.ENV; },
 };

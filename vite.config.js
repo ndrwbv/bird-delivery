@@ -15,8 +15,9 @@ export default defineConfig(({ mode }) => ({
   plugins: mode === 'yandex' ? [yandexSdk()] : [],
   build: {
     target: 'es2022', outDir: 'dist/' + mode, assetsInlineLimit: 0, sourcemap: false, emptyOutDir: true,
-    // в Стиме рядом с игрой — страница диагностики геймпада (--page=pad.html)
-    ...(mode === 'steam' ? { rollupOptions: { input: { index: 'index.html', pad: 'pad.html' } } } : {}),
+    // sandbox.html — песочница для проверки механик (docs/SANDBOX.md): в web и Стиме есть, в Яндекс не попадает.
+    // В Стиме рядом с игрой — ещё страница диагностики геймпада (--page=pad.html)
+    ...(mode !== 'yandex' ? { rollupOptions: { input: { index: 'index.html', sandbox: 'sandbox.html', ...(mode === 'steam' ? { pad: 'pad.html' } : {}) } } } : {}),
   },
   server: { host: '127.0.0.1' },
 }));

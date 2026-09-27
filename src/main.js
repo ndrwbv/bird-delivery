@@ -16,7 +16,7 @@ document.documentElement.dataset.platform = Platform.id;
 
 // Стим (и dev) — Северск, Яндекс — Москва; ?map= — для отладки
 const want = new URLSearchParams(location.search).get('map') || (Platform.id === 'yandex' ? 'moscow' : 'seversk');
-const mapId = MAP_IDS.includes(want) ? want : 'moscow';
+const mapId = MAP_IDS.includes(want) ? want : MAP_IDS[0];
 useMap(await loadMap(mapId));
 document.documentElement.dataset.city = mapId;
 

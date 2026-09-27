@@ -27,6 +27,9 @@ let root = null, queue = Promise.resolve(), open = 0;
 
 export function init (api) { API = { ...API, ...api }; }
 export const isOpen = () => open > 0;
+/* закрыть текущую реплику сразу (катсцена пропущена: story.js) — say вернёт null */
+let CUR = null;
+export function dismiss () { if (CUR) CUR(); }
 
 function build () {
   root = document.createElement('div');
@@ -101,6 +104,7 @@ function show (o, done) {
   };
   const close = v => {
     if (closed) return; closed = true;
+    if (CUR === dismissMe) CUR = null;
     cancelAnimationFrame(raf);
     removeEventListener('keydown', key, true);
     root.classList.remove('on');
@@ -136,6 +140,8 @@ function show (o, done) {
     }
   };
   raf = requestAnimationFrame(tick);
+  const dismissMe = () => close(null);
+  CUR = dismissMe;
   const key = e => {
     if (waiting) return;
     if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE') { e.preventDefault(); e.stopPropagation(); if (!typed) finish(); else if (!two || e.code !== 'Space') close(true); }

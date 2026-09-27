@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ru" translate="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Птица Пицца — песочница</title>
+  <link rel="icon" type="image/png" href="./icon.png">
+</head>
+<body>
+  <!-- Песочница: игра в iframe (index.html?debug&sandbox), справа — ручки на __dlv.
+       Что за ручки и каких ещё не хватает — docs/SANDBOX.md. В яндексовую сборку не попадает. -->
+  <main id="stage">
+    <iframe id="game" title="игра" allow="autoplay; gamepad; fullscreen"></iframe>
+    <div id="loading"><b>грузим город…</b><span id="loading-url"></span></div>
+  </main>
+  <aside id="panel">
+    <header>
+      <h1>песочница</h1>
+      <div id="status">—</div>
+    </header>
+    <div id="sections"></div>
+    <footer><div id="log"></div></footer>
+  </aside>
+  <script type="module" src="/src/sandbox/sandbox.js"></script>
+</body>
+</html>
