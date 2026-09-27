@@ -38,7 +38,7 @@ from PIL import Image
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CACHE = ROOT / "scripts" / ".osm-cache" / "moscow"
-OUT = ROOT / "src" / "game" / "city-data.js"
+OUT = ROOT / "src" / "maps" / "moscow" / "city-data.js"
 
 UA = "dodo-xxx-digest/1.0 (lab prototype, OSM data)"
 ENDPOINT = "https://overpass-api.de/api/interpreter"

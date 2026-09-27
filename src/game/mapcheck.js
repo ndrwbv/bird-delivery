@@ -16,7 +16,7 @@
    Здесь нет three.js и браузера: те же проверки гоняет tools/mapcheck.mjs
    в Node (npm run mapcheck). Всё, что строит сцену, — в mapworks.js.
 
-   Модели высот повторяют moscow.js: groundH — тот же разрез клеток
+   Модели высот повторяют game.js: groundH — тот же разрез клеток
    диагональю, настил моста — прямая между берегами с горбом (или профиль
    r.dk, если его посчитала починка). Меняешь там — поменяй и тут.
    ────────────────────────────────────────────────────────────────────────── */
@@ -60,7 +60,7 @@ export function groundFn (ter, TH) {
   };
 }
 
-/* ── улицы: те же правила, что в moscow.js ── */
+/* ── улицы: те же правила, что в game.js ── */
 export const ROAD_W = [20, 16, 13.5, 11, 9, 7, 5, 5.5];
 export const roadWidth = r => r.w || ROAD_W[r.c];
 export const drivable = r => !r.x && r.c !== 6;
@@ -78,7 +78,7 @@ function polyLen (p) {
 }
 
 /* Профиль настила: плоский массив [s0, y0, s1, y1, …] с шагом по длине.
-   Его понимает moscow.js (r.dk) — туда же, где раньше была прямая с горбом. */
+   Его понимает game.js (r.dk) — туда же, где раньше была прямая с горбом. */
 export function profileFn (dk) {
   const n = dk.length / 2;
   return s => {
@@ -91,7 +91,7 @@ export function profileFn (dk) {
   };
 }
 
-/* настил моста так, как его кладёт moscow.js */
+/* настил моста так, как его кладёт game.js */
 export function deckOf (r, groundH) {
   const p = r.p, acc = polyLen(p), L = acc[acc.length - 1] || 1;
   if (r.dk) return { L, acc, fn: profileFn(r.dk) };
@@ -100,7 +100,7 @@ export function deckOf (r, groundH) {
   return { L, acc, fn: s => lerp(h0, h1, s / L) + arch * Math.sin(Math.PI * clamp(s / L, 0, 1)) };
 }
 /* над землёй настил не ниже двадцати сантиметров — кроме самых концов:
-   там он сходит на нет, иначе на въезде ступенька (fade — так в moscow.js) */
+   там он сходит на нет, иначе на въезде ступенька (fade — так в game.js) */
 export const deckMin = (s, L, fade) => (fade ? Math.min(0.2, 0.04 * Math.min(s, L - s)) : 0.2);
 
 function inPoly (x, z, p) {
@@ -208,7 +208,7 @@ export function mapContext (city, TH, o = {}) {
   const NONE = [];
   const segsNear = (x, z) => SG.get((Math.floor(x / CELL) + 500) * 1000 + Math.floor(z / CELL) + 500) || NONE;
 
-  // граф — как NODES в moscow.js: узел — точка карты, соседей считаем по проезжим
+  // граф — как NODES в game.js: узел — точка карты, соседей считаем по проезжим
   const NODES = new Map();                  // "x,z" → { x, z, nb:Set, roads:[{ri,i}] }
   const node = q => {
     const k = pkey(q);
@@ -490,7 +490,7 @@ function checkJoints (ctx, add, tapers) {
       add('width-jump', n.x, n.z, done ? 'info' : 'warn', `width jumps ${roadWidth(ra)} → ${roadWidth(rb)} m at a joint${done ? ' → tapered' : ''}`, 'taper');
     }
   }
-  // конец улицы на общем узле, где moscow.js не кладёт пятно (узел не в графе)
+  // конец улицы на общем узле, где game.js не кладёт пятно (узел не в графе)
   for (const n of ctx.NODES.values()) {
     if (n.at.length < 2 || n.nb.size >= 2 || !ctx.inBounds(n.x, n.z, -20)) continue;
     const vis = n.at.filter(a => { const r = roads[a.ri]; return !r.b && r.c !== 6; });
@@ -688,7 +688,7 @@ function checkMisc (ctx, add) {
 }
 
 /* ═════════════════ починка ═════════════════
-   Всё — на загрузке, до RSEG, мостов и графа в moscow.js: правим сами
+   Всё — на загрузке, до RSEG, мостов и графа в game.js: правим сами
    данные (city.roads, city.paths) и сетку высот TH. */
 export function fixMap (city, TH, o = {}) {
   const t0 = now();
@@ -972,7 +972,7 @@ function slopeLimit (S, y, slope, y0, y1, L) {
       перила и балки начинаются за краем чужого полотна, а не посреди него.
    б) Над каждой улицей и дорожкой под настилом — просвет не меньше
       CLEAR_*: считаем профиль настила r.dk (подъём не круче BRIDGE_SLOPE),
-      moscow.js кладёт настил по нему.
+      game.js кладёт настил по нему.
    в) Где просвета не добиться (проезд у самого берега, мост низкий) —
       проезд под мостом разрываем: концы у настила получат блоки.
    г) Два настила друг в друге (разделённая эстакада) — на одной высоте. */

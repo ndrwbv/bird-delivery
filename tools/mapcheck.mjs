@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-/* Проверка карты без браузера: npm run mapcheck [-- --list <kind>] [-- --json]
+/* Проверка карты без браузера: npm run mapcheck [-- --map seversk] [-- --list <kind>] [-- --json]
 
    Гоняет те же проверки, что ?mapcheck в игре (src/game/mapcheck.js), по
    city-data.js: сначала на сырых данных, потом после починки, которую игра
    делает на загрузке. Выход с кодом 1, если после починки остались ошибки. */
-import CITY_DATA from '../src/game/city-data.js';
 import { decodeHeights, checkMap, fixMap } from '../src/game/mapcheck.js';
 
 const args = process.argv.slice(2);
 const opt = k => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] || true : null; };
+const CITY_DATA = (await import('../src/maps/' + (opt('--map') || 'moscow') + '/city-data.js')).default;
 const listKind = opt('--list'), asJson = args.includes('--json');
 
 const city = structuredClone(CITY_DATA);

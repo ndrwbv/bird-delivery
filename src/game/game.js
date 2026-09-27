@@ -17,7 +17,8 @@
    ────────────────────────────────────────────────────────────────────────── */
 
 import * as THREE from '../vendor/three.module.min.js';
-import CITY_DATA from './city-data.js';
+import { MAP } from './map.js';
+import { MAP_IDS, MAP_META } from '../maps/index.js';
 import Platform from '../platform/index.js';
 import { t as $t, tn as $tn, N_, translit, lang as curLang, LANGS, LANG_NAMES } from '../i18n/index.js';
 import { sanitizePois, OWN } from './brands.js';
@@ -266,7 +267,7 @@ function mergeGeos (list) {
    шестьдесят метров. Метры настоящие, город не сжат. Выдуман только
    Омега-мост через реку: настоящего в рамке нет. x на восток, z на юг. */
 
-const CITY = CITY_DATA;
+const CITY = MAP.data;
 sanitizePois(CITY.pois);                       // чужие вывески → пародии и выдуманные (brands.js)
 /* Во вступлении камера не отходит от Омеги дальше пары сотен метров —
    город строим только вокруг неё: сборка в разы короче, кино стартует быстрее. */
@@ -1930,7 +1931,7 @@ function surfPlan () {
     scene.add(grp);
     const f = { grp, person, x: sx, z, z0: z, bx: x, side, ph: 0, dead: 0, surf: 1, served: 0, freeT: 0, t: 0 };
     SURF.f = f;
-    return { kind: 'solo', surf: true, stops: [{ peds: [f], reach: 26, surf: true }], why: $t('бонус: {name} катается на сёрфе по Москве-реке — подъедь к набережной и притормози, пицца долетит прямо на доску', { name: person.name }) };
+    return { kind: 'solo', surf: true, stops: [{ peds: [f], reach: 26, surf: true }], why: $t(MAP.river.surfWhy, { name: person.name }) };
   }
   return null;
 }
@@ -2484,7 +2485,7 @@ function realAddress (x, z) {
     const d = (h.x - x) ** 2 + (h.z - z) ** 2;
     if (d < bd) { bd = d; best = h; }
   }
-  return translit(best ? best.addr : 'улица Ленинская Слобода, 19');
+  return translit(best ? best.addr : MAP.fallbackAddr || '');
 }
 
 /* ─── улица: зелень, лавочки, фонари, остановки, чужие машины ───
@@ -2677,7 +2678,7 @@ function osmMetro () {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace; t.magFilter = THREE.NearestFilter;
   const mat = new THREE.MeshBasicMaterial({ map: t });
-  for (const m of CITY.metro) {
+  for (const m of CITY.metro || []) {
     if (m.k !== 'in') continue;
     const [mx, mz] = m.p, gy = groundH(mx, mz);
     box(LIT, 0.22, 4.2, 0.22, '#585460', mx, gy + 2.1, mz);
@@ -2975,8 +2976,23 @@ function osmParkingLots (near) {
    «Птица Пицца» — на первом этаже бизнес-центра на Ленинской Слободе, 19. Дом строится как все остальные, а на
    фасад, что смотрит на Ленинскую Слободу, вешаем вывеску, козырёк,
    витрину и дверь. */
+/* Дом пиццерии — из настроек карты: по адресу (Москва) или по точке
+   (Северск: meta.home — где пиццерия стоит в карте) */
+function homeBuilding () {
+  const H = MAP.home || {};
+  if (H.street) return CITY.buildings.find(q => q.a && H.street.test(q.a[0]) && q.a[1] === H.house);
+  const pt = H.point || CITY.meta.home;
+  if (!pt) return null;
+  let best = null, bd = 60;
+  for (const q of CITY.buildings) {
+    if (inPoly(pt[0], pt[1], q.p)) return q;
+    for (const v of q.p) { const d = Math.hypot(v[0] - pt[0], v[1] - pt[1]); if (d < bd) { bd = d; best = q; } }
+  }
+  return best;
+}
+const homeAddr = () => { if (MAP.home && MAP.home.addr) return MAP.home.addr; const b = homeBuilding(); return b && b.a ? b.a.join(', ') : ''; };
 function dodoHouse () {
-  const b = CITY.buildings.find(q => q.a && /Ленинская Слобода/i.test(q.a[0]) && q.a[1] === '19');
+  const b = homeBuilding();
   if (!b) return null;
   const p = b.p, n = p.length;
   let cx = 0, cz = 0;
@@ -2992,7 +3008,7 @@ function dodoHouse () {
     if (ox * (mx - cx) + oz * (mz - cz) < 0) { ox = -ox; oz = -oz; }     // наружу из дома
     const road = nearestRoad(mx + ox * 4, mz + oz * 4, 4, 1);           // улица, не дворовый проезд
     if (!road) continue;
-    const score = road.d - len * 0.15 - (/Ленинская Слобода/.test(road.seg.name) ? 30 : 0);
+    const score = road.d - len * 0.15 - (MAP.home && MAP.home.street && MAP.home.street.test(road.seg.name) ? 30 : 0);
     if (!best || score < best.score) best = { score, mx, mz, ox, oz, ux: dx / len, uz: dz / len, len, road, cx, cz };
   }
   return best;
@@ -3051,7 +3067,7 @@ function dodoFacade (f) {
   SMOKE_SPOT = { x: sx2, z: sz2 };
   PIZZA = {
     x: r.x + ddx / dl * off, z: r.z + ddz / dl * off,
-    bx: f.cx, bz: f.cz, by: gy, wx, wz, wy: gy + 2.4, name: OWN.pizza() + ' · ' + translit('Ленинская Слобода, 19'),
+    bx: f.cx, bz: f.cz, by: gy, wx, wz, wy: gy + 2.4, name: OWN.pizza() + ' · ' + translit(homeAddr()),
   };
 }
 
@@ -6997,6 +7013,21 @@ function renderSettings () {
   if ($('set-ed')) $('set-ed').onclick = () => { Store.set('dlv-edition', ADULT ? 'kids' : 'adult'); Platform.store.flush && Platform.store.flush(); setTimeout(() => location.reload(), 150); };
 }
 $('st-lang').addEventListener('click', () => { elPanel.hidden = false; elPanel.dataset.kind = 'lang'; renderLangs(); });
+/* выбор карты — только где их больше одной (Стим, dev). Смена — перезагрузка */
+if (MAP_IDS.length > 1) {
+  $('st-map').hidden = false;
+  $('st-map-n').textContent = $t(MAP.title);
+  $('st-map').addEventListener('click', () => {
+    elPanel.hidden = false; elPanel.dataset.kind = 'maps';
+    elPanelBody.innerHTML = '<div class="pn-t">🗺 ' + $t('карта') + '</div><div class="lang-grid">' +
+      MAP_IDS.map(id => '<button type="button" data-m="' + id + '"' + (id === MAP.id ? ' class="cur"' : '') + '><b>' + $t(MAP_META[id].title) + '</b><br><small>' + $t(MAP_META[id].note) + '</small></button>').join('') + '</div>';
+    elPanelBody.querySelectorAll('[data-m]').forEach(b => b.addEventListener('click', () => {
+      if (b.dataset.m === MAP.id) { closePanel(); return; }
+      Store.set('dlv-map', b.dataset.m); Platform.store.flush && Platform.store.flush();
+      setTimeout(() => location.replace(location.pathname + location.search.replace(/[?&]map=[^&]*/, '')), 150);
+    }));
+  });
+}
 $('st-lang-n').textContent = LANG_NAMES[curLang()];
 $('st-set').addEventListener('click', () => { elPanel.hidden = false; elPanel.dataset.kind = 'settings'; renderSettings(); });
 if (Platform.features.quit) { $('st-quit').hidden = false; $('st-quit').addEventListener('click', () => Platform.quit()); }
@@ -7149,7 +7180,7 @@ function driveStep (dt) {
   V.edgeT = (V.edgeT || 0) - dt;
   if (out && V.edgeT <= 0 && S.state !== 'title') {
     V.edgeT = 4;
-    toast($t('тут карта кончается · дальше ТТК и промзона'));
+    toast($t(MAP.edgeToast));
   }
 
   // Река: с моста в неё не съехать — перила, а с берега — можно, и это
@@ -7169,7 +7200,7 @@ function driveStep (dt) {
       V.splashT = 0.6;
       splash(V.x + fx * 2.6, V.z + fz * 2.6);
       Snd.noise(0.35, 0.3);
-      toast(pick([$t('там Москва-река'), $t('вплавь не довезёшь'), $t('мост — севернее')]));
+      toast($t(pick(MAP.waterToasts)));
     }
   }
   V.splashT -= dt;
@@ -7750,6 +7781,7 @@ function setFullMap (on) {
   if (on) { for (const k in IN) IN[k] = 0; touches.clear(); Snd.engine(0); drawFullMap(); }
 }
 $('radar').addEventListener('click', () => setFullMap(true));
+{ const t = document.querySelector('.fm-top b'); if (t) { t.removeAttribute('data-i18n'); t.textContent = $t(MAP.title); } }
 $('mapbtn').addEventListener('click', () => setFullMap(!FM.open));
 elFull.addEventListener('click', () => setFullMap(false));
 
@@ -8236,7 +8268,7 @@ function showOrderCard (order) {
     '<div class="oc-meta">' + st0.addr + (many ? ' → ' + $t('ещё {n}', { n: order.stops.length - 1 }) : '') + ' · ' + order.items + '</div>' +
     '<div class="oc-note"><b>' + $t('комментарий курьера:') + '</b> «' + st0.note + '»</div>' +
     (order.rush ? '<div class="oc-rush">⏱ ' + order.rushText + '<span>' + $t('после загрузки — полный бак кофе-нитро · оплата ×1,5') + '</span></div>' : '') +
-    (order.surf ? $t('<div class="oc-rush oc-surf">🏄 бонус: {name} катается на сёрфе по Москве-реке<span>подъедь к набережной и притормози — пицца долетит прямо на доску · оплата ×2</span></div>', { name: SURF.person ? SURF.person.first : '' }) : '');
+    (order.surf ? '<div class="oc-rush oc-surf">🏄 ' + $t(MAP.river.surfCard, { name: SURF.person ? SURF.person.first : '' }) + '<span>' + $t('подъедь к набережной и притормози — пицца долетит прямо на доску · оплата ×2') + '</span></div>' : '');
   elPhWhat.textContent = order.items;
   elPhWhy.textContent = order.why;
   elPhone.classList.add('on');
@@ -8521,19 +8553,19 @@ function planOrder () {
      гость рядом, дальше подключаются групповые, последовательные, за
      реку, и адреса всё дальше. */
   // бонус: сёрфер на реке — изредка, после третьего заказа
-  if (S.orders > 3 && !S.ride && chance(0.1)) { const f = surfPlan(); if (f) return f; }
+  if (MAP.river && MAP.river.surf && S.orders > 3 && !S.ride && chance(0.1)) { const f = surfPlan(); if (f) return f; }
   const d = difficulty();
   const far = [0, 200, 280, 360, 430, 480, 520][d];
   const r = Math.random();
   // за реку, через Омега-мост — с четвёртой ступени
-  if (d >= 4 && r < 0.18 && V.x > riverX(V.z)) {
+  if (MAP.farOrder && d >= 4 && r < 0.18 && V.x > riverX(V.z)) {
     // тот берег — тоже в глубине двора
     const sp = pick(SPOTS.filter(q => q.x < riverX(q.z)) || []);
     const p = pick(all);
     if (sp && p) {
       if (p.idle) releaseIdle(p);
       p.path = null; p.w = null; p.x = sp.x; p.z = sp.z;
-      return { kind: 'solo', far: true, stops: [{ peds: [p] }], why: $t('за рекой, на набережной: через мост') };
+      return { kind: 'solo', far: true, stops: [{ peds: [p] }], why: $t(MAP.farOrder) };
     }
   }
   if (d >= 2 && r < (d >= 3 ? 0.4 : 0.5)) {
@@ -8582,7 +8614,7 @@ function newOrder () {
 
   for (const st of plan.stops) {
     st.persons = st.peds.map(p => p.person);
-    st.addr = st.surf ? $t('Москва-река, у набережной') : realAddress(st.peds[0].x, st.peds[0].z);
+    st.addr = st.surf ? $t(MAP.river.at) : realAddress(st.peds[0].x, st.peds[0].z);
     st.note = pick(COURIER_NOTES);
     // групповой: остальные подходят к первому и ждут вместе
     if (st.peds.length > 1) {
@@ -9838,7 +9870,7 @@ resize();
 function showTitle () {
   if (INTRO) return;
   showBig(OWN.pizza(),
-    GORE_ON ? $t('развози пиццу по Москве — быстро, но не задави клиентов!') : $t('развози пиццу по Москве — быстро, но не сбей клиентов!'), '');
+    $t(GORE_ON ? MAP.tagline.adult : MAP.tagline.kids), '');
 }
 showTitle();
 
