@@ -27,6 +27,7 @@ import { pollPad, applyToIN, rumble, pad as PAD } from '../input/gamepad.js';
 import { makePadMenu } from '../input/padmenu.js';
 import { fixMap, profileFn } from './mapcheck.js';
 import * as MAPW from './mapworks.js';
+import * as CBITS from './citybits.js';
 
 /* Сохранения — через площадку (облако Яндекса / localStorage). Значения
    хранятся как есть: числа, строки, массивы. */
@@ -273,6 +274,33 @@ sanitizePois(CITY.pois);                       // чужие вывески → 
    город строим только вокруг неё: сборка в разы короче, кино стартует быстрее. */
 const CW = CITY.meta.size[0], CD = CITY.meta.size[1];
 const BOUNDS = { x0: -CW / 2 + 12, x1: CW / 2 - 12, z0: -CD / 2 + 12, z1: CD / 2 - 12 };
+/* Край карты — многоугольник, если он у карты есть (Северск: по забору
+   закрытого города), иначе прямоугольник. Многоугольник растрим на сетку
+   в 8 м один раз — проверка «внутри ли» дальше стоит одного обращения. */
+const BORDER = MAP.border || CITY.border || null;
+const BMASK = (() => {
+  if (!BORDER) return null;
+  const C = 8, x0 = BOUNDS.x0 - 12, z0 = BOUNDS.z0 - 12;
+  const nx = Math.ceil((BOUNDS.x1 - BOUNDS.x0 + 24) / C) + 1, nz = Math.ceil((BOUNDS.z1 - BOUNDS.z0 + 24) / C) + 1;
+  const a = new Uint8Array(nx * nz), n = BORDER.length;
+  for (let j = 0; j < nz; j++) {
+    const z = z0 + j * C, xs = [];
+    for (let i = 0, k = n - 1; i < n; k = i++) {
+      const [xi, zi] = BORDER[i], [xk, zk] = BORDER[k];
+      if ((zi > z) !== (zk > z)) xs.push(xi + (z - zi) / (zk - zi) * (xk - xi));
+    }
+    xs.sort((p, q) => p - q);
+    for (let s = 0; s + 1 < xs.length; s += 2)
+      for (let i = Math.max(0, Math.ceil((xs[s] - x0) / C)); i <= Math.min(nx - 1, Math.floor((xs[s + 1] - x0) / C)); i++) a[j * nx + i] = 1;
+  }
+  return { C, x0, z0, nx, nz, a };
+})();
+const inBorder = (x, z) => {
+  if (!BMASK) return true;
+  const i = Math.round((x - BMASK.x0) / BMASK.C), j = Math.round((z - BMASK.z0) / BMASK.C);
+  return i >= 0 && j >= 0 && i < BMASK.nx && j < BMASK.nz && BMASK.a[j * BMASK.nx + i] === 1;
+};
+const inBorderM = (x, z, m) => inBorder(x, z) && (m <= 0 || (inBorder(x + m, z) && inBorder(x - m, z) && inBorder(x, z + m) && inBorder(x, z - m)));
 const LANE = 3.2;                              // смещение от осевой до центра полосы (запасное)
 
 /* ширина полотна по классу: трасса, главная, вторая, третья,
@@ -946,7 +974,36 @@ function closedSign () {
   return (CLOSED_MAT = new THREE.MeshBasicMaterial({ map: t, side: THREE.DoubleSide }));
 }
 
+/* перекрытие поперёк полотна: щит в полоску, знак, бетонные блоки.
+   u — наружу, за рамку */
+function edgeBlock (x, z, ux, uz, w) {
+  const nx = -uz, nz = ux, ry = Math.atan2(-ux, -uz);
+  const y = groundH(x, z);
+  const n = Math.max(3, Math.round(w / 1.6));
+  for (let k = 0; k < n; k++) {
+    const o = (k + 0.5) / n * w - w / 2;
+    box(LIT, w / n, 0.5, 0.2, k % 2 ? '#f2eee6' : '#d9342c', x + nx * o, y + 1.25, z + nz * o, ry);
+  }
+  for (const s of [-1, 1]) {
+    box(LIT, 0.25, 1.6, 0.25, '#585460', x + nx * (w / 2) * s, y + 0.7, z + nz * (w / 2) * s, ry);
+  }
+  // знак над щитом, на двух стойках: видно издалека, с любой стороны
+  for (const s of [-1, 1])
+    box(LIT, 0.16, 3.4, 0.16, '#585460', x + nx * 1.9 * s, y + 1.7, z + nz * 1.9 * s, ry);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 1.3), closedSign());
+  sign.position.set(x - ux * 0.05, y + 3.0, z - uz * 0.05);
+  sign.rotation.y = ry;
+  scene.add(sign);
+  for (let k = 0; k < Math.ceil(w / 2.6); k++) {
+    const o = (k + 0.5) * 2.6 - w / 2;
+    box(LIT, 2.3, 0.8, 0.9, '#bdb6ab', x + nx * o + ux * 0.8, y + 0.35, z + nz * o + uz * 0.8, ry);
+  }
+  obb(x + ux * 0.4, z + uz * 0.4, w / 2 + 0.5, 0.8, Math.atan2(nz, nx));
+}
+
 function osmEdgeBlocks () {
+  // у карты с границей по забору — свои края: КПП на выездах, остальное перекрыто
+  if (BORDER) { borderEdges(); return; }
   const B = BOUNDS, into = 3;
   const inside = (x, z) => x > B.x0 && x < B.x1 && z > B.z0 && z < B.z1;
   const done = [];
@@ -969,30 +1026,18 @@ function osmEdgeBlocks () {
       const x = lerp(x1, x2, lo) - ux * into, z = lerp(z1, z2, lo) - uz * into;
       if (done.some(q => Math.hypot(q[0] - x, q[1] - z) < 8)) continue;
       done.push([x, z]);
-      const nx = -uz, nz = ux, ry = Math.atan2(-ux, -uz);
-      const y = groundH(x, z);
-      const n = Math.max(3, Math.round(w / 1.6));
-      for (let k = 0; k < n; k++) {
-        const o = (k + 0.5) / n * w - w / 2;
-        box(LIT, w / n, 0.5, 0.2, k % 2 ? '#f2eee6' : '#d9342c', x + nx * o, y + 1.25, z + nz * o, ry);
-      }
-      for (const s of [-1, 1]) {
-        box(LIT, 0.25, 1.6, 0.25, '#585460', x + nx * (w / 2) * s, y + 0.7, z + nz * (w / 2) * s, ry);
-      }
-      // знак над щитом, на двух стойках: видно издалека, с любой стороны
-      for (const s of [-1, 1])
-        box(LIT, 0.16, 3.4, 0.16, '#585460', x + nx * 1.9 * s, y + 1.7, z + nz * 1.9 * s, ry);
-      const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 1.3), closedSign());
-      sign.position.set(x - ux * 0.05, y + 3.0, z - uz * 0.05);
-      sign.rotation.y = ry;
-      scene.add(sign);
-      for (let k = 0; k < Math.ceil(w / 2.6); k++) {
-        const o = (k + 0.5) * 2.6 - w / 2;
-        box(LIT, 2.3, 0.8, 0.9, '#bdb6ab', x + nx * o + ux * 0.8, y + 0.35, z + nz * o + uz * 0.8, ry);
-      }
-      obb(x + ux * 0.4, z + uz * 0.4, w / 2 + 0.5, 0.8, Math.atan2(nz, nx));
+      edgeBlock(x, z, ux, uz, w);
     }
   }
+}
+
+/* Северск: вдоль всей границы забор, на дорогах через неё — КПП (из карты)
+   или перекрытие, если КПП там нет */
+const KPPS = [];
+function borderEdges () {
+  CBITS.buildFence(cityApi(), CITY.fence || [BORDER.concat([BORDER[0]])]);
+  for (const k of CITY.kpp || []) KPPS.push(CBITS.buildKpp(cityApi(), k));
+  for (const [x, z, ux, uz, w] of CITY.closed || []) edgeBlock(x, z, ux, uz, (w || 8) + 2);
 }
 
 /* ── мосты: настил, балки, перила и быки ──
@@ -2117,6 +2162,11 @@ const KIND_WALL = { ind: '#cfc7bb', pub: '#e6dfd2', church: '#f0e7d6', shop: '#e
 const OFFICE_WALLS = ['#b7c4cf', '#c9d0d6', '#aebccb', '#d2d6da'];
 const GLASS = ['#7fa7c6', '#86aecb', '#789fbf', '#8fb6d2'];
 const PITCH = ['#9a6b5e', '#7d6a80', '#6f8a72', '#8a7a5e', '#8b5f55'];
+const GAR_DOORS = ['#6d7f8c', '#8a5a44', '#4f7a5a', '#5a6f9a', '#9a9a92', '#7a4a3a', '#3f5f7a', '#b0a58f'];
+const SHC = new THREE.Color();
+const shade = (hex, k) => '#' + SHC.set(hex).multiplyScalar(k).getHexString();
+/* цвет стен — тот же, что в osmBuildings: из карты, по типу или из палитры */
+const hexOf = b => b._hex || '#e6d3c0';
 
 /* Фасад по типу дома. Офис (Омега и соседи) — сплошное стекло лентами
    по этажам и импосты сверху донизу. Жилой — сетка окон, часть светится,
@@ -2149,9 +2199,40 @@ function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch) {
   };
   const FH = 3.15, base = hHi;
   const floors = Math.min(lv, 16);
-  const k = b.k;
+  const k = b.k, st = b.st;
 
-  if (k === 'off') {
+  if (k === 'gar') {
+    // гаражи: ряд металлических ворот по длинным стенам, у каждого свой цвет
+    for (const w of walls) {
+      if (w.len < 5) continue;
+      const m = Math.floor(w.len / 3.2), pad = (w.len - m * 3.2) / 2;
+      for (let i = 0; i < m; i++) {
+        FLATM.color(GAR_DOORS[(seed + i * 7) % GAR_DOORS.length]);
+        band(w, pad + i * 3.2 + 0.35, pad + (i + 1) * 3.2 - 0.35, base + 0.05, base + 2.25, 0.06);
+      }
+    }
+  } else if (k === 'mall') {
+    // ТЦ: стеклянный первый этаж, над ним облицовка полосами, вывеска на главной стене
+    const sty = b.style || {};
+    let main = null;
+    for (const w of walls) {
+      if (w.len < 4) continue;
+      FLATM.color(sty.glass === false ? '#8fb0cc' : '#9ec3dc');
+      band(w, 0.4, w.len - 0.4, base + 0.3, base + 3.6, 0.08, 0.7);
+      FLATM.color(sty.stripe || '#f0522a');
+      band(w, 0, w.len, base + 3.8, base + 4.3, 0.1);
+      if (floors > 1) { FLATM.color(sty.glass2 || '#7fa7c6'); band(w, 1, w.len - 1, base + 5, h - 1.2, 0.08, 0.3); }
+      if (!main || w.len > main.len) main = w;
+    }
+    if (main && b.n) CBITS.mallSign(cityApi(), { len: main.len, mx: (main.a[0] + main.c[0]) / 2, mz: (main.a[1] + main.c[1]) / 2, ox: main.ox, oz: main.oz }, h, b.n, sty);
+  } else if (k === 'church') {
+    // храм: высокие узкие окна, главы — ниже, над крышей
+    for (const w of walls) {
+      if (w.len < 3) continue;
+      const m = Math.max(1, Math.floor(w.len / 3.4)), pad = (w.len - m * 3.4) / 2;
+      for (let i = 0; i < m; i++) { FLATM.color('#5f7f9f'); band(w, pad + i * 3.4 + 1.1, pad + i * 3.4 + 2.3, base + 1.4, base + Math.min(h - base - 1.2, 5.2), 0.08, 0.3); }
+    }
+  } else if (k === 'off') {
     for (const w of walls) {
       if (w.len < 3) continue;
       for (let f = 0; f < floors; f++) {
@@ -2193,8 +2274,22 @@ function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch) {
           const m = pad + (i + 0.5) * step;
           if (inArch(m, winW / 2, base + 0.9 + f * FH)) continue;
           FLATM.color(chance(0.14) ? '#ffe9a8' : '#8fb0cc');
-          band(w, m - winW / 2, m + winW / 2, base + 0.9 + f * FH, base + 2.5 + f * FH, 0.08, 0.38);
+          // у сталинок окна выше, у частных домов — поменьше
+          const wy0 = st === 'stalin' ? 0.7 : 0.9, wy1 = st === 'stalin' ? 2.7 : st === 'priv' ? 2.2 : 2.5;
+          band(w, m - winW / 2, m + winW / 2, base + wy0 + f * FH, base + wy1 + f * FH, 0.08, 0.38);
         }
+      if (st === 'panel' && w.len > 8) {
+        // панельный дом: швы между плитами — по этажам и через три метра
+        FLATM.color(shade(hexOf(b), 0.86));
+        for (let f = 1; f < floors; f++) band(w, 0, w.len, base + f * FH - 0.05, base + f * FH + 0.05, 0.06);
+        for (let i = 0; i <= cols; i++) band(w, pad + i * step - 0.05, pad + i * step + 0.05, base, base + floors * FH, 0.06);
+      } else if (st === 'stalin' && w.len > 6) {
+        // сталинка: карниз под крышей, междуэтажный пояс, светлые пилястры
+        FLATM.color('#f4ede0');
+        band(w, 0, w.len, h - 0.7, h - 0.2, 0.22);
+        band(w, 0, w.len, base + FH - 0.15, base + FH + 0.1, 0.12);
+        for (let i = 0; i <= cols; i += 2) band(w, pad + i * step - 0.25, pad + i * step + 0.25, base + FH, h - 0.7, 0.14);
+      }
       // балконы — на длинных стенах жилых домов, через колонку
       if (k === 'res' && w.len > 16 && lv >= 3)
         for (let f = 1; f < floors; f++)
@@ -2208,8 +2303,18 @@ function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch) {
     }
   }
 
-  // крыша
-  const pitched = b.roof && area < 420 && n <= 10 && lv <= 4;
+  // крыша: двускатная / вальмовая, если так в карте (частный сектор, сталинки)
+  if (b.roof === 'g' || b.roof === 'h') {
+    const roofHex = b.rc || PITCH[seed % PITCH.length];
+    if (CBITS.gableRoof(cityApi(), p, h, hexOf(b), roofHex, b.roof === 'h')) return;
+  }
+  if (k === 'church') CBITS.churchTop(cityApi(), p, h, cx, cz, area, seed);
+  const pitched = b.roof && b.roof !== 'f' && area < 420 && n <= 10 && lv <= 4;
+  if (k === 'gar') {
+    LITM.color('#57524d');                                          // рубероид
+    LITM.poly(p, h, true);
+    return;
+  }
   if (pitched) {
     // шатёр к центру: у маленьких домов в карте почти всегда выпуклый контур
     LITM.color(PITCH[seed % PITCH.length]);
@@ -2390,10 +2495,11 @@ function osmBuildings (skip) {
     const ccw = s2 > 0;                       // от этого зависит, куда смотрит фасад
 
     const lv = b.lv || (area > 1200 ? 5 : area > 600 ? 4 : area > 220 ? 2 : 1);
-    const h = hHi + 3.15 * lv + 1.1;
+    const h = b.k === 'gar' ? hHi + 2.7 : hHi + 3.15 * lv + 1.1;
     const seed = Math.abs(Math.round(cx * 7 + cz * 13));
     const hex = b.col || (b.k === 'off' ? OFFICE_WALLS[seed % OFFICE_WALLS.length]
       : KIND_WALL[b.k] || WALLS[seed % WALLS.length]);
+    b._hex = hex;
 
     // стены и препятствия
     const arch = archFor(b, p, ccw, lv, area);
@@ -3124,6 +3230,8 @@ const mapApi = () => ({
   get CROWDS () { return CROWDS; }, get DRIVERS () { return DRIVERS; }, get SMOKERS () { return SMOKERS; },
 });
 let MAPW_API = null;
+/* что нужно citybits.js (забор, КПП, рельсы, крыши, купола, вывески ТЦ) */
+const cityApi = () => ({ THREE, scene, LIT, FLAT, LITM, FLATM, LAMPH, LAMP_SPOTS, box, put, obb, groundH, nearestRoad, makeHuman });
 
 /* ─── сборка города ─── */
 const BUILD_T = {};                               // сколько собирался каждый кусок — для отладки
@@ -3137,6 +3245,7 @@ function buildCity () {
   tm0('marks', osmMarkings);
   tm0('bridges', osmBridges);
   tm0('edge', osmEdgeBlocks);
+  if (CITY.rails) tm0('rails', () => { BUILD_T.railKm = Math.round(CBITS.buildRails(cityApi(), CITY.rails, CITY.levelx)); });
   if (MAPFIX) { BUILD_T.mapfix = Math.round(MAPFIX.ms); BUILD_T.mapfixT = MAPFIX.T; tm0('mapworks', () => MAPW.buildWorks(MAPFIX, mapApi())); }   // тупики: блоки и ремонт
   { const t0 = performance.now(); osmBuildings(spot); BUILD_T.houses = Math.round(performance.now() - t0); }
   if (house) dodoFacade(house);
@@ -3305,7 +3414,7 @@ const edgeRun = e => Math.max(0.2, e.len - e.tA - e.tB);   // сколько е�
    группу; у группы две фазы: вдоль главной улицы и поперёк. Внутри
    группы машина не останавливается — только на въезде в неё. */
 const ZW = 3.4;                                    // ширина зебры вдоль дороги
-const inBounds = (x, z, m = 0) => x > BOUNDS.x0 + m && x < BOUNDS.x1 - m && z > BOUNDS.z0 + m && z < BOUNDS.z1 - m;
+const inBounds = (x, z, m = 0) => x > BOUNDS.x0 + m && x < BOUNDS.x1 - m && z > BOUNDS.z0 + m && z < BOUNDS.z1 - m && (m < 0 || inBorderM(x, z, m));
 const SIG_GROUPS = [];
 {
   const centers = [];
@@ -7171,7 +7280,9 @@ function driveStep (dt) {
   V.z += V.vz * dt;
   V.wheel += vf * dt / 0.46;
 
-  const out = V.x < BOUNDS.x0 || V.x > BOUNDS.x1 || V.z < BOUNDS.z0 || V.z > BOUNDS.z1;
+  let out = V.x < BOUNDS.x0 || V.x > BOUNDS.x1 || V.z < BOUNDS.z0 || V.z > BOUNDS.z1;
+  // граница-многоугольник: за забор не выехать — откатываем на шаг и гасим скорость
+  if (BMASK && !out && !inBorder(V.x, V.z)) { V.x = px0; V.z = pz0; V.vx *= -0.2; V.vz *= -0.2; out = true; }
   if (V.x < BOUNDS.x0) { V.x = BOUNDS.x0; V.vx = Math.max(0, V.vx); }
   if (V.x > BOUNDS.x1) { V.x = BOUNDS.x1; V.vx = Math.min(0, V.vx); }
   if (V.z < BOUNDS.z0) { V.z = BOUNDS.z0; V.vz = Math.max(0, V.vz); }
@@ -7695,6 +7806,24 @@ function buildFullMap () {
     x.lineWidth = 3; x.strokeStyle = 'rgba(255,255,255,0.8)'; x.strokeText(nn, 0, 0);
     x.fillStyle = '#3a3345'; x.fillText(nn, 0, 0);
     x.restore();
+  }
+  // железная дорога: тёмная линия со шпалами-штрихами
+  for (const r of CITY.rails || []) {
+    x.beginPath(); r.p.forEach(([a, b], i) => (i ? x.lineTo(fmX(a), fmZ(b)) : x.moveTo(fmX(a), fmZ(b))));
+    x.lineWidth = Math.max(2, 2.4 * FM.s); x.strokeStyle = '#5e5660'; x.setLineDash([]); x.stroke();
+    x.lineWidth = Math.max(1, 1.2 * FM.s); x.strokeStyle = '#e9e4da'; x.setLineDash([4 * FM.s, 4 * FM.s]); x.stroke();
+    x.setLineDash([]);
+  }
+  // граница-многоугольник: всё за забором затемняем, забор — линией
+  if (BORDER) {
+    x.save();
+    x.beginPath(); x.rect(0, 0, c.width, c.height);
+    BORDER.forEach(([bx, bz], i) => (i ? x.lineTo(fmX(bx), fmZ(bz)) : x.moveTo(fmX(bx), fmZ(bz))));
+    x.closePath();
+    x.fillStyle = 'rgba(45, 38, 58, 0.5)'; x.fill('evenodd');
+    x.lineWidth = Math.max(2, 2 * FM.s); x.strokeStyle = '#8a8478'; x.stroke();
+    x.restore();
+    for (const k of CITY.kpp || []) { x.fillStyle = '#1f4f9a'; x.fillRect(fmX(k.p[0]) - 5, fmZ(k.p[1]) - 5, 10, 10); }
   }
   // за рамкой не проехать — затемняем
   x.fillStyle = 'rgba(45, 38, 58, 0.45)';
