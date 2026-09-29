@@ -13,6 +13,22 @@ body.career #hud-right #cr-clock + #endshift:not([hidden]) { display: block; mar
 body.career #shift-t { display: none; }
 body.touch #hud-right #cr-clock { margin-top: 8px; }
 
+/* ── кошелёк на HUD: всегда сколько в кошельке, ниже — за смену; оплата летит монеткой ── */
+body.career #money { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 4px; padding: 7px 10px 6px;
+                     background: rgba(20, 16, 30, .7); border: 2px solid #33210c; border-radius: 6px; }
+body.career #money span { font-size: 7px; color: #bcd0e8; letter-spacing: .5px; }
+body.career #money b { font-size: 16px; color: #ffd85e; }
+body.career #money em { font-style: normal; font-size: 7px; color: #9fe0a6; }
+body.career #money.bump b { animation: wl-bump .45s ease-out; }
+@keyframes wl-bump { 0% { transform: scale(1); } 35% { transform: scale(1.35); color: #fff3d6; } 100% { transform: scale(1); } }
+.wl-fly { position: fixed; z-index: 40; pointer-events: none; transform: translate(-50%, -50%); font-size: 15px; color: #ffd85e;
+          text-shadow: 2px 2px 0 #33210c, -1px -1px 0 #33210c; white-space: nowrap;
+          transition: left .7s cubic-bezier(.5, 0, .8, .4), top .7s cubic-bezier(.2, .6, .4, 1), opacity .7s, transform .7s; }
+.wl-fly.go { transform: translate(-50%, -50%) scale(.6); }
+.wl-fly.neg { color: #ff6b6b; font-size: 12px; transition: top 1.4s ease-out, opacity 1.4s ease-in; }
+.wl-fly.neg.go { opacity: 0; transform: translate(-50%, 0); }
+@media (max-width: 720px) { body.career #money b { font-size: 12px; } }
+
 /* ── обед: три карточки в ряд ── */
 #choice.big.cr-lunch .ch-box { width: min(620px, calc(100% - 32px)); background: #fff3d6; }
 #choice.big.cr-lunch #ch-t { color: #f0522a; }
@@ -101,6 +117,10 @@ body.touch #hud-right #cr-clock { margin-top: 8px; }
 .cr-strip { will-change: transform; }
 .cr-strip i { display: flex; align-items: center; justify-content: center; height: 56px; font-style: normal; font-size: 28px; text-shadow: 2px 2px 0 #33210c; }
 .cr-sres { font-size: 12px; min-height: 14px; color: #fff3d6; }
+.cr-stake { display: flex; flex-direction: column; gap: 8px; width: min(420px, 100%); }
+.cr-stake input { width: 100%; accent-color: #ffd85e; }
+.cr-quick { display: flex; gap: 8px; justify-content: center; }
+.cr-quick .cr-btn { flex: 1; padding: 8px 6px; font-size: 10px; }
 .cr-sres.win { color: #ffd85e; animation: cr-blink .5s steps(2) 6; }
 .cr-sres.lose { color: #ff8a8a; }
 

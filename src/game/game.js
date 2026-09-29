@@ -8428,8 +8428,46 @@ const TOUCH_NOS = document.querySelector('#touchpad .tp-nos');
 let toastT = 0;
 function toast (t) { t = String(t || ""); if (!t) return; elToast.textContent = t; elToast.style.opacity = 1; toastT = Math.max(1.6, t.length / 18); }
 
+/* Карьера: справа сверху всегда кошелёк, а не заработок за смену — оплата
+   сразу падает туда (addWallet), и это видно: «+230 ₽» летит монеткой от
+   машины в кошелёк, цифра докручивается, когда долетела. Списания (мзда,
+   штраф, воскрешение) — красной строкой под кошельком. Ниже — «за смену». */
+const WL = { last: undefined, shown: 0, hold: 0, html: '' };
+function walletFly (d) {
+  const el = document.createElement('div');
+  el.className = 'wl-fly' + (d < 0 ? ' neg' : '');
+  el.textContent = (d > 0 ? '+' : '−') + money(Math.abs(d));
+  document.body.appendChild(el);
+  const r = elMoney.getBoundingClientRect();
+  if (d > 0) {
+    el.style.left = (innerWidth / 2) + 'px'; el.style.top = (innerHeight * 0.52) + 'px';
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      el.classList.add('go');
+      el.style.left = (r.left + r.width / 2) + 'px'; el.style.top = (r.top + r.height / 2) + 'px';
+    }));
+    setTimeout(() => { el.remove(); elMoney.classList.remove('bump'); void elMoney.offsetWidth; elMoney.classList.add('bump'); }, 720);
+  } else {
+    el.style.left = (r.left + r.width / 2) + 'px'; el.style.top = (r.bottom + 4) + 'px';
+    requestAnimationFrame(() => requestAnimationFrame(() => { el.classList.add('go'); el.style.top = (r.bottom + 64) + 'px'; }));
+    setTimeout(() => el.remove(), 1500);
+  }
+}
+function walletHud (dt) {
+  const w = wallet();
+  if (WL.last === undefined) { WL.last = WL.shown = w; }
+  if (w !== WL.last) {
+    const d = w - WL.last;
+    WL.last = w;
+    if (isPlaying() && Math.abs(d) >= 1) { walletFly(d); WL.hold = d > 0 ? 0.7 : 0; } else WL.shown = w;
+  }
+  if ((WL.hold -= dt) <= 0) WL.shown = Math.abs(w - WL.shown) < 2 ? w : WL.shown + (w - WL.shown) * Math.min(1, dt * 7);
+  const shift = !S.ride && isPlaying() ? '<em>' + $t('за смену {money}', { money: (S.money >= 0 ? '+' : '−') + money(Math.abs(S.money || 0)) }) + '</em>' : '';
+  const html = '<span>' + $t('кошелёк') + '</span><b>' + money(Math.round(WL.shown)) + '</b>' + shift;
+  if (html !== WL.html) { WL.html = html; elMoney.innerHTML = html; }
+}
+
 function hudStep (dt) {
-  elMoney.textContent = money(S.money);
+  if (CAREER) walletHud(dt); else elMoney.textContent = money(S.money);
   touchpadStep();
   const es = $('endshift'), showEs = isPlaying() && !S.ride;
   if (es.hidden === showEs) es.hidden = !showEs;

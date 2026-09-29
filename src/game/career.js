@@ -101,7 +101,7 @@ export function startShift () {
   A.env().t = ECON.SHIFT.T0;
   S.lunch = null;
   SH.on = true; SH.phase = ''; SH.lunch = false; SH.hits = 0; SH.lastHurt = S.hurt || 0; SH.fine = 0; SH.stars = 0;
-  SH.slot = false; SH.t0h = hour(); SH.endH = SH.t0h; SH.n = +A.Store.get('dlv-shifts', 0) || 0;
+  SH.slot = false; STAKE = 0; SH.t0h = hour(); SH.endH = SH.t0h; SH.n = +A.Store.get('dlv-shifts', 0) || 0;
   lunchClass(false);
   fire(startCbs, { n: SH.n + 1 });
 }
@@ -371,7 +371,7 @@ function refreshTabs () {
     if (sub) sub.textContent = A.donated(k) >= 1 ? t('цель собрана') : t('{p} % цели города', { p: Math.floor(A.donated(k) * 100) });
   }
   const s = el.querySelector('.cr-t-slot .cr-sub');
-  if (s) s.textContent = SH.slot ? t('уже крутил') : slotStake() > 0 ? t('ставка {money} · выигрываешь ×{n}', { money: A.money(slotStake()), n: ECON.SLOT.MUL }) : t('нечего ставить');
+  if (s) s.textContent = SH.slot ? t('уже крутил') : A.wallet() >= ECON.SLOT.STEP ? t('любая ставка до {money} · выигрываешь ×{n}', { money: A.money(A.wallet()), n: ECON.SLOT.MUL }) : t('нечего ставить');
   el.querySelectorAll('.cr-tab').forEach(b => b.classList.toggle('cur', b.dataset.tab === TAB));
 }
 function openTab (k) {
@@ -552,25 +552,43 @@ function paneDonate (p, k) {
   };
 }
 
-/* ── слот-машина (взрослая версия): ставка — всё за смену, 1 из 10 удваивает ── */
+/* ── слот-машина (взрослая версия): ставка — любая сумма из кошелька (ползунок,
+   ¼ · ½ · всё; сначала стоит заработанное за смену), 1 из 10 удваивает ── */
 const SYM = ['7', '★', '♥', '₽', '◆', '♣'];
 const SYM_C = ['#ff4d5e', '#ffd85e', '#ff7fa8', '#7fe08a', '#6fd3ff', '#c9a0ff'];
-const slotStake = () => Math.max(0, Math.min(Math.round(A.S.money || 0), A.wallet()));
+const stepDown = n => Math.floor(Math.max(0, n) / ECON.SLOT.STEP) * ECON.SLOT.STEP;
+let STAKE = 0;
 function paneSlot (p) {
-  const stake = slotStake();
+  const max = stepDown(A.wallet());
+  STAKE = Math.min(max, STAKE || stepDown(Math.max(A.S.money || 0, max / 4)) || max);
   p.innerHTML = '<div class="cr-slot"><div class="cr-reels">' + [0, 1, 2].map(i => '<div class="cr-reel"><div class="cr-strip" data-r="' + i + '"></div></div>').join('') + '</div>' +
-    '<div class="cr-sres"></div><button type="button" class="cr-btn buy cr-spin"></button></div>';
+    '<div class="cr-sres"></div>' +
+    (SH.slot || max <= 0 ? '' : '<div class="cr-stake"><input type="range" min="' + ECON.SLOT.STEP + '" max="' + max + '" step="' + ECON.SLOT.STEP + '" value="' + STAKE + '">' +
+      '<div class="cr-quick">' + [[0.25, '¼'], [0.5, '½'], [1, t('всё')]].map(([k, l]) => '<button type="button" class="cr-btn" data-k="' + k + '">' + esc(l) + '</button>').join('') + '</div></div>') +
+    '<button type="button" class="cr-btn buy cr-spin"></button></div>';
+  const range = p.querySelector('.cr-stake input');
+  const label = () => {
+    btn.textContent = SH.slot ? t('уже крутил') : t('крутить · ставка {money}', { money: A.money(STAKE) });
+    btn.disabled = SH.slot || STAKE <= 0 || STAKE > A.wallet();
+  };
+  if (range) {
+    range.addEventListener('input', () => { STAKE = +range.value || 0; label(); });
+    p.querySelectorAll('.cr-quick button').forEach(b => b.addEventListener('click', () => {
+      STAKE = Math.max(ECON.SLOT.STEP, stepDown(max * +b.dataset.k)); range.value = STAKE; label();
+    }));
+  }
   const strips = [...p.querySelectorAll('.cr-strip')];
   const cell = s => '<i style="color:' + SYM_C[s] + '">' + SYM[s] + '</i>';
   // лента: 30 случайных символов, последний — тот, на котором встанет барабан
   const fill = (el, last) => { let h = ''; for (let i = 0; i < 29; i++) h += cell((Math.random() * SYM.length) | 0); el.innerHTML = h + cell(last); };
   strips.forEach((el, i) => { el.innerHTML = cell((i * 2 + 1) % SYM.length); });
   const btn = p.querySelector('.cr-spin'), res = p.querySelector('.cr-sres');
-  btn.textContent = SH.slot ? t('уже крутил') : t('крутить · ставка {money}', { money: A.money(stake) });
-  btn.disabled = SH.slot || stake <= 0;
+  label();
   btn.onclick = () => {
-    const st = slotStake();
+    const st = Math.min(STAKE, stepDown(A.wallet()));
     if (SH.slot || st <= 0) return;
+    const stake = p.querySelector('.cr-stake');
+    if (stake) stake.remove();
     SH.slot = true;
     btn.disabled = true;
     const win = Math.random() < ECON.SLOT.WIN;
