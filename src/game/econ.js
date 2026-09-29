@@ -134,21 +134,22 @@ export const BREAK = {
 export const STARS = { CLEAN_SHIFT: 1 };      // смена без единого удара — +1
 
 /* ── машины: 10 штук. hp — сердца, L — ломучесть, vmax/acc — как в CARS игры ──
+   Скорость у всех подняли на 20 % (30.09.2026): было 44…58 м/с, стало 53…70.
    Цены растут примерно в 1,5 раза: 5 → 11 → 19 → 30 → 45 → 65 → 90 → 125 → 180 тыс.
    Сумма ≈ 570 тыс. ₽ + 17 ★. При доходе 3–6 тыс. за смену — это ~120 смен.
    Прокачка на каждую машину: броня (+1 сердце) и мотор (+4 % скорости), по три
    ступени, ступень — 15 % цены машины (у бесплатной «Семёрки» — от 800 ₽). */
 export const CAR_LIST = [
-  { id: 'semerka', price: 0,      stars: 0,  hp: 4,  L: 3,   vmax: 44, acc: 34 },
-  { id: 'matiz',   price: 5000,   stars: 0,  hp: 3,  L: 2,   vmax: 47, acc: 40 },
-  { id: 'kopeyka', price: 11000,  stars: 0,  hp: 5,  L: 4,   vmax: 45, acc: 35 },
-  { id: 'priora',  price: 19000,  stars: 0,  hp: 5,  L: 2,   vmax: 50, acc: 39 },
-  { id: 'buhanka', price: 30000,  stars: 0,  hp: 8,  L: 5,   vmax: 42, acc: 31 },
-  { id: 'niva',    price: 45000,  stars: 0,  hp: 6,  L: 3,   vmax: 48, acc: 38, offroad: true },
-  { id: 'volga',   price: 65000,  stars: 0,  hp: 7,  L: 2,   vmax: 52, acc: 38 },
-  { id: 'cruze',   price: 90000,  stars: 0,  hp: 6,  L: 1,   vmax: 56, acc: 43 },
-  { id: 'vesta',   price: 125000, stars: 5,  hp: 7,  L: 1,   vmax: 58, acc: 45 },
-  { id: 'patriot', price: 180000, stars: 12, hp: 10, L: 0.3, vmax: 57, acc: 42, offroad: true },
+  { id: 'semerka', price: 0,      stars: 0,  hp: 4,  L: 3,   vmax: 53, acc: 41 },
+  { id: 'matiz',   price: 5000,   stars: 0,  hp: 3,  L: 2,   vmax: 56, acc: 48 },
+  { id: 'kopeyka', price: 11000,  stars: 0,  hp: 5,  L: 4,   vmax: 54, acc: 42 },
+  { id: 'priora',  price: 19000,  stars: 0,  hp: 5,  L: 2,   vmax: 60, acc: 47 },
+  { id: 'buhanka', price: 30000,  stars: 0,  hp: 8,  L: 5,   vmax: 50, acc: 37 },
+  { id: 'niva',    price: 45000,  stars: 0,  hp: 6,  L: 3,   vmax: 58, acc: 46, offroad: true },
+  { id: 'volga',   price: 65000,  stars: 0,  hp: 7,  L: 2,   vmax: 62, acc: 46 },
+  { id: 'cruze',   price: 90000,  stars: 0,  hp: 6,  L: 1,   vmax: 67, acc: 52 },
+  { id: 'vesta',   price: 125000, stars: 5,  hp: 7,  L: 1,   vmax: 70, acc: 54 },
+  { id: 'patriot', price: 180000, stars: 12, hp: 10, L: 0.3, vmax: 68, acc: 50, offroad: true },
 ];
 export const UPGRADE = { STEPS: 3, SHARE: 0.15, MIN: 800, HP: 1, VMAX: 0.04 };
 export const upgradePrice = (car, step) => Math.max(UPGRADE.MIN, Math.round(car.price * UPGRADE.SHARE / 100) * 100) * (step + 1);
