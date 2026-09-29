@@ -25,7 +25,9 @@ function frame () {
 
   const pads = Array.prototype.filter.call(navigator.getGamepads ? navigator.getGamepads() : [], g => g && g.connected);
   let html = '';
-  if (!pads.length) html = '<p class="dim">Контроллеров не видно. Нажми любую кнопку — браузер показывает геймпад только после нажатия.</p>';
+  // окно без фокуса или страница не «безопасная» — Chromium геймпад не отдаёт вовсе
+  html += `<p>окно: ${flag('фокус', document.hasFocus())} · ${flag('видно', document.visibilityState === 'visible')} · ${flag('secure', window.isSecureContext)} · getGamepads: ${navigator.getGamepads ? 'есть' : 'НЕТ'} · всего слотов ${(navigator.getGamepads ? navigator.getGamepads() : []).length}</p>`;
+  if (!pads.length) html += '<p class="dim">Контроллеров не видно. Нажми любую кнопку — браузер показывает геймпад только после нажатия.</p>';
   for (const g of pads) {
     const axes = Array.prototype.map.call(g.axes, (v, i) => `<tr><td>ось ${i}</td><td>${bar(v)}</td></tr>`).join('');
     const btns = Array.prototype.map.call(g.buttons, (b, i) => b.pressed || b.value > 0.1
@@ -41,7 +43,7 @@ function frame () {
       <tr><td>руль</td><td>${bar(p.steer)}</td></tr>
       <tr><td>газ RT</td><td>${bar(p.gas, 0)}</td></tr>
       <tr><td>тормоз LT</td><td>${bar(p.brake, 0)}</td></tr>
-      <tr><td>держит</td><td>${flag('ручник A/B', p.hand)} · ${flag('нитро X/RB', p.nitro)}</td></tr>
+      <tr><td>держит</td><td>${flag('ручник B', p.hand)} · ${flag('нитро X/RB', p.nitro)}</td></tr>
       <tr><td>правый стик</td><td>x ${p.rx.toFixed(2)} · y ${p.ry.toFixed(2)}</td></tr>
     </table>`;
   out.innerHTML = html;

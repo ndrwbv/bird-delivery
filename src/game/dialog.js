@@ -17,6 +17,7 @@
    Очередь: несколько say подряд показываются по одному. */
 import './dialog.css';
 import { t } from '../i18n/index.js';
+import { pad as PAD } from '../input/gamepad.js';
 
 const N_ = s => s;
 const FILL = /*i18n*/ [N_('ну'), N_('э-э'), N_('короче'), N_('как бы'), N_('это самое'), N_('в общем'), N_('слушай')];
@@ -131,9 +132,9 @@ function show (o, done) {
     }
     last = now;
     // геймпад: A — пропустить / принять, B — отказаться
-    const gp = navigator.getGamepads ? [...navigator.getGamepads()].find(g => g && g.connected) : null;
-    if (gp) {
-      const a = gp.buttons[0] && gp.buttons[0].pressed, b = gp.buttons[1] && gp.buttons[1].pressed;
+    // раскладку (Xbox, сырой Deck) разбирает input/gamepad.js
+    if (PAD.connected) {
+      const a = PAD.a, b = PAD.b;
       if (a && !padPrev.a && !waiting) { if (!typed) finish(); else close(true); }
       if (b && !padPrev.b && typed && !waiting) close(two ? false : true);
       padPrev = { a, b };

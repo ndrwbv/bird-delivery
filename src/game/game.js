@@ -8949,12 +8949,23 @@ const calmStart = () => !S.ride && !tutDone();
 
 /* Точка учебного заказа: от курьера прямо по своей улице до первого
    перекрёстка, там направо — и тридцать метров по правому тротуару. */
+/* Учебный клиент не должен стоять на парковке курьеров, где начинается смена:
+   до него — не ближе TUT_MIN_D метров от машины. Длина ребра ниже считается от
+   его начала, а машина может стоять почти у конца — поэтому меряем от самой машины. */
+const TUT_MIN_D = 45;
+const tutFar = (x, z) => Math.hypot(x - V.x, z - V.z) >= TUT_MIN_D &&
+  !(COURIER_SLOTS && COURIER_SLOTS.some(s => Math.hypot(x - s.x, z - s.z) < 20));
 function tutorialSpot () {
   const road = nearestRoad(V.x, V.z, DRIVE_MAX, 1);
   if (!road || road.seg.na === undefined) return null;
   let e = edgeOf(road.seg.na, road.seg.nb);
   if (!e) return null;
   if (e.ux * Math.sin(V.h) + e.uz * Math.cos(V.h) < 0) e = edgeOf(e.b, e.a);
+  // с парковки машина смотрит поперёк улицы: не нашлось по ходу — пробуем в другую сторону
+  return tutorialWalk(e) || tutorialWalk(edgeOf(e.b, e.a));
+}
+function tutorialWalk (e) {
+  if (!e) return null;
   let dist = 0;
   for (let k = 0; k < 40 && dist < 360; k++) {
     const n = e.b;
@@ -8964,7 +8975,7 @@ function tutorialSpot () {
     if (nodeDeg(n) >= 3 && dist + e.len > 35) {
       const B = NODES[n], back = (e.tB || 6) + 4, o = e.w / 2 + 1.8;
       const x = B.x - e.ux * back + e.rx * o, z = B.z - e.uz * back + e.rz * o;
-      if (!inHouse(x, z, 1)) return { x, z };
+      if (!inHouse(x, z, 1) && tutFar(x, z)) return { x, z };
     }
     if (nodeDeg(n) >= 3 && dist > 15) {
       let best = null, ba = 0.7;
@@ -8978,7 +8989,7 @@ function tutorialSpot () {
       if (best) {
         const A = NODES[best.a], d = Math.min(32, best.len * 0.6), o = best.w / 2 + 1.6;
         const x = A.x + best.ux * d + best.rx * o, z = A.z + best.uz * d + best.rz * o;
-        if (!inHouse(x, z, 1)) return { x, z };
+        if (!inHouse(x, z, 1) && tutFar(x, z)) return { x, z };
       }
     }
     // дальше прямо — по ребру, которое продолжает улицу
@@ -10517,6 +10528,7 @@ function padStep () {
   if (p.pause && !elPanel.hidden) closePanel();
   else if (p.pause && (S.paused || isPlaying())) setPause(!S.paused);
   if (p.map && !S.paused && isPlaying()) setFullMap(!FM.open);
+  if (p.accept && S.state === 'brief' && !S.paused && !FM.open && !DLG.isOpen() && !(CAREER && CAREERM.padRoot())) acceptOrder();   // A — принять заказ
   if (p.sound) Snd.set(!Snd.on);
   if (CH.opts.length && !CH.pause) { if (p.choice1) pickChoice(0); else if (p.choice2) pickChoice(1); else if (p.choice3) pickChoice(2); }
   if (screen && CAREER) CAREERM.padPre(p);      // гараж: ←→ и LB/RB листают машины

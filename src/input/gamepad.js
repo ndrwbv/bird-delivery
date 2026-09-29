@@ -8,12 +8,12 @@
    | левый стик ↑↓       | —                              | ly                    | ↑↓ выбор (menuUp/Down)     |
    | RT                  | газ, аналоговый                | gas 0..1              | —                          |
    | LT                  | тормоз, на месте — назад       | brake 0..1            | —                          |
-   | A                   | ручник (держать)               | hand                  | нажать (menuOk), принять заказ (accept) |
+   | A                   | принять заказ                  | accept                | нажать (menuOk)            |
    | B                   | ручник (держать)               | hand                  | назад (menuBack)           |
-   | X или RB            | нитро (держать)                | nitro                 | —                          |
+   | X (и RB)            | нитро (держать)                | nitro                 | —                          |
    | Y                   | карта района                   | map                   | закрыть карту              |
    | Back / View / Select| карта района                   | map                   | —                          |
-   | Start / Menu        | пауза                          | pause                 | продолжить                 |
+   | Start / Menu (☰)    | пауза, меню                    | pause                 | продолжить                 |
    | крестовина ← ↑ →    | ответ 1 / 2 / 3 на карточке     | choice1..3            | выбор (menu*)              |
    | крестовина ↓        | —                              | —                     | вниз (menuDown)            |
    | R3 (нажать правый)  | звук вкл/выкл                  | sound                 | —                          |
@@ -23,10 +23,11 @@
    Курки: мёртвая зона 6 %. Удержания (hand, nitro, gas…) — состояние кадра; всё остальное —
    одноразовые фронты: true ровно в тот кадр, когда кнопку нажали. pollPad() зовут раз в кадр.
 
-   Две раскладки. `mapping: 'standard'` — номера кнопок по спецификации. «Сырая» (игра запущена
-   мимо Steam, например из десктоп-режима Deck'а): другой порядок кнопок, курки и крестовина на
-   осях. Падов бывает несколько (виртуальный от Steam Input плюс сырой) — активным считаем тот,
-   на котором шевелились последним.
+   Три раскладки. `mapping: 'standard'` — номера кнопок по спецификации. «Сырая» Xbox-подобная
+   (виртуальный пад Steam Input, xpad): курки и крестовина на осях. «Сырая» Deck'а (Valve 28de:1205,
+   старый Chromium не знает её сам): кнопки A B X Y — 3 4 5 6, курки — оси 9 (LT) и 8 (RT),
+   ☰ — 12, крестовина — кнопки 16–19. Падов бывает несколько (виртуальный от Steam Input плюс
+   сырой Deck) — активным считаем тот, на котором шевелились последним, при равенстве — стандартный.
 
    Подключение в игру (набросок; IN — объект ввода moscow.js):
      const p = pollPad();
@@ -41,7 +42,7 @@
 const CFG = { dead: 0.12, outer: 0.03, curve: 1.6, trigDead: 0.06, rumble: true };
 export function setPadConfig (o) { Object.assign(CFG, o); }
 
-const HOLD = ['hand', 'nitro'];
+const HOLD = ['hand', 'nitro', 'a', 'b'];
 const EDGES = ['pause', 'map', 'accept', 'choice1', 'choice2', 'choice3', 'sound', 'any',
   'menuUp', 'menuDown', 'menuLeft', 'menuRight', 'menuOk', 'menuBack', 'pageL', 'pageR'];
 
@@ -50,11 +51,18 @@ export const pad = {
   connected: false, active: false, id: '', mapping: '', raw: false, index: -1,
   steer: 0, gas: 0, brake: 0, ly: 0, rx: 0, ry: 0,
   hand: false, nitro: false,
+  a: false, b: false,       // A и B держат прямо сейчас — для диалогов и мини-игр со своим учётом нажатий
   pause: false, map: false, accept: false, choice1: false, choice2: false, choice3: false, sound: false, any: false,
   menuUp: false, menuDown: false, menuLeft: false, menuRight: false, menuOk: false, menuBack: false,
   pageL: false, pageR: false,   // LB / RB — листать страницы (гараж карьеры)
   lastUse: 0,               // performance.now() последнего касания — чтобы прятать подсказки мыши/тача
 };
+
+// в лог (Electron --log пишет консоль в stdout): какой пад пришёл и с какой раскладкой
+if (typeof addEventListener === 'function') {
+  addEventListener('gamepadconnected', e => { const g = e.gamepad; console.log('[pad] +', g.index, g.id, 'mapping=' + (g.mapping || 'raw'), 'axes', g.axes.length, 'buttons', g.buttons.length); });
+  addEventListener('gamepaddisconnected', e => console.log('[pad] −', e.gamepad.index, e.gamepad.id));
+}
 
 const prev = Object.create(null);     // прошлое состояние кнопок — по смыслу, не по номеру
 const padAxes = new Map();            // прошлые оси каждого пада — чтобы понять, на каком играют
@@ -66,18 +74,28 @@ function pickPad () {
   const live = [];
   for (const p of pads) if (p && p.connected) live.push(p);
   if (!live.length) { padAxes.clear(); return null; }
-  let touched = false;
+  let touched = false, best = null;
   for (const p of live) {
     const was = padAxes.get(p.index);
     let act = false;
     if (was) for (let i = 0; i < p.axes.length; i++) if (Math.abs((p.axes[i] || 0) - (was[i] || 0)) > 0.2) { act = true; break; }
     padAxes.set(p.index, Array.prototype.slice.call(p.axes));
     if (!act) for (const b of p.buttons) if (b && (b.pressed || b.value > 0.5)) { act = true; break; }
-    if (act) { activeIndex = p.index; touched = true; }
+    // одно нажатие видят оба пада (виртуальный и сырой Deck) — стандартный важнее
+    if (act && (!best || (p.mapping === 'standard' && best.mapping !== 'standard'))) best = p;
   }
+  if (best) { activeIndex = best.index; touched = true; }
   const gp = live.find(p => p.index === activeIndex) || live.find(p => p.mapping === 'standard') || live[0];
   pickPad.touched = touched;
   return gp;
+}
+
+// Deck и новый Steam Controller без Steam Input: Chromium до ~2024 отдаёт их без раскладки
+const VALVE_RAW = ['1205', '1302', '1303', '1304', '1305'];
+function isValveRaw (id) {
+  const m = /vendor:\s*([0-9a-f]{4}).*product:\s*([0-9a-f]{4})/i.exec(id || '');
+  if (m) return m[1].toLowerCase() === '28de' && VALVE_RAW.includes(m[2].toLowerCase());
+  return /steam deck/i.test(id || '');
 }
 
 const dz = (v, d) => (Math.abs(v) < d ? 0 : Math.sign(v) * (Math.abs(v) - d) / (1 - d));
@@ -102,8 +120,9 @@ export function pollPad () {
   if (!gp) { clearState(); return pad; }
   pad.connected = true;
   pad.id = gp.id; pad.mapping = gp.mapping; pad.index = gp.index;
-  const raw = gp.mapping !== 'standard' && gp.axes.length >= 6;
-  pad.raw = raw;
+  const deck = gp.mapping !== 'standard' && isValveRaw(gp.id) && gp.buttons.length >= 20 && gp.axes.length >= 10;
+  const raw = !deck && gp.mapping !== 'standard' && gp.axes.length >= 6;
+  pad.raw = raw || deck;
 
   const ax = i => gp.axes[i] || 0;
   const bv = i => { const b = gp.buttons[i]; return b ? (typeof b === 'object' ? b.value || (b.pressed ? 1 : 0) : +b) : 0; };
@@ -116,7 +135,12 @@ export function pollPad () {
   };
 
   let lx, ly, rx, ry, lt, rt, dUp, dDown, dLeft, dRight, B;
-  if (raw) {
+  if (deck) {
+    lx = ax(0); ly = ax(1); rx = ax(2); ry = ax(3);
+    lt = trig(9); rt = trig(8);
+    dUp = btn(16); dDown = btn(17); dLeft = btn(18); dRight = btn(19);
+    B = { a: 3, b: 4, x: 5, y: 6, lb: 7, rb: 8, back: 11, start: 12, l3: 14, r3: 15 };
+  } else if (raw) {
     lx = ax(0); ly = ax(1); rx = ax(3); ry = ax(4);
     lt = trig(2); rt = trig(5);
     const hx = ax(6), hy = ax(7);                         // крестовина тоже осями
@@ -136,8 +160,9 @@ export function pollPad () {
   pad.brake = Math.min(1, dz(Math.max(0, lt), CFG.trigDead));
 
   const a = btn(B.a), b = btn(B.b), x = btn(B.x), y = btn(B.y), rb = btn(B.rb);
-  pad.hand = a || b;
+  pad.hand = b;
   pad.nitro = x || rb;
+  pad.a = a; pad.b = b;
 
   const edge = (name, now) => { const was = prev[name] || false; prev[name] = now; return now && !was; };
   if (edge('a', a)) { pad.accept = true; pad.menuOk = true; }

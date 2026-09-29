@@ -24,6 +24,7 @@
    ({ id: { armor, engine } }), dlv-car-L ({ id: L }). Звёзды — dlv-stars. */
 import { CAR_LIST, UPGRADE, BREAK, upgradePrice } from './econ.js';
 import { t } from '../i18n/index.js';
+import { pad as PAD } from '../input/gamepad.js';
 import './cars.css';
 
 const N_ = s => s;
@@ -882,8 +883,7 @@ function stallStep (dt, vf) {
   if (ST.p > 1) { ST.p = 2 - ST.p; ST.dir = -1; } else if (ST.p < 0) { ST.p = -ST.p; ST.dir = 1; }
   EL.querySelector('.st-mk').style.left = (ST.p * 100).toFixed(2) + '%';
   // геймпад: A
-  const gp = navigator.getGamepads ? [...navigator.getGamepads()].find(g => g && g.connected) : null;
-  const a = !!(gp && gp.buttons[0] && gp.buttons[0].pressed);
+  const a = PAD.a;                              // раскладка — в input/gamepad.js
   if (a && !ST.pad) press();
   ST.pad = a;
 }
