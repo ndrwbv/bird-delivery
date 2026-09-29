@@ -197,9 +197,21 @@ function stopOf (s, n = 1) {
 }
 
 /* одна спецификация заказа: кто, куда, какой вид */
+/* первые заказы после запуска игры (SHIFT_PLAN.firstEasy) — в соседний дом.
+   Считаются взятые в работу: выпавшие из очереди (новая смена) не в счёт */
+let EASY_DONE = 0;
+function easySpec () {
+  const E = SHIFT_PLAN.firstEasy;
+  if (!E || SIM || EASY_DONE + Q.filter(q => q.easy).length >= E.count) return null;
+  const s = pickSpot({ dmin: E.dist[0], dmax: E.dist[1] });
+  return s ? { type: 'pizza', kind: 'solo', easy: true, stops: [stopOf(s)] } : null;
+}
+
 function genSpec () {
   if (SH.gen === 0 && !POOL.length) buildPool();
   const D = SHIFT_PLAN.dist || { min: 300, max: 1500 };
+  const easy = easySpec();
+  if (easy) return finishSpec(easy, null, hourNow());
   const ahead = (A.S.order ? 1 : 0) + Q.length;          // сколько заказов до этого
   const hAt = hourNow() + ahead / rate();
   let forced = null;
@@ -256,6 +268,11 @@ function genSpec () {
     // поручение — раз в sideEvery пицц; клиент попросит при вручении
     if (++SH.pizzas >= SH.sideAt) { spec.side = true; SH.pizzas = 0; SH.sideAt = rint(SHIFT_PLAN.sideEvery || ORDERS.SIDE_EVERY); }
   }
+  return finishSpec(spec, forced, hAt);
+}
+
+/* спецификация готова: резерв адресов, метры по дорогам, номер, лог */
+function finishSpec (spec, forced, hAt) {
   // считаем сразу: очередь — это уже план смены
   for (const st of spec.stops) { SH.reserved.add(st.key); SH.zones.add(st.zone); SH.pts.push({ x: st.x, z: st.z }); }
   if (spec.edge) SH.must.edge = (SH.must.edge || 0) + 1;
@@ -318,6 +335,7 @@ export function nextPlan () {
   else {
     if (!Q.length) refill();
     spec = Q.shift();
+    if (spec && spec.easy) EASY_DONE++;
     refill();
   }
   return bindSpec(spec);

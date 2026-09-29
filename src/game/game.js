@@ -303,15 +303,19 @@ const BOUNDS = { x0: -CW / 2 + 12, x1: CW / 2 - 12, z0: -CD / 2 + 12, z1: CD / 2
    закрытого города), иначе прямоугольник. Многоугольник растрим на сетку
    в 8 м один раз — проверка «внутри ли» дальше стоит одного обращения. */
 const BORDER = MAP.border || CITY.border || null;
-const BMASK = (() => {
-  if (!BORDER) return null;
+/* Северск пока открыт кусок у пиццерии (MAP.open): BORDER — где можно ездить,
+   DRAW_BORDER — старый забор: по нему решаем, что рисовать крупно (город за
+   линией закрыт, но стоит как стоял) */
+const DRAW_BORDER = MAP.open && CITY.border ? CITY.border : BORDER;
+function polyMask (poly) {
+  if (!poly) return null;
   const C = 8, x0 = BOUNDS.x0 - 12, z0 = BOUNDS.z0 - 12;
   const nx = Math.ceil((BOUNDS.x1 - BOUNDS.x0 + 24) / C) + 1, nz = Math.ceil((BOUNDS.z1 - BOUNDS.z0 + 24) / C) + 1;
-  const a = new Uint8Array(nx * nz), n = BORDER.length;
+  const a = new Uint8Array(nx * nz), n = poly.length;
   for (let j = 0; j < nz; j++) {
     const z = z0 + j * C, xs = [];
     for (let i = 0, k = n - 1; i < n; k = i++) {
-      const [xi, zi] = BORDER[i], [xk, zk] = BORDER[k];
+      const [xi, zi] = poly[i], [xk, zk] = poly[k];
       if ((zi > z) !== (zk > z)) xs.push(xi + (z - zi) / (zk - zi) * (xk - xi));
     }
     xs.sort((p, q) => p - q);
@@ -319,16 +323,18 @@ const BMASK = (() => {
       for (let i = Math.max(0, Math.ceil((xs[s] - x0) / C)); i <= Math.min(nx - 1, Math.floor((xs[s + 1] - x0) / C)); i++) a[j * nx + i] = 1;
   }
   return { C, x0, z0, nx, nz, a };
-})();
-const inBorder = (x, z) => {
-  if (!BMASK) return true;
-  const i = Math.round((x - BMASK.x0) / BMASK.C), j = Math.round((z - BMASK.z0) / BMASK.C);
-  return i >= 0 && j >= 0 && i < BMASK.nx && j < BMASK.nz && BMASK.a[j * BMASK.nx + i] === 1;
+}
+const BMASK = polyMask(BORDER);
+const DMASK = DRAW_BORDER === BORDER ? BMASK : polyMask(DRAW_BORDER);
+const inMask = (M, x, z) => {
+  const i = Math.round((x - M.x0) / M.C), j = Math.round((z - M.z0) / M.C);
+  return i >= 0 && j >= 0 && i < M.nx && j < M.nz && M.a[j * M.nx + i] === 1;
 };
-/* точка далеко за границей: ни одна из восьми точек в 240 м вокруг не внутри */
+const inBorder = (x, z) => !BMASK || inMask(BMASK, x, z);
+/* точка далеко за старым забором: ни одна из восьми точек в 240 м вокруг не внутри */
 const farOut = (x, z) => {
-  if (!BMASK || inBorder(x, z)) return false;
-  for (let a = 0; a < 8; a++) if (inBorder(x + Math.cos(a * 0.785) * 240, z + Math.sin(a * 0.785) * 240)) return false;
+  if (!DMASK || inMask(DMASK, x, z)) return false;
+  for (let a = 0; a < 8; a++) if (inMask(DMASK, x + Math.cos(a * 0.785) * 240, z + Math.sin(a * 0.785) * 240)) return false;
   return true;
 };
 const inBorderM = (x, z, m) => inBorder(x, z) && (m <= 0 || (inBorder(x + m, z) && inBorder(x - m, z) && inBorder(x, z + m) && inBorder(x, z - m)));
@@ -788,7 +794,7 @@ function osmGround () {
     for (let bi = 0; bi < TNX - 1; bi += K) {
       const ei = Math.min(bi + K, TNX - 1), ej = Math.min(bj + K, TNZ - 1);
       const x0 = TX0 + bi * TG, z0 = TZ0 + bj * TG, x1 = TX0 + ei * TG, z1 = TZ0 + ej * TG;
-      if (BMASK && farOut(x0, z0) && farOut(x1, z0) && farOut(x0, z1) && farOut(x1, z1) && farOut((x0 + x1) / 2, (z0 + z1) / 2)) {
+      if (DMASK && farOut(x0, z0) && farOut(x1, z0) && farOut(x0, z1) && farOut(x1, z1) && farOut((x0 + x1) / 2, (z0 + z1) / 2)) {
         const h00 = hAt(bi, bj) - 0.3, h10 = hAt(ei, bj) - 0.3, h01 = hAt(bi, ej) - 0.3, h11 = hAt(ei, ej) - 0.3;
         LITM.color(groundHex((h00 + h10 + h01) / 3)); LITM.up(x0, h00, z0, x1, h10, z0, x0, h01, z1);
         LITM.color(groundHex((h11 + h10 + h01) / 3)); LITM.up(x1, h11, z1, x0, h01, z1, x1, h10, z0);
@@ -831,7 +837,7 @@ function osmGround () {
   LITM.up(wx0, 0, wz1, wx1, 0, wz0, wx0, 0, wz0);
 
   for (const g of CITY.green) {
-    if (BMASK && g.p.every(q => farOut(q[0], q[1]))) continue;      // за забором далеко — не рисуем
+    if (DMASK && g.p.every(q => farOut(q[0], q[1]))) continue;      // за забором далеко — не рисуем
     LITM.color(GREEN_HEX[g.k] || '#95c579');
     LITM.poly(g.p, g.k === 'water' ? 0.03 : 0.04);
   }
@@ -854,7 +860,7 @@ const SIDEWALK = r => roadWidth(r) + (r.c <= 5 ? 5.5 : 2) + (r.g || 0) * 2;
 function osmRoads () {
   // промзоны и площадки — чуть другим цветом земли, под всем остальным
   for (const lot of CITY.lots) {
-    if (lot.k === 'park' || (BMASK && lot.p.every(q => farOut(q[0], q[1])))) continue;
+    if (lot.k === 'park' || (DMASK && lot.p.every(q => farOut(q[0], q[1])))) continue;
     LITM.color(lot.k === 'ind' ? '#c9c8bb' : '#cfcabd');
     LITM.poly(lot.p, 0.025);
   }
@@ -1106,6 +1112,44 @@ function borderEdges () {
   CBITS.buildFence(cityApi(), CITY.fence || [BORDER.concat([BORDER[0]])]);
   for (const k of CITY.kpp || []) KPPS.push(CBITS.buildKpp(cityApi(), k));
   for (const [x, z, ux, uz, w] of CITY.closed || []) edgeBlock(x, z, ux, uz, (w || 8) + 2);
+  if (MAP.open) openEdges();
+}
+
+/* Северск пока открыт у пиццерии (MAP.open): по линии за кольцом — тот же
+   бетонный забор, но не сквозь дома и не поперёк улиц; на улицах через
+   линию — перекрытие «дорога закрыта». Рёбра графа за линией закрыты:
+   трафик туда не сворачивает, навигатор туда не ведёт. */
+function openEdges () {
+  const O = MAP.open, Z = O.z;
+  const crosses = [];
+  for (const r of CITY.roads) {
+    if (!drivable(r) || r.c > DRIVE_MAX || r.b) continue;
+    for (let i = 1; i < r.p.length; i++) {
+      const [x1, z1] = r.p[i - 1], [x2, z2] = r.p[i];
+      if ((z1 >= Z) === (z2 >= Z)) continue;
+      const t = (Z - z1) / (z2 - z1), x = lerp(x1, x2, t);
+      if (!O.fence.some(f => x > f[0][0] && x < f[1][0])) continue;
+      const len = Math.hypot(x2 - x1, z2 - z1) || 1;
+      let ux = (x2 - x1) / len, uz = (z2 - z1) / len;
+      if (uz > 0) { ux = -ux; uz = -uz; }           // u — наружу, на север, за линию
+      const w = roadWidth(r) + 2;
+      if (crosses.some(q => Math.abs(q.x - x) < q.w / 2 + w / 2)) continue;
+      crosses.push({ x, w: w / Math.max(0.3, Math.abs(uz)) });
+      edgeBlock(x + ux * 4, Z + uz * 4, ux, uz, w);
+    }
+  }
+  // забор кусками: не сквозь дома и не поперёк проезжей части
+  const lines = [];
+  for (const f of O.fence) {
+    let cur = null;
+    for (let x = f[0][0]; x <= f[1][0]; x += 3) {
+      const road = crosses.some(q => Math.abs(q.x - x) < q.w / 2 + 1);
+      if (road || inHouse(x, Z, 0.8)) { if (cur && cur.length > 1) lines.push(cur); cur = null; continue; }
+      (cur = cur || []).push([x, Z]);
+    }
+    if (cur && cur.length > 1) lines.push(cur);
+  }
+  CBITS.buildFence(cityApi(), lines);
 }
 
 /* ── мосты: настил, балки, перила и быки ──
@@ -3554,6 +3598,11 @@ const ukey = (a, b) => (a < b ? ekey(a, b) : ekey(b, a));    // ребро бе�
 }
 // номера узлов на концах куска (b у куска уже занято — это мост)
 for (const s of RSEG) { s.na = NODE_IDX.get(s.x1 + ',' + s.z1); s.nb = NODE_IDX.get(s.x2 + ',' + s.z2); }
+/* закрытая часть города (MAP.open): узлы за линией — out, рёбра к ним закрыты (openEdges) */
+if (MAP.open) {
+  for (const N of NODES) N.out = !inBorder(N.x, N.z);
+  for (const e of EDGES.values()) if (NODES[e.a].out || NODES[e.b].out) e.closed = 1;
+}
 
 /* узлов тысячи, перебирать их на каждый пересчёт маршрута
    незачем — раскладываем по клеткам сто двадцать метров */
@@ -3593,7 +3642,7 @@ function routeNodes (fromX, fromZ, toX, toZ) {
     const cur = q[h];
     if (cur === b) break;
     for (const nb of NODES[cur].nb) {
-      if (seen[nb]) continue;
+      if (seen[nb] || (NODES[nb].out && nb !== b)) continue;     // за линию закрытого города не ведём
       seen[nb] = 1; prev[nb] = cur; q.push(nb);
     }
   }
@@ -5354,7 +5403,7 @@ function newCar (parked) {
 function placeTraffic (t, rmin, rmax) {
   for (let k = 0; k < 24; k++) {
     const a = nodeNear(V.x, V.z, rmin, rmax);
-    const opts = NODES[a].nb.map(b => edgeOf(a, b)).filter(e => e.ok && e.c <= 5 && edgeRun(e) > 8 && inBounds(NODES[e.b].x, NODES[e.b].z));
+    const opts = NODES[a].nb.map(b => edgeOf(a, b)).filter(e => e.ok && e.c <= 5 && edgeRun(e) > 8 && !e.closed && inBounds(NODES[e.b].x, NODES[e.b].z) && inBounds(NODES[e.a].x, NODES[e.a].z));
     if (!opts.length) continue;
     const e = pick(opts);
     t.e = e; t.s = rand(0, edgeRun(e) * 0.8); t.lane = (Math.random() * laneCount(e)) | 0; t.turn = null;
@@ -7612,7 +7661,7 @@ function driveStep (dt) {
   V.edgeT = (V.edgeT || 0) - dt;
   if (out && V.edgeT <= 0 && S.state !== 'title') {
     V.edgeT = 4;
-    toast($t(MAP.edgeToast));
+    toast($t(MAP.open && Math.abs(V.z - MAP.open.z) < 30 ? MAP.open.toast : MAP.edgeToast));
   }
 
   // Река: с моста в неё не съехать — перила, а с берега — можно, и это
