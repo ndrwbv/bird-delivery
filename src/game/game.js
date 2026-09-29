@@ -9361,6 +9361,10 @@ function loadPizza () {
     1.0,
     () => {
       setTrunk(false);
+      if (S.state !== 'loading') {                // пока летела коробка, машина взорвалась
+        if (DEATH.keep) { DEATH.keep.prev = 'drive'; S.time = S.timeMax; }   // воскреснет — уже с пиццей
+        return;
+      }
       S.state = 'drive';
       S.time = S.timeMax;                       // срок пошёл с момента загрузки
       if (S.order && S.order.rush) {
@@ -9683,18 +9687,26 @@ const DEATH_WORD = {
 };
 const OVER_TITLE = { 'машина всё': GORE_ON ? $t('помер') : N_('машина всё'), 'не доставил': $t('клиент потерян'), 'утонул': N_('утонул'), 'не успел': N_('не успел'), 'смена окончена': N_('смена окончена') };
 
-function gameOver (why, victims, focus) {
-  if (S.state === 'over' || S.state === 'dying') return;
-  S.state = 'dying';
+/* заказ и поручение снимаем; при взрыве в карьере — только если не воскрес (revive) */
+function dropRun () {
   if (S.side) { S.side.ped.freeT = 3; S.side = null; }
-  hideChoice();
   S.target = null;
   if (S.order) for (const st of S.order.stops) for (const p of st.peds) clearGuest(p);
   S.order = null;
   routePts = [];
   marker.visible = false;
-  hidePhone();
   clearGate();
+}
+
+function gameOver (why, victims, focus) {
+  if (S.state === 'over' || S.state === 'dying') return;
+  // карьера, машина взорвалась — можно воскреснуть за деньги из кошелька: заказ пока держим
+  DEATH.keep = CAREER && !S.ride && !S.free && why === 'машина всё' ? { prev: S.state } : null;
+  DEATH.asked = false; DEATH.rev = null;
+  S.state = 'dying';
+  hideChoice();
+  if (!DEATH.keep) dropRun();
+  hidePhone();
 
   DEATH.t = 0;
   DEATH.x = focus ? focus.x : V.x;
@@ -9757,6 +9769,8 @@ function deathTick (dt) {
   cam.lookAt(DEATH.x, fy + lerp(1.4, 0, k), DEATH.z);
 
   if (t > 1.2) document.body.classList.add('w-show');
+  if (DEATH.keep && !DEATH.asked && t > 1.8) askRevive();
+  if (DEATH.keep && t > 4.9) DEATH.t = 4.9;       // ждём ответа: воскреснуть или нет
   if (t > 5) {
     S.state = 'over';
     setTimeout(clearRivals, 0);
@@ -9765,6 +9779,130 @@ function deathTick (dt) {
     document.body.classList.remove('w-show');
     showOver(DEATH.why, DEATH.victims);
   }
+}
+
+/* ── воскрешение (карьера): машина взорвалась — за деньги из кошелька с неба
+   в луче света спускается новая, на крыльях, и смена идёт дальше с тем же
+   заказом. Цена — ECON.REVIVE: каждое следующее за смену дороже. ── */
+const revivePrice = () => Math.round(ECON.REVIVE.BASE * ECON.REVIVE.GROW ** (S.revives || 0) / 10) * 10;
+function askRevive () {
+  DEATH.asked = true;
+  const price = revivePrice(), have = wallet();
+  const no = () => { DEATH.keep = null; dropRun(); };
+  if (have < price) {
+    showChoice({ title: $t('воскреснуть — {money}', { money: money(price) }),
+      sub: $t('в кошельке {money} — не хватает', { money: money(have) }),
+      opts: [{ label: $t('ну что ж'), fn: no }], timeout: 4, onTimeout: no });
+    return;
+  }
+  showChoice({ title: $t('воскреснуть?'),
+    sub: $t('новая машина спустится с неба · из кошелька {money} (там {have})', { money: money(price), have: money(have) }),
+    opts: [{ label: $t('воскреснуть · {money}', { money: money(price) }), sub: $t('заказ и смена — дальше'), fn: () => revive(price) },
+      { label: $t('нет, всё'), fn: no }],
+    timeout: 9, onTimeout: no });
+  Snd.order();
+}
+
+let REV_FX = null;
+function reviveFx () {
+  if (REV_FX) return REV_FX;
+  const add = (hex, op) => new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: op, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+  const feather = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const tip = new THREE.MeshBasicMaterial({ color: 0xffc94a });
+  const wing = s => {
+    const w = new THREE.Group();
+    // крыло плоское, как у птицы: перья веером назад — переднее длинное, золотое по краю
+    [[3.8, 0.7, 0.35], [3.3, 0.7, -0.25], [2.7, 0.65, -0.8], [2.0, 0.6, -1.3]].forEach(([L, W, z], i) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(L, 0.12, W), i === 0 ? tip : feather);
+      m.position.set(s * L / 2, i * 0.03, z);
+      m.rotation.y = s * i * 0.12;
+      w.add(m);
+    });
+    w.position.set(s * 0.8, 1.7, -0.2);
+    return w;
+  };
+  const fx = new THREE.Group();
+  const wl = wing(-1), wr = wing(1);
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.1, 6, 20), new THREE.MeshBasicMaterial({ color: 0xffe27a }));
+  halo.rotation.x = Math.PI / 2; halo.position.y = 2.9;
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(2.3, 16, 10), add(0xffe9a0, 0.2));
+  glow.scale.set(1, 0.75, 1.4); glow.position.y = 1;
+  fx.add(wl, wr, halo, glow);
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 3.4, 90, 18, 1, true), add(0xfff0a8, 0.09));
+  return (REV_FX = { fx, wl, wr, halo, glow, beam });
+}
+
+function revive (price) {
+  addWallet(-price);
+  S.revives = (S.revives || 0) + 1;
+  DEATH.rev = { t: 0, price, y0: floorAt(V.x, V.z), cx: cam.position.x, cy: cam.position.y, cz: cam.position.z };
+  DEATH.burn = 0;
+  $('wasted').hidden = true;
+  document.body.classList.remove('w-show');
+  // от сгоревшей — дым и искры, на её месте ничего; новая — в небе
+  puff(V.x, 1.5, V.z, true, 1.6); sparks(V.x, 1, V.z, 14);
+  V.vx = V.vz = 0; V.y = DEATH.rev.y0; V.air = false; V.vy = 0;
+  resetCar();
+  const F = reviveFx();
+  car.add(F.fx);
+  F.fx.scale.set(1, 1, 1); F.beam.material.opacity = 0.09;
+  F.beam.position.set(V.x, DEATH.rev.y0 + 45, V.z);
+  scene.add(F.beam);
+  [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => Snd.blip(f, 0.35, 'triangle', 0.08), i * 140));
+}
+
+const REV_T = 3.6;                                   // сколько летит сверху, с
+function reviveTick (dt) {
+  const R = DEATH.rev, F = REV_FX;
+  R.t += dt;
+  const t = R.t, k = clamp(t / REV_T, 0, 1);
+  const y = R.y0 + 38 * (1 - k) ** 1.5;            // плавно, у земли — медленнее
+  car.position.set(V.x, y, V.z);
+  car.rotation.set(0, V.h + (1 - k) ** 2 * 1.6, Math.sin(t * 2.2) * 0.06 * (1 - k));
+  // крылья машут, у земли — реже и складываются
+  const flap = Math.sin(t * lerp(11, 5, k)) * lerp(0.55, 0.2, k);
+  F.wl.rotation.z = -flap; F.wr.rotation.z = flap;
+  F.halo.rotation.z += dt * 2;
+  if (Math.random() < 0.5) sparks(V.x + rand(-2, 2), y + rand(0, 2), V.z + rand(-2, 2), 1);
+  // камера сбоку и чуть снизу — видно, как спускается в луче
+  if (!R.cam) {                                     // точка съёмки: первая, где не в стене
+    const fx = Math.sin(V.h), fz = Math.cos(V.h), sx = Math.cos(V.h), sz = -Math.sin(V.h);
+    R.cam = [V.x - fx * 14 + sx * 7, V.z - fz * 14 + sz * 7];
+    for (const [b, sd] of [[14, 7], [14, -7], [-14, 7], [-14, -7], [9, 5], [9, -5], [-9, 5], [-9, -5], [6, 0], [-6, 0]]) {
+      const x = V.x - fx * b + sx * sd, z = V.z - fz * b + sz * sd;
+      if (camClear(x, z) && camClear((x + V.x) / 2, (z + V.z) / 2)) { R.cam = [x, z]; break; }
+    }
+  }
+  const [cx, cz] = R.cam, cy = Math.max(R.y0 + 2.6 + (y - R.y0) * 0.3, groundH(cx, cz) + 2);
+  const m = clamp(t / 1.1, 0, 1);
+  cam.position.set(lerp(R.cx, cx, m), lerp(R.cy, cy, m), lerp(R.cz, cz, m));
+  cam.lookAt(V.x, lerp(y + 1, R.y0 + 1.2, 0.25), V.z);
+  if (k >= 1 && !R.landed) {
+    R.landed = true;
+    puff(V.x, R.y0 + 0.4, V.z, false, 1.8);
+    for (let i = 0; i < 3; i++) sparks(V.x, R.y0 + 1, V.z, 10);
+    rumble(0.5, 200);
+    Snd.coin();
+  }
+  // приземлился — крылья и свет гаснут за секунду
+  const f = clamp((t - REV_T) / 1, 0, 1);
+  F.fx.scale.setScalar(1 - f * 0.999);
+  F.beam.material.opacity = 0.09 * (1 - f);
+  if (f < 1) return;
+  car.remove(F.fx);
+  scene.remove(F.beam);
+  car.rotation.set(0, V.h, 0);
+  DEATH.rev = null;
+  const prev = DEATH.keep ? DEATH.keep.prev : 'drive';
+  DEATH.keep = null;
+  S.hp = S.hpMax; hudHearts();
+  FXS.shieldT = 3;                                  // три секунды не бьёт: только что с неба
+  S.hurt = 0;
+  S.state = ['drive', 'back', 'handover', 'side', 'loading', 'brief'].includes(prev) ? prev : 'drive';
+  if (S.state === 'brief' && S.order) showOrderCard(S.order);   // взорвался, пока висела карточка — она снова
+  V.camX = cam.position.x; V.camZ = cam.position.z; V.camY = cam.position.y; V.camH = V.h;
+  Platform.gameplayStart();
+  popBonus($t('воскрес!'), $t('минус {money} из кошелька', { money: money(R.price) }));
 }
 
 function startRun (ride) {
@@ -9781,7 +9919,7 @@ function startRun (ride) {
   hideChoice();
   THIEF.cd = rand(35, 60);
   S.state = 'drive'; S.hp = S.hpMax; S.money = 0; S.orders = 0; S.burgers = 0; S.shiftT = 0;
-  S.people = 0; S.wrecks = 0; S.delivered = 0; S.scoots = 0;
+  S.people = 0; S.wrecks = 0; S.delivered = 0; S.scoots = 0; S.revives = 0;
   S.hurt = 0; S.shake = 0;
   S.freeRun = S.free;
   S.lvl0 = levelOf(getXP());
@@ -10674,7 +10812,10 @@ function frame (now) {
   if (isPlaying() && !S.ride && S.state !== 'brief' && S.state !== 'loading') S.shiftT = (S.shiftT || 0) + dt;
 
   let vf = 0;
-  if (S.state === 'dying') {
+  if (S.state === 'dying' && DEATH.rev) {
+    for (const k in IN) IN[k] = 0;
+    reviveTick(dt);                              // новая машина спускается с неба
+  } else if (S.state === 'dying') {
     for (const k in IN) IN[k] = 0;              // руль из рук выпал, машина катится сама
     vf = driveStep(dt);
     deathTick(dt);
@@ -10784,7 +10925,7 @@ function frame (now) {
   rivalsStep(dt);
 
   // машину потряхивает после удара
-  if (S.state !== 'intro') car.position.y = V.y + (V.kerb || 0) + (S.hurt > 0 ? Math.sin(tG * 60) * 0.06 : 0);
+  if (S.state !== 'intro' && !DEATH.rev) car.position.y = V.y + (V.kerb || 0) + (S.hurt > 0 ? Math.sin(tG * 60) * 0.06 : 0);
   if (S.hp <= 2 && S.state !== 'title' && S.state !== 'over') {
     S.smokeT = (S.smokeT || 0) - dt;
     if (S.smokeT <= 0) {
@@ -10807,7 +10948,7 @@ requestAnimationFrame(frame);
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
 /* песочница (sandbox.html): бесконечное здоровье, нитро, «не глохнет» (noStall читает cars.js) */
 const SBX = { god: false, nitro: false, noStall: false };
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { RL: RL.DEBUG, S, V, TRAFFIC, PEDS, PEOPLE, PIZZA, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { RL: RL.DEBUG, S, V, DEATH, revive, TRAFFIC, PEDS, PEOPLE, PIZZA, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта
