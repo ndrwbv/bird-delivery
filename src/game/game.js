@@ -6949,7 +6949,14 @@ const marker = new THREE.Group();
    бык — бист-мод: пятнадцать секунд Shift не жжёт нитро, а просто
    разгоняет вдвое быстрее. Далёкие не рисуем — их всё равно съест туман. */
 const NITRO_CANS = [];                             // все подбираемые: кофе и бонусы
-const NOS_RESPAWN = 25, BONUS_RESPAWN = 45;
+/* сколько и как часто. Карьера (Северск, 30.09.2026) — гуще: нитро и аптечек
+   заметно больше, и пока машина побита, аптечка появляется у дороги впереди */
+const PK = CAREER
+  ? { nos: 90, nosGap: 38, bonus: 44, bonusGap: 48, kinds: ['heal', 'shield', 'heal', 'beast', 'heal'],
+      nosRespawn: 16, bonusRespawn: 28, spawn: [3, 6], spawnCap: 26, heal: [9, 15] }
+  : { nos: 50, nosGap: 45, bonus: 21, bonusGap: 70, kinds: ['shield', 'heal', 'beast'],
+      nosRespawn: 25, bonusRespawn: 45, spawn: [5, 9], spawnCap: 18, heal: null };
+const NOS_RESPAWN = PK.nosRespawn, BONUS_RESPAWN = PK.bonusRespawn;
 const PICK_HEX = { nos: '#6fd3ff', shield: '#8f9bff', heal: '#ff4d6d', beast: '#ff8a1c' };
 
 const PICK_MAT = (() => {
@@ -7010,9 +7017,9 @@ function coffeeSpot (near, rmin, rmax) {
   for (let k = 0; k < 60; k++) {
     const q = pick(COFFEE_SEGS), t = rand(0.25, 0.75);
     const x = lerp(q.x1, q.x2, t), z = lerp(q.z1, q.z2, t);
-    if (x < B.x0 + 30 || x > B.x1 - 30 || z < B.z0 + 30 || z > B.z1 - 30) continue;
+    if (x < B.x0 + 30 || x > B.x1 - 30 || z < B.z0 + 30 || z > B.z1 - 30 || !inBorder(x, z)) continue;
     if (near) { const d = Math.hypot(x - near.x, z - near.z); if (d < rmin || d > rmax) continue; }
-    if (NITRO_CANS.some(n => n.kind === 'nos' && n.t <= 0 && Math.hypot(n.x - x, n.z - z) < 45)) continue;
+    if (NITRO_CANS.some(n => n.kind === 'nos' && n.t <= 0 && Math.hypot(n.x - x, n.z - z) < PK.nosGap)) continue;
     if (PIZZA && Math.hypot(PIZZA.x - x, PIZZA.z - z) < 25) continue;
     return [x, z];
   }
@@ -7022,19 +7029,33 @@ let COFFEE_SEGS = [];
 
 function buildNitro () {
   COFFEE_SEGS = RSEG.filter(q => q.c <= 4 && !q.b && !q.x && Math.hypot(q.x2 - q.x1, q.z2 - q.z1) > 25);
-  for (let k = 0; k < 50; k++) { const p = coffeeSpot(null); if (p) addPickup('nos', p[0], p[1], true); }
+  for (let k = 0; k < PK.nos; k++) { const p = coffeeSpot(null); if (p) addPickup('nos', p[0], p[1], true); }
   // бонусы — во дворах: на проездах и дворовых дорожках, по кругу три вида
   const yard = [];
   for (const q of RSEG) if (q.c === 7 && !q.x && Math.hypot(q.x2 - q.x1, q.z2 - q.z1) > 12) yard.push([(q.x1 + q.x2) / 2, (q.z1 + q.z2) / 2]);
   for (const q of YARD_PATHS) { const m = q[(q.length / 2) | 0]; yard.push([m[0], m[1]]); }
-  const kinds = ['shield', 'heal', 'beast'];
+  YARD_SPOTS = yard.filter(([x, z]) => inBounds(x, z, 25) && !inHouse(x, z, 1.5));
+  const kinds = PK.kinds;
   let n = 0;
-  for (let k = 0; k < 600 && n < 21; k++) {
-    const [x, z] = pick(yard);
-    if (!inBounds(x, z, 25) || inHouse(x, z, 1.5)) continue;
-    if (NITRO_CANS.some(o => o.kind !== 'nos' && Math.hypot(o.x - x, o.z - z) < 70)) continue;
-    addPickup(kinds[n % 3], x, z, true);
+  for (let k = 0; k < 1200 && n < PK.bonus && YARD_SPOTS.length; k++) {
+    const [x, z] = pick(YARD_SPOTS);
+    if (NITRO_CANS.some(o => o.kind !== 'nos' && Math.hypot(o.x - x, o.z - z) < PK.bonusGap)) continue;
+    addPickup(kinds[n % kinds.length], x, z, true);
     n++;
+  }
+}
+let YARD_SPOTS = [];
+/* машина побита — аптечка у дороги впереди, раз в PK.heal секунд (карьера) */
+function healSpawn () {
+  if (!PK.heal || S.hp >= S.hpMax || NITRO_CANS.some(n => n.kind === 'heal' && !n.fixed)) return;
+  const fx = Math.sin(V.h), fz = Math.cos(V.h);
+  for (let k = 0; k < 40; k++) {
+    const p = k < 25 && YARD_SPOTS.length ? pick(YARD_SPOTS) : coffeeSpot(V, 60, 220);
+    if (!p) continue;
+    const dx = p[0] - V.x, dz = p[1] - V.z, d = Math.hypot(dx, dz);
+    if (d < 60 || d > 240 || (dx * fx + dz * fz) / d < 0.2) continue;       // впереди, а не за спиной
+    addPickup('heal', p[0], p[1], false);
+    return;
   }
 }
 
@@ -7067,9 +7088,10 @@ function takePickup (n) {
 function updateNitro (dt) {
   const live = S.state === 'drive' || S.state === 'back' || S.state === 'handover' || S.state === 'side';
   // время от времени — свежий стаканчик у дороги впереди
+  if (live && PK.heal && (FXS.healT = (FXS.healT || PK.heal[0]) - dt) <= 0) { FXS.healT = rand(PK.heal[0], PK.heal[1]); healSpawn(); }
   if (live && (FXS.spawnT -= dt) <= 0) {
-    FXS.spawnT = rand(5, 9);
-    if (NITRO_CANS.filter(n => !n.fixed).length < 18) {
+    FXS.spawnT = rand(PK.spawn[0], PK.spawn[1]);
+    if (NITRO_CANS.filter(n => !n.fixed && n.kind === 'nos').length < PK.spawnCap) {
       const p = coffeeSpot(V, 50, 200);
       if (p) addPickup('nos', p[0], p[1], false);
     }
