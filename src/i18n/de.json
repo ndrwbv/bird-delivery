@@ -1015,5 +1015,13 @@
  "минус {money} из кошелька": "minus {money} aus dem Geldbeutel",
  "нет, всё": "nein, Schluss",
  "новая машина спустится с неба · из кошелька {money} (там {have})": "ein neues Auto schwebt vom Himmel · {money} aus dem Geldbeutel (drin: {have})",
- "ну что ж": "na gut"
+ "ну что ж": "na gut",
+ "9:00—24:00 · ~{n} мин": "9:00—24:00 · ~{n} Min.",
+ "длинная": "lang",
+ "длинная смена": "lange Schicht",
+ "короткая": "kurz",
+ "короткая смена": "kurze Schicht",
+ "смена": "Schicht",
+ "средняя": "mittel",
+ "средняя смена": "mittlere Schicht"
 }

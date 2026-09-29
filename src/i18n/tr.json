@@ -1015,5 +1015,13 @@
  "минус {money} из кошелька": "cüzdandan eksi {money}",
  "нет, всё": "yok, bitti",
  "новая машина спустится с неба · из кошелька {money} (там {have})": "gökten yeni bir araba iniyor · cüzdandan {money} (sende {have})",
- "ну что ж": "n'apalım"
+ "ну что ж": "n'apalım",
+ "9:00—24:00 · ~{n} мин": "9:00—24:00 · ~{n} dk",
+ "длинная": "uzun",
+ "длинная смена": "uzun vardiya",
+ "короткая": "kısa",
+ "короткая смена": "kısa vardiya",
+ "смена": "vardiya",
+ "средняя": "orta",
+ "средняя смена": "orta vardiya"
 }

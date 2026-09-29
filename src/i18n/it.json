@@ -1019,5 +1019,13 @@
  "минус {money} из кошелька": "meno {money} dal portafoglio",
  "нет, всё": "no, basta",
  "новая машина спустится с неба · из кошелька {money} (там {have})": "un'auto nuova scende dal cielo · {money} dal portafoglio (hai {have})",
- "ну что ж": "pazienza"
+ "ну что ж": "pazienza",
+ "9:00—24:00 · ~{n} мин": "9:00—24:00 · ~{n} min",
+ "длинная": "lungo",
+ "длинная смена": "turno lungo",
+ "короткая": "breve",
+ "короткая смена": "turno breve",
+ "смена": "turno",
+ "средняя": "medio",
+ "средняя смена": "turno medio"
 }

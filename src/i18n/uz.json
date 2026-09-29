@@ -1015,5 +1015,13 @@
  "минус {money} из кошелька": "hamyondan minus {money}",
  "нет, всё": "yoʻq, bas",
  "новая машина спустится с неба · из кошелька {money} (там {have})": "osmondan yangi mashina tushadi · hamyondan {money} (unda {have})",
- "ну что ж": "nima ham qilardik"
+ "ну что ж": "nima ham qilardik",
+ "9:00—24:00 · ~{n} мин": "9:00—24:00 · ~{n} daq",
+ "длинная": "uzun",
+ "длинная смена": "uzun smena",
+ "короткая": "qisqa",
+ "короткая смена": "qisqa smena",
+ "смена": "smena",
+ "средняя": "oʻrta",
+ "средняя смена": "oʻrta smena"
 }

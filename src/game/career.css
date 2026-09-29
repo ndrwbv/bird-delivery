@@ -5,6 +5,8 @@
             background: rgba(20, 16, 30, .7); border: 2px solid #33210c; border-radius: 6px; }
 #cr-clock[hidden] { display: none; }
 #cr-clock i { width: 10px; height: 10px; border-radius: 50%; background: #ffd85e; box-shadow: 0 0 0 2px #33210c; }
+#cr-clock em { font-style: normal; font-size: 7px; color: #bcd0e8; }
+#cr-clock em:empty { display: none; }
 #cr-clock.eve i { background: #ff9a3c; }
 #cr-clock.night i { background: #cfd9ff; box-shadow: inset -3px -1px 0 #6a78b0, 0 0 0 2px #33210c; }
 #cr-clock.late b { color: #ff8a8a; animation: cr-blink 1s steps(2) infinite; }

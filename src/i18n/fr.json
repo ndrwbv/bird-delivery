@@ -1019,5 +1019,13 @@
  "минус {money} из кошелька": "moins {money} du portefeuille",
  "нет, всё": "non, c'est fini",
  "новая машина спустится с неба · из кошелька {money} (там {have})": "une voiture neuve descend du ciel · {money} du portefeuille (tu as {have})",
- "ну что ж": "tant pis"
+ "ну что ж": "tant pis",
+ "9:00—24:00 · ~{n} мин": "9:00—24:00 · ~{n} min",
+ "длинная": "long",
+ "длинная смена": "service long",
+ "короткая": "court",
+ "короткая смена": "service court",
+ "смена": "service",
+ "средняя": "moyen",
+ "средняя смена": "service moyen"
 }

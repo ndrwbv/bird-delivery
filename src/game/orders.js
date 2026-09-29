@@ -141,7 +141,8 @@ export function resetShift () {
    смены: туда и обратно ~1,1 км на RUN_V 19 м/с плюс погрузка (≈ 0,2 в час) */
 function rate () {
   const h = hourNow() - SH.h0;
-  const hps = (24 - ECON.SHIFT.KEYS[0][1]) / ((ECON.SHIFT.T_END - ECON.SHIFT.T0) * (A.DAY_LEN || 480));   // часов смены в секунду
+  const slow = CAR && typeof CAR.shiftSlow === 'function' ? CAR.shiftSlow() : ECON.SHIFT.SLOW;
+  const hps = (24 - ECON.SHIFT.KEYS[0][1]) / ((ECON.SHIFT.T_END - ECON.SHIFT.T0) * (A.DAY_LEN || 480) * slow);   // часов смены в секунду
   const prior = 1 / ((2 * 1100 / 19 + 18) * hps);
   const est = h > 1 && SH.done > 0 ? (SH.done + prior) / (h + 1) : prior;
   return Math.min(1.5, Math.max(0.1, est));

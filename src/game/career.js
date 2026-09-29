@@ -19,6 +19,7 @@ import './career.css';
 import * as ECON from './econ.js';
 import * as GARAGE from './garage.js';
 import * as MENU from './menu.js';
+import * as DLG from './dialog.js';
 import { makePadMenu } from '../input/padmenu.js';
 import { t, tn, lang } from '../i18n/index.js';
 
@@ -87,7 +88,7 @@ export function init (api) {
     const ck = document.createElement('div');
     ck.id = 'cr-clock';
     ck.hidden = true;
-    ck.innerHTML = '<i></i><b>09:00</b>';
+    ck.innerHTML = '<i></i><b>09:00</b><em></em>';
     es.parentNode.insertBefore(ck, es);
   }
   setTimeout(() => { if (window.__dlv) window.__dlv.CAREERM = DEBUG; }, 0);
@@ -102,9 +103,17 @@ export function startShift () {
   S.lunch = null;
   SH.on = true; SH.phase = ''; SH.lunch = false; SH.hits = 0; SH.lastHurt = S.hurt || 0; SH.fine = 0; SH.stars = 0;
   SH.slot = false; STAKE = 0; SH.t0h = hour(); SH.endH = SH.t0h; SH.n = +A.Store.get('dlv-shifts', 0) || 0;
+  SH.len = ECON.shiftLen(SH.n);
   lunchClass(false);
   fire(startCbs, { n: SH.n + 1 });
+  const L = SH.len;
+  setTimeout(() => { if (SH.on && SH.len === L) A.popBonus(lenName(L.id), t('9:00—24:00 · ~{n} мин', { n: Math.round(L.slow * ECON.SHIFT.BASE_S / 60) })); }, 1200);
 }
+/* длина смены: короткая / средняя / длинная (ECON.SHIFT.LENGTHS) */
+const lenName = id => ({ short: t('короткая смена'), medium: t('средняя смена'), long: t('длинная смена') }[id] || '');
+const lenShort = id => ({ short: t('короткая'), medium: t('средняя'), long: t('длинная') }[id] || '');
+/** во сколько раз медленнее идут сутки, пока идёт смена (game.js, orders.js) */
+export const shiftSlow = () => (SH.on && SH.len ? SH.len.slow : ECON.SHIFT.SLOW);
 
 export function clockText () { return ECON.clock(hour()); }
 
@@ -115,10 +124,11 @@ function clockStep () {
   const show = !es.hidden && SH.on;
   if (el.hidden === show) el.hidden = !show;
   if (!show) return;
-  const h = hour(), txt = ECON.clock(h);
-  if (txt !== clockPrev) {
-    clockPrev = txt;
+  const h = hour(), txt = ECON.clock(h), len = SH.len ? lenShort(SH.len.id) : '';
+  if (txt + len !== clockPrev) {
+    clockPrev = txt + len;
     el.querySelector('b').textContent = txt;
+    el.querySelector('em').textContent = len;
     el.classList.toggle('eve', h >= ECON.SHIFT.EVENING_H && h < 21);
     el.classList.toggle('night', h >= 21);
     el.classList.toggle('late', h >= 23);
@@ -130,7 +140,9 @@ export function step (dt) {
   const S = A.S;
   if (!$('choice') || $('choice').hidden) lunchClass(false);
   if (!SH.on || S.ride || !A.isPlaying()) { clockStep(); return; }
-  if (S.state === 'loading' || S.state === 'brief') { clockStep(); return; }
+  if (SH.phase === 'late') lateGuard(dt);
+  // висит карточка заказа или грузится пицца — часы идут, и в полночь смена кончается и тут
+  if (S.state === 'loading' || S.state === 'brief') { if (SH.phase === '' && hour() >= 24) midnight(); clockStep(); return; }
   if (FAST > 1 && SH.phase === '') { const E = A.env(); E.t = (E.t + dt * (FAST - 1) / A.DAY_LEN) % 1; }
   // удар — S.hurt подскакивает до 0,9 в hurtCar; считаем такие скачки
   const hu = S.hurt || 0;
@@ -172,15 +184,28 @@ const fmtK = k => Number(k).toLocaleString(lang() === 'zh' ? 'zh-CN' : lang());
 
 /* ── полночь: сначала, может быть, развоз смены, потом итоги ── */
 async function midnight () {
-  SH.phase = 'late';
+  SH.phase = 'late'; SH.lateT = 0;
   const S = A.S;
   let ride = false;
-  if (ORD && typeof ORD.staffRide === 'function' && Math.random() < ECON.ORDERS.STAFF_CHANCE) {
+  // развоз — только если едешь: в полночь на карточке заказа или на погрузке смена просто кончается
+  const moving = ['drive', 'back', 'handover'].includes(S.state);
+  if (moving && ORD && typeof ORD.staffRide === 'function' && Math.random() < ECON.ORDERS.STAFF_CHANCE) {
     A.hideChoice();
     try { ride = await ORD.staffRide(); } catch (e) { console.error('[career] staffRide', e); }
   }
   if (!SH.on || S.state === 'over' || S.state === 'title' || S.state === 'dying') return;   // смена уже кончилась иначе
   A.toast(ride ? t('полночь — всех развёз, смена всё') : t('полночь — смена всё'));
+  A.endShift('время');
+}
+
+/* после полуночи: идёт развоз (заказ staff) или открыт диалог — ждём; иначе через 6 с
+   смена кончается сама — чтобы она не повисла, что бы ни случилось с развозом */
+function lateGuard (dt) {
+  const S = A.S, riding = S.order && S.order.ord && S.order.ord.type === 'staff';
+  if (riding || DLG.isOpen() || A.choiceOpen()) { SH.lateT = 0; return; }
+  if ((SH.lateT = (SH.lateT || 0) + dt) < 6) return;
+  SH.lateT = -1e9;
+  A.toast(t('полночь — смена всё'));
   A.endShift('время');
 }
 
@@ -241,6 +266,7 @@ export function showEnd (why, whyText) {
     [t('заработано'), S.money || 0, A.money, true],
     [t('доставлено заказов'), S.delivered || 0, cnt],
     typeof S.tips === 'number' && S.tips > 0 ? [t('чаевые'), S.tips, A.money] : null,
+    SH.len ? [t('смена'), 1, () => lenShort(SH.len.id)] : null,
     [t('на смене'), SH.endH, h => ECON.clock(SH.t0h) + ' — ' + ECON.clock(SH.t0h + (Math.min(SH.endH, 29) - SH.t0h) * Math.min(1, h / (SH.endH || 1)))],
     [t('ударов'), SH.hits, cnt],
     SH.fine ? [t('штраф за клиента'), SH.fine, n => '−' + A.money(n)] : null,
@@ -638,7 +664,7 @@ function paneSlot (p) {
 
 /* отладка: __dlv.CAREERM.skipTo(13.9) — к обеду, skipTo(23.95) — к полуночи */
 const DEBUG = {
-  get SH () { return SH; }, stars, addStars, hour, isEvening, clockText, shiftOn, phase, onShiftStart, onShiftEnd, startShift, showEnd, clientKilled,
+  get SH () { return SH; }, shiftSlow, stars, addStars, hour, isEvening, clockText, shiftOn, phase, onShiftStart, onShiftEnd, startShift, showEnd, clientKilled,
   hasOrders: () => !!(ORD && ORD.staffRide), hasCars: () => !!carsApi(),
   // перемотка за обед — обед считается прошедшим (иначе он всплывает в любом пресете песочницы)
   skipTo (h) { if (A) { A.env().t = ECON.tOfHour(h); if (h > ECON.SHIFT.LUNCH_H + 0.05) SH.lunch = true; else if (h < ECON.SHIFT.LUNCH_H) SH.lunch = false; } },

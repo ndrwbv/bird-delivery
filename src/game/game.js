@@ -10437,8 +10437,8 @@ const envClock = () => { const h = (6 + ENV.t * 24) % 24; return String(Math.flo
 
 function updateEnv (dt) {
   if (INTRO) return;
-  // в карьере смена идёт медленнее (ECON.SHIFT.SLOW): небо и фазы те же, смена ~15 мин
-  ENV.t = (ENV.t + dt / (DAY_LEN * (CAREER && CAREERM.shiftOn() ? ECON.SHIFT.SLOW : 1))) % 1;
+  // в карьере смена идёт медленнее (короткая / средняя / длинная — ECON.SHIFT.LENGTHS): небо и фазы те же
+  ENV.t = (ENV.t + dt / (DAY_LEN * (CAREER && CAREERM.shiftOn() ? CAREERM.shiftSlow() : 1))) % 1;
   // ключевые точки суток
   let i = 0;
   while (i < SKY_KEYS.length - 2 && ENV.t >= SKY_KEYS[i + 1][0]) i++;
