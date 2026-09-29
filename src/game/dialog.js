@@ -2,7 +2,8 @@
    рта», текст печатается по буквам — с «ну», «э-э» и запинками, как живая
    речь. Договорил — кнопки «принять» / «отказаться» (или одна «дальше»).
    Пропустить: клик по облачку, пробел, Enter, A на геймпаде — первый раз
-   допечатывает, второй (если кнопка одна) — жмёт её.
+   допечатывает, второй — жмёт выбранную кнопку. Крестовина или стик ←→ (↑↓)
+   выбирают кнопку, выбранная обведена (.padsel, как в меню); B — отказаться.
 
      DLG.init({ pause: on => …, face: (person, size) => dataURL })   — один раз из game.js
      const r = await DLG.say({
@@ -89,6 +90,8 @@ function show (o, done) {
   requestAnimationFrame(() => root.classList.add('on'));
 
   let i = 0, typed = false, closed = false, raf = 0, last = performance.now(), acc = 0, padPrev = {};
+  let pick = yes;                                // что нажмёт A: по умолчанию «принять»
+  const mark = on => { yes.classList.toggle('padsel', on && pick === yes); no.classList.toggle('padsel', on && pick === no); };
   const CPS = o.cps || 38;                       // букв в секунду; на многоточии — пауза
   const bar = $('.dlg-timer'), barI = bar.querySelector('i');
   bar.classList.remove('on'); barI.style.transform = 'scaleX(1)';
@@ -108,8 +111,9 @@ function show (o, done) {
     if (CUR === dismissMe) CUR = null;
     cancelAnimationFrame(raf);
     removeEventListener('keydown', key, true);
+    mark(false);
     root.classList.remove('on');
-    setTimeout(() => { root.hidden = true; }, 180);
+    setTimeout(() => { if (!open) root.hidden = true; }, 180);   // следующая реплика из очереди уже открылась — не прячем её
     open--;
     if (!open) API.pause(false);
     done(v);
@@ -135,7 +139,10 @@ function show (o, done) {
     // раскладку (Xbox, сырой Deck) разбирает input/gamepad.js
     if (PAD.connected) {
       const a = PAD.a, b = PAD.b;
-      if (a && !padPrev.a && !waiting) { if (!typed) finish(); else close(true); }
+      if (two && typed && (PAD.menuLeft || PAD.menuUp)) pick = no;          // «отказаться» — слева
+      if (two && typed && (PAD.menuRight || PAD.menuDown)) pick = yes;
+      mark(PAD.active && typed && !waiting);
+      if (a && !padPrev.a && !waiting) { if (!typed) finish(); else close(pick !== no); }
       if (b && !padPrev.b && typed && !waiting) close(two ? false : true);
       padPrev = { a, b };
     }
