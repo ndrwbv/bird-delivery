@@ -1137,5 +1137,13 @@
  "смены, звёзды и сюжетные заказы": "shifts, stars and story orders",
  "сотрётся": "gets wiped",
  "ставлю обновление, игра перезапустится…": "installing the update, the game will restart…",
- "стереть весь прогресс?": "wipe all progress?"
+ "стереть весь прогресс?": "wipe all progress?",
+ "за смену": "this shift",
+ "кофе-нитро в баке!": "coffee-nitro in the tank!",
+ "держи {a} или {b} — машина рванёт вперёд": "hold {a} or {b} — and the car takes off",
+ "держи кнопку {a} — машина рванёт вперёд": "hold the {a} button — and the car takes off",
+ "пока держишь, кофе тает. сколько осталось — голубое кольцо вокруг радара. новые стаканчики стоят у дороги": "the coffee drains while you hold it. what’s left — the blue ring around the radar. fresh cups wait by the road",
+ "пока держишь, кофе тает. сколько осталось — кольцо по краю кнопки. новые стаканчики стоят у дороги": "the coffee drains while you hold it. what’s left — the ring around the button. fresh cups wait by the road",
+ "понял": "got it",
+ "держи бонус нитро": "have a nitro bonus"
 }

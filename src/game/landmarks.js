@@ -47,6 +47,7 @@ function padFree (A, F, u0, u1, n0, n1) {
 }
 
 export const FUEL_LOG = [];                        // для отладки: какие АЗС встали и где
+export const FUEL_PADS = [];                       // бетонные площадки АЗС: на них не остаётся следов колёс (tracks.js)
 function fuelStation (A, poi) {
   const [px, pz] = poi.p;
   const road = A.nearestRoad(px, pz, 5, 3);
@@ -80,6 +81,7 @@ function fuelStation (A, poi) {
   const pad = [at(F, -PU, n0 - 0.4), at(F, PU, n0 - 0.4), at(F, PU, n0 + PD), at(F, -PU, n0 + PD)];
   A.LITM.color('#c9c6bf');
   A.LITM.poly(pad, 0.1);
+  FUEL_PADS.push(pad);
   A.LITM.color('#e8e4da');
   for (const u of [-PU, PU]) { const [a1, a2] = at(F, u, n0), [b1, b2] = at(F, u, n0 + PD); A.LITM.ribbon(a1, a2, b1, b2, 0.4, 0.12); }
   // навес на четырёх стойках, полоса бренда по краю, свет снизу

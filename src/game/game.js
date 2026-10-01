@@ -44,6 +44,7 @@ import * as STORY from './story.js';             // сюжетные заказ�
 import * as AUTO from './cars.js';               // карьера: 10 машин, ломучесть, заглохла, ямы, гараж Дяди Жени
 import * as HK from './hookah.js';               // кальянщики на лавочках (в детской — самовар)
 import * as CULL from './cull.js';               // статика дальше камеры — со сцены, матрицы заморожены (Steam Deck)
+import * as TRK from './tracks.js';              // следы колёс на газоне и снегу
 
 /* Сохранения — через площадку (облако Яндекса / localStorage). Значения
    хранятся как есть: числа, строки, массивы. */
@@ -9937,10 +9938,24 @@ function loadPizza () {
         NOS.tank = 1;
         popBonus($t('поторопись!'), $t('полный бак кофе-нитро — жми {key}', { key: nitroKey() }));
       } else toast($t('пицца в машине — поехали'));
+      if (S.coffeeNext) { S.coffeeNext = false; tossCoffee(); }
       Platform.gameplayStart();
       Snd.blip(760, 0.1, 'square', 0.13);
     },
   );
+}
+
+/* стаканчик кофе из окна пиццерии — вслед за пиццей, в багажник; долетел — +кофе-нитро
+   и мелко снизу «держи бонус нитро» */
+function tossCoffee () {
+  const cup = pickupModel('nos');
+  cup.scale.setScalar(0.7);
+  flyBox({ x: PIZZA.wx, y: PIZZA.wy, z: PIZZA.wz }, trunkPoint, 0.8, () => {
+    cup.traverse(o => { if (o.geometry) o.geometry.dispose(); });   // материалы общие, геометрии — свои
+    NOS.tank = Math.min(1, NOS.tank + 0.4);
+    toast($t('держи бонус нитро'));
+    Snd.blip(980, 0.08, 'triangle', 0.12);
+  }, cup);
 }
 
 /* цель едет вместе с гостем: он ждёт там, где его застал заказ */
@@ -10057,11 +10072,9 @@ function checkArrival (dt) {
     if (d > 7) return;
     S.state = 'handover'; S.handT = 0.8;
     clearGate();
-    // в пиццерии хвалят, а иногда наливают кофе — это плюс к нитро
-    if (chance(0.45) && NOS.tank < 0.95) {
-      NOS.tank = Math.min(1, NOS.tank + 0.4);
-      popBonus($t('молодец!'), $t('подкрепись кофейком · +кофе-нитро'));
-    } else toast(pick([$t('молодец! забирай следующий'), $t('молодец! вот новый заказ'), $t('молодец!')]));
+    // иногда к следующей пицце в багажник кидают и стаканчик кофе — плюс к нитро (loadPizza);
+    // без попапа «молодец!»: похвалу и так видно по деньгам
+    S.coffeeNext = chance(0.45) && NOS.tank < 0.95;
     Snd.blip(600, 0.12, 'square', 0.13);
   }
 }
@@ -11413,6 +11426,8 @@ const LIFE_API = {
   ARCHES, makeHuman, dropMesh, makeCar, newCar, poseOnSlope, gibHuman, handsUp, emote, puff, sayBubble, toast, put, mergeGeos,
   onKill: () => { S.people++; Snd.squish(); },
 };
+// следы колёс (tracks.js): меш — сейчас, до renderer.compile, чтобы шейдер собрался под экраном загрузки
+TRK.init({ THREE, scene, V, IN, CITY, groundH, surfaceAt, curbAt, inPoly, nearestRoad, car: () => car, pizzerias: () => (PIZZERIAS.length ? PIZZERIAS : [PIZZA]) });
 
 /* ─────────────── цикл ─────────────── */
 let last = performance.now(), tG = 0;
@@ -11484,6 +11499,7 @@ function frame (now) {
   updateCollect(dt);
   updateTrunk(dt);
   updateRouteLine(dt);                            // оранжевый маршрут на асфальте
+  TRK.step(dt);                                   // следы колёс на газоне и снегу (tracks.js)
   updateGuide(dt);
   separateWalkers(dt);
   updateGibs(dt);

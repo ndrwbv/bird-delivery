@@ -1146,5 +1146,13 @@
  "смены, звёзды и сюжетные заказы": "services, étoiles et commandes de l’histoire",
  "сотрётся": "effacé",
  "ставлю обновление, игра перезапустится…": "installation de la mise à jour, le jeu va redémarrer…",
- "стереть весь прогресс?": "effacer toute la progression ?"
+ "стереть весь прогресс?": "effacer toute la progression ?",
+ "за смену": "ce service",
+ "кофе-нитро в баке!": "café-nitro dans le réservoir !",
+ "держи {a} или {b} — машина рванёт вперёд": "maintiens {a} ou {b} — et la voiture décolle",
+ "держи кнопку {a} — машина рванёт вперёд": "maintiens le bouton {a} — et la voiture décolle",
+ "пока держишь, кофе тает. сколько осталось — голубое кольцо вокруг радара. новые стаканчики стоят у дороги": "tant que tu maintiens, le café fond. ce qui reste — l’anneau bleu autour du radar. d’autres gobelets attendent au bord de la route",
+ "пока держишь, кофе тает. сколько осталось — кольцо по краю кнопки. новые стаканчики стоят у дороги": "tant que tu maintiens, le café fond. ce qui reste — l’anneau autour du bouton. d’autres gobelets attendent au bord de la route",
+ "понял": "compris",
+ "держи бонус нитро": "tiens, bonus nitro"
 }

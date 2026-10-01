@@ -1137,5 +1137,13 @@
  "смены, звёзды и сюжетные заказы": "smenalar, yulduzlar va syujetli buyurtmalar",
  "сотрётся": "oʻchadi",
  "ставлю обновление, игра перезапустится…": "yangilanish oʻrnatilmoqda, oʻyin qayta ishga tushadi…",
- "стереть весь прогресс?": "butun progress oʻchirilsinmi?"
+ "стереть весь прогресс?": "butun progress oʻchirilsinmi?",
+ "за смену": "smenada",
+ "кофе-нитро в баке!": "bakda kofe-nitro!",
+ "держи {a} или {b} — машина рванёт вперёд": "{a} yoki {b} ni bosib tur — mashina oldinga otiladi",
+ "держи кнопку {a} — машина рванёт вперёд": "{a} tugmasini bosib tur — mashina oldinga otiladi",
+ "пока держишь, кофе тает. сколько осталось — голубое кольцо вокруг радара. новые стаканчики стоят у дороги": "bosib turganingda kofe kamayadi. qancha qolgani — radar atrofidagi havorang halqa. yangi stakanlar yoʻl chetida",
+ "пока держишь, кофе тает. сколько осталось — кольцо по краю кнопки. новые стаканчики стоят у дороги": "bosib turganingda kofe kamayadi. qancha qolgani — tugma chetidagi halqa. yangi stakanlar yoʻl chetida",
+ "понял": "tushundim",
+ "держи бонус нитро": "ol, nitro bonusi"
 }
