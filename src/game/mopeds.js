@@ -26,13 +26,11 @@ const pick = a => a[(Math.random() * a.length) | 0];
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 
 /* службы: цвет короба и шлема, цвет полосы, доля */
-const BRAND_NAMES = /*i18n*/ ['Жуй-Еда', 'Самокатик', 'Клуб Доставки'];
 const BRANDS = [
   { i: 0, hex: '#ffd21f', stripe: '#1b1a1f', w: 0.6 },
   { i: 1, hex: '#ff4f9a', stripe: '#ffffff', w: 0.2 },
   { i: 2, hex: '#2fb35a', stripe: '#ffffff', w: 0.2 },
 ];
-const brandName = b => t(BRAND_NAMES[b.i]);
 const pickBrand = () => { let r = Math.random(); for (const b of BRANDS) if ((r -= b.w) <= 0) return b; return BRANDS[0]; };
 const BODY_HEX = ['#e8e4dc', '#3c4048', '#c8323a', '#7f8a96'];
 
@@ -218,7 +216,6 @@ function fall (A, c) {
     A.gibHuman({ x, z, grp }, c.kvx || 0, c.kvz || 0);
     A.dropMesh(grp);
     A.S.people++;
-    A.toast(t('курьер «{brand}» улетел с мопеда', { brand: brandName(br) }));
     m.gone = 1;
     MP.n.flown++;
     return;
@@ -226,7 +223,6 @@ function fall (A, c) {
   grp.position.set(x, A.groundH(x, z) + 0.9, z);
   A.scene.add(grp);
   FLY.push({ grp, c, x, z, y: 0.9, vx: c.kvx * 0.9 + rand(-1, 1), vz: c.kvz * 0.9 + rand(-1, 1), vy: rand(2.5, 4), st: 'air', T: 0, rot: rand(-3, 3) });
-  A.toast(t('курьер «{brand}» слетел с мопеда', { brand: brandName(br) }));
   MP.n.falls++;
 }
 
@@ -264,7 +260,6 @@ function stepFly (dt, A) {
         A.gibHuman({ x: f.x, z: f.z, grp: g }, V.vx, V.vz);
         A.dropMesh(g);
         A.S.people++;
-        A.toast(t('минус курьер «{brand}»', { brand: brandName(c.mp.br) }));
         if (c.mp) c.mp.gone = 1;
         FLY.splice(i, 1);
       }
@@ -336,7 +331,6 @@ export function step (dt, A) {
         A.gibHuman({ x: man.x, z: man.z, grp: g }, V.vx, V.vz);
         A.dropMesh(g);
         A.S.people++;
-        A.toast(t('минус курьер «{brand}»', { brand: brandName(man.c.mp.br) }));
         man.c.mp.man = null;
       }
     }

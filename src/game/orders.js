@@ -9,7 +9,7 @@
      ORD.setup(plan)                 — после S.order: цена, срок, цвет
      ORD.card(order)                 — полоса цвета и очередь на карточке
      ORD.arrive(o, st, onTime)       — подъехал к клиенту; true — дальше не идти (развоз смены, ждём onArrive)
-     ORD.payStop(o, st, onTime, tier) → сколько заплатили за остановку (ECON.orderPay / tipFor)
+     ORD.payStop(o, st, onTime, tier) → сколько заплатили за остановку (ECON.orderPay / tipFor); разбивку (заказ, скорость, чаевые) кладёт в st.pay — её рисует popPay
      ORD.delivered(o, st, onTime)    — заказ весь отдан: поручение, STORY.onDeliver
      ORD.step(dt)                    — каждый кадр: HUD очереди, посадка работников
      ORD.targetColor(), ORD.tintMarker(marker), ORD.drawMapQueue(ctx, fmX, fmZ, u), ORD.bagMesh(bag)
@@ -566,7 +566,7 @@ export function payStop (o, st, onTime, tier) {
   const zone = st.zone || sp.zone;
   markUsed(st.key);
   SH.done += o.idx === o.stops.length - 1 ? 1 : 0;
-  if (!onTime) return Math.round(fee * PAY.LATE);
+  if (!onTime) { st.pay = { fee, bonus: 0, tip: 0, late: true, story: !!sp.story }; return Math.round(fee * PAY.LATE); }
   const bonus = tier ? Math.round(fee * (PAY.SPEED_BONUS[tier] || 0)) : 0;
   const lunch = S.lunch === 'tips';
   const pc = DIST.pace();
@@ -577,10 +577,8 @@ export function payStop (o, st, onTime, tier) {
     tip = Math.round(fee * rand(a, b) * (lunch ? TIPS.LUNCH_MUL : 1) * (pc.tipMul || 1) / 10) * 10;
     rich = true;
   }
-  const sub = [bonus ? t('за скорость +{money}', { money: A.money(bonus) }) : '', tip ? (rich ? t('чаевые от богача +{money}', { money: A.money(tip) }) : t('чаевые +{money}', { money: A.money(tip) })) : ''].filter(Boolean).join(' · ');
-  if (sp.story) { /* сюжет: катсцена сама покажет награду */ }
-  else if (bonus) A.popBonus(tier === 2 ? t('А ты харош!') : t('Шустро!'), sub);
-  else if (tip) A.popBonus(rich ? t('сдачи не надо!') : t('чаевые!'), sub);
+  // из чего сложилась оплата — game.js покажет кучкой денег и чеком (popPay); сюжет — катсцена сама покажет награду
+  st.pay = { fee, bonus, tip, rich: rich && tip > 0, late: false, story: !!sp.story };
   return fee + bonus + tip;
 }
 

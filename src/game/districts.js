@@ -20,7 +20,7 @@
 import { DISTRICT, PACE } from './econ.js';
 
 let A = null;
-const KEY = 'dlv-district', KEY_N = 'dlv-dist-shifts';
+const KEY = 'dlv-district', KEY_N = 'dlv-dist-shifts', KEY_O = 'dlv-dist-open';
 const cbs = [];
 
 export function init (api) { A = api; }
@@ -42,11 +42,25 @@ function counts () {
 }
 export const shiftsIn = i => counts()[i] || 0;
 export const need = i => (i < count() - 1 ? DISTRICT.OPEN[Math.min(i, DISTRICT.OPEN.length - 1)] || 0 : 0);
-/* открыт первый и каждый следующий, если в предыдущем отъезжено need(i) смен */
+/* открыт первый и каждый следующий, если в предыдущем отъезжено need(i) смен.
+   Сколько уже открыто — запоминаем (KEY_O): когда числа OPEN растут, открытое не закрывается.
+   Старое сохранение (KEY_O ещё нет) — считаем по старым числам OPEN_OLD; в KEY_O это
+   записывается в конце первой же смены (countShift), не раньше: облако Яндекса может
+   догрузиться позже, чем игра впервые спросит opened(). */
+const OLD = DISTRICT.OPEN_OLD || DISTRICT.OPEN;
+const needOld = i => (i < count() - 1 ? OLD[Math.min(i, OLD.length - 1)] || 0 : 0);
+function base () {
+  const v = A ? A.Store.get(KEY_O, null) : null;
+  if (v != null) return Math.max(1, Math.min(count(), +v || 1));
+  const c = counts();
+  let n = 1;
+  while (n < count() && c[n - 1] >= needOld(n - 1)) n++;
+  return n;
+}
 export function opened () {
   if (!has()) return 1;
   const c = counts();
-  let n = 1;
+  let n = base();
   while (n < count() && c[n - 1] >= need(n - 1)) n++;
   return n;
 }
@@ -75,6 +89,7 @@ export function countShift (delivered) {
   c[i] = (c[i] || 0) + 1;
   A.Store.set(KEY_N, c);
   const after = opened();
+  A.Store.set(KEY_O, after);
   let fresh = -1;
   if (after > before) { fresh = after - 1; set(fresh); }
   A.Store.flush && A.Store.flush();
@@ -101,6 +116,6 @@ export function setPace (id) { if (PACE.MODES[id]) MODE = id; }
 /* отладка: __dlv.DIST */
 export const DEBUG = {
   list, at, cur, set, opened, shiftsIn, need, countShift, speed, pay, dist, pace, setPace, beginShift, session,
-  unlockAll () { if (!A) return; A.Store.set(KEY_N, list().map((_, i) => need(i))); A.Store.flush && A.Store.flush(); },
-  reset () { if (!A) return; A.Store.set(KEY_N, []); A.Store.set(KEY, 0); A.Store.flush && A.Store.flush(); },
+  unlockAll () { if (!A) return; A.Store.set(KEY_N, list().map((_, i) => need(i))); A.Store.set(KEY_O, count()); A.Store.flush && A.Store.flush(); },
+  reset () { if (!A) return; A.Store.set(KEY_N, []); A.Store.set(KEY_O, 1); A.Store.set(KEY, 0); A.Store.flush && A.Store.flush(); },
 };

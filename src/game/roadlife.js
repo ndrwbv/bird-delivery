@@ -267,7 +267,6 @@ function buildSigns (A) {
     U.push(u0 + du, v0 + dv, u0 + 0.25 - du, v0 + dv, u0 + 0.25 - du, v1 - dv, u0 + du, v1 - dv);
     I.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
   };
-  A.SM_WORD.sign = t('знак');
   for (const p of SG.poles) {
     const base = A.groundH(p.x, p.z) + A.curbAt(p.x, p.z);
     const L = [];
@@ -497,7 +496,6 @@ function buildFences (A) {
   A.scene.add(mesh);
   // каждая секция (2,5 м) — сбиваемая, как дворовый заборчик: на ходу сносится, летят чёрные обломки
   if (A.smashMesh) {
-    if (A.SM_WORD && !A.SM_WORD.bigfence) A.SM_WORD.bigfence = t('забор');
     for (const [x, z, vi, l] of PANELS) A.smashMesh('bigfence', x, z, l / 2 * 0.8, mesh, vi, 4, '#17181c');
   }
 }

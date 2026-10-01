@@ -835,7 +835,7 @@ function grillStep (dt) {
           g.grp.remove(m.grp);
           A.dropMesh(m.grp);
           A.gibHuman({ x: m.x, z: m.z, grp: m.grp }, V.vx, V.vz);
-          if (A.onRunOver) A.onRunOver(t('минус шашлычник'));
+          if (A.onRunOver) A.onRunOver();
           for (const o of g.men) if (!o.dead) o.shock = rand(2, 3.5);
         }
       }
@@ -1061,7 +1061,7 @@ function gangStep (dt) {
         if (m.bubble) { m.grp.remove(m.bubble); m.bubble.material.dispose(); m.bubble = null; }
         A.dropMesh(m.grp);
         A.gibHuman({ x: m.x, z: m.z, grp: m.grp }, V.vx, V.vz);
-        if (A.onRunOver) A.onRunOver(A.ADULT ? t('минус гопник') : t('минус хулиган'));
+        if (A.onRunOver) A.onRunOver();
       }
     }
   }
@@ -1107,7 +1107,6 @@ export function build (api) {
   if (!CAREER) CAREER = !!api.CAREER;
   if (!MAPR) MAPR = (api.MAP && api.MAP.career) || null;
   const tm = (k, f) => { const t0 = performance.now(); f(); STATS.buildMs[k] = Math.round(performance.now() - t0); };
-  if (A.SM_WORD && !A.SM_WORD.bench) A.SM_WORD.bench = t('лавочка');
   tm('alleys', () => { pathGrid(); planAlleys(); drawAlleys(); });
   if (!CAREER) return;
   tm('rich', richLawns);

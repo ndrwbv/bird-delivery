@@ -16,8 +16,6 @@
    api: THREE, scene, BENCHES, V, S, ADULT, makeHuman, makePerson, dropMesh, gibHuman, groundH, curbAt,
         fxAdd, puffGeo, steam, toast, Snd, CAR_L, CAR_W, nearestRoad, t */
 
-import { t } from '../i18n/index.js';
-
 const SPAWN_R = 230, DROP_R = 320;
 const SHARE = 0.09, MIN_GAP = 110, MAX_SPOTS = 60;   // доля лавочек с кальянщиками, не ближе друг к другу, всего не больше
 
@@ -150,7 +148,6 @@ function hitCheck (s) {
       p.grp.visible = false;
       A.gibHuman(p, V.vx, V.vz);
       A.S.people++;
-      A.toast(A.ADULT ? t('минус кальянщик') : t('минус любитель чая'));
       s.deadT = 30;                                     // компания вернётся, когда отъедешь и полминуты пройдёт
     }
   }

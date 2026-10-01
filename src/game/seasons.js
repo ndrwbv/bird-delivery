@@ -331,7 +331,7 @@ let MESH_GARL = [], MESH_PILE = [];
 const BUILT = { trees: 0, pile: 0, garl: 0, drifts: 0, bulbs: 0, items: 0 };
 
 /* ctx: THREE, scene, cam, renderer, Store, MAP, CITY, V, S, groundH, curbAt, nearestRoad, roadWidth, drivable,
-   inHouse, inPoly, inBounds, put, smashAdd, SMASH, SM_WORD, SMASH_MAT, LAMP_SPOTS, ZEBRAS, NODE_IDX, nodeDeg,
+   inHouse, inPoly, inBounds, put, smashAdd, SMASH, SMASH_MAT, LAMP_SPOTS, ZEBRAS, NODE_IDX, nodeDeg,
    makeHuman, dropMesh, gibHuman, toast, Snd, CAR_L, CAR_W, isPlaying, sayBubble; геттеры: PIZZA, ENV, rainLines, hemi */
 export function initSeasons (ctx) {
   C = ctx; THREE = ctx.THREE;
@@ -345,21 +345,16 @@ export function initSeasons (ctx) {
   }
   PILE = Pile(); GARL = Pile(); DRIFTP = Pile(); LEAFP = Pile();
   smashMat(C.SMASH_MAT);
-  C.SM_WORD.ice = t('ледяная горка');
-  C.SM_WORD.snowman = t('снеговик');
   apply();
 }
 
 /* сдвинуть сезон: новая смена */
 export function advanceSeason () {
   if (FORCED) return;
-  const was = seasonName();
   SEA = wrap(SEA + SEASON_STEP);
   healDrifts();
   C.Store.set('dlv-season', SEA);
   apply();
-  const now = seasonName();
-  if (now !== was) C.toast(t('на дворе {s}', { s: now }));
 }
 export function setSeason (v) { SEA = wrap(+v); FORCED = true; apply(); }
 function wrap (v) { return Math.round(((v % 4) + 4) % 4 * 1000) / 1000 % 4; }
@@ -1108,7 +1103,7 @@ function stepChunks (dt) {
 
 /* ── снежки: две команды во дворе, лепят, замахиваются, бросают ── */
 const FIGHTS = [], BALLS = [];
-let BALL_GEO = null, BALL_MAT = null, fightScan = 0, carHitT = 0;
+let BALL_GEO = null, BALL_MAT = null, fightScan = 0;
 function fightSpots () {
   if (FIGHT_SPOTS.built) return FIGHT_SPOTS;
   const { CITY, inHouse, inPoly, inBounds, nearestRoad } = C;
@@ -1186,7 +1181,6 @@ function stepBalls (dt) {
     // попали в курьера
     if (!done && Math.abs(b.x - V.x) < 1.2 && Math.abs(b.z - V.z) < 1.2 && b.y < V.y + 1.8) {
       done = true;
-      if (carHitT <= 0 && C.isPlaying()) { carHitT = 25; C.toast(t('в тебя попали снежком')); }
       C.Snd.blip(420, 0.05, 'triangle', 0.05);
     }
     if (!done && b.y < gy) done = true;
@@ -1223,7 +1217,6 @@ function stepFights (dt) {
         const dx = q.x - V.x, dz = q.z - V.z;
         if (Math.abs(dx * fx + dz * fz) < C.CAR_L + 0.5 && Math.abs(dx * fz - dz * fx) < C.CAR_W + 0.35) {
           q.dead = 1; C.dropMesh(g); C.gibHuman(q, V.vx, V.vz); C.S.people++; C.Snd.squish();
-          C.toast(t('минус {what}', { what: t('снежный снайпер') }));
           continue;
         }
       }
@@ -1272,7 +1265,6 @@ export function updateSeasons (dt) {
   if (!C || !SNOWF) return;
   U.uTime.value += dt;
   U.uNight.value = C.ENV.night || 0;
-  carHitT -= dt;
   stepSky(dt);
   stepCar(dt);
   stepLeafBits(dt);

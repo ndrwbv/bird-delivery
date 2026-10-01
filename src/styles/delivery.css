@@ -494,6 +494,46 @@ body.brief #view { filter: blur(6px) brightness(0.72); transition: filter .25s; 
   100% { opacity: 0; transform: translate(-50%, -80%) scale(1); }
 }
 
+/* ── оплата за адрес (popPay в game.js): под машиной падает кучка — купюры за заказ,
+   монеты за чаевые и скорость; рядом крупно «+N ₽» и чек «заказ — X · чаевые — Y».
+   Через полторы секунды куча улетает в кошелёк справа сверху. Ввод не перехватывает. ── */
+#payfx { position: fixed; left: 50%; top: 77%; z-index: 12; transform: translate(-50%, -50%); pointer-events: none;
+         display: flex; align-items: flex-end; gap: clamp(10px, 2vw, 22px); }
+#payfx[hidden] { display: none; }
+.pf-pile { position: relative; width: clamp(96px, 12vw, 150px); height: clamp(64px, 9vw, 104px); flex: none; }
+.pf-pile i { position: absolute; display: flex; align-items: center; justify-content: center; font-style: normal; opacity: 0;
+             transform: rotate(var(--r)); will-change: transform, opacity; }
+.pf-pile i.b { width: 32%; height: 22%; font-size: clamp(8px, 1vw, 12px); color: #1d4d23; border: 2px solid #2d6b34; border-radius: 3px;
+               background: linear-gradient(90deg, #7fd38a, #a8ecb0 50%, #7fd38a); box-shadow: 0 2px 0 rgba(0, 0, 0, .35); }
+.pf-pile i.c { width: 17%; aspect-ratio: 1; font-size: clamp(7px, .8vw, 10px); color: #7a5418; border: 2px solid #8a5a14; border-radius: 50%;
+               background: radial-gradient(circle at 35% 35%, #fff0a8, #ffd85e 45%, #c99a2e); box-shadow: 0 2px 0 rgba(0, 0, 0, .35); }
+.pf-pile i.x { display: none; }
+#payfx.on .pf-pile i { animation: pf-fall .45s cubic-bezier(.3, 1.5, .6, 1) var(--d) both; }
+#payfx.on.fly .pf-pile i { animation: pf-fly .55s cubic-bezier(.5, 0, .8, .4) var(--fd) both; }
+@keyframes pf-fall { from { transform: translateY(-260px) rotate(calc(var(--r) * -3)); opacity: 0; } 30% { opacity: 1; } to { transform: rotate(var(--r)); opacity: 1; } }
+@keyframes pf-fly { from { transform: rotate(var(--r)); opacity: 1; } to { transform: translate(var(--fx), var(--fy)) rotate(90deg) scale(.35); opacity: .2; } }
+.pf-r { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+#payfx.on .pf-r { animation: pf-in 2.4s cubic-bezier(.2, .9, .3, 1.2) both; }
+@keyframes pf-in { 0% { opacity: 0; transform: translateY(14px) scale(.8); } 10% { opacity: 1; transform: translateY(0) scale(1.06); } 18% { transform: scale(1); }
+                   84% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-10px); } }
+.pf-t { font-size: clamp(9px, 1.1vw, 13px); color: #fff3d6; text-shadow: 2px 2px 0 #33210c, -1px -1px 0 #33210c; }
+.pf-t:empty { display: none; }
+.pf-sum { font-size: clamp(20px, 2.8vw, 34px); color: #ffd85e; white-space: nowrap;
+          text-shadow: 3px 3px 0 #33210c, -2px -2px 0 #33210c, 2px -2px 0 #33210c, -2px 2px 0 #33210c; }
+.pf-sum.late { color: #ffb0a0; }
+/* чек — та же бумага с перфорацией, что у накладной заказа */
+.pf-chk { position: relative; min-width: clamp(170px, 20vw, 250px); padding: 8px 12px; background: #fff3d6; color: #33210c;
+          border: 3px solid #33210c; border-radius: 3px; box-shadow: 0 5px 0 #33210c; transform: rotate(-1.5deg); }
+.pf-chk::after { content: ''; position: absolute; left: 6px; right: 6px; bottom: -6px; height: 6px;
+                 background: radial-gradient(circle at 5px 3px, rgba(20, 16, 30, .8) 2.5px, transparent 3px) 0 0 / 12px 6px repeat-x; }
+.pf-chk p { display: flex; justify-content: space-between; gap: 14px; margin: 0; padding: 4px 0; font-size: clamp(8px, .95vw, 11px); line-height: 1.4; white-space: nowrap; }
+.pf-chk p + p { border-top: 1px dashed rgba(138, 107, 78, .7); }
+.pf-chk p span { color: #8a6b4e; }
+.pf-chk p.tip b { color: #b0700e; }
+.pf-chk p.neg b { color: #f0522a; }
+.pf-chk b { font-weight: normal; }
+@media (max-width: 560px) { #payfx { top: 72%; gap: 8px; } .pf-chk { min-width: 150px; padding: 6px 9px; } }
+
 /* ── Москва: гайд по управлению — по пунктам, один раз за сессию ── */
 #guide {
   position: absolute; left: 16px; top: 50%; transform: translateY(-50%); z-index: 11;

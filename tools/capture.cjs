@@ -85,7 +85,7 @@ async function main () {
   win.webContents.on('console-message', (e, lvl, msg) => { if (lvl >= 2) console.log('[page]', msg); });
   const url = `app://game/index.html?debug&mute&nolb&lang=${LANG}`;
   const js = code => win.webContents.executeJavaScript(code);
-  // сохранения до старта: без гайда и без учебного заказа (стрелка на весь кадр)
+  // сохранения до старта: без гайда и без учебного заказа (в нём город пустой и тихий)
   await win.loadURL(url);
   await js(`localStorage.clear(); localStorage.setItem('dlv-msk-guide', '1'); localStorage.setItem('dlv-msk-tut', '"1"'); localStorage.setItem('dlv-msk-xp', '4')`);
   await win.loadURL(url);

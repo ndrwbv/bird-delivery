@@ -90,13 +90,12 @@ function carHits (x, z, pad = 0) {
   const fx = Math.sin(V.h), fz = Math.cos(V.h), dx = x - V.x, dz = z - V.z;
   return Math.abs(dx * fx + dz * fz) < A.CAR_L + 0.5 + pad && Math.abs(dx * fz - dz * fx) < A.CAR_W + 0.35 + pad;
 }
-function kill (m, label) {
+function kill (m) {
   unsay(m);
   m.dead = 1; m.gone = 1;
   A.dropMesh(m.grp);
   A.gibHuman(m, A.V.vx, A.V.vz);            // сам зовёт scare и скорую; в детской — «тряпичная кукла»
   A.onKill();
-  A.toast(t('минус {what}', { what: m.person ? m.person.name : label }));
 }
 const handWorld = (m, arm = 'armR', y = -0.58) => { m.grp.updateMatrixWorld(true); return m.u[arm].localToWorld(V3.set(0, y, 0.02)); };
 
@@ -184,7 +183,7 @@ function coupleStep (c, dt) {
 function hitCheck (c) {
   for (const [m, o] of [[c.a, c.b], [c.b, c.a]]) {
     if (m.dead || !carHits(m.x, m.z)) continue;
-    kill(m, t('прохожий'));
+    kill(m);
     if (o.dead) continue;
     // второй: к нему на колени (детская) или прочь / замер (взрослая)
     const mode = A.ADULT ? (chance(0.55) ? 'flee' : 'freeze') : 'kneel';
@@ -373,7 +372,7 @@ function richStep (r, dt) {
   }
   // изредка бросает реплику — если курьер рядом и слышит
   if ((r.sayT -= dt) <= 0) { r.sayT = rand(14, 30); if (d < 40 && !m.say) say(m, t(pick(RICH_LINES)), '#8a6a1a', 2.4); }
-  if (!m.gone && carHits(m.x, m.z)) { kill(m, t('богач')); return; }
+  if (!m.gone && carHits(m.x, m.z)) { kill(m); return; }
   if (!dg) return;
   // собачка семенит слева чуть впереди, поводок — от руки к ошейнику
   const h = m.grp.rotation.y, fx = Math.sin(h), fz = Math.cos(h), rx = Math.cos(h), rz = -Math.sin(h);
@@ -471,7 +470,7 @@ function luxStep (l, dt) {
     if ((l.watchT -= dt) <= 0) { l.watchT = rand(8, 16); l.watch = 1.6; }
   }
   place(m);
-  if (carHits(m.x, m.z)) kill(m, t('шофёр'));
+  if (carHits(m.x, m.z)) kill(m);
 }
 
 /* ═════════════════ графитисты ═════════════════
@@ -793,7 +792,7 @@ function artistStep (a, dt) {
     place(m, Math.abs(Math.sin(m.ph)) * 0.04);
     if (a.t > 40 && d > 70) a.gone = 1;
   }
-  if (carHits(m.x, m.z)) { kill(m, t('графитист')); W.busy = 0; a.gone = 1; }
+  if (carHits(m.x, m.z)) { kill(m); W.busy = 0; a.gone = 1; }
 }
 function flee (a) {
   const m = a.m;
@@ -941,7 +940,7 @@ function flyerStep (f, dt) {
   f.t += dt;
   const d = far(m), vis = d < 200;
   if (!m.gone) m.grp.visible = d < 130;
-  if (!m.dead && carHits(m.x, m.z)) { kill(m, t('прохожий')); f.fall = { t: 0 }; }
+  if (!m.dead && carHits(m.x, m.z)) { kill(m); f.fall = { t: 0 }; }
   if (f.kind === 'kite') {
     f.mesh.visible = f.tail.visible = vis; f.str.visible = vis && !f.fall;
     const wx = Math.sin(WIND), wz = Math.cos(WIND), sx = -wz, sz = wx;
