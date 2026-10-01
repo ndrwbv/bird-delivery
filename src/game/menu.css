@@ -7,6 +7,8 @@ body.career #big { background: linear-gradient(90deg, rgba(10, 14, 32, .86) 0, r
 body.career #topbar { position: absolute; top: 0; right: 0; width: auto; z-index: 3; padding: max(16px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 0 0; }
 
 #cr-menu { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+/* версия сборки — в правом нижнем углу, под рейтингом (у того снизу отступ ≥ 22px) */
+body.career #build-v { position: absolute; z-index: 3; margin: 0; right: max(12px, env(safe-area-inset-right)); bottom: max(7px, env(safe-area-inset-bottom)); font-size: 8px; }
 #cr-menu > * { pointer-events: auto; }
 
 .crm-col { position: absolute; top: 0; bottom: 0; left: 0; width: min(440px, 38vw); box-sizing: border-box; display: flex; flex-direction: column;

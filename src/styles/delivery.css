@@ -958,6 +958,12 @@ body:has(#over:not([hidden])) .hud, body:has(#over:not([hidden])) #ctrls { visib
 #board-list li { font-size: 11px; padding: 8px 0; }
 #board-list li:nth-child(-n+3) { font-size: 12px; }
 #board .bd-t { font-size: 12px; }
+/* версия сборки: мелко и бледно — в Москве под таблицей, в карьере (menu.css) — в правом нижнем углу */
+#build-v { flex: none; margin-top: 14px; font-size: 7px; line-height: 1; letter-spacing: .04em; color: #b9b4ab; opacity: .85;
+           text-shadow: 1px 1px 0 #33210c; pointer-events: none; user-select: none; }
+#build-v:empty { display: none; }
+/* широкий экран: колонка заставки узкая по центру — версия в правом нижнем углу, видна без прокрутки */
+@media (min-width: 900px) { #build-v { position: fixed; right: 12px; bottom: 7px; margin: 0; font-size: 8px; } }
 
 /* ── итоги смены ── */
 #over { position: absolute; inset: 0; z-index: 25; display: flex; align-items: center; justify-content: center; padding: 16px;

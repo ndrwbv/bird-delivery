@@ -27,6 +27,7 @@ OpenStreetMap): заказы от «умного трекера», трафик 
 | `npm run build:yandex` | архив для консоли Яндекс Игр | `release/yandex-<версия>.zip` |
 | `npm run electron` | Стим-сборка в Электроне | окно |
 | `npm run dist:win` / `dist:deck` / `dist:mac` | пакеты для SteamPipe | `release/` |
+| релиз: GitHub → Actions → «Релиз» → Run workflow | выбрать только `patch` / `minor` / `major` — номер (v0.0.8…) CI считает сам и пишет его в углу заставки | GitHub Releases ([docs/STEAM.md](docs/STEAM.md)) |
 
 Сначала Яндекс Игры — [docs/YANDEX.md](docs/YANDEX.md) (что сделать руками, чтобы залить)
 и [docs/YANDEX-AUDIT.md](docs/YANDEX-AUDIT.md) (сверка с требованиями). Что вписано в

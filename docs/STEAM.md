@@ -19,7 +19,13 @@ Steam-бандл — это `vite build --mode steam` (→ `dist/steam`) вну�
 `--no-update`, `--steam-overlay`. `F11` / `Alt+Enter` — полный экран.
 
 **CI:** [.github/workflows/release.yml](../.github/workflows/release.yml), ручной запуск
-(Actions → «Релиз»). Linux собирается на ubuntu, Windows — на windows-раннере (правка иконки
+(Actions → «Релиз» → Run workflow). Номер версии руками не вводится: выбираешь только, что
+поднять — `patch` (правки: v0.0.7 → v0.0.8, по умолчанию), `minor` (заметное новое: → v0.1.0)
+или `major` (→ v1.0.0); CI берёт последний тег `vX.Y.Z` и считает следующий (тегов нет —
+v0.0.1 / v0.1.0 / v1.0.0). Этот номер попадает везде: тег и заголовок релиза, `version` в
+`package.json` (Электрон, свойства `.exe`, установщик, имя zip для Яндекса), подпись версии на
+заставке игры и `electron/build-tag.json`. Запуски идут по очереди, два одинаковых номера не
+выйдут; если тег уже есть — прогон падает сразу. Linux собирается на ubuntu, Windows — на windows-раннере (правка иконки
 и версии `.exe` на Linux требует wine). В гит-релиз идут `bird-pizza-deck.tar.gz`,
 `install-deck.sh`, `bird-pizza-setup.exe` (установщик для Windows мимо Steam, §8) и
 `bird-pizza-win.zip` (папка для депота Windows); отдельно артефактом — zip для Яндекс Игр.

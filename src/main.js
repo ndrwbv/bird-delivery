@@ -10,6 +10,10 @@ import { pickLang } from './langpick.js';
 import { MAP_IDS, loadMap } from './maps/index.js';
 import { useMap } from './game/map.js';
 
+// версия сборки в углу заставки: «v0.0.8» из релиза или «dev-<коммит>» (vite.config.js, __BUILD__)
+const buildV = document.getElementById('build-v');
+if (buildV) buildV.textContent = typeof __BUILD__ === 'string' ? __BUILD__ : '';
+
 await Platform.init({ langs: LANGS });
 // первый запуск — спросить язык: игра ещё не загружена, перезагружать нечего. На Яндексе язык даёт площадка
 if (Platform.id !== 'yandex' && !Platform.langChosen) {

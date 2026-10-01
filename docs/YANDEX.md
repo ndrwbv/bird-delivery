@@ -12,7 +12,7 @@
 
 ## Каждый релиз
 
-1. `npm run build:yandex` → `release/yandex-<версия>.zip` (версия — в `package.json`).
+1. `npm run build:yandex` → `release/yandex-<версия>.zip` (версия — в `package.json`; в CI-релизе это номер релиза, он же — в углу заставки).
 2. Проверить локально с настоящим SDK:
    `npx @yandex-games/sdk-dev-proxy -p dist/yandex --dev-mode=true` → https://localhost:8080.
 3. Консоль → «Добавить игру» (или своя игра → «Черновик») → «Общее → Архив» → загрузить zip.

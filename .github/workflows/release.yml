@@ -1,19 +1,27 @@
 # Ручной релиз: Steam Deck / Linux (x64) и Windows (x64) + zip для Яндекс Игр.
-# Запуск: Actions → «Релиз» → Run workflow.
+# Запуск: Actions → «Релиз» → Run workflow → выбрать, что поднять: patch / minor / major.
+# Номер считается сам от последнего тега vX.Y.Z: patch — v0.0.7 → v0.0.8 (правки),
+# minor — v0.0.7 → v0.1.0 (заметное новое), major — v0.0.7 → v1.0.0. Тегов ещё нет —
+# v0.0.1 / v0.1.0 / v1.0.0. Руками номер не вводится и в package.json не правится.
+# Этот номер — везде: version в package.json (Электрон, свойства .exe, установщик, имя zip
+# для Яндекса), подпись версии на заставке игры (vite, BUILD_VERSION → __BUILD__) и
+# electron/build-tag.json (тег/коммит/дата: по нему установка с GitHub понимает, что вышла
+# версия свежее, и предлагает обновиться).
+# Два запуска подряд не возьмут один номер: они идут по очереди (concurrency), второй
+# считает номер, когда первый уже выложил тег. Если тег вдруг уже есть — прогон падает сразу.
 # В гит-релиз идут bird-pizza-deck.tar.gz + install-deck.sh (Deck), bird-pizza-setup.exe
 # (установщик для Windows) и bird-pizza-win.zip (та же игра папкой — для депота Steam и вручную).
-# Тег запекается в сборку (electron/build-tag.json): по нему установка с GitHub понимает,
-# что вышла версия свежее, и предлагает обновиться. Zip для Яндекса — только артефакт прогона:
-# его заливают руками в консоль разработчика.
+# Zip для Яндекса — только артефакт прогона: его заливают руками в консоль разработчика.
 name: Релиз
 
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Тег релиза, например v0.1.1. Пусто — подставится дата.'
-        required: false
-        default: ''
+      bump:
+        description: 'Что поднять в версии: patch — правки (0.0.7 → 0.0.8), minor — новое (→ 0.1.0), major — большое (→ 1.0.0)'
+        type: choice
+        options: [patch, minor, major]
+        default: patch
       notes:
         description: 'Что нового — попадёт в описание релиза.'
         required: false
@@ -23,6 +31,11 @@ on:
         type: boolean
         default: true
 
+# релизы — строго по одному: иначе два прогона посчитают одинаковый номер
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -31,16 +44,35 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.t.outputs.tag }}
+      version: ${{ steps.t.outputs.version }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # с тегами: от последнего vX.Y.Z считается следующий номер
+
       - id: t
+        name: Номер версии
         env:
-          IN_TAG: ${{ inputs.tag }}
+          BUMP: ${{ inputs.bump }}
         run: |
           set -eu
-          TAG="$IN_TAG"
-          if [ -z "$TAG" ]; then TAG="build-$(date -u +%Y%m%d-%H%M)"; fi
+          git fetch --tags --force --quiet origin
+          LAST=$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)
+          if [ -n "$LAST" ]; then IFS=. read -r MA MI PA <<< "${LAST#v}"; else MA=0; MI=0; PA=0; fi
+          case "$BUMP" in
+            patch) PA=$((PA + 1)) ;;
+            minor) MI=$((MI + 1)); PA=0 ;;
+            major) MA=$((MA + 1)); MI=0; PA=0 ;;
+            *) echo "::error::bump должен быть patch, minor или major, а пришло «$BUMP»"; exit 1 ;;
+          esac
+          VERSION="$MA.$MI.$PA"
+          TAG="v$VERSION"
+          if git rev-parse -q --verify "refs/tags/$TAG" > /dev/null || git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null; then
+            echo "::error::тег $TAG уже есть — релиз с таким номером уже выходил"; exit 1
+          fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "тег: $TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "версия: ${LAST:-тегов не было} → $TAG ($BUMP)" >> "$GITHUB_STEP_SUMMARY"
 
   build:
     needs: meta
@@ -67,6 +99,10 @@ jobs:
       - name: Зависимости
         run: npm ci
 
+      # номер релиза — в package.json: из него Электрон (app.getVersion()), свойства .exe и установщик
+      - name: Версия
+        run: npm version "${{ needs.meta.outputs.version }}" --no-git-tag-version --allow-same-version
+
       - name: Метка сборки
         env:
           TAG: ${{ needs.meta.outputs.tag }}
@@ -76,6 +112,8 @@ jobs:
           cat electron/build-tag.json
 
       - name: Сборка веб-части (steam)
+        env:
+          BUILD_VERSION: ${{ needs.meta.outputs.version }}     # подпись версии на заставке
         run: npm run build:steam
 
       - name: Пакет Electron linux-x64
@@ -119,6 +157,7 @@ jobs:
           retention-days: 7
 
   yandex:
+    needs: meta
     if: inputs.yandex
     runs-on: ubuntu-latest
     steps:
@@ -128,8 +167,12 @@ jobs:
           node-version: '20'
           cache: npm
       - run: npm ci
+      - name: Версия
+        run: npm version "${{ needs.meta.outputs.version }}" --no-git-tag-version --allow-same-version
       - name: Сборка для Яндекс Игр
-        run: npm run build:yandex
+        env:
+          BUILD_VERSION: ${{ needs.meta.outputs.version }}
+        run: npm run build:yandex      # → release/yandex-<версия>.zip
       - uses: actions/upload-artifact@v4
         with:
           name: yandex-zip

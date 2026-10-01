@@ -84,8 +84,10 @@ Store Admin → заполнить и отправить на проверку (
 Сборка — GitHub Actions, руками ничего собирать не нужно:
 
 1. GitHub → репозиторий `ndrwbv/bird-delivery` → **Actions → «Релиз» → Run workflow**.
-2. Тег, например `v0.2.0`, и «что нового». Через ~10 минут в **Releases** появятся
-   `bird-pizza-win.zip` и `bird-pizza-deck.tar.gz`.
+2. В поле «Что поднять в версии» выбрать `patch` (правки, по умолчанию), `minor` (заметное
+   новое) или `major`; номер (например v0.0.8) CI посчитает сам от прошлого релиза.
+   Написать «что нового». Через ~10 минут в **Releases** появятся
+   `bird-pizza-win.zip` и `bird-pizza-deck.tar.gz`; тот же номер — в углу заставки игры.
 
 Собрать локально тоже можно: `npm run dist:deck` (Linux; с Mac обычно собирается) и
 `npm run dist:win` (на Windows) — тогда при заливке `LOCAL=1`.
