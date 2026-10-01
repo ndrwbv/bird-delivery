@@ -111,8 +111,7 @@ export function startShift () {
   lunchClass(false);
   fire(startCbs, { n: SH.n + 1 });
   const L = SH.len, P = SH.pace;
-  const where = DIST.has() ? t('район «{name}»', { name: t(DIST.list()[SH.district].name) }) + ' · ' : '';
-  setTimeout(() => { if (SH.on && SH.len === L) A.popBonus(t('на смене'), where + t('до конца смены ~{n} мин', { n: Math.round(shiftLeft() / 60) })); }, 1200);
+  // попапа «на смене · до конца смены ~N мин» нет: часы и так на экране справа сверху
   // щедрая и час пик — говорим прямо: игрок чувствует ритм
   const pm = ECON.PACE.MODES[P];
   const pace = P === 'generous' ? [t('щедрая смена'), t('кофе, аптечки и чаевые — рекой')]
