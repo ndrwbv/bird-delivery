@@ -100,12 +100,19 @@ ipcMain.handle('steam:textInput', async (e, desc, max, text) => {
 });
 
 /* ─── обновление с GitHub ───
-   Только для сборки, поставленной tools/install-deck.sh: он кладёт в папку метку .github-install.
+   Только для сборок, поставленных с GitHub мимо Steam (в Steam обновляет сам Steam):
+   • Linux / Deck — tools/install-deck.sh, он кладёт в папку метку .github-install;
+     обновление — тот же install-deck.sh поверх.
+   • Windows — установщик bird-pizza-setup.exe (NSIS из electron-builder, build.nsis в package.json).
+     Признак — его деинсталлятор «Uninstall BirdPizza.exe» рядом с exe: установщик кладёт его
+     всегда, в какую бы папку ни встал, а в zip для Steam его нет. Обновление — качаем свежий
+     setup.exe во временную папку, игра закрывается, установщик с --updated встаёт поверх
+     (окошко с полоской, без вопросов) и сам запускает игру снова.
    Сравниваем тег, запечённый CI в electron/build-tag.json, с последним релизом и, если игрок
-   согласен, запускаем тот же install-deck.sh поверх. В Steam обновляет сам Steam.
-   REPO — репозиторий с релизами; его ещё надо создать (см. docs/STEAM.md). */
+   согласен, обновляемся. REPO — репозиторий с релизами (см. docs/STEAM.md). */
 const REPO = 'ndrwbv/bird-delivery';
 const INSTALLER = `https://raw.githubusercontent.com/${REPO}/main/tools/install-deck.sh`;
+const SETUP = 'bird-pizza-setup.exe';
 const installDir = () => path.dirname(process.execPath);
 
 function buildInfo() {
@@ -113,10 +120,16 @@ function buildInfo() {
   catch (e) { return {}; }
 }
 const buildTag = () => buildInfo().tag || '';
+function githubInstall() {
+  if (process.platform === 'linux') return fs.existsSync(path.join(installDir(), '.github-install'));
+  // NSIS называет деинсталлятор по productName, как и сам exe: BirdPizza.exe → «Uninstall BirdPizza.exe»
+  if (process.platform === 'win32') return fs.existsSync(path.join(installDir(), `Uninstall ${path.basename(process.execPath, '.exe')}.exe`));
+  return false;
+}
 function updatable() {
-  if (!app.isPackaged || process.platform !== 'linux' || steamLaunched()) return false;
+  if (!app.isPackaged || steamLaunched()) return false;
   if (has('--no-update') || process.env.BIRD_NO_UPDATE) return false;
-  if (!fs.existsSync(path.join(installDir(), '.github-install'))) return false;
+  if (!githubInstall()) return false;
   try { fs.accessSync(installDir(), fs.constants.W_OK); } catch (e) { return false; }
   return !!buildTag();
 }
@@ -130,7 +143,9 @@ async function latestRelease() {
     });
     if (!r.ok) return null;
     const j = await r.json();
-    return j && j.tag_name ? { tag: j.tag_name, notes: (j.body || '').slice(0, 400) } : null;
+    if (!j || !j.tag_name) return null;
+    const setup = (j.assets || []).find(a => a && a.name === SETUP);
+    return { tag: j.tag_name, notes: (j.body || '').slice(0, 400), setup: setup ? setup.browser_download_url : '' };
   } catch (e) { return null; }
   finally { clearTimeout(timer); }
 }
@@ -143,30 +158,89 @@ async function checkUpdate(win, manual) {
   const rel = await latestRelease();
   if (!rel) return { state: 'error', current: cur };
   if (!cur || rel.tag === cur) return { state: 'fresh', current: cur, latest: rel.tag };
+  // в релизе нет установщика под Windows — предлагать нечего
+  if (process.platform === 'win32' && !rel.setup) return { state: 'error', current: cur, latest: rel.tag };
   if (!updatable()) return { state: 'available', current: cur, latest: rel.tag };
   const ru = RU();
+  const win32 = process.platform === 'win32';
   const { response } = await dialog.showMessageBox(win, {
     type: 'question',
     title: ru ? 'Обновление' : 'Update',
     message: (ru ? 'Вышла версия ' : 'New version ') + rel.tag,
     detail: (rel.notes ? rel.notes + '\n\n' : '') + (ru
-      ? `Установлена ${cur}. Обновить сейчас? Игра закроется и запустится заново.`
-      : `Installed: ${cur}. Update now? The game will restart.`),
+      ? `Установлена ${cur}. Обновить сейчас? ` + (win32
+        ? 'Новая версия скачается в фоне (около 110 МБ, полоска на значке в панели задач), потом игра закроется, обновится и запустится заново.'
+        : 'Игра закроется и запустится заново.')
+      : `Installed: ${cur}. Update now? ` + (win32
+        ? 'The new version downloads in the background (~110 MB), then the game closes, updates and restarts.'
+        : 'The game will restart.')),
     buttons: ru ? ['Обновить', 'Потом'] : ['Update', 'Later'],
     defaultId: 0, cancelId: 1, noLink: true,
   });
   if (response !== 0) return { state: 'declined', current: cur, latest: rel.tag };
-  applyUpdate();
+  applyUpdate(win, rel);
   return { state: 'updating', current: cur, latest: rel.tag };
 }
 
-function applyUpdate() {
+function applyUpdate(win, rel) {
+  if (process.platform === 'win32') { applyUpdateWin(win, rel); return; }
   // ждём, пока процесс отпустит папку, и ставим поверх тем же скриптом, что и в первый раз
   const sh = spawn('bash', ['-c', 'sleep 2; curl -fsSL "$BIRD_INSTALLER" | bash -s -- --dir "$BIRD_DIR" --no-desktop --run'], {
     env: { ...process.env, BIRD_INSTALLER: INSTALLER, BIRD_DIR: installDir() }, detached: true, stdio: 'ignore',
   });
   sh.unref();
   setTimeout(() => app.quit(), 300);
+}
+
+/* Windows: setup.exe качаем сами (net.fetch — без пометки «из интернета», так что SmartScreen
+   не спрашивает), пока игра идёт; ход — полоской на значке в панели задач. Потом запускаем его
+   отдельным процессом и выходим: --updated — тихо дождаться выхода игры, не спрашивать «закрыть?»
+   и не возвращать удалённый ярлык; --force-run — запустить игру после установки.
+   Не скачалось — окошко с ошибкой, игра остаётся открытой; ссылок наружу не даём (правило Steam). */
+let updatingWin = false;
+async function applyUpdateWin(win, rel) {
+  if (updatingWin) return;
+  updatingWin = true;
+  const bar = p => { try { if (win && !win.isDestroyed()) win.setProgressBar(p); } catch (e) { /* — */ } };
+  const file = path.join(app.getPath('temp'), SETUP);
+  try {
+    if (!rel) rel = await latestRelease();
+    if (!rel || !rel.setup) throw new Error('no ' + SETUP + ' in the latest release');
+    const r = await net.fetch(rel.setup, { headers: { 'user-agent': 'birdpizza-updater' } });
+    if (!r.ok || !r.body) throw new Error('HTTP ' + r.status);
+    const total = Number(r.headers.get('content-length')) || 0;
+    const out = fs.createWriteStream(file);
+    const closed = new Promise((res, rej) => { out.on('finish', res); out.on('error', rej); });
+    const reader = r.body.getReader();
+    let got = 0;
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        got += value.length;
+        if (!out.write(value)) await Promise.race([new Promise(res => out.once('drain', res)), closed]);
+        if (total) bar(got / total);
+      }
+    } finally { out.end(); }
+    await closed;
+    if ((total && got !== total) || got < 1e6) throw new Error(`download cut short: ${got} of ${total || '?'} bytes`);
+    bar(-1);
+    spawn(file, ['--updated', '--force-run'], { detached: true, stdio: 'ignore' }).unref();
+    setTimeout(() => app.quit(), 300);
+  } catch (e) {
+    log('update:', e.message);
+    updatingWin = false;
+    bar(-1);
+    const ru = RU();
+    dialog.showMessageBox(win && !win.isDestroyed() ? win : undefined, {
+      type: 'error',
+      title: ru ? 'Обновление' : 'Update',
+      message: ru ? 'Не получилось скачать обновление' : 'Could not download the update',
+      detail: (ru ? 'Проверь интернет и попробуй позже — игра предложит снова при следующем запуске.\n\n'
+        : 'Check your connection and try later — the game will offer it again next launch.\n\n') + e.message,
+      buttons: ['OK'], noLink: true,
+    }).catch(() => {});
+  }
 }
 
 ipcMain.handle('app:info', () => {
@@ -178,7 +252,7 @@ ipcMain.handle('app:info', () => {
   };
 });
 ipcMain.handle('update:check', (e, manual) => checkUpdate(BrowserWindow.fromWebContents(e.sender), !!manual));
-ipcMain.handle('update:apply', () => { if (!updatable()) return false; applyUpdate(); return true; });
+ipcMain.handle('update:apply', e => { if (!updatable()) return false; applyUpdate(BrowserWindow.fromWebContents(e.sender)); return true; });
 ipcMain.handle('app:quit', () => { setTimeout(() => app.quit(), 50); return true; });
 ipcMain.handle('win:fullscreen', (e, on) => { const w = BrowserWindow.fromWebContents(e.sender); if (w) w.setFullScreen(!!on); return !!(w && w.isFullScreen()); });
 ipcMain.handle('win:isFullscreen', e => { const w = BrowserWindow.fromWebContents(e.sender); return !!(w && w.isFullScreen()); });

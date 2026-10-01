@@ -44,6 +44,18 @@
         "dir"
       ]
     },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "packElevateHelper": false,
+      "shortcutName": "Птица Пицца",
+      "uninstallDisplayName": "Птица Пицца",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "bird-pizza-setup.${ext}"
+    },
     "linux": {
       "target": [
         "dir"

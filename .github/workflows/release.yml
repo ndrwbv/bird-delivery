@@ -1,6 +1,7 @@
 # Ручной релиз: Steam Deck / Linux (x64) и Windows (x64) + zip для Яндекс Игр.
 # Запуск: Actions → «Релиз» → Run workflow.
-# В гит-релиз идут bird-pizza-deck.tar.gz, bird-pizza-win.zip и install-deck.sh.
+# В гит-релиз идут bird-pizza-deck.tar.gz + install-deck.sh (Deck), bird-pizza-setup.exe
+# (установщик для Windows) и bird-pizza-win.zip (та же игра папкой — для депота Steam и вручную).
 # Тег запекается в сборку (electron/build-tag.json): по нему установка с GitHub понимает,
 # что вышла версия свежее, и предлагает обновиться. Zip для Яндекса — только артефакт прогона:
 # его заливают руками в консоль разработчика.
@@ -90,6 +91,13 @@ jobs:
         if: matrix.target == 'win'
         run: npx electron-builder --win zip --x64 --publish never -c.win.artifactName='bird-pizza-win.${ext}'
 
+      # Установщик для игроков мимо Steam: ставится в профиль без прав админа, ярлыки «Птица Пицца»,
+      # игра сама предлагает обновления. Настройки — build.nsis в package.json. Отдельным прогоном
+      # после zip, чтобы zip для Steam остался ровно тем же. Не подписан — SmartScreen спросит.
+      - name: Установщик win-x64
+        if: matrix.target == 'win'
+        run: npx electron-builder --win nsis --x64 --publish never
+
       - uses: actions/upload-artifact@v4
         if: matrix.target == 'linux'
         with:
@@ -104,7 +112,9 @@ jobs:
         if: matrix.target == 'win'
         with:
           name: bird-pizza-win
-          path: release/bird-pizza-win.zip
+          path: |
+            release/bird-pizza-win.zip
+            release/bird-pizza-setup.exe
           if-no-files-found: error
           retention-days: 7
 
@@ -155,7 +165,9 @@ jobs:
             sed -n '/<!-- deck-install:/,/<!-- deck-install-end -->/p' README.md | sed '1d;$d'
           } > notes.md
           grep -q 'install-deck.sh' notes.md || { echo 'в README нет блока deck-install'; exit 1; }
+          grep -q 'bird-pizza-setup.exe' notes.md || { echo 'в блоке deck-install нет Windows'; exit 1; }
           gh release create "$TAG" \
-            assets/bird-pizza-deck.tar.gz assets/bird-pizza-win.zip assets/install-deck.sh \
+            assets/bird-pizza-deck.tar.gz assets/install-deck.sh \
+            assets/bird-pizza-setup.exe assets/bird-pizza-win.zip \
             --title "Птица Пицца $TAG" --notes-file notes.md --target "$GITHUB_SHA"
           echo "релиз: $TAG" >> "$GITHUB_STEP_SUMMARY"

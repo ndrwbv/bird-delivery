@@ -21,7 +21,8 @@ Steam-бандл — это `vite build --mode steam` (→ `dist/steam`) вну�
 **CI:** [.github/workflows/release.yml](../.github/workflows/release.yml), ручной запуск
 (Actions → «Релиз»). Linux собирается на ubuntu, Windows — на windows-раннере (правка иконки
 и версии `.exe` на Linux требует wine). В гит-релиз идут `bird-pizza-deck.tar.gz`,
-`bird-pizza-win.zip`, `install-deck.sh`; отдельно артефактом — zip для Яндекс Игр.
+`install-deck.sh`, `bird-pizza-setup.exe` (установщик для Windows мимо Steam, §8) и
+`bird-pizza-win.zip` (папка для депота Windows); отдельно артефактом — zip для Яндекс Игр.
 
 **Сначала надо создать репозиторий релизов** `ndrwbv/bird-delivery` (уже создан; если сменится — поменять константу
 `REPO` в `electron/main.cjs` и `tools/install-deck.sh`). Автообновление читает
@@ -177,9 +178,9 @@ TODO: завести достижения в Steamworks (App Admin → Stats & A
 3–6, курки — оси 9 и 8, ☰ — 12). Если на Deck видны оба пада, берётся стандартный.
 Отдача на аварии — `rumble(strength, ms)`. Проверить, что приезжает: `--page=pad.html`.
 
-## 8. Установка на Deck мимо Steam (тестеры)
+## 8. Установка на Deck и Windows мимо Steam (тестеры)
 
-Для игрока целиком (ярлыки, обновление, запуск из игрового режима) — в [README](../README.md#steam-deck-поставить-обновить-играть-из-игрового-режима); этот же текст CI кладёт в описание каждого релиза.
+Для игрока целиком (ярлыки, обновление, запуск из игрового режима) — в [README](../README.md#steam-deck-и-windows-поставить-обновить-играть); этот же текст CI кладёт в описание каждого релиза.
 
 В Konsole (десктоп-режим):
 
@@ -191,6 +192,17 @@ curl -fsSL https://raw.githubusercontent.com/ndrwbv/bird-delivery/main/tools/ins
 Game → `bird-pizza.sh`, Proton не включать. Такая установка сама предлагает обновления
 (метка `.github-install`, тег из `electron/build-tag.json` против последнего релиза).
 Сохранения — `~/.config/BirdPizza`, обновление их не трогает.
+
+**Windows** — `bird-pizza-setup.exe` из релиза: установщик NSIS (electron-builder, настройки —
+`build.nsis` в `package.json`), ставит в профиль без прав админа
+(`%LOCALAPPDATA%\Programs\bird-pizza-delivery` — папка по `name` из `package.json`), ярлыки
+«Птица Пицца» на рабочем столе и в «Пуске», запись в «Приложениях» для удаления. Не подписан —
+SmartScreen спрашивает «Подробнее → Выполнить в любом случае». Признак такой установки для игры —
+`Uninstall BirdPizza.exe` рядом с `BirdPizza.exe` (в zip для Steam его нет). Обновление: игра
+качает свежий `bird-pizza-setup.exe` (адрес из `/releases/latest`) во временную папку, закрывается
+и запускает его с `--updated --force-run` — он встаёт поверх и запускает игру. Сохранения —
+`%APPDATA%\BirdPizza`, ни обновление, ни удаление их не трогают (`deleteAppDataOnUninstall: false`).
+Депот Windows в Steam по-прежнему из `bird-pizza-win.zip`: установщик туда не кладём.
 
 ## 9. Что осталось
 
