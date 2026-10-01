@@ -1084,7 +1084,6 @@
  "до конца заказа": "buyurtma tugashiga",
  "до конца смены": "smena tugashiga",
  "до конца смены ~{n} мин": "smena tugashiga ~{n} daq",
- "знает по имени всех собак района": "mahalladagi barcha itlarni ismi bilan biladi",
  "комментарий курьера": "kuryer uchun izoh",
  "минус кальянщик": "minus qalyonchi",
  "минус любитель чая": "minus choy ishqibozi",
@@ -1095,7 +1094,6 @@
  "получатель": "qabul qiluvchi",
  "пометка": "belgi",
  "похититель пиццы наказан · +{money}": "pitsa oʻgʻrisi jazolandi · +{money}",
- "профессиональный ставочник на собак": "it poygalarida professional garov tikuvchi",
  "Степан": "Stepan",
  "Тугарев": "Tugarev",
  "ГАЗ ГАЗ": "GAZ GAZ",
@@ -1145,5 +1143,36 @@
  "пока держишь, кофе тает. сколько осталось — голубое кольцо вокруг радара. новые стаканчики стоят у дороги": "bosib turganingda kofe kamayadi. qancha qolgani — radar atrofidagi havorang halqa. yangi stakanlar yoʻl chetida",
  "пока держишь, кофе тает. сколько осталось — кольцо по краю кнопки. новые стаканчики стоят у дороги": "bosib turganingda kofe kamayadi. qancha qolgani — tugma chetidagi halqa. yangi stakanlar yoʻl chetida",
  "понял": "tushundim",
- "держи бонус нитро": "ol, nitro bonusi"
+ "держи бонус нитро": "ol, nitro bonusi",
+ "заядлый кальянщик и профессиональный вайбкодер": "ashaddiy qalyonchi va professional vaybkoder",
+ "любитель самовара и профессиональный вайбкодер": "samovar ishqibozi va professional vaybkoder",
+ "вот пиццерия — сюда я устроился курьером": "mana pitseriya — shu yerga kuryer boʻlib ishga kirdim",
+ "первый заказ": "birinchi buyurtma",
+ "первый заказ — Степану Тугареву: заядлый кальянщик и профессиональный вайбкодер": "birinchi buyurtma — Stepan Tugarevga: ashaddiy qalyonchi va professional vaybkoder",
+ "первый заказ — Степану Тугареву: любитель самовара и профессиональный вайбкодер": "birinchi buyurtma — Stepan Tugarevga: samovar ishqibozi va professional vaybkoder",
+ "первый заказ — вот он, ждёт пиццу": "birinchi buyurtma — ana u, pitsasini kutyapti",
+ "моя тачка": "mening mashinam",
+ "вот моя тачка: у неё есть жизни ♥ и нитро": "mana mening mashinam: uning jonlari ♥ va nitrosi bor",
+ "кхе-кхе": "yo‘tal-yo‘tal",
+ "а ещё она может ломаться": "yana u buzilib ham qolishi mumkin",
+ "выбил {who} со смены": "{who} smenadan chiqib ketdi",
+ "выбил коллегу!": "hamkasbni urib chiqarding!",
+ "Валерий": "Valeriy",
+ "Палыч": "Palych",
+ "директор пиццерии": "pitsaxona direktori",
+ "понял, Палыч": "tushundim, Palych",
+ "весь развоз вовремя!": "hammasi oʻz vaqtida!",
+ "сборный заказ": "yigʻma buyurtma",
+ "сборный: {n} адрес, порядок выбираешь сам|сборный: {n} адреса, порядок выбираешь сам|сборный: {n} адресов, порядок выбираешь сам": {
+  "one": "yigʻma: {n} manzil, tartibni oʻzing tanla",
+  "other": "yigʻma: {n} manzil, tartibni oʻzing tanla"
+ },
+ "остался {n} адрес — выбирай, куда дальше|осталось {n} адреса — выбирай, куда дальше|осталось {n} адресов — выбирай, куда дальше": {
+  "one": "{n} ta manzil qoldi — keyingisini tanla",
+  "other": "{n} ta manzil qoldi — keyingisini tanla"
+ },
+ "слушай, ты растёшь! жалоб на тебя ноль, клиенты довольны. теперь можешь брать два заказа сразу: две пиццы, два адреса. в каком порядке развозить — решай сам, время одно на весь развоз": "qara, sen oʻsyapsan! shikoyat yoʻq, mijozlar mamnun. endi bir yoʻla ikki buyurtma olishing mumkin: ikki pitsa, ikki manzil. qaysi tartibda — oʻzing hal qil, vaqt butun yoʻlga bitta",
+ "клиенты тебя хвалят. держи три адреса за раз — маршрут сам придумаешь, ты уже не стажёр": "mijozlar seni maqtashyapti. mana, bir yoʻla uchta manzil — yoʻnalishni oʻzing oʻylab top, sen endi stajyor emassan",
+ "пять пицц в багажник! кухня еле успевает за тобой. только не перепутай, кому какая": "yukxonaga beshta pitsa! oshxona senga zoʻrgʻa yetib ulguryapti. faqat qaysi biri kimniki — adashtirma",
+ "семь заказов разом — больше нам в багажник не влезет. ты лучший курьер «Птицы Пиццы», так что и времени тебе меньше всех": "bir yoʻla yettita buyurtma — yukxonaga bundan ortiq sigʻmaydi. sen «Qush Pitsa»ning eng zoʻr kuryerisan, shuning uchun vaqt ham senga hammadan kam"
 }

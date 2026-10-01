@@ -1084,7 +1084,6 @@
  "до конца заказа": "bis Auftragsende",
  "до конца смены": "bis Schichtende",
  "до конца смены ~{n} мин": "bis Schichtende ~{n} Min.",
- "знает по имени всех собак района": "kennt jeden Hund im Viertel beim Namen",
  "комментарий курьера": "Notiz vom Kurier",
  "минус кальянщик": "minus ein Shisha-Typ",
  "минус любитель чая": "minus ein Teeliebhaber",
@@ -1095,7 +1094,6 @@
  "получатель": "Empfänger",
  "пометка": "Vermerk",
  "похититель пиццы наказан · +{money}": "Pizzadieb bestraft · +{money}",
- "профессиональный ставочник на собак": "Profi-Wetter auf Hunderennen",
  "Степан": "Stepan",
  "Тугарев": "Tugarew",
  "ГАЗ ГАЗ": "GAS GAS",
@@ -1145,5 +1143,36 @@
  "пока держишь, кофе тает. сколько осталось — голубое кольцо вокруг радара. новые стаканчики стоят у дороги": "solange du hältst, schwindet der Kaffee. wie viel noch da ist — der blaue Ring um das Radar. neue Becher stehen am Straßenrand",
  "пока держишь, кофе тает. сколько осталось — кольцо по краю кнопки. новые стаканчики стоят у дороги": "solange du hältst, schwindet der Kaffee. wie viel noch da ist — der Ring um den Knopf. neue Becher stehen am Straßenrand",
  "понял": "verstanden",
- "держи бонус нитро": "hier, Nitro-Bonus"
+ "держи бонус нитро": "hier, Nitro-Bonus",
+ "заядлый кальянщик и профессиональный вайбкодер": "eingefleischter Shisha-Fan und Profi-Vibecoder",
+ "любитель самовара и профессиональный вайбкодер": "Samowar-Liebhaber und Profi-Vibecoder",
+ "вот пиццерия — сюда я устроился курьером": "das ist die Pizzeria — hier hab ich als Kurier angefangen",
+ "первый заказ": "erster Auftrag",
+ "первый заказ — Степану Тугареву: заядлый кальянщик и профессиональный вайбкодер": "erster Auftrag — für Stepan Tugarew: eingefleischter Shisha-Fan und Profi-Vibecoder",
+ "первый заказ — Степану Тугареву: любитель самовара и профессиональный вайбкодер": "erster Auftrag — für Stepan Tugarew: Samowar-Liebhaber und Profi-Vibecoder",
+ "первый заказ — вот он, ждёт пиццу": "erster Auftrag — da ist er, wartet auf seine Pizza",
+ "моя тачка": "meine Karre",
+ "вот моя тачка: у неё есть жизни ♥ и нитро": "das ist meine Karre: sie hat Leben ♥ und Nitro",
+ "кхе-кхе": "*hust hust*",
+ "а ещё она может ломаться": "und kaputtgehen kann sie auch",
+ "выбил {who} со смены": "{who} aus der Schicht gekickt",
+ "выбил коллегу!": "Kollege ausgeknockt!",
+ "Валерий": "Waleri",
+ "Палыч": "Palytsch",
+ "директор пиццерии": "Filialleiter",
+ "понял, Палыч": "verstanden, Palytsch",
+ "весь развоз вовремя!": "alles pünktlich geliefert!",
+ "сборный заказ": "Sammelbestellung",
+ "сборный: {n} адрес, порядок выбираешь сам|сборный: {n} адреса, порядок выбираешь сам|сборный: {n} адресов, порядок выбираешь сам": {
+  "one": "Sammeltour: {n} Adresse, Reihenfolge wählst du",
+  "other": "Sammeltour: {n} Adressen, Reihenfolge wählst du"
+ },
+ "остался {n} адрес — выбирай, куда дальше|осталось {n} адреса — выбирай, куда дальше|осталось {n} адресов — выбирай, куда дальше": {
+  "one": "noch {n} Adresse — wohin als Nächstes?",
+  "other": "noch {n} Adressen — wohin als Nächstes?"
+ },
+ "слушай, ты растёшь! жалоб на тебя ноль, клиенты довольны. теперь можешь брать два заказа сразу: две пиццы, два адреса. в каком порядке развозить — решай сам, время одно на весь развоз": "hör mal, du wächst! null Beschwerden, zufriedene Kunden. jetzt darfst du zwei Bestellungen auf einmal nehmen: zwei Pizzen, zwei Adressen. die Reihenfolge entscheidest du, die Zeit gilt für die ganze Tour",
+ "клиенты тебя хвалят. держи три адреса за раз — маршрут сам придумаешь, ты уже не стажёр": "die Kunden loben dich. hier, drei Adressen auf einmal — die Route planst du selbst, du bist kein Praktikant mehr",
+ "пять пицц в багажник! кухня еле успевает за тобой. только не перепутай, кому какая": "fünf Pizzen in den Kofferraum! die Küche kommt kaum hinterher. bloß nicht verwechseln, wer welche kriegt",
+ "семь заказов разом — больше нам в багажник не влезет. ты лучший курьер «Птицы Пиццы», так что и времени тебе меньше всех": "sieben Bestellungen auf einmal — mehr passt nicht in den Kofferraum. du bist der beste Kurier von Vogel Pizza, also kriegst du auch am wenigsten Zeit"
 }

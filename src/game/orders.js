@@ -7,12 +7,15 @@
      ORD.init(api)                   — один раз после ZN.init
      ORD.nextPlan()                  — очередной заказ вместо planOrder() → { kind, stops: [{ peds }], why, ord }
      ORD.setup(plan)                 — после S.order: цена, срок, цвет
-     ORD.card(order)                 — полоса цвета и очередь на карточке
+     ORD.card(order)                 — полоса цвета на карточке (очередь «дальше» игроку не показываем)
+     ORD.pickStop(o)                 — из syncTarget: в сборном заказе цель — ближайший по дорогам неотданный адрес
+     ORD.activeStops()               — все неотданные адреса текущего заказа для пинов карты: [{ x, z, color, current, name, addr }]
      ORD.arrive(o, st, onTime)       — подъехал к клиенту; true — дальше не идти (развоз смены, ждём onArrive)
      ORD.payStop(o, st, onTime, tier) → сколько заплатили за остановку (ECON.orderPay / tipFor); разбивку (заказ, скорость, чаевые) кладёт в st.pay — её рисует popPay
      ORD.delivered(o, st, onTime)    — заказ весь отдан: поручение, STORY.onDeliver
-     ORD.step(dt)                    — каждый кадр: HUD очереди, посадка работников
-     ORD.targetColor(), ORD.tintMarker(marker), ORD.drawMapQueue(ctx, fmX, fmZ, u), ORD.bagMesh(bag)
+     ORD.step(dt)                    — каждый кадр: посадка работников, рамка срочного
+     ORD.targetColor(), ORD.tintMarker(marker), ORD.radarRing(ctx, a, b), ORD.bagMesh(bag)
+   Пины всех адресов сборного на радаре и карте рисует game.js (eachTarget): o.stops[idx …) с st.done === false.
    Для других модулей:
      ORD.onArrive(cb)   — «только подъехал к клиенту, до вручения»: cb({ order, stop, zone, type, x, z, hour });
                           вернул Promise — вручение ждёт, пока он не решится (бандиты, катсцена)
@@ -33,10 +36,10 @@ import * as DLG from './dialog.js';
 import * as ZN from './zones.js';
 import * as DIST from './districts.js';
 import { makePerson } from './people.js';
-import { ORDER_TYPES, SHIFT_PLAN, SIDE_ORDERS, STAFF_RIDE } from './orders.config.js';
+import { ORDER_TYPES, SHIFT_PLAN, SIDE_ORDERS, STAFF_RIDE, BOSS } from './orders.config.js';
 
 const N_ = s => s;
-const { PAY, ORDERS, TIPS } = ECON;
+const { PAY, ORDERS, TIPS, BUNDLE } = ECON;
 
 /* необязательные соседи: карьера (часы, звёзды) и сюжет — их пишут отдельно */
 const OPT = import.meta.glob(['./career.js', './story.js']);
@@ -83,6 +86,14 @@ function hourNow () {
   if (HOUR_OVERRIDE !== null) return HOUR_OVERRIDE;
   try { if (CAR && typeof CAR.hour === 'function') { const h = CAR.hour(); if (Number.isFinite(h)) return h; } } catch (e) { /* — */ }
   return ECON.hourOf(A.ENV.t);
+}
+
+/* номер очередного заказа за всё время: доставленные (dlv-msk-xp, в сборном — каждая
+   пицца) + 1. От него — сборные заказы и поручения (econ.js BUNDLE) */
+let LIFE_OVERRIDE = null;                                           // прогон смен (DEBUG.simShift)
+function lifeN () {
+  if (LIFE_OVERRIDE !== null) return LIFE_OVERRIDE;
+  return (+A.Store.get('dlv-msk-xp', 0) || 0) + 1;
 }
 
 /* ─────────────── без повторов за всю игру ───────────────
@@ -138,15 +149,14 @@ function distRing () {
 }
 
 /* ─────────────── смена ─────────────── */
-const SH = { last: 0, gen: 0, pizzas: 0, sideAt: 4, zones: new Set(), must: {}, h0: 9, done: 0, log: [], reserved: new Set(), pts: [], breather: false };
-const Q = [];                                          // следующие заказы (спецификации, без людей)
-let QV = 0;                                            // версия очереди — перерисовать список
+const SH = { last: 0, gen: 0, sideOwed: false, zones: new Set(), must: {}, h0: 9, done: 0, log: [], reserved: new Set(), pts: [], breather: false };
+const Q = [];                                          // заказы наперёд (песочница может положить); в игре — собираем по одному, когда нужен
 
 export function resetShift () {
   staffAbort();
   dropQueue();
   SH.last = 0;
-  SH.gen = 0; SH.pizzas = 0; SH.sideAt = rint(SHIFT_PLAN.sideEvery || ORDERS.SIDE_EVERY);
+  SH.gen = 0; SH.sideOwed = false;
   SH.zones = new Set(); SH.must = {}; SH.done = 0; SH.log = []; SH.reserved = new Set(); SH.pts = []; SH.breather = false;
   SH.h0 = hourNow();
   buildPool();
@@ -268,33 +278,63 @@ function genSpec () {
       if (!spec) storyCancel(s);                           // дом героя далеко от района — глава подождёт
     }
   }
+  const life = lifeN();
+  // сборный: n пицц на n адресов разом (econ.js BUNDLE) — с 8-го заказа за всё время
+  if (!spec && !forced) spec = bundleSpec(life, D);
   if (!spec) {
     // обычная пицца: район по весам (или новый, если надо добрать районы), вид по kinds
     const w = forced === 'zones' ? zoneWeights(D.min, D.max, z => !SH.zones.has(z)) : zoneWeights(D.min, D.max);
     const zone = wpick(w) || wpick(zoneWeights(D.min, D.max)) || null;
-    const kind = wpick(SHIFT_PLAN.kinds || { solo: 1 }) || 'solo';
+    // первые заказы за всё время — по одному человеку на адрес
+    const kind = life < BUNDLE.FROM ? 'solo' : wpick(SHIFT_PLAN.kinds || { solo: 1 }) || 'solo';
     const far = zone && ZMIN[zone] > D.max;                // район за кольцом — его ближние адреса
     const s = far ? pickSpot({ zone, dmin: ZMIN[zone], dmax: ZMIN[zone] + 600 }) : pickSpot({ zone, dmin: D.min, dmax: D.max });
     if (!s) return null;
     spec = { type: 'pizza', kind, stops: [] };
     if (kind === 'group') spec.stops.push(stopOf(s, rint(SHIFT_PLAN.groupSize || [2, 3])));
     else spec.stops.push(stopOf(s));
-    if (kind === 'chain') {
-      const n = rint(SHIFT_PLAN.chainLen || [2, 3]);
-      SH.reserved.add(s.key);
-      for (let i = 1; i < n; i++) {
-        const prev = spec.stops[i - 1];
-        const q = pickSpot({ from: prev, dmin: 150, dmax: 520, zone: prev.zone }) || pickSpot({ from: prev, dmin: 120, dmax: 700 });
-        if (!q) break;
-        SH.reserved.add(q.key);
-        spec.stops.push(stopOf(q));
-      }
-      if (spec.stops.length < 2) spec.kind = 'solo';
-    }
-    // поручение — раз в sideEvery пицц; клиент попросит при вручении
-    if (++SH.pizzas >= SH.sideAt) { spec.side = true; SH.pizzas = 0; SH.sideAt = rint(SHIFT_PLAN.sideEvery || ORDERS.SIDE_EVERY); }
+    // поручение — с BUNDLE.SIDE_FROM-го заказа, шанс растёт (BUNDLE.SIDE); клиент попросит при вручении
+    if (SH.sideOwed || chance(ECON.sideChance(life))) { spec.side = true; SH.sideOwed = false; }
   }
   return finishSpec(spec, forced, hAt);
+}
+
+/* сборный заказ: ступень по номеру заказа за всё время (BUNDLE.STEPS). Самый первый —
+   всегда и ровно две пиццы, перед ним — директор (BOSS). Новая ступень впервые —
+   столько пицц, сколько она даёт по максимуму, и реплика директора, если есть.
+   Адреса — по всему кольцу района, порядок в спецификации — ближайший следующий
+   от пиццерии (по нему считаются отрезки, оплата и срок), игрок развозит как хочет. */
+function bundleSpec (life, D) {
+  const step = ECON.bundleStep(life);
+  if (!step) return null;
+  const told = toldGet();                                 // сколько пицц директор уже объявил
+  const top = step.n[1];
+  let n, boss = null;
+  if (told < 2) { n = 2; boss = 2; }                       // самый первый — знакомство
+  else if (top > told) {
+    n = top;
+    for (const k in BOSS.lines) if (+k > told && +k <= top) boss = +k;
+    if (!boss) boss = -top;                                // реплики нет — просто запомнить
+  } else if (!chance(step.chance)) return null;
+  else n = rint(step.n);
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const s = pickSpot({ dmin: D.min, dmax: D.max });
+    if (!s) break;
+    SH.reserved.add(s.key); SH.pts.push({ x: s.x, z: s.z });
+    pts.push(s);
+  }
+  if (pts.length < 2) { for (const s of pts) SH.reserved.delete(s.key); return null; }
+  // ближайший следующий от пиццерии — по дорогам
+  const order = [];
+  let at = A.PIZZA;
+  while (pts.length) {
+    let bi = 0, bl = Infinity;
+    pts.forEach((s, i) => { const L = A.routeLen(at.x, at.z, s.x, s.z); if (L < bl) { bl = L; bi = i; } });
+    at = pts.splice(bi, 1)[0];
+    order.push(at);
+  }
+  return { type: 'pizza', kind: 'bundle', bundle: { n: order.length, time: step.time, boss }, stops: order.map(s => stopOf(s)) };
 }
 
 /* «в конец района»: адрес из самых далёких от пиццерии района (EDGE_D), но по дорогам
@@ -363,17 +403,10 @@ function storySpec (s) {
 /* очередь выбросили (новая смена, развоз): сюжетные главы — обратно story.js */
 function dropQueue () {
   for (const q of Q) if (q.story) storyCancel(q.story);
-  Q.length = 0; QV++;
+  Q.length = 0;
 }
 function storyCancel (s) {
   try { if (STORY && typeof STORY.onCancel === 'function') STORY.onCancel(s); } catch (e) { console.warn('[orders] STORY.onCancel', e); }
-}
-
-function refill () {
-  const want = ORDERS.QUEUE_SHOW || 2;
-  let guard = 0;
-  while (Q.length < want && guard++ < 6) { const s = genSpec(); if (s) Q.push(s); else break; }
-  QV++;
 }
 
 /* ─────────────── очередной заказ: спецификация → живые люди ─────────────── */
@@ -383,11 +416,7 @@ export function nextPlan () {
   SH.last = S.orders;
   let spec;
   if (FORCE) { spec = FORCE; FORCE = null; }
-  else {
-    if (!Q.length) refill();
-    spec = Q.shift();
-    refill();
-  }
+  else spec = Q.length ? Q.shift() : genSpec();         // собираем, когда нужен: очередь «дальше» не показываем
   return bindSpec(spec);
 }
 function bindSpec (spec) {
@@ -428,7 +457,8 @@ function bindSpec (spec) {
   }
   if (!stops.length) return null;
   spec.stops = spec.stops.slice(0, stops.length);
-  return { kind: stops.length > 1 ? 'chain' : spec.kind === 'chain' ? 'solo' : spec.kind, stops, why: whyOf(spec), ord: spec };
+  if (spec.bundle && stops.length < 2) spec.bundle = null;  // прохожих не хватило — обычный заказ
+  return { kind: spec.bundle ? 'bundle' : stops.length > 1 ? 'chain' : spec.kind === 'chain' || spec.kind === 'bundle' ? 'solo' : spec.kind, stops, why: whyOf(spec), ord: spec };
 }
 
 function whyOf (sp) {
@@ -436,6 +466,7 @@ function whyOf (sp) {
   const z = t(ZONE_LABEL[sp.zone] || ZONE_LABEL.normal);
   if (sp.urgent) return t('срочно: далеко, а времени в обрез · оплата ×{k}', { k: fmtK(PAY.URGENT) });
   if (sp.edge) return t('в самый конец района · оплата ×{k}', { k: fmtK(PAY.EDGE) });
+  if (sp.bundle) return tn(sp.stops.length, 'сборный: {n} адрес, порядок выбираешь сам|сборный: {n} адреса, порядок выбираешь сам|сборный: {n} адресов, порядок выбираешь сам');
   if (sp.kind === 'group') return t('групповой: заказали на всех сразу') + ' · ' + z;
   if (sp.kind === 'chain') return tn(sp.stops.length, 'цепочка: {n} адрес по очереди|цепочка: {n} адреса по очереди|цепочка: {n} адресов по очереди') + ' · ' + z;
   const mul = PAY.ZONE[sp.zone] || 1;
@@ -460,13 +491,35 @@ export function setup (plan) {
     return Math.round((ECON.orderPay(m, zone, opts) + (n - 1) * ECON.orderPay(0, zone, opts)) * mul / 10) * 10;
   });
   S.fee = sp.fees.reduce((a, b) => a + b, 0);
+  // оплата и район — на самой остановке: в сборном игрок развозит в своём порядке, o.stops переставляются
+  o.stops.forEach((st, i) => { st.fee = sp.fees[i]; if (!st.zone && sp.stops[i]) st.zone = sp.stops[i].zone; st.done = false; });
   const L = A.routeLen(V.x, V.z, S.target.x, S.target.z);
   S.timeMax = sp.story && Number.isFinite(sp.story.time) ? sp.story.time
     : sp.urgent ? A.orderTime(L, 1, 1) * PAY.URGENT_TIME
-      : A.orderTime(L, 1, S.orders);
+      // сборный: срок один на весь развоз — путь ближайшим следующим от пиццерии × ступень (BUNDLE.STEPS time)
+      : sp.bundle ? bundleTime(sp.m.reduce((a, b) => a + b, 0), o.stops.length, sp.bundle.time || 1)
+        : A.orderTime(L, 1, S.orders);
   if (!(sp.story && Number.isFinite(sp.story.time))) S.timeMax *= DIST.pace().time || 1;   // щедрая — времени больше
   S.time = S.timeMax;
-  QV++;
+  if (sp.bundle && sp.bundle.boss) bossSays(sp.bundle.boss);
+}
+
+/* срок сборного: как у обычного заказа на весь путь × ступень, но доехать реально (BUNDLE.TIME_FLOOR) */
+const RUN_V = 19;                                         // как в game.js orderTime: средняя скорость по городу, м/с
+function bundleTime (L, n, k) {
+  return Math.max(A.orderTime(L, n, S.orders) * k, L / RUN_V * BUNDLE.TIME_FLOOR + 5 + n * 4);
+}
+
+/* директор пиццерии: «ты растёшь — бери два сразу» (BOSS в orders.config.js). Диалог
+   поверх накладной; запоминаем, сколько пицц уже объявлено (dlv-boss) */
+let BOSS_P = null, SIM_TOLD = 0;
+const toldGet = () => (SIM ? SIM_TOLD : +A.Store.get('dlv-boss', 0) || 0);
+function bossSays (k) {
+  A.Store.set('dlv-boss', Math.max(toldGet(), Math.abs(k)));
+  const line = k > 0 && BOSS.lines[k];
+  if (!line) return;
+  if (!BOSS_P) BOSS_P = makePerson({ seed: BOSS.seed, first: t(BOSS.first), last: t(BOSS.last), fem: !!BOSS.fem });
+  DLG.say({ person: BOSS_P, name: BOSS_P.name + ' · ' + t(BOSS.role), text: t(line), accept: t(BOSS.ok), mood: 'calm', fillers: false, color: typeColor('pizza') });
 }
 
 /* сюжетный заказ без прохожего: у двери его человек (story.js), game.js зовёт вместо сборки S.order */
@@ -496,14 +549,7 @@ function trackStory () {
 }
 
 /* ─────────────── карточка ─────────────── */
-const fmtDist = m => m >= 1000 ? t('{n} км', { n: (Math.round(m / 100) / 10).toLocaleString(A.lang ? A.lang() : undefined) }) : t('{n} м', { n: Math.round(m / 10) * 10 });
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-function queueHTML (cls) {
-  if (!Q.length) return '';
-  const rows = Q.slice(0, ORDERS.QUEUE_SHOW || 2).map(q => '<div class="oq-r"><i style="background:' + q.color + '"></i><span>' + esc(q.stops[0].addr) + '</span><em>' +
-    esc(t(ZONE_LABEL[q.zone] || ZONE_LABEL.normal)) + ' · ' + fmtDist(q.m[0] || 0) + '</em></div>').join('');
-  return '<div class="' + cls + '"><b>' + t('дальше') + '</b>' + rows + '</div>';
-}
 export function card (order) {
   const el = document.getElementById('phone');
   if (!el) return;
@@ -511,6 +557,11 @@ export function card (order) {
   el.classList.add('ord-typed');
   el.classList.toggle('ord-urgent', !!(sp && sp.urgent));
   el.style.setProperty('--ord', sp ? sp.color : typeColor('pizza'));
+  // сборный на 3+ адреса: получатели и фото мельче, фото — в две колонки (иначе накладная не влезает)
+  const many = !!(sp && sp.bundle && order.stops.length > 2);
+  el.classList.toggle('ord-many', many);
+  const ph = el.querySelector('.oc-photos');
+  if (ph) ph.classList.toggle('many', many && order.stops.length > 3);
   if (!sp) return;
   const kind = document.getElementById('ph-kind');
   if (kind && sp.type !== 'pizza') kind.textContent = t(ORDER_TYPES[sp.type] ? ORDER_TYPES[sp.type].label : sp.type) + ' · ' + kind.textContent;
@@ -550,9 +601,10 @@ export function arrive (o, st, onTime) {
 
 /* оплата остановки: ECON.orderPay (посчитана в setup), скорость, чаевые */
 export function payStop (o, st, onTime, tier) {
-  const sp = o.ord, fee = (sp.fees && sp.fees[o.idx]) || Math.round(S.fee / o.stops.length);
+  const sp = o.ord, fee = st.fee || (sp.fees && sp.fees[o.idx]) || Math.round(S.fee / o.stops.length);
   const zone = st.zone || sp.zone;
   markUsed(st.key);
+  st.done = true;                                         // отдали: пины карты и накладная в паузе
   SH.done += o.idx === o.stops.length - 1 ? 1 : 0;
   if (!onTime) { st.pay = { fee, bonus: 0, tip: 0, late: true, story: !!sp.story }; return Math.round(fee * PAY.LATE); }
   const bonus = tier ? Math.round(fee * (PAY.SPEED_BONUS[tier] || 0)) : 0;
@@ -573,7 +625,15 @@ export function payStop (o, st, onTime, tier) {
 /* весь заказ отдан: сюжет, поручение */
 export function delivered (o, st, onTime) {
   const sp = o.ord;
-  QV++;
+  // сборный: все адреса вовремя — ещё BUNDLE.ALL_BONUS от оплаты развоза
+  if (sp.bundle && o.stops.every(q => q.pay && !q.pay.late)) {
+    const bonus = Math.round(o.stops.reduce((a, q) => a + (q.fee || 0), 0) * BUNDLE.ALL_BONUS / 10) * 10;
+    if (bonus > 0) {
+      S.money += bonus;
+      if (!S.freeRun) A.addWallet(bonus);
+      A.popBonus(t('весь развоз вовремя!'), '+' + A.money(bonus));
+    }
+  }
   if (sp.story && STORY && typeof STORY.onDeliver === 'function') {
     if (CUR.order === o) CUR.done = true;
     if (A.marker) A.marker.visible = false;               // в катсцене столб маркера не нужен
@@ -581,7 +641,7 @@ export function delivered (o, st, onTime) {
   }
   if (sp.side) {
     if (onTime && !S.ride && st.persons[0] && st.peds[0] && !st.peds[0].dead && offerSide(st.peds[0], st.persons[0])) return;
-    SH.pizzas = SH.sideAt;                                // не вышло — попросит следующий
+    SH.sideOwed = true;                                   // не вышло — попросит следующий
   }
 }
 
@@ -709,7 +769,6 @@ function beginStaff (crew) {
   homes.forEach((h, i) => stops.push({ peds: [], persons: [crew[i]], at: { x: h.x, z: h.z }, key: h.key, zone: h.zone, addr: A.realAddress(h.x, h.z), note: '', reach: 7 }));
   S.order = { kind: 'chain', stops, idx: 0, why: t('развоз смены'), items: '', ord: { type: 'staff', kind: 'chain', color: typeColor('staff'), zone: homes[0].zone, stops: homes.map(h => ({ key: h.key, zone: h.zone })), m: [] } };
   S.timeMax = S.time = 900;
-  QV++;
   if (far) {
     S.state = 'drive';
     A.syncTarget(); A.rebuildRoutePath();
@@ -776,7 +835,7 @@ function staffArrive (o, st) {
 }
 
 /* ─────────────── каждый кадр ─────────────── */
-let hudEl = null, hudV = -1, hudOn = null, urgOn = null;
+let urgOn = null;
 export function step (dt) {
   if (!A) return;
   if (window.__dlv && !window.__dlv.ORD) window.__dlv.ORD = DEBUG;
@@ -814,18 +873,8 @@ export function step (dt) {
   hud();
 }
 
+/* рамка срочного у часов; список «дальше» на HUD убран — следующие заказы игроку не показываем */
 function hud () {
-  if (!hudEl) {
-    const host = document.getElementById('hud-left');
-    if (!host) return;
-    hudEl = document.createElement('div');
-    hudEl.id = 'oq-hud';
-    hudEl.className = 'oq oq-hud';
-    host.appendChild(hudEl);
-  }
-  const on = !S.ride && ['drive', 'back', 'handover', 'side'].includes(S.state) && Q.length > 0;
-  if (on !== hudOn) { hudOn = on; hudEl.hidden = !on; }
-  if (on && hudV !== QV) { hudV = QV; hudEl.innerHTML = queueHTML('oq-in'); }
   const urg = !!(S.state === 'drive' && S.order && S.order.ord && S.order.ord.urgent);
   if (urg !== urgOn) { urgOn = urg; document.body.classList.toggle('ord-urgent', urg); }
 }
@@ -852,13 +901,50 @@ export function tintMarker (marker) {
   u.ball.material.color.copy(TMP.c).lerp(new T.Color(0xffffff), 0.25);
   if (beam && beam.material) beam.material.color.copy(TMP.c).lerp(new T.Color(0xffffff), 0.45);
 }
-/* следующие заказы на полной карте: полые кружки цвета вида */
-export function drawMapQueue (x, fmX, fmZ, u) {
-  for (const q of Q.slice(0, ORDERS.QUEUE_SHOW || 2)) {
-    const s = q.stops[0];
-    x.beginPath(); x.arc(fmX(s.x), fmZ(s.z), 5 * u, 0, Math.PI * 2);
-    x.lineWidth = 2.5 * u; x.strokeStyle = q.color; x.stroke();
+/* ─────────────── сборный заказ: все адреса разом, порядок выбирает игрок ───────────────
+   o.stops[0 … idx) — отданные, [idx …) — ещё нет. Цель (o.stops[idx] → S.target, маршрут
+   rebuildRoutePath) — ближайший по дорогам неотданный адрес; подъехал к любому — он и
+   становится целью, вручение как обычно (checkArrival). Вызывается из syncTarget каждый кадр:
+   «подъехал» — каждый кадр (по прямой), «ближайший по дорогам» — раз в PICK_MS. */
+const PICK_MS = 400, PICK_GAIN = 25;                     // сменить цель, если новая ближе хотя бы на 25 м
+const PK = { t: 0, o: null };
+const stopAt = st => st.at || st.peds[0];
+function swapStop (o, i) {
+  if (i === o.idx) return;
+  const a = o.stops;
+  [a[o.idx], a[i]] = [a[i], a[o.idx]];
+}
+export function pickStop (o) {
+  if (!o || !o.ord || !o.ord.bundle || o.stops.length - o.idx < 2) return;
+  for (let i = o.idx; i < o.stops.length; i++) {
+    const st = o.stops[i], p = stopAt(st);
+    if (p && Math.hypot(p.x - V.x, p.z - V.z) <= (st.reach || 5) + 2) { swapStop(o, i); return; }
   }
+  const now = performance.now();
+  if (PK.o === o && now - PK.t < PICK_MS) return;
+  PK.o = o; PK.t = now;
+  let bi = o.idx, bl = Infinity, cur = Infinity;
+  for (let i = o.idx; i < o.stops.length; i++) {
+    const p = stopAt(o.stops[i]);
+    if (!p) continue;
+    const L = A.routeLen(V.x, V.z, p.x, p.z);
+    if (i === o.idx) cur = L;
+    if (L < bl) { bl = L; bi = i; }
+  }
+  if (bi !== o.idx && bl < cur - PICK_GAIN) swapStop(o, bi);
+}
+/* все неотданные адреса текущего заказа — для пинов на радаре и карте (current — тот, куда
+   ведёт маршрут, он же S.target). Поручение и «в пиццерию» — пусто: там одна цель S.target */
+export function activeStops () {
+  const o = S.order;
+  if (!o || !o.stops || S.state === 'side' || S.state === 'back' || S.state === 'handover') return [];
+  const col = o.ord ? o.ord.color : typeColor('pizza'), out = [];
+  for (let i = o.idx; i < o.stops.length; i++) {
+    const st = o.stops[i], p = stopAt(st);
+    if (!p || st.pickup) continue;
+    out.push({ x: p.x, z: p.z, color: col, current: i === o.idx, name: st.persons && st.persons[0] ? st.persons[0].name : '', addr: st.addr || '' });
+  }
+  return out;
 }
 /* красная обводка срочного на радаре */
 export function radarRing (ctx, a, b) {
@@ -883,14 +969,11 @@ function css () {
 #phone.ord-urgent { outline: 3px solid #ff2d4a; outline-offset: 2px; }
 .oc-pay { font-size: 8px; line-height: 1.8; color: #7f8cc0; text-align: center; }
 .oc-pay b { color: #ff2d4a; font-weight: normal; }
-.oq { font-size: 7px; line-height: 1.7; color: #9fb4dd; }
-.oq b { display: block; font-weight: normal; opacity: .7; }
-.oq-r { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; overflow: hidden; }
-.oq-r i { flex: none; width: 6px; height: 6px; border-radius: 50%; display: inline-block; transform: translateY(-1px); }
-.oq-r span { overflow: hidden; text-overflow: ellipsis; }
-.oq-r em { font-style: normal; opacity: .7; flex: none; }
-.oq-card { margin: 8px auto 0; max-width: 92%; color: #7f8cc0; border-top: 1px dashed rgba(127,140,192,.35); padding-top: 6px; }
-.oq-hud { margin-top: 6px; max-width: 260px; opacity: .85; }
+#phone.ord-many .oc-inv tr:first-child td b { font-size: clamp(10px, 1.15vw, 16px); }
+#phone.ord-many .oc-inv tr:first-child td small { margin: 0 0 4px; }
+#phone.ord-many .oc-inv th, #phone.ord-many .oc-inv td { padding-top: clamp(3px, .6vh, 7px); padding-bottom: clamp(3px, .6vh, 7px); }
+#phone .oc-photos.many { display: grid; grid-template-columns: repeat(2, auto); gap: 6px; }
+#phone .oc-photos.many .oc-p img, #phone .oc-photos.many .oc-p i { width: clamp(44px, 5vw, 76px); height: clamp(44px, 5vw, 76px); border-width: 4px; border-bottom-width: 9px; }
 body.ord-urgent #timewrap { outline: 2px solid #ff2d4a; box-shadow: 0 0 10px #ff2d4a; animation: ord-urg 0.9s ease-in-out infinite; }
 @keyframes ord-urg { 50% { box-shadow: 0 0 2px #ff2d4a; } }
 `;
@@ -955,24 +1038,29 @@ export function forceSide (id) {
 }
 
 /* ─────────────── отладка: __dlv.ORD ─────────────── */
-/* simShift(n, h0, h1): прогнать смену без езды — n заказов с часами от h0 до h1,
-   каждый «доставлен» (адрес — в dlv-used-addr). Возвращает журнал. */
-function simShift (n = 10, h0 = 9, h1 = 23.5) {
+/* simShift(n, h0, h1, life, told): прогнать смену без езды — n заказов с часами от h0 до h1,
+   каждый «доставлен» (адрес — в dlv-used-addr). life — номер первого заказа за всё время
+   (по умолчанию — настоящий), told — сколько пицц директор уже объявил (по умолчанию —
+   из сохранения); сохранение счётчиков не трогает. Возвращает журнал. */
+function simShift (n = 10, h0 = 9, h1 = 23.5, life = null, told = null) {
+  LIFE_OVERRIDE = life !== null ? life : lifeN();
+  SIM_TOLD = told !== null ? told : +A.Store.get('dlv-boss', 0) || 0;
   HOUR_OVERRIDE = h0; SIM = true;
   resetShift();
   const out = [];
-  refill();
   for (let i = 0; i < n; i++) {
     HOUR_OVERRIDE = h0 + (h1 - h0) * i / Math.max(1, n - 1);
-    const sp = Q.shift();
-    refill();
+    const sp = genSpec();
     if (!sp) break;
     for (const st of sp.stops) markUsed(st.key);
     SH.done++;
-    out.push({ n: sp.n, h: +HOUR_OVERRIDE.toFixed(1), type: sp.type, kind: sp.kind, zone: sp.zone, stops: sp.stops.length, edge: !!sp.edge, urgent: !!sp.urgent, side: !!sp.side, forced: sp.forced, m: sp.m, keys: sp.stops.map(s => s.key),
-      fee: ECON.orderPay(sp.m[0] || 0, sp.zone, { urgent: !!sp.urgent, edge: !!sp.edge, level: A.level() }) });
+    const lvl = { urgent: !!sp.urgent, edge: !!sp.edge, level: A.level() };
+    out.push({ n: sp.n, life: LIFE_OVERRIDE, h: +HOUR_OVERRIDE.toFixed(1), type: sp.type, kind: sp.kind, zone: sp.zone, stops: sp.stops.length, edge: !!sp.edge, urgent: !!sp.urgent, side: !!sp.side, forced: sp.forced, m: sp.m, keys: sp.stops.map(s => s.key),
+      boss: sp.bundle ? sp.bundle.boss : null, fee: sp.stops.reduce((a, st, k) => a + ECON.orderPay(sp.m[k] || 0, st.zone, lvl), 0) });
+    if (sp.bundle && sp.bundle.boss) SIM_TOLD = Math.max(SIM_TOLD, Math.abs(sp.bundle.boss));
+    LIFE_OVERRIDE += sp.bundle ? sp.stops.length : 1;
   }
-  HOUR_OVERRIDE = null; SIM = false;
+  LIFE_OVERRIDE = null; HOUR_OVERRIDE = null; SIM = false;
   dropQueue();
   SH.last = 0;
   return out;
@@ -980,5 +1068,6 @@ function simShift (n = 10, h0 = 9, h1 = 23.5) {
 export const DEBUG = {
   Q, SH, get POOL () { return POOL; }, get USED () { return USED; }, STAFF, ARRIVE, simShift, resetShift, genSpec, pickSpot, staffRide, bagMesh,
   get CAR () { return CAR; }, get STORY () { return STORY; }, hourNow, offerSide, sideOpts, force, forceSide, nextPlan, card, onArrive,
+  lifeN, bundleSpec, activeStops, pickStop,
   clearUsed () { USED = []; reindex(); A.Store.set(USED_KEY, USED); },
 };

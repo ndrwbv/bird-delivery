@@ -358,8 +358,24 @@ function buildFences (A) {
     }
     return false;
   };
-  const near = (list, x, z, r) => list.some(q => Math.abs(q[0] - x) < r && Math.abs(q[1] - z) < r);
-  const TAKEN = new Set(), tk = (x, z) => Math.round(x) + ',' + Math.round(z);
+  // машины и подъезды рядом — по клеткам в 8 м (r не больше 3 м — хватает соседних клеток);
+  // ответ тот же, что у перебора всего списка
+  const NG = new Map();
+  const near = (list, x, z, r) => {
+    let G = NG.get(list);
+    if (!G || G.n !== list.length) {
+      G = { n: list.length, m: new Map() };
+      for (const q of list) { const k = Math.floor(q[0] / 8) * 100003 + Math.floor(q[1] / 8); let a = G.m.get(k); if (!a) G.m.set(k, a = []); a.push(q); }
+      NG.set(list, G);
+    }
+    for (let i = Math.floor((x - r) / 8); i <= Math.floor((x + r) / 8); i++)
+      for (let j = Math.floor((z - r) / 8); j <= Math.floor((z + r) / 8); j++) {
+        const a = G.m.get(i * 100003 + j);
+        if (a) for (const q of a) if (Math.abs(q[0] - x) < r && Math.abs(q[1] - z) < r) return true;
+      }
+    return false;
+  };
+  const TAKEN = new Set(), tk = (x, z) => Math.round(x) * 100003 + Math.round(z);
   const ENTR = CITY.entrances || [];
   // ответ по точке — в кэш по полметра: стороны и секции спрашивают одно и то же
   const BADC = new Map();

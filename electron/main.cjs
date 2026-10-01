@@ -8,6 +8,8 @@
      --steam           считать, что запущены из Steam (обновления с GitHub выключены)
      --no-update       не проверять обновления с GitHub
      --steam-overlay   попытаться включить оверлей Steam (steamworks.js, in-process-gpu)
+     --no-vsync        кадры без ожидания вертикальной развёртки и без ограничения 60 fps —
+                       проверка плавности на Deck (docs/STEAM.md, «Производительность»)
    Сохранения — localStorage рендерера, он лежит в userData (путь закреплён ниже). */
 const { app, BrowserWindow, globalShortcut, Menu, ipcMain, protocol, net, dialog } = require('electron');
 const path = require('path');
@@ -32,6 +34,11 @@ app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 // звук без жеста пользователя: в Стиме кликать «чтобы включить звук» некому
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+/* Проба для Деки, только по флагу: Chromium на Linux тактует кадры своим таймером, и под
+   gamescope он может расходиться с настоящей развёрсткой экрана — fps 60, а картинка
+   подрагивает. С --no-vsync кадры идут без ожидания развёртки, а показывает их уже gamescope.
+   Батарею ест сильнее; включать по умолчанию — только если на Деке это заметно лучше */
+if (has('--no-vsync')) { app.commandLine.appendSwitch('disable-gpu-vsync'); app.commandLine.appendSwitch('disable-frame-rate-limit'); }
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } }]);
 

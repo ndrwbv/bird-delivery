@@ -1,0 +1,55 @@
+/* вступление первого запуска (intro.js): чёрные полосы, косые плашки «как в ГТА», субтитры */
+#intro-cut { position: absolute; inset: 0; z-index: 38; pointer-events: none; overflow: hidden; }
+#intro-cut.on { pointer-events: auto; }
+#intro-cut .ic-bar { position: absolute; left: 0; right: 0; height: 12vh; background: #07080d; transition: transform .45s cubic-bezier(.3, .8, .3, 1); }
+#intro-cut .ic-top { top: 0; transform: translateY(-101%); }
+#intro-cut .ic-bot { bottom: 0; transform: translateY(101%); display: flex; align-items: center; justify-content: center; padding: 0 16px; }
+#intro-cut.on .ic-bar { transform: none; }
+
+/* плашка: подпись мелко сверху, крупное имя жёлтым с толстой обводкой, наискось */
+#intro-cut .ic-card { position: absolute; left: max(16px, 6vw); bottom: calc(12vh + 4vh); max-width: calc(100% - 32px);
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px; opacity: 0;
+  transform: rotate(-3deg); transform-origin: left bottom; }
+#intro-cut .ic-card.on { animation: ic-card 3.3s cubic-bezier(.2, .9, .3, 1) both; }
+#intro-cut .ic-card em { font-style: normal; font-size: clamp(9px, 1.4vw, 14px); color: #fff; letter-spacing: .06em; text-transform: uppercase;
+  text-shadow: 2px 2px 0 #07080d, -2px 2px 0 #07080d, 2px -2px 0 #07080d, -2px -2px 0 #07080d; }
+#intro-cut .ic-card em:empty, #intro-cut .ic-card small:empty { display: none; }
+#intro-cut .ic-card b { font-weight: normal; font-size: clamp(20px, 5vw, 58px); line-height: 1.15; color: #ffd23f; text-transform: uppercase;
+  transform: skewX(-9deg); letter-spacing: .02em; overflow-wrap: anywhere;
+  text-shadow: 3px 3px 0 #1a1208, -3px 3px 0 #1a1208, 3px -3px 0 #1a1208, -3px -3px 0 #1a1208, 0 3px 0 #1a1208, 0 -3px 0 #1a1208, 3px 0 0 #1a1208, -3px 0 0 #1a1208, 7px 8px 0 rgba(0, 0, 0, .45); }
+#intro-cut .ic-card.red b { color: #ff4a3d; }
+#intro-cut .ic-card small { font-size: clamp(8px, 1.3vw, 13px); line-height: 1.6; color: #fff3d6; max-width: min(620px, 80vw);
+  text-shadow: 2px 2px 0 #07080d, -2px 2px 0 #07080d, 2px -2px 0 #07080d, -2px -2px 0 #07080d; }
+@keyframes ic-card {
+  0% { opacity: 0; transform: rotate(-3deg) translateX(-60px) scale(1.25); }
+  9% { opacity: 1; transform: rotate(-3deg) scale(1); }
+  84% { opacity: 1; transform: rotate(-3deg) translateX(8px); }
+  100% { opacity: 0; transform: rotate(-3deg) translateX(14px); }
+}
+
+/* субтитры — от первого лица, внизу на полосе */
+#intro-cut .ic-sub { max-width: 900px; text-align: center; font-size: clamp(9px, 1.6vw, 15px); line-height: 1.7; color: #fff; opacity: 0; }
+#intro-cut .ic-sub.on { animation: ic-sub .35s ease both; }
+@keyframes ic-sub { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+#intro-cut .ic-hrt { display: inline-block; width: 1em; height: .92em; margin: 0 .15em; vertical-align: -.05em; background: #ff5d7a;
+  clip-path: polygon(50% 100%, 0 45%, 0 20%, 18% 0, 50% 18%, 82% 0, 100% 20%, 100% 45%); }
+
+#intro-cut .ic-skip { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); pointer-events: auto; font: inherit; font-size: 8px;
+  color: #c9c2b4; background: rgba(255, 255, 255, .06); border: 2px solid #3a3346; border-radius: 6px; padding: 8px 10px; cursor: pointer; }
+#intro-cut .ic-skip:hover { color: #fff3d6; border-color: #ffd23f; }
+
+/* хад прячем; на плане машины — только сердца и радар с кольцом нитро, поверх полос, и они мигают */
+body.intro-cut .hud, body.intro-cut #ctrls, body.intro-cut #toast, body.intro-cut #touchpad, body.intro-cut #guide,
+body.intro-cut #cr-clock, body.intro-cut #bonus, body.intro-cut #endshift { opacity: 0 !important; pointer-events: none !important; transition: opacity .3s; }
+body.intro-cut.ic-hud #hud-left, body.intro-cut.ic-hud #radar { opacity: 1 !important; z-index: 39; }
+body.intro-cut #task, body.intro-cut #addr, body.intro-cut #rivals { visibility: hidden; }
+body.intro-cut.ic-hp #hearts { animation: ic-pulse .42s ease-in-out infinite alternate; transform-origin: left center; }
+body.intro-cut.ic-nos #radar { animation: ic-ring .42s ease-in-out infinite alternate; }
+@keyframes ic-pulse { from { transform: scale(1.35); filter: none; } to { transform: scale(1.7); filter: drop-shadow(0 0 6px #ff5d7a) drop-shadow(0 0 12px #ff5d7a); } }
+@keyframes ic-ring { from { box-shadow: 0 0 0 3px #6fd3ff, 0 0 14px #6fd3ff; transform: scale(1.04); } to { box-shadow: 0 0 0 6px #e6f7ff, 0 0 34px #6fd3ff; transform: scale(1.12); } }
+@media (max-width: 560px) {
+  #intro-cut .ic-skip { padding: 6px 8px; }
+  #intro-cut .ic-card { bottom: calc(12vh + 2vh); }
+}
+/* на плане машины радар внизу слева — плашка встаёт правее него */
+body.intro-cut.ic-hud #intro-cut .ic-card { left: calc(min(148px, 22vw) + 40px); max-width: calc(100% - min(148px, 22vw) - 56px); }

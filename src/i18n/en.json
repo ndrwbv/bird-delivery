@@ -1084,7 +1084,6 @@
  "до конца заказа": "order time left",
  "до конца смены": "shift time left",
  "до конца смены ~{n} мин": "~{n} min left in the shift",
- "знает по имени всех собак района": "knows every dog in the district by name",
  "комментарий курьера": "courier's note",
  "минус кальянщик": "minus one hookah guy",
  "минус любитель чая": "minus one tea lover",
@@ -1095,7 +1094,6 @@
  "получатель": "recipient",
  "пометка": "note",
  "похититель пиццы наказан · +{money}": "pizza thief punished · +{money}",
- "профессиональный ставочник на собак": "professional dog-race bettor",
  "Степан": "Stepan",
  "Тугарев": "Tugarev",
  "ГАЗ ГАЗ": "GAS GAS",
@@ -1145,5 +1143,36 @@
  "пока держишь, кофе тает. сколько осталось — голубое кольцо вокруг радара. новые стаканчики стоят у дороги": "the coffee drains while you hold it. what’s left — the blue ring around the radar. fresh cups wait by the road",
  "пока держишь, кофе тает. сколько осталось — кольцо по краю кнопки. новые стаканчики стоят у дороги": "the coffee drains while you hold it. what’s left — the ring around the button. fresh cups wait by the road",
  "понял": "got it",
- "держи бонус нитро": "have a nitro bonus"
+ "держи бонус нитро": "have a nitro bonus",
+ "заядлый кальянщик и профессиональный вайбкодер": "hardcore hookah lover and professional vibe coder",
+ "любитель самовара и профессиональный вайбкодер": "samovar enthusiast and professional vibe coder",
+ "вот пиццерия — сюда я устроился курьером": "here’s the pizzeria — I just got hired as a courier",
+ "первый заказ": "first order",
+ "первый заказ — Степану Тугареву: заядлый кальянщик и профессиональный вайбкодер": "first order — for Stepan Tugarev: hardcore hookah lover and professional vibe coder",
+ "первый заказ — Степану Тугареву: любитель самовара и профессиональный вайбкодер": "first order — for Stepan Tugarev: samovar enthusiast and professional vibe coder",
+ "первый заказ — вот он, ждёт пиццу": "first order — there he is, waiting for his pizza",
+ "моя тачка": "my ride",
+ "вот моя тачка: у неё есть жизни ♥ и нитро": "here’s my ride: it’s got lives ♥ and nitro",
+ "кхе-кхе": "*cough cough*",
+ "а ещё она может ломаться": "and it can break down, too",
+ "выбил {who} со смены": "knocked {who} off the shift",
+ "выбил коллегу!": "took out a coworker!",
+ "Валерий": "Valery",
+ "Палыч": "Palych",
+ "директор пиццерии": "pizzeria manager",
+ "понял, Палыч": "got it, Palych",
+ "весь развоз вовремя!": "whole run on time!",
+ "сборный заказ": "bundle order",
+ "сборный: {n} адрес, порядок выбираешь сам|сборный: {n} адреса, порядок выбираешь сам|сборный: {n} адресов, порядок выбираешь сам": {
+  "one": "bundle: {n} address, you pick the order",
+  "other": "bundle: {n} addresses, you pick the order"
+ },
+ "остался {n} адрес — выбирай, куда дальше|осталось {n} адреса — выбирай, куда дальше|осталось {n} адресов — выбирай, куда дальше": {
+  "one": "{n} address left — pick where next",
+  "other": "{n} addresses left — pick where next"
+ },
+ "слушай, ты растёшь! жалоб на тебя ноль, клиенты довольны. теперь можешь брать два заказа сразу: две пиццы, два адреса. в каком порядке развозить — решай сам, время одно на весь развоз": "listen, you're growing! zero complaints, happy customers. now you can take two orders at once: two pizzas, two addresses. which goes first — your call, one timer for the whole run",
+ "клиенты тебя хвалят. держи три адреса за раз — маршрут сам придумаешь, ты уже не стажёр": "customers keep praising you. here, three addresses at once — plan the route yourself, you're no rookie anymore",
+ "пять пицц в багажник! кухня еле успевает за тобой. только не перепутай, кому какая": "five pizzas in the trunk! the kitchen can barely keep up with you. just don't mix up who gets which",
+ "семь заказов разом — больше нам в багажник не влезет. ты лучший курьер «Птицы Пиццы», так что и времени тебе меньше всех": "seven orders at once — the trunk won't fit any more. you're the best courier at Birdy Pizza, so you get the least time of all"
 }

@@ -1084,7 +1084,6 @@
  "до конца заказа": "siparişe kalan",
  "до конца смены": "vardiyaya kalan",
  "до конца смены ~{n} мин": "vardiyanın bitmesine ~{n} dk",
- "знает по имени всех собак района": "mahalledeki tüm köpekleri adıyla bilir",
  "комментарий курьера": "kuryeye not",
  "минус кальянщик": "nargileci gitti",
  "минус любитель чая": "çay sever gitti",
@@ -1095,7 +1094,6 @@
  "получатель": "alıcı",
  "пометка": "not",
  "похититель пиццы наказан · +{money}": "pizza hırsızı cezalandırıldı · +{money}",
- "профессиональный ставочник на собак": "profesyonel köpek yarışı bahisçisi",
  "Степан": "Stepan",
  "Тугарев": "Tugarev",
  "ГАЗ ГАЗ": "GAZ GAZ",
@@ -1145,5 +1143,36 @@
  "пока держишь, кофе тает. сколько осталось — голубое кольцо вокруг радара. новые стаканчики стоят у дороги": "tuttukça kahve azalır. ne kaldığını radarın etrafındaki mavi halka gösterir. yeni bardaklar yol kenarında",
  "пока держишь, кофе тает. сколько осталось — кольцо по краю кнопки. новые стаканчики стоят у дороги": "tuttukça kahve azalır. ne kaldığını düğmenin etrafındaki halka gösterir. yeni bardaklar yol kenarında",
  "понял": "anladım",
- "держи бонус нитро": "al, nitro bonusu"
+ "держи бонус нитро": "al, nitro bonusu",
+ "заядлый кальянщик и профессиональный вайбкодер": "azılı nargile tiryakisi ve profesyonel vibe coder",
+ "любитель самовара и профессиональный вайбкодер": "semaver tutkunu ve profesyonel vibe coder",
+ "вот пиццерия — сюда я устроился курьером": "işte pizzacı — buraya kurye olarak girdim",
+ "первый заказ": "ilk sipariş",
+ "первый заказ — Степану Тугареву: заядлый кальянщик и профессиональный вайбкодер": "ilk sipariş — Stepan Tugarev’e: azılı nargile tiryakisi ve profesyonel vibe coder",
+ "первый заказ — Степану Тугареву: любитель самовара и профессиональный вайбкодер": "ilk sipariş — Stepan Tugarev’e: semaver tutkunu ve profesyonel vibe coder",
+ "первый заказ — вот он, ждёт пиццу": "ilk sipariş — işte orada, pizzasını bekliyor",
+ "моя тачка": "arabam",
+ "вот моя тачка: у неё есть жизни ♥ и нитро": "işte arabam: canları ♥ ve nitrosu var",
+ "кхе-кхе": "öhö öhö",
+ "а ещё она может ломаться": "bir de bozulabiliyor",
+ "выбил {who} со смены": "{who} vardiyadan çıkardın",
+ "выбил коллегу!": "iş arkadaşını devirdin!",
+ "Валерий": "Valeriy",
+ "Палыч": "Palych",
+ "директор пиццерии": "pizzacı müdürü",
+ "понял, Палыч": "anladım, Palych",
+ "весь развоз вовремя!": "tüm teslimatlar zamanında!",
+ "сборный заказ": "toplu sipariş",
+ "сборный: {n} адрес, порядок выбираешь сам|сборный: {n} адреса, порядок выбираешь сам|сборный: {n} адресов, порядок выбираешь сам": {
+  "one": "toplu: {n} adres, sırayı sen seç",
+  "other": "toplu: {n} adres, sırayı sen seç"
+ },
+ "остался {n} адрес — выбирай, куда дальше|осталось {n} адреса — выбирай, куда дальше|осталось {n} адресов — выбирай, куда дальше": {
+  "one": "{n} adres kaldı — sıradakini sen seç",
+  "other": "{n} adres kaldı — sıradakini sen seç"
+ },
+ "слушай, ты растёшь! жалоб на тебя ноль, клиенты довольны. теперь можешь брать два заказа сразу: две пиццы, два адреса. в каком порядке развозить — решай сам, время одно на весь развоз": "bak, gelişiyorsun! sıfır şikâyet, müşteriler memnun. artık aynı anda iki sipariş alabilirsin: iki pizza, iki adres. hangisi önce — sen karar ver, tüm tur için tek süre var",
+ "клиенты тебя хвалят. держи три адреса за раз — маршрут сам придумаешь, ты уже не стажёр": "müşteriler seni övüyor. al sana bir seferde üç adres — rotayı kendin çiz, artık stajyer değilsin",
+ "пять пицц в багажник! кухня еле успевает за тобой. только не перепутай, кому какая": "bagaja beş pizza! mutfak sana zor yetişiyor. sadece kimin hangisi olduğunu karıştırma",
+ "семь заказов разом — больше нам в багажник не влезет. ты лучший курьер «Птицы Пиццы», так что и времени тебе меньше всех": "aynı anda yedi sipariş — bagaja daha fazlası sığmaz. Kuş Pizza'nın en iyi kuryesisin, o yüzden en az süre de sende"
 }

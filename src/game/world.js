@@ -588,15 +588,15 @@ function heapGeos (hp, s, out) {
     if (it.rank >= keep) continue;
     const x = hp.x + it.x * sc, z = hp.z + it.z * sc, y = A.groundH(x, z) + it.y * sc;
     switch (it.k) {
-      case 'core': A.put(out, CORE_G.clone().scale(it.sx * sc, it.sy * sc, it.sz * sc), '#2c2a2c', x, A.groundH(x, z) - 0.05, z, 0, it.ry, 0); break;
+      case 'core': A.put(out, A.geoScaled(CORE_G, it.sx * sc, it.sy * sc, it.sz * sc), '#2c2a2c', x, A.groundH(x, z) - 0.05, z, 0, it.ry, 0); break;
       case 'bag': {
-        const g = BAG_G.clone().scale(it.s * sc, it.s * 0.78 * sc, it.s * 1.08 * sc);
+        const g = A.geoScaled(BAG_G, it.s * sc, it.s * 0.78 * sc, it.s * 1.08 * sc);
         A.put(out, g, it.hex, x, y, z, it.rx, it.ry, 0);
         if (it.s > 0.36) A.box(out, 0.07 * sc, 0.12 * sc, 0.07 * sc, it.hex, x, y + it.s * 0.78 * sc, z);     // узелок
         break;
       }
-      case 'box': A.put(out, new THREE.BoxGeometry(0.6 * sc, 0.45 * sc, 0.5 * sc), pick(['#b08a5a', '#a2804f', '#c09a66']), x, y + 0.22 * sc, z, it.rx * 0.5, it.ry, it.rz || 0); break;
-      case 'tire': A.put(out, TIRE_G.clone().scale(sc, sc, sc), '#1c1c20', x, y + 0.16 * sc, z, Math.PI / 2 + it.rx * 0.4, it.ry, 0); break;
+      case 'box': A.put(out, A.boxGeo(0.6 * sc, 0.45 * sc, 0.5 * sc), pick(['#b08a5a', '#a2804f', '#c09a66']), x, y + 0.22 * sc, z, it.rx * 0.5, it.ry, it.rz || 0); break;
+      case 'tire': A.put(out, A.geoScaled(TIRE_G, sc, sc, sc), '#1c1c20', x, y + 0.16 * sc, z, Math.PI / 2 + it.rx * 0.4, it.ry, 0); break;
       case 'chair': {
         const g = [];
         A.box(g, 0.5, 0.06, 0.5, '#8a6b4e', 0, 0.45, 0); A.box(g, 0.5, 0.5, 0.05, '#8a6b4e', 0, 0.72, -0.23);
@@ -605,10 +605,10 @@ function heapGeos (hp, s, out) {
         A.put(out, m, '#8a6b4e', x, y, z, it.rx, it.ry, 0.5);
         break;
       }
-      case 'mattress': A.put(out, new THREE.BoxGeometry(1.8 * sc, 0.18 * sc, 0.85 * sc), '#cdbf9f', x, y + 0.35 * sc, z, 0, it.ry, 0.45); break;
-      case 'tv': A.put(out, new THREE.BoxGeometry(0.55 * sc, 0.42 * sc, 0.45 * sc), '#4a4a50', x, y + 0.2 * sc, z, it.rx * 0.5, it.ry, 0); break;
-      case 'boards': for (let i = 0; i < 3; i++) A.put(out, new THREE.BoxGeometry(1.6 * sc, 0.05 * sc, 0.18 * sc), '#9a7a55', x + i * 0.1, y + 0.1 * sc + i * 0.06, z + i * 0.2 * sc, 0, it.ry + i * 0.2, 0.25); break;
-      case 'fridge': A.put(out, new THREE.BoxGeometry(0.62 * sc, 1.5 * sc, 0.62 * sc), '#e9e6df', x, y + 0.3 * sc, z, Math.PI / 2 - 0.15, it.ry, 0); break;
+      case 'mattress': A.put(out, A.boxGeo(1.8 * sc, 0.18 * sc, 0.85 * sc), '#cdbf9f', x, y + 0.35 * sc, z, 0, it.ry, 0.45); break;
+      case 'tv': A.put(out, A.boxGeo(0.55 * sc, 0.42 * sc, 0.45 * sc), '#4a4a50', x, y + 0.2 * sc, z, it.rx * 0.5, it.ry, 0); break;
+      case 'boards': for (let i = 0; i < 3; i++) A.put(out, A.boxGeo(1.6 * sc, 0.05 * sc, 0.18 * sc), '#9a7a55', x + i * 0.1, y + 0.1 * sc + i * 0.06, z + i * 0.2 * sc, 0, it.ry + i * 0.2, 0.25); break;
+      case 'fridge': A.put(out, A.boxGeo(0.62 * sc, 1.5 * sc, 0.62 * sc), '#e9e6df', x, y + 0.3 * sc, z, Math.PI / 2 - 0.15, it.ry, 0); break;
     }
   }
 }

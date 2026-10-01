@@ -197,10 +197,16 @@ function Pile () {
   const cells = new Map();
   const col = new THREE.Color(), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), P = new THREE.Vector3(), Sc = new THREE.Vector3();
   let tris = 0;
+  const byNum = new Map(), RGB = new Map();         // клетка по числу (строка-ключ на каждую вещь стоила), цвет по строке — разобранный
   function cell (x, z) {
-    const k = Math.floor(x / CH) + ',' + Math.floor(z / CH);
-    let c = cells.get(k);
-    if (!c) cells.set(k, c = { k, n: 0, cap: 2048, p: new Float32Array(2048 * 3), c: new Uint8Array(2048 * 3), a: new Uint8Array(2048 * 4) });
+    const i = Math.floor(x / CH), j = Math.floor(z / CH), kn = (i + 50000) * 100000 + j + 50000;
+    let c = byNum.get(kn);
+    if (!c) {
+      const k = i + ',' + j;
+      c = cells.get(k);
+      if (!c) cells.set(k, c = { k, n: 0, cap: 2048, p: new Float32Array(2048 * 3), c: new Uint8Array(2048 * 3), a: new Uint8Array(2048 * 4) });
+      byNum.set(kn, c);
+    }
     return c;
   }
   /* вершины шаблона после сдвига, поворота и масштаба — в массив out с o */
@@ -228,8 +234,13 @@ function Pile () {
       const c = cell(x, z), nv = tpl.length / 3, v0 = c.n;
       room(c, nv);
       write(tpl, c.p, v0 * 3, x, y, z, sx, sy, sz, rx, ry, rz);
-      col.set(hex);
-      const r = Math.round(col.r * 255), g = Math.round(col.g * 255), b = Math.round(col.b * 255);
+      let rgb = RGB.get(hex);
+      if (rgb === undefined) {
+        col.set(hex);
+        rgb = (Math.round(col.r * 255) << 16) | (Math.round(col.g * 255) << 8) | Math.round(col.b * 255);
+        if (typeof hex === 'string' || typeof hex === 'number') RGB.set(hex, rgb);
+      }
+      const r = rgb >> 16, g = (rgb >> 8) & 255, b = rgb & 255;
       const sd = Math.max(1, Math.min(254, Math.round(seed * 253) + 1));
       for (let i = v0; i < v0 + nv; i++) {
         const o = i * 3, q = i * 4;
@@ -257,7 +268,7 @@ function Pile () {
         C.scene.add(m);
         out.push(m); out.byKey.set(c.k, m);
       }
-      cells.clear();
+      cells.clear(); byNum.clear();
       return out;
     },
   };
@@ -600,7 +611,17 @@ export function seasonBuild () {
   for (const q of C.PARKED || []) { const k = Math.floor(q[0] / 10) + ',' + Math.floor(q[1] / 10); if (!PK.has(k)) PK.set(k, []); PK.get(k).push(q); }
   const parkedNear = (x, z) => { const i = Math.floor(x / 10), j = Math.floor(z / 10); for (let a = i - 1; a <= i + 1; a++) for (let b = j - 1; b <= j + 1; b++) for (const q of PK.get(a + ',' + b) || []) if (Math.hypot(q[0] - x, q[1] - z) < 4.5) return true; return false; };
   const onAsphalt = (x, z, m) => { const n = nearestRoad(x, z, 7, 1); return n && n.d < n.seg.w / 2 + m; };
-  const nearZebra = (x, z, d) => ZEBRAS.some(q => Math.abs(q.x - x) < d && Math.abs(q.z - z) < d);
+  // зебры по клеткам в 10 м (d — до 9 м): ответ тот же, что у перебора всех
+  const ZG = new Map();
+  for (const q of ZEBRAS) { const k = Math.floor(q.x / 10) * 100003 + Math.floor(q.z / 10); if (!ZG.has(k)) ZG.set(k, []); ZG.get(k).push(q); }
+  const nearZebra = (x, z, d) => {
+    for (let i = Math.floor((x - d) / 10); i <= Math.floor((x + d) / 10); i++)
+      for (let j = Math.floor((z - d) / 10); j <= Math.floor((z + d) / 10); j++) {
+        const a = ZG.get(i * 100003 + j);
+        if (a) for (const q of a) if (Math.abs(q.x - x) < d && Math.abs(q.z - z) < d) return true;
+      }
+    return false;
+  };
   const nearStop = (x, z) => (CITY.stops || []).some(q => Math.abs(q.p[0] - x) < 9 && Math.abs(q.p[1] - z) < 9);
   const RIDGES = svk ? 9000 : 3600, HEAPS = svk ? 1800 : 900, BANKS = svk ? 1300 : 650;
   let nRidge = 0, nHeap = 0, nBank = 0;

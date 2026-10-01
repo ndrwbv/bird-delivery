@@ -13,7 +13,9 @@
    камеры (far + радиус куска) снимаются со сцены и возвращаются, когда
    подъедешь. Видимость (visible) не трогаем — её переключают сезоны.
    Если кто-то всё-таки сдвинул замороженный меш — он размораживается.
-   Плюс у невидимых групп (машины и люди за кадром) не считаем матрицы.
+   Матрицы сцены считает сам step(), а не рендер: только у видимого и живого —
+   невидимые группы (машины и люди за кадром), замороженный реквизит, склейки
+   города и стоящие на месте лёгкие машины пропускаются целиком.
 
    Реквизит (фонари, светофоры, лавочки — PROPS из game.js) двигается только
    пока падает после удара. Стоит или уже лежит — матрицы заморожены целиком
@@ -52,7 +54,26 @@ export function freeze (scene, cam, props) {
       for (const k of c.children.slice()) if (k.isMesh && still(k)) take(k, c);
     }
   }
+  /* Матрицы сцены дальше считает step(), а не рендер. В three.js r169 сцена
+     сама пересобирает свою матрицу каждый кадр и тем «толкает» весь граф:
+     все ~7 тысяч объектов (и замороженные, и спрятанные) заново перемножали
+     матрицы в каждом кадре — на Деке это 3–4 мс из 16,7. Сцена не двигается */
+  scene.updateMatrixWorld(true);
+  scene.matrixAutoUpdate = false;
+  scene.matrixWorldAutoUpdate = false;
   return STATS;
+}
+
+/* Лёгкая машина (одна склейка кузова и фары — makeCarLite) внутри не
+   шевелится: стоит на месте — её матрицы те же, что в прошлом кадре.
+   Таких у бордюров и на парковках под сотню в кадре */
+function moved (c) {
+  const p = c.position, q = c.quaternion, s = c.scale;
+  let k = c.userData._pose;
+  if (!k) k = c.userData._pose = new Float64Array(10).fill(NaN);
+  if (k[0] === p.x && k[1] === p.y && k[2] === p.z && k[3] === q.x && k[4] === q.y && k[5] === q.z && k[6] === q.w && k[7] === s.x && k[8] === s.y && k[9] === s.z) return false;
+  k[0] = p.x; k[1] = p.y; k[2] = p.z; k[3] = q.x; k[4] = q.y; k[5] = q.z; k[6] = q.w; k[7] = s.x; k[8] = s.y; k[9] = s.z;
+  return true;
 }
 
 /* падает — живой; стоит или лёг — заморожен (и может уйти со сцены вдали) */
@@ -79,12 +100,22 @@ export function step () {
     else np++;
   }
   STATS.props = np;
-  // невидимые группы (машины, люди, реквизит вне кадра) матрицы не считают;
-  // стала видимой — со следующего обхода считает снова
-  let g = 0;
-  for (const c of SCENE.children) if (c.isGroup && c.matrixAutoUpdate) { c.matrixWorldAutoUpdate = c.visible; g++; }
-  STATS.groups = g;
-  if (++tick % CULL_EVERY) return;
+  if (++tick % CULL_EVERY === 0) cullFar();
+  // матрицы — только у видимого и живого (см. freeze): спрятанные группы,
+  // замороженный реквизит, склейки города и стоящие лёгкие машины пропускаем
+  let g = 0, still2 = 0;
+  for (const c of SCENE.children) {
+    if (c.isGroup && c.matrixAutoUpdate) {
+      let on = c.visible;
+      if (on && c.userData.lite && !moved(c)) { on = false; still2++; }
+      c.matrixWorldAutoUpdate = on; g++;
+    }
+    if (c.visible && c.matrixWorldAutoUpdate) c.updateMatrixWorld();
+  }
+  STATS.groups = g; STATS.stillCars = still2;
+}
+
+function cullFar () {
   const px = CAM.position.x, pz = CAM.position.z, far = CAM.far + 20;
   let off = 0;
   for (let i = LIST.length - 1; i >= 0; i--) {
@@ -118,21 +149,43 @@ export function step () {
    Кадр в среднем длиннее 18,5 мс две секунды подряд — ступень вниз: туман и
    дальний край камеры ближе (0,85, потом 0,72 от полной дальности), а с ними
    и отсечение выше — меньше города в обходе сцены. Двенадцать секунд с запасом —
-   ступень обратно. Меряем только во время езды: меню и пауза не в счёт. */
+   ступень обратно. Меряем только во время езды: меню и пауза не в счёт.
+
+   Чтобы страховка не качалась туда-сюда (на Деке так и было: на полной
+   дальности кадр чуть не успевает → ступень вниз → через 12 с обратно → снова
+   не успевает — и так по кругу, с рывком и скачком тумана каждый раз):
+   - не вышло подняться (через 20 с снова пришлось опускать) — следующая
+     попытка вдвое позже: 12 с, 24, 48… до 4 минут; прожили наверху минуту — снова 12 с;
+   - дальность меняется не скачком, а плавно, за пару секунд — туман и край
+     камеры ползут, дома вдали не выпрыгивают;
+   - кадр длинный, но код игры занял меньше половины его — дело не в нас
+     (на Деке стоит ограничение 40/45 fps или экран на 50 Гц): дальность не режем. */
 const LEVELS = [1, 0.85, 0.72];
 const BASE_FAR = 490;
 export const Q = { lvl: 0, k: 1 };
-let ema = 1 / 60, slowT = 0, fastT = 0, coolT = 0;
+let ema = 1 / 60, busy = 1 / 120, slowT = 0, fastT = 0, coolT = 0, clock = 0, upAt = -1e9, downAt = -1e9, upWait = 12, farK = 1;
+/* сколько занял сам кадр игры (секунды) — зовётся после рендера */
+export function work (sec) { if (sec > 0 && sec < 0.2) busy += (sec - busy) * 0.05; }
 export function govern (raw, active) {
+  const want = LEVELS[Q.lvl];
+  if (Q.k !== want) {                              // плавный переход, ~1,5 с
+    const d = want - Q.k, st = Math.min(0.1, raw > 0 ? raw : 0) * 0.1;
+    Q.k = Math.abs(d) <= st ? want : Q.k + Math.sign(d) * st;
+  }
+  if (CAM && Q.k !== farK) { farK = Q.k; CAM.far = BASE_FAR * Q.k; CAM.updateProjectionMatrix(); }
   if (!active || !(raw > 0) || raw > 0.1) return;
+  clock += raw;
   ema += (raw - ema) * 0.05;
   coolT = Math.max(0, coolT - raw);
-  if (ema > 1 / 54) { slowT += raw; fastT = 0; } else if (ema < 1 / 58.5) { fastT += raw; slowT = 0; } else { slowT = 0; fastT = 0; }
+  if (upAt > downAt && clock - upAt > 60) upWait = 12;          // поднялись и держимся минуту — всё хорошо
+  const ours = busy > ema * 0.5;                   // долгий кадр — из-за нас, а не из-за ограничения кадров
+  if (ema > 1 / 54 && ours) { slowT += raw; fastT = 0; } else if (ema < 1 / 58.5) { fastT += raw; slowT = 0; } else { slowT = 0; fastT = 0; }
   let to = Q.lvl;
   if (slowT > 2 && Q.lvl < LEVELS.length - 1 && !coolT) to = Q.lvl + 1;
-  else if (fastT > 12 && Q.lvl > 0) to = Q.lvl - 1;
+  else if (fastT > upWait && Q.lvl > 0) to = Q.lvl - 1;
   if (to === Q.lvl) return;
-  Q.lvl = to; Q.k = LEVELS[to]; slowT = fastT = 0; coolT = 4;
-  if (CAM) { CAM.far = BASE_FAR * Q.k; CAM.updateProjectionMatrix(); }
-  STATS.q = to;
+  if (to > Q.lvl) { if (clock - upAt < 20) upWait = Math.min(240, upWait * 2); downAt = clock; }   // только что поднимались — не вышло
+  if (to < Q.lvl) upAt = clock;
+  Q.lvl = to; slowT = fastT = 0; coolT = 4;
+  STATS.q = to; STATS.switches = (STATS.switches || 0) + 1; STATS.upWait = upWait;
 }
