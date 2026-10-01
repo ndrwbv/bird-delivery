@@ -8425,38 +8425,47 @@ function drawRadar () {
     rctx.moveTo(ax, ay); rctx.lineTo(bx, by); rctx.lineTo(cx, cy); rctx.lineTo(dx, dy); rctx.closePath();
     rctx.fill('evenodd');
   }
-  // пиццерия всегда видна, цель — кружком
+  // метки — тихие квадратики, яркое только адрес (пин, ниже). Пересчёт в точку
+  // радара — без массива: машин и баллонов много, а рисуем каждый кадр
+  const rA = (wx, wz) => ((wz - V.z) * sn - (wx - V.x) * cs) * s;
+  const rB = (wx, wz) => -((wx - V.x) * sn + (wz - V.z) * cs) * s;
   const blip = (wx, wz, hex, size) => {
-    let [a, b] = tr(wx, wz);
+    let a = rA(wx, wz), b = rB(wx, wz);
     const len = Math.hypot(a, b);
     if (len > R - 7) { a *= (R - 7) / len; b *= (R - 7) / len; }
     rctx.fillStyle = hex; rctx.fillRect(a - size, b - size, size * 2, size * 2);
   };
   if (PIZZA) blip(PIZZA.x, PIZZA.z, '#ffffff', 3.4);
-  for (const c of DRINKITS) blip(c.cx, c.cz, '#2f6fff', 3.2);
+  for (const c of DRINKITS) blip(c.cx, c.cz, '#2f6fff', 2.6);
   if (CAREER) AUTO.radar(rctx, tr, R);             // гараж Дяди Жени
   if (THIEF.p && Math.floor(tG * 4) % 2 === 0) blip(THIEF.p.x, THIEF.p.z, '#ff2d6e', 3.6);
-  if (S.target) {
-    blip(S.target.x, S.target.z, CAREER ? ORD.targetColor() : '#f0522a', 4);   // карьера: цвет вида заказа
-    if (CAREER) { let [a, b] = tr(S.target.x, S.target.z); const l = Math.hypot(a, b); if (l > R - 7) { a *= (R - 7) / l; b *= (R - 7) / l; } ORD.radarRing(rctx, a, b); }
-  }
-  // находки — фиолетовые, мерцают и пульсируют кольцом (colPing)
+  // находки — просто фиолетовые точки
   for (const o of COL_ON_MAP) {
-    const [a, b] = tr(o.x, o.z);
-    if (Math.hypot(a, b) < R - 5) colPing(rctx, a, b, 1.3, o.ph);
+    const a = rA(o.x, o.z), b = rB(o.x, o.z);
+    if (Math.hypot(a, b) < R - 4) colDot(rctx, a, b, 2.2);
   }
   // кофе и бонусы — только те, что в пределах радара
   for (const n of NITRO_CANS) {
     if (n.t > 0) continue;
-    rctx.fillStyle = PICK_HEX[n.kind];
-    const [a, b] = tr(n.x, n.z);
-    if (Math.hypot(a, b) < R - 4) rctx.fillRect(a - 2, b - 2, 4, 4);
+    const a = rA(n.x, n.z), b = rB(n.x, n.z);
+    if (Math.hypot(a, b) < R - 4) { rctx.fillStyle = PICK_HEX[n.kind]; rctx.fillRect(a - 1.5, b - 1.5, 3, 3); }
   }
-  for (const t of TRAFFIC) blip(t.x, t.z, t.dot || '#5b6b80', t.dot ? 3 : 2);
+  for (const t of TRAFFIC) blip(t.x, t.z, t.dot || '#5b6b80', t.dot ? 2.4 : 1.6);
   rctx.fillStyle = '#fff'; rctx.strokeStyle = '#33210c'; rctx.lineWidth = 1.4;
   rctx.beginPath();
   rctx.moveTo(0, -6.4); rctx.lineTo(4.6, 5.4); rctx.lineTo(0, 2.8); rctx.lineTo(-4.6, 5.4);
   rctx.closePath(); rctx.fill(); rctx.stroke();
+  // куда везти — поверх всего: мигающий пин, а за краем радара — стрелка у края
+  eachTarget((wx, wz, main) => {
+    const a = rA(wx, wz), b = rB(wx, wz), len = Math.hypot(a, b);
+    const out = len > R - 6;
+    if (main && CAREER) {                            // срочный — ещё и красное кольцо (orders.js)
+      const k = out ? (R - 7) / len : 1;
+      ORD.radarRing(rctx, a * k, b * k);
+    }
+    if (out) targetArrow(rctx, a, b, R, main);
+    else targetPin(rctx, a, b, 1, main);
+  });
   rctx.restore();
 }
 
@@ -8652,21 +8661,72 @@ function districtLayer () {
   return c;
 }
 
-/* Метка находки на карте: фиолетовая точка мерцает, от неё расходится
-   кольцо. Часы свои — полная карта рисуется, пока игра стоит. */
-function colPing (x, a, b, s, ph) {
-  const t = performance.now() / 1000 + ph;
-  const k = (t * 1.1) % 1;                              // кольцо: растёт и тает
-  x.save();
-  x.globalAlpha = (1 - k) * 0.9;
-  x.strokeStyle = '#c56cff'; x.lineWidth = 2 * s;
-  x.beginPath(); x.arc(a, b, (4 + k * 10) * s, 0, Math.PI * 2); x.stroke();
-  x.globalAlpha = 0.55 + 0.45 * Math.abs(Math.sin(t * 5));   // мерцание
-  x.fillStyle = '#b44dff';
-  x.beginPath(); x.arc(a, b, (3.2 + Math.sin(t * 5) * 0.9) * s, 0, Math.PI * 2); x.fill();
+/* Метки на радаре и большой карте. Правило одно: самое яркое и мигающее —
+   куда везти заказ (красный пин), всё остальное — тихие точки, чтобы не
+   спорили с ним. Часы — performance.now(): полная карта рисуется, пока игра
+   стоит. Без массивов и строк на метку: радар рисуется каждый кадр. */
+const PIN_HOT = '#ff3b1f', PIN_GLOW = '#ffe14d', PIN_EDGE = '#2a1206', COL_DOT = '#9d5cf0';
+const PIN_A = Math.acos(1 / 2.6);                 // голова пина радиуса r, острие — в 2.6r под её центром
+const pinOn = () => (performance.now() / 1000 * 2.2) % 1 < 0.55;   // мигание ~2 раза в секунду
+
+/* все адреса, куда сейчас везти: текущий S.target (клиент, магазин поручения
+   или «назад в пиццерию») и ещё не врученные остальные адреса заказа.
+   Несколько адресов разом: стоп с done === false ждёт, даже если он раньше idx.
+   cb(x, z, main) — текущий последним, поверх остальных */
+function eachTarget (cb) {
+  if (!S.target) return;
+  const o = S.order;
+  if (o && S.state === 'drive') for (let i = 0; i < o.stops.length; i++) {
+    const st = o.stops[i];
+    if (i === o.idx || st.done || (i < o.idx && st.done !== false)) continue;
+    const p = st.at || st.peds[0];
+    if (p) cb(p.x, p.z, false);
+  }
+  cb(S.target.x, S.target.z, true);
+}
+
+/* куда везти: капля острием в адрес, мигает жёлтым ореолом, от острия
+   расходится кольцо. u — масштаб, main — текущий адрес (крупнее) */
+function targetPin (x, a, b, u, main) {
+  const k = (performance.now() / 1000 * 1.25) % 1;
+  const r = (main ? 4.6 : 3.6) * u, cy = b - r * 2.6;
+  x.globalAlpha = 1 - k;
+  x.lineWidth = 2 * u; x.strokeStyle = PIN_HOT;
+  x.beginPath(); x.arc(a, b, (2 + k * 9) * u, 0, Math.PI * 2); x.stroke();
+  if (pinOn()) {
+    x.globalAlpha = 0.85; x.fillStyle = PIN_GLOW;
+    x.beginPath(); x.arc(a, cy, r * 1.9, 0, Math.PI * 2); x.fill();
+  }
   x.globalAlpha = 1;
-  x.lineWidth = 1; x.strokeStyle = '#f0d8ff'; x.stroke();
-  x.restore();
+  x.beginPath(); x.moveTo(a, b);
+  x.arc(a, cy, r, Math.PI / 2 + PIN_A, Math.PI / 2 - PIN_A);
+  x.closePath();
+  x.fillStyle = PIN_HOT; x.fill();
+  x.lineWidth = 1.6 * u; x.lineJoin = 'round'; x.strokeStyle = PIN_EDGE; x.stroke();
+  x.fillStyle = '#fff';
+  x.beginPath(); x.arc(a, cy, r * 0.42, 0, Math.PI * 2); x.fill();
+}
+
+/* адрес за краем радара — мигающая стрелка у края, остриём в его сторону */
+function targetArrow (x, a, b, R, main) {
+  const l = Math.hypot(a, b) || 1, ux = a / l, uy = b / l;
+  const w = main ? 6 : 4.6, tip = R - 2, base = tip - w * 1.9, bx = ux * base, by = uy * base;
+  if (pinOn()) {
+    x.globalAlpha = 0.85; x.fillStyle = PIN_GLOW;
+    x.beginPath(); x.arc(ux * (tip - w), uy * (tip - w), w * 1.6, 0, Math.PI * 2); x.fill();
+    x.globalAlpha = 1;
+  }
+  x.beginPath();
+  x.moveTo(ux * tip, uy * tip); x.lineTo(bx - uy * w, by + ux * w); x.lineTo(bx + uy * w, by - ux * w);
+  x.closePath();
+  x.fillStyle = PIN_HOT; x.fill();
+  x.lineWidth = 1.6; x.lineJoin = 'round'; x.strokeStyle = PIN_EDGE; x.stroke();
+}
+
+/* находка — просто фиолетовая точка: не мигает, не спорит с адресом */
+function colDot (x, a, b, r) {
+  x.fillStyle = COL_DOT;
+  x.beginPath(); x.arc(a, b, r, 0, Math.PI * 2); x.fill();
 }
 
 function drawFullMap () {
@@ -8693,13 +8753,13 @@ function drawFullMap () {
   for (const n of NITRO_CANS) {
     if (n.t > 0) continue;
     x.fillStyle = PICK_HEX[n.kind];
-    x.fillRect(fmX(n.x) - 3.5 * s, fmZ(n.z) - 3.5 * s, 7 * s, 7 * s);
+    x.fillRect(fmX(n.x) - 2.5 * s, fmZ(n.z) - 2.5 * s, 5 * s, 5 * s);
   }
   for (const t of TRAFFIC) {
     x.fillStyle = t.dot || (t.taxi ? '#ffc400' : '#5b6b80');
-    x.fillRect(fmX(t.x) - 3.5 * s, fmZ(t.z) - 3.5 * s, 7 * s, 7 * s);
+    x.fillRect(fmX(t.x) - 2.5 * s, fmZ(t.z) - 2.5 * s, 5 * s, 5 * s);
   }
-  for (const o of COL_ON_MAP) colPing(x, fmX(o.x), fmZ(o.z), s * 2.8, o.ph);
+  for (const o of COL_ON_MAP) colDot(x, fmX(o.x), fmZ(o.z), 3 * u);   // находки — просто точки
   for (const c of DRINKITS) {
     x.fillStyle = '#2f6fff'; x.fillRect(fmX(c.cx) - 6 * s, fmZ(c.cz) - 6 * s, 12 * s, 12 * s);
     x.lineWidth = 2; x.strokeStyle = '#fff'; x.strokeRect(fmX(c.cx) - 6 * s, fmZ(c.cz) - 6 * s, 12 * s, 12 * s);
@@ -8709,23 +8769,21 @@ function drawFullMap () {
     x.lineWidth = 1.5 * u; x.strokeStyle = '#fff'; x.strokeRect(fmX(PIZZA.x) - 5 * u, fmZ(PIZZA.z) - 5 * u, 10 * u, 10 * u);
   }
   if (CAREER) ORD.drawMapQueue(x, fmX, fmZ, u);   // следующие заказы — полыми кружками
-  if (S.target) {
-    x.fillStyle = CAREER ? ORD.targetColor() : '#ff2d6e';
-    x.beginPath(); x.arc(fmX(S.target.x), fmZ(S.target.z), 6 * u, 0, Math.PI * 2); x.fill();
-    x.lineWidth = 1.5 * u; x.strokeStyle = '#fff'; x.stroke();
-  }
   if (CAREER) AUTO.mapMark(x, fmX, fmZ, u);       // гараж Дяди Жени
   if (MAPW.MAP_DOTS.length) MAPW.drawMapDots(x, fmX, fmZ, s);      // ?mapcheck: проблемы карты
   // ты — крупная стрелка по курсу с пульсирующим кольцом: видно сразу на всей карте
+  // (кольцо бледнее, чем у адреса: мигает ярче всех только «куда везти»)
   const px = fmX(V.x), pz = fmZ(V.z), pulse = (performance.now() / 900) % 1;
-  x.beginPath(); x.arc(px, pz, (12 + pulse * 16) * u, 0, Math.PI * 2);
-  x.lineWidth = 3 * u; x.strokeStyle = 'rgba(255, 216, 94, ' + (1 - pulse).toFixed(2) + ')'; x.stroke();
+  x.beginPath(); x.arc(px, pz, (12 + pulse * 12) * u, 0, Math.PI * 2);
+  x.globalAlpha = (1 - pulse) * 0.5; x.lineWidth = 2 * u; x.strokeStyle = '#ffd85e'; x.stroke(); x.globalAlpha = 1;
   x.beginPath(); x.arc(px, pz, 11 * u, 0, Math.PI * 2);
   x.fillStyle = 'rgba(51, 33, 12, .55)'; x.fill();
   x.save(); x.translate(px, pz); x.rotate(-V.h + Math.PI);
   x.beginPath(); x.moveTo(0, -13 * u); x.lineTo(9 * u, 10 * u); x.lineTo(0, 4 * u); x.lineTo(-9 * u, 10 * u); x.closePath();
   x.fillStyle = '#ffd85e'; x.fill(); x.lineWidth = 2 * u; x.lineJoin = 'round'; x.strokeStyle = '#33210c'; x.stroke();
   x.restore();
+  // куда везти — поверх всего, крупным мигающим пином (все адреса заказа)
+  eachTarget((wx, wz, main) => targetPin(x, fmX(wx), fmZ(wz), 1.8 * u, main));
 }
 
 /* чем дерутся в кофейной войне: в мягком режиме (Яндекс) — подушками,
@@ -10651,7 +10709,7 @@ function keysInfo () {
   const k = (...ks) => ks.map(x => '<kbd>' + x + '</kbd>').join('');
   const rows = pad ? [
     [k('RT'), $t('газ')], [k('LT'), $t('тормоз, назад')], [k($t('левый стик')), $t('руль')],
-    [k('B'), $t('ручник')], [k('X', 'RB'), $t('нитро')], [k('A'), $t('принять заказ')],
+    [k('B'), $t('ручник')], [k('A', 'RB'), $t('нитро — зажал и полетел')], [k('A'), $t('принять заказ')],
     [k('Y'), $t('карта района')], [k('←', '↑', '→'), $t('ответ клиенту')], [k('R3'), $t('звук')], [k('☰'), $t('пауза')],
   ] : touch ? [
     [k($t('палец')), $t('тянешь вверх — газ, вниз — тормоз, в стороны — руль')], [k($t('второй палец')), $t('ручник')],
@@ -10662,14 +10720,16 @@ function keysInfo () {
     [k('1', '2', '3'), $t('ответ клиенту')], [k('M'), $t('звук')], [k('Esc', 'P'), $t('пауза')],
   ];
   return '<div class="pm-keys-t">' + (pad ? $t('геймпад') : touch ? $t('управление') : $t('клавиатура')) + '</div>' +
-    '<div class="pm-keys-g">' + rows.map(([a, b]) => '<span>' + a + '<em>' + b + '</em></span>').join('') + '</div>';
+    '<div class="pm-keys-g">' + rows.map(([a, b]) => '<span>' + a + '</span><em>' + b + '</em>').join('') + '</div>';
 }
 function renderPause () {
   $('pm-order').innerHTML = orderInfo();
   $('pm-keys').innerHTML = keysInfo();
   const rows = [[$t('доставлено'), S.delivered], [$t('заработано'), money(S.money)], [$t('респектов'), S.burgers],
     [$t('прохожих сбито'), S.people], [$t('самокатчиков'), S.scoots], [$t('машин всмятку'), S.wrecks]];
-  $('pm-stats').innerHTML = rows.map(([k, v]) => '<span>' + k + '</span><span>' + v + '</span>').join('');
+  // чек смены: строка — «что ........ сколько»
+  $('pm-stats').innerHTML = '<div class="pm-rc-t">' + $t('за смену') + '</div>' +
+    rows.map(([k, v]) => '<div class="pm-rc-r"><span>' + k + '</span><i></i><b>' + v + '</b></div>').join('');
   $('pm-sfx').textContent = Snd.on ? $t('звук: вкл') : $t('звук: выкл');
   $('pm-menu').textContent = S.ride ? $t('в главное меню') : CAREER ? $t('сняться со смены') : $t('закончить смену');
 }

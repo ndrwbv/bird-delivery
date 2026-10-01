@@ -64,8 +64,8 @@
       <div class="fm-top"><b data-i18n>Москва</b><span data-i18n>клик или esc — закрыть</span></div>
       <div class="fm-view"><canvas id="fullmapc"></canvas></div>
       <div class="fm-leg">
-        <span><i class="lg-me"></i><em data-i18n>ты</em></span><span><i class="lg-dodo"></i><em data-i18n>пиццерия</em></span>
-        <span><i class="lg-to"></i><em data-i18n>заказ</em></span><span><i class="lg-sig"></i><em data-i18n>светофор</em></span>
+        <span><i class="lg-to"></i><em data-i18n>заказ</em></span><span><i class="lg-me"></i><em data-i18n>ты</em></span><span><i class="lg-dodo"></i><em data-i18n>пиццерия</em></span>
+        <span><i class="lg-sig"></i><em data-i18n>светофор</em></span>
         <span><i class="lg-nos"></i><em data-i18n>нитро</em></span><span><i class="lg-col"></i><em data-i18n>находки</em></span><span><i class="lg-dk"></i><em data-i18n>Синий кит</em></span><span><i class="lg-car"></i><em data-i18n>машины</em></span>
       </div>
     </div>
@@ -115,20 +115,23 @@
   </div>
   <!-- ── Москва: меню паузы — всё, что не нужно на экране во время езды ── -->
   <div id="pausem" class="msk-only" hidden>
-    <div class="pm-box">
+    <!-- без общей рамки: на «столе» рядом лежат кнопки (главное), накладная текущего заказа,
+         записка с управлением и чек смены -->
+    <div class="pm-desk">
       <div class="pm-l">
-      <div class="pm-t" data-i18n>пауза</div>
-      <div id="pm-stats"></div>
-      <div class="pm-btns">
-        <button id="pm-go" type="button" data-i18n>продолжить</button>
-        <button id="pm-map" type="button" data-i18n>карта района</button>
-        <button id="pm-sfx" type="button" data-i18n>звук вкл</button>
-        <button id="pm-menu" type="button" data-i18n>в главное меню</button>
+        <div class="pm-t" data-i18n>пауза</div>
+        <div class="pm-btns">
+          <button id="pm-go" type="button" data-i18n>продолжить</button>
+          <button id="pm-map" type="button" data-i18n>карта района</button>
+          <button id="pm-sfx" type="button" data-i18n>звук вкл</button>
+          <button id="pm-menu" type="button" data-i18n>в главное меню</button>
+        </div>
+        <!-- чек смены: сколько развёз, заработал, сбил -->
+        <div id="pm-stats"></div>
       </div>
-      </div>
-      <!-- справа — текущий заказ накладной, как на карточке заказа -->
+      <!-- текущий заказ накладной, как на карточке заказа -->
       <div id="pm-order"></div>
-      <!-- внизу — какие кнопки за что: геймпад, клавиатура или палец, смотря чем играют -->
+      <!-- записка: какие кнопки за что — геймпад, клавиатура или палец, смотря чем играют -->
       <div id="pm-keys"></div>
     </div>
   </div>

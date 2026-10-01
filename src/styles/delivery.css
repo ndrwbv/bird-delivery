@@ -400,7 +400,11 @@ html[data-map="moscow"] #radar { cursor: zoom-in; pointer-events: auto; }
 }
 .fm-leg { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 7px; color: #fff3d6; }
 .fm-leg i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; vertical-align: -1px; border: 1px solid #33210c; }
-.lg-me { background: #ffd85e; box-shadow: 0 0 0 2px #33210c; } .lg-dodo { background: #f0522a; } .lg-to { background: #ff2d6e; border-radius: 50%; }
+.lg-me { background: #ffd85e; box-shadow: 0 0 0 2px #33210c; } .lg-dodo { background: #f0522a; }
+/* куда везти — красный пин, мигает жёлтым, как на радаре и карте */
+.fm-leg i.lg-to { width: 10px; height: 10px; background: #ff3b1f; border-color: #2a1206; border-radius: 50% 50% 50% 0;
+                  transform: rotate(-45deg); margin-right: 6px; animation: lg-to-blink 0.9s steps(2) infinite; }
+@keyframes lg-to-blink { 50% { box-shadow: 0 0 0 3px #ffe14d; } }
 .lg-sig { background: #3fd15e; border-radius: 50%; } .lg-nos { background: #6fd3ff; } .lg-car { background: #5b6b80; }
 #fxs { margin-top: 6px; font-size: 7px; color: #ffb066; text-align: right; min-height: 8px; }
 /* узкий экран: адрес заказа длинный — хад справа не должен на него налезать */
@@ -666,60 +670,104 @@ html[data-map="moscow"] #radar.burn {
   background: conic-gradient(#e6f7ff calc(var(--nos, .5) * 360deg), #1d2440 0);
   box-shadow: 0 0 16px #6fd3ff, 0 6px 18px rgba(0, 0, 0, .35);
 }
+/* ── пауза: без общей рамки, всё «лежит на столе» рядом ──
+   слева — заголовок, большие кнопки (главное) и чек смены, посередине — накладная текущего
+   заказа (как карточка заказа), справа — записка с управлением. Размеры — от экрана:
+   --u ≈ 1/100 ширины (на Деке 1280×800 — 12.8px, на 1920×1080 — 17px), текст не мельче 12px. */
 #pausem {
-  position: absolute; inset: 0; z-index: 28;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(12, 18, 40, .62); backdrop-filter: blur(3px);
+  position: absolute; inset: 0; z-index: 28; overflow-y: auto; overflow-x: hidden;
+  display: flex; --u: clamp(8px, min(1vw, 1.6vh), 20px);
+  background: radial-gradient(ellipse at 50% 45%, rgba(29, 36, 64, .55), rgba(12, 18, 40, .82)); backdrop-filter: blur(4px);
 }
 #pausem[hidden] { display: none; }
-/* пауза: слева — счёт и кнопки, справа — текущий заказ накладной (как карточка заказа),
-   внизу во всю ширину — какие кнопки за что */
-.pm-box {
-  width: min(980px, calc(100% - 32px)); max-height: calc(100% - 24px); overflow-y: auto; box-sizing: border-box; padding: 20px;
-  display: grid; grid-template-columns: minmax(260px, 1fr) minmax(300px, 1.25fr); gap: 16px 20px; align-items: start;
-  background: #1d2440; border: 3px solid #33210c; border-radius: 10px; box-shadow: 0 6px 0 #33210c;
+.pm-desk {
+  margin: auto; box-sizing: border-box; width: min(100%, calc(var(--u) * 100)); padding: calc(var(--u) * 2.2) max(16px, calc(var(--u) * 1.6));
+  display: grid; grid-template-columns: minmax(0, 26fr) minmax(0, 37fr) minmax(0, 29fr); gap: calc(var(--u) * 2);
+  align-items: center; color: #33210c;
 }
-.pm-l { display: flex; flex-direction: column; gap: 14px; text-align: center; }
-.pm-t { font-size: clamp(16px, 3vw, 24px); color: #ffd85e; text-shadow: 3px 3px 0 #33210c; }
-#pm-stats { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; font-size: 8px; color: #fff3d6; text-align: left;
-            padding: 12px; background: rgba(0, 0, 0, .22); border-radius: 6px; }
-#pm-stats span:nth-child(even) { color: #ffd85e; text-align: right; }
-.pm-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pm-l { display: flex; flex-direction: column; gap: calc(var(--u) * 1.8); }
+.pm-t { font-size: max(28px, calc(var(--u) * 4.2)); line-height: 1.1; color: #ffd85e; text-align: center; letter-spacing: .04em;
+        text-shadow: calc(var(--u) * .35) calc(var(--u) * .35) 0 #33210c, 0 0 calc(var(--u) * 2) rgba(0, 0, 0, .4); transform: rotate(-2deg); }
+/* кнопки — крупные, «продолжить» больше всех */
+.pm-btns { display: flex; flex-direction: column; gap: calc(var(--u) * 1.1); }
 .pm-btns button {
-  font: inherit; font-size: 9px; padding: 12px 8px; cursor: pointer; color: #33210c;
-  background: #ffd85e; border: 3px solid #33210c; border-radius: 6px; box-shadow: 0 4px 0 #33210c;
+  position: relative; font: inherit; font-size: max(14px, calc(var(--u) * 1.45)); line-height: 1.3; cursor: pointer; color: #33210c;
+  padding: max(14px, calc(var(--u) * 1.25)) calc(var(--u) * 1); background: #ffd85e;
+  border: max(3px, calc(var(--u) * .28)) solid #33210c; border-radius: calc(var(--u) * .6);
+  box-shadow: 0 max(4px, calc(var(--u) * .5)) 0 #33210c, 0 calc(var(--u) * .9) calc(var(--u) * 1.4) rgba(0, 0, 0, .35);
 }
-.pm-btns button:active { transform: translateY(3px); box-shadow: 0 1px 0 #33210c; }
-#pm-go { grid-column: 1 / -1; background: #f0522a; color: #fff3d6; font-size: 11px; }
-#pm-menu { grid-column: 1 / -1; background: #fff3d6; }
-/* накладная: тот же лист, что у карточки заказа (.oc-*), только поменьше */
-#pm-order { position: relative; margin: 6px 0; padding: 4px 16px 16px; background: #fff3d6; color: #33210c;
-            border: 3px solid #33210c; border-radius: 4px; box-shadow: 0 6px 0 #33210c; transform: rotate(.6deg); }
+.pm-btns button:active { transform: translateY(max(3px, calc(var(--u) * .35))); box-shadow: 0 1px 0 #33210c; }
+#pm-go { font-size: max(20px, calc(var(--u) * 1.95)); white-space: nowrap; padding: max(18px, calc(var(--u) * 1.7)) calc(var(--u) * 1);
+         background: #f0522a; color: #fff3d6; text-shadow: 2px 2px 0 #33210c; letter-spacing: .04em; }
+/* «продолжить» — с треугольником ▶ перед словом */
+#pm-go::before { content: ''; display: inline-block; vertical-align: -.08em; margin-right: .55em;
+                 border-left: .8em solid currentColor; border-top: .5em solid transparent; border-bottom: .5em solid transparent;
+                 filter: drop-shadow(2px 2px 0 #33210c); }
+#pm-menu { background: #fff3d6; }
+/* выбранная геймпадом кнопка — светлой рамкой: жёлтая на жёлтой кнопке не видна */
+#pausem .pm-btns button.padsel { outline-color: #fff3d6 !important; }
+/* чек смены: узкая бумажная лента, внизу зубчатый отрыв, строки «что ...... сколько» */
+#pm-stats { position: relative; margin: 0 calc(var(--u) * 1.4) calc(var(--u) * 1); padding: calc(var(--u) * 1.3) calc(var(--u) * 1.5) calc(var(--u) * .9);
+            background: #fff3d6; transform: rotate(1.2deg); filter: drop-shadow(0 calc(var(--u) * .5) 0 rgba(20, 16, 30, .45));
+            font-size: max(12px, calc(var(--u) * 1.05)); line-height: 1.5; }
+#pm-stats::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: calc(var(--u) * .8);
+                   background: conic-gradient(from -45deg at 50% 100%, #fff3d6 90deg, transparent 0) 0 0 / calc(var(--u) * 1.6) 100% repeat-x; }
+.pm-rc-t { text-align: center; color: #8a3b22; text-transform: uppercase; letter-spacing: .12em; padding-bottom: calc(var(--u) * .7);
+           margin-bottom: calc(var(--u) * .5); border-bottom: 2px dashed #8a6b4e; }
+.pm-rc-r { display: flex; align-items: baseline; gap: calc(var(--u) * .5); padding: calc(var(--u) * .3) 0; }
+.pm-rc-r span { color: #5a4026; }
+.pm-rc-r i { flex: 1; min-width: calc(var(--u) * 1); border-bottom: 2px dotted #b39678; transform: translateY(-.3em); }
+.pm-rc-r b { font-weight: normal; color: #33210c; }
+.pm-rc-r:nth-child(3) b { color: #d9342c; }
+/* накладная: тот же лист, что у карточки заказа (.oc-*), крупно, чуть наискосок */
+#pm-order { position: relative; padding: calc(var(--u) * .4) calc(var(--u) * 1.8) calc(var(--u) * 1.8); background: #fff3d6; color: #33210c;
+            border: max(3px, calc(var(--u) * .25)) solid #33210c; border-radius: 4px; transform: rotate(-1.2deg);
+            box-shadow: 0 calc(var(--u) * .5) 0 #33210c, 0 calc(var(--u) * 1.2) calc(var(--u) * 2.4) rgba(0, 0, 0, .4); }
 #pm-order::before, #pm-order::after { content: ''; position: absolute; left: 10px; right: 10px; height: 8px; pointer-events: none;
             background: radial-gradient(circle at 6px 4px, rgba(20, 16, 30, .85) 3px, transparent 3.5px) 0 0 / 16px 8px repeat-x; }
 #pm-order::before { top: -6px; } #pm-order::after { bottom: -6px; }
-.pm-inv-top { display: flex; justify-content: space-between; gap: 10px; padding: 12px 0 8px; margin-bottom: 4px; border-bottom: 2px dashed #8a6b4e;
-              font-size: 9px; color: #8a3b22; text-transform: uppercase; letter-spacing: .08em; }
-.pm-inv-top span + span { color: #33210c; }
-#pm-order .oc-inv { font-size: 9px; }
-#pm-order .oc-inv th { font-size: 7px; padding: 6px 8px 6px 0; }
-#pm-order .oc-inv td { padding: 6px 0; }
-#pm-order .oc-inv td b { font-size: 11px; }
-#pm-order .oc-inv td small { font-size: 7px; }
-#pm-order .oc-photos .oc-p img { width: 84px; height: 84px; border-width: 5px; border-bottom-width: 14px; }
-#pm-order .oc-photos.small .oc-p img { width: 58px; height: 58px; border-width: 4px; border-bottom-width: 10px; }
-#pm-order .oc-clip { left: 30%; width: 14px; height: 36px; }
-/* кнопки: клавиша (или кнопка геймпада) — что делает */
-#pm-keys { grid-column: 1 / -1; padding: 10px 12px; background: rgba(0, 0, 0, .22); border-radius: 6px; text-align: left; }
-.pm-keys-t { font-size: 8px; color: #ffd85e; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .08em; }
-.pm-keys-g { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 14px; }
-.pm-keys-g span { display: flex; align-items: center; gap: 4px; font-size: 8px; line-height: 1.5; color: #fff3d6; }
-.pm-keys-g em { font-style: normal; color: #bcd0e8; margin-left: 4px; }
-.pm-keys-g kbd { flex: none; font: inherit; font-size: 8px; padding: 3px 5px; min-width: 12px; text-align: center; color: #33210c;
-                 background: #fff3d6; border: 2px solid #33210c; border-radius: 4px; box-shadow: 0 2px 0 #33210c; }
-@media (max-width: 680px) {
-  .pm-box { grid-template-columns: 1fr; }
-  #pm-order { order: -1; }
+.pm-inv-top { display: flex; justify-content: space-between; gap: 10px; padding: calc(var(--u) * 1.3) 0 calc(var(--u) * .8); margin-bottom: calc(var(--u) * .4);
+              border-bottom: 2px dashed #8a6b4e; font-size: max(12px, calc(var(--u) * 1.05)); color: #8a3b22; text-transform: uppercase; letter-spacing: .06em; }
+.pm-inv-top span + span { flex: none; color: #33210c; }
+#pm-order .oc-sheet { gap: calc(var(--u) * 1.2); }
+#pm-order .oc-inv { font-size: max(12px, calc(var(--u) * 1.1)); line-height: 1.5; }
+#pm-order .oc-inv th { width: 1%; white-space: nowrap; font-size: max(11px, calc(var(--u) * .88)); padding: calc(var(--u) * .7) calc(var(--u) * .8) calc(var(--u) * .7) 0; }
+#pm-order .oc-inv td { padding: calc(var(--u) * .7) 0; }
+#pm-order .oc-inv td b { font-size: max(13px, calc(var(--u) * 1.35)); line-height: 1.35; }
+#pm-order .oc-inv td small { font-size: max(11px, calc(var(--u) * .88)); }
+#pm-order .oc-photos { padding-top: calc(var(--u) * 1.2); }
+#pm-order .oc-photos .oc-p img { width: calc(var(--u) * 8); height: calc(var(--u) * 8); border-width: calc(var(--u) * .45); border-bottom-width: calc(var(--u) * 1.3); }
+#pm-order .oc-photos.small .oc-p img { width: calc(var(--u) * 5.6); height: calc(var(--u) * 5.6); border-width: calc(var(--u) * .35); border-bottom-width: calc(var(--u) * .9); }
+#pm-order .oc-clip { left: 30%; width: calc(var(--u) * 1.2); height: calc(var(--u) * 3.2); }
+/* записка с управлением: жёлтый листок на скотче, «клавиша — что делает» в две колонки */
+#pm-keys { position: relative; padding: calc(var(--u) * 2.2) calc(var(--u) * 1.8) calc(var(--u) * 1.8); background: #ffd85e; color: #33210c;
+           transform: rotate(1.8deg); box-shadow: 0 calc(var(--u) * .5) 0 #b8892a, 0 calc(var(--u) * 1.2) calc(var(--u) * 2.4) rgba(0, 0, 0, .4);
+           background-image: linear-gradient(180deg, rgba(255, 255, 255, .25), transparent 30%); }
+#pm-keys::before { content: ''; position: absolute; top: calc(var(--u) * -1); left: 50%; width: calc(var(--u) * 9); height: calc(var(--u) * 2.2);
+                   transform: translateX(-50%) rotate(-3deg); background: rgba(255, 243, 214, .62); box-shadow: 0 1px 2px rgba(0, 0, 0, .2); }
+.pm-keys-t { font-size: max(13px, calc(var(--u) * 1.3)); color: #8a3b22; margin-bottom: calc(var(--u) * 1.2); text-transform: uppercase; letter-spacing: .08em; }
+.pm-keys-g { display: grid; grid-template-columns: auto 1fr; gap: calc(var(--u) * .75) calc(var(--u) * .9); align-items: center;
+             font-size: max(12px, calc(var(--u) * 1)); line-height: 1.45; }
+.pm-keys-g span { display: flex; flex-wrap: wrap; gap: calc(var(--u) * .35); }
+.pm-keys-g em { font-style: normal; color: #33210c; }
+.pm-keys-g kbd { flex: none; font: inherit; padding: calc(var(--u) * .3) calc(var(--u) * .5); min-width: 1em; text-align: center; color: #33210c;
+                 background: #fff3d6; border: 2px solid #33210c; border-radius: 4px; box-shadow: 0 3px 0 #33210c; }
+/* средний экран: две колонки — кнопки и чек слева, накладная и записка справа */
+@media (max-width: 999px) {
+  .pm-desk { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); grid-template-areas: "l inv" "l keys"; gap: calc(var(--u) * 3) calc(var(--u) * 3); }
+  .pm-l { grid-area: l; align-self: center; }
+  #pm-order { grid-area: inv; }
+  #pm-keys { grid-area: keys; }
+}
+/* телефон: всё столбиком, кнопки сверху, листается */
+@media (max-width: 620px) {
+  .pm-desk { grid-template-columns: minmax(0, 1fr); grid-template-areas: none; gap: 28px; padding: 20px 16px 28px; }
+  .pm-l, #pm-order, #pm-keys { grid-area: auto; }
+  .pm-btns { margin: 0 8px; }
+  #pm-stats { margin: 0 20px 10px; }
+  #pm-order { transform: rotate(-.6deg); }
+  #pm-keys { transform: rotate(.8deg); }
+  #pm-order .oc-photos { width: max-content; margin: 0 auto; }
 }
 
 /* карточка выбора: просьба клиента — сбоку сверху, игра идёт; обед — по центру, на паузе */
@@ -800,8 +848,8 @@ html[data-map="moscow"] #radar.burn {
 #rivals li.me b { color: #ff9a3c; }
 @media (max-width: 560px) { #rivals { min-width: 124px; font-size: 6px; } }
 
-/* находки в легенде полной карты: фиолетовая точка */
-.lg-col { background: #b44dff; border-radius: 50%; box-shadow: 0 0 6px #c56cff; }
+/* находки в легенде полной карты: просто фиолетовая точка, не мигает */
+.fm-leg i.lg-col { width: 6px; height: 6px; background: #9d5cf0; border: 0; border-radius: 50%; vertical-align: 0; }
 
 /* курьер взорван — вычеркнут из смены на минуту */
 #rivals li.out { opacity: .55; }
