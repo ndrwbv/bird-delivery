@@ -116,8 +116,8 @@
   <!-- ── Москва: меню паузы — всё, что не нужно на экране во время езды ── -->
   <div id="pausem" class="msk-only" hidden>
     <div class="pm-box">
+      <div class="pm-l">
       <div class="pm-t" data-i18n>пауза</div>
-      <div id="pm-order"></div>
       <div id="pm-stats"></div>
       <div class="pm-btns">
         <button id="pm-go" type="button" data-i18n>продолжить</button>
@@ -125,7 +125,11 @@
         <button id="pm-sfx" type="button" data-i18n>звук вкл</button>
         <button id="pm-menu" type="button" data-i18n>в главное меню</button>
       </div>
-      <div class="pm-k" data-i18n>esc или P — продолжить</div>
+      </div>
+      <!-- справа — текущий заказ накладной, как на карточке заказа -->
+      <div id="pm-order"></div>
+      <!-- внизу — какие кнопки за что: геймпад, клавиатура или палец, смотря чем играют -->
+      <div id="pm-keys"></div>
     </div>
   </div>
 

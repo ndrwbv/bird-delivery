@@ -632,15 +632,15 @@ html[data-map="moscow"] #radar.burn {
   background: rgba(12, 18, 40, .62); backdrop-filter: blur(3px);
 }
 #pausem[hidden] { display: none; }
+/* пауза: слева — счёт и кнопки, справа — текущий заказ накладной (как карточка заказа),
+   внизу во всю ширину — какие кнопки за что */
 .pm-box {
-  width: min(420px, calc(100% - 32px)); box-sizing: border-box; padding: 22px 20px;
-  display: flex; flex-direction: column; gap: 16px; text-align: center;
+  width: min(980px, calc(100% - 32px)); max-height: calc(100% - 24px); overflow-y: auto; box-sizing: border-box; padding: 20px;
+  display: grid; grid-template-columns: minmax(260px, 1fr) minmax(300px, 1.25fr); gap: 16px 20px; align-items: start;
   background: #1d2440; border: 3px solid #33210c; border-radius: 10px; box-shadow: 0 6px 0 #33210c;
 }
+.pm-l { display: flex; flex-direction: column; gap: 14px; text-align: center; }
 .pm-t { font-size: clamp(16px, 3vw, 24px); color: #ffd85e; text-shadow: 3px 3px 0 #33210c; }
-#pm-order { font-size: 9px; line-height: 1.9; color: #fff3d6; }
-#pm-order b { color: #ffd85e; font-weight: normal; }
-#pm-order .sub { color: #bcd0e8; font-size: 8px; }
 #pm-stats { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; font-size: 8px; color: #fff3d6; text-align: left;
             padding: 12px; background: rgba(0, 0, 0, .22); border-radius: 6px; }
 #pm-stats span:nth-child(even) { color: #ffd85e; text-align: right; }
@@ -652,8 +652,35 @@ html[data-map="moscow"] #radar.burn {
 .pm-btns button:active { transform: translateY(3px); box-shadow: 0 1px 0 #33210c; }
 #pm-go { grid-column: 1 / -1; background: #f0522a; color: #fff3d6; font-size: 11px; }
 #pm-menu { grid-column: 1 / -1; background: #fff3d6; }
-.pm-k { font-size: 7px; color: #bcd0e8; opacity: .8; }
-@media (pointer: coarse) { .pm-k { display: none; } }
+/* накладная: тот же лист, что у карточки заказа (.oc-*), только поменьше */
+#pm-order { position: relative; margin: 6px 0; padding: 4px 16px 16px; background: #fff3d6; color: #33210c;
+            border: 3px solid #33210c; border-radius: 4px; box-shadow: 0 6px 0 #33210c; transform: rotate(.6deg); }
+#pm-order::before, #pm-order::after { content: ''; position: absolute; left: 10px; right: 10px; height: 8px; pointer-events: none;
+            background: radial-gradient(circle at 6px 4px, rgba(20, 16, 30, .85) 3px, transparent 3.5px) 0 0 / 16px 8px repeat-x; }
+#pm-order::before { top: -6px; } #pm-order::after { bottom: -6px; }
+.pm-inv-top { display: flex; justify-content: space-between; gap: 10px; padding: 12px 0 8px; margin-bottom: 4px; border-bottom: 2px dashed #8a6b4e;
+              font-size: 9px; color: #8a3b22; text-transform: uppercase; letter-spacing: .08em; }
+.pm-inv-top span + span { color: #33210c; }
+#pm-order .oc-inv { font-size: 9px; }
+#pm-order .oc-inv th { font-size: 7px; padding: 6px 8px 6px 0; }
+#pm-order .oc-inv td { padding: 6px 0; }
+#pm-order .oc-inv td b { font-size: 11px; }
+#pm-order .oc-inv td small { font-size: 7px; }
+#pm-order .oc-photos .oc-p img { width: 84px; height: 84px; border-width: 5px; border-bottom-width: 14px; }
+#pm-order .oc-photos.small .oc-p img { width: 58px; height: 58px; border-width: 4px; border-bottom-width: 10px; }
+#pm-order .oc-clip { left: 30%; width: 14px; height: 36px; }
+/* кнопки: клавиша (или кнопка геймпада) — что делает */
+#pm-keys { grid-column: 1 / -1; padding: 10px 12px; background: rgba(0, 0, 0, .22); border-radius: 6px; text-align: left; }
+.pm-keys-t { font-size: 8px; color: #ffd85e; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .08em; }
+.pm-keys-g { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 14px; }
+.pm-keys-g span { display: flex; align-items: center; gap: 4px; font-size: 8px; line-height: 1.5; color: #fff3d6; }
+.pm-keys-g em { font-style: normal; color: #bcd0e8; margin-left: 4px; }
+.pm-keys-g kbd { flex: none; font: inherit; font-size: 8px; padding: 3px 5px; min-width: 12px; text-align: center; color: #33210c;
+                 background: #fff3d6; border: 2px solid #33210c; border-radius: 4px; box-shadow: 0 2px 0 #33210c; }
+@media (max-width: 680px) {
+  .pm-box { grid-template-columns: 1fr; }
+  #pm-order { order: -1; }
+}
 
 /* карточка выбора: просьба клиента — сбоку сверху, игра идёт; обед — по центру, на паузе */
 #choice { position: absolute; z-index: 27; top: 44px; left: 50%; transform: translateX(-50%); width: min(460px, calc(100% - 24px)); pointer-events: auto; }
@@ -681,6 +708,20 @@ html[data-map="moscow"] #radar.burn {
 #ch-opts button span { font-size: 7px; line-height: 1.6; opacity: .85; }
 #choice.big #ch-opts button { background: #ffd85e; color: #33210c; }
 @media (pointer: coarse) { #ch-opts button em { display: none; } }
+/* воскреснуть или нет — на весь экран, поверх «ПОТРАЧЕНО»: крупно, кнопки во всю ширину,
+   снизу полоска — сколько осталось думать (--ch-left от 1 до 0, game.js choiceStep) */
+#choice.full { z-index: 45; background: rgba(14, 2, 8, .72); backdrop-filter: blur(4px); }
+#choice.full .ch-box { width: min(720px, calc(100% - 32px)); gap: 18px; padding: clamp(20px, 4vh, 36px) clamp(18px, 3vw, 36px); position: relative; overflow: hidden; }
+#choice.full #ch-t { font-size: clamp(22px, 4.6vw, 44px); color: #d9342c; text-shadow: 3px 3px 0 #33210c; margin-bottom: 4px; }
+#choice.full #ch-s { font-size: clamp(9px, 1.4vw, 14px); line-height: 1.7; color: #33210c; }
+#choice.full #ch-opts { flex-direction: column; gap: 12px; }
+#choice.full #ch-opts button { position: relative; padding: clamp(14px, 2.6vh, 22px) 12px; gap: 8px; background: #ffd85e; color: #33210c; }
+#choice.full #ch-opts button:first-child { background: #f0522a; color: #fff3d6; }
+#choice.full #ch-opts button b { font-size: clamp(12px, 2.2vw, 22px); }
+#choice.full #ch-opts button span { font-size: clamp(8px, 1.1vw, 12px); }
+#choice.full #ch-opts button em { font-size: 10px; }
+#choice.full #ch-opts button.padsel { outline: 4px solid #33210c; outline-offset: 3px; }
+#choice.full .ch-box::after { content: ''; position: absolute; left: 0; bottom: 0; height: 6px; width: calc(var(--ch-left, 1) * 100%); background: #d9342c; }
 
 /* рейтинг смены: под сердцами, мелко */
 #rivals { list-style: none; margin: 8px 0 0; padding: 6px 8px; font-size: 7px; line-height: 1; display: flex; flex-direction: column; gap: 5px;
@@ -752,6 +793,12 @@ html[lang="ja"] #game, html[lang="zh"] #game { font-weight: 700; letter-spacing:
 .set-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; font-size: 9px; color: #fff3d6;
            border-bottom: 2px dashed rgba(255, 243, 214, .15); }
 .set-row button { font: inherit; font-size: 9px; cursor: pointer; padding: 8px 12px; color: #33210c; background: #ffd85e; border: 3px solid #33210c; border-radius: 6px; }
+/* выбор языка при первом запуске (src/langpick.js) — поверх экрана загрузки */
+#langpick { position: fixed; inset: 0; z-index: 101; display: flex; align-items: center; justify-content: center; background: #1d2440; }
+#langpick .lp-box { width: min(720px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow-y: auto; box-sizing: border-box; padding: 22px;
+                    background: #1d1830; border: 4px solid #33210c; border-radius: 12px; box-shadow: 0 8px 0 #141a33; }
+#langpick .lp-t { font-size: 16px; color: #ffd85e; margin-bottom: 16px; text-align: center; }
+#langpick button:focus-visible { outline: 3px solid #ffd85e; outline-offset: 2px; }
 .lang-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
 .lang-grid button { font: inherit; font-size: 10px; cursor: pointer; padding: 12px 8px; color: #fff3d6; background: #2a3766; border: 3px solid #33210c; border-radius: 6px; }
 .lang-grid button.cur { background: #f0522a; }

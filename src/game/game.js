@@ -7678,7 +7678,8 @@ $('ov-auth').addEventListener('click', async () => {
 });
 
 /* язык: окно со списком — названия на своих языках. Смена — перезагрузка:
-   строки игры переводятся при загрузке */
+   строки игры переводятся при загрузке. Поэтому язык — только в меню, не в паузе,
+   а в самый первый запуск его спрашивают до загрузки (src/langpick.js) */
 function renderLangs () {
   elPanelBody.innerHTML = '<div class="pn-t">🌐 ' + $t('язык') + '</div><div class="lang-grid">' +
     LANGS.map(l => '<button type="button" lang="' + l + '" data-l="' + l + '"' + (l === curLang() ? ' class="cur"' : '') + '>' + LANG_NAMES[l] + '</button>').join('') + '</div>';
@@ -9840,23 +9841,27 @@ function checkArrival (dt) {
    Одна карточка на всё: лицо (если есть), заголовок, реплика и кнопки.
    Кнопки жмутся и цифрами 1–3. Обед ставит игру на паузу, просьба
    клиента — нет: ответишь или уедешь, через десять секунд она гаснет. */
-const CH = { opts: [], t: 0, onTimeout: null, pause: false };
+const CH = { opts: [], t: 0, t0: 0, onTimeout: null, pause: false, full: false };
 function showChoice (o) {
   const el = $('choice');
   $('ch-face').innerHTML = o.face ? '<img src="' + faceDataURL(o.face) + '" alt="">' : '';
   $('ch-t').textContent = o.title;
   $('ch-s').innerHTML = o.sub || '';
-  CH.opts = o.opts; CH.t = o.timeout || 0; CH.onTimeout = o.onTimeout || null; CH.pause = !!o.pause;
+  CH.opts = o.opts; CH.t = CH.t0 = o.timeout || 0; CH.onTimeout = o.onTimeout || null; CH.pause = !!o.pause;
+  // full — окно на весь экран (воскреснуть или нет): игра идёт, но выбирают как в меню — стиком/крестовиной и A
+  CH.full = !!o.full;
   $('ch-opts').innerHTML = o.opts.map((q, i) => '<button type="button" data-i="' + i + '"><em>' + (i + 1) + '</em><b>' + q.label + '</b>' +
     (q.sub ? '<span>' + q.sub + '</span>' : '') + '</button>').join('');
-  el.classList.toggle('big', CH.pause);
+  el.classList.toggle('big', CH.pause || CH.full);
+  el.classList.toggle('full', CH.full);
+  el.style.setProperty('--ch-left', '1');
   el.hidden = false;
   if (CH.pause) { S.paused = true; S.meal = true; Snd.engine(0); for (const k in IN) IN[k] = 0; joyReset(); }
 }
 function hideChoice () {
   const el = $('choice');
   if (el) el.hidden = true;
-  CH.opts = []; CH.t = 0; CH.onTimeout = null;
+  CH.opts = []; CH.t = 0; CH.onTimeout = null; CH.full = false;
   if (CH.pause) { CH.pause = false; S.meal = false; S.paused = false; }
 }
 function pickChoice (i) {
@@ -9868,7 +9873,8 @@ function pickChoice (i) {
 $('ch-opts').addEventListener('click', e => { const b = e.target.closest('button'); if (b) pickChoice(+b.dataset.i); });
 function choiceStep (dt) {
   if (!CH.opts.length || CH.pause || !CH.t) return;
-  if ((CH.t -= dt) <= 0) { const f = CH.onTimeout; hideChoice(); if (f) f(); }
+  if ((CH.t -= dt) <= 0) { const f = CH.onTimeout; hideChoice(); if (f) f(); return; }
+  if (CH.full) $('choice').style.setProperty('--ch-left', String(CH.t / CH.t0));   // полоска «сколько осталось думать»
 }
 
 /* ── обед ──
@@ -10137,14 +10143,14 @@ function askRevive () {
   if (have < price) {
     showChoice({ title: $t('воскреснуть — {money}', { money: money(price) }),
       sub: $t('в кошельке {money} — не хватает', { money: money(have) }),
-      opts: [{ label: $t('ну что ж'), fn: no }], timeout: 4, onTimeout: no });
+      opts: [{ label: $t('ну что ж'), fn: no }], timeout: 4, onTimeout: no, full: true });
     return;
   }
   showChoice({ title: $t('воскреснуть?'),
     sub: $t('новая машина спустится с неба · из кошелька {money} (там {have})', { money: money(price), have: money(have) }),
     opts: [{ label: $t('воскреснуть · {money}', { money: money(price) }), sub: $t('заказ и смена — дальше'), fn: () => revive(price) },
       { label: $t('нет, всё'), fn: no }],
-    timeout: 9, onTimeout: no });
+    timeout: 9, onTimeout: no, full: true });
   Snd.order();
 }
 
@@ -10318,17 +10324,55 @@ $('pause').addEventListener('click', e => { setPause(!S.paused); e.currentTarget
    нитро. Всё остальное — куда едем, сколько сбито, звук, карта района и
    выход — здесь. */
 const elPause = $('pausem');
+/* текущий заказ — накладной, как на карточке заказа: шапка с номером, таблица, фото на скрепке */
 function orderInfo () {
-  if (S.ride) return '<b>' + $t('просто катаешься') + '</b><br><span class="sub">' + $t('без заказов и рекордов') + '</span>';
-  if (!S.target) return '<span class="sub">' + $t('заказа пока нет') + '</span>';
-  const o = S.order, d = $t('{n} м', { n: Math.round(Math.hypot(S.target.x - V.x, S.target.z - V.z)) });
-  if (S.state === 'side' && S.side) return '<b>' + S.addr + '</b> · ' + d + '<br><span class="sub">' + S.addrLine + '</span>';
-  if (S.state === 'back') return '<b>' + $t('в пиццерию') + '</b> · ' + d + '<br><span class="sub">' + (PIZZA ? PIZZA.name.toLowerCase() : '') + '</span>';
-  return '<b>' + $t('заказ {n}', { n: S.orders }) + (o && o.stops.length > 1 ? ' · ' + $t('{i} из {n}', { i: o.idx + 1, n: o.stops.length }) : '') + '</b> · ' + d + '<br>' +
-    S.addr + (S.addrLine ? '<br><span class="sub">' + S.addrLine + '</span>' : '');
+  const rows = [];
+  let persons = [], head = $t('накладная');
+  const d = S.target ? $t('{n} м', { n: Math.round(Math.hypot(S.target.x - V.x, S.target.z - V.z)) }) : '';
+  if (S.ride) rows.push([$t('заказ'), '<b>' + $t('просто катаешься') + '</b><small>' + $t('без заказов и рекордов') + '</small>']);
+  else if (S.state === 'side' && S.side) {
+    persons = [S.side.person];
+    rows.push([$t('поручение'), '<b>' + S.addr + '</b>'], [$t('куда'), S.addrLine], [$t('до точки'), d]);
+  } else if (S.state === 'back') {
+    rows.push([$t('куда'), '<b>' + $t('в пиццерию') + '</b>' + (PIZZA ? '<small>' + PIZZA.name + '</small>' : '')], [$t('до точки'), d]);
+  } else if (S.target && S.order) {
+    const o = S.order, st = o.stops[Math.min(o.idx, o.stops.length - 1)];
+    head = $t('накладная') + ' · ' + (KIND_LABEL[o.kind] || $t('заказ'));
+    persons = st.persons;
+    rows.push([$t('получатель'), persons.map(p => '<b>' + ((p && p.name) || $t('клиент')) + '</b>').join('')],
+      [$t('адрес'), S.addrLine + (o.stops.length > 1 ? '<small>' + $t('{i} из {n}', { i: o.idx + 1, n: o.stops.length }) + '</small>' : '')],
+      [$t('заказ'), o.items], [$t('до точки'), d]);
+    if (S.fee > 0) rows.push([$t('оплата'), money(S.fee)]);
+  } else rows.push([$t('заказ'), '<b>' + $t('заказа пока нет') + '</b>']);
+  rows.push([$t('сейчас'), (CAREER && CAREERM.shiftOn() ? CAREERM.clockText() : envClock()) + ' · ' + envPhaseName(ENV.t) +
+    '<small>' + SEAS.seasonName() + (ENV.rainWant ? ' · ' + (SEAS.snowy() ? $t('снег, скользко') : $t('дождь, скользко')) : '') + '</small>']);
+  const faces = persons.filter(Boolean).slice(0, 2).map(p => '<div class="oc-p"><img src="' + faceDataURL(p) + '" alt=""></div>').join('');
+  return '<div class="pm-inv-top"><span>' + head + '</span><span>№ ' + String(S.orders).padStart(4, '0') + '</span></div>' +
+    '<div class="oc-sheet"><table class="oc-inv">' + rows.map(([k, v]) => '<tr><th>' + k + '</th><td>' + v + '</td></tr>').join('') + '</table>' +
+    (faces ? '<div class="oc-photos' + (persons.length > 1 ? ' small' : '') + '"><i class="oc-clip"></i>' + faces + '</div>' : '') + '</div>';
+}
+/* какие кнопки за что — тем, чем сейчас играют: геймпад, палец или клавиатура */
+function keysInfo () {
+  const pad = document.body.classList.contains('pad'), touch = !pad && document.body.classList.contains('touch');
+  const k = (...ks) => ks.map(x => '<kbd>' + x + '</kbd>').join('');
+  const rows = pad ? [
+    [k('RT'), $t('газ')], [k('LT'), $t('тормоз, назад')], [k($t('левый стик')), $t('руль')],
+    [k('B'), $t('ручник')], [k('X', 'RB'), $t('нитро')], [k('A'), $t('принять заказ')],
+    [k('Y'), $t('карта района')], [k('←', '↑', '→'), $t('ответ клиенту')], [k('R3'), $t('звук')], [k('☰'), $t('пауза')],
+  ] : touch ? [
+    [k($t('палец')), $t('тянешь вверх — газ, вниз — тормоз, в стороны — руль')], [k($t('второй палец')), $t('ручник')],
+    [k($t('нитро')), $t('держать — ускорение')], [k($t('радар')), $t('карта района')],
+  ] : [
+    [k('W', '↑'), $t('газ')], [k('S', '↓'), $t('тормоз, назад')], [k('A', 'D'), $t('руль')],
+    [k($t('пробел')), $t('ручник')], [k('Shift', 'N'), $t('нитро')], [k('Tab'), $t('карта района')],
+    [k('1', '2', '3'), $t('ответ клиенту')], [k('M'), $t('звук')], [k('Esc', 'P'), $t('пауза')],
+  ];
+  return '<div class="pm-keys-t">' + (pad ? $t('геймпад') : touch ? $t('управление') : $t('клавиатура')) + '</div>' +
+    '<div class="pm-keys-g">' + rows.map(([a, b]) => '<span>' + a + '<em>' + b + '</em></span>').join('') + '</div>';
 }
 function renderPause () {
-  $('pm-order').innerHTML = orderInfo() + '<br><span class="sub">' + (CAREER && CAREERM.shiftOn() ? CAREERM.clockText() : envClock()) + ' · ' + envPhaseName(ENV.t) + ' · ' + SEAS.seasonName() + (ENV.rainWant ? ' · ' + (SEAS.snowy() ? $t('снег, скользко') : $t('дождь, скользко')) : '') + '</span>';
+  $('pm-order').innerHTML = orderInfo();
+  $('pm-keys').innerHTML = keysInfo();
   const rows = [[$t('доставлено'), S.delivered], [$t('заработано'), money(S.money)], [$t('респектов'), S.burgers],
     [$t('прохожих сбито'), S.people], [$t('самокатчиков'), S.scoots], [$t('машин всмятку'), S.wrecks]];
   $('pm-stats').innerHTML = rows.map(([k, v]) => '<span>' + k + '</span><span>' + v + '</span>').join('');
@@ -10570,7 +10614,10 @@ for (const [px, pz, ry] of PARKED) {
   scene.add(t.mesh);
   TRAFFIC.push(t);
 }
-spawnTraffic(INTRO ? 22 : 36);
+// машин в потоке вокруг курьера (40–330 м): было 36 — на улицах Северска толпа, и на Деке
+// каждая машина — это ещё и расчёт её езды в каждом кадре. Припаркованные, мопеды и сервисные — сверху
+const TRAFFIC_N = 24;
+spawnTraffic(INTRO ? 22 : TRAFFIC_N);
 if (!INTRO) { buildSpots(); buildCollect(); }
 buildNitro();
 districtLocks();                                  // закрытые районы: перекрытия на въездах
@@ -11107,7 +11154,7 @@ function padScreen () {
   if (cr) return cr;
   if (!elPanel.hidden) return elPanel;
   if (FM.open) return null;
-  if (!$('choice').hidden && CH.pause) return $('choice');
+  if (!$('choice').hidden && (CH.pause || CH.full)) return $('choice');
   if (S.paused && elPause && !elPause.hidden) return elPause;
   if (elPhone.classList.contains('on')) return elPhone;
   if (!$('over').hidden) return $('over');
@@ -11126,7 +11173,7 @@ function padStep () {
   if (p.map && !S.paused && isPlaying()) setFullMap(!FM.open);
   if (p.accept && S.state === 'brief' && !S.paused && !FM.open && !DLG.isOpen() && !(CAREER && CAREERM.padRoot())) acceptOrder();   // A — принять заказ
   if (p.sound) Snd.set(!Snd.on);
-  if (CH.opts.length && !CH.pause) { if (p.choice1) pickChoice(0); else if (p.choice2) pickChoice(1); else if (p.choice3) pickChoice(2); }
+  if (CH.opts.length && !CH.pause && !CH.full) { if (p.choice1) pickChoice(0); else if (p.choice2) pickChoice(1); else if (p.choice3) pickChoice(2); }
   if (screen && CAREER) CAREERM.padPre(p);      // гараж: ←→ и LB/RB листают машины
   if (screen) padMenu(p, screen);
   else if (!S.paused && !FM.open) applyToIN(IN, p);

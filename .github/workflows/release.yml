@@ -149,15 +149,12 @@ jobs:
           ls -l assets
           NOTES="$IN_NOTES"
           if [ -z "$NOTES" ]; then NOTES="Сборка из ${GITHUB_SHA:0:7}."; fi
+          # как поставить и обновить — тот же текст, что в README (между метками deck-install)
           {
             printf '%s\n\n' "$NOTES"
-            printf '**Steam Deck / Linux** — одна команда в Konsole (десктоп-режим):\n\n'
-            printf '```bash\n'
-            printf 'curl -fsSL https://raw.githubusercontent.com/%s/main/tools/install-deck.sh | bash\n' "$GITHUB_REPOSITORY"
-            printf '```\n\n'
-            printf 'Игра встанет в папку `bird-pizza` там, где запущена команда, и дальше сама будет предлагать обновление.\n\n'
-            printf '**Windows** — распаковать `bird-pizza-win.zip` и запустить `BirdPizza.exe`.\n'
+            sed -n '/<!-- deck-install:/,/<!-- deck-install-end -->/p' README.md | sed '1d;$d'
           } > notes.md
+          grep -q 'install-deck.sh' notes.md || { echo 'в README нет блока deck-install'; exit 1; }
           gh release create "$TAG" \
             assets/bird-pizza-deck.tar.gz assets/bird-pizza-win.zip assets/install-deck.sh \
             --title "Птица Пицца $TAG" --notes-file notes.md --target "$GITHUB_SHA"

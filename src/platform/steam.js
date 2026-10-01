@@ -39,6 +39,7 @@ const Platform = {
     const saved = store.get(LANG_KEY, '');
     const fromSteam = STEAM_LANGS[sw.lang] || '';
     Platform.lang = mapLang((have.includes(saved) ? saved : '') || fromSteam || navigator.language, have);
+    Platform.langChosen = have.includes(saved);   // нет — при первом запуске спросим (main.js)
     hub.watchVisibility();
     // окно потеряло фокус (Alt+Tab, оверлей Steam, кнопка STEAM на Deck) — тоже пауза
     addEventListener('blur', () => hub.pause('blur'));

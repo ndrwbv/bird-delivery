@@ -24,6 +24,7 @@ const Platform = {
     const q = new URLSearchParams(location.search).get('lang');
     const saved = store.get(LANG_KEY, '');
     Platform.lang = mapLang(q || (have.includes(saved) ? saved : '') || navigator.language, have);
+    Platform.langChosen = !!q || have.includes(saved);   // нет — при первом запуске спросим (main.js)
     hub.watchVisibility();
     return Platform;
   },
