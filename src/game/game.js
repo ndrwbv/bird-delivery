@@ -3688,7 +3688,7 @@ function routeNodes (fromX, fromZ, toX, toZ) {
     const cur = q[h];
     if (cur === b) break;
     for (const nb of NODES[cur].nb) {
-      if (seen[nb] || (NODES[nb].out && nb !== b)) continue;     // за линию закрытого города не ведём
+      if (seen[nb] || ((NODES[nb].out || NODES[nb].lock) && nb !== b)) continue;     // за линию закрытого города и в закрытый район не ведём
       seen[nb] = 1; prev[nb] = cur; q.push(nb);
     }
   }
@@ -5449,7 +5449,7 @@ function newCar (parked) {
 function placeTraffic (t, rmin, rmax) {
   for (let k = 0; k < 24; k++) {
     const a = nodeNear(V.x, V.z, rmin, rmax);
-    const opts = NODES[a].nb.map(b => edgeOf(a, b)).filter(e => e.ok && e.c <= 5 && edgeRun(e) > 8 && !e.closed && inBounds(NODES[e.b].x, NODES[e.b].z) && inBounds(NODES[e.a].x, NODES[e.a].z));
+    const opts = NODES[a].nb.map(b => edgeOf(a, b)).filter(e => e.ok && e.c <= 5 && edgeRun(e) > 8 && !e.closed && !e.lock && inBounds(NODES[e.b].x, NODES[e.b].z) && inBounds(NODES[e.a].x, NODES[e.a].z));
     if (!opts.length) continue;
     const e = pick(opts);
     t.e = e; t.s = rand(0, edgeRun(e) * 0.8); t.lane = (Math.random() * laneCount(e)) | 0; t.turn = null;
@@ -5535,7 +5535,7 @@ function nextEdge (e) {
   for (const c of NODES[e.b].nb) {
     if (c === e.a) continue;
     const n = edgeOf(e.b, c);
-    if (!n.ok || n.c > 5 || n.closed) continue;              // closed — ремонт (roadlife.js)
+    if (!n.ok || n.c > 5 || n.closed || n.lock) continue;    // closed — ремонт (roadlife.js), lock — закрытый район
     if (!inBounds(NODES[c].x, NODES[c].z, -40)) continue;   // за рамку не уезжаем
     const dot = e.ux * n.ux + e.uz * n.uz;
     const w = 0.35 + Math.max(0, dot) * 2.2 + (n.c <= 3 ? 0.6 : 0);
@@ -7137,9 +7137,25 @@ function scatterPickups () {
   const len = ls + ly;
   Object.assign(PICK_INFO, { nos: NITRO_CANS.filter(n => n.kind === 'nos').length, bonus: NITRO_CANS.filter(n => n.kind !== 'nos').length, district: di, pace: pc.id, roadM: Math.round(len) });
 }
-/* заехал в другой район — подсказка: чей он и когда откроется закрытый */
-const DW = { t: 0, last: -1 };
+/* заехал в другой район — подсказка: чей он и когда откроется закрытый.
+   В закрытый район не проехать: на въездах — перекрытия «дорога закрыта» (districtLocks),
+   а упёрся в границу где угодно (дворами, газоном) — машину отбрасывает назад */
+const DW = { t: 0, last: -1, ok: null, bump: 0 };
 function districtWatch (dt) {
+  DW.bump -= dt;
+  if (S.state !== 'title' && S.state !== 'dying' && S.state !== 'over') {
+    const here = DIST.at(V.x, V.z);
+    if (!DIST.isOpen(here) && DW.ok) {
+      V.x = DW.ok.x; V.z = DW.ok.z; V.vx *= -0.3; V.vz *= -0.3;
+      if (DW.bump <= 0) {
+        DW.bump = 2.5;
+        const p = DIST.opened() - 1, left = Math.max(1, DIST.need(p) - DIST.shiftsIn(p)), name = $t(DIST.list()[here].name);
+        toast(here === p + 1 ? $tn(left, 'район «{name}» закрыт: ещё {n} смена в районе «{prev}»|район «{name}» закрыт: ещё {n} смены в районе «{prev}»|район «{name}» закрыт: ещё {n} смен в районе «{prev}»', { name, prev: $t(DIST.list()[p].name) })
+          : $t('район «{name}» пока закрыт', { name }));
+        Snd.thud && Snd.thud();
+      }
+    } else DW.ok = { x: V.x, z: V.z };
+  }
   if ((DW.t -= dt) > 0) return;
   DW.t = 0.6;
   if (!isPlaying() || S.state === 'brief' || S.state === 'loading') return;
@@ -7156,8 +7172,56 @@ function districtWatch (dt) {
   } else if (i !== DIST.cur()) toast(S.ride ? $t('район «{name}»', { name }) : $t('район «{name}» — не твой на этой смене, заказов тут нет', { name }));
   else toast($t('твой район — «{name}»', { name }));
 }
-/* сменили район в меню: пиццерия, кофе, карта */
-if (DISTRICTS) DIST.onChange(i => { usePizzeria(i); scatterPickups(); FM.dist = null; });
+/* Закрытые районы: узлы графа в них — lock (навигатор туда не ведёт), рёбра — lock (трафик
+   не сворачивает), на улицах через границу — перекрытие «дорога закрыта» своим мешем, чтобы
+   убрать, когда район откроется. Пересобираем, только когда изменилось число открытых. */
+const LOCKS = { n: -1, group: null };
+const LOCK_MAT = {};
+function districtLocks () {
+  if (!DISTRICTS || !NODES.length) return;
+  const open = DIST.opened();
+  if (open === LOCKS.n) return;
+  LOCKS.n = open;
+  for (const N of NODES) N.lock = !DIST.isOpen(DIST.at(N.x, N.z));
+  for (const e of EDGES.values()) e.lock = NODES[e.a].lock || NODES[e.b].lock ? 1 : 0;
+  if (LOCKS.group) { scene.remove(LOCKS.group); LOCKS.group.traverse(o => { if (o.geometry && o.geometry !== LOCK_MAT.box) o.geometry.dispose(); }); }
+  const g = LOCKS.group = new THREE.Group();
+  if (!LOCK_MAT.box) {
+    LOCK_MAT.box = new THREE.BoxGeometry(1, 1, 1);
+    for (const [k, hex] of [['red', '#d9342c'], ['white', '#f2eee6'], ['post', '#585460'], ['block', '#bdb6ab']]) LOCK_MAT[k] = new THREE.MeshLambertMaterial({ color: hex });
+  }
+  const bx = (mat, sx, sy, sz, x, y, z, ry) => { const m = new THREE.Mesh(LOCK_MAT.box, LOCK_MAT[mat]); m.scale.set(sx, sy, sz); m.position.set(x, y, z); m.rotation.y = ry; g.add(m); };
+  const done = [];
+  for (const q of RSEG) {
+    if (q.b || q.x || !(q.c <= 5 || q.c === 7)) continue;
+    let a = DIST.at(q.x1, q.z1), b = DIST.at(q.x2, q.z2);
+    if (a === b || DIST.isOpen(a) === DIST.isOpen(b)) continue;
+    // точка перехода границы — делением отрезка пополам; u — от открытого к закрытому
+    let t0 = 0, t1 = 1;
+    for (let k = 0; k < 14; k++) { const tm = (t0 + t1) / 2; if (DIST.at(lerp(q.x1, q.x2, tm), lerp(q.z1, q.z2, tm)) === a) t0 = tm; else t1 = tm; }
+    const L = Math.hypot(q.x2 - q.x1, q.z2 - q.z1) || 1;
+    let ux = (q.x2 - q.x1) / L, uz = (q.z2 - q.z1) / L;
+    if (!DIST.isOpen(a)) { ux = -ux; uz = -uz; }
+    const x = lerp(q.x1, q.x2, t0) - ux * 2.5, z = lerp(q.z1, q.z2, t0) - uz * 2.5;
+    if (done.some(d => Math.hypot(d[0] - x, d[1] - z) < 4)) continue;      // у двух половин проспекта — по своему щиту
+    done.push([x, z]);
+    const w = (q.w || 6) + 4, nx = -uz, nz = ux, ry = Math.atan2(-ux, -uz), y = groundH(x, z);
+    const n = Math.max(3, Math.round(w / 1.6));
+    for (let k = 0; k < n; k++) { const o = (k + 0.5) / n * w - w / 2; bx(k % 2 ? 'white' : 'red', w / n, 0.5, 0.2, x + nx * o, y + 1.25, z + nz * o, ry); }
+    for (const sd of [-1, 1]) bx('post', 0.25, 1.6, 0.25, x + nx * (w / 2) * sd, y + 0.7, z + nz * (w / 2) * sd, ry);
+    for (let k = 0; k < Math.ceil(w / 2.6); k++) { const o = (k + 0.5) * 2.6 - w / 2; bx('block', 2.3, 0.8, 0.9, x + nx * o + ux * 0.8, y + 0.35, z + nz * o + uz * 0.8, ry); }
+    if (q.c <= 5) {
+      for (const sd of [-1, 1]) bx('post', 0.16, 3.4, 0.16, x + nx * 1.9 * sd, y + 1.7, z + nz * 1.9 * sd, ry);
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 1.3), closedSign());
+      sign.position.set(x - ux * 0.05, y + 3.0, z - uz * 0.05); sign.rotation.y = ry;
+      g.add(sign);
+    }
+  }
+  LOCKS.count = done.length;
+  scene.add(g);
+}
+/* сменили район в меню или открылся новый: пиццерия, кофе, карта, перекрытия */
+if (DISTRICTS) DIST.onChange(i => { usePizzeria(i); scatterPickups(); FM.dist = null; districtLocks(); });
 
 /* волна щедрости: × к паузе до возвращения взятого и к паузе между свежими у дороги */
 const paceK = k => (DISTRICTS ? DIST.pace()[k] || 1 : 1);
@@ -8392,19 +8456,36 @@ function districtLayer () {
     const l = Math.hypot(q.x2 - q.x1, q.z2 - q.z1), n = Math.max(1, Math.ceil(l / C));
     for (let k = 0; k <= n; k++) mark(q.x1 + (q.x2 - q.x1) * k / n, q.z1 + (q.z2 - q.z1) * k / n);
   }
-  // затемнение: клетка — пиксель маленькой картинки, растягиваем без сглаживания (без швов между клетками)
-  const m = document.createElement('canvas');
-  m.width = nx; m.height = nz;
-  const mx = m.getContext('2d'), img = mx.createImageData(nx, nz);
-  for (let k = 0; k < nx * nz; k++) {
-    const d = g[k];
-    if (d === cur) continue;
-    img.data[k * 4] = 40; img.data[k * 4 + 1] = 32; img.data[k * 4 + 2] = 52;
-    img.data[k * 4 + 3] = d >= open ? 110 : 40;
-  }
-  mx.putImageData(img, 0, 0);
-  x.imageSmoothingEnabled = false;
-  x.drawImage(m, fmX(x0), fmZ(z0), nx * C * FM.s, nz * C * FM.s);
+  // затемнение: клетка — пиксель маленькой картинки, растягиваем без сглаживания (без швов между клетками).
+  // Закрытые — тёмные и в косую штриховку, открытые чужие — чуть притушены, твой — как есть
+  const mask = locked => {
+    const m = document.createElement('canvas');
+    m.width = nx; m.height = nz;
+    const mx = m.getContext('2d'), img = mx.createImageData(nx, nz);
+    for (let k = 0; k < nx * nz; k++) {
+      const d = g[k];
+      if (d === cur || (d >= open) !== locked) continue;
+      img.data[k * 4] = 30; img.data[k * 4 + 1] = 24; img.data[k * 4 + 2] = 40;
+      img.data[k * 4 + 3] = locked ? 170 : 50;
+    }
+    mx.putImageData(img, 0, 0);
+    const big = document.createElement('canvas');
+    big.width = c.width; big.height = c.height;
+    const bx = big.getContext('2d');
+    bx.imageSmoothingEnabled = false;
+    bx.drawImage(m, fmX(x0), fmZ(z0), nx * C * FM.s, nz * C * FM.s);
+    if (locked) {
+      bx.globalCompositeOperation = 'source-atop';
+      bx.strokeStyle = 'rgba(255, 90, 70, 0.35)'; bx.lineWidth = Math.max(2, c.width / 500);
+      const st = Math.max(10, c.width / 90);
+      bx.beginPath();
+      for (let k = -c.height; k < c.width; k += st) { bx.moveTo(k, c.height); bx.lineTo(k + c.height, 0); }
+      bx.stroke();
+    }
+    return big;
+  };
+  x.drawImage(mask(true), 0, 0);
+  x.drawImage(mask(false), 0, 0);
   // границы: между клетками разных районов, только в городе; у твоего — толще и ярче
   x.lineCap = 'round';
   for (const mine of [false, true]) {
@@ -8437,7 +8518,7 @@ function districtLayer () {
       x.fillRect(px - r, pz - r, r * 2, r * 2);
       x.lineWidth = 2; x.strokeStyle = '#fff'; x.strokeRect(px - r, pz - r, r * 2, r * 2);
     }
-    const name = (i + 1) + '. ' + $t(d.name);
+    const name = (locked ? '× ' : '') + (i + 1) + '. ' + $t(d.name);
     const sub = locked ? (i === open ? $tn(Math.max(1, DIST.need(i - 1) - DIST.shiftsIn(i - 1)), 'закрыт · ещё {n} смена в районе «{prev}»|закрыт · ещё {n} смены в районе «{prev}»|закрыт · ещё {n} смен в районе «{prev}»', { prev: $t(DIST.list()[i - 1].name) }) : $t('закрыт'))
       : i === cur ? $t('ты работаешь здесь') : '';
     x.font = 'bold ' + fs + 'px sans-serif';
@@ -10110,7 +10191,7 @@ function startRun (ride) {
   S.free = S.ride;                               // катаемся без срока и не в зачёт
   $('wasted').hidden = true;
   document.body.classList.remove('w-show');
-  if (DISTRICTS) usePizzeria(DIST.cur());          // смена — у пиццерии района, где работаешь
+  if (DISTRICTS) { usePizzeria(DIST.cur()); districtLocks(); FM.dist = null; DW.ok = null; }   // смена — у пиццерии района, где работаешь
   resetCar();
   S.hpMax = curCar().hp;
   carStats();
@@ -10427,6 +10508,7 @@ for (const [px, pz, ry] of PARKED) {
 spawnTraffic(INTRO ? 22 : 36);
 if (!INTRO) { buildSpots(); buildCollect(); }
 buildNitro();
+districtLocks();                                  // закрытые районы: перекрытия на въездах
 /* ─────────────── сутки, погода, облака и птицы ───────────────
    Время идёт: утро → день → вечер → ночь → утро, полный круг за восемь
    минут. Небо, туман и свет плавно перетекают между ключевыми точками.
@@ -11150,7 +11232,7 @@ requestAnimationFrame(frame);
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
 /* песочница (sandbox.html): бесконечное здоровье, нитро, «не глохнет» (noStall читает cars.js) */
 const SBX = { god: false, nitro: false, noStall: false };
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { RL: RL.DEBUG, S, V, DEATH, revive, TRAFFIC, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { RL: RL.DEBUG, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта
