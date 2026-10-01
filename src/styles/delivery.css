@@ -762,6 +762,29 @@ html[data-map="moscow"] #radar.burn {
 #choice.full #ch-opts button em { font-size: 10px; }
 #choice.full #ch-opts button.padsel { outline: 4px solid #33210c; outline-offset: 3px; }
 #choice.full .ch-box::after { content: ''; position: absolute; left: 0; bottom: 0; height: 6px; width: calc(var(--ch-left, 1) * 100%); background: #d9342c; }
+/* первый кофе (game.js nosTutStep): стаканчик, «держи кнопку», бак наливается, одна кнопка «понял» */
+#choice[data-kind="nos"] .ch-box { width: min(580px, calc(100% - 32px)); gap: 14px; padding: clamp(18px, 3.4vh, 28px) clamp(16px, 3vw, 28px);
+                                   animation: nt-in .28s steps(4) both; }
+#choice[data-kind="nos"] #ch-t { font-size: clamp(16px, 3.4vw, 24px); line-height: 1.4; color: #1f5bff; text-shadow: 2px 2px 0 #33210c; margin: 0; }
+#choice[data-kind="nos"] .ch-txt { display: flex; flex-direction: column; align-items: center; gap: 14px; color: #33210c; }
+#choice[data-kind="nos"] #ch-s { display: contents; }
+.nt-cup { display: block; width: 64px; height: 72px; order: -1; animation: nt-bob 1.2s steps(2) infinite; }
+.nt-how { font-size: clamp(10px, 1.9vw, 14px); line-height: 2.2; }
+.nt-how kbd { font: inherit; font-size: .9em; color: #33210c; background: #fff; border: 2px solid #33210c; border-radius: 5px;
+              padding: 3px 7px; margin: 0 2px; box-shadow: 0 3px 0 #33210c; white-space: nowrap; }
+.nt-how kbd.nt-a { background: #3fd15e; color: #fff; border-radius: 50%; padding: 3px 8px; text-shadow: 1px 1px 0 #33210c; }
+.nt-bar { display: block; width: min(260px, 80%); height: 14px; background: #33210c; border: 3px solid #33210c; border-radius: 3px; overflow: hidden; }
+.nt-bar i { display: block; height: 100%; width: 100%; background: #6fd3ff; box-shadow: inset 0 3px 0 #e6f7ff;
+            transform-origin: left; animation: nt-fill 2.4s steps(12) infinite; }
+.nt-n { font-size: clamp(7px, 1.2vw, 9px); line-height: 1.9; color: #6b5560; max-width: 400px; }
+#choice[data-kind="nos"] #ch-opts button { background: #1f5bff; color: #fff3d6; padding: 14px 10px; }
+#choice[data-kind="nos"] #ch-opts button b { font-size: clamp(11px, 2vw, 15px); }
+#choice[data-kind="nos"] #ch-opts button em { display: none; }
+#choice[data-kind="nos"] #ch-opts button:disabled { cursor: default; filter: saturate(.4) brightness(1.15); }
+@keyframes nt-in { from { transform: scale(.7); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes nt-bob { 50% { transform: translateY(-3px); } }
+@keyframes nt-fill { 0% { transform: scaleX(.15); } 70%, 100% { transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) { #choice[data-kind="nos"] .ch-box, .nt-cup, .nt-bar i { animation: none; } }
 
 /* рейтинг смены: под сердцами, мелко */
 #rivals { list-style: none; margin: 8px 0 0; padding: 6px 8px; font-size: 7px; line-height: 1; display: flex; flex-direction: column; gap: 5px;

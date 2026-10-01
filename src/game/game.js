@@ -7223,6 +7223,49 @@ function healSpawn () {
 
 const FXS = { shieldT: 0, beastT: 0, spawnT: 4, aura: null };
 
+/* ── первый кофе: один раз за всё время — карточка «держи кнопку — будет нитро» ──
+   Игра на паузе, кнопка — та, чем сейчас играют (геймпад, палец, клавиатура — как
+   в keysInfo). Подобрал, пока открыто другое окно (заказ, обед, просьба клиента,
+   диалог, карта, погрузка), — карточка ждёт и выходит сразу после. Флаг
+   dlv-msk-nostut; «сбросить прогресс» его стирает — покажется заново. В песочнице
+   (?sandbox) не показывается. Тост «кофе +» в первый раз не нужен — его заменяет карточка */
+const NOS_TUT = { due: false, key: 'dlv-msk-nostut', off: new URLSearchParams(location.search).has('sandbox') };
+const nosTutNeed = () => !NOS_TUT.off && !NOS_TUT.due && !Store.get(NOS_TUT.key, 0);
+/* стаканчик «Синего кита» пикселями: k — контур, l — крышка, b/h — синий и блик, s — рукав, w — логотип, v — пар */
+const CUP_PX = [
+  '......v..v......', '.....v..v.......', '......v..v......', '...kkkkkkkkkk...', '..kllllllllllk..', '.kllllllllllllk.',
+  '.kkkkkkkkkkkkkk.', '..khbbbbbbbbbk..', '..khbbbbbbbbbk..', '..kssssssssssk..', '..ksssswwssssk..', '...kssswwsssk...',
+  '...kssswwsssk...', '...kssssssssk...', '...khbbbbbbbk...', '...khbbbbbbbk...', '....kbbbbbbk....', '....kkkkkkkk....',
+];
+const CUP_COL = { k: '#33210c', l: '#f4f6fb', b: '#1f5bff', h: '#6f9bff', s: '#0c2f9e', w: '#ffffff', v: '#cfe6ff' };
+let cupSVG = '';
+function nosCupSVG () {
+  if (cupSVG) return cupSVG;
+  let r = '';
+  CUP_PX.forEach((row, y) => { for (let x = 0; x < row.length; x++) { const c = CUP_COL[row[x]]; if (c) r += '<rect x="' + x + '" y="' + y + '" width="1" height="1" fill="' + c + '"/>'; } });
+  return (cupSVG = '<svg class="nt-cup" viewBox="0 0 16 18" shape-rendering="crispEdges" aria-hidden="true">' + r + '</svg>');
+}
+function nosTutStep () {
+  if (!NOS_TUT.due) return;
+  if (S.paused || FM.open || CH.opts.length || DLG.isOpen() || elPhone.classList.contains('on') || !elPanel.hidden ||
+      (CAREER && CAREERM.padRoot()) || !['drive', 'back', 'side'].includes(S.state)) return;
+  NOS_TUT.due = false;
+  Store.set(NOS_TUT.key, 1);
+  const pad = document.body.classList.contains('pad'), touch = !pad && document.body.classList.contains('touch');
+  const k = (x, c) => '<kbd' + (c ? ' class="' + c + '"' : '') + '>' + x + '</kbd>';
+  const how = pad ? $t('держи {a} или {b} — машина рванёт вперёд', { a: k('A', 'nt-a'), b: k('RB') })
+    : touch ? $t('держи кнопку {a} — машина рванёт вперёд', { a: k($t('нитро')) })
+    : $t('держи {a} или {b} — машина рванёт вперёд', { a: k('Shift'), b: k('N') });
+  const note = touch ? $t('пока держишь, кофе тает. сколько осталось — кольцо по краю кнопки. новые стаканчики стоят у дороги')
+    : $t('пока держишь, кофе тает. сколько осталось — голубое кольцо вокруг радара. новые стаканчики стоят у дороги');
+  showChoice({
+    kind: 'nos', pause: true, arm: 800,          // A — и нитро, и «понял»: кто жмёт A на ходу, окно не смахнёт не глядя
+    title: $t('кофе-нитро в баке!'),
+    sub: nosCupSVG() + '<div class="nt-how">' + how + '</div><b class="nt-bar"><i></i></b><div class="nt-n">' + note + '</div>',
+    opts: [{ label: $t('понял'), fn () {} }],
+  });
+}
+
 function takePickup (n) {
   n.g.visible = false;
   if (!n.fixed) { dropPickup(n); NITRO_CANS.splice(NITRO_CANS.indexOf(n), 1); }
@@ -7230,7 +7273,8 @@ function takePickup (n) {
   if (n.kind === 'nos') {
     NOS.tank = Math.min(1, NOS.tank + NOS_CAN);
     Snd.nosPick();
-    toast(NOS.tank >= 1 ? $t('кофе «Синего кита»: полный бак · {key}', { key: nitroKey() }) : $t('кофе «Синего кита» + · {key}', { key: nitroKey() }));
+    if (nosTutNeed()) NOS_TUT.due = true;          // первый кофе за всё время — вместо тоста карточка (nosTutStep)
+    else if (!NOS_TUT.due) toast(NOS.tank >= 1 ? $t('кофе «Синего кита»: полный бак · {key}', { key: nitroKey() }) : $t('кофе «Синего кита» + · {key}', { key: nitroKey() }));
   } else if (n.kind === 'shield') {
     FXS.shieldT = 10;
     Snd.nosPick();
@@ -7249,6 +7293,7 @@ function takePickup (n) {
 
 function updateNitro (dt) {
   const live = S.state === 'drive' || S.state === 'back' || S.state === 'handover' || S.state === 'side';
+  nosTutStep();                                     // первый кофе — карточка, как только нет других окон
   // время от времени — свежий стаканчик у дороги впереди
   if (live && PK.heal && (FXS.healT = (FXS.healT || PK.heal[0]) - dt) <= 0) { FXS.healT = rand(PK.heal[0], PK.heal[1]) * paceK('spawn'); healSpawn(); }
   if (live && (FXS.spawnT -= dt) <= 0) {
@@ -7733,7 +7778,7 @@ async function checkUpdate () {
    Через Platform.store — так на Яндексе чистится и облако. Потом — перезагрузка. */
 const RESET_KEEP = ['dlv-lang', 'dlv-sound', 'dlv-edition', 'dlv-name', 'dlv-map', 'dlv-money-x8', 'dlv-__ts'];
 const PROGRESS_KEYS = [
-  'dlv-msk-wallet', 'dlv-msk-cars', 'dlv-msk-car', 'dlv-msk-best', 'dlv-msk-xp', 'dlv-msk-col', 'dlv-msk-tut', 'dlv-msk-guide',
+  'dlv-msk-wallet', 'dlv-msk-cars', 'dlv-msk-car', 'dlv-msk-best', 'dlv-msk-xp', 'dlv-msk-col', 'dlv-msk-tut', 'dlv-msk-guide', 'dlv-msk-nostut',
   'dlv-shifts', 'dlv-stars', 'dlv-crew', 'dlv-story', 'dlv-season', 'dlv-used-addr', 'dlv-lb-local',
   'dlv-car-owned', 'dlv-car-cur', 'dlv-car-up', 'dlv-car-L', 'dlv-district', 'dlv-dist-shifts', 'dlv-dist-open',
   ...Object.keys(ECON.DONATE || {}).map(k => 'dlv-don-' + k),
@@ -10096,8 +10141,16 @@ function showChoice (o) {
     (q.sub ? '<span>' + q.sub + '</span>' : '') + '</button>').join('');
   el.classList.toggle('big', CH.pause || CH.full);
   el.classList.toggle('full', CH.full);
+  el.dataset.kind = o.kind || '';                 // свой вид карточки (nos — «первый кофе»), стиль в delivery.css
   el.style.setProperty('--ch-left', '1');
   el.hidden = false;
+  // arm — первые миллисекунды кнопки не жмутся: кто жал газ/ручник/A, не закроет окно не глядя
+  CH.armAt = performance.now() + (o.arm || 0);
+  if (o.arm) {
+    const bs = $('ch-opts').querySelectorAll('button');
+    for (const b of bs) b.disabled = true;
+    setTimeout(() => { for (const b of bs) b.disabled = false; if (!el.hidden && bs[0]) { try { bs[0].focus({ preventScroll: true }); } catch (e) { /* — */ } } }, o.arm);
+  }
   if (CH.pause) { S.paused = true; S.meal = true; Snd.engine(0); for (const k in IN) IN[k] = 0; joyReset(); }
 }
 function hideChoice () {
@@ -10108,7 +10161,7 @@ function hideChoice () {
 }
 function pickChoice (i) {
   const q = CH.opts[i];
-  if (!q) return;
+  if (!q || performance.now() < (CH.armAt || 0)) return;
   hideChoice();
   q.fn();
 }
@@ -10667,6 +10720,8 @@ const KEY = {
 addEventListener('keydown', e => {
   if (!elPanel.hidden) { if (e.code === 'Escape') panelBack(); return; }
   if (CH.opts.length && /^Digit[1-3]$/.test(e.code)) { pickChoice(+e.code.slice(5) - 1); return; }
+  // окно на паузе с одной кнопкой («понял»): Enter и пробел жмут её; зажатый ручник (повтор) — нет
+  if (CH.pause && CH.opts.length === 1 && /^(Enter|NumpadEnter|Space)$/.test(e.code)) { e.preventDefault(); if (!e.repeat) pickChoice(0); return; }
   if (CH.pause) return;
   if (e.code === 'Tab') { e.preventDefault(); if (!e.repeat) setFullMap(!FM.open); return; }
   if (FM.open) { if (e.code === 'Escape' || e.code === 'Space') setFullMap(false); return; }

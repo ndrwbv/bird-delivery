@@ -87,7 +87,7 @@ async function main () {
   const js = code => win.webContents.executeJavaScript(code);
   // сохранения до старта: без гайда и без учебного заказа (в нём город пустой и тихий)
   await win.loadURL(url);
-  await js(`localStorage.clear(); localStorage.setItem('dlv-msk-guide', '1'); localStorage.setItem('dlv-msk-tut', '"1"'); localStorage.setItem('dlv-msk-xp', '4')`);
+  await js(`localStorage.clear(); localStorage.setItem('dlv-msk-guide', '1'); localStorage.setItem('dlv-msk-tut', '"1"'); localStorage.setItem('dlv-msk-nostut', '1'); localStorage.setItem('dlv-msk-xp', '4')`);
   await win.loadURL(url);
   await sleep(4000);
   const shot = async (name) => {
@@ -98,7 +98,7 @@ async function main () {
   };
   const hud = on => js(`document.body.classList.toggle('shot-clean', ${!on}); (() => { let s = document.getElementById('shot-css'); if (!s) { s = document.createElement('style'); s.id = 'shot-css'; s.textContent = 'body.shot-clean .hud, body.shot-clean #ctrls, body.shot-clean #radar, body.shot-clean #toast, body.shot-clean #bonus, body.shot-clean #guide { display: none !important; }'; document.head.appendChild(s); } })()`);
   // на заставке: имя, «поехали» — первый заказ
-  await js(`(() => { const n = document.getElementById('st-name'); n.value = ${JSON.stringify(LANG === 'ru' ? 'Игрок' : 'Player')}; n.dispatchEvent(new Event('input')); localStorage.setItem('dlv-msk-guide', '1'); localStorage.setItem('dlv-msk-tut', '"1"'); })()`);
+  await js(`(() => { const n = document.getElementById('st-name'); n.value = ${JSON.stringify(LANG === 'ru' ? 'Игрок' : 'Player')}; n.dispatchEvent(new Event('input')); localStorage.setItem('dlv-msk-guide', '1'); localStorage.setItem('dlv-msk-tut', '"1"'); localStorage.setItem('dlv-msk-nostut', '1'); })()`);
   if (has('shots') || !has('video')) await shot(mobile ? 'm-title' : 'shot-0-title');
   await js(`document.getElementById('st-go').click()`);
   await sleep(1500);

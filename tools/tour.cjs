@@ -23,7 +23,7 @@ app.whenReady().then(async () => {
   const js = c => win.webContents.executeJavaScript(c);
   await win.loadURL(`app://g/index.html?debug&mute&nolb&lang=ru&map=${MAP}`);
   for (let i = 0; i < 80 && !(await js('!!window.__dlv')); i++) await sleep(250);
-  await js(`localStorage.setItem('dlv-msk-guide','1'); document.getElementById('st-ride').click()`);
+  await js(`localStorage.setItem('dlv-msk-guide','1'); localStorage.setItem('dlv-msk-nostut','1'); document.getElementById('st-ride').click()`);
   await sleep(1500);
   const names = await js(`(() => { const D = __dlv, C = D.CITY, B = C.buildings;
     const cen = p => p.reduce((a, q) => [a[0] + q[0] / p.length, a[1] + q[1] / p.length], [0, 0]);
