@@ -7618,7 +7618,7 @@ async function showAd () {
   Platform.gameplayStop();
   try { await Platform.showInterstitial(); } catch (e) { console.warn('[ad]', e); }
 }
-const nitroKey = () => (matchMedia('(pointer: coarse)').matches ? $t('кнопку нитро') : PAD.active ? 'X' : 'Shift');
+const nitroKey = () => (matchMedia('(pointer: coarse)').matches ? $t('кнопку нитро') : PAD.active ? 'A' : 'Shift');
 Platform.onPause(() => {
   EXT.paused = true;
   Snd.mute(true);

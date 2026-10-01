@@ -8,9 +8,10 @@
    | левый стик ↑↓       | —                              | ly                    | ↑↓ выбор (menuUp/Down)     |
    | RT                  | газ, аналоговый                | gas 0..1              | —                          |
    | LT                  | тормоз, на месте — назад       | brake 0..1            | —                          |
-   | A                   | принять заказ                  | accept                | нажать (menuOk)            |
+   | A                   | нитро (держать), принять заказ | nitro, accept         | нажать (menuOk)            |
    | B                   | ручник (держать)               | hand                  | назад (menuBack)           |
-   | X (и RB)            | нитро (держать)                | nitro                 | —                          |
+   | RB                  | нитро (держать), запасная      | nitro                 | —                          |
+   | X                   | свободна                       | —                     | —                          |
    | Y                   | карта района                   | map                   | закрыть карту              |
    | Back / View / Select| карта района                   | map                   | —                          |
    | Start / Menu (☰)    | пауза, меню                    | pause                 | продолжить                 |
@@ -161,7 +162,7 @@ export function pollPad () {
 
   const a = btn(B.a), b = btn(B.b), x = btn(B.x), y = btn(B.y), rb = btn(B.rb);
   pad.hand = b;
-  pad.nitro = x || rb;
+  pad.nitro = a || rb;            // нитро — на A (так просил автор), RB — запасная; X теперь свободна
   pad.a = a; pad.b = b;
 
   const edge = (name, now) => { const was = prev[name] || false; prev[name] = now; return now && !was; };
