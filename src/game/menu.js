@@ -37,7 +37,7 @@ function build () {
         '<button type="button" class="crm-b" data-a="settings"></button>' +
         '<button type="button" class="crm-link" data-a="collect"></button>' +
       '</nav>' +
-      '<div class="crm-foot"><button type="button" class="crm-quit" data-a="quit" hidden></button><div class="crm-cred"></div></div>' +
+      '<div class="crm-foot"><button type="button" class="crm-quit" data-a="quit" hidden></button></div>' +
     '</div>' +
     '<aside class="crm-rank"><div class="crm-rt"></div><ol></ol><div class="crm-rn"></div></aside>';
   big.appendChild(el);
@@ -75,7 +75,6 @@ export function show () {
   const q = el.querySelector('[data-a="quit"]');
   q.textContent = t('выйти');
   q.hidden = !A.canQuit;
-  el.querySelector('.crm-cred').textContent = '© ' + t('участники OpenStreetMap') + ' · ODbL';
   rank();
   if (!String(A.Store.get('dlv-name', '') || '').trim()) askName(null, true);
 }

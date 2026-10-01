@@ -817,7 +817,6 @@ html[lang="ja"] #game, html[lang="zh"] #game { font-weight: 700; letter-spacing:
   border: 3px solid #33210c; border-radius: 8px; padding: 8px 10px;
 }
 #st-lang b { font-weight: normal; }
-#credits { font-size: 6px; color: #b9b4ab; opacity: .75; padding: 4px 0 8px; }
 #st-set, #st-quit { flex: 1; }
 #st-quit[hidden] { display: none; }
 #ov-extra { display: flex; flex-direction: column; gap: 10px; align-items: center; margin-top: 12px; pointer-events: auto; }
@@ -833,6 +832,74 @@ html[lang="ja"] #game, html[lang="zh"] #game { font-weight: 700; letter-spacing:
 .set-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; font-size: 9px; color: #fff3d6;
            border-bottom: 2px dashed rgba(255, 243, 214, .15); }
 .set-row button { font: inherit; font-size: 9px; cursor: pointer; padding: 8px 12px; color: #33210c; background: #ffd85e; border: 3px solid #33210c; border-radius: 6px; }
+/* Настройки, язык и «стереть прогресс?» — окно почти во всю ширину, крупно: на Деке и телевизоре
+   читается с дивана, кнопки — под палец и геймпад. --u — базовый размер шрифта: растёт с экраном
+   (и по высоте, чтобы влезло на 1280×800), на телефоне — 12px */
+#panel[data-kind="settings"], #panel[data-kind="lang"], #panel[data-kind="reset"] { --u: clamp(12px, min(1.7vw, 2.5vh), 26px); }
+:is(#panel[data-kind="settings"], #panel[data-kind="lang"], #panel[data-kind="reset"]) .pn-box {
+  width: min(1600px, 90vw, calc(100% - 24px)); max-height: calc(100% - 24px);
+  padding: calc(var(--u) * 1.6) calc(var(--u) * 1.8) calc(var(--u) * 1.4); border-width: 5px; border-radius: 16px;
+}
+:is(#panel[data-kind="settings"], #panel[data-kind="lang"], #panel[data-kind="reset"]) #pn-close {
+  font-size: calc(var(--u) * 1.5); right: calc(var(--u) * .6); top: calc(var(--u) * .4); padding: 6px 10px; min-width: 48px; min-height: 48px;
+}
+:is(#panel[data-kind="settings"], #panel[data-kind="lang"], #panel[data-kind="reset"]) .pn-t { font-size: calc(var(--u) * 1.35); margin: 0 48px calc(var(--u) * 1.2) 0; line-height: 1.4; }
+:is(#panel[data-kind="settings"], #panel[data-kind="reset"]) .pn-n { font-size: max(9px, calc(var(--u) * .62)); margin-top: calc(var(--u) * 1); }
+#panel[data-kind="settings"] .set-cred { margin-top: calc(var(--u) * 1.3); text-align: center; }
+#panel[data-kind="settings"] .set-row {
+  flex-wrap: wrap; gap: calc(var(--u) * .6) var(--u); padding: calc(var(--u) * .55) 0; font-size: var(--u); line-height: 1.4;
+  border-bottom-width: 3px;
+}
+/* подпись сжимается и переносится сама (сообщение про обновление), кнопка — на той же строке;
+   на телефоне, где обе не влезают, кнопка уходит строкой ниже */
+#panel[data-kind="settings"] .set-row > span { flex: 1 1 0; min-width: min(100%, 9em); }
+#panel[data-kind="settings"] .set-row button {
+  margin-left: auto; min-width: min(100%, calc(var(--u) * 11)); max-width: 100%; min-height: 48px; box-sizing: border-box;
+  font-size: var(--u); padding: calc(var(--u) * .7) calc(var(--u) * 1); border-radius: 10px; box-shadow: 0 4px 0 #33210c;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#panel[data-kind="settings"] .set-row button:hover { background: #ffe38a; }
+#panel[data-kind="settings"] .set-row button:active { transform: translateY(3px); box-shadow: 0 1px 0 #33210c; }
+#panel[data-kind="settings"] #set-name { max-width: min(100%, 60vw); }
+.set-tag { font-weight: normal; color: #ffd85e; margin-left: .4em; }
+.set-msg { display: block; margin-top: .5em; font-size: .7em; line-height: 1.6; color: #9fe3a8; }
+/* опасные кнопки: «сбросить прогресс» и «да, стереть всё» */
+.set-danger {
+  display: block; width: 100%; min-height: 52px; margin-top: calc(var(--u, 12px) * 1.2); box-sizing: border-box; cursor: pointer;
+  font: inherit; font-size: var(--u, 12px); padding: calc(var(--u, 12px) * .8) var(--u, 12px); line-height: 1.4;
+  color: #ffb3a8; background: #3a1824; border: 3px solid #e0483a; border-radius: 10px; box-shadow: 0 4px 0 #33210c;
+}
+.set-danger:hover { color: #fff; background: #e0483a; }
+.set-danger:active { transform: translateY(3px); box-shadow: 0 1px 0 #33210c; }
+/* «стереть весь прогресс?»: слева — что сотрётся, справа — что останется; на телефоне — столбиком */
+.rs-cols { display: grid; grid-template-columns: 1.4fr 1fr; gap: var(--u); font-size: calc(var(--u) * .78); line-height: 1.6; color: #fff3d6; }
+.rs-cols > div { padding: calc(var(--u) * .9) var(--u); border-radius: 10px; background: #2a2438; }
+.rs-cols b { display: block; font-weight: normal; font-size: calc(var(--u) * .9); margin-bottom: calc(var(--u) * .6); }
+.rs-gone b { color: #ff8a7a; } .rs-stay b { color: #9fe3a8; }
+.rs-cols ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: calc(var(--u) * .45); }
+.rs-cols li { padding-left: 1.6em; text-indent: -1.6em; }
+.rs-gone li::before { content: '✕ '; color: #ff8a7a; }
+.rs-stay li::before { content: '✓ '; color: #9fe3a8; }
+.rs-btns { display: flex; gap: var(--u); margin-top: calc(var(--u) * 1.2); }
+.rs-btns button { flex: 1; margin-top: 0; }
+#rs-no {
+  min-height: 52px; cursor: pointer; font: inherit; font-size: var(--u); padding: calc(var(--u) * .8) var(--u);
+  color: #33210c; background: #ffd85e; border: 3px solid #33210c; border-radius: 10px; box-shadow: 0 4px 0 #33210c;
+}
+#rs-no:hover { background: #ffe38a; }
+#rs-yes { color: #fff; background: #c8352a; border-color: #33210c; }
+#rs-yes:hover { background: #e0483a; }
+.rs-btns button:disabled { opacity: .5; cursor: default; }
+@media (max-width: 640px) {
+  .rs-cols { grid-template-columns: 1fr; }
+  .rs-btns { flex-direction: column; }
+}
+/* список языков в том же окне — крупными плитками */
+#panel[data-kind="lang"] .lang-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, clamp(140px, 17vw, 320px)), 1fr)); gap: calc(var(--u) * .6); }
+#panel[data-kind="lang"] .lang-grid button { font-size: calc(var(--u) * .9); padding: calc(var(--u) * .9) calc(var(--u) * .5); min-height: 52px; border-radius: 10px; box-shadow: 0 4px 0 #33210c; }
+#panel[data-kind="lang"] .lang-grid button:hover { background: #3a4a85; }
+#panel[data-kind="lang"] .lang-grid button.cur { background: #f0522a; }
+#panel[data-kind="lang"] .lang-grid button[lang="ja"], #panel[data-kind="lang"] .lang-grid button[lang="zh"] { font-size: calc(var(--u) * 1.15); }
 /* выбор языка при первом запуске (src/langpick.js) — поверх экрана загрузки */
 #langpick { position: fixed; inset: 0; z-index: 101; display: flex; align-items: center; justify-content: center; background: #1d2440; }
 #langpick .lp-box { width: min(720px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow-y: auto; box-sizing: border-box; padding: 22px;

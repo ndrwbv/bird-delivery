@@ -37,7 +37,6 @@ body.career #topbar { position: absolute; top: 0; right: 0; width: auto; z-index
             border: 2px solid #33210c; border-radius: 6px; }
 .crm-quit[hidden] { display: none; }
 .crm-quit:hover { color: #fff3d6; }
-.crm-cred { font-size: 6px; color: #b9b4ab; opacity: .8; }
 
 /* рейтинг пиццерии — компактно у правого края, поверх города */
 .crm-rank { text-align: left; position: absolute; right: max(18px, env(safe-area-inset-right)); bottom: max(22px, 4vh); width: clamp(230px, 22vw, 320px); box-sizing: border-box;

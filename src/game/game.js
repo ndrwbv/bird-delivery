@@ -7596,7 +7596,9 @@ function openPanel (kind) {
     renderCollect();
   } else renderShop();
 }
-function closePanel () { elPanel.hidden = true; }
+function closePanel () { elPanel.hidden = true; elPanel.dataset.back = ''; }
+/* B / Esc: язык и «стереть прогресс?», открытые из настроек, — назад в настройки */
+function panelBack () { if (elPanel.dataset.back === 'settings') renderSettings(elPanel.dataset.kind === 'reset' ? 'set-reset' : 'set-lang'); else closePanel(); }
 
 /* ─── площадка: реклама, пауза, язык, настройки ───
    Всё, что зависит от Яндекса или Стима, идёт через Platform. Полноэкранная
@@ -7658,8 +7660,10 @@ $('ov-auth').addEventListener('click', async () => {
    строки игры переводятся при загрузке. Поэтому язык — только в меню, не в паузе,
    а в самый первый запуск его спрашивают до загрузки (src/langpick.js) */
 function renderLangs () {
+  elPanel.dataset.kind = 'lang';
+  // текущий язык — выбран сразу: A на нём просто закрывает окно
   elPanelBody.innerHTML = '<div class="pn-t">🌐 ' + $t('язык') + '</div><div class="lang-grid">' +
-    LANGS.map(l => '<button type="button" lang="' + l + '" data-l="' + l + '"' + (l === curLang() ? ' class="cur"' : '') + '>' + LANG_NAMES[l] + '</button>').join('') + '</div>';
+    LANGS.map(l => '<button type="button" lang="' + l + '" data-l="' + l + '"' + (l === curLang() ? ' class="cur" autofocus' : '') + '>' + LANG_NAMES[l] + '</button>').join('') + '</div>';
   elPanelBody.querySelectorAll('[data-l]').forEach(b => b.addEventListener('click', () => {
     if (b.dataset.l === curLang()) { closePanel(); return; }
     Platform.setLang(b.dataset.l);
@@ -7667,20 +7671,103 @@ function renderLangs () {
     setTimeout(() => location.reload(), 150);
   }));
 }
-function renderSettings () {
-  const row = (label, val, id) => '<div class="set-row"><span>' + label + '</span><button type="button" id="' + id + '">' + val + '</button></div>';
+/* Настройки — окно почти во всю ширину, крупные строки «что — кнопка» (стиль — delivery.css,
+   #panel[data-kind="settings"]). focus — id кнопки, которую только что нажали: после
+   перерисовки геймпад остаётся на ней, а не прыгает на крестик. */
+const escHtml = s => String(s).replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';');
+const SHELL = Platform.id === 'steam' && Platform.shell ? Platform.shell : null;   // версия и обновления — только Стим/Электрон
+const UPD = { tag: null, msg: '', busy: false };
+function renderSettings (focus) {
+  elPanel.dataset.kind = 'settings'; elPanel.dataset.back = '';
+  const row = (label, val, id, extra = '') => '<div class="set-row"><span>' + label + extra + '</span><button type="button" id="' + id + '"' + (id === focus ? ' autofocus' : '') + '>' + val + '</button></div>';
+  // сбросить прогресс можно только из меню: посреди смены кнопки нет
+  const canReset = !isPlaying() && !S.paused;
   elPanelBody.innerHTML = '<div class="pn-t">' + $t('настройки') + '</div>' +
-    (CAREER ? row($t('имя'), String(S.name || '—').replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';'), 'set-name') : '') +
+    (CAREER ? row($t('имя'), escHtml(S.name || '—'), 'set-name') : '') +
     row($t('звук'), Snd.on ? $t('вкл') : $t('выкл'), 'set-snd') +
     row('🌐 ' + $t('язык'), LANG_NAMES[curLang()], 'set-lang') +
     (Platform.features.adult ? row($t('версия'), ADULT ? $t('взрослая 18+') : $t('детская'), 'set-ed') : '') +
-    '<div class="pn-n">' + $t('карта — © участники OpenStreetMap, лицензия ODbL. Рельеф — SRTM (NASA).') + '</div>';
-  $('set-snd').onclick = () => { Snd.set(!Snd.on); renderSettings(); };
-  if ($('set-name')) $('set-name').onclick = () => CAREERM.askName(() => renderSettings());
-  $('set-lang').onclick = () => renderLangs();
+    (SHELL ? row($t('версия игры'), UPD.busy ? $t('проверяю…') : $t('проверить обновления'), 'set-upd',
+      ' <b class="set-tag">' + escHtml(UPD.tag || '—') + '</b>' + (UPD.msg ? '<small class="set-msg">' + UPD.msg + '</small>' : '')) : '') +
+    (canReset ? '<button type="button" id="set-reset" class="set-danger">' + $t('сбросить прогресс') + '</button>' : '') +
+    // единственная подпись OSM в игре (лицензия ODbL требует) — в самом низу, мелко, но читаемо
+    '<div class="pn-n set-cred">' + $t('карта — © участники OpenStreetMap, лицензия ODbL. Рельеф — SRTM (NASA).') + '</div>';
+  $('set-snd').onclick = () => { Snd.set(!Snd.on); renderSettings('set-snd'); };
+  if ($('set-name')) $('set-name').onclick = () => CAREERM.askName(() => renderSettings('set-name'));
+  $('set-lang').onclick = () => { renderLangs(); elPanel.dataset.back = 'settings'; };
   if ($('set-ed')) $('set-ed').onclick = () => { Store.set('dlv-edition', ADULT ? 'kids' : 'adult'); Platform.store.flush && Platform.store.flush(); setTimeout(() => location.reload(), 150); };
+  if ($('set-reset')) $('set-reset').onclick = renderReset;
+  if (SHELL) {
+    if (UPD.tag === null) {
+      UPD.tag = '';
+      Promise.resolve(SHELL.info()).then(i => { UPD.tag = (i && i.tag) || ''; }).catch(() => {})
+        .then(() => { if (!elPanel.hidden && elPanel.dataset.kind === 'settings') renderSettings(padSelId()); });
+    }
+    $('set-upd').onclick = checkUpdate;
+  }
 }
-$('st-lang').addEventListener('click', () => { elPanel.hidden = false; elPanel.dataset.kind = 'lang'; renderLangs(); });
+// какая кнопка сейчас выбрана геймпадом — чтобы перерисовка её не сбросила
+const padSelId = () => { try { const el = padMenu.selected(); return (el && el.isConnected && el.id) || undefined; } catch (e) { return undefined; } };
+/* «проверить обновления»: ответ оболочки (electron/main.cjs) — словами в строке «версия игры».
+   Если обновление ставится само, оболочка сама покажет окно «Вышла версия» */
+async function checkUpdate () {
+  if (UPD.busy) return;
+  UPD.busy = true; UPD.msg = ''; renderSettings('set-upd');
+  let r = null;
+  try { r = await SHELL.checkUpdate(true); } catch (e) { r = { state: 'error' }; }
+  UPD.busy = false;
+  const st = r && r.state;
+  if (r && r.current) UPD.tag = r.current;
+  UPD.msg = st === 'fresh' ? $t('последняя версия')
+    : st === 'available' ? $t('вышла {latest} — поставь заново командой из README', { latest: escHtml(r.latest || '') })
+    : st === 'error' ? $t('нет связи с GitHub')
+    : st === 'updating' ? $t('ставлю обновление, игра перезапустится…')
+    : '';                                            // declined / off — молча
+  if (!elPanel.hidden && elPanel.dataset.kind === 'settings') renderSettings('set-upd');
+}
+
+/* ─── сброс прогресса: второй шаг — экран «что сотрётся, что останется» ───
+   Стираем все ключи игры (dlv-*), кроме настроек из RESET_KEEP. Список PROGRESS_KEYS —
+   на случай, если localStorage закрыт (Яндекс в iframe): ключи из него тоже обнуляются.
+   Через Platform.store — так на Яндексе чистится и облако. Потом — перезагрузка. */
+const RESET_KEEP = ['dlv-lang', 'dlv-sound', 'dlv-edition', 'dlv-name', 'dlv-map', 'dlv-money-x8', 'dlv-__ts'];
+const PROGRESS_KEYS = [
+  'dlv-msk-wallet', 'dlv-msk-cars', 'dlv-msk-car', 'dlv-msk-best', 'dlv-msk-xp', 'dlv-msk-col', 'dlv-msk-tut', 'dlv-msk-guide',
+  'dlv-shifts', 'dlv-stars', 'dlv-crew', 'dlv-story', 'dlv-season', 'dlv-used-addr', 'dlv-lb-local',
+  'dlv-car-owned', 'dlv-car-cur', 'dlv-car-up', 'dlv-car-L', 'dlv-district', 'dlv-dist-shifts', 'dlv-dist-open',
+  ...Object.keys(ECON.DONATE || {}).map(k => 'dlv-don-' + k),
+];
+function renderReset () {
+  elPanel.dataset.kind = 'reset'; elPanel.dataset.back = 'settings';
+  const li = a => '<ul>' + a.map(s => '<li>' + s + '</li>').join('') + '</ul>';
+  const gone = [$t('кошелёк — все деньги'), $t('купленные машины и улучшения'), $t('открытые районы'),
+    $t('смены, звёзды и сюжетные заказы'), $t('мои находки'), $t('рекорды и таблица на этом устройстве'),
+    $t('рейтинг пиццерии и донаты'), $t('обучение — покажется заново')];
+  const stay = [$t('язык'), $t('звук'), ...(Platform.features.adult ? [$t('версия: взрослая или детская')] : []),
+    ...(Platform.features.nameInput ? [$t('имя курьера')] : [])];
+  // «отмена» — первой и выбрана сразу: случайное A ничего не сотрёт
+  elPanelBody.innerHTML = '<div class="pn-t">' + $t('стереть весь прогресс?') + '</div>' +
+    '<div class="rs-cols"><div class="rs-gone"><b>' + $t('сотрётся') + '</b>' + li(gone) + '</div>' +
+    '<div class="rs-stay"><b>' + $t('останется') + '</b>' + li(stay) + '</div></div>' +
+    '<div class="pn-n">' + $t('вернуть будет нельзя: игра начнётся с первой смены, как в первый раз') + '</div>' +
+    '<div class="rs-btns"><button type="button" id="rs-no" autofocus>' + $t('отмена') + '</button>' +
+    '<button type="button" id="rs-yes" class="set-danger">' + $t('да, стереть всё') + '</button></div>';
+  $('rs-no').onclick = () => renderSettings('set-reset');
+  $('rs-yes').onclick = resetProgress;
+}
+async function resetProgress () {
+  if (isPlaying()) return;                          // посреди смены не стираем
+  $('rs-yes').disabled = true; $('rs-no').disabled = true;
+  const keys = new Set(PROGRESS_KEYS);
+  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('dlv-')) keys.add(k); } } catch (e) { /* — */ }
+  // Яндекс: null, а не «удалить» — если облако не успеет, пустая локальная копия новее и победит при слиянии
+  const blank = Platform.id === 'yandex' ? null : undefined;
+  for (const k of keys) if (!RESET_KEEP.includes(k)) Platform.store.set(k, blank);
+  // облако Яндекса — дождаться отправки (не дольше 4 с), иначе старое вернётся после перезагрузки
+  try { await Promise.race([Promise.resolve(Platform.store.flush && Platform.store.flush()), new Promise(r => setTimeout(r, 4000))]); } catch (e) { /* — */ }
+  location.reload();
+}
+$('st-lang').addEventListener('click', () => { elPanel.hidden = false; elPanel.dataset.back = ''; renderLangs(); });
 /* Выбор карты убран: Стим — это Северск, Яндекс — Москва. Для отладки кнопка
    возвращается адресом ?maps. Смена — перезагрузка */
 if (MAP_IDS.length > 1 && new URLSearchParams(location.search).has('maps')) {
@@ -10565,7 +10652,7 @@ const KEY = {
 };
 
 addEventListener('keydown', e => {
-  if (!elPanel.hidden) { if (e.code === 'Escape') closePanel(); return; }
+  if (!elPanel.hidden) { if (e.code === 'Escape') panelBack(); return; }
   if (CH.opts.length && /^Digit[1-3]$/.test(e.code)) { pickChoice(+e.code.slice(5) - 1); return; }
   if (CH.pause) return;
   if (e.code === 'Tab') { e.preventDefault(); if (!e.repeat) setFullMap(!FM.open); return; }
@@ -11280,7 +11367,7 @@ function cullFar () {
    Меню листаются крестовиной или стиком: какое сейчас открыто — то и
    листаем, остальное игнорируем. */
 const padMenu = makePadMenu({
-  onBack: () => { if (CAREER && CAREERM.back()) return; if (!elPanel.hidden) closePanel(); else if (S.paused) setPause(false); else if (FM.open) setFullMap(false); },
+  onBack: () => { if (CAREER && CAREERM.back()) return; if (!elPanel.hidden) panelBack(); else if (S.paused) setPause(false); else if (FM.open) setFullMap(false); },
   // экранная клавиатура Steam (Deck): что ввёл — обратно в поле
   onText: el => {
     if (!(Platform.steam && Platform.steam.textInput)) return;
