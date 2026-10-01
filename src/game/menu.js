@@ -5,13 +5,16 @@
      MENU.show()      — из showTitle: собрать кнопки, рейтинг, при первом запуске — «как тебя зовут?»
      MENU.askName(cb) — из настроек: сменить имя
      MENU.cam(cam, P, tG) — камера заставки
-     MENU.modal()     — открытое окно имени (геймпад, клавиатура) или null; MENU.back() — закрыть
+     MENU.modal()     — открытое окно (имя или выбор района: геймпад, клавиатура) или null; MENU.back() — закрыть
+     Район (districts.js): кнопка «район: …» открывает список; открытые — выбрать, закрытые — сколько смен ещё
 
    В Яндексе и Москве (?nocareer) модуль не работает: его зовёт только career.js. */
 import './menu.css';
-import { t } from '../i18n/index.js';
+import { t, tn } from '../i18n/index.js';
+import * as DIST from './districts.js';
+import { DISTRICT } from './econ.js';
 
-let A = null, el = null, md = null, nameCb = null, nameFirst = false;
+let A = null, el = null, md = null, dm = null, nameCb = null, nameFirst = false;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -28,6 +31,7 @@ function build () {
       '<div class="crm-head"><div class="crm-logo"></div><div class="crm-tag"></div></div>' +
       '<nav class="crm-btns">' +
         '<button type="button" class="crm-go" data-a="go" autofocus><b></b><span></span></button>' +
+        '<button type="button" class="crm-b crm-dist" data-a="district" hidden><b></b><span></span></button>' +
         '<button type="button" class="crm-b" data-a="garage"></button>' +
         '<button type="button" class="crm-b" data-a="ride"></button>' +
         '<button type="button" class="crm-b" data-a="settings"></button>' +
@@ -42,9 +46,10 @@ function build () {
 }
 
 function act (a) {
-  if (md && !md.hidden) return;
+  if ((md && !md.hidden) || (dm && !dm.hidden)) return;
   A.Snd.boot && A.Snd.boot();
   if (a === 'go') A.menuGo();
+  else if (a === 'district') openDistricts();
   else if (a === 'ride') A.menuRide();
   else if (a === 'garage') A.garage(() => show());
   else if (a === 'collect') A.openCollect();
@@ -59,7 +64,10 @@ export function show () {
   el.querySelector('.crm-tag').textContent = $('big-s') ? $('big-s').textContent : '';
   const n = (+A.Store.get('dlv-shifts', 0) || 0) + 1;
   el.querySelector('.crm-go b').textContent = t('на смену');
-  el.querySelector('.crm-go span').textContent = t('смена {n} · {from}—{to}', { n, from: '9:00', to: '24:00' });
+  el.querySelector('.crm-go span').textContent = DIST.has()
+    ? t('смена {n} · район «{name}» · {from}—{to}', { n, name: t(DIST.list()[DIST.cur()].name), from: '9:00', to: '24:00' })
+    : t('смена {n} · {from}—{to}', { n, from: '9:00', to: '24:00' });
+  distButton();
   el.querySelector('[data-a="garage"]').textContent = t('гараж');
   el.querySelector('[data-a="ride"]').textContent = t('покататься');
   el.querySelector('[data-a="settings"]').textContent = t('настройки');
@@ -86,6 +94,63 @@ function rank () {
   box.querySelector('.crm-rn').textContent = up ? t('до {who} — {money}', { who: up.gen || up.name, money: A.money(Math.max(0, up.total - rows[me].total)) })
     : t('ты лучший курьер пиццерии');
 }
+
+/* ── район: кнопка в меню и список районов ──
+   кнопка: «район: Юг» и под ним «открыто 2 из 8 · до «Проспекта» ещё 1 смена» */
+function distButton () {
+  const b = el.querySelector('.crm-dist');
+  b.hidden = !DIST.has();
+  if (b.hidden) return;
+  const i = DIST.cur(), open = DIST.opened(), n = DIST.count();
+  b.querySelector('b').textContent = t('район: {name}', { name: t(DIST.list()[i].name) });
+  b.querySelector('span').textContent = open < n ? t('открыто {k} из {n}', { k: open, n }) + ' · ' + nextLine() : t('открыты все районы');
+}
+/* до следующего района: сколько смен ещё и где */
+function nextLine () {
+  const p = DIST.opened() - 1;
+  if (p >= DIST.count() - 1) return '';
+  const left = Math.max(1, DIST.need(p) - DIST.shiftsIn(p));
+  return tn(left, 'до района «{next}» — {n} смена в районе «{prev}»|до района «{next}» — {n} смены в районе «{prev}»|до района «{next}» — {n} смен в районе «{prev}»',
+    { next: t(DIST.list()[p + 1].name), prev: t(DIST.list()[p].name) });
+}
+function distBox () {
+  if (dm) return dm;
+  dm = document.createElement('div');
+  dm.id = 'crm-dist';
+  dm.hidden = true;
+  dm.innerHTML = '<div class="crm-dbox"><div class="crm-dt"></div><div class="crm-dl"></div><div class="crm-dn"></div><button type="button" class="crm-dclose"></button></div>';
+  ($('big') || document.body).appendChild(dm);
+  dm.querySelector('.crm-dclose').addEventListener('click', () => closeDistricts());
+  dm.addEventListener('click', e => { if (e.target === dm) closeDistricts(); });
+  return dm;
+}
+const pct = k => '+' + Math.round((k - 1) * 100) + ' %';
+function openDistricts () {
+  distBox();
+  const cur = DIST.cur(), open = DIST.opened();
+  dm.querySelector('.crm-dt').textContent = t('где работаешь');
+  dm.querySelector('.crm-dn').textContent = nextLine() || t('открыты все районы');
+  dm.querySelector('.crm-dclose').textContent = t('назад');
+  const list = dm.querySelector('.crm-dl');
+  list.innerHTML = DIST.list().map((d, i) => {
+    const locked = i >= open, sh = DIST.shiftsIn(i), need = DIST.need(i);
+    const sub = locked ? t('закрыт')
+      : [i ? t('машина {s} · оплата {p}', { s: pct(DISTRICT.SPEED[i]), p: pct(DISTRICT.PAY[i]) }) : t('маленький, заказы рядом'),
+        need ? t('{have} из {need} смен', { have: Math.min(sh, need), need }) : tn(sh, '{n} смена|{n} смены|{n} смен')].join(' · ');
+    return '<button type="button" class="crm-di' + (i === cur ? ' cur' : '') + (locked ? ' lock' : '') + '" data-i="' + i + '"' + (locked ? ' disabled' : '') + (i === cur ? ' autofocus' : '') + '>' +
+      '<em>' + (i + 1) + '</em><b>' + esc(t(d.name)) + '</b><span>' + esc(sub) + '</span></button>';
+  }).join('');
+  list.querySelectorAll('.crm-di').forEach(b => b.addEventListener('click', () => {
+    const i = +b.dataset.i;
+    if (!DIST.isOpen(i)) return;
+    DIST.set(i);
+    A.Snd.coin && A.Snd.coin();
+    closeDistricts();
+    show();
+  }));
+  dm.hidden = false;
+}
+function closeDistricts () { if (dm) dm.hidden = true; }
 
 /* ── имя: один раз при первом запуске, потом — из настроек ── */
 function nameBox () {
@@ -134,10 +199,11 @@ function saveName () {
   const cb = nameCb; nameCb = null;
   if (cb) cb(v);
 }
-export const modal = () => (md && !md.hidden && !md.closest('[hidden]') ? md : null);   // заставку спрятали (поехали) — окна нет
+export const modal = () => (md && !md.hidden && !md.closest('[hidden]') ? md : dm && !dm.hidden && !dm.closest('[hidden]') ? dm : null);   // заставку спрятали (поехали) — окна нет
 /* назад: из настроек — отмена; при первом запуске окно не закрывается, ждём имя */
 export function back () {
   if (!modal()) return false;
+  if (modal() === dm) { closeDistricts(); return true; }
   if (nameFirst) return true;
   md.querySelector('input').blur();
   md.hidden = true;

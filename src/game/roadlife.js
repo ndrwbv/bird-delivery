@@ -11,7 +11,8 @@
      таблички — один меш с одной текстурой; сбили столб — табличку прячем.
    • Высокие чёрные заборы (buildFences) вокруг части частных домов, школ
      и новостроек: двор с калиткой-въездом со стороны улицы, через дороги,
-     дорожки и чужие дома не идут; препятствие — машина упирается.
+     дорожки и чужие дома не идут; каждая секция (2,5 м) сбивается, как
+     дворовый заборчик (smashMesh из game.js): на ходу сносишь — летят прутья.
    • Пробки за авариями (jams): поток стоит за аварией во всех перекрытых
      полосах, хвост длиннее (дозаводим машины в очередь), сигналят, иногда
      водитель выходит посмотреть. На радаре и карте — красный кусок улицы.
@@ -386,6 +387,7 @@ function buildFences (A) {
   };
   const KIDS = /школ|детск|сад\b|сад |гимназ|лице|school|kinder/i;
   const P = [], N = [], U = [], I = [];
+  const PANELS = [];                                // секции: середина и первая вершина — их сбивают (smashMesh)
   let houses = 0;
   for (const b of CITY.buildings) {
     if ((houses >= 200 || RL.n.panels > 7000) && !b.rich) continue;      // особняки (world.js) — за забором всегда
@@ -467,12 +469,15 @@ function buildFences (A) {
         for (let v = 0; v < 4; v++) N.push(nx, 0, nz);
         U.push(0, 0, 1, 0, 1, 1, 0, 1);
         I.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
+        PANELS.push([mx, mz, vi, dl]);
         mine.push(tk(mx, mz), tk(x1, z1), tk(x2, z2));
         panels++; sidePanels[si]++;
       }
       if (run) runs.push(run);
     });
-    for (const r of runs) {
+    // сплошной стеной забор был, пока его нельзя было снести; теперь секции сбиваются (ниже),
+    // а стена остаётся, только если сбивать нечем (старый game.js без smashMesh)
+    if (!A.smashMesh) for (const r of runs) {
       const dx = r.x2 - r.x1, dz = r.z2 - r.z1, l = Math.hypot(dx, dz);
       if (l > 0.5) obb((r.x1 + r.x2) / 2, (r.z1 + r.z2) / 2, l / 2, 0.12, Math.atan2(dz, dx));
     }
@@ -488,7 +493,13 @@ function buildFences (A) {
   g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
   g.setIndex(I);
   g.computeBoundingSphere();
-  A.scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: fenceTex(), alphaTest: 0.5, side: THREE.DoubleSide })));
+  const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: fenceTex(), alphaTest: 0.5, side: THREE.DoubleSide }));
+  A.scene.add(mesh);
+  // каждая секция (2,5 м) — сбиваемая, как дворовый заборчик: на ходу сносится, летят чёрные обломки
+  if (A.smashMesh) {
+    if (A.SM_WORD && !A.SM_WORD.bigfence) A.SM_WORD.bigfence = t('забор');
+    for (const [x, z, vi, l] of PANELS) A.smashMesh('bigfence', x, z, l / 2 * 0.8, mesh, vi, 4, '#17181c');
+  }
 }
 
 export function build (A) {

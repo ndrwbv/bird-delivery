@@ -16,7 +16,10 @@ export const geo = (lat, lon) => ({ x: Math.round((lon - LON0) * ML + OX), z: Ma
    через него — бетонные блоки. Линия — z = OPEN_Z (м карты, z растёт на юг);
    открыто то, что южнее. Граница езды — старый забор, обрезанный по этой
    линии; сам город за ней стоит как стоял, туда просто не проехать.
-   Открыть город обратно — убрать поле open ниже (border вернётся к забору). */
+   Открыть город обратно — убрать поле open ниже (border вернётся к забору).
+   С 01.10.2026 город открыт целиком (CLOSE_NORTH = false): его делят районы
+   (districts ниже) — заказы и пиццерия в том районе, где работаешь. */
+const CLOSE_NORTH = false;
 const OPEN_Z = 1530;
 function clipSouth (poly, zc) {
   const out = [];
@@ -28,7 +31,7 @@ function clipSouth (poly, zc) {
   }
   return out;
 }
-const OPEN_BORDER = DATA.border ? clipSouth(DATA.border, OPEN_Z) : null;
+const OPEN_BORDER = CLOSE_NORTH && DATA.border ? clipSouth(DATA.border, OPEN_Z) : null;
 /* забор по линии отсечки: куски, где линия внутри старого забора */
 const OPEN_FENCE = (() => {
   if (!OPEN_BORDER) return [];
@@ -37,6 +40,38 @@ const OPEN_FENCE = (() => {
   for (let i = 0; i + 1 < xs.length; i += 2) out.push([[xs[i], OPEN_Z], [xs[i + 1], OPEN_Z]]);
   return out;
 })();
+
+/* ── районы (зоны доставки) ──
+   Город — полоса вдоль Томи с юго-востока на северо-запад. Жилую полосу режем
+   поперёк на пять районов (BANDS — где по оси кончается каждый, м от южного
+   конца P0), а то, что за железкой и по краям, — ещё три: восток (особняки,
+   промка, тракт), север (гаражи и заводы), запад (частный сектор).
+   Порядок — порядок открытия; pizza — точка дома, где пиццерия района. */
+const P0 = [3350, 3050], AX = [-0.742, -0.670];     // южный конец полосы и ось на северо-запад
+const BANDS = [1000, 2100, 3350, 4700];
+const RL0 = [1190, -1171], RLU = [0.655, 0.756];     // северо-восточный край жилой полосы (вдоль железки)
+function districtAt (x, z) {
+  if (x < -1380) return 7;                           // частный сектор на западе
+  const side = RLU[0] * (z - RL0[1]) - RLU[1] * (x - RL0[0]);
+  if (z < -1250 || (side < 0 && z < 150)) return 6;  // север: гаражи и заводы
+  if (side < 0) return 5;                            // восток: особняки, промка, тракт
+  const t = (x - P0[0]) * AX[0] + (z - P0[1]) * AX[1];
+  for (let i = 0; i < BANDS.length; i++) if (t < BANDS[i]) return i;
+  return 4;
+}
+const DISTRICTS = {
+  at: districtAt,
+  list: [
+    { id: 'south', name: N_('Юг'), pizza: DATA.meta.home },
+    { id: 'ring', name: N_('Кольцо'), pizza: [2488, 1454] },
+    { id: 'avenue', name: N_('Проспект'), pizza: [1846, 172] },
+    { id: 'center', name: N_('Центр'), pizza: [1020, -463] },
+    { id: 'old', name: N_('Старый город'), pizza: [-771, -490] },
+    { id: 'east', name: N_('Восток'), pizza: [3343, 815] },
+    { id: 'north', name: N_('Гаражи'), pizza: [1674, -1307] },
+    { id: 'west', name: N_('Частный сектор'), pizza: [-2384, -219] },
+  ],
+};
 
 export default {
   id: 'seversk',
@@ -63,10 +98,13 @@ export default {
     // без подписей: настоящие места Северска не называем (docs/STEAM-COMPLIANCE.md).
     // Пока город закрыт — один круг у забора на северо-западе открытой части (~1,1 км);
     // весь город — geo(56.603258, 84.868847) и geo(56.601029, 84.836719), r 300
+    // весь город — у реки на Кольце (небольшой), в Старом городе и в частном секторе
     gang: OPEN_BORDER ? [{ x: 2260, z: 1680, r: 260 }] : [
+      { x: 2260, z: 1680, r: 200 },
       { ...geo(56.603258, 84.868847), r: 300 },
       { ...geo(56.601029, 84.836719), r: 300 },
     ],
+    districts: DISTRICTS,
   },
   // край езды — многоугольник: забор закрытого города, обрезанный по кольцу (см. OPEN_Z)
   border: OPEN_BORDER || DATA.border || null,

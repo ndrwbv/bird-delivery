@@ -84,11 +84,11 @@ export const TIPS = {
   LUNCH_CHANCE: 0.2, LUNCH_MUL: 1.3,         // обед «бизнес-ланч»
   CLEAN_CHANCE: 0.1,                          // город вычищен от мусора — люди добрее
 };
-export function tipFor (fee, zone, { lunch = false, clean = 0, rnd = Math.random } = {}) {
-  let ch = TIPS.CHANCE + (TIPS.ZONE_CHANCE[zone] || 0) + (lunch ? TIPS.LUNCH_CHANCE : 0) + TIPS.CLEAN_CHANCE * clean;
+export function tipFor (fee, zone, { lunch = false, clean = 0, rnd = Math.random, extra = 0, mul = 1 } = {}) {
+  let ch = TIPS.CHANCE + (TIPS.ZONE_CHANCE[zone] || 0) + (lunch ? TIPS.LUNCH_CHANCE : 0) + TIPS.CLEAN_CHANCE * clean + extra;
   if (rnd() > ch) return 0;
   const [a, b] = zone === 'rich' ? TIPS.RICH_AMOUNT : TIPS.AMOUNT;
-  return Math.round(fee * (a + rnd() * (b - a)) * (lunch ? TIPS.LUNCH_MUL : 1) / 10) * 10;
+  return Math.round(fee * (a + rnd() * (b - a)) * (lunch ? TIPS.LUNCH_MUL : 1) * mul / 10) * 10;
 }
 
 /* ── смена: что обязательно попадает в заказы ── */
@@ -103,6 +103,49 @@ export const ORDERS = {
   STORY_EVERY: 4,              // сюжетный заказ — не чаще раза в 4 смены
   STORY_STARS: [2, 5],
   COLORS: { pizza: '#ff8a2b', side: '#a15bff', staff: '#ffd23f', story: '#ff3ea5', urgent: '#ff2d4a' },
+};
+
+/* ── районы (зоны доставки): 8 штук, в каждом своя пиццерия ──
+   Смена — в одном районе: оттуда начинаешь, туда везёшь, там же кофе и аптечки.
+   Сначала открыт только 1-й; следующий открывается, когда в нынешнем последнем
+   отъезжено OPEN[i] смен. Смена засчитывается району, если отвёз хотя бы COUNT_MIN
+   заказов. Открытые районы можно выбирать в меню в любой момент.
+   Дальше — больше: заказы дальше (DIST — от пиццерии района, м), зато машина
+   быстрее (SPEED — к максималке и разгону) и платят больше (PAY — к оплате заказа).
+   Индекс — номер района по порядку (MAP.career.districts.list). */
+export const DISTRICT = {
+  OPEN: [2, 3, 3, 4, 4, 5, 5],               // смен в районах 1…7, чтобы открылся следующий: всего 26
+  COUNT_MIN: 2,
+  SPEED: [1, 1.03, 1.06, 1.09, 1.12, 1.15, 1.18, 1.21],
+  PAY: [1, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.35],
+  DIST: [[120, 800], [150, 1000], [200, 1150], [250, 1300], [250, 1500], [300, 1800], [300, 2000], [250, 2000]],
+  EDGE_TOP: 0.15,                            // «в конец района» — адрес из 15 % самых далёких от пиццерии
+  URGENT_K: 0.75,                            // срочный — не ближе 75 % от DIST[1] района
+  FAR_K: 1.6,                                // срочный и «в конец района» — по дорогам не дальше 1,6 × DIST[1]
+};
+
+/* ── волны щедрости: зашёл в игру — засыпаем подарками, потом строже, потом снова ──
+   Считаются смены этой сессии (с запуска игры), по кругу WAVE: 1-я — щедрая,
+   2-я — обычная, 3-я — час пик, 4-я — снова щедрая…
+     nos / kits — сколько кофе (нитро) и аптечек с бонусами по району, ×
+     respawn    — через сколько взятое появляется снова, ×
+     spawn      — как часто у дороги впереди появляется свежий кофе и аптечка, × (меньше — чаще)
+     tipChance  — к шансу чаевых, tipMul — к сумме чаевых
+     dist       — к дальности заказов, time — ко времени на заказ, pay — к оплате
+     hardFrom   — с какого часа бывают срочные и «в конец района»
+     tank       — бак нитро в начале смены
+   Первые WARMUP заказов каждой смены (в щедрую — WARMUP_GEN) — близко, WARM_DIST от
+   пиццерии. После срочного или «в конец района» следующий заказ — тоже близкий (передышка). */
+export const PACE = {
+  WAVE: ['generous', 'normal', 'tight'],
+  MODES: {
+    generous: { nos: 1.7, kits: 1.6, respawn: 0.6, spawn: 0.5, tipChance: 0.25, tipMul: 1.5, dist: 0.75, time: 1.25, pay: 1, hardFrom: 16, tank: 1 },
+    normal: { nos: 1, kits: 1, respawn: 1, spawn: 1, tipChance: 0, tipMul: 1, dist: 1, time: 1, pay: 1, hardFrom: 11, tank: 0.5 },
+    tight: { nos: 0.75, kits: 0.7, respawn: 1.3, spawn: 1.4, tipChance: -0.05, tipMul: 1, dist: 1.15, time: 0.92, pay: 1.1, hardFrom: 10, tank: 0.5 },
+  },
+  WARMUP: 3, WARMUP_GEN: 4, WARM_DIST: [60, 350],
+  NOS_PER_M: 220,                            // кофе: один стаканчик на столько метров улиц района, во дворах — вдвое реже
+  NOS_MAX: 140, BONUS_SHARE: 0.45,           // в обычную смену не больше 140 (волна множит после); бонусов — 45 % от числа кофе
 };
 
 /* ── обед: одно из трёх до конца смены ── */

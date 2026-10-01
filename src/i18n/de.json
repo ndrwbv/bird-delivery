@@ -772,7 +772,6 @@
  "Буханка": "Buchanka",
  "в кошельке": "im Portemonnaie",
  "в общем": "jedenfalls",
- "в самый конец города · оплата ×{k}": "bis ans Stadtende · Lohn ×{k}",
  "В следующий раз плати!": "Nächstes Mal zahlst du!",
  "ВАЗ-2101: двойные круглые фары и клыки на бампере": "VAZ-2101: runde Doppelscheinwerfer und Hauer an der Stoßstange",
  "ВАЗ-2107 в цветах пиццерии: хром, квадратные фары": "VAZ-2107 in Pizzeria-Farben: Chrom, eckige Scheinwerfer",
@@ -1023,5 +1022,57 @@
  "короткая смена": "kurze Schicht",
  "смена": "Schicht",
  "средняя": "mittel",
- "средняя смена": "mittlere Schicht"
+ "средняя смена": "mittlere Schicht",
+ "{have} из {need} смен": "{have} von {need} Schichten",
+ "{n} смена|{n} смены|{n} смен": {
+  "one": "{n} Schicht",
+  "other": "{n} Schichten"
+ },
+ "в самый конец района · оплата ×{k}": "bis ans Ende vom Viertel · Lohn ×{k}",
+ "Восток": "Osten",
+ "Гаражи": "Garagen",
+ "где работаешь": "wo arbeitest du",
+ "до района «{next}» — {n} смена в районе «{prev}»|до района «{next}» — {n} смены в районе «{prev}»|до района «{next}» — {n} смен в районе «{prev}»": {
+  "one": "bis „{next}“: {n} Schicht in „{prev}“",
+  "other": "bis „{next}“: {n} Schichten in „{prev}“"
+ },
+ "заказы дальше, кофе меньше — зато платят ×{k}": "Aufträge weiter weg, weniger Kaffee — dafür Lohn ×{k}",
+ "закрыт": "gesperrt",
+ "закрыт · ещё {n} смена в районе «{prev}»|закрыт · ещё {n} смены в районе «{prev}»|закрыт · ещё {n} смен в районе «{prev}»": {
+  "one": "gesperrt · noch {n} Schicht in „{prev}“",
+  "other": "gesperrt · noch {n} Schichten in „{prev}“"
+ },
+ "Кольцо": "Ring",
+ "кофе, аптечки и чаевые — рекой": "Kaffee, Verbandskästen und Trinkgeld in Strömen",
+ "маленький, заказы рядом": "klein, Aufträge gleich um die Ecke",
+ "машина {s} · оплата {p}": "Auto {s} · Lohn {p}",
+ "не засчитана: меньше {n} заказа|не засчитана: меньше {n} заказов|не засчитана: меньше {n} заказов": {
+  "one": "zählt nicht: weniger als {n} Auftrag",
+  "other": "zählt nicht: weniger als {n} Aufträge"
+ },
+ "открыт новый район": "neues Viertel frei",
+ "открыт район «{name}»": "Viertel „{name}“ frei",
+ "открыто {k} из {n}": "{k} von {n} frei",
+ "открыты все районы": "alle Viertel frei",
+ "Проспект": "Allee",
+ "район": "Viertel",
+ "район «{name}»": "Viertel „{name}“",
+ "район «{name}» — не твой на этой смене, заказов тут нет": "„{name}“ ist diese Schicht nicht dein Viertel — hier gibt’s keine Aufträge",
+ "район «{name}» закрыт: ещё {n} смена в районе «{prev}»|район «{name}» закрыт: ещё {n} смены в районе «{prev}»|район «{name}» закрыт: ещё {n} смен в районе «{prev}»": {
+  "one": "„{name}“ ist gesperrt: noch {n} Schicht in „{prev}“",
+  "other": "„{name}“ ist gesperrt: noch {n} Schichten in „{prev}“"
+ },
+ "район «{name}» пока закрыт": "Viertel „{name}“ ist noch gesperrt",
+ "район: {name}": "Viertel: {name}",
+ "следующая смена — там: машина {s}, оплата {p}. вернуться можно из меню": "nächste Schicht dort: Auto {s}, Lohn {p}. zurück geht’s übers Menü",
+ "смена {n} · район «{name}» · {from}—{to}": "Schicht {n} · Viertel „{name}“ · {from}—{to}",
+ "Старый город": "Altstadt",
+ "твой район — «{name}»": "dein Viertel — „{name}“",
+ "ты работаешь здесь": "hier arbeitest du",
+ "Центр": "Zentrum",
+ "час пик": "Rushhour",
+ "Частный сектор": "Siedlung",
+ "щедрая смена": "großzügige Schicht",
+ "Юг": "Süden",
+ "забор": "Zaun"
 }

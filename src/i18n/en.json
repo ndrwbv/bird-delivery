@@ -772,7 +772,6 @@
  "Буханка": "Bukhanka",
  "в кошельке": "wallet",
  "в общем": "anyway",
- "в самый конец города · оплата ×{k}": "to the far edge of town · pay ×{k}",
  "В следующий раз плати!": "Pay up next time!",
  "ВАЗ-2101: двойные круглые фары и клыки на бампере": "VAZ-2101: twin round headlights and bumper fangs",
  "ВАЗ-2107 в цветах пиццерии: хром, квадратные фары": "VAZ-2107 in pizzeria colors: chrome, square headlights",
@@ -1023,5 +1022,57 @@
  "короткая смена": "short shift",
  "смена": "shift",
  "средняя": "medium",
- "средняя смена": "medium shift"
+ "средняя смена": "medium shift",
+ "{have} из {need} смен": "{have} of {need} shifts",
+ "{n} смена|{n} смены|{n} смен": {
+  "one": "{n} shift",
+  "other": "{n} shifts"
+ },
+ "в самый конец района · оплата ×{k}": "to the far edge of the district · pay ×{k}",
+ "Восток": "East",
+ "Гаражи": "Garages",
+ "где работаешь": "where do you work",
+ "до района «{next}» — {n} смена в районе «{prev}»|до района «{next}» — {n} смены в районе «{prev}»|до района «{next}» — {n} смен в районе «{prev}»": {
+  "one": "“{next}” opens after {n} shift in “{prev}”",
+  "other": "“{next}” opens after {n} shifts in “{prev}”"
+ },
+ "заказы дальше, кофе меньше — зато платят ×{k}": "farther orders, less coffee — but pay ×{k}",
+ "закрыт": "locked",
+ "закрыт · ещё {n} смена в районе «{prev}»|закрыт · ещё {n} смены в районе «{prev}»|закрыт · ещё {n} смен в районе «{prev}»": {
+  "one": "locked · {n} more shift in “{prev}”",
+  "other": "locked · {n} more shifts in “{prev}”"
+ },
+ "Кольцо": "Ring",
+ "кофе, аптечки и чаевые — рекой": "coffee, first aid kits and tips galore",
+ "маленький, заказы рядом": "small, orders close by",
+ "машина {s} · оплата {p}": "car {s} · pay {p}",
+ "не засчитана: меньше {n} заказа|не засчитана: меньше {n} заказов|не засчитана: меньше {n} заказов": {
+  "one": "not counted: under {n} order",
+  "other": "not counted: under {n} orders"
+ },
+ "открыт новый район": "new district unlocked",
+ "открыт район «{name}»": "“{name}” district unlocked",
+ "открыто {k} из {n}": "{k} of {n} unlocked",
+ "открыты все районы": "all districts unlocked",
+ "Проспект": "Avenue",
+ "район": "district",
+ "район «{name}»": "“{name}” district",
+ "район «{name}» — не твой на этой смене, заказов тут нет": "“{name}” isn’t your district this shift — no orders here",
+ "район «{name}» закрыт: ещё {n} смена в районе «{prev}»|район «{name}» закрыт: ещё {n} смены в районе «{prev}»|район «{name}» закрыт: ещё {n} смен в районе «{prev}»": {
+  "one": "“{name}” is locked: {n} more shift in “{prev}”",
+  "other": "“{name}” is locked: {n} more shifts in “{prev}”"
+ },
+ "район «{name}» пока закрыт": "“{name}” district is locked for now",
+ "район: {name}": "district: {name}",
+ "следующая смена — там: машина {s}, оплата {p}. вернуться можно из меню": "next shift is there: car {s}, pay {p}. you can switch back in the menu",
+ "смена {n} · район «{name}» · {from}—{to}": "shift {n} · “{name}” district · {from}—{to}",
+ "Старый город": "Old Town",
+ "твой район — «{name}»": "your district — “{name}”",
+ "ты работаешь здесь": "you work here",
+ "Центр": "Downtown",
+ "час пик": "rush hour",
+ "Частный сектор": "Cottages",
+ "щедрая смена": "generous shift",
+ "Юг": "South",
+ "забор": "fence"
 }

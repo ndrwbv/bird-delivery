@@ -772,7 +772,6 @@
  "Буханка": "Buxanka",
  "в кошельке": "hamyonda",
  "в общем": "xullas",
- "в самый конец города · оплата ×{k}": "shaharning eng chetiga · toʻlov ×{k}",
  "В следующий раз плати!": "Keyingi safar toʻla!",
  "ВАЗ-2101: двойные круглые фары и клыки на бампере": "VAZ-2101: qoʻsh dumaloq fara, bamperda qoziq tishlar",
  "ВАЗ-2107 в цветах пиццерии: хром, квадратные фары": "VAZ-2107 pitseriya rangida: xrom, kvadrat faralar",
@@ -1023,5 +1022,57 @@
  "короткая смена": "qisqa smena",
  "смена": "smena",
  "средняя": "oʻrta",
- "средняя смена": "oʻrta smena"
+ "средняя смена": "oʻrta smena",
+ "{have} из {need} смен": "{need} smenadan {have}",
+ "{n} смена|{n} смены|{n} смен": {
+  "one": "{n} smena",
+  "other": "{n} smena"
+ },
+ "в самый конец района · оплата ×{k}": "tumanning eng chetiga · toʻlov ×{k}",
+ "Восток": "Sharq",
+ "Гаражи": "Garajlar",
+ "где работаешь": "qayerda ishlaysan",
+ "до района «{next}» — {n} смена в районе «{prev}»|до района «{next}» — {n} смены в районе «{prev}»|до района «{next}» — {n} смен в районе «{prev}»": {
+  "one": "«{next}» tumanigacha — «{prev}» tumanida {n} smena",
+  "other": "«{next}» tumanigacha — «{prev}» tumanida {n} smena"
+ },
+ "заказы дальше, кофе меньше — зато платят ×{k}": "buyurtmalar uzoqroq, kofe kamroq — lekin toʻlov ×{k}",
+ "закрыт": "yopiq",
+ "закрыт · ещё {n} смена в районе «{prev}»|закрыт · ещё {n} смены в районе «{prev}»|закрыт · ещё {n} смен в районе «{prev}»": {
+  "one": "yopiq · «{prev}» tumanida yana {n} smena",
+  "other": "yopiq · «{prev}» tumanida yana {n} smena"
+ },
+ "Кольцо": "Halqa",
+ "кофе, аптечки и чаевые — рекой": "kofe, aptechka va choychaqa — daryodek",
+ "маленький, заказы рядом": "kichkina, buyurtmalar yaqin",
+ "машина {s} · оплата {p}": "mashina {s} · toʻlov {p}",
+ "не засчитана: меньше {n} заказа|не засчитана: меньше {n} заказов|не засчитана: меньше {n} заказов": {
+  "one": "hisoblanmadi: {n} ta buyurtmadan kam",
+  "other": "hisoblanmadi: {n} ta buyurtmadan kam"
+ },
+ "открыт новый район": "yangi tuman ochildi",
+ "открыт район «{name}»": "«{name}» tumani ochildi",
+ "открыто {k} из {n}": "{n} tadan {k} tasi ochiq",
+ "открыты все районы": "barcha tumanlar ochiq",
+ "Проспект": "Prospekt",
+ "район": "tuman",
+ "район «{name}»": "«{name}» tumani",
+ "район «{name}» — не твой на этой смене, заказов тут нет": "«{name}» tumani bu smenada seniki emas — bu yerda buyurtma yoʻq",
+ "район «{name}» закрыт: ещё {n} смена в районе «{prev}»|район «{name}» закрыт: ещё {n} смены в районе «{prev}»|район «{name}» закрыт: ещё {n} смен в районе «{prev}»": {
+  "one": "«{name}» tumani yopiq: «{prev}» tumanida yana {n} smena",
+  "other": "«{name}» tumani yopiq: «{prev}» tumanida yana {n} smena"
+ },
+ "район «{name}» пока закрыт": "«{name}» tumani hozircha yopiq",
+ "район: {name}": "tuman: {name}",
+ "следующая смена — там: машина {s}, оплата {p}. вернуться можно из меню": "keyingi smena oʻsha yerda: mashina {s}, toʻlov {p}. menyudan qaytish mumkin",
+ "смена {n} · район «{name}» · {from}—{to}": "smena {n} · «{name}» tumani · {from}—{to}",
+ "Старый город": "Eski shahar",
+ "твой район — «{name}»": "sening tumaning — «{name}»",
+ "ты работаешь здесь": "sen shu yerda ishlaysan",
+ "Центр": "Markaz",
+ "час пик": "tigʻiz payt",
+ "Частный сектор": "Xususiy uylar",
+ "щедрая смена": "saxiy smena",
+ "Юг": "Janub",
+ "забор": "panjara"
 }

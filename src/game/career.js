@@ -20,6 +20,7 @@ import * as ECON from './econ.js';
 import * as GARAGE from './garage.js';
 import * as MENU from './menu.js';
 import * as DLG from './dialog.js';
+import * as DIST from './districts.js';
 import { makePadMenu } from '../input/padmenu.js';
 import { t, tn, lang } from '../i18n/index.js';
 
@@ -104,11 +105,22 @@ export function startShift () {
   SH.on = true; SH.phase = ''; SH.lunch = false; SH.hits = 0; SH.lastHurt = S.hurt || 0; SH.fine = 0; SH.stars = 0;
   SH.slot = false; STAKE = 0; SH.t0h = hour(); SH.endH = SH.t0h; SH.n = +A.Store.get('dlv-shifts', 0) || 0;
   SH.len = ECON.shiftLen(SH.n);
+  SH.pace = DIST.beginShift();                    // волна щедрости: 1-я смена сессии — щедрая (econ.js PACE)
+  SH.district = DIST.cur();
+  SH.opened = -1;
   lunchClass(false);
   fire(startCbs, { n: SH.n + 1 });
-  const L = SH.len;
-  setTimeout(() => { if (SH.on && SH.len === L) A.popBonus(lenName(L.id), t('9:00—24:00 · ~{n} мин', { n: Math.round(L.slow * ECON.SHIFT.BASE_S / 60) })); }, 1200);
+  const L = SH.len, P = SH.pace;
+  const where = DIST.has() ? t('район «{name}»', { name: t(DIST.list()[SH.district].name) }) + ' · ' : '';
+  setTimeout(() => { if (SH.on && SH.len === L) A.popBonus(lenName(L.id), where + t('9:00—24:00 · ~{n} мин', { n: Math.round(L.slow * ECON.SHIFT.BASE_S / 60) })); }, 1200);
+  // щедрая и час пик — говорим прямо: игрок чувствует ритм
+  const pm = ECON.PACE.MODES[P];
+  const pace = P === 'generous' ? [t('щедрая смена'), t('кофе, аптечки и чаевые — рекой')]
+    : P === 'tight' ? [t('час пик'), t('заказы дальше, кофе меньше — зато платят ×{k}', { k: fmtK(pm.pay) })] : null;
+  if (pace) setTimeout(() => { if (SH.on && SH.len === L) A.popBonus(pace[0], pace[1]); }, 5600);
 }
+/** волна этой смены: 'generous' | 'normal' | 'tight' */
+export const pace = () => SH.pace || 'normal';
 /* длина смены: короткая / средняя / длинная (ECON.SHIFT.LENGTHS) */
 const lenName = id => ({ short: t('короткая смена'), medium: t('средняя смена'), long: t('длинная смена') }[id] || '');
 const lenShort = id => ({ short: t('короткая'), medium: t('средняя'), long: t('длинная') }[id] || '');
@@ -247,6 +259,9 @@ export function showEnd (why, whyText) {
   const full = why === 'время';
   if (wasOn) {
     A.Store.set('dlv-shifts', SH.n + 1);
+    // район: смена засчитана (отвёз хотя бы DISTRICT.COUNT_MIN), открылся следующий — сразу туда
+    const r = DIST.countShift(S.delivered || 0);
+    SH.counted = r.counted; SH.opened = r.opened;
     if (full && SH.hits === 0 && (S.delivered || 0) > 0) addStars(ECON.STARS.CLEAN_SHIFT, t('смена без единого удара'));
     crewRecord(S.money || 0, full);
     fire(endCbs, { why, money: S.money || 0, delivered: S.delivered || 0, hits: SH.hits, fine: SH.fine, full });
@@ -272,7 +287,10 @@ export function showEnd (why, whyText) {
     SH.fine ? [t('штраф за клиента'), SH.fine, n => '−' + A.money(n)] : null,
     S.people ? [t('прохожих сбито'), S.people, cnt] : null,
     SH.stars ? [t('звёзд за смену'), SH.stars, n => '+' + Math.round(n) + ' ★'] : null,
+    DIST.has() ? districtRow() : null,
+    DIST.has() && SH.opened >= 0 ? [t('открыт новый район'), 1, () => t(DIST.list()[SH.opened].name), true] : null,
   ].filter(Boolean);
+  if (DIST.has() && SH.opened >= 0) setTimeout(() => { if ($('over') && !$('over').hidden) A.Snd.coin(); }, 200 + rows.length * 220);
   const box = $('ov-stats');
   box.innerHTML = rows.map((r, i) => '<div class="ov-row' + (r[3] ? ' big' : '') + '" data-i="' + i + '"><span>' + esc(r[0]) + '</span><b>' + esc(r[2](0)) + '</b></div>').join('');
   rows.forEach((r, i) => setTimeout(() => {
@@ -299,6 +317,15 @@ export function showEnd (why, whyText) {
   ov.hidden = false;
 }
 
+/* район на экране итогов: «Юг · 2 из 2 смен» или «Юг · смена не засчитана (меньше 2 заказов)» */
+function districtRow () {
+  const i = SH.district >= 0 ? SH.district : DIST.cur(), name = t(DIST.list()[i].name), need = DIST.need(i), have = DIST.shiftsIn(i);
+  const txt = !SH.counted ? name + ' · ' + tn(ECON.DISTRICT.COUNT_MIN, 'не засчитана: меньше {n} заказа|не засчитана: меньше {n} заказов|не засчитана: меньше {n} заказов')
+    : need && i === DIST.opened() - 1 + (SH.opened >= 0 ? -1 : 0) ? name + ' · ' + t('{have} из {need} смен', { have: Math.min(have, need), need })
+      : name + ' · ' + tn(have, '{n} смена|{n} смены|{n} смен');
+  return [t('район'), 1, () => txt];
+}
+
 /* кошелёк и звёзды — строкой под заработком */
 function refreshWallet () {
   const w = $('cr-wallet');
@@ -315,7 +342,7 @@ function spendBox () {
   md = document.createElement('div');
   md.id = 'cr-spend';
   md.hidden = true;
-  md.innerHTML = '<div class="cr-sp-box"><div class="cr-sp-head"><div class="cr-sp-sum"></div><div id="cr-wallet"></div></div>' +
+  md.innerHTML = '<div class="cr-sp-box"><div class="cr-sp-head"><div class="cr-sp-sum"></div><div id="cr-wallet"></div></div><div class="cr-sp-new" hidden></div>' +
     '<button type="button" id="cr-sp-go"></button>' +
     '<div class="cr-sp-body"></div><button type="button" id="cr-sp-close"></button></div>';
   ($('game') || document.body).appendChild(md);
@@ -329,6 +356,11 @@ function openSpend () {
   md.querySelector('.cr-sp-sum').textContent = (earned >= 0 ? '+' : '−') + A.money(Math.abs(earned));
   md.querySelector('#cr-sp-go').textContent = t('на новую смену');
   md.querySelector('#cr-sp-close').textContent = t('не тратить');
+  // открылся новый район — крупно, над кнопкой: следующая смена уже там
+  const nw = md.querySelector('.cr-sp-new');
+  nw.hidden = !(DIST.has() && SH.opened >= 0);
+  if (!nw.hidden) nw.innerHTML = '<b>' + esc(t('открыт район «{name}»', { name: t(DIST.list()[SH.opened].name) })) + '</b><span>' +
+    esc(t('следующая смена — там: машина {s}, оплата {p}. вернуться можно из меню', { s: '+' + Math.round((ECON.DISTRICT.SPEED[SH.opened] - 1) * 100) + ' %', p: '+' + Math.round((ECON.DISTRICT.PAY[SH.opened] - 1) * 100) + ' %' })) + '</span>';
   md.hidden = false;
   if (earned > 0) A.countUp(md.querySelector('.cr-sp-sum'), earned, n => '+' + A.money(n), 700);
   refreshWallet(); refreshTabs();
@@ -664,7 +696,7 @@ function paneSlot (p) {
 
 /* отладка: __dlv.CAREERM.skipTo(13.9) — к обеду, skipTo(23.95) — к полуночи */
 const DEBUG = {
-  get SH () { return SH; }, shiftSlow, stars, addStars, hour, isEvening, clockText, shiftOn, phase, onShiftStart, onShiftEnd, startShift, showEnd, clientKilled,
+  get SH () { return SH; }, shiftSlow, pace, DIST: DIST.DEBUG, stars, addStars, hour, isEvening, clockText, shiftOn, phase, onShiftStart, onShiftEnd, startShift, showEnd, clientKilled,
   hasOrders: () => !!(ORD && ORD.staffRide), hasCars: () => !!carsApi(),
   // перемотка за обед — обед считается прошедшим (иначе он всплывает в любом пресете песочницы)
   skipTo (h) { if (A) { A.env().t = ECON.tOfHour(h); if (h > ECON.SHIFT.LUNCH_H + 0.05) SH.lunch = true; else if (h < ECON.SHIFT.LUNCH_H) SH.lunch = false; } },

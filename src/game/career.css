@@ -155,3 +155,10 @@ body:has(#cr-spend:not([hidden])) .hud, body:has(#cr-spend:not([hidden])) #ctrls
 .cr-sp-box::-webkit-scrollbar { width: 8px; }
 .cr-sp-box::-webkit-scrollbar-track { background: #141a33; }
 .cr-sp-box::-webkit-scrollbar-thumb { background: #ffd85e; border-radius: 4px; border: 2px solid #141a33; }
+
+/* открылся новый район (districts.js) — над кнопкой «на новую смену» */
+.cr-sp-new { display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 12px 16px; margin: 4px auto 12px; max-width: 560px;
+             background: #ffd85e; color: #33210c; border: 3px solid #33210c; border-radius: 10px; box-shadow: 0 4px 0 #33210c; text-align: center; }
+.cr-sp-new[hidden] { display: none; }
+.cr-sp-new b { font-weight: normal; font-size: clamp(11px, 1.4vw, 16px); }
+.cr-sp-new span { font-size: clamp(7px, .75vw, 9px); line-height: 1.7; }

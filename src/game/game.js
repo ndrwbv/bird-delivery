@@ -37,6 +37,7 @@ import * as LM from './landmarks.js';            // заправки и като
 import * as ECON from './econ.js';               // карьера: все числа и формулы (docs/CAREER.md)
 import * as DLG from './dialog.js';              // диалог с головой и печатающимся текстом
 import * as ZN from './zones.js';                // районы города для заказов и событий
+import * as DIST from './districts.js';          // карьера: 8 районов со своими пиццериями, волны щедрости
 import * as ORD from './orders.js';              // карьера: очередь заказов, поручения, развоз смены, оплата (docs/ORDERS.md)
 import * as CAREERM from './career.js';          // карьера: смена 9—24, обед, итоги, донаты, слот, звёзды
 import * as STORY from './story.js';             // сюжетные заказы и катсцены (баба Зина)
@@ -59,6 +60,9 @@ const GORE_ON = ADULT;
 /* Карьера (Стим и dev): смена 9—24, экономика, машины, донаты. Только на карте,
    у которой есть MAP.career (Северск); на Яндексе — прежняя игра. ?nocareer — выключить */
 const CAREER = Platform.id !== 'yandex' && !!MAP.career && !new URLSearchParams(location.search).has('nocareer');
+/* районы карьеры (districts.js): где работаешь, что открыто, волна щедрости */
+if (CAREER) DIST.init({ MAP, Store: { get: Store.get, set: Store.set, flush: () => Platform.store.flush && Platform.store.flush() } });
+const DISTRICTS = CAREER && DIST.has();
 /* прогресс доната на цель города: 0…1 (econ.js DONATE) */
 const donated = k => clamp((+Store.get('dlv-don-' + k, 0) || 0) / ((ECON.DONATE[k] && ECON.DONATE[k].goal) || 1), 0, 1);
 const NUMF = new Intl.NumberFormat(curLang() === 'zh' ? 'zh-CN' : curLang());
@@ -1381,6 +1385,17 @@ function smashAdd (kind, x, z, r, geos, hex) {
   SMASH_GRID.get(gk).push(it);
 }
 
+/* вещь, у которой свой меш (высокие чёрные заборы roadlife.js — одним мешем с текстурой):
+   v0…v0+nv — её вершины в этом меше, сбил — схлопываются так же */
+function smashMesh (kind, x, z, r, mesh, v0, nv, hex) {
+  const it = { kind, x, z, r, hex, nv, down: 0, mesh, v0 };
+  SMASH.push(it);
+  const gk = Math.floor(x / SM_CELL) + ',' + Math.floor(z / SM_CELL);
+  if (!SMASH_GRID.has(gk)) SMASH_GRID.set(gk, []);
+  SMASH_GRID.get(gk).push(it);
+  return it;
+}
+
 function smashBuild () {
   for (const ch of SM_CHUNKS.values()) {
     let v = 0;
@@ -1400,11 +1415,12 @@ function smashHit (it, nx, nz, force, quiet) {
   const pos = it.mesh.geometry.attributes.position, a = pos.array, gy = groundH(it.x, it.z);
   for (let i = it.v0; i < it.v0 + it.nv; i++) { a[i * 3] = it.x; a[i * 3 + 1] = gy - 1; a[i * 3 + 2] = it.z; }
   pos.needsUpdate = true;
-  const n = it.kind === 'fence' ? 4 : it.kind === 'bush' ? 5 : 6;
+  const bar = it.kind === 'fence' || it.kind === 'bigfence';         // заборы — летят прутья и планки
+  const n = bar ? 4 : it.kind === 'bush' ? 5 : 6;
   for (let i = 0; i < n; i++) {
     const hex = it.kind === 'bin' || it.kind === 'dump' ? (i < 2 ? it.hex : pick(['#e8e2d4', '#8a6b4e', '#d95d5d', '#59b06a', '#4f7fd6'])) : it.hex;
     const s = it.kind === 'bush' ? rand(0.3, 0.55) : rand(0.15, 0.5);
-    const m = new THREE.Mesh(it.kind === 'bush' ? new THREE.IcosahedronGeometry(s, 0) : new THREE.BoxGeometry(s * (it.kind === 'fence' ? 3 : 1), s * 0.5, s), propMat(hex));
+    const m = new THREE.Mesh(it.kind === 'bush' ? new THREE.IcosahedronGeometry(s, 0) : new THREE.BoxGeometry(s * (bar ? 3 : 1), s * (it.kind === 'bigfence' ? 1.4 : 0.5), s * (it.kind === 'bigfence' ? 0.3 : 1)), propMat(hex));
     m.position.set(it.x + rand(-0.5, 0.5), gy + rand(0.4, 1.0), it.z + rand(-0.5, 0.5));
     scene.add(m);
     GORE.push({ m, vx: nx * rand(2, 5) * (0.4 + force / 30) + rand(-2.5, 2.5), vy: rand(2.5, 6), vz: nz * rand(2, 5) * (0.4 + force / 30) + rand(-2.5, 2.5),
@@ -3298,10 +3314,15 @@ function osmParkingLots (near) {
         if (chance(0.4)) spots.push([x, z, Math.atan2(rx, rz) + (chance(0.5) ? Math.PI : 0)]);
       }
   }
-  spots.sort((a, b) => Math.hypot(a[0] - near.x, a[1] - near.z) - Math.hypot(b[0] - near.x, b[1] - near.z));
+  // near — пиццерия или все пиццерии районов: машины стоят у той, что ближе
+  const ns = (Array.isArray(near) ? near : [near]).filter(Boolean);
+  const dn = q => Math.min(...ns.map(n => Math.hypot(q[0] - n.x, q[1] - n.z)));
+  for (const q of spots) q.dn = dn(q);
+  spots.sort((a, b) => a.dn - b.dn);
   // все стоящие — живые: их толкают, мнут и взрывают, как любые другие.
-  // Больше полутора сотен не ставим: остальные места пустые
-  spots.forEach((q, i) => { if (i < 150 && Math.hypot(q[0] - near.x, q[1] - near.z) > 14) PARKED.push(q); });
+  // Больше полутора сотен (с районами — двухсот сорока) не ставим: остальные места пустые
+  const cap = ns.length > 1 ? 240 : 150;
+  spots.forEach((q, i) => { if (i < cap && q.dn > 14) PARKED.push(q); });
 }
 
 /* ─── пиццерия ───
@@ -3310,10 +3331,10 @@ function osmParkingLots (near) {
    витрину и дверь. */
 /* Дом пиццерии — из настроек карты: по адресу (Москва) или по точке
    (Северск: meta.home — где пиццерия стоит в карте) */
-function homeBuilding () {
+function homeBuilding (at) {
   const H = MAP.home || {};
-  if (H.street) return CITY.buildings.find(q => q.a && H.street.test(q.a[0]) && q.a[1] === H.house);
-  const pt = H.point || CITY.meta.home;
+  if (H.street && !at) return CITY.buildings.find(q => q.a && H.street.test(q.a[0]) && q.a[1] === H.house);
+  const pt = at || H.point || CITY.meta.home;
   if (!pt) return null;
   let best = null, bd = 60;
   for (const q of CITY.buildings) {
@@ -3323,8 +3344,7 @@ function homeBuilding () {
   return best;
 }
 const homeAddr = () => { if (MAP.home && MAP.home.addr) return MAP.home.addr; const b = homeBuilding(); return b && b.a ? b.a.join(', ') : ''; };
-function dodoHouse () {
-  const b = homeBuilding();
+function dodoHouse (b = homeBuilding()) {
   if (!b) return null;
   const p = b.p, n = p.length;
   let cx = 0, cz = 0;
@@ -3343,6 +3363,7 @@ function dodoHouse () {
     const score = road.d - len * 0.15 - (MAP.home && MAP.home.street && MAP.home.street.test(road.seg.name) ? 30 : 0);
     if (!best || score < best.score) best = { score, mx, mz, ox, oz, ux: dx / len, uz: dz / len, len, road, cx, cz };
   }
+  if (best) best.b = b;
   return best;
 }
 
@@ -3372,7 +3393,10 @@ function signTex () {
   return t;
 }
 
-function dodoFacade (f) {
+/* f — фасад (dodoHouse). Ставит вывеску, маркизу, парковку курьеров и
+   возвращает пиццерию: куда подъезжать (x, z), дом (bx, bz, by), окно выдачи
+   (wx, wy, wz), имя, места на парковке (slots) и курилку (smoke) */
+function dodoFacade (f, name) {
   const ry = Math.atan2(f.ox, f.oz);                  // модель смотрит в +Z — значит, на улицу
   const gy = groundH(f.mx + f.ox * 1.5, f.mz + f.oz * 1.5);
   const at = (along, out) => [f.mx + f.ux * along + f.ox * out, f.mz + f.uz * along + f.oz * out];
@@ -3384,7 +3408,7 @@ function dodoFacade (f) {
   sign.rotation.y = ry;
   scene.add(sign);
   PZ.cozyFront(pizzaApi(), f, gy, w);                // маркиза с гирляндой, тёплая витрина, столики
-  COURIER_SLOTS = PZ.courierLot(pizzaApi(), f, RIVAL_SPEC.length + 1);
+  const slots = PZ.courierLot(pizzaApi(), f, RIVAL_SPEC.length + 1);
   const [dx2, dz2] = at(w / 2 - 2.2, 0.14);
   put(FLAT, new THREE.PlaneGeometry(2.2, 2.9), '#6b4c3a', dx2, gy + 1.45, dz2, 0, ry, 0);  // дверь
 
@@ -3394,11 +3418,32 @@ function dodoFacade (f) {
   const off = Math.min(LANE, Math.max(0, dl - 4));
   const [wx, wz] = at(0, 0.8);                          // окно выдачи: отсюда вылетает коробка
   const [sx2, sz2] = at(w / 2 + 6, 3.2);
-  SMOKE_SPOT = { x: sx2, z: sz2 };
-  PIZZA = {
+  return {
     x: r.x + ddx / dl * off, z: r.z + ddz / dl * off,
-    bx: f.cx, bz: f.cz, by: gy, wx, wz, wy: gy + 2.4, name: OWN.pizza() + ' · ' + translit(homeAddr()),
+    bx: f.cx, bz: f.cz, by: gy, wx, wz, wy: gy + 2.4, name: OWN.pizza() + ' · ' + translit(name || homeAddr()),
+    slots, smoke: { x: sx2, z: sz2 },
   };
+}
+
+/* ─── пиццерии районов ───
+   В карьере с районами (MAP.career.districts) у каждого района своя пиццерия:
+   дом у точки pizza из настроек карты, тот же фасад и парковка курьеров.
+   PIZZERIAS[i] — пиццерия района i; PIZZA — та, где работаешь (usePizzeria).
+   Курилка у пиццерии — только у первой (SMOKE_SPOT не переезжает). */
+const PIZZERIAS = [];
+function buildDistrictPizzerias () {
+  DIST.list().forEach((d, i) => {
+    if (i === 0) { PIZZERIAS.push(PIZZA); return; }
+    const b = d.pizza && homeBuilding(d.pizza), f = b && dodoHouse(b);
+    PIZZERIAS.push(f ? dodoFacade(f, b.a ? b.a.join(', ') : $t(d.name)) : null);    // без адреса — по названию района
+  });
+}
+function usePizzeria (i) {
+  if (!PIZZERIAS.length) return;
+  const P = PIZZERIAS[i] || PIZZERIAS[0];
+  if (P === PIZZA) return;
+  PIZZA = P;
+  COURIER_SLOTS = P.slots || null;           // парковки нет — встаём на улице у пиццерии (startPose)
 }
 
 /* Запасной вариант, если дома с пиццерией в выгрузке нет: отдельная
@@ -3456,7 +3501,7 @@ const mapApi = () => ({
 let MAPW_API = null;
 /* что нужно roadlife.js (знаки, заборы, пробки за авариями, ремонт) */
 const roadApi = () => ({
-  THREE, scene, cam, V, S, CITY, box, put, mergeGeos, obb, smashAdd, SMASH, SM_WORD, SOLIDS, SOLID_GRID, SCELL, PARKED, DRIVE_MAX,
+  THREE, scene, cam, V, S, CITY, box, put, mergeGeos, obb, smashAdd, smashMesh, SMASH, SM_WORD, SOLIDS, SOLID_GRID, SCELL, PARKED, DRIVE_MAX,
   groundH, curbAt, inHouse, inPoly, inBounds, nearestRoad, NODES, NODE_IDX, edgeOf, edgeRun, laneCount, laneOff, routeNodes, nodeNear, nearestNode,
   walkLeg, walkSpawn, walkersAll,
   ZEBRAS, SIG_GROUPS, TRAFFIC, ACCIDENTS, newCar, placeTraffic, poseTraffic, poseOnSlope, svcGone, makeHuman, dropMesh, gibHuman, sayBubble, Snd, toast, calmStart,
@@ -3505,8 +3550,9 @@ function buildCity () {
   if (CITY.rails) tm0('rails', () => { BUILD_T.railKm = Math.round(CBITS.buildRails(cityApi(), CITY.rails, CITY.levelx)); });
   if (MAPFIX) { BUILD_T.mapfix = Math.round(MAPFIX.ms); BUILD_T.mapfixT = MAPFIX.T; tm0('mapworks', () => MAPW.buildWorks(MAPFIX, mapApi())); }   // тупики: блоки и ремонт
   { const t0 = performance.now(); osmBuildings(spot); BUILD_T.houses = Math.round(performance.now() - t0); }
-  if (house) dodoFacade(house);
+  if (house) { PIZZA = dodoFacade(house); COURIER_SLOTS = PIZZA.slots; SMOKE_SPOT = PIZZA.smoke; }
   else buildPizzeria(spot.x, spot.z, spot.ry);
+  if (DISTRICTS && house) { buildDistrictPizzerias(); usePizzeria(DIST.cur()); }
   // во вступлении место под кружок знаем заранее — его держим пустым
 
   const tm = (k, f) => { const t0 = performance.now(); f(); BUILD_T[k] = Math.round(performance.now() - t0); };
@@ -3517,7 +3563,7 @@ function buildCity () {
   tm('gates', osmGates);
   tm('trees', osmStreetTrees);
   tm('metro', osmMetro);
-  tm('lots', () => osmParkingLots(PIZZA));
+  tm('lots', () => osmParkingLots(PIZZERIAS.length ? PIZZERIAS : PIZZA));
   tm('lights', buildLights);
   tm('ramps', osmRamps);
   tm('drinkit', placeDrinkits);
@@ -7011,11 +7057,19 @@ function addPickup (kind, x, z, fixed) {
   return n;
 }
 
+/* убрать подбираемое со сцены: геометрии модельки у каждого свои — освобождаем
+   (материалы и кольцо общие, их не трогаем) */
+function dropPickup (n) {
+  scene.remove(n.g);
+  n.body.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+}
+
 /* где положить кофе: середина улицы, подальше от других и от пиццерии */
-function coffeeSpot (near, rmin, rmax) {
+function coffeeSpot (near, rmin, rmax, segs = COFFEE_SEGS) {
   const B = BOUNDS;
+  if (!segs.length) return null;
   for (let k = 0; k < 60; k++) {
-    const q = pick(COFFEE_SEGS), t = rand(0.25, 0.75);
+    const q = pick(segs), t = rand(0.25, 0.75);
     const x = lerp(q.x1, q.x2, t), z = lerp(q.z1, q.z2, t);
     if (x < B.x0 + 30 || x > B.x1 - 30 || z < B.z0 + 30 || z > B.z1 - 30 || !inBorder(x, z)) continue;
     if (near) { const d = Math.hypot(x - near.x, z - near.z); if (d < rmin || d > rmax) continue; }
@@ -7029,22 +7083,84 @@ let COFFEE_SEGS = [];
 
 function buildNitro () {
   COFFEE_SEGS = RSEG.filter(q => q.c <= 4 && !q.b && !q.x && Math.hypot(q.x2 - q.x1, q.z2 - q.z1) > 25);
-  for (let k = 0; k < PK.nos; k++) { const p = coffeeSpot(null); if (p) addPickup('nos', p[0], p[1], true); }
   // бонусы — во дворах: на проездах и дворовых дорожках, по кругу три вида
   const yard = [];
   for (const q of RSEG) if (q.c === 7 && !q.x && Math.hypot(q.x2 - q.x1, q.z2 - q.z1) > 12) yard.push([(q.x1 + q.x2) / 2, (q.z1 + q.z2) / 2]);
   for (const q of YARD_PATHS) { const m = q[(q.length / 2) | 0]; yard.push([m[0], m[1]]); }
   YARD_SPOTS = yard.filter(([x, z]) => inBounds(x, z, 25) && !inHouse(x, z, 1.5));
+  if (DISTRICTS) { scatterPickups(); return; }      // карьера с районами — раскладываем по району, где работаешь
+  for (let k = 0; k < PK.nos; k++) { const p = coffeeSpot(null); if (p) addPickup('nos', p[0], p[1], true); }
+  placeBonuses(PK.bonus, YARD_SPOTS);
+}
+function placeBonuses (count, spots) {
   const kinds = PK.kinds;
   let n = 0;
-  for (let k = 0; k < 1200 && n < PK.bonus && YARD_SPOTS.length; k++) {
-    const [x, z] = pick(YARD_SPOTS);
+  for (let k = 0; k < 1200 && n < count && spots.length; k++) {
+    const [x, z] = pick(spots);
     if (NITRO_CANS.some(o => o.kind !== 'nos' && Math.hypot(o.x - x, o.z - z) < PK.bonusGap)) continue;
     addPickup(kinds[n % kinds.length], x, z, true);
     n++;
   }
 }
 let YARD_SPOTS = [];
+/* Районы (DISTRICTS): кофе и бонусы — только в районе, где работаешь, и сколько —
+   по волне щедрости (ECON.PACE): один стаканчик на NOS_PER_M метров улиц района и на вдвое
+   больше — дворовых проездов, × nos (всего не больше NOS_MAX),
+   бонусов во дворах — BONUS_SHARE от этого × kits / nos. Раскладываем заново в
+   начале каждой смены и когда меняешь район. */
+const DIST_SEGS = new Map(), DIST_YARD = new Map();
+const PICK_INFO = { nos: 0, bonus: 0, district: -1, pace: '' };
+function scatterPickups () {
+  if (!DISTRICTS || !COFFEE_SEGS.length) return;
+  const di = DIST.cur(), pc = DIST.pace(), P = ECON.PACE;
+  for (const n of NITRO_CANS) dropPickup(n);
+  NITRO_CANS.length = 0;
+  if (!DIST_SEGS.has(di)) {
+    // улицы района (c ≤ 5) и дворовые проезды (c 7): в микрорайонах Северска больших улиц
+    // мало, почти всё — проезды, туда же ведут заказы
+    const ok = q => !q.b && !q.x && Math.hypot(q.x2 - q.x1, q.z2 - q.z1) > 25 && DIST.at((q.x1 + q.x2) / 2, (q.z1 + q.z2) / 2) === di;
+    DIST_SEGS.set(di, { street: RSEG.filter(q => q.c <= 5 && ok(q)), yard: RSEG.filter(q => q.c === 7 && ok(q)) });
+    DIST_YARD.set(di, YARD_SPOTS.filter(([x, z]) => DIST.at(x, z) === di));
+  }
+  const S2 = DIST_SEGS.get(di), yard = DIST_YARD.get(di);
+  const km = list => list.reduce((a, q) => a + Math.hypot(q.x2 - q.x1, q.z2 - q.z1), 0);
+  const ls = km(S2.street), ly = km(S2.yard);
+  // кофе: на улицах — один на NOS_PER_M метров, во дворах — вдвое реже; в обычную смену —
+  // не больше NOS_MAX, волна множит уже после этого (в огромном районе тоже чувствуется)
+  let ns = ls / P.NOS_PER_M, ny = ly / (P.NOS_PER_M * 2);
+  const cap = P.NOS_MAX / Math.max(P.NOS_MAX, ns + ny) * pc.nos;
+  ns = Math.round(ns * cap); ny = Math.round(ny * cap);
+  for (let k = 0; k < ns; k++) { const p = coffeeSpot(null, 0, 0, S2.street); if (p) addPickup('nos', p[0], p[1], true); }
+  for (let k = 0; k < ny; k++) { const p = coffeeSpot(null, 0, 0, S2.yard); if (p) addPickup('nos', p[0], p[1], true); }
+  const bonus = Math.round((ns + ny) * P.BONUS_SHARE * pc.kits / pc.nos);
+  placeBonuses(bonus, yard);
+  const len = ls + ly;
+  Object.assign(PICK_INFO, { nos: NITRO_CANS.filter(n => n.kind === 'nos').length, bonus: NITRO_CANS.filter(n => n.kind !== 'nos').length, district: di, pace: pc.id, roadM: Math.round(len) });
+}
+/* заехал в другой район — подсказка: чей он и когда откроется закрытый */
+const DW = { t: 0, last: -1 };
+function districtWatch (dt) {
+  if ((DW.t -= dt) > 0) return;
+  DW.t = 0.6;
+  if (!isPlaying() || S.state === 'brief' || S.state === 'loading') return;
+  const i = DIST.at(V.x, V.z);
+  if (i === DW.last) return;
+  const first = DW.last < 0;
+  DW.last = i;
+  if (first) return;
+  const name = $t(DIST.list()[i].name);
+  if (!DIST.isOpen(i)) {
+    const p = DIST.opened() - 1, left = Math.max(1, DIST.need(p) - DIST.shiftsIn(p));
+    toast(i === p + 1 ? $tn(left, 'район «{name}» закрыт: ещё {n} смена в районе «{prev}»|район «{name}» закрыт: ещё {n} смены в районе «{prev}»|район «{name}» закрыт: ещё {n} смен в районе «{prev}»', { name, prev: $t(DIST.list()[p].name) })
+      : $t('район «{name}» пока закрыт', { name }));
+  } else if (i !== DIST.cur()) toast(S.ride ? $t('район «{name}»', { name }) : $t('район «{name}» — не твой на этой смене, заказов тут нет', { name }));
+  else toast($t('твой район — «{name}»', { name }));
+}
+/* сменили район в меню: пиццерия, кофе, карта */
+if (DISTRICTS) DIST.onChange(i => { usePizzeria(i); scatterPickups(); FM.dist = null; });
+
+/* волна щедрости: × к паузе до возвращения взятого и к паузе между свежими у дороги */
+const paceK = k => (DISTRICTS ? DIST.pace()[k] || 1 : 1);
 /* машина побита — аптечка у дороги впереди, раз в PK.heal секунд (карьера) */
 function healSpawn () {
   if (!PK.heal || S.hp >= S.hpMax || NITRO_CANS.some(n => n.kind === 'heal' && !n.fixed)) return;
@@ -7063,8 +7179,8 @@ const FXS = { shieldT: 0, beastT: 0, spawnT: 4, aura: null };
 
 function takePickup (n) {
   n.g.visible = false;
-  if (!n.fixed) { scene.remove(n.g); NITRO_CANS.splice(NITRO_CANS.indexOf(n), 1); }
-  else n.t = n.kind === 'nos' ? NOS_RESPAWN : BONUS_RESPAWN;
+  if (!n.fixed) { dropPickup(n); NITRO_CANS.splice(NITRO_CANS.indexOf(n), 1); }
+  else n.t = (n.kind === 'nos' ? NOS_RESPAWN : BONUS_RESPAWN) * paceK('respawn');
   if (n.kind === 'nos') {
     NOS.tank = Math.min(1, NOS.tank + NOS_CAN);
     Snd.nosPick();
@@ -7088,10 +7204,10 @@ function takePickup (n) {
 function updateNitro (dt) {
   const live = S.state === 'drive' || S.state === 'back' || S.state === 'handover' || S.state === 'side';
   // время от времени — свежий стаканчик у дороги впереди
-  if (live && PK.heal && (FXS.healT = (FXS.healT || PK.heal[0]) - dt) <= 0) { FXS.healT = rand(PK.heal[0], PK.heal[1]); healSpawn(); }
+  if (live && PK.heal && (FXS.healT = (FXS.healT || PK.heal[0]) - dt) <= 0) { FXS.healT = rand(PK.heal[0], PK.heal[1]) * paceK('spawn'); healSpawn(); }
   if (live && (FXS.spawnT -= dt) <= 0) {
-    FXS.spawnT = rand(PK.spawn[0], PK.spawn[1]);
-    if (NITRO_CANS.filter(n => !n.fixed && n.kind === 'nos').length < PK.spawnCap) {
+    FXS.spawnT = rand(PK.spawn[0], PK.spawn[1]) * paceK('spawn');
+    if (NITRO_CANS.filter(n => !n.fixed && n.kind === 'nos').length < PK.spawnCap * Math.max(1, paceK('nos'))) {
       const p = coffeeSpot(V, 50, 200);
       if (p) addPickup('nos', p[0], p[1], false);
     }
@@ -7100,7 +7216,7 @@ function updateNitro (dt) {
     const n = NITRO_CANS[i];
     if (n.t > 0) n.t -= dt;
     // временный стаканчик, от которого уехали, исчезает
-    if (!n.fixed && Math.hypot(n.x - V.x, n.z - V.z) > 420) { scene.remove(n.g); NITRO_CANS.splice(i, 1); continue; }
+    if (!n.fixed && Math.hypot(n.x - V.x, n.z - V.z) > 420) { dropPickup(n); NITRO_CANS.splice(i, 1); continue; }
     const near = Math.abs(n.x - V.x) < 460 && Math.abs(n.z - V.z) < 460;
     n.g.visible = n.t <= 0 && near;
     if (!n.g.visible) continue;
@@ -7623,7 +7739,8 @@ const SLOPE_G = 24;
 const NOS = { tank: 0.5, burn: false, was: false, flameT: 0 };
 const NOS_BURN = 0.2, NOS_CAN = 0.5, NOS_ACC = 55;
 let VBOOST = 62;                                  // потолок на нитро: максималка машины плюс четырнадцать
-function carStats () { const c = curCar(); VMAX = c.vmax || 48; ACC = c.acc || 36; VBOOST = VMAX + 14; }
+/* в районе подальше машина быстрее: ECON.DISTRICT.SPEED — к максималке и разгону */
+function carStats () { const c = curCar(), k = DISTRICTS ? DIST.speed() : 1; VMAX = (c.vmax || 48) * k; ACC = (c.acc || 36) * k; VBOOST = VMAX + 14; }
 /* габариты кузова: по ним считаются все попадания, а не по одному кругу */
 const CAR_L = 2.2, CAR_W = 1.0;
 
@@ -7841,7 +7958,7 @@ function driveStep (dt) {
     smashNear(V.x, V.z, it => {
       if (Math.hypot(it.x - noseX, it.z - noseZ) < it.r + CAR_W || Math.hypot(it.x - tailX, it.z - tailZ) < it.r + CAR_W) {
         smashHit(it, V.vx / l, V.vz / l, Math.abs(vf));
-        V.vx *= it.kind === 'dump' ? 0.85 : 0.96; V.vz *= it.kind === 'dump' ? 0.85 : 0.96;
+        const k = it.kind === 'dump' ? 0.85 : it.kind === 'bigfence' ? 0.92 : 0.96; V.vx *= k; V.vz *= k;   // высокий забор тормозит заметнее
       }
     });
   }
@@ -8253,6 +8370,87 @@ function buildFullMap () {
   fullC.width = c.width; fullC.height = c.height;
 }
 
+/* Районы на большой карте: закрытые — затемнены, твой — обведён, границы —
+   пунктиром, у каждой пиццерии — название района и сколько смен до следующего.
+   Слой рисуется раз и заново — когда сменил район или открылся новый (FM.dist = null). */
+function districtLayer () {
+  const c = document.createElement('canvas');
+  c.width = FM.base.width; c.height = FM.base.height;
+  const x = c.getContext('2d'), C = 30, cur = DIST.cur(), open = DIST.opened();
+  const x0 = BOUNDS.x0, z0 = BOUNDS.z0, nx = Math.ceil((BOUNDS.x1 - x0) / C), nz = Math.ceil((BOUNDS.z1 - z0) / C);
+  const g = new Int8Array(nx * nz), city = new Uint8Array(nx * nz);
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) g[j * nx + i] = DIST.at(x0 + (i + 0.5) * C, z0 + (j + 0.5) * C);
+  // «город» — клетки с улицами и соседние: границы районов рисуем только там, не через реку и лес
+  const mark = (px, pz) => {
+    const i = Math.floor((px - x0) / C), j = Math.floor((pz - z0) / C);
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+      const a = i + di, b = j + dj;
+      if (a >= 0 && b >= 0 && a < nx && b < nz) city[b * nx + a] = 1;
+    }
+  };
+  for (const q of RSEG) {
+    const l = Math.hypot(q.x2 - q.x1, q.z2 - q.z1), n = Math.max(1, Math.ceil(l / C));
+    for (let k = 0; k <= n; k++) mark(q.x1 + (q.x2 - q.x1) * k / n, q.z1 + (q.z2 - q.z1) * k / n);
+  }
+  // затемнение: клетка — пиксель маленькой картинки, растягиваем без сглаживания (без швов между клетками)
+  const m = document.createElement('canvas');
+  m.width = nx; m.height = nz;
+  const mx = m.getContext('2d'), img = mx.createImageData(nx, nz);
+  for (let k = 0; k < nx * nz; k++) {
+    const d = g[k];
+    if (d === cur) continue;
+    img.data[k * 4] = 40; img.data[k * 4 + 1] = 32; img.data[k * 4 + 2] = 52;
+    img.data[k * 4 + 3] = d >= open ? 110 : 40;
+  }
+  mx.putImageData(img, 0, 0);
+  x.imageSmoothingEnabled = false;
+  x.drawImage(m, fmX(x0), fmZ(z0), nx * C * FM.s, nz * C * FM.s);
+  // границы: между клетками разных районов, только в городе; у твоего — толще и ярче
+  x.lineCap = 'round';
+  for (const mine of [false, true]) {
+    x.beginPath();
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const d = g[j * nx + i];
+      for (const [di, dj] of [[1, 0], [0, 1]]) {
+        if (i + di >= nx || j + dj >= nz) continue;
+        const k2 = (j + dj) * nx + i + di, e = g[k2];
+        if (e === d || (!city[j * nx + i] && !city[k2]) || (d === cur || e === cur) !== mine) continue;
+        const ax = x0 + (i + di) * C, az = z0 + (j + dj) * C;
+        x.moveTo(fmX(ax), fmZ(az));
+        if (di) x.lineTo(fmX(ax), fmZ(az + C)); else x.lineTo(fmX(ax + C), fmZ(az));
+      }
+    }
+    x.strokeStyle = mine ? '#ffd85e' : 'rgba(255, 255, 255, 0.6)';
+    x.lineWidth = Math.max(mine ? 3 : 1.5, (mine ? 3 : 1.5) * FM.s);
+    x.stroke();
+  }
+  // подписи и пиццерии районов
+  const fs = Math.max(16, Math.round(c.width / 64));        // карта ужата в окно — подписи крупные
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  DIST.list().forEach((d, i) => {
+    const P = PIZZERIAS[i];
+    if (!P) return;
+    const px = fmX(P.x), pz = fmZ(P.z), locked = i >= open;
+    if (i !== cur) {
+      const r = fs * 0.35;
+      x.fillStyle = locked ? '#7a7380' : '#f0522a';
+      x.fillRect(px - r, pz - r, r * 2, r * 2);
+      x.lineWidth = 2; x.strokeStyle = '#fff'; x.strokeRect(px - r, pz - r, r * 2, r * 2);
+    }
+    const name = (i + 1) + '. ' + $t(d.name);
+    const sub = locked ? (i === open ? $tn(Math.max(1, DIST.need(i - 1) - DIST.shiftsIn(i - 1)), 'закрыт · ещё {n} смена в районе «{prev}»|закрыт · ещё {n} смены в районе «{prev}»|закрыт · ещё {n} смен в районе «{prev}»', { prev: $t(DIST.list()[i - 1].name) }) : $t('закрыт'))
+      : i === cur ? $t('ты работаешь здесь') : '';
+    x.font = 'bold ' + fs + 'px sans-serif';
+    x.lineWidth = 4; x.strokeStyle = 'rgba(40, 32, 52, 0.85)';
+    x.strokeText(name, px, pz - fs * 1.4); x.fillStyle = locked ? '#cfc8d6' : i === cur ? '#ffd85e' : '#ffffff'; x.fillText(name, px, pz - fs * 1.4);
+    if (sub) {
+      x.font = Math.round(fs * 0.8) + 'px sans-serif';
+      x.strokeText(sub, px, pz + fs * 1.3); x.fillStyle = locked ? '#cfc8d6' : '#ffd85e'; x.fillText(sub, px, pz + fs * 1.3);
+    }
+  });
+  return c;
+}
+
 /* Метка находки на карте: фиолетовая точка мерцает, от неё расходится
    кольцо. Часы свои — полная карта рисуется, пока игра стоит. */
 function colPing (x, a, b, s, ph) {
@@ -8277,6 +8475,7 @@ function drawFullMap () {
   // масштаб мелкий, и стрелка в размер улицы терялась в точку
   const u = Math.max(s, fullC.width / Math.max(1, fullC.clientWidth));
   x.drawImage(FM.base, 0, 0);
+  if (DISTRICTS) { if (!FM.dist) FM.dist = districtLayer(); x.drawImage(FM.dist, 0, 0); }
   RL.drawMap(x, fmX, fmZ, s);                       // пробки — красным
   WORLD.drawMap(x, fmX, fmZ, s);                    // бандитские районы (world.js)
   if (routePts.length > 1) {
@@ -9911,6 +10110,7 @@ function startRun (ride) {
   S.free = S.ride;                               // катаемся без срока и не в зачёт
   $('wasted').hidden = true;
   document.body.classList.remove('w-show');
+  if (DISTRICTS) usePizzeria(DIST.cur());          // смена — у пиццерии района, где работаешь
   resetCar();
   S.hpMax = curCar().hp;
   carStats();
@@ -9923,9 +10123,10 @@ function startRun (ride) {
   S.hurt = 0; S.shake = 0;
   S.freeRun = S.free;
   S.lvl0 = levelOf(getXP());
-  if (CAREER && !S.ride) CAREERM.startShift();   // часы — на 9:00, обед, звёзды за смену
-  NOS.tank = 0.5; NOS.burn = false;
+  if (CAREER && !S.ride) CAREERM.startShift();   // часы — на 9:00, обед, звёзды за смену; волна щедрости (districts.js)
+  NOS.tank = DISTRICTS && !S.ride ? DIST.pace().tank : 0.5; NOS.burn = false;
   for (const n of NITRO_CANS) { n.t = 0; }
+  scatterPickups();                              // кофе и аптечки — по району и по волне
   FXS.shieldT = 0; FXS.beastT = 0;
   startPose();
   V.vx = V.vz = 0; V.camX = V.x + 12; V.camZ = V.z; V.camH = V.h; V.camY = V.y + 6;
@@ -10867,6 +11068,7 @@ function frame (now) {
   updateGore(dt);
   updateFly(dt);
   updateNitro(dt);
+  if (DISTRICTS) districtWatch(dt);
   updateFX(dt);
   updateEnv(dt);
   if (CAREER) CAREERM.step(dt);                   // часы смены, обед в 14:00, полночь
@@ -10948,7 +11150,7 @@ requestAnimationFrame(frame);
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
 /* песочница (sandbox.html): бесконечное здоровье, нитро, «не глохнет» (noStall читает cars.js) */
 const SBX = { god: false, nitro: false, noStall: false };
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { RL: RL.DEBUG, S, V, DEATH, revive, TRAFFIC, PEDS, PEOPLE, PIZZA, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { RL: RL.DEBUG, S, V, DEATH, revive, TRAFFIC, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта

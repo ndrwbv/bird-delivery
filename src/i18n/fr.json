@@ -775,7 +775,6 @@
  "Буханка": "Boukhanka",
  "в кошельке": "portefeuille",
  "в общем": "bref",
- "в самый конец города · оплата ×{k}": "tout au bout de la ville · paie ×{k}",
  "В следующий раз плати!": "La prochaine fois, tu paies !",
  "ВАЗ-2101: двойные круглые фары и клыки на бампере": "VAZ-2101 : doubles phares ronds et crocs sur le pare-chocs",
  "ВАЗ-2107 в цветах пиццерии: хром, квадратные фары": "VAZ-2107 aux couleurs de la pizzeria : chrome, phares carrés",
@@ -1027,5 +1026,62 @@
  "короткая смена": "service court",
  "смена": "service",
  "средняя": "moyen",
- "средняя смена": "service moyen"
+ "средняя смена": "service moyen",
+ "{have} из {need} смен": "{have} sur {need} services",
+ "{n} смена|{n} смены|{n} смен": {
+  "one": "{n} service",
+  "many": "{n} services",
+  "other": "{n} services"
+ },
+ "в самый конец района · оплата ×{k}": "tout au bout du quartier · paie ×{k}",
+ "Восток": "Est",
+ "Гаражи": "Garages",
+ "где работаешь": "où tu bosses",
+ "до района «{next}» — {n} смена в районе «{prev}»|до района «{next}» — {n} смены в районе «{prev}»|до района «{next}» — {n} смен в районе «{prev}»": {
+  "one": "pour « {next} » : {n} service dans « {prev} »",
+  "many": "pour « {next} » : {n} services dans « {prev} »",
+  "other": "pour « {next} » : {n} services dans « {prev} »"
+ },
+ "заказы дальше, кофе меньше — зато платят ×{k}": "commandes plus loin, moins de café — mais paie ×{k}",
+ "закрыт": "fermé",
+ "закрыт · ещё {n} смена в районе «{prev}»|закрыт · ещё {n} смены в районе «{prev}»|закрыт · ещё {n} смен в районе «{prev}»": {
+  "one": "fermé · encore {n} service dans « {prev} »",
+  "many": "fermé · encore {n} services dans « {prev} »",
+  "other": "fermé · encore {n} services dans « {prev} »"
+ },
+ "Кольцо": "Rond-point",
+ "кофе, аптечки и чаевые — рекой": "café, trousses de secours et pourboires à gogo",
+ "маленький, заказы рядом": "petit, commandes tout près",
+ "машина {s} · оплата {p}": "voiture {s} · paie {p}",
+ "не засчитана: меньше {n} заказа|не засчитана: меньше {n} заказов|не засчитана: меньше {n} заказов": {
+  "one": "pas compté : moins de {n} commande",
+  "many": "pas compté : moins de {n} commandes",
+  "other": "pas compté : moins de {n} commandes"
+ },
+ "открыт новый район": "nouveau quartier ouvert",
+ "открыт район «{name}»": "quartier « {name} » ouvert",
+ "открыто {k} из {n}": "{k} sur {n} ouverts",
+ "открыты все районы": "tous les quartiers ouverts",
+ "Проспект": "Avenue",
+ "район": "quartier",
+ "район «{name}»": "quartier « {name} »",
+ "район «{name}» — не твой на этой смене, заказов тут нет": "« {name} » n'est pas ton quartier pour ce service — pas de commandes ici",
+ "район «{name}» закрыт: ещё {n} смена в районе «{prev}»|район «{name}» закрыт: ещё {n} смены в районе «{prev}»|район «{name}» закрыт: ещё {n} смен в районе «{prev}»": {
+  "one": "« {name} » fermé : encore {n} service dans « {prev} »",
+  "many": "« {name} » fermé : encore {n} services dans « {prev} »",
+  "other": "« {name} » fermé : encore {n} services dans « {prev} »"
+ },
+ "район «{name}» пока закрыт": "le quartier « {name} » est encore fermé",
+ "район: {name}": "quartier : {name}",
+ "следующая смена — там: машина {s}, оплата {p}. вернуться можно из меню": "prochain service là-bas : voiture {s}, paie {p}. retour possible depuis le menu",
+ "смена {n} · район «{name}» · {from}—{to}": "service {n} · quartier « {name} » · {from}—{to}",
+ "Старый город": "Vieille Ville",
+ "твой район — «{name}»": "ton quartier — « {name} »",
+ "ты работаешь здесь": "tu bosses ici",
+ "Центр": "Centre-ville",
+ "час пик": "heure de pointe",
+ "Частный сектор": "Pavillons",
+ "щедрая смена": "service généreux",
+ "Юг": "Sud",
+ "забор": "clôture"
 }

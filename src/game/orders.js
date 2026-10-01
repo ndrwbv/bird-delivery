@@ -31,6 +31,7 @@ import { t, tn } from '../i18n/index.js';
 import * as ECON from './econ.js';
 import * as DLG from './dialog.js';
 import * as ZN from './zones.js';
+import * as DIST from './districts.js';
 import { makePerson } from './people.js';
 import { ORDER_TYPES, SHIFT_PLAN, SIDE_ORDERS, STAFF_RIDE } from './orders.config.js';
 
@@ -115,15 +116,29 @@ function buildPool () {
     ENTR = new Set();
     for (const [x, z, nx, nz] of A.CITY.entrances) ENTR.add(Math.round((x + nx * 3) * 4) + ',' + Math.round((z + nz * 3) * 4));
   }
-  const D = SHIFT_PLAN.dist || { min: 300, max: 1500 };
-  POOL = A.SPOTS.map(s => ({ x: s.x, z: s.z, entr: ENTR.has(Math.round(s.x * 4) + ',' + Math.round(s.z * 4)), key: keyOf(s.x, s.z), zone: ZN.zoneAt(s.x, s.z), d: Math.hypot(s.x - P.x, s.z - P.z) }));
+  const D = distRing();
+  // районы (districts.js): заказы — только в том, где работаешь
+  const di = DIST.has() ? DIST.cur() : -1;
+  const src = di >= 0 ? A.SPOTS.filter(s => DIST.at(s.x, s.z) === di) : A.SPOTS;
+  POOL = src.map(s => ({ x: s.x, z: s.z, entr: ENTR.has(Math.round(s.x * 4) + ',' + Math.round(s.z * 4)), key: keyOf(s.x, s.z), zone: ZN.zoneAt(s.x, s.z), d: Math.hypot(s.x - P.x, s.z - P.z) }));
   ZMIN = {};
   for (const q of POOL) if (q.d >= D.min && !(q.d >= ZMIN[q.zone])) ZMIN[q.zone] = q.d;
+  // «в конец района» — дальше этого от пиццерии (DISTRICT.EDGE_TOP самых далёких адресов)
+  const ds = POOL.map(q => q.d).sort((a, b) => a - b);
+  EDGE_D = ds.length ? ds[Math.floor((ds.length - 1) * (1 - ECON.DISTRICT.EDGE_TOP))] : 0;
   return POOL;
+}
+let EDGE_D = 0;
+/* дальность обычного заказа: у района своя (DISTRICT.DIST), волна её растягивает или сжимает */
+function distRing () {
+  const base = DIST.has() ? DIST.dist() : null;
+  const D = base ? { min: base[0], max: base[1] } : (SHIFT_PLAN.dist || { min: 300, max: 1500 });
+  const k = DIST.pace().dist || 1;
+  return { min: Math.round(D.min * Math.min(1, k)), max: Math.round(D.max * k) };
 }
 
 /* ─────────────── смена ─────────────── */
-const SH = { last: 0, gen: 0, pizzas: 0, sideAt: 4, zones: new Set(), must: {}, h0: 9, done: 0, log: [], reserved: new Set(), pts: [] };
+const SH = { last: 0, gen: 0, pizzas: 0, sideAt: 4, zones: new Set(), must: {}, h0: 9, done: 0, log: [], reserved: new Set(), pts: [], breather: false };
 const Q = [];                                          // следующие заказы (спецификации, без людей)
 let QV = 0;                                            // версия очереди — перерисовать список
 
@@ -132,7 +147,7 @@ export function resetShift () {
   dropQueue();
   SH.last = 0;
   SH.gen = 0; SH.pizzas = 0; SH.sideAt = rint(SHIFT_PLAN.sideEvery || ORDERS.SIDE_EVERY);
-  SH.zones = new Set(); SH.must = {}; SH.done = 0; SH.log = []; SH.reserved = new Set(); SH.pts = [];
+  SH.zones = new Set(); SH.must = {}; SH.done = 0; SH.log = []; SH.reserved = new Set(); SH.pts = []; SH.breather = false;
   SH.h0 = hourNow();
   buildPool();
 }
@@ -198,50 +213,60 @@ function stopOf (s, n = 1) {
 }
 
 /* одна спецификация заказа: кто, куда, какой вид */
-/* первые заказы после запуска игры (SHIFT_PLAN.firstEasy) — в соседний дом.
-   Считаются взятые в работу: выпавшие из очереди (новая смена) не в счёт */
-let EASY_DONE = 0;
+/* разминка: первые заказы смены (PACE.WARMUP, в щедрую — WARMUP_GEN) — близко к
+   пиццерии, один адрес, без поручений, срочных и сюжета. И передышка: после
+   срочного или «в конец района» следующий — тоже близкий */
+const warmCount = () => (DIST.pace().id === 'generous' ? ECON.PACE.WARMUP_GEN : ECON.PACE.WARMUP);
 function easySpec () {
-  const E = SHIFT_PLAN.firstEasy;
-  if (!E || SIM || EASY_DONE + Q.filter(q => q.easy).length >= E.count) return null;
-  const s = pickSpot({ dmin: E.dist[0], dmax: E.dist[1] });
-  return s ? { type: 'pizza', kind: 'solo', easy: true, stops: [stopOf(s)] } : null;
+  const warm = SH.gen < warmCount();
+  if (!warm && !SH.breather) return null;
+  const [a, b] = ECON.PACE.WARM_DIST;
+  const s = pickSpot({ dmin: a, dmax: b });
+  if (!s) return null;
+  SH.breather = false;
+  return { type: 'pizza', kind: 'solo', easy: true, stops: [stopOf(s)] };
 }
 
 function genSpec () {
   if (SH.gen === 0 && !POOL.length) buildPool();
-  const D = SHIFT_PLAN.dist || { min: 300, max: 1500 };
+  const D = distRing();
   const easy = easySpec();
   if (easy) return finishSpec(easy, null, hourNow());
   const ahead = (A.S.order ? 1 : 0) + Q.length;          // сколько заказов до этого
   const hAt = hourNow() + ahead / rate();
   let forced = null;
-  for (const r of SHIFT_PLAN.must || []) {
+  // срочные и «в конец района» — не раньше PACE hardFrom: в щедрую смену — с 16:00
+  if (hAt >= (DIST.pace().hardFrom || 0)) for (const r of SHIFT_PLAN.must || []) {
     const have = r.what === 'zones' ? SH.zones.size : SH.must[r.what] || 0;
     if (have >= r.count) continue;
     const need = r.count - have, slots = (r.byHour - hAt) * rate();
     if (slots <= need + 0.5 || chance(need / Math.max(1, slots))) { forced = r.what; break; }
   }
   let spec = null;
-  if (forced === 'edge' && A.MAP.career && A.MAP.career.edge) {
-    const s = pickSpot({ near: A.MAP.career.edge, r: 350 });
+  if (forced === 'edge') {
+    const s = edgeSpot();
     if (s) spec = { type: 'pizza', kind: 'solo', edge: true, stops: [stopOf(s)] };
   } else if (forced === 'urgent') {
-    // далеко — по дорогам не ближе URGENT_MIN_M; из нескольких кандидатов берём самый дальний
+    // далеко — по дорогам не ближе urgentMin(); из нескольких кандидатов берём самый дальний
+    const um = urgentMin();
     let best = null, bl = 0;
     for (let k = 0; k < 6; k++) {
-      const s = pickSpot({ dmin: PAY.URGENT_MIN_M * 0.8 });
+      const s = pickSpot({ dmin: um * 0.8 });
       if (!s) break;
       const L = A.routeLen(A.PIZZA.x, A.PIZZA.z, s.x, s.z);
+      if (L > farMax()) continue;                          // слишком далеко по дорогам
       if (L > bl) { bl = L; best = s; }
-      if (L >= PAY.URGENT_MIN_M) break;
+      if (L >= um) break;
     }
     if (best) spec = { type: 'urgent', kind: 'solo', urgent: true, stops: [stopOf(best)] };
   }
   if (!spec && !forced && !SIM && STORY && typeof STORY.nextOrder === 'function') {
     let s = null;
     try { s = STORY.nextOrder(storyCtx()); } catch (e) { console.warn('[orders] STORY.nextOrder', e); }
-    if (s && typeof s.then !== 'function') spec = storySpec(s);
+    if (s && typeof s.then !== 'function') {
+      spec = storyNear(s) ? storySpec(s) : null;
+      if (!spec) storyCancel(s);                           // дом героя далеко от района — глава подождёт
+    }
   }
   if (!spec) {
     // обычная пицца: район по весам (или новый, если надо добрать районы), вид по kinds
@@ -272,12 +297,37 @@ function genSpec () {
   return finishSpec(spec, forced, hAt);
 }
 
+/* «в конец района»: адрес из самых далёких от пиццерии района (EDGE_D), но по дорогам
+   не дальше farMax() — в огромном районе иначе выходило 5 км */
+function edgeSpot () {
+  if (!EDGE_D) return null;
+  let best = null, bl = Infinity;
+  for (let k = 0; k < 6; k++) {
+    const s = pickSpot({ dmin: EDGE_D * (k < 3 ? 1 : 0.7), relax: false }) || pickSpot({ dmin: EDGE_D * 0.6 });
+    if (!s) break;
+    const L = A.routeLen(A.PIZZA.x, A.PIZZA.z, s.x, s.z);
+    if (L <= farMax()) return s;
+    if (L < bl) { bl = L; best = s; }
+  }
+  return best;
+}
+/* дальше этого по дорогам срочные и «в конец района» не ведут: DISTRICT.FAR_K × дальность района */
+const farMax = () => (DIST.has() ? DIST.dist()[1] * ECON.DISTRICT.FAR_K : Infinity);
+/* срочный — не ближе этого от пиццерии: в районе — URGENT_K от его дальности, без районов — PAY.URGENT_MIN_M */
+const urgentMin = () => (DIST.has() ? Math.max(400, DIST.dist()[1] * ECON.DISTRICT.URGENT_K) : PAY.URGENT_MIN_M);
+/* сюжет: дом героя не дальше 1,6 × дальности района от пиццерии (иначе глава ждёт района поближе) */
+function storyNear (s) {
+  if (!DIST.has() || !Number.isFinite(s.x) || !Number.isFinite(s.z) || !A.PIZZA) return true;
+  return Math.hypot(s.x - A.PIZZA.x, s.z - A.PIZZA.z) <= DIST.dist()[1] * 1.6;
+}
+
 /* спецификация готова: резерв адресов, метры по дорогам, номер, лог */
 function finishSpec (spec, forced, hAt) {
   // считаем сразу: очередь — это уже план смены
   for (const st of spec.stops) { SH.reserved.add(st.key); SH.zones.add(st.zone); SH.pts.push({ x: st.x, z: st.z }); }
   if (spec.edge) SH.must.edge = (SH.must.edge || 0) + 1;
   if (spec.urgent) SH.must.urgent = (SH.must.urgent || 0) + 1;
+  if ((spec.edge || spec.urgent) && ECON.PACE.WARMUP >= 0) SH.breather = true;      // после тяжёлого — близкий
   // метры по дорогам: от пиццерии до первого, дальше — от прошлого адреса
   spec.m = spec.stops.map((st, i) => {
     const a = i ? spec.stops[i - 1] : A.PIZZA;
@@ -300,7 +350,7 @@ function storyCtx () {
   };
 }
 function storySpec (s) {
-  const D = SHIFT_PLAN.dist || { min: 300, max: 1500 };
+  const D = distRing();
   let sp = null;
   if (Number.isFinite(s.x) && Number.isFinite(s.z)) sp = { x: s.x, z: s.z, key: keyOf(s.x, s.z), zone: ZN.zoneAt(s.x, s.z) };
   else sp = pickSpot({ zone: s.zone || null, dmin: (s.dist && s.dist.min) || D.min, dmax: (s.dist && s.dist.max) || D.max });
@@ -336,7 +386,6 @@ export function nextPlan () {
   else {
     if (!Q.length) refill();
     spec = Q.shift();
-    if (spec && spec.easy) EASY_DONE++;
     refill();
   }
   return bindSpec(spec);
@@ -386,7 +435,7 @@ function whyOf (sp) {
   if (sp.story) return sp.story.why || t('особый заказ');
   const z = t(ZONE_LABEL[sp.zone] || ZONE_LABEL.normal);
   if (sp.urgent) return t('срочно: далеко, а времени в обрез · оплата ×{k}', { k: fmtK(PAY.URGENT) });
-  if (sp.edge) return t('в самый конец города · оплата ×{k}', { k: fmtK(PAY.EDGE) });
+  if (sp.edge) return t('в самый конец района · оплата ×{k}', { k: fmtK(PAY.EDGE) });
   if (sp.kind === 'group') return t('групповой: заказали на всех сразу') + ' · ' + z;
   if (sp.kind === 'chain') return tn(sp.stops.length, 'цепочка: {n} адрес по очереди|цепочка: {n} адреса по очереди|цепочка: {n} адресов по очереди') + ' · ' + z;
   const mul = PAY.ZONE[sp.zone] || 1;
@@ -400,17 +449,20 @@ export function setup (plan) {
   o.ord = sp;
   const level = A.level();
   const opts = { urgent: !!sp.urgent, edge: !!sp.edge, level };
+  // район платит больше (DISTRICT.PAY), час пик — тоже (PACE pay)
+  const mul = (DIST.has() ? DIST.pay() : 1) * (DIST.pace().pay || 1);
   sp.fees = o.stops.map((st, i) => {
     const m = sp.m[i] || 0, zone = sp.stops[i] ? sp.stops[i].zone : sp.zone, n = Math.max(1, st.peds.length);
     if (sp.story && Number.isFinite(sp.story.pay)) return Math.round(sp.story.pay / o.stops.length);
     // групповой: за каждого следующего — ещё одна база
-    return ECON.orderPay(m, zone, opts) + (n - 1) * ECON.orderPay(0, zone, opts);
+    return Math.round((ECON.orderPay(m, zone, opts) + (n - 1) * ECON.orderPay(0, zone, opts)) * mul / 10) * 10;
   });
   S.fee = sp.fees.reduce((a, b) => a + b, 0);
   const L = A.routeLen(V.x, V.z, S.target.x, S.target.z);
   S.timeMax = sp.story && Number.isFinite(sp.story.time) ? sp.story.time
     : sp.urgent ? A.orderTime(L, 1, 1) * PAY.URGENT_TIME
       : A.orderTime(L, 1, S.orders);
+  if (!(sp.story && Number.isFinite(sp.story.time))) S.timeMax *= DIST.pace().time || 1;   // щедрая — времени больше
   S.time = S.timeMax;
   QV++;
 }
@@ -497,11 +549,12 @@ export function payStop (o, st, onTime, tier) {
   if (!onTime) return Math.round(fee * PAY.LATE);
   const bonus = tier ? Math.round(fee * (PAY.SPEED_BONUS[tier] || 0)) : 0;
   const lunch = S.lunch === 'tips';
-  let tip = ECON.tipFor(fee, zone, { lunch, clean: A.donated('trash') }), rich = zone === 'rich' && tip > 0;
+  const pc = DIST.pace();
+  let tip = ECON.tipFor(fee, zone, { lunch, clean: A.donated('trash'), extra: pc.tipChance || 0, mul: pc.tipMul || 1 }), rich = zone === 'rich' && tip > 0;
   // богач рядом (LIFE.richTip) — клиент считается как из особняков: чаевые по-богатому
   if (!tip && zone !== 'rich' && A.LIFE && A.LIFE.richTip(st.peds, fee)) {
     const [a, b] = TIPS.RICH_AMOUNT;
-    tip = Math.round(fee * rand(a, b) * (lunch ? TIPS.LUNCH_MUL : 1) / 10) * 10;
+    tip = Math.round(fee * rand(a, b) * (lunch ? TIPS.LUNCH_MUL : 1) * (pc.tipMul || 1) / 10) * 10;
     rich = true;
   }
   const sub = [bonus ? t('за скорость +{money}', { money: A.money(bonus) }) : '', tip ? (rich ? t('чаевые от богача +{money}', { money: A.money(tip) }) : t('чаевые +{money}', { money: A.money(tip) })) : ''].filter(Boolean).join(' · ');
@@ -849,15 +902,15 @@ function dropCurrent () {
 export function force (spec = {}) {
   if (!A || !['drive', 'back', 'handover', 'brief', 'loading', 'side'].includes(S.state)) return null;
   if (!POOL.length) buildPool();
-  const D = SHIFT_PLAN.dist || { min: 300, max: 1500 };
+  const D = distRing();
   let sp = null;
   if (spec.storyId || spec.type === 'story' || spec.kind === 'story') sp = storySpec(spec);
   else {
     const k = spec.kind || 'pizza';
     let s = null;
     if (spec.near) s = pickSpot({ near: spec.near, r: spec.r || 350, zone: spec.zone || null });
-    else if (k === 'edge' && A.MAP.career && A.MAP.career.edge) s = pickSpot({ near: A.MAP.career.edge, r: 350 });
-    else if (k === 'urgent') s = pickSpot({ dmin: PAY.URGENT_MIN_M * 0.8, zone: spec.zone || null });
+    else if (k === 'edge') { if (!POOL.length) buildPool(); s = edgeSpot(); }
+    else if (k === 'urgent') s = pickSpot({ dmin: urgentMin() * 0.8, zone: spec.zone || null });
     else if (k === 'gang' || spec.zone) {
       const z = spec.zone || 'gang';
       s = ZMIN[z] >= 0 ? pickSpot({ zone: z, relax: false, dmin: ZMIN[z], dmax: ZMIN[z] + 800 }) : null;

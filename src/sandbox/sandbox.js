@@ -57,6 +57,7 @@ const HOOKS = {
     fallback: d => d.Store ? (k, frac) => { d.Store.set('dlv-don-' + k, Math.round(((DONATE[k] && DONATE[k].goal) || 0) * frac)); } : null },
   lunch: { mod: 'career', names: ['lunch', 'showLunch', 'forceLunch'], who: 'career.js', need: 'CAREERM.lunch()' },
   story: { who: 'story.js', need: '__dlv.STORY', fallback: d => d.STORY && d.STORY.list ? d.STORY : null },
+  district: { who: 'districts.js', need: '__dlv.DIST', fallback: d => d.DIST && d.DIST.list ? d.DIST : null },
   god: { who: 'game.js', need: 'SBX', fallback: d => d.SBX ? on => { d.SBX.god = !!on; if (on && d.S) { d.S.hp = d.S.hpMax; d.hudHearts && d.hudHearts(); } } : null },
   nitro: { who: 'game.js', need: 'SBX', fallback: d => d.SBX ? on => { d.SBX.nitro = !!on; } : null },
   noStall: { mod: 'cars', names: ['setNoStall'], who: 'cars.js читает SBX.noStall', need: 'SBX + cars.js', fallback: d => d.SBX && MODS.cars(d) ? on => { d.SBX.noStall = !!on; } : null },
@@ -215,7 +216,10 @@ function POI () {
   const d = D();
   if (!d) return {};
   const out = {};
-  if (d.PIZZA) out['пиццерия'] = { x: d.PIZZA.x, z: d.PIZZA.z };
+  const P = d.PZ_CUR || d.PIZZA;
+  if (P) out['пиццерия'] = { x: P.x, z: P.z };
+  // пиццерии районов (districts.js)
+  if (d.DIST && d.PIZZERIAS) d.PIZZERIAS.forEach((q, i) => { if (q && q !== P) out['пиццерия ' + (i + 1)] = { x: q.x, z: q.z }; });
   const C = d.MAP && d.MAP.career;
   if (C) {
     if (C.garage) out['гараж Дяди Жени'] = C.garage;
@@ -273,7 +277,7 @@ const PRESETS = [
       async run () { if (s && s.adult) await G.kids(false); await G.onShift(); await call('sideOrder', id); } };
   }),
   { group: 'заказы', name: 'Срочный заказ', needs: ['forceOrder'], async run () { await G.onShift(); await call('forceOrder', { kind: 'urgent' }); } },
-  { group: 'заказы', name: 'Заказ в конец города', needs: ['forceOrder'], async run () { await G.onShift(); await call('forceOrder', { kind: 'edge' }); } },
+  { group: 'заказы', name: 'Заказ в конец района', needs: ['forceOrder'], async run () { await G.onShift(); await call('forceOrder', { kind: 'edge' }); } },
 
   { group: 'погода', name: 'Зима ночью, снег', needs: ['season', 'time', 'rain'], async run () { await G.riding(); await G.season(2.4); await G.time(22.5); await G.rain(true); } },
   { group: 'погода', name: 'Осень, дождь', needs: ['season', 'time', 'rain'], async run () { await G.riding(); await G.season(1.4); await G.time(15); await G.rain(true); } },
@@ -409,13 +413,31 @@ function build () {
   const or = section('заказы');
   const orb = el('div', 'grid'); or.appendChild(orb);
   button(orb, 'срочный', 'forceOrder', async () => { await G.onShift(); await call('forceOrder', { kind: 'urgent' }); });
-  button(orb, 'в конец города', 'forceOrder', async () => { await G.onShift(); await call('forceOrder', { kind: 'edge' }); });
+  button(orb, 'в конец района', 'forceOrder', async () => { await G.onShift(); await call('forceOrder', { kind: 'edge' }); });
   button(orb, 'развоз смены', 'staffRide', async () => { await G.onShift(); const r = await call('staffRide'); log('развоз: ' + JSON.stringify(r)); });
   const rs = row(or, 'поручение');
   const side = el('select');
   for (const s of SIDE_ORDERS) { const o = el('option', '', s.what + (s.adult ? ' · 18+' : s.kids ? ' · дет.' : '')); o.value = s.id; side.appendChild(o); }
   rs.appendChild(side);
   button(rs, 'сейчас', 'sideOrder', async () => { await G.onShift(); await call('sideOrder', side.value); }, 'sm');
+
+  // районы и волны щедрости (districts.js, econ.js DISTRICT / PACE)
+  const ds = section('районы и волны');
+  const dr = row(ds, 'район');
+  const dsel = el('select'); dsel.id = 'dist-pick';
+  for (let i = 0; i < 8; i++) { const o = el('option', '', String(i + 1)); o.value = i; dsel.appendChild(o); }
+  dr.appendChild(dsel);
+  button(dr, 'работать тут', 'district', async () => {
+    const d = D(); d.DIST.unlockAll(); d.DIST.set(+dsel.value);
+    log('район ' + (+dsel.value + 1) + ': ' + d.DIST.list()[+dsel.value].name + ' · смена заново');
+    await call('shift');
+  }, 'sm');
+  UI.push({ el: dsel, hooks: ['district'] });
+  const db = el('div', 'grid'); ds.appendChild(db);
+  button(db, 'открыть все районы', 'district', () => { D().DIST.unlockAll(); log('все районы открыты'); });
+  button(db, 'сбросить районы', 'district', () => { D().DIST.reset(); log('районы: открыт только первый, смен — ноль'); });
+  for (const [id, name] of [['generous', 'щедрая'], ['normal', 'обычная'], ['tight', 'час пик']])
+    button(db, 'волна: ' + name, 'district', () => { const d = D(); d.DIST.setPace(id); if (d.scatterPickups) d.scatterPickups(); log('волна «' + name + '»: кофе ' + (d.PICK_INFO ? d.PICK_INFO.nos + ', бонусов ' + d.PICK_INFO.bonus : '') + ' (заказы — со следующего)'); });
 
   // смена и события
   const ev = section('смена и события');

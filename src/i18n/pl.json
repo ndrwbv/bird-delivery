@@ -778,7 +778,6 @@
  "Буханка": "Buchanka",
  "в кошельке": "w portfelu",
  "в общем": "w sumie",
- "в самый конец города · оплата ×{k}": "na sam koniec miasta · zapłata ×{k}",
  "В следующий раз плати!": "Następnym razem płać!",
  "ВАЗ-2101: двойные круглые фары и клыки на бампере": "WAZ-2101: podwójne okrągłe reflektory i kły na zderzaku",
  "ВАЗ-2107 в цветах пиццерии: хром, квадратные фары": "WAZ-2107 w barwach pizzerii: chrom, kwadratowe reflektory",
@@ -1031,5 +1030,67 @@
  "короткая смена": "krótka zmiana",
  "смена": "zmiana",
  "средняя": "średnia",
- "средняя смена": "średnia zmiana"
+ "средняя смена": "średnia zmiana",
+ "{have} из {need} смен": "{have} z {need} zmian",
+ "{n} смена|{n} смены|{n} смен": {
+  "one": "{n} zmiana",
+  "few": "{n} zmiany",
+  "many": "{n} zmian",
+  "other": "{n} zmiany"
+ },
+ "в самый конец района · оплата ×{k}": "na sam koniec dzielnicy · zapłata ×{k}",
+ "Восток": "Wschód",
+ "Гаражи": "Garaże",
+ "где работаешь": "gdzie pracujesz",
+ "до района «{next}» — {n} смена в районе «{prev}»|до района «{next}» — {n} смены в районе «{prev}»|до района «{next}» — {n} смен в районе «{prev}»": {
+  "one": "do „{next}” — {n} zmiana w „{prev}”",
+  "few": "do „{next}” — {n} zmiany w „{prev}”",
+  "many": "do „{next}” — {n} zmian w „{prev}”",
+  "other": "do „{next}” — {n} zmiany w „{prev}”"
+ },
+ "заказы дальше, кофе меньше — зато платят ×{k}": "zamówienia dalej, kawy mniej — za to płacą ×{k}",
+ "закрыт": "zamknięta",
+ "закрыт · ещё {n} смена в районе «{prev}»|закрыт · ещё {n} смены в районе «{prev}»|закрыт · ещё {n} смен в районе «{prev}»": {
+  "one": "zamknięta · jeszcze {n} zmiana w „{prev}”",
+  "few": "zamknięta · jeszcze {n} zmiany w „{prev}”",
+  "many": "zamknięta · jeszcze {n} zmian w „{prev}”",
+  "other": "zamknięta · jeszcze {n} zmiany w „{prev}”"
+ },
+ "Кольцо": "Rondo",
+ "кофе, аптечки и чаевые — рекой": "kawa, apteczki i napiwki — strumieniami",
+ "маленький, заказы рядом": "mała, zamówienia blisko",
+ "машина {s} · оплата {p}": "auto {s} · zapłata {p}",
+ "не засчитана: меньше {n} заказа|не засчитана: меньше {n} заказов|не засчитана: меньше {n} заказов": {
+  "one": "niezaliczona: mniej niż {n} zamówienie",
+  "few": "niezaliczona: mniej niż {n} zamówienia",
+  "many": "niezaliczona: mniej niż {n} zamówień",
+  "other": "niezaliczona: mniej niż {n} zamówienia"
+ },
+ "открыт новый район": "otwarta nowa dzielnica",
+ "открыт район «{name}»": "otwarta dzielnica „{name}”",
+ "открыто {k} из {n}": "otwarte {k} z {n}",
+ "открыты все районы": "otwarte wszystkie dzielnice",
+ "Проспект": "Aleja",
+ "район": "dzielnica",
+ "район «{name}»": "dzielnica „{name}”",
+ "район «{name}» — не твой на этой смене, заказов тут нет": "„{name}” to nie twoja dzielnica na tej zmianie — zamówień tu nie ma",
+ "район «{name}» закрыт: ещё {n} смена в районе «{prev}»|район «{name}» закрыт: ещё {n} смены в районе «{prev}»|район «{name}» закрыт: ещё {n} смен в районе «{prev}»": {
+  "one": "dzielnica „{name}” zamknięta: jeszcze {n} zmiana w „{prev}”",
+  "few": "dzielnica „{name}” zamknięta: jeszcze {n} zmiany w „{prev}”",
+  "many": "dzielnica „{name}” zamknięta: jeszcze {n} zmian w „{prev}”",
+  "other": "dzielnica „{name}” zamknięta: jeszcze {n} zmiany w „{prev}”"
+ },
+ "район «{name}» пока закрыт": "dzielnica „{name}” na razie zamknięta",
+ "район: {name}": "dzielnica: {name}",
+ "следующая смена — там: машина {s}, оплата {p}. вернуться можно из меню": "następna zmiana tam: auto {s}, zapłata {p}. wrócić można z menu",
+ "смена {n} · район «{name}» · {from}—{to}": "zmiana {n} · dzielnica „{name}” · {from}—{to}",
+ "Старый город": "Stare Miasto",
+ "твой район — «{name}»": "twoja dzielnica — „{name}”",
+ "ты работаешь здесь": "tu pracujesz",
+ "Центр": "Centrum",
+ "час пик": "godzina szczytu",
+ "Частный сектор": "Domki",
+ "щедрая смена": "hojna zmiana",
+ "Юг": "Południe",
+ "забор": "płot"
 }

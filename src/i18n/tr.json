@@ -772,7 +772,6 @@
  "Буханка": "Buhanka",
  "в кошельке": "cüzdanda",
  "в общем": "neyse",
- "в самый конец города · оплата ×{k}": "şehrin ta öbür ucuna · ödeme ×{k}",
  "В следующий раз плати!": "Bir dahakine öde!",
  "ВАЗ-2101: двойные круглые фары и клыки на бампере": "VAZ-2101: çift yuvarlak far ve tamponda dişler",
  "ВАЗ-2107 в цветах пиццерии: хром, квадратные фары": "pizzacı renklerinde VAZ-2107: krom, köşeli farlar",
@@ -1023,5 +1022,57 @@
  "короткая смена": "kısa vardiya",
  "смена": "vardiya",
  "средняя": "orta",
- "средняя смена": "orta vardiya"
+ "средняя смена": "orta vardiya",
+ "{have} из {need} смен": "{have}/{need} vardiya",
+ "{n} смена|{n} смены|{n} смен": {
+  "one": "{n} vardiya",
+  "other": "{n} vardiya"
+ },
+ "в самый конец района · оплата ×{k}": "bölgenin ta öbür ucuna · ödeme ×{k}",
+ "Восток": "Doğu",
+ "Гаражи": "Garajlar",
+ "где работаешь": "nerede çalışıyorsun",
+ "до района «{next}» — {n} смена в районе «{prev}»|до района «{next}» — {n} смены в районе «{prev}»|до района «{next}» — {n} смен в районе «{prev}»": {
+  "one": "“{next}” için: “{prev}” bölgesinde {n} vardiya",
+  "other": "“{next}” için: “{prev}” bölgesinde {n} vardiya"
+ },
+ "заказы дальше, кофе меньше — зато платят ×{k}": "siparişler uzak, kahve az — ama ödeme ×{k}",
+ "закрыт": "kapalı",
+ "закрыт · ещё {n} смена в районе «{prev}»|закрыт · ещё {n} смены в районе «{prev}»|закрыт · ещё {n} смен в районе «{prev}»": {
+  "one": "kapalı · “{prev}” bölgesinde {n} vardiya daha",
+  "other": "kapalı · “{prev}” bölgesinde {n} vardiya daha"
+ },
+ "Кольцо": "Göbek",
+ "кофе, аптечки и чаевые — рекой": "kahve, ilk yardım, bahşiş — su gibi akıyor",
+ "маленький, заказы рядом": "küçük, siparişler yakın",
+ "машина {s} · оплата {p}": "araba {s} · ödeme {p}",
+ "не засчитана: меньше {n} заказа|не засчитана: меньше {n} заказов|не засчитана: меньше {n} заказов": {
+  "one": "sayılmadı: {n} siparişten az",
+  "other": "sayılmadı: {n} siparişten az"
+ },
+ "открыт новый район": "yeni bölge açıldı",
+ "открыт район «{name}»": "“{name}” bölgesi açıldı",
+ "открыто {k} из {n}": "açık: {k}/{n}",
+ "открыты все районы": "tüm bölgeler açık",
+ "Проспект": "Bulvar",
+ "район": "bölge",
+ "район «{name}»": "“{name}” bölgesi",
+ "район «{name}» — не твой на этой смене, заказов тут нет": "“{name}” bu vardiya senin bölgen değil — burada sipariş yok",
+ "район «{name}» закрыт: ещё {n} смена в районе «{prev}»|район «{name}» закрыт: ещё {n} смены в районе «{prev}»|район «{name}» закрыт: ещё {n} смен в районе «{prev}»": {
+  "one": "“{name}” kapalı: “{prev}” bölgesinde {n} vardiya daha",
+  "other": "“{name}” kapalı: “{prev}” bölgesinde {n} vardiya daha"
+ },
+ "район «{name}» пока закрыт": "“{name}” bölgesi şimdilik kapalı",
+ "район: {name}": "bölge: {name}",
+ "следующая смена — там: машина {s}, оплата {p}. вернуться можно из меню": "sonraki vardiya orada: araba {s}, ödeme {p}. menüden geri dönebilirsin",
+ "смена {n} · район «{name}» · {from}—{to}": "vardiya {n} · “{name}” bölgesi · {from}—{to}",
+ "Старый город": "Eski Şehir",
+ "твой район — «{name}»": "senin bölgen: “{name}”",
+ "ты работаешь здесь": "burada çalışıyorsun",
+ "Центр": "Merkez",
+ "час пик": "yoğun saat",
+ "Частный сектор": "Müstakil Evler",
+ "щедрая смена": "cömert vardiya",
+ "Юг": "Güney",
+ "забор": "çit"
 }

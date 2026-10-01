@@ -3,7 +3,9 @@
 
    Сезон — число от 0 до 4: 0 — начало лета, 1 — осень, 2 — зима, 3 — весна.
    Каждая смена (не «просто покататься») сдвигает его на SEASON_STEP, полный
-   сезон — восемь смен, год — тридцать две. Хранится в dlv-season, ?season=2.4
+   сезон — восемь смен, год — тридцать две. И каждый заход в игру — ещё на
+   SEASON_ENTER (первый запуск — нет): кто заходит редко и на одну смену, всё
+   равно со временем попадает в разные сезоны. Хранится в dlv-season, ?season=2.4
    ставит своё значение и ничего не сохраняет.
 
    Статика города склеена в меши один раз при загрузке, поэтому сезон в ней
@@ -29,6 +31,7 @@ import { t } from '../i18n/index.js';
 import { setPeopleSeason, redressHumans } from './people.js';
 
 export const SEASON_STEP = 0.125;          // на столько сдвигает сезон одна смена: сезон — восемь смен
+export const SEASON_ENTER = 0.06;          // и на столько — каждый заход в игру (~16 заходов без смен — сезон)
 const CH = 100;                             // клетка склейки, как у статики
 
 let C = null;                               // что дала игра (init)
@@ -334,7 +337,12 @@ export function initSeasons (ctx) {
   C = ctx; THREE = ctx.THREE;
   const q = new URLSearchParams(location.search).get('season');
   if (q !== null && q !== '' && !Number.isNaN(+q)) { SEA = wrap(+q); FORCED = true; }
-  else SEA = wrap(+C.Store.get('dlv-season', 0) || 0);
+  else {
+    const saved = C.Store.get('dlv-season', null);
+    // зашёл в игру — сезон чуть вперёд (сохранённый уже был: не первый запуск)
+    SEA = wrap((+saved || 0) + (saved === null || saved === undefined ? 0 : SEASON_ENTER));
+    C.Store.set('dlv-season', SEA);
+  }
   PILE = Pile(); GARL = Pile(); DRIFTP = Pile();
   smashMat(C.SMASH_MAT);
   C.SM_WORD.ice = t('ледяная горка');
