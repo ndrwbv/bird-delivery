@@ -325,8 +325,8 @@ function weighted (r, o) {
 }
 
 /* ─────────────── инициализация ─────────────── */
-let PILE = null, GARL = null, DRIFTP = null, DRIFT_MESH = [];
-const DECID = [], SPRUCES = [], SEA_ITEMS = [], DRIFTS = new Map(), FIRS = [], FIGHT_SPOTS = [];
+let PILE = null, GARL = null, DRIFTP = null, DRIFT_MESH = [], LEAFP = null, LEAF_MESH = [];
+const DECID = [], SPRUCES = [], SEA_ITEMS = [], DRIFTS = new Map(), LEAVES = new Map(), FIRS = [], FIGHT_SPOTS = [];
 let MESH_GARL = [], MESH_PILE = [];
 const BUILT = { trees: 0, pile: 0, garl: 0, drifts: 0, bulbs: 0, items: 0 };
 
@@ -343,7 +343,7 @@ export function initSeasons (ctx) {
     SEA = wrap((+saved || 0) + (saved === null || saved === undefined ? 0 : SEASON_ENTER));
     C.Store.set('dlv-season', SEA);
   }
-  PILE = Pile(); GARL = Pile(); DRIFTP = Pile();
+  PILE = Pile(); GARL = Pile(); DRIFTP = Pile(); LEAFP = Pile();
   smashMat(C.SMASH_MAT);
   C.SM_WORD.ice = t('ледяная горка');
   C.SM_WORD.snowman = t('снеговик');
@@ -586,9 +586,20 @@ export function seasonBuild () {
     const at = DRIFTP.add(T.mound, x, y, z, W, H, L, 0, ry, 0, DRIFT_HEX, 3, seed);
     const k = Math.floor(x / 20) + ',' + Math.floor(z / 20);
     if (!DRIFTS.has(k)) DRIFTS.set(k, []);
-    DRIFTS.get(k).push({ x, y, z, L, H, W, ry, cs: Math.cos(ry), sn: Math.sin(ry), s: 1, t: 0, ...at,
+    DRIFTS.get(k).push({ x, y, z, L, H, W, ry, cs: Math.cos(ry), sn: Math.sin(ry), s: 1, t: 0, ...at, pile: DRIFTP,
       seed: Math.max(1, Math.min(254, Math.round(seed * 253) + 1)) / 255 });
     BUILT.drifts++;
+    // осенью на тех же местах — кучи листьев (по зерну видны, как опавшие листья: uFallen), пониже и рыжие
+    if (hsh(x, z, 91) < 0.55) leafPile(x, y, z, L * 1.05, H * 0.5, W * 1.15, ry + (hsh(x, z, 92) - 0.5) * 0.5, hsh(x, z, 93));
+  };
+  const LEAF_HEX = ['#c9782a', '#d9a23a', '#a8452a', '#b8862e', '#8a5a2a'];
+  const leafPile = (x, y, z, L, H, W, ry, seed) => {
+    const at = LEAFP.add(T.mound, x, y, z, W, H, L, 0, ry, 0, LEAF_HEX[(hsh(x, z, 94) * LEAF_HEX.length) | 0], 2, seed);
+    const k = Math.floor(x / 20) + ',' + Math.floor(z / 20);
+    if (!LEAVES.has(k)) LEAVES.set(k, []);
+    LEAVES.get(k).push({ x, y, z, L, H, W, ry, cs: Math.cos(ry), sn: Math.sin(ry), s: 1, t: 0, ...at, pile: LEAFP, leaf: true,
+      seed: Math.max(1, Math.min(254, Math.round(seed * 253) + 1)) / 255 });
+    BUILT.leaves = (BUILT.leaves || 0) + 1;
   };
   const PK = new Map();                                   // припаркованные — у бордюра вал не насыпаем
   for (const q of C.PARKED || []) { const k = Math.floor(q[0] / 10) + ',' + Math.floor(q[1] / 10); if (!PK.has(k)) PK.set(k, []); PK.get(k).push(q); }
@@ -761,10 +772,12 @@ export function seasonBuild () {
   // сугробы — отдельно: их позиции живые (разбиваются и отрастают)
   DRIFT_MESH = DRIFTP.build(MESH_PILE[0] ? MESH_PILE[0].material : pileMat(), true);
   for (const list of DRIFTS.values()) for (const d of list) d.mesh = DRIFT_MESH.byKey.get(d.key);
+  LEAF_MESH = LEAFP.build(MESH_PILE[0] ? MESH_PILE[0].material : pileMat(), true);
+  for (const list of LEAVES.values()) for (const d of list) d.mesh = LEAF_MESH.byKey.get(d.key);
   // гирлянды, сугробы, снег и комья впервые появятся посреди зимы — программы собираем сразу
   initSky();
   chunks(0, -500, 0, 1, 0, 0);
-  const warm = [...MESH_GARL, ...DRIFT_MESH, SNOWF, SPLASH.pts, ...CHUNKS.map(c => c.m)];
+  const warm = [...MESH_GARL, ...DRIFT_MESH, ...LEAF_MESH, SNOWF, SPLASH.pts, ...CHUNKS.map(c => c.m)];
   for (const m of warm) m.visible = true;
   C.renderer.compile(C.scene, C.cam);
   for (const c of CHUNKS) { c.life = 0; c.m.visible = false; }
@@ -951,7 +964,7 @@ function driftShape (d, s) {
   if (!m) return;
   const pa = m.geometry.attributes.position;
   if (!pa.array) return;
-  DRIFTP.write(tpls().mound, pa.array, d.v0 * 3, d.x, d.y - (1 - s) * 0.05, d.z, d.W * (1 + (1 - s) * 0.25), d.H * s, d.L * (1 + (1 - s) * 0.15), 0, d.ry, 0);
+  (d.pile || DRIFTP).write(tpls().mound, pa.array, d.v0 * 3, d.x, d.y - (1 - s) * 0.05, d.z, d.W * (1 + (1 - s) * 0.25), d.H * s, d.L * (1 + (1 - s) * 0.15), 0, d.ry, 0);
   pa.addUpdateRange(d.v0 * 3, d.nv * 3);
   pa.needsUpdate = true;
   d.s = s;
@@ -986,8 +999,21 @@ function stepCar (dt) {
       if (s >= 1) GROW.splice(i, 1);
     }
   }
-  if (A.drift < 0.01 || sp < 2.5) return;
+  if (sp < 2.5) return;
   const ci = Math.floor(V.x / 20), cj = Math.floor(V.z / 20);
+  // осенние кучи листьев: въехал — разлетаются, машину чуть тормозит, через минуту-полторы снова куча
+  if (A.fallen > 0.01) for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
+    for (const d of LEAVES.get(i + ',' + j) || []) {
+      if (d.seed >= A.fallen || d.s < 0.5) continue;
+      const dx = V.x - d.x, dz = V.z - d.z;
+      if (Math.abs(dx) > d.L + 2.5 || Math.abs(dz) > d.L + 2.5) continue;
+      const lx = dx * d.cs - dz * d.sn, lz = dx * d.sn + dz * d.cs;
+      const ex = lx / (d.W + 1.0), ez = lz / (d.L + 1.2);
+      if (ex * ex + ez * ez > 1) continue;
+      burstLeaves(d, sp);
+    }
+  }
+  if (A.drift < 0.01) return;
   for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
     for (const d of DRIFTS.get(i + ',' + j) || []) {
       if (d.seed >= A.drift || d.s < 0.5) continue;
@@ -999,6 +1025,48 @@ function stepCar (dt) {
       if (sp > 5) burstDrift(d, sp);
       else { const k = Math.exp(-1.4 * dt); V.vx *= k; V.vz *= k; if (driftT <= 0) { driftT = 0.15; splash(V.x, 0.4 + d.y, V.z, 5, 0.6); } }
     }
+  }
+}
+function burstLeaves (d, sp) {
+  const V = C.V;
+  driftShape(d, 0.2);
+  d.t = rnd(50, 90);
+  GROW.push(d);
+  leafBits(d.x, d.y + d.H * 0.5, d.z, 14 + Math.min(14, sp | 0), V.vx, V.vz);
+  C.Snd.noise(0.18, 0.09);
+  V.vx *= 0.97; V.vz *= 0.97;
+}
+/* листья в воздухе: плоские рыжие квадратики из пула, кружат и падают */
+const LEAF_BITS = [];
+let LEAF_GEO = null;
+function leafBits (x, y, z, n, vx, vz) {
+  if (!LEAF_GEO) LEAF_GEO = new THREE.PlaneGeometry(0.22, 0.16);
+  for (let k = 0; k < n; k++) {
+    let b = LEAF_BITS.find(q => q.life <= 0);
+    if (!b) {
+      if (LEAF_BITS.length > 90) break;
+      b = { m: new THREE.Mesh(LEAF_GEO, new THREE.MeshLambertMaterial({ color: 0xc9782a, side: THREE.DoubleSide })), life: 0 };
+      C.scene.add(b.m);
+      LEAF_BITS.push(b);
+    }
+    b.m.material.color.set(['#c9782a', '#d9a23a', '#a8452a', '#e0b13f'][(Math.random() * 4) | 0]);
+    b.m.position.set(x + rnd(-0.8, 0.8), y, z + rnd(-0.8, 0.8));
+    b.m.visible = true;
+    b.vx = vx * rnd(0.15, 0.35) + rnd(-2.5, 2.5); b.vy = rnd(2, 5); b.vz = vz * rnd(0.15, 0.35) + rnd(-2.5, 2.5);
+    b.spin = rnd(-8, 8); b.life = rnd(2.2, 3.6);
+  }
+}
+function stepLeafBits (dt) {
+  for (const b of LEAF_BITS) {
+    if (b.life <= 0) continue;
+    b.life -= dt;
+    b.vy = Math.max(-1.1, b.vy - 6 * dt);                 // парусят: падают медленно
+    b.vx *= 1 - dt * 1.2; b.vz *= 1 - dt * 1.2;
+    b.m.position.x += (b.vx + Math.sin(b.life * 5) * 0.6) * dt; b.m.position.y += b.vy * dt; b.m.position.z += b.vz * dt;
+    b.m.rotation.x += b.spin * dt; b.m.rotation.y += b.spin * 0.7 * dt;
+    const g = C.groundH(b.m.position.x, b.m.position.z) + 0.05;
+    if (b.m.position.y < g) { b.m.position.y = g; b.vy = 0; b.vx = b.vz = 0; b.spin = 0; }
+    if (b.life <= 0) b.m.visible = false;
   }
 }
 /* новая смена: все сугробы снова целые */
@@ -1074,8 +1142,7 @@ function spawnFight (sp) {
       if (inHouse(x, z, 0.5)) continue;
       const nr = nearestRoad(x, z, 7, 1);
       if (nr && nr.d < nr.seg.w / 2 + 1.2) continue;
-      const kid = Math.random() < 0.5;
-      const grp = makeHuman(null, kid ? { h: rnd(0.56, 0.7), fat: false } : { fat: Math.random() < 0.15 });
+      const grp = makeHuman(null, { fat: Math.random() < 0.15 });      // детей в игре нет — играют взрослые
       grp.position.set(x, groundH(x, z) + curbAt(x, z), z);
       scene.add(grp);
       ppl.push({ grp, x, z, team, st: 'idle', t: rnd(0.2, 2.2), hit: 0, dead: 0, person: null, tgt: null, sc: grp.scale.x });
@@ -1208,6 +1275,7 @@ export function updateSeasons (dt) {
   carHitT -= dt;
   stepSky(dt);
   stepCar(dt);
+  stepLeafBits(dt);
   stepFights(dt);
   stepBalls(dt);
   stepSplash(dt);

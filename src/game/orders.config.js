@@ -52,34 +52,34 @@ export const SHIFT_PLAN = {
    shop    — где купить: вид точки из карты (grocery, food, pharm, shop, cafe) и
              prefer — регулярка по настоящему названию, чтобы найти подходящую
    bag     — что влетает в багажник: пакет-майка такого цвета, в нём предмет
-   pay     — сколько даст, ₽ (случайно в интервале)
+   pay     — сколько даст, ₽ (случайно в интервале; деньги ×8 с 01.10.2026 — econ.js MONEY_K)
    mood    — calm | nervous | drunk | shy */
 export const SIDE_ORDERS = [
   { id: 'lemonade', ask: N_('слушай, сгоняй за лимонадом, а? горло пересохло, я тебе накину'), what: N_('лимонад'),
     shop: { kinds: ['grocery'], prefer: /пят|дикси|магнит|продукт|ярче|мария/i }, bag: { color: '#f4f4f0', item: 'bottle' },
-    pay: [150, 250], mood: 'calm', timer: 8, accept: N_('сгоняю'), decline: N_('не, работаю'), timeout: N_('ну лан ((') },
+    pay: [1200, 2000], mood: 'calm', timer: 8, accept: N_('сгоняю'), decline: N_('не, работаю'), timeout: N_('ну лан ((') },
   { id: 'shawarma', ask: N_('ты же всё равно катаешься — возьми мне шаурмы, вот честно, умираю'), what: N_('шаурма'),
     shop: { kinds: ['food'], prefer: /шаур|кебаб|донер|шашлык/i }, bag: { color: '#f4f4f0', item: 'wrap' },
-    pay: [200, 320], mood: 'nervous', timer: 8, accept: N_('ладно'), decline: N_('сам сходишь'), timeout: N_('ну лан ((') },
+    pay: [1600, 2560], mood: 'nervous', timer: 8, accept: N_('ладно'), decline: N_('сам сходишь'), timeout: N_('ну лан ((') },
   { id: 'plaster', ask: N_('я тут порезался чуть-чуть… пластырь привезёшь? аптека рядом'), what: N_('пластырь'),
     shop: { kinds: ['pharm'], prefer: /аптек|36,6|ригла|монастыр/i }, bag: { color: '#dff3ff', item: 'box' },
-    pay: [150, 220], mood: 'shy', timer: 9, accept: N_('держись, еду'), decline: N_('подорожник приложи'), timeout: N_('ну… сам как-нибудь') },
+    pay: [1200, 1760], mood: 'shy', timer: 9, accept: N_('держись, еду'), decline: N_('подорожник приложи'), timeout: N_('ну… сам как-нибудь') },
   { id: 'charger', ask: N_('телефон сдох, а мне звонить надо — зарядку купишь? любую, типа-си'), what: N_('зарядка'),
     shop: { kinds: ['shop'], prefer: /мтс|билайн|мегафон|dns|связ|t2|видео|эльдорадо/i, anyKind: true }, bag: { color: '#2b2d33', item: 'box' },
-    pay: [250, 400], mood: 'nervous', timer: 8, accept: N_('куплю'), decline: N_('не, некогда'), timeout: N_('ну лан ((') },
+    pay: [2000, 3200], mood: 'nervous', timer: 8, accept: N_('куплю'), decline: N_('не, некогда'), timeout: N_('ну лан ((') },
   { id: 'catfood', kids: true, ask: N_('у меня кот голодный орёт, а я в тапках — корм захватишь?'), what: N_('корм для кота'),
     shop: { kinds: ['grocery', 'shop'], prefer: /зоо|pet|четыре лапы|магнит|пят/i, anyKind: true }, bag: { color: '#f4f4f0', item: 'box' },
-    pay: [150, 260], mood: 'calm', timer: 8, accept: N_('ради кота — да'), decline: N_('кот подождёт'), timeout: N_('ну лан ((') },
+    pay: [1200, 2080], mood: 'calm', timer: 8, accept: N_('ради кота — да'), decline: N_('кот подождёт'), timeout: N_('ну лан ((') },
   // взрослая версия: то, за чем на самом деле гоняют курьера
   { id: 'beer', adult: true, ask: N_('братан, будь другом — пивка возьми, две полторашки, а то мне не продадут'), what: N_('пиво'),
     shop: { kinds: ['grocery'], prefer: /пив|beer|разлив|бристоль|красное|пят|магнит/i }, bag: { color: '#f4f4f0', item: 'bottle2' },
-    pay: [250, 400], mood: 'drunk', timer: 7, accept: N_('ладно, щас'), decline: N_('не, я за рулём'), timeout: N_('ну лан ((') },
+    pay: [2000, 3200], mood: 'drunk', timer: 7, accept: N_('ладно, щас'), decline: N_('не, я за рулём'), timeout: N_('ну лан ((') },
   { id: 'snus', adult: true, ask: N_('слушай, тут такое дело… снюсик не захватишь? я верну, честно'), what: N_('снюс'),
     shop: { kinds: ['grocery', 'shop'], prefer: /табак|tobac|smoke|vape|вейп|кальян|красное|бристоль/i, anyKind: true }, bag: { color: '#2b2d33', item: 'tin' },
-    pay: [200, 350], mood: 'nervous', timer: 7, accept: N_('ну давай'), decline: N_('сам, сам'), timeout: N_('ну лан ((') },
+    pay: [1600, 2800], mood: 'nervous', timer: 7, accept: N_('ну давай'), decline: N_('сам, сам'), timeout: N_('ну лан ((') },
   { id: 'vodka', adult: true, ask: N_('у нас тут праздник, а горючее кончилось… беленькой одну, а?'), what: N_('водочка'),
     shop: { kinds: ['grocery'], prefer: /вин|алко|wine|красное|бристоль|пят/i }, bag: { color: '#f4f4f0', item: 'bottle' },
-    pay: [300, 450], mood: 'drunk', timer: 7, accept: N_('праздник — святое'), decline: N_('не, завязал'), timeout: N_('ну лан ((') },
+    pay: [2400, 3600], mood: 'drunk', timer: 7, accept: N_('праздник — святое'), decline: N_('не, завязал'), timeout: N_('ну лан ((') },
 ];
 
 /* ── развоз смены: в конце смены с шансом ORDERS.STAFF_CHANCE (econ.js) ──

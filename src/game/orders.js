@@ -439,7 +439,9 @@ function whyOf (sp) {
   if (sp.kind === 'group') return t('групповой: заказали на всех сразу') + ' · ' + z;
   if (sp.kind === 'chain') return tn(sp.stops.length, 'цепочка: {n} адрес по очереди|цепочка: {n} адреса по очереди|цепочка: {n} адресов по очереди') + ' · ' + z;
   const mul = PAY.ZONE[sp.zone] || 1;
-  return mul !== 1 ? t('{zone} · оплата ×{k}', { zone: z, k: fmtK(mul) }) : pick([t('один адрес'), t('по пути из пиццерии'), t('клиент ждёт')]) + ' · ' + z;
+  if (mul !== 1) return t('{zone} · оплата ×{k}', { zone: z, k: fmtK(mul) });
+  sp.plain = true;                                       // обычный заказ: в накладной пометку не пишем
+  return pick([t('один адрес'), t('по пути из пиццерии'), t('клиент ждёт')]) + ' · ' + z;
 }
 const fmtK = k => String(+k.toFixed(2)).replace('.', ',');
 
@@ -512,9 +514,15 @@ export function card (order) {
   if (!sp) return;
   const kind = document.getElementById('ph-kind');
   if (kind && sp.type !== 'pizza') kind.textContent = t(ORDER_TYPES[sp.type] ? ORDER_TYPES[sp.type].label : sp.type) + ' · ' + kind.textContent;
-  const list = document.getElementById('ph-list');
-  if (list) list.insertAdjacentHTML('beforeend',
-    '<div class="oc-pay">' + esc(t(ZONE_LABEL[sp.zone] || ZONE_LABEL.normal)) + ' · ' + A.money(S.fee) + (sp.urgent ? ' · <b>' + t('срочно') + '</b>' : '') + '</div>' + queueHTML('oq oq-card'));
+}
+/* строки накладной на карточке (game.js showOrderCard): район, оплата; очередь «дальше» на карточке не показываем */
+export function cardRows (order) {
+  const sp = order.ord;
+  if (!sp) return [];
+  return [
+    [t('район'), esc(t(ZONE_LABEL[sp.zone] || ZONE_LABEL.normal)) + (DIST.has() ? ' · ' + esc(t(DIST.list()[DIST.cur()].name)) : '')],
+    [t('оплата'), A.money(S.fee) + (sp.urgent ? ' · <b class="oc-urg">' + t('срочно') + '</b>' : '')],
+  ];
 }
 
 /* ─────────────── подъехал ─────────────── */

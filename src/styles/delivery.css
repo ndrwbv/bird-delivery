@@ -905,3 +905,63 @@ body.touch .fm-view { flex: 1; overflow: auto; touch-action: pan-x pan-y; -webki
 body.touch #fullmapc { max-width: none; max-height: none; height: 165%; width: auto; border: 0; border-radius: 0; image-rendering: auto; }
 @media (orientation: landscape) { body.touch #fullmapc { height: 220%; } }
 body.touch .fm-leg { font-size: 8px; }
+
+/* ── карточка заказа — накладная целиком (showOrderCard): лист бумаги с перфорацией по краям,
+   шапка «накладная · заказ  № 0007», таблица «поле — значение», справа фото получателя на скрепке,
+   внизу листа — кнопка «ГАЗ ГАЗ» ── */
+#phone { background: #fff3d6; color: #33210c; border: 3px solid #33210c; border-radius: 4px; overflow: visible;
+         box-shadow: 0 8px 0 #33210c, 0 24px 60px rgba(0, 0, 0, .5); }
+#phone::before, #phone::after { content: ''; position: absolute; left: 10px; right: 10px; height: 8px; pointer-events: none;
+         background: radial-gradient(circle at 6px 4px, rgba(20, 16, 30, .85) 3px, transparent 3.5px) 0 0 / 16px 8px repeat-x; }
+#phone::before { top: -6px; } #phone::after { bottom: -6px; }
+#phone .ph-top { background: none; color: #8a3b22; border-bottom: 2px dashed #8a6b4e; margin: 0 16px; padding: 14px 0 10px; font-size: 10px;
+                 text-transform: uppercase; letter-spacing: .08em; }
+#phone .ph-dot { background: #f0522a; opacity: 1; }
+#phone .ph-src { display: block !important; font-size: 10px; opacity: 1; color: #33210c; letter-spacing: .04em; }
+#phone .ph-items, #phone #ph-why { display: none !important; }
+#phone .ph-body { padding: 12px 16px 16px; }
+#phone.ord-typed { border-top-width: 3px; }
+#phone.ord-typed .ph-top { box-shadow: inset 0 -4px 0 var(--ord, #ff8a2b); }
+.oc-sheet { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: start; }
+.oc-inv { width: 100%; border-collapse: collapse; font-size: 10px; line-height: 1.55; color: #33210c; }
+.oc-inv tr + tr th, .oc-inv tr + tr td { border-top: 1px dashed rgba(138, 107, 78, .6); }
+.oc-inv th { width: 32%; padding: 6px 10px 6px 0; text-align: left; vertical-align: top; font-weight: normal; color: #8a6b4e; font-size: 8px; }
+.oc-inv td { padding: 6px 0; text-align: left; vertical-align: top; }
+.oc-inv td b { display: block; font-weight: normal; font-size: 13px; }
+.oc-inv td small { display: block; font-size: 8px; color: #8a3b22; margin-top: 3px; }
+.oc-inv .oc-urg { display: inline; color: #d9342c; font-size: inherit; }
+/* фото получателя: белая рамка, чуть наискосок, сверху скрепка */
+.oc-photos { position: relative; display: flex; flex-direction: column; gap: 8px; padding-top: 10px; transform: rotate(3deg); }
+.oc-photos .oc-p { width: auto; }
+.oc-photos .oc-p img, .oc-photos .oc-p i { width: 104px; height: 104px; border: 6px solid #fff; border-bottom-width: 18px; border-radius: 2px;
+         box-shadow: 0 4px 10px rgba(51, 33, 12, .35); background: #2a3766; }
+.oc-photos.small .oc-p img, .oc-photos.small .oc-p i { width: 64px; height: 64px; border-width: 4px; border-bottom-width: 10px; }
+.oc-photos .oc-p em { top: 4px; left: -8px; }
+.oc-clip { position: absolute; z-index: 2; top: -4px; left: 26px; width: 16px; height: 40px; border: 3px solid #9aa0ad; border-radius: 9px;
+           box-shadow: inset 0 0 0 3px transparent, 1px 1px 0 rgba(0, 0, 0, .25); transform: rotate(-8deg); }
+.oc-clip::after { content: ''; position: absolute; left: 2px; right: 2px; top: 6px; bottom: 4px; border: 2px solid #9aa0ad; border-top: 0; border-radius: 0 0 6px 6px; }
+/* «ГАЗ ГАЗ» — внутри листа, крупно, как штамп */
+#phone #ph-accept { margin: 4px 0 0; padding: 18px 12px; font-size: 22px; letter-spacing: .14em; color: #fff3d6; background: #d9342c;
+                    border: 4px solid #33210c; border-radius: 8px; box-shadow: 0 6px 0 #33210c; text-shadow: 3px 3px 0 #33210c; transform: rotate(-1deg); }
+#phone #ph-accept:hover { background: #ec4a3e; }
+#phone #ph-accept:active { transform: rotate(-1deg) translateY(4px); box-shadow: 0 2px 0 #33210c; }
+#phone .oc-rush { margin-top: 12px; }
+@media (max-width: 520px) { .oc-sheet { grid-template-columns: 1fr; } .oc-photos { order: -1; align-items: center; } }
+/* накладная — от размера экрана: ~3/4 ширины, шрифты от vw/vh */
+#phone { width: min(920px, 76vw); max-height: 90vh; }
+html[data-map] #phone { width: min(920px, 76vw); }
+#phone .ph-top { font-size: clamp(10px, 1.2vw, 16px); padding: clamp(12px, 2vh, 20px) 0 clamp(8px, 1.3vh, 14px); margin: 0 clamp(14px, 2.2vw, 28px); }
+#phone .ph-src { font-size: clamp(10px, 1.2vw, 16px); }
+#phone .ph-dot { width: clamp(8px, .8vw, 12px); height: clamp(8px, .8vw, 12px); }
+#phone .ph-body { padding: clamp(10px, 1.6vh, 20px) clamp(14px, 2.2vw, 28px) clamp(14px, 2.4vh, 26px); gap: clamp(10px, 2vh, 20px); }
+.oc-sheet { gap: clamp(12px, 2vw, 28px); }
+.oc-inv { font-size: clamp(10px, 1.15vw, 16px); }
+.oc-inv th { font-size: clamp(8px, .85vw, 12px); padding: clamp(5px, 1vh, 11px) 12px clamp(5px, 1vh, 11px) 0; }
+.oc-inv td { padding: clamp(5px, 1vh, 11px) 0; }
+.oc-inv td b { font-size: clamp(13px, 1.7vw, 24px); }
+.oc-inv td small { font-size: clamp(8px, .9vw, 12px); }
+.oc-photos .oc-p img, .oc-photos .oc-p i { width: clamp(90px, 13vw, 190px); height: clamp(90px, 13vw, 190px); border-width: 7px; border-bottom-width: clamp(16px, 2.4vh, 28px); }
+.oc-photos.small .oc-p img, .oc-photos.small .oc-p i { width: clamp(60px, 7.5vw, 110px); height: clamp(60px, 7.5vw, 110px); }
+.oc-clip { left: 30%; width: clamp(14px, 1.5vw, 22px); height: clamp(36px, 4vw, 54px); }
+#phone #ph-accept { font-size: clamp(18px, 2.7vw, 38px); padding: clamp(14px, 2.4vh, 24px) 12px; }
+@media (max-width: 520px) { #phone { width: 94vw; } }

@@ -89,7 +89,7 @@ export function init (api) {
     const ck = document.createElement('div');
     ck.id = 'cr-clock';
     ck.hidden = true;
-    ck.innerHTML = '<i></i><b>09:00</b><em></em>';
+    ck.innerHTML = '<i></i><div class="ck-rows"><span class="ck-s"><em></em><b>0:00</b></span><span class="ck-o" hidden><em></em><b>0:00</b></span></div><small>09:00</small>';
     es.parentNode.insertBefore(ck, es);
   }
   setTimeout(() => { if (window.__dlv) window.__dlv.CAREERM = DEBUG; }, 0);
@@ -112,7 +112,7 @@ export function startShift () {
   fire(startCbs, { n: SH.n + 1 });
   const L = SH.len, P = SH.pace;
   const where = DIST.has() ? t('район «{name}»', { name: t(DIST.list()[SH.district].name) }) + ' · ' : '';
-  setTimeout(() => { if (SH.on && SH.len === L) A.popBonus(lenName(L.id), where + t('9:00—24:00 · ~{n} мин', { n: Math.round(L.slow * ECON.SHIFT.BASE_S / 60) })); }, 1200);
+  setTimeout(() => { if (SH.on && SH.len === L) A.popBonus(t('на смене'), where + t('до конца смены ~{n} мин', { n: Math.round(shiftLeft() / 60) })); }, 1200);
   // щедрая и час пик — говорим прямо: игрок чувствует ритм
   const pm = ECON.PACE.MODES[P];
   const pace = P === 'generous' ? [t('щедрая смена'), t('кофе, аптечки и чаевые — рекой')]
@@ -122,13 +122,21 @@ export function startShift () {
 /** волна этой смены: 'generous' | 'normal' | 'tight' */
 export const pace = () => SH.pace || 'normal';
 /* длина смены: короткая / средняя / длинная (ECON.SHIFT.LENGTHS) */
-const lenName = id => ({ short: t('короткая смена'), medium: t('средняя смена'), long: t('длинная смена') }[id] || '');
-const lenShort = id => ({ short: t('короткая'), medium: t('средняя'), long: t('длинная') }[id] || '');
 /** во сколько раз медленнее идут сутки, пока идёт смена (game.js, orders.js) */
 export const shiftSlow = () => (SH.on && SH.len ? SH.len.slow : ECON.SHIFT.SLOW);
 
 export function clockText () { return ECON.clock(hour()); }
 
+/* Часы на экране — словами: «до конца смены 6:12» (настоящие минуты до полуночи) и,
+   пока везёшь, «до конца заказа 0:45». Часы игры (09:00) — мелко сбоку. Длину смены
+   (короткая / средняя / длинная) игроку не пишем. */
+const mmss = sec => { sec = Math.max(0, Math.ceil(sec)); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); };
+/** сколько настоящих секунд осталось до полуночи */
+export function shiftLeft () {
+  const h = Math.min(24, hour());
+  const hps = (24 - ECON.SHIFT.KEYS[0][1]) / ((ECON.SHIFT.T_END - ECON.SHIFT.T0) * (A.DAY_LEN || 480) * shiftSlow());   // часов смены в секунду
+  return Math.max(0, (24 - h) / hps / FAST);
+}
 let clockPrev = '';
 function clockStep () {
   const el = $('cr-clock'), es = $('endshift');
@@ -136,15 +144,21 @@ function clockStep () {
   const show = !es.hidden && SH.on;
   if (el.hidden === show) el.hidden = !show;
   if (!show) return;
-  const h = hour(), txt = ECON.clock(h), len = SH.len ? lenShort(SH.len.id) : '';
-  if (txt + len !== clockPrev) {
-    clockPrev = txt + len;
-    el.querySelector('b').textContent = txt;
-    el.querySelector('em').textContent = len;
-    el.classList.toggle('eve', h >= ECON.SHIFT.EVENING_H && h < 21);
-    el.classList.toggle('night', h >= 21);
-    el.classList.toggle('late', h >= 23);
-  }
+  const S = A.S, h = hour(), left = shiftLeft();
+  const ord = !S.free && S.order && ['drive', 'side'].includes(S.state) && S.timeMax > 0 ? Math.max(0, S.time) : -1;
+  const key = mmss(left) + '|' + (ord >= 0 ? mmss(ord) : '') + '|' + ECON.clock(h);
+  if (key === clockPrev) return;
+  clockPrev = key;
+  const rs = el.querySelector('.ck-s'), ro = el.querySelector('.ck-o');
+  rs.querySelector('em').textContent = t('до конца смены');
+  rs.querySelector('b').textContent = mmss(left);
+  ro.hidden = ord < 0;
+  if (ord >= 0) { ro.querySelector('em').textContent = t('до конца заказа'); ro.querySelector('b').textContent = mmss(ord); }
+  ro.classList.toggle('low', ord >= 0 && ord < 10);
+  el.querySelector('small').textContent = ECON.clock(h);
+  el.classList.toggle('eve', h >= ECON.SHIFT.EVENING_H && h < 21);
+  el.classList.toggle('night', h >= 21);
+  el.classList.toggle('late', left < 60);
 }
 
 export function step (dt) {
@@ -281,7 +295,6 @@ export function showEnd (why, whyText) {
     [t('заработано'), S.money || 0, A.money, true],
     [t('доставлено заказов'), S.delivered || 0, cnt],
     typeof S.tips === 'number' && S.tips > 0 ? [t('чаевые'), S.tips, A.money] : null,
-    SH.len ? [t('смена'), 1, () => lenShort(SH.len.id)] : null,
     [t('на смене'), SH.endH, h => ECON.clock(SH.t0h) + ' — ' + ECON.clock(SH.t0h + (Math.min(SH.endH, 29) - SH.t0h) * Math.min(1, h / (SH.endH || 1)))],
     [t('ударов'), SH.hits, cnt],
     SH.fine ? [t('штраф за клиента'), SH.fine, n => '−' + A.money(n)] : null,
@@ -429,7 +442,7 @@ function refreshTabs () {
     if (sub) sub.textContent = A.donated(k) >= 1 ? t('цель собрана') : t('{p} % цели города', { p: Math.floor(A.donated(k) * 100) });
   }
   const s = el.querySelector('.cr-t-slot .cr-sub');
-  if (s) s.textContent = SH.slot ? t('уже крутил') : A.wallet() >= ECON.SLOT.STEP ? t(GAME_NAME[depGame()]) + ' · ×' + gameMul(depGame()) : t('нечего ставить');
+  if (s) s.textContent = A.wallet() >= ECON.SLOT.STEP ? t(GAME_NAME[depGame()]) + ' · ×' + gameMul(depGame()) : t('нечего ставить');
   el.querySelectorAll('.cr-tab').forEach(b => b.classList.toggle('cur', b.dataset.tab === TAB));
 }
 function openTab (k) {
@@ -449,8 +462,8 @@ function rerender () { refreshWallet(); refreshTabs(); openTab(TAB); }
    их — сколько они заработали на этой смене (R.money), а если не ездили — около
    твоего среднего ×0,6…1,3: догнать можно, но не даром. */
 const CREW_KEY = 'dlv-crew';
-const CREW_START = [1500, 700, 2200, 300];        // фора в начале: сразу есть кого обгонять
-const CREW_FLOOR = 900;                            // средняя смена, пока своих смен нет
+const CREW_START = [12000, 5600, 17600, 2400];   // ×8 с 01.10.2026 (econ.js MONEY_K)        // фора в начале: сразу есть кого обгонять
+const CREW_FLOOR = 7200;                           // средняя смена, пока своих смен нет
 function crewLoad () {
   let c = A.Store.get(CREW_KEY, null);
   if (typeof c === 'string') { try { c = JSON.parse(c); } catch (e) { c = null; } }
@@ -654,7 +667,7 @@ function depBox () {
     '<div class="dep-stake"><button type="button" class="cr-btn dep-minus">−</button><input type="range"><button type="button" class="cr-btn dep-plus">+</button></div>' +
     '<div class="cr-quick dep-quick">' + [[0.25, '¼'], [0.5, '½'], [1, '']].map(([k, l]) => '<button type="button" class="cr-btn" data-k="' + k + '">' + esc(l) + '</button>').join('') + '</div>' +
     '<button type="button" class="dep-go"></button>' +
-    '<button type="button" class="cr-btn dep-close"></button>' +
+    '<div class="dep-foot"><button type="button" class="dep-again" hidden></button><button type="button" class="cr-btn dep-close"></button></div>' +
   '</div>';
   ($('game') || document.body).appendChild(md);
   md.querySelector('.dep-close').addEventListener('click', () => closeDep());
@@ -663,7 +676,9 @@ function depBox () {
   md.querySelector('.dep-minus').addEventListener('click', () => setStake(STAKE - stakeStep()));
   md.querySelector('.dep-plus').addEventListener('click', () => setStake(STAKE + stakeStep()));
   md.querySelectorAll('.dep-quick button').forEach(b => b.addEventListener('click', () => setStake(stepDown(stepDown(A.wallet()) * +b.dataset.k))));
-  md.querySelector('.dep-go').addEventListener('click', spin);
+  // «ДЕП», а после прокрутки — «пора на работу»: сразу на новую смену; «крутить ещё» — новый раунд
+  md.querySelector('.dep-go').addEventListener('click', () => { if (SH.slot) toWork(); else spin(); });
+  md.querySelector('.dep-again').addEventListener('click', () => { if (SPINNING) return; SH.slot = false; openDep(); });
   return md;
 }
 /* шаг кнопок −/+: ~1/20 кошелька, круглым числом */
@@ -715,12 +730,20 @@ function openDep () {
     setStake(STAKE, true);
   }));
   md.classList.remove('spun');
+  SH.slot = false;
+  md.querySelector('.dep-again').hidden = true;
   const r = md.querySelector('input');
   r.min = max ? ECON.SLOT.STEP : 0; r.max = max; r.step = ECON.SLOT.STEP;
   md.hidden = false;
   requestAnimationFrame(() => md.classList.add('on'));
   setStake(STAKE, true);
 }
+function toWork () {
+  if (SPINNING) return;
+  closeDep(); closeSpend(false);
+  const b = $('ov-again'); if (b) b.click();
+}
+let SPINNING = false;
 function closeDep () {
   const md = $('cr-dep');
   if (!md || md.hidden) return false;
@@ -735,12 +758,12 @@ function setStake (v, quiet) {
   const r = md.querySelector('input');
   r.value = STAKE; r.disabled = done || max <= 0;
   md.querySelector('.dep-sum b').textContent = A.money(STAKE);
-  md.querySelector('.dep-sum span').textContent = done ? t('уже крутил на этой смене')
-    : max <= 0 ? t('нечего ставить') : t('из кошелька −{money} · останется {left}', { money: A.money(STAKE), left: A.money(A.wallet() - STAKE) });
+  if (done) return;                                  // раунд сыгран — цифры итога не трогаем
+  md.querySelector('.dep-sum span').textContent = max <= 0 ? t('нечего ставить') : t('из кошелька −{money} · останется {left}', { money: A.money(STAKE), left: A.money(A.wallet() - STAKE) });
   md.querySelectorAll('.dep-stake button, .dep-quick button').forEach(b => { b.disabled = done || max <= 0; });
   const go = md.querySelector('.dep-go'), need = GAME !== 'slot' && !PICK;
-  go.textContent = done ? t('уже крутил') : need ? (GAME === 'roulette' ? t('выбери цвет') : t('выбери, кто выиграет')) : t('ДЕП · {money}', { money: A.money(STAKE) });
-  go.disabled = done || need || STAKE <= 0 || STAKE > A.wallet();
+  go.textContent = need ? (GAME === 'roulette' ? t('выбери цвет') : t('выбери, кто выиграет')) : t('ДЕП · {money}', { money: A.money(STAKE) });
+  go.disabled = need || STAKE <= 0 || STAKE > A.wallet();
   pile(max ? Math.max(1, Math.round(BILLS_MAX * STAKE / max)) : 0, quiet);
 }
 function pile (n, quiet) {
@@ -766,7 +789,7 @@ function spin () {
   const md = depBox();
   const st = Math.min(STAKE, stepDown(A.wallet()));
   if (SH.slot || st <= 0 || (GAME !== 'slot' && !PICK)) return;
-  SH.slot = true;
+  SH.slot = true; SPINNING = true;
   DEP_SESSION++;
   const cfg = ECON.SLOT[GAME] || {};
   const chance = GAME === 'tennis' ? 1 / TENNIS.length : cfg.win != null ? cfg.win : ECON.SLOT.WIN;
@@ -798,7 +821,11 @@ function spin () {
       A.Snd.fail && A.Snd.fail();
     }
     md.querySelector('.dep-sum span').textContent = t('в кошельке {money}', { money: A.money(A.wallet()) });
-    md.querySelector('.dep-go').textContent = t('уже крутил');
+    SPINNING = false;
+    const go = md.querySelector('.dep-go');
+    go.textContent = t('пора на работу'); go.disabled = false;
+    const again = md.querySelector('.dep-again');
+    again.textContent = t('крутить ещё'); again.hidden = stepDown(A.wallet()) <= 0;
     refreshWallet(); refreshTabs();
   };
   if (GAME === 'roulette') spinWheel(md, win, finish);

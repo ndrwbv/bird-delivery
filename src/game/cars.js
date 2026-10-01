@@ -788,8 +788,11 @@ function newZone () {
   zone.style.left = (ST.z0 * 100).toFixed(1) + '%';
   zone.style.width = (ST.zw * 100).toFixed(1) + '%';
 }
+/* машина ломается (глохнет на заказе и в ямах) только с BREAK.FROM_SHIFT-й смены */
+const canBreak = () => !A || !A.Store || (+A.Store.get('dlv-shifts', 0) || 0) + 1 >= (BREAK.FROM_SHIFT || 1);
 function stall (why) {
   if (ST.on || !A) return;
+  if (why !== 'sandbox' && !canBreak()) return;
   // песочница: «не глохнет» (кроме поломки по кнопке)
   const sbx = typeof window !== 'undefined' && window.__dlv && window.__dlv.SBX;
   if (why !== 'sandbox' && sbx && sbx.noStall) return;
@@ -827,7 +830,7 @@ function press () {
     if (ST.need <= 0) { dots(); start(); return; }
     newZone();
   } else {
-    ST.need++;
+    // промах — просто мимо: нужно три попадания всего, не подряд и без штрафа
     EL.classList.add('miss');
     if (Snd) Snd.blip(120, 0.18, 'square', 0.1);
     if (A.rumble) A.rumble(0.3, 120);

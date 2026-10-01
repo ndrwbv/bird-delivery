@@ -42,6 +42,7 @@ import * as ORD from './orders.js';              // карьера: очеред
 import * as CAREERM from './career.js';          // карьера: смена 9—24, обед, итоги, донаты, слот, звёзды
 import * as STORY from './story.js';             // сюжетные заказы и катсцены (баба Зина)
 import * as AUTO from './cars.js';               // карьера: 10 машин, ломучесть, заглохла, ямы, гараж Дяди Жени
+import * as HK from './hookah.js';               // кальянщики на лавочках (в детской — самовар)
 import * as CULL from './cull.js';               // статика дальше камеры — со сцены, матрицы заморожены (Steam Deck)
 
 /* Сохранения — через площадку (облако Яндекса / localStorage). Значения
@@ -64,6 +65,18 @@ const CAREER = Platform.id !== 'yandex' && !!MAP.career && !new URLSearchParams(
 if (CAREER) DIST.init({ MAP, Store: { get: Store.get, set: Store.set, flush: () => Platform.store.flush && Platform.store.flush() } });
 const DISTRICTS = CAREER && DIST.has();
 /* прогресс доната на цель города: 0…1 (econ.js DONATE) */
+/* деньги карьеры ×8 (econ.js MONEY_K): суммы, что заданы прямо в игре (кофейная война,
+   похититель, находки, учебный заказ, курьеры-соперники); на Яндексе — как были */
+const CASH = n => (CAREER ? n * ECON.MONEY_K : n);
+/* старое сохранение — один раз переводим в новые деньги: кошелёк, донаты, рейтинг пиццерии */
+if (CAREER && !Store.get('dlv-money-x8', 0)) {
+  const K = ECON.MONEY_K, mul = key => { const v = +Store.get(key, 0) || 0; if (v) Store.set(key, Math.round(v * K)); };
+  mul('dlv-msk-wallet'); mul('dlv-don-trash'); mul('dlv-don-gang');
+  let c = Store.get('dlv-crew', null);
+  if (typeof c === 'string') { try { c = JSON.parse(c); } catch (e) { c = null; } }
+  if (c && typeof c === 'object' && Array.isArray(c.crew)) { c.me = Math.round((c.me || 0) * K); for (const m of c.crew) m.total = Math.round((m.total || 0) * K); Store.set('dlv-crew', c); }
+  Store.set('dlv-money-x8', 1);
+}
 const donated = k => clamp((+Store.get('dlv-don-' + k, 0) || 0) / ((ECON.DONATE[k] && ECON.DONATE[k].goal) || 1), 0, 1);
 const NUMF = new Intl.NumberFormat(curLang() === 'zh' ? 'zh-CN' : curLang());
 const money = n => NUMF.format(Math.round(n || 0)) + ' ₽';
@@ -1934,9 +1947,9 @@ function warEnd (winner) {
   const near = WAR.pt && Math.hypot(WAR.pt.x - V.x, WAR.pt.z - V.z) < 220;
   if (winner === 0 && WAR.helped) {
     // помог выиграть — команда благодарит
-    S.burgers++; S.money += 500;
-    if (!S.freeRun) addWallet(500);
-    popBonus($t('{brand} благодарит!', { brand: OWN.coffee() }), $t('помог выиграть кофейную войну · +{money} и респект', { money: money(500) }));
+    S.burgers++; S.money += CASH(500);
+    if (!S.freeRun) addWallet(CASH(500));
+    popBonus($t('{brand} благодарит!', { brand: OWN.coffee() }), $t('помог выиграть кофейную войну · +{money} и респект', { money: money(CASH(500)) }));
   } else if (near) toast(winner === 0 ? $t('кофейная война: победил {brand}', { brand: OWN.coffee() }) : winner === 1 ? $t('кофейная война: победил «{rival}»', { rival: WAR.rival }) : $t('кофейная война: разошлись вничью'));
   for (const f of WAR.side2) if (!f.dead) dropMesh(f.grp);
   WAR.side2 = [];
@@ -1993,10 +2006,10 @@ function runOverCheck (f, what, good) {
     gibHuman(f, V.vx, V.vz);
     Snd.squish();
     if (good) {
-      S.burgers++; S.money += 150;
-      if (!S.freeRun) addWallet(150);
+      S.burgers++; S.money += CASH(150);
+      if (!S.freeRun) addWallet(CASH(150));
       WAR.helped++;
-      toast(pick([$t('респект от «{brand}» · +{money}', { brand: OWN.coffee(), money: money(150) }), $t('за синих! респект · +{money}', { money: money(150) }), $t('минус {what} · респект', { what })]));
+      toast(pick([$t('респект от «{brand}» · +{money}', { brand: OWN.coffee(), money: money(CASH(150)) }), $t('за синих! респект · +{money}', { money: money(CASH(150)) }), $t('минус {what} · респект', { what })]));
     } else { S.people++; toast($t('минус {what}', { what })); }
     return true;
   }
@@ -5160,7 +5173,7 @@ function gibHuman (p, vx, vz) {
     scene.add(m);
     GORE.push({
       m, vx: vx * 0.3 + rand(-5, 5), vy: rand(3, 8), vz: vz * 0.3 + rand(-5, 5),
-      spin: rand(-12, 12), life: rand(16, 24), bleed: rand(0.4, 1.2), rest: 0,
+      spin: rand(-12, 12), life: rand(16, 24), bleed: rand(0.4, 1.2), rest: 0, flesh: true,
     });
   }
   blood(p.x, 1, p.z, 16);
@@ -5210,7 +5223,7 @@ function updateGore (dt) {
           g.rest = 1;
           g.m.rotation.set(Math.PI / 2, g.m.rotation.y, 0);   // лёг плашмя
           if (g.soft) g.m.position.y = fl + 0.15;
-          else decal(g.m.position.x, g.m.position.z, 0x8f1f2b, rand(0.6, 1.1), 50);
+          else if (g.flesh) decal(g.m.position.x, g.m.position.z, 0x8f1f2b, rand(0.6, 1.1), 50);   // кровь — только у людей, не у знаков и сугробов
         }
       }
     } else {
@@ -6584,7 +6597,7 @@ function updateRivals (dt) {
       if ((R.wait -= dt) <= 0) {
         R.goal = rivalGoal();
         if (!R.goal) { R.wait = 3; continue; }
-        R.state = 'go'; R.fee = Math.round((120 + Math.hypot(R.goal.x - PIZZA.x, R.goal.z - PIZZA.z) * 1.7) * 0.9);
+        R.state = 'go'; R.fee = Math.round(CASH(120 + Math.hypot(R.goal.x - PIZZA.x, R.goal.z - PIZZA.z) * 1.7) * 0.9);
         svcRoute(t, R.goal.x, R.goal.z);
         dropGuest(R); R.lost = 0;
         R.guest = rivalGuest(R, t);
@@ -6955,10 +6968,10 @@ function updateThief (dt) {
     dropMesh(p.grp);
     gibHuman(p, V.vx, V.vz);
     S.burgers++;
-    S.money += 300;
-    if (!S.freeRun) addWallet(300);
+    S.money += CASH(300);
+    if (!S.freeRun) addWallet(CASH(300));
     Snd.squish();
-    popBonus($t('респект!'), $t('похититель пиццы наказан · +300 ₽'));
+    popBonus($t('респект!'), $t('похититель пиццы наказан · +{money}', { money: money(CASH(300)) }));
     dropThief('', true);
   }
 }
@@ -7334,7 +7347,7 @@ const COLLECT = ADULT ? [
   { id: 'penguin', name: $t('плюшевый пингвин'), far: true },
   { id: 'peel', name: $t('золотая лопата для пиццы'), far: true },
 ];
-const COL_PRIZE = 1000;
+const COL_PRIZE = CASH(1000);
 const colGot = () => { const v = Store.get('dlv-msk-col', []); return Array.isArray(v) ? v : []; };
 
 /* иконка предмета — на канвасе 128×128: и для меню, и для спрайта на карте */
@@ -9147,21 +9160,31 @@ function personRow (p) {
    Адрес, пицца и пометка курьера — мелко и приглушённо, это вторично.
    Внизу — большая «принять». Фон за анкетой размыт, чтобы не отвлекал. */
 function showOrderCard (order) {
-  $('ph-kind').textContent = KIND_LABEL[order.kind] || $t('заказ');
+  // весь попап — накладная: шапка «накладная · заказ  № 0007», таблица, фото на скрепке, кнопка «ГАЗ ГАЗ»
+  $('ph-kind').textContent = $t('накладная') + ' · ' + (KIND_LABEL[order.kind] || $t('заказ'));
+  const src = elPhone.querySelector('.ph-src');
+  if (src) src.textContent = '№ ' + String(S.orders).padStart(4, '0');
+  $('ph-accept').textContent = $t('ГАЗ ГАЗ');
   const many = order.stops.length > 1;
-  const face = (p, n) => {
-    const full = (p && p.name || $t('Иван Иванов')).split(/\s+/);
-    return '<div class="oc-p">' +
-      (n ? '<em>' + n + '</em>' : '') +
-      (p ? '<img src="' + faceDataURL(p) + '" alt="">' : '<i></i>') +
-      '<b>' + (full[0] || '') + '</b><span>' + (full.slice(1).join(' ') || '') + '</span></div>';
-  };
+  // аватарки сверху — кому везёшь; имена и всё остальное — таблицей, как накладная
+  const face = (p, n) => '<div class="oc-p">' + (n ? '<em>' + n + '</em>' : '') +
+    (p ? '<img src="' + faceDataURL(p) + '" alt="">' : '<i></i>') + '</div>';
+  const persons = order.stops.flatMap(st => st.persons);
   const people = order.stops.flatMap((st, i) => st.persons.map(p => face(p, many ? i + 1 : 0))).join('');
   const st0 = order.stops[0];
+  const who = persons.map(p => '<b>' + ((p && p.name) || $t('Иван Иванов')) + '</b>' + (p && p.desc ? '<small>' + p.desc + '</small>' : '')).join('');
+  const rows = [
+    [$t('получатель'), who],
+    [$t('адрес'), st0.addr + (many ? ' → ' + $t('ещё {n}', { n: order.stops.length - 1 }) : '')],
+    [$t('заказ'), order.items],
+    ...(order.ord ? ORD.cardRows(order) : []),
+    // пометка — только по делу: у обычного заказа («клиент ждёт · город») её нет, шлагбаум — остаётся
+    (() => { const w = order.ord && order.ord.plain ? order.why.split(' · ').slice(2).join(' · ') : order.why; return w ? [$t('пометка'), w] : null; })(),
+    st0.note ? [$t('комментарий курьера'), '«' + st0.note + '»'] : null,
+  ].filter(Boolean);
   elPhList.innerHTML =
-    '<div class="oc-people' + (order.stops.reduce((n, st) => n + st.persons.length, 0) > 2 ? ' small' : '') + '">' + people + '</div>' +
-    '<div class="oc-meta">' + st0.addr + (many ? ' → ' + $t('ещё {n}', { n: order.stops.length - 1 }) : '') + ' · ' + order.items + '</div>' +
-    '<div class="oc-note"><b>' + $t('комментарий курьера:') + '</b> «' + st0.note + '»</div>' +
+    '<div class="oc-sheet"><table class="oc-inv">' + rows.map(([k, v]) => '<tr><th>' + k + '</th><td>' + v + '</td></tr>').join('') + '</table>' +
+    '<div class="oc-photos' + (persons.length > 2 ? ' small' : '') + '"><i class="oc-clip"></i>' + people + '</div></div>' +
     (order.rush ? '<div class="oc-rush">⏱ ' + order.rushText + '<span>' + $t('после загрузки — полный бак кофе-нитро · оплата ×1,5') + '</span></div>' : '') +
     (order.surf ? '<div class="oc-rush oc-surf">🏄 ' + $t(MAP.river.surfCard, { name: SURF.person ? SURF.person.first : '' }) + '<span>' + $t('подъедь к набережной и притормози — пицца долетит прямо на доску · оплата ×2') + '</span></div>' : '');
   elPhWhat.textContent = order.items;
@@ -9397,6 +9420,42 @@ function tutorialWalk (e) {
   return null;
 }
 
+/* Первый заказ за всё время — Степан Тугарев, профессиональный ставочник на собак.
+   Сидит на лавочке в соседнем дворе (60—260 м от машины, ближе к 130) с кальяном
+   и выдувает огромные облака — по ним его и находишь. В детской версии — самовар и пар. */
+let STEPAN = null;
+function stepanPerson () {
+  if (!STEPAN) {
+    STEPAN = makePerson({ seed: 0x5e7a11, first: $t('Степан'), last: $t('Тугарев'), fem: false });
+    STEPAN.desc = ADULT ? $t('профессиональный ставочник на собак') : $t('знает по имени всех собак района');
+    STEPAN.pos = STEPAN.desc;
+  }
+  return STEPAN;
+}
+function stepanOrder (all) {
+  let best = null, bs = Infinity;
+  for (const b of BENCHES) {
+    if (b.taken || (b.prop && b.prop.down)) continue;
+    const d = Math.hypot(b.x - V.x, b.z - V.z);
+    if (d < 60 || d > 260 || (COURIER_SLOTS && COURIER_SLOTS.some(q => Math.hypot(q.x - b.x, q.z - b.z) < 25))) continue;
+    if (DISTRICTS && !DIST.isOpen(DIST.at(b.x, b.z))) continue;
+    const r = nearestRoad(b.x, b.z, 7, 4);
+    if (!r || r.d > 30) continue;                   // к лавочке можно подъехать
+    const sc = Math.abs(d - 130);
+    if (sc < bs) { bs = sc; best = b; }
+  }
+  if (!best) return null;
+  const p = all.find(q => !q.guest) || all[0];
+  if (p.idle) releaseIdle(p);
+  p.path = null; p.w = null;
+  dropMesh(p.grp); p.person = stepanPerson(); p.grp = makeHuman(p.person); p.speed = p.base * p.grp.userData.pace; scene.add(p.grp);
+  p.x = best.x; p.z = best.z;
+  p.idle = { b: best, phase: 'sit', t: 1e9, give: 0 }; best.taken = 1;        // сразу сидит: makeGuest оставит его на лавочке
+  p.grp.rotation.y = best.ry;
+  HK.guest(p, best);
+  return { kind: 'solo', tut: true, stops: [{ peds: [p] }], why: ADULT ? $t('первый заказ: Степан на лавочке во дворе — ищи облака дыма') : $t('первый заказ: Степан на лавочке во дворе — ищи пар от самовара') };
+}
+
 function planOrder () {
   const all = alive();
   if (!all.length) return null;
@@ -9447,6 +9506,8 @@ function planOrder () {
      него прямо и один раз направо. Дальше — случайные заказы, и чем
      дальше смена, тем дальше адреса. */
   if (!tutDone()) {
+    const st = stepanOrder(all);                  // Степан Тугарев на лавочке с кальяном
+    if (st) return st;
     const sp = tutorialSpot();
     if (sp) {
       const p = pick(all);
@@ -9573,7 +9634,7 @@ function newOrder () {
   if (plan.ord) ORD.setup(plan);                  // карьера: ECON.orderPay, срок, срочный — ×PAY.URGENT_TIME
   else {
     const d = Math.hypot(S.target.x - V.x, S.target.z - V.z);
-    S.fee = 120 * total + Math.round(d * 1.7);
+    S.fee = CASH(120 * total + Math.round(d * 1.7));
     if (plan.surf) S.fee *= 2;
     // срок — по длине пути по дорогам и по ритму волны (см. slackFor)
     S.timeMax = orderTime(routeLen(V.x, V.z, S.target.x, S.target.z), 1, S.orders);
@@ -10509,6 +10570,7 @@ spawnTraffic(INTRO ? 22 : 36);
 if (!INTRO) { buildSpots(); buildCollect(); }
 buildNitro();
 districtLocks();                                  // закрытые районы: перекрытия на въездах
+if (!INTRO) HK.init({ THREE, scene, BENCHES, V, S, ADULT, makeHuman, makePerson, dropMesh, gibHuman, groundH, curbAt, fxAdd, puffGeo, steam, toast, Snd, CAR_L, CAR_W, t: $t });
 /* ─────────────── сутки, погода, облака и птицы ───────────────
    Время идёт: утро → день → вечер → ночь → утро, полный круг за восемь
    минут. Небо, туман и свет плавно перетекают между ключевыми точками.
@@ -11140,6 +11202,7 @@ function frame (now) {
   choiceStep(dt);
   if (CAREER) ORD.step(dt);                       // очередь на HUD, посадка работников (orders.js)
   updateSmokers(dt);
+  HK.step(dt);                                    // кальянщики на лавочках
   updateParties(dt);
   updateCollect(dt);
   updateTrunk(dt);
