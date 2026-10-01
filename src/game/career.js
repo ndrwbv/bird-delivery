@@ -429,7 +429,7 @@ function refreshTabs () {
     if (sub) sub.textContent = A.donated(k) >= 1 ? t('цель собрана') : t('{p} % цели города', { p: Math.floor(A.donated(k) * 100) });
   }
   const s = el.querySelector('.cr-t-slot .cr-sub');
-  if (s) s.textContent = SH.slot ? t('уже крутил') : A.wallet() >= ECON.SLOT.STEP ? t('любая ставка до {money} · выигрываешь ×{n}', { money: A.money(A.wallet()), n: ECON.SLOT.MUL }) : t('нечего ставить');
+  if (s) s.textContent = SH.slot ? t('уже крутил') : A.wallet() >= ECON.SLOT.STEP ? t(GAME_NAME[depGame()]) + ' · ×' + gameMul(depGame()) : t('нечего ставить');
   el.querySelectorAll('.cr-tab').forEach(b => b.classList.toggle('cur', b.dataset.tab === TAB));
 }
 function openTab (k) {
@@ -438,7 +438,7 @@ function openTab (k) {
   p.className = k ? 'on cr-p-' + k : '';
   p.innerHTML = '';
   if (k === 'trash' || k === 'gang') paneDonate(p, k);
-  else if (k === 'slot') paneSlot(p);
+  else if (k === 'slot') { TAB = ''; p.className = ''; openDep(); }   // депнуть — своё окно на весь экран
   refreshTabs();
 }
 function rerender () { refreshWallet(); refreshTabs(); openTab(TAB); }
@@ -512,15 +512,19 @@ export const menuCam = (cam, P, tG) => MENU.cam(cam, P, tG);
 export const askName = cb => MENU.askName(cb);
 const spendOpen = () => { const m = $('cr-spend'); return m && !m.hidden ? m : null; };
 /** непрозрачный экран поверх города (гараж, «потратить») — кадр мира можно не рисовать */
-export const covered = () => GARAGE.isOpen() || !!spendOpen();
-/** что сейчас листает геймпад: окно имени, гараж, «потратить» — или null */
-export function padRoot () { return MENU.modal() || GARAGE.root() || spendOpen(); }
+export const covered = () => GARAGE.isOpen() || !!spendOpen() || !!depOpen();
+/** что сейчас листает геймпад: окно имени, гараж, «депнуть», «потратить» — или null */
+export function padRoot () { return MENU.modal() || GARAGE.root() || depOpen() || spendOpen(); }
 /** до makePadMenu: в гараже ←→ и LB/RB листают машины, B — закрыть то, что сверху */
 export function padPre (p) {
   if (!A) return;
   if (GARAGE.isOpen() && !MENU.modal()) {
     const d = (p.menuRight || p.pageR ? 1 : 0) - (p.menuLeft || p.pageL ? 1 : 0);
     if (d) GARAGE.flip(d);
+    p.menuLeft = p.menuRight = false;
+  } else if (depOpen() && !MENU.modal()) {          // в «депнуть» ←→ и LB/RB — ставка
+    const d = (p.menuRight || p.pageR ? 1 : 0) - (p.menuLeft || p.pageL ? 1 : 0);
+    if (d && !SH.slot) setStake(STAKE + d * stakeStep());
     p.menuLeft = p.menuRight = false;
   }
   if (p.menuBack && back()) p.menuBack = false;
@@ -529,6 +533,7 @@ export function padPre (p) {
 export function back () {
   if (MENU.modal()) return MENU.back();
   if (GARAGE.isOpen()) { GARAGE.close(); return true; }
+  if (depOpen()) return closeDep();
   if (spendOpen()) { closeSpend(true); return true; }
   return false;
 }
@@ -565,6 +570,7 @@ function onKey (e) {
   e.preventDefault(); e.stopPropagation();
   if (e.repeat && k === 'menuOk') return;
   if (GARAGE.isOpen() && root === GARAGE.root() && (k === 'menuLeft' || k === 'menuRight')) { GARAGE.flip(k === 'menuLeft' ? -1 : 1); return; }
+  if (depOpen() && root === depOpen() && (k === 'menuLeft' || k === 'menuRight')) { if (!SH.slot) setStake(STAKE + (k === 'menuLeft' ? -1 : 1) * stakeStep()); return; }   // ←→ — ставка
   if (k === 'menuBack') { back(); return; }
   const p = { connected: true, active: true, menuUp: false, menuDown: false, menuLeft: false, menuRight: false, menuOk: false, menuBack: false };
   const sel = KB.selected();
@@ -610,88 +616,262 @@ function paneDonate (p, k) {
   };
 }
 
-/* ── слот-машина (взрослая версия): ставка — любая сумма из кошелька (ползунок,
-   ¼ · ½ · всё; сначала стоит заработанное за смену), 1 из 10 удваивает ── */
+/* ── депнуть (взрослая версия) — своё окно на весь экран ──
+   Игра меняется по кругу (ECON.SLOT.GAMES), каждая смена — следующая:
+     slot     — однорукий бандит: три барабана, три семёрки — ×2
+     roulette — красное или чёрное: выбираешь цвет, крутится колесо (есть зеро) — ×2
+     tennis   — Андрюша, Игорёк или Настюша: выбираешь, кто выиграет матч — ×3
+   Ставка общая: ползунок шагом SLOT.STEP, кнопки −/+ и ¼ · ½ · всё (сначала стоит
+   заработанное за смену). Сколько ставишь — столько купюр высыпается кучей рядом,
+   и строкой: «из кошелька −N ₽ · останется M ₽». «ДЕП» — купюры уезжают в игру.
+   Первый деп за сессию (с запуска игры) выигрывает всегда (SLOT.FIRST_WIN). Раз за смену. */
 const SYM = ['7', '★', '♥', '₽', '◆', '♣'];
 const SYM_C = ['#ff4d5e', '#ffd85e', '#ff7fa8', '#7fe08a', '#6fd3ff', '#c9a0ff'];
+const N_ = s => s;
+const TENNIS = [
+  { id: 'andr', name: N_('Андрюша'), seed: 41027, fem: false },
+  { id: 'igor', name: N_('Игорёк'), seed: 77311, fem: false },
+  { id: 'nast', name: N_('Настюша'), seed: 50923, fem: true },
+];
+const GAME_NAME = { slot: N_('однорукий бандит'), roulette: N_('красное или чёрное'), tennis: N_('теннис: кто выиграет матч') };
 const stepDown = n => Math.floor(Math.max(0, n) / ECON.SLOT.STEP) * ECON.SLOT.STEP;
-let STAKE = 0;
-function paneSlot (p) {
-  const max = stepDown(A.wallet());
-  STAKE = Math.min(max, STAKE || stepDown(Math.max(A.S.money || 0, max / 4)) || max);
-  p.innerHTML = '<div class="cr-slot"><div class="cr-reels">' + [0, 1, 2].map(i => '<div class="cr-reel"><div class="cr-strip" data-r="' + i + '"></div></div>').join('') + '</div>' +
-    '<div class="cr-sres"></div>' +
-    (SH.slot || max <= 0 ? '' : '<div class="cr-stake"><input type="range" min="' + ECON.SLOT.STEP + '" max="' + max + '" step="' + ECON.SLOT.STEP + '" value="' + STAKE + '">' +
-      '<div class="cr-quick">' + [[0.25, '¼'], [0.5, '½'], [1, t('всё')]].map(([k, l]) => '<button type="button" class="cr-btn" data-k="' + k + '">' + esc(l) + '</button>').join('') + '</div></div>') +
-    '<button type="button" class="cr-btn buy cr-spin"></button></div>';
-  const range = p.querySelector('.cr-stake input');
-  const label = () => {
-    btn.textContent = SH.slot ? t('уже крутил') : t('крутить · ставка {money}', { money: A.money(STAKE) });
-    btn.disabled = SH.slot || STAKE <= 0 || STAKE > A.wallet();
-  };
-  if (range) {
-    range.addEventListener('input', () => { STAKE = +range.value || 0; label(); });
-    p.querySelectorAll('.cr-quick button').forEach(b => b.addEventListener('click', () => {
-      STAKE = Math.max(ECON.SLOT.STEP, stepDown(max * +b.dataset.k)); range.value = STAKE; label();
-    }));
+let STAKE = 0, DEP_SESSION = 0, PICK = null, GAME = 'slot';
+const BILLS_MAX = 36;
+/** какая игра в «депнуть» на этой смене: по кругу от номера смены */
+export const depGame = () => { const G = ECON.SLOT.GAMES; return G[((SH.n || 0) % G.length + G.length) % G.length]; };
+const gameMul = g => (ECON.SLOT[g] && ECON.SLOT[g].mul) || ECON.SLOT.MUL;
+function depBox () {
+  let md = $('cr-dep');
+  if (md) return md;
+  md = document.createElement('div');
+  md.id = 'cr-dep';
+  md.hidden = true;
+  md.innerHTML = '<div class="dep-box">' +
+    '<div class="dep-t"></div><div class="dep-g"></div>' +
+    '<div class="dep-main"><div class="dep-stage"></div><div class="dep-pile"></div></div>' +
+    '<div class="dep-res"></div>' +
+    '<div class="dep-sum"><b></b><span></span></div>' +
+    '<div class="dep-stake"><button type="button" class="cr-btn dep-minus">−</button><input type="range"><button type="button" class="cr-btn dep-plus">+</button></div>' +
+    '<div class="cr-quick dep-quick">' + [[0.25, '¼'], [0.5, '½'], [1, '']].map(([k, l]) => '<button type="button" class="cr-btn" data-k="' + k + '">' + esc(l) + '</button>').join('') + '</div>' +
+    '<button type="button" class="dep-go"></button>' +
+    '<button type="button" class="cr-btn dep-close"></button>' +
+  '</div>';
+  ($('game') || document.body).appendChild(md);
+  md.querySelector('.dep-close').addEventListener('click', () => closeDep());
+  const range = md.querySelector('input');
+  range.addEventListener('input', () => setStake(+range.value || 0));
+  md.querySelector('.dep-minus').addEventListener('click', () => setStake(STAKE - stakeStep()));
+  md.querySelector('.dep-plus').addEventListener('click', () => setStake(STAKE + stakeStep()));
+  md.querySelectorAll('.dep-quick button').forEach(b => b.addEventListener('click', () => setStake(stepDown(stepDown(A.wallet()) * +b.dataset.k))));
+  md.querySelector('.dep-go').addEventListener('click', spin);
+  return md;
+}
+/* шаг кнопок −/+: ~1/20 кошелька, круглым числом */
+function stakeStep () {
+  const w = A.wallet(), raw = Math.max(ECON.SLOT.STEP, w / 20), p = 10 ** Math.floor(Math.log10(raw));
+  return Math.max(ECON.SLOT.STEP, Math.round(raw / p) * p);
+}
+const depOpen = () => { const m = $('cr-dep'); return m && !m.hidden ? m : null; };
+const cell = s => '<i style="color:' + SYM_C[s] + '">' + SYM[s] + '</i>';
+
+/* ── сцены игр ── */
+const WHEEL_N = 37;                               // 0 — зеро (зелёное), дальше красное и чёрное через одно
+const wheelColor = i => (i === 0 ? 'zero' : i % 2 ? 'red' : 'black');
+function stageHTML (g) {
+  if (g === 'slot') return '<div class="dep-machine"><div class="dep-top">777</div><div class="cr-reels">' +
+    [0, 1, 2].map(i => '<div class="cr-reel"><div class="cr-strip" data-r="' + i + '">' + cell((i * 2 + 1) % SYM.length) + '</div></div>').join('') +
+    '</div><div class="dep-slit"></div><i class="dep-lever"><b></b></i></div>';
+  if (g === 'roulette') {
+    const seg = 360 / WHEEL_N, stops = [];
+    for (let i = 0; i < WHEEL_N; i++) { const c = { zero: '#2f9e4f', red: '#d9342c', black: '#1d1a22' }[wheelColor(i)]; stops.push(c + ' ' + (i * seg).toFixed(2) + 'deg ' + ((i + 1) * seg).toFixed(2) + 'deg'); }
+    return '<div class="dep-rl"><div class="dep-ptr"></div><div class="dep-wheel" style="background:conic-gradient(' + stops.join(',') + ')"><i></i></div></div>' +
+      '<div class="dep-picks">' + [['red', t('красное')], ['black', t('чёрное')]].map(([k, l]) => '<button type="button" class="dep-pick dep-c-' + k + '" data-p="' + k + '">' + esc(l) + '</button>').join('') + '</div>';
   }
-  const strips = [...p.querySelectorAll('.cr-strip')];
-  const cell = s => '<i style="color:' + SYM_C[s] + '">' + SYM[s] + '</i>';
-  // лента: 30 случайных символов, последний — тот, на котором встанет барабан
-  const fill = (el, last) => { let h = ''; for (let i = 0; i < 29; i++) h += cell((Math.random() * SYM.length) | 0); el.innerHTML = h + cell(last); };
-  strips.forEach((el, i) => { el.innerHTML = cell((i * 2 + 1) % SYM.length); });
-  const btn = p.querySelector('.cr-spin'), res = p.querySelector('.cr-sres');
-  label();
-  btn.onclick = () => {
-    const st = Math.min(STAKE, stepDown(A.wallet()));
-    if (SH.slot || st <= 0) return;
-    const stake = p.querySelector('.cr-stake');
-    if (stake) stake.remove();
-    SH.slot = true;
-    btn.disabled = true;
-    const win = Math.random() < ECON.SLOT.WIN;
-    let out;
-    if (win) out = [0, 0, 0];
-    else { do out = [0, 1, 2].map(() => (Math.random() * SYM.length) | 0); while (out[0] === out[1] && out[1] === out[2]); }
-    A.addWallet(-st);
-    A.Store.flush();
-    refreshWallet();
-    res.textContent = ''; res.className = 'cr-sres';
-    strips.forEach((el, i) => fill(el, out[i]));
-    const H = strips[0].firstChild ? strips[0].firstChild.getBoundingClientRect().height || 48 : 48;
-    const t0 = performance.now(), STOP = [1100, 1700, 2300];
-    let tickN = 0;
-    const anim = now => {
-      const e = now - t0;
-      let all = true;
-      strips.forEach((el, i) => {
-        const k = Math.min(1, e / STOP[i]);
-        if (k < 1) all = false;
-        const y = (1 - (1 - k) ** 3) * 29 * H;           // замедляется к концу
-        el.style.transform = 'translateY(' + (-y).toFixed(1) + 'px)';
-        if (k >= 1 && !el.dataset.stopped) { el.dataset.stopped = '1'; A.Snd.blip(420 + i * 120, 0.09, 'square', 0.1); }
-      });
-      if (((e / 90) | 0) > tickN) { tickN = (e / 90) | 0; if (!all) A.Snd.blip(900 + (tickN % 3) * 60, 0.02, 'square', 0.03); }
-      if (!all) requestAnimationFrame(anim);
-      else {
-        if (win) {
-          A.addWallet(st * ECON.SLOT.MUL);
-          A.Store.flush();
-          res.textContent = t('×{k}! +{money}', { k: ECON.SLOT.MUL, money: A.money(st * (ECON.SLOT.MUL - 1)) });
-          res.classList.add('win');
-          A.Snd.coin();
-        } else {
-          res.textContent = t('мимо · −{money}', { money: A.money(st) });
-          res.classList.add('lose');
-          A.Snd.fail && A.Snd.fail();
-        }
-        btn.textContent = t('уже крутил');
-        refreshWallet(); refreshTabs();
-      }
-    };
-    strips.forEach(el => { delete el.dataset.stopped; el.style.transform = 'translateY(0)'; });
-    requestAnimationFrame(anim);
+  // теннис: корт, мячик и три игрока — кого выберешь, за того и болеешь
+  return '<div class="dep-court"><i class="dep-ball"></i><b class="dep-score">0 : 0</b></div><div class="dep-picks dep-players">' + TENNIS.map(p => {
+    let face = '';
+    try { if (A.person && A.face) face = A.face(A.person({ seed: p.seed, fem: p.fem }), 64); } catch (e) { face = ''; }
+    return '<button type="button" class="dep-pick dep-pl" data-p="' + p.id + '">' + (face ? '<img src="' + face + '" alt="">' : '<i></i>') + '<span>' + esc(t(p.name)) + '</span></button>';
+  }).join('') + '</div>';
+}
+function openDep () {
+  const md = depBox();
+  GAME = depGame(); PICK = null;
+  const max = stepDown(A.wallet());
+  STAKE = Math.min(max, stepDown(A.S.money || 0) || stepDown(max / 4) || max);
+  md.dataset.game = GAME;
+  md.querySelector('.dep-t').textContent = t('депнуть');
+  md.querySelector('.dep-g').textContent = t(GAME_NAME[GAME]) + ' · ×' + gameMul(GAME);
+  md.querySelector('.dep-quick [data-k="1"]').textContent = t('всё');
+  md.querySelector('.dep-close').textContent = t('назад');
+  md.querySelector('.dep-pile').innerHTML = '';
+  md.querySelector('.dep-res').textContent = ''; md.querySelector('.dep-res').className = 'dep-res';
+  md.querySelector('.dep-stage').innerHTML = stageHTML(GAME);
+  md.querySelectorAll('.dep-pick').forEach(b => b.addEventListener('click', () => {
+    if (SH.slot) return;
+    PICK = b.dataset.p;
+    md.querySelectorAll('.dep-pick').forEach(q => q.classList.toggle('on', q === b));
+    A.Snd.blip(660, 0.05, 'square', 0.06);
+    setStake(STAKE, true);
+  }));
+  md.classList.remove('spun');
+  const r = md.querySelector('input');
+  r.min = max ? ECON.SLOT.STEP : 0; r.max = max; r.step = ECON.SLOT.STEP;
+  md.hidden = false;
+  requestAnimationFrame(() => md.classList.add('on'));
+  setStake(STAKE, true);
+}
+function closeDep () {
+  const md = $('cr-dep');
+  if (!md || md.hidden) return false;
+  md.classList.remove('on'); md.hidden = true;
+  refreshWallet(); refreshTabs();
+  return true;
+}
+/* ставка: цифры, ползунок и куча купюр рядом с игрой (их столько, какая доля кошелька) */
+function setStake (v, quiet) {
+  const md = depBox(), max = stepDown(A.wallet()), done = SH.slot;
+  STAKE = Math.max(max ? ECON.SLOT.STEP : 0, Math.min(max, stepDown(v)));
+  const r = md.querySelector('input');
+  r.value = STAKE; r.disabled = done || max <= 0;
+  md.querySelector('.dep-sum b').textContent = A.money(STAKE);
+  md.querySelector('.dep-sum span').textContent = done ? t('уже крутил на этой смене')
+    : max <= 0 ? t('нечего ставить') : t('из кошелька −{money} · останется {left}', { money: A.money(STAKE), left: A.money(A.wallet() - STAKE) });
+  md.querySelectorAll('.dep-stake button, .dep-quick button').forEach(b => { b.disabled = done || max <= 0; });
+  const go = md.querySelector('.dep-go'), need = GAME !== 'slot' && !PICK;
+  go.textContent = done ? t('уже крутил') : need ? (GAME === 'roulette' ? t('выбери цвет') : t('выбери, кто выиграет')) : t('ДЕП · {money}', { money: A.money(STAKE) });
+  go.disabled = done || need || STAKE <= 0 || STAKE > A.wallet();
+  pile(max ? Math.max(1, Math.round(BILLS_MAX * STAKE / max)) : 0, quiet);
+}
+function pile (n, quiet) {
+  const box = depBox().querySelector('.dep-pile');
+  const have = box.querySelectorAll('i:not(.gone)');
+  if (have.length < n) {
+    for (let k = have.length; k < n; k++) {
+      const b = document.createElement('i');
+      const row = Math.floor(k / 6), col = k % 6;
+      b.style.left = (6 + col * 14 + (row % 2) * 6 + (Math.random() * 6 - 3)) + '%';
+      b.style.bottom = (4 + row * 9 + Math.random() * 3) + '%';
+      b.style.setProperty('--r', (Math.random() * 40 - 20).toFixed(0) + 'deg');
+      b.style.animationDelay = quiet ? '0s' : ((k - have.length) * 0.035).toFixed(3) + 's';
+      b.textContent = '₽';
+      box.appendChild(b);
+    }
+    if (!quiet) A.Snd.blip(520 + n * 12, 0.04, 'square', 0.05);
+  } else for (let k = have.length - 1; k >= n; k--) { const b = have[k]; b.classList.add('gone'); setTimeout(() => b.remove(), 300); }
+}
+
+/* ── прокрутка: исход решается сразу, анимация его только показывает ── */
+function spin () {
+  const md = depBox();
+  const st = Math.min(STAKE, stepDown(A.wallet()));
+  if (SH.slot || st <= 0 || (GAME !== 'slot' && !PICK)) return;
+  SH.slot = true;
+  DEP_SESSION++;
+  const cfg = ECON.SLOT[GAME] || {};
+  const chance = GAME === 'tennis' ? 1 / TENNIS.length : cfg.win != null ? cfg.win : ECON.SLOT.WIN;
+  const win = (ECON.SLOT.FIRST_WIN && DEP_SESSION === 1) || Math.random() < chance;
+  A.addWallet(-st);
+  A.Store.flush();
+  refreshWallet();
+  md.classList.add('spun');                       // купюры уезжают в игру
+  md.querySelectorAll('.dep-stake button, .dep-quick button, .dep-go').forEach(b => { b.disabled = true; });
+  md.querySelector('input').disabled = true;
+  md.querySelector('.dep-sum span').textContent = t('из кошелька −{money} · останется {left}', { money: A.money(st), left: A.money(A.wallet()) });
+  A.Snd.blip(220, 0.12, 'square', 0.08);
+  const finish = (txt) => {
+    const res = md.querySelector('.dep-res');
+    md.querySelector('.dep-pile').innerHTML = '';
+    if (win) {
+      const prize = st * gameMul(GAME);
+      A.addWallet(prize);
+      A.Store.flush();
+      res.innerHTML = esc(txt) + '<br>' + esc(t('×{k}! +{money}', { k: gameMul(GAME), money: A.money(prize - st) }));
+      res.className = 'dep-res win';
+      md.classList.remove('spun');
+      pile(BILLS_MAX, false);                      // выигрыш — полная куча обратно
+      [0, 1, 2].forEach(i => setTimeout(() => A.Snd.coin(), i * 160));
+      md.querySelector('.dep-sum b').textContent = '+' + A.money(prize);
+    } else {
+      res.innerHTML = esc(txt) + '<br>' + esc(t('мимо · −{money}', { money: A.money(st) }));
+      res.className = 'dep-res lose';
+      A.Snd.fail && A.Snd.fail();
+    }
+    md.querySelector('.dep-sum span').textContent = t('в кошельке {money}', { money: A.money(A.wallet()) });
+    md.querySelector('.dep-go').textContent = t('уже крутил');
+    refreshWallet(); refreshTabs();
   };
+  if (GAME === 'roulette') spinWheel(md, win, finish);
+  else if (GAME === 'tennis') playMatch(md, win, finish);
+  else spinReels(md, win, finish);
+}
+function spinReels (md, win, finish) {
+  let out;
+  if (win) out = [0, 0, 0];
+  else { do out = [0, 1, 2].map(() => (Math.random() * SYM.length) | 0); while (out[0] === out[1] && out[1] === out[2]); }
+  const strips = [...md.querySelectorAll('.cr-strip')];
+  const fill = (el, last) => { let h = ''; for (let i = 0; i < 29; i++) h += cell((Math.random() * SYM.length) | 0); el.innerHTML = h + cell(last); };
+  strips.forEach((el, i) => { fill(el, out[i]); el.style.transform = 'translateY(0)'; delete el.dataset.stopped; });
+  const H = strips[0].firstChild ? strips[0].firstChild.getBoundingClientRect().height || 56 : 56;
+  const t0 = performance.now(), STOP = [1300, 1900, 2600];
+  let tickN = 0;
+  const anim = now => {
+    const e = now - t0;
+    let all = true;
+    strips.forEach((el, i) => {
+      const k = Math.min(1, e / STOP[i]);
+      if (k < 1) all = false;
+      el.style.transform = 'translateY(' + (-(1 - (1 - k) ** 3) * 29 * H).toFixed(1) + 'px)';
+      if (k >= 1 && !el.dataset.stopped) { el.dataset.stopped = '1'; A.Snd.blip(420 + i * 120, 0.09, 'square', 0.1); }
+    });
+    if (((e / 90) | 0) > tickN) { tickN = (e / 90) | 0; if (!all) A.Snd.blip(900 + (tickN % 3) * 60, 0.02, 'square', 0.03); }
+    if (!all) requestAnimationFrame(anim);
+    else finish(win ? t('три семёрки!') : t('не сошлось'));
+  };
+  requestAnimationFrame(anim);
+}
+/* колесо: выигрыш — сектор выбранного цвета, проигрыш — другого или зеро */
+function spinWheel (md, win, finish) {
+  const other = PICK === 'red' ? 'black' : 'red';
+  const want = win ? PICK : (Math.random() < 1 / 19 ? 'zero' : other);
+  const cand = [];
+  for (let i = 0; i < WHEEL_N; i++) if (wheelColor(i) === want) cand.push(i);
+  const i = cand[(Math.random() * cand.length) | 0], seg = 360 / WHEEL_N;
+  // указатель сверху: сектор i встаёт под него, если колесо повернуть на −(середина сектора)
+  const deg = 360 * 6 - (i + 0.5) * seg;
+  const w = md.querySelector('.dep-wheel');
+  w.style.transition = 'none'; w.style.transform = 'rotate(0deg)';
+  void w.offsetWidth;
+  w.style.transition = 'transform 3.2s cubic-bezier(.12, .7, .15, 1)';
+  w.style.transform = 'rotate(' + deg + 'deg)';
+  let n = 0;
+  const tick = setInterval(() => { A.Snd.blip(1000 - n * 20, 0.015, 'square', 0.03); if (++n > 34) clearInterval(tick); }, 90);
+  setTimeout(() => {
+    clearInterval(tick);
+    const name = { red: t('красное'), black: t('чёрное'), zero: t('зеро') }[want];
+    finish(t('выпало: {what}', { what: name }));
+  }, 3350);
+}
+/* матч: мячик летает по корту, счёт тикает; побеждает выбранный (выигрыш) или другой */
+function playMatch (md, win, finish) {
+  const others = TENNIS.filter(p => p.id !== PICK);
+  const champ = win ? TENNIS.find(p => p.id === PICK) : others[(Math.random() * others.length) | 0];
+  const court = md.querySelector('.dep-court'), score = md.querySelector('.dep-score');
+  court.classList.add('play');
+  let a = 0, b = 0, k = 0;
+  const iv = setInterval(() => {
+    if (Math.random() < 0.5) a++; else b++;
+    score.textContent = Math.min(6, a) + ' : ' + Math.min(6, b);
+    A.Snd.blip(k % 2 ? 380 : 520, 0.03, 'square', 0.05);
+    k++;
+  }, 260);
+  setTimeout(() => {
+    clearInterval(iv);
+    court.classList.remove('play');
+    score.textContent = '6 : ' + (2 + ((Math.random() * 3) | 0));
+    md.querySelectorAll('.dep-pl').forEach(q => q.classList.toggle('champ', q.dataset.p === champ.id));
+    finish(champ.fem ? t('матч выиграла {who}', { who: t(champ.name) }) : t('матч выиграл {who}', { who: t(champ.name) }));
+  }, 2900);
 }
 
 /* отладка: __dlv.CAREERM.skipTo(13.9) — к обеду, skipTo(23.95) — к полуночи */
@@ -701,5 +881,5 @@ const DEBUG = {
   // перемотка за обед — обед считается прошедшим (иначе он всплывает в любом пресете песочницы)
   skipTo (h) { if (A) { A.env().t = ECON.tOfHour(h); if (h > ECON.SHIFT.LUNCH_H + 0.05) SH.lunch = true; else if (h < ECON.SHIFT.LUNCH_H) SH.lunch = false; } },
   useCars (api) { CARS_MOCK = api || null; },
-  crewBoard, crewLoad: () => (A ? crewLoad() : null), openGarage, closeGarage: GARAGE.close, garageFlip: GARAGE.flip, openSpend, menu, askName, back,
+  crewBoard, crewLoad: () => (A ? crewLoad() : null), openDep, closeDep, openGarage, closeGarage: GARAGE.close, garageFlip: GARAGE.flip, openSpend, menu, askName, back,
 };

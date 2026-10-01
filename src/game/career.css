@@ -162,3 +162,76 @@ body:has(#cr-spend:not([hidden])) .hud, body:has(#cr-spend:not([hidden])) #ctrls
 .cr-sp-new[hidden] { display: none; }
 .cr-sp-new b { font-weight: normal; font-size: clamp(11px, 1.4vw, 16px); }
 .cr-sp-new span { font-size: clamp(7px, .75vw, 9px); line-height: 1.7; }
+
+/* «депнуть» — своё окно на весь экран (career.js openDep): автомат, куча купюр, ставка */
+#cr-dep { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .2s;
+          background: radial-gradient(ellipse at 50% 35%, #5a1d4e, #1a0f24 72%); padding: 12px; box-sizing: border-box; overflow: auto; }
+#cr-dep[hidden] { display: none; }
+#cr-dep.on { opacity: 1; }
+.dep-box { width: min(760px, 100%); display: flex; flex-direction: column; align-items: center; gap: clamp(10px, 2vh, 18px); margin: auto; }
+.dep-t { font-size: clamp(22px, 4vw, 44px); color: #ffd85e; letter-spacing: .06em; text-shadow: 4px 4px 0 #33210c, 0 0 24px rgba(255, 216, 94, .45); animation: dep-glow 1.4s ease-in-out infinite; }
+@keyframes dep-glow { 50% { text-shadow: 4px 4px 0 #33210c, 0 0 6px rgba(255, 216, 94, .2); } }
+.dep-main { display: flex; align-items: flex-end; justify-content: center; gap: clamp(10px, 3vw, 28px); width: 100%; }
+.dep-machine { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 16px 18px; background: linear-gradient(#d9342c, #8f1d18);
+               border: 4px solid #33210c; border-radius: 18px 18px 10px 10px; box-shadow: 0 8px 0 #33210c, inset 0 0 0 4px #ffb04d; }
+.dep-top { font-size: 16px; color: #ffd85e; text-shadow: 2px 2px 0 #33210c; letter-spacing: .3em; animation: cr-blink .8s steps(2) infinite; }
+.dep-machine .cr-reel { width: clamp(56px, 9vw, 80px); height: 64px; }
+.dep-machine .cr-strip i { height: 64px; font-size: 34px; }
+.dep-slit { width: 70%; height: 8px; border-radius: 4px; background: #1a0f0d; box-shadow: inset 0 2px 3px #000; }
+.dep-res { min-height: 16px; font-size: clamp(11px, 1.4vw, 16px); color: #fff3d6; text-shadow: 2px 2px 0 #33210c; }
+.dep-res.win { color: #ffd85e; animation: cr-blink .4s steps(2) 8; }
+.dep-res.lose { color: #ffb0b0; }
+.dep-lever { position: absolute; right: -22px; top: 26px; width: 8px; height: 70px; background: #9a9aa6; border: 2px solid #33210c; border-radius: 4px; transform-origin: 50% 100%; transition: transform .25s; }
+.dep-lever b { position: absolute; left: -9px; top: -18px; width: 22px; height: 22px; border-radius: 50%; background: #ffd85e; border: 3px solid #33210c; }
+#cr-dep.spun .dep-lever { transform: scaleY(-.6); }
+/* куча купюр: падают сверху, ложатся с наклоном; на «ДЕП» уезжают в щель автомата */
+.dep-pile { position: relative; width: clamp(140px, 30vw, 260px); height: clamp(150px, 26vh, 230px); border-bottom: 4px solid #33210c; }
+.dep-pile i { position: absolute; width: 22%; height: 15%; display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 11px; color: #1d4d23;
+              background: linear-gradient(90deg, #7fd38a, #a8ecb0 50%, #7fd38a); border: 2px solid #2d6b34; border-radius: 3px; box-shadow: 0 2px 0 rgba(0, 0, 0, .35);
+              transform: rotate(var(--r)); animation: dep-fall .45s cubic-bezier(.3, 1.5, .6, 1) both; }
+.dep-pile i.gone { animation: dep-out .3s ease-in forwards; }
+#cr-dep.spun .dep-pile i { animation: dep-suck .6s ease-in forwards; }
+@keyframes dep-fall { from { transform: translateY(-260%) rotate(calc(var(--r) * -2)); opacity: 0; } 60% { opacity: 1; } to { transform: rotate(var(--r)); opacity: 1; } }
+@keyframes dep-out { to { transform: translateY(-80%) rotate(var(--r)); opacity: 0; } }
+@keyframes dep-suck { to { transform: translate(-260%, -320%) rotate(90deg) scale(.3); opacity: 0; } }
+.dep-sum { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.dep-sum b { font-weight: normal; font-size: clamp(26px, 5vw, 54px); color: #ffd85e; text-shadow: 4px 4px 0 #33210c; }
+.dep-sum span { font-size: clamp(8px, 1vw, 12px); color: #ffd0e8; text-align: center; }
+.dep-stake { display: flex; align-items: center; gap: 10px; width: min(520px, 100%); }
+.dep-stake input { flex: 1; accent-color: #ffd85e; height: 28px; }
+.dep-stake .cr-btn { width: 48px; padding: 10px 0; font-size: 16px; }
+.dep-quick { width: min(520px, 100%); }
+.dep-go { font: inherit; font-size: clamp(16px, 2.6vw, 28px); padding: 18px 40px; cursor: pointer; color: #33210c; background: #ffd85e; border: 4px solid #33210c;
+          border-radius: 12px; box-shadow: 0 6px 0 #33210c, 0 0 30px rgba(255, 216, 94, .5); animation: dep-pulse 1s ease-in-out infinite; }
+.dep-go:disabled { animation: none; opacity: .5; cursor: default; }
+.dep-go:not(:disabled):active { transform: translateY(4px); box-shadow: 0 2px 0 #33210c; }
+@keyframes dep-pulse { 50% { transform: scale(1.04); } }
+.dep-close { padding: 10px 22px; }
+@media (max-width: 560px) { .dep-main { flex-direction: column; align-items: center; } .dep-lever { display: none; } }
+.dep-g { font-size: clamp(9px, 1.2vw, 14px); color: #ffd0e8; margin-top: -6px; }
+.dep-stage { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+#cr-dep .dep-res { min-height: 30px; text-align: center; line-height: 1.6; }
+/* красное или чёрное: колесо с указателем сверху */
+.dep-rl { position: relative; width: clamp(150px, 26vw, 220px); aspect-ratio: 1; }
+.dep-wheel { position: absolute; inset: 0; border-radius: 50%; border: 6px solid #ffb04d; box-shadow: 0 0 0 4px #33210c, 0 8px 0 4px #33210c; }
+.dep-wheel i { position: absolute; inset: 34%; border-radius: 50%; background: radial-gradient(#ffe7a0, #b8862e); border: 4px solid #33210c; }
+.dep-ptr { position: absolute; left: 50%; top: -14px; z-index: 2; width: 0; height: 0; transform: translateX(-50%);
+           border-left: 12px solid transparent; border-right: 12px solid transparent; border-top: 24px solid #ffd85e; filter: drop-shadow(0 3px 0 #33210c); }
+.dep-picks { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.dep-pick { font: inherit; font-size: clamp(10px, 1.2vw, 14px); padding: 12px 18px; cursor: pointer; color: #fff3d6; border: 3px solid #33210c; border-radius: 10px;
+            box-shadow: 0 4px 0 #33210c; background: #3a4570; transition: transform .1s; }
+.dep-pick.on { outline: 4px solid #ffd85e; outline-offset: 2px; transform: translateY(-3px); }
+.dep-c-red { background: #d9342c; }
+.dep-c-black { background: #1d1a22; }
+/* теннис: корт с мячиком и три игрока */
+.dep-court { position: relative; width: clamp(200px, 34vw, 300px); height: 90px; border-radius: 6px; border: 4px solid #33210c;
+             background: linear-gradient(90deg, transparent calc(50% - 2px), #fff 0 calc(50% + 2px), transparent 0), linear-gradient(#3f8f4c, #2f7a3e);
+             box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .7); overflow: hidden; }
+.dep-ball { position: absolute; left: 10%; top: 50%; width: 12px; height: 12px; margin: -6px; border-radius: 50%; background: #e6ff4d; border: 2px solid #33210c; }
+.dep-court.play .dep-ball { animation: dep-rally .52s ease-in-out infinite alternate, dep-hop .26s ease-in-out infinite alternate; }
+@keyframes dep-rally { from { left: 8%; } to { left: 92%; } }
+@keyframes dep-hop { from { top: 30%; } to { top: 72%; } }
+.dep-score { position: absolute; left: 50%; top: 6px; transform: translateX(-50%); font-weight: normal; font-size: 12px; color: #fff3d6; text-shadow: 2px 2px 0 #33210c; }
+.dep-pl { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 12px; }
+.dep-pl img, .dep-pl > i { width: 48px; height: 48px; image-rendering: pixelated; border-radius: 6px; background: #2a3766; display: block; }
+.dep-pl.champ { background: #ffd85e; color: #33210c; animation: dep-pulse .6s ease-in-out 4; }
