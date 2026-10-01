@@ -9421,7 +9421,8 @@ function tutorialWalk (e) {
 }
 
 /* Первый заказ за всё время — Степан Тугарев, профессиональный ставочник на собак.
-   Сидит на лавочке в соседнем дворе (60—260 м от машины, ближе к 130) с кальяном
+   В карьере он же — первый клиент каждой смены (ORD.adopt: оплата и срок как у пиццы).
+   Сидит на лавочке в соседнем дворе (45—420 м от машины, ближе к 130) с кальяном
    и выдувает огромные облака — по ним его и находишь. В детской версии — самовар и пар. */
 let STEPAN = null;
 function stepanPerson () {
@@ -9432,13 +9433,14 @@ function stepanPerson () {
   }
   return STEPAN;
 }
-function stepanOrder (all) {
+function stepanOrder (all, career) {
+  if (!all || !all.length) return null;
   let best = null, bs = Infinity;
   for (const b of BENCHES) {
     if (b.taken || (b.prop && b.prop.down)) continue;
     const d = Math.hypot(b.x - V.x, b.z - V.z);
-    if (d < 60 || d > 260 || (COURIER_SLOTS && COURIER_SLOTS.some(q => Math.hypot(q.x - b.x, q.z - b.z) < 25))) continue;
-    if (DISTRICTS && !DIST.isOpen(DIST.at(b.x, b.z))) continue;
+    if (d < 45 || d > 420 || (COURIER_SLOTS && COURIER_SLOTS.some(q => Math.hypot(q.x - b.x, q.z - b.z) < 25))) continue;
+    if (DISTRICTS && DIST.at(b.x, b.z) !== DIST.cur()) continue;           // в районе, где работаешь
     const r = nearestRoad(b.x, b.z, 7, 4);
     if (!r || r.d > 30) continue;                   // к лавочке можно подъехать
     const sc = Math.abs(d - 130);
@@ -9453,7 +9455,8 @@ function stepanOrder (all) {
   p.idle = { b: best, phase: 'sit', t: 1e9, give: 0 }; best.taken = 1;        // сразу сидит: makeGuest оставит его на лавочке
   p.grp.rotation.y = best.ry;
   HK.guest(p, best);
-  return { kind: 'solo', tut: true, stops: [{ peds: [p] }], why: ADULT ? $t('первый заказ: Степан на лавочке во дворе — ищи облака дыма') : $t('первый заказ: Степан на лавочке во дворе — ищи пар от самовара') };
+  const why = ADULT ? $t('первый заказ: Степан на лавочке во дворе — ищи облака дыма') : $t('первый заказ: Степан на лавочке во дворе — ищи пар от самовара');
+  return { kind: 'solo', tut: !career, stops: [{ peds: [p] }], why };
 }
 
 function planOrder () {
@@ -9579,7 +9582,8 @@ function newOrder () {
   S.orders++;
   clearGate();
   // карьера: очередь, план смены, без повторов (orders.js); учебный — по-старому
-  const plan = CAREER && tutDone() ? ORD.nextPlan() : planOrder();
+  // карьера: первый клиент каждой смены — Степан Тугарев на лавочке у пиццерии района
+  const plan = CAREER && tutDone() ? ((S.orders === 1 && !S.ride && ORD.adopt(stepanOrder(alive(), true))) || ORD.nextPlan()) : planOrder();
   if (!plan) { backToBase(); return; }
   if (plan.story) { ORD.startStory(plan); return; }   // сюжетный: у двери человек из story.js
 
