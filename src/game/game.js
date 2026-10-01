@@ -9642,7 +9642,7 @@ function tutorialWalk (e) {
 }
 
 /* Первый заказ за всё время — Степан Тугарев, профессиональный ставочник на собак.
-   В карьере он же — первый клиент каждой смены (ORD.adopt: оплата и срок как у пиццы).
+   Только он один раз: дальше, и в карьере тоже, первым приходит обычный заказ смены.
    Сидит на лавочке в соседнем дворе (45—420 м от машины, ближе к 130) с кальяном
    и выдувает огромные облака — по ним его и находишь. В детской версии — самовар и пар. */
 let STEPAN = null;
@@ -9654,7 +9654,7 @@ function stepanPerson () {
   }
   return STEPAN;
 }
-function stepanOrder (all, career) {
+function stepanOrder (all) {
   if (!all || !all.length) return null;
   let best = null, bs = Infinity;
   for (const b of BENCHES) {
@@ -9677,7 +9677,7 @@ function stepanOrder (all, career) {
   p.grp.rotation.y = best.ry;
   HK.guest(p, best);
   const why = ADULT ? $t('первый заказ: Степан на лавочке во дворе — ищи облака дыма') : $t('первый заказ: Степан на лавочке во дворе — ищи пар от самовара');
-  return { kind: 'solo', tut: !career, stops: [{ peds: [p] }], why };
+  return { kind: 'solo', tut: true, stops: [{ peds: [p] }], why };
 }
 
 function planOrder () {
@@ -9803,8 +9803,8 @@ function newOrder () {
   S.orders++;
   clearGate();
   // карьера: очередь, план смены, без повторов (orders.js); учебный — по-старому
-  // карьера: первый клиент каждой смены — Степан Тугарев на лавочке у пиццерии района
-  const plan = CAREER && tutDone() ? ((S.orders === 1 && !S.ride && ORD.adopt(stepanOrder(alive(), true))) || ORD.nextPlan()) : planOrder();
+  // Степан Тугарев — только самый первый заказ за всё время (учебный, planOrder), не каждую смену
+  const plan = CAREER && tutDone() ? ORD.nextPlan() : planOrder();
   if (!plan) { backToBase(); return; }
   if (plan.story) { ORD.startStory(plan); return; }   // сюжетный: у двери человек из story.js
 

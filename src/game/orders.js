@@ -390,18 +390,6 @@ export function nextPlan () {
   }
   return bindSpec(spec);
 }
-/* свой заказ из game.js (Степан Тугарев — первый клиент каждой смены): живые люди уже
-   на месте, сюда — только план смены, оплата и срок, как у обычной пиццы */
-export function adopt (plan) {
-  if (!A || !plan || !plan.stops || !plan.stops[0]) return plan;
-  if (S.orders <= SH.last) resetShift();
-  SH.last = S.orders;
-  if (!POOL.length) buildPool();
-  const p = plan.stops[0].peds[0];
-  const st = stopOf({ x: p.x, z: p.z, key: keyOf(p.x, p.z), zone: ZN.zoneAt(p.x, p.z) });
-  plan.ord = finishSpec({ type: 'pizza', kind: 'solo', easy: true, stepan: true, stops: [st] }, null, hourNow());
-  return plan;
-}
 function bindSpec (spec) {
   if (!spec) return null;
   if (spec.story && (spec.story.noGuest || !A.alive().length)) return { story: true, kind: 'solo', stops: [], why: whyOf(spec), ord: spec };
