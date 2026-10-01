@@ -39,13 +39,15 @@ const DIST = path.join(__dirname, '..', 'dist', 'steam');
 const log = (...a) => { if (has('--log')) console.log('[electron]', ...a); };
 
 /* ─── запущены ли из Стима ───
-   Настоящий запуск из Steam ставит SteamAppId/SteamGameId с 32-битным App ID. У ярлыка
-   «сторонней игры» SteamGameId огромный (64-битный id ярлыка) — это наша сборка с GitHub,
-   ей обновления нужны. Надёжнее всего — аргумент --steam в Launch Options Steamworks. */
+   Настоящий запуск из Steam ставит SteamAppId/SteamGameId с App ID магазина — он меньше 2³¹.
+   У ярлыка «сторонней игры» (Add a Non-Steam Game) SteamAppId — id ярлыка с поднятым старшим
+   битом (≥ 2³¹), а SteamGameId — 64-битный: это наша сборка с GitHub, ей обновления нужны.
+   Раньше порог был 2³², и ярлык на Деке считался Стимом — обновление не предлагалось.
+   Надёжнее всего — аргумент --steam в Launch Options Steamworks. */
 function steamLaunched() {
   if (has('--steam')) return true;
   const id = Number(process.env.SteamAppId || process.env.SteamGameId || 0);
-  return id > 0 && id < 2 ** 32;
+  return id > 0 && id < 2 ** 31;
 }
 
 /* ─── Steamworks (необязательно) ───
