@@ -710,10 +710,13 @@ export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
    (что ближе к зрителю — поверх), дальние чуть темнее; по краю —
    тёмный контур, фон — пастельный по зерну. */
 const PORTRAITS = new Map();
-export function faceDataURL (person, size = 128) {
+/* настроение (экран оплаты заказа, game.js popPay): те же черты, другие брови и рот */
+const MOOD_FACE = { happy: { brows: 'raised', mouth: 'smile' }, ok: { brows: 'thin', mouth: 'line' }, angry: { brows: 'angry', mouth: 'frown' } };
+export function faceDataURL (person, size = 128, mood = '') {
   if (!person) return '';
-  const Lk = person.look || makeLook(person.seed >>> 0 || 1);
-  const key = (person.id || Lk.seed) + ':' + size;
+  let Lk = person.look || makeLook(person.seed >>> 0 || 1);
+  if (MOOD_FACE[mood]) Lk = Object.assign({}, Lk, MOOD_FACE[mood]);
+  const key = (person.id || Lk.seed) + ':' + size + (mood ? ':' + mood : '');
   const hit = PORTRAITS.get(key);
   if (hit) return hit;
   const S = buildSpec(Lk);

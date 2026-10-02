@@ -45,6 +45,7 @@ import * as AUTO from './cars.js';               // карьера: 10 маши�
 import * as HK from './hookah.js';               // кальянщики на лавочках (в детской — самовар)
 import * as CULL from './cull.js';               // статика дальше камеры — со сцены, матрицы заморожены (Steam Deck)
 import * as TRK from './tracks.js';              // следы колёс на газоне и снегу
+import * as CHAT from './chat.js';             // «Жека управляющий» пишет справа сверху, как в iMessage (похвала, ругань, вычет за опоздание)
 import * as FIRST from './intro.js';             // вступление первого запуска: пиццерия, Степан, машина (катсцена «как в ГТА»)
 
 /* Сохранения — через площадку (облако Яндекса / localStorage). Значения
@@ -5343,7 +5344,7 @@ function runOver (p, vx, vz) {
   S.people++;
   Snd.squish();
   // карьера: сбил своего клиента — заказ сорван и штраф в цену его заказа (CLIENT_KILL); со смены снимают, только если END_SHIFT
-  if (wasTarget && CAREER) { CAREERM.clientKilled(victim, clientFee(p)); if (ECON.CLIENT_KILL.END_SHIFT) gameOver('сбил клиента', victim ? [victim] : [], { x: p.x, z: p.z }); }
+  if (wasTarget && CAREER) { CAREERM.clientKilled(victim, clientFee(p)); setTimeout(() => { if (isPlaying()) CHAT.react('kill'); }, 1200); if (ECON.CLIENT_KILL.END_SHIFT) gameOver('сбил клиента', victim ? [victim] : [], { x: p.x, z: p.z }); }
   else if (wasTarget) gameOver('не доставил', victim ? [victim] : [], { x: p.x, z: p.z });
 }
 
@@ -8081,7 +8082,7 @@ const RESET_KEEP = ['dlv-lang', 'dlv-sound', 'dlv-edition', 'dlv-name', 'dlv-map
 const PROGRESS_KEYS = [
   'dlv-msk-wallet', 'dlv-msk-cars', 'dlv-msk-car', 'dlv-msk-best', 'dlv-msk-xp', 'dlv-msk-col', 'dlv-msk-tut', 'dlv-msk-guide', 'dlv-msk-nostut', 'dlv-intro',
   'dlv-shifts', 'dlv-stars', 'dlv-crew', 'dlv-story', 'dlv-season', 'dlv-used-addr', 'dlv-lb-local', 'dlv-boss', 'dlv-clock', 'dlv-rev-sale',
-  'dlv-car-owned', 'dlv-car-cur', 'dlv-car-up', 'dlv-car-L', 'dlv-district', 'dlv-dist-shifts', 'dlv-dist-open',
+  'dlv-car-owned', 'dlv-car-cur', 'dlv-car-up', 'dlv-car-L', 'dlv-district', 'dlv-dist-shifts', 'dlv-dist-open', 'dlv-knocked',
   ...Object.keys(ECON.DONATE || {}).map(k => 'dlv-don-' + k),
 ];
 function renderReset () {
@@ -9500,17 +9501,18 @@ function popBonus (title, sub) {
    (строки в сумме = N). Через полторы секунды кучка улетает в кошелёк, там
    цифра докручивается. Всё вместе — 2,4 с, ввод не перехватывает. Узлы
    создаются один раз (14 штук) и переиспользуются.
-   rows — [подпись, сумма, 'tip' | 'neg' | ''], title — строка над суммой. */
+   rows — [подпись, сумма, 'tip' | 'neg' | ''], title — строка над суммой,
+   face — { person, mood }: лицо клиента рядом с ней (payMood). */
 const PAYFX = { el: null, pile: null, sum: null, chk: null, title: null, bits: [], t1: 0, t2: 0 };
 const PAYFX_N = 14;
 function payFxEl () {
   if (PAYFX.el) return PAYFX;
   const el = document.createElement('div');
   el.id = 'payfx'; el.hidden = true;
-  el.innerHTML = '<div class="pf-pile"></div><div class="pf-r"><div class="pf-t"></div><div class="pf-sum"></div><div class="pf-chk"></div></div>';
+  el.innerHTML = '<div class="pf-pile"></div><div class="pf-r"><div class="pf-hd"><div class="pf-face" hidden><img alt=""><i></i><i></i><i></i></div><div class="pf-t"></div></div><div class="pf-sum"></div><div class="pf-chk"></div></div>';
   (elBonus.parentNode || document.body).appendChild(el);
   PAYFX.el = el; PAYFX.pile = el.querySelector('.pf-pile'); PAYFX.sum = el.querySelector('.pf-sum');
-  PAYFX.chk = el.querySelector('.pf-chk'); PAYFX.title = el.querySelector('.pf-t');
+  PAYFX.chk = el.querySelector('.pf-chk'); PAYFX.title = el.querySelector('.pf-t'); PAYFX.face = el.querySelector('.pf-face');
   for (let k = 0; k < PAYFX_N; k++) {
     const b = document.createElement('i');
     b.textContent = '₽';
@@ -9519,8 +9521,11 @@ function payFxEl () {
   }
   return PAYFX;
 }
-function popPay (total, rows, title) {
+function popPay (total, rows, title, face) {
   const P = payFxEl();
+  // лицо клиента (то же, что в карточке заказа) с настроением — payMood
+  P.face.hidden = !(face && face.person);
+  if (!P.face.hidden) { P.face.className = 'pf-face ' + face.mood; P.face.firstChild.src = faceDataURL(face.person, 64, face.mood); }
   // сколько чего падает: купюр — по доле заказа, монет — по доле чаевых и скорости;
   // опоздал — кучка меньше настолько, насколько срезали
   let plus = 0, coin = 0;
@@ -10723,7 +10728,9 @@ function checkArrival (dt) {
       if (pp.late) rows.push([$t('опоздал'), part - pp.fee, 'neg']);
       if (pp.bonus) rows.push([$t('за скорость'), pp.bonus, 'tip']);
       if (pp.tip) rows.push([pp.rich ? $t('чаевые от богача') : $t('чаевые'), pp.tip, 'tip']);
-      popPay(part, rows, pp.late ? (CAREER ? $t('клиент недоволен') : '') : tier === 2 && pp.bonus ? $t('А ты харош!') : tier && pp.bonus ? $t('Шустро!') : pp.rich ? $t('сдачи не надо!') : pp.tip ? $t('чаевые!') : '');
+      popPay(part, rows, pp.late ? (CAREER ? $t('клиент недоволен') : '') : tier === 2 && pp.bonus ? $t('А ты харош!') : tier && pp.bonus ? $t('Шустро!') : pp.rich ? $t('сдачи не надо!') : pp.tip ? $t('чаевые!') : '',
+        st.persons[0] ? { person: st.persons[0], mood: payMood(st, onTime, tier) } : null);
+      bossOnDeliver(o, st, onTime, tier);
     } else {
       toast((onTime ? '+' : $t('опоздал') + ' · +') + money(part) + ' · ' + S.addr);
       Snd.coin();
@@ -10949,6 +10956,46 @@ function sideEnd (ok, msg) {
   backToBase();
 }
 
+/* Настроение клиента на экране оплаты (лицо рядом с суммой, docs/ORDERS.md «Лицо клиента»):
+     злое      — опоздал или задел его машиной (st.bumped);
+     сердечки  — вовремя и быстро (осталось ≥ 25 % срока — tier ≥ 1) или дал чаевые; без таймера — тоже;
+     покерфейс — вовремя, но впритык (меньше 25 % срока) и без чаевых. */
+function payMood (st, onTime, tier) {
+  const pp = st.pay || {};
+  if (!onTime || st.bumped) return 'angry';
+  return tier || pp.tip || S.free ? 'happy' : 'ok';
+}
+
+/* Жека управляющий (chat.js) — после оплаты адреса, когда кучка денег долетела (1,6 с):
+     опоздал             — ругается и вычитает пиццу на замену (ECON.lateFine) — каждый опоздавший адрес;
+     вовремя, tier ≥ 1   — «молодец»; вовремя впритык — «постарайся»;
+     сборный             — промежуточные адреса молча, последний: всё вовремя — хвалит за развоз;
+     задел этого клиента — молчит (уже наругал в clientBump); без таймера и сюжетный — молчит. */
+function bossOnDeliver (o, st, onTime, tier) {
+  const pp = st.pay || {};
+  if (pp.story || S.ride) return;
+  const last = o.idx >= o.stops.length - 1, bundle = !!(o.ord && o.ord.bundle);
+  let kind = '';
+  if (!onTime) kind = 'late';
+  else if (st.bumped || S.free) kind = '';
+  else if (bundle) kind = last && o.stops.every(q => q.pay && !q.pay.late) ? 'bundle' : '';
+  else kind = tier ? 'fast' : 'slow';
+  if (!kind) return;
+  const fee = pp.fee || 0;
+  setTimeout(() => {
+    if (kind !== 'late' && !isPlaying()) return;
+    CHAT.react(kind, kind === 'late' ? () => lateFine(fee) : null);
+  }, 1600);
+}
+/* вычет за опоздание — в момент, когда сообщение Жеки появилось: из кошелька (сколько есть) и из «за смену» */
+function lateFine (fee) {
+  const fine = ECON.lateFine(fee, CAREER ? 1 : ECON.MONEY_K);
+  if (CAREER) { const got = Math.max(0, Math.min(fine, wallet())); if (got && !S.freeRun) addWallet(-got); }
+  else walletFly(-fine);
+  S.money = Math.max(0, S.money - fine);
+  if (Snd.fail) Snd.fail();
+}
+
 /* Задел своего клиента несильно (econ.js CLIENT_HIT: от SOFT до HARD м/с): цел, отшатнулся
    из-под машины, злится — а чаевых по этому адресу уже не будет (st.bumped → orders.js payStop).
    Плашка — один раз на адрес. Не свой клиент — false: дальше как со всеми (runOver). */
@@ -10971,6 +11018,7 @@ function clientBump (p, fx, fz, sx, sz) {
   if (!st.bumped) {
     st.bumped = true;
     popBonus($t('задел клиента'), $t('без чаевых · быстрее {n} км/ч — заказ сорван', { n: Math.round(ECON.CLIENT_HIT.HARD * 3.6) }));
+    setTimeout(() => { if (isPlaying()) CHAT.react('bump'); }, 900);
   }
   return true;
 }
@@ -11015,6 +11063,7 @@ function dropRun () {
 
 function gameOver (why, victims, focus) {
   if (S.state === 'over' || S.state === 'dying') return;
+  CHAT.clear();
   // карьера, машина взорвалась — можно воскреснуть за деньги из кошелька: заказ пока держим
   DEATH.keep = CAREER && !S.ride && !S.free && why === 'машина всё' ? { prev: S.state } : null;
   DEATH.asked = false; DEATH.rev = null;
@@ -11541,6 +11590,7 @@ const T0 = performance.now();
 buildCity();
 ZN.init({ CITY, MAP, donated });
 DLG.init({ pause: on => { for (const k in IN) IN[k] = 0; if (on) Snd.engine(0); }, face: (p, size) => faceDataURL(p, size) });
+CHAT.init({ adult: ADULT, person: makePerson({ seed: 0x2E4A17, fem: false }), face: (p, size) => faceDataURL(p, size) });
 /* заказы карьеры (orders.js): очередь, поручения, развоз смены — через это */
 if (CAREER) ORD.init({ S, V, CITY, MAP, THREE, Store, ADULT, SPOTS, LIFE, Snd, get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get DAY_LEN () { return DAY_LEN; }, lang: curLang,
   alive, releaseIdle, pushOut, walkSpawn, nearestRoad, makeGuest, clearGuest, realAddress, routeLen, orderTime, rebuildRoutePath, syncTarget,
@@ -12110,6 +12160,7 @@ hudHearts();
 resize();
 function showTitle () {
   if (INTRO) return;
+  CHAT.clear();
   showBig(OWN.pizza(),
     $t(GORE_ON ? MAP.tagline.adult : MAP.tagline.kids), '');
   if (CAREER) CAREERM.menu();                     // карьера: своё главное меню (menu.js)
@@ -12355,6 +12406,8 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) wi
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта
   groundH, surfaceAt, BRIDGES, frame,
+  // оплата адреса: лицо клиента и чат Жеки
+  popPay, CHAT, bossOnDeliver, payMood,
   // Москва: граф, светофоры, зебры, самокатчики, ввод
   EDGES, SIG_GROUPS, ZEBRAS, SCOOTS, TL, IN, touches, lightOf, edgeOf,
   // песочница: сюжет, карта, сохранения, старт смены, кошелёк, читы
