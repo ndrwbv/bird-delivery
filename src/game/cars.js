@@ -24,6 +24,7 @@
    ({ id: { armor, engine } }), dlv-car-L ({ id: L }). Звёзды — dlv-stars. */
 import { CAR_LIST, UPGRADE, BREAK, upgradePrice } from './econ.js';
 import { t } from '../i18n/index.js';
+import * as DIST from './districts.js';
 import { pad as PAD } from '../input/gamepad.js';
 import './cars.css';
 
@@ -480,7 +481,7 @@ function buildPotholes () {
   if (!segs.length) return;
   const avoid = [];
   if (A.PIZZA) avoid.push([A.PIZZA.x, A.PIZZA.z, 22]);
-  if (GAR) avoid.push([GAR.ox, GAR.oz, 14]);
+  for (const g of GARS) avoid.push([g.ox, g.oz, 14]);
   const pickSeg = () => {
     const v = R() * tot;
     let lo = 0, hi = segs.length - 1;
@@ -551,12 +552,17 @@ function patch (M, x, z, ang, R, lift) {
 /* ─────────────── гараж Дяди Жени ───────────────
    Кирпичная коробка с открытыми воротами к улице, вывеска, смотровая яма,
    стеллаж с инструментом, покрышки и бочка. Стены держат машину (obb),
-   внутрь заезжаешь через ворота. Всё — в статику LIT, вывеска — один меш. */
-let GAR = null, ZHENYA = null;
+   внутрь заезжаешь через ворота. Всё — в статику LIT, вывеска — один меш.
+   Гаражей несколько — по одному на район (MAP.career.garages, у Северска 8):
+   все одинаковые, работает ближайший к курьеру из открытых районов (GAR), на радаре
+   и на карте — только гаражи открытых районов. Дядя Женя в каждом свой, двигается
+   только ближайший, дальние (> 250 м) спрятаны. */
+let GARS = [], GAR = null, ZHENYA = null;
 const GW = 5.8, GD = 8.4, GH = 3.3, DOOR = 3.4;
+const garagePoints = () => { const C = A.MAP.career; return C ? C.garages || (C.garage ? [C.garage] : []) : []; };
+const garOpen = g => !DIST.has() || DIST.at(g.ox, g.oz) < DIST.opened();
 
-function garageSpot () {
-  const G = A.MAP.career && A.MAP.career.garage;
+function garageSpot (G) {
   if (!G) return null;
   /* Точка из карты стоит посреди гаражного ряда: свой бокс ставим рядом, на
      свободное место — ворота к ближайшей улице, от неё до ворот 4—40 м, под
@@ -620,10 +626,10 @@ function signMat () {
   return new THREE.MeshBasicMaterial({ map: tex });
 }
 
-function buildGarage () {
-  const g = garageSpot();
+function buildGarage (G) {
+  const g = garageSpot(G);
   if (!g) return;
-  GAR = g;
+  GAR = g; GARS.push(g);
   const { THREE, LIT, FLAT, box, put, obb } = A;
   const { fx, fz, rx, rz, ry, gy } = g;
   const at = (u, v) => [g.ox + rx * u + fx * v, g.oz + rz * u + fz * v];   // u — вбок, v — наружу (внутри гаража v < 0)
@@ -702,6 +708,7 @@ function buildGarage () {
   B(5.0, 1.0, 0.1, '#6b4f3a', 0, GH + 0.62, -0.05);
   for (const s of [-1, 1]) B(0.08, 0.5, 0.08, '#2b2a30', s * 2.2, GH + 0.1, -0.05);
   buildZhenya();
+  g.zh = ZHENYA;
 }
 
 /* Дядя Женя: большой, с животом, в замасленном синем комбинезоне и кепке */
@@ -740,12 +747,14 @@ export function build () {
   if (!A) return;
   const t0 = performance.now();
   if (A.ZN && A.ZN.init) A.ZN.init({ CITY: A.CITY, MAP: A.MAP, donated: A.donated || (() => 0) });   // районы нужны ямам уже сейчас
-  buildGarage();
+  for (const G of garagePoints()) buildGarage(G);
+  GAR = GARS[0] || null; ZHENYA = GAR ? GAR.zh : null;
   buildPotholes();
-  return { ms: Math.round(performance.now() - t0), potholes: POT.length, garage: !!GAR };
+  return { ms: Math.round(performance.now() - t0), potholes: POT.length, garage: !!GAR, garages: GARS.length };
 }
 export const potholes = () => POT;
 export const garage = () => GAR;
+export const garages = () => GARS;
 
 /* ─────────────── заглохла ─────────────── */
 const ST = { on: false, t: 0, ui: false, need: 0, done: 0, p: 0, dir: 1, z0: 0, zw: 0.2, smokeT: 0, lastPress: 0, pad: false, flash: 0, blinkT: 0 };
@@ -933,9 +942,22 @@ function potStep (dt, vf) {
 
 /* ─────────────── гараж: заехал и встал — Дядя Женя предлагает подшаманить ─────────────── */
 const GS = { stillT: 0, offered: false, busy: false };
+let pickT = 0;
 function garageStep (dt, vf) {
-  if (!GAR) return;
+  if (!GARS.length) return;
   const V = A.V, S = A.S;
+  // ближайший гараж открытого района — раз в полсекунды; дальних Дядей Жень прячем
+  if ((pickT -= dt) <= 0 && !GS.busy) {
+    pickT = 0.5;
+    let best = null, bd = 1e18;
+    for (const g of GARS) {
+      const d = (V.x - g.ox) ** 2 + (V.z - g.oz) ** 2;
+      if (g.zh) g.zh.fig.visible = d < 250 * 250;
+      if (d < bd && garOpen(g)) { bd = d; best = g; }
+    }
+    if (best && best !== GAR) { GAR = best; ZHENYA = best.zh; GS.offered = false; GS.stillT = 0; }
+  }
+  if (!GAR) return;
   const dx = V.x - GAR.ox, dz = V.z - GAR.oz;
   const u = dx * GAR.rx + dz * GAR.rz, v = dx * GAR.fx + dz * GAR.fz;
   const near = dx * dx + dz * dz < 18 * 18;
@@ -1027,6 +1049,5 @@ export function radar (ctx, tr, R) {
   wrench(ctx, a, b, 1, '#6f8a3a');
 }
 export function mapMark (ctx, fmX, fmZ, u) {
-  if (!GAR) return;
-  wrench(ctx, fmX(GAR.ox), fmZ(GAR.oz), 1.6 * u, '#6f8a3a');
+  for (const g of GARS) if (garOpen(g)) wrench(ctx, fmX(g.ox), fmZ(g.oz), 1.6 * u, '#6f8a3a');
 }

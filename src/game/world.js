@@ -472,7 +472,7 @@ function trashSpotOk (x, z, R, lots) {
   const P = A.PIZZA;
   if (P && Math.hypot(P.x - x, P.z - z) < 70) return false;
   if (MAPR && MAPR.rich && Math.hypot(MAPR.rich.x - x, MAPR.rich.z - z) < MAPR.rich.r + 20) return false;
-  if (MAPR && MAPR.garage && Math.hypot(MAPR.garage.x - x, MAPR.garage.z - z) < 40) return false;
+  if (MAPR && (MAPR.garages || (MAPR.garage ? [MAPR.garage] : [])).some(g => Math.hypot(g.x - x, g.z - z) < 40)) return false;
   return !HEAPS.some(h => Math.abs(h.x - x) < 22 && Math.abs(h.z - z) < 22);
 }
 /* дорожки по клеткам: мусор на них не ляжет */
@@ -676,7 +676,7 @@ function planGarages () {
       if (A.inHouse(x, z, 1.6) || !A.inBounds(x, z, 20) || A.groundH(x, z) < 0.3) continue;
       const r = A.nearestRoad(x, z, 7, 1);
       if (r && r.seg.c <= 5 && r.d < r.seg.w / 2 + 5) continue;
-      if (MAPR && MAPR.garage && Math.hypot(MAPR.garage.x - x, MAPR.garage.z - z) < 45) continue;   // гараж Дяди Жени — cars.js
+      if (MAPR && (MAPR.garages || (MAPR.garage ? [MAPR.garage] : [])).some(g => Math.hypot(g.x - x, g.z - z) < 45)) continue;   // гараж Дяди Жени — cars.js
       GRILL_SPOTS.push({ x, z, ry: Math.atan2(nx, nz), busy: 0 });
       break;
     }

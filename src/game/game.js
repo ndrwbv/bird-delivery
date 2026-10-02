@@ -31,6 +31,7 @@ import * as CBITS from './citybits.js';
 import * as SEAS from './seasons.js';
 import * as LIFE from './life.js';               // парочки, богачи, графитисты, змеи и дроны в парках
 import * as WORLD from './world.js';             // плитка, аллеи; в карьере — мусор, бандиты, особняки, шашлыки
+import * as MAFIA from './mafia.js';             // мафиози у адреса: предупреждает, потом стреляет (детская — кидается помидорами)
 import * as RL from './roadlife.js';
 import * as PZ from './pizzeria.js';
 import * as LM from './landmarks.js';            // заправки и каток
@@ -3638,6 +3639,16 @@ const worldApi = () => ({
   get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get fenceAt () { return RL.RL.fenceAt; },
 });
 let WORLD_API = null;
+/* что нужно mafia.js (мафиози у адреса) */
+const mafiaApi = () => ({
+  V, S, scene, CAREER, ADULT, makeHuman, dropMesh, gibHuman, sayBubble, groundH, curbAt, inHouse, inBounds, pushOut, sparks, puff, toast, Snd,
+  onRoad: (x, z) => { const r = nearestRoad(x, z); return !!r && r.d < (r.seg.w || 7) / 2 + 0.8; },
+  hurt: n => { S.hurt = 0; hurtCar(n, 0, V.x + rand(-1, 1), V.z + rand(-1, 1)); },   // выстрел/помидор — полсердца, без мятин и поломок
+  bump: () => { V.vx *= 0.25; V.vz *= 0.25; S.shake = Math.max(S.shake, 0.35); Snd.crash(8); },
+  onRunOver: () => { S.people++; Snd.squish(); },
+  reward: (n, title) => { const v = CAREER ? n : Math.round(n / ECON.MONEY_K); S.money += v; if (!S.freeRun) addWallet(v); popBonus(title, '+' + money(v)); },
+});
+let MAFIA_API = null;
 const landApi = () => ({ ...cityApi(), inHouse, makePerson });
 let RINK = null;                                  // каток с катающимися (landmarks.js), если он есть в карте
 
@@ -5012,6 +5023,7 @@ function releaseIdle (p) {
 
 function makeGuest (p, at) {
   if (p.surf) { p.guest = true; return; }          // сёрфер на реке — своим ходом (updateSurf)
+  if (p.after) afterDrop(p, true);
   p.guest = true;
   p.sitting = 0;
   p.sitAt = null;
@@ -5111,9 +5123,10 @@ function guestStep (p, dt) {
   if (p.served) {
     p.freeT -= dt;
     if (p.freeT <= 0) {
-      if (p.hold) { p.grp.remove(p.hold); p.hold = null; }
       p.served = 0; p.holdT = 0;
       clearGuest(p);
+      // домой в подъезд или на лавочку есть; нет — как раньше, дальше по тротуару без коробки
+      if (!afterStart(p, p.afterMood)) dropHold(p);
       return;
     }
   }
@@ -5129,7 +5142,218 @@ function guestStep (p, dt) {
   }
 }
 
+/* ── клиент после пиццы (docs/ORDERS.md «Клиент после пиццы») ──
+   Получил коробку, постоял AFTER.HOLD с (злой — AFTER.HOLD_ANGRY) — и:
+     довольный: в AFTER.BENCH (30 %) случаев — на свободную лавочку ближе AFTER.BENCH_R (25 м):
+       садится, открывает коробку, ест AFTER.EAT с (кусок ко рту, крошки), потом сердечки
+       и «м-м-м», сидит AFTER.CHILL с и уходит по тротуару; лавочки нет — домой;
+     домой — к ближайшему подъезду ближе AFTER.DOOR_R (45 м): дверь открывается, заходит,
+       дверь закрывается; вместо него где-то вдали появляется другой прохожий;
+     злой (опоздал или задел его машиной) — не ест: быстро топает к подъезду, злится «!».
+   Одновременно — не больше AFTER.MAX (4); остальные, как раньше, уходят по тротуару.
+   Уехал дальше AFTER.FAR (140 м) или застрял дольше AFTER.GIVE (25 с) — сразу: «домашний»
+   пропадает (вдали другой прохожий), с лавочки встаёт и уходит. */
+const AFTER = { HOLD: 3, HOLD_ANGRY: 1.5, BENCH: 0.3, BENCH_R: 25, DOOR_R: 45, MAX: 4, FAR: 140, EAT: 7, CHILL: 8, GIVE: 25 };
+function afterCount () { let n = 0; for (const q of PEOPLE) if (q.after) n++; return n; }
+function nearEntrance (x, z, r) {
+  let best = null, bd = r * r;
+  for (const e of CITY.entrances) { const d = (e[0] - x) ** 2 + (e[1] - z) ** 2; if (d < bd) { bd = d; best = e; } }
+  return best;
+}
+function dropHold (p) {
+  if (!p.hold) return;
+  p.grp.remove(p.hold);
+  p.hold.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+  p.hold = null;
+}
+function afterStart (p, mood) {
+  if (!mood || p.surf || p.dead || !p.hold || p.base === undefined || afterCount() >= AFTER.MAX || Math.hypot(p.x - V.x, p.z - V.z) > AFTER.FAR) return false;
+  const angry = mood === 'angry';
+  if (!angry && chance(AFTER.BENCH)) {
+    let b = null, bd = AFTER.BENCH_R;
+    for (const q of BENCHES) {
+      if (q.taken || (q.prop && q.prop.down) || HK.busy(q)) continue;      // занята или там кальянщики
+      const d = Math.hypot(q.x - p.x, q.z - p.z);
+      if (d < bd) { bd = d; b = q; }
+    }
+    if (b) { b.taken = 1; p.after = { k: 'bench', b, ph: 'walk', t: 0, give: AFTER.GIVE }; return true; }
+  }
+  const e = nearEntrance(p.x, p.z, AFTER.DOOR_R);
+  if (!e) return false;
+  p.after = { k: 'door', e, ph: 'walk', t: 0, give: AFTER.GIVE, angry, sayT: rand(0.6, 1.2) };
+  return true;
+}
+/* идёт к точке; злой — топает: шаг чаще и шире, подпрыгивает */
+function afterWalk (p, tx, tz, sp, dt, stomp, push) {
+  const u = p.grp.userData, dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz);
+  if (d > 0.02) {
+    const k = Math.min(1, sp * dt / d);
+    p.x += dx * k; p.z += dz * k;
+    if (push) pushOut(p, 0.45);
+    p.grp.rotation.y = damp(p.grp.rotation.y, Math.atan2(dx, dz), 8, dt);
+  }
+  p.ph += dt * (stomp ? 11 : 7);
+  p.grp.position.set(p.x, groundH(p.x, p.z) + curbAt(p.x, p.z) + Math.abs(Math.sin(p.ph)) * (stomp ? 0.09 : 0.04), p.z);
+  const sw = Math.sin(p.ph) * (stomp ? 1.05 : 0.75);
+  u.legL.rotation.x = sw; u.legR.rotation.x = -sw;
+  u.armL.rotation.x = u.armR.rotation.x = -1.15 + (stomp ? Math.sin(p.ph * 2) * 0.15 : 0);   // коробка перед собой
+  u.armL.rotation.z = u.armR.rotation.z = 0;
+  return d;
+}
+/* закончил: true — исчез (вошёл в подъезд, вместо него — новый прохожий вдали), иначе — дальше по тротуару */
+function afterDrop (p, keep) {
+  const A = p.after;
+  if (!A) return;
+  if (A.b) A.b.taken = 0;
+  if (A.slice) { A.slice.parent && A.slice.parent.remove(A.slice); A.slice.material.dispose(); A.slice = null; }
+  if (A.bubble) { p.grp.remove(A.bubble); A.bubble.material.dispose(); A.bubble = null; }
+  p.after = null;
+  const u = p.grp.userData;
+  if (A.k === 'door' && !keep) {
+    p.hold = null;                                // коробка уходит вместе с мешем
+    dropMesh(p.grp);
+    p.person = nextPerson(); p.grp = makeHuman(p.person); p.speed = p.base * p.grp.userData.pace;
+    scene.add(p.grp);
+    walkSpawn(p, 90, 400); p.crossT = rand(20, 90); p.restT = rand(20, 70);
+    return;
+  }
+  dropHold(p);
+  p.resnap = true;
+  p.restT = rand(45, 110);
+  p.grp.position.y = groundH(p.x, p.z);
+  u.legL.rotation.x = u.legR.rotation.x = 0; u.armL.rotation.x = u.armR.rotation.x = 0; u.head.rotation.y = 0;
+}
+/* дверь подъезда: тёмный проём и створка, открывается наружу и закрывается за жильцом */
+const DOORS = [];
+let DOOR_GEO = null;
+function doorOpen (e) {
+  const [x, z, nx, nz] = e, ry = Math.atan2(nx, nz), tx = nz, tz = -nx, gy = groundH(x + nx, z + nz);
+  if (!DOOR_GEO) DOOR_GEO = { hole: new THREE.PlaneGeometry(1.0, 2.15), leaf: new THREE.BoxGeometry(1.0, 2.15, 0.06), hm: new THREE.MeshBasicMaterial({ color: 0x0c0a09 }), lm: new THREE.MeshLambertMaterial({ color: '#5a4636', flatShading: true }) };
+  const g = new THREE.Group();
+  const hole = new THREE.Mesh(DOOR_GEO.hole, DOOR_GEO.hm);
+  hole.position.set(x + nx * 0.12, gy + 1.08, z + nz * 0.12); hole.rotation.y = ry;
+  const hinge = new THREE.Group();
+  hinge.position.set(x + nx * 0.16 + tx * 0.5, gy + 1.08, z + nz * 0.16 + tz * 0.5); hinge.rotation.y = ry;
+  const leaf = new THREE.Mesh(DOOR_GEO.leaf, DOOR_GEO.lm);
+  leaf.position.x = -0.5;
+  hinge.add(leaf);
+  g.add(hole, hinge);
+  scene.add(g);
+  const d = { g, hinge, ry, t: 0, shut: -1 };
+  DOORS.push(d);
+  Snd.blip(180, 0.12, 'triangle', 0.06);
+  return d;
+}
+function updateDoors (dt) {
+  for (let i = DOORS.length - 1; i >= 0; i--) {
+    const d = DOORS[i];
+    d.t += dt;
+    if (d.shut < 0 && d.t > 8) d.shut = d.t;      // жилец не дошёл — закрывается сама
+    const open = Math.min(1, d.t / 0.4) * (d.shut < 0 ? 1 : Math.max(0, 1 - (d.t - d.shut) / 0.5));
+    d.hinge.rotation.y = d.ry + open * 1.45;
+    if (d.shut >= 0 && open <= 0) { scene.remove(d.g); DOORS.splice(i, 1); Snd.blip(120, 0.08, 'square', 0.07); }
+  }
+}
+/* крошки от куска пиццы */
+function crumbs (x, y, z) {
+  for (let i = 0; i < 3; i++) {
+    const m = new THREE.Mesh(sparkGeo, new THREE.MeshBasicMaterial({ color: chance(0.5) ? 0xe8b04a : 0xc96a2e }));
+    m.position.set(x + rand(-0.08, 0.08), y, z + rand(-0.08, 0.08));
+    m.scale.setScalar(0.6);
+    fxAdd(m, { vx: rand(-0.4, 0.4), vy: rand(0, 0.6), vz: rand(-0.4, 0.4), gravity: 9, life: rand(0.6, 0.9), max: 0.9, floor: floorAt(x, z) - 0.08 });
+  }
+}
+/* открытая коробка: крышка откинута, внутри пицца (дети box — p.hold) */
+function openBox (box) {
+  const lab = box.children[1];
+  if (lab) lab.visible = false;
+  const lidG = new THREE.Group();
+  lidG.position.set(0, 0.11, -0.425);
+  const lid = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.03, 0.85), new THREE.MeshLambertMaterial({ color: '#f0522a', flatShading: true }));
+  lid.position.z = 0.425;
+  lidG.add(lid);
+  const pie = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.03, 10), new THREE.MeshLambertMaterial({ color: '#f2c14e', flatShading: true }));
+  pie.position.y = 0.115;
+  box.add(lidG, pie);
+  return lidG;
+}
+function afterStep (p, dt) {
+  const A = p.after, u = p.grp.userData;
+  A.t += dt;
+  const far = Math.hypot(p.x - V.x, p.z - V.z) > AFTER.FAR;
+  if (p.guest || !p.hold) { afterDrop(p, true); return; }
+  if (A.k === 'door') {
+    const [ex, ez, nx, nz] = A.e;
+    if (A.ph === 'walk') {
+      const d = afterWalk(p, ex + nx * 1.4, ez + nz * 1.4, A.angry ? 2.8 : 1.5, dt, A.angry, true);
+      if (A.angry && (A.sayT -= dt) <= 0) { A.sayT = rand(1.3, 2.2); emote(p.x, 2.1, p.z, 'angry', 1); }
+      if (d < 0.6) { A.ph = 'in'; A.door = doorOpen(A.e); A.t = 0; }
+      else if (far || (A.give -= dt) <= 0) afterDrop(p, Math.hypot(p.x - V.x, p.z - V.z) < 45);   // застрял: при курьере — просто уходит, без телепорта
+      return;
+    }
+    // дверь открылась — шагнул в проём и пропал
+    if (A.t < 0.35) { afterWalk(p, ex + nx * 1.4, ez + nz * 1.4, 0, dt, false, false); p.grp.rotation.y = damp(p.grp.rotation.y, Math.atan2(-nx, -nz), 10, dt); return; }
+    const d = afterWalk(p, ex + nx * 0.1, ez + nz * 0.1, A.angry ? 2.4 : 1.4, dt, A.angry, false);
+    if (d < 0.15 || A.t > 3) { if (A.door) A.door.shut = A.door.t; afterDrop(p); }
+    return;
+  }
+  // лавочка
+  const b = A.b;
+  if ((b.prop && b.prop.down) || far) { afterDrop(p); return; }
+  if (A.ph === 'walk') {
+    const d = afterWalk(p, b.x, b.z, 1.5, dt, false, true);
+    if (d < 0.5) {
+      A.ph = 'open'; A.t = 0;
+      p.x = b.x; p.z = b.z; p.grp.rotation.y = b.ry;
+      p.hold.position.set(0, 0.86, 0.34);
+      A.lid = openBox(p.hold);
+    } else if ((A.give -= dt) <= 0) afterDrop(p);
+    return;
+  }
+  p.grp.position.set(p.x, groundH(p.x, p.z) + curbAt(p.x, p.z) + 0.42, p.z);
+  p.grp.rotation.y = b.ry;
+  u.legL.rotation.x = damp(u.legL.rotation.x, -1.45, 8, dt);
+  u.legR.rotation.x = damp(u.legR.rotation.x, -1.45, 8, dt);
+  u.armL.rotation.x = damp(u.armL.rotation.x, -0.75, 6, dt);     // левой придерживает коробку
+  if (A.ph === 'open') {
+    A.lid.rotation.x = -1.9 * Math.min(1, A.t / 0.6);
+    u.armR.rotation.x = damp(u.armR.rotation.x, -0.9, 6, dt);
+    if (A.t > 0.7) {
+      A.ph = 'eat'; A.t = 0;
+      A.slice = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.025, 0.24), new THREE.MeshLambertMaterial({ color: '#f2b440', flatShading: true }));
+      A.slice.position.set(0, -0.56, 0.1);
+      u.armR.add(A.slice);
+      steam(p.x, 1.2, p.z);
+    }
+    return;
+  }
+  if (A.ph === 'eat') {
+    // кусок ко рту и обратно, раз в 1,4 с — укус и крошки
+    const c = (A.t % 1.4) / 1.4, up = c < 0.45 ? c / 0.45 : c < 0.6 ? 1 : 1 - (c - 0.6) / 0.4;
+    u.armR.rotation.x = -0.9 - up * 1.55;
+    u.head.rotation.x = up > 0.95 ? Math.sin(A.t * 30) * 0.06 : 0;    // жуёт
+    const was = A.bite || 0; A.bite = Math.floor((A.t + 0.75) / 1.4);
+    if (A.bite !== was && A.t > 0.5) { const f = Math.sin(b.ry), g = Math.cos(b.ry); crumbs(p.x + f * 0.3, groundH(p.x, p.z) + 1.55, p.z + g * 0.3); }
+    if (A.t > AFTER.EAT) {
+      A.ph = 'chill'; A.t = 0;
+      if (A.slice) { u.armR.remove(A.slice); A.slice.geometry.dispose(); A.slice.material.dispose(); A.slice = null; }
+      u.head.rotation.x = 0;
+      emote(p.x, 2.0, p.z, 'heart', 5);
+      A.bubble = sayBubble(p.grp, $t('м-м-м'), '#e0507a', 2.4);
+      Snd.blip(660, 0.12, 'triangle', 0.08);
+    }
+    return;
+  }
+  // сидит довольный: откинулся, покачивает головой; иногда сердечко
+  u.armR.rotation.x = damp(u.armR.rotation.x, -0.6, 4, dt);
+  u.head.rotation.y = Math.sin(A.t * 1.6) * 0.3;
+  if (A.bubble && A.t > 2.6) { p.grp.remove(A.bubble); A.bubble.material.dispose(); A.bubble = null; }
+  if (A.t > 2 && Math.floor(A.t / 3) !== Math.floor((A.t - dt) / 3)) emote(p.x, 2.0, p.z, 'heart', 1);
+  if (A.t > AFTER.CHILL) afterDrop(p);
+}
+
 function updatePeople (dt) {
+  updateDoors(dt);
   for (const p of PEOPLE) {
     if (p.dead) {
       if ((p.deadT -= dt) <= 0) {
@@ -5141,11 +5365,13 @@ function updatePeople (dt) {
         p.panic = null; p.shock = 0;
         scene.add(p.grp);
         if (p.idle) { p.idle.b.taken = 0; p.idle = null; }
+        if (p.after) { if (p.after.b) p.after.b.taken = 0; p.after = null; p.hold = null; }
         walkSpawn(p, 90, 400); p.crossT = rand(20, 90); p.restT = rand(20, 70);
       }
       continue;
     }
     if (p.guest) { guestStep(p, dt); if (p.shock > 0) shockStep(p, dt); continue; }
+    if (p.after) { afterStep(p, dt); continue; }
     if (p.panic) { panicStep(p, dt); continue; }
     if (p.idle) { idleSitStep(p, dt); continue; }
 
@@ -5530,7 +5756,8 @@ const MODELS = ['sedan', 'sedan', 'hatch', 'hatch', 'hatch', 'smart', 'suv', 'su
 const TAXI_HEX = '#ffc400';
 
 function newCar (parked) {
-  const taxi = !parked && chance(0.3);
+  const night = !parked && trafficNight();          // ночью редкие машины — быстрые, такси через одну (econ.js TRAFFIC)
+  const taxi = !parked && chance(night ? ECON.TRAFFIC.NIGHT_TAXI : 0.3);
   const model = taxi ? pick(['sedan', 'hatch', 'suv', 'cn']) : pick(MODELS);
   // Поток — лёгкие машины (один-два меша вместо двадцати), как на парковке:
   // полную модель с мнущимися панелями ставим, когда задели (fullCar).
@@ -5538,11 +5765,43 @@ function newCar (parked) {
   const mesh = parked || !taxi ? makeCarLite(pick(CAR_HEX), model) : makeCar(TAXI_HEX, false, model, taxi);
   return {
     mesh, model, taxi, hl: mesh.userData.hl, parked: !!parked,
-    e: null, s: 0, lane: 0, turn: null, cruise: taxi ? rand(12, 17) : rand(9, 14), speed: 0,
+    e: null, s: 0, lane: 0, turn: null, cruise: (taxi ? rand(12, 17) : rand(9, 14)) * (night ? ECON.TRAFFIC.NIGHT_SPEED : 1), speed: 0,
     x: 0, z: 0, h: 0, wheel: 0, hp: 100, wreck: 0, wreckT: 0, hitT: 0,
     knock: 0, kvx: 0, kvy: 0, kvz: 0, spin: 0, y: 0, roll: 0, smokeT: 0,
     rejoin: 0, jx: 0, jz: 0, jh: 0, waitT: 0, ghost: 0, pull: 0, stopT: 0, stopCd: rand(8, 30),
   };
+}
+
+/* Трафик по часам (econ.js TRAFFIC, docs/SEVERSK.md): сколько машин в потоке — по часам
+   игры (те же часы, что на приборке). Раз в STEP_S секунд — плюс или минус одна машина.
+   Рождается только за HIDE_R м, убирается там же или вне кадра камеры дальше 40 м —
+   на глазах никто не появляется и не исчезает. Сильно не хватает или лишние (> 6:
+   смена началась ночью / утром) — шаги чаще, по 0,3 с. */
+const trafficHour = () => { try { return dashHour(ENV.t) % 24; } catch (e) { return 12; } };   // до объявления ENV (первая расстановка) — полдень
+function trafficNight () { const h = trafficHour(), [a, b] = ECON.TRAFFIC.NIGHT; return h >= a && h < b; }
+const trafficWant = () => Math.round(ECON.trafficAt(trafficHour()) * (TOUCH ? ECON.TRAFFIC.TOUCH_K : 1));
+const isFlow = t => !t.parked && !t.svc && !t.gone && !t.chase && t.model !== 'moped';   // мопеды доставки — свои (mopeds.js)
+const TDEN = { t: 2, want: 0, n: 0, fr: new THREE.Frustum(), m: new THREE.Matrix4(), sp: new THREE.Sphere(new THREE.Vector3(), 3.5) };
+function trafficDensity (dt) {
+  if (INTRO || (TDEN.t -= dt) > 0) return;
+  let n = 0;
+  for (const t of TRAFFIC) if (isFlow(t)) n++;
+  const want = trafficWant(), T = ECON.TRAFFIC;
+  TDEN.want = want; TDEN.n = n;
+  TDEN.t = Math.abs(want - n) > 6 ? 0.3 : T.STEP_S;
+  if (n < want) spawnTraffic(1, T.HIDE_R, 340);
+  else if (n > want) {
+    TDEN.fr.setFromProjectionMatrix(TDEN.m.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+    let far = null, fd = 0;
+    for (const t of TRAFFIC) {
+      if (!isFlow(t) || t.knock || t.wreck || t.driver || t.stalled || t.hitT > 0 || t.chainT > 0) continue;
+      const d = Math.hypot(t.x - V.x, t.z - V.z);
+      if (d < 40) continue;
+      if (d < T.HIDE_R) { TDEN.sp.center.set(t.x, (t.gy || 0) + 1, t.z); if (TDEN.fr.intersectsSphere(TDEN.sp)) continue; }   // в кадре — не трогаем
+      if (d > fd) { fd = d; far = t; }
+    }
+    if (far) svcGone(far);                         // из списка — в конце updateTraffic
+  }
 }
 
 /* ставим машину на случайную полосу рядом с курьером: не под капотом,
@@ -5564,12 +5823,12 @@ function placeTraffic (t, rmin, rmax) {
   return false;
 }
 
-function spawnTraffic (n) {
+function spawnTraffic (n, rmin = 40, rmax = 330) {
   for (let k = 0; k < n; k++) {
     const t = newCar(false);
     scene.add(t.mesh);
     TRAFFIC.push(t);
-    placeTraffic(t, 40, 330);
+    placeTraffic(t, rmin, rmax);
   }
 }
 
@@ -5760,6 +6019,7 @@ function respawnTraffic (t) {
 const walkersAll = () => [PEOPLE, PEDS, SCOOTS, AMB.medics, CREW, WAR.side2, LIFE.WALKERS];
 
 function updateTraffic (dt) {
+  trafficDensity(dt);
   for (const t of TRAFFIC) {
     if (t.hitT > 0) t.hitT -= dt;
     if (t.chainT > 0 && !t.wreck && (t.chainT -= dt) <= 0) { t.chainT = 0; wreckCar(t); S.wrecks++; }
@@ -5799,7 +6059,7 @@ function updateTraffic (dt) {
         if (sp < 0.8 && Math.abs(t.roll) < 0.04) {
           t.knock = 0; t.roll = 0; t.rollV = 0; t.y = 0;
           poseOnSlope(t);
-          if (t.angry && !t.wreck) { t.angry = 0; stallCar(t); }
+          if (t.angry && !t.wreck) { t.angry = 0; if (!chaseStart(t)) stallCar(t); }   // изредка — не выходит, а гонится
           else if (!t.parked && !t.stalled) rejoinRoad(t);
         }
       }
@@ -5819,6 +6079,7 @@ function updateTraffic (dt) {
       if (!t.driver && (t.stallT -= dt) <= 0) { t.stalled = 0; for (const m of hz3 || []) m.visible = false; rejoinRoad(t); }
       continue;
     }
+    if (t.chase) { chaseDrive(t, dt); continue; }
     if (t.svc) { svcDrive(t, dt); continue; }
     if (!t.e) { placeTraffic(t, 120, 340); if (!t.e) continue; }
 
@@ -6002,9 +6263,19 @@ function rageTex (text, col = '#d9342c') {
   x.beginPath(); x.moveTo(110, 92); x.lineTo(128, 122); x.lineTo(146, 92); x.closePath(); x.fill();
   x.fillStyle = col; x.font = 'bold 30px "Press Start 2P", sans-serif';
   x.textAlign = 'center'; x.textBaseline = 'middle';
-  let fs = 30;
-  while (fs > 12 && x.measureText(text).width > 220) { fs -= 2; x.font = 'bold ' + fs + 'px "Press Start 2P", sans-serif'; }
-  x.fillText(text, 128, 52);
+  let fs = 30, L = [text];
+  const wide = () => Math.max(...L.map(q => x.measureText(q).width));
+  const shrink = min => { while (fs > min && wide() > 220) { fs -= 2; x.font = 'bold ' + fs + 'px "Press Start 2P", sans-serif'; } };
+  shrink(16);
+  // длинная реплика (мафиози) — в две строки, по пробелу ближе к середине
+  if (wide() > 220 && text.includes(' ')) {
+    let k = -1;
+    for (let i = 0; i < text.length; i++) if (text[i] === ' ' && (k < 0 || Math.abs(i - text.length / 2) < Math.abs(k - text.length / 2))) k = i;
+    L = [text.slice(0, k), text.slice(k + 1)];
+    fs = 26; x.font = 'bold ' + fs + 'px "Press Start 2P", sans-serif';
+  }
+  shrink(10);
+  L.forEach((q, i) => x.fillText(q, 128, 52 + (i - (L.length - 1) / 2) * fs * 1.25));
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
@@ -6028,6 +6299,104 @@ function stallCar (t) {
   const d = { t, grp, x, z, state: 'chase', hitT: 0.6, ph: 0, give: 28, dead: 0, punch: 0, strikes: 0, bubble, sayT: 1.6, bangT: 0.3 };
   t.driver = d;
   DRIVERS.push(d);
+}
+
+/* ─────────────── обиженный водитель гонится (econ.js CHASE) ───────────────
+   Задел машину и уехал: когда её перестанет кувыркать, а ты уже дальше AWAY м, —
+   изредка (P, не чаще раза в CD с) водитель не выходит ругаться, а гонится: гудит,
+   над крышей «эй, стой!», на радаре — красная точка. Издали едет по улицам к тебе
+   (маршрут как у скорой, svcDrive), ближе 40 м — прямо: заходит перед носом и бьёт
+   по тормозам, разворачиваясь поперёк. Отстал (LOSE м) или вышло время — бросает,
+   ты оторвался: ESCAPE ₽. Врезались — обычный удар по правилам hurtCar, и он остывает. */
+const CHASE = { next: 0, n: 0 };
+const CHASE_LINES = () => [$t('эй, стой!'), $t('а ну стой!'), $t('догоню!'), $t('эй, стой!')];
+function chaseStart (t) {
+  const C = ECON.CHASE;
+  if (INTRO || t.parked || t.svc || t.wreck || tG < CHASE.next || !['drive', 'back', 'side'].includes(S.state)) return false;
+  const d0 = Math.hypot(V.x - t.x, V.z - t.z);
+  if (d0 < C.AWAY || d0 > C.LOSE * 0.6 || !(SBX.chase || chance(C.P))) return false;
+  CHASE.next = tG + C.CD; CHASE.n++;
+  fullCar(t);
+  const bubble = new THREE.Sprite(new THREE.SpriteMaterial({ map: rageTex(CHASE_LINES()[0]), transparent: true, depthWrite: false }));
+  bubble.scale.set(3, 1.5, 1); bubble.position.set(0, 2.9, 0);
+  t.mesh.add(bubble);
+  t.chase = { T: rand(...C.T), brakeT: 0, brakeCd: 2, pathT: 0, stuckT: 0, sayT: 1.8, swerve: chance(0.5) ? 1 : -1, bubble };
+  Object.assign(t, { svc: 'chase', aggr: 1, passT: 0, honkT: 0, acc: 7, corner: 0.55, gap: 1, peds: true, dot: '#ff3b30',
+    cruise0: t.cruise, cruise: VMAX * C.VMAX_K, path: null, goal: { x: V.x, z: V.z }, repath: 1, turn: null, e: null });
+  t.onWreck = () => { chaseEnd(t, 'wreck'); respawnTraffic(t); };
+  honk(t);
+  toast($t('водитель обиделся — гонится за тобой!'));
+  return true;
+}
+function chaseEnd (t, why) {
+  const C = t.chase;
+  if (!C) return;
+  if (C.bubble.parent) C.bubble.parent.remove(C.bubble);
+  C.bubble.material.map.dispose(); C.bubble.material.dispose();
+  t.chase = null; t.svc = null; t.aggr = 0; t.dot = null; t.onWreck = null; t.path = null; t.goal = null;
+  t.cruise = t.cruise0 || rand(9, 14); t.acc = 3;
+  if (why === 'escaped' && S.state !== 'over') {
+    const pay = CAREER ? ECON.CHASE.ESCAPE : Math.round(ECON.CHASE.ESCAPE / ECON.MONEY_K);
+    if (pay > 0 && !S.freeRun) { S.money += pay; addWallet(pay); popPay(pay, [[$t('оторвался от погони'), pay, '']], $t('оторвался!')); }
+    else popBonus($t('оторвался!'), $t('водитель отстал'));
+  }
+  if (why !== 'wreck' && !t.knock) rejoinRoad(t);
+}
+function chaseDrive (t, dt) {
+  const C = t.chase, K = ECON.CHASE;
+  C.T -= dt;
+  const dx = V.x - t.x, dz = V.z - t.z, d = Math.hypot(dx, dz);
+  if (!['drive', 'back', 'side', 'handover', 'brief', 'loading'].includes(S.state)) { chaseEnd(t, 'quit'); return; }
+  if (C.T <= 0 || d > K.LOSE) { chaseEnd(t, d > 40 ? 'escaped' : 'quit'); return; }   // время вышло, а он рядом — просто бросил, без награды
+  // ругается: облачко меняет текст, гудит
+  if ((C.sayT -= dt) <= 0) {
+    C.sayT = rand(1.6, 2.6);
+    C.bubble.material.map.dispose(); C.bubble.material.map = rageTex(pick(CHASE_LINES())); C.bubble.material.needsUpdate = true;
+    t.honkT = 0; honk(t);
+  }
+  C.bubble.position.x = Math.sin(tG * 40) * 0.05;
+  const vp = Math.hypot(V.vx, V.vz), fx = Math.sin(V.h), fz = Math.cos(V.h);
+  t.cruise = VMAX * K.VMAX_K;
+  if (C.pathT > 0) C.pathT -= dt;
+  if (d > 40 || C.pathT > 0) {
+    // издали — по улицам, маршрут к тебе обновляем раз в 1,5 с
+    if ((C.repT = (C.repT || 0) - dt) <= 0) { C.repT = 1.5; t.goal = { x: V.x + V.vx, z: V.z + V.vz }; t.repath = 1; }
+    svcDrive(t, dt);
+    return;
+  }
+  // вблизи — прямо: точка перед твоим носом; обогнал — тормозит поперёк
+  const along = -(dx * fx + dz * fz), side = -(dx * fz - dz * fx);   // где он относительно тебя: вперёд / вбок
+  if (C.brakeCd > 0) C.brakeCd -= dt;
+  if (C.brakeT <= 0 && C.brakeCd <= 0 && along > 3.5 && along < 16 && Math.abs(side) < 2.4 && vp > 5) {
+    C.brakeT = K.BRAKE_S; C.brakeCd = 5; t.honkT = 0; honk(t);
+  }
+  let want, th;
+  if (C.brakeT > 0) {
+    C.brakeT -= dt;
+    want = 0;
+    th = V.h + C.swerve * 0.55;                    // встаёт наискосок поперёк полосы
+    t.speed = Math.max(0, t.speed - 16 * dt);
+  } else {
+    // сзади — уходит на соседнюю полосу (обгон), поравнялся — подрезает к твоей полосе
+    const lead = clamp(d / 12, 0.3, 1.2), off = along < 2 ? 3.6 * C.swerve : clamp(3.6 - (along - 2) * 0.9, 0, 3.6) * C.swerve;
+    const tx = V.x + V.vx * lead + fx * (along < 2 ? 4 : 8) + fz * off, tz = V.z + V.vz * lead + fz * (along < 2 ? 4 : 8) - fx * off;
+    th = Math.atan2(tx - t.x, tz - t.z);
+    want = Math.min(t.cruise, vp + K.CATCH + (along < -6 ? 4 : 0));
+    if (along < 0 && along > -10 && Math.abs(side) < 2.2) want = Math.min(want, vp + 1);   // прямо за тобой — не таранит в зад, а выходит на обгон
+    t.speed = damp(t.speed, want, want > t.speed ? t.acc : 5, dt);
+  }
+  const dh = Math.atan2(Math.sin(th - t.h), Math.cos(th - t.h)), rate = 3 * clamp(t.speed / 5, 0.4, 1.3);
+  t.h += clamp(dh, -rate * dt, rate * dt);
+  t.x += Math.sin(t.h) * t.speed * dt; t.z += Math.cos(t.h) * t.speed * dt;
+  const bx = t.x, bz = t.z;
+  pushOut(t, 1.1);                                 // в дом не въезжает
+  if (bx !== t.x || bz !== t.z) t.speed *= 0.9;
+  // упёрся (дом, забор) — пару секунд по улицам
+  if (want > 3 && t.speed < 1.2) { if ((C.stuckT += dt) > 1.5) { C.stuckT = 0; C.pathT = 3; t.repath = 1; } } else C.stuckT = 0;
+  t.wheel += t.speed * dt / 0.46;
+  for (const w of t.mesh.userData.wheels || []) w.rotation.x = t.wheel;
+  for (const s of t.mesh.userData.steer || []) s.rotation.y = damp(s.rotation.y, clamp(dh, -0.5, 0.5), 8, dt);
+  poseOnSlope(t);
 }
 
 function updateDrivers (dt) {
@@ -7138,7 +7507,7 @@ const PK = CAREER
   : { nos: 50, nosGap: 45, bonus: 21, bonusGap: 70, kinds: ['shield', 'heal', 'beast'],
       nosRespawn: 25, bonusRespawn: 45, spawn: [5, 9], spawnCap: 18, heal: null };
 const NOS_RESPAWN = PK.nosRespawn, BONUS_RESPAWN = PK.bonusRespawn;
-const PICK_HEX = { nos: '#6fd3ff', shield: '#8f9bff', heal: '#ff4d6d', beast: '#ff8a1c' };
+const PICK_HEX = { nos: '#6fd3ff', shield: '#8f9bff', heal: '#ff4d6d', beast: '#ff8a1c', cash: '#3fd46b', life: '#ffc93c' };
 
 const PICK_MAT = (() => {
   const m = hex => new THREE.MeshBasicMaterial({ color: hex });
@@ -7152,9 +7521,43 @@ const PICK_MAT = (() => {
 })();
 const ringGeo = new THREE.RingGeometry(1.6, 2.1, 18);
 
-function pickupModel (kind) {
+/* деньги на улице и лишнее сердце — пиксель-арт на плашке (крутится, как бонусы) и искорка рядом.
+   Буквы: k — контур, g/G/d — зелёная купюра, y/Y/o — золото, w — белый блик, r/R — красное сердце, b — бумажная лента */
+const PX_ART = {
+  coin: ['..kkkkkk..', '.kYYYYyyk.', 'kYwYyyyyok', 'kYwyykyyok', 'kYyykkkyok', 'kYyyykyyok', 'kYyyykyyok', 'kYyykkkyok', '.kyyyyyok.', '..kkkkkk..'],
+  bill: ['kkkkkkkkkkkkkkkk', 'kGggggggggggggGk', 'kgdddggggggdddgk', 'kgdgggwwwwgggdgk', 'kgggggwddwgggggk', 'kgdgggwwwwgggdgk', 'kgdddggggggdddgk', 'kGggggggggggggGk', 'kkkkkkkkkkkkkkkk'],
+  stash: ['..kkkkkkkkkkkkkk', '.kGggggggggggggk', 'kkkkkkkkkkkkkkkk', 'kGggggbbbbgggGgk', 'kgdgggbbbbggdggk', 'kgggggbbbbgggggk', 'kgdgggbbbbggdggk', 'kGggggbbbbgggGgk', 'kkkkkkkkkkkkkkkk', '.kggggggggggggk.', '..kkkkkkkkkkkk..'],
+  life: ['..yyy...yyy..', '.yRRRy.yRRRy.', 'yRwwRRyRRRRry', 'yRwRRRRRRRRry', 'yRRRRRRRRRRry', '.yRRRRRRRRry.', '..yRRRRRRry..', '...yRRRRry...', '....yRRry....', '.....yry.....', '......y......'],
+  spark: ['...w...', '...w...', '..www..', 'wwwYwww', '..www..', '...w...', '...w...'],
+};
+const PX_COL = { k: '#1d2a1a', G: '#9af0a8', g: '#3fbf5c', d: '#1f7a35', y: '#ffc93c', Y: '#fff1a8', o: '#b07a12', w: '#ffffff', R: '#ff2d4a', r: '#a3102a', b: '#f4f0dc' };
+const PX_MAT = {};
+function pxMat (key) {
+  if (PX_MAT[key]) return PX_MAT[key];
+  const rows = PX_ART[key], c = document.createElement('canvas');
+  c.width = rows[0].length; c.height = rows.length;
+  const x = c.getContext('2d');
+  rows.forEach((row, j) => { for (let i = 0; i < row.length; i++) { const col = PX_COL[row[i]]; if (col) { x.fillStyle = col; x.fillRect(i, j, 1, 1); } } });
+  const t = new THREE.CanvasTexture(c);
+  t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.colorSpace = THREE.SRGBColorSpace;
+  return (PX_MAT[key] = key === 'spark'
+    ? new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false })
+    : new THREE.MeshBasicMaterial({ map: t, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide }));
+}
+
+function pickupModel (kind, opt = {}) {
   const body = new THREE.Group(), M = PICK_MAT;
   const add = (geo, mat, x = 0, y = 0, z = 0) => { const me = new THREE.Mesh(geo, mat); me.position.set(x, y, z); body.add(me); return me; };
+  if (kind === 'cash' || kind === 'life') {
+    const art = kind === 'life' ? 'life' : opt.art || 'bill', rows = PX_ART[art];
+    const h = kind === 'life' ? 1.5 : art === 'coin' ? 0.95 : art === 'stash' ? 1.25 : 1.0, w = h * rows[0].length / rows.length;
+    add(new THREE.PlaneGeometry(w, h), pxMat(art));
+    const sp = new THREE.Sprite(pxMat('spark'));
+    sp.position.set(w * 0.45, h * 0.45, 0.05);
+    body.add(sp);
+    body.userData.spark = sp;
+    return body;
+  }
   if (kind === 'nos') {
     // стаканчик: синий, с рукавом потемнее, белой крышкой и буквой D на рукаве
     add(new THREE.CylinderGeometry(0.44, 0.32, 1.15, 12), M.cup);
@@ -7179,15 +7582,16 @@ function pickupModel (kind) {
   return body;
 }
 
-function addPickup (kind, x, z, fixed) {
-  const g = new THREE.Group(), body = pickupModel(kind);
+function addPickup (kind, x, z, fixed, opt) {
+  const g = new THREE.Group(), body = pickupModel(kind, opt);
   const ring = new THREE.Mesh(ringGeo, PICK_MAT.ring[kind]);
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.25;
   g.add(body, ring);
   const y = surfaceAt(x, z);
   g.position.set(x, y, z);
   scene.add(g);
-  const n = { kind, x, z, y, g, body, ring, t: 0, ph: rand(0, 6), fixed };
+  const n = { kind, x, z, y, g, body, ring, t: 0, ph: rand(0, 6), fixed, spark: body.userData.spark || null };
+  if (opt) Object.assign(n, opt);
   NITRO_CANS.push(n);
   return n;
 }
@@ -7196,7 +7600,7 @@ function addPickup (kind, x, z, fixed) {
    (материалы и кольцо общие, их не трогаем) */
 function dropPickup (n) {
   scene.remove(n.g);
-  n.body.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+  n.body.traverse(o => { if (o.geometry && !o.isSprite) o.geometry.dispose(); });   // у спрайтов геометрия общая на всю игру
 }
 
 /* где положить кофе: середина улицы, подальше от других и от пиццерии */
@@ -7437,6 +7841,26 @@ function takePickup (n) {
     FXS.shieldT = 10;
     Snd.nosPick();
     toast($t('щит: десять секунд машину не бьёт'));
+  } else if (n.kind === 'cash') {
+    // деньги на улице (ECON.STREET_CASH): в кошелёк и в «за смену»; «+N ₽» летит в кошелёк (walletHud)
+    S.money += n.amount;
+    if (!S.freeRun) addWallet(n.amount);
+    Snd.coin(); setTimeout(() => Snd.coin(), 110);
+    if (n.stash) setTimeout(() => Snd.coin(), 220);
+    emote(n.x, 1.6, n.z, 'star', n.stash ? 6 : 3);
+    toast(n.stash ? $t('заначка! +{money}', { money: money(n.amount) }) : $t('деньги на асфальте: +{money}', { money: money(n.amount) }));
+  } else if (n.kind === 'life') {
+    // лишнее сердце (ECON.EXTRA_LIFE): полные — ещё одна ячейка до конца смены, побита — +1 сердце
+    XLIFE.taken = true;
+    if (S.hp >= S.hpMax && (S.lifeExtra || 0) < ECON.EXTRA_LIFE.EXTRA_MAX) {
+      S.lifeExtra = (S.lifeExtra || 0) + 1; S.hpMax += 1; S.hp = S.hpMax;
+      toast($t('золотое сердце: +1 сердце сверх машины до конца смены'));
+    } else {
+      S.hp = Math.min(S.hpMax, S.hp + 1);
+      toast($t('золотое сердце: +1 сердце'));
+    }
+    hudHearts();
+    Snd.coin(); emote(V.x, 2.4, V.z, 'heart', 5);
   } else if (n.kind === 'heal') {
     S.hp = Math.min(S.hpMax, S.hp + 1);
     hudHearts();
@@ -7449,9 +7873,70 @@ function takePickup (n) {
   }
 }
 
+/* ── деньги на улице (ECON.STREET_CASH) и лишнее сердце (ECON.EXTRA_LIFE) ──
+   Место — не на проезжей части: двор/проезд (YARD_SPOTS) или тротуар у улицы (сбоку от
+   полосы на ширину дороги + 2,5 м), в своём районе, не в доме, подальше от другой купюры. */
+const LOOT = { t: 0, n: 0, stash: false };
+const XLIFE = { at: -1, t: 0, taken: false, retry: 0 };
+function offRoadSpot (rmin, rmax, ahead) {
+  const fx = Math.sin(V.h), fz = Math.cos(V.h);
+  for (let k = 0; k < 50; k++) {
+    let x, z;
+    if (k % 3 !== 2 && YARD_SPOTS.length) [x, z] = pick(YARD_SPOTS);
+    else {
+      const q = pick(COFFEE_SEGS.length ? COFFEE_SEGS : RSEG);
+      if (!q) continue;
+      const L = Math.hypot(q.x2 - q.x1, q.z2 - q.z1) || 1, t = rand(0.2, 0.8), off = ((q.w || 6) / 2 + 2.5) * (chance(0.5) ? 1 : -1);
+      x = lerp(q.x1, q.x2, t) - (q.z2 - q.z1) / L * off; z = lerp(q.z1, q.z2, t) + (q.x2 - q.x1) / L * off;
+    }
+    const dx = x - V.x, dz = z - V.z, d = Math.hypot(dx, dz);
+    if (d < rmin || d > rmax || (ahead && (dx * fx + dz * fz) / d < 0.2)) continue;
+    if (!inBounds(x, z, 25) || inHouse(x, z, 1.5)) continue;
+    if (DISTRICTS && DIST.at(x, z) !== DIST.cur()) continue;
+    if (PIZZA && Math.hypot(PIZZA.x - x, PIZZA.z - z) < 30) continue;
+    if (NITRO_CANS.some(o => (o.kind === 'cash' || o.kind === 'life') && Math.hypot(o.x - x, o.z - z) < 40)) continue;
+    return [x, z];
+  }
+  return null;
+}
+function streetLoot (dt, live) {
+  if (!live || S.ride) return;
+  const C = ECON.STREET_CASH;
+  if ((LOOT.t -= dt) <= 0) {
+    LOOT.t = rand(C.RESPAWN[0], C.RESPAWN[1]);
+    if (LOOT.n < C.PER_SHIFT && NITRO_CANS.filter(o => o.kind === 'cash').length < C.ON) {
+      const p = offRoadSpot(C.R[0], C.R[1], false);
+      if (p) {
+        const v = ECON.streetCash(CAREER ? 1 : ECON.MONEY_K, Math.random, !LOOT.stash);
+        if (v.stash) LOOT.stash = true;
+        LOOT.n++;
+        addPickup('cash', p[0], p[1], false, { amount: v.amount, stash: v.stash, far: C.FAR, art: v.stash ? 'stash' : v.amount < 200 / (CAREER ? 1 : ECON.MONEY_K) ? 'coin' : 'bill' });
+      } else LOOT.t = 2;
+    }
+  }
+  const E = ECON.EXTRA_LIFE;
+  if (XLIFE.at >= 0 && (XLIFE.t += dt) >= XLIFE.at && (XLIFE.retry -= dt) <= 0) {
+    XLIFE.retry = 1;
+    const p = offRoadSpot(E.R[0], E.R[1], true);
+    if (p) { addPickup('life', p[0], p[1], false, { keep: true }); XLIFE.at = -1; toast($t('впереди во дворе блестит золотое сердце')); }
+  }
+}
+/* начало смены: купюры и сердце прошлой — убрать, счёт заново; сердце в эту смену — с шансом EXTRA_LIFE.CHANCE */
+function lootReset () {
+  for (let i = NITRO_CANS.length - 1; i >= 0; i--) {
+    const n = NITRO_CANS[i];
+    if (n.kind === 'cash' || n.kind === 'life') { dropPickup(n); NITRO_CANS.splice(i, 1); }
+  }
+  const C = ECON.STREET_CASH, E = ECON.EXTRA_LIFE;
+  LOOT.t = rand(C.FIRST[0], C.FIRST[1]); LOOT.n = 0; LOOT.stash = false;
+  XLIFE.t = 0; XLIFE.taken = false; XLIFE.retry = 0; XLIFE.at = !S.ride && chance(E.CHANCE) ? rand(E.AT[0], E.AT[1]) : -1;
+  S.lifeExtra = 0;
+}
+
 function updateNitro (dt) {
   const live = S.state === 'drive' || S.state === 'back' || S.state === 'handover' || S.state === 'side';
   nosTutStep();                                     // первый кофе — карточка, как только нет других окон
+  streetLoot(dt, live);                             // деньги на улице и лишнее сердце
   // время от времени — свежий стаканчик у дороги впереди
   if (live && PK.heal && (FXS.healT = (FXS.healT || PK.heal[0]) - dt) <= 0) { FXS.healT = rand(PK.heal[0], PK.heal[1]) * paceK('spawn'); healSpawn(); }
   if (live && (FXS.spawnT -= dt) <= 0) {
@@ -7464,14 +7949,15 @@ function updateNitro (dt) {
   for (let i = NITRO_CANS.length - 1; i >= 0; i--) {
     const n = NITRO_CANS[i];
     if (n.t > 0) n.t -= dt;
-    // временный стаканчик, от которого уехали, исчезает
-    if (!n.fixed && Math.hypot(n.x - V.x, n.z - V.z) > 420) { dropPickup(n); NITRO_CANS.splice(i, 1); continue; }
+    // временный стаканчик, от которого уехали, исчезает (лишнее сердце — нет, деньги — дальше STREET_CASH.FAR)
+    if (!n.fixed && !n.keep && Math.hypot(n.x - V.x, n.z - V.z) > (n.far || 420)) { dropPickup(n); NITRO_CANS.splice(i, 1); continue; }
     const near = Math.abs(n.x - V.x) < 460 && Math.abs(n.z - V.z) < 460;
     n.g.visible = n.t <= 0 && near;
     if (!n.g.visible) continue;
     n.ph += dt;
     n.body.rotation.y += dt * 2.2;
-    n.body.position.y = 1.6 + Math.sin(n.ph * 2.4) * 0.25;
+    n.body.position.y = (n.kind === 'cash' ? 0.95 : 1.6) + Math.sin(n.ph * 2.4) * (n.kind === 'cash' ? 0.12 : 0.25);
+    if (n.spark) { const k = Math.max(0, Math.sin(n.ph * 4.1)); n.spark.scale.setScalar(0.05 + k * k * 0.7); }
     const p = 1 + Math.sin(n.ph * 3.2) * 0.12;
     n.ring.scale.set(p, p, p);
     if (!live || Math.hypot(n.x - V.x, n.z - V.z) > 3.4 || Math.abs(n.y - V.y) > 3) continue;
@@ -8406,7 +8892,8 @@ function driveStep (dt) {
         V.vx += nx * hit * 0.7; V.vz += nz * hit * 0.7;
         S.shake = Math.max(S.shake, 0.6);
         t.ramT = 0; t.repath = 1;
-      } else if (!t.parked && hit > 6 && !t.driver) t.angry = 1;     // приземлится — выйдет разбираться
+      } else if (t.chase) chaseEnd(t, 'caught');   // догнал и врезались — остыл, едет дальше
+      else if (!t.parked && hit > 6 && !t.driver) t.angry = 1;     // приземлится — выйдет разбираться (или погонится — chaseStart)
       hurtCar((hit - 5) * 0.14, hit, hx, hz);
       t.hitT = 0.5;
       t.x -= nx * (need - d); t.z -= nz * (need - d);
@@ -10682,6 +11169,11 @@ function handOver (st, onTime) {
         ped.hold = box;
         ped.served = 1;
         ped.freeT = 16;
+        // что делать с пиццей дальше (afterStart); сюжетного клиента ведёт story.js — его не трогаем
+        ped.afterMood = st.pay && st.pay.story ? '' : !onTime || st.bumped ? 'angry' : 'happy';
+        // смену/заказ уже свернули (backToBase снимает гостя до того, как долетела коробка) — постоит с ней, потом afterStart
+        if (ped.afterMood && !ped.guest && !ped.surf && ped.base !== undefined) { if (ped.after) afterDrop(ped, true); ped.guest = true; ped.sitting = 0; ped.sitAt = null; ped.waitAt = null; if (ped.idle) { ped.idle.b.taken = 0; ped.idle = null; } }
+        if (ped.afterMood && afterCount() < AFTER.MAX) ped.freeT = onTime && !st.bumped ? AFTER.HOLD : AFTER.HOLD_ANGRY;
         if (onTime) { ped.holdT = 7; emote(ped.x, 2.1, ped.z, 'heart', 5); }
         else emote(ped.x, 2.1, ped.z, 'angry', 3);
       });
@@ -10996,6 +11488,20 @@ function lateFine (fee) {
   if (Snd.fail) Snd.fail();
 }
 
+/* срочный не успел (econ.js URGENT, docs/ORDERS.md «Срочный заказ»): опоздания у срочного нет — срок вышел,
+   и заказ сорван: 0 ₽, штраф ECON.urgentFine (30 % цены, не меньше 400 ₽) из кошелька (сколько есть)
+   и из «за смену», Жека пишет; дальше — в пиццерию за следующим (как после сбитого клиента) */
+function urgentFail () {
+  const fine = ECON.urgentFine(S.fee || 0, CAREER ? 1 : ECON.MONEY_K);
+  const got = Math.max(0, Math.min(fine, wallet()));
+  if (got && !S.freeRun) addWallet(-got);
+  S.money = Math.max(0, S.money - fine);
+  popBonus($t('срочный заказ сорван'), $t('не успел · клиент отказался · штраф −{money}', { money: money(fine) }));
+  if (Snd.fail) Snd.fail();
+  setTimeout(() => { if (isPlaying()) CHAT.react('urgent'); }, 1200);
+  backToBase();
+}
+
 /* Задел своего клиента несильно (econ.js CLIENT_HIT: от SOFT до HARD м/с): цел, отшатнулся
    из-под машины, злится — а чаевых по этому адресу уже не будет (st.bumped → orders.js payStop).
    Плашка — один раз на адрес. Не свой клиент — false: дальше как со всеми (runOver). */
@@ -11299,6 +11805,7 @@ function startRun (ride) {
   NOS.tank = DISTRICTS && !S.ride ? DIST.pace().tank : 0.5; NOS.burn = false;
   for (const n of NITRO_CANS) { n.t = 0; }
   scatterPickups();                              // кофе и аптечки — по району и по волне
+  lootReset();                                   // деньги на улице и лишнее сердце — заново на смену
   FXS.shieldT = 0; FXS.beastT = 0;
   startPose();
   V.vx = V.vz = 0; V.camX = V.x + 12; V.camZ = V.z; V.camH = V.h; V.camY = V.y + 6;
@@ -11657,8 +12164,9 @@ for (const [px, pz, ry] of PARKED) {
 }
 // машин в потоке вокруг курьера (40–330 м): было 36 — на улицах Северска толпа, и на Деке
 // каждая машина — это ещё и расчёт её езды в каждом кадре. Припаркованные, мопеды и сервисные — сверху
+// 02.10.2026: 24 — это теперь обычный день; по часам — econ.js TRAFFIC (пик 28, ночь 4–8), добирается trafficDensity
 const TRAFFIC_N = 24;
-spawnTraffic(INTRO ? 22 : TRAFFIC_N);
+spawnTraffic(INTRO ? 22 : Math.min(TRAFFIC_N, trafficWant()));
 if (!INTRO) { buildSpots(); buildCollect(); }
 buildNitro();
 districtLocks();                                  // закрытые районы: перекрытия на въездах
@@ -12323,6 +12831,7 @@ function frame (now) {
   updateCrowds(dt);
   LIFE.step(dt, LIFE_API);
   WORLD.step(dt, WORLD_API || (WORLD_API = worldApi()));   // мусор, бандиты, шашлыки (world.js)
+  MAFIA.step(dt, MAFIA_API || (MAFIA_API = mafiaApi()));   // мафиози у адреса (mafia.js)
   LM.stepRink(RINK, dt, V.x, V.z);
   updateCrew(dt);
   updateSurf(dt);
@@ -12345,7 +12854,7 @@ function frame (now) {
       if (S.time < 6) { S.tickT += dt; if (S.tickT > 0.4) { S.tickT = 0; Snd.tick(); } }
       // карьера: протух — не конец смены (docs/ORDERS.md «Опоздал»): везёшь дальше, клиент злой, платят ECON.PAY.LATE;
       // вернуться в пиццерию — без штрафа. Развоз смены после полуночи закрывает сам orders.js. Яндекс — по-старому
-      if (CAREER) { if (S.time >= 0) S.lateTold = false; else if (!S.lateTold && S.state === 'drive' && S.order && !(S.order.ord && S.order.ord.type === 'staff')) { S.lateTold = true; popBonus($t('опаздываешь'), $t('клиент недоволен: заплатит {p} % и без чаевых', { p: Math.round(ECON.PAY.LATE * 100) })); } }
+      if (CAREER) { if (S.time >= 0) S.lateTold = false; else if (!S.lateTold && S.state === 'drive' && S.order && !(S.order.ord && S.order.ord.type === 'staff')) { S.lateTold = true; if (S.order.ord && S.order.ord.urgent) urgentFail(); else popBonus($t('опаздываешь'), $t('клиент недоволен: заплатит {p} % и без чаевых', { p: Math.round(ECON.PAY.LATE * 100) })); } }
       else if (S.time < -GRACE) gameOver('не успел', [], { x: V.x, z: V.z });
     }
     checkArrival(dt);
@@ -12401,7 +12910,7 @@ requestAnimationFrame(frame);
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
 /* песочница (sandbox.html): бесконечное здоровье, нитро, «не глохнет» (noStall читает cars.js) */
 const SBX = { god: false, nitro: false, noStall: false };
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { RL: RL.DEBUG, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта
@@ -12412,6 +12921,6 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) wi
   EDGES, SIG_GROUPS, ZEBRAS, SCOOTS, TL, IN, touches, lightOf, edgeOf,
   // песочница: сюжет, карта, сохранения, старт смены, кошелёк, читы
   STORY, STORY_DBG: STORY.DEBUG, MAP, Store, SBX, CARSM: AUTO, startRun, goRun, endShift, wallet, addWallet, hudHearts, marker, updateEnv, humanLod, get SPOTS_N () { return SPOTS.length; },
-  DRIVERS, SMOKERS, NITRO_CANS, NOS, CREW_HOMES, CREW, WAR, warStart, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, PIGEONS, AMB, INCIDENTS, scare, RIVALS, FOES, THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, roadPath, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT };
+  DRIVERS, SMOKERS, NITRO_CANS, NOS, CREW_HOMES, CREW, WAR, warStart, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, PIGEONS, AMB, INCIDENTS, scare, RIVALS, FOES, THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, roadPath, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT, LOOT, XLIFE };
 // ?mapcheck: сводка проблем карты, столбики над ними, «]» — к следующей (mapworks.js)
 if (MAPCHECK) MAPW.debug(MAPFIX, MAPW_API || (MAPW_API = mapApi()));

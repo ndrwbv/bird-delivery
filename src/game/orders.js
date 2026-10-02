@@ -267,22 +267,14 @@ function genSpec () {
     const need = r.count - have, slots = (r.byHour - hAt) * rate();
     if (slots <= need + 0.5 || chance(need / Math.max(1, slots))) { forced = r.what; break; }
   }
+  // и сверх обязательного — иногда ещё срочный (econ.js URGENT: CHANCE, не больше MAX за смену)
+  if (!forced && hAt >= (DIST.pace().hardFrom || 0) && (SH.must.urgent || 0) < ECON.URGENT.MAX && chance(ECON.URGENT.CHANCE)) forced = 'urgent';
   let spec = null;
   if (forced === 'edge') {
     const s = edgeSpot();
     if (s) spec = { type: 'pizza', kind: 'solo', edge: true, stops: [stopOf(s)] };
   } else if (forced === 'urgent') {
-    // далеко — по дорогам не ближе urgentMin(); из нескольких кандидатов берём самый дальний
-    const um = urgentMin();
-    let best = null, bl = 0;
-    for (let k = 0; k < 6; k++) {
-      const s = pickSpot({ dmin: um * 0.8 });
-      if (!s) break;
-      const L = A.routeLen(A.PIZZA.x, A.PIZZA.z, s.x, s.z);
-      if (L > farMax()) continue;                          // слишком далеко по дорогам
-      if (L > bl) { bl = L; best = s; }
-      if (L >= um) break;
-    }
+    const best = urgentSpot();
     if (best) spec = { type: 'urgent', kind: 'solo', urgent: true, stops: [stopOf(best)] };
   }
   if (!spec && !forced && !SIM && STORY && typeof STORY.nextOrder === 'function') {
@@ -382,8 +374,27 @@ function edgeSpot () {
 }
 /* дальше этого по дорогам срочные и «в конец района» не ведут: DISTRICT.FAR_K × дальность района */
 const farMax = () => (DIST.has() ? DIST.dist()[1] * ECON.DISTRICT.FAR_K : Infinity);
-/* срочный — не ближе этого от пиццерии: в районе — URGENT_K от его дальности, без районов — PAY.URGENT_MIN_M */
-const urgentMin = () => (DIST.has() ? Math.max(400, DIST.dist()[1] * ECON.DISTRICT.URGENT_K) : PAY.URGENT_MIN_M);
+/* срочный — средняя дальность по дорогам: в районе — URGENT.DIST × его дальности (не ближе URGENT.MIN_M),
+   без районов — не ближе PAY.URGENT_MIN_M */
+const urgentRange = () => {
+  if (!DIST.has()) return [PAY.URGENT_MIN_M, Infinity];
+  const d = DIST.dist()[1], U = ECON.URGENT;
+  return [Math.max(U.MIN_M, d * U.DIST[0]), Math.max(U.MIN_M + 150, d * U.DIST[1])];
+};
+/* адрес срочного: путь по дорогам в urgentRange(); не нашли — ближайший к середине из кандидатов */
+function urgentSpot (zone) {
+  const [lo, hi] = urgentRange(), mid = Number.isFinite(hi) ? (lo + hi) / 2 : lo * 1.2;
+  let best = null, bd = Infinity;
+  for (let k = 0; k < 8; k++) {
+    const s = pickSpot({ dmin: lo * 0.7, dmax: Number.isFinite(hi) ? hi : undefined, zone: zone || undefined });
+    if (!s) break;
+    const L = A.routeLen(A.PIZZA.x, A.PIZZA.z, s.x, s.z);
+    if (L > farMax()) continue;                            // слишком далеко по дорогам
+    if (L >= lo && L <= hi) return s;
+    if (Math.abs(L - mid) < bd) { bd = Math.abs(L - mid); best = s; }
+  }
+  return best;
+}
 /* сюжет: дом героя не дальше 1,6 × дальности района от пиццерии (иначе глава ждёт района поближе) */
 function storyNear (s) {
   if (!DIST.has() || !Number.isFinite(s.x) || !Number.isFinite(s.z) || !A.PIZZA) return true;
@@ -498,7 +509,7 @@ function bindSpec (spec) {
 function whyOf (sp) {
   if (sp.story) return sp.story.why || t('особый заказ');
   const z = t(ZONE_LABEL[sp.zone] || ZONE_LABEL.normal);
-  if (sp.urgent) return t('срочно: далеко, а времени в обрез · оплата ×{k}', { k: fmtK(PAY.URGENT) });
+  if (sp.urgent) return t('срочно: времени в обрез · оплата ×{k} · не успеешь — штраф', { k: fmtK(PAY.URGENT) });
   if (sp.edge) return t('в самый конец района · оплата ×{k}', { k: fmtK(PAY.EDGE) });
   if (sp.bundle) return tn(sp.stops.length, 'сборный: {n} адрес, порядок выбираешь сам|сборный: {n} адреса, порядок выбираешь сам|сборный: {n} адресов, порядок выбираешь сам');
   if (sp.kind === 'group') return t('групповой: заказали на всех сразу') + ' · ' + z;
@@ -529,7 +540,7 @@ export function setup (plan) {
   o.stops.forEach((st, i) => { st.fee = sp.fees[i]; if (!st.zone && sp.stops[i]) st.zone = sp.stops[i].zone; st.done = false; });
   const L = A.routeLen(V.x, V.z, S.target.x, S.target.z);
   S.timeMax = sp.story && Number.isFinite(sp.story.time) ? sp.story.time
-    : sp.urgent ? A.orderTime(L, 1, 1) * PAY.URGENT_TIME
+    : sp.urgent ? (DIST.has() ? Math.max(ECON.URGENT.MIN_T, L / ECON.URGENT.V + ECON.URGENT.ADD) : A.orderTime(L, 1, 1) * PAY.URGENT_TIME)
       // сборный: срок один на весь развоз — путь ближайшим следующим от пиццерии × ступень (BUNDLE.STEPS time)
       : sp.bundle ? bundleTime(sp.m.reduce((a, b) => a + b, 0), o.stops.length, sp.bundle.time || 1)
         : A.orderTime(L, 1, S.orders);
@@ -590,6 +601,12 @@ export function card (order) {
   const sp = order.ord;
   el.classList.add('ord-typed');
   el.classList.toggle('ord-urgent', !!(sp && sp.urgent));
+  // срочный — красная печать «СРОЧНО» наискось в углу накладной
+  let stamp = el.querySelector(':scope > .oc-stamp');
+  if (sp && sp.urgent) {
+    if (!stamp) { stamp = document.createElement('div'); stamp.className = 'oc-stamp'; el.appendChild(stamp); }
+    stamp.textContent = t('СРОЧНО');
+  } else if (stamp) stamp.remove();
   el.style.setProperty('--ord', sp ? sp.color : typeColor('pizza'));
   // сборный на 3+ адреса: получатели и фото мельче, фото — в две колонки (иначе накладная не влезает)
   const many = !!(sp && sp.bundle && order.stops.length > 2);
@@ -920,7 +937,11 @@ export function step (dt) {
 /* рамка срочного у часов; список «дальше» на HUD убран — следующие заказы игроку не показываем */
 function hud () {
   const urg = !!(S.state === 'drive' && S.order && S.order.ord && S.order.ord.urgent);
-  if (urg !== urgOn) { urgOn = urg; document.body.classList.toggle('ord-urgent', urg); }
+  if (urg !== urgOn) {
+    urgOn = urg; document.body.classList.toggle('ord-urgent', urg);
+    const tw = document.getElementById('timewrap');
+    if (tw) tw.dataset.urg = t('СРОЧНО');               // «СРОЧНО» красным слева от часов (css ниже)
+  }
 }
 
 /* ─────────────── цвета: радар, карта, кольцо ─────────────── */
@@ -1019,6 +1040,13 @@ function css () {
 #phone .oc-photos.many { display: grid; grid-template-columns: repeat(2, auto); gap: 6px; }
 #phone .oc-photos.many .oc-p img, #phone .oc-photos.many .oc-p i { width: clamp(44px, 5vw, 76px); height: clamp(44px, 5vw, 76px); border-width: 4px; border-bottom-width: 9px; }
 body.ord-urgent #timewrap { outline: 2px solid #ff2d4a; box-shadow: 0 0 10px #ff2d4a; animation: ord-urg 0.9s ease-in-out infinite; }
+body.ord-urgent #timewrap::before { content: attr(data-urg); order: -1; background: #ff2d4a; color: #fff; font-size: 11px; letter-spacing: .08em;
+  padding: 3px 5px 2px; border-radius: 3px; box-shadow: 0 2px 0 #7a0f1e; }
+#phone > .oc-stamp { position: absolute; top: 46px; right: 18px; z-index: 3; pointer-events: none; transform: rotate(-11deg);
+  color: #e0182f; border: 4px solid #e0182f; border-radius: 6px; padding: 5px 12px 3px; font-size: clamp(18px, 2.4vw, 30px);
+  letter-spacing: .12em; line-height: 1; background: rgba(255, 243, 214, .6); opacity: .9;
+  box-shadow: inset 0 0 0 2px rgba(224, 24, 47, .35); animation: oc-stamp .35s cubic-bezier(.2, 1.6, .5, 1) both; }
+@keyframes oc-stamp { from { transform: rotate(-11deg) scale(2.2); opacity: 0; } }
 @keyframes ord-urg { 50% { box-shadow: 0 0 2px #ff2d4a; } }
 `;
   document.head.appendChild(s);
@@ -1043,7 +1071,7 @@ export function force (spec = {}) {
     let s = null;
     if (spec.near) s = pickSpot({ near: spec.near, r: spec.r || 350, zone: spec.zone || null });
     else if (k === 'edge') { if (!POOL.length) buildPool(); s = edgeSpot(); }
-    else if (k === 'urgent') s = pickSpot({ dmin: urgentMin() * 0.8, zone: spec.zone || null });
+    else if (k === 'urgent') s = urgentSpot(spec.zone);
     else if (k === 'gang' || spec.zone) {
       const z = spec.zone || 'gang';
       s = ZMIN[z] >= 0 ? pickSpot({ zone: z, relax: false, dmin: ZMIN[z], dmax: ZMIN[z] + 800 }) : null;
