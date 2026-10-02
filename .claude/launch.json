@@ -1,0 +1,143 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 5190
+    },
+    {
+      "name": "dev-alt",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "--port",
+        "5196",
+        "--strictPort"
+      ],
+      "port": 5196
+    },
+    {
+      "name": "preview-steam",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "preview",
+        "--outDir",
+        "dist/steam",
+        "--port",
+        "5197",
+        "--strictPort"
+      ],
+      "port": 5197
+    },
+    {
+      "name": "agent-1",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "AGENT=1",
+        "npx",
+        "vite",
+        "--port",
+        "5201",
+        "--strictPort"
+      ],
+      "port": 5201
+    },
+    {
+      "name": "agent-2",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "AGENT=1",
+        "npx",
+        "vite",
+        "--port",
+        "5202",
+        "--strictPort"
+      ],
+      "port": 5202
+    },
+    {
+      "name": "agent-3",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "AGENT=1",
+        "npx",
+        "vite",
+        "--port",
+        "5203",
+        "--strictPort"
+      ],
+      "port": 5203
+    },
+    {
+      "name": "agent-4",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "AGENT=1",
+        "npx",
+        "vite",
+        "--port",
+        "5204",
+        "--strictPort"
+      ],
+      "port": 5204
+    },
+    {
+      "name": "agent-5",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "AGENT=1",
+        "npx",
+        "vite",
+        "--port",
+        "5205",
+        "--strictPort"
+      ],
+      "port": 5205
+    },
+    {
+      "name": "agent-6",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "AGENT=1",
+        "npx",
+        "vite",
+        "--port",
+        "5206",
+        "--strictPort"
+      ],
+      "port": 5206
+    },
+    {
+      "name": "agent-7",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "AGENT=1",
+        "npx",
+        "vite",
+        "--port",
+        "5207",
+        "--strictPort"
+      ],
+      "port": 5207
+    },
+    {
+      "name": "agent-8",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "AGENT=1",
+        "npx",
+        "vite",
+        "--port",
+        "5208",
+        "--strictPort"
+      ],
+      "port": 5208
+    }
+  ]
+}

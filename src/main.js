@@ -12,7 +12,10 @@ import { useMap } from './game/map.js';
 
 // версия сборки в углу заставки: «v0.0.8» из релиза или «dev-<коммит>» (vite.config.js, __BUILD__)
 const buildV = document.getElementById('build-v');
-if (buildV) buildV.textContent = typeof __BUILD__ === 'string' ? __BUILD__ : '';
+const BUILD = typeof __BUILD__ === 'string' ? __BUILD__ : '';
+if (buildV) buildV.textContent = BUILD;
+// и мелко в углу паузы
+for (const el of document.querySelectorAll('.pm-ver')) el.textContent = BUILD;
 
 await Platform.init({ langs: LANGS });
 // первый запуск — спросить язык: игра ещё не загружена, перезагружать нечего. На Яндексе язык даёт площадка

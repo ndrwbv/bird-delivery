@@ -30,5 +30,6 @@ export default defineConfig(({ mode }) => ({
     // В Стиме рядом с игрой — ещё страница диагностики геймпада (--page=pad.html)
     ...(mode !== 'yandex' ? { rollupOptions: { input: { index: 'index.html', sandbox: 'sandbox.html', ...(mode === 'steam' ? { pad: 'pad.html' } : {}) } } } : {}),
   },
-  server: { host: '127.0.0.1' },
+  // AGENT=1 — dev-сервер для агентов: не перезагружается от чужих правок (docs/AGENTS.md); свежий код — F5
+  server: { host: '127.0.0.1', ...(process.env.AGENT ? { watch: null, hmr: false } : {}) },
 }));

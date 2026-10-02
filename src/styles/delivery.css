@@ -1111,6 +1111,10 @@ body:has(#over:not([hidden])) .hud, body:has(#over:not([hidden])) #ctrls { visib
 #build-v { flex: none; margin-top: 14px; font-size: 7px; line-height: 1; letter-spacing: .04em; color: #b9b4ab; opacity: .85;
            text-shadow: 1px 1px 0 #33210c; pointer-events: none; user-select: none; }
 #build-v:empty { display: none; }
+/* версия в углу паузы — так же мелко и незаметно, как в меню */
+.pm-ver { position: fixed; right: max(12px, env(safe-area-inset-right)); bottom: max(7px, env(safe-area-inset-bottom)); z-index: 5;
+          font-size: 8px; line-height: 1; letter-spacing: .04em; color: #b9b4ab; opacity: .6; pointer-events: none; }
+.pm-ver:empty { display: none; }
 /* широкий экран: колонка заставки узкая по центру — версия в правом нижнем углу, видна без прокрутки */
 @media (min-width: 900px) { #build-v { position: fixed; right: 12px; bottom: 7px; margin: 0; font-size: 8px; } }
 

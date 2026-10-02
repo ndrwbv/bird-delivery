@@ -26,6 +26,7 @@ OpenStreetMap): заказы от «умного трекера», трафик 
 | `npm run dev:yandex` | как на Яндексе, с заглушкой SDK (`src/platform/yandex-mock.js`) | http://localhost:5191 |
 | `npm run build:yandex` | архив для консоли Яндекс Игр | `release/yandex-<версия>.zip` |
 | `npm run electron` | Стим-сборка в Электроне | окно |
+| `npm run probe -- --js="return d.S.state"` / `npm run check` | проверка из скрипта без окна (JSON, кадр по флагу) / общие проверки перед сдачей, ~1 мин | stdout, [docs/AGENTS.md](docs/AGENTS.md) |
 | `npm run dist:win` / `dist:deck` / `dist:mac` | пакеты для SteamPipe | `release/` |
 | релиз: GitHub → Actions → «Релиз» → Run workflow | выбрать только `patch` / `minor` / `major` — номер (v0.0.8…) CI считает сам и пишет его в углу заставки | GitHub Releases ([docs/STEAM.md](docs/STEAM.md)) |
 

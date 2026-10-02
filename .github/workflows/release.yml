@@ -27,9 +27,9 @@ on:
         required: false
         default: ''
       yandex:
-        description: 'Собрать ещё и zip для Яндекс Игр'
+        description: 'Собрать ещё и zip для Яндекс Игр (только когда нужно заливать в Яндекс)'
         type: boolean
-        default: true
+        default: false
 
 # релизы — строго по одному: иначе два прогона посчитают одинаковый номер
 concurrency:
