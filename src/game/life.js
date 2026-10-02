@@ -29,17 +29,9 @@ const COUPLES = [], RICH = [], ARTISTS = [], FLYERS = [], LUX = [], WALLS = [], 
 export const STATE = { COUPLES, RICH, ARTISTS, FLYERS, LUX, WALLS, PARKS, TAGS, CAP: null, stats: { tags: 0, spawned: 0, ms: 0, setupMs: 0 } };
 let CAP = null;
 
-/* сезон — из seasons.js: 0 лето, 1 осень, 2 зима, 3 весна. Насколько
-   холодно (0…1) — по той же кривой, по которой там одеваются люди (warm) */
-const COLD = [[0, 0], [0.82, 0], [1.3, 0.45], [1.8, 0.78], [2.02, 1], [2.8, 1], [3.2, 0.62], [3.6, 0.3], [3.9, 0], [4, 0]];
+/* насколько холодно (0…1) — та же кривая, по которой одеваются люди (seasons.js, warm) */
 function cold () {
-  let v;
-  try { v = ((SEAS.seasonValue() % 4) + 4) % 4; } catch (e) { return 0; }
-  for (let i = 1; i < COLD.length; i++) {
-    const [x0, y0] = COLD[i - 1], [x1, y1] = COLD[i];
-    if (v <= x1) return y0 + (y1 - y0) * (v - x0) / (x1 - x0 || 1);
-  }
-  return 0;
+  try { return SEAS.warmth(); } catch (e) { return 0; }
 }
 const winter = () => cold() > 0.6 || (SEAS.snowy && SEAS.snowy());
 const deepWinter = () => cold() > 0.9;

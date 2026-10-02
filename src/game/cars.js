@@ -1,4 +1,4 @@
-/* Карьера (Стим): десять машин, ломучесть, «заглохла» с мини-игрой, ямы на
+/* Карьера (Стим): четырнадцать машин, мотор и ресурс, «заглохла» с мини-игрой, ямы на
    дорогах и гараж Дяди Жени. Числа — econ.js (CAR_LIST, UPGRADE, BREAK),
    правила — docs/CAREER.md. Работает только когда в game.js CAREER.
 
@@ -8,23 +8,32 @@
      build()              — из buildCity: ямы и гараж в статику (LITM / LIT)
      step(dt, vf)         — каждый кадр после driveStep
      stalled()            — мотор заглох: driveStep не даёт газа и нитро
-     onHit(vn)            — настоящий удар (hurtCar): 40 %, что L + 1
+     onHit(vn)            — настоящий удар (hurtCar): мотор −BREAK.HIT_WEAR(vn) × wearK %
      radar / mapMark      — метка гаража на радаре и на полной карте
 
    Для экрана конца смены (career.js):
-     list()               — все машины: цена, звёзды, сердца, L, куплена ли, прокачка
+     list()               — все машины: цена, звёзды, сердца, мотор/ресурс, куплена ли, прокачка
      buy(id[, api])       — { ok, why: 'owned' | 'stars' | 'money' | 'unknown' }
      select(id)           — выбрать купленную
      upgrade(id, kind)    — kind: 'armor' (+1 сердце) | 'engine' (+4 % скорости)
+     paint(id, hex)       — покрасить свою за деньги (PAINTS — палитра, econ.js PAINT — цена)
+     sell(id)             — продать свою (не текущую и не «Семёрку»): { ok, price } (econ.js SELL)
      current()            — выбранная машина с учётом прокачки (hp, vmax, acc, L…)
-     L()                  — ломучесть выбранной
+     engine([id])         — мотор выбранной: { c — мотор %, r — ресурс %, km — пробег, n — ремонтов,
+                            k — скорость износа, p — шанс заглохнуть за заказ }
+     L()                  — «износ» выбранной для мини-игры и песочницы: (100 − мотор) / 10
+     setL(v)              — песочница: мотор = 100 − 10·v
      previewCanvas(id, { w, h, spin }) — картинка машины для карточки магазина
 
    Сохранения: dlv-car-owned (массив id), dlv-car-cur (id), dlv-car-up
-   ({ id: { armor, engine } }), dlv-car-L ({ id: L }). Звёзды — dlv-stars. */
-import { CAR_LIST, UPGRADE, BREAK, upgradePrice } from './econ.js';
+   ({ id: { armor, engine } }), dlv-car-eng ({ id: { c, r, km, n } } — мотор, ресурс, пробег км,
+   ремонтов), dlv-car-paint ({ id: '#hex' }). Звёзды — dlv-stars. Старое dlv-car-L ({ id: L },
+   до 03.10.2026) читается один раз, когда у машины ещё нет dlv-car-eng (econ.js BREAK.OLD_L). */
+import { CAR_LIST, UPGRADE, BREAK, upgradePrice, paintPrice, sellPrice, wearK, stallChance, repairQuote } from './econ.js';
+import { cnCar } from './roadlife.js';
 import { t } from '../i18n/index.js';
 import * as DIST from './districts.js';
+import { KEY as TOUR_KEY } from './garagetour.js';
 import { pad as PAD } from '../input/gamepad.js';
 import './cars.css';
 
@@ -78,6 +87,22 @@ const LOOK = {
     name: N_('Вестачка'), note: N_('современная, с иксом на морде'), hex: '#2d5fa6', model: 'sedan',
     spec: { L: 4.41, W: 1.76, h: 0.52, hood: 1.2, trunk: 0.82, cab: 2.3, cz: -0.14, ch: 0.56, r: 0.41, fz: 1.3, bz: -1.3 },
   },
+  cheri: {
+    name: N_('Чери-Мери'), note: N_('китайская малютка: глазастая, шустрая, но хлипкая'), hex: '#f2c21b', model: 'hatch',
+    spec: { L: 3.6, W: 1.6, h: 0.46, hood: 1.0, trunk: 0, cab: 2.1, cz: -0.62, ch: 0.72, r: 0.35, fz: 1.16, bz: -1.12 },
+  },
+  belgik: {
+    name: N_('Белджик X-50'), note: N_('компактный кроссовер из Поднебесной: чёрная крыша, LED во всю морду'), hex: '#d23a2f', model: 'hatch', lift: 0.05,
+    spec: { L: 4.33, W: 1.8, h: 0.54, hood: 1.2, trunk: 0, cab: 2.55, cz: -0.6, ch: 0.64, r: 0.46, fz: 1.4, bz: -1.36 },
+  },
+  havalka: {
+    name: N_('Хавалка'), note: N_('квадратный китайский танк: круглые фары, запаска сзади, ямы не замечает'), hex: '#b8a37a', chrome: '#2a2a2e', model: 'hatch', lift: 0.18,
+    spec: { L: 4.76, W: 1.93, h: 0.66, hood: 1.4, trunk: 0, cab: 3.0, cz: -0.7, ch: 0.84, r: 0.52, fz: 1.48, bz: -1.48 },
+  },
+  jilya: {
+    name: N_('Джиля Монжара'), note: N_('большой китайский кроссовер: решётка размером с холодильник'), hex: '#3b4a63', model: 'hatch', lift: 0.08,
+    spec: { L: 4.77, W: 1.9, h: 0.56, hood: 1.4, trunk: 0, cab: 2.85, cz: -0.72, ch: 0.68, r: 0.5, fz: 1.55, bz: -1.55 },
+  },
   patriot: {
     name: N_('Патриот'), note: N_('большой внедорожник: запаска на двери, ямы не замечает'), hex: '#3a4c3c', chrome: '#2a2a2e', model: 'hatch', lift: 0.2,
     spec: { L: 4.78, W: 1.9, h: 0.66, hood: 1.35, trunk: 0, cab: 3.05, cz: -0.72, ch: 0.82, r: 0.5, fz: 1.42, bz: -1.35 },
@@ -87,7 +112,7 @@ const BY_ID = new Map(CAR_LIST.map(c => [c.id, c]));
 const START = CAR_LIST[0].id;
 
 /* ─────────────── сохранения ─────────────── */
-const K_OWN = 'dlv-car-owned', K_CUR = 'dlv-car-cur', K_UP = 'dlv-car-up', K_L = 'dlv-car-L';
+const K_OWN = 'dlv-car-owned', K_CUR = 'dlv-car-cur', K_UP = 'dlv-car-up', K_L = 'dlv-car-L', K_PAINT = 'dlv-car-paint', K_ENG = 'dlv-car-eng';
 const sget = (k, d) => (A && A.Store ? A.Store.get(k, d) : d);
 const sset = (k, v) => { if (A && A.Store) A.Store.set(k, v); };
 const flush = () => { const p = A && A.Platform; if (p && p.store && p.store.flush) p.store.flush(); };
@@ -95,12 +120,41 @@ const obj = k => { const v = sget(k, {}); return v && typeof v === 'object' && !
 const ownedIds = () => { const v = sget(K_OWN, [START]); const a = Array.isArray(v) ? v.filter(id => BY_ID.has(id)) : []; if (!a.includes(START)) a.unshift(START); return a; };
 const curId = () => { const id = sget(K_CUR, START); return BY_ID.has(id) && ownedIds().includes(id) ? id : START; };
 const ups = id => { const u = obj(K_UP)[id] || {}; return { armor: Math.min(UPGRADE.STEPS, +u.armor || 0), engine: Math.min(UPGRADE.STEPS, +u.engine || 0) }; };
-const getL = id => { const v = obj(K_L)[id]; return v === undefined || !isFinite(+v) ? BY_ID.get(id).L : +v; };
-function setL (id, v) {
-  const m = obj(K_L);
-  m[id] = Math.round(Math.max(0, Math.min(Math.max(BREAK.MAX_L, BY_ID.get(id).L), v)) * 100) / 100;
-  sset(K_L, m);
+/* палитра покраски: 10 цветов; «заводской» — свой у каждой машины (LOOK.hex) */
+export const PAINTS = [
+  { hex: '#d8262e', name: N_('красный') }, { hex: '#f0522a', name: N_('оранжевый') }, { hex: '#f2c21b', name: N_('жёлтый') },
+  { hex: '#3f9a4e', name: N_('зелёный') }, { hex: '#46b4e0', name: N_('голубой') }, { hex: '#2d4fa6', name: N_('синий') },
+  { hex: '#7a3fb0', name: N_('фиолетовый') }, { hex: '#f27aa8', name: N_('розовый') }, { hex: '#ecebe6', name: N_('белый') },
+  { hex: '#1b1c21', name: N_('чёрный') },
+];
+const hexOf = id => { const v = obj(K_PAINT)[id]; return typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : LOOK[id].hex; };
+/* мотор: { c — состояние %, r — ресурс (потолок ремонта) %, km — пробег с покупки, n — ремонтов } */
+const r2 = v => Math.round(v * 100) / 100;
+function eng (id) {
+  const e = obj(K_ENG)[id];
+  if (e && isFinite(+e.c) && isFinite(+e.r)) return { c: +e.c, r: +e.r, km: +e.km || 0, n: +e.n || 0 };
+  // записи нет: новая машина — или старое сохранение (до 03.10.2026 была «ломучесть» L)
+  const old = obj(K_L)[id], hasOld = old !== undefined && isFinite(+old);
+  const veteran = (+sget('dlv-shifts', 0) || 0) > 0 && ownedIds().includes(id);
+  if (hasOld || veteran) return { c: BREAK.OLD_L(hasOld ? +old : BY_ID.get(id).L), r: 100, km: BREAK.GRACE_KM, n: 0 };
+  return { c: 100, r: 100, km: 0, n: 0 };
+}
+function setEng (id, e) {
+  const m = obj(K_ENG), r = Math.max(BREAK.CEIL_MIN, Math.min(100, e.r));
+  m[id] = { c: r2(Math.max(0, Math.min(r, e.c))), r: r2(r), km: r2(Math.max(0, e.km || 0)), n: e.n | 0 };
+  sset(K_ENG, m);
   return m[id];
+}
+const newEng = id => setEng(id, { c: 100, r: 100, km: 0, n: 0 });
+/* шанс заглохнуть за заказ: по мотору, на обкатке — 0 */
+const stallP = (id, e = eng(id)) => (e.km < BREAK.GRACE_KM ? 0 : stallChance(e.c));
+/* мотор −dc %, ресурс −dr %; перешёл через 70 / 50 / 30 % — подсказка «пора к Дяде Жене» */
+function wear (id, dc, dr = 0, km = 0) {
+  const e = eng(id), was = e.c;
+  const n = setEng(id, { ...e, c: e.c - dc, r: e.r - dr, km: e.km + km });
+  if (A && A.toast && id === curId() && [70, 50, 30].some(b => was >= b && n.c < b))
+    A.toast(t('мотор {n} % — стучит, заезжай к Дяде Жене (ключик на радаре)', { n: String(Math.round(n.c)) }));
+  return n;
 }
 const stars = () => +sget('dlv-stars', 0) || 0;
 const wallet = api => (api && api.wallet ? +api.wallet() || 0 : 0);
@@ -112,21 +166,25 @@ function pay (api, n) {
 
 /* ─────────────── экспорт для гаража в конце смены ─────────────── */
 function spec (id) {
-  const c = BY_ID.get(id), L = LOOK[id], u = ups(id);
+  const c = BY_ID.get(id), L = LOOK[id], u = ups(id), e = eng(id);
   return {
-    id, name: t(L.name), note: t(L.note), hex: L.hex, model: L.model, price: c.price, stars: c.stars,
+    id, name: t(L.name), note: t(L.note), hex: hexOf(id), hexBase: L.hex, model: L.model, price: c.price, stars: c.stars,
     hpBase: c.hp, hp: c.hp + u.armor * UPGRADE.HP,
     vmaxBase: c.vmax, vmax: Math.round(c.vmax * (1 + u.engine * UPGRADE.VMAX) * 10) / 10, acc: c.acc,
-    Lbase: c.L, L: getL(id), offroad: !!c.offroad, up: u,
+    Lbase: c.L, wearK: wearK(c), offroad: !!c.offroad, up: u,
+    cond: Math.round(e.c), ceil: Math.round(e.r), km: Math.round(e.km), repairs: e.n, stallP: stallP(id, e), L: (100 - e.c) / 10,
     upPrice: { armor: u.armor < UPGRADE.STEPS ? upgradePrice(c, u.armor) : null, engine: u.engine < UPGRADE.STEPS ? upgradePrice(c, u.engine) : null },
+    paintPrice: paintPrice(c), sellPrice: sellPrice(c, u, e.r),
   };
 }
 export function list () {
   const own = ownedIds(), cur = curId();
-  return CAR_LIST.map(c => ({ ...spec(c.id), owned: own.includes(c.id), current: c.id === cur }));
+  return CAR_LIST.map(c => ({ ...spec(c.id), owned: own.includes(c.id), current: c.id === cur, sellable: own.includes(c.id) && c.id !== cur && c.id !== START }));
 }
 export const current = () => spec(curId());
-export const L = () => getL(curId());
+export const engine = (id = curId()) => { const e = eng(id); return { ...e, k: wearK(BY_ID.get(id)), p: stallP(id, e) }; };
+export const L = () => (100 - eng(curId()).c) / 10;
+export const setL = v => { const id = curId(), e = eng(id); return setEng(id, { ...e, c: 100 - 10 * v, km: Math.max(e.km, BREAK.GRACE_KM) }); };
 export function buy (id, api = A) {
   const c = BY_ID.get(id);
   if (!c) return { ok: false, why: 'unknown' };
@@ -135,6 +193,7 @@ export function buy (id, api = A) {
   if (wallet(api) < c.price) return { ok: false, why: 'money', need: c.price };
   if (c.price && !pay(api, c.price)) return { ok: false, why: 'money', need: c.price };
   sset(K_OWN, ownedIds().concat(id));
+  newEng(id);                                       // новая: мотор 100 %, ресурс 100 %, обкатка
   select(id);
   flush();                                          // покупка — сохранить сразу
   return { ok: true };
@@ -162,9 +221,48 @@ export function upgrade (id, kind, api = A) {
   if (id === curId() && A && A.resetCar) A.resetCar();   // кенгурятник виден сразу
   return { ok: true, price };
 }
-/* сделать хуже / лучше (бандиты, Дядя Женя, сюжет) */
-export function worsen (n = 1, id = curId()) { return setL(id, getL(id) + n); }
-export function repair (n = 1, id = curId()) { return setL(id, getL(id) - n); }
+/* покраска: hex — из PAINTS или заводской; тот же цвет второй раз не продаём */
+export function paint (id, hex, api = A) {
+  const c = BY_ID.get(id);
+  hex = String(hex || '').toLowerCase();
+  if (!c || !(PAINTS.some(p => p.hex === hex) || hex === LOOK[id].hex.toLowerCase())) return { ok: false, why: 'unknown' };
+  if (!ownedIds().includes(id)) return { ok: false, why: 'owned' };
+  if (hexOf(id).toLowerCase() === hex) return { ok: false, why: 'same' };
+  const price = paintPrice(c);
+  if (wallet(api) < price || !pay(api, price)) return { ok: false, why: 'money', need: price };
+  const m = obj(K_PAINT);
+  if (hex === LOOK[id].hex.toLowerCase()) delete m[id]; else m[id] = hex;
+  sset(K_PAINT, m);
+  flush();
+  PREV.delete(id);
+  if (id === curId() && A && A.resetCar) A.resetCar();
+  return { ok: true, price };
+}
+/* продажа: половина цены × ресурс (econ.js SELL) + половина вложенного в броню и мотор; прокачка, цвет и мотор — сброс */
+export function sell (id, api = A) {
+  const c = BY_ID.get(id);
+  if (!c) return { ok: false, why: 'unknown' };
+  if (!ownedIds().includes(id)) return { ok: false, why: 'owned' };
+  if (id === START) return { ok: false, why: 'start' };
+  if (id === curId()) return { ok: false, why: 'current' };
+  if (!api || !api.addWallet) return { ok: false, why: 'unknown' };
+  const price = sellPrice(c, ups(id), eng(id).r);
+  sset(K_OWN, ownedIds().filter(q => q !== id));
+  for (const k of [K_UP, K_L, K_PAINT, K_ENG]) { const m = obj(k); if (id in m) { delete m[id]; sset(k, m); } }
+  api.addWallet(price);
+  flush();
+  PREV.delete(id);
+  return { ok: true, price };
+}
+/* сделать хуже / лучше (бандиты, сюжет): worsen(n) — мотор −BREAK.GANG_WEAR × n %;
+   repair(pct) — мотор +pct % до ресурса, ресурс не трогает (ремонт у Дяди Жени — fix ниже) */
+export function worsen (n = 1, id = curId()) { return wear(id, BREAK.GANG_WEAR * n).c; }
+export function repair (pct = 10, id = curId()) { const e = eng(id); return setEng(id, { ...e, c: e.c + pct }).c; }
+/* ремонт у Дяди Жени: мотор до ресурса, ресурс −quote.drop, без денег (деньги — в offer) */
+export function fix (id = curId()) {
+  const e = eng(id), q = repairQuote(e.c, e.r);
+  return setEng(id, { ...e, c: e.r, r: e.r - q.drop, n: e.n + 1 });
+}
 export const names = () => Object.fromEntries(CAR_LIST.map(c => [c.id, t(LOOK[c.id].name)]));
 
 /* ─────────────── модели ─────────────── */
@@ -173,8 +271,9 @@ export function makeModel (id, o = {}) {
   if (!LOOK[id]) id = START;
   const c = LOOK[id], u = o.up || ups(id);
   // шашка доставки — только на «Семёрке» пиццерии: остальные — свои, по ним узнают прототип
-  const g = A.makeCar(c.hex, o.sign !== undefined ? !!o.sign : id === START, c.model, false, {
-    spec: c.spec, lift: c.lift || 0, low: c.low, tint: c.tint, chrome: c.chrome || c.hex, roofHex: c.roof,
+  const hex = o.hex || hexOf(id);
+  const g = A.makeCar(hex, o.sign !== undefined ? !!o.sign : id === START, c.model, false, {
+    spec: c.spec, lift: c.lift || 0, low: c.low, tint: c.tint, chrome: c.chrome || hex, roofHex: c.roof,
     dress: (g, add, k) => dress(id, g, add, k, u),
   });
   g.userData.careerId = id;
@@ -343,6 +442,65 @@ function dress (id, g, add, k, u) {
         rect(0.44, 0.12, TAIL, s * (W / 2 - 0.26), top - 0.08, bk);
       });
       slope(true, 0.6); slope(false, 0.46);
+      break;
+    }
+    case 'cheri': {
+      // глазастая малютка: капот вниз, большие круглые фары на углах, решётка-улыбка
+      slope(true, 0.42); slope(false, 0.16);
+      both(s => {
+        Cy(0.19, 0.08, DARK, s * (W / 2 - 0.28), top - 0.02, fr - 0.02);
+        round(0.16, HEAD, s * (W / 2 - 0.28), top - 0.02, fr + 0.02);
+        round(0.06, '#ffffff', s * (W / 2 - 0.25), top + 0.02, fr + 0.04);       // блик — «глаза»
+        rect(0.1, 0.05, AMBER, s * (W / 2 - 0.14), top - 0.24, fr + 0.02);
+        B(0.16, 0.05, 0.05, DARK, s * 0.22, top - 0.18, fr + 0.01, 0, 0, s * 0.4); // уголки улыбки
+        rect(0.14, 0.32, TAIL, s * (W / 2 - 0.12), top + 0.1, bk);
+      });
+      B(W * 0.3, 0.05, 0.05, DARK, 0, top - 0.22, fr + 0.01);
+      B(W * 0.62, 0.12, 0.05, DARK, 0, y0 - 0.12, fr + 0.02);
+      B(W - 0.3, 0.05, 0.16, bodyHex, 0, roof + 0.02, cb + 0.04);              // козырёк-спойлер
+      break;
+    }
+    case 'belgik': {
+      // компактный кроссовер: клин капота, решётка, чёрная крыша и LED во всю ширину (roadlife.js)
+      cnCar(g, add, { S, W, hl, top, y0, bodyHex });
+      both(s => {
+        rect(0.1, 0.24, '#eaf4ff', s * (W / 2 - 0.08), y0 + 0.04, fr + 0.03);   // фары-бумеранги по краям решётки
+        rect(0.3, 0.1, TAIL, s * (W / 2 - 0.24), top - 0.14, bk);
+        for (const z of [S.fz, S.bz]) B(0.08, 0.08, S.r * 2.2, '#1c1c20', s * (W / 2 + 0.04), S.r * 2 + 0.06 - dy, z);
+      });
+      B(W * 0.5, 0.06, 0.05, '#c9ced4', 0, y0 - 0.3, hl + 0.13);                 // серебристая защита
+      break;
+    }
+    case 'havalka': {
+      // квадратный танк: хромированная решётка с полосами, круглые фары с кольцом, багажник, запаска
+      B(W * 0.52, 0.38, 0.05, '#cfd3d8', 0, top - 0.2, fr);
+      B(W * 0.48, 0.32, 0.06, '#1b1c20', 0, top - 0.2, fr + 0.01);
+      for (const oy of [-0.1, -0.035, 0.03, 0.095]) B(W * 0.46, 0.025, 0.07, '#cfd3d8', 0, top - 0.2 + oy, fr + 0.02);
+      both(s => {
+        Cy(0.17, 0.05, '#26272c', s * (W / 2 - 0.26), top - 0.2, fr);
+        round(0.145, HEAD, s * (W / 2 - 0.26), top - 0.2, fr + 0.03);
+        round(0.06, '#ffffff', s * (W / 2 - 0.26), top - 0.2, fr + 0.05);
+        rect(0.12, 0.42, TAIL, s * (W / 2 - 0.08), top + 0.06, bk);
+        for (const z of [S.fz, S.bz]) B(0.12, 0.12, S.r * 2.3, '#26252a', s * (W / 2 + 0.06), S.r * 2 + 0.06 - dy, z);
+        B(0.06, 0.08, S.cab - 0.3, '#2b2a30', s * (W / 2 - 0.2), roof + 0.14, S.cz);
+      });
+      for (const z of [-0.8, 0, 0.8]) B(W - 0.34, 0.04, 0.05, '#2b2a30', 0, roof + 0.18, S.cz + z);
+      B(W * 0.6, 0.08, 0.06, '#8f949b', 0, y0 - 0.3, hl + 0.12);                 // защита картера
+      B(0.82, 0.82, 0.16, '#2a2a2e', 0, top + 0.12, -hl - 0.1);                   // запаска в квадратном чехле
+      B(0.5, 0.5, 0.17, bodyHex, 0, top + 0.12, -hl - 0.1);
+      break;
+    }
+    case 'jilya': {
+      // большой кроссовер: решётка размером с холодильник, вся в хромированных точках
+      cnCar(g, add, { S, W, hl, top, y0, bodyHex });
+      B(W * 0.86, 0.46, 0.05, '#101114', 0, y0 + 0.02, hl + 0.14);
+      for (let i = -5; i <= 5; i++) for (let j = -2; j <= 2; j++)
+        B(0.045, 0.045, 0.03, '#cfd3d8', i * W * 0.074 + (j % 2 ? W * 0.037 : 0), y0 + 0.02 + j * 0.085, hl + 0.175);
+      both(s => {
+        rect(0.07, 0.34, '#eaf4ff', s * W * 0.455, y0 + 0.02, hl + 0.18);
+        rect(0.34, 0.1, TAIL, s * (W / 2 - 0.24), top - 0.14, bk);
+        for (const z of [S.fz, S.bz]) B(0.08, 0.08, S.r * 2.2, '#1c1c20', s * (W / 2 + 0.04), S.r * 2 + 0.06 - dy, z);
+      });
       break;
     }
     case 'patriot': {
@@ -789,7 +947,7 @@ function dots () {
   for (let i = 0; i < ST.done + ST.need; i++) { const b = document.createElement('i'); if (i < ST.done) b.className = 'on'; d.appendChild(b); }
 }
 function newZone () {
-  ST.zw = BREAK.MINIGAME_ZONE(L());
+  ST.zw = BREAK.MINIGAME_ZONE(L());   // L() = (100 − мотор) / 10
   let z;
   for (let k = 0; k < 6; k++) { z = 0.06 + Math.random() * (0.88 - ST.zw); if (Math.abs(z + ST.zw / 2 - ST.p) > 0.22) break; }
   ST.z0 = z;
@@ -900,13 +1058,22 @@ function stallStep (dt, vf) {
   ST.pad = a;
 }
 
-/* удар: 40 %, что машина станет хуже заводиться */
+/* удар: мотор −HIT_WEAR(vn) × wearK % (только на смене, не в «просто катаемся») */
 export function onHit (vn) {
-  if (!A || !(vn > 0)) return;
-  if (Math.random() < BREAK.HIT_WORSE) {
-    const was = L();
-    if (worsen(1) > was) A.toast(t('машина стала хуже заводиться'));
-  }
+  if (!A || !(vn > 0) || (A.S && A.S.ride)) return;
+  const id = curId();
+  wear(id, BREAK.HIT_WEAR(vn) * wearK(BY_ID.get(id)));
+}
+/* пробег: мотор −KM_WEAR × wearK % и ресурс −CEIL_PER_KM × wearK % за км (пишем раз в 100 м) */
+let odo = 0;
+function odoStep (dt, vf) {
+  const S = A.S;
+  if (S.ride || !DRIVING.has(S.state)) return;
+  odo += Math.abs(vf) * dt;
+  if (odo < 100) return;
+  const km = odo / 1000, id = curId(), k = wearK(BY_ID.get(id));
+  odo = 0;
+  wear(id, BREAK.KM_WEAR * k * km, BREAK.CEIL_PER_KM * k * km, km);
 }
 
 /* ─────────────── ямы: тряхнуло, притормозило, может заглохнуть ─────────────── */
@@ -933,7 +1100,7 @@ function potStep (dt, vf) {
         if (!c.offroad) { const d = 1 - (0.1 + k * 0.12); V.vx *= d; V.vz *= d; }
         if (A.Snd) { A.Snd.blip(58, 0.16, 'triangle', 0.2 + k * 0.1); A.Snd.noise(0.08, 0.12 + k * 0.1); }
         if (A.rumble) A.rumble(0.35 + k * 0.3, 90);
-        if (!ST.on && DRIVING.has(S.state) && Math.random() < L() * BREAK.POTHOLE) stall('pothole');
+        if (!ST.on && DRIVING.has(S.state) && Math.random() < stallP(curId()) * BREAK.POTHOLE) stall('pothole');
         break;
       }
     }
@@ -941,7 +1108,7 @@ function potStep (dt, vf) {
 }
 
 /* ─────────────── гараж: заехал и встал — Дядя Женя предлагает подшаманить ─────────────── */
-const GS = { stillT: 0, offered: false, busy: false };
+const GS = { stillT: 0, offered: false, busy: false, met: false };
 let pickT = 0;
 function garageStep (dt, vf) {
   if (!GARS.length) return;
@@ -975,29 +1142,53 @@ function garageStep (dt, vf) {
   GS.stillT = ok ? GS.stillT + dt : 0;
   if (GS.stillT > 0.6) { GS.offered = true; GS.stillT = 0; offer(); }
 }
+/* что Дядя Женя говорит про ресурс: чем меньше, тем мрачнее */
+function ceilWord (r) {
+  if (r >= 80) return '';
+  if (r >= 60) return ' ' + t('ресурс уже подсел — с каждым ремонтом держит хуже.');
+  if (r >= 40) return ' ' + t('ресурс уже не тот, сынок, скоро на металлолом.');
+  return ' ' + t('я её чиню, а она сыпется. продавай, пока берут, и бери другую.');
+}
+/* полоски в облачке: мотор и ресурс */
+const meters = e => [
+  { name: t('мотор'), v: Math.round(e.c) + ' %', p: e.c / 100, color: e.c >= 70 ? '#7fc36a' : e.c >= 40 ? '#ff9a3c' : '#e5484d' },
+  { name: t('ресурс'), v: Math.round(e.r) + ' %', p: e.r / 100, color: '#6fd3ff' },
+];
 async function offer () {
-  const DLG = A.DLG, id = curId(), Lc = getL(id);
-  const price = BREAK.REPAIR_BASE + Math.round(BREAK.REPAIR_PER_L * Lc);
+  const DLG = A.DLG, id = curId(), e = eng(id), q = repairQuote(e.c, e.r);
+  const price = q.price;
   const face = ZHENYA ? ZHENYA.person : null, name = t('Дядя Женя'), color = '#6f8a3a';
+  const pc = n => String(Math.round(n));
   GS.busy = true;
   try {
-    if (Lc < 0.05) {
-      await DLG.say({ person: face, name, color, text: t('о, здорово. машина как часы — нечего тут крутить. езжай давай'), accept: t('ну ок') });
+    // первый раз в гараже на районе (а экран гаража ещё не открывали) — знакомится и зовёт в гараж меню
+    if (!GS.met && A.Store && !A.Store.get(TOUR_KEY, 0)) {
+      GS.met = true;
+      await DLG.say({ person: face, name, color, text: t('о, новенький! я Дядя Женя. тут я чиню: заехал, встал — подшаманю. а тачки купить и прокачать — это в гараже в меню, там всё покажу'), accept: t('понял') });
+    }
+    if (q.pct < BREAK.REPAIR_MIN_PCT) {
+      await DLG.say({ person: face, name, color, meters: meters(e),
+        text: e.r >= 80 ? t('о, здорово. машина как часы — нечего тут крутить. езжай давай')
+          : t('мотор {c} % — больше из него не выжму, ресурс {r} %.', { c: pc(e.c), r: pc(e.r) }) + ceilWord(e.r),
+        accept: t('ну ок') });
       return;
     }
     if (wallet(A) < price) {
-      await DLG.say({ person: face, name, color, text: t('ну чё, опять стучит? за {money} подшаманю, но у тебя столько нет. заезжай, как заработаешь', { money: A.money(price) }), accept: t('ладно') });
+      await DLG.say({ person: face, name, color, meters: meters(e), text: t('ну чё, опять стучит? мотор {c} %, подтяну до {r} % за {money}, но у тебя столько нет. заезжай, как заработаешь', { c: pc(e.c), r: pc(e.r), money: A.money(price) }), accept: t('ладно') });
       return;
     }
-    const yes = await DLG.say({ person: face, name, color, mood: 'calm',
-      text: t('ну чё, опять стучит? давай гляну — за {money} подшаманю', { money: A.money(price) }),
+    const yes = await DLG.say({ person: face, name, color, mood: 'calm', meters: meters(e),
+      text: t('ну чё, опять стучит? мотор {c} %, подтяну до {r} % за {money}.', { c: pc(e.c), r: pc(e.r), money: A.money(price) }) + ceilWord(e.r),
       accept: t('давай, Дядь Жень'), decline: t('не, потом') });
     if (!yes) return;
     if (!pay(A, price)) return;
-    const now = repair(1, id);
+    const now = fix(id);
     if (A.Snd) [0, 140, 300, 420].forEach((d, i) => setTimeout(() => A.Snd.blip(900 + i * 140, 0.06, 'square', 0.08), d));
-    await DLG.say({ person: face, name, color, text: now < 0.05 ? t('во, другое дело. теперь как новая, езжай аккуратней') : t('ну вот, получше. совсем как новая не станет — заезжай ещё'), accept: t('спасибо!') });
-    A.toast(t('заводится лучше: ломучесть {n}', { n: String(Math.round(now * 10) / 10) }));
+    await DLG.say({ person: face, name, color, meters: meters(now),
+      text: (now.r >= 90 ? t('во, другое дело. мотор {c} %, езжай аккуратней', { c: pc(now.c) })
+        : t('ну вот, мотор {c} %. а ресурс теперь {r} % — как новая уже не будет', { c: pc(now.c), r: pc(now.r) })) + (now.r < 60 ? ceilWord(now.r) : ''),
+      accept: t('спасибо!') });
+    A.toast(t('мотор {c} % · ресурс {r} %', { c: pc(now.c), r: pc(now.r) }));
     if (A.hudMoney) A.hudMoney();
   } finally { GS.busy = false; }
 }
@@ -1014,13 +1205,14 @@ export function step (dt, vf = 0) {
     pending = -1;
     if (key && typeof key === 'object' && !rolled.has(key)) {
       rolled.add(key);
-      if (Math.random() < L() * BREAK.PER_ORDER) pending = 4 + Math.random() * 26;   // столько секунд езды до поломки
+      if (Math.random() < stallP(curId())) pending = 4 + Math.random() * 26;   // столько секунд езды до поломки
     }
   }
   if (pending > 0 && !ST.on && DRIVING.has(S.state) && Math.abs(vf) > 7) {
     pending -= dt;
     if (pending <= 0) stall('order');
   }
+  odoStep(dt, vf);
   if (ST.on) stallStep(dt, vf);
   else if (!LIVE.has(S.state) && EL && !EL.hidden && !EL.classList.contains('ok')) cancel();
   if (LIVE.has(S.state) || S.ride) potStep(dt, vf);

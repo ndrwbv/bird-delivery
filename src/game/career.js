@@ -22,6 +22,7 @@ import * as MENU from './menu.js';
 import * as DLG from './dialog.js';
 import * as DIST from './districts.js';
 import * as END from './shiftend.js';
+import * as CHAT from './chat.js';
 import { makePadMenu } from '../input/padmenu.js';
 import { t, tn, lang } from '../i18n/index.js';
 
@@ -307,9 +308,13 @@ function bossCard () {
   return (b.face ? '<img alt="" src="' + esc(b.face) + '">' : '') + '<div><b>' + esc(b.name) + '</b><p>' + esc(b.text) + '</p></div>';
 }
 
-export function showEnd (why, whyText) {
+/* held — уже подождали Толика управляющего: сообщение, что пришло под конец смены (похвала за последний заказ,
+   вычет за опоздание), сначала показывается крупно и уменьшается, только потом итоги (≤ 6 с) */
+export function showEnd (why, whyText, held) {
   if (!A) return;
   const S = A.S;
+  if (!held && SH.on && CHAT.busy()) { CHAT.idle(() => { if (A.S.state === 'over') showEnd(why, whyText, true); }); return; }
+  CHAT.clear();
   const wasOn = SH.on;
   if (wasOn) SH.endH = hour();
   SH.bonus = 0;
@@ -344,8 +349,10 @@ export function showEnd (why, whyText) {
   $('ov-extra').hidden = true;
   $('st-note2').textContent = '';
   const cnt = n => String(Math.round(n));
+  // [подпись, число, как показать, где]: big — крупно наверху рядом с директором, info — мелкой строкой
+  // под плитками (район и что дальше), new — там же жёлтой плашкой; без пометки — плитка
   const rows = [
-    [t('заработано'), S.money || 0, A.money, true],
+    [t('заработано'), S.money || 0, A.money, 'big'],
     SH.bonus ? [t('бонус за смену'), SH.bonus, n => '+' + A.money(n)] : null,
     [t('доставлено заказов'), S.delivered || 0, cnt],
     typeof S.tips === 'number' && S.tips > 0 ? [t('чаевые'), S.tips, A.money] : null,
@@ -354,16 +361,27 @@ export function showEnd (why, whyText) {
     SH.fine ? [t('штраф за клиента'), SH.fine, n => '−' + A.money(n)] : null,
     S.people ? [t('прохожих сбито'), S.people, cnt] : null,
     SH.stars ? [t('звёзд за смену'), SH.stars, n => '+' + Math.round(n) + ' ★'] : null,
-    DIST.has() ? districtRow() : null,
-    DIST.has() && SH.opened >= 0 ? [t('открыт новый район'), 1, () => t(DIST.list()[SH.opened].name), true] : null,
-    ...(DIST.has() && SH.opened < 0 ? districtNext().map(([k, v]) => [k, 1, () => v]) : []),
+    DIST.has() ? [...districtRow(), 'info'] : null,
+    DIST.has() && SH.opened >= 0 ? [t('открыт новый район'), 1, () => t(DIST.list()[SH.opened].name), 'new'] : null,
+    ...(DIST.has() && SH.opened < 0 ? districtNext().map(([k, v]) => [k, 1, () => v, 'info']) : []),
   ].filter(Boolean);
-  const box = $('ov-stats');
-  box.innerHTML = rows.map((r, i) => '<div class="ov-row' + (r[3] ? ' big' : '') + '" data-i="' + i + '"><span>' + esc(r[0]) + '</span><b>' + esc(r[2](0)) + '</b></div>').join('');
+  const box = $('ov-stats'), head = endHead(), info = endInfo();
+  const rowEl = (r, i) => {
+    const e = document.createElement('div');
+    e.className = 'ov-row' + (r[3] ? ' ' + r[3] : '');
+    e.dataset.i = i;
+    e.innerHTML = '<span>' + esc(r[0]) + '</span><b>' + esc(r[2](r[1])) + '</b>';    // сначала итоговые — по ним меряем экран (fitEnd)
+    return e;
+  };
+  const els = rows.map(rowEl);
+  head.querySelector('#cr-earn').replaceChildren(...els.filter((e, i) => rows[i][3] === 'big'));
+  box.replaceChildren(...els.filter((e, i) => !rows[i][3]));
+  info.replaceChildren(...els.filter((e, i) => rows[i][3] === 'info' || rows[i][3] === 'new'));
+  info.hidden = !info.children.length;
   const rowsGo = () => {
     if (DIST.has() && SH.opened >= 0) setTimeout(() => { if ($('over') && !$('over').hidden) A.Snd.coin(); }, 200 + rows.length * 220);
     rows.forEach((r, i) => setTimeout(() => {
-      const row = box.children[i];
+      const row = els[i];
       if (!row) return;
       row.classList.add('on');
       A.countUp(row.querySelector('b'), r[1], r[2], 600);
@@ -372,8 +390,7 @@ export function showEnd (why, whyText) {
   };
   // директор: похвала по смене или перевод в новый район (shiftend.js)
   SH.boss = wasOn ? bossCard() : '';
-  let bc = $('cr-boss');
-  if (!bc) { bc = document.createElement('div'); bc.id = 'cr-boss'; $('ov-why').after(bc); }
+  const bc = $('cr-boss');
   bc.innerHTML = SH.boss; bc.hidden = !SH.boss;
   // место в пиццерии: «ты #2 среди курьеров · до Саши 1 200 ₽»
   const board = crewBoard(), me = board.findIndex(r => r.me);
@@ -396,7 +413,52 @@ export function showEnd (why, whyText) {
   $('ov-again').setAttribute('autofocus', '');
   $('ov-menu').textContent = t('в меню');
   ov.hidden = false;
+  fitEnd();
+  for (let i = 0; i < rows.length; i++) els[i].querySelector('b').textContent = rows[i][2](0);
 }
+
+/* наверху итогов: крупный заработок и директор рядом (на узком — друг под другом);
+   под плитками — строка района (что засчитано, что откроется) */
+function endHead () {
+  let h = $('cr-head');
+  if (h) return h;
+  h = document.createElement('div');
+  h.id = 'cr-head';
+  h.innerHTML = '<div id="cr-earn"></div><div id="cr-boss" hidden></div>';
+  $('ov-why').after(h);
+  return h;
+}
+function endInfo () {
+  let e = $('cr-info');
+  if (e) return e;
+  e = document.createElement('div');
+  e.id = 'cr-info';
+  $('ov-stats').after(e);
+  return e;
+}
+/* итоги без прокрутки: вёрстка и так сжата под 1280×720, Деку и телефон; если всё равно не влезло
+   (длинный язык, много строк) — весь экран итогов чуть уменьшается (zoom, не меньше 0,6) */
+function fitEnd () {
+  const ov = $('over'), box = ov && ov.querySelector('.ov-box');
+  if (!box || ov.hidden || !ov.classList.contains('cr')) return;
+  box.style.zoom = '';
+  const k = ov.clientHeight / Math.max(1, ov.scrollHeight);
+  if (k < 1) box.style.zoom = Math.max(0.6, Math.floor(k * 100) / 100);
+}
+/* «потратить» — так же: открылся район, длинная реплика директора — чуть меньше, но без прокрутки
+   (раскрытая вкладка доната может и прокрутиться — там список) */
+function fitBox (box) {
+  if (!box) return;
+  box.style.zoom = '';
+  const k = box.clientHeight / Math.max(1, box.scrollHeight);
+  if (k < 1) box.style.zoom = Math.max(0.6, Math.floor(k * 100) / 100);
+}
+addEventListener('resize', () => {
+  if (!A) return;
+  fitEnd();
+  const md = $('cr-spend');
+  if (md && !md.hidden && !TAB) fitBox(md.querySelector('.cr-sp-box'));
+});
 
 /* район на экране итогов: «Юг · 2 из 2 смен» или «Юг · смена не засчитана (меньше 2 заказов)» */
 function districtRow () {
@@ -461,6 +523,7 @@ function openSpend () {
   const bs = md.querySelector('.cr-sp-boss');
   bs.innerHTML = SH.boss || ''; bs.hidden = !SH.boss;
   md.hidden = false;
+  fitBox(md.querySelector('.cr-sp-box'));
   if (earned > 0) A.countUp(md.querySelector('.cr-sp-sum'), earned, n => '+' + A.money(n), 700);
   refreshWallet(); refreshTabs();
   requestAnimationFrame(() => md.classList.add('on'));

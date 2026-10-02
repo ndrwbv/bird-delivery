@@ -110,20 +110,37 @@ function gridAdd (item, x0, z0, x1, z1) {
 }
 function buildGrid () {
   GRID = new Map();
-  const poly = (p, water) => {
+  // h — на сколько над рельефом нарисован верх (game.js osmRoads / osmParkingLots, landmarks.js)
+  const poly = (p, water, h) => {
     let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
     for (const q of p) { if (q[0] < x0) x0 = q[0]; if (q[0] > x1) x1 = q[0]; if (q[1] < z0) z0 = q[1]; if (q[1] > z1) z1 = q[1]; }
     if (!(x1 - x0 < 3000 && z1 - z0 < 3000)) return;
-    gridAdd({ p, x0, z0, x1, z1, water }, x0, z0, x1, z1);
+    gridAdd({ p, x0, z0, x1, z1, water, h }, x0, z0, x1, z1);
   };
-  for (const l of A.CITY.lots || []) poly(l.p, false);
-  for (const g of A.CITY.green || []) if (g.k === 'water') poly(g.p, true);
-  for (const p of FUEL_PADS) poly(p, false);
+  for (const l of A.CITY.lots || []) poly(l.p, false, l.k === 'park' ? 0.11 : 0.025);
+  for (const g of A.CITY.green || []) if (g.k === 'water') poly(g.p, true, 0.03);
+  for (const p of FUEL_PADS) poly(p, false, 0.1);
   for (const q of A.CITY.paths || [])
     for (let i = 1; i < q.length; i++) {
       const x1 = q[i - 1][0], z1 = q[i - 1][1], x2 = q[i][0], z2 = q[i][1];
       gridAdd({ s: [x1, z1, x2, z2] }, Math.min(x1, x2) - 1.2, Math.min(z1, z2) - 1.2, Math.max(x1, x2) + 1.2, Math.max(z1, z2) + 1.2);
     }
+}
+/* верх плитки, дорожки, площадки или парковки над рельефом в точке, м; −1 — ничего такого
+   (трава, голая земля). Для hits.js: на что ложится сбитый вдали от улицы */
+export function pavedLift (x, z) {
+  if (!A) return -1;
+  if (!GRID) buildGrid();
+  let h = -1;
+  const a = GRID.get(ckey(Math.floor(x / CELL), Math.floor(z / CELL)));
+  if (a) for (let i = 0; i < a.length; i++) {
+    const it = a[i];
+    if (it.s) { if (h < 0.085 && segD(x, z, it.s[0], it.s[1], it.s[2], it.s[3]) < 1.05) h = 0.085; continue; }
+    if (it.water || it.h <= h || x < it.x0 || x > it.x1 || z < it.z0 || z > it.z1 || !A.inPoly(x, z, it.p)) continue;
+    h = it.h;
+  }
+  if (h < 0.075 && onAlley(x, z, 0)) h = 0.075;
+  return h;
 }
 function segD (x, z, x1, z1, x2, z2) {
   const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz || 1;

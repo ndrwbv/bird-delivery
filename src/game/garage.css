@@ -50,6 +50,8 @@ body:has(#cr-garage:not([hidden])) .hud, body:has(#cr-garage:not([hidden])) #ctr
 .gr-bar { display: block; height: 10px; background: #141a33; border: 2px solid #33210c; border-radius: 5px; overflow: hidden; }
 .gr-bar > i { display: block; height: 100%; width: 0; background: #6fd3ff; transition: width .7s cubic-bezier(.2, .9, .3, 1.2); }
 .gr-st-break .gr-bar > i { background: #ff9a3c; }
+.gr-card.own .gr-st-break .gr-bar > i { background: #7fc36a; }
+.gr-st-res .gr-bar > i { background: #b98cff; }
 .gr-st-hp .gr-bar > i { background: #ff5d7a; }
 .gr-st.up b { color: #7fe08a; animation: gr-flash .6s steps(2) 3; }
 @keyframes gr-flash { 50% { color: #fff3d6; } }
@@ -61,7 +63,7 @@ body:has(#cr-garage:not([hidden])) .hud, body:has(#cr-garage:not([hidden])) #ctr
 .gr-btn:not(:disabled):active { transform: translateY(3px); box-shadow: 0 1px 0 #33210c; }
 .gr-btn:disabled { cursor: default; opacity: .5; }
 .gr-btn.buy, .gr-btn.pick { color: #33210c; background: #ffd85e; font-size: clamp(11px, 1.3vw, 15px); }
-.gr-btn.buy i { font-style: normal; }
+.gr-btn.buy i { font-style: normal; white-space: nowrap; }
 .gr-btn.cur { color: #33210c; background: #7fe08a; opacity: 1; }
 .gr-btn.up { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; column-gap: 10px; row-gap: 4px; text-align: left; }
 .gr-btn.up b { font-weight: normal; }
@@ -69,6 +71,23 @@ body:has(#cr-garage:not([hidden])) .hud, body:has(#cr-garage:not([hidden])) #ctr
 .gr-btn.up i { grid-row: 1 / span 2; grid-column: 2; align-self: center; font-style: normal; letter-spacing: 2px; color: #ffd85e; font-size: 1.05em; }
 .gr-btn.up.max span { color: #7fe08a; }
 .gr-why { font-size: clamp(7px, .8vw, 9px); line-height: 1.6; color: #ff9a9a; text-align: center; min-height: 1.6em; }
+/* покраска и продажа: ряд из двух кнопок, палитра, «точно продать?» */
+.gr-row { display: flex; gap: 8px; }
+.gr-row > .gr-btn { flex: 1 1 0; min-width: 0; padding: clamp(7px, 1.1vh, 10px) 8px; font-size: clamp(8px, .85vw, 10px); line-height: 1.4; }
+.gr-btn.gr-paint-b { background: #6a3f8f; }
+.gr-btn.gr-sell-b, .gr-btn.sell { background: #8f3f3f; }
+.gr-paint, .gr-ask { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 3px solid #33210c; border-radius: 10px; background: rgba(20, 16, 30, .55); }
+.gr-paint-t { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: clamp(8px, .85vw, 10px); color: #ffd85e; }
+.gr-btn.gr-x { padding: 6px 10px; font-size: clamp(8px, .85vw, 10px); box-shadow: 0 3px 0 #33210c; }
+.gr-sws { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.gr-sw { width: clamp(22px, 2.2vw, 30px); height: clamp(22px, 2.2vw, 30px); padding: 0; cursor: pointer; border-radius: 50%; background: var(--c);
+         border: 3px solid #33210c; box-shadow: 0 3px 0 #33210c, inset 0 0 0 2px rgba(255, 243, 214, .28); }
+.gr-sw.base { border-radius: 6px; }
+.gr-sw.on { outline: 3px solid #ffd85e; outline-offset: 1px; cursor: default; }
+.gr-sw:disabled:not(.on) { opacity: .4; cursor: default; }
+.gr-sw:not(:disabled):hover { transform: scale(1.12); }
+.gr-sw.padsel { outline: 3px solid #fff3d6; outline-offset: 2px; }
+.gr-ask > span { font-size: clamp(8px, .9vw, 11px); color: #fff3d6; text-align: center; line-height: 1.5; }
 .gr-ghost { font-size: clamp(9px, 1vw, 12px); padding: 12px; border: 3px dashed rgba(255, 243, 214, .25); border-radius: 10px; color: #b9c3e6; text-align: center; }
 
 .gr-card.pop { animation: gr-pop .45s cubic-bezier(.2, .9, .3, 1.4); }

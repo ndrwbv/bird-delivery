@@ -35,6 +35,7 @@ import * as ECON from './econ.js';
 import * as DLG from './dialog.js';
 import { STORY_PEOPLE, ORDER_TYPES } from './orders.config.js';
 import { makePerson } from './people.js';
+import { makeCatModel, FURS } from './cats.js';
 
 // career.js пишет другой агент: берём, если он уже есть, и не падаем, если нет
 const CAREER_MOD = import.meta.glob('./career.js', { eager: true })['./career.js'] || null;
@@ -171,7 +172,7 @@ export const STORIES = [
           ['shot', 'courier', { cut: true }],
           ['say', 'courier', N_('На… машину?')],
           ['shot', 'two'],
-          ['say', 'zina', N_('А что ей, мёрзнуть? В Северске зима девять месяцев, а остальное время — ждём зиму.')],
+          ['say', 'zina', N_('А что ей, мёрзнуть? В Солнечном зима девять месяцев, а остальное время — ждём зиму.')],
           ['act', 'courier', 'nod', 1],
           ['say', 'courier', N_('Спасибо, баб Зин.')],
           ['shot', 'zina', { cut: true }],
@@ -362,37 +363,37 @@ export function unstage () {
   CUT.staged = null;
 }
 
-/* кот Барсик: рыжий с белым, из коробок */
-function makeCat () {
-  const T = API.THREE, g = new T.Group();
-  const mat = c => new T.MeshLambertMaterial({ color: c, flatShading: true });
-  const orange = mat('#e0873f'), white = mat('#f4efe6'), dark = mat('#2a1d16'), pink = mat('#e89aa8');
-  const box = (w, h, d, m, x, y, z, parent = g) => { const o = new T.Mesh(new T.BoxGeometry(w, h, d), m); o.position.set(x, y, z); parent.add(o); return o; };
-  const body = box(0.26, 0.22, 0.5, orange, 0, 0.25, 0);
-  box(0.2, 0.08, 0.36, white, 0, 0.14, 0.02);
-  for (const [x, z] of [[-0.08, 0.18], [0.08, 0.18], [-0.08, -0.18], [0.08, -0.18]]) box(0.07, 0.16, 0.07, white, x, 0.08, z);
-  const head = new T.Group(); head.position.set(0, 0.42, 0.28); g.add(head);
-  box(0.26, 0.22, 0.22, orange, 0, 0, 0, head);
-  box(0.16, 0.08, 0.04, white, 0, -0.05, 0.11, head);
-  box(0.04, 0.03, 0.02, pink, 0, -0.02, 0.125, head);
-  for (const x of [-0.07, 0.07]) { box(0.04, 0.05, 0.02, dark, x, 0.03, 0.115, head); box(0.07, 0.09, 0.05, orange, x, 0.14, -0.02, head); }
-  for (const z of [-0.12, 0, 0.12]) box(0.27, 0.03, 0.05, mat('#b8622a'), 0, 0.36, z);   // полоски
-  const tail = new T.Group(); tail.position.set(0, 0.32, -0.24); g.add(tail);
-  box(0.06, 0.06, 0.34, orange, 0, 0.1, -0.14, tail).rotation.x = -0.7;
-  g.userData = { head, tail, body };
-  return g;
-}
+/* кот Барсик: рыжий с белым, из коробок (модель — cats.js, свои геометрии: dropMesh их освобождает) */
+function makeCat () { return makeCatModel(API.THREE, FURS[0], true); }
 
 /* шарф на машину: полосатый, через крышу, два хвоста свисают с борта */
 const SCARF_C = ['#d9342c', '#f4efe6', '#ffd23f', '#4f7fd6', '#f4efe6'];
+/* Габарит кузова в осях машины — только сама машина: без шарфа, без крыльев и сияния оживления
+   (game.js вешает их на новую машину до того, как сюда дойдёт кадр: шарф выходил шириной 9 м
+   и висел в воздухе), без спрятанного и прозрачного (тень). Матрицы — свои, от машины вниз:
+   не важно, где машина стоит и пересчитаны ли её мировые матрицы в этом кадре. */
+function carBox (car) {
+  const T = API.THREE, bb = new T.Box3();
+  const walk = (o, P) => {
+    if (!o.visible || (o.userData && (o.userData.scarf || o.userData.noBox))) return;
+    if (o.matrixAutoUpdate) o.updateMatrix();
+    const M = new T.Matrix4().multiplyMatrices(P, o.matrix);
+    if (o.isMesh && o.geometry && !(o.material && o.material.transparent)) {
+      if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+      const b = o.geometry.boundingBox.clone().applyMatrix4(M);
+      if (b.max.y - b.min.y < 6) bb.union(b);
+    }
+    for (const c of o.children) walk(c, M);
+  };
+  for (const c of car.children) walk(c, new T.Matrix4());
+  if (bb.isEmpty()) bb.set(new T.Vector3(-1, 0, -2), new T.Vector3(1, 1.5, 2));
+  // страховка: самая широкая машина — 2,4 м с зеркалами, самая высокая — 2,5 м
+  bb.min.x = Math.max(bb.min.x, -1.3); bb.max.x = Math.min(bb.max.x, 1.3); bb.max.y = Math.min(bb.max.y, 2.7);
+  return bb;
+}
 function makeScarf (car) {
   const T = API.THREE;
-  const pos = car.position.clone(), rot = car.rotation.clone();
-  car.position.set(0, 0, 0); car.rotation.set(0, 0, 0); car.updateMatrixWorld(true);
-  const bb = new T.Box3();
-  car.traverse(o => { if (o.isMesh && o.visible && o.geometry && !o.userData.noBox) { o.geometry.computeBoundingBox(); const b = o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld); if (b.max.y - b.min.y < 6) bb.union(b); } });
-  car.position.copy(pos); car.rotation.copy(rot); car.updateMatrixWorld(true);
-  if (bb.isEmpty()) bb.set(new T.Vector3(-1, 0, -2), new T.Vector3(1, 1.5, 2));
+  const bb = carBox(car);
   const g = new T.Group();
   g.userData.scarf = true;
   const top = bb.max.y, w = bb.max.x - bb.min.x, zc = (bb.min.z + bb.max.z) / 2 - (bb.max.z - bb.min.z) * 0.06;

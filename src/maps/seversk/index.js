@@ -76,11 +76,11 @@ const DISTRICTS = {
 export default {
   id: 'seversk',
   data: DATA,
-  title: N_('Северск'),
+  title: N_('Солнечный'),
   tagline: { adult: N_('развози пиццу по закрытому городу — пропуск есть только у тебя!'), kids: N_('развози пиццу по закрытому городу — пропуск есть только у тебя!') },
   // пиццерия — там, где в карте стоит «Додо Пицца» (meta.home), вывеска наша
   home: { point: DATA.meta.home },
-  fallbackAddr: 'Северск',
+  fallbackAddr: 'Солнечный',
   river: DATA.meta.river ? { name: N_('Томь'), at: N_('Томь, у берега'), surf: false } : null,
   farOrder: null,
   edgeToast: N_('дальше забор и КПП — из закрытого города без пропуска не выехать'),

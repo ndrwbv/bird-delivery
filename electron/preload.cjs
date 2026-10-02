@@ -12,6 +12,10 @@ contextBridge.exposeInMainWorld('birdSteam', {
   applyUpdate: () => call('update:apply'),
   quit: () => call('app:quit'),
   setFullscreen: on => call('win:fullscreen', !!on),
+  // журнал ошибок (src/platform/crashlog.js, docs/CRASHES.md): строка JSON → userData/logs/crash-ГГГГ-ММ-ДД.log
+  log: line => ipcRenderer.send('log:write', String(line)),
+  logDir: () => call('log:dir'),
+  openLogs: () => call('log:open'),
   isFullscreen: () => call('win:isFullscreen'),
   steam: {
     available: !!boot.available,                   // steamworks.js поднялся и Steam запущен

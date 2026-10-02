@@ -44,12 +44,18 @@ const build = mode => async () => {
   if (j.error) return { status: 'fail', info: j.error.split('\n').filter(l => /error|Error|✗|failed/i.test(l)).slice(0, 3).join(' | ') || j.error.slice(0, 300) };
   return { status: 'ok', info: j.built ? 'собрана за ' + (j.ms / 1000).toFixed(1) + ' с' : 'свежая' };
 };
+/* журнал ошибок дымовых прогонов (src/platform/crashlog.js): предохранитель в цикле кадра глотает
+   исключения, в консоль они уже не «Uncaught» — смотрим журнал. Проверка «журнал пуст» — ниже */
+const CRASHES = [];
+const crashLines = (c, label) => (c || []).map(e => `${label}: ${e.kind} ${e.where} ×${e.n} — ${e.msg}${e.at ? ' ' + e.at.trim() : ''}${e.state ? ' [' + e.state + (e.phase ? '/' + e.phase : '') + ']' : ''}`);
 const smoke = (args, label) => async () => {
   const j = await probe([...args, '--js=return await smoke(30)'], 90);
   const e = errLine(j), s = j.result;
+  if (s && s.crash) CRASHES.push(...crashLines(s.crash, label));
+  else if (!s) CRASHES.push(label + ': нет результата — журнал не прочитан');
   if (e || !s) return { status: 'fail', info: e || 'нет результата' };
   const ft = s.ft || {}, base = `${s.m} м, кадр p50 ${ft.p50} p95 ${ft.p95} мс, ошибок консоли ${j.errors.length}`;
-  if (!s.ok) return { status: 'fail', info: s.fail.join('; ') + ' · ' + base };
+  if (!s.ok) return { status: 'fail', info: s.fail.join('; ') + ' · ' + base + (s.crash && s.crash.length ? '\n' + crashLines(s.crash, '    журнал').join('\n') : '') };
   return { status: ft.p95 > 33 ? 'warn' : 'ok', info: base + (ft.p95 > 33 ? ' (p95 > 33 мс)' : '') };
 };
 
@@ -71,8 +77,10 @@ const CHECKS = [
     if (r.skip) return { status: 'warn', info: r.skip };
     return { status: r.bad ? 'fail' : 'ok', info: `${r.total} адресов, ${r.shifts} смен, плохих ${r.bad}` + (r.bad ? ': ' + JSON.stringify(r.sample[0]) : '') };
   } },
-  { id: 'smoke-adult', name: '30 с автопилота: взрослая (web)', group: 3, run: smoke(['--mode=web']) },
-  { id: 'smoke-phone', name: '30 с автопилота: телефон (web)', group: 3, run: smoke(['--size=phone']) },
+  { id: 'smoke-adult', name: '30 с автопилота: взрослая (web)', group: 3, run: smoke(['--mode=web'], 'взрослая') },
+  { id: 'smoke-phone', name: '30 с автопилота: телефон (web)', group: 3, run: smoke(['--size=phone'], 'телефон') },
+  { id: 'smoke-crashlog', name: 'журнал ошибок пуст после дымовых', group: 4, run: async () => (
+    CRASHES.length ? { status: 'fail', info: CRASHES.length + ' записей:\n' + CRASHES.map(l => '    ' + l).join('\n') } : { status: 'ok', info: 'пуст' }) },
   // детская версия и сборка Яндекса — только по явной просьбе автора (Яндекс собираем по нужде)
 ];
 

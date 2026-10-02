@@ -119,6 +119,8 @@
   <!-- ── Москва: меню паузы — всё, что не нужно на экране во время езды ── -->
   <div id="pausem" class="msk-only" hidden>
     <div class="pm-ver" aria-hidden="true"></div>
+    <!-- журнал ошибок не пуст (src/platform/crashlog.js, docs/CRASHES.md) — показать и скопировать -->
+    <button id="pm-crash" type="button" hidden data-i18n>отчёт об ошибке</button>
     <!-- без общей рамки: на «столе» рядом лежат кнопки (главное), накладная текущего заказа,
          записка с управлением и чек смены -->
     <div class="pm-desk">

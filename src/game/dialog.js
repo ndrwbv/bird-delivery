@@ -13,7 +13,8 @@
        color: '#a15bff',               // полоса сверху — цвет активности
        fillers: true,                  // вставлять «ну» и «э-э» (для катсцен можно false)
        timer: 8,                       // секунд на ответ после того, как договорил (полоска)
-       timeoutText: t('ну лан ((')     // не успел — он это говорит и уходит
+       timeoutText: t('ну лан (('),    // не успел — он это говорит и уходит
+       meters: [{ name, v, p, color }] // полоски под текстом (Дядя Женя: мотор и ресурс), p — 0…1
      });                               // → true (принял) / false (отказался) / null (не успел)
    Очередь: несколько say подряд показываются по одному. */
 import './dialog.css';
@@ -39,7 +40,7 @@ function build () {
   root.hidden = true;
   root.innerHTML = '<div class="dlg-box"><div class="dlg-bar"></div><div class="dlg-row">' +
     '<div class="dlg-head"><img alt=""><b class="dlg-name"></b></div>' +
-    '<div class="dlg-bubble"><p class="dlg-text"></p><span class="dlg-skip"></span></div></div>' +
+    '<div class="dlg-bubble"><p class="dlg-text"></p><div class="dlg-meters"></div><span class="dlg-skip"></span></div></div>' +
     '<div class="dlg-timer"><i></i></div><div class="dlg-btns"><button type="button" class="dlg-no"></button><button type="button" class="dlg-yes"></button></div></div>';
   (document.getElementById('game') || document.body).appendChild(root);
 }
@@ -83,6 +84,9 @@ function show (o, done) {
   no.hidden = !two;
   $('.dlg-btns').classList.remove('on');
   $('.dlg-skip').textContent = t('пропустить ▸');
+  const ms = Array.isArray(o.meters) ? o.meters : [], mel = $('.dlg-meters'), esc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  mel.hidden = !ms.length;
+  mel.innerHTML = ms.map(m => '<div class="dlg-m"><span>' + esc(m.name) + '</span><i><i style="width:' + (Math.max(0, Math.min(1, +m.p || 0)) * 100).toFixed(1) + '%;background:' + esc(m.color || '#ff8a2b') + '"></i></i><b>' + esc(m.v) + '</b></div>').join('');
   const full = o.fillers === false ? o.text : speechify(o.text, o.mood);
   const el = $('.dlg-text');
   el.textContent = '';

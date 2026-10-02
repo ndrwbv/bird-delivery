@@ -48,32 +48,61 @@ body.career #money.bump b { animation: wl-bump .45s ease-out; }
 #choice.big.cr-lunch #ch-opts button span { font-size: 7px; }
 @media (max-width: 560px) { #choice.big.cr-lunch #ch-opts { flex-direction: column; } #choice.big.cr-lunch #ch-opts button { min-height: 0; } }
 
-/* ── экран итогов: на весь экран, как в играх; главная кнопка одна — «на новую смену» ── */
+/* ── экран итогов: на весь экран, как в играх; главная кнопка одна — «на новую смену».
+   Без прокрутки на 1280×720, Деке 1280×800 и телефоне 390×844: заработок и директор — одной
+   полосой, плитки низкие, район — мелкой строкой; не влезло — career.js fitEnd чуть уменьшает. ── */
 #over.cr { padding: 0; align-items: stretch; justify-content: stretch; background: radial-gradient(ellipse at 50% 35%, rgba(44, 58, 120, .93), rgba(16, 20, 42, .97) 75%); }
 #over.cr .ov-box { width: 100%; max-width: none; min-height: 100%; margin: 0; box-sizing: border-box; background: none; border: 0; border-radius: 0; box-shadow: none;
-                   justify-content: center; gap: clamp(12px, 2.6vh, 28px);
-                   padding: max(24px, 5vh) max(20px, 6vw) max(22px, 4vh); }
-#over.cr #ov-t { font-size: clamp(24px, 4.6vw, 64px); }
-#over.cr #ov-why { font-size: clamp(8px, 1vw, 13px); }
-#over.cr #ov-stats { display: flex; flex-direction: row; flex-wrap: wrap; align-items: stretch; justify-content: center; gap: clamp(8px, 1.2vw, 14px); width: min(1400px, 100%); margin: 0 auto; }
-#over.cr .ov-row { flex: 0 1 clamp(150px, 15vw, 220px); flex-direction: column; align-items: center; justify-content: center; gap: 10px;
-                   padding: clamp(10px, 1.6vh, 16px) 10px; background: rgba(14, 18, 40, .55); border: 2px solid rgba(51, 33, 12, .9); border-radius: 10px; }
-#over.cr .ov-row span { font-size: clamp(7px, .75vw, 10px); text-align: center; line-height: 1.5; }
-#over.cr .ov-row b { font-size: clamp(12px, 1.4vw, 18px); }
-#over.cr .ov-row.big { flex: 1 0 100%; background: none; border: 0; gap: 14px; padding: 0 0 clamp(6px, 1.4vh, 14px); }
-#over.cr .ov-row.big span { font-size: clamp(9px, 1.1vw, 14px); }
-#over.cr .ov-row.big b { font-size: clamp(34px, 5.4vw, 76px); color: #ffd85e; text-shadow: 5px 5px 0 #33210c, -2px 2px 0 #33210c, 2px -2px 0 #33210c, -2px -2px 0 #33210c; }
-#over.cr #ov-best { display: flex; flex-direction: column; align-items: center; gap: 8px; min-height: 0; }
-#over.cr #ov-best b { font-weight: normal; font-size: clamp(11px, 1.4vw, 18px); color: #6fd3ff; text-shadow: 2px 2px 0 #33210c; }
+                   justify-content: center; gap: clamp(8px, 1.9vh, 22px);
+                   padding: max(14px, 3vh, env(safe-area-inset-top)) max(16px, 5vw) max(14px, 3vh, env(safe-area-inset-bottom)); }
+#over.cr #ov-t { font-size: clamp(22px, min(4.6vw, 8vh), 64px); line-height: 1.1; }
+#over.cr #ov-why { font-size: clamp(8px, min(1vw, 1.7vh), 13px); line-height: 1.6; }
+#over:not(.cr) #cr-head, #over:not(.cr) #cr-info { display: none; }
+/* заработок слева, директор справа */
+#cr-head { display: flex; align-items: center; justify-content: center; gap: clamp(14px, 3vw, 48px); width: min(1200px, 100%); margin: 0 auto; }
+#cr-earn { flex: none; }
+#cr-earn .ov-row { flex-direction: column; align-items: center; gap: clamp(8px, 1.4vh, 14px); padding: 0; border: 0; }
+#cr-earn .ov-row span { font-size: clamp(9px, min(1.1vw, 2vh), 14px); text-align: center; }
+#cr-earn .ov-row b { font-size: clamp(32px, min(5.4vw, 10vh), 76px); color: #ffd85e; text-shadow: 5px 5px 0 #33210c, -2px 2px 0 #33210c, 2px -2px 0 #33210c, -2px -2px 0 #33210c; }
+#cr-head #cr-boss { flex: 0 1 600px; margin: 0; min-width: 0; }
+/* плитки — низкие, все в один-два ряда */
+#over.cr #ov-stats { display: flex; flex-direction: row; flex-wrap: wrap; align-items: stretch; justify-content: center; gap: clamp(6px, 1vw, 12px); width: min(1400px, 100%); margin: 0 auto; }
+#over.cr #ov-stats .ov-row { flex: 0 1 clamp(120px, 11.5vw, 200px); flex-direction: column; align-items: center; justify-content: center; gap: clamp(5px, 1vh, 9px);
+                   padding: clamp(7px, 1.3vh, 13px) 8px; background: rgba(14, 18, 40, .55); border: 2px solid rgba(51, 33, 12, .9); border-radius: 10px; }
+#over.cr #ov-stats .ov-row span { font-size: clamp(7px, .75vw, 10px); text-align: center; line-height: 1.4; }
+#over.cr #ov-stats .ov-row b { font-size: clamp(11px, min(1.4vw, 2.4vh), 18px); }
+/* район: «район Юг · 1 из 4 смен · новый район «Кольцо» через 3 смены · смена в зачёт от 3 заказов» */
+#cr-info { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px clamp(12px, 2vw, 26px); width: min(1100px, 100%); margin: 0 auto; }
+#cr-info[hidden] { display: none; }
+#cr-info .ov-row { display: inline-flex; align-items: baseline; gap: 8px; padding: 0; border: 0; }
+#cr-info .ov-row span { font-size: clamp(7px, .75vw, 10px); color: #b9c3e6; }
+#cr-info .ov-row b { font-size: clamp(8px, .95vw, 12px); color: #fff3d6; white-space: normal; text-align: left; line-height: 1.4; }
+#cr-info .ov-row.new { padding: 6px 12px; background: #ffd85e; border: 3px solid #33210c; border-radius: 8px; box-shadow: 0 3px 0 #33210c; }
+#cr-info .ov-row.new span, #cr-info .ov-row.new b { color: #33210c; }
+#over.cr #ov-best { display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 6px 14px; min-height: 0; }
+#over.cr #ov-best b { font-weight: normal; font-size: clamp(10px, min(1.3vw, 2.2vh), 17px); color: #6fd3ff; text-shadow: 2px 2px 0 #33210c; }
 #over.cr #ov-best span { font-size: clamp(7px, .8vw, 10px); color: #b9c3e6; }
 #over.cr #ov-best:empty, #over.cr .ov-note:empty { display: none; }
-#over.cr .ov-btns { flex-wrap: wrap; justify-content: center; gap: 12px; width: min(820px, 100%); margin: 0 auto; }
-#over.cr .ov-btns button { flex: 0 1 auto; min-width: 150px; min-height: 0; padding: 13px 18px; font-size: clamp(9px, .95vw, 12px);
+#over.cr .ov-btns { flex-wrap: wrap; justify-content: center; gap: clamp(8px, 1.4vh, 12px); width: min(820px, 100%); margin: 0 auto; }
+#over.cr .ov-btns button { flex: 0 1 auto; min-width: 150px; min-height: 0; padding: clamp(9px, 1.5vh, 13px) 18px; font-size: clamp(9px, .95vw, 12px);
                            color: #fff3d6; background: rgba(34, 44, 90, .95); }
-#over.cr .ov-btns #ov-again { order: -1; flex: 1 0 100%; padding: clamp(16px, 2.6vh, 24px) 20px; font-size: clamp(14px, 1.9vw, 24px);
+#over.cr .ov-btns #ov-again { order: -1; flex: 1 0 100%; padding: clamp(12px, 2.2vh, 22px) 20px; font-size: clamp(14px, min(1.9vw, 3.2vh), 24px);
                               color: #fff3d6; background: #f0522a; box-shadow: 0 6px 0 #33210c, 0 14px 30px rgba(240, 82, 42, .3); text-shadow: 3px 3px 0 #9b2a10; }
 #over.cr .ov-btns #ov-spend { color: #ffd85e; background: rgba(34, 44, 90, .95); }
-@media (max-width: 560px) { #over.cr .ov-row { flex-basis: calc(50% - 6px); } #over.cr .ov-btns button { flex: 1 1 40%; min-width: 0; } }
+/* узко (телефон, портрет): директор под заработком, плитки — списком «подпись … число» */
+@media (max-width: 760px), (max-aspect-ratio: 1/1) {
+  #cr-head { flex-direction: column; gap: 10px; }
+  #cr-head #cr-boss { flex: none; width: 100%; box-sizing: border-box; }
+}
+@media (max-width: 560px) {
+  #over.cr #ov-stats { flex-direction: column; flex-wrap: nowrap; gap: 0; }
+  #over.cr #ov-stats .ov-row { flex: none; flex-direction: row; justify-content: space-between; align-items: baseline; gap: 10px; padding: 6px 2px;
+                               background: none; border: 0; border-bottom: 2px dashed rgba(255, 243, 214, .14); border-radius: 0; }
+  #over.cr #ov-stats .ov-row span { text-align: left; }
+  #over.cr #ov-stats .ov-row b { font-size: 11px; }
+  #cr-info { flex-direction: column; gap: 6px; }
+  #over.cr .ov-btns button { flex: 1 1 40%; min-width: 0; }
+}
 
 #cr-end { display: flex; flex-direction: column; gap: 10px; }
 #over:not(.cr) #cr-end, #over:not(.cr) #ov-ride, #over:not(.cr) #ov-garage { display: none; }
@@ -84,8 +113,8 @@ body.career #money.bump b { animation: wl-bump .45s ease-out; }
 /* три кнопки: мусор, насилие, депнуть — второстепенные, приглушённые; цвет — полоской сверху */
 .cr-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(10px, 1.4vw, 18px); }
 .cr-tabs.n2 { grid-template-columns: repeat(2, 1fr); width: min(760px, 100%); margin: 0 auto; }
-.cr-tab { display: flex; flex-direction: column; align-items: stretch; justify-content: space-between; gap: 10px; min-height: clamp(84px, 13vh, 130px);
-          padding: clamp(12px, 1.8vh, 18px) 16px; font: inherit; text-align: left; cursor: pointer; color: #fff3d6; background: rgba(28, 36, 74, .9);
+.cr-tab { display: flex; flex-direction: column; align-items: stretch; justify-content: space-between; gap: 10px; min-height: clamp(64px, 11vh, 130px);
+          padding: clamp(10px, 1.6vh, 18px) 16px; font: inherit; text-align: left; cursor: pointer; color: #fff3d6; background: rgba(28, 36, 74, .9);
           border: 3px solid #33210c; border-top-width: 7px; border-radius: 10px; box-shadow: 0 4px 0 #33210c; }
 .cr-tab b { font-weight: normal; font-size: clamp(10px, 1.25vw, 16px); line-height: 1.45; }
 .cr-tab .cr-sub { font-size: clamp(7px, .8vw, 10px); line-height: 1.6; color: #b9c3e6; }
@@ -137,18 +166,18 @@ body.career #money.bump b { animation: wl-bump .45s ease-out; }
 #cr-spend[hidden] { display: none; }
 #cr-spend.on { opacity: 1; }
 body:has(#cr-spend:not([hidden])) .hud, body:has(#cr-spend:not([hidden])) #ctrls { visibility: hidden; }
-.cr-sp-box { flex: 1; display: flex; flex-direction: column; align-items: stretch; gap: clamp(14px, 2.6vh, 30px); overflow: auto; box-sizing: border-box;
-             padding: max(26px, 6vh) max(20px, 6vw) max(20px, 4vh); width: 100%; transform: translateY(16px); transition: transform .25s;
+.cr-sp-box { flex: 1; display: flex; flex-direction: column; align-items: stretch; gap: clamp(10px, 2.2vh, 28px); overflow: auto; box-sizing: border-box;
+             padding: max(16px, 4vh) max(16px, 6vw) max(16px, 3.5vh); width: 100%; transform: translateY(16px); transition: transform .25s;
              scrollbar-width: thin; scrollbar-color: #ffd85e #141a33; }
 #cr-spend.on .cr-sp-box { transform: none; }
 .cr-sp-head { display: flex; flex-direction: column; align-items: center; gap: clamp(10px, 1.8vh, 18px); margin-top: auto; }
-.cr-sp-sum { font-size: clamp(30px, min(9vw, 14vh), 128px); line-height: 1; white-space: nowrap; color: #ffd85e; letter-spacing: .02em;
+.cr-sp-sum { font-size: clamp(30px, min(9vw, 12vh), 128px); line-height: 1; white-space: nowrap; color: #ffd85e; letter-spacing: .02em;
              text-shadow: 6px 6px 0 #33210c, -3px 3px 0 #33210c, 3px -3px 0 #33210c, -3px -3px 0 #33210c, 0 18px 40px rgba(0, 0, 0, .35); }
 #cr-sp-go { align-self: center; width: min(560px, 100%); font: inherit; font-size: clamp(14px, 1.9vw, 24px); padding: clamp(16px, 2.6vh, 24px) 20px; cursor: pointer;
             color: #fff3d6; background: #f0522a; border: 3px solid #33210c; border-radius: 12px; text-shadow: 3px 3px 0 #9b2a10;
             box-shadow: 0 6px 0 #33210c, 0 14px 30px rgba(240, 82, 42, .3); }
 #cr-sp-go:active { transform: translateY(4px); box-shadow: 0 2px 0 #33210c; }
-.cr-sp-body { display: flex; width: min(1000px, 100%); margin: clamp(6px, 2vh, 24px) auto 0; }
+.cr-sp-body { display: flex; width: min(1000px, 100%); margin: clamp(2px, 1.2vh, 20px) auto 0; }
 #cr-spend #cr-end { flex: 1; gap: 14px; }
 #cr-sp-close { align-self: center; margin-bottom: auto; font: inherit; font-size: clamp(9px, 1vw, 12px); padding: 11px 26px; border-radius: 8px; border: 3px solid #33210c;
                background: rgba(34, 44, 90, .9); color: #b9c3e6; cursor: pointer; box-shadow: 0 4px 0 #33210c; }
@@ -156,13 +185,13 @@ body:has(#cr-spend:not([hidden])) .hud, body:has(#cr-spend:not([hidden])) #ctrls
 #cr-sp-close:active { transform: translateY(3px); box-shadow: 0 1px 0 #33210c; }
 .ov-btns #ov-spend { color: #2a1d10; background: #ffd85e; }
 #ov-spend[hidden] { display: none; }
-@media (max-width: 560px) { .cr-tabs, .cr-tabs.n2 { grid-template-columns: 1fr; } .cr-tab { min-height: 0; } }
+@media (max-width: 560px) { .cr-tabs, .cr-tabs.n2 { grid-template-columns: 1fr; gap: 8px; } .cr-tab { min-height: 0; gap: 6px; padding: 9px 14px; } }
 .cr-sp-box::-webkit-scrollbar { width: 8px; }
 .cr-sp-box::-webkit-scrollbar-track { background: #141a33; }
 .cr-sp-box::-webkit-scrollbar-thumb { background: #ffd85e; border-radius: 4px; border: 2px solid #141a33; }
 
 /* открылся новый район (districts.js) — над кнопкой «на новую смену» */
-.cr-sp-new { display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 12px 16px; margin: 4px auto 12px; max-width: 560px;
+.cr-sp-new { display: flex; flex-direction: column; gap: 8px; align-items: center; padding: clamp(8px, 1.4vh, 12px) 16px; margin: 0 auto; max-width: 560px;
              background: #ffd85e; color: #33210c; border: 3px solid #33210c; border-radius: 10px; box-shadow: 0 4px 0 #33210c; text-align: center; }
 .cr-sp-new[hidden] { display: none; }
 .cr-sp-new b { font-weight: normal; font-size: clamp(11px, 1.4vw, 16px); }
@@ -267,7 +296,7 @@ body:has(#cr-spend:not([hidden])) .hud, body:has(#cr-spend:not([hidden])) #ctrls
                     text-shadow: 2px 2px 0 #141a33; pointer-events: none; }
 
 /* директор после смены: лицо и реплика (итоги и «потратить») */
-#cr-boss, .cr-sp-boss { display: flex; align-items: center; gap: 12px; margin: 10px auto 0; max-width: 640px; text-align: left;
+#cr-boss, .cr-sp-boss { display: flex; align-items: center; gap: 12px; margin: 0 auto; max-width: 640px; text-align: left;
                         background: #fff3d6; color: #2a1d10; border: 3px solid #33210c; border-radius: 12px; padding: 10px 14px; box-shadow: 0 4px 0 #33210c; }
 #cr-boss[hidden], .cr-sp-boss[hidden] { display: none; }
 #cr-boss img, .cr-sp-boss img { width: clamp(48px, 8vh, 72px); height: clamp(48px, 8vh, 72px); flex: none; image-rendering: pixelated;

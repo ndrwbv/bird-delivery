@@ -5,10 +5,14 @@
 import './styles/delivery.css';
 import './input/padmenu.css';
 import Platform from './platform/index.js';
+import * as CRASH from './platform/crashlog.js';
 import { initI18n, applyDom, LANGS, LANG_NAMES } from './i18n/index.js';
 import { pickLang } from './langpick.js';
 import { MAP_IDS, loadMap } from './maps/index.js';
 import { useMap } from './game/map.js';
+
+// журнал ошибок и зависаний (docs/CRASHES.md) — первым делом: ловит и ошибки загрузки игры
+CRASH.init();
 
 // версия сборки в углу заставки: «v0.0.8» из релиза или «dev-<коммит>» (vite.config.js, __BUILD__)
 const buildV = document.getElementById('build-v');

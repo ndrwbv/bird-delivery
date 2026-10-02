@@ -8,7 +8,8 @@
      ORD.nextPlan()                  — очередной заказ вместо planOrder() → { kind, stops: [{ peds }], why, ord }
      ORD.setup(plan)                 — после S.order: цена, срок, цвет
      ORD.card(order)                 — полоса цвета на карточке (очередь «дальше» игроку не показываем)
-     ORD.pickStop(o)                 — из syncTarget: в сборном заказе цель — ближайший по дорогам неотданный адрес
+     ORD.pickStop(o)                 — из syncTarget (заказ начался, после вручения): в сборном цель — ближайший по дорогам неотданный адрес
+     ORD.reachStop(o)                — каждый кадр в drive: в сборном подъехал к другому неотданному адресу — он цель (true — цель сменилась)
      ORD.activeStops()               — все неотданные адреса текущего заказа для пинов карты: [{ x, z, color, current, name, addr }]
      ORD.arrive(o, st, onTime)       — подъехал к клиенту; true — дальше не идти (развоз смены, ждём onArrive)
      ORD.payStop(o, st, onTime, tier) → сколько заплатили за остановку (ECON.orderPay / tipFor); разбивку (заказ, скорость, чаевые) кладёт в st.pay — её рисует popPay
@@ -967,36 +968,36 @@ export function tintMarker (marker) {
   if (beam && beam.material) beam.material.color.copy(TMP.c).lerp(new T.Color(0xffffff), 0.45);
 }
 /* ─────────────── сборный заказ: все адреса разом, порядок выбирает игрок ───────────────
-   o.stops[0 … idx) — отданные, [idx …) — ещё нет. Цель (o.stops[idx] → S.target, маршрут
-   rebuildRoutePath) — ближайший по дорогам неотданный адрес; подъехал к любому — он и
-   становится целью, вручение как обычно (checkArrival). Вызывается из syncTarget каждый кадр:
-   «подъехал» — каждый кадр (по прямой), «ближайший по дорогам» — раз в PICK_MS. */
-const PICK_MS = 400, PICK_GAIN = 25;                     // сменить цель, если новая ближе хотя бы на 25 м
-const PK = { t: 0, o: null };
+   o.stops[0 … idx) — отданные, [idx …) — ещё нет. Все адреса — неподвижные пины (st.at). Цель
+   (o.stops[idx] → S.target, маршрут rebuildRoutePath) выбирается, только когда заказ начался и
+   после каждого вручения — ближайший по дорогам неотданный (pickStop, из syncTarget); пока едешь,
+   сама не перескакивает. Подъехал к любому другому неотданному — он и становится целью
+   (reachStop, каждый кадр в drive), вручение как обычно (checkArrival). */
 const stopAt = st => st.at || st.peds[0];
 function swapStop (o, i) {
-  if (i === o.idx) return;
+  if (i === o.idx) return false;
   const a = o.stops;
   [a[o.idx], a[i]] = [a[i], a[o.idx]];
+  return true;
+}
+export function reachStop (o) {
+  if (!o || !o.ord || !o.ord.bundle || o.stops.length - o.idx < 2) return false;
+  for (let i = o.idx; i < o.stops.length; i++) {           // у текущего — уже он
+    const st = o.stops[i], p = stopAt(st);
+    if (p && Math.hypot(p.x - V.x, p.z - V.z) <= (st.reach || 5) + 2) return swapStop(o, i);
+  }
+  return false;
 }
 export function pickStop (o) {
   if (!o || !o.ord || !o.ord.bundle || o.stops.length - o.idx < 2) return;
-  for (let i = o.idx; i < o.stops.length; i++) {
-    const st = o.stops[i], p = stopAt(st);
-    if (p && Math.hypot(p.x - V.x, p.z - V.z) <= (st.reach || 5) + 2) { swapStop(o, i); return; }
-  }
-  const now = performance.now();
-  if (PK.o === o && now - PK.t < PICK_MS) return;
-  PK.o = o; PK.t = now;
-  let bi = o.idx, bl = Infinity, cur = Infinity;
+  let bi = o.idx, bl = Infinity;
   for (let i = o.idx; i < o.stops.length; i++) {
     const p = stopAt(o.stops[i]);
     if (!p) continue;
     const L = A.routeLen(V.x, V.z, p.x, p.z);
-    if (i === o.idx) cur = L;
     if (L < bl) { bl = L; bi = i; }
   }
-  if (bi !== o.idx && bl < cur - PICK_GAIN) swapStop(o, bi);
+  swapStop(o, bi);
 }
 /* все неотданные адреса текущего заказа — для пинов на радаре и карте (current — тот, куда
    ведёт маршрут, он же S.target). Поручение и «в пиццерию» — пусто: там одна цель S.target */
@@ -1140,6 +1141,6 @@ function simShift (n = 10, h0 = 9, h1 = 23.5, life = null, told = null) {
 export const DEBUG = {
   Q, SH, get POOL () { return POOL; }, get USED () { return USED; }, STAFF, ARRIVE, simShift, resetShift, genSpec, pickSpot, staffRide, bagMesh,
   get CAR () { return CAR; }, get STORY () { return STORY; }, hourNow, offerSide, sideOpts, force, forceSide, nextPlan, card, onArrive,
-  lifeN, bundleSpec, activeStops, pickStop,
+  lifeN, bundleSpec, activeStops, pickStop, reachStop,
   clearUsed () { USED = []; reindex(); A.Store.set(USED_KEY, USED); },
 };

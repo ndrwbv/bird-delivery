@@ -11,7 +11,7 @@
      --no-vsync        кадры без ожидания вертикальной развёртки и без ограничения 60 fps —
                        проверка плавности на Deck (docs/STEAM.md, «Производительность»)
    Сохранения — localStorage рендерера, он лежит в userData (путь закреплён ниже). */
-const { app, BrowserWindow, globalShortcut, Menu, ipcMain, protocol, net, dialog } = require('electron');
+const { app, BrowserWindow, globalShortcut, Menu, ipcMain, protocol, net, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
@@ -264,6 +264,34 @@ ipcMain.handle('app:quit', () => { setTimeout(() => app.quit(), 50); return true
 ipcMain.handle('win:fullscreen', (e, on) => { const w = BrowserWindow.fromWebContents(e.sender); if (w) w.setFullScreen(!!on); return !!(w && w.isFullScreen()); });
 ipcMain.handle('win:isFullscreen', e => { const w = BrowserWindow.fromWebContents(e.sender); return !!(w && w.isFullScreen()); });
 
+/* ─── журнал ошибок (docs/CRASHES.md) ───
+   Рендерер (src/platform/crashlog.js) шлёт по строке JSON на запись; сюда же — зависание
+   рендерера и его падение. Файл в день: userData/logs/crash-ГГГГ-ММ-ДД.log, не больше 1 МБ,
+   хранятся 7 последних файлов. На Деке — ~/.config/BirdPizza/logs. */
+const LOG_DIR = () => path.join(app.getPath('userData'), 'logs');
+const LOG_MAX = 1024 * 1024, LOG_KEEP = 7;
+let logPruned = false;
+function crashWrite(line) {
+  try {
+    const dir = LOG_DIR();
+    fs.mkdirSync(dir, { recursive: true });
+    if (!logPruned) {
+      logPruned = true;
+      const old = fs.readdirSync(dir).filter(f => /^crash-\d{4}-\d\d-\d\d\.log$/.test(f)).sort();
+      for (const f of old.slice(0, Math.max(0, old.length - LOG_KEEP + 1))) { try { fs.unlinkSync(path.join(dir, f)); } catch (e) { /* — */ } }
+    }
+    const d = new Date(), day = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const file = path.join(dir, 'crash-' + day + '.log');
+    let size = 0; try { size = fs.statSync(file).size; } catch (e) { /* — */ }
+    if (size > LOG_MAX) return;
+    fs.appendFileSync(file, String(line).replace(/\n/g, ' ').slice(0, 20000) + '\n');
+  } catch (e) { log('crashlog:', e.message); }
+}
+const crashMain = (kind, msg) => crashWrite(JSON.stringify({ kind, where: 'electron', msg, n: 1, first: new Date().toISOString(), last: new Date().toISOString(), snap: { build: buildTag() || app.getVersion(), platform: process.platform } }));
+ipcMain.on('log:write', (e, line) => crashWrite(line));
+ipcMain.handle('log:dir', () => LOG_DIR());
+ipcMain.handle('log:open', async () => { try { fs.mkdirSync(LOG_DIR(), { recursive: true }); return !(await shell.openPath(LOG_DIR())); } catch (e) { return false; } });
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1280, height: 800, minWidth: 640, minHeight: 400,
@@ -279,6 +307,10 @@ function createWindow() {
     win.webContents.on('render-process-gone', (e, d) => log('renderer gone', d.reason));
     win.webContents.on('did-fail-load', (e, code, desc, url) => log('fail', code, desc, url));
   }
+  // зависание и падение страницы — в журнал (рендерер сам записать не успеет)
+  win.webContents.on('unresponsive', () => crashMain('freeze', 'renderer unresponsive (страница не отвечает)'));
+  win.webContents.on('responsive', () => crashMain('info', 'renderer responsive again'));
+  win.webContents.on('render-process-gone', (e, d) => crashMain('crash', 'renderer gone: ' + (d && d.reason) + ' ' + (d && d.exitCode)));
   // ссылки наружу — не внутри игры: в Стиме их открывать некуда
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (e, url) => { if (!url.startsWith('app://')) e.preventDefault(); });

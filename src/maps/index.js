@@ -15,7 +15,7 @@ const ALL = {
 export const MAP_IDS = Object.keys(ALL);
 /* что показать в меню выбора, не загружая сам город */
 export const MAP_META = {
-  ...(MODE !== 'yandex' ? { seversk: { title: N_('Северск'), note: N_('закрытый город целиком: КПП, гаражи, промзона, железная дорога') } } : {}),
+  ...(MODE !== 'yandex' ? { seversk: { title: N_('Солнечный'), note: N_('закрытый город целиком: КПП, гаражи, промзона, железная дорога') } } : {}),
   ...(MODE === 'yandex' || DEV ? { moscow: { title: N_('Москва'), note: N_('район у Ленинской Слободы · демо') } } : {}),
 };
 export async function loadMap (id) {

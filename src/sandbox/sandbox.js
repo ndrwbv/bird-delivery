@@ -68,7 +68,7 @@ const HOOKS = {
   // машины (cars.js): своих имён под песочницу у него нет — переходники к тому, что он экспортирует
   setCar: { mod: 'cars', names: ['setCar'], who: 'cars.js → __dlv.CARSM', need: 'CARSM.select(id)',
     fallback: d => { const m = MODS.cars(d); return m && m.select ? id => { own(d, id); m.select(id); } : null; } },
-  setL: { mod: 'cars', names: ['setL'], who: 'cars.js → __dlv.CARSM', need: 'CARSM.worsen / L',
+  setL: { mod: 'cars', names: ['setL'], who: 'cars.js → __dlv.CARSM', need: 'CARSM.setL (мотор = 100 − 10·L)',
     fallback: d => { const m = MODS.cars(d); return m && m.worsen && m.L ? v => m.worsen(v - m.L()) : null; } },
   stall: { mod: 'cars', names: ['stallIn'], who: 'cars.js → __dlv.CARSM', need: 'CARSM.stallNow()',
     fallback: d => { const m = MODS.cars(d); return m && m.stallNow ? sec => (sec > 0 ? new Promise(r => setTimeout(() => r(m.stallNow('sandbox')), sec * 1000)) : m.stallNow('sandbox')) : null; } },
@@ -378,7 +378,7 @@ function build () {
   const g = section('игра');
   const r = row(g, 'карта');
   const sel = el('select'); sel.id = 'map-pick';
-  for (const [v, n] of [['seversk', 'Северск'], ['moscow', 'Москва']]) { const o = el('option', '', n); o.value = v; sel.appendChild(o); }
+  for (const [v, n] of [['seversk', 'Солнечный'], ['moscow', 'Москва']]) { const o = el('option', '', n); o.value = v; sel.appendChild(o); }
   sel.value = CFG.map;
   sel.addEventListener('change', () => { CFG.map = sel.value; reload(); });
   r.appendChild(sel);
@@ -453,11 +453,11 @@ function build () {
   const cr = section('машина');
   const rc = row(cr, 'машина');
   const cars = el('select'); cars.id = 'car-pick';
-  for (const c of CAR_LIST) { const o = el('option', '', c.id + ' · ' + (c.price ? c.price.toLocaleString('ru') + ' ₽' : 'даром') + (c.stars ? ' + ' + c.stars + '★' : '') + ' · L ' + c.L); o.value = c.id; cars.appendChild(o); }
+  for (const c of CAR_LIST) { const o = el('option', '', c.id + ' · ' + (c.price ? c.price.toLocaleString('ru') + ' ₽' : 'даром') + (c.stars ? ' + ' + c.stars + '★' : '') + ' · износ ×' + (0.4 + 0.2 * c.L).toFixed(2)); o.value = c.id; cars.appendChild(o); }
   rc.appendChild(cars);
   button(rc, 'сесть', 'setCar', () => call('setCar', cars.value), 'sm');
   UI.push({ el: cars, hooks: ['setCar'] });
-  const L = slider(cr, 'ломучесть L', 0, 10, 0.1, 3, v => v.toFixed(1), 'setL', v => call('setL', v));
+  const L = slider(cr, 'износ (мотор = 100 − 10·L %)', 0, 10, 0.1, 0, v => v.toFixed(1) + ' → ' + Math.round(100 - 10 * v) + ' %', 'setL', v => call('setL', v));
   const cb = el('div', 'grid'); cr.appendChild(cb);
   button(cb, 'открыть все', 'unlockAll', () => call('unlockAll'));
   button(cb, 'улица с ямами', ['potholes', 'teleport'], async () => { const p = await call('potholes'); if (p) G.tp(p); });

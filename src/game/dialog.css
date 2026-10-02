@@ -38,3 +38,11 @@
   .dlg-text { font-size: 11px; }
   .dlg-btns { justify-content: stretch; } .dlg-btns button { flex: 1; }
 }
+
+/* полоски под текстом (meters): «мотор 82 %», «ресурс 94 %» у Дяди Жени */
+.dlg-meters { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.dlg-meters[hidden] { display: none; }
+.dlg-m { display: grid; grid-template-columns: 72px 1fr 48px; align-items: center; gap: 8px; font-size: 10px; }
+.dlg-m > i { display: block; height: 10px; background: #e8d9b8; border: 2px solid #33210c; border-radius: 5px; overflow: hidden; }
+.dlg-m > i > i { display: block; height: 100%; }
+.dlg-m b { font-weight: normal; text-align: right; }

@@ -964,7 +964,7 @@ function gangTalk () {
     }
   });
 }
-/* машина хуже заводится: ломучесть L +1 (cars.js worsen) */
+/* машина хуже заводится: мотор −10 % (cars.js worsen, econ.js BREAK.GANG_WEAR) */
 function carWorse () {
   const C = MOD('cars');
   try { if (C && C.worsen) C.worsen(1); } catch (e) { console.warn('[world] cars.worsen', e); }

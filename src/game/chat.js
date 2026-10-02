@@ -1,21 +1,34 @@
-/* Чат управляющего: «Жека управляющий» пишет справа сверху, как в iMessage —
+/* Чат управляющего: «Толик управляющий» пишет справа сверху, как в iMessage —
    аватарка, имя, пузырь. Сначала 0,5 с «печатает…» (три точки), потом текст.
+   Текст приходит крупно: «бам» — пузырь выскакивает из своего места вверх к середине экрана
+   (×1,8, не шире экрана, с отскоком и звуком), держится 1,2 с + 1 с на 150 букв (не дольше 2 с)
+   и за 0,45 с уменьшается обратно на своё место. Пришло новое — прежнее крупное сразу
+   уменьшается. prefers-reduced-motion — без увеличения, просто появляется.
    Видно сразу не больше трёх сообщений (четвёртое выталкивает самое старое),
-   каждое висит 4 с + 1 с на каждые 25 букв (не дольше 8 с) и уезжает вправо.
+   каждое висит (после крупного) 4 с + 1 с на каждые 25 букв (не дольше 8 с) и уезжает вправо.
    Ввод не перехватывает. Место — под колонкой хада справа (кошелёк, часы смены,
    «закончить смену», на телефоне — радар и кнопки); не влезает по высоте — слева от неё.
-   Что и когда пишет — docs/ORDERS.md «Жека управляющий».
+   Что и когда пишет — docs/ORDERS.md «Толик управляющий».
 
    Из game.js:
-     CHAT.init({ face, person, adult })   — face(person, size) → картинка; adult — взрослая версия (мат)
+     CHAT.init({ face, person, adult, blip }) — face(person, size) → картинка; adult — взрослая версия (мат);
+                                            blip(f, d, type, v) — звук (Snd.blip)
      CHAT.react(kind, onShow?)            — kind: 'fast' | 'slow' | 'late' | 'bump' | 'kill' | 'bundle' | 'urgent';
                                             onShow() — в момент, когда текст появился (списание денег)
      CHAT.say(text, onShow?)              — своё сообщение
-     CHAT.clear()                         — убрать всё (конец смены, меню) */
+     CHAT.clear()                         — убрать всё (конец смены, меню)
+     CHAT.later(ms, fn)                   — отложенное сообщение; пока не вышло — чат «занят»
+     CHAT.busy() / CHAT.idle(cb, max)     — есть ли отложенное, «печатает…» или крупное; cb — когда всё
+                                            показано и уменьшилось (не дольше max мс) — конец смены ждёт
+     CHAT.waiting()                       — идёт idle(): отложенная похвала всё равно показывается */
 import { t, N_ } from '../i18n/index.js';
 
 const TYPE_S = 0.5, MAX = 3;
 const hold = s => Math.min(8, 4 + s.length / 25);
+/* крупно: во сколько раз, где центр (доля высоты экрана), сколько держится, выскок и уменьшение (мс) */
+const BIG = { S: 1.8, Y: 0.27, MIN: 1.2, PER: 150, MAX: 2, IN: 380, OUT: 450 };
+const bigHold = s => Math.min(BIG.MAX, BIG.MIN + s.length / BIG.PER);
+const calm = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
 
 /* фразы: общие и взрослые/детские (мат — только во взрослой) */
 const LINES = {
@@ -48,10 +61,61 @@ const KIDS_LINES = {
     N_('срочный заказ упустил, гонщик. минус из зарплаты')],
 };
 
-const C = { el: null, face: null, person: null, adult: false, items: [], last: {} };
+const C = { el: null, face: null, person: null, adult: false, blip: null, items: [], last: {}, wait: 0 };
+const PEND = new Set();                                  // отложенные сообщения (later)
+const ANGRY = new Set(['late', 'bump', 'kill', 'urgent']);
 
-export function init ({ face, person, adult }) {
-  C.face = face; C.person = person; C.adult = !!adult;
+export function init ({ face, person, adult, blip }) {
+  C.face = face; C.person = person; C.adult = !!adult; C.blip = blip || null;
+}
+
+/* звук «пришло сообщение»: два коротких тона, ругань — ниже */
+function ding (angry) {
+  if (!C.blip) return;
+  const f = angry ? [620, 470] : [1320, 1760];
+  f.forEach((x, i) => setTimeout(() => { try { C.blip(x, 0.12, 'triangle', 0.13); } catch (e) { /* — */ } }, i * 95));
+}
+
+/* где пузырь крупно: та же строка, сдвинутая и увеличенная так, что её содержимое (аватарка +
+   пузырь) — по центру экрана на высоте BIG.Y, не шире экрана и не выше его половины */
+function bigTf (m) {
+  const row = m.el, b = row.querySelector('.cm-b'), c = C.el.getBoundingClientRect();
+  const W = innerWidth, H = innerHeight;
+  const x0 = row.offsetLeft, x1 = b ? b.offsetLeft + b.offsetWidth : x0 + row.offsetWidth;
+  const cw = Math.max(1, x1 - x0), h = Math.max(1, row.offsetHeight);
+  const s = Math.max(1, Math.min(BIG.S, (W - 24) / cw, H * 0.5 / h));
+  const ox = (x0 + x1) / 2 - x0, oy = h / 2;
+  const cy = Math.max(H * BIG.Y, h * s / 2 + 12);
+  const dx = W / 2 - (c.left + row.offsetLeft + ox), dy = cy - (c.top + row.offsetTop + oy);
+  return { origin: ox.toFixed(1) + 'px ' + oy.toFixed(1) + 'px', s, dx, dy };
+}
+const tf = (g, k) => 'translate(' + (g.dx * k).toFixed(1) + 'px, ' + (g.dy * k).toFixed(1) + 'px) scale(' + (1 + (g.s - 1) * k).toFixed(3) + ')';
+
+function grow (m) {
+  if (!m.el.animate || calm()) return false;
+  for (const o of C.items) if (o !== m && o.big) shrink(o);
+  const g = bigTf(m);
+  m.el.style.transformOrigin = g.origin;
+  m.el.classList.add('big');
+  m.big = true;
+  m.anim = m.el.animate([
+    { transform: 'none', opacity: 0.6 },
+    { transform: tf(g, 1.06), opacity: 1, offset: 0.62 },
+    { transform: tf(g, 0.97), offset: 0.82 },
+    { transform: tf(g, 1) },
+  ], { duration: BIG.IN, easing: 'cubic-bezier(.2, .8, .3, 1)', fill: 'forwards' });
+  return true;
+}
+function shrink (m) {
+  if (!m.big) return;
+  m.big = false;
+  clearTimeout(m.t3);
+  const a = m.anim, from = getComputedStyle(m.el).transform;
+  m.anim = m.el.animate([{ transform: from === 'none' ? 'none' : from }, { transform: 'none' }],
+    { duration: BIG.OUT, easing: 'cubic-bezier(.45, 0, .25, 1)', fill: 'forwards' });
+  if (a) a.cancel();
+  const done = m.anim;
+  done.onfinish = () => { if (m.anim === done) { m.el.classList.remove('big'); done.cancel(); m.anim = null; } };
 }
 
 function box () {
@@ -88,7 +152,10 @@ function drop (m) {
   const i = C.items.indexOf(m);
   if (i < 0) return;
   C.items.splice(i, 1);
-  clearTimeout(m.t1); clearTimeout(m.t2);
+  clearTimeout(m.t1); clearTimeout(m.t2); clearTimeout(m.t3);
+  m.big = false;
+  if (m.anim) { m.anim.cancel(); m.anim = null; }
+  m.el.classList.remove('big');
   shown(m);                                               // убрали, не дождавшись текста, — списание всё равно
   m.el.classList.add('out');
   setTimeout(() => m.el.remove(), 350);
@@ -100,14 +167,14 @@ function shown (m) {
   if (f) try { f(); } catch (e) { console.warn('[chat]', e); }
 }
 
-export function say (text, onShow) {
+export function say (text, onShow, angry) {
   const el = box();
   place();
   while (C.items.length >= MAX) drop(C.items[0]);
   const row = document.createElement('div');
   row.className = 'cm';
   const ava = C.person && C.face ? '<img src="' + C.face(C.person, 48) + '" alt="">' : '<i></i>';
-  row.innerHTML = ava + '<div class="cm-b"><b>' + t('Жека управляющий') + '</b><p class="typing"><span></span><span></span><span></span></p></div>';
+  row.innerHTML = ava + '<div class="cm-b"><b>' + t('Толик управляющий') + '</b><p class="typing"><span></span><span></span><span></span></p></div>';
   el.appendChild(row);
   const m = { el: row, onShow };
   C.items.push(m);
@@ -115,8 +182,12 @@ export function say (text, onShow) {
     const p = row.querySelector('p');
     p.className = '';
     p.textContent = text;
+    m.said = true;
     shown(m);
-    m.t2 = setTimeout(() => drop(m), hold(text) * 1000);
+    ding(angry);
+    const big = grow(m) ? bigHold(text) : 0;
+    if (big) m.t3 = setTimeout(() => shrink(m), big * 1000);
+    m.t2 = setTimeout(() => drop(m), (big + hold(text)) * 1000);
   }, TYPE_S * 1000);
   return m;
 }
@@ -128,7 +199,27 @@ export function react (kind, onShow) {
   let k = Math.floor(Math.random() * pool.length);
   if (pool.length > 1 && k === C.last[kind]) k = (k + 1) % pool.length;
   C.last[kind] = k;
-  return say(t(pool[k]), onShow);
+  return say(t(pool[k]), onShow, ANGRY.has(kind));
 }
 
 export function clear () { for (const m of C.items.slice()) drop(m); }
+
+/* отложенное сообщение: пока таймер не вышел, чат «занят» (конец смены его подождёт); clear() его не
+   отменяет — вычет за опоздание должен случиться и после конца смены */
+export function later (ms, fn) {
+  const id = setTimeout(() => { PEND.delete(id); try { fn(); } catch (e) { console.warn('[chat]', e); } }, ms);
+  PEND.add(id);
+  return id;
+}
+export const busy = () => PEND.size > 0 || C.items.some(m => !m.said || m.big || m.anim);
+export const waiting = () => C.wait > 0;
+export function idle (cb, max = 6000) {
+  const t0 = performance.now();
+  C.wait++;
+  const tick = () => {
+    if (busy() && performance.now() - t0 < max) { setTimeout(tick, 80); return; }
+    C.wait--;
+    try { cb(); } catch (e) { console.error('[chat] idle', e); }
+  };
+  tick();
+}

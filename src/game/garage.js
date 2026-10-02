@@ -6,22 +6,30 @@
      GARAGE.isOpen(), GARAGE.root() — для геймпада и клавиатуры (career.js)
      GARAGE.flip(±1)       — листать: ◀ ▶, стрелки, LB/RB, крестовина, свайп, перетаскивание мышью
 
+   Первый раз за всё время — обучение Дяди Жени (garagetour.js): пока идёт, root() — его
+   облачко (геймпад и клавиатура жмут «дальше» / «пропустить»), close() — пропустить, flip — нет.
+
+   Своя машина: «покрасить» открывает палитру (10 цветов + заводской, цена — econ.js PAINT),
+   «продать» спрашивает «точно?» (да / нет; цена — econ.js SELL). Текущую и «Семёрку» не продать.
+   Листнул — палитра и вопрос закрываются.
+
    В фокусе одна большая карточка, соседи по бокам — меньше и темнее. Крутится
    только картинка в фокусе, остальные — готовые кадры из кэша (PIC). */
 import './garage.css';
 import * as ECON from './econ.js';
-import { t, lang } from '../i18n/index.js';
+import { t } from '../i18n/index.js';
+import * as TOUR from './garagetour.js';
 
 let D = null, el = null, idx = 0, list = [], onCloseCb = null;
+let MODE = null;                       // у карточки в фокусе: null | 'paint' (палитра) | 'sell' («точно продать?»)
 const PIC = new Map();                 // id → неподвижная картинка (canvas)
 let SPIN = null;                       // { id, cv } — крутящаяся картинка карточки в фокусе
 const PW = 640, PH = 400;              // один размер на все картинки: общий WebGL не меняет размер
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const fmtN = n => Number(n).toLocaleString(lang() === 'zh' ? 'zh-CN' : lang());
 
 export function init (api) { D = api; }
 export const isOpen = () => !!(el && !el.hidden);
-export const root = () => (isOpen() ? el : null);
+export const root = () => (isOpen() ? TOUR.root() || el : null);
 
 function build () {
   if (el) return el;
@@ -48,14 +56,24 @@ export function open (onClose) {
   el.querySelector('.gr-back').textContent = '◀ ' + t('назад');
   el.querySelector('.gr-t').textContent = t('гараж');
   load();
+  MODE = null;
   idx = Math.max(0, list.findIndex(c => c.current));
   el.querySelector('.gr-track').innerHTML = '';
   el.hidden = false;
   render();
   requestAnimationFrame(() => el.classList.add('on'));
+  if (TOUR.need(D.A.Store)) TOUR.start(el, { Store: D.A.Store, Snd: D.A.Snd, face: zhenyaFace });
+}
+/* лицо Дяди Жени — того же, что стоит в гаражах (cars.js); гаражей нет — такой же по сиду */
+function zhenyaFace () {
+  if (!D.A.face) return '';
+  const C = D.cars(), g = C && C.garage ? C.garage() : null;
+  const p = (g && g.zh && g.zh.person) || (D.A.person ? D.A.person({ seed: 0x2E1A, fem: false, fat: true }) : null);
+  return p ? D.A.face(p, 160) : '';
 }
 export function close () {
   if (!el || el.hidden) return;
+  if (TOUR.on()) { TOUR.skip(); return; }       // Esc / B / «назад» посреди обучения — только пропустить его
   stopSpin();
   el.classList.remove('on');
   el.hidden = true;
@@ -74,7 +92,13 @@ const vmaxTop = () => Math.max(1, ...ECON.CAR_LIST.map(c => c.vmax * (1 + U.STEP
 const hpTop = () => Math.max(1, ...ECON.CAR_LIST.map(c => c.hp + U.STEPS * U.HP));
 const statsOf = c => [
   { k: 'speed', name: t('скорость'), v: t('{n} км/ч', { n: Math.round((c.vmax || 0) * 3.6) }), p: (c.vmax || 0) / vmaxTop() },
-  { k: 'break', name: t('ломучесть'), v: t('{n} из 10', { n: fmtN(Math.round((c.L || 0) * 10) / 10) }), p: Math.min(1, (c.L || 0) / 10) },
+  // своя — мотор и ресурс (econ.js BREAK); в продаже — как быстро изнашивается мотор
+  ...(c.owned ? [
+    { k: 'break', name: t('мотор'), v: Math.round(c.cond ?? 100) + ' %', p: (c.cond ?? 100) / 100 },
+    { k: 'res', name: t('ресурс'), v: Math.round(c.ceil ?? 100) + ' %', p: (c.ceil ?? 100) / 100 },
+  ] : [
+    { k: 'break', name: t('износ мотора'), v: (c.wearK || 1) <= 0.6 ? t('медленный') : (c.wearK || 1) <= 1 ? t('средний') : t('быстрый'), p: Math.min(1, (c.wearK || 1) / 1.4) },
+  ]),
   { k: 'hp', name: t('сердца'), v: String(Math.round(c.hp || 0)), p: (c.hp || 0) / hpTop() },
 ];
 
@@ -169,7 +193,33 @@ function acts (c) {
     if (pr == null) h += '<button type="button" class="gr-btn up max" disabled><b>' + esc(name) + '</b><span>' + esc(t('до упора')) + '</span><i>' + pips(lv) + '</i></button>';
     else h += '<button type="button" class="gr-btn up" data-a="' + kind + '" autofocus' + (cash < pr ? ' disabled' : '') + '><b>' + esc(name) + '</b><span>' + esc(gain + ' · ' + money(pr)) + '</span><i>' + pips(lv) + '</i></button>';
   }
-  return h;
+  return h + extraActs(c);
+}
+/* покраска и продажа — один ряд; открытая палитра или «точно продать?» встают на его место */
+function extraActs (c) {
+  const cash = D.A.wallet(), money = D.A.money, pp = c.paintPrice || 0;
+  if (MODE === 'paint') {
+    const C = D.cars(), cur = String(c.hex || '').toLowerCase();
+    const sw = [{ hex: c.hexBase, name: t('заводской'), base: true }].concat((C && C.PAINTS) || []);
+    let first = true;
+    const btns = sw.filter((p, i) => !(i > 0 && String(p.hex).toLowerCase() === String(c.hexBase).toLowerCase())).map(p => {
+      const on = String(p.hex).toLowerCase() === cur, af = !on && first ? (first = false, ' autofocus') : '';
+      return '<button type="button" class="gr-sw' + (on ? ' on' : '') + (p.base ? ' base' : '') + '" data-a="paint" data-hex="' + esc(p.hex) + '" style="--c:' + esc(p.hex) + '"' +
+        ' title="' + esc(p.base ? p.name : t(p.name)) + '" aria-label="' + esc(p.base ? p.name : t(p.name)) + '"' + af + (on || cash < pp ? ' disabled' : '') + '></button>';
+    }).join('');
+    return '<div class="gr-paint"><div class="gr-paint-t"><span>' + esc(t('покраска · {money}', { money: money(pp) })) + '</span>' +
+      '<button type="button" class="gr-btn gr-x" data-a="close">' + esc(t('готово')) + '</button></div><div class="gr-sws">' + btns + '</div>' +
+      (cash < pp ? '<div class="gr-why">' + esc(t('не хватает {money}', { money: money(pp - cash) })) + '</div>' : '') + '</div>';
+  }
+  if (MODE === 'sell') {
+    return '<div class="gr-ask"><span>' + esc(t('продать «{name}» за {money}?', { name: c.name, money: money(c.sellPrice) })) + '</span>' +
+      '<div class="gr-row"><button type="button" class="gr-btn sell" data-a="sell">' + esc(t('да, продать')) + '</button>' +
+      '<button type="button" class="gr-btn" data-a="close" autofocus>' + esc(t('нет')) + '</button></div></div>';
+  }
+  const sellLbl = c.sellable ? t('продать · {money}', { money: money(c.sellPrice) }) : !c.price ? t('машину пиццерии не продать') : t('на ней на смене — не продать');
+  return '<div class="gr-row">' +
+    '<button type="button" class="gr-btn gr-paint-b" data-a="paintOpen">' + esc(t('покрасить · {money}', { money: money(pp) })) + '</button>' +
+    '<button type="button" class="gr-btn gr-sell-b" data-a="sellAsk"' + (c.sellable ? '' : ' disabled') + '>' + esc(sellLbl) + '</button></div>';
 }
 /* у соседей — те же места под кнопки, но без кнопок: высота карточек одна, геймпад их не видит */
 function ghostActs (c) {
@@ -182,8 +232,17 @@ function wire (card, c) {
   card.querySelectorAll('[data-a]').forEach(b => b.addEventListener('click', e => {
     e.stopPropagation();
     const a = b.dataset.a;
+    // открыть / закрыть палитру и «точно продать?» — без денег, просто перерисовать карточку
+    const to = { paintOpen: 'paint', sellAsk: 'sell', close: null }[a];
+    if (to !== undefined) {
+      MODE = to;
+      fill(card, c, true);
+      D.A.Snd.blip(to ? 660 : 440, 0.04, 'square', 0.05);
+      return;
+    }
     const oldP = statsOf(c).map(s => s.p);
-    const fn = a === 'buy' ? () => C.buy(c.id) : a === 'pick' ? () => C.select(c.id) : () => C.upgrade(c.id, a);
+    const fn = a === 'buy' ? () => C.buy(c.id) : a === 'pick' ? () => C.select(c.id)
+      : a === 'paint' ? () => C.paint(c.id, b.dataset.hex) : a === 'sell' ? () => C.sell(c.id) : () => C.upgrade(c.id, a);
     let r;
     try { r = fn(); } catch (err) { console.error('[garage]', err); r = false; }
     Promise.resolve(r).then(v => {
@@ -192,14 +251,15 @@ function wire (card, c) {
         card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
         D.A.Snd.blip(220, 0.12, 'square', 0.1);
         const w = card.querySelector('.gr-why');
-        const WHY = { money: t('не хватает денег'), stars: t('не хватает звёзд'), max: t('прокачано до упора') };
+        const WHY = { money: t('не хватает денег'), stars: t('не хватает звёзд'), max: t('прокачано до упора'), current: t('на ней на смене — не продать'), start: t('машину пиццерии не продать') };
         if (w && v && WHY[v.why]) w.textContent = WHY[v.why];
         return;
       }
       D.A.Store.flush();
       D.A.carChanged();
       D.A.Snd.coin();
-      PIC.delete(c.id);                       // броня и мотор видны на картинке
+      PIC.delete(c.id);                       // броня, мотор и цвет видны на картинке
+      if (a === 'sell') MODE = null;          // палитра остаётся открытой — можно перебрать цвета
       load();
       const nc = list[idx];
       render();
@@ -207,7 +267,8 @@ function wire (card, c) {
       if (a !== 'pick' && nCard) fill(nCard, nc, true, oldP);      // полоски доезжают до нового
       if (nCard) {
         nCard.classList.remove('pop'); void nCard.offsetWidth; nCard.classList.add('pop');
-        const gain = a === 'armor' ? '+1 ♥' : a === 'engine' ? '+' + Math.round(U.VMAX * 100) + ' %' : a === 'buy' ? '✓' : '';
+        const gain = a === 'armor' ? '+1 ♥' : a === 'engine' ? '+' + Math.round(U.VMAX * 100) + ' %' : a === 'buy' || a === 'paint' ? '✓'
+          : a === 'sell' ? '+' + D.A.money(v && v.price || 0) : '';
         if (gain) floatText(nCard, gain);
       }
       restartSpin();
@@ -224,13 +285,14 @@ function floatText (card, txt) {
 }
 
 /* ── листать ── */
-export function flip (d) { go(idx + d); }
+export function flip (d) { if (!TOUR.on()) go(idx + d); }
 function go (i) {
   i = Math.max(0, Math.min(list.length - 1, i));
   if (i === idx || !isOpen()) { if (isOpen() && i === idx) bump(); return; }
   const tr = el.querySelector('.gr-track');
   const was = idx;
   idx = i;
+  MODE = null;
   stopSpin();
   fill(tr.children[was], list[was], false);
   fill(tr.children[idx], list[idx], true);

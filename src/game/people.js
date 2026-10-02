@@ -325,7 +325,7 @@ const FURS = ['#5a4a3a', '#3a3036', '#6b5a48', '#8a7a68', '#2b2a30'];
 function wearOf (Lk, o) {
   const r = rng(Lk.seed ^ 0x5EA5011);
   const cold = WARM + (r() - 0.5) * 0.36 + (Lk.age === 'old' ? 0.08 : 0);
-  const lvl = WARM < 0.04 ? 0 : cold < 0.22 ? 0 : cold < 0.48 ? 1 : cold < 0.76 ? 2 : 3;
+  const lvl = o.summer || WARM < 0.04 ? 0 : cold < 0.22 ? 0 : cold < 0.48 ? 1 : cold < 0.76 ? 2 : 3;   // o.summer — одет по-летнему в любой сезон (nightlife.js)
   const coat = o.shirt || P(r, COATS), scarf = r() < 0.7 ? P(r, SCARVES) : null, fur = P(r, FURS);
   const hx = r();
   let head = null;
@@ -660,7 +660,7 @@ export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
     }
     return m;
   }
-  /* o: { fem, fat, h, skin, shirt, pants, cap, face: false — без лица (маска) } */
+  /* o: { fem, fat, h, skin, shirt, pants, cap, face: false — без лица (маска), summer — без зимней одежды } */
   HSET = HUMANS;
   /* та же фигура и лицо, одежда — по нынешнему сезону */
   REDRESS = g => {

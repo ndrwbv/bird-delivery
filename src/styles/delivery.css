@@ -593,8 +593,9 @@ body.brief #view { filter: blur(6px) brightness(0.72); transition: filter .25s; 
 @keyframes pf-angry { 0% { transform: translateX(-2px) rotate(-3deg); } 100% { transform: translateX(2px) rotate(3deg); } }
 @keyframes pf-vein { from { transform: scale(.85); } to { transform: scale(1.15); } }
 
-/* ── «Жека управляющий» (chat.js): сообщения как в iMessage — аватарка, имя, серый пузырь;
-   сначала три точки «печатает…», потом текст. Место и ширину ставит chat.js (под хадом справа). ── */
+/* ── «Толик управляющий» (chat.js): сообщения как в iMessage — аватарка, имя, серый пузырь;
+   сначала три точки «печатает…», потом текст — крупно по центру сверху, через 1,2—2 с уменьшается
+   на место. Место и ширину ставит chat.js (под хадом справа). ── */
 #chat { position: fixed; z-index: 11; display: flex; flex-direction: column; align-items: stretch; gap: 6px; pointer-events: none; }
 #chat .cm { display: flex; align-items: flex-end; gap: 6px; max-width: 100%; animation: cm-in .3s cubic-bezier(.2, .9, .3, 1.2) both; }
 #chat .cm.out { animation: cm-out .3s ease-in both; }
@@ -612,6 +613,12 @@ body.brief #view { filter: blur(6px) brightness(0.72); transition: filter .25s; 
 @keyframes cm-in { from { opacity: 0; transform: translateX(40px) scale(.9); } to { opacity: 1; transform: none; } }
 @keyframes cm-out { to { opacity: 0; transform: translateX(60px); } }
 @media (max-width: 560px) { #chat .cm-b p { font-size: 7px; padding: 6px 9px; } #chat .cm > img, #chat .cm > i { width: 22px; height: 22px; } }
+/* текст пришёл — строка крупно по центру сверху (chat.js grow/shrink: transform анимацией), поверх остальных */
+#chat .cm.big { z-index: 2; }
+#chat .cm.big .cm-b p { box-shadow: 0 4px 14px rgba(0, 0, 0, .45); }
+@keyframes cm-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cm-fade-out { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { #chat .cm { animation-name: cm-fade; } #chat .cm.out { animation-name: cm-fade-out; } }
 
 /* ── Москва: гайд по управлению — по пунктам, один раз за сессию ── */
 #guide {
@@ -1115,6 +1122,30 @@ body:has(#over:not([hidden])) .hud, body:has(#over:not([hidden])) #ctrls { visib
 .pm-ver { position: fixed; right: max(12px, env(safe-area-inset-right)); bottom: max(7px, env(safe-area-inset-bottom)); z-index: 5;
           font-size: 8px; line-height: 1; letter-spacing: .04em; color: #b9b4ab; opacity: .6; pointer-events: none; }
 .pm-ver:empty { display: none; }
+/* «отчёт об ошибке» — над версией, мелко; есть, только когда в журнале есть записи (docs/CRASHES.md) */
+#pm-crash { position: fixed; right: max(12px, env(safe-area-inset-right)); bottom: calc(max(7px, env(safe-area-inset-bottom)) + 14px); z-index: 5;
+            font: inherit; font-size: 10px; line-height: 1; padding: 5px 8px; cursor: pointer; color: #fff3d6; background: rgba(51, 33, 12, .55);
+            border: 1px solid rgba(255, 243, 214, .35); border-radius: 4px; opacity: .75; }
+#pm-crash:hover, #pm-crash.padsel { opacity: 1; }
+#pm-crash[hidden] { display: none; }
+#pm-crash-box { position: fixed; z-index: 6; left: 50%; top: 50%; transform: translate(-50%, -50%); box-sizing: border-box;
+                width: min(calc(100vw - 32px), 640px); max-height: calc(100vh - 32px); display: flex; flex-direction: column; gap: 8px;
+                padding: 14px 16px; background: #fff3d6; color: #33210c; border: 3px solid #33210c; border-radius: 6px;
+                box-shadow: 0 6px 0 #33210c, 0 10px 30px rgba(0, 0, 0, .5); font-size: 12px; }
+#pm-crash-box[hidden] { display: none; }
+#pm-crash-box .pc-t { font-size: 14px; color: #8a3b22; }
+#pm-crash-box .pc-list { margin: 0; flex: 1 1 auto; min-height: 60px; max-height: 50vh; overflow: auto; white-space: pre-wrap; word-break: break-word;
+                         font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace; background: rgba(51, 33, 12, .06); padding: 8px; }
+#pm-crash-box .pc-path { font: 10px/1.3 ui-monospace, Menlo, Consolas, monospace; color: #5a4026; word-break: break-all; }
+#pm-crash-box .pc-path:empty { display: none; }
+#pm-crash-box .pc-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+#pm-crash-box .pc-btns button { font: inherit; font-size: 12px; padding: 7px 10px; cursor: pointer; color: #33210c; background: #ffd85e;
+                                border: 2px solid #33210c; border-radius: 4px; }
+#pm-crash-box .pc-btns button[hidden] { display: none; }
+/* плашка журнала до загрузки игры (потом — обычный тост игры) */
+#crash-toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 60; padding: 6px 12px; font-size: 12px;
+               color: #fff3d6; background: rgba(12, 18, 40, .8); border-radius: 4px; opacity: 0; transition: opacity .3s; pointer-events: none; }
+#crash-toast.on { opacity: 1; }
 /* широкий экран: колонка заставки узкая по центру — версия в правом нижнем углу, видна без прокрутки */
 @media (min-width: 900px) { #build-v { position: fixed; right: 12px; bottom: 7px; margin: 0; font-size: 8px; } }
 
