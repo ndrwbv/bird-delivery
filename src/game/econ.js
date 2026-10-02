@@ -295,10 +295,24 @@ export const CLIENT_KILL = { FINE: 1, END_SHIFT: false };
 export const CLIENT_HIT = { SOFT: 3, HARD: 12 };
 
 /* ── выбил КОНКУРЕНТА: машина курьера чужой сети («Вселенная суши», «Королева Бургеров»)
-   сгорела, а за HIT_S секунд до этого в неё въехал ты — +PAY (ровно «косарь», уже в деньгах ×8)
-   в кошелёк и в «за смену», кучкой денег и чеком. Один раз за смену с каждого (сгорел снова —
-   уже без денег). Вне карьеры (Яндекс) — PAY / MONEY_K, как прочие суммы. ── */
-export const RIVAL_KO = { PAY: 1000, HIT_S: 8 };
+   сгорела, а за HIT_S секунд до этого в неё въехал ты — из его сумки разлетаются деньги:
+   BILLS (4—8) купюр на CASH (600—1 500 ₽ вместе, круглыми по 50 ₽, уже в деньгах ×8) ложатся
+   вокруг горящей машины в 3,5—9 м. Проехал сквозь купюру — она твоя (в кошелёк и в «за смену»),
+   не собрал за LIFE (25 с) — пропала (последние 5 с мигает). Плоского «косаря» больше нет:
+   02.10.2026 было +1 000 ₽ сразу, теперь в среднем столько же (≈1 050 ₽), но надо собрать.
+   Один раз за смену с каждого (сгорел снова — уже без денег). Вне карьеры (Яндекс) —
+   CASH / MONEY_K, как прочие суммы. ── */
+export const RIVAL_KO = { CASH: [600, 1500], BILLS: [4, 8], LIFE: 25, R: [3.5, 9], HIT_S: 8 };
+/* разложить сумму выбитого конкурента на купюры: → [суммы], в сумме — total (круглые по step) */
+export function rivalBills (k = 1, rnd = Math.random) {
+  const [a, b] = RIVAL_KO.CASH, step = k > 1 ? 10 : 50;
+  const total = Math.max(step * 2, Math.round((a + rnd() * (b - a)) / k / step) * step);
+  const n = Math.min(Math.floor(total / step), RIVAL_KO.BILLS[0] + Math.floor(rnd() * (RIVAL_KO.BILLS[1] - RIVAL_KO.BILLS[0] + 1)));
+  const w = Array.from({ length: n }, () => 0.5 + rnd()), ws = w.reduce((s, v) => s + v, 0);
+  const out = w.map(v => Math.max(step, Math.floor(total * v / ws / step) * step));
+  out[0] += total - out.reduce((s, v) => s + v, 0);
+  return out;
+}
 /* ── выбил СВОЕГО (коллегу из твоей пиццерии) — штраф FINE из кошелька, каждый раз.
    Позже (docs/IDEAS.md, блок 9) вместо денег — минус респект: см. colleagueKO в game.js. ── */
 export const COLLEAGUE_KO = { FINE: 1000 };

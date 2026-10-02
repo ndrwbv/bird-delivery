@@ -308,6 +308,7 @@
  "маркетолог": "marketolog",
  "Матрасик": "Matrascha",
  "машин всмятку": "pachoq mashinalar",
+ "остановок снесено": "buzilgan bekatlar",
  "машина всё": "mashina tamom",
  "машина разбита — кончились сердца": "mashina majaqlandi — yuraklar tugadi",
  "машина ушла под воду — вплавь не довезёшь": "mashina suvga choʻkdi — suzib yetkazolmaysan",
@@ -1319,5 +1320,9 @@
  "водитель обиделся — гонится за тобой!": "haydovchi jahli chiqdi — seni quvyapti!",
  "оторвался от погони": "quvgʻindan qutulding",
  "оторвался!": "qutulding!",
- "водитель отстал": "haydovchi ortda qoldi"
+ "водитель отстал": "haydovchi ortda qoldi",
+ "лось на дороге!": "yoʻlda los!",
+ "врезался в лося — он тяжёлый, как машина": "losga urilding — u mashinadek ogʻir",
+ "из сумки «{brand}» разлетелись деньги — собирай!": "«{brand}» sumkasidan pul sochildi — yigʻ!",
+ "из сумки конкурента: +{money}": "raqib sumkasidan: +{money}"
 }

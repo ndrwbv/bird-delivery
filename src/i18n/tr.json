@@ -308,6 +308,7 @@
  "маркетолог": "pazarlamacı",
  "Матрасик": "Şiltecik",
  "машин всмятку": "hurdaya dönen araba",
+ "остановок снесено": "yıkılan duraklar",
  "машина всё": "araba bitti",
  "машина разбита — кончились сердца": "araba hurda — kalpler bitti",
  "машина ушла под воду — вплавь не довезёшь": "araba suya gömüldü — yüzerek teslimat olmaz",
@@ -1319,5 +1320,9 @@
  "водитель обиделся — гонится за тобой!": "sürücü kızdı — peşinde!",
  "оторвался от погони": "takipçiyi atlattın",
  "оторвался!": "atlattın!",
- "водитель отстал": "sürücü vazgeçti"
+ "водитель отстал": "sürücü vazgeçti",
+ "лось на дороге!": "yolda geyik var!",
+ "врезался в лося — он тяжёлый, как машина": "geyiğe çarptın — araba kadar ağır",
+ "из сумки «{brand}» разлетелись деньги — собирай!": "{brand} çantasından para saçıldı — topla!",
+ "из сумки конкурента: +{money}": "rakibin çantasından: +{money}"
 }

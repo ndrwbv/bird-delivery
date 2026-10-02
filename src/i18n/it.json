@@ -309,6 +309,7 @@
  "маркетолог": "marketer",
  "Матрасик": "Materassino",
  "машин всмятку": "auto sfasciate",
+ "остановок снесено": "pensiline distrutte",
  "машина всё": "auto distrutta",
  "машина разбита — кончились сердца": "auto distrutta — cuori finiti",
  "машина ушла под воду — вплавь не довезёшь": "l'auto è finita sott'acqua — a nuoto non si consegna",
@@ -1336,5 +1337,9 @@
  "водитель обиделся — гонится за тобой!": "l’autista si è arrabbiato — ti insegue!",
  "оторвался от погони": "inseguitore seminato",
  "оторвался!": "seminato!",
- "водитель отстал": "l’autista ha mollato"
+ "водитель отстал": "l’autista ha mollato",
+ "лось на дороге!": "alce sulla strada!",
+ "врезался в лося — он тяжёлый, как машина": "hai preso un alce — pesa come un’auto",
+ "из сумки «{brand}» разлетелись деньги — собирай!": "i soldi sono volati fuori dalla borsa di {brand} — raccoglili!",
+ "из сумки конкурента: +{money}": "dalla borsa del rivale: +{money}"
 }

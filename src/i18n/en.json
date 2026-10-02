@@ -331,6 +331,7 @@
  "маркетолог": "marketer",
  "Матрасик": "Mattressy",
  "машин всмятку": "cars wrecked",
+ "остановок снесено": "bus stops wrecked",
  "машина всё": "car's toast",
  "машина разбита — кончились сердца": "car's totaled — out of hearts",
  "машина ушла под воду — вплавь не довезёшь": "car sank — can't swim a pizza over",
@@ -1319,5 +1320,9 @@
  "водитель обиделся — гонится за тобой!": "the driver is mad — he’s chasing you!",
  "оторвался от погони": "lost the chaser",
  "оторвался!": "lost him!",
- "водитель отстал": "the driver gave up"
+ "водитель отстал": "the driver gave up",
+ "лось на дороге!": "moose on the road!",
+ "врезался в лося — он тяжёлый, как машина": "you hit a moose — it’s as heavy as a car",
+ "из сумки «{brand}» разлетелись деньги — собирай!": "cash flew out of the {brand} bag — grab it!",
+ "из сумки конкурента: +{money}": "from the rival’s bag: +{money}"
 }

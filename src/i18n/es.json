@@ -309,6 +309,7 @@
  "маркетолог": "marketer",
  "Матрасик": "Colchoncito",
  "машин всмятку": "coches destrozados",
+ "остановок снесено": "paradas destrozadas",
  "машина всё": "coche KO",
  "машина разбита — кончились сердца": "coche destrozado: sin corazones",
  "машина ушла под воду — вплавь не довезёшь": "coche al agua: a nado no se reparte",
@@ -1336,5 +1337,9 @@
  "водитель обиделся — гонится за тобой!": "¡el conductor se enfadó y te persigue!",
  "оторвался от погони": "despistaste al perseguidor",
  "оторвался!": "¡lo perdiste!",
- "водитель отстал": "el conductor se rindió"
+ "водитель отстал": "el conductor se rindió",
+ "лось на дороге!": "¡alce en la carretera!",
+ "врезался в лося — он тяжёлый, как машина": "chocaste con un alce — pesa como un coche",
+ "из сумки «{brand}» разлетелись деньги — собирай!": "¡el dinero salió volando de la bolsa de {brand}, recógelo!",
+ "из сумки конкурента: +{money}": "de la bolsa del rival: +{money}"
 }

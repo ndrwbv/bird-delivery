@@ -30,8 +30,10 @@ import * as MAPW from './mapworks.js';
 import * as CBITS from './citybits.js';
 import * as SEAS from './seasons.js';
 import * as LIFE from './life.js';               // парочки, богачи, графитисты, змеи и дроны в парках
-import * as WORLD from './world.js';             // плитка, аллеи; в карьере — мусор, бандиты, особняки, шашлыки
+import * as WORLD from './world.js';
+import * as JUNK from './junk.js';              // остановки ломаются, мусор у подъездов, контейнеры (junk.js)             // плитка, аллеи; в карьере — мусор, бандиты, особняки, шашлыки
 import * as MAFIA from './mafia.js';             // мафиози у адреса: предупреждает, потом стреляет (детская — кидается помидорами)
+import * as FAUNA from './fauna.js';             // лоси, лисы и зайцы в лесах; «лось на дороге!» (fauna.js)
 import * as RL from './roadlife.js';
 import * as PZ from './pizzeria.js';
 import * as LM from './landmarks.js';            // заправки и каток
@@ -47,6 +49,7 @@ import * as HK from './hookah.js';               // кальянщики на л
 import * as CULL from './cull.js';               // статика дальше камеры — со сцены, матрицы заморожены (Steam Deck)
 import * as TRK from './tracks.js';              // следы колёс на газоне и снегу
 import * as CHAT from './chat.js';             // «Жека управляющий» пишет справа сверху, как в iMessage (похвала, ругань, вычет за опоздание)
+import * as HITS from './hits.js';               // сила удара по людям: упал и встал / лежит в луже / разорвало; самокат отдельно
 import * as FIRST from './intro.js';             // вступление первого запуска: пиццерия, Степан, машина (катсцена «как в ГТА»)
 
 /* Сохранения — через площадку (облако Яндекса / localStorage). Значения
@@ -1581,6 +1584,7 @@ function smashBuild () {
 /* снести: вершины — в точку у земли, вместо вещи — обломки */
 function smashHit (it, nx, nz, force, quiet) {
   if (it.down) return;
+  if (it.junk) return it.junk(it, nx, nz, force, quiet);   // остановка, мусор, контейнер — по-своему (junk.js)
   it.down = 1;
   const pos = it.mesh.geometry.attributes.position, a = pos.array, gy = groundH(it.x, it.z);
   for (let i = it.v0; i < it.v0 + it.nv; i++) { a[i * 3] = it.x; a[i * 3 + 1] = gy - 1; a[i * 3 + 2] = it.z; }
@@ -1711,11 +1715,7 @@ function osmYardBits () {
       if (inHouse(bx, bz, 1) || !inBounds(bx, bz, -30)) continue;
       const near = nearestRoad(bx, bz, 7, 1);
       if (near && near.d < near.seg.w / 2 + 1) continue;
-      const gy = groundH(bx, bz), g = [], ry = Math.atan2(nx, nz);
-      put(g, new THREE.BoxGeometry(1.5, 1.1, 1.0), '#3f7a4a', bx, gy + 0.62, bz, 0, ry, 0);
-      put(g, new THREE.BoxGeometry(1.56, 0.1, 1.06), '#2f5a38', bx, gy + 1.22, bz, 0, ry, 0);
-      for (const o of [-0.55, 0.55]) put(g, new THREE.CylinderGeometry(0.1, 0.1, 0.1, 6), '#1b1a1f', bx + Math.cos(ry) * o, gy + 0.06, bz - Math.sin(ry) * o, 1.57, 0, 0);
-      smashAdd('dump', bx, bz, 0.95, g, '#3f7a4a');
+      JUNK.can(bx, bz, Math.atan2(nx, nz), 0);              // тяжёлый контейнер (junk.js): толкается, опрокидывается
     }
   }
 }
@@ -2918,16 +2918,10 @@ function osmStreetLife () {
     const ry = Math.atan2(dx / l, dz / l);
     const py = groundH(px, pz);
     if (road.seg.b) continue;
-    box(LIT, 4.4, 0.25, 2.2, '#e8e2d6', px, py + 2.7, pz, ry);
-    // задняя стенка — со стороны домов: ждут лицом к дороге
-    box(LIT, 4.4, 3.0, 0.2, '#4f7fd6', px + Math.sin(ry) * 0.9, py + 1.1, pz + Math.cos(ry) * 0.9, ry);
     if (road.seg.g) box(LIT, 5.2, 0.12, 3.0, '#e3ded4', px, py + CURB_H, pz, ry);      // площадка на газоне бульвара
-    box(LIT, 0.2, 3.2, 0.2, '#585460', px + Math.cos(ry) * 2.1, py + 1.1, pz - Math.sin(ry) * 2.1, ry);
-    box(LIT, 0.2, 3.2, 0.2, '#585460', px - Math.cos(ry) * 2.1, py + 1.1, pz + Math.sin(ry) * 2.1, ry);
-    // препятствие — по стенке и стойкам (4,4 × 1,1 м), крыша на 2,7 м машину не держит.
-    // obb считает угол от оси x (atan2(z, x)), а three.js крутит наоборот — поэтому −ry:
-    // с ry коробка 4,6 × 2,4 м стояла поперёк будки на косых улицах
-    obb(px + Math.sin(ry) * 0.45, pz + Math.cos(ry) * 0.45, 2.2, 0.55, -ry);
+    // будка (крыша, стеклянная задняя стенка — со стороны домов, стойки, лавочка) и её препятствие 4,4 × 1,1 м —
+    // в junk.js: на скорости ломается
+    JUNK.stop(px, py, pz, ry);
   }
 
   // парковки из карты: шлагбаум вешается на въезд ближайшей
@@ -3639,6 +3633,12 @@ const worldApi = () => ({
   get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get fenceAt () { return RL.RL.fenceAt; },
 });
 let WORLD_API = null;
+/* что нужно junk.js (остановки, мусор у подъездов, контейнеры) */
+const junkApi = () => ({
+  scene, CITY, V, S, CAREER, LIT, SMASH, GORE, put, box, boxGeo, geoScaled, mergeGeos, smashAdd, obb,
+  groundH, curbAt, inHouse, inBounds, nearestRoad, pushOut, sparks, puff, Snd, donated, hurt: hurtCar,
+  get PIZZA () { return PIZZA; },
+});
 /* что нужно mafia.js (мафиози у адреса) */
 const mafiaApi = () => ({
   V, S, scene, CAREER, ADULT, makeHuman, dropMesh, gibHuman, sayBubble, groundH, curbAt, inHouse, inBounds, pushOut, sparks, puff, toast, Snd,
@@ -3649,6 +3649,12 @@ const mafiaApi = () => ({
   reward: (n, title) => { const v = CAREER ? n : Math.round(n / ECON.MONEY_K); S.money += v; if (!S.freeRun) addWallet(v); popBonus(title, '+' + money(v)); },
 });
 let MAFIA_API = null;
+/* что нужно fauna.js (лоси, лисы, зайцы в лесах) */
+const faunaApi = () => ({
+  V, S, scene, cam, CITY, CAR_L, CAR_W, groundH, inPoly, inHouse, inBounds, nearestRoad, toast, emote, Snd,
+  hurt: (n, vn, x, z) => hurtCar(n, vn, x, z),
+});
+let FAUNA_API = null;
 const landApi = () => ({ ...cityApi(), inHouse, makePerson });
 let RINK = null;                                  // каток с катающимися (landmarks.js), если он есть в карте
 
@@ -3674,7 +3680,7 @@ function buildCity () {
 
   const tm = (k, f) => { const t0 = performance.now(); f(); BUILD_T[k] = Math.round(performance.now() - t0); };
   tm('world', () => WORLD.build(worldApi()));     // аллеи; в карьере — газоны особняков, мусор, гаражи (world.js) — до деревьев и лавочек
-  tm('life', osmStreetLife);
+  tm('life', () => { JUNK.init(junkApi()); osmStreetLife(); });
   tm('entr', osmEntrances);
   tm('signs', osmSigns);
   tm('gates', osmGates);
@@ -3689,7 +3695,7 @@ function buildCity () {
   });
   tm('roadlife', () => RL.build(roadApi()));      // знаки и заборы (roadlife.js) — до smashBuild
   if (CAREER) tm('cars', () => { BUILD_T.carsInfo = AUTO.build(); });   // ямы в статику дорог, гараж Дяди Жени (cars.js)
-  tm('yard', () => { osmPitches(); osmYardBits(); osmVerandas(); SEAS.seasonYard(); smashBuild(); });
+  tm('yard', () => { osmPitches(); osmYardBits(); if (!INTRO) JUNK.yard(); osmVerandas(); SEAS.seasonYard(); smashBuild(); });
   tm('seasons', SEAS.seasonBuild);                // сугробы, ёлки, гирлянды
 
   const tq = performance.now();
@@ -4098,18 +4104,18 @@ function blastAt (x, z, r) {
     S.burgers++;
   }
   for (const p of SCOOTS) {
-    if (!p.dead && Math.hypot(p.x - x, p.z - z) < r) runOverScoot(p, p.x - x, p.z - z);
+    if (!p.dead && Math.hypot(p.x - x, p.z - z) < r) runOverScoot(p, p.x - x, p.z - z, null, 100);
   }
   smashNear(x, z, it => { const d = Math.hypot(it.x - x, it.z - z); if (d < r) smashHit(it, (it.x - x) / (d || 1), (it.z - z) / (d || 1), 20, true); });
   for (const p of SMOKERS) {
     if (p.dead || Math.hypot(p.x - x, p.z - z) > r) continue;
     p.dead = 1; p.deadT = rand(25, 40); p.grp.visible = false;
-    gibHuman(p, p.x - x, p.z - z);
+    gibHuman(p, p.x - x, p.z - z, 100);
     S.people++;
   }
   for (const d of DRIVERS) {
     if (d.dead || Math.hypot(d.x - x, d.z - z) > r) continue;
-    gibHuman(d, d.x - x, d.z - z);
+    gibHuman(d, d.x - x, d.z - z, 100);
     dropMesh(d.grp); d.gone = 1; d.dead = 1;
   }
   for (const t of TRAFFIC) {
@@ -4949,17 +4955,20 @@ function updateScoots (dt) {
   }
 }
 
-/* сбил самокатчика: самокат летит отдельно, человек — как все */
-function runOverScoot (p, vx, vz, by) {
+/* сбил самокатчика: самокат кувыркается и лежит отдельно (HITS.wreck), человек слетает
+   и дальше как все (HITS.hit). Медленнее HITS.TIER.FALL — свалился, встал, ушёл: не считается.
+   kmh — для взрыва (там vx/vz — направление, а не скорость) */
+function runOverScoot (p, vx, vz, by, kmh) {
   p.dead = 1; p.deadT = rand(14, 22);
+  const u = p.grp.userData;
+  if (kmh == null) kmh = HITS.kmhOf(vx, vz);
+  const up = HITS.isFall(kmh);
+  if (u.scoot) { HITS.wreck(u.scoot, vx, vz); u.scoot = null; }
   p.grp.visible = false;
-  gibHuman(p, vx, vz);
-  const pass = p.grp.userData.pass;
-  if (pass) gibHuman({ x: p.x - Math.sin(p.grp.rotation.y) * 0.5, z: p.z - Math.cos(p.grp.rotation.y) * 0.5, grp: pass }, vx, vz);
-  const m = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.1, 1.05), propMat(p.grp.userData.deck));
-  m.position.set(p.x, groundH(p.x, p.z) + 0.6, p.z);
-  scene.add(m);
-  GORE.push({ m, vx: vx * 0.6 + rand(-3, 3), vy: rand(4, 8), vz: vz * 0.6 + rand(-3, 3), spin: rand(-14, 14), life: 18, bleed: 1e9, rest: 0 });
+  HITS.hit(p, vx, vz, kmh, { up, y0: 0.16 });
+  const pass = u.pass;
+  if (pass) HITS.hit({ x: p.x - Math.sin(p.grp.rotation.y) * 0.5, z: p.z - Math.cos(p.grp.rotation.y) * 0.5, grp: pass }, vx, vz, kmh, { up, y0: 0.16 });
+  if (up) { Snd.noise(0.15, 0.22); return; }
   Snd.squish();
   if (by) return;
   S.scoots += pass ? 2 : 1;
@@ -5357,7 +5366,7 @@ function updatePeople (dt) {
   for (const p of PEOPLE) {
     if (p.dead) {
       if ((p.deadT -= dt) <= 0) {
-        p.dead = 0; p.fly = null;
+        p.dead = 0; p.fly = null; p.fall = null;
         dropMesh(p.grp);                      // возвращается уже другим человеком
         p.person = nextPerson();
         p.grp = makeHuman(p.person);
@@ -5370,6 +5379,7 @@ function updatePeople (dt) {
       }
       continue;
     }
+    if (p.fall && HITS.fallStep(p, dt)) continue;   // упал от лёгкого удара — лежит и встаёт
     if (p.guest) { guestStep(p, dt); if (p.shock > 0) shockStep(p, dt); continue; }
     if (p.after) { afterStep(p, dt); continue; }
     if (p.panic) { panicStep(p, dt); continue; }
@@ -5473,8 +5483,12 @@ function panicStep (p, dt) {
    растёт лужа, поэтому место наезда видно ещё долго. */
 const GORE = [];
 
-function gibHuman (p, vx, vz) {
-  if (!GORE_ON) { knockHuman(p, vx, vz); return; }
+/* сбит: что будет — решает скорость удара (hits.js TIER, docs/CONTENT.md «Сила удара»);
+   kmh — если удар не от машины (взрыв): тогда скорость не из vx/vz */
+function gibHuman (p, vx, vz, kmh) { HITS.hit(p, vx, vz, kmh); }
+
+/* взрослая, быстрее HITS.TIER.BURST: разрывает на куски */
+function burstHuman (p, vx, vz) {
   const c = p.grp.userData.colors;
   const parts = [
     [0.3, 0.32, 0.28, c.skin], [0.44, 0.6, 0.26, c.shirt],
@@ -5495,31 +5509,6 @@ function gibHuman (p, vx, vz) {
   }
   blood(p.x, 1, p.z, 16);
   decal(p.x, p.z, 0x8f1f2b, 1.9, 60);
-  scare(p.x, p.z);
-  callAmbulance(p.x, p.z);
-}
-
-/* Мягкий режим (без крови): человек целиком отлетает, как тряпичная
-   кукла, падает плашмя, над ним кружат звёздочки, потом исчезает с
-   облачком пыли. Одним склеенным мешем — телом из тех же цветов */
-function knockHuman (p, vx, vz) {
-  const c = p.grp.userData.colors, parts = [];
-  box(parts, 0.16, 0.7, 0.16, c.pants, -0.12, 0.35, 0); box(parts, 0.16, 0.7, 0.16, c.pants, 0.12, 0.35, 0);
-  box(parts, 0.44, 0.6, 0.26, c.shirt, 0, 1.0, 0);
-  box(parts, 0.13, 0.55, 0.13, c.shirt, -0.3, 1.25, 0); box(parts, 0.13, 0.55, 0.13, c.shirt, 0.3, 1.25, 0);
-  box(parts, 0.5, 0.5, 0.3, c.skin, 0, 1.58, 0);
-  if (c.hair) box(parts, 0.54, 0.14, 0.34, c.hair, 0, 1.86, 0);
-  const g = mergeGeos(parts);
-  g.translate(0, -0.95, 0);                          // вращается вокруг пояса
-  const m = new THREE.Mesh(g, HUMAN_VC);
-  const floor = groundH(p.x, p.z);
-  m.position.set(p.x, floor + 1.1, p.z);
-  m.rotation.y = p.grp.rotation.y;
-  scene.add(m);
-  GORE.push({ m, vx: vx * 0.45 + rand(-2, 2), vy: rand(4, 7), vz: vz * 0.45 + rand(-2, 2),
-    spin: rand(-9, 9), life: rand(7, 10), bleed: 1e9, rest: 0, soft: true, starT: 0 });
-  for (let i = 0; i < 4; i++) puff(p.x + rand(-0.5, 0.5), 0.4, p.z + rand(-0.5, 0.5), false, rand(0.4, 0.7));
-  emote(p.x, 2.2, p.z, 'star', 4);
   scare(p.x, p.z);
   callAmbulance(p.x, p.z);
 }
@@ -5564,7 +5553,7 @@ function runOver (p, vx, vz) {
   const victim = p.person;
   const wasTarget = checkVictim(p);
   p.dead = 1; p.deadT = rand(18, 26);
-  p.fly = null;
+  p.fly = null; p.fall = null;
   p.grp.visible = false;
   gibHuman(p, vx, vz);
   S.people++;
@@ -6869,7 +6858,7 @@ function updateAmb (dt) {
    «Вселенная суши» и «Королева Бургеров» (docs/IDEAS.md, блок 9). Ездят по
    району со своими заказами, в рейтинге их нет, без шашки пиццы на крыше,
    над машиной — табличка сети. Изредка бодают тебя: ты впереди в 6—28 м
-   почти по их курсу, между таранами 35—60 с. Выбил — ECON.RIVAL_KO, косарь. */
+   почти по их курсу, между таранами 35—60 с. Выбил — ECON.RIVAL_KO: из сумки разлетаются купюры (rivalSpill). */
 const RIVAL_SPEC = [
   // обычный трафик едет 9–14 м/с, такси до 17: курьеры — заметно злее
   // и людей не пропускает никто: кто не отскочил — тот под колёсами
@@ -6961,12 +6950,10 @@ function rivalSpawn (R, delay) {
     const mine = !S.freeRun && t.pHitT !== undefined && tG - t.pHitT < ECON.RIVAL_KO.HIT_S;
     const near = Math.hypot(t.x - V.x, t.z - V.z) < 200;
     if (mine && R.foe && !R.ko) {
-      // конкурент (econ.js RIVAL_KO): косарь в кошелёк и в «за смену», раз за смену с каждого
+      // конкурент (econ.js RIVAL_KO): из сумки разлетаются купюры — собери за 25 с; раз за смену с каждого
       R.ko = 1;
-      const pay = CAREER ? ECON.RIVAL_KO.PAY : Math.round(ECON.RIVAL_KO.PAY / ECON.MONEY_K);
-      S.money += pay;
-      addWallet(pay);
-      popPay(pay, [[$t('выбил курьера «{brand}»', { brand: $t(R.spec.brand) }), pay, '']], $t('выбил конкурента!'));
+      rivalSpill(t.x, t.z);
+      popBonus($t('выбил конкурента!'), $t('из сумки «{brand}» разлетелись деньги — собирай!', { brand: $t(R.spec.brand) }));
     } else if (mine && !R.foe) colleagueKO(R);
     else if (R.foe) { if (near) popBonus($t('курьер «{brand}» сгорел', { brand: $t(R.spec.brand) }), mine ? $t('с этого уже получил — без денег') : $t('не от твоего удара — без денег')); }
     else if (near) popBonus($t('{who} вычеркнут', { who: R.name }), $t('из смены на минуту — сгорел вместе с заказом'));
@@ -7848,7 +7835,7 @@ function takePickup (n) {
     Snd.coin(); setTimeout(() => Snd.coin(), 110);
     if (n.stash) setTimeout(() => Snd.coin(), 220);
     emote(n.x, 1.6, n.z, 'star', n.stash ? 6 : 3);
-    toast(n.stash ? $t('заначка! +{money}', { money: money(n.amount) }) : $t('деньги на асфальте: +{money}', { money: money(n.amount) }));
+    toast(n.stash ? $t('заначка! +{money}', { money: money(n.amount) }) : n.spill ? $t('из сумки конкурента: +{money}', { money: money(n.amount) }) : $t('деньги на асфальте: +{money}', { money: money(n.amount) }));
   } else if (n.kind === 'life') {
     // лишнее сердце (ECON.EXTRA_LIFE): полные — ещё одна ячейка до конца смены, побита — +1 сердце
     XLIFE.taken = true;
@@ -7904,7 +7891,7 @@ function streetLoot (dt, live) {
   const C = ECON.STREET_CASH;
   if ((LOOT.t -= dt) <= 0) {
     LOOT.t = rand(C.RESPAWN[0], C.RESPAWN[1]);
-    if (LOOT.n < C.PER_SHIFT && NITRO_CANS.filter(o => o.kind === 'cash').length < C.ON) {
+    if (LOOT.n < C.PER_SHIFT && NITRO_CANS.filter(o => o.kind === 'cash' && !o.spill).length < C.ON) {
       const p = offRoadSpot(C.R[0], C.R[1], false);
       if (p) {
         const v = ECON.streetCash(CAREER ? 1 : ECON.MONEY_K, Math.random, !LOOT.stash);
@@ -7920,6 +7907,24 @@ function streetLoot (dt, live) {
     const p = offRoadSpot(E.R[0], E.R[1], true);
     if (p) { addPickup('life', p[0], p[1], false, { keep: true }); XLIFE.at = -1; toast($t('впереди во дворе блестит золотое сердце')); }
   }
+}
+/* выбил конкурента (ECON.RIVAL_KO): купюры вылетают из горящей машины и ложатся вокруг в R
+   метрах; подбираются, как деньги на улице, только приземлившись; через LIFE секунд пропадают */
+function rivalSpill (x, z) {
+  const C = ECON.RIVAL_KO, k = CAREER ? 1 : ECON.MONEY_K;
+  const bills = ECON.rivalBills(k);
+  bills.forEach((amount, i) => {
+    let px = x, pz = z;
+    for (let tr = 0; tr < 8; tr++) {
+      const a = i / bills.length * Math.PI * 2 + rand(-0.4, 0.4), d = rand(C.R[0], C.R[1]) * (tr < 5 ? 1 : 0.6);
+      px = x + Math.sin(a) * d; pz = z + Math.cos(a) * d;
+      if (!inHouse(px, pz, 0.8)) break;
+    }
+    const n = addPickup('cash', px, pz, false, { amount, spill: true, life: C.LIFE, far: 600, art: amount < 200 / k ? 'coin' : 'bill' });
+    n.fly = { x0: x, z0: z, y0: n.y + 1.2, t: -i * 0.05, dur: rand(0.6, 0.95), up: rand(3, 5.5) };
+    n.g.position.set(x, n.y + 1.2, z);
+  });
+  Snd.coin(); setTimeout(() => Snd.coin(), 90); setTimeout(() => Snd.coin(), 180);
 }
 /* начало смены: купюры и сердце прошлой — убрать, счёт заново; сердце в эту смену — с шансом EXTRA_LIFE.CHANCE */
 function lootReset () {
@@ -7951,9 +7956,21 @@ function updateNitro (dt) {
     if (n.t > 0) n.t -= dt;
     // временный стаканчик, от которого уехали, исчезает (лишнее сердце — нет, деньги — дальше STREET_CASH.FAR)
     if (!n.fixed && !n.keep && Math.hypot(n.x - V.x, n.z - V.z) > (n.far || 420)) { dropPickup(n); NITRO_CANS.splice(i, 1); continue; }
+    // купюры выбитого конкурента (rivalSpill): живут RIVAL_KO.LIFE секунд, последние 5 — мигают
+    if (n.life !== undefined && (n.life -= dt) <= 0) { dropPickup(n); NITRO_CANS.splice(i, 1); continue; }
     const near = Math.abs(n.x - V.x) < 460 && Math.abs(n.z - V.z) < 460;
-    n.g.visible = n.t <= 0 && near;
-    if (!n.g.visible) continue;
+    n.g.visible = n.t <= 0 && near && !(n.life < 5 && Math.floor(n.life * 6) % 2);
+    if (n.fly) {
+      // летит из сумки: дуга от машины к месту, где ляжет; поймать можно только на земле
+      const f = n.fly;
+      f.t += dt;
+      const p = clamp(f.t / f.dur, 0, 1);
+      n.g.position.set(lerp(f.x0, n.x, p), lerp(f.y0, n.y, p) + 4 * f.up * p * (1 - p), lerp(f.z0, n.z, p));
+      n.body.rotation.y += dt * 9;
+      if (p >= 1) { n.fly = null; n.g.position.set(n.x, n.y, n.z); }
+      continue;
+    }
+    if (!n.g.visible && !(n.life < 5)) continue;
     n.ph += dt;
     n.body.rotation.y += dt * 2.2;
     n.body.position.y = (n.kind === 'cash' ? 0.95 : 1.6) + Math.sin(n.ph * 2.4) * (n.kind === 'cash' ? 0.12 : 0.25);
@@ -8835,6 +8852,8 @@ function driveStep (dt) {
       // от перил выталкиваем только вбок, не вдоль
       if (px < pz && !s.rail) { const sg = lx < 0 ? -1 : 1; nx = sg * s.cs; nz = sg * s.sn; pen = px; }
       else { const sg = lz < 0 ? -1 : 1; nx = -sg * s.sn; nz = sg * s.cs; pen = pz; }
+      // остановка: на скорости ломается и не держит (junk.js)
+      if (s.stop && JUNK.stopHit(s, -(V.vx * nx + V.vz * nz), V.vx / (Math.hypot(V.vx, V.vz) || 1), V.vz / (Math.hypot(V.vx, V.vz) || 1), Math.hypot(V.vx, V.vz))) break;
       // стекло веранды: на скорости бьётся и не держит
       if (s.veranda && -(V.vx * nx + V.vz * nz) > 6) {
         const l = Math.hypot(V.vx, V.vz) || 1;
@@ -8937,12 +8956,15 @@ function driveStep (dt) {
   if (Math.abs(vf) > 2.5) {
     const l = Math.hypot(V.vx, V.vz) || 1;
     smashNear(V.x, V.z, it => {
+      if (it.heavy) return;                       // остановки и контейнеры — ниже и в стенах (junk.js)
       if (Math.hypot(it.x - noseX, it.z - noseZ) < it.r + CAR_W || Math.hypot(it.x - tailX, it.z - tailZ) < it.r + CAR_W) {
         smashHit(it, V.vx / l, V.vz / l, Math.abs(vf));
         const k = it.kind === 'dump' ? 0.85 : it.kind === 'bigfence' ? 0.92 : 0.96; V.vx *= k; V.vz *= k;   // высокий забор тормозит заметнее
       }
     });
   }
+
+  JUNK.car(noseX, noseZ, tailX, tailZ, CAR_W);    // контейнеры: упираются, толкаются, опрокидываются (junk.js)
 
   // пешеходов ловим прямоугольником кузова, а не кругом вокруг центра
   const underCar = (px, pz) => {
@@ -8957,6 +8979,8 @@ function driveStep (dt) {
     if (Math.abs(vf) < ECON.CLIENT_HIT.SOFT) continue;
     // свой клиент и удар несильный (ECON.CLIENT_HIT) — цел, но без чаевых
     if (Math.abs(vf) < ECON.CLIENT_HIT.HARD && clientBump(p, fx, fz, sx, sz)) continue;
+    // медленно (HITS.TIER.FALL) — упал и встал, не «сбит»
+    if (HITS.isFall(Math.abs(vf) * 3.6)) { if (!p.fall) { if (p.idle) releaseIdle(p); HITS.fall(p, V.vx, V.vz); } continue; }
     runOver(p, V.vx, V.vz);
     S.shake = Math.max(S.shake, 0.35);
     V.vx *= 0.99; V.vz *= 0.99;
@@ -10316,6 +10340,7 @@ function showOver (why, victims) {
     [$t('респектов'), S.burgers, n => String(Math.round(n))],
     [$t('прохожих сбито'), S.people, n => String(Math.round(n))],
     [$t('машин всмятку'), S.wrecks, n => String(Math.round(n))],
+    S.stops ? [$t('остановок снесено'), S.stops, n => String(Math.round(n))] : null,
   ].filter(Boolean);
   const box = $('ov-stats');
   box.innerHTML = rows.map((r, i) => '<div class="ov-row' + (r[3] ? ' big' : '') + '" data-i="' + i + '"><span>' + r[0] + '</span><b>' + r[2](0) + '</b></div>').join('');
@@ -11798,6 +11823,7 @@ function startRun (ride) {
   THIEF.cd = rand(35, 60);
   S.state = 'drive'; S.hp = S.hpMax; S.money = 0; S.orders = 0; S.burgers = 0; S.shiftT = 0;
   S.people = 0; S.wrecks = 0; S.delivered = 0; S.scoots = 0; S.revives = 0;
+  JUNK.reset();                                    // снесённые остановки и контейнеры — на место, S.stops = 0 (junk.js)
   S.hurt = 0; S.shake = 0;
   S.freeRun = S.free;
   S.lvl0 = levelOf(getXP());
@@ -11911,6 +11937,7 @@ function renderPause () {
   $('pm-keys').innerHTML = keysInfo();
   const rows = [[$t('доставлено'), S.delivered], [$t('заработано'), money(S.money)], [$t('респектов'), S.burgers],
     [$t('прохожих сбито'), S.people], [$t('самокатчиков'), S.scoots], [$t('машин всмятку'), S.wrecks]];
+  if (S.stops) rows.push([$t('остановок снесено'), S.stops]);
   // когда откроется следующий район: «новый район · «Кольцо» через 2 смены», «смена в зачёт · от 3 заказов · сейчас 1»
   if (CAREER && !S.ride && CAREERM.districtNext) rows.push(...CAREERM.districtNext(S.delivered || 0));
   // чек смены: строка — «что ........ сколько»
@@ -12097,6 +12124,8 @@ const T0 = performance.now();
 buildCity();
 ZN.init({ CITY, MAP, donated });
 DLG.init({ pause: on => { for (const k in IN) IN[k] = 0; if (on) Snd.engine(0); }, face: (p, size) => faceDataURL(p, size) });
+HITS.init({ THREE, scene, box, mergeGeos, HUMAN_VC, groundH, curbAt, groundNormal, emote, puff, pushOut, Snd,
+  burst: burstHuman, scare, callAmbulance, adult: GORE_ON });
 CHAT.init({ adult: ADULT, person: makePerson({ seed: 0x2E4A17, fem: false }), face: (p, size) => faceDataURL(p, size) });
 /* заказы карьеры (orders.js): очередь, поручения, развоз смены — через это */
 if (CAREER) ORD.init({ S, V, CITY, MAP, THREE, Store, ADULT, SPOTS, LIFE, Snd, get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get DAY_LEN () { return DAY_LEN; }, lang: curLang,
@@ -12821,6 +12850,8 @@ function frame (now) {
   separateWalkers(dt);
   updateGibs(dt);
   updateGore(dt);
+  JUNK.step(dt);                                   // контейнеры катятся, обломки остановок падают (junk.js)
+  HITS.update(dt);
   updateFly(dt);
   updateNitro(dt);
   if (DISTRICTS) districtWatch(dt);
@@ -12832,6 +12863,7 @@ function frame (now) {
   LIFE.step(dt, LIFE_API);
   WORLD.step(dt, WORLD_API || (WORLD_API = worldApi()));   // мусор, бандиты, шашлыки (world.js)
   MAFIA.step(dt, MAFIA_API || (MAFIA_API = mafiaApi()));   // мафиози у адреса (mafia.js)
+  FAUNA.step(dt, FAUNA_API || (FAUNA_API = faunaApi()));   // лоси и звери в лесах (fauna.js)
   LM.stepRink(RINK, dt, V.x, V.z);
   updateCrew(dt);
   updateSurf(dt);
@@ -12910,7 +12942,7 @@ requestAnimationFrame(frame);
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
 /* песочница (sandbox.html): бесконечное здоровье, нитро, «не глохнет» (noStall читает cars.js) */
 const SBX = { god: false, nitro: false, noStall: false };
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта

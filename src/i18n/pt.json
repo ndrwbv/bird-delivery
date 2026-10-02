@@ -309,6 +309,7 @@
  "маркетолог": "profissional de marketing",
  "Матрасик": "Colchãozinho",
  "машин всмятку": "carros detonados",
+ "остановок снесено": "paragens destruídas",
  "машина всё": "carro já era",
  "машина разбита — кончились сердца": "carro destruído: acabaram os corações",
  "машина ушла под воду — вплавь не довезёшь": "carro afundou: a nado não dá pra entregar",
@@ -1336,5 +1337,9 @@
  "водитель обиделся — гонится за тобой!": "o motorista ficou bravo — está te perseguindo!",
  "оторвался от погони": "despistou o perseguidor",
  "оторвался!": "despistou!",
- "водитель отстал": "o motorista desistiu"
+ "водитель отстал": "o motorista desistiu",
+ "лось на дороге!": "alce na estrada!",
+ "врезался в лося — он тяжёлый, как машина": "bateu num alce — ele pesa como um carro",
+ "из сумки «{brand}» разлетелись деньги — собирай!": "o dinheiro voou da bolsa da {brand} — pega!",
+ "из сумки конкурента: +{money}": "da bolsa do rival: +{money}"
 }
