@@ -137,10 +137,9 @@ export function startShift () {
   fire(startCbs, { n: SH.n + 1 });
   const L = SH.len, P = SH.pace;
   // попапа «на смене · до конца смены ~N мин» нет: часы и так на экране справа сверху
-  // щедрая и час пик — говорим прямо: игрок чувствует ритм
+  // час пик — говорим прямо (платят больше); щедрую смену не объявляем — плашка ложилась на накладную
   const pm = ECON.PACE.MODES[P];
-  const pace = P === 'generous' ? [t('щедрая смена'), t('кофе, аптечки и чаевые — рекой')]
-    : P === 'tight' ? [t('час пик'), t('заказы дальше, кофе меньше — зато платят ×{k}', { k: fmtK(pm.pay) })] : null;
+  const pace = P === 'tight' ? [t('час пик'), t('заказы дальше, кофе меньше — зато платят ×{k}', { k: fmtK(pm.pay) })] : null;
   if (pace) setTimeout(() => { if (SH.on && SH.len === L) A.popBonus(pace[0], pace[1]); }, 5600);
   if (day) setTimeout(() => { if (SH.on && SH.len === L) A.toast(t('пиццерия круглосуточная — смена с {time}', { time: ECON.clock(SH.t0h) })); }, 2600);
 }
