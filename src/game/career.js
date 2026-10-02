@@ -6,7 +6,7 @@
      CAREERM.startShift()    — из startRun, когда это смена, а не «просто покататься»
      CAREERM.step(dt)        — каждый кадр: часы, обед, полночь, удары
      CAREERM.showEnd(why, whyText) — экран итогов вместо прежнего #over
-     CAREERM.clientKilled(victim)  — сбил своего клиента (CLIENT_KILL)
+     CAREERM.clientKilled(victim, fee) — сбил своего клиента: штраф в цену его заказа (CLIENT_KILL)
 
      CAREERM.menu()          — из showTitle: главное меню (menu.js), menuCam — камера заставки
      CAREERM.padRoot/padPre/back — геймпад: окно имени, гараж (garage.js), «потратить»
@@ -58,8 +58,27 @@ export function addStars (n, why) {
   refreshWallet();
   return v;
 }
-export function hour () { return A ? ECON.hourOf(A.env().t) : ECON.SHIFT.KEYS[0][1]; }
-export const isEvening = () => hour() >= ECON.SHIFT.EVENING_H;
+/* часы мира: на смене — без скачка через полночь (смена с 21:00 кончается в «36» = 12:00),
+   вне смены — 9…33. ECON.clock сам берёт по модулю 24 */
+export function hour () {
+  if (!A) return ECON.SHIFT.KEYS[0][1];
+  const h = ECON.hourOf(A.env().t);
+  return SH.on && h < SH.t0h - 0.01 ? h + 24 : h;
+}
+/* сколько суток (ENV.t) прошло со старта смены: смена — SPAN, как 9:00—24:00 */
+const SPAN = ECON.SHIFT.T_END - ECON.SHIFT.T0;
+function elapsed () {
+  if (!A || !SH.on) return 0;
+  const e = A.env().t - SH.tStart;
+  return e < -1e-9 ? e + 1 : e;
+}
+/* «часы по расписанию» 9…24: где смена, как если бы она шла 9:00—24:00. На них — обед, полночь
+   (конец смены), обязательные заказы и срочные (orders.js). В Юге совпадают с часами мира */
+export function schedHour () { return SH.on ? ECON.hourOf(ECON.SHIFT.T0 + Math.min(elapsed(), SPAN + 0.1)) : hour(); }
+/* вечер для бандитов: с 18:00 до 6 утра по часам мира */
+export const isEvening = () => { const d = hour() % 24; return d >= ECON.SHIFT.EVENING_H || d < 6; };
+/* круглосуточная пиццерия: со второго района (ECON.SHIFT.ALLDAY_FROM) */
+export const allDay = (i = DIST.cur()) => DIST.has() && i >= (ECON.SHIFT.ALLDAY_FROM ?? 99);
 export const shiftOn = () => SH.on;
 export const phase = () => SH.phase;
 export function onShiftStart (cb) { if (typeof cb === 'function') startCbs.push(cb); }
@@ -100,10 +119,15 @@ export function startShift () {
   closeSpend(false);
   if (!A) return;
   const S = A.S;
-  A.env().t = ECON.SHIFT.T0;
+  // круглосуточная пиццерия (со второго района): смена с того часа, когда кончилась прошлая (dlv-clock);
+  // в Юге — всегда с 9:00
+  const cv = A.Store.get('dlv-clock', null), day = allDay(), c0 = cv == null || cv === '' ? 9 : +cv;
+  const h0 = day && Number.isFinite(c0) ? ((c0 % 24) + 24) % 24 : ECON.SHIFT.KEYS[0][1];
+  A.env().t = ECON.tOfHour(h0 < ECON.SHIFT.KEYS[0][1] ? h0 + 24 : h0);
+  SH.tStart = A.env().t; SH.allDay = day;
   S.lunch = null;
   SH.on = true; SH.phase = ''; SH.lunch = false; SH.hits = 0; SH.lastHurt = S.hurt || 0; SH.fine = 0; SH.stars = 0;
-  SH.slot = false; STAKE = 0; SH.t0h = hour(); SH.endH = SH.t0h; SH.n = +A.Store.get('dlv-shifts', 0) || 0;
+  SH.slot = false; STAKE = 0; SH.t0h = ECON.hourOf(A.env().t); SH.endH = SH.t0h; SH.n = +A.Store.get('dlv-shifts', 0) || 0;
   SH.len = ECON.shiftLen(SH.n);
   SH.pace = DIST.beginShift();                    // волна щедрости: 1-я смена сессии — щедрая (econ.js PACE)
   SH.district = DIST.cur();
@@ -117,6 +141,7 @@ export function startShift () {
   const pace = P === 'generous' ? [t('щедрая смена'), t('кофе, аптечки и чаевые — рекой')]
     : P === 'tight' ? [t('час пик'), t('заказы дальше, кофе меньше — зато платят ×{k}', { k: fmtK(pm.pay) })] : null;
   if (pace) setTimeout(() => { if (SH.on && SH.len === L) A.popBonus(pace[0], pace[1]); }, 5600);
+  if (day) setTimeout(() => { if (SH.on && SH.len === L) A.toast(t('пиццерия круглосуточная — смена с {time}', { time: ECON.clock(SH.t0h) })); }, 2600);
 }
 /** волна этой смены: 'generous' | 'normal' | 'tight' */
 export const pace = () => SH.pace || 'normal';
@@ -132,9 +157,10 @@ export function clockText () { return ECON.clock(hour()); }
 const mmss = sec => { sec = Math.max(0, Math.ceil(sec)); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); };
 /** сколько настоящих секунд осталось до полуночи */
 export function shiftLeft () {
-  const h = Math.min(24, hour());
-  const hps = (24 - ECON.SHIFT.KEYS[0][1]) / ((ECON.SHIFT.T_END - ECON.SHIFT.T0) * (A.DAY_LEN || 480) * shiftSlow());   // часов смены в секунду
-  return Math.max(0, (24 - h) / hps / FAST);
+  // по доле суток, а не по часам: ночью часы бегут вдвое быстрее дня, и прежний расчёт по часам
+  // показывал «осталось 1:13», когда до конца было 0:38
+  const perSec = 1 / ((A.DAY_LEN || 480) * shiftSlow()) + (FAST > 1 ? (FAST - 1) / (A.DAY_LEN || 480) : 0);   // долей суток в секунду
+  return Math.max(0, (SPAN - elapsed()) / perSec);
 }
 let clockPrev = '';
 function clockStep () {
@@ -155,8 +181,9 @@ function clockStep () {
   if (ord >= 0) { ro.querySelector('em').textContent = t('до конца заказа'); ro.querySelector('b').textContent = mmss(ord); }
   ro.classList.toggle('low', ord >= 0 && ord < 10);
   el.querySelector('small').textContent = ECON.clock(h);
-  el.classList.toggle('eve', h >= ECON.SHIFT.EVENING_H && h < 21);
-  el.classList.toggle('night', h >= 21);
+  const d = h % 24;                                // смена круглосуточной пиццерии может идти через полночь
+  el.classList.toggle('eve', d >= ECON.SHIFT.EVENING_H && d < 21);
+  el.classList.toggle('night', d >= 21 || d < 6);
   el.classList.toggle('late', left < 60);
 }
 
@@ -167,13 +194,13 @@ export function step (dt) {
   if (!SH.on || S.ride || !A.isPlaying()) { clockStep(); return; }
   if (SH.phase === 'late') lateGuard(dt);
   // висит карточка заказа или грузится пицца — часы идут, и в полночь смена кончается и тут
-  if (S.state === 'loading' || S.state === 'brief') { if (SH.phase === '' && hour() >= 24) midnight(); clockStep(); return; }
+  if (S.state === 'loading' || S.state === 'brief') { if (SH.phase === '' && schedHour() >= 24) midnight(); clockStep(); return; }
   if (FAST > 1 && SH.phase === '') { const E = A.env(); E.t = (E.t + dt * (FAST - 1) / A.DAY_LEN) % 1; }
   // удар — S.hurt подскакивает до 0,9 в hurtCar; считаем такие скачки
   const hu = S.hurt || 0;
   if (hu > SH.lastHurt + 0.05) SH.hits++;
   SH.lastHurt = hu;
-  const h = hour();
+  const h = schedHour();                          // по расписанию 9…24 (в круглосуточной смена может идти с ночи)
   if (!SH.lunch && h >= ECON.SHIFT.LUNCH_H && h < 24 && ['drive', 'back', 'handover', 'side'].includes(S.state) && !A.choiceOpen()) showLunch();
   if (SH.phase === '' && h >= 24) midnight();
   clockStep();
@@ -193,7 +220,7 @@ function showLunch () {
       fn () { S.hpMax += L.hp.hearts; S.hp += L.hp.hearts; A.hudHearts(); } },
   ];
   A.showChoice({
-    title: t('обед'), sub: t('{time} — перерыв. что берёшь до конца смены?', { time: ECON.clock(ECON.SHIFT.LUNCH_H) }),
+    title: t('обед'), sub: t('{time} — перерыв. что берёшь до конца смены?', { time: ECON.clock(hour()) }),
     pause: true,
     opts: opts.map(o => ({ label: o.label, sub: o.sub, fn: () => {
       S.lunch = o.id;
@@ -219,7 +246,8 @@ async function midnight () {
     try { ride = await ORD.staffRide(); } catch (e) { console.error('[career] staffRide', e); }
   }
   if (!SH.on || S.state === 'over' || S.state === 'title' || S.state === 'dying') return;   // смена уже кончилась иначе
-  A.toast(ride ? t('полночь — всех развёз, смена всё') : t('полночь — смена всё'));
+  A.toast(SH.allDay ? (ride ? t('всех развёз — смена всё') : t('смена всё — {time}', { time: ECON.clock(hour()) }))
+    : ride ? t('полночь — всех развёз, смена всё') : t('полночь — смена всё'));
   A.endShift('время');
 }
 
@@ -230,22 +258,24 @@ function lateGuard (dt) {
   if (riding || DLG.isOpen() || A.choiceOpen()) { SH.lateT = 0; return; }
   if ((SH.lateT = (SH.lateT || 0) + dt) < 6) return;
   SH.lateT = -1e9;
-  A.toast(t('полночь — смена всё'));
+  A.toast(SH.allDay ? t('смена всё — {time}', { time: ECON.clock(hour()) }) : t('полночь — смена всё'));
   A.endShift('время');
 }
 
 /* ── сбил своего клиента ── */
-export function clientKilled (victim) {
+/* fee — цена заказа этого клиента (game.js clientFee): штраф = fee × CLIENT_KILL.FINE,
+   из «за смену» (не ниже нуля) и из кошелька (сколько есть) */
+export function clientKilled (victim, fee = 0) {
   if (!A) return;
   const S = A.S;
-  const loss = Math.max(0, Math.round((S.money || 0) * ECON.CLIENT_KILL.LOSE / 10) * 10);
+  const loss = Math.max(0, Math.round((fee || 0) * ECON.CLIENT_KILL.FINE / 10) * 10);
   if (loss) {
-    S.money -= loss;
-    A.addWallet(-Math.min(loss, A.wallet()));
+    S.money = Math.max(0, (S.money || 0) - loss);
+    A.addWallet(-Math.min(loss, Math.max(0, A.wallet())));
   }
   SH.fine += loss;
   if (ECON.CLIENT_KILL.END_SHIFT) return;          // дальше — прежний game over, итоги покажет showEnd
-  A.popBonus(t('сбил своего клиента'), loss ? t('минус {money}', { money: A.money(loss) }) : t('заказ сорван'));
+  A.popBonus(t('сбил своего клиента'), loss ? t('заказ сорван · штраф −{money}', { money: A.money(loss) }) : t('заказ сорван'));
   A.Snd.fail && A.Snd.fail();
   A.dropOrder();
 }
@@ -257,8 +287,8 @@ const TITLE = {
   'сбил клиента': () => t('сняли со смены'),
 };
 const WHY = {
-  'смена окончена': () => t('заработанное — в кошельке, смена засчитана'),
-  'время': () => t('полночь — пиццерия закрылась'),
+  'смена окончена': () => (SH.counted || !DIST.has() ? t('заработанное — в кошельке, смена засчитана') : t('заработанное — в кошельке')),
+  'время': () => (SH.allDay ? t('смена отработана — пиццерия круглосуточная, следующая смена с {time}', { time: ECON.clock(SH.endH) }) : t('полночь — пиццерия закрылась')),
   'сбил клиента': () => t('тебя сняли со смены: сбил своего клиента'),
 };
 
@@ -266,12 +296,14 @@ export function showEnd (why, whyText) {
   if (!A) return;
   const S = A.S;
   const wasOn = SH.on;
-  SH.on = false; SH.phase = 'done'; SH.endH = hour();
+  if (wasOn) SH.endH = hour();
+  SH.on = false; SH.phase = 'done';
   lunchClass(false);
   $('cr-clock') && ($('cr-clock').hidden = true);
   const full = why === 'время';
   if (wasOn) {
     A.Store.set('dlv-shifts', SH.n + 1);
+    A.Store.set('dlv-clock', +(((SH.endH % 24) + 24) % 24).toFixed(2));   // часы мира: круглосуточная следующая смена — с этого часа
     // район: смена засчитана (отвёз хотя бы DISTRICT.COUNT_MIN), открылся следующий — сразу туда
     const r = DIST.countShift(S.delivered || 0);
     SH.counted = r.counted; SH.opened = r.opened;
@@ -294,13 +326,14 @@ export function showEnd (why, whyText) {
     [t('заработано'), S.money || 0, A.money, true],
     [t('доставлено заказов'), S.delivered || 0, cnt],
     typeof S.tips === 'number' && S.tips > 0 ? [t('чаевые'), S.tips, A.money] : null,
-    [t('на смене'), SH.endH, h => ECON.clock(SH.t0h) + ' — ' + ECON.clock(SH.t0h + (Math.min(SH.endH, 29) - SH.t0h) * Math.min(1, h / (SH.endH || 1)))],
+    [t('на смене'), SH.endH, h => ECON.clock(SH.t0h) + ' — ' + ECON.clock(SH.t0h + (SH.endH - SH.t0h) * Math.min(1, h / (SH.endH || 1)))],
     [t('ударов'), SH.hits, cnt],
     SH.fine ? [t('штраф за клиента'), SH.fine, n => '−' + A.money(n)] : null,
     S.people ? [t('прохожих сбито'), S.people, cnt] : null,
     SH.stars ? [t('звёзд за смену'), SH.stars, n => '+' + Math.round(n) + ' ★'] : null,
     DIST.has() ? districtRow() : null,
     DIST.has() && SH.opened >= 0 ? [t('открыт новый район'), 1, () => t(DIST.list()[SH.opened].name), true] : null,
+    ...(DIST.has() && SH.opened < 0 ? districtNext().map(([k, v]) => [k, 1, () => v]) : []),
   ].filter(Boolean);
   if (DIST.has() && SH.opened >= 0) setTimeout(() => { if ($('over') && !$('over').hidden) A.Snd.coin(); }, 200 + rows.length * 220);
   const box = $('ov-stats');
@@ -336,6 +369,22 @@ function districtRow () {
     : need && i === DIST.opened() - 1 + (SH.opened >= 0 ? -1 : 0) ? name + ' · ' + t('{have} из {need} смен', { have: Math.min(have, need), need })
       : name + ' · ' + tn(have, '{n} смена|{n} смены|{n} смен');
   return [t('район'), 1, () => txt];
+}
+
+/* когда откроется следующий район — строки [что, текст] для итогов смены и паузы (game.js renderPause):
+   «новый район · «Кольцо» через 2 смены» и «смена в зачёт · от 3 заказов · сейчас 1».
+   delivered — сколько отвёз за эту смену (на паузе), иначе без «сейчас». Всё открыто — [] */
+export function districtNext (delivered) {
+  if (!DIST.has()) return [];
+  const last = DIST.opened() - 1;
+  if (last >= DIST.count() - 1) return [];
+  const left = Math.max(1, DIST.need(last) - DIST.shiftsIn(last)), next = t(DIST.list()[last + 1].name);
+  const where = DIST.cur() !== last ? ' ' + t('в районе «{name}»', { name: t(DIST.list()[last].name) }) : '';
+  const min = ECON.DISTRICT.COUNT_MIN;
+  return [
+    [t('новый район'), tn(left, '«{name}» через {n} смену|«{name}» через {n} смены|«{name}» через {n} смен', { name: next }) + where],
+    [t('смена в зачёт'), tn(min, 'от {n} заказа|от {n} заказов|от {n} заказов') + (delivered != null ? ' · ' + t('сейчас {n}', { n: delivered }) : '')],
+  ];
 }
 
 /* кошелёк и звёзды — строкой под заработком */
@@ -905,7 +954,9 @@ const DEBUG = {
   get SH () { return SH; }, shiftSlow, pace, DIST: DIST.DEBUG, stars, addStars, hour, isEvening, clockText, shiftOn, phase, onShiftStart, onShiftEnd, startShift, showEnd, clientKilled,
   hasOrders: () => !!(ORD && ORD.staffRide), hasCars: () => !!carsApi(),
   // перемотка за обед — обед считается прошедшим (иначе он всплывает в любом пресете песочницы)
-  skipTo (h) { if (A) { A.env().t = ECON.tOfHour(h); if (h > ECON.SHIFT.LUNCH_H + 0.05) SH.lunch = true; else if (h < ECON.SHIFT.LUNCH_H) SH.lunch = false; } },
+  // h — по расписанию смены (9…24): в круглосуточной смене с ночи «23,9» — это тоже «почти конец смены»
+  schedHour, allDay, districtNext, shiftLeft,
+  skipTo (h) { if (A) { A.env().t = SH.on ? (SH.tStart + ECON.tOfHour(h) - ECON.SHIFT.T0) % 1 : ECON.tOfHour(h); if (h > ECON.SHIFT.LUNCH_H + 0.05) SH.lunch = true; else if (h < ECON.SHIFT.LUNCH_H) SH.lunch = false; } },
   useCars (api) { CARS_MOCK = api || null; },
   crewBoard, crewLoad: () => (A ? crewLoad() : null), openDep, closeDep, openGarage, closeGarage: GARAGE.close, garageFlip: GARAGE.flip, openSpend, menu, askName, back,
 };

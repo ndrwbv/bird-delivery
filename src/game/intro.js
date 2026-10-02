@@ -5,8 +5,11 @@
      1) пиццерия            — «вот пиццерия — сюда я устроился курьером»;
      2) перелёт к Степану   — сидит на лавочке с кальяном (в детской — самовар), облака;
      3) перелёт к машине    — на хаде мигают сердца и кольцо нитро вокруг радара;
-     4) капот крупно        — дым из-под капота, машина кашляет: «а ещё она может ломаться».
-   Всего ~15 с. «пропустить», Esc, Enter, пробел; на геймпаде A, B, Start — сразу
+     4) сердца              — директор Валерий Палыч (лицо в облачке у сердец, стрелка на них):
+                              «а это твои хп — врезаешься куда-то, теряешь сердце (легонько —
+                              половинку)»; на хаде гаснет сердце, потом половинка (только показ);
+     5) капот крупно        — дым из-под капота, машина кашляет: «а ещё она может ломаться».
+   Всего ~20 с. «пропустить», Esc, Enter, пробел; на геймпаде A, B, Start — сразу
    к накладной. Мир стоит, как в катсценах story.js (дышат только дым и Степан);
    камера и угол обзора после — прежние. Флаг ставится, когда вступление кончилось
    или его пропустили; «сбросить прогресс» стирает 'dlv-intro' — покажется снова.
@@ -17,13 +20,16 @@
      FIRST.frame(dt)          — каждый кадр; true — идёт вступление (мир стоит)
      FIRST.on(), FIRST.skip() — для геймпада (game.js padStep)
    api: THREE, cam, V, S, Store, Snd, ADULT, car(), pizza(), brand(), carName(),
-        puff, camClear, groundH, guestStep, hud */
+        puff, camClear, groundH, guestStep, hud, hearts */
 import './intro.css';
 import { t } from '../i18n/index.js';
+import { makePerson, faceDataURL } from './people.js';
+import { BOSS } from './orders.config.js';
 
 const KEY = 'dlv-intro';
 let A = null, P = null, L = null, T1 = null, T2 = null;
-const CUT = { on: false, t: 0, i: -1, segs: [], done: null, el: null, fov0: 60, guest: null, carY: 0, coughT: [], puffT: 0, shake: 0, swallow: '' };
+const CUT = { on: false, t: 0, i: -1, segs: [], done: null, el: null, fov0: 60, guest: null, carY: 0, coughT: [], puffT: 0, shake: 0, swallow: '', side: 1, demo: -1 };
+let BOSS_P = null;
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const ease = k => k * k * k * (k * (k * 6 - 15) + 10);           // мягко трогается и мягко встаёт
@@ -100,7 +106,14 @@ function clientShot (p) {
 function carShot () {
   const V = A.V;
   const s = clearSide(V.x, V.z, V.h, 0.45, 1.45, 7.2, 6) || 1;
+  CUT.side = s;
   return orbit(V.x, V.z, V.y, V.h, 0.45 * s, 1.45 * s, 7.2, 6, 2.6, 1.9, 0.85, 0);
+}
+/* план «сердца»: облёт машины продолжается с того места, где кончился прошлый, и камера
+   поднимается краном — над заборами и припаркованными машинами */
+function hpShot () {
+  const V = A.V, s = CUT.side;
+  return orbit(V.x, V.z, V.y, V.h, 1.45 * s, 1.8 * s, 6, 8, 1.9, 5.2, 0.6, 0);
 }
 function hoodShot () {
   const V = A.V;
@@ -126,7 +139,8 @@ function ui () {
   el.id = 'intro-cut';
   el.innerHTML = '<div class="ic-bar ic-top"><button type="button" class="ic-skip"></button></div>' +
     '<div class="ic-card"><em></em><b></b><small></small></div>' +
-    '<div class="ic-bar ic-bot"><div class="ic-sub"></div></div>';
+    '<div class="ic-bar ic-bot"><div class="ic-sub"></div></div>' +
+    '<div class="ic-tip"><img alt=""><div><em></em><p></p></div></div>';
   (document.getElementById('game') || document.body).appendChild(el);
   el.querySelector('.ic-skip').addEventListener('click', e => { e.stopPropagation(); skip(); });
   // клики и пальцы до игры не доходят: ни руля, ни карты по радару
@@ -154,6 +168,39 @@ function hideText () {
   CUT.el.querySelector('.ic-card').classList.remove('on');
   CUT.el.querySelector('.ic-sub').classList.remove('on');
 }
+/* облачко директора под сердцами: лицо, имя, реплика; стрелка смотрит на сердца */
+function tip (text) {
+  const el = CUT.el.querySelector('.ic-tip');
+  if (!text) { el.classList.remove('on'); return; }
+  if (!BOSS_P) BOSS_P = makePerson({ seed: BOSS.seed, first: t(BOSS.first), last: t(BOSS.last), fem: !!BOSS.fem });
+  const img = el.querySelector('img');
+  if (!img.getAttribute('src')) img.src = faceDataURL(BOSS_P, 96);
+  el.querySelector('em').textContent = BOSS_P.name + ' · ' + t(BOSS.role);
+  el.querySelector('p').textContent = text;
+  // ставим под сердцами по раскладке (без масштаба мигания): на телефоне хад ниже
+  const hl = document.getElementById('hud-left'), hs = document.getElementById('hearts');
+  if (hl && hs) {
+    el.style.top = (hl.offsetTop + hs.offsetTop + hs.offsetHeight + 18) + 'px';
+    el.style.left = Math.max(12, hl.offsetLeft - 4) + 'px';
+  }
+  el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+}
+/* показ на хаде: гаснет последнее сердце, потом половинка соседнего. Настоящее
+   здоровье не трогаем — после плана хад перерисовывается как был (api.hearts) */
+function demoHearts (step) {
+  const lit = [...document.querySelectorAll('#hearts i')].filter(i => !i.classList.contains('off'));
+  const h = lit[lit.length - 1];
+  if (!h) return;
+  if (step === 1) { h.classList.remove('half'); h.classList.add('off'); }
+  else if (step === 2) { h.classList.remove('off'); h.classList.add('half'); }
+  h.classList.remove('ic-lost'); void h.offsetWidth; h.classList.add('ic-lost');
+  const s = Snd(); if (s) { s.noise(0.18, 0.2); s.blip(step === 1 ? 70 : 110, 0.12, 'square', 0.1); }
+}
+function demoOff () {
+  if (CUT.demo < 0) return;
+  CUT.demo = -1;
+  if (A.hearts) A.hearts();
+}
 const hudMode = m => {
   document.body.classList.toggle('ic-hud', !!m);
   document.body.classList.toggle('ic-hp', m === 'hp' || m === 'both');
@@ -177,6 +224,7 @@ function cough () {
 
 /* ─── вход в планы ─── */
 function enter (seg) {
+  if (seg.id !== 'hp') { tip(''); demoOff(); }
   switch (seg.id) {
     case 'pizza': {
       const Z = A.pizza(), name = String(Z.name || '');
@@ -203,6 +251,16 @@ function enter (seg) {
       hudMode('on');
       sting(false);
       break;
+    case 'hp':
+      // директор показывает на сердца: облачко у сердец, сердца мигают, одно гаснет, потом половинка
+      hideText();
+      if (A.hud) A.hud();
+      if (A.hearts) A.hearts();
+      hudMode('hp');
+      tip(t('а это твои хп — врезаешься куда-то, теряешь сердце (легонько — половинку)'));
+      CUT.demo = 0;
+      sting(true);
+      break;
     case 'hood':
       hudMode(null);
       card('', t('кхе-кхе'), '', true);
@@ -221,6 +279,10 @@ function stepSeg (seg, st, dt) {
     // сердца — сразу, кольцо нитро — когда дошли до «и нитро»
     hudMode(st > 1.5 ? 'both' : st > 0.45 ? 'hp' : 'on');
     if (A.hud) A.hud();
+  } else if (seg.id === 'hp') {
+    hudMode('hp');
+    if (CUT.demo === 0 && st > 1.3) { CUT.demo = 1; demoHearts(1); }
+    else if (CUT.demo === 1 && st > 3) { CUT.demo = 2; demoHearts(2); }
   } else if (seg.id === 'hood') {
     const V = A.V, fx = Math.sin(V.h), fz = Math.cos(V.h);
     if ((CUT.puffT -= dt) <= 0) {
@@ -245,7 +307,7 @@ export function play (order, done) {
   const segs = [{ id: 'pizza', d: 3.3, pose: sP }];
   if (sC) segs.push({ id: 'fly', d: 1.15, pose: fly(sP, sC, 18) }, { id: 'client', d: 3.7, pose: sC }, { id: 'fly', d: 1.15, pose: fly(sC, sK, 16) });
   else segs.push({ id: 'fly', d: 1.15, pose: fly(sP, sK, 14) });
-  segs.push({ id: 'car', d: 3.1, pose: sK }, { id: 'hood', d: 2.9, pose: sH });
+  segs.push({ id: 'car', d: 3.1, pose: sK }, { id: 'hp', d: 4.8, pose: hpShot() }, { id: 'hood', d: 2.9, pose: sH });
   CUT.segs = segs; CUT.i = -1; CUT.t = 0; CUT.done = done; CUT.on = true; CUT.shake = 0;
   const car = A.car();
   CUT.carY = car ? car.position.y : 0;
@@ -291,6 +353,7 @@ function finish () {
   setTimeout(() => { removeEventListener('keyup', onKeyUp, true); CUT.swallow = ''; }, 600);
   hudMode(null);
   hideText();
+  tip(''); demoOff();
   const el = CUT.el;
   if (el) el.classList.remove('on');
   document.body.classList.remove('intro-cut');

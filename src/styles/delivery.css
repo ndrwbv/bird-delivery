@@ -52,6 +52,12 @@ html, body {
   filter: drop-shadow(1px 1px 0 #33210c) drop-shadow(-1px -1px 0 #33210c);
 }
 #hearts i.off { background: #6b5560; opacity: .5; }
+/* половинка: левая половина цветная, правая — как пустое сердце; граница ровная, по пикселю */
+#hearts i.half { background: linear-gradient(90deg, #ff5d7a 50%, rgba(107, 85, 96, .5) 50%); }
+/* удар: сердца коротко вздрагивают и вспыхивают */
+#hearts { transform-origin: left center; }
+#hearts.hit { animation: hp-hit .45s steps(3) 1; }
+@keyframes hp-hit { 0% { transform: scale(1.3) translateX(-2px); filter: drop-shadow(0 0 5px #ff2d4a); } 50% { transform: scale(1.15) translateX(2px); } 100% { transform: none; filter: none; } }
 
 #task { margin-top: 6px; }
 #addr { color: #fff3d6; }
@@ -59,15 +65,33 @@ html, body {
 #dist  { color: #fff3d6; }
 #speed { color: #bcd0e8; font-size: 8px; }
 
+/* часы заказа — как на приборке: тёмное окошко, зелёные светящиеся цифры (сейчас),
+   рядом плашкой «доставить до 14:35»; мало времени — плашка красная и мигает */
 #timewrap {
-  top: 16px; left: 50%; transform: translateX(-50%);
-  width: min(280px, 42vw); height: 10px;
-  background: #33210c;
+  top: 12px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 5px 4px 9px;
+  background: #070b08;
   border: 2px solid #33210c;
-  border-radius: 2px;
-  overflow: hidden;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 2px #1a2a1d, 0 4px 12px rgba(0, 0, 0, .4);
+  text-shadow: none; line-height: 1; white-space: nowrap;
 }
-#timebar { height: 100%; width: 100%; background: #ffd85e; }
+#dash-now { font-weight: normal; font-size: 15px; letter-spacing: .06em; color: #5dff8a;
+            text-shadow: 0 0 4px rgba(93, 255, 138, .8), 0 0 10px rgba(93, 255, 138, .35); }
+#dash-due { display: flex; align-items: center; gap: 6px; padding: 5px 7px 4px; border-radius: 3px;
+            background: #ffd85e; color: #1a1208; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .25); }
+#dash-due[hidden] { display: none; }
+#dash-due em { font-style: normal; font-size: 7px; }
+#dash-due b { font-weight: normal; font-size: 12px; }
+#dash-due b:empty { display: none; }
+#timewrap.warn #dash-due { background: #ff9a3c; }
+#timewrap.low #dash-due, #timewrap.late #dash-due { background: #ff2d4a; color: #fff; animation: dash-blink .5s steps(2) infinite; }
+#timewrap.low, #timewrap.late { border-color: #ff2d4a; box-shadow: inset 0 0 0 2px #3a0d14, 0 0 12px rgba(255, 45, 74, .55); }
+#timewrap.late #dash-now { color: #ff6a7a; text-shadow: 0 0 4px rgba(255, 45, 74, .8); }
+@keyframes dash-blink { 50% { background: #5a0d18; color: #ff8a96; } }
+/* «до конца заказа» на часах смены (career.js) больше не нужно — срок теперь на приборке */
+#cr-clock .ck-o { display: none !important; }
 
 #radar {
   left: 16px; bottom: 16px;
@@ -358,7 +382,6 @@ html:not([data-map="moscow"]) .msk-only { display: none !important; }
            border-radius: 2px; overflow: hidden; }
 #nitro i { display: block; height: 100%; width: 50%; background: #6fd3ff; }
 #nitro.burn i { background: #e6f7ff; box-shadow: 0 0 8px #6fd3ff; }
-#timebar.free { background: #6fd3ff !important; }
 #ctrls button.on { color: #6fd3ff; border-color: #6fd3ff; }
 /* нитро кнопкой — для телефона; на компьютере есть Shift */
 #nos { color: #6fd3ff; touch-action: none; user-select: none; -webkit-user-select: none; }
@@ -388,16 +411,17 @@ html[data-map="moscow"] #radar { cursor: zoom-in; pointer-events: auto; }
 #fullmap {
   position: absolute; inset: 0; z-index: 30;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(20, 16, 30, 0.72); cursor: zoom-out;
+  background: rgba(20, 16, 30, 0.93); cursor: zoom-out;     /* плотнее: окно карты почти во весь экран, хад под ним не должен читаться */
 }
 #fullmap[hidden] { display: none; }
-.fm-box { display: flex; flex-direction: column; gap: 8px; max-width: calc(100% - 32px); max-height: calc(100% - 32px); }
+.fm-box { display: flex; flex-direction: column; gap: 8px; width: min(calc(100% - 32px), 1600px); height: calc(100% - 32px); box-sizing: border-box; }
 .fm-top { display: flex; justify-content: space-between; gap: 12px; font-size: clamp(7px, 1.1vw, 10px); color: #fff3d6; }
 .fm-top span { color: #ffd85e; }
-#fullmapc {
-  display: block; max-width: 100%; max-height: calc(100vh - 110px);
-  border: 3px solid #33210c; border-radius: 6px; background: #a6d189; image-rendering: pixelated;
-}
+/* окно карты: сама карта двигается и зумится внутри (game.js, fmStep), холст — ровно по окну */
+.fm-view { flex: 1; min-height: 0; position: relative; overflow: hidden; touch-action: none; cursor: grab;
+           border: 3px solid #33210c; border-radius: 6px; background: #2d263a; }
+.fm-view.drag { cursor: grabbing; }
+#fullmapc { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 .fm-leg { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 7px; color: #fff3d6; }
 .fm-leg i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; vertical-align: -1px; border: 1px solid #33210c; }
 .lg-me { background: #ffd85e; box-shadow: 0 0 0 2px #33210c; } .lg-dodo { background: #f0522a; }
@@ -406,6 +430,13 @@ html[data-map="moscow"] #radar { cursor: zoom-in; pointer-events: auto; }
                   transform: rotate(-45deg); margin-right: 6px; animation: lg-to-blink 0.9s steps(2) infinite; }
 @keyframes lg-to-blink { 50% { box-shadow: 0 0 0 3px #ffe14d; } }
 .lg-sig { background: #3fd15e; border-radius: 50%; } .lg-nos { background: #6fd3ff; } .lg-car { background: #5b6b80; }
+/* маршрут и пробка — полоской; бандиты — красный круг; районы — рамка и штриховка; гараж, КПП */
+.fm-leg i.lg-route { width: 14px; height: 4px; vertical-align: 1px; background: #ff8a2b; border-color: #5a2a00; }
+.fm-leg i.lg-jam { width: 14px; height: 3px; vertical-align: 2px; background: #e8323c; border: 0; }
+.fm-leg i.lg-gang { width: 10px; height: 10px; border-radius: 50%; background: rgba(226, 48, 56, 0.35); border: 2px solid #c81e28; box-sizing: border-box; }
+.fm-leg i.lg-mine { background: transparent; border: 2px solid #ffd85e; box-sizing: border-box; }
+.fm-leg i.lg-lock { background: repeating-linear-gradient(-45deg, #1e1828 0 3px, #8a3a38 3px 4px); }
+.fm-leg i.lg-gar { background: #6f8a3a; border-radius: 2px; } .fm-leg i.lg-kpp { background: #1f4f9a; }
 #fxs { margin-top: 6px; font-size: 7px; color: #ffb066; text-align: right; min-height: 8px; }
 /* узкий экран: адрес заказа длинный — хад справа не должен на него налезать */
 @media (max-width: 640px) {
@@ -865,7 +896,6 @@ html[data-map="moscow"] #radar.burn {
 /* магазин: максималка машины */
 .sh-i .sh-sp { display: block; font-style: normal; font-size: 8px; color: #f0522a; margin-top: 4px; }
 
-.lg-dk { background: #2f6fff; }
 .oc-rush.oc-surf { background: #1f7a8a; animation: none; }
 
 /* ── коммерческая сборка: шрифт свой, язык, настройки, реклама за награду ── */
@@ -997,8 +1027,12 @@ body.pad #guide .gd-keys, body.pad #guide .gd-touch { display: none; }
 /* узкий экран: полоска времени — тонкой линией во всю ширину над хадом,
    сердца и деньги — под ней (раньше полоска налезала на сердца) */
 @media (max-width: 700px) {
-  #timewrap { top: 8px; left: 12px; right: 12px; width: auto; transform: none; height: 8px; }
-  #hud-left, #hud-right { top: 24px; }
+  #timewrap { top: 6px; gap: 6px; padding: 3px 3px 3px 7px; }
+  #dash-now { font-size: 12px; }
+  #dash-due { padding: 4px 5px 3px; gap: 5px; }
+  #dash-due em { font-size: 6px; }
+  #dash-due b { font-size: 10px; }
+  #hud-left, #hud-right { top: 40px; }
 }
 
 /* ── заставка: профиль сверху, колонка кнопок с воздухом, таблица — внизу ──
@@ -1125,16 +1159,12 @@ body.touch #hud-right #endshift { margin-top: 8px; }
 body.touch #toast { bottom: calc(max(16px, env(safe-area-inset-bottom)) + 196px); white-space: normal; width: min(92vw, 360px); text-align: center; line-height: 1.6; }
 @media (max-height: 460px) { body.touch #toast { bottom: auto; top: 44px; } }
 
-/* телефон: подробная карта — на весь экран, крупно, двигается пальцем;
-   при открытии встаёт так, что ты посередине */
-.fm-view { min-height: 0; }
+/* телефон: подробная карта — на весь экран; тянуть пальцем — двигать, щипок — зум;
+   открывается вокруг тебя (game.js, setFullMap) */
 body.touch #fullmap { align-items: stretch; justify-content: stretch; }
 body.touch .fm-box { max-width: none; max-height: none; width: 100%; height: 100%; box-sizing: border-box;
                      padding: max(10px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
-body.touch .fm-view { flex: 1; overflow: auto; touch-action: pan-x pan-y; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
-                      border: 3px solid #33210c; border-radius: 6px; background: #a6d189; }
-body.touch #fullmapc { max-width: none; max-height: none; height: 165%; width: auto; border: 0; border-radius: 0; image-rendering: auto; }
-@media (orientation: landscape) { body.touch #fullmapc { height: 220%; } }
+body.touch .fm-view { overscroll-behavior: contain; }
 body.touch .fm-leg { font-size: 8px; }
 
 /* ── карточка заказа — накладная целиком (showOrderCard): лист бумаги с перфорацией по краям,

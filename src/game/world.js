@@ -18,7 +18,7 @@
      нет совсем. Никто этого не объясняет. Кучи — склейка по клеткам, при
      смене доната пересобирается только она (trash*);
    • бандитские районы (ZN.gangZones): красные круги на радаре и карте;
-     вечером подъехал к клиенту в районе — могут подойти 3–4 гопника
+     подъехал к клиенту в районе — могут подойти 3–4 гопника (днём 6 из 10, вечером всегда)
      в спортивках и потребовать мзду (gang*). Отказал — мнут машину,
      пока не уедешь. В детской версии без бит: «покачают» машину;
    • особняки (prepCity): дома в круге MAP.career.rich — коттеджи в 2–3
@@ -860,14 +860,16 @@ function evening () {
   return hourOf(A.ENV.t) >= SHIFT.EVENING_H;
 }
 const inGang = (x, z) => ZN.gangZones().some(g => (x - g.x) ** 2 + (z - g.z) ** 2 < g.r * g.r);
-/* подъехал к клиенту (orders.js onArrive): вечером в районе — шанс, что подойдут.
+/* подъехал к клиенту (orders.js onArrive): в районе — шанс, что подойдут (днём GANG.CHANCE,
+   вечером GANG.CHANCE_EVENING; донат «борьба с насилием» — вдвое реже).
+   Раньше — только вечером: в укороченных сменах вечер ~1 мин, мзду почти не видели.
    Возвращаем обещание: пока разбираемся с гопниками, заказ ждёт */
 export function arrive (ev) {
   if (!A || !CAREER || GE.st || (GE.cd > 0 && !GE.force)) return;
   const x = ev && ev.x !== undefined ? ev.x : A.V.x, z = ev && ev.z !== undefined ? ev.z : A.V.z;
   if (!inGang(x, z) && !inGang(A.V.x, A.V.z)) return;
   if (GE.force) GE.force = false;
-  else if (!evening() || !chance(GANG.CHANCE * (1 - 0.5 * A.donated('gang')))) return;
+  else if (!chance((evening() ? GANG.CHANCE_EVENING : GANG.CHANCE) * (1 - 0.5 * A.donated('gang')))) return;
   return gangStart();
 }
 function thug (lead) {

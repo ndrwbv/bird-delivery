@@ -12,7 +12,7 @@
 import './menu.css';
 import { t, tn } from '../i18n/index.js';
 import * as DIST from './districts.js';
-import { DISTRICT } from './econ.js';
+import { DISTRICT, SHIFT, clock } from './econ.js';
 
 let A = null, el = null, md = null, dm = null, nameCb = null, nameFirst = false;
 const $ = id => document.getElementById(id);
@@ -64,7 +64,11 @@ export function show () {
   el.querySelector('.crm-tag').textContent = $('big-s') ? $('big-s').textContent : '';
   const n = (+A.Store.get('dlv-shifts', 0) || 0) + 1;
   el.querySelector('.crm-go b').textContent = t('на смену');
-  el.querySelector('.crm-go span').textContent = DIST.has()
+  // круглосуточная пиццерия (со второго района): смена с того часа, когда кончилась прошлая (career.js)
+  const allDay = DIST.has() && DIST.cur() >= (SHIFT.ALLDAY_FROM ?? 99);
+  el.querySelector('.crm-go span').textContent = allDay
+    ? t('смена {n} · район «{name}» · с {from}, круглосуточно', { n, name: t(DIST.list()[DIST.cur()].name), from: clock(A.Store.get('dlv-clock', '') === '' || A.Store.get('dlv-clock', null) == null ? 9 : +A.Store.get('dlv-clock', 9) || 0) })
+    : DIST.has()
     ? t('смена {n} · район «{name}» · {from}—{to}', { n, name: t(DIST.list()[DIST.cur()].name), from: '9:00', to: '24:00' })
     : t('смена {n} · {from}—{to}', { n, from: '9:00', to: '24:00' });
   distButton();

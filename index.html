@@ -52,8 +52,8 @@
     <button id="endshift" type="button"><span data-i18n>закончить смену</span> <b id="shift-t">0:00</b></button>
   </div>
 
-  <!-- ── время на заказ ── -->
-  <div class="hud" id="timewrap"><div id="timebar"></div></div>
+  <!-- ── время на заказ: часы как на приборке — сейчас и «до 14:35» (срок заказа) ── -->
+  <div class="hud" id="timewrap"><b id="dash-now"></b><span id="dash-due"><em></em><b></b></span></div>
 
   <!-- ── карта квартала: в Москве по клику раскрывается во весь экран ── -->
   <div class="hud" id="radar"><canvas id="radarc"></canvas></div>
@@ -64,9 +64,12 @@
       <div class="fm-top"><b data-i18n>Москва</b><span data-i18n>клик или esc — закрыть</span></div>
       <div class="fm-view"><canvas id="fullmapc"></canvas></div>
       <div class="fm-leg">
-        <span><i class="lg-to"></i><em data-i18n>заказ</em></span><span><i class="lg-me"></i><em data-i18n>ты</em></span><span><i class="lg-dodo"></i><em data-i18n>пиццерия</em></span>
+        <span><i class="lg-to"></i><em data-i18n>заказ</em></span><span><i class="lg-me"></i><em data-i18n>ты</em></span><span><i class="lg-dodo"></i><em data-i18n>пиццерия</em></span><span><i class="lg-route"></i><em data-i18n>маршрут</em></span>
+        <span data-fm="career"><i class="lg-gang"></i><em data-i18n>бандиты — трясут мзду</em></span><span><i class="lg-jam"></i><em data-i18n>пробка</em></span>
+        <span data-fm="dist"><i class="lg-mine"></i><em data-i18n>твой район</em></span><span data-fm="dist"><i class="lg-lock"></i><em data-i18n>район закрыт</em></span>
+        <span data-fm="career"><i class="lg-gar"></i><em data-i18n>гараж</em></span><span data-fm="kpp"><i class="lg-kpp"></i><em data-i18n>КПП</em></span>
         <span><i class="lg-sig"></i><em data-i18n>светофор</em></span>
-        <span><i class="lg-nos"></i><em data-i18n>нитро</em></span><span><i class="lg-col"></i><em data-i18n>находки</em></span><span><i class="lg-dk"></i><em data-i18n>Синий кит</em></span><span><i class="lg-car"></i><em data-i18n>машины</em></span>
+        <span><i class="lg-nos"></i><em data-i18n>нитро</em></span><span><i class="lg-col"></i><em data-i18n>находки</em></span><span><i class="lg-car"></i><em data-i18n>машины</em></span>
       </div>
     </div>
   </div>

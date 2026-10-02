@@ -84,7 +84,9 @@ function hookCareer (m) {
 let HOUR_OVERRIDE = null, SIM = false;                              // для прогона смен без езды (DEBUG.simShift)
 function hourNow () {
   if (HOUR_OVERRIDE !== null) return HOUR_OVERRIDE;
-  try { if (CAR && typeof CAR.hour === 'function') { const h = CAR.hour(); if (Number.isFinite(h)) return h; } } catch (e) { /* — */ }
+  // часы по расписанию смены (9…24): в круглосуточной пиццерии смена может идти с ночи, а обязательные
+  // и срочные считаются от её начала, как в смене 9:00—24:00 (career.js schedHour)
+  try { if (CAR && typeof (CAR.schedHour || CAR.hour) === 'function') { const h = (CAR.schedHour || CAR.hour)(); if (Number.isFinite(h)) return h; } } catch (e) { /* — */ }
   return ECON.hourOf(A.ENV.t);
 }
 
@@ -130,7 +132,7 @@ function buildPool () {
   const D = distRing();
   // районы (districts.js): заказы — только в том, где работаешь
   const di = DIST.has() ? DIST.cur() : -1;
-  const src = di >= 0 ? A.SPOTS.filter(s => DIST.at(s.x, s.z) === di) : A.SPOTS;
+  const src = di >= 0 ? A.SPOTS.filter(s => DIST.at(s.x, s.z) === di && openSpot(s.x, s.z)) : A.SPOTS;
   POOL = src.map(s => ({ x: s.x, z: s.z, entr: ENTR.has(Math.round(s.x * 4) + ',' + Math.round(s.z * 4)), key: keyOf(s.x, s.z), zone: ZN.zoneAt(s.x, s.z), d: Math.hypot(s.x - P.x, s.z - P.z) }));
   ZMIN = {};
   for (const q of POOL) if (q.d >= D.min && !(q.d >= ZMIN[q.zone])) ZMIN[q.zone] = q.d;
@@ -140,6 +142,18 @@ function buildPool () {
   return POOL;
 }
 let EDGE_D = 0;
+/* адрес у границы закрытого района — не наш: в районе, но ближайшая к нему улица или двор в
+   OPEN_R метрах уже за перекрытием (заказ «падал в закрытый район»). Нужен открытый район и у
+   ближайшей дороги, и на кольце OPEN_R вокруг (8 точек) */
+const OPEN_R = 25;
+function openSpot (x, z) {
+  if (!DIST.has()) return true;
+  const ok = (px, pz) => DIST.isOpen(DIST.at(px, pz));
+  const r = A.nearestRoad ? A.nearestRoad(x, z, 60, 1) : null;
+  if (r && !ok(r.x, r.z)) return false;
+  for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; if (!ok(x + Math.cos(a) * OPEN_R, z + Math.sin(a) * OPEN_R)) return false; }
+  return true;
+}
 /* дальность обычного заказа: у района своя (DISTRICT.DIST), волна её растягивает или сжимает */
 function distRing () {
   const base = DIST.has() ? DIST.dist() : null;
@@ -149,7 +163,7 @@ function distRing () {
 }
 
 /* ─────────────── смена ─────────────── */
-const SH = { last: 0, gen: 0, sideOwed: false, zones: new Set(), must: {}, h0: 9, done: 0, log: [], reserved: new Set(), pts: [], breather: false };
+const SH = { last: 0, gen: 0, sideOwed: false, zones: new Set(), must: {}, h0: 9, done: 0, log: [], reserved: new Set(), pts: [], breather: false, k: 0, sz: 1, ones: 0 };
 const Q = [];                                          // заказы наперёд (песочница может положить); в игре — собираем по одному, когда нужен
 
 export function resetShift () {
@@ -158,6 +172,7 @@ export function resetShift () {
   SH.last = 0;
   SH.gen = 0; SH.sideOwed = false;
   SH.zones = new Set(); SH.must = {}; SH.done = 0; SH.log = []; SH.reserved = new Set(); SH.pts = []; SH.breather = false;
+  SH.k = 0; SH.sz = 1; SH.ones = 0;
   SH.h0 = hourNow();
   buildPool();
 }
@@ -307,16 +322,15 @@ function genSpec () {
 function bundleSpec (life, D) {
   const step = ECON.bundleStep(life);
   if (!step) return null;
+  let n = sizeRoll(step.max || 2);                       // сколько пицц — «вперемешку» (SHIFT_PLAN.sizes)
+  if (n < 2) return null;                                  // одна — обычная пицца
   const told = toldGet();                                 // сколько пицц директор уже объявил
-  const top = step.n[1];
-  let n, boss = null;
-  if (told < 2) { n = 2; boss = 2; }                       // самый первый — знакомство
-  else if (top > told) {
-    n = top;
-    for (const k in BOSS.lines) if (+k > told && +k <= top) boss = +k;
-    if (!boss) boss = -top;                                // реплики нет — просто запомнить
-  } else if (!chance(step.chance)) return null;
-  else n = rint(step.n);
+  let boss = null;
+  if (told < 2) { n = 2; boss = 2; }                       // самый первый — знакомство, ровно две
+  else if (n > told) {                                     // столько разом впервые — директор скажет, если есть что
+    for (const k in BOSS.lines) if (+k > told && +k <= n) boss = +k;
+    if (!boss) boss = -n;                                  // реплики нет — просто запомнить
+  }
   const pts = [];
   for (let i = 0; i < n; i++) {
     const s = pickSpot({ dmin: D.min, dmax: D.max });
@@ -335,6 +349,21 @@ function bundleSpec (life, D) {
     order.push(at);
   }
   return { type: 'pizza', kind: 'bundle', bundle: { n: order.length, time: step.time, boss }, stops: order.map(s => stopOf(s)) };
+}
+
+/* сколько пицц в очередном заказе (SHIFT_PLAN.sizes): по весам, но потолок растёт с каждым
+   заказом смены (rampStart + rampStep × сколько уже было после разминки), не больше ступени
+   курьера (max), не выше прошлого + maxJump, после большого — маленький, после ones одиночных
+   подряд — хотя бы два. 1 — обычная пицца */
+function sizeRoll (max) {
+  const Z = SHIFT_PLAN.sizes || {}, W = Z.weights || { 1: 1, 2: 1 };
+  let cap = Math.min(max, (Z.rampStart || 2) + Math.floor(SH.k * (Z.rampStep === undefined ? 1 : Z.rampStep)));
+  cap = Math.min(cap, (SH.sz || 1) + (Z.maxJump || 3));
+  if ((SH.sz || 1) >= (Z.big || 4)) cap = Math.min(cap, Z.afterBig || 2);
+  const lo = Math.min(cap, SH.ones >= (Z.ones || 2) ? 2 : 1);
+  const w = {};
+  for (let k = lo; k <= cap; k++) w[k] = W[k] || 0;
+  return +wpick(w) || lo;
 }
 
 /* «в конец района»: адрес из самых далёких от пиццерии района (EDGE_D), но по дорогам
@@ -358,6 +387,7 @@ const urgentMin = () => (DIST.has() ? Math.max(400, DIST.dist()[1] * ECON.DISTRI
 /* сюжет: дом героя не дальше 1,6 × дальности района от пиццерии (иначе глава ждёт района поближе) */
 function storyNear (s) {
   if (!DIST.has() || !Number.isFinite(s.x) || !Number.isFinite(s.z) || !A.PIZZA) return true;
+  if (!openSpot(s.x, s.z)) return false;                  // дом героя в закрытом районе — глава ждёт
   return Math.hypot(s.x - A.PIZZA.x, s.z - A.PIZZA.z) <= DIST.dist()[1] * 1.6;
 }
 
@@ -377,6 +407,10 @@ function finishSpec (spec, forced, hAt) {
   spec.color = spec.color || typeColor(spec.type);
   spec.forced = forced;
   spec.n = ++SH.gen;
+  // ритм размеров (sizeRoll): сколько было после разминки, сколько пицц в прошлом, сколько одиночных подряд
+  const size = spec.bundle ? spec.stops.length : 1;
+  if (!spec.easy) SH.k++;
+  SH.sz = size; SH.ones = size === 1 ? SH.ones + 1 : 0;
   spec.hour = +hAt.toFixed(2);
   SH.log.push({ n: spec.n, h: spec.hour, type: spec.type, kind: spec.kind, zone: spec.zone, edge: !!spec.edge, urgent: !!spec.urgent, side: !!spec.side, story: !!spec.story, m: spec.m.reduce((a, b) => a + b, 0), keys: spec.stops.map(s => s.key), forced });
   return spec;
@@ -617,6 +651,7 @@ export function payStop (o, st, onTime, tier) {
     tip = Math.round(fee * rand(a, b) * (lunch ? TIPS.LUNCH_MUL : 1) * (pc.tipMul || 1) / 10) * 10;
     rich = true;
   }
+  if (st.bumped) tip = 0;                                 // задел клиента машиной (game.js clientBump, ECON.CLIENT_HIT) — без чаевых
   // из чего сложилась оплата — game.js покажет кучкой денег и чеком (popPay); сюжет — катсцена сама покажет награду
   st.pay = { fee, bonus, tip, rich: rich && tip > 0, late: false, story: !!sp.story };
   return fee + bonus + tip;
@@ -755,7 +790,7 @@ function beginStaff (crew) {
   const homes = [];
   for (let i = 0; i < crew.length; i++) {
     const prev = homes[i - 1];
-    const s = prev ? pickSpot({ from: prev, dmin: 200, dmax: 750 }) : pickSpot({ dmin: 300, dmax: 1400 });
+    const s = prev ? pickSpot({ from: prev, dmin: ORDERS.STAFF_DIST[2], dmax: ORDERS.STAFF_DIST[3] }) : pickSpot({ dmin: ORDERS.STAFF_DIST[0], dmax: ORDERS.STAFF_DIST[1] });
     if (!s) break;
     SH.reserved.add(s.key);
     homes.push(s);
@@ -768,7 +803,11 @@ function beginStaff (crew) {
   if (far) stops.push({ peds: [], persons: crew.slice(), at: { x: P.x, z: P.z }, pickup: true, addr: P.name, note: '' });
   homes.forEach((h, i) => stops.push({ peds: [], persons: [crew[i]], at: { x: h.x, z: h.z }, key: h.key, zone: h.zone, addr: A.realAddress(h.x, h.z), note: '', reach: 7 }));
   S.order = { kind: 'chain', stops, idx: 0, why: t('развоз смены'), items: '', ord: { type: 'staff', kind: 'chain', color: typeColor('staff'), zone: homes[0].zone, stops: homes.map(h => ({ key: h.key, zone: h.zone })), m: [] } };
-  S.timeMax = S.time = 900;
+  // срок — путь по дорогам на средней скорости (RUN_V) × ORDERS.STAFF_TIME + 6 с на остановку
+  // (было 900 с: после полуночи смена тянулась до 15 минут — «смена не кончается»)
+  let L = 0, at = { x: V.x, z: V.z };
+  for (const q of stops) { L += A.routeLen(at.x, at.z, q.at.x, q.at.z); at = q.at; }
+  S.timeMax = S.time = Math.round(L / RUN_V * (ORDERS.STAFF_TIME || 1.5) + 6 * stops.length + 10);
   if (far) {
     S.state = 'drive';
     A.syncTarget(); A.rebuildRoutePath();
@@ -866,6 +905,11 @@ export function step (dt) {
     d.b.material.dispose();
     A.clearGuest(d.p);
     STAFF.drops.splice(i, 1);
+  }
+  // развоз не успел: работники выходят и идут пешком — обещание false, career.js закрывает смену
+  if (STAFF.p && S.order && S.order.ord && S.order.ord.type === 'staff' && S.time < 0 && ['drive', 'loading'].includes(S.state)) {
+    A.toast(t('не успел развезти — дальше они пешком'));
+    staffAbort();
   }
   // смена оборвалась посреди развоза
   if (STAFF.p && STAFF.crew && (S.state === 'over' || S.state === 'title' || S.state === 'dying') && !(S.order && S.order.ord && S.order.ord.type === 'staff')) staffDone(false);
