@@ -11,3 +11,6 @@ tools/steam/output/
 tools/steam/dl/
 tools/steam/*.vdf
 steam_appid.txt
+
+# личный журнал регистрации в Steamworks (данные аккаунта, банк) — не коммитить
+STEAM-ACCOUNT.local.md
