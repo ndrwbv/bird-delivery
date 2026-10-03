@@ -251,6 +251,23 @@ export const DISTRICT = {
   FAR_K: 1.6,                                // срочный и «в конец района» — по дорогам не дальше 1,6 × DIST[1]
 };
 
+/* ── весь город открыт (cityopen.js, docs/CAREER.md «Весь город открыт») ──
+   Открыты все районы — один раз праздник, дальше перед каждой сменой выбор: любая пиццерия
+   (как раньше: заказы только вокруг неё) или «весь город»: заказы во всех районах, DIST — от
+   пиццерии, где стоишь (вернуться можно в ближайшую), машина и оплата — как в последнем районе
+   (SPEED, PAY), и премия за дальний заказ: FAR_PER_KM за каждый км пути по дорогам сверх
+   FAR_FROM, круглым до 50 ₽, не больше FAR_MAX. Остановка сборного — за свой отрезок, адреса
+   сборного — кучкой у первого (BUNDLE_R).
+     1 км → 0;  2 км → +800;  3 км → +1 800;  4 км → +2 800;  5 км → +3 800 ₽
+   (обычная оплата ×1,35: 2 км ≈ 3 890, 3 км ≈ 5 400, 4 км ≈ 6 910 ₽ — премия +20…40 %). */
+export const CITY = {
+  DIST: [250, 3000],                         // заказы от пиццерии, где стоишь, м (по прямой)
+  SPEED: 1.21, PAY: 1.35,                    // как в 8-м районе (DISTRICT.SPEED / PAY)
+  FAR_FROM: 1200, FAR_PER_KM: 1000, FAR_MAX: 5000,
+  BUNDLE_R: 700,                             // сборный: адреса после первого — не дальше 700 м от него (по прямой)
+};
+export const cityFar = m => (m > CITY.FAR_FROM ? Math.min(CITY.FAR_MAX, Math.round((m - CITY.FAR_FROM) / 1000 * CITY.FAR_PER_KM / 50) * 50) : 0);
+
 /* ── волны щедрости: зашёл в игру — засыпаем подарками, потом строже, потом снова ──
    Считаются смены этой сессии (с запуска игры), по кругу WAVE: 1-я — щедрая,
    2-я — обычная, 3-я — час пик, 4-я — снова щедрая…
@@ -434,10 +451,11 @@ export const SHIFT_BONUS = { BASE: 1500, PER_ORDER: 300 };
 export const shiftBonus = (delivered, payK = 1) =>
   Math.round((SHIFT_BONUS.BASE + SHIFT_BONUS.PER_ORDER * Math.max(0, delivered | 0)) * payK / 10) * 10;
 
-/* ── денежный дождь в конце смены: одна купюра на каждые PER ₽ заработка (не меньше MIN,
-   не больше MAX — потолок ~80 тыс.), бонус досыпается золотыми монетами — одна на PER_BONUS ₽
-   (до MAX_BONUS). Чем больше наработал — тем выше куча на экране. ── */
-export const RAIN = { PER: 200, MIN: 6, MAX: 400, PER_BONUS: 60, MAX_BONUS: 120 };
+/* ── конец смены: деньги насыпаются кучей, как выигрыш в «депнуть» (shiftend.js) ──
+   Куча до верха — COLS × ROWS купюр (на узком экране — COLS_NARROW × ROWS) при заработке FULL ₽;
+   меньше — пропорционально, не меньше MIN купюр. Бонус за смену — золотые монеты сверху, одна на
+   BONUS_PER ₽ (не больше BONUS_MAX). Чем больше наработал — тем выше куча. ── */
+export const RAIN = { FULL: 60000, MIN: 6, COLS: 12, COLS_NARROW: 7, ROWS: 8, BONUS_PER: 200, BONUS_MAX: 24 };
 
 /* ── директор после смены: какая смена — хорошая / так себе / плохая ──
    плохая — меньше BAD_BELOW заказов или сняли за сбитого клиента; хорошая — досидел до конца,
@@ -446,7 +464,9 @@ export const BOSS_MOOD = { BAD_BELOW: 3, GREAT: { short: 4, medium: 6, long: 8 }
 
 /* ── машины: 14 штук. hp — сердца, L — ломучесть (скорость износа мотора: wearK = 0,4 + 0,2·L,
    см. BREAK), vmax/acc — как в CARS игры ──
-   Скорость у всех подняли на 20 % (30.09.2026): было 44…58 м/с, стало 53…70.
+   Скорость у всех подняли на 20 % (30.09.2026): было 44…58 м/с, стало 53…70. 03.10.2026 — опять
+   медленнее: vmax и acc ×0,83 — 41,5…58 м/с, на прямой −17 % (Семёрка 137 → 114 км/ч,
+   Шеви 174 → 145); порядок «кто быстрее» тот же, бист-мод и нитро считаются от новой максималки.
    Цены растут примерно в 1,3—1,5 раза: 40 → 88 → 120 → 152 → 240 → 360 → 440 → 520 → 720 → 860 →
    1 000 → 1 200 → 1 440 тыс. 02.10.2026 добавлены «китайцы» (между старыми, по цене):
    «Чери-Мери» (дешёвый хэтч: шустрый, но хлипкий и ломучий), «Белджик X-50» (компактный
@@ -456,20 +476,20 @@ export const BOSS_MOOD = { BAD_BELOW: 3, GREAT: { short: 4, medium: 6, long: 8 }
    Прокачка на каждую машину: броня (+1 сердце) и мотор (+4 % скорости), по три
    ступени, ступень — 15 % цены машины (у бесплатной «Семёрки» — от 6 400 ₽). */
 export const CAR_LIST = [
-  { id: 'semerka', price: 0,      stars: 0,  hp: 4,  L: 3,   vmax: 53, acc: 41 },
-  { id: 'matiz',   price: 40000,  stars: 0,  hp: 3,  L: 2,   vmax: 56, acc: 48 },
-  { id: 'kopeyka', price: 88000,  stars: 0,  hp: 5,  L: 4,   vmax: 54, acc: 42 },
-  { id: 'cheri',   price: 120000, stars: 0,  hp: 4,  L: 3,   vmax: 58, acc: 47 },
-  { id: 'priora',  price: 152000, stars: 0,  hp: 5,  L: 2,   vmax: 60, acc: 47 },
-  { id: 'buhanka', price: 240000, stars: 0,  hp: 8,  L: 5,   vmax: 50, acc: 37 },
-  { id: 'niva',    price: 360000, stars: 0,  hp: 6,  L: 3,   vmax: 58, acc: 46, offroad: true },
-  { id: 'belgik',  price: 440000, stars: 0,  hp: 6,  L: 1.5, vmax: 61, acc: 50 },
-  { id: 'volga',   price: 520000, stars: 0,  hp: 7,  L: 2,   vmax: 62, acc: 46 },
-  { id: 'cruze',   price: 720000, stars: 0,  hp: 6,  L: 1,   vmax: 67, acc: 52 },
-  { id: 'havalka', price: 860000, stars: 3,  hp: 9,  L: 1,   vmax: 62, acc: 46, offroad: true },
-  { id: 'vesta',   price: 1000000, stars: 5,  hp: 7,  L: 1,   vmax: 70, acc: 54 },
-  { id: 'jilya',   price: 1200000, stars: 8, hp: 8,  L: 0.5, vmax: 69, acc: 55 },
-  { id: 'patriot', price: 1440000, stars: 12, hp: 10, L: 0.3, vmax: 68, acc: 50, offroad: true },
+  { id: 'semerka', price: 0,      stars: 0,  hp: 4,  L: 3,   vmax: 44, acc: 34 },
+  { id: 'matiz',   price: 40000,  stars: 0,  hp: 3,  L: 2,   vmax: 46.5, acc: 39.8 },
+  { id: 'kopeyka', price: 88000,  stars: 0,  hp: 5,  L: 4,   vmax: 44.8, acc: 34.9 },
+  { id: 'cheri',   price: 120000, stars: 0,  hp: 4,  L: 3,   vmax: 48.1, acc: 39 },
+  { id: 'priora',  price: 152000, stars: 0,  hp: 5,  L: 2,   vmax: 49.8, acc: 39 },
+  { id: 'buhanka', price: 240000, stars: 0,  hp: 8,  L: 5,   vmax: 41.5, acc: 30.7 },
+  { id: 'niva',    price: 360000, stars: 0,  hp: 6,  L: 3,   vmax: 48.1, acc: 38.2, offroad: true },
+  { id: 'belgik',  price: 440000, stars: 0,  hp: 6,  L: 1.5, vmax: 50.6, acc: 41.5 },
+  { id: 'volga',   price: 520000, stars: 0,  hp: 7,  L: 2,   vmax: 51.5, acc: 38.2 },
+  { id: 'cruze',   price: 720000, stars: 0,  hp: 6,  L: 1,   vmax: 55.6, acc: 43.2 },
+  { id: 'havalka', price: 860000, stars: 3,  hp: 9,  L: 1,   vmax: 51.5, acc: 38.2, offroad: true },
+  { id: 'vesta',   price: 1000000, stars: 5,  hp: 7,  L: 1,   vmax: 58.1, acc: 44.8 },
+  { id: 'jilya',   price: 1200000, stars: 8, hp: 8,  L: 0.5, vmax: 57.3, acc: 45.6 },
+  { id: 'patriot', price: 1440000, stars: 12, hp: 10, L: 0.3, vmax: 56.4, acc: 41.5, offroad: true },
 ];
 export const UPGRADE = { STEPS: 3, SHARE: 0.15, MIN: 6400, HP: 1, VMAX: 0.04 };
 export const upgradePrice = (car, step) => Math.max(UPGRADE.MIN, Math.round(car.price * UPGRADE.SHARE / 100) * 100) * (step + 1);

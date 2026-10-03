@@ -594,8 +594,8 @@ body.brief #view { filter: blur(6px) brightness(0.72); transition: filter .25s; 
 @keyframes pf-vein { from { transform: scale(.85); } to { transform: scale(1.15); } }
 
 /* ── «Толик управляющий» (chat.js): сообщения как в iMessage — аватарка, имя, серый пузырь;
-   сначала три точки «печатает…», потом текст — крупно по центру сверху, через 1,2—2 с уменьшается
-   на место. Место и ширину ставит chat.js (под хадом справа). ── */
+   сначала три точки «печатает…», потом текст — крупно на своём месте (раздувается от правого верхнего
+   угла), через 1,2—2 с уменьшается до обычного. Место и ширину ставит chat.js (под хадом справа). ── */
 #chat { position: fixed; z-index: 11; display: flex; flex-direction: column; align-items: stretch; gap: 6px; pointer-events: none; }
 #chat .cm { display: flex; align-items: flex-end; gap: 6px; max-width: 100%; animation: cm-in .3s cubic-bezier(.2, .9, .3, 1.2) both; }
 #chat .cm.out { animation: cm-out .3s ease-in both; }
@@ -613,7 +613,7 @@ body.brief #view { filter: blur(6px) brightness(0.72); transition: filter .25s; 
 @keyframes cm-in { from { opacity: 0; transform: translateX(40px) scale(.9); } to { opacity: 1; transform: none; } }
 @keyframes cm-out { to { opacity: 0; transform: translateX(60px); } }
 @media (max-width: 560px) { #chat .cm-b p { font-size: 7px; padding: 6px 9px; } #chat .cm > img, #chat .cm > i { width: 22px; height: 22px; } }
-/* текст пришёл — строка крупно по центру сверху (chat.js grow/shrink: transform анимацией), поверх остальных */
+/* текст пришёл — строка крупно на своём месте (chat.js grow/shrink: transform анимацией), поверх остальных */
 #chat .cm.big { z-index: 2; }
 #chat .cm.big .cm-b p { box-shadow: 0 4px 14px rgba(0, 0, 0, .45); }
 @keyframes cm-fade { from { opacity: 0; } to { opacity: 1; } }

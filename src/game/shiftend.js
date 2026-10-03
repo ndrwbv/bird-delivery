@@ -1,169 +1,202 @@
-/* Конец смены: денежный дождь и слово директора. Числа — econ.js (SHIFT_BONUS, RAIN, BOSS_MOOD),
-   правила — docs/CAREER.md («Экран итогов»).
+/* Конец смены: деньги кучей, Толик управляющий, слово директора. Числа — econ.js (SHIFT_BONUS, RAIN,
+   BOSS_MOOD), правила — docs/CAREER.md («Экран итогов»).
 
-     END.play({ earned, bonus, money, Snd }, done) — дождь поверх итогов (~3—3,5 с); done() — кончился
-                                                    или пропущен (любая клавиша / тап / кнопка геймпада)
-     END.active() / END.skip() / END.root()        — идёт ли, пропустить, элемент (геймпад листает его — там пусто)
-     END.boss({ A, mood, opened, killed })         — что сказал директор: { face, name, text }
+     END.play({ earned, bonus, money, Snd, mood }, done) — два экрана поверх итогов, у каждого внизу
+         «продолжить»:
+           1) деньги: купюры насыпаются кучей, как выигрыш в «депнуть» (career.js pile: те же зелёные
+              купюры с «₽», падают и ложатся с наклоном), бонус за смену — золотыми монетами сверху,
+              сумма докручивается и мигает, три звона (~2,5 с, с бонусом ~3,3 с);
+           2) Толик управляющий крупно и одна его фраза по смене (CHAT.shiftLine(mood), хоть «мдаа»).
+         Ничего не заработал — сразу второй. done() — после второго «продолжить».
+     END.active() / END.skip() / END.root() — идёт ли; skip — любая клавиша / тап / кнопка геймпада:
+         пока сыплется или Толик печатает — показать сразу, потом — «продолжить»; root — элемент
+     END.boss({ A, mood, opened, killed })  — что сказал директор: { face, name, text }
 
-   Дождь — один canvas в низком разрешении (пиксели — крупные, image-rendering: pixelated):
-   купюры и монеты падают, упавшие «впекаются» в кучу (отдельный canvas), каждый кадр рисуются
-   только летящие. Тысячи DOM-узлов нет, на телефоне и Деке — пара сотен drawImage за кадр. */
+   Куча — пара сотен DOM-купюр с CSS-анимацией (dep-fall из career.css), без canvas. */
 import { t, tn } from '../i18n/index.js';
 import { RAIN as R } from './econ.js';
 import { BOSS } from './orders.config.js';
+import * as CHAT from './chat.js';
 
 const N_ = s => s;
 
-/* ── спрайты: пиксель-арт, 1 пиксель картинки = 1 пиксель низкого разрешения ── */
-const BILL = ['BBBBBBBBBBBB', 'BFFFFFFFFFFB', 'BFLFFOOFFLFB', 'BFFFOOOOFFFB', 'BFLFFOOFFLFB', 'BFFFFFFFFFFB', 'BBBBBBBBBBBB'];
-const COIN = ['..BBB..', '.BYYYB.', 'BYHYYYB', 'BYYYYYB', 'BYYYYDB', '.BYYDB.', '..BBB..'];
-const BILL_C = [
-  { B: '#1f5e2a', F: '#3fa34d', L: '#2c7a39', O: '#9be09b' },     // зелёная
-  { B: '#7a3a12', F: '#e0803a', L: '#b55a20', O: '#ffc08a' },     // оранжевая «пятитысячная»
-  { B: '#164a5e', F: '#3b8fb0', L: '#25708d', O: '#a5dcef' },     // голубая
-];
-const COIN_C = { B: '#8a5a0c', Y: '#ffd24a', H: '#fff6c2', D: '#d9a21c' };
-function sprite (rows, pal) {
-  const c = document.createElement('canvas');
-  c.width = rows[0].length; c.height = rows.length;
-  const g = c.getContext('2d');
-  rows.forEach((r, y) => { for (let x = 0; x < r.length; x++) if (pal[r[x]]) { g.fillStyle = pal[r[x]]; g.fillRect(x, y, 1, 1); } });
-  return c;
-}
-let SPR = null;
-const sprites = () => SPR || (SPR = { bills: BILL_C.map(p => sprite(BILL, p)), coin: sprite(COIN, COIN_C) });
-
-/* ── дождь ── */
 let RUN = null;
 const $c = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
 export const active = () => !!RUN;
 export const root = () => (RUN ? RUN.el : null);
-export function skip () { if (RUN) RUN.end(true); }
+export function skip () { if (RUN) RUN.skip(); }
 
-export function play ({ earned = 0, bonus = 0, money = n => String(Math.round(n)), Snd = null } = {}, done = () => {}) {
-  if (RUN) RUN.end(true);
+const GUARD = 350;                                   // мс: после смены экрана нажатия не считаются — не пролистать оба разом
+const FALL = 450;                                    // мс: одна купюра падает (dep-fall в career.css)
+
+export function play ({ earned = 0, bonus = 0, money = n => String(Math.round(n)), Snd = null, mood = 'ok' } = {}, done = () => {}) {
+  if (RUN) RUN.close(false);
   earned = Math.max(0, Math.round(earned)); bonus = Math.max(0, Math.round(bonus));
-  if (earned <= 0 && bonus <= 0) { done(); return; }
-  const S = sprites();
-  const vw = innerWidth, vh = innerHeight;
-  const PX = Math.max(2, Math.round(Math.min(vw, vh) / 200));      // во сколько раз пиксель крупнее экранного
-  const W = Math.ceil(vw / PX), H = Math.ceil(vh / PX);
-
-  const el = $c('div'); el.id = 'cr-rain';
-  const cv = $c('canvas'); cv.width = W; cv.height = H;
-  const sum = $c('div', 'rn-sum'), cap = $c('div', 'rn-cap'), bon = $c('div', 'rn-bonus'), hint = $c('div', 'rn-hint');
-  cap.textContent = t('заработано за смену');
-  hint.textContent = t('любая кнопка — пропустить');
-  bon.hidden = true;
-  const txt = $c('div', 'rn-txt');
-  txt.append(sum, cap, bon);
-  el.append(cv, txt, hint);
+  const el = $c('div'); el.id = 'cr-payout';
+  const stage = $c('div', 'en-stage');
+  const go = $c('button', 'dep-go en-go');
+  go.type = 'button';
+  go.textContent = t('продолжить');
+  el.append(stage, go);
   (document.getElementById('game') || document.body).appendChild(el);
-  const g = cv.getContext('2d');
-  const pile = $c('canvas'); pile.width = W; pile.height = H;
-  const pg = pile.getContext('2d');
-  const top = new Float32Array(W).fill(H);                          // где верх кучи в каждом столбце
 
-  const nE = earned > 0 ? Math.max(R.MIN, Math.min(R.MAX, Math.round(earned / R.PER))) : 0;
-  const nB = bonus > 0 ? Math.max(R.MIN, Math.min(R.MAX_BONUS, Math.round(bonus / R.PER_BONUS))) : 0;
-  const T_E = 1300, T_B0 = nB ? 1650 : 0, T_B = 800;                // мс: сыплется заработок; бонус — с 1,65 с, 0,8 с
-  const T_END = nB ? 3300 : 2500;
-  const queue = [];                                                  // [когда, бонус?]
-  for (let i = 0; i < nE; i++) queue.push([T_E * Math.pow(i / nE, 0.8), false]);
-  for (let i = 0; i < nB; i++) queue.push([T_B0 + T_B * (i / nB), true]);
-  queue.sort((a, b) => a[0] - b[0]);
-  const fall = [];
-  let qi = 0, t0 = performance.now(), last = t0, raf = 0, ended = false, lastSnd = 0, bonusShown = false;
+  let step = null, ready = 0, closed = false, raf = 0;
+  const timers = [];
+  const later = (ms, f) => { timers.push(setTimeout(f, ms)); };
+  const stopAll = () => { timers.forEach(clearTimeout); timers.length = 0; cancelAnimationFrame(raf); };
+  const blip = (f, d, ty, v) => { if (Snd) try { Snd.blip(f, d, ty, v); } catch (e) { /* — */ } };
+  const coins = () => { if (Snd && Snd.coin) [0, 1, 2].forEach(i => later(i * 160, () => Snd.coin())); };   // как выигрыш ставки
 
-  const spawn = isBonus => {
-    const coin = isBonus ? Math.random() < 0.85 : Math.random() < 0.18;
-    const img = coin ? S.coin : S.bills[Math.random() < 0.55 ? 0 : Math.random() < 0.5 ? 1 : 2];
-    const w = img.width, h = img.height;
-    fall.push({ img, w, h, coin, x: Math.random() * (W - w), y: -h - Math.random() * H * 0.25,
-      vy: H * (0.3 + Math.random() * 0.4), vx: (Math.random() - 0.5) * W * 0.04,
-      ph: Math.random() * 6.28, sp: 4 + Math.random() * 6, vmax: H * (coin ? 1.5 : 0.95 + Math.random() * 0.3) });
-  };
-  const rest = (x0, w) => { let y = H; for (let x = Math.max(0, x0), x1 = Math.min(W, x0 + w); x < x1; x++) y = Math.min(y, top[x]); return y; };
-  const land = s => {
-    // как песок: скатывается в самую низкую ямку рядом (до ширины купюры в стороны) — куча растёт слоями, не столбиками
-    const c0 = Math.max(0, Math.min(W - s.w, Math.round(s.x)));
-    let x0 = c0, best = -1;
-    for (let d = 0; d <= 12; d++) for (const sg of d ? [-1, 1] : [1]) {
-      const x = c0 + d * sg;
-      if (x < 0 || x > W - s.w) continue;
-      const r = rest(x, s.w);
-      if (r > best + 1) { best = r; x0 = x; }
-    }
-    const x1 = Math.min(W, x0 + s.w);
-    let y = H;
-    for (let x = x0; x < x1; x++) y = Math.min(y, top[x]);
-    y = Math.round(y - s.h + Math.min(2, s.h * 0.3));               // чуть утопает в кучу — плотнее
-    pg.save();
-    if (Math.random() < 0.5) { pg.translate(x0 + s.w, 0); pg.scale(-1, 1); pg.drawImage(s.img, 0, y); }
-    else pg.drawImage(s.img, x0, y);
-    pg.restore();
-    for (let x = x0; x < x1; x++) top[x] = Math.min(top[x], y + 1);
-    const now = performance.now();
-    if (Snd && now - lastSnd > (s.coin ? 90 : 140)) { lastSnd = now; Snd.blip(s.coin ? 1300 + Math.random() * 500 : 420 + Math.random() * 160, 0.04, 'square', 0.035); }
-  };
-  const showSum = v => { sum.textContent = '+' + money(v); };
-  showSum(0);
-
-  const frame = now => {
-    if (ended) return;
-    const el_ = now - t0, dt = Math.min(0.05, (now - last) / 1000);
-    last = now;
-    while (qi < queue.length && queue[qi][0] <= el_) spawn(queue[qi++][1]);
-    // счётчик: заработок за первые 1,5 с, бонус — сверху
-    const kE = Math.min(1, el_ / (T_E + 200)), eE = 1 - (1 - kE) ** 3;
-    let v = earned * eE;
-    if (nB && el_ >= T_B0) {
-      if (!bonusShown) {
-        bonusShown = true;
-        bon.innerHTML = '<span>' + esc(t('бонус за смену')) + '</span> <b>+' + esc(money(bonus)) + '</b>';
-        bon.hidden = false;
-        requestAnimationFrame(() => bon.classList.add('on'));
-        if (Snd && Snd.coin) Snd.coin();
-      }
-      const kB = Math.min(1, (el_ - T_B0) / (T_B + 200)), eB = 1 - (1 - kB) ** 3;
-      v = earned + bonus * eB;
-      cap.textContent = t('итого за смену');
-    }
-    showSum(v);
-    g.clearRect(0, 0, W, H);
-    g.drawImage(pile, 0, 0);
-    for (let i = fall.length - 1; i >= 0; i--) {
-      const s = fall[i];
-      s.vy = Math.min(s.vmax, s.vy + H * 2.2 * dt);
-      s.ph += s.sp * dt;
-      s.x = Math.max(0, Math.min(W - s.w, s.x + (s.vx + (s.coin ? 0 : Math.sin(s.ph) * W * 0.05)) * dt));
-      s.y += s.vy * dt;
-      if (s.y + s.h >= rest(Math.round(s.x), s.w) - 1) { land(s); fall.splice(i, 1); continue; }
-      // купюра кувыркается: сплющивается по высоте
-      const k = s.coin ? 1 : Math.abs(Math.cos(s.ph * 0.7));
-      const h = Math.max(1, Math.round(s.h * k));
-      g.drawImage(s.img, Math.round(s.x), Math.round(s.y + (s.h - h) / 2), s.w, h);
-    }
-    if (el_ >= T_END && qi >= queue.length && (!fall.length || el_ >= T_END + 600)) { finish(false); return; }
-    raf = requestAnimationFrame(frame);
-  };
-  const finish = quick => {
-    if (ended) return;
-    ended = true;
-    cancelAnimationFrame(raf);
-    showSum(earned + bonus);
-    if (nB && !bonusShown) { bon.innerHTML = '<span>' + esc(t('бонус за смену')) + '</span> <b>+' + esc(money(bonus)) + '</b>'; bon.hidden = false; bon.classList.add('on'); }
+  const close = call => {
+    if (closed) return;
+    closed = true;
+    stopAll();
     el.classList.add('out');
     if (RUN && RUN.el === el) RUN = null;
-    setTimeout(() => { el.remove(); }, quick ? 160 : 300);
-    done();
+    setTimeout(() => el.remove(), 200);
+    if (call) done();
   };
-  const tap = e => { e.preventDefault(); e.stopPropagation(); finish(true); };
-  el.addEventListener('pointerdown', tap);
-  RUN = { el, end: finish };
+  const next = () => {
+    if (performance.now() < ready) return;
+    if (step && step.busy) step.finish();
+    stopAll();
+    if (step && step.id === 'money') tolik();
+    else close(true);
+  };
+  const skipNow = () => {
+    if (performance.now() < ready) return;
+    if (step && step.busy) { step.finish(); ready = performance.now() + GUARD; return; }
+    next();
+  };
+
+  /* ── 1) деньги кучей ── */
+  function moneyStage () {
+    el.dataset.stage = 'money';
+    const top = $c('div', 'en-top'), sum = $c('div', 'en-sum'), cap = $c('div', 'en-cap'), bon = $c('div', 'en-bonus');
+    cap.textContent = t('заработано за смену');
+    bon.hidden = true;
+    top.append(sum, cap, bon);
+    const pile = $c('div', 'dep-pile en-pile');
+    stage.replaceChildren(top, pile);
+    const pw = Math.max(120, pile.clientWidth), ph = Math.max(80, pile.clientHeight);
+    const cols = pw < 520 ? R.COLS_NARROW : R.COLS, full = cols * R.ROWS;
+    const n = earned > 0 ? Math.max(R.MIN, Math.min(full, Math.round(full * earned / R.FULL))) : 0;
+    const nB = bonus > 0 ? Math.max(3, Math.min(R.BONUS_MAX, Math.round(bonus / R.BONUS_PER))) : 0;
+    // купюра — как в «депнуть»: шире шага (ложатся внахлёст), ряды — внахлёст по высоте
+    const sx = pw * 0.9 / cols, bw = sx * 1.5, bh = bw / 1.7;
+    const sy = Math.max(4, Math.min(bh * 0.7, (ph - bh * 2.2) / Math.max(1, R.ROWS - 1)));
+    const gap = Math.min(35, 1300 / Math.max(1, n));                // мс между купюрами: вся куча — за ~1,3 с
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    const bills = [];
+    const put = (x, y, w, h, cls, delay) => {
+      const b = $c('i', cls);
+      b.style.left = Math.max(0, Math.min(pw - w, x)).toFixed(1) + 'px';
+      b.style.bottom = y.toFixed(1) + 'px';
+      b.style.width = w.toFixed(1) + 'px'; b.style.height = h.toFixed(1) + 'px';
+      b.style.fontSize = Math.max(8, h * 0.42).toFixed(0) + 'px';
+      b.style.setProperty('--r', rnd(-20, 20).toFixed(0) + 'deg');
+      b.style.animationDelay = (delay / 1000).toFixed(3) + 's';
+      if (!cls) b.textContent = '₽';
+      pile.appendChild(b);
+      bills.push(delay);
+    };
+    for (let k = 0; k < n; k++) {
+      const row = Math.floor(k / cols), inRow = Math.min(cols, n - row * cols), j = k - row * cols;
+      // неполный верхний ряд — от середины к краям: горка, а не ступенька
+      const c = inRow < cols ? Math.round((cols - inRow) / 2) + j : j;
+      put(pw * 0.05 + c * sx + (row % 2 ? sx / 2 : 0) - (bw - sx) / 2 + rnd(-4, 4), row * sy + rnd(0, 3), bw, bh, '', k * gap);
+    }
+    // бонус — золотые монеты на вершину кучи, с 1,65 с за 0,8 с
+    const T_B0 = nB ? Math.max(1650, n * gap + FALL) : 0, T_B = 800;
+    // монета ложится на верх кучи там, куда упала: над неполным верхним рядом — выше
+    const cs = Math.max(18, bh * 0.8), full_ = Math.floor(n / cols), part = n - full_ * cols, c0 = Math.round((cols - part) / 2);
+    const topAt = x => {
+      const c = (x + cs / 2 - pw * 0.05) / sx, r = part && c >= c0 - 0.3 && c <= c0 + part + 0.3 ? full_ : full_ - 1;
+      return r < 0 ? 0 : r * sy + bh * 0.75;
+    };
+    const per = Math.max(4, Math.round(cols * 1.2));
+    for (let i = 0; i < nB; i++) {
+      const x = pw * 0.12 + rnd(0, pw * 0.76 - cs);
+      put(x, topAt(x) + Math.floor(i / per) * cs * 0.5 + rnd(0, 4), cs, cs, 'en-coin', T_B0 + T_B * (i / nB));
+    }
+    const T_E = 1300, T_END = Math.max(nB ? T_B0 + T_B + 700 : 2500, n * gap + FALL + 300);
+    const showSum = v => { sum.textContent = '+' + money(v); };
+    const showBonus = () => {
+      bon.innerHTML = '<span>' + esc(t('бонус за смену')) + '</span> <b>+' + esc(money(bonus)) + '</b>';
+      bon.hidden = false;
+      cap.textContent = t('итого за смену');
+      requestAnimationFrame(() => bon.classList.add('on'));
+    };
+    showSum(0);
+    const t0 = performance.now();
+    let landed = 0, lastSnd = 0, bonusShown = false;
+    const st = { id: 'money', busy: true };
+    const end = () => {
+      st.busy = false;
+      cancelAnimationFrame(raf);
+      showSum(earned + bonus);
+      if (nB && !bonusShown) { bonusShown = true; showBonus(); }
+      sum.classList.add('win');
+      el.classList.add('done');
+      if (earned + bonus > 0) coins();
+    };
+    st.finish = () => { el.classList.add('now'); end(); };       // досыпать сразу: купюры — уже в куче
+    const frame = now => {
+      if (closed || !st.busy) return;
+      const e = now - t0;
+      const kE = Math.min(1, e / (T_E + 200)), eE = 1 - (1 - kE) ** 3;
+      let v = earned * eE;
+      if (nB && e >= T_B0) {
+        if (!bonusShown) { bonusShown = true; showBonus(); if (Snd && Snd.coin) Snd.coin(); }
+        const kB = Math.min(1, (e - T_B0) / (T_B + 200)), eB = 1 - (1 - kB) ** 3;
+        v = earned + bonus * eB;
+      }
+      showSum(v);
+      // стук купюр о кучу (как в «депнуть»): не чаще раза в 110 мс
+      let l = 0;
+      for (const d of bills) if (d + FALL * 0.7 <= e) l++;
+      if (l > landed) {
+        landed = l;
+        if (now - lastSnd > 110) { lastSnd = now; blip(e >= T_B0 && nB ? 1300 + Math.random() * 500 : 420 + Math.random() * 160, 0.04, 'square', 0.04); }
+      }
+      if (e >= T_END) { end(); return; }
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    return st;
+  }
+
+  /* ── 2) Толик управляющий: только он и его фраза ── */
+  function tolik () {
+    el.dataset.stage = 'tolik';
+    el.classList.remove('now', 'done');
+    ready = performance.now() + GUARD;
+    const text = CHAT.shiftLine(mood), ava = CHAT.avatar(128);
+    const box = $c('div', 'en-tolik');
+    box.innerHTML = (ava ? '<img alt="" src="' + esc(ava) + '">' : '<i></i>') +
+      '<div class="en-tb"><b>' + esc(t('Толик управляющий')) + '</b><p class="typing"><span></span><span></span><span></span></p></div>';
+    stage.replaceChildren(box);
+    const p = box.querySelector('p');
+    const st = { id: 'tolik', busy: true };
+    st.finish = () => {
+      if (!st.busy) return;
+      st.busy = false;
+      p.className = '';
+      p.textContent = text;
+      el.classList.add('done');
+      const f = mood === 'bad' ? [620, 470] : [1320, 1760];       // как «пришло сообщение» в чате
+      f.forEach((x, i) => later(i * 95, () => blip(x, 0.12, 'triangle', 0.13)));
+    };
+    later(600, st.finish);
+    step = st;
+  }
+
+  el.addEventListener('pointerdown', e => { if (e.target === go) return; e.preventDefault(); e.stopPropagation(); skipNow(); });
+  go.addEventListener('pointerdown', e => e.stopPropagation());
+  go.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); next(); });
+  RUN = { el, skip: skipNow, close };
   requestAnimationFrame(() => el.classList.add('on'));
-  raf = requestAnimationFrame(frame);
+  if (earned > 0 || bonus > 0) { step = moneyStage(); ready = performance.now() + GUARD; } else tolik();
 }
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 

@@ -12,6 +12,7 @@
 import './menu.css';
 import { t, tn } from '../i18n/index.js';
 import * as DIST from './districts.js';
+import * as CITY from './cityopen.js';
 import { DISTRICT, SHIFT, clock } from './econ.js';
 
 let A = null, el = null, md = null, dm = null, nameCb = null, nameFirst = false;
@@ -66,7 +67,10 @@ export function show () {
   el.querySelector('.crm-go b').textContent = t('на смену');
   // круглосуточная пиццерия (со второго района): смена с того часа, когда кончилась прошлая (career.js)
   const allDay = DIST.has() && DIST.cur() >= (SHIFT.ALLDAY_FROM ?? 99);
-  el.querySelector('.crm-go span').textContent = allDay
+  const from0 = clock(A.Store.get('dlv-clock', '') === '' || A.Store.get('dlv-clock', null) == null ? 9 : +A.Store.get('dlv-clock', 9) || 0);
+  el.querySelector('.crm-go span').textContent = DIST.has() && DIST.city()
+    ? (allDay ? t('смена {n} · весь город · с {from}, круглосуточно', { n, from: from0 }) : t('смена {n} · весь город · {from}—{to}', { n, from: '9:00', to: '24:00' }))
+    : allDay
     ? t('смена {n} · район «{name}» · с {from}, круглосуточно', { n, name: t(DIST.list()[DIST.cur()].name), from: clock(A.Store.get('dlv-clock', '') === '' || A.Store.get('dlv-clock', null) == null ? 9 : +A.Store.get('dlv-clock', 9) || 0) })
     : DIST.has()
     ? t('смена {n} · район «{name}» · {from}—{to}', { n, name: t(DIST.list()[DIST.cur()].name), from: '9:00', to: '24:00' })
@@ -81,6 +85,7 @@ export function show () {
   q.hidden = !A.canQuit;
   rank();
   if (!String(A.Store.get('dlv-name', '') || '').trim()) askName(null, true);
+  else CITY.check(() => show());                  // открыт весь город, а праздника ещё не было — сейчас (cityopen.js)
 }
 
 /* ── рейтинг пиццерии: ты и курьеры, по заработку за всё время ── */
@@ -105,7 +110,7 @@ function distButton () {
   b.hidden = !DIST.has();
   if (b.hidden) return;
   const i = DIST.cur(), open = DIST.opened(), n = DIST.count();
-  b.querySelector('b').textContent = t('район: {name}', { name: t(DIST.list()[i].name) });
+  b.querySelector('b').textContent = DIST.city() ? t('район: {name}', { name: t('весь город') }) : t('район: {name}', { name: t(DIST.list()[i].name) });
   b.querySelector('span').textContent = open < n ? t('открыто {k} из {n}', { k: open, n }) + ' · ' + nextLine() : t('открыты все районы');
 }
 /* до следующего района: сколько смен ещё и где */
@@ -129,6 +134,7 @@ function distBox () {
 }
 const pct = k => '+' + Math.round((k - 1) * 100) + ' %';
 function openDistricts () {
+  if (DIST.allOpen()) { CITY.picker(() => show(), false); return; }   // всё открыто: «весь город» или пиццерия (cityopen.js)
   distBox();
   const cur = DIST.cur(), open = DIST.opened();
   dm.querySelector('.crm-dt').textContent = t('где работаешь');

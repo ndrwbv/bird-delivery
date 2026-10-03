@@ -21,20 +21,21 @@
        трассер) или кидается помидорами и ботинками (детская), раз в RATE (1 с);
        попал (HIT 65 %) — −½ сердца; дальше STOP_R (30 м) — перестаёт;
        вернулся в 15 м — снова сначала предупреждение и 4 с;
-     сбить можно только быстрее KO_KMH (40 км/ч) — бонус KO_PAY (2 500 ₽);
-       медленнее — отшатнулся, тормозит машину и сразу стреляет.
+     сбить — как любого прохожего: быстрее KO_KMH (20 км/ч) — бонус KO_PAY (2 500 ₽);
+       медленнее — твёрдый: машина его толкает (не сквозь), тормознуло, и сразу стреляет.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 import { t } from '../i18n/index.js';
 import * as ZN from './zones.js';
 import * as DIST from './districts.js';
 import { makePerson } from './people.js';
+import { TIER } from './hits.js';
 
 export const MAFIA = {
   CHANCE_GANG: 0.25, CHANCE: 0.06, PER_SHIFT: 1, FROM_STOP: 3,
   OFF_MIN: 6, OFF_MAX: 9, LIFE: 75,
   WARN_R: 15, GRACE: 4, STOP_R: 30, RATE: 1, HIT: 0.65, DMG: 0.4,     // DMG 0.4 → полсердца (game.js hitHearts)
-  KO_KMH: 40, KO_PAY: 2500,
+  KO_KMH: TIER.FALL, KO_PAY: 2500,                                   // KO_KMH — 20 км/ч, как у прохожих
 };
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -300,24 +301,33 @@ function manStep (m, dt) {
   m.grp.position.set(m.x, A.groundH(m.x, m.z) + (A.curbAt ? A.curbAt(m.x, m.z) : 0), m.z);
   m.grp.rotation.y = m.h;
 
-  // наезд: быстрее 40 км/ч — лежит; медленнее — отшатнулся, тормознул машину и злой
-  if (sp > 2) {
-    const fx = Math.sin(V.h), fz = Math.cos(V.h), ex = m.x - V.x, ez = m.z - V.z;
-    if (Math.abs(ex * fx + ez * fz) < 2.4 && Math.abs(ex * fz - ez * fx) < 1.1) {
-      if (sp * 3.6 >= MAFIA.KO_KMH) {
-        m.dead = 1;
-        if (m.bubble) { m.grp.remove(m.bubble); m.bubble.material.dispose(); m.bubble = null; }
-        A.dropMesh(m.grp);
-        A.gibHuman({ x: m.x, z: m.z, grp: m.grp }, V.vx, V.vz);
-        if (A.onRunOver) A.onRunOver();
-        M.stats.ko++;
-        if (A.reward) A.reward(MAFIA.KO_PAY, A.ADULT ? t('завалил мафиози') : t('уложил мафиози'));
-        M.man = null;
-        return;
-      }
-      const k = 1.6 / Math.max(0.3, Math.hypot(ex, ez));
-      m.x += ex * k * 0.6; m.z += ez * k * 0.6;
-      if (A.pushOut) A.pushOut(m, 0.45);
+  // наезд — как у всех прохожих: прямоугольник кузова (CAR_L + 0,5 × CAR_W + 0,35), не уже.
+  // Быстрее KO_KMH (20 км/ч, hits.js TIER.FALL) — сбит: лежит / разорвало — решает скорость (hits.js).
+  // Медленнее — он твёрдый: машина его толкает, а не проезжает сквозь (раньше при ударе медленнее
+  // 40 км/ч машину гасило до четверти скорости, она ползла меньше 7 км/ч — и проверка не работала).
+  const fx = Math.sin(V.h), fz = Math.cos(V.h), ex = m.x - V.x, ez = m.z - V.z;
+  const al = ex * fx + ez * fz, ac = ex * fz - ez * fx;
+  const HL = (A.CAR_L || 2.2) + 0.5, HW = (A.CAR_W || 1) + 0.35;
+  m.bumpT = Math.max(0, (m.bumpT || 0) - dt);
+  if (Math.abs(al) < HL && Math.abs(ac) < HW) {
+    if (sp * 3.6 >= MAFIA.KO_KMH) {
+      m.dead = 1;
+      if (m.bubble) { m.grp.remove(m.bubble); m.bubble.material.dispose(); m.bubble = null; }
+      A.gibHuman({ x: m.x, z: m.z, grp: m.grp }, V.vx, V.vz);
+      A.dropMesh(m.grp);
+      if (A.onRunOver) A.onRunOver();
+      M.stats.ko++;
+      if (A.reward) A.reward(MAFIA.KO_PAY, A.ADULT ? t('завалил мафиози') : t('уложил мафиози'));
+      M.man = null;
+      return;
+    }
+    // вытолкнуть из-под кузова — в ближайшую сторону: вбок или вперёд/назад от бампера
+    const outW = HW - Math.abs(ac) + 0.05, outL = HL - Math.abs(al) + 0.05;
+    if (outW <= outL) { const k = ac >= 0 ? outW : -outW; m.x += fz * k; m.z -= fx * k; }
+    else { const k = al >= 0 ? outL : -outL; m.x += fx * k; m.z += fz * k; }
+    if (A.pushOut) A.pushOut(m, 0.45);
+    if (m.bumpT <= 0 && sp > 1) {
+      m.bumpT = 1;
       if (A.bump) A.bump();
       m.stun = 0.5;
       if (m.st !== 'shoot') { m.st = 'shoot'; m.fireT = 0.6; }

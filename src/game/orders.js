@@ -123,18 +123,25 @@ function markUsed (key) {
    очередь, дворовые дорожки — когда свежих подъездов не осталось. Район и
    расстояние считаем раз за смену: круги бандитов сжимаются донатом.
    ZMIN — ближайший к пиццерии адрес района (дальше dist.min). */
-let POOL = [], ENTR = null, ZMIN = {};
+let POOL = [], ENTR = null, ZMIN = {}, POOL_AT = null;
 function buildPool () {
-  const P = A.PIZZA || { x: 0, z: 0 };
   if (!ENTR) {
     ENTR = new Set();
     for (const [x, z, nx, nz] of A.CITY.entrances) ENTR.add(Math.round((x + nx * 3) * 4) + ',' + Math.round((z + nz * 3) * 4));
   }
-  const D = distRing();
-  // районы (districts.js): заказы — только в том, где работаешь
-  const di = DIST.has() ? DIST.cur() : -1;
+  // районы (districts.js): заказы — только в том, где работаешь; «весь город» (cityopen.js) — во всех
+  // (там всё открыто — openSpot не нужен)
+  const di = DIST.has() && !DIST.city() ? DIST.cur() : -1;
   const src = di >= 0 ? A.SPOTS.filter(s => DIST.at(s.x, s.z) === di && openSpot(s.x, s.z)) : A.SPOTS;
-  POOL = src.map(s => ({ x: s.x, z: s.z, entr: ENTR.has(Math.round(s.x * 4) + ',' + Math.round(s.z * 4)), key: keyOf(s.x, s.z), zone: ZN.zoneAt(s.x, s.z), d: Math.hypot(s.x - P.x, s.z - P.z) }));
+  POOL = src.map(s => ({ x: s.x, z: s.z, entr: ENTR.has(Math.round(s.x * 4) + ',' + Math.round(s.z * 4)), key: keyOf(s.x, s.z), zone: ZN.zoneAt(s.x, s.z), d: 0 }));
+  return rebase();
+}
+/* расстояния пула — от пиццерии, где стоишь. В режиме «весь город» вернуться можно в любую
+   (game.js backToBase → ближайшая) — тогда пересчитываем, адреса те же */
+function rebase () {
+  const P = A.PIZZA || { x: 0, z: 0 }, D = distRing();
+  POOL_AT = A.PIZZA;
+  for (const q of POOL) q.d = Math.hypot(q.x - P.x, q.z - P.z);
   ZMIN = {};
   for (const q of POOL) if (q.d >= D.min && !(q.d >= ZMIN[q.zone])) ZMIN[q.zone] = q.d;
   // «в конец района» — дальше этого от пиццерии (DISTRICT.EDGE_TOP самых далёких адресов)
@@ -164,7 +171,7 @@ function distRing () {
 }
 
 /* ─────────────── смена ─────────────── */
-const SH = { last: 0, gen: 0, sideOwed: false, zones: new Set(), must: {}, h0: 9, done: 0, log: [], reserved: new Set(), pts: [], breather: false, k: 0, sz: 1, ones: 0 };
+const SH = { far: 0, last: 0, gen: 0, sideOwed: false, zones: new Set(), must: {}, h0: 9, done: 0, log: [], reserved: new Set(), pts: [], breather: false, k: 0, sz: 1, ones: 0 };
 const Q = [];                                          // заказы наперёд (песочница может положить); в игре — собираем по одному, когда нужен
 
 export function resetShift () {
@@ -173,7 +180,7 @@ export function resetShift () {
   SH.last = 0;
   SH.gen = 0; SH.sideOwed = false;
   SH.zones = new Set(); SH.must = {}; SH.done = 0; SH.log = []; SH.reserved = new Set(); SH.pts = []; SH.breather = false;
-  SH.k = 0; SH.sz = 1; SH.ones = 0;
+  SH.k = 0; SH.sz = 1; SH.ones = 0; SH.far = 0;
   SH.h0 = hourNow();
   buildPool();
 }
@@ -255,6 +262,7 @@ function easySpec () {
 
 function genSpec () {
   if (SH.gen === 0 && !POOL.length) buildPool();
+  else if (POOL_AT !== A.PIZZA) rebase();                 // «весь город»: вернулся в другую пиццерию
   const D = distRing();
   const easy = easySpec();
   if (easy) return finishSpec(easy, null, hourNow());
@@ -325,8 +333,10 @@ function bundleSpec (life, D) {
     if (!boss) boss = -n;                                  // реплики нет — просто запомнить
   }
   const pts = [];
+  // «весь город» (econ.js CITY): остальные адреса — кучкой у первого, не через весь город
+  const city = DIST.has() && DIST.city();
   for (let i = 0; i < n; i++) {
-    const s = pickSpot({ dmin: D.min, dmax: D.max });
+    const s = pickSpot(city && pts.length ? { near: pts[0], r: ECON.CITY.BUNDLE_R } : { dmin: D.min, dmax: D.max });
     if (!s) break;
     SH.reserved.add(s.key); SH.pts.push({ x: s.x, z: s.z });
     pts.push(s);
@@ -529,16 +539,19 @@ export function setup (plan) {
   const level = A.level();
   const opts = { urgent: !!sp.urgent, edge: !!sp.edge, level };
   // район платит больше (DISTRICT.PAY), час пик — тоже (PACE pay)
-  const mul = (DIST.has() ? DIST.pay() : 1) * (DIST.pace().pay || 1);
+  const mul = (DIST.has() ? DIST.pay() : 1) * (DIST.pace().pay || 1), city = DIST.has() && DIST.city();
   sp.fees = o.stops.map((st, i) => {
     const m = sp.m[i] || 0, zone = sp.stops[i] ? sp.stops[i].zone : sp.zone, n = Math.max(1, st.peds.length);
     if (sp.story && Number.isFinite(sp.story.pay)) return Math.round(sp.story.pay / o.stops.length);
     // групповой: за каждого следующего — ещё одна база
     return Math.round((ECON.orderPay(m, zone, opts) + (n - 1) * ECON.orderPay(0, zone, opts)) * mul / 10) * 10;
   });
+  // «весь город» (econ.js CITY): премия за дальний — за путь по дорогам сверх FAR_FROM, в цене остановки
+  sp.far = o.stops.map((st, i) => (city && !sp.story ? ECON.cityFar(sp.m[i] || 0) : 0));
+  sp.fees = sp.fees.map((f, i) => f + sp.far[i]);
   S.fee = sp.fees.reduce((a, b) => a + b, 0);
   // оплата и район — на самой остановке: в сборном игрок развозит в своём порядке, o.stops переставляются
-  o.stops.forEach((st, i) => { st.fee = sp.fees[i]; if (!st.zone && sp.stops[i]) st.zone = sp.stops[i].zone; st.done = false; });
+  o.stops.forEach((st, i) => { st.fee = sp.fees[i]; st.far = sp.far[i]; if (!st.zone && sp.stops[i]) st.zone = sp.stops[i].zone; st.done = false; });
   const L = A.routeLen(V.x, V.z, S.target.x, S.target.z);
   S.timeMax = sp.story && Number.isFinite(sp.story.time) ? sp.story.time
     : sp.urgent ? (DIST.has() ? Math.max(ECON.URGENT.MIN_T, L / ECON.URGENT.V + ECON.URGENT.ADD) : A.orderTime(L, 1, 1) * PAY.URGENT_TIME)
@@ -572,7 +585,9 @@ function bossSays (k) {
 const CUR = { order: null, story: null, done: false };
 export function startStory (plan) {
   const sp = plan.ord, s = sp.story, stp = sp.stops[0];
-  const st = { peds: [], persons: s.person ? [s.person] : [], at: { x: stp.x, z: stp.z }, key: stp.key, zone: stp.zone,
+  // пин — перед дверью на свободном месте (game.js pinFront), человек сюжета — у самой двери
+  const at = A.pinFront ? A.pinFront(stp.x, stp.z) : { x: stp.x, z: stp.z };
+  const st = { peds: [], persons: s.person ? [s.person] : [], at, key: stp.key, zone: stp.zone,
     addr: stp.addr, note: s.note || '', reach: s.reach || 6 };
   S.order = { kind: 'solo', tut: false, surf: false, stops: [st], idx: 0, why: plan.why, items: s.items || '1 × ' + t('пицца'), ord: sp };
   S.state = 'brief';
@@ -622,9 +637,14 @@ export function card (order) {
 export function cardRows (order) {
   const sp = order.ord;
   if (!sp) return [];
+  // «весь город»: район — тот, где адрес; премия за дальний — отдельной строкой (она уже в оплате)
+  const at = S.target || sp.stops[0];
+  const di = !DIST.has() ? -1 : DIST.city() && at ? DIST.at(at.x, at.z) : DIST.cur();
+  const far = (sp.far || []).reduce((a, b) => a + b, 0);
   return [
-    [t('район'), esc(t(ZONE_LABEL[sp.zone] || ZONE_LABEL.normal)) + (DIST.has() ? ' · ' + esc(t(DIST.list()[DIST.cur()].name)) : '')],
+    [t('район'), esc(t(ZONE_LABEL[sp.zone] || ZONE_LABEL.normal)) + (di >= 0 ? ' · ' + esc(t(DIST.list()[di].name)) : '')],
     [t('оплата'), A.money(S.fee) + (sp.urgent ? ' · <b class="oc-urg">' + t('срочно') + '</b>' : '')],
+    ...(far > 0 ? [[t('за дальний'), '<b class="oc-far">+' + A.money(far) + '</b>' + ' · ' + esc(t('премия, уже в оплате'))]] : []),
   ];
 }
 
@@ -658,6 +678,7 @@ export function payStop (o, st, onTime, tier) {
   markUsed(st.key);
   st.done = true;                                         // отдали: пины карты и накладная в паузе
   SH.done += o.idx === o.stops.length - 1 ? 1 : 0;
+  if (st.far) SH.far += onTime ? st.far : Math.round(st.far * PAY.LATE);   // «весь город»: премия за дальние за смену (итоги)
   if (!onTime) { st.pay = { fee, bonus: 0, tip: 0, late: true, story: !!sp.story }; return Math.round(fee * PAY.LATE); }
   const bonus = tier ? Math.round(fee * (PAY.SPEED_BONUS[tier] || 0)) : 0;
   const lunch = S.lunch === 'tips';
@@ -984,7 +1005,7 @@ export function reachStop (o) {
   if (!o || !o.ord || !o.ord.bundle || o.stops.length - o.idx < 2) return false;
   for (let i = o.idx; i < o.stops.length; i++) {           // у текущего — уже он
     const st = o.stops[i], p = stopAt(st);
-    if (p && Math.hypot(p.x - V.x, p.z - V.z) <= (st.reach || 5) + 2) return swapStop(o, i);
+    if (p && Math.hypot(p.x - V.x, p.z - V.z) <= (st.reach || 6) + 2) return swapStop(o, i);
   }
   return false;
 }
@@ -1129,7 +1150,8 @@ function simShift (n = 10, h0 = 9, h1 = 23.5, life = null, told = null) {
     SH.done++;
     const lvl = { urgent: !!sp.urgent, edge: !!sp.edge, level: A.level() };
     out.push({ n: sp.n, life: LIFE_OVERRIDE, h: +HOUR_OVERRIDE.toFixed(1), type: sp.type, kind: sp.kind, zone: sp.zone, stops: sp.stops.length, edge: !!sp.edge, urgent: !!sp.urgent, side: !!sp.side, forced: sp.forced, m: sp.m, keys: sp.stops.map(s => s.key),
-      boss: sp.bundle ? sp.bundle.boss : null, fee: sp.stops.reduce((a, st, k) => a + ECON.orderPay(sp.m[k] || 0, st.zone, lvl), 0) });
+      boss: sp.bundle ? sp.bundle.boss : null, fee: sp.stops.reduce((a, st, k) => a + ECON.orderPay(sp.m[k] || 0, st.zone, lvl), 0),
+      far: DIST.has() && DIST.city() ? sp.m.map(ECON.cityFar) : null });
     if (sp.bundle && sp.bundle.boss) SIM_TOLD = Math.max(SIM_TOLD, Math.abs(sp.bundle.boss));
     LIFE_OVERRIDE += sp.bundle ? sp.stops.length : 1;
   }
@@ -1138,8 +1160,10 @@ function simShift (n = 10, h0 = 9, h1 = 23.5, life = null, told = null) {
   SH.last = 0;
   return out;
 }
+/** «весь город»: премия за дальние, заработанная за эту смену (итоги смены, career.js) */
+export const farEarned = () => SH.far || 0;
 export const DEBUG = {
-  Q, SH, get POOL () { return POOL; }, get USED () { return USED; }, STAFF, ARRIVE, simShift, resetShift, genSpec, pickSpot, staffRide, bagMesh,
+  farEarned, Q, SH, get POOL () { return POOL; }, get USED () { return USED; }, STAFF, ARRIVE, simShift, resetShift, genSpec, pickSpot, staffRide, bagMesh,
   get CAR () { return CAR; }, get STORY () { return STORY; }, hourNow, offerSide, sideOpts, force, forceSide, nextPlan, card, onArrive,
   lifeN, bundleSpec, activeStops, pickStop, reachStop,
   clearUsed () { USED = []; reindex(); A.Store.set(USED_KEY, USED); },

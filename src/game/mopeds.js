@@ -12,7 +12,8 @@
      пешеход (кровь только во взрослой версии, это решает gibHuman), слабо —
      падает, встаёт, садится и едет дальше.
    • Часть стоит у кафе, магазинов и подъездов: мопед на тротуаре, курьер
-     рядом с короба за спиной смотрит в телефон.
+     рядом с короба за спиной смотрит в телефон. У твоего ждущего клиента
+     (ближе MP.clientR) не встают, а вставшие раньше уходят.
    • Рядом с курьером-игроком всегда около десяти на ходу и до четырёх
      стоящих; уехали далеко — переставляем поближе, как весь трафик.
 
@@ -34,7 +35,8 @@ const BRANDS = [
 const pickBrand = () => { let r = Math.random(); for (const b of BRANDS) if ((r -= b.w) <= 0) return b; return BRANDS[0]; };
 const BODY_HEX = ['#e8e4dc', '#3c4048', '#c8323a', '#7f8a96'];
 
-export const MP = { moving: 10, parked: 4, n: { spawned: 0, falls: 0, flown: 0, weaves: 0 }, spots: null, park: [], men: [], T: 0 };
+/* clientR — у ждущего клиента (game.js nearClient) ближе этого курьер не стоит */
+export const MP = { moving: 10, parked: 4, clientR: 20, n: { spawned: 0, falls: 0, flown: 0, weaves: 0 }, spots: null, park: [], men: [], T: 0 };
 const HL = 0.85;
 
 /* ── модели: склейки по вершинам, по одной на цвет, копия на каждый мопед ── */
@@ -298,7 +300,9 @@ export function step (dt, A) {
     // стоящие: дальние убираем, новые — в кольце вокруг
     for (let i = MP.park.length - 1; i >= 0; i--) {
       const man = MP.park[i], d = Math.hypot(man.x - V.x, man.z - V.z);
-      if (d > 280 || man.c.gone) {
+      // стоит у твоего ждущего клиента — уходит (пока ты не рядом: на глазах не пропадает)
+      const atClient = d > 40 && A.nearClient && A.nearClient(man.x, man.z, MP.clientR);
+      if (d > 280 || man.c.gone || atClient) {
         if (!man.dead) A.dropMesh(man.grp);
         if (!man.c.gone) A.svcGone(man.c);
         MP.park.splice(i, 1);
@@ -308,6 +312,7 @@ export function step (dt, A) {
     for (let k = 0; k < 30 && MP.park.length < MP.parked && S.length; k++) {
       const sp = pick(S), d = Math.hypot(sp[0] - V.x, sp[1] - V.z);
       if (d < 70 || d > 230 || MP.park.some(m => Math.abs(m.x - sp[0]) < 45 && Math.abs(m.z - sp[1]) < 45)) continue;   // не кучкой у одного ТЦ
+      if (A.nearClient && A.nearClient(sp[0], sp[1], MP.clientR)) continue;          // не у твоего клиента
       parkAt(A, sp);
     }
   }

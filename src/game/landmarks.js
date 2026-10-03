@@ -4,6 +4,7 @@
    пятна света в LAMP_SPOTS, стойки — obb. Переменных игры модуль не
    видит — всё приходит в api (landApi в game.js). */
 import { t } from '../i18n/index.js';
+import * as SL from './streetlamps.js';
 
 /* ── заправки ──
    Название и цвета — те же, что на вывеске точки (brands.js переписал
@@ -210,10 +211,8 @@ export function buildRink (A, green, spot) {
   // мачты со светом по углам
   for (const [u, n] of [[-hu - 1, -hn - 1], [hu + 1, -hn - 1], [-hu - 1, hn + 1], [hu + 1, hn + 1]]) {
     const [x, z] = pt(u, n), y = A.groundH(x, z);
-    box(A.LIT, 0.3, 9, 0.3, '#585460', x, y + 4.5, z, ry);
     const [lx, lz] = pt(u * 0.9, n * 0.9);
-    put(A.LAMPH, new THREE.BoxGeometry(1.2, 0.3, 0.6), '#f4fbff', lx, y + 8.8, lz, 0, ry, 0);
-    A.LAMP_SPOTS.push(pt(u * 0.6, n * 0.6));
+    SL.lamp(A, { x, z, y, style: 'mast', dx: lx - x, dz: lz - z, spot: pt(u * 0.6, n * 0.6) });   // мачта сбивается (streetlamps.js)
   }
   // катающиеся: по эллипсу, с наклоном в поворот
   const skaters = [];

@@ -1,0 +1,31 @@
+/* ── заработок смены на хаде (shiftcash.js): пачка купюр и крупная сумма, в одной строке с кошельком ── */
+#shiftcash { position: relative; display: inline-flex; align-items: center; gap: 8px; vertical-align: top; margin-right: 8px;
+             padding: 6px 10px 5px 8px; line-height: 1.2;
+             background: rgba(20, 16, 30, .7); border: 2px solid #33210c; border-radius: 6px; }
+#shiftcash[hidden] { display: none; }
+#shiftcash .sc-ico { width: 40px; height: 30px; flex: none; filter: drop-shadow(2px 2px 0 #33210c); transform-origin: 50% 100%; }
+#shiftcash .sc-txt { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+#shiftcash .sc-txt span { font-size: 7px; color: #bcd0e8; letter-spacing: .5px; }
+#shiftcash .sc-txt b { font-size: 20px; color: #8cf07a; white-space: nowrap; }
+/* оплата: пачка подпрыгивает, число вспыхивает; вычет — число краснеет */
+#shiftcash.bump .sc-ico { animation: sc-jump .5s steps(5) 1; }
+#shiftcash.bump .sc-txt b { animation: sc-flash .5s ease-out 1; }
+#shiftcash.hurt .sc-txt b { animation: sc-hurt .6s steps(3) 1; }
+@keyframes sc-jump { 0% { transform: none; } 30% { transform: translateY(-6px) scale(1.15); } 60% { transform: translateY(1px) scale(1, .9); } 100% { transform: none; } }
+@keyframes sc-flash { 0% { transform: scale(1); } 35% { transform: scale(1.25); color: #fff3d6; } 100% { transform: scale(1); } }
+@keyframes sc-hurt { 0%, 100% { color: #8cf07a; } 33% { color: #ff6b6b; } 66% { color: #ff9a9a; } }
+/* «+сумма» всплывает над блоком и тает */
+#shiftcash .sc-pop { position: absolute; right: 8px; bottom: 100%; font-style: normal; font-size: 12px; color: #ffd85e;
+                     white-space: nowrap; pointer-events: none; animation: sc-up 1.1s ease-out forwards; }
+#shiftcash .sc-pop.neg { color: #ff6b6b; }
+@keyframes sc-up { 0% { transform: translateY(10px); opacity: 0; } 15% { transform: translateY(0); opacity: 1; }
+                   70% { opacity: 1; } 100% { transform: translateY(-14px); opacity: 0; } }
+
+@media (max-width: 720px) {
+  #shiftcash { gap: 5px; margin-right: 5px; padding: 5px 7px 4px 5px; }
+  #shiftcash .sc-ico { width: 26px; height: 20px; }
+  #shiftcash .sc-txt { gap: 4px; }
+  #shiftcash .sc-txt span { font-size: 6px; }
+  #shiftcash .sc-txt b { font-size: 13px; }
+  #shiftcash .sc-pop { font-size: 9px; }
+}

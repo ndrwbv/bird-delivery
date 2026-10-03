@@ -1,32 +1,36 @@
 /* Чат управляющего: «Толик управляющий» пишет справа сверху, как в iMessage —
    аватарка, имя, пузырь. Сначала 0,5 с «печатает…» (три точки), потом текст.
-   Текст приходит крупно: «бам» — пузырь выскакивает из своего места вверх к середине экрана
-   (×1,8, не шире экрана, с отскоком и звуком), держится 1,2 с + 1 с на 150 букв (не дольше 2 с)
-   и за 0,45 с уменьшается обратно на своё место. Пришло новое — прежнее крупное сразу
-   уменьшается. prefers-reduced-motion — без увеличения, просто появляется.
+   Текст приходит крупно **на своём месте** (не по центру): «бам» — строка раздувается от своего
+   правого верхнего угла влево-вниз (×1,8, не вылезая за экран, с отскоком и звуком), держится 1,2 с
+   + 1 с на 150 букв (не дольше 2 с) и за 0,45 с уменьшается до обычной. Пришло новое — прежнее
+   крупное сразу уменьшается. prefers-reduced-motion — без увеличения, просто появляется.
    Видно сразу не больше трёх сообщений (четвёртое выталкивает самое старое),
    каждое висит (после крупного) 4 с + 1 с на каждые 25 букв (не дольше 8 с) и уезжает вправо.
    Ввод не перехватывает. Место — под колонкой хада справа (кошелёк, часы смены,
    «закончить смену», на телефоне — радар и кнопки); не влезает по высоте — слева от неё.
+   Пишет только на плохое и на очень хорошее, обычные доставки — молча.
    Что и когда пишет — docs/ORDERS.md «Толик управляющий».
 
    Из game.js:
      CHAT.init({ face, person, adult, blip }) — face(person, size) → картинка; adult — взрослая версия (мат);
                                             blip(f, d, type, v) — звук (Snd.blip)
-     CHAT.react(kind, onShow?)            — kind: 'fast' | 'slow' | 'late' | 'bump' | 'kill' | 'bundle' | 'urgent';
+     CHAT.react(kind, onShow?)            — kind: 'fast' | 'late' | 'bump' | 'kill' | 'bundle' | 'urgent';
                                             onShow() — в момент, когда текст появился (списание денег)
      CHAT.say(text, onShow?)              — своё сообщение
      CHAT.clear()                         — убрать всё (конец смены, меню)
      CHAT.later(ms, fn)                   — отложенное сообщение; пока не вышло — чат «занят»
      CHAT.busy() / CHAT.idle(cb, max)     — есть ли отложенное, «печатает…» или крупное; cb — когда всё
                                             показано и уменьшилось (не дольше max мс) — конец смены ждёт
-     CHAT.waiting()                       — идёт idle(): отложенная похвала всё равно показывается */
+     CHAT.waiting()                       — идёт idle(): отложенная похвала всё равно показывается
+   Из shiftend.js (экран Толика в конце смены):
+     CHAT.avatar(size)                    — его лицо картинкой ('' — нет)
+     CHAT.shiftLine(mood)                 — что он пишет после смены: mood 'bad' | 'ok' | 'great' */
 import { t, N_ } from '../i18n/index.js';
 
 const TYPE_S = 0.5, MAX = 3;
 const hold = s => Math.min(8, 4 + s.length / 25);
-/* крупно: во сколько раз, где центр (доля высоты экрана), сколько держится, выскок и уменьшение (мс) */
-const BIG = { S: 1.8, Y: 0.27, MIN: 1.2, PER: 150, MAX: 2, IN: 380, OUT: 450 };
+/* крупно: во сколько раз, сколько держится, выскок и уменьшение (мс) */
+const BIG = { S: 1.8, MIN: 1.2, PER: 150, MAX: 2, IN: 380, OUT: 450 };
 const bigHold = s => Math.min(BIG.MAX, BIG.MIN + s.length / BIG.PER);
 const calm = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
 
@@ -34,8 +38,6 @@ const calm = () => { try { return matchMedia('(prefers-reduced-motion: reduce)')
 const LINES = {
   fast: /*i18n*/ [N_('молодец)'), N_('красава, так держать'), N_('вот это скорость! клиент в шоке'),
     N_('огонь. ещё бы все так возили'), N_('быстро! премию не дам, но горжусь'), N_('молодец, Шумахер')],
-  slow: /*i18n*/ [N_('успел впритык. постарайся побыстрее'), N_('ну такое… постарайся'),
-    N_('клиент уже звонил, где пицца. постарайся'), N_('пицца приехала тёплой, а не горячей. постарайся')],
   bundle: /*i18n*/ [N_('весь развоз вовремя! Палыч доволен, я тоже'), N_('все адреса в срок. ты машина'), N_('развоз закрыт. уважуха')],
 };
 const ADULT_LINES = {
@@ -76,18 +78,14 @@ function ding (angry) {
   f.forEach((x, i) => setTimeout(() => { try { C.blip(x, 0.12, 'triangle', 0.13); } catch (e) { /* — */ } }, i * 95));
 }
 
-/* где пузырь крупно: та же строка, сдвинутая и увеличенная так, что её содержимое (аватарка +
-   пузырь) — по центру экрана на высоте BIG.Y, не шире экрана и не выше его половины */
+/* где пузырь крупно: на своём месте — строка раздувается от правого верхнего угла своего содержимого
+   (аватарка + пузырь) влево и вниз; не больше BIG.S, не за левый и нижний край экрана */
 function bigTf (m) {
   const row = m.el, b = row.querySelector('.cm-b'), c = C.el.getBoundingClientRect();
-  const W = innerWidth, H = innerHeight;
   const x0 = row.offsetLeft, x1 = b ? b.offsetLeft + b.offsetWidth : x0 + row.offsetWidth;
   const cw = Math.max(1, x1 - x0), h = Math.max(1, row.offsetHeight);
-  const s = Math.max(1, Math.min(BIG.S, (W - 24) / cw, H * 0.5 / h));
-  const ox = (x0 + x1) / 2 - x0, oy = h / 2;
-  const cy = Math.max(H * BIG.Y, h * s / 2 + 12);
-  const dx = W / 2 - (c.left + row.offsetLeft + ox), dy = cy - (c.top + row.offsetTop + oy);
-  return { origin: ox.toFixed(1) + 'px ' + oy.toFixed(1) + 'px', s, dx, dy };
+  const s = Math.max(1, Math.min(BIG.S, (c.left + x1 - 10) / cw, (innerHeight - 10 - c.top - row.offsetTop) / h));
+  return { origin: cw.toFixed(1) + 'px 0px', s, dx: 0, dy: 0 };
 }
 const tf = (g, k) => 'translate(' + (g.dx * k).toFixed(1) + 'px, ' + (g.dy * k).toFixed(1) + 'px) scale(' + (1 + (g.s - 1) * k).toFixed(3) + ')';
 
@@ -200,6 +198,27 @@ export function react (kind, onShow) {
   if (pool.length > 1 && k === C.last[kind]) k = (k + 1) % pool.length;
   C.last[kind] = k;
   return say(t(pool[k]), onShow, ANGRY.has(kind));
+}
+
+/* ── экран Толика в конце смены (shiftend.js): одна фраза по смене, «мдаа» — тоже фраза ── */
+const SHIFT_LINES = {
+  bad: /*i18n*/ [N_('мдаа'), N_('мдаа… это что сейчас было'), N_('ну такое. завтра чтоб без этого'),
+    N_('я даже не знаю, что Палычу сказать'), N_('мдаа. клиенты голодные, я седой')],
+  ok: /*i18n*/ [N_('норм. завтра давай бодрее'), N_('ну пойдёт. не шедевр, но пойдёт'), N_('смена как смена. иди отдыхай'),
+    N_('мм. сойдёт')],
+  great: /*i18n*/ [N_('вот это смена! красава)'), N_('ты сегодня зверь. так держать'), N_('Палыч доволен, я тоже. молодец)'),
+    N_('кухня не успевала за тобой. уважуха')],
+};
+const SHIFT_ADULT = {
+  bad: /*i18n*/ [N_('мдаа. пиздец, а не смена')],
+  ok: /*i18n*/ [N_('ну такое, бля. сойдёт')],
+  great: /*i18n*/ [N_('охуенно отработал, без шуток')],
+};
+export const avatar = size => (C.person && C.face ? C.face(C.person, size) : '');
+export function shiftLine (mood) {
+  const k = SHIFT_LINES[mood] ? mood : 'ok';
+  const pool = SHIFT_LINES[k].concat(C.adult ? SHIFT_ADULT[k] : []);
+  return t(pool[Math.floor(Math.random() * pool.length)]);
 }
 
 export function clear () { for (const m of C.items.slice()) drop(m); }

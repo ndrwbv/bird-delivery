@@ -37,6 +37,7 @@ import { GANG, SHIFT, hourOf } from './econ.js';
 import * as ZN from './zones.js';
 import * as DLG from './dialog.js';
 import * as SEAS from './seasons.js';
+import * as SL from './streetlamps.js';
 import { makePerson } from './people.js';
 
 /* соседние модули карьеры — если уже есть: вечер (career.js), «подъехал к
@@ -354,12 +355,7 @@ function drawAlleys () {
           const o = W / 2 + 1.1, lx = x + nx * o * side, lz = z + nz * o * side;
           if (A.inHouse(lx, lz, 1) || !roadClear(lx, lz, 0.5) || benchAt.some(q => Math.abs(q[0] - lx) < 1.8 && Math.abs(q[1] - lz) < 1.8)) continue;
           if (onAlley(lx, lz, 0.4) || nearPath(lx, lz, 1.4)) continue;
-          const gy = A.groundH(lx, lz);
-          A.box(A.LIT, 0.34, 0.5, 0.34, '#2f3338', lx, gy + 0.2, lz);
-          A.box(A.LIT, 0.14, 3.9, 0.14, '#3b3f46', lx, gy + 2.2, lz);
-          A.box(A.LIT, 0.5, 0.12, 0.5, '#2f3338', lx, gy + 4.2, lz);
-          A.put(A.LAMPH, new THREE.IcosahedronGeometry(0.3, 0), '#fff3c4', lx, gy + 4.5, lz);
-          A.LAMP_SPOTS.push([lx, lz]);
+          SL.lamp(A, { x: lx, z: lz, y: A.groundH(lx, lz), style: 'park' });   // шар на столбике, сбивается (streetlamps.js)
           lamps++;
         }
       }
@@ -863,14 +859,16 @@ const inGang = (x, z) => ZN.gangZones().some(g => (x - g.x) ** 2 + (z - g.z) ** 
 /* подъехал к клиенту (orders.js onArrive): в районе — шанс, что подойдут (днём GANG.CHANCE,
    вечером GANG.CHANCE_EVENING; донат «борьба с насилием» — вдвое реже).
    Раньше — только вечером: в укороченных сменах вечер ~1 мин, мзду почти не видели.
-   Возвращаем обещание: пока разбираемся с гопниками, заказ ждёт */
+   Заказ гопников не ждёт: пицца отдаётся сразу, они подходят уже после (обещание не
+   возвращаем). До 03.10.2026 возвращали — и вручение висело, пока гопники не уйдут:
+   подходят до 11 с, разговор 9 с, мнут машину до 14 с; уехал — вернись в пин заново */
 export function arrive (ev) {
   if (!A || !CAREER || GE.st || (GE.cd > 0 && !GE.force)) return;
   const x = ev && ev.x !== undefined ? ev.x : A.V.x, z = ev && ev.z !== undefined ? ev.z : A.V.z;
   if (!inGang(x, z) && !inGang(A.V.x, A.V.z)) return;
   if (GE.force) GE.force = false;
   else if (!chance((evening() ? GANG.CHANCE_EVENING : GANG.CHANCE) * (1 - 0.5 * A.donated('gang')))) return;
-  return gangStart();
+  gangStart();
 }
 function thug (lead) {
   const person = lead ? makePerson({ fem: false }) : null, hex = pick(TRACK);

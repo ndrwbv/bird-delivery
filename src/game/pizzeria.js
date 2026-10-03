@@ -5,6 +5,7 @@
    фирменном цвете, табличка и фонарь. Все курьеры (и ты) ждут заказ там.
    Переменных игры модуль не видит — всё приходит в api (pizzaApi в game.js). */
 import { t } from '../i18n/index.js';
+import * as SL from './streetlamps.js';
 
 const BRAND = '#f0522a', CREAM = '#fff3d6';
 
@@ -159,9 +160,7 @@ export function courierLot (A, f, count) {
   sign.position.set(sx, sy + 2.6, sz); sign.rotation.y = Math.atan2(-nx, -nz);
   A.scene.add(sign);
   const [lx, lz] = P(W / 2 + 1.2, D + 0.6), ly = A.groundH(lx, lz);
-  A.box(A.LIT, 0.22, 5.5, 0.22, '#585460', lx, ly + 2.75, lz);
-  A.put(A.LAMPH, new THREE.BoxGeometry(0.7, 0.2, 0.5), '#fff3c4', lx - nx * 0.8, ly + 5.4, lz - nz * 0.8, 0, 0, 0);
-  A.LAMP_SPOTS.push(P(W / 2 - 2, D / 2));
+  SL.lamp(A, { x: lx, z: lz, y: ly, style: 'yard', dx: -nx, dz: -nz, spot: P(W / 2 - 2, D / 2) });   // сбивается (streetlamps.js)
   const h = Math.atan2(-nx, -nz);                                        // носом к улице
   const out = [];
   for (let i = 0; i < count; i++) { const [x, z] = P(-W / 2 + (i + 0.5) * SW, D / 2 + 0.2); out.push({ x, z, h, gy }); }

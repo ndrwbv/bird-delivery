@@ -21,8 +21,11 @@ import * as GARAGE from './garage.js';
 import * as MENU from './menu.js';
 import * as DLG from './dialog.js';
 import * as DIST from './districts.js';
+import * as CITY from './cityopen.js';
+import { farEarned } from './orders.js';
 import * as END from './shiftend.js';
 import * as CHAT from './chat.js';
+import * as ACH from './achievements.js';          // достижения: «Всё на красное» в «депнуть» (achievements.js)
 import { makePadMenu } from '../input/padmenu.js';
 import { t, tn, lang } from '../i18n/index.js';
 
@@ -133,6 +136,7 @@ export function startShift () {
   SH.len = ECON.shiftLen(SH.n);
   SH.pace = DIST.beginShift();                    // волна щедрости: 1-я смена сессии — щедрая (econ.js PACE)
   SH.district = DIST.cur();
+  SH.city = DIST.city();                          // «весь город» (cityopen.js): итоги — без района, с премией за дальние
   SH.opened = -1;
   lunchClass(false);
   fire(startCbs, { n: SH.n + 1 });
@@ -329,14 +333,14 @@ export function showEnd (why, whyText, held) {
     const r = DIST.countShift(S.delivered || 0);
     SH.counted = r.counted; SH.opened = r.opened;
     // бонус за смену — только досидел до конца (econ.js SHIFT_BONUS), сразу в кошелёк
-    SH.bonus = full ? ECON.shiftBonus(S.delivered || 0, DIST.has() ? DIST.pay(SH.district >= 0 ? SH.district : DIST.cur()) : 1) : 0;
+    SH.bonus = full ? ECON.shiftBonus(S.delivered || 0, DIST.has() ? (SH.city ? ECON.CITY.PAY : DIST.pay(SH.district >= 0 ? SH.district : DIST.cur())) : 1) : 0;
     if (SH.bonus) A.addWallet(SH.bonus);
     // сбито прохожих за всю карьеру — для директора при переводе в новый район
     A.Store.set(KNOCKED, knocked() + (S.people || 0));
     SH.mood = moodOf(why, full);
     if (full && SH.hits === 0 && (S.delivered || 0) > 0) addStars(ECON.STARS.CLEAN_SHIFT, t('смена без единого удара'));
     crewRecord(S.money || 0, full);
-    fire(endCbs, { why, money: S.money || 0, delivered: S.delivered || 0, hits: SH.hits, fine: SH.fine, full });
+    fire(endCbs, { why, money: S.money || 0, delivered: S.delivered || 0, hits: SH.hits, fine: SH.fine, full, mood: SH.mood });
   }
   A.Store.flush();
 
@@ -362,6 +366,7 @@ export function showEnd (why, whyText, held) {
     S.people ? [t('прохожих сбито'), S.people, cnt] : null,
     SH.stars ? [t('звёзд за смену'), SH.stars, n => '+' + Math.round(n) + ' ★'] : null,
     DIST.has() ? [...districtRow(), 'info'] : null,
+    SH.city && farEarned() > 0 ? [t('премия за дальние'), farEarned(), n => '+' + A.money(n)] : null,
     DIST.has() && SH.opened >= 0 ? [t('открыт новый район'), 1, () => t(DIST.list()[SH.opened].name), 'new'] : null,
     ...(DIST.has() && SH.opened < 0 ? districtNext().map(([k, v]) => [k, 1, () => v, 'info']) : []),
   ].filter(Boolean);
@@ -401,12 +406,13 @@ export function showEnd (why, whyText, held) {
   // цифры докрутились — поверх всплывает заработок и на что потратить, если есть что тратить
   closeSpend(false);
   clearTimeout(SPEND_T);
-  // сначала денежный дождь (заработок, потом бонус за смену), потом цифры и «потратить»
+  // сначала деньги кучей (заработок, потом бонус за смену) → «продолжить» → Толик управляющий и его фраза →
+  // «продолжить» → цифры итогов и «потратить» (shiftend.js)
   const after = () => {
     rowsGo();
     SPEND_T = setTimeout(() => { if (A.wallet() > 0 && $('over') && !$('over').hidden) openSpend(); else reopenBtn(); }, 200 + rows.length * 220 + 700);
   };
-  if (wasOn) setTimeout(() => END.play({ earned: S.money || 0, bonus: SH.bonus || 0, money: A.money, Snd: A.Snd }, after), 60);
+  if (wasOn) setTimeout(() => END.play({ earned: S.money || 0, bonus: SH.bonus || 0, money: A.money, Snd: A.Snd, mood: SH.mood || 'ok' }, after), 60);
   else after();
   // кнопки: на новую смену (главная) / потратить / гараж / покататься / в меню
   $('ov-again').textContent = t('на новую смену');
@@ -462,6 +468,7 @@ addEventListener('resize', () => {
 
 /* район на экране итогов: «Юг · 2 из 2 смен» или «Юг · смена не засчитана (меньше 2 заказов)» */
 function districtRow () {
+  if (SH.city) return [t('район'), 1, () => t('весь город')];
   const i = SH.district >= 0 ? SH.district : DIST.cur(), name = t(DIST.list()[i].name), need = DIST.need(i), have = DIST.shiftsIn(i);
   const txt = !SH.counted ? name + ' · ' + tn(ECON.DISTRICT.COUNT_MIN, 'не засчитана: меньше {n} заказа|не засчитана: меньше {n} заказов|не засчитана: меньше {n} заказов')
     : need && i === DIST.opened() - 1 + (SH.opened >= 0 ? -1 : 0) ? name + ' · ' + t('{have} из {need} смен', { have: Math.min(have, need), need })
@@ -676,11 +683,11 @@ const spendOpen = () => { const m = $('cr-spend'); return m && !m.hidden ? m : n
 /** непрозрачный экран поверх города (гараж, «потратить») — кадр мира можно не рисовать */
 export const covered = () => GARAGE.isOpen() || !!spendOpen() || !!depOpen();
 /** что сейчас листает геймпад: окно имени, гараж, «депнуть», «потратить» — или null */
-export function padRoot () { return END.root() || MENU.modal() || GARAGE.root() || depOpen() || spendOpen(); }
+export function padRoot () { return END.root() || CITY.root() || MENU.modal() || GARAGE.root() || depOpen() || spendOpen(); }
 /** до makePadMenu: в гараже ←→ и LB/RB листают машины, B — закрыть то, что сверху */
 export function padPre (p) {
   if (!A) return;
-  if (END.active()) {                               // денежный дождь: любая кнопка — пропустить
+  if (END.active()) {                               // конец смены (деньги, Толик): любая кнопка — показать сразу / «продолжить»
     if (p.any || p.menuOk || p.menuBack || p.accept) END.skip();
     p.menuOk = p.menuBack = p.menuUp = p.menuDown = p.menuLeft = p.menuRight = false;
     return;
@@ -698,6 +705,7 @@ export function padPre (p) {
 }
 /** назад: окно имени → гараж → «потратить»; true — что-то закрыли */
 export function back () {
+  if (CITY.root()) return CITY.back();
   if (MENU.modal()) return MENU.back();
   if (GARAGE.isOpen()) { GARAGE.close(); return true; }
   if (depOpen()) return closeDep();
@@ -721,7 +729,7 @@ const KEYS = { ArrowUp: 'menuUp', KeyW: 'menuUp', ArrowDown: 'menuDown', KeyS: '
   ArrowRight: 'menuRight', KeyD: 'menuRight', Enter: 'menuOk', NumpadEnter: 'menuOk', Space: 'menuOk', Escape: 'menuBack', Backspace: 'menuBack' };
 function onKey (e) {
   if (!A) return;
-  if (END.active()) { if (!e.repeat) END.skip(); e.preventDefault(); e.stopPropagation(); return; }   // дождь — любая клавиша пропускает
+  if (END.active()) { if (!e.repeat) END.skip(); e.preventDefault(); e.stopPropagation(); return; }   // конец смены — любая клавиша: показать сразу / «продолжить»
   const root = kbRoot();
   if (!root) return;
   const tg = e.target, typing = tg && ((tg.tagName === 'INPUT' && /^(text|search|)$/.test(tg.type)) || tg.tagName === 'TEXTAREA');
@@ -950,6 +958,7 @@ function spin () {
   const chance = GAME === 'tennis' ? 1 / TENNIS.length : cfg.win != null ? cfg.win : ECON.SLOT.WIN;
   const win = (ECON.SLOT.FIRST_WIN && DEP_SESSION === 1) || Math.random() < chance;
   A.addWallet(-st);
+  const allIn = stepDown(A.wallet()) <= 0;        // поставил всё — для достижения ALL_IN (achievements.js)
   A.Store.flush();
   refreshWallet();
   md.classList.add('spun');                       // купюры уезжают в игру
@@ -958,6 +967,7 @@ function spin () {
   md.querySelector('.dep-sum span').textContent = t('из кошелька −{money} · останется {left}', { money: A.money(st), left: A.money(A.wallet()) });
   A.Snd.blip(220, 0.12, 'square', 0.08);
   const finish = (txt) => {
+    ACH.dep(win, allIn);                          // проиграл всё — «Всё на красное» (после анимации, не раньше)
     const res = md.querySelector('.dep-res');
     md.querySelector('.dep-pile').innerHTML = '';
     if (win) {

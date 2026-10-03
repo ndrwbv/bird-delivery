@@ -14,13 +14,17 @@
      DIST.countShift(delivered)  — конец смены: засчитать нынешнему району → { counted, opened: номер нового или -1 }
      DIST.speed() / pay() / dist() — надбавки и дальность заказов нынешнего района
      DIST.onChange(cb)           — сменили район (game.js переставляет пиццерию)
+     DIST.allOpen()              — открыты все районы
+     DIST.city() / setCity(on)   — режим «весь город» (только когда всё открыто; сохраняется, cityopen.js):
+                                   заказы, кофе и аптечки — во всех районах, speed/pay/dist — ECON.CITY
+     DIST.mine(i)                — район i — «твой» на этой смене: в режиме «весь город» любой открытый, иначе cur()
 
    Волны — по сменам этой сессии (с запуска игры): DIST.beginShift() в начале смены
    ставит режим по кругу PACE.WAVE, DIST.pace() → { id, …PACE.MODES[id] }. */
-import { DISTRICT, PACE } from './econ.js';
+import { DISTRICT, PACE, CITY } from './econ.js';
 
 let A = null;
-const KEY = 'dlv-district', KEY_N = 'dlv-dist-shifts', KEY_O = 'dlv-dist-open';
+const KEY = 'dlv-district', KEY_N = 'dlv-dist-shifts', KEY_O = 'dlv-dist-open', KEY_C = 'dlv-city-mode';
 const cbs = [];
 
 export function init (api) { A = api; }
@@ -81,6 +85,20 @@ export function set (i) {
 }
 export function onChange (cb) { if (typeof cb === 'function') cbs.push(cb); }
 
+/* весь город (cityopen.js): когда открыты все районы, можно работать сразу везде. Пиццерия
+   старта — cur(), вернуться можно в любую (game.js backToBase → ближайшая) */
+export const allOpen = () => has() && opened() >= count();
+export const city = () => allOpen() && !!(A && +A.Store.get(KEY_C, 0));
+export function setCity (on) {
+  if (!has() || (on && !allOpen())) return false;
+  const was = city();
+  A.Store.set(KEY_C, on ? 1 : 0);
+  A.Store.flush && A.Store.flush();
+  if (was !== !!on) { const i = cur(); for (const cb of cbs) { try { cb(i, i); } catch (e) { console.error('[districts]', e); } } }
+  return true;
+}
+export const mine = i => (city() ? isOpen(i) : i === cur());
+
 /* конец смены: засчитать району; открылся новый — сразу туда (вернуться можно из меню) */
 export function countShift (delivered) {
   if (!has()) return { counted: false, opened: -1 };
@@ -97,9 +115,10 @@ export function countShift (delivered) {
 }
 
 const pick = (arr, i) => arr[Math.max(0, Math.min(arr.length - 1, i))];
-export const speed = (i = cur()) => pick(DISTRICT.SPEED, i);
-export const pay = (i = cur()) => pick(DISTRICT.PAY, i);
-export const dist = (i = cur()) => pick(DISTRICT.DIST, i);
+// без номера — для этой смены: в режиме «весь город» — ECON.CITY
+export const speed = i => (i === undefined && city() ? CITY.SPEED : pick(DISTRICT.SPEED, i ?? cur()));
+export const pay = i => (i === undefined && city() ? CITY.PAY : pick(DISTRICT.PAY, i ?? cur()));
+export const dist = i => (i === undefined && city() ? CITY.DIST : pick(DISTRICT.DIST, i ?? cur()));
 
 /* ── волны щедрости ── */
 let SESSION = 0, MODE = 'generous';
@@ -115,7 +134,7 @@ export function setPace (id) { if (PACE.MODES[id]) MODE = id; }
 
 /* отладка: __dlv.DIST */
 export const DEBUG = {
-  list, at, cur, set, opened, shiftsIn, need, countShift, speed, pay, dist, pace, setPace, beginShift, session,
+  list, at, cur, set, opened, shiftsIn, need, countShift, speed, pay, dist, pace, setPace, beginShift, session, allOpen, city, setCity, mine,
   unlockAll () { if (!A) return; A.Store.set(KEY_N, list().map((_, i) => need(i))); A.Store.set(KEY_O, count()); A.Store.flush && A.Store.flush(); },
-  reset () { if (!A) return; A.Store.set(KEY_N, []); A.Store.set(KEY_O, 1); A.Store.set(KEY, 0); A.Store.flush && A.Store.flush(); },
+  reset () { if (!A) return; A.Store.set(KEY_N, []); A.Store.set(KEY_O, 1); A.Store.set(KEY, 0); A.Store.set(KEY_C, 0); A.Store.flush && A.Store.flush(); },
 };

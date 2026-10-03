@@ -31,6 +31,8 @@ import * as CBITS from './citybits.js';
 import * as SEAS from './seasons.js';
 import * as LIFE from './life.js';               // парочки, богачи, графитисты, змеи и дроны в парках
 import * as WORLD from './world.js';
+import * as SL from './streetlamps.js';
+import * as CARL from './carlights.js';         // огни машины игрока: стоп-сигналы, поворотники, задний ход (carlights.js)         // фонари: все сбиваются, шары и консоли, частный сектор (streetlamps.js)
 import * as JUNK from './junk.js';              // остановки ломаются, мусор у подъездов, контейнеры (junk.js)             // плитка, аллеи; в карьере — мусор, бандиты, особняки, шашлыки
 import * as MAFIA from './mafia.js';             // мафиози у адреса: предупреждает, потом стреляет (детская — кидается помидорами)
 import * as FAUNA from './fauna.js';             // лоси, лисы и зайцы в лесах; «лось на дороге!» (fauna.js)
@@ -43,6 +45,7 @@ import * as ECON from './econ.js';               // карьера: все чи�
 import * as DLG from './dialog.js';              // диалог с головой и печатающимся текстом
 import * as ZN from './zones.js';                // районы города для заказов и событий
 import * as DIST from './districts.js';          // карьера: 8 районов со своими пиццериями, волны щедрости
+import * as CITYOPEN from './cityopen.js';      // карьера: все районы открыты — праздник, выбор перед сменой, «весь город»
 import * as ORD from './orders.js';              // карьера: очередь заказов, поручения, развоз смены, оплата (docs/ORDERS.md)
 import * as CAREERM from './career.js';          // карьера: смена 9—24, обед, итоги, донаты, слот, звёзды
 import * as STORY from './story.js';             // сюжетные заказы и катсцены (баба Зина)
@@ -51,8 +54,10 @@ import * as HK from './hookah.js';               // кальянщики на л
 import * as CULL from './cull.js';               // статика дальше камеры — со сцены, матрицы заморожены (Steam Deck)
 import * as TRK from './tracks.js';              // следы колёс на газоне и снегу
 import * as CHAT from './chat.js';             // «Толик управляющий» пишет справа сверху, как в iMessage (похвала, ругань, вычет за опоздание)
+import * as SC from './shiftcash.js';             // карьера: пачка купюр на хаде — заработок смены (shiftcash.js)
 import * as HITS from './hits.js';               // сила удара по людям: упал и встал / лежит в луже / разорвало; самокат отдельно
 import * as FIRST from './intro.js';             // вступление первого запуска: пиццерия, Степан, машина (катсцена «как в ГТА»)
+import * as ACH from './achievements.js';          // достижения Стима: таблица, счётчики, вызов моста (achievements.js, docs/STEAM.md)
 import * as CL from '../platform/crashlog.js';   // журнал ошибок, предохранитель шагов мира, сторож зависаний (docs/CRASHES.md)
 
 /* Сохранения — через площадку (облако Яндекса / localStorage). Значения
@@ -1559,6 +1564,7 @@ function smashAdd (kind, x, z, r, geos, hex) {
   const gk = Math.floor(x / SM_CELL) + ',' + Math.floor(z / SM_CELL);
   if (!SMASH_GRID.has(gk)) SMASH_GRID.set(gk, []);
   SMASH_GRID.get(gk).push(it);
+  return it;
 }
 
 /* вещь, у которой свой меш (высокие чёрные заборы roadlife.js — одним мешем с текстурой):
@@ -1589,6 +1595,7 @@ function smashHit (it, nx, nz, force, quiet) {
   if (it.down) return;
   if (it.junk) return it.junk(it, nx, nz, force, quiet);   // остановка, мусор, контейнер — по-своему (junk.js)
   it.down = 1;
+  if (it.onDown) it.onDown(it, nx, nz, force, quiet);           // фонарь: гаснет и падает (streetlamps.js)
   const pos = it.mesh.geometry.attributes.position, a = pos.array, gy = groundH(it.x, it.z);
   for (let i = it.v0; i < it.v0 + it.nv; i++) { a[i * 3] = it.x; a[i * 3 + 1] = gy - 1; a[i * 3 + 2] = it.z; }
   pos.needsUpdate = true;
@@ -2880,36 +2887,9 @@ function osmStreetLife () {
     benches++;
   }
 
-  // Фонари вдоль улиц — в склейку, ломать их не дадим. Столб стоит на
-  // внешнем краю тротуара, консоль — над дорогой. У разделённого
-  // проспекта тротуар одной половины — это асфальт другой, поэтому
-  // столб, попавший на чужое полотно или в дом, не ставим.
-  for (const r of CITY.roads) {
-    if (r.c > 3 || r.b || r.x) continue;         // на мосту свои перила, фонарям там не место
-    const w = roadWidth(r) / 2 + 2.4;
-    const p = r.p;
-    let acc = 20, side = 1;
-    for (let i = 1; i < p.length; i++) {
-      const x1 = p[i - 1][0], z1 = p[i - 1][1], x2 = p[i][0], z2 = p[i][1];
-      const len = Math.hypot(x2 - x1, z2 - z1) || 1;
-      const ux = (x2 - x1) / len, uz = (z2 - z1) / len;
-      for (let d = 0; d < len; d += 1) {
-        acc += 1;
-        if (acc < 36) continue;
-        acc = 0; side = -side;
-        const nx = -uz * side, nz = ux * side;              // от осевой к тротуару
-        const px = x1 + ux * d + nx * w, pz = z1 + uz * d + nz * w;
-        const near = nearestRoad(px, pz, 7, 1);
-        if (near && near.d < near.seg.w / 2 + 1.2) continue;
-        if (inHouse(px, pz, 1) || introClear(px, pz, 9) || ZEBRAS.some(q => Math.abs(q.x - px) < 6 && Math.abs(q.z - pz) < 6)) continue;
-        const py = groundH(px, pz), ry = Math.atan2(-nx, -nz);
-        box(LIT, 0.26, 7.0, 0.26, '#585460', px, py + 3.2, pz);
-        box(LIT, 0.22, 0.22, 2.2, '#585460', px - nx * 1.0, py + 6.6, pz - nz * 1.0, ry);
-        put(LAMPH, new THREE.BoxGeometry(0.5, 0.16, 0.9), '#fff3c4', px - nx * 1.9, py + 6.45, pz - nz * 1.9, 0, ry, 0);
-        LAMP_SPOTS.push([px - nx * 1.9, pz - nz * 1.9]);
-      }
-    }
-  }
+  // Фонари вдоль улиц и в частном секторе — сбиваются: столб в склейке
+  // сбиваемого, плафон — в LAMPH, пятно — в LAMP_SPOTS (streetlamps.js)
+  SL.streets({ THREE, scene, CITY, MAP, ZEBRAS, LAMPH, LAMP_SPOTS, put, smashAdd, groundH, curbAt, roadWidth, nearestRoad, inHouse, introClear });
 
   // остановки: будка на тротуаре, развёрнутая к дороге
   for (const s of CITY.stops) {
@@ -3608,7 +3588,7 @@ const roadApi = () => ({
   THREE, scene, cam, V, S, CITY, box, put, mergeGeos, obb, smashAdd, smashMesh, SMASH, SOLIDS, SOLID_GRID, SCELL, PARKED, DRIVE_MAX,
   groundH, curbAt, inHouse, inPoly, inBounds, nearestRoad, NODES, NODE_IDX, edgeOf, edgeRun, laneCount, laneOff, routeNodes, nodeNear, nearestNode,
   walkLeg, walkSpawn, walkersAll,
-  ZEBRAS, SIG_GROUPS, TRAFFIC, ACCIDENTS, newCar, placeTraffic, poseTraffic, poseOnSlope, svcGone, makeHuman, dropMesh, gibHuman, sayBubble, Snd, toast, calmStart,
+  ZEBRAS, SIG_GROUPS, TRAFFIC, ACCIDENTS, newCar, placeTraffic, poseTraffic, poseOnSlope, svcGone, makeHuman, dropMesh, gibHuman, sayBubble, Snd, toast, calmStart, nearClient,
   onRunOver: () => { S.people++; },
   get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get tG () { return tG; },
 });
@@ -3644,18 +3624,18 @@ const junkApi = () => ({
 });
 /* что нужно mafia.js (мафиози у адреса) */
 const mafiaApi = () => ({
-  V, S, scene, CAREER, ADULT, makeHuman, dropMesh, gibHuman, sayBubble, groundH, curbAt, inHouse, inBounds, pushOut, sparks, puff, toast, Snd,
+  V, S, scene, CAREER, ADULT, CAR_L, CAR_W, makeHuman, dropMesh, gibHuman, sayBubble, groundH, curbAt, inHouse, inBounds, pushOut, sparks, puff, toast, Snd,
   onRoad: (x, z) => { const r = nearestRoad(x, z); return !!r && r.d < (r.seg.w || 7) / 2 + 0.8; },
   hurt: n => { S.hurt = 0; hurtCar(n, 0, V.x + rand(-1, 1), V.z + rand(-1, 1)); },   // выстрел/помидор — полсердца, без мятин и поломок
   bump: () => { V.vx *= 0.25; V.vz *= 0.25; S.shake = Math.max(S.shake, 0.35); Snd.crash(8); },
-  onRunOver: () => { S.people++; Snd.squish(); },
+  onRunOver: () => { S.people++; Snd.squish(); ACH.add('mafia'); },
   reward: (n, title) => { const v = CAREER ? n : Math.round(n / ECON.MONEY_K); S.money += v; if (!S.freeRun) addWallet(v); popBonus(title, '+' + money(v)); },
 });
 let MAFIA_API = null;
 /* что нужно fauna.js (лоси, лисы, зайцы в лесах) */
 const faunaApi = () => ({
   V, S, scene, cam, CITY, CAR_L, CAR_W, groundH, inPoly, inHouse, inBounds, nearestRoad, toast, emote, Snd,
-  hurt: (n, vn, x, z) => hurtCar(n, vn, x, z),
+  hurt: (n, vn, x, z) => { ACH.add('moose'); hurtCar(n, vn, x, z); },   // зовётся только при ударе о лося
 });
 let FAUNA_API = null;
 /* что нужно cats.js (продухи подвалов, коты) */
@@ -3681,7 +3661,7 @@ const nightApi = () => ({
   runOver: () => { S.people++; Snd.squish(); },
   get ENV () { return ENV; },
 });
-const landApi = () => ({ ...cityApi(), inHouse, makePerson });
+const landApi = () => ({ ...cityApi(), inHouse, makePerson, smashAdd, curbAt });
 let RINK = null;                                  // каток с катающимися (landmarks.js), если он есть в карте
 
 /* ─── сборка города ─── */
@@ -4984,19 +4964,23 @@ function updateScoots (dt) {
   }
 }
 
-/* сбил самокатчика: самокат кувыркается и лежит отдельно (HITS.wreck), человек слетает
-   и дальше как все (HITS.hit). Медленнее HITS.TIER.FALL — свалился, встал, ушёл: не считается.
+/* сбил самокатчика: самокат кувыркается и лежит отдельно (HITS.wreck), человек перелетает
+   вперёд через руль (HITS.hit с over) — во взрослой разбивается о землю на куски. Медленнее HITS.TIER.FALL — свалился, встал, ушёл: не считается.
    kmh — для взрыва (там vx/vz — направление, а не скорость) */
 function runOverScoot (p, vx, vz, by, kmh) {
   p.dead = 1; p.deadT = rand(14, 22);
   const u = p.grp.userData;
+  const blast = kmh != null;
   if (kmh == null) kmh = HITS.kmhOf(vx, vz);
   const up = HITS.isFall(kmh);
   if (u.scoot) { HITS.wreck(u.scoot, vx, vz); u.scoot = null; }
   p.grp.visible = false;
-  HITS.hit(p, vx, vz, kmh, { up, y0: 0.16 });
+  // машина — через руль вперёд по ходу самоката (hits.js throwOver); взрыв (kmh задан) — от взрыва
+  const hx = Math.sin(p.grp.rotation.y), hz = Math.cos(p.grp.rotation.y);
+  const over = blast ? null : { hx, hz, sp: p.speed || 0 };
+  HITS.hit(p, vx, vz, kmh, { up, y0: 0.16, over });
   const pass = u.pass;
-  if (pass) HITS.hit({ x: p.x - Math.sin(p.grp.rotation.y) * 0.5, z: p.z - Math.cos(p.grp.rotation.y) * 0.5, grp: pass }, vx, vz, kmh, { up, y0: 0.16 });
+  if (pass) HITS.hit({ x: p.x - hx * 0.5, z: p.z - hz * 0.5, grp: pass }, vx, vz, kmh, { up, y0: 0.16, over });
   if (up) { Snd.noise(0.15, 0.22); return; }
   Snd.squish();
   if (by) return;
@@ -5096,15 +5080,72 @@ function settleGuest (p) {
   p.grp.position.set(p.x, groundH(p.x, p.z), p.z);
 }
 /* неподвижная точка адреса: st.at — туда пин, маршрут и проверка «подъехал» (checkArrival).
-   Сёрфер катается вдоль берега — пин на берегу напротив середины его заплыва */
+   Пин — прямо перед клиентом (pinFront), а не на нём. Сёрфер катается вдоль берега — пин на берегу
+   напротив середины его заплыва */
 function pinStop (st) {
   if (st.at || !st.peds.length) return;
   const f = st.peds[0];
   if (f.surf) { st.at = { x: f.bx, z: f.z0 }; return; }
   st.peds.forEach(settleGuest);
   const n = st.peds.length;
-  st.at = { x: st.peds.reduce((a, p) => a + p.x, 0) / n, z: st.peds.reduce((a, p) => a + p.z, 0) / n };
+  const cx = st.peds.reduce((a, p) => a + p.x, 0) / n, cz = st.peds.reduce((a, p) => a + p.z, 0) / n;
+  const rr = st.peds.reduce((a, p) => Math.max(a, Math.hypot(p.x - cx, p.z - cz)), 0);   // групповой — кружок вокруг середины
+  st.at = pinFront(cx, cz, Math.max(PIN.OFF, rr + PIN.OFF - 1));
 }
+
+/* Пин — прямо перед клиентом, на свободном месте (docs/ORDERS.md «Адрес не двигается»).
+   От клиента 16 лучей: луч идёт, пока не упрётся в дом или забор; пин — на PIN.OFF м по лучу
+   (места меньше — ближе, но не ближе PIN.MIN), там, где машине есть куда встать: не в доме и
+   PIN.WALL м от его стен, не в заборе, будке, дереве (SOLIDS, радиус PIN.CAR), не в воде.
+   Из подходящих — где простора за пином больше, чуть лучше — в сторону ближайшего проезда или
+   дорожки. Места нет нигде — пин на клиенте, как раньше. */
+const PIN = { OFF: 3.5, MIN: 2.2, WALL: 1.6, CAR: 1.3, DIRS: 16, LOOK: 9 };
+function solidAt (x, z, r) {
+  for (const s of solidsNear(x, z)) {
+    if (s.deckY !== undefined) continue;          // перила моста — не на земле
+    const dx = x - s.cx, dz = z - s.cz;
+    const lx = dx * s.cs + dz * s.sn, lz = -dx * s.sn + dz * s.cs;
+    if (Math.abs(lx) < s.hw + r && Math.abs(lz) < s.hd + r) return true;
+  }
+  return false;
+}
+const pinRay = (x, z) => !inHouse(x, z) && !solidAt(x, z, 0.25);
+const pinFree = (x, z) => inBounds(x, z, 5) && groundH(x, z) >= 0.3 && !inHouse(x, z, PIN.WALL) && !solidAt(x, z, PIN.CAR);
+function pinFront (cx, cz, off = PIN.OFF) {
+  const r = nearestRoad(cx, cz, 7, 2);           // любая дорога, проезд во двор или дорожка
+  const ra = r && r.d > 0.5 ? Math.atan2(r.x - cx, r.z - cz) : null;
+  const look = Math.max(PIN.LOOK, off + 4);
+  let best = null, bs = -Infinity;
+  for (let i = 0; i < PIN.DIRS; i++) {
+    const a = i / PIN.DIRS * Math.PI * 2, sx = Math.sin(a), sz = Math.cos(a);
+    let L = 0;                                     // докуда луч свободен
+    for (let s = 0.5; s <= look; s += 0.5) { if (!pinRay(cx + sx * s, cz + sz * s)) break; L = s; }
+    let dd = 0;
+    for (let s = Math.min(off, L); s >= PIN.MIN; s -= 0.5) if (pinFree(cx + sx * s, cz + sz * s)) { dd = s; break; }
+    if (!dd) continue;
+    let C = 0;                                     // простор за пином: машине есть откуда заехать
+    for (let s = dd + 0.5; s <= Math.min(L, look); s += 0.5) { if (!pinFree(cx + sx * s, cz + sz * s)) break; C = s - dd; }
+    const sc = dd * 2 + C + (ra === null ? 0 : 2 * Math.cos(a - ra));
+    if (sc > bs) { bs = sc; best = { x: cx + sx * dd, z: cz + sz * dd }; }
+  }
+  return best || { x: cx, z: cz };
+}
+
+/* У ждущего клиента никого лишнего: курьеры на мопедах (mopeds.js), конкуренты с их гостями
+   (rivalGoal) и ночные компании не встают ближе r м к нему и к его пину. Отданные — не в счёт */
+function nearClient (x, z, r) {
+  const o = S.order;
+  if (!o || !o.stops) return false;
+  const r2 = r * r;
+  for (let i = 0; i < o.stops.length; i++) {
+    const st = o.stops[i];
+    if (st.done || (i < o.idx && st.done !== false)) continue;
+    for (const p of st.peds) if (!p.served && (p.x - x) ** 2 + (p.z - z) ** 2 < r2) return true;
+    if (st.at && (st.at.x - x) ** 2 + (st.at.z - z) ** 2 < r2) return true;
+  }
+  return false;
+}
+const GUEST_GAP = 0.9;                            // ближе к ждущему клиенту стоящий прохожий не встанет
 
 function clearGuest (p) {
   if (!p.guest) return;
@@ -5120,6 +5161,17 @@ function clearGuest (p) {
 function guestStep (p, dt) {
   const u = p.grp.userData;
   const b = p.sitAt || p.waitAt;
+
+  // в клиенте никто не стоит: прохожий ближе GUEST_GAP — на край (сидящих на лавочке не трогаем)
+  if (!p.served) for (const q of PEOPLE) {
+    if (q === p || q.dead || q.guest || q.idle || q.sitting) continue;
+    const dx = q.x - p.x, dz = q.z - p.z, dd = dx * dx + dz * dz;
+    if (dd >= GUEST_GAP * GUEST_GAP) continue;
+    const l = Math.sqrt(dd);
+    if (l < 1e-3) q.x += GUEST_GAP;
+    else { q.x = p.x + dx / l * GUEST_GAP; q.z = p.z + dz / l * GUEST_GAP; }
+    pushOut(q, 0.45);
+  }
 
   if (b && !p.sitting) {
     // доходит до лавочки
@@ -5541,8 +5593,8 @@ const GORE = [];
 function gibHuman (p, vx, vz, kmh) { HITS.hit(p, vx, vz, kmh); }
 
 /* взрослая, быстрее HITS.TIER.BURST: разрывает на куски — куски, их кровь и как тают — hits.js burst */
-function burstHuman (p, vx, vz) {
-  HITS.burst(p, vx, vz);
+function burstHuman (p, vx, vz, low) {
+  HITS.burst(p, vx, vz, low);
   blood(p.x, 1, p.z, 16);
   decal(p.x, p.z, 0x8f1f2b, 1.9, 60);
   scare(p.x, p.z);
@@ -6988,6 +7040,7 @@ function rivalSpawn (R, delay) {
     if (mine && R.foe && !R.ko) {
       // конкурент (econ.js RIVAL_KO): из сумки разлетаются купюры — собери за 25 с; раз за смену с каждого
       R.ko = 1;
+      ACH.add('rivals');
       rivalSpill(t.x, t.z);
       popBonus($t('выбил конкурента!'), $t('из сумки «{brand}» разлетелись деньги — собирай!', { brand: $t(R.spec.brand) }));
     } else if (mine && !R.foe) colleagueKO(R);
@@ -7043,6 +7096,7 @@ function rivalGoal (fromV = 90) {
     const q = rand(0.2, 0.8), x = lerp(sg.x1, sg.x2, q), z = lerp(sg.z1, sg.z2, q);
     const dP = Math.hypot(x - PIZZA.x, z - PIZZA.z);
     if (dP < 140 || dP > 650 || Math.hypot(x - V.x, z - V.z) < fromV || !inBounds(x, z, 30) || x < riverX(z)) continue;
+    if (nearClient(x, z, 40)) continue;           // не к твоему ждущему клиенту
     return { x, z, w: sg.w, h: Math.atan2(sg.x2 - sg.x1, sg.z2 - sg.z1) };   // h — курс по улице (старт конкурента)
   }
   return null;
@@ -7674,15 +7728,17 @@ const DIST_SEGS = new Map(), DIST_YARD = new Map();
 const PICK_INFO = { nos: 0, bonus: 0, district: -1, pace: '' };
 function scatterPickups () {
   if (!DISTRICTS || !COFFEE_SEGS.length) return;
-  const di = DIST.cur(), pc = DIST.pace(), P = ECON.PACE;
+  // «весь город» (cityopen.js) — по всем районам: улицы всего города, общий потолок NOS_MAX
+  const city = DIST.city(), di = city ? 'city' : DIST.cur(), pc = DIST.pace(), P = ECON.PACE;
+  const inMine = (x, z) => (city ? DIST.isOpen(DIST.at(x, z)) : DIST.at(x, z) === di);
   for (const n of NITRO_CANS) dropPickup(n);
   NITRO_CANS.length = 0;
   if (!DIST_SEGS.has(di)) {
     // улицы района (c ≤ 5) и дворовые проезды (c 7): в микрорайонах Северска больших улиц
     // мало, почти всё — проезды, туда же ведут заказы
-    const ok = q => !q.b && !q.x && Math.hypot(q.x2 - q.x1, q.z2 - q.z1) > 25 && DIST.at((q.x1 + q.x2) / 2, (q.z1 + q.z2) / 2) === di;
+    const ok = q => !q.b && !q.x && Math.hypot(q.x2 - q.x1, q.z2 - q.z1) > 25 && inMine((q.x1 + q.x2) / 2, (q.z1 + q.z2) / 2);
     DIST_SEGS.set(di, { street: RSEG.filter(q => q.c <= 5 && ok(q)), yard: RSEG.filter(q => q.c === 7 && ok(q)) });
-    DIST_YARD.set(di, YARD_SPOTS.filter(([x, z]) => DIST.at(x, z) === di));
+    DIST_YARD.set(di, YARD_SPOTS.filter(([x, z]) => inMine(x, z)));
   }
   const S2 = DIST_SEGS.get(di), yard = DIST_YARD.get(di);
   const km = list => list.reduce((a, q) => a + Math.hypot(q.x2 - q.x1, q.z2 - q.z1), 0);
@@ -7731,7 +7787,8 @@ function districtWatch (dt) {
     const p = DIST.opened() - 1, left = Math.max(1, DIST.need(p) - DIST.shiftsIn(p));
     toast(i === p + 1 ? $tn(left, 'район «{name}» закрыт: ещё {n} смена в районе «{prev}»|район «{name}» закрыт: ещё {n} смены в районе «{prev}»|район «{name}» закрыт: ещё {n} смен в районе «{prev}»', { name, prev: $t(DIST.list()[p].name) })
       : $t('район «{name}» пока закрыт', { name }));
-  } else if (i !== DIST.cur()) toast(S.ride ? $t('район «{name}»', { name }) : $t('район «{name}» — не твой на этой смене, заказов тут нет', { name }));
+  } else if (DIST.city()) toast($t('район «{name}»', { name }));
+  else if (i !== DIST.cur()) toast(S.ride ? $t('район «{name}»', { name }) : $t('район «{name}» — не твой на этой смене, заказов тут нет', { name }));
   else toast($t('твой район — «{name}»', { name }));
 }
 /* Закрытые районы: узлы графа в них — lock (навигатор туда не ведёт), рёбра — lock (трафик
@@ -7915,7 +7972,7 @@ function offRoadSpot (rmin, rmax, ahead) {
     const dx = x - V.x, dz = z - V.z, d = Math.hypot(dx, dz);
     if (d < rmin || d > rmax || (ahead && (dx * fx + dz * fz) / d < 0.2)) continue;
     if (!inBounds(x, z, 25) || inHouse(x, z, 1.5)) continue;
-    if (DISTRICTS && DIST.at(x, z) !== DIST.cur()) continue;
+    if (DISTRICTS && !DIST.mine(DIST.at(x, z))) continue;
     if (PIZZA && Math.hypot(PIZZA.x - x, PIZZA.z - z) < 30) continue;
     if (NITRO_CANS.some(o => (o.kind === 'cash' || o.kind === 'life') && Math.hypot(o.x - x, o.z - z) < 40)) continue;
     return [x, z];
@@ -8576,6 +8633,8 @@ function renderSettings (focus) {
     (Platform.features.adult ? row($t('версия'), ADULT ? $t('взрослая 18+') : $t('детская'), 'set-ed') : '') +
     (SHELL ? row($t('версия игры'), UPD.busy ? $t('проверяю…') : $t('проверить обновления'), 'set-upd',
       ' <b class="set-tag">' + escHtml(UPD.tag || '—') + '</b>' + (UPD.msg ? '<small class="set-msg">' + UPD.msg + '</small>' : '')) : '') +
+    // ТЕСТ: «открыть все районы» — проверить праздник и «весь город». Перед публикацией убрать или спрятать за ?debug
+    (canReset && DISTRICTS ? row($t('районы') + ' <small class="set-msg">' + $t('для тестов') + '</small>', DIST.allOpen() ? $t('все открыты') : $t('открыть все районы'), 'set-unlock') : '') +
     (canReset ? '<button type="button" id="set-reset" class="set-danger">' + $t('сбросить прогресс') + '</button>' : '') +
     // единственная подпись OSM в игре (лицензия ODbL требует) — в самом низу, мелко, но читаемо
     '<div class="pn-n set-cred">' + $t('карта — © участники OpenStreetMap, лицензия ODbL. Рельеф — SRTM (NASA).') + '</div>';
@@ -8584,6 +8643,11 @@ function renderSettings (focus) {
   $('set-lang').onclick = () => { renderLangs(); elPanel.dataset.back = 'settings'; };
   if ($('set-ed')) $('set-ed').onclick = () => { Store.set('dlv-edition', ADULT ? 'kids' : 'adult'); Platform.store.flush && Platform.store.flush(); setTimeout(() => location.reload(), 150); };
   if ($('set-reset')) $('set-reset').onclick = renderReset;
+  if ($('set-unlock')) $('set-unlock').onclick = () => {             // ТЕСТ (см. выше): открыть всё и сразу праздник
+    CITYOPEN.unlockAll();
+    closePanel();
+    CITYOPEN.party(() => CAREERM.menu());
+  };
   if (SHELL) {
     if (UPD.tag === null) {
       UPD.tag = '';
@@ -8617,11 +8681,11 @@ async function checkUpdate () {
    Стираем все ключи игры (dlv-*), кроме настроек из RESET_KEEP. Список PROGRESS_KEYS —
    на случай, если localStorage закрыт (Яндекс в iframe): ключи из него тоже обнуляются.
    Через Platform.store — так на Яндексе чистится и облако. Потом — перезагрузка. */
-const RESET_KEEP = ['dlv-lang', 'dlv-sound', 'dlv-edition', 'dlv-name', 'dlv-map', 'dlv-money-x8', 'dlv-__ts'];
+const RESET_KEEP = ['dlv-lang', 'dlv-sound', 'dlv-edition', 'dlv-name', 'dlv-map', 'dlv-money-x8', 'dlv-__ts', 'dlv-ach'];   // dlv-ach — достижения, как в Стиме, не стираются
 const PROGRESS_KEYS = [
   'dlv-msk-wallet', 'dlv-msk-cars', 'dlv-msk-car', 'dlv-msk-best', 'dlv-msk-xp', 'dlv-msk-col', 'dlv-msk-tut', 'dlv-msk-guide', 'dlv-msk-nostut', 'dlv-intro', 'dlv-garage-tut',
   'dlv-shifts', 'dlv-stars', 'dlv-crew', 'dlv-story', 'dlv-season', 'dlv-used-addr', 'dlv-lb-local', 'dlv-boss', 'dlv-clock', 'dlv-rev-sale',
-  'dlv-car-owned', 'dlv-car-cur', 'dlv-car-up', 'dlv-car-L', 'dlv-car-eng', 'dlv-car-paint', 'dlv-district', 'dlv-dist-shifts', 'dlv-dist-open', 'dlv-knocked',
+  'dlv-car-owned', 'dlv-car-cur', 'dlv-car-up', 'dlv-car-L', 'dlv-car-eng', 'dlv-car-paint', 'dlv-district', 'dlv-dist-shifts', 'dlv-dist-open', 'dlv-city-mode', 'dlv-city-party', 'dlv-knocked',
   ...Object.keys(ECON.DONATE || {}).map(k => 'dlv-don-' + k),
 ];
 function renderReset () {
@@ -8756,6 +8820,10 @@ function resetCar () {
 /* ─────────────── физика ─────────────── */
 let ACC = 36, VMAX = 48;                       // у каждой машины свои — ставятся в startRun (carStats)
 const BRK = 38, TURN = 2.3;
+/* Мокрая дорога (дождь, зимой — снег; wet 0…1): боковое сцепление — как быстро гаснет снос вбок, 1/с
+   (сухо SIDE_DRY, в ливень SIDE_WET), и тормоз слабее на BRAKE. До 03.10.2026 было 2,6 и 45 % —
+   в ливень машину носило под 37° и она казалась неуправляемой; теперь ~18° и тормоз −25 %. */
+const WET = { SIDE_DRY: 8.5, SIDE_WET: 5.5, BRAKE: 0.25 };
 /* Горка: под гору разгоняет, в гору тянет назад. Настоящие девять и
    восемь десятых здесь почти не чувствуются — у машины аркадный разгон
    в тридцать шесть, поэтому склон усилен. Стоящая машина не катится:
@@ -8804,13 +8872,13 @@ function driveStep (dt) {
 
   if (IN.gas && !V.air && !dead) vf += acc * Math.max(0.25, 1 - vf / vmax) * dt;
   const wet = Math.min(1, ENV.rain + SEAS.slip());   // дождь, а зимой и снег
-  if (IN.brake) vf -= (vf > 0.4 ? BRK * (1 - wet * 0.45) : dead ? 0 : ACC * 0.5) * dt;
+  if (IN.brake) vf -= (vf > 0.4 ? BRK * (1 - wet * WET.BRAKE) : dead ? 0 : ACC * 0.5) * dt;
   if (dead) vf -= vf * 0.55 * dt;                 // без мотора — накатом до остановки
   vf = clamp(vf, -15, beast ? VMAX * BEAST.NITRO : Math.max(VBOOST, vmax));
   if (!NOS.burn && !beast && vf > vmax) vf -= (vf - vmax) * 1.4 * dt;   // после нитро сбрасывает, а не упирается
   vf -= vf * 0.3 * dt;
   if (IN.hand) vf -= vf * 1.1 * dt;
-  vl *= Math.exp(-(IN.hand ? 2.2 : lerp(8.5, 2.6, wet)) * dt);   // ручник пускает в занос, в дождь носит и так
+  vl *= Math.exp(-(IN.hand ? 2.2 : lerp(WET.SIDE_DRY, WET.SIDE_WET, wet)) * dt);   // ручник пускает в занос, в дождь чуть носит (WET)
 
   const sv = IN.joy ? -clamp(IN.jx * 1.35, -1, 1) : (IN.left ? 1 : 0) - (IN.right ? 1 : 0);
   const spd = Math.abs(vf);
@@ -8995,7 +9063,7 @@ function driveStep (dt) {
       if (it.heavy) return;                       // остановки и контейнеры — ниже и в стенах (junk.js)
       if (Math.hypot(it.x - noseX, it.z - noseZ) < it.r + CAR_W || Math.hypot(it.x - tailX, it.z - tailZ) < it.r + CAR_W) {
         smashHit(it, V.vx / l, V.vz / l, Math.abs(vf));
-        const k = it.kind === 'dump' ? 0.85 : it.kind === 'bigfence' ? 0.92 : 0.96; V.vx *= k; V.vz *= k;   // высокий забор тормозит заметнее
+        const k = it.slow || (it.kind === 'dump' ? 0.85 : it.kind === 'bigfence' ? 0.92 : 0.96); V.vx *= k; V.vz *= k;   // высокий забор тормозит заметнее
       }
     });
   }
@@ -9092,6 +9160,7 @@ function driveStep (dt) {
   for (const s of car.userData.steer) s.rotation.y = V.steerVis;
   V.lean = damp(V.lean || 0, -V.steerVis * clamp(Math.abs(vf) / VMAX, 0, 1) * 0.12, 6, dt);
   car.rotation.z = V.roll + V.lean;
+  CARL.step(car, dt, vf, sv, IN.brake, IN.gas, ENV.night);   // стоп-сигналы, поворотники, задний ход (carlights.js)
 
   // огонь из выхлопа, пока горит нитро
   if ((NOS.burn || beast) && (NOS.flameT -= dt) <= 0) {
@@ -10223,8 +10292,8 @@ function walletHud (dt) {
     else if (isPlaying() && Math.abs(d) >= 1) { walletFly(d); WL.hold = d > 0 ? 0.7 : 0; } else WL.shown = w;
   }
   if ((WL.hold -= dt) <= 0) WL.shown = Math.abs(w - WL.shown) < 2 ? w : WL.shown + (w - WL.shown) * Math.min(1, dt * 7);
-  const shift = !S.ride && isPlaying() ? '<em>' + $t('за смену {money}', { money: (S.money >= 0 ? '+' : '−') + money(Math.abs(S.money || 0)) }) + '</em>' : '';
-  const html = '<span>' + $t('кошелёк') + '</span><b>' + money(Math.round(WL.shown)) + '</b>' + shift;
+  SC.step(dt, !S.ride && isPlaying());              // за смену — отдельным блоком с пачкой купюр (shiftcash.js)
+  const html = '<span>' + $t('кошелёк') + '</span><b>' + money(Math.round(WL.shown)) + '</b>';
   if (html !== WL.html) { WL.html = html; elMoney.innerHTML = html; }
 }
 
@@ -10321,7 +10390,9 @@ $('start').addEventListener('submit', e => {
   goRun();
 });
 /* «ещё раз» после смены — естественная пауза: здесь реклама (если пора) */
-function goRun () {
+function goRun (picked) {
+  // все районы открыты: перед сменой — праздник (один раз) и выбор «весь город / пиццерия» (cityopen.js)
+  if (!picked && DISTRICTS && CITYOPEN.beforeShift(() => goRun(true))) return;
   if (S.state === 'over' && Platform.features.ads && (S.delivered || 0) > 0) { S.state = 'title'; $('over').hidden = true; showAd().then(() => startRun()); }
   else startRun();
 }
@@ -11206,6 +11277,7 @@ function syncTarget (repick) {
 
 function backToBase () {
   S.state = 'back';
+  if (DISTRICTS && DIST.city()) usePizzeria(CITYOPEN.nearest(V.x, V.z));   // «весь город»: назад — в ближайшую пиццерию
   if (S.order) for (const st of S.order.stops) for (const p of st.peds) if (!p.served) clearGuest(p);
   S.order = null;
   S.target = { x: PIZZA.x, z: PIZZA.z, name: PIZZA.name };
@@ -11252,7 +11324,7 @@ function checkArrival (dt) {
 
   if (S.state === 'drive') {
     // к гостю надо подъехать и притормозить, а не влететь
-    if (d > (S.order.stops[S.order.idx].reach || 5) || speed > 6) return;
+    if (d > (S.order.stops[S.order.idx].reach || 6) || speed > 6) return;
     const o = S.order;
     const st = o.stops[o.idx];
     const onTime = S.free || S.time > 0;
@@ -11275,6 +11347,8 @@ function checkArrival (dt) {
     // оплата — сразу в кошелёк: умер или закрыл вкладку — деньги уже твои
     if (!S.freeRun) addWallet(part);
     S.delivered += st.peds.length;
+    ACH.deliver({ n: st.peds.length, onTime, left, free: !!S.free, last: o.idx >= o.stops.length - 1, stops: o.stops.length,   // достижения (achievements.js)
+      bundle: !!(o.ord && o.ord.bundle), allOnTime: o.stops.every(q => q.pay && !q.pay.late), urgent: !!(o.ord && o.ord.type === 'urgent') });
 
     handOver(st, onTime);
     // оплата — кучкой денег и чеком (popPay); в сюжетном заказе награду покажет катсцена
@@ -11500,6 +11574,7 @@ function sideArrival (d, speed) {
     S.money += pay;
     if (!S.freeRun) addWallet(pay);
     popBonus(Sd.it.pay ? $t('поручение выполнено!') : $t('косарь!'), Sd.it.ask + ' · +' + money(pay));
+    ACH.add('errands');
     sideEnd(true);
   }
 }
@@ -11522,9 +11597,10 @@ function payMood (st, onTime, tier) {
   return tier || pp.tip || S.free ? 'happy' : 'ok';
 }
 
-/* Толик управляющий (chat.js) — после оплаты адреса, когда кучка денег долетела (1,6 с):
+/* Толик управляющий (chat.js) — после оплаты адреса, когда кучка денег долетела (1,6 с); пишет только на
+   плохое и на очень хорошее, обычные доставки — молча:
      опоздал             — ругается и вычитает пиццу на замену (ECON.lateFine) — каждый опоздавший адрес;
-     вовремя, tier ≥ 1   — «молодец»; вовремя впритык — «постарайся»;
+     вовремя, tier 2     — «молодец» (осталось ≥ 50 % срока, «А ты харош!»); tier 0—1 — молчит;
      сборный             — промежуточные адреса молча, последний: всё вовремя — хвалит за развоз;
      задел этого клиента — молчит (уже наругал в clientBump); без таймера и сюжетный — молчит. */
 function bossOnDeliver (o, st, onTime, tier) {
@@ -11535,7 +11611,7 @@ function bossOnDeliver (o, st, onTime, tier) {
   if (!onTime) kind = 'late';
   else if (st.bumped || S.free) kind = '';
   else if (bundle) kind = last && o.stops.every(q => q.pay && !q.pay.late) ? 'bundle' : '';
-  else kind = tier ? 'fast' : 'slow';
+  else kind = tier >= 2 ? 'fast' : '';
   if (!kind) return;
   const fee = pp.fee || 0;
   CHAT.later(1600, () => {                         // конец смены ждёт это сообщение (career.js showEnd → CHAT.idle)
@@ -11635,6 +11711,7 @@ function gameOver (why, victims, focus) {
   if (S.state === 'over' || S.state === 'dying') return;
   CHAT.clear();
   // карьера, машина взорвалась — можно воскреснуть за деньги из кошелька: заказ пока держим
+  ACH.over(why);                                   // взорвал / утопил — достижения (achievements.js)
   DEATH.keep = CAREER && !S.ride && !S.free && why === 'машина всё' ? { prev: S.state } : null;
   DEATH.asked = false; DEATH.rev = null;
   S.state = 'dying';
@@ -12169,10 +12246,14 @@ HITS.init({ THREE, scene, box, mergeGeos, HUMAN_VC, groundH, surfaceAt, curbAt, 
 CHAT.init({ adult: ADULT, person: makePerson({ seed: 0x2E4A17, fem: false }), face: (p, size) => faceDataURL(p, size), blip: (f, d, ty, v) => Snd.blip(f, d, ty, v) });
 /* заказы карьеры (orders.js): очередь, поручения, развоз смены — через это */
 if (CAREER) ORD.init({ S, V, CITY, MAP, THREE, Store, ADULT, SPOTS, LIFE, Snd, get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get DAY_LEN () { return DAY_LEN; }, lang: curLang,
-  alive, releaseIdle, pushOut, walkSpawn, nearestRoad, makeGuest, clearGuest, realAddress, routeLen, orderTime, rebuildRoutePath, syncTarget,
+  alive, releaseIdle, pushOut, walkSpawn, nearestRoad, makeGuest, clearGuest, realAddress, routeLen, orderTime, rebuildRoutePath, syncTarget, pinFront,
   errandShop, startSide, declineSide, popBonus, toast, money, sayBubble, addWallet, donated, hidePhone, clearGate, showOrderCard,
   newOrder, marker, level: () => levelOf(getXP()), gameplayStop: () => Platform.gameplayStop(),
   rehuman: (p, person) => { dropMesh(p.grp); p.person = person || nextPerson(); p.grp = makeHuman(p.person); p.speed = p.base * p.grp.userData.pace; scene.add(p.grp); } });
+if (CAREER) SC.init({ S, money });
+/* достижения (achievements.js): счётчики, Стим; смена — через onShiftStart/End карьеры */
+ACH.init({ career: CAREER, adult: ADULT, S, hour: () => (CAREER ? CAREERM.hour() : NaN) });
+if (CAREER) { CAREERM.onShiftStart(ACH.shiftStart); CAREERM.onShiftEnd(ACH.shiftEnd); }
 if (CAREER) CAREERM.init({ S, NOS, Snd, ADULT, get DAY_LEN () { return DAY_LEN; }, env: () => ENV, donated, money, wallet, addWallet, toast, popBonus, showChoice, hideChoice, hudHearts, isPlaying, countUp,
   Store: { get: Store.get, set: Store.set, flush: () => Platform.store.flush && Platform.store.flush() },
   choiceOpen: () => CH.opts.length > 0, endShift, rideOn, dropOrder: () => backToBase(), carChanged: () => { resetCar(); carStats(); },
@@ -12184,6 +12265,9 @@ if (CAREER) CAREERM.init({ S, NOS, Snd, ADULT, get DAY_LEN () { return DAY_LEN; 
   setName: n => { S.name = n; Store.set('dlv-name', n); elName.value = n; renderProfile(); },
   rivalSpec: () => RIVAL_SPEC.map(q => ({ hex: q.hex, fem: !!q.fem })), rivals: () => RIVALS.map(R => ({ i: R.slot, money: R.money || 0 })),
   person: o => makePerson(o), face: (p, size) => faceDataURL(p, size) });
+/* все районы открыты (cityopen.js): праздник, выбор перед сменой, «весь город» */
+if (DISTRICTS) CITYOPEN.init({ Store: { get: Store.get, set: Store.set, flush: () => Platform.store.flush && Platform.store.flush() }, Snd, money,
+  pizzerias: () => PIZZERIAS, routeLen });
 /* сюжетные заказы (story.js): люди, кот, камера катсцены — через это */
 STORY.init({ THREE, scene, cam, V, S, IN, CITY, MAP, Store, SPOTS, groundH, surfaceAt, inHouse, nearestRoad, makeHuman, dropMesh, emote, sayBubble, pizzaBox, realAddress, popBonus, money, Snd,
   get car () { return car; }, addMoney: n => { S.money += n; if (!S.freeRun) addWallet(n); }, addStars: CAREER ? CAREERM.addStars : null, shift: () => (+Store.get('dlv-shifts', 0) || 0) + 1,
@@ -12207,9 +12291,15 @@ function mergeChunked (list, mat) {
     b.push(g);
   }
   for (const b of buckets.values()) {
+    // track — кто хочет знать, где в склейке его вершины (плафон фонаря гаснет, когда столб сбит)
+    const trk = [];
+    let v = 0;
+    for (const g of b) { if (g.userData.track) trk.push([g.userData.track, v, g.attributes.position.count]); v += g.attributes.position.count; }
     const g = mergeGeos(b);
     boundSphere(g);
-    scene.add(new THREE.Mesh(g, mat));
+    const m = new THREE.Mesh(g, mat);
+    scene.add(m);
+    for (const [f, v0, nv] of trk) f(m, v0, nv);
   }
 }
 mergeChunked(LIT, SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), 0.4));
@@ -12296,9 +12386,11 @@ const NIGHT_OBJ = [];
 function buildNight () {
   const pools = [];
   const spots = LAMP_SPOTS.concat(PROPS.filter(p => p.kind === 'lamp').map(p => [p.x + 1.3, p.z]));
-  for (const [x, z] of spots) {
+  for (const sp of spots) {
+    const [x, z] = sp;
     const g = new THREE.PlaneGeometry(11, 11).rotateX(-Math.PI / 2);
     g.translate(x, groundH(x, z) + curbAt(x, z) + 0.3, z);
+    g.userData.track = sp.track;                   // сбитый фонарь гасит своё пятно (streetlamps.js)
     pools.push(g);
   }
   // склейка по клеткам — что не в кадре, не рисуется
@@ -12310,9 +12402,13 @@ function buildNight () {
     byChunk.get(k).push(g);
   }
   for (const list of byChunk.values()) {
+    const trk = [];
+    let v = 0;
+    for (const g of list) { if (g.userData.track) trk.push([g.userData.track, v, g.attributes.position.count]); v += g.attributes.position.count; }
     const m = new THREE.Mesh(mergeUV(list), POOL_MAT);
     m.visible = false; m.renderOrder = 2;
     scene.add(m); NIGHT_OBJ.push(m);
+    for (const [f, v0, nv] of trk) f(m, v0, nv);
   }
   // окна — тоже по клеткам: одним мешем на весь город они рисовались
   // целиком, даже за спиной, — сто с лишним тысяч треугольников ночью
@@ -12665,7 +12761,7 @@ function updateCrowds (dt) {
     crowdScanT = 1;
     for (let i = CROWDS.length - 1; i >= 0; i--)
       if (Math.hypot(CROWDS[i].sp.x - V.x, CROWDS[i].sp.z - V.z) > 230) { dropCrowd(CROWDS[i]); CROWDS.splice(i, 1); }
-    const near = PUB_SPOTS.filter(p => !p.on && Math.hypot(p.x - V.x, p.z - V.z) < 190)
+    const near = PUB_SPOTS.filter(p => !p.on && Math.hypot(p.x - V.x, p.z - V.z) < 190 && !nearClient(p.x, p.z, 12))
       .sort((a, b) => Math.hypot(a.x - V.x, a.z - V.z) - Math.hypot(b.x - V.x, b.z - V.z));
     for (const sp of near) { if (CROWDS.length >= 6) break; spawnCrowd(sp); }
   }
@@ -12901,6 +12997,7 @@ function frameStep (now) {
   CL.at.ph = 'world';
   CL.step('lights', updateLights, dt);
   CL.step('props', updateProps, dt);
+  CL.step('lamps', SL.step, dt);                                     // сбитые фонари падают и лежат (streetlamps.js)
   CL.step('traffic', updateTraffic, dt);
   CL.step('peds', updatePeds, dt);
   CL.step('people', updatePeople, dt);
@@ -12949,6 +13046,7 @@ function frameStep (now) {
   CL.step('mafia', MAFIA.step, dt, MAFIA_API || (MAFIA_API = mafiaApi()));   // мафиози у адреса (mafia.js)
   CL.step('fauna', FAUNA.step, dt, FAUNA_API || (FAUNA_API = faunaApi()));   // лоси и звери в лесах (fauna.js)
   CL.step('cats', CATS.step, dt, CATS_API || (CATS_API = catsApi()));      // коты на крышах и у подвалов (cats.js)
+  CL.step('ach', ACH.step, dt);                                              // достижения: опрос счётчиков (achievements.js)
   CL.step('rink', LM.stepRink, RINK, dt, V.x, V.z);
   CL.step('crew', updateCrew, dt);
   CL.step('surf', updateSurf, dt);
@@ -13033,7 +13131,7 @@ requestAnimationFrame(frame);
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
 /* песочница (sandbox.html): бесконечное здоровье, нитро, «не глохнет» (noStall читает cars.js) */
 const SBX = { god: false, nitro: false, noStall: false };
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { ACH: ACH.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта
@@ -13046,5 +13144,7 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) wi
   STORY, STORY_DBG: STORY.DEBUG, MAP, Store, SBX, CARSM: AUTO, startRun, goRun, endShift, wallet, addWallet, hudHearts, marker, updateEnv, humanLod, get SPOTS_N () { return SPOTS.length; },
   DRIVERS, SMOKERS, NITRO_CANS, NOS, CREW_HOMES, CREW, WAR, warStart, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, PIGEONS, AMB, INCIDENTS, scare, RIVALS, FOES, THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, roadPath, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT, LOOT, XLIFE };
 if (window.__dlv) window.__dlv.crashlog = CL;        // журнал ошибок: entries(), text(), disabled() (docs/CRASHES.md)
+if (window.__dlv) Object.assign(window.__dlv, { pinFront, nearClient, PIN });   // пин перед клиентом, кто у клиента лишний (docs/ORDERS.md)
+if (window.__dlv) { window.__dlv.SL = SL.DEBUG; window.__dlv.LAMP_SPOTS = LAMP_SPOTS; window.__dlv.smashHit = smashHit; window.__dlv.CARL = CARL.DEBUG; }   // фонари и огни машины
 // ?mapcheck: сводка проблем карты, столбики над ними, «]» — к следующей (mapworks.js)
 if (MAPCHECK) MAPW.debug(MAPFIX, MAPW_API || (MAPW_API = mapApi()));

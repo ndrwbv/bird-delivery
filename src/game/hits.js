@@ -6,7 +6,10 @@
                                 она летит отдельно. В детской — лежит со звёздочками, встаёт и уходит;
      BURST и быстрее          — во взрослой разрывает на куски (старый gibHuman), в детской —
                                 отлетает дальше и лежит дольше, потом тоже встаёт.
-   Самокат при ударе отделяется от самокатчика: кувыркается, скользит и лежит на боку.
+   Самокат при ударе отделяется от самокатчика: кувыркается, скользит и лежит на боку, а сам
+   самокатчик (o.over) перелетает вперёд через руль — по ходу своего самоката, удар сбоку только
+   добавляет снос вбок. Во взрослой он, ударившись о землю, разбивается на куски (тот же burst),
+   в детской — лежит со звёздочками и встаёт; медленнее FALL — в обеих падает и встаёт.
    Сколько всего одновременно — CAP: лишнее самое старое тает. */
 
 export const TIER = { FALL: 20, HIGH: 55, BURST: 85 };          // км/ч
@@ -208,7 +211,7 @@ export const kmhOf = (vx, vz) => Math.hypot(vx, vz) * 3.6;
 export const isFall = kmh => kmh < TIER.FALL;
 
 const BODIES = [], LIMBS = [], PUDDLES = [], WRECKS = [], CHUNKS = [], SPLATS = [];
-export const STATS = { BODIES, LIMBS, PUDDLES, WRECKS, CHUNKS, SPLATS };
+export const STATS = { BODIES, LIMBS, PUDDLES, WRECKS, CHUNKS, SPLATS, LAST: null };   // LAST — последний «через руль» (отладка)
 
 /* ── упал и встал: живой человек из PEOPLE, его же модель ── */
 export function fall (p, vx, vz) {
@@ -273,12 +276,19 @@ export function fallStep (p, dt) {
 
 /* ── сбит: отлетает. p — { x, z, grp } (grp — модель из makeHuman, её прячет вызывающий).
    o.up — встанет и уйдёт в любой версии (самокатчик на малой скорости), без скорой и счёта.
-   o.y0 — с какой высоты летит (самокатчик стоит на деке). Возвращает true — «сбит» (считать). */
+   o.y0 — с какой высоты летит (самокатчик стоит на деке).
+   o.over — { hx, hz, sp }: самокатчик, куда смотрел его самокат (единичный вектор) и его скорость, м/с —
+   летит вперёд через руль, во взрослой разбивается о землю. Возвращает true — «сбит» (считать). */
 export function hit (p, vx, vz, kmh, o = {}) {
   if (kmh == null) kmh = kmhOf(vx, vz);
   if (!o.up) {                                      // сбит: «бум» в точке удара и глухой удар
     flashAt(p.x, A.groundH(p.x, p.z) + 1.1 + (o.y0 || 0), p.z);
     A.Snd.blip(62, 0.2, 'sine', 0.34); A.Snd.noise(0.08, 0.16);
+  }
+  if (o.over) {
+    const B = throwOver(p, vx, vz, kmh, o);
+    if (!o.up) { A.scare(p.x, p.z); if (!B.shatter) A.callAmbulance(p.x, p.z); }   // разбился — скорая к кускам
+    return !o.up;
   }
   if (A.adult && kmh >= TIER.BURST && !o.up) { A.burst(p, vx, vz); return true; }
   const up = o.up || !A.adult;
@@ -287,6 +297,33 @@ export function hit (p, vx, vz, kmh, o = {}) {
   if (A.adult && !o.up && kmh >= TIER.FALL && Math.random() < (kmh >= TIER.HIGH ? LIMB.HIGH : LIMB.MID)) tearLimb(B);
   if (!o.up) { A.scare(p.x, p.z); A.callAmbulance(p.x, p.z); }
   return !o.up;
+}
+
+/* ── самокатчик: через руль вперёд ──
+   Самокат встаёт как вкопанный, человек летит дальше по ходу самоката: вперёд — его своя скорость
+   и часть удара (OVER.PUSH), вбок — только боковая часть удара (OVER.SIDE); лобовой удар его не
+   разворачивает — он всё равно летит через руль. Стартует над рулём, кувыркается головой вперёд.
+   Взрослая и не «упал и встал» — у земли разбивается на куски; иначе ложится и встаёт как все. */
+export const OVER = { PUSH: 0.35, SIDE: 0.3, MIN: 4, MAX: 13, AHEAD: 0.45, Y0: 0.55 };
+function throwOver (p, vx, vz, kmh, o) {
+  const { hx, hz } = o.over, sp = o.over.sp || 0;
+  const vl = vx * hx + vz * hz;                     // удар вдоль хода (сзади — плюс, в лоб — минус)
+  const lx = vx - vl * hx, lz = vz - vl * hz;       // удар вбок
+  const fwd = clamp(sp + Math.abs(vl) * OVER.PUSH + kmh / 20, OVER.MIN, OVER.MAX);
+  const fx = hx * fwd + lx * OVER.SIDE, fz = hz * fwd + lz * OVER.SIDE;
+  const q = { x: p.x + hx * OVER.AHEAD, z: p.z + hz * OVER.AHEAD, grp: p.grp };
+  const up = o.up || !A.adult;
+  const lie = o.up ? TIME.FALL_LIE : !A.adult ? (kmh >= TIER.BURST ? TIME.KID_LIE_HIGH : TIME.KID_LIE) : TIME.BODY;
+  const B = throwBody(q, fx, fz, kmh, up, lie, OVER.Y0);
+  B.vx = fx; B.vz = fz;                             // без случайного разброса: через руль — прямо
+  B.vy = clamp(3.2 + kmh / 25, 3.5, 7);
+  B.spin = rand(6, 9) * clamp(fwd / 8, 0.7, 1.3);   // головой вперёд (плюс по X — голова к +Z)
+  B.roll = rand(-1, 1);
+  B.shatter = A.adult && !o.up;
+  B.c = (p.grp && p.grp.userData.colors) || null;
+  B.x0 = q.x; B.z0 = q.z;                          // откуда полетел — для отладки (STATS.LAST)
+  STATS.LAST = { x0: q.x, z0: q.z, hx, hz, shatter: B.shatter, x: null, z: null };
+  return B;
 }
 
 function part (list, x, y, z) {
@@ -384,9 +421,9 @@ function puddle (x, z, R) {
    лужица. Лежат TIME.CHUNK, потом за TIME.SINK уходят в землю и тают. Больше CAP.CHUNKS кусков
    (CAP.SPLATS лужиц) — самые старые начинают таять раньше. */
 const BLOOD = '#8f1f2b', BLOOD_D = '#5e0f18', MEAT = '#a3222c';
-export function burst (p, vx, vz) {
+export function burst (p, vx, vz, low) {
   const box = A.box;
-  const c = (p.grp && p.grp.userData.colors) || { skin: '#e0b48c', shirt: '#4a6fa5', pants: '#333' };
+  const c = p.c || (p.grp && p.grp.userData.colors) || { skin: '#e0b48c', shirt: '#4a6fa5', pants: '#333' };
   const hair = c.hair;
   const sm = (l, w, h, d, y) => box(l, w * 1.06, 0.07, d * 1.06, BLOOD, 0, y, 0);          // рваный край
   const smear = (l, w, h, d) => box(l, w * 0.7, h * 0.45, 0.02, BLOOD_D, w * 0.08, h * rand(-0.15, 0.15), d / 2 + 0.006);
@@ -404,11 +441,13 @@ export function burst (p, vx, vz) {
   if (!BX) { BX = new A.THREE.Box3(); V3 = new A.THREE.Vector3(); }
   for (let i = 0; i < kinds.length; i++) {
     const l = []; kinds[i](l);
-    const m = part(l, p.x + rand(-0.25, 0.25), fl + rand(0.6, 1.4), p.z + rand(-0.25, 0.25));
+    const m = part(l, p.x + rand(-0.25, 0.25), fl + (low ? rand(0.15, 0.6) : rand(0.6, 1.4)), p.z + rand(-0.25, 0.25));
     m.rotation.set(rand(0, TAU), rand(0, TAU), rand(0, TAU));
     A.scene.add(m);
     const long = i >= 1 && i <= 5;                  // туловище, руки, ноги — ложатся вдоль земли
-    CHUNKS.push({ m, vx: vx * 0.3 + rand(-5, 5), vy: rand(3, 8), vz: vz * 0.3 + rand(-5, 5), spin: rand(-12, 12),
+    // low — разбился о землю: куски катятся дальше по ходу полёта и подскакивают невысоко
+    CHUNKS.push({ m, vx: low ? vx * 0.6 + rand(-2.5, 2.5) : vx * 0.3 + rand(-5, 5), vy: low ? rand(2, 4.5) : rand(3, 8),
+      vz: low ? vz * 0.6 + rand(-2.5, 2.5) : vz * 0.3 + rand(-5, 5), spin: rand(-12, 12),
       rest: 0, long, life: rand(TIME.CHUNK[0], TIME.CHUNK[1]) + TIME.SINK, splat: null, R: i === 1 ? rand(0.55, 0.75) : i >= 6 ? rand(0.18, 0.28) : rand(0.3, 0.45) });
   }
   let over = CHUNKS.length - CAP.CHUNKS;
@@ -542,6 +581,15 @@ function placeShadow (B, fade) {
   m.scale.set(0.5 * k, 1.05 * k, 1);
 }
 
+/* самокатчик ударился о землю (взрослая): тело — на куски, там же, со скоростью полёта */
+function shatter (B) {
+  const r = B.root;
+  if (STATS.LAST) { STATS.LAST.x = r.position.x; STATS.LAST.z = r.position.z; }
+  A.burst({ x: r.position.x, z: r.position.z, c: B.c }, B.vx, B.vz, true);   // куски, брызги, пятно, скорая
+  A.Snd.noise(0.1, 0.2);
+  B.mode = 'gone';
+}
+
 function stepBody (B, dt) {
   const r = B.root, P = B.parts;
   B.t += dt;
@@ -566,6 +614,7 @@ function stepBody (B, dt) {
     const lo = r.position.y < B.floor + 1.6 * B.s ? (r.updateMatrixWorld(true), lowest(r)) : Infinity;
     if (lo < B.floor + 0.01) {
       r.position.y += B.floor + 0.01 - lo;
+      if (B.shatter) { shatter(B); return; }
       if (!B.landed) { B.landed = 1; B.lx = nearest(r.rotation.x, Math.PI, Math.PI / 2); B.lz = nearest(r.rotation.z, TAU, 0); lieTargets(B); }
       B.vy = B.vy < 0 ? -B.vy * 0.25 : B.vy; B.vx *= 0.55; B.vz *= 0.55;
       if (Math.hypot(B.vx, B.vz) < 0.7 && Math.abs(B.vy) < 0.9) {
