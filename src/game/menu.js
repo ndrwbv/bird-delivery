@@ -16,6 +16,8 @@ import * as DIST from './districts.js';
 import * as CITY from './cityopen.js';
 import { DISTRICT, SHIFT, clock } from './econ.js';
 import * as BOARD from './board.js';
+import * as PROF from './profiles.js';           // профили: у каждого свой прогресс (profiles.js)
+import * as QR from './quickrun.js';             // быстрый заезд: сезон, длина смены, машина — без копилки и сюжета
 
 let A = null, el = null, md = null, dm = null, nameCb = null, nameFirst = false;
 const $ = id => document.getElementById(id);
@@ -31,10 +33,12 @@ function build () {
   el.id = 'cr-menu';
   el.innerHTML =
     '<div class="crm-col">' +
-      '<div class="crm-head"><div class="crm-logo"></div><div class="crm-tag"></div></div>' +
+      '<div class="crm-head"><div class="crm-logo"></div><div class="crm-tag"></div>' +
+        '<button type="button" class="crm-prof" data-a="profile" hidden></button></div>' +
       '<nav class="crm-btns">' +
         '<button type="button" class="crm-go" data-a="go" autofocus><b></b><span></span></button>' +
         '<button type="button" class="crm-b crm-dist" data-a="district" hidden><b></b><span></span></button>' +
+        '<button type="button" class="crm-b crm-quick" data-a="quick"><b></b><span></span></button>' +
         '<button type="button" class="crm-b" data-a="garage"></button>' +
         '<button type="button" class="crm-b" data-a="ride"></button>' +
         '<button type="button" class="crm-b" data-a="board" hidden></button>' +
@@ -50,10 +54,12 @@ function build () {
 }
 
 function act (a) {
-  if ((md && !md.hidden) || (dm && !dm.hidden) || BOARD.root()) return;
+  if ((md && !md.hidden) || (dm && !dm.hidden) || BOARD.root() || QR.root() || PROF.root()) return;
   A.Snd.boot && A.Snd.boot();
   if (a === 'go') A.menuGo();
   else if (a === 'district') openDistricts();
+  else if (a === 'quick') QR.openSetup();
+  else if (a === 'profile') openProfiles();
   else if (a === 'ride') A.menuRide();
   else if (a === 'garage') A.garage(() => show());
   else if (a === 'collect') A.openCollect();
@@ -80,6 +86,11 @@ export function show () {
     ? t('смена {n} · район «{name}» · {from}—{to}', { n, name: t(DIST.list()[DIST.cur()].name), from: '9:00', to: '24:00' })
     : t('смена {n} · {from}—{to}', { n, from: '9:00', to: '24:00' });
   distButton();
+  profButton();
+  const qb = el.querySelector('.crm-quick');
+  qb.querySelector('b').textContent = t('быстрый заезд');
+  qb.querySelector('span').textContent = QR.available() ? t('сезон, машина, длина смены · без копилки и сюжета') : t('откроется после первой смены');
+  qb.disabled = !QR.available();
   el.querySelector('[data-a="garage"]').textContent = t('гараж');
   el.querySelector('[data-a="ride"]').textContent = t('покататься');
   el.querySelector('[data-a="settings"]').textContent = t('настройки');
@@ -93,6 +104,24 @@ export function show () {
   rank();
   if (!String(A.Store.get('dlv-name', '') || '').trim()) askName(null, true);
   else CITY.check(() => show());                  // открыт весь город, а праздника ещё не было — сейчас (cityopen.js)
+}
+
+/* ── профиль: кнопка «профиль: Вася» под логотипом и окно профилей (profiles.js) ── */
+function profButton () {
+  const b = el.querySelector('.crm-prof');
+  b.hidden = !PROF.on();
+  if (b.hidden) return;
+  b.innerHTML = esc(t('профиль')) + ': <b>' + esc(PROF.curName()) + '</b>' + (PROF.list().length > 1 ? ' · ' + esc(t('сменить')) : '');
+}
+/* подпись профиля в списке: «смена 12 · 340 000 ₽ · районов 3 из 8» (читается Store профиля — PROF.peek) */
+function profInfo () {
+  const sh = +A.Store.get('dlv-shifts', 0) || 0;
+  const parts = [sh ? t('смен: {n}', { n: sh }) : t('ещё не работал'), A.money(+A.Store.get('dlv-msk-wallet', 0) || 0)];
+  if (DIST.has()) parts.push(DIST.allOpen() ? t('весь город') : t('районов {k} из {n}', { k: DIST.opened(), n: DIST.count() }));
+  return parts.join(' · ');
+}
+function openProfiles () {
+  PROF.open({ money: A.money, info: profInfo, setName: n => A.setName(n), Snd: A.Snd, onClose: () => { if (el) { profButton(); rank(); } } });
 }
 
 /* ── рейтинг пиццерии: ты и курьеры, по заработку за всё время ── */
@@ -215,11 +244,12 @@ function saveName () {
   const cb = nameCb; nameCb = null;
   if (cb) cb(v);
 }
-export const modal = () => (md && !md.hidden && !md.closest('[hidden]') ? md : dm && !dm.hidden && !dm.closest('[hidden]') ? dm : BOARD.root());   // заставку спрятали (поехали) — окна нет
+export const modal = () => (md && !md.hidden && !md.closest('[hidden]') ? md : dm && !dm.hidden && !dm.closest('[hidden]') ? dm : PROF.root() || BOARD.root());   // заставку спрятали (поехали) — окна нет
 /* назад: из настроек — отмена; при первом запуске окно не закрывается, ждём имя */
 export function back () {
   if (!modal()) return false;
   if (modal() === dm) { closeDistricts(); return true; }
+  if (modal() === PROF.root()) return PROF.back();
   if (modal() === BOARD.root()) return BOARD.close();
   if (nameFirst) return true;
   md.querySelector('input').blur();
@@ -227,7 +257,7 @@ export function back () {
   nameCb = null;
   return true;
 }
-export function submitName () { if (modal()) saveName(); }
+export function submitName () { if (PROF.root() && modal() === PROF.root()) PROF.submit(); else if (modal() === md) saveName(); }
 
 /* ── камера заставки: медленный облёт на высоте, пиццерия — в правой половине кадра,
    слева колонка меню. Стоймя — пиццерия по центру, чуть выше середины ── */

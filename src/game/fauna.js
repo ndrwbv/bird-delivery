@@ -6,8 +6,11 @@
 
    Лось: большой, тяжёлый, низкополигональный (самцы — с рогами-лопатами).
      Рядом с тобой в лесах — до MOOSE.ON (3) лосей, появляются в MOOSE.R (110–330 м)
-     от машины, не на дороге и не дальше EDGE (80 м) от неё — у опушки, чтобы было видно.
-     Ходят медленно (WALK 0,8 м/с), подолгу пасутся, из леса и на дорогу сами не выходят.
+     от машины, на опушке: от IN (12 м) в глубь ельника до 0,6·OUT (11 м) на луг, не на дороге
+     (опушки рядом нет — где угодно в лесу не дальше EDGE, 80 м, от дороги).
+     Ходят медленно (WALK 0,8 м/с), подолгу пасутся. Пасутся на опушке: в лесу — не глубже
+     2,5·IN (30 м) от края, на лугу — не дальше OUT (18 м); с шансом OUTP (45 %), тронувшись,
+     идут к краю — выходят из леса на луг и возвращаются (forest.js — ельник). На дорогу сами не выходят.
      Уехал дальше FAR (480 м) — лось пропадает, вместо него появится другой.
    «Лось на дороге!» (CROSS): раз в CD (80–160 с), первый — через FIRST (45–90 с) смены,
      если впереди тебя в AHEAD (60–150 м) есть дорога у леса (лес не дальше 25 м от
@@ -43,7 +46,7 @@ import { t } from '../i18n/index.js';
 
 export const FAUNA = {
   FOREST_MIN: 30000,
-  MOOSE: { ON: 3, R: [110, 330], EDGE: 80, FAR: 480, SHOW: 380, WALK: 0.8, TROT: 2.2, RESPAWN: [15, 35], RAD: 0.9 },
+  MOOSE: { ON: 3, R: [110, 330], EDGE: 80, FAR: 480, SHOW: 380, WALK: 0.8, TROT: 2.2, RESPAWN: [15, 35], RAD: 0.9, IN: 12, OUT: 18, OUTP: 0.45 },
   CROSS: { FIRST: [45, 90], CD: [80, 160], RETRY: 6, AHEAD: [60, 150], NEAR: 25, SPEED: 1.3, STOP: 0.5, STAND: [2, 4] },
   HIT: { MIN: 3, BASE: 3, K: 0.12, MAX: 2, KEEP: 0.3, STAGGER: 5 },
   SMALL: { ON: 3, R: [50, 220], FAR: 360, SHOW: 260, FLEE: 14, HARE: 0.67 },
@@ -160,6 +163,45 @@ function onRoad (x, z, m) {
 }
 function okGround (x, z) { return A.inBounds(x, z, 10) && !A.inHouse(x, z, 1.5); }
 
+/* край леса: ближайшая точка контура и расстояние до неё */
+function edgeOf (f, x, z) {
+  const p = f.p;
+  let e = Infinity, px = x, pz = z;
+  for (let i = 0; i < p.length; i++) {
+    const a = p[i], b = p[(i + 1) % p.length], dx = b[0] - a[0], dz = b[1] - a[1];
+    const t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / (dx * dx + dz * dz || 1), 0, 1);
+    const qx = a[0] + dx * t, qz = a[1] + dz * t, d = Math.hypot(x - qx, z - qz);
+    if (d < e) { e = d; px = qx; pz = qz; }
+  }
+  return { e, px, pz };
+}
+/* лосю можно сюда: опушка — в лесу не глубже IN·2,5 м от края, на лугу — не дальше OUT м
+   (из глубины — только к краю) */
+function opushka (f, x, z, x0, z0) {
+  const M = FAUNA.MOOSE, e = edgeOf(f, x, z).e;
+  if (!A.inPoly(x, z, f.p)) return e < M.OUT;
+  return e < M.IN * 2.5 || e < edgeOf(f, x0, z0).e;
+}
+/* лось — на опушке (docs/ORDERS.md «Лоси и звери»): точка на краю леса в кольце R от машины,
+   от IN м в глубь ельника до OUT·0,6 м на луг, не на дороге */
+function edgeSpot (R) {
+  const M = FAUNA.MOOSE, V = A.V;
+  const near = forests().filter(f => f.x1 > V.x - R[1] && f.x0 < V.x + R[1] && f.z1 > V.z - R[1] && f.z0 < V.z + R[1]);
+  if (!near.length) return null;
+  for (let k = 0; k < 30; k++) {
+    const f = near[(Math.random() * near.length) | 0], p = f.p, i = (Math.random() * p.length) | 0;
+    const a = p[i], b = p[(i + 1) % p.length], t = Math.random();
+    const bx = a[0] + (b[0] - a[0]) * t, bz = a[1] + (b[1] - a[1]) * t, L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    let nx = -(b[1] - a[1]) / L, nz = (b[0] - a[0]) / L;
+    if (!A.inPoly(bx + nx * 2, bz + nz * 2, p)) { nx = -nx; nz = -nz; }     // нормаль — в лес
+    const o = rand(-M.OUT * 0.6, M.IN), x = bx + nx * o, z = bz + nz * o;
+    const d = Math.hypot(x - V.x, z - V.z);
+    if (d < R[0] || d > R[1] || !okGround(x, z) || onRoad(x, z, 4)) continue;
+    return { x, z, f };
+  }
+  return null;
+}
+
 /* место для зверя: в лесу, в кольце R от машины, не на дороге; лось — у опушки (дорога не дальше EDGE) */
 function spot (R, edge) {
   const near = forests().filter(f => f.x1 > A.V.x - R[1] && f.x0 < A.V.x + R[1] && f.z1 > A.V.z - R[1] && f.z0 < A.V.z + R[1]);
@@ -243,7 +285,14 @@ function think (a, dt, dCar) {
   if ((a.mt -= dt) <= 0) {
     if (a.mode === 'stand') { a.mode = 'cross'; return; }
     if (a.mode === 'stagger' || a.mode === 'flee') { a.mode = 'graze'; a.mt = rand(3, 7); }
-    else if (a.mode === 'graze') { a.mode = 'walk'; a.mt = rand(4, 10); a.h += rand(-1.2, 1.2); }
+    else if (a.mode === 'graze') {
+      a.mode = 'walk'; a.mt = rand(4, 10); a.h += rand(-1.2, 1.2);
+      // лось выходит из леса на опушку и уходит обратно
+      if (a.big && a.f && Math.random() < FAUNA.MOOSE.OUTP) {
+        const q = edgeOf(a.f, a.x, a.z), out = A.inPoly(a.x, a.z, a.f.p) ? 1 : -1;
+        if (q.e > 0.5) a.h = Math.atan2((q.px - a.x) * out, (q.pz - a.z) * out) + rand(-0.4, 0.4);
+      }
+    }
     else { a.mode = 'graze'; a.mt = rand(3, 8); }
   }
   if (a.mode === 'stand') { a.v = 0; return; }
@@ -254,7 +303,7 @@ function think (a, dt, dCar) {
   if (sp > 0 && (a.chk -= dt) <= 0 && a.mode === 'walk') {
     a.chk = 0.4;
     const la = a.big ? 3 : 1.5, nx = a.x + Math.sin(a.h) * la, nz = a.z + Math.cos(a.h) * la;
-    if ((a.f && !A.inPoly(nx, nz, a.f.p)) || onRoad(nx, nz, 2.5) || A.inHouse(nx, nz, 0.5)) {
+    if ((a.f && !(a.big ? opushka(a.f, nx, nz, a.x, a.z) : A.inPoly(nx, nz, a.f.p))) || onRoad(nx, nz, 2.5) || A.inHouse(nx, nz, 0.5)) {
       a.h += Math.PI * rand(0.6, 1.4); a.mode = 'graze'; a.mt = rand(1, 3);
     }
   }
@@ -484,7 +533,7 @@ export function step (dt, api) {
     if ((ST.spawnM -= dt) <= 0) {
       ST.spawnM = rand(...M.RESPAWN) / 3;
       if (LIST.filter(a => a.big && a.mode !== 'cross').length < M.ON) {
-        const p = spot(M.R, M.EDGE);
+        const p = edgeSpot(M.R) || spot(M.R, M.EDGE);    // на опушке; не нашлось — где раньше
         if (p) add('moose', p.x, p.z, p.f);
       }
     }

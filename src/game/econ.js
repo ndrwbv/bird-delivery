@@ -493,24 +493,44 @@ export const BOSS_MOOD = { BAD_BELOW: 3, GREAT: { short: 4, medium: 6, long: 8 }
    кроссовер: почти не ломается), «Хавалка» (квадратный внедорожник, 3 ★), «Джиля Монжара»
    (кроссовер с огромной решёткой, 8 ★). Сумма ≈ 7,18 млн ₽. Звёзды — порог, не тратятся.
    При доходе 24–48 тыс. за смену — это ~190 смен.
+   handling — управляемость 1…10 (HANDLING ниже): 1—2 баржа, 5 — Семёрка, 9—10 резкая.
    Прокачка на каждую машину: броня (+1 сердце) и мотор (+4 % скорости), по три
    ступени, ступень — 15 % цены машины (у бесплатной «Семёрки» — от 6 400 ₽). */
 export const CAR_LIST = [
-  { id: 'semerka', price: 0,      stars: 0,  hp: 4,  L: 3,   vmax: 44, acc: 34 },
-  { id: 'matiz',   price: 40000,  stars: 0,  hp: 3,  L: 2,   vmax: 46.5, acc: 39.8 },
-  { id: 'kopeyka', price: 88000,  stars: 0,  hp: 5,  L: 4,   vmax: 44.8, acc: 34.9 },
-  { id: 'cheri',   price: 120000, stars: 0,  hp: 4,  L: 3,   vmax: 48.1, acc: 39 },
-  { id: 'priora',  price: 152000, stars: 0,  hp: 5,  L: 2,   vmax: 49.8, acc: 39 },
-  { id: 'buhanka', price: 240000, stars: 0,  hp: 8,  L: 5,   vmax: 41.5, acc: 30.7 },
-  { id: 'niva',    price: 360000, stars: 0,  hp: 6,  L: 3,   vmax: 48.1, acc: 38.2, offroad: true },
-  { id: 'belgik',  price: 440000, stars: 0,  hp: 6,  L: 1.5, vmax: 50.6, acc: 41.5 },
-  { id: 'volga',   price: 520000, stars: 0,  hp: 7,  L: 2,   vmax: 51.5, acc: 38.2 },
-  { id: 'cruze',   price: 720000, stars: 0,  hp: 6,  L: 1,   vmax: 55.6, acc: 43.2 },
-  { id: 'havalka', price: 860000, stars: 3,  hp: 9,  L: 1,   vmax: 51.5, acc: 38.2, offroad: true },
-  { id: 'vesta',   price: 1000000, stars: 5,  hp: 7,  L: 1,   vmax: 58.1, acc: 44.8 },
-  { id: 'jilya',   price: 1200000, stars: 8, hp: 8,  L: 0.5, vmax: 57.3, acc: 45.6 },
-  { id: 'patriot', price: 1440000, stars: 12, hp: 10, L: 0.3, vmax: 56.4, acc: 41.5, offroad: true },
+  { id: 'semerka', price: 0,      stars: 0,  hp: 4,  L: 3,   vmax: 44, acc: 34, handling: 5 },
+  { id: 'matiz',   price: 40000,  stars: 0,  hp: 3,  L: 2,   vmax: 46.5, acc: 39.8, handling: 8 },
+  { id: 'kopeyka', price: 88000,  stars: 0,  hp: 5,  L: 4,   vmax: 44.8, acc: 34.9, handling: 4 },
+  { id: 'cheri',   price: 120000, stars: 0,  hp: 4,  L: 3,   vmax: 48.1, acc: 39, handling: 9 },
+  { id: 'priora',  price: 152000, stars: 0,  hp: 5,  L: 2,   vmax: 49.8, acc: 39, handling: 6 },
+  { id: 'buhanka', price: 240000, stars: 0,  hp: 8,  L: 5,   vmax: 41.5, acc: 30.7, handling: 1 },
+  { id: 'niva',    price: 360000, stars: 0,  hp: 6,  L: 3,   vmax: 48.1, acc: 38.2, handling: 4, offroad: true },
+  { id: 'belgik',  price: 440000, stars: 0,  hp: 6,  L: 1.5, vmax: 50.6, acc: 41.5, handling: 6 },
+  { id: 'volga',   price: 520000, stars: 0,  hp: 7,  L: 2,   vmax: 51.5, acc: 38.2, handling: 2 },
+  { id: 'cruze',   price: 720000, stars: 0,  hp: 6,  L: 1,   vmax: 55.6, acc: 43.2, handling: 10 },
+  { id: 'havalka', price: 860000, stars: 3,  hp: 9,  L: 1,   vmax: 51.5, acc: 38.2, handling: 3, offroad: true },
+  { id: 'vesta',   price: 1000000, stars: 5,  hp: 7,  L: 1,   vmax: 58.1, acc: 44.8, handling: 7 },
+  { id: 'jilya',   price: 1200000, stars: 8, hp: 8,  L: 0.5, vmax: 57.3, acc: 45.6, handling: 5 },
+  { id: 'patriot', price: 1440000, stars: 12, hp: 10, L: 0.3, vmax: 56.4, acc: 41.5, handling: 2, offroad: true },
 ];
+/* ── управляемость (03.10.2026, IDEAS блок 7): handling в CAR_LIST — от 1 до 10, 5 — «Семёрка» (как было
+   у всех до этого). 1—2 — баржа (Буханка, Волжанка, Патриот), 9—10 — резкая (Чери-Мери, Шеви Круиз).
+   Что делает число H (game.js driveStep, docs/CAREER.md «Управляемость»):
+     TURN  — скорость поворота кузова: × (0,75 + 0,05·H)       → H1 ×0,8, H5 ×1, H10 ×1,25
+     FALL  — на скорости руль «тупеет»: делитель 1 + v·0,014·(1,5 − 0,1·H) → у баржи на 60 км/ч
+             поворот слабеет на 25 %, у резкой — на 10 %
+     RATE  — как быстро крутится руль до упора, долей упора в секунду: 2 + 1,2·H → H1 за 0,31 с,
+             H5 за 0,13 с, H10 за 0,07 с; к центру — в RETURN раз быстрее
+     SIDE  — как быстро гаснет снос вбок (и на сухом, и в дождь): × (0,82 + 0,036·H) → H1 ×0,86, H10 ×1,18;
+             в ливень у баржи 5,5 × 0,86 ≈ 4,7 1/с — сносит чуть сильнее, но не как до 03.10 (2,6)
+   Прокачки «подвеска» нет — управляемость у машины заводская. */
+export const HANDLING = {
+  DEF: 5,
+  TURN: [0.75, 0.05], FALL: [1.5, -0.1], RATE: [2, 1.2], RETURN: 1.5, SIDE: [0.82, 0.036],
+};
+export function handlingK (h) {
+  const H = Math.max(1, Math.min(10, Number.isFinite(+h) ? +h : HANDLING.DEF)), L = HANDLING;
+  return { h: H, turn: L.TURN[0] + L.TURN[1] * H, fall: L.FALL[0] + L.FALL[1] * H, rate: L.RATE[0] + L.RATE[1] * H, side: L.SIDE[0] + L.SIDE[1] * H };
+}
 export const UPGRADE = { STEPS: 3, SHARE: 0.15, MIN: 6400, HP: 1, VMAX: 0.04 };
 export const upgradePrice = (car, step) => Math.max(UPGRADE.MIN, Math.round(car.price * UPGRADE.SHARE / 100) * 100) * (step + 1);
 

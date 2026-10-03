@@ -52,6 +52,7 @@ import * as DLG from './dialog.js';
 import { STORY_PEOPLE, ORDER_TYPES } from './orders.config.js';
 import { makePerson } from './people.js';
 import { makeCatModel, FURS } from './cats.js';
+import * as QR from './quickrun.js';             // быстрый заезд: глав нет
 
 // career.js пишет другой агент: берём, если он уже есть, и не падаем, если нет
 const CAREER_MOD = import.meta.glob('./career.js', { eager: true })['./career.js'] || null;
@@ -228,6 +229,8 @@ function load () {
 function save () { try { if (API && API.Store) API.Store.set(KEY, ST.data); } catch (e) { /* — */ } }
 const prog = id => { const d = load(); return d[id] || (d[id] = { ch: 0, last: -99 }); };
 
+/* быстрый заезд кончился: прогресс — заново из сохранения (встречи с героями на заезде не в счёт) */
+export function reload () { ST.data = null; }
 export function progress () { return JSON.parse(JSON.stringify(load())); }
 /* для herostories.js: живой прогресс истории и запись */
 export const progOf = id => prog(id);
@@ -321,7 +324,7 @@ const hourOk = (c, h) => !c.hours || h === undefined || h === null || (h >= c.ho
 
 /* ctx: { shift, hour, x, z } — номер смены (с 1), час игры (9…24), где курьер */
 export function nextOrder (ctx = {}) {
-  if (!API) return null;
+  if (!API || QR.on()) return null;                              // быстрый заезд — без сюжета и глав героев (quickrun.js)
   // номер смены: orders.js его не передаёт — тогда берём из сохранения (API.shift)
   const shift = +ctx.shift || (API.shift ? +API.shift() || 0 : 0);
   for (const s of STORIES) {

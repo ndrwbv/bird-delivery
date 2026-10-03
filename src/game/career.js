@@ -28,6 +28,7 @@ import * as CHAT from './chat.js';
 import * as ACH from './achievements.js';          // достижения: «Всё на красное» в «депнуть» (achievements.js)
 import * as HEROES from './heroes.js';           // теннисисты в «депнуть» — герои города: те же лица
 import * as HQ from './heroquests.js';           // герои, этап 2: совет Лёхи на ставке, «наоборот» Игорька, Жека про машину
+import * as QR from './quickrun.js';             // быстрый заезд: своя длина смены, с 9:00, свои итоги (quickrun.js)
 import { makePadMenu } from '../input/padmenu.js';
 import { t, tn, lang } from '../i18n/index.js';
 
@@ -129,15 +130,17 @@ export function startShift () {
   const S = A.S;
   // круглосуточная пиццерия (со второго района): смена с того часа, когда кончилась прошлая (dlv-clock);
   // в Юге — всегда с 9:00
-  const cv = A.Store.get('dlv-clock', null), day = allDay(), c0 = cv == null || cv === '' ? 9 : +cv;
+  // быстрый заезд (quickrun.js) — всегда с 9:00
+  const cv = A.Store.get('dlv-clock', null), day = allDay() && !QR.on(), c0 = cv == null || cv === '' ? 9 : +cv;
   const h0 = day && Number.isFinite(c0) ? ((c0 % 24) + 24) % 24 : ECON.SHIFT.KEYS[0][1];
   A.env().t = ECON.tOfHour(h0 < ECON.SHIFT.KEYS[0][1] ? h0 + 24 : h0);
   SH.tStart = A.env().t; SH.allDay = day;
   S.lunch = null;
   SH.on = true; SH.phase = ''; SH.lunch = false; SH.hits = 0; SH.lastHurt = S.hurt || 0; SH.fine = 0; SH.stars = 0;
   SH.slot = false; STAKE = 0; SH.t0h = ECON.hourOf(A.env().t); SH.endH = SH.t0h; SH.n = +A.Store.get('dlv-shifts', 0) || 0;
-  SH.len = ECON.shiftLen(SH.n);
-  SH.pace = DIST.beginShift();                    // волна щедрости: 1-я смена сессии — щедрая (econ.js PACE)
+  SH.len = QR.on() ? QR.len() : ECON.shiftLen(SH.n);   // быстрый заезд — длина, что выбрал игрок
+  // волна щедрости: 1-я смена сессии — щедрая (econ.js PACE); быстрый заезд — обычная и волну не двигает
+  SH.pace = QR.on() ? (DIST.setPace('normal'), 'normal') : DIST.beginShift();
   SH.district = DIST.cur();
   SH.city = DIST.city();                          // «весь город» (cityopen.js): итоги — без района, с премией за дальние
   SH.opened = -1;
@@ -320,6 +323,7 @@ function bossCard () {
 export function showEnd (why, whyText, held) {
   if (!A) return;
   const S = A.S;
+  if (QR.on()) { quickEnd(why, whyText); return; }
   if (!held && SH.on && CHAT.busy()) { CHAT.idle(() => { if (A.S.state === 'over') showEnd(why, whyText, true); }); return; }
   CHAT.clear();
   const wasOn = SH.on;
@@ -424,6 +428,25 @@ export function showEnd (why, whyText, held) {
   ov.hidden = false;
   fitEnd();
   for (let i = 0; i < rows.length; i++) els[i].querySelector('b').textContent = rows[i][2](0);
+}
+
+/* быстрый заезд кончился (полночь, снялся, сгорел): карьере ничего — ни смены, ни бонуса, ни района, ни звёзд,
+   ни рейтинга; итоги заезда и выход из песочницы сохранения — quickrun.js */
+const QTITLE = { 'смена окончена': () => t('ты сам закончил заезд'), 'время': () => t('заезд окончен'), 'сбил клиента': () => t('сняли с заезда') };
+function quickEnd (why, whyText) {
+  const S = A.S;
+  CHAT.clear();
+  if (SH.on) SH.endH = hour();
+  SH.on = false; SH.phase = 'done'; SH.bonus = 0;
+  lunchClass(false);
+  $('cr-clock') && ($('cr-clock').hidden = true);
+  closeSpend(false);
+  QR.finish({
+    title: QTITLE[why] ? QTITLE[why]() : t('заезд сорвался'),
+    why: why === 'время' ? t('полночь — пиццерия закрылась') : why === 'смена окончена' ? '' : whyText || '',
+    money: S.money || 0, delivered: S.delivered || 0, tips: typeof S.tips === 'number' ? S.tips : 0,
+    hits: SH.hits, fine: SH.fine, people: S.people || 0, t0h: SH.t0h, endH: SH.endH,
+  });
 }
 
 /* наверху итогов: крупный заработок и директор рядом (на узком — друг под другом);
@@ -686,7 +709,7 @@ const spendOpen = () => { const m = $('cr-spend'); return m && !m.hidden ? m : n
 /** непрозрачный экран поверх города (гараж, «потратить») — кадр мира можно не рисовать */
 export const covered = () => GARAGE.isOpen() || !!spendOpen() || !!depOpen();
 /** что сейчас листает геймпад: окно имени, гараж, «депнуть», «потратить» — или null */
-export function padRoot () { return END.root() || CITY.root() || MENU.modal() || GARAGE.root() || depOpen() || spendOpen(); }
+export function padRoot () { return QR.root() || END.root() || CITY.root() || MENU.modal() || GARAGE.root() || depOpen() || spendOpen(); }
 /** до makePadMenu: в гараже ←→ и LB/RB листают машины, B — закрыть то, что сверху */
 export function padPre (p) {
   if (!A) return;
@@ -708,6 +731,7 @@ export function padPre (p) {
 }
 /** назад: окно имени → гараж → «потратить»; true — что-то закрыли */
 export function back () {
+  if (QR.root()) return QR.back();
   if (CITY.root()) return CITY.back();
   if (MENU.modal()) return MENU.back();
   if (GARAGE.isOpen()) { GARAGE.close(); return true; }

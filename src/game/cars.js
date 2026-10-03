@@ -171,7 +171,7 @@ function spec (id) {
     id, name: t(L.name), note: t(L.note), hex: hexOf(id), hexBase: L.hex, model: L.model, price: c.price, stars: c.stars,
     hpBase: c.hp, hp: c.hp + u.armor * UPGRADE.HP,
     vmaxBase: c.vmax, vmax: Math.round(c.vmax * (1 + u.engine * UPGRADE.VMAX) * 10) / 10, acc: c.acc,
-    Lbase: c.L, wearK: wearK(c), offroad: !!c.offroad, up: u,
+    Lbase: c.L, wearK: wearK(c), offroad: !!c.offroad, up: u, handling: c.handling ?? 5,
     cond: Math.round(e.c), ceil: Math.round(e.r), km: Math.round(e.km), repairs: e.n, stallP: stallP(id, e), L: (100 - e.c) / 10,
     upPrice: { armor: u.armor < UPGRADE.STEPS ? upgradePrice(c, u.armor) : null, engine: u.engine < UPGRADE.STEPS ? upgradePrice(c, u.engine) : null },
     paintPrice: paintPrice(c), sellPrice: sellPrice(c, u, e.r),

@@ -53,6 +53,7 @@ body:has(#cr-garage:not([hidden])) .hud, body:has(#cr-garage:not([hidden])) #ctr
 .gr-card.own .gr-st-break .gr-bar > i { background: #7fc36a; }
 .gr-st-res .gr-bar > i { background: #b98cff; }
 .gr-st-hp .gr-bar > i { background: #ff5d7a; }
+.gr-st-handle .gr-bar > i { background: #46b4e0; }
 .gr-st.up b { color: #7fe08a; animation: gr-flash .6s steps(2) 3; }
 @keyframes gr-flash { 50% { color: #fff3d6; } }
 

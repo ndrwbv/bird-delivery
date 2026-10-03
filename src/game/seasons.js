@@ -75,6 +75,8 @@ export const warmth = () => A.warm || 0;
 export const slip = () => (A.snow || 0) * 0.32;
 /* идёт ли вместо дождя снег */
 export const snowy = () => (A.snow || 0) > 0.45;
+/* сколько снега на ветках и земле, 0 … 1 (ельник: forest.js) */
+export const snowAmt = () => A.snow || 0;
 /* река во льду (сёрферу там не место) */
 export const iced = () => (A.snow || 0) > 0.25;
 
@@ -371,7 +373,10 @@ export function advanceSeason () {
   C.Store.set('dlv-season', SEA);
   apply();
 }
-export function setSeason (v) { SEA = wrap(+v); FORCED = true; apply(); }
+/* forced — дальше не сдвигать (песочница, ?season=). Быстрый заезд (quickrun.js) ставит свой сезон
+   и потом возвращает прежний с прежним forced — сохранение не трогается */
+export function setSeason (v, forced = true) { SEA = wrap(+v); FORCED = !!forced; apply(); }
+export const seasonForced = () => FORCED;
 function wrap (v) { return Math.round(((v % 4) + 4) % 4 * 1000) / 1000 % 4; }
 
 function apply () {

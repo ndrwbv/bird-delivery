@@ -111,6 +111,8 @@ function loadUsed () {
   reindex();
 }
 function reindex () { UIDX = new Map(); USED.forEach((k, i) => UIDX.set(k, i)); }
+/* быстрый заезд кончился (quickrun.js): адреса заезда не в счёт — список снова из сохранения */
+export const reloadUsed = () => { if (A) loadUsed(); };
 function markUsed (key) {
   if (!key || (SHIFT_PLAN.noRepeat && SHIFT_PLAN.noRepeat.wholeGame === false)) return;
   if (UIDX.has(key)) { USED.splice(UIDX.get(key), 1); USED.push(key); reindex(); }

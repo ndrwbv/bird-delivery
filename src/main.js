@@ -10,6 +10,7 @@ import { initI18n, applyDom, LANGS, LANG_NAMES } from './i18n/index.js';
 import { pickLang } from './langpick.js';
 import { MAP_IDS, loadMap } from './maps/index.js';
 import { useMap } from './game/map.js';
+import * as PROF from './game/profiles.js';
 
 // журнал ошибок и зависаний (docs/CRASHES.md) — первым делом: ловит и ошибки загрузки игры
 CRASH.init();
@@ -22,6 +23,8 @@ if (buildV) buildV.textContent = BUILD;
 for (const el of document.querySelectorAll('.pm-ver')) el.textContent = BUILD;
 
 await Platform.init({ langs: LANGS });
+// профили (game/profiles.js): прогресс каждого — под своими ключами; до первого чтения сохранения. Яндекс — без профилей
+if (Platform.id !== 'yandex') PROF.install(Platform);
 // первый запуск — спросить язык: игра ещё не загружена, перезагружать нечего. На Яндексе язык даёт площадка
 if (Platform.id !== 'yandex' && !Platform.langChosen) {
   Platform.setLang(await pickLang(LANGS, LANG_NAMES, Platform.lang));

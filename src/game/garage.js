@@ -90,8 +90,11 @@ function load () {
 const U = ECON.UPGRADE;
 const vmaxTop = () => Math.max(1, ...ECON.CAR_LIST.map(c => c.vmax * (1 + U.STEPS * U.VMAX)));
 const hpTop = () => Math.max(1, ...ECON.CAR_LIST.map(c => c.hp + U.STEPS * U.HP));
+const handleWord = h => { h = ECON.handlingK(h).h; return h <= 2 ? t('баржа') : h <= 4 ? t('тугая') : h <= 6 ? t('обычная') : h <= 8 ? t('вёрткая') : t('резкая'); };
 const statsOf = c => [
   { k: 'speed', name: t('скорость'), v: t('{n} км/ч', { n: Math.round((c.vmax || 0) * 3.6) }), p: (c.vmax || 0) / vmaxTop() },
+  // управляемость 1…10 (econ.js HANDLING): 1—2 баржа, 3—4 тугая, 5—6 обычная, 7—8 вёрткая, 9—10 резкая
+  { k: 'handle', name: t('управляемость'), v: handleWord(c.handling) + ' · ' + ECON.handlingK(c.handling).h + '/10', p: ECON.handlingK(c.handling).h / 10 },
   // своя — мотор и ресурс (econ.js BREAK); в продаже — как быстро изнашивается мотор
   ...(c.owned ? [
     { k: 'break', name: t('мотор'), v: Math.round(c.cond ?? 100) + ' %', p: (c.cond ?? 100) / 100 },

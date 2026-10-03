@@ -104,10 +104,12 @@ export function cozyFront (A, f, gy, w) {
    пиццерии. Места — носом к дому, выезд прямо на проезжую часть.
    Возвращает места [{ x, z, h }], h — куда смотрит машина на месте
    (к улице: так и выезжают). */
-export function courierLot (A, f, count) {
-  const THREE = A.THREE, r = f.road, s = r.seg;
+/* Где встанет парковка: точка на улице (base) и оси. block(x, z) — ещё
+   занято (пиццерия-шар, которую только собираются поставить: pizzadome.js) */
+export function lotBase (A, f, count, block) {
+  const r = f.road, s = r.seg;
   const L = Math.hypot(s.x2 - s.x1, s.z2 - s.z1) || 1;
-  let ux = (s.x2 - s.x1) / L, uz = (s.z2 - s.z1) / L;
+  const ux = (s.x2 - s.x1) / L, uz = (s.z2 - s.z1) / L;
   // «наружу от дороги» — в сторону пиццерии
   let nx = -uz, nz = ux;
   if ((f.mx - r.x) * nx + (f.mz - r.z) * nz < 0) { nx = -nx; nz = -nz; }
@@ -115,16 +117,22 @@ export function courierLot (A, f, count) {
   const ok = (cx, cz) => {
     for (const [a, b] of [[-W / 2, 0], [W / 2, 0], [-W / 2, D], [W / 2, D], [0, D / 2], [-W / 4, D], [W / 4, D]]) {
       const x = cx + ux * a + nx * (off + b), z = cz + uz * a + nz * (off + b);
-      if (A.inHouse(x, z, 0.6) || A.onOtherRoad(x, z, s)) return false;
+      if (A.inHouse(x, z, 0.6) || A.onOtherRoad(x, z, s) || (block && block(x, z))) return false;
     }
     return true;
   };
-  let base = null;
   for (const d of [14, -14, 22, -22, 30, -30, 8, -8, 40, -40, 0]) {
     const cx = r.x + ux * d, cz = r.z + uz * d;
-    if (ok(cx, cz)) { base = [cx, cz]; break; }
+    if (ok(cx, cz)) return { base: [cx, cz], ux, uz, nx, nz, SW, D, W, off };
   }
-  if (!base) return null;
+  return null;
+}
+
+export function courierLot (A, f, count) {
+  const THREE = A.THREE;
+  const lb = lotBase(A, f, count);
+  if (!lb) return null;
+  const { base, ux, uz, nx, nz, SW, D, W, off } = lb;
   const [bx, bz] = base, gy = A.groundH(bx + nx * (off + D / 2), bz + nz * (off + D / 2));
   const P = (a, b) => [bx + ux * a + nx * (off + b), bz + uz * a + nz * (off + b)];
   // асфальт площадки и разметка мест

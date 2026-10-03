@@ -47,6 +47,8 @@ import * as CATS from './cats.js';               // продухи подвал�
 import * as NIGHT from './nightlife.js';         // взрослая: девушки у обочины ночью, стрип-клуб «Клубничка» (nightlife.js)
 import * as RL from './roadlife.js';
 import * as PZ from './pizzeria.js';
+import * as PZD from './pizzadome.js';          // пиццерия-шар: отдельное здание у улицы рядом с прежней точкой (pizzadome.js)
+import * as FOREST from './forest.js';         // ельник в больших лесах: ели и сосны инстансами, опушка, снег зимой (forest.js)
 import * as LM from './landmarks.js';            // заправки и каток
 import * as ECON from './econ.js';               // карьера: все числа и формулы (docs/CAREER.md)
 import * as DLG from './dialog.js';              // диалог с головой и печатающимся текстом
@@ -67,6 +69,8 @@ import * as HITS from './hits.js';               // сила удара по л�
 import * as FIRST from './intro.js';             // вступление первого запуска: пиццерия, Степан, машина (катсцена «как в ГТА»)
 import * as ACH from './achievements.js';          // достижения Стима: таблица, счётчики, вызов моста (achievements.js, docs/STEAM.md)
 import * as BOARD from './board.js';               // таблица рекордов «лучшая смена» в Стим-сборке (board.js, docs/STEAM.md §4.2)
+import * as PROF from './profiles.js';           // профили: прогресс каждого под своими ключами, сброс — только текущего (profiles.js)
+import * as QR from './quickrun.js';               // быстрый заезд из меню: сезон, длина, машина; сохранение карьеры не трогает (quickrun.js)
 import * as CL from '../platform/crashlog.js';   // журнал ошибок, предохранитель шагов мира, сторож зависаний (docs/CRASHES.md)
 
 /* Сохранения — через площадку (облако Яндекса / localStorage). Значения
@@ -1021,7 +1025,7 @@ function osmGround () {
 
   for (const g of CITY.green) {
     if (DMASK && g.p.every(q => farOut(q[0], q[1]))) continue;      // за забором далеко — не рисуем
-    LITM.color(GREEN_HEX[g.k] || '#95c579');
+    LITM.color(FOREST.isForest(g) ? FOREST.FOREST.FLOOR : GREEN_HEX[g.k] || '#95c579');   // в ельнике земля темнее (forest.js)
     LITM.poly(g.p, g.k === 'water' ? 0.03 : 0.04);
   }
   // Кисловка и ручьи линией: русла в карте нет, только осевая
@@ -1451,6 +1455,7 @@ function tree (x, z, strip = 0) {
   const road = nearestRoad(x, z, DRIVE_MAX + 2, 1);
   if (road && road.d < road.seg.w / 2 + (strip ? 1 : 2.5)) return;
   if (WORLD.onAlley(x, z)) return;                 // на аллее парка (world.js) — не сажаем
+  if (PZD.blocks(x, z, 0.8)) return;               // не в пиццерии-шаре и не на её площади (pizzadome.js)
   if (SEAS.seasonTree(x, z, y) === false) return;   // вид дерева и сезон — seasons.js (у столиков пиццерии не сажает)
   solid(x - 0.55, z - 0.55, x + 0.55, z + 0.55);
 }
@@ -2945,6 +2950,17 @@ for (const b of CITY.buildings) {
       HOUSE_GRID.get(k).push(b);
     }
 }
+/* своя постройка (пиццерия-шар) — как дом: деревья, лавочки, гаражи её обходят */
+function houseFoot (p, k = 'pizza') {
+  const b = { p, k };
+  let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+  for (const q of p) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); z0 = Math.min(z0, q[1]); z1 = Math.max(z1, q[1]); }
+  for (let i = Math.floor(x0 / 40); i <= Math.floor(x1 / 40); i++) for (let j = Math.floor(z0 / 40); j <= Math.floor(z1 / 40); j++) {
+    const k2 = i + ',' + j;
+    if (!HOUSE_GRID.has(k2)) HOUSE_GRID.set(k2, []);
+    HOUSE_GRID.get(k2).push(b);
+  }
+}
 function inHouse (x, z, m = 0) {
   const a = HOUSE_GRID.get(Math.floor(x / 40) + ',' + Math.floor(z / 40));
   if (!a) return false;
@@ -3498,6 +3514,9 @@ function signTex () {
    возвращает пиццерию: куда подъезжать (x, z), дом (bx, bz, by), окно выдачи
    (wx, wy, wz), имя, места на парковке (slots) и курилку (smoke) */
 function dodoFacade (f, name) {
+  // пиццерия — отдельный оранжевый шар на свободном месте рядом (pizzadome.js); места нет — в доме, как раньше
+  const D = PZD.build(pizzaApi(), f, { brand: OWN.pizza(), lots: RIVAL_SPEC.length + 1, lane: LANE });
+  if (D) return Object.assign(D, { name: OWN.pizza() + ' · ' + translit(name || homeAddr()) });
   const ry = Math.atan2(f.ox, f.oz);                  // модель смотрит в +Z — значит, на улицу
   const gy = groundH(f.mx + f.ox * 1.5, f.mz + f.oz * 1.5);
   const at = (along, out) => [f.mx + f.ux * along + f.ox * out, f.mz + f.uz * along + f.oz * out];
@@ -3615,10 +3634,13 @@ const bbApi = () => ({
   get ENV () { return ENV; },
 });
 let BB_API = null;
+const ENV_API = { get ENV () { return ENV; } };    // пиццерия-шар: ночная подсветка (pizzadome.js)
 /* что нужно citybits.js (забор, КПП, рельсы, крыши, купола, вывески ТЦ) */
 /* что нужно pizzeria.js: ламповый фасад и парковка курьеров */
 const pizzaApi = () => ({
   THREE, scene, LIT, FLAT, LITM, FLATM, LAMPH, LAMP_SPOTS, box, put, smashAdd, groundH, inHouse,
+  CITY, SOLIDS, obb, inBounds, nearestRoad, addFoot: houseFoot,
+  distAt: DISTRICTS ? (x, z) => DIST.at(x, z) : null,
   onRoad: (x, z, m) => { const r = nearestRoad(x, z, 7, 1); return !!r && r.d < r.seg.w / 2 + m; },
   onOtherRoad: (x, z, seg) => { const r = nearestRoad(x, z, 7, 1); return !!r && r.seg !== seg && r.d < r.seg.w / 2 + 0.3; },
 });
@@ -8735,15 +8757,15 @@ function renderReset () {
   elPanel.dataset.kind = 'reset'; elPanel.dataset.back = 'settings';
   const li = a => '<ul>' + a.map(s => '<li>' + s + '</li>').join('') + '</ul>';
   const gone = [$t('кошелёк — все деньги'), $t('купленные машины и улучшения'), $t('открытые районы'),
-    $t('смены, звёзды и сюжетные заказы'), $t('мои находки'), $t('рекорды и таблица на этом устройстве'),
+    $t('смены, звёзды и сюжетные заказы'), $t('мои находки'), PROF.on() ? $t('рекорд профиля') : $t('рекорды и таблица на этом устройстве'),
     $t('рейтинг пиццерии и донаты'), $t('обучение — покажется заново')];
   const stay = [$t('язык'), $t('звук'), ...(Platform.features.adult ? [$t('версия: взрослая или детская')] : []),
-    ...(Platform.features.nameInput ? [$t('имя курьера')] : [])];
+    ...(Platform.features.nameInput ? [$t('имя курьера')] : []), ...(PROF.on() ? [$t('таблица рекордов на этом устройстве'), ...(PROF.list().length > 1 ? [$t('другие профили')] : [])] : [])];
   // «отмена» — первой и выбрана сразу: случайное A ничего не сотрёт
-  elPanelBody.innerHTML = '<div class="pn-t">' + $t('стереть весь прогресс?') + '</div>' +
+  elPanelBody.innerHTML = '<div class="pn-t">' + (PROF.on() ? $t('стереть прогресс профиля «{name}»?', { name: escHtml(PROF.curName()) }) : $t('стереть весь прогресс?')) + '</div>' +
     '<div class="rs-cols"><div class="rs-gone"><b>' + $t('сотрётся') + '</b>' + li(gone) + '</div>' +
     '<div class="rs-stay"><b>' + $t('останется') + '</b>' + li(stay) + '</div></div>' +
-    '<div class="pn-n">' + $t('вернуть будет нельзя: игра начнётся с первой смены, как в первый раз') + '</div>' +
+    '<div class="pn-n">' + $t('вернуть будет нельзя: игра начнётся с первой смены, как в первый раз') + (PROF.on() && PROF.list().length > 1 ? ' ' + $t('другие профили не тронет') : '') + '</div>' +
     '<div class="rs-btns"><button type="button" id="rs-no" autofocus>' + $t('отмена') + '</button>' +
     '<button type="button" id="rs-yes" class="set-danger">' + $t('да, стереть всё') + '</button></div>';
   $('rs-no').onclick = () => renderSettings('set-reset');
@@ -8753,10 +8775,10 @@ async function resetProgress () {
   if (isPlaying()) return;                          // посреди смены не стираем
   $('rs-yes').disabled = true; $('rs-no').disabled = true;
   const keys = new Set(PROGRESS_KEYS);
-  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('dlv-')) keys.add(k); } } catch (e) { /* — */ }
+  for (const k of PROF.keys()) keys.add(k);         // ключи текущего профиля (без профилей — все dlv-*): другие профили не трогаем
   // Яндекс: null, а не «удалить» — если облако не успеет, пустая локальная копия новее и победит при слиянии
   const blank = Platform.id === 'yandex' ? null : undefined;
-  for (const k of keys) if (!RESET_KEEP.includes(k)) Platform.store.set(k, blank);
+  for (const k of keys) if (!RESET_KEEP.includes(k) && !(PROF.on() && PROF.shared(k))) Platform.store.set(k, blank);   // общее на все профили (таблица на устройстве) — остаётся
   // облако Яндекса — дождаться отправки (не дольше 4 с), иначе старое вернётся после перезагрузки
   try { await Promise.race([Promise.resolve(Platform.store.flush && Platform.store.flush()), new Promise(r => setTimeout(r, 4000))]); } catch (e) { /* — */ }
   location.reload();
@@ -8884,7 +8906,13 @@ const NOS_BURN = 0.2, NOS_CAN = 0.5, NOS_ACC = 55;
 const BEAST = { T: 15, VMAX: 1.6, ACC: 1.8, NITRO: 2 };
 let VBOOST = 62;                                  // потолок на нитро: максималка машины плюс четырнадцать
 /* в районе подальше машина быстрее: ECON.DISTRICT.SPEED — к максималке и разгону */
-function carStats () { const c = curCar(), k = DISTRICTS ? DIST.speed() : 1; VMAX = (c.vmax || 48) * k; ACC = (c.acc || 36) * k; VBOOST = VMAX + 14; }
+/* управляемость машины (econ.js HANDLING, CAR_LIST.handling 1…10): поворот, «тупеет» на скорости, руль, снос.
+   Нет числа (детская версия, машины вне карьеры) — как было: руль мгновенный, всё ×1 */
+let HANDLE = { h: 5, turn: 1, fall: 1, rate: Infinity, side: 1 };
+function carStats () {
+  const c = curCar(), k = DISTRICTS ? DIST.speed() : 1; VMAX = (c.vmax || 48) * k; ACC = (c.acc || 36) * k; VBOOST = VMAX + 14;
+  HANDLE = c.handling != null ? ECON.handlingK(c.handling) : { h: 5, turn: 1, fall: 1, rate: Infinity, side: 1 };
+}
 /* габариты кузова: по ним считаются все попадания, а не по одному кругу */
 const CAR_L = 2.2, CAR_W = 1.0;
 
@@ -8921,12 +8949,16 @@ function driveStep (dt) {
   if (!NOS.burn && !beast && vf > vmax) vf -= (vf - vmax) * 1.4 * dt;   // после нитро сбрасывает, а не упирается
   vf -= vf * 0.3 * dt;
   if (IN.hand) vf -= vf * 1.1 * dt;
-  vl *= Math.exp(-(IN.hand ? 2.2 : lerp(WET.SIDE_DRY, WET.SIDE_WET, wet)) * dt);   // ручник пускает в занос, в дождь чуть носит (WET)
+  // ручник пускает в занос, в дождь чуть носит (WET); у баржи снос гаснет медленнее, у резкой — быстрее (HANDLE.side)
+  vl *= Math.exp(-(IN.hand ? 2.2 : lerp(WET.SIDE_DRY, WET.SIDE_WET, wet) * HANDLE.side) * dt);
 
-  const sv = IN.joy ? -clamp(IN.jx * 1.35, -1, 1) : (IN.left ? 1 : 0) - (IN.right ? 1 : 0);
+  // руль крутится до упора не мгновенно: HANDLE.rate долей упора в секунду (к центру — быстрее)
+  const want = IN.joy ? -clamp(IN.jx * 1.35, -1, 1) : (IN.left ? 1 : 0) - (IN.right ? 1 : 0);
+  const sr = HANDLE.rate * (Math.abs(want) < Math.abs(V.steer || 0) || want * (V.steer || 0) < 0 ? ECON.HANDLING.RETURN : 1) * dt;
+  const sv = V.steer = Number.isFinite(sr) ? (V.steer || 0) + clamp(want - (V.steer || 0), -sr, sr) : want;
   const spd = Math.abs(vf);
-  const grip = clamp(spd / 8, 0, 1) / (1 + spd * 0.014) * (V.air ? 0.15 : 1);
-  V.h += sv * TURN * grip * (IN.hand ? 1.5 : 1) * Math.sign(vf || 1) * dt;
+  const grip = clamp(spd / 8, 0, 1) / (1 + spd * 0.014 * HANDLE.fall) * (V.air ? 0.15 : 1);
+  V.h += sv * TURN * HANDLE.turn * grip * (IN.hand ? 1.5 : 1) * Math.sign(vf || 1) * dt;
   V.steerVis = damp(V.steerVis, sv * 0.42, 10, dt);
 
   V.vx = fx * vf + sx * vl;
@@ -8985,7 +9017,7 @@ function driveStep (dt) {
   // гасим скорость по её нормали — вдоль стены машина продолжает ехать.
   const r = CAR_W;
   for (const [cx, cz] of [[noseX, noseZ], [tailX, tailZ]]) {
-    for (const s of solidsNear(cx, cz)) {
+    for (const s of FOREST.withTrees(solidsNear(cx, cz), cx, cz)) {     // + стволы ельника (forest.js)
       if (s.deckY !== undefined && V.y < s.deckY - 1.2) continue; // едем под мостом, не по нему
       // задняя стенка рампы держит только тех, кто заезжает сзади: кто уже
       // на скате или летит над ней — проезжает
@@ -9532,7 +9564,7 @@ function paintBase (x, px, B) {
       x.fillRect(fmX(TX0 + i * TG - TG / 2), fmZ(TZ0 + j * TG - TG / 2), TG * FM.s + px, TG * FM.s + px);
     }
   for (const l of CITY.lots) if (vis(l)) poly(l.p, l.k === 'park' ? '#a6abb3' : '#c6c5b8');
-  for (const g of CITY.green) if (vis(g)) poly(g.p, GREEN_HEX[g.k] || '#95c579');
+  for (const g of CITY.green) if (vis(g)) poly(g.p, FOREST.isForest(g) ? '#5f8a4c' : GREEN_HEX[g.k] || '#95c579');   // лес на карте темнее
   for (const q of CITY.paths) if (vis(q)) line(q, 1.6, '#ddd5c6');
   for (const r of CITY.roads) if (vis(r)) line(r.p, SIDEWALK(r), '#e3ded4');
   for (const r of CITY.roads) if (vis(r)) line(r.p, roadWidth(r), r.b ? '#8c8680' : ROAD_HEX[r.c]);
@@ -10474,7 +10506,7 @@ function countUp (el, to, fmt, ms) {
 function showOver (why, victims) {
   Platform.store.flush && Platform.store.flush();       // итоги смены — в облако сразу
   Platform.gameplayStop();
-  const best = S.money > S.best;
+  const best = S.money > S.best && !QR.on();      // быстрый заезд — не рекорд смены
   if (best) { S.best = S.money; Store.set('dlv-msk-best', String(S.money)); }
   elBig.hidden = true;
   closePanel();
@@ -11975,7 +12007,7 @@ function reviveTick (dt) {
 
 function startRun (ride) {
   S.ride = !!ride;
-  if (!S.ride) SEAS.advanceSeason();             // каждая смена — шаг к следующему времени года
+  if (!S.ride && !QR.on()) SEAS.advanceSeason();   // каждая смена — шаг к следующему времени года (быстрый заезд — свой сезон)
   S.free = S.ride;                               // катаемся без срока и не в зачёт
   $('wasted').hidden = true;
   document.body.classList.remove('w-show');
@@ -12317,6 +12349,16 @@ if (CAREER) CAREERM.init({ S, NOS, Snd, ADULT, get DAY_LEN () { return DAY_LEN; 
   setName: n => { S.name = n; Store.set('dlv-name', n); elName.value = n; renderProfile(); },
   rivalSpec: () => RIVAL_SPEC.map(q => ({ hex: q.hex, fem: !!q.fem })), rivals: () => RIVALS.map(R => ({ i: R.slot, money: R.money || 0 })),
   person: o => makePerson(o), face: (p, size) => faceDataURL(p, size) });
+/* быстрый заезд (quickrun.js): сохранение — в песочнице, в конце машина, пиццерия и сюжет — снова как в карьере */
+if (CAREER) QR.init({ Platform, Store, S, Snd, money, cars: () => AUTO,
+  seasons: { value: SEAS.seasonValue, forced: SEAS.seasonForced, set: SEAS.setSeason, name: SEAS.seasonName },
+  startRun: () => { Snd.boot(); Snd.resume(); startRun(); },
+  toMenu: () => { S.state = 'title'; $('over').hidden = true; showTitle(); },
+  afterQuick: () => {
+    STORY.reload(); ORD.reloadUsed();
+    resetCar(); carStats(); S.hpMax = curCar().hp;
+    if (DISTRICTS) { usePizzeria(DIST.cur()); scatterPickups(); FM.dist = null; districtLocks(); }
+  } });
 /* все районы открыты (cityopen.js): праздник, выбор перед сменой, «весь город» */
 if (DISTRICTS) CITYOPEN.init({ Store: { get: Store.get, set: Store.set, flush: () => Platform.store.flush && Platform.store.flush() }, Snd, money,
   pizzerias: () => PIZZERIAS, routeLen });
@@ -12361,6 +12403,9 @@ mergeChunked(LIT, SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: t
 mergeChunked(FLAT, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }));
 { const m = new THREE.MeshBasicMaterial({ vertexColors: true }); m.userData.glow = 1; if (LAMPH.length) mergeChunked(LAMPH, m); }
 indexSolids();
+/* ельник (forest.js): клетки собираются на ходу вокруг камеры — уже после всего города */
+const FOREST_API = FOREST.init({ THREE, scene, cam, CITY, groundH, inHouse, inBounds, nearestRoad, solidAt,
+  onAlley: (x, z, m) => WORLD.onAlley(x, z, m), yardBlocks: (x, z, r) => YARDS.blocks(x, z, r), pzBlocks: PZD.blocks });
 // Курьера ставим раньше всех: припаркованные, трафик и прохожие заводятся
 // вокруг него, а не вокруг центра карты — иначе первый заказ уезжает за
 // полтора километра, а у бордюра можно проснуться внутри чужой машины.
@@ -13066,6 +13111,8 @@ function frameStep (now) {
   CL.step('accidents', updateAccidents, dt);
   CL.step('roadlife', RL.step, dt, RL_API || (RL_API = roadApi()));    // пробки, ремонт, знаки, фары потока (roadlife.js)
   CL.step('billboards', BB.step, dt, BB_API || (BB_API = bbApi()));   // смена рекламы на щитах (billboards.js)
+  CL.step('pizzadome', PZD.step, dt, ENV_API);    // пиццерия-шар: логотип крутится, ночью светится (pizzadome.js)
+  CL.step('forest', FOREST.step, dt, FOREST_API);  // ельник: какие ели рядом и в кадре (forest.js)
   CL.step('rivals', updateRivals, dt);
   CL.step('verandas', updateVerandas, dt);
   CL.at.ph = 'orders';
@@ -13207,6 +13254,7 @@ if (window.__dlv) window.__dlv.crashlog = CL;        // журнал ошибо�
 if (window.__dlv) Object.assign(window.__dlv, { pinFront, nearClient, PIN });   // пин перед клиентом, кто у клиента лишний (docs/ORDERS.md)
 if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)
 if (window.__dlv) Object.assign(window.__dlv, { HB: HB.DEBUG, FLIRT: ADULT ? FLIRT.DEBUG : null });   // коневозки, заигрывание (только взрослая)
+if (window.__dlv) { window.__dlv.FOREST = FOREST.DEBUG; window.__dlv.PZD = PZD.DEBUG; window.__dlv.cam = cam; }   // ельник и пиццерия-шар (forest.js, pizzadome.js)
 if (window.__dlv) { window.__dlv.SL = SL.DEBUG; window.__dlv.LAMP_SPOTS = LAMP_SPOTS; window.__dlv.smashHit = smashHit; window.__dlv.CARL = CARL.DEBUG; }   // фонари и огни машины
 // ?mapcheck: сводка проблем карты, столбики над ними, «]» — к следующей (mapworks.js)
 if (MAPCHECK) MAPW.debug(MAPFIX, MAPW_API || (MAPW_API = mapApi()));

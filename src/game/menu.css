@@ -57,7 +57,10 @@ body.career #build-v { position: absolute; z-index: 3; margin: 0; right: max(12p
 .crm-rn { margin-top: 9px; font-size: 7px; line-height: 1.7; color: #b9c3e6; }
 
 /* район: кнопка с подписью и окно со списком районов */
-.crm-dist { display: flex; flex-direction: column; gap: 7px; }
+.crm-dist, .crm-quick { display: flex; flex-direction: column; gap: 7px; }
+.crm-quick b { font-weight: normal; }
+.crm-quick span { font-size: clamp(6px, .62vw, 8px); line-height: 1.6; color: #b9c3e6; }
+.crm-quick:disabled { opacity: .5; cursor: default; }
 .crm-dist[hidden] { display: none; }
 .crm-dist b { font-weight: normal; }
 .crm-dist span { font-size: clamp(6px, .62vw, 8px); line-height: 1.6; color: #b9c3e6; }
