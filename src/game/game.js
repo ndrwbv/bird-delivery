@@ -32,6 +32,7 @@ import * as SEAS from './seasons.js';
 import * as LIFE from './life.js';               // парочки, богачи, графитисты, змеи и дроны в парках
 import * as WORLD from './world.js';
 import * as SL from './streetlamps.js';
+import * as WINS from './windows.js';          // окна: рамы, свет, комната за стеклом (windows.js)
 import * as PAINT from './citypaint.js';         // дома в цвет по номеру, муралы на торцах (citypaint.js)
 import * as BB from './billboards.js';            // щиты со смешной рекламой у больших дорог (billboards.js)
 import * as CARL from './carlights.js';         // огни машины игрока: стоп-сигналы, поворотники, задний ход (carlights.js)         // фонари: все сбиваются, шары и консоли, частный сектор (streetlamps.js)
@@ -40,6 +41,7 @@ import * as MAFIA from './mafia.js';             // мафиози у адрес
 import * as HEROES from './heroes.js';           // герои города: Лёха, Жека, Игорёк, Стёпа, Настюша, Ариша, Андрюша — места и реплики
 import * as HB from './horsebox.js';             // коневозки в потоке: прицеп за машиной, конь в окне (horsebox.js)
 import * as FLIRT from './flirt.js';            // взрослая: клиентка изредка заигрывает при вручении, курьер отказывает (flirt.js)
+import * as YARDS from './yards.js';             // дворы многоэтажек: лавочки у подъездов, тропинки, низкие заборчики (yards.js)
 import * as FAUNA from './fauna.js';             // лоси, лисы и зайцы в лесах; «лось на дороге!» (fauna.js)
 import * as CATS from './cats.js';               // продухи подвалов и коты на крышах и во дворах (cats.js)
 import * as NIGHT from './nightlife.js';         // взрослая: девушки у обочины ночью, стрип-клуб «Клубничка» (nightlife.js)
@@ -54,6 +56,7 @@ import * as CITYOPEN from './cityopen.js';      // карьера: все рай
 import * as ORD from './orders.js';              // карьера: очередь заказов, поручения, развоз смены, оплата (docs/ORDERS.md)
 import * as CAREERM from './career.js';          // карьера: смена 9—24, обед, итоги, донаты, слот, звёзды
 import * as STORY from './story.js';             // сюжетные заказы и катсцены (баба Зина)
+import * as HSTORY from './herostories.js';      // герои города, этап 3: истории Стёпы, Ариши, Лёхи по главам (через story.js)
 import * as AUTO from './cars.js';               // карьера: 14 машин, мотор и ресурс, заглохла, ямы, гараж Дяди Жени
 import * as HK from './hookah.js';               // кальянщики на лавочках (в детской — самовар)
 import * as CULL from './cull.js';               // статика дальше камеры — со сцены, матрицы заморожены (Steam Deck)
@@ -930,6 +933,9 @@ function dropArr () { this.array = null; }
 // клетка статики, метров: по ним отсекается то, что не в кадре. Большому
 // городу — крупнее: сорок тысяч мелких кусков дороже обходить, чем дорисовать лишнее
 const CHUNK = MAP.border ? 200 : 100;
+WINS.init(CHUNK);
+// телефон и планшет (касания, не Стим): комнаты за стеклом нет — рама, шторы и свет остаются (windows.js)
+if (Platform.id !== 'steam' && matchMedia('(pointer: coarse)').matches) WINS.quality({ interior: 0, lod: 0 });
 const LITM = Mesher();      // всё материальное: земля, дороги, дома
 const FLATM = Mesher();     // разметка, окна, вывески — света не ловят
 
@@ -2504,6 +2510,7 @@ function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch) {
     const shop = k === 'shop' || k === 'pub' && lv <= 2;
     const winW = k === 'pub' ? 2.0 : 1.3, step = k === 'pub' ? 3.6 : 3.0;
     const mw = INTRO ? null : PAINT.mural(b, walls, base, h, lv, arch, { inHouse, nearestRoad });   // мурал на торце — там без окон (citypaint.js)
+    const wsty = WINS.style(seed, st);              // переплёт и рама — свои у дома
     for (const w of walls) {
       if (w.len < 4.5 || w === mw) continue;
       const cols = Math.max(1, Math.floor((w.len - 1) / step));
@@ -2521,10 +2528,9 @@ function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch) {
         for (let i = 0; i < cols; i++) {
           const m = pad + (i + 0.5) * step;
           if (inArch(m, winW / 2, base + 0.9 + f * FH)) continue;
-          FLATM.color(chance(0.14) ? '#ffe9a8' : '#8fb0cc');
-          // у сталинок окна выше, у частных домов — поменьше
+          // у сталинок окна выше, у частных домов — поменьше; рама, свет и комната — шейдер (windows.js)
           const wy0 = st === 'stalin' ? 0.7 : 0.9, wy1 = st === 'stalin' ? 2.7 : st === 'priv' ? 2.2 : 2.5;
-          band(w, m - winW / 2, m + winW / 2, base + wy0 + f * FH, base + wy1 + f * FH, 0.08, 0.38);
+          WINS.add(w, m - winW / 2, m + winW / 2, base + wy0 + f * FH, base + wy1 + f * FH, 0.08, wsty);
         }
       if (st === 'panel' && w.len > 8) {
         // панельный дом: швы между плитами — по этажам и через три метра
@@ -2967,6 +2973,9 @@ function osmEntrances () {
     }
   }
   houseWalks();
+  // у многоэтажек: тропинка от двери к общей дорожке, заборчики, лавочки (yards.js)
+  if (!INTRO) BUILD_T.yards = YARDS.build({ THREE, CITY, HOUSE_GRID, LITM, BENCHES, YARD_PATHS, box, put, smashAdd, groundH, inHouse, inBounds, inPoly, nearestRoad, DRIVE_MAX,
+    benchOk: (x, z) => benchSpotOk(x, z) && !introClear(x, z) && groundH(x, z) >= 0.3 });
 }
 
 /* Дорожка у подъездов: вдоль всей стены, где двери, — плитка в два метра
@@ -3740,6 +3749,7 @@ function buildCity () {
   const litG = LITM.mesh(WORLD.paveMat(SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }))));   // + узор плитки (world.js)
   const flatG = FLATM.mesh(new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }));
   BUILD_T.mesh = Math.round(performance.now() - tq);
+  WINS.build(scene);                              // окна — по клеткам, один материал (windows.js)
   PAINT.build(scene);                             // муралы — один меш (citypaint.js)
   /* Всю статику — сразу в видеокарту, одним кадром в крохотную цель:
      иначе куски, которых ещё не было в кадре, держат свои вершины и в
@@ -5140,8 +5150,8 @@ function solidAt (x, z, r) {
   }
   return false;
 }
-const pinRay = (x, z) => !inHouse(x, z) && !solidAt(x, z, 0.25);
-const pinFree = (x, z) => inBounds(x, z, 5) && groundH(x, z) >= 0.3 && !inHouse(x, z, PIN.WALL) && !solidAt(x, z, PIN.CAR);
+const pinRay = (x, z) => !inHouse(x, z) && !solidAt(x, z, 0.25) && !YARDS.blocks(x, z, 0.25);   // заборчики и лавочки у подъездов (yards.js) — тоже
+const pinFree = (x, z) => inBounds(x, z, 5) && groundH(x, z) >= 0.3 && !inHouse(x, z, PIN.WALL) && !solidAt(x, z, PIN.CAR) && !YARDS.blocks(x, z, PIN.CAR);
 function pinFront (cx, cz, off = PIN.OFF) {
   const r = nearestRoad(cx, cz, 7, 2);           // любая дорога, проезд во двор или дорожка
   const ra = r && r.d > 0.5 ? Math.atan2(r.x - cx, r.z - cz) : null;
@@ -6221,6 +6231,7 @@ function updateTraffic (dt) {
         if (p.dead || Math.abs(p.x - t.x) > 13 || Math.abs(p.z - t.z) > 13) continue;
         ahead(p.x, p.z, 3.4, 1.8, 12);
       }
+    slow = Math.min(slow, FAUNA.trafficYield(t, dt));   // лось на полосе: тормозит, сигналит, ждёт (fauna.js)
     // красный: встаём у стоп-линии. Кто уже въехал — доезжает; на жёлтом
     // тот, кому до линии пара метров, тоже проезжает, а не тормозит в пол
     if (!t.turn && t.e.sig) {
@@ -9716,6 +9727,7 @@ function eachTarget (cb) {
     const p = st.at || st.peds[0];
     if (p) cb(p.x, p.z, false);
   }
+  if (o && S.state === 'drive') for (const q of HSTORY.pins()) cb(q.x, q.z, false);   // герой: «заехать по пути» (herostories.js)
   cb(S.target.x, S.target.z, true);
 }
 
@@ -12309,10 +12321,13 @@ if (CAREER) CAREERM.init({ S, NOS, Snd, ADULT, get DAY_LEN () { return DAY_LEN; 
 if (DISTRICTS) CITYOPEN.init({ Store: { get: Store.get, set: Store.set, flush: () => Platform.store.flush && Platform.store.flush() }, Snd, money,
   pizzerias: () => PIZZERIAS, routeLen });
 /* сюжетные заказы (story.js): люди, кот, камера катсцены — через это */
-STORY.init({ THREE, scene, cam, V, S, IN, CITY, MAP, Store, SPOTS, groundH, surfaceAt, inHouse, nearestRoad, makeHuman, dropMesh, emote, sayBubble, pizzaBox, realAddress, popBonus, money, Snd,
+STORY.init({ THREE, scene, cam, V, S, IN, ADULT, CITY, MAP, Store, SPOTS, groundH, surfaceAt, inHouse, nearestRoad, makeHuman, dropMesh, emote, sayBubble, pizzaBox, realAddress, popBonus, money, Snd,
   get car () { return car; }, addMoney: n => { S.money += n; if (!S.freeRun) addWallet(n); }, addStars: CAREER ? CAREERM.addStars : null, shift: () => (+Store.get('dlv-shifts', 0) || 0) + 1,
   // гость, который ждал бабушку у точки, после катсцены уходит в другой квартал другим человеком
   retirePed: p => { if (!p || p.dead || p.base === undefined) return; clearGuest(p); dropMesh(p.grp); p.person = nextPerson(); p.grp = makeHuman(p.person); p.speed = p.base * p.grp.userData.pace; p.hold = null; scene.add(p.grp); walkSpawn(p, 120, 380); } });
+/* истории героев города по главам (herostories.js): встречи, условие главы в пути, бонусы */
+HSTORY.init({ S, V, ADULT, CAREER, Snd, toast, shops: () => SIGNS, pizza: () => PIZZA, shiftN: () => (+Store.get('dlv-shifts', 0) || 0) + 1,
+  openAt: (x, z) => !DISTRICTS || DIST.isOpen(DIST.at(x, z)), heal: n => { S.hp = Math.min(S.hpMax, S.hp + n); hudHearts(); } });
 /* вступление первого запуска (intro.js): камера, машина, Степан, дым — через это */
 FIRST.init({ THREE, cam, V, S, Store, Snd, ADULT, car: () => car, pizza: () => PIZZA, brand: () => OWN.pizza(), carName: () => curCar().name,
   puff, camClear, groundH, guestStep, hud: () => { drawRadar(); hudStep(0); }, hearts: () => hudHearts() });
@@ -12622,6 +12637,7 @@ function updateEnv (dt) {
   // склейки без света: темнеют вместе с вечером
   const dk = lerp(1, 0.34, ENV.night) * (1 - R * 0.18);
   for (const m of FLAT_MATS) m.color.setRGB(dk, dk, dk * (1 + ENV.night * 0.12));
+  WINS.update(ENV.night, dk, dk * (1 + ENV.night * 0.12), SKY_C, performance.now() / 1000);
   const nOn = ENV.night > 0.05;
   POOL_MAT.opacity = ENV.night * 0.75; WIN_MAT.opacity = clamp(ENV.night * 1.1, 0, 0.95);
   WIN_U.uT.value = performance.now() / 1000;
@@ -13174,7 +13190,7 @@ requestAnimationFrame(frame);
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
 /* песочница (sandbox.html): бесконечное здоровье, нитро, «не глохнет» (noStall читает cars.js) */
 const SBX = { god: false, nitro: false, noStall: false };
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { ACH: ACH.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта

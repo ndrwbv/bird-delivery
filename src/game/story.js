@@ -28,7 +28,23 @@
      ['cat', что]                    — out | sit | rub | meow | in
      ['emote', кто, heart | note | star, n]
      ['scarf']                       — шарф на машину (и насовсем, в сохранении)
-     ['wait', сек] */
+     ['wait', сек]
+   Последним аргументом шага можно дать условия: { if: 'ok' | 'bad' } — только если условие
+   главы выполнено / провалено (успеть, не разбить, заехать по пути — herostories.js),
+   { adult: true | false } — только во взрослой / только в детской, { when: () => bool } — своё условие
+   (например, на какой машине приехал), у 'say' — { vars: () => ({ car }) } — подстановки в текст. Кто: 'courier' — курьер,
+   любое другое имя (zina, stepa, host…) — хозяин истории.
+
+   Другие истории (герои города — herostories.js) добавляются через register(story):
+     who: { seed, fem, look }    — внешность для портрета; model() — своя 3D-модель (герой с болгаркой)
+     name                        — имя, если человека нет в STORY_PEOPLE
+     home: { addr, near, any }   — или функция → то же: дом выбирается заново (герой стоит где хочет)
+     ready(ctx, prog, shift)     — вместо fromShift/every: пора ли следующей главе
+     decorate(order, ch, idx)    — дописать заказ (время, хрупкое, заезд по пути)
+     cond(order) → 'ok' | 'bad'  — как прошло условие главы; глава: moneyBad — награда при 'bad'
+     onDone(idx, cond, order)    — после награды (мелкий бонус)
+     kids: { items }, глава kids: { name, note, why } — для детской версии
+     catFur                      — номер окраса кота из cats.js FURS для ['cat', …] */
 import './story.css';
 import { t, N_ } from '../i18n/index.js';
 import * as ECON from './econ.js';
@@ -213,13 +229,27 @@ function save () { try { if (API && API.Store) API.Store.set(KEY, ST.data); } ca
 const prog = id => { const d = load(); return d[id] || (d[id] = { ch: 0, last: -99 }); };
 
 export function progress () { return JSON.parse(JSON.stringify(load())); }
+/* для herostories.js: живой прогресс истории и запись */
+export const progOf = id => prog(id);
+export const persist = () => save();
+/* ещё одна история (герои города): в конец списка, по id без повторов */
+export function register (story) {
+  if (!story || !story.id || STORIES.some(s => s.id === story.id)) return false;
+  STORIES.push(story);
+  return true;
+}
+const frameHooks = [];
+/** fn(dt, cutsceneOn) — каждый кадр из STORY.frame (herostories.js следит за заказом) */
+export function onFrame (fn) { if (typeof fn === 'function') frameHooks.push(fn); }
 export function reset (id) { const d = load(); if (id) delete d[id]; else for (const k in d) delete d[k]; ST.issued = {}; save(); }
 /* для песочницы: истории и главы */
 export function list () {
   return STORIES.map(s => ({ id: s.id, name: t(personCfg(s).name || s.id), done: prog(s.id).ch, chapters: s.chapters.map((c, i) => ({ i, name: t(c.name), hours: c.hours || null, minShift: c.minShift || 0 })) }));
 }
 
-const personCfg = s => STORY_PEOPLE.find(p => p.id === s.id) || { id: s.id, name: s.id, fromShift: 1, every: ECON.ORDERS.STORY_EVERY };
+const personCfg = s => STORY_PEOPLE.find(p => p.id === s.id) || { id: s.id, name: s.name || s.id, fromShift: 1, every: ECON.ORDERS.STORY_EVERY };
+const kidsOf = o => (o && API && !API.ADULT && o.kids) || {};
+const hostModel = s => (s.model && s.model()) || API.makeHuman(storyPerson(s));
 const PEOPLE_CACHE = new Map();
 function storyPerson (s) {
   if (PEOPLE_CACHE.has(s.id)) return PEOPLE_CACHE.get(s.id);
@@ -242,15 +272,19 @@ function courierPerson () {
 /* ─────────────── где живёт ─────────────── */
 const HOME = new Map();
 function homeOf (s) {
-  if (HOME.has(s.id)) return HOME.get(s.id);
+  // home-функция: дом выбирают заново (герой города — у подъезда рядом с тем местом, где стоит)
+  const HM = typeof s.home === 'function' ? s.home() : s.home;
+  if (!HM) return null;
+  const hk = s.id + (HM.near ? ':' + HM.near.map(Math.round).join(',') : '');
+  if (HOME.has(hk)) return HOME.get(hk);
   const C = API.CITY, B = C.buildings || [];
-  const want = s.home.addr;
+  const want = HM.addr;
   let b = want ? B.find(q => q.a && q.a[0] === want[0] && q.a[1] === want[1]) : null;
-  if (!b && s.home.near) {           // нет в карте — ближайшая панелька к точке
+  if (!b && HM.near) {               // нет в карте — ближайшая панелька к точке (any — любой дом с адресом)
     let bd = Infinity;
     for (const q of B) {
-      if (!q.a || q.st !== 'panel') continue;
-      const c = centroid(q.p), d = (c[0] - s.home.near[0]) ** 2 + (c[1] - s.home.near[1]) ** 2;
+      if (!q.a || (!HM.any && q.st !== 'panel')) continue;
+      const c = centroid(q.p), d = (c[0] - HM.near[0]) ** 2 + (c[1] - HM.near[1]) ** 2;
       if (d < bd) { bd = d; b = q; }
     }
   }
@@ -277,7 +311,7 @@ function homeOf (s) {
   }
   if (!spot) spot = want4;
   const h = { ex, ez, nx, nz, sx: -nz, sz: nx, x: spot.x, z: spot.z, addr: b.a ? API.realAddress(ex + nx * 2, ez + nz * 2) : '' };
-  HOME.set(s.id, h);
+  HOME.set(hk, h);
   return h;
 }
 const centroid = p => p.reduce((a, q) => [a[0] + q[0] / p.length, a[1] + q[1] / p.length], [0, 0]);
@@ -295,9 +329,13 @@ export function nextOrder (ctx = {}) {
     const c = s.chapters[p.ch];
     if (!c) continue;
     if (ST.issued[s.id] === shift) continue;                      // эта смена уже дала главу
-    const every = Math.max(cfg.every || 0, 1);
-    if (shift < (cfg.fromShift || 1) || shift < (c.minShift || 0)) continue;
-    if (p.ch > 0 && shift - p.last < every) continue;
+    if (s.ready) {                                                 // свои правила (герои города: встречи и смены)
+      if (!s.ready(ctx, p, shift)) continue;
+    } else {
+      const every = Math.max(cfg.every || 0, 1);
+      if (shift < (cfg.fromShift || 1) || shift < (c.minShift || 0)) continue;
+      if (p.ch > 0 && shift - p.last < every) continue;
+    }
     if (!hourOk(c, ctx.hour)) continue;
     const o = orderFor(s.id, p.ch);
     if (!o) continue;
@@ -314,15 +352,17 @@ export function orderFor (storyId, chapter) {
   const c = s && s.chapters[chapter];
   const h = s && API && homeOf(s);
   if (!c || !h) return null;
-  const person = storyPerson(s);
-  return {
+  const person = storyPerson(s), K = kidsOf(c), KS = kidsOf(s);
+  const o = {
     kind: 'story', type: 'story', storyId, chapter, color: COLOR,
     x: h.x, z: h.z, door: { x: h.ex, z: h.ez, nx: h.nx, nz: h.nz }, addr: h.addr,
     person, name: person.name,
-    title: t(c.name), items: t(s.items), note: t(c.note), why: t(c.why),
+    title: t(K.name || c.name), items: t(K.items || c.items || KS.items || s.items), note: t(K.note || c.note), why: t(K.why || c.why),
     reward: { stars: starsOf(c), money: c.money || 0 },
     reach: 6,
   };
+  if (s.decorate) { try { s.decorate(o, c, chapter); } catch (e) { console.warn('[story] decorate', e); } }
+  return o;
 }
 const starsOf = c => { const [a, b] = ECON.ORDERS.STORY_STARS; return Math.max(a, Math.min(b, c.stars || a)); };
 
@@ -351,7 +391,7 @@ export function stage (order) {
   if (!h) return;
   if (CUT.staged && CUT.staged.id === s.id) return;
   unstage();
-  const g = API.makeHuman(storyPerson(s));
+  const g = hostModel(s);
   API.scene.add(g);
   const a = actor(g, h.ex + h.nx * 0.9, h.ez + h.nz * 0.9, Math.atan2(h.nx, h.nz));
   placeActor(a);
@@ -364,7 +404,7 @@ export function unstage () {
 }
 
 /* кот Барсик: рыжий с белым, из коробок (модель — cats.js, свои геометрии: dropMesh их освобождает) */
-function makeCat () { return makeCatModel(API.THREE, FURS[0], true); }
+function makeCat () { return makeCatModel(API.THREE, FURS[(CUT.story && CUT.story.catFur) || 0] || FURS[0], true); }
 
 /* шарф на машину: полосатый, через крышу, два хвоста свисают с борта */
 const SCARF_C = ['#d9342c', '#f4efe6', '#ffd23f', '#4f7fd6', '#f4efe6'];
@@ -692,12 +732,13 @@ function scarf () {
   }
 }
 
+const SHOTS_OWN = ['establish', 'two', 'car'];
 async function say (who, text, o = {}) {
   if (CUT.skip) return;
   const a = CUT.actors[who];
   const person = who === 'courier' ? courierPerson() : storyPerson(CUT.story);
   if (a) { a.talk = true; for (const k in CUT.actors) if (k !== who && CUT.actors[k]) CUT.actors[k].talk = false; }
-  await DLG.say({ person, name: person.name, text: t(text), color: COLOR, fillers: false, mood: o.mood || 'calm', cps: 42 });
+  await DLG.say({ person, name: person.name, text: t(text, typeof o.vars === 'function' ? o.vars() : o.vars), color: COLOR, fillers: false, mood: o.mood || 'calm', cps: 42 });
   if (a) a.talk = false;
 }
 
@@ -708,10 +749,20 @@ function face (who, target) {
   a.look = b ? { x: b.x, z: b.z } : null;
 }
 
+const isOpt = a => a && typeof a === 'object' && !Array.isArray(a);
+const ROLE = n => (n === 'courier' || n === 'cat' ? n : 'zina');          // хозяин истории в CUT.actors — всегда 'zina'
 async function run (s, c, idx) {
   for (const step of c.script) {
     if (CUT.skip) break;
-    const [op, ...args] = step;
+    const o = step.slice(1).find(isOpt) || {};
+    if (o.if && o.if !== CUT.cond) continue;                               // только при выполненном / проваленном условии
+    if (o.adult === true && !API.ADULT) continue;
+    if (o.adult === false && API.ADULT) continue;
+    if (typeof o.when === 'function') { let ok = false; try { ok = !!o.when(); } catch (e) { /* — */ } if (!ok) continue; }   // своё условие (машина у Жеки)
+    const op = step[0], args = step.slice(1);
+    if (op === 'shot') { if (args[0] !== 'courier' && args[0] !== 'cat' && SHOTS_OWN.indexOf(args[0]) < 0) args[0] = 'zina'; }
+    else if (op === 'say' || op === 'walk' || op === 'act' || op === 'emote') args[0] = ROLE(args[0]);
+    else if (op === 'face') { args[0] = ROLE(args[0]); args[1] = ROLE(args[1]); }
     switch (op) {
       case 'title': title(s, c, idx); break;
       case 'shot': setShot(args[0], args[1] && args[1].cut); break;
@@ -733,12 +784,12 @@ async function run (s, c, idx) {
 function title (s, c, idx) {
   const el = ui().querySelector('.sc-title');
   el.querySelector('em').textContent = t('{who} · глава {n} из {m}', { who: storyPerson(s).name, n: idx + 1, m: s.chapters.length });
-  el.querySelector('b').textContent = '«' + t(c.name) + '»';
+  el.querySelector('b').textContent = '«' + t(kidsOf(c).name || c.name) + '»';
   el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
 }
 
 async function reward (s, c) {
-  const stars = starsOf(c), cash = c.money || 0;
+  const stars = starsOf(c), cash = (CUT.cond === 'bad' && Number.isFinite(c.moneyBad) ? c.moneyBad : c.money) || 0;
   let given = false;
   try {
     if (API.addStars) { API.addStars(stars, 'story'); given = true; }
@@ -751,7 +802,7 @@ async function reward (s, c) {
   if (cash) {
     try { if (API.addMoney) API.addMoney(cash, 'story'); } catch (e) { console.warn('[story] addMoney:', e); }
   }
-  if (API.popBonus) API.popBonus(t('глава «{name}»', { name: t(c.name) }), '+' + stars + ' ★' + (cash ? ' · +' + (API.money ? API.money(cash) : cash + ' ₽') : ''));
+  if (API.popBonus) API.popBonus(t('глава «{name}»', { name: t(kidsOf(c).name || c.name) }), '+' + stars + ' ★' + (cash ? ' · +' + (API.money ? API.money(cash) : cash + ' ₽') : ''));
   return { stars, money: cash };
 }
 
@@ -798,6 +849,10 @@ export async function play (storyId, chapter, o = {}) {
   if (API.Snd && API.Snd.engine) API.Snd.engine(0);
 
   CUT.story = s; CUT.home = h; CUT.skip = false; CUT.t = 0; CUT.waits = []; CUT.on = true;
+  // условие главы (успеть, не разбить, заехать по пути): как прошло — свои реплики и награда
+  CUT.cond = 'ok';
+  if (s.cond) { try { CUT.cond = s.cond(o.order || {}) === 'bad' ? 'bad' : 'ok'; } catch (e) { console.warn('[story] cond', e); } }
+  if (o.cond === 'ok' || o.cond === 'bad') CUT.cond = o.cond;
   if (!CP) { CP = V3(); CL = V3(); CPW = V3(); CLW = V3(); }
   CP.copy(API.cam.position);
   const dir = V3(); API.cam.getWorldDirection(dir); CL.copy(API.cam.position).addScaledVector(dir, 10);
@@ -806,12 +861,12 @@ export async function play (storyId, chapter, o = {}) {
   let za;
   if (CUT.staged && CUT.staged.id === s.id) { za = CUT.staged.a; CUT.staged = null; }
   else {
-    const g = API.makeHuman(storyPerson(s));
+    const g = hostModel(s);
     API.scene.add(g);
     za = actor(g, h.ex - h.nx * 0.4, h.ez - h.nz * 0.4, Math.atan2(h.nx, h.nz));
   }
   // в первых главах она выходит из подъезда: сначала её нет
-  const first = c.script.find(q => q[0] === 'walk' && q[1] === 'zina');
+  const first = c.script.find(q => q[0] === 'walk' && q[1] !== 'courier');
   if (first && first[2] === 'out') { za.x = h.ex - h.nx * 0.4; za.z = h.ez - h.nz * 0.4; za.hidden = true; za.grp.visible = false; }
   za.speed = 1.1;
   za.look = null;
@@ -862,11 +917,14 @@ export async function play (storyId, chapter, o = {}) {
     p.ch = idx + 1; p.last = Number.isFinite(sh) ? sh : p.last; p.at = Date.now(); save();
   }
   r = await reward(s, c);
+  if (s.onDone) { try { s.onDone(idx, CUT.cond, o.order || null); } catch (e) { console.warn('[story] onDone', e); } }
+  r.cond = CUT.cond;
   return r;
 }
 
 /* каждый кадр из game.js: шарф на новой машине; идёт катсцена — шаг и true */
 export function frame (dt, car) {
+  for (const f of frameHooks) { try { f(dt, CUT.on); } catch (e) { console.warn('[story] frame hook', e); } }
   if (car && car !== CUT.lastCar) { CUT.lastCar = car; decorate(car); }
   CUT.scarfT = (CUT.scarfT || 0) + dt;
   if (CUT.scarf) scarfStep(car, CUT.scarfT);          // хвосты шарфа развеваются
@@ -888,4 +946,4 @@ export function init (api) {
 }
 
 /* для ?debug и песочницы */
-export const DEBUG = { CUT, STORIES, homeOf: id => homeOf(STORIES.find(s => s.id === id)), skip };
+export const DEBUG = { CUT, STORIES, homeOf: id => homeOf(STORIES.find(s => s.id === id)), skip, get running () { return !!RUNNING; } };

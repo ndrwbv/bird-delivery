@@ -525,13 +525,65 @@ export function step (dt, api) {
   }
 }
 
+/* ── трафик тормозит перед лосем (game.js updateTraffic) ──
+   Лось на полосе впереди (ближе YIELD.REACH по ходу и не дальше YIELD.HALF + его ширины вбок) —
+   машина сбавляет ход с YIELD.SOFT м до остановки и встаёт так, что до лося остаётся YIELD.GAP м
+   между бампером и лосем. Стоит дольше YIELD.WAIT — сигналит (раз в YIELD.HONK с); после
+   YIELD.SHOO гудков лось, если он не переходит дорогу, сам уходит с неё. Ушёл с полосы — едет. */
+export const YIELD = { REACH: 30, HALF: 1.4, GAP: 3, SOFT: 14, WAIT: 1.2, HONK: [2.5, 4], SHOO: 2 };
+export function trafficYield (t, dt) {
+  let slow = 1, who = null;
+  if (LIST.length) {
+    const hx = Math.sin(t.h), hz = Math.cos(t.h), Y = YIELD;
+    for (const a of LIST) {
+      if (!a.big) continue;
+      const dx = a.x - t.x, dz = a.z - t.z;
+      if (Math.abs(dx) > Y.REACH || Math.abs(dz) > Y.REACH) continue;
+      const fw = dx * hx + dz * hz;
+      if (fw <= 0 || fw > Y.REACH || Math.abs(-hz * dx + hx * dz) > Y.HALF + a.rad) continue;
+      const k = clamp((fw - (t.hl || 2) - a.rad - Y.GAP) / Y.SOFT, 0, 1);
+      if (k < slow) { slow = k; who = a; }
+    }
+  }
+  if (!who || t.speed > 0.5) { if (!who) { t.mooseT = 0; t.mooseN = 0; } return slow; }
+  // стоит перед лосем: подождал — сигналит, лось уходит с дороги
+  t.mooseT = (t.mooseT || 0) + dt;
+  if (t.mooseT > YIELD.WAIT && (t.mooseHonk = (t.mooseHonk || 0) - dt) <= 0) {
+    t.mooseHonk = rand(...YIELD.HONK);
+    t.mooseN = (t.mooseN || 0) + 1;
+    ST.honks = (ST.honks || 0) + 1;
+    const V = A.V, d = Math.hypot(t.x - V.x, t.z - V.z);
+    if (d < 70 && A.Snd && A.Snd.blip) {
+      const v = 0.07 * (1 - d / 70);
+      A.Snd.blip(400, 0.16, 'square', v); setTimeout(() => A.Snd.blip(400, 0.28, 'square', v), 200);
+    }
+    if (A.emote && t.mooseN === 1) A.emote(who.x, 2.8, who.z, 'angry', 1.5);
+    if (t.mooseN >= YIELD.SHOO) shoo(who);
+  }
+  return slow;
+}
+/* лось уходит с дороги поперёк, в сторону от середины полотна */
+function shoo (a) {
+  if (a.mode === 'cross' || a.mode === 'aim' || a.mode === 'charge') return;
+  if (a.mode === 'stand' && a.ex !== undefined) { a.mode = 'cross'; return; }
+  const r = A.nearestRoad(a.x, a.z);
+  if (!r) return;
+  const s = r.seg, L = Math.hypot(s.x2 - s.x1, s.z2 - s.z1) || 1;
+  let nx = -(s.z2 - s.z1) / L, nz = (s.x2 - s.x1) / L;
+  if ((a.x - r.x) * nx + (a.z - r.z) * nz < 0) { nx = -nx; nz = -nz; }
+  const off = (s.w || 7) / 2 + 6;
+  if (a.love) loveEnd(a);
+  a.mode = 'cross'; a.mid = 2; a.ex = r.x + nx * off; a.ez = r.z + nz * off; a.cx = r.x; a.cz = r.z;
+}
+
 /* отладка: window.__fauna (только dev или ?debug) */
 export const DEBUG = {
   LIST, FAUNA, get forests () { return forests().length; }, get cam () { return A && A.cam; },
   cross: () => tryCross(),
   ram: a => { a = a || LIST.find(m => m.big); if (!a) return false; a.male = true; startRam(a); return true; },   // этот лось бодает
   love: () => !!(A && A.ADULT) && tryLove(),        // в детской — всегда false
-  get stats () { return { rams: ST.rams || 0, loves: ST.loves || 0, ram: ST.ram, love: ST.love }; },
+  get stats () { return { rams: ST.rams || 0, loves: ST.loves || 0, ram: ST.ram, love: ST.love, honks: ST.honks || 0 }; },
+  at: (x, z, h) => add('moose', x, z, null, h),        // лось в точке (проверка: трафик тормозит)
   near: (kind = 'moose', d = 25) => { const V = A.V; return add(kind, V.x + Math.sin(V.h) * d, V.z + Math.cos(V.h) * d, null); },
 };
 if (typeof window !== 'undefined' && (import.meta.env.DEV || new URLSearchParams(location.search).has('debug'))) window.__fauna = DEBUG;

@@ -130,6 +130,7 @@ let A = null, CARS = () => null, GAME_OF = () => 'slot', SHIFT_N = () => 0, SHIF
 const M = {
   tip: null,            // { n, game, pick, good, used, text }
   claim: null,          // { claim: 'win' | 'lose', heard }
+  luck: 0,              // сколько следующих советов Лёхи — счастливые наверняка (его история, глава 3)
   seen: {},             // id → номер смены, когда герой уже говорил про своё (первая встреча за смену)
   last: null,
   stats: { tips: 0, igor: 0, zheka: 0, stepa: 0, rolls: 0 },
@@ -138,18 +139,31 @@ const pick = a => a[(Math.random() * a.length) | 0];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const adult = () => !!(A && A.ADULT);
 function load () {
-  try { const v = A.Store.get(KEY, null); if (v && (v.claim === 'win' || v.claim === 'lose')) M.claim = { claim: v.claim, heard: !!v.heard }; } catch (e) { /* — */ }
+  try {
+    const v = A.Store.get(KEY, null);
+    if (v && (v.claim === 'win' || v.claim === 'lose')) M.claim = { claim: v.claim, heard: !!v.heard, sure: !!v.sure };
+    M.luck = v && v.luck > 0 ? +v.luck : 0;
+  } catch (e) { /* — */ }
 }
-function save () { try { A.Store.set(KEY, M.claim); } catch (e) { /* — */ } }
+function save () { try { A.Store.set(KEY, M.claim || M.luck ? Object.assign({}, M.claim, { luck: M.luck || 0 }) : null); } catch (e) { /* — */ } }
+/** Лёха должен: следующие n советов — счастливые (глава «Поднял всё», herostories.js) */
+export function addLuck (n) { M.luck = (M.luck || 0) + n; if (A) save(); return M.luck; }
 
 /* ── Игорёк: прогноз на ближайший матч ── */
 function claim () {
   if (!M.claim) { M.claim = { claim: Math.random() < 0.5 ? 'win' : 'lose', heard: false }; save(); }
   return M.claim;
 }
+/** Игорёк проговорился (глава «Финал», herostories.js): на ближайшем матче прогноз «проиграю» и он
+ *  сбывается наоборот наверняка — Игорёк выигрывает. Держится до матча (и между сменами). */
+export function sureMatch () {
+  M.claim = { claim: 'lose', heard: true, sure: true };
+  if (A) save();
+  return M.claim;
+}
 /** шансы на победу в матче: { andr, igor, nast } (с учётом прогноза Игорька) */
 export function tennisOdds () {
-  const F = HEROQ.IGOR.FLIP, c = claim().claim;
+  const c = claim().claim, F = M.claim.sure ? 1 : HEROQ.IGOR.FLIP;
   const ig = c === 'lose' ? F : 1 - F, rest = (1 - ig) / 2;
   return { andr: rest, igor: ig, nast: rest };
 }
@@ -163,7 +177,8 @@ function igorLine () {
 
 /* ── Лёха: совет на ставку после этой смены ── */
 function makeTip () {
-  const game = GAME_OF(), good = Math.random() < HEROQ.LEHA.GOOD;
+  const game = GAME_OF(), owed = M.luck > 0, good = owed || Math.random() < HEROQ.LEHA.GOOD;
+  if (owed) { M.luck--; save(); }
   let p = null, text;
   if (game === 'roulette') { p = Math.random() < 0.5 ? 'red' : 'black'; text = t(pick(LEHA_TIP[p])); }
   else if (game === 'tennis') {
@@ -206,6 +221,8 @@ function yellow (hex) {
 function car () {
   try { const C = CARS(); const c = C && C.current && C.current(); return c && c.id ? c : null; } catch (e) { return null; }
 }
+/** текущая машина игрока: { id, name, hex } или null (главы Жеки, herostories.js) */
+export const curCar = () => car();
 /** что Жека думает о машине: 'china' | 'yellow' | 'both' | 'home' | 'other' */
 export function carKind (c = car()) {
   if (!c) return null;
@@ -299,7 +316,7 @@ export function init (o) {
 
 /* отладка: __dlv.HEROQ */
 const DEBUG = {
-  M, HEROQ, tipFor, roll, verdict, tennisOdds, carKind, yellow, hook,
+  M, HEROQ, tipFor, roll, verdict, tennisOdds, carKind, yellow, hook, sureMatch, curCar,
   tip: (good) => { M.tip = null; const s = makeTip(); if (good != null) M.tip.good = !!good; return { text: s, ...M.tip }; },
   setClaim: (c, heard = true) => { M.claim = c ? { claim: c, heard } : null; save(); return M.claim; },
   newShift: () => { M.seen = {}; },

@@ -29,7 +29,7 @@
    спрашиваем перед каждой обычной пиццей. Заказ стал текущим — STORY.stage(spec), отдали —
    STORY.onDeliver(spec) (катсцена и награда — его), сорвался или выпал из очереди — STORY.onCancel(spec).
    Спецификация (всё необязательно): { storyId, x, z | zone, dist: { min, max }, person, addr, items,
-   note, why, pay, time, color, reach, noGuest }. why/items/note — уже переведённые; noGuest — человека
+   note, why, pay, time, timeK (срок × от обычного), color, reach, noGuest }. why/items/note — уже переведённые; noGuest — человека
    у двери ставит story.js, прохожего не зовём (иначе ждёт прохожий, person — его лицо). */
 import { t, tn } from '../i18n/index.js';
 import * as ECON from './econ.js';
@@ -559,6 +559,7 @@ export function setup (plan) {
       : sp.bundle ? bundleTime(sp.m.reduce((a, b) => a + b, 0), o.stops.length, sp.bundle.time || 1)
         : A.orderTime(L, 1, S.orders);
   if (!(sp.story && Number.isFinite(sp.story.time))) S.timeMax *= DIST.pace().time || 1;   // щедрая — времени больше
+  if (sp.story && Number.isFinite(sp.story.timeK)) S.timeMax *= sp.story.timeK;             // глава героя: «успеть» / крюк (herostories.js)
   S.time = S.timeMax;
   if (sp.bundle && sp.bundle.boss) bossSays(sp.bundle.boss);
 }
@@ -711,6 +712,7 @@ export function delivered (o, st, onTime) {
   if (sp.story && STORY && typeof STORY.onDeliver === 'function') {
     if (CUR.order === o) CUR.done = true;
     if (A.marker) A.marker.visible = false;               // в катсцене столб маркера не нужен
+    sp.story.late = !onTime;                              // условие «успеть» у глав героев (herostories.js)
     try { STORY.onDeliver(sp.story); } catch (e) { console.warn('[orders] STORY.onDeliver', e); }
   }
   if (sp.side) {

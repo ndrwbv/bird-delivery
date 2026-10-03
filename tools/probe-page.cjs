@@ -157,13 +157,47 @@ const INSTALL = `(() => { if (window.__probe) return; const P = window.__probe =
   };
   /* свой путь: от точки дороги под машиной (к тому концу улицы, что не за перегородкой) по узлам в обход
      закрытых рёбер к улице клиента, дальше — как у игры */
-  const detour = (D, R, V) => {
+  const detour = (D, R, V, tail) => {
     const rc = D.nearestRoad(V.x, V.z); if (!rc) return null;
-    const q = R[R.length - 2], tg = R[R.length - 1];
-    const st = ends(D, rc.x, rc.z), gl = ends(D, q[0], q[1]);
+    tail = tail || [R[R.length - 2], R[R.length - 1]];
+    const q = tail[0], st = ends(D, rc.x, rc.z), gl = ends(D, q[0], q[1]);
     if (!st.length || !gl.length) return null;
     const path = astar(D, st, gl);
-    return path ? [[V.x, V.z], [rc.x, rc.z], ...path, q, tg] : null;
+    return path ? [[V.x, V.z], [rc.x, rc.z], ...path, ...tail] : null;
+  };
+  /* Последние метры до пина вдали от дорог (двор, территория за забором — до ближайшей улицы бывает
+     и 100 м). Маршрут игры кончается прямой «точка улицы → пин», часто сквозь забор. Ищем проезд
+     по клеткам 2 × 2 м от пина наружу (поиск в ширину, клетка свободна — не стена, не забор, не вода)
+     до ближайшей улицы; дальше едем: по улицам до этой точки, по клеткам — к пину. */
+  const lastMile = (D, tx, tz) => {
+    const r0 = D.nearestRoad(tx, tz); if (r0 && r0.d < 12) return null;
+    const C = 2, RR = 1.2, MAXN = 30000;
+    const free = (x, z) => {
+      if (D.groundH(x, z) < 0.3) return false;
+      const cell = D.SOLID_GRID.get(Math.floor(x / 30) + ',' + Math.floor(z / 30));
+      if (cell) for (const q of cell) {
+        if (q.deckY !== undefined) continue;
+        const dx = x - q.cx, dz = z - q.cz, lx = dx * q.cs + dz * q.sn, lz = -dx * q.sn + dz * q.cs;
+        if (Math.abs(lx) < q.hw + RR && Math.abs(lz) < q.hd + RR) return false;
+      }
+      return true;
+    };
+    const par = new Map([['0,0', null]]), Q = [[0, 0]];
+    for (let h = 0, n = 0; h < Q.length && n < MAXN; h++, n++) {
+      const [i, j] = Q[h], x = tx + i * C, z = tz + j * C, r = D.nearestRoad(x, z);
+      if (r && r.d < r.seg.w / 2 - 0.5) {
+        const pts = []; for (let k = i + ',' + j; k; k = par.get(k)) { const [a, b] = k.split(',').map(Number); pts.push([tx + a * C, tz + b * C]); }
+        const sm = pts.filter((p, m) => m === 0 || m === pts.length - 1 || m % 3 === 0);   // от улицы к пину
+        return { entry: sm[0], pts: sm };
+      }
+      for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const k = (i + a) + ',' + (j + b);
+        if (par.has(k)) continue;
+        par.set(k, i + ',' + j);
+        if (free(tx + (i + a) * C, tz + (j + b) * C)) Q.push([i + a, j + b]);
+      }
+    }
+    return null;
   };
   const step = () => { raf0(step);
     const D = window.__dlv, A = P.ap; if (!A.on || !D) return; const IN = D.IN, V = D.V, S = D.S;
@@ -180,13 +214,17 @@ const INSTALL = `(() => { if (window.__probe) return; const P = window.__probe =
       if (onRoad || !A.trail) A.trail = [[V.x, V.z]];
       else { const l = A.trail[A.trail.length - 1]; if (Math.hypot(V.x - l[0], V.z - l[1]) > 2) { A.trail.push([V.x, V.z]); if (A.trail.length > 150) A.trail.shift(); } }
       const tkey = S.target ? Math.round(S.target.x) + ',' + Math.round(S.target.z) : '';
-      if (tkey !== A.tkey) { A.tkey = tkey; A.own = null; A.detT = 0;
+      if (tkey !== A.tkey) { A.tkey = tkey; A.own = null; A.detT = 0; A.lm = S.target ? lastMile(D, S.target.x, S.target.z) : null; A.lmOn = false;
         if (!onRoad && A.trail.length > 2) A.own = { kind: 'trail', pts: [[V.x, V.z], ...A.trail.slice().reverse()] }; }
       if (A.own && A.own.kind === 'trail' && (onRoad || Math.hypot(V.x - A.own.pts[A.own.pts.length - 1][0], V.z - A.own.pts[A.own.pts.length - 1][1]) < 3)) A.own = null;
-      // объезд ремонта: раз в секунду смотрим, не идёт ли маршрут игры через перекрытую улицу
-      if ((!A.own || A.own.kind === 'detour') && (A.detT = (A.detT || 0) - dts) <= 0) {
+      // доехали до въезда к пину вдали от улиц — дальше по клеткам, маршрут больше не пересчитываем
+      if (A.lm && !A.lmOn && !(A.own && A.own.kind === 'trail') && Math.hypot(V.x - A.lm.entry[0], V.z - A.lm.entry[1]) < 8) {
+        A.lmOn = true; A.own = { kind: 'last', pts: [[V.x, V.z], ...A.lm.pts] };
+      }
+      // объезд ремонта и путь к въезду: раз в секунду, свой путь по улицам
+      if ((!A.own || A.own.kind === 'detour') && !A.lmOn && (A.detT = (A.detT || 0) - dts) <= 0) {
         A.detT = 1;
-        const dt = needDetour(D, GR) ? detour(D, GR, V) : null;
+        const dt = A.lm ? detour(D, GR, V, A.lm.pts) : needDetour(D, GR) ? detour(D, GR, V) : null;
         A.own = dt ? { kind: 'detour', pts: dt } : null;
       }
       const R = A.own ? A.own.pts : GR;
@@ -200,7 +238,7 @@ const INSTALL = `(() => { if (window.__probe) return; const P = window.__probe =
       let [tx, tz, ux, uz] = along(R, pr.i, pr.k, L);
       // полоса: правая (как поток), на обгоне — встречная; у пина — прямо на него
       let lane = 0;
-      if (left > 25 && !(A.own && A.own.kind === 'trail')) {
+      if (left > 25 && !(A.own && A.own.kind !== 'detour')) {
         const rd = D.nearestRoad(tx, tz, 7, 1), w = rd && rd.d < rd.seg.w / 2 + 2 ? rd.seg.w : 7;
         lane = Math.max(1.4, Math.min(2.6, w >= 12.5 ? w / 8 : w / 4)) * (A.pass > 0 ? -1 : 1);
       }
@@ -240,15 +278,28 @@ const INSTALL = `(() => { if (window.__probe) return; const P = window.__probe =
       else if (A.pass > 0) block = false;
       A.wait = block && sp < 1 ? (A.wait || 0) + dts : 0;
       if (A.wait > 2.5 && !oncoming) { A.wait = 0; A.pass = 3; }
-      let want = block ? 0 : left < 14 ? 3.5 : left < 30 ? 7 : Math.abs(diff) > 0.45 ? 6 : turn > 0.7 ? 8 : A.pass > 0 ? 8 : A.vmax;
+      let want = block ? 0 : left < 14 ? 3.5 : Math.abs(diff) > 1.5 ? 4 : left < 30 ? 7 : Math.abs(diff) > 0.45 ? 6 : turn > 0.7 ? 8 : A.pass > 0 ? 8 : A.vmax;
       if (wall) want = Math.min(want, 10);
+      if (A.own && A.own.kind !== 'detour') want = Math.min(want, 7);   // по двору и по своему следу — не спеша
+      /* таран конкурента (game.js svcDrive, ECON.FOES): несётся на тебя ~30 м/с, удар — 2 сердца. Сзади —
+         газ в пол (удар слабее на разницу скоростей, а то и не догонит за 2,6 с тарана); спереди — тормоз и руль прочь */
+      let ram = null, rd2 = 35 * 35;
+      for (const t of D.TRAFFIC) if (t.ramT > 0) { const q = (t.x - V.x) ** 2 + (t.z - V.z) ** 2; if (q < rd2) { rd2 = q; ram = t; } }
+      if (ram) {
+        const ax = ram.x - V.x, az = ram.z - V.z, f = ax * fx + az * fz, lat = ax * fz - az * fx;
+        if (f < 2) want = wall && Math.sqrt(rd2) > 12 ? 10 : 32;
+        else { want = Math.min(want, 6); IN.jx = lat > 0 ? 0.8 : -0.8; }
+      }
       // тормоз на месте — это задний ход: катится назад (после разворота, со склона) — гасим газом, не тормозом
       const vf = V.vx * fx + V.vz * fz;
       if (vf < -0.5) { IN.gas = 1; IN.brake = 0; }
       else { IN.gas = sp < want ? 1 : 0; IN.brake = sp > want + 1 ? 1 : 0; }
       A.stk = IN.gas && vf < 0.6 ? (A.stk || 0) + dts : 0;
       if (A.stk > 1.5) { A.stk = 0; A.nrev = now - (A.lastRev || 0) < 8000 / (window.__warp || 1) ? (A.nrev || 0) + 1 : 0; A.lastRev = now;
-        A.rev = Math.min(3, 1.2 + A.nrev * 0.6); A.rjx = (A.nrev % 2 ? -1 : 1) * (IN.jx > 0 ? -0.8 : 0.8); }
+        // цель сзади (разворот на узкой улице) — разворот в три приёма: назад с рулём в другую сторону, каждый раз;
+        // цель впереди, а упёрлась — то так, то этак
+        A.rev = Math.min(3, 1.2 + A.nrev * 0.6); A.rjx = (Math.abs(diff) > 1.2 || A.nrev % 2 === 0 ? 1 : -1) * (IN.jx > 0 ? -0.8 : 0.8);
+        if (onRoad && Math.abs(diff) < 0.6 && !oncoming) A.pass = 3; }   // впереди перегорожена своя полоса (ремонт полосы) — потом по встречной
     } catch (e) { console.error('[probe autopilot]', e && e.message); A.on = false; }
   };
   raf0(step);

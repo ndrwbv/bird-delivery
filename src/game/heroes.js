@@ -279,7 +279,7 @@ const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
 let A = null;
 const M = {
   ready: false, heroes: [], session: null, pz: null, gapAll: 0, checkT: 0,
-  save: { met: {}, grudge: {} }, hook: null, meet: [],
+  save: { met: {}, grudge: {} }, hook: null, meet: [], held: {},
   stats: { said: 0, hits: 0, falls: 0, back: 0, built: 0 },
 };
 
@@ -849,6 +849,7 @@ export function step (dt, api) {
         }
         continue;
       }
+      if (M.held[H.def.id]) { if (H.grp) unbuild(H); continue; }     // играет в главе своей истории (herostories.js)
       if (!H.home && H.next) place(H);
       if (!H.home) continue;
       const d = Math.hypot(H.x - V.x, H.z - V.z);
@@ -869,6 +870,22 @@ export const get = id => { const H = byId(id); return H ? api(H) : null; };
 export function sayLine (id, text, ttl) { const H = byId(id); return H ? say(H, text, ttl) : false; }
 export function setLineHook (fn) { M.hook = typeof fn === 'function' ? fn : null; }
 export function onMeet (fn) { if (typeof fn === 'function') M.meet.push(fn); }
+/* глава истории (herostories.js): герой ждёт у подъезда актёром катсцены — на улице его прячем */
+export function hold (id, on) {
+  if (!!M.held[id] === !!on) return;
+  if (on) M.held[id] = 1; else delete M.held[id];
+  const H = byId(id);
+  if (on && H && H.grp) unbuild(H);
+}
+/* модель героя со всеми приметами (болгарка, кот, химзавивка…) — без имени над головой: для катсцен */
+export function model (id) {
+  const d = BY_ID.get(id);
+  if (!d || !A) return null;
+  const F = { def: d, grp: A.makeHuman(person(id), { h: d.h }), cat: 2, lift: 0 };
+  F.u = F.grp.userData;
+  try { EXTRA[id] && EXTRA[id](F, F.u); } catch (e) { console.error('[heroes] model', e); }
+  return F.grp;
+}
 
 /* отладка: __dlv.HEROES */
 export const DEBUG = {

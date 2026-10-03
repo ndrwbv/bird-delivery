@@ -148,10 +148,9 @@ const PICS = {
     circle(x, 0, 0, 9, '#d8382f');
     x.restore();
   },
-  wrench (x, a) {
+  wrench (x, a, bg) {
     line(x, [22, 82, 70, 30], 12, a);
-    circle(x, 76, 24, 16, a);
-    x.save(); x.globalCompositeOperation = 'destination-out'; circle(x, 84, 16, 8, '#000'); x.restore();
+    circle(x, 76, 24, 16, a); circle(x, 84, 16, 8, bg);               // зев ключа — цветом фона
     line(x, [30, 30, 76, 76], 8, '#e8892e'); rrect(x, 62, 62, 24, 24, 4, '#e8892e');
   },
   tire (x, a) {
@@ -225,7 +224,7 @@ function drawAd (x, ad) {
   x.fillStyle = ad.bg; x.fillRect(0, 0, CW, CH);
   x.fillStyle = ad.ac; x.fillRect(0, CH - 10, CW, 10);
   // рисунок слева
-  x.save(); x.translate(10, 20); x.scale(1.5, 1.5); PICS[ad.pic](x, ad.ac); x.restore();
+  x.save(); x.translate(10, 20); x.scale(1.5, 1.5); PICS[ad.pic](x, ad.ac, ad.bg); x.restore();
   // текст справа
   const tx = 172, tw = CW - tx - 12;
   x.fillStyle = ad.fg; x.textAlign = 'left'; x.textBaseline = 'top';
