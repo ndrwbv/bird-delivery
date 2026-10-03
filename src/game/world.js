@@ -18,9 +18,9 @@
      нет совсем. Никто этого не объясняет. Кучи — склейка по клеткам, при
      смене доната пересобирается только она (trash*);
    • бандитские районы (ZN.gangZones): красные круги на радаре и карте;
-     подъехал к клиенту в районе — могут подойти 3–4 гопника (днём 6 из 10, вечером всегда)
-     в спортивках и потребовать мзду (gang*). Отказал — мнут машину,
-     пока не уедешь. В детской версии без бит: «покачают» машину;
+     адрес в районе — 3–4 гопника в спортивках (днём 6 из 10, вечером всегда) ждут у пина
+     или выходят из-за угла; пицца отдаётся сразу, но машину тут же окружают и держат,
+     пока не заплатишь или не помнут (gang*, HOLD). В детской версии без бит: «покачают» машину;
    • особняки (prepCity): дома в круге MAP.career.rich — коттеджи в 2–3
      этажа со скатной крышей, светлыми стенами, газоном, высоким забором
      (roadlife.js), воротами и дорогой машиной у дома;
@@ -34,6 +34,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { t } from '../i18n/index.js';
 import { GANG, SHIFT, hourOf } from './econ.js';
+import { TIER } from './hits.js';
 import * as ZN from './zones.js';
 import * as DLG from './dialog.js';
 import * as SEAS from './seasons.js';
@@ -836,7 +837,24 @@ function say (m, text, col) {
 
 /* ═════════════════ бандитские районы ═════════════════ */
 const TRACK = ['#1d2a66', '#1b1b20', '#2a2d36', '#16305a', '#3a3a42'];
-const GE = { st: '', men: [], t: 0, cd: 0, cx: 0, cz: 0, bribe: 0, hearts: 0, hurtT: 0, done: null, lead: null, left: 0, force: false };
+const GE = { st: '', men: [], t: 0, cd: 0, cx: 0, cz: 0, bribe: 0, hearts: 0, hurtT: 0, done: null, lead: null, left: 0, force: false,
+  stop: null, pre: null, preOk: false, flip: 1, capV: 0, ax: 0, az: 0, ah: 0, gasT: 0, push: 0, t0: 0 };
+/* хватка банды (docs/CAREER.md «Мзда»): пицца отдаётся сразу, но уехать сразу не дают.
+   Адрес в красном круге — жребий бросаем, как только он стал целью (днём GANG.CHANCE, вечером
+   GANG.CHANCE_EVENING). Выпало и машина дальше PRE_R — гопники уже стоят у пина (AT от него), выпало
+   ближе — выходят из-за угла / подъезда в NEAR от машины в момент вручения. С вручения машину
+   держат: потолок скорости падает на BRAKE м/с за секунду до V, дальше машина только качается —
+   не дальше LEASH м и TURN рад от места, где встала; гопники подбегают (RUN м/с) и встают у
+   водительской двери, перед капотом, за багажником (и у пассажирской). Держат, пока живы и не ушли:
+   разговор → заплатил — уходят; отказал — мнут машину и уходят. Сбить — по общим правилам
+   (hits.js TIER.FALL, 20 км/ч): быстрее — сбит, медленнее — твёрдый, отталкивается от кузова. */
+export const HOLD = {
+  PRE_R: 60, AT: [4.5, 7], NEAR: [3.5, 6.5], RUN: 5.5,
+  BRAKE: 14, V: 0.5, LEASH: 0.35, TURN: 0.12,
+};
+/* у машины: у водительской двери — главный, дальше перед капотом, за багажником, у пассажирской */
+const SLOTS = [[1.75, 0.6], [0, 3.0], [0, -3.1], [-1.75, 0.4], [1.7, -1.5]];
+const HL = 2.7, HW = 1.35;                     // кузов для наезда — как у прохожих и мафиози (CAR_L + 0,5 × CAR_W + 0,35)
 /* песочница: на ближайшем вручении в районе — гопники наверняка (без жребия и часов) */
 export function thugsNext (on = true) { GE.force = !!on; GE.cd = 0; return GE.force; }
 function evening () {
@@ -845,19 +863,74 @@ function evening () {
   return hourOf(A.ENV.t) >= SHIFT.EVENING_H;
 }
 const inGang = (x, z) => ZN.gangZones().some(g => (x - g.x) ** 2 + (z - g.z) ** 2 < g.r * g.r);
-/* подъехал к клиенту (orders.js onArrive): в районе — шанс, что подойдут (днём GANG.CHANCE,
-   вечером GANG.CHANCE_EVENING; донат «борьба с насилием» — вдвое реже).
-   Раньше — только вечером: в укороченных сменах вечер ~1 мин, мзду почти не видели.
-   Заказ гопников не ждёт: пицца отдаётся сразу, они подходят уже после (обещание не
-   возвращаем). До 03.10.2026 возвращали — и вручение висело, пока гопники не уйдут:
-   подходят до 11 с, разговор 9 с, мнут машину до 14 с; уехал — вернись в пин заново */
+const gangChance = () => (evening() ? GANG.CHANCE_EVENING : GANG.CHANCE) * (1 - 0.5 * A.donated('gang'));
+/* жребий на новый адрес (каждый кадр, пока банды нет): адрес — пин или клиент — в круге */
+function preRoll () {
+  const S = A.S, o = S && S.order;
+  if (GE.st || !S || S.state !== 'drive' || !o || !o.ord || o.tut || S.free || S.ride || S.freeRun || o.ord.type === 'staff') return;
+  const st = o.stops[o.idx];
+  if (!st || st === GE.pre || st.story || (st.pay && st.pay.story)) return;
+  if (GE.cd > 0 && !GE.force) return;            // передышка — жребий, когда кончится
+  const tg = S.target, at = st.at || (st.peds && st.peds[0]);
+  if (!tg) return;
+  GE.pre = st; GE.preOk = false;
+  if (!inGang(tg.x, tg.z) && !(at && inGang(at.x, at.z))) return;
+  if (GE.force) { GE.preOk = true; return; }     // песочница: из-за угла при вручении
+  if (!chance(gangChance())) return;
+  GE.preOk = true;
+  if (Math.hypot(tg.x - A.V.x, tg.z - A.V.z) < HOLD.PRE_R) return;   // близко — на глазах не появляются: выйдут при вручении
+  gangWait(st, tg, at);
+}
+/* точка: не в доме, в границах; лучше не на проезжей части и у стены (вышли из подъезда / из-за угла) */
+function spot (cx, cz, a0, spread, r0, r1, avoid) {
+  let best = null, bs = -1;
+  for (let k = 0; k < 20; k++) {
+    const an = a0 + rand(-spread, spread), d = rand(r0, r1);
+    const x = cx + Math.sin(an) * d, z = cz + Math.cos(an) * d;
+    if (A.inHouse(x, z, 0.8) || !A.inBounds(x, z, 5)) continue;
+    if (avoid && avoid.some(p => Math.hypot(p.x - x, p.z - z) < p.r)) continue;
+    const r = A.nearestRoad ? A.nearestRoad(x, z) : null;
+    const s = (r && r.d < (r.seg.w || 7) / 2 + 0.5 ? 0 : 2) + (A.inHouse(x, z, 2.4) ? 1 : 0) + Math.random() * 0.5;
+    if (s > bs) { bs = s; best = [x, z]; }
+  }
+  return best;
+}
+/* стоят у пина заранее: кучкой с одной стороны, не в кольце пина и не в клиенте */
+function gangWait (st, tg, at) {
+  const n = 3 + (chance(0.5) ? 1 : 0), a0 = rand(0, Math.PI * 2);
+  const avoid = [{ x: tg.x, z: tg.z, r: 3.6 }];
+  if (at) avoid.push({ x: at.x, z: at.z, r: 2.2 });
+  const men = [];
+  for (let i = 0; i < n; i++) {
+    const p = spot(tg.x, tg.z, a0 + (i - (n - 1) / 2) * 0.55, 0.35, HOLD.AT[0], HOLD.AT[1], avoid.concat(men.map(m => ({ x: m.x, z: m.z, r: 1 }))))
+      || spot(tg.x, tg.z, a0, Math.PI, HOLD.AT[0], HOLD.AT[1] + 2, avoid);
+    if (!p) continue;
+    const m = thug(i === 0);
+    m.x = m.wx = p[0]; m.z = m.wz = p[1]; m.h = Math.atan2(tg.x - m.x, tg.z - m.z);
+    men.push(m);
+  }
+  if (!men.length) return;
+  if (!men[0].person) { for (const m of men) { m.dead = 1; A.dropMesh(m.grp); } return; }
+  GE.st = 'wait'; GE.t = 0; GE.stop = st; GE.men = men; GE.lead = men[0];
+}
+/* подъехал к клиенту (orders.js onArrive). Заказ гопников не ждёт: пицца отдаётся сразу (обещание
+   не возвращаем), но с этой же секунды машину держат (HOLD выше). До 03.10.2026 вручение висело,
+   пока гопники не уйдут (подходили с 14–22 м до 11 с, разговор 9 с, мнут до 14 с); 03.10 — отдавали
+   сразу, но гопники шли ~10 с и игрок успевал уехать; с 04.10 — подходят за 1–2 с и не отпускают */
 export function arrive (ev) {
-  if (!A || !CAREER || GE.st || (GE.cd > 0 && !GE.force)) return;
+  if (!A || !CAREER) return;
+  const st = ev && ev.stop;
+  if (GE.st === 'wait') {
+    if (st && GE.stop === st) { gangStart(true); return; }
+    gangClear();                                  // ждали у другого адреса
+  }
+  if (GE.st || (GE.cd > 0 && !GE.force)) return;
   const x = ev && ev.x !== undefined ? ev.x : A.V.x, z = ev && ev.z !== undefined ? ev.z : A.V.z;
   if (!inGang(x, z) && !inGang(A.V.x, A.V.z)) return;
   if (GE.force) GE.force = false;
-  else if (!chance((evening() ? GANG.CHANCE_EVENING : GANG.CHANCE) * (1 - 0.5 * A.donated('gang')))) return;
-  gangStart();
+  else if (st && st === GE.pre) { if (!GE.preOk) return; }
+  else if (!chance(gangChance())) return;
+  gangStart(false);
 }
 function thug (lead) {
   const person = lead ? makePerson({ fem: false }) : null, hex = pick(TRACK);
@@ -882,40 +955,119 @@ function thug (lead) {
   A.scene.add(grp);
   return { grp, u, person, x: 0, z: 0, h: 0, ph: rand(0, 6), dead: 0, slot: 0, swingT: rand(0.2, 1), swing: 0, bubble: null, bubT: 0, bat };
 }
-function slotPos (i, n) {
-  // вокруг машины: у водительской двери — главный, остальные — у капота, багажника и с другой стороны
+function slotPos (i) {
   const V = A.V, fx = Math.sin(V.h), fz = Math.cos(V.h), rx = fz, rz = -fx;
-  const S = [[1.75, 0.6], [-1.75, 1.0], [1.7, -1.5], [-1.7, -1.3], [0, 3.2]];
-  const [a, b] = S[i % S.length];
+  const [a0, b] = SLOTS[i % SLOTS.length], a = a0 * (GE.flip || 1);   // flip: главный подошёл с другой стороны
   return [V.x + rx * a + fx * b, V.z + rz * a + fz * b];
 }
-function gangStart () {
-  const V = A.V, n = 3 + (chance(0.5) ? 1 : 0);
-  GE.st = 'come'; GE.t = 0; GE.cx = V.x; GE.cz = V.z; GE.hearts = 0; GE.hurtT = 1.2; GE.men = [];
-  GE.bribe = Math.round((GANG.BRIBE_BASE + GANG.BRIBE_SHARE * Math.max(0, (A.S && A.S.money) || 0)) / 10) * 10;
-  for (let i = 0; i < n; i++) {
-    const m = thug(i === 0);
-    m.slot = i;
-    // из разных сторон: из-за угла, из двора, с улицы
-    let placed = false;
-    for (let k = 0; k < 14 && !placed; k++) {
-      const an = V.h + (i / n) * Math.PI * 2 + rand(-0.5, 0.5), d = rand(14, 22);
-      const x = V.x + Math.sin(an) * d, z = V.z + Math.cos(an) * d;
-      if (A.inHouse(x, z, 0.8) || !A.inBounds(x, z, 5)) continue;
-      m.x = x; m.z = z; placed = true;
-    }
-    if (!placed) { m.x = V.x + rand(-12, 12); m.z = V.z + rand(-12, 12); }
-    GE.men.push(m);
+/* отрезок (x0,y0)–(x1,y1) задевает прямоугольник |x| < hx, |y| < hy (Лианг — Барски) */
+function segHits (x0, y0, x1, y1, hx, hy) {
+  let t0 = 0, t1 = 1;
+  const dx = x1 - x0, dy = y1 - y0;
+  for (const [p, q] of [[-dx, x0 + hx], [dx, hx - x0], [-dy, y0 + hy], [dy, hy - y0]]) {
+    if (p === 0) { if (q < 0) return false; continue; }
+    const r = q / p;
+    if (p < 0) { if (r > t1) return false; if (r > t0) t0 = r; } else { if (r < t0) return false; if (r < t1) t1 = r; }
   }
-  GE.lead = GE.men[0];
+  return t0 < t1;
+}
+/* к месту — в обход кузова: прямой путь задевает машину — сначала к углу, откуда видно цель */
+function around (m, tx, tz) {
+  const V = A.V, fx = Math.sin(V.h), fz = Math.cos(V.h), hx = HL - 0.05, hy = HW - 0.05;
+  const ex = m.x - V.x, ez = m.z - V.z, al = ex * fx + ez * fz, ac = ex * fz - ez * fx;
+  const gx = tx - V.x, gz = tz - V.z, bl = gx * fx + gz * fz, bc = gx * fz - gz * fx;
+  if (!segHits(al, ac, bl, bc, hx, hy)) return [tx, tz];
+  let best = null, bd = 1e9;
+  for (const sa of [1, -1]) for (const sc of [1, -1]) {
+    const cl = sa * (HL + 0.6), cc = sc * (HW + 0.5), dm = Math.hypot(cl - al, cc - ac);
+    if (dm < 0.35 || segHits(al, ac, cl, cc, hx, hy)) continue;
+    const sum = dm + Math.hypot(bl - cl, bc - cc);
+    if (sum < bd) { bd = sum; best = [cl, cc]; }
+  }
+  if (!best) return [tx, tz];
+  return [V.x + fx * best[0] + fz * best[1], V.z + fz * best[0] - fx * best[1]];
+}
+/* reuse — те, что ждали у пина; иначе выходят из-за угла / подъезда в NEAR от машины, каждый со
+   своей стороны (к капоту и багажнику — сбоку) */
+function gangStart (reuse) {
+  const V = A.V, fx = Math.sin(V.h), fz = Math.cos(V.h), rx = fz, rz = -fx;
+  let men = [];
+  if (reuse) {
+    const alive = GE.men.filter(m => !m.dead);
+    GE.men = [];
+    if (!alive.length) { gangClear(); return null; }
+    // главный (с лицом для диалога) — к водительской двери, остальные — к ближайшему свободному месту
+    const lead = alive.find(m => m.person) || alive[0];
+    lead.slot = 0; men.push(lead);
+    GE.flip = ((lead.x - V.x) * fz - (lead.z - V.z) * fx) >= 0 ? 1 : -1;   // к ближней двери
+    let rest = alive.filter(m => m !== lead);
+    for (let i = 1; rest.length; i++) {
+      const [sx, sz] = slotPos(i);
+      rest.sort((p, q) => Math.hypot(p.x - sx, p.z - sz) - Math.hypot(q.x - sx, q.z - sz));
+      const m = rest.shift(); m.slot = i; men.push(m);
+    }
+  } else {
+    GE.flip = 1;
+    const n = 3 + (chance(0.5) ? 1 : 0);
+    for (let i = 0; i < n; i++) {
+      const m = thug(i === 0);
+      m.slot = i;
+      const [a, b] = SLOTS[i];
+      const side = a ? Math.sign(a) : (chance(0.5) ? 1 : -1);
+      // направление из машины: вбок на сторону места, к капоту/багажнику — с наклоном вперёд/назад
+      const lx = side * 1, lf = b > 2 ? 1.2 : b < -2 ? -1.2 : b * 0.3;
+      const a0 = Math.atan2(rx * lx + fx * lf, rz * lx + fz * lf);
+      const p = spot(V.x, V.z, a0, 0.7, HOLD.NEAR[0], HOLD.NEAR[1], [{ x: V.x, z: V.z, r: 3 }])
+        || spot(V.x, V.z, a0, Math.PI, HOLD.NEAR[0], HOLD.NEAR[1] + 3, null);
+      if (p) { m.x = p[0]; m.z = p[1]; } else { m.x = V.x + rx * side * 4; m.z = V.z + rz * side * 4; }
+      m.h = Math.atan2(V.x - m.x, V.z - m.z);
+      men.push(m);
+    }
+  }
+  GE.men = men; GE.lead = men[0];
+  GE.st = 'come'; GE.t = 0; GE.t0 = performance.now(); GE.cx = V.x; GE.cz = V.z; GE.hearts = 0; GE.hurtT = 1.2; GE.stop = null;
+  GE.capV = Math.hypot(V.vx, V.vz); GE.ax = V.x; GE.az = V.z; GE.ah = V.h; GE.gasT = 0; GE.push = 0;
+  GE.bribe = Math.round((GANG.BRIBE_BASE + GANG.BRIBE_SHARE * Math.max(0, (A.S && A.S.money) || 0)) / 10) * 10;
+  const front = men.find(m => m.slot === 1) || men[0];
+  gsay(front, A.ADULT ? t('Тормози, курьер. Приехали.') : t('Стой, курьер! Приехали.'), '#d9342c');
   STATS.gang++;
   return new Promise(res => { GE.done = res; });
+}
+/* держат машину: тормозят до HOLD.V и не отпускают дальше HOLD.LEASH / HOLD.TURN от места, где встала */
+function hold (dt) {
+  const V = A.V;
+  if (!GE.men.some(m => !m.dead)) return;
+  const sp = Math.hypot(V.vx, V.vz);
+  GE.capV = Math.max(HOLD.V, GE.capV - HOLD.BRAKE * dt);
+  if (sp > GE.capV) { const k = GE.capV / sp; V.vx *= k; V.vz *= k; }
+  if (GE.capV > HOLD.V) { GE.ax = V.x; GE.az = V.z; GE.ah = V.h; }   // ещё тормозит — место едет с машиной
+  else {
+    const dx = V.x - GE.ax, dz = V.z - GE.az, d = Math.hypot(dx, dz);
+    if (d > HOLD.LEASH) {
+      const k = HOLD.LEASH / d, vn = (V.vx * dx + V.vz * dz) / d;
+      V.x = GE.ax + dx * k; V.z = GE.az + dz * k;
+      if (vn > 0) { V.vx -= dx / d * vn; V.vz -= dz / d * vn; }
+    }
+    const dh = wrap(V.h - GE.ah);
+    if (Math.abs(dh) > HOLD.TURN) V.h = GE.ah + Math.sign(dh) * HOLD.TURN;
+  }
+  // жмёт газ — машина качается, гопники орут
+  if (GE.gasT > 0) GE.gasT -= dt;
+  if (sp > GE.capV + 0.4) {
+    GE.push += dt;
+    if (A.S) A.S.shake = Math.max(A.S.shake || 0, 0.12);
+    if (GE.gasT <= 0 && GE.st !== 'talk') {
+      GE.gasT = 3.5;
+      const m = GE.men.find(q => !q.dead && q.slot === 1) || GE.men.find(q => !q.dead);
+      if (m) gsay(m, A.ADULT ? t('Куда собрался? Стоять!') : t('Куда? Стой!'), '#d9342c');
+    }
+  }
 }
 function gangEnd () {
   if (GE.done) { const f = GE.done; GE.done = null; f(); }
 }
-function gangLeave (line, col) {
-  GE.st = 'leave'; GE.t = 0; GE.cd = 45;
+function gangLeave (line, col, cd = 45) {
+  GE.st = 'leave'; GE.t = 0; GE.cd = Math.max(GE.cd, cd); GE.stop = null;
   const m = GE.men.find(q => !q.dead);
   if (m && line) gsay(m, line, col || '#3a3a42');
   for (const q of GE.men) { const an = Math.atan2(q.x - A.V.x, q.z - A.V.z) + rand(-0.4, 0.4); q.tx = q.x + Math.sin(an) * 30; q.tz = q.z + Math.cos(an) * 30; }
@@ -958,10 +1110,22 @@ function carWorse () {
 }
 function gangStep (dt) {
   if (GE.cd > 0) GE.cd -= dt;
+  if (!GE.st) preRoll();
   if (!GE.st) return;
-  const V = A.V, S = A.S, sp = Math.hypot(V.vx, V.vz), fx = Math.sin(V.h), fz = Math.cos(V.h);
+  const V = A.V, S = A.S, fx = Math.sin(V.h), fz = Math.cos(V.h);
   if (!S || S.state === 'title' || S.state === 'over' || S.state === 'dying') { gangClear(); return; }
   GE.t += dt;
+  if (GE.st === 'wait') {
+    // ждали у пина, а адрес сменился (отменили, другой заказ) — уходят; далеко — просто пропадают
+    const o = S.order, cur = o && o.stops && o.stops[o.idx];
+    if (cur !== GE.stop) {
+      const far = GE.men.every(m => m.dead || Math.hypot(m.x - V.x, m.z - V.z) > 50);
+      if (far) gangClear(); else gangLeave(null, null, 0);
+      if (!GE.st) return;
+    } else if (GE.men.every(m => m.dead)) { gangClear(); GE.preOk = false; GE.cd = 45; return; }   // всех сбил по дороге — некому трясти
+  }
+  if (GE.st === 'come' || GE.st === 'talk' || GE.st === 'smash') hold(dt);
+  const sp = Math.hypot(V.vx, V.vz);
   const dCar = Math.hypot(V.x - GE.cx, V.z - GE.cz);
   // уехал до разговора — ну и вали
   if (GE.st === 'come') {
@@ -970,8 +1134,8 @@ function gangStep (dt) {
       const L = GE.lead && !GE.lead.dead ? GE.lead : GE.men.find(q => !q.dead);
       if (!L) { gangLeave(); }
       else {
-        const [tx, tz] = slotPos(L.slot, GE.men.length);
-        if (Math.hypot(tx - L.x, tz - L.z) < 0.6 || GE.t > 11) gangTalk();
+        const [tx, tz] = slotPos(L.slot);
+        if (Math.hypot(tx - L.x, tz - L.z) < 0.6 || GE.t > 4) gangTalk();   // подбегают за 1–2 с; застрял — через 4 с говорит как есть
       }
     }
   }
@@ -1000,18 +1164,19 @@ function gangStep (dt) {
     if (m.dead) continue;
     const u = m.u;
     if (m.bubble && (m.bubT -= dt) <= 0) { m.grp.remove(m.bubble); m.bubble.material.dispose(); m.bubble = null; }
-    let tx, tz, speed = 1.6;
+    let tx, tz, speed = HOLD.RUN;                  // подбегают
     if (GE.st === 'leave') { tx = m.tx; tz = m.tz; speed = 1.9; }
-    else { [tx, tz] = slotPos(m.slot, GE.men.length); if (GE.st === 'smash') speed = 3.2; }
+    else if (GE.st === 'wait') { tx = m.wx; tz = m.wz; speed = 1.2; }
+    else { [tx, tz] = around(m, ...slotPos(m.slot)); if (GE.st === 'smash') speed = 3.2; }
     const dx = tx - m.x, dz = tz - m.z, d = Math.hypot(dx, dz);
     let walk = false;
     if (d > 0.3 && GE.st !== 'talk') {
       const k = Math.min(1, speed * dt / d);
       m.x += dx * k; m.z += dz * k; walk = true;
       m.h = damp(m.h, m.h + wrap(Math.atan2(dx, dz) - m.h), 8, dt);
-    } else m.h = damp(m.h, m.h + wrap(Math.atan2(V.x - m.x, V.z - m.z) - m.h), 6, dt);   // лицом к машине
-    m.ph += dt * (walk ? 8 : 2);
-    const sw = walk ? Math.sin(m.ph) * 0.6 : 0;
+    } else if (GE.st !== 'wait' || Math.hypot(V.x - m.x, V.z - m.z) < 35) m.h = damp(m.h, m.h + wrap(Math.atan2(V.x - m.x, V.z - m.z) - m.h), 6, dt);   // лицом к машине
+    m.ph += dt * (walk ? (speed > 3 ? 13 : 8) : 2);
+    const sw = walk ? Math.sin(m.ph) * (speed > 3 ? 0.85 : 0.6) : 0;
     u.legL.rotation.x = sw; u.legR.rotation.x = -sw;
     if (GE.st === 'smash' && !walk) {
       if (m.bat) {
@@ -1042,16 +1207,22 @@ function gangStep (dt) {
     }
     m.grp.position.set(m.x, A.groundH(m.x, m.z) + (A.curbAt ? A.curbAt(m.x, m.z) : 0), m.z);
     m.grp.rotation.y = m.h;
-    // наезд
-    if (sp > 3) {
-      const ex = m.x - V.x, ez = m.z - V.z;
-      if (Math.abs(ex * fx + ez * fz) < 2.4 && Math.abs(ex * fz - ez * fx) < 1.2) {
+    // наезд — по общим правилам (hits.js): быстрее TIER.FALL (20 км/ч) — сбит;
+    // медленнее — твёрдый: выталкиваем из-под кузова вбок или вперёд/назад от бампера
+    const ex = m.x - V.x, ez = m.z - V.z, al = ex * fx + ez * fz, ac = ex * fz - ez * fx;
+    if (Math.abs(al) < HL && Math.abs(ac) < HW) {
+      if (sp * 3.6 >= TIER.FALL) {
         m.dead = 1;
         if (m.bubble) { m.grp.remove(m.bubble); m.bubble.material.dispose(); m.bubble = null; }
         A.dropMesh(m.grp);
         A.gibHuman({ x: m.x, z: m.z, grp: m.grp }, V.vx, V.vz);
         if (A.onRunOver) A.onRunOver();
+        continue;
       }
+      const outW = HW - Math.abs(ac) + 0.05, outL = HL - Math.abs(al) + 0.05;
+      if (outW <= outL) { const k = ac >= 0 ? outW : -outW; m.x += fz * k; m.z -= fx * k; }
+      else { const k = al >= 0 ? outL : -outL; m.x += fx * k; m.z += fz * k; }
+      m.grp.position.set(m.x, A.groundH(m.x, m.z) + (A.curbAt ? A.curbAt(m.x, m.z) : 0), m.z);
     }
   }
   if (GE.st === 'leave') {
@@ -1065,7 +1236,7 @@ function gangClear () {
     if (m.bubble) { m.grp.remove(m.bubble); m.bubble.material.dispose(); m.bubble = null; }
     if (!m.dead) { m.dead = 1; A.dropMesh(m.grp); }
   }
-  GE.men = []; GE.st = ''; GE.lead = null;
+  GE.men = []; GE.st = ''; GE.lead = null; GE.stop = null;
   gangEnd();
 }
 
@@ -1125,5 +1296,5 @@ export function step (dt, api) {
 /* для отладки: __dlv.WORLD */
 export const DEBUG = {
   STATS, HEAPS, ALLEYS, VILLAS, GRILLS, GRILL_SPOTS, GE, LUX_SPOTS, TRASH, paveRoad, pavePath, PAVE,
-  gang: () => A && !GE.st && gangStart(), thugsNext, trash: k => A && trashBuild(k), grill: () => { const V = A.V; const s = GRILL_SPOTS.filter(q => !q.busy).sort((a, b) => Math.hypot(a.x - V.x, a.z - V.z) - Math.hypot(b.x - V.x, b.z - V.z))[0]; if (s) spawnGrill(s); return s; },
+  HOLD, gang: () => A && (!GE.st || GE.st === 'wait') && gangStart(GE.st === 'wait'), thugsNext, trash: k => A && trashBuild(k), grill: () => { const V = A.V; const s = GRILL_SPOTS.filter(q => !q.busy).sort((a, b) => Math.hypot(a.x - V.x, a.z - V.z) - Math.hypot(b.x - V.x, b.z - V.z))[0]; if (s) spawnGrill(s); return s; },
 };

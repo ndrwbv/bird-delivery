@@ -17,8 +17,8 @@
      CITY.party(done?)       — праздник (отладка — показать ещё раз)
      CITY.picker(done, start) — выбор, где работать; done(true) — выбрали, done(false) — «назад»
      CITY.nearest(x, z)      — номер ближайшей по дорогам пиццерии (режим «весь город»)
-     CITY.unlockAll()        — ТЕСТ: открыть все районы (кнопка в настройках — перед публикацией
-                               убрать или спрятать за ?debug, см. game.js renderSettings)
+     CITY.unlockAll()        — ТЕСТ: открыть все районы (кнопка в настройках; в релизной
+                               сборке её нет, только с ?debug — game.js testTools)
      CITY.root() / CITY.back() — открытое окно (геймпад, клавиатура: career.js padRoot / back) */
 import './cityopen.css';
 import { t, N_ } from '../i18n/index.js';
@@ -207,7 +207,7 @@ export function nearest (px, pz) {
   return best.i;
 }
 
-/* ТЕСТ: открыть все районы (кнопка в настройках). Перед публикацией — убрать или спрятать за ?debug */
+/* ТЕСТ: открыть все районы (кнопка в настройках; в релизной сборке её нет, только с ?debug — game.js testTools) */
 export function unlockAll () {
   if (!DIST.has()) return false;
   DIST.DEBUG.unlockAll();

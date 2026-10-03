@@ -2164,5 +2164,9 @@
  "{fest} · парковка ТЦ «{mall}», проход": "{fest} · “{mall}” mall parking, gate",
  "{fest}: отдать у прохода, внутрь не проехать": "{fest}: hand over at the gate, you can't drive inside",
  "вместо бургера": "instead of a burger",
- "День угнетения бургеров, уже в оплате": "Burger Oppression Day, already in the pay"
+ "День угнетения бургеров, уже в оплате": "Burger Oppression Day, already in the pay",
+ "Тормози, курьер. Приехали.": "Hold it, courier. End of the line.",
+ "Стой, курьер! Приехали.": "Stop, courier! End of the line.",
+ "Куда собрался? Стоять!": "Going somewhere? Stay put!",
+ "Куда? Стой!": "Where to? Stop!"
 }

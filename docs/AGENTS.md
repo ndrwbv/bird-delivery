@@ -43,7 +43,9 @@ npm run probe -- --eval=my-check.js --size=phone --errors
   `window.__ui`; без — панель, `window.__uilab`), [SANDBOX.md](SANDBOX.md) → «Песочница интерфейса»;
 - сборка — в `os.tmpdir()/bird-probe/<mode>.*`, только если `src/`, `public/`, `index.html`,
   `sandbox.html`, `pad.html`, `ui.html` или `vite.config.js` новее (+3—5 с); `--rebuild` — всегда,
-  `--no-build` — не собирать. `dist/` не трогает;
+  `--no-build` — не собирать. `dist/` не трогает; `--dir=папка` — готовая сборка вместо своей
+  (релиз: `BUILD_VERSION=0.0.99 npx vite build --mode steam --outDir папка` — в ней прячется то, что
+  только для тестов; вернуть — `?debug`, который probe и так добавляет);
 - каждый запуск — с чистым сохранением (сессия в памяти, своя userData): агенты не мешают
   друг другу и не трогают сохранение автора;
 - код выхода 1 — необработанная ошибка в странице, исключение в скрипте или игра не загрузилась.

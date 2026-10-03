@@ -6,6 +6,8 @@
 
    --mode=web|yandex|steam  сборка (web); собирается в os.tmpdir()/bird-probe, только если
                             исходники новее (--rebuild — всегда, --no-build — не собирать)
+   --dir=папка              готовая сборка вместо своей (напр. релизная: BUILD_VERSION=0.0.99 npx vite build
+                            --mode steam --outDir папка) — проверить то, что видно только в релизе
    --kids                   ?kids (детская версия; на yandex она и так)
    --map=seversk  --lang=ru  --q=a=1&b  — добавки к адресу игры (?debug&mute&nolb&nointro уже есть)
    --fresh                  первый запуск как у новичка: без ?nointro, гайд и учебный заказ не пропущены
@@ -77,7 +79,9 @@ function finish (code, report) {
 const { PRELUDE, INSTALL } = require('./probe-page.cjs');   // помощники скрипта и автопилот — общие с perf.cjs
 
 app.whenReady().then(async () => {
-  const b = ensureBuild(MODE, { force: has('rebuild'), skip: has('no-build') });
+  // --dir=папка — готовая сборка (например, релизная с BUILD_VERSION), без своей пересборки
+  const b = arg('dir') ? (fs.existsSync(path.join(path.resolve(arg('dir')), 'index.html')) ? { dir: path.resolve(arg('dir')) } : { error: 'нет index.html в ' + arg('dir') })
+    : ensureBuild(MODE, { force: has('rebuild'), skip: has('no-build') });
   if (b.error) { err('probe: сборка', MODE, 'не удалась:\n' + b.error); return finish(1, { ok: false, buildError: b.error }); }
   const tBuild = Date.now() - T0;
   const DIST = b.dir;

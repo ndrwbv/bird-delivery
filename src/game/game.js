@@ -8700,6 +8700,8 @@ function renderLangs () {
 const escHtml = s => String(s).replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';');
 const SHELL = Platform.id === 'steam' && Platform.shell ? Platform.shell : null;   // версия и обновления — только Стим/Электрон
 const UPD = { tag: null, msg: '', busy: false };
+// тестовые кнопки настроек: в локальных/dev-сборках — всегда, в релизной (CI задаёт BUILD_VERSION → __RELEASE__) — только с ?debug
+const testTools = () => !(typeof __RELEASE__ !== 'undefined' && __RELEASE__) || new URLSearchParams(location.search).has('debug');
 function renderSettings (focus) {
   elPanel.dataset.kind = 'settings'; elPanel.dataset.back = '';
   const row = (label, val, id, extra = '') => '<div class="set-row"><span>' + label + extra + '</span><button type="button" id="' + id + '"' + (id === focus ? ' autofocus' : '') + '>' + val + '</button></div>';
@@ -8712,8 +8714,8 @@ function renderSettings (focus) {
     (Platform.features.adult ? row($t('версия'), ADULT ? $t('взрослая 18+') : $t('детская'), 'set-ed') : '') +
     (SHELL ? row($t('версия игры'), UPD.busy ? $t('проверяю…') : $t('проверить обновления'), 'set-upd',
       ' <b class="set-tag">' + escHtml(UPD.tag || '—') + '</b>' + (UPD.msg ? '<small class="set-msg">' + UPD.msg + '</small>' : '')) : '') +
-    // ТЕСТ: «открыть все районы» — проверить праздник и «весь город». Перед публикацией убрать или спрятать за ?debug
-    (canReset && DISTRICTS ? row($t('районы') + ' <small class="set-msg">' + $t('для тестов') + '</small>', DIST.allOpen() ? $t('все открыты') : $t('открыть все районы'), 'set-unlock') : '') +
+    // ТЕСТ: «открыть все районы» — проверить праздник и «весь город». В релизе (BUILD_VERSION, __RELEASE__) нет, с ?debug — есть
+    (canReset && DISTRICTS && testTools() ? row($t('районы') + ' <small class="set-msg">' + $t('для тестов') + '</small>', DIST.allOpen() ? $t('все открыты') : $t('открыть все районы'), 'set-unlock') : '') +
     (canReset ? '<button type="button" id="set-reset" class="set-danger">' + $t('сбросить прогресс') + '</button>' : '') +
     // единственная подпись OSM в игре (лицензия ODbL требует) — в самом низу, мелко, но читаемо
     '<div class="pn-n set-cred">' + $t('карта — © участники OpenStreetMap, лицензия ODbL. Рельеф — SRTM (NASA).') + '</div>';

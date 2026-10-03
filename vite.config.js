@@ -9,6 +9,8 @@ const buildLabel = () => {
   try { return 'dev-' + execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); }
   catch { return 'dev'; }
 };
+// релизная сборка — та, где CI задал BUILD_VERSION: в ней прячем тестовые кнопки (__RELEASE__, вернуть — ?debug)
+const isRelease = () => !!(process.env.BUILD_VERSION || '').trim();
 
 // Яндекс Игры: SDK v2 грузится с их домена по /sdk.js — классический скрипт в head: модуль игры (defer) выполнится после него.
 // В dev без sdk-dev-proxy отдаём пустышку, чтобы не было 404; тогда yandex.js берёт yandex-mock.js.
@@ -23,7 +25,7 @@ const yandexSdk = () => ({
 export default defineConfig(({ mode }) => ({
   base: './',
   plugins: mode === 'yandex' ? [yandexSdk()] : [],
-  define: { __BUILD__: JSON.stringify(buildLabel()) },
+  define: { __BUILD__: JSON.stringify(buildLabel()), __RELEASE__: JSON.stringify(isRelease()) },
   build: {
     target: 'es2022', outDir: 'dist/' + mode, assetsInlineLimit: 0, sourcemap: false, emptyOutDir: true,
     // sandbox.html — песочница для проверки механик (docs/SANDBOX.md): в web и Стиме есть, в Яндекс не попадает.
