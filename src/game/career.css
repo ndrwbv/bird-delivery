@@ -243,6 +243,10 @@ body:has(#cr-spend:not([hidden])) .hud, body:has(#cr-spend:not([hidden])) #ctrls
 .dep-close { padding: 10px 22px; }
 @media (max-width: 560px) { .dep-main { flex-direction: column; align-items: center; } .dep-lever { display: none; } }
 .dep-g { font-size: clamp(9px, 1.2vw, 14px); color: #ffd0e8; margin-top: -6px; }
+/* совет Лёхи Арбуза (heroquests.js) и его итог после прокрутки */
+.dep-tip { font-size: clamp(10px, 1.3vw, 15px); color: #a8f0a0; text-shadow: 2px 2px 0 #1f4a24; text-align: center; }
+.dep-tip[hidden] { display: none; }
+#cr-dep .dep-hq { color: #a8f0a0; font-size: .85em; }
 .dep-stage { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 #cr-dep .dep-res { min-height: 30px; text-align: center; line-height: 1.6; }
 /* красное или чёрное: колесо с указателем сверху */

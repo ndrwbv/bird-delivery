@@ -69,5 +69,9 @@ Platform = {
 - `yandex.js` в `init()` запрещает выделение текста, контекстное меню и перетаскивание
   (`hardenPage()` из `common.js`) — требование модерации.
 - Таблица Яндекса: лидерборд с техническим именем `shift` (`LB_NAME`) создаётся в консоли руками.
+- Таблица Стима: `BEST_SHIFT` (`steam.js`, мост `electron/steamlb.cjs`), `leaderboard.submit` пишет и в
+  Стим, и в локальную; `top/mine` — из Стима, без ответа — локальная. Сверх контракта —
+  `Platform.steam.leaderboard.upload/top/friends/around` (null — Стим не ответил), `leaderboard.last`,
+  `leaderboard.friends()`, `leaderboard.local`. Без Стима — `?mock-steam` (`steam-mock.js`). docs/STEAM.md §4.2.
 - Проверка без Яндекса: `npm run dev:yandex` → заглушка `yandex-mock.js`
   (`?mock-auth`, `?mock-old-lb`, `?mock-noads`, `?mock-fail`, `?lang=de`).

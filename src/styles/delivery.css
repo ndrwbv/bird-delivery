@@ -1211,15 +1211,18 @@ body:has(#over:not([hidden])) .hud, body:has(#over:not([hidden])) #ctrls { visib
   .tp-right button { width: 62px; height: 62px; }
   .tp-right .tp-gas { width: 80px; height: 80px; }
 }
-/* радар — в правом верхнем углу, без кольца нитро (оно на кнопке);
-   деньги и «закончить смену» — столбиком под ним, пауза — ниже */
+/* радар — в правом верхнем углу, без кольца нитро (оно на кнопке); пауза — сразу под радаром
+   (раньше висела поверх часов «до конца смены»: высота столбика под радаром меняется —
+   строка «до конца заказа», щит, — а пауза стояла на постоянной высоте);
+   деньги, часы и «закончить смену» — столбиком под паузой, боком — слева от радара */
 body.touch #radar { left: auto; right: max(10px, env(safe-area-inset-right)); bottom: auto; top: max(10px, env(safe-area-inset-top)); width: 96px; }
 html[data-map="moscow"] body.touch #radar, body.touch #radar { padding: 0; border: 3px solid #33210c; background: #1d2440; box-shadow: 0 4px 12px rgba(0, 0, 0, .35); }
-body.touch #hud-right { top: calc(max(10px, env(safe-area-inset-top)) + 106px); right: max(10px, env(safe-area-inset-right)); }
-body.touch #ctrls { bottom: auto; top: calc(max(10px, env(safe-area-inset-top)) + 186px); right: max(10px, env(safe-area-inset-right)); transform: none; flex-direction: column; }
+body.touch #hud-right { top: calc(max(10px, env(safe-area-inset-top)) + 142px); right: max(10px, env(safe-area-inset-right)); }
+body.touch #ctrls { bottom: auto; top: calc(max(10px, env(safe-area-inset-top)) + 104px); right: max(10px, env(safe-area-inset-right)); transform: none; flex-direction: column; }
+/* часы заказа стоя — по центру места слева от радара, а не экрана (иначе краем на радаре) */
+@media (max-width: 700px) and (orientation: portrait) { body.touch #timewrap { left: calc((100% - 106px) / 2); } }
 @media (max-height: 460px) {                                    /* боком: столбик — слева от радара */
   body.touch #hud-right { top: max(10px, env(safe-area-inset-top)); right: calc(max(10px, env(safe-area-inset-right)) + 108px); }
-  body.touch #ctrls { top: calc(max(10px, env(safe-area-inset-top)) + 70px); right: calc(max(10px, env(safe-area-inset-right)) + 108px); }
 }
 body.touch #nos, body.touch #joy { display: none !important; }
 body.touch #hud-right #endshift { margin-top: 110px; }
@@ -1236,7 +1239,8 @@ body.touch #hud-right #endshift { margin-top: 8px; }
 
 /* телефон: подсказки — над кнопками руля и педалей, а не на них */
 body.touch #toast { bottom: calc(max(16px, env(safe-area-inset-bottom)) + 196px); white-space: normal; width: min(92vw, 360px); text-align: center; line-height: 1.6; }
-@media (max-height: 460px) { body.touch #toast { bottom: auto; top: 44px; } }
+/* боком: подсказка — под часами заказа, между табличкой курьеров и столбиком кошелька */
+@media (max-height: 460px) { body.touch #toast { bottom: auto; top: 44px; width: min(92vw, 360px, calc(100vw - 420px)); } }
 
 /* телефон: подробная карта — на весь экран; тянуть пальцем — двигать, щипок — зум;
    открывается вокруг тебя (game.js, setFullMap) */

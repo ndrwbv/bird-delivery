@@ -8,6 +8,7 @@
      --steam           считать, что запущены из Steam (обновления с GitHub выключены)
      --no-update       не проверять обновления с GitHub
      --steam-overlay   попытаться включить оверлей Steam (steamworks.js, in-process-gpu)
+     --no-steam-lb     без таблиц лидеров Стима (только локальная) — если они мешают
      --no-vsync        кадры без ожидания вертикальной развёртки и без ограничения 60 fps —
                        проверка плавности на Deck (docs/STEAM.md, «Производительность»)
    Сохранения — localStorage рендерера, он лежит в userData (путь закреплён ниже). */
@@ -72,14 +73,40 @@ function steamAppId() {
   }
   return undefined;
 }
+/* steamworks.js в init() сам заводит setInterval(runCallbacks, 33 мс) — ловим этот таймер,
+   чтобы таблицы лидеров (steamlb.cjs) могли на время своих запросов разбирать очередь Стима сами */
+let swTick = null, swTimer = null;
 function initSteam() {
   if (!SW) return;
   const id = steamAppId();
   if (!id && !steamLaunched()) { log('steam: нет App ID и не из Стима — пропускаю'); return; }
+  const realSI = global.setInterval;
+  global.setInterval = function (fn, ms, ...rest) {
+    const h = realSI.call(this, fn, ms, ...rest);
+    if (!swTick && typeof fn === 'function') { swTick = fn; swTimer = h; }
+    return h;
+  };
   try { steam = SW.init(id); log('steam: ок, app', steam.utils.getAppId(), 'deck', steam.utils.isSteamRunningOnSteamDeck()); }
   catch (e) { steam = null; log('steam: init не удался:', e.message); }
+  finally { global.setInterval = realSI; }
 }
 initSteam();
+
+/* ─── таблицы лидеров Стима (electron/steamlb.cjs, docs/STEAM.md §4.2) ───
+   koffi + steam_api из steamworks.js. Не поднялось (нет koffi, нет Стима, --no-steam-lb) —
+   игра берёт локальную таблицу. Очередь Стима: пока таблица ждёт ответа — разбирает она,
+   иначе steamworks.js, как раньше. Открыта экранная клавиатура — всегда steamworks.js. */
+let LB = null, textOpen = false;
+if (steam && swTick && !has('--no-steam-lb')) {
+  try { LB = require('./steamlb.cjs').create({ log }); } catch (e) { LB = null; log('lb:', e.message); }
+  if (LB) {
+    clearInterval(swTimer);
+    setInterval(() => {
+      try { if (LB.busy() && !textOpen) LB.pump(); else swTick(); }
+      catch (e) { log('steam: очередь:', e.message); }
+    }, 1000 / 30);
+  }
+}
 if (steam && has('--steam-overlay')) { try { SW.electronEnableSteamOverlay(); } catch (e) { log('overlay:', e.message); } }
 
 const safe = fn => { try { return fn(); } catch (e) { log('steam:', e.message); return null; } };
@@ -91,7 +118,19 @@ ipcMain.on('steam:boot', e => {
     launched: steamLaunched(),
     lang: steam ? safe(() => steam.apps.currentGameLanguage()) || '' : '',
     name: steam ? safe(() => steam.localplayer.getName()) || '' : '',
+    lb: !!LB,                                      // таблицы лидеров Стима работают
   };
+});
+// таблица лидеров: null — Стим не ответил (игра возьмёт локальную)
+ipcMain.handle('steam:lbUpload', async (e, name, score, details) => {
+  if (!LB) return null;
+  try { return await LB.upload(String(name), Math.round(+score || 0), Array.isArray(details) ? details : []); }
+  catch (err) { log('lb upload:', err.message); return null; }
+});
+ipcMain.handle('steam:lbEntries', async (e, name, kind, from, to) => {
+  if (!LB) return null;
+  try { return await LB.entries(String(name), String(kind), from | 0, to | 0); }
+  catch (err) { log('lb entries:', err.message); return null; }
 });
 ipcMain.handle('steam:achievement', (e, id) => !!(steam && safe(() => steam.achievement.activate(String(id)))));
 ipcMain.handle('steam:achieved', (e, id) => !!(steam && safe(() => steam.achievement.isActivated(String(id)))));
@@ -102,8 +141,10 @@ ipcMain.handle('steam:richPresence', (e, k, v) => { if (steam) safe(() => steam.
 // экранная клавиатура Steam (Big Picture / Deck): вернёт текст или null, если отменили или не вышло
 ipcMain.handle('steam:textInput', async (e, desc, max, text) => {
   if (!steam) return null;
+  textOpen = true;                                 // её колбэк ждёт steamworks.js — очередь не трогаем
   try { return await steam.utils.showGamepadTextInput(0, 0, String(desc || ''), max || 24, text || ''); }
   catch (err) { log('textInput:', err.message); return null; }
+  finally { textOpen = false; }
 });
 
 /* ─── обновление с GitHub ───

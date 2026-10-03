@@ -32,9 +32,14 @@ import * as SEAS from './seasons.js';
 import * as LIFE from './life.js';               // парочки, богачи, графитисты, змеи и дроны в парках
 import * as WORLD from './world.js';
 import * as SL from './streetlamps.js';
+import * as PAINT from './citypaint.js';         // дома в цвет по номеру, муралы на торцах (citypaint.js)
+import * as BB from './billboards.js';            // щиты со смешной рекламой у больших дорог (billboards.js)
 import * as CARL from './carlights.js';         // огни машины игрока: стоп-сигналы, поворотники, задний ход (carlights.js)         // фонари: все сбиваются, шары и консоли, частный сектор (streetlamps.js)
 import * as JUNK from './junk.js';              // остановки ломаются, мусор у подъездов, контейнеры (junk.js)             // плитка, аллеи; в карьере — мусор, бандиты, особняки, шашлыки
 import * as MAFIA from './mafia.js';             // мафиози у адреса: предупреждает, потом стреляет (детская — кидается помидорами)
+import * as HEROES from './heroes.js';           // герои города: Лёха, Жека, Игорёк, Стёпа, Настюша, Ариша, Андрюша — места и реплики
+import * as HB from './horsebox.js';             // коневозки в потоке: прицеп за машиной, конь в окне (horsebox.js)
+import * as FLIRT from './flirt.js';            // взрослая: клиентка изредка заигрывает при вручении, курьер отказывает (flirt.js)
 import * as FAUNA from './fauna.js';             // лоси, лисы и зайцы в лесах; «лось на дороге!» (fauna.js)
 import * as CATS from './cats.js';               // продухи подвалов и коты на крышах и во дворах (cats.js)
 import * as NIGHT from './nightlife.js';         // взрослая: девушки у обочины ночью, стрип-клуб «Клубничка» (nightlife.js)
@@ -58,6 +63,7 @@ import * as SC from './shiftcash.js';             // карьера: пачка 
 import * as HITS from './hits.js';               // сила удара по людям: упал и встал / лежит в луже / разорвало; самокат отдельно
 import * as FIRST from './intro.js';             // вступление первого запуска: пиццерия, Степан, машина (катсцена «как в ГТА»)
 import * as ACH from './achievements.js';          // достижения Стима: таблица, счётчики, вызов моста (achievements.js, docs/STEAM.md)
+import * as BOARD from './board.js';               // таблица рекордов «лучшая смена» в Стим-сборке (board.js, docs/STEAM.md §4.2)
 import * as CL from '../platform/crashlog.js';   // журнал ошибок, предохранитель шагов мира, сторож зависаний (docs/CRASHES.md)
 
 /* Сохранения — через площадку (облако Яндекса / localStorage). Значения
@@ -2497,8 +2503,9 @@ function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch) {
   } else {
     const shop = k === 'shop' || k === 'pub' && lv <= 2;
     const winW = k === 'pub' ? 2.0 : 1.3, step = k === 'pub' ? 3.6 : 3.0;
+    const mw = INTRO ? null : PAINT.mural(b, walls, base, h, lv, arch, { inHouse, nearestRoad });   // мурал на торце — там без окон (citypaint.js)
     for (const w of walls) {
-      if (w.len < 4.5) continue;
+      if (w.len < 4.5 || w === mw) continue;
       const cols = Math.max(1, Math.floor((w.len - 1) / step));
       const pad = (w.len - cols * step) / 2;
       let f0 = 0;
@@ -2742,7 +2749,7 @@ function osmBuildings (skip) {
     const lv = b.lv || (area > 1200 ? 5 : area > 600 ? 4 : area > 220 ? 2 : 1);
     const h = b.k === 'gar' ? hHi + 2.7 : hHi + 3.15 * lv + 1.1;
     const seed = Math.abs(Math.round(cx * 7 + cz * 13));
-    const hex = b.col || (b.k === 'off' ? OFFICE_WALLS[seed % OFFICE_WALLS.length]
+    const hex = PAINT.wallHex(b) || b.col || (b.k === 'off' ? OFFICE_WALLS[seed % OFFICE_WALLS.length]   // жилые — палитра по номеру дома (citypaint.js)
       : KIND_WALL[b.k] || WALLS[seed % WALLS.length]);
     b._hex = hex;
 
@@ -3593,6 +3600,12 @@ const roadApi = () => ({
   get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get tG () { return tG; },
 });
 let RL_API = null;
+/* что нужно billboards.js (щиты с рекламой) */
+const bbApi = () => ({
+  scene, CITY, ADULT, LIT, box, obb, groundH, inHouse, inBounds, nearestRoad, roadWidth,
+  get ENV () { return ENV; },
+});
+let BB_API = null;
 /* что нужно citybits.js (забор, КПП, рельсы, крыши, купола, вывески ТЦ) */
 /* что нужно pizzeria.js: ламповый фасад и парковка курьеров */
 const pizzaApi = () => ({
@@ -3632,12 +3645,28 @@ const mafiaApi = () => ({
   reward: (n, title) => { const v = CAREER ? n : Math.round(n / ECON.MONEY_K); S.money += v; if (!S.freeRun) addWallet(v); popBonus(title, '+' + money(v)); },
 });
 let MAFIA_API = null;
+/* что нужно heroes.js (герои города: места, реплики, сбить) */
+const heroesApi = () => ({
+  V, S, scene, CAREER, ADULT, CAR_L, CAR_W, Store, CITY, PITCHES, BENCHES, PIZZERIAS, makeHuman, dropMesh, gibHuman, groundH, curbAt,
+  inHouse, inBounds, nearestRoad, pushOut, emote, fxAdd, puffGeo, Snd,
+  garages: () => (CAREER ? AUTO.garages() : []), hookahSpots: () => HK.spots(),
+  onRunOver: () => { S.people++; Snd.squish(); },
+  get PIZZA () { return PIZZA; },
+});
+let HEROES_API = null;
 /* что нужно fauna.js (лоси, лисы, зайцы в лесах) */
 const faunaApi = () => ({
-  V, S, scene, cam, CITY, CAR_L, CAR_W, groundH, inPoly, inHouse, inBounds, nearestRoad, toast, emote, Snd,
+  V, S, scene, cam, CITY, CAR_L, CAR_W, ADULT, groundH, inPoly, inHouse, inBounds, nearestRoad, toast, emote, sparks, sayBubble, Snd,
   hurt: (n, vn, x, z) => { ACH.add('moose'); hurtCar(n, vn, x, z); },   // зовётся только при ударе о лося
+  ram: (vn, x, z) => hurtCar(0.5, vn, x, z),      // лось боднул машину: половинка сердца и мятина (fauna.js RAM)
 });
 let FAUNA_API = null;
+/* что нужно horsebox.js (коневозки в потоке) */
+const hbApi = () => ({
+  V, S, scene, TRAFFIC, CAR_L, CAR_W, put, mergeGeos, surfaceAt, pushOut, sparks, puff, sayBubble, Snd,
+  hurt: (n, vn, x, z) => hurtCar(n, vn, x, z),
+});
+let HB_API = null;
 /* что нужно cats.js (продухи подвалов, коты) */
 const catsApi = () => ({
   V, S, scene, cam, CITY, FLATM, ARCHES, WGRID, groundH, inHouse, inPoly, nearestRoad, hexOf, Snd,
@@ -3702,6 +3731,7 @@ function buildCity () {
     if (MAP.landmarks && MAP.landmarks.rink) RINK = LM.buildRink(landApi(), CITY.green, MAP.landmarks.rink);
   });
   tm('roadlife', () => RL.build(roadApi()));      // знаки и заборы (roadlife.js) — до smashBuild
+  if (!INTRO) tm('billboards', () => BB.build(bbApi()));   // щиты с рекламой у больших дорог (billboards.js)
   if (CAREER) tm('cars', () => { BUILD_T.carsInfo = AUTO.build(); });   // ямы в статику дорог, гараж Дяди Жени (cars.js)
   tm('yard', () => { osmPitches(); osmYardBits(); if (!INTRO) JUNK.yard(); osmVerandas(); SEAS.seasonYard(); smashBuild(); });
   tm('seasons', SEAS.seasonBuild);                // сугробы, ёлки, гирлянды
@@ -3710,6 +3740,7 @@ function buildCity () {
   const litG = LITM.mesh(WORLD.paveMat(SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }))));   // + узор плитки (world.js)
   const flatG = FLATM.mesh(new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }));
   BUILD_T.mesh = Math.round(performance.now() - tq);
+  PAINT.build(scene);                             // муралы — один меш (citypaint.js)
   /* Всю статику — сразу в видеокарту, одним кадром в крохотную цель:
      иначе куски, которых ещё не было в кадре, держат свои вершины и в
      памяти JS (onUpload их отпускает только после загрузки) */
@@ -6087,6 +6118,7 @@ function respawnTraffic (t) {
   const fresh = newCar(false);
   Object.assign(t, { mesh: fresh.mesh, model: fresh.model, taxi: fresh.taxi, hl: fresh.hl, cruise: fresh.cruise });
   scene.add(t.mesh);
+  HB.onRespawn(t);                                // старый прицеп долой, жребий на коневозку заново (horsebox.js)
   // сразу ставим на новое место: иначе в следующем кадре машина всё ещё
   // числится за полкилометра и рождается заново — и так каждый кадр
   placeTraffic(t, 120, 340);
@@ -6179,7 +6211,7 @@ function updateTraffic (dt) {
       // встречную не ждём: она в своей полосе
       if (!o.knock && !o.parked && Math.sin(o.h) * hx + Math.cos(o.h) * hz < -0.3) continue;
       // клинч — только с тем, кто стоит поперёк; в попутной очереди просто ждём
-      if (ahead(o.x, o.z, (t.hl || 2) + (o.hl || 2) + 1.4, 1.9, 15) &&
+      if (ahead(o.x, o.z, (t.hl || 2) + (o.hl || 2) + 1.4 + (o.tow || 0), 1.9, 15) &&   // tow — прицеп сзади (horsebox.js)
           Math.abs(Math.sin(o.h) * hx + Math.cos(o.h) * hz) < 0.85) blocked = true;
     }
     ahead(V.x, V.z, 6, 2.1, 15);
@@ -6696,7 +6728,7 @@ function svcDrive (t, dt) {
         if (fw > 0 && fw < 20 && Math.abs(-hz * dx + hx * dz) < 2.2 && o.speed < t.speed + 2) { t.passT = rand(1.8, 2.6); honk(t); continue; }
         continue;
       }
-      ahead(o.x, o.z, (t.hl || 2) + (o.hl || 2) + t.gap, 1.9, 16);
+      ahead(o.x, o.z, (t.hl || 2) + (o.hl || 2) + t.gap + (o.tow || 0), 1.9, 16);
     }
     // курьер стоит или плетётся впереди — злой объезжает и его, по встречке
     const vdx = V.x - t.x, vdz = V.z - t.z, vfw = vdx * hx + vdz * hz;
@@ -9549,11 +9581,13 @@ function paintBase (x, px, B) {
 
 /* Районы на большой карте: закрытые — затемнены, твой — обведён, границы —
    пунктиром, у каждой пиццерии — название района и сколько смен до следующего.
+   «Весь город» (cityopen.js): твои все районы — без жёлтой обводки и притушенных чужих.
    Слой рисуется раз и заново — когда сменил район или открылся новый (FM.dist = null). */
 function districtLayer () {
   const c = document.createElement('canvas');
   c.width = FM.base.width; c.height = FM.base.height;
-  const C = 30, cur = DIST.cur(), open = DIST.opened();
+  const whole = DIST.city(), C = 30, cur = whole ? -1 : DIST.cur(), open = DIST.opened();
+  { const lm = elFull.querySelector('.lg-mine'); if (lm) lm.parentElement.hidden = whole; }   // легенда «твой район»
   const x0 = BOUNDS.x0, z0 = BOUNDS.z0, nx = Math.ceil((BOUNDS.x1 - x0) / C), nz = Math.ceil((BOUNDS.z1 - z0) / C);
   const g = new Int8Array(nx * nz), city = new Uint8Array(nx * nz);
   for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) g[j * nx + i] = DIST.at(x0 + (i + 0.5) * C, z0 + (j + 0.5) * C);
@@ -9577,7 +9611,7 @@ function districtLayer () {
     const mx = m.getContext('2d'), img = mx.createImageData(nx, nz);
     for (let k = 0; k < nx * nz; k++) {
       const d = g[k];
-      if (d === cur || (d >= open) !== locked) continue;
+      if (d === cur || (whole && d < open) || (d >= open) !== locked) continue;
       img.data[k * 4] = 30; img.data[k * 4 + 1] = 24; img.data[k * 4 + 2] = 40;
       img.data[k * 4 + 3] = locked ? 170 : 50;
     }
@@ -9640,7 +9674,7 @@ function districtLayer () {
     const P = PIZZERIAS[i];
     if (!P) return;
     const px = fmX(P.x), pz = fmZ(P.z), locked = i >= open;
-    if (i !== cur) {
+    if (P !== PIZZA) {                              // своя — значком пиццерии; «весь город» — та, откуда едешь
       const r = fs * 0.35;
       x.fillStyle = locked ? '#7a7380' : '#f0522a';
       x.fillRect(px - r, pz - r, r * 2, r * 2);
@@ -10514,8 +10548,9 @@ function updateFly (dt) {
 
 /* ─────────────── таблица лидеров ───────────────
    Таблица — площадки: в Яндексе это их лидерборд (имя и место из профиля
-   игрока), в Стиме и локально — лучшие смены на этом устройстве. Сама игра
-   знает только Platform.leaderboard: submit, top и mine. */
+   игрока), в Стиме — таблица Стима BEST_SHIFT (без Стима — локальная), в web —
+   лучшие смены на этом устройстве. Сама игра знает только Platform.leaderboard:
+   submit, top и mine. Карьера (Стим) пишет смену через board.js. */
 
 const LB = {
   cache: null,
@@ -10950,6 +10985,7 @@ function stepanPerson () {
     STEPAN.desc = ADULT ? $t('заядлый кальянщик и бизнесмен — бизнес вот-вот будет') : $t('любитель самовара и бизнесмен — бизнес вот-вот будет');
     STEPAN.pos = STEPAN.desc;
     STEPAN.stepan = true;                       // вступление (intro.js) узнаёт его по этому флагу
+    Object.assign(STEPAN.look, HEROES.look('stepa'));   // тот же Стёпа Тугарев, что ходит по городу (heroes.js)
   }
   return STEPAN;
 }
@@ -11351,6 +11387,7 @@ function checkArrival (dt) {
       bundle: !!(o.ord && o.ord.bundle), allOnTime: o.stops.every(q => q.pay && !q.pay.late), urgent: !!(o.ord && o.ord.type === 'urgent') });
 
     handOver(st, onTime);
+    if (ADULT && !o.tut) FLIRT.onHand(st, onTime, { car: () => car });   // клиентка изредка заигрывает, курьер отказывает (flirt.js)
     // оплата — кучкой денег и чеком (popPay); в сюжетном заказе награду покажет катсцена
     const pp = st.pay;
     if (pp && !pp.story) {
@@ -12254,6 +12291,9 @@ if (CAREER) SC.init({ S, money });
 /* достижения (achievements.js): счётчики, Стим; смена — через onShiftStart/End карьеры */
 ACH.init({ career: CAREER, adult: ADULT, S, hour: () => (CAREER ? CAREERM.hour() : NaN) });
 if (CAREER) { CAREERM.onShiftStart(ACH.shiftStart); CAREERM.onShiftEnd(ACH.shiftEnd); }
+/* таблица рекордов Стима (board.js): смена карьеры — в таблицу; ?nolb — проверочный прогон, не пишем */
+BOARD.init({ nolb: new URLSearchParams(location.search).has('nolb'), level: () => levelOf(getXP()), money });
+if (CAREER) CAREERM.onShiftEnd(BOARD.shiftEnd);
 if (CAREER) CAREERM.init({ S, NOS, Snd, ADULT, get DAY_LEN () { return DAY_LEN; }, env: () => ENV, donated, money, wallet, addWallet, toast, popBonus, showChoice, hideChoice, hudHearts, isPlaying, countUp,
   Store: { get: Store.get, set: Store.set, flush: () => Platform.store.flush && Platform.store.flush() },
   choiceOpen: () => CH.opts.length > 0, endShift, rideOn, dropOrder: () => backToBase(), carChanged: () => { resetCar(); carStats(); },
@@ -12999,6 +13039,7 @@ function frameStep (now) {
   CL.step('props', updateProps, dt);
   CL.step('lamps', SL.step, dt);                                     // сбитые фонари падают и лежат (streetlamps.js)
   CL.step('traffic', updateTraffic, dt);
+  CL.step('horsebox', HB.step, dt, HB_API || (HB_API = hbApi()));   // коневозки: прицеп за машиной (horsebox.js)
   CL.step('peds', updatePeds, dt);
   CL.step('people', updatePeople, dt);
   CL.step('scoots', updateScoots, dt);
@@ -13008,6 +13049,7 @@ function frameStep (now) {
   CL.step('thief', updateThief, dt);
   CL.step('accidents', updateAccidents, dt);
   CL.step('roadlife', RL.step, dt, RL_API || (RL_API = roadApi()));    // пробки, ремонт, знаки, фары потока (roadlife.js)
+  CL.step('billboards', BB.step, dt, BB_API || (BB_API = bbApi()));   // смена рекламы на щитах (billboards.js)
   CL.step('rivals', updateRivals, dt);
   CL.step('verandas', updateVerandas, dt);
   CL.at.ph = 'orders';
@@ -13044,6 +13086,7 @@ function frameStep (now) {
   CL.step('life', LIFE.step, dt, LIFE_API);
   CL.step('world', WORLD.step, dt, WORLD_API || (WORLD_API = worldApi()));   // мусор, бандиты, шашлыки (world.js)
   CL.step('mafia', MAFIA.step, dt, MAFIA_API || (MAFIA_API = mafiaApi()));   // мафиози у адреса (mafia.js)
+  CL.step('heroes', HEROES.step, dt, HEROES_API || (HEROES_API = heroesApi()));   // герои города (heroes.js)
   CL.step('fauna', FAUNA.step, dt, FAUNA_API || (FAUNA_API = faunaApi()));   // лоси и звери в лесах (fauna.js)
   CL.step('cats', CATS.step, dt, CATS_API || (CATS_API = catsApi()));      // коты на крышах и у подвалов (cats.js)
   CL.step('ach', ACH.step, dt);                                              // достижения: опрос счётчиков (achievements.js)
@@ -13143,8 +13186,11 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) wi
   // песочница: сюжет, карта, сохранения, старт смены, кошелёк, читы
   STORY, STORY_DBG: STORY.DEBUG, MAP, Store, SBX, CARSM: AUTO, startRun, goRun, endShift, wallet, addWallet, hudHearts, marker, updateEnv, humanLod, get SPOTS_N () { return SPOTS.length; },
   DRIVERS, SMOKERS, NITRO_CANS, NOS, CREW_HOMES, CREW, WAR, warStart, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, PIGEONS, AMB, INCIDENTS, scare, RIVALS, FOES, THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, roadPath, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT, LOOT, XLIFE };
+if (window.__dlv) { window.__dlv.BOARD = BOARD; window.__dlv.Platform = Platform; }   // таблица рекордов Стима (board.js)
 if (window.__dlv) window.__dlv.crashlog = CL;        // журнал ошибок: entries(), text(), disabled() (docs/CRASHES.md)
 if (window.__dlv) Object.assign(window.__dlv, { pinFront, nearClient, PIN });   // пин перед клиентом, кто у клиента лишний (docs/ORDERS.md)
+if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)
+if (window.__dlv) Object.assign(window.__dlv, { HB: HB.DEBUG, FLIRT: ADULT ? FLIRT.DEBUG : null });   // коневозки, заигрывание (только взрослая)
 if (window.__dlv) { window.__dlv.SL = SL.DEBUG; window.__dlv.LAMP_SPOTS = LAMP_SPOTS; window.__dlv.smashHit = smashHit; window.__dlv.CARL = CARL.DEBUG; }   // фонари и огни машины
 // ?mapcheck: сводка проблем карты, столбики над ними, «]» — к следующей (mapworks.js)
 if (MAPCHECK) MAPW.debug(MAPFIX, MAPW_API || (MAPW_API = mapApi()));

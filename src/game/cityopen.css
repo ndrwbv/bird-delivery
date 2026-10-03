@@ -15,6 +15,7 @@
             animation: cy-pop .7s cubic-bezier(.2, 1.6, .4, 1) both, cy-wob 1.6s ease-in-out .7s infinite; }
 .cy-sub { font-size: clamp(10px, min(1.8vw, 2.8vh), 20px); color: #fff3d6; text-shadow: 2px 2px 0 #33210c; animation: cy-pop .5s .35s both; }
 .cy-tolik { margin: 0; text-align: left; animation: cy-pop .5s .6s both; }
+.cy-tolik .en-tb p { font-size: clamp(11px, min(1.9vw, 3.2vh), 20px); }
 .cy-perks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; animation: cy-pop .5s .9s both; }
 .cy-perks li { font-size: clamp(8px, min(1.2vw, 2vh), 13px); line-height: 1.6; color: #b9c3e6; }
 .cy-perks li::before { content: '★ '; color: #ffd85e; }

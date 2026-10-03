@@ -160,6 +160,8 @@ function hitCheck (s) {
 
 /* на лавочке сейчас кальянщики — другим не садиться (клиент с пиццей, game.js afterStart) */
 export const busy = b => SPOTS.some(s => s.live && s.b === b);
+/* где сидят компании — герои города встают рядом (heroes.js) */
+export const spots = () => SPOTS;
 export function step (dt) {
   if (!A) return;
   const V = A.V;

@@ -7,6 +7,7 @@
      MENU.cam(cam, P, tG) — камера заставки
      MENU.modal()     — открытое окно (имя или выбор района: геймпад, клавиатура) или null; MENU.back() — закрыть
      Район (districts.js): кнопка «район: …» открывает список; открытые — выбрать, закрытые — сколько смен ещё
+     Таблица рекордов (board.js): кнопка только в Стим-сборке, окно — тоже modal()
 
    В Яндексе и Москве (?nocareer) модуль не работает: его зовёт только career.js. */
 import './menu.css';
@@ -14,6 +15,7 @@ import { t, tn } from '../i18n/index.js';
 import * as DIST from './districts.js';
 import * as CITY from './cityopen.js';
 import { DISTRICT, SHIFT, clock } from './econ.js';
+import * as BOARD from './board.js';
 
 let A = null, el = null, md = null, dm = null, nameCb = null, nameFirst = false;
 const $ = id => document.getElementById(id);
@@ -35,6 +37,7 @@ function build () {
         '<button type="button" class="crm-b crm-dist" data-a="district" hidden><b></b><span></span></button>' +
         '<button type="button" class="crm-b" data-a="garage"></button>' +
         '<button type="button" class="crm-b" data-a="ride"></button>' +
+        '<button type="button" class="crm-b" data-a="board" hidden></button>' +
         '<button type="button" class="crm-b" data-a="settings"></button>' +
         '<button type="button" class="crm-link" data-a="collect"></button>' +
       '</nav>' +
@@ -47,13 +50,14 @@ function build () {
 }
 
 function act (a) {
-  if ((md && !md.hidden) || (dm && !dm.hidden)) return;
+  if ((md && !md.hidden) || (dm && !dm.hidden) || BOARD.root()) return;
   A.Snd.boot && A.Snd.boot();
   if (a === 'go') A.menuGo();
   else if (a === 'district') openDistricts();
   else if (a === 'ride') A.menuRide();
   else if (a === 'garage') A.garage(() => show());
   else if (a === 'collect') A.openCollect();
+  else if (a === 'board') BOARD.open();
   else if (a === 'settings') A.openSettings();
   else if (a === 'quit') A.quit();
 }
@@ -79,6 +83,9 @@ export function show () {
   el.querySelector('[data-a="garage"]').textContent = t('гараж');
   el.querySelector('[data-a="ride"]').textContent = t('покататься');
   el.querySelector('[data-a="settings"]').textContent = t('настройки');
+  const bd = el.querySelector('[data-a="board"]');
+  bd.textContent = t('таблица рекордов');
+  bd.hidden = !BOARD.on();                        // таблица «лучшая смена» — только Стим-сборка (board.js)
   el.querySelector('[data-a="collect"]').textContent = t('мои находки');
   const q = el.querySelector('[data-a="quit"]');
   q.textContent = t('выйти');
@@ -208,11 +215,12 @@ function saveName () {
   const cb = nameCb; nameCb = null;
   if (cb) cb(v);
 }
-export const modal = () => (md && !md.hidden && !md.closest('[hidden]') ? md : dm && !dm.hidden && !dm.closest('[hidden]') ? dm : null);   // заставку спрятали (поехали) — окна нет
+export const modal = () => (md && !md.hidden && !md.closest('[hidden]') ? md : dm && !dm.hidden && !dm.closest('[hidden]') ? dm : BOARD.root());   // заставку спрятали (поехали) — окна нет
 /* назад: из настроек — отмена; при первом запуске окно не закрывается, ждём имя */
 export function back () {
   if (!modal()) return false;
   if (modal() === dm) { closeDistricts(); return true; }
+  if (modal() === BOARD.root()) return BOARD.close();
   if (nameFirst) return true;
   md.querySelector('input').blur();
   md.hidden = true;

@@ -26,6 +26,8 @@ import { farEarned } from './orders.js';
 import * as END from './shiftend.js';
 import * as CHAT from './chat.js';
 import * as ACH from './achievements.js';          // достижения: «Всё на красное» в «депнуть» (achievements.js)
+import * as HEROES from './heroes.js';           // теннисисты в «депнуть» — герои города: те же лица
+import * as HQ from './heroquests.js';           // герои, этап 2: совет Лёхи на ставке, «наоборот» Игорька, Жека про машину
 import { makePadMenu } from '../input/padmenu.js';
 import { t, tn, lang } from '../i18n/index.js';
 
@@ -103,6 +105,7 @@ export function init (api) {
   GARAGE.init({ cars: carsApi, A, stars, onChange: () => { refreshWallet(); refreshTabs(); } });
   api.crew = crewBoard; api.garage = openGarage;       // getter-ы api (DAY_LEN) не трогаем: они живые
   MENU.init(api);
+  HQ.init({ A, cars: carsApi, depGame, shiftN: () => SH.n, shiftOn: () => SH.on });
   addEventListener('keydown', onKey, true);
   addEventListener('keyup', onKeyUp, true);
   addEventListener('pointerdown', () => KB.clear(), true);        // мышью — клавиатурная подсветка уходит
@@ -797,6 +800,8 @@ function paneDonate (p, k) {
      slot     — однорукий бандит: три барабана, три семёрки — ×2
      roulette — красное или чёрное: выбираешь цвет, крутится колесо (есть зеро) — ×2
      tennis   — Андрюша, Игорёк или Настюша: выбираешь, кто выиграет матч — ×3
+   Исход решает heroquests.js: совет Лёхи Арбуза (встретил его в смену) — ± к удаче на первую
+   прокрутку, в теннисе — «наоборот» Игорька (прогноз на матч сбывается наоборот в 85 %).
    Ставка общая: ползунок шагом SLOT.STEP, кнопки −/+ и ¼ · ½ · всё (сначала стоит
    заработанное за смену). Сколько ставишь — столько купюр высыпается кучей рядом,
    и строкой: «из кошелька −N ₽ · останется M ₽». «ДЕП» — купюры уезжают в игру.
@@ -823,7 +828,7 @@ function depBox () {
   md.id = 'cr-dep';
   md.hidden = true;
   md.innerHTML = '<div class="dep-box">' +
-    '<div class="dep-t"></div><div class="dep-g"></div>' +
+    '<div class="dep-t"></div><div class="dep-g"></div><div class="dep-tip" hidden></div>' +
     '<div class="dep-main"><div class="dep-stage"></div><div class="dep-pile"></div></div>' +
     '<div class="dep-res"></div>' +
     '<div class="dep-sum"><b></b><span></span></div>' +
@@ -868,7 +873,7 @@ function stageHTML (g) {
   // теннис: корт, мячик и три игрока — кого выберешь, за того и болеешь
   return '<div class="dep-court"><i class="dep-ball"></i><b class="dep-score">0 : 0</b></div><div class="dep-picks dep-players">' + TENNIS.map(p => {
     let face = '';
-    try { if (A.person && A.face) face = A.face(A.person({ seed: p.seed, fem: p.fem }), 64); } catch (e) { face = ''; }
+    try { if (A.person && A.face) face = A.face(HEROES.person(p.id) || A.person({ seed: p.seed, fem: p.fem }), 64); } catch (e) { face = ''; }   // тот же человек, что в городе (heroes.js)
     return '<button type="button" class="dep-pick dep-pl" data-p="' + p.id + '">' + (face ? '<img src="' + face + '" alt="">' : '<i></i>') + '<span>' + esc(t(p.name)) + '</span></button>';
   }).join('') + '</div>';
 }
@@ -885,6 +890,9 @@ function openDep () {
   md.querySelector('.dep-pile').innerHTML = '';
   md.querySelector('.dep-res').textContent = ''; md.querySelector('.dep-res').className = 'dep-res';
   md.querySelector('.dep-stage').innerHTML = stageHTML(GAME);
+  // совет Лёхи Арбуза (встретил его в эту смену) — строкой под названием игры (heroquests.js)
+  const tip = HQ.tipFor(GAME), tipEl = md.querySelector('.dep-tip');
+  tipEl.textContent = tip ? tip.text : ''; tipEl.hidden = !tip;
   md.querySelectorAll('.dep-pick').forEach(b => b.addEventListener('click', () => {
     if (SH.slot) return;
     PICK = b.dataset.p;
@@ -955,8 +963,9 @@ function spin () {
   SH.slot = true; SPINNING = true;
   DEP_SESSION++;
   const cfg = ECON.SLOT[GAME] || {};
-  const chance = GAME === 'tennis' ? 1 / TENNIS.length : cfg.win != null ? cfg.win : ECON.SLOT.WIN;
-  const win = (ECON.SLOT.FIRST_WIN && DEP_SESSION === 1) || Math.random() < chance;
+  // исход — в heroquests.js: совет Лёхи (± к удаче), в теннисе — «наоборот» Игорька
+  const R = HQ.roll({ game: GAME, pick: PICK, base: cfg.win != null ? cfg.win : ECON.SLOT.WIN, first: ECON.SLOT.FIRST_WIN && DEP_SESSION === 1 });
+  const win = R.win;
   A.addWallet(-st);
   const allIn = stepDown(A.wallet()) <= 0;        // поставил всё — для достижения ALL_IN (achievements.js)
   A.Store.flush();
@@ -969,19 +978,20 @@ function spin () {
   const finish = (txt) => {
     ACH.dep(win, allIn);                          // проиграл всё — «Всё на красное» (после анимации, не раньше)
     const res = md.querySelector('.dep-res');
+    const heroTxt = HQ.verdict(R).map(s => '<br><span class="dep-hq">' + esc(s) + '</span>').join('');   // «Лёха был прав!» / «Лёха опять слил»
     md.querySelector('.dep-pile').innerHTML = '';
     if (win) {
       const prize = st * gameMul(GAME);
       A.addWallet(prize);
       A.Store.flush();
-      res.innerHTML = esc(txt) + '<br>' + esc(t('×{k}! +{money}', { k: gameMul(GAME), money: A.money(prize - st) }));
+      res.innerHTML = esc(txt) + '<br>' + esc(t('×{k}! +{money}', { k: gameMul(GAME), money: A.money(prize - st) })) + heroTxt;
       res.className = 'dep-res win';
       md.classList.remove('spun');
       pile(BILLS_MAX, false);                      // выигрыш — полная куча обратно
       [0, 1, 2].forEach(i => setTimeout(() => A.Snd.coin(), i * 160));
       md.querySelector('.dep-sum b').textContent = '+' + A.money(prize);
     } else {
-      res.innerHTML = esc(txt) + '<br>' + esc(t('мимо · −{money}', { money: A.money(st) }));
+      res.innerHTML = esc(txt) + '<br>' + esc(t('мимо · −{money}', { money: A.money(st) })) + heroTxt;
       res.className = 'dep-res lose';
       A.Snd.fail && A.Snd.fail();
     }
@@ -994,7 +1004,7 @@ function spin () {
     refreshWallet(); refreshTabs();
   };
   if (GAME === 'roulette') spinWheel(md, win, finish);
-  else if (GAME === 'tennis') playMatch(md, win, finish);
+  else if (GAME === 'tennis') playMatch(md, win, finish, R.champ);
   else spinReels(md, win, finish);
 }
 function spinReels (md, win, finish) {
@@ -1045,9 +1055,9 @@ function spinWheel (md, win, finish) {
   }, 3350);
 }
 /* матч: мячик летает по корту, счёт тикает; побеждает выбранный (выигрыш) или другой */
-function playMatch (md, win, finish) {
+function playMatch (md, win, finish, champId) {
   const others = TENNIS.filter(p => p.id !== PICK);
-  const champ = win ? TENNIS.find(p => p.id === PICK) : others[(Math.random() * others.length) | 0];
+  const champ = TENNIS.find(p => p.id === champId) || (win ? TENNIS.find(p => p.id === PICK) : others[(Math.random() * others.length) | 0]);
   const court = md.querySelector('.dep-court'), score = md.querySelector('.dep-score');
   court.classList.add('play');
   let a = 0, b = 0, k = 0;

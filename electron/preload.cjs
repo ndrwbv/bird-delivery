@@ -2,7 +2,7 @@
    src/platform/steam.js работает на заглушках. */
 const { contextBridge, ipcRenderer } = require('electron');
 
-let boot = { available: false, deck: false, launched: false, lang: '', name: '' };
+let boot = { available: false, deck: false, launched: false, lang: '', name: '', lb: false };
 try { boot = ipcRenderer.sendSync('steam:boot') || boot; } catch (e) { /* — */ }
 const call = (ch, ...a) => ipcRenderer.invoke(ch, ...a);
 
@@ -30,5 +30,9 @@ contextBridge.exposeInMainWorld('birdSteam', {
     setStat: (name, value) => call('steam:setStat', name, value),
     richPresence: (key, value) => call('steam:richPresence', key, value),
     textInput: (desc, max, text) => call('steam:textInput', desc, max, text),   // → строка | null
+    // таблицы лидеров (electron/steamlb.cjs): lb — работают ли; ответы null — Стим не ответил
+    lb: !!boot.lb,
+    lbUpload: (name, score, details) => call('steam:lbUpload', name, score, details),            // → { ok, score, changed, rank, prev } | null
+    lbEntries: (name, kind, from, to) => call('steam:lbEntries', name, kind, from, to),         // kind: global | around | friends → [{ rank, score, details, steamId, name, me }] | null
   },
 });

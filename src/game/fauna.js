@@ -18,6 +18,20 @@
      почти весь ход. Медленнее — просто упёрся, лося не сдвинуть.
      Лось шатается, вокруг головы — звёздочки, и трусит прочь (5 с), потом снова пасётся.
      Ни крови, ни смерти — ни в детской, ни во взрослой версии.
+   Бодание (RAM, обе версии): раз в CD (90–180 с), первое — через FIRST (30–60 с) смены,
+     раз в TICK (1 с) с шансом P (30 %) рогатый лось, который пасётся в SEE (9–30 м) от
+     машины, замечает её (только пока едешь, не у клиента): AIM (1,3 с) стоит, разворачивается
+     к машине, опускает рога и фыркает; потом бежит SPEED (9 м/с ≈ 32 км/ч) до RUN (3,5 с),
+     доворачивая не быстрее TURN (0,6 рад/с) — отъедь вбок, и промахнётся. Достал — машину
+     толкает по ходу лося (вбок PUSH 9 м/с, вдоль кузова 40 % от этого; удар не в
+     середину — слегка разворачивает), −½ сердца (как лёгкий удар:
+     мятина, звук, искры), лось отступает обратно к своему месту (до HOME 10 с).
+     Удар об лося при бодании не считается «сбил лося».
+   Любовь (LOVE, только взрослая): раз в CD (120–240 с), первая — через FIRST (50–100 с),
+     если есть пасущийся лось в VIEW (25–200 м) от тебя: второй лось (рядом в NEAR 40 м или
+     приходит из леса в 10–20 м) подходит сзади и пристраивается — ритмичное покачивание
+     DUR (4–6 с), над парой сердечки. Подъехал ближе SHOO (16 м) — пузырь «не мешай!»
+     (не чаще раза в 6 с). Задел машиной — всё прекращается. Без анатомии.
    Лиса и заяц (SMALL): до SMALL.ON (3) рядом, в тех же лесах (заяц вдвое чаще лисы).
      Видят машину ближе FLEE (14 м) — удирают; задел — кувыркнулся и убежал, урона нет.
 
@@ -33,6 +47,8 @@ export const FAUNA = {
   CROSS: { FIRST: [45, 90], CD: [80, 160], RETRY: 6, AHEAD: [60, 150], NEAR: 25, SPEED: 1.3, STOP: 0.5, STAND: [2, 4] },
   HIT: { MIN: 3, BASE: 3, K: 0.12, MAX: 2, KEEP: 0.3, STAGGER: 5 },
   SMALL: { ON: 3, R: [50, 220], FAR: 360, SHOW: 260, FLEE: 14, HARE: 0.67 },
+  RAM: { FIRST: [30, 60], CD: [90, 180], TICK: 1, P: 0.3, SEE: [9, 30], AIM: 1.3, SPEED: 9, TURN: 0.6, RUN: 3.5, REACH: 1.1, PUSH: 9, ALONG: 0.4, HOME: 10 },
+  LOVE: { FIRST: [50, 100], CD: [120, 240], RETRY: 10, VIEW: [25, 200], NEAR: 40, COME: 1.5, DUR: [4, 6], RATE: 1.7, WAIT: 25, SHOO: 16, SAY: 6 },
 };
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -40,7 +56,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 let A = null;
 const LIST = [];                     // живые звери
 let FOR = null;                      // леса: { p, x0, x1, z0, z1 }
-const ST = { spawnM: 3, spawnS: 2, cross: -1, hitToast: 0 };
+const ST = { spawnM: 3, spawnS: 2, cross: -1, hitToast: 0, ram: -1, love: -1 };
 const LIVE = ['drive', 'back', 'handover', 'side'];
 
 /* ── модели: коробки с плоским светом, как всё в игре ── */
@@ -85,7 +101,7 @@ function mooseModel () {
     part(head, 0.8, 0.08, 0.55, '#d6c095', s * 0.62, 0.42, -0.05, 0, 0, s * 0.3);       // лопата
     for (const tz of [0.18, -0.02, -0.24]) part(head, 0.08, 0.26, 0.08, '#d6c095', s * 0.95, 0.62, tz, 0, 0, s * 0.35);   // отростки
   }
-  return { g, legs: L, neck, head, step: 1.15, amp: 0.38 };
+  return { g, legs: L, neck, head, step: 1.15, amp: 0.38, male };
 }
 function foxModel () {
   const g = new THREE.Group(), o = '#d9682a';
@@ -166,6 +182,7 @@ function add (kind, x, z, f, h) {
     v: 0, mode: 'graze', mt: rand(1, 5), chk: 0, ph: rand(0, 6), kx: 0, kz: 0, roll: 0, stun: 0, hitCd: 0,
     big: kind === 'moose', rad: kind === 'moose' ? FAUNA.MOOSE.RAD : 0.35,
   };
+  a.g.rotation.order = 'YXZ';                      // наклон (x) — вдоль тела, после поворота
   a.g.position.set(x, a.y, z); a.g.rotation.y = a.h;
   A.scene.add(a.g);
   LIST.push(a);
@@ -177,7 +194,7 @@ function drop (a) {
 }
 export function clear () {
   for (let i = LIST.length - 1; i >= 0; i--) drop(LIST[i]);
-  ST.cross = -1;
+  ST.cross = ST.ram = ST.love = -1;
 }
 
 /* ── «лось на дороге!»: найти дорогу у леса впереди и выпустить на неё лося ── */
@@ -213,6 +230,8 @@ function think (a, dt, dCar) {
     a.mode = 'flee'; a.mt = rand(1.8, 2.6);
     a.h = Math.atan2(a.x - A.V.x, a.z - A.V.z) + rand(-0.6, 0.6);
   }
+  if (a.mode === 'wait' || a.mode === 'court' || a.mode === 'love') { loveStep(a, dt, dCar); return; }
+  if (a.mode === 'aim' || a.mode === 'charge' || a.mode === 'home') { ramStep(a, dt); return; }
   if (a.mode === 'cross') {
     const dx = a.ex - a.x, dz = a.ez - a.z, d = Math.hypot(dx, dz);
     a.h = Math.atan2(dx, dz);
@@ -244,6 +263,130 @@ function think (a, dt, dCar) {
   }
 }
 
+/* ── бодание: лось замечает машину, опускает рога и бежит на неё ── */
+const turnTo = (h, want, max) => { let d = want - h; d = Math.atan2(Math.sin(d), Math.cos(d)); return h + clamp(d, -max, max); };
+function startRam (a) {
+  a.mode = 'aim'; a.mt = FAUNA.RAM.AIM; a.v = 0; a.hit = 0; a.x0 = a.x; a.z0 = a.z;   // сюда вернётся
+  if (A.emote) A.emote(a.x, 2.8, a.z, 'angry', 2);
+  if (A.Snd && A.Snd.noise) { A.Snd.noise(0.35, 0.16); A.Snd.blip(75, 0.3, 'sawtooth', 0.08); }   // фыркнул
+}
+function tryRam () {
+  const R = FAUNA.RAM, V = A.V;
+  for (const a of LIST) {
+    if (!a.big || !a.male || a.love || (a.mode !== 'graze' && a.mode !== 'walk')) continue;
+    const d = Math.hypot(a.x - V.x, a.z - V.z);
+    if (d < R.SEE[0] || d > R.SEE[1]) continue;
+    startRam(a);
+    return true;
+  }
+  return false;
+}
+function ramStep (a, dt) {
+  const R = FAUNA.RAM, V = A.V, want = Math.atan2(V.x - a.x, V.z - a.z);
+  a.mt -= dt;
+  if (a.mode === 'aim') {
+    a.v = 0; a.h = turnTo(a.h, want, 3 * dt);
+    if (a.mt <= 0) { a.mode = 'charge'; a.mt = R.RUN; a.h = want; }
+    return;
+  }
+  if (a.mode === 'charge') {
+    a.v = R.SPEED; a.h = turnTo(a.h, want, R.TURN * dt);
+    const ahead = A.inHouse(a.x + Math.sin(a.h) * 2, a.z + Math.cos(a.h) * 2, 0.3);
+    if (a.mt <= 0 || a.hit || ahead) { a.mode = 'home'; a.mt = R.HOME; }
+    return;
+  }
+  // home: трусцой обратно на своё место
+  const dx = a.x0 - a.x, dz = a.z0 - a.z;
+  a.h = turnTo(a.h, Math.atan2(dx, dz), 2.5 * dt); a.v = FAUNA.MOOSE.TROT;
+  if (Math.hypot(dx, dz) < 2 || a.mt <= 0 || A.inHouse(a.x + Math.sin(a.h) * 1.5, a.z + Math.cos(a.h) * 1.5, 0.3)) { a.mode = 'graze'; a.mt = rand(3, 7); a.v = 0; }
+}
+function ramHit (a, hx, hz) {
+  const R = FAUNA.RAM, V = A.V, dx = Math.sin(a.h), dz = Math.cos(a.h);
+  a.hit = 1; a.hitCd = 1.2;
+  // вбок — полный толчок (сцепление гасит его за ~0,3 с: машину сдвигает на ~1 м), вдоль кузова — 40 %,
+  // иначе удар в зад/нос разгонял бы машину надолго
+  const fx = Math.sin(V.h), fz = Math.cos(V.h), along = dx * fx + dz * fz;
+  V.vx += (dx - fx * along * (1 - R.ALONG)) * R.PUSH; V.vz += (dz - fz * along * (1 - R.ALONG)) * R.PUSH;
+  const tq = (hz - V.z) * dx - (hx - V.x) * dz;      // удар не в центр — машину слегка разворачивает
+  V.h += clamp(tq * 0.08, -0.3, 0.3);
+  if (A.sparks) A.sparks(hx, 1, hz, 10, dx, dz);
+  if (A.ram) A.ram(R.SPEED + 3, hx, hz);              // −½ сердца, мятина, звук удара (game.js hurtCar)
+  if (A.Snd && A.Snd.blip) A.Snd.blip(60, 0.25, 'square', 0.12);
+  a.kx = -dx * 2; a.kz = -dz * 2;                       // отскочил назад
+  if (A.emote) A.emote(a.x, 2.8, a.z, 'star', 3);
+  a.mode = 'home'; a.mt = R.HOME;
+  ST.rams = (ST.rams || 0) + 1;
+  if (ST.hitToast <= 0) { ST.hitToast = 8; A.toast(t('лось боднул машину!')); }
+}
+
+/* ── любовь (только взрослая): один лось пристраивается к другому ── */
+const LOVE_MODES = ['wait', 'court', 'love'];
+function loveEnd (a, burst) {
+  for (const m of [a, a.love]) {
+    if (!m) continue;
+    if (burst && A.emote) A.emote(m.x, 3, m.z, 'heart', 4);
+    if (LOVE_MODES.includes(m.mode)) { m.mode = 'graze'; m.mt = rand(3, 7); }
+    m.v = 0; m.top = 0; m.love = null;
+    if (m.bub) { m.g.remove(m.bub); m.bub = null; }
+  }
+}
+function tryLove () {
+  const L = FAUNA.LOVE, V = A.V;
+  const free = m => m.big && !m.love && (m.mode === 'graze' || m.mode === 'walk');
+  for (const a of LIST) {
+    if (!free(a)) continue;
+    const d = Math.hypot(a.x - V.x, a.z - V.z);
+    if (d < L.VIEW[0] || d > L.VIEW[1]) continue;
+    let b = LIST.find(o => o !== a && free(o) && Math.hypot(o.x - a.x, o.z - a.z) < L.NEAR);
+    for (let k = 0; k < 12 && !b; k++) {           // рядом никого — второй выходит из леса
+      const an = rand(0, Math.PI * 2), r = rand(10, 20), x = a.x + Math.sin(an) * r, z = a.z + Math.cos(an) * r;
+      if ((a.f && !A.inPoly(x, z, a.f.p)) || !okGround(x, z) || onRoad(x, z, 3)) continue;
+      b = add('moose', x, z, a.f, an + Math.PI);
+    }
+    if (!b) continue;
+    a.mode = 'wait'; a.mt = L.WAIT; a.v = 0; a.love = b;
+    b.mode = 'court'; b.mt = L.WAIT; b.love = a; b.said = 0;
+    ST.loves = (ST.loves || 0) + 1;
+    return true;
+  }
+  return false;
+}
+function loveStep (a, dt, dCar) {
+  const L = FAUNA.LOVE, p = a.love;
+  if (!p || p.love !== a || !LIST.includes(p) || !LOVE_MODES.includes(p.mode)) { loveEnd(a); return; }
+  a.mt -= dt; a.said = (a.said || 0) - dt;
+  if (a.bub && (a.bubT -= dt) <= 0) { a.g.remove(a.bub); a.bub = null; }
+  if (a.mode === 'wait' || (a.mode === 'love' && !a.top)) {
+    a.v = 0;
+    // подъехал близко — «не мешай!» (пузырь над нижним)
+    if (dCar < L.SHOO && a.said <= 0 && A.sayBubble) {
+      const L2 = [t('не мешай!'), t('занято!'), t('отвернись!'), t('проезжай, проезжай')];
+      if (a.bub) a.g.remove(a.bub);
+      a.bub = A.sayBubble(a.g, L2[Math.floor(Math.random() * L2.length)], '#c2185b', 3.7);
+      a.bubT = 2.5; a.said = L.SAY;
+    }
+    if (a.mode === 'love' && (a.heartT = (a.heartT || 0) - dt) <= 0 && a.g.visible && A.emote) { a.heartT = 0.6; A.emote(a.x, 3.3, a.z, 'heart', 1); }
+    if (a.mt <= 0) loveEnd(a, a.mode === 'love');
+    return;
+  }
+  if (a.mode === 'court') {
+    const tx = p.x - Math.sin(p.h) * L.COME, tz = p.z - Math.cos(p.h) * L.COME, dx = tx - a.x, dz = tz - a.z, d = Math.hypot(dx, dz);
+    if (d < 0.35) {
+      a.mode = p.mode = 'love'; a.top = 1; p.top = 0;
+      a.mt = p.mt = rand(...L.DUR); a.lp = p.lp = 0; a.h = p.h;
+      return;
+    }
+    a.h = d > 2 ? Math.atan2(dx, dz) : turnTo(a.h, Math.atan2(dx, dz), 3 * dt);
+    a.v = Math.min(FAUNA.MOOSE.TROT, d * 1.5);
+    if (a.mt <= 0) loveEnd(a);
+    return;
+  }
+  // love, верхний: стоит вплотную сзади, ритмично покачивается
+  a.v = 0; a.h = p.h;
+  a.x = p.x - Math.sin(p.h) * L.COME; a.z = p.z - Math.cos(p.h) * L.COME;
+  if (a.mt <= 0) loveEnd(a, true);
+}
+
 /* ── машина и зверь ── */
 function bump (a) {
   const V = A.V, fx = Math.sin(V.h), fz = Math.cos(V.h), half = (A.CAR_L || 2.2) * 0.75;
@@ -251,6 +394,10 @@ function bump (a) {
   const cx = V.x + fx * tt, cz = V.z + fz * tt;
   let nx = a.x - cx, nz = a.z - cz;
   const d = Math.hypot(nx, nz), need = (A.CAR_W || 1) + a.rad;
+  if (a.mode === 'charge' && !a.hit && d < need + FAUNA.RAM.REACH && Math.abs(V.y - a.y) < 2.5) {
+    const k = d > 1e-3 ? 1 / d : 0;
+    ramHit(a, cx + nx * k * (A.CAR_W || 1), cz + nz * k * (A.CAR_W || 1));
+  }
   if (d >= need || Math.abs(V.y - a.y) > 2.5) return;
   if (d < 1e-3) { nx = fx; nz = fz; } else { nx /= d; nz /= d; }
   const vn = V.vx * nx + V.vz * nz - (a.kx * nx + a.kz * nz);
@@ -294,7 +441,8 @@ function animate (a, dt) {
   a.legs[0].rotation.x = a.legs[3].rotation.x = sw;
   a.legs[1].rotation.x = a.legs[2].rotation.x = -sw;
   // пасётся — голову к траве
-  const down = a.mode === 'graze' ? (a.big ? 1.0 : 0.6) : a.mode === 'stand' ? -0.15 : 0;
+  const down = a.mode === 'graze' ? (a.big ? 1.0 : 0.6) : a.mode === 'aim' ? 1.15 : a.mode === 'charge' ? 0.85
+    : a.mode === 'stand' || a.mode === 'love' ? -0.15 : 0;
   a.neck.rotation.x += (down - a.neck.rotation.x) * Math.min(1, dt * 2);
   a.roll *= Math.exp(-dt * 1.6);
   const wob = a.mode === 'stagger' ? Math.sin(a.ph * 0.9) * 0.12 : 0;
@@ -304,6 +452,22 @@ function animate (a, dt) {
   if (a.jump) {                                // кувырок: дуга вверх за 0,6 с
     a.jy = (a.jy || 0) + dt / 0.6;
     if (a.jy >= 1) { a.jump = 0; a.jy = 0; } else { y += 4 * a.jump * a.jy * (1 - a.jy); a.g.rotation.x = a.jy * Math.PI * 2; }
+  }
+  if (a.mode === 'love') {
+    // ритмичное покачивание; верхний встал на дыбы передними ногами на спину нижнего
+    a.lp = (a.lp || 0) + dt * FAUNA.LOVE.RATE * Math.PI * 2;
+    const s = Math.sin(a.lp), fx = Math.sin(a.h), fz = Math.cos(a.h);
+    if (a.top) {
+      a.g.rotation.x = -0.42;
+      a.legs[0].rotation.x = a.legs[1].rotation.x = -1.0;
+      a.legs[2].rotation.x = a.legs[3].rotation.x = 0.42;
+      y += 0.38;
+      a.g.position.set(a.x + fx * s * 0.14, y, a.z + fz * s * 0.14);
+    } else {
+      a.g.rotation.x = s * 0.025;
+      a.g.position.set(a.x + fx * s * 0.05, y, a.z + fz * s * 0.05);
+    }
+    return;
   }
   a.g.position.set(a.x, y, a.z);
 }
@@ -334,6 +498,14 @@ export function step (dt, api) {
     if (ST.cross < 0) ST.cross = rand(...FAUNA.CROSS.FIRST);
     if (Math.hypot(V.vx, V.vz) > 5 && (ST.cross -= dt) <= 0)
       ST.cross = tryCross() ? rand(...FAUNA.CROSS.CD) : FAUNA.CROSS.RETRY;
+    const R = FAUNA.RAM;
+    if (ST.ram < 0) ST.ram = rand(...R.FIRST);
+    if ((ST.ram -= dt) <= 0) ST.ram = S.state === 'drive' && Math.random() < R.P && tryRam() ? rand(...R.CD) : R.TICK;
+    if (A.ADULT) {
+      const L = FAUNA.LOVE;
+      if (ST.love < 0) ST.love = rand(...L.FIRST);
+      if ((ST.love -= dt) <= 0) ST.love = tryLove() ? rand(...L.CD) : L.RETRY;
+    }
   }
   for (let i = LIST.length - 1; i >= 0; i--) {
     const a = LIST[i];
@@ -357,6 +529,9 @@ export function step (dt, api) {
 export const DEBUG = {
   LIST, FAUNA, get forests () { return forests().length; }, get cam () { return A && A.cam; },
   cross: () => tryCross(),
+  ram: a => { a = a || LIST.find(m => m.big); if (!a) return false; a.male = true; startRam(a); return true; },   // этот лось бодает
+  love: () => !!(A && A.ADULT) && tryLove(),        // в детской — всегда false
+  get stats () { return { rams: ST.rams || 0, loves: ST.loves || 0, ram: ST.ram, love: ST.love }; },
   near: (kind = 'moose', d = 25) => { const V = A.V; return add(kind, V.x + Math.sin(V.h) * d, V.z + Math.cos(V.h) * d, null); },
 };
 if (typeof window !== 'undefined' && (import.meta.env.DEV || new URLSearchParams(location.search).has('debug'))) window.__fauna = DEBUG;

@@ -82,7 +82,7 @@ export function party (done) {
   const boom = () => { if (A.Snd && A.Snd.noise) try { A.Snd.noise(0.25, 0.18); } catch (e) { /* — */ } blip(160 + Math.random() * 80, 0.18, 'triangle', 0.1); };
   const rocket = () => P.push({ kind: 'rocket', x: W * (0.15 + Math.random() * 0.7), y: H + 10, vx: (Math.random() - 0.5) * 60, vy: -(H * (0.9 + Math.random() * 0.35)), life: 0, max: 0.75 + Math.random() * 0.35, col: pick(COLS) });
   const burst = (bx, by, col) => {
-    const k = 44 + (Math.random() * 30 | 0), sp = 120 + Math.random() * 120;
+    const k = 60 + (Math.random() * 40 | 0), sp = 150 + Math.random() * 150;
     for (let i = 0; i < k; i++) { const a = i / k * Math.PI * 2 + Math.random() * 0.2, v = sp * (0.6 + Math.random() * 0.5);
       P.push({ kind: 'spark', x: bx, y: by, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: 1 + Math.random() * 0.6, col: Math.random() < 0.25 ? '#fff3d6' : col }); }
     boom();
@@ -95,7 +95,7 @@ export function party (done) {
   const frame = now => {
     const dt = Math.min(0.05, (now - last) / 1000), el2 = (now - t0) / 1000;
     last = now;
-    if (el2 < 7 && now >= nextVolley) { rocket(); if (Math.random() < 0.5) rocket(); nextVolley = now + 380 + Math.random() * 420; }
+    if (el2 < 7 && now >= nextVolley) { rocket(); if (Math.random() < 0.5) rocket(); nextVolley = now + 300 + Math.random() * 350; }
     if (el2 < 12 && P.filter(p => p.kind === 'conf').length < 90) confetti(4);
     x.clearRect(0, 0, W, H);
     for (let i = P.length - 1; i >= 0; i--) {
@@ -111,7 +111,7 @@ export function party (done) {
         p.vx *= 1 - 1.6 * dt; p.vy = p.vy * (1 - 1.6 * dt) + 90 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
         const k = 1 - p.life / p.max;
         if (k <= 0) { P.splice(i, 1); continue; }
-        x.globalAlpha = k; x.fillStyle = p.col; x.fillRect(p.x - 2, p.y - 2, 4, 4); x.globalAlpha = 1;
+        const r = 2 + 2 * k; x.globalAlpha = k; x.fillStyle = p.col; x.fillRect(p.x - r, p.y - r, r * 2, r * 2); x.globalAlpha = 1;
         continue;
       }
       p.x += (p.vx + Math.sin(p.life * 3 + p.a) * 30) * dt; p.y += p.vy * dt; p.a += p.va * dt;

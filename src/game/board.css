@@ -1,0 +1,24 @@
+/* таблица рекордов «лучшая смена» (board.js): окно поверх меню карьеры, как выбор района */
+#crm-lb { position: fixed; inset: 0; z-index: 45; display: flex; align-items: center; justify-content: center; padding: 16px;
+          background: rgba(10, 12, 24, .62); backdrop-filter: blur(3px); pointer-events: auto; }
+#crm-lb[hidden] { display: none; }
+.lbd-tabs { display: flex; gap: 8px; }
+.lbd-tabs[hidden] { display: none; }
+.lbd-tabs button { flex: 1; font: inherit; font-size: clamp(9px, 1vw, 12px); padding: 11px 8px; cursor: pointer; color: #fff3d6; background: #3a4570;
+                   border: 3px solid #33210c; border-radius: 9px; box-shadow: 0 3px 0 #33210c; }
+.lbd-tabs button.cur { background: #f0522a; }
+.lbd-sub { font-size: 7px; line-height: 1.8; color: #b9c3e6; text-align: center; }
+.lbd-sub:empty { display: none; }
+.lbd-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; min-height: 120px; }
+.lbd-list li { display: grid; grid-template-columns: 30px 1fr 22px auto; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 7px;
+               font-size: clamp(8px, .9vw, 11px); color: #fff3d6; background: rgba(34, 44, 90, .55); }
+.lbd-list li em { font-style: normal; color: #ffd85e; text-align: right; }
+.lbd-list li b { font-weight: normal; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lbd-list li i { font-style: normal; font-size: 7px; text-align: center; color: #33210c; background: #6fd3ff; border-radius: 50%; width: 18px; height: 18px; line-height: 18px; }
+.lbd-list li i.none { background: none; }
+.lbd-list li span { color: #ffb066; white-space: nowrap; }
+.lbd-list li.me { background: #ffd85e; color: #33210c; }
+.lbd-list li.me em, .lbd-list li.me span { color: #33210c; }
+.lbd-list li.gap, .lbd-list li.empty { display: block; background: none; text-align: center; color: #b9c3e6; padding: 4px; }
+.lbd-list li.empty { font-size: 8px; line-height: 1.8; padding: 24px 8px; }
+.lbd-me:empty { display: none; }
