@@ -52,8 +52,9 @@ export function speechify (text, mood = 'calm', rnd = Math.random) {
   const out = [];
   for (let i = 0; i < words.length; i++) {
     let w = words[i];
-    if (i && rnd() < pf && !/[.!?…]$/.test(out[out.length - 1] || '')) out.push(t(FILL[Math.floor(rnd() * FILL.length)]) + '…');
-    if (w.length > 3 && rnd() < ps && /^[\p{L}]/u.test(w)) w = w[0] + '-' + (rnd() < 0.3 ? w[0].toLowerCase() + '-' : '') + w;
+    // не внутри числа и не между числом и его знаком: «6 000 ₽», «70 %», «90 км/ч» — после цифры и перед «%», «₽» не мычим
+    if (i && rnd() < pf && !/[.!?…]$/.test(out[out.length - 1] || '') && !/\d$/.test(words[i - 1]) && /^[\p{L}\d«"(]/u.test(w)) out.push(t(FILL[Math.floor(rnd() * FILL.length)]) + '…');
+    if (w.length > 3 && rnd() < ps && /^[\p{L}]/u.test(w) && !/\d$/.test(words[i - 1] || '')) w = w[0] + '-' + (rnd() < 0.3 ? w[0].toLowerCase() + '-' : '') + w;
     out.push(w);
   }
   if (rnd() < pf * 1.5) out.unshift(t(FILL[0]) + '…');

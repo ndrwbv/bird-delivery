@@ -32,7 +32,7 @@ import { setPeopleSeason, redressHumans } from './people.js';
 
 export const SEASON_STEP = 0.125;          // на столько сдвигает сезон одна смена: сезон — восемь смен
 export const SEASON_ENTER = 0.06;          // и на столько — каждый заход в игру (~16 заходов без смен — сезон)
-const CH = 100;                             // клетка склейки, как у статики
+const CELL = 100;                           // клетка склейки, как у статики
 
 let C = null;                               // что дала игра (init)
 let SEA = 0, FORCED = false;
@@ -85,6 +85,7 @@ const U = {
   uSnow: { value: 0 }, uDry: { value: 0 }, uMud: { value: 0 }, uFresh: { value: 0 }, uWet: { value: 0 },
   uLeaf: { value: 1 }, uYellow: { value: 0 }, uFallen: { value: 0 }, uDrift: { value: 0 }, uNY: { value: 0 }, uIce: { value: 0 },
   uTime: { value: 0 }, uNight: { value: 0 },
+  uHeat: { value: 0 }, uGold: { value: 0 },     // варианты сезона (weather.js): жара, яркая сухая осень
 };
 
 /* Снег и краски земли. Нормаль грани — из производных мировой позиции:
@@ -92,7 +93,7 @@ const U = {
    Классы по цвету вершины (цвета линейные): зелёное — трава, серое и
    тёмное — асфальт, синее — вода. */
 const TINT = `
-uniform float uSnow, uDry, uMud, uFresh, uWet;
+uniform float uSnow, uDry, uMud, uFresh, uWet, uHeat, uGold, uTime;
 varying vec3 vSW;
 float sHash (vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float sNoise (vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -111,6 +112,20 @@ vec3 seasonTint (vec3 c, float dryK, float snowK) {
   c = mix(c, vec3(0.2, 0.15, 0.07), uMud * g * smoothstep(0.35, 0.65, n) * 0.85);
   c = mix(c, vec3(0.16, 0.52, 0.08), uFresh * g * 0.55);
   c *= 1.0 - uWet * (0.3 * road + 0.12 * g + 0.06) * up * (0.6 + 0.4 * n);
+  if (uGold > 0.0) {                           // яркая сухая осень: листья на асфальте — рыжие квадратики
+    vec2 lc = floor(vSW.xz * 1.5);
+    float lf = sHash(lc) * (0.5 + 0.5 * n), pk = sHash(lc + 17.0);
+    vec3 lcol = pk < 0.35 ? vec3(0.78, 0.36, 0.04) : pk < 0.7 ? vec3(0.85, 0.6, 0.06) : vec3(0.62, 0.1, 0.03);
+    c = mix(c, lcol, uGold * road * up * step(0.66, lf));
+  }
+  if (uHeat > 0.0) {                           // жара: трава — песок, всё в оранжевый, марево над дальним асфальтом
+    c = mix(c, vec3(0.7, 0.45, 0.16) * (0.8 + 0.4 * n), uHeat * g * 0.85);
+    c = mix(c, c * vec3(1.25, 0.92, 0.58) + vec3(0.07, 0.025, 0.0), uHeat * 0.85);
+    float dist = length(vSW.xz - cameraPosition.xz);
+    float mir = road * up * smoothstep(28.0, 70.0, dist) * (1.0 - smoothstep(150.0, 260.0, dist));
+    mir *= 0.55 + 0.45 * sin(vSW.x * 0.21 + vSW.z * 0.17 + uTime * 2.6) * sin(vSW.z * 0.33 - uTime * 1.9);
+    c = mix(c, vec3(0.96, 0.82, 0.62), uHeat * clamp(mir, 0.0, 1.0) * 0.6);
+  }
   float lim = uSnow * up * 1.35 * snowK - 0.22;
   float cov = (1.0 - smoothstep(lim - 0.06, lim + 0.06, n)) * (1.0 - water * 0.7);
   cov *= 1.0 - road * 0.55 * (0.45 + 0.55 * n);
@@ -147,6 +162,7 @@ function smashMat (m) {
         vec3 c0 = diffuseColor.rgb;
         float leafy = smoothstep(0.03, 0.12, c0.g - max(c0.r, c0.b));
         vec3 pal = vP < 0.5 ? vec3(0.52, 0.33, 0.02) : vP < 1.5 ? vec3(0.55, 0.17, 0.02) : vec3(0.4, 0.05, 0.02);
+        pal = mix(pal, pal * vec3(1.55, 1.35, 1.0) + vec3(0.06, 0.02, 0.0), uGold);
         vec3 c = mix(c0, pal, clamp(uYellow * 1.7 - vSeed * 0.7, 0.0, 1.0));
         c = mix(c, vec3(0.13, 0.09, 0.06), clamp((1.0 - uLeaf) * 1.4 - vSeed * 0.4, 0.0, 1.0));
         c = mix(c, vec3(0.2, 0.5, 0.08), uFresh * 0.5);
@@ -172,6 +188,7 @@ function pileMat () {
     sh.fragmentShader = 'uniform float uYellow;\nvarying float vK, vP, vSeed;\n' + TINT + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       if (vK == 1.0) {
         vec3 pal = vP < 0.5 ? vec3(0.52, 0.33, 0.02) : vP < 1.5 ? vec3(0.55, 0.17, 0.02) : vP < 2.5 ? vec3(0.4, 0.05, 0.02) : vec3(0.3, 0.3, 0.03);
+        pal = mix(pal, pal * vec3(1.55, 1.35, 1.0) + vec3(0.06, 0.02, 0.0), uGold);   // яркая сухая осень — сочнее
         diffuseColor.rgb = mix(diffuseColor.rgb, pal, clamp(uYellow * 1.7 - vSeed * 0.7, 0.0, 1.0));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.5, 0.08), uFresh * 0.5);
       }
@@ -199,7 +216,7 @@ function garlandMat () {
 }
 
 /* ─── своя склейка: клетки по сто метров, позиция + цвет + aux ─── */
-function Pile () {
+function Pile (CH = CELL) {                      // CH — клетка склейки, м
   const cells = new Map();
   const col = new THREE.Color(), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), P = new THREE.Vector3(), Sc = new THREE.Vector3();
   let tris = 0;
@@ -379,8 +396,15 @@ export function setSeason (v, forced = true) { SEA = wrap(+v); FORCED = !!forced
 export const seasonForced = () => FORCED;
 function wrap (v) { return Math.round(((v % 4) + 4) % 4 * 1000) / 1000 % 4; }
 
+/* Вариант сезона на смену (weather.js): поверх кривых — свои доли. v: { snow, leaf, yellow, …: число или
+   f(было) → стало; heat, gold — юниформы жары и яркой осени; snowfall — снегопад не реже этой силы }.
+   null — как по календарю. */
+let VAR = null;
+export function setVariant (v) { VAR = v || null; apply(); }
 function apply () {
   for (const k in K) A[k] = K[k](SEA);
+  if (VAR) for (const k in K) if (VAR[k] !== undefined) A[k] = typeof VAR[k] === 'function' ? VAR[k](A[k]) : VAR[k];
+  U.uHeat.value = (VAR && VAR.heat) || 0; U.uGold.value = (VAR && VAR.gold) || 0;
   U.uSnow.value = A.snow; U.uDry.value = A.dry; U.uMud.value = A.mud; U.uFresh.value = A.fresh; U.uWet.value = A.wet;
   U.uLeaf.value = A.leaf; U.uYellow.value = A.yellow; U.uFallen.value = A.fallen; U.uDrift.value = A.drift;
   U.uNY.value = A.ny; U.uIce.value = A.ice;
@@ -947,7 +971,7 @@ function stepSky (dt) {
     if ((SKY.t -= dt) <= 0) { SKY.want = SKY.want ? 0 : Math.random() < 0.55 ? rnd(0.3, 0.7) : 0; SKY.t = SKY.want ? rnd(40, 90) : rnd(30, 80); }
     if (rain) rain.visible = false;                      // дождь зимой — это снег
   } else SKY.want = 0;
-  const want = sn > 0.45 ? Math.max(SKY.want, ENV.rain || 0) : 0;
+  const want = sn > 0.45 ? Math.max(SKY.want, ENV.rain || 0, (VAR && VAR.snowfall) || 0) : 0;
   SKY.amt += (want - SKY.amt) * (1 - Math.exp(-0.5 * dt));
   // небо: зимой бледнее, осенью чуть серее, свет от снега снизу
   const day = 1 - night;
@@ -1055,7 +1079,15 @@ function stepCar (dt) {
 /* верх видимого сугроба в точке — сбитые, лужи и пятна ложатся на него, а не внутрь (hits.js topAt).
    Профиль — как у модели кучи (moundTpl): вершина 1, на 0,62 радиуса — 0,7, край — у земли.
    Нет сугроба — -Infinity */
+const EXTRA_TOP = [];
+/* ещё сугробы со своим верхом (weather.js: снежная зима) */
+export function addDriftTop (fn) { EXTRA_TOP.push(fn); }
 export function driftTop (x, z) {
+  let ex = -Infinity;
+  for (const f of EXTRA_TOP) ex = Math.max(ex, f(x, z));
+  return Math.max(ex, driftTop0(x, z));
+}
+function driftTop0 (x, z) {
   if ((A.drift || 0) < 0.01) return -Infinity;
   const ci = Math.floor(x / 20), cj = Math.floor(z / 20);
   let top = -Infinity;
@@ -1329,6 +1361,10 @@ export function updateSeasons (dt) {
   if ((redressT -= dt) <= 0) { redressT = 0.3; C.cam.getWorldDirection(CAM_DIR); redressHumans(C.cam.position.x, C.cam.position.z, CAM_DIR.x, CAM_DIR.z, 2); }
   if (window.__dlv && !window.__dlv.season) window.__dlv.season = DEBUG;
 }
+
+/* для weather.js: склейка, шаблоны, шум и снежные брызги — сугробы снежной зимы строятся тем же */
+export const kit = () => ({ Pile, tpls, hsh, rngAt, splash: (x, y, z, n, k) => splash(x, y, z, n, k), chunks: (x, y, z, n, vx, vz) => chunks(x, y, z, n, vx, vz),
+  mat: () => (MESH_PILE[0] ? MESH_PILE[0].material : pileMat()) });
 
 /* для ?debug: __dlv.season */
 const DEBUG = {

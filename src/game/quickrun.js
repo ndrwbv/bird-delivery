@@ -20,7 +20,7 @@
      QR.finish(r)      — из career.js showEnd: заезд кончился → песочницу выбросить, показать итоги
 
    api: Platform, Store { get, set }, S, Snd, money(n), cars() → cars.js (list), seasons { value(), forced(), set(v, forced),
-        name(v) }, startRun(), toMenu(), afterQuick() — вернуть машину, пиццерию и сюжет к сохранённым. */
+        name(v) }, weather — weather.js (вариант погоды: «по календарю» или свой; не к сезону — сезон подстроится), startRun(), toMenu(), afterQuick() — вернуть машину, пиццерию и сюжет к сохранённым. */
 import './quickrun.css';
 import { t } from '../i18n/index.js';
 import { SHIFT, handlingK } from './econ.js';
@@ -32,6 +32,8 @@ const FREEZE = new Set(['dlv-msk-xp']);
 /* сезоны на выбор: «как сейчас в карьере» и середина каждого (seasons.js: 0 — начало лета, год — 4) */
 const SEASONS = [{ id: 'now' }, { id: 'summer', v: 0.5 }, { id: 'autumn', v: 1.5 }, { id: 'winter', v: 2.5 }, { id: 'spring', v: 3.5 }];
 const SEASON_NAME = { summer: () => t('лето'), autumn: () => t('осень'), winter: () => t('зима'), spring: () => t('весна') };
+/* погода: не к сезону — сезон подстроится (жара — лето, снежная зима — зима) */
+const WX_SUB = { clear: () => t('как обычно'), heat: () => t('лето'), golden: () => t('осень'), snowy: () => t('зима'), rain: () => t('не зимой'), storm: () => t('не зимой') };
 const LEN_NAME = { short: () => t('короткая'), medium: () => t('средняя'), long: () => t('длинная') };
 
 let A = null, box = null, endBox = null;
@@ -88,6 +90,7 @@ function choices () {
   const curCar = (cars.find(c => c.current) || cars[0] || {}).id;
   const o = {
     season: SEASONS.some(x => x.id === s.season) ? s.season : 'now',
+    weather: A.weather && A.weather.IDS.includes(s.weather) ? s.weather : 'auto',
     len: SHIFT.LENGTHS.some(l => l.id === s.len) ? s.len : 'medium',
     car: cars.some(c => c.id === s.car) ? s.car : curCar,
     dist: s.dist === 'city' && DIST.allOpen() ? 'city' : Number.isFinite(+s.dist) && +s.dist >= 0 && +s.dist < open ? +s.dist : (DIST.city() ? 'city' : DIST.cur()),
@@ -123,6 +126,8 @@ function render () {
     group('season', t('сезон'), SEASONS.map(s => s.id === 'now'
       ? { v: 'now', name: t('как в карьере'), sub: S.name(S.value()) }
       : { v: s.id, name: SEASON_NAME[s.id](), sub: S.name(s.v) })) +
+    (A.weather ? group('weather', t('погода'), [{ v: 'auto', name: t('по календарю'), sub: t('как выпадет') },
+      ...A.weather.IDS.map(id => ({ v: id, name: A.weather.NAME[id](), sub: WX_SUB[id] ? WX_SUB[id]() : '' }))]) : '') +
     group('len', t('длина смены'), SHIFT.LENGTHS.map(l => ({ v: l.id, name: LEN_NAME[l.id] ? LEN_NAME[l.id]() : l.id, sub: t('~{n} мин', { n: mins(l) }) }))) +
     group('car', t('машина'), cars.map(c => ({ v: c.id, name: c.name,
       sub: t('{kmh} км/ч · руль {h}/10', { kmh: Math.round((c.vmax || 0) * 3.6), h: handlingK(c.handling).h }) }))) +
@@ -169,7 +174,7 @@ function go () {
   if (Q.on) return;
   const o = { ...SEL };
   if (!ownedCars().some(c => c.id === o.car)) return;
-  try { A.Store.set(KEY, { ...saved(), season: o.season, len: o.len, car: o.car, dist: o.dist }); } catch (e) { /* — */ }
+  try { A.Store.set(KEY, { ...saved(), season: o.season, weather: o.weather, len: o.len, car: o.car, dist: o.dist }); } catch (e) { /* — */ }
   closeSetup();
   hideEnd();
   start(o);
@@ -188,6 +193,7 @@ function start (o) {
   }
   const sv = SEASONS.find(s => s.id === o.season);
   A.seasons.set(sv && sv.v !== undefined ? sv.v : Q.sea, true);   // forced: startRun сезон не сдвигает
+  if (A.weather) A.weather.force(o.weather && o.weather !== 'auto' ? o.weather : null);   // startRun → weather.shiftStart
   A.Snd.boot && A.Snd.boot();
   A.startRun();
 }
@@ -196,6 +202,7 @@ function stop () {
   if (!Q.on) return;
   Q.on = false;
   sandbox(false);
+  if (A.weather) A.weather.force(null);
   A.seasons.set(Q.sea, Q.seaForced);
   if (DIST.has()) DIST.setPace(Q.pace);
   try { A.afterQuick(); } catch (e) { console.error('[quickrun] afterQuick', e); }
@@ -222,6 +229,7 @@ export function finish (r = {}) {
   const o = Q.opt || {}, car = ownedCars().find(c => c.id === o.car);
   const carName = car ? car.name : '';
   const seaName = A.seasons.name(A.seasons.value());
+  const wxName = A.weather ? A.weather.label() || A.weather.NAME.clear() : '';
   const distName = o.dist === 'city' ? t('весь город') : DIST.has() ? t((DIST.list()[+o.dist] || {}).name || '') : '';
   stop();
   // рекорд быстрого заезда — свой, мимо карьеры (dlv-quick.best)
@@ -243,6 +251,7 @@ export function finish (r = {}) {
     [t('на заезде'), clock(r.t0h ?? 9) + ' — ' + clock(r.endH ?? 9)],
     [t('машина'), carName],
     [t('сезон'), seaName],
+    wxName ? [t('погода'), wxName] : null,
     distName ? [t('район'), distName] : null,
     [t('лучший быстрый заезд'), A.money(Math.max(money, +s.best || 0))],
   ].filter(Boolean);

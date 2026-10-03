@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite --port 5190 --strictPort",
     "sandbox": "vite --port 5193 --mode web --open /sandbox.html",
+    "ui": "vite --port 5194 --mode web --open /ui.html",
     "dev:yandex": "vite --port 5191 --strictPort --mode yandex",
     "dev:steam": "vite --port 5192 --strictPort --mode steam",
     "build:web": "vite build --mode web",

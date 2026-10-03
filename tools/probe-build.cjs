@@ -1,6 +1,6 @@
 /* Сборка игры для probe и check — в свою временную папку, а не в dist/:
    os.tmpdir()/bird-probe/<mode>.<время>, указатель на свежую — <mode>.json.
-   Пересобирает, только если что-то в src/, public/, index.html, sandbox.html, pad.html
+   Пересобирает, только если что-то в src/, public/, index.html, sandbox.html, pad.html, ui.html
    или vite.config.js новее прошлой сборки. Старые папки чистит через 10 минут
    (вдруг их ещё читает чужой probe). Несколько probe сразу: сборка под замком. */
 const fs = require('fs');
@@ -10,7 +10,7 @@ const { spawnSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 const BASE = path.join(os.tmpdir(), 'bird-probe');
-const WATCH = ['src', 'public', 'index.html', 'sandbox.html', 'pad.html', 'vite.config.js'];
+const WATCH = ['src', 'public', 'index.html', 'sandbox.html', 'pad.html', 'ui.html', 'vite.config.js'];
 const sleepSync = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 function newest (p) {

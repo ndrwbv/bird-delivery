@@ -36,6 +36,7 @@ import * as ECON from './econ.js';
 import * as DLG from './dialog.js';
 import * as ZN from './zones.js';
 import * as DIST from './districts.js';
+import * as FEST from './festivals.js';
 import { makePerson } from './people.js';
 import { ORDER_TYPES, SHIFT_PLAN, SIDE_ORDERS, STAFF_RIDE, BOSS } from './orders.config.js';
 
@@ -202,6 +203,9 @@ function rate () {
    Кончились — самый давний из подходящих; нет и таких — ослабляем условия */
 function pickSpot (o = {}) {
   if ((o.grow || 0) > 6) return null;
+  // фестиваль кальянщиков (festivals.js): все адреса смены — рядом с ним
+  const fn = !o.near && !SIM ? FEST.near() : null;
+  if (fn) o = { ...o, near: fn, r: fn.r, dmin: undefined, dmax: undefined, zone: null };
   const c = o.from || A.PIZZA;
   const fit = s => (!o.zone || s.zone === o.zone) && !SH.reserved.has(s.key) &&
     (o.near ? Math.hypot(s.x - o.near.x, s.z - o.near.z) <= o.r : true) &&
@@ -266,6 +270,9 @@ function genSpec () {
   if (SH.gen === 0 && !POOL.length) buildPool();
   else if (POOL_AT !== A.PIZZA) rebase();                 // «весь город»: вернулся в другую пиццерию
   const D = distRing();
+  // фестиваль кальянщиков: первый заказ смены и часть остальных — на сам фестиваль, к проходу (festivals.js)
+  const fp = SIM ? null : FEST.passSpec(SH.gen);
+  if (fp) return finishSpec({ type: 'pizza', kind: 'solo', fest: fp, stops: [{ x: fp.x, z: fp.z, key: keyOf(fp.x, fp.z), zone: ZN.zoneAt(fp.x, fp.z), n: 1, addr: fp.addr }] }, null, hourNow());
   const easy = easySpec();
   if (easy) return finishSpec(easy, null, hourNow());
   const ahead = (A.S.order ? 1 : 0) + Q.length;          // сколько заказов до этого
@@ -430,6 +437,8 @@ function finishSpec (spec, forced, hAt) {
   spec.zone = spec.stops[0].zone;
   spec.color = spec.color || typeColor(spec.type);
   spec.forced = forced;
+  // День угнетения бургеров (festivals.js): часть заказов — «вместо бургера», оплата ×FEST.BURGER_K
+  if (!spec.story && !SIM) { const bk = FEST.burgerRoll(); if (bk) spec.burger = bk; }
   spec.n = ++SH.gen;
   // ритм размеров (sizeRoll): сколько было после разминки, сколько пицц в прошлом, сколько одиночных подряд
   const size = spec.bundle ? spec.stops.length : 1;
@@ -511,7 +520,7 @@ function bindSpec (spec) {
       A.pushOut(b, 0.5);
       peds.push(b);
     }
-    stops.push({ peds, key: st.key, zone: st.zone });
+    stops.push({ peds, key: st.key, zone: st.zone, ...(spec.fest ? { fixAddr: st.addr } : {}) });   // фестиваль: адрес — «… проход», не дом рядом
   }
   if (!stops.length) return null;
   spec.stops = spec.stops.slice(0, stops.length);
@@ -521,6 +530,7 @@ function bindSpec (spec) {
 
 function whyOf (sp) {
   if (sp.story) return sp.story.why || t('особый заказ');
+  if (sp.fest) return sp.fest.why;
   const z = t(ZONE_LABEL[sp.zone] || ZONE_LABEL.normal);
   if (sp.urgent) return t('срочно: времени в обрез · оплата ×{k} · не успеешь — штраф', { k: fmtK(PAY.URGENT) });
   if (sp.edge) return t('в самый конец района · оплата ×{k}', { k: fmtK(PAY.EDGE) });
@@ -551,6 +561,9 @@ export function setup (plan) {
   // «весь город» (econ.js CITY): премия за дальний — за путь по дорогам сверх FAR_FROM, в цене остановки
   sp.far = o.stops.map((st, i) => (city && !sp.story ? ECON.cityFar(sp.m[i] || 0) : 0));
   sp.fees = sp.fees.map((f, i) => f + sp.far[i]);
+  // «вместо бургера» (День угнетения бургеров): надбавка — в цене остановки
+  sp.burgerAdd = sp.burger ? sp.fees.map(f => Math.round(f * (sp.burger - 1) / 10) * 10) : null;
+  if (sp.burgerAdd) sp.fees = sp.fees.map((f, i) => f + sp.burgerAdd[i]);
   S.fee = sp.fees.reduce((a, b) => a + b, 0);
   // оплата и район — на самой остановке: в сборном игрок развозит в своём порядке, o.stops переставляются
   o.stops.forEach((st, i) => { st.fee = sp.fees[i]; st.far = sp.far[i]; if (!st.zone && sp.stops[i]) st.zone = sp.stops[i].zone; st.done = false; });
@@ -617,6 +630,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 export function card (order) {
   const el = document.getElementById('phone');
   if (!el) return;
+  css();                                    // песочница (ui.html) init не зовёт — стили накладной ставим и тут
   const sp = order.ord;
   el.classList.add('ord-typed');
   el.classList.toggle('ord-urgent', !!(sp && sp.urgent));
@@ -644,10 +658,12 @@ export function cardRows (order) {
   const at = S.target || sp.stops[0];
   const di = !DIST.has() ? -1 : DIST.city() && at ? DIST.at(at.x, at.z) : DIST.cur();
   const far = (sp.far || []).reduce((a, b) => a + b, 0);
+  const brg = (sp.burgerAdd || []).reduce((a, b) => a + b, 0);
   return [
     [t('район'), esc(t(ZONE_LABEL[sp.zone] || ZONE_LABEL.normal)) + (di >= 0 ? ' · ' + esc(t(DIST.list()[di].name)) : '')],
     [t('оплата'), A.money(S.fee) + (sp.urgent ? ' · <b class="oc-urg">' + t('срочно') + '</b>' : '')],
     ...(far > 0 ? [[t('за дальний'), '<b class="oc-far">+' + A.money(far) + '</b>' + ' · ' + esc(t('премия, уже в оплате'))]] : []),
+    ...(brg > 0 ? [[t('вместо бургера'), '<b class="oc-far">+' + A.money(brg) + '</b>' + ' · ' + esc(t('День угнетения бургеров, уже в оплате'))]] : []),
   ];
 }
 

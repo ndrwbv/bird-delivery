@@ -39,8 +39,10 @@ npm run probe -- --eval=my-check.js --size=phone --errors
   `--size=desktop|phone|deck|WxH` (телефон 390×844 с касаниями), `--secs=N` (идти после
   скрипта), `--shot=out.png --scale=0.5`, `--errors` (текст ошибок консоли; счётчик — всегда),
   `--fresh` (первый запуск как у новичка: гайд, учебный заказ, вступление);
+- `--page=ui.html` — другая страница сборки: песочница интерфейса (`--q=frame` — сам экран,
+  `window.__ui`; без — панель, `window.__uilab`), [SANDBOX.md](SANDBOX.md) → «Песочница интерфейса»;
 - сборка — в `os.tmpdir()/bird-probe/<mode>.*`, только если `src/`, `public/`, `index.html`,
-  `sandbox.html`, `pad.html` или `vite.config.js` новее (+3—5 с); `--rebuild` — всегда,
+  `sandbox.html`, `pad.html`, `ui.html` или `vite.config.js` новее (+3—5 с); `--rebuild` — всегда,
   `--no-build` — не собирать. `dist/` не трогает;
 - каждый запуск — с чистым сохранением (сессия в памяти, своя userData): агенты не мешают
   друг другу и не трогают сохранение автора;

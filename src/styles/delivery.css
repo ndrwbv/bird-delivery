@@ -1309,3 +1309,23 @@ html[data-map] #phone { width: min(920px, 76vw); }
 .oc-clip { left: 30%; width: clamp(14px, 1.5vw, 22px); height: clamp(36px, 4vw, 54px); }
 #phone #ph-accept { font-size: clamp(18px, 2.7vw, 38px); padding: clamp(14px, 2.4vh, 24px) 12px; }
 @media (max-width: 520px) { #phone { width: 94vw; } }
+/* накладная не влезает по высоте (сборный на 3+ адреса, телефон боком): прокручивается только лист
+   с таблицей и фото, «ГАЗ ГАЗ» всегда виден внизу. Отступы у листа — чтобы скрепка и наклонённые
+   фото не обрезались краем прокрутки */
+#phone .ph-body { overflow: hidden; }
+#phone .ph-main { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+                  margin: -8px -12px 0; padding: 8px 12px 4px; }
+#phone #ph-accept { flex: none; }
+/* телефон боком: строки накладной теснее, у сборного имя и адрес — в одну строку, кнопка ниже */
+@media (max-height: 460px) {
+  #phone { max-height: calc(100% - 16px); }
+  #phone .ph-top { padding: 8px 0 6px; }
+  #phone .ph-body { padding-top: 6px; padding-bottom: 10px; gap: 8px; }
+  html body #phone .oc-inv th, html body #phone .oc-inv td { padding-top: 3px; padding-bottom: 3px; }
+  html #phone.ord-many .oc-inv tr:first-child td b { display: inline; }
+  html #phone.ord-many .oc-inv tr:first-child td small { display: inline; margin: 0 0 0 .7em; }
+  html #phone.ord-many .oc-inv tr:first-child td small::after { content: ''; display: block; margin-bottom: 3px; }
+  #phone #ph-accept { font-size: 18px; padding: 8px 12px; border-width: 3px; box-shadow: 0 4px 0 #33210c; }
+}
+/* телефон стоя: фото сборного (две колонки) — кучкой по центру, а не по краям листа */
+@media (max-width: 520px) { #phone .oc-photos.many { justify-content: center; column-gap: 14px; } }

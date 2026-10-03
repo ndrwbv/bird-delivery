@@ -1,0 +1,11 @@
+/* пример мини-игры (домофон-заглушка): бумага и шрифт — как у накладной */
+.mgx { width: min(300px, calc(100% - 32px)); box-sizing: border-box; padding: 16px; background: #fff3d6; border: 4px solid #33210c;
+  border-radius: 6px; box-shadow: 0 6px 0 rgba(0, 0, 0, .35); color: #33210c; text-align: center; font-family: "Press Start 2P", ui-monospace, monospace; }
+.mgx-t { display: block; font-size: 14px; margin-bottom: 10px; }
+.mgx-q { font-size: 9px; line-height: 1.6; margin-bottom: 10px; }
+.mgx-scr { background: #1c2a1c; color: #7fe08a; padding: 10px; font-size: 16px; margin-bottom: 12px; border-radius: 3px; min-height: 1em; }
+.mgx.ok .mgx-scr { color: #ffd85e; }
+.mgx.bad .mgx-scr { color: #ff6b6b; }
+.mgx-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.mgx-keys button { font: inherit; font-size: 14px; padding: 10px 0; background: #e8d6ae; border: 3px solid #33210c; border-radius: 4px; cursor: pointer; color: #33210c; }
+.mgx-keys button:active { transform: translateY(2px); }

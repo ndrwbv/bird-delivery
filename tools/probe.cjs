@@ -9,6 +9,9 @@
    --kids                   ?kids (детская версия; на yandex она и так)
    --map=seversk  --lang=ru  --q=a=1&b  — добавки к адресу игры (?debug&mute&nolb&nointro уже есть)
    --fresh                  первый запуск как у новичка: без ?nointro, гайд и учебный заказ не пропущены
+   --page=ui.html           другая страница сборки (index.html по умолчанию): ждём не __dlv, а загрузку
+                            и window.__probeReady !== false. Песочница интерфейса: --page=ui.html — панель
+                            (window.__uilab), --page=ui.html --q=frame — сам экран (window.__ui), docs/SANDBOX.md
    --size=desktop|phone|deck|WxH   1280×720 / 390×844 с касаниями / 1280×800
    --js="код" | --eval=file.js     тело async-функции в странице. Есть: d (= __dlv), wait(ms),
                             until(fn, ms), run(secs, k) — дать игре идти secs секунд (k — ускорение
@@ -40,6 +43,8 @@ const arg = (k, d) => { const a = argv.find(x => x.startsWith('--' + k + '=')); 
 const has = k => argv.includes('--' + k);
 const T0 = Date.now();
 const MODE = arg('mode', 'web');
+const PAGE = arg('page', 'index.html').replace(/^\/+/, '');
+const GAME = PAGE === 'index.html';
 const SIZES = { desktop: [1280, 720], phone: [390, 844], deck: [1280, 800] };
 const SZ = arg('size', 'desktop');
 const [W, H] = SIZES[SZ] || (/^\d+x\d+$/.test(SZ) ? SZ.split('x').map(Number) : SIZES.desktop);
@@ -126,15 +131,15 @@ app.whenReady().then(async () => {
   if (has('kids')) q.push('kids');
   if (arg('map')) q.push('map=' + arg('map'));
   if (arg('q')) q.push(arg('q').replace(/^[?&]/, ''));
-  const url = 'app://g/index.html?' + q.join('&');
+  const url = 'app://g/' + PAGE + '?' + q.join('&');
   try { await win.loadURL(url); } catch (e) { err('probe: не открылась', url, e.message); }
   let ok = false;
   for (let i = 0; i < 240; i++) {
-    try { ok = await js(`!!(window.__dlv && __dlv.frame && __dlv.S && !document.body.classList.contains('booting'))`); } catch (e) { /* — */ }
+    try { ok = await js(GAME ? `!!(window.__dlv && __dlv.frame && __dlv.S && !document.body.classList.contains('booting'))` : `document.readyState === 'complete' && window.__probeReady !== false`); } catch (e) { /* — */ }
     if (ok) break;
     await sleep(100);
   }
-  if (!ok) { err('probe: игра не загрузилась за 24 с;', errors.length, 'ошибок:\n  ' + errors.slice(0, 5).join('\n  ')); clearTimeout(timer); return finish(1, { ok: false, loaded: false, errors }); }
+  if (!ok) { err('probe: ' + (GAME ? 'игра' : PAGE) + ' не загрузилась за 24 с;', errors.length, 'ошибок:\n  ' + errors.slice(0, 5).join('\n  ')); clearTimeout(timer); return finish(1, { ok: false, loaded: false, errors }); }
   await js(INSTALL);
   await sleep(200);                                   // модули дописывают себя в __dlv через setTimeout 0
   const tLoad = Date.now() - T0;

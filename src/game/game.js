@@ -29,12 +29,14 @@ import { fixMap, profileFn } from './mapcheck.js';
 import * as MAPW from './mapworks.js';
 import * as CBITS from './citybits.js';
 import * as SEAS from './seasons.js';
+import * as WTH from './weather.js';
 import * as LIFE from './life.js';               // парочки, богачи, графитисты, змеи и дроны в парках
 import * as WORLD from './world.js';
 import * as SL from './streetlamps.js';
 import * as WINS from './windows.js';          // окна: рамы, свет, комната за стеклом (windows.js)
 import * as PAINT from './citypaint.js';         // дома в цвет по номеру, муралы на торцах (citypaint.js)
 import * as BB from './billboards.js';            // щиты со смешной рекламой у больших дорог (billboards.js)
+import * as CONSTR from './construction.js';     // стройки на пустырях: шиферный забор, кран, техника, «паспорт объекта», самосвалы (construction.js)
 import * as CARL from './carlights.js';         // огни машины игрока: стоп-сигналы, поворотники, задний ход (carlights.js)         // фонари: все сбиваются, шары и консоли, частный сектор (streetlamps.js)
 import * as JUNK from './junk.js';              // остановки ломаются, мусор у подъездов, контейнеры (junk.js)             // плитка, аллеи; в карьере — мусор, бандиты, особняки, шашлыки
 import * as MAFIA from './mafia.js';             // мафиози у адреса: предупреждает, потом стреляет (детская — кидается помидорами)
@@ -60,6 +62,7 @@ import * as CAREERM from './career.js';          // карьера: смена 9
 import * as STORY from './story.js';             // сюжетные заказы и катсцены (баба Зина)
 import * as HSTORY from './herostories.js';      // герои города, этап 3: истории Стёпы, Ариши, Лёхи по главам (через story.js)
 import * as AUTO from './cars.js';               // карьера: 14 машин, мотор и ресурс, заглохла, ямы, гараж Дяди Жени
+import * as FEST from './festivals.js';          // фестивали на парковках ТЦ: кальянщики, тыква, День угнетения бургеров (festivals.js)
 import * as HK from './hookah.js';               // кальянщики на лавочках (в детской — самовар)
 import * as CULL from './cull.js';               // статика дальше камеры — со сцены, матрицы заморожены (Steam Deck)
 import * as TRK from './tracks.js';              // следы колёс на газоне и снегу
@@ -3634,6 +3637,13 @@ const bbApi = () => ({
   get ENV () { return ENV; },
 });
 let BB_API = null;
+/* что нужно construction.js (стройки на пустырях) */
+const consApi = () => ({
+  scene, CITY, ADULT, LIT, LITM, V, S, SOLIDS, GORE, SMASH, NODES, edgeOf, PIZZERIAS, GEN_ENTR, box, put, boxGeo, mergeGeos, obb, smashAdd, smashMesh,
+  groundH, inHouse, inBounds, nearestRoad, roadWidth, pushOut, sparks, puff, Snd, hurt: hurtCar, addFoot: houseFoot,
+  distAt: DIST.has() ? (x, z) => DIST.at(x, z) : null,
+  get TRAFFIC () { return TRAFFIC; },
+});
 const ENV_API = { get ENV () { return ENV; } };    // пиццерия-шар: ночная подсветка (pizzadome.js)
 /* что нужно citybits.js (забор, КПП, рельсы, крыши, купола, вывески ТЦ) */
 /* что нужно pizzeria.js: ламповый фасад и парковка курьеров */
@@ -3747,6 +3757,7 @@ function buildCity () {
   const tm = (k, f) => { const t0 = performance.now(); f(); BUILD_T[k] = Math.round(performance.now() - t0); };
   if (ADULT && !INTRO) tm('nightlife', () => NIGHT.build(nightApi()));   // стрип-клуб и места «ночных бабочек» (nightlife.js) — до деревьев и лавочек: они обходят пристройку
   tm('world', () => WORLD.build(worldApi()));     // аллеи; в карьере — газоны особняков, мусор, гаражи (world.js) — до деревьев и лавочек
+  if (!INTRO && !new URLSearchParams(location.search).has('nocons')) tm('construction', () => CONSTR.build(consApi()));   // стройки на пустырях — до деревьев и лавочек: участок обходят (construction.js); ?nocons — без них
   tm('life', () => { JUNK.init(junkApi()); osmStreetLife(); });
   tm('entr', osmEntrances);
   tm('vents', () => { BUILD_T.ventsInfo = CATS.build(CATS_API || (CATS_API = catsApi())); });   // продухи подвалов — после подъездов (cats.js)
@@ -6052,7 +6063,7 @@ function nextEdge (e) {
 
 /* дуга через перекрёсток: из конца своей полосы в начало следующей */
 function startTurn (t, over) {
-  const e = t.e, n = nextEdge(e);
+  const e = t.e, n = (t.dump && CONSTR.nextEdge(t, e)) || nextEdge(e);   // самосвал сворачивает к стройке (construction.js)
   if (!n) { placeTraffic(t, 120, 340); return; }
   const lane = clamp(t.lane, 0, laneCount(n) - 1);
   const p0 = lanePoint(e, t.lane, edgeRun(e)), p2 = lanePoint(n, lane, 0);
@@ -6151,6 +6162,7 @@ function respawnTraffic (t) {
   Object.assign(t, { mesh: fresh.mesh, model: fresh.model, taxi: fresh.taxi, hl: fresh.hl, cruise: fresh.cruise });
   scene.add(t.mesh);
   HB.onRespawn(t);                                // старый прицеп долой, жребий на коневозку заново (horsebox.js)
+  CONSTR.onRespawn(t);                            // и на самосвал (construction.js)
   // сразу ставим на новое место: иначе в следующем кадре машина всё ещё
   // числится за полкилометра и рождается заново — и так каждый кадр
   placeTraffic(t, 120, 340);
@@ -8434,6 +8446,7 @@ function routeTail (x, z) {
   RT.key = key; RT.cand = []; RT.tail = new Map();
   for (const r of [80, 200, 500, 1500]) {
     edgesNear(x, z, r, (a, b, px, pz, d) => {
+      if (NODES[a].fx && NODES[a].fx.has(b)) return;   // проезд сквозь фестиваль закрыт блоками (festivals.js)
       RT.cand.push({ a, b, x: px, z: pz, c: d * 2 + (d > 4 && throughHouse(px, pz, x, z) ? 400 : 0) });
     });
     if (RT.cand.length) break;
@@ -8522,6 +8535,7 @@ function roadPath (x0, z0, x1, z1, h, deck) {
       for (const v of U.nb) {
         const N = NODES[v];
         if (!free && (N.out || N.lock) && !RT.tail.has(v)) continue;   // за линию закрытого города и в закрытый район не ведём
+        if (U.fx && U.fx.has(v)) continue;           // сквозь фестиваль — блоки (festivals.js)
         relax(v, g + Math.hypot(N.x - U.x, N.z - U.z), u);
       }
     }
@@ -9144,6 +9158,7 @@ function driveStep (dt) {
   }
 
   JUNK.car(noseX, noseZ, tailX, tailZ, CAR_W);    // контейнеры: упираются, толкаются, опрокидываются (junk.js)
+  CONSTR.car(noseX, noseZ, tailX, tailZ, CAR_W);  // бытовки и техника строек: толкаются, мнутся (construction.js)
 
   // пешеходов ловим прямоугольником кузова, а не кругом вокруг центра
   const underCar = (px, pz) => {
@@ -11192,7 +11207,7 @@ function newOrder () {
 
   for (const st of plan.stops) {
     st.persons = st.peds.map(p => p.person);
-    st.addr = st.surf ? $t(MAP.river.at) : realAddress(st.peds[0].x, st.peds[0].z);
+    st.addr = st.fixAddr || (st.surf ? $t(MAP.river.at) : realAddress(st.peds[0].x, st.peds[0].z));
     st.note = pick(COURIER_NOTES);
     // групповой: остальные подходят к первому и ждут вместе
     if (st.peds.length > 1) {
@@ -12008,6 +12023,7 @@ function reviveTick (dt) {
 function startRun (ride) {
   S.ride = !!ride;
   if (!S.ride && !QR.on()) SEAS.advanceSeason();   // каждая смена — шаг к следующему времени года (быстрый заезд — свой сезон)
+  WTH.shiftStart(S.ride);                         // вариант погоды на смену: жара, гроза, снегопад… (weather.js)
   S.free = S.ride;                               // катаемся без срока и не в зачёт
   $('wasted').hidden = true;
   document.body.classList.remove('w-show');
@@ -12022,9 +12038,11 @@ function startRun (ride) {
   S.state = 'drive'; S.hp = S.hpMax; S.money = 0; S.orders = 0; S.burgers = 0; S.shiftT = 0;
   S.people = 0; S.wrecks = 0; S.delivered = 0; S.scoots = 0; S.revives = 0;
   JUNK.reset();                                    // снесённые остановки и контейнеры — на место, S.stops = 0 (junk.js)
+  CONSTR.reset();                                  // стройки — как новые: забор, кучи, бытовки и техника (construction.js)
   S.hurt = 0; S.shake = 0;
   S.freeRun = S.free;
   S.lvl0 = levelOf(getXP());
+  if (CAREER) { FEST.shiftStart({ ride: S.ride, quick: QR.on() }); if (!S.ride) FEST.announce(); }   // фестиваль в эту смену? (festivals.js)
   if (CAREER && !S.ride) CAREERM.startShift();   // часы — на 9:00, обед, звёзды за смену; волна щедрости (districts.js)
   NOS.tank = DISTRICTS && !S.ride ? DIST.pace().tank : 0.5; NOS.burn = false;
   for (const n of NITRO_CANS) { n.t = 0; }
@@ -12105,7 +12123,7 @@ function orderInfo () {
     if (S.fee > 0) rows.push([$t('оплата'), money(S.fee)]);
   } else rows.push([$t('заказ'), '<b>' + $t('заказа пока нет') + '</b>']);
   rows.push([$t('сейчас'), (CAREER && CAREERM.shiftOn() ? CAREERM.clockText() : envClock()) + ' · ' + envPhaseName(ENV.t) +
-    '<small>' + SEAS.seasonName() + (ENV.rainWant ? ' · ' + (SEAS.snowy() ? $t('снег, скользко') : $t('дождь, скользко')) : '') + '</small>']);
+    '<small>' + SEAS.seasonName() + (WTH.label() ? ' · ' + WTH.label() : '') + (ENV.rainWant ? ' · ' + (SEAS.snowy() ? $t('снег, скользко') : $t('дождь, скользко')) : '') + '</small>']);
   const faces = persons.filter(Boolean).slice(0, 2).map(p => '<div class="oc-p"><img src="' + faceDataURL(p) + '" alt=""></div>').join('');
   return '<div class="pm-inv-top"><span>' + head + '</span><span>№ ' + String(S.orders).padStart(4, '0') + '</span></div>' +
     '<div class="oc-sheet"><table class="oc-inv">' + rows.map(([k, v]) => '<tr><th>' + k + '</th><td>' + v + '</td></tr>').join('') + '</table>' +
@@ -12351,7 +12369,7 @@ if (CAREER) CAREERM.init({ S, NOS, Snd, ADULT, get DAY_LEN () { return DAY_LEN; 
   person: o => makePerson(o), face: (p, size) => faceDataURL(p, size) });
 /* быстрый заезд (quickrun.js): сохранение — в песочнице, в конце машина, пиццерия и сюжет — снова как в карьере */
 if (CAREER) QR.init({ Platform, Store, S, Snd, money, cars: () => AUTO,
-  seasons: { value: SEAS.seasonValue, forced: SEAS.seasonForced, set: SEAS.setSeason, name: SEAS.seasonName },
+  seasons: { value: SEAS.seasonValue, forced: SEAS.seasonForced, set: SEAS.setSeason, name: SEAS.seasonName }, weather: WTH,
   startRun: () => { Snd.boot(); Snd.resume(); startRun(); },
   toMenu: () => { S.state = 'title'; $('over').hidden = true; showTitle(); },
   afterQuick: () => {
@@ -12427,9 +12445,16 @@ for (const [px, pz, ry] of PARKED) {
 const TRAFFIC_N = 24;
 spawnTraffic(INTRO ? 22 : Math.min(TRAFFIC_N, trafficWant()));
 if (!INTRO) { buildSpots(); buildCollect(); }
+/* погода смены (weather.js): сугробы снежной зимы — после адресов, чтобы их не завалить */
+WTH.init({ THREE, scene, cam, renderer, Store, MAP, CITY, V, S, SPOTS, ZEBRAS, Snd, toast, groundH, curbAt, nearestRoad, roadWidth, drivable, inHouse, inPoly, inBounds,
+  makeHuman, dropMesh, gibHuman, CAR_L, CAR_W, isPlaying, intro: INTRO, PIZZERIAS, get PIZZA () { return PIZZA; },
+  get ENV () { return ENV; }, get sun () { return sun; }, get hemi () { return hemi; }, get amb () { return amb; } });
 buildNitro();
 districtLocks();                                  // закрытые районы: перекрытия на въездах
 if (!INTRO) HK.init({ THREE, scene, BENCHES, V, S, ADULT, makeHuman, makePerson, dropMesh, gibHuman, groundH, curbAt, fxAdd, puffGeo, steam, toast, Snd, CAR_L, CAR_W, t: $t });
+if (!INTRO && CAREER) FEST.init({ THREE, scene, V, S, CITY, ADULT, Store, obb, SOLIDS, indexSolids, NODES, TRAFFIC, put, mergeGeos, groundH, inHouse, inPoly, nearestRoad, solidAt,
+  makeHuman, makePerson, dropMesh, sayBubble, fxAdd, puffGeo, steam, gibBurger, popBonus, toast, chat: s => CHAT.say(s), addWallet, money, CASH, Snd, CAR_L, CAR_W, HEROES, DIST,
+  season: () => SEAS.seasonValue() });   // фестивали на парковках ТЦ (festivals.js)
 /* ─────────────── сутки, погода, облака и птицы ───────────────
    Время идёт: утро → день → вечер → ночь → утро, полный круг за восемь
    минут. Небо, туман и свет плавно перетекают между ключевыми точками.
@@ -12655,7 +12680,7 @@ function updateEnv (dt) {
   const A = SKY_KEYS[i], B = SKY_KEYS[i + 1], k = ease(clamp((ENV.t - A[0]) / (B[0] - A[0]), 0, 1));
   const mix = (a, b) => CA.set(a).lerp(CB.set(b), k);
   // погода: изредка дождь на минуту-полторы
-  if (S.state !== 'title' && S.state !== 'over') {
+  if (S.state !== 'title' && S.state !== 'over' && !WTH.rainControl(ENV, dt)) {   // в дождь и грозу смены дождём правит weather.js
     ENV.rainT -= dt;
     if (ENV.rainT <= 0) {
       // дождь редко и ненадолго: чаще светит солнце
@@ -13100,6 +13125,7 @@ function frameStep (now) {
   CL.step('props', updateProps, dt);
   CL.step('lamps', SL.step, dt);                                     // сбитые фонари падают и лежат (streetlamps.js)
   CL.step('traffic', updateTraffic, dt);
+  CL.step('construction', CONSTR.step, dt);       // краны, упавший забор, толкнутая техника, самосвалы (construction.js) — до коневозок
   CL.step('horsebox', HB.step, dt, HB_API || (HB_API = hbApi()));   // коневозки: прицеп за машиной (horsebox.js)
   CL.step('peds', updatePeds, dt);
   CL.step('people', updatePeople, dt);
@@ -13121,6 +13147,7 @@ function frameStep (now) {
   CL.at.ph = 'world';
   CL.step('smokers', updateSmokers, dt);
   CL.step('hookah', HK.step, dt);                                    // кальянщики на лавочках
+  if (CAREER) CL.step('festivals', FEST.step, dt);                    // фестиваль на парковке ТЦ (festivals.js)
   CL.step('parties', updateParties, dt);
   CL.step('collect', updateCollect, dt);
   CL.step('trunk', updateTrunk, dt);
@@ -13144,6 +13171,7 @@ function frameStep (now) {
   if (CAREER) CAREERM.step(dt);                   // часы смены, обед в 14:00, полночь
   CL.at.ph = 'world';
   CL.step('seasons', SEAS.updateSeasons, dt);                         // снег, небо, снежки
+  CL.step('weather', WTH.update, dt);                                // жара, гроза с молниями, сугробы и ледянки (weather.js)
   CL.step('crowds', updateCrowds, dt);
   if (ADULT && !INTRO) CL.step('nightlife', NIGHT.step, dt);            // ночная жизнь, только взрослая (nightlife.js)
   CL.step('life', LIFE.step, dt, LIFE_API);
@@ -13252,7 +13280,7 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) wi
 if (window.__dlv) { window.__dlv.BOARD = BOARD; window.__dlv.Platform = Platform; }   // таблица рекордов Стима (board.js)
 if (window.__dlv) window.__dlv.crashlog = CL;        // журнал ошибок: entries(), text(), disabled() (docs/CRASHES.md)
 if (window.__dlv) Object.assign(window.__dlv, { pinFront, nearClient, PIN });   // пин перед клиентом, кто у клиента лишний (docs/ORDERS.md)
-if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)
+if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG, CONS: CONSTR.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)
 if (window.__dlv) Object.assign(window.__dlv, { HB: HB.DEBUG, FLIRT: ADULT ? FLIRT.DEBUG : null });   // коневозки, заигрывание (только взрослая)
 if (window.__dlv) { window.__dlv.FOREST = FOREST.DEBUG; window.__dlv.PZD = PZD.DEBUG; window.__dlv.cam = cam; }   // ельник и пиццерия-шар (forest.js, pizzadome.js)
 if (window.__dlv) { window.__dlv.SL = SL.DEBUG; window.__dlv.LAMP_SPOTS = LAMP_SPOTS; window.__dlv.smashHit = smashHit; window.__dlv.CARL = CARL.DEBUG; }   // фонари и огни машины

@@ -271,6 +271,8 @@ function courierPerson () {
   PEOPLE_CACHE.set('_courier', p);
   return p;
 }
+/* песочница интерфейса (src/uilab): портреты для реплик без катсцены — хозяин истории и курьер */
+export const PERSON = { host: id => { const s = STORIES.find(q => q.id === id); return s ? storyPerson(s) : null; }, courier: () => courierPerson() };
 
 /* ─────────────── где живёт ─────────────── */
 const HOME = new Map();

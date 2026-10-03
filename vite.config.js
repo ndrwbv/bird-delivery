@@ -27,8 +27,9 @@ export default defineConfig(({ mode }) => ({
   build: {
     target: 'es2022', outDir: 'dist/' + mode, assetsInlineLimit: 0, sourcemap: false, emptyOutDir: true,
     // sandbox.html — песочница для проверки механик (docs/SANDBOX.md): в web и Стиме есть, в Яндекс не попадает.
+    // ui.html — песочница интерфейса (экраны без мира, docs/SANDBOX.md): только в web (и в dev).
     // В Стиме рядом с игрой — ещё страница диагностики геймпада (--page=pad.html)
-    ...(mode !== 'yandex' ? { rollupOptions: { input: { index: 'index.html', sandbox: 'sandbox.html', ...(mode === 'steam' ? { pad: 'pad.html' } : {}) } } } : {}),
+    ...(mode !== 'yandex' ? { rollupOptions: { input: { index: 'index.html', sandbox: 'sandbox.html', ...(mode === 'web' ? { ui: 'ui.html' } : {}), ...(mode === 'steam' ? { pad: 'pad.html' } : {}) } } } : {}),
   },
   // AGENT=1 — dev-сервер для агентов: не перезагружается от чужих правок (docs/AGENTS.md); свежий код — F5
   server: { host: '127.0.0.1', ...(process.env.AGENT ? { watch: null, hmr: false } : {}) },
