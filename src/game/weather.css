@@ -1,6 +1,6 @@
 /* погода смены (weather.js): подпись варианта в начале смены — «жара +34°», «снегопад», «гроза» */
 #wx-cap {
-  position: absolute; left: 50%; top: 16%; transform: translate(-50%, -50%);
+  position: absolute; left: 50%; top: 27%; transform: translate(-50%, -50%);
   display: flex; flex-direction: column; align-items: center; gap: 8px;
   opacity: 0; pointer-events: none; text-align: center; z-index: 12; max-width: 92vw;
 }
@@ -18,4 +18,10 @@
   10% { opacity: 1; transform: translate(-50%, -50%); }
   85% { opacity: 1; }
   100% { opacity: 0; transform: translate(-50%, -60%); }
+}
+/* низкий экран (телефон боком): ниже верхнего табло и мельче */
+@media (max-height: 500px) {
+  #wx-cap { top: 46%; gap: 5px; }
+  #wx-cap b { font-size: clamp(16px, 5.5vh, 26px); }
+  #wx-cap span { font-size: clamp(8px, 2.6vh, 11px); padding: 5px 10px; }
 }

@@ -5183,8 +5183,8 @@ function solidAt (x, z, r) {
   }
   return false;
 }
-const pinRay = (x, z) => !inHouse(x, z) && !solidAt(x, z, 0.25) && !YARDS.blocks(x, z, 0.25);   // заборчики и лавочки у подъездов (yards.js) — тоже
-const pinFree = (x, z) => inBounds(x, z, 5) && groundH(x, z) >= 0.3 && !inHouse(x, z, PIN.WALL) && !solidAt(x, z, PIN.CAR) && !YARDS.blocks(x, z, PIN.CAR);
+const pinRay = (x, z) => !inHouse(x, z) && !solidAt(x, z, 0.25) && !YARDS.blocks(x, z, 0.25) && !FEST.blocks(x, z);   // и не внутрь фестиваля (festivals.js)   // заборчики и лавочки у подъездов (yards.js) — тоже
+const pinFree = (x, z) => inBounds(x, z, 5) && groundH(x, z) >= 0.3 && !inHouse(x, z, PIN.WALL) && !solidAt(x, z, PIN.CAR) && !YARDS.blocks(x, z, PIN.CAR) && !FEST.blocks(x, z, PIN.CAR);
 function pinFront (cx, cz, off = PIN.OFF) {
   const r = nearestRoad(cx, cz, 7, 2);           // любая дорога, проезд во двор или дорожка
   const ra = r && r.d > 0.5 ? Math.atan2(r.x - cx, r.z - cz) : null;
@@ -8434,7 +8434,7 @@ function edgesNear (x, z, r, fn) {
 /* отрезок к клиенту проходит сквозь дом? (концы не считаем: клиент стоит у стены) */
 function throughHouse (x0, z0, x1, z1) {
   const l = Math.hypot(x1 - x0, z1 - z0);
-  for (let d = 1.5; d < l - 1.5; d += 2) if (inHouse(lerp(x0, x1, d / l), lerp(z0, z1, d / l))) return true;
+  for (let d = 1.5; d < l - 1.5; d += 2) { const x = lerp(x0, x1, d / l), z = lerp(z0, z1, d / l); if (inHouse(x, z) || FEST.blocks(x, z)) return true; }   // и сквозь фестиваль (festivals.js)
   return false;
 }
 /* куда на дороге подъезжать к клиенту: кандидаты на ближних кусках улиц.
@@ -11221,7 +11221,7 @@ function newOrder () {
         makeGuest(p, { x: gx + Math.sin(ang) * rad, z: gz + Math.cos(ang) * rad });
       });
       startParty(gx, gz, st.peds);
-    } else makeGuest(st.peds[0]);
+    } else makeGuest(st.peds[0], st.fest ? { x: st.peds[0].x, z: st.peds[0].z } : undefined);   // фестиваль: ждёт в проходе, не на лавке (festivals.js)
     pinStop(st);                                  // где ждёт — решено сейчас, пин больше не двигается
   }
 
@@ -11242,7 +11242,7 @@ function newOrder () {
   // Шлагбаум вешаем на въезд ближайшей дворовой парковки, а не в
   // случайную точку: раньше стрела торчала посреди газона.
   const first = S.order.stops[0].peds[0];
-  if (S.orders > 1 && chance(0.4)) {
+  if (S.orders > 1 && chance(0.4) && !S.order.stops[0].fest) {   // к проходу фестиваля — без шлагбаума
     let best = null, bd = 34;
     for (const pk of PARKINGS) {
       const d = Math.hypot(pk.cx - first.x, pk.cz - first.z);

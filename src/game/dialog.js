@@ -58,7 +58,7 @@ export function speechify (text, mood = 'calm', rnd = Math.random) {
     out.push(w);
   }
   if (rnd() < pf * 1.5) out.unshift(t(FILL[0]) + '…');
-  return out.join(' ');
+  return out.join(' ').replace(/(\d) (?=\d|[%₽$€])/g, '$1\u00a0');   // «85 %», «8 300 ₽» не рвутся переносом строки
 }
 
 export function say (o) {

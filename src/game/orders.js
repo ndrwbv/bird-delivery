@@ -520,7 +520,7 @@ function bindSpec (spec) {
       A.pushOut(b, 0.5);
       peds.push(b);
     }
-    stops.push({ peds, key: st.key, zone: st.zone, ...(spec.fest ? { fixAddr: st.addr } : {}) });   // фестиваль: адрес — «… проход», не дом рядом
+    stops.push({ peds, key: st.key, zone: st.zone, ...(spec.fest ? { fixAddr: st.addr, fest: true } : {}) });   // фестиваль: адрес — «… проход», не дом рядом
   }
   if (!stops.length) return null;
   spec.stops = spec.stops.slice(0, stops.length);

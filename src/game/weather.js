@@ -106,7 +106,7 @@ export function shiftStart (ride) {
   let id = FORCE || pickFor(n, bucket());
   if (FORCE && !fits(FORCE, bucket())) SEAS.setSeason(HOME[FORCE], true);   // быстрый заезд: «жара» — значит лето
   set(id, n);
-  caption(1.1);
+  caption(0.8);
 }
 /* поставить вариант сейчас */
 function set (id, n = N) {
@@ -145,8 +145,16 @@ export const NAME = {
   clear: () => t('обычная'), heat: () => t('жара'), golden: () => t('золотая осень'), snowy: () => t('снежная зима'),
   rain: () => t('дождь'), storm: () => t('гроза'),
 };
-let capEl = null, capT = 0;
-function caption (delay = 0) {
+let capEl = null, capT = 0, capWait = -1;
+/* подпись ждёт, пока не закроют накладную (state 'brief') и не загрузят пиццу: потом ещё delay с */
+function caption (delay = 0) { capWait = TITLE[ID] ? delay : -1; }
+const capFree = () => C.isPlaying() && C.S.state !== 'brief' && C.S.state !== 'loading' && !document.body.classList.contains('brief');
+function capStep (dt) {
+  if (capEl && capEl.classList.contains('on') && document.body.classList.contains('brief')) capEl.classList.remove('on');   // открыли накладную — подпись прочь
+  if (capWait < 0 || !capFree()) return;
+  if ((capWait -= dt) <= 0) { capWait = -1; showCaption(); }
+}
+function showCaption () {
   if (!TITLE[ID]) return;
   if (!capEl) {
     capEl = document.createElement('div');
@@ -159,7 +167,9 @@ function caption (delay = 0) {
   capEl.querySelector('span').textContent = SUB[ID]();
   clearTimeout(capT);
   capEl.classList.remove('on');
-  capT = setTimeout(() => { void capEl.offsetWidth; capEl.classList.add('on'); capT = setTimeout(() => capEl.classList.remove('on'), 4200); }, delay * 1000);
+  void capEl.offsetWidth;
+  capEl.classList.add('on');
+  capT = setTimeout(() => capEl.classList.remove('on'), 4200);
 }
 
 /* дождь: true — расписанием управляет вариант (game.js updateEnv своё не крутит) */
@@ -302,11 +312,11 @@ function thunder (dist) {
 }
 
 /* ─────────────── снежная зима: сугробы до второго этажа ───────────────
-   Вдоль стен домов (у трёх из четырёх, с разрывами) — кучи высотой 3,4—5,2 м у домов в 2 этажа и
+   Вдоль стен домов (у 60 % домов, с разрывами) — кучи высотой 3,4—5,2 м у домов в 2 этажа и
    выше, 1,5—2,3 м у одноэтажных. Вдоль улиц — валы 1,7—2,7 м сразу за тротуаром. Ни один не
    залезает на асфальт (проезды во дворах тоже) и не стоит ближе своего размера + 3,5 м к адресу
    заказа или двери подъезда; у пиццерии (45 м), зебр и остановок — нет. Одна склейка по клеткам
-   100 м с тем же материалом, что сугробы сезона (новых программ нет), видна только в снежную зиму. */
+   200 м с тем же материалом, что сугробы сезона (новых программ нет), видна только в снежную зиму. */
 let DEEP_MESH = [];
 const DEEP = new Map(), DEEP_LIST = [], SLED_SPOTS = [];
 const DSTAT = { house: 0, road: 0, ms: 0, tris: 0 };
@@ -562,6 +572,7 @@ const PERF = { ms: 0, n: 0 };
 export function update (dt) {
   if (!C) return;
   const t0 = performance.now();
+  capStep(dt);
   sky(dt);
   if (ID === 'snowy') stepDeep(dt);
   stepSleds(dt);

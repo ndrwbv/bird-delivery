@@ -1,6 +1,6 @@
 /* Собрать все строки для перевода в src/i18n/_source.json.
 
-   Берём: $t('…') / t('…') / N_('…') — ключ-строка; $tn(n, 'a|b|c') / tn(…) —
+   Берём: $t('…') / t('…') / tr('…') / N_('…') — ключ-строка; $tn(n, 'a|b|c') / tn(…) —
    множественное (plural: true); из index.html — текст [data-i18n],
    [data-i18n-html], значения data-i18n-ph / data-i18n-title. У каждого ключа —
    где встретился (ctx), чтобы переводчику было видно, что это за строка.
@@ -35,7 +35,7 @@ function scanJs (file) {
     const k = toks[i];
     if (k.kind !== 'str') continue;
     const pre = src.slice(Math.max(0, k.start - 5), k.start);
-    if (/(?:\$t|(?<![\w$.])t|N_)\($/.test(pre)) add(unq(k.value), rel + ':' + k.line);
+    if (/(?:\$t|(?<![\w$.])tr?|N_)\($/.test(pre)) add(unq(k.value), rel + ':' + k.line); // tr — `import { t as tr }`
     // $tn(выражение, 'a|b|c') — ищем открывающую скобку назад, до запятой верхнего уровня
     else if (/,\s*$/.test(pre)) {
       let j = k.start - 1, depth = 0;

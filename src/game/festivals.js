@@ -201,6 +201,16 @@ function kindRoll (prev) {
 }
 const isAutumn = () => { const s = A.season ? A.season() : 0; const y = ((s % 4) + 4) % 4; return y >= 1 && y < 2; };
 
+/* решить на смену: shifts — законченных смен игрока, sv — память (last, since, kind), n — сколько площадок.
+   → вид фестиваля или null; sv меняется на месте */
+function decide (shifts, sv, n) {
+  if (!n || shifts < FEST.FROM || sv.last === shifts - 1) return null;   // нет площадки, рано, вчера уже был
+  const since = sv.since || 0;
+  if (since + 1 < FEST.PITY && Math.random() >= FEST.CHANCE) { sv.since = since + 1; return null; }
+  const kind = kindRoll(sv.kind);
+  sv.since = 0; sv.last = shifts; sv.kind = kind;
+  return kind;
+}
 export function shiftStart (o = {}) {
   if (!A) return;
   const want = ST.forced;
@@ -208,16 +218,9 @@ export function shiftStart (o = {}) {
   if (o.ride || o.quick) { stop(); return; }
   if (want) { start(want.kind, want.site); return; }
   const shifts = +A.Store.get('dlv-shifts', 0) || 0, sv = load(), choices = siteChoices();
-  let go = false;
-  if (choices.length && shifts >= FEST.FROM && sv.last !== shifts - 1) {
-    const since = sv.since || 0;
-    go = since + 1 >= FEST.PITY || Math.random() < FEST.CHANCE;
-    sv.since = go ? 0 : since + 1;
-  }
-  if (!go) { save(sv); stop(); return; }
-  const kind = kindRoll(sv.kind);
-  sv.last = shifts; sv.kind = kind;
+  const kind = decide(shifts, sv, choices.length);
   save(sv);
+  if (!kind) { stop(); return; }
   start(kind, pick(choices));
 }
 
@@ -933,6 +936,8 @@ export function burgerRoll () {
   if (!F || F.kind !== 'burger') return 0;
   return Math.random() < FEST.BURGER_SHARE ? FEST.BURGER_K : 0;
 }
+/* точка внутри блоков (с запасом m)? — пин клиента туда не ставим (game.js pinFront) */
+export const blocks = (x, z, m = 0) => !!F && insideRect(x, z, m);
 export const active = () => (F ? { kind: F.kind, mall: F.site.mall } : null);
 
 /* ─────────────── отладка: __dlv.FEST ─────────────── */
@@ -972,6 +977,20 @@ export const DEBUG = {
     return { n: pts.length, free: pts.filter(p => p.ok).length, sides: by, front: by[0] };
   },
   inside: (x, z) => insideRect(x, z),
+  /* прогон решения на N смен подряд (площадка есть всегда): сколько фестивалей, какие, самый долгий перерыв */
+  sim: (N = 3200, season) => {
+    const sv = {}, cnt = { none: 0 }, s0 = A.season;
+    let gap = 0, maxGap = 0, row = 0;
+    for (let i = 0; i < N; i++) {
+      if (season === undefined) A.season = () => (i / 8) % 4;           // год — 32 смены
+      else A.season = () => season;
+      const k = decide(i, sv, 1);
+      cnt[k || 'none'] = (cnt[k || 'none'] || 0) + 1;
+      if (k) { if (gap === 0 && i > FEST.FROM) row++; maxGap = Math.max(maxGap, gap); gap = 0; } else if (i >= FEST.FROM) gap++;
+    }
+    A.season = s0;
+    return { N, ...cnt, share: +((N - cnt.none) / (N - FEST.FROM)).toFixed(3), maxGap, twoInRow: row };
+  },
   local: (x, z) => (F ? local(x, z) : null),
   crowdAt: () => (F && F.crowd ? F.crowd.P.map(q => [+q.x.toFixed(1), +q.z.toFixed(1)]) : []),
   mascot: () => (F && F.mascot ? { x: +F.mascot.x.toFixed(1), z: +F.mascot.z.toFixed(1), down: F.mascot.down } : null),
