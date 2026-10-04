@@ -13,6 +13,8 @@
   [docs/ORDERS.md](docs/ORDERS.md) (заказы, клиенты, штрафы), [docs/CONTENT.md](docs/CONTENT.md)
   (детская и взрослая версии). План работ — [docs/IDEAS.md](docs/IDEAS.md), куда идём —
   [docs/DIRECTION.md](docs/DIRECTION.md). Как проверять — [docs/AGENTS.md](docs/AGENTS.md).
+- Словарь терминов автора (сессия, смена, событие, хад…) — [docs/TERMS.md](docs/TERMS.md); новое
+  неочевидное слово автора — сразу туда.
 - Код: `src/game/*.js`. `game.js` огромный (13 тыс. строк) — не читать целиком, грепать.
   Числа экономики — `econ.js`, заказы — `orders.js` / `orders.config.js`, смена — `career.js`.
 - Отладка: с `?debug` (и всегда в dev) есть `window.__dlv` — состояние и ручки игры.
