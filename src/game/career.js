@@ -4,7 +4,8 @@
 
      CAREERM.init(api)       — один раз из game.js (что нужно — см. init)
      CAREERM.startShift()    — из startRun, когда это смена, а не «просто покататься»
-     CAREERM.step(dt)        — каждый кадр: часы, обед, полночь, удары
+     CAREERM.step(dt)        — каждый кадр: часы, полночь, удары
+     CAREERM.atBase(next)    — вернулся в пиццерию: обед (с 14:00) или развоз смены (после полуночи)
      CAREERM.showEnd(why, whyText) — экран итогов вместо прежнего #over
      CAREERM.clientKilled(victim, fee) — сбил своего клиента: штраф в цену его заказа (CLIENT_KILL)
 
@@ -207,14 +208,37 @@ export function step (dt) {
   if (hu > SH.lastHurt + 0.05) SH.hits++;
   SH.lastHurt = hu;
   const h = schedHour();                          // по расписанию 9…24 (в круглосуточной смена может идти с ночи)
-  if (!SH.lunch && h >= ECON.SHIFT.LUNCH_H && h < 24 && ['drive', 'back', 'handover', 'side'].includes(S.state) && !A.choiceOpen()) showLunch();
   if (SH.phase === '' && h >= 24) midnight();
   clockStep();
 }
 
-/* ── обед в 14:00: одно из трёх до конца смены ── */
+/* ── вернулся в пиццерию (game.js: «отдал заказ и доехал назад», handover без заказа) ──
+   После полуночи — развоз смены, если ждут (orders.js staffHere). С 14:00 — обед, раз за смену: Толик
+   управляющий диалогом «на, похавай», потом выбор. true — ход забрали: next() (следующий заказ) — потом */
+const LUNCH_SAY = /*i18n*/ [
+  'о, вернулся. на, похавай — что будешь?',
+  'стоять! обед. на, похавай, потом поедешь',
+  'два часа уже. на, похавай — за счёт заведения',
+];
+export function atBase (next) {
+  if (!A || !SH.on || A.S.ride) return false;
+  if (SH.phase === 'late') return !!(ORD && ORD.staffHere && ORD.staffHere());
+  if (SH.lunch || SH.phase !== '') return false;
+  const h = schedHour();
+  if (h < ECON.SHIFT.LUNCH_H || h >= 24) return false;
+  SH.lunch = true;
+  A.S.handT = 1e9;                                  // пока обедаешь — следующий заказ не берём
+  const go = () => { if (SH.on && A.S.state === 'handover' && !A.S.order) showLunch(next); };
+  const p = CHAT.person && CHAT.person();
+  if (!p) { go(); return true; }
+  DLG.say({ person: p, name: t('Толик управляющий'), text: t(LUNCH_SAY[Math.floor(Math.random() * LUNCH_SAY.length)]),
+    accept: t('давай'), mood: 'calm', color: '#3fae5a' }).then(go, go);
+  return true;
+}
+
+/* ── обед (с 14:00, в пиццерии): одно из трёх до конца смены; next — после выбора ── */
 function lunchClass (on) { const c = $('choice'); if (c) c.classList.toggle('cr-lunch', on); }
-function showLunch () {
+function showLunch (next) {
   SH.lunch = true;
   const S = A.S, L = ECON.LUNCH, T = ECON.TIPS;
   const opts = [
@@ -233,6 +257,7 @@ function showLunch () {
       lunchClass(false);
       o.fn();
       A.popBonus(t('обед: {what}', { what: o.label }), o.sub);
+      if (next) next();
     } })),
   });
   lunchClass(true);
@@ -261,7 +286,7 @@ async function midnight () {
    смена кончается сама — чтобы она не повисла, что бы ни случилось с развозом */
 function lateGuard (dt) {
   const S = A.S, riding = S.order && S.order.ord && S.order.ord.type === 'staff';
-  if (riding || DLG.isOpen() || A.choiceOpen()) { SH.lateT = 0; return; }
+  if (riding || DLG.isOpen() || A.choiceOpen() || (ORD && ORD.staffWaiting && ORD.staffWaiting())) { SH.lateT = 0; return; }   // едет за ними в пиццерию — ждём
   if ((SH.lateT = (SH.lateT || 0) + dt) < 6) return;
   SH.lateT = -1e9;
   A.toast(SH.allDay ? t('смена всё — {time}', { time: ECON.clock(hour()) }) : t('полночь — смена всё'));

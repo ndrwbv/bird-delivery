@@ -427,14 +427,18 @@ html[data-map="moscow"] #radar { cursor: zoom-in; pointer-events: auto; }
 #fullmapc { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 .fm-leg { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 7px; color: #fff3d6; }
 .fm-leg i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; vertical-align: -1px; border: 1px solid #33210c; }
-.lg-me { background: #ffd85e; box-shadow: 0 0 0 2px #33210c; } .lg-dodo { background: #f0522a; }
-/* куда везти — красный пин, мигает жёлтым, как на радаре и карте */
-.fm-leg i.lg-to { width: 10px; height: 10px; background: #ff3b1f; border-color: #2a1206; border-radius: 50% 50% 50% 0;
+.lg-me { background: #ffd85e; box-shadow: 0 0 0 2px #33210c; }
+/* пиццерия — домиком, как на карте и радаре */
+.fm-leg i.lg-dodo { width: 10px; height: 10px; border: 0; background: #f0522a; clip-path: polygon(50% 0, 100% 45%, 86% 45%, 86% 100%, 14% 100%, 14% 45%, 0 45%); }
+/* куда везти — красный пин с пиццей, мигает жёлтым, как на радаре и карте */
+.fm-leg i.lg-to { width: 10px; height: 10px; background: radial-gradient(circle, #c8322a 0 16%, #ffd85e 17% 38%, #e0a24a 39% 50%, #ff3b1f 51%);
+                  border-color: #2a1206; border-radius: 50% 50% 50% 0;
                   transform: rotate(-45deg); margin-right: 6px; animation: lg-to-blink 0.9s steps(2) infinite; }
 @keyframes lg-to-blink { 50% { box-shadow: 0 0 0 3px #ffe14d; } }
 .lg-sig { background: #3fd15e; border-radius: 50%; } .lg-nos { background: #6fd3ff; } .lg-car { background: #5b6b80; }
 /* маршрут и пробка — полоской; бандиты — красный круг; районы — рамка и штриховка; гараж, КПП */
-.fm-leg i.lg-route { width: 14px; height: 4px; vertical-align: 1px; background: #ff8a2b; border-color: #5a2a00; }
+/* маршрут: к клиенту — оранжевый, в пиццерию — зелёный */
+.fm-leg i.lg-route { width: 14px; height: 4px; vertical-align: 1px; background: linear-gradient(90deg, #ff8a2b 50%, #3fd15e 50%); border-color: #5a2a00; }
 .fm-leg i.lg-jam { width: 14px; height: 3px; vertical-align: 2px; background: #e8323c; border: 0; }
 .fm-leg i.lg-gang { width: 10px; height: 10px; border-radius: 50%; background: rgba(226, 48, 56, 0.35); border: 2px solid #c81e28; box-sizing: border-box; }
 .fm-leg i.lg-mine { background: transparent; border: 2px solid #ffd85e; box-sizing: border-box; }

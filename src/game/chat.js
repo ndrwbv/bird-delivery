@@ -23,7 +23,7 @@
                                             показано и уменьшилось (не дольше max мс) — конец смены ждёт
      CHAT.waiting()                       — идёт idle(): отложенная похвала всё равно показывается
    Из shiftend.js (экран Толика в конце смены):
-     CHAT.avatar(size)                    — его лицо картинкой ('' — нет)
+     CHAT.avatar(size)                    — его лицо картинкой ('' — нет); CHAT.person() — он сам (диалог обеда)
      CHAT.shiftLine(mood)                 — что он пишет после смены: mood 'bad' | 'ok' | 'great' */
 import { t, N_ } from '../i18n/index.js';
 
@@ -215,6 +215,8 @@ const SHIFT_ADULT = {
   great: /*i18n*/ [N_('охуенно отработал, без шуток')],
 };
 export const avatar = size => (C.person && C.face ? C.face(C.person, size) : '');
+/* он сам — человек (people.js): диалог «на, похавай» в пиццерии (career.js atBase) */
+export const person = () => C.person;
 export function shiftLine (mood) {
   const k = SHIFT_LINES[mood] ? mood : 'ok';
   const pool = SHIFT_LINES[k].concat(C.adult ? SHIFT_ADULT[k] : []);

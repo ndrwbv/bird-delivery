@@ -8,6 +8,9 @@
    Андрюша (теннисисты связаны друг с другом). Добавить героя: элемент HERO_STORIES с hero = id из
    heroes.js DEFS и главами того же вида — больше ничего не нужно.
 
+   С 04.10.2026 героев на улице нет (heroes.js HERO.STREET = false): need.meets считается сменами —
+   глава, когда после прошлой главы (первая — с начала карьеры) прошло max(meets, shifts) смен.
+   Ниже — как было со встречами (HERO.STREET = true).
    Когда глава: need.meets — встреч с героем после прошлой главы (встреча — он сказал
    реплику, когда ты подъехал; одна и та же засчитывается не чаще раза в HS.MEET_GAP с),
    need.shifts — смен после прошлой главы, need.after — [герой, глав] у другого героя (или список таких пар).
@@ -826,8 +829,10 @@ function ready (H, ctx, p, shift) {
   if (!c) return false;
   if (M.issued === shift) return false;                          // за смену — одна глава героев
   if ((ctx.shiftOrders | 0) < 1) return false;                   // не первым заказом смены
-  if ((p.meets || 0) - (p.m0 || 0) < (need.meets || 0)) return false;
-  if (p.ch > 0 && shift - (p.last || 0) < (need.shifts || 0)) return false;
+  if (HEROES.HERO.STREET) {
+    if ((p.meets || 0) - (p.m0 || 0) < (need.meets || 0)) return false;
+    if (p.ch > 0 && shift - (p.last || 0) < (need.shifts || 0)) return false;
+  } else if (shift - (p.last || 0) < Math.max(need.meets || 0, need.shifts || 0)) return false;   // героев на улице нет: встреча = смена
   if (!afterOk(need.after)) return false;
   const h = HEROES.get(H.hero);
   if (!h || !h.place || h.down) return false;                    // нет на месте или сбит — подождём

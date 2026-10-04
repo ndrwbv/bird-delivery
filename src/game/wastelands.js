@@ -47,6 +47,7 @@ import * as CONSTR from './construction.js';
 import * as HITS from './hits.js';
 import * as SEAS from './seasons.js';
 import * as WTH from './weather.js';
+import { onPave } from './pave.js';
 
 export const WASTE = {
   BIG: { W: 36, D: 26, MAX: 46, GAP: 140, PER: 3, CAP: 9, SALT: 51 },     // большой участок, м; сколько; не ближе друг к другу
@@ -129,7 +130,11 @@ function frame (s) {
     G3 (list, gg, hex, a, y, b, r = 0) { const [px, pz] = P(a, b); A.put(list, gg, hex, px, A.groundH(px, pz) + y, pz, 0, ry + r, 0); },
     /* то же — в список вещи, которая сбивается */
     Bg (list, w, h, d, hex, a, y, b, r = 0, rx = 0, rz = 0) { const [px, pz] = P(a, b); A.put(list, geo(w, h, d, rx, rz), hex, px, A.groundH(px, pz) + y, pz, 0, ry + r, 0); },
-    smash (kind, a, b, r, list, hex) { const [px, pz] = P(a, b); STATS.smash++; return A.smashAdd(kind, px, pz, r, list, hex); },
+    smash (kind, a, b, r, list, hex) {
+      const [px, pz] = P(a, b);
+      if ((kind === 'fence' || kind === 'bigfence') && onPave(px, pz, 0.2)) return { kind, x: px, z: pz, down: 1 };   // заборы и снаряды — не на тротуар и дорожку (pave.js)
+      STATS.smash++; return A.smashAdd(kind, px, pz, r, list, hex);
+    },
     wall (a, b, hw, hd, r = 0) { const [px, pz] = P(a, b); STATS.solids++; A.obb(px, pz, hw, hd, oy - r); },
     /* земля участка: прямоугольник и пятно по рельефу (LITM) */
     rect (a0, b0, a1, b1, hex, lift = 0.05) {
@@ -157,6 +162,7 @@ function blobAt (x, z, ra, rb, ang, hex, lift, k = 0) {
 const DOOR = ['#7a4a2e', '#4f6fa8', '#e8e4dc', '#4f7a52', '#8a3b3b', '#c9a24a'];
 function fenceSeg (c, a0, b0, a1, b1, sort, k) {
   const L = Math.hypot(a1 - a0, b1 - b0), am = (a0 + a1) / 2, bm = (b0 + b1) / 2;
+  { const [px, pz] = c.P(am, bm); if (onPave(px, pz, 0.2)) return; }   // на тротуар и дорожку секцию не ставим (pave.js)
   const r = -Math.atan2(b1 - b0, a1 - a0);           // вдоль отрезка в осях участка
   const ea = (a1 - a0) / L, eb = (b1 - b0) / L;
   const g = [];
@@ -404,7 +410,7 @@ function dogs (c) {
   fenceRect(c, a0, b0, a1, b1, ['net'], 2.2, 81);
   { const [px, pz] = c.P(2.6, b0 - 0.05); signQuad('dogs', px, c.G(2.6, b0) + 1.95, pz, -c.nx, -c.nz, 1.8, 0.45);
     c.B(1.9, 0.55, 0.04, '#e8e4dc', 2.6, 1.95, b0 + 0.02); }
-  const S = (kind, a, b, r, fn, hex) => { const g = []; fn(g); c.smash(kind, a, b, r, g, hex); };
+  const S = (kind, a, b, r, fn, hex) => { const [px, pz] = c.P(a, b); if (onPave(px, pz, 0.3)) return; const g = []; fn(g); c.smash(kind, a, b, r, g, hex); };   // не на тротуар и дорожку (pave.js)
   const stripe = ['#d9342c', '#f4f1ea'];
   for (const [a, b] of [[-W / 4, -D / 6], [-W / 4 + 3, D / 6]]) S('fence', a, b, 1.0, g => {   // барьеры
     for (const s of [-0.7, 0.7]) c.Bg(g, 0.08, 0.9, 0.08, '#e8e4dc', a, 0.45, b + s);

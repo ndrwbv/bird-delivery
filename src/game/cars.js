@@ -34,6 +34,7 @@ import { CAR_LIST, UPGRADE, BREAK, upgradePrice, paintPrice, sellPrice, wearK, s
 import { cnCar } from './roadlife.js';
 import { t } from '../i18n/index.js';
 import * as DIST from './districts.js';
+import * as RW from './roadwear.js';
 import { KEY as TOUR_KEY } from './garagetour.js';
 import { pad as PAD } from '../input/gamepad.js';
 import './cars.css';
@@ -604,7 +605,10 @@ export function previewCanvas (id, o = {}) {
    Несколько сотен по городу, гуще в частном секторе, промзоне и у гаражей
    (ZN.zoneAt). Рисуются прямо в статику дорог: кромка битого асфальта,
    светлый скол с одной стороны (как будто свет падает в яму), сама яма и
-   тёмное дно, пара трещин. Раскладка — от зерна карты, всегда одна и та же. */
+   тёмное дно, пара трещин. Раскладка — от зерна карты, всегда одна и та же.
+   Вид асфальта улицы (roadwear.js): на свежем ям нет, на ровном — редко. На
+   разбитом, кроме этих, — свои ямы в шейдере (RW.potAt): густо, 0,5—1,3 м;
+   глубокие (от 0,75 м) роняют колесо, кренят и подкидывают на выезде. */
 const POT = [], PGRID = new Map(), PCELL = 16;
 const pkey = (x, z) => Math.floor(x / PCELL) + ',' + Math.floor(z / PCELL);
 const rng = seed => () => { seed = (seed + 0x6D2B79F5) | 0; let q = Math.imul(seed ^ (seed >>> 15), 1 | seed); q = (q + Math.imul(q ^ (q >>> 7), 61 | q)) ^ q; return ((q ^ (q >>> 14)) >>> 0) / 4294967296; };
@@ -632,7 +636,9 @@ function buildPotholes () {
       if (len < 8) continue;
       const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
       if (A.inBounds && !A.inBounds(mx, mz, -20)) continue;
-      const k = (ZONE_W[ZN.zoneAt(mx, mz)] || 1) * (1 + r.c * 0.3) * len;
+      const pw = RW.potW(r);                       // вид асфальта: свежий — без ям, разбитый — густо
+      if (!pw) continue;
+      const k = (ZONE_W[ZN.zoneAt(mx, mz)] || 1) * (1 + r.c * 0.3) * len * pw;
       tot += k;
       segs.push({ x1, z1, x2, z2, len, w, c: r.c, acc: tot });
     }
@@ -666,7 +672,7 @@ function buildPotholes () {
       const lift = 0.206 + (7 - s.c) * 0.001;
       if (q === 0 && R() < 0.22) patch(LITM, x + ux * (R() - 0.5) * 1.5, z + uz * (R() - 0.5) * 1.5, Math.atan2(uz, ux), R, lift);
       hole(LITM, x, z, r, Math.atan2(uz, ux) + (R() - 0.5) * 0.8, 0.62 + R() * 0.3, R, lift);
-      const p = { x, z, r, t: 0 };
+      const p = { x, z, r, t: 0, deep: r > 0.85 ? 1 : 0 };
       POT.push(p);
       const k = pkey(x, z);
       let a = PGRID.get(k);
@@ -1078,13 +1084,26 @@ function odoStep (dt, vf) {
 }
 
 /* ─────────────── ямы: тряхнуло, притормозило, может заглохнуть ─────────────── */
+const POTB = { t: 0, up: 0 };                     // глубокая яма: через долю секунды кузов подкидывает
 function potStep (dt, vf) {
   const V = A.V, S = A.S;
+  if (POTB.t > 0 && (POTB.t -= dt) <= 0 && !V.air) { V.kerb = Math.max(V.kerb || 0, POTB.up); V.pitch = (V.pitch || 0) - POTB.up * 0.35; }
   if (V.air || Math.abs(vf) < 3) return;
   const fx = Math.sin(V.h), fz = Math.cos(V.h), sx = fz, sz = -fx;
   const c = current(), w = 0.8;
   const wheels = [[1.3, -w], [1.3, w], [-1.25, -w], [-1.25, w]];
   const now = performance.now() / 1000;
+  // ямы разбитого асфальта (roadwear.js, рисует шейдер): своя раскладка, откат — по ключу клетки
+  for (const [al, ac] of wheels) {
+    const p = RW.potAt(V.x + fx * al + sx * ac, V.z + fz * al + sz * ac);
+    if (!p) continue;
+    let o = RWPOT.get(p.key);
+    if (!o) { if (RWPOT.size > 200) RWPOT.clear(); RWPOT.set(p.key, o = { t: 0, deep: p.deep }); }
+    if (now - o.t < 1.2) continue;
+    o.t = now;
+    potHit(o, al, ac, vf, c, 0.4);                // их много: заглохнуть — реже, чем в одиночной яме
+    break;
+  }
   const ci = Math.floor(V.x / PCELL), cj = Math.floor(V.z / PCELL);
   for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
     const a = PGRID.get(i + ',' + j);
@@ -1095,18 +1114,32 @@ function potStep (dt, vf) {
         const x = V.x + fx * al + sx * ac, z = V.z + fz * al + sz * ac;
         if ((x - p.x) ** 2 + (z - p.z) ** 2 > (p.r * 0.95) ** 2) continue;
         p.t = now;
-        const k = Math.min(1, Math.abs(vf) / 30);
-        S.shake = Math.max(S.shake || 0, (c.offroad ? 0.12 : 0.3) + k * 0.25);
-        V.pitch = (V.pitch || 0) + (al > 0 ? -1 : 1) * (0.05 + k * 0.05);
-        if (!c.offroad) { const d = 1 - (0.1 + k * 0.12); V.vx *= d; V.vz *= d; }
-        if (A.Snd) { A.Snd.blip(58, 0.16, 'triangle', 0.2 + k * 0.1); A.Snd.noise(0.08, 0.12 + k * 0.1); }
-        if (A.rumble) A.rumble(0.35 + k * 0.3, 90);
-        if (!ST.on && DRIVING.has(S.state) && Math.random() < stallP(curId()) * BREAK.POTHOLE) stall('pothole');
+        potHit(p, al, ac, vf, c);
         break;
       }
     }
   }
 }
+const RWPOT = new Map();
+/* колесо (al вдоль, ac поперёк) попало в яму p: трясёт, тормозит, может заглохнуть (шанс × sk); глубокая — роняет и подкидывает */
+function potHit (p, al, ac, vf, c, sk = 1) {
+  const V = A.V, S = A.S;
+  const k = Math.min(1, Math.abs(vf) / 30), D = p.deep && !c.offroad;
+  S.shake = Math.max(S.shake || 0, (c.offroad ? 0.12 : 0.3) + k * 0.25 + (D ? 0.25 : 0));
+  V.pitch = (V.pitch || 0) + (al > 0 ? -1 : 1) * (0.05 + k * 0.05) * (D ? 2.2 : 1);
+  if (D) {                                     // глубокая: колесо проваливается, кузов кренит к нему, на выезде подкидывает
+    V.roll = (V.roll || 0) + (ac > 0 ? 1 : -1) * (0.05 + k * 0.05);
+    V.kerb = (V.kerb || 0) - (0.12 + k * 0.1);
+    POTB.t = 0.11; POTB.up = 0.1 + k * 0.1;
+  }
+  if (!c.offroad) { const d = 1 - (0.1 + k * 0.12) * (D ? 1.3 : 1); V.vx *= d; V.vz *= d; }
+  if (A.Snd) { A.Snd.blip(D ? 46 : 58, D ? 0.22 : 0.16, 'triangle', 0.2 + k * 0.1 + (D ? 0.1 : 0)); A.Snd.noise(D ? 0.12 : 0.08, 0.12 + k * 0.1 + (D ? 0.08 : 0)); }
+  if (A.rumble) A.rumble(Math.min(1, 0.35 + k * 0.3 + (D ? 0.25 : 0)), D ? 140 : 90);
+  if (!ST.on && DRIVING.has(S.state) && Math.random() < stallP(curId()) * BREAK.POTHOLE * sk) stall('pothole');
+  POTN.hits++; if (D) POTN.deep++;
+}
+const POTN = { hits: 0, deep: 0 };            // попаданий в ямы за запуск (проверка)
+export const potHits = () => POTN;
 
 /* ─────────────── гараж: заехал и встал — Дядя Женя предлагает подшаманить ─────────────── */
 const GS = { stillT: 0, offered: false, busy: false, met: false };

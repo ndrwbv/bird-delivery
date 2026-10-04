@@ -50,6 +50,7 @@ const B = {
   RUN: 3.8, CHARGE: 4.2, FLEE: 6,  // м/с
   AGGRO: 26,           // м — ближе к машине: часть налётчиков бежит бить её
   HIT_R: 1.9, HIT_CD: 1.4, HIT_P: 0.55, DMG: 0.4,   // удар по машине: полсердца
+  HIT_BOX: 0.9,        // м от борта машины — достаёт битой (раньше мерили от центра: у носа и кормы шагал на месте)
   HONK_R: 18, HONK_P: 0.5,   // м — сигнал: в радиусе каждый второй разбегается; кто уже бьёт машину — не боится
   SCARE_R: 4.5, SCARE_KMH: 25,      // пронёсся рядом — убегает
   CAME_R: 70,          // м — «ты приехал» (иначе победа — заслуга ёлки)
@@ -61,6 +62,7 @@ const rand = (a, b) => a + Math.random() * (b - a);
 const chance = p => Math.random() < p;
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const pick = a => a[(Math.random() * a.length) | 0];
 
 const BRANDS = {
@@ -296,11 +298,20 @@ function manStep (m, dt, dV, near) {
   m.t += dt;
   if (m.bubble && (m.bubT -= dt) <= 0) { m.grp.remove(m.bubble); m.bubble.material.dispose(); m.bubble = null; }
   const d = Math.hypot(V.x - m.x, V.z - m.z);
+  // до борта машины (прямоугольник кузова), а не до центра: машина длинная
+  const bfx = Math.sin(V.h), bfz = Math.cos(V.h), bal = (m.x - V.x) * bfx + (m.z - V.z) * bfz, bac = (m.x - V.x) * bfz - (m.z - V.z) * bfx;
+  const CL = A.CAR_L || 2.2, CW = A.CAR_W || 1;
+  const dBox = Math.hypot(Math.max(0, Math.abs(bal) - CL), Math.max(0, Math.abs(bac) - CW));
   let tx = m.tx, tz = m.tz, speed = 0, walk = false;
   if (m.st === 'flee') {
     // прочь от точки и от машины
     const P = R.P, cx = P.dome ? P.dome.x : P.bx, cz = P.dome ? P.dome.z : P.bz;
     let ax = m.x - cx + (m.x - V.x) * 0.6, az = m.z - cz + (m.z - V.z) * 0.6;
+    if (m.faT > 0) {                                     // упёрся в стену — пока вдоль неё
+      m.faT -= dt;
+      const c = Math.cos(m.fa), s = Math.sin(m.fa);
+      [ax, az] = [ax * c + az * s, -ax * s + az * c];
+    }
     const al = Math.hypot(ax, az) || 1;
     tx = m.x + ax / al * 10; tz = m.z + az / al * 10; speed = B.FLEE;
     if (m.cheer && m.t < 1.5) speed = 0;                 // проиграл — они сначала ликуют
@@ -311,15 +322,20 @@ function manStep (m, dt, dV, near) {
   } else if (m.st === 'smash') {
     if (m.charge && d < B.AGGRO && R.on) m.st = 'charge';
   } else if (m.st === 'charge') {
-    tx = V.x; tz = V.z; speed = d > B.HIT_R ? B.CHARGE : 0;
+    // бежит к ближней точке борта; дошёл — стоит и бьёт
+    const ca = clamp(bal, -CL, CL), cc = clamp(bac, -CW, CW);
+    tx = V.x + bfx * ca + bfz * cc; tz = V.z + bfz * ca - bfx * cc;
+    speed = dBox > B.HIT_BOX - 0.2 ? B.CHARGE : 0;
     if (d > B.AGGRO + 14) m.st = 'in';
   }
   if (speed > 0) {
     const dx = tx - m.x, dz = tz - m.z, l = Math.hypot(dx, dz);
     if (l > 0.3) {
-      const k = Math.min(l, speed * dt);
+      const k = Math.min(l, speed * dt), x0 = m.x, z0 = m.z;
       m.x += dx / l * k; m.z += dz / l * k;
       if (A.pushOut) A.pushOut(m, 0.45);
+      // стена не пускает — не шагать на месте: бежит вдоль неё (flee) полторы секунды
+      if (m.st === 'flee' && k > 0.02 && Math.hypot(m.x - x0, m.z - z0) < k * 0.35 && !(m.faT > 0)) { m.fa = chance(0.5) ? 1.4 : -1.4; m.faT = 1.5; }
       m.h = damp(m.h, m.h + wrap(Math.atan2(dx, dz) - m.h), 10, dt);
       walk = true;
     }
@@ -331,7 +347,7 @@ function manStep (m, dt, dV, near) {
 
   // замах: громят точку или бьют машину
   m.swing = Math.max(0, m.swing - dt);
-  if ((m.st === 'smash' || (m.st === 'charge' && d < B.HIT_R + 0.4)) && (m.swingCd -= dt) <= 0) {
+  if ((m.st === 'smash' || (m.st === 'charge' && dBox < B.HIT_BOX)) && (m.swingCd -= dt) <= 0) {
     m.swingCd = rand(0.7, 1.2); m.swing = 0.3;
     if (m.st === 'charge' && sp < 4 && (m.hitCd <= 0) && chance(B.HIT_P)) {
       m.hitCd = B.HIT_CD;

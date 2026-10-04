@@ -259,8 +259,7 @@ function tryCross () {
     if (!okGround(sx, sz) || !okGround(ex, ez)) continue;
     const m = add('moose', sx, sz, fB, Math.atan2(ex - sx, ez - sz));
     m.mode = 'cross'; m.ex = ex; m.ez = ez; m.cx = r.x; m.cz = r.z; m.mid = Math.random() < C.STOP ? 1 : 0;
-    A.toast(t('лось на дороге!'));
-    return true;
+    return true;                                     // без подписи «лось на дороге!» (04.10.2026: информационные плашки убраны)
   }
   return false;
 }

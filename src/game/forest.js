@@ -34,11 +34,13 @@
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 import { snowAmt } from './seasons.js';
+import * as FADEJS from './fade.js';
 
 export const FOREST = {
   MIN: 30000, CELL: 48, SPACE: 5, JIT: 0.8,
   EDGE: 16, HOUSE: 9, ROAD: 3.5, PATH: 1.6,
   NEAR: 220, FAR: 470, THIN: 0.4, BUSH_R: 170,
+  BAND: 30, BUSH_FADE: 26, LAG: 7,            // растворение подробных елей перед NEAR, рост кустов у BUSH_R, запас на сдвиг камеры, м (fade.js)
   CAP: 16000, BUSH_CAP: 9000,
   SOLID_H: 6, TRUNK: 0.45,
   BUDGET: 2.5, WARM: 160,
@@ -141,26 +143,39 @@ function bushGeo () {
   return merge([part(new THREE.IcosahedronGeometry(1, 0).scale(1, 0.62, 1).translate(0, 0.38, 0), '#4f8a40', y => (y > 0.5 ? 0.4 + (y - 0.5) * 2 : 0.05))]);
 }
 
-function material () {
+/* kind: 'near' — подробные ели и сосны, 'far' — простые, 'bush' — кусты.
+   Смена подробной модели на простую — растворением в полосе BAND м перед NEAR (fade.js):
+   подробная тает точка за точкой, простая на её месте проявляется (узор у них взаимно
+   дополняющий — ни дыр, ни двойных). Кусты у края BUSH_R растут из земли */
+const FADE_LOD = { value: null }, FADE_BUSH = { value: null };
+function material (kind) {
   const m = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  const bush = kind === 'bush';
   m.onBeforeCompile = sh => {
     sh.uniforms.uSnow = U.uSnow;
-    sh.vertexShader = 'attribute float aSnow;\nvarying float vSnow;\nvarying vec3 vFW;\n' + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+    sh.uniforms.uFade = bush ? FADE_BUSH : FADE_LOD;
+    sh.vertexShader = 'attribute float aSnow;\nvarying float vSnow;\nvarying vec3 vFW;\nvarying float vFadeK;\nuniform vec2 uFade;\n' + FADEJS.FADE_FN + '\n' +
+      sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>' + FADEJS.BASE_DIST + (bush ? FADEJS.GROW_BEGIN : '') + '\n  vFadeK = fadeK(fadeD, uFade);')
+        .replace('#include <project_vertex>', `#include <project_vertex>
       vSnow = aSnow;
       vFW = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;`);
-    sh.fragmentShader = 'uniform float uSnow;\nvarying float vSnow;\nvarying vec3 vFW;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+    const cut = kind === 'near' ? 'if (vFadeK <= bayer4(gl_FragCoord.xy)) discard;' : kind === 'far' ? 'if (vFadeK > bayer4(gl_FragCoord.xy)) discard;' : '';
+    sh.fragmentShader = 'uniform float uSnow;\nvarying float vSnow;\nvarying vec3 vFW;\nvarying float vFadeK;\n' + FADEJS.BAYER_FN + '\n' +
+      sh.fragmentShader.replace('void main() {', 'void main() {\n  ' + cut).replace('#include <color_fragment>', `#include <color_fragment>
       float fn = fract(sin(dot(floor(vFW.xz * 1.7 + vFW.y * 0.9), vec2(12.9898, 78.233))) * 43758.5453);
       float cov = smoothstep(0.98 - uSnow * 0.62, 1.1 - uSnow * 0.62, vSnow + (fn - 0.5) * 0.22) * step(0.02, uSnow);
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.93, 0.98), cov * 0.95);`);
   };
-  m.customProgramCacheKey = () => 'forestSnow';
+  m.customProgramCacheKey = () => 'forestSnow' + kind;
   return m;
 }
 
 function makeMeshes () {
-  const mat = material();
-  const mk = (geo, cap) => {
-    const m = new THREE.InstancedMesh(geo, mat, cap);
+  FADE_LOD.value = FADEJS.uniform(THREE, 1e4, 1e4 + 1).value;
+  FADE_BUSH.value = FADEJS.uniform(THREE, 1e4, 1e4 + 1).value;
+  const mats = { near: material('near'), far: material('far'), bush: material('bush') };
+  const mk = (geo, cap, kind) => {
+    const m = new THREE.InstancedMesh(geo, mats[kind], cap);
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3).fill(1), 3);
     m.instanceColor.setUsage(THREE.DynamicDrawUsage);
@@ -168,9 +183,9 @@ function makeMeshes () {
     A.scene.add(m);
     return m;
   };
-  MESH.sp0 = mk(spruceGeo(), FOREST.CAP); MESH.sp1 = mk(spruceFar(), FOREST.CAP);
-  MESH.pi0 = mk(pineGeo(), FOREST.CAP >> 1); MESH.pi1 = mk(pineFar(), FOREST.CAP >> 1);
-  MESH.bu = mk(bushGeo(), FOREST.BUSH_CAP);
+  MESH.sp0 = mk(spruceGeo(), FOREST.CAP, 'near'); MESH.sp1 = mk(spruceFar(), FOREST.CAP, 'far');
+  MESH.pi0 = mk(pineGeo(), FOREST.CAP >> 1, 'near'); MESH.pi1 = mk(pineFar(), FOREST.CAP >> 1, 'far');
+  MESH.bu = mk(bushGeo(), FOREST.BUSH_CAP, 'bush');
 }
 
 /* ── зерно по точке ── */
@@ -357,12 +372,15 @@ function refresh (cam) {
     M.instanceColor.array.set(k === src.n ? src.c : src.c.subarray(0, k * 3), n[mk] * 3);
     n[mk] += k;
   };
+  // полоса смены моделей — по каждому дереву в шейдере: клетка у полосы — в обоих мешах
+  const half = F.CELL * 0.71 + F.LAG, n0 = NEAR - F.BAND;
+  FADE_LOD.value.set(n0, NEAR - F.LAG);
+  FADE_BUSH.value.set(F.BUSH_R - F.LAG - F.BUSH_FADE, F.BUSH_R - F.LAG);
   for (const [d, c] of vis) {
-    const near = d < NEAR;
-    const keep = near ? 1 : 1 - (1 - F.THIN) * Math.min(1, (d - NEAR) / Math.max(1, FAR - NEAR));
-    if (c.sp) put(near ? 'sp0' : 'sp1', c.sp, Math.ceil(c.sp.n * keep));
-    if (c.pi) put(near ? 'pi0' : 'pi1', c.pi, Math.ceil(c.pi.n * keep));
-    if (c.bu && d < F.BUSH_R) put('bu', c.bu, c.bu.n);
+    const keep = d < NEAR ? 1 : 1 - (1 - F.THIN) * Math.min(1, (d - NEAR) / Math.max(1, FAR - NEAR));
+    if (d < NEAR + half) { if (c.sp) put('sp0', c.sp, c.sp.n); if (c.pi) put('pi0', c.pi, c.pi.n); }
+    if (d > n0 - half) { if (c.sp) put('sp1', c.sp, Math.ceil(c.sp.n * keep)); if (c.pi) put('pi1', c.pi, Math.ceil(c.pi.n * keep)); }
+    if (c.bu && d < F.BUSH_R + half) put('bu', c.bu, c.bu.n);
   }
   for (const k in MESH) {
     const M = MESH[k];

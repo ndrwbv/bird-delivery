@@ -1,6 +1,7 @@
 /* ──────────────────────────────────────────────────────────────────────────
-   Курьеры еды на мопедах: жёлтая «Жуй-Еда» (больше всех), розовый
-   «Самокатик», зелёный «Клуб Доставки». Бренды выдуманные.
+   Курьеры еды на мопедах: горчичная «Жуй-Еда» (больше всех), пыльно-розовый
+   «Самокатик», серо-зелёный «Клуб Доставки». Бренды выдуманные. Редкие (рядом
+   MP.moving на ходу и MP.parked у дверей), цвета приглушённые, зимой их нет.
    Голубые мопеды «Вселенной суши» с коробом-роллом — курьеры сети-конкурента:
    их рождает и водит rivals.js (spawnBrand, к своей точке и адресам), в счёт
    MP.moving не идут; слетел седок — MP.onRival(c) (респект, rivals.js).
@@ -17,30 +18,33 @@
    • Часть стоит у кафе, магазинов и подъездов: мопед на тротуаре, курьер
      рядом с короба за спиной смотрит в телефон. У твоего ждущего клиента
      (ближе MP.clientR) не встают, а вставшие раньше уходят.
-   • Рядом с курьером-игроком всегда около десяти на ходу и до четырёх
-     стоящих; уехали далеко — переставляем поближе, как весь трафик.
+   • Рядом с курьером-игроком — около трёх на ходу и один стоящий (зимой —
+     ни одного); уехали далеко — переставляем поближе, как весь трафик.
 
    Всё из игры — через api (roadApi в game.js), шаг и полоса — из roadlife.js.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 import { t } from '../i18n/index.js';
+import { seasonValue, snowAmt } from './seasons.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[(Math.random() * a.length) | 0];
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 
 /* службы: цвет короба и шлема, цвет полосы, доля */
+/* цвета приглушены (автор 04.10.2026: «слишком яркие»): горчичный, пыльно-розовый, серо-зелёный */
 const BRANDS = [
-  { i: 0, hex: '#ffd21f', stripe: '#1b1a1f', w: 0.6 },
-  { i: 1, hex: '#ff4f9a', stripe: '#ffffff', w: 0.2 },
-  { i: 2, hex: '#2fb35a', stripe: '#ffffff', w: 0.2 },
+  { i: 0, hex: '#bfa04e', stripe: '#2b2a2e', w: 0.5 },
+  { i: 1, hex: '#b07a8e', stripe: '#d9d4ca', w: 0.25 },
+  { i: 2, hex: '#5f8a69', stripe: '#d9d4ca', w: 0.25 },
   { i: 3, hex: '#2fa8e0', stripe: '#ffffff', w: 0, rival: 'sushi', roll: 1 },   // «Вселенная суши»: короб-ролл (rivals.js)
 ];
 const pickBrand = () => { let r = Math.random(); for (const b of BRANDS) if ((r -= b.w) <= 0) return b; return BRANDS[0]; };
-const BODY_HEX = ['#e8e4dc', '#3c4048', '#c8323a', '#7f8a96'];
+const BODY_HEX = ['#cfcac0', '#3c4048', '#8a4a4a', '#7f8a96'];
 
-/* clientR — у ждущего клиента (game.js nearClient) ближе этого курьер не стоит */
-export const MP = { moving: 10, parked: 4, clientR: 20, n: { spawned: 0, falls: 0, flown: 0, weaves: 0 }, spots: null, park: [], men: [], T: 0 };
+/* moving / parked — сколько курьеров рядом на ходу и у дверей (до 04.10.2026 — 10 и 4: «слишком много»);
+   зимой (сезон — зима или снег) их нет вовсе. clientR — у ждущего клиента (game.js nearClient) ближе этого курьер не стоит */
+export const MP = { moving: 3, parked: 1, clientR: 20, n: { spawned: 0, falls: 0, flown: 0, weaves: 0 }, spots: null, park: [], men: [], T: 0 };
 const HL = 0.85;
 
 /* ── модели: склейки по вершинам, по одной на цвет, копия на каждый мопед ── */
@@ -262,8 +266,12 @@ function stepFly (dt, A) {
       if ((f.T -= dt) <= 0) { f.st = 'walk'; g.rotation.x = 0; f.y = 0; }
     } else {
       // встал, отряхнулся — к мопеду; мопеда нет — уходит пешком и пропадает
+      // мопед ещё кувыркается — стоит и ждёт (раньше шагал на месте)
+      const wait = c && !c.gone && !c.wreck && c.knock;
       const ok = c && !c.gone && !c.wreck && !c.knock;
-      const tx = ok ? c.x + Math.cos(c.h) * 0.7 : f.x + 1, tz = ok ? c.z - Math.sin(c.h) * 0.7 : f.z;
+      // мопеда нет (разбит, убран) — уходит прочь от машины игрока, а не шагает на месте
+      if (!ok && !wait && f.ax === undefined) { const a = Math.atan2(f.x - V.x, f.z - V.z) + rand(-0.6, 0.6); f.ax = Math.sin(a); f.az = Math.cos(a); }
+      const tx = ok ? c.x + Math.cos(c.h) * 0.7 : f.x + (f.ax || 0), tz = ok ? c.z - Math.sin(c.h) * 0.7 : f.z + (f.az || 0);
       const dx = tx - f.x, dz = tz - f.z, d = Math.hypot(dx, dz);
       f.T += dt;
       if ((ok && d < 0.4) || f.T > 12) {
@@ -272,8 +280,16 @@ function stepFly (dt, A) {
         FLY.splice(i, 1);
         continue;
       }
-      if (ok) { f.x += dx / d * Math.min(d, 1.5 * dt); f.z += dz / d * Math.min(d, 1.5 * dt); g.rotation.y = Math.atan2(dx, dz); }
-      if (u.legL) { const s = Math.sin(f.T * 9) * 0.5; u.legL.rotation.x = s; u.legR.rotation.x = -s; }
+      let moved = 0;
+      if (!wait && d > 1e-3) {
+        const x0 = f.x, z0 = f.z, st = Math.min(d, 1.5 * dt);
+        f.x += dx / d * st; f.z += dz / d * st;
+        if (A.pushOut) A.pushOut(f, 0.45);
+        moved = Math.hypot(f.x - x0, f.z - z0) / Math.max(1e-6, st);
+        g.rotation.y = Math.atan2(dx, dz);
+        if (moved < 0.35 && !ok) { const a = Math.atan2(f.az || 0, f.ax || 1) + (Math.random() < 0.5 ? 1.4 : -1.4); f.ax = Math.cos(a); f.az = Math.sin(a); }   // в стену — вдоль неё
+      }
+      if (u.legL) { const s = moved > 0.35 ? Math.sin(f.T * 9) * 0.5 : 0; u.legL.rotation.x = s; u.legR.rotation.x = -s; }
     }
     g.position.set(f.x, gy + f.y, f.z);
     // лежит на асфальте — можно переехать
@@ -291,8 +307,11 @@ function stepFly (dt, A) {
 }
 
 /* ── шаг: сколько на ходу, сколько стоит, падения, курьеры у дверей ── */
+/* зима — мопеды в гараже: сезон 2…3 (начало — конец зимы) или лежит снег */
+export const winter = () => { const s = ((seasonValue() % 4) + 4) % 4; return (s >= 2 && s < 3) || snowAmt() > 0.3; };
 export function step (dt, A) {
   const V = A.V, cx = A.cam.position.x, cz = A.cam.position.z;
+  const WIN = winter();
   let moving = 0;
   for (const c of A.TRAFFIC) {
     if (!c.mp) continue;
@@ -310,6 +329,8 @@ export function step (dt, A) {
       if (!c.knock && !c.wreck && !m.fell && Math.hypot(c.x - V.x, c.z - V.z) > 420) A.svcGone(c);
       continue;
     }
+    // зима: свои курьеры уезжают — пропадают, как только отъедут подальше (на глазах не исчезают)
+    if (WIN && !c.knock && !c.wreck && !m.fell && Math.hypot(c.x - V.x, c.z - V.z) > 110) { A.svcGone(c); continue; }
     moving++;
     // укатил далеко — ближе к курьеру, пока трафик не сделал из него машину
     if (!c.knock && !c.wreck && !m.fell && Math.hypot(c.x - V.x, c.z - V.z) > 420) A.placeTraffic(c, 120, 330);
@@ -321,20 +342,20 @@ export function step (dt, A) {
   }
   if ((MP.T -= dt) <= 0) {
     MP.T = 1;
-    for (let k = moving; k < MP.moving; k++) { const c = newMoped(A, false); A.placeTraffic(c, 60, 330); }
+    for (let k = moving; k < (WIN ? 0 : MP.moving); k++) { const c = newMoped(A, false); A.placeTraffic(c, 60, 330); }
     // стоящие: дальние убираем, новые — в кольце вокруг
     for (let i = MP.park.length - 1; i >= 0; i--) {
       const man = MP.park[i], d = Math.hypot(man.x - V.x, man.z - V.z);
       // стоит у твоего ждущего клиента — уходит (пока ты не рядом: на глазах не пропадает)
       const atClient = d > 40 && A.nearClient && A.nearClient(man.x, man.z, MP.clientR);
-      if (d > 280 || man.c.gone || atClient) {
+      if (d > 280 || man.c.gone || atClient || (WIN && d > 110)) {
         if (!man.dead) A.dropMesh(man.grp);
         if (!man.c.gone) A.svcGone(man.c);
         MP.park.splice(i, 1);
       }
     }
     const S = spots(A);
-    for (let k = 0; k < 30 && MP.park.length < MP.parked && S.length; k++) {
+    for (let k = 0; k < 30 && MP.park.length < (WIN ? 0 : MP.parked) && S.length; k++) {
       const sp = pick(S), d = Math.hypot(sp[0] - V.x, sp[1] - V.z);
       if (d < 70 || d > 230 || MP.park.some(m => Math.abs(m.x - sp[0]) < 45 && Math.abs(m.z - sp[1]) < 45)) continue;   // не кучкой у одного ТЦ
       if (A.nearClient && A.nearClient(sp[0], sp[1], MP.clientR)) continue;          // не у твоего клиента

@@ -33,6 +33,7 @@
 import { t } from '../i18n/index.js';
 import { setPeopleSeason, redressHumans } from './people.js';
 import { growTree } from './trees.js';
+import { YARD, onYard } from './yards.js';   // дворовые дорожки: зимой протоптаны, сугробы мимо (yards.js)
 
 export const SEASON_STEP = 0.125;          // на столько сдвигает сезон одна смена: сезон — восемь смен
 export const SEASON_ENTER = 0.06;          // и на столько — каждый заход в игру (~16 заходов без смен — сезон)
@@ -83,6 +84,8 @@ export const slip = () => (A.snow || 0) * 0.32;
 export const snowy = () => (A.snow || 0) > 0.45;
 /* сколько снега на ветках и земле, 0 … 1 (ельник: forest.js) */
 export const snowAmt = () => A.snow || 0;
+/* жара (вариант погоды weather.js): 0 … 1 — трава выжжена (lawnprops.js красит пучки в солому) */
+export const heatAmt = () => U.uHeat.value || 0;
 /* река во льду (сёрферу там не место) */
 export const iced = () => (A.snow || 0) > 0.25;
 
@@ -94,6 +97,7 @@ const U = {
   uHeat: { value: 0 }, uGold: { value: 0 },     // варианты сезона (weather.js): жара, яркая сухая осень
   uBloom: { value: 0 }, uBerry: { value: 0 },  // цветы сирени, ягоды рябины (trees.js): вид 5 и 6 в PILE
   uGale: { value: 0 }, uGaleD: { value: [1, 0] },   // ураган (hurricane.js): кроны клонит по ветру, м
+  uYardP: { value: [-1, -1, -1] },              // цвет-метка дворовых дорожек (yards.js YARD.COLOR) — как его хранит склейка
 };
 /* ураган: насколько клонит кроны (м, 0 — тихо) и куда дует (x, z) */
 export function setGale (amp, dx = 1, dz = 0) { U.uGale.value = amp; U.uGaleD.value[0] = dx; U.uGaleD.value[1] = dz; }
@@ -104,10 +108,25 @@ export function setGale (amp, dx = 1, dz = 0) { U.uGale.value = amp; U.uGaleD.va
    тёмное — асфальт, синее — вода. */
 const TINT = `
 uniform float uSnow, uDry, uMud, uFresh, uWet, uHeat, uGold, uTime;
+uniform vec3 uYardP;
 varying vec3 vSW;
 float sHash (vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float sNoise (vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(sHash(i), sHash(i + vec2(1.0, 0.0)), f.x), mix(sHash(i + vec2(0.0, 1.0)), sHash(i + vec2(1.0, 1.0)), f.x), f.y); }
+/* хэш без синуса: на координатах в тысячи метров sin теряет точность и рисует ряды (листья лежали строем) */
+float lHash (vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+/* опавший лист: в клетке s м — не больше одного, со случайным сдвигом, поворотом и размером (ряды не видны);
+   есть ли — жребий против dens (0…1). 1 — точка на листе, pk — жребий цвета */
+float leafAt (vec2 p, float s, float dens, float salt, out float pk) {
+  vec2 q = p / s, c = floor(q) + salt, f = fract(q);
+  pk = lHash(c + 31.0);
+  if (lHash(c) >= dens) return 0.0;
+  vec2 d = f - (vec2(lHash(c + 7.0), lHash(c + 13.0)) * 0.3 + 0.35);
+  float a = lHash(c + 19.0) * 3.1416, ca = cos(a), sa = sin(a);
+  d = vec2(d.x * ca - d.y * sa, d.x * sa + d.y * ca);
+  float r = 0.17 + 0.15 * lHash(c + 23.0);
+  return step(abs(d.x) / r + abs(d.y) / (r * 0.6), 1.0);
+}
 /* осенняя листва: 0 — золотая (берёза, липа), 1 — оранжевая, 2 — красная (клён, рябина), 3 — лимонная (тополь);
    чистые яркие цвета, у каждого комка чуть свой оттенок (зерно), золотая осень — ещё ярче */
 vec3 autPal (float p, float seed) {
@@ -116,6 +135,8 @@ vec3 autPal (float p, float seed) {
   return mix(a, a * vec3(1.12, 1.08, 1.0) + vec3(0.04, 0.02, 0.0), uGold);
 }
 vec3 seasonTint (vec3 c, float dryK, float snowK) {
+  vec3 ydd = abs(c - uYardP);
+  float yardP = step(max(ydd.r, max(ydd.g, ydd.b)), 0.0022);   // дворовая дорожка (цвет-метка)
   vec3 N = normalize(cross(dFdx(vSW), dFdy(vSW)));
   float up = smoothstep(0.42, 0.8, N.y);
   float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b));
@@ -131,14 +152,17 @@ vec3 seasonTint (vec3 c, float dryK, float snowK) {
   c = mix(c, vec3(0.2, 0.15, 0.07), uMud * g * smoothstep(0.35, 0.65, n) * 0.85);
   c = mix(c, vec3(0.16, 0.52, 0.08), uFresh * g * 0.55);
   c *= 1.0 - uWet * (0.3 * road + 0.12 * g + 0.06) * up * (0.6 + 0.4 * n);
-  if (uGold > 0.0) {                           // яркая сухая осень: листья на асфальте — рыжие квадратики
-    vec2 lc = floor(vSW.xz * 1.5);
-    float lf = sHash(lc) * (0.5 + 0.5 * n), pk = sHash(lc + 17.0);
+  if (uGold > 0.0) {                           // яркая сухая осень: листья на асфальте — вразброс, кучками (то густо, то пусто)
+    float clump = smoothstep(0.3, 0.8, sNoise(vSW.xz * 0.07 + 3.7)) * 0.75 + n * 0.25;
+    float pk, pk2;
+    float lf = max(leafAt(vSW.xz, 0.7, 0.08 + 0.6 * clump, 0.0, pk), leafAt(vSW.xz + 0.31, 0.53, 0.45 * clump * clump, 57.0, pk2));
     vec3 lcol = pk < 0.35 ? vec3(0.9, 0.42, 0.04) : pk < 0.7 ? vec3(0.95, 0.7, 0.08) : vec3(0.75, 0.14, 0.03);
-    c = mix(c, lcol, uGold * road * up * step(0.66, lf));
+    c = mix(c, lcol, uGold * road * up * lf);
   }
   if (uHeat > 0.0) {                           // жара: трава — песок, всё в оранжевый, марево над дальним асфальтом
-    c = mix(c, vec3(0.7, 0.45, 0.16) * (0.8 + 0.4 * n), uHeat * g * 0.85);
+    // выжженная трава: соломенная и сухая оливковая пятнами, кое-где ещё зелёная (не песок и не осень)
+    vec3 burnt = mix(vec3(0.62, 0.52, 0.2), vec3(0.44, 0.43, 0.15), smoothstep(0.3, 0.7, n)) * (0.85 + 0.3 * n);
+    c = mix(c, burnt, uHeat * g * (0.6 + 0.3 * smoothstep(0.25, 0.6, n)));
     c = mix(c, c * vec3(1.25, 0.92, 0.58) + vec3(0.07, 0.025, 0.0), uHeat * 0.85);
     float dist = length(vSW.xz - cameraPosition.xz);
     float mir = road * up * smoothstep(28.0, 70.0, dist) * (1.0 - smoothstep(150.0, 260.0, dist));
@@ -148,7 +172,9 @@ vec3 seasonTint (vec3 c, float dryK, float snowK) {
   float lim = uSnow * up * 1.35 * snowK - 0.22;
   float cov = (1.0 - smoothstep(lim - 0.06, lim + 0.06, n)) * (1.0 - water * 0.7);
   cov *= 1.0 - road * 0.55 * (0.45 + 0.55 * n);
+  cov *= 1.0 - yardP * (0.45 + 0.3 * n);       // дворовая дорожка зимой протоптана: плитка проглядывает пятнами
   vec3 snowC = mix(vec3(0.88, 0.91, 0.97), vec3(0.46, 0.48, 0.52), road * 0.6);
+  snowC = mix(snowC, vec3(0.66, 0.68, 0.72), yardP * 0.55);   // утоптанный снег — серее
   c = mix(c, vec3(0.55, 0.7, 0.8), uSnow * water * up * 0.85);
   return mix(c, snowC, cov);
 }
@@ -156,8 +182,14 @@ vec3 seasonTint (vec3 c, float dryK, float snowK) {
 const WPOS = 'vSW = (modelMatrix * vec4(transformed, 1.0)).xyz;';
 
 /* статика игры: земля (dry 1), реквизит и мелочь дворов */
+function yardMark () {
+  if (U.uYardP.value[0] >= 0 || !THREE) return;
+  const c = new THREE.Color(YARD.COLOR);         // как Mesher кладёт цвет вершины: байтами
+  U.uYardP.value = [Math.round(c.r * 255) / 255, Math.round(c.g * 255) / 255, Math.round(c.b * 255) / 255];
+}
 export function seasonMat (m, dryK = 1) {
   m.onBeforeCompile = sh => {
+    yardMark();
     Object.assign(sh.uniforms, U);
     sh.vertexShader = 'varying vec3 vSW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n' + WPOS);
     sh.fragmentShader = TINT + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = seasonTint(diffuseColor.rgb, ' + dryK.toFixed(2) + ', 1.0);');
@@ -572,7 +604,7 @@ export function seasonBuild () {
   const busy = (x, z) => PZ0 && Math.hypot(x - PZ0.bx, z - PZ0.bz) < 75 &&
     (SL.some(q => Math.hypot(q.x - x, q.z - z) < 9) || PZT.some(it => Math.hypot(it.x - x, it.z - z) < (it.r || 1) + 2.5));
   const drift = (x, z, L, H, W, ry, seed) => {
-    if (busy(x, z)) return;
+    if (busy(x, z) || onYard(x, z, Math.max(L, W) * 0.8)) return;   // на дворовые дорожки и выходы к тротуару — нет (yards.js)
     const y = groundH(x, z) + C.curbAt(x, z) + 0.02;
     const at = DRIFTP.add(T.mound, x, y, z, W, H, L, 0, ry, 0, DRIFT_HEX, 3, seed);
     const k = Math.floor(x / 20) + ',' + Math.floor(z / 20);
@@ -580,8 +612,13 @@ export function seasonBuild () {
     DRIFTS.get(k).push({ x, y, z, L, H, W, ry, cs: Math.cos(ry), sn: Math.sin(ry), s: 1, t: 0, ...at, pile: DRIFTP,
       seed: Math.max(1, Math.min(254, Math.round(seed * 253) + 1)) / 255 });
     BUILT.drifts++;
-    // осенью на тех же местах — кучи листьев (по зерну видны, как опавшие листья: uFallen), пониже и рыжие
-    if (hsh(x, z, 91) < 0.55) leafPile(x, y, z, L * 1.05, H * 0.5, W * 1.15, ry + (hsh(x, z, 92) - 0.5) * 0.5, hsh(x, z, 93));
+    // осенью рядом — кучи листьев (по зерну видны, как опавшие листья: uFallen), пониже и рыжие. Не строем через
+    // каждые 5 м, как валы: где-то кучки гуще, где-то пусто (пятна 9 и 23 м), сдвиг вдоль улицы ±1,8 м, размер ×0,5—1,4
+    const clump = hsh(Math.floor(x / 23), Math.floor(z / 23), 96) * 0.6 + hsh(Math.floor(x / 9), Math.floor(z / 9), 97) * 0.4;
+    if (hsh(x, z, 91) < 0.75 * clump * clump * 1.6) {
+      const ja = (hsh(x, z, 98) - 0.5) * 3.6, k = 0.5 + hsh(x, z, 99) * 0.9, lx = x + Math.sin(ry) * ja, lz = z + Math.cos(ry) * ja;
+      leafPile(lx, groundH(lx, lz) + C.curbAt(lx, lz) + 0.02, lz, L * 1.05 * k, H * 0.5 * (0.7 + 0.3 * k), W * 1.15 * (0.8 + 0.4 * hsh(x, z, 100)), ry + (hsh(x, z, 92) - 0.5) * 1.4, hsh(x, z, 93));
+    }
   };
   const LEAF_HEX = ['#e8862a', '#f2b438', '#d8502a', '#eca232', '#e06a22'];   // яркие, не бурые (осень золотая, не грязная)
   const leafPile = (x, y, z, L, H, W, ry, seed) => {

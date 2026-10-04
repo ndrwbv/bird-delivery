@@ -14,6 +14,8 @@
      win     комнат нет        есть           есть
      fx      меньше и короче   как есть       как есть
      far     вдали раз в 3 к.  раз в 2        каждый кадр
+     aa      нет               сглаживание    сглаживание   (MSAA ×4 на маленьком кадре —
+             края и огни вдали не рябят; меняется после перезапуска игры)
 
    Правило: графика не меняет игру. Пресет трогает только то, что видно и что
    далеко: сколько машин и людей, где они рождаются, кто клиент, физика —
@@ -47,11 +49,12 @@ export const ITEMS = [
   { id: 'win', label: N_('окна с комнатами'), vals: [0, 1] },
   { id: 'fx', label: N_('эффекты'), vals: [0, 1] },
   { id: 'far', label: N_('машины и люди вдали'), vals: [3, 2, 1] },
+  { id: 'aa', label: N_('сглаживание'), vals: [0, 1] },
 ];
 export const PRESETS = {
-  low: { fps: 0, range: 0, menu: 0, px: 0, win: 0, fx: 0, far: 0 },
-  mid: { fps: 1, range: 1, menu: 1, px: 1, win: 1, fx: 1, far: 1 },
-  high: { fps: 2, range: 2, menu: 2, px: 2, win: 1, fx: 1, far: 2 },
+  low: { fps: 0, range: 0, menu: 0, px: 0, win: 0, fx: 0, far: 0, aa: 0 },
+  mid: { fps: 1, range: 1, menu: 1, px: 1, win: 1, fx: 1, far: 1, aa: 0 },
+  high: { fps: 2, range: 2, menu: 2, px: 2, win: 1, fx: 1, far: 2, aa: 1 },
 };
 const ORDER = ['low', 'mid', 'high'];
 const NAMES = { low: N_('низкая'), mid: N_('средняя'), high: N_('высокая'), custom: N_('своя') };
@@ -108,6 +111,9 @@ export const rangeK = () => val('range') / BASE_FAR;           // доля по�
 export const pixelShort = () => val('px');
 export const every = () => val('far');                         // вдали — раз в столько кадров
 export const fxLow = () => !val('fx');
+/* сглаживание: контекст WebGL создаётся один раз — значение на момент запуска (game.js), смена — после перезапуска */
+export const aa = () => !!val('aa');
+const AA0 = aa();
 export const winQ = () => (val('win') ? { interior: 1, lod: 70 } : { interior: 0, lod: 0 });
 /* прятать дальше (м): прохожих, машин; ближний/дальний вариант человечка */
 /* мелочь мира — по пункту «дальность» (свой пункт в окне не заводим): мелочь на газоне
@@ -253,6 +259,7 @@ function itemText (it, v) {
     case 'win': return v ? t('вкл') : t('выкл');
     case 'fx': return v ? t('все') : t('меньше');
     case 'far': return v === 2 ? t('каждый кадр') : t('раз в {n} кадра', { n: it.vals[v] });
+    case 'aa': return (v ? t('вкл') : t('выкл')) + (!!v !== AA0 ? ' · ' + t('после перезапуска') : '');
   }
   return String(v);
 }

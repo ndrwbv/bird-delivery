@@ -2,7 +2,9 @@
    как выбор машины в гараже (garage.js): крупная карточка в центре, соседи по краям меньше и
    темнее, дальше второй — не видно. Правила — docs/CAREER.md «Главное меню» и «Настройки».
 
-     const C = carousel(host, { cls, onChange(i, card), wrap })
+     const C = carousel(host, { cls, onChange(i, card), wrap, scales, reach })
+       scales — размер карточки в центре, у соседа, у второго ([1, .8, .64]); reach — сколько соседей
+       видно с каждой стороны (2; дальше — прозрачные)
      C.set(cards, i)    — карточки (элементы; у каждой может быть data-key), какая в центре
      C.go(i) / C.flip(±1) / C.idx() / C.card() / C.find(key) → номер
      C.el               — корень: стрелки ◀ ▶, сцена, точки внизу
@@ -24,6 +26,7 @@ export function carousel (host, opts = {}) {
   host.appendChild(el);
   const stage = el.querySelector('.cz-stage'), track = el.querySelector('.cz-track'), dotsEl = el.querySelector('.cz-dots');
   let cards = [], idx = 0;
+  const SC = opts.scales || [1, 0.8, 0.64], REACH = opts.reach || 2;
   const DRAG = { id: null, x0: 0, y0: 0, dx: 0, moved: false };
 
   function place (instant) {
@@ -31,11 +34,11 @@ export function carousel (host, opts = {}) {
     cards.forEach((c, i) => {
       const o = i - idx, a = Math.abs(o);
       c.style.setProperty('--o', o);
-      c.style.setProperty('--s', a === 0 ? 1 : a === 1 ? 0.8 : 0.64);
+      c.style.setProperty('--s', SC[Math.min(a, SC.length - 1)]);
       c.classList.toggle('on', o === 0);
       c.classList.toggle('side', a === 1);
       c.classList.toggle('far', a >= 2);
-      c.classList.toggle('gone', a > 2);
+      c.classList.toggle('gone', a > REACH);
       c.setAttribute('aria-hidden', o === 0 ? 'false' : 'true');
       if (o === 0) c.removeAttribute('data-pad-skip'); else c.setAttribute('data-pad-skip', '');
       c.querySelectorAll('button, input, select, textarea, a[href]').forEach(b => {

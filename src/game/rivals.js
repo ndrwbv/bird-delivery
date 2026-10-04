@@ -13,7 +13,10 @@
    • Точка: павильон с витриной и вывеской (рисунок кодом), на крыше —
      ролл-планета с кольцом или бургер в короне; перед ним к улице —
      терраса: столики с гостями (инстансами), зонтики, кадки с цветами,
-     стела у тротуара, меню-доска. Зимой (seasons.js warmth ≥ WINTER)
+     стела у тротуара, меню-доска. Тротуар идёт мимо, не через точку: передний
+     край террасы — в LAWN (2,5 м) газона за тротуаром, весь участок — не на
+     тротуаре, пешеходке, дорожке и аллее (pave.js); от тротуара ко входу на
+     террасу (проход между кадками) — своя дорожка BRANCH_W (2,2 м). Зимой (seasons.js warmth ≥ WINTER)
      терраса застеклена (рамы и крыша + стёкла), зонтиков нет; летом открыта.
    • Сломать точку: сбить SHOP_HITS вещей одной точки (столики, зонтики,
      кадки, стелу, доску, стёкла) — RESPECT rivalShop, не чаще раза в смену
@@ -45,12 +48,16 @@ import { warmth } from './seasons.js';
 import * as RESPECT from './respect.js';
 import * as MOPEDS from './mopeds.js';
 import * as CONSTR from './construction.js';
+import { onPave, walkHalf } from './pave.js';
+import { addTrail, YARD } from './yards.js';
 
 export const RIV = {
   PER_DIST: 2, MAX: 26, NODIST: 6,     // точек сети в районе; всего; без районов на карте
   GAP_ANY: 160, GAP_SAME: 520, GAP_2ND: 700,   // м: между любыми точками; одной сети; вторая точка сети в районе
   W: 16, D: 12, TER: 9, SIDE: 3,      // павильон вдоль улицы и вглубь, терраса, поля по бокам, м
-  SET: 3.4,                            // терраса — в стольких м от края полотна (точка у ТЦ)
+  LAWN: 2.5,                           // м газона между тротуаром и террасой: тротуар идёт мимо, не через точку
+  PUSH: 1.5,                           // м: участок на пустыре берём глубже — точка отходит от тротуара на LAWN
+  BRANCH_W: 2.2,                       // ширина своей дорожки от тротуара ко входу на террасу, м
   H: 5.6, ROOF: 1.7,                   // высота павильона; во столько раз крупнее фигура на крыше
   WALL: 18,                            // м: участок на пустыре — не ближе к стене любого дома
   HOUSE: 2, ENTR: 16, PIZZA: 160, POI: 11, SLOPE: 1.2, STEP: 24, MALL_R: 320,
@@ -82,7 +89,7 @@ const hash = (x, z, k = 0) => { const s = Math.sin(x * 12.9898 + z * 78.233 + k 
 
 let A = null;
 const SHOPS = [];        // точки: { chain, x, z, ux, uz, nx, nz, gy, dist, items, guests, mascots, hits, paid, jobs }
-const ST = { tried: 0, tested: 0, ms: 0, why: {}, items: 0, guests: 0, shopHits: 0, broke: 0, mascotHits: 0, couriers: 0, cars: 0, bcars: 0, sushi: 0, season: '' };
+const ST = { tried: 0, tested: 0, ms: 0, why: {}, items: 0, branches: 0, guests: 0, shopHits: 0, broke: 0, mascotHits: 0, couriers: 0, cars: 0, bcars: 0, sushi: 0, season: '' };
 
 /* ═════════════ вывески и логотипы (кодом) ═════════════ */
 function circle (x, cx, cy, r, col) { x.fillStyle = col; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill(); }
@@ -248,8 +255,9 @@ function finder () {
     // улица у террасы — та самая и прямая
     for (const a of [-W / 2, 0, W / 2]) {
       const [px, pz] = P(a, 0), r = A.nearestRoad(px, pz, 5, 1);
-      if (!r || r.d > r.seg.w / 2 + RIV.SET + 2) return no('curve');
+      if (!r || r.d > walkHalf(r.seg) + RIV.LAWN + 2) return no('curve');
     }
+    if (!paveFree(s)) return no('pave');
     // подъезды (пины заказов), двери магазинов, остановки
     const cx = fx + nx * D / 2, cz = fz + nz * D / 2, R = Math.hypot(W, D) / 2;
     const rectD = (x, z) => { const dx = x - cx, dz = z - cz, la = Math.abs(dx * ux + dz * uz) - W / 2, lb = Math.abs(dx * nx + dz * nz) - D / 2; return Math.hypot(Math.max(0, la), Math.max(0, lb)); };
@@ -308,23 +316,44 @@ function rectWall (G, x, z, ux, uz, hw, hd, R) {
   return best;
 }
 
+/* Тротуар идёт мимо точки, не через неё: передний край террасы — в LAWN м газона за внешним краем
+   тротуара (pave.js walkHalf), участок целиком — не на тротуаре, пешеходке, дорожке и аллее. */
+function paveFree (s) {
+  const { fx, fz, ux, uz, nx, nz } = s, W = WT();
+  for (let a = -W / 2 - 0.5; a <= W / 2 + 0.51; a += 1) for (let b = -RIV.LAWN + 0.6; b <= DT() + 0.51; b += 1)
+    if (onPave(fx + ux * a + nx * b, fz + uz * a + nz * b, 0.2)) return false;
+  return true;
+}
+/* участок пустыря (центр c, глубина LD с запасом PUSH): где встанет передний край точки — или null */
+function lotFront (c, LD) {
+  const nx = -c.uz, nz = c.ux, x0 = c.x - nx * LD / 2, z0 = c.z - nz * LD / 2;
+  const r = A.nearestRoad(x0, z0, 5, 2);
+  if (!r) return null;
+  const sh = Math.max(0, walkHalf(r.seg) + RIV.LAWN - r.d);
+  if (sh > RIV.PUSH) return null;
+  const fx = x0 + nx * sh, fz = z0 + nz * sh;
+  return paveFree({ fx, fz, ux: c.ux, uz: c.uz, nx, nz }) ? [fx, fz] : null;
+}
+
 /* точки на пустырях: тот же отбор, что у строек (construction.js freeLots) — участок под всю
    точку с полями, от стен домов ≥ WALL, от наших пиццерий ≥ PIZZA, от строек, костров и котлов
    (общий список занятых) — край + 15 м. Районы без пустыря — 1 точка у ТЦ (mallSites). */
 function findSites () {
-  const G = wallGrid(), LW = WT() + 2, LD = DT() + 1;
+  const G = wallGrid(), LW = WT() + 2, LD = DT() + 1 + RIV.PUSH;
   const piz = (A.PIZZERIAS || []).map(p => [p.bx || p.x || 0, p.bz || p.z || 0]);
   const D = !!A.distAt, cap = D ? RIV.MAX : RIV.NODIST;
   const ok = c => {
     for (const p of piz) if (Math.hypot(p[0] - c.x, p[1] - c.z) < RIV.PIZZA) return false;
-    return rectWall(G, c.x, c.z, c.ux, c.uz, LW / 2, LD / 2, RIV.WALL) >= RIV.WALL;
+    return rectWall(G, c.x, c.z, c.ux, c.uz, LW / 2, LD / 2, RIV.WALL) >= RIV.WALL && !!lotFront(c, LD);
   };
   const lots = CONSTR.freeLots({ W: LW, D: LD, max: cap, gap: RIV.GAP_ANY, salt: 31, per: 2, cap: RIV.PER_DIST * 2, ok, claim: false });
   ST.lots = lots.length;
   const per = new Map(), sites = [];
   const far = (c, chain, gapSame) => sites.every(s => s.chain !== chain || Math.hypot(s.cx - c.cx, s.cz - c.cz) > gapSame);
   for (const l of lots) {
-    const nx = -l.uz, nz = l.ux, fx = l.x - nx * LD / 2, fz = l.z - nz * LD / 2;
+    const nx = -l.uz, nz = l.ux, f = lotFront(l, LD);
+    if (!f) continue;
+    const [fx, fz] = f;
     const c = { fx, fz, ux: l.ux, uz: l.uz, nx, nz, gy: l.gy, cx: fx + nx * DT() / 2, cz: fz + nz * DT() / 2, h: hash(l.x, l.z, 17), lot: 1 };
     const di = D ? l.dist : 0;
     const ns = per.get(di + ':sushi') || 0, nb = per.get(di + ':burger') || 0;
@@ -359,7 +388,7 @@ function mallSites (sites) {
       for (; acc < L; acc += RIV.STEP) {
         const px = x1 + ux * acc, pz = z1 + uz * acc;
         for (const sd of [1, -1]) {
-          const vx = ux * sd, vz = uz * sd, nx = -vz, nz = vx, off = w / 2 + RIV.SET;
+          const vx = ux * sd, vz = uz * sd, nx = -vz, nz = vx, off = walkHalf({ w, c: r.c, g: r.g || 0 }) + RIV.LAWN;
           const fx = px + nx * off, fz = pz + nz * off;
           let dm = Infinity;
           for (const m of malls) dm = Math.min(dm, Math.hypot(m[0] - fx, m[1] - fz));
@@ -407,8 +436,26 @@ function build1 (s, idx) {
 
   // площадка из плитки под всем участком и деревянная терраса
   {
-    const [x1, z1] = P(0, -1.2), [x2, z2] = P(0, DT() + 0.2);
+    const [x1, z1] = P(0, -0.3), [x2, z2] = P(0, DT() + 0.2);
     LITM.color(s.chain === 'sushi' ? '#d7dde0' : '#ddd5c4'); LITM.ribbon(x1, z1, x2, z2, WT() + 0.4, 0.12);
+    // своя дорожка от тротуара ко входу на террасу (проход между кадками): от площадки назад к улице
+    // до тротуара и на метр внахлёст — не на полотно
+    let e = 0, e0 = 0;
+    for (let b = -0.5; b >= -RIV.LAWN - 6; b -= 0.25) {
+      const [qx, qz] = P(0, b), k = onPave(qx, qz, 0);
+      if (k === 'road') break;                                   // полотно — дальше не идём
+      if (k === 'walk') { if (!e0) e0 = b; e = b; if (e0 - b >= 1) break; }
+      else if (e0) break;
+    }
+    if (e < 0) {
+      const [bx, bz] = P(0, e), [cx, cz] = P(0, -0.2);
+      LITM.color(YARD.COLOR);                                    // цвет дворовых дорожек: зимой протоптана (seasons.js)
+      LITM.ribbon(bx, bz, cx, cz, RIV.BRANCH_W, 0.13);
+      shop.branch = [[bx, bz], [cx, cz]];
+      A.CITY.paths.push(shop.branch);
+      addTrail(shop.branch, RIV.BRANCH_W / 2);
+      ST.branches++;
+    }
   }
   B(W - 0.2, 0.5, TER, '#a87b52', 0, gy - 0.1, TER / 2);                       // настил
   for (let a = -W / 2 + 0.6; a < W / 2 - 0.3; a += 1.2) B(0.06, 0.02, TER - 0.1, '#8d6440', a, gy + 0.16, TER / 2);   // доски

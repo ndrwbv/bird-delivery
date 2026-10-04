@@ -20,7 +20,8 @@
    Для других модулей:
      ORD.onArrive(cb)   — «только подъехал к клиенту, до вручения»: cb({ order, stop, zone, type, x, z, hour });
                           вернул Promise — вручение ждёт, пока он не решится (бандиты, катсцена)
-     ORD.staffRide()    — развоз смены (career.js в 24:00): Promise → { ok, people, pay, stars } или false (отказался)
+     ORD.staffRide()    — развоз смены (career.js в 24:00): Promise → { ok, people, pay, stars } или false (отказался);
+                          спрашивают только в пиццерии: не там — едешь назад, staffWaiting() — ждут, staffHere() — вернулся
      ORD.resetShift()   — новая смена (career.js onShiftStart; сам ловит и по S.orders)
      ORD.force(spec)    — песочница: сделать заказ текущим сейчас. spec — сюжетная (STORY.orderFor)
                           или { kind: 'urgent' | 'edge' | 'gang' | 'pizza', zone?, near?: { x, z }, r?, dist? }
@@ -820,7 +821,11 @@ export function bagMesh (bag = {}) {
 }
 
 /* ─────────────── развоз смены ─────────────── */
-const STAFF = { p: null, res: null, crew: null, board: null, drops: [], pay: 0 };
+/* Спрашивают только в пиццерии (04.10.2026): полночь застала в дороге — заказ снимаем, «заедь в пиццерию»,
+   маршрут назад (зелёный); вернулся — game.js (handover без заказа) → career.atBase → staffHere() — диалог.
+   Не вернулся за STAFF_WAIT с — ушли пешком (false), смена кончается. */
+const STAFF = { p: null, res: null, crew: null, board: null, drops: [], pay: 0, wait: false, waitT: 0 };
+const STAFF_WAIT = 150;
 export function staffRide () {
   if (!A) return Promise.resolve(false);
   if (STAFF.p) return STAFF.p;
@@ -828,11 +833,33 @@ export function staffRide () {
   const n = rint(STAFF_RIDE.people || [2, 3]);
   const crew = Array.from({ length: n }, () => makePerson());
   STAFF.crew = crew; STAFF.pay = 0;
+  const P = A.PIZZA, here = !S.order && !S.side && S.state === 'handover' && P && Math.hypot(V.x - P.x, V.z - P.z) < 25;
+  if (here) staffAsk();
+  else {
+    STAFF.wait = true; STAFF.waitT = 0;
+    if (S.side) { if (!S.side.ped.dead) S.side.ped.freeT = 3; S.side = null; }
+    A.hidePhone(); A.clearGate();
+    if (A.backToBase) A.backToBase();
+    A.toast(t('полночь — заедь в пиццерию: смену надо развезти'));
+  }
+  return STAFF.p;
+}
+function staffAsk () {
+  const crew = STAFF.crew;
+  STAFF.wait = false;
+  S.handT = 1e9;                                          // пока спрашивают — следующий заказ не берём
   DLG.say({
     person: crew[0], name: crew[0].first + ' · ' + t('пиццерия'), text: t(STAFF_RIDE.ask),
     accept: t(STAFF_RIDE.accept), decline: t(STAFF_RIDE.decline), mood: 'shy', color: typeColor('staff'),
-  }).then(r => { if (r === true) beginStaff(crew); else staffDone(false); });
-  return STAFF.p;
+  }).then(r => { if (r === true && STAFF.crew === crew) beginStaff(crew); else staffDone(false); });
+}
+/** развоз ждёт, пока вернёшься в пиццерию (career.js lateGuard не закрывает смену) */
+export const staffWaiting = () => !!(STAFF.p && STAFF.wait);
+/** вернулся в пиццерию (career.atBase): ждали — спрашиваем; true — ход забрали */
+export function staffHere () {
+  if (!STAFF.p || !STAFF.wait) return false;
+  staffAsk();
+  return true;
 }
 /* смена оборвалась (снялся, новая смена): развоз снимаем, обещание — false */
 function staffAbort () {
@@ -843,7 +870,7 @@ function staffAbort () {
 }
 function staffDone (r) {
   const res = STAFF.res;
-  STAFF.p = null; STAFF.res = null; STAFF.board = null; STAFF.crew = null;
+  STAFF.p = null; STAFF.res = null; STAFF.board = null; STAFF.crew = null; STAFF.wait = false;
   if (res) res(r);
 }
 function beginStaff (crew) {
@@ -972,6 +999,11 @@ export function step (dt) {
     A.clearGuest(d.p);
     STAFF.drops.splice(i, 1);
   }
+  // ждут в пиццерии, а ты не едешь — ушли пешком
+  if (STAFF.p && STAFF.wait && (STAFF.waitT += dt) > STAFF_WAIT) {
+    A.toast(t('не дождались — ушли пешком'));
+    staffDone(false);
+  }
   // развоз не успел: работники выходят и идут пешком — обещание false, career.js закрывает смену
   if (STAFF.p && S.order && S.order.ord && S.order.ord.type === 'staff' && S.time < 0 && ['drive', 'loading'].includes(S.state)) {
     A.toast(t('не успел развезти — дальше они пешком'));
@@ -996,7 +1028,9 @@ function hud () {
 /* ─────────────── цвета: радар, карта, кольцо ─────────────── */
 export function targetColor () {
   if (S.state === 'side') return typeColor('side');
-  if (S.state === 'back') return '#f0522a';
+  if (S.state === 'back') return '#3fd15e';                // в пиццерию — зелёный, как путь (game.js ROUTE_HEX)
+  const st0 = S.order && S.order.stops && S.order.stops[S.order.idx];
+  if (st0 && st0.pickup) return '#3fd15e';                 // развоз смены: сначала заехать за ними в пиццерию
   const sp = S.order && S.order.ord;
   return sp ? sp.color : typeColor('pizza');
 }

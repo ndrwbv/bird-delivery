@@ -34,8 +34,10 @@
    твёрдое и один на гнущееся. Сборка клетки — не больше BUDGET мс за кадр.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
-import { snowAmt, seasonValue } from './seasons.js';
+import { snowAmt, seasonValue, heatAmt } from './seasons.js';
 import * as GFX from './gfx.js';
+import { onPave, walkHalf } from './pave.js';
+import * as FADEJS from './fade.js';
 
 export const LAWN = {
   CELL: 40, STEP: 4, DROP: 120,
@@ -45,10 +47,12 @@ export const LAWN = {
   PIN_HIDE: 6, PIN_HIDE_BIG: 9,
   GRASS: 0.55, DAND: 0.5, LITTER: 0.035, LITTER_HOT: 0.4, HOT_R: 9,
   WALL_WEED: 0.25, TIRES: 0.07,
-  THICKET: 0.7, THICKET_S: 26,               // порог шума и его масштаб (м)
+  THICKET: 0.78, THICKET_S: 26, THICK_N: 2,  // порог шума, его масштаб (м), стеблей в точке сетки (+ до 3 по густоте)
+  YARD_R: 40,                                // заросли, бельё, ракушки, выбивалки — дальше от большой улицы или за домом, м
   BIG: { beater: 0.16, line: 0.18, garage: 0.12, sand: 0.1 },
   RAIL: 0.3, RAIL_YARD: 0.1,
   SLOW: 2.5, SNOW: 0.35,
+  FADE: 22, FADE_S: 14, FADE_LAG: 6,         // рост из земли у края дальности: полоса крупного / мелкого, запас, м (fade.js)
   CAPS: { grass: 7000, dand: 3000, weed: 2500, burdock: 1500, tall: 5000, reed: 5000, hog: 2500,
     rail: 1500, tire: 1200, flower: 1200, shell: 300, sand: 200, cube: 5000, lit: 4000, bottle: 2000 },
 };
@@ -179,7 +183,17 @@ function spot (x, z, m = 0) {
   if (nr) { edge = nr.d - nr.seg.w / 2; if (edge < (nr.seg.c > 5 ? 0.8 : 1.0) + m) return null; }
   if (onPath(x, z, 1.1 + m) || A.onAlley(x, z, 0.8 + m) || A.yardBlocks(x, z, 0.8 + m) || A.pzBlocks(x, z, 1 + m)) return null;
   if (inPolys(POLYS, x, z) || claimed(x, z, 4 + m)) return null;
+  if (onPave(x, z, 0.3 + m)) return null;              // тротуары, пешеходки, дорожки, аллеи (pave.js)
   return { y, edge, wall: A.inHouse(x, z, 4.2) };
+}
+
+/* во дворе: с большой улицы (класс ≤ 4) не видно — до неё дальше YARD_R или между ними дом */
+function inYard (x, z) {
+  const nr = A.nearestRoad(x, z, 4, 2);
+  if (!nr || nr.d > LAWN.YARD_R) return true;
+  const dx = nr.x - x, dz = nr.z - z, n = Math.ceil(nr.d / 2);
+  for (let k = 1; k < n; k++) if (A.inHouse(x + dx * k / n, z + dz * k / n, 0)) return true;
+  return false;
 }
 
 /* ── модели: единичные, цвет в вершинах ── */
@@ -284,14 +298,23 @@ function geos () {
 }
 
 /* материал: твёрдое — как есть; гнущееся — машина раздвигает, ветер чуть качает */
-function material (bend) {
+/* материал: твёрдое — как есть; гнущееся — машина раздвигает, ветер чуть качает.
+   small — трава, одуванчики, мелкий мусор (своя дальность DETAIL.small). У каждого из четырёх —
+   свой uFade: вещь растёт из земли в полосе FADE м до края своей дальности (fade.js), а не
+   выскакивает целой клеткой */
+const FADE_U = { small: [], big: [] };
+function material (bend, small) {
   const m = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-  if (!bend) return m;
+  const uFade = FADEJS.uniform(THREE, 1e4, 1e4 + 1);
+  FADE_U[small ? 'small' : 'big'].push(uFade);
   m.onBeforeCompile = sh => {
+    sh.uniforms.uFade = uFade;
+    sh.vertexShader = 'uniform vec2 uFade;\n' + FADEJS.FADE_FN + '\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>' + FADEJS.BASE_DIST + FADEJS.GROW_BEGIN);
+    if (!bend) return;
     sh.uniforms.uCar = U.uCar; sh.uniforms.uTime = U.uTime;
     sh.vertexShader = 'uniform vec4 uCar;\nuniform float uTime;\n' + sh.vertexShader.replace('#include <project_vertex>', `
       vec4 wq = modelMatrix * instanceMatrix * vec4(transformed, 1.0);
-      vec3 b0 = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+      vec3 b0 = fadeB0;
       float hk = max(wq.y - b0.y, 0.0);
       vec2 dd = b0.xz - uCar.xy; float dl = max(length(dd), 0.001);
       float bend = (1.0 - smoothstep(0.8, 3.2, dl)) * uCar.z;
@@ -301,13 +324,19 @@ function material (bend) {
       vec4 mvPosition = viewMatrix * wq;
       gl_Position = projectionMatrix * mvPosition;`);
   };
-  m.customProgramCacheKey = () => 'lawnBend';
+  m.customProgramCacheKey = () => (bend ? 'lawnBendF' : 'lawnSolidF');
   return m;
 }
+/* полоса роста: кончается FADE_LAG м до края (камера уходит до 5 м между пересборками) */
+function setFade (R, RS) {
+  const e = LAWN.FADE_LAG;
+  for (const u of FADE_U.small) u.value.set(Math.max(0, RS - e - LAWN.FADE_S), RS - e);
+  for (const u of FADE_U.big) u.value.set(Math.max(0, R - e - LAWN.FADE), R - e);
+}
 function makeMeshes () {
-  const G = geos(), mS = material(false), mB = material(true);
+  const G = geos(), mats = { sb: material(true, true), bb: material(true, false), ss: material(false, true), bs: material(false, false) };
   for (const k in LAWN.CAPS) {
-    const cap = LAWN.CAPS[k], M = new THREE.InstancedMesh(G[k], BEND[k] ? mB : mS, cap);
+    const cap = LAWN.CAPS[k], M = new THREE.InstancedMesh(G[k], mats[(SMALL[k] ? 's' : 'b') + (BEND[k] ? 'b' : 's')], cap);
     M.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     M.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3).fill(1), 3);
     M.instanceColor.setUsage(THREE.DynamicDrawUsage);
@@ -363,13 +392,13 @@ function * buildCell (i, j) {
       const entNear = nearEnt(x, z, F.ENT);
       // заросли на пустыре
       const thick = vn(x, z, F.THICKET_S, 21);
-      if (thick > F.THICKET && sp.edge > 6 && !sp.wall && !entNear && !A.inHouse(x, z, 13) && !nearEnt(x, z, 14) && !inPolys(PARKS, x, z)) {
-        const kind = (() => { const h = hsh(Math.floor(x / 30), Math.floor(z / 30), 22); return h < 0.45 ? 'tall' : h < 0.75 ? 'reed' : 'hog'; })();
-        const dens = Math.min(1, (thick - F.THICKET) / 0.12);
-        const n = 3 + Math.floor(dens * 4);
+      if (thick > F.THICKET && sp.edge > 6 && !sp.wall && !entNear && !A.inHouse(x, z, 13) && !nearEnt(x, z, 14) && !inPolys(PARKS, x, z) && inYard(x, z)) {
+        const kind = (() => { const h = hsh(Math.floor(x / 30), Math.floor(z / 30), 22); return h < 0.55 ? 'tall' : h < 0.75 ? 'reed' : 'hog'; })();
+        const dens = Math.min(1, (thick - F.THICKET) / 0.1);
+        const n = F.THICK_N + Math.floor(dens * 3.99);
         for (let k = 0; k < n; k++) {
           const px = x + (r() - 0.5) * S, pz = z + (r() - 0.5) * S;
-          if (!inCell(px, pz) || onPath(px, pz, 1.1)) continue;
+          if (!inCell(px, pz) || !spot(px, pz, 0.4)) continue;
           const kk = kind === 'hog' && r() < 0.45 ? 'tall' : kind;
           const s = 0.85 + r() * 0.3, sh = (0.75 + 0.25 * dens) * (0.9 + r() * 0.2);
           inst(cell, kk, px, A.groundH(px, pz) - 0.05, pz, r() * 6.3, s, sh, s, '#ffffff', -1, r(), 0, 0);
@@ -429,7 +458,7 @@ function * buildCell (i, j) {
         for (let k = 0; k < n; k++) litter(cell, x + (r() - 0.5) * 2.4, z + (r() - 0.5) * 2.4, r, kids);
       }
       // большое во дворе: выбивалка, бельё, песок, ракушки — по одной на кусок 20×20
-      if (!entNear && !nearEnt(x, z, F.ENT_BIG) && sp.edge > 4 && !A.inHouse(x, z, 8) && A.inHouse(x, z, 35) && free(x, z, 6)) {
+      if (!entNear && !nearEnt(x, z, F.ENT_BIG) && sp.edge > 4 && !A.inHouse(x, z, 8) && A.inHouse(x, z, 35) && free(x, z, 6) && inYard(x, z)) {
         const h = hsh(Math.floor(x / 20), Math.floor(z / 20), 31);
         const b = F.BIG;
         const claimKey = Math.floor(x / 20) + ',' + Math.floor(z / 20);
@@ -583,12 +612,12 @@ function rails (cell, inCell) {
       const hex = ['#3f7a4a', '#4f6fa8', '#e8e4d8', '#c9803a', '#a8463a'][Math.floor(hsh(ri, sd, 52) * 5)];
       const [ax, az] = rd.p[si - 1], [bx, bz] = rd.p[si], len = Math.hypot(bx - ax, bz - az);
       if (len < 14) continue;
-      const ux = (bx - ax) / len, uz = (bz - az) / len, nx = -uz * sd, nz = ux * sd, off = A.roadWidth(rd) / 2 + 1.5;
+      const ux = (bx - ax) / len, uz = (bz - az) / len, nx = -uz * sd, nz = ux * sd, off = walkHalf({ w: A.roadWidth(rd), c: rd.c, g: rd.g }) + 0.5;   // за тротуаром, по краю газона
       const ry = Math.atan2(-uz, ux);
       for (let d = 7; d + 2.44 < len - 7; d += 2.44) {
-        // у края газона: сразу за полотном или за тротуаром (кто первый свободен)
+        // у края газона, сразу за тротуаром (или чуть дальше, если там занято)
         let x = 0, z = 0, sp = null;
-        for (const o of [off, off + 1.8, off + 3.4]) {
+        for (const o of [off, off + 1.2, off + 2.4]) {
           x = ax + ux * (d + 1.22) + nx * o; z = az + uz * (d + 1.22) + nz * o;
           sp = spot(x, z);
           if (sp && sp.edge >= 1.0 && spot(x - ux * 1.2, z - uz * 1.2) && spot(x + ux * 1.2, z + uz * 1.2)) break;
@@ -641,7 +670,8 @@ function season () {
   const winter = snow > LAWN.SNOW;
   const dand = !winter && (s >= 3.2 || s < 0.95);
   const autumn = winter ? 0 : s < 0.9 ? 0 : s < 1.4 ? (s - 0.9) / 0.5 : s < 2.2 ? 1 : 0;
-  return { winter, dand, autumn, sig: (winter ? 'w' : '') + (dand ? 'd' : '') + Math.round(autumn * 10) };
+  const heat = winter ? 0 : heatAmt();                 // жара: трава и бурьян выжжены, одуванчиков нет
+  return { winter, dand: dand && heat < 0.5, autumn, heat, sig: (winter ? 'w' : '') + (dand ? 'd' : '') + Math.round(autumn * 10) + 'h' + Math.round(heat * 10) };
 }
 
 /* ── в меши: что рядом и в кадре ── */
@@ -659,6 +689,7 @@ function hideNear (x, z, big) {
 function refresh (cam) {
   const t0 = performance.now(), F = LAWN, x = cam.position.x, z = cam.position.z, R = radius(cam), RS = Math.min(R, DET().small);
   const SEA = season(), thin = DET().thin;
+  setFade(R, RS);
   PM.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
   FR.setFromProjectionMatrix(PM);
   const vis = [];
@@ -708,6 +739,7 @@ function refresh (cam) {
   // краски сезона: осенью трава желтеет, зимой бурьян и заросли — бурые
   const tint = (k, r, g, b) => { const a = MESH[k].instanceColor.array; for (let q = 0; q < n[k] * 3; q += 3) { a[q] *= r; a[q + 1] *= g; a[q + 2] *= b; } };
   if (SEA.autumn > 0) { const t = SEA.autumn; tint('grass', 1 + 0.35 * t, 1 - 0.05 * t, 1 - 0.5 * t); tint('weed', 1 + 0.3 * t, 1 - 0.1 * t, 1 - 0.4 * t); tint('burdock', 1 + 0.2 * t, 1 - 0.1 * t, 1 - 0.3 * t); }
+  if (SEA.heat > 0) { const t = SEA.heat; tint('grass', 1 + 0.45 * t, 1 - 0.02 * t, 1 - 0.6 * t); tint('weed', 1 + 0.35 * t, 1 - 0.05 * t, 1 - 0.5 * t); tint('burdock', 1 + 0.25 * t, 1 - 0.05 * t, 1 - 0.4 * t); for (const k of ['tall', 'reed', 'hog']) tint(k, 1 + 0.3 * t, 1 - 0.04 * t, 1 - 0.45 * t); }
   if (SEA.winter) for (const k in DRY) tint(k, 1.25, 0.82, 0.55);
   else if (SEA.autumn > 0) for (const k of ['tall', 'reed', 'hog']) tint(k, 1 + 0.25 * SEA.autumn, 1 - 0.08 * SEA.autumn, 1 - 0.35 * SEA.autumn);
   for (const k in MESH) {

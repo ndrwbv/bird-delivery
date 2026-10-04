@@ -8,6 +8,7 @@
    Переменных игры модуль не видит — всё приходит в api (pizzaApi в game.js). */
 import { t } from '../i18n/index.js';
 import * as SL from './streetlamps.js';
+import { onPave } from './pave.js';
 
 const BRAND = '#f0522a', CREAM = '#fff3d6';
 
@@ -153,6 +154,7 @@ export function courierLot (A, f, count) {
     const [x0, z0] = P(a0, b0), [x1, z1] = P(a1, b1), l = Math.hypot(x1 - x0, z1 - z0), m = Math.max(1, Math.round(l / 2.2));
     for (let i = 0; i < m; i++) {
       const cx = x0 + (x1 - x0) * (i + 0.5) / m, cz = z0 + (z1 - z0) * (i + 0.5) / m, y = A.groundH(cx, cz), g = [];
+      if (onPave(cx, cz, 0.1)) continue;                 // не поперёк тротуара и дорожки (pave.js)
       const ry = Math.atan2(-(z1 - z0), x1 - x0);
       A.put(g, new THREE.BoxGeometry(l / m, 0.08, 0.06), BRAND, cx, y + 0.9, cz, 0, ry, 0);
       A.put(g, new THREE.BoxGeometry(l / m, 0.08, 0.06), CREAM, cx, y + 0.5, cz, 0, ry, 0);

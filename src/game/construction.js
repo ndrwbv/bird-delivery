@@ -41,6 +41,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { reliefAt, RELIEF } from './relief.js';
 import { t, N_ } from '../i18n/index.js';
+import { onPave } from './pave.js';
 
 export const CONS = {
   MAX: 13, GAP: 380, PER_DIST: 2,   // строек — не больше; не ближе друг к другу, м; в одном районе
@@ -516,6 +517,7 @@ function build1 (s, idx) {
   // ── забор: секции по периметру, ворота к улице ──
   const sec = (a, b, r, v) => {
     const [px, pz] = P(a, b), g = [];
+    if (onPave(px, pz, 0.2)) return;                  // на тротуар и дорожку секцию не ставим (pave.js)
     slateParts(g, px, A.groundH(px, pz), pz, ry + r, v);
     const it = A.smashAdd('bigfence', px, pz, 1.3, g, '#9aa0a2');
     it.cons = 'fence'; it.ry = ry + r; it.v = v;
@@ -541,6 +543,7 @@ function build1 (s, idx) {
     Bw(0.25, 2.6, 0.25, '#3d6a3f', sd * CONS.GATE / 2, 1.3, -D / 2);
     const a = sd * (CONS.GATE / 2 - 1.15), b = -D / 2 + 1.2;
     const [px, pz] = P(a, b), g = [], gyy = A.groundH(px, pz), rr = ry + sd * 1.2;
+    if (onPave(px, pz, 0.2)) continue;               // створка не на тротуар (pave.js)
     A.put(g, A.boxGeo(2.6, 1.9, 0.05), '#4f7a52', px, gyy + 1.1, pz, 0, rr, 0);
     A.put(g, A.boxGeo(2.6, 0.08, 0.1), '#2f4a32', px, gyy + 2.05, pz, 0, rr, 0);
     const it = A.smashAdd('fence', px, pz, 1.2, g, '#4f7a52');

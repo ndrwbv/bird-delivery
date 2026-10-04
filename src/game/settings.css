@@ -1,36 +1,48 @@
-/* настройки — карусель карточек-разделов (settings.js): окно во весь экран без прокрутки,
-   карточка в центре крупно, соседи по краям. Строки «что — кнопка» — .set-row (delivery.css) */
+/* настройки — табы (settings.js): окно во весь экран без прокрутки; сверху строка табов
+   (Игра · Графика · Звук · Управление · Язык), под ней — список таба; не влез — листается внутри
+   таба. Строки «что — кнопка» — .set-row (delivery.css) */
 #panel[data-kind="settings"] { --u: clamp(10px, min(1.2vw, 2.1vh), 18px); }
 #panel[data-kind="settings"] .pn-box {
-  width: min(1600px, calc(100% - 16px)); height: calc(100% - 16px); max-height: none; overflow: hidden;
-  display: flex; flex-direction: column; padding: calc(var(--u) * .9) calc(var(--u) * .8) calc(var(--u) * .5);
-  background: rgba(29, 24, 48, .94);
+  width: min(1100px, calc(100% - 16px)); height: calc(100% - 16px); max-height: none; overflow: hidden;
+  display: flex; flex-direction: column; padding: calc(var(--u) * .9) calc(var(--u) * 1.2) calc(var(--u) * .5);
+  background: rgba(29, 24, 48, .96);
 }
 #panel[data-kind="settings"] #pn-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-#panel[data-kind="settings"] .pn-t { flex: none; text-align: center; margin: 0 48px calc(var(--u) * .5); }
+#panel[data-kind="settings"] .pn-t { flex: none; text-align: center; margin: 0 48px calc(var(--u) * .6); }
 #panel[data-kind="settings"] .set-cred { flex: none; margin-top: calc(var(--u) * .4); font-size: max(7px, calc(var(--u) * .55)); }
-.set-czh { flex: 1; min-height: 0; display: flex; }
-.set-cz { flex: 1; --cw: clamp(250px, min(48vw, 92vh), 680px); --step: calc(var(--cw) * .96); }
 
-.set-card { display: flex; flex-direction: column; gap: calc(var(--u) * .5); max-height: 100%; overflow: hidden;
-            padding: calc(var(--u) * 1) calc(var(--u) * 1.2); color: #fff3d6;
-            background: linear-gradient(180deg, #2c3a78 0, #1d2440 70%); border: 4px solid #33210c; border-radius: 16px;
-            box-shadow: 0 8px 0 #33210c, 0 20px 46px rgba(0, 0, 0, .45); }
-.set-ct { flex: none; font-size: calc(var(--u) * 1.4); color: #ffd85e; text-shadow: 3px 3px 0 #33210c; text-align: center; line-height: 1.3; }
-.set-cb { display: flex; flex-direction: column; min-height: 0; }
-#panel[data-kind="settings"] .set-card .set-row { padding: calc(var(--u) * .35) 0; font-size: var(--u); gap: calc(var(--u) * .4) calc(var(--u) * .8); }
-#panel[data-kind="settings"] .set-card .set-row button { min-height: 36px; min-width: min(100%, calc(var(--u) * 9)); padding: calc(var(--u) * .5) calc(var(--u) * .8); font-size: calc(var(--u) * .95); }
-#panel[data-kind="settings"] .set-card .pn-n { margin-top: calc(var(--u) * .5); font-size: max(8px, calc(var(--u) * .6)); }
-#panel[data-kind="settings"] .set-card .set-danger { margin-top: calc(var(--u) * .8); min-height: 40px; }
-.set-card .set-rows { display: flex; flex-direction: column; }
-.set-card button.padsel, .set-card .set-still.padsel { outline: 4px solid #fff3d6 !important; outline-offset: 2px; }
-/* язык — сетка плиток прямо в карточке */
-.set-card .lang-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(var(--u) * .4); }
-.set-card .lang-grid button { font: inherit; font-size: calc(var(--u) * .82); padding: calc(var(--u) * .55) 4px; min-height: 34px; cursor: pointer; color: #fff3d6;
+/* строка табов: выбранный — оранжевый; LB / RB по краям — только когда играют геймпадом */
+.set-tabs { flex: none; display: flex; align-items: stretch; justify-content: center; gap: calc(var(--u) * .4); margin-bottom: calc(var(--u) * .7);
+            padding-bottom: calc(var(--u) * .6); border-bottom: 3px solid #33210c; }
+.set-tab { flex: 1 1 0; min-width: 0; max-width: calc(var(--u) * 14); min-height: 44px; font: inherit; font-size: calc(var(--u) * .9); line-height: 1.3; cursor: pointer;
+           padding: calc(var(--u) * .55) calc(var(--u) * .4); color: #b9c3e6; background: #2a3766; border: 3px solid #33210c; border-radius: 10px;
+           box-shadow: 0 4px 0 #33210c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.set-tab:hover { color: #fff3d6; background: #3a4a85; }
+.set-tab.on { color: #fff3d6; background: #f0522a; text-shadow: 2px 2px 0 #9b2a10; }
+.set-tab.padsel, .set-tab:focus-visible { outline: 4px solid #fff3d6 !important; outline-offset: 2px; }
+.set-tk { display: none; flex: none; align-self: center; font-style: normal; cursor: pointer; font-size: calc(var(--u) * .7); padding: calc(var(--u) * .35) calc(var(--u) * .45);
+          color: #33210c; background: #fff3d6; border: 2px solid #33210c; border-radius: 6px; box-shadow: 0 3px 0 #33210c; }
+body.pad .set-tk { display: block; }
+
+/* список таба: обычный вертикальный, по центру окна; не влез — листается сам */
+.set-pane { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #ffd85e transparent;
+            padding: 0 calc(var(--u) * .3) calc(var(--u) * .4); }
+.set-list { max-width: calc(var(--u) * 48); margin: 0 auto; display: flex; flex-direction: column; color: #fff3d6; }
+.set-h { font-size: calc(var(--u) * .78); color: #ffd85e; text-transform: uppercase; letter-spacing: .08em; padding: calc(var(--u) * .8) 0 calc(var(--u) * .2); }
+.set-h:first-child { padding-top: 0; }
+#panel[data-kind="settings"] .set-list .set-row { padding: calc(var(--u) * .4) 0; font-size: var(--u); gap: calc(var(--u) * .4) calc(var(--u) * .8); }
+#panel[data-kind="settings"] .set-list .set-row button { min-height: 40px; min-width: min(100%, calc(var(--u) * 11)); padding: calc(var(--u) * .5) calc(var(--u) * .8); font-size: calc(var(--u) * .95); }
+#panel[data-kind="settings"] .set-list .pn-n { margin-top: calc(var(--u) * .5); font-size: max(8px, calc(var(--u) * .62)); }
+#panel[data-kind="settings"] .set-list .set-danger { margin-top: calc(var(--u) * 1); min-height: 44px; }
+.set-list .set-rows { display: flex; flex-direction: column; }
+.set-list button.padsel, .set-list .set-still.padsel { outline: 4px solid #fff3d6 !important; outline-offset: 2px; }
+/* язык — сетка плиток */
+.set-list .lang-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(var(--u) * .5); }
+.set-list .lang-grid button { font: inherit; font-size: calc(var(--u) * .9); padding: calc(var(--u) * .7) 4px; min-height: 40px; cursor: pointer; color: #fff3d6;
                               background: #2a3766; border: 3px solid #33210c; border-radius: 8px; box-shadow: 0 3px 0 #33210c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.set-card .lang-grid button:hover { background: #3a4a85; }
-.set-card .lang-grid button.cur { background: #f0522a; }
-/* без кнопок: управление, «меняется в главном меню», версия в браузере */
+.set-list .lang-grid button:hover { background: #3a4a85; }
+.set-list .lang-grid button.cur { background: #f0522a; }
+/* без кнопок: управление, «меняется в главном меню» */
 .set-still { outline: none; display: flex; flex-direction: column; gap: calc(var(--u) * .5); font-size: var(--u); line-height: 1.5; }
 .set-big { font-weight: normal; font-size: calc(var(--u) * 1.2); color: #fff3d6; }
 .set-keys { padding: calc(var(--u) * .9) calc(var(--u) * 1); background: #ffd85e; color: #33210c; border-radius: 6px; font-size: calc(var(--u) * .85); }
@@ -43,11 +55,19 @@
 /* низкий экран (телефон боком): пункты графики — в две колонки, языки — в четыре */
 @media (max-height: 560px) {
   #panel[data-kind="settings"] { --u: clamp(8px, 2.2vh, 12px); }
-  .set-cz { --cw: clamp(300px, 66vw, 620px); }
-  .set-card .set-rows { display: grid; grid-template-columns: 1fr 1fr; column-gap: calc(var(--u) * 1.2); }
-  .set-card .lang-grid { grid-template-columns: repeat(4, 1fr); }
-  #panel[data-kind="settings"] .set-card .set-row button { min-height: 28px; }
-  .set-card .lang-grid button { min-height: 26px; }
+  #panel[data-kind="settings"] .pn-t { margin-bottom: 4px; }
+  .set-tab { min-height: 32px; }
+  .set-list { max-width: none; }
+  .set-list .set-rows { display: grid; grid-template-columns: 1fr 1fr; column-gap: calc(var(--u) * 1.2); }
+  .set-list .lang-grid { grid-template-columns: repeat(4, 1fr); }
+  #panel[data-kind="settings"] .set-list .set-row button { min-height: 30px; }
+  .set-list .lang-grid button { min-height: 28px; }
   .set-keys .pm-keys-g { grid-template-columns: auto 1fr auto 1fr; }
 }
-@media (max-aspect-ratio: 1/1) { .set-cz { --cw: min(86vw, 420px); } }
+/* телефон стоймя: табы мельче, языки — в две колонки */
+@media (max-aspect-ratio: 1/1) {
+  .set-tabs { flex-wrap: wrap; gap: 6px 4px; }
+  .set-tab { flex: 1 1 30%; max-width: none; min-height: 38px; font-size: max(8px, calc(var(--u) * .78)); padding: 6px 2px; }
+  .set-tk { display: none !important; }
+  .set-list .lang-grid { grid-template-columns: repeat(2, 1fr); }
+}

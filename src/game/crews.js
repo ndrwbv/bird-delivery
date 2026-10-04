@@ -263,9 +263,12 @@ function hangStep (crew, m, dt, near) {
 function fightStep (crew, m, dt, near) {
   const u = m.u;
   if (m.flee) {                                     // уходит прочь от машины и тает за 50 м
-    const an = Math.atan2(m.x - A.V.x, m.z - A.V.z);
+    if (m.faT > 0) m.faT -= dt;
+    const an = Math.atan2(m.x - A.V.x, m.z - A.V.z) + (m.faT > 0 ? m.fa : 0), x0 = m.x, z0 = m.z;
     m.x += Math.sin(an) * 4.2 * dt; m.z += Math.cos(an) * 4.2 * dt;
     if (A.pushOut) A.pushOut(m, 0.45);
+    // упёрся в стену — не шагает на месте, а бежит вдоль неё полторы секунды
+    if (!(m.faT > 0) && Math.hypot(m.x - x0, m.z - z0) < 4.2 * dt * 0.35) { m.fa = Math.random() < 0.5 ? 1.4 : -1.4; m.faT = 1.5; }
     m.h = damp(m.h, an, 8, dt); m.ph += dt * 12;
     walkPose(u, m.ph); u.armR.rotation.x = -0.6;
     place(m);

@@ -91,6 +91,19 @@ const CHECKS = [
     const n = Object.entries(r.n).map(([k, v]) => k + ' ' + v).join(', ');
     return { status: r.ok ? 'ok' : 'fail', info: `${n}; на асфальте ${r.bad}` + (r.bad ? ': ' + JSON.stringify(r.by) + " " + JSON.stringify(r.sample) : '') };
   } },
+  { id: 'pave', name: 'заборчики и конструкции не на тротуарах', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/pave-props.js')]);
+    const e = errLine(j), r = j.result;
+    if (e || !r) return { status: 'fail', info: e || 'нет результата' };
+    const n = Object.entries(r.n).map(([k, v]) => k + ' ' + v).join(', ');
+    return { status: r.ok ? 'ok' : 'fail', info: `${n}, стеблей зарослей ${r.thick} (${r.perK} на клетку); на тротуаре и дорожке ${r.bad}` + (r.bad ? ': ' + JSON.stringify(r.by) + ' ' + JSON.stringify(r.sample) : '') };
+  } },
+  { id: 'yardnet', name: 'дорожки дворов в сети, точки конкурентов за тротуаром', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/yard-paths.js')]);
+    const e = errLine(j), r = j.result;
+    if (e || !r) return { status: 'fail', info: e || 'нет результата' };
+    return { status: r.ok ? 'ok' : 'fail', info: `тропинок дверей ${r.doors}, общих дорожек ${r.walks}, выходов ${r.links}, хвостов ${r.stub}; точек конкурентов ${r.shops}, с дорожкой ${r.branch}; не так ${r.bad}` + (r.bad ? ': ' + JSON.stringify(r.by) + ' ' + JSON.stringify(r.sample) : '') };
+  } },
   { id: 'smoke-adult', name: '30 с автопилота: взрослая (web)', group: 3, run: smoke(['--mode=web'], 'взрослая') },
   { id: 'smoke-phone', name: '30 с автопилота: телефон (web)', group: 3, run: smoke(['--size=phone'], 'телефон') },
   { id: 'smoke-crashlog', name: 'журнал ошибок пуст после дымовых', group: 4, run: async () => (

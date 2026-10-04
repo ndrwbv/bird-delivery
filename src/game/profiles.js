@@ -19,7 +19,7 @@
      PROF.keys()             — ключи прогресса текущего профиля (для «сбросить прогресс» в game.js)
      PROF.peek(id, fn)       — fn() так, будто текущий — профиль id (подписи в списке профилей)
      PROF.open(api) / root() / back() / submit()  — окно «профили» из главного меню (menu.js)
-       api: { money(n), info() → строка-подпись профиля (читает Store), setName(n), Snd, onClose() } */
+       api: { money(n), info() → строка-подпись профиля (читает Store), face(id) → портрет, setName(n), Snd, onClose() } */
 import './profiles.css';
 import { t } from '../i18n/index.js';
 
@@ -195,6 +195,8 @@ export function back () {
 }
 /** Enter в поле имени (career.js ловит клавиши сам) */
 export function submit () { if (root() && view && view.k === 'name') saveName(); }
+/* портрет профиля (menu.js face): у каждого профиля своё лицо */
+const ava = id => { let u = ''; try { u = A && A.face ? A.face(id) : ''; } catch (e) { u = ''; } return u ? '<img class="prf-ava" src="' + u + '" alt="">' : ''; };
 const info = id => { try { return A && A.info ? peek(id, A.info) : ''; } catch (e) { return ''; } };
 const snd = k => { try { if (A && A.Snd && A.Snd[k]) A.Snd[k](); } catch (e) { /* — */ } };
 
@@ -234,8 +236,8 @@ function render () {
   const rows = meta.list.map(p => {
     const c = p.id === meta.cur;
     return '<div class="prf-row' + (c ? ' cur' : '') + '">' +
-      '<button type="button" class="prf-pick" data-id="' + p.id + '"' + (c && !view.focus ? ' autofocus' : '') + '><b>' + esc(label(p)) + '</b>' +
-      '<span>' + esc((c ? t('играешь сейчас') + ' · ' : '') + info(p.id)) + '</span></button>' +
+      '<button type="button" class="prf-pick" data-id="' + p.id + '"' + (c && !view.focus ? ' autofocus' : '') + '>' + ava(p.id) + '<i class="prf-pt"><b>' + esc(label(p)) + '</b>' +
+      '<span>' + esc((c ? t('играешь сейчас') + ' · ' : '') + info(p.id)) + '</span></i></button>' +
       '<button type="button" class="prf-ren" data-id="' + p.id + '" title="' + esc(t('переименовать')) + '"' + (view.focus === p.id ? ' autofocus' : '') + '>' + esc(t('имя')) + '</button>' +
       (meta.list.length > 1 ? '<button type="button" class="prf-del" data-id="' + p.id + '" title="' + esc(t('удалить')) + '">✕</button>' : '') +
       '</div>';

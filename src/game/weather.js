@@ -6,8 +6,9 @@
    та же смена того же сохранения всегда с той же погодой. Шансы — CHANCES ниже.
 
      clear  — как по календарю: изредка дождь (или снег), как было до блока 8
-     heat   — жаркое лето: небо, земля, трава и туман оранжевые, как пустыня, над дальним асфальтом
-              марево, все в шортах, дождя нет; подпись «жара +31…36°»
+     heat   — жаркое лето: небо и туман оранжевые, трава выжженная (соломенная, пятнами ещё зелёная,
+              проплешины пыльные), кроны зелёные, листьев на земле нет; над дальним асфальтом марево,
+              все в шортах, дождя нет
      golden — яркая сухая осень: кроны насыщенно жёлто-красные и ещё держатся, на асфальте листья,
               сухо, небо чистое
      snowy  — снежная зима: снегопад всю смену, вдоль домов сугробы до второго этажа, вдоль улиц —
@@ -16,23 +17,24 @@
      rain   — дождь почти всю смену (льёт 60—120 с, перерывы 15—35 с), асфальт мокрый
      storm  — гроза: ливень всю смену, небо тёмное, молнии (вспышка света на миг) и гром с
               задержкой «сколько до молнии / 343 м/с»
-     hurricane — ураган (редко, не в первые смены — hurricane.js HUR.FROM): ливень, ветер сносит
-              машину, клонит деревья, летит мусор; уносит 1—3 дома рядом — на их месте забор и кран
-              на несколько смен (hurricane.js)
+     hurricane — ураган (редко, не в первые смены — hurricane.js HUR.FROM): гроза (молнии чаще),
+              косой ливень, ветер сносит машину, клонит деревья, летит мусор; смерч приходит к 1—3 домам
+              рядом и уносит их — на их месте забор и кран на несколько смен (hurricane.js, twister.js);
+              видно как в обычный дождь — туман почти не ближе
    Сцепление в дождь и грозу — по общим правилам мокрой дороги (WET в game.js: от ENV.rain).
 
    Как подключено (game.js — точечные хуки):
      init(ctx)            — после buildSpots: строит сугробы снежной зимы (спрятаны, пока не нужны)
-     shiftStart(ride)     — из startRun: выбрать вариант, подпись на экране
+     shiftStart(ride)     — из startRun: выбрать вариант (игроку его не называем — ни подписи, ни строки)
      rainControl(ENV, dt) — из updateEnv: true — дождём управляет вариант (расписание игры молчит)
      update(dt)           — каждый кадр после seasons: небо, молнии, сугробы и ледянки
-     label()              — коротко для накладной («жара +34°»), '' — обычная погода
+     label()              — всегда '' (погоду игроку не пишем; было — «жара +34°» для накладной)
      force(id)            — быстрый заезд: свой вариант на следующую смену (null — снова жребий)
    ?weather=storm — вариант сразу (проверка), __dlv.weather — ручки.
    ────────────────────────────────────────────────────────────────────────── */
-import './weather.css';
 import { t } from '../i18n/index.js';
 import * as SEAS from './seasons.js';
+import { onYard } from './yards.js';              // дворовые дорожки и выходы к тротуару — сугробы мимо (yards.js)
 import * as HUR from './hurricane.js';
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 
@@ -49,14 +51,16 @@ const HOME = { heat: 0.45, golden: 1.45, snowy: 2.5, rain: 3.5, storm: 0.6, hurr
 const W = {
   RAIN_ON: [60, 120], RAIN_OFF: [15, 35],      // дождь: сколько льёт и сколько перерыв, с
   BOLT_EVERY: [6, 16], BOLT_DIST: [320, 1100], // молния: раз в 6—16 с, в 320—1 100 м
+  BOLT_HUR: [4, 10],                            // в ураган — раз в 4—10 с
   SOUND: 343,                                   // м/с: гром через 1—3,2 с после вспышки
-  HEAT_T: [31, 36],                             // жара: градусы в подписи
+  HEAT_T: [31, 36],                             // жара, градусы (игроку не пишем — __dlv.weather.temp)
   SLED_MAX: 5, SLED_NEAR: [30, 120],            // ледянки: до 5 человек в 30—120 м от машины
   DEEP_BRAKE: 2.4,                              // в сугробе скорость гаснет как e^(−2,4·t): с 50 км/ч до 10 — за 0,7 с
 };
 const OVER = {
   clear: null,
-  heat: { heat: 1, dry: v => Math.max(v, 0.6), yellow: v => Math.max(v, 0.32), fresh: 0, wet: 0, warm: 0, mud: 0 },
+  // жара — не осень (автор 04.10.2026): ни жёлтых крон, ни листьев на земле, ни золотого газона; трава выжжена (uHeat в seasons.js, lawn.js)
+  heat: { heat: 1, dry: 0, yellow: 0, fallen: 0, fresh: 0, wet: 0, warm: 0, mud: 0 },
   golden: { gold: 1, yellow: 1, leaf: v => Math.max(v, 0.85), fallen: v => Math.max(v, 0.75), dry: v => Math.max(v, 0.6), wet: 0, mud: 0 },
   snowy: { snow: v => Math.max(v, 0.95), drift: 1, ice: v => Math.max(v, 0.9), warm: 1, snowfall: 0.85 },
   rain: { wet: v => Math.max(v, 0.65) },
@@ -66,7 +70,6 @@ const OVER = {
 
 let C = null, THREE = null;
 let ID = 'clear', FORCE = null, TEMP = 0, RT = 0, N = 0;
-const $ = id => document.getElementById(id);
 const rnd = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
@@ -105,7 +108,7 @@ export function init (ctx) {
   else setTimeout(() => { if (window.__dlv) window.__dlv.weather = DEBUG; }, 0);
 }
 
-/* начало смены: снять вариант прошлой, выбрать новый, показать подпись */
+/* начало смены: снять вариант прошлой, выбрать новый */
 export function shiftStart (ride) {
   if (!C) return;
   SEAS.setVariant(null);
@@ -116,7 +119,6 @@ export function shiftStart (ride) {
   set(id, n);
   if (id === 'hurricane') DIRECTOR.start('hurricane');   // до конца смены (режиссёр сам забудет на новой)
   HUR.shiftStart(id, ride, n);
-  caption(0.8);
 }
 /* поставить вариант сейчас */
 function set (id, n = N) {
@@ -131,57 +133,21 @@ function set (id, n = N) {
     else if (id !== 'clear') { ENV.rainWant = 0; ENV.rain = 0; }
   }
   if (id !== 'snowy') dropSleds();
-  BOLT.t = id === 'storm' ? rnd(2, 5) : 0;
+  BOLT.t = id === 'storm' || id === 'hurricane' ? rnd(2, 5) : 0;
 }
 export const id = () => ID;
 export function force (v) { FORCE = v && IDS.includes(v) ? v : null; }
 export const forced = () => FORCE;
 
-/* названия: для подписи и накладной */
-const TITLE = {
-  heat: () => t('жара +{n}°', { n: TEMP }), golden: () => t('золотая осень'), snowy: () => t('снегопад'),
-  rain: () => t('дождь весь день'), storm: () => t('гроза'), hurricane: () => t('ураган!'),
-};
-const SUB = {
-  heat: () => t('асфальт плавится, город оранжевый, все в шортах'),
-  golden: () => t('сухо и ярко: листья на асфальте'),
-  snowy: () => t('сугробы до второго этажа, дороги расчищены'),
-  rain: () => t('дорога мокрая — тормоз слабее, в повороте сносит'),
-  storm: () => t('ливень, молнии и гром — дорога мокрая'),
-  hurricane: () => t('ветер сносит машину и уносит дома — держи руль'),
-};
-export const label = () => (TITLE[ID] ? TITLE[ID]() : '');
+/* Погоду игроку не называем (04.10.2026): ни подписи в начале смены, ни в накладной, итогах и чате —
+   погода просто есть. label() оставлен для старых вызовов и всегда ''. Имена вариантов — только для
+   выбора в быстром заезде (NAME). */
+export const label = () => '';
 /* имя варианта для выбора в быстром заезде */
 export const NAME = {
   clear: () => t('обычная'), heat: () => t('жара'), golden: () => t('золотая осень'), snowy: () => t('снежная зима'),
   rain: () => t('дождь'), storm: () => t('гроза'), hurricane: () => t('ураган'),
 };
-let capEl = null, capT = 0, capWait = -1;
-/* подпись ждёт, пока не закроют накладную (state 'brief') и не загрузят пиццу: потом ещё delay с */
-function caption (delay = 0) { capWait = TITLE[ID] ? delay : -1; }
-const capFree = () => C.isPlaying() && C.S.state !== 'brief' && C.S.state !== 'loading' && !document.body.classList.contains('brief');
-function capStep (dt) {
-  if (capEl && capEl.classList.contains('on') && document.body.classList.contains('brief')) capEl.classList.remove('on');   // открыли накладную — подпись прочь
-  if (capWait < 0 || !capFree()) return;
-  if ((capWait -= dt) <= 0) { capWait = -1; showCaption(); }
-}
-function showCaption () {
-  if (!TITLE[ID]) return;
-  if (!capEl) {
-    capEl = document.createElement('div');
-    capEl.id = 'wx-cap';
-    ($('game') || document.body).appendChild(capEl);
-  }
-  capEl.dataset.v = ID;
-  capEl.innerHTML = '<b></b><span></span>';
-  capEl.querySelector('b').textContent = TITLE[ID]();
-  capEl.querySelector('span').textContent = SUB[ID]();
-  clearTimeout(capT);
-  capEl.classList.remove('on');
-  void capEl.offsetWidth;
-  capEl.classList.add('on');
-  capT = setTimeout(() => capEl.classList.remove('on'), 4200);
-}
 
 /* дождь: true — расписанием управляет вариант (game.js updateEnv своё не крутит) */
 export function rainControl (ENV, dt) {
@@ -190,8 +156,7 @@ export function rainControl (ENV, dt) {
   else if (ID === 'rain') {
     if ((RT -= dt) <= 0) {
       ENV.rainWant = ENV.rainWant ? 0 : 1;
-      RT = rnd(...(ENV.rainWant ? W.RAIN_ON : W.RAIN_OFF));
-      C.toast(ENV.rainWant ? t('пошёл дождь — дорога скользкая') : t('дождь притих — ненадолго'));
+      RT = rnd(...(ENV.rainWant ? W.RAIN_ON : W.RAIN_OFF));        // без подписи: погоду игроку не называем (04.10.2026)
     }
   } else ENV.rainWant = 0;
   return true;
@@ -222,12 +187,13 @@ function sky (dt) {
     scene.background.lerp(K.snowSky, 0.35 * day);
     if (fog) { fog.color.lerp(K.snowFog, 0.4 * day); fog.far *= 0.72; }
   } else if (ID === 'storm' || ID === 'hurricane') {
+    // ураган — видно как в обычный дождь (04.10.2026: был сплошной туман): туман не ближе, чуть темнее
     const R = ENV.rain || 0, hu = ID === 'hurricane';
-    scene.background.lerp(hu ? K.hurSky : K.stormSky, 0.6 * R);
-    if (fog) { fog.color.lerp(hu ? K.hurFog : K.stormFog, 0.55 * R); fog.far *= 1 - (hu ? 0.26 : 0.18) * R; }
-    if (sun) sun.intensity *= 1 - 0.55 * R;
-    if (hemi) hemi.intensity *= 1 - 0.32 * R;
-    if (amb) amb.intensity *= 1 - 0.3 * R;
+    scene.background.lerp(hu ? K.hurSky : K.stormSky, (hu ? 0.45 : 0.6) * R);
+    if (fog) { fog.color.lerp(hu ? K.hurFog : K.stormFog, (hu ? 0.3 : 0.55) * R); fog.far *= 1 - (hu ? 0.04 : 0.18) * R; }
+    if (sun) sun.intensity *= 1 - (hu ? 0.3 : 0.55) * R;
+    if (hemi) hemi.intensity *= 1 - (hu ? 0.15 : 0.32) * R;
+    if (amb) amb.intensity *= 1 - (hu ? 0.12 : 0.3) * R;
   }
   stepBolt(dt);
   const F = BOLT.f;
@@ -282,8 +248,8 @@ export function strike (dist = rnd(...W.BOLT_DIST), da = rnd(-0.5, 0.5)) {
   return { dist: Math.round(dist), delay: +delay.toFixed(2) };
 }
 function stepBolt (dt) {
-  if (ID === 'storm' && C.S.state !== 'title' && (C.ENV.rain || 0) > 0.5) {
-    if ((BOLT.t -= dt) <= 0) { strike(); BOLT.t = rnd(...W.BOLT_EVERY); }
+  if ((ID === 'storm' || ID === 'hurricane') && C.S.state !== 'title' && (C.ENV.rain || 0) > 0.5) {
+    if ((BOLT.t -= dt) <= 0) { strike(); BOLT.t = rnd(...(ID === 'hurricane' ? W.BOLT_HUR : W.BOLT_EVERY)); }   // в ураган — гроза чаще
   }
   let f = 0;
   if (BOLT.pulses.length) {
@@ -362,7 +328,8 @@ function buildDeep () {
     const pts = [[x + nx * Wd, z + nz * Wd], [x + tx * L, z + tz * L], [x - tx * L, z - tz * L],
       [x + nx * Wd * 0.7 + tx * L * 0.7, z + nz * Wd * 0.7 + tz * L * 0.7], [x + nx * Wd * 0.7 - tx * L * 0.7, z + nz * Wd * 0.7 - tz * L * 0.7]];
     if (inner) pts.push([x - nx * Wd, z - nz * Wd], [x - nx * Wd * 0.7 + tx * L * 0.7, z - nz * Wd * 0.7 + tz * L * 0.7], [x - nx * Wd * 0.7 - tx * L * 0.7, z - nz * Wd * 0.7 - tz * L * 0.7], [x, z]);
-    for (const [px, pz] of pts) if (!inBounds(px, pz, -20) || inHouse(px, pz) || !offRoad(px, pz, 0.6)) return false;
+    for (const [px, pz] of pts) if (!inBounds(px, pz, -20) || inHouse(px, pz) || !offRoad(px, pz, 0.6) || onYard(px, pz, 0.3)) return false;
+    if (onYard(x, z, Math.max(Wd, L))) return false;
     return !nearAddr(x, z, Math.max(Wd, L) + 3.5) && !nearPizza(x, z);
   };
   const add = (x, z, nx, nz, Wd, L, H, house) => {
@@ -583,7 +550,6 @@ const PERF = { ms: 0, n: 0 };
 export function update (dt) {
   if (!C) return;
   const t0 = performance.now();
-  capStep(dt);
   sky(dt);
   if (ID === 'snowy') stepDeep(dt);
   stepSleds(dt);
@@ -596,7 +562,7 @@ const DEBUG = {
   get id () { return ID; }, get forced () { return FORCE; }, get temp () { return TEMP; }, get label () { return label(); },
   CHANCES, IDS, bucket, pickFor, force, strike, shiftStart, hur: HUR.DEBUG,
   /* поставить вариант сейчас (и сезон, если не к месту) */
-  set (v) { SEAS.setVariant(null); if (v !== 'clear' && !fits(v, bucket())) SEAS.setSeason(HOME[v], true); set(v); HUR.shiftStart(ID, false, N); caption(0); return ID; },
+  set (v) { SEAS.setVariant(null); if (v !== 'clear' && !fits(v, bucket())) SEAS.setSeason(HOME[v], true); set(v); HUR.shiftStart(ID, false, N); return ID; },
   /* как разойдутся смены 0…n-1 по вариантам в этом сезоне */
   spread (n = 1000, b = bucket()) { const o = {}; for (let i = 0; i < n; i++) { const k = pickFor(i, b); o[k] = (o[k] || 0) + 1; } return o; },
   get bolts () { return BOLT.n; }, get flash () { return BOLT.f; }, hold (on = true) { BOLT.hold = on; },

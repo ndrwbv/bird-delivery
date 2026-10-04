@@ -91,6 +91,12 @@ function kill (m) {
 }
 const handWorld = (m, arm = 'armR', y = -0.58) => { m.grp.updateMatrixWorld(true); return m.u[arm].localToWorld(V3.set(0, y, 0.02)); };
 
+/* стоит ли точка на проезжей части (там не останавливаются болтать и целоваться — только на тротуаре) */
+function onCarriage (o) {
+  const r = A.nearestRoad(o.x, o.z, 5, 1);
+  return !!(r && r.d < r.seg.w / 2 + 0.5);
+}
+
 /* ═════════════════ парочки ═════════════════
    Идут рядом в ногу по тротуару (центр пары — обычный «пешеход» игры,
    люди — по бокам), часть держится за руки и поглядывает друг на друга,
@@ -117,15 +123,18 @@ function coupleStep (c, dt) {
   for (const m of [a, b]) if (!m.gone) m.grp.visible = d < 130;
   if (c.react && solo) { reactStep(c, solo, dt); hitCheck(c); return; }
   let ang = NaN, moving = false;
-  if (c.shock > 0) c.shock -= dt;
-  else if (c.chat > 0) c.chat -= dt;
+  // на зебре не замирают (испуг, болтовня) — доходят до тротуара быстрым шагом
+  if (c.shock > 0 && !c.cross) c.shock -= dt;
+  else if (c.chat > 0 && !c.cross) c.chat -= dt;
   else {
-    if (pair && (c.chatT -= dt) <= 0 && !c.cross && !c.goTo) { c.chat = rand(4, 9); c.chatT = rand(25, 60); }
+    if (c.shock > 0) c.shock -= dt;
+    if (pair && (c.chatT -= dt) <= 0 && !c.cross && !c.goTo && !onCarriage(c)) { c.chat = rand(4, 9); c.chatT = rand(25, 60); }
     if (!walkable(c)) return;
     ang = A.walkerStep(c, dt, c.huddle ? 5.2 : 6.5);
-    A.pushOut(c, pair ? 0.8 : 0.45);
     moving = true;
   }
+  if (A.dodgeCar) A.dodgeCar(c, dt);             // стоящую машину обходят, а не проходят насквозь
+  if (moving) A.pushOut(c, pair ? 0.8 : 0.45);
   if (!Number.isNaN(ang)) c.h = c.fresh ? ang : dampAng(c.h, ang, 6, dt);
   c.fresh = 0;
   const off = pair ? (c.huddle ? 0.3 : 0.42) : 0, rx = Math.cos(c.h), rz = -Math.sin(c.h);
@@ -135,7 +144,12 @@ function coupleStep (c, dt) {
   hitCheck(c);
   if (!moving || !pair) for (const m of alive) m.grp.rotation.z = damp(m.grp.rotation.z, 0, 8, dt);
   if (c.shock > 0) {
-    for (const m of alive) { if (m.gone) continue; A.handsUp(m.u, dt); m.u.legL.rotation.x = damp(m.u.legL.rotation.x, 0, 10, dt); m.u.legR.rotation.x = damp(m.u.legR.rotation.x, 0, 10, dt); }
+    for (const m of alive) {
+      if (m.gone) continue;
+      if (moving) { m.grp.rotation.y = dampAng(m.grp.rotation.y, c.h, 10, dt); walkPose(m.u, c.ph); }   // испугались на зебре — бегом с поднятыми руками
+      A.handsUp(m.u, dt);
+      if (!moving) { m.u.legL.rotation.x = damp(m.u.legL.rotation.x, 0, 10, dt); m.u.legR.rotation.x = damp(m.u.legR.rotation.x, 0, 10, dt); }
+    }
     return;
   }
   if (c.chat > 0) {

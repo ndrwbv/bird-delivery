@@ -42,6 +42,9 @@ export const PROT = {
   MARCH: { FIRST: [8, 20], EVERY: [30, 60], R: [60, 160], N: [12, 20], V: 1.3, LEN: [50, 160], RALLY: 18, FAR: 280 },
   RIOT: { N: 2, R: [45, 150], MEN: [2, 3], LIFE: [40, 70], FAR: 220, GAP: [4, 12] },
   YIELD: { REACH: 18, HALF: 1.6, GAP: 2.5, SOFT: 6 },   // как машины потока ждут колонну
+  // тумбы сбиваются (04.10.2026: машина проезжала сквозь): быстрее KNOCK м/с — валится по ходу удара,
+  // машина теряет SLOW скорости, урона нет; медленнее — упирается, как в столб. Лежит LIE с, уходит в землю SINK с
+  HIT: { R: 0.12, KNOCK: 2.5, SLOW: 0.92, LIE: 25, SINK: 2, FALL: 0.45 },
 };
 export const GIG = {
   DAY: [60, 120], EVE: [20, 45], NIGHT: [150, 260],   // с между концертами
@@ -346,7 +349,7 @@ function pole (q, x, z, gh, h) {
 function buildChunk (ci, cj) {
   const key = ci + ',' + cj, st = ST.stage;
   const rng = mulberry((ci * 73856093) ^ (cj * 19349663) ^ (ST.cycle * 83492791) ^ ST.p);
-  const q = new Quads(), cnt = { posts: 0, banners: 0, graff: 0, tries: 0 };
+  const q = new Quads(), cnt = { posts: 0, banners: 0, graff: 0, tries: 0 }, posts = [];
   for (const s of BUCKET.get(key) || []) {
     const dx = s.x2 - s.x1, dz = s.z2 - s.z1, L = Math.hypot(dx, dz);
     if (L < 14) continue;
@@ -361,6 +364,7 @@ function buildChunk (ci, cj) {
       if (okPost(px, pz)) {
         const gh = A.groundH(px, pz) + (A.curbAt ? A.curbAt(px, pz) : 0);
         cnt.posts++;
+        const v0 = q.p.length / 3;
         if (st === 5) {                                       // власть сменилась: флаги
           pole(q, px, pz, gh, 4.6);
           q.add(px + ux * 0.85, gh + 4.1, pz + uz * 0.85, -sx, -sz, 1.6, 0.8, cellUV(7));
@@ -374,6 +378,7 @@ function buildChunk (ci, cj) {
             q.add(px + nx * 0.075, gh + 1.05 + ((k * 0.37 + r2) % 1) * 1.0, pz + nz * 0.075, nx, nz, 0.3, 0.3, leafUV(L2));
           }
         }
+        posts.push({ x: px, z: pz, gh, v0, nv: q.p.length / 3 - v0, down: 0 });   // вершины тумбы — сбить (postHit)
       }
       if (rb < PROT.BANNER[st]) {
         cnt.tries++;
@@ -399,7 +404,7 @@ function buildChunk (ci, cj) {
     A.scene.add(mesh);
     STATS.quads += q.i.length / 6;
   }
-  CHUNKS.set(key, { mesh, ci, cj, cnt });
+  CHUNKS.set(key, { mesh, ci, cj, cnt, posts });
   STATS.chunks++;
 }
 function dropChunk (key) {
@@ -408,7 +413,84 @@ function dropChunk (key) {
   CHUNKS.delete(key);
   STATS.chunks--;
 }
-function dropAllChunks () { for (const k of [...CHUNKS.keys()]) dropChunk(k); }
+function dropAllChunks () { for (const k of [...CHUNKS.keys()]) dropChunk(k); ST.knocked = 0; }
+
+/* ── тумбы сбиваются ──
+   Тумба с листовками — кусок склейки клетки (v0…v0+nv). Сбил — её вершины уходят под землю,
+   а вместо неё своя копия валится по ходу удара, лежит и уходит в землю. Медленно — упёрся. */
+const FALLEN = [];
+function postsCar () {
+  const V = A.V, H = PROT.HIT;
+  if (!V || !A.CAR_W) return;
+  const fx = Math.sin(V.h), fz = Math.cos(V.h), L = A.CAR_L * 0.55, rr = A.CAR_W + H.R;
+  const ci = Math.floor(V.x / PROT.CELL), cj = Math.floor(V.z / PROT.CELL);
+  for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
+    const c = CHUNKS.get(i + ',' + j);
+    if (!c || !c.mesh) continue;
+    for (const P of c.posts) {
+      if (P.down || Math.abs(P.x - V.x) > 6 || Math.abs(P.z - V.z) > 6) continue;
+      for (const k of [1, -1]) {
+        const cx = V.x + fx * L * k, cz = V.z + fz * L * k;
+        let nx = cx - P.x, nz = cz - P.z;
+        const d = Math.hypot(nx, nz);
+        if (d >= rr) continue;
+        const sp = Math.hypot(V.vx, V.vz);
+        if (sp > H.KNOCK) { postHit(c, P, V.vx / sp, V.vz / sp, sp); V.vx *= H.SLOW; V.vz *= H.SLOW; break; }
+        // медленно — как столб: выталкиваем и гасим скорость в тумбу
+        if (d < 1e-4) { nx = -fx * k; nz = -fz * k; } else { nx /= d; nz /= d; }
+        V.x += nx * (rr - d); V.z += nz * (rr - d);
+        const vn = V.vx * nx + V.vz * nz;
+        if (vn < 0) { V.vx -= vn * nx; V.vz -= vn * nz; }
+        break;
+      }
+    }
+  }
+}
+function postHit (c, P, dx, dz, sp) {
+  P.down = 1; ST.knocked = (ST.knocked || 0) + 1; STATS.posts = (STATS.posts || 0) + 1;
+  const pos = c.mesh.geometry.attributes.position, a = pos.array;
+  // копия тумбы — от основания, чтобы валить вокруг него
+  const n = P.nv, pp = new Float32Array(n * 3), uv = new Float32Array(n * 2), nn = new Float32Array(n * 3), idx = [];
+  const ua = c.mesh.geometry.attributes.uv.array, na = c.mesh.geometry.attributes.normal.array;
+  for (let i = 0; i < n; i++) {
+    const v = P.v0 + i;
+    pp[i * 3] = a[v * 3] - P.x; pp[i * 3 + 1] = a[v * 3 + 1] - P.gh; pp[i * 3 + 2] = a[v * 3 + 2] - P.z;
+    uv[i * 2] = ua[v * 2]; uv[i * 2 + 1] = ua[v * 2 + 1];
+    nn[i * 3] = na[v * 3]; nn[i * 3 + 1] = na[v * 3 + 1]; nn[i * 3 + 2] = na[v * 3 + 2];
+    a[v * 3] = P.x; a[v * 3 + 1] = P.gh - 2; a[v * 3 + 2] = P.z;
+  }
+  pos.needsUpdate = true;
+  for (let b = 0; b < n; b += 4) idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pp, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(nn, 3));
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  const ry = Math.atan2(dx, dz);                   // валится по ходу машины: наклон по своей оси X
+  g.rotateY(-ry);                                  // листовки остаются там, где висели
+  g.computeBoundingSphere();
+  const m = new THREE.Mesh(g, MAT);
+  m.position.set(P.x, P.gh, P.z);
+  m.rotation.order = 'YXZ';
+  m.rotation.y = ry;
+  A.scene.add(m);
+  FALLEN.push({ m, t: 0, T: PROT.HIT.FALL * (sp > 12 ? 0.6 : 1) });
+  if (A.sparks) A.sparks(P.x, 0.9, P.z, 4, dx, dz);
+  if (A.Snd && A.Snd.noise) A.Snd.noise(0.16, 0.2);
+  if (A.S) A.S.shake = Math.max(A.S.shake || 0, 0.15);
+}
+function fallenStep (dt) {
+  const H = PROT.HIT;
+  for (let i = FALLEN.length - 1; i >= 0; i--) {
+    const f = FALLEN[i];
+    f.t += dt;
+    const k = Math.min(1, f.t / f.T);
+    f.m.rotation.x = (Math.PI / 2 - 0.06) * k * k;    // с ускорением, как падает столб
+    const sink = f.t - H.LIE;
+    if (sink > 0) f.m.position.y -= dt * 0.25;
+    if (sink > H.SINK) { A.scene.remove(f.m); f.m.geometry.dispose(); FALLEN.splice(i, 1); }
+  }
+}
 function chunksStep () {
   const V = A.V, ci = Math.floor(V.x / PROT.CELL), cj = Math.floor(V.z / PROT.CELL);
   for (const [k, c] of CHUNKS) if (Math.abs(c.ci - ci) > PROT.KEEP || Math.abs(c.cj - cj) > PROT.KEEP) dropChunk(k);
@@ -930,6 +1012,7 @@ export function step (dt, api) {
   if (ses !== ST.session) {
     ST.session = ses;
     segs();
+    if (ST.knocked) dropAllChunks();               // новая смена — тумбы снова стоят
     apply(resolve());
     ST.annT = S && !S.ride ? 4.5 : -1;
     MS.cd = rand(PROT.MARCH.FIRST[0], PROT.MARCH.FIRST[1]); RS.cd = rand(5, 15); GS.cd = rand(15, 40);
@@ -937,6 +1020,8 @@ export function step (dt, api) {
   }
   if (!S || S.state === 'title') { if (MA) clearMarch(); if (RIOTS.length) clearRiots(); if (GIGS.length) clearGigs(); return; }
   chunksStep();
+  postsCar();                                      // тумбы: сбиваются или держат (PROT.HIT)
+  if (FALLEN.length) fallenStep(dt);
   if (!live()) return;
   if (ST.annT > 0 && (ST.annT -= dt) <= 0) announce();
   // марш (ступени 3—4)
@@ -965,6 +1050,10 @@ export const DEBUG = {
   riot: () => spawnRiot(true),
   gig: kind => spawnGig(true, kind),
   clear: () => { clearMarch(); clearRiots(); clearGigs(); },
+  /* тумбы рядом: [{ x, z, down }] — проверить, что сбиваются (PROT.HIT) */
+  posts: (x, z, r = 60) => [...CHUNKS.values()].flatMap(c => c.posts || []).filter(P => Math.hypot(P.x - x, P.z - z) < r).map(P => ({ x: P.x, z: P.z, down: P.down })),
+  get FALLEN () { return FALLEN.length; },
+  fallen: () => FALLEN.map(f => ({ p: f.m.position.toArray().map(Math.round), rx: +f.m.rotation.x.toFixed(2), ry: +f.m.rotation.y.toFixed(2), r: +f.m.geometry.boundingSphere.radius.toFixed(2), c: f.m.geometry.boundingSphere.center.toArray().map(v => +v.toFixed(2)), vis: f.m.visible, n: f.m.geometry.attributes.position.count })),
   /* прогон ступеней: номер законченной смены → ступень (цикл по 8 смен) */
   sim (n = 20) { const out = []; let c0 = PROT.FROM; for (let s = 0; s < n; s++) { if (s < PROT.FROM) { out.push(0); continue; } let st = stageAt(s - c0); if (!st) { c0 = s; st = 1; } out.push(st); } return out; },
   get info () {

@@ -22,9 +22,9 @@
    __dlv.weather.hur — ручки (force(), sites, wind, restore()).
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
-import { t } from '../i18n/index.js';
 import * as SEAS from './seasons.js';
 import * as CONSTR from './construction.js';
+import * as TWIST from './twister.js';          // смерч к дому и косой ливень (twister.js)
 
 export const HUR = {
   FROM: 8,                 // не в первые смены: только когда закончено ≥ 8 смен (с 9-й)
@@ -504,12 +504,11 @@ function placeStill (i, back, temp) {
   holesApply();
   return s;
 }
-function restore (s, say) {
+function restore (s) {                              // «дом снова стоит» — без подписи снизу (04.10.2026: информационные плашки убраны)
   dropSite(s);
   const k = SITES.indexOf(s);
   if (k >= 0) SITES.splice(k, 1);
   holesApply();
-  if (say && C.realAddress) C.toast(t('дом снова стоит, как новенький: {addr}', { addr: C.realAddress(s.I.cx, s.I.cz) }));
 }
 /* новая смена: вернуть отстоявшие своё дома, сверить со списком профиля */
 function sync (sayBack) {
@@ -640,6 +639,7 @@ export function shiftStart (id, ride, n) {
   PLAN.on = id === 'hurricane';
   WIND.base = h01(n | 0, 11) * Math.PI * 2;
   WIND.T = h01(n | 0, 12) * 100;
+  PLAN.pend = null;
   if (!PLAN.on) { PLAN.left = 0; PLAN.scan = null; return; }
   const x = h01(n | 0, 13) * 100;
   PLAN.left = x < HUR.HOUSES[0] ? 1 : x < HUR.HOUSES[0] + HUR.HOUSES[1] ? 2 : 3;
@@ -691,7 +691,7 @@ function takeHouse (I) {
   holesApply();
   if (!s.temp) save();
   PLAN.took++;
-  C.toast(t('ураган унёс дом! {addr}', { addr: C.realAddress ? C.realAddress(I.cx, I.cz) : '' }));
+  // «ураган унёс дом!» — без подписи снизу (04.10.2026): видно и слышно
   if (C.Snd && C.Snd.noise) { C.Snd.noise(0.9, 0.22); C.Snd.blip(55, 0.6, 'sawtooth', 0.12); }
   if (C.S) C.S.shake = Math.max(C.S.shake || 0, 0.18);
   return s;
@@ -739,16 +739,25 @@ export function step (dt, on) {
     if (HOWL.src) { try { HOWL.src.stop(); } catch (e) { /* — */ } HOWL.src.disconnect(); HOWL.src = null; }
   }
   if (SITES.length) stepSites(dt);
-  if (on && PLAN.left > 0 && C.isPlaying() && DRIVE.has(C.S.state)) {
+  if (on && PLAN.left > 0 && !PLAN.pend && C.isPlaying() && DRIVE.has(C.S.state)) {
     if (PLAN.scan || (PLAN.wait -= dt) <= 0) {
       const t1 = performance.now(), I = scanStep(false);
       MS.scan = Math.max(MS.scan, +(performance.now() - t1).toFixed(1));
       if (I !== undefined) {
-        if (I) { takeHouse(I); PLAN.left--; PLAN.wait = rnd(...HUR.GAP); PLAN.miss = 0; }
+        // дом выбран: смерч касается земли и идёт к нему (twister.js), дом взлетает, когда дошёл
+        if (I) { PLAN.pend = { I, t: TWIST.come(I.cx, I.cz, WIND) }; PLAN.left--; PLAN.wait = rnd(...HUR.GAP); PLAN.miss = 0; }
         else { PLAN.wait = 3; PLAN.miss = (PLAN.miss || 0) + 1; }
       }
     }
   }
+  if (PLAN.pend && (PLAN.pend.t -= dt) <= 0) {
+    const I = PLAN.pend.I, dbg = PLAN.pend.dbg;
+    PLAN.pend = null;
+    // пока шёл смерч, рядом мог появиться адрес заказа — тогда дом стоит, а смерч уходит
+    if (on && !SITES.some(s => s.I.i === I.i) && !clientPts().some(([x, z]) => nearBox(I, x, z, HUR.CLIENT))) takeHouse(I);
+    else if (!dbg) PLAN.left++;
+  }
+  TWIST.step(dt, on && WIND.on, WIND);
   PERF.ms += performance.now() - t0; PERF.n++;
 }
 
@@ -759,6 +768,7 @@ export function init (ctx) {
   ctx.scene.traverse(o => { if (o.isMesh && (o.name === 'windows' || o.name === 'murals')) holeMat(o.material); });
   try { sync(false); } catch (e) { console.error('[hurricane] загрузка', e); }
   warm();
+  TWIST.init(ctx);
 }
 /* программы шейдеров — сразу при загрузке (со светом и туманом сцены): иначе первый взлёт дома
    и первый мусор компилируются посреди смены — рывок кадра в 50 мс */
@@ -782,7 +792,10 @@ export const DEBUG = {
   get holes () { return HOLE_N.value; },
   get wind () { return { g: +WIND.g.toFixed(2), amt: +WIND.amt.toFixed(2), dir: [+WIND.x.toFixed(2), +WIND.z.toFixed(2)], push: +WIND.push.toFixed(2) }; },
   /* унести дом рядом сейчас (поиск целиком, без «перед камерой»); null — нечего */
-  force () { PLAN.scan = null; const I = scanStep(true); PLAN.scan = null; return I ? takeHouse(I) && DEBUG.sites.slice(-1)[0] : null; },
+  force () { PLAN.scan = null; const I = scanStep(true); PLAN.scan = null; if (I) TWIST.at(I.cx, I.cz); return I ? takeHouse(I) && DEBUG.sites.slice(-1)[0] : null; },
+  /* как в смене: смерч идёт к дому рядом, дом взлетает через TW.COME с */
+  come () { PLAN.scan = null; const I = scanStep(true); PLAN.scan = null; if (!I) return null; PLAN.pend = { I, t: TWIST.come(I.cx, I.cz, WIND), dbg: 1 }; return { i: I.i, x: Math.round(I.cx), z: Math.round(I.cz), t: PLAN.pend.t }; },
+  twister: TWIST.DEBUG,
   /* сколько домов в кольце вокруг машины вообще можно унести */
   candidates () { const V = C.V, R = HUR.NEAR[1], out = []; for (const i of near(V.x - R, V.z - R, V.x + R, V.z + R)) { const I = info(i); if (I) out.push({ i, x: Math.round(I.cx), z: Math.round(I.cz), d: Math.round(Math.hypot(I.cx - V.x, I.cz - V.z)), lv: I.lv, area: Math.round(I.area) }); } return out; },
   /* унести этот дом (индекс в CITY.buildings), если его вообще можно уносить */

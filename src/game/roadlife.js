@@ -30,8 +30,10 @@
    Всё, что нужно из игры, приходит объектом api (roadApi в game.js).
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
+import { narrow } from './narrow.js';           // узкие дороги: одна полоса (narrow.js)
 import { t } from '../i18n/index.js';
 import * as MOPEDS from './mopeds.js';
+import { onPave } from './pave.js';
 
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -387,7 +389,7 @@ function buildFences (A) {
     if (v === undefined) {
       v = !A.inBounds(x, z, 10) || groundH(x, z) < 0.3;
       if (!v) { const r = nearestRoad(x, z, 7, 1); v = !!r && r.d < r.seg.w / 2 + (r.seg.c <= 5 ? 2.85 : 0.9); }   // не через улицу, тротуар и проезд
-      if (!v) v = nearPath(x, z, 1.3) || near(A.PARKED, x, z, 3) || near(ENTR, x, z, 2);
+      if (!v) v = nearPath(x, z, 1.3) || near(A.PARKED, x, z, 3) || near(ENTR, x, z, 2) || !!onPave(x, z, 0.15);   // и не на тротуар бульвара, пешеходку, аллею (pave.js)
       BADC.set(key, v);
     }
     return v || inHouse(x, z, hm);
@@ -398,7 +400,7 @@ function buildFences (A) {
     if (TAKEN.has(tk(x, z)) || !A.inBounds(x, z, 10) || groundH(x, z) < 0.3) return true;
     const r = nearestRoad(x, z, 7, 1);
     if (r && r.d < r.seg.w / 2 + (r.seg.c <= 5 ? 2.2 : 0.9)) return true;
-    return nearPath(x, z, 1.3) || near(A.PARKED, x, z, 3) || near(ENTR, x, z, 1.2) || inHouse(x, z, 0);
+    return nearPath(x, z, 1.3) || near(A.PARKED, x, z, 3) || near(ENTR, x, z, 1.2) || !!onPave(x, z, 0.1) || inHouse(x, z, 0);
   };
   const KIDS = /школ|детск|сад\b|сад |гимназ|лице|school|kinder/i;
   const P = [], N = [], U = [], I = [];
@@ -1016,6 +1018,7 @@ function arrowTex () {
 /* годится ли ребро: две полосы в эту сторону — или одна, но со встречкой для объезда */
 function laneOk (A, e) {
   if (!e || !e.ok || e.c > 5 || !e.road || e.road.b || e.closed || LANES.has(e) || CLOSED.has(e)) return null;
+  if (narrow(e)) return null;                      // узкая — одна полоса посередине, закрыть «полосу» нельзя (narrow.js)
   const run = A.edgeRun(e), n = A.laneCount(e), r = A.edgeOf(e.b, e.a);
   if (run < 42) return null;
   if (n < 2 && (e.oneway || !r || r.closed || LANES.has(r))) return null;
@@ -1187,11 +1190,8 @@ function stepWorks (dt, A) {
     W8.grp.visible = vis;
     if (!vis) { for (const m of W8.men) if (!m.dead) m.grp.visible = false; continue; }
     if (W8.blink) W8.blink.visible = blink;
-    // едет к ремонту — предупреждаем: навигатор про него не знает
-    if (!W8.warned && d < 70 && ((W8.x - V.x) * fx + (W8.z - V.z) * fz) > d * 0.5) {
-      W8.warned = 1;
-      A.toast(t('дорогу закрыли на ремонт · навигатор не в курсе — ищи объезд'));
-    }
+    // едет к ремонту: подписи снизу нет (04.10.2026 — информационные плашки убраны), видно мигалку и знаки
+    if (!W8.warned && d < 70 && ((W8.x - V.x) * fx + (W8.z - V.z) * fz) > d * 0.5) W8.warned = 1;
     // дорожники: лопатой вниз-вверх, иногда передых; наезд — как на прохожего
     for (const m of W8.men) {
       if (m.dead) continue;

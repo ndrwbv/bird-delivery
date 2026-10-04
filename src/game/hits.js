@@ -1,19 +1,20 @@
 /* Сила удара по человеку (docs/CONTENT.md «Сила удара»). Решает скорость машины
    в момент удара, км/ч — как на спидометре:
      медленнее FALL           — упал и встал: полежал ~2 с, поднялся, грозит кулаком; не «сбит»;
-     FALL … BURST             — отлетел и лежит. Во взрослой — в аккуратной тёмной луже, которая
-                                медленно растекается; иногда (LIMB) отрывает руку или ногу —
-                                она летит отдельно. В детской — лежит со звёздочками, встаёт и уходит;
-     BURST и быстрее          — во взрослой разрывает на куски (старый gibHuman), в детской —
-                                отлетает дальше и лежит дольше, потом тоже встаёт.
+     быстрее FALL             — отлетел и лежит. Во взрослой — целым, в аккуратной тёмной луже, которая
+                                медленно растекается. В детской — лежит со звёздочками, встаёт и уходит
+                                (быстрее BURST — отлетает дальше и лежит дольше);
+     на нитро (A.shred)       — только во взрослой (04.10.2026): быстрее HIGH — на куски (старый
+                                gibHuman), FALL … HIGH — отлетает, и в LIMB.HIGH случаев без руки/ноги.
+                                Нитро — горит нитро, машина быстрее своей максималки или взрыв.
    Самокат при ударе отделяется от самокатчика: кувыркается, скользит и лежит на боку, а сам
    самокатчик (o.over) перелетает вперёд через руль — по ходу своего самоката, удар сбоку только
-   добавляет снос вбок. Во взрослой он, ударившись о землю, разбивается на куски (тот же burst),
-   в детской — лежит со звёздочками и встаёт; медленнее FALL — в обеих падает и встаёт.
+   добавляет снос вбок. Во взрослой на нитро он, ударившись о землю, разбивается на куски (тот же burst),
+   без нитро — ложится целым; в детской — лежит со звёздочками и встаёт; медленнее FALL — в обеих падает и встаёт.
    Сколько всего одновременно — CAP: лишнее самое старое тает. */
 
-export const TIER = { FALL: 20, HIGH: 55, BURST: 85 };          // км/ч
-export const LIMB = { MID: 0.15, HIGH: 0.4 };                   // шанс оторвать руку/ногу: 20–55 и 55–85 км/ч
+export const TIER = { FALL: 20, HIGH: 55, BURST: 85 };          // км/ч; BURST — только детская (лежит дольше)
+export const LIMB = { MID: 0.15, HIGH: 0.4 };                   // шанс оторвать руку/ногу на нитро 20–55 км/ч (HIGH); MID не используется
 export const TIME = {
   FALL_LIE: 1.8,        // упал и встал: сколько лежит
   BODY: 30,             // взрослая: сколько лежит тело (потом тает)
@@ -290,11 +291,13 @@ export function hit (p, vx, vz, kmh, o = {}) {
     if (!o.up) { A.scare(p.x, p.z); if (!B.shatter) A.callAmbulance(p.x, p.z); }   // разбился — скорая к кускам
     return !o.up;
   }
-  if (A.adult && kmh >= TIER.BURST && !o.up) { A.burst(p, vx, vz); return true; }
+  // на куски и с оторванной рукой — только на нитро (A.shred, game.js shredHit); без нитро — отлетает целым
+  const nitro = !!(A.adult && !o.up && A.shred && A.shred(p));
+  if (nitro && kmh >= TIER.HIGH) { A.burst(p, vx, vz); return true; }
   const up = o.up || !A.adult;
   const lie = o.up ? TIME.FALL_LIE : !A.adult ? (kmh >= TIER.BURST ? TIME.KID_LIE_HIGH : TIME.KID_LIE) : TIME.BODY;
   const B = throwBody(p, vx, vz, kmh, up, lie, o.y0 || 0);
-  if (A.adult && !o.up && kmh >= TIER.FALL && Math.random() < (kmh >= TIER.HIGH ? LIMB.HIGH : LIMB.MID)) tearLimb(B);
+  if (nitro && kmh >= TIER.FALL && Math.random() < LIMB.HIGH) tearLimb(B);
   if (!o.up) { A.scare(p.x, p.z); A.callAmbulance(p.x, p.z); }
   return !o.up;
 }
@@ -319,7 +322,7 @@ function throwOver (p, vx, vz, kmh, o) {
   B.vy = clamp(3.2 + kmh / 25, 3.5, 7);
   B.spin = rand(6, 9) * clamp(fwd / 8, 0.7, 1.3);   // головой вперёд (плюс по X — голова к +Z)
   B.roll = rand(-1, 1);
-  B.shatter = A.adult && !o.up;
+  B.shatter = !!(A.adult && !o.up && A.shred && A.shred(p));   // о землю на куски — только на нитро
   B.c = (p.grp && p.grp.userData.colors) || null;
   B.x0 = q.x; B.z0 = q.z;                          // откуда полетел — для отладки (STATS.LAST)
   STATS.LAST = { x0: q.x, z0: q.z, hx, hz, shatter: B.shatter, x: null, z: null };

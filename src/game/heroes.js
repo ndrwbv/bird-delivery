@@ -42,6 +42,7 @@ import * as THREE from '../vendor/three.module.min.js';
 import { t, N_ } from '../i18n/index.js';
 import * as DIST from './districts.js';
 import * as HITS from './hits.js';
+import * as TALK from './talk.js';             // облачка реплик (talk.js)
 import { makePerson } from './people.js';
 import { makeCatModel, FURS } from './cats.js';
 
@@ -56,6 +57,10 @@ export const HERO = {
   FAR: 900,                        // место — не дальше, м от пиццерии, где работаешь
   APART: 30,                       // два героя не стоят ближе (кроме «рядом со Стёпой»), м
   STAND: [40, 100], ROAM: [8, 28], WALK: 1.1,
+  // 04.10.2026: герои — сюжетные, на улице их нет. Место на смену по-прежнему выбирается (у него — дом
+  // главы, herostories.js), но модель не ставится, встреч и реплик нет; сам герой — только в катсцене
+  // своей главы. true — снова стоят и гуляют по городу, как в этапе 1
+  STREET: false,
 };
 const KEY = 'dlv-heroes';           // сохранение: met — знакомы, grudge — кто обижен (сбил)
 
@@ -432,56 +437,20 @@ function tagTex (H) {
   TAGS.set(k, tx);
   return tx;
 }
-function bubbleTex (H, text) {
-  const W = 512, Hh = 232;
-  const c = document.createElement('canvas');
-  c.width = W; c.height = Hh;
-  const x = c.getContext('2d');
-  const col = H.def.color;
-  x.fillStyle = '#ffffff'; x.strokeStyle = col; x.lineWidth = 8;
-  x.beginPath(); x.roundRect(8, 8, W - 16, 184, 26); x.fill(); x.stroke();
-  x.beginPath(); x.moveTo(230, 190); x.lineTo(256, 226); x.lineTo(282, 190); x.closePath(); x.fill();
-  x.beginPath(); x.moveTo(230, 192); x.lineTo(256, 226); x.lineTo(282, 192); x.stroke();
-  x.fillStyle = '#ffffff'; x.fillRect(232, 184, 48, 10);
-  x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.fillStyle = col; x.font = 'bold 20px ' + FONT;
-  x.fillText(t(H.def.name), W / 2, 34);
-  // текст — до трёх строк, шрифт уменьшаем, пока не влезет
-  const words = String(text).split(' ');
-  let fs = 30, L = [];
-  for (; fs >= 16; fs -= 2) {
-    x.font = 'bold ' + fs + 'px sans-serif';
-    L = []; let cur = '';
-    for (const w of words) {
-      const s = cur ? cur + ' ' + w : w;
-      if (x.measureText(s).width > W - 56 && cur) { L.push(cur); cur = w; } else cur = s;
-    }
-    if (cur) L.push(cur);
-    if (L.length <= 3 && L.every(q => x.measureText(q).width <= W - 40)) break;
-  }
-  x.fillStyle = '#1b1b20';
-  const y0 = 116 - (L.length - 1) * fs * 0.6;
-  L.slice(0, 4).forEach((q, i) => x.fillText(q, W / 2, y0 + i * fs * 1.2));
-  const tx = new THREE.CanvasTexture(c);
-  tx.colorSpace = THREE.SRGBColorSpace;
-  return tx;
-}
 function dropBubble (H) {
   if (!H.bubble) return;
   if (H.grp) H.grp.remove(H.bubble);
-  H.bubble.material.map.dispose();
-  H.bubble.material.dispose();
+  H.bubble.material.dispose();                     // текстура — общая из talk.js
   H.bubble = null;
 }
 /* сказать: пузырь над головой на HERO.SAY_T с */
 function say (H, text, ttl = HERO.SAY_T) {
   if (!H.grp || !text) return false;
   dropBubble(H);
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTex(H, text), transparent: true, depthWrite: false }));
-  sp.scale.set(3.4, 1.54, 1);
-  sp.position.set(0, 3.0 + (H.lift || 0), 0);
-  sp.renderOrder = 5;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: TALK.tex(String(text), H.def.color, t(H.def.name)), transparent: true, depthWrite: false }));
+  sp.position.set(0, 2.85 + (H.lift || 0), 0);
   H.grp.add(sp);
+  TALK.track(sp);                                  // читаемая плашка с именем, размер по расстоянию (talk.js)
   H.bubble = sp; H.bubT = ttl; H.talk = Math.min(ttl, 2.5);
   H.log.push(text);
   if (H.log.length > 40) H.log.shift();
@@ -849,7 +818,7 @@ export function step (dt, api) {
         }
         continue;
       }
-      if (M.held[H.def.id]) { if (H.grp) unbuild(H); continue; }     // играет в главе своей истории (herostories.js)
+      if (!HERO.STREET || M.held[H.def.id]) { if (H.grp) unbuild(H); continue; }   // на улице не стоят (HERO.STREET) / играет в главе (herostories.js)
       if (!H.home && H.next) place(H);
       if (!H.home) continue;
       const d = Math.hypot(H.x - V.x, H.z - V.z);

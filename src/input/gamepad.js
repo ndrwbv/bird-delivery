@@ -6,8 +6,8 @@
    |---------------------|--------------------------------|-----------------------|----------------------------|
    | левый стик ←→       | руль, аналоговый               | steer −1..1           | ←→ выбор (menuLeft/Right)  |
    | левый стик ↑↓       | —                              | ly                    | ↑↓ выбор (menuUp/Down)     |
-   | RT                  | газ, аналоговый                | gas 0..1              | —                          |
-   | LT                  | тормоз, на месте — назад       | brake 0..1            | —                          |
+   | RT                  | газ, аналоговый                | gas 0..1              | таб вправо (trigR)         |
+   | LT                  | тормоз, на месте — назад       | brake 0..1            | таб влево (trigL)          |
    | A                   | нитро (держать), принять заказ | nitro, accept         | нажать (menuOk)            |
    | B                   | ручник (держать)               | hand                  | назад (menuBack)           |
    | RB                  | нитро (держать), запасная      | nitro                 | —                          |
@@ -46,7 +46,7 @@ export function setPadConfig (o) { Object.assign(CFG, o); }
 
 const HOLD = ['hand', 'nitro', 'a', 'b'];
 const EDGES = ['pause', 'map', 'accept', 'choice1', 'choice2', 'choice3', 'sound', 'any',
-  'menuUp', 'menuDown', 'menuLeft', 'menuRight', 'menuOk', 'menuBack', 'pageL', 'pageR'];
+  'menuUp', 'menuDown', 'menuLeft', 'menuRight', 'menuOk', 'menuBack', 'pageL', 'pageR', 'trigL', 'trigR'];
 
 // один объект на всё время: не мусорим каждый кадр
 export const pad = {
@@ -57,6 +57,7 @@ export const pad = {
   pause: false, map: false, accept: false, choice1: false, choice2: false, choice3: false, sound: false, any: false,
   menuUp: false, menuDown: false, menuLeft: false, menuRight: false, menuOk: false, menuBack: false,
   pageL: false, pageR: false,   // LB / RB — листать страницы (гараж карьеры)
+  trigL: false, trigR: false,   // LT / RT нажали до половины — табы настроек (settings.js)
   lastUse: 0,               // performance.now() последнего касания — чтобы прятать подсказки мыши/тача
 };
 
@@ -175,6 +176,8 @@ export function pollPad () {
   if (edge('r3', btn(B.r3))) pad.sound = true;
   if (edge('lb', btn(B.lb))) pad.pageL = true;
   if (edge('rb', rb)) pad.pageR = true;
+  if (edge('lt', pad.brake > 0.5)) pad.trigL = true;
+  if (edge('rt', pad.gas > 0.5)) pad.trigR = true;
   if (edge('up', dUp)) { pad.choice2 = true; pad.menuUp = true; }
   if (edge('left', dLeft)) { pad.choice1 = true; pad.menuLeft = true; }
   if (edge('right', dRight)) { pad.choice3 = true; pad.menuRight = true; }

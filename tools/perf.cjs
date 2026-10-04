@@ -5,7 +5,7 @@
    --deck — как на Steam Deck: экран 1280×800 и процессор втрое медленнее
    (DevTools CPU throttling; Zen 2 на 3,5 ГГц против Apple M — примерно так).
    --cpu=N — своё замедление, --q=&season=2.4 — добавка к адресу (зима, ночь…).
-   --secs=N — сколько ехать в каждой точке (4 с), --fps=40 — ограничение кадров,
+   --secs=N — сколько ехать в каждой точке (4 с), --at=x,z[,h];x,z — свои точки (h — курс, рад), --fps=40 — ограничение кадров,
    --dist=web — папка сборки в dist/
    (или полный путь), --prof — где сидит время кадра, --spikes — что делали
    самые долгие кадры (по профилю, кадр за кадром).
@@ -73,13 +73,14 @@ app.whenReady().then(async () => {
     window.requestAnimationFrame = cb => raf(t => { if (t !== lastT) { if (lastT >= 0) window.__busy.push(acc); acc = 0; odd ^= 1; lastT = t; } const s = performance.now(); odd ? A(cb, t) : B(cb, t); acc += performance.now() - s; }); })()`);
   await js(`document.getElementById('st-ride').click()`);
   await sleep(1500);
-  const pts = await js(`(() => { const C = __dlv.CITY, B = C.buildings; const cen = p => p.reduce((a, q) => [a[0] + q[0] / p.length, a[1] + q[1] / p.length], [0, 0]);
+  /* --at=x,z;x,z — свои точки вместо стандартных (например большие перекрёстки) */
+  const pts = arg('at') ? arg('at').split(';').map(q => q.split(',').map(Number)) : await js(`(() => { const C = __dlv.CITY, B = C.buildings; const cen = p => p.reduce((a, q) => [a[0] + q[0] / p.length, a[1] + q[1] / p.length], [0, 0]);
     const one = (f, i) => { const a = B.filter(f); return a.length ? cen(a[Math.min(i, a.length - 1)].p) : null; };
     return [__dlv.PIZZA ? [__dlv.PIZZA.x, __dlv.PIZZA.z] : [0, 0], one(b => b.st === 'panel', 40), one(b => b.st === 'stalin', 80), one(b => b.k === 'ind', 200), one(b => b.k === 'gar', 100), one(b => b.lv >= 5, 30)].filter(Boolean); })()`);
-  const place = (x, z) => js(`(() => { const D = __dlv, r = D.nearestRoad(${x}, ${z}, 5, 4); if (r) { D.V.x = r.x; D.V.z = r.z; D.V.h = Math.atan2(r.seg.x2 - r.seg.x1, r.seg.z2 - r.seg.z1); } D.V.vx = D.V.vz = 0; D.V.y = D.surfaceAt(D.V.x, D.V.z); D.V.camX = D.V.x; D.V.camZ = D.V.z; D.IN.gas = 1; })()`);
+  const place = (x, z, h) => js(`(() => { const D = __dlv, r = D.nearestRoad(${x}, ${z}, 5, 4); if (r) { D.V.x = r.x; D.V.z = r.z; D.V.h = Math.atan2(r.seg.x2 - r.seg.x1, r.seg.z2 - r.seg.z1); } if (${h !== undefined && !isNaN(h)}) D.V.h = ${+h || 0}; D.V.vx = D.V.vz = 0; D.V.y = D.surfaceAt(D.V.x, D.V.z); D.V.camX = D.V.x; D.V.camZ = D.V.z; D.IN.gas = 1; })()`);
   const ALL = [], ALLB = [], levels = [];
-  for (const [x, z] of pts) {
-    await place(x, z);
+  for (const [x, z, h] of pts) {
+    await place(x, z, h);
     await sleep(1500);
     const r = await js(`new Promise(res => { const iv = []; let last = -1; const t0 = performance.now(); window.__busy.length = 0;
       const f = () => { const now = performance.now(); if (last >= 0) iv.push(now - last); last = now; if (now - t0 < ${SECS * 1000}) __raf0(f); else res({ iv, busy: window.__busy.slice(), calls: __dlv.renderer.info.render.calls, tris: __dlv.renderer.info.render.triangles, geo: __dlv.renderer.info.memory.geometries }); }; __raf0(f); })`);
@@ -89,8 +90,8 @@ app.whenReady().then(async () => {
   }
   console.log('ВСЕГО', line(stats(ALL, ALLB)), '| ступени дальности по точкам', levels.join(' '), '| переключений', await js('__dlv.CULL.switches || 0'));
   if (has('prof') || has('spikes')) {               // где сидит время кадра
-    const [px, pz] = pts[Math.min(+arg('profat', pts.length - 1), pts.length - 1)];   // --profat=0 — у пиццерии
-    await place(px, pz);
+    const [px, pz, ph] = pts[Math.min(+arg('profat', pts.length - 1), pts.length - 1)];   // --profat=0 — у пиццерии
+    await place(px, pz, ph);
     await sleep(1500);
     await dbg.sendCommand('Profiler.enable'); await dbg.sendCommand('Profiler.setSamplingInterval', { interval: 250 });
     await dbg.sendCommand('Profiler.start'); await sleep(+arg('profsecs', 6) * 1000);

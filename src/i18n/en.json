@@ -1,4 +1,5 @@
 {
+ "сменить район": "change district",
  "«сгоняй {what}, даю косарь»": "“run out {what}, I'll pay a grand”",
  "{brand} благодарит!": "{brand} says thanks!",
  "маршрут": "route",
@@ -2479,6 +2480,8 @@
  "окна с комнатами": "rooms behind windows",
  "эффекты": "effects",
  "машины и люди вдали": "far-off cars & people",
+ "сглаживание": "anti-aliasing",
+ "после перезапуска": "after restart",
  "низкая": "low",
  "высокая": "high",
  "своя": "custom",
@@ -2546,5 +2549,11 @@
  "игру обновляет Стим": "Steam keeps the game updated",
  "в браузере — всегда последняя версия": "in the browser it is always the latest version",
  "игра": "game",
- "нет, закончить смену": "no, end shift"
+ "нет, закончить смену": "no, end shift",
+ "о, вернулся. на, похавай — что будешь?": "oh, you're back. here, grab a bite — what'll it be?",
+ "стоять! обед. на, похавай, потом поедешь": "hold it! lunch. here, eat something, then you go",
+ "два часа уже. на, похавай — за счёт заведения": "it's two already. here, eat — on the house",
+ "давай": "sure",
+ "полночь — заедь в пиццерию: смену надо развезти": "midnight — swing by the pizzeria: the crew needs a ride home",
+ "не дождались — ушли пешком": "they didn't wait — walked home"
 }

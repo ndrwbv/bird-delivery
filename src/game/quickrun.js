@@ -229,7 +229,6 @@ export function finish (r = {}) {
   const o = Q.opt || {}, car = ownedCars().find(c => c.id === o.car);
   const carName = car ? car.name : '';
   const seaName = A.seasons.name(A.seasons.value());
-  const wxName = A.weather ? A.weather.label() || A.weather.NAME.clear() : '';
   const distName = o.dist === 'city' ? t('весь город') : DIST.has() ? t((DIST.list()[+o.dist] || {}).name || '') : '';
   stop();
   // рекорд быстрого заезда — свой, мимо карьеры (dlv-quick.best)
@@ -251,7 +250,6 @@ export function finish (r = {}) {
     [t('на заезде'), clock(r.t0h ?? 9) + ' — ' + clock(r.endH ?? 9)],
     [t('машина'), carName],
     [t('сезон'), seaName],
-    wxName ? [t('погода'), wxName] : null,
     distName ? [t('район'), distName] : null,
     [t('лучший быстрый заезд'), A.money(Math.max(money, +s.best || 0))],
   ].filter(Boolean);

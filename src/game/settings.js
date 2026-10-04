@@ -1,128 +1,154 @@
-/* Настройки (04.10.2026): карусель карточек-разделов, как главное меню и гараж (carousel.js).
-   Один и тот же экран — из главного меню и из паузы (game.js renderSettings → SET.render).
-   Правила словами — docs/CAREER.md «Настройки».
+/* Настройки (04.10.2026): табы — Игра · Графика · Звук · Управление · Язык. Один и тот же экран —
+   из главного меню и из паузы (game.js renderSettings → SET.render). Правила словами —
+   docs/CAREER.md «Главное меню, пауза и настройки».
 
-   Карточки: звук · графика (качество и 7 пунктов, gfx.js) · язык · управление (какие кнопки за
-   что — геймпад, клавиатура или палец) · профиль (имя, профили; карьера) · игра (версия 18+ /
-   детская, сбросить прогресс, тестовые районы) · версия и обновление (update.js).
-   Что перезагружает игру (язык, профиль, версия 18+/детская, сброс) — только в главном меню:
-   в паузе на этих карточках подпись «— в главном меню». Графика и звук из паузы — сразу.
+   Табы: игра (имя, профиль, сбросить прогресс, тестовые районы, версия и обновление, update.js) ·
+   графика (качество и 7 пунктов, gfx.js) · звук · управление (какие кнопки за что — геймпад,
+   клавиатура или палец) · язык (сетка языков). Внутри таба — обычный вертикальный список; не влез
+   (телефон боком) — листается внутри таба, окно целиком не прокручивается.
+   Переключить таб: LB/RB и LT/RT геймпада, ←→ (крестовина, стик, клавиши), когда подсветка на строке
+   табов, Q/E и PageUp/PageDown, клик или тап по табу. Строка табов для геймпада и клавиатуры — один
+   пункт (виден только выбранный таб, остальные data-pad-skip): ↓ с неё — в список, ↑ с первой строки — к ней.
+   Что перезагружает игру (язык, профиль, сброс) — только в главном меню: в паузе подпись
+   «меняется в главном меню». Графика и звук из паузы — сразу. Взрослая / детская версия — не
+   настройка: её задаёт сборка (Стим — взрослая, Яндекс — детская).
 
-     SET.init(api)    — из game.js (что нужно — ниже, в render)
-     SET.render(focus) — нарисовать в окно #panel; focus — id кнопки, на которой встать (её карточка — в центре)
-     SET.flip(±1)     — листать (←→, стик, крестовина, LB/RB — game.js padStep, career.js onKey)
-     SET.on()         — настройки на экране */
+     SET.init(api)     — из game.js (что нужно — ниже, в render)
+     SET.render(focus, tab) — нарисовать в окно #panel; focus — id кнопки, на которой встать (её таб
+                         откроется сам); tab — какой таб открыть ('game' | 'gfx' | 'snd' | 'ctrl' | 'lang')
+     SET.flip(±1, force) — соседний таб: force — всегда (LB/RB, LT/RT), без него — только если
+                         подсветка на строке табов или её нет (←→); true — переключили
+     SET.on()          — настройки на экране */
 import './settings.css';
 import { t } from '../i18n/index.js';
-import { carousel } from './carousel.js';
 import * as UPD from './update.js';
 
-let A = null, CZ = null, lastKey = 'snd';
+let A = null, TAB = 'game', TABS = [];
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';');
+const TAB_NAMES = { game: 'игра', gfx: 'графика', snd: 'звук', ctrl: 'управление', lang: 'язык' };
 
 export function init (api) {
   A = api;
-  UPD.onChange(() => { if (on() && CZ.card() && CZ.card().dataset.key === 'ver') render(focusId()); });
+  UPD.onChange(() => { if (on() && TAB === 'game') render(focusId()); });
+  // Q / E и PageUp / PageDown — соседний таб (клавиатура)
+  addEventListener('keydown', e => {
+    if (!on() || e.repeat) return;
+    const tg = e.target;
+    if (tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA')) return;
+    const d = e.code === 'KeyQ' || e.code === 'PageUp' ? -1 : e.code === 'KeyE' || e.code === 'PageDown' ? 1 : 0;
+    if (d && flip(d, true)) e.preventDefault();
+  });
 }
-export const on = () => !!(A && CZ && CZ.el.isConnected && A.kind() === 'settings' && !A.panel().hidden);
-export function flip (d) { return on() && CZ.flip(d); }
+export const on = () => !!(A && A.kind() === 'settings' && !A.panel().hidden && A.body().querySelector('.set-tabs'));
 const focusId = () => { const e = A.selected && A.selected(); return (e && e.id) || undefined; };
+/* какая кнопка в каком табе */
+const tabOf = id => !id ? null : id === 'set-snd' ? 'snd' : id.startsWith('gfx-') ? 'gfx' : id.startsWith('set-l-') ? 'lang' : id.startsWith('set-tab-') ? id.slice(8) : 'game';
 
-function card (key, title, html) {
-  const c = document.createElement('div');
-  c.className = 'set-card';
-  c.dataset.key = key; c.dataset.title = title;
-  c.innerHTML = '<div class="set-ct">' + esc(title) + '</div><div class="set-cb">' + html + '</div>';
-  return c;
+/** соседний таб; force — LB/RB, LT/RT, Q/E (всегда), без него — ←→ (только со строки табов) */
+export function flip (d, force) {
+  if (!on() || !TABS.length) return false;
+  if (!force) {
+    const P = A.panel(), sel = P.querySelector('.padsel') || (P.contains(document.activeElement) ? document.activeElement : null);
+    if (sel && !sel.closest('.set-tabs')) return false;
+  }
+  const i = TABS.indexOf(TAB);
+  const j = Math.max(0, Math.min(TABS.length - 1, i + d));
+  if (j === i) return true;                        // край: ←→ всё равно наши, в список не уходят
+  TAB = TABS[j];
+  if (A.Snd && A.Snd.blip) try { A.Snd.blip(520, 0.03, 'square', 0.04); } catch (e) { /* — */ }
+  render('set-tab-' + TAB);
+  A.navReset();
+  return true;
 }
-const row = (label, val, id, focus, opt = {}) => '<div class="set-row"><span>' + label + (opt.extra || '') + '</span><button type="button" id="' + id + '"' +
-  (id === focus ? ' autofocus' : '') + (opt.main ? ' data-main' : '') + (opt.cls ? ' class="' + opt.cls + '"' : '') + '>' + val + '</button></div>';
-const note = s => '<div class="pn-n">' + s + '</div>';
-/* карточка без кнопок (управление, версия в браузере): геймпад встаёт на неё саму (data-pad), A — ничего */
-const still = html => '<div class="set-still" data-pad data-main tabindex="-1">' + html + '</div>';
 
-export function render (focus) {
+const row = (label, val, id, focus, opt = {}) => '<div class="set-row"><span>' + label + (opt.extra || '') + '</span><button type="button" id="' + id + '"' +
+  (id === focus ? ' autofocus' : '') + (opt.cls ? ' class="' + opt.cls + '"' : '') + '>' + val + '</button></div>';
+const note = s => '<div class="pn-n">' + s + '</div>';
+const head = s => '<div class="set-h">' + s + '</div>';
+/* без кнопок (управление, «меняется в главном меню»): геймпад встаёт на него сам (data-pad), A — ничего */
+const still = html => '<div class="set-still" data-pad tabindex="-1">' + html + '</div>';
+
+export function render (focus, tab) {
   if (!A) return;
   const P = A.panel(), body = A.body();
   P.dataset.kind = 'settings'; P.dataset.back = ''; P.dataset.sub = '';
   const menu = A.inMenu();                          // из главного меню (не посреди смены)
   const onlyMenu = t('меняется в главном меню');
-  const cards = [];
+  TABS = ['game', 'gfx', 'snd', 'ctrl', 'lang'];
+  if (tab && TABS.includes(tab)) TAB = tab;
+  else if (tabOf(focus)) TAB = tabOf(focus);
+  if (!TABS.includes(TAB)) TAB = TABS[0];
 
-  // звук
-  cards.push(card('snd', t('звук'), row(t('звук'), A.Snd.on ? t('вкл') : t('выкл'), 'set-snd', focus, { main: true }) +
-    note(t('M на клавиатуре, R3 на геймпаде — звук вкл / выкл прямо в игре'))));
-
-  // графика (gfx.js рисует сама: качество и семь пунктов)
-  const g = card('gfx', t('графика'), '');
-  A.GFX.panel(g.querySelector('.set-cb'), focus, true);
-  cards.push(g);
-
-  // язык: сетка языков; смена — перезагрузка, поэтому только в меню
-  cards.push(card('lang', t('язык'), menu
-    ? '<div class="lang-grid">' + A.langs.map(l => '<button type="button" lang="' + l + '" data-l="' + l + '" id="set-l-' + l + '"' +
-        (l === A.lang() ? ' class="cur" data-main' : '') + ('set-l-' + l === focus ? ' autofocus' : '') + '>' + A.langNames[l] + '</button>').join('') + '</div>'
-    : still('<b class="set-big">' + esc(A.langNames[A.lang()]) + '</b>' + note(onlyMenu))));
-
-  // управление: что за что — тем, чем сейчас играют
-  cards.push(card('ctrl', t('управление'), still('<div class="set-keys">' + A.keys() + '</div>')));
-
-  // профиль (карьера): имя курьера и профили
-  if (A.career) {
-    const name = A.name();
-    let h = menu ? row(t('имя'), esc(name || '—'), 'set-name', focus, { main: true }) : still('<b class="set-big">' + esc(name || '—') + '</b>' + note(onlyMenu));
-    if (menu && A.prof.on()) h += row(t('профиль'), esc(A.prof.curName()) + (A.prof.list().length > 1 ? ' · ' + t('сменить') : ''), 'set-prof', focus) +
-      note(t('у каждого профиля свой прогресс: кошелёк, машины, районы'));
-    cards.push(card('prof', t('профиль'), h));
-  }
-
-  // игра: версия 18+ / детская, тестовые районы, сброс прогресса — только в меню
-  {
-    let h = '';
-    if (A.adult.on) h += menu ? row(t('версия'), A.adult.adult ? t('взрослая 18+') : t('детская'), 'set-ed', focus, { main: true })
-      : still('<b class="set-big">' + t('версия') + ': ' + (A.adult.adult ? t('взрослая 18+') : t('детская')) + '</b>' + note(onlyMenu));
-    // ТЕСТ: «открыть все районы» — в релизе (BUILD_VERSION, __RELEASE__) нет, с ?debug — есть
-    if (menu && A.unlock.on()) h += row(t('районы') + ' <small class="set-msg">' + t('для тестов') + '</small>', A.unlock.all() ? t('все открыты') : t('открыть все районы'), 'set-unlock', focus);
-    if (menu && A.canReset()) h += '<button type="button" id="set-reset" class="set-danger"' + (h ? '' : ' data-main') + ('set-reset' === focus ? ' autofocus' : '') + '>' + t('сбросить прогресс') + '</button>';
-    if (!menu) h += note(t('сбросить прогресс — в главном меню'));
-    if (h) cards.push(card('game', t('игра'), h.includes('data-main') ? h : h.replace('<div class="pn-n">', '<div class="pn-n" data-pad data-main tabindex="-1">')));
-  }
-
-  // версия и обновление
-  {
-    const st = UPD.state(), v = UPD.version();
-    let h = '<div class="set-ver">' + t('стоит') + ' <b>' + esc(v || '—') + '</b>' + (st.latest && st.latest !== v ? ' · ' + t('вышла') + ' <b>' + esc(st.latest) + '</b>' : '') + '</div>';
-    if (UPD.on()) {
-      const can = st.st === 'newer' && st.updatable;
-      h += row(can ? '<b>' + esc(UPD.line()) + '</b>' : t('обновления с GitHub'), can ? t('обновить до {v}', { v: esc(st.latest) }) : st.st === 'wait' ? t('проверяю…') : t('проверить обновления'),
-        can ? 'set-upd-go' : 'set-upd', focus, { main: true, extra: !can && UPD.line() ? '<small class="set-msg">' + esc(UPD.line()) + '</small>' : '' });
-    } else h = still(h + note(A.steam ? t('игру обновляет Стим') : t('в браузере — всегда последняя версия')));
-    cards.push(card('ver', t('версия игры'), h));
-  }
-
-  body.innerHTML = '<div class="pn-t">' + t('настройки') + '</div><div class="set-czh"></div>' +
+  const tabsHtml = '<div class="set-tabs" role="tablist"><i class="set-tk" data-d="-1" aria-hidden="true">LB</i>' +
+    TABS.map(k => '<button type="button" role="tab" class="set-tab' + (k === TAB ? ' on' : '') + '" id="set-tab-' + k + '" data-tab="' + k + '"' +
+      (k === TAB ? ' aria-selected="true"' + (focus === 'set-tab-' + k || !focus ? ' autofocus' : '') : ' aria-selected="false" data-pad-skip') + '>' + esc(t(TAB_NAMES[k])) + '</button>').join('') +
+    '<i class="set-tk" data-d="1" aria-hidden="true">RB</i></div>';
+  body.innerHTML = '<div class="pn-t">' + t('настройки') + '</div>' + tabsHtml +
+    '<div class="set-pane" data-tab="' + TAB + '"><div class="set-list"></div></div>' +
     // единственная подпись OSM в игре (лицензия ODbL требует) — в самом низу, мелко, но читаемо
     '<div class="pn-n set-cred">' + t('карта — © участники OpenStreetMap, лицензия ODbL. Рельеф — SRTM (NASA).') + '</div>';
-  CZ = carousel(body.querySelector('.set-czh'), { cls: 'set-cz', onChange: (i, c) => { lastKey = c.dataset.key; A.navReset(); } });
-  let i = focus ? cards.findIndex(c => c.querySelector('#' + CSS.escape(focus))) : -1;
-  if (i < 0) i = Math.max(0, cards.findIndex(c => c.dataset.key === lastKey));
-  CZ.set(cards, i);
-  lastKey = cards[i].dataset.key;
-  if (focus && body.querySelector('#' + CSS.escape(focus))) cards[i].querySelectorAll('[data-main]').forEach(m => { if (m.id !== focus) m.removeAttribute('autofocus'); });
+  const list = body.querySelector('.set-list');
+
+  if (TAB === 'snd') {
+    list.innerHTML = row(t('звук'), A.Snd.on ? t('вкл') : t('выкл'), 'set-snd', focus) +
+      note(t('M на клавиатуре, R3 на геймпаде — звук вкл / выкл прямо в игре'));
+  } else if (TAB === 'gfx') {
+    A.GFX.panel(list, focus, true);                 // gfx.js рисует сама: качество и семь пунктов
+  } else if (TAB === 'ctrl') {
+    list.innerHTML = still('<div class="set-keys">' + A.keys() + '</div>');
+  } else if (TAB === 'lang') {
+    // смена — перезагрузка, поэтому только в меню
+    list.innerHTML = menu
+      ? '<div class="lang-grid">' + A.langs.map(l => '<button type="button" lang="' + l + '" data-l="' + l + '" id="set-l-' + l + '"' +
+          (l === A.lang() ? ' class="cur"' : '') + ('set-l-' + l === focus ? ' autofocus' : '') + '>' + A.langNames[l] + '</button>').join('') + '</div>'
+      : still('<b class="set-big">' + esc(A.langNames[A.lang()]) + '</b>' + note(onlyMenu));
+  } else {
+    let h = '';
+    // профиль (карьера): имя курьера и профили
+    if (A.career) {
+      const name = A.name();
+      h += head(t('профиль'));
+      h += menu ? row(t('имя'), esc(name || '—'), 'set-name', focus) : still('<b class="set-big">' + esc(name || '—') + '</b>' + note(onlyMenu));
+      if (menu && A.prof.on()) h += row(t('профиль'), esc(A.prof.curName()) + (A.prof.list().length > 1 ? ' · ' + t('сменить') : ''), 'set-prof', focus) +
+        note(t('у каждого профиля свой прогресс: кошелёк, машины, районы'));
+    }
+    // версия и обновление
+    {
+      const st = UPD.state(), v = UPD.version();
+      h += head(t('версия игры'));
+      h += '<div class="set-ver">' + t('стоит') + ' <b>' + esc(v || '—') + '</b>' + (st.latest && st.latest !== v ? ' · ' + t('вышла') + ' <b>' + esc(st.latest) + '</b>' : '') + '</div>';
+      if (UPD.on()) {
+        const can = st.st === 'newer' && st.updatable;
+        h += row(can ? '<b>' + esc(UPD.line()) + '</b>' : t('обновления с GitHub'), can ? t('обновить до {v}', { v: esc(st.latest) }) : st.st === 'wait' ? t('проверяю…') : t('проверить обновления'),
+          can ? 'set-upd-go' : 'set-upd', focus, { extra: !can && UPD.line() ? '<small class="set-msg">' + esc(UPD.line()) + '</small>' : '' });
+      } else h += note(A.steam ? t('игру обновляет Стим') : t('в браузере — всегда последняя версия'));
+    }
+    // ТЕСТ: «открыть все районы» — в релизе (BUILD_VERSION, __RELEASE__) нет, с ?debug — есть
+    if (menu && A.unlock.on()) h += row(t('районы') + ' <small class="set-msg">' + t('для тестов') + '</small>', A.unlock.all() ? t('все открыты') : t('открыть все районы'), 'set-unlock', focus);
+    if (menu && A.canReset()) h += '<button type="button" id="set-reset" class="set-danger"' + ('set-reset' === focus ? ' autofocus' : '') + '>' + t('сбросить прогресс') + '</button>';
+    if (!menu) h += note(t('сбросить прогресс — в главном меню'));
+    list.innerHTML = h;
+  }
   wire(body);
 }
 
 function wire (body) {
   const $ = id => body.querySelector('#' + id);
-  $('set-snd').onclick = () => { A.Snd.set(!A.Snd.on); render('set-snd'); };
+  body.querySelectorAll('.set-tab').forEach(b => b.addEventListener('click', () => {
+    if (b.dataset.tab === TAB) return;
+    TAB = b.dataset.tab;
+    render('set-tab-' + TAB);
+    A.navReset();
+  }));
+  body.querySelectorAll('.set-tk').forEach(b => b.addEventListener('click', () => flip(+b.dataset.d, true)));
+  if ($('set-snd')) $('set-snd').onclick = () => { A.Snd.set(!A.Snd.on); render('set-snd'); };
   body.querySelectorAll('[data-l]').forEach(b => b.addEventListener('click', () => A.setLang(b.dataset.l)));
   if ($('set-name')) $('set-name').onclick = () => A.askName(() => render('set-name'));
   if ($('set-prof')) $('set-prof').onclick = () => A.openProfiles();
-  if ($('set-ed')) $('set-ed').onclick = () => A.adult.toggle();
   if ($('set-unlock')) $('set-unlock').onclick = () => A.unlock.run();
   if ($('set-reset')) $('set-reset').onclick = () => A.reset();
   if ($('set-upd')) $('set-upd').onclick = () => { UPD.check(true); render('set-upd'); };
   if ($('set-upd-go')) $('set-upd-go').onclick = () => { UPD.apply(); render(); };
 }
 
-export const DEBUG = { render, flip, on, get idx () { return CZ ? CZ.idx() : -1; }, get key () { return CZ && CZ.card() ? CZ.card().dataset.key : null; } };
+export const DEBUG = { render, flip, on, get tab () { return TAB; }, get tabs () { return TABS.slice(); } };

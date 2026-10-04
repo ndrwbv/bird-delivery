@@ -17,9 +17,10 @@
 
    Сезоны (юниформы seasons.js) поверх: осенью трава золотисто-зелёная и
    жёлтая, проплешины — светлая сухая трава и опавшие листья, по газону —
-   редкие яркие листья (золотая осень — гуще); грязь — только весной
-   (мокрые проплешины); в жару проплешин больше и они пыльные; зимой всё
-   под снегом, как было (снег кладёт seasons.js после нас).
+   яркие листья вразброс, кучками (золотая осень — гуще; leafAt в seasons.js:
+   у каждого листа свой сдвиг и поворот, рядов нет); грязь — только весной
+   (мокрые проплешины); в жару проплешин больше и они пыльные, листьев нет;
+   зимой всё под снегом, как было (снег кладёт seasons.js после нас).
 
    Травой считаем то же, что seasons.js: зелёный цвет вершины и грань,
    смотрящая вверх. Асфальт, плитку, стены и воду не трогаем.
@@ -73,12 +74,14 @@ const LAWN_GLSL = `
     float bald = smoothstep(bTh, bTh + 0.03, bn);
     float bt = bn > bTh - 0.05 ? sNoise(q * 0.9 + 2.0) : 0.5;
     vec3 dirt = vec3(0.30, 0.22, 0.13) * (0.86 + 0.24 * bt);
-    // осень — не грязь, а светлая сухая трава и опавшие листья клетками ~0,33 м (вдали — ровный тёплый цвет)
+    // осень — не грязь, а светлая сухая трава и опавшие листья вразброс (лист ~0,2 м, свой сдвиг и поворот;
+    // вдали — ровный тёплый цвет). До 04.10.2026 листья были клетками сетки — лежали ровными рядами
     if (uDry > 0.0) {
-      float lh = sHash(floor(q * 3.0) + 7.0);
-      vec3 lf = lh < 0.22 ? vec3(0.9, 0.36, 0.03) : lh < 0.44 ? vec3(0.92, 0.66, 0.06) : lh < 0.54 ? vec3(0.72, 0.1, 0.03) : vec3(0.74, 0.58, 0.22) * (0.9 + 0.2 * bt);
-      vec3 straw = mix(vec3(0.8, 0.5, 0.12), lf, pix * (1.0 - uLawnLo));
-      dirt = mix(dirt, straw, uDry);
+      float lpk, lon = leafAt(q, 0.5, 0.7, 11.0, lpk);
+      vec3 lf = lpk < 0.3 ? vec3(0.9, 0.36, 0.03) : lpk < 0.6 ? vec3(0.92, 0.66, 0.06) : vec3(0.72, 0.1, 0.03);
+      vec3 straw = vec3(0.74, 0.58, 0.22) * (0.9 + 0.2 * bt);
+      straw = mix(straw, lf, lon * pix * (1.0 - uLawnLo));
+      dirt = mix(dirt, mix(vec3(0.8, 0.5, 0.12), straw, pix * (1.0 - uLawnLo)), uDry);
     }
     dirt = mix(dirt, vec3(0.13, 0.09, 0.05), uMud * 0.85);                     // весна — мокрая грязь (только весной)
     dirt = mix(dirt, vec3(0.52, 0.42, 0.28) * (0.9 + 0.2 * bt), uHeat * 0.7);  // жара — пыль
@@ -86,13 +89,14 @@ const LAWN_GLSL = `
     float near = smoothstep(bTh - 0.05, bTh, bn) * (1.0 - bald);
     c = mix(c, rim, near * 0.6);
     c = mix(c, dirt, bald);
-    // осень: по всему газону редкие яркие листья (золотая осень — гуще); вдали гаснут, не мерцают
+    // осень: по газону яркие листья вразброс — кучками (пятна ~12 м: где-то густо, где-то пусто; золотая осень —
+    // гуще), каждый лист со своим сдвигом и поворотом; вдали гаснут, не мерцают
     if (uDry > 0.0 && uLawnLo < 0.5) {
-      vec2 lc = floor(q * 2.5);
-      float lk = sHash(lc + 3.0), lp = sHash(lc + 29.0);
-      float dens = (uDry * 0.07 + uGold * 0.1) * (0.5 + big);
+      float clump = smoothstep(0.35, 0.85, sNoise(q * 0.085 + 41.0));
+      float dens = (uDry * 0.12 + uGold * 0.16) * (0.15 + 2.2 * clump * clump) * (0.6 + 0.8 * big);
+      float lp, lon = leafAt(q, 0.6, dens, 3.0, lp);
       vec3 lv = lp < 0.4 ? vec3(0.92, 0.4, 0.03) : lp < 0.8 ? vec3(0.95, 0.7, 0.07) : vec3(0.78, 0.12, 0.03);
-      c = mix(c, lv, step(1.0 - dens, lk) * pix);
+      c = mix(c, lv, lon * pix);
     }
     // рябь: клетки 0,5 и 1 м, ±6 %; гаснет, когда клетка меньше пары точек
     if (uLawnLo < 0.5) {
@@ -115,7 +119,7 @@ export function lawnMat (m) {
   const prev = m.onBeforeCompile, key = m.customProgramCacheKey ? m.customProgramCacheKey() : '';
   m.onBeforeCompile = (sh, r) => {
     if (prev) prev.call(m, sh, r);
-    if (!/sNoise/.test(sh.fragmentShader) || !/vSW/.test(sh.fragmentShader) || !/uHeat/.test(sh.fragmentShader)) return;   // без сезонного шейдера — как было
+    if (!/sNoise/.test(sh.fragmentShader) || !/vSW/.test(sh.fragmentShader) || !/uHeat/.test(sh.fragmentShader) || !/leafAt/.test(sh.fragmentShader)) return;   // без сезонного шейдера — как было
     sh.uniforms.uLawnLo = uLawnLo; sh.uniforms.uLawnQ = uLawnQ;
     sh.fragmentShader = 'uniform float uLawnLo;\nuniform float uLawnQ;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' + LAWN_GLSL);
   };

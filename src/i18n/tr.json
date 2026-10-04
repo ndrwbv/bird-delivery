@@ -2546,5 +2546,14 @@
  "игру обновляет Стим": "oyunu Steam güncelliyor",
  "в браузере — всегда последняя версия": "tarayıcıda her zaman son sürüm",
  "игра": "oyun",
- "нет, закончить смену": "hayır, mesaiyi bitir"
+ "нет, закончить смену": "hayır, mesaiyi bitir",
+ "давай": "tamam",
+ "два часа уже. на, похавай — за счёт заведения": "saat iki oldu. al, ye — müessesenin ikramı",
+ "не дождались — ушли пешком": "beklemediler — yürüyerek gittiler",
+ "о, вернулся. на, похавай — что будешь?": "oo, döndün. al, bir şeyler ye — ne alırsın?",
+ "полночь — заедь в пиццерию: смену надо развезти": "gece yarısı — pizzacıya uğra: ekibi evlerine bırakman lazım",
+ "после перезапуска": "yeniden başlatınca",
+ "сглаживание": "kenar yumuşatma",
+ "сменить район": "bölge değiştir",
+ "стоять! обед. на, похавай, потом поедешь": "dur! öğle yemeği. al ye, sonra gidersin"
 }

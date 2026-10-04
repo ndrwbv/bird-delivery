@@ -1,26 +1,39 @@
-/* главное меню карьеры (menu.js): сверху логотип и профиль, по центру — карусель карточек
-   (carousel.js), за ним город; номер версии — внизу справа, плашка «есть новая версия» — сверху */
+/* главное меню карьеры (menu.js): сверху слева логотип, справа — профиль (портрет, имя, «сменить»);
+   середина пустая — там живой город; внизу — компактная полоса карточек (carousel.js);
+   номер версии — внизу справа, плашка «есть новая версия» — сверху */
 
-/* старая заставка в карьере не нужна: имя, «поехали», таблица рекордов, выбор карты, язык */
-body.career #big-main, body.career #st-lang { display: none !important; }
-body.career #big { background: linear-gradient(180deg, rgba(10, 14, 32, .78) 0, rgba(10, 14, 32, .25) 28%, rgba(10, 14, 32, .2) 62%, rgba(10, 14, 32, .7) 100%);
+/* старая заставка в карьере не нужна: имя, «поехали», таблица рекордов, выбор карты, язык;
+   полоса уровня и рейтинга (#topbar) — тоже: профиль теперь в .crm-me */
+body.career #big-main, body.career #st-lang, body.career #topbar { display: none !important; }
+body.career #big { background: linear-gradient(180deg, rgba(10, 14, 32, .62) 0, rgba(10, 14, 32, .08) 22%, rgba(10, 14, 32, 0) 50%, rgba(10, 14, 32, .55) 78%, rgba(10, 14, 32, .82) 100%);
                    padding: 0; overflow: hidden; }
-body.career #topbar { position: absolute; top: 0; right: 0; width: auto; z-index: 3; padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 0 0; }
 body.career #build-v { display: none; }          /* версия — в .crm-ver, крупнее */
 
 #cr-menu { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; box-sizing: border-box;
            padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
-           --cw: clamp(260px, min(36vw, 52vh), 460px); }
+           --mcw: clamp(170px, min(20vw, 32vh), 290px); }
 .crm-top { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; min-height: 0; }
-.crm-head { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; text-align: left; max-width: 60%; }
-.crm-logo { font-size: clamp(20px, min(3.4vw, 6vh), 50px); line-height: 1.12; color: #ffd85e; letter-spacing: .04em;
+.crm-head { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; text-align: left; min-width: 0; }
+.crm-logo { font-size: clamp(20px, min(3.2vw, 5.6vh), 46px); line-height: 1.12; color: #ffd85e; letter-spacing: .04em;
             text-shadow: 3px 3px 0 #33210c, -3px 3px 0 #33210c, 3px -3px 0 #33210c, -3px -3px 0 #33210c, 0 8px 0 rgba(0, 0, 0, .35); }
 .crm-tag { font-size: clamp(7px, .8vw, 10px); line-height: 1.9; color: #fff3d6; max-width: 40ch;
            text-shadow: 2px 2px 0 #33210c, -2px 2px 0 #33210c, 2px -2px 0 #33210c, -2px -2px 0 #33210c; }
-.crm-prof { font: inherit; cursor: pointer; font-size: clamp(7px, .8vw, 10px); padding: 7px 12px; color: #fff3d6; background: rgba(20, 16, 30, .75);
-            border: 2px solid #33210c; border-radius: 6px; box-shadow: 0 3px 0 #33210c; }
-.crm-prof b { font-weight: normal; color: #ffd85e; }
-.crm-prof[hidden] { display: none; }
+
+/* профиль: портрет курьера, «профиль» и имя, кнопка «сменить» */
+.crm-me { flex: none; display: flex; align-items: center; gap: clamp(8px, 1vw, 12px); max-width: min(46%, 380px); box-sizing: border-box;
+          padding: clamp(5px, .8vh, 8px) clamp(6px, .8vw, 10px) clamp(5px, .8vh, 8px) clamp(5px, .8vh, 8px); color: #fff3d6;
+          background: rgba(20, 16, 30, .8); border: 3px solid #33210c; border-radius: 12px; box-shadow: 0 4px 0 #33210c; }
+.crm-ava { flex: none; width: clamp(38px, min(4.4vw, 8vh), 60px); height: clamp(38px, min(4.4vw, 8vh), 60px); border-radius: 8px;
+           image-rendering: pixelated; background: #2a3766; border: 3px solid #ffd85e; box-sizing: border-box; object-fit: cover; }
+.crm-ava[hidden] { display: none; }
+.crm-who { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.crm-who small { font-size: clamp(6px, .6vw, 8px); color: #b9c3e6; }
+.crm-who b { font-weight: normal; font-size: clamp(9px, min(1.05vw, 2vh), 14px); color: #ffd85e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crm-swap { flex: none; font: inherit; cursor: pointer; font-size: clamp(7px, .75vw, 10px); padding: clamp(7px, 1vh, 10px) clamp(8px, .9vw, 12px); min-height: 32px;
+            color: #33210c; background: #ffd85e; border: 3px solid #33210c; border-radius: 8px; box-shadow: 0 3px 0 #33210c; }
+.crm-swap:hover { filter: brightness(1.08); }
+.crm-swap:active { transform: translateY(2px); box-shadow: 0 1px 0 #33210c; }
+.crm-swap.padsel, .crm-swap:focus-visible { outline: 4px solid #fff3d6; outline-offset: 2px; }
 
 /* плашка «есть новая версия — обновить»: заметная, по центру над каруселью */
 .crm-upd { position: relative; flex: none; align-self: center; display: flex; align-items: center; gap: 12px; max-width: min(640px, 100%); margin: 8px 0 0;
@@ -36,42 +49,36 @@ body.career #build-v { display: none; }          /* версия — в .crm-ver
 .crm-upd:not(:disabled):hover { filter: brightness(1.08); }
 @keyframes crm-upd { 50% { transform: translateY(-2px); box-shadow: 0 6px 0 #33210c; } }
 
-/* карусель */
-.crm-car { flex: 1; min-height: 0; display: flex; }
-.crm-cz { flex: 1; --step: calc(var(--cw) * .9); }
-.crm-card { display: flex; height: min(100%, calc(var(--cw) * .82)); }
-.crm-cb { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(8px, 1.6vh, 16px);
-          font: inherit; cursor: pointer; text-align: center; padding: clamp(12px, 2.4vh, 26px) clamp(12px, 1.6vw, 22px); color: #fff3d6;
-          background: linear-gradient(180deg, #2c3a78 0, #1d2440 70%); border: 4px solid #33210c; border-radius: 16px;
-          box-shadow: 0 8px 0 #33210c, 0 22px 50px rgba(0, 0, 0, .45); transition: filter .1s; overflow: hidden; }
+/* полоса карточек внизу: верх (.crm-sky) пустой — там город */
+.crm-sky { flex: 1; min-height: 0; }
+.crm-car { flex: none; display: flex; height: calc(var(--mcw) * .66 + 30px); }
+.cz.crm-cz { flex: 1; --cw: var(--mcw); --step: calc(var(--cw) * .97); }
+.crm-cz .cz-card.side { opacity: .82; filter: saturate(.8) brightness(.82); }
+.crm-cz .cz-card.far { opacity: .5; filter: saturate(.6) brightness(.66); }
+.crm-cz .cz-dots { padding: 6px 0 0; gap: 6px; }
+.crm-cz .cz-dots i { width: 8px; height: 8px; }
+.crm-card { display: flex; flex-direction: column; gap: 5px; height: calc(var(--cw) * .66); }
+.crm-cb { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(4px, 1vh, 9px);
+          font: inherit; cursor: pointer; text-align: center; padding: clamp(8px, 1.4vh, 14px) clamp(8px, 1vw, 14px); color: #fff3d6;
+          background: linear-gradient(180deg, #2c3a78 0, #1d2440 70%); border: 4px solid #33210c; border-radius: 14px;
+          box-shadow: 0 6px 0 #33210c, 0 16px 36px rgba(0, 0, 0, .45); transition: filter .1s; overflow: hidden; }
 .crm-cb:hover { filter: brightness(1.08); }
 .crm-cb:active { transform: translateY(3px); box-shadow: 0 3px 0 #33210c; }
-.crm-ico { font-style: normal; font-size: clamp(30px, min(4.4vw, 8vh), 64px); line-height: 1; color: #ffd85e; text-shadow: 4px 4px 0 #33210c; }
-.crm-cb b { font-weight: normal; font-size: clamp(14px, min(1.9vw, 3.6vh), 28px); line-height: 1.3; text-shadow: 3px 3px 0 #33210c; }
-.crm-cb span { font-size: clamp(7px, min(.78vw, 1.5vh), 11px); line-height: 1.8; color: #b9c3e6; max-width: 30ch; }
-.crm-card.main .crm-cb { background: linear-gradient(180deg, #f0522a 0, #c23a18 100%); box-shadow: 0 8px 0 #33210c, 0 18px 40px rgba(240, 82, 42, .35); }
-.crm-card.main .crm-cb b { font-size: clamp(18px, min(2.6vw, 4.6vh), 38px); text-shadow: 3px 3px 0 #9b2a10; }
+.crm-ico { font-style: normal; font-size: clamp(18px, min(2.4vw, 4.4vh), 34px); line-height: 1; color: #ffd85e; text-shadow: 3px 3px 0 #33210c; }
+.crm-cb b { font-weight: normal; font-size: clamp(11px, min(1.35vw, 2.6vh), 19px); line-height: 1.3; text-shadow: 3px 3px 0 #33210c; }
+.crm-cb span { font-size: clamp(6px, min(.62vw, 1.2vh), 9px); line-height: 1.7; color: #b9c3e6; max-width: 30ch; }
+.crm-card.main .crm-cb { background: linear-gradient(180deg, #f0522a 0, #c23a18 100%); box-shadow: 0 6px 0 #33210c, 0 14px 32px rgba(240, 82, 42, .35); }
+.crm-card.main .crm-cb b { font-size: clamp(14px, min(1.8vw, 3.4vh), 26px); text-shadow: 3px 3px 0 #9b2a10; }
 .crm-card.main .crm-cb span { color: #ffe0c8; }
-.crm-card.main .crm-ico { color: #fff3d6; text-shadow: 4px 4px 0 #9b2a10; }
+.crm-card.main .crm-ico { color: #fff3d6; text-shadow: 3px 3px 0 #9b2a10; }
+/* «сменить район» — маленькая кнопка под «на смену» (открыто больше одного района, но не все) */
+.crm-sub { flex: none; font: inherit; cursor: pointer; font-size: clamp(6px, .65vw, 9px); padding: 6px 8px; min-height: 28px; color: #fff3d6;
+           background: rgba(20, 16, 30, .85); border: 3px solid #33210c; border-radius: 8px; box-shadow: 0 3px 0 #33210c; }
+.crm-sub:hover { filter: brightness(1.15); }
+.crm-card.cz-card.on .crm-sub.padsel, .crm-card.cz-card.on .crm-sub:focus-visible { outline: 3px solid #ffd85e; outline-offset: 2px; }
 .crm-card.k-quit .crm-cb { background: linear-gradient(180deg, #3a2a44 0, #20182c 100%); }
 .crm-card.off .crm-cb { opacity: .55; cursor: default; }
 .crm-card.cz-card.on .crm-cb.padsel, .crm-card.cz-card.on .crm-cb:focus-visible { outline: 4px solid #ffd85e; outline-offset: 4px; }
-
-/* рейтинг пиццерии — карточкой: ты и курьеры */
-.crm-card.rank .crm-cb { justify-content: flex-start; gap: 8px; cursor: default; }
-.crm-card.rank .crm-ico { display: none; }
-.crm-card.rank .crm-cb > b { font-size: clamp(11px, min(1.3vw, 2.6vh), 18px); color: #ffd85e; }
-.crm-cb ol { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 2px; text-align: left; min-height: 0; overflow: hidden; }
-.crm-cb li { display: grid; grid-template-columns: 16px 22px 1fr auto; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px;
-             font-size: clamp(7px, min(.75vw, 1.5vh), 10px); color: #fff3d6; }
-.crm-cb li em { font-style: normal; color: #b9c3e6; text-align: right; }
-.crm-cb li img { width: 22px; height: 22px; image-rendering: pixelated; border-radius: 4px; background: #2a3766; }
-.crm-cb li i { width: 16px; height: 16px; margin: 0 3px; border-radius: 50%; background: #ffd85e; border: 2px solid #33210c; box-sizing: border-box; }
-.crm-cb li b { font-weight: normal; font-size: inherit; text-shadow: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.crm-cb li span { color: #ffb066; white-space: nowrap; font-size: inherit; line-height: 1.4; }
-.crm-cb li.me { background: #ffd85e; color: #33210c; }
-.crm-cb li.me em, .crm-cb li.me span { color: #33210c; }
-.crm-cb small { font-size: clamp(6px, .65vw, 8px); line-height: 1.7; color: #b9c3e6; }
 
 .crm-hint { flex: none; text-align: center; font-size: clamp(6px, .7vw, 9px); color: #b9c3e6; padding-top: 4px; text-shadow: 2px 2px 0 #33210c; }
 .crm-ver { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); font-size: clamp(7px, .75vw, 10px);
@@ -115,23 +122,23 @@ body.career #build-v { display: none; }          /* версия — в .crm-ver
 .crm-nn { font-size: 7px; line-height: 1.8; color: #b9c3e6; }
 .crm-nn:empty { display: none; }
 
-/* телефон стоймя: логотип сверху, карточка почти во всю ширину */
+/* телефон стоймя: логотип сверху, профиль под ним справа, карточка шире */
 @media (max-aspect-ratio: 1/1) {
-  #cr-menu { --cw: min(78vw, 360px); padding-top: max(64px, env(safe-area-inset-top)); }
-  .crm-head { max-width: 100%; }
+  #cr-menu { --mcw: min(60vw, 260px); }
+  .crm-top { flex-direction: column; align-items: stretch; gap: 10px; }
   .crm-logo { font-size: clamp(22px, 8vw, 38px); }
   .crm-tag { display: none; }
-  .crm-card { height: min(100%, calc(var(--cw) * 1.05)); }
-  body.career #topbar { left: 0; right: 0; padding: 10px 12px 0; justify-content: flex-end; }
+  .crm-me { align-self: flex-end; max-width: 100%; }
+  .crm-hint { display: none; }
 }
-/* низкий экран (телефон боком, 1280×720 с панелью): логотип в строку, карточка ниже */
+/* низкий экран (телефон боком): логотип в строку, полоса ниже */
 @media (max-height: 560px) {
   .crm-tag { display: none; }
-  .crm-head { flex-direction: row; align-items: center; gap: 14px; }
-  .crm-logo { font-size: clamp(16px, 5vh, 26px); }
   .crm-hint { display: none; }
   .crm-upd { margin-top: 4px; padding: 6px 14px; }
-  #cr-menu { --cw: clamp(220px, 34vw, 340px); }
-  .crm-cb { gap: 6px; padding: 10px; }
-  .crm-ico { font-size: clamp(22px, 7vh, 36px); }
+  #cr-menu { --mcw: clamp(150px, 22vw, 230px); }
+  .crm-cb { gap: 3px; padding: 6px; }
+  .crm-cb span { display: none; }
+  .crm-ava { width: 34px; height: 34px; }
+  .crm-swap { min-height: 28px; padding: 5px 8px; }
 }

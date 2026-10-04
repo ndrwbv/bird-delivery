@@ -1,32 +1,52 @@
-/* пауза — карусель карточек (pausecz.js): без прокрутки; листки (чек, накладная, управление)
-   и кнопки — те же, что были «на столе» (стиль бумаги — delivery.css #pm-stats, #pm-order, #pm-keys) */
+/* пауза (pausecz.js): сверху — чек смены и накладная (стиль бумаги — delivery.css #pm-stats,
+   #pm-order), внизу — полоса кнопок-карточек (carousel.js), как в главном меню. Без прокрутки:
+   листок, который не влез, листается внутри себя */
 #pausem { flex-direction: column; overflow: hidden; box-sizing: border-box;
           padding: max(10px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
-          --cw: clamp(250px, min(40vw, 70vh), 560px); }
+          --pcw: clamp(170px, min(20vw, 30vh), 280px); }
 #pausem .pm-desk[hidden] { display: none; }
-.pz-head { flex: none; display: flex; justify-content: center; padding: 4px 0 6px; }
-.pz-head .pm-t { font-size: clamp(20px, min(3.4vw, 6vh), 52px); }
-.pz-host { flex: 1; min-height: 0; display: flex; }
-.pz-cz { flex: 1; --step: calc(var(--cw) * .94); }
-.pz-card { display: flex; align-items: center; justify-content: center; max-height: 100%; color: #33210c; }
-.pz-card.pz-btn { height: min(100%, calc(var(--cw) * .62)); }
+.pz-head { flex: none; display: flex; justify-content: center; padding: 2px 0 6px; }
+.pz-head .pm-t { font-size: clamp(18px, min(3vw, 5vh), 44px); }
+/* листки: чек слева (уже), накладная справа */
+.pz-top { flex: 1; min-height: 0; display: flex; justify-content: center; align-items: flex-start; gap: calc(var(--u) * 3);
+          padding: calc(var(--u) * 1) calc(var(--u) * 1) calc(var(--u) * 1.4); color: #33210c; }
+.pz-sheet { min-width: 0; max-height: 100%; box-sizing: border-box; padding: calc(var(--u) * .8) calc(var(--u) * .8) calc(var(--u) * 1.4);
+             overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #ffd85e transparent; }
+.pz-sheet:first-child { flex: 0 1 calc(var(--u) * 34); }
+.pz-sheet:last-child { flex: 0 1 calc(var(--u) * 50); }
+.pz-sheet > * { min-width: 0; box-sizing: border-box; }
+.pz-sheet > #pm-stats { margin: 0; }
+.pz-sheet > #pm-stats::after { display: none; }
+.pz-sheet > #pm-order .oc-photos { width: auto; margin: 0; }
+/* полоса кнопок */
+.pz-host { flex: none; display: flex; height: calc(var(--pcw) * .5 + 30px); }
+.cz.pz-cz { flex: 1; --cw: var(--pcw); --step: calc(var(--cw) * .97); }
+.pz-cz .cz-card.side { opacity: .82; filter: saturate(.8) brightness(.82); }
+.pz-cz .cz-card.far { opacity: .5; filter: saturate(.6) brightness(.66); }
+.pz-cz .cz-dots { padding: 6px 0 0; gap: 6px; }
+.pz-cz .cz-dots i { width: 8px; height: 8px; }
+.pz-card { display: flex; align-items: center; justify-content: center; color: #33210c; }
+.pz-card.pz-btn { height: calc(var(--cw) * .5); }
 .pz-card.pz-btn > button {
-  width: 100%; height: 100%; box-sizing: border-box; font: inherit; font-size: clamp(16px, min(2.2vw, 4vh), 30px); line-height: 1.3; cursor: pointer;
-  color: #33210c; background: #ffd85e; border: 4px solid #33210c; border-radius: 16px; padding: 12px;
-  box-shadow: 0 8px 0 #33210c, 0 18px 40px rgba(0, 0, 0, .4);
+  width: 100%; height: 100%; box-sizing: border-box; font: inherit; font-size: clamp(9px, min(1.05vw, 2vh), 15px); line-height: 1.4; cursor: pointer;
+  color: #33210c; background: #ffd85e; border: 4px solid #33210c; border-radius: 14px; padding: 8px;
+  box-shadow: 0 6px 0 #33210c, 0 14px 32px rgba(0, 0, 0, .4); white-space: normal;
 }
 .pz-card.pz-btn > button:active { transform: translateY(3px); box-shadow: 0 3px 0 #33210c; }
-.pz-card.pz-btn > #pm-go { background: #f0522a; color: #fff3d6; text-shadow: 3px 3px 0 #33210c; font-size: clamp(20px, min(2.8vw, 5vh), 38px); padding: 12px; white-space: normal; }
+.pz-card.pz-btn > #pm-go { background: #f0522a; color: #fff3d6; text-shadow: 3px 3px 0 #33210c; font-size: clamp(10px, min(1.3vw, 2.4vh), 19px); padding: 8px; white-space: normal; letter-spacing: 0; }
 .pz-card.pz-btn > #pm-menu { background: #fff3d6; }
-.pz-card.pz-btn > #pm-set { background: #b9c3e6; }
+.pz-card.pz-btn > #pm-set, .pz-card.pz-btn > #pm-ctrl { background: #b9c3e6; }
 .pz-card.on > .padsel { outline: 4px solid #fff3d6 !important; outline-offset: 4px; }
-.pz-still > * { width: 100%; max-height: 100%; overflow: hidden; box-sizing: border-box; margin: 0 !important; }
-.pz-still > #pm-stats { transform: none; }
-.pz-still > #pm-order, .pz-still > #pm-keys { transform: none; }
-.pz-still > #pm-order .oc-photos { width: auto; margin: 0; }
+/* низкий экран (телефон боком): заголовок мельче, листки ниже */
 @media (max-height: 500px) {
-  #pausem { --u: clamp(7px, 1.5vh, 12px); --cw: clamp(240px, 46vw, 420px); }
-  .pz-head { padding: 0 0 2px; }
-  .pz-head .pm-t { font-size: 20px; }
+  #pausem { --u: clamp(6px, 1.4vh, 10px); --pcw: clamp(140px, 20vw, 200px); }
+  .pz-head { padding: 0; }
+  .pz-head .pm-t { font-size: 16px; }
+  .pz-top { padding-top: 4px; padding-bottom: 6px; }
 }
-@media (max-aspect-ratio: 1/1) { #pausem { --cw: min(84vw, 380px); } }
+/* телефон стоймя: листки друг под другом, каждый — до половины места */
+@media (max-aspect-ratio: 1/1) {
+  #pausem { --pcw: min(56vw, 240px); }
+  .pz-top { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 14px; padding: 6px 4px 10px; }
+  .pz-sheet { flex: 0 1 auto !important; max-height: 50%; }
+}

@@ -9,7 +9,10 @@
 .prf-row { display: flex; gap: 6px; align-items: stretch; }
 .prf-box button { font: inherit; cursor: pointer; color: #fff3d6; border: 3px solid #33210c; border-radius: 9px; box-shadow: 0 3px 0 #33210c; }
 .prf-box button:hover:not(:disabled) { filter: brightness(1.12); }
-.prf-pick { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 10px 12px; background: rgba(34, 44, 90, .92); }
+.prf-pick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 12px 8px 8px; background: rgba(34, 44, 90, .92); }
+.prf-pt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; font-style: normal; }
+.prf-ava { flex: none; width: 44px; height: 44px; border-radius: 7px; image-rendering: pixelated; background: #2a3766; border: 3px solid #33210c; box-sizing: border-box; }
+.prf-row.cur .prf-ava { border-color: #ffd85e; }
 .prf-pick b { font-weight: normal; font-size: clamp(9px, 1vw, 13px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prf-pick span { font-size: clamp(6px, .62vw, 8px); line-height: 1.5; color: #b9c3e6; }
 .prf-row.cur .prf-pick { background: #f0522a; }
@@ -30,10 +33,3 @@
 .prf-form input { font: inherit; font-size: clamp(12px, 1.6vw, 18px); padding: 16px; text-align: center; color: #33210c; background: #fff3d6;
                   border: 3px solid #33210c; border-radius: 10px; box-shadow: 0 5px 0 #33210c; outline: none; min-width: 0; }
 .prf-form input:focus { border-color: #f0522a; box-shadow: 0 5px 0 #f0522a; }
-
-/* кнопка профиля в шапке меню (menu.js) */
-.crm-prof { display: inline-flex; align-items: center; gap: 8px; margin-top: 14px; max-width: 100%; box-sizing: border-box; font: inherit; cursor: pointer;
-            font-size: clamp(7px, .8vw, 10px); padding: 8px 12px; color: #fff3d6; background: rgba(20, 16, 30, .75); border: 2px solid #33210c; border-radius: 8px; }
-.crm-prof b { font-weight: normal; color: #ffd85e; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.crm-prof[hidden] { display: none; }
-.crm-prof:hover { filter: brightness(1.15); }

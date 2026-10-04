@@ -40,6 +40,7 @@ import * as PAINT from './citypaint.js';         // дома в цвет по н
 import * as BB from './billboards.js';            // щиты со смешной рекламой у больших дорог (billboards.js)
 import * as CONSTR from './construction.js';     // стройки на пустырях: шиферный забор, кран, техника, «паспорт объекта», самосвалы (construction.js)
 import * as RIVS from './rivals.js';             // точки «Вселенной суши» и «Королевы Бургеров», маскоты, их курьеры (rivals.js)
+import * as CSH from './carshadow.js';           // пятно-тень под машиной игрока (carshadow.js)
 import * as CARL from './carlights.js';         // огни машины игрока: стоп-сигналы, поворотники, задний ход (carlights.js)         // фонари: все сбиваются, шары и консоли, частный сектор (streetlamps.js)
 import * as JUNK from './junk.js';              // остановки ломаются, мусор у подъездов, контейнеры (junk.js)             // плитка, аллеи; в карьере — мусор, бандиты, особняки, шашлыки
 import * as DIRECTOR from './director.js';       // режиссёр событий: сессия начинается спокойно, события по нарастающей (director.js)
@@ -60,6 +61,7 @@ import * as NIGHT from './nightlife.js';         // взрослая: девуш
 import * as RL from './roadlife.js';
 import * as PZ from './pizzeria.js';
 import * as PZD from './pizzadome.js';          // пиццерия-шар: отдельное здание у улицы рядом с прежней точкой (pizzadome.js)
+import * as PAVE from './pave.js';             // где ходят люди: тротуары, пешеходки, дорожки — туда заборчики и конструкции не ставим (pave.js)
 import * as LAWNP from './lawnprops.js';      // мелочь на газоне рядом с камерой: трава, заросли, покрышки, выбивалки, ракушки, мусор (lawnprops.js)
 import * as FOREST from './forest.js';         // ельник в больших лесах: ели и сосны инстансами, опушка, снег зимой (forest.js)
 import * as LM from './landmarks.js';            // заправки и каток
@@ -94,7 +96,10 @@ import * as PROF from './profiles.js';           // профили: прогре
 import * as QR from './quickrun.js';               // быстрый заезд из меню: сезон, длина, машина; сохранение карьеры не трогает (quickrun.js)
 import * as CL from '../platform/crashlog.js';   // журнал ошибок, предохранитель шагов мира, сторож зависаний (docs/CRASHES.md)
 import * as RELIEF from './relief.js';          // неровный газон: бугры и холмики на газонах и пустырях (relief.js)
+import * as RW from './roadwear.js';            // асфальт разный: свежий, ровный, в заплатках, старый, разбитый (roadwear.js)
 import * as LAWN from './lawn.js';              // пятна на газоне — в краске земли (lawn.js)
+import * as NAR from './narrow.js';            // узкие дороги: одна полоса посередине, встречные прижимаются (narrow.js)
+import * as TALK from './talk.js';             // реплики над головами: читаемая плашка, крупнее вблизи, не больше нескольких (talk.js)
 
 /* Сохранения — через площадку (облако Яндекса / localStorage). Значения
    хранятся как есть: числа, строки, массивы. */
@@ -105,9 +110,10 @@ const Store = {
 /* Две версии игры. Детская (12+) — Яндекс, всегда: без крови, алкоголя,
    табака и бит. Взрослая (18+) — Стим по умолчанию: кровь и куски тел,
    пиво и водка в поручениях, курилка у пиццерии, пьющие компании ночью,
-   биты в кофейной войне, «взрослые» находки. В Стиме версия переключается
-   в настройках (dlv-edition), ?kids — детская для проверки. */
-const ADULT = !!Platform.features.adult && Store.get('dlv-edition', 'adult') !== 'kids' && !new URLSearchParams(location.search).has('kids');
+   биты в кофейной войне, «взрослые» находки. Версию задаёт сборка (Стим и web —
+   взрослая, Яндекс — детская); переключателя у игрока нет с 04.10.2026 (старый
+   ключ dlv-edition больше не читаем), ?kids — детская для проверки. */
+const ADULT = !!Platform.features.adult && !new URLSearchParams(location.search).has('kids');
 const GORE_ON = ADULT;
 /* Карьера (Стим и dev): смена 9—24, экономика, машины, донаты. Только на карте,
    у которой есть MAP.career (Северск); на Яндексе — прежняя игра. ?nocareer — выключить */
@@ -262,7 +268,10 @@ const Snd = {
    Ровно этим Hamster Rescue и берёт — крупный пиксель вместо сглаживания. */
 
 const canvas = $('view');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
+/* сглаживание (MSAA ×4) — по настройке графики «сглаживание» (gfx.js), на маленьком кадре оно дешёвое:
+   края домов и огни окон вдали ночью не рябят. ?aa=0 / ?aa=1 — на этот запуск (замеры) */
+const AA_Q = new URLSearchParams(location.search).get('aa');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: AA_Q === '0' ? false : AA_Q === '1' ? true : GFX.aa() });
 /* Размер «пикселя» игры в пикселях экрана. Раньше делили CSS-пиксели на
    два: на телефоне это 195 точек в ширину — каша. Теперь по короткой
    стороне в физических пикселях: примерно 540 точек, как на ноутбуке с
@@ -668,6 +677,8 @@ for (const r of CITY.roads) {
   for (let i = 1; i < p.length; i++)
     RSEG.push({ x1: p[i - 1][0], z1: p[i - 1][1], x2: p[i][0], z2: p[i][1], c: r.c, w, name: r.n, b: r.b || 0, x: r.x || 0, g: r.g || 0 });   // g — газон бульвара: ширина плиты за бордюром (hits.js)
 }
+
+PAVE.init({ RSEG, CITY, onAlley: (x, z, m) => WORLD.onAlley(x, z, m) });   // тротуары и дорожки: общее «сюда не ставить» (pave.js)
 
 const RCELL = 64, ROAD_GRID = new Map();
 for (let k = 0; k < RSEG.length; k++) {
@@ -1097,7 +1108,7 @@ function osmRoads () {
       // На перекрёстке два полотна лежат в одной плоскости и мерцают.
       // Главная чуть выше второстепенной — поверх и рисуется.
       const y = (pass ? 0.14 : 0.09) + (7 - r.c) * 0.004;
-      LITM.color(pass ? ROAD_HEX[r.c] : WORLD.paveRoad(r));   // тротуар: гладкий, брусчатка или в крапинку (world.js)
+      LITM.color(pass ? RW.roadHex(r, ROAD_HEX[r.c]) : WORLD.paveRoad(r));   // полотно — по виду асфальта (roadwear.js); тротуар: гладкий, брусчатка или в крапинку (world.js)
       const p = r.p;
       for (let i = 1; i < p.length; i++) {
         LITM.ribbon(p[i - 1][0], p[i - 1][1], p[i][0], p[i][1], w, y);
@@ -1105,6 +1116,7 @@ function osmRoads () {
         const n = NODE_IDX.get(p[i][0] + ',' + p[i][1]);
         if (i < p.length - 1 || (n !== undefined && nodeDeg(n) >= 2)) LITM.disc(p[i][0], p[i][1], w / 2, y, 9);
       }
+      if (pass) RW.decorate(LITM, r, w, y, (x, z) => { const n = NODE_IDX.get(x + ',' + z); return n !== undefined && nodeDeg(n) >= 3; });   // заплатки
     }
   }
 }
@@ -1229,7 +1241,7 @@ function osmMarkings () {
           for (let d = s0 - ((acc + s0) % (DASH + GAP)); d < s1; d += DASH + GAP)
             seg(e, o, Math.max(s0, d), Math.min(s1, d + DASH), wd);
         };
-        if (!e.oneway) {
+        if (!e.oneway && !NAR.narrow(e)) {           // узкая — одна полоса, без осевой (narrow.js)
           if (e.c <= 2 || n >= 2) { seg(e, 0.18, s0, s1, 0.13); seg(e, -0.18, s0, s1, 0.13); }
           else if (e.w >= 7.5) dashed(0, 0.14);
           for (let k = 1; k < n; k++) { dashed(e.w / 2 - lw * k, 0.12); dashed(-(e.w / 2 - lw * k), 0.12); }
@@ -1675,16 +1687,25 @@ function smashNear (x, z, fn) {
       for (const it of SMASH_GRID.get(i + ',' + j) || []) if (!it.down) fn(it);
 }
 
+/* сбиваемый забор ближе r: дорожку у дома и тропинку к тротуару через него не ведём —
+   заборы пиццерий, строек и пустырей встают раньше дорожек (pave.js — правило наоборот) */
+function fenceNear (x, z, r) {
+  let f = false;
+  smashNear(x, z, it => { if (!f && (it.kind === 'fence' || it.kind === 'bigfence') && !it.rshop && Math.hypot(it.x - x, it.z - z) < r + Math.min(it.r, 1.3)) f = true; });
+  return f;
+}
+
 /* ── расстановка ── */
 function osmYardBits () {
   if (INTRO) return;
-  // заборчики вдоль дворовых проездов: кусками, с проходами у перекрёстков,
-  // подъездов и дорожек — двор должен остаться проезжим
+  // заборчики вдоль улиц: кусками, с проходами у перекрёстков, подъездов и дорожек —
+  // двор должен остаться проезжим. Стоят за тротуаром, по краю газона (до 04.10.2026 —
+  // в 0,8 м от бордюра, посреди тротуара); на тротуар, дорожку и аллею не встают (pave.js)
   let segs = 0;
   const FENCE = ['#3f7a4a', '#4f6fa8', '#8a3b3b', '#d8d2c8'];
   for (const r of CITY.roads) {
     if (r.c !== 4 || r.b || r.x || segs > 900) continue;
-    const w = roadWidth(r) / 2 + 0.8, hex = pick(FENCE);
+    const w = PAVE.walkHalf({ w: roadWidth(r), c: r.c, g: r.g }) + 0.35, hex = pick(FENCE);
     for (const sd of [-1, 1]) {
       if (!chance(0.45)) continue;
       for (let i = 1; i < r.p.length; i++) {
@@ -1699,6 +1720,7 @@ function osmYardBits () {
           if (near && near.seg.c !== 7 && near.d < near.seg.w / 2 + 0.4) continue;        // чужое полотно
           if (near && near.seg.c === 7 && near.d < 1.8) continue;                          // дорожка — проход
           if (CITY.entrances.some(e => Math.abs(e[0] - cx) < 5 && Math.abs(e[1] - cz) < 5)) continue;
+          if (PAVE.onPave(cx, cz, 0.2) || PAVE.onPave(cx - ux * 1.25, cz - uz * 1.25, 0.1) || PAVE.onPave(cx + ux * 1.25, cz + uz * 1.25, 0.1)) continue;   // чужой тротуар, дорожка — проход
           const gy = groundH(cx, cz), g = [];
           put(g, new THREE.BoxGeometry(2.5, 0.07, 0.06), hex, cx, gy + 0.75, cz, 0, ry, 0);
           put(g, new THREE.BoxGeometry(2.5, 0.07, 0.06), hex, cx, gy + 0.35, cz, 0, ry, 0);
@@ -1832,6 +1854,7 @@ function pitchAt (cx, cz, ang, L, W, own) {
     const ex = (x1 - x0) / l, ez = (z1 - z0) / l, fr = Math.atan2(-ez, ex);
     for (let i = 0; i < n; i++) {
       const cx2 = x0 + ex * (i + 0.5) * l / n, cz2 = z0 + ez * (i + 0.5) * l / n, fy = groundH(cx2, cz2), g = [];
+      if (PAVE.onPave(cx2, cz2, 0.1)) continue;          // не поперёк тротуара, дорожки и аллеи (pave.js)
       put(g, new THREE.BoxGeometry(l / n, 0.06, 0.05), '#3f6fa8', cx2, fy + 0.95, cz2, 0, fr, 0);
       put(g, new THREE.BoxGeometry(l / n, 0.06, 0.05), '#3f6fa8', cx2, fy + 0.45, cz2, 0, fr, 0);
       put(g, new THREE.BoxGeometry(0.07, 1.0, 0.07), '#3f6fa8', cx2 - ex * l / n / 2, fy + 0.5, cz2 - ez * l / n / 2);
@@ -2339,6 +2362,15 @@ function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch) {
       let f0 = 0;
       const cu = arch ? arch.cut.get(w.a) : undefined;
       const inArch = (m, half, y) => cu !== undefined && y < arch.top + 0.3 && Math.abs(m - cu) < ARCH_W / 2 + half + 0.3;
+      // полоса по стене с аркой: проём (и чуть по краям) ниже свода пропускаем — швы и пояса не висят в воздухе арки
+      const bandA = (w, from, to, y0, y1, out) => {
+        if (cu === undefined || y0 >= arch.top + 0.2) return band(w, from, to, y0, y1, out);
+        const g0 = cu - ARCH_W / 2 - 0.15, g1 = cu + ARCH_W / 2 + 0.15;
+        if (to <= g0 || from >= g1) return band(w, from, to, y0, y1, out);
+        if (from < g0) band(w, from, g0, y0, y1, out);
+        if (to > g1) band(w, g1, to, y0, y1, out);
+        if (y1 > arch.top + 0.2) band(w, Math.max(from, g0), Math.min(to, g1), arch.top + 0.2, y1, out);
+      };
       if (cu === undefined && (shop || (k === 'res' && lv >= 5 && w.len > 14 && seed % 3 === 0))) {
         // витрина во весь первый этаж
         FLATM.color('#cfe3f2');
@@ -2356,14 +2388,14 @@ function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch) {
       if (st === 'panel' && w.len > 8) {
         // панельный дом: швы между плитами — по этажам и через три метра
         FLATM.color(shade(hexOf(b), 0.86));
-        for (let f = 1; f < floors; f++) band(w, 0, w.len, base + f * FH - 0.05, base + f * FH + 0.05, 0.06);
-        for (let i = 0; i <= cols; i++) band(w, pad + i * step - 0.05, pad + i * step + 0.05, base, base + floors * FH, 0.06);
+        for (let f = 1; f < floors; f++) bandA(w, 0, w.len, base + f * FH - 0.05, base + f * FH + 0.05, 0.06);
+        for (let i = 0; i <= cols; i++) bandA(w, pad + i * step - 0.05, pad + i * step + 0.05, base, base + floors * FH, 0.06);
       } else if (st === 'stalin' && w.len > 6) {
         // сталинка: карниз под крышей, междуэтажный пояс, светлые пилястры
         FLATM.color('#f4ede0');
         band(w, 0, w.len, h - 0.7, h - 0.2, 0.22);
-        band(w, 0, w.len, base + FH - 0.15, base + FH + 0.1, 0.12);
-        for (let i = 0; i <= cols; i += 2) band(w, pad + i * step - 0.25, pad + i * step + 0.25, base + FH, h - 0.7, 0.14);
+        bandA(w, 0, w.len, base + FH - 0.15, base + FH + 0.1, 0.12);
+        for (let i = 0; i <= cols; i += 2) bandA(w, pad + i * step - 0.25, pad + i * step + 0.25, base + FH, h - 0.7, 0.14);
       }
       // балконы — на длинных стенах жилых домов, через колонку
       if (k === 'res' && w.len > 16 && lv >= 3)
@@ -2819,7 +2851,8 @@ function osmEntrances () {
   }
   houseWalks();
   // у многоэтажек: тропинка от двери к общей дорожке, заборчики, лавочки (yards.js)
-  if (!INTRO) BUILD_T.yards = YARDS.build({ THREE, CITY, HOUSE_GRID, LITM, BENCHES, YARD_PATHS, box, put, smashAdd, groundH, inHouse, inBounds, inPoly, nearestRoad, DRIVE_MAX,
+  if (!INTRO) BUILD_T.yards = YARDS.build({ THREE, CITY, HOUSE_GRID, LITM, BENCHES, YARD_PATHS, box, put, smashAdd, groundH, inHouse, inBounds, inPoly, nearestRoad, DRIVE_MAX, fenceNear,
+    solidAt, rivBlocks: RIVS.blocks, SMASH,
     benchOk: (x, z) => benchSpotOk(x, z) && !introClear(x, z) && groundH(x, z) >= 0.3 });
 }
 
@@ -2866,7 +2899,7 @@ function houseWalks () {
         const x1 = a[0] + ux * d + ox * OFF, z1 = a[1] + uz * d + oz * OFF;
         const x2 = a[0] + ux * d2 + ox * OFF, z2 = a[1] + uz * d2 + oz * OFF;
         const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
-        if (onAsphalt(mx, mz) || inHouse(mx, mz, 0.3)) { if (pts.length > 1) { YARD_PATHS.push(pts.slice()); CITY.paths.push(pts.slice()); } pts.length = 0; continue; }
+        if (onAsphalt(mx, mz) || inHouse(mx, mz, 0.3) || fenceNear(mx, mz, 1) || fenceNear(x1, z1, 1) || fenceNear(x2, z2, 1)) { if (pts.length > 1) { YARD_PATHS.push(pts.slice()); CITY.paths.push(pts.slice()); } pts.length = 0; continue; }
         LITM.ribbon(x1, z1, x2, z2, W, 0.08);
         if (!pts.length) pts.push([x1, z1]);
         pts.push([x2, z2]);
@@ -2888,11 +2921,14 @@ function houseWalks () {
       const ex = r.x + ddx / dl * edge, ez = r.z + ddz / dl * edge, L = Math.hypot(ex - sx, ez - sz);
       if (L < 1.5 || L > 38) continue;
       let clear = true;
-      for (let t = 0.1; clear && t < 0.96; t += 0.08) { const qx = lerp(sx, ex, t), qz = lerp(sz, ez, t); if (inHouse(qx, qz, 0.4) || (t < 0.9 && onAsphalt(qx, qz))) clear = false; }
+      for (let t = 0.1; clear && t < 0.96; t += 0.08) { const qx = lerp(sx, ex, t), qz = lerp(sz, ez, t); if (inHouse(qx, qz, 0.4) || (t < 0.9 && onAsphalt(qx, qz)) || fenceNear(qx, qz, 0.8)) clear = false; }
       if (!clear) continue;
+      LITM.color(YARDS.YARD.COLOR);                  // цвет-метка: зимой тропинка протоптана (seasons.js), сугробы мимо (yards.js onYard)
       LITM.ribbon(sx, sz, ex, ez, 1.5, 0.085);
       LITM.disc(ex, ez, 0.75, 0.085, 6);
+      LITM.color('#d9d0c0');
       YARD_PATHS.push([[sx, sz], [ex, ez]]); CITY.paths.push([[sx, sz], [ex, ez]]);
+      YARDS.addTrail([[sx, sz], [ex, ez]], 0.75);
     }
   }
   BUILD_T.walks = n;
@@ -3444,6 +3480,7 @@ function pizzaSpot () {
 const mapApi = () => ({
   THREE, scene, cam, V, S, CITY, TH, LIT, LITM, FLAT, box, put, mergeGeos, obb, smashAdd, makeHuman, gibHuman, toast,
   groundH, surfaceAt, curbAt, inHouse, inBounds, nearestRoad, ROAD_HEX, RAISED, SOLIDS, BRIDGES,
+  roadHexAt: (x, z, c) => { const q = nearestRoad(x, z, 7, 1); return RW.segHex(q && q.seg, ROAD_HEX[c]); },   // вид асфальта улицы (roadwear.js)
   onRunOver: () => { S.people++; },
   get TRAFFIC () { return TRAFFIC; }, get PEOPLE () { return PEOPLE; }, get PEDS () { return PEDS; }, get SCOOTS () { return SCOOTS; },
   get CROWDS () { return CROWDS; }, get DRIVERS () { return DRIVERS; }, get SMOKERS () { return SMOKERS; },
@@ -3453,7 +3490,7 @@ let MAPW_API = null;
 const roadApi = () => ({
   THREE, scene, cam, V, S, CITY, box, put, mergeGeos, obb, smashAdd, smashMesh, SMASH, SOLIDS, SOLID_GRID, SCELL, PARKED, DRIVE_MAX,
   groundH, curbAt, inHouse, inPoly, inBounds, nearestRoad, NODES, NODE_IDX, edgeOf, edgeRun, laneCount, laneOff, routeNodes, nodeNear, nearestNode,
-  walkLeg, walkSpawn, walkersAll,
+  walkLeg, walkSpawn, walkersAll, pushOut,          // pushOut — слетевший с мопеда обходит стены (mopeds.js)
   ZEBRAS, SIG_GROUPS, TRAFFIC, ACCIDENTS, newCar, placeTraffic, poseTraffic, poseOnSlope, svcGone, makeHuman, dropMesh, gibHuman, sayBubble, Snd, toast, calmStart, nearClient,
   onRunOver: () => { S.people++; },
   get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get tG () { return tG; },
@@ -3532,6 +3569,7 @@ let THUGS_API = null;
 /* что нужно protests.js (протест по ступеням, концерты во дворах) */
 const protApi = () => ({
   V, S, scene, CAREER, ADULT, HUMAN_VC, BENCHES, Store, put, mergeGeos, makeHuman, dropMesh, gibHuman, sayBubble, emote, puff, groundH, curbAt, inHouse, inBounds, nearestRoad,
+  CAR_L, CAR_W, sparks, Snd,                       // тумбы сбиваются машиной (protests.js PROT.HIT)
   segs: () => RSEG, get ENV () { return ENV; }, chat: s => CHAT.say(s),
   popBonus: (a, b) => popBonus(escHtml(a), escHtml(b)),
   onRunOver: () => { S.people++; Snd.squish(); },
@@ -3616,6 +3654,7 @@ function buildCity () {
   const spot = house ? null : pizzaSpot();
   const tm0 = (k, f) => { const t0 = performance.now(); f(); BUILD_T[k] = Math.round(performance.now() - t0); };
   tm0('ground', osmGround);
+  RW.init({ CITY, MAP, nearestRoad, get ENV () { return ENV; } });   // вид асфальта улиц — до полотна (roadwear.js); ENV — позже, на дождь
   tm0('roads', osmRoads);
   tm0('curbs', osmCurbs);
   tm0('marks', osmMarkings);
@@ -3660,7 +3699,7 @@ function buildCity () {
   if (!INTRO) tm('trails', WASTE.trails);         // тропинки наискосок, вытоптанное у лавочек, лужи — после дворов и лавочек (wastelands.js)
 
   const tq = performance.now();
-  const litG = LITM.mesh(HUR.holeMat(LAWN.lawnMat(WORLD.paveMat(SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }))))));   // + узор плитки (world.js), + пятна газона (lawn.js), + ураган (hurricane.js)
+  const litG = LITM.mesh(HUR.holeMat(LAWN.lawnMat(RW.wearMat(WORLD.paveMat(SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide })))))));   // + узор плитки (world.js), + вид асфальта (roadwear.js), + пятна газона (lawn.js), + ураган (hurricane.js)
   const flatG = FLATM.mesh(HUR.holeMat(new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
   BUILD_T.mesh = Math.round(performance.now() - tq);
   WINS.build(scene);                              // окна — по клеткам, один материал (windows.js)
@@ -3787,9 +3826,11 @@ function routeNodes (fromX, fromZ, toX, toZ) {
    смещение считается от осевой вдоль правой нормали ребра. */
 function laneCount (e) {
   if (e.oneway) return e.lanes || Math.max(1, Math.round(e.w / 3.3));
+  if (NAR.narrow(e)) return 1;                     // узкая двусторонняя — одна полоса посередине (narrow.js)
   return e.lanes ? Math.max(1, Math.floor(e.lanes / 2)) : (e.w >= 12.5 ? 2 : 1);
 }
 function laneOff (e, k) {
+  if (NAR.narrow(e)) return 0;
   const n = laneCount(e), lw = (e.oneway ? e.w : e.w / 2) / n;
   return e.w / 2 - lw * (Math.min(k, n - 1) + 0.5);
 }
@@ -4061,6 +4102,10 @@ function boom (x, z, r = 11) {
 
 /* ударная волна: людей рвёт, бургеры рассыпает, соседние машины расшвыривает */
 function blastAt (x, z, r) {
+  BLASTING = true;                                 // взрыв рвёт и без нитро (shredHit)
+  try { blastPeople(x, z, r); } finally { BLASTING = false; }
+}
+function blastPeople (x, z, r) {
   for (const p of PEOPLE) {
     if (p.dead) continue;
     const d = Math.hypot(p.x - x, p.z - z);
@@ -4499,14 +4544,33 @@ function updateGibs (dt) {
 // по мостам не гуляют: высоту людям берём с земли, и на мосту они шли бы по дну реки
 const walkable = e => !!e && e.c <= 5 && !(MAPFIX && e.road.b);
 const walkOff = (e, bike) => e.w / 2 + (bike ? 0.9 : 1.5) + (e.road.g || 0);   // бульвар: тротуар за газоном
+/* Есть ли у ребра тротуар с этой стороны: линия тротуара не должна лежать на чужом полотне.
+   У проспекта из двух встречных половин (две одностороннние улицы рядом) внутренняя «сторона» —
+   разделительная полоса или вторая половина: там люди гуляли вдоль по проезжей части (04.10.2026).
+   Смотрим три точки (¼, ½, ¾ ребра); на полотне две из трёх — стороны нет. Помним на ребре. */
+function walkSideOk (e, side, bike) {
+  const key = side * (bike ? 2 : 1);
+  const C = e.wok || (e.wok = {});
+  if (C[key] !== undefined) return C[key];
+  const o = walkOff(e, bike) * side, A = NODES[e.a];
+  let bad = 0;
+  for (const t of [0.25, 0.5, 0.75]) {
+    const x = A.x + e.ux * e.len * t + e.rx * o, z = A.z + e.uz * e.len * t + e.rz * o;
+    const r = nearestRoad(x, z, DRIVE_MAX, 1);
+    if (r && r.d < r.seg.w / 2 + 0.3) bad++;
+  }
+  return (C[key] = bad < 2);
+}
+/* переходят быстро: по зебре — во столько раз быстрее своего шага */
+const CROSS_K = 1.7;
 
-function walkNext (a, b, side) {
+function walkNext (a, b, side, bike) {
   const e = edgeOf(a, b);
   let best = -1, bs = side > 0 ? -Infinity : Infinity;
   for (const c of NODES[b].nb) {
     if (c === a || !inBounds(NODES[c].x, NODES[c].z, -30)) continue;
     const n = edgeOf(b, c);
-    if (!walkable(n)) continue;
+    if (!walkable(n) || !walkSideOk(n, side, bike)) continue;   // с этой стороны нет тротуара — туда не сворачивает
     const ang = Math.atan2(e.ux * n.uz - e.uz * n.ux, e.ux * n.ux + e.uz * n.uz);   // плюс — направо
     if (side > 0 ? ang > bs : ang < bs) { bs = ang; best = c; }
   }
@@ -4531,7 +4595,7 @@ function walkCorner (a, b, c, side, bike) {
 
 function walkLeg (p, sx, sz) {
   const W = p.w;
-  W.c = walkNext(W.a, W.b, W.side);
+  W.c = walkNext(W.a, W.b, W.side, p.bike);
   [W.ex, W.ez] = walkCorner(W.a, W.b, W.c, W.side, p.bike);
   W.sx = sx; W.sz = sz; W.d = 0;
   W.L = Math.max(0.01, Math.hypot(W.ex - sx, W.ez - sz));
@@ -4539,7 +4603,9 @@ function walkLeg (p, sx, sz) {
 
 /* поставить на тротуар ребра a→b, на долю t его длины */
 function walkInit (p, a, b, side, t) {
-  const e = edgeOf(a, b), A = NODES[a], o = walkOff(e, p.bike) * side;
+  const e0 = edgeOf(a, b);
+  if (!walkSideOk(e0, side, p.bike) && walkSideOk(e0, -side, p.bike)) side = -side;   // с той стороны — полотно
+  const e = e0, A = NODES[a], o = walkOff(e, p.bike) * side;
   p.w = { a, b, side, c: -1, sx: 0, sz: 0, ex: 0, ez: 0, d: 0, L: 1 };
   p.path = null; p.cross = null;
   const x = A.x + e.ux * e.len * t + e.rx * o, z = A.z + e.uz * e.len * t + e.rz * o;
@@ -4552,7 +4618,7 @@ function walkSnap (p) {
   const road = nearestRoad(p.x, p.z, 5, 1);
   if (!road || road.seg.na === undefined || road.d > 25) return walkSpawn(p, 40, 300);
   const e = edgeOf(road.seg.na, road.seg.nb);
-  if (!walkable(e)) return walkSpawn(p, 40, 300);
+  if (!walkable(e) || (!walkSideOk(e, 1, p.bike) && !walkSideOk(e, -1, p.bike))) return walkSpawn(p, 40, 300);
   const side = (p.x - road.x) * e.rx + (p.z - road.z) * e.rz >= 0 ? 1 : -1;
   const [a, b] = chance(0.5) ? [e.a, e.b] : [e.b, e.a];
   const tt = a === e.a ? road.t : 1 - road.t;
@@ -4579,7 +4645,7 @@ function walkSpawn (p, rmin, rmax, c = V) {
   }
   for (let k = 0; k < 20; k++) {
     const a = nodeNear(c.x, c.z, rmin, rmax);
-    const opts = NODES[a].nb.filter(b => walkable(edgeOf(a, b)));
+    const opts = NODES[a].nb.filter(b => { const e = edgeOf(a, b); return walkable(e) && (walkSideOk(e, 1, p.bike) || walkSideOk(e, -1, p.bike)); });
     if (!opts.length) continue;
     walkInit(p, a, pick(opts), chance(0.5) ? 1 : -1, rand(0.15, 0.85));
     return;
@@ -4640,7 +4706,8 @@ function walkerStep (p, dt, legSwing) {
       if (!C.zb.sig || lightOf(C.zb.sig.ph) === 'r') C.wait = false;
       return Math.atan2(-e.rx * W.side, -e.rz * W.side);
     }
-    C.t = Math.min(1, C.t + p.speed * dt / C.span);
+    C.t = Math.min(1, C.t + p.speed * CROSS_K * dt / C.span);   // по зебре — быстрым шагом
+    p.ph += dt * legSwing * (CROSS_K - 1);
     const o = lerp(C.o0, -C.o0, C.t);
     const nx = C.x + e.rx * o, nz = C.z + e.rz * o;
     const ang = Math.atan2(nx - p.x, nz - p.z);
@@ -4668,7 +4735,8 @@ function walkerStep (p, dt, legSwing) {
     p.crossT -= dt;
     if (p.crossT <= 0) {
       const list = ZEB_BY_EDGE.get(ukey(W.a, W.b));
-      if (list) {
+      if (list && !walkSideOk(edgeOf(W.a, W.b), -W.side, p.bike)) p.crossT = rand(25, 80);   // на той стороне тротуара нет (разделительная) — не переходит
+      else if (list) {
         const e = edgeOf(W.a, W.b), ux = (W.ex - W.sx) / W.L, uz = (W.ez - W.sz) / W.L;
         for (const zb of list) {
           const along = (zb.x - W.sx) * ux + (zb.z - W.sz) * uz;
@@ -4688,6 +4756,35 @@ function walkerStep (p, dt, legSwing) {
   const ang = Math.atan2(nx - p.x, nz - p.z);
   p.x = nx; p.z = nz;
   return ang;
+}
+
+/* Машина стоит или ползёт (медленнее ECON.CLIENT_HIT.SOFT — тогда наезда нет) — люди её
+   обходят, а не проходят насквозь (04.10.2026): точку пути, попавшую в кузов (+ полметра),
+   выносим к ближнему борту; сторону запоминаем, пока человек у машины, — не перескакивает
+   через капот. Сдвиг набирается плавно (DODGE.V м/с), без рывков. Быстрее — наезд, как был. */
+const DODGE = { L: 0.6, W: 0.45, V: 10 };
+function dodgeCar (p, dt) {
+  let tx = 0, tz = 0, rx = p.x, rz = p.z;
+  // шаг не двигал (ждёт у зебры) — в p.x ещё прошлый сдвиг: снимаем, чтобы не копился
+  if (p.dpx === p.x && p.dpz === p.z) { rx -= p.dox || 0; rz -= p.doz || 0; }
+  const sp = Math.hypot(V.vx, V.vz);
+  if (sp < ECON.CLIENT_HIT.SOFT && !V.air && Math.abs(rx - V.x) < 6 && Math.abs(rz - V.z) < 6) {
+    const fx = Math.sin(V.h), fz = Math.cos(V.h), dx = rx - V.x, dz = rz - V.z;
+    const al = dx * fx + dz * fz, ac = dx * fz - dz * fx;
+    const HL = CAR_L + DODGE.L, HW = CAR_W + DODGE.W;
+    if (Math.abs(al) < HL && Math.abs(ac) < HW) {
+      if (!p.dodge) p.dodge = HW - Math.abs(ac) <= HL - Math.abs(al) ? (ac >= 0 ? 1 : -1) : (al >= 0 ? 2 : -2);
+      let nal = al, nac = ac;
+      if (Math.abs(p.dodge) === 1) nac = p.dodge * HW; else nal = Math.sign(p.dodge) * HL;
+      tx = fx * (nal - al) + fz * (nac - ac); tz = fz * (nal - al) - fx * (nac - ac);
+    } else p.dodge = 0;
+  } else p.dodge = 0;
+  if (p.goTo) { p.x = rx + tx; p.z = rz + tz; p.dox = p.doz = 0; p.dpx = p.dpz = NaN; return; }   // идёт своим ходом — сдвиг сразу и насовсем
+  const k = DODGE.V * dt;
+  const ox = p.dox || 0, oz = p.doz || 0, ex = tx - ox, ez = tz - oz, el = Math.hypot(ex, ez);
+  p.dox = el > k ? ox + ex / el * k : tx; p.doz = el > k ? oz + ez / el * k : tz;
+  p.x = rx + p.dox; p.z = rz + p.doz;
+  p.dpx = p.x; p.dpz = p.z;
 }
 
 const PEDS = [];
@@ -4766,6 +4863,7 @@ function updatePeds (dt) {
     const dl = GFX.lag(p, dt, V.x, V.z);           // вдали — раз в N кадров (gfx.js)
     if (!dl) continue;
     const ang = walkerStep(p, dl, 7);
+    dodgeCar(p, dl);                             // стоящую машину обходят
     pushOut(p, 0.5);
     const g = p.grp;
     g.position.set(p.x, groundH(p.x, p.z) + curbAt(p.x, p.z) + Math.abs(Math.sin(p.ph)) * 0.05, p.z);
@@ -4922,6 +5020,7 @@ function updateScoots (dt) {
     const dl = GFX.lag(p, dt, V.x, V.z);           // вдали — раз в N кадров (gfx.js)
     if (!dl) continue;
     const ang = walkerStep(p, dl, 0);
+    dodgeCar(p, dl);                               // стоящую машину объезжает
     pushOut(p, 0.45);
     const g = p.grp;
     g.position.set(p.x, groundH(p.x, p.z) + curbAt(p.x, p.z), p.z);
@@ -5473,6 +5572,7 @@ function updatePeople (dt) {
     }
 
     const ang = walkerStep(p, dl, 7 * (p.grp.userData.fat ? 0.75 : 1));
+    dodgeCar(p, dl);                             // стоящую машину обходят, а не проходят насквозь
     pushOut(p, 0.45);                            // не залезать в стены и изгороди
     const g = p.grp;
     g.position.set(p.x, groundH(p.x, p.z) + curbAt(p.x, p.z) + Math.abs(Math.sin(p.ph)) * 0.04, p.z);
@@ -5563,6 +5663,16 @@ const GORE = [];
 /* сбит: что будет — решает скорость удара (hits.js TIER, docs/CONTENT.md «Сила удара»);
    kmh — если удар не от машины (взрыв): тогда скорость не из vx/vz */
 function gibHuman (p, vx, vz, kmh) { HITS.hit(p, vx, vz, kmh); DARKN.onHit(p, vx, vz); }   // ночью встанет привидением (darknight.js)
+
+/* На куски — только на нитро (04.10.2026, docs/CONTENT.md «Сила удара»): горит нитро (или бист с нитро),
+   машина ещё быстрее своей максималки (разгон нитро не сбросила) или взрыв. Удар не от твоей машины
+   (дальше 9 м) — никогда. Обычный удар — просто отлетает. */
+let BLASTING = false;
+function shredHit (p) {
+  if (BLASTING) return true;
+  if (!p || Math.hypot(p.x - V.x, p.z - V.z) > 9) return false;
+  return NOS.burn || (FXS.beastT > 0 && !!IN.nitro) || Math.hypot(V.vx, V.vz) > VMAX + 0.5;
+}
 
 /* взрослая, быстрее HITS.TIER.BURST: разрывает на куски — куски, их кровь и как тают — hits.js burst */
 function burstHuman (p, vx, vz, low) {
@@ -5856,9 +5966,10 @@ function trafficDensity (dt) {
 /* ставим машину на случайную полосу рядом с курьером: не под капотом,
    но и не на другом конце карты */
 function placeTraffic (t, rmin, rmax) {
+  const L = nodesNear(V.x, V.z, rmin, rmax);       // кольцо узлов — один раз на все попытки
   for (let k = 0; k < 24; k++) {
-    const a = nodeNear(V.x, V.z, rmin, rmax);
-    const opts = NODES[a].nb.map(b => edgeOf(a, b)).filter(e => e.ok && e.c <= 5 && edgeRun(e) > 8 && !e.closed && !e.lock && inBounds(NODES[e.b].x, NODES[e.b].z) && inBounds(NODES[e.a].x, NODES[e.a].z));
+    const a = nodeFrom(L, V.x, V.z);
+    const opts = NODES[a].nb.map(b => edgeOf(a, b)).filter(e => e.ok && e.c <= 5 && edgeRun(e) > 8 && !e.closed && !e.lock && NAR.flowOk(e, nodeDeg) && inBounds(NODES[e.b].x, NODES[e.b].z) && inBounds(NODES[e.a].x, NODES[e.a].z));
     if (!opts.length) continue;
     const e = pick(opts);
     t.e = e; t.s = rand(0, edgeRun(e) * 0.8); t.lane = (Math.random() * laneCount(e)) | 0; t.turn = null;
@@ -5881,6 +5992,30 @@ function spawnTraffic (n, rmin = 40, rmax = 330) {
   }
 }
 
+/* тень под машиной игрока (carshadow.js): по позе кузова; в прыжке — на земле под ним */
+CSH.init(scene);
+function carShadow () {
+  const p = car.position, gy = V.air ? surfaceAt(V.x, V.z, V.y) + 0.15 : p.y;
+  CSH.step(p.x, p.z, car.rotation.y, gy, p.y, car.rotation.x, car.rotation.z, ENV.night || 0, car.visible && car.parent === scene && V.sink === undefined, sun.position.x - V.x, sun.position.z - V.z);
+}
+
+/* На чём стоят колёса (04.10.2026): полотно, тротуар, газон и плитка нарисованы над рельефом
+   (osmRoads: полотно 0,14—0,17 м, тротуар без бордюра 0,09—0,12, газон 0,04; плитка, площадки,
+   парковки — tracks.js pavedLift), а машины ставились на сам рельеф — колёса уходили в асфальт
+   на 15—18 см. Теперь кузов — на верх того, что под ним. Поднятый бордюр (0,28) — отдельно:
+   у игрока V.kerb, чужие на тротуар не заезжают. На мосту — настил (surfaceAt), без добавки */
+function paveLift (x, z) {
+  const r = nearestRoad(x, z, 7, 1);
+  let y = 0.03;
+  if (r) {
+    const s = r.seg, k = (7 - s.c) * 0.004;
+    if (s.b) return r.d < s.w / 2 + 4 ? 0 : y;
+    if (r.d < s.w / 2 + 0.1) return 0.14 + k;
+    if (r.d < s.w / 2 + (s.c <= 5 ? 2.75 : 1)) y = 0.09 + k;
+  }
+  return Math.max(y, TRK.pavedLift(x, z));
+}
+
 /* Машину ставим на то, по чему она едет, и наклоняем по склону:
    высоту берём под передними и задними колёсами. */
 function poseOnSlope (t) {
@@ -5888,7 +6023,7 @@ function poseOnSlope (t) {
   const hx = Math.sin(t.h) * k, hz = Math.cos(t.h) * k;
   t.gy = surfaceAt(t.x, t.z, t.gy);
   const f = surfaceAt(t.x + hx, t.z + hz, t.gy), b = surfaceAt(t.x - hx, t.z - hz, t.gy);
-  t.mesh.position.set(t.x, t.gy, t.z);
+  t.mesh.position.set(t.x, t.gy + paveLift(t.x, t.z), t.z);   // колёса — на асфальт, а не в него (paveLift)
   t.mesh.rotation.set(-Math.atan((f - b) / (2 * k)), t.h, 0);
 }
 
@@ -5914,7 +6049,7 @@ function poseTraffic (t, dt) {
     lh = Math.hypot(dx, dz) > 1e-4 ? Math.atan2(dx, dz) : t.h;
   } else {
     const e = t.e;
-    [lx, lz] = lanePoint(e, t.lane, t.s, t.pull);
+    [lx, lz] = lanePoint(e, t.lane, t.s, t.pull + (t.nar || 0));   // nar — прижался вправо на узкой (narrow.js)
     lh = Math.atan2(e.ux, e.uz);
   }
   // После кувырка машина не прыгает обратно в полосу, а доезжает до неё
@@ -5944,7 +6079,7 @@ function nextEdge (e) {
   for (const c of NODES[e.b].nb) {
     if (c === e.a) continue;
     const n = edgeOf(e.b, c);
-    if (!n.ok || n.c > 5 || n.closed || n.lock) continue;    // closed — ремонт (roadlife.js), lock — закрытый район
+    if (!n.ok || n.c > 5 || n.closed || n.lock || !NAR.flowOk(n, nodeDeg)) continue;    // самые узкие — в одну сторону (narrow.js); closed — ремонт (roadlife.js), lock — закрытый район
     if (!inBounds(NODES[c].x, NODES[c].z, -40)) continue;   // за рамку не уезжаем
     const dot = e.ux * n.ux + e.uz * n.uz;
     const w = 0.35 + Math.max(0, dot) * 2.2 + (n.c <= 3 ? 0.6 : 0);
@@ -5964,7 +6099,8 @@ function startTurn (t, over) {
   const e = t.e, n = (t.dump && CONSTR.nextEdge(t, e)) || (t.rvGoal && RIVS.nextEdge(t, e)) || nextEdge(e);   // самосвал сворачивает к стройке (construction.js)
   if (!n) { placeTraffic(t, 120, 340); return; }
   const lane = clamp(t.lane, 0, laneCount(n) - 1);
-  const p0 = lanePoint(e, t.lane, edgeRun(e)), p2 = lanePoint(n, lane, 0);
+  const p0 = lanePoint(e, t.lane, edgeRun(e), t.nar || 0), p2 = lanePoint(n, lane, 0);
+  t.nar = 0;
   // вершина дуги — пересечение двух полос; если они почти параллельны
   // или пересекаются где-то далеко — середина между концами с выносом
   const den = e.ux * n.uz - e.uz * n.ux;
@@ -6030,7 +6166,11 @@ function rejoinRoad (t) {
 
 /* Узел в кольце вокруг курьера: не под капотом, но и не на другом конце
    города — иначе улицы вокруг стоят пустые. Ищем по клеткам вокруг. */
-function nodeNear (x, z, rmin, rmax) {
+/* узлы в кольце rmin…rmax: { ok: [номера], best — ближайший к кольцу, если в кольце пусто }.
+   «Внутри границы с запасом 8 м» у узла не меняется — считаем один раз (n.ib8): на больших
+   перекрёстках в кольце 340 м тысячи узлов, и placeTraffic звал это до 24 раз подряд —
+   рывки 20—70 мс на Деке, когда машины перерождались пачкой */
+function nodesNear (x, z, rmin, rmax) {
   const ci = Math.floor(x / NCELL), cj = Math.floor(z / NCELL), R = Math.ceil(rmax / NCELL);
   const ok = [];
   let best = -1, bd = 1e9;
@@ -6039,16 +6179,20 @@ function nodeNear (x, z, rmin, rmax) {
       const a = NODE_GRID.get(i + ',' + j);
       if (!a) continue;
       for (const k of a) {
-        if (!NODES[k].nb.length || !inBounds(NODES[k].x, NODES[k].z, 8)) continue;
-        const d = Math.hypot(NODES[k].x - x, NODES[k].z - z);
+        const N = NODES[k];
+        if (!N.nb.length) continue;
+        if (N.ib8 === undefined) N.ib8 = inBounds(N.x, N.z, 8);
+        if (!N.ib8) continue;
+        const d = Math.hypot(N.x - x, N.z - z);
         if (d >= rmin && d <= rmax) { ok.push(k); continue; }
         const miss = d < rmin ? rmin - d : d - rmax;
         if (miss < bd) { bd = miss; best = k; }
       }
     }
-  if (ok.length) return pick(ok);
-  return best >= 0 ? best : nearestNode(x, z);
+  return { ok, best };
 }
+const nodeFrom = (L, x, z) => (L.ok.length ? pick(L.ok) : L.best >= 0 ? L.best : nearestNode(x, z));
+function nodeNear (x, z, rmin, rmax) { return nodeFrom(nodesNear(x, z, rmin, rmax), x, z); }
 
 function respawnTraffic (t) {
   t.wreck = 0; t.knock = 0; t.hp = 100; t.y = 0; t.roll = 0; t.smokeT = 0; t.gy = undefined;
@@ -6072,6 +6216,7 @@ const walkersAll = () => [PEOPLE, PEDS, SCOOTS, AMB.medics, CREWS.WALKERS, LIFE.
 
 function updateTraffic (dt0) {
   trafficDensity(dt0);
+  let respN = 0;
   for (const t of TRAFFIC) {
     // вдали — раз в N кадров с накопленным временем (графика «машины и люди вдали», gfx.js); летящие, погоня, службы — всегда
     const dt = t.knock || t.chase || t.svc ? dt0 : GFX.lag(t, dt0, V.x, V.z);
@@ -6080,7 +6225,7 @@ function updateTraffic (dt0) {
     if (t.chainT > 0 && !t.wreck && (t.chainT -= dt) <= 0) { t.chainT = 0; wreckCar(t); S.wrecks++; }
     // укатилась за полкилометра — возвращаем в соседние кварталы
     if (!t.parked && !t.wreck && !t.knock && !t.driver && !t.svc &&
-        Math.hypot(t.x - V.x, t.z - V.z) > 520) { respawnTraffic(t); continue; }
+        Math.hypot(t.x - V.x, t.z - V.z) > 520) { if (respN < 2) { respN++; respawnTraffic(t); } continue; }   // не больше двух за кадр: после прыжка (смерть, новая смена) машины перерождались пачкой по 15—20 — кадр 80—130 мс на Деке
     // сгоревшая, но ещё летящая сперва доигрывает падение
     if (t.wreck && !t.knock) {
       t.smokeT -= dt;
@@ -6195,6 +6340,8 @@ function updateTraffic (dt0) {
       if (hz2 && hz2.length) { const on = t.stopT > 0 && Math.floor(tG * 2.5) % 2 === 0; for (const m of hz2) m.visible = on; }
     }
     slow = Math.min(slow, RL.hold(t, dt));        // пробка за аварией, ремонт (roadlife.js)
+    if (!t.turn && NAR.narrow(t.e)) slow = Math.min(slow, NAR.step(t, dt, TRAFFIC, V));   // узкая: встречные прижимаются и сбавляют (narrow.js)
+    else NAR.relax(t, dt);
     t.speed = damp(t.speed, t.cruise * slow, 3.2, dt);
     if (slow < 0.02) t.speed = 0;                 // иначе доползает за стоп-линию
     // встали из-за поперечной машины и стоим долго — значит, сцепились на
@@ -6311,32 +6458,7 @@ function updateSmokers (dt) {
 const DRIVERS = [];
 const RAGE = [$t('ты чё?!'), $t('куда прёшь!'), $t('стоять!'), $t('ну всё!'), $t('выходи!'), $t('я тебя запомнил'), $t('страховка есть?'), '!!!', $t('в глаза смотри!')];
 /* облачко с руганью: белое, с красной обводкой, текст — пиксельным шрифтом */
-function rageTex (text, col = '#d9342c') {
-  const c = document.createElement('canvas');
-  c.width = 256; c.height = 128;
-  const x = c.getContext('2d');
-  x.fillStyle = '#ffffff'; x.strokeStyle = col; x.lineWidth = 8;
-  x.beginPath(); x.roundRect(8, 8, 240, 86, 22); x.fill(); x.stroke();
-  x.beginPath(); x.moveTo(110, 92); x.lineTo(128, 122); x.lineTo(146, 92); x.closePath(); x.fill();
-  x.fillStyle = col; x.font = 'bold 30px "Press Start 2P", sans-serif';
-  x.textAlign = 'center'; x.textBaseline = 'middle';
-  let fs = 30, L = [text];
-  const wide = () => Math.max(...L.map(q => x.measureText(q).width));
-  const shrink = min => { while (fs > min && wide() > 220) { fs -= 2; x.font = 'bold ' + fs + 'px "Press Start 2P", sans-serif'; } };
-  shrink(16);
-  // длинная реплика (мафиози) — в две строки, по пробелу ближе к середине
-  if (wide() > 220 && text.includes(' ')) {
-    let k = -1;
-    for (let i = 0; i < text.length; i++) if (text[i] === ' ' && (k < 0 || Math.abs(i - text.length / 2) < Math.abs(k - text.length / 2))) k = i;
-    L = [text.slice(0, k), text.slice(k + 1)];
-    fs = 26; x.font = 'bold ' + fs + 'px "Press Start 2P", sans-serif';
-  }
-  shrink(10);
-  L.forEach((q, i) => x.fillText(q, 128, 52 + (i - (L.length - 1) / 2) * fs * 1.25));
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
+function rageTex (text, col = '#d9342c') { return TALK.tex(text, col); }   // читаемая плашка (talk.js)
 
 function stallCar (t) {
   t.stalled = 1; t.speed = 0; t.stallT = 30;
@@ -6352,6 +6474,7 @@ function stallCar (t) {
   bubble.scale.set(2.4, 1.2, 1);
   bubble.position.set(0, 2.55, 0);
   grp.add(bubble);
+  TALK.track(bubble);
   scene.add(grp);
   const d = { t, grp, x, z, state: 'chase', hitT: 0.6, ph: 0, give: 28, dead: 0, punch: 0, strikes: 0, bubble, sayT: 1.6, bangT: 0.3 };
   t.driver = d;
@@ -6377,6 +6500,7 @@ function chaseStart (t) {
   const bubble = new THREE.Sprite(new THREE.SpriteMaterial({ map: rageTex(CHASE_LINES()[0]), transparent: true, depthWrite: false }));
   bubble.scale.set(3, 1.5, 1); bubble.position.set(0, 2.9, 0);
   t.mesh.add(bubble);
+  TALK.track(bubble);
   t.chase = { T: rand(...C.T), brakeT: 0, brakeCd: 2, pathT: 0, stuckT: 0, sayT: 1.8, swerve: chance(0.5) ? 1 : -1, bubble };
   Object.assign(t, { svc: 'chase', aggr: 1, passT: 0, honkT: 0, acc: 7, corner: 0.55, gap: 1, peds: true, dot: '#ff3b30',
     cruise0: t.cruise, cruise: VMAX * C.VMAX_K, path: null, goal: { x: V.x, z: V.z }, repath: 1, turn: null, e: null });
@@ -6515,14 +6639,13 @@ function updateDrivers (dt) {
     if (d.state !== 'back') {
       if ((d.sayT -= dt) <= 0) {
         d.sayT = rand(1.3, 2.2);
-        d.bubble.material.map.dispose();
         d.bubble.material.map = rageTex(pick(RAGE));
         d.bubble.material.needsUpdate = true;
       }
       if ((d.bangT -= dt) <= 0) { d.bangT = rand(0.35, 0.7); emote(d.x, 2.2, d.z, 'angry', 1); }
-      d.bubble.visible = true;
+      d.bubble.userData.mute = 0;                  // показывает talk.js (ближние, не больше нескольких)
       d.bubble.position.x = Math.sin(tG * 40) * 0.05;
-    } else d.bubble.visible = false;
+    } else d.bubble.userData.mute = 1;
     const sw = spd ? Math.sin(d.ph) * 0.9 : 0;
     u.legL.rotation.x = sw; u.legR.rotation.x = -sw;
     u.armL.rotation.x = d.state === 'chase' ? -2.5 + Math.sin(tG * 18) * 0.3 : -sw * 0.8;   // кулаком трясёт
@@ -7410,7 +7533,7 @@ function sayBubble (grp, text, col, y = 2.7) {
   const b = new THREE.Sprite(new THREE.SpriteMaterial({ map: lineTex(text, col), transparent: true, depthWrite: false }));
   b.scale.set(2.8, 1.4, 1); b.position.set(0, y, 0);
   grp.add(b);
-  return b;
+  return TALK.track(b);                            // размер и кого показать — talk.js
 }
 function setSay (b, text, col) { b.material.map = lineTex(text, col); b.material.needsUpdate = true; }
 function spawnThief () {
@@ -8458,6 +8581,16 @@ function roadPath (x0, z0, x1, z1, h, deck) {
   return [[x0, z0], [x1, z1]];
 }
 
+/* цвет пути — везде, где он нарисован (радар, большая карта, полоса на асфальте, кольцо-маркер — orders.js):
+   в пиццерию (назад после заказа, «заедь за сменой») — зелёный, к клиенту — оранжевый */
+const ROUTE_HEX = { home: '#3fd15e', client: '#ff8a2b' };
+function routeHome () {
+  if (S.state === 'back') return true;
+  const o = S.order, st = o && o.stops && o.stops[o.idx];
+  return !!(st && st.pickup);
+}
+const routeHex = () => (routeHome() ? ROUTE_HEX.home : ROUTE_HEX.client);
+
 function rebuildRoutePath () {
   const tgt = S.target;
   if (!tgt) { routePts = []; return; }
@@ -8619,7 +8752,6 @@ SET.init({
   setLang: l => { if (l === curLang()) { closePanel(); return; } Platform.setLang(l); Platform.store.flush && Platform.store.flush(); setTimeout(() => location.reload(), 150); },
   name: () => S.name, askName: cb => CAREERM.askName(cb),
   prof: PROF, openProfiles: () => { closePanel(); CAREERM.openProfiles(); },
-  adult: { on: !!Platform.features.adult, adult: !!ADULT, toggle: () => { Store.set('dlv-edition', ADULT ? 'kids' : 'adult'); Platform.store.flush && Platform.store.flush(); setTimeout(() => location.reload(), 150); } },
   unlock: { on: () => !!(DISTRICTS && testTools()), all: () => DIST.allOpen(), run: () => { CITYOPEN.unlockAll(); closePanel(); CITYOPEN.party(() => CAREERM.menu()); } },
   canReset: () => !isPlaying() && !S.paused, reset: () => renderReset(),
   keys: () => keysInfo(),
@@ -8646,7 +8778,7 @@ function renderReset () {
   const gone = [$t('кошелёк — все деньги'), $t('купленные машины и улучшения'), $t('открытые районы'),
     $t('смены, звёзды и сюжетные заказы'), $t('мои находки'), PROF.on() ? $t('рекорд профиля') : $t('рекорды и таблица на этом устройстве'),
     $t('рейтинг пиццерии и донаты'), $t('обучение — покажется заново')];
-  const stay = [$t('язык'), $t('звук'), $t('графика'), ...(Platform.features.adult ? [$t('версия: взрослая или детская')] : []),
+  const stay = [$t('язык'), $t('звук'), $t('графика'),
     ...(Platform.features.nameInput ? [$t('имя курьера')] : []), ...(PROF.on() ? [$t('таблица рекордов на этом устройстве'), ...(PROF.list().length > 1 ? [$t('другие профили')] : [])] : [])];
   // «отмена» — первой и выбрана сразу: случайное A ничего не сотрёт
   elPanelBody.innerHTML = '<div class="pn-t">' + (PROF.on() ? $t('стереть прогресс профиля «{name}»?', { name: escHtml(PROF.curName()) }) : $t('стереть весь прогресс?')) + '</div>' +
@@ -8905,7 +9037,7 @@ function driveStep (dt) {
   const tailX = V.x - fx * CAR_L * 0.55, tailZ = V.z - fz * CAR_L * 0.55;
   const bump = vn => {
     if (vn > 2.5) { sparks(V.x + fx * 2, 0.7, V.z + fz * 2, vn > 12 ? 9 : 4, 0, 0); Snd.spark(); }
-    if (vn > 13) hurtCar((vn - 13) * 0.16, vn, V.x + fx * 2, V.z + fz * 2);
+    if (vn > 13) hurtCar(wallDmg(vn), vn, V.x + fx * 2, V.z + fz * 2);   // до SOFT_HIT.WALL — только мятина
   };
   // Стены домов стоят под любым углом, поэтому выталкиваем в осях самой
   // стены: сначала находим, с какой стороны коробки мы влезли, а потом
@@ -8987,7 +9119,7 @@ function driveStep (dt) {
         t.ramT = 0; t.repath = 1;
       } else if (t.chase) chaseEnd(t, 'caught');   // догнал и врезались — остыл, едет дальше
       else if (!t.parked && hit > 6 && !t.driver) t.angry = 1;     // приземлится — выйдет разбираться (или погонится — chaseStart)
-      hurtCar((hit - 5) * 0.14, hit, hx, hz);
+      hurtCar(carDmg(hit), hit, hx, hz);          // лёгкий удар (до SOFT_HIT.CAR) — только мятина
       t.hitT = 0.5;
       t.x -= nx * (need - d); t.z -= nz * (need - d);
       V.vx *= 0.9; V.vz *= 0.9;
@@ -9125,7 +9257,7 @@ function driveStep (dt) {
   V.pitch = damp(V.pitch, V.air ? -Math.atan2(V.vy, Math.max(4, Math.abs(vf))) * 0.8 : -Math.atan((f2 - t2) / 2.85), V.air ? 4 : 12, dt);
   V.roll = damp(V.roll, V.air ? 0 : Math.atan((l2 - r2) / 1.8), 12, dt);
   // бордюр: тротуар выше дороги — заехал, и кузов стоит на нём
-  V.kerb = damp(V.kerb || 0, V.air || lift > 0 ? 0 : curbAt(V.x, V.z), 22, dt);
+  V.kerb = damp(V.kerb || 0, V.air || lift > 0 ? 0 : Math.max(curbAt(V.x, V.z), paveLift(V.x, V.z)), 22, dt);   // + верх асфальта и плитки (paveLift): колёса не в асфальте
   car.position.set(V.x, V.y + V.kerb, V.z);
   car.rotation.y = V.h;
   car.rotation.x = V.pitch;
@@ -9156,15 +9288,24 @@ function drown () {
 }
 
 /* Сколько сердец снимает удар (docs/CAREER.md «Сердца»). dmg — сила удара из места
-   столкновения: стена/дом (vn − 13) × 0,16, машина (удар − 5) × 0,14, взрыв 1—2, бандиты 1.
-   Легонько (< 0,8) — половинка, сильно (< 1,5) — целое, очень сильно — два. */
+   столкновения: стена/дом wallDmg, машина carDmg, взрыв 1—2, бандиты 1.
+   dmg ≤ 0 — толчок: мятина и искры, сердца целы. Легонько (< 0,8) — половинка,
+   сильно (< 1,5) — целое, очень сильно — два. */
 const HIT_HEARTS = { HALF_BELOW: 0.8, TWO_FROM: 1.5 };
 const hitHearts = dmg => (dmg < HIT_HEARTS.HALF_BELOW ? 0.5 : dmg < HIT_HEARTS.TWO_FROM ? 1 : 2);
+/* Лёгкие удары (04.10.2026: «за мелкие тычки снимает много»): ниже порога — только мятина.
+   Стена/дом/столб: без урона до WALL м/с «в лоб» (было 13 — 47 км/ч); дальше (vn − 13) × 0,16, как было.
+   Машина: без урона до CAR м/с сближения (было 5 — 18 км/ч), от CAR до CAR_ONE — половинка,
+   дальше (удар − 5) × 0,14, но не меньше целого — сильные удары как были. */
+const SOFT_HIT = { WALL: 15, CAR: 8.5, CAR_ONE: 12.5 };
+const wallDmg = vn => (vn < SOFT_HIT.WALL ? 0 : (vn - 13) * 0.16);
+const carDmg = hit => (hit < SOFT_HIT.CAR ? 0 : hit < SOFT_HIT.CAR_ONE ? 0.5 : Math.max(HIT_HEARTS.HALF_BELOW, (hit - 5) * 0.14));
 function hurtCar (dmg, vn, hx, hz) {
   if (S.state === 'over' || S.state === 'dying' || S.state === 'title') return;
   if (V.air || V.rampSafe > 0) return;            // с трамплина — без урона
   if (FXS.shieldT > 0) { sparks(hx === undefined ? V.x : hx, 1, hz === undefined ? V.z : hz, 6); return; }
   dentCar(car, hx === undefined ? V.x : hx, hz === undefined ? V.z : hz, vn);   // мятина видна на кузове
+  if (!(dmg > 0)) { rumble(0.3, 120); return; }    // толчок: без урона и без «удара» (смена без ударов цела)
   if (S.hurt > 0) return;
   if (CAREER) AUTO.onHit(vn);                     // удар: мотор изнашивается (cars.js, econ.js BREAK)
   rumble(dmg > 1 ? 0.9 : 0.6, 240);
@@ -9325,7 +9466,7 @@ function drawRadar () {
     rctx.beginPath();
     routePts.forEach((p, i) => { const [a, b] = tr(p[0], p[1]); i ? rctx.lineTo(a, b) : rctx.moveTo(a, b); });
     rctx.strokeStyle = 'rgba(70, 30, 6, 0.6)'; rctx.lineWidth = 6; rctx.stroke();
-    rctx.strokeStyle = '#ff8a2b'; rctx.lineWidth = 3.6; rctx.stroke();
+    rctx.strokeStyle = routeHex(); rctx.lineWidth = 3.6; rctx.stroke();
     rctx.lineCap = 'butt';
   }
   // за краем карты — затемнение: туда не проехать
@@ -9349,7 +9490,12 @@ function drawRadar () {
     rctx.fillStyle = hex; rctx.fillRect(a - size, b - size, size * 2, size * 2);
   };
   rctx.globalAlpha = 0.75;
-  if (PIZZA) blip(PIZZA.x, PIZZA.z, '#ffffff', 3.4);
+  if (PIZZA) {                                       // пиццерия — домиком (у края радара — прижат к краю)
+    let a = rA(PIZZA.x, PIZZA.z), b = rB(PIZZA.x, PIZZA.z);
+    const len = Math.hypot(a, b);
+    if (len > R - 8) { a *= (R - 8) / len; b *= (R - 8) / len; }
+    houseIcon(rctx, a, b, 4, '#ffffff', '#33210c', '#f0522a');
+  }
   if (CAREER) AUTO.radar(rctx, tr, R);             // гараж Дяди Жени
   rctx.globalAlpha = 1;
   if (THIEF.p && Math.floor(tG * 4) % 2 === 0) blip(THIEF.p.x, THIEF.p.z, '#ff2d6e', 3.6);
@@ -9373,15 +9519,15 @@ function drawRadar () {
   rctx.moveTo(0, -6.4); rctx.lineTo(4.6, 5.4); rctx.lineTo(0, 2.8); rctx.lineTo(-4.6, 5.4);
   rctx.closePath(); rctx.fill(); rctx.stroke();
   // куда везти — поверх всего: мигающий пин, а за краем радара — стрелка у края
-  eachTarget((wx, wz, main) => {
+  eachTarget((wx, wz, main, kind) => {
     const a = rA(wx, wz), b = rB(wx, wz), len = Math.hypot(a, b);
     const out = len > R - 6;
     if (main && CAREER) {                            // срочный — ещё и красное кольцо (orders.js)
       const k = out ? (R - 7) / len : 1;
       ORD.radarRing(rctx, a * k, b * k);
     }
-    if (out) targetArrow(rctx, a, b, R, main);
-    else targetPin(rctx, a, b, 1, main);
+    if (out) targetArrow(rctx, a, b, R, main, kind);
+    else targetPin(rctx, a, b, 1, main, kind);
   });
   rctx.restore();
 }
@@ -9649,27 +9795,49 @@ const pinOn = () => (performance.now() / 1000 * 2.2) % 1 < 0.55;   // миган
 /* все адреса, куда сейчас везти: текущий S.target (клиент, магазин поручения
    или «назад в пиццерию») и ещё не врученные остальные адреса заказа.
    Несколько адресов разом: стоп с done === false ждёт, даже если он раньше idx.
-   cb(x, z, main) — текущий последним, поверх остальных */
+   cb(x, z, main, kind) — текущий последним, поверх остальных. kind — значок в головке пина:
+   'pizza' — заказ «Птицы Пиццы» (обычный, сборный, срочный), 'home' — назад в пиццерию (зелёный
+   с домиком), '' — остальное (поручение, сюжет, развоз смены, магазин по пути) */
 function eachTarget (cb) {
   if (!S.target) return;
   const o = S.order;
+  const pz = o && S.state === 'drive' && (!o.ord || o.ord.type === 'pizza' || o.ord.type === 'urgent') ? 'pizza' : '';
   if (o && S.state === 'drive') for (let i = 0; i < o.stops.length; i++) {
     const st = o.stops[i];
     if (i === o.idx || st.done || (i < o.idx && st.done !== false)) continue;
     const p = st.at || st.peds[0];
-    if (p) cb(p.x, p.z, false);
+    if (p) cb(p.x, p.z, false, pz);
   }
-  if (o && S.state === 'drive') for (const q of HSTORY.pins()) cb(q.x, q.z, false);   // герой: «заехать по пути» (herostories.js)
-  cb(S.target.x, S.target.z, true);
+  if (o && S.state === 'drive') for (const q of HSTORY.pins()) cb(q.x, q.z, false, '');   // герой: «заехать по пути» (herostories.js)
+  cb(S.target.x, S.target.z, true, routeHome() ? 'home' : pz);
+}
+
+/* значки пинов и пиццерии (радар, большая карта): пицца с пепперони и домик. r — радиус головки */
+function pizzaIcon (x, a, c, r) {
+  x.fillStyle = '#e0a24a'; x.beginPath(); x.arc(a, c, r, 0, Math.PI * 2); x.fill();          // корочка
+  x.fillStyle = '#ffd85e'; x.beginPath(); x.arc(a, c, r * 0.76, 0, Math.PI * 2); x.fill();   // сыр
+  x.fillStyle = '#c8322a';                                                                       // пепперони
+  for (const [dx, dy] of [[-0.3, -0.26], [0.32, -0.12], [-0.06, 0.34]]) { x.beginPath(); x.arc(a + dx * r, c + dy * r, r * 0.2, 0, Math.PI * 2); x.fill(); }
+  x.lineWidth = Math.max(0.5, r * 0.08); x.strokeStyle = PIN_EDGE; x.beginPath(); x.arc(a, c, r, 0, Math.PI * 2); x.stroke();
+}
+/* домик: s — полуширина; fill — стены и крыша, edge — обводка, door — дверь */
+function houseIcon (x, a, c, s, fill, edge, door) {
+  x.beginPath();
+  x.moveTo(a, c - s * 1.15); x.lineTo(a + s * 1.1, c - s * 0.1); x.lineTo(a + s * 0.8, c - s * 0.1); x.lineTo(a + s * 0.8, c + s * 0.9);
+  x.lineTo(a - s * 0.8, c + s * 0.9); x.lineTo(a - s * 0.8, c - s * 0.1); x.lineTo(a - s * 1.1, c - s * 0.1); x.closePath();
+  x.fillStyle = fill; x.fill();
+  if (edge) { x.lineWidth = Math.max(0.8, s * 0.22); x.lineJoin = 'round'; x.strokeStyle = edge; x.stroke(); }
+  if (door) { x.fillStyle = door; x.fillRect(a - s * 0.25, c + s * 0.25, s * 0.5, s * 0.65); }
 }
 
 /* куда везти: капля острием в адрес, мигает жёлтым ореолом, от острия
    расходится кольцо. u — масштаб, main — текущий адрес (крупнее) */
-function targetPin (x, a, b, u, main) {
+function targetPin (x, a, b, u, main, kind) {
   const k = (performance.now() / 1000 * 1.25) % 1;
-  const r = (main ? 4.6 : 3.6) * u, cy = b - r * 2.6;
+  const r = (main ? 4.6 : 3.6) * u * (kind === 'pizza' || kind === 'home' ? 1.2 : 1), cy = b - r * 2.6;
+  const hot = kind === 'home' ? ROUTE_HEX.home : PIN_HOT;     // в пиццерию — зелёный, как путь
   x.globalAlpha = 1 - k;
-  x.lineWidth = 2 * u; x.strokeStyle = PIN_HOT;
+  x.lineWidth = 2 * u; x.strokeStyle = hot;
   x.beginPath(); x.arc(a, b, (2 + k * 9) * u, 0, Math.PI * 2); x.stroke();
   if (pinOn()) {
     x.globalAlpha = 0.85; x.fillStyle = PIN_GLOW;
@@ -9679,14 +9847,15 @@ function targetPin (x, a, b, u, main) {
   x.beginPath(); x.moveTo(a, b);
   x.arc(a, cy, r, Math.PI / 2 + PIN_A, Math.PI / 2 - PIN_A);
   x.closePath();
-  x.fillStyle = PIN_HOT; x.fill();
+  x.fillStyle = hot; x.fill();
   x.lineWidth = 1.6 * u; x.lineJoin = 'round'; x.strokeStyle = PIN_EDGE; x.stroke();
-  x.fillStyle = '#fff';
-  x.beginPath(); x.arc(a, cy, r * 0.42, 0, Math.PI * 2); x.fill();
+  if (kind === 'pizza') pizzaIcon(x, a, cy, r * 0.82);
+  else if (kind === 'home') houseIcon(x, a, cy, r * 0.55, '#fff', null, ROUTE_HEX.home);
+  else { x.fillStyle = '#fff'; x.beginPath(); x.arc(a, cy, r * 0.42, 0, Math.PI * 2); x.fill(); }
 }
 
 /* адрес за краем радара — мигающая стрелка у края, остриём в его сторону */
-function targetArrow (x, a, b, R, main) {
+function targetArrow (x, a, b, R, main, kind) {
   const l = Math.hypot(a, b) || 1, ux = a / l, uy = b / l;
   const w = main ? 6 : 4.6, tip = R - 2, base = tip - w * 1.9, bx = ux * base, by = uy * base;
   if (pinOn()) {
@@ -9697,7 +9866,7 @@ function targetArrow (x, a, b, R, main) {
   x.beginPath();
   x.moveTo(ux * tip, uy * tip); x.lineTo(bx - uy * w, by + ux * w); x.lineTo(bx + uy * w, by - ux * w);
   x.closePath();
-  x.fillStyle = PIN_HOT; x.fill();
+  x.fillStyle = kind === 'home' ? ROUTE_HEX.home : PIN_HOT; x.fill();   // в пиццерию — зелёная
   x.lineWidth = 1.6; x.lineJoin = 'round'; x.strokeStyle = PIN_EDGE; x.stroke();
 }
 
@@ -9804,7 +9973,7 @@ function drawFullMap () {
   if (routePts.length > 1) {
     x.beginPath();
     routePts.forEach((p, i) => (i ? x.lineTo(fmX(p[0]), fmZ(p[1])) : x.moveTo(fmX(p[0]), fmZ(p[1]))));
-    x.lineWidth = clamp(4 * s, 3.5 * u, 7 * u); x.strokeStyle = '#ff8a2b'; x.lineJoin = 'round'; x.lineCap = 'round'; x.stroke();
+    x.lineWidth = clamp(4 * s, 3.5 * u, 7 * u); x.strokeStyle = routeHex(); x.lineJoin = 'round'; x.lineCap = 'round'; x.stroke();
   }
   for (const g of SIG_GROUPS) {
     const st = lightOf(0);
@@ -9826,8 +9995,7 @@ function drawFullMap () {
   for (const o of COL_ON_MAP) colDot(x, fmX(o.x), fmZ(o.z), 3 * u);   // находки — просто точки
   if (DISTRICTS) FM.dist.labels(x, 12 * u);         // районы: названия и «сколько смен до открытия»
   if (PIZZA) {
-    x.fillStyle = '#f0522a'; x.fillRect(fmX(PIZZA.x) - 5 * u, fmZ(PIZZA.z) - 5 * u, 10 * u, 10 * u);
-    x.lineWidth = 1.5 * u; x.strokeStyle = '#fff'; x.strokeRect(fmX(PIZZA.x) - 5 * u, fmZ(PIZZA.z) - 5 * u, 10 * u, 10 * u);
+    houseIcon(x, fmX(PIZZA.x), fmZ(PIZZA.z), 6.5 * u, '#f0522a', '#fff', '#fff3d6');   // пиццерия — домиком
   }
   if (CAREER) AUTO.mapMark(x, fmX, fmZ, u);       // гараж Дяди Жени
   if (CAREER) RAID.mapMark(x, fmX, fmZ, u);       // налёт на точку — мигает (raid.js)
@@ -9844,7 +10012,7 @@ function drawFullMap () {
   x.fillStyle = '#ffd85e'; x.fill(); x.lineWidth = 2 * u; x.lineJoin = 'round'; x.strokeStyle = '#33210c'; x.stroke();
   x.restore();
   // куда везти — поверх всего, крупным мигающим пином (все адреса заказа)
-  eachTarget((wx, wz, main) => targetPin(x, fmX(wx), fmZ(wz), 1.8 * u, main));
+  eachTarget((wx, wz, main, kind) => targetPin(x, fmX(wx), fmZ(wz), 1.8 * u, main, kind));
 }
 
 /* чем дерутся компании сетей в драках (crews.js): в детской версии — подушками,
@@ -9958,15 +10126,20 @@ elFull.addEventListener('click', () => { if (FM.moved > 8) { FM.moved = 0; retur
    десяток метров — хвост за спиной гасится в шейдере). */
 const ROUTE_LEN = 200, ROUTE_STEP = 2.5, ROUTE_W = 2.4, ROUTE_LIFT = 0.26, ROUTE_PER = 3, ROUTE_MAX = 220, ROUTE_TUT = 3;
 const ROUTE_LINE = (() => {
-  // текстура: приглушённая оранжевая полоса, тонкая кромка чуть темнее, неяркий шеврон остриём к цели
-  const c = document.createElement('canvas'); c.width = 32; c.height = 64;
-  const x = c.getContext('2d');
-  x.fillStyle = '#a8673d'; x.fillRect(0, 0, 32, 64);
-  x.fillStyle = '#e0925c'; x.fillRect(2, 0, 28, 64);
-  x.fillStyle = '#f0c29a';
-  x.beginPath(); x.moveTo(16, 8); x.lineTo(28, 26); x.lineTo(28, 38); x.lineTo(16, 20); x.lineTo(4, 38); x.lineTo(4, 26); x.closePath(); x.fill();
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace; tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = 4;
+  // текстура: приглушённая полоса, тонкая кромка чуть темнее, неяркий шеврон остриём к цели.
+  // К клиенту — оранжевая (tex), в пиццерию — зелёная (texHome), как линия на радаре и карте (ROUTE_HEX)
+  const stripe = (edge, body, chev) => {
+    const c = document.createElement('canvas'); c.width = 32; c.height = 64;
+    const x = c.getContext('2d');
+    x.fillStyle = edge; x.fillRect(0, 0, 32, 64);
+    x.fillStyle = body; x.fillRect(2, 0, 28, 64);
+    x.fillStyle = chev;
+    x.beginPath(); x.moveTo(16, 8); x.lineTo(28, 26); x.lineTo(28, 38); x.lineTo(16, 20); x.lineTo(4, 38); x.lineTo(4, 26); x.closePath(); x.fill();
+    const tx = new THREE.CanvasTexture(c);
+    tx.colorSpace = THREE.SRGBColorSpace; tx.wrapT = THREE.RepeatWrapping; tx.anisotropy = 4;
+    return tx;
+  };
+  const tex = stripe('#a8673d', '#e0925c', '#f0c29a'), texHome = stripe('#3c8a46', '#62c46e', '#b8ecbc');
   const pos = new Float32Array(ROUTE_MAX * 6), uv = new Float32Array(ROUTE_MAX * 4), col = new Float32Array(ROUTE_MAX * 8).fill(1);
   const dist = new Float32Array(ROUTE_MAX * 2), idx = new Uint16Array((ROUTE_MAX - 1) * 6);
   for (let i = 0; i < ROUTE_MAX - 1; i++) {
@@ -9997,7 +10170,7 @@ const ROUTE_LINE = (() => {
   m.frustumCulled = false;                          // сфера меняется с маршрутом; cull.js такую не снимает
   m.renderOrder = 3; m.visible = false;
   scene.add(m);
-  return { m, geo, pos, uv, col, dist, tex, uFrom, src: null, n: 0, k: 0,
+  return { m, geo, pos, uv, col, dist, tex, texHome, uFrom, src: null, n: 0, k: 0,
     SX: new Float32Array(ROUTE_MAX), SZ: new Float32Array(ROUTE_MAX), SD: new Float32Array(ROUTE_MAX) };
 })();
 
@@ -10076,6 +10249,9 @@ function updateRouteLine (dt) {
   R.k = best;
   R.uFrom.value = SD[best] + (SD[best + 1] - SD[best]) * bt + 2;   // начинается у капота
   R.tex.offset.y = (R.tex.offset.y - dt * 0.6) % 1;              // шевроны бегут к цели
+  R.texHome.offset.y = R.tex.offset.y;
+  const map = routeHome() ? R.texHome : R.tex;                    // в пиццерию — зелёная, к клиенту — оранжевая
+  if (R.m.material.map !== map) { R.m.material.map = map; R.m.material.needsUpdate = true; }
   R.m.material.color.setScalar(lerp(1, 0.6, ENV.night));        // ночью тише: город темнеет до 0,34, полоса — до 0,6
 }
 
@@ -10261,6 +10437,7 @@ function walletFly (d) {
 function walletHud (dt) {
   PG.step(dt);
   SC.step(dt, !S.ride && isPlaying());
+  RESPECT.hud(!S.ride && isPlaying());              // третья плашка — респект: прилетает значками с места (respect.js)
 }
 
 function hudStep (dt) {
@@ -12010,7 +12187,7 @@ function orderInfo () {
     if (S.fee > 0) rows.push([$t('оплата'), money(S.fee)]);
   } else rows.push([$t('заказ'), '<b>' + $t('заказа пока нет') + '</b>']);
   rows.push([$t('сейчас'), (CAREER && CAREERM.shiftOn() ? CAREERM.clockText() : envClock()) + ' · ' + envPhaseName(ENV.t) +
-    '<small>' + SEAS.seasonName() + (WTH.label() ? ' · ' + WTH.label() : '') + (ENV.rainWant ? ' · ' + (SEAS.snowy() ? $t('снег, скользко') : $t('дождь, скользко')) : '') + '</small>']);
+    '<small>' + SEAS.seasonName() + '</small>']);   // погоду игроку не пишем (04.10.2026) — только сезон
   const faces = persons.filter(Boolean).slice(0, 2).map(p => '<div class="oc-p"><img src="' + faceDataURL(p) + '" alt=""></div>').join('');
   return '<div class="pm-inv-top"><span>' + head + '</span><span>№ ' + String(S.orders).padStart(4, '0') + '</span></div>' +
     '<div class="oc-sheet"><table class="oc-inv">' + rows.map(([k, v]) => '<tr><th>' + k + '</th><td>' + v + '</td></tr>').join('') + '</table>' +
@@ -12084,7 +12261,7 @@ if (elPause) {
   $('pm-sfx').addEventListener('click', () => { Snd.set(!Snd.on); renderPause(); });
   $('pm-menu').addEventListener('click', endShift);
   // пауза — карусель (pausecz.js); «настройки» — те же, что в главном меню, поверх паузы
-  PAUSE.init(elPause, { settings: () => { elPanel.hidden = false; renderSettings(); }, navReset: () => { padMenu.clear(); if (CAREER) CAREERM.kbClear(); } });
+  PAUSE.init(elPause, { settings: tab => { elPanel.hidden = false; SET.render(undefined, tab); }, navReset: () => { padMenu.clear(); if (CAREER) CAREERM.kbClear(); } });
 }
 
 /* нитро кнопкой — пока держишь палец */
@@ -12241,17 +12418,20 @@ buildCity();
 ZN.init({ CITY, MAP, donated });
 DLG.init({ pause: on => { for (const k in IN) IN[k] = 0; if (on) Snd.engine(0); }, face: (p, size) => faceDataURL(p, size) });
 HITS.init({ THREE, scene, box, mergeGeos, HUMAN_VC, groundH, surfaceAt, curbAt, nearestRoad, driftTop: SEAS.driftTop, pavedLift: TRK.pavedLift, groundNormal, emote, puff, pushOut, Snd,
-  burst: burstHuman, scare, callAmbulance, adult: GORE_ON });
+  burst: burstHuman, scare, callAmbulance, adult: GORE_ON, shred: shredHit });
 CHAT.init({ adult: ADULT, person: makePerson({ seed: 0x2E4A17, fem: false }), face: (p, size) => faceDataURL(p, size), blip: (f, d, ty, v) => Snd.blip(f, d, ty, v) });
 /* заказы карьеры (orders.js): очередь, поручения, развоз смены — через это */
 if (CAREER) ORD.init({ S, V, CITY, MAP, THREE, Store, ADULT, SPOTS, LIFE, Snd, get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get DAY_LEN () { return DAY_LEN; }, lang: curLang,
   alive, releaseIdle, pushOut, walkSpawn, nearestRoad, makeGuest, clearGuest, realAddress, routeLen, orderTime, rebuildRoutePath, syncTarget, pinFront,
-  errandShop, startSide, declineSide, popBonus, toast, money, sayBubble, addWallet, donated, hidePhone, clearGate, showOrderCard,
+  errandShop, startSide, declineSide, popBonus, toast, money, sayBubble, addWallet, donated, hidePhone, clearGate, showOrderCard, backToBase,
   newOrder, marker, level: () => levelOf(getXP()), gameplayStop: () => Platform.gameplayStop(),
   rehuman: (p, person) => { dropMesh(p.grp); p.person = person || nextPerson(); p.grp = makeHuman(p.person); p.speed = p.base * p.grp.userData.pace; scene.add(p.grp); } });
 if (CAREER) { PG.init({ el: elMoney, S, money, wallet, shiftOn: CAREERM.shiftOn, playing: isPlaying }); SC.init({ S, money }); }
 /* респект (respect.js): сохранение в профиле, хад — чип под кошельком; за смену — с нуля */
-RESPECT.init({ Store, toast: s => toast(s) });
+RESPECT.init({ Store, toast: s => toast(s), from: () => {   // откуда летят значки респекта: машина на экране
+  const v = new THREE.Vector3(V.x, (V.y || 0) + 1.2, V.z).project(cam);
+  return v.z < 1 ? [(v.x + 1) / 2 * innerWidth, (1 - v.y) / 2 * innerHeight] : null;
+} });
 if (CAREER) CAREERM.onShiftStart(RESPECT.shiftReset);
 /* достижения (achievements.js): счётчики, Стим; смена — через onShiftStart/End карьеры */
 ACH.init({ career: CAREER, adult: ADULT, S, hour: () => (CAREER ? CAREERM.hour() : NaN) });
@@ -12578,10 +12758,30 @@ function makeBird (mat, s) {
   return g;
 }
 const FLOCKS = [], PIGEONS = [];
+/* крыша под точкой: высота верха дома (рельеф + 3,15 м на этаж + 1,1), m — запас от стены; нет дома — -Infinity.
+   Птицы в дома не влетают (04.10.2026): стая идёт над крышами, голуби у стены взмывают и садятся на крышу */
+function roofTop (x, z, m = 0) {
+  const a = HOUSE_GRID.get(Math.floor(x / 40) + ',' + Math.floor(z / 40));
+  let top = -Infinity;
+  if (!a) return top;
+  for (let i = 0; i < a.length; i++) {
+    const b = a[i], p = b.p;
+    if (FOOT_SOFT.has(b.k)) continue;                 // участки строек и пустырей — не дома
+    if (!(inPoly(x, z, p) || (m && (inPoly(x + m, z, p) || inPoly(x - m, z, p) || inPoly(x, z + m, p) || inPoly(x, z - m, p))))) continue;
+    if (b.birdTop === undefined) {
+      let gy = -Infinity, s2 = 0;
+      for (let k = 0; k < p.length; k++) { const q = p[k], r = p[(k + 1) % p.length]; gy = Math.max(gy, groundH(q[0], q[1])); s2 += q[0] * r[1] - r[0] * q[1]; }
+      const area = Math.abs(s2) / 2, lv = b.lv || (area > 1200 ? 5 : area > 600 ? 4 : area > 220 ? 2 : 1);
+      b.birdTop = gy + (b.k === 'gar' ? 2.7 : 3.15 * lv + 1.1);
+    }
+    top = Math.max(top, b.birdTop);
+  }
+  return top;
+}
 function initBirds () {
   for (let f = 0; f < 2; f++) {
-    const fl = { cx: V.x + rand(-80, 80), cz: V.z + rand(-80, 80), y: rand(35, 55), a: rand(0, 6), r: rand(30, 50), w: rand(0.25, 0.4) * (chance(0.5) ? 1 : -1), birds: [] };
-    for (let i = 0; i < 6; i++) fl.birds.push({ g: makeBird(BIRD_MAT, 2.2), o: i, ph: rand(0, 6) });
+    const fl = { cx: V.x + rand(-80, 80), cz: V.z + rand(-80, 80), y: rand(42, 60), gy: groundH(V.x, V.z), a: rand(0, 6), r: rand(30, 50), w: rand(0.25, 0.4) * (chance(0.5) ? 1 : -1), birds: [] };   // y — над землёй, а не над нулём карты
+    for (let i = 0; i < 6; i++) fl.birds.push({ g: makeBird(BIRD_MAT, 2.2), o: i, ph: rand(0, 6), lift: 0 });
     FLOCKS.push(fl);
   }
   for (let k = 0; k < 3; k++) {
@@ -12604,6 +12804,7 @@ function placePigeons (grp) {
     b.g.rotation.set(0, rand(0, 6.28), 0);
     b.g.userData.wing.scale.y = 0.2;
     b.g.visible = true;
+    b.perch = 0;
   }
 }
 
@@ -12626,8 +12827,9 @@ function updateEnv (dt) {
     ENV.rainT -= dt;
     if (ENV.rainT <= 0) {
       // дождь редко и ненадолго: чаще светит солнце
-      if (ENV.rainWant) { ENV.rainWant = 0; ENV.rainT = rand(150, 260); toast(SEAS.snowy() ? $t('снег перестал') : $t('дождь кончился — снова солнце')); }
-      else if (chance(0.22)) { ENV.rainWant = 1; ENV.rainT = rand(40, 70); toast(SEAS.snowy() ? $t('пошёл снег — дорога скользкая') : $t('пошёл дождь — дорога скользкая')); }
+      // без подписи снизу: погоду игроку не называем (04.10.2026)
+      if (ENV.rainWant) { ENV.rainWant = 0; ENV.rainT = rand(150, 260); }
+      else if (chance(0.22)) { ENV.rainWant = 1; ENV.rainT = rand(40, 70); }
       else ENV.rainT = rand(90, 160);
     }
   }
@@ -12699,10 +12901,14 @@ function updateBirds (dt) {
     fl.a += fl.w * dt;
     // стая держится недалеко от курьера
     fl.cx = damp(fl.cx, V.x, 0.08, dt); fl.cz = damp(fl.cz, V.z, 0.08, dt);
+    fl.gy = damp(fl.gy === undefined ? groundH(fl.cx, fl.cz) : fl.gy, groundH(fl.cx, fl.cz), 0.3, dt);
     for (const b of fl.birds) {
       const a = fl.a - b.o * 0.09 * Math.sign(fl.w), r = fl.r + (b.o % 2 ? 2 : -2) * Math.ceil(b.o / 2);
       const x = fl.cx + Math.cos(a) * r, z = fl.cz + Math.sin(a) * r;
-      b.g.position.set(x, fl.y + Math.sin(tG * 1.3 + b.o) * 1.2, z);
+      // над высоткой — выше её крыши на 8 м (плавно), иначе на своей высоте над землёй
+      const y0 = fl.gy + fl.y, top = roofTop(x, z, 6);
+      b.lift = damp(b.lift || 0, Math.max(0, top + 8 - y0), 1.5, dt);
+      b.g.position.set(x, y0 + b.lift + Math.sin(tG * 1.3 + b.o) * 1.2, z);
       b.g.rotation.y = Math.atan2(-Math.sin(a) * Math.sign(fl.w), Math.cos(a) * Math.sign(fl.w));
       b.ph += dt * 9;
       b.g.userData.wing.scale.y = Math.sin(b.ph) * 1.2;
@@ -12733,13 +12939,27 @@ function updateBirds (dt) {
     } else {
       grp.t += dt;
       for (const b of grp.birds) {
-        b.g.position.x += b.vx * dt; b.g.position.y += b.vy * dt; b.g.position.z += b.vz * dt;
-        b.vy = Math.max(1.5, b.vy - dt * 1.5);
+        if (b.perch) {                                // сел на крышу: клюёт, крылья сложены
+          b.ph += dt * 3;
+          b.g.rotation.x = Math.max(0, Math.sin(b.ph)) * 0.4;
+          b.g.userData.wing.scale.y = 0.2;
+          continue;
+        }
+        const P = b.g.position, nx = P.x + b.vx * dt, nz = P.z + b.vz * dt, ny = P.y + b.vy * dt;
+        const top = roofTop(nx, nz, 0.5);
+        if (ny < top + 0.3) {
+          // впереди стена: вперёд не летит — взмывает вдоль неё; долетел до края крыши — садится
+          if (top - ny < 1.5) { P.set(nx, top + 0.07, nz); b.perch = 1; b.g.rotation.set(0, b.g.rotation.y, 0); continue; }
+          P.y += Math.max(b.vy, 6) * dt; b.vy = Math.max(b.vy, 6);
+        } else {
+          P.x = nx; P.y = ny; P.z = nz;
+          b.vy = Math.max(1.5, b.vy - dt * 1.5);
+        }
         b.g.rotation.x = -0.3;
         b.ph += dt * 22;
         b.g.userData.wing.scale.y = Math.sin(b.ph) * 1.3;
       }
-      if (grp.t > 9) placePigeons(grp);             // улетели — сядут где-то ещё
+      if (grp.t > 9 && (d > 70 || grp.t > 40)) placePigeons(grp);   // улетели — сядут где-то ещё (сели на крышу рядом — посидят, пока не отъедешь)
     }
   }
 }
@@ -12913,12 +13133,29 @@ showTitle();
 /* Прохожие дальше ста семидесяти метров и машины дальше двухсот
    восьмидесяти — точки в тумане: рисовать их незачем. Считаются они
    по-прежнему, прячем только меш. */
+/* у края дальности не выскакивают и не пропадают разом: последние FAR_BAND м уходят в землю —
+   сжимаются к основанию (на 100—200 м это несколько точек экрана: глазом — как растворились) */
+const FAR_BAND = { people: 20, cars: 35 };
+function farShrink (o, d, r, band) {
+  const k = clamp((r - d) / band, 0, 1), u = o.userData;
+  if (k >= 1) { if (u.fs0 !== undefined) { o.scale.setScalar(u.fs0); u.fs0 = undefined; } return; }
+  if (u.fs0 === undefined) u.fs0 = o.scale.x;
+  o.scale.setScalar(u.fs0 * Math.max(0.02, k * k * (3 - 2 * k)));
+}
 function cullFar () {
-  const far2 = (x, z, r) => (x - V.x) ** 2 + (z - V.z) ** 2 > r * r;
   const R = GFX.hideR();                          // 130 / 220 м; на Низкой — 100 / 200 (gfx.js «меньше декора»)
   for (const list of [PEOPLE, PEDS, SCOOTS])
-    for (const p of list) if (!p.dead) p.grp.visible = !far2(p.x, p.z, R.people);
-  for (const t of TRAFFIC) t.mesh.visible = !far2(t.x, t.z, R.cars);
+    for (const p of list) {
+      if (p.dead) continue;
+      const d = Math.hypot(p.x - V.x, p.z - V.z);
+      p.grp.visible = d <= R.people;
+      if (p.grp.visible) farShrink(p.grp, d, R.people, FAR_BAND.people);
+    }
+  for (const t of TRAFFIC) {
+    const d = Math.hypot(t.x - V.x, t.z - V.z);
+    t.mesh.visible = d <= R.cars;
+    if (t.mesh.visible && !t.knock) farShrink(t.mesh, d, R.cars, FAR_BAND.cars);
+  }
 }
 
 /* ── геймпад: езда, карточки, меню (раскладка — в input/gamepad.js) ──
@@ -12990,10 +13227,13 @@ function padStep () {
   if (p.sound) Snd.set(!Snd.on);
   if (CH.opts.length && !CH.pause && !CH.full) { if (p.choice1) pickChoice(0); else if (p.choice2) pickChoice(1); else if (p.choice3) pickChoice(2); }
   if (screen && CAREER) CAREERM.padPre(p);      // гараж: ←→ и LB/RB листают машины
-  // настройки и пауза — карусели карточек (settings.js, pausecz.js): ←→, LB/RB — листать
-  if (screen === elPanel && SET.on() || screen === elPause && PAUSE.on()) {
+  // настройки — табы (settings.js): LB/RB и LT/RT — всегда, ←→ — со строки табов (иначе — по списку)
+  if (screen === elPanel && SET.on()) {
+    const pg = (p.pageR || p.trigR ? 1 : 0) - (p.pageL || p.trigL ? 1 : 0), d = (p.menuRight ? 1 : 0) - (p.menuLeft ? 1 : 0);
+    if (pg) { SET.flip(pg, true); p.menuLeft = p.menuRight = false; } else if (d && SET.flip(d)) p.menuLeft = p.menuRight = false;
+  } else if (screen === elPause && PAUSE.on()) {   // пауза — полоса кнопок внизу (pausecz.js): ←→, LB/RB — листать
     const d = (p.menuRight || p.pageR ? 1 : 0) - (p.menuLeft || p.pageL ? 1 : 0);
-    if (d) (screen === elPanel ? SET : PAUSE).flip(d);
+    if (d) PAUSE.flip(d);
     p.menuLeft = p.menuRight = false;
   }
   if (screen) padMenu(p, screen);
@@ -13004,7 +13244,7 @@ function padStep () {
    переменных этого модуля не видит */
 const LIFE_API = {
   THREE, scene, cam, V, S, ENV, CITY, ADULT, HUMAN_VC, CAR_L, CAR_W, TRAFFIC, Snd,
-  groundH, curbAt, inHouse, inPoly, inBounds, nearestRoad, pushOut, walkerStep, walkSpawn, walkBack,
+  groundH, curbAt, inHouse, inPoly, inBounds, nearestRoad, pushOut, walkerStep, walkSpawn, walkBack, dodgeCar,
   ARCHES, makeHuman, dropMesh, makeCar, newCar, poseOnSlope, gibHuman, handsUp, emote, puff, sayBubble, toast, put, mergeGeos,
   onKill: () => { S.people++; Snd.squish(); },
 };
@@ -13176,6 +13416,7 @@ function frameStep (now) {
   CL.step('crew', CREWS.step, dt, CREWS_API || (CREWS_API = crewsApi()));   // компании в форме сетей (crews.js)
   CL.step('surf', updateSurf, dt);
   CL.step('football', updateFootball, dt);
+  CL.step('talk', TALK.step, dt, cam, V);                            // реплики над головами: ближние, крупнее вблизи (talk.js)
   CL.at.ph = 'car';
   if (CAREER) AUTO.step(dt, vf);                  // заглохла, ямы, гараж Дяди Жени
   S.hurt = Math.max(0, S.hurt - dt);
@@ -13206,7 +13447,8 @@ function frameStep (now) {
   } else if (S.state === 'handover') {
     S.handT -= dt;
     if (S.handT <= 0) {
-      if (!S.order) { if (mealDue()) showMeal(); else newOrder(); }
+      // вернулся в пиццерию: карьера — обед с 14:00 (Толик «на, похавай») или развоз смены после полуночи (career.js atBase)
+      if (!S.order) { if (mealDue()) showMeal(); else if (!(CAREER && CAREERM.atBase(newOrder))) newOrder(); }
       else backToBase();
     }
   }
@@ -13241,6 +13483,7 @@ function frameStep (now) {
   }
 
   CL.done(tG);
+  CL.step('carshadow', carShadow);                 // пятно-тень под машиной игрока (carshadow.js)
   CL.at.ph = 'render';
   CULL.step();
   renderer.render(scene, cam);
@@ -13268,19 +13511,21 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) wi
   // оплата адреса: лицо клиента и чат Толика
   popPay, CHAT, bossOnDeliver, payMood,
   // Москва: граф, светофоры, зебры, самокатчики, ввод
-  EDGES, SIG_GROUPS, ZEBRAS, SCOOTS, TL, IN, touches, lightOf, edgeOf,
+  EDGES, SIG_GROUPS, ZEBRAS, SCOOTS, TL, IN, touches, lightOf, edgeOf, NAR: NAR.DEBUG, TALK: TALK.DEBUG,
   // песочница: сюжет, карта, сохранения, старт смены, кошелёк, читы
   STORY, STORY_DBG: STORY.DEBUG, MAP, Store, SBX, CARSM: AUTO, startRun, goRun, endShift, wallet, addWallet, hudHearts, marker, updateEnv, humanLod, get SPOTS_N () { return SPOTS.length; },
-  DRIVERS, SMOKERS, NITRO_CANS, NOS, RESPECT: RESPECT.DEBUG, RESPECT_API: RESPECT, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, PIGEONS, AMB, INCIDENTS, scare, RIVALS, FOES, THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, roadPath, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT, LOOT, XLIFE };
+  DRIVERS, SMOKERS, NITRO_CANS, NOS, RESPECT: RESPECT.DEBUG, RESPECT_API: RESPECT, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, PIGEONS, FLOCKS, AMB, INCIDENTS, scare, RIVALS, FOES, THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, roadPath, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT, LOOT, XLIFE };
 if (window.__dlv) { window.__dlv.BOARD = BOARD; window.__dlv.Platform = Platform; }   // таблица рекордов Стима (board.js)
 if (window.__dlv) window.__dlv.TREES = TREES.DEBUG;   // деревья и кусты: породы, группы во дворах (trees.js)
 if (window.__dlv) Object.assign(window.__dlv, { showTitle, CAREERM, renderSettings, closePanel });   // меню, настройки — проверки интерфейса в probe
+if (window.__dlv) window.__dlv.CSH = CSH.DEBUG;   // тень под машиной (carshadow.js)
 if (window.__dlv) window.__dlv.crashlog = CL;        // журнал ошибок: entries(), text(), disabled() (docs/CRASHES.md)
 if (window.__dlv) Object.assign(window.__dlv, { pinFront, nearClient, PIN });   // пин перед клиентом, кто у клиента лишний (docs/ORDERS.md)
 if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG, CONS: CONSTR.DEBUG, DARK: DARKN.DEBUG, WASTE: WASTE.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)
 if (window.__dlv) Object.assign(window.__dlv, { DIRECTOR: DIRECTOR.DEBUG, HB: HB.DEBUG, FLIRT: ADULT ? FLIRT.DEBUG : null });   // коневозки, заигрывание (только взрослая)
-if (window.__dlv) { window.__dlv.FOREST = FOREST.DEBUG; window.__dlv.LAWN = LAWNP.DEBUG; window.__dlv.PZD = PZD.DEBUG; window.__dlv.cam = cam; window.__dlv.RIV = RIVS.DEBUG; }   // ельник и пиццерия-шар (forest.js, pizzadome.js)
+if (window.__dlv) { window.__dlv.FOREST = FOREST.DEBUG; window.__dlv.LAWN = LAWNP.DEBUG; window.__dlv.PAVE = PAVE.DEBUG; window.__dlv.PZD = PZD.DEBUG; window.__dlv.cam = cam; window.__dlv.RIV = RIVS.DEBUG; }   // ельник и пиццерия-шар (forest.js, pizzadome.js)
 if (window.__dlv) window.__dlv.RELIEF = { STATS: RELIEF.STATS, at: RELIEF.reliefAt };   // неровный газон (relief.js)
+if (window.__dlv) window.__dlv.RW = RW.DEBUG;   // вид асфальта улиц (roadwear.js)
 if (window.__dlv) { window.__dlv.SL = SL.DEBUG; window.__dlv.LAMP_SPOTS = LAMP_SPOTS; window.__dlv.smashHit = smashHit; window.__dlv.CARL = CARL.DEBUG; }   // фонари и огни машины
 // ?mapcheck: сводка проблем карты, столбики над ними, «]» — к следующей (mapworks.js)
 if (MAPCHECK) MAPW.debug(MAPFIX, MAPW_API || (MAPW_API = mapApi()));
