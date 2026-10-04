@@ -2015,6 +2015,17 @@ function updateFootball (dt) {
       if (p.dead) continue;
       const u = p.grp.userData;
       p.grp.visible = dV < 130;
+      // под колёса — до испуга: рядом сбили одного — остальные не бессмертные (04.10.2026)
+      if (vsp > 3) {
+        const ex = p.x - V.x, ez = p.z - V.z;
+        if (Math.abs(ex * fx + ez * fz) < CAR_L + 0.5 && Math.abs(ex * fz - ez * fx) < CAR_W + 0.35) {
+          p.dead = 1; dropMesh(p.grp);
+          gibHuman(p, V.vx, V.vz);
+          S.people++;
+          Snd.squish();
+          continue;
+        }
+      }
       if (p.shock > 0) { p.shock -= dt; handsUp(u, dt); continue; }
       let tx, tz, spd;
       if (p === chaser[p.team] && inside) { tx = G.bx; tz = G.bz; spd = 4.6 * u.pace; }
@@ -2038,16 +2049,6 @@ function updateFootball (dt) {
         G.vx = kx / kl * pw; G.vz = kz / kl * pw; G.vy = chance(0.3) ? rand(2, 4) : 0;
         u.legR.rotation.x = -1.1;
         if (dV < 50) Snd.blip(200, 0.04, 'square', 0.05);
-      }
-      // под колёса — как все
-      if (vsp > 3) {
-        const ex = p.x - V.x, ez = p.z - V.z;
-        if (Math.abs(ex * fx + ez * fz) < CAR_L + 0.5 && Math.abs(ex * fz - ez * fx) < CAR_W + 0.35) {
-          p.dead = 1; dropMesh(p.grp);
-          gibHuman(p, V.vx, V.vz);
-          S.people++;
-          Snd.squish();
-        }
       }
     }
     if (G.sayT > 0 && (G.sayT -= dt) <= 0 && G.say) { G.say.parent && G.say.parent.remove(G.say); G.say.material.dispose(); G.say = null; }
@@ -7511,6 +7512,17 @@ function updateAccidents (dt) {
       if (f.dead) continue;
       const u = f.grp.userData;
       f.grp.visible = dV < 130;
+      // под колёса — до испуга: рядом сбили одного — остальные не бессмертные (04.10.2026)
+      if (vsp > 3) {
+        const dx = f.x - V.x, dz = f.z - V.z;
+        if (Math.abs(dx * fx + dz * fz) < CAR_L + 0.5 && Math.abs(dx * fz - dz * fx) < CAR_W + 0.35) {
+          f.dead = 1; dropMesh(f.grp);
+          gibHuman(f, V.vx, V.vz);
+          S.people++;
+          Snd.squish();
+          continue;
+        }
+      }
       if (f.shock > 0) { f.shock -= dt; handsUp(u, dt); continue; }
       f.ph += dt * 9;
       u.armR.rotation.x = -1.4 - Math.max(0, Math.sin(f.ph)) * 0.9;
@@ -7520,15 +7532,6 @@ function updateAccidents (dt) {
       f.grp.rotation.z = Math.sin(f.ph * 0.5) * 0.08;
       if ((f.sayT -= dt) <= 0) { f.sayT = rand(1.2, 2.2); setSay(f.bubble, pick(FIGHT_LINES), '#d9342c'); if (dV < 60 && chance(0.5)) Snd.blip(110, 0.08, 'square', 0.06); }
       f.bubble.position.x = Math.sin(tG * 30) * 0.04;
-      if (vsp > 3) {
-        const dx = f.x - V.x, dz = f.z - V.z;
-        if (Math.abs(dx * fx + dz * fz) < CAR_L + 0.5 && Math.abs(dx * fz - dz * fx) < CAR_W + 0.35) {
-          f.dead = 1; dropMesh(f.grp);
-          gibHuman(f, V.vx, V.vz);
-          S.people++;
-          Snd.squish();
-        }
-      }
     }
   }
 }
@@ -13084,6 +13087,17 @@ function updateCrowds (dt) {
       const u = q.grp.userData;
       q.ph += dt;
       q.grp.visible = dC < 130;
+      // под колёса — как все; и до испуга: рядом сбили одного — остальные не бессмертные (04.10.2026)
+      if (vsp > 3) {
+        const dx = q.x - V.x, dz = q.z - V.z;
+        if (Math.abs(dx * fx + dz * fz) < CAR_L + 0.5 && Math.abs(dx * fz - dz * fx) < CAR_W + 0.35) {
+          q.dead = 1; dropMesh(q.grp);
+          gibHuman(q, V.vx, V.vz);
+          S.people++;
+          Snd.squish();
+          continue;
+        }
+      }
       if (q.shock > 0) { q.shock -= dt; handsUp(u, dt); continue; }
       u.armL.rotation.z = 0; u.armR.rotation.z = 0;
       // пританцовывают и отпивают газировку
@@ -13094,16 +13108,6 @@ function updateCrowds (dt) {
       u.armR.rotation.x = damp(u.armR.rotation.x, sip ? -2.3 : -0.5, 8, dt);
       u.head.rotation.x = damp(u.head.rotation.x, sip ? -0.45 : 0.05, 8, dt);
       u.armL.rotation.x = Math.sin(q.ph * 1.7) * 0.25;             // размахивают руками — разговор
-      // под колёса — как все
-      if (vsp > 3) {
-        const dx = q.x - V.x, dz = q.z - V.z;
-        if (Math.abs(dx * fx + dz * fz) < CAR_L + 0.5 && Math.abs(dx * fz - dz * fx) < CAR_W + 0.35) {
-          q.dead = 1; dropMesh(q.grp);
-          gibHuman(q, V.vx, V.vz);
-          S.people++;
-          Snd.squish();
-        }
-      }
     }
     // поют по очереди: реплика над головой и пара нот, если рядом
     if (c.sayT > 0 && (c.sayT -= dt) <= 0 && c.say) { c.say.parent && c.say.parent.remove(c.say); c.say.material.dispose(); c.say = null; }
@@ -13523,6 +13527,7 @@ if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG
 if (window.__dlv) Object.assign(window.__dlv, { DIRECTOR: DIRECTOR.DEBUG, HB: HB.DEBUG, FLIRT: ADULT ? FLIRT.DEBUG : null });   // коневозки, заигрывание (только взрослая)
 if (window.__dlv) { window.__dlv.FOREST = FOREST.DEBUG; window.__dlv.LAWN = LAWNP.DEBUG; window.__dlv.PAVE = PAVE.DEBUG; window.__dlv.PZD = PZD.DEBUG; window.__dlv.cam = cam; window.__dlv.RIV = RIVS.DEBUG; }   // ельник и пиццерия-шар (forest.js, pizzadome.js)
 if (window.__dlv) window.__dlv.RELIEF = { STATS: RELIEF.STATS, at: RELIEF.reliefAt };   // неровный газон (relief.js)
+if (window.__dlv) Object.assign(window.__dlv, { CROWDS, PUB_SPOTS, spawnCrowd, ACCIDENTS, PITCHES });   // компании у подъездов, драки на авариях, футбол — проверка наезда в probe
 if (window.__dlv) window.__dlv.RW = RW.DEBUG;   // вид асфальта улиц (roadwear.js)
 if (window.__dlv) { window.__dlv.SL = SL.DEBUG; window.__dlv.LAMP_SPOTS = LAMP_SPOTS; window.__dlv.smashHit = smashHit; window.__dlv.CARL = CARL.DEBUG; }   // фонари и огни машины
 // ?mapcheck: сводка проблем карты, столбики над ними, «]» — к следующей (mapworks.js)

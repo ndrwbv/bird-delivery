@@ -5,7 +5,10 @@
      ?mock-steam        Стим есть, таблицы работают: 30 игроков в мире, трое из них — друзья
      ?mock-steam=nolb   Стим есть, таблиц нет (koffi не поднялся) — игра берёт локальную
      ?mock-steam=fail   таблицы есть, но Стим не отвечает (null) — тоже локальная
-     ?mock-steam=deck   как на Steam Deck (экранная клавиатура по фокусу поля)
+     ?mock-steam=deck   как на Steam Deck (экранная клавиатура по фокусу поля): большая клавиатура
+                        сразу возвращается пустой (не поднялась), плавающая — 'float'
+     ?mock-steam=deck-hang   большая клавиатура не отвечает никогда (Стим её «открыл», но её нет)
+     ?mock-steam=deck-text   большая клавиатура вернула текст «Вася Пупкин»
 
    ?mock-update=v9.9.9 — вышла новая версия (плашка «обновить» в меню); textInput и floatKeyboard
    (экранная клавиатура) тоже пишутся в calls.
@@ -34,7 +37,7 @@ export function mockBridge (mode = '') {
     getStat: n => (log('getStat', n), later(null)),
     setStat: (n, v) => (log('setStat', n, v), later(true)),
     richPresence: (k, v) => (log('richPresence', k, v), later(true)),
-    textInput: (...a) => (log('textInput', ...a), later(null)),
+    textInput: (...a) => (log('textInput', ...a), /hang/.test(mode) ? new Promise(() => {}) : later(/text/.test(mode) ? 'Вася Пупкин' : null)),
     lb: mode !== 'nolb',
     lbUpload (name, score, details) {
       log('lbUpload', name, score, details);
@@ -74,6 +77,6 @@ export function mockBridge (mode = '') {
     setFullscreen: off, isFullscreen: off, log () {}, logDir: async () => '', openLogs: off,
     steam,
   };
-  window.__steamMock = { mode, calls, mine, me };
+  window.__steamMock = { mode, calls, mine, me, bridge };
   return bridge;
 }
