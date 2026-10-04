@@ -1,0 +1,15 @@
+/* «кадр не успевает — включить Среднюю?» (gfx.js offer): тихая плашка внизу, сама уходит через 15 с */
+.gfx-offer {
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 14px); transform: translateX(-50%); z-index: 60;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px;
+  max-width: min(92vw, 640px); box-sizing: border-box; padding: 10px 14px;
+  font-size: 11px; line-height: 1.5; color: #fff3d6; background: rgba(42, 36, 56, .92);
+  border: 3px solid #33210c; border-radius: 10px; box-shadow: 0 4px 0 #33210c;
+}
+.gfx-offer span { flex: 1 1 14em; }
+.gfx-offer button {
+  font: inherit; cursor: pointer; padding: 6px 10px; color: #33210c; background: #ffd85e;
+  border: 3px solid #33210c; border-radius: 6px; min-height: 36px;
+}
+.gfx-offer button[data-a="no"] { background: #cfc6b4; }
+.gfx-offer small { flex: 1 0 100%; font-size: .8em; opacity: .75; text-align: center; }

@@ -382,6 +382,64 @@ function findSites () {
   }
 }
 
+/* Свободные пустыри для других систем (darknight.js — костры и котлы тёмной ночи): тот же отбор,
+   что у строек (finder), только участок свой (W × D) и жребий свой (salt). От строек и от avoid
+   ({ x, z, r }) — не ближе их края + 15 м; друг от друга — gap; сначала по per на район, потом до max.
+   Звать после build(); без строек (?nocons) — пусто. Занятые участки (claim: точки конкурентов,
+   костры, котлы) — общий список CLAIM: следующий поиск их обходит (край + 15 м). cap — сколько
+   участков на район во втором круге; ok(c) — своя добавочная проверка участка; claim: false — не
+   занимать (занять потом самому — claim()). */
+const CLAIM = [];                                  // { x, z, r }
+export function claim (x, z, r) { CLAIM.push({ x, z, r }); }
+export function claimed () { return CLAIM; }
+export function freeLots ({ W, D, max, gap, salt = 11, per = 1, cap = Infinity, avoid = [], ok = null, claim: take = true }) {
+  if (!A) return [];
+  const why = ST.why; ST.why = {};                 // отказы чужого поиска не путаем со своими
+  const F = finder(), out = [], perD = new Map();
+  const R = Math.hypot(W, D) / 2;
+  const cands = [];
+  for (const r of A.CITY.roads) {
+    if (r.c < 2 || r.c > 4 || r.b || r.x) continue;
+    const w = A.roadWidth(r);
+    let acc = CONS.STEP / 2;
+    for (let i = 1; i < r.p.length; i++) {
+      const [x1, z1] = r.p[i - 1], [x2, z2] = r.p[i];
+      const L = Math.hypot(x2 - x1, z2 - z1);
+      if (L < 1) continue;
+      const ux = (x2 - x1) / L, uz = (z2 - z1) / L;
+      for (; acc < L; acc += CONS.STEP) {
+        const cx = x1 + ux * acc, cz = z1 + uz * acc;
+        for (const sd of [1, -1]) {
+          const vx = ux * sd, vz = uz * sd, nx = -vz, nz = vx, off = w / 2 + CONS.SET + D / 2;
+          cands.push({ x: cx + nx * off, z: cz + nz * off, ux: vx, uz: vz, W, D, pr: hash(cx, cz, salt + (sd > 0 ? 0 : 1)) });
+        }
+      }
+      acc -= L;
+    }
+  }
+  cands.sort((a, b) => a.pr - b.pr);
+  const clear = c => SITES.every(s => Math.hypot(s.x - c.x, s.z - c.z) > R + Math.hypot(s.W, s.D) / 2 + 15)
+    && avoid.every(a => Math.hypot(a.x - c.x, a.z - c.z) > R + a.r + 15)
+    && CLAIM.every(a => Math.hypot(a.x - c.x, a.z - c.z) > R + a.r + 15)
+    && out.every(o => Math.hypot(o.x - c.x, o.z - c.z) > gap);
+  for (let round = 0; round < 2 && out.length < max; round++) {
+    const lim = !A.distAt ? Infinity : round === 0 ? per : cap;
+    for (const c of cands) {
+      if (out.length >= max) break;
+      if (c.used || c.bad || !clear(c)) continue;
+      const di = A.distAt ? A.distAt(c.x, c.z) : 0;
+      if ((perD.get(di) || 0) >= lim) continue;
+      if (!F.test(c) || (ok && !ok(c))) { c.bad = 1; continue; }
+      c.used = 1; c.dist = di;
+      perD.set(di, (perD.get(di) || 0) + 1);
+      out.push({ x: c.x, z: c.z, ux: c.ux, uz: c.uz, W, D, gy: c.gy, dist: di });
+    }
+  }
+  if (take) for (const o of out) claim(o.x, o.z, R);
+  ST.why = why;
+  return out;
+}
+
 /* ═════════════ постройка одной стройки ═════════════ */
 let PMESH_P = [], PMESH_UV = [], PMESH_I = [], STANDS = [];
 let DIG_TPL = null, MIX_TPL = null, CAB_TPL = [null, null], PANEL_GEO = null, MAT = null;
@@ -896,6 +954,7 @@ export function onRespawn (t) { t.dump = null; t.cnRoll = 0; }
 export function build (api) {
   A = api;
   const t0 = performance.now();
+  CLAIM.length = 0;
   PLIST = PASS.filter(p => A.ADULT || !p.adult);
   findSites();
   SITES.forEach((s, i) => build1(s, i));
@@ -972,6 +1031,15 @@ export function reset () {
     unhide(o.it);
   }
   DYN.length = 0;
+}
+
+/* готовые модели стройки — для урагана (hurricane.js: забор и кран на месте унесённого дома).
+   null — стройки не собраны (?nocons, вступление). panel — секция шифера (x вдоль забора, низ на 0),
+   jib(col) — стрела крана (поворот вокруг верха башни), cabin(v) — бытовка; MAT — общий материал */
+export function kit () {
+  if (!A) return null;
+  mats();
+  return { panel: slatePanelGeo(), jib: jibTpl, cabin: v => tplOf('cabin', v & 1), MAT, SEC: CONS.SEC, FENCE_H: CONS.FENCE_H };
 }
 
 /* для probe: d.CONS.list — стройки; force = 2 — следующие две машины потока у строек станут самосвалами */

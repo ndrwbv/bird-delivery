@@ -65,31 +65,27 @@ html, body {
 #dist  { color: #fff3d6; }
 #speed { color: #bcd0e8; font-size: 8px; }
 
-/* часы заказа — как на приборке: тёмное окошко, зелёные светящиеся цифры (сейчас),
-   рядом плашкой «доставить до 14:35»; мало времени — плашка красная и мигает */
+/* часы заказа — как на приборке: зелёные светящиеся цифры (сейчас), рядом жёлтым «доставить до 14:35»;
+   мало времени — срок оранжевый, потом красный и мигает. Без окошка и плашки (правило хада, CAREER.md) —
+   читается тёмной пиксельной обводкой */
 #timewrap {
   top: 12px; left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; gap: 8px;
   padding: 4px 5px 4px 9px;
-  background: #070b08;
-  border: 2px solid #33210c;
-  border-radius: 6px;
-  box-shadow: inset 0 0 0 2px #1a2a1d, 0 4px 12px rgba(0, 0, 0, .4);
   text-shadow: none; line-height: 1; white-space: nowrap;
 }
 #dash-now { font-weight: normal; font-size: 15px; letter-spacing: .06em; color: #5dff8a;
-            text-shadow: 0 0 4px rgba(93, 255, 138, .8), 0 0 10px rgba(93, 255, 138, .35); }
-#dash-due { display: flex; align-items: center; gap: 6px; padding: 5px 7px 4px; border-radius: 3px;
-            background: #ffd85e; color: #1a1208; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .25); }
+            text-shadow: 2px 2px 0 #33210c, -1px 0 0 #33210c, 1px 0 0 #33210c, 0 -1px 0 #33210c, 0 1px 0 #33210c, 0 0 8px rgba(93, 255, 138, .6); }
+#dash-due { display: flex; align-items: center; gap: 6px; padding: 5px 7px 4px; color: #ffd85e;
+            text-shadow: 2px 2px 0 #33210c, -1px 0 0 #33210c, 1px 0 0 #33210c, 0 -1px 0 #33210c, 0 1px 0 #33210c; }
 #dash-due[hidden] { display: none; }
 #dash-due em { font-style: normal; font-size: 7px; }
 #dash-due b { font-weight: normal; font-size: 12px; }
 #dash-due b:empty { display: none; }
-#timewrap.warn #dash-due { background: #ff9a3c; }
-#timewrap.low #dash-due, #timewrap.late #dash-due { background: #ff2d4a; color: #fff; animation: dash-blink .5s steps(2) infinite; }
-#timewrap.low, #timewrap.late { border-color: #ff2d4a; box-shadow: inset 0 0 0 2px #3a0d14, 0 0 12px rgba(255, 45, 74, .55); }
-#timewrap.late #dash-now { color: #ff6a7a; text-shadow: 0 0 4px rgba(255, 45, 74, .8); }
-@keyframes dash-blink { 50% { background: #5a0d18; color: #ff8a96; } }
+#timewrap.warn #dash-due { color: #ff9a3c; }
+#timewrap.low #dash-due, #timewrap.late #dash-due { color: #ff4d62; animation: dash-blink .5s steps(2) infinite; }
+#timewrap.late #dash-now { color: #ff6a7a; text-shadow: 2px 2px 0 #33210c, -1px 0 0 #33210c, 1px 0 0 #33210c, 0 -1px 0 #33210c, 0 1px 0 #33210c, 0 0 8px rgba(255, 45, 74, .7); }
+@keyframes dash-blink { 50% { color: #fff3d6; } }
 /* «до конца заказа» на часах смены (career.js) больше не нужно — срок теперь на приборке */
 #cr-clock .ck-o { display: none !important; }
 
@@ -518,8 +514,8 @@ body.brief #view { filter: blur(6px) brightness(0.72); transition: filter .25s; 
 }
 #bonus b { font-weight: normal; font-size: clamp(22px, 4.5vw, 44px); color: #ffd85e;
            text-shadow: 4px 4px 0 #33210c, -2px -2px 0 #33210c, 2px -2px 0 #33210c, -2px 2px 0 #33210c; }
-#bonus span { font-size: clamp(15px, 2.8vw, 28px); line-height: 1.4; color: #fff3d6; background: rgba(20, 16, 30, .78);
-               padding: 10px 18px; border: 3px solid #ffd85e; border-radius: 8px; text-shadow: 2px 2px 0 #33210c; }
+#bonus span { font-size: clamp(15px, 2.8vw, 28px); line-height: 1.4; color: #fff3d6;
+               padding: 4px 8px; text-shadow: 3px 3px 0 #33210c, -2px 0 0 #33210c, 2px 0 0 #33210c, 0 -2px 0 #33210c, 0 2px 0 #33210c; }
 #bonus.on { animation: bonus-pop 4s cubic-bezier(.2, .9, .3, 1.2) both; }
 @keyframes bonus-pop {
   0% { opacity: 0; transform: translate(-50%, -50%) scale(.6); }
@@ -918,7 +914,7 @@ html[data-map="moscow"] #radar.burn {
 
 /* рейтинг смены: под сердцами, мелко */
 #rivals { list-style: none; margin: 8px 0 0; padding: 6px 8px; font-size: 7px; line-height: 1; display: flex; flex-direction: column; gap: 5px;
-          background: rgba(21, 27, 51, .55); border-radius: 6px; width: max-content; min-width: 150px; text-shadow: 1px 1px 0 #33210c; }
+          width: max-content; min-width: 150px; text-shadow: 1px 1px 0 #33210c, -1px 0 0 #33210c, 1px 0 0 #33210c, 0 -1px 0 #33210c, 0 1px 0 #33210c; }
 #rivals[hidden] { display: none; }
 #rivals li { display: flex; align-items: center; gap: 6px; color: #fff3d6; }
 #rivals li em { font-style: normal; width: 10px; color: #bcd0e8; }

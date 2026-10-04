@@ -4,10 +4,11 @@
 
    • Две чужие сети: «Вселенная суши» (голубая) и «Королева Бургеров»
      (жёлто-синяя). В каждом районе — по точке каждой сети, где хватает
-     места — по второй (RIV.PER_DIST). Место: у улицы (2—4 класс), участок
-     ~16 × 16 м, где нет домов, дорог и дорожек, парков, парковок, площадок,
-     воды; от подъездов (пины заказов) — не ближе ENTR, от наших пиццерий —
-     PIZZA, от дверей магазинов — POI; сначала — места у ТЦ (MALL_R).
+     места — по второй (RIV.PER_DIST). Место — пустырь у улицы тем же
+     отбором, что стройки (construction.js freeLots), участок ~24 × 23 м,
+     от стен домов ≥ WALL, от наших пиццерий ≥ PIZZA, от строек, костров и
+     котлов — по общему списку занятых (CONSTR.claim). Район без пустыря —
+     1 точка у ТЦ (MALL_R) прежним отбором (finder).
      Жребий — по месту (хэш): карта та же — точки те же.
    • Точка: павильон с витриной и вывеской (рисунок кодом), на крыше —
      ролл-планета с кольцом или бургер в короне; перед ним к улице —
@@ -43,13 +44,15 @@ import { t, N_ } from '../i18n/index.js';
 import { warmth } from './seasons.js';
 import * as RESPECT from './respect.js';
 import * as MOPEDS from './mopeds.js';
+import * as CONSTR from './construction.js';
 
 export const RIV = {
   PER_DIST: 2, MAX: 26, NODIST: 6,     // точек сети в районе; всего; без районов на карте
   GAP_ANY: 160, GAP_SAME: 520, GAP_2ND: 700,   // м: между любыми точками; одной сети; вторая точка сети в районе
-  W: 11, D: 7.5, TER: 6.5, SIDE: 2.6,  // павильон вдоль улицы и вглубь, терраса, поля по бокам, м
-  SET: 3.4,                            // терраса — в стольких м от края полотна
-  H: 3.8,                              // высота павильона
+  W: 16, D: 12, TER: 9, SIDE: 3,      // павильон вдоль улицы и вглубь, терраса, поля по бокам, м
+  SET: 3.4,                            // терраса — в стольких м от края полотна (точка у ТЦ)
+  H: 5.6, ROOF: 1.7,                   // высота павильона; во столько раз крупнее фигура на крыше
+  WALL: 18,                            // м: участок на пустыре — не ближе к стене любого дома
   HOUSE: 2, ENTR: 16, PIZZA: 160, POI: 11, SLOPE: 1.2, STEP: 24, MALL_R: 320,
   NEAR: 200, FAR: 260,                 // м: маскоты — у точек ближе; дальше — спят
   MASCOTS: [2, 3], MASCOT_BACK: 40, MASCOT_COOL: 25,
@@ -272,8 +275,77 @@ function mallCenters () {
   return out;
 }
 
+/* стены домов: отрезки контуров в сетке — расстояние от участка до ближайшей стены */
+function wallGrid () {
+  const G = grid(40);
+  for (const b of A.CITY.buildings || []) {
+    const p = b.p;
+    if (!p || p.length < 2) continue;
+    for (let i = 0; i < p.length; i++) {
+      const [x1, z1] = p[i], [x2, z2] = p[(i + 1) % p.length];
+      G.add(Math.min(x1, x2), Math.min(z1, z2), Math.max(x1, x2), Math.max(z1, z2), [x1, z1, x2, z2]);
+    }
+  }
+  return G;
+}
+/* от прямоугольника (центр x, z; ось u; полуразмеры hw, hd) до ближайшей стены, не дальше R */
+function rectWall (G, x, z, ux, uz, hw, hd, R) {
+  const nx = -uz, nz = ux;
+  const L = (px, pz) => { const dx = px - x, dz = pz - z; return [dx * ux + dz * uz, dx * nx + dz * nz]; };
+  const ptRect = (a, b) => Math.hypot(Math.max(0, Math.abs(a) - hw), Math.max(0, Math.abs(b) - hd));
+  const corners = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]];
+  let best = R;
+  const seen = new Set();
+  G.near(x, z, Math.hypot(hw, hd) + R, sg => {
+    if (seen.has(sg)) return; seen.add(sg);
+    const [a1, b1] = L(sg[0], sg[1]), [a2, b2] = L(sg[2], sg[3]);
+    let d = Math.min(ptRect(a1, b1), ptRect(a2, b2));
+    for (const [ca, cb] of corners) d = Math.min(d, segD(ca, cb, a1, b1, a2, b2));
+    // отрезок пересекает прямоугольник: середина или пересечение с осями — грубо, по 8 точкам
+    if (d > 0) for (let k = 1; k < 8; k++) { const q = k / 8; d = Math.min(d, ptRect(a1 + (a2 - a1) * q, b1 + (b2 - b1) * q)); }
+    if (d < best) best = d;
+  });
+  return best;
+}
+
+/* точки на пустырях: тот же отбор, что у строек (construction.js freeLots) — участок под всю
+   точку с полями, от стен домов ≥ WALL, от наших пиццерий ≥ PIZZA, от строек, костров и котлов
+   (общий список занятых) — край + 15 м. Районы без пустыря — 1 точка у ТЦ (mallSites). */
 function findSites () {
+  const G = wallGrid(), LW = WT() + 2, LD = DT() + 1;
+  const piz = (A.PIZZERIAS || []).map(p => [p.bx || p.x || 0, p.bz || p.z || 0]);
+  const D = !!A.distAt, cap = D ? RIV.MAX : RIV.NODIST;
+  const ok = c => {
+    for (const p of piz) if (Math.hypot(p[0] - c.x, p[1] - c.z) < RIV.PIZZA) return false;
+    return rectWall(G, c.x, c.z, c.ux, c.uz, LW / 2, LD / 2, RIV.WALL) >= RIV.WALL;
+  };
+  const lots = CONSTR.freeLots({ W: LW, D: LD, max: cap, gap: RIV.GAP_ANY, salt: 31, per: 2, cap: RIV.PER_DIST * 2, ok, claim: false });
+  ST.lots = lots.length;
+  const per = new Map(), sites = [];
+  const far = (c, chain, gapSame) => sites.every(s => s.chain !== chain || Math.hypot(s.cx - c.cx, s.cz - c.cz) > gapSame);
+  for (const l of lots) {
+    const nx = -l.uz, nz = l.ux, fx = l.x - nx * LD / 2, fz = l.z - nz * LD / 2;
+    const c = { fx, fz, ux: l.ux, uz: l.uz, nx, nz, gy: l.gy, cx: fx + nx * DT() / 2, cz: fz + nz * DT() / 2, h: hash(l.x, l.z, 17), lot: 1 };
+    const di = D ? l.dist : 0;
+    const ns = per.get(di + ':sushi') || 0, nb = per.get(di + ':burger') || 0;
+    const order = ns < nb ? ['sushi', 'burger'] : nb < ns ? ['burger', 'sushi'] : c.h < 0.5 ? ['sushi', 'burger'] : ['burger', 'sushi'];
+    let chain = null;
+    for (const k of order) { const n = per.get(di + ':' + k) || 0; if (n < RIV.PER_DIST && far(c, k, n ? RIV.GAP_2ND : RIV.GAP_SAME)) { chain = k; break; } }
+    if (!chain) continue;
+    c.dist = di; c.chain = chain;
+    per.set(di + ':' + chain, (per.get(di + ':' + chain) || 0) + 1);
+    sites.push(c);
+    CONSTR.claim(l.x, l.z, Math.hypot(LW, LD) / 2);
+  }
+  mallSites(sites);
+  return sites;
+}
+
+/* районы без пустыря — по 1 точке у ТЦ, прежним отбором (у улицы, без домов на участке) */
+function mallSites (sites) {
   const F = finder(), malls = mallCenters();
+  if (!malls.length) return;
+  const have = new Set(sites.map(s => s.dist));
   const cands = [];
   for (const r of A.CITY.roads) {
     if (r.c < 2 || r.c > 4 || r.b || r.x) continue;
@@ -291,7 +363,8 @@ function findSites () {
           const fx = px + nx * off, fz = pz + nz * off;
           let dm = Infinity;
           for (const m of malls) dm = Math.min(dm, Math.hypot(m[0] - fx, m[1] - fz));
-          const pr = hash(px, pz, sd > 0 ? 11 : 13) + (dm < RIV.MALL_R ? -1.2 + dm / RIV.MALL_R : 0) + (r.c <= 3 ? -0.15 : 0);
+          if (dm > RIV.MALL_R) continue;
+          const pr = dm / RIV.MALL_R + hash(px, pz, sd > 0 ? 11 : 13) * 0.3;
           cands.push({ fx, fz, ux: vx, uz: vz, nx, nz, pr, h: hash(px, pz, 17) });
         }
       }
@@ -300,32 +373,22 @@ function findSites () {
   }
   ST.tried = cands.length;
   cands.sort((a, b) => a.pr - b.pr);
-  const per = new Map();        // 'район:сеть' → сколько
-  const sites = [];
-  const far = (c, chain, gapSame) => sites.every(s => { const d = Math.hypot(s.cx - c.cx, s.cz - c.cz); return d > RIV.GAP_ANY && (s.chain !== chain || d > gapSame); });
-  const cxz = c => { c.cx = c.fx + c.nx * DT() / 2; c.cz = c.fz + c.nz * DT() / 2; };
-  const D = !!A.distAt, cap = D ? Infinity : RIV.NODIST;
-  for (let round = 0; round < 2 && sites.length < RIV.MAX; round++) {
-    const lim = round === 0 ? 1 : RIV.PER_DIST;
-    for (const c of cands) {
-      if (sites.length >= Math.min(RIV.MAX, cap)) break;
-      if (c.used || c.bad) continue;
-      cxz(c);
-      const di = D ? A.distAt(c.cx, c.cz) : 0;
-      // какая сеть нужна этому району: сначала та, которой меньше (жребий — по месту)
-      const ns = per.get(di + ':sushi') || 0, nb = per.get(di + ':burger') || 0;
-      const order = ns < nb ? ['sushi', 'burger'] : nb < ns ? ['burger', 'sushi'] : c.h < 0.5 ? ['sushi', 'burger'] : ['burger', 'sushi'];
-      let chain = null;
-      for (const k of order) if ((per.get(di + ':' + k) || 0) < lim && far(c, k, round === 0 ? RIV.GAP_SAME : RIV.GAP_2ND)) { chain = k; break; }
-      if (!chain) continue;
-      ST.tested++;
-      if (!F.test(c)) { c.bad = 1; continue; }
-      c.used = 1; c.dist = di; c.chain = chain;
-      per.set(di + ':' + chain, (per.get(di + ':' + chain) || 0) + 1);
-      sites.push(c);
-    }
+  const D = !!A.distAt, cap = D ? RIV.MAX : RIV.NODIST, n0 = sites.length;
+  const far = c => sites.every(s => Math.hypot(s.cx - c.cx, s.cz - c.cz) > RIV.GAP_ANY);
+  const busy = CONSTR.claimed(), R = Math.hypot(WT(), DT()) / 2;
+  for (const c of cands) {
+    if (sites.length >= cap) break;
+    c.cx = c.fx + c.nx * DT() / 2; c.cz = c.fz + c.nz * DT() / 2;
+    const di = D ? A.distAt(c.cx, c.cz) : 0;
+    if (have.has(di) || !far(c) || !busy.every(a => Math.hypot(a.x - c.cx, a.z - c.cz) > R + a.r + 15)) continue;
+    ST.tested++;
+    if (!F.test(c)) continue;
+    c.dist = di; c.chain = c.h < 0.5 ? 'sushi' : 'burger'; c.mall = 1;
+    have.add(di);
+    sites.push(c);
+    CONSTR.claim(c.cx, c.cz, R);
   }
-  return sites;
+  ST.mall = sites.length - n0;
 }
 
 /* ═════════════ постройка точки ═════════════ */
@@ -340,7 +403,7 @@ function build1 (s, idx) {
   const ryU = Math.atan2(ux, uz);               // ось z модели — вдоль улицы
   const { put, LIT, LITM, LAMPH } = A;
   const B = (w, h, d, hex, a, y, b, list = LIT) => { const [x, z] = P(a, b); A.box(list, w, h, d, hex, x, y, z, ry); };
-  const shop = { i: idx, chain: s.chain, name: ch.name, x: s.cx, z: s.cz, fx: s.fx, fz: s.fz, ux, uz, nx, nz, gy, ry, dist: s.dist, items: [], umbs: [], tables: [], hits: 0, paid: 0, mascots: [], near: false, jobs: [], roam: [] };
+  const shop = { i: idx, mall: s.mall || 0, chain: s.chain, name: ch.name, x: s.cx, z: s.cz, fx: s.fx, fz: s.fz, ux, uz, nx, nz, gy, ry, dist: s.dist, items: [], umbs: [], tables: [], hits: 0, paid: 0, mascots: [], near: false, jobs: [], roam: [] };
 
   // площадка из плитки под всем участком и деревянная терраса
   {
@@ -361,31 +424,35 @@ function build1 (s, idx) {
   // витрина к террасе: тёплое стекло во всю стену, рамы, дверь
   {
     const [x, z] = P(0, b0 - 0.03);
-    put(LAMPH, new THREE.PlaneGeometry(W - 1.2, 2.3), s.chain === 'sushi' ? '#d9f1ff' : '#ffe2a8', x, gy + 1.75, z, 0, ry, 0);
-    for (let a = -W / 2 + 0.6; a <= W / 2 - 0.59; a += (W - 1.2) / 4) B(0.12, 2.4, 0.08, ch.dark, a, gy + 1.75, b0 - 0.06);
-    B(W - 1.0, 0.14, 0.1, ch.dark, 0, gy + 2.95, b0 - 0.06);
-    B(W - 1.0, 0.14, 0.1, ch.dark, 0, gy + 0.62, b0 - 0.06);
-    B(1.4, 2.3, 0.06, s.chain === 'sushi' ? '#8fc9e6' : '#cfa86a', W / 2 - 1.6, gy + 1.5, b0 - 0.09);   // дверь
+    put(LAMPH, new THREE.PlaneGeometry(W - 1.2, 3.2), s.chain === 'sushi' ? '#d9f1ff' : '#ffe2a8', x, gy + 2.2, z, 0, ry, 0);
+    for (let a = -W / 2 + 0.6; a <= W / 2 - 0.59; a += (W - 1.2) / 6) B(0.14, 3.3, 0.08, ch.dark, a, gy + 2.2, b0 - 0.06);
+    B(W - 1.0, 0.16, 0.1, ch.dark, 0, gy + 3.85, b0 - 0.06);
+    B(W - 1.0, 0.16, 0.1, ch.dark, 0, gy + 0.62, b0 - 0.06);
+    B(1.8, 2.7, 0.06, s.chain === 'sushi' ? '#8fc9e6' : '#cfa86a', W / 2 - 2, gy + 1.7, b0 - 0.09);   // дверь
     // внутри у стекла — стойка и «меню» над ней
-    const [mx, mz] = P(-1.2, b0 - 0.05);
-    put(LAMPH, new THREE.PlaneGeometry(3.4, 0.6), ch.dark, mx, gy + 2.55, mz, 0, ry, 0);
-    for (let i = 0; i < 4; i++) { const [qx, qz] = P(-2.6 + i * 0.95, b0 - 0.06); put(LAMPH, new THREE.PlaneGeometry(0.7, 0.32), ch.main, qx, gy + 2.55, qz, 0, ry, 0); }
+    const [mx, mz] = P(-2, b0 - 0.05);
+    put(LAMPH, new THREE.PlaneGeometry(5.4, 0.8), ch.dark, mx, gy + 3.3, mz, 0, ry, 0);
+    for (let i = 0; i < 5; i++) { const [qx, qz] = P(-4.2 + i * 1.1, b0 - 0.06); put(LAMPH, new THREE.PlaneGeometry(0.85, 0.42), ch.main, qx, gy + 3.3, qz, 0, ry, 0); }
     // боковые окна
     for (const sd of [-1, 1]) {
       const [x2, z2] = P(sd * (W / 2 + 0.03), bm);
-      put(LAMPH, new THREE.PlaneGeometry(D - 2.2, 1.4), s.chain === 'sushi' ? '#d9f1ff' : '#ffe2a8', x2, gy + 2.0, z2, 0, ry + sd * Math.PI / 2, 0);
+      put(LAMPH, new THREE.PlaneGeometry(D - 2.6, 2.0), s.chain === 'sushi' ? '#d9f1ff' : '#ffe2a8', x2, gy + 2.5, z2, 0, ry + sd * Math.PI / 2, 0);
     }
   }
   // вывеска над витриной — текстурой сети
   {
     // ось «право» вывески — против ux: лицевая сторона смотрит к улице (−n)
-    const [x, z] = P(0, b0 - 0.42), sw = Math.min(W - 1, 8), sh = sw * SIGN_H / SIGN_W, sy = gy + 3.05 + sh / 2;
+    const [x, z] = P(0, b0 - 0.42), sw = Math.min(W - 1.5, 13), sh = sw * SIGN_H / SIGN_W, sy = gy + 4.0 + sh / 2;
     signQuad(s.chain, x, sy, z, -ux, -uz, sw, sh);
     B(sw + 0.2, sh + 0.12, 0.12, ch.dark, 0, sy, b0 - 0.33);
   }
 
   // фигура на крыше
-  const rx = s.fx + nx * bm, rz = s.fz + nz * bm, ty = gy + H + 0.55;
+  const rx = s.fx + nx * bm, rz = s.fz + nz * bm, ty = gy + H + 0.55, K = RIV.ROOF;
+  // фигура — в своих осях, потом ×K и на крышу
+  const fig = [], putF = (_, geo, hex, x, y, z, ax = 0, ay = 0, az = 0) => put(fig, geo, hex, x, y, z, ax, ay, az);
+  {
+  const put = putF, rx = 0, rz = 0, ty = 0;
   if (s.chain === 'sushi') {
     // ролл-планета с кольцом, палочки воткнуты, звёзды
     put(LIT, new THREE.CylinderGeometry(1.5, 1.5, 1.7, 18), '#1d3b2c', rx, ty + 1.05, rz);
@@ -395,7 +462,7 @@ function build1 (s, idx) {
     put(LIT, new THREE.TorusGeometry(2.4, 0.13, 4, 36), ch.main, rx, ty + 1.1, rz, Math.PI / 2 - 0.35, ry, 0);
     for (const o of [-0.25, 0.25]) put(LIT, new THREE.BoxGeometry(0.1, 3.0, 0.1), '#d8b07a', rx + ux * o, ty + 2.6, rz + uz * o, 0, ryU, 0.35);
     for (let i = 0; i < 5; i++) { const a = i * 1.26 + 0.4; put(LIT, new THREE.OctahedronGeometry(0.22, 0), '#ffd84a', rx + Math.cos(a) * 3.2, ty + 0.4 + (i % 3) * 0.9, rz + Math.sin(a) * 3.2); }
-    B(0.2, 0.9, 0.2, '#585460', 0, ty + 0.2, bm);
+    put(LIT, new THREE.BoxGeometry(0.2, 0.9, 0.2), '#585460', rx, ty + 0.2, rz);
   } else {
     // бургер в короне
     const R = 1.9;
@@ -408,6 +475,8 @@ function build1 (s, idx) {
     for (let i = 0; i < 5; i++) { const a = i * 1.257; put(LIT, new THREE.ConeGeometry(0.17, 0.5, 4), '#f2c230', rx + Math.cos(a) * 0.76, ty + 1.18 + R + 0.55, rz + Math.sin(a) * 0.76); }
     put(LIT, new THREE.SphereGeometry(0.16, 6, 5), '#e04836', rx + ux * 0.8 - nx * 0.05, ty + 1.18 + R + 0.15, rz + uz * 0.8 - nz * 0.05);
   }
+  }
+  for (const g of fig) { g.scale(K, K, K); g.translate(rx, ty, rz); LIT.push(g); }
 
   // препятствие и «дом» — павильон
   {
@@ -425,7 +494,7 @@ function build1 (s, idx) {
     ST.items++;
     return it;
   };
-  const cols = 3, rows = 2, ta = (W - 2.6) / (cols - 1), tb = (TER - 2.6) / (rows - 1);
+  const cols = 4, rows = 3, ta = (W - 2.6) / (cols - 1), tb = (TER - 2.6) / (rows - 1);
   for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
     const a = -W / 2 + 1.3 + i * ta, b = 1.3 + j * tb, [x, z] = P(a, b), y = gy + 0.16, g = [];
     put(g, new THREE.CylinderGeometry(0.55, 0.55, 0.06, 10), '#f4f1ea', x, y + 0.75, z);
@@ -511,10 +580,10 @@ function build1 (s, idx) {
       GLASS_P.push({ g, x: mx, z: mz, shop });
       A.put(GLASS_F, A.boxGeo(0.09, HG, 0.09), fr, x0, y + HG / 2, z0);
     };
-    const nP = 6, pw = W / nP;
+    const nP = 8, pw = W / nP;
     for (let i = 0; i < nP; i++) pane(-W / 2 + i * pw, 0, -W / 2 + (i + 1) * pw, 0);
     for (const sd of [-1, 1]) {
-      const n2 = 4, pd = TER / n2;
+      const n2 = 5, pd = TER / n2;
       for (let i = 0; i < n2; i++) pane(sd * W / 2, i * pd, sd * W / 2, (i + 1) * pd);
     }
     { const [x, z] = P(W / 2, 0); A.put(GLASS_F, A.boxGeo(0.09, HG, 0.09), fr, x, y + HG / 2, z); }
@@ -879,29 +948,38 @@ let BCAR_TPL = null;
 function bcarTpl () {
   if (BCAR_TPL) return BCAR_TPL;
   const g = [], l = [], P = A.put, bx = A.boxGeo;
-  // машинка-бургер: колёса, нижняя булка с синей полосой, котлета, сыр, салат, помидор, верхняя булка-купол, корона
-  for (const z of [1.35, -1.35]) for (const s of [-1, 1]) {
-    P(g, new THREE.CylinderGeometry(0.38, 0.38, 0.3, 10), '#1d1c20', s * 0.92, 0.38, z, 0, 0, Math.PI / 2);
-    P(g, new THREE.CylinderGeometry(0.17, 0.17, 0.32, 8), '#c8c8cc', s * 0.92, 0.38, z, 0, 0, Math.PI / 2);
+  // машинка-бургер — круглая, как бургер (вид сверху — круг R): колёса снизу, нижняя булка с синей
+  // полосой сети, котлета, сыр уголками, салат волной, помидор, верхняя булка-купол с кунжутом
+  // и тёмным окном спереди, корона на макушке. Хитбокс — как у машины потока (hl)
+  const R = 1.6, cyl = (r1, r2, h, n = 24) => new THREE.CylinderGeometry(r1, r2, h, n);
+  for (const z of [0.95, -0.95]) for (const s of [-1, 1]) {
+    P(g, cyl(0.4, 0.4, 0.32, 12), '#1d1c20', s * 1.02, 0.4, z, 0, 0, Math.PI / 2);
+    P(g, cyl(0.18, 0.18, 0.34, 8), '#c8c8cc', s * 1.02, 0.4, z, 0, 0, Math.PI / 2);
   }
-  P(g, bx(1.95, 0.5, 4.2), '#e8a84f', 0, 0.68, 0);
-  P(g, bx(2.0, 0.14, 3.7), BCAR_HEX, 0, 0.62, 0);
-  P(g, bx(2.05, 0.26, 4.05), '#7a4526', 0, 1.06, 0);
-  P(g, bx(2.2, 0.06, 4.15), '#ffd34d', 0, 1.22, 0, 0, 0.02, 0);
-  for (const s of [-1, 1]) for (let i = 0; i < 4; i++) P(g, new THREE.ConeGeometry(0.1, 0.3, 3), '#ffd34d', s * 1.06, 1.08, -1.4 + i * 0.95, Math.PI, 0, 0);   // сыр свисает
-  P(g, bx(2.12, 0.08, 4.1), '#5fbf4a', 0, 1.29, 0);
-  P(g, bx(1.9, 0.08, 3.9), '#e04836', 0, 1.36, 0);
-  const top = new THREE.SphereGeometry(1, 16, 7, 0, Math.PI * 2, 0, Math.PI / 2);
-  top.scale(1.02, 0.78, 2.1);
-  P(g, top, '#e8a84f', 0, 1.4, 0);
-  for (let i = 0; i < 14; i++) { const a = i * 2.4, rr = 0.35 + (i % 3) * 0.2; P(g, new THREE.SphereGeometry(0.07, 5, 4), '#fff3d6', Math.cos(a) * rr * 0.9, 1.4 + 0.74 * Math.sqrt(Math.max(0, 1 - rr * rr)), Math.sin(a) * rr * 1.9); }
-  P(g, bx(1.5, 0.5, 0.06), '#22303e', 0, 1.72, 1.55, -0.9, 0, 0);      // лобовое
-  for (const s of [-1, 1]) P(g, bx(0.06, 0.38, 1.2), '#22303e', s * 0.9, 1.6, 0.6);
-  P(g, new THREE.CylinderGeometry(0.42, 0.42, 0.24, 10, 1, true), '#f2c230', 0, 2.3, -0.2);
-  for (let i = 0; i < 5; i++) P(g, new THREE.ConeGeometry(0.09, 0.26, 4), '#f2c230', Math.cos(i * 1.257) * 0.4, 2.52, -0.2 + Math.sin(i * 1.257) * 0.4);
+  P(g, cyl(R * 0.95, R * 0.85, 0.5), '#e8a84f', 0, 0.78, 0);              // нижняя булка
+  P(g, cyl(R * 0.97, R * 0.95, 0.14), BCAR_HEX, 0, 0.66, 0);              // полоса сети
+  P(g, cyl(R * 1.04, R * 1.04, 0.34), '#7a4526', 0, 1.2, 0);              // котлета
+  P(g, bx(R * 1.75, 0.06, R * 1.75), '#ffd34d', 0, 1.39, 0, 0, Math.PI / 4, 0);   // сыр квадратом, уголки свисают
+  for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; P(g, new THREE.ConeGeometry(0.13, 0.36, 3), '#ffd34d', Math.cos(a) * R * 1.2, 1.24, Math.sin(a) * R * 1.2, Math.PI, 0, 0); }
+  P(g, cyl(R * 1.08, R * 1.08, 0.08), '#5fbf4a', 0, 1.45, 0);             // салат
+  for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8; P(g, new THREE.SphereGeometry(0.16, 5, 3), '#5fbf4a', Math.cos(a) * R * 1.08, 1.43 - (i % 2) * 0.05, Math.sin(a) * R * 1.08); }
+  P(g, cyl(R * 0.98, R * 0.98, 0.1), '#e04836', 0, 1.52, 0);              // помидор
+  const top = new THREE.SphereGeometry(R, 20, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+  top.scale(1, 0.8, 1);
+  P(g, top, '#e8a84f', 0, 1.57, 0);                                         // верхняя булка
+  const win = new THREE.SphereGeometry(R * 1.015, 12, 4, Math.PI / 2 - 0.75, 1.5, 0.62, 0.5);
+  win.scale(1, 0.8, 1);
+  P(g, win, '#22303e', 0, 1.57, 0);                                         // окно спереди (+z)
+  for (let i = 0; i < 22; i++) {                                            // кунжут по куполу, не на окне
+    const a = i * 2.4, th = 0.25 + (i % 4) * 0.22, x = Math.cos(a) * Math.sin(th) * R, z = Math.sin(a) * Math.sin(th) * R;
+    if (z > 0.7 && Math.abs(x) < 1.1 && th > 0.5) continue;
+    P(g, new THREE.SphereGeometry(0.07, 5, 4), '#fff3d6', x, 1.57 + Math.cos(th) * R * 0.8, z);
+  }
+  P(g, cyl(0.42, 0.42, 0.24, 10), '#f2c230', 0, 1.57 + R * 0.8 + 0.08, 0);   // корона
+  for (let i = 0; i < 5; i++) P(g, new THREE.ConeGeometry(0.09, 0.26, 4), '#f2c230', Math.cos(i * 1.257) * 0.4, 1.57 + R * 0.8 + 0.3, Math.sin(i * 1.257) * 0.4);
   for (const s of [-1, 1]) {
-    P(l, bx(0.36, 0.18, 0.05), '#fff6d8', s * 0.66, 0.74, 2.12);
-    P(l, bx(0.3, 0.14, 0.05), '#e0262a', s * 0.72, 0.74, -2.12);
+    P(l, bx(0.34, 0.18, 0.05), '#fff6d8', s * 0.6, 0.8, R * 0.93);
+    P(l, bx(0.3, 0.14, 0.05), '#e0262a', s * 0.6, 0.8, -R * 0.93);
   }
   BCAR_TPL = { lit: A.mergeGeos(g), flat: A.mergeGeos(l) };
   return BCAR_TPL;
@@ -1114,10 +1192,12 @@ export const DEBUG = {
   get stats () {
     const by = {};
     for (const s of SHOPS) { const k = s.dist + ''; by[k] = by[k] || { sushi: 0, burger: 0 }; by[k][s.chain]++; }
-    return { shops: SHOPS.length, sushi: SHOPS.filter(s => s.chain === 'sushi').length, burger: SHOPS.filter(s => s.chain === 'burger').length, byDist: by, mascots: MASC.length, guests: SEAT.length, items: ST.items, ms: ST.ms, season: ST.season, tried: ST.tried, tested: ST.tested, why: ST.why };
+    return { shops: SHOPS.length, sushi: SHOPS.filter(s => s.chain === 'sushi').length, burger: SHOPS.filter(s => s.chain === 'burger').length, byDist: by, mascots: MASC.length, guests: SEAT.length, items: ST.items, ms: ST.ms, season: ST.season, tried: ST.tried, tested: ST.tested, lots: ST.lots, mall: ST.mall, why: ST.why };
   },
   mascots: () => MASC.filter(m => m.root).map(m => ({ kind: m.kind, x: +m.x.toFixed(2), z: +m.z.toFixed(2), st: m.st, chain: m.shop.chain })),
   couriers: () => (A ? A.TRAFFIC.filter(c => !c.gone && (c.bcar || (c.mp && c.mp.br.rival))).map(c => ({ kind: c.bcar ? 'bcar' : 'sushi', x: Math.round(c.x), z: Math.round(c.z), sp: +(c.speed || 0).toFixed(1), goal: c.rvGoal ? [Math.round(c.rvGoal[0]), Math.round(c.rvGoal[1])] : null, trips: c.rvTrips || 0 })) : []),
+  /* м от участка точки (с полями) до ближайшей стены дома: [сеть, район, м, у ТЦ] */
+  walls: () => { const G = wallGrid(); return SHOPS.map(s => [s.chain, s.dist, +rectWall(G, s.x, s.z, s.ux, s.uz, WT() / 2, DT() / 2, 300).toFixed(1), s.mall ? 1 : 0]); },
   season: () => applySeason(true),
   respect: () => ({ v: RESPECT.get(), log: RESPECT.DEBUG.log.slice(-8) }),
   reset: () => reset(),

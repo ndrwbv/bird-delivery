@@ -6,12 +6,13 @@
 }
 #wx-cap b { font-weight: normal; font-size: clamp(20px, 4vw, 40px); color: #fff3d6;
             text-shadow: 4px 4px 0 #33210c, -2px -2px 0 #33210c, 2px -2px 0 #33210c, -2px 2px 0 #33210c; }
-#wx-cap span { font-size: clamp(9px, 1.4vw, 15px); line-height: 1.5; color: #fff3d6; background: rgba(20, 16, 30, .72);
-               padding: 7px 14px; border-radius: 8px; text-shadow: 2px 2px 0 #33210c; }
+#wx-cap span { font-size: clamp(9px, 1.4vw, 15px); line-height: 1.5; color: #fff3d6;
+               padding: 2px 4px; text-shadow: 2px 2px 0 #33210c, -1px 0 0 #33210c, 1px 0 0 #33210c, 0 -1px 0 #33210c, 0 1px 0 #33210c; }
 #wx-cap[data-v="heat"] b { color: #ffb347; }
 #wx-cap[data-v="golden"] b { color: #ffd85e; }
 #wx-cap[data-v="snowy"] b { color: #e6f2ff; }
 #wx-cap[data-v="rain"] b, #wx-cap[data-v="storm"] b { color: #b9d4ff; }
+#wx-cap[data-v="hurricane"] b { color: #c8f0b8; }
 #wx-cap.on { animation: wx-cap 4.2s ease-out both; }
 @keyframes wx-cap {
   0% { opacity: 0; transform: translate(-50%, -30%); }

@@ -1,7 +1,7 @@
 /* ── респект на хаде (respect.js): мелкий чип «★ 42 Свой пацан» под кошельком, всплывашка под ним ── */
 #respect { position: relative; display: flex; align-items: center; justify-content: flex-end; gap: 5px; margin: 6px 0 0 auto;
-           width: max-content; max-width: 280px; padding: 4px 7px 3px; line-height: 1.2;
-           background: rgba(20, 16, 30, .62); border: 2px solid #33210c; border-radius: 6px; }
+           width: max-content; max-width: 280px; padding: 2px 2px 1px; line-height: 1.2;
+           text-shadow: 2px 2px 0 #33210c, -1px 0 0 #33210c, 1px 0 0 #33210c, 0 -1px 0 #33210c, 0 1px 0 #33210c; }   /* без плашки: обводка текста (правило хада — CAREER.md) */
 #respect[hidden] { display: none; }
 #respect .rs-ico { font-style: normal; font-size: 10px; color: #ff9a3c; }
 #respect b { font-size: 10px; color: #ffd85e; }
@@ -18,7 +18,7 @@
 @keyframes rs-up { 0% { transform: translateY(8px); opacity: 0; } 10% { transform: translateY(0); opacity: 1; }
                    75% { opacity: 1; } 100% { transform: translateY(-8px); opacity: 0; } }
 @media (max-width: 720px) {
-  #respect { margin-top: 4px; padding: 3px 5px 2px; gap: 4px; }
+  #respect { margin-top: 4px; padding: 2px 2px 1px; gap: 4px; }
   #respect .rs-ico, #respect b { font-size: 8px; }
   #respect span { font-size: 6px; max-width: 90px; }
   .rs-pop { font-size: 7px; }

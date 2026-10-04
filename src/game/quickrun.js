@@ -33,7 +33,7 @@ const FREEZE = new Set(['dlv-msk-xp']);
 const SEASONS = [{ id: 'now' }, { id: 'summer', v: 0.5 }, { id: 'autumn', v: 1.5 }, { id: 'winter', v: 2.5 }, { id: 'spring', v: 3.5 }];
 const SEASON_NAME = { summer: () => t('лето'), autumn: () => t('осень'), winter: () => t('зима'), spring: () => t('весна') };
 /* погода: не к сезону — сезон подстроится (жара — лето, снежная зима — зима) */
-const WX_SUB = { clear: () => t('как обычно'), heat: () => t('лето'), golden: () => t('осень'), snowy: () => t('зима'), rain: () => t('не зимой'), storm: () => t('не зимой') };
+const WX_SUB = { clear: () => t('как обычно'), heat: () => t('лето'), golden: () => t('осень'), snowy: () => t('зима'), rain: () => t('не зимой'), storm: () => t('не зимой'), hurricane: () => t('уносит дома') };
 const LEN_NAME = { short: () => t('короткая'), medium: () => t('средняя'), long: () => t('длинная') };
 
 let A = null, box = null, endBox = null;

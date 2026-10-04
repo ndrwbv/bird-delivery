@@ -25,7 +25,7 @@
 
    Перф: ничего не склеено заранее (лесов ~3000 га — это миллион деревьев).
    Лес режется на клетки CELL (48 м); клетка собирается, только когда камера
-   ближе FAR (470 м — дальше туман), не больше BUDGET мс за кадр; дальше
+   ближе FAR (470 м — дальше туман; туман ближе по настройке графики — и FAR ближе, farOf), не больше BUDGET мс за кадр; дальше
    FAR + 150 м — выбрасывается. Рисуют 5 общих InstancedMesh (ель, ель-даль,
    сосна, сосна-даль, куст): раз в несколько кадров (или когда камера
    сдвинулась/повернулась) в них копируются клетки, что в кадре: ближе NEAR
@@ -330,15 +330,19 @@ function ensure (x, z, R, budget) {
 
 /* ── в меши: что в кадре ── */
 const FR = new THREE.Frustum(), PM = new THREE.Matrix4(), SPH = new THREE.Sphere(), V3 = new THREE.Vector3();
+/* дальность леса — не дальше края камеры: туман ближе (настройка графики gfx.js, страховка cull.js) —
+   и ельник ближе, дальше тумана не строим и не рисуем. Твёрдые стволы нужны только у машины — рядом */
+const farOf = cam => Math.max(120, Math.min(FOREST.FAR, (cam.far || 490) - 20));
+const nearOf = far => Math.min(FOREST.NEAR, far * 0.47);
 function refresh (cam) {
-  const F = FOREST, x = cam.position.x, z = cam.position.z;
+  const F = FOREST, x = cam.position.x, z = cam.position.z, FAR = farOf(cam), NEAR = nearOf(FAR);
   PM.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
   FR.setFromProjectionMatrix(PM);
   const vis = [];
   for (const c of CELLS.values()) {
     if (c.empty) continue;
     const d = Math.hypot(c.cx - x, c.cz - z);
-    if (d > F.FAR + F.CELL * 0.71) continue;
+    if (d > FAR + F.CELL * 0.71) continue;
     SPH.center.set(c.cx, c.gy + 9, c.cz); SPH.radius = F.CELL * 0.71 + 22;
     if (d > F.CELL * 1.5 && !FR.intersectsSphere(SPH)) continue;
     vis.push([d, c]);
@@ -354,8 +358,8 @@ function refresh (cam) {
     n[mk] += k;
   };
   for (const [d, c] of vis) {
-    const near = d < F.NEAR;
-    const keep = near ? 1 : 1 - (1 - F.THIN) * Math.min(1, (d - F.NEAR) / (F.FAR - F.NEAR));
+    const near = d < NEAR;
+    const keep = near ? 1 : 1 - (1 - F.THIN) * Math.min(1, (d - NEAR) / Math.max(1, FAR - NEAR));
     if (c.sp) put(near ? 'sp0' : 'sp1', c.sp, Math.ceil(c.sp.n * keep));
     if (c.pi) put(near ? 'pi0' : 'pi1', c.pi, Math.ceil(c.pi.n * keep));
     if (c.bu && d < F.BUSH_R) put('bu', c.bu, c.bu.n);
@@ -392,17 +396,19 @@ export function step (dt, api) {
   const jump = Math.hypot(x - LAST.x, z - LAST.z);
   // первый кадр или прыжок (телепорт, другая пиццерия): ближнее — сразу
   let built = jump > 150 ? ensure(x, z, F.WARM, 140) : false;
-  built = ensure(x, z, F.FAR, F.BUDGET) || built;
+  const FAR = farOf(cam);
+  built = ensure(x, z, FAR, F.BUDGET) || built;
   const fx = -cam.matrixWorld.elements[8], fz = -cam.matrixWorld.elements[10], yaw = Math.atan2(fx, fz);
   let dy = Math.abs(yaw - LAST.yaw); if (dy > Math.PI) dy = 2 * Math.PI - dy;
-  if (built || jump > 6 || dy > 0.1 || LAST.frame - LAST.n > 30) {
+  if (built || jump > 6 || dy > 0.1 || LAST.frame - LAST.n > 30 || FAR !== LAST.far) {
+    LAST.far = FAR;
     refresh(cam);
     LAST.x = x; LAST.z = z; LAST.yaw = yaw; LAST.n = LAST.frame;
   }
   // дальние клетки — из памяти
   if ((LAST.sweep += dt) > 3) {
     LAST.sweep = 0;
-    const R = F.FAR + 150;
+    const R = FAR + 150;
     for (const [k, c] of CELLS) {
       const cx = c.empty ? (c.i + 0.5) * F.CELL : c.cx, cz = c.empty ? (c.j + 0.5) * F.CELL : c.cz;
       if (Math.hypot(cx - x, cz - z) > R) { if (c.empty) CELLS.delete(k); else dropCell(k, c); }

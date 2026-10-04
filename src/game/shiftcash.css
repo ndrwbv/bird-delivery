@@ -1,42 +1,50 @@
-/* ── заработок смены на хаде (shiftcash.js): пачка купюр и крупная сумма, в одной строке с кошельком ── */
-#shiftcash { position: relative; display: inline-flex; align-items: center; gap: 8px; vertical-align: top; margin-right: 8px;
-             padding: 6px 10px 5px 8px; line-height: 1.2;
-             background: rgba(20, 16, 30, .7); border: 2px solid #33210c; border-radius: 6px; }
+/* ── заработок смены на хаде (shiftcash.js): пачка купюр и крупная сумма, в одной строке с кошельком.
+   Без рамки и плашки: читается на светлом и тёмном за счёт пиксельной обводки текста и тени пачки ── */
+#shiftcash { position: relative; display: inline-flex; align-items: center; gap: 6px; vertical-align: top; margin-right: 4px;
+             padding: 4px 4px 3px 2px; line-height: 1.2; }
 #shiftcash[hidden] { display: none; }
-#shiftcash .sc-ico { width: 40px; height: 30px; flex: none; filter: drop-shadow(2px 2px 0 #33210c); transform-origin: 50% 100%; }
-#shiftcash .sc-txt { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
-#shiftcash .sc-txt span { font-size: 7px; color: #bcd0e8; letter-spacing: .5px; }
-#shiftcash .sc-txt b { font-size: 20px; color: #8cf07a; white-space: nowrap; }
-/* оплата: пачка подпрыгивает, число вспыхивает; вычет — число краснеет */
-#shiftcash.bump .sc-ico { animation: sc-jump .5s steps(5) 1; }
+#shiftcash .sc-ico { width: 32px; height: 24px; flex: none; filter: drop-shadow(2px 2px 0 #33210c); transform-origin: 50% 70%; }
+#shiftcash .sc-txt { display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+                     text-shadow: 2px 2px 0 #33210c, -1px 0 0 #33210c, 1px 0 0 #33210c, 0 -1px 0 #33210c, 0 1px 0 #33210c; }
+#shiftcash .sc-txt span { font-size: 6px; color: #dfe9f5; letter-spacing: .5px; }
+#shiftcash .sc-txt b { font-size: 16px; color: #8cf07a; white-space: nowrap; }
+/* оплата: число вспыхивает (пачка «пухнет» на каждой долетевшей купюре — из js); вычет — число краснеет */
 #shiftcash.bump .sc-txt b { animation: sc-flash .5s ease-out 1; }
 #shiftcash.hurt .sc-txt b { animation: sc-hurt .6s steps(3) 1; }
-@keyframes sc-jump { 0% { transform: none; } 30% { transform: translateY(-6px) scale(1.15); } 60% { transform: translateY(1px) scale(1, .9); } 100% { transform: none; } }
+#shiftcash.hurt .sc-ico { animation: sc-jump .5s steps(5) 1; }
+@keyframes sc-jump { 0% { transform: none; } 30% { transform: translateY(-4px) scale(1.1); } 60% { transform: translateY(1px) scale(1, .9); } 100% { transform: none; } }
 @keyframes sc-flash { 0% { transform: scale(1); } 35% { transform: scale(1.25); color: #fff3d6; } 100% { transform: scale(1); } }
 @keyframes sc-hurt { 0%, 100% { color: #8cf07a; } 33% { color: #ff6b6b; } 66% { color: #ff9a9a; } }
 /* «+сумма» всплывает из-под блока (над ним — край экрана) и тает */
-#shiftcash .sc-pop { position: absolute; right: 8px; top: calc(100% + 6px); font-style: normal; font-size: 12px; line-height: 1;
-                     color: #ffd85e; white-space: nowrap; pointer-events: none; animation: sc-up 1.1s ease-out forwards; }
+#shiftcash .sc-pop { position: absolute; right: 4px; top: calc(100% + 4px); font-style: normal; font-size: 10px; line-height: 1;
+                     color: #ffd85e; white-space: nowrap; pointer-events: none; animation: sc-up 1.1s ease-out forwards;
+                     text-shadow: 2px 2px 0 #33210c, -1px -1px 0 #33210c; }
 #shiftcash .sc-pop.neg { color: #ff6b6b; }
 @keyframes sc-up { 0% { transform: translateY(12px); opacity: 0; } 15% { transform: translateY(4px); opacity: 1; }
                    70% { opacity: 1; } 100% { transform: translateY(-6px); opacity: 0; } }
+/* купюры и монетки в полёте (из кучки под машиной в пачку) и красная купюра вычета — поверх всего хада */
+.sc-fly { position: fixed; z-index: 41; width: 26px; height: 14px; margin: -7px 0 0 -13px; pointer-events: none;
+          will-change: transform, opacity; filter: drop-shadow(2px 2px 0 rgba(51, 33, 12, .8)); }
+.sc-fly.c { width: 12px; height: 12px; margin: -6px 0 0 -6px; }
+.sc-fly svg { display: block; width: 100%; height: 100%; }
+@media (max-width: 720px) { .sc-fly { width: 20px; height: 11px; margin: -5px 0 0 -10px; } .sc-fly.c { width: 10px; height: 10px; margin: -5px 0 0 -5px; } }
 
 /* узкий экран (телефон, окно до 1000 точек): пачка и «за смену» строкой сверху, сумма — под ними.
    Телефон стоя (до 720) — рядом с кошельком, не залезает на табличку курьеров слева; окно 721—1000 —
    места рядом с кошельком нет (часы заказа по центру), блок — по центру под часами; телефон боком — ниже */
 @media (max-width: 1000px) {
   #shiftcash { display: inline-grid; grid-template-columns: auto auto; align-items: center; justify-items: end;
-               gap: 4px 5px; margin-right: 5px; padding: 5px 7px 5px 6px; }
+               gap: 3px 4px; margin-right: 3px; padding: 3px 3px 3px 2px; }
   #shiftcash[hidden] { display: none; }
-  #shiftcash .sc-ico { width: 22px; height: 16px; justify-self: start; }
+  #shiftcash .sc-ico { width: 18px; height: 13px; justify-self: start; }
   #shiftcash .sc-txt { display: contents; }
   #shiftcash .sc-txt span { font-size: 6px; }
-  #shiftcash .sc-txt b { grid-column: 1 / -1; font-size: 16px; }
-  #shiftcash .sc-pop { font-size: 10px; }
+  #shiftcash .sc-txt b { grid-column: 1 / -1; font-size: 13px; }
+  #shiftcash .sc-pop { font-size: 9px; }
 }
 @media (max-width: 720px) {
-  #shiftcash .sc-txt b { font-size: 12px; }
-  #shiftcash .sc-pop { font-size: 9px; }
+  #shiftcash .sc-txt b { font-size: 10px; }
+  #shiftcash .sc-pop { font-size: 8px; }
 }
 @media (min-width: 721px) and (max-width: 1000px) {
   #shiftcash { position: fixed; top: 52px; left: 50%; transform: translateX(-50%); margin: 0; }
@@ -44,5 +52,5 @@
 /* телефон боком: под часами — подсказки (#toast), а слева под табличкой курьеров пусто до руля */
 @media (max-height: 460px) {
   body.touch #shiftcash { position: fixed; top: 146px; left: max(16px, env(safe-area-inset-left)); transform: none; margin: 0; }
-  body.touch #shiftcash .sc-txt b { font-size: 14px; }
+  body.touch #shiftcash .sc-txt b { font-size: 11px; }
 }

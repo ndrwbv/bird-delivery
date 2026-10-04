@@ -38,6 +38,7 @@ import * as DLG from './dialog.js';
 import * as ZN from './zones.js';
 import * as DIST from './districts.js';
 import * as FEST from './festivals.js';
+import * as HURR from './hurricane.js';          // дома, унесённые ураганом: их адреса не выдаём (hurricane.js blocked)
 import * as GROW from './growth.js';            // пиццерия растёт: оплата, чаевые, размер сборных по ступени (econ.js GROWTH)
 import { makePerson } from './people.js';
 import { ORDER_TYPES, SHIFT_PLAN, SIDE_ORDERS, STAFF_RIDE, BOSS } from './orders.config.js';
@@ -209,7 +210,7 @@ function pickSpot (o = {}) {
   const fn = !o.near && !SIM ? FEST.near() : null;
   if (fn) o = { ...o, near: fn, r: fn.r, dmin: undefined, dmax: undefined, zone: null };
   const c = o.from || A.PIZZA;
-  const fit = s => (!o.zone || s.zone === o.zone) && !SH.reserved.has(s.key) &&
+  const fit = s => (!o.zone || s.zone === o.zone) && !SH.reserved.has(s.key) && !HURR.blocked(s.x, s.z) &&   // у унесённого ураганом дома — не возим
     (o.near ? Math.hypot(s.x - o.near.x, s.z - o.near.z) <= o.r : true) &&
     (o.dmin === undefined || Math.hypot(s.x - c.x, s.z - c.z) >= o.dmin) &&
     (o.dmax === undefined || Math.hypot(s.x - c.x, s.z - c.z) <= o.dmax);

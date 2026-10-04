@@ -16,6 +16,9 @@
      rain   — дождь почти всю смену (льёт 60—120 с, перерывы 15—35 с), асфальт мокрый
      storm  — гроза: ливень всю смену, небо тёмное, молнии (вспышка света на миг) и гром с
               задержкой «сколько до молнии / 343 м/с»
+     hurricane — ураган (редко, не в первые смены — hurricane.js HUR.FROM): ливень, ветер сносит
+              машину, клонит деревья, летит мусор; уносит 1—3 дома рядом — на их месте забор и кран
+              на несколько смен (hurricane.js)
    Сцепление в дождь и грозу — по общим правилам мокрой дороги (WET в game.js: от ENV.rain).
 
    Как подключено (game.js — точечные хуки):
@@ -30,17 +33,18 @@
 import './weather.css';
 import { t } from '../i18n/index.js';
 import * as SEAS from './seasons.js';
+import * as HUR from './hurricane.js';
 
 /* шансы вариантов на смену, по сезону календаря (в сумме 100) */
 export const CHANCES = {
-  summer: { clear: 50, heat: 25, rain: 15, storm: 10 },
-  autumn: { clear: 45, golden: 25, rain: 20, storm: 10 },
+  summer: { clear: 47, heat: 25, rain: 15, storm: 10, hurricane: 3 },
+  autumn: { clear: 39, golden: 25, rain: 20, storm: 10, hurricane: 6 },
   winter: { clear: 55, snowy: 45 },
-  spring: { clear: 55, rain: 30, storm: 15 },
+  spring: { clear: 52, rain: 30, storm: 15, hurricane: 3 },
 };
-export const IDS = ['clear', 'heat', 'golden', 'snowy', 'rain', 'storm'];
+export const IDS = ['clear', 'heat', 'golden', 'snowy', 'rain', 'storm', 'hurricane'];
 /* где вариант к месту: быстрый заезд с «жарой» зимой ставит сезон отсюда */
-const HOME = { heat: 0.45, golden: 1.45, snowy: 2.5, rain: 3.5, storm: 0.6 };
+const HOME = { heat: 0.45, golden: 1.45, snowy: 2.5, rain: 3.5, storm: 0.6, hurricane: 1.3 };
 const W = {
   RAIN_ON: [60, 120], RAIN_OFF: [15, 35],      // дождь: сколько льёт и сколько перерыв, с
   BOLT_EVERY: [6, 16], BOLT_DIST: [320, 1100], // молния: раз в 6—16 с, в 320—1 100 м
@@ -56,6 +60,7 @@ const OVER = {
   snowy: { snow: v => Math.max(v, 0.95), drift: 1, ice: v => Math.max(v, 0.9), warm: 1, snowfall: 0.85 },
   rain: { wet: v => Math.max(v, 0.65) },
   storm: { wet: v => Math.max(v, 0.85) },
+  hurricane: { wet: v => Math.max(v, 0.85), fallen: v => Math.max(v, 0.5) },
 };
 
 let C = null, THREE = null;
@@ -91,6 +96,7 @@ const fits = (id, b) => id === 'clear' || (CHANCES[b] && CHANCES[b][id] !== unde
 export function init (ctx) {
   C = ctx; THREE = ctx.THREE;
   if (!ctx.intro) { try { buildDeep(); } catch (e) { console.error('[weather] сугробы', e); } }
+  if (!ctx.intro) { try { HUR.init(ctx); } catch (e) { console.error('[weather] ураган', e); } }
   SEAS.addDriftTop(deepTop);
   const q = new URLSearchParams(location.search).get('weather');
   if (q && IDS.includes(q)) { FORCE = q; setTimeout(() => set(q), 0); }   // ENV игры заводится позже
@@ -104,8 +110,10 @@ export function shiftStart (ride) {
   SEAS.setVariant(null);
   const n = (+C.Store.get('dlv-shifts', 0) || 0) + (ride ? 5003 : 0);
   let id = FORCE || pickFor(n, bucket());
+  if (id === 'hurricane' && !FORCE && (ride || n < HUR.HUR.FROM)) id = 'storm';   // ураган — не в первые смены и не «просто покататься»
   if (FORCE && !fits(FORCE, bucket())) SEAS.setSeason(HOME[FORCE], true);   // быстрый заезд: «жара» — значит лето
   set(id, n);
+  HUR.shiftStart(id, ride, n);
   caption(0.8);
 }
 /* поставить вариант сейчас */
@@ -117,7 +125,7 @@ function set (id, n = N) {
   for (const m of DEEP_MESH) m.visible = id === 'snowy';
   const ENV = C.ENV;
   if (ENV) {
-    if (id === 'rain' || id === 'storm') { ENV.rainWant = 1; ENV.rain = Math.max(ENV.rain, 0.85); RT = rnd(...W.RAIN_ON); }
+    if (id === 'rain' || id === 'storm' || id === 'hurricane') { ENV.rainWant = 1; ENV.rain = Math.max(ENV.rain, 0.85); RT = rnd(...W.RAIN_ON); }
     else if (id !== 'clear') { ENV.rainWant = 0; ENV.rain = 0; }
   }
   if (id !== 'snowy') dropSleds();
@@ -130,7 +138,7 @@ export const forced = () => FORCE;
 /* названия: для подписи и накладной */
 const TITLE = {
   heat: () => t('жара +{n}°', { n: TEMP }), golden: () => t('золотая осень'), snowy: () => t('снегопад'),
-  rain: () => t('дождь весь день'), storm: () => t('гроза'),
+  rain: () => t('дождь весь день'), storm: () => t('гроза'), hurricane: () => t('ураган!'),
 };
 const SUB = {
   heat: () => t('асфальт плавится, город оранжевый, все в шортах'),
@@ -138,12 +146,13 @@ const SUB = {
   snowy: () => t('сугробы до второго этажа, дороги расчищены'),
   rain: () => t('дорога мокрая — тормоз слабее, в повороте сносит'),
   storm: () => t('ливень, молнии и гром — дорога мокрая'),
+  hurricane: () => t('ветер сносит машину и уносит дома — держи руль'),
 };
 export const label = () => (TITLE[ID] ? TITLE[ID]() : '');
 /* имя варианта для выбора в быстром заезде */
 export const NAME = {
   clear: () => t('обычная'), heat: () => t('жара'), golden: () => t('золотая осень'), snowy: () => t('снежная зима'),
-  rain: () => t('дождь'), storm: () => t('гроза'),
+  rain: () => t('дождь'), storm: () => t('гроза'), hurricane: () => t('ураган'),
 };
 let capEl = null, capT = 0, capWait = -1;
 /* подпись ждёт, пока не закроют накладную (state 'brief') и не загрузят пиццу: потом ещё delay с */
@@ -175,7 +184,7 @@ function showCaption () {
 /* дождь: true — расписанием управляет вариант (game.js updateEnv своё не крутит) */
 export function rainControl (ENV, dt) {
   if (ID === 'clear') return false;
-  if (ID === 'storm') ENV.rainWant = 1;
+  if (ID === 'storm' || ID === 'hurricane') ENV.rainWant = 1;
   else if (ID === 'rain') {
     if ((RT -= dt) <= 0) {
       ENV.rainWant = ENV.rainWant ? 0 : 1;
@@ -193,7 +202,7 @@ function colors () {
   const c = h => new THREE.Color(h);
   COL = { heatSky: c('#f2a04e'), heatFog: c('#f2b673'), heatGnd: c('#d98c40'), heatSun: c('#ffbf70'),
     goldSky: c('#8fcaf2'), goldSun: c('#ffd9a0'), snowSky: c('#cdd5de'), snowFog: c('#dfe5ec'),
-    stormSky: c('#3b424f'), stormFog: c('#4a525f'), flash: c('#e4e9ff'), flashFog: c('#bfc8e6') };
+    stormSky: c('#3b424f'), stormFog: c('#4a525f'), hurSky: c('#525a52'), hurFog: c('#646b62'), flash: c('#e4e9ff'), flashFog: c('#bfc8e6') };
   return COL;
 }
 function sky (dt) {
@@ -210,10 +219,10 @@ function sky (dt) {
   } else if (ID === 'snowy') {
     scene.background.lerp(K.snowSky, 0.35 * day);
     if (fog) { fog.color.lerp(K.snowFog, 0.4 * day); fog.far *= 0.72; }
-  } else if (ID === 'storm') {
-    const R = ENV.rain || 0;
-    scene.background.lerp(K.stormSky, 0.6 * R);
-    if (fog) { fog.color.lerp(K.stormFog, 0.55 * R); fog.far *= 1 - 0.18 * R; }
+  } else if (ID === 'storm' || ID === 'hurricane') {
+    const R = ENV.rain || 0, hu = ID === 'hurricane';
+    scene.background.lerp(hu ? K.hurSky : K.stormSky, 0.6 * R);
+    if (fog) { fog.color.lerp(hu ? K.hurFog : K.stormFog, 0.55 * R); fog.far *= 1 - (hu ? 0.26 : 0.18) * R; }
     if (sun) sun.intensity *= 1 - 0.55 * R;
     if (hemi) hemi.intensity *= 1 - 0.32 * R;
     if (amb) amb.intensity *= 1 - 0.3 * R;
@@ -576,15 +585,16 @@ export function update (dt) {
   sky(dt);
   if (ID === 'snowy') stepDeep(dt);
   stepSleds(dt);
+  HUR.step(dt, ID === 'hurricane' && C.S.state !== 'title');
   PERF.ms += performance.now() - t0; PERF.n++;
 }
 
 /* для ?debug: __dlv.weather */
 const DEBUG = {
   get id () { return ID; }, get forced () { return FORCE; }, get temp () { return TEMP; }, get label () { return label(); },
-  CHANCES, IDS, bucket, pickFor, force, strike, shiftStart,
+  CHANCES, IDS, bucket, pickFor, force, strike, shiftStart, hur: HUR.DEBUG,
   /* поставить вариант сейчас (и сезон, если не к месту) */
-  set (v) { SEAS.setVariant(null); if (v !== 'clear' && !fits(v, bucket())) SEAS.setSeason(HOME[v], true); set(v); caption(0); return ID; },
+  set (v) { SEAS.setVariant(null); if (v !== 'clear' && !fits(v, bucket())) SEAS.setSeason(HOME[v], true); set(v); HUR.shiftStart(ID, false, N); caption(0); return ID; },
   /* как разойдутся смены 0…n-1 по вариантам в этом сезоне */
   spread (n = 1000, b = bucket()) { const o = {}; for (let i = 0; i < n; i++) { const k = pickFor(i, b); o[k] = (o[k] || 0) + 1; } return o; },
   get bolts () { return BOLT.n; }, get flash () { return BOLT.f; }, hold (on = true) { BOLT.hold = on; },

@@ -52,6 +52,7 @@ const WHY_TEXT = {
   ownCrew: N_('сбил своего коллегу'),
   passCrew: N_('проехал мимо — своих били'),
   noDefend: N_('не помог отбиться'),
+  marcher: N_('сбил митингующего'),
 };
 export const whyText = why => (WHY_TEXT[why] ? t(WHY_TEXT[why]) : '');
 

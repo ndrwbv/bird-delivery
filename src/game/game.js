@@ -30,6 +30,7 @@ import * as MAPW from './mapworks.js';
 import * as CBITS from './citybits.js';
 import * as SEAS from './seasons.js';
 import * as WTH from './weather.js';
+import * as HUR from './hurricane.js';            // ураган: дом проваливается в шейдере статики (holeMat), забор и кран на месте (hurricane.js)
 import * as LIFE from './life.js';               // парочки, богачи, графитисты, змеи и дроны в парках
 import * as WORLD from './world.js';
 import * as SL from './streetlamps.js';
@@ -43,6 +44,7 @@ import * as JUNK from './junk.js';              // остановки ломаю
 import * as RAID from './raid.js';               // налёт конкурентов на твою точку и ёлка-турель (raid.js)
 import * as MAFIA from './mafia.js';             // мафиози у адреса: предупреждает, потом стреляет (детская — кидается помидорами)
 import * as THUGS from './thugs.js';             // гопники прессуют прохожего в бандитских кругах — помог, респект (thugs.js)
+import * as PROT from './protests.js';         // жизнь города: протест по ступеням, марши, драки, концерты во дворах (protests.js)
 import * as GROW from './growth.js';             // пиццерия растёт: ступени 1—5 по доставкам в районе, вид у шара (growth.js)
 import * as HEROES from './heroes.js';           // герои города: Лёха, Жека, Игорёк, Стёпа, Настюша, Ариша, Андрюша — места и реплики
 import * as HB from './horsebox.js';             // коневозки в потоке: прицеп за машиной, конь в окне (horsebox.js)
@@ -50,6 +52,7 @@ import * as FLIRT from './flirt.js';            // взрослая: клиен�
 import * as YARDS from './yards.js';             // дворы многоэтажек: лавочки у подъездов, тропинки, низкие заборчики (yards.js)
 import * as FAUNA from './fauna.js';             // лоси, лисы и зайцы в лесах; «лось на дороге!» (fauna.js)
 import * as CATS from './cats.js';               // продухи подвалов и коты на крышах и во дворах (cats.js)
+import * as DARKN from './darknight.js';       // тёмная ночь 23—5: костры дикарей-бургеров, ведьмы с котлами, привидения (darknight.js)
 import * as NIGHT from './nightlife.js';         // взрослая: девушки у обочины ночью, стрип-клуб «Клубничка» (nightlife.js)
 import * as RL from './roadlife.js';
 import * as PZ from './pizzeria.js';
@@ -68,7 +71,8 @@ import * as HSTORY from './herostories.js';      // герои города, э�
 import * as AUTO from './cars.js';               // карьера: 14 машин, мотор и ресурс, заглохла, ямы, гараж Дяди Жени
 import * as FEST from './festivals.js';          // фестивали на парковках ТЦ: кальянщики, тыква, День угнетения бургеров (festivals.js)
 import * as HK from './hookah.js';               // кальянщики на лавочках (в детской — самовар)
-import * as CULL from './cull.js';               // статика дальше камеры — со сцены, матрицы заморожены (Steam Deck)
+import * as CULL from './cull.js';
+import * as GFX from './gfx.js';                 // настройки графики: пресеты, 30 к/с, дальность, город за меню (gfx.js, docs/CAREER.md)               // статика дальше камеры — со сцены, матрицы заморожены (Steam Deck)
 import * as TRK from './tracks.js';              // следы колёс на газоне и снегу
 import * as CHAT from './chat.js';             // «Толик управляющий» пишет справа сверху, как в iMessage (похвала, ругань, вычет за опоздание)
 import * as SC from './shiftcash.js';             // карьера: пачка купюр на хаде — заработок смены (shiftcash.js)
@@ -252,8 +256,8 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
 /* Размер «пикселя» игры в пикселях экрана. Раньше делили CSS-пиксели на
    два: на телефоне это 195 точек в ширину — каша. Теперь по короткой
    стороне в физических пикселях: примерно 540 точек, как на ноутбуке с
-   1080 по высоте, — пиксель одного размера и на телефоне, и на десктопе. */
-const PIXEL_SHORT = 540;
+   1080 по высоте, — пиксель одного размера и на телефоне, и на десктопе.
+   Сколько точек — настройка графики «чёткость» (gfx.js): ~430 / 540 / 720. */
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xa8daf4);
@@ -270,7 +274,7 @@ scene.add(new THREE.AmbientLight(0xdfeaff, 0.5));
 function resize () {
   const w = canvas.clientWidth || 640, h = canvas.clientHeight || 360;
   const dpr = window.devicePixelRatio || 1;
-  const px = Math.max(1, Math.min(w, h) * dpr / PIXEL_SHORT);
+  const px = Math.max(1, Math.min(w, h) * dpr / GFX.pixelShort());
   renderer.setPixelRatio(1);
   renderer.setSize(Math.max(200, Math.round(w * dpr / px)), Math.max(112, Math.round(h * dpr / px)), false);
   cam.aspect = w / h;
@@ -947,8 +951,8 @@ function dropArr () { this.array = null; }
 // городу — крупнее: сорок тысяч мелких кусков дороже обходить, чем дорисовать лишнее
 const CHUNK = MAP.border ? 200 : 100;
 WINS.init(CHUNK);
-// телефон и планшет (касания, не Стим): комнаты за стеклом нет — рама, шторы и свет остаются (windows.js)
-if (Platform.id !== 'steam' && matchMedia('(pointer: coarse)').matches) WINS.quality({ interior: 0, lod: 0 });
+// окна с комнатами — настройка графики (gfx.js): на Низкой комнаты за стеклом нет — рама, шторы и свет остаются (windows.js)
+WINS.quality(GFX.winQ());
 const LITM = Mesher();      // всё материальное: земля, дороги, дома
 const FLATM = Mesher();     // разметка, окна, вывески — света не ловят
 
@@ -3491,6 +3495,14 @@ const thugsApi = () => ({
   reward: n => { const v = CAREER ? n : Math.round(n / ECON.MONEY_K / 10) * 10; S.money += v; if (!S.freeRun) addWallet(v); return v; },
 });
 let THUGS_API = null;
+/* что нужно protests.js (протест по ступеням, концерты во дворах) */
+const protApi = () => ({
+  V, S, scene, CAREER, ADULT, HUMAN_VC, BENCHES, Store, put, mergeGeos, makeHuman, dropMesh, gibHuman, sayBubble, emote, puff, groundH, curbAt, inHouse, inBounds, nearestRoad,
+  segs: () => RSEG, get ENV () { return ENV; }, chat: s => CHAT.say(s),
+  popBonus: (a, b) => popBonus(escHtml(a), escHtml(b)),
+  onRunOver: () => { S.people++; Snd.squish(); },
+});
+let PROT_API = null;
 /* что нужно growth.js (вид пиццерии по ступени: гости, очередь, гирлянды, оркестр) */
 const growApi = () => ({
   V, S, scene, CAREER, ADULT, HUMAN_VC, PIZZERIAS, box, put, mergeGeos, makeHuman, dropMesh, gibHuman, emote, groundH, smashMesh,
@@ -3526,6 +3538,13 @@ const catsApi = () => ({
   V, S, scene, cam, CITY, FLATM, ARCHES, WGRID, groundH, inHouse, inPoly, nearestRoad, hexOf, Snd,
 });
 let CATS_API = null;
+/* что нужно darknight.js (тёмная ночь: костры, котлы, привидения) */
+const darkApi = () => ({
+  scene, cam, V, CITY, ADULT, CAR_L, CAR_W, put, boxGeo, mergeGeos, groundH, makeHuman, makePerson, dropMesh, gibHuman, gibBurger, sayBubble, fxAdd, puff, sparks, Snd,
+  isOpenAt: DIST.has() ? (x, z) => DIST.isOpen(DIST.at(x, z)) : null,
+  runOver: () => { S.people++; },
+  get ENV () { return ENV; },
+});
 /* что нужно nightlife.js (только ADULT): девушки у обочины, стрип-клуб */
 const nightApi = () => ({
   THREE, scene, cam, V, S, CITY, MAP, LIT, HUMAN_VC, CAR_L, CAR_W, box, put, obb, groundH, curbAt, inHouse, inBounds, nearestRoad, pushOut,
@@ -3572,6 +3591,7 @@ function buildCity () {
   tm('world', () => WORLD.build(worldApi()));     // аллеи; в карьере — газоны особняков, мусор, гаражи (world.js) — до деревьев и лавочек
   if (!INTRO && !new URLSearchParams(location.search).has('nocons')) tm('construction', () => CONSTR.build(consApi()));   // стройки на пустырях — до деревьев и лавочек: участок обходят (construction.js); ?nocons — без них
   if (!INTRO && !new URLSearchParams(location.search).has('norivals')) tm('rivals', () => RIVS.build(rivApi()));   // точки конкурентов — тоже до деревьев, лавочек и smashBuild (rivals.js); ?norivals — без них
+  if (!INTRO) tm('darknight', () => DARKN.build(darkApi()));   // тёмная ночь: места костров и котлов — свободные пустыри после строек (darknight.js)
   tm('life', () => { JUNK.init(junkApi()); osmStreetLife(); });
   tm('entr', osmEntrances);
   tm('vents', () => { BUILD_T.ventsInfo = CATS.build(CATS_API || (CATS_API = catsApi())); });   // продухи подвалов — после подъездов (cats.js)
@@ -3593,8 +3613,8 @@ function buildCity () {
   tm('seasons', SEAS.seasonBuild);                // сугробы, ёлки, гирлянды
 
   const tq = performance.now();
-  const litG = LITM.mesh(WORLD.paveMat(SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }))));   // + узор плитки (world.js)
-  const flatG = FLATM.mesh(new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+  const litG = LITM.mesh(HUR.holeMat(WORLD.paveMat(SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide })))));   // + узор плитки (world.js), + ураган (hurricane.js)
+  const flatG = FLATM.mesh(HUR.holeMat(new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
   BUILD_T.mesh = Math.round(performance.now() - tq);
   WINS.build(scene);                              // окна — по клеткам, один материал (windows.js)
   PAINT.build(scene);                             // муралы — один меш (citypaint.js)
@@ -3876,6 +3896,14 @@ const puffGeo = new THREE.IcosahedronGeometry(0.5, 0);
 /* Высоты у эффектов передаются от земли: пол под частицей берём один
    раз, при рождении, — далеко она всё равно не улетает. */
 function fxAdd (mesh, o, floor) {
+  // графика «эффекты: меньше» (gfx.js): мелкие частицы — через одну, все — короче
+  if (GFX.fxLow()) {
+    const g = mesh.geometry;
+    if ((g === sparkGeo || g === bitGeo || g === puffGeo) && GFX.fxDrop()) { if (mesh.material && mesh.material.dispose) mesh.material.dispose(); return; }
+    const k = GFX.fxLife();
+    if (o.life) o.life *= k;
+    if (o.max) o.max *= k;
+  }
   scene.add(mesh);
   FX.push(Object.assign({ mesh, vx: 0, vy: 0, vz: 0, life: 1, max: 1, grow: 0, spin: 0, gravity: 0, fade: 1, floor }, o));
 }
@@ -3952,8 +3980,9 @@ function decal (x, z, hex, r, life) {
   m.lookAt(m.position.x + nrm.x, m.position.y + nrm.y, m.position.z + nrm.z);
   m.scale.set(rand(0.8, 1.3), rand(0.8, 1.3), 1);
   scene.add(m);
-  DECALS.push({ m, life: life || 30, max: life || 30 });
-  if (DECALS.length > 70) { const d = DECALS.shift(); scene.remove(d.m); d.m.geometry.dispose(); d.m.material.dispose(); }
+  const dl = (life || 30) * (GFX.fxLow() ? 0.5 : 1);   // «эффекты: меньше» — следы вдвое короче и не больше 35
+  DECALS.push({ m, life: dl, max: dl });
+  while (DECALS.length > GFX.decalMax()) { const d = DECALS.shift(); scene.remove(d.m); d.m.geometry.dispose(); d.m.material.dispose(); }
 }
 
 function blood (x, y, z, n) {
@@ -4402,7 +4431,7 @@ function updateGibs (dt) {
     g.m.position.x += g.vx * dt; g.m.position.y += g.vy * dt; g.m.position.z += g.vz * dt;
     g.m.rotation.x += g.ax * dt; g.m.rotation.z += g.az * dt;
     if (g.m.position.y < g.floor + 0.3 && g.vy < 0) { g.m.position.y = g.floor + 0.3; g.vy *= -0.35; g.vx *= 0.6; g.vz *= 0.6; }
-    if ((g.life -= dt) < 0.6) g.m.scale.setScalar(Math.max(0.001, g.life / 0.6));
+    if ((g.life -= dt * GFX.gibFade()) < 0.6) g.m.scale.setScalar(Math.max(0.001, g.life / 0.6));
     if (g.life <= 0) { scene.remove(g.m); g.m.geometry.dispose(); g.m.material.dispose(); GIBS.splice(i, 1); }
   }
 }
@@ -4686,11 +4715,13 @@ function updatePeds (dt) {
     if (p.panic) { panicStep(p, dt); continue; }
     if (p.hang) { if ((p.x - V.x) ** 2 + (p.z - V.z) ** 2 < 300 * 300) hangStep(p, dt); continue; }
     if (Math.hypot(p.x - V.x, p.z - V.z) > 480) walkSpawn(p, 120, 380);
-    const ang = walkerStep(p, dt, 7);
+    const dl = GFX.lag(p, dt, V.x, V.z);           // вдали — раз в N кадров (gfx.js)
+    if (!dl) continue;
+    const ang = walkerStep(p, dl, 7);
     pushOut(p, 0.5);
     const g = p.grp;
     g.position.set(p.x, groundH(p.x, p.z) + curbAt(p.x, p.z) + Math.abs(Math.sin(p.ph)) * 0.05, p.z);
-    if (!Number.isNaN(ang)) g.rotation.y = damp(g.rotation.y, ang, 8, dt);
+    if (!Number.isNaN(ang)) g.rotation.y = damp(g.rotation.y, ang, 8, dl);
     const sw = Math.sin(p.ph) * 0.7;
     g.userData.legL.rotation.x = sw;
     g.userData.legR.rotation.x = -sw;
@@ -4739,11 +4770,11 @@ function makeHuman (person, o = {}) {
 const HUMANS = new Set();
 const LOD_P = new THREE.Vector3();
 function humanLod () {
-  const cx = cam.position.x, cz = cam.position.z;
+  const cx = cam.position.x, cz = cam.position.z, L = GFX.hideR().lod;   // 45 м; на Низкой — 32 (gfx.js)
   for (const g of HUMANS) {
     const p = g.parent === scene ? g.position : g.parent ? g.parent.position : null;
     if (!p) continue;
-    const far = (p.x - cx) ** 2 + (p.z - cz) ** 2 > 45 * 45;
+    const far = (p.x - cx) ** 2 + (p.z - cz) ** 2 > L * L;
     const u = g.userData;
     if (u.far === far) continue;
     u.far = far;
@@ -4840,14 +4871,16 @@ function updateScoots (dt) {
       continue;
     }
     if (Math.hypot(p.x - V.x, p.z - V.z) > 480) walkSpawn(p, 120, 380);
-    const ang = walkerStep(p, dt, 0);
+    const dl = GFX.lag(p, dt, V.x, V.z);           // вдали — раз в N кадров (gfx.js)
+    if (!dl) continue;
+    const ang = walkerStep(p, dl, 0);
     pushOut(p, 0.45);
     const g = p.grp;
     g.position.set(p.x, groundH(p.x, p.z) + curbAt(p.x, p.z), p.z);
     if (!Number.isNaN(ang)) {
       const dh = Math.atan2(Math.sin(ang - g.rotation.y), Math.cos(ang - g.rotation.y));
-      g.rotation.y += dh * Math.min(1, dt * 9);
-      p.lean = damp(p.lean, clamp(-dh * 2.5, -0.35, 0.35), 6, dt);
+      g.rotation.y += dh * Math.min(1, dl * 9);
+      p.lean = damp(p.lean, clamp(-dh * 2.5, -0.35, 0.35), 6, dl);
     }
     g.rotation.z = p.lean;
   }
@@ -5379,8 +5412,11 @@ function updatePeople (dt) {
     if (p.panic) { panicStep(p, dt); continue; }
     if (p.idle) { idleSitStep(p, dt); continue; }
 
+    // вдали — раз в N кадров (графика, gfx.js); клиенты, сидящие, напуганные — выше, всегда
+    const dl = GFX.lag(p, dt, V.x, V.z);
+    if (!dl) continue;
     // изредка кто-нибудь садится передохнуть на свободную лавочку
-    p.restT -= dt;
+    p.restT -= dl;
     if (!p.guest && !p.idle && Math.hypot(p.x - V.x, p.z - V.z) > 480) walkSpawn(p, 120, 380);
     if (p.restT <= 0 && !p.cross) {
       const b = freeBench(p.x, p.z, 15);
@@ -5388,11 +5424,11 @@ function updatePeople (dt) {
       p.restT = rand(20, 50);
     }
 
-    const ang = walkerStep(p, dt, 7 * (p.grp.userData.fat ? 0.75 : 1));
+    const ang = walkerStep(p, dl, 7 * (p.grp.userData.fat ? 0.75 : 1));
     pushOut(p, 0.45);                            // не залезать в стены и изгороди
     const g = p.grp;
     g.position.set(p.x, groundH(p.x, p.z) + curbAt(p.x, p.z) + Math.abs(Math.sin(p.ph)) * 0.04, p.z);
-    if (!Number.isNaN(ang)) g.rotation.y = damp(g.rotation.y, ang, 8, dt);
+    if (!Number.isNaN(ang)) g.rotation.y = damp(g.rotation.y, ang, 8, dl);
     const sw = Math.sin(p.ph) * 0.8;
     g.userData.legL.rotation.x = sw; g.userData.legR.rotation.x = -sw;
     g.userData.armL.rotation.x = -sw * 0.7; g.userData.armR.rotation.x = sw * 0.7;
@@ -5478,7 +5514,7 @@ const GORE = [];
 
 /* сбит: что будет — решает скорость удара (hits.js TIER, docs/CONTENT.md «Сила удара»);
    kmh — если удар не от машины (взрыв): тогда скорость не из vx/vz */
-function gibHuman (p, vx, vz, kmh) { HITS.hit(p, vx, vz, kmh); }
+function gibHuman (p, vx, vz, kmh) { HITS.hit(p, vx, vz, kmh); DARKN.onHit(p, vx, vz); }   // ночью встанет привидением (darknight.js)
 
 /* взрослая, быстрее HITS.TIER.BURST: разрывает на куски — куски, их кровь и как тают — hits.js burst */
 function burstHuman (p, vx, vz, low) {
@@ -5518,7 +5554,7 @@ function updateGore (dt) {
     }
     // лежит «в отключке»: звёздочки над головой, в конце — облачко пыли
     if (g.soft && g.rest && (g.starT -= dt) <= 0) { g.starT = 0.7; emote(g.m.position.x, 0.9, g.m.position.z, 'star', 1); }
-    g.life -= dt;
+    g.life -= g.soft ? dt : dt * GFX.gibFade();     // «в отключке» лежит как лежал; куски и обломки на «меньше» тают быстрее
     if (g.life < 1) g.m.scale.setScalar(Math.max(0.001, g.life));
     if (g.soft && g.life <= 0) puff(g.m.position.x, 0.3, g.m.position.z, false, 0.8);
     if (g.life <= 0) { scene.remove(g.m); g.m.geometry.dispose(); if (g.m.material !== HUMAN_VC) g.m.material.dispose(); GORE.splice(i, 1); }
@@ -5986,9 +6022,12 @@ function respawnTraffic (t) {
 /* все, кто ходит и ездит по тротуарам: машины перед ними тормозят */
 const walkersAll = () => [PEOPLE, PEDS, SCOOTS, AMB.medics, CREWS.WALKERS, LIFE.WALKERS];   // CREWS — компании в форме сетей (crews.js)
 
-function updateTraffic (dt) {
-  trafficDensity(dt);
+function updateTraffic (dt0) {
+  trafficDensity(dt0);
   for (const t of TRAFFIC) {
+    // вдали — раз в N кадров с накопленным временем (графика «машины и люди вдали», gfx.js); летящие, погоня, службы — всегда
+    const dt = t.knock || t.chase || t.svc ? dt0 : GFX.lag(t, dt0, V.x, V.z);
+    if (!dt) continue;
     if (t.hitT > 0) t.hitT -= dt;
     if (t.chainT > 0 && !t.wreck && (t.chainT -= dt) <= 0) { t.chainT = 0; wreckCar(t); S.wrecks++; }
     // укатилась за полкилометра — возвращаем в соседние кварталы
@@ -6081,6 +6120,7 @@ function updateTraffic (dt) {
         ahead(p.x, p.z, 3.4, 1.8, 12);
       }
     slow = Math.min(slow, FAUNA.trafficYield(t, dt));   // лось на полосе: тормозит, сигналит, ждёт (fauna.js)
+    slow = Math.min(slow, PROT.trafficHold(t));          // колонна митингующих на полотне: стоят и ждут (protests.js)
     // красный: встаём у стоп-линии. Кто уже въехал — доезжает; на жёлтом
     // тот, кому до линии пара метров, тоже проезжает, а не тормозит в пол
     if (!t.turn && t.e.sig) {
@@ -8440,9 +8480,9 @@ function openPanel (kind) {
     renderCollect();
   } else renderShop();
 }
-function closePanel () { elPanel.hidden = true; elPanel.dataset.back = ''; }
+function closePanel () { elPanel.hidden = true; elPanel.dataset.back = ''; elPanel.dataset.sub = ''; }
 /* B / Esc: язык и «стереть прогресс?», открытые из настроек, — назад в настройки */
-function panelBack () { if (elPanel.dataset.back === 'settings') renderSettings(elPanel.dataset.kind === 'reset' ? 'set-reset' : 'set-lang'); else closePanel(); }
+function panelBack () { if (elPanel.dataset.back === 'settings') renderSettings(elPanel.dataset.kind === 'reset' ? 'set-reset' : elPanel.dataset.sub === 'gfx' ? 'set-gfx' : 'set-lang'); else closePanel(); }
 
 /* ─── площадка: реклама, пауза, язык, настройки ───
    Всё, что зависит от Яндекса или Стима, идёт через Platform. Полноэкранная
@@ -8524,7 +8564,7 @@ const UPD = { tag: null, msg: '', busy: false };
 // тестовые кнопки настроек: в локальных/dev-сборках — всегда, в релизной (CI задаёт BUILD_VERSION → __RELEASE__) — только с ?debug
 const testTools = () => !(typeof __RELEASE__ !== 'undefined' && __RELEASE__) || new URLSearchParams(location.search).has('debug');
 function renderSettings (focus) {
-  elPanel.dataset.kind = 'settings'; elPanel.dataset.back = '';
+  elPanel.dataset.kind = 'settings'; elPanel.dataset.back = ''; elPanel.dataset.sub = '';
   const row = (label, val, id, extra = '') => '<div class="set-row"><span>' + label + extra + '</span><button type="button" id="' + id + '"' + (id === focus ? ' autofocus' : '') + '>' + val + '</button></div>';
   // сбросить прогресс можно только из меню: посреди смены кнопки нет
   const canReset = !isPlaying() && !S.paused;
@@ -8532,6 +8572,7 @@ function renderSettings (focus) {
     (CAREER ? row($t('имя'), escHtml(S.name || '—'), 'set-name') : '') +
     row($t('звук'), Snd.on ? $t('вкл') : $t('выкл'), 'set-snd') +
     row('🌐 ' + $t('язык'), LANG_NAMES[curLang()], 'set-lang') +
+    row($t('графика'), GFX.presetName(), 'set-gfx') +
     (Platform.features.adult ? row($t('версия'), ADULT ? $t('взрослая 18+') : $t('детская'), 'set-ed') : '') +
     (SHELL ? row($t('версия игры'), UPD.busy ? $t('проверяю…') : $t('проверить обновления'), 'set-upd',
       ' <b class="set-tag">' + escHtml(UPD.tag || '—') + '</b>' + (UPD.msg ? '<small class="set-msg">' + UPD.msg + '</small>' : '')) : '') +
@@ -8543,6 +8584,8 @@ function renderSettings (focus) {
   $('set-snd').onclick = () => { Snd.set(!Snd.on); renderSettings('set-snd'); };
   if ($('set-name')) $('set-name').onclick = () => CAREERM.askName(() => renderSettings('set-name'));
   $('set-lang').onclick = () => { renderLangs(); elPanel.dataset.back = 'settings'; };
+  // графика — своё окно (gfx.js); вид — как у настроек, назад — в настройки на «графика»
+  $('set-gfx').onclick = () => { elPanel.dataset.back = 'settings'; elPanel.dataset.sub = 'gfx'; GFX.panel(elPanelBody); };
   if ($('set-ed')) $('set-ed').onclick = () => { Store.set('dlv-edition', ADULT ? 'kids' : 'adult'); Platform.store.flush && Platform.store.flush(); setTimeout(() => location.reload(), 150); };
   if ($('set-reset')) $('set-reset').onclick = renderReset;
   if ($('set-unlock')) $('set-unlock').onclick = () => {             // ТЕСТ (см. выше): открыть всё и сразу праздник
@@ -8554,7 +8597,7 @@ function renderSettings (focus) {
     if (UPD.tag === null) {
       UPD.tag = '';
       Promise.resolve(SHELL.info()).then(i => { UPD.tag = (i && i.tag) || ''; }).catch(() => {})
-        .then(() => { if (!elPanel.hidden && elPanel.dataset.kind === 'settings') renderSettings(padSelId()); });
+        .then(() => { if (!elPanel.hidden && elPanel.dataset.kind === 'settings' && !elPanel.dataset.sub) renderSettings(padSelId()); });
     }
     $('set-upd').onclick = checkUpdate;
   }
@@ -8583,7 +8626,7 @@ async function checkUpdate () {
    Стираем все ключи игры (dlv-*), кроме настроек из RESET_KEEP. Список PROGRESS_KEYS —
    на случай, если localStorage закрыт (Яндекс в iframe): ключи из него тоже обнуляются.
    Через Platform.store — так на Яндексе чистится и облако. Потом — перезагрузка. */
-const RESET_KEEP = ['dlv-lang', 'dlv-sound', 'dlv-edition', 'dlv-name', 'dlv-map', 'dlv-money-x8', 'dlv-__ts', 'dlv-ach'];   // dlv-ach — достижения, как в Стиме, не стираются
+const RESET_KEEP = ['dlv-lang', 'dlv-sound', 'dlv-gfx', 'dlv-edition', 'dlv-name', 'dlv-map', 'dlv-money-x8', 'dlv-__ts', 'dlv-ach'];   // dlv-ach — достижения, как в Стиме, не стираются
 const PROGRESS_KEYS = [
   'dlv-msk-wallet', 'dlv-msk-cars', 'dlv-msk-car', 'dlv-msk-best', 'dlv-msk-xp', 'dlv-msk-col', 'dlv-msk-tut', 'dlv-msk-guide', 'dlv-msk-nostut', 'dlv-intro', 'dlv-garage-tut',
   'dlv-shifts', 'dlv-stars', 'dlv-crew', 'dlv-story', 'dlv-season', 'dlv-used-addr', 'dlv-lb-local', 'dlv-boss', 'dlv-clock', 'dlv-rev-sale',
@@ -8596,7 +8639,7 @@ function renderReset () {
   const gone = [$t('кошелёк — все деньги'), $t('купленные машины и улучшения'), $t('открытые районы'),
     $t('смены, звёзды и сюжетные заказы'), $t('мои находки'), PROF.on() ? $t('рекорд профиля') : $t('рекорды и таблица на этом устройстве'),
     $t('рейтинг пиццерии и донаты'), $t('обучение — покажется заново')];
-  const stay = [$t('язык'), $t('звук'), ...(Platform.features.adult ? [$t('версия: взрослая или детская')] : []),
+  const stay = [$t('язык'), $t('звук'), $t('графика'), ...(Platform.features.adult ? [$t('версия: взрослая или детская')] : []),
     ...(Platform.features.nameInput ? [$t('имя курьера')] : []), ...(PROF.on() ? [$t('таблица рекордов на этом устройстве'), ...(PROF.list().length > 1 ? [$t('другие профили')] : [])] : [])];
   // «отмена» — первой и выбрана сразу: случайное A ничего не сотрёт
   elPanelBody.innerHTML = '<div class="pn-t">' + (PROF.on() ? $t('стереть прогресс профиля «{name}»?', { name: escHtml(PROF.curName()) }) : $t('стереть весь прогресс?')) + '</div>' +
@@ -8753,6 +8796,14 @@ function carStats () {
 /* габариты кузова: по ним считаются все попадания, а не по одному кругу */
 const CAR_L = 2.2, CAR_W = 1.0;
 
+/* физика машины — шагами не длиннее 1/60 с: на 30 к/с (графика, gfx.js) кадр считает два шага,
+   и путь машины тот же, что на 60 (проверка — docs/CAREER.md «Настройки графики») */
+function driveSub (dt) {
+  const n = Math.max(1, Math.ceil(dt * 60 - 0.05));
+  let vf = 0;
+  for (let i = 0; i < n; i++) vf = driveStep(dt / n);
+  return vf;
+}
 function driveStep (dt) {
   const fx = Math.sin(V.h), fz = Math.cos(V.h);
   const sx = fz, sz = -fx;
@@ -12260,9 +12311,9 @@ function mergeChunked (list, mat) {
     for (const [f, v0, nv] of trk) f(m, v0, nv);
   }
 }
-mergeChunked(LIT, SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), 0.4));
-mergeChunked(FLAT, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }));
-{ const m = new THREE.MeshBasicMaterial({ vertexColors: true }); m.userData.glow = 1; if (LAMPH.length) mergeChunked(LAMPH, m); }
+mergeChunked(LIT, HUR.holeMat(SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), 0.4)));
+mergeChunked(FLAT, HUR.holeMat(new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+{ const m = HUR.holeMat(new THREE.MeshBasicMaterial({ vertexColors: true })); m.userData.glow = 1; if (LAMPH.length) mergeChunked(LAMPH, m); }
 indexSolids();
 /* ельник (forest.js): клетки собираются на ходу вокруг камеры — уже после всего города */
 const FOREST_API = FOREST.init({ THREE, scene, cam, CITY, groundH, inHouse, inBounds, nearestRoad, solidAt,
@@ -12291,6 +12342,7 @@ if (!INTRO) { buildSpots(); buildCollect(); }
 /* погода смены (weather.js): сугробы снежной зимы — после адресов, чтобы их не завалить */
 WTH.init({ THREE, scene, cam, renderer, Store, MAP, CITY, V, S, SPOTS, ZEBRAS, Snd, toast, groundH, curbAt, nearestRoad, roadWidth, drivable, inHouse, inPoly, inBounds,
   makeHuman, dropMesh, gibHuman, CAR_L, CAR_W, isPlaying, intro: INTRO, PIZZERIAS, get PIZZA () { return PIZZA; },
+  ARCHES, realAddress, puff, quick: () => QR.on(),   // ураган (hurricane.js): дома с аркой не уносит, адрес в подписи, пыль, быстрый заезд не сохраняет
   get ENV () { return ENV; }, get sun () { return sun; }, get hemi () { return hemi; }, get amb () { return amb; } });
 buildNitro();
 districtLocks();                                  // закрытые районы: перекрытия на въездах
@@ -12362,6 +12414,7 @@ WIN_MAT.onBeforeCompile = sh => {
     vWc = aSeed < 0.05 ? vec3(0.72, 0.32, 1.0) : aSeed < 0.14 ? vec3(0.86, 0.93, 1.0) : mix(vec3(1.0, 0.86, 0.58), vec3(1.0, 0.93, 0.72), fract(aSeed * 7.0));`);
   sh.fragmentShader = 'varying float vOn;\nvarying vec3 vWc;\n' + sh.fragmentShader.replace('vec4 diffuseColor = vec4( diffuse, opacity );', 'vec4 diffuseColor = vec4( diffuse * vWc, opacity * vOn );');
 };
+HUR.holeMat(WIN_MAT);                              // ночные окна унесённого ураганом дома — тоже под землю
 const NIGHT_OBJ = [];
 function buildNight () {
   const pools = [];
@@ -12550,7 +12603,9 @@ function updateEnv (dt) {
   FOG_C.copy(mix(A[2], B[2])).lerp(RAIN_SKY, R * 0.6 * (1 - ENV.night * 0.6));
   scene.background.copy(SKY_C);
   scene.fog.color.copy(FOG_C);
-  scene.fog.far = (470 - R * 170) * CULL.Q.k;      // CULL.Q — страховка дальности на слабом железе
+  const gk = GFX.rangeK();                          // дальность по настройке графики: 250 / 370 / 490 м (gfx.js)
+  scene.fog.far = (470 - R * 170) * CULL.Q.k * gk;  // CULL.Q — страховка дальности на слабом железе
+  scene.fog.near = 150 * (0.4 + 0.6 * gk);
   sun.color.copy(mix(A[3], B[3]));
   sun.intensity = lerp(A[4], B[4], k) * (1 - R * 0.55);
   if (hemi) { hemi.color.copy(mix(A[5], B[5])); hemi.groundColor.copy(mix(A[6], B[6])); hemi.intensity = lerp(A[7], B[7], k) * (1 - R * 0.25); }
@@ -12826,9 +12881,10 @@ showTitle();
    по-прежнему, прячем только меш. */
 function cullFar () {
   const far2 = (x, z, r) => (x - V.x) ** 2 + (z - V.z) ** 2 > r * r;
+  const R = GFX.hideR();                          // 130 / 220 м; на Низкой — 100 / 200 (gfx.js «меньше декора»)
   for (const list of [PEOPLE, PEDS, SCOOTS])
-    for (const p of list) if (!p.dead) p.grp.visible = !far2(p.x, p.z, 130);
-  for (const t of TRAFFIC) t.mesh.visible = !far2(t.x, t.z, 220);
+    for (const p of list) if (!p.dead) p.grp.visible = !far2(p.x, p.z, R.people);
+  for (const t of TRAFFIC) t.mesh.visible = !far2(t.x, t.z, R.cars);
 }
 
 /* ── геймпад: езда, карточки, меню (раскладка — в input/gamepad.js) ──
@@ -12926,6 +12982,10 @@ function frame (now) {
 }
 function frameStep (now) {
   CL.at.ph = 'pre';
+  // настройки графики (gfx.js): 30 / 60 к/с, город за меню застывший или 20 к/с — лишний кадр пропускаем
+  // целиком, время копится (last не трогаем): следующий кадр шагнёт мир на всё прошедшее
+  const menu = S.state === 'title' || S.state === 'over';
+  if (GFX.hold(now, menu, menu ? S.state + (CAREER && CAREERM.covered() ? '+' : '') + canvas.width + 'x' + canvas.height + (PIZZA && PIZZA.name) : '')) { if (menu) padStep(); return; }
   const tWork = performance.now();                // сколько занял сам кадр — для страховки дальности (cull.js)
   const raw = Math.max(0, (now - last) / 1000);
   const dt = clamp(raw, 0, 1 / 20);     // назад время не идёт
@@ -12971,7 +13031,7 @@ function frameStep (now) {
     car.position.set(V.x, V.y, V.z);
     car.rotation.y = V.h;
   } else {
-    vf = driveStep(dt);
+    vf = driveSub(dt);
     camStep(dt, vf);
   }
 
@@ -13029,11 +13089,13 @@ function frameStep (now) {
   CL.step('seasons', SEAS.updateSeasons, dt);                         // снег, небо, снежки
   CL.step('weather', WTH.update, dt);                                // жара, гроза с молниями, сугробы и ледянки (weather.js)
   CL.step('crowds', updateCrowds, dt);
+  if (!INTRO) CL.step('darknight', DARKN.step, dt);              // тёмная ночь: костры, ведьмы, привидения (darknight.js)
   if (ADULT && !INTRO) CL.step('nightlife', NIGHT.step, dt);            // ночная жизнь, только взрослая (nightlife.js)
   CL.step('life', LIFE.step, dt, LIFE_API);
   CL.step('world', WORLD.step, dt, WORLD_API || (WORLD_API = worldApi()));   // мусор, бандиты, шашлыки (world.js)
   CL.step('mafia', MAFIA.step, dt, MAFIA_API || (MAFIA_API = mafiaApi()));   // мафиози у адреса (mafia.js)
   CL.step('thugs', THUGS.step, dt, THUGS_API || (THUGS_API = thugsApi()));   // гопники прессуют прохожего (thugs.js)
+  CL.step('protests', PROT.step, dt, PROT_API || (PROT_API = protApi()));   // протест по ступеням, концерты во дворах (protests.js)
   CL.step('growth', GROW.step, dt, GROW_API || (GROW_API = growApi()));      // пиццерия растёт: вид у шара (growth.js)
   if (CAREER) CL.step('raid', RAID.step, dt);                          // налёт на точку, ёлка-турель (raid.js)
   CL.step('heroes', HEROES.step, dt, HEROES_API || (HEROES_API = heroesApi()));   // герои города (heroes.js)
@@ -13112,19 +13174,23 @@ function frameStep (now) {
   CL.at.ph = 'render';
   CULL.step();
   renderer.render(scene, cam);
-  CULL.work((performance.now() - tWork) / 1000);
+  const wk = performance.now() - tWork;
+  CULL.work(wk / 1000);
+  GFX.work(wk);
+  GFX.watch(isPlaying() && !S.paused);             // кадр не успевает на Высокой — один раз предложить Среднюю
 }
 // шейдеры всех материалов города — сейчас, под экраном загрузки, а не рывком
 // в первый раз, когда кусок попадёт в кадр (зимой на Деке это было 150 мс)
 try { renderer.compile(scene, cam); } catch (e) { /* — */ }
 CULL.freeze(scene, cam, PROPS);                   // город собран: неподвижное — в заморозку и отсечение
+GFX.init({ resize });                             // настройки графики: дальность, окна, чёткость (gfx.js)
 requestAnimationFrame(frame);
 
 /* отладочная ручка */
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
 /* песочница (sandbox.html): бесконечное здоровье, нитро, «не глохнет» (noStall читает cars.js) */
 const SBX = { god: false, nitro: false, noStall: false };
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, CULLQ: CULL.Q, GFX: GFX.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта
@@ -13139,7 +13205,7 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) wi
 if (window.__dlv) { window.__dlv.BOARD = BOARD; window.__dlv.Platform = Platform; }   // таблица рекордов Стима (board.js)
 if (window.__dlv) window.__dlv.crashlog = CL;        // журнал ошибок: entries(), text(), disabled() (docs/CRASHES.md)
 if (window.__dlv) Object.assign(window.__dlv, { pinFront, nearClient, PIN });   // пин перед клиентом, кто у клиента лишний (docs/ORDERS.md)
-if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG, CONS: CONSTR.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)
+if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG, CONS: CONSTR.DEBUG, DARK: DARKN.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)
 if (window.__dlv) Object.assign(window.__dlv, { HB: HB.DEBUG, FLIRT: ADULT ? FLIRT.DEBUG : null });   // коневозки, заигрывание (только взрослая)
 if (window.__dlv) { window.__dlv.FOREST = FOREST.DEBUG; window.__dlv.PZD = PZD.DEBUG; window.__dlv.cam = cam; window.__dlv.RIV = RIVS.DEBUG; }   // ельник и пиццерия-шар (forest.js, pizzadome.js)
 if (window.__dlv) { window.__dlv.SL = SL.DEBUG; window.__dlv.LAMP_SPOTS = LAMP_SPOTS; window.__dlv.smashHit = smashHit; window.__dlv.CARL = CARL.DEBUG; }   // фонари и огни машины

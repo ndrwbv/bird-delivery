@@ -27,7 +27,7 @@ export const MAX = 5;
 export const META = 'dlv-profiles';
 /* общее на всё устройство; всё остальное «dlv-*» — у каждого профиля своё */
 export const SHARED = new Set([
-  META, 'dlv-lang', 'dlv-sound', 'dlv-edition', 'dlv-map',  // настройки
+  META, 'dlv-lang', 'dlv-sound', 'dlv-gfx', 'dlv-edition', 'dlv-map',  // настройки (dlv-gfx — графика, gfx.js)
   'dlv-ach',                // достижения и их счётчики — как в Стиме, на весь аккаунт
   'dlv-lb-local',           // таблица рекордов на устройстве — все профили по именам
   'dlv-money-x8', 'dlv-__ts', 'dlv-crashlog',               // служебное

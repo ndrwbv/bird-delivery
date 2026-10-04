@@ -89,7 +89,10 @@ const U = {
   uLeaf: { value: 1 }, uYellow: { value: 0 }, uFallen: { value: 0 }, uDrift: { value: 0 }, uNY: { value: 0 }, uIce: { value: 0 },
   uTime: { value: 0 }, uNight: { value: 0 },
   uHeat: { value: 0 }, uGold: { value: 0 },     // варианты сезона (weather.js): жара, яркая сухая осень
+  uGale: { value: 0 }, uGaleD: { value: [1, 0] },   // ураган (hurricane.js): кроны клонит по ветру, м
 };
+/* ураган: насколько клонит кроны (м, 0 — тихо) и куда дует (x, z) */
+export function setGale (amp, dx = 1, dz = 0) { U.uGale.value = amp; U.uGaleD.value[0] = dx; U.uGaleD.value[1] = dz; }
 
 /* Снег и краски земли. Нормаль грани — из производных мировой позиции:
    она всегда смотрит на камеру, поэтому у земли и крыш y > 0, у стен ~0.
@@ -182,9 +185,10 @@ function pileMat () {
   const m = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, U);
-    sh.vertexShader = 'attribute vec4 aux;\nuniform float uLeaf, uFallen, uDrift, uNY;\nvarying vec3 vSW;\nvarying float vK, vP, vSeed;\n' +
+    sh.vertexShader = 'attribute vec4 aux;\nuniform float uLeaf, uFallen, uDrift, uNY, uGale, uTime;\nuniform vec2 uGaleD;\nvarying vec3 vSW;\nvarying float vK, vP, vSeed;\n' +
       sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
         vK = floor(aux.x * 255.0 + 0.5); vSeed = aux.y; vP = floor(aux.z * 255.0 + 0.5);
+        if (uGale > 0.0 && vK == 1.0) transformed.xz += uGaleD * uGale * (0.72 + 0.28 * sin(uTime * 3.1 + vSeed * 41.0 + transformed.x * 0.07));   // ураган: крону клонит по ветру
         float lim = vK == 1.0 ? uLeaf : vK == 2.0 ? uFallen : vK == 3.0 ? uDrift : vK == 4.0 ? uNY : 2.0;
         if (vSeed >= lim) transformed = vec3(0.0, -3000.0, 0.0);`)
         .replace('#include <project_vertex>', '#include <project_vertex>\n' + WPOS);
