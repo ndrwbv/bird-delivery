@@ -52,6 +52,7 @@ import * as DLG from './dialog.js';
 import { STORY_PEOPLE, ORDER_TYPES } from './orders.config.js';
 import { makePerson } from './people.js';
 import { makeCatModel, FURS } from './cats.js';
+import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 import * as QR from './quickrun.js';             // быстрый заезд: глав нет
 
 // career.js пишет другой агент: берём, если он уже есть, и не падаем, если нет
@@ -326,7 +327,8 @@ const hourOk = (c, h) => !c.hours || h === undefined || h === null || (h >= c.ho
 
 /* ctx: { shift, hour, x, z } — номер смены (с 1), час игры (9…24), где курьер */
 export function nextOrder (ctx = {}) {
-  if (!API || QR.on()) return null;                              // быстрый заезд — без сюжета и глав героев (quickrun.js)
+  if (!API || QR.on()) return null;
+  if (!DIRECTOR.can('story')) return null;                        // режиссёр: главы — не раньше 3-го заказа сессии                              // быстрый заезд — без сюжета и глав героев (quickrun.js)
   // номер смены: orders.js его не передаёт — тогда берём из сохранения (API.shift)
   const shift = +ctx.shift || (API.shift ? +API.shift() || 0 : 0);
   for (const s of STORIES) {

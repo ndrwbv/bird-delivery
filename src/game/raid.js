@@ -39,6 +39,7 @@ import * as THREE from '../vendor/three.module.min.js';
 import { t, N_ } from '../i18n/index.js';
 import { RAID, TURRET, RESPECT as RCFG } from './econ.js';
 import * as RESPECT from './respect.js';
+import * as DIRECTOR from './director.js';   // режиссёр событий: налёт — крупное, не в начале сессии
 import * as CREWS from './crews.js';             // форма сетей — та же, что у компаний на улицах
 import { TIER } from './hits.js';
 import './raid.css';
@@ -159,6 +160,7 @@ export function start (brand, P) {
     R.men.push(m);
   }
   R.stats.started++;
+  DIRECTOR.start('raid');
   if (A.chat) A.chat(t('Налёт на точку! Гони!'));      // о налёте — только Толик, одной фразой; на радаре и карте — мигающая точка
   if (A.Snd) { A.Snd.blip(440, 0.12, 'square', 0.14); setTimeout(() => A.Snd && A.Snd.blip(330, 0.18, 'square', 0.14), 160); }
   return true;
@@ -168,6 +170,7 @@ export function start (brand, P) {
 export function clear (quiet) {
   for (const m of R.men) dropMan(m);
   R.men.length = 0;
+  if (R.on) DIRECTOR.end('raid');
   R.on = false;
   if (!quiet) R.P = null;
 }
@@ -195,6 +198,7 @@ const standing = () => R.men.filter(m => m.st === 'in' || m.st === 'smash' || m.
 /* ── итог ── */
 function end (won) {
   R.on = false;
+  DIRECTOR.end('raid');
   R.last = { won, came: R.came, myKO: R.myKO, gunKO: R.gunKO, scared: R.scared, left: Math.round(R.t), took: Math.round(R.T0 - R.t) };
   if (won) {
     R.stats.won++;
@@ -526,7 +530,7 @@ export function step (dt) {
   // пора начинать?
   if (!R.on && R.plan >= 0 && !S.ride && (S.shiftT || 0) >= R.plan && A.PIZZA) {
     const P = A.PIZZA;
-    if (Math.hypot(A.V.x - P.x, A.V.z - P.z) > RAID.FAR) { R.plan = -1; start(); }
+    if (Math.hypot(A.V.x - P.x, A.V.z - P.z) > RAID.FAR && DIRECTOR.can('raid')) { R.plan = -1; start(); }   // режиссёр против — ждём
   }
   turretStep(dt);
   if (!R.men.length) return;

@@ -30,6 +30,7 @@ import * as ZN from './zones.js';
 import * as DIST from './districts.js';
 import { makePerson } from './people.js';
 import { TIER } from './hits.js';
+import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 
 export const MAFIA = {
   CHANCE_GANG: 0.25, CHANCE: 0.06, PER_SHIFT: 1, FROM_STOP: 3,
@@ -115,12 +116,14 @@ export function spawn (x, z) {
   m.h = Math.random() * Math.PI * 2;
   M.man = m;
   M.stats.spawned++;
+  DIRECTOR.start('mafia');
   return m;
 }
 
 export function clear () {
   const m = M.man;
   if (!m) return;
+  DIRECTOR.end('mafia');
   if (m.bubble) { m.grp.remove(m.bubble); m.bubble.material.dispose(); m.bubble = null; }
   if (!m.dead) A.dropMesh(m.grp);
   M.man = null;
@@ -147,6 +150,7 @@ function roll () {
   if (!chance(p)) return;
   // на глазах из воздуха не появляется
   if (!M.force && Math.hypot(tg.x - A.V.x, tg.z - A.V.z) < 60) return;
+  if (!M.force && !DIRECTOR.can('mafia')) return;   // режиссёр: мафиози — среднее событие
   M.force = false;
   const at = placeNear(tg.x, tg.z);
   if (!at) return;

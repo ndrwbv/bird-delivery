@@ -40,6 +40,7 @@ import * as DLG from './dialog.js';
 import * as SEAS from './seasons.js';
 import * as SL from './streetlamps.js';
 import { makePerson } from './people.js';
+import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 
 /* соседние модули карьеры — если уже есть: вечер (career.js), «подъехал к
    клиенту» (orders.js), «машина хуже заводится» (cars.js) */
@@ -876,7 +877,7 @@ function preRoll () {
   GE.pre = st; GE.preOk = false;
   if (!inGang(tg.x, tg.z) && !(at && inGang(at.x, at.z))) return;
   if (GE.force) { GE.preOk = true; return; }     // песочница: из-за угла при вручении
-  if (!chance(gangChance())) return;
+  if (!chance(gangChance()) || !DIRECTOR.can('gang')) return;   // режиссёр: банда — среднее событие
   GE.preOk = true;
   if (Math.hypot(tg.x - A.V.x, tg.z - A.V.z) < HOLD.PRE_R) return;   // близко — на глазах не появляются: выйдут при вручении
   gangWait(st, tg, at);
@@ -912,6 +913,7 @@ function gangWait (st, tg, at) {
   if (!men.length) return;
   if (!men[0].person) { for (const m of men) { m.dead = 1; A.dropMesh(m.grp); } return; }
   GE.st = 'wait'; GE.t = 0; GE.stop = st; GE.men = men; GE.lead = men[0];
+  if (!GE.dir) { GE.dir = 1; DIRECTOR.start('gang'); }
 }
 /* подъехал к клиенту (orders.js onArrive). Заказ гопников не ждёт: пицца отдаётся сразу (обещание
    не возвращаем), но с этой же секунды машину держат (HOLD выше). До 03.10.2026 вручение висело,
@@ -929,7 +931,7 @@ export function arrive (ev) {
   if (!inGang(x, z) && !inGang(A.V.x, A.V.z)) return;
   if (GE.force) GE.force = false;
   else if (st && st === GE.pre) { if (!GE.preOk) return; }
-  else if (!chance(gangChance())) return;
+  else if (!chance(gangChance()) || !DIRECTOR.can('gang')) return;
   gangStart(false);
 }
 function thug (lead) {
@@ -1025,6 +1027,7 @@ function gangStart (reuse) {
     }
   }
   GE.men = men; GE.lead = men[0];
+  if (!GE.dir) { GE.dir = 1; DIRECTOR.start('gang'); }
   GE.st = 'come'; GE.t = 0; GE.t0 = performance.now(); GE.cx = V.x; GE.cz = V.z; GE.hearts = 0; GE.hurtT = 1.2; GE.stop = null;
   GE.capV = Math.hypot(V.vx, V.vz); GE.ax = V.x; GE.az = V.z; GE.ah = V.h; GE.gasT = 0; GE.push = 0;
   GE.bribe = Math.round((GANG.BRIBE_BASE + GANG.BRIBE_SHARE * Math.max(0, (A.S && A.S.money) || 0)) / 10) * 10;
@@ -1237,6 +1240,7 @@ function gangClear () {
     if (!m.dead) { m.dead = 1; A.dropMesh(m.grp); }
   }
   GE.men = []; GE.st = ''; GE.lead = null; GE.stop = null;
+  if (GE.dir) { GE.dir = 0; DIRECTOR.end('gang'); }
   gangEnd();
 }
 

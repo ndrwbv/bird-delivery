@@ -5,7 +5,7 @@
      сюжет бабы Зины   — story.js STORIES (сценарий главы: только 'say', с условиями if / adult / when)
      главы героев      — herostories.js HERO_STORIES, лица — heroes.js person(id)
      герои при встрече — heroes.js DEFS: intro, lines, adult / kids (в игре — облачко над головой)
-     директор          — orders.config.js BOSS (два, три… заказа сразу) и shiftend.js boss() (после смены)
+     директор          — orders.config.js BOSS (два, три… заказа сразу)
      поручения, развоз — orders.config.js SIDE_ORDERS, STAFF_RIDE
    Копии текста из кода (поменял там — поправь тут):
      бандиты           — world.js gangTalk
@@ -22,7 +22,7 @@ const isOpt = a => a && typeof a === 'object' && !Array.isArray(a);
 const safe = (f, d) => { try { return f(); } catch (e) { return d; } };
 
 export default function dialogScreens (ctx) {
-  const { A, ADULT, t, money, makePerson, DLG, END, log } = ctx;
+  const { A, ADULT, t, money, makePerson, DLG, log } = ctx;
   const courier = () => PERSON.courier();
   const E = [];                                   // { id, group, name, title?, lines(o) → [реплика] }
 
@@ -84,16 +84,6 @@ export default function dialogScreens (ctx) {
       lines: () => { const p = bossP(); return [{ person: p, name: p.name + ' · ' + t(BOSS.role), text: t(BOSS.lines[k]), accept: t(BOSS.ok), mood: 'calm', fillers: false, color: ORDER_TYPES.pizza.color }]; },
     });
   }
-  for (const [mood, name] of [['great', 'хорошая'], ['ok', 'так себе'], ['bad', 'плохая']]) {
-    E.push({
-      id: 'bossend:' + mood, group: 'Директор Палыч', name: 'после смены: ' + name + ' (случайная фраза)',
-      lines: () => { const b = END.boss({ A, mood, opened: '', killed: 0 }); return [{ face: b.face, name: b.name, text: b.text, fillers: false, color: ORDER_TYPES.pizza.color }]; },
-    });
-  }
-  E.push({
-    id: 'bossend:transfer', group: 'Директор Палыч', name: 'после смены: перевод в новый район',
-    lines: o => { const b = END.boss({ A, mood: 'great', opened: t('Кольцо'), killed: +o.killed || 0 }); return [{ face: b.face, name: b.name, text: b.text, fillers: false, color: ORDER_TYPES.pizza.color }]; },
-  });
   // ── поручения ──
   SIDE_ORDERS.forEach((s, i) => E.push({
     id: 'side:' + s.id, group: 'Поручения клиентов', name: s.id + (s.adult ? ' (взрослая)' : s.kids ? ' (детская)' : ''),

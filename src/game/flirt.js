@@ -14,6 +14,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 import { t, N_ } from '../i18n/index.js';
+import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 
 export const FLIRT = { P: 0.08, SAY: 0.9, HOLD: 3.2, REPLY: 1.6, REPLY_HOLD: 2.6 };
 
@@ -96,12 +97,14 @@ export function roll (st, onTime) {
   if (!onTime || !p || p.dead || p.surf || st.bumped || !p.grp || !p.grp.userData.fem) return false;
   if (st.pay && (st.pay.story || st.pay.rich)) return false;
   ST.fem++;
-  return Math.random() < (DEBUG.force ? 1 : FLIRT.P);
+  if (DEBUG.force) return true;
+  return Math.random() < FLIRT.P && DIRECTOR.can('flirt');   // режиссёр: приглашение — лёгкое, не в первые заказы сессии
 }
 
 export function onHand (st, onTime, api) {
   if (!roll(st, onTime)) return false;
   ST.rolled++;
+  DIRECTOR.start('flirt', FLIRT.SAY + FLIRT.REPLY + FLIRT.REPLY_HOLD);
   const p = st.peds[0];
   setTimeout(() => {
     if (p.dead || !p.grp.parent) return;

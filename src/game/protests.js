@@ -30,6 +30,7 @@ import { TIER } from './hits.js';
 import { hourOf } from './econ.js';
 import * as RESPECT from './respect.js';
 import * as FEST from './festivals.js';
+import * as DIRECTOR from './director.js';   // режиссёр событий: концерт — лёгкое, марш — среднее, восстание — крупное
 
 export const PROT = {
   FROM: 1,                   // с какой законченной смены протест (первая смена новичка — тихая)
@@ -569,12 +570,14 @@ function buildMarch (P) {
   const u = lg.userData;
   if (u.armR) { const g = []; A.put(g, new THREE.CylinderGeometry(0.07, 0.16, 0.34, 8), '#f2f2f0', 0, -0.62, 0.12, Math.PI / 2); u.armR.add(new THREE.Mesh(A.mergeGeos(g), A.HUMAN_VC)); }
   A.scene.add(lg);
+  DIRECTOR.start('march');
   MA = { P, st: 'walk', S: rows * 1.5 + 3, t: 0, M, body, head, plac, rows, cols, half: (cols - 1) / 2 * 1.05 + 0.5,
     lead: { grp: lg, u, x: 0, z: 0, dead: 0, bubble: null, bubT: 0, ph: 0 }, sayT: 1, rowPts: [], cx: P.pts[0].x, cz: P.pts[0].z, rad: 0, heldNow: 0, held: 0, ko: 0 };
   STATS.marches++;
 }
 function clearMarch () {
   if (!MA) return;
+  DIRECTOR.end('march');
   dropInst(MA.body); dropInst(MA.head); for (const m of MA.plac) dropInst(m);
   if (!MA.lead.dead) { unsay(MA.lead); A.dropMesh(MA.lead.grp); }
   MA = null;
@@ -691,6 +694,7 @@ function spawnRiot (force) {
     men.push({ grp, u: grp.userData, x: s.x + Math.sin(a) * r, z: s.z + Math.cos(a) * r, bx: s.x + Math.sin(a) * r, bz: s.z + Math.cos(a) * r, h: 0, ph: rand(0, 6), dead: 0, bubble: null, bubT: 0, punch: 0, pT: rand(0.3, 1.2), jx: 0, jz: 0 });
   }
   RIOTS.push({ x: s.x, z: s.z, men, t: 0, life: rand(PROT.RIOT.LIFE[0], PROT.RIOT.LIFE[1]), sayT: 0.5, smokeT: 1 });
+  if (RIOTS.length === 1) DIRECTOR.start('riot');   // восстание — одно событие, сколько бы кучек ни дралось
   STATS.riots++;
   return true;
 }
@@ -701,7 +705,7 @@ function riotStep (dt) {
     const R = RIOTS[k];
     R.t += dt;
     const dC = Math.hypot(V.x - R.x, V.z - R.z), alive = R.men.filter(m => !m.dead);
-    if (dC > PROT.RIOT.FAR || alive.length < 1 || (R.t > R.life && dC > 50)) { clearRiot(R); RIOTS.splice(k, 1); continue; }
+    if (dC > PROT.RIOT.FAR || alive.length < 1 || (R.t > R.life && dC > 50)) { clearRiot(R); RIOTS.splice(k, 1); if (!RIOTS.length) DIRECTOR.end('riot'); continue; }
     if ((R.sayT -= dt) <= 0 && alive.length) {
       R.sayT = rand(2, 3.5);
       const pool = [...RIOT_L, ...prob().chant, ...(A.ADULT ? RIOT_ADULT : [])];
@@ -732,7 +736,7 @@ function riotStep (dt) {
     }
   }
 }
-function clearRiots () { for (const R of RIOTS) clearRiot(R); RIOTS.length = 0; }
+function clearRiots () { for (const R of RIOTS) clearRiot(R); if (RIOTS.length) DIRECTOR.end('riot'); RIOTS.length = 0; }
 
 /* ─────────────── концерты и сходки ─────────────── */
 const GIGS = [];
@@ -824,11 +828,13 @@ function spawnGig (force, kind) {
   const body = inst(BODY, CMAT, L.length), head = inst(HEAD, CMAT, L.length);
   L.forEach((q, i) => { body.setColorAt(i, COL.set(q.shirt)); head.setColorAt(i, COL.set(pick(SKINS))); });
   const band = t(pick(BANDS));
+  DIRECTOR.start('gig');
   GIGS.push({ kind, x, z, fx, fz, stage, musicians, L, body, head, t: 0, life: rand(GIG.LIFE[0], GIG.LIFE[1]), st: 'on', sayT: 1.5, noteT: 0.5, band });
   STATS.gigs++;
   return true;
 }
 function clearGig (G) {
+  DIRECTOR.end('gig');
   A.scene.remove(G.stage); G.stage.geometry.dispose();
   for (const m of G.musicians) if (!m.dead) { unsay(m); A.dropMesh(m.grp); }
   dropInst(G.body); dropInst(G.head);
@@ -935,13 +941,13 @@ export function step (dt, api) {
   if (ST.annT > 0 && (ST.annT -= dt) <= 0) announce();
   // марш (ступени 3—4)
   if (MA) marchStep(dt);
-  else if (ST.stage >= 3 && ST.stage <= 4 && (MS.cd -= dt) <= 0) { if (!spawnMarch()) MS.cd = 3; }
+  else if (ST.stage >= 3 && ST.stage <= 4 && (MS.cd -= dt) <= 0) { if (!DIRECTOR.can('march') || !spawnMarch()) MS.cd = 3; }
   // драки (ступень 4)
   if (RIOTS.length) riotStep(dt);
-  if (ST.stage === 4 && RIOTS.length < PROT.RIOT.N && (RS.cd -= dt) <= 0) RS.cd = spawnRiot() ? rand(PROT.RIOT.GAP[0], PROT.RIOT.GAP[1]) : 3;
+  if (ST.stage === 4 && RIOTS.length < PROT.RIOT.N && (RS.cd -= dt) <= 0) RS.cd = (RIOTS.length || DIRECTOR.can('riot')) && spawnRiot() ? rand(PROT.RIOT.GAP[0], PROT.RIOT.GAP[1]) : 3;
   // концерты и сходки
   if (GIGS.length) gigStep(dt);
-  if (GIGS.length < gigMax() && (GS.cd -= dt) <= 0) { const e = gigEvery(); GS.cd = spawnGig() ? rand(e[0], e[1]) : 5; }
+  if (GIGS.length < gigMax() && (GS.cd -= dt) <= 0) { const e = gigEvery(); GS.cd = DIRECTOR.can('gig') && spawnGig() ? rand(e[0], e[1]) : 5; }
 }
 
 export const DEBUG = {

@@ -34,6 +34,7 @@ import './weather.css';
 import { t } from '../i18n/index.js';
 import * as SEAS from './seasons.js';
 import * as HUR from './hurricane.js';
+import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 
 /* шансы вариантов на смену, по сезону календаря (в сумме 100) */
 export const CHANCES = {
@@ -110,9 +111,10 @@ export function shiftStart (ride) {
   SEAS.setVariant(null);
   const n = (+C.Store.get('dlv-shifts', 0) || 0) + (ride ? 5003 : 0);
   let id = FORCE || pickFor(n, bucket());
-  if (id === 'hurricane' && !FORCE && (ride || n < HUR.HUR.FROM)) id = 'storm';   // ураган — не в первые смены и не «просто покататься»
+  if (id === 'hurricane' && !FORCE && (ride || n < HUR.HUR.FROM || !DIRECTOR.can('hurricane'))) id = 'storm';   // режиссёр: не в первую смену сессии   // ураган — не в первые смены и не «просто покататься»
   if (FORCE && !fits(FORCE, bucket())) SEAS.setSeason(HOME[FORCE], true);   // быстрый заезд: «жара» — значит лето
   set(id, n);
+  if (id === 'hurricane') DIRECTOR.start('hurricane');   // до конца смены (режиссёр сам забудет на новой)
   HUR.shiftStart(id, ride, n);
   caption(0.8);
 }

@@ -43,6 +43,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 import { t } from '../i18n/index.js';
+import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 
 export const FAUNA = {
   FOREST_MIN: 30000,
@@ -549,11 +550,11 @@ export function step (dt, api) {
       ST.cross = tryCross() ? rand(...FAUNA.CROSS.CD) : FAUNA.CROSS.RETRY;
     const R = FAUNA.RAM;
     if (ST.ram < 0) ST.ram = rand(...R.FIRST);
-    if ((ST.ram -= dt) <= 0) ST.ram = S.state === 'drive' && Math.random() < R.P && tryRam() ? rand(...R.CD) : R.TICK;
+    if ((ST.ram -= dt) <= 0) ST.ram = S.state === 'drive' && Math.random() < R.P && DIRECTOR.can('moose') && tryRam() ? (DIRECTOR.start('moose', 12), rand(...R.CD)) : R.TICK;
     if (A.ADULT) {
       const L = FAUNA.LOVE;
       if (ST.love < 0) ST.love = rand(...L.FIRST);
-      if ((ST.love -= dt) <= 0) ST.love = tryLove() ? rand(...L.CD) : L.RETRY;
+      if ((ST.love -= dt) <= 0) ST.love = DIRECTOR.can('moose') && tryLove() ? (DIRECTOR.start('moose', 12), rand(...L.CD)) : L.RETRY;
     }
   }
   for (let i = LIST.length - 1; i >= 0; i--) {

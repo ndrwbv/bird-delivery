@@ -33,64 +33,44 @@ body.career #money b { color: #ffe6ee; text-shadow: 2px 2px 0 #3a1020; }
 #choice.big.cr-lunch #ch-opts button span { font-size: 7px; }
 @media (max-width: 560px) { #choice.big.cr-lunch #ch-opts { flex-direction: column; } #choice.big.cr-lunch #ch-opts button { min-height: 0; } }
 
-/* ── экран итогов: на весь экран, как в играх; главная кнопка одна — «на новую смену».
-   Без прокрутки на 1280×720, Деке 1280×800 и телефоне 390×844: заработок и директор — одной
-   полосой, плитки низкие, район — мелкой строкой; не влезло — career.js fitEnd чуть уменьшает. ── */
-#over.cr { padding: 0; align-items: stretch; justify-content: stretch; background: radial-gradient(ellipse at 50% 35%, rgba(44, 58, 120, .93), rgba(16, 20, 42, .97) 75%); }
+/* ── экран конца смены — один (career.js showEnd, shiftend.js): заголовок и причина мелко, Толик одной
+   фразой, большая копилка в центре, важное строками, кнопки выбора. Без прокрутки на 1280×720, Деке
+   1280×800 и телефоне 390×844; не влезло — career.js fitEnd чуть уменьшает. ── */
+#over.cr { padding: 0; align-items: stretch; justify-content: stretch; background: radial-gradient(ellipse at 50% 42%, rgba(70, 40, 92, .95), rgba(16, 20, 42, .98) 72%); }
 #over.cr .ov-box { width: 100%; max-width: none; min-height: 100%; margin: 0; box-sizing: border-box; background: none; border: 0; border-radius: 0; box-shadow: none;
-                   justify-content: center; gap: clamp(8px, 1.9vh, 22px);
-                   padding: max(14px, 3vh, env(safe-area-inset-top)) max(16px, 5vw) max(14px, 3vh, env(safe-area-inset-bottom)); }
-#over.cr #ov-t { font-size: clamp(22px, min(4.6vw, 8vh), 64px); line-height: 1.1; }
-#over.cr #ov-why { font-size: clamp(8px, min(1vw, 1.7vh), 13px); line-height: 1.6; }
-#over:not(.cr) #cr-head, #over:not(.cr) #cr-info { display: none; }
-/* заработок слева, директор справа */
-#cr-head { display: flex; align-items: center; justify-content: center; gap: clamp(14px, 3vw, 48px); width: min(1200px, 100%); margin: 0 auto; }
-#cr-earn { flex: none; }
-#cr-earn .ov-row { flex-direction: column; align-items: center; gap: clamp(8px, 1.4vh, 14px); padding: 0; border: 0; }
-#cr-earn .ov-row span { font-size: clamp(9px, min(1.1vw, 2vh), 14px); text-align: center; }
-#cr-earn .ov-row b { font-size: clamp(32px, min(5.4vw, 10vh), 76px); color: #ffd85e; text-shadow: 5px 5px 0 #33210c, -2px 2px 0 #33210c, 2px -2px 0 #33210c, -2px -2px 0 #33210c; }
-#cr-head #cr-boss { flex: 0 1 600px; margin: 0; min-width: 0; }
-/* плитки — низкие, все в один-два ряда */
-#over.cr #ov-stats { display: flex; flex-direction: row; flex-wrap: wrap; align-items: stretch; justify-content: center; gap: clamp(6px, 1vw, 12px); width: min(1400px, 100%); margin: 0 auto; }
-#over.cr #ov-stats .ov-row { flex: 0 1 clamp(120px, 11.5vw, 200px); flex-direction: column; align-items: center; justify-content: center; gap: clamp(5px, 1vh, 9px);
-                   padding: clamp(7px, 1.3vh, 13px) 8px; background: rgba(14, 18, 40, .55); border: 2px solid rgba(51, 33, 12, .9); border-radius: 10px; }
-#over.cr #ov-stats .ov-row span { font-size: clamp(7px, .75vw, 10px); text-align: center; line-height: 1.4; }
-#over.cr #ov-stats .ov-row b { font-size: clamp(11px, min(1.4vw, 2.4vh), 18px); }
-/* район: «район Юг · 1 из 4 смен · новый район «Кольцо» через 3 смены · смена в зачёт от 3 заказов» */
-#cr-info { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px clamp(12px, 2vw, 26px); width: min(1100px, 100%); margin: 0 auto; }
+                   justify-content: center; gap: clamp(8px, 1.8vh, 20px);
+                   padding: max(12px, 2.6vh, env(safe-area-inset-top)) max(16px, 5vw) max(14px, 3vh, env(safe-area-inset-bottom)); }
+#over.cr #ov-t { font-size: clamp(14px, min(2.6vw, 4.4vh), 34px); line-height: 1.1; }
+#over.cr #ov-why { font-size: clamp(7px, min(.9vw, 1.5vh), 12px); line-height: 1.6; margin-top: -4px; opacity: .85; }
+#over.cr #ov-stats, #over.cr #ov-best { display: none; }
+#over:not(.cr) #cr-stage, #over:not(.cr) #cr-info { display: none; }
+/* важное за смену — по строке: открыт район, новое звание, пиццерия выросла (жёлтым), район и место — мелко */
+#cr-info { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px clamp(10px, 1.6vw, 20px); width: min(1100px, 100%); margin: 0 auto; }
 #cr-info[hidden] { display: none; }
 #cr-info .ov-row { display: inline-flex; align-items: baseline; gap: 8px; padding: 0; border: 0; }
-#cr-info .ov-row span { font-size: clamp(7px, .75vw, 10px); color: #b9c3e6; }
+#cr-info .ov-row span { font-size: clamp(7px, .8vw, 10px); color: #b9c3e6; }
 #cr-info .ov-row b { font-size: clamp(8px, .95vw, 12px); color: #fff3d6; white-space: normal; text-align: left; line-height: 1.4; }
 #cr-info .ov-row.new { padding: 6px 12px; background: #ffd85e; border: 3px solid #33210c; border-radius: 8px; box-shadow: 0 3px 0 #33210c; }
 #cr-info .ov-row.new span, #cr-info .ov-row.new b { color: #33210c; }
-#over.cr #ov-best { display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 6px 14px; min-height: 0; }
-#over.cr #ov-best b { font-weight: normal; font-size: clamp(10px, min(1.3vw, 2.2vh), 17px); color: #6fd3ff; text-shadow: 2px 2px 0 #33210c; }
-#over.cr #ov-best span { font-size: clamp(7px, .8vw, 10px); color: #b9c3e6; }
-#over.cr #ov-best:empty, #over.cr .ov-note:empty { display: none; }
-#over.cr .ov-btns { flex-wrap: wrap; justify-content: center; gap: clamp(8px, 1.4vh, 12px); width: min(820px, 100%); margin: 0 auto; }
-#over.cr .ov-btns button { flex: 0 1 auto; min-width: 150px; min-height: 0; padding: clamp(9px, 1.5vh, 13px) 18px; font-size: clamp(9px, .95vw, 12px);
-                           color: #fff3d6; background: rgba(34, 44, 90, .95); }
+#over.cr .ov-note:empty { display: none; }
+/* кнопки выбора: «на новую смену» — во всю ширину; «депнуть» и «потратить деньги» — рядом; «гараж» · «покататься» · «в меню» — мелко */
+#over.cr .ov-btns { flex-wrap: wrap; justify-content: center; gap: clamp(8px, 1.4vh, 12px); width: min(760px, 100%); margin: 0 auto; }
+#over.cr .ov-btns button { flex: 1 1 26%; min-width: 0; min-height: 0; padding: clamp(8px, 1.3vh, 12px) 10px; font-size: clamp(8px, .9vw, 11px);
+                           color: #b9c3e6; background: rgba(34, 44, 90, .95); }
 #over.cr .ov-btns #ov-again { order: -1; flex: 1 0 100%; padding: clamp(12px, 2.2vh, 22px) 20px; font-size: clamp(14px, min(1.9vw, 3.2vh), 24px);
                               color: #fff3d6; background: #f0522a; box-shadow: 0 6px 0 #33210c, 0 14px 30px rgba(240, 82, 42, .3); text-shadow: 3px 3px 0 #9b2a10; }
-#over.cr .ov-btns #ov-spend { color: #ffd85e; background: rgba(34, 44, 90, .95); }
-/* узко (телефон, портрет): директор под заработком, плитки — списком «подпись … число» */
-@media (max-width: 760px), (max-aspect-ratio: 1/1) {
-  #cr-head { flex-direction: column; gap: 10px; }
-  #cr-head #cr-boss { flex: none; width: 100%; box-sizing: border-box; }
-}
-@media (max-width: 560px) {
-  #over.cr #ov-stats { flex-direction: column; flex-wrap: nowrap; gap: 0; }
-  #over.cr #ov-stats .ov-row { flex: none; flex-direction: row; justify-content: space-between; align-items: baseline; gap: 10px; padding: 6px 2px;
-                               background: none; border: 0; border-bottom: 2px dashed rgba(255, 243, 214, .14); border-radius: 0; }
-  #over.cr #ov-stats .ov-row span { text-align: left; }
-  #over.cr #ov-stats .ov-row b { font-size: 11px; }
-  #cr-info { flex-direction: column; gap: 6px; }
-  #over.cr .ov-btns button { flex: 1 1 40%; min-width: 0; }
-}
+#over.cr .ov-btns #ov-dep, #over.cr .ov-btns #ov-spend { flex: 1 1 40%; padding: clamp(10px, 1.7vh, 16px) 12px; font-size: clamp(10px, min(1.3vw, 2.2vh), 16px); }
+#over.cr .ov-btns #ov-dep { display: flex; flex-direction: column; align-items: center; gap: 5px; color: #ffd85e; background: #7a1f5c; }
+#over.cr .ov-btns #ov-dep b { font-weight: normal; text-shadow: 2px 2px 0 #33210c; }
+#over.cr .ov-btns #ov-dep span { font-size: .55em; color: #ffd0e8; }
+#over.cr .ov-btns #ov-spend { color: #2a1d10; background: #ffd85e; }
+#over.cr .ov-btns #ov-dep[hidden], #over.cr .ov-btns #ov-spend[hidden] { display: none; }
+#over:not(.cr) #ov-dep, #over:not(.cr) #ov-spend, #over:not(.cr) #ov-ride, #over:not(.cr) #ov-garage { display: none; }
+/* пока Толик говорит и сыплются деньги — строк и кнопок не видно (место под ними держим) */
+#over.cr #cr-info, #over.cr .ov-btns, #over.cr .ov-note { transition: opacity .3s, transform .3s; }
+#over.cr.wait #cr-info, #over.cr.wait .ov-btns, #over.cr.wait .ov-note { opacity: 0; transform: translateY(10px); pointer-events: none; visibility: hidden; }
 
 #cr-end { display: flex; flex-direction: column; gap: 10px; }
-#over:not(.cr) #cr-end, #over:not(.cr) #ov-ride, #over:not(.cr) #ov-garage { display: none; }
 #cr-wallet { font-size: clamp(9px, 1vw, 13px); color: #b9c3e6; text-align: center; }
 #cr-wallet b { font-weight: normal; font-size: clamp(11px, 1.3vw, 16px); color: #ffd85e; margin: 0 6px; }
 #cr-wallet em { font-style: normal; font-size: clamp(10px, 1.2vw, 15px); color: #fff3d6; }
@@ -145,7 +125,7 @@ body.career #money b { color: #ffe6ee; text-shadow: 2px 2px 0 #3a1020; }
 .cr-sres.win { color: #ffd85e; animation: cr-blink .5s steps(2) 6; }
 .cr-sres.lose { color: #ff8a8a; }
 
-/* заработок за смену и на что потратить — на весь экран поверх итогов */
+/* «потратить деньги» — на весь экран поверх экрана конца смены */
 #cr-spend { position: absolute; inset: 0; z-index: 36; display: flex; opacity: 0; transition: opacity .25s;
             background: radial-gradient(ellipse at 50% 30%, #2c3a78, #141a33 75%); }
 #cr-spend[hidden] { display: none; }
@@ -156,8 +136,8 @@ body:has(#cr-spend:not([hidden])) .hud, body:has(#cr-spend:not([hidden])) #ctrls
              scrollbar-width: thin; scrollbar-color: #ffd85e #141a33; }
 #cr-spend.on .cr-sp-box { transform: none; }
 .cr-sp-head { display: flex; flex-direction: column; align-items: center; gap: clamp(10px, 1.8vh, 18px); margin-top: auto; }
-.cr-sp-sum { font-size: clamp(30px, min(9vw, 12vh), 128px); line-height: 1; white-space: nowrap; color: #ffd85e; letter-spacing: .02em;
-             text-shadow: 6px 6px 0 #33210c, -3px 3px 0 #33210c, 3px -3px 0 #33210c, -3px -3px 0 #33210c, 0 18px 40px rgba(0, 0, 0, .35); }
+.cr-sp-sum { font-size: clamp(18px, min(3.4vw, 6vh), 44px); line-height: 1.1; color: #ffd85e; text-align: center;
+             text-shadow: 4px 4px 0 #33210c, -2px 2px 0 #33210c, 2px -2px 0 #33210c, -2px -2px 0 #33210c; }
 #cr-sp-go { align-self: center; width: min(560px, 100%); font: inherit; font-size: clamp(14px, 1.9vw, 24px); padding: clamp(16px, 2.6vh, 24px) 20px; cursor: pointer;
             color: #fff3d6; background: #f0522a; border: 3px solid #33210c; border-radius: 12px; text-shadow: 3px 3px 0 #9b2a10;
             box-shadow: 0 6px 0 #33210c, 0 14px 30px rgba(240, 82, 42, .3); }
@@ -168,19 +148,10 @@ body:has(#cr-spend:not([hidden])) .hud, body:has(#cr-spend:not([hidden])) #ctrls
                background: rgba(34, 44, 90, .9); color: #b9c3e6; cursor: pointer; box-shadow: 0 4px 0 #33210c; }
 #cr-sp-close:hover { color: #fff3d6; }
 #cr-sp-close:active { transform: translateY(3px); box-shadow: 0 1px 0 #33210c; }
-.ov-btns #ov-spend { color: #2a1d10; background: #ffd85e; }
-#ov-spend[hidden] { display: none; }
 @media (max-width: 560px) { .cr-tabs, .cr-tabs.n2 { grid-template-columns: 1fr; gap: 8px; } .cr-tab { min-height: 0; gap: 6px; padding: 9px 14px; } }
 .cr-sp-box::-webkit-scrollbar { width: 8px; }
 .cr-sp-box::-webkit-scrollbar-track { background: #141a33; }
 .cr-sp-box::-webkit-scrollbar-thumb { background: #ffd85e; border-radius: 4px; border: 2px solid #141a33; }
-
-/* открылся новый район (districts.js) — над кнопкой «на новую смену» */
-.cr-sp-new { display: flex; flex-direction: column; gap: 8px; align-items: center; padding: clamp(8px, 1.4vh, 12px) 16px; margin: 0 auto; max-width: 560px;
-             background: #ffd85e; color: #33210c; border: 3px solid #33210c; border-radius: 10px; box-shadow: 0 4px 0 #33210c; text-align: center; }
-.cr-sp-new[hidden] { display: none; }
-.cr-sp-new b { font-weight: normal; font-size: clamp(11px, 1.4vw, 16px); }
-.cr-sp-new span { font-size: clamp(7px, .75vw, 9px); line-height: 1.7; }
 
 /* «депнуть» — своё окно на весь экран (career.js openDep): автомат, куча купюр, ставка */
 #cr-dep { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .2s;
@@ -266,68 +237,47 @@ body:has(#cr-spend:not([hidden])) .hud, body:has(#cr-spend:not([hidden])) #ctrls
 .dep-again[hidden] { display: none; }
 .dep-again:hover { opacity: 1; }
 
-/* конец смены (shiftend.js): 1) деньги насыпаются кучей, как выигрыш в «депнуть» (те же купюры .dep-pile i
-   и dep-fall), 2) Толик управляющий и его фраза; внизу «продолжить» (.dep-go). Без прокрутки: куча
-   занимает, сколько осталось по высоте */
-#cr-payout { position: absolute; inset: 0; z-index: 40; display: flex; flex-direction: column; align-items: center; justify-content: space-between;
-             gap: clamp(8px, 2vh, 18px); padding: max(14px, 3vh) 16px max(18px, 4vh); box-sizing: border-box; overflow: hidden;
-             opacity: 0; transition: opacity .2s; cursor: pointer; touch-action: none;
-             background: radial-gradient(ellipse at 50% 30%, #2c3a78, #141a33 75%); }
-#cr-payout.on { opacity: 1; }
-#cr-payout.out { opacity: 0; transition-duration: .15s; }
-.en-stage { flex: 1; min-height: 0; width: min(900px, 100%); display: flex; flex-direction: column; align-items: center; gap: clamp(8px, 2vh, 18px); }
-.en-top { flex: none; display: flex; flex-direction: column; align-items: center; gap: clamp(8px, 1.6vh, 16px); text-align: center; }
-.en-sum { font-size: clamp(28px, min(8vw, 11vh), 96px); line-height: 1; white-space: nowrap; color: #ffd85e;
-          text-shadow: 6px 6px 0 #33210c, -3px 3px 0 #33210c, 3px -3px 0 #33210c, -3px -3px 0 #33210c; }
-.en-sum.win { animation: cr-blink .4s steps(2) 8; }
-.en-cap { font-size: clamp(10px, 1.5vw, 16px); color: #b9c3e6; text-shadow: 2px 2px 0 #141a33; }
-.en-bonus { font-size: clamp(11px, 2vw, 22px); color: #fff3d6; background: #f0522a; border: 3px solid #33210c; border-radius: 10px;
-            padding: .55em 1em; box-shadow: 0 5px 0 #33210c; transform: scale(.4); opacity: 0; transition: transform .25s cubic-bezier(.3, 1.6, .5, 1), opacity .15s; }
-.en-bonus[hidden] { display: none; }
-.en-bonus.on { transform: none; opacity: 1; }
-.en-bonus b { font-weight: normal; color: #ffd85e; text-shadow: 2px 2px 0 #9b2a10; }
-.en-pile.dep-pile { flex: 1; min-height: 80px; width: 100%; height: auto; }
-/* копилка: куча за смену перетекает в неё (shiftend.js pour) — розовая плашка, как на хаде */
-.en-pig { display: flex; align-items: center; gap: 10px; padding: 4px 14px 4px 8px; background: #8c3a58; border: 3px solid #3a1020; border-radius: 10px;
-          font-size: clamp(14px, min(2.4vw, 4vh), 26px); line-height: 1.2; }
-.en-pig[hidden] { display: none; }
-.en-pig .pg-ico { width: 1.9em; height: 1.4em; flex: none; filter: drop-shadow(2px 2px 0 #33210c); transform-origin: 50% 70%; }
-.en-pig b { font-weight: normal; color: #ffe6ee; text-shadow: 2px 2px 0 #3a1020; white-space: nowrap; }
-.en-pig span { font-size: .5em; color: #ffc4d6; text-shadow: 1px 1px 0 #3a1020; white-space: nowrap; }
-.en-pig.fill { animation: en-fill .45s cubic-bezier(.3, 1.6, .5, 1); }
-.en-pig.win b { animation: cr-blink .4s steps(2) 4; }
-@keyframes en-fill { 0% { transform: scale(1); } 40% { transform: scale(1.2); } 100% { transform: scale(1); } }
-.en-pile .en-coin { border-radius: 50%; border: 3px solid #8a5a0c; background: radial-gradient(circle at 35% 35%, #fff6c2, #ffd24a 45%, #d9a21c); }
-#cr-payout.now .en-pile i { animation: none; }
-.en-go { flex: none; }
-#cr-payout:not(.done) .en-go { animation: none; }
-.en-tolik { margin: auto; display: flex; align-items: flex-end; gap: clamp(10px, 2vw, 22px); max-width: min(780px, 100%); }
-.en-tolik > img, .en-tolik > i { flex: none; width: clamp(60px, min(14vw, 20vh), 140px); height: auto; aspect-ratio: 1; border-radius: 50%; border: 4px solid #fff3d6;
-                                 image-rendering: pixelated; background: #8a6b4e; box-shadow: 0 4px 0 rgba(0, 0, 0, .35); }
-.en-tb { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-.en-tb b { font-weight: normal; font-size: clamp(9px, 1.3vw, 14px); color: #fff3d6; text-shadow: 2px 2px 0 #33210c; padding-left: 14px; }
-.en-tb p { margin: 0; padding: .9em 1.2em; font-size: clamp(13px, min(2.6vw, 4.2vh), 28px); line-height: 1.5; color: #14101e; background: #e9e9eb;
-           border-radius: 26px; border-bottom-left-radius: 8px; box-shadow: 0 6px 16px rgba(0, 0, 0, .45); overflow-wrap: anywhere;
+/* конец смены (shiftend.js): Толик одной фразой и большая копилка-свинья — купюры сверху летят в неё,
+   сумма докручивается; всё — в #cr-stage экрана конца смены */
+#cr-stage { position: relative; flex: 1 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: clamp(8px, 2vh, 22px); cursor: default; }
+.en-tolik { display: flex; align-items: flex-end; gap: clamp(8px, 1.4vw, 16px); max-width: min(760px, 100%); }
+.en-tolik > img, .en-tolik > i { flex: none; width: clamp(40px, min(8vw, 9vh), 80px); height: auto; aspect-ratio: 1; border-radius: 50%; border: 3px solid #fff3d6;
+                                 background: #3a4a8a; box-shadow: 0 4px 0 #33210c; }
+.en-tb { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.en-tb b { font-weight: normal; font-size: clamp(7px, .9vw, 11px); color: #fff3d6; text-shadow: 2px 2px 0 #33210c; padding-left: 12px; }
+.en-tb p { margin: 0; padding: .75em 1.1em; font-size: clamp(10px, min(1.5vw, 2.3vh), 18px); line-height: 1.5; color: #14101e; background: #e9e9eb;
+           border-radius: 22px 22px 22px 6px; text-align: left; box-shadow: 0 4px 0 rgba(0, 0, 0, .35);
            transform-origin: 0 100%; animation: en-pop .38s cubic-bezier(.2, .9, .3, 1.3) both; }
-.en-tb p.typing { display: flex; gap: 8px; padding: 1.1em 1.3em; }
-.en-tb p.typing span { width: 12px; height: 12px; border-radius: 50%; background: #8e8e93; animation: cm-dot .9s ease-in-out infinite; }
+.en-tb p.typing { display: flex; gap: 7px; padding: .95em 1.2em; }
+.en-tb p.typing span { width: 10px; height: 10px; border-radius: 50%; background: #8e8e93; animation: cm-dot .9s ease-in-out infinite; }
 .en-tb p.typing span:nth-child(2) { animation-delay: .15s; }
 .en-tb p.typing span:nth-child(3) { animation-delay: .3s; }
 @keyframes en-pop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+.en-pigbox { display: flex; flex-direction: column; align-items: center; gap: clamp(4px, 1vh, 10px); }
+.en-pig { line-height: 0; }
+.en-pig .pg-ico { width: clamp(100px, min(24vw, 26vh), 300px); height: auto; aspect-ratio: 32 / 24; filter: drop-shadow(6px 6px 0 #33210c); transform-origin: 50% 70%; }
+.en-pig.fill .pg-ico { animation: en-fill .5s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes en-fill { 0% { transform: scale(1); } 40% { transform: scale(1.18) translateY(-6%); } 100% { transform: scale(1); } }
+.en-wal { display: flex; flex-direction: column; align-items: center; gap: clamp(4px, .8vh, 8px); }
+.en-wal span { font-size: clamp(7px, .9vw, 11px); color: #ffc4d6; text-shadow: 1px 1px 0 #3a1020; }
+.en-wal b { font-weight: normal; font-size: clamp(26px, min(5.6vw, 8.5vh), 80px); line-height: 1; white-space: nowrap; color: #ffe6ee;
+            text-shadow: 5px 5px 0 #3a1020, -2px 2px 0 #3a1020, 2px -2px 0 #3a1020, -2px -2px 0 #3a1020; }
+.en-pig.win + .en-wal b { animation: en-blink .4s steps(2) 4; }
+@keyframes en-blink { 50% { color: #ffd85e; } }
+.en-plus { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; font-size: clamp(7px, .9vw, 11px); color: #b9c3e6; opacity: 0; transition: opacity .3s; }
+.en-plus.on { opacity: 1; }
+.en-plus b { font-weight: normal; font-size: 1.3em; color: #7fe08a; text-shadow: 2px 2px 0 #1a3a1e; }
+.en-plus .bn b { color: #ffd85e; text-shadow: 2px 2px 0 #9b2a10; }
+.en-rain { position: absolute; inset: 0; pointer-events: none; }
+.en-rain i { position: absolute; width: clamp(30px, 4vw, 52px); height: clamp(18px, 2.4vw, 31px); margin: clamp(-15px, -1.2vw, -9px) 0 0 clamp(-26px, -2vw, -15px);
+             display: flex; align-items: center; justify-content: center; font-style: normal; font-size: clamp(9px, 1.2vw, 15px); color: #1d4d23;
+             background: linear-gradient(90deg, #7fd38a, #a8ecb0 50%, #7fd38a); border: 2px solid #2d6b34; border-radius: 3px; box-shadow: 0 2px 0 rgba(0, 0, 0, .35); }
+.en-rain i.c { width: clamp(20px, 2.4vw, 32px); height: clamp(20px, 2.4vw, 32px); margin: clamp(-16px, -1.2vw, -10px) 0 0 clamp(-16px, -1.2vw, -10px); border-radius: 50%;
+               border: 3px solid #8a5a0c; background: radial-gradient(circle at 35% 35%, #fff6c2, #ffd24a 45%, #d9a21c); }
 @media (max-width: 560px) {
-  .en-tolik { flex-direction: column; align-items: center; }
-  .en-tolik > img, .en-tolik > i { width: clamp(80px, 26vw, 120px); }
-  .en-tb { align-items: center; }
-  .en-tb b { padding-left: 0; }
-  .en-tb p { font-size: clamp(14px, 4.4vw, 20px); border-bottom-left-radius: 26px; text-align: center; }
+  .en-tb p { font-size: clamp(12px, 3.6vw, 16px); }
+  .en-pig .pg-ico { width: clamp(110px, 40vw, 180px); }
+  .en-wal b { font-size: clamp(28px, 10vw, 44px); }
+  #cr-info { flex-direction: column; gap: 6px; }
 }
-
-/* директор после смены: лицо и реплика (итоги и «потратить») */
-#cr-boss, .cr-sp-boss { display: flex; align-items: center; gap: 12px; margin: 0 auto; max-width: 640px; text-align: left;
-                        background: #fff3d6; color: #2a1d10; border: 3px solid #33210c; border-radius: 12px; padding: 10px 14px; box-shadow: 0 4px 0 #33210c; }
-#cr-boss[hidden], .cr-sp-boss[hidden] { display: none; }
-#cr-boss img, .cr-sp-boss img { width: clamp(48px, 8vh, 72px); height: clamp(48px, 8vh, 72px); flex: none; image-rendering: pixelated;
-                                border: 3px solid #33210c; border-radius: 10px; background: #ffd85e; }
-#cr-boss b, .cr-sp-boss b { display: block; font-size: 9px; color: #9b2a10; margin-bottom: 6px; }
-#cr-boss p, .cr-sp-boss p { margin: 0; font-size: clamp(9px, 1.2vw, 13px); line-height: 1.6; }
-.cr-sp-boss { align-self: center; width: min(640px, 100%); box-sizing: border-box; }

@@ -42,6 +42,7 @@ import * as CONSTR from './construction.js';     // стройки на пуст
 import * as RIVS from './rivals.js';             // точки «Вселенной суши» и «Королевы Бургеров», маскоты, их курьеры (rivals.js)
 import * as CARL from './carlights.js';         // огни машины игрока: стоп-сигналы, поворотники, задний ход (carlights.js)         // фонари: все сбиваются, шары и консоли, частный сектор (streetlamps.js)
 import * as JUNK from './junk.js';              // остановки ломаются, мусор у подъездов, контейнеры (junk.js)             // плитка, аллеи; в карьере — мусор, бандиты, особняки, шашлыки
+import * as DIRECTOR from './director.js';       // режиссёр событий: сессия начинается спокойно, события по нарастающей (director.js)
 import * as RAID from './raid.js';               // налёт конкурентов на твою точку и ёлка-турель (raid.js)
 import * as MAFIA from './mafia.js';             // мафиози у адреса: предупреждает, потом стреляет (детская — кидается помидорами)
 import * as THUGS from './thugs.js';             // гопники прессуют прохожего в бандитских кругах — помог, респект (thugs.js)
@@ -2786,6 +2787,19 @@ function inHouse (x, z, m = 0) {
   }
   return false;
 }
+/* для камеры: участки строек и пустырей (заборы, грядки) — не стены; только дома и пристройки */
+const FOOT_SOFT = new Set(['waste', 'site']);
+function inWall (x, z, m = 0) {
+  const a = HOUSE_GRID.get(Math.floor(x / 40) + ',' + Math.floor(z / 40));
+  if (!a) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (FOOT_SOFT.has(a[i].k)) continue;
+    const p = a[i].p;
+    if (inPoly(x, z, p)) return true;
+    if (m && (inPoly(x + m, z, p) || inPoly(x - m, z, p) || inPoly(x, z + m, p) || inPoly(x, z - m, p))) return true;
+  }
+  return false;
+}
 
 /* Подъезды — настоящие, из карты (entrance=*): дверь, козырёк, лампа
    над дверью и ступенька, у части — лавочка и урна. Дом в карте знает,
@@ -2888,11 +2902,13 @@ function houseWalks () {
    краю тротуара через каждые тринадцать метров, как на московских
    улицах. У перекрёстков, остановок и зебр не сажаем: заслоняют. */
 function osmStreetTrees () {
+  const ALLEY = new Set(TREES.alleyRoads(CITY, MAP.id));   // аллея-арка (trees.js) — там свои деревья
+  BUILD_T.alley = TREES.plantAlley({ CITY, mapId: MAP.id, tree, roadWidth, NODE_IDX, nodeDeg, ZEBRAS, inHouse, inBounds, solidAt });
   for (const [x, z] of CITY.trees) if (!inHouse(x, z, 1.2)) tree(x, z);
   boulevardTrees();
   let n = 0;
   for (const r of CITY.roads) {
-    if (!drivable(r) || r.b || r.g || r.c < 2 || r.c > 4 || n > 700) continue;
+    if (!drivable(r) || r.b || r.g || r.c < 2 || r.c > 4 || n > 700 || ALLEY.has(r)) continue;
     const off = roadWidth(r) / 2 + 3.5;
     let acc = rand(0, 13);
     for (let i = 1; i < r.p.length; i++) {
@@ -9186,7 +9202,7 @@ const camClear = (x, z) => {
     const lx = dx * s.cs + dz * s.sn, lz = -dx * s.sn + dz * s.cs;
     if (Math.abs(lx) < s.hw + 0.9 && Math.abs(lz) < s.hd + 0.9) return false;
   }
-  return !inHouse(x, z, 0.9);
+  return !inWall(x, z, 0.9);   // участки строек и пустырей — не стены (inWall)
 };
 
 function camStep (dt, vf) {
@@ -11310,6 +11326,7 @@ function checkArrival (dt) {
 
     handOver(st, onTime);
     if (ADULT && !o.tut) FLIRT.onHand(st, onTime, { car: () => car });   // клиентка изредка заигрывает, курьер отказывает (flirt.js)
+    DIRECTOR.delivered();                           // доставка сессии: режиссёр открывает события по нарастающей (director.js)
     // оплата — кучкой денег и чеком (popPay); в сюжетном заказе награду покажет катсцена
     const pp = st.pay;
     if (pp && !pp.story) {
@@ -11886,6 +11903,7 @@ function reviveTick (dt) {
 function startRun (ride) {
   S.ride = !!ride;
   if (!S.ride && !QR.on()) SEAS.advanceSeason();   // каждая смена — шаг к следующему времени года (быстрый заезд — свой сезон)
+  DIRECTOR.shiftStart(S.ride);                   // режиссёр событий: смена сессии (director.js) — до погоды и фестиваля
   WTH.shiftStart(S.ride);                         // вариант погоды на смену: жара, гроза, снегопад… (weather.js)
   S.free = S.ride;                               // катаемся без срока и не в зачёт
   $('wasted').hidden = true;
@@ -12366,6 +12384,7 @@ if (!INTRO && CAREER) FEST.init({ THREE, scene, V, S, CITY, ADULT, Store, obb, S
   makeHuman, makePerson, dropMesh, sayBubble, fxAdd, puffGeo, steam, gibBurger, popBonus, toast, chat: s => CHAT.say(s), addWallet, money, CASH, Snd, CAR_L, CAR_W, HEROES, DIST,
   season: () => SEAS.seasonValue() });   // фестивали на парковках ТЦ (festivals.js)
 /* налёт на точку и ёлка-турель (raid.js) */
+DIRECTOR.init({ Store, S });                     // сессия: новая или продолжение (director.js)
 if (!INTRO && CAREER) RAID.init({ V, S, scene, CAREER, ADULT, CAR_L, CAR_W, Store, wallet, addWallet, makeHuman, dropMesh, gibHuman, sayBubble, groundH, curbAt, pushOut, sparks, puff, popBonus, money, Snd,
   get PIZZA () { return PIZZA; }, isPlaying, chat: s => CHAT.say(s),
   hurt: n => { S.hurt = 0; hurtCar(n, 0, V.x + rand(-1, 1), V.z + rand(-1, 1)); },   // удар битой — полсердца, без мятин
@@ -13147,6 +13166,7 @@ function frameStep (now) {
   CL.step('thugs', THUGS.step, dt, THUGS_API || (THUGS_API = thugsApi()));   // гопники прессуют прохожего (thugs.js)
   CL.step('protests', PROT.step, dt, PROT_API || (PROT_API = protApi()));   // протест по ступеням, концерты во дворах (protests.js)
   CL.step('growth', GROW.step, dt, GROW_API || (GROW_API = growApi()));      // пиццерия растёт: вид у шара (growth.js)
+  CL.step('director', DIRECTOR.step, dt);                           // режиссёр событий: пауза после крупного (director.js)
   if (CAREER) CL.step('raid', RAID.step, dt);                          // налёт на точку, ёлка-турель (raid.js)
   CL.step('heroes', HEROES.step, dt, HEROES_API || (HEROES_API = heroesApi()));   // герои города (heroes.js)
   CL.step('fauna', FAUNA.step, dt, FAUNA_API || (FAUNA_API = faunaApi()));   // лоси и звери в лесах (fauna.js)
@@ -13240,7 +13260,7 @@ requestAnimationFrame(frame);
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
 /* песочница (sandbox.html): бесконечное здоровье, нитро, «не глохнет» (noStall читает cars.js) */
 const SBX = { god: false, nitro: false, noStall: false };
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, PG: PG.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, CULLQ: CULL.Q, GFX: GFX.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { inWall, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, PG: PG.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, CULLQ: CULL.Q, GFX: GFX.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта
@@ -13258,7 +13278,7 @@ if (window.__dlv) Object.assign(window.__dlv, { showTitle, CAREERM, renderSettin
 if (window.__dlv) window.__dlv.crashlog = CL;        // журнал ошибок: entries(), text(), disabled() (docs/CRASHES.md)
 if (window.__dlv) Object.assign(window.__dlv, { pinFront, nearClient, PIN });   // пин перед клиентом, кто у клиента лишний (docs/ORDERS.md)
 if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG, CONS: CONSTR.DEBUG, DARK: DARKN.DEBUG, WASTE: WASTE.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)
-if (window.__dlv) Object.assign(window.__dlv, { HB: HB.DEBUG, FLIRT: ADULT ? FLIRT.DEBUG : null });   // коневозки, заигрывание (только взрослая)
+if (window.__dlv) Object.assign(window.__dlv, { DIRECTOR: DIRECTOR.DEBUG, HB: HB.DEBUG, FLIRT: ADULT ? FLIRT.DEBUG : null });   // коневозки, заигрывание (только взрослая)
 if (window.__dlv) { window.__dlv.FOREST = FOREST.DEBUG; window.__dlv.LAWN = LAWNP.DEBUG; window.__dlv.PZD = PZD.DEBUG; window.__dlv.cam = cam; window.__dlv.RIV = RIVS.DEBUG; }   // ельник и пиццерия-шар (forest.js, pizzadome.js)
 if (window.__dlv) window.__dlv.RELIEF = { STATS: RELIEF.STATS, at: RELIEF.reliefAt };   // неровный газон (relief.js)
 if (window.__dlv) { window.__dlv.SL = SL.DEBUG; window.__dlv.LAMP_SPOTS = LAMP_SPOTS; window.__dlv.smashHit = smashHit; window.__dlv.CARL = CARL.DEBUG; }   // фонари и огни машины

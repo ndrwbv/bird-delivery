@@ -120,7 +120,7 @@ export function init (api) {
 
 /* ── смена ── */
 export function startShift () {
-  closeSpend(false);
+  closeSpend();
   if (!A) return;
   const S = A.S;
   // круглосуточная пиццерия (со второго района): смена с того часа, когда кончилась прошлая (dlv-clock);
@@ -132,7 +132,7 @@ export function startShift () {
   SH.tStart = A.env().t; SH.allDay = day;
   S.lunch = null;
   SH.on = true; SH.phase = ''; SH.lunch = false; SH.hits = 0; SH.lastHurt = S.hurt || 0; SH.fine = 0; SH.stars = 0;
-  SH.slot = false; STAKE = 0; SH.t0h = ECON.hourOf(A.env().t); SH.endH = SH.t0h; SH.n = +A.Store.get('dlv-shifts', 0) || 0;
+  SH.slot = false; SH.forceMood = ''; STAKE = 0; SH.t0h = ECON.hourOf(A.env().t); SH.endH = SH.t0h; SH.n = +A.Store.get('dlv-shifts', 0) || 0;
   SH.len = QR.on() ? QR.len() : ECON.shiftLen(SH.n);   // быстрый заезд — длина, что выбрал игрок
   // волна щедрости: 1-я смена сессии — щедрая (econ.js PACE); быстрый заезд — обычная и волну не двигает
   SH.pace = QR.on() ? (DIST.setPace('normal'), 'normal') : DIST.beginShift();
@@ -301,20 +301,21 @@ const WHY = {
 /* сбито прохожих за всю карьеру (сохранение dlv-knocked, стирается сбросом прогресса) */
 const KNOCKED = 'dlv-knocked';
 const knocked = () => Math.max(0, +A.Store.get(KNOCKED, 0) || 0);
-/* какая смена для директора: плохая / так себе / хорошая (econ.js BOSS_MOOD) */
+/* какая смена для Толика: плохая / так себе / хорошая (econ.js BOSS_MOOD) */
 function moodOf (why, full) {
+  if (SH.forceMood) return SH.forceMood;            // песочница интерфейса (src/uilab) — настроение руками
   const d = A.S.delivered || 0, M = ECON.BOSS_MOOD;
   if (why === 'сбил клиента' || d < M.BAD_BELOW) return 'bad';
   if (full && !SH.fine && d >= (M.GREAT[(SH.len && SH.len.id) || 'medium'] || 6)) return 'great';
   return 'ok';
 }
-function bossCard () {
-  const b = END.boss({ A, mood: SH.mood || 'ok', opened: DIST.has() && SH.opened >= 0 ? t(DIST.list()[SH.opened].name) : '', killed: knocked() });
-  return (b.face ? '<img alt="" src="' + esc(b.face) + '">' : '') + '<div><b>' + esc(b.name) + '</b><p>' + esc(b.text) + '</p></div>';
-}
 
-/* held — уже подождали Толика управляющего: сообщение, что пришло под конец смены (похвала за последний заказ,
-   вычет за опоздание), сначала показывается крупно и уменьшается, только потом итоги (≤ 6 с) */
+/* Конец смены — один экран (docs/CAREER.md «Конец смены»): заголовок и причина мелко; Толик управляющий
+   одной фразой (по смене или перевод в новый район); большая копилка-свинья — деньги смены сыплются в неё
+   (shiftend.js); важное одной строкой (открыт район, новое звание, пиццерия выросла, обогнал курьера);
+   выбор: «на новую смену», «депнуть», «потратить деньги», внизу «гараж» · «покататься» · «в меню».
+   held — уже подождали Толика: сообщение, что пришло под конец смены (похвала за последний заказ, вычет за
+   опоздание), сначала показывается крупно в чате и уменьшается, только потом этот экран (≤ 6 с) */
 export function showEnd (why, whyText, held) {
   if (!A) return;
   const S = A.S;
@@ -328,6 +329,8 @@ export function showEnd (why, whyText, held) {
   lunchClass(false);
   $('cr-clock') && ($('cr-clock').hidden = true);
   const full = why === 'время';
+  const rankWas = RESPECT.level(RESPECT.get() - RESPECT.shift()).i;   // звание до смены — «новое звание» строкой
+  let placeWas = 0;
   if (wasOn) {
     A.Store.set('dlv-shifts', SH.n + 1);
     A.Store.set('dlv-clock', +(((SH.endH % 24) + 24) % 24).toFixed(2));   // часы мира: круглосуточная следующая смена — с этого часа
@@ -337,10 +340,11 @@ export function showEnd (why, whyText, held) {
     // бонус за смену — только досидел до конца (econ.js SHIFT_BONUS), сразу в кошелёк
     SH.bonus = full ? ECON.shiftBonus(S.delivered || 0, DIST.has() ? (SH.city ? ECON.CITY.PAY : DIST.pay(SH.district >= 0 ? SH.district : DIST.cur())) : 1) : 0;
     if (SH.bonus) A.addWallet(SH.bonus);
-    // сбито прохожих за всю карьеру — для директора при переводе в новый район
+    // сбито прохожих за всю карьеру — Толик шутит про них при переводе в новый район
     A.Store.set(KNOCKED, knocked() + (S.people || 0));
     SH.mood = moodOf(why, full);
     if (full && SH.hits === 0 && (S.delivered || 0) > 0) addStars(ECON.STARS.CLEAN_SHIFT, t('смена без единого удара'));
+    placeWas = crewPlace();
     crewRecord(S.money || 0, full);
     fire(endCbs, { why, money: S.money || 0, delivered: S.delivered || 0, hits: SH.hits, fine: SH.fine, full, mood: SH.mood });
   }
@@ -353,78 +357,49 @@ export function showEnd (why, whyText, held) {
   $('ov-t').classList.toggle('win', !lost && why !== 'сбил клиента');
   $('ov-why').textContent = WHY[why] ? WHY[why]() : whyText || '';
   $('ov-extra').hidden = true;
-  $('st-note2').textContent = '';
-  const cnt = n => String(Math.round(n));
-  // [подпись, число, как показать, где]: big — крупно наверху рядом с директором, info — мелкой строкой
-  // под плитками (район и что дальше), new — там же жёлтой плашкой; без пометки — плитка
-  const rows = [
-    [t('заработано'), S.money || 0, A.money, 'big'],
-    SH.bonus ? [t('бонус за смену'), SH.bonus, n => '+' + A.money(n)] : null,
-    [t('доставлено заказов'), S.delivered || 0, cnt],
-    typeof S.tips === 'number' && S.tips > 0 ? [t('чаевые'), S.tips, A.money] : null,
-    [t('на смене'), SH.endH, h => ECON.clock(SH.t0h) + ' — ' + ECON.clock(SH.t0h + (SH.endH - SH.t0h) * Math.min(1, h / (SH.endH || 1)))],
-    [t('ударов'), SH.hits, cnt],
-    SH.fine ? [t('штраф за клиента'), SH.fine, n => '−' + A.money(n)] : null,
-    S.people ? [t('прохожих сбито'), S.people, cnt] : null,
-    RESPECT.shift() || RESPECT.get() ? [t('респект за смену'), RESPECT.shift(), n => (n < 0 ? '−' : '+') + Math.abs(Math.round(n)) + ' · ' + RESPECT.level().name] : null,
-    SH.stars ? [t('звёзд за смену'), SH.stars, n => '+' + Math.round(n) + ' ★'] : null,
-    DIST.has() ? [...districtRow(), 'info'] : null,
-    ...GROW.rows().map(([k, v, where]) => [k, 1, () => v, where]),   // «пиццерия «Юг» · растёт ★★★☆☆» (growth.js)
-    SH.city && farEarned() > 0 ? [t('премия за дальние'), farEarned(), n => '+' + A.money(n)] : null,
-    DIST.has() && SH.opened >= 0 ? [t('открыт новый район'), 1, () => t(DIST.list()[SH.opened].name), 'new'] : null,
-    ...(DIST.has() && SH.opened < 0 ? districtNext().map(([k, v]) => [k, 1, () => v, 'info']) : []),
-  ].filter(Boolean);
-  const box = $('ov-stats'), head = endHead(), info = endInfo();
-  const rowEl = (r, i) => {
+  $('st-note2').textContent = '';                   // сюда board.js допишет «лучшая смена! ты #N в мире»
+  $('ov-stats').replaceChildren();
+  $('ov-best').textContent = '';
+  const lines = wasOn ? endLines(rankWas, placeWas) : [];
+  const info = endInfo();
+  info.replaceChildren(...lines.map(([k, v, cls]) => {
     const e = document.createElement('div');
-    e.className = 'ov-row' + (r[3] ? ' ' + r[3] : '');
-    e.dataset.i = i;
-    e.innerHTML = '<span>' + esc(r[0]) + '</span><b>' + esc(r[2](r[1])) + '</b>';    // сначала итоговые — по ним меряем экран (fitEnd)
+    e.className = 'ov-row on ' + cls;
+    e.innerHTML = '<span>' + esc(k) + '</span>' + (v ? '<b>' + esc(v) + '</b>' : '');
     return e;
-  };
-  const els = rows.map(rowEl);
-  head.querySelector('#cr-earn').replaceChildren(...els.filter((e, i) => rows[i][3] === 'big'));
-  box.replaceChildren(...els.filter((e, i) => !rows[i][3]));
-  info.replaceChildren(...els.filter((e, i) => rows[i][3] === 'info' || rows[i][3] === 'new'));
-  info.hidden = !info.children.length;
-  const rowsGo = () => {
-    if (DIST.has() && SH.opened >= 0) setTimeout(() => { if ($('over') && !$('over').hidden) A.Snd.coin(); }, 200 + rows.length * 220);
-    rows.forEach((r, i) => setTimeout(() => {
-      const row = els[i];
-      if (!row) return;
-      row.classList.add('on');
-      A.countUp(row.querySelector('b'), r[1], r[2], 600);
-      if (r[1]) A.Snd.blip(700 + i * 90, 0.06, 'square', 0.06);
-    }, 200 + i * 220));
-  };
-  // директор: похвала по смене или перевод в новый район (shiftend.js)
-  SH.boss = wasOn ? bossCard() : '';
-  const bc = $('cr-boss');
-  bc.innerHTML = SH.boss; bc.hidden = !SH.boss;
-  // место в пиццерии: «ты #2 среди курьеров · до Саши 1 200 ₽»
-  const board = crewBoard(), me = board.findIndex(r => r.me);
-  const up = me > 0 ? board[me - 1] : null;
-  $('ov-best').innerHTML = me < 0 ? '' : '<b>' + esc(t('ты #{n} среди курьеров', { n: me + 1 })) + '</b>' +
-    (up ? '<span>' + esc(t('до {who} — {money}', { who: up.gen || up.name, money: A.money(Math.max(0, up.total - board[me].total)) })) + '</span>' : '<span>' + esc(t('ты лучший курьер пиццерии')) + '</span>');
+  }));
+  info.hidden = !lines.length;
   buildEnd();
-  // цифры докрутились — поверх всплывает заработок и на что потратить, если есть что тратить
-  closeSpend(false);
-  clearTimeout(SPEND_T);
-  // сначала деньги кучей (заработок, потом бонус за смену) → «продолжить» → Толик управляющий и его фраза →
-  // «продолжить» → цифры итогов и «потратить» (shiftend.js)
-  const after = () => {
-    rowsGo();
-    SPEND_T = setTimeout(() => { if (A.wallet() > 0 && $('over') && !$('over').hidden) openSpend(); else reopenBtn(); }, 200 + rows.length * 220 + 700);
-  };
-  if (wasOn) setTimeout(() => END.play({ earned: S.money || 0, bonus: SH.bonus || 0, wallet: A.wallet(), money: A.money, Snd: A.Snd, mood: SH.mood || 'ok' }, after), 60);
-  else after();
-  // кнопки: на новую смену (главная) / потратить / гараж / покататься / в меню
+  closeSpend(); closeDep();
   $('ov-again').textContent = t('на новую смену');
   $('ov-again').setAttribute('autofocus', '');
   $('ov-menu').textContent = t('в меню');
+  refreshEnd();
+  // пока Толик говорит и сыплются деньги — кнопок не видно и не нажать (любое нажатие — «показать сразу»)
+  ov.classList.add('wait');
   ov.hidden = false;
+  const opened = DIST.has() && SH.opened >= 0 ? t(DIST.list()[SH.opened].name) : '';
+  END.play({
+    host: endStage(), tap: ov, money: A.money, Snd: A.Snd, wallet: A.wallet(),
+    line: wasOn ? END.tolikLine({ mood: SH.mood || 'ok', opened, killed: knocked(), adult: !!A.ADULT }) : '',
+    earned: wasOn ? S.money || 0 : 0, bonus: SH.bonus || 0,
+  }, quick => { fitEnd(); setTimeout(() => { ov.classList.remove('wait'); KB.clear(); }, quick ? 350 : 0); });   // Толик договорил — экран мог вырасти
   fitEnd();
-  for (let i = 0; i < rows.length; i++) els[i].querySelector('b').textContent = rows[i][2](0);
+}
+
+/* важное за смену — по строке, без таблиц: [что, значение, 'new' (жёлтая плашка) | 'info'] */
+function endLines (rankWas, placeWas) {
+  const out = [];
+  if (DIST.has() && SH.opened >= 0) out.push([t('открыт новый район'), t(DIST.list()[SH.opened].name), 'new']);
+  else if (DIST.has() && !SH.city && !SH.counted) out.push([t('район'), districtRow()[2](), 'info']);   // «Юг · не засчитана: меньше 3 заказов»
+  else if (DIST.has()) { const nx = districtNext(); if (nx.length) out.push([nx[0][0], nx[0][1], 'info']); }   // «новый район · «Кольцо» через 2 смены»
+  const lv = RESPECT.level();
+  if (lv.i > rankWas) out.push([t('новое звание: {name}', { name: lv.name }), '', 'new']);
+  else if (lv.i < rankWas) out.push([t('звание упало: {name}', { name: lv.name }), '', 'info']);
+  for (const [k, v, where] of GROW.rows()) if (where === 'new') out.push([k, v, 'new']);   // «пиццерия «Юг» выросла · ★★★☆☆»
+  const place = crewPlace();
+  if (placeWas > 0 && place > 0 && place < placeWas) out.push([t('ты #{n} среди курьеров', { n: place }), '', 'info']);
+  return out;
 }
 
 /* быстрый заезд кончился (полночь, снялся, сгорел): карьере ничего — ни смены, ни бонуса, ни района, ни звёзд,
@@ -437,7 +412,7 @@ function quickEnd (why, whyText) {
   SH.on = false; SH.phase = 'done'; SH.bonus = 0;
   lunchClass(false);
   $('cr-clock') && ($('cr-clock').hidden = true);
-  closeSpend(false);
+  closeSpend();
   QR.finish({
     title: QTITLE[why] ? QTITLE[why]() : t('заезд сорвался'),
     why: why === 'время' ? t('полночь — пиццерия закрылась') : why === 'смена окончена' ? '' : whyText || '',
@@ -446,16 +421,14 @@ function quickEnd (why, whyText) {
   });
 }
 
-/* наверху итогов: крупный заработок и директор рядом (на узком — друг под другом);
-   под плитками — строка района (что засчитано, что откроется) */
-function endHead () {
-  let h = $('cr-head');
-  if (h) return h;
-  h = document.createElement('div');
-  h.id = 'cr-head';
-  h.innerHTML = '<div id="cr-earn"></div><div id="cr-boss" hidden></div>';
-  $('ov-why').after(h);
-  return h;
+/* Толик и копилка — под заголовком; важное строками — под ними */
+function endStage () {
+  let s = $('cr-stage');
+  if (s) return s;
+  s = document.createElement('div');
+  s.id = 'cr-stage';
+  $('ov-why').after(s);
+  return s;
 }
 function endInfo () {
   let e = $('cr-info');
@@ -465,8 +438,8 @@ function endInfo () {
   $('ov-stats').after(e);
   return e;
 }
-/* итоги без прокрутки: вёрстка и так сжата под 1280×720, Деку и телефон; если всё равно не влезло
-   (длинный язык, много строк) — весь экран итогов чуть уменьшается (zoom, не меньше 0,6) */
+/* без прокрутки: вёрстка и так под 1280×720, Деку и телефон; если всё равно не влезло (длинный язык,
+   много строк) — весь экран чуть уменьшается (zoom, не меньше 0,6) */
 function fitEnd () {
   const ov = $('over'), box = ov && ov.querySelector('.ov-box');
   if (!box || ov.hidden || !ov.classList.contains('cr')) return;
@@ -474,8 +447,7 @@ function fitEnd () {
   const k = ov.clientHeight / Math.max(1, ov.scrollHeight);
   if (k < 1) box.style.zoom = Math.max(0.6, Math.floor(k * 100) / 100);
 }
-/* «потратить» — так же: открылся район, длинная реплика директора — чуть меньше, но без прокрутки
-   (раскрытая вкладка доната может и прокрутиться — там список) */
+/* «потратить деньги» — так же (раскрытая вкладка доната может и прокрутиться — там список) */
 function fitBox (box) {
   if (!box) return;
   box.style.zoom = '';
@@ -521,87 +493,72 @@ function refreshWallet () {
   if (w) w.innerHTML = '<span>' + esc(t('в кошельке')) + '</span> <b>' + esc(A.money(A.wallet())) + '</b> <em>★ ' + stars() + '</em>';
 }
 
-/* Заработок и «на что потратить» — на весь экран поверх итогов: крупно сколько за смену,
-   три кнопки (мусор, насилие, депнуть), главная — «на новую смену». «не тратить» — к итогам,
-   там остаётся кнопка «потратить деньги». */
-let SPEND_T = 0;
+/* «потратить деньги» — с экрана конца смены, на весь экран поверх него: кошелёк и звёзды, донаты городу
+   (мусор, насилие) и ёлка-турель; «на новую смену» — сразу работать, «назад» — к экрану конца смены.
+   «Депнуть» — не здесь, а своей кнопкой на экране конца смены. */
 function spendBox () {
   let md = $('cr-spend');
   if (md) return md;
   md = document.createElement('div');
   md.id = 'cr-spend';
   md.hidden = true;
-  md.innerHTML = '<div class="cr-sp-box"><div class="cr-sp-head"><div class="cr-sp-sum"></div><div id="cr-wallet"></div></div><div class="cr-sp-new" hidden></div><div class="cr-sp-boss" hidden></div>' +
-    '<button type="button" id="cr-sp-go"></button>' +
-    '<div class="cr-sp-body"></div><button type="button" id="cr-sp-close"></button></div>';
+  md.innerHTML = '<div class="cr-sp-box"><div class="cr-sp-head"><div class="cr-sp-sum"></div><div id="cr-wallet"></div></div>' +
+    '<div class="cr-sp-body"></div><button type="button" id="cr-sp-go"></button><button type="button" id="cr-sp-close"></button></div>';
   ($('game') || document.body).appendChild(md);
-  md.querySelector('#cr-sp-close').addEventListener('click', () => closeSpend(true));
+  md.querySelector('#cr-sp-close').addEventListener('click', () => closeSpend());
   md.querySelector('#cr-sp-go').addEventListener('click', () => { const b = $('ov-again'); if (b) b.click(); });
   return md;
 }
 function openSpend () {
   const md = spendBox();
-  const earned = Math.round(A.S.money || 0) + (SH.bonus || 0);
-  md.querySelector('.cr-sp-sum').textContent = (earned >= 0 ? '+' : '−') + A.money(Math.abs(earned));
+  md.querySelector('.cr-sp-sum').textContent = t('потратить деньги');
   md.querySelector('#cr-sp-go').textContent = t('на новую смену');
-  md.querySelector('#cr-sp-close').textContent = t('не тратить');
-  // открылся новый район — крупно, над кнопкой: следующая смена уже там
-  const nw = md.querySelector('.cr-sp-new');
-  nw.hidden = !(DIST.has() && SH.opened >= 0);
-  if (!nw.hidden) nw.innerHTML = '<b>' + esc(t('открыт район «{name}»', { name: t(DIST.list()[SH.opened].name) })) + '</b><span>' +
-    esc(t('следующая смена — там: машина {s}, оплата {p}. вернуться можно из меню', { s: '+' + Math.round((ECON.DISTRICT.SPEED[SH.opened] - 1) * 100) + ' %', p: '+' + Math.round((ECON.DISTRICT.PAY[SH.opened] - 1) * 100) + ' %' })) + '</span>';
-  const bs = md.querySelector('.cr-sp-boss');
-  bs.innerHTML = SH.boss || ''; bs.hidden = !SH.boss;
+  md.querySelector('#cr-sp-close').textContent = t('назад');
   md.hidden = false;
+  refreshWallet(); openTab('');
   fitBox(md.querySelector('.cr-sp-box'));
-  if (earned > 0) A.countUp(md.querySelector('.cr-sp-sum'), earned, n => '+' + A.money(n), 700);
-  refreshWallet(); refreshTabs();
   requestAnimationFrame(() => md.classList.add('on'));
-  const b = $('ov-spend'); if (b) b.hidden = true;
 }
-function closeSpend (showBtn) {
+function closeSpend () {
   const md = $('cr-spend');
-  if (md) { md.classList.remove('on'); md.hidden = true; }
-  if (showBtn) reopenBtn();
+  if (md && !md.hidden) { md.classList.remove('on'); md.hidden = true; }
+  refreshEnd();
 }
-function reopenBtn () {
-  let b = $('ov-spend');
-  if (!b) {
-    b = document.createElement('button');
-    b.type = 'button'; b.id = 'ov-spend';
-    b.addEventListener('click', openSpend);
-    $('ov-again').after(b);
+/* кнопки экрана конца смены: «депнуть» — только взрослая версия и есть что ставить; «потратить деньги» — есть деньги.
+   Копилка в центре — сколько в кошельке сейчас (после ставки, гаража, донатов) */
+function refreshEnd () {
+  if (!A) return;
+  const w = A.wallet(), dep = $('ov-dep'), sp = $('ov-spend');
+  if (dep) {
+    dep.hidden = !A.ADULT || w < ECON.SLOT.STEP;
+    dep.innerHTML = '<b>' + esc(t('депнуть')) + '</b><span>' + esc(t(GAME_NAME[depGame()]) + ' · ×' + gameMul(depGame())) + '</span>';
   }
-  b.textContent = t('потратить деньги');
-  b.hidden = !(A.wallet() > 0);
+  if (sp) { sp.textContent = t('потратить деньги'); sp.hidden = !(w > 0); }
+  END.wallet(w);
 }
 
-/* гараж — отдельно: с экрана итогов и из меню, на весь экран (garage.js) */
+/* гараж — отдельно: с экрана конца смены и из меню, на весь экран (garage.js) */
 function openGarage (onClose) { GARAGE.open(onClose); }
 
 let TAB = '';
 function buildEnd () {
+  if (!$('ov-dep')) {
+    const mk = (id, fn) => { const b = document.createElement('button'); b.type = 'button'; b.id = id; b.addEventListener('click', fn); return b; };
+    $('ov-again').after(mk('ov-dep', () => { A.Snd.boot && A.Snd.boot(); openDep(); }), mk('ov-spend', openSpend));
+    $('ov-menu').before(mk('ov-garage', () => openGarage(refreshEnd)), mk('ov-ride', () => { A.Snd.boot && A.Snd.boot(); A.rideOn(); }));
+  }
+  $('ov-ride').textContent = t('покататься');
+  $('ov-garage').textContent = t('гараж');
   let el = $('cr-end');
   if (!el) {
     el = document.createElement('div');
     el.id = 'cr-end';
     spendBox().querySelector('.cr-sp-body').appendChild(el);
-    const ride = document.createElement('button');
-    ride.type = 'button'; ride.id = 'ov-ride';
-    ride.addEventListener('click', () => { A.Snd.boot && A.Snd.boot(); A.rideOn(); });
-    $('ov-menu').before(ride);
-    const gar = document.createElement('button');
-    gar.type = 'button'; gar.id = 'ov-garage';
-    gar.addEventListener('click', () => openGarage(() => reopenBtn()));
-    ride.before(gar);
   }
-  $('ov-ride').textContent = t('покататься');
-  $('ov-garage').textContent = t('гараж');
   const tabs = [
     ['trash', t('борьба с мусором'), 'bar'],
     ['gang', t('борьба с насилием'), 'bar'],
     RAID.ready() ? ['turret', t('ёлка-турель'), ''] : null,
-    A.ADULT ? ['slot', t('депнуть'), ''] : null,
   ].filter(Boolean);
   el.innerHTML = '<div class="cr-tabs n' + tabs.length + '">' + tabs.map(([k, name, bar]) =>
     '<button type="button" class="cr-tab cr-t-' + k + '" data-tab="' + k + '"><b>' + esc(name) + '</b>' +
@@ -623,8 +580,6 @@ function refreshTabs () {
   }
   const tu = el.querySelector('.cr-t-turret .cr-sub');
   if (tu) tu.textContent = RAID.spendTab(A.money).sub;
-  const s = el.querySelector('.cr-t-slot .cr-sub');
-  if (s) s.textContent = A.wallet() >= ECON.SLOT.STEP ? t(GAME_NAME[depGame()]) + ' · ×' + gameMul(depGame()) : t('нечего ставить');
   el.querySelectorAll('.cr-tab').forEach(b => b.classList.toggle('cur', b.dataset.tab === TAB));
 }
 function openTab (k) {
@@ -634,7 +589,6 @@ function openTab (k) {
   p.innerHTML = '';
   if (k === 'trash' || k === 'gang') paneDonate(p, k);
   else if (k === 'turret') RAID.spendPane(p, { wallet: A.wallet, addWallet: A.addWallet, money: A.money, Snd: A.Snd }, rerender);
-  else if (k === 'slot') { TAB = ''; p.className = ''; openDep(); }   // депнуть — своё окно на весь экран
   refreshTabs();
 }
 function rerender () { refreshWallet(); refreshTabs(); openTab(TAB); }
@@ -747,7 +701,7 @@ export function back () {
   if (MENU.modal()) return MENU.back();
   if (GARAGE.isOpen()) { GARAGE.close(); return true; }
   if (depOpen()) return closeDep();
-  if (spendOpen()) { closeSpend(true); return true; }
+  if (spendOpen()) { closeSpend(); return true; }
   return false;
 }
 /* клавиатура: ↑↓ (и WASD) — по кнопкам, Enter/пробел — нажать, Esc — назад;
@@ -949,7 +903,7 @@ function openDep () {
 }
 function toWork () {
   if (SPINNING) return;
-  closeDep(); closeSpend(false);
+  closeDep(); closeSpend();
   const b = $('ov-again'); if (b) b.click();
 }
 let SPINNING = false;
@@ -957,7 +911,7 @@ function closeDep () {
   const md = $('cr-dep');
   if (!md || md.hidden) return false;
   md.classList.remove('on'); md.hidden = true;
-  refreshWallet(); refreshTabs();
+  refreshWallet(); refreshTabs(); refreshEnd();
   return true;
 }
 /* ставка: цифры, ползунок и куча купюр рядом с игрой (их столько, какая доля кошелька) */

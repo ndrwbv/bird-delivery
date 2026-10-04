@@ -28,12 +28,13 @@
         dropMesh, sayBubble, fxAdd, puffGeo, steam, gibBurger, popBonus, toast, chat(text),
         addWallet, money, CASH, Snd, CAR_L, CAR_W, HEROES, DIST, season() */
 import * as RESPECT from './respect.js';
+import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 import { t, N_ } from '../i18n/index.js';
 
 export const FEST = {
-  CHANCE: 0.22,          // шанс фестиваля в смену (если в районе есть парковка ТЦ)
+  CHANCE: 0.25,          // шанс фестиваля в смену (если в районе есть парковка ТЦ)
   FROM: 3,               // не раньше 4-й смены игрока (3 законченных)
-  PITY: 7,               // 7 смен подряд без фестиваля (где он мог быть) — следующая точно с ним
+  PITY: 5,               // 4 смены подряд без фестиваля (где он мог быть) — 5-я точно с ним (автор 04.10: «раз в смен 5»)
   EDGE: 1.5,             // блоки — не ближе к краю парковки, м
   LANE: 6.5,             // перед (к улице) отодвинут вглубь: дорожка вдоль блоков по самой парковке, м
   MIN_SIDE: 22,          // площадка не уже, м (с дорожкой; без неё — от 15,5)
@@ -218,6 +219,7 @@ export function shiftStart (o = {}) {
   ST.forced = null;
   if (o.ride || o.quick) { stop(); return; }
   if (want) { start(want.kind, want.site); return; }
+  if (!DIRECTOR.can('fest')) { stop(); return; }   // режиссёр: не в первую смену сессии и не вместе с ураганом
   const shifts = +A.Store.get('dlv-shifts', 0) || 0, sv = load(), choices = siteChoices();
   const kind = decide(shifts, sv, choices.length);
   save(sv);
@@ -320,6 +322,7 @@ function start (kind, site) {
   if (!site) site = sites()[0];
   if (!site || !KINDS.includes(kind)) return false;
   const L = layout(site);
+  DIRECTOR.start('fest');                         // до конца смены (stop)
   F = { kind, site, L, objs: [], solids: [], hidden: [], fest: [], crowd: null, t: 0, sayT: rand(2, 4), say: null, puffT: 0, stage: null, hookahs: [], mascot: null, mascotN: 0, mascotT: 0, near: false };
   const kp = kind === 'hookah' && !A.ADULT ? 'hookahKids' : kind;
   const pal = PAL[kp];
@@ -869,6 +872,7 @@ function puff (h) {
 /* ─────────────── убрать ─────────────── */
 export function stop () {
   if (!F) return;
+  DIRECTOR.end('fest');
   for (const o of F.objs) {
     if (o.parent) o.parent.remove(o);
     if (o === F.stepa) continue;

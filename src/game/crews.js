@@ -21,6 +21,7 @@ import { t, N_ } from '../i18n/index.js';
 import { RESPECT as R } from './econ.js';
 import * as RESPECT from './respect.js';
 import { TIER } from './hits.js';
+import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 
 const C = R.CREW;
 /* форма сетей: футболка, штаны, кепка; цвет облачка с репликами */
@@ -165,6 +166,7 @@ function spawn (kind, o = {}) {
       member(crew, att, 'att', at.x + Math.sin(a) * 2.2, at.z + Math.cos(a) * 2.2);
     }
     ST.stats.fights++;
+    crew.dir = 1; DIRECTOR.start('crew');
     if (crew.own) {
       ST.stats.own++;
       if (A.toast && Math.hypot(at.x - A.V.x, at.z - A.V.z) < 320) {
@@ -179,6 +181,7 @@ function spawn (kind, o = {}) {
 }
 
 function drop (crew) {
+  if (crew.dir) { crew.dir = 0; DIRECTOR.end('crew'); }
   for (const b of crew.bubbles) if (b.s.parent) { b.s.parent.remove(b.s); b.s.material.dispose(); }
   crew.bubbles.length = 0;
   for (const m of crew.people) if (!m.dead) A.dropMesh(m.grp);
@@ -205,6 +208,7 @@ function scare (crew) {
 /* как кончилась драка: ko — всех нападавших сбил; honk — спугнул; time — кончилась сама */
 function finish (crew, how) {
   if (crew.over) return;
+  if (crew.dir) { crew.dir = 0; DIRECTOR.end('crew'); }
   crew.over = 1; crew.overT = 8;
   if (crew.own && !A.S.freeRun) {
     if (how === 'ko' || how === 'honk') {
@@ -397,7 +401,7 @@ export function step (dt, api) {
   // новые компании — только на смене, не в первые минуты (calmStart) и не больше MAX
   if (SHIFT_STATES.includes(S.state) && !(A.calmStart && A.calmStart()) && (ST.cd -= dt) <= 0) {
     ST.cd = rand(C.EVERY[0], C.EVERY[1]);
-    if (CREWS.length < C.MAX) spawn(chance(C.FIGHT_P) ? 'fight' : 'hang');
+    if (CREWS.length < C.MAX) spawn(chance(C.FIGHT_P) && DIRECTOR.can('crew') ? 'fight' : 'hang');   // драка — лёгкое событие; нельзя — просто перекур
   }
   WALKERS.length = 0;
   for (let i = CREWS.length - 1; i >= 0; i--) {

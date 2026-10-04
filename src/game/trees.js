@@ -43,7 +43,19 @@ export const TREE = {
     STEP: 2.0,                  // между кустами, м
     LILAC: 0.6,                 // сирень, остальное — шиповник
   },
+  // аллея-арка: ряды пышных деревьев с обеих сторон, кроны смыкаются над дорогой (plantAlley)
+  ALLEY: {
+    MAP: 'seversk', NAME: 'улица Ленина', MIN_W: 13,   // широкий отрезок улицы Ленина (14 м, ~0,9 км)
+    STEP: 9,                    // между деревьями вдоль улицы, м
+    OFF: 3.5,                   // ствол — от края асфальта (за тротуаром), м
+    CROSS: 18,                  // от перекрёстка и съезда не ближе, м
+    ZEBRA: 9, STOP: 11,         // от зебры и остановки не ближе, м
+    TRUNK: 6.0,                 // ствол до развилки, м
+    TOP: 11.6,                  // верх арки над осью улицы, м; низ кроны там ~8 м (камера — 6,2 м над машиной, автобус ~3,5)
+    MIX: { lime: 55, maple: 30, poplar: 15 },   // осенью: липа — золотая, клён — рыжий и красный, тополь — лимонный
+  },
 };
+let LEAN = null;                // для 'alley': куда клонится крона — к оси улицы { ux, uz, reach }
 
 export const STATS = { kinds: {}, where: {}, groups: 0, yard: 0, shrubs: 0, tried: 0 };
 
@@ -66,7 +78,7 @@ function weighted (r, o) {
 }
 
 const YEL = ['#e8b830', '#f0c848', '#d8a028'], ORA = ['#e8902a', '#d86a22', '#f0a838'], RED = ['#c84a24', '#d86a22', '#b83a22'];
-const DECIDUOUS = new Set(['birch', 'maple', 'lime', 'poplar', 'rowan', 'bush', 'lilac', 'rosehip']);
+const DECIDUOUS = new Set(['birch', 'maple', 'lime', 'poplar', 'rowan', 'bush', 'lilac', 'rosehip', 'alley']);
 
 /* o: P (склейка), T (шаблоны), r (жребий от точки), x, z, y, kind, seversk, DECID, SPRUCES, ground(x, z) */
 export function growTree (o) {
@@ -132,6 +144,38 @@ export function growTree (o) {
     clump(0, top * H, 0, maple ? 1.65 : 1.45, maple ? 0.85 : 1.15, g, pal, 1);
     for (let i = 0; i < 2; i++) branch((top - 1.4) * H, 1.5, 0.3 + r() * 0.3, i * 3.1 + r(), 0.08, '#5e4632');   // макушка: зимой видно, что это дерево, а не рогатка
     leaves(pal === 0 ? YEL : pal === 1 ? ORA : RED, 6, 3.4);
+  } else if (kind === 'alley' && LEAN) {
+    // дерево аллеи: толстый ствол, сучья и крона тянутся над дорогой к её оси — с той стороны навстречу
+    // такое же, кроны смыкаются аркой. Зимой видно голые сучья через всю дорогу
+    const AL = TREE.ALLEY, ux = LEAN.ux, uz = LEAN.uz, R = LEAN.reach, vx = -uz, vz = ux;
+    const sp = weighted(r, AL.MIX);
+    const pal = sp === 'maple' ? (r() < 0.55 ? 2 : 1) : sp === 'poplar' ? 3 : r() < 0.8 ? 0 : 1;
+    const g = pickR(r, sp === 'maple' ? ['#4f9443', '#5aa04a'] : ['#5aa04a', '#62a84f', '#548f44']);
+    const bark = sp === 'poplar' ? '#6a5a48' : '#6e5440';
+    const TR = AL.TRUNK * (0.94 + r() * 0.12), hTop = AL.TOP * (0.97 + r() * 0.06);
+    const at = (f, h, sd = 0) => [x + ux * f + vx * sd, y + h, z + uz * f + vz * sd];
+    const limb = (a, b, w, hex) => {
+      const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], l = Math.hypot(dx, dy, dz) || 1;
+      P.add(T.stick, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, w, l, w, 0, Math.atan2(dz / l, -dx / l), Math.acos(Math.max(-1, Math.min(1, dy / l))), hex);
+    };
+    const F = at(0.3, TR), M = at(R * 0.55, TR + 2.4), sd = r() < 0.5 ? -1 : 1;
+    limb(at(0, -0.2), F, 0.78, bark);                                   // ствол, чуть к дороге
+    limb(F, M, 0.42, bark);                                             // главный сук — над дорогу
+    limb(M, at(R * 1.02, hTop - 1.4, sd * 0.8), 0.18, '#5e4632');        // тонкий — до середины улицы
+    limb(M, at(R * 0.7, hTop - 0.4, -sd * 1.6), 0.12, '#5e4632');
+    for (const k of [-1, 1]) limb(F, at(1.0, TR + 2.4, k * 2.6), 0.28, bark);   // вдоль улицы
+    limb(F, at(-1.6, TR + 2.2), 0.24, bark);                            // назад, над тротуаром
+    limb(F, at(0.6, TR + 4.4), 0.2, '#5e4632');                         // макушка
+    // крона по дуге от ствола к оси улицы: у ствола ~9 м, над осью ~10 м до центра комка
+    const hc = t => TR + 3.1 + (hTop - 1.7 - TR - 3.1) * Math.sin(Math.min(1, Math.max(0, t)) * Math.PI / 2);
+    const C = [[-0.18, 0, 2.3], [0.12, 0, 2.7], [0.42, 0, 2.7], [0.72, 0, 2.6], [1.0, 0, 2.5],
+      [0.3, 2.5, 2.2], [0.3, -2.5, 2.2], [0.78, 2.1 * sd, 2.1], [0.2, 0.6 * sd, 1.9]];
+    C.forEach(([t, side, rr], i) => {
+      const p = at(t * R, hc(t) + (i === 8 ? 2.1 : 0) + (r() - 0.5) * 0.5, side + (r() - 0.5) * 0.8);
+      const k = rr * (0.92 + r() * 0.16);
+      P.add(T.ico, p[0], p[1], p[2], k, k * 0.74, k, 0, r() * 6.283, 0, tone(g, Math.round((0.84 + 0.3 * (i === 8 ? 1 : t * 0.6)) * 20) / 20), 1, r(), pal, 0.38);
+    });
+    leaves(pal === 0 ? YEL : pal === 1 ? ORA : pal === 2 ? RED : ['#e0c840', '#f0d048'], 6, 3.0);
   } else if (kind === 'poplar') {
     // тополь колонной: высокий, узкий, крона от низа почти до макушки; зимой — метла из прямых веток
     trunk(0.5, 2.4 * H, '#6a5a48');
@@ -282,6 +326,48 @@ export function plantYards (A) {
     }
   }
   return STATS;
+}
+
+/* ─────────────── аллея-арка (улица Ленина в Солнечном) ───────────────
+   Вдоль отрезка — деревья 'alley' с обеих сторон через STEP м за тротуаром, крона каждого
+   тянется к оси улицы, и кроны с двух сторон смыкаются над дорогой. Не у перекрёстков и
+   съездов, зебр, остановок, не в домах и не вплотную к другим препятствиям. Обычные
+   деревья вдоль этих отрезков (game.js osmStreetTrees) не сажаются.
+   A: CITY, mapId, tree, roadWidth, NODE_IDX, nodeDeg, ZEBRAS, inHouse, inBounds, solidAt. */
+export function alleyRoads (CITY, mapId) {
+  const AL = TREE.ALLEY;
+  if (mapId !== AL.MAP || (typeof location !== 'undefined' && new URLSearchParams(location.search).has('noalley'))) return [];
+  return CITY.roads.filter(r => r.n === AL.NAME && (r.w || 0) >= AL.MIN_W);
+}
+export function plantAlley (A) {
+  const AL = TREE.ALLEY, roads = alleyRoads(A.CITY, A.mapId);
+  let n = 0, len = 0, skip = 0;
+  const PTS = [];                                       // где стоят (для проверки, ?debug)
+  for (const r of roads) {
+    const off = A.roadWidth(r) / 2 + AL.OFF;
+    const X = r.p.filter(p => { const k = A.NODE_IDX.get(p[0] + ',' + p[1]); return k !== undefined && A.nodeDeg(k) >= 3; });
+    let acc = AL.STEP / 2;
+    for (let i = 1; i < r.p.length; i++) {
+      const [x1, z1] = r.p[i - 1], [x2, z2] = r.p[i], L = Math.hypot(x2 - x1, z2 - z1) || 1, ux = (x2 - x1) / L, uz = (z2 - z1) / L;
+      len += L;
+      for (; acc < L; acc += AL.STEP) {
+        const bx = x1 + ux * acc, bz = z1 + uz * acc;
+        if (X.some(p => Math.hypot(p[0] - bx, p[1] - bz) < AL.CROSS)) { skip += 2; continue; }
+        for (const s of [-1, 1]) {
+          const x = bx - uz * off * s, z = bz + ux * off * s;
+          if (!A.inBounds(x, z, -50) || A.inHouse(x, z, 1.5) || A.solidAt(x, z, 0.9) ||
+            A.ZEBRAS.some(q => Math.abs(q.x - x) < AL.ZEBRA && Math.abs(q.z - z) < AL.ZEBRA) ||
+            A.CITY.stops.some(q => Math.abs(q.p[0] - x) < AL.STOP && Math.abs(q.p[1] - z) < AL.STOP)) { skip++; continue; }
+          LEAN = { ux: uz * s, uz: -ux * s, reach: off };
+          if (A.tree(x, z, 0, 'alley')) { n++; PTS.push([Math.round(x), Math.round(z)]); } else skip++;
+          LEAN = null;
+        }
+      }
+      acc -= L;
+    }
+  }
+  STATS.alley = { trees: n, skipped: skip, len: Math.round(len), roads: roads.length, PTS };
+  return STATS.alley;
 }
 
 export const DEBUG = { TREE, STATS };

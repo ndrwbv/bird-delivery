@@ -39,6 +39,7 @@ import * as ZN from './zones.js';
 import * as DIST from './districts.js';
 import * as FEST from './festivals.js';
 import * as HURR from './hurricane.js';          // дома, унесённые ураганом: их адреса не выдаём (hurricane.js blocked)
+import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 import * as GROW from './growth.js';            // пиццерия растёт: оплата, чаевые, размер сборных по ступени (econ.js GROWTH)
 import { makePerson } from './people.js';
 import { ORDER_TYPES, SHIFT_PLAN, SIDE_ORDERS, STAFF_RIDE, BOSS } from './orders.config.js';
@@ -740,7 +741,7 @@ export function delivered (o, st, onTime) {
     try { STORY.onDeliver(sp.story); } catch (e) { console.warn('[orders] STORY.onDeliver', e); }
   }
   if (sp.side) {
-    if (onTime && !S.ride && st.persons[0] && st.peds[0] && !st.peds[0].dead && offerSide(st.peds[0], st.persons[0])) return;
+    if (onTime && !S.ride && st.persons[0] && st.peds[0] && !st.peds[0].dead && DIRECTOR.can('errand') && offerSide(st.peds[0], st.persons[0])) return;
     SH.sideOwed = true;                                   // не вышло — попросит следующий
   }
 }

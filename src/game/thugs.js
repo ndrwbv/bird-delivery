@@ -34,6 +34,7 @@ import { TIER } from './hits.js';
 import { DEBUG as WD } from './world.js';
 import { RESPECT as RG } from './econ.js';
 import * as RESPECT from './respect.js';
+import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 import * as CREWS from './crews.js';           // сигнал игрока (H; машина гудит сама, если постоял рядом) — общий с компаниями в форме
 
 
@@ -166,6 +167,7 @@ export function spawn (force = false) {
   }
   v.h = Math.atan2(SC.men[0].x - v.x, SC.men[0].z - v.z);
   SC.stats.spawned++; SC.n++;
+  DIRECTOR.start('thugs');
   return true;
 }
 
@@ -225,6 +227,7 @@ function robbed (why) {
 }
 
 export function clear () {
+  if (SC.st) DIRECTOR.end('thugs');
   for (const m of SC.men) { unsay(m); if (!m.dead) { m.dead = 1; A.dropMesh(m.grp); } }
   if (SC.vic) { unsay(SC.vic); if (!SC.vic.dead) A.dropMesh(SC.vic.grp); }
   SC.men = []; SC.vic = null; SC.st = '';
@@ -271,7 +274,7 @@ export function step (dt, api) {
     if (SC.n >= PRESS.PER_SHIFT) return;
     const ge = WD && WD.GE && WD.GE.st;
     const near = ZN.gangZones().some(g => Math.hypot(V.x - g.x, V.z - g.z) < g.r + PRESS.NEAR);
-    if (!near || (ge && ge !== 'wait') || !spawn()) { SC.cd = 2; return; }
+    if (!near || (ge && ge !== 'wait') || !DIRECTOR.can('thugs') || !spawn()) { SC.cd = 2; return; }
     return;
   }
   SC.t += dt;

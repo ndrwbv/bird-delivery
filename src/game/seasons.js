@@ -108,6 +108,13 @@ varying vec3 vSW;
 float sHash (vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float sNoise (vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(sHash(i), sHash(i + vec2(1.0, 0.0)), f.x), mix(sHash(i + vec2(0.0, 1.0)), sHash(i + vec2(1.0, 1.0)), f.x), f.y); }
+/* осенняя листва: 0 — золотая (берёза, липа), 1 — оранжевая, 2 — красная (клён, рябина), 3 — лимонная (тополь);
+   чистые яркие цвета, у каждого комка чуть свой оттенок (зерно), золотая осень — ещё ярче */
+vec3 autPal (float p, float seed) {
+  vec3 a = p < 0.5 ? vec3(0.82, 0.52, 0.02) : p < 1.5 ? vec3(0.88, 0.28, 0.02) : p < 2.5 ? vec3(0.7, 0.07, 0.02) : vec3(0.66, 0.6, 0.04);
+  a *= 0.86 + 0.28 * fract(seed * 13.7);
+  return mix(a, a * vec3(1.12, 1.08, 1.0) + vec3(0.04, 0.02, 0.0), uGold);
+}
 vec3 seasonTint (vec3 c, float dryK, float snowK) {
   vec3 N = normalize(cross(dFdx(vSW), dFdy(vSW)));
   float up = smoothstep(0.42, 0.8, N.y);
@@ -118,14 +125,16 @@ vec3 seasonTint (vec3 c, float dryK, float snowK) {
   float road = (1.0 - smoothstep(0.05, 0.12, sat)) * (1.0 - smoothstep(0.4, 0.62, lum));
   float n = sNoise(vSW.xz * 0.23) * 0.62 + sNoise(vSW.xz * 0.9) * 0.38;
   float g = green * up;
-  c = mix(c, vec3(0.36, 0.25, 0.07) * (0.8 + 0.45 * n), uDry * g * 0.85);
+  // сухая трава осенью — золотисто-зелёная и жёлтая, чистая (не бурая): пятнами по шуму
+  vec3 dryC = mix(vec3(0.38, 0.45, 0.05), vec3(0.80, 0.52, 0.04), smoothstep(0.3, 0.75, n)) * (0.88 + 0.26 * n);
+  c = mix(c, mix(dryC, dryC * vec3(1.1, 1.06, 0.9), uGold), uDry * g * 0.8);
   c = mix(c, vec3(0.2, 0.15, 0.07), uMud * g * smoothstep(0.35, 0.65, n) * 0.85);
   c = mix(c, vec3(0.16, 0.52, 0.08), uFresh * g * 0.55);
   c *= 1.0 - uWet * (0.3 * road + 0.12 * g + 0.06) * up * (0.6 + 0.4 * n);
   if (uGold > 0.0) {                           // яркая сухая осень: листья на асфальте — рыжие квадратики
     vec2 lc = floor(vSW.xz * 1.5);
     float lf = sHash(lc) * (0.5 + 0.5 * n), pk = sHash(lc + 17.0);
-    vec3 lcol = pk < 0.35 ? vec3(0.78, 0.36, 0.04) : pk < 0.7 ? vec3(0.85, 0.6, 0.06) : vec3(0.62, 0.1, 0.03);
+    vec3 lcol = pk < 0.35 ? vec3(0.9, 0.42, 0.04) : pk < 0.7 ? vec3(0.95, 0.7, 0.08) : vec3(0.75, 0.14, 0.03);
     c = mix(c, lcol, uGold * road * up * step(0.66, lf));
   }
   if (uHeat > 0.0) {                           // жара: трава — песок, всё в оранжевый, марево над дальним асфальтом
@@ -171,8 +180,7 @@ function smashMat (m) {
       if (vK == 1.0) {
         vec3 c0 = diffuseColor.rgb;
         float leafy = smoothstep(0.03, 0.12, c0.g - max(c0.r, c0.b));
-        vec3 pal = vP < 0.5 ? vec3(0.52, 0.33, 0.02) : vP < 1.5 ? vec3(0.55, 0.17, 0.02) : vec3(0.4, 0.05, 0.02);
-        pal = mix(pal, pal * vec3(1.55, 1.35, 1.0) + vec3(0.06, 0.02, 0.0), uGold);
+        vec3 pal = autPal(min(vP, 2.0), vSeed);
         vec3 c = mix(c0, pal, clamp(uYellow * 1.7 - vSeed * 0.7, 0.0, 1.0));
         c = mix(c, vec3(0.13, 0.09, 0.06), clamp((1.0 - uLeaf) * 1.4 - vSeed * 0.4, 0.0, 1.0));
         c = mix(c, vec3(0.2, 0.5, 0.08), uFresh * 0.5);
@@ -198,8 +206,7 @@ function pileMat () {
         .replace('#include <project_vertex>', '#include <project_vertex>\n' + WPOS);
     sh.fragmentShader = 'uniform float uYellow;\nvarying float vK, vP, vSeed;\n' + TINT + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       if (vK == 1.0) {
-        vec3 pal = vP < 0.5 ? vec3(0.52, 0.33, 0.02) : vP < 1.5 ? vec3(0.55, 0.17, 0.02) : vP < 2.5 ? vec3(0.4, 0.05, 0.02) : vec3(0.3, 0.3, 0.03);
-        pal = mix(pal, pal * vec3(1.55, 1.35, 1.0) + vec3(0.06, 0.02, 0.0), uGold);   // яркая сухая осень — сочнее
+        vec3 pal = autPal(vP, vSeed);                 // яркая сухая осень — сочнее (uGold внутри)
         diffuseColor.rgb = mix(diffuseColor.rgb, pal, clamp(uYellow * 1.7 - vSeed * 0.7, 0.0, 1.0));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.72, 0.16), uFresh * 0.55);   // весна: молодая листва светлее
       }
@@ -576,7 +583,7 @@ export function seasonBuild () {
     // осенью на тех же местах — кучи листьев (по зерну видны, как опавшие листья: uFallen), пониже и рыжие
     if (hsh(x, z, 91) < 0.55) leafPile(x, y, z, L * 1.05, H * 0.5, W * 1.15, ry + (hsh(x, z, 92) - 0.5) * 0.5, hsh(x, z, 93));
   };
-  const LEAF_HEX = ['#c9782a', '#d9a23a', '#a8452a', '#b8862e', '#8a5a2a'];
+  const LEAF_HEX = ['#e8862a', '#f2b438', '#d8502a', '#eca232', '#e06a22'];   // яркие, не бурые (осень золотая, не грязная)
   const leafPile = (x, y, z, L, H, W, ry, seed) => {
     const at = LEAFP.add(T.mound, x, y, z, W, H, L, 0, ry, 0, LEAF_HEX[(hsh(x, z, 94) * LEAF_HEX.length) | 0], 2, seed);
     const k = Math.floor(x / 20) + ',' + Math.floor(z / 20);
@@ -922,7 +929,7 @@ function stepSky (dt) {
   const day = 1 - night;
   scene.background.lerp(SKY.bg, sn * 0.32 * day);
   if (scene.fog) scene.fog.color.lerp(SKY.fog, sn * 0.42 * day);
-  if (A.dry > 0 && sn < 0.5) scene.background.lerp(SKY.aut, A.dry * 0.14 * day * (1 - sn));
+  if (A.dry > 0 && sn < 0.5) scene.background.lerp(SKY.aut, A.dry * 0.08 * day * (1 - sn) * (1 - U.uGold.value));   // осень чуть серее, золотая — нет
   if (hemi) hemi.groundColor.lerp(SKY.gnd, sn * 0.55);
   SNOWF.visible = SKY.amt > 0.02;
   if (!SNOWF.visible) return;

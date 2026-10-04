@@ -41,7 +41,9 @@ export const HUR = {
   DEBRIS: 150, DEBRIS_PHONE: 80,   // летящего мусора вокруг камеры
   M: 1.8,                  // м: коробка дома шире контура (балконы, козырьки, водостоки)
 };
-const HOLE_MAX = 6;
+/* коробок в шейдере статики; сохранённых бывает до 9 (3 смены × 3 дома), с запасом — 12;
+   больше — самая старая стройка снимается (дом возвращается), чтобы не было дома сквозь стройку */
+const HOLE_MAX = 12;
 
 let C = null;
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -86,6 +88,13 @@ export function holeMat (m) {
   m.customProgramCacheKey = () => (prevKey ? prevKey.call(m) : base) + '|hole';
   m.needsUpdate = true;
   return m;
+}
+/* место под ещё одну коробку: лишняя самая старая стройка — дом снова стоит */
+function holesRoom () {
+  while (SITES.filter(s => s.hole).length >= HOLE_MAX) {
+    const old = SITES.find(s => s.hole && !s.fly) || SITES.find(s => s.hole);
+    restore(old, false);
+  }
 }
 function holesApply () {
   let n = 0;
@@ -489,6 +498,7 @@ function placeStill (i, back, temp) {
   if (SITES.some(s => s.I.i === i)) return null;
   const I = info(i) || (() => { const b = C.CITY.buildings[i]; const S = shape(b); const I2 = { i, b, p: b.p, ...S, lv: b.lv || 2 }; let lo = Infinity, hi = -Infinity; for (const q of b.p) { const g = C.groundH(q[0], q[1]); lo = Math.min(lo, g); hi = Math.max(hi, g); } return Object.assign(I2, { gmin: lo, gmax: hi, hLo: lo, hHi: hi, top: hi + 3.15 * I2.lv + 1.1, hex: b._hex || '#e6d3c0' }); })();
   const s = { I, back, temp: !!temp, hole: true, mesh: null, cranes: [], fly: null, t: -1 };
+  holesRoom();
   SITES.push(s);
   buildSite(s);
   holesApply();
@@ -676,6 +686,7 @@ function takeHouse (I) {
   MS.fly = Math.max(MS.fly, +(performance.now() - t0).toFixed(1));
   s.fly.material.userData.U.uW.value.set(WIND.x, WIND.z);
   C.scene.add(s.fly);
+  holesRoom();
   SITES.push(s);
   holesApply();
   if (!s.temp) save();
