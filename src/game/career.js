@@ -108,6 +108,7 @@ export function init (api) {
   document.body.classList.add('career');
   GARAGE.init({ cars: carsApi, A, stars, onChange: () => { refreshWallet(); refreshTabs(); } });
   api.crew = crewBoard; api.garage = openGarage;       // getter-ы api (DAY_LEN) не трогаем: они живые
+  api.kbClear = () => KB.clear();                  // меню-карусель: после листания подсветка — на карточку в центре
   MENU.init(api);
   HQ.init({ A, cars: carsApi, depGame, shiftN: () => SH.n, shiftOn: () => SH.on });
   addEventListener('keydown', onKey, true);
@@ -703,6 +704,12 @@ export function crewPlace () { const b = crewBoard(); return b.findIndex(r => r.
 
 /* ── меню и экраны поверх: геймпад и клавиатура ── */
 export function menu () { KB.clear(); MENU.show(); }
+/** главное меню на экране и ничего поверх (панель настроек — отдельно, game.js) */
+const menuOn = () => A && A.S.state === 'title' && !(A.panelOpen && A.panelOpen()) && MENU.shown() && !$('big').hidden;
+/** после окна поверх меню (праздник, выбор): подсветка клавиатуры сброшена, фокус — на карточке меню */
+export function refocus () { KB.clear(); MENU.focus(); }
+export const kbClear = () => KB.clear();
+export const openProfiles = () => MENU.openProfiles();
 export const menuCam = (cam, P, tG) => MENU.cam(cam, P, tG);
 export const askName = cb => MENU.askName(cb);
 const spendOpen = () => { const m = $('cr-spend'); return m && !m.hidden ? m : null; };
@@ -721,6 +728,10 @@ export function padPre (p) {
   if (GARAGE.isOpen() && !MENU.modal()) {
     const d = (p.menuRight || p.pageR ? 1 : 0) - (p.menuLeft || p.pageL ? 1 : 0);
     if (d) GARAGE.flip(d);
+    p.menuLeft = p.menuRight = false;
+  } else if (!padRoot() && menuOn()) {                // главное меню: ←→, LB/RB — листать карточки (menu.js)
+    const d = (p.menuRight || p.pageR ? 1 : 0) - (p.menuLeft || p.pageL ? 1 : 0);
+    if (d) MENU.flip(d);
     p.menuLeft = p.menuRight = false;
   } else if (depOpen() && !MENU.modal()) {          // в «депнуть» ←→ и LB/RB — ставка
     const d = (p.menuRight || p.pageR ? 1 : 0) - (p.menuLeft || p.pageL ? 1 : 0);
@@ -746,6 +757,7 @@ function kbRoot () {
   const r = padRoot();
   if (r) return r;
   if (A.panelOpen && A.panelOpen()) return $('panel');
+  if (A.S.paused) { const pm = $('pausem'); if (pm && !pm.hidden) return pm; }   // пауза — карусель (pausecz.js): ←→ листать, ↑↓ Enter
   const ov = $('over');
   if (ov && !ov.hidden && ov.classList.contains('cr')) return ov;
   const big = $('big');
@@ -769,12 +781,14 @@ function onKey (e) {
   }
   const k = KEYS[e.code];
   if (!k) { if (top && e.code !== 'KeyM') e.stopPropagation(); return; }
-  if (root.id === 'panel' && k === 'menuBack') return;             // окно настроек/находок закрывает сама игра
+  if ((root.id === 'panel' || root.id === 'pausem') && k === 'menuBack') return;   // окно настроек/находок и паузу закрывает сама игра (Esc)
   e.preventDefault(); e.stopPropagation();
   if (e.repeat && k === 'menuOk') return;
   if (GARAGE.isOpen() && root === GARAGE.root() && (k === 'menuLeft' || k === 'menuRight')) { GARAGE.flip(k === 'menuLeft' ? -1 : 1); return; }
   if (depOpen() && root === depOpen() && (k === 'menuLeft' || k === 'menuRight')) { if (!SH.slot) setStake(STAKE + (k === 'menuLeft' ? -1 : 1) * stakeStep()); return; }   // ←→ — ставка
   if (k === 'menuBack') { back(); return; }
+  if (root.id === 'cr-menu' && (k === 'menuLeft' || k === 'menuRight')) { MENU.flip(k === 'menuLeft' ? -1 : 1); return; }   // меню-карусель
+  if ((root.id === 'panel' || root.id === 'pausem') && (k === 'menuLeft' || k === 'menuRight') && A.cardFlip && A.cardFlip(root, k === 'menuLeft' ? -1 : 1)) return;   // настройки и пауза — карусели
   const p = { connected: true, active: true, menuUp: false, menuDown: false, menuLeft: false, menuRight: false, menuOk: false, menuBack: false };
   const sel = KB.selected();
   if (!sel || !sel.isConnected || !root.contains(sel) || !sel.classList.contains('padsel')) {

@@ -24,6 +24,7 @@
                             smoke(secs) — смена на автопилоте и проверка «игра жива» (едет ≥ 150 м,
                             кадры и часы идут, числа конечные, в конце смена, журнал ошибок пуст)
                             → { ok, fail, m, ft, crash }. Журнал — d.crashlog (docs/CRASHES.md)
+   --cpu=N                  процессор медленнее в N раз (после загрузки, как perf.cjs --deck; Дека ≈ 3)
    --secs=N                 после скрипта дать игре идти N секунд
    --shot=out.png [--scale=0.5]    кадр в конце
    --errors                 напечатать ошибки консоли (счётчик печатается всегда)
@@ -146,6 +147,9 @@ app.whenReady().then(async () => {
   if (!ok) { err('probe: ' + (GAME ? 'игра' : PAGE) + ' не загрузилась за 24 с;', errors.length, 'ошибок:\n  ' + errors.slice(0, 5).join('\n  ')); clearTimeout(timer); return finish(1, { ok: false, loaded: false, errors }); }
   await js(INSTALL);
   await sleep(200);                                   // модули дописывают себя в __dlv через setTimeout 0
+  if (+arg('cpu', 1) > 1) {                           // --cpu=3 — как процессор Деки (сборку города не тормозим — только игру)
+    try { win.webContents.debugger.attach('1.3'); await win.webContents.debugger.sendCommand('Emulation.setCPUThrottlingRate', { rate: +arg('cpu') }); } catch (e) { err('probe: --cpu не вышло:', e.message); }
+  }
   const tLoad = Date.now() - T0;
 
   let result, evalErr = null;

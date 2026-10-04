@@ -10,6 +10,9 @@ contextBridge.exposeInMainWorld('birdSteam', {
   info: () => call('app:info'),                    // { tag, sha, version, updatable, steamLaunched, steam, userData, … }
   checkUpdate: manual => call('update:check', !!manual),   // { state: off|fresh|available|declined|updating|error, current, latest }
   applyUpdate: () => call('update:apply'),
+  latestUpdate: force => call('update:latest', !!force),   // без окон: { state: off|fresh|newer|error, current, latest, updatable, platform }
+  onUpdate: cb => { ipcRenderer.on('update:progress', (e, d) => { try { cb(d); } catch (err) { /* — */ } }); },   // { stage: download|restart|error, p, msg }
+  floatKeyboard: (x, y, w, h) => call('steam:floatKeyboard', x, y, w, h),   // плавающая клавиатура Стима над полем → 'float' | 'url' | ''
   quit: () => call('app:quit'),
   setFullscreen: on => call('win:fullscreen', !!on),
   // журнал ошибок (src/platform/crashlog.js, docs/CRASHES.md): строка JSON → userData/logs/crash-ГГГГ-ММ-ДД.log

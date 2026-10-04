@@ -27,6 +27,9 @@ import * as GFX from './gfx.js';
 
 /* чёткость: на «Низкой» (~430 точек по короткой стороне) — без ряби */
 const uLawnLo = { get value () { try { return GFX.pixelShort() < 480 ? 1 : 0; } catch (e) { return 0; } } };
+/* полная краска (gfx.js DETAIL.lawn): на «Средней» и «Низкой» — без тени-рельефа (рельеф теперь
+   настоящий, relief.js) и без вторых октав шума: 4 шума на точку вместо 10 */
+const uLawnQ = { get value () { try { return GFX.detail().lawn ? 1 : 0; } catch (e) { return 1; } } };
 
 const LAWN_GLSL = `
 {
@@ -38,26 +41,28 @@ const LAWN_GLSL = `
     vec2 q = vSW.xz;
     vec3 c = diffuseColor.rgb, c0 = c;
     // крупные пятна: светлее / темнее (~40 и ~17 м), желтее / сочнее (~55 м)
-    float big = sNoise(q * 0.025 + 3.1) * 0.65 + sNoise(q * 0.06 + 7.7) * 0.35;
+    float big = uLawnQ > 0.5 ? sNoise(q * 0.025 + 3.1) * 0.65 + sNoise(q * 0.06 + 7.7) * 0.35 : sNoise(q * 0.025 + 3.1);
     float hue = sNoise(q * 0.018 + 11.3);
     c *= 0.8 + 0.38 * big;
     float yel = smoothstep(0.52, 0.82, hue - uDry * 0.25);
     c = mix(c, c * vec3(1.22, 1.03, 0.62), yel * 0.75);
     c = mix(c, c * vec3(0.82, 0.98, 0.86), smoothstep(0.45, 0.12, hue) * 0.6);
     // тень-рельеф: бугры ~25 м, наклон к солнцу (с юго-запада) светлее; градиент — конечной разностью
-    vec2 hq = q * 0.04;
-    float h0 = sNoise(hq), hx = sNoise(hq + vec2(0.06, 0.0)), hz = sNoise(hq + vec2(0.0, 0.06));
-    float rel = clamp(dot(vec2(hx - h0, hz - h0) / 0.06, vec2(-0.6, -0.8)), -1.5, 1.5);
-    c *= 1.0 + 0.085 * rel;
+    if (uLawnQ > 0.5) {
+      vec2 hq = q * 0.04;
+      float h0 = sNoise(hq), hx = sNoise(hq + vec2(0.06, 0.0)), hz = sNoise(hq + vec2(0.0, 0.06));
+      float rel = clamp(dot(vec2(hx - h0, hz - h0) / 0.06, vec2(-0.6, -0.8)), -1.5, 1.5);
+      c *= 1.0 + 0.085 * rel;
+    }
     // проплешины 3—8 м, кучками: край — клетками по 0,5 м, вдали гладкий
     vec2 bc = (floor(q * 2.0) + 0.5) * 0.5;
     float pix = 1.0 - smoothstep(0.35, 0.9, max(fwidth(q.x * 2.0), fwidth(q.y * 2.0)));
     vec2 bq = mix(q, bc, pix * (1.0 - uLawnLo));
     float clump = sNoise(bq * 0.021 + 19.0);   // где проплешин больше (~50 м)
-    float bn = sNoise(bq * 0.14 + 5.0) * 0.82 + sNoise(bq * 0.5 + 9.0) * 0.18;
+    float bn = sNoise(bq * 0.14 + 5.0) * 0.82 + (uLawnQ > 0.5 ? sNoise(bq * 0.5 + 9.0) : 0.5) * 0.18;
     float bTh = 0.84 - clump * 0.1 - uHeat * 0.08 - uDry * 0.02 - uMud * 0.03;
     float bald = smoothstep(bTh, bTh + 0.03, bn);
-    float bt = sNoise(q * 0.9 + 2.0);
+    float bt = bn > bTh - 0.05 ? sNoise(q * 0.9 + 2.0) : 0.5;
     vec3 dirt = vec3(0.30, 0.22, 0.13) * (0.86 + 0.24 * bt);
     dirt = mix(dirt, vec3(0.13, 0.09, 0.05), uMud * 0.85);                     // весна — мокрая грязь
     dirt = mix(dirt, vec3(0.52, 0.42, 0.28) * (0.9 + 0.2 * bt), uHeat * 0.7);  // жара — пыль
@@ -87,8 +92,8 @@ export function lawnMat (m) {
   m.onBeforeCompile = (sh, r) => {
     if (prev) prev.call(m, sh, r);
     if (!/sNoise/.test(sh.fragmentShader) || !/vSW/.test(sh.fragmentShader) || !/uHeat/.test(sh.fragmentShader)) return;   // без сезонного шейдера — как было
-    sh.uniforms.uLawnLo = uLawnLo;
-    sh.fragmentShader = 'uniform float uLawnLo;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' + LAWN_GLSL);
+    sh.uniforms.uLawnLo = uLawnLo; sh.uniforms.uLawnQ = uLawnQ;
+    sh.fragmentShader = 'uniform float uLawnLo;\nuniform float uLawnQ;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' + LAWN_GLSL);
   };
   m.customProgramCacheKey = () => key + 'lawn';
   return m;

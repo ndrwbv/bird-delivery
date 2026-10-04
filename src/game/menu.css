@@ -1,69 +1,82 @@
-/* главное меню карьеры (menu.js): колонка слева, город справа, рейтинг пиццерии — у правого края */
+/* главное меню карьеры (menu.js): сверху логотип и профиль, по центру — карусель карточек
+   (carousel.js), за ним город; номер версии — внизу справа, плашка «есть новая версия» — сверху */
 
 /* старая заставка в карьере не нужна: имя, «поехали», таблица рекордов, выбор карты, язык */
 body.career #big-main, body.career #st-lang { display: none !important; }
-body.career #big { background: linear-gradient(90deg, rgba(10, 14, 32, .86) 0, rgba(10, 14, 32, .62) 26%, rgba(10, 14, 32, .12) 52%, rgba(10, 14, 32, 0) 70%);
+body.career #big { background: linear-gradient(180deg, rgba(10, 14, 32, .78) 0, rgba(10, 14, 32, .25) 28%, rgba(10, 14, 32, .2) 62%, rgba(10, 14, 32, .7) 100%);
                    padding: 0; overflow: hidden; }
-body.career #topbar { position: absolute; top: 0; right: 0; width: auto; z-index: 3; padding: max(16px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 0 0; }
+body.career #topbar { position: absolute; top: 0; right: 0; width: auto; z-index: 3; padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 0 0; }
+body.career #build-v { display: none; }          /* версия — в .crm-ver, крупнее */
 
-#cr-menu { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
-/* версия сборки — в правом нижнем углу, под рейтингом (у того снизу отступ ≥ 22px) */
-body.career #build-v { position: absolute; z-index: 3; margin: 0; right: max(12px, env(safe-area-inset-right)); bottom: max(7px, env(safe-area-inset-bottom)); font-size: 8px; }
-#cr-menu > * { pointer-events: auto; }
-
-.crm-col { position: absolute; top: 0; bottom: 0; left: 0; width: min(440px, 38vw); box-sizing: border-box; display: flex; flex-direction: column;
-           padding: max(34px, 6vh) 0 max(18px, 3vh) max(28px, 4vw); text-align: left; }
-.crm-head { flex: none; }
-.crm-logo { font-size: clamp(26px, 3.8vw, 56px); line-height: 1.12; color: #ffd85e; letter-spacing: .04em;
-            text-shadow: 4px 4px 0 #33210c, -4px 4px 0 #33210c, 4px -4px 0 #33210c, -4px -4px 0 #33210c, 0 10px 0 rgba(0, 0, 0, .35); }
-.crm-tag { margin-top: 18px; font-size: clamp(7px, .85vw, 11px); line-height: 2; color: #fff3d6; max-width: 36ch;
+#cr-menu { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; box-sizing: border-box;
+           padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+           --cw: clamp(260px, min(36vw, 52vh), 460px); }
+.crm-top { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; min-height: 0; }
+.crm-head { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; text-align: left; max-width: 60%; }
+.crm-logo { font-size: clamp(20px, min(3.4vw, 6vh), 50px); line-height: 1.12; color: #ffd85e; letter-spacing: .04em;
+            text-shadow: 3px 3px 0 #33210c, -3px 3px 0 #33210c, 3px -3px 0 #33210c, -3px -3px 0 #33210c, 0 8px 0 rgba(0, 0, 0, .35); }
+.crm-tag { font-size: clamp(7px, .8vw, 10px); line-height: 1.9; color: #fff3d6; max-width: 40ch;
            text-shadow: 2px 2px 0 #33210c, -2px 2px 0 #33210c, 2px -2px 0 #33210c, -2px -2px 0 #33210c; }
+.crm-prof { font: inherit; cursor: pointer; font-size: clamp(7px, .8vw, 10px); padding: 7px 12px; color: #fff3d6; background: rgba(20, 16, 30, .75);
+            border: 2px solid #33210c; border-radius: 6px; box-shadow: 0 3px 0 #33210c; }
+.crm-prof b { font-weight: normal; color: #ffd85e; }
+.crm-prof[hidden] { display: none; }
 
-.crm-btns { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: stretch; gap: clamp(10px, 1.6vh, 16px); padding: 3vh 0; }
-.crm-btns button { font: inherit; cursor: pointer; text-align: left; border: 3px solid #33210c; border-radius: 10px; transition: transform .08s, filter .08s; }
-.crm-btns button:hover { filter: brightness(1.1); transform: translateX(4px); }
-.crm-btns button:active { transform: translateY(3px); }
-/* главная — одна: на смену */
-.crm-go { display: flex; flex-direction: column; gap: 10px; padding: clamp(16px, 2.6vh, 26px) 22px; color: #fff3d6; background: #f0522a;
-          box-shadow: 0 6px 0 #33210c, 0 14px 30px rgba(240, 82, 42, .28); margin-bottom: clamp(6px, 1.4vh, 14px); }
-.crm-go b { font-weight: normal; font-size: clamp(15px, 1.9vw, 26px); text-shadow: 3px 3px 0 #9b2a10; }
-.crm-go span { font-size: clamp(7px, .75vw, 10px); color: #ffe0c8; }
-.crm-go:active { box-shadow: 0 2px 0 #33210c; }
-.crm-b { width: 82%; padding: clamp(11px, 1.8vh, 16px) 18px; font-size: clamp(9px, 1.05vw, 14px); color: #fff3d6;
-         background: rgba(34, 44, 90, .92); box-shadow: 0 4px 0 #33210c; }
-.crm-b:active { box-shadow: 0 1px 0 #33210c; }
-.crm-link { align-self: flex-start; padding: 8px 4px !important; font-size: clamp(7px, .8vw, 10px); color: #ffd85e; background: none;
-            border-color: transparent !important; text-decoration: underline; text-underline-offset: 4px; text-shadow: 2px 2px 0 #33210c; }
-.crm-foot { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
-.crm-quit { font: inherit; cursor: pointer; font-size: clamp(7px, .75vw, 9px); padding: 8px 14px; color: #b9c3e6; background: rgba(20, 16, 30, .7);
-            border: 2px solid #33210c; border-radius: 6px; }
-.crm-quit[hidden] { display: none; }
-.crm-quit:hover { color: #fff3d6; }
+/* плашка «есть новая версия — обновить»: заметная, по центру над каруселью */
+.crm-upd { position: relative; flex: none; align-self: center; display: flex; align-items: center; gap: 12px; max-width: min(640px, 100%); margin: 8px 0 0;
+           font: inherit; font-size: clamp(9px, 1vw, 13px); line-height: 1.5; text-align: left; cursor: pointer; overflow: hidden;
+           padding: 10px 18px; color: #33210c; background: #7fe08a; border: 3px solid #33210c; border-radius: 10px; box-shadow: 0 4px 0 #33210c;
+           animation: crm-upd 1.6s ease-in-out infinite; }
+.crm-upd[hidden] { display: none; }
+.crm-upd i { font-style: normal; font-size: 1.5em; }
+.crm-upd span { position: relative; z-index: 1; }
+.crm-upd em { position: absolute; left: 0; bottom: 0; height: 4px; background: #33210c; }
+.crm-upd:disabled { cursor: default; animation: none; background: #ffd85e; }
+.crm-upd.busy { background: #b9e6ff; }
+.crm-upd:not(:disabled):hover { filter: brightness(1.08); }
+@keyframes crm-upd { 50% { transform: translateY(-2px); box-shadow: 0 6px 0 #33210c; } }
 
-/* рейтинг пиццерии — компактно у правого края, поверх города */
-.crm-rank { text-align: left; position: absolute; right: max(18px, env(safe-area-inset-right)); bottom: max(22px, 4vh); width: clamp(230px, 22vw, 320px); box-sizing: border-box;
-            padding: 14px 14px 12px; background: rgba(20, 16, 30, .8); border: 3px solid #33210c; border-radius: 12px; box-shadow: 0 6px 0 rgba(0, 0, 0, .3); }
-.crm-rt { font-size: clamp(8px, .8vw, 11px); color: #ffd85e; margin-bottom: 10px; }
-.crm-rank ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-.crm-rank li { display: grid; grid-template-columns: 16px 22px 1fr auto; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 6px;
-               font-size: clamp(7px, .72vw, 9px); color: #fff3d6; }
-.crm-rank li em { font-style: normal; color: #b9c3e6; text-align: right; }
-.crm-rank li img { width: 22px; height: 22px; image-rendering: pixelated; border-radius: 4px; background: #2a3766; }
-.crm-rank li i { width: 16px; height: 16px; margin: 0 3px; border-radius: 50%; background: #ffd85e; border: 2px solid #33210c; box-sizing: border-box; }
-.crm-rank li b { font-weight: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.crm-rank li span { color: #ffb066; white-space: nowrap; }
-.crm-rank li.me { background: #ffd85e; color: #33210c; }
-.crm-rank li.me em, .crm-rank li.me span { color: #33210c; }
-.crm-rn { margin-top: 9px; font-size: 7px; line-height: 1.7; color: #b9c3e6; }
+/* карусель */
+.crm-car { flex: 1; min-height: 0; display: flex; }
+.crm-cz { flex: 1; --step: calc(var(--cw) * .9); }
+.crm-card { display: flex; height: min(100%, calc(var(--cw) * .82)); }
+.crm-cb { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(8px, 1.6vh, 16px);
+          font: inherit; cursor: pointer; text-align: center; padding: clamp(12px, 2.4vh, 26px) clamp(12px, 1.6vw, 22px); color: #fff3d6;
+          background: linear-gradient(180deg, #2c3a78 0, #1d2440 70%); border: 4px solid #33210c; border-radius: 16px;
+          box-shadow: 0 8px 0 #33210c, 0 22px 50px rgba(0, 0, 0, .45); transition: filter .1s; overflow: hidden; }
+.crm-cb:hover { filter: brightness(1.08); }
+.crm-cb:active { transform: translateY(3px); box-shadow: 0 3px 0 #33210c; }
+.crm-ico { font-style: normal; font-size: clamp(30px, min(4.4vw, 8vh), 64px); line-height: 1; color: #ffd85e; text-shadow: 4px 4px 0 #33210c; }
+.crm-cb b { font-weight: normal; font-size: clamp(14px, min(1.9vw, 3.6vh), 28px); line-height: 1.3; text-shadow: 3px 3px 0 #33210c; }
+.crm-cb span { font-size: clamp(7px, min(.78vw, 1.5vh), 11px); line-height: 1.8; color: #b9c3e6; max-width: 30ch; }
+.crm-card.main .crm-cb { background: linear-gradient(180deg, #f0522a 0, #c23a18 100%); box-shadow: 0 8px 0 #33210c, 0 18px 40px rgba(240, 82, 42, .35); }
+.crm-card.main .crm-cb b { font-size: clamp(18px, min(2.6vw, 4.6vh), 38px); text-shadow: 3px 3px 0 #9b2a10; }
+.crm-card.main .crm-cb span { color: #ffe0c8; }
+.crm-card.main .crm-ico { color: #fff3d6; text-shadow: 4px 4px 0 #9b2a10; }
+.crm-card.k-quit .crm-cb { background: linear-gradient(180deg, #3a2a44 0, #20182c 100%); }
+.crm-card.off .crm-cb { opacity: .55; cursor: default; }
+.crm-card.cz-card.on .crm-cb.padsel, .crm-card.cz-card.on .crm-cb:focus-visible { outline: 4px solid #ffd85e; outline-offset: 4px; }
 
-/* район: кнопка с подписью и окно со списком районов */
-.crm-dist, .crm-quick { display: flex; flex-direction: column; gap: 7px; }
-.crm-quick b { font-weight: normal; }
-.crm-quick span { font-size: clamp(6px, .62vw, 8px); line-height: 1.6; color: #b9c3e6; }
-.crm-quick:disabled { opacity: .5; cursor: default; }
-.crm-dist[hidden] { display: none; }
-.crm-dist b { font-weight: normal; }
-.crm-dist span { font-size: clamp(6px, .62vw, 8px); line-height: 1.6; color: #b9c3e6; }
+/* рейтинг пиццерии — карточкой: ты и курьеры */
+.crm-card.rank .crm-cb { justify-content: flex-start; gap: 8px; cursor: default; }
+.crm-card.rank .crm-ico { display: none; }
+.crm-card.rank .crm-cb > b { font-size: clamp(11px, min(1.3vw, 2.6vh), 18px); color: #ffd85e; }
+.crm-cb ol { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 2px; text-align: left; min-height: 0; overflow: hidden; }
+.crm-cb li { display: grid; grid-template-columns: 16px 22px 1fr auto; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px;
+             font-size: clamp(7px, min(.75vw, 1.5vh), 10px); color: #fff3d6; }
+.crm-cb li em { font-style: normal; color: #b9c3e6; text-align: right; }
+.crm-cb li img { width: 22px; height: 22px; image-rendering: pixelated; border-radius: 4px; background: #2a3766; }
+.crm-cb li i { width: 16px; height: 16px; margin: 0 3px; border-radius: 50%; background: #ffd85e; border: 2px solid #33210c; box-sizing: border-box; }
+.crm-cb li b { font-weight: normal; font-size: inherit; text-shadow: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.crm-cb li span { color: #ffb066; white-space: nowrap; font-size: inherit; line-height: 1.4; }
+.crm-cb li.me { background: #ffd85e; color: #33210c; }
+.crm-cb li.me em, .crm-cb li.me span { color: #33210c; }
+.crm-cb small { font-size: clamp(6px, .65vw, 8px); line-height: 1.7; color: #b9c3e6; }
+
+.crm-hint { flex: none; text-align: center; font-size: clamp(6px, .7vw, 9px); color: #b9c3e6; padding-top: 4px; text-shadow: 2px 2px 0 #33210c; }
+.crm-ver { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); font-size: clamp(7px, .75vw, 10px);
+           color: #fff3d6; opacity: .8; text-shadow: 2px 2px 0 #33210c; pointer-events: none; }
+
 #crm-dist { position: fixed; inset: 0; z-index: 45; display: flex; align-items: center; justify-content: center; padding: 16px;
             background: rgba(10, 12, 24, .62); backdrop-filter: blur(3px); pointer-events: auto; }
 #crm-dist[hidden] { display: none; }
@@ -102,20 +115,23 @@ body.career #build-v { position: absolute; z-index: 3; margin: 0; right: max(12p
 .crm-nn { font-size: 7px; line-height: 1.8; color: #b9c3e6; }
 .crm-nn:empty { display: none; }
 
-/* телефон стоймя: логотип сверху, рейтинг под ним у правого края, кнопки — внизу */
+/* телефон стоймя: логотип сверху, карточка почти во всю ширину */
 @media (max-aspect-ratio: 1/1) {
-  body.career #big { background: linear-gradient(180deg, rgba(10, 14, 32, .7) 0, rgba(10, 14, 32, .15) 30%, rgba(10, 14, 32, .25) 55%, rgba(10, 14, 32, .88) 100%); }
-  .crm-col { width: 100%; padding: max(80px, 11vh) 20px max(16px, 2vh); }
-  .crm-logo { font-size: clamp(24px, 8vw, 40px); }
-  .crm-tag { font-size: 7px; }
-  .crm-btns { justify-content: flex-end; padding: 2vh 0 1.5vh; gap: 10px; }
-  .crm-b { width: 100%; }
-  .crm-go { margin-bottom: 4px; }
-  .crm-rank { top: max(205px, 27vh); bottom: auto; right: 12px; width: min(236px, 62vw); padding: 10px 10px 8px; }
-  .crm-rank li { padding: 3px 5px; grid-template-columns: 12px 18px 1fr auto; gap: 6px; }
-  .crm-rank li img { width: 18px; height: 18px; }
-  .crm-rn { display: none; }
-  body.career #topbar { left: 0; right: 0; padding: 12px 12px 0; justify-content: flex-start; }
+  #cr-menu { --cw: min(78vw, 360px); padding-top: max(64px, env(safe-area-inset-top)); }
+  .crm-head { max-width: 100%; }
+  .crm-logo { font-size: clamp(22px, 8vw, 38px); }
+  .crm-tag { display: none; }
+  .crm-card { height: min(100%, calc(var(--cw) * 1.05)); }
+  body.career #topbar { left: 0; right: 0; padding: 10px 12px 0; justify-content: flex-end; }
 }
-/* низкий экран: кнопки плотнее */
-@media (max-height: 560px) { .crm-tag { display: none; } .crm-btns { gap: 8px; padding: 1vh 0; } }
+/* низкий экран (телефон боком, 1280×720 с панелью): логотип в строку, карточка ниже */
+@media (max-height: 560px) {
+  .crm-tag { display: none; }
+  .crm-head { flex-direction: row; align-items: center; gap: 14px; }
+  .crm-logo { font-size: clamp(16px, 5vh, 26px); }
+  .crm-hint { display: none; }
+  .crm-upd { margin-top: 4px; padding: 6px 14px; }
+  #cr-menu { --cw: clamp(220px, 34vw, 340px); }
+  .crm-cb { gap: 6px; padding: 10px; }
+  .crm-ico { font-size: clamp(22px, 7vh, 36px); }
+}

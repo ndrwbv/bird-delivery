@@ -147,17 +147,33 @@ ipcMain.handle('steam:textInput', async (e, desc, max, text) => {
   finally { textOpen = false; }
 });
 
+/* плавающая клавиатура Стима над полем ввода (поле в фокусе, буквы приходят нажатиями клавиш):
+   Стим есть — showFloatingGamepadTextInput; не поднялась или Стима нет (ярлык «сторонней игры»
+   на Деке) — steam://open/keyboard, его понимает сам клиент Стима на Деке и в Big Picture */
+ipcMain.handle('steam:floatKeyboard', async (e, x, y, w, h) => {
+  if (steam) {
+    try { if (await steam.utils.showFloatingGamepadTextInput(0, x | 0, y | 0, w | 0, h | 0)) return 'float'; }
+    catch (err) { log('floatKeyboard:', err.message); }
+  }
+  if (process.platform === 'linux') { try { await shell.openExternal('steam://open/keyboard'); return 'url'; } catch (err) { log('keyboard url:', err.message); } }
+  return '';
+});
+
 /* ─── обновление с GitHub ───
    Только для сборок, поставленных с GitHub мимо Steam (в Steam обновляет сам Steam):
    • Linux / Deck — tools/install-deck.sh, он кладёт в папку метку .github-install;
-     обновление — тот же install-deck.sh поверх.
+     обновление — тот же install-deck.sh поверх. Распакованный руками архив (без метки) тоже
+     обновляется: рядом с exe есть resources/app.asar — это наша папка, install-deck.sh сносит
+     только такую (чужую не тронет).
    • Windows — установщик bird-pizza-setup.exe (NSIS из electron-builder, build.nsis в package.json).
      Признак — его деинсталлятор «Uninstall BirdPizza.exe» рядом с exe: установщик кладёт его
      всегда, в какую бы папку ни встал, а в zip для Steam его нет. Обновление — качаем свежий
      setup.exe во временную папку, игра закрывается, установщик с --updated встаёт поверх
      (окошко с полоской, без вопросов) и сам запускает игру снова.
-   Сравниваем тег, запечённый CI в electron/build-tag.json, с последним релизом и, если игрок
-   согласен, обновляемся. REPO — репозиторий с релизами (см. docs/STEAM.md). */
+   Сравниваем тег, запечённый CI в electron/build-tag.json, с последним релизом. С 04.10.2026 окна
+   «Вышла версия» при старте нет (в игровом режиме Деки оно могло не показаться): игра сама спрашивает
+   update:latest и рисует на первом экране меню плашку «есть новая версия — обновить», по ней —
+   update:apply. Ход скачивания — событием update:progress. REPO — репозиторий с релизами (docs/STEAM.md). */
 const REPO = 'ndrwbv/bird-delivery';
 const INSTALLER = `https://raw.githubusercontent.com/${REPO}/main/tools/install-deck.sh`;
 const SETUP = 'bird-pizza-setup.exe';
@@ -169,7 +185,8 @@ function buildInfo() {
 }
 const buildTag = () => buildInfo().tag || '';
 function githubInstall() {
-  if (process.platform === 'linux') return fs.existsSync(path.join(installDir(), '.github-install'));
+  if (process.platform === 'linux') return fs.existsSync(path.join(installDir(), '.github-install'))
+    || (fs.existsSync(path.join(installDir(), 'resources', 'app.asar')) && fs.existsSync(process.execPath));
   // NSIS называет деинсталлятор по productName, как и сам exe: BirdPizza.exe → «Uninstall BirdPizza.exe»
   if (process.platform === 'win32') return fs.existsSync(path.join(installDir(), `Uninstall ${path.basename(process.execPath, '.exe')}.exe`));
   return false;
@@ -230,8 +247,24 @@ async function checkUpdate(win, manual) {
   return { state: 'updating', current: cur, latest: rel.tag };
 }
 
+/* без окон: что стоит, что вышло, можно ли обновиться отсюда. Ответ GitHub — на 10 минут */
+let relCache = null, relAt = 0;
+async function latestInfo(force) {
+  const cur = buildTag();
+  const base = { current: cur, updatable: updatable(), platform: process.platform, steam: steamLaunched() };
+  if (!app.isPackaged || steamLaunched() || has('--no-update') || process.env.BIRD_NO_UPDATE) return { ...base, state: 'off' };
+  if (force || !relCache || Date.now() - relAt > 600e3) { const r = await latestRelease(); if (r) { relCache = r; relAt = Date.now(); } else if (force || !relCache) return { ...base, state: 'error' }; }
+  const rel = relCache;
+  if (!cur || rel.tag === cur) return { ...base, state: 'fresh', latest: rel.tag };
+  if (process.platform === 'win32' && !rel.setup) return { ...base, state: 'error', latest: rel.tag };
+  return { ...base, state: 'newer', latest: rel.tag, notes: rel.notes };
+}
+const progress = (win, d) => { try { if (win && !win.isDestroyed()) win.webContents.send('update:progress', d); } catch (e) { /* — */ } };
+
 function applyUpdate(win, rel) {
+  if (!rel) rel = relCache;
   if (process.platform === 'win32') { applyUpdateWin(win, rel); return; }
+  progress(win, { stage: 'restart' });
   // ждём, пока процесс отпустит папку, и ставим поверх тем же скриптом, что и в первый раз
   const sh = spawn('bash', ['-c', 'sleep 2; curl -fsSL "$BIRD_INSTALLER" | bash -s -- --dir "$BIRD_DIR" --no-desktop --run'], {
     env: { ...process.env, BIRD_INSTALLER: INSTALLER, BIRD_DIR: installDir() }, detached: true, stdio: 'ignore',
@@ -267,18 +300,20 @@ async function applyUpdateWin(win, rel) {
         if (done) break;
         got += value.length;
         if (!out.write(value)) await Promise.race([new Promise(res => out.once('drain', res)), closed]);
-        if (total) bar(got / total);
+        if (total) { bar(got / total); progress(win, { stage: 'download', p: got / total }); }
       }
     } finally { out.end(); }
     await closed;
     if ((total && got !== total) || got < 1e6) throw new Error(`download cut short: ${got} of ${total || '?'} bytes`);
     bar(-1);
+    progress(win, { stage: 'restart' });
     spawn(file, ['--updated', '--force-run'], { detached: true, stdio: 'ignore' }).unref();
     setTimeout(() => app.quit(), 300);
   } catch (e) {
     log('update:', e.message);
     updatingWin = false;
     bar(-1);
+    progress(win, { stage: 'error', msg: e.message });
     const ru = RU();
     dialog.showMessageBox(win && !win.isDestroyed() ? win : undefined, {
       type: 'error',
@@ -300,6 +335,7 @@ ipcMain.handle('app:info', () => {
   };
 });
 ipcMain.handle('update:check', (e, manual) => checkUpdate(BrowserWindow.fromWebContents(e.sender), !!manual));
+ipcMain.handle('update:latest', (e, force) => latestInfo(!!force));
 ipcMain.handle('update:apply', e => { if (!updatable()) return false; applyUpdate(BrowserWindow.fromWebContents(e.sender)); return true; });
 ipcMain.handle('app:quit', () => { setTimeout(() => app.quit(), 50); return true; });
 ipcMain.handle('win:fullscreen', (e, on) => { const w = BrowserWindow.fromWebContents(e.sender); if (w) w.setFullScreen(!!on); return !!(w && w.isFullScreen()); });
@@ -358,8 +394,7 @@ function createWindow() {
 
   const pageArg = argv.find(a => a.startsWith('--page='));
   win.loadURL(`app://birdpizza/${pageArg ? pageArg.slice(7) : 'index.html'}`);
-  // тихая проверка обновления через пару секунд после старта, чтобы не мешать загрузке
-  if (updatable()) setTimeout(() => checkUpdate(win, false).catch(() => {}), 2500);
+  // обновление: окна при старте нет — игра сама спросит update:latest и покажет плашку в меню
   const toggle = () => { if (win.isFocused()) win.setFullScreen(!win.isFullScreen()); };
   globalShortcut.register('F11', toggle);
   globalShortcut.register('Alt+Enter', toggle);

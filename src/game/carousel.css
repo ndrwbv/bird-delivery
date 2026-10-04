@@ -1,0 +1,29 @@
+/* карусель карточек (carousel.js): меню карьеры и настройки. Ширина карточки — --cw, шаг между
+   соседями — --step (задаёт тот, кто ставит карусель: menu.css, settings.css) */
+.cz { position: relative; display: grid; grid-template-columns: auto 1fr auto; grid-template-rows: 1fr auto; align-items: center;
+      min-height: 0; --cw: min(420px, 70vw); --step: calc(var(--cw) * .86); user-select: none; -webkit-user-select: none; }
+.cz-stage { position: relative; grid-column: 1 / 4; grid-row: 1; align-self: stretch; min-height: 0; touch-action: pan-y; overflow: visible; }
+.cz-track { position: absolute; inset: 0; --drag: 0px; }
+.cz-card { position: absolute; left: 50%; top: 50%; width: var(--cw); max-height: 100%; box-sizing: border-box;
+           transform: translate(-50%, -50%) translateX(calc(var(--o, 0) * var(--step) + var(--drag))) scale(var(--s, 1));
+           transition: transform .32s cubic-bezier(.2, .8, .25, 1.08), opacity .25s, filter .25s; will-change: transform; }
+.cz-track.drag .cz-card { transition: none; }
+.cz-card.on { z-index: 3; }
+.cz-card.side { z-index: 2; opacity: .55; filter: saturate(.6) brightness(.72); cursor: pointer; }
+.cz-card.far { z-index: 1; opacity: .2; filter: saturate(.4) brightness(.55); cursor: pointer; }
+.cz-card.gone { opacity: 0; pointer-events: none; }
+.cz-card:not(.on) * { pointer-events: none; }
+.cz-card:not(.on) { pointer-events: auto; }
+/* стрелки ◀ ▶ — поверх краёв сцены */
+.cz-arr { grid-row: 1; z-index: 5; display: flex; align-items: center; justify-content: center; cursor: pointer;
+          width: clamp(34px, 4vw, 54px); height: clamp(34px, 4vw, 54px); font-size: clamp(14px, 1.6vw, 22px); color: #fff3d6;
+          background: rgba(20, 16, 30, .78); border: 3px solid #33210c; border-radius: 50%; box-shadow: 0 4px 0 #33210c; }
+.cz-arr.l { grid-column: 1; margin-left: 4px; }
+.cz-arr.r { grid-column: 3; margin-right: 4px; }
+.cz-arr:hover { filter: brightness(1.2); }
+.cz-arr:active { transform: translateY(3px); box-shadow: 0 1px 0 #33210c; }
+.cz-arr.off { opacity: .25; pointer-events: none; }
+.cz-dots { grid-column: 1 / 4; grid-row: 2; display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; padding: 8px 0 2px; }
+.cz-dots i { width: 10px; height: 10px; border-radius: 50%; background: rgba(255, 243, 214, .3); border: 2px solid #33210c; cursor: pointer; }
+.cz-dots i.on { background: #ffd85e; transform: scale(1.25); }
+@media (pointer: coarse) { .cz-arr { width: 40px; height: 40px; } }

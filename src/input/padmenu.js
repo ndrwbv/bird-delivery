@@ -17,7 +17,7 @@
 const FOCUSABLE = 'button, a[href], select, input:not([type=hidden]), textarea, .btn, [data-pad]';
 
 const shown = el => {
-  if (el.hidden || el.disabled || el.closest('[hidden]')) return false;
+  if (el.hidden || el.disabled || el.closest('[hidden]') || el.closest('[data-pad-skip]')) return false;   // data-pad-skip — соседние карточки карусели (carousel.js)
   const r = el.getBoundingClientRect();
   return r.width > 0 && r.height > 0;
 };

@@ -5,7 +5,10 @@
      ?mock-steam        Стим есть, таблицы работают: 30 игроков в мире, трое из них — друзья
      ?mock-steam=nolb   Стим есть, таблиц нет (koffi не поднялся) — игра берёт локальную
      ?mock-steam=fail   таблицы есть, но Стим не отвечает (null) — тоже локальная
+     ?mock-steam=deck   как на Steam Deck (экранная клавиатура по фокусу поля)
 
+   ?mock-update=v9.9.9 — вышла новая версия (плашка «обновить» в меню); textInput и floatKeyboard
+   (экранная клавиатура) тоже пишутся в calls.
    Все вызовы пишутся в window.__steamMock.calls: [имя, ...аргументы]. */
 export function mockBridge (mode = '') {
   const calls = [];
@@ -24,14 +27,14 @@ export function mockBridge (mode = '') {
   const later = v => new Promise(r => setTimeout(() => r(v), 30));
   const log = (...a) => { calls.push(a); return a; };
   const steam = {
-    available: true, deck: false, launched: true, lang: 'russian', name: me.name,
+    available: true, deck: /deck/.test(mode), launched: true, lang: 'russian', name: me.name,
     achievement: id => (log('achievement', id), later(true)),
     achieved: id => (log('achieved', id), later(false)),
     clearAchievement: id => (log('clearAchievement', id), later(true)),
     getStat: n => (log('getStat', n), later(null)),
     setStat: (n, v) => (log('setStat', n, v), later(true)),
     richPresence: (k, v) => (log('richPresence', k, v), later(true)),
-    textInput: () => later(null),
+    textInput: (...a) => (log('textInput', ...a), later(null)),
     lb: mode !== 'nolb',
     lbUpload (name, score, details) {
       log('lbUpload', name, score, details);
@@ -56,9 +59,18 @@ export function mockBridge (mode = '') {
     },
   };
   const off = async () => false;
+  /* обновление: ?mock-update=v9.9.9 — вышла новая (кнопка «обновить» в меню), без него — стоит последняя */
+  const Q = new URLSearchParams(location.search), upd = Q.get('mock-update');
+  const cur = 'v0.4.0';
+  let onUpd = null;
   const bridge = {
-    info: async () => ({ tag: 'mock', updatable: false, steam: true }),
-    checkUpdate: async () => ({ state: 'off' }), applyUpdate: off, quit: off,
+    info: async () => ({ tag: cur, updatable: !!upd, steam: true }),
+    checkUpdate: async () => ({ state: 'off' }),
+    latestUpdate: async force => (log('latestUpdate', !!force), later(upd ? { state: 'newer', current: cur, latest: upd, updatable: true, platform: 'linux' } : { state: 'fresh', current: cur, latest: cur, updatable: true, platform: 'linux' })),
+    applyUpdate: async () => { log('applyUpdate'); if (onUpd) setTimeout(() => onUpd({ stage: 'download', p: 0.4 }), 30); return true; },
+    onUpdate: cb => { onUpd = cb; },
+    floatKeyboard: (...a) => (log('floatKeyboard', ...a), later('float')),
+    quit: off,
     setFullscreen: off, isFullscreen: off, log () {}, logDir: async () => '', openLogs: off,
     steam,
   };

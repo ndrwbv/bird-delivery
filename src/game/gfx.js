@@ -9,7 +9,7 @@
      пункт   Низкая            Средняя        Высокая
      fps     30 к/с            60             как у экрана
      range   туман ~250 м      ~370 м         ~490 м
-     menu    застывший кадр    20 к/с         живой
+     menu    застывший кадр    30 к/с         живой    (листаешь меню — полные к/с)
      px      ~430 точек        ~540           ~720 (по короткой стороне)
      win     комнат нет        есть           есть
      fx      меньше и короче   как есть       как есть
@@ -42,7 +42,7 @@ const LAG_R = 110;                 // дальше — «вдали»: счит�
 export const ITEMS = [
   { id: 'fps', label: N_('кадров в секунду'), vals: [30, 60, 0] },
   { id: 'range', label: N_('дальность'), vals: [250, 370, 490] },
-  { id: 'menu', label: N_('город за меню'), vals: [0, 20, -1] },
+  { id: 'menu', label: N_('город за меню'), vals: [0, 30, -1] },
   { id: 'px', label: N_('чёткость'), vals: [430, 540, 720] },
   { id: 'win', label: N_('окна с комнатами'), vals: [0, 1] },
   { id: 'fx', label: N_('эффекты'), vals: [0, 1] },
@@ -110,6 +110,16 @@ export const every = () => val('far');                         // вдали —
 export const fxLow = () => !val('fx');
 export const winQ = () => (val('win') ? { interior: 1, lod: 70 } : { interior: 0, lod: 0 });
 /* прятать дальше (м): прохожих, машин; ближний/дальний вариант человечка */
+/* мелочь мира — по пункту «дальность» (свой пункт в окне не заводим): мелочь на газоне
+   (lawnprops.js) — радиус клеток R, трава / одуванчики / мусор — до small, доля травы,
+   зарослей и мусора — thin; краска газона (lawn.js) — полная (1) или облегчённая (0:
+   без тени-рельефа и мелких октав шума — на Деке это ~треть времени видеокарты на землю) */
+export const DETAIL = [
+  { R: 80, small: 40, thin: 0.5, lawn: 0 },     // низкая
+  { R: 100, small: 50, thin: 0.7, lawn: 0 },    // средняя (Steam Deck)
+  { R: 120, small: 60, thin: 1, lawn: 1 },      // высокая
+];
+export const detail = () => DETAIL[O.range] || DETAIL[2];
 export const hideR = () => (O.far === 0 ? { people: 100, cars: 200, lod: 32 } : { people: 130, cars: 220, lod: 45 });
 
 /* ── применить: что меняется без перезагрузки ── */
@@ -133,17 +143,25 @@ export function setPreset (p) {
 }
 
 /* ── кадры: ограничение к/с и город за меню ──
+   04.10.2026: «в интерфейсе 20 к/с» — облёт камеры над городом за меню шёл 20 к/с, и всё меню
+   (Steam показывает к/с всего окна) выглядело рывками. Теперь на средней — 30 к/с, а пока игрок
+   листает меню (касание, мышь, клавиши, геймпад — poke()) и ещё 0,9 с после — полные. Экран,
+   закрывающий город целиком (гараж, «потратить»: cover), не ограничивается: города там нет,
+   кадр игры пустой, а машина в гараже крутится своим кадром (cars.js previewCanvas).
    hold(now, menu, sig) — true: этот кадр пропустить целиком (мир не считаем, не рисуем).
    Пропуск по времени, а не «каждый второй»: на 120 Гц ограничение 60 — тоже 60.
    Физика от этого не зависит: шаг мира — по прошедшему времени (game.js frameStep).
    Застывший город за меню: первую секунду после смены экрана (sig) — 20 к/с,
    чтобы всё догрузилось, дальше — один кадр раз в MENU_KEEP мс (на случай, если меню
    что-то поменяло в городе). */
-const MENU_SETTLE = 1000, MENU_KEEP = 4000;
-let due = 0, mSig = null, mBurst = 0, mNext = 0;
+const MENU_SETTLE = 1000, MENU_KEEP = 4000, UI_HOLD = 900;
+let due = 0, mSig = null, mBurst = 0, mNext = 0, uiUntil = 0;
+/** игрок трогает меню — город за ним полные к/с ещё UI_HOLD мс (на «застывшем» — не трогаем) */
+export function poke () { uiUntil = performance.now() + UI_HOLD; }
 export const STATS = { drawn: 0, skipped: 0, menuDrawn: 0, work: [], frame: 0 };
-export function hold (now, menu, sig) {
+export function hold (now, menu, sig, cover) {
   let fps = fpsCap();
+  if (menu && cover) { mSig = null; return pass(now, 0, true); }
   if (menu) {
     const m = val('menu');
     if (m === 0) {
@@ -152,7 +170,7 @@ export function hold (now, menu, sig) {
       if (now < mBurst) fps = 20;
       else if (now >= mNext) { mNext = now + MENU_KEEP; return pass(now, 0, true); }
       else { STATS.skipped++; return true; }
-    } else if (m > 0) fps = fps ? Math.min(fps, m) : m;
+    } else if (m > 0 && now >= uiUntil) fps = fps ? Math.min(fps, m) : m;
   } else mSig = null;
   return pass(now, fps, menu);
 }
@@ -230,7 +248,7 @@ function itemText (it, v) {
   switch (it.id) {
     case 'fps': return v === 2 ? t('как у экрана') : String(it.vals[v]);
     case 'range': return [t('близко'), t('средне'), t('далеко')][v] + ' · ' + t('{m} м', { m: it.vals[v] });
-    case 'menu': return v === 0 ? t('застывший кадр') : v === 1 ? t('{n} к/с', { n: 20 }) : t('живой');
+    case 'menu': return v === 0 ? t('застывший кадр') : v === 1 ? t('{n} к/с', { n: 30 }) : t('живой');
     case 'px': return [t('крупный пиксель'), t('средний пиксель'), t('мелкий пиксель')][v];
     case 'win': return v ? t('вкл') : t('выкл');
     case 'fx': return v ? t('все') : t('меньше');
@@ -238,14 +256,16 @@ function itemText (it, v) {
   }
   return String(v);
 }
-export function panel (body, focus) {
-  const btn = (id, txt) => '<button type="button" id="' + id + '"' + (id === focus ? ' autofocus' : '') + '>' + txt + '</button>';
-  const row = (label, id, txt) => '<div class="set-row"><span>' + label + '</span>' + btn(id, txt) + '</div>';
-  body.innerHTML = '<div class="pn-t">' + t('графика') + '</div>' +
-    row('<b>' + t('качество') + '</b>', 'gfx-p', presetName()) +
-    ITEMS.map(it => row(t(it.label), 'gfx-' + it.id, itemText(it, O[it.id]))).join('') +
+/* card — карточка «графика» в карусели настроек (settings.js): без заголовка, пункты — сеткой,
+   у «качества» data-main (на неё встаёт геймпад) */
+export function panel (body, focus, card) {
+  const btn = (id, txt, main) => '<button type="button" id="' + id + '"' + (id === focus ? ' autofocus' : '') + (main && card ? ' data-main' : '') + '>' + txt + '</button>';
+  const row = (label, id, txt, main) => '<div class="set-row"><span>' + label + '</span>' + btn(id, txt, main) + '</div>';
+  body.innerHTML = (card ? '' : '<div class="pn-t">' + t('графика') + '</div>') +
+    row('<b>' + t('качество') + '</b>', 'gfx-p', presetName(), true) +
+    '<div class="set-rows">' + ITEMS.map(it => row(t(it.label), 'gfx-' + it.id, itemText(it, O[it.id]))).join('') + '</div>' +
     '<div class="pn-n">' + t('графика не меняет игру: машины и люди рядом, клиенты и физика — одинаковые на любой') + '</div>';
-  const again = id => panel(body, id);
+  const again = id => panel(body, id, card);
   body.querySelector('#gfx-p').onclick = () => {
     const i = ORDER.indexOf(PRESET);
     setPreset(ORDER[(i + 1) % ORDER.length]);      // «своя» → низкая
@@ -257,7 +277,7 @@ export function panel (body, focus) {
 /* отладка: __dlv.GFX */
 export const DEBUG = {
   get dev () { return DEV; }, get preset () { return PRESET; }, get opts () { return { ...O }; },
-  set, setPreset, STATS, ITEMS, PRESETS,
+  set, setPreset, STATS, ITEMS, PRESETS, DETAIL, poke,
   /* время кадра CPU за последние n кадров: p50 / p95, мс */
   work (n = 300) { const s = STATS.work.slice(-n).sort((a, b) => a - b), q = p => (s.length ? +s[Math.min(s.length - 1, Math.floor(p * s.length))].toFixed(2) : 0); return { n: s.length, p50: q(0.5), p95: q(0.95) }; },
 };

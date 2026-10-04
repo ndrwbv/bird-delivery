@@ -34,7 +34,29 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&am
 const host = () => document.getElementById('game') || document.body;
 const pct = k => '+' + Math.round((k - 1) * 100) + ' %';
 
-export function init (api) { A = api; }
+export function init (api) { A = api; repair(); }
+
+/* ── ложное «весь город открыт» (04.10.2026) ──
+   В v0.3.0 тестовая кнопка «открыть все районы» стояла в настройках релиза, сразу под «проверить
+   обновления»; на Деке настройки не влезали в экран, и её жали вместо обновления: все районы
+   «открывались» и показывался праздник. Честно открыть все районы нельзя быстрее, чем за сумму
+   OPEN_OLD смен (26; сейчас — 40), а «смен» (dlv-shifts) у такого сохранения меньше. Тогда откатываем:
+   районы — заново из числа смен (districts.js rebuild), праздник и «весь город» — снять.
+   И просто: районы открыты не все, а праздник отмечен или включён «весь город» — снять.
+   С ?debug и в dev (A.debug — там есть тестовая кнопка) не трогаем. force — проверка в probe. */
+const MIN_ALL = () => (DISTRICT.OPEN_OLD || DISTRICT.OPEN).reduce((a, b) => a + b, 0);
+export function repair (force) {
+  if (!A || !DIST.has() || (A.debug && !force)) return null;
+  const shifts = +A.Store.get('dlv-shifts', 0) || 0;
+  let fixed = '';
+  if (DIST.allOpen() && shifts < MIN_ALL()) { DIST.rebuild(shifts); fixed = 'rebuild'; }
+  if (!DIST.allOpen()) {
+    if (+A.Store.get(SEEN, 0)) { A.Store.set(SEEN, 0); fixed = fixed || 'seen'; }
+    if (+A.Store.get('dlv-city-mode', 0)) { DIST.setCity(false); A.Store.set('dlv-city-mode', 0); fixed = fixed || 'city'; }
+  }
+  if (fixed) A.Store.flush && A.Store.flush();
+  return fixed || null;
+}
 export const seen = () => !!(A && +A.Store.get(SEEN, 0));
 const ready = () => !!A && DIST.has() && DIST.allOpen();
 
@@ -133,9 +155,13 @@ export function party (done) {
     root.classList.add('out');
     setTimeout(() => root.remove(), 200);
     if (PARTY && PARTY.el === root) PARTY = null;
-    if (call && done) done();
+    if (call && done) { try { done(); } catch (e) { console.error('[cityopen] done', e); } }
+    // управление — назад меню: подсветка геймпада и клавиатуры сброшена, фокус на карточке меню
+    if (A.refocus) setTimeout(() => { try { A.refocus(); } catch (e) { /* — */ } }, 0);
   };
   go.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); if (performance.now() < guard) return; close(true); });
+  // тап / клик где угодно по празднику (после защитных 0,7 с) — тоже «ура!»
+  root.addEventListener('click', () => { if (performance.now() >= guard) close(true); });
   PARTY = { el: root, close, ok: () => { if (performance.now() >= guard) close(true); } };
   requestAnimationFrame(() => root.classList.add('on'));
 }
@@ -215,11 +241,14 @@ export function unlockAll () {
   return true;
 }
 
-export const root = () => (PARTY ? PARTY.el : pk && !pk.hidden ? pk : null);
+export function root () {
+  if (PARTY && !PARTY.el.isConnected) PARTY = null;   // окно уже снято — меню не держим
+  return PARTY ? PARTY.el : pk && !pk.hidden && pk.isConnected ? pk : null;
+}
 export function back () {
   if (PARTY) { PARTY.ok(); return true; }
   if (pk && !pk.hidden) { closePick(false); return true; }
   return false;
 }
-export const DEBUG = { party, picker, choose, check, beforeShift, nearest, unlockAll, seen, cityFar, root,
+export const DEBUG = { party, picker, choose, check, beforeShift, nearest, unlockAll, seen, cityFar, root, repair,
   reset () { if (A) { A.Store.set(SEEN, 0); DIST.setCity(false); } } };

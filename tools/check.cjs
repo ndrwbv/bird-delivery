@@ -84,6 +84,13 @@ const CHECKS = [
     return { status: r.ok ? 'ok' : 'fail', info: `${r.n} сугробов, ${r.addrs} адресов и дверей; на асфальте ${r.road}, на адресе ${r.addr}` +
       (r.ok ? '' : (r.err ? ' · ' + r.err : '') + (!r.visible ? ' · не видны в снежную зиму' : '') + (r.stormRain !== 1 ? ' · в грозу нет дождя' : '') + (r.sample && r.sample.length ? ': ' + JSON.stringify(r.sample[0]) : '')) };
   } },
+  { id: 'buildings', name: 'постройки не на дороге', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/buildings-road.js')]);
+    const e = errLine(j), r = j.result;
+    if (e || !r) return { status: 'fail', info: e || 'нет результата' };
+    const n = Object.entries(r.n).map(([k, v]) => k + ' ' + v).join(', ');
+    return { status: r.ok ? 'ok' : 'fail', info: `${n}; на асфальте ${r.bad}` + (r.bad ? ': ' + JSON.stringify(r.by) + " " + JSON.stringify(r.sample) : '') };
+  } },
   { id: 'smoke-adult', name: '30 с автопилота: взрослая (web)', group: 3, run: smoke(['--mode=web'], 'взрослая') },
   { id: 'smoke-phone', name: '30 с автопилота: телефон (web)', group: 3, run: smoke(['--size=phone'], 'телефон') },
   { id: 'smoke-crashlog', name: 'журнал ошибок пуст после дымовых', group: 4, run: async () => (

@@ -3,7 +3,8 @@
    «Город: стройки на пустырях»).
 
    • Где: пустырь у улицы — участок 34—46 × 26—34 м, в котором и рядом
-     (6 м) нет домов, нет ни одной дороги и дорожки, не парк, не лес, не
+     (6 м) нет домов, нет ни одной дороги и дорожки (до края асфальта ≥ 1,5 м —
+     до края каждой дороги рядом, край участка — через 1 м), не парк, не лес, не
      газон, не площадка и не парковка из карты, не вода, перепад высот
      меньше SLOPE; от подъездов — не ближе ENTR м (там пины заказов), от
      пиццерий — PIZZA м. Рядом должен быть жилой квартал (NEAR подъездов в
@@ -262,6 +263,14 @@ function finder () {
   for (const p of C.paths || []) addL(p);
   for (const r of C.rails || []) addL(r.p);
   for (const s of C.streams || []) addL(s.p);
+  /* края всех дорог (и проездов, и пешеходок): ближайшая осевая — не всегда ближайший асфальт
+     (узкий проезд рядом с широкой улицей), поэтому меряем до края каждой дороги рядом */
+  const ROAD = grid(32);
+  for (const r of C.roads) {
+    const hw = A.roadWidth(r) / 2;
+    for (let i = 1; i < r.p.length; i++) { const [x1, z1] = r.p[i - 1], [x2, z2] = r.p[i]; ROAD.add(Math.min(x1, x2) - hw - 3, Math.min(z1, z2) - hw - 3, Math.max(x1, x2) + hw + 3, Math.max(z1, z2) + hw + 3, [x1, z1, x2, z2, hw]); }
+  }
+  const roadGap = (x, z) => { let g = 99; const a = ROAD.at(x, z); if (a) for (const s of a) g = Math.min(g, segD(x, z, s[0], s[1], s[2], s[3]) - s[4]); return g; };
   const SOL = grid(30);
   for (const s of A.SOLIDS) SOL.add(s.cx - s.ex, s.cz - s.ez, s.cx + s.ex, s.cz + s.ez, s);
   const ENT = grid(50);
@@ -310,9 +319,11 @@ function finder () {
       if (inPolys(px, pz)) return no('poly');
       if (nearLine(px, pz, 2.5)) return no('path');
       if (inSolid(px, pz, 1.2)) return no('solid');
-      const r = A.nearestRoad(px, pz, 7, 1);
-      if (r && r.d < r.seg.w / 2 + 1.5) return no('road');
+      if (roadGap(px, pz) < 1.5) return no('road');
     }
+    // край участка — гуще (через 1 м): угол асфальта не проскочит между точками сетки
+    for (let a = -W / 2 - 1.5; a <= W / 2 + 1.51; a += 1) for (const b of [-D / 2 - 1.5, D / 2 + 1.5]) { const [px, pz] = P(a, b); if (roadGap(px, pz) < 0) return no('road'); }
+    for (let b = -D / 2 - 1.5; b <= D / 2 + 1.51; b += 1) for (const a of [-W / 2 - 1.5, W / 2 + 1.5]) { const [px, pz] = P(a, b); if (roadGap(px, pz) < 0) return no('road'); }
     // улица у ворот — та самая и прямая: передний край в SET м от полотна по всей длине
     for (const a of [-W / 2, 0, W / 2]) {
       const [px, pz] = P(a, -D / 2), r = A.nearestRoad(px, pz, 5, 1);

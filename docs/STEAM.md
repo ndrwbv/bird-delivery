@@ -362,7 +362,19 @@ curl -fsSL https://raw.githubusercontent.com/ndrwbv/bird-delivery/main/tools/ins
 
 Игра встанет в `./bird-pizza`, ярлык «Птица Пицца» появится в меню; в Steam — Add a Non-Steam
 Game → `bird-pizza.sh`, Proton не включать. Такая установка сама предлагает обновления
-(метка `.github-install`, тег из `electron/build-tag.json` против последнего релиза).
+(метка `.github-install` или просто `resources/app.asar` рядом с бинарником — распакованный руками
+архив тоже обновляется; тег из `electron/build-tag.json` против последнего релиза).
+
+**Обновление из игры (04.10.2026).** Окна «Вышла версия» при запуске больше нет (в игровом режиме Деки
+оно могло не показаться). Рендерер (`src/game/update.js`) спрашивает оболочку `update:latest` — ответ
+без окон `{ state: off|fresh|newer|error, current, latest, updatable, platform }`, GitHub — раз в 10 мин;
+вышла новее — плашка «есть новая версия — обновить» на первом экране меню и кнопка в настройках →
+«версия игры». Нажал — `update:apply`: Windows качает установщик (ход — событием `update:progress`
+`{ stage: download, p }` на плашку и полоской на значке), Linux — игра закрывается и
+`install-deck.sh --dir <папка игры> --run` ставит архив релиза поверх и запускает игру. Проверка без
+Электрона: `npm run probe -- --mode=steam --q="mock-steam&mock-update=v9.9.9"` — плашка есть, без
+`mock-update` — нет. Экранная клавиатура над полем: `steam:floatKeyboard`
+(`showFloatingGamepadTextInput`, иначе `steam://open/keyboard`), `?mock-steam=deck` — как на Деке.
 Сохранения — `~/.config/BirdPizza`, обновление их не трогает.
 
 **Windows** — `bird-pizza-setup.exe` из релиза: установщик NSIS (electron-builder, настройки —

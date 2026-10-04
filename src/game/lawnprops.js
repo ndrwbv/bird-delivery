@@ -35,10 +35,11 @@
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 import { snowAmt, seasonValue } from './seasons.js';
+import * as GFX from './gfx.js';
 
 export const LAWN = {
   CELL: 40, STEP: 4, DROP: 120,
-  R: 120, R_LOW: 80, R_SMALL: 60, R_SMALL_LOW: 40,
+  // радиус клеток, трава ближе, доля мелочи — по графике: gfx.js DETAIL
   BUDGET: 2, WARM: 80,
   ENT: 7, ENT_BIG: 12,                       // от двери подъезда: мелочь / большое
   PIN_HIDE: 6, PIN_HIDE_BIG: 9,
@@ -202,7 +203,7 @@ function merge (parts) {
   return g;
 }
 const Bx = (w, h, d) => new THREE.BoxGeometry(w, h, d);
-const blade = (r, h, x, z, tx, tz, hex, seg = 3) => paint(new THREE.ConeGeometry(r, h, seg).translate(0, h / 2, 0).rotateX(tx).rotateZ(tz).translate(x, 0, z), hex);
+const blade = (r, h, x, z, tx, tz, hex, seg = 3) => paint(new THREE.ConeGeometry(r, h, seg, 1, true).translate(0, h / 2, 0).rotateX(tx).rotateZ(tz).translate(x, 0, z), hex);
 const stalk = (w, h, x, z, tx, tz, hex) => paint(Bx(w, h, w).translate(0, h / 2, 0).rotateX(tx).rotateZ(tz).translate(x, 0, z), hex);
 const blob = (sx, sy, sz, x, y, z, hex, ry = 0, rx = 0) => paint(new THREE.IcosahedronGeometry(1, 0).scale(sx, sy, sz).rotateX(rx).rotateY(ry).translate(x, y, z), hex);
 function geos () {
@@ -338,10 +339,13 @@ function item (cell, kind, pts, hex, o = {}) {
 }
 const pick = (r, a) => a[Math.floor(r() * a.length) % a.length];
 
-function buildCell (i, j) {
-  const t0 = performance.now(), F = LAWN, S = F.STEP;
+/* сборка клетки — кусками: после каждой точки сетки, если время кадра вышло (DEADLINE), —
+   yield, дальше в следующем кадре. Клетка попадает в CELLS только целой. */
+let DEADLINE = Infinity, BUILDING = null;
+const late = () => performance.now() > DEADLINE;
+function * buildCell (i, j) {
+  const F = LAWN, S = F.STEP;
   const cell = Cell(i, j);
-  CELLS.set(key(i, j), cell);
   const { x0, z0 } = cell, x1 = x0 + F.CELL, z1 = z0 + F.CELL;
   const inCell = (x, z) => x >= x0 && x < x1 && z >= z0 && z < z1;
   const kids = !A.ADULT;
@@ -351,6 +355,7 @@ function buildCell (i, j) {
   // 1) точки сетки
   for (let gx = x0 + S / 2; gx < x1; gx += S)
     for (let gz = z0 + S / 2; gz < z1; gz += S) {
+      if (late()) yield;
       const r = rng(gx, gz);
       const x = gx + (r() - 0.5) * S * 0.8, z = gz + (r() - 0.5) * S * 0.8;
       const sp = spot(x, z);
@@ -438,9 +443,11 @@ function buildCell (i, j) {
         if (r() > 0.35) continue;                       // не первая же точка куска — место гуляет
         if (bigThing(cell, kind, x, z, r, taken, kids)) cell['big' + claimKey] = 1;
       }
+      if (late()) yield;
     }
   // 2) оградки вдоль улиц, со стороны газона
   rails(cell, inCell);
+  if (late()) yield;
   // 3) мусор у баков
   for (const c of A.cans || []) {
     if (!inCell(c.x0, c.z0) || hsh(c.x0, c.z0, 41) > 0.5) continue;
@@ -470,11 +477,11 @@ function buildCell (i, j) {
     });
     cell.L[k] = { m, c, own, n };
     ST.n[k] = (ST.n[k] || 0) + n;
+    if (late()) yield;
   }
   ST.items += cell.items.length;
   ST.built++;
-  const dt = performance.now() - t0;
-  ST.ms += dt; ST.msMax = Math.max(ST.msMax, dt);
+  CELLS.set(key(i, j), cell);
   return cell;
 }
 
@@ -605,16 +612,27 @@ function ensure (x, z, R, budget) {
   const todo = [];
   for (let i = ci - n; i <= ci + n; i++)
     for (let j = cj - n; j <= cj + n; j++) {
-      if (CELLS.has(key(i, j))) continue;
+      if (CELLS.has(key(i, j)) || (BUILDING && BUILDING.k === key(i, j))) continue;
       const d = Math.hypot((i + 0.5) * C - x, (j + 0.5) * C - z);
       if (d > R + C * 0.71) continue;
       todo.push([d, i, j]);
     }
-  if (!todo.length) return false;
+  if (!todo.length && !BUILDING) return false;
   todo.sort((a, b) => a[0] - b[0]);
   const t0 = performance.now();
-  for (const [, i, j] of todo) { buildCell(i, j); if (performance.now() - t0 > budget) break; }
-  return true;
+  DEADLINE = t0 + budget;
+  let done = false;
+  const slice = g => { const s = performance.now(), r = g.next(), dt = performance.now() - s; ST.ms += dt; ST.msMax = Math.max(ST.msMax, dt); return r.done; };
+  try {
+    if (BUILDING) { if (!slice(BUILDING.g)) return false; BUILDING = null; done = true; }
+    for (const [, i, j] of todo) {
+      if (performance.now() > DEADLINE) break;
+      const g = buildCell(i, j);
+      if (!slice(g)) { BUILDING = { k: key(i, j), g }; break; }
+      done = true;
+    }
+  } finally { DEADLINE = Infinity; }
+  return done;                                         // true — есть новые целые клетки
 }
 
 /* ── сезон: что видно и каким цветом ── */
@@ -630,7 +648,8 @@ function season () {
 const FR = new THREE.Frustum(), PM = new THREE.Matrix4(), SPH = new THREE.Sphere();
 let PINS = null;
 const low = () => !!(A.low && A.low());
-function radius (cam) { return Math.min(low() ? LAWN.R_LOW : LAWN.R, (cam.far || 490) - 20); }
+const DET = () => GFX.detail();
+function radius (cam) { return Math.min(DET().R, (cam.far || 490) - 20); }
 function hideNear (x, z, big) {
   if (!PINS) return false;
   const r = big ? LAWN.PIN_HIDE_BIG : LAWN.PIN_HIDE;
@@ -638,8 +657,8 @@ function hideNear (x, z, big) {
   return false;
 }
 function refresh (cam) {
-  const t0 = performance.now(), F = LAWN, x = cam.position.x, z = cam.position.z, R = radius(cam), RS = Math.min(R, low() ? F.R_SMALL_LOW : F.R_SMALL);
-  const SEA = season(), lo = low();
+  const t0 = performance.now(), F = LAWN, x = cam.position.x, z = cam.position.z, R = radius(cam), RS = Math.min(R, DET().small);
+  const SEA = season(), thin = DET().thin;
   PM.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
   FR.setFromProjectionMatrix(PM);
   const vis = [];
@@ -665,7 +684,7 @@ function refresh (cam) {
       if (k === 'dand' && !SEA.dand) continue;
       if (SMALL[k] && d > RS + F.CELL * 0.71) continue;
       const src = c.L[k], M = MESH[k], cap = M.instanceMatrix.count;
-      const want = lo && THIN[k] ? Math.ceil(src.n * 0.5) : src.n;
+      const want = thin < 1 && THIN[k] ? Math.ceil(src.n * thin) : src.n;
       const ma = M.instanceMatrix.array, ca = M.instanceColor.array;
       if (!c.down && !c.pinNear) {
         const q = Math.min(want, cap - n[k]);
@@ -711,6 +730,7 @@ function refresh (cam) {
    debris(x, z, nx, nz, force, hex, n) — разлёт кусков, Snd */
 let DIRTY = true, T = 0;
 export function init (api) {
+  if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('noprops')) return api;   // ?noprops — без мелочи на газоне (сравнить)
   A = api;
   indexAll();
   makeMeshes();
@@ -730,7 +750,7 @@ export function step (dt) {
   // пины заказа: рядом с ними вещи прячутся
   const P = A.pins();
   PINS = P && P.length ? P : null;
-  let sig = season().sig + (low() ? 'L' : '');
+  let sig = season().sig + DET().R;
   if (PINS) for (let k = 0; k < PINS.length; k++) sig += ',' + Math.round(PINS[k]);
   const fx = -cam.matrixWorld.elements[8], fz = -cam.matrixWorld.elements[10], yaw = Math.atan2(fx, fz);
   let dy = Math.abs(yaw - LAST.yaw); if (dy > Math.PI) dy = 2 * Math.PI - dy;

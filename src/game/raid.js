@@ -6,9 +6,10 @@
    рубашки, синие кепки) или «Королевы Бургеров» (жёлтые рубашки, синие штаны
    и кепки) прибегают к пиццерии-шару, где ты работаешь, и громят её: машут
    битами (детская — подушками), сносят столики. Точка мигает красным на радаре
-   (за краем — у края) и на большой карте, Толик пишет в чат, внизу — плашка
-   «налёт · 1:05 · осталось 5». Успел — отбился: каждого надо сбить машиной
-   (быстрее 20 км/ч), распугать (пронёсся рядом быстрее 25 км/ч, не задев)
+   (за краем — у края) и на большой карте, Толик пишет в чат одной фразой
+   («Налёт на точку! Гони!»; итог — тоже одной). Других надписей нет. Успел — отбился: каждого надо сбить машиной
+   (быстрее 20 км/ч; летишь прямо в него — не отпрыгнет, сбит), распугать
+   (пронёсся рядом быстрее 25 км/ч, не задев; убегающего тоже можно сбить)
    или посигналить рядом (H или постоял рядом 1,5 с: в 18 м каждый второй разбегается, кто уже бьёт машину — нет). Медленнее
    20 км/ч — налётчик твёрдый, отходит и бьёт по машине (полсердца).
    Когда — econ.js RAID: не раньше 5-й смены, не в быстром заезде и не
@@ -71,7 +72,7 @@ const RUN_LINES = [N_('атас!'), N_('валим!'), N_('мама!'), N_('я �
 
 let A = null;
 const R = { on: false, P: null, brand: '', men: [], t: 0, T0: 0, came: false, myKO: 0, gunKO: 0, scared: 0, tables: false,
-  plan: -1, sinceT: 0, hud: null, shards: [], lost: null, last: null, stats: { started: 0, won: 0, lost: 0, shots: 0, hits: 0 } };
+  plan: -1, sinceT: 0, shards: [], lost: null, last: null, stats: { started: 0, won: 0, lost: 0, shots: 0, hits: 0 } };
 const TUR = { g: null, head: null, at: null, cd: 1, fx: [], light: 0 };
 
 /* ── память: смены без налёта, куплена ли ёлка ── */
@@ -158,11 +159,7 @@ export function start (brand, P) {
     R.men.push(m);
   }
   R.stats.started++;
-  hud();
-  const bn = t(BRANDS[brand].name);
-  const time = Math.floor(RAID.TIME / 60) + ':' + String(RAID.TIME % 60).padStart(2, '0');
-  if (A.chat) A.chat(A.ADULT ? t('СРОЧНО, блядь! «{brand}» громят нашу точку! дуй туда, разгони их — у тебя {time}', { brand: bn, time })
-    : t('СРОЧНО! «{brand}» громят нашу точку! дуй туда, разгони их — у тебя {time}', { brand: bn, time }));
+  if (A.chat) A.chat(t('Налёт на точку! Гони!'));      // о налёте — только Толик, одной фразой; на радаре и карте — мигающая точка
   if (A.Snd) { A.Snd.blip(440, 0.12, 'square', 0.14); setTimeout(() => A.Snd && A.Snd.blip(330, 0.18, 'square', 0.14), 160); }
   return true;
 }
@@ -172,7 +169,6 @@ export function clear (quiet) {
   for (const m of R.men) dropMan(m);
   R.men.length = 0;
   R.on = false;
-  hud();
   if (!quiet) R.P = null;
 }
 function dropMan (m) {
@@ -198,7 +194,6 @@ const standing = () => R.men.filter(m => m.st === 'in' || m.st === 'smash' || m.
 
 /* ── итог ── */
 function end (won) {
-  const P = R.P, bn = t(BRANDS[R.brand].name);
   R.on = false;
   R.last = { won, came: R.came, myKO: R.myKO, gunKO: R.gunKO, scared: R.scared, left: Math.round(R.t), took: Math.round(R.T0 - R.t) };
   if (won) {
@@ -209,10 +204,7 @@ function end (won) {
     // = RESPECT.gain('defend'), но тихо: сумма и респект — одной всплывашкой ниже; без тебя — вполовину
     RESPECT.add(full ? null : resp, 'defend', true);
     if (cash && A.reward) A.reward(cash);
-    if (A.popBonus) A.popBonus(full ? t('точка отбита!') : t('ёлка отбила точку!'),
-      (cash ? '+' + A.money(cash) + ' · ' : '') + t('+{n} респект', { n: resp }));
-    if (A.chat) A.chat(full ? (A.ADULT ? t('отбил точку, красава! «{brand}» обосрались и свалили. премия твоя', { brand: bn }) : t('отбил точку, красава! «{brand}» удрали. премия твоя', { brand: bn }))
-      : t('ёлка всех разогнала. на тебя бы так рассчитывать'));
+    if (A.chat) A.chat(full ? t('Отбил точку! +{money}', { money: A.money(cash) }) : t('Ёлка отбила точку.'));
     R.last.cash = cash; R.last.resp = resp;
     // убежавшие и уцелевшие — прочь
     for (const m of R.men) if (m.st !== 'gone' && m.st !== 'flee') { m.st = 'flee'; m.t = 0; }
@@ -225,14 +217,11 @@ function end (won) {
     smashTables(true);
     shards(R.P);
     R.lost = R.P;
-    if (A.popBonus) A.popBonus(t('точку разгромили'), t('ремонт −{money} · {n} респект', { money: A.money(fine), n: '−' + Math.abs(resp) }));
-    if (A.chat) A.chat(A.ADULT ? t('пока ты катался, «{brand}» разъебали витрину и столики. ремонт за твой счёт, и кухня до конца смены разгребает стекло — заказы дольше', { brand: bn })
-      : t('пока ты катался, «{brand}» разбили витрину и столики. ремонт за твой счёт, и кухня до конца смены разгребает стекло — заказы дольше', { brand: bn }));
+    if (A.chat) A.chat(t('Точку разгромили. Ремонт −{money}', { money: A.money(fine) }));
     if (A.Snd && A.Snd.fail) A.Snd.fail();
     R.last.fine = fine; R.last.resp = resp;
     for (const m of R.men) if (m.st !== 'gone' && m.st !== 'flee') { m.st = 'flee'; m.t = 0; m.cheer = 1; }
   }
-  hud();
 }
 
 /* столики у точки — снести (smashNear в game.js) */
@@ -360,26 +349,28 @@ function manStep (m, dt, dV, near) {
   m.grp.rotation.y = m.h;
   m.grp.visible = near;
 
-  if (m.st === 'flee') return;
   // машина: сбил / твёрдый / пронёсся рядом
   const fx = Math.sin(V.h), fz = Math.cos(V.h), ex = m.x - V.x, ez = m.z - V.z;
   const al = ex * fx + ez * fz, ac = ex * fz - ez * fx;
   const HL = (A.CAR_L || 2.2) + 0.5, HW = (A.CAR_W || 1) + 0.35, kmh = sp * 3.6;
+  const inBox = Math.abs(al) < HL && Math.abs(ac) < HW;
+  // убегающего тоже можно сбить (он уже убран — без премии, как прохожий)
+  if (m.st === 'flee') { if (inBox && kmh >= TIER.FALL) knock(m, V.vx, V.vz, kmh, true, true); return; }
   m.bump = Math.max(0, m.bump - dt);
-  if (Math.abs(al) < HL && Math.abs(ac) < HW) {
+  if (inBox) {
     if (kmh >= TIER.FALL) { knock(m, V.vx, V.vz, kmh, true); return; }
     const outW = HW - Math.abs(ac) + 0.05, outL = HL - Math.abs(al) + 0.05;
     if (outW <= outL) { const k = ac >= 0 ? outW : -outW; m.x += fz * k; m.z -= fx * k; }
     else { const k = al >= 0 ? outL : -outL; m.x += fx * k; m.z += fz * k; }
     if (A.pushOut) A.pushOut(m, 0.45);
     if (m.bump <= 0 && sp > 1) { m.bump = 1; if (A.bump) A.bump(); m.st = 'charge'; m.charge = true; }
-  } else if (kmh >= B.SCARE_KMH && d < B.SCARE_R) flee(m);
+  } else if (kmh >= B.SCARE_KMH && d < B.SCARE_R && !(al > 0 && Math.abs(ac) < HW + 0.3)) flee(m);   // пугается, только если машина проносится мимо, а не летит прямо в него
 }
 
 /* сбит машиной или ёлкой */
-function knock (m, vx, vz, kmh, byCar) {
+function knock (m, vx, vz, kmh, byCar, fled) {
   if (m.bubble) { m.grp.remove(m.bubble); m.bubble.material.dispose(); m.bubble = null; }
-  if (byCar) { R.myKO++; if (A.onRunOver) A.onRunOver(); }
+  if (byCar) { if (!fled) R.myKO++; if (A.onRunOver) A.onRunOver(); }
   else R.gunKO++;
   unshare(m.grp);
   A.gibHuman({ x: m.x, z: m.z, grp: m.grp }, vx, vz, kmh);       // взрослая — лежит/кусками, детская — со звёздочками и встаёт
@@ -521,22 +512,6 @@ function fxStep (dt) {
   }
 }
 
-/* ── плашка внизу: «налёт на точку · 1:05 · осталось 5» ── */
-function hud () {
-  if (typeof document === 'undefined') return;
-  if (!R.hud) {
-    R.hud = document.createElement('div');
-    R.hud.id = 'raid-hud'; R.hud.hidden = true;
-    document.body.appendChild(R.hud);
-  }
-  if (!R.on) { R.hud.hidden = true; return; }
-  const s = Math.max(0, Math.ceil(R.t)), left = standing();
-  const txt = t('налёт «{brand}» на точку', { brand: t(BRANDS[R.brand].name) }) + ' · ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' · ' + t('осталось {n}', { n: left });
-  if (R.hud.textContent !== txt) R.hud.textContent = txt;
-  R.hud.hidden = false;
-  R.hud.classList.toggle('hot', s <= 15);
-}
-
 /* ── кадр ── */
 export function step (dt) {
   if (!A || !A.CAREER) return;
@@ -576,7 +551,6 @@ export function step (dt) {
     else if (R.t <= 0) end(false);
   }
   if (honkT >= 0) honkT += dt;
-  hud();
 }
 
 /* ── радар и карта: точка мигает красным ── */

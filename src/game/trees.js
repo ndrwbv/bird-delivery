@@ -195,6 +195,7 @@ export function growTree (o) {
    A: CITY, tree(x, z, strip, kind) → true, если посадил; inHouse, inBounds, inPoly, groundH,
       nearestRoad, solidAt, SMASH, YARD_PATHS, PITCHES. Один раз при сборке, до smashBuild. */
 export function plantYards (A) {
+  if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('noyardtrees')) return 0;   // ?noyardtrees — без дворовых групп и кустов (сравнить)
   const { CITY } = A, Y = TREE.YARD, WN = TREE.WIN;
   // сетки: двери, тропинки, мелочь дворов, уже посаженное здесь
   const grid = (cell) => { const m = new Map(); return { cell, m,

@@ -99,6 +99,25 @@ export function setCity (on) {
 }
 export const mine = i => (city() ? isOpen(i) : i === cur());
 
+/* починка ложного «всё открыто» (cityopen.js repair): смены районов — заново из числа смен n,
+   по порядку, сколько каждому надо сейчас (need); остаток — в первый недооткрытый */
+export function rebuild (n) {
+  if (!has() || !A) return opened();
+  const c = list().map(() => 0);
+  let left = Math.max(0, n | 0), open = 1;
+  for (let i = 0; i < count() - 1 && left > 0; i++) {
+    const k = Math.min(left, need(i));
+    c[i] = k; left -= k;
+    if (k >= need(i)) open = i + 2; else break;
+  }
+  A.Store.set(KEY_N, c);
+  A.Store.set(KEY_O, open);
+  if ((+A.Store.get(KEY, 0) || 0) > open - 1) A.Store.set(KEY, open - 1);
+  A.Store.set(KEY_C, 0);
+  A.Store.flush && A.Store.flush();
+  return opened();
+}
+
 /* конец смены: засчитать району; открылся новый — сразу туда (вернуться можно из меню) */
 export function countShift (delivered) {
   if (!has()) return { counted: false, opened: -1 };
@@ -134,7 +153,7 @@ export function setPace (id) { if (PACE.MODES[id]) MODE = id; }
 
 /* отладка: __dlv.DIST */
 export const DEBUG = {
-  list, at, cur, set, opened, shiftsIn, need, countShift, speed, pay, dist, pace, setPace, beginShift, session, allOpen, city, setCity, mine,
+  list, at, cur, set, opened, shiftsIn, need, countShift, rebuild, speed, pay, dist, pace, setPace, beginShift, session, allOpen, city, setCity, mine,
   unlockAll () { if (!A) return; A.Store.set(KEY_N, list().map((_, i) => need(i))); A.Store.set(KEY_O, count()); A.Store.flush && A.Store.flush(); },
   reset () { if (!A) return; A.Store.set(KEY_N, []); A.Store.set(KEY_O, 1); A.Store.set(KEY, 0); A.Store.set(KEY_C, 0); A.Store.flush && A.Store.flush(); },
 };

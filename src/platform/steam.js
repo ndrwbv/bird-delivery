@@ -133,6 +133,8 @@ const Platform = {
     /** Экранная клавиатура Steam для поля имени. null — отменили или Steam недоступен
         (тогда остаётся обычное поле ввода). */
     textInput: (desc, max = 24, text = '') => (bridge && sw.available ? bridge.steam.textInput(desc, max, text) : Promise.resolve(null)),
+    /** плавающая клавиатура Стима над полем (x, y, w, h — где поле): 'float' | 'url' | '' (не вышло) */
+    floatKeyboard: (x, y, w, h) => (bridge && bridge.floatKeyboard ? bridge.floatKeyboard(x, y, w, h) : Promise.resolve('')),
     /** Таблицы лидеров Стима: upload(name, score, details), top(name, n), friends(name),
         around(name, n). Ответ null — Стим не запущен или не ответил: берите Platform.leaderboard
         (он сам падает на локальную). */
@@ -142,6 +144,11 @@ const Platform = {
   shell: {
     info: () => (bridge ? bridge.info() : Promise.resolve({ tag: '', updatable: false, steam: false })),
     checkUpdate: manual => (bridge ? bridge.checkUpdate(manual) : Promise.resolve({ state: 'off' })),
+    /** без окон: { state: off|fresh|newer|error, current, latest, updatable, platform } — плашка в меню */
+    latest: force => (bridge && bridge.latestUpdate ? bridge.latestUpdate(force) : Promise.resolve({ state: 'off' })),
+    /** поставить последнюю: Windows — качает установщик (ход — onUpdate), Linux — install-deck.sh; игра перезапустится */
+    apply: () => (bridge ? bridge.applyUpdate() : Promise.resolve(false)),
+    onUpdate: cb => { if (bridge && bridge.onUpdate) bridge.onUpdate(cb); },
     setFullscreen: on => {
       if (bridge) return bridge.setFullscreen(on);
       try { return on ? document.documentElement.requestFullscreen() : document.exitFullscreen(); } catch (e) { return Promise.resolve(false); }

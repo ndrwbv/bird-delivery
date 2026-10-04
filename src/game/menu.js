@@ -1,13 +1,17 @@
-/* Главное меню карьеры (Стим): колонка слева, справа — город, камера медленно
-   облетает пиццерию. Имя спрашиваем один раз, рейтинг пиццерии — сбоку.
+/* Главное меню карьеры (Стим). С 04.10.2026 — карусель карточек, как выбор машины в гараже
+   (carousel.js): в центре крупная карточка, соседи по краям; листать — свайп, ◀ ▶, ←→, стик и
+   крестовина, LB/RB; выбрать — A / Enter / тап. За меню — город, камера медленно облетает пиццерию.
+   Сверху — логотип, профиль и (сборка с GitHub) плашка «есть новая версия — обновить» (update.js),
+   внизу справа — номер версии. Правила — docs/CAREER.md «Главное меню».
 
      MENU.init(api)   — из career.js (api — тот же, что у карьеры, + crew() и garage())
-     MENU.show()      — из showTitle: собрать кнопки, рейтинг, при первом запуске — «как тебя зовут?»
+     MENU.show()      — из showTitle: собрать карточки, рейтинг, при первом запуске — «как тебя зовут?»
+     MENU.flip(±1)    — листать (career.js padPre / onKey); MENU.focus() — фокус на карточке в центре
      MENU.askName(cb) — из настроек: сменить имя
      MENU.cam(cam, P, tG) — камера заставки
      MENU.modal()     — открытое окно (имя или выбор района: геймпад, клавиатура) или null; MENU.back() — закрыть
-     Район (districts.js): кнопка «район: …» открывает список; открытые — выбрать, закрытые — сколько смен ещё
-     Таблица рекордов (board.js): кнопка только в Стим-сборке, окно — тоже modal()
+     Район (districts.js): карточка «район: …» открывает список; открытые — выбрать, закрытые — сколько смен ещё
+     Таблица рекордов (board.js): карточка только в Стим-сборке, окно — тоже modal()
 
    В Яндексе и Москве (?nocareer) модуль не работает: его зовёт только career.js. */
 import './menu.css';
@@ -19,12 +23,14 @@ import { DISTRICT, SHIFT, clock } from './econ.js';
 import * as BOARD from './board.js';
 import * as PROF from './profiles.js';           // профили: у каждого свой прогресс (profiles.js)
 import * as QR from './quickrun.js';             // быстрый заезд: сезон, длина смены, машина — без копилки и сюжета
+import * as UPD from './update.js';              // плашка «есть новая версия — обновить» (update.js)
+import { carousel } from './carousel.js';
 
-let A = null, el = null, md = null, dm = null, nameCb = null, nameFirst = false;
+let A = null, el = null, md = null, dm = null, nameCb = null, nameFirst = false, CZ = null, curKey = 'go';
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-export function init (api) { A = api; }
+export function init (api) { A = api; UPD.onChange(() => { if (el) upd(); }); }
 
 function build () {
   if (el) return el;
@@ -33,40 +39,47 @@ function build () {
   el = document.createElement('div');
   el.id = 'cr-menu';
   el.innerHTML =
-    '<div class="crm-col">' +
+    '<div class="crm-top">' +
       '<div class="crm-head"><div class="crm-logo"></div><div class="crm-tag"></div>' +
         '<button type="button" class="crm-prof" data-a="profile" hidden></button></div>' +
-      '<nav class="crm-btns">' +
-        '<button type="button" class="crm-go" data-a="go" autofocus><b></b><span></span></button>' +
-        '<button type="button" class="crm-b crm-dist" data-a="district" hidden><b></b><span></span></button>' +
-        '<button type="button" class="crm-b crm-quick" data-a="quick"><b></b><span></span></button>' +
-        '<button type="button" class="crm-b" data-a="garage"></button>' +
-        '<button type="button" class="crm-b" data-a="ride"></button>' +
-        '<button type="button" class="crm-b" data-a="board" hidden></button>' +
-        '<button type="button" class="crm-b" data-a="settings"></button>' +
-        '<button type="button" class="crm-link" data-a="collect"></button>' +
-      '</nav>' +
-      '<div class="crm-foot"><button type="button" class="crm-quit" data-a="quit" hidden></button></div>' +
     '</div>' +
-    '<aside class="crm-rank"><div class="crm-rt"></div><ol></ol><div class="crm-rn"></div></aside>';
+    '<button type="button" class="crm-upd" data-a="update" hidden></button>' +
+    '<div class="crm-car"></div>' +
+    '<div class="crm-hint"></div>' +
+    '<div class="crm-ver"></div>';
   big.appendChild(el);
   el.querySelectorAll('[data-a]').forEach(b => b.addEventListener('click', () => act(b.dataset.a)));
+  CZ = carousel(el.querySelector('.crm-car'), { cls: 'crm-cz', onChange: (i, c) => { curKey = c.dataset.key; navReset(); if (A.Snd && A.Snd.blip) try { A.Snd.blip(520, 0.03, 'square', 0.04); } catch (e) { /* — */ } } });
   return el;
 }
+/* после листания подсветка геймпада и клавиатуры встаёт на карточку в центре */
+function navReset () { if (A.padClear) A.padClear(); if (A.kbClear) A.kbClear(); }
 
 function act (a) {
-  if ((md && !md.hidden) || (dm && !dm.hidden) || BOARD.root() || QR.root() || PROF.root()) return;
+  if ((md && !md.hidden) || (dm && !dm.hidden) || BOARD.root() || QR.root() || PROF.root() || CITY.root()) return;
   A.Snd.boot && A.Snd.boot();
   if (a === 'go') A.menuGo();
   else if (a === 'district') openDistricts();
-  else if (a === 'quick') QR.openSetup();
+  else if (a === 'quick') { if (QR.available()) QR.openSetup(); }
   else if (a === 'profile') openProfiles();
   else if (a === 'ride') A.menuRide();
   else if (a === 'garage') A.garage(() => show());
   else if (a === 'collect') A.openCollect();
   else if (a === 'board') BOARD.open();
   else if (a === 'settings') A.openSettings();
+  else if (a === 'update') UPD.apply();
   else if (a === 'quit') A.quit();
+}
+
+/* карточка: одна большая кнопка (data-main — на неё встаёт геймпад) */
+function card (key, ico, title, sub, cls) {
+  const c = document.createElement('div');
+  c.className = 'crm-card k-' + key + (cls ? ' ' + cls : '');
+  c.dataset.key = key; c.dataset.title = title;
+  c.innerHTML = '<button type="button" class="crm-cb" data-a="' + key + '" data-main><i class="crm-ico" aria-hidden="true">' + ico + '</i>' +
+    '<b>' + esc(title) + '</b>' + (sub ? '<span>' + esc(sub) + '</span>' : '') + '</button>';
+  c.querySelector('button').addEventListener('click', () => act(key));
+  return c;
 }
 
 export function show () {
@@ -75,36 +88,58 @@ export function show () {
   el.querySelector('.crm-logo').textContent = logo || t('Птица Пицца');
   el.querySelector('.crm-tag').textContent = $('big-s') ? $('big-s').textContent : '';
   const n = (+A.Store.get('dlv-shifts', 0) || 0) + 1;
-  el.querySelector('.crm-go b').textContent = t('на смену');
   // круглосуточная пиццерия (со второго района): смена с того часа, когда кончилась прошлая (career.js)
   const allDay = DIST.has() && DIST.cur() >= (SHIFT.ALLDAY_FROM ?? 99);
   const from0 = clock(A.Store.get('dlv-clock', '') === '' || A.Store.get('dlv-clock', null) == null ? 9 : +A.Store.get('dlv-clock', 9) || 0);
-  el.querySelector('.crm-go span').textContent = DIST.has() && DIST.city()
+  const goSub = DIST.has() && DIST.city()
     ? (allDay ? t('смена {n} · весь город · с {from}, круглосуточно', { n, from: from0 }) : t('смена {n} · весь город · {from}—{to}', { n, from: '9:00', to: '24:00' }))
     : allDay
-    ? t('смена {n} · район «{name}» · с {from}, круглосуточно', { n, name: t(DIST.list()[DIST.cur()].name), from: clock(A.Store.get('dlv-clock', '') === '' || A.Store.get('dlv-clock', null) == null ? 9 : +A.Store.get('dlv-clock', 9) || 0) })
+    ? t('смена {n} · район «{name}» · с {from}, круглосуточно', { n, name: t(DIST.list()[DIST.cur()].name), from: from0 })
     : DIST.has()
     ? t('смена {n} · район «{name}» · {from}—{to}', { n, name: t(DIST.list()[DIST.cur()].name), from: '9:00', to: '24:00' })
     : t('смена {n} · {from}—{to}', { n, from: '9:00', to: '24:00' });
-  distButton();
+  const cards = [card('go', '▶', t('на смену'), goSub, 'main')];
+  if (DIST.has()) cards.push(distCard());
+  const qr = card('quick', '»', t('быстрый заезд'), QR.available() ? t('сезон, машина, длина смены · без копилки и сюжета') : t('откроется после первой смены'));
+  if (!QR.available()) qr.classList.add('off');
+  cards.push(qr,
+    card('garage', '⌂', t('гараж'), t('машины, броня, мотор, покраска')),
+    card('ride', '~', t('покататься'), t('без заказов и без часов смены')),
+    rankCard());
+  if (BOARD.on()) cards.push(card('board', '★', t('таблица рекордов'), t('лучшая смена — у тебя и в мире')));   // только Стим-сборка (board.js)
+  cards.push(card('collect', '◆', t('мои находки'), t('предметы, разбросанные по району')),
+    card('settings', '⚙', t('настройки'), t('звук, графика, язык, управление, версия')));
+  if (A.canQuit) cards.push(card('quit', '✕', t('выйти'), t('закрыть игру')));
+  const keep = cards.findIndex(c => c.dataset.key === curKey);
+  CZ.set(cards, keep >= 0 ? keep : 0);
+  curKey = CZ.card() ? CZ.card().dataset.key : 'go';
   profButton();
-  const qb = el.querySelector('.crm-quick');
-  qb.querySelector('b').textContent = t('быстрый заезд');
-  qb.querySelector('span').textContent = QR.available() ? t('сезон, машина, длина смены · без копилки и сюжета') : t('откроется после первой смены');
-  qb.disabled = !QR.available();
-  el.querySelector('[data-a="garage"]').textContent = t('гараж');
-  el.querySelector('[data-a="ride"]').textContent = t('покататься');
-  el.querySelector('[data-a="settings"]').textContent = t('настройки');
-  const bd = el.querySelector('[data-a="board"]');
-  bd.textContent = t('таблица рекордов');
-  bd.hidden = !BOARD.on();                        // таблица «лучшая смена» — только Стим-сборка (board.js)
-  el.querySelector('[data-a="collect"]').textContent = t('мои находки');
-  const q = el.querySelector('[data-a="quit"]');
-  q.textContent = t('выйти');
-  q.hidden = !A.canQuit;
-  rank();
+  upd();
+  el.querySelector('.crm-hint').textContent = t('листай ◀ ▶ · выбрать — A, Enter или тап');
   if (!String(A.Store.get('dlv-name', '') || '').trim()) askName(null, true);
   else CITY.check(() => show());                  // открыт весь город, а праздника ещё не было — сейчас (cityopen.js)
+}
+/** листать карточки меню: true — пролистнули */
+export function flip (d) { return !!(CZ && el && !modal() && CZ.flip(d)); }
+export const shown = () => !!(el && el.isConnected && !el.closest('[hidden]'));
+/** фокус и подсветка — на карточку в центре (после окон поверх меню: праздник, выбор) */
+export function focus () {
+  navReset();
+  const b = CZ && CZ.card() && CZ.card().querySelector('[data-main]');
+  if (b && shown()) try { b.focus({ preventScroll: true }); } catch (e) { /* — */ }
+}
+
+/* ── обновление: плашка сверху (только сборка с GitHub в Электроне) и номер версии внизу ── */
+function upd () {
+  const b = el.querySelector('.crm-upd'), st = UPD.state();
+  b.hidden = !UPD.newer();
+  if (!b.hidden) {
+    b.innerHTML = '<i aria-hidden="true">⬇</i><span>' + esc(UPD.line()) + '</span>' + (st.st === 'download' && st.p > 0 ? '<em style="width:' + Math.round(st.p * 100) + '%"></em>' : '');
+    b.disabled = !(st.st === 'newer' && st.updatable);
+    b.classList.toggle('busy', st.st === 'download' || st.st === 'restart');
+  }
+  const v = UPD.version();
+  el.querySelector('.crm-ver').textContent = v ? t('версия {v}', { v }) : '';
 }
 
 /* ── профиль: кнопка «профиль: Вася» под логотипом и окно профилей (profiles.js) ── */
@@ -121,34 +156,31 @@ function profInfo () {
   if (DIST.has()) parts.push(DIST.allOpen() ? t('весь город') : t('районов {k} из {n}', { k: DIST.opened(), n: DIST.count() }));
   return parts.join(' · ');
 }
-function openProfiles () {
-  PROF.open({ money: A.money, info: profInfo, setName: n => A.setName(n), Snd: A.Snd, onClose: () => { if (el) { profButton(); rank(); } } });
+export function openProfiles () {
+  PROF.open({ money: A.money, info: profInfo, setName: n => A.setName(n), Snd: A.Snd, onClose: () => { if (el) { profButton(); show(); } } });
 }
 
-/* ── рейтинг пиццерии: ты и курьеры, по заработку за всё время ── */
-function rank () {
-  const box = el.querySelector('.crm-rank');
+/* ── рейтинг пиццерии: карточка в карусели — ты и курьеры, по заработку за всё время ── */
+function rankCard () {
+  const c = card('rank', '#', t('рейтинг пиццерии'), '', 'rank');
   const rows = A.crew();
-  box.querySelector('.crm-rt').textContent = t('рейтинг пиццерии');
-  box.querySelector('ol').innerHTML = rows.map((r, i) =>
-    '<li' + (r.me ? ' class="me"' : '') + '><em>' + (i + 1) + '</em>' +
-    (r.face ? '<img src="' + r.face + '" alt="">' : '<i' + (r.hex ? ' style="background:' + r.hex + '"' : '') + '></i>') +
-    '<b>' + esc(r.name) + '</b><span>' + esc(A.money(r.total)) + '</span></li>').join('');
   const me = rows.findIndex(r => r.me);
   const up = me > 0 ? rows[me - 1] : null;
-  box.querySelector('.crm-rn').textContent = up ? t('до {who} — {money}', { who: up.gen || up.name, money: A.money(Math.max(0, up.total - rows[me].total)) })
-    : t('ты лучший курьер пиццерии');
+  const b = c.querySelector('button');
+  b.insertAdjacentHTML('beforeend', '<ol>' + rows.slice(0, 7).map((r, i) =>
+    '<li' + (r.me ? ' class="me"' : '') + '><em>' + (i + 1) + '</em>' +
+    (r.face ? '<img src="' + r.face + '" alt="">' : '<i' + (r.hex ? ' style="background:' + r.hex + '"' : '') + '></i>') +
+    '<b>' + esc(r.name) + '</b><span>' + esc(A.money(r.total)) + '</span></li>').join('') + '</ol>' +
+    '<small>' + esc(up ? t('до {who} — {money}', { who: up.gen || up.name, money: A.money(Math.max(0, up.total - rows[me].total)) }) : t('ты лучший курьер пиццерии')) + '</small>');
+  return c;
 }
 
-/* ── район: кнопка в меню и список районов ──
-   кнопка: «район: Юг» и под ним «открыто 2 из 8 · до «Проспекта» ещё 1 смена» */
-function distButton () {
-  const b = el.querySelector('.crm-dist');
-  b.hidden = !DIST.has();
-  if (b.hidden) return;
+/* ── район: карточка в меню и список районов ──
+   карточка: «район: Юг» и под ним «открыто 2 из 8 · до «Проспекта» ещё 1 смена» */
+function distCard () {
   const i = DIST.cur(), open = DIST.opened(), n = DIST.count();
-  b.querySelector('b').textContent = DIST.city() ? t('район: {name}', { name: t('весь город') }) : t('район: {name}', { name: t(DIST.list()[i].name) });
-  b.querySelector('span').textContent = open < n ? t('открыто {k} из {n}', { k: open, n }) + ' · ' + nextLine() : t('открыты все районы');
+  return card('district', '◎', DIST.city() ? t('район: {name}', { name: t('весь город') }) : t('район: {name}', { name: t(DIST.list()[i].name) }),
+    open < n ? t('открыто {k} из {n}', { k: open, n }) + ' · ' + nextLine() : t('открыты все районы'));
 }
 /* до следующего района: сколько смен ещё и где */
 function nextLine () {
@@ -196,7 +228,7 @@ function openDistricts () {
   }));
   dm.hidden = false;
 }
-function closeDistricts () { if (dm) dm.hidden = true; }
+function closeDistricts () { if (dm) dm.hidden = true; focus(); }
 
 /* ── имя: один раз при первом запуске, потом — из настроек ── */
 function nameBox () {
@@ -241,8 +273,8 @@ function saveName () {
   md.querySelector('input').blur();
   md.hidden = true;
   A.Snd.coin && A.Snd.coin();
-  if (el) rank();
   const cb = nameCb; nameCb = null;
+  if (el && shown() && !cb) { show(); focus(); }        // первый запуск: имя есть — рейтинг с ним, фокус на «на смену»
   if (cb) cb(v);
 }
 export const modal = () => (md && !md.hidden && !md.closest('[hidden]') ? md : dm && !dm.hidden && !dm.closest('[hidden]') ? dm : PROF.root() || BOARD.root());   // заставку спрятали (поехали) — окна нет
@@ -256,6 +288,7 @@ export function back () {
   md.querySelector('input').blur();
   md.hidden = true;
   nameCb = null;
+  focus();
   return true;
 }
 export function submitName () { if (PROF.root() && modal() === PROF.root()) PROF.submit(); else if (modal() === md) saveName(); }

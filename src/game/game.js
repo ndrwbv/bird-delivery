@@ -75,6 +75,9 @@ import * as AUTO from './cars.js';               // карьера: 14 маши�
 import * as FEST from './festivals.js';          // фестивали на парковках ТЦ: кальянщики, тыква, День угнетения бургеров (festivals.js)
 import * as HK from './hookah.js';               // кальянщики на лавочках (в детской — самовар)
 import * as CULL from './cull.js';
+import * as UPD from './update.js';              // обновление из меню: плашка «есть новая версия», настройки → версия (update.js)
+import * as SET from './settings.js';           // настройки — карусель карточек, одна и та же из меню и из паузы (settings.js)
+import * as PAUSE from './pausecz.js';             // пауза — карусель карточек: продолжить, чек, накладная, карта, настройки, управление, закончить смену
 import * as GFX from './gfx.js';                 // настройки графики: пресеты, 30 к/с, дальность, город за меню (gfx.js, docs/CAREER.md)               // статика дальше камеры — со сцены, матрицы заморожены (Steam Deck)
 import * as TRK from './tracks.js';              // следы колёс на газоне и снегу
 import * as CHAT from './chat.js';             // «Толик управляющий» пишет справа сверху, как в iMessage (похвала, ругань, вычет за опоздание)
@@ -8511,7 +8514,7 @@ function openPanel (kind) {
 }
 function closePanel () { elPanel.hidden = true; elPanel.dataset.back = ''; elPanel.dataset.sub = ''; }
 /* B / Esc: язык и «стереть прогресс?», открытые из настроек, — назад в настройки */
-function panelBack () { if (elPanel.dataset.back === 'settings') renderSettings(elPanel.dataset.kind === 'reset' ? 'set-reset' : elPanel.dataset.sub === 'gfx' ? 'set-gfx' : 'set-lang'); else closePanel(); }
+function panelBack () { if (elPanel.dataset.back === 'settings') renderSettings(elPanel.dataset.kind === 'reset' ? 'set-reset' : undefined); else closePanel(); }
 
 /* ─── площадка: реклама, пауза, язык, настройки ───
    Всё, что зависит от Яндекса или Стима, идёт через Platform. Полноэкранная
@@ -8589,67 +8592,26 @@ function renderLangs () {
    перерисовки геймпад остаётся на ней, а не прыгает на крестик. */
 const escHtml = s => String(s).replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';');
 const SHELL = Platform.id === 'steam' && Platform.shell ? Platform.shell : null;   // версия и обновления — только Стим/Электрон
-const UPD = { tag: null, msg: '', busy: false };
+UPD.init(SHELL);                                   // спросить оболочку, что вышло на GitHub (без окон; в браузере и из Стима — ничего)
 // тестовые кнопки настроек: в локальных/dev-сборках — всегда, в релизной (CI задаёт BUILD_VERSION → __RELEASE__) — только с ?debug
 const testTools = () => !(typeof __RELEASE__ !== 'undefined' && __RELEASE__) || new URLSearchParams(location.search).has('debug');
-function renderSettings (focus) {
-  elPanel.dataset.kind = 'settings'; elPanel.dataset.back = ''; elPanel.dataset.sub = '';
-  const row = (label, val, id, extra = '') => '<div class="set-row"><span>' + label + extra + '</span><button type="button" id="' + id + '"' + (id === focus ? ' autofocus' : '') + '>' + val + '</button></div>';
-  // сбросить прогресс можно только из меню: посреди смены кнопки нет
-  const canReset = !isPlaying() && !S.paused;
-  elPanelBody.innerHTML = '<div class="pn-t">' + $t('настройки') + '</div>' +
-    (CAREER ? row($t('имя'), escHtml(S.name || '—'), 'set-name') : '') +
-    row($t('звук'), Snd.on ? $t('вкл') : $t('выкл'), 'set-snd') +
-    row('🌐 ' + $t('язык'), LANG_NAMES[curLang()], 'set-lang') +
-    row($t('графика'), GFX.presetName(), 'set-gfx') +
-    (Platform.features.adult ? row($t('версия'), ADULT ? $t('взрослая 18+') : $t('детская'), 'set-ed') : '') +
-    (SHELL ? row($t('версия игры'), UPD.busy ? $t('проверяю…') : $t('проверить обновления'), 'set-upd',
-      ' <b class="set-tag">' + escHtml(UPD.tag || '—') + '</b>' + (UPD.msg ? '<small class="set-msg">' + UPD.msg + '</small>' : '')) : '') +
-    // ТЕСТ: «открыть все районы» — проверить праздник и «весь город». В релизе (BUILD_VERSION, __RELEASE__) нет, с ?debug — есть
-    (canReset && DISTRICTS && testTools() ? row($t('районы') + ' <small class="set-msg">' + $t('для тестов') + '</small>', DIST.allOpen() ? $t('все открыты') : $t('открыть все районы'), 'set-unlock') : '') +
-    (canReset ? '<button type="button" id="set-reset" class="set-danger">' + $t('сбросить прогресс') + '</button>' : '') +
-    // единственная подпись OSM в игре (лицензия ODbL требует) — в самом низу, мелко, но читаемо
-    '<div class="pn-n set-cred">' + $t('карта — © участники OpenStreetMap, лицензия ODbL. Рельеф — SRTM (NASA).') + '</div>';
-  $('set-snd').onclick = () => { Snd.set(!Snd.on); renderSettings('set-snd'); };
-  if ($('set-name')) $('set-name').onclick = () => CAREERM.askName(() => renderSettings('set-name'));
-  $('set-lang').onclick = () => { renderLangs(); elPanel.dataset.back = 'settings'; };
-  // графика — своё окно (gfx.js); вид — как у настроек, назад — в настройки на «графика»
-  $('set-gfx').onclick = () => { elPanel.dataset.back = 'settings'; elPanel.dataset.sub = 'gfx'; GFX.panel(elPanelBody); };
-  if ($('set-ed')) $('set-ed').onclick = () => { Store.set('dlv-edition', ADULT ? 'kids' : 'adult'); Platform.store.flush && Platform.store.flush(); setTimeout(() => location.reload(), 150); };
-  if ($('set-reset')) $('set-reset').onclick = renderReset;
-  if ($('set-unlock')) $('set-unlock').onclick = () => {             // ТЕСТ (см. выше): открыть всё и сразу праздник
-    CITYOPEN.unlockAll();
-    closePanel();
-    CITYOPEN.party(() => CAREERM.menu());
-  };
-  if (SHELL) {
-    if (UPD.tag === null) {
-      UPD.tag = '';
-      Promise.resolve(SHELL.info()).then(i => { UPD.tag = (i && i.tag) || ''; }).catch(() => {})
-        .then(() => { if (!elPanel.hidden && elPanel.dataset.kind === 'settings' && !elPanel.dataset.sub) renderSettings(padSelId()); });
-    }
-    $('set-upd').onclick = checkUpdate;
-  }
-}
+/* настройки — карусель карточек (settings.js): из главного меню и из паузы одно и то же */
+SET.init({
+  panel: () => elPanel, body: () => elPanelBody, kind: () => elPanel.dataset.kind,
+  inMenu: () => !isPlaying() && !S.paused, career: CAREER, steam: Platform.id === 'steam', Snd, GFX,
+  langs: LANGS, langNames: LANG_NAMES, lang: curLang,
+  setLang: l => { if (l === curLang()) { closePanel(); return; } Platform.setLang(l); Platform.store.flush && Platform.store.flush(); setTimeout(() => location.reload(), 150); },
+  name: () => S.name, askName: cb => CAREERM.askName(cb),
+  prof: PROF, openProfiles: () => { closePanel(); CAREERM.openProfiles(); },
+  adult: { on: !!Platform.features.adult, adult: !!ADULT, toggle: () => { Store.set('dlv-edition', ADULT ? 'kids' : 'adult'); Platform.store.flush && Platform.store.flush(); setTimeout(() => location.reload(), 150); } },
+  unlock: { on: () => !!(DISTRICTS && testTools()), all: () => DIST.allOpen(), run: () => { CITYOPEN.unlockAll(); closePanel(); CITYOPEN.party(() => CAREERM.menu()); } },
+  canReset: () => !isPlaying() && !S.paused, reset: () => renderReset(),
+  keys: () => keysInfo(),
+  selected: () => padSel(), navReset: () => { padMenu.clear(); if (CAREER) CAREERM.kbClear(); },
+});
+function renderSettings (focus) { SET.render(focus); }
 // какая кнопка сейчас выбрана геймпадом — чтобы перерисовка её не сбросила
-const padSelId = () => { try { const el = padMenu.selected(); return (el && el.isConnected && el.id) || undefined; } catch (e) { return undefined; } };
-/* «проверить обновления»: ответ оболочки (electron/main.cjs) — словами в строке «версия игры».
-   Если обновление ставится само, оболочка сама покажет окно «Вышла версия» */
-async function checkUpdate () {
-  if (UPD.busy) return;
-  UPD.busy = true; UPD.msg = ''; renderSettings('set-upd');
-  let r = null;
-  try { r = await SHELL.checkUpdate(true); } catch (e) { r = { state: 'error' }; }
-  UPD.busy = false;
-  const st = r && r.state;
-  if (r && r.current) UPD.tag = r.current;
-  UPD.msg = st === 'fresh' ? $t('последняя версия')
-    : st === 'available' ? $t('вышла {latest} — поставь заново командой из README', { latest: escHtml(r.latest || '') })
-    : st === 'error' ? $t('нет связи с GitHub')
-    : st === 'updating' ? $t('ставлю обновление, игра перезапустится…')
-    : '';                                            // declined / off — молча
-  if (!elPanel.hidden && elPanel.dataset.kind === 'settings') renderSettings('set-upd');
-}
+const padSel = () => { try { const el = padMenu.selected(); return el && el.isConnected ? el : null; } catch (e) { return null; } };
 
 /* ─── сброс прогресса: второй шаг — экран «что сотрётся, что останется» ───
    Стираем все ключи игры (dlv-*), кроме настроек из RESET_KEEP. Список PROGRESS_KEYS —
@@ -11812,7 +11774,7 @@ function askRevive () {
     sub: $t('новая машина спустится с неба · из кошелька {money} (там {have})', { money: money(price), have: money(have) }),
     opts: [{ label: $t('воскреснуть · {money}', { money: money(price) }) + (R.sale ? ' <s>' + money(R.full) + '</s>' : ''),
       sub: $t('заказ и смена — дальше') + ' · ' + saleLine, fn: () => revive(price, R.sale) },
-      { label: $t('нет, всё'), fn: no }],
+      { label: $t('нет, закончить смену'), fn: no }],
     timeout: 9, onTimeout: no, full: true });
   Snd.order();
 }
@@ -12073,7 +12035,8 @@ function renderPause () {
   $('pm-stats').innerHTML = '<div class="pm-rc-t">' + $t('за смену') + '</div>' +
     rows.map(([k, v]) => '<div class="pm-rc-r"><span>' + k + '</span><i></i><b>' + v + '</b></div>').join('');
   $('pm-sfx').textContent = Snd.on ? $t('звук: вкл') : $t('звук: выкл');
-  $('pm-menu').textContent = S.ride ? $t('в главное меню') : CAREER ? $t('сняться со смены') : $t('закончить смену');
+  $('pm-menu').textContent = S.ride ? $t('в главное меню') : $t('закончить смену');
+  PAUSE.label();
 }
 function setPause (on) {
   if (on && (S.meal || !['drive', 'back', 'handover', 'brief', 'loading', 'side'].includes(S.state))) return;
@@ -12081,7 +12044,7 @@ function setPause (on) {
   pauseBtn(on);
   if (on) Platform.gameplayStop(); else if (isPlaying()) Platform.gameplayStart();
   if (elPause) elPause.hidden = !on;
-  if (on) { Snd.engine(0); renderPause(); for (const k in IN) IN[k] = 0; joyReset(); CL.refreshButton(true); }
+  if (on) { Snd.engine(0); PAUSE.reset(); renderPause(); for (const k in IN) IN[k] = 0; joyReset(); CL.refreshButton(true); }
 }
 /* выйти в меню посреди смены: заработанное уже в кошельке, итоги — как в конце */
 function endShift (why) {
@@ -12102,6 +12065,8 @@ if (elPause) {
   $('pm-map').addEventListener('click', () => { setPause(false); setFullMap(true); });
   $('pm-sfx').addEventListener('click', () => { Snd.set(!Snd.on); renderPause(); });
   $('pm-menu').addEventListener('click', endShift);
+  // пауза — карусель (pausecz.js); «настройки» — те же, что в главном меню, поверх паузы
+  PAUSE.init(elPause, { settings: () => { elPanel.hidden = false; renderSettings(); }, navReset: () => { padMenu.clear(); if (CAREER) CAREERM.kbClear(); } });
 }
 
 /* нитро кнопкой — пока держишь палец */
@@ -12120,7 +12085,11 @@ const KEY = {
 };
 
 addEventListener('keydown', e => {
-  if (!elPanel.hidden) { if (e.code === 'Escape') panelBack(); return; }
+  if (!elPanel.hidden) {
+    if (e.code === 'Escape') panelBack();
+    else if (!CAREER && (e.code === 'ArrowLeft' || e.code === 'ArrowRight') && SET.flip(e.code === 'ArrowLeft' ? -1 : 1)) e.preventDefault();   // в карьере листает career.js onKey
+    return;
+  }
   if (CH.opts.length && /^Digit[1-3]$/.test(e.code)) { pickChoice(+e.code.slice(5) - 1); return; }
   // окно на паузе с одной кнопкой («понял»): Enter и пробел жмут её; зажатый ручник (повтор) — нет
   if (CH.pause && CH.opts.length === 1 && /^(Enter|NumpadEnter|Space)$/.test(e.code)) { e.preventDefault(); if (!e.repeat) pickChoice(0); return; }
@@ -12280,6 +12249,7 @@ if (CAREER) CAREERM.init({ S, NOS, Snd, ADULT, get DAY_LEN () { return DAY_LEN; 
   menuGo: () => { Snd.boot(); Snd.resume(); goRun(); }, menuRide: () => { Snd.boot(); Snd.resume(); startRun(true); },
   openCollect: () => openPanel('collect'), openSettings: () => { elPanel.hidden = false; elPanel.dataset.kind = 'settings'; renderSettings(); },
   panelOpen: () => !elPanel.hidden, quit: () => Platform.quit(), canQuit: !!Platform.features.quit, playerName: () => Platform.player.name || '',
+  padClear: () => padMenu.clear(), cardFlip: (root, d) => (root === elPanel ? SET : PAUSE).flip(d),                 // меню-карусель (menu.js): после листания подсветка геймпада — на карточку в центре
   setName: n => { S.name = n; Store.set('dlv-name', n); elName.value = n; renderProfile(); },
   rivalSpec: () => RIVAL_SPEC.map(q => ({ hex: q.hex, fem: !!q.fem })), rivals: () => RIVALS.map(R => ({ i: R.slot, money: R.money || 0 })),
   person: o => makePerson(o), face: (p, size) => faceDataURL(p, size) });
@@ -12295,6 +12265,7 @@ if (CAREER) QR.init({ Platform, Store, S, Snd, money, cars: () => AUTO,
   } });
 /* все районы открыты (cityopen.js): праздник, выбор перед сменой, «весь город» */
 if (DISTRICTS) CITYOPEN.init({ Store: { get: Store.get, set: Store.set, flush: () => Platform.store.flush && Platform.store.flush() }, Snd, money,
+  debug: testTools(), refocus: () => { padMenu.clear(); CAREERM.refocus(); },
   pizzerias: () => PIZZERIAS, routeLen });
 /* сюжетные заказы (story.js): люди, кот, камера катсцены — через это */
 STORY.init({ THREE, scene, cam, V, S, IN, ADULT, CITY, MAP, Store, SPOTS, groundH, surfaceAt, inHouse, nearestRoad, makeHuman, dropMesh, emote, sayBubble, pizzaBox, realAddress, popBonus, money, Snd,
@@ -12937,12 +12908,38 @@ function cullFar () {
 const padMenu = makePadMenu({
   onBack: () => { if (CAREER && CAREERM.back()) return; if (!elPanel.hidden) panelBack(); else if (S.paused) setPause(false); else if (FM.open) setFullMap(false); },
   // экранная клавиатура Steam (Deck): что ввёл — обратно в поле
-  onText: el => {
-    if (!(Platform.steam && Platform.steam.textInput)) return;
-    Promise.resolve(Platform.steam.textInput(el.placeholder || $t('имя'), el.maxLength > 0 ? el.maxLength : 24, el.value || ''))
-      .then(v => { if (typeof v === 'string') { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); } }).catch(() => {});
-  },
+  onText: el => steamKeyboard(el, true),
 });
+/* ── экранная клавиатура Стима для любого поля ввода текста (имя, профиль) ──
+   Поле получило фокус (тап, A геймпада, окно само поставило фокус) — в Стим-сборке на Деке, с
+   геймпадом или касанием поднимаем клавиатуру Стима. Сначала большая (showGamepadTextInput): что
+   ввёл — в поле. Вернулась пустой быстрее 0,4 с — значит, не поднялась (Стим не запущен, ярлык
+   «сторонней игры»): тогда плавающая над полем (буквы идут в поле нажатиями) или
+   steam://open/keyboard (electron/main.cjs steam:floatKeyboard). Отменил сам — больше не лезем.
+   Мышью и клавиатурой на компьютере — не мешаем. */
+const OSK = { busy: false, el: null, t: 0 };
+const isTextField = el => !!el && ((el.tagName === 'INPUT' && /^(text|search|email|)$/.test(el.type)) || el.tagName === 'TEXTAREA');
+const oskWanted = () => Platform.id === 'steam' && !!Platform.steam && (!!Platform.steam.deck || !!PAD.active || matchMedia('(pointer: coarse)').matches);
+function steamKeyboard (el, force) {
+  if (!isTextField(el) || !Platform.steam || !Platform.steam.textInput || OSK.busy) return;
+  if (!force && !oskWanted()) return;
+  if (OSK.el === el && performance.now() - OSK.t < 800) return;   // тот же фокус второй раз подряд
+  OSK.busy = true; OSK.el = el;
+  const t0 = performance.now(), max = el.maxLength > 0 ? el.maxLength : 24;
+  const r = el.getBoundingClientRect(), k = devicePixelRatio || 1;
+  Promise.resolve(Platform.steam.textInput(el.placeholder || $t('имя'), max, el.value || ''))
+    .then(v => {
+      if (typeof v === 'string') { el.value = v.slice(0, max); el.dispatchEvent(new Event('input', { bubbles: true })); return null; }
+      if (performance.now() - t0 > 400) return null;                     // отменил сам
+      try { if (el.isConnected) el.focus({ preventScroll: true }); } catch (e) { /* — */ }
+      return Platform.steam.floatKeyboard && Platform.steam.floatKeyboard(Math.round(r.left * k), Math.round(r.top * k), Math.round(r.width * k), Math.round(r.height * k));
+    })
+    .catch(() => {})
+    .then(() => { OSK.busy = false; OSK.t = performance.now(); });
+}
+document.addEventListener('focusin', e => { if (isTextField(e.target)) steamKeyboard(e.target); });
+/* трогает экран, мышь, клавиши — город за меню полные к/с, пока листаешь (gfx.js poke) */
+for (const ev of ['pointerdown', 'pointermove', 'wheel', 'keydown']) addEventListener(ev, () => GFX.poke(), { passive: true, capture: true });
 function padScreen () {
   const cr = CAREER && CAREERM.padRoot();         // карьера: окно имени, гараж, «потратить» — поверх всего
   if (cr) return cr;
@@ -12960,7 +12957,7 @@ function padStep () {
   document.body.classList.toggle('pad', !!p.active);
   if (!p.connected) return;
   if (EXT.paused) return;
-  if (p.any) { Snd.boot(); Snd.resume(); }
+  if (p.any) { Snd.boot(); Snd.resume(); GFX.poke(); }
   if (FIRST.on()) { if (p.accept || p.menuBack || p.pause) FIRST.skip(); return; }   // вступление: A / B / Start — пропустить, до игры не доходит
   const screen = padScreen();
   if (p.pause && !elPanel.hidden) closePanel();
@@ -12974,6 +12971,12 @@ function padStep () {
   if (p.sound) Snd.set(!Snd.on);
   if (CH.opts.length && !CH.pause && !CH.full) { if (p.choice1) pickChoice(0); else if (p.choice2) pickChoice(1); else if (p.choice3) pickChoice(2); }
   if (screen && CAREER) CAREERM.padPre(p);      // гараж: ←→ и LB/RB листают машины
+  // настройки и пауза — карусели карточек (settings.js, pausecz.js): ←→, LB/RB — листать
+  if (screen === elPanel && SET.on() || screen === elPause && PAUSE.on()) {
+    const d = (p.menuRight || p.pageR ? 1 : 0) - (p.menuLeft || p.pageL ? 1 : 0);
+    if (d) (screen === elPanel ? SET : PAUSE).flip(d);
+    p.menuLeft = p.menuRight = false;
+  }
   if (screen) padMenu(p, screen);
   else if (!S.paused && !FM.open) applyToIN(IN, p);
 }
@@ -13026,10 +13029,11 @@ function frame (now) {
 }
 function frameStep (now) {
   CL.at.ph = 'pre';
-  // настройки графики (gfx.js): 30 / 60 к/с, город за меню застывший или 20 к/с — лишний кадр пропускаем
+  // настройки графики (gfx.js): 30 / 60 к/с, город за меню застывший или 30 к/с — лишний кадр пропускаем
   // целиком, время копится (last не трогаем): следующий кадр шагнёт мир на всё прошедшее
   const menu = S.state === 'title' || S.state === 'over';
-  if (GFX.hold(now, menu, menu ? S.state + (CAREER && CAREERM.covered() ? '+' : '') + canvas.width + 'x' + canvas.height + (PIZZA && PIZZA.name) : '')) { if (menu) padStep(); return; }
+  const cover = menu && CAREER && CAREERM.covered();
+  if (GFX.hold(now, menu, menu ? S.state + (cover ? '+' : '') + canvas.width + 'x' + canvas.height + (PIZZA && PIZZA.name) : '', cover)) { if (menu) padStep(); return; }
   const tWork = performance.now();                // сколько занял сам кадр — для страховки дальности (cull.js)
   const raw = Math.max(0, (now - last) / 1000);
   const dt = clamp(raw, 0, 1 / 20);     // назад время не идёт
@@ -13250,6 +13254,7 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) wi
   DRIVERS, SMOKERS, NITRO_CANS, NOS, RESPECT: RESPECT.DEBUG, RESPECT_API: RESPECT, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, PIGEONS, AMB, INCIDENTS, scare, RIVALS, FOES, THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, roadPath, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT, LOOT, XLIFE };
 if (window.__dlv) { window.__dlv.BOARD = BOARD; window.__dlv.Platform = Platform; }   // таблица рекордов Стима (board.js)
 if (window.__dlv) window.__dlv.TREES = TREES.DEBUG;   // деревья и кусты: породы, группы во дворах (trees.js)
+if (window.__dlv) Object.assign(window.__dlv, { showTitle, CAREERM, renderSettings, closePanel });   // меню, настройки — проверки интерфейса в probe
 if (window.__dlv) window.__dlv.crashlog = CL;        // журнал ошибок: entries(), text(), disabled() (docs/CRASHES.md)
 if (window.__dlv) Object.assign(window.__dlv, { pinFront, nearClient, PIN });   // пин перед клиентом, кто у клиента лишний (docs/ORDERS.md)
 if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG, CONS: CONSTR.DEBUG, DARK: DARKN.DEBUG, WASTE: WASTE.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)
