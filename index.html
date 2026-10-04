@@ -33,23 +33,23 @@
   <!-- ── слева сверху: ресурс машины и задание ── -->
   <div class="hud" id="hud-left">
     <div id="hearts"></div>
+    <!-- деньги одним блоком под сердцами: копилка — кошелёк, пачка купюр — за смену (shiftcash.js) -->
+    <div id="cash"><div id="money">0 ₽</div></div>
     <!-- рейтинг смены: ты и другие курьеры (только Москва) -->
     <ol id="rivals" class="msk-only" hidden></ol>
     <div id="task"></div>
     <div id="addr"></div>
   </div>
 
-  <!-- ── справа сверху: деньги и скорость ── -->
+  <!-- ── справа сверху: скорость, нитро, щит (деньги — слева под сердцами) ── -->
   <div class="hud" id="hud-right">
-    <div id="money">0 ₽</div>
     <div id="dist"></div>
     <div id="speed"></div>
     <!-- бак нитро (только Москва): пополняется баллонами на улицах, жжётся на Shift -->
     <div id="nitro" class="msk-only"><span data-i18n>кофе</span><b><i id="nitrobar"></i></b></div>
     <!-- щит и бист-мод: сколько секунд осталось -->
     <div id="fxs" class="msk-only"></div>
-    <!-- закончить смену и записать результат; рядом — сколько уже едешь -->
-    <button id="endshift" type="button"><span data-i18n>закончить смену</span> <b id="shift-t">0:00</b></button>
+    <!-- «сняться со смены» — только в меню паузы -->
   </div>
 
   <!-- ── время на заказ: часы как на приборке — сейчас и «до 14:35» (срок заказа) ── -->
@@ -103,7 +103,7 @@
   <!-- ── звук и пауза: не все догадаются про клавиши ── -->
   <div id="ctrls">
     <button id="sfx" type="button" data-i18n>звук вкл</button>
-    <button id="pause" type="button" data-i18n>пауза</button>
+    <button id="pause" type="button" aria-label="пауза" data-i18n-title="пауза"><i class="pz-ico" aria-hidden="true"></i></button>
     <button id="mapbtn" class="msk-only" type="button" data-i18n>карта</button>
     <button id="nos" class="msk-only" type="button" data-i18n>нитро</button>
     <button id="menu" type="button" hidden data-i18n>в меню</button>

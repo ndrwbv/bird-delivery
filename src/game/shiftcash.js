@@ -1,12 +1,12 @@
 /* Заработок смены на хаде (карьера, docs/CAREER.md «Хад»): пачка купюр, нарисованная кодом, и крупно —
-   сколько заработано за эту смену (S.money, как «заработано» в итогах). Без рамки, над кошельком.
+   сколько заработано за эту смену (S.money, как «заработано» в итогах). Строкой под кошельком-копилкой,
+   в одной рамке с ним (#cash слева под сердцами), без подписи — только пачка и сумма.
    Каждая оплата — 3—8 купюр (мелочь — монетками) вылетают из кучки денег под машиной (нет кучки — из
    низа экрана по центру) и по дуге летят в пачку; каждая долетевшая — пачка «пухнет», сумма прибавляет
    её долю, на первой — «+сумма» под блоком. Вычет — красная купюра падает из блока вниз, «−сумма».
    Анимация — Web Animations (только transform/opacity), без работы в кадре.
    Видно только во время смены (не в свободной езде и не в меню). */
 import './shiftcash.css';
-import { t } from '../i18n/index.js';
 
 const UP_T = 1.1;          // «+сумма» всплывает столько секунд
 const MIN = 1;             // меньше — не всплывает (копейки от округления)
@@ -44,14 +44,14 @@ const ST = { real: 0, shown: 0, pend: 0, on: false, txt: '', fly: new Set() };
 /* api: money(n) — сумма, как её видит игрок; S — состояние игры (S.money — за смену) */
 export function init (api) {
   A = api;
-  const host = document.getElementById('hud-right'), w = document.getElementById('money');
+  const w = document.getElementById('money'), host = w && w.parentNode;
   if (!host || EL) return;
   EL = document.createElement('div');
   EL.id = 'shiftcash';
   EL.hidden = true;
-  EL.innerHTML = ICON + '<div class="sc-txt"><span></span><b>0</b></div>';
+  EL.innerHTML = ICON + '<div class="sc-txt"><b>0</b></div>';
   NUM = EL.querySelector('b'); ICO = EL.querySelector('.sc-ico');
-  host.insertBefore(EL, w || host.firstChild);
+  host.insertBefore(EL, w.nextSibling);
 }
 
 /* каждый кадр (из хада карьеры); on — идёт смена */
@@ -63,8 +63,6 @@ export function step (dt, on) {
     if (on) { ST.real = ST.shown = Math.round(A.S.money || 0); ST.txt = ''; }
   }
   if (!on) return;
-  const cap = EL.querySelector('span'), c = t('за смену');
-  if (cap.textContent !== c) cap.textContent = c;
   const m = Math.round(A.S.money || 0);
   if (m !== ST.real) {
     const d = m - ST.real;

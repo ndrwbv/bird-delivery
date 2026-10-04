@@ -1,29 +1,16 @@
 /* карьера: часы смены на HUD, обед, экран итогов (донаты, слот-машина); гараж — garage.css, меню — menu.css */
 
-/* ── часы 09:00 над «сняться со смены» ── */
-#cr-clock { margin-top: 8px; display: inline-flex; align-items: center; gap: 7px; padding: 6px 9px; font-size: 12px; color: #fff3d6; }
-#cr-clock[hidden] { display: none; }
-#cr-clock i { width: 10px; height: 10px; border-radius: 50%; background: #ffd85e; box-shadow: 0 0 0 2px #33210c; }
-#cr-clock .ck-rows { display: flex; flex-direction: column; gap: 5px; }
-#cr-clock .ck-rows span { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-#cr-clock .ck-rows span[hidden] { display: none; }
-#cr-clock em { font-style: normal; font-size: 7px; color: #bcd0e8; }
-#cr-clock .ck-o b { color: #ffd85e; }
-#cr-clock .ck-o.low b { color: #ff8a8a; animation: cr-blink .6s steps(2) infinite; }
-#cr-clock small { align-self: flex-start; font-size: 7px; color: #8f9bc4; }
-#cr-clock.eve i { background: #ff9a3c; }
-#cr-clock.night i { background: #cfd9ff; box-shadow: inset -3px -1px 0 #6a78b0, 0 0 0 2px #33210c; }
-#cr-clock.late b { color: #ff8a8a; animation: cr-blink 1s steps(2) infinite; }
-@keyframes cr-blink { 50% { opacity: .45; } }
-body.career #hud-right #cr-clock + #endshift:not([hidden]) { display: block; margin-left: auto; }
-body.career #shift-t { display: none; }
-body.touch #hud-right #cr-clock { margin-top: 8px; }
+/* часы смены и «сняться со смены» на хаде больше не стоят (04.10.2026): «до конца смены» и кнопка — в паузе */
 
-/* ── кошелёк на HUD: всегда сколько в кошельке, ниже — за смену; оплата летит монеткой. Без плашки — обводка .hud ── */
-body.career #money { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 4px; padding: 7px 10px 6px; }
-body.career #money span { font-size: 7px; color: #bcd0e8; letter-spacing: .5px; }
-body.career #money b { font-size: 16px; color: #ffd85e; }
-body.career #money em { font-style: normal; font-size: 7px; color: #9fe0a6; }
+/* ── деньги на хаде — один блок в рамке слева под сердцами: копилка — кошелёк, ниже пачка купюр — за смену
+   (shiftcash.css). Подписей нет — только значки и суммы. Оплата летит в кошелёк, купюры — в пачку ── */
+#cash { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 6px; padding: 6px 10px 5px 7px;
+        background: rgba(20, 16, 30, .7); border: 2px solid #33210c; border-radius: 6px; }
+#cash + #rivals { margin-top: 6px; }
+body.intro-cut #cash { visibility: hidden; }
+body.career #money { display: flex; align-items: center; gap: 7px; line-height: 1.2; }
+body.career #money .pg-ico { width: 32px; height: 24px; flex: none; filter: drop-shadow(2px 2px 0 #33210c); }
+body.career #money b { font-size: 16px; color: #ffd85e; white-space: nowrap; }
 body.career #money.bump b { animation: wl-bump .45s ease-out; }
 @keyframes wl-bump { 0% { transform: scale(1); } 35% { transform: scale(1.35); color: #fff3d6; } 100% { transform: scale(1); } }
 .wl-fly { position: fixed; z-index: 40; pointer-events: none; transform: translate(-50%, -50%); font-size: 15px; color: #ffd85e;
@@ -32,7 +19,12 @@ body.career #money.bump b { animation: wl-bump .45s ease-out; }
 .wl-fly.go { transform: translate(-50%, -50%) scale(.6); }
 .wl-fly.neg { color: #ff6b6b; font-size: 12px; transition: top 1.4s ease-out, opacity 1.4s ease-in; }
 .wl-fly.neg.go { opacity: 0; transform: translate(-50%, 0); }
-@media (max-width: 720px) { body.career #money b { font-size: 12px; } }
+@media (max-width: 720px), (max-height: 460px) {
+  #cash { padding: 4px 7px 4px 5px; gap: 3px; }
+  body.career #money { gap: 5px; }
+  body.career #money .pg-ico { width: 22px; height: 16px; }
+  body.career #money b { font-size: 12px; }
+}
 
 /* ── обед: три карточки в ряд ── */
 #choice.big.cr-lunch .ch-box { width: min(620px, calc(100% - 32px)); background: #fff3d6; }

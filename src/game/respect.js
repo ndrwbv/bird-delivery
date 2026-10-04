@@ -99,7 +99,7 @@ export function add (n, why, quiet) {
   return val;
 }
 
-/* ── хад: чип под кошельком ── */
+/* ── хад: чип (скрыт с 04.10.2026 — респект и звание в паузе; hud(on) больше не зовут) ── */
 let EL = null, NUM = null, RANK = null, ON = false, SHOWN = '';
 function mount () {
   if (EL || typeof document === 'undefined') return;
@@ -110,8 +110,7 @@ function mount () {
   EL.hidden = true;
   EL.innerHTML = '<i class="rs-ico">★</i><b>0</b><span></span>';
   NUM = EL.querySelector('b'); RANK = EL.querySelector('span');
-  const money = document.getElementById('money');
-  host.insertBefore(EL, money ? money.nextSibling : host.firstChild);
+  host.appendChild(EL);   // чип на хаде не показываем (04.10.2026): респект и звание — в паузе; элемент — для всплывашек
 }
 function paint (d) {
   if (!EL) return;

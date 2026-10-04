@@ -10233,6 +10233,17 @@ function toast (t) { t = String(t || ""); if (!t) return; CL.event('toast ' + t)
    сразу падает туда (addWallet), и это видно: «+230 ₽» летит монеткой от
    машины в кошелёк, цифра докручивается, когда долетела. Списания (мзда,
    штраф, воскрешение) — красной строкой под кошельком. Ниже — «за смену». */
+/* кошелёк на хаде — копилка-свинья (без подписи «кошелёк»), нарисована кодом пикселями */
+const PIGGY = '<svg class="pg-ico" viewBox="0 0 32 24" shape-rendering="crispEdges" aria-hidden="true">' +
+  [[6, 3, 18, 18], [4, 5, 22, 14], [3, 7, 24, 10], [25, 8, 5, 7], [19, 1, 4, 4], [7, 19, 4, 5], [19, 19, 4, 5], [1, 9, 3, 2]]
+    .map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#7a2e48"/>`).join('') +
+  [[7, 4, 16, 16], [5, 6, 20, 12], [4, 8, 22, 8], [20, 2, 2, 2], [8, 20, 2, 3], [20, 20, 2, 3]]
+    .map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#f39ab4"/>`).join('') +
+  '<rect x="26" y="9" width="3" height="5" fill="#ffb3c8"/><rect x="27" y="10" width="1" height="1" fill="#7a2e48"/>' +
+  '<rect x="27" y="12" width="1" height="1" fill="#7a2e48"/><rect x="8" y="6" width="6" height="2" fill="#ffd0de"/>' +
+  '<rect x="6" y="15" width="18" height="2" fill="#d9779a"/><rect x="21" y="8" width="2" height="2" fill="#33210c"/>' +
+  '<rect x="12" y="5" width="6" height="1" fill="#33210c"/><rect x="13" y="0" width="4" height="4" fill="#c99a2e"/>' +
+  '<rect x="14" y="0" width="2" height="3" fill="#ffd85e"/></svg>';
 const WL = { last: undefined, shown: 0, hold: 0, html: '', skip: 0 };   // skip — до какого времени плюс уже показан кучкой (popPay)
 function walletFly (d) {
   const el = document.createElement('div');
@@ -10264,17 +10275,14 @@ function walletHud (dt) {
   }
   if ((WL.hold -= dt) <= 0) WL.shown = Math.abs(w - WL.shown) < 2 ? w : WL.shown + (w - WL.shown) * Math.min(1, dt * 7);
   SC.step(dt, !S.ride && isPlaying());
-  RESPECT.hud(CAREER && !S.ride && isPlaying());   // ★ респект и звание — чип под кошельком (respect.js)              // за смену — отдельным блоком с пачкой купюр (shiftcash.js)
-  const html = '<span>' + $t('кошелёк') + '</span><b>' + money(Math.round(WL.shown)) + '</b>';
+  // за смену — строкой под кошельком с пачкой купюр (shiftcash.js); респект и звание — в паузе (на хаде чипа нет)
+  const html = PIGGY + '<b>' + money(Math.round(WL.shown)) + '</b>';
   if (html !== WL.html) { WL.html = html; elMoney.innerHTML = html; }
 }
 
 function hudStep (dt) {
   if (CAREER) walletHud(dt); else elMoney.textContent = money(S.money);
   touchpadStep();
-  const es = $('endshift'), showEs = isPlaying() && !S.ride;
-  if (es.hidden === showEs) es.hidden = !showEs;
-  if (showEs) { const tt = fmtTime(S.shiftT); if ($('shift-t').textContent !== tt) $('shift-t').textContent = tt; }
   elBurgers.innerHTML = [S.burgers ? $t('респект {n}', { n: S.burgers }) : '', S.people ? $t('сбито {n}', { n: S.people }) : '',
     S.scoots ? $t('самокатов {n}', { n: S.scoots }) : '', S.wrecks ? $t('всмятку {n}', { n: S.wrecks }) : ''].filter(Boolean).join('<br>');
   elSpeed.textContent = $t('{n} км/ч', { n: Math.round(Math.hypot(V.vx, V.vz) * 3.6) });
@@ -10375,7 +10383,6 @@ $('ov-menu').addEventListener('click', () => { S.state = 'title'; $('over').hidd
 
 /* время смены: 12:34 */
 const fmtTime = sec => { sec = Math.max(0, Math.floor(sec || 0)); const m = Math.floor(sec / 60), s = sec % 60; return m + ':' + String(s).padStart(2, '0'); };
-$('endshift').addEventListener('click', e => { e.currentTarget.blur(); if (isPlaying() && !S.ride) endShift(); });
 
 /* ── конец смены ──
    Отдельный экран, а не простыня текста: крупно — чем кончилось
@@ -11977,6 +11984,9 @@ $('st-ride').addEventListener('click', () => { Snd.boot(); Snd.resume(); elName.
 $('sfx').textContent = Snd.on ? $t('звук вкл') : $t('звук выкл');
 $('sfx').addEventListener('click', e => { Snd.set(!Snd.on); e.currentTarget.blur(); });
 $('pause').addEventListener('click', e => { setPause(!S.paused); e.currentTarget.blur(); });
+/* пауза — значком «две полосочки» (на паузе — треугольник «дальше»); слово — в подсказке и для читалки */
+function pauseBtn (on) { const b = $('pause'), l = on ? $t('продолжить') : $t('пауза'); b.classList.toggle('on', !!on); b.title = l; b.setAttribute('aria-label', l); }
+pauseBtn(false);
 
 /* ── меню паузы ──
    На экране во время езды только сердца, деньги, время и радар с кольцом
@@ -12045,6 +12055,12 @@ function renderPause () {
   const rows = [[$t('доставлено'), S.delivered], [$t('заработано'), money(S.money)], [$t('респектов'), CAREER ? RESPECT.shift() : S.burgers],
     [$t('прохожих сбито'), S.people], [$t('самокатчиков'), S.scoots], [$t('машин всмятку'), S.wrecks]];
   if (S.stops) rows.push([$t('остановок снесено'), S.stops]);
+  // перенесено с хада (04.10.2026): часы смены и респект с званием — только здесь
+  if (CAREER && !S.ride && CAREERM.shiftOn()) {
+    const sl = Math.max(0, Math.ceil(CAREERM.shiftLeft()));
+    rows.unshift([$t('до конца смены'), Math.floor(sl / 60) + ':' + String(sl % 60).padStart(2, '0')]);
+    rows.push([$t('респект'), '★ ' + RESPECT.get() + ' · ' + RESPECT.level().name]);
+  }
   // когда откроется следующий район: «новый район · «Кольцо» через 2 смены», «смена в зачёт · от 3 заказов · сейчас 1»
   if (CAREER && !S.ride && CAREERM.districtNext) rows.push(...CAREERM.districtNext(S.delivered || 0));
   // чек смены: строка — «что ........ сколько»
@@ -12056,7 +12072,7 @@ function renderPause () {
 function setPause (on) {
   if (on && (S.meal || !['drive', 'back', 'handover', 'brief', 'loading', 'side'].includes(S.state))) return;
   S.paused = on;
-  $('pause').textContent = on ? $t('продолжить') : $t('пауза');
+  pauseBtn(on);
   if (on) Platform.gameplayStop(); else if (isPlaying()) Platform.gameplayStart();
   if (elPause) elPause.hidden = !on;
   if (on) { Snd.engine(0); renderPause(); for (const k in IN) IN[k] = 0; joyReset(); CL.refreshButton(true); }

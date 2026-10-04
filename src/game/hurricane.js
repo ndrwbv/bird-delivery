@@ -647,7 +647,7 @@ function scanStep (force) {
   const sc = PLAN.scan, fw = new THREE.Vector3(); C.cam.getWorldDirection(fw);
   const fl = Math.hypot(fw.x, fw.z) || 1, fx = fw.x / fl, fz = fw.z / fl;
   const cl = clientPts(), used = new Set(SITES.map(s => s.I.i));
-  let budget = force ? Infinity : 6;
+  let budget = force ? Infinity : 3;
   while (sc.k < sc.list.length && budget > 0) {
     const i = sc.list[sc.k++];
     if (used.has(i)) continue;

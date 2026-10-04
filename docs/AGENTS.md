@@ -36,7 +36,7 @@ npm run probe -- --eval=my-check.js --size=phone --errors
   `frames()` — время кадров, `smoke(secs)` — смена на автопилоте и проверка «игра жива»,
   `log(x)` — строка в вывод. `return` — JSON в stdout (обрезается до 4000 символов, `--max=0`);
 - `--mode=web|yandex|steam`, `--kids`, `--map=`, `--lang=`, `--q=a=1&b` (добавка к адресу),
-  `--size=desktop|phone|deck|WxH` (телефон 390×844 с касаниями), `--secs=N` (идти после
+  `--size=desktop|phone|phone-land|deck|WxH` (телефон 390×844 с касаниями, `phone-land` — он же боком 844×390), `--secs=N` (идти после
   скрипта), `--shot=out.png --scale=0.5`, `--errors` (текст ошибок консоли; счётчик — всегда),
   `--fresh` (первый запуск как у новичка: гайд, учебный заказ, вступление);
 - `--page=ui.html` — другая страница сборки: песочница интерфейса (`--q=frame` — сам экран,

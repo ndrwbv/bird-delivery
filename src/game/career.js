@@ -113,16 +113,7 @@ export function init (api) {
   addEventListener('keydown', onKey, true);
   addEventListener('keyup', onKeyUp, true);
   addEventListener('pointerdown', () => KB.clear(), true);        // мышью — клавиатурная подсветка уходит
-  const es = $('endshift');
-  if (es) {
-    const sp = es.querySelector('span');
-    if (sp) sp.textContent = t('сняться со смены');
-    const ck = document.createElement('div');
-    ck.id = 'cr-clock';
-    ck.hidden = true;
-    ck.innerHTML = '<i></i><div class="ck-rows"><span class="ck-s"><em></em><b>0:00</b></span><span class="ck-o" hidden><em></em><b>0:00</b></span></div><small>09:00</small>';
-    es.parentNode.insertBefore(ck, es);
-  }
+  // часы смены и «сняться со смены» на хаде больше не ставим (04.10.2026): «до конца смены» и кнопка — в паузе
   setTimeout(() => { if (window.__dlv) window.__dlv.CAREERM = DEBUG; }, 0);
 }
 
@@ -150,7 +141,7 @@ export function startShift () {
   lunchClass(false);
   fire(startCbs, { n: SH.n + 1 });
   const L = SH.len, P = SH.pace;
-  // попапа «на смене · до конца смены ~N мин» нет: часы и так на экране справа сверху
+  // попапа «на смене · до конца смены ~N мин» нет: сколько осталось — в паузе
   // час пик — говорим прямо (платят больше); щедрую смену не объявляем — плашка ложилась на накладную
   const pm = ECON.PACE.MODES[P];
   const pace = P === 'tight' ? [t('час пик'), t('заказы дальше, кофе меньше — зато платят ×{k}', { k: fmtK(pm.pay) })] : null;

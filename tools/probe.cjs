@@ -14,7 +14,7 @@
    --page=ui.html           другая страница сборки (index.html по умолчанию): ждём не __dlv, а загрузку
                             и window.__probeReady !== false. Песочница интерфейса: --page=ui.html — панель
                             (window.__uilab), --page=ui.html --q=frame — сам экран (window.__ui), docs/SANDBOX.md
-   --size=desktop|phone|deck|WxH   1280×720 / 390×844 с касаниями / 1280×800
+   --size=desktop|phone|phone-land|deck|WxH   1280×720 / 390×844 с касаниями / 844×390 боком / 1280×800
    --js="код" | --eval=file.js     тело async-функции в странице. Есть: d (= __dlv), wait(ms),
                             until(fn, ms), run(secs, k) — дать игре идти secs секунд (k — ускорение
                             до 3), onShift() — начать смену и принять заказ, ride() — просто кататься,
@@ -47,10 +47,10 @@ const T0 = Date.now();
 const MODE = arg('mode', 'web');
 const PAGE = arg('page', 'index.html').replace(/^\/+/, '');
 const GAME = PAGE === 'index.html';
-const SIZES = { desktop: [1280, 720], phone: [390, 844], deck: [1280, 800] };
+const SIZES = { desktop: [1280, 720], phone: [390, 844], 'phone-land': [844, 390], deck: [1280, 800] };
 const SZ = arg('size', 'desktop');
 const [W, H] = SIZES[SZ] || (/^\d+x\d+$/.test(SZ) ? SZ.split('x').map(Number) : SIZES.desktop);
-const PHONE = SZ === 'phone';
+const PHONE = SZ === 'phone' || SZ === 'phone-land';
 const MAXC = +arg('max', 4000);
 const err = (...a) => process.stderr.write(a.join(' ') + '\n');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
