@@ -25,6 +25,12 @@ const N_ = s => s;
 const FILL = /*i18n*/ [N_('ну'), N_('э-э'), N_('короче'), N_('как бы'), N_('это самое'), N_('в общем'), N_('слушай')];
 const MOOD = { calm: [0.08, 0.03], nervous: [0.22, 0.14], drunk: [0.28, 0.08], shy: [0.16, 0.12] };   // [мычание, запинка]
 
+/* сколько реплика висит сама, если катсцена идёт по таймеру (intro.js; пузыри героев):
+   1,5 с + 0,06 с на букву (~15 букв в секунду), но не меньше 3 с. Печатается по буквам —
+   отсчёт после того, как допечаталась. Диалог выше (say) ждёт нажатия и сам не листается. */
+export const READ = { BASE: 1.5, PER_CHAR: 0.06, MIN: 3 };
+export const readTime = text => Math.max(READ.MIN, READ.BASE + READ.PER_CHAR * String(text == null ? '' : text).length);
+
 let API = { pause: () => {}, face: null };
 let root = null, queue = Promise.resolve(), open = 0;
 

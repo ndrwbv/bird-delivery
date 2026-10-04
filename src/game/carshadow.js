@@ -12,8 +12,8 @@
 import * as THREE from '../vendor/three.module.min.js';
 
 export const SHADOW = {
-  W: 2.8, L: 5.1,                 // размер пятна, м (кузов ~2 × 4,4 + мягкий край)
-  DAY: 0.7, NIGHT: 0.4,          // насколько тёмное в середине
+  W: 3.3, L: 5.9,                 // размер пятна, м (кузов ~2 × 4,4 + широкий мягкий край)
+  DAY: 0.35, NIGHT: 0.2,         // насколько тёмное в середине (04.10.2026: было 0,7 / 0,4 — чёрное пятно)
   SUN: 0.45,                      // сдвиг от солнца, м: днём пятно чуть выглядывает из-под машины
   UP: 0.035,                      // над тем, на чём стоят колёса, м
   AIR: 3,                         // высота прыжка, на которой пятно почти пропадает, м
@@ -22,13 +22,14 @@ export const SHADOW = {
 let M = null;
 function tex () {
   const c = document.createElement('canvas');
-  c.width = 64; c.height = 128;
+  c.width = 80; c.height = 144;     // 1 px ≈ 4 см: холст во всё пятно SHADOW.W × SHADOW.L
   const x = c.getContext('2d');
   x.fillStyle = '#000';
-  x.filter = 'blur(5px)';
-  // прямоугольник со скруглёнными углами, размытый: тень кузова, а не круг
+  x.filter = 'blur(7px)';
+  // прямоугольник со скруглёнными углами, размытый: тень кузова, а не круг. От кузова до края
+  // холста — больше двух радиусов размытия: к краю плоскости пятно сходит на нет, без ступеньки
   x.beginPath();
-  x.roundRect(9, 10, 46, 108, 12);
+  x.roundRect(16, 18, 48, 108, 14);
   x.fill();
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;

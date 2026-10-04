@@ -247,7 +247,7 @@ function tapers (fix, api) {
     const nx = -vz, nz = vx, ex = x + vx * L, ez = z + vz * L;
     for (const pass of [0, 1]) {
       const a = pass ? w2 / 2 : w2 / 2 + (c <= 5 ? 2.75 : 1), b = pass ? w1 / 2 : w1 / 2 + (c1 <= 5 ? 2.75 : 1);
-      const lift = pass ? 0.14 + (7 - c) * 0.004 + 0.0015 : 0.09 + (7 - c) * 0.004 + 0.0015;
+      const lift = (pass ? 0.14 : 0.09) + (7 - c) * 0.004 + 0.0032;   // над всеми ступеньками класса (roadwear.js WEAR_Y), под заплатками
       LITM.color(pass ? (api.roadHexAt ? api.roadHexAt(x - vx * 2, z - vz * 2, c) : ROAD_HEX[c]) : '#e3ded4');   // клин — в цвет асфальта широкой улицы (roadwear.js)
       LITM.dtri(x + nx * a, z + nz * a, ex + nx * b, ez + nz * b, ex - nx * b, ez - nz * b, lift);
       LITM.dtri(x + nx * a, z + nz * a, ex - nx * b, ez - nz * b, x - nx * a, z - nz * a, lift);

@@ -9,8 +9,9 @@
                               «а это твои хп — врезаешься куда-то, теряешь сердце (легонько —
                               половинку)»; на хаде гаснет сердце, потом половинка (только показ);
      5) капот крупно        — дым из-под капота, машина кашляет: «а ещё она может ломаться».
-   Всего ~20 с. «пропустить», Esc, Enter, пробел; на геймпаде A, B, Start — сразу
-   к накладной. Мир стоит, как в катсценах story.js (дышат только дым и Степан);
+   Всего ~25 с: план с репликой висит не меньше, чем её прочитать (readTime в dialog.js:
+   1,5 с + 0,06 с на букву, не меньше 3 с). Enter, пробел, клик, A — следующий план;
+   «пропустить», Esc, B, Start — сразу к накладной. Мир стоит, как в катсценах story.js (дышат только дым и Степан);
    камера и угол обзора после — прежние. Флаг ставится, когда вступление кончилось
    или его пропустили; «сбросить прогресс» стирает 'dlv-intro' — покажется снова.
 
@@ -18,13 +19,14 @@
      FIRST.wants(order)       — показать ли вступление перед этой накладной
      FIRST.play(order, done)  — запустить; done() — когда кончилось или пропустили
      FIRST.frame(dt)          — каждый кадр; true — идёт вступление (мир стоит)
-     FIRST.on(), FIRST.skip() — для геймпада (game.js padStep)
+     FIRST.on(), FIRST.next(), FIRST.skip() — для геймпада (game.js padStep)
    api: THREE, cam, V, S, Store, Snd, ADULT, car(), pizza(), brand(), carName(),
         puff, camClear, groundH, guestStep, hud, hearts */
 import './intro.css';
 import { t } from '../i18n/index.js';
 import { makePerson, faceDataURL } from './people.js';
 import { BOSS } from './orders.config.js';
+import { readTime } from './dialog.js';
 
 const KEY = 'dlv-intro';
 let A = null, P = null, L = null, T1 = null, T2 = null;
@@ -39,6 +41,7 @@ export function init (api) {
   A = api;
   P = new A.THREE.Vector3(); L = new A.THREE.Vector3();
   T1 = new A.THREE.Vector3(); T2 = new A.THREE.Vector3();
+  if (typeof window !== 'undefined') window.setTimeout(() => { if (window.__dlv) window.__dlv.FIRST = DEBUG; }, 0);
 }
 export const on = () => CUT.on;
 export function wants (order) {
@@ -145,14 +148,16 @@ function ui () {
   el.querySelector('.ic-skip').addEventListener('click', e => { e.stopPropagation(); skip(); });
   // клики и пальцы до игры не доходят: ни руля, ни карты по радару
   for (const ev of ['pointerdown', 'touchstart', 'mousedown', 'click']) el.addEventListener(ev, e => { if (!e.target.closest('.ic-skip')) { e.stopPropagation(); } }, { passive: true });
+  el.addEventListener('click', e => { if (!e.target.closest('.ic-skip')) next(); });   // клик или тап — следующий план
   CUT.el = el;
   return el;
 }
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 // сердечко рисуем фигурой: в пиксельном шрифте такого символа нет
 const hearts = s => esc(s).replace(/♥/g, '<i class="ic-hrt"></i>');
-function card (kicker, title, sub, red) {
+function card (kicker, title, sub, red, dur) {
   const c = CUT.el.querySelector('.ic-card');
+  c.style.animationDuration = (dur || 3.3) + 's';           // плашка гаснет вместе с планом
   c.querySelector('em').textContent = kicker || '';
   c.querySelector('b').textContent = title || '';
   c.querySelector('small').textContent = sub || '';
@@ -229,24 +234,21 @@ function enter (seg) {
     case 'pizza': {
       const Z = A.pizza(), name = String(Z.name || '');
       const at = name.split(' · ').slice(1).join(' · ');
-      card(at || t('пиццерия'), A.brand(), '');
-      subtitle(t('вот пиццерия — сюда я устроился курьером'));
+      card(at || t('пиццерия'), A.brand(), '', false, seg.d);
+      subtitle(seg.text);
       sting(false);
       break;
     }
     case 'client': {
       const p = CUT.guest, pr = p && p.person;
-      const stepan = !!(pr && pr.stepan);
-      card(t('первый заказ'), pr ? pr.name : '', pr && pr.desc ? pr.desc : '');
-      subtitle(stepan ? (A.ADULT ? t('первый заказ — Степану Тугареву: заядлый кальянщик и бизнесмен — бизнес вот-вот будет')
-        : t('первый заказ — Степану Тугареву: любитель самовара и бизнесмен — бизнес вот-вот будет'))
-        : t('первый заказ — вот он, ждёт пиццу'));
+      card(t('первый заказ'), pr ? pr.name : '', pr && pr.desc ? pr.desc : '', false, seg.d);
+      subtitle(seg.text);
       sting(true);
       break;
     }
     case 'car':
-      card(t('моя тачка'), A.carName(), '');
-      subtitle(t('вот моя тачка: у неё есть жизни ♥ и нитро'));
+      card(t('моя тачка'), A.carName(), '', false, seg.d);
+      subtitle(seg.text);
       if (A.hud) A.hud();
       hudMode('on');
       sting(false);
@@ -257,14 +259,14 @@ function enter (seg) {
       if (A.hud) A.hud();
       if (A.hearts) A.hearts();
       hudMode('hp');
-      tip(t('а это твои хп — врезаешься куда-то, теряешь сердце (легонько — половинку)'));
+      tip(seg.text);
       CUT.demo = 0;
       sting(true);
       break;
     case 'hood':
       hudMode(null);
-      card('', t('кхе-кхе'), '', true);
-      subtitle(t('а ещё она может ломаться'));
+      card('', t('кхе-кхе'), '', true, seg.d);
+      subtitle(seg.text);
       CUT.coughT = [0.25, 0.85, 1.5, 2.1];
       CUT.puffT = 0.15;
       whoosh();
@@ -295,6 +297,25 @@ function stepSeg (seg, st, dt) {
   }
 }
 
+/* реплика плана: её длина задаёт, сколько план висит (readTime, dialog.js) */
+function lineOf (id) {
+  switch (id) {
+    case 'pizza': return t('вот пиццерия — сюда я устроился курьером');
+    case 'client': {
+      const pr = CUT.guest && CUT.guest.person;
+      return pr && pr.stepan ? (A.ADULT ? t('первый заказ — Степану Тугареву: заядлый кальянщик и бизнесмен — бизнес вот-вот будет')
+        : t('первый заказ — Степану Тугареву: любитель самовара и бизнесмен — бизнес вот-вот будет'))
+        : t('первый заказ — вот он, ждёт пиццу');
+    }
+    case 'car': return t('вот моя тачка: у неё есть жизни ♥ и нитро');
+    case 'hp': return t('а это твои хп — врезаешься куда-то, теряешь сердце (легонько — половинку)');
+    case 'hood': return t('а ещё она может ломаться');
+  }
+  return '';
+}
+/* план с репликой: не короче, чем её прочитать; перелёты — как были */
+const plan = (id, d, pose) => { const text = lineOf(id); return { id, d: text ? Math.max(d, readTime(text)) : d, pose, text }; };
+
 /* ─── запуск, кадр, конец ─── */
 export function play (order, done) {
   if (!A) { if (done) done(); return; }
@@ -304,10 +325,10 @@ export function play (order, done) {
   const sP = pizzaShot();
   const sC = CUT.guest ? clientShot(CUT.guest) : null;
   const sK = carShot(), sH = hoodShot();
-  const segs = [{ id: 'pizza', d: 3.3, pose: sP }];
-  if (sC) segs.push({ id: 'fly', d: 1.15, pose: fly(sP, sC, 18) }, { id: 'client', d: 3.7, pose: sC }, { id: 'fly', d: 1.15, pose: fly(sC, sK, 16) });
-  else segs.push({ id: 'fly', d: 1.15, pose: fly(sP, sK, 14) });
-  segs.push({ id: 'car', d: 3.1, pose: sK }, { id: 'hp', d: 4.8, pose: hpShot() }, { id: 'hood', d: 2.9, pose: sH });
+  const segs = [plan('pizza', 3.3, sP)];
+  if (sC) segs.push(plan('fly', 1.15, fly(sP, sC, 18)), plan('client', 3.7, sC), plan('fly', 1.15, fly(sC, sK, 16)));
+  else segs.push(plan('fly', 1.15, fly(sP, sK, 14)));
+  segs.push(plan('car', 3.1, sK), plan('hp', 4.8, hpShot()), plan('hood', 2.9, sH));
   CUT.segs = segs; CUT.i = -1; CUT.t = 0; CUT.done = done; CUT.on = true; CUT.shake = 0;
   const car = A.car();
   CUT.carY = car ? car.position.y : 0;
@@ -344,6 +365,17 @@ export function frame (dt) {
   return true;
 }
 export function skip () { if (CUT.on) finish(); }
+/* дальше: A, Enter, пробел, клик — сразу к следующему плану (субтитры не печатаются по буквам —
+   допечатывать нечего); на последнем — конец. Esc, B, Start, «пропустить» — всё вступление */
+export function next () {
+  if (!CUT.on) return;
+  let acc = 0;
+  for (let i = 0; i < CUT.segs.length; i++) {
+    acc += CUT.segs[i].d;
+    if (CUT.t < acc) { CUT.t = acc; if (i === CUT.segs.length - 1) finish(); return; }
+  }
+  finish();
+}
 function finish () {
   if (!CUT.on) return;
   CUT.on = false;
@@ -372,10 +404,10 @@ const onKey = e => {
   e.stopImmediatePropagation();
   if (/^(Escape|Enter|NumpadEnter|Space)$/.test(e.code)) {
     e.preventDefault();
-    if (!e.repeat) { CUT.swallow = e.code; skip(); }
+    if (!e.repeat) { CUT.swallow = e.code; if (e.code === 'Escape') skip(); else next(); }
   }
 };
 const onKeyUp = e => { if (e.code === CUT.swallow) { e.preventDefault(); e.stopImmediatePropagation(); CUT.swallow = ''; } };
 
 /* для ?debug */
-export const DEBUG = { CUT, wants, skip };
+export const DEBUG = { CUT, wants, skip, next };

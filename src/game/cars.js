@@ -607,7 +607,7 @@ export function previewCanvas (id, o = {}) {
    светлый скол с одной стороны (как будто свет падает в яму), сама яма и
    тёмное дно, пара трещин. Раскладка — от зерна карты, всегда одна и та же.
    Вид асфальта улицы (roadwear.js): на свежем ям нет, на ровном — редко. На
-   разбитом, кроме этих, — свои ямы в шейдере (RW.potAt): густо, 0,5—1,3 м;
+   разбитом, кроме этих, — свои ямы (RW.drawPots рисует, RW.potAt трясёт): густо, 0,5—1,3 м;
    глубокие (от 0,75 м) роняют колесо, кренят и подкидывают на выезде. */
 const POT = [], PGRID = new Map(), PCELL = 16;
 const pkey = (x, z) => Math.floor(x / PCELL) + ',' + Math.floor(z / PCELL);
@@ -915,7 +915,8 @@ export function build () {
   for (const G of garagePoints()) buildGarage(G);
   GAR = GARS[0] || null; ZHENYA = GAR ? GAR.zh : null;
   buildPotholes();
-  return { ms: Math.round(performance.now() - t0), potholes: POT.length, garage: !!GAR, garages: GARS.length };
+  const broken = RW.drawPots(A.LITM);              // ямы разбитого асфальта (roadwear.js) — тоже в статику, там же, где трясёт
+  return { ms: Math.round(performance.now() - t0), potholes: POT.length, brokenPots: broken, garage: !!GAR, garages: GARS.length };
 }
 export const potholes = () => POT;
 export const garage = () => GAR;
@@ -1083,17 +1084,18 @@ function odoStep (dt, vf) {
   wear(id, BREAK.KM_WEAR * k * km, BREAK.CEIL_PER_KM * k * km, km);
 }
 
-/* ─────────────── ямы: тряхнуло, притормозило, может заглохнуть ─────────────── */
-const POTB = { t: 0, up: 0 };                     // глубокая яма: через долю секунды кузов подкидывает
+/* ─────────────── ямы: мягко качнуло, притормозило, может заглохнуть ───────────────
+   04.10.2026 (жалоба автора: «проезжать неприятно и непонятно, что происходит»): без вибрации
+   геймпада, без тряски камеры, без провала и подкидывания в глубокой яме — одно мягкое
+   покачивание кузова, глухой «бум» и прежнее торможение; шанс заглохнуть — как был */
 function potStep (dt, vf) {
-  const V = A.V, S = A.S;
-  if (POTB.t > 0 && (POTB.t -= dt) <= 0 && !V.air) { V.kerb = Math.max(V.kerb || 0, POTB.up); V.pitch = (V.pitch || 0) - POTB.up * 0.35; }
+  const V = A.V;
   if (V.air || Math.abs(vf) < 3) return;
   const fx = Math.sin(V.h), fz = Math.cos(V.h), sx = fz, sz = -fx;
   const c = current(), w = 0.8;
   const wheels = [[1.3, -w], [1.3, w], [-1.25, -w], [-1.25, w]];
   const now = performance.now() / 1000;
-  // ямы разбитого асфальта (roadwear.js, рисует шейдер): своя раскладка, откат — по ключу клетки
+  // ямы разбитого асфальта (roadwear.js, плоские пятна в статике): своя раскладка, откат — по ключу клетки
   for (const [al, ac] of wheels) {
     const p = RW.potAt(V.x + fx * al + sx * ac, V.z + fz * al + sz * ac);
     if (!p) continue;
@@ -1121,22 +1123,16 @@ function potStep (dt, vf) {
   }
 }
 const RWPOT = new Map();
-/* колесо (al вдоль, ac поперёк) попало в яму p: трясёт, тормозит, может заглохнуть (шанс × sk); глубокая — роняет и подкидывает */
+/* колесо (al вдоль, ac поперёк) попало в яму p: мягко качнуло, притормозило, может заглохнуть (шанс × sk).
+   Глубокая (p.deep) — как обычная: только для счёта */
 function potHit (p, al, ac, vf, c, sk = 1) {
   const V = A.V, S = A.S;
-  const k = Math.min(1, Math.abs(vf) / 30), D = p.deep && !c.offroad;
-  S.shake = Math.max(S.shake || 0, (c.offroad ? 0.12 : 0.3) + k * 0.25 + (D ? 0.25 : 0));
-  V.pitch = (V.pitch || 0) + (al > 0 ? -1 : 1) * (0.05 + k * 0.05) * (D ? 2.2 : 1);
-  if (D) {                                     // глубокая: колесо проваливается, кузов кренит к нему, на выезде подкидывает
-    V.roll = (V.roll || 0) + (ac > 0 ? 1 : -1) * (0.05 + k * 0.05);
-    V.kerb = (V.kerb || 0) - (0.12 + k * 0.1);
-    POTB.t = 0.11; POTB.up = 0.1 + k * 0.1;
-  }
-  if (!c.offroad) { const d = 1 - (0.1 + k * 0.12) * (D ? 1.3 : 1); V.vx *= d; V.vz *= d; }
-  if (A.Snd) { A.Snd.blip(D ? 46 : 58, D ? 0.22 : 0.16, 'triangle', 0.2 + k * 0.1 + (D ? 0.1 : 0)); A.Snd.noise(D ? 0.12 : 0.08, 0.12 + k * 0.1 + (D ? 0.08 : 0)); }
-  if (A.rumble) A.rumble(Math.min(1, 0.35 + k * 0.3 + (D ? 0.25 : 0)), D ? 140 : 90);
+  const k = Math.min(1, Math.abs(vf) / 30);
+  V.pitch = (V.pitch || 0) + (al > 0 ? -1 : 1) * (0.015 + k * 0.015);   // одно мягкое покачивание (было 0,05—0,1 и тряска камеры)
+  if (!c.offroad) { const d = 1 - (0.1 + k * 0.12); V.vx *= d; V.vz *= d; }
+  if (A.Snd) { A.Snd.blip(58, 0.16, 'triangle', 0.15 + k * 0.08); A.Snd.noise(0.08, 0.1 + k * 0.08); }
   if (!ST.on && DRIVING.has(S.state) && Math.random() < stallP(curId()) * BREAK.POTHOLE * sk) stall('pothole');
-  POTN.hits++; if (D) POTN.deep++;
+  POTN.hits++; if (p.deep) POTN.deep++;
 }
 const POTN = { hits: 0, deep: 0 };            // попаданий в ямы за запуск (проверка)
 export const potHits = () => POTN;

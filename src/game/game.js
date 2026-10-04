@@ -96,6 +96,7 @@ import * as PROF from './profiles.js';           // профили: прогре
 import * as QR from './quickrun.js';               // быстрый заезд из меню: сезон, длина, машина; сохранение карьеры не трогает (quickrun.js)
 import * as CL from '../platform/crashlog.js';   // журнал ошибок, предохранитель шагов мира, сторож зависаний (docs/CRASHES.md)
 import * as RELIEF from './relief.js';          // неровный газон: бугры и холмики на газонах и пустырях (relief.js)
+import * as OSKM from './osk.js';                // экранная клавиатура Стима в полях ввода: поднять, гасить автоповтор, геймпад — не игре (osk.js)
 import * as RW from './roadwear.js';            // асфальт разный: свежий, ровный, в заплатках, старый, разбитый (roadwear.js)
 import * as LAWN from './lawn.js';              // пятна на газоне — в краске земли (lawn.js)
 import * as NAR from './narrow.js';            // узкие дороги: одна полоса посередине, встречные прижимаются (narrow.js)
@@ -747,7 +748,7 @@ function nearestRoad (x, z, maxCls = DRIVE_MAX, rings = 2) {
 function Mesher () {
   let n = 0;
   const C = new THREE.Color();
-  let cr = 0, cg = 0, cb = 0;
+  let cr = 0, cg = 0, cb = 0, GRAD = null;
   /* Треугольник сразу ложится в свою клетку (см. mesh): общий массив на весь
      город с последующей раскладкой по клеткам весил в Северске сотни мегабайт
      и стоил лишнего копирования. Клетки — в порядке первого треугольника */
@@ -815,9 +816,13 @@ function Mesher () {
       room(b, 3);
       const p = b.pos, c = b.col, i = b.n * 3;
       p[i] = ax; p[i + 1] = ay; p[i + 2] = az; p[i + 3] = bx; p[i + 4] = by; p[i + 5] = bz; p[i + 6] = cx; p[i + 7] = cy; p[i + 8] = cz;
-      c[i] = c[i + 3] = c[i + 6] = cr; c[i + 1] = c[i + 4] = c[i + 7] = cg; c[i + 2] = c[i + 5] = c[i + 8] = cb;
+      if (GRAD) { GRAD(ax, az, c, i); GRAD(bx, bz, c, i + 3); GRAD(cx, cz, c, i + 6); }
+      else { c[i] = c[i + 3] = c[i + 6] = cr; c[i + 1] = c[i + 4] = c[i + 7] = cg; c[i + 2] = c[i + 5] = c[i + 8] = cb; }
       b.n += 3; n += 3;
     },
+    /* цвет по месту: fn(x, z, байты, i) кладёт цвет вершины в байты[i…i+2] (плавный стык асфальта,
+       roadwear.js); null — снова один цвет на треугольник */
+    grad (fn) { GRAD = fn || null; return api; },
     quad (ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz, nx, ny, nz) {
       api.tri(ax, ay, az, bx, by, bz, cx, cy, cz, nx, ny, nz);
       api.tri(ax, ay, az, cx, cy, cz, dx, dy, dz, nx, ny, nz);
@@ -1101,24 +1106,40 @@ function osmRoads () {
       if (i < q.length - 1) LITM.disc(q[i][0], q[i][1], 1, 0.07, 6);
     }
   }
+  RW.prepJoints(roadWidth);                        // где стык разных видов асфальта — плавный переход (roadwear.js)
   for (const pass of [0, 1]) {
     for (const r of CITY.roads) {
       if (r.b) continue;                          // мосты кладутся отдельно, над водой
       const w = pass ? roadWidth(r) : SIDEWALK(r);
       // На перекрёстке два полотна лежат в одной плоскости и мерцают.
       // Главная чуть выше второстепенной — поверх и рисуется.
-      const y = (pass ? 0.14 : 0.09) + (7 - r.c) * 0.004;
-      LITM.color(pass ? RW.roadHex(r, ROAD_HEX[r.c]) : WORLD.paveRoad(r));   // полотно — по виду асфальта (roadwear.js); тротуар: гладкий, брусчатка или в крапинку (world.js)
-      const p = r.p;
+      // Внутри класса — своя ступенька по виду асфальта (roadwear.js) и по плитке тротуара: два разных
+      // полотна одного класса больше не лежат на одной высоте и не мерцают на стыке
+      const pv = pass ? '' : WORLD.paveRoad(r);
+      const y = (pass ? 0.14 : 0.09) + (7 - r.c) * 0.004 + (pass ? RW.rankY(r) : paveRank(pv));
+      LITM.color(pass ? RW.roadHex(r, ROAD_HEX[r.c]) : pv);   // полотно — по виду асфальта (roadwear.js); тротуар: гладкий, брусчатка или в крапинку (world.js)
+      // стык с другим видом асфальта — плавно: конец полотна перекрашен по месту (roadwear.js)
+      const jp = pass ? RW.jointPts(r) : null;
+      if (jp) LITM.grad(RW.jointGrad(r));
+      const p = jp || r.p;
       for (let i = 1; i < p.length; i++) {
         LITM.ribbon(p[i - 1][0], p[i - 1][1], p[i][0], p[i][1], w, y);
+        if (jp && !p[i][2]) continue;                // добавленная точка перехода — на прямой, пятно не нужно
         // пятно на изломе и на перекрёстке: без него угол улицы рвётся
         const n = NODE_IDX.get(p[i][0] + ',' + p[i][1]);
         if (i < p.length - 1 || (n !== undefined && nodeDeg(n) >= 2)) LITM.disc(p[i][0], p[i][1], w / 2, y, 9);
       }
+      if (jp) LITM.grad(null);
       if (pass) RW.decorate(LITM, r, w, y, (x, z) => { const n = NODE_IDX.get(x + ',' + z); return n !== undefined && nodeDeg(n) >= 3; });   // заплатки
     }
   }
+}
+/* ступенька тротуара по плитке (0—2,5 мм внутри класса): разная плитка одного класса — не на одной высоте */
+const PAVE_RANK = new Map();
+function paveRank (hex) {
+  let k = PAVE_RANK.get(hex);
+  if (k === undefined) PAVE_RANK.set(hex, k = Math.min(5, PAVE_RANK.size));
+  return k * 0.0005;
 }
 
 /* ── бордюры ──
@@ -13166,34 +13187,10 @@ const padMenu = makePadMenu({
   // экранная клавиатура Steam (Deck): что ввёл — обратно в поле
   onText: el => steamKeyboard(el, true),
 });
-/* ── экранная клавиатура Стима для любого поля ввода текста (имя, профиль) ──
-   Поле получило фокус (тап, A геймпада, окно само поставило фокус) — в Стим-сборке на Деке, с
-   геймпадом или касанием поднимаем клавиатуру Стима. Сначала большая (showGamepadTextInput): что
-   ввёл — в поле. Вернулась пустой быстрее 0,4 с — значит, не поднялась (Стим не запущен, ярлык
-   «сторонней игры»): тогда плавающая над полем (буквы идут в поле нажатиями) или
-   steam://open/keyboard (electron/main.cjs steam:floatKeyboard). Отменил сам — больше не лезем.
-   Мышью и клавиатурой на компьютере — не мешаем. */
-const OSK = { busy: false, el: null, t: 0 };
-const isTextField = el => !!el && ((el.tagName === 'INPUT' && /^(text|search|email|)$/.test(el.type)) || el.tagName === 'TEXTAREA');
-const oskWanted = () => Platform.id === 'steam' && !!Platform.steam && (!!Platform.steam.deck || !!PAD.active || matchMedia('(pointer: coarse)').matches);
-function steamKeyboard (el, force) {
-  if (!isTextField(el) || !Platform.steam || !Platform.steam.textInput || OSK.busy) return;
-  if (!force && !oskWanted()) return;
-  if (OSK.el === el && performance.now() - OSK.t < 800) return;   // тот же фокус второй раз подряд
-  OSK.busy = true; OSK.el = el;
-  const t0 = performance.now(), max = el.maxLength > 0 ? el.maxLength : 24;
-  const r = el.getBoundingClientRect(), k = devicePixelRatio || 1;
-  Promise.resolve(Platform.steam.textInput(el.placeholder || $t('имя'), max, el.value || ''))
-    .then(v => {
-      if (typeof v === 'string') { el.value = v.slice(0, max); el.dispatchEvent(new Event('input', { bubbles: true })); return null; }
-      if (performance.now() - t0 > 400) return null;                     // отменил сам
-      try { if (el.isConnected) el.focus({ preventScroll: true }); } catch (e) { /* — */ }
-      return Platform.steam.floatKeyboard && Platform.steam.floatKeyboard(Math.round(r.left * k), Math.round(r.top * k), Math.round(r.width * k), Math.round(r.height * k));
-    })
-    .catch(() => {})
-    .then(() => { OSK.busy = false; OSK.t = performance.now(); });
-}
-document.addEventListener('focusin', e => { if (isTextField(e.target)) steamKeyboard(e.target); });
+/* экранная клавиатура Стима для любого поля ввода текста (имя, профиль): поднять, не поднимать
+   второй раз, гасить автоповтор букв, пока висит, и не отдавать игре геймпад (osk.js) */
+const steamKeyboard = (el, force) => OSKM.keyboard(el, force);
+OSKM.init();
 /* трогает экран, мышь, клавиши — город за меню полные к/с, пока листаешь (gfx.js poke) */
 for (const ev of ['pointerdown', 'pointermove', 'wheel', 'keydown']) addEventListener(ev, () => GFX.poke(), { passive: true, capture: true });
 function padScreen () {
@@ -13213,8 +13210,9 @@ function padStep () {
   document.body.classList.toggle('pad', !!p.active);
   if (!p.connected) return;
   if (EXT.paused) return;
+  if (OSKM.padGate(p)) return;                    // над полем висит клавиатура Стима — кнопки её, не игры (osk.js)
   if (p.any) { Snd.boot(); Snd.resume(); GFX.poke(); }
-  if (FIRST.on()) { if (p.accept || p.menuBack || p.pause) FIRST.skip(); return; }   // вступление: A / B / Start — пропустить, до игры не доходит
+  if (FIRST.on()) { if (p.accept) FIRST.next(); else if (p.menuBack || p.pause) FIRST.skip(); return; }   // вступление: A — следующий план, B / Start — пропустить; до игры не доходит
   const screen = padScreen();
   if (p.pause && !elPanel.hidden) closePanel();
   else if (p.pause && (S.paused || isPlaying())) setPause(!S.paused);
@@ -13503,7 +13501,7 @@ requestAnimationFrame(frame);
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
 /* песочница (sandbox.html): бесконечное здоровье, нитро, «не глохнет» (noStall читает cars.js) */
 const SBX = { god: false, nitro: false, noStall: false };
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { inWall, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, PG: PG.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, CULLQ: CULL.Q, GFX: GFX.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { inWall, OSK: OSKM, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, PG: PG.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта

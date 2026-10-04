@@ -43,6 +43,7 @@ import { t, N_ } from '../i18n/index.js';
 import * as DIST from './districts.js';
 import * as HITS from './hits.js';
 import * as TALK from './talk.js';             // облачка реплик (talk.js)
+import { readTime } from './dialog.js';         // сколько читать реплику
 import { makePerson } from './people.js';
 import { makeCatModel, FURS } from './cats.js';
 
@@ -443,7 +444,7 @@ function dropBubble (H) {
   H.bubble.material.dispose();                     // текстура — общая из talk.js
   H.bubble = null;
 }
-/* сказать: пузырь над головой на HERO.SAY_T с */
+/* сказать: пузырь над головой на HERO.SAY_T с — длинную реплику дольше, пока не прочитать (readTime) */
 function say (H, text, ttl = HERO.SAY_T) {
   if (!H.grp || !text) return false;
   dropBubble(H);
@@ -451,7 +452,7 @@ function say (H, text, ttl = HERO.SAY_T) {
   sp.position.set(0, 2.85 + (H.lift || 0), 0);
   H.grp.add(sp);
   TALK.track(sp);                                  // читаемая плашка с именем, размер по расстоянию (talk.js)
-  H.bubble = sp; H.bubT = ttl; H.talk = Math.min(ttl, 2.5);
+  H.bubble = sp; H.bubT = Math.max(ttl, readTime(text)); H.talk = Math.min(ttl, 2.5);
   H.log.push(text);
   if (H.log.length > 40) H.log.shift();
   if (A.Snd && A.Snd.blip) A.Snd.blip(H.def.fem ? 640 : 380, 0.06, 'triangle', 0.08);

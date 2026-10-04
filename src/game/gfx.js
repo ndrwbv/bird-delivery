@@ -53,7 +53,7 @@ export const ITEMS = [
 ];
 export const PRESETS = {
   low: { fps: 0, range: 0, menu: 0, px: 0, win: 0, fx: 0, far: 0, aa: 0 },
-  mid: { fps: 1, range: 1, menu: 1, px: 1, win: 1, fx: 1, far: 1, aa: 0 },
+  mid: { fps: 1, range: 1, menu: 1, px: 1, win: 1, fx: 1, far: 1, aa: 1 },
   high: { fps: 2, range: 2, menu: 2, px: 2, win: 1, fx: 1, far: 2, aa: 1 },
 };
 const ORDER = ['low', 'mid', 'high'];
