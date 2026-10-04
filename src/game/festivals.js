@@ -32,9 +32,10 @@ import * as DIRECTOR from './director.js';   // режиссёр событий 
 import { t, N_ } from '../i18n/index.js';
 
 export const FEST = {
-  CHANCE: 0.25,          // шанс фестиваля в смену (если в районе есть парковка ТЦ)
+  CHANCE: 0.15,          // шанс фестиваля в смену (если в районе есть парковка ТЦ и прошло GAP_MIN смен)
+  GAP_MIN: 5,            // не чаще раза в 5 смен (автор 04.10: «не чаще раз в пять, но могут и раз в 10 и в 20»)
   FROM: 3,               // не раньше 4-й смены игрока (3 законченных)
-  PITY: 5,               // 4 смены подряд без фестиваля (где он мог быть) — 5-я точно с ним (автор 04.10: «раз в смен 5»)
+  PITY: 20,              // 20 смен подряд без фестиваля (где он мог быть) — следующая точно с ним
   EDGE: 1.5,             // блоки — не ближе к краю парковки, м
   LANE: 6.5,             // перед (к улице) отодвинут вглубь: дорожка вдоль блоков по самой парковке, м
   MIN_SIDE: 22,          // площадка не уже, м (с дорожкой; без неё — от 15,5)
@@ -206,7 +207,8 @@ const isAutumn = () => { const s = A.season ? A.season() : 0; const y = ((s % 4)
 /* решить на смену: shifts — законченных смен игрока, sv — память (last, since, kind), n — сколько площадок.
    → вид фестиваля или null; sv меняется на месте */
 function decide (shifts, sv, n) {
-  if (!n || shifts < FEST.FROM || sv.last === shifts - 1) return null;   // нет площадки, рано, вчера уже был
+  if (!n || shifts < FEST.FROM) return null;                             // нет площадки, рано
+  if (sv.last != null && shifts - sv.last < FEST.GAP_MIN) return null;  // не чаще раза в GAP_MIN смен
   const since = sv.since || 0;
   if (since + 1 < FEST.PITY && Math.random() >= FEST.CHANCE) { sv.since = since + 1; return null; }
   const kind = kindRoll(sv.kind);
