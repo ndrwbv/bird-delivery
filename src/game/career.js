@@ -415,7 +415,7 @@ export function showEnd (why, whyText, held) {
     rowsGo();
     SPEND_T = setTimeout(() => { if (A.wallet() > 0 && $('over') && !$('over').hidden) openSpend(); else reopenBtn(); }, 200 + rows.length * 220 + 700);
   };
-  if (wasOn) setTimeout(() => END.play({ earned: S.money || 0, bonus: SH.bonus || 0, money: A.money, Snd: A.Snd, mood: SH.mood || 'ok' }, after), 60);
+  if (wasOn) setTimeout(() => END.play({ earned: S.money || 0, bonus: SH.bonus || 0, wallet: A.wallet(), money: A.money, Snd: A.Snd, mood: SH.mood || 'ok' }, after), 60);
   else after();
   // кнопки: на новую смену (главная) / потратить / гараж / покататься / в меню
   $('ov-again').textContent = t('на новую смену');

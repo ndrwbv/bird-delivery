@@ -32,6 +32,7 @@
 
 import { t } from '../i18n/index.js';
 import { setPeopleSeason, redressHumans } from './people.js';
+import { growTree } from './trees.js';
 
 export const SEASON_STEP = 0.125;          // на столько сдвигает сезон одна смена: сезон — восемь смен
 export const SEASON_ENTER = 0.06;          // и на столько — каждый заход в игру (~16 заходов без смен — сезон)
@@ -57,6 +58,8 @@ const K = {
   yellow: curve([[0, 0], [0.92, 0], [1.4, 1], [2.95, 1], [3.0, 0], [4, 0]]),
   fresh: curve([[0, 0.25], [0.4, 0], [3.02, 0], [3.3, 1], [3.6, 0.8], [4, 0.25]]),
   fallen: curve([[0, 0], [1.2, 0], [1.6, 1], [1.95, 1], [2.12, 0], [4, 0]]),
+  bloom: curve([[0, 0], [3.25, 0], [3.4, 1], [3.7, 1], [3.85, 0], [4, 0]]),      // сирень цветёт: разгар весны (trees.js)
+  berry: curve([[0, 0], [0.85, 0], [1.15, 1], [2.25, 1], [2.5, 0], [4, 0]]),      // ягоды рябины и шиповника: с ранней осени до середины зимы
   dry: curve([[0, 0], [0.8, 0.1], [1.1, 0.45], [1.55, 1], [2.9, 1], [3.1, 0], [4, 0]]),
   mud: curve([[0, 0], [2.9, 0], [3.06, 1], [3.35, 0], [4, 0]]),
   wet: curve([[0, 0], [1.5, 0], [1.75, 0.5], [1.95, 0], [2.85, 0], [3.08, 1], [3.4, 0.35], [3.7, 0], [4, 0]]),
@@ -89,6 +92,7 @@ const U = {
   uLeaf: { value: 1 }, uYellow: { value: 0 }, uFallen: { value: 0 }, uDrift: { value: 0 }, uNY: { value: 0 }, uIce: { value: 0 },
   uTime: { value: 0 }, uNight: { value: 0 },
   uHeat: { value: 0 }, uGold: { value: 0 },     // варианты сезона (weather.js): жара, яркая сухая осень
+  uBloom: { value: 0 }, uBerry: { value: 0 },  // цветы сирени, ягоды рябины (trees.js): вид 5 и 6 в PILE
   uGale: { value: 0 }, uGaleD: { value: [1, 0] },   // ураган (hurricane.js): кроны клонит по ветру, м
 };
 /* ураган: насколько клонит кроны (м, 0 — тихо) и куда дует (x, z) */
@@ -185,11 +189,11 @@ function pileMat () {
   const m = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, U);
-    sh.vertexShader = 'attribute vec4 aux;\nuniform float uLeaf, uFallen, uDrift, uNY, uGale, uTime;\nuniform vec2 uGaleD;\nvarying vec3 vSW;\nvarying float vK, vP, vSeed;\n' +
+    sh.vertexShader = 'attribute vec4 aux;\nuniform float uLeaf, uFallen, uDrift, uNY, uGale, uTime, uBloom, uBerry;\nuniform vec2 uGaleD;\nvarying vec3 vSW;\nvarying float vK, vP, vSeed;\n' +
       sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
         vK = floor(aux.x * 255.0 + 0.5); vSeed = aux.y; vP = floor(aux.z * 255.0 + 0.5);
         if (uGale > 0.0 && vK == 1.0) transformed.xz += uGaleD * uGale * (0.72 + 0.28 * sin(uTime * 3.1 + vSeed * 41.0 + transformed.x * 0.07));   // ураган: крону клонит по ветру
-        float lim = vK == 1.0 ? uLeaf : vK == 2.0 ? uFallen : vK == 3.0 ? uDrift : vK == 4.0 ? uNY : 2.0;
+        float lim = vK == 1.0 ? uLeaf : vK == 2.0 ? uFallen : vK == 3.0 ? uDrift : vK == 4.0 ? uNY : vK == 5.0 ? uBloom : vK == 6.0 ? uBerry : 2.0;
         if (vSeed >= lim) transformed = vec3(0.0, -3000.0, 0.0);`)
         .replace('#include <project_vertex>', '#include <project_vertex>\n' + WPOS);
     sh.fragmentShader = 'uniform float uYellow;\nvarying float vK, vP, vSeed;\n' + TINT + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
@@ -197,7 +201,7 @@ function pileMat () {
         vec3 pal = vP < 0.5 ? vec3(0.52, 0.33, 0.02) : vP < 1.5 ? vec3(0.55, 0.17, 0.02) : vP < 2.5 ? vec3(0.4, 0.05, 0.02) : vec3(0.3, 0.3, 0.03);
         pal = mix(pal, pal * vec3(1.55, 1.35, 1.0) + vec3(0.06, 0.02, 0.0), uGold);   // яркая сухая осень — сочнее
         diffuseColor.rgb = mix(diffuseColor.rgb, pal, clamp(uYellow * 1.7 - vSeed * 0.7, 0.0, 1.0));
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.5, 0.08), uFresh * 0.5);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.72, 0.16), uFresh * 0.55);   // весна: молодая листва светлее
       }
       diffuseColor.rgb = seasonTint(diffuseColor.rgb, 0.0, vK == 0.0 || vK == 4.0 ? 0.62 : 1.0);`);
   };
@@ -260,7 +264,8 @@ function Pile (CH = CELL) {                      // CH — клетка скле
   return {
     /* tpl — неиндексированные вершины шаблона; поворот: X, потом Z, потом Y */
     /* возвращает, где лежат вершины: клетка и первая вершина */
-    add (tpl, x, y, z, sx, sy, sz, rx, ry, rz, hex, kind = 0, seed = 0, pal = 0) {
+    /* shade — низ куска темнее, верх светлее (кроны, trees.js): 0 — ровный цвет */
+    add (tpl, x, y, z, sx, sy, sz, rx, ry, rz, hex, kind = 0, seed = 0, pal = 0, shade = 0) {
       const c = cell(x, z), nv = tpl.length / 3, v0 = c.n;
       room(c, nv);
       write(tpl, c.p, v0 * 3, x, y, z, sx, sy, sz, rx, ry, rz);
@@ -274,7 +279,10 @@ function Pile (CH = CELL) {                      // CH — клетка скле
       const sd = Math.max(1, Math.min(254, Math.round(seed * 253) + 1));
       for (let i = v0; i < v0 + nv; i++) {
         const o = i * 3, q = i * 4;
-        c.c[o] = r; c.c[o + 1] = g; c.c[o + 2] = b;
+        if (shade) {
+          const f = 1 + shade * (0.6 * tpl[(i - v0) * 3 + 1] - 0.12);
+          c.c[o] = Math.min(255, r * f); c.c[o + 1] = Math.min(255, g * f); c.c[o + 2] = Math.min(255, b * f);
+        } else { c.c[o] = r; c.c[o + 1] = g; c.c[o + 2] = b; }
         c.a[q] = kind; c.a[q + 1] = sd; c.a[q + 2] = pal; c.a[q + 3] = 0;
       }
       c.n += nv;
@@ -315,6 +323,9 @@ function tpls () {
     cone: arr(new THREE.ConeGeometry(1, 1, 7, 1, true)), quad: arr(new THREE.PlaneGeometry(1, 1)),
     flat: arr(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)),
     mound: moundTpl(),
+    // стволы и ветки без торцов (8 треугольников вместо 12) и ягоды-октаэдры (8 вместо 20) — trees.js
+    stick: arr(new THREE.CylinderGeometry(0.7071, 0.7071, 1, 4, 1, true).rotateY(Math.PI / 4)),
+    oct: arr(new THREE.OctahedronGeometry(1, 0)),
   };
   return TPL;
 }
@@ -359,11 +370,6 @@ function rngAt (x, z, k = 0) {
 }
 const rnd = (a, b) => a + Math.random() * (b - a);
 const pickR = (r, a) => a[(r() * a.length) | 0];
-function weighted (r, o) {
-  let s = 0; for (const k in o) s += o[k];
-  let x = r() * s; for (const k in o) if ((x -= o[k]) < 0) return k;
-  return Object.keys(o)[0];
-}
 
 /* ─────────────── инициализация ─────────────── */
 let PILE = null, GARL = null, DRIFTP = null, DRIFT_MESH = [], LEAFP = null, LEAF_MESH = [];
@@ -414,7 +420,7 @@ function apply () {
   U.uHeat.value = (VAR && VAR.heat) || 0; U.uGold.value = (VAR && VAR.gold) || 0;
   U.uSnow.value = A.snow; U.uDry.value = A.dry; U.uMud.value = A.mud; U.uFresh.value = A.fresh; U.uWet.value = A.wet;
   U.uLeaf.value = A.leaf; U.uYellow.value = A.yellow; U.uFallen.value = A.fallen; U.uDrift.value = A.drift;
-  U.uNY.value = A.ny; U.uIce.value = A.ice;
+  U.uNY.value = A.ny; U.uIce.value = A.ice; U.uBloom.value = A.bloom; U.uBerry.value = A.berry;
   setPeopleSeason(A.warm);
   for (const m of MESH_GARL) m.visible = A.ny > 0.001;
   for (const m of DRIFT_MESH) m.visible = A.drift > 0.004;
@@ -438,16 +444,11 @@ function apply () {
 }
 
 /* ─────────────── деревья ───────────────
-   Вид — от точки: в Москве больше лип, клёнов и тополей, в Северске
-   (Сибирь) — берёзы, ели и сосны. Ствол и голые ветки есть всегда, в
-   кроне — две-четыре шапки, у каждой своё зерно: осенью пропадают по
-   одной. Под лиственными — пятна листьев (вид 2, осенью). */
-const W_MSK = { lime: 34, maple: 14, birch: 14, poplar: 11, spruce: 11, pine: 4, bush: 12 };
-const W_SVK = { birch: 34, spruce: 22, pine: 17, lime: 8, poplar: 8, bush: 11 };
-const GREENS = ['#5aa04a', '#6fb05a', '#4f9443', '#62a84f'];
-
+   Породы и как они выглядят — trees.js (growTree). Здесь — только где
+   нельзя сажать у пиццерии и общая склейка PILE. kind — порода силой
+   (группы во дворах и кусты под окнами), иначе — жребий по месту. */
 let PZ_NEAR = null;
-export function seasonTree (x, z, y) {
+export function seasonTree (x, z, y, kind) {
   // у пиццерии: не в столиках, кашпо и заборчике и не на парковке курьеров
   const PZ = C.PIZZA;
   if (PZ && Math.hypot(x - PZ.bx, z - PZ.bz) < 90) {
@@ -455,71 +456,8 @@ export function seasonTree (x, z, y) {
     if (PZ_NEAR.some(it => Math.hypot(it.x - x, it.z - z) < (it.r || 1) + 1.6) || (C.COURIER_SLOTS || []).some(q => Math.hypot(q.x - x, q.z - z) < 4)) return false;
     if (startViewBlocked(PZ, x, z, 3.5)) return false;              // не заслоняет стартовый кадр
   }
-  const T = tpls(), r = rngAt(x, z, 7), P = PILE;
-  const kind = weighted(r, C.MAP.id === 'seversk' ? W_SVK : W_MSK);
-  const s = 0.82 + r() * 0.4, yaw = r() * 6.283;
   BUILT.trees++;
-  const trunk = (w, h, hex) => P.add(T.box, x, y + h / 2 - 0.2, z, w * s, h * s + 0.2, w * s, 0, yaw, 0, hex);
-  const branch = (y0, len, tilt, a, w, hex) => {
-    // ветка от ствола: наклон tilt, по кругу a; центр — на середине длины
-    const dx = -Math.sin(tilt) * Math.cos(a + yaw), dy = Math.cos(tilt), dz = Math.sin(tilt) * Math.sin(a + yaw);
-    P.add(T.box, x + dx * len / 2 * s, y + (y0 + dy * len / 2) * s, z + dz * len / 2 * s, w * s, len * s, w * s, 0, a + yaw, tilt, hex);
-  };
-  const crown = (ox, oy, oz, rr, sy, hex, pal) => P.add(T.ico, x + ox * s, y + oy * s, z + oz * s, rr * s, rr * s * sy, rr * s, 0, r() * 6.283, 0, hex, 1, r(), pal);
-  const leaves = (hexes, n, rad) => {
-    for (let i = 0; i < n; i++) {
-      const a = r() * 6.283, d = 0.4 + r() * rad, lx = x + Math.cos(a) * d, lz = z + Math.sin(a) * d;
-      const sz = 0.6 + r() * 0.8, ly = C.groundH(lx, lz) + C.curbAt(lx, lz) + 0.1;
-      P.add(T.flat, lx, ly, lz, sz, 1, sz * (0.6 + r() * 0.6), 0, r() * 6.283, 0, pickR(r, hexes), 2, r());
-    }
-  };
-  const YEL = ['#e8b830', '#f0c848', '#d8a028'], ORA = ['#e8902a', '#d86a22', '#f0a838'], RED = ['#c84a24', '#d86a22', '#b83a22'];
-  if (kind === 'lime' || kind === 'maple') {
-    const pal = kind === 'maple' ? (r() < 0.6 ? 1 : 2) : r() < 0.7 ? 0 : 1;
-    trunk(0.5, 3.1, '#7a5a3c');
-    for (let i = 0; i < 3; i++) branch(2.3 + r() * 0.5, 1.8 + r() * 0.5, 0.55 + r() * 0.35, i * 2.1 + r() * 0.6, 0.15, '#6a4c32');
-    const g = pickR(r, GREENS);
-    crown(0, 4.1, 0, 1.85, 1, g, pal);
-    crown(0.5, 5.2, -0.35, 1.3, 1, '#6fb05a', pal);
-    crown(-0.7, 4.6, 0.6, 1.2, 0.9, g, pal);
-    leaves(pal === 0 ? YEL : pal === 1 ? ORA : RED, 5, 3.2);
-    DECID.push([x, z]);
-  } else if (kind === 'birch') {
-    trunk(0.32, 5.8, '#ece8de');
-    for (const [hy, sd] of [[1.3, 1], [3.0, -1]]) P.add(T.box, x + sd * 0.04 * s, y + hy * s, z, 0.34 * s, 0.09 * s, 0.22 * s, 0, yaw, 0, '#2b2a30');
-    for (let i = 0; i < 3; i++) branch(3.4 + i * 0.7, 1.3 + r() * 0.5, 0.45 + r() * 0.35, i * 1.9 + r(), 0.09, '#d8d2c6');
-    const g = r() < 0.5 ? '#7fbf5a' : '#8cc862';
-    crown(0, 4.4, 0, 1.15, 1.35, g, 0);
-    crown(0.25, 5.6, 0.2, 1.0, 1.4, '#94cc6a', 0);
-    crown(-0.2, 6.6, -0.1, 0.75, 1.3, g, 0);
-    leaves(YEL, 4, 2.6);
-    DECID.push([x, z]);
-  } else if (kind === 'poplar') {
-    trunk(0.45, 2.6, '#6a5a48');
-    branch(2.0, 3.2, 0.18, r() * 6.28, 0.14, '#5a4a3a'); branch(2.3, 3.4, 0.2, r() * 6.28 + 3, 0.14, '#5a4a3a'); branch(3.0, 3.0, 0.12, r() * 6.28, 0.12, '#5a4a3a');
-    crown(0, 5.0, 0, 1.35, 2.2, '#4f8f3f', 3);
-    crown(0.1, 7.4, 0.1, 1.0, 1.7, '#5a9a48', 0);
-    leaves(['#c8b840', '#e0c040'], 3, 2.2);
-    DECID.push([x, z]);
-  } else if (kind === 'bush') {
-    for (let i = 0; i < 3; i++) branch(0, 2.2, 0.28, i * 2.1 + r(), 0.16, '#6a4c32');
-    const pal = r() < 0.5 ? 2 : 1;
-    for (let i = 0; i < 3; i++) { const a = i * 2.1 + r(); crown(Math.sin(a) * 0.75, 2.1 + r() * 0.6, Math.cos(a) * 0.75, 0.95 + r() * 0.3, 0.9, pickR(r, GREENS), pal); }
-    leaves(pal === 2 ? RED : ORA, 3, 2.0);
-    DECID.push([x, z]);
-  } else if (kind === 'spruce') {
-    const hs = 0.85 + r() * 0.5;
-    trunk(0.36, 1.4, '#5a4030');
-    const L = [[2.3, 1.0], [1.85, 2.2], [1.4, 3.3], [0.9, 4.3]];
-    L.forEach(([rr, b], i) => P.add(T.cone, x, y + (b + 1.0) * s * hs, z, rr * s, 2.0 * s * hs, rr * s, 0, yaw + i * 0.45, 0, i % 2 ? '#357341' : '#2f6a3a'));
-    SPRUCES.push({ x, z, y, s, hs });
-  } else {                                           // сосна: высокий рыжий ствол, крона наверху
-    trunk(0.38, 7.2, '#a0603a');
-    branch(5.6, 1.6, 1.0, r() * 6.28, 0.14, '#8a5030'); branch(6.2, 1.4, 0.9, r() * 6.28 + 2.5, 0.12, '#8a5030');
-    P.add(T.ico, x, y + 7.5 * s, z, 1.7 * s, 0.75 * s, 1.7 * s, 0, yaw, 0, '#3f7a3f');
-    P.add(T.ico, x + 0.8 * s, y + 6.7 * s, z + 0.3 * s, 1.25 * s, 0.6 * s, 1.25 * s, 0, yaw, 0, '#467f44');
-    P.add(T.ico, x - 0.6 * s, y + 8.2 * s, z - 0.4 * s, 1.0 * s, 0.55 * s, 1.0 * s, 0, yaw, 0, '#3a7240');
-  }
+  return growTree({ P: PILE, T: tpls(), r: rngAt(x, z, 7), x, z, y, kind, seversk: C.MAP.id === 'seversk', DECID, SPRUCES, ground: (lx, lz) => C.groundH(lx, lz) + C.curbAt(lx, lz) });
 }
 
 /* ─────────────── двор: ледяные горки и снеговики (до smashBuild) ─────────────── */

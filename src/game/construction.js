@@ -38,6 +38,7 @@
    самосвала, onRespawn(t), reset() — новая смена.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
+import { reliefAt, RELIEF } from './relief.js';
 import { t, N_ } from '../i18n/index.js';
 
 export const CONS = {
@@ -303,6 +304,7 @@ function finder () {
       if (A.inHouse(px, pz, CONS.HOUSE)) return no('house');
       const gy = A.groundH(px, pz);
       if (gy < 0.5) return no('water');
+      if (Math.abs(reliefAt(px, pz)) > RELIEF.FLAT_OK) return no('relief');   // бугры и холмики газона (relief.js) — стройке и точке ровное место
       h0 = Math.min(h0, gy); h1 = Math.max(h1, gy);
       if (h1 - h0 > CONS.SLOPE) return no('slope');
       if (inPolys(px, pz)) return no('poly');

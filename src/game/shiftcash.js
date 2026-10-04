@@ -1,6 +1,8 @@
 /* Заработок смены на хаде (карьера, docs/CAREER.md «Хад»): пачка купюр, нарисованная кодом, и крупно —
-   сколько заработано за эту смену (S.money, как «заработано» в итогах). Строкой под кошельком-копилкой,
-   в одной рамке с ним (#cash слева под сердцами), без подписи — только пачка и сумма.
+   сколько заработано за эту смену (S.money, как «заработано» в итогах). Своей зелёной плашкой под
+   копилкой-свиньёй (piggy.js, розовая плашка; обе — в #cash слева под сердцами), без подписи — только
+   пачка и сумма. В конце смены пачка перетекает в копилку (shiftend.js).
+   В покое плашка полупрозрачная; деньги пришли или ушли — heat(): непрозрачная и крупнее, потом обратно.
    Каждая оплата — 3—8 купюр (мелочь — монетками) вылетают из кучки денег под машиной (нет кучки — из
    низа экрана по центру) и по дуге летят в пачку; каждая долетевшая — пачка «пухнет», сумма прибавляет
    её долю, на первой — «+сумма» под блоком. Вычет — красная купюра падает из блока вниз, «−сумма».
@@ -34,9 +36,29 @@ const ICON = '<svg class="sc-ico" viewBox="0 0 32 24" shape-rendering="crispEdge
 const SVG = (w, h, body) => `<svg viewBox="0 0 ${w} ${h}" shape-rendering="crispEdges">${body}</svg>`;
 const FLY_BILL = SVG(26, 14, BILL(0, 0));
 const FLY_RED = SVG(26, 14, BILL(0, 0, '#7a1e1e', '#e04848', '#c53a3a', '#ff9a9a'));
-const FLY_COIN = SVG(10, 10, '<rect x="2" y="0" width="6" height="10" fill="#8a5a14"/><rect x="0" y="2" width="10" height="6" fill="#8a5a14"/>' +
+export const FLY_COIN = SVG(10, 10, '<rect x="2" y="0" width="6" height="10" fill="#8a5a14"/><rect x="0" y="2" width="10" height="6" fill="#8a5a14"/>' +
   '<rect x="1" y="2" width="8" height="6" fill="#ffd85e"/><rect x="2" y="1" width="6" height="8" fill="#ffd85e"/>' +
   '<rect x="3" y="2" width="2" height="2" fill="#fff0a8"/><rect x="4" y="4" width="2" height="3" fill="#c99a2e"/>');
+
+/* кошелёк — копилка-свинья (piggy.js; конец смены — shiftend.js), нарисована кодом пикселями */
+export const PIGGY = '<svg class="pg-ico" viewBox="0 0 32 24" shape-rendering="crispEdges" aria-hidden="true">' +
+  [[6, 3, 18, 18], [4, 5, 22, 14], [3, 7, 24, 10], [25, 8, 5, 7], [19, 1, 4, 4], [7, 19, 4, 5], [19, 19, 4, 5], [1, 9, 3, 2]]
+    .map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#7a2e48"/>`).join('') +
+  [[7, 4, 16, 16], [5, 6, 20, 12], [4, 8, 22, 8], [20, 2, 2, 2], [8, 20, 2, 3], [20, 20, 2, 3]]
+    .map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#f39ab4"/>`).join('') +
+  '<rect x="26" y="9" width="3" height="5" fill="#ffb3c8"/><rect x="27" y="10" width="1" height="1" fill="#7a2e48"/>' +
+  '<rect x="27" y="12" width="1" height="1" fill="#7a2e48"/><rect x="8" y="6" width="6" height="2" fill="#ffd0de"/>' +
+  '<rect x="6" y="15" width="18" height="2" fill="#d9779a"/><rect x="21" y="8" width="2" height="2" fill="#33210c"/>' +
+  '<rect x="12" y="5" width="6" height="1" fill="#33210c"/><rect x="13" y="0" width="4" height="4" fill="#c99a2e"/>' +
+  '<rect x="14" y="0" width="2" height="3" fill="#ffd85e"/></svg>';
+
+/* акцент плашки денег: непрозрачная и крупнее (класс hot, shiftcash.css) на ms, потом обратно */
+export function heat (el, ms) {
+  if (!el) return;
+  el.classList.add('hot');
+  clearTimeout(el._hotT);
+  el._hotT = setTimeout(() => el.classList.remove('hot'), ms);
+}
 
 let A = null, EL = null, NUM = null, ICO = null;
 const ST = { real: 0, shown: 0, pend: 0, on: false, txt: '', fly: new Set() };
@@ -48,6 +70,7 @@ export function init (api) {
   if (!host || EL) return;
   EL = document.createElement('div');
   EL.id = 'shiftcash';
+  EL.className = 'mb';
   EL.hidden = true;
   EL.innerHTML = ICON + '<div class="sc-txt"><b>0</b></div>';
   NUM = EL.querySelector('b'); ICO = EL.querySelector('.sc-ico');
@@ -98,6 +121,7 @@ function fly (d) {
   const r = ICO.getBoundingClientRect(), tx = r.left + r.width / 2, ty = r.top + r.height / 2;
   if (!(r.width > 0)) { pop(d); return; }
   const [sx, sy] = source(), dx = tx - sx, dy = ty - sy;
+  heat(EL, (FLY.DELAY + FLY.SPREAD + FLY.T) * 1000 + 800);
   ST.pend += d;
   let left = d, first = true;
   for (let k = 0; k < n; k++) {
@@ -130,6 +154,7 @@ function fly (d) {
 
 /* вычет: красная купюра выпадает из пачки вниз */
 function drop () {
+  heat(EL, FLY.DROP * 1000 + 900);
   const r = ICO.getBoundingClientRect();
   if (!(r.width > 0)) return;
   const e = flyer(FLY_RED, ' neg', r.left + r.width / 2, r.top + r.height / 2);
@@ -168,5 +193,5 @@ function pop (d) {
 export const DEBUG = {
   get text () { return EL && !EL.hidden ? NUM.textContent : null; }, get real () { return ST.real; },
   get shown () { return Math.round(ST.shown); }, get pend () { return ST.pend; }, get flying () { return ST.fly.size; },
-  get el () { return EL; },
+  get hot () { return !!(EL && EL.classList.contains('hot')); }, get el () { return EL; },
 };

@@ -1,22 +1,28 @@
-/* ── заработок смены на хаде (shiftcash.js): пачка купюр и сумма — строкой под кошельком-копилкой, в рамке #cash
-   (слева под сердцами, career.css). Подписей нет — только значки и суммы ── */
-#shiftcash { position: relative; display: flex; align-items: center; gap: 7px; line-height: 1.2; }
-#shiftcash[hidden] { display: none; }
-#shiftcash .sc-ico { width: 32px; height: 24px; flex: none; filter: drop-shadow(2px 2px 0 #33210c); transform-origin: 50% 70%; }
+/* ── деньги на хаде — две плашки .mb в #cash (слева под сердцами): #money — копилка-свинья, кошелёк (piggy.js,
+   розовая — career.css), #shiftcash — пачка купюр, за смену (shiftcash.js, зелёная). Подписей нет — только
+   значки и суммы. В покое плашка полупрозрачная; .hot — деньги пришли или ушли: непрозрачная и ×1,4 ── */
+#cash .mb { position: relative; display: flex; align-items: center; gap: 5px; line-height: 1.2; padding: 3px 8px 3px 4px;
+            border: 2px solid; border-radius: 6px; opacity: .5; transform-origin: 0 50%;
+            transition: opacity .3s ease-out, transform .35s ease-out; }
+#cash .mb.hot { opacity: 1; transform: scale(1.4); z-index: 2; transition: opacity .12s, transform .25s cubic-bezier(.3, 1.6, .5, 1); }
+#cash .mb[hidden] { display: none; }
+#cash .mb svg { width: 24px; height: 18px; flex: none; filter: drop-shadow(1px 1px 0 #33210c); transform-origin: 50% 70%; }
+#cash .mb b { font-size: 13px; white-space: nowrap; }
+#cash #shiftcash { background: #2d6a33; border-color: #0f2e14; }
 #shiftcash .sc-txt { display: flex; align-items: center; }
-#shiftcash .sc-txt b { font-size: 16px; color: #8cf07a; white-space: nowrap; }
-/* оплата: число вспыхивает (пачка «пухнет» на каждой долетевшей купюре — из js); вычет — число краснеет */
-#shiftcash.bump .sc-txt b { animation: sc-flash .5s ease-out 1; }
-#shiftcash.hurt .sc-txt b { animation: sc-hurt .6s steps(3) 1; }
+#shiftcash .sc-txt b { color: #e2ffd2; text-shadow: 2px 2px 0 #0f2e14; }
+/* пришли — число вспыхивает (значок «пухнет» на каждой долетевшей купюре или монете — из js); ушли — краснеет */
+#cash .mb.bump b { animation: sc-flash .5s ease-out 1; }
+#cash .mb.hurt b { animation: sc-hurt .6s steps(3) 1; }
 #shiftcash.hurt .sc-ico { animation: sc-jump .5s steps(5) 1; }
 @keyframes sc-jump { 0% { transform: none; } 30% { transform: translateY(-4px) scale(1.1); } 60% { transform: translateY(1px) scale(1, .9); } 100% { transform: none; } }
-@keyframes sc-flash { 0% { transform: scale(1); } 35% { transform: scale(1.25); color: #fff3d6; } 100% { transform: scale(1); } }
-@keyframes sc-hurt { 0%, 100% { color: #8cf07a; } 33% { color: #ff6b6b; } 66% { color: #ff9a9a; } }
-/* «+сумма» всплывает справа от рамки (под ней — табличка курьеров) и тает */
-#shiftcash .sc-pop { position: absolute; left: calc(100% + 18px); top: 50%; margin-top: -5px; font-style: normal; font-size: 10px; line-height: 1;
-                     color: #ffd85e; white-space: nowrap; pointer-events: none; animation: sc-up 1.1s ease-out forwards;
-                     text-shadow: 2px 2px 0 #33210c, -1px -1px 0 #33210c; }
-#shiftcash .sc-pop.neg { color: #ff6b6b; }
+@keyframes sc-flash { 0% { transform: scale(1); } 35% { transform: scale(1.25); color: #fff; } 100% { transform: scale(1); } }
+@keyframes sc-hurt { 33% { color: #ff6b6b; } 66% { color: #ff9a9a; } }
+/* «+сумма» всплывает справа от плашки и тает */
+#cash .mb .sc-pop { position: absolute; left: calc(100% + 8px); top: 50%; margin-top: -5px; font-style: normal; font-size: 10px; line-height: 1;
+                    color: #ffd85e; white-space: nowrap; pointer-events: none; animation: sc-up 1.1s ease-out forwards;
+                    text-shadow: 2px 2px 0 #33210c, -1px -1px 0 #33210c; }
+#cash .mb .sc-pop.neg { color: #ff6b6b; }
 @keyframes sc-up { 0% { transform: translateY(12px); opacity: 0; } 15% { transform: translateY(4px); opacity: 1; }
                    70% { opacity: 1; } 100% { transform: translateY(-6px); opacity: 0; } }
 /* купюры и монетки в полёте (из кучки под машиной в пачку) и красная купюра вычета — поверх всего хада */
@@ -28,8 +34,8 @@
 
 /* телефон: значки и суммы мельче */
 @media (max-width: 720px), (max-height: 460px) {
-  #shiftcash { gap: 5px; }
-  #shiftcash .sc-ico { width: 22px; height: 16px; }
-  #shiftcash .sc-txt b { font-size: 12px; }
-  #shiftcash .sc-pop { font-size: 9px; left: calc(100% + 12px); }
+  #cash .mb { gap: 4px; padding: 2px 6px 2px 3px; }
+  #cash .mb svg { width: 18px; height: 13px; }
+  #cash .mb b { font-size: 10px; }
+  #cash .mb .sc-pop { font-size: 9px; left: calc(100% + 6px); }
 }

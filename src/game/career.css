@@ -2,17 +2,14 @@
 
 /* часы смены и «сняться со смены» на хаде больше не стоят (04.10.2026): «до конца смены» и кнопка — в паузе */
 
-/* ── деньги на хаде — один блок в рамке слева под сердцами: копилка — кошелёк, ниже пачка купюр — за смену
-   (shiftcash.css). Подписей нет — только значки и суммы. Оплата летит в кошелёк, купюры — в пачку ── */
-#cash { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 6px; padding: 6px 10px 5px 7px;
-        background: rgba(20, 16, 30, .7); border: 2px solid #33210c; border-radius: 6px; }
+/* ── деньги на хаде — две плашки слева под сердцами: розовая — копилка-свинья, кошелёк (piggy.js), под ней
+   зелёная — пачка купюр, за смену (shiftcash.js, стиль плашек .mb — там же). Подписей нет — только значки и суммы ── */
+#cash { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 6px; }
+body:not(.career) #cash { padding: 6px 10px 5px 7px; background: rgba(20, 16, 30, .7); border: 2px solid #33210c; border-radius: 6px; }
 #cash + #rivals { margin-top: 6px; }
 body.intro-cut #cash { visibility: hidden; }
-body.career #money { display: flex; align-items: center; gap: 7px; line-height: 1.2; }
-body.career #money .pg-ico { width: 32px; height: 24px; flex: none; filter: drop-shadow(2px 2px 0 #33210c); }
-body.career #money b { font-size: 16px; color: #ffd85e; white-space: nowrap; }
-body.career #money.bump b { animation: wl-bump .45s ease-out; }
-@keyframes wl-bump { 0% { transform: scale(1); } 35% { transform: scale(1.35); color: #fff3d6; } 100% { transform: scale(1); } }
+body.career #money { background: #8c3a58; border-color: #3a1020; }
+body.career #money b { color: #ffe6ee; text-shadow: 2px 2px 0 #3a1020; }
 .wl-fly { position: fixed; z-index: 40; pointer-events: none; transform: translate(-50%, -50%); font-size: 15px; color: #ffd85e;
           text-shadow: 2px 2px 0 #33210c, -1px -1px 0 #33210c; white-space: nowrap;
           transition: left .7s cubic-bezier(.5, 0, .8, .4), top .7s cubic-bezier(.2, .6, .4, 1), opacity .7s, transform .7s; }
@@ -20,10 +17,8 @@ body.career #money.bump b { animation: wl-bump .45s ease-out; }
 .wl-fly.neg { color: #ff6b6b; font-size: 12px; transition: top 1.4s ease-out, opacity 1.4s ease-in; }
 .wl-fly.neg.go { opacity: 0; transform: translate(-50%, 0); }
 @media (max-width: 720px), (max-height: 460px) {
-  #cash { padding: 4px 7px 4px 5px; gap: 3px; }
-  body.career #money { gap: 5px; }
-  body.career #money .pg-ico { width: 22px; height: 16px; }
-  body.career #money b { font-size: 12px; }
+  body:not(.career) #cash { padding: 4px 7px 4px 5px; }
+  #cash { gap: 3px; }
 }
 
 /* ── обед: три карточки в ряд ── */
@@ -292,6 +287,16 @@ body:has(#cr-spend:not([hidden])) .hud, body:has(#cr-spend:not([hidden])) #ctrls
 .en-bonus.on { transform: none; opacity: 1; }
 .en-bonus b { font-weight: normal; color: #ffd85e; text-shadow: 2px 2px 0 #9b2a10; }
 .en-pile.dep-pile { flex: 1; min-height: 80px; width: 100%; height: auto; }
+/* копилка: куча за смену перетекает в неё (shiftend.js pour) — розовая плашка, как на хаде */
+.en-pig { display: flex; align-items: center; gap: 10px; padding: 4px 14px 4px 8px; background: #8c3a58; border: 3px solid #3a1020; border-radius: 10px;
+          font-size: clamp(14px, min(2.4vw, 4vh), 26px); line-height: 1.2; }
+.en-pig[hidden] { display: none; }
+.en-pig .pg-ico { width: 1.9em; height: 1.4em; flex: none; filter: drop-shadow(2px 2px 0 #33210c); transform-origin: 50% 70%; }
+.en-pig b { font-weight: normal; color: #ffe6ee; text-shadow: 2px 2px 0 #3a1020; white-space: nowrap; }
+.en-pig span { font-size: .5em; color: #ffc4d6; text-shadow: 1px 1px 0 #3a1020; white-space: nowrap; }
+.en-pig.fill { animation: en-fill .45s cubic-bezier(.3, 1.6, .5, 1); }
+.en-pig.win b { animation: cr-blink .4s steps(2) 4; }
+@keyframes en-fill { 0% { transform: scale(1); } 40% { transform: scale(1.2); } 100% { transform: scale(1); } }
 .en-pile .en-coin { border-radius: 50%; border: 3px solid #8a5a0c; background: radial-gradient(circle at 35% 35%, #fff6c2, #ffd24a 45%, #d9a21c); }
 #cr-payout.now .en-pile i { animation: none; }
 .en-go { flex: none; }

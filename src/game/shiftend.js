@@ -1,11 +1,14 @@
 /* Конец смены: деньги кучей, Толик управляющий, слово директора. Числа — econ.js (SHIFT_BONUS, RAIN,
    BOSS_MOOD), правила — docs/CAREER.md («Экран итогов»).
 
-     END.play({ earned, bonus, money, Snd, mood }, done) — два экрана поверх итогов, у каждого внизу
+     END.play({ earned, bonus, wallet, money, Snd, mood }, done) — два экрана поверх итогов, у каждого внизу
          «продолжить»:
            1) деньги: купюры насыпаются кучей, как выигрыш в «депнуть» (career.js pile: те же зелёные
               купюры с «₽», падают и ложатся с наклоном), бонус за смену — золотыми монетами сверху,
-              сумма докручивается и мигает, три звона (~2,5 с, с бонусом ~3,3 с);
+              сумма докручивается и мигает, три звона (~2,5 с, с бонусом ~3,3 с); потом вся куча
+              перетекает в копилку-свинью (сверху под суммой, «в копилке N ₽»): купюры по дуге летят в неё,
+              свинья пухнет от каждой, её сумма докручивается от «было» до wallet (кошелёк уже с заработком
+              и бонусом) — ~1,5 с;
            2) Толик управляющий крупно и одна его фраза по смене (CHAT.shiftLine(mood), хоть «мдаа»).
          Ничего не заработал — сразу второй. done() — после второго «продолжить».
      END.active() / END.skip() / END.root() — идёт ли; skip — любая клавиша / тап / кнопка геймпада:
@@ -17,6 +20,7 @@ import { t, tn } from '../i18n/index.js';
 import { RAIN as R } from './econ.js';
 import { BOSS } from './orders.config.js';
 import * as CHAT from './chat.js';
+import { PIGGY } from './shiftcash.js';
 
 const N_ = s => s;
 
@@ -28,8 +32,9 @@ export function skip () { if (RUN) RUN.skip(); }
 
 const GUARD = 350;                                   // мс: после смены экрана нажатия не считаются — не пролистать оба разом
 const FALL = 450;                                    // мс: одна купюра падает (dep-fall в career.css)
+const POUR = { WAIT: 450, T: 520, SPAN: 1000 };      // мс: куча → копилка: пауза после кучи, полёт купюры, вся куча за столько
 
-export function play ({ earned = 0, bonus = 0, money = n => String(Math.round(n)), Snd = null, mood = 'ok' } = {}, done = () => {}) {
+export function play ({ earned = 0, bonus = 0, wallet = null, money = n => String(Math.round(n)), Snd = null, mood = 'ok' } = {}, done = () => {}) {
   if (RUN) RUN.close(false);
   earned = Math.max(0, Math.round(earned)); bonus = Math.max(0, Math.round(bonus));
   const el = $c('div'); el.id = 'cr-payout';
@@ -75,7 +80,15 @@ export function play ({ earned = 0, bonus = 0, money = n => String(Math.round(n)
     const top = $c('div', 'en-top'), sum = $c('div', 'en-sum'), cap = $c('div', 'en-cap'), bon = $c('div', 'en-bonus');
     cap.textContent = t('заработано за смену');
     bon.hidden = true;
-    top.append(sum, cap, bon);
+    // копилка: было (кошелёк без заработка и бонуса) → стало (wallet); нет кошелька — без перелива
+    const after = wallet == null ? null : Math.max(0, Math.round(wallet)), before = after == null ? 0 : Math.max(0, after - earned - bonus);
+    const pig = $c('div', 'en-pig');
+    pig.innerHTML = PIGGY + '<span>' + esc(t('в копилке')) + '</span><b></b>';
+    const pigN = pig.querySelector('b'), pigIco = pig.querySelector('.pg-ico');
+    const showPig = v => { pigN.textContent = money(Math.round(v)); };
+    showPig(before);
+    pig.hidden = after == null;
+    top.append(sum, cap, bon, pig);
     const pile = $c('div', 'dep-pile en-pile');
     stage.replaceChildren(top, pile);
     const pw = Math.max(120, pile.clientWidth), ph = Math.max(80, pile.clientHeight);
@@ -129,18 +142,64 @@ export function play ({ earned = 0, bonus = 0, money = n => String(Math.round(n)
     };
     showSum(0);
     const t0 = performance.now();
-    let landed = 0, lastSnd = 0, bonusShown = false;
+    let landed = 0, lastSnd = 0, bonusShown = false, heaped = false, poured = false;
     const st = { id: 'money', busy: true };
+    const over = () => { if (!st.busy) return; st.busy = false; el.classList.add('done'); };
+    // куча перетекла в копилку: купюр нет, сумма копилки — «стало»
+    let filledUp = false;
+    const filled = () => {
+      if (filledUp) return;
+      filledUp = true;
+      if (!poured) { poured = true; pile.getAnimations({ subtree: true }).forEach(a => a.cancel()); }
+      pile.replaceChildren();
+      showPig(after);
+      pig.classList.remove('fill'); void pig.offsetWidth; pig.classList.add('fill', 'win');
+      over();
+    };
+    // перелив: купюры (сверху кучи — первыми) по дуге летят в свинью, она пухнет, сумма докручивается
+    const pour = () => {
+      if (closed || poured) return;
+      poured = true;
+      const items = [...pile.children].reverse(), n = items.length;
+      const r = pigIco.getBoundingClientRect(), tx = r.left + r.width / 2, ty = r.top + r.height / 2;
+      if (!n || !(r.width > 0)) { filled(); return; }
+      const span = Math.min(POUR.SPAN, 200 + n * 12);
+      let got = 0, lastPuff = 0;
+      const land = () => {
+        if (++got >= n) { filled(); return; }
+        showPig(before + (after - before) * got / n);
+        const now = performance.now();
+        if (now - lastPuff > 70) {
+          lastPuff = now;
+          pigIco.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.25,1.2)', offset: 0.35 }, { transform: 'scale(1)' }], { duration: 200, easing: 'ease-out' });
+          blip(700 + Math.random() * 300, 0.03, 'square', 0.03);
+        }
+      };
+      items.forEach((b, i) => {
+        const q = b.getBoundingClientRect(), dx = tx - (q.left + q.width / 2), dy = ty - (q.top + q.height / 2);
+        const rr = parseFloat(b.style.getPropertyValue('--r')) || 0, side = (Math.random() - 0.5) * 80;
+        const an = b.animate([
+          { transform: `rotate(${rr}deg)`, opacity: 1 },
+          { transform: `translate(${(dx * 0.45 + side).toFixed(0)}px,${(dy * 0.55 - 40).toFixed(0)}px) rotate(${rr * 3}deg) scale(.75)`, opacity: 1, offset: 0.5 },
+          { transform: `translate(${dx.toFixed(0)}px,${dy.toFixed(0)}px) rotate(${rr * 5}deg) scale(.25)`, opacity: 0 },
+        ], { duration: POUR.T, delay: n > 1 ? i * span / (n - 1) : 0, easing: 'ease-in', fill: 'forwards' });
+        an.onfinish = land;
+      });
+      later(span + POUR.T + 400, filled);                    // на всякий случай: анимации не идут — всё равно перелилось
+    };
+    // куча насыпалась: сумма мигает, звон; через паузу — в копилку
     const end = () => {
-      st.busy = false;
+      if (heaped) return;
+      heaped = true;
       cancelAnimationFrame(raf);
       showSum(earned + bonus);
       if (nB && !bonusShown) { bonusShown = true; showBonus(); }
       sum.classList.add('win');
-      el.classList.add('done');
       if (earned + bonus > 0) coins();
+      if (after == null) over(); else later(POUR.WAIT, pour);
     };
-    st.finish = () => { el.classList.add('now'); end(); };       // досыпать сразу: купюры — уже в куче
+    // показать сразу: досыпать и перелить без анимации
+    st.finish = () => { el.classList.add('now'); end(); if (after != null) filled(); };
     const frame = now => {
       if (closed || !st.busy) return;
       const e = now - t0;
