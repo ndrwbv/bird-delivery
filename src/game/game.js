@@ -37,9 +37,13 @@ import * as WINS from './windows.js';          // окна: рамы, свет, 
 import * as PAINT from './citypaint.js';         // дома в цвет по номеру, муралы на торцах (citypaint.js)
 import * as BB from './billboards.js';            // щиты со смешной рекламой у больших дорог (billboards.js)
 import * as CONSTR from './construction.js';     // стройки на пустырях: шиферный забор, кран, техника, «паспорт объекта», самосвалы (construction.js)
+import * as RIVS from './rivals.js';             // точки «Вселенной суши» и «Королевы Бургеров», маскоты, их курьеры (rivals.js)
 import * as CARL from './carlights.js';         // огни машины игрока: стоп-сигналы, поворотники, задний ход (carlights.js)         // фонари: все сбиваются, шары и консоли, частный сектор (streetlamps.js)
 import * as JUNK from './junk.js';              // остановки ломаются, мусор у подъездов, контейнеры (junk.js)             // плитка, аллеи; в карьере — мусор, бандиты, особняки, шашлыки
+import * as RAID from './raid.js';               // налёт конкурентов на твою точку и ёлка-турель (raid.js)
 import * as MAFIA from './mafia.js';             // мафиози у адреса: предупреждает, потом стреляет (детская — кидается помидорами)
+import * as THUGS from './thugs.js';             // гопники прессуют прохожего в бандитских кругах — помог, респект (thugs.js)
+import * as GROW from './growth.js';             // пиццерия растёт: ступени 1—5 по доставкам в районе, вид у шара (growth.js)
 import * as HEROES from './heroes.js';           // герои города: Лёха, Жека, Игорёк, Стёпа, Настюша, Ариша, Андрюша — места и реплики
 import * as HB from './horsebox.js';             // коневозки в потоке: прицеп за машиной, конь в окне (horsebox.js)
 import * as FLIRT from './flirt.js';            // взрослая: клиентка изредка заигрывает при вручении, курьер отказывает (flirt.js)
@@ -68,6 +72,8 @@ import * as CULL from './cull.js';               // статика дальше 
 import * as TRK from './tracks.js';              // следы колёс на газоне и снегу
 import * as CHAT from './chat.js';             // «Толик управляющий» пишет справа сверху, как в iMessage (похвала, ругань, вычет за опоздание)
 import * as SC from './shiftcash.js';             // карьера: пачка купюр на хаде — заработок смены (shiftcash.js)
+import * as RESPECT from './respect.js';         // респект: уважение на районе, копится через смены (respect.js)
+import * as CREWS from './crews.js';             // компании в форме сетей: курят или бьют конкурентов (crews.js)
 import * as HITS from './hits.js';               // сила удара по людям: упал и встал / лежит в луже / разорвало; самокат отдельно
 import * as FIRST from './intro.js';             // вступление первого запуска: пиццерия, Степан, машина (катсцена «как в ГТА»)
 import * as ACH from './achievements.js';          // достижения Стима: таблица, счётчики, вызов моста (achievements.js, docs/STEAM.md)
@@ -1459,6 +1465,7 @@ function tree (x, z, strip = 0) {
   if (road && road.d < road.seg.w / 2 + (strip ? 1 : 2.5)) return;
   if (WORLD.onAlley(x, z)) return;                 // на аллее парка (world.js) — не сажаем
   if (PZD.blocks(x, z, 0.8)) return;               // не в пиццерии-шаре и не на её площади (pizzadome.js)
+  if (RIVS.blocks(x, z, 0.8)) return;              // не на террасе точки конкурента (rivals.js)
   if (SEAS.seasonTree(x, z, y) === false) return;   // вид дерева и сезон — seasons.js (у столиков пиццерии не сажает)
   solid(x - 0.55, z - 0.55, x + 0.55, z + 0.55);
 }
@@ -1540,6 +1547,7 @@ function benchSpotOk (x, z) {
   const road = nearestRoad(x, z, 7, 1);
   if (road && road.d < road.seg.w / 2 + 1.0) return false;
   if (WORLD.onAlley(x, z, 0.6)) return false;          // посреди аллеи (world.js) — нет
+  if (RIVS.blocks(x, z, 1)) return false;              // на террасе точки конкурента (rivals.js) — нет
   return !inHouse(x, z, 1.4);
 }
 
@@ -1979,234 +1987,16 @@ function updateFootball (dt) {
   }
 }
 
-/* ─── война команд (спит) ───
-   Раньше здесь стояли синие кофейни «Синий кит» с командой бариста у входа,
-   и команда иногда дралась на улице с соседней кофейней. Кофейни и бренд
-   убраны (02.10.2026), а сама драка — две команды с битами (в детской версии
-   подушками), сбитые встают, трижды получивший лежит, помог своим — респект
-   и деньги — оставлена выключенной: перевести на войну брендов в блоке 9
-   (docs/IDEAS.md) — Птица Пицца против «Вселенной суши» и «Королевы Бургеров».
-   Включить: CREW_WAR = true и положить в CREW_HOMES точки своей сети
-   ({ x, z, nx, nz } — дверь и направление наружу, к дороге). Пока флаг
-   выключен, updateCrew сразу выходит: никто не появляется, ничего не всплывает. */
-const CREW_WAR = false;                // перевести на войну брендов в блоке 9
-const CREW_HOMES = [];
-const CREW_HEX = '#2f6fff';            // форма команды; в блоке 9 — цвет своей сети
-const WAR_ALLY = () => OWN.pizza();    // за кого команда; в блоке 9 — сеть игрока
-
-/* ── команда у своей точки ── */
-/* шестеро выдуманных бариста — одни и те же на всю смену (заводим при
-   первой встрече, когда язык игры уже выбран); на табличке — имя */
-const CREW_N = 6;
-let CREW_PEOPLE = null;
-const CREW = [];                                      // { grp, person, name, x, z, hx, hz, dead, deadT, mode, ... }
-let crewAt = null;
-function spawnCrewMember (c, i) {
-  if (!CREW_PEOPLE) CREW_PEOPLE = Array.from({ length: CREW_N }, () => makePerson());
-  const person = CREW_PEOPLE[i], name = person.first;
-  const grp = makeHuman(person, { shirt: CREW_HEX, pants: '#1b2a6b', fat: false });
-  // стаканчик в руке — белый
-  const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.055, 0.2, 8), new THREE.MeshLambertMaterial({ color: 0xffffff }));
-  cup.position.set(0, -0.56, 0.08);
-  grp.userData.armR.add(cup);
-  const bat = warStick(0x8a6b4e);
-  bat.position.set(0, -0.56, 0.45); bat.visible = false;
-  grp.userData.armR.add(bat);
-  if (name) {
-    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: crewTag(name), transparent: true, depthWrite: false }));
-    tag.scale.set(2.2, 0.55, 1); tag.position.set(0, 2.35, 0);
-    grp.add(tag);
-  }
-  const a = i / CREW_N * Math.PI * 1.4 - 0.7;
-  const hx = c.x + c.nx * (2.2 + Math.cos(a) * 1.6) + c.nz * Math.sin(a) * 2.4, hz = c.z + c.nz * (2.2 + Math.cos(a) * 1.6) - c.nx * Math.sin(a) * 2.4;
-  grp.position.set(hx, groundH(hx, hz), hz);
-  scene.add(grp);
-  return { grp, person, name, i, x: hx, z: hz, hx, hz, dead: 0, deadT: 0, ph: rand(0, 6), cup, bat, mode: 'hang', shock: 0, side: 0, hp: 3, down: 0, swing: 0, swingCd: 0 };
-}
-const CREW_TAGS = new Map();
-function crewTag (name) { if (!CREW_TAGS.has(name)) CREW_TAGS.set(name, nameTex(name, CREW_HEX)); return CREW_TAGS.get(name); }
-function dropCrew () { for (const m of CREW) if (!m.dead) dropMesh(m.grp); CREW.length = 0; crewAt = null; }
-
-/* ── война команд (выключена, см. CREW_WAR) ──
-   Иногда команда сходится на улице с соседней кофейней: обе
-   стороны с битами, бегут друг на друга, машут, сбитые валятся на
-   асфальт и через пару секунд встают, трижды получивший — лежит до
-   конца. Через полминуты-минуту или когда одна сторона легла — победители
-   ликуют, чужие уходят, свои возвращаются к кофейне. */
-const WAR = { on: false, cd: 70, side2: [], pt: null, t: 0, rival: '', hex: '', sayT: 0, bubbles: [], helped: 0 };
-/* цвет формы соперников — цвет их вывески (пародийной, brands.js) */
-const WAR_BLUE = [$t('за {brand}!', { brand: WAR_ALLY() }), $t('наш раф лучше!'), $t('синие, вперёд!'), $t('кофе — только у нас!')];
-function warStart () {
-  const c = crewAt;
-  let rival = null, bd = 380;
-  for (const q of SIGNS) {
-    if (!COFFEE_RE.test(q.n0 || '')) continue;   // соперник — ближайшая кофейня; в блоке 9 — точка чужой сети
-    const d = Math.hypot(q.x - c.x, q.z - c.z);
-    if (d < bd && d > 40) { bd = d; rival = q; }
-  }
-  if (!rival) return;
-  // поле боя — по дороге от своей точки к соседям, на тротуаре
-  const dx = rival.x - c.x, dz = rival.z - c.z, l = Math.hypot(dx, dz) || 1, k = Math.min(55, l / 2);
-  let px = c.x + dx / l * k, pz = c.z + dz / l * k;
-  for (let s = 0; s < 10 && inHouse(px, pz, 1.5); s++) { px -= dx / l * 4; pz -= dz / l * 4; }
-  WAR.on = true; WAR.t = rand(35, 55); WAR.helped = 0; WAR.pt = { x: px, z: pz }; WAR.rival = rival.n; WAR.hex = (rival.c && rival.c[0]) || '#6b4a3a';
-  WAR.side2 = [];
-  for (let i = 0; i < 6; i++) {
-    const grp = makeHuman(null, { shirt: WAR.hex, pants: '#2f3540', fat: chance(0.2) });
-    const bat = warStick(0x5c4a3a);
-    bat.position.set(0, -0.56, 0.45);
-    grp.userData.armR.add(bat);
-    // выходят с той стороны, где их кофейня, — сразу к полю боя
-    const x = px + dx / l * 14 + rand(-3, 3), z = pz + dz / l * 14 + rand(-3, 3);
-    grp.position.set(x, groundH(x, z), z);
-    scene.add(grp);
-    WAR.side2.push({ grp, x, z, dead: 0, side: 1, hp: 3, down: 0, swing: 0, swingCd: rand(0, 1), ph: rand(0, 6), shock: 0 });
-  }
-  for (const m of CREW) if (!m.dead) { m.mode = 'war'; m.hp = 3; m.down = 0; m.cup.visible = false; m.bat.visible = true; }
-  if (Math.hypot(px - V.x, pz - V.z) < 220) popBonus($t('кофейная война!'), $t('{brand} против «{rival}» — помоги синим, будет респект', { brand: WAR_ALLY(), rival: rival.n }));
-}
-function warEnd (winner) {
-  WAR.on = false; WAR.cd = rand(100, 170);
-  if (winner === 0 && WAR.helped) {
-    // помог выиграть — команда благодарит
-    S.burgers++; S.money += CASH(500);
-    if (!S.freeRun) addWallet(CASH(500));
-    popBonus($t('{brand} благодарит!', { brand: WAR_ALLY() }), $t('помог выиграть кофейную войну · +{money} и респект', { money: money(CASH(500)) }));
-  }
-  for (const f of WAR.side2) if (!f.dead) dropMesh(f.grp);
-  WAR.side2 = [];
-  for (const b of WAR.bubbles) if (b.parent) { b.parent.remove(b); b.material.dispose(); }
-  WAR.bubbles = [];
-  for (const m of CREW) if (!m.dead) { m.mode = 'home'; m.down = 0; m.grp.rotation.x = 0; m.bat.visible = false; m.cup.visible = true; m.hp = 3; }
-}
-
-/* общий шаг бойца: к ближнему стоящему врагу, замах, удар, падение */
-function fighterStep (f, foes, dt, dV) {
-  const u = f.grp.userData;
-  if (f.down > 0) {
-    f.down -= dt;
-    f.grp.rotation.x = damp(f.grp.rotation.x, -1.45, 10, dt);
-    f.grp.position.y = groundH(f.x, f.z) + 0.25;
-    if (f.down <= 0 && f.hp > 0) f.grp.rotation.x = 0;
-    else if (f.down <= 0) f.down = 999;                // вырубили — лежит до конца
-    return;
-  }
-  let foe = null, bd = Infinity;
-  for (const e of foes) if (!e.dead && e.down <= 0) { const d = Math.hypot(e.x - f.x, e.z - f.z); if (d < bd) { bd = d; foe = e; } }
-  if (!foe) { handsUp(u, dt); return; }                  // врагов не осталось — ликует
-  const dx = foe.x - f.x, dz = foe.z - f.z;
-  if (bd > 1.3) {
-    const sp = 3.6 * (u.pace || 1);
-    f.x += dx / bd * sp * dt; f.z += dz / bd * sp * dt;
-    pushOut(f, 0.45);
-    f.ph += dt * 12;
-    const sw = Math.sin(f.ph) * 1;
-    u.legL.rotation.x = sw; u.legR.rotation.x = -sw;
-    u.armR.rotation.x = -2.6; u.armL.rotation.x = -sw * 0.6;
-  } else {
-    u.legL.rotation.x = u.legR.rotation.x = 0;
-    f.swingCd -= dt;
-    if (f.swingCd <= 0) {
-      f.swingCd = rand(0.6, 1.1); f.swing = 0.25;
-      if (chance(0.5)) {
-        foe.hp--; foe.down = 2.2;
-        if (dV < 70) { Snd.blip(rand(150, 220), 0.06, 'square', 0.07); emote(foe.x, 2, foe.z, 'angry', 1); }
-      }
-    }
-    if (f.swing > 0) { f.swing -= dt; u.armR.rotation.x = -2.8 + (0.25 - f.swing) * 9; }
-    else u.armR.rotation.x = damp(u.armR.rotation.x, -2.7, 8, dt);
-  }
-  f.grp.rotation.y = damp(f.grp.rotation.y, Math.atan2(dx, dz), 10, dt);
-  f.grp.position.set(f.x, groundH(f.x, f.z) + curbAt(f.x, f.z), f.z);
-}
-
-/* good — помог своей команде: сбил бойца чужой. Это респект, а не «минус» */
-function runOverCheck (f, what, good) {
-  const fx = Math.sin(V.h), fz = Math.cos(V.h), dx = f.x - V.x, dz = f.z - V.z;
-  if (Math.hypot(V.vx, V.vz) > 3 && Math.abs(dx * fx + dz * fz) < CAR_L + 0.5 && Math.abs(dx * fz - dz * fx) < CAR_W + 0.35) {
-    f.dead = 1; dropMesh(f.grp);
-    gibHuman(f, V.vx, V.vz);
-    Snd.squish();
-    if (good) {
-      S.burgers++; S.money += CASH(150);
-      if (!S.freeRun) addWallet(CASH(150));
-      WAR.helped++;
-    } else S.people++;
-    return true;
-  }
-  return false;
-}
-
-function updateCrew (dt) {
-  if (!CREW_WAR || INTRO || !CREW_HOMES.length) return;
-  // команда — у ближней к курьеру своей точки
-  let near = null, nd = Infinity;
-  for (const c of CREW_HOMES) { const d = Math.hypot(c.x - V.x, c.z - V.z); if (d < nd) { nd = d; near = c; } }
-  if (!WAR.on && nd < 170 && crewAt !== near) {
-    dropCrew();
-    crewAt = near;
-    for (let i = 0; i < CREW_N; i++) CREW.push(spawnCrewMember(near, i));
-  } else if (!WAR.on && nd > 240 && crewAt) dropCrew();
-  if (!crewAt) return;
-  const dV = Math.hypot(crewAt.x - V.x, crewAt.z - V.z);
-  // война: изредка, пока курьер поблизости
-  if (!WAR.on && !calmStart() && ['drive', 'back', 'handover', 'side'].includes(S.state) && (WAR.cd -= dt) <= 0) {
-    WAR.cd = rand(80, 140);
-    if (dV < 200) warStart();
-  }
-  const crewAlive = CREW.filter(m => !m.dead);
-  if (WAR.on) {
-    WAR.t -= dt;
-    const blueUp = crewAlive.filter(m => m.hp > 0).length, redUp = WAR.side2.filter(f => !f.dead && f.hp > 0).length;
-    if (WAR.t <= 0 || !blueUp || !redUp) warEnd(!redUp && blueUp ? 0 : !blueUp && redUp ? 1 : -1);
-    else if ((WAR.sayT -= dt) <= 0) {
-      WAR.sayT = 1.8;
-      for (const b of WAR.bubbles) if (b.parent) { b.parent.remove(b); b.material.dispose(); }
-      WAR.bubbles = [];
-      const a = pick(crewAlive.filter(m => m.down <= 0) || []), b2 = pick(WAR.side2.filter(f => !f.dead && f.down <= 0) || []);
-      if (a) WAR.bubbles.push(sayBubble(a.grp, pick(WAR_BLUE), '#1a3fb8', 2.8));
-      if (b2) WAR.bubbles.push(sayBubble(b2.grp, pick([$t('{rival} — сила!', { rival: WAR.rival }), $t('ваш кофе — вода!'), $t('на районе один кофе!'), $t('синие, домой!')]), '#d9342c', 2.8));
-    }
-  }
-  for (const m of CREW) {
-    if (m.dead) {
-      if ((m.deadT -= dt) <= 0 && !WAR.on) Object.assign(m, spawnCrewMember(crewAt, m.i));   // свои не кончаются
-      continue;
-    }
-    const u = m.grp.userData;
-    m.grp.visible = dV < 130 || WAR.on;
-    if (m.shock > 0 && m.mode !== 'war') { m.shock -= dt; handsUp(u, dt); }
-    else if (m.mode === 'war') fighterStep(m, WAR.side2, dt, WAR.pt ? Math.hypot(WAR.pt.x - V.x, WAR.pt.z - V.z) : 999);
-    else {
-      // домой к кофейне или стоит у входа с кофе: болтает и отхлёбывает
-      const tx = m.hx, tz = m.hz, dx = tx - m.x, dz = tz - m.z, d = Math.hypot(dx, dz);
-      if (d > 0.4) {
-        m.x += dx / d * 2.2 * dt; m.z += dz / d * 2.2 * dt; m.ph += dt * 7;
-        const sw = Math.sin(m.ph) * 0.8; u.legL.rotation.x = sw; u.legR.rotation.x = -sw;
-        m.grp.rotation.y = damp(m.grp.rotation.y, Math.atan2(dx, dz), 8, dt);
-      } else {
-        if (m.mode === 'home') m.mode = 'hang';
-        m.ph += dt;
-        u.legL.rotation.x = u.legR.rotation.x = 0;
-        const sip = Math.max(0, Math.sin(m.ph * 0.7 + m.i)) ** 8;
-        u.armR.rotation.x = -0.5 - sip * 1.8;
-        u.head.rotation.y = Math.sin(m.ph * 0.5 + m.i) * 0.4;
-        m.grp.rotation.y = damp(m.grp.rotation.y, Math.atan2(crewAt.x + crewAt.nx * 2.2 - m.x, crewAt.z + crewAt.nz * 2.2 - m.z), 3, dt);
-      }
-      m.grp.position.set(m.x, groundH(m.x, m.z) + curbAt(m.x, m.z), m.z);
-    }
-    if (runOverCheck(m, m.name || $t('бариста «{brand}»', { brand: WAR_ALLY() }))) m.deadT = 30;
-  }
-  if (WAR.on) {
-    const dW = Math.hypot(WAR.pt.x - V.x, WAR.pt.z - V.z);
-    for (const f of WAR.side2) {
-      if (f.dead) continue;
-      f.grp.visible = dW < 150;
-      fighterStep(f, CREW, dt, dW);
-      runOverCheck(f, $t('боец «{rival}»', { rival: WAR.rival }), true);
-    }
-  }
-}
+/* ─── войны брендов: компании в форме сетей на улицах — crews.js (блок 9) ───
+   Раньше здесь спала «кофейная война» команд у кофеен; теперь компании «Птицы Пиццы»,
+   «Вселенной суши» и «Королевы Бургеров» стоят по тротуарам и курят (детская — едят мороженое)
+   или бьют друг друга. Что нужно модулю: */
+const crewsApi = () => ({
+  V, S, scene, CAREER, ADULT, CAR_L, CAR_W, makeHuman, dropMesh, gibHuman, sayBubble, groundH, curbAt, inHouse, inBounds, nearestRoad, pushOut,
+  emote, toast, popBonus, Snd, warStick, blood, fxAdd, puffGeo, money, addWallet, calmStart, intro: INTRO,
+  onRunOver: () => { S.people++; Snd.squish(); },
+});
+let CREWS_API = null;
 
 /* ─── бонус: сёрфер на Москве-реке ───
    Изредка приходит заказ от сёрфера: он катается на доске по реке.
@@ -3638,6 +3428,13 @@ const bbApi = () => ({
 });
 let BB_API = null;
 /* что нужно construction.js (стройки на пустырях) */
+/* что нужно rivals.js (точки конкурентов, маскоты, курьеры-конкуренты) */
+const rivApi = () => ({
+  scene, CITY, ADULT, CAREER, LIT, LITM, LAMPH, V, S, SOLIDS, SMASH, NODES, PIZZERIAS, GEN_ENTR, TRAFFIC, CAR_L, CAR_W,
+  box, put, boxGeo, mergeGeos, obb, smashAdd, smashMesh, addFoot: houseFoot, groundH, inHouse, inBounds, nearestRoad, roadWidth,
+  edgeOf, edgeRun, poseTraffic, placeTraffic, newCar, svcGone, sayBubble, fxAdd, gibBurger, puff, Snd,
+  distAt: DIST.has() ? (x, z) => DIST.at(x, z) : null,
+});
 const consApi = () => ({
   scene, CITY, ADULT, LIT, LITM, V, S, SOLIDS, GORE, SMASH, NODES, edgeOf, PIZZERIAS, GEN_ENTR, box, put, boxGeo, mergeGeos, obb, smashAdd, smashMesh,
   groundH, inHouse, inBounds, nearestRoad, roadWidth, pushOut, sparks, puff, Snd, hurt: hurtCar, addFoot: houseFoot,
@@ -3686,6 +3483,22 @@ const mafiaApi = () => ({
   reward: (n, title) => { const v = CAREER ? n : Math.round(n / ECON.MONEY_K); S.money += v; if (!S.freeRun) addWallet(v); popBonus(title, '+' + money(v)); },
 });
 let MAFIA_API = null;
+/* что нужно thugs.js (гопники прессуют прохожего) */
+const thugsApi = () => ({
+  V, S, scene, CAREER, ADULT, HUMAN_VC, box, mergeGeos, makeHuman, dropMesh, gibHuman, sayBubble, handsUp, emote, groundH, curbAt, inHouse, inBounds, nearestRoad, toast, Snd, money,
+  popBonus: (a, b) => popBonus(escHtml(a), escHtml(b)),
+  onRunOver: () => { S.people++; Snd.squish(); },
+  reward: n => { const v = CAREER ? n : Math.round(n / ECON.MONEY_K / 10) * 10; S.money += v; if (!S.freeRun) addWallet(v); return v; },
+});
+let THUGS_API = null;
+/* что нужно growth.js (вид пиццерии по ступени: гости, очередь, гирлянды, оркестр) */
+const growApi = () => ({
+  V, S, scene, CAREER, ADULT, HUMAN_VC, PIZZERIAS, box, put, mergeGeos, makeHuman, dropMesh, gibHuman, emote, groundH, smashMesh,
+  popBonus: (a, b) => popBonus(escHtml(a), escHtml(b)),
+  onRunOver: () => { S.people++; Snd.squish(); },
+  get PIZZA () { return PIZZA; }, get ENV () { return ENV; },
+});
+let GROW_API = null;
 /* что нужно heroes.js (герои города: места, реплики, сбить) */
 const heroesApi = () => ({
   V, S, scene, CAREER, ADULT, CAR_L, CAR_W, Store, CITY, PITCHES, BENCHES, PIZZERIAS, makeHuman, dropMesh, gibHuman, groundH, curbAt,
@@ -3758,6 +3571,7 @@ function buildCity () {
   if (ADULT && !INTRO) tm('nightlife', () => NIGHT.build(nightApi()));   // стрип-клуб и места «ночных бабочек» (nightlife.js) — до деревьев и лавочек: они обходят пристройку
   tm('world', () => WORLD.build(worldApi()));     // аллеи; в карьере — газоны особняков, мусор, гаражи (world.js) — до деревьев и лавочек
   if (!INTRO && !new URLSearchParams(location.search).has('nocons')) tm('construction', () => CONSTR.build(consApi()));   // стройки на пустырях — до деревьев и лавочек: участок обходят (construction.js); ?nocons — без них
+  if (!INTRO && !new URLSearchParams(location.search).has('norivals')) tm('rivals', () => RIVS.build(rivApi()));   // точки конкурентов — тоже до деревьев, лавочек и smashBuild (rivals.js); ?norivals — без них
   tm('life', () => { JUNK.init(junkApi()); osmStreetLife(); });
   tm('entr', osmEntrances);
   tm('vents', () => { BUILD_T.ventsInfo = CATS.build(CATS_API || (CATS_API = catsApi())); });   // продухи подвалов — после подъездов (cats.js)
@@ -4185,6 +3999,7 @@ function blastAt (x, z, r) {
     p.grp.visible = false;
     gibBurger(p.x, p.z);
     S.burgers++;
+    if (!S.freeRun) RESPECT.add(null, 'burger', true);   // +1, не больше 10 за смену (econ.js RESPECT.CAP), без всплывашки
   }
   for (const p of SCOOTS) {
     if (!p.dead && Math.hypot(p.x - x, p.z - z) < r) runOverScoot(p, p.x - x, p.z - z, null, 100);
@@ -5605,7 +5420,6 @@ function scare (x, z, r = 26) {
   for (const a of ACCIDENTS) for (const f of a.fighters) if (!f.dead && Math.hypot(f.x - x, f.z - z) < r) f.shock = rand(1.5, 3);
   LIFE.scare(x, z, r);
   for (const pt of PITCHES) if (pt.game) for (const q of pt.game.players) if (!q.dead && Math.hypot(q.x - x, q.z - z) < r) q.shock = rand(1.5, 3);
-  for (const m of CREW) if (!m.dead && m.mode !== 'war' && Math.hypot(m.x - x, m.z - z) < r) m.shock = rand(1.5, 3);
   for (const p of PEDS) {
     if (p.dead || Math.hypot(p.x - x, p.z - z) > r) continue;
     p.panic = { x, z, t: 0.3, run: rand(3, 5), spd: rand(3.5, 4.5) };
@@ -6063,7 +5877,7 @@ function nextEdge (e) {
 
 /* дуга через перекрёсток: из конца своей полосы в начало следующей */
 function startTurn (t, over) {
-  const e = t.e, n = (t.dump && CONSTR.nextEdge(t, e)) || nextEdge(e);   // самосвал сворачивает к стройке (construction.js)
+  const e = t.e, n = (t.dump && CONSTR.nextEdge(t, e)) || (t.rvGoal && RIVS.nextEdge(t, e)) || nextEdge(e);   // самосвал сворачивает к стройке (construction.js)
   if (!n) { placeTraffic(t, 120, 340); return; }
   const lane = clamp(t.lane, 0, laneCount(n) - 1);
   const p0 = lanePoint(e, t.lane, edgeRun(e)), p2 = lanePoint(n, lane, 0);
@@ -6163,13 +5977,14 @@ function respawnTraffic (t) {
   scene.add(t.mesh);
   HB.onRespawn(t);                                // старый прицеп долой, жребий на коневозку заново (horsebox.js)
   CONSTR.onRespawn(t);                            // и на самосвал (construction.js)
+  RIVS.onRespawn(t);                              // была машиной-бургером — больше нет (rivals.js)
   // сразу ставим на новое место: иначе в следующем кадре машина всё ещё
   // числится за полкилометра и рождается заново — и так каждый кадр
   placeTraffic(t, 120, 340);
 }
 
 /* все, кто ходит и ездит по тротуарам: машины перед ними тормозят */
-const walkersAll = () => [PEOPLE, PEDS, SCOOTS, AMB.medics, CREW, WAR.side2, LIFE.WALKERS];
+const walkersAll = () => [PEOPLE, PEDS, SCOOTS, AMB.medics, CREWS.WALKERS, LIFE.WALKERS];   // CREWS — компании в форме сетей (crews.js)
 
 function updateTraffic (dt) {
   trafficDensity(dt);
@@ -7118,10 +6933,14 @@ function rivalSpawn (R, delay) {
       // конкурент (econ.js RIVAL_KO): из сумки разлетаются купюры — собери за 25 с; раз за смену с каждого
       R.ko = 1;
       ACH.add('rivals');
+      RESPECT.gain('rivalCar');                    // взорвал машину конкурента — респект (econ.js RESPECT.GAIN)
       rivalSpill(t.x, t.z);
       popBonus($t('выбил конкурента!'), $t('из сумки «{brand}» разлетелись деньги — собирай!', { brand: $t(R.spec.brand) }));
     } else if (mine && !R.foe) colleagueKO(R);
-    else if (R.foe) { if (near) popBonus($t('курьер «{brand}» сгорел', { brand: $t(R.spec.brand) }), mine ? $t('с этого уже получил — без денег') : $t('не от твоего удара — без денег')); }
+    else if (R.foe) {
+      if (mine) RESPECT.gain('rivalCar');          // денег второй раз нет, а респект — каждый раз
+      if (near) popBonus($t('курьер «{brand}» сгорел', { brand: $t(R.spec.brand) }), mine ? $t('с этого уже получил — без денег') : $t('не от твоего удара — без денег'));
+    }
     else if (near) popBonus($t('{who} вычеркнут', { who: R.name }), $t('из смены на минуту — сгорел вместе с заказом'));
   };
 }
@@ -7136,6 +6955,7 @@ function colleagueKO (R) {
   if (got) addWallet(-got);
   S.money = Math.max(0, S.money - fine);
   popBonus($t('выбил своего!'), $t('{who} из твоей пиццерии · штраф −{money}', { who: R.name, money: money(fine) }));
+  RESPECT.gain('ownCourier');                      // и минус респект (econ.js RESPECT.GAIN.ownCourier)
   if (Snd.fail) Snd.fail();
 }
 
@@ -7143,7 +6963,7 @@ const RIVAL_ALL = [RIVALS, FOES];                 // свои и конкуре�
 function initRivals () {
   clearRivals();
   restSlots();
-  RIVAL_SPEC.forEach((spec, i) => {
+  RIVAL_SPEC.slice(0, CAREER ? GROW.couriers() : RIVAL_SPEC.length).forEach((spec, i) => {   // своих на смене — по ступени пиццерии (growth.js, econ.js GROWTH.COURIERS)
     const person = makePerson({ fem: !!spec.fem, seed: CAREER ? CAREERM.crewSeed(i) : undefined });   // четвёртая — реплики в женском роде; в карьере — те же люди, что в рейтинге пиццерии
     const R = { spec, person, name: person.first, money: 0, done: 0, t: null, tagTex: nameTex(person.first, spec.hex), back: 0, slot: i };
     RIVALS.push(R);
@@ -7617,6 +7437,7 @@ function updateThief (dt) {
     if (!S.freeRun) addWallet(CASH(300));
     Snd.squish();
     popBonus($t('респект!'), $t('похититель пиццы наказан · +{money}', { money: money(CASH(300)) }));
+    if (!S.freeRun) RESPECT.gain('thief');
     dropThief('', true);
   }
 }
@@ -8766,7 +8587,7 @@ const RESET_KEEP = ['dlv-lang', 'dlv-sound', 'dlv-edition', 'dlv-name', 'dlv-map
 const PROGRESS_KEYS = [
   'dlv-msk-wallet', 'dlv-msk-cars', 'dlv-msk-car', 'dlv-msk-best', 'dlv-msk-xp', 'dlv-msk-col', 'dlv-msk-tut', 'dlv-msk-guide', 'dlv-msk-nostut', 'dlv-intro', 'dlv-garage-tut',
   'dlv-shifts', 'dlv-stars', 'dlv-crew', 'dlv-story', 'dlv-season', 'dlv-used-addr', 'dlv-lb-local', 'dlv-boss', 'dlv-clock', 'dlv-rev-sale',
-  'dlv-car-owned', 'dlv-car-cur', 'dlv-car-up', 'dlv-car-L', 'dlv-car-eng', 'dlv-car-paint', 'dlv-district', 'dlv-dist-shifts', 'dlv-dist-open', 'dlv-city-mode', 'dlv-city-party', 'dlv-knocked',
+  'dlv-car-owned', 'dlv-car-cur', 'dlv-car-up', 'dlv-car-L', 'dlv-car-eng', 'dlv-car-paint', 'dlv-district', 'dlv-dist-shifts', 'dlv-dist-open', 'dlv-city-mode', 'dlv-city-party', 'dlv-knocked', 'dlv-pz-grow',
   ...Object.keys(ECON.DONATE || {}).map(k => 'dlv-don-' + k),
 ];
 function renderReset () {
@@ -9197,6 +9018,7 @@ function driveStep (dt) {
     p.grp.visible = false;
     gibBurger(p.x, p.z);
     S.burgers++;
+    if (!S.freeRun) RESPECT.add(null, 'burger', true);
     S.shake = Math.max(S.shake, 0.22);
     Snd.squish();
   }
@@ -9435,6 +9257,7 @@ function drawRadar () {
   rctx.globalAlpha = 0.5;                           // пробки и бандиты — видны, но тише маршрута
   RL.drawRadar(rctx, tr, s);                        // пробки — красным
   WORLD.drawRadar(rctx, tr, s);                     // бандитские районы — красные круги (world.js)
+  THUGS.drawRadar(rctx, tr, s);                     // гопники прессуют прохожего — мигающая точка (thugs.js)
   rctx.globalAlpha = 1;
   // проложенный маршрут
   // проложенный маршрут — самое яркое после пина: толще, с тёмной каймой, чтобы читался на любом фоне
@@ -9471,6 +9294,7 @@ function drawRadar () {
   if (CAREER) AUTO.radar(rctx, tr, R);             // гараж Дяди Жени
   rctx.globalAlpha = 1;
   if (THIEF.p && Math.floor(tG * 4) % 2 === 0) blip(THIEF.p.x, THIEF.p.z, '#ff2d6e', 3.6);
+  if (CAREER) RAID.radar(rctx, rA, rB, R);         // налёт на точку — мигает (raid.js)
   rctx.globalAlpha = 0.5;                           // находки, бонусы и машины — тихо, чтобы не спорили с адресом
   // находки — просто фиолетовые точки
   for (const o of COL_ON_MAP) {
@@ -9947,6 +9771,7 @@ function drawFullMap () {
     x.lineWidth = 1.5 * u; x.strokeStyle = '#fff'; x.strokeRect(fmX(PIZZA.x) - 5 * u, fmZ(PIZZA.z) - 5 * u, 10 * u, 10 * u);
   }
   if (CAREER) AUTO.mapMark(x, fmX, fmZ, u);       // гараж Дяди Жени
+  if (CAREER) RAID.mapMark(x, fmX, fmZ, u);       // налёт на точку — мигает (raid.js)
   if (MAPW.MAP_DOTS.length) MAPW.drawMapDots(x, fmX, fmZ, s);      // ?mapcheck: проблемы карты
   // ты — крупная стрелка по курсу с пульсирующим кольцом: видно сразу на всей карте
   // (кольцо бледнее, чем у адреса: мигает ярче всех только «куда везти»)
@@ -9963,7 +9788,7 @@ function drawFullMap () {
   eachTarget((wx, wz, main) => targetPin(x, fmX(wx), fmZ(wz), 1.8 * u, main));
 }
 
-/* чем дерутся в войне команд (CREW_WAR, сейчас выключена): в мягком режиме (Яндекс) — подушками,
+/* чем дерутся компании сетей в драках (crews.js): в детской версии — подушками,
    иначе битами. Подушка — белый пухлый брусок, не оружие */
 function warStick (hex) {
   if (ADULT) return new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.95), new THREE.MeshLambertMaterial({ color: hex }));
@@ -10387,7 +10212,8 @@ function walletHud (dt) {
     else if (isPlaying() && Math.abs(d) >= 1) { walletFly(d); WL.hold = d > 0 ? 0.7 : 0; } else WL.shown = w;
   }
   if ((WL.hold -= dt) <= 0) WL.shown = Math.abs(w - WL.shown) < 2 ? w : WL.shown + (w - WL.shown) * Math.min(1, dt * 7);
-  SC.step(dt, !S.ride && isPlaying());              // за смену — отдельным блоком с пачкой купюр (shiftcash.js)
+  SC.step(dt, !S.ride && isPlaying());
+  RESPECT.hud(CAREER && !S.ride && isPlaying());   // ★ респект и звание — чип под кошельком (respect.js)              // за смену — отдельным блоком с пачкой купюр (shiftcash.js)
   const html = '<span>' + $t('кошелёк') + '</span><b>' + money(Math.round(WL.shown)) + '</b>';
   if (html !== WL.html) { WL.html = html; elMoney.innerHTML = html; }
 }
@@ -11323,6 +11149,15 @@ function acceptOrder () {
 function loadPizza () {
   V.vx = V.vz = 0;
   setTrunk(true);
+  // точку разгромили налётом — кухня разгребает стекло, коробка вылетает позже (raid.js loadWait)
+  const wait = CAREER ? RAID.loadWait(PIZZA) : 0;
+  if (wait > 0 && !loadPizza.waited) {
+    loadPizza.waited = true;
+    toast($t('кухня разгребает погром — пицца через {n} с', { n: wait }));
+    setTimeout(() => { if (S.state === 'loading') loadPizza(); else loadPizza.waited = false; }, wait * 1000);
+    return;
+  }
+  loadPizza.waited = false;
   flyBox(
     { x: PIZZA.wx, y: PIZZA.wy, z: PIZZA.wz },
     trunkPoint,
@@ -11433,6 +11268,7 @@ function checkArrival (dt) {
     const tier = S.free ? 0 : left >= 0.5 ? 2 : left >= 0.25 ? 1 : 0;
     let part;
     if (o.ord) part = ORD.payStop(o, st, onTime, tier);   // карьера: ECON.orderPay, PAY.SPEED_BONUS, ECON.tipFor; из чего сложилось — в st.pay
+    if (o.ord && CAREER && !o.tut && !S.freeRun && o.ord.type !== 'staff') GROW.delivered(V.x, V.z);   // пиццерия района растёт (growth.js)
     else {
       const bonus = tier ? Math.round(share * (tier === 2 ? 0.6 : 0.3) * (S.tipMul || 1)) : 0;
       // клиент-богач (рядом гуляет богач или дом солидный) — изредка крупные чаевые, см. LIFE.richTip
@@ -12041,9 +11877,11 @@ function startRun (ride) {
   S.people = 0; S.wrecks = 0; S.delivered = 0; S.scoots = 0; S.revives = 0;
   JUNK.reset();                                    // снесённые остановки и контейнеры — на место, S.stops = 0 (junk.js)
   CONSTR.reset();                                  // стройки — как новые: забор, кучи, бытовки и техника (construction.js)
+  RIVS.reset();                                    // точки конкурентов — как новые, маскоты на местах (rivals.js)
   S.hurt = 0; S.shake = 0;
   S.freeRun = S.free;
   S.lvl0 = levelOf(getXP());
+  if (CAREER) RAID.shiftStart({ ride: S.ride, quick: QR.on() });   // налёт на точку в эту смену? (raid.js)
   if (CAREER) { FEST.shiftStart({ ride: S.ride, quick: QR.on() }); if (!S.ride) FEST.announce(); }   // фестиваль в эту смену? (festivals.js)
   if (CAREER && !S.ride) CAREERM.startShift();   // часы — на 9:00, обед, звёзды за смену; волна щедрости (districts.js)
   NOS.tank = DISTRICTS && !S.ride ? DIST.pace().tank : 0.5; NOS.burn = false;
@@ -12153,7 +11991,7 @@ function keysInfo () {
 function renderPause () {
   $('pm-order').innerHTML = orderInfo();
   $('pm-keys').innerHTML = keysInfo();
-  const rows = [[$t('доставлено'), S.delivered], [$t('заработано'), money(S.money)], [$t('респектов'), S.burgers],
+  const rows = [[$t('доставлено'), S.delivered], [$t('заработано'), money(S.money)], [$t('респектов'), CAREER ? RESPECT.shift() : S.burgers],
     [$t('прохожих сбито'), S.people], [$t('самокатчиков'), S.scoots], [$t('машин всмятку'), S.wrecks]];
   if (S.stops) rows.push([$t('остановок снесено'), S.stops]);
   // когда откроется следующий район: «новый район · «Кольцо» через 2 смены», «смена в зачёт · от 3 заказов · сейчас 1»
@@ -12352,6 +12190,9 @@ if (CAREER) ORD.init({ S, V, CITY, MAP, THREE, Store, ADULT, SPOTS, LIFE, Snd, g
   newOrder, marker, level: () => levelOf(getXP()), gameplayStop: () => Platform.gameplayStop(),
   rehuman: (p, person) => { dropMesh(p.grp); p.person = person || nextPerson(); p.grp = makeHuman(p.person); p.speed = p.base * p.grp.userData.pace; scene.add(p.grp); } });
 if (CAREER) SC.init({ S, money });
+/* респект (respect.js): сохранение в профиле, хад — чип под кошельком; за смену — с нуля */
+RESPECT.init({ Store, toast: s => toast(s) });
+if (CAREER) CAREERM.onShiftStart(RESPECT.shiftReset);
 /* достижения (achievements.js): счётчики, Стим; смена — через onShiftStart/End карьеры */
 ACH.init({ career: CAREER, adult: ADULT, S, hour: () => (CAREER ? CAREERM.hour() : NaN) });
 if (CAREER) { CAREERM.onShiftStart(ACH.shiftStart); CAREERM.onShiftEnd(ACH.shiftEnd); }
@@ -12457,6 +12298,18 @@ if (!INTRO) HK.init({ THREE, scene, BENCHES, V, S, ADULT, makeHuman, makePerson,
 if (!INTRO && CAREER) FEST.init({ THREE, scene, V, S, CITY, ADULT, Store, obb, SOLIDS, indexSolids, NODES, TRAFFIC, put, mergeGeos, groundH, inHouse, inPoly, nearestRoad, solidAt,
   makeHuman, makePerson, dropMesh, sayBubble, fxAdd, puffGeo, steam, gibBurger, popBonus, toast, chat: s => CHAT.say(s), addWallet, money, CASH, Snd, CAR_L, CAR_W, HEROES, DIST,
   season: () => SEAS.seasonValue() });   // фестивали на парковках ТЦ (festivals.js)
+/* налёт на точку и ёлка-турель (raid.js) */
+if (!INTRO && CAREER) RAID.init({ V, S, scene, CAREER, ADULT, CAR_L, CAR_W, Store, wallet, addWallet, makeHuman, dropMesh, gibHuman, sayBubble, groundH, curbAt, pushOut, sparks, puff, popBonus, money, Snd,
+  get PIZZA () { return PIZZA; }, isPlaying, chat: s => CHAT.say(s),
+  hurt: n => { S.hurt = 0; hurtCar(n, 0, V.x + rand(-1, 1), V.z + rand(-1, 1)); },   // удар битой — полсердца, без мятин
+  bump: () => { V.vx *= 0.25; V.vz *= 0.25; S.shake = Math.max(S.shake, 0.35); Snd.crash(8); },
+  onRunOver: () => { S.people++; Snd.squish(); },
+  reward: n => { S.money += n; if (!S.freeRun) addWallet(n); },
+  fine: n => { const got = Math.max(0, Math.min(n, wallet())); if (got && !S.freeRun) addWallet(-got); S.money = Math.max(0, S.money - n); },
+  smashTables: (x, z, r) => smashNear(x, z, it => { if (it.kind === 'table' && Math.hypot(it.x - x, it.z - z) < r) smashHit(it, it.x - x, it.z - z, 8); }),
+  // ёлка-турель бьёт и по нападающим чужих сетей в драках у точки (crews.js): попала — убегают
+  foes: () => CREWS.WALKERS.filter(m => m.role === 'att' && m.brand !== 'pizza' && !m.dead && !m.flee).map(m => ({ x: m.x, z: m.z, hit () { m.flee = 1; m.down = 0; m.grp.rotation.x = 0; } })),
+});
 /* ─────────────── сутки, погода, облака и птицы ───────────────
    Время идёт: утро → день → вечер → ночь → утро, полный круг за восемь
    минут. Небо, туман и свет плавно перетекают между ключевыми точками.
@@ -13128,6 +12981,7 @@ function frameStep (now) {
   CL.step('lamps', SL.step, dt);                                     // сбитые фонари падают и лежат (streetlamps.js)
   CL.step('traffic', updateTraffic, dt);
   CL.step('construction', CONSTR.step, dt);       // краны, упавший забор, толкнутая техника, самосвалы (construction.js) — до коневозок
+  CL.step('rivalshops', RIVS.step, dt);           // маскоты у точек конкурентов, зима/лето террас, их курьеры (rivals.js)
   CL.step('horsebox', HB.step, dt, HB_API || (HB_API = hbApi()));   // коневозки: прицеп за машиной (horsebox.js)
   CL.step('peds', updatePeds, dt);
   CL.step('people', updatePeople, dt);
@@ -13179,12 +13033,15 @@ function frameStep (now) {
   CL.step('life', LIFE.step, dt, LIFE_API);
   CL.step('world', WORLD.step, dt, WORLD_API || (WORLD_API = worldApi()));   // мусор, бандиты, шашлыки (world.js)
   CL.step('mafia', MAFIA.step, dt, MAFIA_API || (MAFIA_API = mafiaApi()));   // мафиози у адреса (mafia.js)
+  CL.step('thugs', THUGS.step, dt, THUGS_API || (THUGS_API = thugsApi()));   // гопники прессуют прохожего (thugs.js)
+  CL.step('growth', GROW.step, dt, GROW_API || (GROW_API = growApi()));      // пиццерия растёт: вид у шара (growth.js)
+  if (CAREER) CL.step('raid', RAID.step, dt);                          // налёт на точку, ёлка-турель (raid.js)
   CL.step('heroes', HEROES.step, dt, HEROES_API || (HEROES_API = heroesApi()));   // герои города (heroes.js)
   CL.step('fauna', FAUNA.step, dt, FAUNA_API || (FAUNA_API = faunaApi()));   // лоси и звери в лесах (fauna.js)
   CL.step('cats', CATS.step, dt, CATS_API || (CATS_API = catsApi()));      // коты на крышах и у подвалов (cats.js)
   CL.step('ach', ACH.step, dt);                                              // достижения: опрос счётчиков (achievements.js)
   CL.step('rink', LM.stepRink, RINK, dt, V.x, V.z);
-  CL.step('crew', updateCrew, dt);
+  CL.step('crew', CREWS.step, dt, CREWS_API || (CREWS_API = crewsApi()));   // компании в форме сетей (crews.js)
   CL.step('surf', updateSurf, dt);
   CL.step('football', updateFootball, dt);
   CL.at.ph = 'car';
@@ -13278,13 +13135,13 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) wi
   EDGES, SIG_GROUPS, ZEBRAS, SCOOTS, TL, IN, touches, lightOf, edgeOf,
   // песочница: сюжет, карта, сохранения, старт смены, кошелёк, читы
   STORY, STORY_DBG: STORY.DEBUG, MAP, Store, SBX, CARSM: AUTO, startRun, goRun, endShift, wallet, addWallet, hudHearts, marker, updateEnv, humanLod, get SPOTS_N () { return SPOTS.length; },
-  DRIVERS, SMOKERS, NITRO_CANS, NOS, CREW_HOMES, CREW, WAR, warStart, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, PIGEONS, AMB, INCIDENTS, scare, RIVALS, FOES, THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, roadPath, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT, LOOT, XLIFE };
+  DRIVERS, SMOKERS, NITRO_CANS, NOS, RESPECT: RESPECT.DEBUG, RESPECT_API: RESPECT, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, PIGEONS, AMB, INCIDENTS, scare, RIVALS, FOES, THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, roadPath, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT, LOOT, XLIFE };
 if (window.__dlv) { window.__dlv.BOARD = BOARD; window.__dlv.Platform = Platform; }   // таблица рекордов Стима (board.js)
 if (window.__dlv) window.__dlv.crashlog = CL;        // журнал ошибок: entries(), text(), disabled() (docs/CRASHES.md)
 if (window.__dlv) Object.assign(window.__dlv, { pinFront, nearClient, PIN });   // пин перед клиентом, кто у клиента лишний (docs/ORDERS.md)
 if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG, CONS: CONSTR.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)
 if (window.__dlv) Object.assign(window.__dlv, { HB: HB.DEBUG, FLIRT: ADULT ? FLIRT.DEBUG : null });   // коневозки, заигрывание (только взрослая)
-if (window.__dlv) { window.__dlv.FOREST = FOREST.DEBUG; window.__dlv.PZD = PZD.DEBUG; window.__dlv.cam = cam; }   // ельник и пиццерия-шар (forest.js, pizzadome.js)
+if (window.__dlv) { window.__dlv.FOREST = FOREST.DEBUG; window.__dlv.PZD = PZD.DEBUG; window.__dlv.cam = cam; window.__dlv.RIV = RIVS.DEBUG; }   // ельник и пиццерия-шар (forest.js, pizzadome.js)
 if (window.__dlv) { window.__dlv.SL = SL.DEBUG; window.__dlv.LAMP_SPOTS = LAMP_SPOTS; window.__dlv.smashHit = smashHit; window.__dlv.CARL = CARL.DEBUG; }   // фонари и огни машины
 // ?mapcheck: сводка проблем карты, столбики над ними, «]» — к следующей (mapworks.js)
 if (MAPCHECK) MAPW.debug(MAPFIX, MAPW_API || (MAPW_API = mapApi()));

@@ -23,6 +23,7 @@
 import './cityopen.css';
 import { t, N_ } from '../i18n/index.js';
 import * as DIST from './districts.js';
+import * as GROW from './growth.js';             // ступень пиццерии в выборе перед сменой (growth.js)
 import * as CHAT from './chat.js';
 import { CITY as C, DISTRICT, cityFar } from './econ.js';
 
@@ -162,7 +163,7 @@ export function picker (done, start = true) {
   pk.querySelector('.crm-dl').innerHTML =
     row('city', '★', t('весь город'), t('заказы во всех районах · машина {s} · оплата {p} · за 2 / 3 / 4 км: {far}', { s: pct(C.SPEED), p: pct(C.PAY), far }), city) +
     DIST.list().map((d, i) => row(String(i), String(i + 1), t('пиццерия · {name}', { name: t(d.name) }),
-      i ? t('заказы только в районе · машина {s} · оплата {p}', { s: pct(DISTRICT.SPEED[i]), p: pct(DISTRICT.PAY[i]) }) : t('заказы только в районе · маленький, всё рядом'), !city && i === cur)).join('');
+      (i ? t('заказы только в районе · машина {s} · оплата {p}', { s: pct(DISTRICT.SPEED[i]), p: pct(DISTRICT.PAY[i]) }) : t('заказы только в районе · маленький, всё рядом')) + ' · ' + GROW.label(i), !city && i === cur)).join('');
   pk.querySelectorAll('.crm-di').forEach(b => b.addEventListener('click', () => choose(b.dataset.k)));
   pk.querySelector('.crm-dclose').onclick = () => closePick(false);
   pk.onclick = e => { if (e.target === pk) closePick(false); };

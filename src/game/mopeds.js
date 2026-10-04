@@ -1,6 +1,9 @@
 /* ──────────────────────────────────────────────────────────────────────────
    Курьеры еды на мопедах: жёлтая «Жуй-Еда» (больше всех), розовый
    «Самокатик», зелёный «Клуб Доставки». Бренды выдуманные.
+   Голубые мопеды «Вселенной суши» с коробом-роллом — курьеры сети-конкурента:
+   их рождает и водит rivals.js (spawnBrand, к своей точке и адресам), в счёт
+   MP.moving не идут; слетел седок — MP.onRival(c) (респект, rivals.js).
 
    • Модель — два меша: мопед (кузов, щиток, руль, колёса одной склейкой)
      и седок с кубическим термокоробом цвета службы и полосой логотипа.
@@ -31,6 +34,7 @@ const BRANDS = [
   { i: 0, hex: '#ffd21f', stripe: '#1b1a1f', w: 0.6 },
   { i: 1, hex: '#ff4f9a', stripe: '#ffffff', w: 0.2 },
   { i: 2, hex: '#2fb35a', stripe: '#ffffff', w: 0.2 },
+  { i: 3, hex: '#2fa8e0', stripe: '#ffffff', w: 0, rival: 'sushi', roll: 1 },   // «Вселенная суши»: короб-ролл (rivals.js)
 ];
 const pickBrand = () => { let r = Math.random(); for (const b of BRANDS) if ((r -= b.w) <= 0) return b; return BRANDS[0]; };
 const BODY_HEX = ['#e8e4dc', '#3c4048', '#c8323a', '#7f8a96'];
@@ -74,14 +78,27 @@ function riderGeo (A, br, look) {
   box(L, 0.3, 0.3, 0.28, skin, 0, 1.62, -0.12);                        // лицо
   box(L, 0.36, 0.26, 0.36, br.hex, 0, 1.8, -0.13);                     // шлем
   box(L, 0.3, 0.1, 0.04, '#1b1a1f', 0, 1.66, 0.04);                    // визор
-  box(L, 0.58, 0.56, 0.44, br.hex, 0, 1.36, -0.52);                    // термокороб
-  box(L, 0.59, 0.09, 0.45, br.stripe, 0, 1.4, -0.52);                  // полоса логотипа
-  box(L, 0.24, 0.16, 0.02, br.stripe, 0, 1.2, -0.75);                  // логотип на спине
+  if (br.roll) rollBox(A, L, 1.36, -0.52);                             // короб-ролл «Вселенной суши»
+  else {
+    box(L, 0.58, 0.56, 0.44, br.hex, 0, 1.36, -0.52);                  // термокороб
+    box(L, 0.59, 0.09, 0.45, br.stripe, 0, 1.4, -0.52);                // полоса логотипа
+    box(L, 0.24, 0.16, 0.02, br.stripe, 0, 1.2, -0.75);                // логотип на спине
+  }
   box(L, 0.08, 0.3, 0.06, '#1b1a1f', 0.2, 1.22, -0.28);                // лямки
   box(L, 0.08, 0.3, 0.06, '#1b1a1f', -0.2, 1.22, -0.28);
   const g = mergeGeos(L);
   GEO.set(k, g);
   return g;
+}
+/* термокороб в форме ролла: нори снаружи, рис и лосось на торцах, голубая полоса */
+function rollBox (A, L, y, z) {
+  const P = A.put, Q = Math.PI / 2;
+  P(L, new THREE.CylinderGeometry(0.31, 0.31, 0.62, 12), '#1d3b2c', 0, y, z, 0, 0, Q);
+  P(L, new THREE.CylinderGeometry(0.315, 0.315, 0.1, 12), '#2fa8e0', 0, y, z, 0, 0, Q);
+  for (const s of [-1, 1]) {
+    P(L, new THREE.CylinderGeometry(0.27, 0.27, 0.02, 12), '#f8f6ef', s * 0.315, y, z, 0, 0, Q);
+    P(L, new THREE.CylinderGeometry(0.11, 0.11, 0.03, 8), '#f07a5a', s * 0.32, y, z, 0, 0, Q);
+  }
 }
 const vcMat = () => new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
 
@@ -97,10 +114,10 @@ function makeMopedMesh (A, br) {
 }
 
 /* новый мопед: поля трафика берём у newCar и меняем кузов */
-function newMoped (A, parked) {
+function newMoped (A, parked, brand) {
   const c = A.newCar(true);
   c.mesh.traverse(o => { if (o.isMesh && o.geometry) o.geometry.dispose(); });
-  const br = pickBrand();
+  const br = brand || pickBrand();
   c.mesh = makeMopedMesh(A, br);
   Object.assign(c, { model: 'moped', hl: HL, taxi: false, parked: !!parked, cruise: rand(12.5, 16.5), dot: br.hex, hp: 70,
     mp: { br, fell: 0, weave: 0, slowT: 0, man: null } });
@@ -194,9 +211,12 @@ function riderBagGeo (A, br) {
   const k = 'b' + br.i;
   if (GEO.has(k)) return GEO.get(k).clone();
   const L = [];
-  A.box(L, 0.58, 0.56, 0.44, br.hex, 0, 1.34, -0.4);
-  A.box(L, 0.59, 0.09, 0.45, br.stripe, 0, 1.38, -0.4);
-  A.box(L, 0.24, 0.16, 0.02, br.stripe, 0, 1.18, -0.63);
+  if (br.roll) rollBox(A, L, 1.34, -0.4);
+  else {
+    A.box(L, 0.58, 0.56, 0.44, br.hex, 0, 1.34, -0.4);
+    A.box(L, 0.59, 0.09, 0.45, br.stripe, 0, 1.38, -0.4);
+    A.box(L, 0.24, 0.16, 0.02, br.stripe, 0, 1.18, -0.63);
+  }
   const g = A.mergeGeos(L);
   GEO.set(k, g);
   return g.clone();
@@ -207,6 +227,7 @@ const FLY = [];
 function fall (A, c) {
   const m = c.mp, u = c.mesh.userData;
   m.fell = 1;
+  if (m.br.rival && MP.onRival) MP.onRival(c);          // курьер конкурента (rivals.js): сбил ты — респект
   u.rider.visible = false;
   c.angry = 0;                                          // это не водитель машины — разбираться не выйдет
   const sp = Math.hypot(c.kvx, c.kvz), br = m.br;
@@ -285,6 +306,10 @@ export function step (dt, A) {
       c.parked = 1;
       continue;
     }
+    if (m.br.rival) {                                   // курьер конкурента: укатил далеко — прочь, rivals.js родит нового у точки
+      if (!c.knock && !c.wreck && !m.fell && Math.hypot(c.x - V.x, c.z - V.z) > 420) A.svcGone(c);
+      continue;
+    }
     moving++;
     // укатил далеко — ближе к курьеру, пока трафик не сделал из него машину
     if (!c.knock && !c.wreck && !m.fell && Math.hypot(c.x - V.x, c.z - V.z) > 420) A.placeTraffic(c, 120, 330);
@@ -340,6 +365,12 @@ export function step (dt, A) {
       }
     }
   }
+}
+
+/* курьер на мопеде нужной службы (rivals.js: key — 'sushi'); ставит его на дорогу тот, кто позвал */
+export function spawnBrand (A, key) {
+  const br = BRANDS.find(b => b.rival === key);
+  return br ? newMoped(A, false, br) : null;
 }
 
 export const DEBUG = { MP, FLY };

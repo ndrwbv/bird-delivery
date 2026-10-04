@@ -14,6 +14,7 @@ import './menu.css';
 import { t, tn } from '../i18n/index.js';
 import * as DIST from './districts.js';
 import * as CITY from './cityopen.js';
+import * as GROW from './growth.js';             // ступень пиццерии в списке районов (growth.js)
 import { DISTRICT, SHIFT, clock } from './econ.js';
 import * as BOARD from './board.js';
 import * as PROF from './profiles.js';           // профили: у каждого свой прогресс (profiles.js)
@@ -181,7 +182,7 @@ function openDistricts () {
     const locked = i >= open, sh = DIST.shiftsIn(i), need = DIST.need(i);
     const sub = locked ? t('закрыт')
       : [i ? t('машина {s} · оплата {p}', { s: pct(DISTRICT.SPEED[i]), p: pct(DISTRICT.PAY[i]) }) : t('маленький, заказы рядом'),
-        need && (i === open - 1 || sh >= need) ? t('{have} из {need} смен', { have: Math.min(sh, need), need }) : tn(sh, '{n} смена|{n} смены|{n} смен')].join(' · ');
+        need && (i === open - 1 || sh >= need) ? t('{have} из {need} смен', { have: Math.min(sh, need), need }) : tn(sh, '{n} смена|{n} смены|{n} смен'), GROW.label(i)].join(' · ');
     return '<button type="button" class="crm-di' + (i === cur ? ' cur' : '') + (locked ? ' lock' : '') + '" data-i="' + i + '"' + (locked ? ' disabled' : '') + (i === cur ? ' autofocus' : '') + '>' +
       '<em>' + (i + 1) + '</em><b>' + esc(t(d.name)) + '</b><span>' + esc(sub) + '</span></button>';
   }).join('');

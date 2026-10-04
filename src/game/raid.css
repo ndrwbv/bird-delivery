@@ -1,0 +1,22 @@
+/* налёт на точку: плашка внизу над подсказками (raid.js) */
+#raid-hud {
+  position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 11;
+  max-width: calc(100vw - 32px); padding: 8px 14px; pointer-events: none;
+  font-size: clamp(8px, .9vw, 11px); line-height: 1.5; text-align: center; color: #fff3d6;
+  background: rgba(120, 18, 18, .88); border: 3px solid #33210c; border-radius: 8px;
+  box-shadow: 0 4px 0 #33210c; text-shadow: 2px 2px 0 #33210c;
+  animation: raid-blink 1s steps(2, start) infinite;
+}
+#raid-hud[hidden] { display: none; }
+#raid-hud.hot { background: rgba(200, 24, 24, .95); animation-duration: .5s; }
+@keyframes raid-blink { 50% { border-color: #ffd23f; } }
+@media (prefers-reduced-motion: reduce) { #raid-hud { animation: none; } }
+
+/* «потратить» → ёлка-турель (career.js) */
+.cr-tabs.n4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 760px) { .cr-tabs.n4 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .cr-tabs.n4 { grid-template-columns: 1fr; } }
+.cr-t-turret { border-top-color: #7fe07a; }
+.rd-pane { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.rd-pane p { margin: 0; font-size: clamp(8px, 1vw, 12px); line-height: 1.7; color: #fff3d6; }
+.rd-pane .rd-lock { color: #ffb36b; }

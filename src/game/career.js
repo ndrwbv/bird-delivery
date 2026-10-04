@@ -15,6 +15,7 @@
    onShiftStart(cb), onShiftEnd(cb), shiftOn(), crewSeed(i), crewBoard(). В отладке — __dlv.CAREERM.
 
    Всё здесь работает только в карьере: game.js зовёт модуль под флагом CAREER. */
+import * as RESPECT from './respect.js';
 import './career.css';
 import * as ECON from './econ.js';
 import * as GARAGE from './garage.js';
@@ -22,12 +23,14 @@ import * as MENU from './menu.js';
 import * as DLG from './dialog.js';
 import * as DIST from './districts.js';
 import * as CITY from './cityopen.js';
+import * as GROW from './growth.js';             // пиццерия растёт: ступень на итогах смены (growth.js)
 import { farEarned } from './orders.js';
 import * as END from './shiftend.js';
 import * as CHAT from './chat.js';
 import * as ACH from './achievements.js';          // достижения: «Всё на красное» в «депнуть» (achievements.js)
 import * as HEROES from './heroes.js';           // теннисисты в «депнуть» — герои города: те же лица
 import * as HQ from './heroquests.js';           // герои, этап 2: совет Лёхи на ставке, «наоборот» Игорька, Жека про машину
+import * as RAID from './raid.js';               // «потратить» → ёлка-турель у точки (raid.js)
 import * as QR from './quickrun.js';             // быстрый заезд: своя длина смены, с 9:00, свои итоги (quickrun.js)
 import { makePadMenu } from '../input/padmenu.js';
 import { t, tn, lang } from '../i18n/index.js';
@@ -371,8 +374,10 @@ export function showEnd (why, whyText, held) {
     [t('ударов'), SH.hits, cnt],
     SH.fine ? [t('штраф за клиента'), SH.fine, n => '−' + A.money(n)] : null,
     S.people ? [t('прохожих сбито'), S.people, cnt] : null,
+    RESPECT.shift() || RESPECT.get() ? [t('респект за смену'), RESPECT.shift(), n => (n < 0 ? '−' : '+') + Math.abs(Math.round(n)) + ' · ' + RESPECT.level().name] : null,
     SH.stars ? [t('звёзд за смену'), SH.stars, n => '+' + Math.round(n) + ' ★'] : null,
     DIST.has() ? [...districtRow(), 'info'] : null,
+    ...GROW.rows().map(([k, v, where]) => [k, 1, () => v, where]),   // «пиццерия «Юг» · растёт ★★★☆☆» (growth.js)
     SH.city && farEarned() > 0 ? [t('премия за дальние'), farEarned(), n => '+' + A.money(n)] : null,
     DIST.has() && SH.opened >= 0 ? [t('открыт новый район'), 1, () => t(DIST.list()[SH.opened].name), 'new'] : null,
     ...(DIST.has() && SH.opened < 0 ? districtNext().map(([k, v]) => [k, 1, () => v, 'info']) : []),
@@ -603,6 +608,7 @@ function buildEnd () {
   const tabs = [
     ['trash', t('борьба с мусором'), 'bar'],
     ['gang', t('борьба с насилием'), 'bar'],
+    RAID.ready() ? ['turret', t('ёлка-турель'), ''] : null,
     A.ADULT ? ['slot', t('депнуть'), ''] : null,
   ].filter(Boolean);
   el.innerHTML = '<div class="cr-tabs n' + tabs.length + '">' + tabs.map(([k, name, bar]) =>
@@ -623,6 +629,8 @@ function refreshTabs () {
     const sub = el.querySelector('.cr-t-' + k + ' .cr-sub');
     if (sub) sub.textContent = A.donated(k) >= 1 ? t('цель собрана') : t('{p} % цели города', { p: Math.floor(A.donated(k) * 100) });
   }
+  const tu = el.querySelector('.cr-t-turret .cr-sub');
+  if (tu) tu.textContent = RAID.spendTab(A.money).sub;
   const s = el.querySelector('.cr-t-slot .cr-sub');
   if (s) s.textContent = A.wallet() >= ECON.SLOT.STEP ? t(GAME_NAME[depGame()]) + ' · ×' + gameMul(depGame()) : t('нечего ставить');
   el.querySelectorAll('.cr-tab').forEach(b => b.classList.toggle('cur', b.dataset.tab === TAB));
@@ -633,6 +641,7 @@ function openTab (k) {
   p.className = k ? 'on cr-p-' + k : '';
   p.innerHTML = '';
   if (k === 'trash' || k === 'gang') paneDonate(p, k);
+  else if (k === 'turret') RAID.spendPane(p, { wallet: A.wallet, addWallet: A.addWallet, money: A.money, Snd: A.Snd }, rerender);
   else if (k === 'slot') { TAB = ''; p.className = ''; openDep(); }   // депнуть — своё окно на весь экран
   refreshTabs();
 }

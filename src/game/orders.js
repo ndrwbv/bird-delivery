@@ -31,12 +31,14 @@
    Спецификация (всё необязательно): { storyId, x, z | zone, dist: { min, max }, person, addr, items,
    note, why, pay, time, timeK (срок × от обычного), color, reach, noGuest }. why/items/note — уже переведённые; noGuest — человека
    у двери ставит story.js, прохожего не зовём (иначе ждёт прохожий, person — его лицо). */
+import * as RESPECT from './respect.js';
 import { t, tn } from '../i18n/index.js';
 import * as ECON from './econ.js';
 import * as DLG from './dialog.js';
 import * as ZN from './zones.js';
 import * as DIST from './districts.js';
 import * as FEST from './festivals.js';
+import * as GROW from './growth.js';            // пиццерия растёт: оплата, чаевые, размер сборных по ступени (econ.js GROWTH)
 import { makePerson } from './people.js';
 import { ORDER_TYPES, SHIFT_PLAN, SIDE_ORDERS, STAFF_RIDE, BOSS } from './orders.config.js';
 
@@ -332,7 +334,7 @@ function genSpec () {
 function bundleSpec (life, D) {
   const step = ECON.bundleStep(life);
   if (!step) return null;
-  let n = sizeRoll(step.max || 2);                       // сколько пицц — «вперемешку» (SHIFT_PLAN.sizes)
+  let n = sizeRoll(Math.max(1, Math.min(7, (step.max || 2) + GROW.sizeAdd())));   // сколько пицц — «вперемешку» (SHIFT_PLAN.sizes); ступень пиццерии ± (GROWTH.SIZE)
   if (n < 2) return null;                                  // одна — обычная пицца
   const told = toldGet();                                 // сколько пицц директор уже объявил
   let boss = null;
@@ -556,7 +558,8 @@ export function setup (plan) {
     const m = sp.m[i] || 0, zone = sp.stops[i] ? sp.stops[i].zone : sp.zone, n = Math.max(1, st.peds.length);
     if (sp.story && Number.isFinite(sp.story.pay)) return Math.round(sp.story.pay / o.stops.length);
     // групповой: за каждого следующего — ещё одна база
-    return Math.round((ECON.orderPay(m, zone, opts) + (n - 1) * ECON.orderPay(0, zone, opts)) * mul / 10) * 10;
+    const g = sp.stops[i] ? GROW.payK(sp.stops[i].x, sp.stops[i].z) : GROW.payK();   // ступень пиццерии района (econ.js GROWTH.PAY)
+    return Math.round((ECON.orderPay(m, zone, opts) + (n - 1) * ECON.orderPay(0, zone, opts)) * mul * g / 10) * 10;
   });
   // «весь город» (econ.js CITY): премия за дальний — за путь по дорогам сверх FAR_FROM, в цене остановки
   sp.far = o.stops.map((st, i) => (city && !sp.story ? ECON.cityFar(sp.m[i] || 0) : 0));
@@ -702,13 +705,15 @@ export function payStop (o, st, onTime, tier) {
   const bonus = tier ? Math.round(fee * (PAY.SPEED_BONUS[tier] || 0)) : 0;
   const lunch = S.lunch === 'tips';
   const pc = DIST.pace();
-  let tip = ECON.tipFor(fee, zone, { lunch, clean: A.donated('trash'), extra: pc.tipChance || 0, mul: pc.tipMul || 1 }), rich = zone === 'rich' && tip > 0;
+  const gTip = st.x !== undefined ? GROW.tipAdd(st.x, st.z) : GROW.tipAdd();   // ступень пиццерии (econ.js GROWTH.TIP)
+  let tip = ECON.tipFor(fee, zone, { lunch, clean: A.donated('trash'), extra: (pc.tipChance || 0) + gTip, mul: pc.tipMul || 1 }), rich = zone === 'rich' && tip > 0;
   // богач рядом (LIFE.richTip) — клиент считается как из особняков: чаевые по-богатому
   if (!tip && zone !== 'rich' && A.LIFE && A.LIFE.richTip(st.peds, fee)) {
     const [a, b] = TIPS.RICH_AMOUNT;
     tip = Math.round(fee * rand(a, b) * (lunch ? TIPS.LUNCH_MUL : 1) * (pc.tipMul || 1) / 10) * 10;
     rich = true;
   }
+  if (tip > 0) tip = Math.round(tip * (RESPECT.perk('tipK') || 1) / 10) * 10;   // звание по респекту — чаевые больше (econ.js RESPECT.LEVELS)
   if (st.bumped) tip = 0;                                 // задел клиента машиной (game.js clientBump, ECON.CLIENT_HIT) — без чаевых
   // из чего сложилась оплата — game.js покажет кучкой денег и чеком (popPay); сюжет — катсцена сама покажет награду
   st.pay = { fee, bonus, tip, rich: rich && tip > 0, late: false, story: !!sp.story };

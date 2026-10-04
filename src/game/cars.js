@@ -29,6 +29,7 @@
    ({ id: { armor, engine } }), dlv-car-eng ({ id: { c, r, km, n } } — мотор, ресурс, пробег км,
    ремонтов), dlv-car-paint ({ id: '#hex' }). Звёзды — dlv-stars. Старое dlv-car-L ({ id: L },
    до 03.10.2026) читается один раз, когда у машины ещё нет dlv-car-eng (econ.js BREAK.OLD_L). */
+import * as RESPECT from './respect.js';
 import { CAR_LIST, UPGRADE, BREAK, upgradePrice, paintPrice, sellPrice, wearK, stallChance, repairQuote } from './econ.js';
 import { cnCar } from './roadlife.js';
 import { t } from '../i18n/index.js';
@@ -1156,7 +1157,7 @@ const meters = e => [
 ];
 async function offer () {
   const DLG = A.DLG, id = curId(), e = eng(id), q = repairQuote(e.c, e.r);
-  const price = q.price;
+  const price = Math.round(q.price * (1 - (RESPECT.perk('garageOff') || 0)) / 10) * 10;   // звание по респекту — скидка (econ.js RESPECT.LEVELS)
   const face = ZHENYA ? ZHENYA.person : null, name = t('Дядя Женя'), color = '#6f8a3a';
   const pc = n => String(Math.round(n));
   GS.busy = true;

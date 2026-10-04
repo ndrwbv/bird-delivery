@@ -1,0 +1,25 @@
+/* ── респект на хаде (respect.js): мелкий чип «★ 42 Свой пацан» под кошельком, всплывашка под ним ── */
+#respect { position: relative; display: flex; align-items: center; justify-content: flex-end; gap: 5px; margin: 6px 0 0 auto;
+           width: max-content; max-width: 280px; padding: 4px 7px 3px; line-height: 1.2;
+           background: rgba(20, 16, 30, .62); border: 2px solid #33210c; border-radius: 6px; }
+#respect[hidden] { display: none; }
+#respect .rs-ico { font-style: normal; font-size: 10px; color: #ff9a3c; }
+#respect b { font-size: 10px; color: #ffd85e; }
+#respect span { font-size: 7px; color: #f2c9a0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 210px; }
+#respect.bump b { animation: rs-flash .5s ease-out 1; }
+#respect.hurt b { animation: rs-hurt .6s steps(3) 1; }
+@keyframes rs-flash { 0% { transform: scale(1); } 35% { transform: scale(1.35); color: #fff3d6; } 100% { transform: scale(1); } }
+@keyframes rs-hurt { 0%, 100% { color: #ffd85e; } 33% { color: #ff6b6b; } 66% { color: #ff9a9a; } }
+/* «+3 респект · сбил конкурента» — под чипом, вправо по краю, тает за 2,2 с */
+.rs-pop { position: absolute; right: 0; top: calc(100% + 4px); font-size: 9px; line-height: 1.2; color: #ffb35e; white-space: nowrap;
+          text-shadow: 2px 2px 0 #33210c, -1px -1px 0 #33210c; pointer-events: none; animation: rs-up 2.2s ease-out forwards; z-index: 5; }
+.rs-pop.neg { color: #ff6b6b; }
+.rs-pop.free { position: fixed; top: 64px; right: 16px; z-index: 40; }
+@keyframes rs-up { 0% { transform: translateY(8px); opacity: 0; } 10% { transform: translateY(0); opacity: 1; }
+                   75% { opacity: 1; } 100% { transform: translateY(-8px); opacity: 0; } }
+@media (max-width: 720px) {
+  #respect { margin-top: 4px; padding: 3px 5px 2px; gap: 4px; }
+  #respect .rs-ico, #respect b { font-size: 8px; }
+  #respect span { font-size: 6px; max-width: 90px; }
+  .rs-pop { font-size: 7px; }
+}

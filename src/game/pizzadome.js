@@ -277,10 +277,11 @@ export function build (A, f, opt = {}) {
   { const [x, z] = at(-2.4, V1 + 0.03); put(LAMPH, new THREE.PlaneGeometry(1.0, 0.8), '#ff8a2b', x, gy + 2.6, z, 0, ry, 0); }      // отсвет печи
   { const [x, z] = at(1.9, V1 + 0.04); put(FLAT, new THREE.PlaneGeometry(1.9, 2.7), '#7fb3c8', x, gy + 1.36, z, 0, ry, 0); }       // дверь
   { const [x, z] = at(1.9, V1 + 0.05); put(FLAT, new THREE.PlaneGeometry(0.06, 2.6), WHITE, x, gy + 1.36, z, 0, ry, 0); }
-  // вывеска на тамбуре
+  // вывеска на тамбуре (sign — для growth.js: мигает у загибающейся, светится у процветающей)
+  let sign = null;
   {
     const [x, z] = at(0, V1 + 0.1);
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(VW + 0.2, (VW + 0.2) * 112 / 512), signMat(opt.brand));
+    const m = sign = new THREE.Mesh(new THREE.PlaneGeometry(VW + 0.2, (VW + 0.2) * 112 / 512), signMat(opt.brand));
     m.position.set(x, gy + VH + 1.05, z); m.rotation.y = ry;
     A.scene.add(m);
     const [bx, bz] = at(0, V1 - 0.05);
@@ -331,7 +332,7 @@ export function build (A, f, opt = {}) {
   { const [x, z] = at(0, vm + 0.15); A.obb(x, z, VW / 2 + 0.3, vd / 2 + 0.15, -ry); }
   A.addFoot(foot);
   A.addFoot([at(-VW / 2 - 0.3, V0), at(VW / 2 + 0.3, V0), at(VW / 2 + 0.3, V1 + 0.3), at(-VW / 2 - 0.3, V1 + 0.3)]);
-  DOMES.push({ x: cx, z: cz, R: R + 0.3, gy, logo, ry, dist: S.dist });
+  DOMES.push({ x: cx, z: cz, R: R + 0.3, gy, logo, ry, dist: S.dist, sign, porch: { V0, V1, VW, VH }, road });
 
   // парковка курьеров — у улицы, сбоку от шара
   const g = { mx: cx, mz: cz, road };

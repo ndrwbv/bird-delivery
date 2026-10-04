@@ -27,6 +27,7 @@
         put, mergeGeos, groundH, inHouse, inPoly, nearestRoad, solidAt, makeHuman, makePerson,
         dropMesh, sayBubble, fxAdd, puffGeo, steam, gibBurger, popBonus, toast, chat(text),
         addWallet, money, CASH, Snd, CAR_L, CAR_W, HEROES, DIST, season() */
+import * as RESPECT from './respect.js';
 import { t, N_ } from '../i18n/index.js';
 
 export const FEST = {
@@ -777,6 +778,7 @@ function hitMascot (m, sp) {
   if (paid) {
     const cash = A.CASH(FEST.MASCOT_PAY);
     S.burgers = (S.burgers || 0) + 2;
+    if (!S.freeRun) RESPECT.add(2, 'rivalMascot', true);   // в общую шкалу респекта (respect.js), всплывашка — своя ниже
     S.money += cash;
     if (!S.freeRun) A.addWallet(cash);
     A.popBonus(t('маскот угнетён!'), t('+2 респекта · премия +{money}', { money: A.money(cash) }));
