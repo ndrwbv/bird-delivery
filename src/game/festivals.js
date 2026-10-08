@@ -786,7 +786,7 @@ function hitMascot (m, sp) {
     if (!S.freeRun) RESPECT.add(2, 'rivalMascot', true);   // в общую шкалу респекта (respect.js), всплывашка — своя ниже
     S.money += cash;
     if (!S.freeRun) A.addWallet(cash);
-    A.popBonus(t('маскот угнетён!'), t('+2 респекта · премия +{money}', { money: A.money(cash) }));
+    A.toast(t('маскот угнетён!') + ' ' + t('+2 респекта · премия +{money}', { money: A.money(cash) }));
   } else A.toast(t('маскот угнетён — премии на сегодня кончились'));
   try { A.Snd.squish(); A.Snd.blip(140, 0.25, 'square', 0.08); } catch (e) { /* звук не обязателен */ }
   if (F.host && Math.hypot(F.host.position.x - V.x, F.host.position.z - V.z) < 160) say(F.host, pick([t('УРА! Минус булка!'), t('Вот это угнетение!'), t('Пицца победила!')]), 3.4);
@@ -912,12 +912,9 @@ export function announce () {
       ? [t('сегодня День угнетения бургеров! у ТЦ «{mall}» митинг против «Королевы Бургеров». кто берёт пиццу вместо бургера — платит больше. увидишь ихнего маскота — сам знаешь, что делать)', { mall: m })]
       : [t('сегодня День угнетения бургеров! у ТЦ «{mall}» митинг против «Королевы Бургеров». кто берёт пиццу вместо бургера — платит больше. увидишь маскота — толкни его, он мягкий)', { mall: m })],
   };
-  const sub = k === 'hookah' ? t('парковка ТЦ «{mall}» · заказы — туда и рядом', { mall: m })
-    : k === 'pumpkin' ? t('парковка ТЦ «{mall}» · тыквы-гиганты, конкурс', { mall: m })
-      : t('парковка ТЦ «{mall}» · заказы «вместо бургера» ×{k}', { mall: m, k: String(FEST.BURGER_K).replace('.', ',') });
   const id = F;
   setTimeout(() => { if (F === id && A.chat) A.chat(lines[k][0]); }, 2500);
-  setTimeout(() => { if (F === id) A.popBonus(nameOf(k) + '!', sub); }, 8000);
+  // плашки с названием фестиваля через 8 с нет: Толик уже всё написал в чат (строка выше)
 }
 
 /* ─────────────── для orders.js ─────────────── */

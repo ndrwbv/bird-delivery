@@ -186,7 +186,7 @@ function acts (c) {
     h += '<div class="gr-why">' + esc(why || t('броня и мотор — после покупки')) + '</div>';
     return h;
   }
-  h += c.current ? '<button type="button" class="gr-btn cur" disabled>' + esc(t('на смене')) + '</button>'
+  h += c.current ? '<button type="button" class="gr-btn cur" disabled>✓ ' + esc(t('на смене')) + '</button>'
     : '<button type="button" class="gr-btn pick" data-a="pick" autofocus>' + esc(t('выбрать')) + '</button>';
   for (const [kind, name, gain] of [
     ['armor', t('добавить броню'), t('+1 ♥')],
@@ -219,10 +219,10 @@ function extraActs (c) {
       '<div class="gr-row"><button type="button" class="gr-btn sell" data-a="sell">' + esc(t('да, продать')) + '</button>' +
       '<button type="button" class="gr-btn" data-a="close" autofocus>' + esc(t('нет')) + '</button></div></div>';
   }
-  const sellLbl = c.sellable ? t('продать · {money}', { money: money(c.sellPrice) }) : !c.price ? t('машину пиццерии не продать') : t('на ней на смене — не продать');
+  // продать — только если можно: серая «машину пиццерии не продать» только мешала (05.10.2026)
   return '<div class="gr-row">' +
     '<button type="button" class="gr-btn gr-paint-b" data-a="paintOpen">' + esc(t('покрасить · {money}', { money: money(pp) })) + '</button>' +
-    '<button type="button" class="gr-btn gr-sell-b" data-a="sellAsk"' + (c.sellable ? '' : ' disabled') + '>' + esc(sellLbl) + '</button></div>';
+    (c.sellable ? '<button type="button" class="gr-btn gr-sell-b" data-a="sellAsk">' + esc(t('продать · {money}', { money: money(c.sellPrice) })) + '</button>' : '') + '</div>';
 }
 /* у соседей — те же места под кнопки, но без кнопок: высота карточек одна, геймпад их не видит */
 function ghostActs (c) {

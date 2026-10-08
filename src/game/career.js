@@ -24,6 +24,7 @@ import * as MENU from './menu.js';
 import * as DLG from './dialog.js';
 import * as DIST from './districts.js';
 import * as CITY from './cityopen.js';
+import * as DP from './distpick.js';             // выбор района — карусель карточек (листать с геймпада и клавиш)
 import * as GROW from './growth.js';             // пиццерия растёт: ступень на итогах смены (growth.js)
 import { farEarned } from './orders.js';
 import * as END from './shiftend.js';
@@ -65,8 +66,7 @@ export function addStars (n, why) {
   A.Store.set('dlv-stars', v);
   A.Store.flush();
   if (n > 0) SH.stars += n;
-  if (A.isPlaying()) A.popBonus('+' + n + ' ★', why || t('звезда пиццерии'));
-  else A.Snd.coin();
+  A.Snd.coin();                                     // без плашки «+N ★»: звёзды называет тот, кто их дал (реплика Толика: глава, развоз смены)
   refreshWallet();
   return v;
 }
@@ -256,7 +256,6 @@ function showLunch (next) {
       S.lunch = o.id;
       lunchClass(false);
       o.fn();
-      A.popBonus(t('обед: {what}', { what: o.label }), o.sub);
       if (next) next();
     } })),
   });
@@ -306,7 +305,7 @@ export function clientKilled (victim, fee = 0) {
   }
   SH.fine += loss;
   if (ECON.CLIENT_KILL.END_SHIFT) return;          // дальше — прежний game over, итоги покажет showEnd
-  A.popBonus(t('сбил своего клиента'), loss ? t('заказ сорван · штраф −{money}', { money: A.money(loss) }) : t('заказ сорван'));
+  // плашки «сбил своего клиента» нет: Толик пишет в чат (CHAT.react('kill')), штраф — красной купюрой
   A.Snd.fail && A.Snd.fail();
   A.dropOrder();
 }
@@ -580,15 +579,20 @@ function buildEnd () {
     el.id = 'cr-end';
     spendBox().querySelector('.cr-sp-body').appendChild(el);
   }
+  // 05.10.2026: у каждой плитки — что даёт (было только «0 % цели города»); гараж — тоже сюда: главная трата
   const tabs = [
-    ['trash', t('борьба с мусором'), 'bar'],
-    ['gang', t('борьба с насилием'), 'bar'],
-    RAID.ready() ? ['turret', t('ёлка-турель'), ''] : null,
+    ['garage', t('гараж'), '', t('машины, броня, мотор, покраска')],
+    ['trash', t('борьба с мусором'), 'bar', t('меньше мусора у подъездов и на дорогах')],
+    ['gang', t('борьба с насилием'), 'bar', t('бандитские круги меньше, гопники подходят реже')],
+    RAID.ready() ? ['turret', t('ёлка-турель'), '', ''] : null,
   ].filter(Boolean);
-  el.innerHTML = '<div class="cr-tabs n' + tabs.length + '">' + tabs.map(([k, name, bar]) =>
-    '<button type="button" class="cr-tab cr-t-' + k + '" data-tab="' + k + '"><b>' + esc(name) + '</b>' +
+  el.innerHTML = '<div class="cr-tabs n' + tabs.length + '">' + tabs.map(([k, name, bar, what]) =>
+    '<button type="button" class="cr-tab cr-t-' + k + '" data-tab="' + k + '"><b>' + esc(name) + '</b>' + (what ? '<span class="cr-what">' + esc(what) + '</span>' : '') +
     (bar ? '<i class="cr-bar"><i></i></i><span class="cr-sub"></span>' : '<span class="cr-sub"></span>') + '</button>').join('') + '</div><div id="cr-pane"></div>';
-  el.querySelectorAll('.cr-tab').forEach(b => b.addEventListener('click', () => openTab(b.dataset.tab === TAB ? '' : b.dataset.tab)));
+  el.querySelectorAll('.cr-tab').forEach(b => b.addEventListener('click', () => {
+    if (b.dataset.tab === 'garage') { openGarage(() => { rerender(); refreshEnd(); }); return; }
+    openTab(b.dataset.tab === TAB ? '' : b.dataset.tab);
+  }));
   TAB = '';
   refreshWallet();
   refreshTabs();
@@ -601,7 +605,7 @@ function refreshTabs () {
     const b = el.querySelector('.cr-t-' + k + ' .cr-bar i');
     if (b) b.style.width = (A.donated(k) * 100).toFixed(1) + '%';
     const sub = el.querySelector('.cr-t-' + k + ' .cr-sub');
-    if (sub) sub.textContent = A.donated(k) >= 1 ? t('цель собрана') : t('{p} % цели города', { p: Math.floor(A.donated(k) * 100) });
+    if (sub) sub.textContent = A.donated(k) >= 1 ? t('цель собрана') : t('собрано {have} из {goal}', { have: A.money(+A.Store.get('dlv-don-' + k, 0) || 0), goal: A.money(ECON.DONATE[k].goal) });
   }
   const tu = el.querySelector('.cr-t-turret .cr-sub');
   if (tu) tu.textContent = RAID.spendTab(A.money).sub;
@@ -704,7 +708,11 @@ export function padPre (p) {
     p.menuOk = p.menuBack = p.menuUp = p.menuDown = p.menuLeft = p.menuRight = false;
     return;
   }
-  if (GARAGE.isOpen() && !MENU.modal()) {
+  if (DP.isOpen()) {                                // выбор района — карусель (distpick.js): ←→, LB/RB — листать
+    const d = (p.menuRight || p.pageR ? 1 : 0) - (p.menuLeft || p.pageL ? 1 : 0);
+    if (d) DP.flip(d);
+    p.menuLeft = p.menuRight = false;
+  } else if (GARAGE.isOpen() && !MENU.modal()) {
     const d = (p.menuRight || p.pageR ? 1 : 0) - (p.menuLeft || p.pageL ? 1 : 0);
     if (d) GARAGE.flip(d);
     p.menuLeft = p.menuRight = false;
@@ -763,6 +771,7 @@ function onKey (e) {
   if ((root.id === 'panel' || root.id === 'pausem') && k === 'menuBack') return;   // окно настроек/находок и паузу закрывает сама игра (Esc)
   e.preventDefault(); e.stopPropagation();
   if (e.repeat && k === 'menuOk') return;
+  if (DP.isOpen() && root === DP.root() && (k === 'menuLeft' || k === 'menuRight')) { DP.flip(k === 'menuLeft' ? -1 : 1); return; }   // выбор района
   if (GARAGE.isOpen() && root === GARAGE.root() && (k === 'menuLeft' || k === 'menuRight')) { GARAGE.flip(k === 'menuLeft' ? -1 : 1); return; }
   if (depOpen() && root === depOpen() && (k === 'menuLeft' || k === 'menuRight')) { if (!SH.slot) setStake(STAKE + (k === 'menuLeft' ? -1 : 1) * stakeStep()); return; }   // ←→ — ставка
   if (k === 'menuBack') { back(); return; }

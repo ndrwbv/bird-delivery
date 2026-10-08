@@ -106,8 +106,8 @@ export default function hudScreens (ctx) {
         bundle ? null : [t('адрес'), st0.addr + (many ? ' → ' + t('ещё {n}', { n: stops.length - 1 }) : '')],
         [t('заказ'), order.items],
         // orders.js cardRows: район и оплата
-        [t('район'), esc(t(ZL[o.zone] || ZL.normal)) + ' · ' + esc(t(DIST.list()[di].name))],
-        [t('оплата'), money(+o.fee || 0) + (order.ord.urgent ? ' · <b class="oc-urg">' + t('срочно') + '</b>' : '')],
+        [t('район'), esc(t(DIST.list()[di].name)) + (o.zone && o.zone !== 'normal' ? ' · ' + esc(t(ZL[o.zone])) : '')],
+        [t('оплата'), '<b class="oc-pay">' + money(+o.fee || 0) + '</b>'],
         order.why ? [t('пометка'), order.why] : null,
         st0.note ? [t('комментарий курьера'), '«' + st0.note + '»'] : null,
       ].filter(Boolean);

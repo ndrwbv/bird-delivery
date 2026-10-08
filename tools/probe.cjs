@@ -10,7 +10,7 @@
                             --mode steam --outDir папка) — проверить то, что видно только в релизе
    --kids                   ?kids (детская версия; на yandex она и так)
    --map=seversk  --lang=ru  --q=a=1&b  — добавки к адресу игры (?debug&mute&nolb&nointro уже есть)
-   --fresh                  первый запуск как у новичка: без ?nointro, гайд и учебный заказ не пропущены
+   --fresh                  первый запуск как у новичка: подсказки (hints.js) и учебный заказ не пропущены
    --page=ui.html           другая страница сборки (index.html по умолчанию): ждём не __dlv, а загрузку
                             и window.__probeReady !== false. Песочница интерфейса: --page=ui.html — панель
                             (window.__uilab), --page=ui.html --q=frame — сам экран (window.__ui), docs/SANDBOX.md

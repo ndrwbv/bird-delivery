@@ -25,12 +25,3 @@
 @media (prefers-reduced-motion: reduce) { .cy-title, .cy-sub, .cy-tolik, .cy-perks { animation: none; } }
 @media (max-width: 560px) { .cy-tolik { text-align: center; } }
 
-#cr-cityp { position: absolute; inset: 0; z-index: 48; display: flex; align-items: center; justify-content: center; padding: 16px;
-            background: rgba(10, 12, 24, .62); backdrop-filter: blur(3px); pointer-events: auto; }
-#cr-cityp[hidden] { display: none; }
-#cr-cityp .crm-dbox { width: min(600px, 100%); gap: 8px; padding: 18px 18px 14px; }
-#cr-cityp .crm-dl { gap: 5px; }
-#cr-cityp .crm-di { padding: 7px 12px; }
-#cr-cityp .crm-di.cy-all { border-color: #ffd85e; background: #6b3fb0; }
-#cr-cityp .crm-di.cy-all.cur { background: #f0522a; }
-#cr-cityp .crm-di.cy-all em { font-size: 16px; }

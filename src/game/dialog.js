@@ -16,7 +16,15 @@
        timeoutText: t('ну лан (('),    // не успел — он это говорит и уходит
        meters: [{ name, v, p, color }] // полоски под текстом (Дядя Женя: мотор и ресурс), p — 0…1
      });                               // → true (принял) / false (отказался) / null (не успел)
-   Очередь: несколько say подряд показываются по одному. */
+   Очередь: несколько say подряд показываются по одному.
+
+   Реплика на ходу (события посреди езды — вместо плашки сверху экрана, docs/CAREER.md «Реплики на ходу»):
+     DLG.line({ person, name, text, color })   // → Promise, когда ушла
+   Та же голова и облачко, но меньше и сверху по центру, без затемнения и кнопок: мир НЕ стоит,
+   клавиши и геймпад не перехватывает (пробел — ручник, A — нитро). Допечаталась — висит
+   readTime(текст) (1,5 с + 0,06 с на букву, не меньше 3 с) и уходит сама; клик — убрать сразу.
+   Своя очередь: по одной, ждут не больше LIVE.Q (лишние — самые старые — выбрасываются).
+   isOpen() её не считает. */
 import './dialog.css';
 import { t } from '../i18n/index.js';
 import { pad as PAD } from '../input/gamepad.js';
@@ -171,3 +179,63 @@ function show (o, done) {
   yes.onclick = () => { if (typed && !waiting) close(true); };
   no.onclick = () => { if (typed && !waiting) close(false); };
 }
+
+/* ── реплика на ходу (line) ── */
+export const LIVE = { Q: 2, CPS: 40 };
+let lroot = null, lcur = null;
+const lq = [];
+export const lineOpen = () => !!lcur;
+export function line (o) {
+  return new Promise(res => {
+    lq.push({ o, res });
+    while (lq.length > LIVE.Q) lq.shift().res(false);
+    if (!lcur) lineNext();
+  });
+}
+function lineNext () {
+  const it = lq.shift();
+  if (!it) { lcur = null; return; }
+  if (!lroot) {
+    lroot = document.createElement('div');
+    lroot.id = 'dlg-live';
+    lroot.hidden = true;
+    lroot.innerHTML = '<div class="dlg-bar"></div><div class="dll-row"><img alt=""><div class="dll-b"><b></b><p></p></div></div>';
+    (document.getElementById('game') || document.body).appendChild(lroot);
+  }
+  const o = it.o, $ = s => lroot.querySelector(s);
+  $('.dlg-bar').style.background = o.color || '#3fae5a';
+  const img = $('img');
+  img.src = o.face || (API.face && o.person ? API.face(o.person, 128) : '');
+  img.hidden = !img.src;
+  $('b').textContent = o.name || '';
+  const el = $('p'), full = String(o.text == null ? '' : o.text);
+  el.textContent = '';
+  lroot.hidden = false;
+  requestAnimationFrame(() => lroot.classList.add('on'));
+  let i = 0, acc = 0, last = performance.now(), left = -1, raf = 0, done = false;
+  const close = () => {
+    if (done) return; done = true;
+    cancelAnimationFrame(raf);
+    lroot.classList.remove('on');
+    lroot.onclick = null;
+    setTimeout(() => { if (!lcur) lroot.hidden = true; }, 200);
+    lcur = null;
+    it.res(true);
+    setTimeout(() => { if (!lcur) lineNext(); }, 220);
+  };
+  const tick = now => {
+    raf = requestAnimationFrame(tick);
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (i < full.length) {
+      acc += dt * LIVE.CPS;
+      while (acc >= 1 && i < full.length) { const c = full[i++]; acc -= c === '.' || c === '!' || c === '?' || c === '…' ? 5 : 1; }
+      el.textContent = full.slice(0, i);
+      if (i >= full.length) left = readTime(full);
+    } else if ((left -= dt) <= 0) close();
+  };
+  lcur = { close };
+  lroot.onclick = close;
+  raf = requestAnimationFrame(tick);
+}
+/* убрать реплику на ходу и очередь (конец смены, меню) */
+export function lineClear () { while (lq.length) lq.shift().res(false); if (lcur) lcur.close(); }

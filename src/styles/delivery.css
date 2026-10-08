@@ -440,7 +440,7 @@ html[data-map="moscow"] #radar { cursor: zoom-in; pointer-events: auto; }
 /* маршрут: к клиенту — оранжевый, в пиццерию — зелёный */
 .fm-leg i.lg-route { width: 14px; height: 4px; vertical-align: 1px; background: linear-gradient(90deg, #ff8a2b 50%, #3fd15e 50%); border-color: #5a2a00; }
 .fm-leg i.lg-jam { width: 14px; height: 3px; vertical-align: 2px; background: #e8323c; border: 0; }
-.fm-leg i.lg-gang { width: 10px; height: 10px; border-radius: 50%; background: rgba(226, 48, 56, 0.35); border: 2px solid #c81e28; box-sizing: border-box; }
+.fm-leg i.lg-gang { width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle, rgba(214, 36, 44, 0.75) 0, rgba(214, 36, 44, 0.35) 45%, rgba(214, 36, 44, 0) 72%); }   /* размытое пятно, как на карте (world.js drawBlob) */
 .fm-leg i.lg-mine { background: transparent; border: 2px solid #ffd85e; box-sizing: border-box; }
 .fm-leg i.lg-lock { background: repeating-linear-gradient(-45deg, #1e1828 0 3px, #8a3a38 3px 4px); }
 .fm-leg i.lg-gar { background: #6f8a3a; border-radius: 2px; } .fm-leg i.lg-kpp { background: #1f4f9a; }
@@ -627,25 +627,7 @@ body.brief #view { filter: blur(6px) brightness(0.72); transition: filter .25s; 
 @keyframes cm-fade-out { to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { #chat .cm { animation-name: cm-fade; } #chat .cm.out { animation-name: cm-fade-out; } }
 
-/* ── Москва: гайд по управлению — по пунктам, один раз за сессию ── */
-#guide {
-  position: absolute; left: 16px; top: 50%; transform: translateY(-50%); z-index: 11;
-  width: 300px; padding: 18px 18px 14px; cursor: pointer;
-  background: rgba(20, 16, 30, .86); border: 4px solid #33210c; border-radius: 10px;
-  animation: gd-in .4s cubic-bezier(.2, .9, .3, 1.2) both;
-}
-@keyframes gd-in { from { opacity: 0; margin-left: -24px; } to { opacity: 1; margin-left: 0; } }
-#guide[hidden] { display: none; }
-#guide .gd-t { font-size: 13px; color: #ffd85e; margin-bottom: 12px; }
-#guide ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
-#guide li { font-size: 10px; line-height: 1.5; color: #fff3d6; display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
-#guide kbd { font: inherit; font-size: 9px; color: #33210c; background: #fff3d6; border-radius: 4px; padding: 4px 6px;
-             box-shadow: 0 3px 0 #b9b4ab; }
-#guide .gd-n { font-size: 7px; line-height: 1.8; color: #b9b4ab; margin-top: 12px; }
-@media (max-width: 640px) { #guide { top: auto; bottom: 150px; transform: none; width: auto; right: 16px; } }
 .oc-note b { font-weight: normal; color: #7f8cc0; }
-/* пока открыта анкета, гайд ждёт: появится, как только нажал «принять» */
-body.brief #guide { display: none; }
 #st-lvl { font-size: clamp(7px, 1.1vw, 9px); color: #ffd85e; opacity: .85; margin-top: -4px; }
 
 /* ── Москва: коллекция слева в меню ── */
@@ -678,12 +660,6 @@ html[data-map="moscow"] #view { touch-action: none; }
 #joy-k {
   position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%;
   background: #f0522a; border: 3px solid #33210c; box-shadow: 0 4px 0 #33210c;
-}
-/* гайд: на телефоне — жесты, с клавиатурой — клавиши */
-#guide .gd-touch { display: none; }
-@media (pointer: coarse) {
-  #guide .gd-touch { display: flex; }
-  #guide .gd-keys { display: none; }
 }
 /* уровень курьера в рейтинге — кружок рядом с именем */
 #board-list li em.lv {
@@ -899,29 +875,6 @@ html[data-map="moscow"] #radar.burn {
 #choice.full #ch-opts button em { font-size: 10px; }
 #choice.full #ch-opts button.padsel { outline: 4px solid #33210c; outline-offset: 3px; }
 #choice.full .ch-box::after { content: ''; position: absolute; left: 0; bottom: 0; height: 6px; width: calc(var(--ch-left, 1) * 100%); background: #d9342c; }
-/* первый кофе (game.js nosTutStep): стаканчик, «держи кнопку», бак наливается, одна кнопка «понял» */
-#choice[data-kind="nos"] .ch-box { width: min(580px, calc(100% - 32px)); gap: 14px; padding: clamp(18px, 3.4vh, 28px) clamp(16px, 3vw, 28px);
-                                   animation: nt-in .28s steps(4) both; }
-#choice[data-kind="nos"] #ch-t { font-size: clamp(16px, 3.4vw, 24px); line-height: 1.4; color: #1f5bff; text-shadow: 2px 2px 0 #33210c; margin: 0; }
-#choice[data-kind="nos"] .ch-txt { display: flex; flex-direction: column; align-items: center; gap: 14px; color: #33210c; }
-#choice[data-kind="nos"] #ch-s { display: contents; }
-.nt-cup { display: block; width: 64px; height: 72px; order: -1; animation: nt-bob 1.2s steps(2) infinite; }
-.nt-how { font-size: clamp(10px, 1.9vw, 14px); line-height: 2.2; }
-.nt-how kbd { font: inherit; font-size: .9em; color: #33210c; background: #fff; border: 2px solid #33210c; border-radius: 5px;
-              padding: 3px 7px; margin: 0 2px; box-shadow: 0 3px 0 #33210c; white-space: nowrap; }
-.nt-how kbd.nt-a { background: #3fd15e; color: #fff; border-radius: 50%; padding: 3px 8px; text-shadow: 1px 1px 0 #33210c; }
-.nt-bar { display: block; width: min(260px, 80%); height: 14px; background: #33210c; border: 3px solid #33210c; border-radius: 3px; overflow: hidden; }
-.nt-bar i { display: block; height: 100%; width: 100%; background: #6fd3ff; box-shadow: inset 0 3px 0 #e6f7ff;
-            transform-origin: left; animation: nt-fill 2.4s steps(12) infinite; }
-.nt-n { font-size: clamp(7px, 1.2vw, 9px); line-height: 1.9; color: #6b5560; max-width: 400px; }
-#choice[data-kind="nos"] #ch-opts button { background: #1f5bff; color: #fff3d6; padding: 14px 10px; }
-#choice[data-kind="nos"] #ch-opts button b { font-size: clamp(11px, 2vw, 15px); }
-#choice[data-kind="nos"] #ch-opts button em { display: none; }
-#choice[data-kind="nos"] #ch-opts button:disabled { cursor: default; filter: saturate(.4) brightness(1.15); }
-@keyframes nt-in { from { transform: scale(.7); opacity: 0; } to { transform: none; opacity: 1; } }
-@keyframes nt-bob { 50% { transform: translateY(-3px); } }
-@keyframes nt-fill { 0% { transform: scaleX(.15); } 70%, 100% { transform: scaleX(1); } }
-@media (prefers-reduced-motion: reduce) { #choice[data-kind="nos"] .ch-box, .nt-cup, .nt-bar i { animation: none; } }
 
 /* рейтинг смены: под сердцами, мелко */
 #rivals { list-style: none; margin: 8px 0 0; padding: 6px 8px; font-size: 7px; line-height: 1; display: flex; flex-direction: column; gap: 5px;
@@ -1069,10 +1022,6 @@ html[lang="ja"] #game, html[lang="zh"] #game { font-weight: 700; letter-spacing:
 .lang-grid button { font: inherit; font-size: 10px; cursor: pointer; padding: 12px 8px; color: #fff3d6; background: #2a3766; border: 3px solid #33210c; border-radius: 6px; }
 .lang-grid button.cur { background: #f0522a; }
 .lang-grid button[lang="ja"], .lang-grid button[lang="zh"] { font-family: "Hiragino Sans", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; font-size: 13px; }
-/* играют на геймпаде — гайд про кнопки пада, а не клавиатуры */
-#guide .gd-pad { display: none; }
-body.pad #guide .gd-pad { display: flex; }
-body.pad #guide .gd-keys, body.pad #guide .gd-touch { display: none; }
 /* анкета на низком или узком экране: не вылезает за край, «принять» всегда видно */
 #phone { max-height: calc(100% - 24px); overflow-y: auto; }
 @media (max-width: 420px), (max-height: 560px) {
@@ -1275,6 +1224,8 @@ body.touch .fm-leg { font-size: 8px; }
 .oc-inv td b { display: block; font-weight: normal; font-size: 13px; }
 .oc-inv td small { display: block; font-size: 8px; color: #8a3b22; margin-top: 3px; }
 .oc-inv .oc-urg { display: inline; color: #d9342c; font-size: inherit; }
+/* оплата — крупно и зелёным: главное число накладной (05.10.2026) */
+.oc-inv td b.oc-pay { display: inline-block; color: #1f7a2e; }
 /* фото получателя: белая рамка, чуть наискосок, сверху скрепка */
 .oc-photos { position: relative; display: flex; flex-direction: column; gap: 8px; padding-top: 10px; transform: rotate(3deg); }
 .oc-photos .oc-p { width: auto; }
@@ -1301,7 +1252,7 @@ html[data-map] #phone { width: min(920px, 76vw); }
 #phone .ph-body { padding: clamp(10px, 1.6vh, 20px) clamp(14px, 2.2vw, 28px) clamp(14px, 2.4vh, 26px); gap: clamp(10px, 2vh, 20px); }
 .oc-sheet { gap: clamp(12px, 2vw, 28px); }
 .oc-inv { font-size: clamp(10px, 1.15vw, 16px); }
-.oc-inv th { font-size: clamp(8px, .85vw, 12px); padding: clamp(5px, 1vh, 11px) 12px clamp(5px, 1vh, 11px) 0; }
+.oc-inv th { color: #75573b; font-size: clamp(9px, .9vw, 13px); padding: clamp(5px, 1vh, 11px) 12px clamp(5px, 1vh, 11px) 0; }
 .oc-inv td { padding: clamp(5px, 1vh, 11px) 0; }
 .oc-inv td b { font-size: clamp(13px, 1.7vw, 24px); }
 .oc-inv td small { font-size: clamp(8px, .9vw, 12px); }

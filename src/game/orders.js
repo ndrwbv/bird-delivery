@@ -666,8 +666,10 @@ export function cardRows (order) {
   const far = (sp.far || []).reduce((a, b) => a + b, 0);
   const brg = (sp.burgerAdd || []).reduce((a, b) => a + b, 0);
   return [
-    [t('район'), esc(t(ZONE_LABEL[sp.zone] || ZONE_LABEL.normal)) + (di >= 0 ? ' · ' + esc(t(DIST.list()[di].name)) : '')],
-    [t('оплата'), A.money(S.fee) + (sp.urgent ? ' · <b class="oc-urg">' + t('срочно') + '</b>' : '')],
+    // район — имя района; вид квартала — только особый (было «город · Юг»: «город» игроку ничего не говорил)
+    [t('район'), [di >= 0 ? esc(t(DIST.list()[di].name)) : '', sp.zone && sp.zone !== 'normal' && ZONE_LABEL[sp.zone] ? esc(t(ZONE_LABEL[sp.zone])) : ''].filter(Boolean).join(' · ') || esc(t(ZONE_LABEL.normal))],
+    // оплата — крупно, это главное число накладной; «срочно» тут не пишем — есть печать и шапка
+    [t('оплата'), '<b class="oc-pay">' + A.money(S.fee) + '</b>'],
     ...(far > 0 ? [[t('за дальний'), '<b class="oc-far">+' + A.money(far) + '</b>' + ' · ' + esc(t('премия, уже в оплате'))]] : []),
     ...(brg > 0 ? [[t('вместо бургера'), '<b class="oc-far">+' + A.money(brg) + '</b>' + ' · ' + esc(t('День угнетения бургеров, уже в оплате'))]] : []),
   ];
@@ -732,7 +734,7 @@ export function delivered (o, st, onTime) {
     if (bonus > 0) {
       S.money += bonus;
       if (!S.freeRun) A.addWallet(bonus);
-      A.popBonus(t('весь развоз вовремя!'), '+' + A.money(bonus));
+      // плашки нет: Толик пишет в чат «весь развоз вовремя!» (CHAT.react('bundle')), премия — купюрами в пачку
     }
   }
   if (sp.story && STORY && typeof STORY.onDeliver === 'function') {

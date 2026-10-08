@@ -23,16 +23,15 @@
 import './cityopen.css';
 import { t, N_ } from '../i18n/index.js';
 import * as DIST from './districts.js';
-import * as GROW from './growth.js';             // ступень пиццерии в выборе перед сменой (growth.js)
 import * as CHAT from './chat.js';
+import * as DP from './distpick.js';             // выбор перед сменой — карусель карточек районов
 import { CITY as C, DISTRICT, cityFar } from './econ.js';
 
 const SEEN = 'dlv-city-party';
-let A = null, el = null, pk = null, PARTY = null;
+let A = null, el = null, PARTY = null;
 const $c = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const host = () => document.getElementById('game') || document.body;
-const pct = k => '+' + Math.round((k - 1) * 100) + ' %';
 
 export function init (api) { A = api; repair(); }
 
@@ -166,34 +165,22 @@ export function party (done) {
   requestAnimationFrame(() => root.classList.add('on'));
 }
 
-/* ── 2) выбор перед сменой: весь город или пиццерия ── */
-function pickBox () {
-  if (pk) return pk;
-  pk = $c('div'); pk.id = 'cr-cityp'; pk.hidden = true;
-  pk.innerHTML = '<div class="crm-dbox"><div class="crm-dt"></div><div class="crm-dl"></div><div class="crm-dn"></div><button type="button" class="crm-dclose"></button></div>';
-  host().appendChild(pk);
-  return pk;
-}
-let PICK_DONE = null;
+/* ── 2) выбор перед сменой: весь город или пиццерия — карусель карточек (distpick.js) ── */
+let PICK_DONE = null, PICK_ON = false;
 export function picker (done, start = true) {
   if (!ready()) { if (done) done(true); return; }
-  pickBox();
-  PICK_DONE = done || null;
+  PICK_DONE = done || null; PICK_ON = true;
   const city = DIST.city(), cur = DIST.cur();
-  pk.querySelector('.crm-dt').textContent = start ? t('где работаешь эту смену?') : t('где работаешь');
-  pk.querySelector('.crm-dn').textContent = t('весь город: возвращаешься в ближайшую пиццерию, за дальние (от {km} км по дорогам) — премия', { km: String(C.FAR_FROM / 1000).replace('.', ',') });
-  pk.querySelector('.crm-dclose').textContent = t('назад');
-  const row = (key, em, name, sub, on) => '<button type="button" class="crm-di' + (key === 'city' ? ' cy-all' : '') + (on ? ' cur' : '') + '" data-k="' + key + '"' + (on ? ' autofocus' : '') + '>' +
-    '<em>' + em + '</em><b>' + esc(name) + '</b><span>' + esc(sub) + '</span></button>';
+  const btn = start ? t('на смену здесь') : t('работать здесь');
   const far = [2000, 3000, 4000].map(m => '+' + A.money(cityFar(m))).join(' / ');
-  pk.querySelector('.crm-dl').innerHTML =
-    row('city', '★', t('весь город'), t('заказы во всех районах · машина {s} · оплата {p} · за 2 / 3 / 4 км: {far}', { s: pct(C.SPEED), p: pct(C.PAY), far }), city) +
-    DIST.list().map((d, i) => row(String(i), String(i + 1), t('пиццерия · {name}', { name: t(d.name) }),
-      (i ? t('заказы только в районе · машина {s} · оплата {p}', { s: pct(DISTRICT.SPEED[i]), p: pct(DISTRICT.PAY[i]) }) : t('заказы только в районе · маленький, всё рядом')) + ' · ' + GROW.label(i), !city && i === cur)).join('');
-  pk.querySelectorAll('.crm-di').forEach(b => b.addEventListener('click', () => choose(b.dataset.k)));
-  pk.querySelector('.crm-dclose').onclick = () => closePick(false);
-  pk.onclick = e => { if (e.target === pk) closePick(false); };
-  pk.hidden = false;
+  DP.open({
+    title: start ? t('где работаешь эту смену?') : t('где работаешь'),
+    cards: [DP.cityCard({ btn, on: city, far }), ...DP.districtCards({ btn, cur, noCur: city })],
+    idx: city ? 0 : cur + 1,
+    onFlip: () => { if (A.padClear) A.padClear(); if (A.kbClear) A.kbClear(); },
+    onPick: k => { PICK_ON = false; choose(k); },
+    onBack: () => { PICK_ON = false; closePick(false); },
+  });
 }
 /** выбрать: 'city' — весь город, '0'…'7' — пиццерия района */
 export function choose (k) {
@@ -203,8 +190,7 @@ export function choose (k) {
   closePick(true);
 }
 function closePick (ok) {
-  if (!pk || pk.hidden) return;
-  pk.hidden = true;
+  if (PICK_ON) { PICK_ON = false; DP.close(); }
   const cb = PICK_DONE; PICK_DONE = null;
   if (cb) cb(ok);
 }
@@ -243,11 +229,11 @@ export function unlockAll () {
 
 export function root () {
   if (PARTY && !PARTY.el.isConnected) PARTY = null;   // окно уже снято — меню не держим
-  return PARTY ? PARTY.el : pk && !pk.hidden && pk.isConnected ? pk : null;
+  return PARTY ? PARTY.el : PICK_ON && DP.root() ? DP.root() : null;
 }
 export function back () {
   if (PARTY) { PARTY.ok(); return true; }
-  if (pk && !pk.hidden) { closePick(false); return true; }
+  if (PICK_ON && DP.root()) return DP.back();
   return false;
 }
 export const DEBUG = { party, picker, choose, check, beforeShift, nearest, unlockAll, seen, cityFar, root, repair,

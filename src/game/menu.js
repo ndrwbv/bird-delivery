@@ -12,25 +12,26 @@
      MENU.cam(cam, P, tG) — камера заставки
      MENU.modal()     — открытое окно (имя или выбор района: геймпад, клавиатура) или null; MENU.back() — закрыть
      Район (districts.js): карточки района нет; открыто больше одного (не все) — на карточке «на смену»
-       кнопка «сменить район» (список: открытые — выбрать, закрытые — сколько смен ещё); открыто всё —
+       кнопка «сменить район» (карусель районов distpick.js: открытые — «на смену здесь», закрытые — что там
+       и сколько смен до открытия); открыто всё —
        выбор перед каждой сменой (cityopen.js picker)
      MENU.face(id)    — портрет профиля id (data:URL; у каждого профиля свой — по номеру)
      Таблица рекордов (board.js): карточка только в Стим-сборке, окно — тоже modal()
 
    В Яндексе и Москве (?nocareer) модуль не работает: его зовёт только career.js. */
 import './menu.css';
-import { t, tn } from '../i18n/index.js';
+import { t } from '../i18n/index.js';
 import * as DIST from './districts.js';
 import * as CITY from './cityopen.js';
-import * as GROW from './growth.js';             // ступень пиццерии в списке районов (growth.js)
-import { DISTRICT, SHIFT, clock } from './econ.js';
+import { SHIFT, clock } from './econ.js';
 import * as BOARD from './board.js';
 import * as PROF from './profiles.js';           // профили: у каждого свой прогресс (profiles.js)
 import * as QR from './quickrun.js';             // быстрый заезд: сезон, длина смены, машина — без копилки и сюжета
 import * as UPD from './update.js';              // плашка «есть новая версия — обновить» (update.js)
 import { carousel } from './carousel.js';
+import * as DP from './distpick.js';            // выбор района — карусель карточек (distpick.js)
 
-let A = null, el = null, md = null, dm = null, nameCb = null, nameFirst = false, CZ = null, curKey = 'go';
+let A = null, el = null, md = null, nameCb = null, nameFirst = false, CZ = null, curKey = 'go';
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -62,7 +63,7 @@ function build () {
 function navReset () { if (A.padClear) A.padClear(); if (A.kbClear) A.kbClear(); }
 
 function act (a) {
-  if ((md && !md.hidden) || (dm && !dm.hidden) || BOARD.root() || QR.root() || PROF.root() || CITY.root()) return;
+  if ((md && !md.hidden) || DP.root() || BOARD.root() || QR.root() || PROF.root() || CITY.root()) return;
   A.Snd.boot && A.Snd.boot();
   if (a === 'go') A.menuGo();
   else if (a === 'district') openDistricts();
@@ -188,54 +189,19 @@ export function openProfiles () {
   PROF.open({ money: A.money, info: profInfo, face, setName: n => A.setName(n), Snd: A.Snd, onClose: () => { if (el) { profButton(); show(); } } });
 }
 
-/* ── район: список районов (кнопка «сменить район» на карточке «на смену») ── */
-/* до следующего района: сколько смен ещё и где */
-function nextLine () {
-  const p = DIST.opened() - 1;
-  if (p >= DIST.count() - 1) return '';
-  const left = Math.max(1, DIST.need(p) - DIST.shiftsIn(p));
-  return tn(left, 'до района «{next}» — {n} смена в районе «{prev}»|до района «{next}» — {n} смены в районе «{prev}»|до района «{next}» — {n} смен в районе «{prev}»',
-    { next: t(DIST.list()[p + 1].name), prev: t(DIST.list()[p].name) });
-}
-function distBox () {
-  if (dm) return dm;
-  dm = document.createElement('div');
-  dm.id = 'crm-dist';
-  dm.hidden = true;
-  dm.innerHTML = '<div class="crm-dbox"><div class="crm-dt"></div><div class="crm-dl"></div><div class="crm-dn"></div><button type="button" class="crm-dclose"></button></div>';
-  ($('big') || document.body).appendChild(dm);
-  dm.querySelector('.crm-dclose').addEventListener('click', () => closeDistricts());
-  dm.addEventListener('click', e => { if (e.target === dm) closeDistricts(); });
-  return dm;
-}
-const pct = k => '+' + Math.round((k - 1) * 100) + ' %';
+/* ── район: карусель карточек районов (distpick.js; кнопка «сменить район» на карточке «на смену») ──
+   выбрал открытый — сразу смена в нём; «назад» — в меню */
 function openDistricts () {
   if (DIST.allOpen()) { CITY.picker(() => show(), false); return; }   // всё открыто: «весь город» или пиццерия (cityopen.js)
-  distBox();
-  const cur = DIST.cur(), open = DIST.opened();
-  dm.querySelector('.crm-dt').textContent = t('где работаешь');
-  dm.querySelector('.crm-dn').textContent = nextLine() || t('открыты все районы');
-  dm.querySelector('.crm-dclose').textContent = t('назад');
-  const list = dm.querySelector('.crm-dl');
-  list.innerHTML = DIST.list().map((d, i) => {
-    const locked = i >= open, sh = DIST.shiftsIn(i), need = DIST.need(i);
-    const sub = locked ? t('закрыт')
-      : [i ? t('машина {s} · оплата {p}', { s: pct(DISTRICT.SPEED[i]), p: pct(DISTRICT.PAY[i]) }) : t('маленький, заказы рядом'),
-        need && (i === open - 1 || sh >= need) ? t('{have} из {need} смен', { have: Math.min(sh, need), need }) : tn(sh, '{n} смена|{n} смены|{n} смен'), GROW.label(i)].join(' · ');
-    return '<button type="button" class="crm-di' + (i === cur ? ' cur' : '') + (locked ? ' lock' : '') + '" data-i="' + i + '"' + (locked ? ' disabled' : '') + (i === cur ? ' autofocus' : '') + '>' +
-      '<em>' + (i + 1) + '</em><b>' + esc(t(d.name)) + '</b><span>' + esc(sub) + '</span></button>';
-  }).join('');
-  list.querySelectorAll('.crm-di').forEach(b => b.addEventListener('click', () => {
-    const i = +b.dataset.i;
-    if (!DIST.isOpen(i)) return;
-    DIST.set(i);
-    A.Snd.coin && A.Snd.coin();
-    closeDistricts();
-    show();
-  }));
-  dm.hidden = false;
+  DP.open({
+    title: t('где работаешь'),
+    cards: DP.districtCards({ btn: t('на смену здесь') }),
+    idx: DIST.cur(),
+    onFlip: navReset,
+    onPick: k => { DIST.set(+k); A.Snd.coin && A.Snd.coin(); show(); A.menuGo(); },
+    onBack: () => focus(),
+  });
 }
-function closeDistricts () { if (dm) dm.hidden = true; focus(); }
 
 /* ── имя: один раз при первом запуске, потом — из настроек ── */
 function nameBox () {
@@ -284,11 +250,11 @@ function saveName () {
   if (el && shown() && !cb) { show(); focus(); }        // первый запуск: имя есть — рейтинг с ним, фокус на «на смену»
   if (cb) cb(v);
 }
-export const modal = () => (md && !md.hidden && !md.closest('[hidden]') ? md : dm && !dm.hidden && !dm.closest('[hidden]') ? dm : PROF.root() || BOARD.root());   // заставку спрятали (поехали) — окна нет
+export const modal = () => (md && !md.hidden && !md.closest('[hidden]') ? md : DP.root() || PROF.root() || BOARD.root());   // заставку спрятали (поехали) — окна нет
 /* назад: из настроек — отмена; при первом запуске окно не закрывается, ждём имя */
 export function back () {
   if (!modal()) return false;
-  if (modal() === dm) { closeDistricts(); return true; }
+  if (modal() === DP.root()) return DP.back();
   if (modal() === PROF.root()) return PROF.back();
   if (modal() === BOARD.root()) return BOARD.close();
   if (nameFirst) return true;

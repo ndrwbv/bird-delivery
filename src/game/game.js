@@ -64,6 +64,7 @@ import * as PZD from './pizzadome.js';          // пиццерия-шар: от
 import * as PAVE from './pave.js';             // где ходят люди: тротуары, пешеходки, дорожки — туда заборчики и конструкции не ставим (pave.js)
 import * as LAWNP from './lawnprops.js';      // мелочь на газоне рядом с камерой: трава, заросли, покрышки, выбивалки, ракушки, мусор (lawnprops.js)
 import * as FOREST from './forest.js';         // ельник в больших лесах: ели и сосны инстансами, опушка, снег зимой (forest.js)
+import * as LWOOD from './leninwood.js';        // лес вдоль улицы Ленина: полоса ельника с полянами и проезжими тропами (leninwood.js)
 import * as LM from './landmarks.js';            // заправки и каток
 import * as ECON from './econ.js';               // карьера: все числа и формулы (docs/CAREER.md)
 import * as DLG from './dialog.js';              // диалог с головой и печатающимся текстом
@@ -74,6 +75,9 @@ import * as ORD from './orders.js';              // карьера: очеред
 import * as CAREERM from './career.js';          // карьера: смена 9—24, обед, итоги, донаты, слот, звёзды
 import * as STORY from './story.js';             // сюжетные заказы и катсцены (баба Зина)
 import * as HSTORY from './herostories.js';      // герои города, этап 3: истории Стёпы, Ариши, Лёхи по главам (через story.js)
+import * as STEPAB from './stepabench.js';     // Стёпа на лавочке у Ленинградской, 8 сам заказывает пиццу (через story.js)
+import * as WORK from './workout.js';         // площадки-качалки у коробок: турник и брусья, люди качаются, курьер подтягивается сам (workout.js)
+import * as KITES from './kites.js';          // воздушные змеи и дроны в парках и на Ленина (kites.js)
 import * as AUTO from './cars.js';               // карьера: 14 машин, мотор и ресурс, заглохла, ямы, гараж Дяди Жени
 import * as FEST from './festivals.js';          // фестивали на парковках ТЦ: кальянщики, тыква, День угнетения бургеров (festivals.js)
 import * as HK from './hookah.js';               // кальянщики на лавочках (в детской — самовар)
@@ -81,6 +85,8 @@ import * as CULL from './cull.js';
 import * as UPD from './update.js';              // обновление из меню: плашка «есть новая версия», настройки → версия (update.js)
 import * as SET from './settings.js';           // настройки — карусель карточек, одна и та же из меню и из паузы (settings.js)
 import * as PAUSE from './pausecz.js';             // пауза — карусель карточек: продолжить, чек, накладная, карта, настройки, управление, закончить смену
+import * as PIX from './pixfx.js';              // пиксельные частицы одним мешем: дымок из-под колёс, осколки стёкол (pixfx.js)
+import * as CG from './carglass.js';            // стёкла своей машины: курьер внутри, трещины и осколки (carglass.js)
 import * as GFX from './gfx.js';                 // настройки графики: пресеты, 30 к/с, дальность, город за меню (gfx.js, docs/CAREER.md)               // статика дальше камеры — со сцены, матрицы заморожены (Steam Deck)
 import * as TRK from './tracks.js';              // следы колёс на газоне и снегу
 import * as CHAT from './chat.js';             // «Толик управляющий» пишет справа сверху, как в iMessage (похвала, ругань, вычет за опоздание)
@@ -89,6 +95,7 @@ import * as SC from './shiftcash.js';             // карьера: пачка 
 import * as RESPECT from './respect.js';         // респект: уважение на районе, копится через смены (respect.js)
 import * as CREWS from './crews.js';             // компании в форме сетей: курят или бьют конкурентов (crews.js)
 import * as HITS from './hits.js';               // сила удара по людям: упал и встал / лежит в луже / разорвало; самокат отдельно
+import * as HINTS from './hints.js';             // подсказки первой смены одной строкой внизу, без пауз (hints.js)
 import * as FIRST from './intro.js';             // вступление первого запуска: пиццерия, Степан, машина (катсцена «как в ГТА»)
 import * as ACH from './achievements.js';          // достижения Стима: таблица, счётчики, вызов моста (achievements.js, docs/STEAM.md)
 import * as BOARD from './board.js';               // таблица рекордов «лучшая смена» в Стим-сборке (board.js, docs/STEAM.md §4.2)
@@ -1636,6 +1643,12 @@ const SMASH = [];
 const SM_CELL = 20, SMASH_GRID = new Map(), SM_CHUNKS = new Map();
 const SMASH_MAT = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
 
+/* столбы (фонари, знаки, рекламные стелы конкурентов, табличка парковки курьеров): it.post = 1 —
+   медленнее POST_KNOCK м/с (~22 км/ч) машина упирается, быстрее — сбивает (08.10.2026: «сквозь столбики
+   можно проезжать»). POST_N — сколько таких есть: без них медленный ход не проверяем */
+const POST_KNOCK = 6;
+let POST_N = 0;
+const markPost = it => { if (it && !it.post) { it.post = 1; POST_N++; } return it; };
 function smashAdd (kind, x, z, r, geos, hex) {
   const k = Math.floor(x / CHUNK) + ',' + Math.floor(z / CHUNK);
   if (!SM_CHUNKS.has(k)) SM_CHUNKS.set(k, { geos: [], items: [] });
@@ -1643,6 +1656,7 @@ function smashAdd (kind, x, z, r, geos, hex) {
   let nv = 0;
   for (const g of geos) { ch.geos.push(g); nv += g.attributes.position.count; }
   const it = { kind, x, z, r, hex, nv, down: 0, mesh: null, v0: 0 };
+  if (kind === 'lamp' || (kind === 'sign' && r <= 0.8)) markPost(it);   // столб: медленно — твёрдый (POST_KNOCK)
   ch.items.push(it);
   SMASH.push(it);
   const gk = Math.floor(x / SM_CELL) + ',' + Math.floor(z / SM_CELL);
@@ -3577,13 +3591,13 @@ const mafiaApi = () => ({
   hurt: n => { S.hurt = 0; hurtCar(n, 0, V.x + rand(-1, 1), V.z + rand(-1, 1)); },   // выстрел/помидор — полсердца, без мятин и поломок
   bump: () => { V.vx *= 0.25; V.vz *= 0.25; S.shake = Math.max(S.shake, 0.35); Snd.crash(8); },
   onRunOver: () => { S.people++; Snd.squish(); ACH.add('mafia'); },
-  reward: (n, title) => { const v = CAREER ? n : Math.round(n / ECON.MONEY_K); S.money += v; if (!S.freeRun) addWallet(v); popBonus(title, '+' + money(v)); },
+  reward: (n, title) => { const v = CAREER ? n : Math.round(n / ECON.MONEY_K); S.money += v; if (!S.freeRun) addWallet(v); if (title) popBonus(title, '+' + money(v)); return v; },
 });
 let MAFIA_API = null;
 /* что нужно thugs.js (гопники прессуют прохожего) */
 const thugsApi = () => ({
   V, S, scene, CAREER, ADULT, HUMAN_VC, box, mergeGeos, makeHuman, dropMesh, gibHuman, sayBubble, handsUp, emote, groundH, curbAt, inHouse, inBounds, nearestRoad, toast, Snd, money,
-  popBonus: (a, b) => popBonus(escHtml(a), escHtml(b)),
+  popBonus,
   onRunOver: () => { S.people++; Snd.squish(); },
   reward: n => { const v = CAREER ? n : Math.round(n / ECON.MONEY_K / 10) * 10; S.money += v; if (!S.freeRun) addWallet(v); return v; },
 });
@@ -3593,14 +3607,14 @@ const protApi = () => ({
   V, S, scene, CAREER, ADULT, HUMAN_VC, BENCHES, Store, put, mergeGeos, makeHuman, dropMesh, gibHuman, sayBubble, emote, puff, groundH, curbAt, inHouse, inBounds, nearestRoad,
   CAR_L, CAR_W, sparks, Snd,                       // тумбы сбиваются машиной (protests.js PROT.HIT)
   segs: () => RSEG, get ENV () { return ENV; }, chat: s => CHAT.say(s),
-  popBonus: (a, b) => popBonus(escHtml(a), escHtml(b)),
+  popBonus,
   onRunOver: () => { S.people++; Snd.squish(); },
 });
 let PROT_API = null;
 /* что нужно growth.js (вид пиццерии по ступени: гости, очередь, гирлянды, оркестр) */
 const growApi = () => ({
   V, S, scene, CAREER, ADULT, HUMAN_VC, PIZZERIAS, box, put, mergeGeos, makeHuman, dropMesh, gibHuman, emote, groundH, smashMesh,
-  popBonus: (a, b) => popBonus(escHtml(a), escHtml(b)),
+  popBonus,
   onRunOver: () => { S.people++; Snd.squish(); },
   get PIZZA () { return PIZZA; }, get ENV () { return ENV; },
 });
@@ -3714,7 +3728,7 @@ function buildCity () {
   tm('roadlife', () => RL.build(roadApi()));      // знаки и заборы (roadlife.js) — до smashBuild
   if (!INTRO) tm('billboards', () => BB.build(bbApi()));   // щиты с рекламой у больших дорог (billboards.js)
   if (CAREER) tm('cars', () => { BUILD_T.carsInfo = AUTO.build(); });   // ямы в статику дорог, гараж Дяди Жени (cars.js)
-  tm('yard', () => { osmPitches(); osmYardBits(); if (!INTRO) JUNK.yard(); osmVerandas();
+  tm('yard', () => { osmPitches(); if (!INTRO) BUILD_T.workout = WORK.build({ THREE, PITCHES, LIT, box, obb, groundH, inHouse, nearestRoad, solidAt, BENCHES, onPave: PAVE.onPave }); osmYardBits(); if (!INTRO) JUNK.yard(); osmVerandas();
     if (!INTRO) BUILD_T.yardTrees = TREES.plantYards({ CITY, tree, inHouse, inBounds, inPoly, groundH, nearestRoad, solidAt, SMASH, YARD_PATHS, PITCHES });   // группы деревьев во дворах и кусты под окнами (trees.js)
     SEAS.seasonYard(); smashBuild(); });
   tm('seasons', SEAS.seasonBuild);                // сугробы, ёлки, гирлянды
@@ -3999,6 +4013,7 @@ const lightOf = ph => (TL_PLAN[TL.i][0] === ph ? TL_PLAN[TL.i][1] : 'r');
    как она гаснет. Материалы клонируются — иначе гаснут все разом. */
 
 const FX = [], DECALS = [];
+PIX.init(scene, GFX.fxLow);                    // пул пиксельных частиц — одна отрисовка (pixfx.js)
 const sparkGeo = new THREE.BoxGeometry(0.11, 0.11, 0.11);
 const bitGeo = new THREE.BoxGeometry(0.22, 0.22, 0.22);
 const puffGeo = new THREE.IcosahedronGeometry(0.5, 0);
@@ -4357,19 +4372,22 @@ function makeCar (bodyHex, roofSign, model = 'sedan', taxi = false, opts = {}) {
     trunk = { m: tm, hy: top + 0.08, hz: -hl + S.trunk + 0.05, len: S.trunk, a: 0, want: 0, py: top + 0.35, pz: -hl + S.trunk / 2 };
   }
   // салон: стойки и крыша (у смарта — каркасом другого цвета)
-  const cy = top + S.ch / 2;
-  add(new THREE.BoxGeometry(W - 0.12, S.ch, S.cab), frame, 0, cy, S.cz);
+  const cy = top + S.ch / 2, gh = S.ch * 0.72;
+  // своя машина (opts.see): салон — рама и стёкла, внутри курьер; стёкла трескаются и бьются (carglass.js)
+  const cg = opts.see ? CG.cabin(g, add, { S, W, top, cy, gh, frame, tint: !!opts.tint, dy }) : null;
+  if (!cg) add(new THREE.BoxGeometry(W - 0.12, S.ch, S.cab), frame, 0, cy, S.cz);
   add(new THREE.BoxGeometry(W - 0.24, 0.12, S.cab - 0.05), frame, 0, top + S.ch + 0.04, S.cz, 'roof');
   // двери
   const door = Math.min(1.85, S.cab * 0.85);
   add(new THREE.BoxGeometry(0.1, S.h + 0.08, door), dark, -W / 2 - 0.02, top - 0.1, S.cz + 0.02, 'doorL');
   add(new THREE.BoxGeometry(0.1, S.h + 0.08, door), dark, W / 2 + 0.02, top - 0.1, S.cz + 0.02, 'doorR');
-  // стёкла
-  const gh = S.ch * 0.72;
-  const wsF = add(new THREE.BoxGeometry(W - 0.28, gh, 0.1), GLASS, 0, cy + 0.02, S.cz + S.cab / 2 + 0.01, 'keep');
-  const wsB = add(new THREE.BoxGeometry(W - 0.28, gh * 0.9, 0.1), GLASS, 0, cy + 0.02, S.cz - S.cab / 2 - 0.01, 'keep');
-  add(new THREE.BoxGeometry(0.1, gh * 0.84, S.cab - 0.3), GLASS, -W / 2 + 0.05, cy + 0.03, S.cz);
-  add(new THREE.BoxGeometry(0.1, gh * 0.84, S.cab - 0.3), GLASS, W / 2 - 0.05, cy + 0.03, S.cz);
+  // стёкла (у своей машины — carglass.js, выше)
+  const wsF = cg ? null : add(new THREE.BoxGeometry(W - 0.28, gh, 0.1), GLASS, 0, cy + 0.02, S.cz + S.cab / 2 + 0.01, 'keep');
+  const wsB = cg ? null : add(new THREE.BoxGeometry(W - 0.28, gh * 0.9, 0.1), GLASS, 0, cy + 0.02, S.cz - S.cab / 2 - 0.01, 'keep');
+  if (!cg) {
+    add(new THREE.BoxGeometry(0.1, gh * 0.84, S.cab - 0.3), GLASS, -W / 2 + 0.05, cy + 0.03, S.cz);
+    add(new THREE.BoxGeometry(0.1, gh * 0.84, S.cab - 0.3), GLASS, W / 2 - 0.05, cy + 0.03, S.cz);
+  }
   // бамперы: у седана хромированные, у остальных пластик
   add(new THREE.BoxGeometry(W + 0.14, 0.16, 0.22), CHR, 0, y0 - 0.04, hl - 0.03, 'bumperF');
   add(new THREE.BoxGeometry(W + 0.14, 0.16, 0.22), CHR, 0, y0 - 0.04, -hl + 0.03, 'bumperR');
@@ -4450,7 +4468,7 @@ function makeCar (bodyHex, roofSign, model = 'sedan', taxi = false, opts = {}) {
   sh.rotation.x = -Math.PI / 2; sh.position.y = 0.03; sh.scale.set(W / (L + 0.5) * 1.15, 1, 1);
   g.add(sh);
 
-  g.userData = { wheels, steer, panels, glass: [wsF, wsB], dmg: 0, smokeT: 0, bodyHex, hazard, hl, model, trunk,
+  g.userData = { wheels, steer, panels, glass: cg ? [] : [wsF, wsB], cg, dmg: 0, smokeT: 0, bodyHex, hazard, hl, model, trunk,
     hood: hoodM ? { m: hoodM, y: hoodM.position.y, z: hoodM.position.z, len: S.hood } : null };
   return g;
 }
@@ -4462,6 +4480,7 @@ function dentCar (g, wx, wz, force) {
   const inv = new THREE.Vector3(wx - g.position.x, 0, wz - g.position.z);
   inv.applyAxisAngle(new THREE.Vector3(0, 1, 0), -g.rotation.y);
   const f = clamp(force / 26, 0.12, 1);
+  if (u.cg) CG.hit(u.cg, inv.x, inv.z, force, g);   // своя машина: стекло у удара трескается или бьётся (carglass.js)
   u.dmg = clamp(u.dmg + f * 0.3, 0, 1);
   let best = null, bd = 1e9;
   for (const p of u.panels) {
@@ -4586,16 +4605,24 @@ function walkSideOk (e, side, bike) {
 /* переходят быстро: по зебре — во столько раз быстрее своего шага */
 const CROSS_K = 1.7;
 
+/* Самокатчики держатся главных улиц (08.10.2026, автор: «чаще по главным, реже по второстепенным»):
+   на перекрёстке, кроме обычного поворота за угол, можно проехать прямо (через устье поперечной
+   улицы, |угол| < SCOOT_MAIN.STRAIGHT) — из этих двух главная (класс ≤ SCOOT_MAIN.C) берётся
+   с вероятностью SCOOT_MAIN.KEEP; новый самокатчик — на главной в SCOOT_MAIN.SPAWN случаев. */
+const SCOOT_MAIN = { C: 3, STRAIGHT: 0.6, KEEP: 0.7, SPAWN: 0.7 };
 function walkNext (a, b, side, bike) {
   const e = edgeOf(a, b);
-  let best = -1, bs = side > 0 ? -Infinity : Infinity;
+  let best = -1, bs = side > 0 ? -Infinity : Infinity, str = -1, sa = 9;
   for (const c of NODES[b].nb) {
     if (c === a || !inBounds(NODES[c].x, NODES[c].z, -30)) continue;
     const n = edgeOf(b, c);
     if (!walkable(n) || !walkSideOk(n, side, bike)) continue;   // с этой стороны нет тротуара — туда не сворачивает
     const ang = Math.atan2(e.ux * n.uz - e.uz * n.ux, e.ux * n.ux + e.uz * n.uz);   // плюс — направо
     if (side > 0 ? ang > bs : ang < bs) { bs = ang; best = c; }
+    if (bike && n.c <= SCOOT_MAIN.C && Math.abs(ang) < SCOOT_MAIN.STRAIGHT && Math.abs(ang) < sa) { sa = Math.abs(ang); str = c; }
   }
+  // самокат: за угол — на второстепенную, а прямо — главная: чаще прямо
+  if (bike && str >= 0 && str !== best && edgeOf(b, best).c > SCOOT_MAIN.C && chance(SCOOT_MAIN.KEEP)) return str;
   return best;
 }
 
@@ -4665,9 +4692,11 @@ function walkSpawn (p, rmin, rmax, c = V) {
     p.x = best[p.path.i][0]; p.z = best[p.path.i][1];
     return;
   }
+  const wantMain = p.bike && chance(SCOOT_MAIN.SPAWN);   // самокатчик — чаще на главной (SCOOT_MAIN)
   for (let k = 0; k < 20; k++) {
     const a = nodeNear(c.x, c.z, rmin, rmax);
-    const opts = NODES[a].nb.filter(b => { const e = edgeOf(a, b); return walkable(e) && (walkSideOk(e, 1, p.bike) || walkSideOk(e, -1, p.bike)); });
+    let opts = NODES[a].nb.filter(b => { const e = edgeOf(a, b); return walkable(e) && (walkSideOk(e, 1, p.bike) || walkSideOk(e, -1, p.bike)); });
+    if (wantMain && k < 16) { opts = opts.filter(b => edgeOf(a, b).c <= SCOOT_MAIN.C); }
     if (!opts.length) continue;
     walkInit(p, a, pick(opts), chance(0.5) ? 1 : -1, rand(0.15, 0.85));
     return;
@@ -6541,7 +6570,7 @@ function chaseEnd (t, why) {
   if (why === 'escaped' && S.state !== 'over') {
     const pay = CAREER ? ECON.CHASE.ESCAPE : Math.round(ECON.CHASE.ESCAPE / ECON.MONEY_K);
     if (pay > 0 && !S.freeRun) { S.money += pay; addWallet(pay); popPay(pay, [[$t('оторвался от погони'), pay, '']], $t('оторвался!')); }
-    else popBonus($t('оторвался!'), $t('водитель отстал'));
+    else toast($t('оторвался!') + ' · ' + $t('водитель отстал'));
   }
   if (why !== 'wreck' && !t.knock) rejoinRoad(t);
 }
@@ -7172,9 +7201,9 @@ function rivalSpawn (R, delay) {
     } else if (mine && !R.foe) colleagueKO(R);
     else if (R.foe) {
       if (mine) RESPECT.gain('rivalCar');          // денег второй раз нет, а респект — каждый раз
-      if (near) popBonus($t('курьер «{brand}» сгорел', { brand: $t(R.spec.brand) }), mine ? $t('с этого уже получил — без денег') : $t('не от твоего удара — без денег'));
+      if (near) toast($t('курьер «{brand}» сгорел', { brand: $t(R.spec.brand) }) + ' · ' + (mine ? $t('с этого уже получил — без денег') : $t('не от твоего удара — без денег')));
     }
-    else if (near) popBonus($t('{who} вычеркнут', { who: R.name }), $t('из смены на минуту — сгорел вместе с заказом'));
+    else if (near) toast($t('{who} вычеркнут', { who: R.name }) + ' · ' + $t('из смены на минуту — сгорел вместе с заказом'));
   };
 }
 
@@ -7671,7 +7700,7 @@ function updateThief (dt) {
     S.money += CASH(300);
     if (!S.freeRun) addWallet(CASH(300));
     Snd.squish();
-    popBonus($t('респект!'), $t('похититель пиццы наказан · +{money}', { money: money(CASH(300)) }));
+    toast($t('респект!') + ' ' + $t('похититель пиццы наказан · +{money}', { money: money(CASH(300)) }));
     if (!S.freeRun) RESPECT.gain('thief');
     dropThief('', true);
   }
@@ -7998,49 +8027,6 @@ function healSpawn () {
 
 const FXS = { shieldT: 0, beastT: 0, spawnT: 4, aura: null };
 
-/* ── первый кофе: один раз за всё время — карточка «держи кнопку — будет нитро» ──
-   Игра на паузе, кнопка — та, чем сейчас играют (геймпад, палец, клавиатура — как
-   в keysInfo). Подобрал, пока открыто другое окно (заказ, обед, просьба клиента,
-   диалог, карта, погрузка), — карточка ждёт и выходит сразу после. Флаг
-   dlv-msk-nostut; «сбросить прогресс» его стирает — покажется заново. В песочнице
-   (?sandbox) не показывается. Тост «кофе +» в первый раз не нужен — его заменяет карточка */
-const NOS_TUT = { due: false, key: 'dlv-msk-nostut', off: new URLSearchParams(location.search).has('sandbox') };
-const nosTutNeed = () => !NOS_TUT.off && !NOS_TUT.due && !Store.get(NOS_TUT.key, 0);
-/* стаканчик кофе-нитро пикселями: k — контур, l — крышка, b/h — синий и блик, s — рукав, w — логотип, v — пар */
-const CUP_PX = [
-  '......v..v......', '.....v..v.......', '......v..v......', '...kkkkkkkkkk...', '..kllllllllllk..', '.kllllllllllllk.',
-  '.kkkkkkkkkkkkkk.', '..khbbbbbbbbbk..', '..khbbbbbbbbbk..', '..kssssssssssk..', '..ksssswwssssk..', '...kssswwsssk...',
-  '...kssswwsssk...', '...kssssssssk...', '...khbbbbbbbk...', '...khbbbbbbbk...', '....kbbbbbbk....', '....kkkkkkkk....',
-];
-const CUP_COL = { k: '#33210c', l: '#f4f6fb', b: '#1f5bff', h: '#6f9bff', s: '#0c2f9e', w: '#ffffff', v: '#cfe6ff' };
-let cupSVG = '';
-function nosCupSVG () {
-  if (cupSVG) return cupSVG;
-  let r = '';
-  CUP_PX.forEach((row, y) => { for (let x = 0; x < row.length; x++) { const c = CUP_COL[row[x]]; if (c) r += '<rect x="' + x + '" y="' + y + '" width="1" height="1" fill="' + c + '"/>'; } });
-  return (cupSVG = '<svg class="nt-cup" viewBox="0 0 16 18" shape-rendering="crispEdges" aria-hidden="true">' + r + '</svg>');
-}
-function nosTutStep () {
-  if (!NOS_TUT.due) return;
-  if (S.paused || FM.open || CH.opts.length || DLG.isOpen() || elPhone.classList.contains('on') || !elPanel.hidden ||
-      (CAREER && CAREERM.padRoot()) || !['drive', 'back', 'side'].includes(S.state)) return;
-  NOS_TUT.due = false;
-  Store.set(NOS_TUT.key, 1);
-  const pad = document.body.classList.contains('pad'), touch = !pad && document.body.classList.contains('touch');
-  const k = (x, c) => '<kbd' + (c ? ' class="' + c + '"' : '') + '>' + x + '</kbd>';
-  const how = pad ? $t('держи {a} или {b} — машина рванёт вперёд', { a: k('A', 'nt-a'), b: k('RB') })
-    : touch ? $t('держи кнопку {a} — машина рванёт вперёд', { a: k($t('нитро')) })
-    : $t('держи {a} или {b} — машина рванёт вперёд', { a: k('Shift'), b: k('N') });
-  const note = touch ? $t('пока держишь, кофе тает. сколько осталось — кольцо по краю кнопки. новые стаканчики стоят у дороги')
-    : $t('пока держишь, кофе тает. сколько осталось — голубое кольцо вокруг радара. новые стаканчики стоят у дороги');
-  showChoice({
-    kind: 'nos', pause: true, arm: 800,          // A — и нитро, и «понял»: кто жмёт A на ходу, окно не смахнёт не глядя
-    title: $t('кофе-нитро в баке!'),
-    sub: nosCupSVG() + '<div class="nt-how">' + how + '</div><b class="nt-bar"><i></i></b><div class="nt-n">' + note + '</div>',
-    opts: [{ label: $t('понял'), fn () {} }],
-  });
-}
-
 function takePickup (n) {
   n.g.visible = false;
   if (!n.fixed) { dropPickup(n); NITRO_CANS.splice(NITRO_CANS.indexOf(n), 1); }
@@ -8048,8 +8034,7 @@ function takePickup (n) {
   if (n.kind === 'nos') {
     NOS.tank = Math.min(1, NOS.tank + NOS_CAN);
     Snd.nosPick();
-    if (nosTutNeed()) NOS_TUT.due = true;          // первый кофе за всё время — вместо тоста карточка (nosTutStep)
-    else if (!NOS_TUT.due) toast(NOS.tank >= 1 ? $t('кофе: полный бак · {key}', { key: nitroKey() }) : $t('кофе + · {key}', { key: nitroKey() }));
+    if (!HINTS.coffee()) toast(NOS.tank >= 1 ? $t('кофе: полный бак · {key}', { key: nitroKey() }) : $t('кофе + · {key}', { key: nitroKey() }));
   } else if (n.kind === 'shield') {
     FXS.shieldT = 10;
     Snd.nosPick();
@@ -8166,7 +8151,6 @@ function lootReset () {
 
 function updateNitro (dt) {
   const live = S.state === 'drive' || S.state === 'back' || S.state === 'handover' || S.state === 'side';
-  nosTutStep();                                     // первый кофе — карточка, как только нет других окон
   streetLoot(dt, live);                             // деньги на улице и лишнее сердце
   // время от времени — свежий стаканчик у дороги впереди
   if (live && PK.heal && (FXS.healT = (FXS.healT || PK.heal[0]) - dt) <= 0) { FXS.healT = rand(PK.heal[0], PK.heal[1]) * paceK('spawn'); healSpawn(); }
@@ -8401,7 +8385,7 @@ function updateCollect (dt) {
     // находка — сразу в кошелёк; в смене ещё и в её счёт
     addWallet(COL_PRIZE);
     if (!S.ride) S.money += COL_PRIZE;
-    popBonus($t('находка!'), o.c.name + ' · +' + money(COL_PRIZE) + ' · ' + $t('{i} из {n}', { i: got.length, n: COLLECT.length }));
+    toast($t('находка!') + ' ' + o.c.name + ' · +' + money(COL_PRIZE) + ' · ' + $t('{i} из {n}', { i: got.length, n: COLLECT.length }));
     scene.remove(o.g);
     COL_ON_MAP.splice(i, 1);
   }
@@ -8639,7 +8623,7 @@ const wallet = () => +Store.get('dlv-msk-wallet', 0) || 0;
 const addWallet = n => Store.set('dlv-msk-wallet', wallet() + n);
 const owned = () => { const v = Store.get('dlv-msk-cars', ['dodo']); return Array.isArray(v) ? v : ['dodo']; };
 const curCar = () => CAREER ? AUTO.current() : CARS.find(c => c.id === Store.get('dlv-msk-car', 'dodo') && owned().includes(c.id)) || CARS[0];
-const makeCourier = () => { const c = curCar(); return CAREER ? AUTO.makeModel(c.id) : makeCar(c.hex, true, c.model, false, c); };
+const makeCourier = () => { const c = curCar(); return CAREER ? AUTO.makeModel(c.id, { see: true }) : makeCar(c.hex, true, c.model, false, Object.assign({}, c, { see: true })); };   // see — курьер за стёклами (carglass.js)
 /* карьера: четырнадцать машин, поломки, ямы и гараж Дяди Жени — cars.js. Кошелёк
    career.js может подменить: AUTO.init({ wallet, addWallet }) */
 if (CAREER) AUTO.init({ THREE, scene, MAP, CITY, Store, Platform, Snd, DLG, ZN, donated, money, wallet, addWallet, rumble,
@@ -8791,7 +8775,7 @@ const padSel = () => { try { const el = padMenu.selected(); return el && el.isCo
    Через Platform.store — так на Яндексе чистится и облако. Потом — перезагрузка. */
 const RESET_KEEP = ['dlv-lang', 'dlv-sound', 'dlv-gfx', 'dlv-edition', 'dlv-name', 'dlv-map', 'dlv-money-x8', 'dlv-__ts', 'dlv-ach'];   // dlv-ach — достижения, как в Стиме, не стираются
 const PROGRESS_KEYS = [
-  'dlv-msk-wallet', 'dlv-msk-cars', 'dlv-msk-car', 'dlv-msk-best', 'dlv-msk-xp', 'dlv-msk-col', 'dlv-msk-tut', 'dlv-msk-guide', 'dlv-msk-nostut', 'dlv-intro', 'dlv-garage-tut',
+  'dlv-msk-wallet', 'dlv-msk-cars', 'dlv-msk-car', 'dlv-msk-best', 'dlv-msk-xp', 'dlv-msk-col', 'dlv-msk-tut', 'dlv-msk-guide', 'dlv-msk-nostut', 'dlv-intro', 'dlv-garage-tut', 'dlv-hints',
   'dlv-shifts', 'dlv-stars', 'dlv-crew', 'dlv-story', 'dlv-season', 'dlv-used-addr', 'dlv-lb-local', 'dlv-boss', 'dlv-clock', 'dlv-rev-sale',
   'dlv-car-owned', 'dlv-car-cur', 'dlv-car-up', 'dlv-car-L', 'dlv-car-eng', 'dlv-car-paint', 'dlv-district', 'dlv-dist-shifts', 'dlv-dist-open', 'dlv-city-mode', 'dlv-city-party', 'dlv-knocked', 'dlv-pz-grow',
   ...Object.keys(ECON.DONATE || {}).map(k => 'dlv-don-' + k),
@@ -9182,15 +9166,26 @@ function driveStep (dt) {
     }
   }
 
-  // дворовая мелочь: сносится на любом ходу быстрее пешехода
-  if (Math.abs(vf) > 2.5) {
-    const l = Math.hypot(V.vx, V.vz) || 1;
-    smashNear(V.x, V.z, it => {
+  // дворовая мелочь: сносится на любом ходу быстрее пешехода; столбы (it.post — фонари, знаки,
+  // рекламные стелы) медленнее POST_KNOCK — твёрдые: упираешься, как в тумбы протеста (08.10.2026)
+  {
+    const sp = Math.abs(vf), l = Math.hypot(V.vx, V.vz) || 1;
+    if (sp > 2.5 || POST_N) smashNear(V.x, V.z, it => {
       if (it.heavy) return;                       // остановки и контейнеры — ниже и в стенах (junk.js)
-      if (Math.hypot(it.x - noseX, it.z - noseZ) < it.r + CAR_W || Math.hypot(it.x - tailX, it.z - tailZ) < it.r + CAR_W) {
-        smashHit(it, V.vx / l, V.vz / l, Math.abs(vf));
-        const k = it.slow || (it.kind === 'dump' ? 0.85 : it.kind === 'bigfence' ? 0.92 : 0.96); V.vx *= k; V.vz *= k;   // высокий забор тормозит заметнее
+      if (!it.post && sp <= 2.5) return;
+      const rr = it.r + CAR_W, dn = Math.hypot(it.x - noseX, it.z - noseZ), dt2 = Math.hypot(it.x - tailX, it.z - tailZ);
+      if (dn >= rr && dt2 >= rr) return;
+      if (it.post && sp <= POST_KNOCK) {
+        const nose = dn < dt2, cx = nose ? noseX : tailX, cz = nose ? noseZ : tailZ, d = nose ? dn : dt2;
+        let nx = cx - it.x, nz = cz - it.z;
+        if (d < 1e-4) { nx = nose ? -fx : fx; nz = nose ? -fz : fz; } else { nx /= d; nz /= d; }
+        V.x += nx * (rr - d); V.z += nz * (rr - d);
+        const vn = V.vx * nx + V.vz * nz;
+        if (vn < 0) { V.vx -= vn * nx; V.vz -= vn * nz; }
+        return;
       }
+      smashHit(it, V.vx / l, V.vz / l, sp);
+      const k = it.slow || (it.kind === 'dump' ? 0.85 : it.kind === 'bigfence' ? 0.92 : 0.96); V.vx *= k; V.vz *= k;   // высокий забор тормозит заметнее
     });
   }
 
@@ -9296,6 +9291,7 @@ function driveStep (dt) {
     NOS.flameT = 0.03;
     nosFlame(V.x - fx * 2.35 + sx * 0.45, V.y + 0.5, V.z - fz * 2.35 + sz * 0.45, -fx, -fz);
   }
+  if (!dead) PIX.tires(dt, car, car.userData.careerId, V, vf, IN.gas);   // резкий старт — дымок из-под ведущих колёс (pixfx.js)
 
   Snd.engine(dead ? 0 : vf * (NOS.burn ? 1.12 : 1), !dead && (IN.gas || NOS.burn));
   return vf;
@@ -10279,14 +10275,18 @@ function updateRouteLine (dt) {
   R.m.material.color.setScalar(lerp(1, 0.6, ENV.night));        // ночью тише: город темнеет до 0,34, полоса — до 0,6
 }
 
-/* бонус за скорость — крупно по центру, на секунду-другую */
+/* бывшая плашка по центру сверху («выбил конкурента!», «час пик»…) — теперь реплика Толика на ходу
+   (dialog.js line: лицо, текст печатается, мир не стоит, уходит сама). Текст — как есть, не HTML.
+   Что убрано совсем и что ушло в тост — docs/CAREER.md «Реплики на ходу». #bonus остался только
+   якорем для чека оплаты (payFxEl) */
 const elBonus = $('bonus');
-let bonusT = 0;
 function popBonus (title, sub) {
-  elBonus.innerHTML = '<b>' + title + '</b><span>' + sub + '</span>';
-  elBonus.classList.remove('on'); void elBonus.offsetWidth; elBonus.classList.add('on');
-  clearTimeout(bonusT);
-  bonusT = setTimeout(() => elBonus.classList.remove('on'), 4000);
+  title = String(title || ''); sub = String(sub || '');
+  const text = title && sub ? title + (/[.!?…:]$/.test(title) ? ' ' : '. ') + sub : title || sub;
+  if (!text) return;
+  CL.event('line ' + text);
+  const p = CAREER && CHAT.person ? CHAT.person() : null;
+  DLG.line({ person: p, name: $t('Толик управляющий'), text, color: '#3fae5a' });
   Snd.coin();
 }
 
@@ -10363,23 +10363,6 @@ function popPay (total, rows, title, face) {
   P.t2 = setTimeout(() => { el.classList.remove('on', 'fly'); el.hidden = true; }, 2450);
 }
 
-/* Гайд по управлению — один раз за всё время: сразу после «поехали» или
-   «просто покататься». Висит, пока не тронешься, и ещё десять секунд
-   после — или пока не кликнешь. */
-const GUIDE = { on: false, t: 0 };
-function showGuide () {
-  if (Store.get('dlv-msk-guide')) return;
-  Store.set('dlv-msk-guide', 1);
-  $('guide').hidden = false;
-  GUIDE.on = true; GUIDE.t = 10;
-}
-function updateGuide (dt) {
-  if (!GUIDE.on) return;
-  // отсчёт — только когда уже едешь
-  if (S.state === 'drive' && Math.hypot(V.vx, V.vz) > 2) GUIDE.t -= dt;
-  if (GUIDE.t <= 0 || S.state === 'over' || S.state === 'title') { GUIDE.on = false; $('guide').hidden = true; }
-}
-$('guide').addEventListener('click', () => { GUIDE.on = false; $('guide').hidden = true; });
 
 /* ─────────────── хад ─────────────── */
 const elHearts = $('hearts'), elMoney = $('money'), elTask = $('task'), elAddr = $('addr'),
@@ -11526,7 +11509,8 @@ function checkArrival (dt) {
       bundle: !!(o.ord && o.ord.bundle), allOnTime: o.stops.every(q => q.pay && !q.pay.late), urgent: !!(o.ord && o.ord.type === 'urgent') });
 
     handOver(st, onTime);
-    if (ADULT && !o.tut) FLIRT.onHand(st, onTime, { car: () => car });   // клиентка изредка заигрывает, курьер отказывает (flirt.js)
+    if (ADULT && !o.tut) FLIRT.onHand(st, onTime, { car: () => car, person: st.persons[0], speed: () => Math.hypot(V.vx, V.vz),   // клиентка изредка зовёт зайти — диалог, курьер отказывает (flirt.js)
+      hold: on => { if (S.state === 'handover') S.handT = on ? 1e9 : 0.3; } });
     DIRECTOR.delivered();                           // доставка сессии: режиссёр открывает события по нарастающей (director.js)
     // оплата — кучкой денег и чеком (popPay); в сюжетном заказе награду покажет катсцена
     const pp = st.pay;
@@ -11560,7 +11544,7 @@ function checkArrival (dt) {
       S.state = 'handover'; S.handT = 0.9;
       addXP(o.ord && o.ord.bundle ? o.stops.length : 1);   // сборный: каждая пицца — заказ (рост курьера, econ.js BUNDLE)
       S.done = (S.done || 0) + 1;
-      if (o.tut) Store.set('dlv-msk-tut', '1');
+      if (o.tut) { Store.set('dlv-msk-tut', '1'); HINTS.stepan(st.peds[0]); }   // Степан зовёт в бизнес и дует облаком на машину (hints.js)
       else if (o.ord) ORD.delivered(o, st, onTime);   // карьера: поручение по SIDE_ORDERS, STORY.onDeliver
       else if (!S.ride && onTime && st.persons[0] && chance(0.45)) offerSide(st.peds[0], st.persons[0]);
     }
@@ -11750,7 +11734,7 @@ function sideArrival (d, speed) {
     const pay = Sd.it.pay || 1000;                // карьера: pay из SIDE_ORDERS
     S.money += pay;
     if (!S.freeRun) addWallet(pay);
-    popBonus(Sd.it.pay ? $t('поручение выполнено!') : $t('косарь!'), Sd.it.ask + ' · +' + money(pay));
+    toast((Sd.it.pay ? $t('поручение выполнено!') : $t('косарь!')) + ' ' + Sd.it.ask + ' · +' + money(pay));
     ACH.add('errands');
     sideEnd(true);
   }
@@ -11813,7 +11797,7 @@ function urgentFail () {
   const got = Math.max(0, Math.min(fine, wallet()));
   if (got && !S.freeRun) addWallet(-got);
   S.money = Math.max(0, S.money - fine);
-  popBonus($t('срочный заказ сорван'), $t('не успел · клиент отказался · штраф −{money}', { money: money(fine) }));
+  // плашки «срочный заказ сорван» нет: Толик пишет об этом в чат (CHAT.react('urgent')), штраф — красной купюрой
   if (Snd.fail) Snd.fail();
   setTimeout(() => { if (isPlaying()) CHAT.react('urgent'); }, 1200);
   backToBase();
@@ -11840,7 +11824,7 @@ function clientBump (p, fx, fz, sx, sz) {
   Snd.noise(0.12, 0.2);
   if (!st.bumped) {
     st.bumped = true;
-    popBonus($t('задел клиента'), $t('без чаевых · быстрее {n} км/ч — заказ сорван', { n: Math.round(ECON.CLIENT_HIT.HARD * 3.6) }));
+    // плашки «задел клиента» нет: Толик пишет в чат (CHAT.react('bump')), клиент злится
     setTimeout(() => { if (isPlaying()) CHAT.react('bump'); }, 900);
   }
   return true;
@@ -11886,7 +11870,7 @@ function dropRun () {
 
 function gameOver (why, victims, focus) {
   if (S.state === 'over' || S.state === 'dying') return;
-  CHAT.clear();
+  CHAT.clear(); DLG.lineClear();
   // карьера, машина взорвалась — можно воскреснуть за деньги из кошелька: заказ пока держим
   ACH.over(why);                                   // взорвал / утопил — достижения (achievements.js)
   DEATH.keep = CAREER && !S.ride && !S.free && why === 'машина всё' ? { prev: S.state } : null;
@@ -12098,7 +12082,7 @@ function reviveTick (dt) {
   if (S.state === 'brief' && S.order) showOrderCard(S.order);   // взорвался, пока висела карточка — она снова
   V.camX = cam.position.x; V.camZ = cam.position.z; V.camY = cam.position.y; V.camH = V.h;
   Platform.gameplayStart();
-  popBonus($t('воскрес!'), $t('минус {money} из кошелька', { money: money(R.price) }));
+  // плашки «воскрес!» нет: цену видел на карточке, списание — красной купюрой из пачки
 }
 
 function startRun (ride) {
@@ -12141,7 +12125,6 @@ function startRun (ride) {
   $('menu').hidden = !S.ride;
   if (S.ride) { clearRivals(); S.order = null; S.target = null; routePts = []; toast($t('просто катаемся: без заказов и рекордов · esc — пауза и выход')); Platform.gameplayStart(); }
   else { initRivals(); newOrder(); }
-  showGuide();                                   // первый старт за всё время — как ехать
 }
 
 /* из «просто покататься» — обратно в меню */
@@ -12497,9 +12480,19 @@ STORY.init({ THREE, scene, cam, V, S, IN, ADULT, CITY, MAP, Store, SPOTS, ground
 /* истории героев города по главам (herostories.js): встречи, условие главы в пути, бонусы */
 HSTORY.init({ S, V, ADULT, CAREER, Snd, toast, shops: () => SIGNS, pizza: () => PIZZA, shiftN: () => (+Store.get('dlv-shifts', 0) || 0) + 1,
   openAt: (x, z) => !DISTRICTS || DIST.isOpen(DIST.at(x, z)), heal: n => { S.hp = Math.min(S.hpMax, S.hp + n); hudHearts(); } });
+/* Стёпа на лавочке (stepabench.js): лавочка у Ленинградской, 8 и его заказ — через story.js */
+STEPAB.init({ CITY, ADULT, CAREER, bench, realAddress });
+const NO_E = /[?&]noE(&|$)/.test(location.search);   // ?noE — без леса у Ленина, змеев и качалок (сравнить кадр)
+/* змеи и дроны (kites.js): места в парках и на Ленина, люди — только рядом с камерой */
+if (!NO_E) KITES.init({ THREE, scene, CITY, V, get ENV () { return ENV; }, groundH, inHouse, nearestRoad, solidAt, onPave: PAVE.onPave, makeHuman, dropMesh });
+/* площадки-качалки (workout.js): люди на турниках и брусьях, курьер подтягивается сам */
+if (!NO_E) WORK.init({ scene, V, S, get ENV () { return ENV; }, makeHuman, dropMesh, sayBubble, toast, Snd, shiftN: () => (+Store.get('dlv-shifts', 0) || 0) + 1,
+  heal: n => { S.hp = Math.min(S.hpMax, S.hp + n); hudHearts(); }, cutOn: () => STORY.active(), courier: () => STORY.PERSON.courier() });
+
 /* вступление первого запуска (intro.js): камера, машина, Степан, дым — через это */
 FIRST.init({ THREE, cam, V, S, Store, Snd, ADULT, car: () => car, pizza: () => PIZZA, brand: () => OWN.pizza(), carName: () => curCar().name,
   puff, camClear, groundH, guestStep, hud: () => { drawRadar(); hudStep(0); }, hearts: () => hudHearts() });
+HINTS.init({ S, V, NOS: () => NOS, Store, Snd, ADULT, CAREER, sayBubble, puff, toast });
 const BUILD_MS = performance.now() - T0;          // сколько собирался город — для отладки
 /* реквизит склейки — тоже по клеткам: иначе снова один меш на весь город */
 function mergeChunked (list, mat) {
@@ -12533,8 +12526,10 @@ indexSolids();
 /* ельник (forest.js): клетки собираются на ходу вокруг камеры — уже после всего города */
 const FOREST_API = FOREST.init({ THREE, scene, cam, CITY, groundH, inHouse, inBounds, nearestRoad, solidAt,
   onAlley: (x, z, m) => WORLD.onAlley(x, z, m), yardBlocks: (x, z, r) => YARDS.blocks(x, z, r), pzBlocks: PZD.blocks });
+/* лес вдоль Ленина (leninwood.js): полосы ельника в forest.js, тропы — один меш */
+if (!INTRO && !NO_E) LWOOD.init({ THREE, scene, CITY, groundH, inHouse, inBounds, solidAt, onPave: PAVE.onPave });
 /* мелочь на газоне (lawnprops.js): тоже клетками вокруг камеры */
-LAWNP.init({ THREE, scene, cam, CITY, ADULT, groundH, inHouse, inBounds, nearestRoad, roadWidth, car: V, Snd,
+LAWNP.init({ THREE, scene, cam, CITY, ADULT, forests: LWOOD.polys, groundH, inHouse, inBounds, nearestRoad, roadWidth, car: V, Snd,
   onAlley: (x, z, m) => WORLD.onAlley(x, z, m), yardBlocks: (x, z, r) => YARDS.blocks(x, z, r), pzBlocks: PZD.blocks, isForest: FOREST.isForest,
   claims: () => [...CONSTR.claimed(), ...CONSTR.DEBUG.SITES.map(s => ({ x: s.x, z: s.z, r: Math.hypot(s.W, s.D) / 2 + 2 }))],
   benches: BENCHES, stops: JUNK.DEBUG.STOPS, cans: JUNK.DEBUG.CANS_ALL, low: () => GFX.preset() === 'low',
@@ -13148,7 +13143,7 @@ hudHearts();
 resize();
 function showTitle () {
   if (INTRO) return;
-  CHAT.clear();
+  CHAT.clear(); DLG.lineClear();
   showBig(OWN.pizza(),
     $t(GORE_ON ? MAP.tagline.adult : MAP.tagline.kids), '');
   if (CAREER) CAREERM.menu();                     // карьера: своё главное меню (menu.js)
@@ -13364,6 +13359,7 @@ function frameStep (now) {
   CL.step('billboards', BB.step, dt, BB_API || (BB_API = bbApi()));   // смена рекламы на щитах (billboards.js)
   CL.step('pizzadome', PZD.step, dt, ENV_API);    // пиццерия-шар: логотип крутится, ночью светится (pizzadome.js)
   CL.step('forest', FOREST.step, dt, FOREST_API);
+  CL.step('lwood', LWOOD.step, dt);                // тропы леса у Ленина зимой светлее (leninwood.js)
   CL.step('lawn', LAWNP.step, dt);                 // мелочь на газоне: какие клетки рядом и в кадре (lawnprops.js)  // ельник: какие ели рядом и в кадре (forest.js)
   CL.step('rivals', updateRivals, dt);
   CL.step('verandas', updateVerandas, dt);
@@ -13379,7 +13375,7 @@ function frameStep (now) {
   CL.step('trunk', updateTrunk, dt);
   CL.step('routeline', updateRouteLine, dt);                            // оранжевый маршрут на асфальте
   CL.step('tracks', TRK.step, dt);                                   // следы колёс на газоне и снегу (tracks.js)
-  CL.step('guide', updateGuide, dt);
+  CL.step('hints', HINTS.step, dt);                                 // подсказки первой смены строкой внизу (hints.js)
   CL.step('walkers', separateWalkers, dt);
   CL.step('gibs', updateGibs, dt);
   CL.step('gore', updateGore, dt);
@@ -13392,6 +13388,7 @@ function frameStep (now) {
   if (DISTRICTS) districtWatch(dt);
   CL.at.ph = 'world';
   CL.step('fx', updateFX, dt);
+  CL.step('pixfx', PIX.step, dt);                 // дымок из-под колёс и осколки стёкол (pixfx.js)
   CL.step('env', updateEnv, dt);
   CL.at.ph = 'career';
   if (CAREER) CAREERM.step(dt);                   // часы смены, обед в 14:00, полночь
@@ -13418,6 +13415,8 @@ function frameStep (now) {
   CL.step('crew', CREWS.step, dt, CREWS_API || (CREWS_API = crewsApi()));   // компании в форме сетей (crews.js)
   CL.step('surf', updateSurf, dt);
   CL.step('football', updateFootball, dt);
+  CL.step('workout', WORK.step, dt);              // площадки-качалки: люди качаются, курьер подтягивается (workout.js)
+  CL.step('kites', KITES.step, dt);                // змеи и дроны (kites.js)
   CL.step('talk', TALK.step, dt, cam, V);                            // реплики над головами: ближние, крупнее вблизи (talk.js)
   CL.at.ph = 'car';
   if (CAREER) AUTO.step(dt, vf);                  // заглохла, ямы, гараж Дяди Жени
@@ -13523,8 +13522,9 @@ if (window.__dlv) Object.assign(window.__dlv, { showTitle, CAREERM, renderSettin
 if (window.__dlv) window.__dlv.CSH = CSH.DEBUG;   // тень под машиной (carshadow.js)
 if (window.__dlv) window.__dlv.crashlog = CL;        // журнал ошибок: entries(), text(), disabled() (docs/CRASHES.md)
 if (window.__dlv) Object.assign(window.__dlv, { pinFront, nearClient, PIN });   // пин перед клиентом, кто у клиента лишний (docs/ORDERS.md)
+if (window.__dlv) Object.assign(window.__dlv, { PIX: PIX.STATS, CG: CG.STATS, cgState: () => CG.state(car.userData.cg), hurtCar });   // дымок, стёкла (pixfx.js, carglass.js)
 if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG, CONS: CONSTR.DEBUG, DARK: DARKN.DEBUG, WASTE: WASTE.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)
-if (window.__dlv) Object.assign(window.__dlv, { DIRECTOR: DIRECTOR.DEBUG, HB: HB.DEBUG, FLIRT: ADULT ? FLIRT.DEBUG : null });   // коневозки, заигрывание (только взрослая)
+if (window.__dlv) Object.assign(window.__dlv, { DIRECTOR: DIRECTOR.DEBUG, HB: HB.DEBUG, FLIRT: ADULT ? FLIRT.DEBUG : null, popBonus, CHAT_PERSON: () => CHAT.person() });   // коневозки, заигрывание (только взрослая)
 if (window.__dlv) { window.__dlv.FOREST = FOREST.DEBUG; window.__dlv.LAWN = LAWNP.DEBUG; window.__dlv.PAVE = PAVE.DEBUG; window.__dlv.PZD = PZD.DEBUG; window.__dlv.cam = cam; window.__dlv.RIV = RIVS.DEBUG; }   // ельник и пиццерия-шар (forest.js, pizzadome.js)
 if (window.__dlv) window.__dlv.RELIEF = { STATS: RELIEF.STATS, at: RELIEF.reliefAt };   // неровный газон (relief.js)
 if (window.__dlv) Object.assign(window.__dlv, { CROWDS, PUB_SPOTS, spawnCrowd, ACCIDENTS, PITCHES });   // компании у подъездов, драки на авариях, футбол — проверка наезда в probe

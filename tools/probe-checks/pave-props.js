@@ -8,7 +8,8 @@
        оградки, выбивалки, бельевые столбы, песок, покрышки, ракушки — ни одна опора не на мощёном;
        заросли (бурьян 2 м, камыш, борщевик) — ни один стебель не на мощёном;
      • высокое во дворах: заросли, бельё, выбивалки, ракушки — не ближе 40 м к большой улице
-       (класс ≤ 4), если между ними нет дома (lawnprops.js inYard). */
+       (класс ≤ 4), если между ними нет дома (lawnprops.js inYard);
+     • стойки площадок-качалок (workout.js), лавочка Стёпы (stepabench.js), места змеев и дронов (kites.js). */
 const P = d.PAVE.onPave;
 const R = { n: {}, by: {}, sample: [], street: {}, thick: 0, perK: 0 };
 const cnt = k => { R.n[k] = (R.n[k] || 0) + 1; };
@@ -51,6 +52,10 @@ for (let q = 0; q < ents.length; q += 15) {
     }
   }
 }
+// 3) площадки-качалки (workout.js): стойки турника и брусьев; лавочка Стёпы (stepabench.js); места змеев и дронов (kites.js)
+for (const st of (d.WORK && d.WORK.SITES) || []) for (const [px, pz] of st.posts || []) { cnt('workout'); const w = P(px, pz, 0); if (w) hit('workout', px, pz, w); }
+if (d.STEPAB && d.STEPAB.place) { const b = d.STEPAB.place; cnt('stepa-bench'); const w = P(b.ex, b.ez, 0); if (w) hit('stepa-bench', b.ex, b.ez, w); }
+for (const sp of (d.KITES && d.KITES.SPOTS) || []) { cnt('kite'); const w = P(sp.x, sp.z, 0); if (w) hit('kite', sp.x, sp.z, w); }
 R.thick = thickN; R.cells = cells; R.perK = cells ? +(thickN / cells).toFixed(2) : 0;
 const bad = Object.values(R.by).reduce((a, b) => a + b, 0);
 return { ok: bad === 0 && (R.n.fence || 0) > 0 && cells > 0, bad, ...R };

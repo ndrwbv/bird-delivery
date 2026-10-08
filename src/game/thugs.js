@@ -196,7 +196,7 @@ function helped (how) {
   let tip = 0;
   if (v && !v.dead && chance(PRESS.TIP_CHANCE)) tip = A.reward ? A.reward(Math.round(rand(PRESS.TIP[0], PRESS.TIP[1]) / 50) * 50) : 0;
   SC.tip = tip;
-  if (A.popBonus) A.popBonus(t('спас прохожего!'), (gain ? t('+{n} респект', { n: gain }) : '') + (tip ? (gain ? ' · ' : '') + t('на чай {money}', { money: A.money(tip) }) : ''));
+  if (A.toast) A.toast(t('спас прохожего!') + ' ' + (gain ? t('+{n} респект', { n: gain }) : '') + (tip ? (gain ? ' · ' : '') + t('на чай {money}', { money: A.money(tip) }) : ''));
 }
 /* гудок машины (если есть): спугивает ближе HONK_R */
 export function honk (x, z) {

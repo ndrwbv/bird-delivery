@@ -17,7 +17,7 @@
      хлам. Чем больше донат «борьба с мусором», тем они меньше; на цели —
      нет совсем. Никто этого не объясняет. Кучи — склейка по клеткам, при
      смене доната пересобирается только она (trash*);
-   • бандитские районы (ZN.gangZones): красные круги на радаре и карте;
+   • бандитские районы (ZN.gangZones): размытые красные пятна на радаре и карте;
      адрес в районе — 3–4 гопника в спортивках (днём 6 из 10, вечером всегда) ждут у пина
      или выходят из-за угла; пицца отдаётся сразу, но машину тут же окружают и держат,
      пока не заплатишь или не помнут (gang*, HOLD). В детской версии без бит: «покачают» машину;
@@ -1244,24 +1244,60 @@ function gangClear () {
   gangEnd();
 }
 
-/* круги районов на радаре и полной карте */
+/* районы на радаре и полной карте — размытые красные пятна неровной формы, без края (08.10.2026,
+   было — круги с обводкой). Пятно — GANG_BLOB мягких кружков: один в середине и вокруг по кругу со
+   случайным (по месту района — всегда тем же) сдвигом и размером. Кружки — одна заготовка-градиент
+   64 px (рисуется один раз), на кадр — drawImage на кружок: радар не тяжелеет. Сами правила района —
+   прежний круг ZN.gangZones (r): пятно гаснет как раз около него. */
+const GANG_BLOB = { N: 8, A_RADAR: 0.16, A_MAP: 0.2 };
+let BLOB_IMG = null;
+const blobCache = new Map();
+function blobImg () {
+  if (BLOB_IMG) return BLOB_IMG;
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(214, 36, 44, 1)'); g.addColorStop(0.45, 'rgba(214, 36, 44, 0.6)'); g.addColorStop(1, 'rgba(214, 36, 44, 0)');
+  x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+  return (BLOB_IMG = c);
+}
+/* кружки пятна в долях радиуса: [dx, dz, r] — от места района, всегда одинаковые */
+function blobDots (g) {
+  const k = Math.round(g.x) + ',' + Math.round(g.z);
+  let d = blobCache.get(k);
+  if (d) return d;
+  let sd = (Math.abs(Math.round(g.x * 13 + g.z * 7)) % 233280) + 1;
+  const rnd = () => (sd = (sd * 9301 + 49297) % 233280) / 233280;
+  d = [[0, 0, 0.72]];
+  const a0 = rnd() * 6.283;
+  for (let i = 0; i < GANG_BLOB.N; i++) {
+    const a = a0 + i * 6.283 / GANG_BLOB.N + (rnd() - 0.5) * 0.6, q = 0.3 + rnd() * 0.34;
+    d.push([Math.cos(a) * q, Math.sin(a) * q, 0.3 + rnd() * 0.26]);
+  }
+  blobCache.set(k, d);
+  return d;
+}
+function drawBlob (ctx, g, at, sc, alpha) {
+  const img = blobImg(), a0 = ctx.globalAlpha;
+  ctx.globalAlpha = alpha;
+  for (const [dx, dz, rr] of blobDots(g)) {
+    const [a, b] = at(g.x + dx * g.r, g.z + dz * g.r), r = rr * g.r * sc;
+    ctx.drawImage(img, a - r, b - r, r * 2, r * 2);
+  }
+  ctx.globalAlpha = a0;
+}
 export function drawRadar (ctx, tr, s) {
   if (!CAREER || !A) return;
   for (const g of ZN.gangZones()) {
     const [a, b] = tr(g.x, g.z), r = g.r * s;
-    if (Math.hypot(a, b) > r + 200) continue;
-    ctx.beginPath(); ctx.arc(a, b, r, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(226, 48, 56, 0.24)'; ctx.fill();
-    ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(214, 36, 44, 0.75)'; ctx.stroke();
+    if (Math.hypot(a, b) > r * 1.2 + 200) continue;
+    drawBlob(ctx, g, tr, s, GANG_BLOB.A_RADAR);
   }
 }
 export function drawMap (x, fmX, fmZ, s) {
   if (!CAREER || !A) return;
   for (const g of ZN.gangZones()) {
-    const a = fmX(g.x), b = fmZ(g.z), r = Math.abs(fmX(g.x + g.r) - a);
-    x.beginPath(); x.arc(a, b, r, 0, Math.PI * 2);
-    x.fillStyle = 'rgba(226, 48, 56, 0.3)'; x.fill();
-    x.lineWidth = Math.max(2, 3 * s); x.strokeStyle = 'rgba(200, 30, 40, 0.85)'; x.stroke();
+    const k = Math.abs(fmX(g.x + 1) - fmX(g.x));
+    drawBlob(x, g, (wx, wz) => [fmX(wx), fmZ(wz)], k, GANG_BLOB.A_MAP);
   }
 }
 

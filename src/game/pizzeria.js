@@ -166,11 +166,15 @@ export function courierLot (A, f, count) {
   fence(W / 2 + 0.6, 0.6, W / 2 + 0.6, D + 0.5);
   fence(-W / 2 - 0.6, D + 0.5, W / 2 + 0.6, D + 0.5);
   // табличка «парковка курьеров» на столбе и фонарь над площадкой
+  // столб — сбиваемый (до 08.10.2026 машина проезжала сквозь): медленно — твёрдый, быстрее — валится, табличка пропадает
   const [sx, sz] = P(-W / 2 - 1.2, 0.6), sy = A.groundH(sx, sz);
-  A.box(A.LIT, 0.12, 2.8, 0.12, '#585460', sx, sy + 1.4, sz);
+  const pole = [];
+  A.put(pole, new THREE.BoxGeometry(0.12, 2.8, 0.12), '#585460', sx, sy + 1.4, sz);
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.8), lotSignMat(A));
   sign.position.set(sx, sy + 2.6, sz); sign.rotation.y = Math.atan2(-nx, -nz);
   A.scene.add(sign);
+  const it = A.smashAdd('sign', sx, sz, 0.5, pole, '#585460');
+  it.onDown = () => { sign.visible = false; };
   const [lx, lz] = P(W / 2 + 1.2, D + 0.6), ly = A.groundH(lx, lz);
   SL.lamp(A, { x: lx, z: lz, y: ly, style: 'yard', dx: -nx, dz: -nz, spot: P(W / 2 - 2, D / 2) });   // сбивается (streetlamps.js)
   const h = Math.atan2(-nx, -nz);                                        // носом к улице

@@ -1000,7 +1000,6 @@ function announce () {
   o.ann = key; save(o);
   if (st === 5) {
     if (A.chat) A.chat(t(P.win));
-    if (A.popBonus) setTimeout(() => A.popBonus(t('Власть сменилась!'), title(P)), 5000);
   } else if (A.chat) A.chat(t(ANNOUNCE[st], { title: title(P) }));
 }
 export function step (dt, api) {

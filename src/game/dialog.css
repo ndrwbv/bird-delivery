@@ -46,3 +46,20 @@
 .dlg-m > i { display: block; height: 10px; background: #e8d9b8; border: 2px solid #33210c; border-radius: 5px; overflow: hidden; }
 .dlg-m > i > i { display: block; height: 100%; }
 .dlg-m b { font-weight: normal; text-align: right; }
+
+/* реплика на ходу (DLG.line): сверху по центру, без затемнения, мир идёт */
+#dlg-live { position: absolute; left: 50%; top: 64px; z-index: 30; width: min(520px, calc(100% - 32px)); background: #1d2440;
+            border: 3px solid #33210c; border-radius: 10px; box-shadow: 0 5px 0 #141a33; overflow: hidden; cursor: pointer;
+            opacity: 0; transform: translate(-50%, -10px); transition: opacity .2s, transform .2s; }
+#dlg-live[hidden] { display: none; }
+#dlg-live.on { opacity: 1; transform: translate(-50%, 0); }
+#dlg-live .dlg-bar { height: 6px; }
+.dll-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; }
+.dll-row img { flex: 0 0 auto; width: 64px; height: 64px; image-rendering: pixelated; border-radius: 10px; border: 3px solid #33210c;
+               background: #f3c9a0; animation: dlg-talk .5s ease-in-out infinite alternate; }
+.dll-row img[hidden] { display: none; }
+.dll-b { flex: 1; min-width: 0; background: #fff3d6; color: #2a1d10; border: 3px solid #33210c; border-radius: 10px; padding: 8px 12px; }
+.dll-b b { display: block; font-weight: normal; font-size: 9px; color: #9a6b1e; margin-bottom: 4px; }
+.dll-b p { margin: 0; font-size: 11px; line-height: 1.7; min-height: 1.7em; }
+@media (max-width: 560px) { #dlg-live { top: 52px; } .dll-row img { width: 48px; height: 48px; } .dll-b p { font-size: 10px; } }
+@media (prefers-reduced-motion: reduce) { .dll-row img { animation: none; } }

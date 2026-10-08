@@ -278,6 +278,8 @@ export const PERSON = { host: id => { const s = STORIES.find(q => q.id === id); 
 /* ─────────────── где живёт ─────────────── */
 const HOME = new Map();
 function homeOf (s) {
+  // своё место (Стёпа на лавочке, stepabench.js): { ex, ez, nx, nz, sx, sz, x, z, addr } — «дверь» = где он сидит
+  if (typeof s.place === 'function') return s.place();
   // home-функция: дом выбирают заново (герой города — у подъезда рядом с тем местом, где стоит)
   const HM = typeof s.home === 'function' ? s.home() : s.home;
   if (!HM) return null;
@@ -400,7 +402,12 @@ export function stage (order) {
   unstage();
   const g = hostModel(s);
   API.scene.add(g);
-  const a = actor(g, h.ex + h.nx * 0.9, h.ez + h.nz * 0.9, Math.atan2(h.nx, h.nz));
+  const a = s.sit ? actor(g, h.ex, h.ez, Math.atan2(h.nx, h.nz)) : actor(g, h.ex + h.nx * 0.9, h.ez + h.nz * 0.9, Math.atan2(h.nx, h.nz));
+  if (s.sit) {                               // сидит (лавочка): высота сиденья, м; ноги вперёд
+    a.sit = a.lift = s.sit;
+    const u = g.userData;
+    if (u.legL) { u.legL.rotation.x = -1.45; u.legR.rotation.x = -1.45; }
+  }
   placeActor(a);
   CUT.staged = { id: s.id, a };
 }
@@ -627,7 +634,7 @@ function actorStep (a, dt) {
   placeActor(a);
   const walking = !!a.to;
   const sw = walking ? Math.sin(a.ph) * 0.6 : 0;
-  if (u.legL) { u.legL.rotation.x = sw; u.legR.rotation.x = -sw; }
+  if (u.legL) { u.legL.rotation.x = a.sit ? -1.45 : sw; u.legR.rotation.x = a.sit ? -1.45 : -sw; }
   let aL = walking ? -sw * 0.6 : 0, aR = walking ? sw * 0.6 : 0, zL = 0, zR = 0, hx = 0, hy = 0, lift = 0;
   if (a.hold) aL = aR = -1.15;
   const q = a.act;
@@ -649,6 +656,7 @@ function actorStep (a, dt) {
   }
   // говорит — чуть кивает в такт
   if (a.talk && !q) hx += Math.sin(CUT.t * 7.3) * 0.05;
+  if (a.sit) lift += a.sit;                  // сидит на лавочке
   if (u.armL) { u.armL.rotation.x = aL; u.armR.rotation.x = aR; u.armL.rotation.z = zL; u.armR.rotation.z = zR; }
   if (u.head) { u.head.rotation.x = hx; u.head.rotation.y = hy; }
   a.lift = lift;
@@ -809,7 +817,7 @@ async function reward (s, c) {
   if (cash) {
     try { if (API.addMoney) API.addMoney(cash, 'story'); } catch (e) { console.warn('[story] addMoney:', e); }
   }
-  if (API.popBonus) API.popBonus(t('глава «{name}»', { name: t(kidsOf(c).name || c.name) }), '+' + stars + ' ★' + (cash ? ' · +' + (API.money ? API.money(cash) : cash + ' ₽') : ''));
+  if (API.popBonus) API.popBonus(c.label ? t(kidsOf(c).label || c.label) : t('глава «{name}»', { name: t(kidsOf(c).name || c.name) }), '+' + stars + ' ★' + (cash ? ' · +' + (API.money ? API.money(cash) : cash + ' ₽') : ''));
   return { stars, money: cash };
 }
 
@@ -875,6 +883,7 @@ export async function play (storyId, chapter, o = {}) {
   // в первых главах она выходит из подъезда: сначала её нет
   const first = c.script.find(q => q[0] === 'walk' && q[1] !== 'courier');
   if (first && first[2] === 'out') { za.x = h.ex - h.nx * 0.4; za.z = h.ez - h.nz * 0.4; za.hidden = true; za.grp.visible = false; }
+  if (s.sit) { za.x = h.ex; za.z = h.ez; za.h = za.want = Math.atan2(h.nx, h.nz); za.sit = s.sit; za.hidden = false; za.grp.visible = true; }
   za.speed = 1.1;
   za.look = null;
   const cg = API.makeHuman(courierPerson(), { shirt: COURIER_LOOK.shirt, pants: COURIER_LOOK.pants });

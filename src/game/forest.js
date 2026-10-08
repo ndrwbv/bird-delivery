@@ -258,7 +258,7 @@ function buildCell (i, j) {
       const x = gx + (r() - 0.5) * S * F.JIT, z = gz + (r() - 0.5) * S * F.JIT;
       let f = null;
       for (const q of polys) if (x > q.x0 && x < q.x1 && z > q.z0 && z < q.z1 && inP(x, z, q.p)) { f = q; break; }
-      if (!f) continue;
+      if (!f || (f.hole && f.hole(x, z, 1.2))) continue;              // проплешины и тропы своего леса (addArea)
       const dR = okAt(x, z, 1.2);
       if (dR < 0) continue;
       const k = Math.min(1, Math.min(edgeD(x, z), dR) / F.EDGE);   // 0 — край, 1 — глубина
@@ -280,7 +280,7 @@ function buildCell (i, j) {
       // подлесок: куст или молодая ёлка рядом
       if (r() < 0.12 + 0.5 * (1 - k)) {
         const a = r() * 6.3, d = 1.6 + r() * 1.2, bx = x + Math.cos(a) * d, bz = z + Math.sin(a) * d;
-        if (okAt(bx, bz, 0.6) >= 0) {
+        if (okAt(bx, bz, 0.6) >= 0 && !(f.hole && f.hole(bx, bz, 0.8))) {
           const by = A.groundH(bx, bz);
           if (r() < 0.55) bu.push([bx, by, bz, r() * 6.3, 0.8 + r() * 1.0, 0.5 + r() * 0.7, 0.75 + r() * 0.45, r()]);
           else { const H = 1.5 + r() * 2; sp.push([bx, by, bz, r() * 6.3, H, H, 0.95 + r() * 0.3, r()]); }
@@ -404,6 +404,24 @@ export function init (api) {
   if (!FORESTS.length) return api;
   makeMeshes();
   return api;
+}
+
+/* свой лес (не из карты): полоса вдоль улицы Ленина (leninwood.js). p — контур, hole(x, z, r) → true —
+   здесь дерева нет (проплешина, тропа). Клетки рядом, уже собранные пустыми, — заново */
+export function addArea (p, hole) {
+  if (!A || !p || p.length < 3) return false;
+  forests();
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const q of p) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); z0 = Math.min(z0, q[1]); z1 = Math.max(z1, q[1]); }
+  FORESTS.push({ p, x0, x1, z0, z1, hole: hole || null, own: true });
+  if (!MESH.sp0) makeMeshes();
+  const C = FOREST.CELL;
+  for (const [k, c] of CELLS) {
+    const cx0 = c.i * C, cz0 = c.j * C;
+    if (cx0 + C > x0 && cx0 < x1 && cz0 + C > z0 && cz0 < z1) { if (c.empty) CELLS.delete(k); else dropCell(k, c); }
+  }
+  LAST.dirty = true;
+  return true;
 }
 
 export function step (dt, api) {

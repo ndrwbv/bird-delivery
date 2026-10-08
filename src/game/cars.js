@@ -275,7 +275,7 @@ export function makeModel (id, o = {}) {
   // шашка доставки — только на «Семёрке» пиццерии: остальные — свои, по ним узнают прототип
   const hex = o.hex || hexOf(id);
   const g = A.makeCar(hex, o.sign !== undefined ? !!o.sign : id === START, c.model, false, {
-    spec: c.spec, lift: c.lift || 0, low: c.low, tint: c.tint, chrome: c.chrome || hex, roofHex: c.roof,
+    spec: c.spec, lift: c.lift || 0, low: c.low, tint: c.tint, chrome: c.chrome || hex, roofHex: c.roof, see: !!o.see,   // see — салон со стёклами и курьером (carglass.js)
     dress: (g, add, k) => dress(id, g, add, k, u),
   });
   g.userData.careerId = id;

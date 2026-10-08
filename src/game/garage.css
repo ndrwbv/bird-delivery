@@ -65,7 +65,8 @@ body:has(#cr-garage:not([hidden])) .hud, body:has(#cr-garage:not([hidden])) #ctr
 .gr-btn:disabled { cursor: default; opacity: .5; }
 .gr-btn.buy, .gr-btn.pick { color: #33210c; background: #ffd85e; font-size: clamp(11px, 1.3vw, 15px); }
 .gr-btn.buy i { font-style: normal; white-space: nowrap; }
-.gr-btn.cur { color: #33210c; background: #7fe08a; opacity: 1; }
+/* «на смене» — не кнопка, а отметка: машина уже твоя на смене (05.10.2026: была зелёной кнопкой и звала нажать) */
+.gr-btn.cur { color: #7fe08a; background: transparent; border-style: dashed; box-shadow: none; opacity: 1; padding: 6px 12px; }
 .gr-btn.up { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; column-gap: 10px; row-gap: 4px; text-align: left; }
 .gr-btn.up b { font-weight: normal; }
 .gr-btn.up span { grid-row: 2; font-size: .78em; color: #ffd85e; }
@@ -123,4 +124,8 @@ body:has(#cr-garage:not([hidden])) .hud, body:has(#cr-garage:not([hidden])) #ctr
   .gr-st { grid-template-columns: 76px 1fr auto; }
 }
 /* низкий экран (Steam Deck 1280×800 и ниже) — картинка ниже, чтобы влезли кнопки */
-@media (max-height: 820px) { .gr-pic { max-height: 30vh; } .gr-note { display: none; } }
+/* низкий экран (Steam Deck 1280×800 и ниже) — картинка ниже, чтобы влезли кнопки; описание машины — в две строки
+   (05.10.2026: на компьютере и Деке его не было видно вовсе) */
+@media (max-height: 820px) { .gr-pic { max-height: 26vh; }
+  .gr-note { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; } }
+@media (max-height: 560px) { .gr-note { display: none; } }

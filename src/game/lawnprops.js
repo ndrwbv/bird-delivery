@@ -127,6 +127,7 @@ function indexAll () {
     if (g.k === 'water' || g.k === 'pitch' || g.k === 'play' || A.isForest(g)) { const b = box(g.p); gridPut(POLYS, L, b.x0, b.z0, b.x1, b.z1, b); }
     else if (g.k === 'park') { const b = box(g.p); gridPut(PARKS, L, b.x0, b.z0, b.x1, b.z1, b); }
   }
+  for (const p of (A.forests && A.forests()) || []) { const b = box(p); gridPut(POLYS, L, b.x0, b.z0, b.x1, b.z1, b); }   // свой лес (лес у Ленина, leninwood.js) — как ельник
   ENTS = new Map();
   for (const e of C.entrances || []) gridPut(ENTS, 20, e[0], e[1], e[0], e[1], e);
   HOT = new Map();
