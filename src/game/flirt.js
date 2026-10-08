@@ -98,7 +98,7 @@ function dialog (p, person, api) {
   if (api && api.hold) api.hold(true);
   const name = person.first || String(person.name || '').split(/\s+/)[0];
   const end = r => { ST.reply = r === false ? b : a; if (api && api.hold) api.hold(false); };
-  DLG.say({ person, name, text: ST.last, accept: a, decline: b, mood: 'shy', color: '#d6457a' }).then(end, end);
+  DLG.say({ person, name, text: ST.last, accept: a, decline: b, mood: 'shy', color: '#d6457a', plain: true }).then(end, end);
 }
 
 /* по-старому, облачками над головами: машина уже едет — игру не останавливаем */

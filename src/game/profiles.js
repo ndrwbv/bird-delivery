@@ -15,11 +15,12 @@
      PROF.on()               — профили включены
      PROF.cur() / curName()  — текущий профиль (id 1…5) / его имя
      PROF.list()             — [{ id, name, cur }]
-     PROF.create(name) / rename(id, name) / remove(id) / use(id)  — use и create перезагружают игру
+     PROF.create(name) / rename(id, name) / remove(id) / use(id)  — use и create переключают игру: api.swap()
+                             из окна (game.js reprofile) — без перезагрузки; без swap — перезагрузка
      PROF.keys()             — ключи прогресса текущего профиля (для «сбросить прогресс» в game.js)
      PROF.peek(id, fn)       — fn() так, будто текущий — профиль id (подписи в списке профилей)
      PROF.open(api) / root() / back() / submit()  — окно «профили» из главного меню (menu.js)
-       api: { money(n), info() → строка-подпись профиля (читает Store), face(id) → портрет, setName(n), Snd, onClose() } */
+       api: { money(n), info() → строка-подпись профиля (читает Store), face(id) → портрет, setName(n), Snd, onClose(), swap() } */
 import './profiles.css';
 import { t } from '../i18n/index.js';
 
@@ -118,9 +119,19 @@ export function peek (id, fn) {
   try { return fn(); } finally { meta.cur = was; }
 }
 function wipe (id) { for (const k of keys(id)) rset(phys(k, id), undefined); }
+/* переключились: без перезагрузки страницы — игра пересчитывает только то, что у профиля своё
+   (A.swap = game.js reprofile: сохранение, машина, районы, сюжет, подсказки; город тот же).
+   swap нет или упал — как раньше, перезагрузка */
 function go (reload) {
   save(); flush();
-  if (reload !== false) setTimeout(() => location.reload(), 150);
+  if (reload === false) return;
+  const sw = A && A.swap;
+  setTimeout(() => {
+    let ok = false;
+    if (sw) { try { ok = sw() !== false; } catch (e) { console.error('[profiles] swap', e); } }
+    if (!ok) { location.reload(); return; }
+    close();
+  }, sw ? 30 : 150);
 }
 /** новый профиль с именем → id (и сразу на него; null — уже MAX) */
 export function create (name, reload) {
@@ -206,7 +217,7 @@ function render () {
     const p = view.id && meta.list.find(x => x.id === view.id);
     b.innerHTML = '<form class="prf-form" autocomplete="off"><label for="prf-in">' + esc(p ? t('новое имя профиля') : t('новый профиль — как тебя зовут?')) + '</label>' +
       '<input id="prf-in" type="text" maxlength="24" autocomplete="off" spellcheck="false" placeholder="' + esc(t('имя и фамилия')) + '" value="' + esc(p ? p.name : '') + '">' +
-      (p ? '' : '<div class="prf-note">' + esc(t('новый профиль начинает с первой смены: свой кошелёк, машины и районы. настройки — общие')) + '</div>') +
+      (p ? '' : '<div class="prf-note">' + esc(t('новый профиль начинает с первой смены: своя копилка, машины и районы. настройки — общие')) + '</div>') +
       '<div class="prf-btns"><button type="button" class="prf-no">' + esc(t('отмена')) + '</button>' +
       '<button type="submit" class="prf-ok"' + (p && p.name ? '' : ' disabled') + '>' + esc(p ? t('готово') : t('создать')) + '</button></div></form>';
     const inp = b.querySelector('input'), ok = b.querySelector('.prf-ok');
@@ -220,7 +231,7 @@ function render () {
     const p = meta.list.find(x => x.id === view.id);
     b.innerHTML = '<div class="prf-t">' + esc(t('удалить профиль «{name}»?', { name: label(p) })) + '</div>' +
       '<div class="prf-note">' + esc(info(p.id)) + '</div>' +
-      '<div class="prf-warn">' + esc(t('весь его прогресс сотрётся: кошелёк, машины, районы, сюжет. вернуть будет нельзя. другие профили не тронет')) + '</div>' +
+      '<div class="prf-warn">' + esc(t('весь его прогресс сотрётся: копилка, машины, районы, сюжет. вернуть будет нельзя. другие профили не тронет')) + '</div>' +
       '<div class="prf-btns"><button type="button" class="prf-no" autofocus>' + esc(t('отмена')) + '</button>' +
       '<button type="button" class="prf-yes">' + esc(t('да, удалить')) + '</button></div>';
     b.querySelector('.prf-no').addEventListener('click', () => back());
@@ -245,7 +256,7 @@ function render () {
   b.innerHTML = '<div class="prf-t">' + esc(t('профили')) + '</div>' +
     '<div class="prf-l">' + rows + '</div>' +
     (meta.list.length < MAX ? '<button type="button" class="prf-new">+ ' + esc(t('новый профиль')) + '</button>' : '') +
-    '<div class="prf-note">' + esc(t('у каждого профиля свой кошелёк, машины, районы и сюжет. язык, звук и достижения — общие. до {n} профилей', { n: MAX })) + '</div>' +
+    '<div class="prf-note">' + esc(t('у каждого профиля своя копилка, машины, районы и сюжет. язык, звук и достижения — общие. до {n} профилей', { n: MAX })) + '</div>' +
     '<button type="button" class="prf-close">' + esc(t('назад')) + '</button>';
   b.querySelectorAll('.prf-pick').forEach(x => x.addEventListener('click', () => {
     const id = +x.dataset.id;

@@ -762,6 +762,8 @@ export function step (dt, on) {
 }
 
 /* ctx — тот же, что у weather.js (+ ARCHES, realAddress, puff, quick) */
+/** сменили профиль без перезагрузки (game.js reprofile): унесённые дома — как в сохранении нового профиля */
+export function reload () { if (C) sync(false); }
 export function init (ctx) {
   C = ctx;
   // окна и муралы собраны в своих модулях — их материалы оборачиваем здесь (склейки — в game.js)

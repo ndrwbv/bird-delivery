@@ -11,8 +11,8 @@
    | A                   | нитро (держать), принять заказ | nitro, accept         | нажать (menuOk)            |
    | B                   | ручник (держать)               | hand                  | назад (menuBack)           |
    | RB                  | нитро (держать), запасная      | nitro                 | —                          |
-   | X                   | свободна                       | —                     | —                          |
-   | Y                   | карта района                   | map                   | закрыть карту              |
+   | X                   | свободна                       | btnX                  | пометка [X] на «бумаге»    |
+   | Y                   | карта района                   | map, btnY             | закрыть карту; пометка [Y] |
    | Back / View / Select| карта района                   | map                   | —                          |
    | на карте района     | RT/LT — зум, стик — двигать, B — закрыть (game.js, padStep → FM) |   |                |
    | Start / Menu (☰)    | пауза, меню                    | pause                 | продолжить                 |
@@ -45,7 +45,7 @@ const CFG = { dead: 0.12, outer: 0.03, curve: 1.6, trigDead: 0.06, rumble: true 
 export function setPadConfig (o) { Object.assign(CFG, o); }
 
 const HOLD = ['hand', 'nitro', 'a', 'b'];
-const EDGES = ['pause', 'map', 'accept', 'choice1', 'choice2', 'choice3', 'sound', 'any',
+const EDGES = ['pause', 'map', 'accept', 'choice1', 'choice2', 'choice3', 'sound', 'any', 'btnX', 'btnY',
   'menuUp', 'menuDown', 'menuLeft', 'menuRight', 'menuOk', 'menuBack', 'pageL', 'pageR', 'trigL', 'trigR'];
 
 // один объект на всё время: не мусорим каждый кадр
@@ -58,6 +58,7 @@ export const pad = {
   menuUp: false, menuDown: false, menuLeft: false, menuRight: false, menuOk: false, menuBack: false,
   pageL: false, pageR: false,   // LB / RB — листать страницы (гараж карьеры)
   trigL: false, trigR: false,   // LT / RT нажали до половины — табы настроек (settings.js)
+  btnX: false, btnY: false,     // X / Y нажали — прямые кнопки экранов-«бумаг» (конец смены: [X] депнуть, [Y] гараж и траты)
   lastUse: 0,               // performance.now() последнего касания — чтобы прятать подсказки мыши/тача
 };
 
@@ -170,7 +171,8 @@ export function pollPad () {
   const edge = (name, now) => { const was = prev[name] || false; prev[name] = now; return now && !was; };
   if (edge('a', a)) { pad.accept = true; pad.menuOk = true; }
   if (edge('b', b)) pad.menuBack = true;
-  if (edge('y', y)) pad.map = true;
+  if (edge('y', y)) { pad.map = true; pad.btnY = true; }
+  if (edge('x', x)) pad.btnX = true;
   if (edge('back', btn(B.back))) pad.map = true;
   if (edge('start', btn(B.start))) pad.pause = true;
   if (edge('r3', btn(B.r3))) pad.sound = true;

@@ -27,6 +27,7 @@ import * as DIST from './districts.js';
 import * as AUTO from './cars.js';
 import * as SL from './streetlamps.js';
 import * as STORY from './story.js';
+import * as RQ from './ridequeue.js';               // плашка достижения — после чека, Толика и подсказки (ridequeue.js)
 
 export const KEY = 'dlv-ach';
 
@@ -66,7 +67,7 @@ export const LIST = [
   { id: 'POTHOLE', group: 'fun', stat: 'pothole', need: 1, name: N_('Яма с историей'), desc: N_('Заглохнуть в яме') },
   { id: 'SEMERKA_50', group: 'fun', stat: 'semerka', need: 50, name: N_('Верность Семёрке'), desc: N_('Доставить 50 заказов на «Семёрке»') },
   { id: 'BUHANKA_20', group: 'fun', stat: 'buhanka', need: 20, name: N_('Хлебовоз'), desc: N_('Доставить 20 заказов на «Буханке»') },
-  { id: 'ALL_IN', group: 'fun', stat: 'allin', need: 1, hidden: true, name: N_('Всё на красное'), desc: N_('Депнуть весь кошелёк и проиграть') },
+  { id: 'ALL_IN', group: 'fun', stat: 'allin', need: 1, hidden: true, name: N_('Всё на красное'), desc: N_('Депнуть всю копилку и проиграть') },
   { id: 'TOLIK_MDAA', group: 'fun', stat: 'mdaa', need: 1, name: N_('Мдаа'), desc: N_('Услышать от Толика «мдаа» в конце смены') },
   { id: 'ZINA', group: 'fun', stat: 'zina', need: 1, name: N_('Для внука'), desc: N_('Пройти историю бабы Зины до конца') },
 ];
@@ -103,25 +104,32 @@ function send (id) {
   try { const r = sw.achievement(id); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch (e) { console.warn('[ach] steam', e); }
 }
 
-/* своя плашка — только без Стима */
+/* своя плашка — только без Стима. Маленькая «грамота» сверху по центру (на телефоне — между часами и
+   радаром), не на радаре и не на руле (UI-REVIEW № 30). В езде — после чека оплаты, денег в пачку,
+   Толика и подсказки (ridequeue.js whenQuiet): одна вещь за раз; одно короткое проявление, без тряски */
 let TOAST = null, toastQ = [], toastOn = false;
 function chip (a) {
   if (typeof document === 'undefined') return;
   if (!TOAST) {
     const st = document.createElement('style');
-    st.textContent = '#ach-toast{position:fixed;left:12px;bottom:12px;z-index:60;pointer-events:none;display:flex;gap:8px;align-items:center;'
-      + 'max-width:min(320px,calc(100vw - 24px));padding:7px 11px;border-radius:10px;background:rgba(18,20,28,.86);color:#fff;'
-      + 'font:12px/1.25 inherit;box-shadow:0 2px 10px rgba(0,0,0,.35);opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s}'
-      + '#ach-toast.on{opacity:1;transform:none}#ach-toast i{flex:none;width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ffe58a,#e0a21a 60%,#9c6a08)}'
-      + '#ach-toast small{display:block;opacity:.7;font-size:10px;text-transform:lowercase}#ach-toast b{font-weight:600}';
+    st.textContent = '#ach-toast{position:fixed;left:50%;top:46px;z-index:60;pointer-events:none;display:flex;gap:8px;align-items:center;'
+      + 'max-width:min(320px,calc(100vw - 24px));padding:6px 10px;border:2px solid #33210c;border-radius:3px;background:#fff3d6;color:#33210c;'
+      + 'font:12px/1.3 inherit;box-shadow:0 4px 0 #33210c;opacity:0;transform:translate(-50%,-8px);transition:opacity .25s,transform .25s}'
+      + '#ach-toast.on{opacity:1;transform:translate(-50%,0)}#ach-toast i{flex:none;width:18px;height:18px;border-radius:50%;border:2px solid #33210c;background:radial-gradient(circle at 35% 35%,#ffe58a,#e0a21a 60%,#9c6a08)}'
+      + '#ach-toast small{display:block;color:#8a3b22;font-size:11px;text-transform:lowercase}#ach-toast b{font-weight:normal}'
+      // телефон стоя: справа под радаром (слева — деньги с подписями); там же чат Толика — плашка ждёт, пока он уйдёт
+      + '@media (max-width:560px){#ach-toast{left:auto;right:16px;top:116px;max-width:min(170px,44vw);transform:translateY(-8px);font-size:10px;padding:5px 7px}'
+      + '#ach-toast.on{transform:none}#ach-toast small{font-size:10px}}';
     document.head.appendChild(st);
     TOAST = document.createElement('div');
     TOAST.id = 'ach-toast';
     document.body.appendChild(TOAST);
   }
   toastQ.push(a);
-  if (!toastOn) nextChip();
+  if (!toastOn) { toastOn = true; RQ.whenQuiet(nextChip, 20000, chatGone); }
 }
+/* на узком экране плашка там же, где чат Толика (под радаром) — ждём, пока его сообщения уйдут */
+const chatGone = () => innerWidth > 560 || !document.querySelector('#chat .cm:not(.out)');
 function nextChip () {
   const a = toastQ.shift();
   if (!a) { toastOn = false; return; }
@@ -130,7 +138,8 @@ function nextChip () {
   TOAST.querySelector('small').textContent = t('достижение');
   TOAST.querySelector('b').textContent = t(a.name);
   requestAnimationFrame(() => TOAST.classList.add('on'));
-  setTimeout(() => { TOAST.classList.remove('on'); setTimeout(nextChip, 350); }, 4000);
+  RQ.hold(4300);                                   // пока плашка висит — следующая подсказка ждёт (ridequeue.js)
+  setTimeout(() => { TOAST.classList.remove('on'); setTimeout(() => RQ.whenQuiet(nextChip, 20000, chatGone), 350); }, 4000);
 }
 
 function grant (a) {

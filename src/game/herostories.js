@@ -941,6 +941,9 @@ export function init (api) {
   if (typeof window !== 'undefined') window.setTimeout(() => { if (window.__dlv) window.__dlv.HSTORY = DEBUG; }, 0);
 }
 
+/** сменили профиль без перезагрузки (game.js reprofile): глава «за смену» и встречи — заново */
+export function resetSession () { if (M.held) HEROES.hold(M.held, false); M.issued = -1; M.cur = null; M.held = null; M.met = {}; }
+
 /* отладка: __dlv.HSTORY */
 const DEBUG = {
   M, HS, HERO_STORIES, pins, condOf, viaShop: (id, ch) => { const H = BY.get(id), c = H && H.chapters[ch]; const h = HEROES.get(id); return c && viaOf(c) && h ? viaShop(viaOf(c), h.x, h.z) : null; },

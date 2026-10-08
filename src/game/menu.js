@@ -23,7 +23,9 @@ import './menu.css';
 import { t } from '../i18n/index.js';
 import * as DIST from './districts.js';
 import * as CITY from './cityopen.js';
-import { SHIFT, clock } from './econ.js';
+import { SHIFT, clock, shiftLen } from './econ.js';
+import { keyHTML, onInput, inputKind } from '../input/glyphs.js';   // значки кнопок по текущему вводу
+import './fmlegend.js';                       // легенда полной карты — только то, что сейчас на карте
 import * as BOARD from './board.js';
 import * as PROF from './profiles.js';           // профили: у каждого свой прогресс (profiles.js)
 import * as QR from './quickrun.js';             // быстрый заезд: сезон, длина смены, машина — без копилки и сюжета
@@ -98,13 +100,12 @@ export function show () {
   // круглосуточная пиццерия (со второго района): смена с того часа, когда кончилась прошлая (career.js)
   const allDay = DIST.has() && DIST.cur() >= (SHIFT.ALLDAY_FROM ?? 99);
   const from0 = clock(A.Store.get('dlv-clock', '') === '' || A.Store.get('dlv-clock', null) == null ? 9 : +A.Store.get('dlv-clock', 9) || 0);
-  const goSub = DIST.has() && DIST.city()
-    ? (allDay ? t('смена {n} · весь город · с {from}, круглосуточно', { n, from: from0 }) : t('смена {n} · весь город · {from}—{to}', { n, from: '9:00', to: '24:00' }))
-    : allDay
-    ? t('смена {n} · район «{name}» · с {from}, круглосуточно', { n, name: t(DIST.list()[DIST.cur()].name), from: from0 })
-    : DIST.has()
-    ? t('смена {n} · район «{name}» · {from}—{to}', { n, name: t(DIST.list()[DIST.cur()].name), from: '9:00', to: '24:00' })
-    : t('смена {n} · {from}—{to}', { n, from: '9:00', to: '24:00' });
+  // «смена 1 · Юг · ~4 мин»: длина — та, что будет у этой смены (econ.js shiftLen, 4 / 6 / 8 мин)
+  const mins = Math.max(1, Math.round(SHIFT.BASE_S * shiftLen(n - 1).slow / 60));
+  const place = DIST.has() ? (DIST.city() ? t('весь город') : t(DIST.list()[DIST.cur()].name)) : '';
+  const goSub = place
+    ? (allDay ? t('смена {n} · {place} · с {from} · ~{m} мин', { n, place, from: from0, m: mins }) : t('смена {n} · {place} · ~{m} мин', { n, place, m: mins }))
+    : t('смена {n} · ~{m} мин', { n, m: mins });
   const go = card('go', '▶', t('на смену'), goSub, 'main');
   // вернуться в прежний район, пока открыты не все (открыто всё — выбор и так перед каждой сменой)
   if (DIST.has() && DIST.opened() > 1 && !DIST.allOpen()) {
@@ -128,10 +129,18 @@ export function show () {
   curKey = CZ.card() ? CZ.card().dataset.key : 'go';
   profButton();
   upd();
-  el.querySelector('.crm-hint').textContent = t('листай ◀ ▶ · выбрать — A, Enter или тап');
+  hint();
   if (!String(A.Store.get('dlv-name', '') || '').trim()) askName(null, true);
   else CITY.check(() => show());                  // открыт весь город, а праздника ещё не было — сейчас (cityopen.js)
 }
+/* подсказка внизу — значком того, чем играют сейчас (glyphs.js): [A] / [Enter]; пальцем — «свайп · тап» */
+function hint () {
+  const h = el && el.querySelector('.crm-hint');
+  if (!h) return;
+  h.innerHTML = inputKind().kind === 'touch' ? esc(t('листай свайпом · выбрать — тап'))
+    : esc(t('листай ◀ ▶')) + ' · ' + esc(t('выбрать')) + ' ' + keyHTML('ok');
+}
+onInput(() => hint());
 /** листать карточки меню: true — пролистнули */
 export function flip (d) { return !!(CZ && el && !modal() && CZ.flip(d)); }
 export const shown = () => !!(el && el.isConnected && !el.closest('[hidden]'));
@@ -152,7 +161,7 @@ function upd () {
     b.classList.toggle('busy', st.st === 'download' || st.st === 'restart');
   }
   const v = UPD.version();
-  el.querySelector('.crm-ver').textContent = v ? t('версия {v}', { v }) : '';
+  el.querySelector('.crm-ver').textContent = v ? t('версия {v}', { v: String(v).replace(/^v(?=\d)/, '') }) : '';
 }
 
 /* ── профиль: справа сверху портрет курьера, имя и «сменить» — окно профилей (profiles.js) ──
@@ -186,7 +195,7 @@ function profInfo () {
   return parts.join(' · ');
 }
 export function openProfiles () {
-  PROF.open({ money: A.money, info: profInfo, face, setName: n => A.setName(n), Snd: A.Snd, onClose: () => { if (el) { profButton(); show(); } } });
+  PROF.open({ money: A.money, info: profInfo, face, setName: n => A.setName(n), Snd: A.Snd, swap: A.reprofile, onClose: () => { if (el) { profButton(); show(); } } });
 }
 
 /* ── район: карусель карточек районов (distpick.js; кнопка «сменить район» на карточке «на смену») ──

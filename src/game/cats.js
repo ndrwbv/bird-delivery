@@ -352,13 +352,13 @@ function wanderTo (c) {
   c.tx = sp.x; c.tz = sp.z; c.mode = 'walk'; c.mt = 12;
 }
 
-/* прохожий рядом (сетка прохожих game.js — клетки 5 м) */
+/* прохожий рядом (сетка прохожих game.js — клетки 5 м, ключ i·4099+j) */
 function personNear (c) {
   const W = A.WGRID, r = CATS.GROUND.PEOPLE;
   if (!W) return false;
   for (let i = Math.floor((c.x - r) / 5); i <= Math.floor((c.x + r) / 5); i++)
     for (let j = Math.floor((c.z - r) / 5); j <= Math.floor((c.z + r) / 5); j++) {
-      const a = W.get(i + ',' + j);
+      const a = W.get(i * 4099 + j);             // ключ клетки — число i·4099+j (game.js separateWalkers)
       if (a) for (const p of a) if (!p.dead && Math.hypot(p.x - c.x, p.z - c.z) < r) return true;
     }
   return false;

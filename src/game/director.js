@@ -69,6 +69,9 @@ export function init (api) {
   if (typeof window !== 'undefined' && window.__dlv) window.__dlv.DIRECTOR = DEBUG;
 }
 
+/** сменили профиль без перезагрузки (game.js reprofile): сессия — по сохранению нового профиля */
+export function reload () { if (A) boot(); }
+
 /* начало смены: идущие события прошлой смены — кончились */
 export function shiftStart (ride) {
   ACT.length = 0;

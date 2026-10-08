@@ -6,14 +6,22 @@
 
      drive  — руль в руках (принял первый заказ): газ, руль, тормоз — тем, чем играешь;
               уходит, когда проехал 30 м (не раньше 3 с) или через 20 с;
-     map    — через 1,5 с после «drive» или сразу, если 3 с едешь от цели: точка на радаре
-              и карта района; радар подсвечен;
+     map    — сразу за «drive» (или раньше, если 3 с едешь от цели): точка на радаре и карта
+              района; радар подсвечен. Всегда раньше «кофе» и «тормоза» (UI-REVIEW № 25);
      brake  — первый раз ближе 40 м к гостю быстрее 25 км/ч: «притормози — пицца отдастся сама»;
      nitro  — первая длинная прямая: быстрее 36 км/ч, 1,2 с почти не крутишь руль, в баке кофе
-              (больше 20 %); или первый подобранный кофе. Уходит, как только нажал нитро;
+              (больше 20 %), и про радар уже сказали; или первый подобранный кофе. Уходит, как
+              только нажал кофе;
      hp     — первый удар, который снял сердце: сердца подсвечены;
-     cash   — первые деньги за смену (карьера): через 2,2 с, когда купюры долетели до пачки;
-     wallet — сразу за «cash»: копилка — кошелёк, пачка ссыпается в неё в конце смены.
+     cash   — первые деньги за смену (карьера): после чека оплаты и денег в пачку;
+     wallet — сразу за «cash»: копилка — все твои деньги, пачка ссыпается в неё в конце смены;
+     respect — первый респект (карьера): что такое звезда; звезда подсвечена;
+     bump   — первый раз задел своего клиента (карьера): без чаевых, а быстрее 43 км/ч — заказ сорван.
+   «respect» и «bump» видят и ветераны — это правила, о которых раньше не говорили.
+
+   Очередь вручения (ridequeue.js, UI-REVIEW № 41): пока на экране чек оплаты, деньги летят в пачку
+   или только что написал Толик (RQ.busy) — подсказка спрятана, её время стоит, новая не открывается.
+   Пока подсказка на экране — RQ.mark('hint'): достижение ждёт её.
 
    Подсказка висит не меньше, чем её прочитать (readTime, dialog.js), следующая ждёт, пока
    уйдёт текущая (+0,6 с). «hp» и кофе — срочные: сменяют текущую, та встаёт в очередь.
@@ -31,6 +39,8 @@
 import './hints.css';
 import { t } from '../i18n/index.js';
 import { readTime } from './dialog.js';
+import * as RQ from './ridequeue.js';
+import { CLIENT_HIT } from './econ.js';
 
 const KEY = 'dlv-hints';
 const PLAY = ['drive', 'back', 'side', 'loading', 'handover'];
@@ -49,11 +59,23 @@ const k = (...ks) => ks.map(x => '<kbd>' + x + '</kbd>').join('');
 
 export function init (api) {
   A = api;
+  readSeen();
+  if (typeof window !== 'undefined') window.setTimeout(() => { if (window.__dlv) window.__dlv.HINTS = DEBUG; }, 0);
+}
+function readSeen () {
   const raw = String(A.Store.get(KEY, '') || '');
   for (const id of raw.split(',')) if (id) H.seen.add(id);
   // ветеран: учебный заказ отвезён до подсказок — ничего не показываем
   if (A.Store.get('dlv-msk-tut', 0) || new URLSearchParams(location.search).has('sandbox')) for (const id of ALL) H.seen.add(id);
-  if (typeof window !== 'undefined') window.setTimeout(() => { if (window.__dlv) window.__dlv.HINTS = DEBUG; }, 0);
+}
+/** сменили профиль без перезагрузки (game.js reprofile): что видел — заново из сохранения нового профиля */
+export function reload () {
+  if (!A) return;
+  if (H.hiEl) H.hiEl.classList.remove('hn-hi');
+  if (EL) EL.classList.remove('on');
+  Object.assign(H, { cur: null, t: 0, shown: 0, gap: 0, queue: [], hiEl: null, driveAt: null, mapT: -1, away: 0, lastD: 0, straight: 0, lastH: 0, lastHp: null, lastMoney: null, cashT: -1, burn: 0 });
+  H.seen.clear();
+  readSeen();
 }
 const need = id => !H.seen.has(id) && !(H.cur && H.cur.id === id) && !H.queue.some(h => h.id === id);
 
@@ -69,13 +91,15 @@ function make (id, extra) {
         : t('куда везти — точка на радаре · {key} — карта района', { key: k('Tab') }) };
     case 'brake': return { text: t('у гостя притормози — пицца отдастся сама') };
     case 'nitro': {
-      const key = pad ? k('A') : touch ? k(t('нитро')) : k('Shift');
-      return { hi: touch ? '#touchpad .tp-nos' : '#radar', text: extra === 'coffee' ? t('кофе-нитро в баке! держи {key} — машина рванёт', { key })
-        : t('прямая! держи {key} — кофе-нитро, машина рванёт', { key }) };
+      const key = pad ? k('A') : touch ? k(t('кофе')) : k('Shift');
+      return { hi: touch ? '#touchpad .tp-nos' : '#radar', text: extra === 'coffee' ? t('кофе в баке! держи {key} — машина рванёт', { key })
+        : touch ? t('прямая! держи {key} — машина рванёт', { key }) : t('прямая! держи {key} — кофе, машина рванёт', { key }) };
     }
     case 'hp': return { hi: '#hearts', text: t('сердца — жизни тачки: врезался — минус сердце, легонько — половинка') };
     case 'cash': return { hi: '#shiftcash', text: t('зелёная пачка — заработано за смену') };
-    case 'wallet': return { hi: '#money', text: t('копилка — твой кошелёк: в конце смены пачка ссыпается в неё') };
+    case 'wallet': return { hi: '#money', text: t('копилка — все твои деньги: в конце смены пачка ссыпается в неё') };
+    case 'respect': return { hi: '#respect', text: t('звезда — респект района: за конкурентов, похитителя и помощь своим. копишь — растёт звание') };
+    case 'bump': return { text: t('задел клиента — без чаевых; быстрее {kmh} км/ч — заказ сорван', { kmh: Math.round(CLIENT_HIT.HARD * 3.6) }) };
   }
   return null;
 }
@@ -100,6 +124,7 @@ function highlight (sel) {
 }
 function open (h) {
   ui();
+  RQ.mark('hint', true);
   H.cur = h; H.t = 0; H.shown = 0;
   TXT.innerHTML = h.text;
   seen(h.id);
@@ -110,9 +135,10 @@ function close () {
   if (!H.cur) return;
   const id = H.cur.id;
   H.cur = null; H.gap = GAP;
+  RQ.mark('hint', false);
   highlight(null);
   if (EL) EL.classList.remove('on');
-  if (id === 'drive') H.mapT = 1.5;
+  if (id === 'drive' && need('map')) { const h = make('map'); H.queue.unshift(Object.assign({ id: 'map', min: Math.max(3, readTime(h.text.replace(/<[^>]+>/g, ''))) }, h)); }   // радар — сразу следом
   if (id === 'cash' && need('wallet')) push('wallet');
 }
 /* в очередь; urgent — сменить текущую (она — первой в очередь, если её почти не видели) */
@@ -127,9 +153,14 @@ function push (id, extra, urgent) {
     open(h);
     return true;
   }
-  if (!H.cur && H.gap <= 0) open(h); else H.queue.push(h);
+  if (!H.cur && H.gap <= 0 && !RQ.busy()) open(h); else H.queue.push(h);
   return true;
 }
+
+/** первый респект (game.js RESPECT.onChange) */
+export function respect () { if (A && A.CAREER) push('respect'); }
+/** первый раз задел своего клиента (game.js clientBump) */
+export function bump () { if (A && A.CAREER) push('bump'); }
 
 export function coffee () {
   if (!A || !need('nitro')) return false;
@@ -156,7 +187,9 @@ export function step (dt) {
   if (!A) return;
   const S = A.S, V = A.V;
   const live = !S.paused && PLAY.includes(S.state) && !S.ride;
-  if (EL) EL.classList.toggle('on', !!(H.cur && live));
+  const wait = RQ.busy();                          // чек оплаты, деньги в пачку, Толик — подсказка ждёт (ridequeue.js)
+  if (EL) EL.classList.toggle('on', !!(H.cur && live && !wait));
+  RQ.mark('hint', !!(H.cur && live && !wait));      // достижение ждёт, пока подсказка на экране; следующая — после него (RQ.hold)
   if (!live) {
     if (H.hiEl) H.hiEl.classList.remove('hn-hi');
     if (S.state === 'title' || S.state === 'over') { H.driveAt = null; H.lastHp = null; H.lastMoney = null; }
@@ -166,12 +199,11 @@ export function step (dt) {
 
   // ── что понадобилось ──
   if (S.state === 'drive' && !H.driveAt) { H.driveAt = { x: V.x, z: V.z }; push('drive'); }
-  if (H.mapT >= 0 && (H.mapT -= dt) < 0) push('map');
   if (S.target && (S.state === 'drive' || S.state === 'back')) {
     const d = Math.hypot(S.target.x - V.x, S.target.z - V.z);
     H.away = d > H.lastD + 0.02 && v > 3 ? H.away + dt : Math.max(0, H.away - dt);
     H.lastD = d;
-    if (H.away > 3 && H.driveAt && need('map')) { H.mapT = -1; push('map'); }
+    if (H.away > 3 && H.driveAt && need('map')) push('map');
     if (S.state === 'drive' && d < 40 && v > 7) push('brake');
   }
   // прямая: быстро и руль почти не крутишь
@@ -179,23 +211,30 @@ export function step (dt) {
   dh = Math.atan2(Math.sin(dh), Math.cos(dh));
   const nos = A.NOS();
   H.straight = v > 10 && Math.abs(dh) < 0.12 * dt && !nos.burn ? H.straight + dt : 0;
-  if (H.straight > 1.2 && nos.tank > 0.2 && need('nitro') && H.driveAt) push('nitro');
+  if (H.straight > 1.2 && nos.tank > 0.2 && need('nitro') && H.driveAt && H.seen.has('map')) push('nitro');
   // первый удар: сердце убыло
   if (H.lastHp !== null && S.hp < H.lastHp && S.hp > 0) push('hp', null, true);
   H.lastHp = S.hp;
-  // первые деньги за смену — когда купюры долетели до пачки
+  // первые деньги за смену — в очередь: откроется, когда чек и деньги в пачку уйдут (RQ.busy)
   if (A.CAREER) {
-    if (H.lastMoney !== null && S.money > H.lastMoney && need('cash')) H.cashT = 2.2;
+    if (H.lastMoney !== null && S.money > H.lastMoney) push('cash');
     H.lastMoney = S.money;
-    if (H.cashT >= 0 && (H.cashT -= dt) < 0) push('cash');
   }
 
   // ── показ ──
+  if (wait) {                                      // занято (чек, деньги, Толик): текущая — обратно в очередь, покажется заново целиком
+    if (H.cur) { const was = H.cur; highlight(null); H.cur = null; H.gap = GAP; if (was.id !== 'brake') H.queue.unshift(was); }
+    return;
+  }
   if (H.cur) {
     H.t += dt; H.shown += dt;
     if (H.hiEl) H.hiEl.classList.toggle('hn-hi', H.t % 0.7 < 0.4);   // мигает: класс туда-сюда
     if (done(H.cur, dt)) close();
-  } else if ((H.gap -= dt) <= 0 && H.queue.length) open(H.queue.shift());
+  } else if ((H.gap -= dt) <= 0 && H.queue.length) {
+    const h = H.queue.shift();
+    if (h.id === 'brake' && S.state !== 'drive') H.seen.delete('brake');   // гость уже позади — «притормози» в другой раз
+    else open(h);
+  }
 }
 
 /* ── первый смешной момент: Степан забрал пиццу ── */

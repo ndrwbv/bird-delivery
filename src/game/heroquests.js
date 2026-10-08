@@ -150,6 +150,8 @@ function load () {
 }
 function save () { try { A.Store.set(KEY, M.claim || M.luck ? Object.assign({}, M.claim, { luck: M.luck || 0 }) : null); } catch (e) { /* — */ } }
 /** Лёха должен: следующие n советов — счастливые (глава «Поднял всё», herostories.js) */
+/** сменили профиль без перезагрузки (game.js reprofile): прогноз Игорька и удача — нового профиля */
+export function reload () { M.tip = null; M.claim = null; M.luck = 0; M.seen = {}; M.last = null; if (A) load(); }
 export function addLuck (n) { M.luck = (M.luck || 0) + n; if (A) save(); return M.luck; }
 
 /* ── Игорёк: прогноз на ближайший матч ── */

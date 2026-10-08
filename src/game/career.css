@@ -33,42 +33,72 @@ body.career #money b { color: #ffe6ee; text-shadow: 2px 2px 0 #3a1020; }
 #choice.big.cr-lunch #ch-opts button span { font-size: 7px; }
 @media (max-width: 560px) { #choice.big.cr-lunch #ch-opts { flex-direction: column; } #choice.big.cr-lunch #ch-opts button { min-height: 0; } }
 
-/* ── экран конца смены — один (career.js showEnd, shiftend.js): заголовок и причина мелко, Толик одной
-   фразой, большая копилка в центре, важное строками, кнопки выбора. Без прокрутки на 1280×720, Деке
-   1280×800 и телефоне 390×844; не влезло — career.js fitEnd чуть уменьшает. ── */
-#over.cr { padding: 0; align-items: stretch; justify-content: stretch; background: radial-gradient(ellipse at 50% 42%, rgba(70, 40, 92, .95), rgba(16, 20, 42, .98) 72%); }
+/* ── экран конца смены — «чек смены» (career.js showEnd, shiftend.js; стиль — src/styles/paper.css, UI-REVIEW.md П1):
+   тёплое затемнение города, по центру чек, сбоку стикер Толика, под ними — пометки на полях.
+   Без прокрутки на 1280×720, Деке 1280×800, телефоне 390×844 и боком 844×390 (там чек в две колонки);
+   не влезло (длинный язык) — career.js fitEnd чуть уменьшает. ── */
+#over.cr { padding: 0; align-items: stretch; justify-content: stretch; background: var(--pp-dim); }
 #over.cr .ov-box { width: 100%; max-width: none; min-height: 100%; margin: 0; box-sizing: border-box; background: none; border: 0; border-radius: 0; box-shadow: none;
-                   justify-content: center; gap: clamp(8px, 1.8vh, 20px);
-                   padding: max(12px, 2.6vh, env(safe-area-inset-top)) max(16px, 5vw) max(14px, 3vh, env(safe-area-inset-bottom)); }
-#over.cr #ov-t { font-size: clamp(14px, min(2.6vw, 4.4vh), 34px); line-height: 1.1; }
-#over.cr #ov-why { font-size: clamp(7px, min(.9vw, 1.5vh), 12px); line-height: 1.6; margin-top: -4px; opacity: .85; }
-#over.cr #ov-stats, #over.cr #ov-best { display: none; }
-#over:not(.cr) #cr-stage, #over:not(.cr) #cr-info { display: none; }
-/* важное за смену — по строке: открыт район, новое звание, пиццерия выросла (жёлтым), район и место — мелко */
-#cr-info { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px clamp(10px, 1.6vw, 20px); width: min(1100px, 100%); margin: 0 auto; }
-#cr-info[hidden] { display: none; }
-#cr-info .ov-row { display: inline-flex; align-items: baseline; gap: 8px; padding: 0; border: 0; }
-#cr-info .ov-row span { font-size: clamp(7px, .8vw, 10px); color: #b9c3e6; }
-#cr-info .ov-row b { font-size: clamp(8px, .95vw, 12px); color: #fff3d6; white-space: normal; text-align: left; line-height: 1.4; }
-#cr-info .ov-row.new { padding: 6px 12px; background: #ffd85e; border: 3px solid #33210c; border-radius: 8px; box-shadow: 0 3px 0 #33210c; }
-#cr-info .ov-row.new span, #cr-info .ov-row.new b { color: #33210c; }
-#over.cr .ov-note:empty { display: none; }
-/* кнопки выбора: «на новую смену» — во всю ширину; «депнуть» и «потратить деньги» — рядом; «гараж» · «покататься» · «в меню» — мелко */
-#over.cr .ov-btns { flex-wrap: wrap; justify-content: center; gap: clamp(8px, 1.4vh, 12px); width: min(760px, 100%); margin: 0 auto; }
-#over.cr .ov-btns button { flex: 1 1 26%; min-width: 0; min-height: 0; padding: clamp(8px, 1.3vh, 12px) 10px; font-size: clamp(8px, .9vw, 11px);
-                           color: #b9c3e6; background: rgba(34, 44, 90, .95); }
-#over.cr .ov-btns #ov-again { order: -1; flex: 1 0 100%; padding: clamp(12px, 2.2vh, 22px) 20px; font-size: clamp(14px, min(1.9vw, 3.2vh), 24px);
-                              color: #fff3d6; background: #f0522a; box-shadow: 0 6px 0 #33210c, 0 14px 30px rgba(240, 82, 42, .3); text-shadow: 3px 3px 0 #9b2a10; }
-#over.cr .ov-btns #ov-dep, #over.cr .ov-btns #ov-spend { flex: 1 1 40%; padding: clamp(10px, 1.7vh, 16px) 12px; font-size: clamp(10px, min(1.3vw, 2.2vh), 16px); }
-#over.cr .ov-btns #ov-dep { display: flex; flex-direction: column; align-items: center; gap: 5px; color: #ffd85e; background: #7a1f5c; }
-#over.cr .ov-btns #ov-dep b { font-weight: normal; text-shadow: 2px 2px 0 #33210c; }
-#over.cr .ov-btns #ov-dep span { font-size: .55em; color: #ffd0e8; }
-#over.cr .ov-btns #ov-spend { color: #2a1d10; background: #ffd85e; }
-#over.cr .ov-btns #ov-dep[hidden], #over.cr .ov-btns #ov-spend[hidden] { display: none; }
-#over:not(.cr) #ov-dep, #over:not(.cr) #ov-spend, #over:not(.cr) #ov-ride, #over:not(.cr) #ov-garage { display: none; }
-/* пока Толик говорит и сыплются деньги — строк и кнопок не видно (место под ними держим) */
-#over.cr #cr-info, #over.cr .ov-btns, #over.cr .ov-note { transition: opacity .3s, transform .3s; }
-#over.cr.wait #cr-info, #over.cr.wait .ov-btns, #over.cr.wait .ov-note { opacity: 0; transform: translateY(10px); pointer-events: none; visibility: hidden; }
+                   align-items: center; justify-content: center; gap: clamp(10px, 2vh, 22px); text-align: left; color: var(--pp-ink);
+                   padding: max(12px, 2.4vh, env(safe-area-inset-top)) 16px max(12px, 2.4vh, env(safe-area-inset-bottom)); }
+#over.cr #ov-t, #over.cr #ov-why, #over.cr #ov-stats, #over.cr #ov-best { display: none; }
+#over:not(.cr) #cr-stage { display: none; }
+#cr-stage { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: clamp(12px, 2.4vw, 32px); width: 100%; cursor: default; }
+
+/* чек: строки «подпись ··· значение» плотнее, чем в образце; печать итога лежит поверх строк */
+.cr-rc { width: min(560px, 100%); margin-bottom: 12px; }
+.cr-rc .pp-head { margin-bottom: .2em; }
+.cr-rc .pp-row { padding: .32em 0; }
+.cr-rc .pp-row.pp-total { margin-top: .3em; padding-top: .55em; }
+.cr-rc-body { position: relative; }
+.cr-rc-mid { display: flex; align-items: center; gap: .6em; }
+.cr-rc-hints { flex: 1; min-width: 0; }
+.cr-rc-hints > .pp-hint { margin: .45em 0 0; }
+.cr-rc-why { margin: 0 0 .3em; }
+.cr-rc .pp-row > b.cr-rc-no { color: var(--pp-label); font-size: var(--pp-fs-s); }
+.cr-rc-wal b { font-weight: normal; color: var(--pp-ink); white-space: nowrap; }
+.cr-rc .ov-note { min-height: 0; font-size: var(--pp-fs-s); line-height: 1.7; color: var(--pp-label); opacity: 1; }
+.cr-rc .ov-note:empty { display: none; }
+/* печать — справа от мелких строк, своё место (не поверх цифр), слова в две строки */
+.pp-seal.cr-rc-seal { position: relative; top: auto; right: auto; flex: none; max-width: 8.5em; margin: .5em .3em 0 0; white-space: normal; text-align: center;
+                      font-size: clamp(14px, 1.45vw, 22px); line-height: 1.15; --pp-seal-rot: -10deg; }
+.cr-rc-stamp:empty { display: none; }
+.cr-rc .pp-stamp { margin-top: .8em; }
+/* стикер Толика — сбоку от чека (на узком — под ним) */
+.cr-tolik { width: min(320px, 100%); }
+
+/* пометки на полях: [Y] гараж и траты · [X] депнуть · [B] в меню (перебивают .ov-btns из delivery.css) */
+#over.cr .ov-btns { flex-wrap: wrap; justify-content: center; gap: 10px 14px; width: min(640px, 100%); margin: 0 auto; }
+#over.cr .ov-btns button { flex: 0 1 auto; min-width: 0; min-height: 0; padding: .7em 1em; font-size: var(--pp-fs-m); color: var(--pp-ink);
+                           background: var(--pp-paper); border: 2px dashed var(--pp-brown); border-radius: 3px; box-shadow: 0 4px 0 rgba(51, 33, 12, .6); }
+#over.cr .ov-btns button:hover { border-style: solid; border-color: var(--pp-ink); }
+#over.cr .ov-btns button.pp-red { color: var(--pp-red); }
+#over.cr .ov-btns button[hidden] { display: none; }
+#over:not(.cr) #ov-dep, #over:not(.cr) #ov-spend { display: none; }
+
+/* пока чек печатается — штампа и пометок не видно и не нажать (место держим); штамп потом шлёпает (paperfx slam) */
+#over.cr .ov-btns { transition: opacity .25s ease-out; }
+#over.cr.wait .cr-rc-stamp, #over.cr.wait .ov-btns { opacity: 0; visibility: hidden; pointer-events: none; }
+/* «допечатать сразу» — все анимации чека и стикера в конец */
+#cr-stage.cr-now .cr-rc, #cr-stage.cr-now .cr-rc *, #cr-stage.cr-now .cr-tolik { animation: none !important; }
+
+/* телефон боком и низкие окна: чек слева во всю высоту, справа столбиком — стикер Толика и пометки */
+@media (max-height: 540px) and (min-width: 600px) {
+  #over.cr { --pp-fs-s: 10px; --pp-fs-m: 11px; --pp-fs-l: clamp(15px, 4.2vh, 18px); }
+  #over.cr .ov-box { display: grid; grid-template-columns: minmax(0, 600px) minmax(150px, 220px); grid-template-areas: "rc tol" "rc btn";
+                     align-content: center; justify-content: center; gap: 10px 14px;
+                     padding: max(8px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+  #cr-stage { display: contents; }
+  .cr-rc { grid-area: rc; width: 100%; align-self: center; margin-bottom: 10px; padding-top: 4px; padding-bottom: 8px; }
+  .cr-rc .pp-head { padding: .7em 0 .45em; }
+  .cr-rc .pp-row { padding: .2em 0; }
+  .cr-rc .pp-stamp { margin-top: .5em; padding: 8px 6px; }
+  .cr-rc-hints > .pp-hint { margin-top: .3em; line-height: 1.5; }
+  .cr-tolik { grid-area: tol; align-self: end; width: 100%; padding: 1.1em .7em .7em; gap: .5em; }
+  .cr-tolik .pp-polaroid { width: 40px; height: 40px; border-width: 3px; border-bottom-width: 8px; }
+  #over.cr .ov-btns { grid-area: btn; align-self: start; flex-direction: column; align-items: stretch; width: 100%; gap: 8px; }
+  #over.cr .ov-btns button { padding: .6em .8em; }
+}
 
 #cr-end { display: flex; flex-direction: column; gap: 10px; }
 #cr-wallet { font-size: clamp(9px, 1vw, 13px); color: #b9c3e6; text-align: center; }
@@ -240,47 +270,3 @@ body:has(#cr-spend:not([hidden])) .hud, body:has(#cr-spend:not([hidden])) #ctrls
 .dep-again[hidden] { display: none; }
 .dep-again:hover { opacity: 1; }
 
-/* конец смены (shiftend.js): Толик одной фразой и большая копилка-свинья — купюры сверху летят в неё,
-   сумма докручивается; всё — в #cr-stage экрана конца смены */
-#cr-stage { position: relative; flex: 1 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center;
-            gap: clamp(8px, 2vh, 22px); cursor: default; }
-.en-tolik { display: flex; align-items: flex-end; gap: clamp(8px, 1.4vw, 16px); max-width: min(760px, 100%); }
-.en-tolik > img, .en-tolik > i { flex: none; width: clamp(40px, min(8vw, 9vh), 80px); height: auto; aspect-ratio: 1; border-radius: 50%; border: 3px solid #fff3d6;
-                                 background: #3a4a8a; box-shadow: 0 4px 0 #33210c; }
-.en-tb { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
-.en-tb b { font-weight: normal; font-size: clamp(7px, .9vw, 11px); color: #fff3d6; text-shadow: 2px 2px 0 #33210c; padding-left: 12px; }
-.en-tb p { margin: 0; padding: .75em 1.1em; font-size: clamp(10px, min(1.5vw, 2.3vh), 18px); line-height: 1.5; color: #14101e; background: #e9e9eb;
-           border-radius: 22px 22px 22px 6px; text-align: left; box-shadow: 0 4px 0 rgba(0, 0, 0, .35);
-           transform-origin: 0 100%; animation: en-pop .38s cubic-bezier(.2, .9, .3, 1.3) both; }
-.en-tb p.typing { display: flex; gap: 7px; padding: .95em 1.2em; }
-.en-tb p.typing span { width: 10px; height: 10px; border-radius: 50%; background: #8e8e93; animation: cm-dot .9s ease-in-out infinite; }
-.en-tb p.typing span:nth-child(2) { animation-delay: .15s; }
-.en-tb p.typing span:nth-child(3) { animation-delay: .3s; }
-@keyframes en-pop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
-.en-pigbox { display: flex; flex-direction: column; align-items: center; gap: clamp(4px, 1vh, 10px); }
-.en-pig { line-height: 0; }
-.en-pig .pg-ico { width: clamp(100px, min(24vw, 26vh), 300px); height: auto; aspect-ratio: 32 / 24; filter: drop-shadow(6px 6px 0 #33210c); transform-origin: 50% 70%; }
-.en-pig.fill .pg-ico { animation: en-fill .5s cubic-bezier(.3, 1.6, .5, 1); }
-@keyframes en-fill { 0% { transform: scale(1); } 40% { transform: scale(1.18) translateY(-6%); } 100% { transform: scale(1); } }
-.en-wal { display: flex; flex-direction: column; align-items: center; gap: clamp(4px, .8vh, 8px); }
-.en-wal span { font-size: clamp(7px, .9vw, 11px); color: #ffc4d6; text-shadow: 1px 1px 0 #3a1020; }
-.en-wal b { font-weight: normal; font-size: clamp(26px, min(5.6vw, 8.5vh), 80px); line-height: 1; white-space: nowrap; color: #ffe6ee;
-            text-shadow: 5px 5px 0 #3a1020, -2px 2px 0 #3a1020, 2px -2px 0 #3a1020, -2px -2px 0 #3a1020; }
-.en-pig.win + .en-wal b { animation: en-blink .4s steps(2) 4; }
-@keyframes en-blink { 50% { color: #ffd85e; } }
-.en-plus { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; font-size: clamp(7px, .9vw, 11px); color: #b9c3e6; opacity: 0; transition: opacity .3s; }
-.en-plus.on { opacity: 1; }
-.en-plus b { font-weight: normal; font-size: 1.3em; color: #7fe08a; text-shadow: 2px 2px 0 #1a3a1e; }
-.en-plus .bn b { color: #ffd85e; text-shadow: 2px 2px 0 #9b2a10; }
-.en-rain { position: absolute; inset: 0; pointer-events: none; }
-.en-rain i { position: absolute; width: clamp(30px, 4vw, 52px); height: clamp(18px, 2.4vw, 31px); margin: clamp(-15px, -1.2vw, -9px) 0 0 clamp(-26px, -2vw, -15px);
-             display: flex; align-items: center; justify-content: center; font-style: normal; font-size: clamp(9px, 1.2vw, 15px); color: #1d4d23;
-             background: linear-gradient(90deg, #7fd38a, #a8ecb0 50%, #7fd38a); border: 2px solid #2d6b34; border-radius: 3px; box-shadow: 0 2px 0 rgba(0, 0, 0, .35); }
-.en-rain i.c { width: clamp(20px, 2.4vw, 32px); height: clamp(20px, 2.4vw, 32px); margin: clamp(-16px, -1.2vw, -10px) 0 0 clamp(-16px, -1.2vw, -10px); border-radius: 50%;
-               border: 3px solid #8a5a0c; background: radial-gradient(circle at 35% 35%, #fff6c2, #ffd24a 45%, #d9a21c); }
-@media (max-width: 560px) {
-  .en-tb p { font-size: clamp(12px, 3.6vw, 16px); }
-  .en-pig .pg-ico { width: clamp(110px, 40vw, 180px); }
-  .en-wal b { font-size: clamp(28px, 10vw, 44px); }
-  #cr-info { flex-direction: column; gap: 6px; }
-}

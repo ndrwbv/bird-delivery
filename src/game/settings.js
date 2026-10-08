@@ -95,7 +95,8 @@ export function render (focus, tab) {
   } else if (TAB === 'gfx') {
     A.GFX.panel(list, focus, true);                 // gfx.js рисует сама: качество и семь пунктов
   } else if (TAB === 'ctrl') {
-    list.innerHTML = still('<div class="set-keys">' + A.keys() + '</div>');
+    // лист без кнопок: курсор на него не встаёт (UI-REVIEW № 34) — остаётся на строке табов, B закрывает
+    list.innerHTML = '<div class="set-still"><div class="set-keys">' + A.keys() + '</div></div>';
   } else if (TAB === 'lang') {
     // смена — перезагрузка, поэтому только в меню
     list.innerHTML = menu
@@ -108,15 +109,17 @@ export function render (focus, tab) {
     if (A.career) {
       const name = A.name();
       h += head(t('профиль'));
-      h += menu ? row(t('имя'), esc(name || '—'), 'set-name', focus) : still('<b class="set-big">' + esc(name || '—') + '</b>' + note(onlyMenu));
-      if (menu && A.prof.on()) h += row(t('профиль'), esc(A.prof.curName()) + (A.prof.list().length > 1 ? ' · ' + t('сменить') : ''), 'set-prof', focus) +
-        note(t('у каждого профиля свой прогресс: кошелёк, машины, районы'));
+      // одна строка (UI-REVIEW № 29): профили есть — «профиль: имя · сменить» (там же и переименовать), нет — «имя»
+      if (!menu) h += still('<b class="set-big">' + esc(name || '—') + '</b>' + note(onlyMenu));
+      else if (A.prof.on()) h += row(t('курьер'), esc(A.prof.curName() || name || '—') + ' · ' + t('сменить'), 'set-prof', focus) +
+        note(t('у каждого профиля свой прогресс: копилка, машины, районы'));
+      else h += row(t('имя'), esc(name || '—'), 'set-name', focus);
     }
     // версия и обновление
     {
       const st = UPD.state(), v = UPD.version();
-      h += head(t('версия игры'));
-      h += '<div class="set-ver">' + t('стоит') + ' <b>' + esc(v || '—') + '</b>' + (st.latest && st.latest !== v ? ' · ' + t('вышла') + ' <b>' + esc(st.latest) + '</b>' : '') + '</div>';
+      const vv = x => String(x || '—').replace(/^v(?=\d)/, '');      // «v0.8.2» → «0.8.2»
+      h += '<div class="set-ver">' + t('версия {v}', { v: '<b>' + esc(vv(v)) + '</b>' }) + (st.latest && st.latest !== v ? ' · ' + t('вышла') + ' <b>' + esc(vv(st.latest)) + '</b>' : '') + '</div>';
       if (UPD.on()) {
         const can = st.st === 'newer' && st.updatable;
         h += row(can ? '<b>' + esc(UPD.line()) + '</b>' : t('обновления с GitHub'), can ? t('обновить до {v}', { v: esc(st.latest) }) : st.st === 'wait' ? t('проверяю…') : t('проверить обновления'),

@@ -1,9 +1,11 @@
-/* Песочница интерфейса: конец смены — один экран (career.js showEnd + shiftend.js): Толик одной фразой →
-   деньги смены сыплются в большую копилку → важное строками и выбор («на новую смену», «депнуть»,
-   «потратить деньги», «гараж» · «покататься» · «в меню»). Всё — настоящим кодом игры.
+/* Песочница интерфейса: конец смены — «чек смены» (career.js showEnd + shiftend.js): чек влетает, строки
+   допечатываются, итог щёлкает, печать хлопает, стикер Толика; штамп «на новую смену [A]», пометки
+   [Y] гараж и траты · [X] депнуть · [B] в меню. Всё — настоящим кодом игры.
    Ручки ставят то, из чего игра сама считает итоги: сохранение (смен, районы, сбито за карьеру),
    S (заработок, заказы, чаевые), SH (удары, штраф). Бонус и настроение — как в игре (econ.js),
    настроение можно и задать руками. */
+import { setInput } from '../../input/glyphs.js';
+
 const MOODS = [['auto', 'как посчитает игра'], ['bad', 'плохая (мдаа)'], ['ok', 'так себе'], ['great', 'отличная']];
 const WHY = [
   ['время', 'досидел до конца (бонус)'],
@@ -26,13 +28,14 @@ export default function shiftEndScreens (ctx) {
 
   const full = {
     id: 'shiftend', group: 'Конец смены', name: 'конец смены целиком',
-    note: 'career.js showEnd: Толик одной фразой → деньги в копилку → выбор (на новую смену, депнуть, потратить). Как в игре, только без города.',
+    note: 'career.js showEnd: чек смены (строки, итог, печать), стикер Толика, штамп [A] и пометки [Y] [X] [B]. Как в игре, только без города. Значки — по вводу (ручка «чем играют»).',
     knobs: [
       { k: 'earned', label: 'заработал за смену, ₽', type: 'num', def: 24000, min: 0, max: 400000, step: 1000 },
       { k: 'delivered', label: 'заказов доставлено', type: 'num', def: 7, min: 0, max: 40, step: 1 },
       { k: 'tips', label: 'чаевые, ₽', type: 'num', def: 1800, min: 0, max: 50000, step: 100 },
       { k: 'why', label: 'как кончилась смена', type: 'sel', def: 'время', opts: WHY },
       { k: 'fine', label: 'штраф за клиента, ₽ (если сбил)', type: 'num', def: 4000, min: 0, max: 50000, step: 500 },
+      { k: 'late', label: 'опоздания и другие штрафы, ₽', type: 'num', def: 0, min: 0, max: 50000, step: 500 },
       { k: 'endH', label: 'во сколько снялся (если не досидел)', type: 'num', def: 17, min: 9, max: 23.9, step: 0.5 },
       { k: 'hits', label: 'ударов за смену', type: 'num', def: 2, min: 0, max: 50, step: 1 },
       { k: 'people', label: 'прохожих сбито за смену', type: 'num', def: 0, min: 0, max: 30, step: 1 },
@@ -43,9 +46,11 @@ export default function shiftEndScreens (ctx) {
       { k: 'transfer', label: 'эта смена открывает следующий район (перевод)', type: 'bool', def: false },
       { k: 'city', label: 'весь город открыт (режим «весь город»)', type: 'bool', def: false },
       { k: 'wallet', label: 'в кошельке до смены, ₽', type: 'num', def: 15000, min: 0, max: 2000000, step: 1000 },
-      { k: 'stage', label: 'с какого шага', type: 'sel', def: 'all', opts: [['all', 'всё по порядку'], ['end', 'сразу выбор'], ['spend', 'сразу «потратить деньги»'], ['dep', 'сразу «депнуть»']] },
+      { k: 'stage', label: 'с какого шага', type: 'sel', def: 'all', opts: [['all', 'всё по порядку'], ['end', 'сразу выбор'], ['spend', 'сразу «гараж и траты»'], ['dep', 'сразу «депнуть»']] },
+      { k: 'input', label: 'чем играют (значки)', type: 'sel', def: 'xbox', opts: [['kb', 'клавиатура'], ['xbox', 'геймпад Xbox / Deck'], ['ps', 'геймпад PlayStation'], ['touch', 'касание']] },
     ],
     async show (o, tok) {
+      if (o.input === 'xbox' || o.input === 'ps') setInput('pad', o.input); else if (o.input) setInput(o.input);
       const n = DIST.count(), di = Math.max(0, Math.min(n - 1, +o.district || 0));
       // сохранение: смены, сбитые, районы
       Store.clear();
@@ -69,6 +74,7 @@ export default function shiftEndScreens (ctx) {
       const SH = CM.SH;
       SH.hits = +o.hits || 0;
       SH.fine = o.why === 'сбил клиента' ? +o.fine || 0 : 0;
+      SH.lost = SH.fine + (+o.late || 0); SH.m = S.money;   // чек: все вычеты за смену (career.js watchMoney)
       CM.skipTo(o.why === 'время' ? 24 : Math.max(9.1, Math.min(23.95, +o.endH || 17)));
       CM.showEnd(o.why, WHY_TEXT[o.why] ? t(WHY_TEXT[o.why]) : '', true);
       log('смена ' + (SH.n + 1) + ' (' + (SH.len && SH.len.id) + ') · настроение ' + SH.mood + ' · бонус ' + ctx.money(SH.bonus || 0) +

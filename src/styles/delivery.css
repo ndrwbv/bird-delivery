@@ -82,7 +82,7 @@ html, body {
 #dash-due { display: flex; align-items: center; gap: 6px; padding: 5px 7px 4px; border-radius: 3px;
             background: #ffd85e; color: #1a1208; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .25); }
 #dash-due[hidden] { display: none; }
-#dash-due em { font-style: normal; font-size: 7px; }
+#dash-due em { font-style: normal; font-size: 11px; }   /* «доставить до» — не мельче 11 px (UI-REVIEW № 32) */
 #dash-due b { font-weight: normal; font-size: 12px; }
 #dash-due b:empty { display: none; }
 #timewrap.warn #dash-due { background: #ff9a3c; }
@@ -425,8 +425,9 @@ html[data-map="moscow"] #radar { cursor: zoom-in; pointer-events: auto; }
            border: 3px solid #33210c; border-radius: 6px; background: #2d263a; }
 .fm-view.drag { cursor: grabbing; }
 #fullmapc { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
-.fm-leg { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 7px; color: #fff3d6; }
-.fm-leg i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; vertical-align: -1px; border: 1px solid #33210c; }
+.fm-leg { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: clamp(10px, .95vw, 12px); line-height: 1.4; color: #fff3d6; }   /* ≥ 10 px (UI-REVIEW № 38) */
+.fm-leg > span[hidden], .fm-leg > span.lg-off { display: none; }   /* только то, что сейчас на карте (fmlegend.js) */
+.fm-leg i { display: inline-block; width: 11px; height: 11px; margin-right: 5px; vertical-align: -1px; border: 1px solid #33210c; }
 .lg-me { background: #ffd85e; box-shadow: 0 0 0 2px #33210c; }
 /* пиццерия — домиком, как на карте и радаре */
 .fm-leg i.lg-dodo { width: 10px; height: 10px; border: 0; background: #f0522a; clip-path: polygon(50% 0, 100% 45%, 86% 45%, 86% 100%, 14% 100%, 14% 45%, 0 45%); }
@@ -874,7 +875,25 @@ html[data-map="moscow"] #radar.burn {
 #choice.full #ch-opts button span { font-size: clamp(8px, 1.1vw, 12px); }
 #choice.full #ch-opts button em { font-size: 10px; }
 #choice.full #ch-opts button.padsel { outline: 4px solid #33210c; outline-offset: 3px; }
-#choice.full .ch-box::after { content: ''; position: absolute; left: 0; bottom: 0; height: 6px; width: calc(var(--ch-left, 1) * 100%); background: #d9342c; }
+/* воскрешение — «квитанция на новую машину» (UI-REVIEW № 27): перфорация сверху, значки [A]/[B] на кнопках (glyphs.js),
+   курсор сразу на «воскреснуть» (.ch-main — пока геймпад не зажёг свою подсветку), заметный таймер: полоса 12 px и секунды
+   в углу; оплатил — печать ОПЛАЧЕНО (game.js paidSeal) */
+#choice.full .ch-box { background: radial-gradient(circle at 6px 4px, rgba(20, 16, 30, .85) 3px, transparent 3.5px) 0 0 / 16px 8px repeat-x, #fff3d6; padding-top: clamp(26px, 5vh, 42px); padding-bottom: clamp(28px, 5vh, 44px); }
+#choice.full .ch-box::after { content: ''; position: absolute; left: 0; bottom: 0; height: 12px; width: calc(var(--ch-left, 1) * 100%); background: #d9342c;
+                              border-top: 2px solid #33210c; transition: width .2s linear; }
+.ch-sec { display: none; }
+#choice.full #ch-t { padding: 0 1.8em; }
+@media (max-width: 560px) { #choice.full #ch-t { padding: 0 1.1em; } #choice.full .ch-sec { right: 8px; top: 10px; font-size: 14px; } }
+#choice.full .ch-sec { display: block; position: absolute; right: 12px; top: 14px; min-width: 2.2em; padding: 6px 4px; text-align: center; font-weight: normal;
+                       font-size: clamp(16px, 2.4vw, 24px); color: #fff3d6; background: #d9342c; border: 3px solid #33210c; border-radius: 50%; }
+#choice.full .ch-sec:empty { display: none; }
+#choice.full #ch-opts button { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+#choice.full #ch-opts button span { flex-basis: 100%; }
+#choice.full #ch-opts button .pp-key { font-size: clamp(11px, 1.3vw, 15px); }
+#choice.full #ch-opts button:first-child .pp-key { color: #d9342c; background: #fff3d6; }
+#choice.full #ch-opts button.ch-main:not(.padsel), #choice.full #ch-opts button:focus-visible { outline: 4px solid #ffd85e; outline-offset: 3px; }
+body.touch #choice.full #ch-opts button.ch-main:not(.padsel) { outline: 0; }
+.paid-seal { position: fixed; left: 50%; top: 42%; z-index: 46; translate: -50% -50%; --pp-seal-rot: -9deg; font-size: clamp(22px, 5vw, 48px); }
 
 /* рейтинг смены: под сердцами, мелко */
 #rivals { list-style: none; margin: 8px 0 0; padding: 6px 8px; font-size: 7px; line-height: 1; display: flex; flex-direction: column; gap: 5px;
@@ -888,7 +907,10 @@ html[data-map="moscow"] #radar.burn {
 #rivals li span { color: #ffd85e; }
 #rivals li.me { color: #ffd85e; }
 #rivals li.me b { color: #ff9a3c; }
-@media (max-width: 560px) { #rivals { min-width: 124px; font-size: 6px; } }
+/* в езде — одна строка «место 2 из 5» (game.js rivalsStep); вся таблица — в паузе. Не мельче 11 px, на телефоне 10 (UI-REVIEW № 31) */
+#rivals { font-size: 11px; min-width: 0; padding: 4px 7px; }
+#rivals li i { width: 10px; height: 10px; }
+@media (max-width: 560px) { #rivals { font-size: 10px; } }
 
 /* находки в легенде полной карты: просто фиолетовая точка, не мигает */
 .fm-leg i.lg-col { width: 6px; height: 6px; background: #9d5cf0; border: 0; border-radius: 50%; vertical-align: 0; }
@@ -1037,7 +1059,7 @@ html[lang="ja"] #game, html[lang="zh"] #game { font-weight: 700; letter-spacing:
   #timewrap { top: 6px; gap: 6px; padding: 3px 3px 3px 7px; }
   #dash-now { font-size: 12px; }
   #dash-due { padding: 4px 5px 3px; gap: 5px; }
-  #dash-due em { font-size: 6px; }
+  #dash-due em { font-size: 10px; }
   #dash-due b { font-size: 10px; }
   #hud-left, #hud-right { top: 40px; }
 }
@@ -1202,30 +1224,30 @@ body.touch .fm-leg { font-size: 8px; }
 
 /* ── карточка заказа — накладная целиком (showOrderCard): лист бумаги с перфорацией по краям,
    шапка «накладная · заказ  № 0007», таблица «поле — значение», справа фото получателя на скрепке,
-   внизу листа — кнопка «ГАЗ ГАЗ» ── */
-#phone { background: #fff3d6; color: #33210c; border: 3px solid #33210c; border-radius: 4px; overflow: visible;
-         box-shadow: 0 8px 0 #33210c, 0 24px 60px rgba(0, 0, 0, .5); }
+   внизу листа — кнопка «ГАЗ ГАЗ». Цвета — палитра накладной --pp-* (src/styles/paper.css) ── */
+#phone { background: var(--pp-paper); color: var(--pp-ink); border: 3px solid var(--pp-ink); border-radius: 4px; overflow: visible;
+         box-shadow: 0 8px 0 var(--pp-ink), 0 24px 60px rgba(0, 0, 0, .5); }
 #phone::before, #phone::after { content: ''; position: absolute; left: 10px; right: 10px; height: 8px; pointer-events: none;
-         background: radial-gradient(circle at 6px 4px, rgba(20, 16, 30, .85) 3px, transparent 3.5px) 0 0 / 16px 8px repeat-x; }
+         background: var(--pp-perf); }
 #phone::before { top: -6px; } #phone::after { bottom: -6px; }
-#phone .ph-top { background: none; color: #8a3b22; border-bottom: 2px dashed #8a6b4e; margin: 0 16px; padding: 14px 0 10px; font-size: 10px;
+#phone .ph-top { background: none; color: var(--pp-rust); border-bottom: 2px dashed var(--pp-brown); margin: 0 16px; padding: 14px 0 10px; font-size: 10px;
                  text-transform: uppercase; letter-spacing: .08em; }
 #phone .ph-dot { background: #f0522a; opacity: 1; }
-#phone .ph-src { display: block !important; font-size: 10px; opacity: 1; color: #33210c; letter-spacing: .04em; }
+#phone .ph-src { display: block !important; font-size: 10px; opacity: 1; color: var(--pp-ink); letter-spacing: .04em; }
 #phone .ph-items, #phone #ph-why { display: none !important; }
 #phone .ph-body { padding: 12px 16px 16px; }
 #phone.ord-typed { border-top-width: 3px; }
 #phone.ord-typed .ph-top { box-shadow: inset 0 -4px 0 var(--ord, #ff8a2b); }
 .oc-sheet { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: start; }
-.oc-inv { width: 100%; border-collapse: collapse; font-size: 10px; line-height: 1.55; color: #33210c; }
+.oc-inv { width: 100%; border-collapse: collapse; font-size: 10px; line-height: 1.55; color: var(--pp-ink); }
 .oc-inv tr + tr th, .oc-inv tr + tr td { border-top: 1px dashed rgba(138, 107, 78, .6); }
-.oc-inv th { width: 32%; padding: 6px 10px 6px 0; text-align: left; vertical-align: top; font-weight: normal; color: #8a6b4e; font-size: 8px; }
+.oc-inv th { width: 32%; padding: 6px 10px 6px 0; text-align: left; vertical-align: top; font-weight: normal; color: var(--pp-brown); font-size: 8px; }
 .oc-inv td { padding: 6px 0; text-align: left; vertical-align: top; }
 .oc-inv td b { display: block; font-weight: normal; font-size: 13px; }
-.oc-inv td small { display: block; font-size: 8px; color: #8a3b22; margin-top: 3px; }
-.oc-inv .oc-urg { display: inline; color: #d9342c; font-size: inherit; }
+.oc-inv td small { display: block; font-size: 8px; color: var(--pp-rust); margin-top: 3px; }
+.oc-inv .oc-urg { display: inline; color: var(--pp-red); font-size: inherit; }
 /* оплата — крупно и зелёным: главное число накладной (05.10.2026) */
-.oc-inv td b.oc-pay { display: inline-block; color: #1f7a2e; }
+.oc-inv td b.oc-pay { display: inline-block; color: var(--pp-money); }
 /* фото получателя: белая рамка, чуть наискосок, сверху скрепка */
 .oc-photos { position: relative; display: flex; flex-direction: column; gap: 8px; padding-top: 10px; transform: rotate(3deg); }
 .oc-photos .oc-p { width: auto; }
@@ -1237,10 +1259,10 @@ body.touch .fm-leg { font-size: 8px; }
            box-shadow: inset 0 0 0 3px transparent, 1px 1px 0 rgba(0, 0, 0, .25); transform: rotate(-8deg); }
 .oc-clip::after { content: ''; position: absolute; left: 2px; right: 2px; top: 6px; bottom: 4px; border: 2px solid #9aa0ad; border-top: 0; border-radius: 0 0 6px 6px; }
 /* «ГАЗ ГАЗ» — внутри листа, крупно, как штамп */
-#phone #ph-accept { margin: 4px 0 0; padding: 18px 12px; font-size: 22px; letter-spacing: .14em; color: #fff3d6; background: #d9342c;
-                    border: 4px solid #33210c; border-radius: 8px; box-shadow: 0 6px 0 #33210c; text-shadow: 3px 3px 0 #33210c; transform: rotate(-1deg); }
+#phone #ph-accept { margin: 4px 0 0; padding: 18px 12px; font-size: 22px; letter-spacing: .14em; color: var(--pp-paper); background: var(--pp-red);
+                    border: 4px solid var(--pp-ink); border-radius: 8px; box-shadow: 0 6px 0 var(--pp-ink); text-shadow: 3px 3px 0 var(--pp-ink); transform: rotate(-1deg); }
 #phone #ph-accept:hover { background: #ec4a3e; }
-#phone #ph-accept:active { transform: rotate(-1deg) translateY(4px); box-shadow: 0 2px 0 #33210c; }
+#phone #ph-accept:active { transform: rotate(-1deg) translateY(4px); box-shadow: 0 2px 0 var(--pp-ink); }
 #phone .oc-rush { margin-top: 12px; }
 @media (max-width: 520px) { .oc-sheet { grid-template-columns: 1fr; } .oc-photos { order: -1; align-items: center; } }
 /* накладная — от размера экрана: ~3/4 ширины, шрифты от vw/vh */
@@ -1252,7 +1274,7 @@ html[data-map] #phone { width: min(920px, 76vw); }
 #phone .ph-body { padding: clamp(10px, 1.6vh, 20px) clamp(14px, 2.2vw, 28px) clamp(14px, 2.4vh, 26px); gap: clamp(10px, 2vh, 20px); }
 .oc-sheet { gap: clamp(12px, 2vw, 28px); }
 .oc-inv { font-size: clamp(10px, 1.15vw, 16px); }
-.oc-inv th { color: #75573b; font-size: clamp(9px, .9vw, 13px); padding: clamp(5px, 1vh, 11px) 12px clamp(5px, 1vh, 11px) 0; }
+.oc-inv th { color: var(--pp-label); font-size: clamp(9px, .9vw, 13px); padding: clamp(5px, 1vh, 11px) 12px clamp(5px, 1vh, 11px) 0; }
 .oc-inv td { padding: clamp(5px, 1vh, 11px) 0; }
 .oc-inv td b { font-size: clamp(13px, 1.7vw, 24px); }
 .oc-inv td small { font-size: clamp(8px, .9vw, 12px); }
@@ -1277,7 +1299,19 @@ html[data-map] #phone { width: min(920px, 76vw); }
   html #phone.ord-many .oc-inv tr:first-child td b { display: inline; }
   html #phone.ord-many .oc-inv tr:first-child td small { display: inline; margin: 0 0 0 .7em; }
   html #phone.ord-many .oc-inv tr:first-child td small::after { content: ''; display: block; margin-bottom: 3px; }
-  #phone #ph-accept { font-size: 18px; padding: 8px 12px; border-width: 3px; box-shadow: 0 4px 0 #33210c; }
+  #phone #ph-accept { font-size: 18px; padding: 8px 12px; border-width: 3px; box-shadow: 0 4px 0 var(--pp-ink); }
 }
 /* телефон стоя: фото сборного (две колонки) — кучкой по центру, а не по краям листа */
 @media (max-width: 520px) { #phone .oc-photos.many { justify-content: center; column-gap: 14px; } }
+
+/* ── Толик одним видом (UI-REVIEW № 42): и чат справа (chat.js), и реплика на ходу сверху (dialog.js DLG.line, dialog.css) —
+   жёлтый стикер-записка с полароидом, как в паузе и в конце смены (paper.css .pp-sticker), но тихо: без наклона,
+   без скотча, без покачивания; появляется один раз. Текст не мельче 11 px (телефон — 10) ── */
+#chat .cm > img, #chat .cm > i { border-radius: 2px; border: 3px solid #fff; border-bottom-width: 7px; background: var(--pp-orange, #ff8a2b);
+                                 box-shadow: 0 2px 4px rgba(51, 33, 12, .4); }
+#chat .cm-b b { font-size: 10px; color: #ffd85e; text-transform: uppercase; letter-spacing: .04em; padding-left: 2px; }
+#chat .cm-b p { font-size: 11px; line-height: 1.55; color: var(--pp-ink, #33210c); background: var(--pp-yellow, #ffd85e); border-radius: 2px;
+                box-shadow: 0 3px 0 rgba(51, 33, 12, .75), 0 6px 12px rgba(0, 0, 0, .25); }
+#chat .cm-b p.typing span { background: var(--pp-label, #75573b); }
+#chat .cm.big .cm-b p { box-shadow: 0 3px 0 rgba(51, 33, 12, .75), 0 8px 16px rgba(0, 0, 0, .35); }
+@media (max-width: 560px) { #chat .cm-b p { font-size: 10px; } #chat .cm-b b { font-size: 9px; } }

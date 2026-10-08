@@ -14,13 +14,13 @@
 .prf-ava { flex: none; width: 44px; height: 44px; border-radius: 7px; image-rendering: pixelated; background: #2a3766; border: 3px solid #33210c; box-sizing: border-box; }
 .prf-row.cur .prf-ava { border-color: #ffd85e; }
 .prf-pick b { font-weight: normal; font-size: clamp(9px, 1vw, 13px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.prf-pick span { font-size: clamp(6px, .62vw, 8px); line-height: 1.5; color: #b9c3e6; }
+.prf-pick span { font-size: clamp(9px, .9vw, 11px); line-height: 1.5; color: #b9c3e6; }
 .prf-row.cur .prf-pick { background: #f0522a; }
 .prf-row.cur .prf-pick span { color: #ffe0c8; }
 .prf-ren, .prf-del { flex: none; padding: 0 12px; font-size: clamp(7px, .75vw, 10px); background: #3a4570; }
 .prf-del { color: #ffb0a0; }
 .prf-new { padding: 12px; font-size: clamp(9px, 1vw, 12px); background: rgba(34, 44, 90, .6); border-style: dashed !important; }
-.prf-note { font-size: 7px; line-height: 1.8; color: #b9c3e6; text-align: center; }
+.prf-note { font-size: 12px; line-height: 1.7; color: #b9c3e6; text-align: center; }
 .prf-note:empty { display: none; }
 .prf-warn { font-size: clamp(7px, .8vw, 10px); line-height: 1.8; color: #ffb0a0; text-align: center; }
 .prf-close { font-size: clamp(9px, 1.1vw, 12px); padding: 12px; background: #3a4570; box-shadow: 0 4px 0 #33210c; }

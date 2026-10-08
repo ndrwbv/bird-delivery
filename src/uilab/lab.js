@@ -30,6 +30,7 @@ import { memStore, makeApi } from './mock.js';
 import shiftEndScreens from './screens/shiftend.js';
 import hudScreens from './screens/hud.js';
 import dialogScreens from './screens/dialogs.js';
+import paperScreens from './screens/paper.js';
 import { minigameScreens } from './minigames.js';
 
 const $ = id => document.getElementById(id);
@@ -92,7 +93,7 @@ export async function boot ({ adult, lang }) {
     CM, END, CHAT, DLG, DIST, ECON, ORD, HQ, makePerson, faceDataURL,
     setCar: k => { CAR = CARS[k] ? k : 'home'; }, carNow,
   };
-  const SCREENS = [...shiftEndScreens(ctx), ...dialogScreens(ctx), ...hudScreens(ctx), ...minigameScreens(ctx)];
+  const SCREENS = [...shiftEndScreens(ctx), ...dialogScreens(ctx), ...hudScreens(ctx), ...paperScreens(ctx), ...minigameScreens(ctx)];
   const byId = new Map(SCREENS.map(s => [s.id, s]));
   let cur = '';
 

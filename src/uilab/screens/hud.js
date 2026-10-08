@@ -232,10 +232,10 @@ export default function hudScreens (ctx) {
       const saleLine = R.sale ? t('скидка: {sale} вместо {full}', { sale: money(R.price), full: money(R.full) }) + ' · ' + tn(every, 'раз в {n} смену|раз в {n} смены|раз в {n} смен')
         : tn(R.wait, 'скидка {sale} — через {n} смену|скидка {sale} — через {n} смены|скидка {sale} — через {n} смен', { sale: money(ECON.REVIVE.SALE) });
       const choice = have < price
-        ? { title: t('воскреснуть — {money}', { money: money(price) }), sub: t('в кошельке {money} — не хватает', { money: money(have) }) + ' · ' + saleLine,
+        ? { title: t('воскреснуть — {money}', { money: money(price) }), sub: t('в копилке {money} — не хватает', { money: money(have) }) + ' · ' + saleLine,
           opts: [{ label: t('ну что ж'), r: 'нет денег' }], timeout: 4 }
         : { title: R.sale ? t('воскреснуть со скидкой?') : t('воскреснуть?'),
-          sub: t('новая машина спустится с неба · из кошелька {money} (там {have})', { money: money(price), have: money(have) }),
+          sub: t('новая машина спустится с неба · из копилки {money} (там {have})', { money: money(price), have: money(have) }),
           opts: [{ label: t('воскреснуть · {money}', { money: money(price) }) + (R.sale ? ' <s>' + money(R.full) + '</s>' : ''), sub: t('заказ и смена — дальше') + ' · ' + saleLine, r: 'воскрес' },
             { label: t('нет, всё'), r: 'нет, всё' }], timeout: 9 };
       // game.js showChoice({ …, full: true })

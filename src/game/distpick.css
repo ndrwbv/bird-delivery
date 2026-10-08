@@ -1,63 +1,59 @@
-/* выбор района — карусель карточек (distpick.js), в стиле меню и гаража */
+/* выбор района — карусель «пропусков в район» (distpick.js) на бумаге накладной (src/styles/paper.css):
+   фон глухой (меню под ним не видно), заголовок сверху, карточки — листы; боковые целиком в кадре */
 #cr-dpick { position: fixed; inset: 0; z-index: 48; display: flex; flex-direction: column; align-items: stretch; gap: clamp(6px, 1.6vh, 14px);
-            padding: max(14px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
-            box-sizing: border-box; background: rgba(10, 12, 24, .8); backdrop-filter: blur(3px); pointer-events: auto; color: #fff3d6; }
+            padding: max(16px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+            box-sizing: border-box; background: radial-gradient(ellipse at 50% 45%, #5a3324 0, #2a1620 62%, #1a0f16 100%); pointer-events: auto; color: var(--pp-paper); }
 #cr-dpick[hidden] { display: none; }
-.dp-t { flex: none; text-align: center; font-size: clamp(14px, min(2vw, 3.6vh), 26px); color: #ffd85e; text-shadow: 3px 3px 0 #33210c; }
+.dp-t { flex: none; text-align: center; font-size: var(--pp-fs-l); color: var(--pp-yellow); text-shadow: 3px 3px 0 var(--pp-ink); }
 .dp-car { flex: 1; min-height: 0; display: flex; }
-.cz.dp-cz { flex: 1; --cw: min(460px, 80vw); --step: calc(var(--cw) * 1.02); }
-.dp-cz .cz-card.side { opacity: .45; filter: saturate(.6) brightness(.7); }
-.dp-cz .cz-card.far { opacity: .15; }
+/* ширина листа — так, чтобы соседи (×0,84) влезали в экран целиком: центр ± шаг ± половина соседа ≤ края */
+.cz.dp-cz { flex: 1; --cw: min(440px, 34vw); --step: calc(var(--cw) * .92); }
+.dp-cz .cz-card.side { opacity: .6; filter: saturate(.7) brightness(.75); }
+.dp-cz .cz-card.far { opacity: 0; }
 .dp-bot { flex: none; display: flex; justify-content: center; }
-.dp-back { font: inherit; font-size: clamp(9px, min(1.1vw, 2vh), 13px); padding: 12px 28px; min-height: 44px; cursor: pointer; color: #fff3d6;
-           background: #3a4570; border: 3px solid #33210c; border-radius: 10px; box-shadow: 0 4px 0 #33210c; }
-.dp-back:hover { filter: brightness(1.15); }
-.dp-back.padsel, .dp-back:focus-visible { outline: 3px solid #ffd85e; outline-offset: 3px; }
+.dp-back { min-height: 44px; }
 
-/* карточка района */
-.dp-card { display: flex; flex-direction: column; gap: clamp(6px, 1.3vh, 12px); padding: clamp(12px, 2vh, 20px) clamp(12px, 1.6vw, 20px);
-           background: linear-gradient(180deg, #2c3a78 0, #1d2440 70%); border: 4px solid #33210c; border-radius: 14px;
-           box-shadow: 0 6px 0 #33210c, 0 16px 36px rgba(0, 0, 0, .45); }
-.dp-card.cur { border-color: #ffd85e; }
-.dp-card.city { background: linear-gradient(180deg, #6b3fb0 0, #3a2366 75%); }
-.dp-card.lock { background: linear-gradient(180deg, #3a3550 0, #23202f 75%); }
-.dp-h { display: flex; align-items: center; gap: 12px; }
-.dp-h em { flex: none; font-style: normal; width: 1.9em; height: 1.9em; display: flex; align-items: center; justify-content: center; font-size: clamp(12px, min(1.5vw, 2.8vh), 20px);
-           color: #33210c; background: #ffd85e; border: 3px solid #33210c; border-radius: 50%; }
-.dp-card.lock .dp-h em { background: #8a86a0; }
-.dp-h b { flex: 1; min-width: 0; font-weight: normal; font-size: clamp(14px, min(1.9vw, 3.4vh), 26px); line-height: 1.25; text-shadow: 3px 3px 0 #33210c; }
-.dp-h i { flex: none; font-style: normal; font-size: clamp(7px, min(.75vw, 1.4vh), 10px); padding: 5px 8px; color: #33210c; background: #ffd85e; border: 2px solid #33210c; border-radius: 6px; }
-.dp-h i.lk { background: #8a86a0; }
-.dp-w { font-size: clamp(8px, min(.9vw, 1.7vh), 12px); line-height: 1.6; color: #b9c3e6; }
-.dp-rows { margin: 0; display: flex; flex-direction: column; gap: clamp(4px, .9vh, 8px); }
-.dp-r { display: grid; grid-template-columns: 8.4em 1fr; gap: 10px; align-items: baseline; font-size: clamp(8px, min(.9vw, 1.7vh), 12px); line-height: 1.55; }
-.dp-r dt { color: #b9c3e6; }
-.dp-r dd { margin: 0; color: #fff3d6; }
-.dp-r.up dd { color: #8ff09a; }
-.dp-r.warn dd { color: #ffb08a; }
-.dp-card.lock .dp-r dd { color: #d6d2e6; }
-.dp-f { font-size: clamp(7px, min(.8vw, 1.5vh), 11px); line-height: 1.6; color: #ffd85e; text-align: center; }
-.dp-card.lock .dp-f { color: #fff3d6; }
-.dp-go { font: inherit; cursor: pointer; font-size: clamp(11px, min(1.4vw, 2.6vh), 18px); padding: clamp(10px, 1.8vh, 16px); min-height: 48px; color: #fff3d6;
-         background: linear-gradient(180deg, #f0522a 0, #c23a18 100%); border: 4px solid #33210c; border-radius: 12px; box-shadow: 0 5px 0 #33210c; text-shadow: 2px 2px 0 #9b2a10; }
-.dp-go:hover { filter: brightness(1.08); }
-.dp-go:active { transform: translateY(3px); box-shadow: 0 2px 0 #33210c; }
-.dp-go:disabled { cursor: default; background: #4a4560; color: #a9a4bd; text-shadow: none; }
-.dp-card.cz-card.on .dp-go.padsel, .dp-card.cz-card.on .dp-go:focus-visible { outline: 4px solid #ffd85e; outline-offset: 4px; }
+/* пропуск: лист накладной */
+.dp-card.pp-sheet { width: var(--cw); display: flex; flex-direction: column; gap: .2em; padding-top: 4px; }
+.dp-card.cur { --pp-accent: var(--pp-yellow); }
+.dp-card.city { --pp-accent: var(--pp-pink); }
+.dp-card.lock { --pp-accent: var(--pp-brown); }
+.dp-card .pp-head { margin-bottom: .3em; }
+.dp-id { display: flex; align-items: center; gap: 1em; margin: .3em 0 .5em; }
+.dp-ph { flex: none; margin: 0; display: flex; flex-direction: column; align-items: center; gap: .4em; max-width: 8.5em; }
+.dp-ph .pp-polaroid { position: relative; width: clamp(56px, 5.4vw, 84px); height: clamp(56px, 5.4vw, 84px); background: linear-gradient(180deg, #8fd0ff 0 62%, #6fbf4a 62%); }
+/* пиццерия на фото — домиком, как на карте */
+.dp-ph .pp-polaroid::before { content: ''; position: absolute; left: 20%; right: 20%; top: 18%; bottom: 14%; background: var(--pp-fire);
+                              clip-path: polygon(50% 0, 100% 42%, 88% 42%, 88% 100%, 12% 100%, 12% 42%, 0 42%); }
+.dp-card.lock .dp-ph .pp-polaroid { filter: grayscale(1) brightness(.85); }
+.dp-ph figcaption { font-size: var(--pp-fs-s); line-height: 1.4; color: var(--pp-label); text-align: center; }
+.dp-nm { min-width: 0; display: flex; flex-direction: column; gap: .4em; }
+.dp-nm > b { font-weight: normal; font-size: var(--pp-fs-l); line-height: 1.2; color: var(--pp-ink); }
+.dp-nm .pp-hint { margin: 0; line-height: 1.5; }
+.dp-here { align-self: flex-start; font-size: var(--pp-fs-s); }
+.dp-card .pp-row > b { white-space: normal; text-align: right; }
+.dp-x { margin-top: .3em; }
+.dp-f { margin-top: .5em; text-align: center; }
+/* печать — поверх фото пиццерии, имя района не закрывает */
+.dp-card .pp-seal { --pp-seal-top: 5.6em; --pp-seal-rot: -11deg; right: auto; left: .5em; font-size: var(--pp-fs-m); padding: .3em .45em .2em; letter-spacing: .06em; }
+.dp-card .pp-stamp { font-size: var(--pp-fs-m); margin-top: .8em; }
+/* закрытый: штамп серый, но курсор на нём стоит (не disabled) */
+.dp-card .pp-stamp.dp-lk { color: var(--pp-ink); background: #cdbfa3; text-shadow: none; border-style: dashed; cursor: default; letter-spacing: .02em; text-transform: none; }
+.dp-card .pp-stamp.dp-lk:hover { background: #cdbfa3; }
+.dp-card .pp-stamp.dp-lk:active { translate: 0 0; }
+.dp-card.cz-card.on .dp-go.padsel, .dp-card.cz-card.on .dp-go:focus-visible { outline: 4px solid var(--pp-ink); outline-offset: 3px; box-shadow: 0 0 0 9px var(--pp-yellow); }
 
 /* телефон стоймя: карточка почти на всю ширину, соседей почти не видно */
 @media (max-aspect-ratio: 1/1) {
-  .cz.dp-cz { --cw: min(460px, 82vw); }
-  .dp-r { font-size: clamp(9px, 2.6vw, 12px); grid-template-columns: 1fr; gap: 2px; }
-  .dp-r dt { font-size: .82em; }
-  .dp-w, .dp-f { font-size: clamp(8px, 2.4vw, 11px); }
+  .cz.dp-cz { --cw: min(460px, 86vw); --step: calc(var(--cw) * 1.04); }
+  .dp-ph .pp-polaroid { width: 52px; height: 52px; }
 }
-/* низкий экран (телефон боком): без строки «где это», плотнее */
+/* низкий экран (телефон боком): без строки «где это» и подписи под фото, плотнее */
 @media (max-height: 560px) {
-  .dp-w { display: none; }
-  .dp-card { gap: 5px; padding: 8px 12px; }
-  .dp-rows { gap: 2px; }
-  .dp-go { min-height: 40px; padding: 8px; }
-  .dp-back { min-height: 36px; padding: 8px 20px; }
-  .cz.dp-cz { --cw: min(520px, 62vw); }
+  .dp-nm .pp-hint, .dp-ph figcaption { display: none; }
+  .dp-card.pp-sheet { padding-bottom: 10px; }
+  .dp-id { margin: 0 0 .2em; }
+  .dp-ph .pp-polaroid { width: 40px; height: 40px; border-width: 3px; border-bottom-width: 8px; }
+  .dp-back { min-height: 36px; padding: 6px 14px; }
+  .cz.dp-cz { --cw: min(460px, 50vw); --step: calc(var(--cw) * .96); }
 }

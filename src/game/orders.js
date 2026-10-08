@@ -722,6 +722,7 @@ export function payStop (o, st, onTime, tier) {
   if (st.bumped) tip = 0;                                 // задел клиента машиной (game.js clientBump, ECON.CLIENT_HIT) — без чаевых
   // из чего сложилась оплата — game.js покажет кучкой денег и чеком (popPay); сюжет — катсцена сама покажет награду
   st.pay = { fee, bonus, tip, rich: rich && tip > 0, late: false, story: !!sp.story };
+  S.tips = (S.tips || 0) + bonus + tip;                   // чек смены: строка «чаевые и за скорость» (career.js; обнуляет startShift)
   return fee + bonus + tip;
 }
 

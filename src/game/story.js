@@ -231,7 +231,7 @@ function save () { try { if (API && API.Store) API.Store.set(KEY, ST.data); } ca
 const prog = id => { const d = load(); return d[id] || (d[id] = { ch: 0, last: -99 }); };
 
 /* быстрый заезд кончился: прогресс — заново из сохранения (встречи с героями на заезде не в счёт) */
-export function reload () { ST.data = null; }
+export function reload (all) { ST.data = null; if (all) ST.issued = {}; }   // all — сменили профиль (game.js reprofile)
 export function progress () { return JSON.parse(JSON.stringify(load())); }
 /* для herostories.js: живой прогресс истории и запись */
 export const progOf = id => prog(id);

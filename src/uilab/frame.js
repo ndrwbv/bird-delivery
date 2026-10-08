@@ -5,6 +5,8 @@
    3) модули игры и экраны — lab.js (импорт после языка). */
 import '../styles/delivery.css';
 import '../input/padmenu.css';
+import '../styles/paper.css';            // стиль «как накладная»: бумага, чек, штамп, печать, стикер (П0)
+import '../input/glyphs.js';             // значки кнопок по текущему вводу (A / Enter / тап)
 import './frame.css';
 import { initI18n, applyDom } from '../i18n/index.js';
 

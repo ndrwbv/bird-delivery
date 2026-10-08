@@ -4,6 +4,8 @@
    иначе Стим и dev — Северск, Яндекс — Москва (выбора в меню больше нет). */
 import './styles/delivery.css';
 import './input/padmenu.css';
+import './styles/paper.css';            // стиль «как накладная»: бумага, чек, штамп, печать, стикер (П0)
+import './input/glyphs.js';             // значки кнопок по текущему вводу (A / Enter / тап)
 import Platform from './platform/index.js';
 import * as CRASH from './platform/crashlog.js';
 import { initI18n, applyDom, LANGS, LANG_NAMES } from './i18n/index.js';

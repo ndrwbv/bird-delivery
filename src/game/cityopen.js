@@ -12,7 +12,8 @@
 
      CITY.init(api)          — из game.js: { Store, Snd, money, pizzerias(), routeLen(x1, z1, x2, z2) }
      CITY.beforeShift(go)    — «на смену» / «ещё раз»: всё открыто — праздник (если не было) и выбор,
-                               потом go(); true — перехватили (go позовут сами), false — сразу смена
+                               потом go(); true — перехватили (go позовут сами), false — сразу смена;
+                               с экрана конца смены выбора нет — тот же район, что в прошлую смену
      CITY.check(done?)       — меню: всё открыто, а праздника не было — показать
      CITY.party(done?)       — праздник (отладка — показать ещё раз)
      CITY.picker(done, start) — выбор, где работать; done(true) — выбрали, done(false) — «назад»
@@ -198,6 +199,10 @@ function closePick (ok) {
 /* «на смену» / «ещё раз»: всё открыто — сначала праздник (один раз), потом выбор, потом смена */
 export function beforeShift (go) {
   if (!ready()) return false;
+  // с экрана конца смены («на новую смену») — без выбора: тот же район или весь город, что в прошлую смену
+  // (сменить — в меню). Праздник, если его ещё не было, — всё равно сначала (UI-REVIEW.md № 7, П1)
+  const fromEnd = !!(document.getElementById('over') && !document.getElementById('over').hidden);
+  if (fromEnd && seen()) return false;
   const pickNow = () => picker(ok => { if (ok) go(); });
   if (!seen()) party(pickNow);
   else pickNow();

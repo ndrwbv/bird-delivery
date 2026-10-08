@@ -39,3 +39,10 @@
   #cash .mb b { font-size: 10px; }
   #cash .mb .sc-pop { font-size: 9px; left: calc(100% + 6px); }
 }
+
+/* подписи под значками — первые 3 смены (game.js hudCaps, body.hud-caps; UI-REVIEW № 20): «копилка», «за смену»,
+   «респект» мелко внутри плашки после суммы. Плашка в покое полупрозрачная — подпись вместе с ней */
+#cash .mb[data-cap]::after { content: none; }
+body.hud-caps #cash .mb[data-cap]::after { content: attr(data-cap); font-size: 11px; line-height: 1; color: #fff3d6; opacity: .85;
+                                           white-space: nowrap; text-shadow: 1px 1px 0 #33210c; margin-left: 2px; }
+@media (max-width: 720px), (max-height: 460px) { body.hud-caps #cash .mb[data-cap]::after { font-size: 10px; } }

@@ -91,6 +91,8 @@ function propThaw (p) {
   p._fz = 0;
 }
 
+/** камера прыгнула далеко (смена профиля в меню, game.js reprofile): дальние — сразу, не через CULL_EVERY кадров */
+export function refresh () { if (SCENE) cullFar(); }
 export function step () {
   if (!SCENE) return;
   let np = 0;

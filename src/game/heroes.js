@@ -487,6 +487,8 @@ function load () {
   } catch (e) { /* — */ }
 }
 function save () { try { if (A.Store) A.Store.set(KEY, M.save); } catch (e) { /* — */ } }
+/** сменили профиль без перезагрузки (game.js reprofile): знакомства и обиды — нового профиля */
+export function reloadSave () { M.save = { met: {}, grudge: {} }; if (A) load(); }
 
 /* ─────────────── места ─────────────── */
 /* точка на тротуаре у улицы рядом с (x, z): лицом к дороге; tx/tz — вдоль улицы (гулять) */

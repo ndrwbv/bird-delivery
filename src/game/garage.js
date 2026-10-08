@@ -123,7 +123,7 @@ function render () {
 }
 function wallet () {
   const w = el.querySelector('.gr-wallet');
-  w.innerHTML = '<span>' + esc(t('в кошельке')) + '</span> <b>' + esc(D.A.money(D.A.wallet())) + '</b> <em>★ ' + D.stars() + '</em>';
+  w.innerHTML = '<span>' + esc(t('в копилке')) + '</span> <b>' + esc(D.A.money(D.A.wallet())) + '</b> <em>★ ' + D.stars() + '</em>';
 }
 function dots () {
   const d = el.querySelector('.gr-dots');

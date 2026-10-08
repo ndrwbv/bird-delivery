@@ -1139,6 +1139,8 @@ export const potHits = () => POTN;
 
 /* ─────────────── гараж: заехал и встал — Дядя Женя предлагает подшаманить ─────────────── */
 const GS = { stillT: 0, offered: false, busy: false, met: false };
+/** сменили профиль без перезагрузки (game.js reprofile): знакомство с Дядей Женей и пробег — заново */
+export function reprofile () { GS.met = false; GS.offered = false; GS.stillT = 0; odo = 0; }
 let pickT = 0;
 function garageStep (dt, vf) {
   if (!GARS.length) return;

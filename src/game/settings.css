@@ -48,7 +48,7 @@ body.pad .set-tk { display: block; }
 .set-keys { padding: calc(var(--u) * .9) calc(var(--u) * 1); background: #ffd85e; color: #33210c; border-radius: 6px; font-size: calc(var(--u) * .85); }
 .set-keys .pm-keys-t { margin-bottom: calc(var(--u) * .6); font-size: calc(var(--u) * 1); }
 .set-keys .pm-keys-g { gap: calc(var(--u) * .45) calc(var(--u) * .7); }
-.set-ver { font-size: var(--u); line-height: 1.6; color: #b9c3e6; padding: calc(var(--u) * .3) 0; }
+.set-ver { font-size: var(--u); line-height: 1.6; color: #b9c3e6; padding: calc(var(--u) * .3) 0; margin-top: calc(var(--u) * .6); }
 .set-ver b { font-weight: normal; color: #ffd85e; }
 #set-upd-go { background: #7fe08a !important; }
 

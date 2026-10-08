@@ -53,6 +53,8 @@ function counts () {
   return ST.counts;
 }
 function save () { try { Platform.store.set(KEY, counts().slice()); } catch (e) { /* приватный режим */ } }
+/** сменили профиль без перезагрузки (game.js reprofile): доставки районов — нового профиля */
+export function reload () { ST.counts = null; ST.snap = null; ST.session = -1; ST.ups = []; }
 export const count = i => counts()[i] || 0;
 /** ступень пиццерии района i: 1…5 */
 export function stage (i, n) {

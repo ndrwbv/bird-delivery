@@ -1,0 +1,244 @@
+/* ── Стиль «как накладная» — сочный и живой (пачка П0, docs/UI-REVIEW.md) ──
+   Общий набор для экранов вне езды: конец смены, быстрый заезд, меню, пауза, настройки, район,
+   карта. Основа — бумага накладной (лист, чек, штамп, печать, стикер), сверху — яркие акценты и
+   движение-акцент: лист влетает с пружиной, штамп шлёпает с тряской и пылью, печать хлопает с
+   отскоком, деньги щёлкают счётчиком, на хорошем итоге — монетки и конфетти.
+   ДВИЖЕНИЕ — ТОЛЬКО АКЦЕНТ: на событии (появился лист, шлёпнул штамп, итог, деньги пришли,
+   нажатие), доли секунды — и тишина. Вечного покачивания, дыхания, дрожания в покое нет.
+   ДВА РЕЖИМА: экраны вне езды (конец смены, меню, пауза, гараж, итоги) — сочно, как есть;
+   в езде (хад, реплики Толика на ходу, подсказки, деньги в пачку) — контейнер с .pp-ride: одно
+   короткое проявление, без тряски, пыли, конфетти и монеток, ничего не перекрывает дорогу.
+   Правила словами — docs/CAREER.md, «Стиль интерфейса: как накладная». Образец — песочница
+   интерфейса (ui.html) → «Стиль: как накладная» → «лист-образец».
+
+   КАК ПОЛЬЗОВАТЬСЯ
+     <div class="pp-desk">                                   город под листом, тёплое затемнение
+       <section class="pp-receipt pp-in">                    чек влетает (.pp-sheet — лист с перфорацией)
+         <header class="pp-head"><span>чек смены · Юг</span><b>№ 0007</b></header>
+         <p class="pp-row"><span>доставлено</span><i></i><b>5</b></p>        подпись ··· значение
+         <p class="pp-row pp-total"><span>итого</span><i></i><b class="pp-plus" id="sum">0 ₽</b></p>
+         <div class="pp-seal pp-seal-green pp-seal-inline">выполнено</div>  печать с хлопком
+         <button class="pp-stamp" autofocus>${keyHTML('ok')}на новую смену</button>
+       </section>
+       <nav class="pp-margin">                               пометки на полях — второстепенное
+         <button class="pp-note">${keyHTML('y')}гараж и траты</button>
+         <button class="pp-note">${keyHTML('back')}в меню</button>
+       </nav>
+       <aside class="pp-sticker pp-in-side"><img class="pp-polaroid" src="…"><p><span class="pp-label">Толик</span>норм смена</p></aside>
+     </div>
+     JS (src/game/paperfx.js): countUp(el, 0, 5261, { fmt: money }) — деньги щёлкают вверх;
+     burst(el, { kind: 'coins' | 'confetti' }) — монетки / конфетти из точки; slam(el) — шлепок штампа
+     (тряска стола и пыль); replay(el, 'pp-seal') — хлопнуть печать заново; press(el) — вдавить
+     кнопку на A с геймпада; stagger(rows) — строки чека допечатываются по одной.
+
+   Классы: .pp-desk стол · .pp-sheet лист · .pp-receipt чек · .pp-head шапка · .pp-row строка ·
+   .pp-total итог · .pp-label подпись · .pp-hint мелкая строка · .pp-big крупное число ·
+   .pp-plus/.pp-minus деньги · .pp-mark маркер-выделение · .pp-key значок кнопки (glyphs.js) ·
+   .pp-stamp штамп-главное · .pp-margin/.pp-note пометки · .pp-seal печать (-green -red -rust -pink,
+   -inline — своё место в листе) · .pp-sticker стикер (-pink -orange) · .pp-polaroid фото ·
+   .pp-tilt-l/-r наклон · движение: .pp-in .pp-in-side .pp-print .pp-shake .pp-slam .pp-tick .pp-burst ·
+   .pp-ride — тихий режим для езды (на контейнере или самом узле).
+   Фокус геймпада — .padsel (padmenu.js) или .pp-focus: толстая чернильно-жёлтая обводка, при
+   переходе фокуса один раз чуть приподнимается; лист с фокусом приподнят. Шрифт — три размера: --pp-fs-s подписи, --pp-fs-m текст, --pp-fs-l
+   крупно (итог, штамп, печать); на Деке подписи ≥ 11 px и текст ≥ 12, на телефоне ≥ 10.
+   Цвета — только --pp-*: палитра накладной + яркие акценты; скупого синего нет (он — только хад).
+   Меньше движения: prefers-reduced-motion или body.calm-fx — коротко, без тряски, без конфетти. */
+
+:root {
+  /* бумага накладной */
+  --pp-paper: #fff3d6;      /* бумага */
+  --pp-ink: #33210c;        /* чернила: рамка, тень, текст */
+  --pp-brown: #8a6b4e;      /* бурый пунктир между строками */
+  --pp-label: #75573b;      /* подпись мелко */
+  --pp-rust: #8a3b22;       /* шапка капсом */
+  --pp-money: #1f7a2e;      /* деньги «плюс» на бумаге, зелёная печать */
+  --pp-red: #d9342c;        /* штамп, «минус», красная печать */
+  /* яркие акценты — смело */
+  --pp-yellow: #ffd85e;     /* стикер Толика, фокус, монетки */
+  --pp-orange: #ff8a2b;     /* акцент, стикер */
+  --pp-pink: #ff5fa2;       /* стикер, конфетти, печать «рекорд» */
+  --pp-lime: #4fd65a;       /* яркий зелёный: конфетти, блеск денег */
+  --pp-fire: #f0522a;       /* оранжево-красный игры: штамп при наведении */
+  --pp-hole: rgba(20, 16, 30, .85);   /* дырочки перфорации */
+  --pp-dim: radial-gradient(ellipse at 50% 45%, rgba(255, 138, 43, .22), rgba(40, 14, 24, .7) 70%);   /* тёплое затемнение города */
+  --pp-perf: radial-gradient(circle at 6px 4px, var(--pp-hole) 3px, transparent 3.5px) 0 0 / 16px 8px repeat-x;
+  --pp-spring: cubic-bezier(.2, 1.6, .45, 1);
+  --pp-fs-s: clamp(11px, .95vw, 14px);
+  --pp-fs-m: clamp(12px, 1.15vw, 17px);
+  --pp-fs-l: clamp(16px, 1.9vw, 28px);
+}
+/* телефон: мельче, но не меньше 10 px */
+body.touch { --pp-fs-s: 10px; --pp-fs-m: clamp(10px, 2.9vw, 13px); --pp-fs-l: clamp(16px, 5vw, 24px); }
+
+/* ── стол: город под листом, тёплое затемнение, лист по центру ── */
+.pp-desk { position: absolute; inset: 0; z-index: 40; display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+           align-content: center; gap: clamp(12px, 2.4vw, 32px); padding: clamp(12px, 3vh, 36px) 16px; overflow: auto;
+           background: var(--pp-dim); font-family: "Press Start 2P", ui-monospace, monospace; color: var(--pp-ink); }
+.pp-desk[hidden] { display: none; }
+
+/* ── лист бумаги: рамка 3 px, жёсткая тень (лежит на столе), перфорация точками сверху и снизу ── */
+.pp-sheet, .pp-receipt {
+  position: relative; box-sizing: border-box; width: min(640px, 100%); padding: clamp(10px, 1.6vh, 20px) clamp(14px, 2.2vw, 28px) clamp(14px, 2.4vh, 26px);
+  color: var(--pp-ink); background: var(--pp-paper); font-size: var(--pp-fs-m); line-height: 1.5;
+  rotate: var(--pp-tilt, 0deg); translate: 0 0; transition: translate .18s var(--pp-spring), box-shadow .18s ease-out;
+}
+.pp-sheet { border: 3px solid var(--pp-ink); border-radius: 4px; box-shadow: 0 8px 0 var(--pp-ink), 0 24px 60px rgba(0, 0, 0, .5); }
+.pp-sheet::before, .pp-sheet::after, .pp-receipt::before { content: ''; position: absolute; left: 10px; right: 10px; height: 8px; pointer-events: none; background: var(--pp-perf); }
+.pp-sheet::before, .pp-receipt::before { top: -6px; }
+.pp-sheet::after { bottom: -6px; }
+.pp-tilt-l { --pp-tilt: -1.2deg; }
+.pp-tilt-r { --pp-tilt: 1.5deg; }
+
+/* ── чек: снизу зубчатый оторванный край; тень повторяет зубцы ── */
+.pp-receipt { width: min(540px, 100%); border: 3px solid var(--pp-ink); border-bottom: 0; border-radius: 3px 3px 0 0;
+              margin-bottom: 12px; filter: drop-shadow(0 6px 0 var(--pp-ink)); }
+.pp-receipt::after { content: ''; position: absolute; left: -3px; right: -3px; bottom: -12px; height: 12px; pointer-events: none;
+                     background: linear-gradient(-45deg, transparent 8px, var(--pp-paper) 0) 0 0 / 16px 12px repeat-x,
+                                 linear-gradient(45deg, transparent 8px, var(--pp-paper) 0) 0 0 / 16px 12px repeat-x; }
+
+/* ── шапка: капсом, ржавая, с разрядкой; справа номер чернилами; яркая полоска сверху ── */
+.pp-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0 0 .5em; padding: .9em 0 .6em;
+           border-bottom: 2px dashed var(--pp-brown); color: var(--pp-rust); font-size: var(--pp-fs-m); text-transform: uppercase; letter-spacing: .08em;
+           box-shadow: 0 -5px 0 -1px var(--pp-accent, var(--pp-orange)); }
+.pp-head > b, .pp-head > span + span { flex: none; font-weight: normal; color: var(--pp-ink); letter-spacing: .04em; }
+
+/* ── строка «подпись ··· значение» ── */
+.pp-row { display: flex; align-items: baseline; gap: .6em; margin: 0; padding: .45em 0; font-size: var(--pp-fs-m); }
+.pp-row > span, .pp-label { color: var(--pp-label); font-size: var(--pp-fs-s); }
+.pp-row > i { flex: 1; min-width: 1em; border-bottom: 2px dotted var(--pp-brown); opacity: .7; transform: translateY(-.3em); }
+.pp-row > b { font-weight: normal; color: var(--pp-ink); white-space: nowrap; }
+.pp-row + .pp-row { border-top: 1px dashed rgba(138, 107, 78, .45); }
+.pp-row.pp-total { margin-top: .4em; padding-top: .7em; border-top: 3px double var(--pp-brown); }
+.pp-row.pp-total > span { color: var(--pp-ink); font-size: var(--pp-fs-m); text-transform: uppercase; letter-spacing: .06em; }
+.pp-row.pp-total > b, .pp-big { font-size: var(--pp-fs-l); line-height: 1.2; }
+.pp-hint { margin: .6em 0 0; font-size: var(--pp-fs-s); line-height: 1.7; color: var(--pp-label); }
+
+/* ── деньги и маркер ── */
+.pp-plus, .pp-row > b.pp-plus { color: var(--pp-money); }
+.pp-minus, .pp-row > b.pp-minus { color: var(--pp-red); }
+.pp-mark { padding: 0 .25em; background: linear-gradient(transparent 12%, var(--pp-mark-c, var(--pp-yellow)) 12% 88%, transparent 88%);
+           box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.pp-mark.pp-pinkmark { --pp-mark-c: color-mix(in srgb, var(--pp-pink) 55%, var(--pp-paper)); }
+
+/* ── значок кнопки (glyphs.js keyHTML): геймпад — кружок, клавиатура — клавиша, касание — нет ── */
+.pp-key { display: inline-flex; align-items: center; justify-content: center; flex: none; box-sizing: border-box;
+          min-width: 2em; height: 2em; padding: 0 .4em; margin-right: .7em; vertical-align: middle;
+          font: inherit; font-size: var(--pp-fs-s); line-height: 1; letter-spacing: 0; text-shadow: none;
+          color: var(--pp-paper); background: var(--pp-ink); border: 2px solid var(--pp-ink); border-radius: 999px; box-shadow: 0 2px 0 var(--pp-ink); }
+.pp-key.pp-key-kb { border-radius: 4px; box-shadow: inset 0 -3px 0 rgba(255, 243, 214, .25), 0 2px 0 var(--pp-ink); }
+.pp-key:empty { display: none; }
+.pp-key[data-pp-key="y"] { color: var(--pp-ink); background: var(--pp-yellow); }
+.pp-key[data-pp-key="x"] { color: var(--pp-ink); background: var(--pp-pink); }
+.pp-key[data-pp-key="lb"], .pp-key[data-pp-key="rb"] { color: var(--pp-ink); background: var(--pp-orange); }
+
+/* ── кнопка-штамп: главное действие листа, красная, наклон −1°, значок [A]; вдавливается и отпружинивает ── */
+.pp-stamp { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; margin: 1em 0 0; padding: clamp(12px, 2.2vh, 22px) 10px;
+            font: inherit; font-size: var(--pp-fs-l); line-height: 1.3; letter-spacing: .08em; text-transform: uppercase; color: var(--pp-paper); cursor: pointer;
+            background: var(--pp-red); border: 4px solid var(--pp-ink); border-radius: 8px; box-shadow: 0 6px 0 var(--pp-ink), inset 0 -6px 0 rgba(0, 0, 0, .14);
+            text-shadow: 3px 3px 0 var(--pp-ink); rotate: -1deg; transition: translate .22s var(--pp-spring), box-shadow .22s var(--pp-spring), background .12s; }
+.pp-stamp .pp-key { font-size: var(--pp-fs-m); color: var(--pp-red); background: var(--pp-paper); }
+.pp-stamp:hover { background: var(--pp-fire); }
+.pp-stamp:active, .pp-stamp.pp-down { translate: 0 5px; box-shadow: 0 1px 0 var(--pp-ink), inset 0 -2px 0 rgba(0, 0, 0, .14); transition-duration: .05s; }
+.pp-stamp:disabled { filter: grayscale(.7); opacity: .6; cursor: default; }
+/* пыль от шлепка (paperfx.js slam): кольцо клякс расходится и тает */
+.pp-stamp.pp-dust::after { content: ''; position: absolute; inset: -10px; border-radius: 14px; pointer-events: none;
+            background: radial-gradient(circle at 8% 50%, rgba(51, 33, 12, .35) 5px, transparent 6px), radial-gradient(circle at 92% 40%, rgba(51, 33, 12, .3) 6px, transparent 7px),
+                        radial-gradient(circle at 30% 105%, rgba(51, 33, 12, .3) 4px, transparent 5px), radial-gradient(circle at 70% -5%, rgba(51, 33, 12, .3) 5px, transparent 6px);
+            animation: pp-dust .5s ease-out both; }
+
+/* ── пометки на полях: второстепенное действие — бумажный ярлычок со значком ── */
+.pp-margin { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 14px; width: min(640px, 100%); }
+.pp-note { display: inline-flex; align-items: center; padding: .7em 1em; font: inherit; font-size: var(--pp-fs-m); color: var(--pp-ink); cursor: pointer;
+           background: var(--pp-paper); border: 2px dashed var(--pp-brown); border-radius: 3px; box-shadow: 0 4px 0 rgba(51, 33, 12, .6);
+           transition: translate .22s var(--pp-spring), box-shadow .22s var(--pp-spring); }
+.pp-note:hover { border-style: solid; border-color: var(--pp-ink); translate: 0 -2px; }
+.pp-note:active, .pp-note.pp-down { translate: 0 3px; box-shadow: 0 1px 0 rgba(51, 33, 12, .6); transition-duration: .05s; }
+.pp-note.pp-red { color: var(--pp-red); }
+
+/* ── печать итога: наклон −8…−12°, хлопает с отскоком; чернила поверх текста (multiply).
+   Место — переменными --pp-seal-top / --pp-seal-right / --pp-seal-rot или .pp-seal-inline (своя строка в листе) ── */
+.pp-seal { position: absolute; z-index: 3; top: var(--pp-seal-top, 18%); right: var(--pp-seal-right, 6%); pointer-events: none;
+           --pp-seal-c: var(--pp-red); rotate: var(--pp-seal-rot, -10deg);
+           padding: .3em .7em .2em; font-size: var(--pp-fs-l); line-height: 1; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap;
+           color: var(--pp-seal-c); border: 4px solid var(--pp-seal-c); border-radius: 6px; background: transparent; opacity: .9; mix-blend-mode: multiply;
+           box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--pp-seal-c) 35%, transparent);
+           animation: pp-pop .5s var(--pp-spring) var(--pp-delay, 0s) both; }
+.pp-seal-inline { position: relative; top: auto; right: auto; display: table; margin: .9em auto .1em; }
+.pp-seal-red { --pp-seal-c: var(--pp-red); }
+.pp-seal-green { --pp-seal-c: var(--pp-money); }
+.pp-seal-rust { --pp-seal-c: var(--pp-rust); }
+.pp-seal-pink { --pp-seal-c: #e0287a; }
+
+/* ── стикер Толика: жёлтая записка на скотче, с полароидом; одинаковый везде; в покое не шевелится ── */
+.pp-sticker { position: relative; box-sizing: border-box; display: flex; align-items: flex-start; gap: .9em; width: min(330px, 100%);
+              padding: 1.3em 1em 1em; color: var(--pp-ink); background: var(--pp-sticker-c, var(--pp-yellow)); font-size: var(--pp-fs-m); line-height: 1.6;
+              box-shadow: 0 5px 0 rgba(51, 33, 12, .75), 0 10px 22px rgba(0, 0, 0, .3); rotate: var(--pp-tilt, 2deg);
+              transform-origin: 50% 0; }
+.pp-sticker.pp-pink { --pp-sticker-c: var(--pp-pink); }
+.pp-sticker.pp-orange { --pp-sticker-c: var(--pp-orange); }
+.pp-sticker::before { content: ''; position: absolute; top: -10px; left: 50%; width: 76px; height: 20px; translate: -50% 0; rotate: -4deg;
+                      background: rgba(255, 243, 214, .55); border: 1px solid rgba(138, 107, 78, .35); }
+.pp-sticker > p { margin: 0; }
+.pp-sticker .pp-label { display: block; margin-bottom: .3em; color: var(--pp-rust); text-transform: uppercase; letter-spacing: .06em; }
+.pp-sticker .pp-polaroid { rotate: 0deg; }   /* стикер уже наклонён — второй наклон лишний (правило 6) */
+
+/* ── полароид: белая рамка, низ шире, чуть наискосок ── */
+.pp-polaroid { flex: none; display: block; box-sizing: content-box; width: clamp(56px, 6vw, 96px); height: clamp(56px, 6vw, 96px);
+               object-fit: cover; background: var(--pp-orange); border: 5px solid #fff; border-bottom-width: 14px; border-radius: 2px;
+               box-shadow: 0 3px 8px rgba(51, 33, 12, .35); rotate: -3deg; image-rendering: pixelated; }
+
+/* ── фокус геймпада: толстая чернильно-жёлтая обводка; при переходе — один раз «приподнялся» (.2 с); лист с фокусом приподнят ── */
+:is(.pp-stamp, .pp-note, .pp-sheet, .pp-receipt, .pp-desk) :is(.padsel, .pp-focus), .pp-stamp.padsel, .pp-note.padsel, .pp-focus {
+  outline: 4px solid var(--pp-ink) !important; outline-offset: 3px;
+  box-shadow: 0 0 0 9px var(--pp-yellow), 0 6px 0 var(--pp-ink) !important;
+  transform: none; scale: 1.03; position: relative; z-index: 2; animation: pp-lift .2s var(--pp-spring);
+}
+.pp-stamp:focus-visible, .pp-note:focus-visible { outline: 4px solid var(--pp-ink); outline-offset: 3px; box-shadow: 0 0 0 9px var(--pp-yellow); }
+:is(.pp-sheet, .pp-receipt):has(.padsel, .pp-focus) { translate: 0 -4px; }
+.pp-sheet:has(.padsel, .pp-focus) { box-shadow: 0 12px 0 var(--pp-ink), 0 30px 70px rgba(0, 0, 0, .55); }
+.pp-receipt:has(.padsel, .pp-focus) { filter: drop-shadow(0 10px 0 var(--pp-ink)); }
+
+/* ── движение: классы ── */
+.pp-in { animation: pp-in .62s var(--pp-spring) var(--pp-delay, 0s) both; }             /* лист влетает снизу и пружинит */
+.pp-in-side { animation: pp-in-side .62s var(--pp-spring) var(--pp-delay, .25s) both; }   /* стикер прилетает сбоку */
+.pp-print { animation: pp-print .28s ease-out var(--pp-delay, 0s) both; }              /* строка допечатывается */
+.pp-shake { animation: pp-shake .32s linear both; }                                     /* стол вздрогнул от шлепка */
+.pp-slam { animation: pp-slam .42s var(--pp-spring) both; }                             /* штамп шлёпнул */
+.pp-tick { animation: pp-tick .09s ease-out; }                                          /* счётчик щёлкнул */
+.pp-burst { position: absolute; z-index: 60; width: 0; height: 0; pointer-events: none; }   /* монетки / конфетти (paperfx.js burst) */
+.pp-burst > i { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; background: var(--c, var(--pp-yellow)); border-radius: 2px;
+                animation: pp-fly var(--t, .9s) cubic-bezier(.15, .7, .35, 1) both; }
+.pp-burst > i.coin { width: 18px; height: 18px; left: -9px; top: -9px; border-radius: 50%; border: 2px solid var(--pp-ink);
+                     background: radial-gradient(circle at 35% 35%, #fff6b8, var(--pp-yellow) 45%, #d99a1e); }
+
+@keyframes pp-in { 0% { opacity: 0; transform: translateY(70vh) rotate(7deg) scale(.92); } 55% { opacity: 1; transform: translateY(-3%) rotate(-1.5deg) scale(1.01); }
+                   78% { transform: translateY(1%) rotate(.6deg); } 100% { transform: none; } }
+@keyframes pp-in-side { 0% { opacity: 0; transform: translateX(60vw) rotate(18deg); } 60% { opacity: 1; transform: translateX(-4%) rotate(-3deg); } 100% { transform: none; } }
+@keyframes pp-print { from { opacity: 0; transform: translateY(-.5em); clip-path: inset(0 100% 0 0); } to { opacity: 1; transform: none; clip-path: inset(0 0 0 0); } }
+@keyframes pp-pop { 0% { opacity: 0; scale: 2.4; } 45% { opacity: .95; scale: .88; } 70% { scale: 1.07; } 100% { scale: 1; } }
+@keyframes pp-slam { 0% { scale: 1.35; } 35% { scale: .9; } 65% { scale: 1.05; } 100% { scale: 1; } }
+@keyframes pp-shake { 0%, 100% { transform: none; } 20% { transform: translate(-4px, 3px) rotate(-.4deg); } 40% { transform: translate(4px, -2px) rotate(.3deg); }
+                      60% { transform: translate(-3px, 1px); } 80% { transform: translate(2px, -1px); } }
+@keyframes pp-dust { from { opacity: 1; scale: .85; } to { opacity: 0; scale: 1.35; } }
+@keyframes pp-lift { 0% { scale: 1; translate: 0 0; } 60% { scale: 1.06; translate: 0 -3px; } 100% { scale: 1.03; translate: 0 0; } }
+@keyframes pp-fade { from { opacity: 0; } }
+@keyframes pp-tick { 50% { transform: translateY(-2px) scale(1.12); filter: brightness(1.25); } }
+@keyframes pp-fly { 0% { opacity: 1; transform: translate(0, 0) rotate(0) scale(.6); }
+                    70% { opacity: 1; }
+                    100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--r)) scale(1); } }
+
+/* ── езда: тихо. Одно короткое проявление, без пружин, тряски, пыли, конфетти и монеток ── */
+.pp-ride :is(.pp-in, .pp-in-side, .pp-print, .pp-seal, .pp-slam, .pp-tick), :is(.pp-in, .pp-in-side, .pp-print, .pp-seal, .pp-slam).pp-ride {
+  animation: pp-fade .18s ease-out both !important; }
+.pp-ride .pp-shake, .pp-shake.pp-ride, .pp-ride .pp-stamp.pp-dust::after, .pp-ride .padsel { animation: none !important; }
+.pp-ride .pp-burst, .pp-burst.pp-ride { display: none; }
+
+/* ── меньше движения: коротко, без тряски и конфетти ── */
+@media (prefers-reduced-motion: reduce) {
+  .pp-desk *, .pp-desk { animation-duration: .15s !important; }
+  .pp-shake, .pp-desk .padsel, .pp-stamp.pp-dust::after { animation: none !important; }
+  .pp-burst { display: none; }
+}
+body.calm-fx .pp-desk *, body.calm-fx .pp-desk { animation-duration: .15s !important; }
+body.calm-fx .pp-shake, body.calm-fx .pp-desk .padsel, body.calm-fx .pp-stamp.pp-dust::after { animation: none !important; }
+body.calm-fx .pp-burst { display: none; }

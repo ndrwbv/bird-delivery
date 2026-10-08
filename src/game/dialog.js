@@ -14,9 +14,13 @@
        fillers: true,                  // вставлять «ну» и «э-э» (для катсцен можно false)
        timer: 8,                       // секунд на ответ после того, как договорил (полоска)
        timeoutText: t('ну лан (('),    // не успел — он это говорит и уходит
-       meters: [{ name, v, p, color }] // полоски под текстом (Дядя Женя: мотор и ресурс), p — 0…1
+       meters: [{ name, v, p, color }], // полоски под текстом (Дядя Женя: мотор и ресурс), p — 0…1
+       plain: true,                    // обе кнопки одного вида (приглашение клиентки: оба ответа — отказы)
      });                               // → true (принял) / false (отказался) / null (не успел)
    Очередь: несколько say подряд показываются по одному.
+   На кнопках — значок, что жать: [A] / [B] на геймпаде, Enter / Esc на клавиатуре, на тач-экране без
+   значков. Подсветка геймпада от простоя не гаснет (гасят мышь и клавиши, padmenu.js padLit); если её
+   не было, первое ←→↑↓ только зажигает её (A без подсветки — «принять»).
 
    Реплика на ходу (события посреди езды — вместо плашки сверху экрана, docs/CAREER.md «Реплики на ходу»):
      DLG.line({ person, name, text, color })   // → Promise, когда ушла
@@ -28,6 +32,11 @@
 import './dialog.css';
 import { t } from '../i18n/index.js';
 import { pad as PAD } from '../input/gamepad.js';
+import { padLit } from '../input/padmenu.js';
+import { keyHTML, refreshKeys } from '../input/glyphs.js';
+
+/* значок кнопки — общий .pp-key (glyphs.js keyHTML, paper.css): геймпад — A / B (PlayStation — ✕ / ○),
+   клавиатура — Enter / Esc, касание — без значка; меняется сам, когда игрок сменил ввод */
 
 const N_ = s => s;
 const FILL = /*i18n*/ [N_('ну'), N_('э-э'), N_('короче'), N_('как бы'), N_('это самое'), N_('в общем'), N_('слушай')];
@@ -55,7 +64,9 @@ function build () {
   root.innerHTML = '<div class="dlg-box"><div class="dlg-bar"></div><div class="dlg-row">' +
     '<div class="dlg-head"><img alt=""><b class="dlg-name"></b></div>' +
     '<div class="dlg-bubble"><p class="dlg-text"></p><div class="dlg-meters"></div><span class="dlg-skip"></span></div></div>' +
-    '<div class="dlg-timer"><i></i></div><div class="dlg-btns"><button type="button" class="dlg-no"></button><button type="button" class="dlg-yes"></button></div></div>';
+    '<div class="dlg-timer"><i></i></div><div class="dlg-btns">' +
+    '<button type="button" class="dlg-no">' + keyHTML('back') + '<span></span></button>' +
+    '<button type="button" class="dlg-yes">' + keyHTML('ok') + '<span></span></button></div></div>';
   (document.getElementById('game') || document.body).appendChild(root);
 }
 
@@ -94,10 +105,13 @@ function show (o, done) {
   img.hidden = !img.src;
   $('.dlg-name').textContent = o.name || '';
   const yes = $('.dlg-yes'), no = $('.dlg-no');
-  yes.textContent = o.accept || t('дальше');
-  no.textContent = o.decline || '';
+  yes.querySelector('span').textContent = o.accept || t('дальше');
+  no.querySelector('span').textContent = o.decline || '';
   no.hidden = !two;
   $('.dlg-btns').classList.remove('on');
+  $('.dlg-btns').classList.toggle('plain', !!o.plain);
+  const glyphs = () => refreshKeys(root);           // значки [A]/[B] — по тому, чем сейчас играют (glyphs.js)
+  glyphs();
   $('.dlg-skip').textContent = t('пропустить ▸');
   const ms = Array.isArray(o.meters) ? o.meters : [], mel = $('.dlg-meters'), esc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   mel.hidden = !ms.length;
@@ -110,6 +124,7 @@ function show (o, done) {
 
   let i = 0, typed = false, closed = false, raf = 0, last = performance.now(), acc = 0, padPrev = {};
   let pick = yes;                                // что нажмёт A: по умолчанию «принять»
+  let lit = false;                               // подсветка видна: первое ←→↑↓ без неё только будит
   const mark = on => { yes.classList.toggle('padsel', on && pick === yes); no.classList.toggle('padsel', on && pick === no); };
   const CPS = o.cps || 38;                       // букв в секунду; на многоточии — пауза
   const bar = $('.dlg-timer'), barI = bar.querySelector('i');
@@ -156,11 +171,14 @@ function show (o, done) {
     last = now;
     // геймпад: A — пропустить / принять, B — отказаться
     // раскладку (Xbox, сырой Deck) разбирает input/gamepad.js
+    glyphs();
     if (PAD.connected) {
       const a = PAD.a, b = PAD.b;
-      if (two && typed && (PAD.menuLeft || PAD.menuUp)) pick = no;          // «отказаться» — слева
-      if (two && typed && (PAD.menuRight || PAD.menuDown)) pick = yes;
-      mark(PAD.active && typed && !waiting);
+      const on = padLit(PAD) && typed && !waiting;
+      if (on && lit && two && (PAD.menuLeft || PAD.menuUp)) pick = no;      // «отказаться» — слева
+      if (on && lit && two && (PAD.menuRight || PAD.menuDown)) pick = yes;
+      lit = on;
+      mark(on);
       if (a && !padPrev.a && !waiting) { if (!typed) finish(); else close(pick !== no); }
       if (b && !padPrev.b && typed && !waiting) close(two ? false : true);
       padPrev = { a, b };

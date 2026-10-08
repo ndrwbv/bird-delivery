@@ -423,12 +423,7 @@ export function initSeasons (ctx) {
   C = ctx; THREE = ctx.THREE;
   const q = new URLSearchParams(location.search).get('season');
   if (q !== null && q !== '' && !Number.isNaN(+q)) { SEA = wrap(+q); FORCED = true; }
-  else {
-    const saved = C.Store.get('dlv-season', null);
-    // зашёл в игру — сезон чуть вперёд (сохранённый уже был: не первый запуск)
-    SEA = wrap((+saved || 0) + (saved === null || saved === undefined ? 0 : SEASON_ENTER));
-    C.Store.set('dlv-season', SEA);
-  }
+  else readSaved();
   PILE = Pile(); GARL = Pile(); DRIFTP = Pile(); LEAFP = Pile();
   smashMat(C.SMASH_MAT);
   apply();
@@ -444,6 +439,14 @@ export function advanceSeason () {
 }
 /* forced — дальше не сдвигать (песочница, ?season=). Быстрый заезд (quickrun.js) ставит свой сезон
    и потом возвращает прежний с прежним forced — сохранение не трогается */
+function readSaved () {
+  const saved = C.Store.get('dlv-season', null);
+  // зашёл в игру — сезон чуть вперёд (сохранённый уже был: не первый запуск)
+  SEA = wrap((+saved || 0) + (saved === null || saved === undefined ? 0 : SEASON_ENTER));
+  C.Store.set('dlv-season', SEA);
+}
+/** сменили профиль без перезагрузки (game.js reprofile): сезон — сохранённый у нового профиля (как при входе в игру) */
+export function reloadSaved () { if (!C || FORCED) return; readSaved(); apply(); }
 export function setSeason (v, forced = true) { SEA = wrap(+v); FORCED = !!forced; apply(); }
 export const seasonForced = () => FORCED;
 function wrap (v) { return Math.round(((v % 4) + 4) % 4 * 1000) / 1000 % 4; }
