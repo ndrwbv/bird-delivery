@@ -54,6 +54,7 @@ const WHY_TEXT = {
   passCrew: N_('проехал мимо — своих били'),
   noDefend: N_('не помог отбиться'),
   marcher: N_('сбил митингующего'),
+  chat: N_('поболтал с клиентом'),
 };
 export const whyText = why => (WHY_TEXT[why] ? t(WHY_TEXT[why]) : '');
 

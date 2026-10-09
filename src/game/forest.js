@@ -36,6 +36,7 @@ import * as THREE from '../vendor/three.module.min.js';
 import { snowAmt } from './seasons.js';
 import * as FADEJS from './fade.js';
 import { wet } from './streams.js';             // речки и пруды — без ёлок (streams.js)
+import * as EDL from './editlayer.js';          // редактор города: убранные ели, сосны и кусты (edits.json, вид forest)
 
 export const FOREST = {
   MIN: 30000, CELL: 48, SPACE: 5, JIT: 0.8,
@@ -230,6 +231,13 @@ function buildCell (i, j) {
   }
   const lots = LOTS.filter(l => l.x1 > x0 && l.x0 < x1 && l.z1 > z0 && l.z0 < z1);
   const sp = [], pi = [], bu = [];
+  // в клетку — если автор не убрал (редактор: ещё и список «что стоит» — для выбора и «убрать в круге»)
+  const keepT = (list, sub, t) => {
+    if (EDL.gone('forest', t[0], t[2])) return false;
+    list.push(t);
+    if (EDL.ED.on) (cell.ed || (cell.ed = [])).push({ sub, x: t[0], z: t[2], h: t[5] });
+    return true;
+  };
   const edgeD = (x, z) => {
     let e = F.EDGE;
     for (let k = 0; k < segs.length; k += 4) {
@@ -267,24 +275,23 @@ function buildCell (i, j) {
       gs += y; gn++;
       const rank = r();
       // опушка: реже, ниже, больше кустов и молодых ёлок
-      if (r() < 0.38 * (1 - k)) { if (r() < 0.6) bu.push([x, y, z, r() * 6.3, 0.9 + r() * 1.1, 0.6 + r() * 0.7, 0.8 + r() * 0.4, rank]); continue; }
+      // убранное в редакторе (EDL.gone, вид forest) — жребий тянем тот же, а в клетку не кладём: соседи те же
+      if (r() < 0.38 * (1 - k)) { if (r() < 0.6) keepT(bu, 'bush', [x, y, z, r() * 6.3, 0.9 + r() * 1.1, 0.6 + r() * 0.7, 0.8 + r() * 0.4, rank]); continue; }
       const grow = 0.34 + 0.66 * k;
       if (r() < (k > 0.7 ? 0.3 : 0.12)) {
         const H = (14 + r() * 6) * grow;
-        pi.push([x, y, z, r() * 6.3, H, H, 0.85 + r() * 0.3, rank]);
-        if (H > F.SOLID_H) cell.sol.push(x, z);
+        if (keepT(pi, 'pine', [x, y, z, r() * 6.3, H, H, 0.85 + r() * 0.3, rank]) && H > F.SOLID_H) cell.sol.push(x, z);
       } else {
         const H = (10 + r() * 7) * grow, w = H * (0.85 + r() * 0.35);
-        sp.push([x, y, z, r() * 6.3, w, H, 0.82 + r() * 0.36, rank]);
-        if (H > F.SOLID_H) cell.sol.push(x, z);
+        if (keepT(sp, 'spruce', [x, y, z, r() * 6.3, w, H, 0.82 + r() * 0.36, rank]) && H > F.SOLID_H) cell.sol.push(x, z);
       }
       // подлесок: куст или молодая ёлка рядом
       if (r() < 0.12 + 0.5 * (1 - k)) {
         const a = r() * 6.3, d = 1.6 + r() * 1.2, bx = x + Math.cos(a) * d, bz = z + Math.sin(a) * d;
         if (okAt(bx, bz, 0.6) >= 0 && !(f.hole && f.hole(bx, bz, 0.8))) {
           const by = A.groundH(bx, bz);
-          if (r() < 0.55) bu.push([bx, by, bz, r() * 6.3, 0.8 + r() * 1.0, 0.5 + r() * 0.7, 0.75 + r() * 0.45, r()]);
-          else { const H = 1.5 + r() * 2; sp.push([bx, by, bz, r() * 6.3, H, H, 0.95 + r() * 0.3, r()]); }
+          if (r() < 0.55) keepT(bu, 'bush', [bx, by, bz, r() * 6.3, 0.8 + r() * 1.0, 0.5 + r() * 0.7, 0.75 + r() * 0.45, r()]);
+          else { const H = 1.5 + r() * 2; keepT(sp, 'spruce', [bx, by, bz, r() * 6.3, H, H, 0.95 + r() * 0.3, r()]); }
         }
       }
     }
@@ -403,6 +410,7 @@ function refresh (cam) {
    solidAt(x, z, r), onAlley(x, z, m), yardBlocks(x, z, r), pzBlocks(x, z, m) */
 export function init (api) {
   A = api;
+  EDL.provide('forest', EDP);
   forests();
   if (!FORESTS.length) return api;
   makeMeshes();
@@ -454,6 +462,43 @@ export function step (dt, api) {
     }
   }
 }
+
+/* ── редактор города (editlayer.js): что стоит у точки, пересобрать клетки с новым списком «убрать» ── */
+const cellsAround = (x, z, r, fn) => {
+  const C = FOREST.CELL;
+  for (let i = Math.floor((x - r) / C); i <= Math.floor((x + r) / C); i++)
+    for (let j = Math.floor((z - r) / C); j <= Math.floor((z + r) / C); j++) fn(i, j, CELLS.get(key(i, j)));
+};
+const EDP = {
+  list (x, z, r) {
+    const out = [];
+    cellsAround(x, z, r, (i, j, c) => { for (const t of (c && c.ed) || []) if (Math.hypot(t.x - x, t.z - z) <= r) out.push(t); });
+    return out;
+  },
+  refresh (x, z, r = 1) {
+    if (!A || !FORESTS || !FORESTS.length) return;
+    const redo = (k, c) => { dropCell(k, c); buildCell(c.i, c.j); };
+    if (x === undefined) { for (const [k, c] of [...CELLS]) if (!c.empty) redo(k, c); }
+    else cellsAround(x, z, r, (i, j, c) => { if (c && !c.empty) redo(key(i, j), c); });
+    LAST.n = -1e9;                                       // в меши — в следующем кадре
+  },
+  /* клетка у точки собрана (для npm run check: убранное ищут в собранной клетке) */
+  warm (x, z) {
+    if (!A || !FORESTS || !FORESTS.length) return;
+    const C = FOREST.CELL, i = Math.floor(x / C), j = Math.floor(z / C);
+    if (!CELLS.has(key(i, j))) buildCell(i, j);
+  },
+  /* стоит ли тут дерево ельника (r — радиус) — клетку собирает, если надо */
+  has (x, z, r) {
+    EDP.warm(x, z);
+    let n = 0;
+    cellsAround(x, z, r, (i, j, c) => {
+      if (!c || c.empty) return;
+      for (const P of [c.sp, c.pi, c.bu]) if (P) for (let q = 0; q < P.n; q++) if (Math.hypot(P.m[q * 16 + 12] - x, P.m[q * 16 + 14] - z) <= r) n++;
+    });
+    return n;
+  },
+};
 
 /* стволы рядом с точкой — машина в них упирается (game.js: столкновения кузова) */
 const T_LIST = [];

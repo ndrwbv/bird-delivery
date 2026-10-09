@@ -375,7 +375,7 @@ ipcMain.handle('log:open', async () => { try { fs.mkdirSync(LOG_DIR(), { recursi
 function videoDir(folder) {
   let base = '';
   try { base = app.getPath('videos'); } catch (e) { base = path.join(app.getPath('home'), 'Videos'); }
-  const name = String(folder || TITLE).replace(/[\\/:*?"<>|\x00-\x1f]/g, '').trim().slice(0, 60) || TITLE;
+  const name = String(folder || TITLE).replace(/[\\/:*?"<>|\x00-\x1f]/g, '').replace(/^[.\s]+/, '').trim().slice(0, 60) || TITLE;   // «..» — не выше папки видео
   return path.join(base, name);
 }
 ipcMain.handle('video:save', async (e, data, folder, name) => {

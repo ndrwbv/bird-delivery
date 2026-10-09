@@ -13,6 +13,7 @@
 | `night` | смена ночью: когда стемнело (по часам игры ~23:30—5:45; закат и рассвет — ещё день) | играет `day` |
 | `tense` | налёт на точку, восстание, мафиози, погоня, ураган; держится ещё 6 с после | играет день / ночь |
 | `shiftend` | чек конца смены | играет `menu` |
+| `radio-disco`, `radio-retro`, `radio-night` | смена с радио (по умолчанию радио вкл): станция, которую выбрал игрок; `day` / `night` тогда не играют — только у станции без файлов и при «радио в машине: выкл» | играет `day` / `night` |
 
 - **Переходы** плавные: старый трек гаснет, новый вступает за **2,5 с** (меню → смена, день → ночь, смена → чек).
 - **Тише:** катсцена — до 35 %, диалог — до 50 %, Толик пишет (печатает или сообщение крупно) — до 75 %,
@@ -65,6 +66,29 @@ Suno не пустит запрос или молча выкинет имя. О�
 | `tense.mp3` | налёт, погоня, ураган: быстро, тревожно, но **смешно**, как погоня в мультике | `Tense 80s Soviet action synth, instrumental, 140 BPM, urgent arpeggiated bass, punchy drums, stabbing brass synths, comic chase, chiptune alarm beeps, cartoon danger` | 1,5—3 мин | вкл |
 | `shiftend.mp3` | чек смены: «смена окончена, молодец!» — короткий победный джингл | `Triumphant 80s Soviet VIA estrada jingle, 112 BPM, electric organ, brass section, bouncy bass, wordless la-la choir, victory after a hard shift, warm, short` | 30—60 с (обрезать) | **выкл** — в Lyrics: `[Intro] [Chorus] la la la, pa-pa-pa-pa, la la la la [Outro]`; без вокализа — вкл |
 
+### Радио в машине (М6)
+
+В смене вместо `day` / `night` играет **станция радио** (правила — [CAREER.md](CAREER.md) «Радио в машине»;
+переключают клавишей F или крестовиной ↓). У каждой станции — свои файлы с префиксом `radio-<станция>-`,
+номер — через дефис, играют по очереди, как варианты дня. **Нет файлов станции — она играет `day` / `night`**,
+поэтому радио можно наполнять постепенно. **Для станции лучше 4—6 треков** (её слушают всю смену подряд);
+между песнями ведущий говорит текстом, поэтому трекам можно **кончаться обычным концом** (затухание в
+2—3 с — нормально, длинная тишина — обрезать).
+
+| файлы | станция | что за музыка | Style (вставить в Suno) | длина | Instrumental |
+|---|---|---|---|---|---|
+| `radio-disco-1.mp3` … `radio-disco-6.mp3` | **Солнечный FM** (101.7) | диско и поп 80-х: солнце, танцпол, улыбка | `80s Soviet disco pop, instrumental, 120 BPM, four-on-the-floor kick, octave synth bass, string synth stabs, funky rhythm guitar, bright synth lead, sunny dance floor, radio hit` | 2,5—4 мин | вкл |
+| | | второй вариант того же (для чередования) | `Euro disco 1985, instrumental, 126 BPM, sequenced bass, claps, glossy synth brass, catchy hook, cheerful, carefree summer radio` | 2,5—4 мин | вкл |
+| `radio-retro-1.mp3` … `radio-retro-6.mp3` | **Ретро-волна** (68.4) | ВИА и эстрада: орган, гитара, медь, танцы в доме культуры | `70s Soviet VIA estrada, instrumental, 118 BPM, electric organ, clean twangy guitar, warm bass, brass section, tambourine, vintage radio sound, nostalgic, dancing` | 2,5—4 мин | вкл |
+| | | второй вариант: медленнее, «белый танец» | `Soviet estrada ballad 1978, instrumental, 92 BPM, electric piano, soft strings, flute melody, gentle guitar, warm tape saturation, romantic, slow dance` | 2,5—4 мин | вкл |
+| `radio-night-1.mp3` … `radio-night-6.mp3` | **Ночной эфир** (88.8) | синтвейв: пустые проспекты, фонари, уют | `Soviet synthwave, instrumental, 96 BPM, warm analog pads, slow arpeggio, deep pulsing bass, soft gated snare, dreamy synth lead, empty city at night, calm` | 2,5—4 мин | вкл |
+| | | второй вариант: медленнее, почти эмбиент | `Late night 80s synth ambient, instrumental, 84 BPM, lush pads, gentle electric piano, slow bassline, tape echo, starry sky over sleeping town, cozy, hypnotic` | 2,5—4 мин | вкл |
+
+Варианты — тот же Style ещё раз (Suno каждый раз делает новый трек) или чередовать два текста из таблицы.
+Те же правила, что выше: без голоса (Instrumental — вкл), без имён исполнителей, только на платном плане.
+Проверить имена — `npm run sfx:index`: внизу строки `radio-disco`, `radio-retro`, `radio-night` с файлами
+(«— нет (станция играет день / ночь)» — файлов этой станции пока нет).
+
 Ещё варианты дня / ночи — тот же текст ещё раз (выйдет другой трек) или поменять одно-два слова: темп
 (`118 BPM` ↔ `130 BPM`), инструмент (`funky guitar` → `slap bass`, `electric organ` → `accordion`), настроение
 (`sunny` → `carefree`).
@@ -88,7 +112,8 @@ Suno не пустит запрос или молча выкинет имя. О�
 ## Куда положить
 
 1. В Suno у трека «…» → **Download → MP3 Audio** (WAV — тоже можно, но в 10 раз больше).
-2. Переименовать по таблице: `menu.mp3`, `day-1.mp3`, `day-2.mp3`, `night-1.mp3`, `tense.mp3`, `shiftend.mp3`
+2. Переименовать по таблице: `menu.mp3`, `day-1.mp3`, `day-2.mp3`, `night-1.mp3`, `tense.mp3`, `shiftend.mp3`,
+   радио — `radio-disco-1.mp3`, `radio-retro-1.mp3`, `radio-night-1.mp3` …
    (маленькими буквами, без пробелов; номер — через дефис).
 3. Положить в папку **`public/music`** проекта.
 4. Проверить имена: **`npm run sfx:index`** — в конце список «музыка, public/music»: у каждого места —
@@ -96,7 +121,7 @@ Suno не пустит запрос или молча выкинет имя. О�
 5. Запустить игру (в dev — F5; сборка — пересобрать). Всё.
 
 Формат: **.mp3** (проще всего — как скачали) или **.ogg**; одно место — в одном формате (не класть
-`day-1.mp3` и `day-1.ogg` вместе — станут два варианта). Размер: ~4 МБ на 3 мин MP3; 8 треков — ~30 МБ,
+`day-1.mp3` и `day-1.ogg` вместе — станут два варианта). Размер: ~4 МБ на 3 мин MP3; 8 треков — ~30 МБ, с радио (3 станции × 4—6) — ~80—100 МБ,
 для Стима не страшно. Файлы играют потоком — в память целиком не грузятся.
 
 ## Стим: отметить ИИ
@@ -118,6 +143,11 @@ Suno не пустит запрос или молча выкинет имя. О�
   без расширения и без «-цифры».
 - Звук: `<audio>` → MediaElementSource → громкость трека (переход) → приглушение → шина «музыка» (ползунок)
   → общий регулятор (вкл / выкл; `?mute` — 0). С `?mute` звук выключен с самого начала — музыка не стартует.
+- Радио (`src/game/radio.js`): `music.js` спрашивает `radio.slot()` — `null` (радио нет: меню, чек, радио
+  выключено в настройках), `'off'` (станция «выкл» — тишина) или `'radio-<id>'`; у слота станции нет файлов —
+  запасной `day` / `night`. Новая песня — `radio.onSong()` (стык песен — время для ведущего). Отладка —
+  `__dlv.RADIO`: `state`, `STATS` (реплики, рубрики, стыки, журнал), `set(i)` (0—2, −1 — выкл), `next()`,
+  `say('call')` — реплика сейчас, `line('weather')` — собрать и не показывать, `count()` — фраз по рубрикам.
 - Отладка: `__dlv.Snd.MUS.state` (место, файл, громкость, приглушение), `STATS.log` (переходы),
   `STATS.errors`, `force('night')` — держать место; `force(null)` — снова по игре. Probe: `d.Snd.set(true)`
   нужен, чтобы музыка пошла (общий регулятор остаётся 0 — ничего не слышно).

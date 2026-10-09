@@ -301,6 +301,16 @@ function* buildSigns (A) {
   A.scene.add(SG.mesh);
 }
 
+/* редактор города (editlayer.js): знак убрали — таблички под землю (on), отменили — назад. Столб прячет он сам */
+export function unsign (it, on) {
+  const p = SG.poles.find(q => q.it === it);
+  if (!p || !SG.pos || !SG.pos.array) return;
+  const a = SG.pos.array;
+  if (on) { if (!p.edOrig) p.edOrig = a.slice(p.v0 * 3, (p.v0 + p.vn) * 3); for (let v = p.v0; v < p.v0 + p.vn; v++) a[v * 3 + 1] = -60; p.down = 1; }
+  else if (p.edOrig) { a.set(p.edOrig, p.v0 * 3); p.edOrig = null; p.down = 0; }
+  SG.pos.needsUpdate = true;
+}
+
 /* сбитый столб: табличку — под землю (столб прячет сама склейка сбиваемого) */
 function stepSigns (dt, A) {
   if (!SG.mesh || (SG.checkT -= dt) > 0) return;

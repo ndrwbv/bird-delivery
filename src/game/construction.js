@@ -530,7 +530,7 @@ function build1 (s, idx) {
     slateParts(g, px, A.groundH(px, pz), pz, ry + r, v);
     const it = A.smashAdd('bigfence', px, pz, 1.3, g, '#9aa0a2');
     it.cons = 'fence'; it.ry = ry + r; it.v = v;
-    it.onDown = onFenceDown;
+    it.onDown = onFenceDown; it.edOk = 1;          // edOk — редактор города может убрать секцию (editlayer.js)
     ITEMS.push(it);
     ST.sections++;
   };
@@ -556,7 +556,7 @@ function build1 (s, idx) {
     A.put(g, A.boxGeo(2.6, 1.9, 0.05), '#4f7a52', px, gyy + 1.1, pz, 0, rr, 0);
     A.put(g, A.boxGeo(2.6, 0.08, 0.1), '#2f4a32', px, gyy + 2.05, pz, 0, rr, 0);
     const it = A.smashAdd('fence', px, pz, 1.2, g, '#4f7a52');
-    it.onDown = saveOrig; ITEMS.push(it);
+    it.onDown = saveOrig; it.edOk = 1; ITEMS.push(it);
   }
   // ── стенд «паспорт объекта»: справа от ворот, снаружи, лицом к улице ──
   {
@@ -565,7 +565,7 @@ function build1 (s, idx) {
     for (const o of [-1.4, 1.4]) { const [qx, qz] = P(a + o, b + 0.05); A.put(g, A.boxGeo(0.12, 3.4, 0.12), '#4a4a50', qx, g0 + 1.7, qz, 0, ry, 0); }
     { const [qx, qz] = P(a, b + 0.08); A.put(g, A.boxGeo(3.3, 2.5, 0.08), '#5a5a60', qx, g0 + 2.1, qz, 0, ry, 0); }
     const it = A.smashAdd('sign', px, pz, 1.4, g, '#5a5a60');
-    it.onDown = saveOrig; ITEMS.push(it);
+    it.onDown = saveOrig; it.edOk = 1; ITEMS.push(it);
     // лицо — в общий меш стендов (вершины v0…v0+4)
     const fx = -nx, fz = -nz, ox = px + fx * 0.02, oz = pz + fz * 0.02;      // чуть перед доской
     const hw = 1.56, y0 = g0 + 0.95, y1 = g0 + 3.25;
@@ -999,7 +999,7 @@ export function* build (api) {
     A.scene.add(m);
     for (const s of STANDS) {
       const it = A.smashMesh('sign', s.x, s.z, 1.4, m, s.v0, 4, '#f4f2ec');
-      it.onDown = saveOrig; ITEMS.push(it);
+      it.onDown = saveOrig; it.edOk = 1; ITEMS.push(it);
     }
     PMESH_P = PMESH_UV = PMESH_I = null;
   }

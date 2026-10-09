@@ -1,0 +1,32 @@
+/* Радио в машине (radio.js, docs/CAREER.md «Радио в машине»): маленькая бумажная плашка слева внизу,
+   над радаром (не наезжает на тост и подсказки по центру). Станция — 2 с; ведущий — та же плашка с именем и текстом (4—8 с).
+   Стиль накладной (src/styles/paper.css), тихий режим для езды: без тряски, только въезд снизу. */
+#radio {
+  position: absolute; z-index: 8; left: 16px; bottom: calc(16px + min(148px, 22vw) + 12px);
+  box-sizing: border-box; width: max-content; max-width: min(340px, calc(100vw - 32px));
+  padding: 7px 10px 8px; font-family: "Press Start 2P", ui-monospace, monospace; font-size: var(--pp-fs-s, 11px); line-height: 1.6;
+  color: var(--pp-ink, #33210c); background: var(--pp-paper, #fff3d6);
+  border: 2px solid var(--pp-ink, #33210c); border-left: 5px solid var(--pp-orange, #ff8a2b); border-radius: 3px;
+  box-shadow: 0 3px 0 rgba(51, 33, 12, .7);
+  pointer-events: none; user-select: none;
+  opacity: 0; transform: translateY(10px) rotate(-.6deg); transition: opacity .22s, transform .22s;
+}
+#radio.on { opacity: 1; transform: translateY(0) rotate(-.6deg); }
+#radio .rd-h { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+#radio .rd-fq { font-weight: normal; padding: 2px 5px 1px; color: var(--pp-paper, #fff3d6); background: var(--pp-ink, #33210c); border-radius: 2px; }
+#radio .rd-st { color: var(--pp-rust, #8a3b22); text-transform: uppercase; letter-spacing: .04em; }
+#radio .rd-who { margin-top: 5px; color: var(--pp-label, #75573b); }
+#radio .rd-tx { margin-top: 3px; white-space: normal; }
+#radio [hidden] { display: none; }
+#radio.talk { border-left-color: var(--pp-yellow, #ffd85e); }
+
+/* телефон: внизу — палец-руль и кнопки, справа сверху — радар; плашка — слева сверху, под сердцами, до радара */
+body.touch #radio { left: max(10px, env(safe-area-inset-left)); bottom: auto; top: calc(max(10px, env(safe-area-inset-top)) + 40px);
+                    max-width: min(340px, calc(100vw - 96px - 36px)); transform: translateY(-6px); }
+body.touch #radio.on { transform: translateY(0); }
+/* телефон боком: сверху — кошелёк и часы; плашка — слева посередине, над пальцем-рулём */
+@media (max-height: 460px) { body.touch #radio { top: auto; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 104px); max-width: min(340px, 44vw); } }
+
+/* катсцена, накладная, пауза — не мешать */
+body.intro-cut #radio, body.brief #radio { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { #radio, #radio.on, body.touch #radio, body.touch #radio.on { transition: opacity .15s; transform: none; } }

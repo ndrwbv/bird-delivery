@@ -743,10 +743,14 @@ export function payStop (o, st, onTime, tier) {
   if (st.bumped) tip = 0;                                 // задел клиента машиной (game.js clientBump, ECON.CLIENT_HIT) — без чаевых
   // домофон (doorstep.js): с первого раза и быстро — +add; не успел, клиент спускался сам — минус cut из «за скорость» и чаевых
   const door = DOOR.payAdjust(st, fee, bonus, tip);
+  // разговор у двери (doorstep.js talkAdjust): поддержал — +add; поторопил / шутка не зашла — минус cut из чаевых
+  const talk = DOOR.talkAdjust(st, fee, tip);
   // из чего сложилась оплата — game.js покажет кучкой денег и чеком (popPay); сюжет — катсцена сама покажет награду
-  st.pay = { fee, bonus, tip, rich: rich && tip > 0, late: false, story: !!sp.story, doorAdd: door.add, doorCut: door.cut, doorMode: st.door ? st.door.mode : '' };
-  S.tips = (S.tips || 0) + bonus + tip + door.add - door.cut;   // чек смены: строка «чаевые и за скорость» (career.js; обнуляет startShift)
-  return fee + bonus + tip + door.add - door.cut;
+  st.pay = { fee, bonus, tip, rich: rich && tip > 0, late: false, story: !!sp.story, doorAdd: door.add, doorCut: door.cut, doorMode: st.door ? st.door.mode : '',
+    talkAdd: talk.add, talkCut: talk.cut, talkKind: talk.kind };
+  const extra = door.add - door.cut + talk.add - talk.cut;
+  S.tips = (S.tips || 0) + bonus + tip + extra;   // чек смены: строка «чаевые и за скорость» (career.js; обнуляет startShift)
+  return fee + bonus + tip + extra;
 }
 
 /* весь заказ отдан: сюжет, поручение */
@@ -768,7 +772,8 @@ export function delivered (o, st, onTime) {
     try { STORY.onDeliver(sp.story); } catch (e) { console.warn('[orders] STORY.onDeliver', e); }
   }
   if (sp.side) {
-    if (onTime && !S.ride && st.persons[0] && st.peds[0] && !st.peds[0].dead && DIRECTOR.can('errand') && offerSide(st.peds[0], st.persons[0])) return;
+    // после разговора у двери (doorstep.js) просьбу не задаёт — попросит следующий
+    if (onTime && !S.ride && !st.talk && st.persons[0] && st.peds[0] && !st.peds[0].dead && DIRECTOR.can('errand') && offerSide(st.peds[0], st.persons[0])) return;
     SH.sideOwed = true;                                   // не вышло — попросит следующий
   }
 }

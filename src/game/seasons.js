@@ -34,6 +34,7 @@
 import { t } from '../i18n/index.js';
 import { setPeopleSeason, redressHumans } from './people.js';
 import { growTree } from './trees.js';
+import * as EDL from './editlayer.js';         // редактор города: прятать убранные деревья на месте
 import { YARD, onYard } from './yards.js';   // дворовые дорожки: зимой протоптаны, сугробы мимо (yards.js)
 
 /* сколько смен длится каждый сезон: лето, осень, зима, весна (год — 32 смены). Лето длиннее (09.10.2026):
@@ -524,7 +525,12 @@ export function seasonTree (x, z, y, kind) {
     if (startViewBlocked(PZ, x, z, 3.5)) return false;              // не заслоняет стартовый кадр
   }
   BUILT.trees++;
-  return growTree({ P: PILE, T: tpls(), r: rngAt(x, z, 7), x, z, y, kind, seversk: C.MAP.id === 'seversk', DECID, SPRUCES, ground: (lx, lz) => C.groundH(lx, lz) + C.curbAt(lx, lz) });
+  // редактор города: где чьи куски склейки — чтобы «убрать» прятало дерево сразу (editlayer.js hideNow)
+  const rec = EDL.ED.on ? [] : null;
+  const P = rec ? { add (...a) { const q = PILE.add(...a); rec.push(q); return q; } } : PILE;
+  const out = growTree({ P, T: tpls(), r: rngAt(x, z, 7), x, z, y, kind, seversk: C.MAP.id === 'seversk', DECID, SPRUCES, ground: (lx, lz) => C.groundH(lx, lz) + C.curbAt(lx, lz) });
+  if (rec) EDL.edTree(x, z, rec);
+  return out;
 }
 
 /* ─────────────── двор: ледяные горки и снеговики (до smashBuild) ─────────────── */
@@ -864,7 +870,8 @@ export function* seasonSteps () {
   BUILT.bulbs = bulbs;
   yield 'garl2';
   BUILT.pile = PILE.tris(); BUILT.garl = GARL.tris();
-  MESH_PILE = yield* PILE.steps(pileMat());
+  MESH_PILE = yield* PILE.steps(pileMat(), EDL.ED.on);   // редактор: вершины деревьев — в памяти (прятать убранное на месте)
+  if (EDL.ED.on) EDL.PILE_OF.get = key => MESH_PILE.byKey.get(key);
   yield 'pile';
   MESH_GARL = yield* GARL.steps(garlandMat());
   yield 'garlmesh';

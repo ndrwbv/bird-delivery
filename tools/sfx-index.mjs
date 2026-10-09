@@ -68,10 +68,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.log('\nНЕИЗВЕСТНЫЕ имена — игра их не возьмёт (опечатка?):');
     for (const n of stray) console.log('  ' + n.padEnd(18) + idx[n].join(', '));
   }
-  // музыка: имена — те же правила (day-1.ogg → «day»), слоты — music.js SLOTS
-  const mus = sfxIndex(MUSIC_DIR), SLOTS = ['menu', 'day', 'night', 'tense', 'shiftend'];
+  // музыка: имена — те же правила (day-1.ogg → «day»), слоты — music.js SLOTS; радио — станции radio.js STATIONS
+  const mus = sfxIndex(MUSIC_DIR), SLOTS = ['menu', 'day', 'night', 'tense', 'shiftend', 'radio-disco', 'radio-retro', 'radio-night'];
   console.log('\nмузыка, public/music (docs/MUSIC.md):');
-  for (const n of SLOTS) console.log('  ' + n.padEnd(18) + (mus[n] ? mus[n].join(', ') : '— нет'));
+  for (const n of SLOTS) console.log('  ' + n.padEnd(18) + (mus[n] ? mus[n].join(', ') : n.startsWith('radio-') ? '— нет (станция играет день / ночь)' : '— нет'));
   const mStray = Object.keys(mus).filter(n => !SLOTS.includes(n));
   if (mStray.length) console.log('  НЕИЗВЕСТНЫЕ — игра их не возьмёт: ' + mStray.map(n => mus[n].join(', ')).join(', '));
 }

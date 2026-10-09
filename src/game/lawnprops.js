@@ -39,6 +39,7 @@ import * as GFX from './gfx.js';
 import { onPave, walkHalf } from './pave.js';
 import { wet } from './streams.js';             // речки и пруды — не газон (streams.js)
 import * as FADEJS from './fade.js';
+import * as EDL from './editlayer.js';          // редактор города: убранная мелочь (edits.json, вид lawn; ключ — место вещи)
 
 export const LAWN = {
   CELL: 40, STEP: 4, DROP: 120,
@@ -365,7 +366,8 @@ function inst (cell, k, x, y, z, ry, sx, sy, sz, hex, own = -1, rk = Math.random
 function item (cell, kind, pts, hex, o = {}) {
   const it = { kind, pts, hex, key: kind + ':' + Math.round(pts[0][0] * 10) + ':' + Math.round(pts[0][1] * 10), down: 0, hid: 0, ...o };
   it.x = pts[0][0]; it.z = pts[0][1];
-  if (DOWN.has(it.key)) { it.down = 1; cell.down++; }
+  if (EDL.gone('lawn', it.x, it.z)) it.ed = 1;           // убрана в редакторе города — не видна и не мешает, всегда
+  if (it.ed || DOWN.has(it.key)) { it.down = 1; cell.down++; }
   cell.items.push(it);
   return cell.items.length - 1;
 }
@@ -767,6 +769,7 @@ let DIRTY = true, T = 0;
 export function init (api) {
   if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('noprops')) return api;   // ?noprops — без мелочи на газоне (сравнить)
   A = api;
+  EDL.provide('lawn', EDP);
   indexAll();
   makeMeshes();
   return api;
@@ -860,7 +863,7 @@ export function boom (x, z, r) {
 /* новая смена — всё стоит снова */
 export function reset () {
   DOWN.clear(); ST.down = 0; DIRTY = true; CLAIMS = null;
-  for (const c of CELLS.values()) { c.down = 0; for (const it of c.items) it.down = 0; }
+  for (const c of CELLS.values()) { c.down = 0; for (const it of c.items) { it.down = it.ed ? 1 : 0; c.down += it.down; } }
 }
 /* ракушки — твёрдые, как стена (game.js: столкновения кузова; формат — как obb) */
 const S_LIST = [];
@@ -869,12 +872,45 @@ export function withSolids (list, x, z) {
   S_LIST.length = 0;
   cellsNear(x, z, 4, c => {
     for (const s of c.sol) {
-      if (c.items[s.own].hid || Math.abs(s.cx - x) > 6 || Math.abs(s.cz - z) > 6) continue;
+      if (c.items[s.own].hid || c.items[s.own].ed || Math.abs(s.cx - x) > 6 || Math.abs(s.cz - z) > 6) continue;
       S_LIST.push(s);
     }
   });
   return S_LIST.length ? list.concat(S_LIST) : list;
 }
+
+/* ── редактор города (editlayer.js): что стоит у точки; список «убрать» поменялся — пометить заново ── */
+const EDP = {
+  list (x, z, r) {
+    const out = [];
+    cellsNear(x, z, r, c => { for (const it of c.items) if (!it.ed && Math.hypot(it.x - x, it.z - z) <= r) out.push({ sub: it.kind, x: it.x, z: it.z }); });
+    return out;
+  },
+  refresh (x, z, r = 1) {
+    if (!A) return;
+    const redo = c => {
+      c.down = 0;
+      for (const it of c.items) { it.ed = EDL.gone('lawn', it.x, it.z) ? 1 : 0; it.down = it.ed || DOWN.has(it.key) ? 1 : 0; c.down += it.down; }
+    };
+    if (x === undefined) for (const c of CELLS.values()) redo(c);
+    else cellsNear(x, z, r + 1, redo);
+    DIRTY = true;
+  },
+  /* клетка у точки собрана (npm run check) */
+  warm (x, z) {
+    if (!A) return;
+    const i = Math.floor(x / LAWN.CELL), j = Math.floor(z / LAWN.CELL);
+    if (CELLS.has(key(i, j)) || (BUILDING && BUILDING.k === key(i, j))) return;
+    const g = buildCell(i, j);
+    while (!g.next().done);
+  },
+  has (x, z, r) {
+    EDP.warm(x, z);
+    let n = 0;
+    cellsNear(x, z, r, c => { for (const it of c.items) if (!it.ed && Math.hypot(it.x - x, it.z - z) <= r) n++; });
+    return n;
+  },
+};
 
 export const DEBUG = {
   LAWN, CELLS, MESH, DOWN,

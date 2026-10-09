@@ -17,7 +17,7 @@
    неважный, нет — не звучит. Один и тот же удар (нос и корма, место столкновения + hurtCar) в IMP.GAP с
    рядом — один раз, если не сильнее прежнего. Вариант файла / синтеза подряд не повторяется.
 
-     init({ Snd })          — из game.js
+     init({ Snd, tap })     — из game.js; tap(вид, ...аргументы) — повтор (replay.js) пишет hit / glass / debris
      hit(v, mat, at, o)     — удар силы v (м/с) о материал mat в точке at { x, z } (без at — «в машине»)
      glass(broken, cracked, lamps, at) — сколько стёкол разбилось / треснуло и фар разбилось за удар
      debris(at, v, key, again) — деталь упала на асфальт со скоростью v м/с (again — повторный отскок)
@@ -140,6 +140,7 @@ function outFor (at) {
 
 /** удар силы v (м/с) о материал mat в точке at (без at — «в машине», по центру) → { v, mat, tier, layers } или null */
 export function hit (v, mat, at) {
+  if (A && A.tap) A.tap('hit', v, mat, at);       // повтор (replay.js) пишет удар, чтобы прозвучал и в повторе
   v = +v || 0;
   const tier = tierOf(v);
   if (tier < 0) return null;
@@ -184,6 +185,7 @@ export function hit (v, mat, at) {
 
 /** стекло за удар (dentCar своей машины): broken — разбилось стёкол, cracked — треснуло, lamps — фар */
 export function glass (broken, cracked, lamps, at) {
+  if (A && A.tap) A.tap('glass', broken, cracked, lamps, at);
   if (!(broken > 0 || cracked > 0 || lamps > 0)) return null;
   const c = A && A.Snd && A.Snd.ctx, out = c && outFor(at);
   if (!out) return null;
@@ -198,6 +200,7 @@ export function glass (broken, cracked, lamps, at) {
 /** деталь (бампер, крышка, зеркало, колпак) ударилась об асфальт: v — скорость падения, м/с */
 const DEB_K = { bumperF: 1, bumperR: 1, trunk: 1, hub: 0.6 };
 export function debris (at, v, key, again) {
+  if (A && A.tap) A.tap('debris', at, v, key, again);
   const c = A && A.Snd && A.Snd.ctx, out = c && outFor(at);
   if (!out) return null;
   const vol = clamp((v - 1) / 7, 0.15, 1) * (DEB_K[key] || 0.7) * (again ? 0.6 : 1);

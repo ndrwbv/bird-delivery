@@ -70,6 +70,12 @@ const CHECKS = [
     if (r.code !== 0 || errs) return { status: 'fail', info: `ошибок ${errs}: ` + lines.filter(l => /^\s{3}/.test(l)).slice(0, 2).map(s => s.trim()).join(' | ') };
     return { status: miss ? 'warn' : 'ok', info: miss ? `без перевода ${miss} строк (на все языки)` : 'всё переведено' };
   } },
+  { id: 'video', name: 'ролик повтора: сохранение в Стиме, длительность webm', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'video-save-test.cjs')], { timeout: 30 });
+    let j = null; try { j = JSON.parse(r.out.trim().split('\n').pop()); } catch (e) { /* — */ }
+    if (!j) return { status: 'fail', info: 'без ответа: ' + (r.err || r.out).trim().slice(0, 160) };
+    return j.ok ? { status: 'ok', info: 'video:save → «Видео/Птица Пицца», Duration дописана' } : { status: 'fail', info: j.fail.join(' | ').slice(0, 200) };
+  } },
   { id: 'orders', name: 'заказы в открытых районах', group: 2, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/orders-open.js')]);
     const e = errLine(j), r = j.result;

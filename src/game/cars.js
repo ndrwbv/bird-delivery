@@ -38,6 +38,7 @@ import { t } from '../i18n/index.js';
 import * as DIST from './districts.js';
 import * as RW from './roadwear.js';
 import { KEY as TOUR_KEY } from './garagetour.js';
+import { ZHENYA_KEY } from './doorstep.js';
 import { pad as PAD } from '../input/gamepad.js';
 import './cars.css';
 
@@ -1208,7 +1209,9 @@ const bodyHurt = () => DENT.hurt(A.car);
 function bodyFix () { if (bodyHurt() && A.resetCar) A.resetCar(); }
 async function offer () {
   const DLG = A.DLG, id = curId(), e = eng(id), q = repairQuote(e.c, e.r);
-  const price = Math.round(q.price * (1 - (RESPECT.perk('garageOff') || 0)) / 10) * 10;   // звание по респекту — скидка (econ.js RESPECT.LEVELS)
+  // скидка от клиента (разговор у двери, doorstep.js ZHENYA_KEY: «скажи, что от меня») — на один ремонт, вместе со скидкой звания
+  const talkOff = Math.min(0.5, Math.max(0, +(A.Store ? A.Store.get(ZHENYA_KEY, 0) : 0) || 0));
+  const price = Math.round(q.price * (1 - (RESPECT.perk('garageOff') || 0) - talkOff) / 10) * 10;   // звание по респекту — скидка (econ.js RESPECT.LEVELS)
   const face = ZHENYA ? ZHENYA.person : null, name = t('Дядя Женя'), color = '#6f8a3a';
   const pc = n => String(Math.round(n));
   GS.busy = true;
@@ -1241,6 +1244,7 @@ async function offer () {
       accept: t('давай, Дядь Жень'), decline: t('не, потом') });
     if (!yes) return;
     if (!pay(A, price)) return;
+    if (talkOff && A.Store) { A.Store.set(ZHENYA_KEY, 0); A.toast(t('скидка «от знакомого» −{n} %', { n: Math.round(talkOff * 100) })); }
     const now = fix(id);
     bodyFix();                                       // заодно выправил кузов: вмятины, детали, стёкла (cardent.js)
     if (A.Snd) A.Snd.fx('repair', s => [0, 140, 300, 420].forEach((d, i) => setTimeout(() => s.blip(900 + i * 140, 0.06, 'square', 0.08), d)));

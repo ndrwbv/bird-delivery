@@ -20,8 +20,13 @@
 
    Работает от своего таймера (TICK), не от кадра мира: в паузе, в меню и на чеке кадры мира не идут.
 
+   Радио в машине (М6, radio.js): в смене вместо day / night играет слот станции «radio-<id>»
+   (radio-disco-1.mp3 …); нет файлов станции — день / ночь игры; станция «выкл» — тишина. Напряжённая
+   важнее радио. Новая песня — radio.onSong (ведущий говорит на стыке песен).
+
      load()        — прочитать список файлов (из game.js сразу при загрузке)
-     init(api)     — { Snd, S, ENV, isPlaying, tense, cut, dialog, chat }: Snd.ctx / musicBus / vol / on
+     init(api)     — { Snd, S, ENV, isPlaying, tense, cut, dialog, chat, radio }: Snd.ctx / musicBus / vol / on;
+                     radio — radio.js (slot(): null | 'off' | 'radio-<id>', onSong)
      has()         — есть ли хоть один трек (настройки: пометка «скоро» у ползунка — только если нет)
      level()       — 0…1, насколько сейчас слышна музыка (для фона города)
      DEBUG         — __dlv.Snd.MUS: state, STATS, list, force(slot), MUS */
@@ -36,18 +41,20 @@ export const MUS = {
   TENSE_HOLD: 6,      // с — после конца события напряжённая ещё держится
   AMB: 0.3,           // фон города тише на столько при музыке на 100 %
   TICK: 100,          // мс — как часто решаем
+  RADIO_XF: 0.7,      // с — переход между станциями радио (крутишь ручку — быстрее, чем смена дня и ночи)
 };
 
 const BASE = 'music/';
 export const SLOTS = ['menu', 'day', 'night', 'tense', 'shiftend'];
 const FALL = { menu: ['menu'], day: ['day', 'night'], night: ['night', 'day'], tense: ['tense'], shiftend: ['shiftend', 'menu'] };
+const isRadio = s => typeof s === 'string' && s.startsWith('radio-');   // станции радио (radio.js): radio-disco, radio-retro, radio-night
 
 let A = null, LIST = {}, D = null;            // D — регулятор приглушения перед шиной «музыка»
 let CUR = null;                                // { slot, file, el, src, g, t0 }
 const OLD = [];                                // гаснущие
 const NEXT = {};                               // слот → номер следующего варианта
 const BAD = new Set();                         // файлы, что не играют
-const ST = { want: null, night: false, tenseT: 0, duck: 1, dg: 1, forced: null, last: 0 };
+const ST = { want: null, night: false, tenseT: 0, duck: 1, dg: 1, forced: null, last: 0, radio: null };
 export const STATS = { listed: 0, started: {}, switches: 0, errors: [], log: [] };
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -59,7 +66,7 @@ export function load () {
     .then(r => (r.ok ? r.json() : {}))
     .then(j => {
       LIST = {};
-      if (j && typeof j === 'object') for (const k of SLOTS) if (Array.isArray(j[k]) && j[k].length) LIST[k] = j[k].slice();
+      if (j && typeof j === 'object') for (const k of Object.keys(j)) if ((SLOTS.includes(k) || isRadio(k)) && Array.isArray(j[k]) && j[k].length) LIST[k] = j[k].slice();
       STATS.listed = Object.values(LIST).reduce((s, a) => s + a.length, 0);
     })
     .catch(() => { /* списка нет (старая сборка, файл открыт с диска) — без музыки */ });
@@ -71,7 +78,7 @@ export function init (api) {
 }
 
 const files = slot => (LIST[slot] || []).filter(f => !BAD.has(f));
-export const has = () => SLOTS.some(s => files(s).length > 0);
+export const has = () => Object.keys(LIST).some(s => files(s).length > 0);
 
 /** насколько сейчас слышна музыка: 0…1 (ползунок «музыка» × приглушение), 0 — не играет */
 export function level () {
@@ -83,6 +90,7 @@ export function level () {
 /* какой слот нужен сейчас (до запасных) */
 function wantSlot (dt) {
   const S = A.S;
+  ST.radio = null;
   if (ST.forced) return ST.forced;
   if (S.state === 'title') return 'menu';
   if (S.state === 'over') return 'shiftend';
@@ -93,9 +101,16 @@ function wantSlot (dt) {
   try { tense = !!(A.tense && A.tense()); } catch (e) { /* — */ }
   if (tense) ST.tenseT = MUS.TENSE_HOLD; else ST.tenseT = Math.max(0, ST.tenseT - dt);
   const drive = ST.night ? 'night' : 'day';
-  return ST.tenseT > 0 && files('tense').length ? 'tense' : drive;
+  if (ST.tenseT > 0 && files('tense').length) return 'tense';
+  let r = null;
+  try { r = A.radio ? A.radio.slot() : null; } catch (e) { /* — */ }
+  ST.radio = r;
+  if (r === 'off') return null;                  // радио: станция «выкл» — тишина
+  return r || drive;
 }
-const resolve = slot => (slot ? (FALL[slot] || [slot]).find(s => files(s).length > 0) || null : null);
+// у станции радио нет файлов — день / ночь игры
+const fall = slot => FALL[slot] || (isRadio(slot) ? [slot].concat(ST.night ? ['night', 'day'] : ['day', 'night']) : [slot]);
+const resolve = slot => (slot ? fall(slot).find(s => files(s).length > 0) || null : null);
 
 /* следующий вариант слота: по очереди с случайного, подряд не повторяется */
 function nextFile (slot) {
@@ -115,7 +130,7 @@ function bus () {
   return D;
 }
 
-function start (slot) {
+function start (slot, secs = MUS.XF) {
   const f = nextFile(slot);
   if (!f) return null;
   const c = A.Snd.ctx, el = new Audio();
@@ -137,7 +152,7 @@ function start (slot) {
   if (p && p.catch) p.catch(e => { if (CUR === ch) STATS.errors.push(f + ': play — ' + ((e && e.message) || e)); });
   const t = c.currentTime;
   g.gain.setValueAtTime(0, t);
-  g.gain.linearRampToValueAtTime(MUS.GAIN, t + MUS.XF);
+  g.gain.linearRampToValueAtTime(MUS.GAIN, t + secs);
   STATS.started[slot] = (STATS.started[slot] || 0) + 1;
   return ch;
 }
@@ -159,9 +174,10 @@ function stop (ch) {
 function swap (slot, secs = MUS.XF) {
   const was = CUR;
   if (was) fade(was, secs);
-  CUR = slot ? start(slot) : null;
+  CUR = slot ? start(slot, secs) : null;
   STATS.switches++;
   note((was ? was.slot : '—') + ' → ' + (slot || '—') + (CUR ? ' (' + CUR.file + ')' : ''));
+  if (CUR && A.radio && A.radio.onSong) try { A.radio.onSong(CUR.slot, CUR.file); } catch (e) { /* — */ }
 }
 
 function tick () {
@@ -173,7 +189,7 @@ function tick () {
   const slot = Snd.on ? resolve(wantSlot(dt)) : null;
   ST.want = slot;
   if (!slot) { if (CUR) swap(null, Snd.on ? MUS.XF : MUS.OUT); }
-  else if (!CUR || CUR.slot !== slot) swap(slot);
+  else if (!CUR || CUR.slot !== slot) swap(slot, CUR && isRadio(CUR.slot) && isRadio(slot) ? MUS.RADIO_XF : MUS.XF);
   else {
     // к концу трека — следующий вариант (или он же сначала), с переходом
     const d = CUR.el.duration, left = d - CUR.el.currentTime;
@@ -200,14 +216,14 @@ export const DEBUG = {
   get bad () { return [...BAD]; },
   get state () {
     return {
-      want: ST.want, slot: CUR ? CUR.slot : null, file: CUR ? CUR.file : null, night: ST.night, tense: +ST.tenseT.toFixed(1),
+      want: ST.want, radio: ST.radio, slot: CUR ? CUR.slot : null, file: CUR ? CUR.file : null, night: ST.night, tense: +ST.tenseT.toFixed(1),
       duck: ST.duck, level: +level().toFixed(3), fading: OLD.length,
       gain: CUR ? +CUR.g.gain.value.toFixed(3) : 0, duckGain: D ? +D.gain.value.toFixed(3) : 1,
       bus: A && A.Snd && A.Snd.musicBus ? +A.Snd.musicBus.gain.value.toFixed(3) : null,
       t: CUR ? +CUR.el.currentTime.toFixed(2) : 0, dur: CUR && Number.isFinite(CUR.el.duration) ? +CUR.el.duration.toFixed(1) : null, paused: CUR ? CUR.el.paused : null,
     };
   },
-  /* держать слот (проверки): 'day' | 'night' | 'tense' | 'menu' | 'shiftend'; null — снова по игре */
-  force (slot) { ST.forced = slot && SLOTS.includes(slot) ? slot : null; return ST.forced; },
+  /* держать слот (проверки): 'day' | 'night' | 'tense' | 'menu' | 'shiftend' | 'radio-disco' …; null — снова по игре */
+  force (slot) { ST.forced = slot && (SLOTS.includes(slot) || isRadio(slot)) ? slot : null; return ST.forced; },
   reload: () => load(),
 };

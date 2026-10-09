@@ -21,6 +21,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 import { t, N_ } from '../i18n/index.js';
+import * as EDL from './editlayer.js';          // редактор города: щит можно убрать (edits.json, editlayer.js)
 
 const hash = (x, z, k = 0) => { const s = Math.sin(x * 12.9898 + z * 78.233 + k * 37.719) * 43758.5453; return s - Math.floor(s); };
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -29,7 +30,7 @@ export const DEBUG = { boards: 0, faces: 0, ads: 0, swaps: 0, tried: 0, ms: 0, l
 
 /* ═════════════ реклама ═════════════
    h — заголовок, s — подпись, pic — рисунок, bg/fg/ac — фон, текст, акцент */
-const ADS = [
+export const ADS = [                     // радио (radio.js) читает их в эфире
   { h: N_('Кальянная «У Стёпы»'), s: N_('Дымим с 9 до 24. Бизнесмен угощает'), pic: 'hookah', bg: '#2b1e3f', fg: '#f4e6ff', ac: '#c88bff', adult: 1 },
   { h: N_('Кальянная «У Стёпы»'), s: N_('Новый вкус: дыня с пломбиром'), pic: 'hookah', bg: '#3a2b18', fg: '#ffe8c0', ac: '#ffb347', adult: 1 },
   { h: N_('Королева Бургеров'), s: N_('Корона — бесплатно. Бургер — нет'), pic: 'burger', bg: '#f4c430', fg: '#1d3f8f', ac: '#1d3f8f' },
@@ -272,21 +273,51 @@ const BW = 6, BH = 3, POLE_H = 5.2;
 
 function place (A, x, z, fx, fz) {
   const gy = A.groundH(x, z), ry = Math.atan2(fx, fz), rx = fz, rz = -fx;   // rx/rz — вправо, если смотреть на лицевую сторону
-  A.box(A.LIT, 1.3, 0.5, 1.3, '#a9a59c', x, gy + 0.2, z, ry);                  // тумба
-  A.box(A.LIT, 0.5, POLE_H, 0.5, '#5b5f66', x, gy + POLE_H / 2, z, ry);        // стойка
-  A.box(A.LIT, BW + 0.4, BH + 0.4, 0.3, '#3d4148', x, gy + POLE_H + BH / 2, z, ry);   // рама
-  A.box(A.LIT, BW, 0.08, 0.7, '#5b5f66', x + fx * 0.45, gy + POLE_H - 0.15, z + fz * 0.45, ry);   // мостик
-  for (const s of [-1.8, 1.8]) A.box(A.LIT, 0.25, 0.18, 0.6, '#2f3338', x + rx * s + fx * 0.5, gy + POLE_H + BH + 0.35, z + rz * s + fz * 0.5, ry);   // прожекторы
+  // убран в редакторе города: места соседей те же (щит в списке для «не ближе»), но ни стойки, ни сторон
+  if (EDL.gone('board', x, z)) { rand(35, 75); rand(35, 75); BOARDS.push({ x, z, gone: 1 }); return; }
+  // в редакторе стойка — своим мешем (не в склейке LIT): «убрать» прячет щит сразу (edHide)
+  const G = EDL.ED.on ? new THREE.Group() : null;
+  const bx = (w, h, d, hex, px, py, pz) => {
+    if (!G) return A.box(A.LIT, w, h, d, hex, px, py, pz, ry);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), edMat(hex));
+    m.position.set(px, py, pz); m.rotation.y = ry; G.add(m);
+  };
+  bx(1.3, 0.5, 1.3, '#a9a59c', x, gy + 0.2, z);                  // тумба
+  bx(0.5, POLE_H, 0.5, '#5b5f66', x, gy + POLE_H / 2, z);        // стойка
+  bx(BW + 0.4, BH + 0.4, 0.3, '#3d4148', x, gy + POLE_H + BH / 2, z);   // рама
+  bx(BW, 0.08, 0.7, '#5b5f66', x + fx * 0.45, gy + POLE_H - 0.15, z + fz * 0.45);   // мостик
+  for (const s of [-1.8, 1.8]) bx(0.25, 0.18, 0.6, '#2f3338', x + rx * s + fx * 0.5, gy + POLE_H + BH + 0.35, z + rz * s + fz * 0.5);   // прожекторы
+  if (G) A.scene.add(G);
   A.obb(x, z, 0.65, 0.65, ry);
-  const y0 = gy + POLE_H + 0.0, y1 = y0 + BH;
+  const y0 = gy + POLE_H + 0.0, y1 = y0 + BH, f0 = FACES.length;
   for (const side of [1, -1]) {
     const nx = fx * side, nz = fz * side, ox = x + nx * 0.16, oz = z + nz * 0.16;
     const qx = rx * side * BW / 2, qz = rz * side * BW / 2;          // вправо для смотрящего на эту сторону
     FACES.push({ v: P.length / 3, ad: -1, t: rand(35, 75) });
     P.push(ox - qx, y0, oz - qz, ox + qx, y0, oz + qz, ox + qx, y1, oz + qz, ox - qx, y1, oz - qz);
   }
-  BOARDS.push({ x, z });
+  BOARDS.push({ x, z, g: G, f0 });
 }
+const ED_MATS = new Map();
+const edMat = hex => ED_MATS.get(hex) || (ED_MATS.set(hex, new THREE.MeshLambertMaterial({ color: hex, flatShading: true })), ED_MATS.get(hex));
+
+/* редактор города (editlayer.js hideNow): спрятать щиты ближе r к точке → функция «вернуть» или null */
+export function edHide (x, z, r) {
+  const list = BOARDS.filter(b => !b.gone && !b.hid && b.g && Math.hypot(b.x - x, b.z - z) <= r);
+  if (!list.length) return null;
+  const pos = MESH && MESH.geometry.attributes.position, a = pos && pos.array;
+  const set = (b, on) => {
+    b.hid = on ? 1 : 0; b.g.visible = !on;
+    if (!a) return;
+    const v0 = FACES[b.f0].v, n = 8;                                 // две стороны по 4 вершины
+    if (on) { b.orig = a.slice(v0 * 3, (v0 + n) * 3); for (let v = v0; v < v0 + n; v++) a[v * 3 + 1] = -60; }
+    else if (b.orig) { a.set(b.orig, v0 * 3); b.orig = null; }
+    pos.needsUpdate = true;
+  };
+  for (const b of list) set(b, true);
+  return () => { for (const b of list) set(b, false); };
+}
+export const boards = () => BOARDS.filter(b => !b.gone);
 
 /* пройти по большим улицам и поставить щиты */
 export function build (A) {
@@ -351,8 +382,8 @@ export function build (A) {
   MESH.name = 'billboards';
   A.scene.add(MESH);
   P.length = 0;
-  DEBUG.boards = BOARDS.length; DEBUG.faces = FACES.length;
-  DEBUG.list = BOARDS.map(b => [Math.round(b.x), Math.round(b.z)]);
+  DEBUG.boards = boards().length; DEBUG.faces = FACES.length;
+  DEBUG.list = boards().map(b => [Math.round(b.x), Math.round(b.z)]);
   DEBUG.ms = Math.round(performance.now() - t0);
 }
 function setUV (i) {

@@ -3,7 +3,8 @@
    docs/CAREER.md «Главное меню, пауза и настройки».
 
    Табы: игра (имя, профиль, мини-игры у клиента вкл / выкл, сбросить прогресс, тестовые районы, версия и обновление, update.js) ·
-   графика (качество и 7 пунктов, gfx.js) · звук (вкл / выкл и три ползунка: музыка, звуки, мотор — docs/SOUNDS.md) · управление (какие кнопки за что — геймпад,
+   графика (качество и 7 пунктов, gfx.js) · звук (вкл / выкл и три ползунка: музыка, звуки, мотор — docs/SOUNDS.md;
+   радио в машине вкл / выкл и станция — radio.js) · управление (какие кнопки за что — геймпад,
    клавиатура или палец) · язык (сетка языков). Внутри таба — обычный вертикальный список; не влез
    (телефон боком) — листается внутри таба, окно целиком не прокручивается.
    Переключить таб: LB/RB и LT/RT геймпада, ←→ (крестовина, стик, клавиши), когда подсветка на строке
@@ -43,7 +44,7 @@ export function init (api) {
 export const on = () => !!(A && A.kind() === 'settings' && !A.panel().hidden && A.body().querySelector('.set-tabs'));
 const focusId = () => { const e = A.selected && A.selected(); return (e && e.id) || undefined; };
 /* какая кнопка в каком табе */
-const tabOf = id => !id ? null : id === 'set-snd' || id.startsWith('set-vol-') ? 'snd' : id.startsWith('gfx-') ? 'gfx' : id.startsWith('set-l-') ? 'lang' : id.startsWith('set-tab-') ? id.slice(8) : 'game';
+const tabOf = id => !id ? null : id === 'set-snd' || id.startsWith('set-vol-') || id.startsWith('set-radio') ? 'snd' : id.startsWith('gfx-') ? 'gfx' : id.startsWith('set-l-') ? 'lang' : id.startsWith('set-tab-') ? id.slice(8) : 'game';
 
 /** соседний таб; force — LB/RB, LT/RT, Q/E (всегда), без него — ←→ (только со строки табов) */
 export function flip (d, force) {
@@ -107,7 +108,11 @@ export function render (focus, tab) {
       slider('music', t('музыка'), vol.music, focus, A.Snd.music ? '' : ' <small class="set-tag">' + t('скоро') + '</small>') +
       slider('sfx', t('звуки'), vol.sfx, focus) +
       slider('eng', t('мотор'), vol.eng, focus) +
-      note(t('M на клавиатуре, R3 на геймпаде — звук вкл / выкл прямо в игре'));
+      note(t('M на клавиатуре, R3 на геймпаде — звук вкл / выкл прямо в игре')) +
+      // радио в машине (radio.js): вкл — в смене играет станция, выкл — музыка игры; «станция» — для телефона, где нет клавиш
+      (A.radio ? row(t('радио в машине'), A.radio.on() ? t('вкл') : t('выкл'), 'set-radio', focus) +
+        (A.radio.on() ? row(t('станция'), esc(A.radio.name()), 'set-radio-st', focus) : '') +
+        note(t('F на клавиатуре, ↓ на крестовине — следующая станция; в меню и на чеке смены радио нет')) : '');
   } else if (TAB === 'gfx') {
     A.GFX.panel(list, focus, true);                 // gfx.js рисует сама: качество и семь пунктов
   } else if (TAB === 'ctrl') {
@@ -131,10 +136,10 @@ export function render (focus, tab) {
         note(t('у каждого профиля свой прогресс: копилка, машины, районы'));
       else h += row(t('имя'), esc(name || '—'), 'set-name', focus);
     }
-    // мини-игры у клиента (doorstep.js): домофон у подъезда; выкл — только езда. Меняется и из паузы — со следующего адреса
+    // мини-игры у клиента (doorstep.js): домофон у подъезда и разговор у двери; выкл — только езда. Меняется и из паузы — со следующего адреса
     if (A.door) {
       h += row(t('мини-игры у клиента'), A.door.on() ? t('вкл') : t('выкл'), 'set-door', focus) +
-        note(t('домофон у подъезда и другие задачки при вручении; выкл — только езда'));
+        note(t('домофон у подъезда и разговоры с клиентами при вручении; выкл — только езда'));
     }
     // версия и обновление
     {
@@ -194,6 +199,8 @@ function wire (body) {
   if ($('set-name')) $('set-name').onclick = () => A.askName(() => render('set-name'));
   if ($('set-prof')) $('set-prof').onclick = () => A.openProfiles();
   if ($('set-door')) $('set-door').onclick = () => { A.door.set(!A.door.on()); render('set-door'); };
+  if ($('set-radio')) $('set-radio').onclick = () => { A.radio.set(!A.radio.on()); render('set-radio'); };
+  if ($('set-radio-st')) $('set-radio-st').onclick = () => { A.radio.next(); render('set-radio-st'); };
   if ($('set-unlock')) $('set-unlock').onclick = () => A.unlock.run();
   if ($('set-reset')) $('set-reset').onclick = () => A.reset();
   if ($('set-upd')) $('set-upd').onclick = () => { UPD.check(true); render('set-upd'); };

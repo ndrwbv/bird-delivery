@@ -142,6 +142,20 @@ export function unlamp (it) {
   return { lh: rec.lh, spot: rec.spot, LH: rec.LH };
 }
 
+/* редактор города (editlayer.js hideNow): плафон и пятно света убранного фонаря — под землю и назад
+   (столб прячет сам редактор). on — спрятать */
+export function edHide (it, on) {
+  const rec = LAMPS.find(r => r.it === it);
+  if (!rec) return;
+  for (const h of [...rec.heads, ...rec.pools]) {
+    const [m, v0, nv] = h, pos = m.geometry.attributes.position, a = pos.array;
+    if (!a) continue;
+    if (on) { if (!h.orig) h.orig = a.slice(v0 * 3, (v0 + nv) * 3); for (let v = v0; v < v0 + nv; v++) a[v * 3 + 1] = -60; }
+    else if (h.orig) { a.set(h.orig, v0 * 3); h.orig = null; }
+    pos.needsUpdate = true;
+  }
+}
+
 /* вершины куска склейки — под землю (как знаки в roadlife.js) */
 function hide ([m, v0, nv]) {
   const pos = m.geometry.attributes.position, a = pos.array;

@@ -4,29 +4,51 @@
      смотреть  — только камера (тянуть мышью — повернуть голову);
      пометка   — клик по городу → текст → булавка; файл src/maps/<карта>/notes.json;
      поставить — выбрать предмет в палитре, клик — поставить (R — повернуть на 15°); файл edits.json;
-     выбрать   — клик по предмету: свой (поставленный) — повернуть или убрать, городской — убрать.
-   Правки видны в городе после «пересобрать город» (страница перезагружается, камера остаётся):
-   город строит игра (src/game/editlayer.js), редактор до того показывает заготовки и красные кресты.
+     выбрать   — клик по предмету: свой (поставленный) — повернуть или убрать, городской — убрать;
+     кисть     — круг радиуса R: «посадить рощу» (N деревьев выбранных пород вперемешку, не на асфальт)
+                 или «убрать всё в круге» (что отмечено галочками).
+   Убранное пропадает сразу (editlayer.js hideNow: город в редакторе собран целиком, убранное спрятано на
+   месте); поставленное — заготовкой, в городе — после «пересобрать город» (страница перезагружается,
+   камера остаётся). Отмена — Ctrl+Z (Cmd+Z) или кнопка, до UNDO_MAX шагов.
 
-   Для probe и агентов — window.__editor: st, goTo, top, side, addNote, place, removeAt, pickAt, check. */
-import { KINDS, REMOVABLE } from '../game/editlayer.js';
+   Для probe и агентов — window.__editor: st, goTo, top, side, addNote, place, removeCity, grove, clearCircle,
+   undo, pickAt, check, cityNear. */
+import { KINDS } from '../game/editlayer.js';
 import * as FILES from './files.js';
 import { makeCam } from './cam.js';
 import { makeMinimap } from './minimap.js';
 
-const NAME = { tree: 'дерево', bench: 'лавочка', bush: 'куст', bin: 'урна', fence: 'заборчик', sand: 'песочница', slide: 'горка', lamp: 'фонарь' };
-const HGT = { tree: [7, 1.8], bench: [1.1, 1.3], bush: [1.2, 1.1], bin: [0.9, 0.6], fence: [1, 1.2], sand: [0.5, 1.7], slide: [2, 1.3], lamp: [6.5, 0.7] };
+const NAME = { tree: 'дерево', bench: 'лавочка', bush: 'куст', bin: 'урна', fence: 'заборчик', sand: 'песочница', slide: 'горка', lamp: 'фонарь',
+  forest: 'ельник', lawn: 'мелочь газона', sign: 'знак', bigfence: 'забор', board: 'рекламный щит' };
+// что именно (sub у ельника и мелочи газона)
+const SUBNAME = { spruce: 'ель', pine: 'сосна', bush: 'куст ельника', tire: 'клумба из покрышек', beater: 'выбивалка', line: 'бельё на верёвке',
+  sand: 'куча песка', garage: 'ракушка', trash: 'мусор у баков', rail: 'оградка' };
+const itemName = r => (r.sub && SUBNAME[r.sub]) || NAME[r.kind] || r.kind;
+// высота и толщина «столба», по которому попадает клик: [h, r]
+const HGT = { tree: [7, 1.8], bench: [1.1, 1.3], bush: [1.2, 1.1], bin: [0.9, 0.6], fence: [1, 1.2], sand: [0.5, 1.7], slide: [2, 1.3], lamp: [6.5, 0.7],
+  forest: [10, 1.3], lawn: [1.4, 1.4], sign: [2.6, 0.6], bigfence: [2, 1.4], board: [8.5, 2.2] };
+// «убрать всё в круге»: что трогать (галочки кисти)
+const CLEAR = [
+  { id: 'trees', name: 'деревья и кусты', kinds: ['tree', 'bush'], on: true },
+  { id: 'forest', name: 'ельник', kinds: ['forest'], on: true },
+  { id: 'yard', name: 'мелочь дворов и газона', kinds: ['lawn', 'bench', 'bin', 'sand', 'slide', 'fence'], on: true },
+  { id: 'street', name: 'фонари, знаки, заборы, щиты', kinds: ['lamp', 'sign', 'bigfence', 'board'], on: false },
+];
+const TREEKINDS = KINDS.filter(k => k.kind === 'tree');
+const UNDO_MAX = 20;
 const FAR = { normal: 0, far: 1600, all: 6000 };
 const $ = id => document.getElementById(id);
 const r2 = v => Math.round(v * 100) / 100;
 const today = () => new Date().toISOString().slice(0, 10);
-const uid = p => p + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
+let UIDN = 0;
+const uid = p => p + Date.now().toString(36) + (UIDN++ % 1296).toString(36).padStart(2, '0') + Math.floor(Math.random() * 1296).toString(36);
 const kindOf = a => KINDS.find(k => k.kind === a.kind && (k.sub || null) === (a.sub || null)) || KINDS.find(k => k.kind === a.kind);
 const addName = a => { const k = kindOf(a); return k ? k.name : a.kind; };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 let d, THREE, CAM, MAPID, MM, ROOT3, built = false;
-const st = { clouds: false, tool: 'look', notes: [], edits: { add: [], remove: [] }, notesAbout: '', editsAbout: '', place: KINDS[0], ry: 0, sel: null, selNote: null, far: 'normal', status: '' };
+const st = { clouds: false, tool: 'look', notes: [], edits: { add: [], remove: [] }, notesAbout: '', editsAbout: '', place: KINDS[0], ry: 0, sel: null, selNote: null, far: 'normal', status: '',
+  brush: { mode: 'grove', R: 12, N: 10, kinds: new Set(['birch', 'pine', 'rowan']), clear: new Set(CLEAR.filter(c => c.on).map(c => c.id)) }, undo: [] };
 
 /* ── ожидание игры ── */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -48,6 +70,9 @@ export async function boot () {
   $('ed-wait').remove();
   ROOT3 = new THREE.Group(); ROOT3.name = 'editor'; d.scene.add(ROOT3);
   built = true;
+  // убранное — спрятать на месте: город в редакторе собран целиком (editlayer.js), ельник и газон — по живому списку
+  d.EDL.setLive(st.edits.remove);
+  for (const r of st.edits.remove) d.EDL.hideNow(r);
   rebuildMarks();
   renderLists();
   status(FILES.canSave() ? 'готово. Пометки и правки сохраняются сами — в ' + FILES.path(MAPID, 'notes') + ' и edits.json' : 'только чтение: сохранять можно из npm run editor', FILES.canSave() ? 'ok' : 'bad');
@@ -121,14 +146,11 @@ function rayToPost (R, x, z, h) {
 }
 
 /* ── что можно выбрать ── */
-function pending (r) { return !(d.EDL.edits.remove || []).some(q => q.kind === r.kind && Math.abs(q.x - r.x) < 0.01 && Math.abs(q.z - r.z) < 0.01); }
 function removedNow (kind, x, z) { return st.edits.remove.some(q => q.kind === kind && Math.hypot(q.x - x, q.z - z) <= d.EDL.R_MATCH); }
-function* cityItems () {
-  for (const s of d.SOLIDS) if (s.tree && s.hw < 0.6) yield { kind: 'tree', x: s.cx, z: s.cz };   // ствол game.js tree (новогодние ёлки seasons.js — шире, их не трогаем)
-  for (const it of d.SMASH) if (!it.down && REMOVABLE[it.kind]) yield { kind: it.kind, x: it.x, z: it.z };
-  for (const p of d.PROPS) if (p.kind === 'bench' && !p.down) yield { kind: 'bench', x: p.x, z: p.z };
-}
-/** что под точкой экрана: { type: 'add', a } | { type: 'city', kind, x, z } | { type: 'note', n } | null */
+/* что из города стоит ближе r к точке (editlayer.js itemsNear: деревья, сбиваемое, лавочки, щиты, ельник и мелочь
+   газона у собранных клеток), без уже убранного */
+const cityAround = (x, z, r) => d.EDL.itemsNear(x, z, r).filter(c => !removedNow(c.kind, c.x, c.z));
+/** что под точкой экрана: { type: 'add', a } | { type: 'city', kind, x, z, sub? } | { type: 'note', n } | null */
 function pickAt (cx, cy) {
   const R = ray(cx, cy), G = groundAt(cx, cy), tMax = G ? G.t + 3 : 1e9;
   let best = null, bt = Infinity;
@@ -136,15 +158,16 @@ function pickAt (cx, cy) {
   for (const n of st.notes) consider({ type: 'note', n }, n.x, n.z, 8, 1.4);
   for (const a of st.edits.add) { const box = a.kind === 'box'; consider({ type: 'add', a }, a.x, a.z, box ? (+a.h || 3) : 3, box ? Math.max(+a.w || 3, +a.d || 3) / 2 + 0.5 : 1.6); }
   if (best) return best;
-  for (const c of cityItems()) {
-    if (removedNow(c.kind, c.x, c.z)) continue;
-    const [h, r] = HGT[c.kind] || [1, 1];
+  const o = R.origin, reach = G ? Math.min(900, Math.hypot(G.x - o.x, G.z - o.z) + 12) : 300;
+  const city = cityAround(o.x, o.z, reach);
+  for (const c of city) {
+    const [h, r] = c.kind === 'forest' && c.h ? [c.h, c.sub === 'bush' ? 1 : 1.3] : HGT[c.kind] || [1, 1];
     consider({ type: 'city', ...c }, c.x, c.z, h, r);
   }
   if (best || !G) return best;
   // ничего на луче — ближайшее к точке земли в 2,5 м
   let bd = 2.5;
-  for (const c of cityItems()) { if (removedNow(c.kind, c.x, c.z)) continue; const dd = Math.hypot(c.x - G.x, c.z - G.z); if (dd < bd) { bd = dd; best = { type: 'city', ...c }; } }
+  for (const c of city) { const dd = Math.hypot(c.x - G.x, c.z - G.z); if (dd < bd) { bd = dd; best = { type: 'city', ...c }; } }
   return best;
 }
 
@@ -259,7 +282,8 @@ function rebuildMarks () {
     if (!applied.has(a.id)) MK.adds.add(shapeOf(a, 0.7));           // ещё не в городе — заготовка
     MK.adds.add(ring(a.x, a.z, a.kind === 'box' ? Math.max(+a.w || 3, +a.d || 3) * 0.6 : 1.3, '#2f6fd0'));
   }
-  for (const r of st.edits.remove) MK.rem.add(cross(r.x, r.z));
+  // убранное спрятано сразу; крест — только где «убрать» ничего не нашло (ельник и газон — у собранной клетки)
+  for (const r of st.edits.remove) if (!(d.EDL.hits(r) > 0)) MK.rem.add(cross(r.x, r.z));
   showSel();
 }
 function showSel () {
@@ -284,29 +308,107 @@ function saveLater (f) {
 }
 function status (s, cls = '') { const el = $('ed-status'); if (!el) return; el.textContent = s; el.className = cls; st.status = s; }
 
-/* ── действия ── */
+/* ── действия (каждое — шаг отмены: do / undo) ── */
+const sameR = (q, r) => q.kind === r.kind && Math.abs(q.x - r.x) < 0.005 && Math.abs(q.z - r.z) < 0.005;
+function refresh () { rebuildMarks(); renderLists(); renderSel(); }
+/* список «убрать» правим на месте: его же видит игра (editlayer.js setLive) */
+function remPush (list) { for (const r of list) { st.edits.remove.push(r); } d.EDL.hideMany(list); }
+function remDrop (list) { const L = st.edits.remove; for (const r of list) { const i = L.findIndex(q => q === r || sameR(q, r)); if (i >= 0) L.splice(i, 1); } d.EDL.showMany(list); }
+function addPush (list) { for (const a of list) st.edits.add.push(a); }
+function addDrop (list) { const set = new Set(list.map(a => a.id)); st.edits.add = st.edits.add.filter(a => !set.has(a.id)); if (st.sel && st.sel.a && set.has(st.sel.a.id)) st.sel = null; }
+/* выполнить и запомнить для отмены */
+function act (name, fwd, back) {
+  fwd();
+  st.undo.push({ name, back });
+  if (st.undo.length > UNDO_MAX) st.undo.shift();
+  renderUndo();
+}
+function undo () {
+  const u = st.undo.pop();
+  if (!u) { status('отменять нечего', 'bad'); return null; }
+  u.back();
+  renderUndo();
+  status('отменено: ' + u.name, 'ok');
+  return u.name;
+}
+function renderUndo () {
+  const b = $('ed-undo');
+  if (!b) return;
+  const u = st.undo[st.undo.length - 1];
+  b.disabled = !u;
+  b.textContent = u ? '↶ отменить: ' + u.name + ' (' + st.undo.length + ')' : '↶ отменить';
+}
+
 function addNote (x, z, text) {
   const n = { id: uid('n'), x: r2(x), z: r2(z), text: String(text).trim(), date: today(), done: false };
   if (!n.text) return null;
-  st.notes.push(n); saveLater('notes'); rebuildMarks(); renderLists();
+  act('пометка', () => { st.notes.push(n); saveLater('notes'); refresh(); }, () => { st.notes = st.notes.filter(q => q !== n); saveLater('notes'); refresh(); });
   return n;
 }
+function mkAdd (a) {
+  return { id: uid('a'), kind: a.kind, ...(a.sub ? { sub: a.sub } : {}), x: r2(a.x), z: r2(a.z), ry: r2(a.ry || 0), ...(a.kind === 'box' ? { w: a.w, d: a.d, h: a.h, col: a.col } : {}), date: today() };
+}
 function place (a, force = false) {
-  a = { id: uid('a'), kind: a.kind, ...(a.sub ? { sub: a.sub } : {}), x: r2(a.x), z: r2(a.z), ry: r2(a.ry || 0), ...(a.kind === 'box' ? { w: a.w, d: a.d, h: a.h, col: a.col } : {}), date: today() };
+  a = mkAdd(a);
   const W = check(a);
   if (W.length && !force) return { ok: false, why: W, a };
-  st.edits.add.push(a); saveLater('edits'); rebuildMarks(); renderLists();
+  act('поставить ' + addName(a), () => { addPush([a]); saveLater('edits'); refresh(); }, () => { addDrop([a]); saveLater('edits'); refresh(); });
   return { ok: true, a, why: W };
 }
-function removeCity (kind, x, z) {
-  if (removedNow(kind, x, z)) return null;
-  const r = { kind, x: r2(x), z: r2(z), date: today() };
-  st.edits.remove.push(r); saveLater('edits');
-  st.sel = null; rebuildMarks(); renderLists(); renderSel();
-  return r;
+/* убрать из города: правки «убрать» (одна или пачка) — спрятано сразу, один шаг отмены */
+function removeMany (items, name) {
+  const list = [];
+  for (const c of items) {
+    if (removedNow(c.kind, c.x, c.z) || list.some(q => q.kind === c.kind && Math.hypot(q.x - c.x, q.z - c.z) <= d.EDL.R_MATCH)) continue;
+    list.push({ kind: c.kind, ...(c.sub ? { sub: c.sub } : {}), x: r2(c.x), z: r2(c.z), date: today() });
+  }
+  if (!list.length) return [];
+  act(name || 'убрать ' + itemName(list[0]), () => { remPush(list); saveLater('edits'); st.sel = null; refresh(); }, () => { remDrop(list); saveLater('edits'); refresh(); });
+  return list;
 }
-function unAdd (a) { st.edits.add = st.edits.add.filter(q => q !== a); saveLater('edits'); if (st.sel && st.sel.a === a) st.sel = null; rebuildMarks(); renderLists(); renderSel(); }
-function rotateAdd (a, da) { a.ry = r2(((+a.ry || 0) + da) % (Math.PI * 2)); saveLater('edits'); rebuildMarks(); renderLists(); renderSel(); }
+function removeCity (kind, x, z, sub) { const l = removeMany([{ kind, x, z, sub }]); return l[0] || null; }
+function unRemove (r) { act('вернуть ' + itemName(r), () => { remDrop([r]); saveLater('edits'); refresh(); }, () => { remPush([r]); saveLater('edits'); refresh(); }); }
+function unAdd (a) {
+  const i = st.edits.add.indexOf(a);
+  act('убрать ' + addName(a), () => { addDrop([a]); saveLater('edits'); refresh(); }, () => { st.edits.add.splice(Math.min(i, st.edits.add.length), 0, a); saveLater('edits'); refresh(); });
+}
+function rotateAdd (a, da) {
+  const was = a.ry;
+  act('повернуть ' + addName(a), () => { a.ry = r2(((+a.ry || 0) + da) % (Math.PI * 2)); saveLater('edits'); refresh(); }, () => { a.ry = was; saveLater('edits'); refresh(); });
+}
+
+/* ── кисть: роща и «убрать всё в круге» ── */
+/** посадить рощу: n деревьев пород kinds (sub из палитры) вперемешку в круге радиуса R — не на асфальт, не в дом и воду,
+    не вплотную к деревьям (новым и городским). → поставленные */
+function grove (x, z, R = st.brush.R, n = st.brush.N, kinds = [...st.brush.kinds]) {
+  const subs = kinds.filter(k => TREEKINDS.some(q => q.sub === k));
+  if (!subs.length) { status('кисть: выбери хоть одну породу', 'bad'); return []; }
+  const city = cityAround(x, z, R + 3).filter(c => c.kind === 'tree' || c.kind === 'forest');
+  const out = [];
+  const gap = sub => (['bush', 'lilac', 'rosehip'].includes(sub) ? 1.6 : 3);
+  for (let tries = 0; out.length < n && tries < n * 25; tries++) {
+    const a0 = Math.random() * Math.PI * 2, rr = R * Math.sqrt(Math.random());
+    const sub = subs[Math.floor(Math.random() * subs.length)];
+    const a = mkAdd({ kind: 'tree', sub, x: x + Math.cos(a0) * rr, z: z + Math.sin(a0) * rr, ry: 0 });
+    if (check(a).length) continue;
+    const g = gap(sub);
+    if (out.some(q => Math.hypot(q.x - a.x, q.z - a.z) < Math.max(g, gap(q.sub))) || city.some(c => Math.hypot(c.x - a.x, c.z - a.z) < g)) continue;
+    if (st.edits.add.some(q => q.kind === 'tree' && Math.hypot(q.x - a.x, q.z - a.z) < g)) continue;
+    out.push(a);
+  }
+  if (!out.length) { status('кисть: тут некуда сажать (асфальт, дома, вода или уже густо)', 'bad'); return []; }
+  act('роща (' + out.length + ')', () => { addPush(out); saveLater('edits'); refresh(); }, () => { addDrop(out); saveLater('edits'); refresh(); });
+  status('роща: ' + out.length + (out.length < n ? ' из ' + n + ' (больше не влезло)' : '') + ' — в городе после «пересобрать город»', out.length < n ? 'bad' : 'ok');
+  return out;
+}
+/** убрать всё в круге: что отмечено (groups — id из CLEAR) → убранные правки */
+function clearCircle (x, z, R = st.brush.R, groups = [...st.brush.clear]) {
+  const kinds = new Set(CLEAR.filter(c => groups.includes(c.id)).flatMap(c => c.kinds));
+  const items = cityAround(x, z, R).filter(c => kinds.has(c.kind));
+  const list = removeMany(items, 'убрать в круге');
+  status(list.length ? 'убрано в круге: ' + list.length : 'в круге нечего убирать (галочки — что трогать)', list.length ? 'ok' : 'bad');
+  return list;
+}
 
 /* ── клики по городу ── */
 function onClick (cx, cy) {
@@ -322,6 +424,10 @@ function onClick (cx, cy) {
     const r = place(a);
     if (r.ok) status('поставлено: ' + k.name + ' — в городе после «пересобрать город»', 'ok');
     else askYes(cx, cy, 'Тут плохо: ' + r.why.join('; ') + '. Поставить всё равно?', () => { place(a, true); status('поставлено с предупреждением: ' + r.why.join('; '), 'bad'); });
+  } else if (st.tool === 'brush') {
+    const G = groundAt(cx, cy);
+    if (!G) return;
+    if (st.brush.mode === 'grove') grove(G.x, G.z); else clearCircle(G.x, G.z);
   } else if (st.tool === 'pick') {
     st.sel = pickAt(cx, cy);
     if (st.sel && st.sel.type === 'note') st.selNote = st.sel.n.id;
@@ -369,13 +475,21 @@ function buildDom () {
       <h2>Что делаем</h2>
       <div class="row tools">
         <button data-tool="look">смотреть</button><button data-tool="note">пометка</button>
-        <button data-tool="place">поставить</button><button data-tool="pick">выбрать / убрать</button>
+        <button data-tool="place">поставить</button><button data-tool="pick">выбрать / убрать</button><button data-tool="brush">кисть</button>
       </div>
+      <div class="row"><button id="ed-undo" disabled>↶ отменить</button> <span class="hint">Ctrl+Z</span></div>
       <div class="hint" id="ed-toolhint"></div>
       <div id="ed-placebox" hidden>
         <div class="ed-pal">${groups.map(g => `<b>${esc(g)}</b>` + KINDS.map((k, i) => k.group === g ? `<button data-kind="${i}">${esc(k.name)}</button>` : '').join('')).join('')}</div>
         <div class="row">поворот: <b id="ed-ry">0°</b> <button class="mini" id="ed-rl">↺ 15°</button><button class="mini" id="ed-rr">↻ 15°</button> <span class="hint">или R</span></div>
         <div class="row" id="ed-boxdims" hidden>ш <input type="number" id="ed-bw" step="0.5" min="0.5"> г <input type="number" id="ed-bd" step="0.5" min="0.5"> в <input type="number" id="ed-bh" step="0.5" min="0.5"> <input type="color" id="ed-bc"></div>
+      </div>
+      <div id="ed-brushbox" hidden>
+        <div class="row"><button data-bmode="grove">посадить рощу</button><button data-bmode="clear">убрать всё в круге</button></div>
+        <div class="row">радиус <input type="range" id="ed-br" min="3" max="60" step="1"> <b id="ed-brv"></b> м</div>
+        <div class="row" id="ed-bgrove">деревьев <input type="number" id="ed-bn" min="1" max="80" step="1"></div>
+        <div class="ed-pal" id="ed-bkinds">${TREEKINDS.map(k => `<button data-bk="${k.sub}">${esc(k.name)}</button>`).join('')}</div>
+        <div id="ed-bclear">${CLEAR.map(c => `<label><input type="checkbox" data-bc="${c.id}"> ${esc(c.name)}</label>`).join('<br>')}</div>
       </div>
       <div id="ed-sel" hidden></div>
       <h2>Камера</h2>
@@ -396,8 +510,9 @@ function buildDom () {
       <ul class="ed-list" id="ed-edits"></ul>
       <h2>Кнопки</h2>
       <div id="ed-keys"><kbd>W A S D</kbd> / стрелки — лететь, <kbd>Q</kbd> <kbd>E</kbd> — ниже / выше, <kbd>Shift</kbd> — быстрее,
-        колесо — высота, тянуть мышью — повернуть голову. <kbd>1</kbd>–<kbd>4</kbd> — инструменты, <kbd>R</kbd> — повернуть предмет,
-        <kbd>Del</kbd> — убрать выбранное, <kbd>Esc</kbd> — отмена. Геймпад: стики, курки — высота, A — действие в центре.</div>
+        колесо — высота, тянуть мышью — повернуть голову. <kbd>1</kbd>–<kbd>5</kbd> — инструменты, <kbd>R</kbd> — повернуть предмет,
+        <kbd>[</kbd> <kbd>]</kbd> — радиус кисти, <kbd>Del</kbd> — убрать выбранное, <kbd>Ctrl</kbd>+<kbd>Z</kbd> — отменить, <kbd>Esc</kbd> — снять выбор.
+        Геймпад: стики, курки — высота, A — действие в центре.</div>
     </div>`;
   document.body.appendChild(root);
   // события мыши и касаний редактора — не игре (её обработчики висят на window и document)
@@ -414,6 +529,12 @@ function buildDom () {
   $('ed-hour').onchange = e => { const h = +e.target.value; if (h) { d.ENV.t = d.ECON.tOfHour(h); d.updateEnv && d.updateEnv(0); } };
   $('ed-sea').onchange = e => { const v = e.target.value; if (v !== '' && d.season && d.season.set) d.season.set(+v); };
   $('ed-rebuild').onclick = rebuild;
+  $('ed-undo').onclick = undo;
+  for (const b of root.querySelectorAll('[data-bmode]')) b.onclick = () => setBrush({ mode: b.dataset.bmode });
+  for (const b of root.querySelectorAll('[data-bk]')) b.onclick = () => { const k = b.dataset.bk, K = st.brush.kinds; if (K.has(k)) K.delete(k); else K.add(k); setBrush({}); };
+  for (const c of root.querySelectorAll('[data-bc]')) c.onchange = () => { const C = st.brush.clear; if (c.checked) C.add(c.dataset.bc); else C.delete(c.dataset.bc); };
+  $('ed-br').oninput = e => setBrush({ R: +e.target.value });
+  $('ed-bn').oninput = e => setBrush({ N: Math.max(1, Math.min(80, Math.round(+e.target.value) || 1)) }, true);
   $('ed-clouds').onchange = e => { st.clouds = e.target.checked; };
   $('ed-hidedone').onchange = renderLists;
   for (const id of ['ed-bw', 'ed-bd', 'ed-bh', 'ed-bc']) $(id).addEventListener('input', () => { if (GH.ghost) updateGhost(true); });
@@ -440,7 +561,7 @@ function buildDom () {
   V.addEventListener('contextmenu', e => e.preventDefault());
 
   window.__edKeys.on = onKey;
-  setTool('look'); setKind(KINDS[0]);
+  setTool('look'); setKind(KINDS[0]); setBrush({});
 }
 const MOUSE = { x: 0, y: 0, in: false };
 function lookPoint () { const G = groundAt(innerWidth / 2 + 165, innerHeight / 2); return G || { x: CAM.P.x, z: CAM.P.z }; }
@@ -449,13 +570,16 @@ function setTool (t) {
   for (const b of document.querySelectorAll('[data-tool]')) b.classList.toggle('on', b.dataset.tool === t);
   $('ed-view').className = 't-' + t;
   $('ed-placebox').hidden = t !== 'place';
+  $('ed-brushbox').hidden = t !== 'brush';
   $('ed-toolhint').textContent = {
     look: 'Просто смотреть: лететь — WASD, повернуть голову — тянуть мышью.',
     note: 'Клик по городу — булавка с текстом. Сохраняется сразу в ' + FILES.path(MAPID || 'seversk', 'notes') + '.',
     place: 'Выбери предмет и кликни, куда поставить. В городе появится после «пересобрать город».',
-    pick: 'Клик по предмету: свой — повернуть или убрать, городской — убрать (дерево, лавочка, фонарь, урна, куст, заборчик, песочница, горка).',
+    pick: 'Клик по предмету: свой — повернуть или убрать, городской — убрать: дерево, куст, ель и сосна ельника, лавочка, фонарь, урна, заборчик, песочница, горка, мелочь газона (покрышки, выбивалка, бельё, ракушка…), знак, забор стройки, рекламный щит. Пропадает сразу.',
+    brush: 'Круг под мышью. «Посадить рощу» — деревья выбранных пород вперемешку (не на асфальт, не в дом и воду; в городе — после «пересобрать город»). «Убрать всё в круге» — что отмечено галочками, пропадает сразу. [ ] — радиус.',
   }[t];
   if (t !== 'place') { clearGroup(GH.ghost); GH.ghost = null; }
+  if (t !== 'brush') { clearGroup(GH.ring); GH.ring = null; }
   if (t !== 'pick') { st.sel = null; showSel(); renderSel(); }
 }
 function setKind (k) {
@@ -465,6 +589,19 @@ function setKind (k) {
   if (k.kind === 'box') { $('ed-bw').value = k.w; $('ed-bd').value = k.d; $('ed-bh').value = k.h; $('ed-bc').value = k.col; }
   updateGhost(true);
 }
+function setBrush (o, quiet) {
+  Object.assign(st.brush, o);
+  const B = st.brush;
+  B.R = Math.max(3, Math.min(60, B.R));
+  for (const b of document.querySelectorAll('[data-bmode]')) b.classList.toggle('on', b.dataset.bmode === B.mode);
+  for (const b of document.querySelectorAll('[data-bk]')) b.classList.toggle('on', B.kinds.has(b.dataset.bk));
+  for (const c of document.querySelectorAll('[data-bc]')) c.checked = B.clear.has(c.dataset.bc);
+  $('ed-br').value = B.R; $('ed-brv').textContent = B.R;
+  if (!quiet) $('ed-bn').value = B.N;
+  $('ed-bgrove').hidden = $('ed-bkinds').hidden = B.mode !== 'grove';
+  $('ed-bclear').hidden = B.mode !== 'clear';
+  GH.rkey = '';
+}
 function setRy (v) { st.ry = ((v % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2); $('ed-ry').textContent = Math.round(st.ry * 180 / Math.PI) + '°'; updateGhost(true); }
 
 function onKey (e) {
@@ -473,7 +610,9 @@ function onKey (e) {
   if (e.type !== 'keydown' || typing) return;
   window.__edKeys.down.add(e.code);
   const k = e.code;
-  if (k === 'Digit1') setTool('look'); else if (k === 'Digit2') setTool('note'); else if (k === 'Digit3') setTool('place'); else if (k === 'Digit4') setTool('pick');
+  if ((e.ctrlKey || e.metaKey) && k === 'KeyZ') { e.preventDefault(); undo(); return; }
+  if (k === 'Digit1') setTool('look'); else if (k === 'Digit2') setTool('note'); else if (k === 'Digit3') setTool('place'); else if (k === 'Digit4') setTool('pick'); else if (k === 'Digit5') setTool('brush');
+  else if (k === 'BracketLeft' || k === 'BracketRight') { if (st.tool === 'brush') setBrush({ R: st.brush.R + (k === 'BracketLeft' ? -2 : 2) }); }
   else if (k === 'KeyR') { if (st.tool === 'place') setRy(st.ry - Math.PI / 12); else if (st.sel && st.sel.type === 'add') rotateAdd(st.sel.a, -Math.PI / 12); }
   else if (k === 'Escape') { closePop(); if (st.sel) { st.sel = null; showSel(); renderSel(); } }
   else if (k === 'Delete' || k === 'Backspace') delSel();
@@ -483,7 +622,7 @@ function delSel () {
   const s = st.sel;
   if (!s) return;
   if (s.type === 'add') unAdd(s.a);
-  else if (s.type === 'city') removeCity(s.kind, s.x, s.z);
+  else if (s.type === 'city') removeCity(s.kind, s.x, s.z, s.sub);
   else if (s.type === 'note') delNote(s.n);
 }
 
@@ -496,7 +635,7 @@ function renderSel () {
     el.innerHTML = `<b>${esc(addName(s.a))}</b> — поставлено в редакторе<br><span class="hint">x ${s.a.x}, z ${s.a.z}, поворот ${Math.round((s.a.ry || 0) * 180 / Math.PI)}°</span>
       <div class="row"><button class="mini" data-a="rl">↺ 15°</button><button class="mini" data-a="rr">↻ 15°</button><button class="mini warn" data-a="del">убрать</button></div>`;
   } else if (s.type === 'city') {
-    el.innerHTML = `<b>${esc(NAME[s.kind] || s.kind)}</b> — из города<br><span class="hint">x ${r2(s.x)}, z ${r2(s.z)}</span>
+    el.innerHTML = `<b>${esc(itemName(s))}</b> — из города<br><span class="hint">x ${r2(s.x)}, z ${r2(s.z)}</span>
       <div class="row"><button class="mini warn" data-a="del">убрать из города</button></div>`;
   } else {
     el.innerHTML = `<b>пометка</b>: ${esc(s.n.text)}<div class="row"><button class="mini warn" data-a="del">удалить пометку</button></div>`;
@@ -506,9 +645,9 @@ function renderSel () {
 
 function delNote (n) {
   if (!confirm('Удалить пометку «' + n.text.slice(0, 60) + '»?')) return;
-  st.notes = st.notes.filter(q => q !== n);
-  if (st.sel && st.sel.n === n) st.sel = null;
-  saveLater('notes'); rebuildMarks(); renderLists(); renderSel();
+  const i = st.notes.indexOf(n);
+  act('удалить пометку', () => { st.notes = st.notes.filter(q => q !== n); if (st.sel && st.sel.n === n) st.sel = null; saveLater('notes'); refresh(); },
+    () => { st.notes.splice(Math.min(i, st.notes.length), 0, n); saveLater('notes'); refresh(); });
 }
 function renderLists () {
   const ul = $('ed-notes');
@@ -528,29 +667,33 @@ function renderLists () {
     ul.appendChild(li);
   }
   $('ed-ncount').textContent = st.notes.length ? `${st.notes.filter(n => !n.done).length} открыто · ${st.notes.filter(n => n.done).length} сделано` : 'пока нет';
-  // правки: поставленное и убранное; ещё не в городе — «после пересборки»; игра не поставила / ничего не нашлось — красным
+  // правки: поставленное и убранное. Поставленное ещё не в городе — «после пересборки»; игра не поставила — красным.
+  // Убранное спрятано сразу; «ничего не нашлось» — красным (ельник и газон проверяются у собранной клетки — подлети)
   const ue = $('ed-edits');
   ue.innerHTML = '';
   const A = d.EDL.edits || {}, applied = new Set((A.add || []).map(a => a.id)), ST = d.EDL.STATS, refused = new Set(ST.refused);
-  const remIdx = r => (A.remove || []).findIndex(q => q.kind === r.kind && Math.abs(q.x - r.x) < 0.01 && Math.abs(q.z - r.z) < 0.01);
+  const MAXROWS = 150;
+  let rows = 0;
   const row = (cls, html, go, undo, undoT) => {
+    if (++rows > MAXROWS) return;
     const li = document.createElement('li'); li.className = cls;
     li.innerHTML = `<span class="tx">${html}</span><button class="mini" title="лететь туда">→</button><button class="mini warn">${undoT}</button>`;
     const bs = li.getElementsByTagName('button');
     li.querySelector('.tx').onclick = bs[0].onclick = go; bs[1].onclick = undo;
     ue.appendChild(li);
   };
+  // сначала поставленное, потом убранное; новые — сверху
   for (const a of st.edits.add.slice().reverse()) {
     const W = check(a), pend = !applied.has(a.id), bad = !pend && refused.has(a.id);
     const note = pend ? 'ещё не в городе — «пересобрать город»' : bad ? 'игра не поставила: ' + (W.join('; ') || 'место занято') : W.length ? W.join('; ') : 'в городе';
-    row(bad || W.length ? 'bad' : '', `+ ${esc(addName(a))}<small>x ${Math.round(a.x)}, z ${Math.round(a.z)} · ${esc(note)}</small>`, () => { CAM.goTo(a.x, a.z, 30); st.sel = { type: 'add', a }; setTool('pick'); st.sel = { type: 'add', a }; showSel(); renderSel(); }, () => unAdd(a), 'убрать');
+    row(bad || W.length ? 'bad' : '', `+ ${esc(addName(a))}<small>x ${Math.round(a.x)}, z ${Math.round(a.z)} · ${esc(note)}</small>`, () => { CAM.goTo(a.x, a.z, 30); setTool('pick'); st.sel = { type: 'add', a }; showSel(); renderSel(); }, () => unAdd(a), 'убрать');
   }
   for (const r of st.edits.remove.slice().reverse()) {
-    const i = remIdx(r), pend = i < 0, miss = !pend && !(ST.hits[i] > 0);
-    const note = pend ? 'ещё в городе — «пересобрать город»' : miss ? 'тут ничего не нашлось (предмета уже нет?)' : 'убрано';
-    row(miss ? 'bad' : '', `− ${esc(NAME[r.kind] || r.kind)}<small>x ${Math.round(r.x)}, z ${Math.round(r.z)} · ${esc(note)}</small>`, () => CAM.goTo(r.x, r.z, 30),
-      () => { st.edits.remove = st.edits.remove.filter(q => q !== r); saveLater('edits'); rebuildMarks(); renderLists(); }, 'вернуть');
+    const n = d.EDL.hits(r), lazy = d.EDL.LAZY[r.kind];
+    const note = n > 0 ? 'убрано' + (n > 1 ? ' (' + n + ')' : '') : lazy ? 'не нашлось — или далеко (подлети: ельник и газон строятся у камеры)' : 'тут ничего не нашлось (предмета уже нет?)';
+    row(n > 0 ? '' : 'bad', `− ${esc(itemName(r))}<small>x ${Math.round(r.x)}, z ${Math.round(r.z)} · ${esc(note)}</small>`, () => CAM.goTo(r.x, r.z, 30), () => unRemove(r), 'вернуть');
   }
+  if (rows > MAXROWS) { const li = document.createElement('li'); li.className = 'hint'; li.textContent = '… и ещё ' + (rows - MAXROWS) + ' (старые)'; ue.appendChild(li); }
   $('ed-ecount').textContent = `+${st.edits.add.length} · −${st.edits.remove.length}`;
 }
 async function rebuild () {
@@ -560,8 +703,33 @@ async function rebuild () {
 }
 
 /* ── заготовка под мышью (инструмент «поставить») ── */
-const GH = { ghost: null, key: '' };
+const GH = { ghost: null, key: '', ring: null, rkey: '' };
+/* кисть: круг радиуса R по земле под мышью (зелёный — роща, красный — убрать) */
+function updateRing () {
+  const G = MOUSE.in ? groundAt(MOUSE.x, MOUSE.y) : null;
+  if (!G) { if (GH.ring) GH.ring.visible = false; return; }
+  const B = st.brush, key = B.mode + B.R;
+  if (key !== GH.rkey || !GH.ring) {
+    clearGroup(GH.ring); GH.rkey = key;
+    const n = 64, pts = [];
+    for (let i = 0; i <= n; i++) pts.push(new THREE.Vector3(Math.cos(i / n * Math.PI * 2) * B.R, 0, Math.sin(i / n * Math.PI * 2) * B.R));
+    GH.ring = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: B.mode === 'grove' ? '#3fbf4a' : '#e0281b', fog: false, depthTest: false }));
+    GH.ring.renderOrder = 10;
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(B.R, 48).rotateX(-Math.PI / 2), mat(B.mode === 'grove' ? '#3fbf4a' : '#e0281b', 0.18));
+    disc.name = 'disc';
+    GH.ring.add(disc);
+    ROOT3.add(GH.ring);
+  }
+  // по рельефу: точки круга — на высоте земли
+  const P = GH.ring.geometry.attributes.position, a = P.array;
+  for (let i = 0; i < P.count; i++) a[i * 3 + 1] = gH(G.x + a[i * 3], G.z + a[i * 3 + 2]) + 0.4;
+  P.needsUpdate = true;
+  GH.ring.position.set(G.x, 0, G.z);
+  GH.ring.getObjectByName('disc').position.y = G.y + 0.35;
+  GH.ring.visible = true;
+}
 function updateGhost (force) {
+  if (built && st.tool === 'brush') return updateRing();
   if (!built || st.tool !== 'place') return;
   const G = MOUSE.in ? groundAt(MOUSE.x, MOUSE.y) : null;
   if (!G) { if (GH.ghost) GH.ghost.visible = false; return; }
@@ -611,6 +779,10 @@ function loop (now) {
       MM.draw({ cam: { x: CAM.P.x, z: CAM.P.z, yaw: CAM.P.yaw }, notes: $('ed-hidedone').checked ? st.notes.filter(n => !n.done) : st.notes, adds: st.edits.add, removes: st.edits.remove, sel });
       $('ed-pos').textContent = `камера: x ${Math.round(CAM.P.x)}, z ${Math.round(CAM.P.z)}, высота ${Math.round(CAM.P.y - gH(CAM.P.x, CAM.P.z))} м`;
       if (now - camSaved > 1000) { camSaved = now; saveCam(); }
+      // ельник и газон строятся у камеры: правка «убрать» находит своё, когда клетка собралась — список и кресты заново
+      let lazy = 0;
+      for (const r of st.edits.remove) if (d.EDL.LAZY[r.kind] && d.EDL.hits(r) > 0) lazy++;
+      if (lazy !== st.lazySeen) { st.lazySeen = lazy; rebuildMarks(); renderLists(); }
     }
     // геймпад: A — действие в центре экрана, B — отмена
     const p = CAM.pad, padOn = now - p.used < 8000;
@@ -626,8 +798,8 @@ window.__editor = {
   st, get cam () { return CAM.P; },
   goTo: (x, z, h) => CAM.goTo(x, z, h), top: (x, z, h) => CAM.top(x, z, h), side: (x, z) => CAM.side(x, z),
   setTool, setKind: name => { const k = KINDS.find(q => q.name === name || q.sub === name || q.kind === name); if (k) setKind(k); return k; }, setFar,
-  addNote, place, removeCity, unAdd, rotateAdd, check, pickAt, groundAt, pen, inHouse,
-  cityNear: (x, z, r = 3) => [...cityItems()].filter(c => Math.hypot(c.x - x, c.z - z) < r).map(c => ({ ...c, d: r2(Math.hypot(c.x - x, c.z - z)) })).sort((a, b) => a.d - b.d),
+  addNote, place, removeCity, unAdd, unRemove, rotateAdd, check, pickAt, groundAt, pen, inHouse, grove, clearCircle, undo, setBrush,
+  cityNear: (x, z, r = 3) => cityAround(x, z, r).map(c => ({ ...c, d: r2(Math.hypot(c.x - x, c.z - z)) })).sort((a, b) => a.d - b.d),
   click: (cx, cy) => onClick(cx, cy),
   get ghost () { return GH.ghost; }, hover: (cx, cy) => { MOUSE.x = cx; MOUSE.y = cy; MOUSE.in = true; updateGhost(true); },
 };

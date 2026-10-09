@@ -17,7 +17,7 @@
    | на карте района     | RT/LT — зум, стик — двигать, B — закрыть (game.js, padStep → FM) |   |                |
    | Start / Menu (☰)    | пауза, меню                    | pause                 | продолжить                 |
    | крестовина ← ↑ →    | ответ 1 / 2 / 3 на карточке     | choice1..3            | выбор (menu*)              |
-   | крестовина ↓        | —                              | —                     | вниз (menuDown)            |
+   | крестовина ↓        | радио: следующая станция (radio.js) | dDown            | вниз (menuDown)            |
    | R3 (нажать правый)  | звук вкл/выкл                  | sound                 | —                          |
    | LB                  | повтор последних 10 с (replay.js) | pageL              | LB/RB — листать (pageL/R) |
    | правый стик         | свободен (в повторе — перемотка) | rx, ry (сырые)      | —                          |
@@ -46,7 +46,7 @@ const CFG = { dead: 0.12, outer: 0.03, curve: 1.6, trigDead: 0.06, rumble: true 
 export function setPadConfig (o) { Object.assign(CFG, o); }
 
 const HOLD = ['hand', 'nitro', 'a', 'b'];
-const EDGES = ['pause', 'map', 'accept', 'choice1', 'choice2', 'choice3', 'sound', 'any', 'btnX', 'btnY',
+const EDGES = ['pause', 'map', 'accept', 'choice1', 'choice2', 'choice3', 'sound', 'any', 'btnX', 'btnY', 'dDown',
   'menuUp', 'menuDown', 'menuLeft', 'menuRight', 'menuOk', 'menuBack', 'pageL', 'pageR', 'trigL', 'trigR'];
 
 // один объект на всё время: не мусорим каждый кадр
@@ -56,6 +56,7 @@ export const pad = {
   hand: false, nitro: false,
   a: false, b: false,       // A и B держат прямо сейчас — для диалогов и мини-игр со своим учётом нажатий
   pause: false, map: false, accept: false, choice1: false, choice2: false, choice3: false, sound: false, any: false,
+  dDown: false,             // крестовина ↓ — только она (не стик): радио в езде
   menuUp: false, menuDown: false, menuLeft: false, menuRight: false, menuOk: false, menuBack: false,
   pageL: false, pageR: false,   // LB / RB — листать страницы (гараж карьеры)
   trigL: false, trigR: false,   // LT / RT нажали до половины — табы настроек (settings.js)
@@ -184,7 +185,7 @@ export function pollPad () {
   if (edge('up', dUp)) { pad.choice2 = true; pad.menuUp = true; }
   if (edge('left', dLeft)) { pad.choice1 = true; pad.menuLeft = true; }
   if (edge('right', dRight)) { pad.choice3 = true; pad.menuRight = true; }
-  if (edge('down', dDown)) pad.menuDown = true;
+  if (edge('down', dDown)) { pad.menuDown = true; pad.dDown = true; }
   // левый стик тоже листает меню — на Deck'е крестовиной пользуются реже
   if (edge('sUp', ly < -0.6)) pad.menuUp = true;
   if (edge('sDown', ly > 0.6)) pad.menuDown = true;

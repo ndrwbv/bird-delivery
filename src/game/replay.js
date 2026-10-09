@@ -11,9 +11,19 @@
    плашка «ПОВТОР»; камера — 4 ракурса (сзади низко, сбоку как у трассы, облёт, как было в игре),
    скорость ×0,25 / ×0,5 / ×1, перемотка. В катсцене, диалоге, на карте, в меню — нельзя.
 
+   ЗВУК ПОВТОРА — пока идёт запись, пишутся и звуки (кольцо EV, последние RP.SECS с): именованные
+   звуки игры (Snd.fx: гудки, бах, сбитый столб…; кроме звуков интерфейса — SND_SKIP), удары слоями
+   (impact.js: удар, стекло, упавшая деталь), а в кадре — газ, тормоз и занос (мотор, визг шин).
+   Повтор идёт вперёд (×0,25—×1, не перемотка) — звуки звучат в свой момент, мотор — по записанной
+   скорости, «уши» — у машины в повторе. Перемотка, пауза — мотор молчит. Музыка (music.js) идёт своя.
+
    РОЛИК — запись холста (MediaRecorder, webm) от начала повтора до конца тем же ракурсом и
-   скоростью. В Стим-сборке (Электрон) — файл в «Видео/Птица Пицца» (electron/main.cjs video:save),
-   в браузере — скачивается. Гифку не делаем: webm и так открывают все плееры и мессенджеры.
+   скоростью, со звуком: шины «звуки», «мотор», «музыка» (общий AudioContext игры) → свой регулятор →
+   MediaStreamAudioDestinationNode → дорожка opus в том же webm. Звук выключен (M, настройки), ?mute,
+   площадка заглушила — ролик без звука. После записи в заголовок webm дописывается длительность
+   (webmdur.js): без неё часть плееров не показывает время. В Стим-сборке (Электрон) — файл в
+   «Видео/Птица Пицца» (electron/main.cjs video:save), в браузере — скачивается. Гифку не делаем:
+   webm и так открывают все плееры и мессенджеры.
 
    УДАР — сильный (от RP.SLOW.V м/с, авария, impact.js IMP.TIER.HEAVY): ~0,4 с мир идёт ×0,3,
    тряска камеры, низкий «вуух». Графика «эффекты: меньше» (gfx.js) — без этого.
@@ -24,6 +34,7 @@
      on()            — повтор открыт: кадр игры — frame(raw), мир не шагает
      pad(p)          — геймпад (game.js padStep); true — кнопки забрал повтор
      crash(vn)       — удар своей машины силой vn м/с (game.js hurtCar)
+     tapFx(...)      — Snd.fx (game.js): записать именованный звук; tapHit(вид, ...) — impact.js: удар, стекло, деталь
      slowK(raw)      — множитель времени мира в этом кадре (замедление после удара)
      DEBUG           — __dlv.REPLAY: состояние, счётчики, ручки для проверок
 
@@ -32,6 +43,8 @@
 import './replay.css';
 import { t, N_ } from '../i18n/index.js';
 import { keyHTML, matchKey, refreshKeys } from '../input/glyphs.js';
+import * as IMPACT from './impact.js';
+import { fixDuration } from './webmdur.js';
 
 export const RP = {
   HZ: 30,             // снимков в секунду игрового времени
@@ -46,7 +59,13 @@ export const RP = {
   STEP: 1,            // с: шаг крестовины / кнопки ◀ ▶
   SLOW: { V: 15, K: 0.3, SECS: 0.4, EASE: 0.12, GAP: 2.5, SHAKE: 0.9 },
   REC_FPS: 30, REC_BPS: 8e6,
+  SND: true,          // звуки в повторе (и в ролике): удары, гудки, мотор по записи
+  EV_MAX: 400,        // звуков в кольце, не больше (старые выпадают)
+  REC_ABPS: 128e3,    // звук ролика, бит/с (opus)
+  REC_GAIN: 0.45,     // громкость звука в ролике — как общий регулятор игры (Snd.main)
 };
+/* звуки интерфейса — не в повтор */
+const SND_SKIP = new Set(['ui-click', 'ui-deny', 'tick', 'clip-saved', 'order', 'fail', 'receipt', 'fanfare', 'reel-tick', 'reel-stop', 'talk-f', 'chip', 'bet']);
 const CAMS = [
   { id: 'chase', label: N_('сзади') },
   { id: 'side', label: N_('сбоку') },
@@ -62,7 +81,7 @@ const F_CAP = RP.HZ * RP.SECS + 2;
 const E_CAP = F_CAP * RP.E_AVG;
 const ED = new Float32Array(E_CAP * FL);
 const EID = new Int32Array(E_CAP);
-const FDL = 16;                                 // кадр: время, камера xyz, кватернион, fov, машина xyz, курс, скорость
+const FDL = 16;                                 // кадр: время, камера xyz, кватернион, машина xyz, курс, скорость, fov, педали (MF_*), занос
 const FD = new Float32Array(F_CAP * FDL);
 const FS = new Float64Array(F_CAP);             // номер первой записи кадра (сквозной)
 const FC = new Int32Array(F_CAP);               // сколько записей
@@ -75,7 +94,7 @@ const OBJ = [], LAST = [], FREE = [];
 const POS = [], QUA = [], SCL = [], MAT = [];
 const ALW = new Set();
 
-export const STATS = { samples: 0, entries: 0, maxPer: 0, objs: 0, clears: 0, opens: 0, slow: 0, saved: 0, recMs: 0, lastPath: '' };
+export const STATS = { samples: 0, entries: 0, maxPer: 0, objs: 0, clears: 0, opens: 0, slow: 0, saved: 0, recMs: 0, lastPath: '', events: 0, played: 0, audio: false, lastDurMs: 0 };
 
 /* ?noreplay — без записи (сравнить цену кадра: tools/probe-checks/frametail.js) */
 const OFF = typeof location !== 'undefined' && /[?&]noreplay(&|$)/.test(location.search);
@@ -89,6 +108,7 @@ export function init (api) {
 function clear () {
   FN = F0 = EN = 0; T = 0; ACC = 0;
   IDX.clear(); OBJ.length = 0; LAST.length = 0; FREE.length = 0; POS.length = 0; QUA.length = 0; SCL.length = 0; MAT.length = 0; CAND.length = 0; NEXT.length = 0;
+  EV.length = 0;
   STATS.clears++;
 }
 /** не едем (меню, итоги): следующая запись — с чистого листа */
@@ -113,6 +133,42 @@ function put (id, o, flags) {
   ED[b + 11] = flags | (o.visible ? 1 : 0);
   EN++;
 }
+/* ── звуки: кольцо событий ──
+   { t — время записи (T), k — 'fx' | 'hit' | 'glass' | 'debris', a — аргументы как у вызова }; «где» копируем */
+const EV = [];
+const MF_GAS = 1, MF_BRAKE = 2, MF_HAND = 4, MF_NOS = 8, MF_AIR = 16, MF_DEAD = 32;
+const cp = o => (o && typeof o === 'object' ? { ...o } : o);
+function evPush (k, a) {
+  if (!A || OPEN || OFF || !LIVE) return;
+  const old = T - RP.SECS - 1;
+  let n = 0;
+  while (n < EV.length && (EV[n].t < old || EV.length - n >= RP.EV_MAX)) n++;
+  if (n) EV.splice(0, n);
+  EV.push({ t: T, k, a });
+  STATS.events++;
+}
+/** Snd.fx (game.js): именованный звук игры */
+export function tapFx (name, synth, at, v) {
+  if (!LIVE || OPEN) return;
+  if (SND_SKIP.has(Array.isArray(name) ? name[0] : name)) return;
+  evPush('fx', [name, synth, cp(at), v]);
+}
+/** impact.js: 'hit' (v, mat, at) | 'glass' (broken, cracked, lamps, at) | 'debris' (at, v, key, again) */
+export function tapHit (k, a, b, c, d) {
+  if (!LIVE || OPEN) return;
+  evPush(k, [cp(a), cp(b), cp(c), cp(d)]);
+}
+function fire (e) {
+  const a = e.a;
+  try {
+    if (e.k === 'fx') A.Snd.fx(a[0], a[1], a[2] || undefined, a[3]);
+    else if (e.k === 'hit') IMPACT.hit(a[0], a[1], a[2] || undefined);
+    else if (e.k === 'glass') IMPACT.glass(a[0], a[1], a[2], a[3] || undefined);
+    else if (e.k === 'debris') IMPACT.debris(a[0], a[1], a[2], a[3]);
+    STATS.played++;
+  } catch (err) { /* звук не главное */ }
+}
+
 /* кого писать в снимок: ближе RP.R, ещё не в этом снимке; новых — только то, что двигается (не замороженную статику) */
 let SX = 0, SZ = 0, SN = 0;
 const R2 = RP.R * RP.R;
@@ -174,6 +230,9 @@ export function rec (dt) {
   FD[b + 11] = car.rotation.y;
   FD[b + 12] = A.speed ? A.speed() : 0;
   FD[b + 13] = c.fov;
+  const mi = A.motorIn ? A.motorIn() : null;      // педали и занос — мотор и визг шин в повторе
+  FD[b + 14] = mi ? ((A.gas && A.gas() ? MF_GAS : 0) | (mi.brake ? MF_BRAKE : 0) | (mi.hand ? MF_HAND : 0) | (mi.nos ? MF_NOS : 0) | (mi.air ? MF_AIR : 0) | (mi.dead ? MF_DEAD : 0)) : 0;
+  FD[b + 15] = mi ? +mi.side || 0 : 0;
   FN++;
   while (FN - F0 > F_CAP - 1) F0++;
   while (F0 < FN && FS[F0 % F_CAP] < EN - E_CAP) F0++;   // записи этого кадра уже затёрты — кадр не живой
@@ -187,7 +246,8 @@ export function rec (dt) {
 
 /* ── повтор ── */
 let OPEN = false, FROM = '', F = 0, TT = null, CD = null, TR = null, DUR = 0;
-let PT = 0, PLAY = true, SPD = 2, CAM = 0, HOLD = 0, PADH = 0, LASTPT = -1;
+let PT = 0, PLAY = true, SPD = 2, CAM = 0, HOLD = 0, PADH = 0, LASTPT = -1, RT0 = 0, MOT = false;
+const MI = { live: true, dead: false, brake: 0, hand: 0, side: 0, air: false, nos: false, vmax: 48, surf: 1, id: '' };   // мотор в повторе
 const SNAP = { px: 0, py: 0, pz: 0, qx: 0, qy: 0, qz: 0, qw: 1, fov: 60 };
 const CM = { x: 0, y: 0, z: 0, lx: 0, ly: 0, lz: 0, ok: false, h: 0, ang: 0, ax: 0, ay: 0, az: 0, anchor: false, side: 1 };
 export const on = () => OPEN;
@@ -220,6 +280,9 @@ function build () {
   TT = new Float32Array(F);
   CD = new Float32Array(F * FDL);
   const tBase = FD[(F0 % F_CAP) * FDL];
+  RT0 = tBase;
+  const mi = A.motorIn ? A.motorIn() : null;
+  MI.vmax = (mi && mi.vmax) || 48; MI.surf = mi && mi.surf != null ? mi.surf : 1; MI.id = (mi && mi.id) || '';
   const map = new Map();
   for (let k = 0; k < F; k++) {
     const slot = (F0 + k) % F_CAP;
@@ -275,6 +338,8 @@ export function close () {
     if (tr.added && o.parent) o.parent.remove(o);
     if (tr.frozen) { o.updateMatrix(); o.updateMatrixWorld(true); }
   }
+  if (MOT && A.motor) A.motor(0, false, null, 0);
+  MOT = false;
   TR = null; TT = null; CD = null;
   const c = A.cam;
   c.position.set(SNAP.px, SNAP.py, SNAP.pz); c.quaternion.set(SNAP.qx, SNAP.qy, SNAP.qz, SNAP.qw);
@@ -411,6 +476,7 @@ function setFov (c, f) { if (Math.abs(c.fov - f) > 0.05) { c.fov = f; c.updatePr
 export function frame (raw) {
   const dt = Math.min(Math.max(raw, 0), 0.1);
   const rate = HOLD || PADH ? (HOLD || PADH) * RP.SCRUB : PLAY ? RP.SPEEDS[SPD] : 0;
+  const pt0 = PT;
   PT += dt * rate;
   if (PT >= DUR) {
     if (REC) { PT = DUR; stopRec(false); }
@@ -422,7 +488,28 @@ export function frame (raw) {
   const r = at(PT); AT[0] = r[0]; AT[1] = r[1];
   apply(r[0], r[1]);
   camera(dt, jump);
+  sounds(pt0, dt, rate > 0 && !HOLD && !PADH && PT > pt0 && PT - pt0 < 0.6);
   bar();
+}
+
+/* звуки повтора: события [pt0, PT) и мотор по записи; fwd — идёт вперёд обычным ходом (не перемотка, не пауза) */
+function sounds (pt0, dt, fwd) {
+  if (!RP.SND || !A.Snd) return;
+  const c = A.cam;
+  c.updateMatrixWorld();
+  const e = c.matrixWorld.elements;
+  if (A.Snd.ear) A.Snd.ear(P.x, P.z, e[0], e[2]);   // «уши» — у машины в повторе, правое — по камере повтора
+  if (fwd) {
+    for (let i = 0; i < EV.length; i++) { const et = EV[i].t - RT0; if (et >= pt0 && et < PT) fire(EV[i]); }
+  }
+  if (!A.motor) return;
+  if (fwd) {
+    const k = AT[0], f = CD[k * FDL + 14];
+    MI.dead = !!(f & MF_DEAD); MI.brake = f & MF_BRAKE ? 1 : 0; MI.hand = f & MF_HAND ? 1 : 0; MI.nos = !!(f & MF_NOS); MI.air = !!(f & MF_AIR);
+    MI.side = CD[k * FDL + 15];
+    A.motor(P.v, !MI.dead && !!(f & (MF_GAS | MF_NOS)), MI, dt);
+    MOT = true;
+  } else { A.motor(0, false, null, dt); MOT = false; }   // мотор молчит; визг шин и нитро гаснут своим шагом
 }
 
 /* ── управление ── */
@@ -543,24 +630,59 @@ function msg (text, path) {
 }
 
 /* ── ролик: запись холста ── */
-let REC = null, CHUNKS = [], STREAM = null, CANCEL = false;
-const MIME = () => {
+let REC = null, CHUNKS = [], STREAM = null, CANCEL = false, AUD = null, REC_MS = 0;
+const MIME = aud => {
   if (typeof MediaRecorder === 'undefined') return '';
-  for (const m of ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4']) { try { if (MediaRecorder.isTypeSupported(m)) return m; } catch (e) { /* — */ } }
+  const L = aud ? ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus'] : ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+  for (const m of L) { try { if (MediaRecorder.isTypeSupported(m)) return m; } catch (e) { /* — */ } }
   return '';
 };
+/* звук ролика: шины «звуки», «мотор», «музыка» → свой регулятор → дорожка. Динамики — как были (общий регулятор
+   Snd.main не трогаем). Звук выключен, ?mute, площадка заглушила, контекст спит — null (ролик без звука) */
+function audioOn () {
+  const S = A.Snd, c = S && S.ctx;
+  if (!c || !c.createMediaStreamDestination) return null;
+  if (!DEBUG.forceAudio && (S.hard || !S.on || S.muted)) return null;
+  if (c.state !== 'running') return null;
+  const buses = [S.sfxBus, S.engBus, S.musicBus].filter(Boolean);
+  if (!buses.length) return null;
+  try {
+    const g = c.createGain(), d = c.createMediaStreamDestination();
+    g.gain.value = RP.REC_GAIN;
+    for (const b of buses) b.connect(g);
+    g.connect(d);
+    AUD = { g, d, buses };
+    return d.stream.getAudioTracks()[0] || null;
+  } catch (e) { audioOff(); return null; }
+}
+function audioOff () {
+  if (!AUD) return;
+  for (const b of AUD.buses) { try { b.disconnect(AUD.g); } catch (e) { /* — */ } }
+  try { AUD.g.disconnect(); } catch (e) { /* — */ }
+  AUD = null;
+}
 function save () {
   if (REC) { stopRec(true); msg(t('запись отменена')); return; }
-  const cv = A.canvas, mime = MIME();
-  if (!cv || !cv.captureStream || !mime) { msg(t('тут ролик не записать: браузер не умеет')); return; }
+  const cv = A.canvas;
+  if (!cv || !cv.captureStream || !MIME(false)) { msg(t('тут ролик не записать: браузер не умеет')); return; }
+  let mime = '';
   try {
     STREAM = cv.captureStream(RP.REC_FPS);
-    REC = new MediaRecorder(STREAM, { mimeType: mime, videoBitsPerSecond: RP.REC_BPS });
-  } catch (e) { REC = null; msg(t('тут ролик не записать: браузер не умеет')); return; }
+    const at = MIME(true) ? audioOn() : null;
+    if (at) { STREAM = new MediaStream([...STREAM.getVideoTracks(), at]); mime = MIME(true); } else { audioOff(); mime = MIME(false); }
+    const o = { mimeType: mime, videoBitsPerSecond: RP.REC_BPS };
+    if (at) o.audioBitsPerSecond = RP.REC_ABPS;
+    REC = new MediaRecorder(STREAM, o);
+  } catch (e) {
+    REC = null; audioOff();
+    if (STREAM) { for (const tr of STREAM.getTracks()) tr.stop(); STREAM = null; }
+    msg(t('тут ролик не записать: браузер не умеет')); return;
+  }
+  STATS.audio = !!AUD;
   CHUNKS = []; CANCEL = false;
   const r = REC;
   r.ondataavailable = e => { if (e.data && e.data.size) CHUNKS.push(e.data); };
-  r.onstop = () => { const parts = CHUNKS; CHUNKS = []; if (!CANCEL) done(new Blob(parts, { type: mime.split(';')[0] }), mime); };
+  r.onstop = () => { const parts = CHUNKS; CHUNKS = []; if (!CANCEL) done(new Blob(parts, { type: mime.split(';')[0] }), mime, REC_MS); };
   PT = 0; PLAY = true; LASTPT = -1;
   r.start(500);
   STATS.recStart = performance.now();
@@ -570,16 +692,20 @@ function stopRec (cancel) {
   const r = REC;
   if (!r) return;
   REC = null; CANCEL = !!cancel;
+  REC_MS = performance.now() - (STATS.recStart || 0);
   try { r.stop(); } catch (e) { /* — */ }
   if (STREAM) { for (const tr of STREAM.getTracks()) tr.stop(); STREAM = null; }
+  audioOff();
   hud();
 }
 function stamp () {
   const d = new Date(), z = n => String(n).padStart(2, '0');
   return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + '_' + z(d.getHours()) + '-' + z(d.getMinutes()) + '-' + z(d.getSeconds());
 }
-async function done (blob, mime) {
-  STATS.lastSize = blob.size; STATS.lastMs = performance.now() - (STATS.recStart || 0);
+async function done (blob, mime, ms) {
+  STATS.lastMs = performance.now() - (STATS.recStart || 0);
+  if (/webm/.test(mime)) { const b = await fixDuration(blob, ms); STATS.lastDurMs = b !== blob ? Math.round(ms) : 0; blob = b; }   // длительность — в заголовок
+  STATS.lastSize = blob.size;
   const name = 'bird-pizza_' + stamp() + (/mp4/.test(mime) ? '.mp4' : '.webm');
   if (DEBUG.sink) { DEBUG.sink(blob, name); return; }
   const B = typeof window !== 'undefined' && window.birdSteam;
@@ -628,7 +754,8 @@ export function slowK (raw) {
 }
 
 export const DEBUG = {
-  RP, STATS, open, close, can, length, slowK, crash, sink: null,
+  RP, STATS, EV, open, close, can, length, slowK, crash, sink: null,
+  forceAudio: false,      // проверки: звук в ролик и при ?mute (динамики молчат — общий регулятор игры на нуле)
   get on () { return OPEN; }, get pt () { return PT; }, get dur () { return DUR; }, get cam () { return CAMS[CAM].id; }, get speed () { return RP.SPEEDS[SPD]; },
   get play () { return PLAY; }, get rec () { return !!REC; }, get frames () { return FN - F0; }, get slow () { return SLOW_T; },
   set pt (v) { PT = +v || 0; }, setCam (i) { CAM = i % CAMS.length; CM.ok = false; CM.anchor = false; hud(); }, setSpeed (i) { SPD = i; hud(); }, togglePlay, save, stopRec,
