@@ -20,6 +20,8 @@ const onShift = async () => {
   return d.S.state; };
 const ride = async () => { if (!d.S.ride || !['drive'].includes(d.S.state)) { d.startRun(true); await wait(200); } return d.S.state; };
 const autopilot = (on = true) => P.autopilot(on);
+/* что автопилот закрыл за прогон: { closed: {окно: сколько раз}, maxStall: самая долгая стойка мира, с } */
+const apStats = () => ({ closed: { ...P.ap.closed }, maxStall: +P.ap.maxStall.toFixed(1) });
 /* smoke(secs): смена на автопилоте и проверка, что игра жива. → { ok, fail: [что не так], m, frames, clock, ft }
    жива — машина проехала ≥ 150 м, кадры идут, часы смены идут, числа конечные, в конце — смена и руль в руках */
 const smoke = async (secs = 30, minM = 150) => {
@@ -48,7 +50,7 @@ const smoke = async (secs = 30, minM = 150) => {
   // журнал ошибок (src/platform/crashlog.js): предохранитель глотает исключения кадра — их видно только тут
   const crash = d.crashlog ? d.crashlog.entries().map(e => ({ kind: e.kind, where: e.where, n: e.n, msg: e.msg, at: (e.stack || '').split('\\n')[1] || '', phase: e.snap && e.snap.phase, state: e.snap && e.snap.state })) : null;
   if (crash && crash.length) fail.push('журнал ошибок: ' + crash.length + ' записей');
-  return { ok: !fail.length, fail, m: Math.round(m), frames, clock, env, state: d.S.state, delivered: d.S.delivered || 0, ft: P.stats(f0), crash };
+  return { ok: !fail.length, fail, ap: apStats(), m: Math.round(m), frames, clock, env, state: d.S.state, delivered: d.S.delivered || 0, ft: P.stats(f0), crash };
 };
 `;
 
@@ -69,7 +71,7 @@ const INSTALL = `(() => { if (window.__probe) return; const P = window.__probe =
      занесло, вытолкнули) старый автопилот тянул назад к дороге — она кружила вокруг одной точки
      и не доезжала (до 03.10.2026: 0—1 доставка за 90 с, смена кончалась сердцами). */
   const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
-  P.ap = { on: false, vmax: 14 };
+  P.ap = { on: false, vmax: 14, closed: {}, maxStall: 0 };
   P.autopilot = on => { P.ap.on = !!on; if (!on) { const IN = window.__dlv.IN; IN.joy = 0; IN.gas = 0; IN.brake = 0; } return P.ap.on; };
   /* ближайшая точка ломаной R[i0..] к (x, z): участок i (R[i-1] → R[i]) и доля k; почти поровну — дальше по маршруту */
   const proj = (R, x, z) => {
@@ -203,7 +205,34 @@ const INSTALL = `(() => { if (window.__probe) return; const P = window.__probe =
     const D = window.__dlv, A = P.ap; if (!A.on || !D) return; const IN = D.IN, V = D.V, S = D.S;
     try {
       if (S.state === 'brief') { D.acceptOrder(); return; }
-      if (D.CH && D.CH.opts && D.CH.opts.length && D.pickChoice) { D.pickChoice(1); return; }
+      /* окна, что ждут ответа игрока (мир стоит на паузе): ~0,8 с «читает» и жмёт кнопку, как игрок мышью —
+         диалог (DLG: приглашение клиентки, Толик, поручения, гопники) — «отказаться» (гопникам — заплатить;
+         одна кнопка — она), карточка выбора (CH): обед и «воскреснуть?» — первый вариант, просьба клиента — отказ.
+         Сколько закрыто — P.ap.closed; самая долгая стойка мира — P.ap.maxStall (с) */
+      const rn = performance.now(), dlgOn = !!(D.DLG && D.DLG.isOpen && D.DLG.isOpen()), chOn = !!(D.CH && D.CH.opts && D.CH.opts.length && D.pickChoice);
+      if (dlgOn || chOn || (S.paused && S.state !== 'over')) {
+        IN.joy = 0; IN.gas = 0; IN.brake = 0;
+        if (!A.stallT) A.stallT = rn;
+        A.maxStall = Math.max(A.maxStall || 0, (rn - A.stallT) / 1000);
+        const cnt = k => { A.closed[k] = (A.closed[k] || 0) + 1; };
+        if (rn - A.stallT > 800 && rn - (A.actT || 0) > 400) {
+          A.actT = rn;
+          if (dlgOn) {
+            const root = document.getElementById('dlg'), q = s => root && root.querySelector(s);
+            if (root && !root.hidden && q('.dlg-btns.on')) {
+              const gang = (q('.dlg-bar').style.backgroundColor || '').replace(/\\s/g, '') === 'rgb(217,52,44)', no = q('.dlg-no'), yes = q('.dlg-yes');
+              const b = !gang && no && !no.hidden ? no : yes;
+              cnt('диалог: ' + ((q('.dlg-name').textContent || '?').split(' · ')[0]) + (b === yes && no && !no.hidden ? ' (принял)' : ''));
+              b.click();
+            } else if (root && !root.hidden) { const bb = q('.dlg-bubble'); if (bb) bb.click(); }   // ещё печатает — пропустить
+          } else if (chOn) {
+            const o = D.CH.opts, i = D.CH.pause || D.CH.full || o.length < 2 ? 0 : o.length - 1, tt = document.getElementById('ch-t');
+            if (performance.now() >= (D.CH.armAt || 0)) { cnt('карточка: ' + (tt ? tt.textContent : '?') + ' → ' + (o[i].label || '').replace(/<[^>]*>/g, '').slice(0, 24)); D.pickChoice(i); }
+          } else if (S.paused && !S.meal && ['drive', 'back', 'handover', 'brief', 'loading', 'side'].includes(S.state)) { cnt('пауза без окна'); D.setPause(false); }
+        }
+        return;
+      }
+      A.stallT = 0;
       // мини-игры у клиента (doorstep.js): через ~0,6 с домофон — набирает верный номер и жмёт «вызов» (сломан — стучит),
       // разговор у двери — отвечает «поторопить»
       if (D.DOOR && D.DOOR.on && D.DOOR.on()) { IN.joy = 0; IN.gas = 0; IN.brake = 0; const n = performance.now(); if (!A.doorT) A.doorT = n; else if (n - A.doorT > 600) { A.doorT = 0; D.DOOR.solve(); } return; }
