@@ -317,7 +317,7 @@ const turnTo = (h, want, max) => { let d = want - h; d = Math.atan2(Math.sin(d),
 function startRam (a) {
   a.mode = 'aim'; a.mt = FAUNA.RAM.AIM; a.v = 0; a.hit = 0; a.x0 = a.x; a.z0 = a.z;   // сюда вернётся
   if (A.emote) A.emote(a.x, 2.8, a.z, 'angry', 2);
-  if (A.Snd && A.Snd.noise) { A.Snd.noise(0.35, 0.16); A.Snd.blip(75, 0.3, 'sawtooth', 0.08); }   // фыркнул
+  if (A.Snd && A.Snd.fx) A.Snd.fx('moose', s => { s.noise(0.35, 0.16); s.blip(75, 0.3, 'sawtooth', 0.08); }, { x: a.x, z: a.z });   // фыркнул
 }
 function tryRam () {
   const R = FAUNA.RAM, V = A.V;
@@ -360,7 +360,7 @@ function ramHit (a, hx, hz) {
   V.h += clamp(tq * 0.08, -0.3, 0.3);
   if (A.sparks) A.sparks(hx, 1, hz, 10, dx, dz);
   if (A.ram) A.ram(R.SPEED + 3, hx, hz);              // −½ сердца, мятина, звук удара (game.js hurtCar)
-  if (A.Snd && A.Snd.blip) A.Snd.blip(60, 0.25, 'square', 0.12);
+  if (A.Snd && A.Snd.fx) A.Snd.fx('moose-hit', s => s.blip(60, 0.25, 'square', 0.12));
   a.kx = -dx * 2; a.kz = -dz * 2;                       // отскочил назад
   if (A.emote) A.emote(a.x, 2.8, a.z, 'star', 3);
   a.mode = 'home'; a.mt = R.HOME;
@@ -477,7 +477,7 @@ function bump (a) {
     a.kx = nx * k; a.kz = nz * k; a.roll = Math.min(0.55, 0.15 + vn * 0.025) * (Math.random() < 0.5 ? 1 : -1);
     a.mode = 'stagger'; a.mt = H.STAGGER; a.h = Math.atan2(nx, nz) + rand(-0.5, 0.5);
     if (A.emote) A.emote(a.x, 2.6, a.z, 'star', 5);
-    if (A.Snd && A.Snd.crash && A.S.hurt <= 0) A.Snd.crash(vn);
+    if (A.Snd && A.Snd.crash && A.S.hurt <= 0) A.Snd.crash(vn, { x: hx, z: hz }, 'person');   // лось — мягкое тело (impact.js)
     if (ST.hitToast <= 0) { ST.hitToast = 8; A.toast(t('врезался в лося — он тяжёлый, как машина')); }
   } else {
     V.vx -= nx * vn; V.vz -= nz * vn;          // упёрся: дальше не едешь
@@ -602,9 +602,8 @@ export function trafficYield (t, dt) {
     t.mooseN = (t.mooseN || 0) + 1;
     ST.honks = (ST.honks || 0) + 1;
     const V = A.V, d = Math.hypot(t.x - V.x, t.z - V.z);
-    if (d < 70 && A.Snd && A.Snd.blip) {
-      const v = 0.07 * (1 - d / 70);
-      A.Snd.blip(400, 0.16, 'square', v); setTimeout(() => A.Snd.blip(400, 0.28, 'square', v), 200);
+    if (d < 70 && A.Snd && A.Snd.fx) {
+      A.Snd.fx('honk', s => { s.blip(400, 0.16, 'square', 0.07); setTimeout(() => s.blip(400, 0.28, 'square', 0.07), 200); }, { x: t.x, z: t.z, far: 70 });
     }
     if (A.emote && t.mooseN === 1) A.emote(who.x, 2.8, who.z, 'angry', 1.5);
     if (t.mooseN >= YIELD.SHOO) shoo(who);

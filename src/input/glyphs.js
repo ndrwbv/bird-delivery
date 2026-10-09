@@ -8,17 +8,20 @@
      matchKey('x', e)       → true, если keydown e — клавиатурная пара действия (KeyX и т. п.)
 
    Действия: ok (главное, штамп) · back (назад) · x · y (пометки на полях) · lb · rb (страницы) ·
-   pause. Ввод: 'pad' (Xbox / Steam Deck — A B X Y LB RB; PlayStation — ✕ ○ □ △ L1 R1),
+   pause · replay (повтор: LB / R). Ввод: 'pad' (Xbox / Steam Deck — A B X Y LB RB; PlayStation — ✕ ○ □ △ L1 R1),
    'kb' (клавиатура и мышь), 'touch' (палец — значков нет, жмут сам штамп).
 
    Как понимаем, чем играют: первое же нажатие геймпада (game.js padStep → setInput('pad'), по
    gamepad.js pad.lastUse; без game.js — body.pad) — «геймпад»; клавиша или мышь — «клавиатура»;
-   касание — «касание». От простоя геймпада значок не гаснет: остаётся последний ввод.
+   касание — «касание». От простоя геймпада значок не гаснет: остаётся последний ввод; геймпад
+   отключили — назад на клавиатуру (или касание). game.js держит body.pad ровно по этому вводу
+   (09.10.2026; было — «трогали геймпад последние 8 с», и после мыши значки геймпада возвращались
+   только через 8 с простоя).
    Песочница (без game.js) переключает руками: setInput('pad' | 'kb' | 'touch', 'xbox' | 'ps'). */
 
 const PAD = {
-  xbox: { ok: 'A', back: 'B', x: 'X', y: 'Y', lb: 'LB', rb: 'RB', pause: '☰' },
-  ps: { ok: '✕', back: '○', x: '□', y: '△', lb: 'L1', rb: 'R1', pause: '☰' },
+  xbox: { ok: 'A', back: 'B', x: 'X', y: 'Y', lb: 'LB', rb: 'RB', pause: '☰', replay: 'LB' },
+  ps: { ok: '✕', back: '○', x: '□', y: '△', lb: 'L1', rb: 'R1', pause: '☰', replay: 'L1' },
 };
 // клавиатура: что нарисовано на значке и какие e.code его жмут (matchKey)
 const KB = {
@@ -29,6 +32,7 @@ const KB = {
   lb: ['Q', ['KeyQ']],
   rb: ['E', ['KeyE']],
   pause: ['Esc', ['Escape']],
+  replay: ['R', ['KeyR']],      // повтор последних 10 с (replay.js): в езде LB / R
 };
 
 let kind = matchMedia('(pointer: coarse)').matches ? 'touch' : 'kb';
@@ -97,4 +101,9 @@ if (typeof window !== 'undefined') {
   addEventListener('keydown', () => setInput('kb'), true);
   addEventListener('pointerdown', e => setInput(e.pointerType === 'touch' || e.pointerType === 'pen' ? 'touch' : 'kb'), true);
   addEventListener('gamepadconnected', () => { if (kind === 'pad') setInput('pad', padFamily()); });
+  addEventListener('gamepaddisconnected', () => {
+    let any = false;
+    try { any = [...(navigator.getGamepads ? navigator.getGamepads() : [])].some(Boolean); } catch (e) { /* — */ }
+    if (kind === 'pad' && !any) setInput(matchMedia('(pointer: coarse)').matches ? 'touch' : 'kb');
+  });
 }

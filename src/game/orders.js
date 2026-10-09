@@ -24,7 +24,7 @@
                           спрашивают только в пиццерии: не там — едешь назад, staffWaiting() — ждут, staffHere() — вернулся
      ORD.resetShift()   — новая смена (career.js onShiftStart; сам ловит и по S.orders)
      ORD.force(spec)    — песочница: сделать заказ текущим сейчас. spec — сюжетная (STORY.orderFor)
-                          или { kind: 'urgent' | 'edge' | 'gang' | 'pizza', zone?, near?: { x, z }, r?, dist? }
+                          или { kind: 'urgent' | 'edge' | 'gang' | 'pizza' | 'beach', zone?, near?: { x, z }, r?, dist? }
      ORD.forceSide(id)  — песочница: диалог поручения id из SIDE_ORDERS с клиентом или ближайшим прохожим
    Сюжет (story.js, если есть): STORY.nextOrder({ shift, hour, x, z, … }) → спецификация или null —
    спрашиваем перед каждой обычной пиццей. Заказ стал текущим — STORY.stage(spec), отдали —
@@ -42,6 +42,7 @@ import * as FEST from './festivals.js';
 import * as HURR from './hurricane.js';          // дома, унесённые ураганом: их адреса не выдаём (hurricane.js blocked)
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 import * as GROW from './growth.js';            // пиццерия растёт: оплата, чаевые, размер сборных по ступени (econ.js GROWTH)
+import * as BEACH from './beach.js';            // пляж летом: заказ на полотенце (beach.js ORDER)
 import { makePerson } from './people.js';
 import { ORDER_TYPES, SHIFT_PLAN, SIDE_ORDERS, STAFF_RIDE, BOSS } from './orders.config.js';
 
@@ -179,7 +180,7 @@ function distRing () {
 }
 
 /* ─────────────── смена ─────────────── */
-const SH = { far: 0, last: 0, gen: 0, sideOwed: false, zones: new Set(), must: {}, h0: 9, done: 0, log: [], reserved: new Set(), pts: [], breather: false, k: 0, sz: 1, ones: 0 };
+const SH = { far: 0, last: 0, gen: 0, sideOwed: false, zones: new Set(), must: {}, h0: 9, done: 0, log: [], reserved: new Set(), pts: [], breather: false, k: 0, sz: 1, ones: 0, beach: 0, beachAt: -99 };
 const Q = [];                                          // заказы наперёд (песочница может положить); в игре — собираем по одному, когда нужен
 
 export function resetShift () {
@@ -188,7 +189,7 @@ export function resetShift () {
   SH.last = 0;
   SH.gen = 0; SH.sideOwed = false;
   SH.zones = new Set(); SH.must = {}; SH.done = 0; SH.log = []; SH.reserved = new Set(); SH.pts = []; SH.breather = false;
-  SH.k = 0; SH.sz = 1; SH.ones = 0; SH.far = 0;
+  SH.k = 0; SH.sz = 1; SH.ones = 0; SH.far = 0; SH.beach = 0; SH.beachAt = -99;
   SH.h0 = hourNow();
   buildPool();
 }
@@ -309,6 +310,8 @@ function genSpec () {
     }
   }
   const life = lifeN();
+  // пляж летом (beach.js ORDER): клиент загорает на полотенце — в среднем 1 из EVERY, если пляж в твоём районе
+  if (!spec && !forced) spec = beachSpec(hAt);
   // сборный: n пицц на n адресов разом (econ.js BUNDLE) — с 8-го заказа за всё время
   if (!spec && !forced) spec = bundleSpec(life, D);
   if (!spec) {
@@ -327,6 +330,24 @@ function genSpec () {
     if (SH.sideOwed || chance(ECON.sideChance(life))) { spec.side = true; SH.sideOwed = false; }
   }
   return finishSpec(spec, forced, hAt);
+}
+
+/* заказ на пляж (beach.js): лето, день (ORDER.H0…H1), пляж в районе, где работаешь (без районов — не дальше
+   дальности заказа от пиццерии), не чаще ORDER.GAP заказов подряд и не больше ORDER.MAX за смену; шанс 1 / ORDER.EVERY */
+function beachSpec (hAt) {
+  const O = BEACH.ORDER;
+  if (SH.beach >= O.MAX || SH.gen - SH.beachAt < O.GAP) return null;
+  if (!SIM && (hAt < O.H0 || hAt > O.H1)) return null;
+  if (!BEACH.orderOk(SIM)) return null;
+  const c = BEACH.center();
+  if (!c) return null;
+  if (DIST.has()) { if (!DIST.mine(DIST.at(c.x, c.z))) return null; }
+  else if (!A.PIZZA || Math.hypot(c.x - A.PIZZA.x, c.z - A.PIZZA.z) > (SHIFT_PLAN.dist.max || 1500) * 1.3) return null;
+  if (!chance(1 / O.EVERY)) return null;
+  const s = BEACH.orderSpot();
+  if (!s) return null;
+  SH.beach++; SH.beachAt = SH.gen;
+  return { type: 'pizza', kind: 'solo', beach: true, stops: [{ x: s.x, z: s.z, key: keyOf(s.x, s.z), zone: ZN.zoneAt(s.x, s.z), n: 1, addr: t('пляж на Томи, у воды') }] };
 }
 
 /* сборный заказ: ступень по номеру заказа за всё время (BUNDLE.STEPS). Самый первый —
@@ -525,7 +546,7 @@ function bindSpec (spec) {
       A.pushOut(b, 0.5);
       peds.push(b);
     }
-    stops.push({ peds, key: st.key, zone: st.zone, ...(spec.fest ? { fixAddr: st.addr, fest: true } : {}) });   // фестиваль: адрес — «… проход», не дом рядом
+    stops.push({ peds, key: st.key, zone: st.zone, ...(spec.fest ? { fixAddr: st.addr, fest: true } : {}), ...(spec.beach ? { fixAddr: st.addr, beach: true } : {}) });   // фестиваль: адрес — «… проход», не дом рядом; пляж — «пляж на Томи»
   }
   if (!stops.length) return null;
   spec.stops = spec.stops.slice(0, stops.length);
@@ -536,6 +557,7 @@ function bindSpec (spec) {
 function whyOf (sp) {
   if (sp.story) return sp.story.why || t('особый заказ');
   if (sp.fest) return sp.fest.why;
+  if (sp.beach) return t('пляж: клиент загорает на полотенце · на песке машина вязнет');
   const z = t(ZONE_LABEL[sp.zone] || ZONE_LABEL.normal);
   if (sp.urgent) return t('срочно: времени в обрез · оплата ×{k} · не успеешь — штраф', { k: fmtK(PAY.URGENT) });
   if (sp.edge) return t('в самый конец района · оплата ×{k}', { k: fmtK(PAY.EDGE) });
@@ -656,18 +678,16 @@ export function card (order) {
   const kind = document.getElementById('ph-kind');
   if (kind && sp.type !== 'pizza') kind.textContent = t(ORDER_TYPES[sp.type] ? ORDER_TYPES[sp.type].label : sp.type) + ' · ' + kind.textContent;
 }
-/* строки накладной на карточке (game.js showOrderCard): район, оплата; очередь «дальше» на карточке не показываем */
+/* строки накладной на карточке (game.js showOrderCard): оплата и премии; очередь «дальше» на карточке не показываем.
+   Района нет (О4, 09.10.2026): в накладной — кому, куда, что и пометка по делу; особый квартал с другой оплатой
+   («бандитский район · оплата ×1,3») и так в пометке (whyOf) */
 export function cardRows (order) {
   const sp = order.ord;
   if (!sp) return [];
-  // «весь город»: район — тот, где адрес; премия за дальний — отдельной строкой (она уже в оплате)
-  const at = S.target || sp.stops[0];
-  const di = !DIST.has() ? -1 : DIST.city() && at ? DIST.at(at.x, at.z) : DIST.cur();
+  // премия за дальний («весь город») — отдельной строкой (она уже в оплате)
   const far = (sp.far || []).reduce((a, b) => a + b, 0);
   const brg = (sp.burgerAdd || []).reduce((a, b) => a + b, 0);
   return [
-    // район — имя района; вид квартала — только особый (было «город · Юг»: «город» игроку ничего не говорил)
-    [t('район'), [di >= 0 ? esc(t(DIST.list()[di].name)) : '', sp.zone && sp.zone !== 'normal' && ZONE_LABEL[sp.zone] ? esc(t(ZONE_LABEL[sp.zone])) : ''].filter(Boolean).join(' · ') || esc(t(ZONE_LABEL.normal))],
     // оплата — крупно, это главное число накладной; «срочно» тут не пишем — есть печать и шапка
     [t('оплата'), '<b class="oc-pay">' + A.money(S.fee) + '</b>'],
     ...(far > 0 ? [[t('за дальний'), '<b class="oc-far">+' + A.money(far) + '</b>' + ' · ' + esc(t('премия, уже в оплате'))]] : []),
@@ -991,7 +1011,7 @@ export function step (dt) {
       S.state = 'drive';
       A.syncTarget(); A.rebuildRoutePath();
       A.toast(t('все сели — по домам'));
-      A.Snd.blip(760, 0.1, 'square', 0.13);
+      A.Snd.fx('go', s => s.blip(760, 0.1, 'square', 0.13));
     }
   }
   for (let i = STAFF.drops.length - 1; i >= 0; i--) {
@@ -1155,7 +1175,10 @@ export function force (spec = {}) {
   else {
     const k = spec.kind || 'pizza';
     let s = null;
-    if (spec.near) s = pickSpot({ near: spec.near, r: spec.r || 350, zone: spec.zone || null });
+    if (k === 'beach') {                                   // пляж (beach.js): место под полотенце — без проверок лета и района
+      const b = BEACH.orderSpot();
+      if (b) sp = { type: 'pizza', kind: 'solo', beach: true, stops: [{ x: b.x, z: b.z, key: keyOf(b.x, b.z), zone: ZN.zoneAt(b.x, b.z), n: 1, addr: t('пляж на Томи, у воды') }] };
+    } else if (spec.near) s = pickSpot({ near: spec.near, r: spec.r || 350, zone: spec.zone || null });
     else if (k === 'edge') { if (!POOL.length) buildPool(); s = edgeSpot(); }
     else if (k === 'urgent') s = urgentSpot(spec.zone);
     else if (k === 'gang' || spec.zone) {

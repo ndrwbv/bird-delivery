@@ -117,9 +117,13 @@ function chip (a) {
       + 'font:12px/1.3 inherit;box-shadow:0 4px 0 #33210c;opacity:0;transform:translate(-50%,-8px);transition:opacity .25s,transform .25s}'
       + '#ach-toast.on{opacity:1;transform:translate(-50%,0)}#ach-toast i{flex:none;width:18px;height:18px;border-radius:50%;border:2px solid #33210c;background:radial-gradient(circle at 35% 35%,#ffe58a,#e0a21a 60%,#9c6a08)}'
       + '#ach-toast small{display:block;color:#8a3b22;font-size:11px;text-transform:lowercase}#ach-toast b{font-weight:normal}'
+      // доска почёта открыта — плашку не показываем: ложилась на её ярлычок «достижения», а грамота и так на доске
+      + 'body:has(#honor:not([hidden])) #ach-toast{display:none}'
       // телефон стоя: справа под радаром (слева — деньги с подписями); там же чат Толика — плашка ждёт, пока он уйдёт
       + '@media (max-width:560px){#ach-toast{left:auto;right:16px;top:116px;max-width:min(170px,44vw);transform:translateY(-8px);font-size:10px;padding:5px 7px}'
-      + '#ach-toast.on{transform:none}#ach-toast small{font-size:10px}}';
+      + '#ach-toast.on{transform:none}#ach-toast small{font-size:10px}'
+      // чек смены на телефоне: под радаром (116 px) плашка закрывала шапку чека «ЧЕК СМЕНЫ · № 0004» — радара там нет, плашку выше
+      + 'body:has(#over:not([hidden])) #ach-toast{top:max(8px,env(safe-area-inset-top))}}';
     document.head.appendChild(st);
     TOAST = document.createElement('div');
     TOAST.id = 'ach-toast';
@@ -278,11 +282,24 @@ export function stats () { return { ...load().n }; }
 export function got () { return Object.keys(load().got); }
 export function list () {
   const d = load();
-  return LIST.map(a => ({ id: a.id, name: t(a.name), got: !!d.got[a.id], have: Math.min(d.n[a.stat] || 0, a.need), need: a.need, adult: !!a.adult, hidden: !!a.hidden }));
+  return LIST.map(a => ({ id: a.id, name: t(a.name), got: !!d.got[a.id], at: d.got[a.id] || 0, have: Math.min(d.n[a.stat] || 0, a.need), need: a.need, adult: !!a.adult, hidden: !!a.hidden }));
+}
+/* доска почёта (honor.js): какие полученные игрок ещё не видел на доске — они «прилетают» при открытии.
+   Отметка — в том же сохранении (dlv-ach, общее на устройство, сброс прогресса не стирает) */
+export function unseen () {
+  const d = load(), s = d.seen || {};
+  return Object.keys(d.got).filter(id => BY_ID.has(id) && !s[id]);
+}
+export function markSeen () {
+  const d = load();
+  d.seen = d.seen && typeof d.seen === 'object' ? d.seen : {};
+  let ch = false;
+  for (const id in d.got) if (!d.seen[id]) { d.seen[id] = 1; ch = true; }
+  if (ch) save();
 }
 export const DEBUG = {
-  LIST, SH, LAST, sent: SENT, stats, got, list, unlock, add, cityOpen,
+  LIST, SH, LAST, sent: SENT, stats, got, list, unlock, add, cityOpen, unseen, markSeen,
   get platform () { return Platform; },
   /** стереть только локальную запись (в Стиме — Platform.steam.clearAchievement руками) */
-  wipe () { D = { got: {}, n: {} }; for (const k in LAST) delete LAST[k]; save(); },
+  wipe () { D = { got: {}, n: {}, seen: {} }; for (const k in LAST) delete LAST[k]; save(); },
 };

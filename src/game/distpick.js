@@ -46,7 +46,7 @@ function build () {
   el = document.createElement('div');
   el.id = 'cr-dpick';
   el.hidden = true;
-  el.innerHTML = '<div class="dp-t"></div><div class="dp-car"></div><div class="dp-bot"><button type="button" class="dp-back"></button></div>';
+  el.innerHTML = '<div class="dp-t"></div><div class="dp-car"></div><div class="dp-bot"><button type="button" class="dp-back pp-note"></button></div>';
   (document.getElementById('game') || document.body).appendChild(el);
   CZ = carousel(el.querySelector('.dp-car'), { cls: 'dp-cz', scales: [1, 0.84, 0.7], reach: 2,
     onChange: () => { if (ON && ON.onFlip) try { ON.onFlip(); } catch (e) { /* — */ } } });

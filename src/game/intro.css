@@ -34,7 +34,7 @@
 #intro-cut .ic-hrt { display: inline-block; width: 1em; height: .92em; margin: 0 .15em; vertical-align: -.05em; background: #ff5d7a;
   clip-path: polygon(50% 100%, 0 45%, 0 20%, 18% 0, 50% 18%, 82% 0, 100% 20%, 100% 45%); }
 
-#intro-cut .ic-skip { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); pointer-events: auto; font: inherit; font-size: 8px;
+#intro-cut .ic-skip { display: inline-flex; align-items: center; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); pointer-events: auto; font: inherit; font-size: 11px;
   color: #c9c2b4; background: rgba(255, 255, 255, .06); border: 2px solid #3a3346; border-radius: 6px; padding: 8px 10px; cursor: pointer; }
 #intro-cut .ic-skip:hover { color: #fff3d6; border-color: #ffd23f; }
 
@@ -73,3 +73,5 @@ body.intro-cut.ic-hud #intro-cut .ic-card { left: calc(min(148px, 22vw) + 40px);
   #intro-cut .ic-tip { gap: 8px; padding: 8px 9px; }
   #intro-cut .ic-tip img { width: 40px; height: 40px; }
 }
+
+#intro-cut .ic-skip .pp-key { font-size: 10px; margin-right: .6em; }   /* [B] / Esc — по вводу (glyphs.js) */

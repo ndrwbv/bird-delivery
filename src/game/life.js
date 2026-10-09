@@ -769,7 +769,7 @@ function artistStep (a, dt) {
       for (let k = 0; k < 2; k++) mistEmit(h.x, h.y, h.z, (H.x - h.x) * rand(2.5, 4) + rand(-0.3, 0.3), (H.y - h.y) * rand(2.5, 4) + rand(-0.2, 0.3), (H.z - h.z) * rand(2.5, 4) + rand(-0.3, 0.3), H.r, H.g, H.b);
       for (let k = 0; k < 2; k++) mistEmit(H.x + W.nx * 0.1, H.y, H.z + W.nz * 0.1, W.nx * rand(0.4, 1.2) + rand(-0.6, 0.6), rand(-0.3, 0.6), W.nz * rand(0.4, 1.2) + rand(-0.6, 0.6), H.r, H.g, H.b);
     }
-    if (d < 22 && (a.hissT -= dt) <= 0 && A.Snd) { a.hissT = rand(0.5, 1.2); A.Snd.noise(0.22, 0.025 * (1 - d / 22)); }
+    if (d < 22 && (a.hissT -= dt) <= 0 && A.Snd) { a.hissT = rand(0.5, 1.2); A.Snd.fx('spray', s => s.noise(0.22, 0.025), { x: m.x, z: m.z, far: 22, near: 2 }); }
     if (T.done) { T.tex.needsUpdate = true; a.st = 'admire'; a.t = 0; W.cd = 60; }
   } else if (a.st === 'admire') {
     // отошёл на шаг, полюбовался
@@ -1075,6 +1075,9 @@ function sweep (list, bad, drop) {
   for (let i = list.length - 1; i >= 0; i--) if (bad(list[i])) { drop(list[i]); list.splice(i, 1); }
 }
 let scanT = 0.5;
+/* рождения из scan() — по одному за кадр, а не пачкой в одном кадре раз в секунду (09.10.2026, хвост кадров
+   на Деке): парочка, богач, машина богача, граффити, змей — каждый 1—4 мс на Деке, вместе — рывок до 15 мс */
+const LATER = [];
 function scan () {
   const V = A.V, E = A.ENV;
   const day = E.night < 0.4 && E.rain < 0.25 && !E.rainWant;
@@ -1088,22 +1091,22 @@ function scan () {
   // волна схлынула — лишние сворачиваются (змей сматывают, дрон садится)
   let live = FLYERS.filter(f => !f.pack && !f.fall).length;
   for (const f of FLYERS) if (live > want && !f.pack && !f.fall) { f.pack = 1; live--; }
-  if (COUPLES.length < CAP.couples && chance(0.6)) spawnCouple();
-  if (RICH.length < CAP.rich && chance(0.3)) spawnRich();
-  if (LUX.length < CAP.lux && chance(0.2)) spawnLux();
+  if (COUPLES.length < CAP.couples && chance(0.6)) LATER.push(spawnCouple);
+  if (RICH.length < CAP.rich && chance(0.3)) LATER.push(spawnRich);
+  if (LUX.length < CAP.lux && chance(0.2)) LATER.push(spawnLux);
   // стены рядом: на части — старые граффити, у свободной — может встать художник
   let free = null, fd = Infinity, olds = 0;
   for (const W of WALLS) {
     const d = Math.hypot(W.x - V.x, W.z - V.z);
     if (d > 200) continue;
-    if (!W.seen && olds < 3) { W.seen = 1; if (chance(W.k === 'gar' || W.k === 'arch' ? 0.35 : 0.15)) { makeTag(W, true); olds++; } }   // не больше трёх холстов за раз — без рывка
+    if (!W.seen && olds < 3) { W.seen = 1; if (chance(W.k === 'gar' || W.k === 'arch' ? 0.35 : 0.15)) { LATER.push(() => makeTag(W, true)); olds++; } }   // не больше трёх холстов за раз — и по одному в кадр
     if (W.cd > 0) { W.cd -= 1; continue; }
     if (W.busy || (W.tag && W.tag.done) || d < 35 || d > 150) continue;
     const s = d + rand(0, 60) - (W.k === 'arch' ? 35 : 0);       // арки-тоннели — любимое место
     if (s < fd) { fd = s; free = W; }
   }
-  if (free && ARTISTS.length < CAP.artists && !E.rainWant && chance(deepWinter() ? 0.08 : winter() ? 0.25 : 0.5)) spawnArtist(free);   // в лютый мороз не рисуют
-  if (day && PARKS.length && FLYERS.length < want && chance(0.5)) { const at = parkSpot(); if (at) spawnFlyer(at[0], at[1]); }
+  if (free && ARTISTS.length < CAP.artists && !E.rainWant && chance(deepWinter() ? 0.08 : winter() ? 0.25 : 0.5)) LATER.push(() => { if (!free.busy && ARTISTS.length < CAP.artists) spawnArtist(free); });   // в лютый мороз не рисуют
+  if (day && PARKS.length && FLYERS.length < want && chance(0.5)) { const at = parkSpot(); if (at) LATER.push(() => spawnFlyer(at[0], at[1])); }
 }
 
 const OFF = new URLSearchParams(location.search).has('nolife');     // ?nolife — без жизни улиц: сравнить кадр
@@ -1112,6 +1115,7 @@ export function step (dt, api) {
   const t0 = performance.now();
   if (!A) { A = api; setup(); STATE.stats.setupMs = Math.round(performance.now() - t0); }
   if ((scanT -= dt) <= 0) { scanT = 1; scan(); }
+  else if (LATER.length) LATER.shift()();
   WIND += Math.sin(performance.now() / 23000) * 0.02 * dt;
   WALKERS.length = 0;
   for (const c of COUPLES) { coupleStep(c, dt); if (!c.a.dead) WALKERS.push(c.a); if (!c.b.dead) WALKERS.push(c.b); }

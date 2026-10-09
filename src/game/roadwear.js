@@ -140,10 +140,56 @@ export const potW = r => (OFF ? 1 : WEAR.POT[kindOf(r)] ?? 1);
 /* ── высоты внутри класса улицы (м над полотном класса; следующий класс — на 4 мм выше) ──
    Два полотна одного класса разного вида на одной высоте мерцали на стыке (кто сверху — решала
    точность глубины, кадр за кадром по-разному). Теперь у каждого вида своя ступенька RANK × номер
-   вида (0—2,4 мм), выше — клин на стыке ширин (mapworks.js, 3,2 мм) и заплатки (3,5—3,7 мм) */
-export const WEAR_Y = { RANK: 0.0006, WEDGE: 0.0032, PATCH: 0.0035 };
+   вида (0—2,4 мм) + подступенька SLOT (0—0,45 мм, ниже), выше — клин на стыке ширин (mapworks.js, 3,2 мм) и
+   заплатки (3,5 и 3,7 мм — по цвету) */
+export const WEAR_Y = { RANK: 0.0006, SLOT: 0.00015, WEDGE: 0.0032, PATCH: 0.0035 };
 const KRANK = { fresh: 0, smooth: 1, patched: 2, old: 3, broken: 4 };
-export const rankY = r => (OFF ? 0 : (KRANK[kindOf(r)] ?? 1) * WEAR_Y.RANK);
+export const rankY = r => (OFF ? 0 : (KRANK[kindOf(r)] ?? 1) * WEAR_Y.RANK + (SLOT.get(r) || 0) * WEAR_Y.SLOT);
+/* Две улицы одного класса и вида, сходящиеся в узле, у которых конец перекрашен плавно (jointGrad), лежали на одной
+   высоте, а цвет у каждой тянется вдоль своей оси — внахлёст за краем узла цвета расходились, и стык мерцал (О3,
+   09.10.2026). Таким улицам — разные подступеньки SLOT (0; 0,15; 0,3; 0,45 мм — ниже ступеньки вида 0,6 мм):
+   раскраска графа «внахлёст у перекрашенного конца» жадно, в четыре цвета */
+const SLOT = new Map();
+function slotJoints (widthOf) {
+  SLOT.clear();
+  if (!JOINT.size) return;
+  // отрезки улиц того же класса и вида — по клеткам 20 м
+  const key = r => r.c + ':' + kindOf(r), CS = 20, G = new Map();
+  for (const r of A.CITY.roads) {
+    if (r.b || r.c === 6 || !WEAR.P[r.c]) continue;
+    for (let i = 1; i < r.p.length; i++) {
+      const a = r.p[i - 1], b = r.p[i];
+      for (let gx = Math.floor(Math.min(a[0], b[0]) / CS); gx <= Math.floor(Math.max(a[0], b[0]) / CS); gx++)
+        for (let gz = Math.floor(Math.min(a[1], b[1]) / CS); gz <= Math.floor(Math.max(a[1], b[1]) / CS); gz++) {
+          const k = gx + ',' + gz; let L = G.get(k); if (!L) G.set(k, L = []); L.push([r, a, b]);
+        }
+    }
+  }
+  // соседи: улица того же класса и вида проходит ближе (переход + полуширины) к узлу, где у одной из них
+  // конец перекрашен, — их полотна там внахлёст (и в общем узле, и на развязках, где узлы разные)
+  const NB = new Map(), link = (a, b) => { if (!NB.has(a)) NB.set(a, new Set()); NB.get(a).add(b); };
+  for (const [r, J] of JOINT) for (const j of J) {
+    const k0 = key(r);
+    for (let gx = Math.floor((j.N[0] - 40) / CS); gx <= Math.floor((j.N[0] + 40) / CS); gx++)
+      for (let gz = Math.floor((j.N[1] - 40) / CS); gz <= Math.floor((j.N[1] + 40) / CS); gz++)
+        for (const [o, a, b] of G.get(gx + ',' + gz) || []) {
+          if (o === r || key(o) !== k0 || (NB.get(r) && NB.get(r).has(o))) continue;
+          if (segD(j.N[0], j.N[1], a, b) < j.d1 + j.hw + widthOf(o) / 2 + 1) { link(r, o); link(o, r); }
+        }
+  }
+  for (const [r, nb] of NB) {
+    const used = new Set();
+    for (const o of nb) if (SLOT.has(o)) used.add(SLOT.get(o));
+    let s = 0; while (used.has(s) && s < 3) s++;
+    SLOT.set(r, s);
+  }
+  DEBUG.slots = [...SLOT.values()].filter(v => v > 0).length;
+}
+/* отладка (probe): улицы у точки — класс, вид, высота внутри класса, переходы на концах */
+DEBUG.at = (x, z, R = 15) => (A ? A.CITY.roads : []).filter(r => r.p.some((q, i) => i && segD(x, z, r.p[i - 1], q) < R)).map(r => ({
+  c: r.c, kind: kindOf(r), slot: SLOT.get(r) || 0, rank: +(rankY(r) * 1000).toFixed(2), hex: roadHex(r), n: r.p.length,
+  ends: [r.p[0], r.p[r.p.length - 1]].map(q => q.map(Math.round)), joints: (JOINT.get(r) || []).map(j => ({ N: j.N.map(Math.round), d0: +j.d0.toFixed(1), d1: +j.d1.toFixed(1) })) }));
+const segD = (x, z, a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / l2)); return Math.hypot(a[0] + dx * t - x, a[1] + dz * t - z); };
 
 /* ── заплатки ──
    Прямоугольники свежего асфальта вдоль полотна (в колее), поперечные траншеи во
@@ -193,8 +239,11 @@ export function decorate (M, r, w, y, junc) {
     const j = () => (R() - 0.5) * 0.12;
     const P = [[a.x + nx * o0 + j(), a.z + nz * o0 + j()], [b.x + nx * o0 + j(), b.z + nz * o0 + j()],
                [b.x + nx * o1 + j(), b.z + nz * o1 + j()], [a.x + nx * o1 + j(), a.z + nz * o1 + j()]];
-    M.color(WEAR.PATCH[R() < (kind === 'patched' ? 0.55 : 0.35) ? 0 : 1]);
-    M.poly(P, lift + (q % 3) * 0.0001);                      // соседние заплатки — на 0,1 мм друг над другом
+    // высота — по цвету заплатки (0,2 мм): две заплатки одного цвета внахлёст — одно пятно, разного — на разной
+    // высоте. До 09.10.2026 высота шла по номеру (q % 3), и заплатки разного цвета на одной высоте мерцали (О3)
+    const pc = R() < (kind === 'patched' ? 0.55 : 0.35) ? 0 : 1;
+    M.color(WEAR.PATCH[pc]);
+    M.poly(P, lift + pc * 0.0002);
     DEBUG.patches++;
   }
   DEBUG.ms += performance.now() - t0;
@@ -256,11 +305,12 @@ export function prepJoints (widthOf) {
       if (d1 < d0 + 0.3) continue;
       let J = JOINT.get(r);
       if (!J) JOINT.set(r, J = []);
-      J.push({ N, ux: (Q[0] - N[0]) / Ls, uz: (Q[1] - N[1]) / Ls, d0, d1, dom, own, first: e.i === 0 });
+      J.push({ N, ux: (Q[0] - N[0]) / Ls, uz: (Q[1] - N[1]) / Ls, d0, d1, dom, own, first: e.i === 0, hw: w / 2 });
       n++;
     }
   }
   DEBUG.joints = n;
+  slotJoints(widthOf);
   DEBUG.ms += performance.now() - t0;
   return n;
 }
@@ -288,6 +338,9 @@ export function jointGrad (r) {
     for (const j of J) {
       const d = (x - j.N[0]) * j.ux + (z - j.N[1]) * j.uz;
       if (d >= j.d1) continue;
+      // только у самого узла: на изогнутой улице точка далеко позади узла тоже давала d < d1 и красилась
+      // в цвет узла посреди улицы — пятно чужого цвета внахлёст с соседней улицей мерцало (О3)
+      if (Math.hypot(x - j.N[0], z - j.N[1]) > j.d1 + j.hw + 0.5) continue;
       const t = Math.max(0, (d - j.d0) / (j.d1 - j.d0));
       R = Math.round(j.dom[0] + (own[0] - j.dom[0]) * t); G = Math.round(j.dom[1] + (own[1] - j.dom[1]) * t); B = Math.round(j.dom[2] + (own[2] - j.dom[2]) * t);
     }

@@ -218,7 +218,7 @@ export const STATS = { BODIES, LIMBS, PUDDLES, WRECKS, CHUNKS, SPLATS, LAST: nul
 export function fall (p, vx, vz) {
   const l = Math.hypot(vx, vz) || 1;
   p.fall = { t: 0, yaw: Math.atan2(-vx, -vz), vx: vx / l * 2.6, vz: vz / l * 2.6, mad: 0 };
-  A.Snd.noise(0.12, 0.2);
+  A.Snd.fx('fall', s => s.noise(0.12, 0.2), { x: p.x, z: p.z });
   A.puff(p.x, 0.3, p.z, false, 0.5);
 }
 
@@ -284,7 +284,9 @@ export function hit (p, vx, vz, kmh, o = {}) {
   if (kmh == null) kmh = kmhOf(vx, vz);
   if (!o.up) {                                      // сбит: «бум» в точке удара и глухой удар
     flashAt(p.x, A.groundH(p.x, p.z) + 1.1 + (o.y0 || 0), p.z);
-    A.Snd.blip(62, 0.2, 'sine', 0.34); A.Snd.noise(0.08, 0.16);
+    // удар слоями (impact.js): тело hit-person-<сила>, нет файла — hit-person; без слоёв — как раньше
+    if (A.Snd.impact) A.Snd.impact(Math.max(kmh / 3.6, 8), 'person', { x: p.x, z: p.z });
+    else A.Snd.fx('hit-person', s => { s.blip(62, 0.2, 'sine', 0.34); s.noise(0.08, 0.16); }, { x: p.x, z: p.z });
   }
   if (o.over) {
     const B = throwOver(p, vx, vz, kmh, o);
@@ -589,7 +591,7 @@ function shatter (B) {
   const r = B.root;
   if (STATS.LAST) { STATS.LAST.x = r.position.x; STATS.LAST.z = r.position.z; }
   A.burst({ x: r.position.x, z: r.position.z, c: B.c }, B.vx, B.vz, true);   // куски, брызги, пятно, скорая
-  A.Snd.noise(0.1, 0.2);
+  A.Snd.fx('splat', s => s.noise(0.1, 0.2), { x: r.position.x, z: r.position.z });
   B.mode = 'gone';
 }
 

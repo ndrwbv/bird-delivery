@@ -23,12 +23,14 @@
        api: { money(n), info() → строка-подпись профиля (читает Store), face(id) → портрет, setName(n), Snd, onClose(), swap() } */
 import './profiles.css';
 import { t } from '../i18n/index.js';
+import { keyHTML } from '../input/glyphs.js';
 
 export const MAX = 5;
 export const META = 'dlv-profiles';
 /* общее на всё устройство; всё остальное «dlv-*» — у каждого профиля своё */
 export const SHARED = new Set([
   META, 'dlv-lang', 'dlv-sound', 'dlv-gfx', 'dlv-edition', 'dlv-map',  // настройки (dlv-gfx — графика, gfx.js)
+  'dlv-vol-music', 'dlv-vol-sfx', 'dlv-vol-eng',           // громкость: музыка, звуки, мотор (game.js Snd.setVol)
   'dlv-ach',                // достижения и их счётчики — как в Стиме, на весь аккаунт
   'dlv-lb-local',           // таблица рекордов на устройстве — все профили по именам
   'dlv-money-x8', 'dlv-__ts', 'dlv-crashlog',               // служебное
@@ -38,7 +40,7 @@ const KNOWN = ['dlv-name', 'dlv-msk-wallet', 'dlv-msk-cars', 'dlv-msk-car', 'dlv
   'dlv-msk-guide', 'dlv-msk-nostut', 'dlv-intro', 'dlv-garage-tut', 'dlv-shifts', 'dlv-stars', 'dlv-crew', 'dlv-story', 'dlv-season',
   'dlv-used-addr', 'dlv-boss', 'dlv-clock', 'dlv-rev-sale', 'dlv-car-owned', 'dlv-car-cur', 'dlv-car-up', 'dlv-car-L', 'dlv-car-eng',
   'dlv-car-paint', 'dlv-district', 'dlv-dist-shifts', 'dlv-dist-open', 'dlv-city-mode', 'dlv-city-party', 'dlv-knocked', 'dlv-heroes',
-  'dlv-heroq', 'dlv-quick', 'dlv-don-trash', 'dlv-don-gang', 'dlv-respect', 'dlv-pz-grow'];
+  'dlv-heroq', 'dlv-quick', 'dlv-don-trash', 'dlv-don-gang', 'dlv-respect', 'dlv-pz-grow', 'dlv-delivered', 'dlv-honor'];
 
 let st = null, raw = null, meta = null, view = null;
 const OTHER = /^dlv-p\d+-/;                       // ключ чужого профиля (2…5)
@@ -218,8 +220,8 @@ function render () {
     b.innerHTML = '<form class="prf-form" autocomplete="off"><label for="prf-in">' + esc(p ? t('новое имя профиля') : t('новый профиль — как тебя зовут?')) + '</label>' +
       '<input id="prf-in" type="text" maxlength="24" autocomplete="off" spellcheck="false" placeholder="' + esc(t('имя и фамилия')) + '" value="' + esc(p ? p.name : '') + '">' +
       (p ? '' : '<div class="prf-note">' + esc(t('новый профиль начинает с первой смены: своя копилка, машины и районы. настройки — общие')) + '</div>') +
-      '<div class="prf-btns"><button type="button" class="prf-no">' + esc(t('отмена')) + '</button>' +
-      '<button type="submit" class="prf-ok"' + (p && p.name ? '' : ' disabled') + '>' + esc(p ? t('готово') : t('создать')) + '</button></div></form>';
+      '<div class="prf-btns"><button type="button" class="prf-no">' + keyHTML('back') + esc(t('отмена')) + '</button>' +
+      '<button type="submit" class="prf-ok"' + (p && p.name ? '' : ' disabled') + '>' + keyHTML('ok') + esc(p ? t('готово') : t('создать')) + '</button></div></form>';
     const inp = b.querySelector('input'), ok = b.querySelector('.prf-ok');
     inp.addEventListener('input', () => { ok.disabled = !inp.value.trim(); });
     b.querySelector('form').addEventListener('submit', e => { e.preventDefault(); saveName(); });
@@ -232,7 +234,7 @@ function render () {
     b.innerHTML = '<div class="prf-t">' + esc(t('удалить профиль «{name}»?', { name: label(p) })) + '</div>' +
       '<div class="prf-note">' + esc(info(p.id)) + '</div>' +
       '<div class="prf-warn">' + esc(t('весь его прогресс сотрётся: копилка, машины, районы, сюжет. вернуть будет нельзя. другие профили не тронет')) + '</div>' +
-      '<div class="prf-btns"><button type="button" class="prf-no" autofocus>' + esc(t('отмена')) + '</button>' +
+      '<div class="prf-btns"><button type="button" class="prf-no" autofocus>' + keyHTML('back') + esc(t('отмена')) + '</button>' +
       '<button type="button" class="prf-yes">' + esc(t('да, удалить')) + '</button></div>';
     b.querySelector('.prf-no').addEventListener('click', () => back());
     b.querySelector('.prf-yes').addEventListener('click', () => {
@@ -253,11 +255,12 @@ function render () {
       (meta.list.length > 1 ? '<button type="button" class="prf-del" data-id="' + p.id + '" title="' + esc(t('удалить')) + '">✕</button>' : '') +
       '</div>';
   }).join('');
-  b.innerHTML = '<div class="prf-t">' + esc(t('профили')) + '</div>' +
+  // трудовая книжка (UI-REVIEW № 45): шапка капсом, у каждого профиля — запись с портретом-полароидом
+  b.innerHTML = '<header class="pp-head prf-head"><span>' + esc(t('трудовая книжка')) + '</span><b>' + esc(t('профили')) + '</b></header>' +
     '<div class="prf-l">' + rows + '</div>' +
     (meta.list.length < MAX ? '<button type="button" class="prf-new">+ ' + esc(t('новый профиль')) + '</button>' : '') +
     '<div class="prf-note">' + esc(t('у каждого профиля своя копилка, машины, районы и сюжет. язык, звук и достижения — общие. до {n} профилей', { n: MAX })) + '</div>' +
-    '<button type="button" class="prf-close">' + esc(t('назад')) + '</button>';
+    '<button type="button" class="prf-close">' + keyHTML('back') + esc(t('назад')) + '</button>';
   b.querySelectorAll('.prf-pick').forEach(x => x.addEventListener('click', () => {
     const id = +x.dataset.id;
     if (id === meta.cur) { close(); return; }

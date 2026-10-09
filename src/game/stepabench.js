@@ -51,19 +51,21 @@ const CHAPTER = {
     ['shot', 'two'],
     ['give'],
     ['act', 'stepa', 'nod'],
-    ['say', 'stepa', N_('Спасибо за пиццу, это моя любимая.')],
+    ['say', 'stepa', N_('Спасибо за пиццу, это моя любимая.'), { emo: 'happy' }],
     ['shot', 'host', { cut: true }],
     ['say', 'stepa', N_('А теперь пойду постреляю из лука с окна на газон через дорогу.')],
     ['act', 'stepa', 'think'],
-    ['say', 'stepa', N_('А, ещё пиво стынет, так что пока.'), { adult: true }],
-    ['say', 'stepa', N_('А, ещё квас стынет, так что пока.'), { adult: false }],
+    ['say', 'stepa', N_('А, ещё пиво стынет, так что пока.'), { emo: 'surprised', adult: true }],
+    ['say', 'stepa', N_('А, ещё квас стынет, так что пока.'), { emo: 'surprised', adult: false }],
     ['shot', 'two'],
     ['act', 'stepa', 'give'],
-    ['say', 'stepa', N_('На тебе на жидкий хлеб.'), { adult: true }],
-    ['say', 'stepa', N_('На тебе на квасок.'), { adult: false }],
+    ['say', 'stepa', N_('На тебе на жидкий хлеб.'), { emo: 'happy', adult: true }],
+    ['say', 'stepa', N_('На тебе на квасок.'), { emo: 'happy', adult: false }],
     ['act', 'stepa', 'wave'],
+    // уходит домой: встаёт с лавочки и идёт в свой подъезд, курьер — к машине; сцена кончается,
+    // когда Стёпа скрылся в двери (до 09.10.2026 он просто пропадал с лавочки)
     ['walk', 'courier', 'car', { wait: false }],
-    ['wait', 1.2],
+    ['walk', 'stepa', 'in'],
   ],
 };
 
@@ -92,6 +94,7 @@ function buildBench () {
       // куда ставить машину: перед лавочкой, на 5 м
       M.prop = p;
       return { ex: x, ez: z, nx: fx, nz: fz, sx: -fz, sz: fx, x: x + fx * 5, z: z + fz * 5,
+        door: { x: ex, z: ez, nx, nz },                          // в конце сцены уходит сюда (story.js 'in')
         addr: A.realAddress ? A.realAddress(ex + nx * 2, ez + nz * 2) : SB.ADDR.join(', ') };
     }
   }

@@ -544,7 +544,8 @@ function hairBoxes (Lk, Wd, D, r, out) {
    с крупным пикселем — поэтому глаза и брови по два пикселя, без полутонов. */
 const faceKey = (Lk, skin, Wp) => [Wp, skin, Lk.eyes, Lk.eyeC, Lk.gaze, Lk.brows, Lk.browC, Lk.mouth, Lk.lip, Lk.glasses, Lk.glassC,
   Lk.freckles, Lk.blush, Lk.mole, Lk.stubble && Lk.hairC, Lk.wrinkles].join('|');
-function drawFace (x, Lk, skin, Wp, ox, oy) {
+/* fx — живое лицо в катсценах (actorlife.js): { blink — глаза закрыты, talk — рот открыт (кадр речи) } */
+function drawFace (x, Lk, skin, Wp, ox, oy, fx) {
   const px = (c, X, Y, w = 1, h = 1) => { x.fillStyle = c; x.fillRect(ox + X, oy + Y, w, h); };
   const cx = Wp / 2, e1 = cx - 4, e2 = cx + 2;
   const dark = mix(skin, '#1a0f0a', 0.35);
@@ -556,6 +557,7 @@ function drawFace (x, Lk, skin, Wp, ox, oy) {
   // глаза
   const ec = Lk.eyeC;
   for (const [e, side] of [[e1, -1], [e2, 1]]) {
+    if (fx && fx.blink) { px(dark, e, 7, 2, 1); if (Lk.eyes === 'lashes') px('#1d1a1f', side < 0 ? e - 1 : e + 2, 6); continue; }   // моргнул
     if (Lk.eyes === 'round' || Lk.eyes === 'lashes') px(ec, e, 6, 2, 2);
     if (Lk.eyes === 'lashes') px('#1d1a1f', side < 0 ? e - 1 : e + 2, 5);
     if (Lk.eyes === 'white') { px('#f4f1ea', e, 6, 2, 2); px(ec, e + Lk.gaze, 6, 1, 2); }
@@ -577,8 +579,16 @@ function drawFace (x, Lk, skin, Wp, ox, oy) {
     }
   }
   // рот
-  const lc = Lk.lip || mix(skin, '#5a1f1f', 0.5);
-  switch (Lk.mouth) {
+  const lc = Lk.lip || mix(skin, '#5a1f1f', 0.5), hole = '#3a1a1a', teeth = '#f4f1ea';
+  // говорит: рот открыт — какой, зависит от выражения (смеётся, кричит, ахает)
+  const mouth = fx && fx.talk ? ({ smile: 'laugh', open: 'oo', o: 'oo', frown: 'shout', grit: 'oo' }[Lk.mouth] || 'talk') : Lk.mouth;
+  switch (mouth) {
+    case 'talk': px(hole, cx - 2, 12, 4, 2); px(lc, cx - 2, 14, 4); break;
+    case 'laugh': px(lc, cx - 3, 11); px(lc, cx + 2, 11); px(hole, cx - 2, 12, 4, 2); px(teeth, cx - 2, 12, 4); break;
+    case 'shout': px(hole, cx - 2, 12, 4, 3); px(teeth, cx - 2, 12, 4); px(lc, cx - 3, 13); px(lc, cx + 2, 13); break;
+    case 'oo': px(hole, cx - 1, 11, 2, 3); px(lc, cx - 2, 12, 1, 1); px(lc, cx + 1, 12, 1, 1); break;
+    case 'o': px(hole, cx - 1, 12, 2, 2); break;
+    case 'grit': px(teeth, cx - 2, 12, 4); px(lc, cx - 3, 12); px(lc, cx + 2, 12); px(mix(teeth, '#000000', 0.35), cx - 1, 12); px(mix(teeth, '#000000', 0.35), cx + 1, 12); break;
     case 'line': px(lc, cx - 2, 12, 4); break;
     case 'smile': px(lc, cx - 2, 12, 4); px(lc, cx - 3, 11); px(lc, cx + 2, 11); break;
     case 'small': px(lc, cx - 1, 12, 2); break;
@@ -698,7 +708,7 @@ export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
     lod.visible = false;
     g.add(lod);
     g.scale.setScalar(S.hs);
-    g.userData = { legL, legR, armL, armR, head, colors: { skin: S.skin, shirt: S.shirt, pants: S.pants }, person, fem: S.fem, fat: S.fat, pace: S.pace,
+    g.userData = { legL, legR, armL, armR, head, faceM: head.children.find(m => m.geometry && m.geometry.type === 'PlaneGeometry') || null, faceS: { skin: S.skin, Wp: S.Wp }, colors: { skin: S.skin, shirt: S.shirt, pants: S.pants }, person, fem: S.fem, fat: S.fat, pace: S.pace,
       lod, parts: [legL, legR, bodyM, armL, armR, head], far: false, look: Lk, o, hair, warm: WARM };
     HUMANS.add(g);
     return g;
@@ -710,8 +720,22 @@ export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
    (что ближе к зрителю — поверх), дальние чуть темнее; по краю —
    тёмный контур, фон — пастельный по зерну. */
 const PORTRAITS = new Map();
-/* настроение (экран оплаты заказа, game.js popPay): те же черты, другие брови и рот */
-const MOOD_FACE = { happy: { brows: 'raised', mouth: 'smile' }, ok: { brows: 'thin', mouth: 'line' }, angry: { brows: 'angry', mouth: 'frown' } };
+/* настроение (экран оплаты заказа, game.js popPay): те же черты, другие брови и рот.
+   Выражения реплик в катсценах (story.js { emo }, actorlife.js) — те же: радуется, злится,
+   грустит, пугается (глаза-плошки, сжатые зубы), удивляется (глаза-плошки, рот «о») */
+export const EMO_FACE = {
+  happy: { brows: 'raised', mouth: 'smile' },
+  angry: { brows: 'angry', mouth: 'frown' },
+  sad: { brows: 'sad', mouth: 'frown' },
+  scared: { brows: 'sad', mouth: 'grit', eyes: 'white', gaze: 0 },
+  surprised: { brows: 'raised', mouth: 'o', eyes: 'white', gaze: 0 },
+};
+const MOOD_FACE = { ...EMO_FACE, ok: { brows: 'thin', mouth: 'line' } };
+/* лицо одним кадром — для живых лиц катсцен (actorlife.js): Wp×16, прозрачный фон */
+export function drawFaceFrame (ctx, Lk, skin, Wp, fx) {
+  ctx.clearRect(0, 0, Wp, 16);
+  drawFace(ctx, Lk, skin, Wp, 0, 0, fx);
+}
 export function faceDataURL (person, size = 128, mood = '') {
   if (!person) return '';
   let Lk = person.look || makeLook(person.seed >>> 0 || 1);

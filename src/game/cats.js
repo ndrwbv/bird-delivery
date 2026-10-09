@@ -375,7 +375,7 @@ function thinkGround (c, dt, dCar, spd, ppl) {
     if (q && q !== c.hole) { if (c.hole.cat === c) c.hole.cat = null; c.hole = q; q.cat = c; }
     if (q) { c.mode = 'flee'; c.tx = q.x + q.ox * 0.2; c.tz = q.z + q.oz * 0.2; }
     else { c.mode = 'away'; c.mt = 3; c.h = Math.atan2(c.x - V.x, c.z - V.z); }
-    if (A.Snd && A.Snd.blip && dCar < 30 && Math.random() < 0.5) A.Snd.blip(1100, 0.08, 'triangle', 0.03);
+    if (A.Snd && A.Snd.fx && dCar < 30 && Math.random() < 0.5) A.Snd.fx('meow', s => s.blip(1100, 0.08, 'triangle', 0.03), { x: c.x, z: c.z, far: 30 });
   }
   // машина совсем рядом — отпрыгнуть вбок (сбить кота нельзя: столкновения нет вовсе)
   if (dCar < G.DODGE && !c.jump && c.mode !== 'hid' && c.mode !== 'in') {

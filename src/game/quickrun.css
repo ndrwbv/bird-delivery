@@ -83,3 +83,6 @@ body.touch .qr-ar { min-width: 44px; min-height: 44px; }
   .qr-check .qr-cond, .qr-check .qr-best { margin-top: .3em; }
   .qr-check .qr-warn { margin-top: .2em; }
 }
+/* путевой лист поверх меню: значки кнопок карточек меню и строку «листай · выбрать» прячем — под листом
+   виднелся [A] карточки рядом с «[B] назад», будто A жмёт карточку; жмётся только лист */
+body:has(#qr-setup:not([hidden])) #cr-menu :is(.pp-key, .crm-hint) { visibility: hidden; }

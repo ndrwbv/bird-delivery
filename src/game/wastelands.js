@@ -528,7 +528,8 @@ function score (kind, f, used) {
   return base - WASTE.QUOTA * (used[kind] || 0);
 }
 
-export function build (api) {
+/* шагами (yield) — поздняя сборка (latebuild.js; при ?nolate — разом): на Деке весь кусок ~0,45 с */
+export function* build (api) {
   A = api;
   const t0 = performance.now();
   entGrid();
@@ -536,9 +537,13 @@ export function build (api) {
   const used = {};
   const tex = signAtlas();
   for (const [cfg, kinds] of [[WASTE.BIG, BIG_KINDS], [WASTE.SMALL, SMALL_KINDS]]) {
-    const lots = CONSTR.freeLots({ W: cfg.W, D: cfg.D, max: cfg.MAX, gap: cfg.GAP, salt: cfg.SALT, per: cfg.PER, cap: cfg.CAP, claim: false });
+    yield 'grid';
+    const lots = yield* CONSTR.freeLotsSteps({ W: cfg.W, D: cfg.D, max: cfg.MAX, gap: cfg.GAP, salt: cfg.SALT, per: cfg.PER, cap: cfg.CAP, claim: false });
     STATS.tried += lots.length;
+    yield 'lots';
+    let nl = 0;
     for (const s of lots) {
+      if (++nl % 6 === 0) yield 'lot';
       const f = features(s);
       const order = kinds.map(k => ({ k, v: score(k, f, used) + hash(s.x, s.z, 7 + kinds.indexOf(k)) * 0.35 })).sort((p, q) => q.v - p.v);
       let ok = null;
@@ -627,9 +632,11 @@ export function trails () {
     const w = TRAIL.W[0] + (TRAIL.W[1] - TRAIL.W[0]) * hash(seed, 1, 3), hex = TRAIL_HEX[(hash(seed, 2, 3) * 3) | 0];
     A.LITM.color(EDGE_HEX);
     for (let i = 1; i < pts.length; i++) A.LITM.ribbon(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], w + TRAIL.EDGE * 0.6, 0.066);
+    // три оттенка тропинок — каждый на своей высоте (0,7 мм): две тропинки разного цвета внахлёст не мерцают (О3)
+    const ty = 0.072 + TRAIL_HEX.indexOf(hex) * 0.0007;
     A.LITM.color(hex);
-    for (let i = 1; i < pts.length; i++) A.LITM.ribbon(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], w, 0.072);
-    for (let i = 1; i < pts.length - 1; i++) A.LITM.disc(pts[i][0], pts[i][1], w / 2, 0.072, 6);
+    for (let i = 1; i < pts.length; i++) A.LITM.ribbon(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], w, ty);
+    for (let i = 1; i < pts.length - 1; i++) A.LITM.disc(pts[i][0], pts[i][1], w / 2, ty, 6);
     let m = 0;
     for (let i = 1; i < pts.length; i++) m += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
     STATS.trails++; STATS.trailM += m;
@@ -687,7 +694,7 @@ export function trails () {
     if (hash(b.x, b.z, 31) > TRAIL.BENCH) continue;
     const fx = Math.sin(b.ry || 0), fz = Math.cos(b.ry || 0), x = b.x + fx * 1.25, z = b.z + fz * 1.25;
     if (onRoad(x, z, 0.3)) continue;
-    blobAt(x, z, 1.5, 0.95, Math.atan2(-fz, fx), '#9a8662', 0.07, 13);
+    blobAt(x, z, 1.5, 0.95, Math.atan2(-fz, fx), '#9a8662', 0.0685, 13);   // под дорожками парка (0,07): на одной высоте мерцало (О3)
     SPOTS.push({ x, z, r: 1.4 });
     if (hash(b.x, b.z, 32) < PUD.BENCH) puddle(x + fx * 0.8, z + fz * 0.8, 0.7, b.x + b.z);
   }
@@ -839,7 +846,7 @@ function dogStep (s, o, dt, sp) {
   if (sp > 3 && carHits(o.x, o.z, 0.4)) {
     o.gone = 0.001; o.fly = { vx: V.vx * 0.5, vz: V.vz * 0.5, vy: 5, y: 0 }; o.h = Math.atan2(o.x - V.x, o.z - V.z);
     STATS.hitDogs++;
-    if (A.Snd) { A.Snd.blip(980, 0.12, 'square', 0.08); A.Snd.blip(760, 0.18, 'square', 0.06); }
+    if (A.Snd) A.Snd.fx('yelp', s => { s.blip(980, 0.12, 'square', 0.08); s.blip(760, 0.18, 'square', 0.06); });
     return;
   }
   const [ia0, ib0, ia1, ib1] = s.inner;
@@ -864,7 +871,7 @@ function dogStep (s, o, dt, sp) {
   o.ph += dt * (run ? 14 : 2);
   o.m.position.set(o.x, A.groundH(o.x, o.z) + (run ? Math.abs(Math.sin(o.ph)) * 0.1 : 0), o.z);
   o.m.rotation.y = o.h; o.m.rotation.z = 0;
-  if (dc < 40 && (o.bark -= dt) <= 0) { o.bark = rand(3, 8); if (A.Snd) { A.Snd.blip(520, 0.06, 'square', 0.035); A.Snd.blip(480, 0.06, 'square', 0.03); } }
+  if (dc < 40 && (o.bark -= dt) <= 0) { o.bark = rand(3, 8); if (A.Snd) A.Snd.fx('bark', s => { s.blip(520, 0.06, 'square', 0.035); s.blip(480, 0.06, 'square', 0.03); }, { x: o.x, z: o.z, far: 40 }); }
 }
 let scanT = 0;
 export function step (dt) {

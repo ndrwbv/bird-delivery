@@ -1,0 +1,84 @@
+/* «мои находки» (collect.js) — лист «как накладная» (src/styles/paper.css) в окне меню #panel:
+   бумага с перфорацией, шапка капсом, полоска «сколько собрал», сетка карточек — найденное фото на белой
+   рамке с галочкой, ненайденное — пунктирный конверт с «?»; записка под сеткой, внизу «[B] назад».
+   Влезает без прокрутки на Деке 1280×800, 1280×720 и телефоне боком; на узком телефоне — три в ряд,
+   сетка листается внутри листа. Было — тёмно-фиолетовое окно с «×» (UI-REVIEW, 09.10.2026). */
+#panel[data-kind="collect"] { --u: clamp(10px, min(1.2vw, 2.1vh), 18px); background: var(--pp-dim), rgba(30, 12, 20, .35); }
+#panel[data-kind="collect"] .pn-box {
+  width: min(940px, calc(100% - 16px)); max-height: calc(100% - 24px); overflow: visible; display: flex; flex-direction: column;
+  padding: calc(var(--u) * .6) calc(var(--u) * 1.4) calc(var(--u) * .7); color: var(--pp-ink); background: var(--pp-paper);
+  border: 3px solid var(--pp-ink); border-radius: 4px; box-shadow: 0 8px 0 var(--pp-ink), 0 24px 60px rgba(0, 0, 0, .5);
+  animation: pp-in .5s var(--pp-spring) both;
+}
+#panel[data-kind="collect"] .pn-box::before, #panel[data-kind="collect"] .pn-box::after { content: ''; position: absolute; left: 10px; right: 10px; height: 8px; pointer-events: none; background: var(--pp-perf); }
+#panel[data-kind="collect"] .pn-box::before { top: -6px; }
+#panel[data-kind="collect"] .pn-box::after { bottom: -6px; }
+#panel[data-kind="collect"] #pn-close { display: none; }          /* закрыть — пометкой «[B] назад» внизу */
+#panel[data-kind="collect"] #pn-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+/* шапка: «НАХОДКИ КУРЬЕРА ··· 3 / 10», яркая полоска сверху */
+#panel[data-kind="collect"] .pn-t.col-head { flex: none; display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  margin: 0; padding: calc(var(--u) * .9) 0 calc(var(--u) * .55); font-size: var(--pp-fs-m); line-height: 1.3; color: var(--pp-rust);
+  text-transform: uppercase; letter-spacing: .08em; border-bottom: 2px dashed var(--pp-brown); box-shadow: 0 -5px 0 -1px var(--pp-pink); }
+#panel .pn-t.col-head > span { color: var(--pp-rust); font-size: inherit; margin: 0; min-width: 0; }
+.col-head b { flex: none; font-weight: normal; color: var(--pp-ink); font-size: var(--pp-fs-l); letter-spacing: .04em; }
+
+/* полоска «сколько собрал» — зелёная, как деньги */
+.col-bar { flex: none; height: calc(var(--u) * .7); min-height: 8px; margin: calc(var(--u) * .6) 0; border: 2px solid var(--pp-ink); border-radius: 3px; background: #efdfba; overflow: hidden; }
+.col-bar i { display: block; height: 100%; background: repeating-linear-gradient(-45deg, var(--pp-lime) 0 8px, var(--pp-money) 8px 12px); transition: width .4s var(--pp-spring); }
+
+/* сетка карточек: на Деке и 720 — пять в ряд, без прокрутки; не влезла — листается внутри листа */
+#panel[data-kind="collect"] #col-grid { flex: 0 1 auto; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: calc(var(--u) * .9) calc(var(--u) * .8); padding: 13px calc(var(--u) * .4) calc(var(--u) * .7); margin: 0 calc(var(--u) * -.4); }   /* сверху — место галочке */
+.col-c { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: calc(var(--u) * .45); min-width: 0; margin: 0;
+  padding: calc(var(--u) * .45) calc(var(--u) * .45) calc(var(--u) * .5); font: inherit; color: var(--pp-ink); cursor: pointer; text-align: center;
+  background: #efdfba; border: 3px dashed var(--pp-brown); border-radius: 4px; rotate: 0deg; translate: 0 0;
+  transition: translate .18s var(--pp-spring), rotate .18s var(--pp-spring); }
+.col-ph { display: flex; align-items: center; justify-content: center; height: clamp(44px, 15vh, 128px); border-radius: 2px; }
+.col-ph b { font-weight: normal; font-size: clamp(22px, 6vh, 52px); color: var(--pp-brown); opacity: .55; }
+.col-ph canvas { display: block; height: 100%; width: auto; max-width: 100%; aspect-ratio: 1; image-rendering: pixelated; }
+.col-c > span { font-size: max(10px, calc(var(--u) * .66)); line-height: 1.45; color: var(--pp-label); overflow-wrap: break-word; hyphens: auto; }   /* «аудио-кассета», не «аудиокасс / ета» */
+/* найдено: фото на белой рамке, чуть наискось, зелёная галочка-печать в углу */
+.col-c.have { background: #fff; border: 3px solid var(--pp-ink); box-shadow: 0 4px 0 var(--pp-ink); rotate: -1.2deg; }
+.col-c.have:nth-child(even) { rotate: 1.4deg; }
+.col-c.have .col-ph { background: radial-gradient(circle at 50% 45%, #fff6cf, #ffd85e 85%); border: 2px solid var(--pp-ink); }
+.col-c.have > span { color: var(--pp-ink); }
+.col-c.have::after { content: '✓'; position: absolute; top: -9px; right: -9px; width: 26px; height: 26px; line-height: 24px; font-size: 14px; text-align: center;
+  color: var(--pp-paper); background: var(--pp-money); border: 2px solid var(--pp-ink); border-radius: 50%; rotate: 12deg; }
+.col-c:hover { translate: 0 -3px; }
+.col-c.on:not(.padsel) { border-color: var(--pp-orange); }
+/* курсор геймпада — толстая чернильно-жёлтая обводка, как у всей бумаги */
+#panel[data-kind="collect"] .col-c.padsel, #panel[data-kind="collect"] .col-c:focus-visible { outline: 4px solid var(--pp-ink) !important; outline-offset: 2px;
+  box-shadow: 0 0 0 8px var(--pp-yellow), 0 4px 0 var(--pp-ink) !important; rotate: 0deg; z-index: 2; animation: pp-lift .2s var(--pp-spring); }
+.col-c.col-bump { animation: col-bump .3s var(--pp-spring); }
+@keyframes col-bump { 40% { translate: 0 -8px; } }
+
+/* записка: что под курсором и где искать */
+.col-note { flex: none; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: .3em 1em; min-height: 2.6em; margin: calc(var(--u) * .3) 0 0;
+  padding: calc(var(--u) * .5) calc(var(--u) * .6); font-size: var(--pp-fs-m); line-height: 1.5; text-align: center; border-top: 1px dashed rgba(138, 107, 78, .45); }
+.col-note b { font-weight: normal; padding: 0 .25em; background: linear-gradient(transparent 12%, var(--pp-yellow) 12% 88%, transparent 88%); }
+.col-note em { font-style: normal; font-size: var(--pp-fs-s); color: var(--pp-label); }
+.col-note em.pp-plus { color: var(--pp-money); }
+
+/* низ листа: пометка «[B] назад» и «за каждый — 5 000 ₽» */
+.col-foot { flex: none; display: flex; align-items: center; justify-content: space-between; gap: calc(var(--u) * 1); padding-top: calc(var(--u) * .5);
+  border-top: 2px dashed var(--pp-brown); }
+.col-foot .col-close { flex: none; padding: .5em .9em; font-size: calc(var(--u) * .9); min-height: 40px; }
+.col-foot > span { flex: 1 1 0; min-width: 0; text-align: right; font-size: max(10px, calc(var(--u) * .62)); line-height: 1.6; color: var(--pp-label); }
+
+/* телефон стоя: три в ряд, сетка листается внутри листа */
+@media (max-width: 560px) {
+  #panel[data-kind="collect"] .pn-box { padding-left: 12px; padding-right: 12px; }
+  #panel[data-kind="collect"] #col-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .col-ph { height: clamp(44px, 9vh, 96px); }
+  .col-foot { flex-direction: column; align-items: stretch; gap: 6px; }
+  .col-foot > span { text-align: center; }
+}
+/* телефон боком: низко — карточки ниже, записка в одну строку */
+@media (max-height: 460px) {
+  #panel[data-kind="collect"] .pn-box { max-height: calc(100% - 16px); }
+  .col-ph { height: clamp(32px, 11vh, 56px); }
+  .col-bar { margin: 4px 0; }
+  .col-note { min-height: 0; padding: 4px; }
+}
+@media (prefers-reduced-motion: reduce) { .col-c, .col-c.col-bump, .col-bar i { animation: none; transition: none; } }

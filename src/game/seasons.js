@@ -2,11 +2,12 @@
    Времена года.
 
    Сезон — число от 0 до 4: 0 — начало лета, 1 — осень, 2 — зима, 3 — весна.
-   Каждая смена (не «просто покататься») сдвигает его на SEASON_STEP, полный
-   сезон — восемь смен, год — тридцать две. И каждый заход в игру — ещё на
-   SEASON_ENTER (первый запуск — нет): кто заходит редко и на одну смену, всё
-   равно со временем попадает в разные сезоны. Хранится в dlv-season, ?season=2.4
-   ставит своё значение и ничего не сохраняет.
+   Каждая смена (не «просто покататься») сдвигает его на одну смену календаря:
+   сезоны разной длины — SEASON_SHIFTS (лето 14 смен, осень, зима и весна по 6,
+   год — 32; 09.10.2026, автор: «чаще ярко-солнечно», до того — по 8 смен).
+   И каждый заход в игру — ещё на SEASON_ENTER смены (первый запуск — нет): кто
+   заходит редко и на одну смену, всё равно со временем попадает в разные сезоны.
+   Хранится в dlv-season, ?season=2.4 ставит своё значение и ничего не сохраняет.
 
    Статика города склеена в меши один раз при загрузке, поэтому сезон в ней
    не «запечён», а считается в шейдере по общим юниформам:
@@ -35,8 +36,17 @@ import { setPeopleSeason, redressHumans } from './people.js';
 import { growTree } from './trees.js';
 import { YARD, onYard } from './yards.js';   // дворовые дорожки: зимой протоптаны, сугробы мимо (yards.js)
 
-export const SEASON_STEP = 0.125;          // на столько сдвигает сезон одна смена: сезон — восемь смен
-export const SEASON_ENTER = 0.06;          // и на столько — каждый заход в игру (~16 заходов без смен — сезон)
+/* сколько смен длится каждый сезон: лето, осень, зима, весна (год — 32 смены). Лето длиннее (09.10.2026):
+   первое впечатление и большая часть игры — ярко и зелено; осень и зима остаются, просто короче */
+export const SEASON_SHIFTS = [14, 6, 6, 6];
+export const SEASON_ENTER = 0.5;           // заход в игру — ещё на полсмены календаря (~12—28 заходов без смен — сезон)
+const SEASON_CUM = SEASON_SHIFTS.reduce((a, n) => (a.push(a[a.length - 1] + n), a), [0]);
+const YEAR_SHIFTS = SEASON_CUM[4];
+/* сезон (0…4) → номер смены в году (0…32) и обратно: внутри сезона — ровно */
+const toShifts = s => { const v = ((s % 4) + 4) % 4, q = Math.min(3, Math.floor(v)); return SEASON_CUM[q] + (v - q) * SEASON_SHIFTS[q]; };
+const fromShifts = u => { const w = ((u % YEAR_SHIFTS) + YEAR_SHIFTS) % YEAR_SHIFTS; let q = 0; while (q < 3 && w >= SEASON_CUM[q + 1]) q++; return q + (w - SEASON_CUM[q]) / SEASON_SHIFTS[q]; };
+/* сезон через n смен календаря от s */
+export const seasonAfter = (s, n) => fromShifts(toShifts(s) + n);
 const CELL = 100;                           // клетка склейки, как у статики
 
 let C = null;                               // что дала игра (init)
@@ -52,8 +62,8 @@ const curve = pts => s => {
   return pts[pts.length - 1][1];
 };
 const K = {
-  // год — 32 смены (SEASON_STEP): лето 0—1, осень 1—2, зима 2—3, весна 3—4, у каждого ~8 смен.
-  // «Зимний вид» (снег, сугробы, пуховики) — только 2,0—3,0: четверть года, не больше (docs/CAREER.md)
+  // год — 32 смены (SEASON_SHIFTS): лето 0—1 (14 смен), осень 1—2, зима 2—3, весна 3—4 (по 6).
+  // «Зимний вид» (снег, сугробы, пуховики) — только 2,0—3,0: 6 смен из 32 (docs/CAREER.md)
   snow: curve([[0, 0], [1.92, 0], [2.1, 1], [2.85, 1], [3.08, 0], [4, 0]]),
   leaf: curve([[0, 1], [1.35, 1], [1.85, 0], [3.05, 0], [3.35, 1], [4, 1]]),
   yellow: curve([[0, 0], [0.92, 0], [1.4, 1], [2.95, 1], [3.0, 0], [4, 0]]),
@@ -61,7 +71,8 @@ const K = {
   fallen: curve([[0, 0], [1.2, 0], [1.6, 1], [1.95, 1], [2.12, 0], [4, 0]]),
   bloom: curve([[0, 0], [3.25, 0], [3.4, 1], [3.7, 1], [3.85, 0], [4, 0]]),      // сирень цветёт: разгар весны (trees.js)
   berry: curve([[0, 0], [0.85, 0], [1.15, 1], [2.25, 1], [2.5, 0], [4, 0]]),      // ягоды рябины и шиповника: с ранней осени до середины зимы
-  dry: curve([[0, 0], [0.8, 0.1], [1.1, 0.45], [1.55, 1], [2.9, 1], [3.1, 0], [4, 0]]),
+  // трава летом не подсыхает (09.10.2026: было 0→0,1 за лето — газон желтел уже в июле): сохнет с самого конца лета
+  dry: curve([[0, 0], [0.88, 0], [1.1, 0.45], [1.55, 1], [2.9, 1], [3.1, 0], [4, 0]]),
   mud: curve([[0, 0], [2.9, 0], [3.06, 1], [3.35, 0], [4, 0]]),
   wet: curve([[0, 0], [1.5, 0], [1.75, 0.5], [1.95, 0], [2.85, 0], [3.08, 1], [3.4, 0.35], [3.7, 0], [4, 0]]),
   drift: curve([[0, 0], [1.98, 0], [2.2, 1], [2.82, 1], [3.04, 0], [4, 0]]),
@@ -84,6 +95,11 @@ export const slip = () => (A.snow || 0) * 0.32;
 export const snowy = () => (A.snow || 0) > 0.45;
 /* сколько снега на ветках и земле, 0 … 1 (ельник: forest.js) */
 export const snowAmt = () => A.snow || 0;
+/* распутица (весна) и мокрая земля, 0 … 1 — грязь на машине (cardirt.js) */
+export const mudAmt = () => A.mud || 0;
+export const wetAmt = () => A.wet || 0;
+/* сколько снега падает сейчас (снегопад 0…1) — дворникам (wipers.js) */
+export const snowFall = () => (SKY ? SKY.amt : 0);
 /* жара (вариант погоды weather.js): 0 … 1 — трава выжжена (lawnprops.js красит пучки в солому) */
 export const heatAmt = () => U.uHeat.value || 0;
 /* река во льду (сёрферу там не место) */
@@ -144,7 +160,12 @@ vec3 seasonTint (vec3 c, float dryK, float snowK) {
   float green = smoothstep(0.05, 0.18, c.g - max(c.r, c.b)) * dryK;
   float water = smoothstep(0.08, 0.2, c.b - c.r) * step(c.g, c.b);
   float road = (1.0 - smoothstep(0.05, 0.12, sat)) * (1.0 - smoothstep(0.4, 0.62, lum));
-  float n = sNoise(vSW.xz * 0.23) * 0.62 + sNoise(vSW.xz * 0.9) * 0.38;
+  // шум пятен (снег, сухая трава, грязь): сетка шума повёрнута (37° и −53°), у двух октав — каждая по-своему,
+  // Ровная сетка по осям мира рисовала пятна углами и клетками — снег лежал «квадратами» (О6, 09.10.2026)
+  // крупная октава ещё и сдвинута мелкой (без лишних вызовов шума): край пятна извилистый, а не ромбом
+  // (мелкая — ~2 м, а не ~1 м: метровые клетки шума по краю пятна читались ступеньками)
+  float n2 = sNoise(mat2(0.6, -0.8, 0.8, 0.6) * vSW.xz * 0.5 + 17.0);
+  float n = sNoise(mat2(0.8, 0.6, -0.6, 0.8) * vSW.xz * 0.23 + (n2 - 0.5) * 0.9) * 0.68 + n2 * 0.32;
   float g = green * up;
   // сухая трава осенью — золотисто-зелёная и жёлтая, чистая (не бурая): пятнами по шуму
   vec3 dryC = mix(vec3(0.38, 0.45, 0.05), vec3(0.80, 0.52, 0.04), smoothstep(0.3, 0.75, n)) * (0.88 + 0.26 * n);
@@ -163,14 +184,14 @@ vec3 seasonTint (vec3 c, float dryK, float snowK) {
     // выжженная трава: соломенная и сухая оливковая пятнами, кое-где ещё зелёная (не песок и не осень)
     vec3 burnt = mix(vec3(0.62, 0.52, 0.2), vec3(0.44, 0.43, 0.15), smoothstep(0.3, 0.7, n)) * (0.85 + 0.3 * n);
     c = mix(c, burnt, uHeat * g * (0.6 + 0.3 * smoothstep(0.25, 0.6, n)));
-    c = mix(c, c * vec3(1.25, 0.92, 0.58) + vec3(0.07, 0.025, 0.0), uHeat * 0.85);
+    c = mix(c, c * vec3(1.25, 0.92, 0.58) + vec3(0.07, 0.025, 0.0), uHeat * 0.6);   // всё теплее; 09.10.2026 — слабее (было 0,85: «оранжевый туман»)
     float dist = length(vSW.xz - cameraPosition.xz);
     float mir = road * up * smoothstep(28.0, 70.0, dist) * (1.0 - smoothstep(150.0, 260.0, dist));
     mir *= 0.55 + 0.45 * sin(vSW.x * 0.21 + vSW.z * 0.17 + uTime * 2.6) * sin(vSW.z * 0.33 - uTime * 1.9);
     c = mix(c, vec3(0.96, 0.82, 0.62), uHeat * clamp(mir, 0.0, 1.0) * 0.6);
   }
   float lim = uSnow * up * 1.35 * snowK - 0.22;
-  float cov = (1.0 - smoothstep(lim - 0.06, lim + 0.06, n)) * (1.0 - water * 0.7);
+  float cov = (1.0 - smoothstep(lim - 0.1, lim + 0.1, n)) * (1.0 - water * 0.7);   // край проталины — мягкий (до 09.10 ±0,06)
   cov *= 1.0 - road * 0.55 * (0.45 + 0.55 * n);
   cov *= 1.0 - yardP * (0.45 + 0.3 * n);       // дворовая дорожка зимой протоптана: плитка проглядывает пятнами
   vec3 snowC = mix(vec3(0.88, 0.91, 0.97), vec3(0.46, 0.48, 0.52), road * 0.6);
@@ -330,12 +351,16 @@ function Pile (CH = CELL) {                      // CH — клетка скле
     },
     write,
     tris: () => tris,
-    /* keep — позиции остаются в памяти: их правят на ходу (сугробы) */
-    build (mat, keep) {
+    /* keep — позиции остаются в памяти: их правят на ходу (сугробы). steps — то же шагами по 24 клетки
+       (поздняя сборка, latebuild.js) */
+    build (mat, keep) { const it = this.steps(mat, keep); for (;;) { const r = it.next(); if (r.done) return r.value; } },
+    *steps (mat, keep) {
       const out = [];
       out.byKey = new Map();
+      let i = 0;
       for (const c of cells.values()) {
         if (!c.n) continue;
+        if (++i % 24 === 0) yield 'pile';
         const g = new THREE.BufferGeometry();
         const pa = new THREE.BufferAttribute(c.p.slice(0, c.n * 3), 3), ca = new THREE.BufferAttribute(c.c.slice(0, c.n * 3), 3, true), aa = new THREE.BufferAttribute(c.a.slice(0, c.n * 4), 4, true);
         g.setAttribute('position', pa); g.setAttribute('color', ca); g.setAttribute('aux', aa);
@@ -432,7 +457,7 @@ export function initSeasons (ctx) {
 /* сдвинуть сезон: новая смена */
 export function advanceSeason () {
   if (FORCED) return;
-  SEA = wrap(SEA + SEASON_STEP);
+  SEA = wrap(seasonAfter(SEA, 1));
   healDrifts();
   C.Store.set('dlv-season', SEA);
   apply();
@@ -442,14 +467,14 @@ export function advanceSeason () {
 function readSaved () {
   const saved = C.Store.get('dlv-season', null);
   // зашёл в игру — сезон чуть вперёд (сохранённый уже был: не первый запуск)
-  SEA = wrap((+saved || 0) + (saved === null || saved === undefined ? 0 : SEASON_ENTER));
+  SEA = wrap(saved === null || saved === undefined ? 0 : seasonAfter(+saved || 0, SEASON_ENTER));
   C.Store.set('dlv-season', SEA);
 }
 /** сменили профиль без перезагрузки (game.js reprofile): сезон — сохранённый у нового профиля (как при входе в игру) */
 export function reloadSaved () { if (!C || FORCED) return; readSaved(); apply(); }
 export function setSeason (v, forced = true) { SEA = wrap(+v); FORCED = !!forced; apply(); }
 export const seasonForced = () => FORCED;
-function wrap (v) { return Math.round(((v % 4) + 4) % 4 * 1000) / 1000 % 4; }
+function wrap (v) { return Math.round(((v % 4) + 4) % 4 * 1e5) / 1e5 % 4; }
 
 /* Вариант сезона на смену (weather.js): поверх кривых — свои доли. v: { snow, leaf, yellow, …: число или
    f(было) → стало; heat, gold — юниформы жары и яркой осени; snowfall — снегопад не реже этой силы }.
@@ -511,7 +536,26 @@ export function seasonYard () {
     const n = nearestRoad(x, z, 7, 1);
     return !(n && n.d < n.seg.w / 2 + m + 1);
   };
-  const nearSmash = (x, z, d) => SMASH.some(it => Math.abs(it.x - x) < d && Math.abs(it.z - z) < d);
+  // то же, что SMASH.some(|dx| < d и |dz| < d), только по клеткам 8 м: перебор 25 тыс. мелочи на каждую пробу
+  // съедал ~0,35 с на Деке. Новое в SMASH (горки, снеговики) дописываем в клетки перед каждым вопросом
+  const SG = new Map(), SGC = 8;
+  let sgN = 0;
+  const nearSmash = (x, z, d) => {
+    for (; sgN < SMASH.length; sgN++) {
+      const it = SMASH[sgN];
+      if (!Number.isFinite(it.x) || !Number.isFinite(it.z)) continue;
+      const k = Math.floor(it.x / SGC) * 65536 + Math.floor(it.z / SGC);
+      let a = SG.get(k);
+      if (!a) SG.set(k, a = []);
+      a.push(it);
+    }
+    for (let i = Math.floor((x - d) / SGC); i <= Math.floor((x + d) / SGC); i++)
+      for (let j = Math.floor((z - d) / SGC); j <= Math.floor((z + d) / SGC); j++) {
+        const a = SG.get(i * 65536 + j);
+        if (a) for (const it of a) if (Math.abs(it.x - x) < d && Math.abs(it.z - z) < d) return true;
+      }
+    return false;
+  };
   const track = () => { const it = SMASH[SMASH.length - 1]; it.seaSeed = 0.02 + hsh(it.x, it.z, 3) * 0.9; SEA_ITEMS.push(it); };
   const slideAt = (x, z, ry, big) => {
     const k = big ? 1.35 : 1, gy = groundH(x, z), g = [];
@@ -579,8 +623,10 @@ export function seasonYard () {
   BUILT.items = SEA_ITEMS.length;
 }
 
-/* ─────────────── сугробы, ёлки, гирлянды — в конце сборки города ─────────────── */
-export function seasonBuild () {
+/* ─────────────── сугробы, ёлки, гирлянды — в конце сборки города ───────────────
+   seasonSteps — итератором, шагами для поздней сборки (latebuild.js; при ?nolate — разом): на Деке весь
+   кусок ~0,65 с, меню между шагами отвечает. Шаги — по счёту улиц и домов, не по времени */
+export function* seasonSteps () {
   const { CITY, groundH, curbAt, nearestRoad, roadWidth, drivable, inHouse, inPoly, inBounds, ZEBRAS, NODE_IDX, nodeDeg, LAMP_SPOTS } = C;
   const T = tpls(), P = PILE, G = GARL;
   const svk = C.MAP.id === 'seversk';
@@ -598,6 +644,7 @@ export function seasonBuild () {
     BUILT.bushes = (BUILT.bushes || 0) + 1;
   }
   for (const [m, a] of SMA) m.geometry.setAttribute('aux', new THREE.BufferAttribute(a, 4, true));
+  yield 'bush';
 
   // ── сугробы вдоль улиц: за тротуаром, у перекрёстков и зебр не наваливаем
   const DRIFT_HEX = '#e6ebf2';
@@ -651,7 +698,9 @@ export function seasonBuild () {
   const RIDGES = svk ? 9000 : 3600, HEAPS = svk ? 1800 : 900, BANKS = svk ? 1300 : 650;
   let nRidge = 0, nHeap = 0, nBank = 0;
   const heapCells = new Set();
+  let nRd = 0;
   for (const rd of CITY.roads) {
+    if (++nRd % 30 === 0) yield 'roads';                   // шаг поздней сборки (latebuild.js)
     if (!drivable(rd) || rd.b || rd.c > 5) continue;
     const w = roadWidth(rd), off = w / 2 + 2.75 + 1.1;
     for (let i = 1; i < rd.p.length; i++) {
@@ -707,9 +756,11 @@ export function seasonBuild () {
     }
   }
   BUILT.ridges = nRidge; BUILT.heaps = nHeap; BUILT.banks = nBank;
+  yield 'roads';
   // во дворах и парках
-  let yd = 0;
+  let yd = 0, ng = 0;
   for (const pl of CITY.green) {
+    if (++ng % 150 === 0) yield 'yard';
     if (yd > (svk ? 1000 : 500)) break;
     if (pl.k === 'water' || pl.k === 'pitch') continue;
     let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
@@ -725,6 +776,7 @@ export function seasonBuild () {
     }
   }
 
+  yield 'yard';
   // ── ёлки к Новому году: у пиццерии и в самых больших парках
   const firSpot = (x, z, need) => {
     if (!inBounds(x, z, -10) || inHouse(x, z, 5)) return false;
@@ -756,7 +808,10 @@ export function seasonBuild () {
   const PAL_MULTI = ['#ff5a4a', '#ffd23f', '#5aff7a', '#5aa8ff', '#ff7ae0'], PAL_WARM = ['#ffe6a0', '#ffd98a', '#fff2c8'];
   let bulbs = 0;
   const BULB_CAP = svk ? 16000 : 9000;
+  yield 'yardfir';
+  let nB = 0;
   for (const b of CITY.buildings) {
+    if (++nB % 400 === 0) yield 'garl';                    // шаг поздней сборки
     if (bulbs > BULB_CAP) break;
     if (b.k === 'gar' || b.k === 'ind' || b.k === 'church' || b.p.length < 3) continue;
     let cx = 0, cz = 0;
@@ -807,22 +862,29 @@ export function seasonBuild () {
     spiral(f.x, f.z, f.y + 1.1 * f.s * f.hs, 4.6 * f.s * f.hs, 2.5 * f.s, 0.7 * f.s, 34, 0.02 + hsh(f.x, f.z, 42) * 0.95, PAL_MULTI);
   }
   BUILT.bulbs = bulbs;
+  yield 'garl2';
   BUILT.pile = PILE.tris(); BUILT.garl = GARL.tris();
-  MESH_PILE = PILE.build(pileMat());
-  MESH_GARL = GARL.build(garlandMat());
+  MESH_PILE = yield* PILE.steps(pileMat());
+  yield 'pile';
+  MESH_GARL = yield* GARL.steps(garlandMat());
+  yield 'garlmesh';
   // сугробы — отдельно: их позиции живые (разбиваются и отрастают)
-  DRIFT_MESH = DRIFTP.build(MESH_PILE[0] ? MESH_PILE[0].material : pileMat(), true);
+  DRIFT_MESH = yield* DRIFTP.steps(MESH_PILE[0] ? MESH_PILE[0].material : pileMat(), true);
   for (const list of DRIFTS.values()) for (const d of list) d.mesh = DRIFT_MESH.byKey.get(d.key);
-  LEAF_MESH = LEAFP.build(MESH_PILE[0] ? MESH_PILE[0].material : pileMat(), true);
+  yield 'drift';
+  LEAF_MESH = yield* LEAFP.steps(MESH_PILE[0] ? MESH_PILE[0].material : pileMat(), true);
   for (const list of LEAVES.values()) for (const d of list) d.mesh = LEAF_MESH.byKey.get(d.key);
+  yield 'drift';
   // гирлянды, сугробы, снег и комья впервые появятся посреди зимы — программы собираем сразу
   initSky();
   chunks(0, -500, 0, 1, 0, 0);
+  yield 'sky';
   const warm = [...MESH_GARL, ...DRIFT_MESH, ...LEAF_MESH, SNOWF, SPLASH.pts, ...CHUNKS.map(c => c.m)];
   for (const m of warm) m.visible = true;
   C.renderer.compile(C.scene, C.cam);
   for (const c of CHUNKS) { c.life = 0; c.m.visible = false; }
   SNOWF.visible = false;
+  yield 'compile';
   apply();
 }
 /* Стартовый кадр (V.hero в camStep): камера в 10 м перед машиной на месте 0
@@ -890,7 +952,7 @@ function bigFir (x, z, k) {
   for (const ry of [0, Math.PI / 2]) GARL.add(T.quad, x, y + 12.2 * k, z, 1.1 * k, 1.1 * k, 1, 0, ry, Math.PI / 4, '#ffcf3a', 4, 0.01, 0);
   spiral(x, z, y + 1.2 * k, 9.4 * k, 4.7 * k, 0.9 * k, 150, 0.01, ['#ff5a4a', '#ffd23f', '#5aff7a', '#5aa8ff', '#ffe6a0']);
   // настоящее препятствие; вне праздников его уносим прочь (apply)
-  FIRS.push({ x, z, hw: 3.1 * k, solid: C.obb ? C.obb(x, z, 3.1 * k, 3.1 * k, 0) : null });
+  FIRS.push({ x, z, hw: 3.1 * k, solid: C.obb ? Object.assign(C.obb(x, z, 3.1 * k, 3.1 * k, 0), { tree: 1 }) : null });   // tree — удар звучит деревом (impact.js)
 }
 
 /* ─────────────── живое: снег с неба, снежки, сугробы под колёсами ─────────────── */
@@ -1018,8 +1080,7 @@ function burstDrift (d, sp) {
   const vol = Math.min(1.6, d.L * d.W * d.H);
   splash(d.x, d.y + d.H * 0.6, d.z, 18 + (vol * 14 | 0), 1.3 + sp / 18);
   chunks(d.x, d.y + d.H * 0.5, d.z, 5 + (vol * 5 | 0), V.vx, V.vz);
-  C.Snd.blip(70 + Math.random() * 25, 0.22, 'sine', 0.2);
-  C.Snd.noise(0.22, 0.13);
+  C.Snd.fx('snowdrift', s => { s.blip(70 + Math.random() * 25, 0.22, 'sine', 0.2); s.noise(0.22, 0.13); });
   C.S.shake = Math.max(C.S.shake || 0, 0.1 + Math.min(0.15, sp / 120));
   const k = 0.84 - Math.min(0.12, vol * 0.08);
   V.vx *= k; V.vz *= k;
@@ -1105,7 +1166,7 @@ function burstLeaves (d, sp) {
   d.t = rnd(50, 90);
   GROW.push(d);
   leafBits(d.x, d.y + d.H * 0.5, d.z, 14 + Math.min(14, sp | 0), V.vx, V.vz);
-  C.Snd.noise(0.18, 0.09);
+  C.Snd.fx('leaves', s => s.noise(0.18, 0.09));
   V.vx *= 0.97; V.vz *= 0.97;
 }
 /* листья в воздухе: плоские рыжие квадратики из пула, кружат и падают */
@@ -1258,13 +1319,13 @@ function stepBalls (dt) {
     // попали в курьера
     if (!done && Math.abs(b.x - V.x) < 1.2 && Math.abs(b.z - V.z) < 1.2 && b.y < V.y + 1.8) {
       done = true;
-      C.Snd.blip(420, 0.05, 'triangle', 0.05);
+      C.Snd.fx('snowball-hit', s => s.blip(420, 0.05, 'triangle', 0.05));
     }
     if (!done && b.y < gy) done = true;
     if (done) {
       b.on = 0; b.m.visible = false;
       splash(b.x, Math.max(b.y, gy + 0.1), b.z, 7, 0.6);
-      if (Math.hypot(b.x - V.x, b.z - V.z) < 25) C.Snd.noise(0.05, 0.03);
+      C.Snd.fx('snowball', s => s.noise(0.05, 0.03), { x: b.x, z: b.z, far: 25, near: 2 });
     }
   }
 }
@@ -1330,7 +1391,7 @@ function stepFights (dt) {
           u.armR.rotation.x = -0.7;
           const ty = atCar ? V.y + 1.0 : q.tgt ? q.tgt.grp.position.y + 1.1 * q.tgt.sc : C.groundH(tx, tz);
           throwBall(q, tx + rnd(-0.5, 0.5), ty, tz + rnd(-0.5, 0.5), f);
-          if (dC < 40) C.Snd.blip(rnd(500, 700), 0.04, 'triangle', 0.03);
+          if (dC < 40) C.Snd.fx('throw', s => s.blip(rnd(500, 700), 0.04, 'triangle', 0.03), { x: tx, z: tz, far: 40 });
         }
       }
     }

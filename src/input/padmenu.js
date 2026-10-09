@@ -107,5 +107,6 @@ export function makePadMenu (opts = {}) {
   }
   update.clear = () => { mark(null); lastRoot = null; };
   update.selected = () => sel;
+  update.select = el => mark(el);               // поставить курсор самому (сетка «мои находки» — ↑↓ по рядам, collect.js)
   return update;
 }

@@ -2,7 +2,6 @@
 .cr-tabs.n4 { grid-template-columns: repeat(4, 1fr); }
 @media (max-width: 760px) { .cr-tabs.n4 { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 560px) { .cr-tabs.n4 { grid-template-columns: 1fr; } }
-.cr-t-turret { border-top-color: #7fe07a; }
 .rd-pane { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
-.rd-pane p { margin: 0; font-size: clamp(8px, 1vw, 12px); line-height: 1.7; color: #fff3d6; }
-.rd-pane .rd-lock { color: #ffb36b; }
+.rd-pane p { margin: 0; font-size: var(--pp-fs-s); line-height: 1.7; color: var(--pp-ink); }
+.rd-pane .rd-lock { color: var(--pp-red); }

@@ -18,6 +18,7 @@
    там же, где аварийка. Источников света нет: только яркие плашки и
    ореолы (прозрачные, складываются с картинкой), видны, только когда горят.
    step(car, dt, vf, steer, brake, gas, night) — из driveStep каждый кадр.
+   kill(car, угол) — фонарь разбит (carglass.js): его плашки больше не горят.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 
@@ -131,7 +132,31 @@ function rig (car) {
     state: { brake: false, reverse: false, left: false, right: false, side: 0, found: { tail: F.tail[0].n + F.tail[1].n, ambR: F.ambR[0].n + F.ambR[1].n, ambF: F.ambF[0].n + F.ambF[1].n } },
   };
   DEBUG.L = L;
-  return (ud.lights = L);
+  ud.lights = L;
+  if (ud.lampDead) for (const k in ud.lampDead) apply(L, k);    // разбиты раньше, чем огни собрались
+  return L;
+}
+
+/* разбитый фонарь (carglass.js): его плашки больше не горят. k — угол: 'rl' / 'rr' / 'fl' / 'fr'
+   (r — сзади / f — спереди, l — левый бок +X, r — правый −X) */
+export function kill (car, k) {
+  const ud = car && car.userData;
+  if (!ud) return;
+  (ud.lampDead || (ud.lampDead = {}))[k] = 1;
+  if (ud.lights) apply(ud.lights, k);
+}
+function collapse (set, q) {
+  for (const m of [set.lamp, set.halo]) {
+    const a = m.geometry.attributes.position;
+    if (!a || a.count < (q + 1) * 4) continue;
+    for (let i = q * 4 + 1; i < q * 4 + 4; i++) a.setXYZ(i, a.getX(q * 4), a.getY(q * 4), a.getZ(q * 4));
+    a.needsUpdate = true;
+  }
+}
+function apply (L, k) {
+  const s = k[1] === 'l' ? 1 : 0;
+  if (k[0] === 'r') { collapse(L.brake, s); collapse(L.rev, s); collapse(L.turn[s], 0); }
+  else collapse(L.turn[s], 1);
 }
 
 function set (S, on, op) {

@@ -1,0 +1,52 @@
+/* Повтор для клипов (replay.js, docs/CAREER.md «Повтор»): хад скрыт, сверху — бумажная плашка со штампом
+   «ПОВТОР», ракурсом, скоростью и полоской времени; внизу — ярлычки кнопок (значки — glyphs.js keyHTML).
+   Стиль накладной (src/styles/paper.css): бумага, чернила, красный штамп; движение — только на появлении. */
+
+/* всё, кроме картинки города и самой плашки, — спрятать (место держат: ничего не прыгает при выходе) */
+body.replay-on > *:not(#game):not(.rp-ui):not(script),
+body.replay-on #game > *:not(#view) { visibility: hidden !important; pointer-events: none !important; }
+body.replay-on #view { cursor: default; }
+
+.rp-ui { display: none; position: fixed; inset: 0; z-index: 70; pointer-events: none;
+         font-family: "Press Start 2P", ui-monospace, monospace; color: var(--pp-ink); }
+.rp-ui.on { display: block; }
+
+.rp-top { position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 12px); translate: -50% 0; box-sizing: border-box;
+          display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; width: max-content; max-width: calc(100vw - 24px); padding: 9px 14px 10px;
+          font-size: var(--pp-fs-s); line-height: 1.4; background: var(--pp-paper); border: 2px solid var(--pp-ink); border-top: 5px solid var(--pp-red);
+          border-radius: 3px; box-shadow: 0 4px 0 rgba(51, 33, 12, .75); animation: rp-in .25s var(--pp-spring, ease-out) both; }
+.rp-stamp { display: inline-block; padding: .35em .6em .3em; font-weight: normal; font-size: var(--pp-fs-m); letter-spacing: .14em; text-transform: uppercase;
+            color: var(--pp-red); border: 3px solid var(--pp-red); border-radius: 4px; transform: rotate(-4deg); mix-blend-mode: multiply; }
+.rp-info { display: inline-flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.rp-info em { font-style: normal; color: var(--pp-label); }
+.rp-info .rp-spd { color: var(--pp-ink); }
+.rp-info .rp-rec { color: var(--pp-red); animation: rp-blink 1s steps(2, start) infinite; }
+.rp-bar { flex: 1 0 100%; height: 6px; background: repeating-linear-gradient(90deg, rgba(138, 107, 78, .35) 0 6px, transparent 6px 10px); border-radius: 2px; overflow: hidden; }
+.rp-bar > i { display: block; height: 100%; width: 0; background: var(--pp-orange); border-right: 2px solid var(--pp-ink); }
+.rp-ui.rec .rp-top { border-top-color: var(--pp-fire); }
+.rp-ui.rec .rp-bar > i { background: var(--pp-red); }
+
+/* сообщение «ролик сохранён: путь» — записка под плашкой; в Стиме по клику — показать файл в папке */
+.rp-msg { position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 96px); translate: -50% 0; max-width: min(640px, calc(100vw - 24px));
+          padding: 8px 12px; font: inherit; font-size: var(--pp-fs-s); line-height: 1.6; text-align: center; word-break: break-all; pointer-events: auto; cursor: default;
+          color: var(--pp-ink); background: var(--pp-yellow); border: 2px solid var(--pp-ink); border-radius: 3px; box-shadow: 0 3px 0 var(--pp-ink);
+          transform: rotate(-1deg); animation: rp-in .2s ease-out both; }
+.rp-msg.link { cursor: pointer; text-decoration: underline dotted; }
+.rp-msg[hidden] { display: none; }
+
+/* ярлычки кнопок внизу */
+.rp-keys { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); translate: -50% 0; box-sizing: border-box;
+           display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; width: max-content; max-width: calc(100vw - 24px); pointer-events: auto; }
+.rp-keys button { display: inline-flex; align-items: center; min-height: 34px; padding: .45em .75em; font: inherit; font-size: var(--pp-fs-s); cursor: pointer;
+                  color: var(--pp-ink); background: var(--pp-paper); border: 2px solid var(--pp-ink); border-radius: 3px; box-shadow: 0 3px 0 var(--pp-ink); }
+.rp-keys button:active { translate: 0 2px; box-shadow: 0 1px 0 var(--pp-ink); }
+.rp-keys button[data-a="save"] { background: var(--pp-yellow); }
+.rp-ui.rec .rp-keys button[data-a="save"] { color: var(--pp-paper); background: var(--pp-red); }
+.rp-keys .pp-key { margin-right: .5em; }
+.rp-keys .rp-ar { min-width: 1.6em; }
+body.touch .rp-keys .rp-ar { display: none; }
+body.touch .rp-keys button { min-height: 40px; }
+
+@keyframes rp-in { from { opacity: 0; translate: -50% -8px; } }
+@keyframes rp-blink { to { visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) { .rp-top, .rp-msg { animation: none; } .rp-info .rp-rec { animation: none; } }

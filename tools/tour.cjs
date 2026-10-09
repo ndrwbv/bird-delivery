@@ -16,6 +16,7 @@ const SPOTS = `{
   priv: one(b => b.k === 'priv', 40), gar: one(b => b.k === 'gar', 150), ind: one(b => b.k === 'ind', 250), pub: one(b => b.k === 'pub', 20),
   rail: C.levelx[8], rail2: (() => { let best = null; for (const r of C.rails) for (const q of r.p) { const n = D.nearestRoad(q[0], q[1], 5, 1); if (n && n.d > 14 && n.d < 30 && Math.abs(q[0] - D.PIZZA.x) < 2500 && Math.abs(q[1] - D.PIZZA.z) < 2500) return q; } return best; })(), lx2: C.levelx[20], kpp: C.kpp[0] && C.kpp[0].p, kpp2: C.kpp[4] && C.kpp[4].p,
 }`;
+app.commandLine.appendSwitch('mute-audio');   // проверки — без звука (автор 09.10)
 app.whenReady().then(async () => {
   protocol.handle('app', req => { let p = decodeURIComponent(new URL(req.url).pathname); if (p === '/' || p === '') p = '/index.html'; return net.fetch(pathToFileURL(path.join(DIST, p)).toString()); });
   const win = new BrowserWindow({ width: 1280, height: 720, show: false, webPreferences: { offscreen: true, backgroundThrottling: false } });

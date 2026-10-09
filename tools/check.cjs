@@ -91,6 +91,14 @@ const CHECKS = [
     const n = Object.entries(r.n).map(([k, v]) => k + ' ' + v).join(', ');
     return { status: r.ok ? 'ok' : 'fail', info: `${n}; на асфальте ${r.bad}` + (r.bad ? ': ' + JSON.stringify(r.by) + " " + JSON.stringify(r.sample) : '') };
   } },
+  { id: 'edits', name: 'правки редактора города применены', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/edits.js')]);
+    const e = errLine(j), r = j.result;
+    if (e || !r) return { status: 'fail', info: e || 'нет результата' };
+    const info = `поставить ${r.add}, убрать ${r.remove}` + (r.missing.length ? '; нет в городе: ' + JSON.stringify(r.missing) : '') + (r.still.length ? '; не убрано: ' + JSON.stringify(r.still) : '')
+      + (r.refused.length ? '; игра не поставила (место): ' + JSON.stringify(r.refused) : '') + (r.stale.length ? '; «убрать» ничего не нашло (город поменялся?): ' + JSON.stringify(r.stale) : '');
+    return { status: !r.ok ? 'fail' : (r.refused.length || r.stale.length) ? 'warn' : 'ok', info };
+  } },
   { id: 'pave', name: 'заборчики и конструкции не на тротуарах', group: 2, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/pave-props.js')]);
     const e = errLine(j), r = j.result;

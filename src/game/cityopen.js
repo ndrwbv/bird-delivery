@@ -27,6 +27,7 @@ import * as DIST from './districts.js';
 import * as CHAT from './chat.js';
 import * as DP from './distpick.js';             // выбор перед сменой — карусель карточек районов
 import { CITY as C, DISTRICT, cityFar } from './econ.js';
+import { keyHTML } from '../input/glyphs.js';     // «[A] ура!» — значок по вводу
 
 const SEEN = 'dlv-city-party';
 let A = null, el = null, PARTY = null;
@@ -90,7 +91,8 @@ export function party (done) {
     '</ul>';
   const go = $c('button', 'dep-go cy-go');
   go.type = 'button';
-  go.textContent = t('ура!');
+  go.innerHTML = keyHTML('ok') + esc(t('ура!'));
+  go.setAttribute('data-pad-main', '');
   root.append(cv, stage, go);
   host().appendChild(root);
 
@@ -101,8 +103,7 @@ export function party (done) {
   let W = 0, H = 0, raf = 0, t0 = performance.now(), last = t0, nextVolley = 0, closed = false;
   const fit = () => { const r = root.getBoundingClientRect(), k = Math.min(2, window.devicePixelRatio || 1); W = r.width; H = r.height; cv.width = Math.max(1, W * k); cv.height = Math.max(1, H * k); x.setTransform(k, 0, 0, k, 0, 0); };
   fit();
-  const blip = (f, d, ty, v) => { if (A.Snd) try { A.Snd.blip(f, d, ty, v); } catch (e) { /* — */ } };
-  const boom = () => { if (A.Snd && A.Snd.noise) try { A.Snd.noise(0.25, 0.18); } catch (e) { /* — */ } blip(160 + Math.random() * 80, 0.18, 'triangle', 0.1); };
+  const boom = () => { if (A.Snd && A.Snd.fx) try { A.Snd.fx('firework', s => { s.noise(0.25, 0.18); s.blip(160 + Math.random() * 80, 0.18, 'triangle', 0.1); }); } catch (e) { /* — */ } };
   const rocket = () => P.push({ kind: 'rocket', x: W * (0.15 + Math.random() * 0.7), y: H + 10, vx: (Math.random() - 0.5) * 60, vy: -(H * (0.9 + Math.random() * 0.35)), life: 0, max: 0.75 + Math.random() * 0.35, col: pick(COLS) });
   const burst = (bx, by, col) => {
     const k = 60 + (Math.random() * 40 | 0), sp = 150 + Math.random() * 150;
@@ -113,7 +114,7 @@ export function party (done) {
   const confetti = k => { for (let i = 0; i < k; i++) P.push({ kind: 'conf', x: Math.random() * W, y: -20 - Math.random() * H * 0.5, vx: (Math.random() - 0.5) * 40, vy: 60 + Math.random() * 90, life: 0, max: 99, col: pick(COLS), w: 5 + Math.random() * 6, h: 3 + Math.random() * 4, a: Math.random() * 6, va: (Math.random() - 0.5) * 10 }); };
   confetti(140);
   // фанфары: до-ми-соль-до, потом аккорд
-  [[523, 0], [659, 140], [784, 280], [1047, 430], [784, 640], [1047, 760]].forEach(([f, ms]) => setTimeout(() => { if (!closed) blip(f, ms >= 640 ? 0.35 : 0.14, 'square', 0.12); }, ms));
+  if (A.Snd && A.Snd.fx) try { A.Snd.fx('fanfare', s => [[523, 0], [659, 140], [784, 280], [1047, 430], [784, 640], [1047, 760]].forEach(([f, ms]) => setTimeout(() => { if (!closed) s.blip(f, ms >= 640 ? 0.35 : 0.14, 'square', 0.12); }, ms))); } catch (e) { /* — */ }
   setTimeout(() => { if (!closed && A.Snd && A.Snd.coin) A.Snd.coin(); }, 1000);
   const frame = now => {
     const dt = Math.min(0.05, (now - last) / 1000), el2 = (now - t0) / 1000;

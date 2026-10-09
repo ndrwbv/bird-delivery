@@ -20,7 +20,9 @@
    Формат сценария — список шагов [что, ...аргументы]:
      ['title']                       — плашка «имя · глава N · название»
      ['shot', имя, { cut }]          — план камеры (см. SHOTS); cut — склейкой, иначе наездом
-     ['say', кто, N_('текст'), { mood }]
+     ['say', кто, N_('текст'), { mood, emo }]  — emo: выражение на реплике — happy | angry | sad | scared |
+                                     surprised (лицо актёра и голова в диалоге; без — спокойное). Пока
+                                     реплика висит, рот говорит, а руки жестикулируют по характеру (actorlife.js)
      ['walk', кто, куда, { wait }]   — куда: front | door | in | out | car | side
      ['act', кто, действие, сек]     — wave | nod | shake | shrug | give | joy | hug | sad | think
      ['face', кто, на кого]
@@ -50,10 +52,14 @@ import { t, N_ } from '../i18n/index.js';
 import * as ECON from './econ.js';
 import * as DLG from './dialog.js';
 import { STORY_PEOPLE, ORDER_TYPES } from './orders.config.js';
-import { makePerson } from './people.js';
+import { makePerson, faceDataURL } from './people.js';
+import * as LIFE from './actorlife.js';          // живые лица и жесты актёров — только в катсцене (Н2)
 import { makeCatModel, FURS } from './cats.js';
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 import * as QR from './quickrun.js';             // быстрый заезд: глав нет
+import { keyHTML } from '../input/glyphs.js';     // «[B] пропустить» — значок по вводу (было «esc» всегда)
+import { pad as PAD } from '../input/gamepad.js';  // B на геймпаде — пропустить катсцену, как Esc
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // career.js пишет другой агент: берём, если он уже есть, и не падаем, если нет
 const CAREER_MOD = import.meta.glob('./career.js', { eager: true })['./career.js'] || null;
@@ -95,9 +101,9 @@ export const STORIES = [
           ['walk', 'zina', 'out'],
           ['shot', 'two'],
           ['act', 'zina', 'wave', 1.2],
-          ['say', 'zina', N_('Ой, приехал! Пицца, да? Это внучку моему, Серёженьке. Он у меня в Томске, программист.')],
+          ['say', 'zina', N_('Ой, приехал! Пицца, да? Это внучку моему, Серёженьке. Он у меня в Томске, программист.'), { emo: 'happy' }],
           ['shot', 'courier', { cut: true }],
-          ['say', 'courier', N_('Добрый день! Пепперони, большая. Приятного аппетита внуку!')],
+          ['say', 'courier', N_('Добрый день! Пепперони, большая. Приятного аппетита внуку!'), { emo: 'happy' }],
           ['shot', 'zina', { cut: true }],
           ['say', 'zina', N_('Он обещал к обеду заехать. С колбаской, как он любит. Сама-то я её не ем: от неё изжога и мысли.')],
           ['give'],
@@ -107,10 +113,10 @@ export const STORIES = [
           ['wait', 0.8],
           ['shot', 'two'],
           ['face', 'zina', 'cat'],
-          ['say', 'zina', N_('Барсик, брысь! Это не тебе. Барсик у меня за старшего, пока Серёжи нет. Командует.')],
+          ['say', 'zina', N_('Барсик, брысь! Это не тебе. Барсик у меня за старшего, пока Серёжи нет. Командует.'), { emo: 'angry' }],
           ['face', 'zina', 'courier'],
           ['act', 'zina', 'give', 1],
-          ['say', 'zina', N_('На вот, сынок, за труды. И конфетку возьми — «Коровка», свежая, я её с Нового года берегла.')],
+          ['say', 'zina', N_('На вот, сынок, за труды. И конфетку возьми — «Коровка», свежая, я её с Нового года берегла.'), { emo: 'happy' }],
           ['shot', 'courier', { cut: true }],
           ['act', 'courier', 'nod', 1],
           ['say', 'courier', N_('Спасибо… Передавайте Серёже привет.')],
@@ -133,13 +139,13 @@ export const STORIES = [
           ['wait', 1],
           ['walk', 'zina', 'out'],
           ['shot', 'two'],
-          ['say', 'zina', N_('А, это ты! Опять ты. Хорошо, что ты — ты хоть приезжаешь.')],
+          ['say', 'zina', N_('А, это ты! Опять ты. Хорошо, что ты — ты хоть приезжаешь.'), { emo: 'happy' }],
           ['act', 'zina', 'sad', 1.6],
           ['shot', 'zina', { cut: true }],
-          ['say', 'zina', N_('Серёжа опять не смог. У него там дедлайн. Это у них вроде посевной — все бегают, а урожая не видно.')],
+          ['say', 'zina', N_('Серёжа опять не смог. У него там дедлайн. Это у них вроде посевной — все бегают, а урожая не видно.'), { emo: 'sad' }],
           ['shot', 'courier', { cut: true }],
           ['act', 'courier', 'shrug', 1.2],
-          ['say', 'courier', N_('А прошлая пицца как же?')],
+          ['say', 'courier', N_('А прошлая пицца как же?'), { emo: 'surprised' }],
           ['shot', 'cat'],
           ['cat', 'rub'],
           ['say', 'zina', N_('Барсик съел. Всю. Коробку тоже пытался, но коробка оказалась сильнее.')],
@@ -147,15 +153,15 @@ export const STORIES = [
           ['give'],
           ['say', 'courier', N_('А может, вы сами попробуете? Она правда вкусная.')],
           ['act', 'zina', 'think', 1.4],
-          ['say', 'zina', N_('Сама?.. Ну разве что кусочек. Для пробы. Чтобы Серёже рассказать, какую я ему не оставила.')],
+          ['say', 'zina', N_('Сама?.. Ну разве что кусочек. Для пробы. Чтобы Серёже рассказать, какую я ему не оставила.'), { emo: 'surprised' }],
           ['shot', 'zina', { cut: true }],
           ['say', 'zina', N_('Слушай, а шея у тебя какого размера? Да так, просто спрашиваю. Бабушкин интерес.')],
           ['shot', 'courier', { cut: true }],
           ['act', 'courier', 'shake', 1],
-          ['say', 'courier', N_('Э-э… обычного?')],
+          ['say', 'courier', N_('Э-э… обычного?'), { emo: 'scared' }],
           ['shot', 'two'],
           ['act', 'zina', 'nod', 1.2],
-          ['say', 'zina', N_('Обычного, значит. Запомнила. Ну, езжай, езжай, у тебя работа. Шапку надень!')],
+          ['say', 'zina', N_('Обычного, значит. Запомнила. Ну, езжай, езжай, у тебя работа. Шапку надень!'), { emo: 'happy' }],
           ['emote', 'zina', 'heart', 3],
           ['cat', 'in'],
           ['walk', 'zina', 'in', { wait: false }],
@@ -176,33 +182,33 @@ export const STORIES = [
           ['walk', 'courier', 'front'],
           ['shot', 'two'],
           ['act', 'zina', 'joy', 1.4],
-          ['say', 'zina', N_('Серёжа звонил! Сказал: «Ба, закажи себе пиццу, я оплачу». Вот я и заказала. Себе! Первый раз в жизни.')],
+          ['say', 'zina', N_('Серёжа звонил! Сказал: «Ба, закажи себе пиццу, я оплачу». Вот я и заказала. Себе! Первый раз в жизни.'), { emo: 'happy' }],
           ['give'],
           ['shot', 'courier', { cut: true }],
-          ['say', 'courier', N_('Ну наконец-то! Приятного аппетита вам. И Барсику — только немного.')],
+          ['say', 'courier', N_('Ну наконец-то! Приятного аппетита вам. И Барсику — только немного.'), { emo: 'happy' }],
           ['shot', 'zina', { cut: true }],
           ['say', 'zina', N_('Стой, стой, не убегай. Я тебе связала. Шея у тебя, конечно, оказалась так себе…')],
           ['act', 'zina', 'give', 1.2],
-          ['say', 'zina', N_('…так что я связала на машину. Двенадцать метров. Барсик помогал, так что узелки — это его.')],
+          ['say', 'zina', N_('…так что я связала на машину. Двенадцать метров. Барсик помогал, так что узелки — это его.'), { emo: 'happy' }],
           ['shot', 'car'],
           ['scarf'],
           ['wait', 1.4],
           ['shot', 'courier', { cut: true }],
-          ['say', 'courier', N_('На… машину?')],
+          ['say', 'courier', N_('На… машину?'), { emo: 'surprised' }],
           ['shot', 'two'],
-          ['say', 'zina', N_('А что ей, мёрзнуть? В Солнечном зима девять месяцев, а остальное время — ждём зиму.')],
+          ['say', 'zina', N_('А что ей, мёрзнуть? В Солнечном зима девять месяцев, а остальное время — ждём зиму.'), { emo: 'surprised' }],
           ['act', 'courier', 'nod', 1],
-          ['say', 'courier', N_('Спасибо, баб Зин.')],
+          ['say', 'courier', N_('Спасибо, баб Зин.'), { emo: 'happy' }],
           ['shot', 'zina', { cut: true }],
           ['act', 'zina', 'joy', 1.2],
-          ['say', 'zina', N_('Слышал, Барсик? «Баб Зин»! Внучок у нас теперь есть. Настоящий, с доставкой.')],
+          ['say', 'zina', N_('Слышал, Барсик? «Баб Зин»! Внучок у нас теперь есть. Настоящий, с доставкой.'), { emo: 'happy' }],
           ['shot', 'cat'],
           ['cat', 'meow'],
           ['emote', 'zina', 'heart', 5],
           ['shot', 'two'],
           ['act', 'zina', 'hug', 1.6],
           ['emote', 'courier', 'heart', 3],
-          ['say', 'zina', N_('Заезжай в четверг. Я пиццу закажу, а пирожки тебе и так дам.')],
+          ['say', 'zina', N_('Заезжай в четверг. Я пиццу закажу, а пирожки тебе и так дам.'), { emo: 'happy' }],
           ['shot', 'establish'],
           ['cat', 'in'],
           ['walk', 'zina', 'in', { wait: false }],
@@ -278,7 +284,8 @@ export const PERSON = { host: id => { const s = STORIES.find(q => q.id === id); 
 /* ─────────────── где живёт ─────────────── */
 const HOME = new Map();
 function homeOf (s) {
-  // своё место (Стёпа на лавочке, stepabench.js): { ex, ez, nx, nz, sx, sz, x, z, addr } — «дверь» = где он сидит
+  // своё место (Стёпа на лавочке, stepabench.js): { ex, ez, nx, nz, sx, sz, x, z, addr, door } — «дверь» = где он сидит,
+  // door — настоящий подъезд (туда уходит: 'in')
   if (typeof s.place === 'function') return s.place();
   // home-функция: дом выбирают заново (герой города — у подъезда рядом с тем местом, где стоит)
   const HM = typeof s.home === 'function' ? s.home() : s.home;
@@ -584,8 +591,9 @@ function spot (where, who) {
   const h = CUT.home, V = API.V;
   switch (where) {
     case 'out': return who === 'courier' ? spot('front', who) : [h.ex + h.nx * 0.9, h.ez + h.nz * 0.9];
-    case 'door': return [h.ex + h.nx * 0.2, h.ez + h.nz * 0.2];
-    case 'in': return [h.ex - h.nx * 0.5, h.ez - h.nz * 0.5];
+    // своё место не у двери (Стёпа на лавочке): настоящий подъезд — h.door { x, z, nx, nz }
+    case 'door': return h.door ? [h.door.x + h.door.nx * 0.2, h.door.z + h.door.nz * 0.2] : [h.ex + h.nx * 0.2, h.ez + h.nz * 0.2];
+    case 'in': return h.door ? [h.door.x - h.door.nx * 0.5, h.door.z - h.door.nz * 0.5] : [h.ex - h.nx * 0.5, h.ez - h.nz * 0.5];
     case 'front': return [h.ex + h.nx * 2.3, h.ez + h.nz * 2.3];
     case 'side': return [h.ex + h.nx * 1.4 + h.sx * CUT.side * 0.9, h.ez + h.nz * 1.4 + h.sz * CUT.side * 0.9];
     case 'car': { const d = Math.hypot(V.x - h.ex, V.z - h.ez); return d < 16 ? [V.x, V.z] : [h.ex + h.nx * 9, h.ez + h.nz * 9]; }
@@ -598,6 +606,7 @@ function walk (who, where, o = {}) {
   if (!a) return Promise.resolve();
   const [x, z] = spot(where, who);
   a.hidden = false; a.grp.visible = true;
+  a.sit = 0;                                 // сидел на лавочке — встаёт и идёт
   if (CUT.skip) { a.x = x; a.z = z; placeActor(a); return Promise.resolve(); }
   a.to = { x, z, hide: where === 'in' || (where === 'car' && who === 'courier') };
   const p = until(() => !a.to, 12);
@@ -609,12 +618,14 @@ function act (who, kind, sec) {
   const a = CUT.actors[who];
   if (!a) return;
   a.act = { kind, t: 0, dur: sec || ACTS[kind] || 1 };
+  if (kind === 'joy' || kind === 'sad') LIFE.emo(a, kind === 'joy' ? 'happy' : 'sad', a.act.dur + 0.4);   // лицо — под действие
   if (kind === 'hug') {                 // обнять: подходит вплотную
     const o = CUT.actors[who === 'zina' ? 'courier' : 'zina'];
     if (o) { const dx = o.x - a.x, dz = o.z - a.z, d = Math.hypot(dx, dz) || 1; a.hugFrom = [a.x, a.z]; a.to = { x: a.x + dx / d * Math.max(0, d - 0.75), z: a.z + dz / d * Math.max(0, d - 0.75), keep: true }; }
   }
 }
 
+const LP = { walking: false, legL: 0, legR: 0, aL: 0, aR: 0, zL: 0, zR: 0, hx: 0, hy: 0, lift: 0, roll: 0 };
 function actorStep (a, dt) {
   const u = a.grp.userData;
   if (a.to) {
@@ -634,8 +645,14 @@ function actorStep (a, dt) {
   placeActor(a);
   const walking = !!a.to;
   const sw = walking ? Math.sin(a.ph) * 0.6 : 0;
-  if (u.legL) { u.legL.rotation.x = a.sit ? -1.45 : sw; u.legR.rotation.x = a.sit ? -1.45 : -sw; }
-  let aL = walking ? -sw * 0.6 : 0, aR = walking ? sw * 0.6 : 0, zL = 0, zR = 0, hx = 0, hy = 0, lift = 0;
+  // живой актёр (actorlife.js): походка и жесты по характеру, лицо моргает и говорит
+  const P = LP;
+  P.walking = walking; P.legL = sw; P.legR = -sw; P.aL = walking ? -sw * 0.6 : 0; P.aR = walking ? sw * 0.6 : 0;
+  P.zL = P.zR = P.hx = P.hy = P.lift = P.roll = 0;
+  if (a.life) LIFE.pose(a, P, dt, CUT.t);
+  if (u.legL) { u.legL.rotation.x = a.sit ? -1.45 : P.legL; u.legR.rotation.x = a.sit ? -1.45 : P.legR; }
+  let aL = P.aL, aR = P.aR, zL = P.zL, zR = P.zR, hx = P.hx, hy = P.hy, lift = P.lift;
+  a.grp.rotation.z = a.sit ? 0 : P.roll;
   if (a.hold) aL = aR = -1.15;
   const q = a.act;
   if (q) {
@@ -708,8 +725,7 @@ async function cat (what) {
     if (CUT.skip) return;
     const b = API.sayBubble(k.grp, t('мяу!'), '#e0873f', 1.05);
     b.scale.set(1.3, 0.65, 1);
-    API.Snd && API.Snd.blip && API.Snd.blip(900, 0.12, 'triangle', 0.08);
-    setTimeout(() => API.Snd && API.Snd.blip && API.Snd.blip(700, 0.18, 'triangle', 0.07), 120);
+    API.Snd && API.Snd.fx && API.Snd.fx('meow', s => { s.blip(900, 0.12, 'triangle', 0.08); setTimeout(() => s.blip(700, 0.18, 'triangle', 0.07), 120); });
     await wait(1.1);
     k.grp.remove(b); b.material.dispose();
   } else if (what === 'in') {
@@ -726,7 +742,7 @@ function give () {
   const box = c.hold;
   c.grp.remove(box); z.grp.add(box);
   z.hold = box; c.hold = null;
-  API.Snd && API.Snd.blip && API.Snd.blip(880, 0.08, 'triangle', 0.1);
+  API.Snd && API.Snd.fx && API.Snd.fx('box', s => s.blip(880, 0.08, 'triangle', 0.1));
 }
 
 function emote (who, kind, n) {
@@ -743,7 +759,7 @@ function scarf () {
   decorate(API.car);
   if (!CUT.skip) {
     API.emote(API.V.x, 2.4, API.V.z, 'heart', 6);
-    API.Snd && API.Snd.blip && API.Snd.blip(520, 0.2, 'triangle', 0.1);
+    API.Snd && API.Snd.fx && API.Snd.fx('love', s => s.blip(520, 0.2, 'triangle', 0.1));
   }
 }
 
@@ -752,9 +768,13 @@ async function say (who, text, o = {}) {
   if (CUT.skip) return;
   const a = CUT.actors[who];
   const person = who === 'courier' ? courierPerson() : storyPerson(CUT.story);
-  if (a) { a.talk = true; for (const k in CUT.actors) if (k !== who && CUT.actors[k]) CUT.actors[k].talk = false; }
-  await DLG.say({ person, name: person.name, text: t(text, typeof o.vars === 'function' ? o.vars() : o.vars), color: COLOR, fillers: false, mood: o.mood || 'calm', cps: 42 });
-  if (a) a.talk = false;
+  if (a) { a.talk = true; for (const k in CUT.actors) if (k !== who && CUT.actors[k]) { CUT.actors[k].talk = false; LIFE.say(CUT.actors[k], false); } }
+  // выражение реплики ({ emo }): лицо актёра и голова в диалоге — с тем же выражением
+  const emo = o.emo || '';
+  if (a) LIFE.say(a, true, emo);
+  await DLG.say({ person, name: person.name, text: t(text, typeof o.vars === 'function' ? o.vars() : o.vars), color: COLOR, fillers: false, mood: o.mood || 'calm', cps: 42,
+    face: emo ? faceDataURL(person, 256, emo) : undefined });
+  if (a) { a.talk = false; LIFE.say(a, false); }
 }
 
 function face (who, target) {
@@ -896,12 +916,15 @@ export async function play (storyId, chapter, o = {}) {
   box.scale.setScalar(0.75); box.position.set(0, 1.12, 0.34);
   cg.add(box); ca.hold = box;
   CUT.actors = { zina: za, courier: ca };
+  // характер: id истории = id героя (Стёпа на лавочке — 'stepa-bench', баба Зина — 'zina')
+  LIFE.attach(za, s.id); LIFE.attach(ca, 'courier');
+  for (const a of [za, ca]) if (a.life) a.speed *= a.life.ch.walk.speed;
   placeActor(za); placeActor(ca);
   if (o.guest && o.guest.grp) o.guest.grp.visible = false;
 
   document.body.classList.add('story-cut');
   const el = ui();
-  el.querySelector('.sc-skip').textContent = t('пропустить ▸▸ esc');
+  el.querySelector('.sc-skip').innerHTML = keyHTML('back') + esc(t('пропустить ▸▸'));
   el.querySelector('.sc-title').classList.remove('on');
   requestAnimationFrame(() => el.classList.add('on'));
   addEventListener('keydown', onKey, true);
@@ -917,7 +940,7 @@ export async function play (storyId, chapter, o = {}) {
     removeEventListener('keydown', onKey, true);
     el.classList.remove('on');
     document.body.classList.remove('story-cut');
-    for (const k in CUT.actors) if (CUT.actors[k]) API.dropMesh(CUT.actors[k].grp);
+    for (const k in CUT.actors) if (CUT.actors[k]) { LIFE.detach(CUT.actors[k]); API.dropMesh(CUT.actors[k].grp); }
     if (CUT.cat) { API.dropMesh(CUT.cat.grp); CUT.cat = null; }
     CUT.actors = {}; CUT.on = false; CUT.shot = null;
     for (const w of CUT.waits.splice(0)) w();
@@ -945,6 +968,7 @@ export function frame (dt, car) {
   CUT.scarfT = (CUT.scarfT || 0) + dt;
   if (CUT.scarf) scarfStep(car, CUT.scarfT);          // хвосты шарфа развеваются
   if (!CUT.on) return false;
+  if (PAD.connected && PAD.menuBack) skip();         // B — пропустить (на Деке Esc нет; 09.10.2026 — раньше катсцену с геймпада не пропустить)
   CUT.t += dt;
   for (const k in CUT.actors) if (CUT.actors[k]) actorStep(CUT.actors[k], dt);
   catStep(dt);
@@ -962,4 +986,11 @@ export function init (api) {
 }
 
 /* для ?debug и песочницы */
-export const DEBUG = { CUT, STORIES, homeOf: id => homeOf(STORIES.find(s => s.id === id)), skip, get running () { return !!RUNNING; } };
+export const DEBUG = { CUT, STORIES, homeOf: id => homeOf(STORIES.find(s => s.id === id)), skip, get running () { return !!RUNNING; }, get cam () { return API && API.cam; },
+  // лица всех актёров во всех выражениях (actorlife.js) — картинка PNG dataURL; строки — герои по STORIES и курьер
+  faceSheet: () => {
+    const gs = STORIES.map(s => hostModel(s)).concat(API.makeHuman(courierPerson()));
+    const url = LIFE.DEBUG.sheet(gs);
+    for (const g of gs) API.dropMesh(g);
+    return { url, rows: STORIES.map(s => s.id).concat('courier'), cols: LIFE.DEBUG.cols() };
+  } };

@@ -609,26 +609,13 @@ function stepDebris (dt) {
   if (!m._colorsUp) { m.instanceColor.needsUpdate = true; m._colorsUp = 1; }
 }
 
-/* ═════════════ вой ветра ═════════════ */
-const HOWL = { src: null, f: null, g: null };
+/* ═════════════ вой ветра ═════════════
+   Петля «amb-storm-wind» в ambience.js (файл автора или синтез — полоса шума, высота от порыва) */
 function stepHowl () {
   const Snd = C.Snd;
-  if (!Snd || !Snd.ctx || !Snd.master) return;
-  const want = Snd.on && WIND.amt > 0.02 ? (0.05 + 0.13 * WIND.g) * WIND.amt : 0;
-  if (!HOWL.src) {
-    if (want <= 0) return;
-    const c = Snd.ctx, n = c.sampleRate * 3, b = c.createBuffer(1, n, c.sampleRate), a = b.getChannelData(0);
-    let lp = 0;
-    for (let i = 0; i < n; i++) { lp += (Math.random() * 2 - 1 - lp) * 0.12; a[i] = lp * 3; }
-    HOWL.src = c.createBufferSource(); HOWL.src.buffer = b; HOWL.src.loop = true;
-    HOWL.f = c.createBiquadFilter(); HOWL.f.type = 'bandpass'; HOWL.f.Q.value = 1.6;
-    HOWL.g = c.createGain(); HOWL.g.gain.value = 0;
-    HOWL.src.connect(HOWL.f); HOWL.f.connect(HOWL.g); HOWL.g.connect(Snd.master); HOWL.src.start();
-  }
-  const now = Snd.ctx.currentTime;
-  HOWL.g.gain.setTargetAtTime(want, now, 0.3);
-  HOWL.f.frequency.setTargetAtTime(260 + 520 * WIND.g, now, 0.4);
-  if (want <= 0 && WIND.amt < 0.005) { try { HOWL.src.stop(); } catch (e) { /* — */ } HOWL.src.disconnect(); HOWL.src = null; }
+  if (!Snd || !Snd.amb) return;
+  const want = WIND.amt > 0.02 ? (0.05 + 0.13 * WIND.g) * WIND.amt / 0.18 : 0;
+  if (want > 0) Snd.amb.want('amb-storm-wind', want, WIND.g);
 }
 
 /* ═════════════ смена урагана: когда и какой дом ═════════════ */
@@ -692,7 +679,7 @@ function takeHouse (I) {
   if (!s.temp) save();
   PLAN.took++;
   // «ураган унёс дом!» — без подписи снизу (04.10.2026): видно и слышно
-  if (C.Snd && C.Snd.noise) { C.Snd.noise(0.9, 0.22); C.Snd.blip(55, 0.6, 'sawtooth', 0.12); }
+  if (C.Snd && C.Snd.fx) C.Snd.fx('house-gone', s => { s.noise(0.9, 0.22); s.blip(55, 0.6, 'sawtooth', 0.12); });
   if (C.S) C.S.shake = Math.max(C.S.shake || 0, 0.18);
   return s;
 }
@@ -736,7 +723,7 @@ export function step (dt, on) {
     stepHowl();
   } else {
     if (DEB && DEB.mesh.visible) DEB.mesh.visible = false;
-    if (HOWL.src) { try { HOWL.src.stop(); } catch (e) { /* — */ } HOWL.src.disconnect(); HOWL.src = null; }
+    // вой гаснет сам: ambience.js снимает петлю, когда want() перестали слать
   }
   if (SITES.length) stepSites(dt);
   if (on && PLAN.left > 0 && !PLAN.pend && C.isPlaying() && DRIVE.has(C.S.state)) {

@@ -21,11 +21,81 @@
    пока падает после удара. Стоит или уже лежит — матрицы заморожены целиком
    (matrixWorldAutoUpdate = false на пивоте), а дальше камеры — снят со сцены. */
 
+import * as THREE from '../vendor/three.module.min.js';
+
 const CULL_EVERY = 12;
 const MAX_R = 400;              // больше — это юбка земли и река: они всегда на сцене
 
 let LIST = [], SCENE = null, CAM = null, PROPS = [], tick = 0;
-export const STATS = { frozen: 0, culled: 0, groups: 0, props: 0, propsOff: 0 };
+export const STATS = { frozen: 0, culled: 0, groups: 0, props: 0, propsOff: 0, cells: 0, cellsOut: 0, outMeshes: 0 };
+
+/* ── что в кадре: клетки статики (09.10.2026, хвост кадров на Деке) ──
+   three.js в каждом кадре проверяет КАЖДЫЙ видимый меш сцены на попадание в кадр (projectObject →
+   frustum.intersectsObject). Статики в радиусе дальности (490 м) — ~8 тысяч кусков, а в кадр
+   попадает меньше трети: остальное сзади и по бокам. На Деке эта проверка была самым дорогим
+   куском кадра (~40 % времени процессора). Теперь куски статики разложены по клеткам VIEW_CELL м;
+   раз в кадр — проверка коробки клетки (сотни проверок вместо тысяч), и у кусков клетки вне кадра
+   выключен слой (layers.mask = 0) — three.js проходит их, не считая. Видимость (visible) не
+   трогаем: её переключают сезоны. Слои в игре больше никто не использует.
+   Камера та же для всех отрисовок (главная, катсцены, меню) — inView() годится и для машин и людей. */
+const VIEW_CELL = 128;
+/* VIEW.on = false (или ?noview) — без отсечения по кадру: для сравнения замеров (tools/perf.cjs, probe) */
+export const VIEW = { on: typeof location === 'undefined' || !/[?&]noview(&|$)/.test(location.search) };
+let CELLS = [], masked = false;
+const FR = new THREE.Frustum(), PS = new THREE.Matrix4(), BOX = new THREE.Box3(), SPH = new THREE.Sphere();
+let frOk = false;
+function viewFrustum () {
+  CAM.updateMatrixWorld();
+  PS.multiplyMatrices(CAM.projectionMatrix, CAM.matrixWorldInverse);
+  FR.setFromProjectionMatrix(PS);
+  frOk = true;
+}
+/** пирамиду кадра — сейчас (камера уже на месте в этом кадре): для inView() до step() */
+export function view () { if (CAM && VIEW.on) viewFrustum(); else frOk = false; }
+/** шар (x, y, z, r) в кадре камеры — по пирамиде, посчитанной в этом кадре в step(); до первого step() — да */
+export function inView (x, y, z, r) {
+  if (!frOk) return true;
+  SPH.center.set(x, y, z); SPH.radius = r;
+  return FR.intersectsSphere(SPH);
+}
+function buildCells () {
+  const M = new Map();
+  for (const e of LIST) {
+    const k = Math.floor(e.x / VIEW_CELL) + ',' + Math.floor(e.z / VIEW_CELL);
+    let c = M.get(k);
+    if (!c) M.set(k, c = { box: new THREE.Box3(), list: [], vis: true, cx: 0, cz: 0, rad: 0 });
+    c.list.push(e);
+    c.box.expandByPoint(BOX.min.set(e.x - e.r, e.y - e.r, e.z - e.r));
+    c.box.expandByPoint(BOX.max.set(e.x + e.r, e.y + e.r, e.z + e.r));
+  }
+  CELLS = [...M.values()];
+  for (const c of CELLS) { const b = c.box; c.cx = (b.min.x + b.max.x) / 2; c.cz = (b.min.z + b.max.z) / 2; c.rad = Math.hypot(b.max.x - b.min.x, b.max.z - b.min.z) / 2; }
+  STATS.cells = CELLS.length;
+  nearCells();
+}
+/* клетки в пределах дальности — раз в CULL_EVERY кадров или сразу, если камера прыгнула:
+   каждый кадр пирамиду проверяем только у них (десятки, а не 4 тысячи по всему городу) */
+let NEAR = [], nearX = 1e9, nearZ = 1e9;
+function nearCells () {
+  const px = CAM.position.x, pz = CAM.position.z, far = CAM.far + 20;
+  NEAR = [];
+  for (const c of CELLS) { const dx = c.cx - px, dz = c.cz - pz, r = far + c.rad; if (dx * dx + dz * dz < r * r) NEAR.push(c); }
+  nearX = px; nearZ = pz;
+}
+function cellCull () {
+  let out = 0, om = 0;
+  masked = true;
+  for (let i = 0; i < NEAR.length; i++) {
+    const c = NEAR[i], v = FR.intersectsBox(c.box);
+    if (v !== c.vis) {
+      c.vis = v;
+      const L = c.list, mask = v ? 1 : 0;
+      for (let j = 0; j < L.length; j++) if (!L[j].gone) L[j].m.layers.mask = mask;
+    }
+    if (!v) { out++; om += c.list.length; }
+  }
+  STATS.cellsOut = out; STATS.outMeshes = om;
+}
 
 const still = o => o.position.x === 0 && o.position.y === 0 && o.position.z === 0 &&
   o.rotation.x === 0 && o.rotation.y === 0 && o.rotation.z === 0 &&
@@ -42,11 +112,15 @@ function take (m, parent) {
   if (!g.boundingSphere) g.computeBoundingSphere();
   const s = g.boundingSphere;
   if (!s || !(s.radius < MAX_R)) return;
-  LIST.push({ m, parent, x: s.center.x, z: s.center.z, r: s.radius, on: true });
+  if (parent === SCENE) m.matrixWorldAutoUpdate = false;   // step() не зовёт ему updateMatrixWorld каждый кадр (их тысячи); сдвинут — cullFar вернёт
+  LIST.push({ m, parent, x: s.center.x, y: s.center.y, z: s.center.z, r: s.radius, on: true });
 }
 
 export function freeze (scene, cam, props) {
+  for (const c of CELLS) for (const e of c.list) if (!e.gone) e.m.layers.mask = 1;   // второй раз — с чистого листа
+  CELLS = []; NEAR = []; OFF = 0;
   SCENE = scene; CAM = cam; LIST = []; PROPS = props || [];
+  POFF = PROPS.filter(p => p._fz && p._on === false).length;
   for (const c of scene.children.slice()) {
     if (c.isMesh && still(c)) take(c, scene);
     else if (c.isGroup && still(c) && c.matrixWorldAutoUpdate === false) {
@@ -61,6 +135,7 @@ export function freeze (scene, cam, props) {
   scene.updateMatrixWorld(true);
   scene.matrixAutoUpdate = false;
   scene.matrixWorldAutoUpdate = false;
+  buildCells();
   return STATS;
 }
 
@@ -87,7 +162,7 @@ function propFreeze (p) {
 function propThaw (p) {
   const g = p.pivot;
   g.matrixAutoUpdate = true; g.matrixWorldAutoUpdate = true;
-  if (!p._on) { SCENE.add(g); p._on = true; }
+  if (!p._on) { SCENE.add(g); p._on = true; POFF--; }
   p._fz = 0;
 }
 
@@ -102,7 +177,15 @@ export function step () {
     else np++;
   }
   STATS.props = np;
-  if (++tick % CULL_EVERY === 0) cullFar();
+  /* дальнее — по кусочку в каждом кадре (1/CULL_EVERY списка), а не всё разом раз в 12 кадров:
+     11 тысяч кусков разом давали на Деке рывок кадра 1—3 мс каждые 12 кадров. Камера прыгнула
+     (смерть, новая смена, телепорт) — сразу всё */
+  tick++;
+  const jump = Math.abs(CAM.position.x - nearX) + Math.abs(CAM.position.z - nearZ) > 60;
+  if (jump) cullFar(); else cullFar(tick % CULL_EVERY, CULL_EVERY);
+  if (jump || tick % CULL_EVERY === 0) nearCells();
+  if (VIEW.on) { viewFrustum(); cellCull(); }
+  else if (masked) { masked = false; frOk = false; for (const c of CELLS) { c.vis = true; for (const e of c.list) if (!e.gone) e.m.layers.mask = 1; } STATS.cellsOut = STATS.outMeshes = 0; }
   // матрицы — только у видимого и живого (см. freeze): спрятанные группы,
   // замороженный реквизит, склейки города и стоящие лёгкие машины пропускаем
   let g = 0, still2 = 0;
@@ -117,34 +200,34 @@ export function step () {
   STATS.groups = g; STATS.stillCars = still2;
 }
 
-function cullFar () {
+/* part, of — каждый of-й элемент, начиная с part (по кусочку в кадр); без них — весь список */
+let OFF = 0, POFF = 0;
+function cullFar (part = 0, of = 1) {
   const px = CAM.position.x, pz = CAM.position.z, far = CAM.far + 20;
-  let off = 0;
-  for (let i = LIST.length - 1; i >= 0; i--) {
+  for (let i = LIST.length - 1 - part; i >= 0; i -= of) {
     const e = LIST[i], m = e.m;
     if (!still(m)) {                                // кто-то сдвинул — больше не наш
-      m.matrixAutoUpdate = true;
-      if (!e.on) e.parent.add(m);
+      m.matrixAutoUpdate = true; m.matrixWorldAutoUpdate = true;
+      e.gone = true; m.layers.mask = 1;             // и не в клетках «что в кадре»
+      if (!e.on) { e.parent.add(m); OFF--; }
       LIST.splice(i, 1);
       continue;
     }
-    const d = Math.hypot(e.x - px, e.z - pz) - e.r;
-    const want = d < far;
+    const dx = e.x - px, dz = e.z - pz, lim = far + e.r;   // как hypot(dx, dz) - r < far, без Math.hypot (он сорит числами)
+    const want = dx * dx + dz * dz < lim * lim;
     if (want !== e.on) {
       e.on = want;
-      if (want) e.parent.add(m); else e.parent.remove(m);
+      if (want) { e.parent.add(m); OFF--; } else { e.parent.remove(m); OFF++; }
     }
-    if (!e.on) off++;
   }
-  STATS.culled = off;
-  let po = 0;
-  for (const p of PROPS) {
+  STATS.culled = OFF;
+  for (let i = part; i < PROPS.length; i += of) {
+    const p = PROPS[i];
     if (!p._fz) continue;
-    const want = Math.hypot(p.x - px, p.z - pz) < far;
-    if (want !== p._on) { p._on = want; if (want) SCENE.add(p.pivot); else SCENE.remove(p.pivot); }
-    if (!p._on) po++;
+    const dx = p.x - px, dz = p.z - pz, want = dx * dx + dz * dz < far * far;
+    if (want !== p._on) { p._on = want; if (want) { SCENE.add(p.pivot); POFF--; } else { SCENE.remove(p.pivot); POFF++; } }
   }
-  STATS.propsOff = po;
+  STATS.propsOff = POFF;
 }
 
 /* ── страховка на слабом железе: дальность видимости по ступеням ──

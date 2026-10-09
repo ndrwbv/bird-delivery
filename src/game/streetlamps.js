@@ -108,12 +108,13 @@ export function lamp (A, o) {
   const dx = l ? o.dx / l : 1, dz = l ? o.dz / l : 0;
   const ry = Math.atan2(-dz, dx);                  // +X фонаря → (dx, dz)
   const y = o.y !== undefined ? o.y : A.groundH(x, z) + (A.curbAt ? A.curbAt(x, z) : 0);
-  const rec = { x, z, y, ry, dx, dz, style, down: 0, heads: [], pools: [], it: null };
+  const rec = { x, z, y, ry, dx, dz, style, down: 0, heads: [], pools: [], it: null, lh: [], spot: null, LH: A.LAMPH };   // lh — номера плафонов в LAMPH до склейки (unlamp)
   const { P, head } = parts(style);
   const L = [];
   for (const p of P) {
     if (p.glow) {
       const g = A.put(A.LAMPH, p.g, p.hex, x, y, z, 0, ry, 0);
+      rec.lh.push(A.LAMPH.length - 1);
       g.userData.track = (m, v0, nv) => rec.heads.push([m, v0, nv]);
     } else A.put(L, p.g, p.hex, x, y, z, 0, ry, 0);
   }
@@ -125,9 +126,20 @@ export function lamp (A, o) {
     const s = o.spot ? [o.spot[0], o.spot[1]] : [x + dx * head[0], z + dz * head[0]];
     s.track = (m, v0, nv) => rec.pools.push([m, v0, nv]);
     A.LAMP_SPOTS.push(s);
+    rec.spot = s;
   }
   LAMPS.push(rec);
   return rec;
+}
+
+/* убрать фонарь до склейки (правки редактора, editlayer.js): из списка фонарей; → { lh — номера его плафонов
+   в LAMPH, spot — его пятно в LAMP_SPOTS } — их вынимает вызывающий. Столб (сбиваемое) вынимает он же */
+export function unlamp (it) {
+  const i = LAMPS.findIndex(r => r.it === it);
+  if (i < 0) return null;
+  const rec = LAMPS[i];
+  LAMPS.splice(i, 1);
+  return { lh: rec.lh, spot: rec.spot, LH: rec.LH };
 }
 
 /* вершины куска склейки — под землю (как знаки в roadlife.js) */
@@ -256,6 +268,7 @@ export function streets (A) {
         const near = A.nearestRoad(px, pz, 7, 1);
         if (near && near.d < near.seg.w / 2 + (big ? 1.2 : 0.9)) { if (small) STATS.skip.road++; continue; }
         if (A.inHouse(px, pz, 1) || A.introClear(px, pz, 9)) { if (small) STATS.skip.house++; continue; }
+        if (A.startClear && A.startClear(px, pz)) { STATS.skip.start = (STATS.skip.start || 0) + 1; continue; }   // выезд со стоянки курьеров свободен (game.js START_CLEAR)
         if (zebra(px, pz)) { if (small) STATS.skip.zebra++; continue; }
         lamp(A, { x: px, z: pz, y: A.groundH(px, pz), style, dx: -nx, dz: -nz });
         if (big) {

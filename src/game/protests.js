@@ -476,7 +476,7 @@ function postHit (c, P, dx, dz, sp) {
   A.scene.add(m);
   FALLEN.push({ m, t: 0, T: PROT.HIT.FALL * (sp > 12 ? 0.6 : 1) });
   if (A.sparks) A.sparks(P.x, 0.9, P.z, 4, dx, dz);
-  if (A.Snd && A.Snd.noise) A.Snd.noise(0.16, 0.2);
+  if (A.Snd && A.Snd.fx) A.Snd.fx('smash', s => s.noise(0.16, 0.2), { x: P.x, z: P.z });
   if (A.S) A.S.shake = Math.max(A.S.shake || 0, 0.15);
 }
 function fallenStep (dt) {
@@ -1032,6 +1032,15 @@ export function step (dt, api) {
   // концерты и сходки
   if (GIGS.length) gigStep(dt);
   if (GIGS.length < gigMax() && (GS.cd -= dt) <= 0) { const e = gigEvery(); GS.cd = DIRECTOR.can('gig') && spawnGig() ? rand(e[0], e[1]) : 5; }
+}
+
+/* где сейчас толпа — для гула толпы (ambience.js): марш, драки, концерты во дворах */
+export function crowds () {
+  const out = [];
+  if (MA) out.push({ x: MA.cx, z: MA.cz, k: 1, kind: 'march' });
+  for (const r of RIOTS) out.push({ x: r.x, z: r.z, k: 0.8, kind: 'riot' });
+  for (const g of GIGS) out.push({ x: g.x, z: g.z, k: 0.7, kind: 'gig' });
+  return out;
 }
 
 export const DEBUG = {

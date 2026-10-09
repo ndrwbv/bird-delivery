@@ -12,9 +12,10 @@
      LEHA.GOOD: шанс выиграть +UP, иначе −DOWN (MIN…MAX). Пошёл против совета — шанс обычный.
      Совет — на первую прокрутку после смены; после исхода — строка «Лёха был прав!» /
      «Лёха опять слил» с цифрой удачи.
-   «Наоборот» Игорька: на каждый матч у него прогноз — «всех порву» или «проиграю» (50/50,
-     хранится до матча). Матч: Игорёк побеждает с шансом FLIP, если сказал «проиграю», и
-     1 − FLIP, если «всех порву»; остальное поровну Андрюше и Настюше. Прогноз — при первой
+   «Наоборот» Игорька: матч — один на один (09.10.2026): Игорёк против Андрюши или Настюши
+     (соперник — 50/50, хранится вместе с прогнозом до матча). На каждый матч у Игорька прогноз —
+     «всех порву» или «проиграю» (50/50). Матч: Игорёк побеждает с шансом FLIP, если сказал
+     «проиграю», и 1 − FLIP, если «всех порву»; остальное — сопернику. Прогноз — при первой
      встрече за смену, дальше с шансом IGOR.TALK. Слышал прогноз — после матча строка «как
      всегда, наоборот».
    Жека про машину: первая встреча за смену — всегда, дальше с шансом ZHEKA.TALK. Китайская
@@ -24,6 +25,7 @@
 
    init({ A, cars, depGame, shiftN, shiftOn }) — career.js
    tipFor(game) → { text, pick } | null — совет Лёхи для окна «депнуть»
+   match() → ['igor', соперник] — кто играет ближайший матч (dep.js)
    roll({ game, pick, base, first }) → { win, chance, champ, tip, claim } — исход ставки
    verdict(r) → [строки] — что сказать после исхода
    отладка: __dlv.HEROQ
@@ -33,7 +35,7 @@ import * as HEROES from './heroes.js';
 import { HEROQ } from './econ.js';
 
 const KEY = 'dlv-heroq';               // сохранение: прогноз Игорька на ближайший матч { claim, heard }
-const TENNIS = ['andr', 'igor', 'nast'];
+const OPP = ['andr', 'nast'];              // соперник Игорька в матче один на один
 const WHO_ACC = { andr: N_('на Андрюшу'), igor: N_('на Игорька'), nast: N_('на Настюшу') };
 const WHO = { andr: N_('Андрюша'), igor: N_('Игорёк'), nast: N_('Настюша') };
 
@@ -144,7 +146,7 @@ const adult = () => !!(A && A.ADULT);
 function load () {
   try {
     const v = A.Store.get(KEY, null);
-    if (v && (v.claim === 'win' || v.claim === 'lose')) M.claim = { claim: v.claim, heard: !!v.heard, sure: !!v.sure };
+    if (v && (v.claim === 'win' || v.claim === 'lose')) M.claim = { claim: v.claim, heard: !!v.heard, sure: !!v.sure, vs: OPP.includes(v.vs) ? v.vs : pick(OPP) };
     M.luck = v && v.luck > 0 ? +v.luck : 0;
   } catch (e) { /* — */ }
 }
@@ -156,21 +158,24 @@ export function addLuck (n) { M.luck = (M.luck || 0) + n; if (A) save(); return 
 
 /* ── Игорёк: прогноз на ближайший матч ── */
 function claim () {
-  if (!M.claim) { M.claim = { claim: Math.random() < 0.5 ? 'win' : 'lose', heard: false }; save(); }
+  if (!M.claim) { M.claim = { claim: Math.random() < 0.5 ? 'win' : 'lose', heard: false, vs: pick(OPP) }; save(); }
+  if (!OPP.includes(M.claim.vs)) { M.claim.vs = pick(OPP); save(); }
   return M.claim;
 }
+/** кто играет ближайший матч: ['igor', 'andr' | 'nast'] — Игорёк слева */
+export const match = () => ['igor', claim().vs];
 /** Игорёк проговорился (глава «Финал», herostories.js): на ближайшем матче прогноз «проиграю» и он
  *  сбывается наоборот наверняка — Игорёк выигрывает. Держится до матча (и между сменами). */
 export function sureMatch () {
-  M.claim = { claim: 'lose', heard: true, sure: true };
+  M.claim = { claim: 'lose', heard: true, sure: true, vs: pick(OPP) };
   if (A) save();
   return M.claim;
 }
-/** шансы на победу в матче: { andr, igor, nast } (с учётом прогноза Игорька) */
+/** шансы на победу в матче один на один: { igor, <соперник> } (с учётом прогноза Игорька); кто не играет — 0 */
 export function tennisOdds () {
-  const c = claim().claim, F = M.claim.sure ? 1 : HEROQ.IGOR.FLIP;
-  const ig = c === 'lose' ? F : 1 - F, rest = (1 - ig) / 2;
-  return { andr: rest, igor: ig, nast: rest };
+  const c = claim(), F = c.sure ? 1 : HEROQ.IGOR.FLIP;
+  const ig = c.claim === 'lose' ? F : 1 - F;
+  return { andr: 0, nast: 0, igor: ig, [c.vs]: 1 - ig };
 }
 function igorLine () {
   const c = claim();
@@ -189,7 +194,7 @@ function makeTip () {
   else if (game === 'tennis') {
     // Лёха верит Игорьку на слово: сказал «порву» — ставь на Игорька, «проиграю» — на другого
     if (claim().claim === 'win') { p = 'igor'; text = t(pick(LEHA_TIP.igorWin)); }
-    else { p = Math.random() < 0.5 ? 'andr' : 'nast'; text = t(pick(LEHA_TIP.igorLose), { who: t(WHO_ACC[p]) }); }
+    else { p = claim().vs; text = t(pick(LEHA_TIP.igorLose), { who: t(WHO_ACC[p]) }); }
   } else text = t(pick(LEHA_TIP.slot));
   M.tip = { n: SHIFT_N(), game, pick: p, good, used: false, text };
   M.stats.tips++;
@@ -267,7 +272,7 @@ function hook (h) {
 export function roll ({ game, pick: p = null, base = 0.1, first = false }) {
   const L = HEROQ.LEHA;
   const cl = game === 'tennis' ? { ...claim() } : null;
-  let chance = game === 'tennis' ? tennisOdds()[p] || 1 / 3 : base;
+  let chance = game === 'tennis' ? tennisOdds()[p] || 0 : base;
   const plain = chance;
   const tp = tipLive();
   let tip = null;
@@ -282,9 +287,7 @@ export function roll ({ game, pick: p = null, base = 0.1, first = false }) {
   if (game === 'tennis') {
     if (win) champ = p;
     else {
-      const o = tennisOdds(), rest = TENNIS.filter(id => id !== p), sum = rest.reduce((a, id) => a + o[id], 0);
-      let r = Math.random() * sum;
-      champ = rest.find(id => (r -= o[id]) < 0) || rest[rest.length - 1];
+      champ = match().find(id => id !== p) || 'igor';   // один на один: проиграл — победил другой
     }
     M.claim = null; save();                        // матч сыгран — у следующего свой прогноз
   }
@@ -323,9 +326,9 @@ export function init (o) {
 
 /* отладка: __dlv.HEROQ */
 const DEBUG = {
-  M, HEROQ, tipFor, roll, verdict, tennisOdds, carKind, yellow, hook, sureMatch, curCar,
+  M, HEROQ, tipFor, roll, verdict, tennisOdds, match, carKind, yellow, hook, sureMatch, curCar,
   tip: (good) => { M.tip = null; const s = makeTip(); if (good != null) M.tip.good = !!good; return { text: s, ...M.tip }; },
-  setClaim: (c, heard = true) => { M.claim = c ? { claim: c, heard } : null; save(); return M.claim; },
+  setClaim: (c, heard = true, vs) => { M.claim = c ? { claim: c, heard, vs } : null; if (c) claim(); save(); return M.claim; },
   newShift: () => { M.seen = {}; },
   /* реплика героя без встречи (как при встрече): first — первая за смену */
   line: (id, first = true) => { if (first) delete M.seen[id]; return hook({ id, met: true, grudge: false }); },

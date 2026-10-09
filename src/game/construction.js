@@ -351,7 +351,7 @@ function finder () {
   return { test };
 }
 
-function findSites () {
+function* findSites () {
   const F = finder();
   const cands = [];
   for (const r of A.CITY.roads) {
@@ -377,6 +377,7 @@ function findSites () {
   }
   ST.tried = cands.length;
   cands.sort((a, b) => a.pr - b.pr);
+  yield 'cands';
   const per = new Map();
   const far = (c, m) => SITES.every(s => Math.hypot(s.x - c.x, s.z - c.z) > m);
   for (let round = 0; round < 2 && SITES.length < CONS.MAX; round++) {
@@ -388,6 +389,7 @@ function findSites () {
       if ((per.get(di) || 0) >= cap) continue;
       if (c.bad) continue;
       ST.tested++;
+      if (ST.tested % 60 === 0) yield 'test';
       if (!F.test(c)) { c.bad = 1; continue; }
       c.used = 1; c.dist = di;
       per.set(di, (per.get(di) || 0) + 1);
@@ -404,9 +406,13 @@ function findSites () {
    участков на район во втором круге; ok(c) — своя добавочная проверка участка; claim: false — не
    занимать (занять потом самому — claim()). */
 const CLAIM = [];                                  // { x, z, r }
+/* участки строек { x, z, … } — для стука и болгарки (ambience.js) */
+export const sites = () => SITES;
 export function claim (x, z, r) { CLAIM.push({ x, z, r }); }
 export function claimed () { return CLAIM; }
-export function freeLots ({ W, D, max, gap, salt = 11, per = 1, cap = Infinity, avoid = [], ok = null, claim: take = true }) {
+export function freeLots (o) { const it = freeLotsSteps(o); for (;;) { const r = it.next(); if (r.done) return r.value; } }
+/* то же шагами (yield) — для поздней сборки (latebuild.js): на Деке поиск ~0,1—0,2 с */
+export function* freeLotsSteps ({ W, D, max, gap, salt = 11, per = 1, cap = Infinity, avoid = [], ok = null, claim: take = true }) {
   if (!A) return [];
   const why = ST.why; ST.why = {};                 // отказы чужого поиска не путаем со своими
   const F = finder(), out = [], perD = new Map();
@@ -432,6 +438,8 @@ export function freeLots ({ W, D, max, gap, salt = 11, per = 1, cap = Infinity, 
     }
   }
   cands.sort((a, b) => a.pr - b.pr);
+  yield 'cands';
+  let nt = 0;
   const clear = c => SITES.every(s => Math.hypot(s.x - c.x, s.z - c.z) > R + Math.hypot(s.W, s.D) / 2 + 15)
     && avoid.every(a => Math.hypot(a.x - c.x, a.z - c.z) > R + a.r + 15)
     && CLAIM.every(a => Math.hypot(a.x - c.x, a.z - c.z) > R + a.r + 15)
@@ -443,6 +451,7 @@ export function freeLots ({ W, D, max, gap, salt = 11, per = 1, cap = Infinity, 
       if (c.used || c.bad || !clear(c)) continue;
       const di = A.distAt ? A.distAt(c.x, c.z) : 0;
       if ((perD.get(di) || 0) >= lim) continue;
+      if (++nt % 60 === 0) yield 'test';
       if (!F.test(c) || (ok && !ok(c))) { c.bad = 1; continue; }
       c.used = 1; c.dist = di;
       perD.set(di, (perD.get(di) || 0) + 1);
@@ -725,7 +734,7 @@ function onFenceDown (it, nx, nz, force) {
   A.scene.add(m);
   FALL.push({ m, a: 0, va: 1.5 + Math.min(force, 25) * 0.12, dir: s, t: CONS.FALL_LIE, slide: Math.min(force, 20) * 0.04, nx, nz });
   if (FALL.length > CONS.FALL_MAX) { const o = FALL.shift(); A.scene.remove(o.m); }
-  if (A.Snd && A.Snd.blip) A.Snd.blip(140, 0.12, 'square', 0.05);
+  if (A.Snd && A.Snd.fx) A.Snd.fx('fence', s => s.blip(140, 0.12, 'square', 0.05));
 }
 function addPile (x, z, r, h, hex) {
   const g = [], gy = A.groundH(x, z);
@@ -753,7 +762,7 @@ function onPileDown (it, nx, nz, force) {
       spin: rand(-8, 8), life: rand(5, 9), bleed: 1e9, rest: 0 });
   }
   if (A.puff) { A.puff(it.x, 0.6, it.z, false, 1.4); A.puff(it.x + nx, 0.4, it.z + nz, false, 1.0); }
-  if (A.Snd && A.Snd.noise) A.Snd.noise(0.35, 0.3);
+  if (A.Snd && A.Snd.fx) A.Snd.fx('smash', s => s.noise(0.35, 0.3), { x: it.x, z: it.z });
 }
 
 /* ═════════════ бытовки и техника: толкаются, мнутся ═════════════ */
@@ -855,11 +864,12 @@ export function car (noseX, noseZ, tailX, tailZ, rc) {
       o.rest = 0;
       if (rel > 3) {
         A.sparks(hx, 0.9, hz, rel > 9 ? 8 : 3, -nx, -nz);
-        A.Snd.noise(0.15, Math.min(0.32, rel * 0.03));
+        if (A.Snd.impact) A.Snd.impact(rel, 'bin', { x: hx, z: hz });   // бытовка, техника — гулкое железо (impact.js)
+        else A.Snd.fx('clank', s => s.noise(0.15, Math.min(0.32, rel * 0.03)), { x: hx, z: hz }, Math.min(1, rel * 0.1));
         A.S.shake = Math.max(A.S.shake, Math.min(0.4, rel * 0.035));
       }
       if (rel > CONS.DENT) dent(o, hx, hz, nx, nz, clamp((rel - CONS.DENT) / 14, 0.25, 1));
-      if (rel >= CONS.HURT) A.hurt(rel >= CONS.HURT2 ? 1 : 0.5, rel, hx, hz);
+      if (rel >= CONS.HURT) A.hurt(rel >= CONS.HURT2 ? 1 : 0.5, rel, hx, hz, 'bin');
     }
   }
 }
@@ -967,12 +977,14 @@ export function nextEdge (t, e) {
 export function onRespawn (t) { t.dump = null; t.cnRoll = 0; }
 
 /* ═════════════ сборка, кадр, новая смена ═════════════ */
-export function build (api) {
+/* шагами (yield) — поздняя сборка (latebuild.js; при ?nolate — разом): на Деке весь кусок ~0,2 с */
+export function* build (api) {
   A = api;
   const t0 = performance.now();
   CLAIM.length = 0;
   PLIST = PASS.filter(p => A.ADULT || !p.adult);
-  findSites();
+  yield* findSites();
+  yield 'sites';
   SITES.forEach((s, i) => build1(s, i));
   if (STANDS.length) {
     const g = new THREE.BufferGeometry();

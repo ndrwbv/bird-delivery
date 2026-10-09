@@ -164,6 +164,7 @@ function putSign (A, kind, x, z, fx, fz) {
   const rb = A.nearestRoad(x, z, 5, 1);
   if (rb && rb.seg.b && rb.d < rb.seg.w / 2 + 10) return false;       // у моста и под ним — нет
   if (A.inHouse(x, z, 0.7)) return false;
+  if (A.startClear && A.startClear(x, z)) return false;            // не на выезде со стоянки курьеров (game.js START_CLEAR)
   const p = { x, z, fx, fz, signs: [{ kind }], it: null, v0: 0, vn: 0, down: 0 };
   SG.poles.push(p);
   const k = sgKey(x, z);
@@ -172,7 +173,7 @@ function putSign (A, kind, x, z, fx, fz) {
   return true;
 }
 
-function buildSigns (A) {
+function* buildSigns (A) {
   const { NODES, edgeOf, edgeRun, ZEBRAS, SIG_GROUPS, CITY } = A;
   const sigNodes = new Set();
   for (const g of SIG_GROUPS) for (const n of g.nodes) sigNodes.add(n);
@@ -190,7 +191,9 @@ function buildSigns (A) {
     if (fwd) placeSign(A, K.ZEB, zb.x + rx * off - zb.ux * 1.2, zb.z + rz * off - zb.uz * 1.2, -zb.ux, -zb.uz, st);
     if (bwd) placeSign(A, K.ZEB, zb.x - rx * off + zb.ux * 1.2, zb.z - rz * off + zb.uz * 1.2, zb.ux, zb.uz, st);
   }
+  yield 'zebras';
   for (let n = 0; n < NODES.length; n++) {
+    if (n % 1500 === 1499) yield 'nodes';
     const N = NODES[n];
     if (!A.inBounds(N.x, N.z, 20)) continue;
     const deg = N.nb.length;
@@ -244,6 +247,7 @@ function buildSigns (A) {
   }
   // «дети» у школ и садов: с обеих сторон улицы метров за тридцать
   const KIDS = /школ|детск|сад\b|сад |гимназ|лице|school|kinder/i;
+  yield 'stops';
   for (const b of CITY.buildings) {
     if (b.k !== 'pub' || !b.n || !KIDS.test(b.n)) continue;
     let cx = 0, cz = 0;
@@ -338,7 +342,7 @@ function fenceTex () {
   return t;
 }
 
-function buildFences (A) {
+function* buildFences (A) {
   const { CITY, inHouse, nearestRoad, groundH, obb } = A;
   const PIZ = A.PIZZA;
   // дорожки — по клеткам: забор их не перекрывает, в этом месте калитка
@@ -405,8 +409,10 @@ function buildFences (A) {
   const KIDS = /школ|детск|сад\b|сад |гимназ|лице|school|kinder/i;
   const P = [], N = [], U = [], I = [];
   const PANELS = [];                                // секции: середина и первая вершина — их сбивают (smashMesh)
-  let houses = 0;
+  let houses = 0, nb = 0;
+  yield 'paths';
   for (const b of CITY.buildings) {
+    if (++nb % 150 === 0) yield 'fences';
     if ((houses >= 200 || RL.n.panels > 7000) && !b.rich) continue;      // особняки (world.js) — за забором всегда
     const p = b.p;
     let cx = 0, cz = 0;
@@ -518,12 +524,14 @@ function buildFences (A) {
   }
 }
 
-export function build (A) {
+/* шагами (yield) — поздняя сборка (latebuild.js; при ?nolate — разом): на Деке весь кусок ~0,4 с */
+export function* build (A) {
   if (RL_OFF) return;
   const t0 = performance.now();
-  buildSigns(A);
+  yield* buildSigns(A);
   const t1 = performance.now();
-  buildFences(A);
+  yield 'signs';
+  yield* buildFences(A);
   RL.ms.signs = Math.round(t1 - t0);
   RL.ms.fences = Math.round(performance.now() - t1);
 }
@@ -581,7 +589,7 @@ function makeJam (A, a) {
   }
   const rear = Math.min(along, ...a.cars.map(c => (c.x - N.x) * e.ux + (c.z - N.z) * e.uz));      // задняя из двух — по ходу потока
   const J = { a, e, chain, sStop: rear - e.tA - 5.6, lanes, stops: new Map(), edges: new Set([e, ...chain]), pieces: [], extras: [], men: [],
-    honkT: rand(1, 3), outT: rand(4, 9), outN: 0, age: 0, done: 0, doneT: 0 };
+    honkT: rand(1, 3), outT: rand(4, 9), outN: 0, age: 0, done: 0, doneT: 0, fill: null };
   const st = jamAt(A, J, 0);
   if (st) J.stops.set(st[0], st[1]);
   // хвост на радаре: от аварии на семьдесят метров назад, по кускам рёбер
@@ -591,7 +599,7 @@ function makeJam (A, a) {
     const last = J.pieces[J.pieces.length - 1];
     if (last && last.e === b[0]) last.s0 = b[1]; else J.pieces.push({ e: b[0], s0: b[1], s1: b[1] });
   }
-  if (Math.hypot(a.x - A.V.x, a.z - A.V.z) < 330) fillJam(A, J);
+  if (Math.hypot(a.x - A.V.x, a.z - A.V.z) < 330) J.fill = fillJam(A, J);   // очередь — по машине за кадр (stepJams)
   return J;
 }
 
@@ -607,8 +615,9 @@ function jamAt (A, J, v) {
   return [e, Math.min(s, A.edgeRun(e) - 0.5)];
 }
 
-/* дозаводим очередь: по перекрытым полосам назад от аварии */
-function fillJam (A, J) {
+/* дозаводим очередь: по перекрытым полосам назад от аварии. По машине за шаг (yield): двенадцать разом
+   на Деке — рывок до 17 мс; stepJams делает шаг за кадр */
+function* fillJam (A, J) {
   for (const lane of J.lanes)
     for (let k = 0; k < 7 && J.extras.length < 12; k++) {
       const b = jamAt(A, J, -0.5 - k * 6.6);
@@ -624,6 +633,7 @@ function fillJam (A, J) {
       A.TRAFFIC.push(c);
       A.poseTraffic(c, 0);
       J.extras.push(c);
+      yield;
     }
 }
 
@@ -637,6 +647,7 @@ function stepJams (dt, A) {
   for (let i = JAMS.length - 1; i >= 0; i--) {
     const J = JAMS[i];
     J.age += dt;
+    if (J.fill && (J.done || J.fill.next().done)) J.fill = null;   // очередь дозаводится по машине за кадр
     if (!J.done && !A.ACCIDENTS.includes(J.a)) {
       J.done = 1;
       for (const e of J.edges) if (JAM_BY.get(e) === J) JAM_BY.delete(e);
@@ -650,9 +661,8 @@ function stepJams (dt, A) {
         if (q.length && A.Snd) {
           const c = pick(q), d = Math.hypot(c.x - V.x, c.z - V.z);
           if (d < 90) {
-            const f = c.rlHorn || (c.rlHorn = rand(330, 470)), v = 0.07 * (1 - d / 90);
-            A.Snd.blip(f, 0.13, 'square', v);
-            if (Math.random() < 0.6) setTimeout(() => A.Snd.blip(f, 0.22, 'square', v), 170);
+            const f = c.rlHorn || (c.rlHorn = rand(330, 470)), two = Math.random() < 0.6;
+            A.Snd.fx('honk', s => { s.blip(f, 0.13, 'square', 0.07); if (two) setTimeout(() => s.blip(f, 0.22, 'square', 0.07), 170); }, { x: c.x, z: c.z, far: 90 });
           }
         }
       }
@@ -1215,7 +1225,7 @@ function stepWorks (dt, A) {
     for (const c of W8.cones) {
       if (!c.fly && sp > 2.5 && Math.hypot(c.x - V.x, c.z - V.z) < 1.5) {
         c.fly = 1; c.vx = V.vx * 0.8 + rand(-1.5, 1.5); c.vz = V.vz * 0.8 + rand(-1.5, 1.5); c.vy = rand(3, 5.5); c.spin = rand(-9, 9);
-        if (A.Snd) A.Snd.noise(0.08, 0.1);
+        if (A.Snd) A.Snd.fx('cone', s => s.noise(0.08, 0.1));
       }
       if (c.fly === 1) {
         c.vy -= 20 * dt; c.x += c.vx * dt; c.z += c.vz * dt; c.y += c.vy * dt;

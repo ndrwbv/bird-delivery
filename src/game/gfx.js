@@ -7,7 +7,8 @@
    у окон и эффектов — 0/1:
 
      пункт   Низкая            Средняя        Высокая
-     fps     30 к/с            60             как у экрана
+     fps     30 к/с            без огранич.   без ограничения  (пункт: 30 / 40 / 60 / без ограничения;
+             09.10.2026, IDEAS К2: по умолчанию — без ограничения, и на Деке; было 30 / 60 / как у экрана)
      range   туман ~250 м      ~370 м         ~490 м
      menu    застывший кадр    30 к/с         живой    (листаешь меню — полные к/с)
      px      ~430 точек        ~540           ~720 (по короткой стороне)
@@ -33,6 +34,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import './gfx.css';
 import { t, N_ } from '../i18n/index.js';
+import { keyHTML } from '../input/glyphs.js';
 import Platform from '../platform/index.js';
 import * as CULL from './cull.js';
 import * as WINS from './windows.js';
@@ -42,7 +44,7 @@ const BASE_FAR = 490;
 const LAG_R = 110;                 // дальше — «вдали»: считаем раз в N кадров
 
 export const ITEMS = [
-  { id: 'fps', label: N_('кадров в секунду'), vals: [30, 60, 0] },
+  { id: 'fps', label: N_('кадров в секунду'), vals: [30, 40, 60, 0] },   // 0 — без ограничения (как у экрана)
   { id: 'range', label: N_('дальность'), vals: [250, 370, 490] },
   { id: 'menu', label: N_('город за меню'), vals: [0, 30, -1] },
   { id: 'px', label: N_('чёткость'), vals: [430, 540, 720] },
@@ -53,8 +55,8 @@ export const ITEMS = [
 ];
 export const PRESETS = {
   low: { fps: 0, range: 0, menu: 0, px: 0, win: 0, fx: 0, far: 0, aa: 0 },
-  mid: { fps: 1, range: 1, menu: 1, px: 1, win: 1, fx: 1, far: 1, aa: 1 },
-  high: { fps: 2, range: 2, menu: 2, px: 2, win: 1, fx: 1, far: 2, aa: 1 },
+  mid: { fps: 3, range: 1, menu: 1, px: 1, win: 1, fx: 1, far: 1, aa: 1 },
+  high: { fps: 3, range: 2, menu: 2, px: 2, win: 1, fx: 1, far: 2, aa: 1 },
 };
 const ORDER = ['low', 'mid', 'high'];
 const NAMES = { low: N_('низкая'), mid: N_('средняя'), high: N_('высокая'), custom: N_('своя') };
@@ -86,7 +88,11 @@ function load () {
   const mine = readAll()[DEV];
   const p = PRESETS[forced] ? forced : mine && (PRESETS[mine.p] || mine.p === 'custom') ? mine.p : DEFAULTS[DEV];
   Object.assign(O, PRESETS[p] || PRESETS.high);
-  if (p === 'custom' && mine && mine.o) for (const it of ITEMS) { const v = clampItem(it, mine.o[it.id]); if (v !== null) O[it.id] = v; }
+  if (p === 'custom' && mine && mine.o) {
+    const o = { ...mine.o };
+    if (!(mine.fv >= 2) && Number.isInteger(o.fps)) o.fps = [0, 2, 3][o.fps] ?? o.fps;   // сохранено до 09.10.2026: к/с были 30 / 60 / как у экрана
+    for (const it of ITEMS) { const v = clampItem(it, o[it.id]); if (v !== null) O[it.id] = v; }
+  }
   PRESET = whichPreset();
 }
 function whichPreset () {
@@ -96,7 +102,7 @@ function whichPreset () {
 function save () {
   if (PRESETS[Q.get('gfx')]) return;             // отладочный пресет из адреса — не сохраняем
   const all = readAll();
-  all[DEV] = PRESET === 'custom' ? { p: 'custom', o: { ...O } } : { p: PRESET };
+  all[DEV] = PRESET === 'custom' ? { p: 'custom', o: { ...O }, fv: 2 } : { p: PRESET };   // fv — номера пункта к/с: 30 / 40 / 60 / без ограничения
   writeAll(all);
 }
 load();
@@ -222,11 +228,15 @@ export const gibFade = () => (fxLow() ? 1.6 : 1);
 
 /* ── «кадр не успевает»: один раз предложить «Среднюю» ──
    cull.js сам опускает дальность, если кадр долгий две секунды подряд
-   (CULL.Q.lvl > 0). На Высокой это и есть повод предложить Среднюю — тихой
-   плашкой внизу на 15 с, один раз на устройство. */
+   (CULL.Q.lvl > 0). На Высокой это и есть повод предложить Среднюю — маленькой
+   бумажкой в правом нижнем углу на 15 с, один раз на устройство. В езде она
+   ничего не ждёт и не перекрывает: «[X] включить» — кнопкой X геймпада или
+   клавишей X (в езде обе свободны), пальцем / мышью — по самой кнопке; «не надо» —
+   только пальцем / мышью, иначе сама уходит через 15 с (game.js padStep / keydown → offerYes). */
 let offerEl = null;
 export function watch (playing) {
-  if (PRESET !== 'high' || !playing || !(CULL.Q.lvl > 0) || offerEl) return;
+  if (offerEl && offerEl.hidden === playing) offerEl.hidden = !playing;   // пауза, карта, повтор, диалог — записку прячем: X там не её
+  if (PRESET !== 'high' || !playing || !(CULL.Q.lvl > 0) || offerEl !== null) return;
   const all = readAll();
   if (all.offered && all.offered[DEV]) return;
   all.offered = { ...(all.offered || {}), [DEV]: 1 }; writeAll(all);
@@ -234,25 +244,38 @@ export function watch (playing) {
 }
 function offer () {
   const el = offerEl = document.createElement('div');
-  el.className = 'gfx-offer';
+  el.className = 'gfx-offer pp-ride';
   el.innerHTML = '<span>' + t('кадр не успевает — включить графику «средняя»?') + '</span>' +
-    '<button type="button" data-a="yes">' + t('включить') + '</button><button type="button" data-a="no">' + t('не надо') + '</button>' +
-    '<small>' + t('поменять — в настройках → графика') + '</small>';
-  const close = () => { if (el.parentNode) el.parentNode.removeChild(el); };
+    '<button type="button" data-a="yes">' + keyHTML('x') + t('включить') + '</button><button type="button" data-a="no">' + t('не надо') + '</button>';
   el.addEventListener('click', e => {
-    const a = e.target && e.target.dataset && e.target.dataset.a;
-    if (a === 'yes') setPreset('mid');
-    if (a) close();
+    const b = e.target && e.target.closest && e.target.closest('button[data-a]');
+    if (!b) return;
+    if (b.dataset.a === 'yes') setPreset('mid');
+    closeOffer();
   });
   document.body.appendChild(el);
-  setTimeout(close, 15000);
+  setTimeout(() => { if (offerEl === el) closeOffer(); }, 15000);
+}
+function closeOffer () {
+  const el = offerEl;
+  if (el && el.parentNode) el.parentNode.removeChild(el);
+  offerEl = el ? 0 : offerEl;                       // 0 — уже предлагали в этот запуск (null — ещё нет)
+}
+/** X геймпада / клавиша X в езде: плашка «включить „среднюю“?» на экране — включить; true — нажали её */
+export function offerYes () {
+  if (!offerEl) return false;
+  const b = offerEl.querySelector('button[data-a="yes"]');
+  if (b) b.classList.add('pp-down');
+  setPreset('mid');
+  setTimeout(closeOffer, 120);                      // кнопка успевает вдавиться
+  return true;
 }
 
 /* ── окно «графика» в настройках ──
    body — куда рисовать, focus — id кнопки после перерисовки */
 function itemText (it, v) {
   switch (it.id) {
-    case 'fps': return v === 2 ? t('как у экрана') : String(it.vals[v]);
+    case 'fps': return it.vals[v] ? String(it.vals[v]) : t('без ограничения');
     case 'range': return [t('близко'), t('средне'), t('далеко')][v] + ' · ' + t('{m} м', { m: it.vals[v] });
     case 'menu': return v === 0 ? t('застывший кадр') : v === 1 ? t('{n} к/с', { n: 30 }) : t('живой');
     case 'px': return [t('крупный пиксель'), t('средний пиксель'), t('мелкий пиксель')][v];
@@ -285,6 +308,7 @@ export function panel (body, focus, card) {
 export const DEBUG = {
   get dev () { return DEV; }, get preset () { return PRESET; }, get opts () { return { ...O }; },
   set, setPreset, STATS, ITEMS, PRESETS, DETAIL, poke,
+  offer: () => { offerEl = null; offer(); return true; },   // показать плашку «кадр не успевает» сразу (проверка вида)
   /* время кадра CPU за последние n кадров: p50 / p95, мс */
   work (n = 300) { const s = STATS.work.slice(-n).sort((a, b) => a - b), q = p => (s.length ? +s[Math.min(s.length - 1, Math.floor(p * s.length))].toFixed(2) : 0); return { n: s.length, p50: q(0.5), p95: q(0.95) }; },
 };

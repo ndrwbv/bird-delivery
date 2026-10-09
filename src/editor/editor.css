@@ -1,0 +1,67 @@
+/* Редактор города (docs/SANDBOX.md): игра под панелью — только картинка города, её хад и меню спрятаны */
+body.editor { overflow: hidden; }
+body.editor #game > :not(#view) { display: none !important; }
+body.editor > :not(#game):not(#boot):not(#ed-root):not(vite-error-overlay):not(script) { display: none !important; }
+
+#ed-root { position: fixed; inset: 0; z-index: 50; font: 13px/1.35 system-ui, -apple-system, 'Segoe UI', sans-serif; color: #2b2620; pointer-events: none; }
+#ed-root * { box-sizing: border-box; }
+#ed-root [hidden] { display: none !important; }
+#ed-view { position: absolute; inset: 0; pointer-events: auto; cursor: grab; }
+#ed-view.drag { cursor: grabbing; }
+#ed-view.t-note, #ed-view.t-place { cursor: crosshair; }
+#ed-view.t-pick { cursor: pointer; }
+#ed-labels { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.ed-lab { position: absolute; transform: translate(-50%, -100%); max-width: 220px; padding: 3px 7px; border-radius: 4px; background: #fffbea; border: 2px solid #c0392b;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, .25); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: auto; cursor: pointer; }
+.ed-lab.done { border-color: #3c8d40; opacity: .75; text-decoration: line-through; }
+.ed-lab.sel { outline: 3px solid #ffcc00; }
+#ed-cross { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; pointer-events: none; display: none; }
+#ed-cross::before, #ed-cross::after { content: ''; position: absolute; background: #fff; box-shadow: 0 0 0 1px #000; }
+#ed-cross::before { left: 8px; top: 0; width: 2px; height: 18px; }
+#ed-cross::after { top: 8px; left: 0; height: 2px; width: 18px; }
+#ed-root.pad #ed-cross { display: block; }
+
+/* панель — как накладная: бумага, штамп, от руки */
+#ed-panel { position: absolute; left: 10px; top: 10px; bottom: 10px; width: 330px; overflow-y: auto; pointer-events: auto;
+  background: #fbf6e6; border: 2px solid #3a3226; border-radius: 6px; box-shadow: 4px 4px 0 rgba(0, 0, 0, .35); padding: 10px 12px 14px; }
+#ed-panel h1 { margin: 0 0 2px; font-size: 18px; letter-spacing: .5px; }
+#ed-panel h1 small { font-size: 12px; font-weight: normal; color: #7a6c55; }
+#ed-panel h2 { margin: 12px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #7a2d1f; border-bottom: 1px dashed #b9a98a; padding-bottom: 2px; }
+#ed-panel .row { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin: 4px 0; }
+#ed-panel button { font: inherit; padding: 4px 9px; border: 2px solid #3a3226; border-radius: 4px; background: #fff; cursor: pointer; box-shadow: 0 2px 0 #3a3226; }
+#ed-panel button:active { transform: translateY(2px); box-shadow: none; }
+#ed-panel button.on { background: #ffd85e; }
+#ed-panel button.big { flex: 1; font-weight: 600; }
+#ed-panel button.warn { background: #ffe1d6; }
+#ed-panel button.mini { padding: 1px 6px; font-size: 12px; box-shadow: 0 1px 0 #3a3226; }
+#ed-panel input[type=number], #ed-panel input[type=text], #ed-panel select { font: inherit; padding: 3px 5px; border: 2px solid #3a3226; border-radius: 4px; background: #fff; }
+#ed-panel input[type=number] { width: 74px; }
+#ed-panel .hint { color: #7a6c55; font-size: 12px; }
+#ed-panel .tools button { flex: 1 1 45%; }
+#ed-map { width: 100%; height: 230px; display: block; border: 2px solid #3a3226; border-radius: 4px; background: #d9e6c9; cursor: crosshair; }
+#ed-status { margin: 6px 0 0; padding: 5px 7px; border-radius: 4px; background: #efe6cc; min-height: 22px; font-size: 12px; }
+#ed-status.bad { background: #ffd9cf; color: #8a1d0b; }
+#ed-status.ok { background: #dcefd2; }
+.ed-list { list-style: none; margin: 0; padding: 0; max-height: 230px; overflow-y: auto; }
+.ed-list li { display: flex; gap: 5px; align-items: flex-start; padding: 4px 2px; border-bottom: 1px dotted #c9bb9d; }
+.ed-list li .tx { flex: 1; min-width: 0; word-wrap: break-word; cursor: pointer; }
+.ed-list li .tx small { display: block; color: #8b7d63; font-size: 11px; }
+.ed-list li.done .tx { text-decoration: line-through; color: #7a6c55; }
+.ed-list li.bad .tx { color: #a3260f; }
+.ed-pal { display: flex; flex-wrap: wrap; gap: 4px; }
+.ed-pal b { width: 100%; font-size: 11px; color: #7a6c55; text-transform: uppercase; margin-top: 4px; }
+.ed-pal button { padding: 2px 7px !important; font-size: 12px !important; }
+#ed-sel { padding: 6px; border: 2px dashed #3a3226; border-radius: 4px; background: #fff; }
+#ed-keys { font-size: 12px; color: #5c5040; }
+#ed-keys kbd { font: 11px monospace; padding: 0 4px; border: 1px solid #8b7d63; border-radius: 3px; background: #fff; }
+
+/* окошко ввода текста пометки — у точки клика */
+#ed-pop { position: absolute; z-index: 5; width: 280px; padding: 8px; pointer-events: auto; background: #fffbea; border: 2px solid #3a3226; border-radius: 6px; box-shadow: 3px 3px 0 rgba(0, 0, 0, .35); }
+#ed-pop textarea { width: 100%; height: 64px; font: inherit; resize: vertical; border: 2px solid #3a3226; border-radius: 4px; padding: 4px; }
+#ed-pop .row { display: flex; gap: 6px; margin-top: 6px; }
+#ed-pop .row button { flex: 1; font: inherit; padding: 4px; border: 2px solid #3a3226; border-radius: 4px; background: #fff; cursor: pointer; }
+#ed-pop .row button.yes { background: #ffd85e; font-weight: 600; }
+#ed-pop .msg { margin-bottom: 4px; font-size: 12px; }
+#ed-pop .msg.bad { color: #8a1d0b; }
+
+#ed-wait { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); padding: 14px 22px; border-radius: 8px; background: #fbf6e6; border: 2px solid #3a3226; font-size: 16px; pointer-events: none; }

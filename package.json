@@ -10,6 +10,7 @@
     "dev": "vite --port 5190 --strictPort",
     "sandbox": "vite --port 5193 --mode web --open /sandbox.html",
     "ui": "vite --port 5194 --mode web --open /ui.html",
+    "editor": "vite --port 5195 --mode web --open /editor.html",
     "dev:yandex": "vite --port 5191 --strictPort --mode yandex",
     "dev:steam": "vite --port 5192 --strictPort --mode steam",
     "build:web": "vite build --mode web",
@@ -22,6 +23,8 @@
     "mapcheck": "node tools/mapcheck.mjs",
     "i18n:extract": "node tools/i18n-extract.mjs",
     "i18n:check": "node tools/i18n-check.mjs",
+    "sfx": "node tools/sfx-gen.mjs",
+    "sfx:index": "node tools/sfx-index.mjs",
     "probe": "electron tools/probe.cjs",
     "check": "node tools/check.cjs",
     "media": "npm run build:yandex && for l in ru en es; do electron tools/capture.cjs --lang=$l && electron tools/capture.cjs --lang=$l --mobile && electron tools/capture.cjs --lang=$l --video; done && node tools/media-post.mjs"

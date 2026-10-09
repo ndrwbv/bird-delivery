@@ -1,131 +1,183 @@
-/* гараж на весь экран (карьера): карусель карточек, garage.js */
+/* гараж на весь экран (карьера): карусель карточек, garage.js.
+   Стиль «техпаспорт» (09.10.2026, docs/UI-REVIEW.md, docs/CAREER.md «Стиль интерфейса: как накладная»):
+   тёплый стол, карточка машины — бумажный лист с перфорацией и ржавой шапкой «ТЕХПАСПОРТ № 0003»,
+   главное («купить», «выбрать») — красный штамп со значком [A], броня и мотор — строки со значками [X] / [Y],
+   покрасить и продать — пометки на полях. Скупого синего нет. Шрифт — три размера --pp-fs-* (paper.css). */
 #cr-garage { position: absolute; inset: 0; z-index: 38; display: flex; flex-direction: column; opacity: 0; transition: opacity .2s;
-             background: radial-gradient(ellipse at 50% 45%, #33448c 0, #1d2650 45%, #10142a 100%); overflow: hidden;
-             padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-             box-sizing: border-box; --cw: clamp(340px, 37.5vw, 660px); --step: calc(var(--cw) * .8); }
+             background: radial-gradient(ellipse at 50% 42%, #6b3a22 0, #3a2014 48%, #1a0e08 100%); overflow: hidden; overflow: clip; color: var(--pp-ink);   /* clip: курсор геймпада (scrollIntoView) на узком экране сдвигал весь гараж вбок на 200 px */
+             padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+             box-sizing: border-box; --cw: clamp(360px, 38vw, 660px); --step: calc(var(--cw) * .8); }
 #cr-garage[hidden] { display: none; }
 #cr-garage.on { opacity: 1; }
 body:has(#cr-garage:not([hidden])) .hud, body:has(#cr-garage:not([hidden])) #ctrls { visibility: hidden; }
 
 .gr-top { flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; }
-.gr-back { justify-self: start; font: inherit; font-size: clamp(9px, 1.1vw, 12px); padding: 11px 16px; cursor: pointer; color: #fff3d6;
-           background: rgba(20, 16, 30, .75); border: 3px solid #33210c; border-radius: 8px; box-shadow: 0 4px 0 #33210c; }
-.gr-back:active { transform: translateY(3px); box-shadow: 0 1px 0 #33210c; }
-.gr-t { font-size: clamp(18px, 3vw, 34px); color: #ffd85e; text-shadow: 4px 4px 0 #33210c; letter-spacing: .04em; }
-.gr-wallet { justify-self: end; font-size: clamp(7px, .9vw, 10px); color: #b9c3e6; text-align: right; }
-.gr-wallet b { font-weight: normal; font-size: clamp(11px, 1.4vw, 16px); color: #ffd85e; margin: 0 6px; }
-.gr-wallet em { font-style: normal; font-size: clamp(10px, 1.2vw, 14px); color: #fff3d6; white-space: nowrap; }
+/* «назад» — пометка на полях со значком [B] */
+.gr-back { justify-self: start; display: inline-flex; align-items: center; font: inherit; font-size: var(--pp-fs-m); padding: .6em 1em; cursor: pointer;
+           color: var(--pp-ink); background: var(--pp-paper); border: 2px dashed var(--pp-brown); border-radius: 3px; box-shadow: 0 4px 0 rgba(0, 0, 0, .55); }
+.gr-back:hover { border-style: solid; border-color: var(--pp-ink); }
+.gr-back:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0, 0, 0, .55); }
+.gr-t { font-size: clamp(18px, 3vw, 34px); color: var(--pp-yellow); text-shadow: 4px 4px 0 var(--pp-ink); letter-spacing: .04em; }
+.gr-wallet { justify-self: end; font-size: var(--pp-fs-s); color: #e8cfa6; text-align: right; line-height: 1.5; }
+.gr-wallet b { font-weight: normal; font-size: var(--pp-fs-m); color: var(--pp-yellow); margin: 0 6px; }
+.gr-wallet em { font-style: normal; font-size: var(--pp-fs-s); color: var(--pp-paper); white-space: nowrap; }
+.gr-wallet .w-why { display: block; margin-top: 2px; font-size: var(--pp-fs-s); color: #c9a98a; }
 
 .gr-stage { position: relative; flex: 1; min-height: 0; touch-action: pan-y; user-select: none; }
 .gr-track { position: absolute; inset: 0; --drag: 0px; }
+/* карточка — лист техпаспорта: бумага, рамка чернилами, жёсткая тень, перфорация сверху */
 .gr-card { position: absolute; left: 50%; top: 50%; width: var(--cw); max-height: 100%; box-sizing: border-box;
-           display: flex; flex-direction: column; gap: clamp(6px, 1.2vh, 12px); padding: clamp(10px, 1.6vh, 18px) clamp(12px, 1.6vw, 20px);
-           background: linear-gradient(180deg, #2c3a78 0, #1d2440 62%); border: 4px solid #33210c; border-radius: 16px;
-           box-shadow: 0 8px 0 #33210c, 0 22px 50px rgba(0, 0, 0, .45);
+           display: flex; flex-direction: column; gap: clamp(4px, 1vh, 10px); padding: clamp(8px, 1.4vh, 16px) clamp(12px, 1.6vw, 20px) clamp(10px, 1.6vh, 18px);
+           color: var(--pp-ink); background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 4px;
+           box-shadow: 0 8px 0 var(--pp-ink), 0 22px 50px rgba(0, 0, 0, .5);
            transform: translate(-50%, -50%) translateX(calc(var(--o) * var(--step) + var(--drag))) scale(var(--s));
            transition: transform .35s cubic-bezier(.2, .8, .25, 1.1), opacity .3s, filter .3s; cursor: pointer; }
+.gr-card::before { content: ''; position: absolute; left: 10px; right: 10px; top: -6px; height: 8px; pointer-events: none; background: var(--pp-perf); }
 .gr-track.drag .gr-card { transition: none; }
 .gr-card.on { z-index: 3; cursor: default; }
-.gr-card.side { z-index: 2; opacity: .5; filter: saturate(.55) brightness(.75); }
-.gr-card.far { z-index: 1; opacity: .18; filter: saturate(.4) brightness(.6); }
+.gr-card.side { z-index: 2; opacity: .55; filter: saturate(.55) brightness(.7); }
+.gr-card.far { z-index: 1; opacity: .2; filter: saturate(.4) brightness(.55); }
 .gr-card.gone { opacity: 0; pointer-events: none; }
-.gr-card.cur { border-color: #ffd85e; }
+.gr-card.cur { box-shadow: 0 8px 0 var(--pp-ink), 0 0 0 5px var(--pp-yellow), 0 22px 50px rgba(0, 0, 0, .5); }
 .gr-card:not(.on) .gr-acts { pointer-events: none; }
 
-.gr-pic { position: relative; flex: none; aspect-ratio: 16 / 10; width: 100%; max-height: 36vh; display: flex; justify-content: center; align-items: center;
-          background: radial-gradient(ellipse at 50% 72%, rgba(255, 216, 94, .22), rgba(255, 216, 94, 0) 62%); border-radius: 10px; }
+.gr-pic { position: relative; flex: none; aspect-ratio: 16 / 10; width: 100%; max-height: 34vh; display: flex; justify-content: center; align-items: center; order: 1;
+          background: radial-gradient(ellipse at 50% 72%, rgba(255, 138, 43, .28), rgba(255, 216, 94, 0) 64%), #f6e2b8; border: 2px solid var(--pp-ink); border-radius: 3px; }
 .gr-pic { overflow: hidden; }
 .gr-pic canvas { width: 100%; height: 100%; object-fit: contain; transform: scale(1.4); transform-origin: 50% 58%; }
-.gr-card.cur .gr-pic::after { content: '★'; position: absolute; top: 4px; left: 8px; font-size: 16px; color: #ffd85e; text-shadow: 2px 2px 0 #33210c; }
+/* «на смене» — жёлтая звезда в углу фото */
+.gr-card.cur .gr-pic::after { content: '★'; position: absolute; top: 4px; left: 8px; font-size: 16px; color: var(--pp-yellow); text-shadow: 2px 2px 0 var(--pp-ink); }
 
-.gr-info { display: flex; flex-direction: column; gap: clamp(5px, 1vh, 10px); min-width: 0; }
-.gr-name { font-size: clamp(15px, 2.1vw, 24px); color: #fff3d6; text-shadow: 3px 3px 0 #33210c; line-height: 1.2; }
-.gr-hp { font-style: normal; font-size: clamp(13px, 1.5vw, 18px); color: #ff5d7a; letter-spacing: 3px; text-shadow: 2px 2px 0 #33210c; }
-.gr-note { font-size: clamp(7px, .8vw, 9px); line-height: 1.7; color: #b9c3e6; }
+/* шапка листа — над фото (order), имя, описание, полоски, кнопки — под ним */
+.gr-info { display: contents; }
+.gr-head { order: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: .5em 0 .45em; margin-top: .2em;
+           border-bottom: 2px dashed var(--pp-brown); color: var(--pp-rust); font-size: var(--pp-fs-s); text-transform: uppercase; letter-spacing: .1em;
+           box-shadow: 0 -5px 0 -1px var(--pp-orange); }
+.gr-head b { font-weight: normal; color: var(--pp-ink); letter-spacing: .04em; }
+.gr-name, .gr-note, .gr-stats, .gr-acts { order: 2; }
+.gr-name { font-size: var(--pp-fs-l); color: var(--pp-ink); line-height: 1.2; }
+.gr-note { font-size: var(--pp-fs-s); line-height: 1.6; color: var(--pp-label); }
 
-.gr-stats { display: flex; flex-direction: column; gap: 6px; }
-.gr-st { display: grid; grid-template-columns: minmax(80px, 30%) 1fr auto; align-items: center; gap: 10px; }
-.gr-st span { font-size: clamp(7px, .8vw, 9px); color: #b9c3e6; }
-.gr-st b { font-weight: normal; font-size: clamp(8px, .9vw, 10px); color: #fff3d6; min-width: 64px; text-align: right; }
-.gr-bar { display: block; height: 10px; background: #141a33; border: 2px solid #33210c; border-radius: 5px; overflow: hidden; }
-.gr-bar > i { display: block; height: 100%; width: 0; background: #6fd3ff; transition: width .7s cubic-bezier(.2, .9, .3, 1.2); }
-.gr-st-break .gr-bar > i { background: #ff9a3c; }
-.gr-card.own .gr-st-break .gr-bar > i { background: #7fc36a; }
+/* полоски — общей сеткой (subgrid): подписи одной ширины, полоски начинаются в одном месте */
+.gr-stats { display: grid; grid-template-columns: max-content 1fr auto; column-gap: 10px; row-gap: 4px; }
+.gr-st { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; padding: 1px 0; }
+.gr-st + .gr-st { border-top: 1px dashed rgba(138, 107, 78, .45); padding-top: 4px; }
+.gr-st span { font-size: var(--pp-fs-s); color: var(--pp-label); }
+.gr-st b { font-weight: normal; font-size: var(--pp-fs-s); color: var(--pp-ink); min-width: 64px; text-align: right; white-space: nowrap; }
+.gr-bar { display: block; height: 10px; background: #ead2a6; border: 2px solid var(--pp-ink); border-radius: 2px; overflow: hidden; }
+.gr-bar > i { display: block; height: 100%; width: 0; background: var(--pp-orange); transition: width .7s cubic-bezier(.2, .9, .3, 1.2); }
+.gr-st-speed .gr-bar > i { background: var(--pp-yellow); }
+.gr-st-handle .gr-bar > i { background: var(--pp-orange); }
+.gr-st-break .gr-bar > i { background: var(--pp-fire); }
+.gr-card.own .gr-st-break .gr-bar > i { background: var(--pp-lime); }
 .gr-st-res .gr-bar > i { background: #b98cff; }
-.gr-st-hp .gr-bar > i { background: #ff5d7a; }
-.gr-st-handle .gr-bar > i { background: #46b4e0; }
-.gr-st.up b { color: #7fe08a; animation: gr-flash .6s steps(2) 3; }
-@keyframes gr-flash { 50% { color: #fff3d6; } }
+.gr-st-hp .gr-bar > i { background: var(--pp-pink); }
+.gr-st.up b { color: var(--pp-money); animation: gr-flash .6s steps(2) 3; }
+@keyframes gr-flash { 50% { color: var(--pp-ink); } }
 
 .gr-acts { display: flex; flex-direction: column; gap: 8px; margin-top: 2px; }
-.gr-btn { font: inherit; cursor: pointer; text-align: center; color: #fff3d6; background: #3a4570; border: 3px solid #33210c; border-radius: 10px;
-          box-shadow: 0 4px 0 #33210c; padding: clamp(9px, 1.4vh, 13px) 12px; font-size: clamp(9px, 1vw, 12px); }
-.gr-btn:not(:disabled):hover { filter: brightness(1.1); }
-.gr-btn:not(:disabled):active { transform: translateY(3px); box-shadow: 0 1px 0 #33210c; }
+.gr-btn { display: flex; align-items: center; justify-content: center; font: inherit; cursor: pointer; text-align: center; color: var(--pp-ink); background: var(--pp-paper);
+          border: 3px solid var(--pp-ink); border-radius: 6px; box-shadow: 0 4px 0 var(--pp-ink); padding: clamp(8px, 1.3vh, 12px) 12px; font-size: var(--pp-fs-m); }
+.gr-btn:not(:disabled):hover { filter: brightness(1.05); }
+.gr-btn:not(:disabled):active { transform: translateY(3px); box-shadow: 0 1px 0 var(--pp-ink); }
 .gr-btn:disabled { cursor: default; opacity: .5; }
-.gr-btn.buy, .gr-btn.pick { color: #33210c; background: #ffd85e; font-size: clamp(11px, 1.3vw, 15px); }
+.gr-btn .pp-key { margin-right: .7em; }
+/* главное — красный штамп: купить / выбрать */
+.gr-btn.buy, .gr-btn.pick { color: var(--pp-paper); background: var(--pp-red); border-width: 4px; font-size: var(--pp-fs-m); letter-spacing: .06em; text-transform: uppercase;
+                            text-shadow: 2px 2px 0 var(--pp-ink); rotate: -1deg; box-shadow: 0 5px 0 var(--pp-ink), inset 0 -5px 0 rgba(0, 0, 0, .14); }
+.gr-btn.buy:not(:disabled):hover, .gr-btn.pick:hover { background: var(--pp-fire); filter: none; }
+.gr-btn.buy .pp-key, .gr-btn.pick .pp-key { color: var(--pp-red); background: var(--pp-paper); }
 .gr-btn.buy i { font-style: normal; white-space: nowrap; }
-/* «на смене» — не кнопка, а отметка: машина уже твоя на смене (05.10.2026: была зелёной кнопкой и звала нажать) */
-.gr-btn.cur { color: #7fe08a; background: transparent; border-style: dashed; box-shadow: none; opacity: 1; padding: 6px 12px; }
-.gr-btn.up { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; column-gap: 10px; row-gap: 4px; text-align: left; }
-.gr-btn.up b { font-weight: normal; }
-.gr-btn.up span { grid-row: 2; font-size: .78em; color: #ffd85e; }
-.gr-btn.up i { grid-row: 1 / span 2; grid-column: 2; align-self: center; font-style: normal; letter-spacing: 2px; color: #ffd85e; font-size: 1.05em; }
-.gr-btn.up.max span { color: #7fe08a; }
-.gr-why { font-size: clamp(7px, .8vw, 9px); line-height: 1.6; color: #ff9a9a; text-align: center; min-height: 1.6em; }
-/* покраска и продажа: ряд из двух кнопок, палитра, «точно продать?» */
+/* «на смене» — не кнопка, а отметка (05.10.2026: была кнопкой и звала нажать) — зелёная печатью */
+.gr-btn.cur { color: var(--pp-money); background: transparent; border-style: dashed; border-color: var(--pp-money); box-shadow: none; opacity: 1; padding: 6px 12px;
+              text-transform: uppercase; letter-spacing: .1em; font-size: var(--pp-fs-s); }
+/* броня и мотор: строка «что даёт · цена» и точки ступеней */
+.gr-btn.up { display: grid; grid-template-columns: auto 1fr auto; grid-template-rows: auto auto; column-gap: 10px; row-gap: 4px; text-align: left;
+             border-color: var(--pp-ink); box-shadow: 0 3px 0 var(--pp-ink); }
+.gr-btn.up .pp-key { grid-row: 1 / span 2; grid-column: 1; align-self: center; margin-right: 0; }
+.gr-btn.up b { font-weight: normal; grid-column: 2; }
+.gr-btn.up span { grid-row: 2; grid-column: 2; font-size: var(--pp-fs-s); color: var(--pp-money); }
+.gr-btn.up i { grid-row: 1 / span 2; grid-column: 3; align-self: center; font-style: normal; letter-spacing: 2px; color: var(--pp-rust); font-size: 1.05em; }
+.gr-btn.up.max { grid-template-columns: 1fr auto; }
+.gr-btn.up.max b, .gr-btn.up.max span { grid-column: 1; }
+.gr-btn.up.max i { grid-column: 2; }
+.gr-why { font-size: var(--pp-fs-s); line-height: 1.5; color: var(--pp-red); text-align: center; min-height: 1.5em; }
+/* покраска и продажа — пометки на полях: ряд из двух; палитра и «точно продать?» встают на их место */
 .gr-row { display: flex; gap: 8px; }
-.gr-row > .gr-btn { flex: 1 1 0; min-width: 0; padding: clamp(7px, 1.1vh, 10px) 8px; font-size: clamp(8px, .85vw, 10px); line-height: 1.4; }
-.gr-btn.gr-paint-b { background: #6a3f8f; }
-.gr-btn.gr-sell-b, .gr-btn.sell { background: #8f3f3f; }
-.gr-paint, .gr-ask { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 3px solid #33210c; border-radius: 10px; background: rgba(20, 16, 30, .55); }
-.gr-paint-t { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: clamp(8px, .85vw, 10px); color: #ffd85e; }
-.gr-btn.gr-x { padding: 6px 10px; font-size: clamp(8px, .85vw, 10px); box-shadow: 0 3px 0 #33210c; }
-.gr-sws { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
-.gr-sw { width: clamp(22px, 2.2vw, 30px); height: clamp(22px, 2.2vw, 30px); padding: 0; cursor: pointer; border-radius: 50%; background: var(--c);
-         border: 3px solid #33210c; box-shadow: 0 3px 0 #33210c, inset 0 0 0 2px rgba(255, 243, 214, .28); }
+.gr-row > .gr-btn { flex: 1 1 0; min-width: 0; padding: clamp(6px, 1vh, 9px) 8px; font-size: var(--pp-fs-s); line-height: 1.4;
+                    border: 2px dashed var(--pp-brown); border-radius: 3px; box-shadow: 0 3px 0 rgba(51, 33, 12, .6); }
+.gr-row > .gr-btn:not(:disabled):hover { border-style: solid; border-color: var(--pp-ink); }
+.gr-btn.gr-paint-b { color: #6a2f8f; }
+.gr-btn.gr-sell-b { color: var(--pp-red); }
+.gr-ask .gr-btn.sell { color: var(--pp-paper); background: var(--pp-red); border: 3px solid var(--pp-ink); }
+.gr-ask .gr-btn.sell .pp-key { color: var(--pp-red); background: var(--pp-paper); }
+.gr-paint, .gr-ask { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 2px dashed var(--pp-brown); border-radius: 3px; background: #f6e2b8; }
+.gr-paint-t { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: var(--pp-fs-s); color: var(--pp-rust); }
+.gr-btn.gr-x { padding: 5px 10px; font-size: var(--pp-fs-s); box-shadow: 0 3px 0 var(--pp-ink); border-width: 2px; }
+.gr-sws { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; }
+.gr-sw { width: clamp(24px, 2.3vw, 32px); height: clamp(24px, 2.3vw, 32px); padding: 0; cursor: pointer; border-radius: 50%; background: var(--c);
+         border: 3px solid var(--pp-ink); box-shadow: 0 3px 0 var(--pp-ink), inset 0 0 0 2px rgba(255, 243, 214, .28); }
 .gr-sw.base { border-radius: 6px; }
-.gr-sw.on { outline: 3px solid #ffd85e; outline-offset: 1px; cursor: default; }
+.gr-sw.on { outline: 3px solid var(--pp-money); outline-offset: 2px; cursor: default; }
 .gr-sw:disabled:not(.on) { opacity: .4; cursor: default; }
-.gr-sw:not(:disabled):hover { transform: scale(1.12); }
-.gr-sw.padsel { outline: 3px solid #fff3d6; outline-offset: 2px; }
-.gr-ask > span { font-size: clamp(8px, .9vw, 11px); color: #fff3d6; text-align: center; line-height: 1.5; }
-.gr-ghost { font-size: clamp(9px, 1vw, 12px); padding: 12px; border: 3px dashed rgba(255, 243, 214, .25); border-radius: 10px; color: #b9c3e6; text-align: center; }
+.gr-sw:not(:disabled):not(.on):hover { transform: scale(1.12); }
+.gr-ask > span { font-size: var(--pp-fs-s); color: var(--pp-ink); text-align: center; line-height: 1.5; }
+.gr-ghost { font-size: var(--pp-fs-s); padding: 12px; border: 2px dashed var(--pp-brown); border-radius: 3px; color: var(--pp-label); text-align: center; }
+
+/* курсор геймпада на бумаге — толстая чернильная обводка в жёлтом кольце (правило 9) */
+#cr-garage .padsel { outline: 3px solid var(--pp-ink) !important; outline-offset: 2px; box-shadow: 0 0 0 7px var(--pp-yellow), 0 4px 14px rgba(0, 0, 0, .35) !important; }
+#cr-garage .gr-sw.padsel { transform: scale(1.18); }
 
 .gr-card.pop { animation: gr-pop .45s cubic-bezier(.2, .9, .3, 1.4); }
 @keyframes gr-pop { 0% { transform: translate(-50%, -50%) scale(1); } 35% { transform: translate(-50%, -50%) scale(1.06); } 100% { transform: translate(-50%, -50%) scale(1); } }
 .gr-card.shake { animation: gr-shake .35s; }
 @keyframes gr-shake { 25% { transform: translate(calc(-50% - 8px), -50%); } 75% { transform: translate(calc(-50% + 8px), -50%); } }
-.gr-float { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); pointer-events: none; font-size: clamp(18px, 2.4vw, 28px); color: #7fe08a;
-            text-shadow: 3px 3px 0 #33210c; animation: gr-up 1.1s ease-out forwards; z-index: 5; }
+.gr-float { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); pointer-events: none; font-size: clamp(18px, 2.4vw, 28px); color: var(--pp-money);
+            text-shadow: 3px 3px 0 var(--pp-paper), -2px -2px 0 var(--pp-paper); animation: gr-up 1.1s ease-out forwards; z-index: 5; }
 @keyframes gr-up { from { opacity: 1; transform: translate(-50%, 0) scale(.8); } 20% { transform: translate(-50%, -10px) scale(1.15); } to { opacity: 0; transform: translate(-50%, -70px) scale(1); } }
 
-.gr-arrow { position: absolute; top: 50%; z-index: 4; transform: translateY(-50%); width: 54px; height: 72px; display: grid; place-items: center; cursor: pointer;
-            font-size: 22px; color: #33210c; background: #ffd85e; border: 3px solid #33210c; border-radius: 10px; box-shadow: 0 4px 0 #33210c; }
-.gr-arrow.l { left: max(0px, calc(50% - var(--cw) / 2 - 80px)); }
-.gr-arrow.r { right: max(0px, calc(50% - var(--cw) / 2 - 80px)); }
-.gr-arrow:active { transform: translateY(calc(-50% + 3px)); box-shadow: 0 1px 0 #33210c; }
+/* стрелки: ◀ ▶ и под ними значок [LB] / [RB] (Q / E); пальцем — без значка */
+.gr-arrow { position: absolute; top: 50%; z-index: 4; transform: translateY(-50%); width: 58px; min-height: 72px; padding: 8px 0; box-sizing: border-box;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; cursor: pointer;
+            font-size: 22px; color: var(--pp-ink); background: var(--pp-yellow); border: 3px solid var(--pp-ink); border-radius: 8px; box-shadow: 0 4px 0 var(--pp-ink); }
+.gr-arrow b { font-weight: normal; line-height: 1; }
+.gr-arrow .pp-key { margin: 0; font-size: 10px; }
+.gr-arrow.l { left: max(0px, calc(50% - var(--cw) / 2 - 84px)); }
+.gr-arrow.r { right: max(0px, calc(50% - var(--cw) / 2 - 84px)); }
+.gr-arrow:active { transform: translateY(calc(-50% + 3px)); box-shadow: 0 1px 0 var(--pp-ink); }
 .gr-arrow.off { opacity: .3; pointer-events: none; }
 
 .gr-dots { flex: none; display: flex; justify-content: center; gap: 10px; padding: 12px 0 2px; }
-.gr-dots i { width: 12px; height: 12px; border-radius: 50%; cursor: pointer; background: transparent; border: 2px solid #b9c3e6; box-sizing: border-box; transition: transform .2s; }
-.gr-dots i.own { background: #b9c3e6; }
-.gr-dots i.cur { background: #ffd85e; border-color: #ffd85e; }
-.gr-dots i.on { transform: scale(1.5); border-color: #fff3d6; box-shadow: 0 0 0 2px #33210c; }
+.gr-dots i { width: 12px; height: 12px; border-radius: 50%; cursor: pointer; background: transparent; border: 2px solid #e8cfa6; box-sizing: border-box; transition: transform .2s; }
+.gr-dots i.own { background: #e8cfa6; }
+.gr-dots i.cur { background: var(--pp-yellow); border-color: var(--pp-yellow); }
+.gr-dots i.on { transform: scale(1.5); border-color: var(--pp-paper); box-shadow: 0 0 0 2px var(--pp-ink); }
 
 /* телефон стоймя: карточка почти во всю ширину, стрелки поверх краёв */
 @media (max-width: 560px) {
-  #cr-garage { --cw: calc(100vw - 56px); --step: calc(var(--cw) * .92); }
+  #cr-garage { --cw: calc(100vw - 80px); --step: calc(var(--cw) * .96); }   /* стрелки — по краям, не поверх листа */
+  .gr-card { padding-left: 9px; padding-right: 9px; }
   .gr-top { grid-template-columns: auto 1fr; }
   .gr-t { justify-self: end; }
-  .gr-wallet { grid-column: 1 / -1; justify-self: center; }
-  .gr-arrow { width: 34px; height: 56px; font-size: 14px; }
-  .gr-arrow.l { left: -6px; } .gr-arrow.r { right: -6px; }
-  .gr-st { grid-template-columns: 76px 1fr auto; }
+  .gr-wallet { grid-column: 1 / -1; justify-self: center; text-align: center; }
+  .gr-arrow { width: 34px; min-height: 56px; font-size: 14px; }
+  .gr-arrow.l { left: -10px; } .gr-arrow.r { right: -10px; }
+  /* узко: вместо полосок — строка чека «подпись ····· значение» (полоски выходили по 10 px, значения не влезали) */
+  .gr-stats { column-gap: 6px; }
+  .gr-bar { height: 0; align-self: end; margin-bottom: .45em; background: none; border: 0; border-bottom: 2px dotted var(--pp-brown); border-radius: 0; opacity: .8; }
+  .gr-bar > i { display: none; }
+  .gr-st b { min-width: 0; white-space: normal; }
 }
-/* низкий экран (Steam Deck 1280×800 и ниже) — картинка ниже, чтобы влезли кнопки */
 /* низкий экран (Steam Deck 1280×800 и ниже) — картинка ниже, чтобы влезли кнопки; описание машины — в две строки
    (05.10.2026: на компьютере и Деке его не было видно вовсе) */
-@media (max-height: 820px) { .gr-pic { max-height: 26vh; }
-  .gr-note { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; } }
-@media (max-height: 560px) { .gr-note { display: none; } }
+@media (max-height: 820px) { .gr-pic { max-height: 24vh; }
+  .gr-note { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  /* у своей машины кнопок больше (броня, мотор, покраска, палитра) — места не хватало, и сжималось описание:
+     от него оставалась полоска верхушек букв (QA 09.10). Теперь ужимается картинка, описание — целиком */
+  .gr-note { flex: none; }
+  .gr-pic { flex: 0 1 auto; min-height: 72px; }
+  /* палитра и «точно продать?» — описание прячем: в покраске важнее видеть машину крупнее */
+  .gr-card:has(.gr-paint, .gr-ask) .gr-note { display: none; } }
+@media (max-height: 560px) { .gr-note { display: none; } .gr-pic { max-height: 20vh; }
+  /* телефон боком (390 px): кнопки брони и мотора уходили под нижний край экрана — лист листается внутри себя */
+  .gr-card.on { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--pp-brown) transparent; } }

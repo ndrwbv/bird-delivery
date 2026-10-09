@@ -1,0 +1,322 @@
+/* «депнуть» (dep.js) — три игры, у каждой свой экран и цвет, как в казино:
+   slot — неон (ночной фиолетовый, розовый и голубой свет, сетка пола, автомат с лампочками);
+   roulette — зелёное сукно, деревянный борт, золото, колесо с номерами и шариком, фишки;
+   tennis — грунтовый корт (оранжевый), белые линии, трибуны, табло.
+   Раскладка: слева игра (сцена + итог), справа ставка (кучка, сумма, −/+, ¼ ½ всё, «ДЕП», назад).
+   Влезает без прокрутки в 1280×720 и 1280×800 (Дека); уже 760 px — столбиком (телефон, касанием).
+   Анимации — акцентами: прокрутка, выигрыш (вспышка, печать, монетки), курсор на кнопке дышит. */
+
+#cr-dep { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; box-sizing: border-box;
+          padding: clamp(8px, 2.2vh, 22px) clamp(10px, 2.4vw, 32px); overflow: hidden; isolation: isolate; opacity: 0; transition: opacity .2s;
+          --txt: #fff3d6; --sub: #ffd0e8; --edge: #2a0a18; --acc: #ffd85e; --acc-ink: #33210c; --acc-sh: #33210c;
+          --btn: rgba(255, 255, 255, .1); --side: rgba(20, 8, 30, .78); --glow: rgba(255, 216, 94, .5);
+          --fs-s: clamp(11px, 1.6vh, 13px); --fs-m: clamp(12px, 2vh, 16px); --fs-l: clamp(18px, 3.6vh, 30px);
+          font-size: var(--fs-m); color: var(--txt); }
+#cr-dep[hidden] { display: none; }
+#cr-dep.on { opacity: 1; }
+.dep-bg { position: absolute; inset: 0; z-index: -1; overflow: hidden; }
+.dep-bg::before, .dep-bg::after { content: ''; position: absolute; pointer-events: none; }
+.dep-box { position: relative; width: min(1200px, 100%); height: min(100%, 780px); display: flex; flex-direction: column; gap: clamp(6px, 1.6vh, 16px); }
+
+/* ── шапка: вывеска игры ── */
+.dep-head { text-align: center; flex: none; }
+.dep-t { font-size: clamp(20px, 5vh, 42px); line-height: 1.15; letter-spacing: .06em; text-transform: uppercase; color: var(--acc); text-shadow: 4px 4px 0 var(--edge); }
+.dep-g { display: inline-block; margin-top: .5em; padding: .45em .9em; font-size: var(--fs-s); color: var(--sub); letter-spacing: .08em; background: rgba(0, 0, 0, .45); border-radius: 999px; }
+
+.dep-main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) clamp(300px, 31vw, 390px); gap: clamp(12px, 2.4vw, 32px); }
+.dep-left { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: clamp(6px, 1.2vh, 12px); }
+.dep-stage { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.dep-res { flex: none; min-height: 4.6em; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .35em; text-align: center; line-height: 1.4; }
+.dep-res b { font-weight: normal; font-size: var(--fs-m); }
+.dep-res.win b { color: var(--acc); text-shadow: 2px 2px 0 var(--edge); }
+.dep-res .dep-miss { color: #ffb0b0; font-size: var(--fs-s); }
+.dep-res .dep-hq { font-size: var(--fs-s); color: #a8f0a0; }
+
+/* ── ставка справа ── */
+.dep-side { min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: clamp(8px, 1.7vh, 16px); box-sizing: border-box;
+            padding: clamp(10px, 2vh, 20px) clamp(12px, 1.4vw, 20px); background: var(--side); border: 3px solid var(--edge); border-radius: 18px;
+            box-shadow: 0 8px 0 var(--edge), 0 0 0 2px var(--rim, transparent) inset; }
+.dep-tip { padding: .6em .8em; font-size: var(--fs-s); line-height: 1.5; text-align: center; color: #33210c; background: #ffd85e; border: 3px solid #33210c; border-radius: 8px; rotate: -1.5deg; }
+.dep-tip[hidden] { display: none; }
+.dep-sum { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.dep-sum b { font-weight: normal; font-size: var(--fs-l); color: var(--acc); text-shadow: 3px 3px 0 var(--edge); white-space: nowrap; }
+#cr-dep.lost .dep-sum b { color: #ffb0b0; }
+.dep-sum span { font-size: var(--fs-s); color: var(--sub); text-align: center; line-height: 1.4; }
+.dep-pile { position: relative; width: 100%; height: clamp(40px, 8vh, 72px); }
+.dep-pile i { position: absolute; display: flex; align-items: center; justify-content: center; font-style: normal; box-sizing: border-box;
+              transform: rotate(var(--r)); animation: dep-fall .45s cubic-bezier(.3, 1.5, .6, 1) both; }
+.dep-pile i.gone { animation: dep-out .3s ease-in forwards; }
+#cr-dep.spun .dep-pile i { animation: dep-suck .55s ease-in forwards; }
+@keyframes dep-fall { from { transform: translateY(-220%) rotate(calc(var(--r) * -2)); opacity: 0; } 60% { opacity: 1; } to { transform: rotate(var(--r)); opacity: 1; } }
+@keyframes dep-out { to { transform: translateY(-80%) rotate(var(--r)); opacity: 0; } }
+@keyframes dep-suck { to { transform: translate(-320%, -140%) rotate(90deg) scale(.3); opacity: 0; } }
+
+.dep-btn { font: inherit; font-size: var(--fs-s); padding: .7em .8em; cursor: pointer; color: var(--txt); background: var(--btn); border: 3px solid var(--edge);
+           border-radius: 10px; box-shadow: 0 4px 0 var(--edge); display: inline-flex; align-items: center; justify-content: center; gap: .5em; }
+.dep-btn:disabled { opacity: .45; cursor: default; }
+.dep-btn:not(:disabled):active { translate: 0 3px; box-shadow: 0 1px 0 var(--edge); }
+.dep-btn .pp-key { margin: 0; font-size: 10px; }
+.dep-stake { display: flex; align-items: center; gap: 8px; }
+.dep-stake input { flex: 1; min-width: 0; accent-color: var(--acc); height: 26px; }
+.dep-stake .dep-btn { min-width: 52px; font-size: var(--fs-m); padding: .45em .6em; }
+.dep-quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+
+/* главная кнопка: ярко, крупно, со значком [A]; дышит, когда на ней курсор */
+.dep-go { font: inherit; font-size: clamp(14px, 2.4vh, 20px); white-space: nowrap; line-height: 1.3; padding: clamp(10px, 2vh, 18px) 12px; cursor: pointer; color: var(--acc-ink); background: var(--acc);
+          border: 4px solid var(--edge); border-radius: 14px; box-shadow: 0 6px 0 var(--acc-sh), 0 0 28px var(--glow); display: flex; align-items: center; justify-content: center;
+          text-transform: uppercase; letter-spacing: .04em; transition: translate .15s, box-shadow .15s; }
+.dep-go .pp-key { font-size: var(--fs-s); color: var(--acc); background: var(--acc-ink); border-color: var(--acc-ink); }
+.dep-go:disabled { opacity: .5; cursor: default; }
+.dep-go:not(:disabled):active, .dep-go.pp-down { translate: 0 4px; box-shadow: 0 2px 0 var(--acc-sh), 0 0 18px var(--glow); }
+.dep-go.padsel, .dep-go:focus-visible { animation: dep-pulse 1.1s ease-in-out infinite; }
+@keyframes dep-pulse { 50% { box-shadow: 0 6px 0 var(--acc-sh), 0 0 46px var(--glow); filter: brightness(1.1); } }
+.dep-foot { display: flex; gap: 12px; align-items: center; justify-content: center; }
+.dep-close { padding: .6em 1.2em; }
+/* «крутить ещё» — нарочно неприметная: надпись без рамки (главное — «пора на работу») */
+.dep-again { font: inherit; font-size: var(--fs-s); padding: 6px 4px; cursor: pointer; color: var(--sub); background: none; border: 0; opacity: .7;
+             text-decoration: underline; text-underline-offset: 3px; display: inline-flex; align-items: center; }
+.dep-again[hidden] { display: none; }
+.dep-again:hover, .dep-again.padsel { opacity: 1; }
+.dep-again .pp-key { font-size: 9px; min-width: 1.9em; height: 1.9em; margin-right: .6em; }
+
+/* выбор: цвет или игрок, со значком [X] / [Y] */
+.dep-picks { display: flex; gap: clamp(8px, 1.4vw, 16px); justify-content: center; }
+.dep-pick { position: relative; font: inherit; font-size: var(--fs-m); cursor: pointer; color: #fff3d6; border: 3px solid var(--edge); border-radius: 12px;
+            box-shadow: 0 5px 0 var(--edge); display: flex; align-items: center; justify-content: center; gap: .5em; transition: translate .15s, filter .15s; }
+.dep-pick .pp-key { margin: 0; font-size: 10px; }
+.dep-pick:disabled { cursor: default; }
+.dep-pick.on { outline: 4px solid #ffd85e; outline-offset: 3px; translate: 0 -3px; }
+.dep-pick:not(.on) { filter: saturate(.75) brightness(.85); }
+.dep-pick:disabled .pp-key { visibility: hidden; }
+.dep-chips { position: absolute; right: -10px; top: -14px; display: flex; flex-direction: column-reverse; align-items: center; pointer-events: none; }
+.dep-chips:empty { display: none; }
+.dep-chips i { width: 30px; height: 10px; margin-top: -5px; border-radius: 50%; border: 2px solid #33210c; background: #ffd85e;
+               box-shadow: inset 0 0 0 3px #d9342c; animation: dep-chip .3s cubic-bezier(.3, 1.6, .6, 1) both; }
+.dep-chips i:nth-child(2n) { background: #fff3d6; box-shadow: inset 0 0 0 3px #2b6fd9; }
+@keyframes dep-chip { from { transform: translateY(-14px); opacity: 0; } }
+
+/* ── итог: вспышка и печать ── */
+.dep-flash { position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0; background: radial-gradient(circle at 36% 50%, #fff9d0, rgba(255, 216, 94, .6) 35%, transparent 70%); }
+.dep-flash.go { animation: dep-flash .7s ease-out both; }
+@keyframes dep-flash { 0% { opacity: .95; } 100% { opacity: 0; } }
+.dep-stamp { position: absolute; z-index: 4; left: calc((100% - clamp(300px, 31vw, 390px)) / 2 - 10px); top: 48%; pointer-events: none; white-space: nowrap;
+             padding: .3em .6em .2em; font-size: clamp(24px, 6.5vh, 56px); text-transform: uppercase; letter-spacing: .06em; border: 6px solid; border-radius: 10px;
+             translate: -50% -50%; rotate: -10deg; background: rgba(255, 243, 214, .92); box-shadow: 0 8px 0 rgba(0, 0, 0, .35); }
+.dep-stamp[hidden] { display: none; }
+.dep-stamp.good { color: #1f7a2e; border-color: #1f7a2e; }
+.dep-stamp.bad { color: #d9342c; border-color: #d9342c; font-size: clamp(20px, 5vh, 42px); rotate: 8deg; opacity: .9; }
+.dep-stamp.go { animation: dep-stamp .55s cubic-bezier(.2, 1.6, .45, 1) both; }
+.dep-stamp.good.go { animation: dep-stamp .55s cubic-bezier(.2, 1.6, .45, 1) both, dep-stamp-sit .5s ease-in 2.2s forwards; }
+@keyframes dep-stamp { 0% { opacity: 0; scale: 2.6; } 45% { opacity: 1; scale: .9; } 70% { scale: 1.06; } 100% { opacity: 1; scale: 1; } }
+@keyframes dep-stamp-sit { to { scale: .8; opacity: 0; } }   /* печать хлопнула и тает: итог остаётся строкой и суммой */
+
+/* ═════════ однорукий бандит: неон ═════════ */
+#cr-dep[data-game="slot"] { --sub: #9ff3ff; --edge: #1a0630; --acc: #ff2fb3; --acc-ink: #fff3d6; --acc-sh: #6b0f4c; --glow: rgba(255, 47, 179, .65);
+                            --btn: rgba(95, 232, 255, .12); --side: rgba(22, 6, 44, .82); --rim: rgba(95, 232, 255, .55); }
+#cr-dep[data-game="slot"] .dep-bg { background: radial-gradient(ellipse at 20% 15%, rgba(255, 47, 179, .38), transparent 45%), radial-gradient(ellipse at 85% 25%, rgba(95, 232, 255, .3), transparent 45%), linear-gradient(#0d0221, #1b0640 60%, #2a0750); }
+#cr-dep[data-game="slot"] .dep-bg::after { left: -50%; right: -50%; bottom: -10%; height: 55%; transform-origin: 50% 100%; transform: perspective(320px) rotateX(62deg);
+  background: linear-gradient(rgba(255, 47, 179, .7) 2px, transparent 2px) 0 0 / 70px 70px, linear-gradient(90deg, rgba(255, 47, 179, .7) 2px, transparent 2px) 0 0 / 70px 70px;
+  mask-image: linear-gradient(transparent, #000 40%); -webkit-mask-image: linear-gradient(transparent, #000 40%); }
+#cr-dep[data-game="slot"].spun .dep-bg::after { animation: dep-grid .5s linear infinite; }
+@keyframes dep-grid { to { background-position: 0 70px, 0 0; } }
+#cr-dep[data-game="slot"] .dep-t { color: #fff3f9; text-shadow: 0 0 6px #ff2fb3, 0 0 16px #ff2fb3, 0 0 34px #ff2fb3, 3px 3px 0 #4a0a35; }
+#cr-dep[data-game="slot"].won .dep-t { animation: dep-neon .14s steps(2) 8; }
+@keyframes dep-neon { 50% { color: #5fe8ff; text-shadow: 0 0 6px #5fe8ff, 0 0 20px #5fe8ff, 0 0 40px #5fe8ff; } }
+#cr-dep[data-game="slot"] .dep-side { box-shadow: 0 8px 0 var(--edge), 0 0 26px rgba(95, 232, 255, .35), 0 0 0 2px var(--rim) inset; }
+#cr-dep[data-game="slot"] .dep-pile i { width: 11%; aspect-ratio: 1; font-size: 10px; color: #6b4a00; border-radius: 50%; border: 2px solid #33210c;
+  background: radial-gradient(circle at 35% 35%, #fff6b8, #ffd85e 45%, #d99a1e); }
+
+.dep-machine { --cell: clamp(60px, 15vh, 124px); position: relative; display: flex; flex-direction: column; align-items: center; gap: clamp(6px, 1.2vh, 12px);
+               padding: clamp(8px, 1.6vh, 16px) clamp(12px, 1.6vw, 22px) clamp(10px, 1.8vh, 18px); border: 4px solid #1a0630; border-radius: 26px 26px 16px 16px;
+               background: linear-gradient(100deg, #b3123c, #ff3b6b 30%, #d81b55 55%, #8f0c33); box-shadow: 0 8px 0 #1a0630, 0 0 50px rgba(255, 47, 179, .55), inset 0 5px 0 rgba(255, 255, 255, .35); }
+.dep-marquee { width: 100%; box-sizing: border-box; padding: 6px 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; background: #1a0630; border-radius: 14px; border: 3px solid #ffd85e; }
+.dep-marquee b { font-weight: normal; font-size: clamp(16px, 3.4vh, 28px); letter-spacing: .4em; color: #ffd85e; text-shadow: 0 0 10px #ff8a2b, 2px 2px 0 #6b0f4c; }
+.dep-bulbs { display: flex; justify-content: space-between; width: 100%; }
+.dep-bulbs i { width: 8px; height: 8px; border-radius: 50%; background: #ffd85e; box-shadow: 0 0 6px #ffd85e; }
+.dep-bulbs i:nth-child(2n) { background: #ff7fd0; box-shadow: 0 0 6px #ff7fd0; }
+#cr-dep.spun .dep-bulbs i { animation: dep-bulb .36s steps(2) infinite; animation-delay: calc(var(--i) * -.06s); }
+#cr-dep.won .dep-bulbs i { animation: dep-bulb .12s steps(2) 16; }
+@keyframes dep-bulb { 50% { background: #3a1a4a; box-shadow: none; } }
+.dep-window { position: relative; padding: 8px; background: #1a0630; border-radius: 12px; box-shadow: inset 0 0 0 3px #5fe8ff, 0 0 18px rgba(95, 232, 255, .5); }
+.dep-reels { display: flex; gap: 8px; }
+.dep-reel { width: calc(var(--cell) * 1.1); height: var(--cell); overflow: hidden; background: #fff3d6; border-radius: 8px;
+            box-shadow: inset 0 10px 10px rgba(0, 0, 0, .3), inset 0 -10px 10px rgba(0, 0, 0, .3); }
+.dep-reel.stop { animation: dep-thunk .18s ease-out; }
+@keyframes dep-thunk { 50% { transform: translateY(4px); } }
+.dep-strip { will-change: transform; }
+.dep-strip i, .dep-pay i { display: flex; align-items: center; justify-content: center; font-style: normal; color: var(--c); }
+.dep-strip i { height: var(--cell); font-size: calc(var(--cell) * .52); text-shadow: 3px 3px 0 #33210c; }
+.dep-line { position: absolute; left: 2px; right: 2px; top: 50%; height: 3px; margin-top: -1px; background: rgba(255, 47, 179, .75); box-shadow: 0 0 8px #ff2fb3; pointer-events: none; }
+#cr-dep.won .dep-reel { animation: dep-win .3s steps(2) 6; }
+@keyframes dep-win { 50% { background: #ffd85e; box-shadow: inset 0 0 0 4px #ff2fb3, 0 0 20px #ffd85e; } }
+.dep-pay { display: flex; align-items: center; gap: 2px; padding: 3px 10px; font-size: var(--fs-s); background: rgba(26, 6, 48, .7); border-radius: 8px; }
+.dep-pay i { font-size: var(--fs-m); text-shadow: 1px 1px 0 #33210c; }
+.dep-pay span { margin-left: .6em; color: #ffd85e; }
+.dep-tray { position: relative; width: 62%; height: clamp(16px, 3vh, 26px); background: #1a0630; border-radius: 0 0 14px 14px; box-shadow: inset 0 4px 4px #000; overflow: hidden; }
+.dep-tray i { position: absolute; bottom: 2px; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #33210c; background: radial-gradient(circle at 35% 35%, #fff6b8, #ffd85e 45%, #d99a1e);
+              animation: dep-drop .4s cubic-bezier(.3, 1.4, .6, 1) both; }
+@keyframes dep-drop { from { transform: translateY(-40px); opacity: 0; } }
+.dep-lever { position: absolute; right: -26px; top: 22%; width: 10px; height: 34%; background: linear-gradient(90deg, #8f8fa0, #e6e6f0, #8f8fa0); border: 2px solid #1a0630;
+             border-radius: 5px; transform-origin: 50% 100%; }
+.dep-lever b { position: absolute; left: -10px; top: -22px; width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ff9ac4, #ff2fb3 55%, #a3115f); border: 3px solid #1a0630; }
+#cr-dep.spun .dep-lever { animation: dep-pull .5s ease-in-out; }
+@keyframes dep-pull { 40% { transform: scaleY(-.55); } 100% { transform: none; } }
+
+/* ═════════ красное или чёрное: зелёное сукно ═════════ */
+#cr-dep[data-game="roulette"] { --sub: #cfe9c2; --edge: #2b1405; --acc: #ffd85e; --acc-ink: #33210c; --acc-sh: #6b4a0e; --glow: rgba(255, 216, 94, .45);
+                                --btn: rgba(0, 0, 0, .22); --side: rgba(6, 40, 18, .82); --rim: rgba(230, 195, 106, .7); }
+#cr-dep[data-game="roulette"] .dep-bg { background: radial-gradient(ellipse at 40% 45%, #2fa257, #157038 45%, #0a4320 80%, #062b14);
+  box-shadow: inset 0 0 0 clamp(8px, 1.4vw, 16px) #6b3412, inset 0 0 0 calc(clamp(8px, 1.4vw, 16px) + 3px) #e6c36a, inset 0 0 90px rgba(0, 0, 0, .55); }
+#cr-dep[data-game="roulette"] .dep-bg::after { inset: 0; opacity: .08; background: repeating-linear-gradient(45deg, #fff 0 1px, transparent 1px 7px), repeating-linear-gradient(-45deg, #fff 0 1px, transparent 1px 7px); }
+#cr-dep[data-game="roulette"] .dep-t { color: #ffd85e; text-shadow: 3px 3px 0 #2b1405, 0 0 18px rgba(255, 216, 94, .4); }
+#cr-dep[data-game="roulette"] .dep-pile i { width: 11%; aspect-ratio: 1; font-size: 0; border-radius: 50%; border: 3px dashed #fff3d6; background: #d9342c; box-shadow: 0 0 0 2px #2b1405; }
+#cr-dep[data-game="roulette"] .dep-pile i:nth-child(3n + 1) { background: #1d1a22; }
+#cr-dep[data-game="roulette"] .dep-pile i:nth-child(3n + 2) { background: #2b6fd9; }
+
+.dep-table { display: flex; align-items: center; justify-content: center; gap: clamp(14px, 3vw, 40px); width: 100%; height: 100%; }
+.dep-rl { --d: min(50vh, 30vw, 380px); position: relative; flex: none; width: var(--d); height: var(--d); }
+.dep-rim { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, #3b1d08 62%, #8a4a1c 63%, #6b3412 78%, #e6c36a 79%, #e6c36a 81%, #4a2209 82%);
+           box-shadow: 0 10px 0 #2b1405, 0 18px 40px rgba(0, 0, 0, .5); }
+.dep-wheel { position: absolute; inset: 11%; border-radius: 50%; }
+.dep-sectors { position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 3px #e6c36a; }
+.dep-wheel > span { position: absolute; inset: 0; pointer-events: none; }
+.dep-wheel > span b { position: absolute; left: 50%; top: 3%; translate: -50% 0; font-weight: normal; font-size: calc(var(--d) * .024); color: #fff3d6; }
+.dep-hub { position: absolute; inset: 27%; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #ffe7a0, #c9922e 45%, #6b3412 75%); border: 4px solid #2b1405;
+           box-shadow: inset 0 0 0 calc(var(--d) * .05) #3b1d08, inset 0 0 0 calc(var(--d) * .06) #e6c36a; }
+.dep-hub::before, .dep-hub::after { content: ''; position: absolute; left: 50%; top: 50%; width: 70%; height: 8%; translate: -50% -50%; background: #e6c36a; border-radius: 4px; box-shadow: 0 0 0 2px #2b1405; }
+.dep-hub::after { rotate: 90deg; }
+.dep-track { position: absolute; inset: 7%; border-radius: 50%; pointer-events: none; }
+.dep-rball { position: absolute; left: 50%; top: 0; width: 6%; height: 6%; translate: -50% 0; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff, #d8d8e0 60%, #9a9aa6); box-shadow: 0 2px 3px rgba(0, 0, 0, .6); }
+.dep-track.run .dep-rball { animation: dep-bounce .18s ease-in-out infinite alternate; }
+@keyframes dep-bounce { to { top: 2.5%; } }
+.dep-ptr { position: absolute; left: 50%; top: -3%; z-index: 2; width: 0; height: 0; translate: -50% 0; border: 12px solid transparent; border-top: 20px solid #ffd85e; filter: drop-shadow(0 3px 0 #2b1405); }
+#cr-dep.won .dep-sectors { animation: dep-ring .25s steps(2) 6; }
+@keyframes dep-ring { 50% { box-shadow: 0 0 0 6px #ffd85e, 0 0 34px #ffd85e; } }
+.dep-table .dep-picks { flex-direction: column; }
+.dep-c-red, .dep-c-black { width: clamp(150px, 15vw, 200px); padding: clamp(14px, 3vh, 26px) 12px; text-transform: uppercase; letter-spacing: .06em;
+                           border-color: #e6c36a; box-shadow: 0 5px 0 #2b1405; clip-path: none; }
+.dep-c-red { background: linear-gradient(#e8473e, #b02119); }
+.dep-c-black { background: linear-gradient(#35303d, #141118); }
+
+/* ═════════ теннис: грунтовый корт ═════════ */
+#cr-dep[data-game="tennis"] { --sub: #fff3d6; --edge: #33210c; --acc: #d7ff3a; --acc-ink: #33210c; --acc-sh: #5d7a10; --glow: rgba(215, 255, 58, .5);
+                              --btn: rgba(255, 243, 214, .14); --side: rgba(59, 28, 12, .8); --rim: rgba(255, 243, 214, .5); }
+#cr-dep[data-game="tennis"] .dep-bg { background: linear-gradient(#173d2a 0 22%, #0f2c1e 22% 24%, #c65a2e 24%, #d9703f 70%, #b84f26); }
+#cr-dep[data-game="tennis"] .dep-bg::before { left: 0; right: 0; top: 0; height: 22%; opacity: .75;
+  background: radial-gradient(circle, #ffd85e 2.5px, transparent 3px) 0 0 / 22px 18px, radial-gradient(circle, #ff5fa2 2.5px, transparent 3px) 11px 9px / 22px 18px, radial-gradient(circle, #fff3d6 2px, transparent 2.5px) 5px 4px / 15px 13px; }
+#cr-dep[data-game="tennis"] .dep-bg::after { left: 0; right: 0; top: 24%; bottom: 0; background: repeating-linear-gradient(90deg, rgba(255, 255, 255, .05) 0 40px, transparent 40px 80px); }
+#cr-dep.won[data-game="tennis"] .dep-bg::before { animation: dep-crowd .2s steps(2) 10; }
+@keyframes dep-crowd { 50% { transform: translateY(-4px); } }
+#cr-dep[data-game="tennis"] .dep-t { color: #fff3d6; text-shadow: 3px 3px 0 #33210c, 0 0 0 #000; }
+#cr-dep[data-game="tennis"] .dep-pile i { width: 16%; height: 30%; font-size: 9px; color: #1d4d23; border: 2px solid #1d4d23; border-radius: 3px; background: #9fd88a; }
+
+.dep-arena { --cw: min(100%, 64vh, 620px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(8px, 1.8vh, 18px); width: 100%; height: 100%; }
+.dep-board { display: flex; align-items: center; gap: 14px; padding: 8px 14px; background: #173d2a; border: 3px solid #33210c; border-radius: 10px; box-shadow: 0 5px 0 #33210c; }
+.dep-board span { font-size: var(--fs-s); color: #fff3d6; min-width: 6em; text-align: center; }
+.dep-score { font-weight: normal; font-size: var(--fs-l); color: #ffd85e; letter-spacing: .1em; min-width: 4.4em; text-align: center; }
+.dep-court { position: relative; width: var(--cw); aspect-ratio: 2 / 1; box-sizing: border-box; border-radius: 6px;
+             background: #d9703f; border: 5px solid #fff3d6; box-shadow: 0 0 0 clamp(10px, 2vh, 18px) #b84f26, 0 0 0 calc(clamp(10px, 2vh, 18px) + 3px) #33210c; }
+.dep-lines { position: absolute; left: 0; right: 0; top: 12%; bottom: 12%; border-top: 4px solid #fff3d6; border-bottom: 4px solid #fff3d6; }
+.dep-lines::before, .dep-lines::after { content: ''; position: absolute; top: 0; bottom: 0; width: 26%; border: 4px solid #fff3d6; border-top: 0; border-bottom: 0; }
+.dep-lines::before { left: 24%; border-left: 0; }
+.dep-lines::after { right: 24%; border-right: 0; }
+.dep-lines { background: linear-gradient(#fff3d6, #fff3d6) 50% 50% / 52% 4px no-repeat; }
+.dep-net { position: absolute; left: 50%; top: -6%; bottom: -6%; width: 8px; translate: -50% 0; background: repeating-linear-gradient(#33210c 0 3px, #fff3d6 3px 5px); border: 2px solid #fff3d6; border-radius: 3px; }
+.dep-p { position: absolute; top: 50%; width: 15%; aspect-ratio: 1; translate: -50% -50%; border-radius: 50%; overflow: hidden; background: #2a3766; border: 4px solid #fff3d6; box-shadow: 0 6px 0 rgba(0, 0, 0, .35); }
+.dep-p img { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.dep-pa { left: 10%; }
+.dep-pb { left: 90%; }
+.dep-court.play .dep-pa { animation: dep-run-a .52s ease-in-out infinite alternate; }
+.dep-court.play .dep-pb { animation: dep-run-b .52s ease-in-out infinite alternate; }
+@keyframes dep-run-a { from { top: 36%; } to { top: 64%; } }
+@keyframes dep-run-b { from { top: 62%; } to { top: 38%; } }
+.dep-court.won-a .dep-pa, .dep-court.won-b .dep-pb { animation: dep-champ .5s cubic-bezier(.2, 1.6, .45, 1) both; border-color: #ffd85e; box-shadow: 0 0 0 4px #33210c, 0 0 30px #ffd85e; }
+@keyframes dep-champ { 0% { scale: 1; } 50% { scale: 1.35; } 100% { scale: 1.2; } }
+.dep-ball { position: absolute; left: 18%; top: 50%; width: 3.2%; aspect-ratio: 1; translate: -50% -50%; border-radius: 50%; background: #d7ff3a; border: 2px solid #33210c; opacity: 0; }
+.dep-court.play .dep-ball { opacity: 1; animation: dep-rally .52s ease-in-out infinite alternate, dep-hop .26s ease-in-out infinite alternate; }
+@keyframes dep-rally { from { left: 17%; } to { left: 83%; } }
+@keyframes dep-hop { from { top: 40%; scale: 1.5; } to { top: 60%; scale: 1; } }
+.dep-arena .dep-picks { width: var(--cw, 100%); }
+.dep-pl { flex: 1; min-width: 0; max-width: 46%; padding: clamp(6px, 1.2vh, 10px) 12px; background: #3b1c0c; }
+.dep-pl img, .dep-pl > i { width: clamp(30px, 6vh, 48px); height: clamp(30px, 6vh, 48px); image-rendering: pixelated; border-radius: 50%; background: #2a3766; display: block; border: 2px solid #fff3d6; }
+.dep-pl.champ { background: #ffd85e; color: #33210c; filter: none; animation: dep-card .5s cubic-bezier(.2, 1.6, .45, 1) both; }
+@keyframes dep-card { 0% { scale: 1; } 50% { scale: 1.12; } 100% { scale: 1.04; } }
+.dep-pl.champ::after { content: '★'; position: absolute; left: -10px; top: -14px; font-size: 22px; color: #ffd85e; text-shadow: 2px 2px 0 #33210c; }
+.dep-pl.out { filter: grayscale(.8) brightness(.7); }
+
+/* ── меньше движения: без вспышки, тряски и мигания ── */
+@media (prefers-reduced-motion: reduce) {
+  #cr-dep *, #cr-dep .dep-bg::after { animation-duration: .01s !important; animation-iteration-count: 1 !important; }
+  .dep-flash { display: none; }
+}
+body.calm-fx .dep-flash { display: none; }
+body.calm-fx #cr-dep .dep-box.pp-shake { animation: none; }
+
+/* ── узко (телефон): столбиком, касанием; прокрутка — если не влезло ── */
+@media (max-width: 760px) {
+  #cr-dep { overflow-y: auto; align-items: flex-start; --fs-l: clamp(18px, 6vw, 26px); }
+  .dep-box { height: auto; }
+  .dep-main { grid-template-columns: minmax(0, 1fr); }   /* 1fr тянулся по самому широкому ряду и вылезал за телефон на 6 px */
+  .dep-stage { flex: none; }
+  .dep-res { min-height: 3.2em; }
+  .dep-stamp, .dep-stamp.bad { left: 50%; top: 30%; font-size: clamp(18px, 7.5vw, 32px); border-width: 4px; }   /* телефон: 6,5vh — во всю ширину, печать обрезалась */
+  .dep-rl { --d: min(56vw, 30vh, 300px); }
+  .dep-table { gap: 14px; }
+  .dep-c-red, .dep-c-black { width: 120px; padding: 14px 8px; }
+  .dep-arena { --cw: min(100%, 520px); }
+  .dep-machine { --cell: clamp(54px, 9vh, 80px); }
+  .dep-lever { display: none; }
+  .dep-pile { display: none; }
+  .dep-t { font-size: clamp(15px, 5vw, 22px); }
+  .dep-box { gap: 8px; }
+  .dep-main { gap: 10px; }
+  .dep-arena { --cw: min(100%, 330px); gap: 8px; }
+  .dep-board { padding: 5px 10px; }
+  .dep-res { min-height: 0; }
+  .dep-side { gap: 8px; padding: 10px 12px; }
+  .dep-go { padding: 12px 10px; }
+}
+/* телефон боком (844×390): «[B] назад» уходил под нижний край на 8 px — правая колонка плотнее, ставка без ползунка-зазоров */
+@media (max-height: 460px) and (min-width: 761px) {
+  .dep-side { gap: 5px; padding-block: 8px; }
+  .dep-tip { padding: .3em .6em; }
+  .dep-sum { gap: 2px; }
+  .dep-quick .dep-btn, .dep-stake .dep-btn { padding-block: .3em; }
+}
+@media (max-width: 760px) and (orientation: portrait) {
+  .dep-table { flex-direction: column; }
+  .dep-table .dep-picks { flex-direction: row; }
+}
+
+/* ═════════ плитка «депнуть» в «гараже и тратах» (career.js buildEnd): яркая, манит ═════════
+   Вокруг — бумага; эта плитка — казино: ночной фиолетовый с неоновой рамкой, золотая надпись, пачки купюр и
+   монеты справа, по плитке раз в несколько секунд пробегает блик. Нечего ставить (< 50 ₽) — серая, как была. */
+#cr-spend .cr-tab.cr-t-dep { overflow: hidden; color: #fff3d6; border-color: #1a0630; border-top-color: #ff2fb3;
+  background: radial-gradient(ellipse at 85% 70%, rgba(255, 216, 94, .35), transparent 55%), radial-gradient(ellipse at 10% 0%, rgba(255, 47, 179, .45), transparent 60%), linear-gradient(135deg, #2a0750, #12031f);
+  box-shadow: 0 4px 0 #1a0630, 0 0 0 2px #ffd85e inset, 0 0 18px rgba(255, 47, 179, .45); padding-right: 42%; }
+#cr-spend .cr-t-dep b { color: #ffd85e; text-shadow: 2px 2px 0 #6b0f4c, 0 0 10px rgba(255, 216, 94, .6); }
+#cr-spend .cr-t-dep .cr-sub { color: #9ff3ff; }
+#cr-spend .cr-tab.cr-t-dep.cur { background: linear-gradient(135deg, #3a0a66, #1a0630); }
+#cr-spend .cr-t-dep::after { content: ''; position: absolute; inset: -20% auto -20% -40%; width: 30%; pointer-events: none; rotate: 18deg;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .5), transparent); animation: dep-sheen 4.5s ease-in-out 1s infinite; }
+@keyframes dep-sheen { 0%, 78% { left: -40%; } 100% { left: 130%; } }
+#cr-spend .cr-t-dep.padsel, #cr-spend .cr-t-dep:hover { box-shadow: 0 4px 0 #1a0630, 0 0 0 2px #ffd85e inset, 0 0 30px rgba(255, 216, 94, .7); }
+.dep-loot { position: absolute; right: 4%; bottom: 10%; width: 36%; height: 72%; pointer-events: none; }
+.dep-stack { position: absolute; bottom: 0; width: 46%; height: 22%; border: 2px solid #1d4d23; border-radius: 3px; background: #9fd88a;
+  box-shadow: 0 -5px 0 -2px #7fc06a, 0 -5px 0 0 #1d4d23, 0 -10px 0 -2px #9fd88a, 0 -10px 0 0 #1d4d23, 0 -15px 0 -2px #7fc06a, 0 -15px 0 0 #1d4d23; }
+.dep-stack::after { content: ''; position: absolute; left: 38%; top: 0; bottom: 0; width: 22%; background: #ffd85e; border-left: 2px solid #1d4d23; border-right: 2px solid #1d4d23; }   /* банковская лента */
+.dep-stack.s1 { left: 0; rotate: -6deg; }
+.dep-stack.s2 { left: 30%; bottom: 26%; rotate: 4deg; }
+.dep-stack.s3 { left: 52%; rotate: -2deg; }
+.dep-coin { position: absolute; width: 22%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 9px; color: #6b4a00;
+  border: 2px solid #33210c; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff6b8, #ffd85e 45%, #d99a1e); }
+.dep-coin.c1 { left: 6%; top: 4%; }
+.dep-coin.c2 { left: 70%; top: 0; }
+.dep-coin.c3 { left: 40%; top: 20%; width: 18%; }
+.dep-coin.c4 { left: 84%; bottom: 0; width: 18%; }
+.dep-coin.c1, .dep-coin.c2 { animation: dep-twinkle 4.5s ease-in-out 1.6s infinite; }
+@keyframes dep-twinkle { 0%, 80%, 100% { filter: none; } 88% { filter: brightness(1.5) drop-shadow(0 0 6px #fff6b8); } }
+#cr-spend .cr-tab.cr-t-dep:disabled { filter: grayscale(.85); opacity: .6; }
+#cr-spend .cr-tab.cr-t-dep:disabled::after, #cr-spend .cr-tab.cr-t-dep:disabled .dep-coin { animation: none; }
+@media (prefers-reduced-motion: reduce) { #cr-spend .cr-t-dep::after, .dep-coin { animation: none !important; } }
+body.calm-fx #cr-spend .cr-t-dep::after, body.calm-fx .dep-coin { animation: none; }

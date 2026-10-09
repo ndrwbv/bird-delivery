@@ -17,12 +17,15 @@
    build(api) — game.js, в сборке дворов (после коробок, до склейки): { THREE, PITCHES, LIT, box, obb,
      groundH, inHouse, nearestRoad, solidAt, BENCHES, onPave }
    init(api)  — game.js, после сборки: { scene, V, S, ENV, makeHuman, dropMesh, sayBubble, toast, heal,
-     shiftN, cutOn, courier, Snd }
+     shiftN, cutOn, courier, Snd, CAR_L, CAR_W, gibHuman, runOver }
+   Наезд — как на прохожего (hits.js): медленнее HITS.TIER.FALL — падает и встаёт обратно на снаряд,
+   быстрее — сбит (до 09.10.2026 машина проходила сквозь качающихся).
    step(dt)   — каждый кадр
    отладка: __dlv.WORK
    ────────────────────────────────────────────────────────────────────────── */
 import { t } from '../i18n/index.js';
 import { makePerson } from './people.js';
+import * as HITS from './hits.js';
 
 export const WO = {
   SHARE: 0.55,             // у какой доли коробок есть качалка
@@ -34,7 +37,7 @@ export const WO = {
 
 let B = null, A = null;
 const SITES = [];
-const ST = { sites: 0, tried: 0, active: 0, people: 0, me: 0, heal: 0 };
+const ST = { sites: 0, tried: 0, active: 0, people: 0, me: 0, heal: 0, falls: 0, hit: 0 };
 const rand = (a, b) => a + Math.random() * (b - a);
 const hsh = (x, z) => { let h = Math.imul(Math.round(x) ^ 0x51ed27, 0x9E3779B1) ^ Math.imul(Math.round(z) + 0x2545f491, 0x85ebca6b); h ^= h >>> 15; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 13; return (h >>> 0) / 4294967296; };
 
@@ -68,7 +71,7 @@ function iron (s) {
   const ry = Math.atan2(-uz, ux), nx = -uz, nz = ux;
   const P = (a, b) => [x + ux * a + nx * b, z + uz * a + nz * b];
   const gy = B.groundH(x, z);
-  box(LIT, 4.6, 0.05, 2.4, '#cdb98f', x, gy + 0.025, z, ry);          // песок
+  box(LIT, 4.6, 0.05, 2.4, '#dcb174', x, gy + 0.025, z, ry);          // песок (рыжий, 09.10.2026; был #cdb98f)
   const STEEL = '#4f5a66', PAINT = s.paint;
   s.posts = [];
   const post = (a, b, h, hex) => { const [px, pz] = P(a, b); s.posts.push([px, pz]); box(LIT, 0.09, h, 0.09, hex, px, B.groundH(px, pz) + h / 2, pz, ry); obb(px, pz, 0.12, 0.12, ry); };
@@ -141,7 +144,7 @@ function athlete (s, kind, person) {
   const grp = A.makeHuman(person || makePerson({ seed: (Math.random() * 1e9) | 0, fem: Math.random() < 0.15 }), {});
   A.scene.add(grp);
   const at = kind === 'bar' ? s.bar : s.dip, h = kind === 'bar' ? s.h : s.hd;
-  const p = { grp, kind, x: at.x, y: at.y, z: at.z, h, fx: Math.sin(h), fz: Math.cos(h),
+  const p = { grp, kind, x: at.x, y: at.y, z: at.z, ax: at.x, az: at.z, h, fx: Math.sin(h), fz: Math.cos(h),
     t: rand(0, 3), rep: 0, reps: 5 + ((Math.random() * 8) | 0), per: rand(1.4, 1.9), rest: rand(3, 6) };
   pose(p, 0);
   ST.people++;
@@ -165,7 +168,7 @@ function meStart (s) {
   if (busy) { A.dropMesh(busy.grp); s.people.splice(s.people.indexOf(busy), 1); ST.people--; }   // уступил турник
   const p = athlete(s, 'bar', A.courier ? A.courier() : null);
   p.t = 0; p.rep = 0; p.reps = 5 + ((Math.random() * 8) | 0); p.per = 1.5; p.rest = 1.2;
-  p.onRep = n => { bubble(p, String(n)); if (A.Snd && A.Snd.blip) A.Snd.blip(520 + n * 30, 0.06, 'triangle', 0.05); };
+  p.onRep = n => { bubble(p, String(n)); if (A.Snd && A.Snd.fx) A.Snd.fx('rep', s => s.blip(520 + n * 30, 0.06, 'triangle', 0.05), { x: p.x, z: p.z, far: 40 }); };
   p.onSet = () => { meDone(true); return true; };
   ME.site = s; ME.p = p; ST.me++;
 }
@@ -210,9 +213,32 @@ export function step (dt) {
       if (near.length && ST.active < WO.ACTIVE) start(near[0]);
     }
   }
-  for (const s of SITES) if (s.people) for (const p of s.people) pose(p, dt);
+  // наезд — как на любого прохожего (game.js underCar, hits.js): медленно — упал и встал, быстрее — сбит
+  const sp = Math.hypot(V.vx, V.vz), S = A.S, kmh = sp * 3.6, fx = Math.sin(V.h), fz = Math.cos(V.h);
+  for (const s of SITES) {
+    if (!s.people) continue;
+    for (let i = s.people.length - 1; i >= 0; i--) {
+      const p = s.people[i];
+      if (p.fall) {
+        if (HITS.fallStep(p, dt)) continue;
+        p.x = p.ax; p.z = p.az;                       // встал — обратно на снаряд
+      }
+      // человек внутри снаряда: стойки (твёрдые) не дают машине подойти вплотную — ловим чуть дальше кузова
+      if (sp > 3 && A.CAR_L) {
+        const dx = p.x - V.x, dz = p.z - V.z;
+        if (Math.abs(dx * fx + dz * fz) < A.CAR_L + 0.9 && Math.abs(dx * fz - dz * fx) < A.CAR_W + 0.35) {
+          if (HITS.isFall(kmh)) { HITS.fall(p, V.vx, V.vz); ST.falls++; continue; }
+          s.people.splice(i, 1); ST.people--; ST.hit++;
+          A.dropMesh(p.grp);
+          A.gibHuman(p, V.vx, V.vz, kmh);
+          if (A.runOver) A.runOver();
+          continue;
+        }
+      }
+      pose(p, dt);
+    }
+  }
   // сам: стоишь у площадки — курьер подтягивается
-  const sp = Math.hypot(V.vx, V.vz), S = A.S;
   const free = !(A.cutOn && A.cutOn()) && ['drive', 'back'].includes(S.state);
   if (ME.p) {
     pose(ME.p, dt);

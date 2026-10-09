@@ -138,7 +138,7 @@ export function stopHit (s, rel, dx, dz, speed) {
   stopBreak(st, dx, dz, speed, false);
   const V = A.V;
   V.vx *= 1 - STOP.SLOW; V.vz *= 1 - STOP.SLOW;
-  A.hurt(Math.max(STOP.DMG_MIN, (rel - 13) * 0.16 * STOP.DMG_K), rel, st.x, st.z);
+  A.hurt(Math.max(STOP.DMG_MIN, (rel - 13) * 0.16 * STOP.DMG_K), rel, st.x, st.z, 'fence');
   A.S.stops = (A.S.stops || 0) + 1;
   return true;
 }
@@ -196,9 +196,11 @@ function stopBreak (st, dx, dz, speed, quiet) {
   piece('bench', [0.18, 1.5], [-Math.PI / 2 * (Math.random() < 0.5 ? 1 : -1), ry + rand(-0.4, 0.4), 0], 0.3, 2);   // опрокинулась
   if (!quiet) A.S.shake = Math.max(A.S.shake, 0.45);
   A.sparks(x, 1.2, z, 10, dx, dz);
-  A.Snd.noise(0.4, 0.42);
-  for (let i = 0; i < 6; i++) setTimeout(() => A.Snd.blip(rand(1800, 3400), 0.05, 'triangle', 0.06), i * 55);
-  A.Snd.blip(110, 0.25, 'sawtooth', 0.14);
+  A.Snd.fx('glass', s => {
+    s.noise(0.4, 0.42);
+    for (let i = 0; i < 6; i++) setTimeout(() => s.blip(rand(1800, 3400), 0.05, 'triangle', 0.06), i * 55);
+    s.blip(110, 0.25, 'sawtooth', 0.14);
+  }, { x, z });
 }
 
 function stepStops (dt) {
@@ -260,7 +262,7 @@ function litterHit (it, nx, nz, force) {
     A.GORE.push({ m, vx: nx * rand(2, 6) * f + rand(-2, 2), vy: rand(2, 5) * f, vz: nz * rand(2, 6) * f + rand(-2, 2),
       spin: rand(-10, 10), life: rand(10, 16), bleed: 1e9, rest: 0 });
   }
-  A.Snd.noise(0.12, 0.12);
+  A.Snd.fx('smash', s => s.noise(0.12, 0.12), { x: it.x, z: it.z }, 0.6);
 }
 function litterAt (x, z, seed) {
   if (!A.inBounds(x, z, -30) || A.groundH(x, z) < 0.3 || A.inHouse(x, z, 0.7)) return false;
@@ -360,8 +362,7 @@ function spill (o, nx, nz, rel) {
     A.GORE.push({ m, vx: nx * rand(2, 5) * (0.5 + rel / 25) + rand(-2, 2), vy: rand(2, 4.5), vz: nz * rand(2, 5) * (0.5 + rel / 25) + rand(-2, 2),
       spin: rand(-8, 8), life: rand(40, 60), bleed: 1e9, rest: 0 });
   }
-  A.Snd.noise(0.3, 0.32);
-  A.Snd.blip(80, 0.3, 'square', 0.12);                    // гулкий железный бах
+  A.Snd.fx('dumpster', s => { s.noise(0.3, 0.32); s.blip(80, 0.3, 'square', 0.12); }, { x: o.x, z: o.z });   // гулкий железный бах
 }
 
 /* удар машины: нос и корма — два круга радиуса rc. Возвращает, было ли касание */
@@ -393,10 +394,11 @@ export function car (noseX, noseZ, tailX, tailZ, rc) {
       push(o, -dx * j / CANS.MASS, -dz * j / CANS.MASS, rel);
       if (rel > 3) {
         A.sparks(o.x, 0.8, o.z, rel > 8 ? 6 : 3, -dx, -dz);
-        A.Snd.noise(0.15, Math.min(0.3, rel * 0.03));
+        if (A.Snd.impact) A.Snd.impact(rel, 'bin', { x: o.x, z: o.z });   // удар слоями: гулкий бак (impact.js; нет файла hit-bin-* — clank)
+        else A.Snd.fx('clank', s => s.noise(0.15, Math.min(0.3, rel * 0.03)), { x: o.x, z: o.z }, Math.min(1, rel * 0.1));
         A.S.shake = Math.max(A.S.shake, Math.min(0.35, rel * 0.03));
       }
-      if (rel >= CANS.HURT) A.hurt(0.5, rel, o.x, o.z);   // полсердца
+      if (rel >= CANS.HURT) A.hurt(0.5, rel, o.x, o.z, 'bin');   // полсердца
     }
   }
 }
@@ -415,7 +417,7 @@ function stepCans (dt) {
     if (o.fell && o.tip < Math.PI / 2) {
       o.tip = Math.min(Math.PI / 2, o.tip + o.tipV * dt);
       o.tipV += 9 * dt;
-      if (o.tip >= Math.PI / 2) { A.Snd.noise(0.2, 0.25); A.puff && A.puff(o.x, 0.3, o.z, false, 0.7); }
+      if (o.tip >= Math.PI / 2) { A.Snd.fx('clank', s => s.noise(0.2, 0.25), { x: o.x, z: o.z }); A.puff && A.puff(o.x, 0.3, o.z, false, 0.7); }
     }
     if (o.hop > 0) { o.hop += o.hopV * dt; o.hopV -= 19 * dt; if (o.hop <= 0) o.hop = 0; }
     pose(o);

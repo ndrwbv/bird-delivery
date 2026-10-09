@@ -74,12 +74,13 @@ export function play ({ host, tap = null, head = '', no = 0, why = '', rows = []
   let finished = false, ended = false;
   const timers = [];
   const later = (ms, f) => { timers.push(setTimeout(f, ms)); };
-  const blip = (f, d, ty, v) => { if (Snd && Snd.blip) try { Snd.blip(f, d, ty, v); } catch (e) { /* — */ } };
+  // name — звук из файла автора (Snd.fx, docs/SOUNDS.md), нет файла — этот тон. sfx-names: seal, stamp, receipt
+  const blip = (f, d, ty, v, name) => { if (Snd && Snd.fx) try { Snd.fx(name || 'ui-click', s => s.blip(f, d, ty, v)); } catch (e) { /* — */ } };
   const coin = () => { if (Snd && Snd.coin) try { Snd.coin(); } catch (e) { /* — */ } };
 
   const pop = () => {                    // печать хлопнула, из итога — монетки / конфетти
     if (sealEl) { sealEl.style.visibility = ''; PFX.replay(sealEl, 'pp-seal'); }
-    blip(150, 0.12, 'square', 0.12);
+    blip(150, 0.12, 'square', 0.12, 'seal');
     const from = sumEl && sumEl.isConnected ? sumEl : rc;
     if (party === 'coins' || party === 'both') { PFX.burst(from, { kind: 'coins' }); [0, 1, 2].forEach(i => later(i * 140, coin)); }
     if (party === 'confetti' || party === 'both') later(party === 'both' ? 120 : 0, () => PFX.burst(from, { kind: 'confetti' }));
@@ -98,7 +99,7 @@ export function play ({ host, tap = null, head = '', no = 0, why = '', rows = []
     }
     host.classList.add('done');
     try { done(!!quick); } catch (e) { console.warn('[shiftend]', e); }
-    if (!quick && stamp) { PFX.slam(stamp); blip(90, 0.09, 'square', 0.1); }
+    if (!quick && stamp) { PFX.slam(stamp); blip(90, 0.09, 'square', 0.1, 'stamp'); }
     setTimeout(stop, quick ? GUARD : 0);
   };
   const stop = () => {
@@ -120,7 +121,7 @@ export function play ({ host, tap = null, head = '', no = 0, why = '', rows = []
   if (sealEl) sealEl.style.visibility = 'hidden';
   if (sumEl && total) sumEl.textContent = fmt(0);   // итог щёлкнет вверх от нуля, когда строки допечатаются
   PFX.stagger(lines, T.ROW / 1000, T.ROWS0 / 1000);
-  lines.forEach((_, i) => later(T.ROWS0 + i * T.ROW, () => blip(620 + i * 60, 0.03, 'square', 0.035)));
+  lines.forEach((_, i) => later(T.ROWS0 + i * T.ROW, () => blip(620 + i * 60, 0.03, 'square', 0.035, 'receipt')));
   const tCount = T.ROWS0 + Math.max(0, lines.length - 1) * T.ROW + 200;
   later(tCount, () => {
     if (!total || !sumEl) { later(T.SEAL, () => { pop(); later(T.SLAM, () => finish(false)); }); return; }

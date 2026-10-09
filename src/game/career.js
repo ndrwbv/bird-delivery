@@ -21,6 +21,7 @@ import './career.css';
 import * as ECON from './econ.js';
 import * as GARAGE from './garage.js';
 import * as MENU from './menu.js';
+import * as HONOR from './honor.js';            // доска почёта (honor.js): геймпад и «доставлено всего» профиля
 import * as DLG from './dialog.js';
 import * as DIST from './districts.js';
 import * as CITY from './cityopen.js';
@@ -29,8 +30,7 @@ import * as GROW from './growth.js';             // пиццерия растё�
 import { farEarned } from './orders.js';
 import * as END from './shiftend.js';
 import * as CHAT from './chat.js';
-import * as ACH from './achievements.js';          // достижения: «Всё на красное» в «депнуть» (achievements.js)
-import * as HEROES from './heroes.js';           // теннисисты в «депнуть» — герои города: те же лица
+import * as DEP from './dep.js';                // «депнуть»: однорукий бандит, рулетка, теннис — свои экраны (dep.js)
 import * as HQ from './heroquests.js';           // герои, этап 2: совет Лёхи на ставке, «наоборот» Игорька, Жека про машину
 import * as RAID from './raid.js';               // «потратить» → ёлка-турель у точки (raid.js)
 import * as QR from './quickrun.js';             // быстрый заезд: своя длина смены, с 9:00, свои итоги (quickrun.js)
@@ -52,7 +52,7 @@ const FAST = Q.has('fastshift') ? Math.max(1, +Q.get('fastshift') || 8) : 1;
 let A = null;
 const SH = {
   on: false, phase: '',          // '' | 'late' (после полуночи, развоз смены) | 'done'
-  lunch: false, hits: 0, lastHurt: 0, fine: 0, stars: 0, t0h: 9, endH: 9,
+  lunch: false, hits: 0, lastHurt: 0, fine: 0, back: 0, stars: 0, t0h: 9, endH: 9,
   slot: false, n: 0,
 };
 const startCbs = [], endCbs = [];
@@ -113,7 +113,8 @@ export function init (api) {
   api.crew = crewBoard; api.garage = openGarage;       // getter-ы api (DAY_LEN) не трогаем: они живые
   api.kbClear = () => KB.clear();                  // меню-карусель: после листания подсветка — на карточку в центре
   MENU.init(api);
-  HQ.init({ A, cars: carsApi, depGame, shiftN: () => SH.n, shiftOn: () => SH.on });
+  DEP.init({ A, SH, kbClear: () => KB.clear(), refreshWallet, refreshTabs, refreshEnd, closeSpend });
+  HQ.init({ A, cars: carsApi, depGame: DEP.game, shiftN: () => SH.n, shiftOn: () => SH.on });
   addEventListener('keydown', onKey, true);
   addEventListener('keyup', onKeyUp, true);
   addEventListener('pointerdown', () => KB.clear(), true);        // мышью — клавиатурная подсветка уходит
@@ -134,8 +135,8 @@ export function startShift () {
   A.env().t = ECON.tOfHour(h0 < ECON.SHIFT.KEYS[0][1] ? h0 + 24 : h0);
   SH.tStart = A.env().t; SH.allDay = day;
   S.lunch = null;
-  SH.on = true; SH.phase = ''; SH.lunch = false; SH.hits = 0; SH.lastHurt = S.hurt || 0; SH.fine = 0; SH.stars = 0;
-  SH.slot = false; SH.forceMood = ''; STAKE = 0; SH.lost = 0; SH.m = S.money || 0; S.tips = 0; SH.t0h = ECON.hourOf(A.env().t); SH.endH = SH.t0h; SH.n = +A.Store.get('dlv-shifts', 0) || 0;
+  SH.on = true; SH.phase = ''; SH.lunch = false; SH.hits = 0; SH.lastHurt = S.hurt || 0; SH.fine = 0; SH.back = 0; SH.stars = 0;
+  SH.slot = false; SH.forceMood = ''; SH.lost = 0; SH.m = S.money || 0; S.tips = 0; SH.t0h = ECON.hourOf(A.env().t); SH.endH = SH.t0h; SH.n = +A.Store.get('dlv-shifts', 0) || 0;
   SH.len = QR.on() ? QR.len() : ECON.shiftLen(SH.n);   // быстрый заезд — длина, что выбрал игрок
   // волна щедрости: 1-я смена сессии — щедрая (econ.js PACE); быстрый заезд — обычная и волну не двигает
   SH.pace = QR.on() ? (DIST.setPace('normal'), 'normal') : DIST.beginShift();
@@ -321,6 +322,10 @@ export function clientKilled (victim, fee = 0) {
   A.dropOrder();
 }
 
+/* ── опоздал обратно в пиццерию (game.js backLate, econ.js BACK_FINE): сколько вычли — для строки
+   «опоздал обратно» в чеке смены (сами деньги game.js уже снял) ── */
+export function backLate (loss) { if (loss > 0) SH.back += Math.round(loss); }
+
 /* ── экран итогов ── */
 const TITLE = {
   'смена окончена': () => t('снялся со смены'),
@@ -390,6 +395,7 @@ export function showEnd (why, whyText, held) {
     if (SH.bonus) A.addWallet(SH.bonus);
     // сбито прохожих за всю карьеру — Толик шутит про них при переводе в новый район
     A.Store.set(KNOCKED, knocked() + (S.people || 0));
+    HONOR.shiftEnd(A.Store, S.delivered || 0);      // доставлено за всю карьеру профиля — рекорд на доске почёта
     SH.mood = moodOf(why, full);
     if (full && SH.hits === 0 && (S.delivered || 0) > 0) addStars(ECON.STARS.CLEAN_SHIFT, t('смена без единого удара'));
     placeWas = crewPlace();
@@ -407,7 +413,7 @@ export function showEnd (why, whyText, held) {
   $('ov-stats').replaceChildren();
   $('ov-best').textContent = '';
   buildEnd();
-  closeSpend(); closeDep();
+  closeSpend(); DEP.close();
   const again = $('ov-again');
   again.innerHTML = keyHTML('ok') + esc(t('на новую смену'));
   again.className = 'pp-stamp';
@@ -445,16 +451,18 @@ export function showEnd (why, whyText, held) {
 
 /* строки чека: [подпись, значение, класс]. Сходится: доставлено + чаевые − штрафы + бонус = итог «за смену».
    «доставлено» — всё, что пришло за смену, кроме чаевых (заказы, премия за развоз, поручения); штрафы —
-   все вычеты за смену (career.js watchMoney): за клиента — своей строкой, остальное — «опоздания и штрафы» */
+   все вычеты за смену (career.js watchMoney): за клиента и «опоздал обратно» — своими строками, остальное — «опоздания и штрафы» */
 function endRows (full) {
   const S = A.S, m = A.money, d = S.delivered || 0;
   const tips = Math.max(0, Math.round(S.tips || 0)), lost = Math.max(0, Math.round(SH.lost || 0));
-  const fine = Math.min(lost, Math.max(0, Math.round(SH.fine || 0))), other = lost - fine;
+  const fine = Math.min(lost, Math.max(0, Math.round(SH.fine || 0)));
+  const back = Math.min(lost - fine, Math.max(0, Math.round(SH.back || 0))), other = lost - fine - back;
   const got = Math.max(0, (S.money || 0) - tips + lost);
   const rows = [[d ? tn(d, '{n} заказ доставлен|{n} заказа доставлено|{n} заказов доставлено') : t('заказов не доставлено'), (got ? '+' : '') + m(got), got ? 'pp-plus' : '']];
   if (tips) rows.push([t('чаевые и за скорость'), '+' + m(tips), 'pp-plus']);
   rows.push([t('удары'), String(SH.hits || 0), SH.hits ? '' : 'pp-plus']);
   if (fine) rows.push([t('штраф за клиента'), '−' + m(fine), 'pp-minus']);
+  if (back) rows.push([t('опоздал обратно'), '−' + m(back), 'pp-minus']);
   if (other) rows.push([t('опоздания и штрафы'), '−' + m(other), 'pp-minus']);
   if (S.people) rows.push([t('прохожих сбито'), String(S.people), '']);
   rows.push(full ? [t('бонус за смену'), '+' + m(SH.bonus || 0), 'pp-plus'] : [t('бонус за смену'), t('только до конца'), 'cr-rc-no']);
@@ -515,7 +523,7 @@ function quickEnd (why, whyText) {
     kind: why === 'время' ? 'time' : why === 'смена окончена' ? 'quit' : why === 'сбил клиента' ? 'pulled' : 'dead',
     why: why === 'время' ? t('полночь — пиццерия закрылась') : why === 'смена окончена' ? '' : whyText || '',
     money: S.money || 0, delivered: S.delivered || 0, tips: typeof S.tips === 'number' ? S.tips : 0,
-    hits: SH.hits, fine: SH.fine, people: S.people || 0, t0h: SH.t0h, endH: SH.endH,
+    hits: SH.hits, fine: SH.fine, back: SH.back, people: S.people || 0, t0h: SH.t0h, endH: SH.endH,
   });
 }
 
@@ -541,7 +549,11 @@ function fitEnd () {
 function fitBox (box) {
   if (!box) return;
   box.style.zoom = '';
-  const k = box.clientHeight / Math.max(1, box.scrollHeight);
+  // высота по раскладке, а не scrollHeight: пока лист влетает снизу (pp-in, transform), scrollHeight раздут
+  const cs = getComputedStyle(box), kids = [...box.children].filter(k => k.offsetParent);
+  const need = kids.reduce((h, k) => h + k.offsetHeight, 0) + (parseFloat(cs.rowGap) || 0) * Math.max(0, kids.length - 1) +
+    (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0) + 10;   // + тень листа
+  const k = box.clientHeight / Math.max(1, need);
   if (k < 1) box.style.zoom = Math.max(0.6, Math.floor(k * 100) / 100);
 }
 addEventListener('resize', () => {
@@ -570,7 +582,12 @@ export function districtNext (delivered) {
 /* кошелёк и звёзды — строкой под заработком */
 function refreshWallet () {
   const w = $('cr-wallet');
-  if (w) w.innerHTML = '<span>' + esc(t('в копилке')) + '</span> <b>' + esc(A.money(A.wallet())) + '</b> <em>★ ' + stars() + '</em>';
+  if (!w) return;
+  // строка чека «в копилке ··· 227 600 ₽», звёзды — в шапке справа, что это — мелко под строкой
+  w.innerHTML = '<p class="pp-row pp-total"><span>' + esc(t('в копилке')) + '</span><i></i><b class="pp-plus">' + esc(A.money(A.wallet())) + '</b></p>' +
+    '<p class="pp-hint">' + esc(t('звёзды — за хорошие смены, открывают крутые машины')) + '</p>';
+  const st = $('cr-spend') && $('cr-spend').querySelector('.cr-sp-stars');
+  if (st) st.textContent = '★ ' + tn(stars(), '{n} звезда|{n} звезды|{n} звёзд');
 }
 
 /* «потратить деньги» — с экрана конца смены, на весь экран поверх него: кошелёк и звёзды, донаты городу
@@ -582,8 +599,11 @@ function spendBox () {
   md = document.createElement('div');
   md.id = 'cr-spend';
   md.hidden = true;
-  md.innerHTML = '<div class="cr-sp-box"><div class="cr-sp-head"><div class="cr-sp-sum"></div><div id="cr-wallet"></div></div>' +
-    '<div class="cr-sp-body"></div><button type="button" id="cr-sp-go"></button><button type="button" id="cr-sp-close"></button></div>';
+  // бумага, как чек смены и гараж (UI-REVIEW): лист «ГАРАЖ И ТРАТЫ ··· ★ 3» с перфорацией, строка «в копилке ··· 227 600 ₽»,
+  // плитки — бланки с цветной полоской, внизу листа — красный штамп «[X] на новую смену», под листом — пометка «[B] назад»
+  md.innerHTML = '<div class="cr-sp-box"><section class="cr-sp-sheet pp-sheet pp-in"><header class="pp-head cr-sp-head"><span class="cr-sp-sum"></span><b class="cr-sp-stars"></b></header>' +
+    '<div id="cr-wallet"></div><div class="cr-sp-body"></div><button type="button" id="cr-sp-go" class="pp-stamp"></button></section>' +
+    '<nav class="pp-margin"><button type="button" id="cr-sp-close" class="pp-note"></button></nav></div>';
   ($('game') || document.body).appendChild(md);
   md.querySelector('#cr-sp-close').addEventListener('click', () => closeSpend());
   md.querySelector('#cr-sp-go').addEventListener('click', () => { const b = $('ov-again'); if (b) b.click(); });
@@ -592,9 +612,12 @@ function spendBox () {
 function openSpend () {
   const md = spendBox();
   md.querySelector('.cr-sp-sum').textContent = t('гараж и траты');
-  md.querySelector('#cr-sp-go').textContent = t('на новую смену');
-  md.querySelector('#cr-sp-close').textContent = t('назад');
+  // [X] на новую смену · [B] назад · [Y] в гараж (плитки — ещё курсором и A; курсор сразу на «гараже»)
+  md.querySelector('#cr-sp-go').innerHTML = keyHTML('x') + esc(t('на новую смену'));
+  md.querySelector('#cr-sp-close').innerHTML = keyHTML('back') + esc(t('назад'));
   md.hidden = false;
+  const sh = md.querySelector('.cr-sp-sheet');      // лист влетает заново при каждом открытии
+  sh.classList.remove('pp-in'); void sh.offsetWidth; sh.classList.add('pp-in');
   refreshWallet(); openTab('');
   fitBox(md.querySelector('.cr-sp-box'));
   requestAnimationFrame(() => md.classList.add('on'));
@@ -613,7 +636,7 @@ function refreshEnd () {
     dep.hidden = !A.ADULT || w < ECON.SLOT.STEP;
     dep.className = 'pp-note pp-red';
     dep.innerHTML = keyHTML('x') + esc(t('депнуть'));
-    dep.title = t(GAME_NAME[depGame()]) + ' · ×' + gameMul(depGame());
+    dep.title = DEP.label();
   }
   if (sp) { sp.className = 'pp-note'; sp.innerHTML = keyHTML('y') + esc(t('гараж и траты')); sp.hidden = false; }   // гараж — первой плиткой
   END.wallet(w);
@@ -623,12 +646,13 @@ function refreshEnd () {
 function openGarage (onClose) { GARAGE.open(onClose); }
 
 let TAB = '';
+const SPEND_MORE = false;   // «гараж и траты»: донаты городу и ёлка-турель — пока скрыты (автор, 09.10.2026)
 function buildEnd () {
   // пометки на полях: [Y] гараж и траты · [X] депнуть · [B] в меню («гараж» отдельно и «покататься» убраны 09.10.2026:
   // гараж — первая плитка «гаража и трат», покататься — в меню)
   if (!$('ov-dep')) {
     const mk = (id, fn) => { const b = document.createElement('button'); b.type = 'button'; b.id = id; b.addEventListener('click', fn); return b; };
-    $('ov-menu').before(mk('ov-spend', openSpend), mk('ov-dep', () => { A.Snd.boot && A.Snd.boot(); openDep(); }));
+    $('ov-menu').before(mk('ov-spend', openSpend), mk('ov-dep', () => { A.Snd.boot && A.Snd.boot(); DEP.open(); }));
   }
   let el = $('cr-end');
   if (!el) {
@@ -636,18 +660,24 @@ function buildEnd () {
     el.id = 'cr-end';
     spendBox().querySelector('.cr-sp-body').appendChild(el);
   }
-  // 05.10.2026: у каждой плитки — что даёт (было только «0 % цели города»); гараж — тоже сюда: главная трата
+  // 05.10.2026: у каждой плитки — что даёт (было только «0 % цели города»); гараж — тоже сюда: главная трата.
+  // 09.10.2026 (автор): пока только две плитки — «перейти в гараж» и «депнуть»; донаты (мусор, насилие) и ёлка-турель
+  // скрыты флагом SPEND_MORE — код на месте, вернуть — SPEND_MORE = true
   const tabs = [
-    ['garage', t('гараж'), '', t('машины, броня, мотор, покраска')],
-    ['trash', t('борьба с мусором'), 'bar', t('меньше мусора у подъездов и на дорогах')],
-    ['gang', t('борьба с насилием'), 'bar', t('бандитские круги меньше, гопники подходят реже')],
-    RAID.ready() ? ['turret', t('ёлка-турель'), '', ''] : null,
+    ['garage', t('перейти в гараж'), '', t('машины, броня, мотор, покраска')],
+    !SPEND_MORE && A.ADULT ? ['dep', t('депнуть'), '', ''] : null,
+    SPEND_MORE ? ['trash', t('борьба с мусором'), 'bar', t('меньше мусора у подъездов и на дорогах')] : null,
+    SPEND_MORE ? ['gang', t('борьба с насилием'), 'bar', t('бандитские круги меньше, гопники подходят реже')] : null,
+    SPEND_MORE && RAID.ready() ? ['turret', t('ёлка-турель'), '', ''] : null,
   ].filter(Boolean);
+  // значки: [Y] у гаража — всегда (Y жмёт его сразу), [A] — у плитки под курсором геймпада / клавиатуры
   el.innerHTML = '<div class="cr-tabs n' + tabs.length + '">' + tabs.map(([k, name, bar, what]) =>
-    '<button type="button" class="cr-tab cr-t-' + k + '" data-tab="' + k + '"><b>' + esc(name) + '</b>' + (what ? '<span class="cr-what">' + esc(what) + '</span>' : '') +
-    (bar ? '<i class="cr-bar"><i></i></i><span class="cr-sub"></span>' : '<span class="cr-sub"></span>') + '</button>').join('') + '</div><div id="cr-pane"></div>';
+    '<button type="button" class="cr-tab cr-t-' + k + '" data-tab="' + k + '"><b>' + (k === 'garage' ? keyHTML('y') : '') + '<span class="cr-ok">' + keyHTML('ok') + '</span>' + esc(name) + '</b>' +
+    (what ? '<span class="cr-what">' + esc(what) + '</span>' : '') +
+    (bar ? '<i class="cr-bar"><i></i></i><span class="cr-sub"></span>' : '<span class="cr-sub"></span>') + (k === 'dep' ? DEP.tileArt() : '') + '</button>').join('') + '</div><div id="cr-pane"></div>';
   el.querySelectorAll('.cr-tab').forEach(b => b.addEventListener('click', () => {
     if (b.dataset.tab === 'garage') { openGarage(() => { rerender(); refreshEnd(); }); return; }
+    if (b.dataset.tab === 'dep') { A.Snd.boot && A.Snd.boot(); DEP.open(); return; }   // окно «депнуть» — поверх (dep.js), «назад» — сюда
     openTab(b.dataset.tab === TAB ? '' : b.dataset.tab);
   }));
   TAB = '';
@@ -663,6 +693,12 @@ function refreshTabs () {
     if (b) b.style.width = (A.donated(k) * 100).toFixed(1) + '%';
     const sub = el.querySelector('.cr-t-' + k + ' .cr-sub');
     if (sub) sub.textContent = A.donated(k) >= 1 ? t('цель собрана') : t('собрано {have} из {goal}', { have: A.money(+A.Store.get('dlv-don-' + k, 0) || 0), goal: A.money(ECON.DONATE[k].goal) });
+  }
+  const dp = el.querySelector('.cr-t-dep');           // «депнуть»: какая игра сегодня; нечего ставить — плитка не жмётся
+  if (dp) {
+    const can = A.wallet() >= ECON.SLOT.STEP;
+    dp.disabled = !can;
+    dp.querySelector('.cr-sub').textContent = can ? DEP.label() : t('в копилке меньше {money}', { money: A.money(ECON.SLOT.STEP) });
   }
   const tu = el.querySelector('.cr-t-turret .cr-sub');
   if (tu) tu.textContent = RAID.spendTab(A.money).sub;
@@ -749,14 +785,14 @@ const menuOn = () => A && A.S.state === 'title' && !(A.panelOpen && A.panelOpen(
 /** после окна поверх меню (праздник, выбор): подсветка клавиатуры сброшена, фокус — на карточке меню */
 export function refocus () { KB.clear(); MENU.focus(); }
 export const kbClear = () => KB.clear();
-export const openProfiles = () => MENU.openProfiles();
+export const openProfiles = after => MENU.openProfiles(after);
 export const menuCam = (cam, P, tG) => MENU.cam(cam, P, tG);
 export const askName = cb => MENU.askName(cb);
 const spendOpen = () => { const m = $('cr-spend'); return m && !m.hidden ? m : null; };
 /** непрозрачный экран поверх города (гараж, «потратить») — кадр мира можно не рисовать */
-export const covered = () => GARAGE.isOpen() || !!spendOpen() || !!depOpen();
+export const covered = () => GARAGE.isOpen() || !!spendOpen() || !!DEP.root();
 /** что сейчас листает геймпад: окно имени, гараж, «депнуть», «потратить» — или null */
-export function padRoot () { return QR.root() || END.root() || CITY.root() || MENU.modal() || GARAGE.root() || depOpen() || spendOpen(); }
+export function padRoot () { return QR.root() || END.root() || CITY.root() || MENU.modal() || GARAGE.root() || DEP.root() || spendOpen(); }
 /** до makePadMenu: в гараже ←→ и LB/RB листают машины, B — закрыть то, что сверху */
 export function padPre (p) {
   if (!A) return;
@@ -770,22 +806,32 @@ export function padPre (p) {
     if (hit && !hit.hidden) { PFX.press(hit); hit.click(); }
     if (hit) { p.menuOk = p.menuBack = p.menuUp = p.menuDown = p.menuLeft = p.menuRight = false; return; }
   }
+  if (HONOR.root()) HONOR.pad(p);                   // доска почёта: свой курсор по сетке, LB/RB — страницы (honor.js); B — ниже, back()
   if (DP.isOpen()) {                                // выбор района — карусель (distpick.js): ←→, LB/RB — листать
     const d = (p.menuRight || p.pageR ? 1 : 0) - (p.menuLeft || p.pageL ? 1 : 0);
     if (d) DP.flip(d);
     p.menuLeft = p.menuRight = false;
   } else if (GARAGE.isOpen() && !MENU.modal()) {
-    const d = (p.menuRight || p.pageR ? 1 : 0) - (p.menuLeft || p.pageL ? 1 : 0);
+    // LB/RB — листать машины всегда; ←→ — тоже, а в палитре — ходить по цветам (padmenu: ←→ как ↑↓)
+    const paint = GARAGE.mode() === 'paint';
+    const d = (p.pageR || (!paint && p.menuRight) ? 1 : 0) - (p.pageL || (!paint && p.menuLeft) ? 1 : 0);
     if (d) GARAGE.flip(d);
-    p.menuLeft = p.menuRight = false;
+    if (!paint) p.menuLeft = p.menuRight = false;
+    if (p.btnX) GARAGE.act('armor');                 // [X] броня, [Y] мотор — прямо, без курсора
+    else if (p.btnY) GARAGE.act('engine');
   } else if (!padRoot() && menuOn()) {                // главное меню: ←→, LB/RB — листать карточки (menu.js)
     const d = (p.menuRight || p.pageR ? 1 : 0) - (p.menuLeft || p.pageL ? 1 : 0);
     if (d) MENU.flip(d);
     p.menuLeft = p.menuRight = false;
-  } else if (depOpen() && !MENU.modal()) {          // в «депнуть» ←→ и LB/RB — ставка
+    if ((p.btnY && MENU.hot('y')) || (p.btnX && MENU.hot('x'))) { p.menuOk = p.menuBack = p.menuUp = p.menuDown = false; return; }   // [Y] профиль, [X] район
+  } else if (DEP.root() && !MENU.modal()) {         // в «депнуть» ←→ и LB/RB — ставка, X / Y — цвет или игрок, после — X «крутить ещё»
     const d = (p.menuRight || p.pageR ? 1 : 0) - (p.menuLeft || p.pageL ? 1 : 0);
-    if (d && !SH.slot) setStake(STAKE + d * stakeStep());
+    if (d) DEP.stake(d);
     p.menuLeft = p.menuRight = false;
+    if (p.btnX) DEP.x(); else if (p.btnY) DEP.y();
+  } else if (spendOpen() && padRoot() === spendOpen() && (p.btnX || p.btnY)) {   // «гараж и траты»: X — на новую смену, Y — в гараж
+    const go = p.btnX ? $('cr-sp-go') : document.querySelector('#cr-spend .cr-t-garage'); if (go) { PFX.press(go); go.click(); }
+    p.menuOk = false;
   }
   if (p.menuBack && back()) p.menuBack = false;
 }
@@ -799,8 +845,8 @@ export function back () {
   if (QR.root()) return QR.back();
   if (CITY.root()) return CITY.back();
   if (MENU.modal()) return MENU.back();
-  if (GARAGE.isOpen()) { GARAGE.close(); return true; }
-  if (depOpen()) return closeDep();
+  if (GARAGE.isOpen()) return GARAGE.back();       // палитра / «точно продать?» — закрыть их, иначе выйти
+  if (DEP.root()) return DEP.back();               // посреди прокрутки B не закрывает — дождись итога
   if (spendOpen()) { closeSpend(); return true; }
   return false;
 }
@@ -829,6 +875,23 @@ function onKey (e) {
   }
   const root = kbRoot();
   if (!root) return;
+  // «депнуть»: Q / E — ставка, X / Y — цвет или игрок (после — X «крутить ещё»); «гараж и траты»: X — на новую смену (как геймпад)
+  if (DEP.root() && root === DEP.root() && !MENU.modal()) {
+    const g = matchKey('lb', e) ? () => DEP.stake(-1) : matchKey('rb', e) ? () => DEP.stake(1)
+      : matchKey('x', e) ? DEP.x : matchKey('y', e) ? DEP.y : null;
+    if (g) { e.preventDefault(); e.stopPropagation(); if (!e.repeat) g(); return; }
+  }
+  if (spendOpen() && root === spendOpen() && (matchKey('x', e) || matchKey('y', e))) {   // X — на новую смену, Y — в гараж
+    e.preventDefault(); e.stopPropagation();
+    const go = matchKey('x', e) ? $('cr-sp-go') : document.querySelector('#cr-spend .cr-t-garage'); if (go && !e.repeat) { PFX.press(go); go.click(); }
+    return;
+  }
+  // гараж: X — броня, Y — мотор, Q / E — листать (как [X] [Y] [LB] [RB] геймпада)
+  if (GARAGE.isOpen() && root === GARAGE.root() && !MENU.modal()) {
+    const g = matchKey('x', e) ? () => GARAGE.act('armor') : matchKey('y', e) ? () => GARAGE.act('engine')
+      : matchKey('lb', e) ? () => GARAGE.flip(-1) : matchKey('rb', e) ? () => GARAGE.flip(1) : null;
+    if (g) { e.preventDefault(); e.stopPropagation(); if (!e.repeat) g(); return; }
+  }
   const tg = e.target, typing = tg && ((tg.tagName === 'INPUT' && /^(text|search|)$/.test(tg.type)) || tg.tagName === 'TEXTAREA');
   const top = padRoot();                          // окно поверх всего — клавиши игре не отдаём
   if (typing) {
@@ -837,14 +900,15 @@ function onKey (e) {
     e.stopPropagation();
     return;
   }
+  if (!top && root.id === 'cr-menu' && !e.repeat && ((matchKey('y', e) && MENU.hot('y')) || (matchKey('x', e) && MENU.hot('x')))) { e.preventDefault(); e.stopPropagation(); return; }   // меню: Y — профиль, X — район
   const k = KEYS[e.code];
   if (!k) { if (top && e.code !== 'KeyM') e.stopPropagation(); return; }
   if ((root.id === 'panel' || root.id === 'pausem') && k === 'menuBack') return;   // окно настроек/находок и паузу закрывает сама игра (Esc)
   e.preventDefault(); e.stopPropagation();
   if (e.repeat && k === 'menuOk') return;
   if (DP.isOpen() && root === DP.root() && (k === 'menuLeft' || k === 'menuRight')) { DP.flip(k === 'menuLeft' ? -1 : 1); return; }   // выбор района
-  if (GARAGE.isOpen() && root === GARAGE.root() && (k === 'menuLeft' || k === 'menuRight')) { GARAGE.flip(k === 'menuLeft' ? -1 : 1); return; }
-  if (depOpen() && root === depOpen() && (k === 'menuLeft' || k === 'menuRight')) { if (!SH.slot) setStake(STAKE + (k === 'menuLeft' ? -1 : 1) * stakeStep()); return; }   // ←→ — ставка
+  if (GARAGE.isOpen() && root === GARAGE.root() && (k === 'menuLeft' || k === 'menuRight') && GARAGE.mode() !== 'paint') { GARAGE.flip(k === 'menuLeft' ? -1 : 1); return; }
+  if (DEP.root() && root === DEP.root() && (k === 'menuLeft' || k === 'menuRight')) { DEP.stake(k === 'menuLeft' ? -1 : 1); return; }   // ←→ — ставка
   if (k === 'menuBack') { back(); return; }
   if (root.id === 'cr-menu' && (k === 'menuLeft' || k === 'menuRight')) { MENU.flip(k === 'menuLeft' ? -1 : 1); return; }   // меню-карусель
   if ((root.id === 'panel' || root.id === 'pausem') && (k === 'menuLeft' || k === 'menuRight') && A.cardFlip && A.cardFlip(root, k === 'menuLeft' ? -1 : 1)) return;   // настройки и пауза — карусели
@@ -892,288 +956,9 @@ function paneDonate (p, k) {
   };
 }
 
-/* ── депнуть (взрослая версия) — своё окно на весь экран ──
-   Игра меняется по кругу (ECON.SLOT.GAMES), каждая смена — следующая:
-     slot     — однорукий бандит: три барабана, три семёрки — ×2
-     roulette — красное или чёрное: выбираешь цвет, крутится колесо (есть зеро) — ×2
-     tennis   — Андрюша, Игорёк или Настюша: выбираешь, кто выиграет матч — ×3
-   Исход решает heroquests.js: совет Лёхи Арбуза (встретил его в смену) — ± к удаче на первую
-   прокрутку, в теннисе — «наоборот» Игорька (прогноз на матч сбывается наоборот в 85 %).
-   Ставка общая: ползунок шагом SLOT.STEP, кнопки −/+ и ¼ · ½ · всё (сначала стоит
-   заработанное за смену). Сколько ставишь — столько купюр высыпается кучей рядом,
-   и строкой: «из кошелька −N ₽ · останется M ₽». «ДЕП» — купюры уезжают в игру.
-   Первый деп за сессию (с запуска игры) выигрывает всегда (SLOT.FIRST_WIN). Раз за смену. */
-const SYM = ['7', '★', '♥', '₽', '◆', '♣'];
-const SYM_C = ['#ff4d5e', '#ffd85e', '#ff7fa8', '#7fe08a', '#6fd3ff', '#c9a0ff'];
-const N_ = s => s;
-const TENNIS = [
-  { id: 'andr', name: N_('Андрюша'), seed: 41027, fem: false },
-  { id: 'igor', name: N_('Игорёк'), seed: 77311, fem: false },
-  { id: 'nast', name: N_('Настюша'), seed: 50923, fem: true },
-];
-const GAME_NAME = { slot: N_('однорукий бандит'), roulette: N_('красное или чёрное'), tennis: N_('теннис: кто выиграет матч') };
-const stepDown = n => Math.floor(Math.max(0, n) / ECON.SLOT.STEP) * ECON.SLOT.STEP;
-let STAKE = 0, DEP_SESSION = 0, PICK = null, GAME = 'slot';
+/* ── депнуть (взрослая версия) — своё окно на весь экран: dep.js (три игры, свои экраны) ── */
 /** сменили профиль без перезагрузки (game.js reprofile): первая ставка сессии — снова первая */
-export function reprofile () { DEP_SESSION = 0; STAKE = 0; PICK = null; }
-const BILLS_MAX = 36;
-/** какая игра в «депнуть» на этой смене: по кругу от номера смены */
-export const depGame = () => { const G = ECON.SLOT.GAMES; return G[((SH.n || 0) % G.length + G.length) % G.length]; };
-const gameMul = g => (ECON.SLOT[g] && ECON.SLOT[g].mul) || ECON.SLOT.MUL;
-function depBox () {
-  let md = $('cr-dep');
-  if (md) return md;
-  md = document.createElement('div');
-  md.id = 'cr-dep';
-  md.hidden = true;
-  md.innerHTML = '<div class="dep-box">' +
-    '<div class="dep-t"></div><div class="dep-g"></div><div class="dep-tip" hidden></div>' +
-    '<div class="dep-main"><div class="dep-stage"></div><div class="dep-pile"></div></div>' +
-    '<div class="dep-res"></div>' +
-    '<div class="dep-sum"><b></b><span></span></div>' +
-    '<div class="dep-stake"><button type="button" class="cr-btn dep-minus">−</button><input type="range"><button type="button" class="cr-btn dep-plus">+</button></div>' +
-    '<div class="cr-quick dep-quick">' + [[0.25, '¼'], [0.5, '½'], [1, '']].map(([k, l]) => '<button type="button" class="cr-btn" data-k="' + k + '">' + esc(l) + '</button>').join('') + '</div>' +
-    '<button type="button" class="dep-go"></button>' +
-    '<div class="dep-foot"><button type="button" class="dep-again" hidden></button><button type="button" class="cr-btn dep-close"></button></div>' +
-  '</div>';
-  ($('game') || document.body).appendChild(md);
-  md.querySelector('.dep-close').addEventListener('click', () => closeDep());
-  const range = md.querySelector('input');
-  range.addEventListener('input', () => setStake(+range.value || 0));
-  md.querySelector('.dep-minus').addEventListener('click', () => setStake(STAKE - stakeStep()));
-  md.querySelector('.dep-plus').addEventListener('click', () => setStake(STAKE + stakeStep()));
-  md.querySelectorAll('.dep-quick button').forEach(b => b.addEventListener('click', () => setStake(stepDown(stepDown(A.wallet()) * +b.dataset.k))));
-  // «ДЕП», а после прокрутки — «пора на работу»: сразу на новую смену; «крутить ещё» — новый раунд
-  md.querySelector('.dep-go').addEventListener('click', () => { if (SH.slot) toWork(); else spin(); });
-  md.querySelector('.dep-again').addEventListener('click', () => { if (SPINNING) return; SH.slot = false; openDep(); });
-  return md;
-}
-/* шаг кнопок −/+: ~1/20 кошелька, круглым числом */
-function stakeStep () {
-  const w = A.wallet(), raw = Math.max(ECON.SLOT.STEP, w / 20), p = 10 ** Math.floor(Math.log10(raw));
-  return Math.max(ECON.SLOT.STEP, Math.round(raw / p) * p);
-}
-const depOpen = () => { const m = $('cr-dep'); return m && !m.hidden ? m : null; };
-const cell = s => '<i style="color:' + SYM_C[s] + '">' + SYM[s] + '</i>';
-
-/* ── сцены игр ── */
-const WHEEL_N = 37;                               // 0 — зеро (зелёное), дальше красное и чёрное через одно
-const wheelColor = i => (i === 0 ? 'zero' : i % 2 ? 'red' : 'black');
-function stageHTML (g) {
-  if (g === 'slot') return '<div class="dep-machine"><div class="dep-top">777</div><div class="cr-reels">' +
-    [0, 1, 2].map(i => '<div class="cr-reel"><div class="cr-strip" data-r="' + i + '">' + cell((i * 2 + 1) % SYM.length) + '</div></div>').join('') +
-    '</div><div class="dep-slit"></div><i class="dep-lever"><b></b></i></div>';
-  if (g === 'roulette') {
-    const seg = 360 / WHEEL_N, stops = [];
-    for (let i = 0; i < WHEEL_N; i++) { const c = { zero: '#2f9e4f', red: '#d9342c', black: '#1d1a22' }[wheelColor(i)]; stops.push(c + ' ' + (i * seg).toFixed(2) + 'deg ' + ((i + 1) * seg).toFixed(2) + 'deg'); }
-    return '<div class="dep-rl"><div class="dep-ptr"></div><div class="dep-wheel" style="background:conic-gradient(' + stops.join(',') + ')"><i></i></div></div>' +
-      '<div class="dep-picks">' + [['red', t('красное')], ['black', t('чёрное')]].map(([k, l]) => '<button type="button" class="dep-pick dep-c-' + k + '" data-p="' + k + '">' + esc(l) + '</button>').join('') + '</div>';
-  }
-  // теннис: корт, мячик и три игрока — кого выберешь, за того и болеешь
-  return '<div class="dep-court"><i class="dep-ball"></i><b class="dep-score">0 : 0</b></div><div class="dep-picks dep-players">' + TENNIS.map(p => {
-    let face = '';
-    try { if (A.person && A.face) face = A.face(HEROES.person(p.id) || A.person({ seed: p.seed, fem: p.fem }), 64); } catch (e) { face = ''; }   // тот же человек, что в городе (heroes.js)
-    return '<button type="button" class="dep-pick dep-pl" data-p="' + p.id + '">' + (face ? '<img src="' + face + '" alt="">' : '<i></i>') + '<span>' + esc(t(p.name)) + '</span></button>';
-  }).join('') + '</div>';
-}
-function openDep () {
-  const md = depBox();
-  GAME = depGame(); PICK = null;
-  const max = stepDown(A.wallet());
-  STAKE = Math.min(max, stepDown(A.S.money || 0) || stepDown(max / 4) || max);
-  md.dataset.game = GAME;
-  md.querySelector('.dep-t').textContent = t('депнуть');
-  md.querySelector('.dep-g').textContent = t(GAME_NAME[GAME]) + ' · ×' + gameMul(GAME);
-  md.querySelector('.dep-quick [data-k="1"]').textContent = t('всё');
-  md.querySelector('.dep-close').textContent = t('назад');
-  md.querySelector('.dep-pile').innerHTML = '';
-  md.querySelector('.dep-res').textContent = ''; md.querySelector('.dep-res').className = 'dep-res';
-  md.querySelector('.dep-stage').innerHTML = stageHTML(GAME);
-  // совет Лёхи Арбуза (встретил его в эту смену) — строкой под названием игры (heroquests.js)
-  const tip = HQ.tipFor(GAME), tipEl = md.querySelector('.dep-tip');
-  tipEl.textContent = tip ? tip.text : ''; tipEl.hidden = !tip;
-  md.querySelectorAll('.dep-pick').forEach(b => b.addEventListener('click', () => {
-    if (SH.slot) return;
-    PICK = b.dataset.p;
-    md.querySelectorAll('.dep-pick').forEach(q => q.classList.toggle('on', q === b));
-    A.Snd.blip(660, 0.05, 'square', 0.06);
-    setStake(STAKE, true);
-  }));
-  md.classList.remove('spun');
-  SH.slot = false;
-  md.querySelector('.dep-again').hidden = true;
-  const r = md.querySelector('input');
-  r.min = max ? ECON.SLOT.STEP : 0; r.max = max; r.step = ECON.SLOT.STEP;
-  md.hidden = false;
-  requestAnimationFrame(() => md.classList.add('on'));
-  setStake(STAKE, true);
-}
-function toWork () {
-  if (SPINNING) return;
-  closeDep(); closeSpend();
-  const b = $('ov-again'); if (b) b.click();
-}
-let SPINNING = false;
-function closeDep () {
-  const md = $('cr-dep');
-  if (!md || md.hidden) return false;
-  md.classList.remove('on'); md.hidden = true;
-  refreshWallet(); refreshTabs(); refreshEnd();
-  return true;
-}
-/* ставка: цифры, ползунок и куча купюр рядом с игрой (их столько, какая доля кошелька) */
-function setStake (v, quiet) {
-  const md = depBox(), max = stepDown(A.wallet()), done = SH.slot;
-  STAKE = Math.max(max ? ECON.SLOT.STEP : 0, Math.min(max, stepDown(v)));
-  const r = md.querySelector('input');
-  r.value = STAKE; r.disabled = done || max <= 0;
-  md.querySelector('.dep-sum b').textContent = A.money(STAKE);
-  if (done) return;                                  // раунд сыгран — цифры итога не трогаем
-  md.querySelector('.dep-sum span').textContent = max <= 0 ? t('нечего ставить') : t('из копилки −{money} · останется {left}', { money: A.money(STAKE), left: A.money(A.wallet() - STAKE) });
-  md.querySelectorAll('.dep-stake button, .dep-quick button').forEach(b => { b.disabled = done || max <= 0; });
-  const go = md.querySelector('.dep-go'), need = GAME !== 'slot' && !PICK;
-  go.textContent = need ? (GAME === 'roulette' ? t('выбери цвет') : t('выбери, кто выиграет')) : t('ДЕП · {money}', { money: A.money(STAKE) });
-  go.disabled = need || STAKE <= 0 || STAKE > A.wallet();
-  pile(max ? Math.max(1, Math.round(BILLS_MAX * STAKE / max)) : 0, quiet);
-}
-function pile (n, quiet) {
-  const box = depBox().querySelector('.dep-pile');
-  const have = box.querySelectorAll('i:not(.gone)');
-  if (have.length < n) {
-    for (let k = have.length; k < n; k++) {
-      const b = document.createElement('i');
-      const row = Math.floor(k / 6), col = k % 6;
-      b.style.left = (6 + col * 14 + (row % 2) * 6 + (Math.random() * 6 - 3)) + '%';
-      b.style.bottom = (4 + row * 9 + Math.random() * 3) + '%';
-      b.style.setProperty('--r', (Math.random() * 40 - 20).toFixed(0) + 'deg');
-      b.style.animationDelay = quiet ? '0s' : ((k - have.length) * 0.035).toFixed(3) + 's';
-      b.textContent = '₽';
-      box.appendChild(b);
-    }
-    if (!quiet) A.Snd.blip(520 + n * 12, 0.04, 'square', 0.05);
-  } else for (let k = have.length - 1; k >= n; k--) { const b = have[k]; b.classList.add('gone'); setTimeout(() => b.remove(), 300); }
-}
-
-/* ── прокрутка: исход решается сразу, анимация его только показывает ── */
-function spin () {
-  const md = depBox();
-  const st = Math.min(STAKE, stepDown(A.wallet()));
-  if (SH.slot || st <= 0 || (GAME !== 'slot' && !PICK)) return;
-  SH.slot = true; SPINNING = true;
-  DEP_SESSION++;
-  const cfg = ECON.SLOT[GAME] || {};
-  // исход — в heroquests.js: совет Лёхи (± к удаче), в теннисе — «наоборот» Игорька
-  const R = HQ.roll({ game: GAME, pick: PICK, base: cfg.win != null ? cfg.win : ECON.SLOT.WIN, first: ECON.SLOT.FIRST_WIN && DEP_SESSION === 1 });
-  const win = R.win;
-  A.addWallet(-st);
-  const allIn = stepDown(A.wallet()) <= 0;        // поставил всё — для достижения ALL_IN (achievements.js)
-  A.Store.flush();
-  refreshWallet();
-  md.classList.add('spun');                       // купюры уезжают в игру
-  md.querySelectorAll('.dep-stake button, .dep-quick button, .dep-go').forEach(b => { b.disabled = true; });
-  md.querySelector('input').disabled = true;
-  md.querySelector('.dep-sum span').textContent = t('из копилки −{money} · останется {left}', { money: A.money(st), left: A.money(A.wallet()) });
-  A.Snd.blip(220, 0.12, 'square', 0.08);
-  const finish = (txt) => {
-    ACH.dep(win, allIn);                          // проиграл всё — «Всё на красное» (после анимации, не раньше)
-    const res = md.querySelector('.dep-res');
-    const heroTxt = HQ.verdict(R).map(s => '<br><span class="dep-hq">' + esc(s) + '</span>').join('');   // «Лёха был прав!» / «Лёха опять слил»
-    md.querySelector('.dep-pile').innerHTML = '';
-    if (win) {
-      const prize = st * gameMul(GAME);
-      A.addWallet(prize);
-      A.Store.flush();
-      res.innerHTML = esc(txt) + '<br>' + esc(t('×{k}! +{money}', { k: gameMul(GAME), money: A.money(prize - st) })) + heroTxt;
-      res.className = 'dep-res win';
-      md.classList.remove('spun');
-      pile(BILLS_MAX, false);                      // выигрыш — полная куча обратно
-      [0, 1, 2].forEach(i => setTimeout(() => A.Snd.coin(), i * 160));
-      md.querySelector('.dep-sum b').textContent = '+' + A.money(prize);
-    } else {
-      res.innerHTML = esc(txt) + '<br>' + esc(t('мимо · −{money}', { money: A.money(st) })) + heroTxt;
-      res.className = 'dep-res lose';
-      A.Snd.fail && A.Snd.fail();
-    }
-    md.querySelector('.dep-sum span').textContent = t('в копилке {money}', { money: A.money(A.wallet()) });
-    SPINNING = false;
-    const go = md.querySelector('.dep-go');
-    go.textContent = t('пора на работу'); go.disabled = false;
-    const again = md.querySelector('.dep-again');
-    again.textContent = t('крутить ещё'); again.hidden = stepDown(A.wallet()) <= 0;
-    refreshWallet(); refreshTabs();
-  };
-  if (GAME === 'roulette') spinWheel(md, win, finish);
-  else if (GAME === 'tennis') playMatch(md, win, finish, R.champ);
-  else spinReels(md, win, finish);
-}
-function spinReels (md, win, finish) {
-  let out;
-  if (win) out = [0, 0, 0];
-  else { do out = [0, 1, 2].map(() => (Math.random() * SYM.length) | 0); while (out[0] === out[1] && out[1] === out[2]); }
-  const strips = [...md.querySelectorAll('.cr-strip')];
-  const fill = (el, last) => { let h = ''; for (let i = 0; i < 29; i++) h += cell((Math.random() * SYM.length) | 0); el.innerHTML = h + cell(last); };
-  strips.forEach((el, i) => { fill(el, out[i]); el.style.transform = 'translateY(0)'; delete el.dataset.stopped; });
-  const H = strips[0].firstChild ? strips[0].firstChild.getBoundingClientRect().height || 56 : 56;
-  const t0 = performance.now(), STOP = [1300, 1900, 2600];
-  let tickN = 0;
-  const anim = now => {
-    const e = now - t0;
-    let all = true;
-    strips.forEach((el, i) => {
-      const k = Math.min(1, e / STOP[i]);
-      if (k < 1) all = false;
-      el.style.transform = 'translateY(' + (-(1 - (1 - k) ** 3) * 29 * H).toFixed(1) + 'px)';
-      if (k >= 1 && !el.dataset.stopped) { el.dataset.stopped = '1'; A.Snd.blip(420 + i * 120, 0.09, 'square', 0.1); }
-    });
-    if (((e / 90) | 0) > tickN) { tickN = (e / 90) | 0; if (!all) A.Snd.blip(900 + (tickN % 3) * 60, 0.02, 'square', 0.03); }
-    if (!all) requestAnimationFrame(anim);
-    else finish(win ? t('три семёрки!') : t('не сошлось'));
-  };
-  requestAnimationFrame(anim);
-}
-/* колесо: выигрыш — сектор выбранного цвета, проигрыш — другого или зеро */
-function spinWheel (md, win, finish) {
-  const other = PICK === 'red' ? 'black' : 'red';
-  const want = win ? PICK : (Math.random() < 1 / 19 ? 'zero' : other);
-  const cand = [];
-  for (let i = 0; i < WHEEL_N; i++) if (wheelColor(i) === want) cand.push(i);
-  const i = cand[(Math.random() * cand.length) | 0], seg = 360 / WHEEL_N;
-  // указатель сверху: сектор i встаёт под него, если колесо повернуть на −(середина сектора)
-  const deg = 360 * 6 - (i + 0.5) * seg;
-  const w = md.querySelector('.dep-wheel');
-  w.style.transition = 'none'; w.style.transform = 'rotate(0deg)';
-  void w.offsetWidth;
-  w.style.transition = 'transform 3.2s cubic-bezier(.12, .7, .15, 1)';
-  w.style.transform = 'rotate(' + deg + 'deg)';
-  let n = 0;
-  const tick = setInterval(() => { A.Snd.blip(1000 - n * 20, 0.015, 'square', 0.03); if (++n > 34) clearInterval(tick); }, 90);
-  setTimeout(() => {
-    clearInterval(tick);
-    const name = { red: t('красное'), black: t('чёрное'), zero: t('зеро') }[want];
-    finish(t('выпало: {what}', { what: name }));
-  }, 3350);
-}
-/* матч: мячик летает по корту, счёт тикает; побеждает выбранный (выигрыш) или другой */
-function playMatch (md, win, finish, champId) {
-  const others = TENNIS.filter(p => p.id !== PICK);
-  const champ = TENNIS.find(p => p.id === champId) || (win ? TENNIS.find(p => p.id === PICK) : others[(Math.random() * others.length) | 0]);
-  const court = md.querySelector('.dep-court'), score = md.querySelector('.dep-score');
-  court.classList.add('play');
-  let a = 0, b = 0, k = 0;
-  const iv = setInterval(() => {
-    if (Math.random() < 0.5) a++; else b++;
-    score.textContent = Math.min(6, a) + ' : ' + Math.min(6, b);
-    A.Snd.blip(k % 2 ? 380 : 520, 0.03, 'square', 0.05);
-    k++;
-  }, 260);
-  setTimeout(() => {
-    clearInterval(iv);
-    court.classList.remove('play');
-    score.textContent = '6 : ' + (2 + ((Math.random() * 3) | 0));
-    md.querySelectorAll('.dep-pl').forEach(q => q.classList.toggle('champ', q.dataset.p === champ.id));
-    finish(champ.fem ? t('матч выиграла {who}', { who: t(champ.name) }) : t('матч выиграл {who}', { who: t(champ.name) }));
-  }, 2900);
-}
+export function reprofile () { DEP.reprofile(); }
 
 /* отладка: __dlv.CAREERM.skipTo(13.9) — к обеду, skipTo(23.95) — к полуночи */
 const DEBUG = {
@@ -1184,5 +969,6 @@ const DEBUG = {
   schedHour, allDay, districtNext, shiftLeft,
   skipTo (h) { if (A) { A.env().t = SH.on ? (SH.tStart + ECON.tOfHour(h) - ECON.SHIFT.T0) % 1 : ECON.tOfHour(h); if (h > ECON.SHIFT.LUNCH_H + 0.05) SH.lunch = true; else if (h < ECON.SHIFT.LUNCH_H) SH.lunch = false; } },
   useCars (api) { CARS_MOCK = api || null; },
-  crewBoard, crewLoad: () => (A ? crewLoad() : null), openDep, closeDep, openGarage, closeGarage: GARAGE.close, garageFlip: GARAGE.flip, openSpend, menu, askName, back,
+  showLunch,                                        // обед сразу — проверить карточку (A / X / Y)
+  crewBoard, crewLoad: () => (A ? crewLoad() : null), openDep: DEP.open, closeDep: DEP.close, openGarage, closeGarage: GARAGE.close, garageFlip: GARAGE.flip, openSpend, menu, askName, back,
 };

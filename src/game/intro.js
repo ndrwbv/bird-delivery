@@ -22,16 +22,18 @@
      FIRST.frame(dt)          — каждый кадр; true — идёт вступление (мир стоит)
      FIRST.on(), FIRST.next(), FIRST.skip() — для геймпада (game.js padStep)
    api: THREE, cam, V, S, Store, Snd, ADULT, car(), pizza(), brand(), carName(),
-        puff, camClear, groundH, guestStep, hud, hearts */
+        puff, camClear, camTree(x, z, r) — нет дерева ближе r м, groundH, guestStep, hud, hearts */
 import './intro.css';
 import { t } from '../i18n/index.js';
 import { makePerson, faceDataURL } from './people.js';
 import { BOSS } from './orders.config.js';
 import { readTime } from './dialog.js';
+import * as LIFE from './actorlife.js';          // живое лицо Степана в кадре: моргает, улыбается (Н2)
+import { keyHTML } from '../input/glyphs.js';     // «[B] пропустить» — значок по вводу (было «esc» всегда)
 
 const KEY = 'dlv-intro';
 let A = null, P = null, L = null, T1 = null, T2 = null;
-const CUT = { on: false, t: 0, i: -1, segs: [], done: null, el: null, fov0: 60, guest: null, carY: 0, coughT: [], puffT: 0, shake: 0, swallow: '', side: 1, demo: -1 };
+const CUT = { on: false, t: 0, i: -1, segs: [], done: null, el: null, fov0: 60, guest: null, life: null, carY: 0, coughT: [], puffT: 0, shake: 0, swallow: '', side: 1, demo: -1 };
 let BOSS_P = null;
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -60,13 +62,16 @@ function pizzaShot () {
   if (l < 0.5) { nx = Z.x - Z.bx; nz = Z.z - Z.bz; l = Math.hypot(nx, nz) || 1; }
   nx /= l; nz /= l;
   const tx = nz, tz = -nx, wy = Z.wy;
-  // откуда фасад видно: камера не в доме на всём пролёте
+  // откуда фасад видно: камера не в доме и не в кроне дерева на всём пролёте — и в 4 м перед ней дерева
+  // нет (камера здесь на 4,5—9 м, ровно на высоте кроны: дерево у пиццерии давало зелёный кадр, 09.10.2026)
+  const noTree = (x, z) => !A.camTree || A.camTree(x, z, 4.2);
   let D = 0, s = 1;
-  find: for (const d of [27, 22, 17]) for (const sd of [1, -1]) {
+  find: for (const d of [27, 22, 17, 32]) for (const sd of [1, -1]) {
     let ok = true;
-    for (let k = 0; k <= 1; k += 0.25) {
-      const x = Z.wx + nx * (d - 7 * k) + tx * (-11 + 17 * k) * sd, z = Z.wz + nz * (d - 7 * k) + tz * (-11 + 17 * k) * sd;
-      if (!A.camClear(x, z)) { ok = false; break; }
+    for (let k = 0; k <= 1.001; k += 0.1) {
+      const o = (-11 + 17 * k) * sd, x = Z.wx + nx * (d - 7 * k) + tx * o, z = Z.wz + nz * (d - 7 * k) + tz * o;
+      const lx = Z.wx + tx * o * 0.15 - x, lz = Z.wz + tz * o * 0.15 - z, ll = Math.hypot(lx, lz) || 1;
+      if (!A.camClear(x, z) || !noTree(x, z) || !noTree(x + lx / ll * 4, z + lz / ll * 4)) { ok = false; break; }
     }
     if (ok) { D = d; s = sd; break find; }
   }
@@ -202,7 +207,7 @@ function demoHearts (step) {
   if (step === 1) { h.classList.remove('half'); h.classList.add('off'); }
   else if (step === 2) { h.classList.remove('off'); h.classList.add('half'); }
   h.classList.remove('ic-lost'); void h.offsetWidth; h.classList.add('ic-lost');
-  const s = Snd(); if (s) { s.noise(0.18, 0.2); s.blip(step === 1 ? 70 : 110, 0.12, 'square', 0.1); }
+  const S = Snd(); if (S && S.fx) S.fx('heart-lost', s => { s.noise(0.18, 0.2); s.blip(step === 1 ? 70 : 110, 0.12, 'square', 0.1); });
 }
 function demoOff () {
   if (CUT.demo < 0) return;
@@ -215,16 +220,18 @@ const hudMode = m => {
   document.body.classList.toggle('ic-nos', m === 'both');
 };
 
-/* ─── звук: всё из синтезатора игры ─── */
-const Snd = () => A.Snd || null;
-function whoosh () { const s = Snd(); if (s) s.noise(0.55, 0.1); }
+/* ─── звук: синтезатор игры или файлы автора (Snd.fx, docs/SOUNDS.md) ─── */
+const Snd = () => (A.Snd && A.Snd.fx ? A.Snd : null);
+function whoosh () { const S = Snd(); if (S) S.fx('whoosh', s => s.noise(0.55, 0.1)); }
 function sting (hi) {
-  const s = Snd(); if (!s) return;
-  s.blip(hi ? 147 : 98, 0.28, 'sawtooth', 0.13);
-  setTimeout(() => s.blip(hi ? 294 : 196, 0.32, 'square', 0.07), 110);
+  const S = Snd(); if (!S) return;
+  S.fx(hi ? 'sting-high' : 'sting', s => {
+    s.blip(hi ? 147 : 98, 0.28, 'sawtooth', 0.13);
+    setTimeout(() => s.blip(hi ? 294 : 196, 0.32, 'square', 0.07), 110);
+  });
 }
 function cough () {
-  const s = Snd(); if (s) { s.noise(0.12, 0.22); s.blip(80 + Math.random() * 30, 0.14, 'sawtooth', 0.16); }
+  const S = Snd(); if (S) S.fx('engine-cough', s => { s.noise(0.12, 0.22); s.blip(80 + Math.random() * 30, 0.14, 'sawtooth', 0.16); }, { eng: 1 });
   CUT.shake = 0.07;
   const car = A.car();
   if (car) car.position.y = CUT.carY + 0.07;
@@ -245,6 +252,7 @@ function enter (seg) {
     case 'client': {
       const p = CUT.guest, pr = p && p.person;
       card(t('первый заказ'), pr ? pr.name : '', pr && pr.desc ? pr.desc : '', false, seg.d);
+      if (CUT.life) { CUT.life.emo = 'happy'; CUT.life.emoT = 0; }      // Степан доволен жизнью
       subtitle(seg.text);
       sting(true);
       break;
@@ -324,6 +332,7 @@ export function play (order, done) {
   if (!A) { if (done) done(); return; }
   const st = order.stops && order.stops[0], g = st && st.peds && st.peds[0];
   CUT.guest = g && g.grp ? g : null;
+  CUT.life = CUT.guest ? LIFE.faceOnly(CUT.guest.grp) : null;
   if (CUT.guest && CUT.guest.guest && A.guestStep) A.guestStep(CUT.guest, 0);     // сел на лавочку — до первого кадра
   const sP = pizzaShot();
   const sC = CUT.guest ? clientShot(CUT.guest) : null;
@@ -340,7 +349,7 @@ export function play (order, done) {
   V.vx = V.vz = 0;
   const s = Snd(); if (s && s.engine) s.engine(0);
   const el = ui();
-  el.querySelector('.ic-skip').textContent = t('пропустить ▸▸ esc');
+  el.querySelector('.ic-skip').innerHTML = keyHTML('back') + esc(t('пропустить ▸▸'));
   hideText();
   document.body.classList.add('intro-cut');
   requestAnimationFrame(() => el.classList.add('on'));
@@ -365,6 +374,7 @@ export function frame (dt) {
   if (Math.abs(cam.fov - fov) > 0.05) { cam.fov += (fov - cam.fov) * Math.min(1, dt * 5); cam.updateProjectionMatrix(); }
   // Степан сидит и дышит, кальян дымит; остальной мир стоит
   if (CUT.guest && CUT.guest.guest && A.guestStep) A.guestStep(CUT.guest, dt);
+  if (CUT.life) LIFE.face(CUT.life, dt);                                // моргает
   return true;
 }
 export function skip () { if (CUT.on) finish(); }
@@ -396,6 +406,7 @@ function finish () {
   if (car) car.position.y = CUT.carY;
   const cam = A.cam;
   cam.fov = CUT.fov0; cam.updateProjectionMatrix();
+  if (CUT.life) { LIFE.detach(CUT.life); CUT.life = null; }          // лицо снова общее, как у всех прохожих
   CUT.segs = []; CUT.guest = null;
   const d = CUT.done; CUT.done = null;
   if (document.activeElement && document.activeElement.blur && el && el.contains(document.activeElement)) document.activeElement.blur();

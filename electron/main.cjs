@@ -369,6 +369,26 @@ ipcMain.on('log:write', (e, line) => crashWrite(line));
 ipcMain.handle('log:dir', () => LOG_DIR());
 ipcMain.handle('log:open', async () => { try { fs.mkdirSync(LOG_DIR(), { recursive: true }); return !(await shell.openPath(LOG_DIR())); } catch (e) { return false; } });
 
+/* ─── ролики повтора (src/game/replay.js, docs/CAREER.md «Повтор») ───
+   webm из рендерера → «Видео/Птица Пицца» (папка видео системы: ~/Movies на маке, ~/Videos на Деке,
+   «Видео» на Windows; имя папки — на языке игры). Ответ — полный путь файла или null */
+function videoDir(folder) {
+  let base = '';
+  try { base = app.getPath('videos'); } catch (e) { base = path.join(app.getPath('home'), 'Videos'); }
+  const name = String(folder || TITLE).replace(/[\\/:*?"<>|\x00-\x1f]/g, '').trim().slice(0, 60) || TITLE;
+  return path.join(base, name);
+}
+ipcMain.handle('video:save', async (e, data, folder, name) => {
+  try {
+    const dir = videoDir(folder);
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, path.basename(String(name || 'clip.webm')).replace(/[^\w.\-]/g, '_'));
+    await fs.promises.writeFile(file, Buffer.from(data));
+    return file;
+  } catch (err) { log('video:', err.message); return null; }
+});
+ipcMain.handle('video:show', (e, file) => { try { shell.showItemInFolder(String(file)); return true; } catch (err) { return false; } });
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1280, height: 800, minWidth: 640, minHeight: 400,

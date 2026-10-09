@@ -17,7 +17,8 @@
    Где асфальт: улица с тротуаром (nearestRoad), площадки и парковки
    (CITY.lots), дорожки (CITY.paths), аллеи (world.js), площадки АЗС
    (landmarks.js), парковка курьеров у пиццерии. Вода, мост, трамплин,
-   полёт — следа нет.
+   полёт — следа нет. Зимой на льду Томи и прудов (ice.js iceY) — колея по
+   снегу льда, по верху льда.
 
    Всё, что нужно из игры, приходит объектом api (init в game.js).
    ────────────────────────────────────────────────────────────────────────── */
@@ -38,7 +39,7 @@ let POS = null, COL = null, AT = null;
 let head = 0, filled = 0, now = 0, lastBirth = -1e9, q0 = -1, k = 0;
 let lastX = 0, lastZ = 0;
 // цвета (линейные, как у вершин three.js) и непрозрачность по виду поверхности: 1 трава, 2 снег, 3 снег на асфальте
-const TINT = [null, null, null, null], BASE_A = [0, 0.44, 0.62, 0.38];
+const TINT = [null, null, null, null, null], BASE_A = [0, 0.44, 0.62, 0.38, 0.55];   // 4 — снег на льду (ice.js)
 export const STATS = { quads: 0, kind: 0 };
 
 /* колесо: идёт ли сейчас след, последняя точка середины и края */
@@ -47,7 +48,7 @@ const W = [0, 1, 2, 3].map(() => ({ on: false, cx: 0, cz: 0, lx: 0, ly: 0, lz: 0
 export function init (api) {
   A = api;
   const THREE = A.THREE;
-  for (const [i, hex] of [[1, '#3a4520'], [2, '#7a879f'], [3, '#5a616d']]) TINT[i] = new THREE.Color(hex);
+  for (const [i, hex] of [[1, '#3a4520'], [2, '#7a879f'], [3, '#5a616d'], [4, '#8396ab']]) TINT[i] = new THREE.Color(hex);
   POS = new Float32Array(CAP * 12);
   COL = new Uint8Array(CAP * 16);
   AT = new Float32Array(CAP * 8);
@@ -170,6 +171,7 @@ function ground (x, z) {
 const snowK = () => SEAS.slip() / 0.32;
 /* вид следа в точке: 0 — нет следа, 1 — трава, 2 — снег, 3 — снег на асфальте */
 function surf (x, z, sn) {
+  if (A.iceY && sn > 0.3 && A.iceY(x, z) !== null) return 4;   // замёрзшая Томь и пруды: колея на снегу льда (ice.js)
   const g = A.groundH(x, z);
   if (g < -0.05) return 0;                              // река, дно
   if (A.surfaceAt(x, z, A.V.y) - g > 0.5) return 0;     // по мосту
@@ -231,7 +233,8 @@ export function step (dt) {
   if (!live && filled) { filled = 0; head = 0; G.setDrawRange(0, 0); }
 
   const speed = Math.hypot(V.vx || 0, V.vz || 0);
-  if (V.air || V.sink !== undefined || (V.rlift || 0) > 0.05) { for (const w of W) w.on = false; return; }
+  // V.wade — вброд по речке (streams.js): следов на воде нет
+  if (V.air || V.sink !== undefined || V.wade || (V.rlift || 0) > 0.05) { for (const w of W) w.on = false; return; }
   if (speed < 0.6) return;
   wheelsOf(A.car());
   const fx = Math.sin(V.h), fz = Math.cos(V.h), sx = fz, sz = -fx;
@@ -256,7 +259,9 @@ export function step (dt) {
     if (w.on && d < JUMP && d > 0.01) { nx = dz / d; nz = -dx / d; }
     const lift = kind === 3 ? LIFT_ROAD : LIFT;
     const lx = px + nx * hw, lz = pz + nz * hw, rx = px - nx * hw, rz = pz - nz * hw;
-    const ly = A.groundH(lx, lz) + lift + A.curbAt(lx, lz), ry = A.groundH(rx, rz) + lift + A.curbAt(rx, rz);
+    let ly, ry;
+    if (kind === 4) { const iy = A.iceY(px, pz) + 0.02; ly = ry = iy; }   // лёд ровный: по верху льда
+    else { ly = A.groundH(lx, lz) + lift + A.curbAt(lx, lz); ry = A.groundH(rx, rz) + lift + A.curbAt(rx, rz); }
     if (w.on && d < JUMP) quad(w, lx, ly, lz, rx, ry, rz, kind, BASE_A[kind] * str);
     w.on = true; w.cx = px; w.cz = pz;
     w.lx = lx; w.ly = ly; w.lz = lz; w.rx = rx; w.ry = ry; w.rz = rz;

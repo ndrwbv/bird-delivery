@@ -37,6 +37,7 @@ import * as THREE from '../vendor/three.module.min.js';
 import { snowAmt, seasonValue, heatAmt } from './seasons.js';
 import * as GFX from './gfx.js';
 import { onPave, walkHalf } from './pave.js';
+import { wet } from './streams.js';             // речки и пруды — не газон (streams.js)
 import * as FADEJS from './fade.js';
 
 export const LAWN = {
@@ -185,6 +186,7 @@ function spot (x, z, m = 0) {
   if (onPath(x, z, 1.1 + m) || A.onAlley(x, z, 0.8 + m) || A.yardBlocks(x, z, 0.8 + m) || A.pzBlocks(x, z, 1 + m)) return null;
   if (inPolys(POLYS, x, z) || claimed(x, z, 4 + m)) return null;
   if (onPave(x, z, 0.3 + m)) return null;              // тротуары, пешеходки, дорожки, аллеи (pave.js)
+  if (wet(x, z, 0.5 + m)) return null;                 // речка с берегом, пруд (streams.js)
   return { y, edge, wall: A.inHouse(x, z, 4.2) };
 }
 
@@ -290,7 +292,7 @@ function geos () {
     G.shell = merge(P); }
   { const g = new THREE.IcosahedronGeometry(1, 1), p = g.attributes.position;
     for (let i = 0; i < p.count; i++) p.setY(i, Math.max(0, p.getY(i)) * 0.55 - 0.02);
-    G.sand = merge([paint(g, '#d9c28a')]); }
+    G.sand = merge([paint(g, '#e2b26c')]); }
   G.cube = merge([paint(Bx(1, 1, 1), '#ffffff')]);
   G.lit = G.cube;
   G.bottle = merge([paint(new THREE.CylinderGeometry(0.035, 0.035, 0.2, 6).translate(0, 0.1, 0), '#ffffff'),
@@ -568,7 +570,7 @@ function bigThing (cell, kind, x, z, r, taken, kids) {
     taken.push([x, z, W / 2 + 0.5]);
   } else if (kind === 'sand') {
     if (!spot(x, z, 1)) return false;
-    const own = item(cell, 'sand', [[x, z, 1.3]], '#d9c28a', { slow: 0.9 });
+    const own = item(cell, 'sand', [[x, z, 1.3]], '#e2b26c', { slow: 0.9 });
     inst(cell, 'sand', x, y0, z, r() * 6.3, 1.2 + r() * 0.5, 1 + r() * 0.4, 1 + r() * 0.4, '#ffffff', own, r());
     if (r() < 0.4) inst(cell, 'cube', x + 0.8, y0 + 0.5, z, r() * 6.3, 0.05, 1.1, 0.05, '#8a6b4e', own, r(), 0.4, 0.2);   // лопата
     taken.push([x, z, 2]);
@@ -590,7 +592,7 @@ function bigThing (cell, kind, x, z, r, taken, kids) {
       const own = item(cell, 'garage', [[gx, gz, 0]], '#888', { solid: 1 });
       inst(cell, 'shell', gx, A.groundH(gx, gz) - 0.05, gz, rot, 1.5, 1.95, 5.4, C(['#7fa07a', '#7f95b8', '#c0c0b8', '#b07a5a', '#e8e8e0', '#6f8f9f']), own, r());
       const cs = tx, sn = tz, hw = 1.5, hd = 2.7;
-      cell.sol.push({ cx: gx, cz: gz, hw, hd, cs, sn, ex: Math.abs(cs) * hw + Math.abs(sn) * hd, ez: Math.abs(sn) * hw + Math.abs(cs) * hd, own });
+      cell.sol.push({ cx: gx, cz: gz, hw, hd, cs, sn, ex: Math.abs(cs) * hw + Math.abs(sn) * hd, ez: Math.abs(sn) * hw + Math.abs(cs) * hd, own, mat: 'bin' });   // mat — удар звучит пустым железом (impact.js)
       taken.push([gx, gz, 3]);
       gridHot(gx, gz);
     }
@@ -799,7 +801,7 @@ export function step (dt) {
   // шорох в зарослях
   if ((LAST.rustle -= dt) < 0 && Math.hypot(V.vx, V.vz) > 3 && inThicket(V.x, V.z)) {
     LAST.rustle = 0.3;
-    A.Snd && A.Snd.noise(0.14, 0.05);
+    A.Snd && A.Snd.fx('rustle', s => s.noise(0.14, 0.05));
   }
 }
 function inThicket (x, z) {
@@ -821,7 +823,7 @@ function knock (c, it, nx, nz, force, quiet) {
   it.down = 1; c.down++; DOWN.add(it.key); ST.down++; DIRTY = true;
   const lo = low();
   for (const [px, pz] of it.pts) A.debris(px, pz, nx, nz, force, it.hex, lo ? 2 : 4, it.kind);
-  if (!quiet && A.Snd) A.Snd.noise(0.15, it.kind === 'sand' || it.kind === 'trash' ? 0.12 : 0.2);
+  if (!quiet && A.Snd) A.Snd.fx('smash', s => s.noise(0.15, it.kind === 'sand' || it.kind === 'trash' ? 0.12 : 0.2), null, it.kind === 'sand' || it.kind === 'trash' ? 0.6 : 1);
 }
 
 /* машина: сносит мелочь быстрее 9 км/ч (game.js — рядом с дворовой мелочью). → во сколько скорость */

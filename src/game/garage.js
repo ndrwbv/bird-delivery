@@ -4,7 +4,16 @@
      GARAGE.open(onClose)  — из меню и с экрана итогов
      GARAGE.close()
      GARAGE.isOpen(), GARAGE.root() — для геймпада и клавиатуры (career.js)
-     GARAGE.flip(±1)       — листать: ◀ ▶, стрелки, LB/RB, крестовина, свайп, перетаскивание мышью
+     GARAGE.flip(±1)       — листать: ◀ ▶, стрелки, LB/RB (Q/E), крестовина, свайп, перетаскивание мышью
+     GARAGE.act('armor' | 'engine') — прямые кнопки: [X] броня, [Y] мотор (геймпад и клавиши X / Y, career.js)
+     GARAGE.back()         — B / Esc: закрыть палитру или «точно продать?», иначе — выйти из гаража
+     GARAGE.mode()         — null | 'paint' | 'sell': в палитре ←→ ходят по цветам, а не листают машины
+
+   Геймпад (Steam Deck, 09.10.2026): курсор сразу на главном у машины в фокусе — «купить», «выбрать»,
+   иначе первое, что можно нажать (броня, мотор, покрасить); на «назад» курсор не встаёт никогда (это B).
+   После покупки, прокачки и покраски курсор остаётся на той же кнопке (тот же цвет) — жми A ещё раз.
+   Значки — по вводу (glyphs.js): [A] на главном, [X] броня, [Y] мотор, [B] назад / «готово» / «нет»,
+   [LB] [RB] на стрелках.
 
    Первый раз за всё время — обучение Дяди Жени (garagetour.js): пока идёт, root() — его
    облачко (геймпад и клавиатура жмут «дальше» / «пропустить»), close() — пропустить, flip — нет.
@@ -17,11 +26,15 @@
    только картинка в фокусе, остальные — готовые кадры из кэша (PIC). */
 import './garage.css';
 import * as ECON from './econ.js';
-import { t } from '../i18n/index.js';
+import { t, tn } from '../i18n/index.js';
 import * as TOUR from './garagetour.js';
+import { keyHTML, refreshKeys } from '../input/glyphs.js';
+import * as PFX from './paperfx.js';
 
 let D = null, el = null, idx = 0, list = [], onCloseCb = null;
 let MODE = null;                       // у карточки в фокусе: null | 'paint' (палитра) | 'sell' («точно продать?»)
+let ASK_AT = 0;                        // когда открыли «точно продать?»: «да» раньше 0,35 с не считается (двойное A не продаст)
+let WANT = null;                       // { a, hex } — на какой кнопке оставить курсор после перерисовки (то, что жали)
 const PIC = new Map();                 // id → неподвижная картинка (canvas)
 let SPIN = null;                       // { id, cv } — крутящаяся картинка карточки в фокусе
 const PW = 640, PH = 400;              // один размер на все картинки: общий WebGL не меняет размер
@@ -37,8 +50,10 @@ function build () {
   el.id = 'cr-garage';
   el.hidden = true;
   el.innerHTML =
-    '<div class="gr-top"><button type="button" class="gr-back"></button><div class="gr-t"></div><div class="gr-wallet"></div></div>' +
-    '<div class="gr-stage"><div class="gr-arrow l" role="button" aria-label="prev">◀</div><div class="gr-track"></div><div class="gr-arrow r" role="button" aria-label="next">▶</div></div>' +
+    // «назад» — B / Esc; курсор геймпада на него не встаёт (data-pad-skip), чтобы A не выкидывал из гаража
+    '<div class="gr-top"><button type="button" class="gr-back" data-pad-skip></button><div class="gr-t"></div><div class="gr-wallet"></div></div>' +
+    '<div class="gr-stage"><div class="gr-arrow l" role="button" aria-label="prev"><b>◀</b>' + keyHTML('lb') + '</div><div class="gr-track"></div>' +
+    '<div class="gr-arrow r" role="button" aria-label="next"><b>▶</b>' + keyHTML('rb') + '</div></div>' +
     '<div class="gr-dots"></div>';
   ($('game') || document.body).appendChild(el);
   el.querySelector('.gr-back').addEventListener('click', close);
@@ -53,13 +68,14 @@ export function open (onClose) {
   if (!D) return;
   build();
   onCloseCb = onClose || null;
-  el.querySelector('.gr-back').textContent = '◀ ' + t('назад');
+  el.querySelector('.gr-back').innerHTML = keyHTML('back') + esc(t('назад'));
   el.querySelector('.gr-t').textContent = t('гараж');
   load();
-  MODE = null;
+  MODE = null; WANT = null;
   idx = Math.max(0, list.findIndex(c => c.current));
   el.querySelector('.gr-track').innerHTML = '';
   el.hidden = false;
+  refreshKeys(el);
   render();
   requestAnimationFrame(() => el.classList.add('on'));
   if (TOUR.need(D.A.Store)) TOUR.start(el, { Store: D.A.Store, Snd: D.A.Snd, face: zhenyaFace });
@@ -70,6 +86,31 @@ function zhenyaFace () {
   const C = D.cars(), g = C && C.garage ? C.garage() : null;
   const p = (g && g.zh && g.zh.person) || (D.A.person ? D.A.person({ seed: 0x2E1A, fem: false, fat: true }) : null);
   return p ? D.A.face(p, 160) : '';
+}
+/** B / Esc: палитра или «точно продать?» — закрыть их (курсор — на ту же кнопку), иначе выйти из гаража */
+export function back () {
+  if (!isOpen()) return false;
+  if (!TOUR.on() && MODE) {
+    WANT = { a: MODE === 'paint' ? 'paintOpen' : 'sellAsk' };
+    MODE = null;
+    const card = el.querySelector('.gr-card.on');
+    if (card) fill(card, list[idx], true);
+    D.A.Snd.click(440, 0.05, 0.04);
+    return true;
+  }
+  close();
+  return true;
+}
+export const mode = () => (isOpen() && !TOUR.on() ? MODE : null);
+/** прямая кнопка: [X] броня, [Y] мотор — у своей машины в фокусе; нельзя (чужая, нет денег, до упора) — карточка вздрагивает */
+export function act (a) {
+  if (!isOpen() || TOUR.on()) return false;
+  const card = el.querySelector('.gr-card.on');
+  const b = card && card.querySelector('.gr-acts [data-a="' + a + '"]');
+  if (!b || b.disabled) { bump(); if (D.A.Snd) D.A.Snd.deny(); return false; }
+  PFX.press(b);
+  b.click();
+  return true;
 }
 export function close () {
   if (!el || el.hidden) return;
@@ -102,7 +143,8 @@ const statsOf = c => [
   ] : [
     { k: 'break', name: t('износ мотора'), v: (c.wearK || 1) <= 0.6 ? t('медленный') : (c.wearK || 1) <= 1 ? t('средний') : t('быстрый'), p: Math.min(1, (c.wearK || 1) / 1.4) },
   ]),
-  { k: 'hp', name: t('сердца'), v: String(Math.round(c.hp || 0)), p: (c.hp || 0) / hpTop() },
+  // сердца — только здесь (было ещё ♥♥♥ под именем — два раза одно и то же, 09.10.2026)
+  { k: 'hp', name: t('сердца'), v: Math.round(c.hp || 0) + ' ♥', p: (c.hp || 0) / hpTop() },
 ];
 
 /* ── карточки ── */
@@ -122,8 +164,13 @@ function render () {
   pics();
 }
 function wallet () {
-  const w = el.querySelector('.gr-wallet');
-  w.innerHTML = '<span>' + esc(t('в копилке')) + '</span> <b>' + esc(D.A.money(D.A.wallet())) + '</b> <em>★ ' + D.stars() + '</em>';
+  el.querySelector('.gr-wallet').innerHTML = walletHTML(D.A.money(D.A.wallet()), D.stars());
+}
+/** кошелёк и звёзды (гараж и «потратить», career.js): «в копилке 12 000 ₽ · ★ 3 звезды» и что такое звёзды —
+    подписью под ними (было голое «★ 0», а ★ на хаде — респект, другое) */
+export function walletHTML (cash, n) {
+  return '<span>' + esc(t('в копилке')) + '</span> <b>' + esc(cash) + '</b> <em>★ ' + esc(tn(n, '{n} звезда|{n} звезды|{n} звёзд')) + '</em>' +
+    '<small class="w-why">' + esc(t('звёзды — за хорошие смены, открывают крутые машины')) + '</small>';
 }
 function dots () {
   const d = el.querySelector('.gr-dots');
@@ -147,19 +194,20 @@ function place () {
   el.querySelector('.gr-arrow.r').classList.toggle('off', idx >= list.length - 1);
 }
 
-/* что на карточке: имя, сердца, три полоски и кнопки (кнопки — только у той, что в фокусе) */
+/* что на карточке: имя, полоски (сердца — последней) и кнопки (кнопки — только у той, что в фокусе) */
 function fill (card, c, focus, oldP) {
   const st = statsOf(c);
   const info = card.querySelector('.gr-info');
-  const hearts = '<em class="gr-hp">' + '♥'.repeat(Math.max(0, Math.round(c.hp || 0))) + '</em>';
   const bars = '<div class="gr-stats">' + st.map((s, j) =>
     '<div class="gr-st gr-st-' + s.k + '"><span>' + esc(s.name) + '</span><i class="gr-bar"><i style="width:' + ((oldP ? oldP[j] : s.p) * 100).toFixed(1) + '%"></i></i><b>' + esc(s.v) + '</b></div>').join('') + '</div>';
   card.classList.toggle('cur', !!c.current);
   card.classList.toggle('own', !!c.owned);
-  info.innerHTML = '<div class="gr-name">' + esc(c.name) + '</div>' + hearts +
+  // «техпаспорт № 0003» — шапкой, как у накладной (UI-REVIEW: гараж — техпаспорт)
+  info.innerHTML = '<div class="gr-head"><span>' + esc(t('техпаспорт')) + '</span><b>№ ' + String(list.indexOf(c) + 1).padStart(4, '0') + '</b></div>' +
+    '<div class="gr-name">' + esc(c.name) + '</div>' +
     (c.note ? '<div class="gr-note">' + esc(c.note) + '</div>' : '') + bars +
     '<div class="gr-acts">' + (focus ? acts(c) : ghostActs(c)) + '</div>';
-  if (focus) wire(card, c);
+  if (focus) { aim(card); wire(card, c); }
   if (oldP) requestAnimationFrame(() => requestAnimationFrame(() => {
     card.querySelectorAll('.gr-st .gr-bar > i').forEach((b, j) => {
       if (st[j].p > oldP[j] + 0.001) b.parentElement.parentElement.classList.add('up');
@@ -180,21 +228,22 @@ function acts (c) {
   let h = '';
   if (!c.owned) {
     const needSt = (c.stars || 0) > st, needM = cash < (c.price || 0);
-    h += '<button type="button" class="gr-btn buy" data-a="buy" autofocus' + (needSt || needM ? ' disabled' : '') + '>' +
-      esc(t('купить за {money}', { money: money(c.price) })) + (c.stars ? ' <i>· ★ ' + c.stars + '</i>' : '') + '</button>';
+    h += '<button type="button" class="gr-btn buy" data-a="buy"' + (needSt || needM ? ' disabled' : '') + '>' + keyHTML('ok') +
+      '<span>' + esc(t('купить за {money}', { money: money(c.price) })) + (c.stars ? ' <i>· ★ ' + c.stars + '</i>' : '') + '</span></button>';
     const why = needSt ? t('нужно ★ {n}, у тебя ★ {have}', { n: c.stars, have: st }) : needM ? t('не хватает {money}', { money: money(c.price - cash) }) : '';
     h += '<div class="gr-why">' + esc(why || t('броня и мотор — после покупки')) + '</div>';
     return h;
   }
   h += c.current ? '<button type="button" class="gr-btn cur" disabled>✓ ' + esc(t('на смене')) + '</button>'
-    : '<button type="button" class="gr-btn pick" data-a="pick" autofocus>' + esc(t('выбрать')) + '</button>';
-  for (const [kind, name, gain] of [
-    ['armor', t('добавить броню'), t('+1 ♥')],
-    ['engine', t('улучшить мотор'), t('+{n} % к скорости', { n: Math.round(U.VMAX * 100) })],
+    : '<button type="button" class="gr-btn pick" data-a="pick">' + (MODE ? '' : keyHTML('ok')) + '<span>' + esc(t('выбрать')) + '</span></button>';   // в палитре и «точно продать?» [A] — у них
+  // броня и мотор — прямыми кнопками [X] и [Y]: жать их можно, где бы ни стоял курсор
+  for (const [kind, name, gain, key] of [
+    ['armor', t('добавить броню'), t('+1 ♥'), 'x'],
+    ['engine', t('улучшить мотор'), t('+{n} % к скорости', { n: Math.round(U.VMAX * 100) }), 'y'],
   ]) {
     const lv = (c.up && c.up[kind]) || 0, pr = upPrice(c, kind);
     if (pr == null) h += '<button type="button" class="gr-btn up max" disabled><b>' + esc(name) + '</b><span>' + esc(t('до упора')) + '</span><i>' + pips(lv) + '</i></button>';
-    else h += '<button type="button" class="gr-btn up" data-a="' + kind + '" autofocus' + (cash < pr ? ' disabled' : '') + '><b>' + esc(name) + '</b><span>' + esc(gain + ' · ' + money(pr)) + '</span><i>' + pips(lv) + '</i></button>';
+    else h += '<button type="button" class="gr-btn up" data-a="' + kind + '"' + (cash < pr ? ' disabled' : '') + '>' + keyHTML(key) + '<b>' + esc(name) + '</b><span>' + esc(gain + ' · ' + money(pr)) + '</span><i>' + pips(lv) + '</i></button>';
   }
   return h + extraActs(c);
 }
@@ -204,20 +253,20 @@ function extraActs (c) {
   if (MODE === 'paint') {
     const C = D.cars(), cur = String(c.hex || '').toLowerCase();
     const sw = [{ hex: c.hexBase, name: t('заводской'), base: true }].concat((C && C.PAINTS) || []);
-    let first = true;
+    // свой цвет не жмётся (on), но курсор на нём стоит можно: ←→ ходят по цветам, A — красить
     const btns = sw.filter((p, i) => !(i > 0 && String(p.hex).toLowerCase() === String(c.hexBase).toLowerCase())).map(p => {
-      const on = String(p.hex).toLowerCase() === cur, af = !on && first ? (first = false, ' autofocus') : '';
+      const on = String(p.hex).toLowerCase() === cur;
       return '<button type="button" class="gr-sw' + (on ? ' on' : '') + (p.base ? ' base' : '') + '" data-a="paint" data-hex="' + esc(p.hex) + '" style="--c:' + esc(p.hex) + '"' +
-        ' title="' + esc(p.base ? p.name : t(p.name)) + '" aria-label="' + esc(p.base ? p.name : t(p.name)) + '"' + af + (on || cash < pp ? ' disabled' : '') + '></button>';
+        ' title="' + esc(p.base ? p.name : t(p.name)) + '" aria-label="' + esc(p.base ? p.name : t(p.name)) + '"' + (on ? ' aria-current="true"' : cash < pp ? ' disabled' : '') + '></button>';
     }).join('');
     return '<div class="gr-paint"><div class="gr-paint-t"><span>' + esc(t('покраска · {money}', { money: money(pp) })) + '</span>' +
-      '<button type="button" class="gr-btn gr-x" data-a="close">' + esc(t('готово')) + '</button></div><div class="gr-sws">' + btns + '</div>' +
+      '<button type="button" class="gr-btn gr-x" data-a="close">' + keyHTML('back') + esc(t('готово')) + '</button></div><div class="gr-sws">' + btns + '</div>' +
       (cash < pp ? '<div class="gr-why">' + esc(t('не хватает {money}', { money: money(pp - cash) })) + '</div>' : '') + '</div>';
   }
   if (MODE === 'sell') {
     return '<div class="gr-ask"><span>' + esc(t('продать «{name}» за {money}?', { name: c.name, money: money(c.sellPrice) })) + '</span>' +
-      '<div class="gr-row"><button type="button" class="gr-btn sell" data-a="sell">' + esc(t('да, продать')) + '</button>' +
-      '<button type="button" class="gr-btn" data-a="close" autofocus>' + esc(t('нет')) + '</button></div></div>';
+      '<div class="gr-row"><button type="button" class="gr-btn sell" data-a="sell">' + keyHTML('ok') + esc(t('да, продать')) + '</button>' +
+      '<button type="button" class="gr-btn" data-a="close">' + keyHTML('back') + esc(t('нет')) + '</button></div></div>';
   }
   // продать — только если можно: серая «машину пиццерии не продать» только мешала (05.10.2026)
   return '<div class="gr-row">' +
@@ -230,17 +279,39 @@ function ghostActs (c) {
   return '<div class="gr-ghost">' + esc(c.current ? t('на смене') : t('выбрать')) + '</div>';
 }
 
+/* куда встаёт курсор геймпада и клавиатуры (padmenu.js: [data-pad-main]) — ровно одна кнопка на карточке:
+   то, что жали в прошлый раз (тот же цвет), если оно ещё жмётся; иначе главное — «купить» / «выбрать»,
+   у своей на смене — броня, мотор, покрасить; в палитре — первый чужой цвет; в «точно продать?» — «да» */
+const MAIN_ORDER = { paint: ['.gr-sw:not(.on)', '[data-a="close"]'], sell: ['[data-a="sell"]', '[data-a="close"]'],
+  '': ['[data-a="buy"]', '[data-a="pick"]', '[data-a="armor"]', '[data-a="engine"]', '[data-a="paintOpen"]', '[data-a="sellAsk"]'] };
+function aim (card) {
+  const acts = card.querySelector('.gr-acts');
+  if (!acts) return;
+  let b = null;
+  if (WANT) {
+    const q = '[data-a="' + WANT.a + '"]' + (WANT.hex ? '[data-hex="' + WANT.hex + '"]' : '');
+    b = acts.querySelector(q);
+    if (b && b.disabled) b = null;
+  }
+  for (const q of MAIN_ORDER[MODE || '']) { if (b) break; const x = acts.querySelector(q); if (x && !x.disabled) b = x; }
+  if (b) b.setAttribute('data-pad-main', '');
+}
 function wire (card, c) {
   const C = D.cars();
   card.querySelectorAll('[data-a]').forEach(b => b.addEventListener('click', e => {
     e.stopPropagation();
     const a = b.dataset.a;
+    if (b.classList.contains('gr-sw') && b.classList.contains('on')) { D.A.Snd.click(330, 0.04, 0.04); return; }   // этот цвет уже на машине
+    if (a === 'sell' && performance.now() - ASK_AT < 350) return;
+    WANT = { a, hex: b.dataset.hex || '' };
     // открыть / закрыть палитру и «точно продать?» — без денег, просто перерисовать карточку
     const to = { paintOpen: 'paint', sellAsk: 'sell', close: null }[a];
     if (to !== undefined) {
+      WANT = to ? null : { a: MODE === 'sell' ? 'sellAsk' : 'paintOpen' };   // закрыл — курсор назад на «покрасить» / «продать»
       MODE = to;
+      if (to === 'sell') ASK_AT = performance.now();
       fill(card, c, true);
-      D.A.Snd.blip(to ? 660 : 440, 0.04, 'square', 0.05);
+      D.A.Snd.click(to ? 660 : 440, 0.05, 0.04);
       return;
     }
     const oldP = statsOf(c).map(s => s.p);
@@ -252,7 +323,7 @@ function wire (card, c) {
       const bad = v === false || (v && v.ok === false);
       if (bad) {
         card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
-        D.A.Snd.blip(220, 0.12, 'square', 0.1);
+        D.A.Snd.deny();
         const w = card.querySelector('.gr-why');
         const WHY = { money: t('не хватает денег'), stars: t('не хватает звёзд'), max: t('прокачано до упора'), current: t('на ней на смене — не продать'), start: t('машину пиццерии не продать') };
         if (w && v && WHY[v.why]) w.textContent = WHY[v.why];
@@ -262,7 +333,7 @@ function wire (card, c) {
       D.A.carChanged();
       D.A.Snd.coin();
       PIC.delete(c.id);                       // броня, мотор и цвет видны на картинке
-      if (a === 'sell') MODE = null;          // палитра остаётся открытой — можно перебрать цвета
+      if (a === 'sell') { MODE = null; WANT = null; }   // палитра остаётся открытой — можно перебрать цвета
       load();
       const nc = list[idx];
       render();
@@ -295,14 +366,14 @@ function go (i) {
   const tr = el.querySelector('.gr-track');
   const was = idx;
   idx = i;
-  MODE = null;
+  MODE = null; WANT = null;
   stopSpin();
   fill(tr.children[was], list[was], false);
   fill(tr.children[idx], list[idx], true);
   dots();
   place();
   pics();
-  D.A.Snd.blip(520 + idx * 18, 0.04, 'square', 0.05);
+  D.A.Snd.click(520 + idx * 18, 0.05, 0.04);
   if (D.onFlip) D.onFlip();
 }
 function bump () {                            // край ленты — карточка вздрагивает

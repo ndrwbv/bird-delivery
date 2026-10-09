@@ -16,3 +16,9 @@ steam_appid.txt
 STEAM-ACCOUNT.local.md
 # личные заметки автора (деньги, окупаемость) — не коммитить
 *.local.md
+
+# ключи (ElevenLabs для npm run sfx и т. п.) — не коммитить
+.env.local
+.env.*.local
+# старые звуки после npm run sfx -- --force
+.sfx-old/

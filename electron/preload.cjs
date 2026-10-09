@@ -20,6 +20,9 @@ contextBridge.exposeInMainWorld('birdSteam', {
   logDir: () => call('log:dir'),
   openLogs: () => call('log:open'),
   isFullscreen: () => call('win:isFullscreen'),
+  // ролик повтора (src/game/replay.js): байты webm → «Видео/<папка>/<имя>», ответ — путь или null; показать в папке
+  saveVideo: (data, folder, name) => call('video:save', data, folder, name),
+  showVideo: file => call('video:show', file),
   steam: {
     available: !!boot.available,                   // steamworks.js поднялся и Steam запущен
     deck: !!boot.deck,                             // Steam Deck (по Steamworks или env SteamDeck=1)

@@ -4,8 +4,9 @@
      • свои постройки-«дома» (контуры, что модули кладут как дом): пустыри (wastelands.js), точки
        конкурентов (rivals.js), стройки (construction.js), пиццерии-шары (pizzadome.js), клуб — ни одна
        точка контура не на асфальте;
-     • участки строек, пустырей, костров и котлов (darknight.js) — прямоугольник целиком не на асфальте;
-     • гаражи-ракушки (lawnprops.js) — собираем клетки у каждого 20-го подъезда, коробка не на асфальте. */
+     • участки строек, пустырей, костров и котлов (darknight.js), пляж (beach.js) — прямоугольник целиком не на асфальте;
+     • гаражи-ракушки (lawnprops.js) — собираем клетки у каждого 20-го подъезда, коробка не на асфальте;
+     • коробки-постройки из редактора города (edits.json) — ни одна точка не на асфальте. */
 const RS = d.RSEG, G = new Map(), CELL = 40;
 RS.forEach(s => {
   if (s.c === 6) return;
@@ -57,6 +58,7 @@ for (const s of (d.CONS && d.CONS.SITES) || []) rect('стройка', s);
 for (const s of (d.WASTE && d.WASTE.LOTS) || []) rect('пустырь', s);
 for (const s of (d.DARK && d.DARK.CAMPS) || []) rect('костёр', s);
 for (const s of (d.DARK && d.DARK.POTS) || []) rect('котёл', s);
+if (d.BEACH && d.BEACH.rect) rect('пляж', d.BEACH.rect);   // песок пляжа с ларьком и кабинкой (beach.js)
 // 3) гаражи-ракушки газона (собираются у камеры — соберём сами у части подъездов)
 if (d.LAWN) {
   const ents = d.CITY.entrances, done = new Set();
@@ -73,6 +75,13 @@ if (d.LAWN) {
       }
     }
   }
+}
+// 4) коробки-постройки из редактора города (src/maps/<карта>/edits.json, editlayer.js)
+for (const s of (d.EDL && d.EDL.BOXES) || []) {
+  cnt('коробка из редактора');
+  let w = -99;
+  for (const a of [-1, -0.5, 0, 0.5, 1]) for (const b of [-1, -0.5, 0, 0.5, 1]) w = Math.max(w, pen(s.cx + s.hw * a * s.cs - s.hd * b * s.sn, s.cz + s.hw * a * s.sn + s.hd * b * s.cs));
+  if (w > 0) hit('коробка из редактора', s.cx, s.cz, w);
 }
 const bad = Object.values(R.by).reduce((a, b) => a + b, 0);
 return { ok: bad === 0 && Object.keys(R.n).length > 0, bad, ...R };

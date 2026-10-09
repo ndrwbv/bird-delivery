@@ -308,10 +308,17 @@ export function build (A, f, opt = {}) {
   }
   A.LAMP_SPOTS.push(at(0, V1 + 2.5));
 
-  // столики под зонтиками по бокам от входа — сбиваются, как дворовая мелочь
+  // столики под зонтиками по бокам от входа — сбиваются, как дворовая мелочь. На стоянку курьеров
+  // и её выезд не ставим (09.10.2026: на первой пиццерии столик стоял вплотную к машине на старте)
+  const lb = opt.lots ? lotBase(A, { mx: cx, mz: cz, road }, opt.lots) : null;
+  const inLot = (x, z) => {
+    if (!lb) return false;
+    const dx = x - lb.base[0], dz = z - lb.base[1], a = dx * lb.ux + dz * lb.uz, b = dx * lb.nx + dz * lb.nz - lb.off;
+    return Math.abs(a) < lb.W / 2 + 2.2 && b > -3 && b < lb.D + 2.2;
+  };
   for (const s of [-1, 1]) {
     const [tx, tz] = at(s * (VW / 2 + 3.4), V1 + 1.2);
-    if (A.inHouse(tx, tz, 0.6) || A.onRoad(tx, tz, 1.2)) continue;
+    if (A.inHouse(tx, tz, 0.6) || A.onRoad(tx, tz, 1.2) || inLot(tx, tz)) continue;
     const ty = A.groundH(tx, tz) + 0.13, g = [];
     put(g, new THREE.CylinderGeometry(0.55, 0.55, 0.06, 10), WHITE, tx, ty + 0.75, tz);
     put(g, new THREE.CylinderGeometry(0.05, 0.05, 0.75, 6), '#585460', tx, ty + 0.38, tz);

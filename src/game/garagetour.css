@@ -2,13 +2,13 @@
 .gt { position: absolute; inset: 0; z-index: 10; opacity: 0; transition: opacity .18s; }
 .gt.on { opacity: 1; }
 .gt-hole { position: absolute; border-radius: 14px; pointer-events: none; border: 3px solid #ffd85e;
-           box-shadow: 0 0 0 4px #33210c, 0 0 0 9999px rgba(8, 10, 24, .74);
+           box-shadow: 0 0 0 4px #33210c, 0 0 0 9999px rgba(22, 12, 6, .74);
            transition: left .3s cubic-bezier(.2, .8, .25, 1), top .3s cubic-bezier(.2, .8, .25, 1), width .3s cubic-bezier(.2, .8, .25, 1), height .3s cubic-bezier(.2, .8, .25, 1);
            animation: gt-pulse 1.1s ease-in-out infinite alternate; }
 .gt-hole[hidden] { display: block; width: 0 !important; height: 0 !important; border: 0; }
 @keyframes gt-pulse { to { border-color: #fff3d6; } }
-.gt-box { position: absolute; width: min(460px, calc(100% - 24px)); box-sizing: border-box; background: #1d2440; border: 3px solid #33210c;
-          border-top: 10px solid #6f8a3a; border-radius: 12px; box-shadow: 0 8px 0 #141a33; padding: 12px 14px 12px;
+.gt-box { position: absolute; width: min(500px, calc(100% - 24px)); box-sizing: border-box; background: #3b2516; border: 3px solid #33210c;
+          border-top: 10px solid #6f8a3a; border-radius: 12px; box-shadow: 0 8px 0 #1a0f08; padding: 12px 14px 12px;
           transition: left .3s cubic-bezier(.2, .8, .25, 1), top .3s cubic-bezier(.2, .8, .25, 1); }
 .gt-box.pop { animation: gt-pop .3s cubic-bezier(.2, .9, .3, 1.4); }
 @keyframes gt-pop { from { transform: scale(.94); } to { transform: none; } }
@@ -17,25 +17,27 @@
 .gt-head img { width: 84px; height: 84px; image-rendering: pixelated; border-radius: 10px; border: 3px solid #33210c; background: #f3c9a0;
                animation: gt-talk .5s ease-in-out infinite alternate; }
 .gt-head img[hidden] { display: none; }
-.gt-head b { font-weight: normal; font-size: 8px; color: #ffd85e; text-align: center; max-width: 96px; }
+.gt-head b { font-weight: normal; font-size: var(--pp-fs-s, 11px); color: #ffd85e; text-align: center; max-width: 96px; }
 @keyframes gt-talk { from { transform: translateY(0); } to { transform: translateY(-3px) rotate(-1deg); } }
 .gt-bub { position: relative; flex: 1; min-width: 0; background: #fff3d6; color: #2a1d10; border: 3px solid #33210c; border-radius: 12px;
           padding: 10px 12px; margin-bottom: 20px; cursor: pointer; }
 .gt-bub::before { content: ''; position: absolute; left: -18px; bottom: 14px; border: 9px solid transparent; border-right: 10px solid #33210c; }
 .gt-bub::after { content: ''; position: absolute; left: -12px; bottom: 16px; border: 7px solid transparent; border-right: 8px solid #fff3d6; }
-.gt-bub p { margin: 0; font-size: 10px; line-height: 1.8; }
+.gt-bub p { margin: 0; font-size: var(--pp-fs-m, 12px); line-height: 1.7; }
 .gt-btns { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 10px; }
-.gt-n { margin-right: auto; font-style: normal; font-size: 8px; color: #b9c3e6; }
-.gt-btns button { font: inherit; font-size: 10px; padding: 10px 14px; border-radius: 8px; border: 3px solid #33210c; cursor: pointer; box-shadow: 0 4px 0 #33210c; }
+.gt-n { margin-right: auto; font-style: normal; font-size: var(--pp-fs-s, 11px); color: #e8cfa6; }
+.gt-btns button { display: inline-flex; align-items: center; justify-content: center; font: inherit; font-size: var(--pp-fs-s, 11px); padding: 10px 14px;
+                  border-radius: 8px; border: 3px solid #33210c; cursor: pointer; box-shadow: 0 4px 0 #1a0f08; }
+.gt-btns button .pp-key { margin-right: .6em; }
 .gt-btns button[hidden] { display: none; }
 .gt-next { background: #ffd85e; color: #2a1d10; }
-.gt-skip { background: #3a4570; color: #fff3d6; }
+.gt-skip { background: #fff3d6; color: #33210c; border-style: dashed !important; border-color: #8a6b4e !important; }
 .gt-btns button:active { transform: translateY(2px); box-shadow: 0 2px 0 #33210c; }
 @media (max-width: 560px) {
   .gt-head img { width: 56px; height: 56px; }
   .gt-head b { display: none; }
   .gt-bub { margin-bottom: 10px; }
-  .gt-bub p { font-size: 9px; line-height: 1.7; }
+  .gt-bub p { line-height: 1.7; }
   .gt-btns button { flex: 1; padding: 11px 8px; }
   .gt-n { flex: none; }
 }

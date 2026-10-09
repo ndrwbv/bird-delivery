@@ -275,7 +275,7 @@ function campStep (s, dt, near) {
     A.sparks(s.x, 0.6, s.z, 18, V.vx / sp, V.vz / sp);
     A.puff(s.x, 0.8, s.z, true, 1);
     V.vx *= 0.85; V.vz *= 0.85;
-    if (A.Snd) A.Snd.noise(0.15, 0.2);
+    if (A.Snd) A.Snd.fx('smash', s => s.noise(0.15, 0.2), { x: s.x, z: s.z });
     const v = s.sav.find(q => !q.dead);
     if (v) say(s, v.g, t('огонь — наш!'), '#c8641a');
   }
@@ -382,7 +382,7 @@ function tipPot (s, dx, dz) {
   s.tip = { t: 0, dx: dx / l, dz: dz / l, ax: new THREE.Vector3(dz / l, 0, -dx / l) };
   s.liq.visible = false; for (const b of s.bub) b.visible = false;
   STATS.tipped++;
-  if (A.Snd) { A.Snd.crash(6); A.Snd.blip(180, 0.25, 'square', 0.12); }
+  if (A.Snd) A.Snd.fx('cauldron', s => { A.Snd.crash(6, null, 'bin'); s.blip(180, 0.25, 'square', 0.12); }, { x: s.x, z: s.z });
   A.puff(s.x, 0.8, s.z, false, 0.8);
   const pud = { x: s.x + s.tip.dx * 1.8, z: s.z + s.tip.dz * 1.8, t: 0, smokeT: 0, mat: new THREE.MeshBasicMaterial({ color: '#5cff2a', transparent: true, opacity: 0.8, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }) };
   pud.m = new THREE.Mesh(R.disc, pud.mat);
@@ -448,7 +448,7 @@ function potStep (s, dt, near) {
     if ((s.say -= dt) <= 0 && Math.hypot(w.x - V.x, w.z - V.z) < POT.SAY_R) {
       say(s, g, t(WITCH_LINES[(Math.random() * WITCH_LINES.length) | 0]), '#4a8a1a');
       s.say = POT.SAY_CD;
-      if (A.Snd) A.Snd.blip(1100, 0.08, 'triangle', 0.05);
+      if (A.Snd) A.Snd.fx('witch', s => s.blip(1100, 0.08, 'triangle', 0.05), { x: w.x, z: w.z });
     }
   }
 }
@@ -496,7 +496,7 @@ export function onHit (p, vx, vz) {
 function dispel (g) {
   g.state = 'gone'; g.k = 0; STATS.dispelled++;
   for (let i = 0; i < 5; i++) A.puff(g.x + rand(-0.4, 0.4), 0.6 + i * 0.3, g.z + rand(-0.4, 0.4), false, 0.6);
-  if (A.Snd) { A.Snd.blip(880, 0.12, 'sine', 0.08); A.Snd.blip(440, 0.3, 'sine', 0.06); }
+  if (A.Snd) A.Snd.fx('ghost', s => { s.blip(880, 0.12, 'sine', 0.08); s.blip(440, 0.3, 'sine', 0.06); }, { x: g.x, z: g.z });
 }
 function ghostStep (dt) {
   if (!GHOSTS.length) return;

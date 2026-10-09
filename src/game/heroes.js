@@ -455,7 +455,7 @@ function say (H, text, ttl = HERO.SAY_T) {
   H.bubble = sp; H.bubT = Math.max(ttl, readTime(text)); H.talk = Math.min(ttl, 2.5);
   H.log.push(text);
   if (H.log.length > 40) H.log.shift();
-  if (A.Snd && A.Snd.blip) A.Snd.blip(H.def.fem ? 640 : 380, 0.06, 'triangle', 0.08);
+  if (A.Snd && A.Snd.fx) A.Snd.fx(H.def.fem ? 'talk-f' : 'talk-m', s => s.blip(H.def.fem ? 640 : 380, 0.06, 'triangle', 0.08));
   return true;
 }
 

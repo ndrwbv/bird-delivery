@@ -13,8 +13,8 @@
 
    Из game.js:
      CHAT.init({ face, person, adult, blip }) — face(person, size) → картинка; adult — взрослая версия (мат);
-                                            blip(f, d, type, v) — звук (Snd.blip)
-     CHAT.react(kind, onShow?)            — kind: 'fast' | 'late' | 'bump' | 'kill' | 'bundle' | 'urgent';
+                                            blip(f, d, type, v) — звук (Snd.blip); fx — Snd.fx (файлы chat / chat-angry)
+     CHAT.react(kind, onShow?)            — kind: 'fast' | 'late' | 'bump' | 'kill' | 'bundle' | 'urgent' | 'back';
                                             onShow() — в момент, когда текст появился (списание денег)
      CHAT.say(text, onShow?)              — своё сообщение
      CHAT.clear()                         — убрать всё (конец смены, меню)
@@ -22,6 +22,7 @@
      CHAT.busy() / CHAT.idle(cb, max)     — есть ли отложенное, «печатает…» или крупное; cb — когда всё
                                             показано и уменьшилось (не дольше max мс) — конец смены ждёт
      CHAT.waiting()                       — идёт idle(): отложенная похвала всё равно показывается
+     CHAT.talking()                       — печатает или крупное сообщение (музыка тише, music.js)
    Из shiftend.js (экран Толика в конце смены):
      CHAT.avatar(size)                    — его лицо картинкой ('' — нет); CHAT.person() — он сам (диалог обеда)
      CHAT.shiftLine(mood)                 — что он пишет после смены: mood 'bad' | 'ok' | 'great' */
@@ -50,6 +51,9 @@ const ADULT_LINES = {
     N_('клиент лежит на асфальте, а пицца у тебя. ты больной, блин?')],
   urgent: /*i18n*/ [N_('СРОЧНЫЙ, блядь! русским же языком написано. клиент отказался, штраф с тебя'),
     N_('ты срочный заказ проебал, гонщик хренов. минус из зп')],
+  back: /*i18n*/ [N_('ты где застрял, блядь? тут пиццы стынут, а он катается. штраф'),
+    N_('обратно тоже надо вовремя, гонщик хренов. минус из зп'),
+    N_('отвёз — и пропал, сука. в пиццерию живо, а штраф уже вычел')],
 };
 const KIDS_LINES = {
   late: /*i18n*/ [N_('какого лешего ты проспал заказ?! теперь пиццерия должна этому вредному дядьке ещё одну пиццу, вычитаю из твоей зарплаты'),
@@ -61,21 +65,25 @@ const KIDS_LINES = {
     N_('клиент лежит на асфальте, а пицца у тебя. ты в своём уме?')],
   urgent: /*i18n*/ [N_('там же было написано СРОЧНО! клиент отказался, штраф с тебя'),
     N_('срочный заказ упустил, гонщик. минус из зарплаты')],
+  back: /*i18n*/ [N_('ты где застрял?! тут пиццы стынут, а он катается. штраф'),
+    N_('обратно тоже надо вовремя, гонщик. минус из зарплаты'),
+    N_('отвёз — и пропал! в пиццерию живо, а штраф я уже вычел')],
 };
 
-const C = { el: null, face: null, person: null, adult: false, blip: null, items: [], last: {}, wait: 0 };
+const C = { el: null, face: null, person: null, adult: false, blip: null, fx: null, items: [], last: {}, wait: 0, pl: 0 };
 const PEND = new Set();                                  // отложенные сообщения (later)
-const ANGRY = new Set(['late', 'bump', 'kill', 'urgent']);
+const ANGRY = new Set(['late', 'bump', 'kill', 'urgent', 'back']);
 
-export function init ({ face, person, adult, blip }) {
-  C.face = face; C.person = person; C.adult = !!adult; C.blip = blip || null;
+export function init ({ face, person, adult, blip, fx }) {
+  C.face = face; C.person = person; C.adult = !!adult; C.blip = blip || null; C.fx = fx || null;
 }
 
 /* звук «пришло сообщение»: два коротких тона, ругань — ниже */
 function ding (angry) {
-  if (!C.blip) return;
   const f = angry ? [620, 470] : [1320, 1760];
-  f.forEach((x, i) => setTimeout(() => { try { C.blip(x, 0.12, 'triangle', 0.13); } catch (e) { /* — */ } }, i * 95));
+  const synth = s => f.forEach((x, i) => setTimeout(() => { try { s.blip(x, 0.12, 'triangle', 0.13); } catch (e) { /* — */ } }, i * 95));
+  if (C.fx) { try { C.fx(angry ? 'chat-angry' : 'chat', synth); } catch (e) { /* — */ } return; }
+  if (C.blip) synth({ blip: C.blip });
 }
 
 /* где пузырь крупно: на своём месте — строка раздувается от правого верхнего угла своего содержимого
@@ -168,6 +176,9 @@ function shown (m) {
 export function say (text, onShow, angry) {
   const el = box();
   place();
+  // хад мог появиться или спрятаться, пока сообщения висят (написал в катсцене — хада нет, чат встал в самый верх;
+  // катсцена кончилась — он лёг на кошелёк и радар): пока есть сообщения, место пересчитываем
+  if (!C.pl) C.pl = setInterval(() => { if (!C.items.length) { clearInterval(C.pl); C.pl = 0; return; } place(); }, 400);
   while (C.items.length >= MAX) drop(C.items[0]);
   const row = document.createElement('div');
   row.className = 'cm';
@@ -234,6 +245,8 @@ export function later (ms, fn) {
 }
 export const busy = () => PEND.size > 0 || C.items.some(m => !m.said || m.big || m.anim);
 export const waiting = () => C.wait > 0;
+/** Толик сейчас «говорит»: печатает или сообщение крупно (музыка приглушается — music.js) */
+export const talking = () => C.items.some(m => !m.said || m.big);
 export function idle (cb, max = 6000) {
   const t0 = performance.now();
   C.wait++;

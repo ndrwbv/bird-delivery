@@ -13,6 +13,7 @@
 import './board.css';
 import Platform from '../platform/index.js';
 import { t } from '../i18n/index.js';
+import { keyHTML } from '../input/glyphs.js';   // «[B] назад» — значком того, чем играют
 
 export const LB_NAME = 'BEST_SHIFT';
 const TOP = 10;
@@ -66,7 +67,7 @@ export function open (cb) {
   box.querySelector('.crm-dt').textContent = t('лучшая смена');
   box.querySelector('[data-tab="world"]').textContent = t('весь мир');
   box.querySelector('[data-tab="friends"]').textContent = t('друзья');
-  box.querySelector('.crm-dclose').textContent = t('назад');
+  box.querySelector('.crm-dclose').innerHTML = keyHTML('back') + esc(t('назад'));
   box.hidden = false;
   load();
 }

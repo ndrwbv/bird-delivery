@@ -23,6 +23,7 @@ const has = k => process.argv.includes('--' + k);
 const DIST = path.isAbsolute(arg('dist', 'web')) ? arg('dist', 'web') : path.join(__dirname, '..', 'dist', arg('dist', 'web'));
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
+app.commandLine.appendSwitch('mute-audio');   // проверки — без звука (автор 09.10)
 app.commandLine.appendSwitch('js-flags', '--expose-gc');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -53,7 +54,7 @@ app.whenReady().then(async () => {
   const js = c => win.webContents.executeJavaScript(c);
   const t0 = Date.now();
   await win.loadURL(`app://g/index.html?debug&mute&nolb&lang=ru&map=${arg('map', 'seversk')}${arg('q', '')}`);
-  for (let i = 0; i < 120 && !(await js('!!window.__dlv')); i++) await sleep(250);
+  for (let i = 0; i < 120 && !(await js('!!window.__dlv && (!window.__boot || !!window.__boot.full)')); i++) await sleep(250);
   const dbg = win.webContents.debugger; dbg.attach('1.3');
   if (CPU > 1) {                                   // сборку города не тормозим — только игру
     await dbg.sendCommand('Emulation.setCPUThrottlingRate', { rate: CPU });

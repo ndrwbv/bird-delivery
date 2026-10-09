@@ -44,11 +44,15 @@ document.documentElement.dataset.city = mapId;
 
 // город строится синхронно при импорте: сначала даём браузеру нарисовать экран загрузки
 await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+// время запуска (docs/AGENTS.md → «Запуск до меню»): window.__boot — мс от старта страницы
+const BOOT = window.__boot = { pre: Math.round(performance.now()) };
 await import('./game/game.js');
+BOOT.game = Math.round(performance.now());
 document.title = (await import('./game/brands.js')).OWN.pizza();
 Platform.ready();
 // первый кадр игры готов — загрузка плавно уходит, интерфейс плавно проявляется
 requestAnimationFrame(() => requestAnimationFrame(() => {
+  BOOT.menu = Math.round(performance.now());
   document.body.classList.remove('booting');
   const boot = document.getElementById('boot');
   if (boot) { boot.classList.add('gone'); setTimeout(() => boot.remove(), 600); }

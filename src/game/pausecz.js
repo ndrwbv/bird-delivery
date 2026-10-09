@@ -1,10 +1,12 @@
 /* Пауза (04.10.2026): сверху — чек смены (до конца смены, доставлено, заработано, респект…) и
    накладная (текущий заказ, адрес, сколько до точки), внизу — полоса кнопок-карточек, как в главном
-   меню (carousel.js): продолжить · карта района · настройки (те же, что в главном меню, settings.js)
+   меню (carousel.js): продолжить · карта района · повтор последних 10 с (replay.js) · настройки (те же, что в главном меню, settings.js)
    · управление (настройки сразу на табе «управление») · закончить смену. Без прокрутки на любом
    экране; листок, который не влез, листается внутри себя. Правила — docs/CAREER.md «Пауза».
    Кнопки и листки — те же элементы из index.html (#pm-go, #pm-stats, #pm-order, #pm-map, #pm-menu):
    модуль только раскладывает их, обработчики — в game.js. Открыл паузу — в центре «продолжить».
+   Стиль (09.10.2026, UI-REVIEW № 45): кнопки — бумажные ярлычки с дыркой под нитку, «продолжить» —
+   красный штамп; у ярлычка в центре — значок [A]; «пауза» — жёлтый стикер.
 
      PZ.init(elPause, { settings(tab), navReset }) — из game.js один раз
      PZ.reset()      — при открытии паузы: в центр «продолжить»
@@ -12,6 +14,7 @@
 import './pausecz.css';
 import { t } from '../i18n/index.js';
 import { carousel } from './carousel.js';
+import { keyHTML } from '../input/glyphs.js';
 
 let root = null, CZ = null, A = null;
 const $ = id => document.getElementById(id);
@@ -39,6 +42,10 @@ export function init (el, api) {
     return b;
   };
   const set = mk('pm-set'), ctrl = mk('pm-ctrl', 'ctrl');
+  // «повтор последних 10 с» (replay.js): пауза закрывается, после повтора — снова пауза
+  const rp = document.createElement('button');
+  rp.type = 'button'; rp.id = 'pm-replay';
+  rp.addEventListener('click', () => { if (A.replay) A.replay(); });
   if ($('pm-sfx')) $('pm-sfx').hidden = true;
   const btnCard = (key, btn) => {
     const c = document.createElement('div');
@@ -51,6 +58,7 @@ export function init (el, api) {
   const cards = [
     btnCard('go', $('pm-go')),
     btnCard('map', $('pm-map')),
+    btnCard('replay', rp),
     btnCard('set', set),
     btnCard('keys', ctrl),
     btnCard('end', $('pm-menu')),
@@ -60,9 +68,16 @@ export function init (el, api) {
   if (desk) desk.hidden = true;
   label();
 }
+/* подписи и значок кнопки [A] на каждом ярлычке (виден только у ярлычка в центре — его и жмёт A).
+   game.js renderPause меняет текст «закончить смену» / «в главное меню» и зовёт label() — значок ставим заново */
 export function label () {
   const b = $('pm-set'); if (b) b.textContent = t('настройки');
   const c = $('pm-ctrl'); if (c) c.textContent = t('управление');
+  const r = $('pm-replay'); if (r) r.textContent = t('повтор последних 10 с');
+  for (const id of ['pm-go', 'pm-map', 'pm-replay', 'pm-set', 'pm-ctrl', 'pm-menu']) {
+    const n = $(id);
+    if (n && !n.querySelector('.pp-key')) n.insertAdjacentHTML('afterbegin', keyHTML('ok'));
+  }
 }
 export function reset () { if (CZ) { CZ.go(0, true); label(); } }
 export const on = () => !!(CZ && root && !root.hidden);

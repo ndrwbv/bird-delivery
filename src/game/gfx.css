@@ -1,15 +1,23 @@
-/* «кадр не успевает — включить Среднюю?» (gfx.js offer): тихая плашка внизу, сама уходит через 15 с */
+/* «кадр не успевает — включить „среднюю“?» (gfx.js offer) — маленькая бумажка-записка в углу, в езде:
+   одно короткое проявление (.pp-ride), без пружин; «[X] включить» — кнопкой X / клавишей X, «не надо» — пальцем */
 .gfx-offer {
-  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 14px); transform: translateX(-50%); z-index: 60;
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px;
-  max-width: min(92vw, 640px); box-sizing: border-box; padding: 10px 14px;
-  font-size: 11px; line-height: 1.5; color: #fff3d6; background: rgba(42, 36, 56, .92);
-  border: 3px solid #33210c; border-radius: 10px; box-shadow: 0 4px 0 #33210c;
+  position: fixed; right: max(12px, env(safe-area-inset-right, 0px)); top: calc(env(safe-area-inset-top, 0px) + 12px); z-index: 60;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; width: min(310px, 50vw); box-sizing: border-box; padding: 9px 10px 10px;
+  font-family: "Press Start 2P", ui-monospace, monospace; font-size: var(--pp-fs-s); line-height: 1.5; color: var(--pp-ink);
+  background: var(--pp-paper); border: 2px solid var(--pp-ink); border-top: 5px solid var(--pp-orange); border-radius: 3px;
+  box-shadow: 0 4px 0 rgba(51, 33, 12, .75); animation: pp-fade .18s ease-out both;
 }
-.gfx-offer span { flex: 1 1 14em; }
+.gfx-offer span { flex: 1 0 100%; }
+.gfx-offer[hidden] { display: none; }
+/* пауза, карта, повтор — записку прячем: там X не её (кадры в паузе не идут, gfx.js watch не зовётся) */
+body:has(#pausem:not([hidden]), #fullmap:not([hidden]), .rp-ui.on, #panel:not([hidden]), #dlg:not([hidden])) .gfx-offer { display: none; }
+/* телефон: справа сверху — радар и пауза, записка — под ними, уже */
+body.touch .gfx-offer { top: calc(env(safe-area-inset-top, 0px) + 150px); width: min(180px, 46vw); padding: 7px 8px 8px; }
+@media (max-height: 460px) { body.touch .gfx-offer { top: calc(env(safe-area-inset-top, 0px) + 120px); } }
 .gfx-offer button {
-  font: inherit; cursor: pointer; padding: 6px 10px; color: #33210c; background: #ffd85e;
-  border: 3px solid #33210c; border-radius: 6px; min-height: 36px;
+  display: inline-flex; align-items: center; font: inherit; font-size: var(--pp-fs-s); cursor: pointer; padding: .45em .7em; min-height: 32px;
+  color: var(--pp-ink); background: var(--pp-yellow); border: 2px solid var(--pp-ink); border-radius: 3px; box-shadow: 0 3px 0 var(--pp-ink);
 }
-.gfx-offer button[data-a="no"] { background: #cfc6b4; }
-.gfx-offer small { flex: 1 0 100%; font-size: .8em; opacity: .75; text-align: center; }
+.gfx-offer button .pp-key { margin-right: .5em; }
+.gfx-offer button[data-a="no"] { margin-left: auto; padding-inline: .5em; background: none; border: 2px dashed var(--pp-brown); box-shadow: none; color: var(--pp-label); }
+.gfx-offer button:active, .gfx-offer button.pp-down { translate: 0 2px; box-shadow: 0 1px 0 var(--pp-ink); }

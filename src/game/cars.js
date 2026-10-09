@@ -30,8 +30,10 @@
    ремонтов), dlv-car-paint ({ id: '#hex' }). Звёзды — dlv-stars. Старое dlv-car-L ({ id: L },
    до 03.10.2026) читается один раз, когда у машины ещё нет dlv-car-eng (econ.js BREAK.OLD_L). */
 import * as RESPECT from './respect.js';
+import * as DENT from './cardent.js';
 import { CAR_LIST, UPGRADE, BREAK, upgradePrice, paintPrice, sellPrice, wearK, stallChance, repairQuote } from './econ.js';
 import { cnCar } from './roadlife.js';
+import { lampDepth } from './carrear.js';
 import { t } from '../i18n/index.js';
 import * as DIST from './districts.js';
 import * as RW from './roadwear.js';
@@ -54,59 +56,59 @@ export function init (api) {
    клиренс: кузов выше, колёса на месте. chrome — цвет бамперов. */
 const LOOK = {
   semerka: {
-    name: N_('Семёрка'), note: N_('ВАЗ-2107 в цветах пиццерии: хром, квадратные фары'), hex: '#f0522a', roof: '#fff3e2', chrome: '#d4d8dc', model: 'sedan',
+    name: N_('Семёрка'), note: N_('ВАЗ-2107 в цветах пиццерии: хром, квадратные фары'), hex: '#f0522a', roof: '#fff3e2', chrome: '#d4d8dc', model: 'sedan', wheel: 'cap', molding: null, handle: '#c9ccd1', rake: { f: 0, b: 0.3 },
     spec: { L: 4.13, W: 1.62, h: 0.44, hood: 1.35, trunk: 1.0, cab: 1.85, cz: -0.2, ch: 0.6, r: 0.37, fz: 1.3, bz: -1.12 },
   },
   matiz: {
-    name: N_('Матизик'), note: N_('крошечный высокий хэтчбек, круглые фары'), hex: '#a6cc3f', model: 'hatch',
+    name: N_('Матизик'), note: N_('крошечный высокий хэтчбек, круглые фары'), hex: '#a6cc3f', model: 'hatch', wheel: 'steel',
     spec: { L: 3.5, W: 1.5, h: 0.5, hood: 0.72, trunk: 0, cab: 2.4, cz: -0.4, ch: 0.8, r: 0.33, fz: 1.15, bz: -1.12 },
   },
   kopeyka: {
-    name: N_('Копейка'), note: N_('ВАЗ-2101: двойные круглые фары и клыки на бампере'), hex: '#86b7cf', chrome: '#d4d8dc', model: 'sedan',
+    name: N_('Копейка'), note: N_('ВАЗ-2101: двойные круглые фары и клыки на бампере'), hex: '#86b7cf', chrome: '#d4d8dc', model: 'sedan', wheel: 'cap', molding: null, handle: '#c9ccd1', rake: { f: 0, b: 0.3 },
     spec: { L: 4.07, W: 1.61, h: 0.44, hood: 1.3, trunk: 1.02, cab: 1.8, cz: -0.18, ch: 0.62, r: 0.36, fz: 1.25, bz: -1.17 },
   },
   priora: {
-    name: N_('Приорик'), note: N_('заниженная, тонированная — классика двора'), hex: '#232428', tint: true, low: true, model: 'sedan',
+    name: N_('Приорик'), note: N_('заниженная, тонированная — классика двора'), hex: '#232428', tint: true, low: true, model: 'sedan', wheel: 'alloy',
     spec: { L: 4.35, W: 1.68, h: 0.46, hood: 1.3, trunk: 0.95, cab: 2.1, cz: -0.15, ch: 0.54, r: 0.38, fz: 1.3, bz: -1.25 },
   },
   buhanka: {
-    name: N_('Буханка'), note: N_('УАЗ-452: фургон-батон, кабина над мотором'), hex: '#7d8a52', chrome: '#3a3a34', model: 'hatch', lift: 0.12,
+    name: N_('Буханка'), note: N_('УАЗ-452: фургон-батон, кабина над мотором'), hex: '#7d8a52', chrome: '#3a3a34', model: 'hatch', wheel: 'steel', molding: null, lift: 0.12,
     spec: { L: 4.36, W: 1.94, h: 0.78, hood: 0.3, trunk: 0, cab: 4.28, cz: 0, ch: 1.0, r: 0.42, fz: 1.25, bz: -1.1 },
   },
   niva: {
-    name: N_('Нивка'), note: N_('трёхдверный полный привод: ямы не замечает'), hex: '#e6e1cf', chrome: '#2b2a2e', model: 'hatch', lift: 0.14,
+    name: N_('Нивка'), note: N_('трёхдверный полный привод: ямы не замечает'), hex: '#e6e1cf', chrome: '#2b2a2e', model: 'hatch', wheel: 'steel', two: true, molding: null, flare: '#26252a', lift: 0.14,
     spec: { L: 3.74, W: 1.68, h: 0.56, hood: 1.15, trunk: 0, cab: 2.3, cz: -0.55, ch: 0.74, r: 0.42, fz: 1.12, bz: -1.08 },
   },
   volga: {
-    name: N_('Волжанка'), note: N_('ГАЗ-24: длинная, чёрная, вся в хроме'), hex: '#1b1c21', chrome: '#d9dde2', model: 'sedan',
+    name: N_('Волжанка'), note: N_('ГАЗ-24: длинная, чёрная, вся в хроме'), hex: '#1b1c21', chrome: '#d9dde2', model: 'sedan', wheel: 'cap', molding: null, handle: '#c9ccd1', rake: { f: 0, b: 0.3 },
     spec: { L: 4.74, W: 1.8, h: 0.48, hood: 1.62, trunk: 1.18, cab: 1.95, cz: -0.2, ch: 0.6, r: 0.38, fz: 1.43, bz: -1.37 },
   },
   cruze: {
-    name: N_('Шеви Круиз'), note: N_('современный седан: раскосые фары, покатая крыша'), hex: '#b7bcc3', model: 'sedan',
+    name: N_('Шеви Круиз'), note: N_('современный седан: раскосые фары, покатая крыша'), hex: '#b7bcc3', model: 'sedan', wheel: 'alloy',
     spec: { L: 4.6, W: 1.8, h: 0.52, hood: 1.25, trunk: 0.8, cab: 2.4, cz: -0.15, ch: 0.56, r: 0.41, fz: 1.35, bz: -1.32 },
   },
   vesta: {
-    name: N_('Вестачка'), note: N_('современная, с иксом на морде'), hex: '#2d5fa6', model: 'sedan',
+    name: N_('Вестачка'), note: N_('современная, с иксом на морде'), hex: '#2d5fa6', model: 'sedan', wheel: 'alloy',
     spec: { L: 4.41, W: 1.76, h: 0.52, hood: 1.2, trunk: 0.82, cab: 2.3, cz: -0.14, ch: 0.56, r: 0.41, fz: 1.3, bz: -1.3 },
   },
   cheri: {
-    name: N_('Чери-Мери'), note: N_('китайская малютка: глазастая, шустрая, но хлипкая'), hex: '#f2c21b', model: 'hatch',
+    name: N_('Чери-Мери'), note: N_('китайская малютка: глазастая, шустрая, но хлипкая'), hex: '#f2c21b', model: 'hatch', wheel: 'alloy',
     spec: { L: 3.6, W: 1.6, h: 0.46, hood: 1.0, trunk: 0, cab: 2.1, cz: -0.62, ch: 0.72, r: 0.35, fz: 1.16, bz: -1.12 },
   },
   belgik: {
-    name: N_('Белджик X-50'), note: N_('компактный кроссовер из Поднебесной: чёрная крыша, LED во всю морду'), hex: '#d23a2f', model: 'hatch', lift: 0.05,
+    name: N_('Белджик X-50'), note: N_('компактный кроссовер из Поднебесной: чёрная крыша, LED во всю морду'), hex: '#d23a2f', model: 'hatch', wheel: 'alloy', flare: '#1c1c20', lift: 0.05,
     spec: { L: 4.33, W: 1.8, h: 0.54, hood: 1.2, trunk: 0, cab: 2.55, cz: -0.6, ch: 0.64, r: 0.46, fz: 1.4, bz: -1.36 },
   },
   havalka: {
-    name: N_('Хавалка'), note: N_('квадратный китайский танк: круглые фары, запаска сзади, ямы не замечает'), hex: '#b8a37a', chrome: '#2a2a2e', model: 'hatch', lift: 0.18,
+    name: N_('Хавалка'), note: N_('квадратный китайский танк: круглые фары, запаска сзади, ямы не замечает'), hex: '#b8a37a', chrome: '#2a2a2e', model: 'hatch', wheel: 'alloy', flare: '#26252a', lift: 0.18,
     spec: { L: 4.76, W: 1.93, h: 0.66, hood: 1.4, trunk: 0, cab: 3.0, cz: -0.7, ch: 0.84, r: 0.52, fz: 1.48, bz: -1.48 },
   },
   jilya: {
-    name: N_('Джиля Монжара'), note: N_('большой китайский кроссовер: решётка размером с холодильник'), hex: '#3b4a63', model: 'hatch', lift: 0.08,
+    name: N_('Джиля Монжара'), note: N_('большой китайский кроссовер: решётка размером с холодильник'), hex: '#3b4a63', model: 'hatch', wheel: 'alloy', flare: '#1c1c20', plateF: { dz: 0.1, dy: -0.13 }, lift: 0.08,
     spec: { L: 4.77, W: 1.9, h: 0.56, hood: 1.4, trunk: 0, cab: 2.85, cz: -0.72, ch: 0.68, r: 0.5, fz: 1.55, bz: -1.55 },
   },
   patriot: {
-    name: N_('Патриот'), note: N_('большой внедорожник: запаска на двери, ямы не замечает'), hex: '#3a4c3c', chrome: '#2a2a2e', model: 'hatch', lift: 0.2,
+    name: N_('Патриот'), note: N_('большой внедорожник: запаска на двери, ямы не замечает'), hex: '#3a4c3c', chrome: '#2a2a2e', model: 'hatch', wheel: 'steel', flare: '#26252a', lift: 0.2,
     spec: { L: 4.78, W: 1.9, h: 0.66, hood: 1.35, trunk: 0, cab: 3.05, cz: -0.72, ch: 0.82, r: 0.5, fz: 1.42, bz: -1.35 },
   },
 };
@@ -276,17 +278,26 @@ export function makeModel (id, o = {}) {
   const hex = o.hex || hexOf(id);
   const g = A.makeCar(hex, o.sign !== undefined ? !!o.sign : id === START, c.model, false, {
     spec: c.spec, lift: c.lift || 0, low: c.low, tint: c.tint, chrome: c.chrome || hex, roofHex: c.roof, see: !!o.see,   // see — салон со стёклами и курьером (carglass.js)
+    armor: u.armor,                                 // броня — вмятины мельче, кенгурятник держит передний бампер (cardent.js)
+    dual: u.engine >= 2, spare: id === 'havalka' || id === 'patriot',   // зад своей машины (carrear.js): двойной выхлоп, запаска на двери
     dress: (g, add, k) => dress(id, g, add, k, u),
+    // кузов (carbody.js): диски, пластик арок, номер спереди, ручки и молдинг дверей, двухдверная
+    wheel: c.wheel, flare: c.flare, rake: c.rake, plateF: c.plateF, handle: c.handle, molding: c.molding, two: c.two,
   });
   g.userData.careerId = id;
+  g.userData.ws = WS.run ? { run: WS.run, rise: WS.rise } : null;   // наклонное лобовое: дворники ложатся на него (wipers.js)
+  g.userData.wsB = WS.brun ? { run: WS.brun, rise: WS.brise } : null;   // наклонное заднее — задний дворник на нём
+  g.userData.hatch = !c.spec.trunk;               // без багажника (хэтчбек, джип, фургон) — есть задний дворник
+  WS.run = WS.brun = 0;
   return g;
 }
 
+const WS = { run: 0, rise: 0, brun: 0, brise: 0 };                    // наклон лобового последней собранной машины (dress → makeModel)
 /* морда, корма и мелочи — всё, кроме фар, в общий склеенный меш кузова;
    фары и фонари — один меш без света, чтобы горели ночью */
 function dress (id, g, add, k, u) {
   const { THREE } = A;
-  const { S, W, hl, top, y0, bodyHex, CHR, dy } = k;
+  const { S, W, hl, top, y0, bodyHex, CHR, dy } = k, rb = k.rb || 0;   // rb — наклон заднего стекла: крыша короче сзади
   const cy = top + S.ch / 2, roof = top + S.ch, cf = S.cz + S.cab / 2, cb = S.cz - S.cab / 2;
   const lamps = [];
   const B = (w, h, d, hex, x, y, z, rx = 0, ry = 0, rz = 0) => {
@@ -297,7 +308,11 @@ function dress (id, g, add, k, u) {
   const Cy = (r, len, hex, x, y, z, seg = 12) => add(new THREE.CylinderGeometry(r, r, len, seg).rotateX(Math.PI / 2), hex, x, y, z);
   const lamp = (geo, hex, x, y, z) => A.put(lamps, geo, hex, x, y + dy, z);
   const round = (r, hex, x, y, z) => lamp(new THREE.CylinderGeometry(r, r, 0.05, 12).rotateX(Math.PI / 2), hex, x, y, z);
-  const rect = (w, h, hex, x, y, z, ry = 0) => lamp(new THREE.BoxGeometry(w, h, 0.05).rotateY(ry), hex, x, y, z);
+  const backs = [];                                   // стёкла задних фонарей — для ниши с глубиной (carrear.js, своя машина)
+  const rect = (w, h, hex, x, y, z, ry = 0) => {
+    if (k.see && z === bk) backs.push({ w, h, x, y, face: z - 0.025, tail: hex === TAIL });
+    lamp(new THREE.BoxGeometry(w, h, 0.05).rotateY(ry), hex, x, y, z);
+  };
   const HEAD = '#fff4cf', TAIL = '#e0283a', AMBER = '#ffa630', DARK = '#1f1e23';
   const both = f => { f(-1); f(1); };
   const fr = hl + 0.02, bk = -hl - 0.02;              // передняя и задняя плоскость
@@ -306,6 +321,7 @@ function dress (id, g, add, k, u) {
   const slope = (front, run, hex = '#4f7197') => {
     const rise = S.ch - 0.06, len = Math.hypot(run, rise), a = Math.atan2(rise, run);
     const z = front ? cf + run / 2 - 0.02 : cb - run / 2 + 0.02;
+    if (front) { WS.run = run; WS.rise = rise; } else { WS.brun = run; WS.brise = rise; }
     B(W - 0.26, 0.05, len, hex, 0, top + rise / 2 + 0.05, z, front ? a : -a);
   };
   const tails = (w, h, y, x = W / 2 - 0.22) => both(s => rect(w, h, TAIL, s * x, y, bk));
@@ -321,7 +337,7 @@ function dress (id, g, add, k, u) {
       both(s => { rect(0.3, 0.2, TAIL, s * (W / 2 - 0.3), top - 0.13, bk); rect(0.12, 0.2, AMBER, s * (W / 2 - 0.1), top - 0.13, bk); });
       // белая полоса по борту и хромированные молдинги окон
       both(s => B(0.02, 0.07, S.L - 0.5, '#fff3e2', s * (W / 2 + 0.075), top - 0.22, 0));
-      both(s => B(0.035, 0.035, S.cab, CHR, s * (W / 2 - 0.05), roof - 0.02, S.cz));
+      both(s => B(0.035, 0.035, S.cab - rb, CHR, s * (W / 2 - 0.05), roof - 0.02, S.cz + rb / 2));
       break;
     }
     case 'kopeyka': {
@@ -337,7 +353,7 @@ function dress (id, g, add, k, u) {
         rect(0.1, 0.15, AMBER, s * (W / 2 - 0.07), top - 0.13, bk);
       });
       // закруглённые углы крыши — фасками
-      both(s => B(0.14, 0.14, S.cab - 0.08, bodyHex, s * (W / 2 - 0.16), roof - 0.05, S.cz, 0, 0, Math.PI / 4));
+      both(s => B(0.14, 0.14, S.cab - 0.08 - rb, bodyHex, s * (W / 2 - 0.16), roof - 0.05, S.cz + rb / 2, 0, 0, Math.PI / 4));
       both(s => B(0.035, 0.035, S.L - 0.8, CHR, s * (W / 2 + 0.075), top - 0.18, 0));
       break;
     }
@@ -395,8 +411,7 @@ function dress (id, g, add, k, u) {
         round(0.1, HEAD, s * (W / 2 - 0.2), top - 0.14, fr + 0.03);
         rect(0.14, 0.06, AMBER, s * (W / 2 - 0.2), top - 0.34, fr + 0.02);
         rect(0.14, 0.3, TAIL, s * (W / 2 - 0.1), top - 0.05, bk);
-        // чёрные расширители арок и молдинг
-        for (const z of [S.fz, S.bz]) B(0.1, 0.1, S.r * 2.3, '#26252a', s * (W / 2 + 0.05), S.r * 2 + 0.08 - dy, z);
+        // молдинг (расширители арок — полукругом, carbody.js)
         B(0.04, 0.1, S.L - 0.4, '#26252a', s * (W / 2 + 0.07), top - 0.3, 0);
       });
       // багажник на крыше
@@ -415,7 +430,7 @@ function dress (id, g, add, k, u) {
         B(0.06, 0.2, 0.07, CHR, s * 0.36, y0 - 0.04, hl + 0.1);
         rect(0.16, 0.26, TAIL, s * (W / 2 - 0.14), top - 0.14, bk);
         B(0.02, 0.035, S.L - 0.5, CHR, s * (W / 2 + 0.075), top - 0.12, 0);   // молдинг по борту
-        B(0.035, 0.035, S.cab, CHR, s * (W / 2 - 0.05), roof - 0.02, S.cz);
+        B(0.035, 0.035, S.cab - rb, CHR, s * (W / 2 - 0.05), roof - 0.02, S.cz + rb / 2);
       });
       B(0.05, 0.14, 0.3, CHR, 0, top + 0.19, hl - 0.25);                     // фигурка на капоте — просто хромированный гребень
       break;
@@ -468,7 +483,6 @@ function dress (id, g, add, k, u) {
       both(s => {
         rect(0.1, 0.24, '#eaf4ff', s * (W / 2 - 0.08), y0 + 0.04, fr + 0.03);   // фары-бумеранги по краям решётки
         rect(0.3, 0.1, TAIL, s * (W / 2 - 0.24), top - 0.14, bk);
-        for (const z of [S.fz, S.bz]) B(0.08, 0.08, S.r * 2.2, '#1c1c20', s * (W / 2 + 0.04), S.r * 2 + 0.06 - dy, z);
       });
       B(W * 0.5, 0.06, 0.05, '#c9ced4', 0, y0 - 0.3, hl + 0.13);                 // серебристая защита
       break;
@@ -483,7 +497,6 @@ function dress (id, g, add, k, u) {
         round(0.145, HEAD, s * (W / 2 - 0.26), top - 0.2, fr + 0.03);
         round(0.06, '#ffffff', s * (W / 2 - 0.26), top - 0.2, fr + 0.05);
         rect(0.12, 0.42, TAIL, s * (W / 2 - 0.08), top + 0.06, bk);
-        for (const z of [S.fz, S.bz]) B(0.12, 0.12, S.r * 2.3, '#26252a', s * (W / 2 + 0.06), S.r * 2 + 0.06 - dy, z);
         B(0.06, 0.08, S.cab - 0.3, '#2b2a30', s * (W / 2 - 0.2), roof + 0.14, S.cz);
       });
       for (const z of [-0.8, 0, 0.8]) B(W - 0.34, 0.04, 0.05, '#2b2a30', 0, roof + 0.18, S.cz + z);
@@ -501,7 +514,6 @@ function dress (id, g, add, k, u) {
       both(s => {
         rect(0.07, 0.34, '#eaf4ff', s * W * 0.455, y0 + 0.02, hl + 0.18);
         rect(0.34, 0.1, TAIL, s * (W / 2 - 0.24), top - 0.14, bk);
-        for (const z of [S.fz, S.bz]) B(0.08, 0.08, S.r * 2.2, '#1c1c20', s * (W / 2 + 0.04), S.r * 2 + 0.06 - dy, z);
       });
       break;
     }
@@ -512,7 +524,6 @@ function dress (id, g, add, k, u) {
         B(0.36, 0.24, 0.05, DARK, s * (W / 2 - 0.22), top - 0.17, fr);
         rect(0.3, 0.18, HEAD, s * (W / 2 - 0.22), top - 0.17, fr + 0.03);
         rect(0.14, 0.34, TAIL, s * (W / 2 - 0.1), top + 0.02, bk);
-        for (const z of [S.fz, S.bz]) B(0.12, 0.12, S.r * 2.3, '#26252a', s * (W / 2 + 0.06), S.r * 2 + 0.06 - dy, z);
         B(0.22, 0.05, S.fz - S.bz - S.r * 2 - 0.12, '#2a2a2e', s * (W / 2 + 0.08), 0.42 - dy, (S.fz + S.bz) / 2);   // подножка
         B(0.06, 0.08, S.cab - 0.3, '#2b2a30', s * (W / 2 - 0.22), roof + 0.14, S.cz);   // рейлинги
       });
@@ -536,6 +547,8 @@ function dress (id, g, add, k, u) {
   }
   // мотор: на второй ступени — двойной выхлоп
   if (u.engine >= 2) both(s => add(new THREE.CylinderGeometry(0.05, 0.05, 0.3, 8).rotateX(Math.PI / 2), '#9aa0a8', s * 0.25, y0 - 0.2, -hl - 0.05));
+  // своя машина: задние фонари в нише с рифлёным стеклом и белым стеклом заднего хода (carrear.js)
+  if (k.see) lampDepth(add, lamp, backs, { minY: y0 + 0.05, frameHex: LOOK[id].chrome && new THREE.Color(CHR).getHSL({}).l > 0.5 ? CHR : '#1d1b20' });
   if (lamps.length) {
     const m = new THREE.Mesh(A.mergeGeos(lamps), new THREE.MeshBasicMaterial({ vertexColors: true }));
     m.position.y = -dy;                           // склейку сдвинет вместе с кузовом, put уже поднял
@@ -932,6 +945,8 @@ const DRIVING = new Set(['drive', 'back', 'side']);
 export const stalled = () => ST.on;
 export const stallNow = (why = 'debug') => stall(why);     // песочница и ?debug
 export const stallInfo = () => ({ ...ST, pending });
+/* через сколько секунд езды заглохнет на этом заказе (0 — не собирается; для «чихов» выхлопа, exhaust.js) */
+export const stallIn = () => (ST.on || !(pending > 0) ? 0 : pending);
 
 function ui () {
   if (EL) return EL;
@@ -976,7 +991,7 @@ function stall (why) {
   Object.assign(ST, { on: true, t: 0, ui: false, need: BREAK.MINIGAME_HITS, done: 0, p: 0, dir: 1, smokeT: 0, why });
   pending = -1;
   const Snd = A.Snd;
-  if (Snd) { Snd.blip(70, 0.35, 'sawtooth', 0.2); setTimeout(() => Snd.blip(52, 0.4, 'square', 0.14), 160); Snd.noise(0.3, 0.2); }
+  if (Snd) Snd.fx('engine-stall', s => { s.blip(70, 0.35, 'sawtooth', 0.2); setTimeout(() => s.blip(52, 0.4, 'square', 0.14), 160); s.noise(0.3, 0.2); }, { eng: 1 });
   if (A.rumble) A.rumble(0.5, 300);
   A.toast(why === 'pothole' ? t('ой… в яме заглохла') : t('заглохла!'));
 }
@@ -1001,13 +1016,13 @@ function press () {
   if (hit) {
     ST.need--; ST.done++;
     EL.classList.add('hit');
-    if (Snd) { Snd.noise(0.12, 0.22); Snd.blip(95 + ST.done * 25, 0.12, 'sawtooth', 0.16); }   // стартер: «чих»
+    if (Snd) Snd.fx('engine-crank', s => { s.noise(0.12, 0.22); s.blip(95 + ST.done * 25, 0.12, 'sawtooth', 0.16); }, { eng: 1 });   // стартер: «чих»
     if (ST.need <= 0) { dots(); start(); return; }
     newZone();
   } else {
     // промах — просто мимо: нужно три попадания всего, не подряд и без штрафа
     EL.classList.add('miss');
-    if (Snd) Snd.blip(120, 0.18, 'square', 0.1);
+    if (Snd) Snd.fx('engine-miss', s => s.blip(120, 0.18, 'square', 0.1), { eng: 1 });
     if (A.rumble) A.rumble(0.3, 120);
   }
   dots();
@@ -1020,9 +1035,11 @@ function start () {
   setTimeout(() => { if (!ST.on) EL.hidden = true; }, 650);
   const Snd = A.Snd, V = A.V;
   if (Snd) {
-    [0, 90, 180].forEach((d, i) => setTimeout(() => Snd.noise(0.07, 0.18), d + i * 10));
-    setTimeout(() => { Snd.blip(110, 0.3, 'sawtooth', 0.2); Snd.blip(165, 0.35, 'square', 0.1); }, 280);
-    setTimeout(() => Snd.blip(220, 0.25, 'sawtooth', 0.14), 480);
+    Snd.fx('engine-start', s => {
+      [0, 90, 180].forEach((d, i) => setTimeout(() => s.noise(0.07, 0.18), d + i * 10));
+      setTimeout(() => { s.blip(110, 0.3, 'sawtooth', 0.2); s.blip(165, 0.35, 'square', 0.1); }, 280);
+      setTimeout(() => s.blip(220, 0.25, 'sawtooth', 0.14), 480);
+    }, { eng: 1 });
   }
   if (A.rumble) A.rumble(0.7, 220);
   const bx = V.x - Math.sin(V.h) * 2.3, bz = V.z - Math.cos(V.h) * 2.3;
@@ -1130,7 +1147,7 @@ function potHit (p, al, ac, vf, c, sk = 1) {
   const k = Math.min(1, Math.abs(vf) / 30);
   V.pitch = (V.pitch || 0) + (al > 0 ? -1 : 1) * (0.015 + k * 0.015);   // одно мягкое покачивание (было 0,05—0,1 и тряска камеры)
   if (!c.offroad) { const d = 1 - (0.1 + k * 0.12); V.vx *= d; V.vz *= d; }
-  if (A.Snd) { A.Snd.blip(58, 0.16, 'triangle', 0.15 + k * 0.08); A.Snd.noise(0.08, 0.1 + k * 0.08); }
+  if (A.Snd) A.Snd.fx('pothole', s => { s.blip(58, 0.16, 'triangle', 0.15 + k * 0.08); s.noise(0.08, 0.1 + k * 0.08); }, null, 0.6 + k * 0.4);
   if (!ST.on && DRIVING.has(S.state) && Math.random() < stallP(curId()) * BREAK.POTHOLE * sk) stall('pothole');
   POTN.hits++; if (p.deep) POTN.deep++;
 }
@@ -1186,6 +1203,9 @@ const meters = e => [
   { name: t('мотор'), v: Math.round(e.c) + ' %', p: e.c / 100, color: e.c >= 70 ? '#7fc36a' : e.c >= 40 ? '#ff9a3c' : '#e5484d' },
   { name: t('ресурс'), v: Math.round(e.r) + ' %', p: e.r / 100, color: '#6fd3ff' },
 ];
+/* кузов битый — вмятины, отлетевшие детали, стёкла, фары (cardent.js hurt); чинит — машина собирается заново (resetCar) */
+const bodyHurt = () => DENT.hurt(A.car);
+function bodyFix () { if (bodyHurt() && A.resetCar) A.resetCar(); }
 async function offer () {
   const DLG = A.DLG, id = curId(), e = eng(id), q = repairQuote(e.c, e.r);
   const price = Math.round(q.price * (1 - (RESPECT.perk('garageOff') || 0)) / 10) * 10;   // звание по респекту — скидка (econ.js RESPECT.LEVELS)
@@ -1199,6 +1219,13 @@ async function offer () {
       await DLG.say({ person: face, name, color, text: t('о, новенький! я Дядя Женя. тут я чиню: заехал, встал — подшаманю. а тачки купить и прокачать — это в гараже в меню, там всё покажу'), accept: t('понял') });
     }
     if (q.pct < BREAK.REPAIR_MIN_PCT) {
+      if (bodyHurt()) {                              // мотор цел, а кузов мятый — выправит даром (cardent.js)
+        await DLG.say({ person: face, name, color, mood: 'calm', meters: meters(e),
+          text: t('мотор в порядке, крутить нечего. а кузов выправлю: вмятины, бампер, зеркала, стёкла — даром, по-соседски'), accept: t('спасибо!') });
+        bodyFix();
+        A.toast(t('кузов как новый'));
+        return;
+      }
       await DLG.say({ person: face, name, color, meters: meters(e),
         text: e.r >= 80 ? t('о, здорово. машина как часы — нечего тут крутить. езжай давай')
           : t('мотор {c} % — больше из него не выжму, ресурс {r} %.', { c: pc(e.c), r: pc(e.r) }) + ceilWord(e.r),
@@ -1215,7 +1242,8 @@ async function offer () {
     if (!yes) return;
     if (!pay(A, price)) return;
     const now = fix(id);
-    if (A.Snd) [0, 140, 300, 420].forEach((d, i) => setTimeout(() => A.Snd.blip(900 + i * 140, 0.06, 'square', 0.08), d));
+    bodyFix();                                       // заодно выправил кузов: вмятины, детали, стёкла (cardent.js)
+    if (A.Snd) A.Snd.fx('repair', s => [0, 140, 300, 420].forEach((d, i) => setTimeout(() => s.blip(900 + i * 140, 0.06, 'square', 0.08), d)));
     await DLG.say({ person: face, name, color, meters: meters(now),
       text: (now.r >= 90 ? t('во, другое дело. мотор {c} %, езжай аккуратней', { c: pc(now.c) })
         : t('ну вот, мотор {c} %. а ресурс теперь {r} % — как новая уже не будет', { c: pc(now.c), r: pc(now.r) })) + (now.r < 60 ? ceilWord(now.r) : ''),

@@ -1,6 +1,6 @@
 /* Сборка игры для probe и check — в свою временную папку, а не в dist/:
    os.tmpdir()/bird-probe/<mode>.<время>, указатель на свежую — <mode>.json.
-   Пересобирает, только если что-то в src/, public/, index.html, sandbox.html, pad.html, ui.html
+   Пересобирает, только если что-то в src/, public/, index.html, sandbox.html, pad.html, ui.html, editor.html
    или vite.config.js новее прошлой сборки. Старые папки чистит через 10 минут
    (вдруг их ещё читает чужой probe). Несколько probe сразу: сборка под замком. */
 const fs = require('fs');
@@ -10,7 +10,7 @@ const { spawnSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 const BASE = path.join(os.tmpdir(), 'bird-probe');
-const WATCH = ['src', 'public', 'index.html', 'sandbox.html', 'pad.html', 'ui.html', 'vite.config.js'];
+const WATCH = ['src', 'public', 'index.html', 'sandbox.html', 'pad.html', 'ui.html', 'editor.html', 'vite.config.js'];
 const sleepSync = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 function newest (p) {
@@ -49,7 +49,7 @@ function ensureBuild (mode, { force = false, skip = false, quiet = false } = {})
     const t0 = Date.now();
     // node из npm, иначе сам Электрон в роли node
     const node = process.env.npm_node_execpath || process.execPath;
-    const env = { ...process.env };
+    const env = { ...process.env, BIRD_EDITOR: '1' };   // + editor.html (редактор города, docs/SANDBOX.md) — только в сборке для probe
     if (process.versions.electron && !process.env.npm_node_execpath) env.ELECTRON_RUN_AS_NODE = '1';
     const r = spawnSync(node, [path.join(ROOT, 'node_modules/vite/bin/vite.js'), 'build', '--mode', mode, '--outDir', dir, '--emptyOutDir', '--logLevel', 'warn'],
       { cwd: ROOT, env, encoding: 'utf8', maxBuffer: 64 << 20 });

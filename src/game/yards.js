@@ -34,6 +34,7 @@ import { onPave } from './pave.js';
 
 export const YARD = {
   MIN_LV: 3,
+  STEP: 6,                                       // домов за шаг поздней сборки (latebuild.js): на Деке шаг ~30—60 мс
   PATH: { W: 1.6, FROM: 2.3, MIN: 3 },
   WALK: { OFF: 7.5, W: 1.8, EXT: 4, STEP: 3, ROAD_MAX: 40 },
   FENCE: { U: 2.9, H: 0.55, SEG: 2.5, FROM: 2.9, FLOWERS: 0.35, COLORS: ['#3f7a4a', '#4f6fa8', '#d8d2c8', '#8a3b3b', '#c9803a'] },
@@ -105,8 +106,15 @@ export function blocks (x, z, r) {
 
 /* Расстановка — один раз, после подъездов и дорожек у стен (game.js osmEntrances).
    A: THREE, CITY, HOUSE_GRID, LITM, BENCHES, YARD_PATHS, box, put, smashAdd, groundH, inHouse,
-      inBounds, inPoly, nearestRoad, benchOk, DRIVE_MAX, fenceNear (чужой забор ближе r — дорожку не ведём) */
+      inBounds, inPoly, nearestRoad, benchOk, DRIVE_MAX, fenceNear (чужой забор ближе r — дорожку не ведём)
+   build — разом; steps — те же шаги итератором для поздней сборки (latebuild.js): на Деке весь кусок ~1,3 с,
+   шаг — несколько домов (YARD.STEP), меню между шагами отвечает. Места шагов не зависят от времени —
+   город тот же при ?nolate и без */
 export function build (A) {
+  const it = steps(A);
+  for (;;) { const r = it.next(); if (r.done) return r.value; }
+}
+export function* steps (A) {
   const { THREE, CITY, LITM } = A, t0 = performance.now();
   const onAsphalt = (x, z, m = 0.6) => { const r = A.nearestRoad(x, z, 7, 1); return !!r && r.d < r.seg.w / 2 + m; };
   const fenced = (x, z, r) => !!(A.fenceNear && A.fenceNear(x, z, r));   // чужой забор (пиццерия, стройка, пустырь) — дорожку не ведём
@@ -160,6 +168,7 @@ export function build (A) {
     w.ents.push({ x, z, u: bu });
   }
 
+  yield 'walls';
   const P = YARD.PATH, W = YARD.WALK, F = YARD.FENCE, B = YARD.BENCH;
   // заборчики ставим в самом конце, когда все тропинки, общие дорожки и выходы к тротуару уже
   // проложены: кусок, на который потом легла чужая дорожка, пропускаем (onPave ниже)
@@ -269,7 +278,9 @@ export function build (A) {
   };
   const BENCHQ = [];
 
+  let nHouse = 0;
   for (const [hb, set] of walls) {
+    if (++nHouse % YARD.STEP === 0) yield 'houses';           // шаг поздней сборки — каждые YARD.STEP домов
     const p = hb.p;
     for (const [i, w] of set) {
       const a = p[i], c = p[(i + 1) % p.length], len = Math.hypot(c[0] - a[0], c[1] - a[1]);
@@ -395,7 +406,8 @@ export function build (A) {
   }
   STATS.linkM = Math.round(STATS.linkM);
   STATS.ms = Math.round(performance.now() - t0);
-  for (const f of FENCES) fenceNow(...f);
+  yield 'benches';
+  for (let i = 0; i < FENCES.length; i++) { fenceNow(...FENCES[i]); if (i % 400 === 399) yield 'fences'; }
   return STATS;
 }
 

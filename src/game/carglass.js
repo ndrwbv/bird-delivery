@@ -11,16 +11,27 @@
        быстрее GLASS.BREAK м/с (≈ 54 км/ч) или второй удар по треснувшему —
        разбилось: стекла нет (пустая рама), вылетают GLASS.SHARDS пиксельных
        осколков (пул pixfx.js), падают на асфальт и лежат несколько секунд.
+   • Фары и задние фонари (09.10.2026, группа Ж2): удар у угла машины (в
+     передней или задней четверти длины) быстрее LAMP.BREAK м/с (≈ 29 км/ч) —
+     фара или фонарь с той стороны разбит: гаснет (тёмное стекло), вылетают
+     LAMP.SHARDS осколков — белые и жёлтые спереди, красные (и оранжевые) сзади;
+     быстрее LAMP.BOTH м/с (≈ 58 км/ч) — обе на этом конце. Разбитый задний
+     фонарь не горит стоп-сигналом и задним ходом (carlights.js kill);
+     разбитые фары — светлое пятно на асфальте ночью тусклее (headK), обе — нет.
    • Чинятся вместе с кузовом: новая смена, «ещё раз», возрождение, смена или
-     тюнинг машины — машина собирается заново (resetCar в game.js), стёкла целые.
+     тюнинг машины — машина собирается заново (resetCar в game.js), стёкла,
+     фары и фонари целые.
    Кадр: рама, курьер и сиденья — в общей склейке кузова (ни одной лишней
    отрисовки), стёкла — одна отрисовка; трещина и разбитое — правка UV и вершин.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 import * as PIX from './pixfx.js';
+import { kill as killLights } from './carlights.js';
 
 export const GLASS = { CRACK: 9, BREAK: 15, SHARDS: 14 };
-export const STATS = { cracked: 0, broken: 0 };
+/* фары: BREAK / BOTH — м/с удара; END — удар в передней / задней такой доле половины длины; SHARDS — осколков на фару */
+export const LAMP = { BREAK: 8, BOTH: 16, END: 0.45, SHARDS: 10 };
+export const STATS = { cracked: 0, broken: 0, lamps: 0 };
 
 /* текстура: слева — целое стекло (блик пикселями), справа — то же в трещинах; NearestFilter — пиксели */
 const TEX = new Map();
@@ -58,11 +69,15 @@ export function cabin (g, add, k) {
   const { S, W, top, cy, gh, frame, tint, dy } = k;
   const gb = cy + 0.02 - gh / 2, gt = cy + 0.02 + gh / 2, roof = top + S.ch, cf = S.cz + S.cab / 2, cb = S.cz - S.cab / 2;
   const B = (w, h, d, hex, x, y, z) => add(new THREE.BoxGeometry(w, h, d), hex, x, y, z);
+  // rb — заднее стекло наклонное (классические седаны, cars.js LOOK.rake): верх на rb м ближе к середине (carbody.js, Ж6)
+  const rb = Math.min(k.rb || 0, S.cab * 0.3), tilt = rb / (gt - gb);
   // рама: низ до стёкол, верх над ними, четыре угловые стойки и средние
   B(W - 0.12, gb - top, S.cab, frame, 0, (top + gb) / 2, S.cz);
-  B(W - 0.12, roof - gt, S.cab, frame, 0, (gt + roof) / 2, S.cz);
+  B(W - 0.12, roof - gt, S.cab - rb, frame, 0, (gt + roof) / 2, S.cz + rb / 2);
   for (const sx of [-1, 1]) {
-    for (const z of [cf - 0.07, cb + 0.07]) B(0.12, gt - gb, 0.14, frame, sx * (W / 2 - 0.12), cy + 0.02, z);
+    B(0.12, gt - gb, 0.14, frame, sx * (W / 2 - 0.12), cy + 0.02, cf - 0.07);
+    if (rb) add(new THREE.BoxGeometry(0.12, Math.hypot(gt - gb, rb), 0.14).rotateX(Math.atan(tilt)), frame, sx * (W / 2 - 0.12), cy + 0.02, cb + 0.07 + rb / 2);
+    else B(0.12, gt - gb, 0.14, frame, sx * (W / 2 - 0.12), cy + 0.02, cb + 0.07);
     if (S.cab > 1.7) B(0.09, gt - gb, 0.1, frame, sx * (W / 2 - 0.1), cy + 0.02, S.cz + S.cab * 0.08);
   }
   // пол салона тёмный, торпедо, спинки сидений
@@ -82,9 +97,9 @@ export function cabin (g, add, k) {
   // стёкла: четыре квадрата одним мешем (вершины и UV на стекло — 4 подряд)
   const panes = [
     { k: 'f', w: W - 0.28, h: gh, c: [0, cy + 0.02, cf + 0.01], n: [0, 0, 1] },
-    { k: 'b', w: W - 0.28, h: gh * 0.9, c: [0, cy + 0.02, cb - 0.01], n: [0, 0, -1] },
-    { k: 'l', w: S.cab - 0.3, h: gh * 0.84, c: [W / 2 - 0.05, cy + 0.03, S.cz], n: [1, 0, 0] },
-    { k: 'r', w: S.cab - 0.3, h: gh * 0.84, c: [-W / 2 + 0.05, cy + 0.03, S.cz], n: [-1, 0, 0] },
+    { k: 'b', w: W - 0.28, h: gh * 0.9, c: [0, cy + 0.02, cb - 0.01 + rb / 2], n: [0, 0, -1], tz: rb * 0.9 },
+    { k: 'l', w: S.cab - 0.3, h: gh * 0.84, c: [W / 2 - 0.05, cy + 0.03, S.cz], n: [1, 0, 0], tb: rb * 0.92 },
+    { k: 'r', w: S.cab - 0.3, h: gh * 0.84, c: [-W / 2 + 0.05, cy + 0.03, S.cz], n: [-1, 0, 0], tb: rb * 0.92 },
   ];
   const pos = [], uv = [], idx = [];
   for (const p of panes) {
@@ -92,7 +107,9 @@ export function cabin (g, add, k) {
     const v = pos.length / 3;
     p.v0 = v;
     const ax = side ? 0 : hw, az = side ? hw : 0;
-    pos.push(cx - ax, cy2 - hh, cz - az, cx + ax, cy2 - hh, cz + az, cx + ax, cy2 + hh, cz + az, cx - ax, cy2 + hh, cz - az);
+    // наклон: tz — верх заднего стекла вперёд (низ — назад), tb — верхний задний угол бокового вперёд
+    const lo = -(p.tz || 0) / 2, hi = (p.tz || 0) / 2, tb = p.tb || 0;
+    pos.push(cx - ax, cy2 - hh, cz - az + lo, cx + ax, cy2 - hh, cz + az + lo, cx + ax, cy2 + hh, cz + az + hi, cx - ax, cy2 + hh, cz - az + hi + tb);
     uv.push(0, 0, 0.5, 0, 0.5, 1, 0, 1);
     idx.push(v, v + 1, v + 2, v, v + 2, v + 3);
     p.st = 0;
@@ -105,11 +122,12 @@ export function cabin (g, add, k) {
   const mesh = new THREE.Mesh(geo, tex(tint));
   mesh.renderOrder = 1;
   g.add(mesh);                                    // занижение (dy) makeCar добавит сам, как всем детям
-  return { mesh, panes, dy, S };
+  return { mesh, panes, dy, S, rb, roofZ: S.cz + rb / 2, roofLen: S.cab - rb };
 }
 
 /* удар по машине: lx, lz — точка удара в осях машины (как в dentCar), force — м/с удара */
 export function hit (cg, lx, lz, force, car) {
+  if (car && force >= LAMP.BREAK) lampHit(car, lx, lz, force);
   if (!cg || !(force >= GLASS.CRACK)) return;
   const S = cg.S, cf = S.cz + S.cab / 2, cb = S.cz - S.cab / 2;
   const k = lz > cf ? 'f' : lz < cb ? 'b' : lx > 0 ? 'l' : 'r';
@@ -148,6 +166,85 @@ function breakPane (cg, p, car) {
       s: 0.06 + Math.random() * 0.07, life: 2.5 + Math.random() * 2, hex: Math.random() < 0.5 ? 0xcfeaff : 0xa8d0ec, g: 16, floor,
     });
   }
+}
+
+/* ─────────────── фары и фонари ───────────────
+   Где они у модели — по мешу фар (cars.js dress: фары и фонари одной склейкой без света, MeshBasic
+   с цветом по вершинам) — вершины у переднего и заднего края по четырём углам. У простой машины
+   (без dress) — отдельные меши фар спереди; задние у неё в склейке кузова — не бьются. */
+const BROKEN = { f: new THREE.Color(0x2a2c31), r: new THREE.Color(0x3b161b) };
+const SHARD = { f: [0xfff4cf, 0xeaf4ff, 0xffffff], r: [0xe0283a, 0xb81e2c, 0xe0283a, 0xffa630] };
+function lampsOf (car) {
+  const ud = car.userData;
+  if (ud.lamps) return ud.lamps;
+  const hl = ud.hl || 2, C = {}, v = new THREE.Vector3();
+  const at = k => C[k] || (C[k] = { k, st: 0, n: 0, x: 0, y: 0, z: 0, parts: [] });
+  const hz = ud.hazard || [];
+  for (const m of car.children) {
+    if (!m.isMesh || !m.material || !m.material.isMeshBasicMaterial || hz.includes(m)) continue;
+    m.updateMatrix();
+    const pos = m.geometry.attributes.position;
+    if (m.material.vertexColors && m.geometry.attributes.color && !m.material.map) {
+      const per = {};
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(m.matrix);
+        if (Math.abs(v.z) < hl * (1 - LAMP.END)) continue;        // люстра на крыше — не фара
+        const k = (v.z > 0 ? 'f' : 'r') + (v.x > 0 ? 'l' : 'r'), c = at(k);
+        c.x += v.x; c.y += v.y; c.z += v.z; c.n++;
+        (per[k] || (per[k] = [])).push(i);
+      }
+      for (const k in per) C[k].parts.push({ m, idx: per[k] });
+    } else if (!m.material.vertexColors && m.material.color.getHex() === 0xfff1c8 && m.position.z > 0) {
+      const k = 'f' + (m.position.x > 0 ? 'l' : 'r'), c = at(k);
+      c.x += m.position.x; c.y += m.position.y; c.z += m.position.z; c.n++;
+      c.parts.push({ m });
+    }
+  }
+  for (const k in C) { const c = C[k]; c.x /= c.n; c.y /= c.n; c.z /= c.n; }
+  return (ud.lamps = C);
+}
+function lampHit (car, lx, lz, force) {
+  const ud = car.userData;
+  if (!ud || !ud.hl || Math.abs(lz) < ud.hl * (1 - LAMP.END) * 0.9) return;   // удар в бок посередине — фары целы
+  const L = lampsOf(car), end = lz > 0 ? 'f' : 'r';
+  const keys = force >= LAMP.BOTH || Math.abs(lx) < 0.12 && force >= LAMP.BREAK * 1.5 ? [end + 'l', end + 'r'] : [end + (lx > 0 ? 'l' : 'r')];
+  for (const k of keys) if (L[k] && !L[k].st) breakLamp(car, L[k], end);
+}
+function breakLamp (car, c, end) {
+  c.st = 1; STATS.lamps++;
+  for (const p of c.parts) {
+    if (!p.idx) { p.m.material.color.copy(BROKEN[end]); continue; }
+    const col = p.m.geometry.attributes.color;
+    for (const i of p.idx) col.setXYZ(i, BROKEN[end].r, BROKEN[end].g, BROKEN[end].b);
+    col.needsUpdate = true;
+  }
+  killLights(car, c.k);
+  // осколки: из фары вперёд (или назад) и в стороны, падают на асфальт
+  car.updateMatrixWorld();
+  const w = new THREE.Vector3(), n = new THREE.Vector3(0, 0, end === 'f' ? 1 : -1).transformDirection(car.matrixWorld);
+  const floor = car.position.y + 0.02, cols = SHARD[end];
+  for (let i = 0; i < LAMP.SHARDS; i++) {
+    w.set(c.x + (Math.random() - 0.5) * 0.2, c.y + (Math.random() - 0.5) * 0.1, c.z).applyMatrix4(car.matrixWorld);
+    const sp = 1 + Math.random() * 2.2;
+    PIX.spawn(w.x, w.y, w.z, {
+      vx: n.x * sp + (Math.random() - 0.5) * 2.2, vy: 0.8 + Math.random() * 2, vz: n.z * sp + (Math.random() - 0.5) * 2.2,
+      s: 0.05 + Math.random() * 0.06, life: 2.5 + Math.random() * 2, hex: cols[(Math.random() * cols.length) | 0], g: 16, floor,
+    });
+  }
+}
+/* сколько света у фар: целых передних / найденных (1 — нет данных) — для пятна на асфальте (game.js) */
+export function headK (ud) {
+  const L = ud && ud.lamps;
+  if (!L) return 1;
+  let n = 0, ok = 0;
+  for (const k of ['fl', 'fr']) if (L[k]) { n++; if (!L[k].st) ok++; }
+  return n ? ok / n : 1;
+}
+/* фары и фонари: «fl0 fr1 rl0 rr0» (1 — разбит) — для проверки (__dlv.cgLamps) */
+export function lampState (car) {
+  if (!car || !car.userData) return '';
+  const L = lampsOf(car);
+  return Object.keys(L).sort().map(k => k + L[k].st).join(' ');
 }
 
 /* сколько стёкол целых / в трещинах / разбито — для проверки (__dlv.CG) */

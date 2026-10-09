@@ -3,9 +3,11 @@
 
    Сезон по календарю (seasons.js) решает, ЧТО может быть, номер смены — ЧТО будет: вариант
    выбирается в начале смены жребием от номера смены (dlv-shifts), то есть детерминированно —
-   та же смена того же сохранения всегда с той же погодой. Шансы — CHANCES ниже.
+   та же смена того же сохранения всегда с той же погодой. Шансы — CHANCES ниже. Первые NEWBIE смен
+   карьеры — всегда «clear» и без дождя (09.10.2026: первая смена новичка выпадала «жарой» — оранжевая
+   дымка и выжженная трава, «осень и туман»).
 
-     clear  — как по календарю: изредка дождь (или снег), как было до блока 8
+     clear  — как по календарю: изредка дождь (или снег) — шанс DRIZZLE, летом редко
      heat   — жаркое лето: небо и туман оранжевые, трава выжженная (соломенная, пятнами ещё зелёная,
               проплешины пыльные), кроны зелёные, листьев на земле нет; над дальним асфальтом марево,
               все в шортах, дождя нет
@@ -38,13 +40,20 @@ import { onYard } from './yards.js';              // дворовые дорож
 import * as HUR from './hurricane.js';
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 
-/* шансы вариантов на смену, по сезону календаря (в сумме 100) */
+/* шансы вариантов на смену, по сезону календаря (в сумме 100). 09.10.2026 (автор: «чаще ярко-солнечно»):
+   ясных больше, жары и затяжного дождя меньше; гроза и ураган — как были (было: лето 47/25/15/10/3,
+   осень 39/25/20/10/6, весна 52/30/15/3) */
 export const CHANCES = {
-  summer: { clear: 47, heat: 25, rain: 15, storm: 10, hurricane: 3 },
-  autumn: { clear: 39, golden: 25, rain: 20, storm: 10, hurricane: 6 },
+  summer: { clear: 65, heat: 10, rain: 12, storm: 10, hurricane: 3 },
+  autumn: { clear: 50, golden: 26, rain: 8, storm: 10, hurricane: 6 },
   winter: { clear: 55, snowy: 45 },
-  spring: { clear: 52, rain: 30, storm: 15, hurricane: 3 },
+  spring: { clear: 62, rain: 20, storm: 15, hurricane: 3 },
 };
+/* первые смены новичка — всегда ясно, без дождя (первое впечатление и кадры для Стима): смены 1…NEWBIE */
+export const NEWBIE = 3;
+/* обычная (ясная) смена: шанс, что на очередном «броске» (раз в 90—160 с) пойдёт дождь на 40—70 с.
+   Было 0,22 всегда — за 15-минутную смену (~6 бросков) дождь шёл в ~4 из 5 «ясных» смен; теперь летом ~1 из 6, весной и осенью ~1 из 2 */
+export const DRIZZLE = { summer: 0.03, autumn: 0.12, spring: 0.12, winter: 0.22 };
 export const IDS = ['clear', 'heat', 'golden', 'snowy', 'rain', 'storm', 'hurricane'];
 /* где вариант к месту: быстрый заезд с «жарой» зимой ставит сезон отсюда */
 const HOME = { heat: 0.45, golden: 1.45, snowy: 2.5, rain: 3.5, storm: 0.6, hurricane: 1.3 };
@@ -69,7 +78,7 @@ const OVER = {
 };
 
 let C = null, THREE = null;
-let ID = 'clear', FORCE = null, TEMP = 0, RT = 0, N = 0;
+let ID = 'clear', FORCE = null, TEMP = 0, RT = 0, N = 0, NEW = false;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
@@ -112,11 +121,13 @@ export function init (ctx) {
 export function shiftStart (ride) {
   if (!C) return;
   SEAS.setVariant(null);
-  const n = (+C.Store.get('dlv-shifts', 0) || 0) + (ride ? 5003 : 0);
-  let id = FORCE || pickFor(n, bucket());
+  const done = +C.Store.get('dlv-shifts', 0) || 0, n = done + (ride ? 5003 : 0);
+  NEW = !ride && done < NEWBIE;                    // первые смены карьеры: ясно и сухо
+  let id = FORCE || (NEW ? 'clear' : pickFor(n, bucket()));
   if (id === 'hurricane' && !FORCE && (ride || n < HUR.HUR.FROM || !DIRECTOR.can('hurricane'))) id = 'storm';   // режиссёр: не в первую смену сессии   // ураган — не в первые смены и не «просто покататься»
   if (FORCE && !fits(FORCE, bucket())) SEAS.setSeason(HOME[FORCE], true);   // быстрый заезд: «жара» — значит лето
   set(id, n);
+  if (NEW && id === 'clear' && C.ENV) { C.ENV.rainWant = 0; C.ENV.rain = 0; }   // новичку — сухо с первой секунды
   if (id === 'hurricane') DIRECTOR.start('hurricane');   // до конца смены (режиссёр сам забудет на новой)
   HUR.shiftStart(id, ride, n);
 }
@@ -149,6 +160,9 @@ export const NAME = {
   rain: () => t('дождь'), storm: () => t('гроза'), hurricane: () => t('ураган'),
 };
 
+/* обычная смена: шанс дождя на очередном броске расписания game.js (DRIZZLE; у новичка — 0) */
+export const drizzle = () => (NEW && !FORCE ? 0 : DRIZZLE[bucket()] ?? 0.22);
+
 /* дождь: true — расписанием управляет вариант (game.js updateEnv своё не крутит) */
 export function rainControl (ENV, dt) {
   if (ID === 'clear') return false;
@@ -176,8 +190,9 @@ function sky (dt) {
   const ENV = C.ENV, scene = C.scene, sun = C.sun, hemi = C.hemi, amb = C.amb, K = colors();
   const day = 1 - (ENV.night || 0), fog = scene.fog;
   if (ID === 'heat') {
-    scene.background.lerp(K.heatSky, 0.78 * day);
-    if (fog) { fog.color.lerp(K.heatFog, 0.75 * day); fog.far *= 0.82; }
+    // 09.10.2026: жара — солнечная, а не «в тумане»: небо и дымка оранжевее слабее (было 0,78 и 0,75), даль ×0,92 (было ×0,82)
+    scene.background.lerp(K.heatSky, 0.55 * day);
+    if (fog) { fog.color.lerp(K.heatFog, 0.5 * day); fog.far *= 0.92; }
     if (hemi) hemi.groundColor.lerp(K.heatGnd, 0.55);
     if (sun) sun.color.lerp(K.heatSun, 0.5 * day);
   } else if (ID === 'golden') {
@@ -244,7 +259,7 @@ export function strike (dist = rnd(...W.BOLT_DIST), da = rnd(-0.5, 0.5)) {
   for (let i = 0; i < n; i++) { const len = rnd(0.05, 0.11); BOLT.pulses.push([t0, t0 + len, i ? rnd(0.55, 0.9) : 1]); t0 += len + rnd(0.06, 0.16); }
   BOLT.life = 0; BOLT.n++;
   const delay = dist / W.SOUND;
-  BOLT.thunder.push({ t: delay, dist });
+  BOLT.thunder.push({ t: delay, dist, x: bx, z: bz });
   return { dist: Math.round(dist), delay: +delay.toFixed(2) };
 }
 function stepBolt (dt) {
@@ -263,14 +278,20 @@ function stepBolt (dt) {
     const q = BOLT.thunder[i];
     if ((q.t -= dt) > 0) continue;
     BOLT.thunder.splice(i, 1);
-    thunder(q.dist);
+    thunder(q.dist, q.x, q.z);
   }
 }
 /* гром: шум через фильтр низких, раскат с затуханием 2,5—4 с; ближе — громче и звонче */
-function thunder (dist) {
+function thunder (dist, x, z) {
   const Snd = C.Snd;
   if (!Snd || !Snd.ctx || !Snd.on || !Snd.master) return;
-  const c = Snd.ctx;
+  // файл автора «thunder» (docs/SOUNDS.md) — вместо синтеза, тише вдали; слева / справа — с той стороны,
+  // где ударила молния (громкость — от расстояния здесь же, «слышно до» не режет: near = far огромные)
+  const at = x != null ? { x, z, far: 1e6, near: 1e6 } : null;
+  if (Snd.fx) Snd.fx('thunder', v => thunderSynth(Snd.ctx, v.out, dist), at, clamp(420 / dist, 0.25, 1));
+  else thunderSynth(Snd.ctx, Snd.master, dist);
+}
+function thunderSynth (c, out, dist) {
   if (BOLT.bufs.length < 3) {
     const dur = rnd(2.6, 4), n = (c.sampleRate * dur) | 0, b = c.createBuffer(1, n, c.sampleRate), a = b.getChannelData(0);
     let lp = 0;
@@ -285,7 +306,7 @@ function thunder (dist) {
   const s = c.createBufferSource(); s.buffer = BOLT.bufs[(Math.random() * BOLT.bufs.length) | 0];
   const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = clamp(1100 - dist * 0.7, 260, 900);
   const g = c.createGain(); g.gain.value = clamp(420 / dist, 0.25, 1) * 0.55;
-  s.connect(f); f.connect(g); g.connect(Snd.master); s.start();
+  s.connect(f); f.connect(g); g.connect(out); s.start();
 }
 
 /* ─────────────── снежная зима: сугробы до второго этажа ───────────────
@@ -434,7 +455,7 @@ function stepDeep (dt) {
     inDeep = true;
     K.splash(V.x, hit.y + 1.2, V.z, 14 + Math.min(20, sp | 0), 1 + sp / 20);
     if (sp > 8) K.chunks(V.x, hit.y + 1, V.z, 4, V.vx, V.vz);
-    C.Snd.blip(65 + Math.random() * 20, 0.25, 'sine', 0.18); C.Snd.noise(0.25, 0.12);
+    C.Snd.fx('snowdrift', s => { s.blip(65 + Math.random() * 20, 0.25, 'sine', 0.18); s.noise(0.25, 0.12); });
     C.S.shake = Math.max(C.S.shake || 0, 0.06 + Math.min(0.12, sp / 140));
   } else if (deepT <= 0) { deepT = 0.15; K.splash(V.x, hit.y + 0.6, V.z, 5, 0.7); }
 }

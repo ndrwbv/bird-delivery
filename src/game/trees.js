@@ -11,11 +11,12 @@
    2 — листья на земле, 5 — цветы сирени (весной), 6 — ягоды рябины и
    шиповника (осень — зима).
 
-   plantYards — дворы: группы по 3—7 деревьев перед подъездами и кусты под
+   plantYardsSteps — дворы: группы по 3—7 деревьев перед подъездами и кусты под
    окнами (сирень, шиповник). Не на проезде, не у двери, не на тропинке,
    не на площадке и не в дворовой мелочи — места для пина остаются.
    Твёрдость — как у всех деревьев: ствол — препятствие 1,1 × 1,1 м (game.js tree).
    ────────────────────────────────────────────────────────────────────────── */
+import { wet } from './streams.js';             // речки и пруды — без деревьев (streams.js)
 
 export const TREE = {
   // доли пород там, где дерево сажает карта и улицы (без своей породы)
@@ -100,7 +101,10 @@ export function growTree (o) {
     for (let i = 0; i < n; i++) {
       const a = r() * 6.283, d = 0.4 + r() * rad, lx = x + Math.cos(a) * d, lz = z + Math.sin(a) * d;
       const sz = 0.6 + r() * 0.8;
-      P.add(T.flat, lx, o.ground(lx, lz) + 0.1, lz, sz, 1, sz * (0.6 + r() * 0.6), 0, r() * 6.283, 0, pickR(r, hexes), 2, r());
+      // первый лист у крупной россыпи — не плоский, а низкая кучка 10—17 см (О7, 09.10.2026: осенью под деревьями
+      // бугорки, а не только плоские пятна). Жребий тот же (размер), лишних r() нет — деревья растут как прежде
+      if (i === 0 && sz > 1.0 && T.mound) P.add(T.mound, lx, o.ground(lx, lz) + 0.02, lz, sz * 0.75, 0.1 + (sz - 1) * 0.18, sz * (0.45 + r() * 0.45), 0, r() * 6.283, 0, pickR(r, hexes), 2, r());
+      else P.add(T.flat, lx, o.ground(lx, lz) + 0.1, lz, sz, 1, sz * (0.6 + r() * 0.6), 0, r() * 6.283, 0, pickR(r, hexes), 2, r());
     }
   };
   // мелочь на кроне: цветы (вид 5) и ягоды (вид 6) — снаружи комков, больше снизу
@@ -238,7 +242,8 @@ export function growTree (o) {
 /* ─────────────── дворы: группы деревьев и кусты под окнами ───────────────
    A: CITY, tree(x, z, strip, kind) → true, если посадил; inHouse, inBounds, inPoly, groundH,
       nearestRoad, solidAt, SMASH, YARD_PATHS, PITCHES. Один раз при сборке, до smashBuild. */
-export function plantYards (A) {
+/* шагами (yield) — поздняя сборка (latebuild.js; при ?nolate — разом): на Деке весь кусок ~0,5 с; шаг — 200 подъездов */
+export function* plantYardsSteps (A) {
   if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('noyardtrees')) return 0;   // ?noyardtrees — без дворовых групп и кустов (сравнить)
   const { CITY } = A, Y = TREE.YARD, WN = TREE.WIN;
   // сетки: двери, тропинки, мелочь дворов, уже посаженное здесь
@@ -269,7 +274,7 @@ export function plantYards (A) {
   // свободно ли место: m — сколько от дома, road — от проезда, door — от двери, path — от тропинки
   const free = (x, z, m, road, door, path, sm) => {
     STATS.tried++;
-    if (!A.inBounds(x, z, -30) || A.groundH(x, z) < 0.3 || A.inHouse(x, z, m)) return false;
+    if (!A.inBounds(x, z, -30) || A.groundH(x, z) < 0.3 || A.inHouse(x, z, m) || wet(x, z, 1)) return false;
     const n = A.nearestRoad(x, z, 14, 1);
     if (n && n.d < n.seg.w / 2 + road) return false;
     if (DOORS.near(x, z, e => Math.hypot(e[0] - x, e[1] - z) < door)) return false;
@@ -282,7 +287,10 @@ export function plantYards (A) {
   const PITCHES_NEAR = (x, z) => (A.PITCHES || []).some(p => Math.hypot(p.cx - x, p.cz - z) < Math.max(p.L || 0, p.W || 0) / 2 + 4);
   const hash = (x, z, k) => { const v = Math.sin(x * 12.9898 + z * 78.233 + k * 37.719) * 43758.5453; return v - Math.floor(v); };
 
+  yield 'grid';
+  let ne = 0;
   for (const e of CITY.entrances) {
+    if (++ne % 200 === 0) yield 'ents';
     const [ex, ez, nx, nz] = e, tx = -nz, tz = nx;
     // группа деревьев перед подъездом
     if (hash(ex, ez, 1) < Y.SHARE) {

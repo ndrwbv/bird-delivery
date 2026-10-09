@@ -17,6 +17,7 @@
        выбор перед каждой сменой (cityopen.js picker)
      MENU.face(id)    — портрет профиля id (data:URL; у каждого профиля свой — по номеру)
      Таблица рекордов (board.js): карточка только в Стим-сборке, окно — тоже modal()
+     Доска почёта (honor.js): достижения и рекорды профиля, окно — тоже modal()
 
    В Яндексе и Москве (?nocareer) модуль не работает: его зовёт только career.js. */
 import './menu.css';
@@ -27,10 +28,12 @@ import { SHIFT, clock, shiftLen } from './econ.js';
 import { keyHTML, onInput, inputKind } from '../input/glyphs.js';   // значки кнопок по текущему вводу
 import './fmlegend.js';                       // легенда полной карты — только то, что сейчас на карте
 import * as BOARD from './board.js';
+import * as HONOR from './honor.js';            // доска почёта: достижения и рекорды (honor.js)
 import * as PROF from './profiles.js';           // профили: у каждого свой прогресс (profiles.js)
 import * as QR from './quickrun.js';             // быстрый заезд: сезон, длина смены, машина — без копилки и сюжета
 import * as UPD from './update.js';              // плашка «есть новая версия — обновить» (update.js)
 import { carousel } from './carousel.js';
+import * as PFX from './paperfx.js';
 import * as DP from './distpick.js';            // выбор района — карусель карточек (distpick.js)
 
 let A = null, el = null, md = null, nameCb = null, nameFirst = false, CZ = null, curKey = 'go';
@@ -58,14 +61,14 @@ function build () {
     '<div class="crm-ver"></div>';
   big.appendChild(el);
   el.querySelectorAll('[data-a]').forEach(b => b.addEventListener('click', () => act(b.dataset.a)));
-  CZ = carousel(el.querySelector('.crm-car'), { cls: 'crm-cz', scales: [1, 0.86, 0.74], reach: 3, onChange: (i, c) => { curKey = c.dataset.key; navReset(); if (A.Snd && A.Snd.blip) try { A.Snd.blip(520, 0.03, 'square', 0.04); } catch (e) { /* — */ } } });
+  CZ = carousel(el.querySelector('.crm-car'), { cls: 'crm-cz', scales: [1, 0.86, 0.74], reach: 3, onChange: (i, c) => { curKey = c.dataset.key; navReset(); if (A.Snd && A.Snd.click) try { A.Snd.click(520); } catch (e) { /* — */ } } });
   return el;
 }
 /* после листания подсветка геймпада и клавиатуры встаёт на карточку в центре */
 function navReset () { if (A.padClear) A.padClear(); if (A.kbClear) A.kbClear(); }
 
 function act (a) {
-  if ((md && !md.hidden) || DP.root() || BOARD.root() || QR.root() || PROF.root() || CITY.root()) return;
+  if ((md && !md.hidden) || DP.root() || BOARD.root() || HONOR.root() || QR.root() || PROF.root() || CITY.root()) return;
   A.Snd.boot && A.Snd.boot();
   if (a === 'go') A.menuGo();
   else if (a === 'district') openDistricts();
@@ -75,18 +78,24 @@ function act (a) {
   else if (a === 'garage') A.garage(() => show());
   else if (a === 'collect') A.openCollect();
   else if (a === 'board') BOARD.open();
+  else if (a === 'honor') HONOR.open({ api: A, face: face(), name: PROF.on() ? PROF.curName() : String(A.Store.get('dlv-name', '') || '').trim(), onClose: () => { show(); focus(); } });
   else if (a === 'settings') A.openSettings();
   else if (a === 'update') UPD.apply();
   else if (a === 'quit') A.quit();
 }
 
-/* карточка: одна большая кнопка (data-main — на неё встаёт геймпад) */
-function card (key, ico, title, sub, cls) {
+/* карточка: одна большая кнопка (data-main — на неё встаёт геймпад) — бумажка на доске (UI-REVIEW № 45):
+   лист накладной на скотче, значок в цветном кружке, у карточки в центре — значок кнопки [A].
+   «На смену» — пропуск: шапка «ПРОПУСК ··· № 7» и красный штамп «[A] на смену», под ним — «Юг · ~4 мин» */
+function card (key, ico, title, sub, cls, pass) {
   const c = document.createElement('div');
   c.className = 'crm-card k-' + key + (cls ? ' ' + cls : '');
   c.dataset.key = key; c.dataset.title = title;
-  c.innerHTML = '<button type="button" class="crm-cb" data-a="' + key + '" data-main><i class="crm-ico" aria-hidden="true">' + ico + '</i>' +
-    '<b>' + esc(title) + '</b>' + (sub ? '<span>' + esc(sub) + '</span>' : '') + '</button>';
+  c.innerHTML = '<button type="button" class="crm-cb" data-a="' + key + '" data-main>' +
+    (pass ? '<em class="crm-pass"><span>' + esc(t('пропуск')) + '</span><u>' + esc(pass) + '</u></em>' +
+      '<b class="crm-stamp">' + keyHTML('ok') + esc(title) + '</b>'
+      : '<i class="crm-ico" aria-hidden="true">' + ico + '</i><b>' + keyHTML('ok') + esc(title) + '</b>') +
+    (sub ? '<span>' + esc(sub) + '</span>' : '') + '</button>';
   c.querySelector('button').addEventListener('click', () => act(key));
   return c;
 }
@@ -100,17 +109,18 @@ export function show () {
   // круглосуточная пиццерия (со второго района): смена с того часа, когда кончилась прошлая (career.js)
   const allDay = DIST.has() && DIST.cur() >= (SHIFT.ALLDAY_FROM ?? 99);
   const from0 = clock(A.Store.get('dlv-clock', '') === '' || A.Store.get('dlv-clock', null) == null ? 9 : +A.Store.get('dlv-clock', 9) || 0);
-  // «смена 1 · Юг · ~4 мин»: длина — та, что будет у этой смены (econ.js shiftLen, 4 / 6 / 8 мин)
+  // «Юг · ~4 мин»: длина — та, что будет у этой смены (econ.js shiftLen, 4 / 6 / 8 мин)
   const mins = Math.max(1, Math.round(SHIFT.BASE_S * shiftLen(n - 1).slow / 60));
   const place = DIST.has() ? (DIST.city() ? t('весь город') : t(DIST.list()[DIST.cur()].name)) : '';
+  // номер смены — в шапке пропуска («ПРОПУСК ··· № 1»), под штампом — район и длина
   const goSub = place
-    ? (allDay ? t('смена {n} · {place} · с {from} · ~{m} мин', { n, place, from: from0, m: mins }) : t('смена {n} · {place} · ~{m} мин', { n, place, m: mins }))
-    : t('смена {n} · ~{m} мин', { n, m: mins });
-  const go = card('go', '▶', t('на смену'), goSub, 'main');
+    ? (allDay ? t('{place} · с {from} · ~{m} мин', { place, from: from0, m: mins }) : t('{place} · ~{m} мин', { place, m: mins }))
+    : t('~{m} мин', { m: mins });
+  const go = card('go', '▶', t('на смену'), goSub, 'main', '№ ' + n);
   // вернуться в прежний район, пока открыты не все (открыто всё — выбор и так перед каждой сменой)
   if (DIST.has() && DIST.opened() > 1 && !DIST.allOpen()) {
     const b = document.createElement('button');
-    b.type = 'button'; b.className = 'crm-sub'; b.textContent = t('сменить район');
+    b.type = 'button'; b.className = 'crm-sub'; b.innerHTML = keyHTML('x') + esc(t('сменить район'));
     b.addEventListener('click', () => act('district'));
     go.appendChild(b);
   }
@@ -120,6 +130,9 @@ export function show () {
   cards.push(qr,
     card('garage', '⌂', t('гараж'), t('машины, броня, мотор, покраска')),
     card('ride', '~', t('покататься'), t('без заказов и без часов смены')));
+  const hon = card('honor', '♛', t('доска почёта'), HONOR.sub(A));
+  HONOR.badge(hon);                                // «+N» — новые грамоты, которых ещё не видел
+  cards.push(hon);
   if (BOARD.on()) cards.push(card('board', '★', t('таблица рекордов'), t('лучшая смена — у тебя и в мире')));   // только Стим-сборка (board.js)
   cards.push(card('collect', '◆', t('мои находки'), t('предметы, разбросанные по району')),
     card('settings', '⚙', t('настройки'), t('звук, графика, язык, управление, версия')));
@@ -141,6 +154,16 @@ function hint () {
     : esc(t('листай ◀ ▶')) + ' · ' + esc(t('выбрать')) + ' ' + keyHTML('ok');
 }
 onInput(() => hint());
+/** горячие кнопки меню (значки — на самих кнопках): Y — сменить профиль, X — сменить район (если кнопка есть).
+    Зовут career.js padPre (геймпад) и onKey (клавиатура Y / X); true — нажали */
+export function hot (k) {
+  if (!el || !shown() || modal()) return false;
+  const b = k === 'y' ? el.querySelector('.crm-swap') : k === 'x' ? el.querySelector('.crm-card.cz-card.on .crm-sub') : null;
+  if (!b || b.hidden) return false;
+  PFX.press(b);
+  b.click();
+  return true;
+}
 /** листать карточки меню: true — пролистнули */
 export function flip (d) { return !!(CZ && el && !modal() && CZ.flip(d)); }
 export const shown = () => !!(el && el.isConnected && !el.closest('[hidden]'));
@@ -185,7 +208,7 @@ function profButton () {
   if (u) img.src = u;
   m.querySelector('small').textContent = t('профиль');
   m.querySelector('b').textContent = name;
-  m.querySelector('.crm-swap').textContent = t('сменить');
+  m.querySelector('.crm-swap').innerHTML = keyHTML('y') + esc(t('сменить'));
 }
 /* подпись профиля в списке: «смена 12 · 340 000 ₽ · районов 3 из 8» (читается Store профиля — PROF.peek) */
 function profInfo () {
@@ -194,8 +217,9 @@ function profInfo () {
   if (DIST.has()) parts.push(DIST.allOpen() ? t('весь город') : t('районов {k} из {n}', { k: DIST.opened(), n: DIST.count() }));
   return parts.join(' · ');
 }
-export function openProfiles () {
-  PROF.open({ money: A.money, info: profInfo, face, setName: n => A.setName(n), Snd: A.Snd, swap: A.reprofile, onClose: () => { if (el) { profButton(); show(); } } });
+/* after — куда вернуться по «назад» (из настроек — снова в настройки, а не в меню) */
+export function openProfiles (after) {
+  PROF.open({ money: A.money, info: profInfo, face, setName: n => A.setName(n), Snd: A.Snd, swap: A.reprofile, onClose: () => { if (el) { profButton(); show(); } if (after) after(); } });
 }
 
 /* ── район: карусель карточек районов (distpick.js; кнопка «сменить район» на карточке «на смену») ──
@@ -223,8 +247,8 @@ function nameBox () {
     '<div class="crm-nbtns"><button type="button" class="crm-ncancel"></button><button type="submit" class="crm-nok" autofocus></button></div>' +
     '<div class="crm-nn"></div></form>';
   ($('big') || document.body).appendChild(md);
-  const inp = md.querySelector('input'), ok = md.querySelector('.crm-nok');
-  inp.addEventListener('input', () => { ok.disabled = !inp.value.trim(); });
+  const inp = md.querySelector('input');
+  inp.addEventListener('input', () => nameOk());
   md.querySelector('form').addEventListener('submit', e => { e.preventDefault(); saveName(); });
   md.querySelector('.crm-ncancel').addEventListener('click', () => back());
   return md;
@@ -235,17 +259,24 @@ export function askName (cb, first) {
   nameCb = cb || null; nameFirst = !!first;
   const cur = String(A.Store.get('dlv-name', '') || '').trim() || String(A.playerName() || '').trim();
   md.querySelector('label').textContent = t('как тебя зовут?');
-  md.querySelector('.crm-nok').textContent = t('готово');
-  md.querySelector('.crm-ncancel').textContent = t('отмена');
+  md.querySelector('.crm-nok').innerHTML = keyHTML('ok') + esc(t('готово'));
+  md.querySelector('.crm-ncancel').innerHTML = keyHTML('back') + esc(t('отмена'));
   md.querySelector('.crm-ncancel').hidden = nameFirst;
   md.querySelector('.crm-nn').textContent = nameFirst ? t('так тебя будут звать в пиццерии. поменять можно в настройках') : '';
   const inp = md.querySelector('input');
   inp.placeholder = t('имя и фамилия');
   inp.value = cur;
-  md.querySelector('.crm-nok').disabled = !cur;
+  nameOk();
+  inp.toggleAttribute('data-pad-main', !cur);           // геймпад: пустое имя — курсор сразу на поле (A — клавиатура)
   md.hidden = false;
   // пустое поле — сразу в него; имя уже есть (ник в Steam) — достаточно «готово»
   if (!cur) setTimeout(() => { try { inp.focus(); } catch (e) { /* — */ } }, 50);
+}
+/* «готово» при пустом имени — бледное, но не disabled: иначе геймпаду с поля некуда уйти (↓ — опять поле,
+   при первом запуске «отмены» нет). Жмёшь его пустым — фокус в поле (saveName), на Деке — клавиатура */
+function nameOk () {
+  const ok = md.querySelector('.crm-nok');
+  ok.classList.toggle('crm-off', !md.querySelector('input').value.trim());
 }
 function saveName () {
   const v = md.querySelector('input').value.trim().slice(0, 24);
@@ -259,13 +290,14 @@ function saveName () {
   if (el && shown() && !cb) { show(); focus(); }        // первый запуск: имя есть — рейтинг с ним, фокус на «на смену»
   if (cb) cb(v);
 }
-export const modal = () => (md && !md.hidden && !md.closest('[hidden]') ? md : DP.root() || PROF.root() || BOARD.root());   // заставку спрятали (поехали) — окна нет
+export const modal = () => (md && !md.hidden && !md.closest('[hidden]') ? md : DP.root() || PROF.root() || BOARD.root() || HONOR.root());   // заставку спрятали (поехали) — окна нет
 /* назад: из настроек — отмена; при первом запуске окно не закрывается, ждём имя */
 export function back () {
   if (!modal()) return false;
   if (modal() === DP.root()) return DP.back();
   if (modal() === PROF.root()) return PROF.back();
   if (modal() === BOARD.root()) return BOARD.close();
+  if (modal() === HONOR.root()) return HONOR.close();
   if (nameFirst) return true;
   md.querySelector('input').blur();
   md.hidden = true;

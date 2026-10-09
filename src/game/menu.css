@@ -1,113 +1,174 @@
-/* главное меню карьеры (menu.js): сверху слева логотип, справа — профиль (портрет, имя, «сменить»);
+/* главное меню карьеры (menu.js): сверху слева логотип, справа — пропуск сотрудника (портрет, имя, «[Y] сменить»);
    середина пустая — там живой город; внизу — компактная полоса карточек (carousel.js);
-   номер версии — внизу справа, плашка «есть новая версия» — сверху */
+   номер версии — внизу справа, плашка «есть новая версия» — сверху.
+   Стиль — «как накладная» (src/styles/paper.css, UI-REVIEW № 45): карточки — бумажки на доске на скотче,
+   «на смену» — «пропуск на смену № 0007» с красным штампом; движение — только акцентом (появилось, нажали) */
 
 /* старая заставка в карьере не нужна: имя, «поехали», таблица рекордов, выбор карты, язык;
    полоса уровня и рейтинга (#topbar) — тоже: профиль теперь в .crm-me */
 body.career #big-main, body.career #st-lang, body.career #topbar { display: none !important; }
-body.career #big { background: linear-gradient(180deg, rgba(10, 14, 32, .62) 0, rgba(10, 14, 32, .08) 22%, rgba(10, 14, 32, 0) 50%, rgba(10, 14, 32, .55) 78%, rgba(10, 14, 32, .82) 100%);
+/* тёплое затемнение сверху (под логотип) и снизу (под карточки), середина — живой город */
+body.career #big { background: linear-gradient(180deg, rgba(40, 14, 24, .58) 0, rgba(40, 14, 24, .08) 22%, rgba(40, 14, 24, 0) 48%, rgba(60, 22, 20, .5) 76%, rgba(36, 12, 20, .84) 100%);
                    padding: 0; overflow: hidden; }
 body.career #build-v { display: none; }          /* версия — в .crm-ver, крупнее */
 
 #cr-menu { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; box-sizing: border-box;
            padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
-           --mcw: clamp(170px, min(20vw, 32vh), 290px); }
+           --mcw: clamp(170px, min(20vw, 32vh), 290px); color: var(--pp-ink); }
 .crm-top { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; min-height: 0; }
-.crm-head { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; text-align: left; min-width: 0; }
-.crm-logo { font-size: clamp(20px, min(3.2vw, 5.6vh), 46px); line-height: 1.12; color: #ffd85e; letter-spacing: .04em;
-            text-shadow: 3px 3px 0 #33210c, -3px 3px 0 #33210c, 3px -3px 0 #33210c, -3px -3px 0 #33210c, 0 8px 0 rgba(0, 0, 0, .35); }
-.crm-tag { font-size: clamp(7px, .8vw, 10px); line-height: 1.9; color: #fff3d6; max-width: 40ch;
-           text-shadow: 2px 2px 0 #33210c, -2px 2px 0 #33210c, 2px -2px 0 #33210c, -2px -2px 0 #33210c; }
+.crm-head { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; text-align: left; min-width: 0; }
+.crm-logo { font-size: clamp(20px, min(3.2vw, 5.6vh), 46px); line-height: 1.12; color: var(--pp-yellow); letter-spacing: .04em;
+            text-shadow: 3px 3px 0 var(--pp-ink), -3px 3px 0 var(--pp-ink), 3px -3px 0 var(--pp-ink), -3px -3px 0 var(--pp-ink), 0 8px 0 rgba(0, 0, 0, .35); }
+/* подзаголовок — бумажная полоска на скотче */
+.crm-tag { position: relative; max-width: 42ch; padding: .55em .8em .45em; font-size: var(--pp-fs-s); line-height: 1.7; color: var(--pp-ink);
+           background: var(--pp-paper); border: 2px solid var(--pp-ink); border-radius: 2px; box-shadow: 0 4px 0 rgba(51, 33, 12, .7); }
+.crm-tag:empty { display: none; }
 
-/* профиль: портрет курьера, «профиль» и имя, кнопка «сменить» */
-.crm-me { flex: none; display: flex; align-items: center; gap: clamp(8px, 1vw, 12px); max-width: min(46%, 380px); box-sizing: border-box;
-          padding: clamp(5px, .8vh, 8px) clamp(6px, .8vw, 10px) clamp(5px, .8vh, 8px) clamp(5px, .8vh, 8px); color: #fff3d6;
-          background: rgba(20, 16, 30, .8); border: 3px solid #33210c; border-radius: 12px; box-shadow: 0 4px 0 #33210c; }
-.crm-ava { flex: none; width: clamp(38px, min(4.4vw, 8vh), 60px); height: clamp(38px, min(4.4vw, 8vh), 60px); border-radius: 8px;
-           image-rendering: pixelated; background: #2a3766; border: 3px solid #ffd85e; box-sizing: border-box; object-fit: cover; }
+/* пропуск сотрудника: портрет-полароид, «профиль» и имя, «[Y] сменить»; бумага с ярким верхом и дыркой под шнурок */
+.crm-me { position: relative; flex: none; display: flex; align-items: center; gap: clamp(8px, 1vw, 12px); max-width: min(46%, 500px); box-sizing: border-box;
+          padding: clamp(10px, 1.4vh, 14px) clamp(8px, .9vw, 12px) clamp(6px, .9vh, 9px) clamp(8px, .9vw, 12px); color: var(--pp-ink);
+          background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 6px; box-shadow: inset 0 6px 0 var(--pp-orange), 0 5px 0 var(--pp-ink), 0 12px 26px rgba(0, 0, 0, .35);
+          animation: pp-in .62s var(--pp-spring) .1s both; }
+.crm-me::before { content: ''; position: absolute; top: 9px; left: 50%; width: 22px; height: 6px; translate: -50% 0; border-radius: 4px;
+                  background: var(--pp-hole); box-shadow: inset 0 1px 0 rgba(0, 0, 0, .4); }
+.crm-ava { flex: none; width: clamp(38px, min(4.2vw, 7.6vh), 58px); height: clamp(38px, min(4.2vw, 7.6vh), 58px);
+           image-rendering: pixelated; background: var(--pp-orange); border: 4px solid #fff; border-bottom-width: 10px; border-radius: 2px;
+           box-sizing: content-box; object-fit: cover; box-shadow: 0 2px 6px rgba(51, 33, 12, .35); }
 .crm-ava[hidden] { display: none; }
-.crm-who { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.crm-who small { font-size: clamp(6px, .6vw, 8px); color: #b9c3e6; }
-.crm-who b { font-weight: normal; font-size: clamp(9px, min(1.05vw, 2vh), 14px); color: #ffd85e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.crm-swap { flex: none; font: inherit; cursor: pointer; font-size: clamp(7px, .75vw, 10px); padding: clamp(7px, 1vh, 10px) clamp(8px, .9vw, 12px); min-height: 32px;
-            color: #33210c; background: #ffd85e; border: 3px solid #33210c; border-radius: 8px; box-shadow: 0 3px 0 #33210c; }
-.crm-swap:hover { filter: brightness(1.08); }
-.crm-swap:active { transform: translateY(2px); box-shadow: 0 1px 0 #33210c; }
-.crm-swap.padsel, .crm-swap:focus-visible { outline: 4px solid #fff3d6; outline-offset: 2px; }
+.crm-who { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.crm-who small { font-size: var(--pp-fs-s); color: var(--pp-rust); text-transform: uppercase; letter-spacing: .06em; }
+.crm-who b { font-weight: normal; font-size: var(--pp-fs-m); color: var(--pp-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crm-swap { flex: none; display: inline-flex; align-items: center; font: inherit; cursor: pointer; font-size: var(--pp-fs-s); padding: .6em .8em; min-height: 34px;
+            color: var(--pp-ink); background: var(--pp-yellow); border: 3px solid var(--pp-ink); border-radius: 6px; box-shadow: 0 3px 0 var(--pp-ink);
+            transition: translate .18s var(--pp-spring), box-shadow .18s var(--pp-spring); }
+.crm-swap .pp-key { margin-right: .5em; }
+.crm-swap:hover { background: var(--pp-orange); }
+.crm-swap:active, .crm-swap.pp-down { translate: 0 3px; box-shadow: 0 0 0 var(--pp-ink); transition-duration: .05s; }
+.crm-swap.padsel, .crm-swap:focus-visible { outline: 4px solid var(--pp-ink) !important; outline-offset: 2px; box-shadow: 0 0 0 8px var(--pp-yellow) !important; }
 
-/* плашка «есть новая версия — обновить»: заметная, по центру над каруселью */
+/* плашка «есть новая версия — обновить»: ярко-зелёный стикер, влетает один раз (в покое не качается) */
 .crm-upd { position: relative; flex: none; align-self: center; display: flex; align-items: center; gap: 12px; max-width: min(640px, 100%); margin: 8px 0 0;
-           font: inherit; font-size: clamp(9px, 1vw, 13px); line-height: 1.5; text-align: left; cursor: pointer; overflow: hidden;
-           padding: 10px 18px; color: #33210c; background: #7fe08a; border: 3px solid #33210c; border-radius: 10px; box-shadow: 0 4px 0 #33210c;
-           animation: crm-upd 1.6s ease-in-out infinite; }
+           font: inherit; font-size: var(--pp-fs-m); line-height: 1.5; text-align: left; cursor: pointer; overflow: hidden;
+           padding: 10px 18px; color: var(--pp-ink); background: var(--pp-lime); border: 3px solid var(--pp-ink); border-radius: 4px; box-shadow: 0 5px 0 var(--pp-ink);
+           animation: pp-in .62s var(--pp-spring) .2s both; }
 .crm-upd[hidden] { display: none; }
 .crm-upd i { font-style: normal; font-size: 1.5em; }
 .crm-upd span { position: relative; z-index: 1; }
-.crm-upd em { position: absolute; left: 0; bottom: 0; height: 4px; background: #33210c; }
-.crm-upd:disabled { cursor: default; animation: none; background: #ffd85e; }
-.crm-upd.busy { background: #b9e6ff; }
-.crm-upd:not(:disabled):hover { filter: brightness(1.08); }
-@keyframes crm-upd { 50% { transform: translateY(-2px); box-shadow: 0 6px 0 #33210c; } }
+.crm-upd em { position: absolute; left: 0; bottom: 0; height: 5px; background: var(--pp-ink); }
+.crm-upd:disabled { cursor: default; background: var(--pp-yellow); }
+.crm-upd.busy { background: var(--pp-paper); }
+.crm-upd:not(:disabled):hover { background: #7ff08a; }
 
 /* полоса карточек внизу: верх (.crm-sky) пустой — там город */
 .crm-sky { flex: 1; min-height: 0; }
-.crm-car { flex: none; display: flex; height: calc(var(--mcw) * .66 + 30px); }
-.cz.crm-cz { flex: 1; --cw: var(--mcw); --step: calc(var(--cw) * .97); }
-.crm-cz .cz-card.side { opacity: .82; filter: saturate(.8) brightness(.82); }
-.crm-cz .cz-card.far { opacity: .5; filter: saturate(.6) brightness(.66); }
-.crm-cz .cz-dots { padding: 6px 0 0; gap: 6px; }
+.crm-car { flex: none; display: flex; height: calc(var(--mcw) * .66 + 34px); }
+.cz.crm-cz { flex: 1; --cw: var(--mcw); --step: calc(var(--cw) * .99); }
+.crm-cz .cz-card.side { opacity: .9; filter: saturate(.85) brightness(.86); }
+.crm-cz .cz-card.far { opacity: .6; filter: saturate(.7) brightness(.72); }
+.crm-cz .cz-dots { padding: 8px 0 0; gap: 6px; }
 .crm-cz .cz-dots i { width: 8px; height: 8px; }
-.crm-card { display: flex; flex-direction: column; gap: 5px; height: calc(var(--cw) * .66); }
-.crm-cb { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(4px, 1vh, 9px);
-          font: inherit; cursor: pointer; text-align: center; padding: clamp(8px, 1.4vh, 14px) clamp(8px, 1vw, 14px); color: #fff3d6;
-          background: linear-gradient(180deg, #2c3a78 0, #1d2440 70%); border: 4px solid #33210c; border-radius: 14px;
-          box-shadow: 0 6px 0 #33210c, 0 16px 36px rgba(0, 0, 0, .45); transition: filter .1s; overflow: hidden; }
-.crm-cb:hover { filter: brightness(1.08); }
-.crm-cb:active { transform: translateY(3px); box-shadow: 0 3px 0 #33210c; }
-.crm-ico { font-style: normal; font-size: clamp(18px, min(2.4vw, 4.4vh), 34px); line-height: 1; color: #ffd85e; text-shadow: 3px 3px 0 #33210c; }
-.crm-cb b { font-weight: normal; font-size: clamp(11px, min(1.35vw, 2.6vh), 19px); line-height: 1.3; text-shadow: 3px 3px 0 #33210c; }
-.crm-cb span { font-size: clamp(9px, min(.95vw, 1.5vh), 12px); line-height: 1.5;   /* Дека 1280×800 — 12 px (UI-REVIEW № 35) */ color: #b9c3e6; max-width: 30ch; }
-.crm-card.main .crm-cb { background: linear-gradient(180deg, #f0522a 0, #c23a18 100%); box-shadow: 0 6px 0 #33210c, 0 14px 32px rgba(240, 82, 42, .35); }
-.crm-card.main .crm-cb b { font-size: clamp(14px, min(1.8vw, 3.4vh), 26px); text-shadow: 3px 3px 0 #9b2a10; }
-.crm-card.main .crm-cb span { color: #ffe0c8; }
-.crm-card.main .crm-ico { color: #fff3d6; text-shadow: 3px 3px 0 #9b2a10; }
-/* «сменить район» — маленькая кнопка под «на смену» (открыто больше одного района, но не все) */
-.crm-sub { flex: none; font: inherit; cursor: pointer; font-size: clamp(9px, .85vw, 11px); padding: 6px 8px; min-height: 28px; color: #fff3d6;
-           background: rgba(20, 16, 30, .85); border: 3px solid #33210c; border-radius: 8px; box-shadow: 0 3px 0 #33210c; }
-.crm-sub:hover { filter: brightness(1.15); }
-.crm-card.cz-card.on .crm-sub.padsel, .crm-card.cz-card.on .crm-sub:focus-visible { outline: 3px solid #ffd85e; outline-offset: 2px; }
-.crm-card.k-quit .crm-cb { background: linear-gradient(180deg, #3a2a44 0, #20182c 100%); }
-.crm-card.off .crm-cb { opacity: .55; cursor: default; }
-.crm-card.cz-card.on .crm-cb.padsel, .crm-card.cz-card.on .crm-cb:focus-visible { outline: 4px solid #ffd85e; outline-offset: 4px; }
+.crm-card { display: flex; flex-direction: column; gap: 6px; height: calc(var(--cw) * .66); --acc: var(--pp-yellow); }
+/* бумажка: лист накладной, сверху скотч; значок — в кружке цвета карточки */
+.crm-cb { position: relative; flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(4px, 1vh, 9px);
+          font: inherit; cursor: pointer; text-align: center; padding: clamp(10px, 1.6vh, 16px) clamp(8px, 1vw, 14px) clamp(8px, 1.2vh, 12px); color: var(--pp-ink);
+          background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 4px;
+          box-shadow: inset 0 -5px 0 var(--acc), 0 6px 0 var(--pp-ink), 0 16px 36px rgba(0, 0, 0, .45);
+          transition: translate .22s var(--pp-spring), box-shadow .22s var(--pp-spring); }
+.crm-cb::before { content: ''; position: absolute; top: -10px; left: 50%; width: 64px; height: 18px; translate: -50% 0; rotate: -3deg; pointer-events: none;
+                  background: rgba(255, 243, 214, .6); border: 1px solid rgba(138, 107, 78, .4); }
+.crm-cb:hover { background: #fff8e6; }
+.crm-cb:active { translate: 0 4px; box-shadow: inset 0 -5px 0 var(--acc), 0 2px 0 var(--pp-ink); transition-duration: .05s; }
+.crm-ico { flex: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box;
+           width: clamp(30px, min(3.4vw, 6vh), 50px); height: clamp(30px, min(3.4vw, 6vh), 50px);
+           font-style: normal; font-size: clamp(14px, min(1.7vw, 3vh), 24px); line-height: 1; color: var(--pp-ink);
+           background: var(--acc); border: 3px solid var(--pp-ink); border-radius: 50%; box-shadow: 0 3px 0 var(--pp-ink); }
+.crm-cb b { display: flex; align-items: center; justify-content: center; font-weight: normal; font-size: clamp(11px, min(1.3vw, 2.4vh), 18px); line-height: 1.3; color: var(--pp-ink); }
+.crm-cb b .pp-key { margin-right: .55em; }
+.crm-cb > span { font-size: var(--pp-fs-s); line-height: 1.5; color: var(--pp-label); max-width: 30ch; }   /* Дека 1280×800 — 12 px (UI-REVIEW № 35) */
+/* значок кнопки — только у карточки в центре (её и жмёт A) */
+.crm-card:not(.on) .pp-key, .crm-card.off .pp-key { display: none; }
+/* цвет каждой бумажки */
+.crm-card.k-quick { --acc: var(--pp-pink); }
+.crm-card.k-garage { --acc: var(--pp-orange); }
+.crm-card.k-ride { --acc: var(--pp-lime); }
+.crm-card.k-board { --acc: var(--pp-yellow); }
+.crm-card.k-collect { --acc: var(--pp-pink); }
+.crm-card.k-settings { --acc: #cdbfa3; }
+.crm-card.k-quit { --acc: var(--pp-red); }
+.crm-card.k-quit .crm-ico { color: var(--pp-paper); }
 
-.crm-hint { flex: none; text-align: center; font-size: clamp(9px, .95vw, 12px); line-height: 2; color: #b9c3e6; padding-top: 4px; text-shadow: 2px 2px 0 #33210c; }
-.crm-hint .pp-key { margin: 0 .2em; }
-.crm-ver { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); font-size: clamp(7px, .75vw, 10px);
-           color: #fff3d6; opacity: .8; text-shadow: 2px 2px 0 #33210c; pointer-events: none; }
+/* «на смену» — пропуск на смену: шапка «ПРОПУСК ··· № 7», красный штамп «[A] на смену», под ним — смена, район, минуты */
+.crm-card.main { --acc: var(--pp-red); }
+.crm-card.main .crm-cb { justify-content: space-between; gap: clamp(4px, .9vh, 8px); padding-top: clamp(8px, 1.2vh, 12px);
+                         box-shadow: 0 6px 0 var(--pp-ink), 0 16px 36px rgba(240, 82, 42, .35); }
+.crm-card.main .crm-cb::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: -6px; height: 8px; pointer-events: none; background: var(--pp-perf); }
+.crm-pass { align-self: stretch; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: .5em 0 .45em;
+            font-style: normal; font-size: var(--pp-fs-s); color: var(--pp-rust); text-transform: uppercase; letter-spacing: .06em;
+            border-bottom: 2px dashed var(--pp-brown); box-shadow: 0 -5px 0 -1px var(--pp-orange); }
+.crm-pass span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.crm-pass u { flex: none; text-decoration: none; color: var(--pp-ink); letter-spacing: .02em; }
+.crm-card.main .crm-cb b.crm-stamp { align-self: stretch; padding: clamp(6px, 1.2vh, 12px) 6px; font-size: clamp(11px, min(1.2vw, 2.1vh), 19px); letter-spacing: .02em; text-transform: uppercase; white-space: nowrap;
+            color: var(--pp-paper); background: var(--pp-red); border: 3px solid var(--pp-ink); border-radius: 6px; rotate: -1deg;
+            box-shadow: 0 4px 0 var(--pp-ink), inset 0 -4px 0 rgba(0, 0, 0, .14); text-shadow: 2px 2px 0 var(--pp-ink); }
+.crm-card.main .crm-cb:hover b.crm-stamp { background: var(--pp-fire); }
+.crm-stamp .pp-key { margin-right: .45em; color: var(--pp-red); background: var(--pp-paper); text-shadow: none; }
+.crm-card.main .crm-cb > span { color: var(--pp-ink); }
+/* «сменить район» — пометка на полях под пропуском (открыто больше одного района, но не все), [X] */
+.crm-sub { flex: none; display: inline-flex; align-items: center; justify-content: center; font: inherit; cursor: pointer; font-size: var(--pp-fs-s); padding: 5px 8px; min-height: 30px;
+           color: var(--pp-ink); background: var(--pp-paper); border: 2px dashed var(--pp-brown); border-radius: 3px; box-shadow: 0 3px 0 rgba(51, 33, 12, .6);
+           transition: translate .18s var(--pp-spring), box-shadow .18s var(--pp-spring); }
+.crm-sub .pp-key { margin-right: .5em; }
+.crm-sub:hover { border-style: solid; border-color: var(--pp-ink); }
+.crm-sub:active, .crm-sub.pp-down { translate: 0 3px; box-shadow: 0 0 0 rgba(51, 33, 12, .6); transition-duration: .05s; }
+.crm-card.cz-card.on .crm-sub.padsel, .crm-card.cz-card.on .crm-sub:focus-visible { outline: 4px solid var(--pp-ink) !important; outline-offset: 2px; box-shadow: 0 0 0 8px var(--pp-yellow) !important; }
+.crm-card.off .crm-cb { cursor: default; }
+.crm-card.off .crm-cb > :not(span) { opacity: .5; }
+/* курсор геймпада на карточке: чернильно-жёлтая обводка, бумажка один раз приподнялась */
+.crm-card.cz-card.on .crm-cb.padsel, .crm-card.cz-card.on .crm-cb:focus-visible {
+  outline: 4px solid var(--pp-ink) !important; outline-offset: 3px; box-shadow: 0 0 0 9px var(--pp-yellow), 0 6px 0 var(--pp-ink) !important; animation: pp-lift .2s var(--pp-spring); }
+
+/* подсказка внизу — бумажная полоска; значок — по вводу (glyphs.js) */
+.crm-hint { flex: none; align-self: center; margin-top: 6px; padding: .35em .9em .25em; text-align: center; font-size: var(--pp-fs-s); line-height: 2; color: var(--pp-ink);
+            background: var(--pp-paper); border: 2px solid var(--pp-ink); border-radius: 2px; box-shadow: 0 3px 0 rgba(51, 33, 12, .7); }
+.crm-hint .pp-key { margin: 0 .2em 0 .4em; }
+.crm-ver { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); font-size: 11px;
+           color: var(--pp-paper); opacity: .85; text-shadow: 2px 2px 0 var(--pp-ink); pointer-events: none; }
 
 .crm-dbox { width: min(560px, 100%); max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 22px 20px 18px; box-sizing: border-box;
-            background: #1d1830; border: 4px solid #33210c; border-radius: 14px; box-shadow: 0 8px 0 #33210c, 0 20px 50px rgba(0, 0, 0, .45); }
-.crm-dt { font-size: clamp(13px, 1.8vw, 20px); color: #ffd85e; text-shadow: 3px 3px 0 #33210c; text-align: center; margin-bottom: 4px; }
-.crm-dn { font-size: 7px; line-height: 1.8; color: #b9c3e6; text-align: center; }
-.crm-dclose { font: inherit; font-size: clamp(9px, 1.1vw, 12px); padding: 12px; cursor: pointer; color: #fff3d6; background: #3a4570; border: 3px solid #33210c; border-radius: 10px; box-shadow: 0 4px 0 #33210c; }
+            background: var(--pp-paper); color: var(--pp-ink); border: 3px solid var(--pp-ink); border-radius: 4px; box-shadow: 0 8px 0 var(--pp-ink), 0 20px 50px rgba(0, 0, 0, .45); }
+.crm-dt { font-size: var(--pp-fs-m); color: var(--pp-rust); text-transform: uppercase; letter-spacing: .06em; text-align: center; margin-bottom: 4px; }
+.crm-dn { font-size: var(--pp-fs-s); line-height: 1.8; color: var(--pp-label); text-align: center; }
+.crm-dclose { font: inherit; font-size: var(--pp-fs-m); padding: 12px; cursor: pointer; color: var(--pp-ink); background: var(--pp-paper); border: 2px dashed var(--pp-brown); border-radius: 3px; box-shadow: 0 4px 0 rgba(51, 33, 12, .6); }
 
-/* «как тебя зовут?» — один раз при первом запуске, потом из настроек */
+/* «как тебя зовут?» — один раз при первом запуске, потом из настроек: анкета на бумаге накладной */
 #crm-name { position: fixed; inset: 0; z-index: 45; display: flex; align-items: center; justify-content: center; padding: 16px;
-            background: rgba(10, 12, 24, .62); backdrop-filter: blur(3px); pointer-events: auto; }
+            background: var(--pp-dim); pointer-events: auto; }
 #crm-name[hidden] { display: none; }
-.crm-nbox { width: min(520px, 100%); display: flex; flex-direction: column; gap: 18px; padding: 26px 24px 20px; box-sizing: border-box; text-align: center;
-            background: #1d1830; border: 4px solid #33210c; border-radius: 14px; box-shadow: 0 8px 0 #33210c, 0 20px 50px rgba(0, 0, 0, .45); }
-.crm-nbox label { font-size: clamp(14px, 2vw, 22px); color: #ffd85e; text-shadow: 3px 3px 0 #33210c; }
-.crm-nbox input { font: inherit; font-size: clamp(12px, 1.6vw, 18px); padding: 16px; text-align: center; color: #33210c; background: #fff3d6;
-                  border: 3px solid #33210c; border-radius: 10px; box-shadow: 0 5px 0 #33210c; outline: none; }
-.crm-nbox input:focus { border-color: #f0522a; box-shadow: 0 5px 0 #f0522a; }
-.crm-nbtns { display: flex; gap: 10px; }
-.crm-nbtns button { flex: 1; font: inherit; font-size: clamp(10px, 1.3vw, 14px); padding: 15px 10px; cursor: pointer; border: 3px solid #33210c; border-radius: 10px;
-                    box-shadow: 0 4px 0 #33210c; color: #fff3d6; background: #3a4570; }
+.crm-nbox { position: relative; width: min(520px, 100%); display: flex; flex-direction: column; gap: 18px; padding: 26px 24px 22px; box-sizing: border-box; text-align: center;
+            color: var(--pp-ink); background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 4px;
+            box-shadow: inset 0 6px 0 var(--pp-yellow), 0 8px 0 var(--pp-ink), 0 24px 60px rgba(0, 0, 0, .5); animation: pp-in .62s var(--pp-spring) both; }
+.crm-nbox::before, .crm-nbox::after { content: ''; position: absolute; left: 10px; right: 10px; height: 8px; pointer-events: none; background: var(--pp-perf); }
+.crm-nbox::before { top: -6px; }
+.crm-nbox::after { bottom: -6px; }
+.crm-nbox label { padding-bottom: .7em; font-size: var(--pp-fs-l); line-height: 1.3; color: var(--pp-ink); border-bottom: 2px dashed var(--pp-brown); }
+.crm-nbox input { font: inherit; font-size: var(--pp-fs-m); padding: 16px; text-align: center; color: var(--pp-ink); background: #fffaf0;
+                  border: 3px solid var(--pp-ink); border-radius: 4px; box-shadow: inset 0 3px 0 rgba(51, 33, 12, .12); outline: none; }
+.crm-nbox input::placeholder { color: var(--pp-label); opacity: .7; }
+.crm-nbox input:focus { border-color: var(--pp-red); box-shadow: 0 0 0 5px var(--pp-yellow); }
+.crm-nbtns { display: flex; gap: 12px; align-items: stretch; }
+.crm-nbtns button { flex: 1; display: inline-flex; align-items: center; justify-content: center; font: inherit; font-size: var(--pp-fs-m); padding: 14px 10px; cursor: pointer;
+                    color: var(--pp-ink); background: var(--pp-paper); border: 2px dashed var(--pp-brown); border-radius: 3px; box-shadow: 0 4px 0 rgba(51, 33, 12, .6);
+                    transition: translate .18s var(--pp-spring), box-shadow .18s var(--pp-spring); }
+.crm-nbtns button .pp-key { margin-right: .6em; }
 .crm-nbtns button[hidden] { display: none; }
-.crm-nbtns .crm-nok { color: #fff3d6; background: #f0522a; flex: 2; }
-.crm-nbtns button:disabled { opacity: .4; cursor: default; }
-.crm-nn { font-size: 12px; line-height: 1.7; color: #b9c3e6; }
+.crm-nbtns .crm-nok { flex: 2; color: var(--pp-paper); background: var(--pp-red); border: 3px solid var(--pp-ink); border-radius: 6px; rotate: -1deg;
+                      text-transform: uppercase; letter-spacing: .06em; text-shadow: 2px 2px 0 var(--pp-ink); box-shadow: 0 5px 0 var(--pp-ink); }
+.crm-nbtns .crm-nok .pp-key { color: var(--pp-red); background: var(--pp-paper); text-shadow: none; }
+.crm-nbtns .crm-nok:hover { background: var(--pp-fire); }
+.crm-nbtns button:active { translate: 0 3px; box-shadow: 0 1px 0 var(--pp-ink); transition-duration: .05s; }
+.crm-nbtns button:disabled, .crm-nbtns button.crm-off { opacity: .4; cursor: default; }
+.crm-nbox .padsel { outline: 4px solid var(--pp-ink) !important; outline-offset: 3px; box-shadow: 0 0 0 9px var(--pp-yellow) !important; }
+.crm-nn { font-size: max(12px, var(--pp-fs-s)); line-height: 1.7; color: var(--pp-label); }
 .crm-nn:empty { display: none; }
 
 /* телефон стоймя: логотип сверху, профиль под ним справа, карточка шире */
@@ -125,8 +186,11 @@ body.career #build-v { display: none; }          /* версия — в .crm-ver
   .crm-hint { display: none; }
   .crm-upd { margin-top: 4px; padding: 6px 14px; }
   #cr-menu { --mcw: clamp(150px, 22vw, 230px); }
-  .crm-cb { gap: 3px; padding: 6px; }
-  .crm-cb span { display: none; }
-  .crm-ava { width: 34px; height: 34px; }
+  .crm-cb { gap: 3px; padding: 8px 6px 6px; }
+  .crm-cb > span { display: none; }
+  .crm-ico { width: 26px; height: 26px; font-size: 13px; border-width: 2px; }
+  .crm-ava { width: 30px; height: 30px; border-width: 3px; border-bottom-width: 7px; }
+  .crm-me { padding-top: 9px; }
   .crm-swap { min-height: 28px; padding: 5px 8px; }
+  .crm-pass { padding: .2em 0 .3em; }
 }

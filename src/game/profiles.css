@@ -1,35 +1,57 @@
-/* окно «профили» (profiles.js) — в стиле окна районов главного меню (menu.css) */
+/* окно «профили» (profiles.js) — «трудовая книжка» на бумаге накладной (src/styles/paper.css, UI-REVIEW № 45):
+   лист с перфорацией, шапка капсом, у каждого профиля — запись с портретом-полароидом; текущий — жёлтым
+   маркером; «назад» и «отмена» — пометки [B], «готово» / «создать» — красный штамп [A] */
 #crm-prof { position: fixed; inset: 0; z-index: 46; display: flex; align-items: center; justify-content: center; padding: 16px;
-            background: rgba(10, 12, 24, .62); backdrop-filter: blur(3px); pointer-events: auto; }
+            background: var(--pp-dim); pointer-events: auto; }
 #crm-prof[hidden] { display: none; }
-.prf-box { width: min(600px, 100%); max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 22px 20px 18px; box-sizing: border-box;
-           background: #1d1830; border: 4px solid #33210c; border-radius: 14px; box-shadow: 0 8px 0 #33210c, 0 20px 50px rgba(0, 0, 0, .45); color: #fff3d6; }
-.prf-t { font-size: clamp(13px, 1.8vw, 20px); line-height: 1.5; color: #ffd85e; text-shadow: 3px 3px 0 #33210c; text-align: center; margin-bottom: 4px; overflow-wrap: anywhere; }
-.prf-l { display: flex; flex-direction: column; gap: 6px; }
-.prf-row { display: flex; gap: 6px; align-items: stretch; }
-.prf-box button { font: inherit; cursor: pointer; color: #fff3d6; border: 3px solid #33210c; border-radius: 9px; box-shadow: 0 3px 0 #33210c; }
-.prf-box button:hover:not(:disabled) { filter: brightness(1.12); }
-.prf-pick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 12px 8px 8px; background: rgba(34, 44, 90, .92); }
+.prf-box { position: relative; width: min(600px, 100%); max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px 22px 20px; box-sizing: border-box;
+           color: var(--pp-ink); background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 4px;
+           box-shadow: 0 8px 0 var(--pp-ink), 0 24px 60px rgba(0, 0, 0, .5); animation: pp-in .55s var(--pp-spring) both;
+           scrollbar-width: thin; scrollbar-color: var(--pp-brown) transparent; }
+.prf-head { --pp-accent: var(--pp-orange); margin-bottom: 4px; }
+.prf-t { padding-top: 12px; font-size: var(--pp-fs-l); line-height: 1.4; color: var(--pp-ink); text-align: center; margin-bottom: 4px; overflow-wrap: anywhere; }
+.prf-l { display: flex; flex-direction: column; gap: 0; }
+.prf-row { display: flex; gap: 14px; align-items: stretch; padding: 6px 0; }
+.prf-row + .prf-row { border-top: 1px dashed rgba(138, 107, 78, .55); }
+.prf-box button { font: inherit; cursor: pointer; color: var(--pp-ink); border: 2px dashed var(--pp-brown); border-radius: 3px; background: var(--pp-paper);
+                  box-shadow: 0 3px 0 rgba(51, 33, 12, .6); transition: translate .18s var(--pp-spring), box-shadow .18s var(--pp-spring); }
+.prf-box button:hover:not(:disabled) { border-style: solid; border-color: var(--pp-ink); }
+.prf-box button:active:not(:disabled) { translate: 0 3px; box-shadow: 0 0 0 rgba(51, 33, 12, .6); transition-duration: .05s; }
+.prf-box button .pp-key { margin-right: .6em; }
+/* запись: портрет-полароид, имя и что сделано */
+.prf-pick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; text-align: left; padding: 8px 12px 8px 8px; border-color: transparent !important; box-shadow: none !important; background: transparent !important; }
 .prf-pt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; font-style: normal; }
-.prf-ava { flex: none; width: 44px; height: 44px; border-radius: 7px; image-rendering: pixelated; background: #2a3766; border: 3px solid #33210c; box-sizing: border-box; }
-.prf-row.cur .prf-ava { border-color: #ffd85e; }
-.prf-pick b { font-weight: normal; font-size: clamp(9px, 1vw, 13px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.prf-pick span { font-size: clamp(9px, .9vw, 11px); line-height: 1.5; color: #b9c3e6; }
-.prf-row.cur .prf-pick { background: #f0522a; }
-.prf-row.cur .prf-pick span { color: #ffe0c8; }
-.prf-ren, .prf-del { flex: none; padding: 0 12px; font-size: clamp(7px, .75vw, 10px); background: #3a4570; }
-.prf-del { color: #ffb0a0; }
-.prf-new { padding: 12px; font-size: clamp(9px, 1vw, 12px); background: rgba(34, 44, 90, .6); border-style: dashed !important; }
-.prf-note { font-size: 12px; line-height: 1.7; color: #b9c3e6; text-align: center; }
+.prf-ava { flex: none; width: 40px; height: 40px; image-rendering: pixelated; background: var(--pp-orange); border: 4px solid #fff; border-bottom-width: 10px; border-radius: 2px;
+           box-sizing: content-box; box-shadow: 0 2px 6px rgba(51, 33, 12, .35); }
+.prf-pick b { font-weight: normal; font-size: var(--pp-fs-m); color: var(--pp-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prf-pick span { font-size: max(11px, var(--pp-fs-s)); line-height: 1.5; color: var(--pp-label); }
+/* текущий профиль — жёлтым маркером */
+.prf-row.cur .prf-pick b { align-self: flex-start; max-width: 100%; padding: 0 .25em; background: linear-gradient(transparent 12%, var(--pp-yellow) 12% 88%, transparent 88%); }
+.prf-row.cur .prf-pick span { color: var(--pp-ink); }
+.prf-ren, .prf-del { flex: none; align-self: center; min-height: 40px; padding: 0 12px; font-size: max(11px, var(--pp-fs-s)); }
+.prf-del { color: var(--pp-red) !important; }
+.prf-new { padding: 12px; font-size: var(--pp-fs-m); background: color-mix(in srgb, var(--pp-yellow) 35%, var(--pp-paper)) !important; }
+.prf-note { font-size: max(12px, var(--pp-fs-s)); line-height: 1.7; color: var(--pp-label); text-align: center; }
 .prf-note:empty { display: none; }
-.prf-warn { font-size: clamp(7px, .8vw, 10px); line-height: 1.8; color: #ffb0a0; text-align: center; }
-.prf-close { font-size: clamp(9px, 1.1vw, 12px); padding: 12px; background: #3a4570; box-shadow: 0 4px 0 #33210c; }
-.prf-btns { display: flex; gap: 10px; }
-.prf-btns button { flex: 1; font-size: clamp(10px, 1.3vw, 14px); padding: 15px 10px; background: #3a4570; box-shadow: 0 4px 0 #33210c; }
-.prf-btns .prf-ok, .prf-btns .prf-yes { flex: 2; background: #f0522a; }
+.prf-warn { font-size: max(12px, var(--pp-fs-s)); line-height: 1.8; color: var(--pp-red); text-align: center; }
+.prf-close { display: flex; align-items: center; justify-content: center; align-self: center; min-width: 50%; font-size: var(--pp-fs-m); padding: 12px; }
+.prf-btns { display: flex; gap: 12px; }
+.prf-btns button { flex: 1; display: inline-flex; align-items: center; justify-content: center; font-size: var(--pp-fs-m); padding: 14px 10px; }
+/* главное — красный штамп: «готово», «создать»; «да, удалить» — красный по бумаге */
+.prf-btns .prf-ok { flex: 2; color: var(--pp-paper) !important; background: var(--pp-red) !important; border: 3px solid var(--pp-ink) !important; border-radius: 6px !important; rotate: -1deg;
+                    text-transform: uppercase; letter-spacing: .05em; text-shadow: 2px 2px 0 var(--pp-ink); box-shadow: 0 5px 0 var(--pp-ink) !important; }
+.prf-btns .prf-ok .pp-key { color: var(--pp-red); background: var(--pp-paper); text-shadow: none; }
+.prf-btns .prf-yes { flex: 2; color: var(--pp-red) !important; border: 3px solid var(--pp-red) !important; }
+.prf-btns .prf-yes:hover { color: var(--pp-paper) !important; background: var(--pp-red) !important; }
 .prf-btns button:disabled { opacity: .4; cursor: default; }
-.prf-form { display: flex; flex-direction: column; gap: 16px; text-align: center; }
-.prf-form label { font-size: clamp(12px, 1.7vw, 19px); line-height: 1.5; color: #ffd85e; text-shadow: 3px 3px 0 #33210c; }
-.prf-form input { font: inherit; font-size: clamp(12px, 1.6vw, 18px); padding: 16px; text-align: center; color: #33210c; background: #fff3d6;
-                  border: 3px solid #33210c; border-radius: 10px; box-shadow: 0 5px 0 #33210c; outline: none; min-width: 0; }
-.prf-form input:focus { border-color: #f0522a; box-shadow: 0 5px 0 #f0522a; }
+.prf-form { display: flex; flex-direction: column; gap: 16px; padding-top: 12px; text-align: center; }
+.prf-form label { padding-bottom: .6em; font-size: var(--pp-fs-l); line-height: 1.4; color: var(--pp-ink); border-bottom: 2px dashed var(--pp-brown); }
+.prf-form input { font: inherit; font-size: var(--pp-fs-m); padding: 16px; text-align: center; color: var(--pp-ink); background: #fffaf0;
+                  border: 3px solid var(--pp-ink); border-radius: 4px; box-shadow: inset 0 3px 0 rgba(51, 33, 12, .12); outline: none; min-width: 0; }
+.prf-form input::placeholder { color: var(--pp-label); opacity: .7; }
+.prf-form input:focus { border-color: var(--pp-red); box-shadow: 0 0 0 5px var(--pp-yellow); }
+/* курсор геймпада: чернильно-жёлтая обводка */
+.prf-box .padsel { outline: 4px solid var(--pp-ink) !important; outline-offset: 2px; box-shadow: 0 0 0 8px var(--pp-yellow) !important; animation: pp-lift .2s var(--pp-spring); }
+.prf-box .prf-pick.padsel { background: color-mix(in srgb, var(--pp-yellow) 35%, var(--pp-paper)) !important; }
+/* в строке профиля кнопки стоят через 14 px: без увеличения и с тонкой жёлтой каймой — обводка карточки не наезжает на «имя» */
+.prf-row .padsel { transform: none; outline-offset: 0; box-shadow: 0 0 0 5px var(--pp-yellow) !important; }

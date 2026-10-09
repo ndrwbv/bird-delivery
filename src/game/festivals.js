@@ -788,7 +788,7 @@ function hitMascot (m, sp) {
     if (!S.freeRun) A.addWallet(cash);
     A.toast(t('маскот угнетён!') + ' ' + t('+2 респекта · премия +{money}', { money: A.money(cash) }));
   } else A.toast(t('маскот угнетён — премии на сегодня кончились'));
-  try { A.Snd.squish(); A.Snd.blip(140, 0.25, 'square', 0.08); } catch (e) { /* звук не обязателен */ }
+  try { A.Snd.fx('mascot', s => { A.Snd.squish(); s.blip(140, 0.25, 'square', 0.08); }); } catch (e) { /* звук не обязателен */ }
   if (F.host && Math.hypot(F.host.position.x - V.x, F.host.position.z - V.z) < 160) say(F.host, pick([t('УРА! Минус булка!'), t('Вот это угнетение!'), t('Пицца победила!')]), 3.4);
   if (A.ADULT) {
     // лопается на ингредиенты — большие куски
@@ -944,6 +944,8 @@ export function burgerRoll () {
 /* точка внутри блоков (с запасом m)? — пин клиента туда не ставим (game.js pinFront) */
 export const blocks = (x, z, m = 0) => !!F && insideRect(x, z, m);
 export const active = () => (F ? { kind: F.kind, mall: F.site.mall } : null);
+/* середина площадки фестиваля — для гула толпы (ambience.js) */
+export const where = () => (F ? { x: F.site.x, z: F.site.z } : null);
 
 /* ─────────────── отладка: __dlv.FEST ─────────────── */
 export const DEBUG = {

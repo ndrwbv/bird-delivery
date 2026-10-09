@@ -3,7 +3,7 @@
    docs/CAREER.md «Главное меню, пауза и настройки».
 
    Табы: игра (имя, профиль, сбросить прогресс, тестовые районы, версия и обновление, update.js) ·
-   графика (качество и 7 пунктов, gfx.js) · звук · управление (какие кнопки за что — геймпад,
+   графика (качество и 7 пунктов, gfx.js) · звук (вкл / выкл и три ползунка: музыка, звуки, мотор — docs/SOUNDS.md) · управление (какие кнопки за что — геймпад,
    клавиатура или палец) · язык (сетка языков). Внутри таба — обычный вертикальный список; не влез
    (телефон боком) — листается внутри таба, окно целиком не прокручивается.
    Переключить таб: LB/RB и LT/RT геймпада, ←→ (крестовина, стик, клавиши), когда подсветка на строке
@@ -22,6 +22,7 @@
 import './settings.css';
 import { t } from '../i18n/index.js';
 import * as UPD from './update.js';
+import { keyHTML } from '../input/glyphs.js';
 
 let A = null, TAB = 'game', TABS = [];
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';');
@@ -42,7 +43,7 @@ export function init (api) {
 export const on = () => !!(A && A.kind() === 'settings' && !A.panel().hidden && A.body().querySelector('.set-tabs'));
 const focusId = () => { const e = A.selected && A.selected(); return (e && e.id) || undefined; };
 /* какая кнопка в каком табе */
-const tabOf = id => !id ? null : id === 'set-snd' ? 'snd' : id.startsWith('gfx-') ? 'gfx' : id.startsWith('set-l-') ? 'lang' : id.startsWith('set-tab-') ? id.slice(8) : 'game';
+const tabOf = id => !id ? null : id === 'set-snd' || id.startsWith('set-vol-') ? 'snd' : id.startsWith('gfx-') ? 'gfx' : id.startsWith('set-l-') ? 'lang' : id.startsWith('set-tab-') ? id.slice(8) : 'game';
 
 /** соседний таб; force — LB/RB, LT/RT, Q/E (всегда), без него — ←→ (только со строки табов) */
 export function flip (d, force) {
@@ -55,7 +56,7 @@ export function flip (d, force) {
   const j = Math.max(0, Math.min(TABS.length - 1, i + d));
   if (j === i) return true;                        // край: ←→ всё равно наши, в список не уходят
   TAB = TABS[j];
-  if (A.Snd && A.Snd.blip) try { A.Snd.blip(520, 0.03, 'square', 0.04); } catch (e) { /* — */ }
+  if (A.Snd && A.Snd.click) try { A.Snd.click(520); } catch (e) { /* — */ }
   render('set-tab-' + TAB);
   A.navReset();
   return true;
@@ -64,6 +65,14 @@ export function flip (d, force) {
 const row = (label, val, id, focus, opt = {}) => '<div class="set-row"><span>' + label + (opt.extra || '') + '</span><button type="button" id="' + id + '"' +
   (id === focus ? ' autofocus' : '') + (opt.cls ? ' class="' + opt.cls + '"' : '') + '>' + val + '</button></div>';
 const note = s => '<div class="pn-n">' + s + '</div>';
+/* ползунок громкости — линейка анкеты: ←→ геймпада и клавиш, мышь, палец; шаг 10 % */
+const slider = (k, label, v, focus, extra = '') => {
+  v = Math.max(0, Math.min(100, v == null ? 100 : +v));
+  const id = 'set-vol-' + k;
+  return '<div class="set-row set-vol"><span>' + label + extra + '</span><label class="set-sl" style="--v:' + v + '%">' +
+    '<input type="range" id="' + id + '" data-vol="' + k + '" min="0" max="100" step="10" value="' + v + '" aria-label="' + esc(label) + '"' +
+    (id === focus ? ' autofocus' : '') + '><b>' + v + ' %</b></label></div>';
+};
 const head = s => '<div class="set-h">' + s + '</div>';
 /* без кнопок (управление, «меняется в главном меню»): геймпад встаёт на него сам (data-pad), A — ничего */
 const still = html => '<div class="set-still" data-pad tabindex="-1">' + html + '</div>';
@@ -79,18 +88,25 @@ export function render (focus, tab) {
   else if (tabOf(focus)) TAB = tabOf(focus);
   if (!TABS.includes(TAB)) TAB = TABS[0];
 
-  const tabsHtml = '<div class="set-tabs" role="tablist"><i class="set-tk" data-d="-1" aria-hidden="true">LB</i>' +
+  const tabsHtml = '<div class="set-tabs" role="tablist"><i class="set-tk" data-d="-1" aria-hidden="true">' + keyHTML('lb') + '</i>' +
     TABS.map(k => '<button type="button" role="tab" class="set-tab' + (k === TAB ? ' on' : '') + '" id="set-tab-' + k + '" data-tab="' + k + '"' +
       (k === TAB ? ' aria-selected="true"' + (focus === 'set-tab-' + k || !focus ? ' autofocus' : '') : ' aria-selected="false" data-pad-skip') + '>' + esc(t(TAB_NAMES[k])) + '</button>').join('') +
-    '<i class="set-tk" data-d="1" aria-hidden="true">RB</i></div>';
-  body.innerHTML = '<div class="pn-t">' + t('настройки') + '</div>' + tabsHtml +
+    '<i class="set-tk" data-d="1" aria-hidden="true">' + keyHTML('rb') + '</i></div>';
+  // анкета сотрудника (UI-REVIEW № 45): шапка капсом, табы — ярлычки папки, внизу — пометка «[B] готово»
+  body.innerHTML = '<header class="pn-t set-head"><span>' + t('анкета сотрудника') + '</span><b>' + t('настройки') + '</b></header>' + tabsHtml +
     '<div class="set-pane" data-tab="' + TAB + '"><div class="set-list"></div></div>' +
+    '<div class="set-foot"><button type="button" class="pp-note set-close">' + keyHTML('back') + esc(t('готово')) + '</button>' +
     // единственная подпись OSM в игре (лицензия ODbL требует) — в самом низу, мелко, но читаемо
-    '<div class="pn-n set-cred">' + t('карта — © участники OpenStreetMap, лицензия ODbL. Рельеф — SRTM (NASA).') + '</div>';
+    '<div class="pn-n set-cred">' + t('карта — © участники OpenStreetMap, лицензия ODbL. Рельеф — SRTM (NASA).') + '</div></div>';
   const list = body.querySelector('.set-list');
 
   if (TAB === 'snd') {
+    // вкл / выкл — общий (M, R3), под ним три ползунка громкости: музыка, звуки, мотор (game.js Snd.setVol)
+    const vol = A.Snd.vol || {};
     list.innerHTML = row(t('звук'), A.Snd.on ? t('вкл') : t('выкл'), 'set-snd', focus) +
+      slider('music', t('музыка'), vol.music, focus, A.Snd.music ? '' : ' <small class="set-tag">' + t('скоро') + '</small>') +
+      slider('sfx', t('звуки'), vol.sfx, focus) +
+      slider('eng', t('мотор'), vol.eng, focus) +
       note(t('M на клавиатуре, R3 на геймпаде — звук вкл / выкл прямо в игре'));
   } else if (TAB === 'gfx') {
     A.GFX.panel(list, focus, true);                 // gfx.js рисует сама: качество и семь пунктов
@@ -132,10 +148,24 @@ export function render (focus, tab) {
     if (!menu) h += note(t('сбросить прогресс — в главном меню'));
     list.innerHTML = h;
   }
+  ticks(list);
+  // графика перерисовывает свой список сама (gfx.js panel) — галочки ставим заново
+  new MutationObserver(() => ticks(list)).observe(list, { childList: true });
   wire(body);
 }
 
+/* галочки анкеты: кнопки «вкл» / «выкл» (звук, графика) — с квадратиком ☑ / ☐ (только вид, gfx.js не трогаем) */
+function ticks (list) {
+  const on1 = t('вкл'), off1 = t('выкл');
+  list.querySelectorAll('.set-row button').forEach(b => {
+    const v = b.textContent.trim();
+    b.classList.toggle('set-on', v === on1 || v.startsWith(on1 + ' ·'));
+    b.classList.toggle('set-off', v === off1 || v.startsWith(off1 + ' ·'));
+  });
+}
+
 function wire (body) {
+  { const c = body.querySelector('.set-close'), x = A.panel().querySelector('#pn-close'); if (c && x) c.addEventListener('click', () => x.click()); }
   const $ = id => body.querySelector('#' + id);
   body.querySelectorAll('.set-tab').forEach(b => b.addEventListener('click', () => {
     if (b.dataset.tab === TAB) return;
@@ -145,6 +175,16 @@ function wire (body) {
   }));
   body.querySelectorAll('.set-tk').forEach(b => b.addEventListener('click', () => flip(+b.dataset.d, true)));
   if ($('set-snd')) $('set-snd').onclick = () => { A.Snd.set(!A.Snd.on); render('set-snd'); };
+  // ползунки: тянешь — громкость сразу, отпустил — короткий пример этого звука
+  body.querySelectorAll('input[data-vol]').forEach(inp => {
+    const k = inp.dataset.vol, lab = inp.closest('.set-sl'), num = lab && lab.querySelector('b');
+    inp.addEventListener('input', () => {
+      if (A.Snd.setVol) A.Snd.setVol(k, +inp.value);
+      if (lab) lab.style.setProperty('--v', inp.value + '%');
+      if (num) num.textContent = inp.value + ' %';
+    });
+    inp.addEventListener('change', () => { if (A.Snd.preview) try { A.Snd.preview(k); } catch (e) { /* — */ } });
+  });
   body.querySelectorAll('[data-l]').forEach(b => b.addEventListener('click', () => A.setLang(b.dataset.l)));
   if ($('set-name')) $('set-name').onclick = () => A.askName(() => render('set-name'));
   if ($('set-prof')) $('set-prof').onclick = () => A.openProfiles();

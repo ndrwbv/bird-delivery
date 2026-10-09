@@ -38,7 +38,7 @@ import { keyHTML, refreshKeys, matchKey } from '../input/glyphs.js';
 import * as PFX from './paperfx.js';
 
 const KEY = 'dlv-quick';
-const PASS = new Set(['dlv-sound', 'dlv-lang', 'dlv-edition', 'dlv-name', 'dlv-map', 'dlv-ach', 'dlv-heroes', 'dlv-heroq', 'dlv-crashlog', KEY]);
+const PASS = new Set(['dlv-sound', 'dlv-vol-music', 'dlv-vol-sfx', 'dlv-vol-eng', 'dlv-lang', 'dlv-edition', 'dlv-name', 'dlv-map', 'dlv-ach', 'dlv-heroes', 'dlv-heroq', 'dlv-crashlog', KEY]);
 const FREEZE = new Set(['dlv-msk-xp']);
 /* сезоны на выбор: «как сейчас в карьере» и середина каждого (seasons.js: 0 — начало лета, год — 4) */
 const SEASONS = [{ id: 'now' }, { id: 'summer', v: 0.5 }, { id: 'autumn', v: 1.5 }, { id: 'winter', v: 2.5 }, { id: 'spring', v: 3.5 }];
@@ -51,7 +51,7 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const copy = v => (v && typeof v === 'object' ? JSON.parse(JSON.stringify(v)) : v);
 const num = n => '№ ' + String(Math.max(1, n | 0)).padStart(4, '0');
-const blip = (f = 880) => { try { A.Snd.blip && A.Snd.blip(f, 0.04, 'square', 0.05); } catch (e) { /* — */ } };
+const blip = (f = 880) => { try { A.Snd.click && A.Snd.click(f, 0.05, 0.04); } catch (e) { /* — */ } };
 
 export function init (api) {
   A = api;
@@ -373,6 +373,7 @@ export function finish (r = {}) {
     row(t('ударов'), String(r.hits || 0)),
     r.people ? row(t('прохожих сбито'), String(r.people)) : '',
     r.fine ? row(t('штраф за клиента'), '−' + A.money(r.fine), 'pp-minus') : '',
+    r.back ? row(t('опоздал обратно'), '−' + A.money(r.back), 'pp-minus') : '',
   ].join('');
   const cond = [seaName, carName, distName, clock(r.t0h ?? 9) + '—' + clock(r.endH ?? 9)].filter(Boolean).map(x => '<span>' + esc(x) + '</span>').join(' · ');
   endBox.innerHTML =

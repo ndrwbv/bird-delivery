@@ -1,24 +1,25 @@
-/* таблица рекордов «лучшая смена» (board.js): окно поверх меню карьеры, как выбор района */
+/* таблица рекордов «лучшая смена» (board.js): окно поверх меню карьеры, как выбор района.
+   09.10.2026 (QA): была на синем с текстом 7—8 px, сиреневым по бумаге — не читалась. Теперь палитра накладной
+   (чернила, бурые подписи, ржавые места, зелёные деньги), текст не мельче 11 px, «[B] назад» — значком по вводу */
 #crm-lb { position: fixed; inset: 0; z-index: 45; display: flex; align-items: center; justify-content: center; padding: 16px;
-          background: rgba(10, 12, 24, .62); backdrop-filter: blur(3px); pointer-events: auto; }
+          background: var(--pp-dim, rgba(40, 14, 24, .62)); backdrop-filter: blur(3px); pointer-events: auto; }
 #crm-lb[hidden] { display: none; }
 .lbd-tabs { display: flex; gap: 8px; }
 .lbd-tabs[hidden] { display: none; }
-.lbd-tabs button { flex: 1; font: inherit; font-size: clamp(9px, 1vw, 12px); padding: 11px 8px; cursor: pointer; color: #fff3d6; background: #3a4570;
-                   border: 3px solid #33210c; border-radius: 9px; box-shadow: 0 3px 0 #33210c; }
-.lbd-tabs button.cur { background: #f0522a; }
-.lbd-sub { font-size: 7px; line-height: 1.8; color: #b9c3e6; text-align: center; }
+.lbd-tabs button { flex: 1; font: inherit; font-size: max(11px, var(--pp-fs-s, 12px)); padding: 11px 8px; cursor: pointer; color: var(--pp-label, #75573b); background: #efdfba;
+                   border: 3px solid var(--pp-ink, #33210c); border-radius: 9px; box-shadow: 0 3px 0 var(--pp-ink, #33210c); }
+.lbd-tabs button.cur { color: var(--pp-ink, #33210c); background: var(--pp-yellow, #ffd85e); }
+.lbd-sub { font-size: max(11px, var(--pp-fs-s, 12px)); line-height: 1.7; color: var(--pp-label, #75573b); text-align: center; }
 .lbd-sub:empty { display: none; }
-.lbd-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; min-height: 120px; }
-.lbd-list li { display: grid; grid-template-columns: 30px 1fr 22px auto; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 7px;
-               font-size: clamp(8px, .9vw, 11px); color: #fff3d6; background: rgba(34, 44, 90, .55); }
-.lbd-list li em { font-style: normal; color: #ffd85e; text-align: right; }
+.lbd-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; min-height: 120px; }
+.lbd-list li { display: grid; grid-template-columns: 34px 1fr 22px auto; align-items: center; gap: 8px; padding: 7px 8px;
+               font-size: max(11px, var(--pp-fs-s, 12px)); color: var(--pp-ink, #33210c); border-bottom: 2px dashed rgba(138, 107, 78, .45); }
+.lbd-list li em { font-style: normal; color: var(--pp-rust, #8a3b22); text-align: right; }
 .lbd-list li b { font-weight: normal; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lbd-list li i { font-style: normal; font-size: 7px; text-align: center; color: #33210c; background: #6fd3ff; border-radius: 50%; width: 18px; height: 18px; line-height: 18px; }
+.lbd-list li i { font-style: normal; font-size: 9px; text-align: center; color: var(--pp-ink, #33210c); background: var(--pp-orange, #ff8a2b); border-radius: 50%; width: 18px; height: 18px; line-height: 18px; }
 .lbd-list li i.none { background: none; }
-.lbd-list li span { color: #ffb066; white-space: nowrap; }
-.lbd-list li.me { background: #ffd85e; color: #33210c; }
-.lbd-list li.me em, .lbd-list li.me span { color: #33210c; }
-.lbd-list li.gap, .lbd-list li.empty { display: block; background: none; text-align: center; color: #b9c3e6; padding: 4px; }
-.lbd-list li.empty { font-size: 8px; line-height: 1.8; padding: 24px 8px; }
+.lbd-list li span { color: var(--pp-money, #1f7a2e); white-space: nowrap; }
+.lbd-list li.me { background: var(--pp-yellow, #ffd85e); border-radius: 3px; }
+.lbd-list li.gap, .lbd-list li.empty { display: block; border: 0; text-align: center; color: var(--pp-label, #75573b); padding: 4px; }
+.lbd-list li.empty { line-height: 1.8; padding: 24px 8px; }
 .lbd-me:empty { display: none; }

@@ -306,7 +306,7 @@ function workStep (dt) {
       say(s, near, t(LINES[k]));
       s.sayT = WORK.SAY_CD;
       STATS.said++;
-      if (A.Snd) A.Snd.blip(760, 0.06, 'triangle', 0.05);
+      if (A.Snd) A.Snd.fx('talk-f', v => v.blip(760, 0.06, 'triangle', 0.05));
     }
   }
   STATS.live = live;

@@ -9,29 +9,31 @@
    Когда: днём, без дождя, только на KT.ACTIVE ближайших местах ближе KT.NEAR м от камеры
    (дальше KT.DROP — убираем). Змей: человек держит нитку, змей на 18—28 м, в 14—22 м по ветру,
    покачивается и водит хвостом. Дрон: человек с пультом смотрит вверх, дрон висит на 6—14 м и
-   плавает восьмёркой в 10 м от него, винты крутятся. Машина ближе KT.SCARE м — человек
-   сворачивается и уходит (место отдыхает KT.REST с).
+   плавает восьмёркой в 10 м от него, винты крутятся. Наезд — как на прохожего (hits.js): медленнее
+   HITS.TIER.FALL — упал и встал, быстрее — сбит, змей/дрон пропадает, место отдыхает KT.REST с
+   (до 09.10.2026 человек исчезал, когда машина подъезжала ближе 3,5 м).
 
    Перф: геометрии и материалы общие, людей — не больше 2 × KT.ACTIVE.
 
    init(api) — game.js, после сборки: { THREE, scene, CITY, V, ENV, groundH, inHouse, nearestRoad,
-     solidAt, onPave, makeHuman, dropMesh }
+     solidAt, onPave, makeHuman, dropMesh, CAR_L, CAR_W, gibHuman, runOver }
    step(dt)  — каждый кадр
    отладка: __dlv.KITES
    ────────────────────────────────────────────────────────────────────────── */
 import { makePerson } from './people.js';
+import * as HITS from './hits.js';
 
 export const KT = {
   PARK_MIN: 6000, PARKS: 14,
   LENIN: 'улица Ленина', LENIN_GAP: 450, LENIN_OFF: 8,
   KITE_SHARE: 0.6,
   NEAR: 260, DROP: 320, ACTIVE: 4,
-  SCARE: 3.5, REST: 90,
+  REST: 90,
 };
 
 let A = null, GEO = null;
 const SPOTS = [];
-const ST = { parks: 0, lenin: 0, kites: 0, drones: 0, active: 0, scared: 0 };
+const ST = { parks: 0, lenin: 0, kites: 0, drones: 0, active: 0, falls: 0, hit: 0 };
 const hsh = (x, z, k = 0) => { let h = Math.imul(Math.round(x) ^ 0x6a09e667, 0x9E3779B1) ^ Math.imul(Math.round(z) + k * 0x3c6ef372, 0x85ebca6b); h ^= h >>> 15; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 13; return (h >>> 0) / 4294967296; };
 const inP = (x, z, p) => {
   let c = false;
@@ -123,8 +125,7 @@ function spawn (s) {
   const gy = A.groundH(s.x, s.z);
   person.position.set(s.x, gy, s.z);
   A.scene.add(person);
-  const u = person.userData;
-  const on = { person, t: hsh(s.x, s.z, 5) * 30, gy };
+  const on = { person, t: hsh(s.x, s.z, 5) * 30, gy, p: { x: s.x, z: s.z, grp: person } };   // p — для наезда (hits.js)
   if (s.kite) {
     const k = new T.Group();
     const sail = new T.Mesh(G.kite, mat(s.hex, { side: true }));
@@ -140,7 +141,6 @@ function spawn (s) {
     on.line.frustumCulled = false;
     A.scene.add(on.line);
     person.rotation.y = s.wind;
-    u.armR.rotation.x = -1.9; u.armL.rotation.x = -0.4;
   } else {
     const dr = new T.Group();
     dr.add(new T.Mesh(G.body, mat('#2b2f36')));
@@ -156,10 +156,15 @@ function spawn (s) {
     const rc = new T.Mesh(G.remote, mat('#30343a'));
     rc.position.set(0, 1.05, 0.38);
     person.add(rc); on.rc = rc;
-    u.armL.rotation.x = u.armR.rotation.x = -1.0;
-    u.head.rotation.x = -0.45;                           // смотрит вверх
   }
+  hold(s, on);
   s.on = on; ST.active++;
+}
+/* руки: змей — правая с ниткой вверх, дрон — обе с пультом, смотрит вверх (и снова — когда встал после наезда) */
+function hold (s, on) {
+  const u = on.person.userData;
+  if (s.kite) { u.armR.rotation.x = -1.9; u.armL.rotation.x = -0.4; on.person.rotation.y = s.wind; }
+  else { u.armL.rotation.x = u.armR.rotation.x = -1.0; u.head.rotation.x = -0.45; }
 }
 function despawn (s) {
   const on = s.on;
@@ -171,7 +176,7 @@ function despawn (s) {
   s.on = null; ST.active--;
 }
 
-function animate (s, dt) {
+function animate (s, dt, lying) {
   const on = s.on, p = on.person;
   on.t += dt;
   const t = on.t;
@@ -184,10 +189,10 @@ function animate (s, dt) {
     on.kite.rotation.set(0.35, s.wind + Math.PI, Math.sin(t * 1.3) * 0.35);
     for (let i = 0; i < on.tail.length; i++) on.tail[i].position.x = Math.sin(t * 3 - i * 0.8) * 0.12 * (i + 1);
     // нитка: от руки к змею
-    const hx = s.x + wx * 0.45, hz = s.z + wz * 0.45, hy = on.gy + 1.85 * p.scale.y;
+    const hx = on.p.x + wx * 0.45, hz = on.p.z + wz * 0.45, hy = on.gy + (lying ? 0.4 : 1.85 * p.scale.y);
     on.posA.set([hx, hy, hz, kx, ky - 0.75, kz]);
     on.line.geometry.attributes.position.needsUpdate = true;
-    p.userData.armR.rotation.x = -1.9 + Math.sin(t * 1.3) * 0.12;
+    if (!lying) p.userData.armR.rotation.x = -1.9 + Math.sin(t * 1.3) * 0.12;
   } else {
     // восьмёрка над хозяином, чуть дрожит
     const ax = Math.sin(t * 0.31) * 10, az = Math.sin(t * 0.62) * 5, ay = 9 + Math.sin(t * 0.23) * 4 + Math.sin(t * 5.1) * 0.05;
@@ -196,7 +201,7 @@ function animate (s, dt) {
     const vx = on.drone.position.x - dx, vz = on.drone.position.z - dz;
     on.drone.rotation.set(vz * 2, Math.sin(t * 0.2) * 1.2, -vx * 2);
     for (const r of on.rot) r.rotation.y += dt * 40;
-    p.rotation.y = Math.atan2(on.drone.position.x - s.x, on.drone.position.z - s.z);
+    if (!lying) p.rotation.y = Math.atan2(on.drone.position.x - on.p.x, on.drone.position.z - on.p.z);
   }
 }
 
@@ -223,10 +228,26 @@ export function step (dt) {
       for (const s of near.slice(0, KT.ACTIVE - ST.active)) spawn(s);
     }
   }
+  // наезд — как на любого прохожего (game.js underCar, hits.js): медленно — упал и встал, быстрее — сбит
+  const sp = Math.hypot(V.vx, V.vz), kmh = sp * 3.6, fx = Math.sin(V.h), fz = Math.cos(V.h);
   for (const s of SPOTS) {
     if (!s.on) continue;
-    // машина вплотную — сворачивается и уходит
-    if (Math.abs(s.x - V.x) < KT.SCARE && Math.abs(s.z - V.z) < KT.SCARE && Math.hypot(s.x - V.x, s.z - V.z) < KT.SCARE) { despawn(s); s.rest = KT.REST; ST.scared++; continue; }
+    const p = s.on.p;
+    if (p.fall) {
+      if (HITS.fallStep(p, dt)) { animate(s, dt, true); continue; }
+      hold(s, s.on);                                     // встал — снова держит нитку / пульт
+    }
+    if (sp > 3 && A.CAR_L) {
+      const dx = p.x - V.x, dz = p.z - V.z;
+      if (Math.abs(dx * fx + dz * fz) < A.CAR_L + 0.5 && Math.abs(dx * fz - dz * fx) < A.CAR_W + 0.35) {
+        if (HITS.isFall(kmh)) { HITS.fall(p, V.vx, V.vz); ST.falls++; animate(s, dt, true); continue; }
+        despawn(s);                                      // змей/дрон пропадает, модель человека — в hits.js
+        A.gibHuman(p, V.vx, V.vz, kmh);
+        if (A.runOver) A.runOver();
+        s.rest = KT.REST; ST.hit++;
+        continue;
+      }
+    }
     animate(s, dt);
   }
 }

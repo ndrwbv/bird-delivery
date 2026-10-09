@@ -1,0 +1,53 @@
+/* Полная карта — бумажная (09.10.2026, UI-REVIEW № 47; подключена из fmlegend.js). Основа — delivery.css
+   (#fullmap, .fm-box, .fm-view, значки .lg-*), здесь — только вид «как накладная» (src/styles/paper.css):
+   карта — лист на столе с перфорацией, сама схема — тёплая, будто напечатана на бумаге, со сгибами
+   (на три части по ширине и пополам по высоте); легенда — штампиками. Сгибы и тон — поверх холста
+   (pointer-events: none), рисование карты (game.js) не трогаем. */
+#fullmap { background: var(--pp-dim), rgba(30, 12, 20, .78); }
+#fullmap .fm-box { position: relative; gap: 8px; padding: 8px 14px 12px; color: var(--pp-ink); background: var(--pp-paper);
+                   border: 3px solid var(--pp-ink); border-radius: 4px; box-shadow: 0 8px 0 var(--pp-ink), 0 24px 60px rgba(0, 0, 0, .5);
+                   animation: pp-in .5s var(--pp-spring) both; }
+#fullmap .fm-box::before, #fullmap .fm-box::after { content: ''; position: absolute; left: 10px; right: 10px; height: 8px; pointer-events: none; background: var(--pp-perf); }
+#fullmap .fm-box::before { top: -6px; }
+#fullmap .fm-box::after { bottom: -6px; }
+/* шапка: название города капсом ржавым, справа — как управлять и «[B] закрыть» */
+#fullmap .fm-top { align-items: center; flex-wrap: wrap; padding: 6px 0 6px; font-size: var(--pp-fs-s); line-height: 1.6; color: var(--pp-ink);
+                   border-bottom: 2px dashed var(--pp-brown); box-shadow: 0 -5px 0 -1px var(--pp-orange); }
+#fullmap .fm-top b { font-weight: normal; font-size: var(--pp-fs-m); color: var(--pp-rust); text-transform: uppercase; letter-spacing: .08em; }
+#fullmap .fm-top span { display: inline-flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 4px 0; color: var(--pp-label); }
+#fullmap .fm-close { display: inline-flex; align-items: center; margin-left: 1.2em; font-style: normal; color: var(--pp-ink); }
+#fullmap .fm-close .pp-key { margin-right: .5em; }
+/* сама карта: тонкая чернильная рамка; поверх — тон бумаги (multiply) и сгибы */
+#fullmap .fm-view { border: 3px solid var(--pp-ink); border-radius: 2px; background: #e9dcc0; }
+#fullmap .fm-view::before, #fullmap .fm-view::after { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+#fullmap .fm-view::before { background: #f1d7a6; mix-blend-mode: multiply; opacity: .45; }
+#fullmap .fm-view::after {
+  background:
+    /* сгибы: тёмная складка и светлый край рядом */
+    linear-gradient(90deg, transparent calc(33.33% - 3px), rgba(51, 33, 12, .22) calc(33.33% - 1px), rgba(255, 250, 235, .5) calc(33.33% + 1px), transparent calc(33.33% + 4px)),
+    linear-gradient(90deg, transparent calc(66.66% - 3px), rgba(51, 33, 12, .22) calc(66.66% - 1px), rgba(255, 250, 235, .5) calc(66.66% + 1px), transparent calc(66.66% + 4px)),
+    linear-gradient(180deg, transparent calc(50% - 3px), rgba(51, 33, 12, .22) calc(50% - 1px), rgba(255, 250, 235, .5) calc(50% + 1px), transparent calc(50% + 4px)),
+    /* панели между сгибами чуть по-разному освещены */
+    linear-gradient(90deg, rgba(51, 33, 12, .07), transparent 33.33%, rgba(255, 250, 235, .08) 33.33%, transparent 66.66%, rgba(51, 33, 12, .06) 66.66%, transparent),
+    linear-gradient(180deg, rgba(255, 250, 235, .06), transparent 50%, rgba(51, 33, 12, .07) 50%, transparent),
+    /* потёртые края листа */
+    radial-gradient(ellipse at 50% 50%, transparent 62%, rgba(138, 107, 78, .22) 100%);
+}
+/* легенда — штампики: чернильная рамка с внутренним ободком, капсом; только то, что сейчас на карте (fmlegend.js) */
+#fullmap .fm-leg { gap: 6px 8px; font-size: max(11px, var(--pp-fs-s)); line-height: 1.2; color: var(--pp-ink); }
+#fullmap .fm-leg > span { display: inline-flex; align-items: center; padding: .35em .6em .3em; white-space: nowrap;
+                          border: 2px solid var(--pp-rust); border-radius: 4px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pp-rust) 35%, transparent);
+                          background: color-mix(in srgb, var(--pp-paper) 85%, #fff); }
+#fullmap .fm-leg > span[hidden], #fullmap .fm-leg > span.lg-off { display: none; }
+#fullmap .fm-leg em { font-style: normal; color: var(--pp-rust); text-transform: uppercase; letter-spacing: .04em; }
+#fullmap .fm-leg i { flex: none; margin-right: .5em; }
+body.touch #fullmap .fm-box { border-radius: 0; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+body.touch #fullmap .fm-leg { font-size: 10px; gap: 4px 5px; }
+/* телефон стоя: легенда — за пометкой «легенда ▾» под картой (fmlegend.js), тап — раскрыть; карта выше на 5 строк */
+#fullmap .fm-legbtn { display: none; }
+@media (max-width: 600px) and (orientation: portrait) {
+  #fullmap .fm-legbtn { display: inline-flex; align-self: flex-start; align-items: center; padding: .55em .9em; font: inherit; font-size: 10px; color: var(--pp-ink); cursor: pointer;
+                        background: var(--pp-paper); border: 2px dashed var(--pp-brown); border-radius: 3px; box-shadow: 0 3px 0 rgba(51, 33, 12, .6); }
+  #fullmap .fm-legbtn:active { translate: 0 2px; box-shadow: 0 1px 0 rgba(51, 33, 12, .6); }
+  #fullmap:not(.leg-open) .fm-leg { display: none; }
+}

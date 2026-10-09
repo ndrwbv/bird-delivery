@@ -164,7 +164,7 @@ export function start (brand, P) {
   R.stats.started++;
   DIRECTOR.start('raid');
   if (A.chat) A.chat(t('Налёт на точку! Гони!'));      // о налёте — только Толик, одной фразой; на радаре и карте — мигающая точка
-  if (A.Snd) { A.Snd.blip(440, 0.12, 'square', 0.14); setTimeout(() => A.Snd && A.Snd.blip(330, 0.18, 'square', 0.14), 160); }
+  if (A.Snd) A.Snd.fx('alarm', s => { s.blip(440, 0.12, 'square', 0.14); setTimeout(() => s.blip(330, 0.18, 'square', 0.14), 160); });
   return true;
 }
 
@@ -272,7 +272,7 @@ function standHonk (dt) {
   if (close && sp < 3) standT += dt; else standT = 0;
   if (standT > 1.5) {
     standT = -2;                                       // следующий — не раньше чем через 3,5 с
-    if (A.Snd) { A.Snd.blip(392, 0.16, 'square', 0.09); setTimeout(() => A.Snd.blip(392, 0.26, 'square', 0.09), 190); }
+    if (A.Snd) A.Snd.fx('horn', s => { s.blip(392, 0.16, 'square', 0.09); setTimeout(() => s.blip(392, 0.26, 'square', 0.09), 190); });
     honk();
   }
 }
@@ -352,8 +352,8 @@ function manStep (m, dt, dV, near) {
     if (m.st === 'charge' && sp < 4 && (m.hitCd <= 0) && chance(B.HIT_P)) {
       m.hitCd = B.HIT_CD;
       if (A.hurt) A.hurt(B.DMG);
-      if (A.Snd) A.Snd.blip(A.ADULT ? 140 : 300, 0.06, A.ADULT ? 'square' : 'triangle', 0.1);
-    } else if (dV < 60 && A.Snd && chance(0.5)) A.Snd.blip(rand(150, 230), 0.05, 'square', 0.05);
+      if (A.Snd) A.Snd.fx('bat', s => s.blip(A.ADULT ? 140 : 300, 0.06, A.ADULT ? 'square' : 'triangle', 0.1));
+    } else if (dV < 60 && A.Snd && chance(0.5)) A.Snd.fx('bat', s => s.blip(rand(150, 230), 0.05, 'square', 0.05), { x: m.x, z: m.z, far: 60 });
   }
   m.hitCd = Math.max(0, m.hitCd - dt);
 
@@ -493,7 +493,7 @@ function shoot (m, near) {
       const tr = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xfff1b0, transparent: true, opacity: 0.9 }));
       A.scene.add(tr);
       TUR.fx.push({ o: fl, life: 0.07 }, { o: tr, life: 0.06, geo: g });
-      if (A.Snd) { A.Snd.noise(0.08, 0.22); A.Snd.blip(180, 0.06, 'square', 0.12); }
+      if (A.Snd) A.Snd.fx('shot', s => { s.noise(0.08, 0.22); s.blip(180, 0.06, 'square', 0.12); }, { x: p.x, z: p.z });
       if (!hit && A.sparks) A.sparks(tx, 0.1, tz, 3);
     }
     if (hit) gunHit(m, tx - p.x, tz - p.z);
@@ -502,7 +502,7 @@ function shoot (m, near) {
     const o = new THREE.Mesh(TG.snow, TG.mSnow);
     o.position.copy(p); A.scene.add(o);
     TUR.fx.push({ o, life: 0.5, keep: true, fly: { x0: p.x, y0: p.y, z0: p.z, x1: tx, y1: ty, z1: tz, T: 0.5, t: 0, m: hit ? m : null } });
-    if (near && A.Snd) A.Snd.blip(620, 0.06, 'triangle', 0.08);
+    if (near && A.Snd) A.Snd.fx('pizza-throw', s => s.blip(620, 0.06, 'triangle', 0.08), { x: p.x, z: p.z });
   }
 }
 function gunHit (m, dx, dz) {

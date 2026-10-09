@@ -135,7 +135,7 @@ function detach (o, vx, vz, force) {
   if (force >= HB.TIP) o.rollT = Math.random() < 0.5 ? 1.45 : -1.45;
   // конь возмущён
   if (A.sayBubble) { if (o.say) { o.say.parent && o.say.parent.remove(o.say); o.say.material.dispose(); } o.say = A.sayBubble(o.grp, tr('иго-го!'), '#7a4a2a', 3.5); o.sayT = 2.2; }
-  if (A.Snd && A.Snd.blip) [880, 1180, 760].forEach((f, i) => setTimeout(() => { try { A.Snd.blip(f, 0.12, 'sawtooth', 0.07); } catch (e) { /* — */ } }, i * 110));
+  if (A.Snd && A.Snd.fx) A.Snd.fx('horse', s => [880, 1180, 760].forEach((f, i) => setTimeout(() => { try { s.blip(f, 0.12, 'sawtooth', 0.07); } catch (e) { /* — */ } }, i * 110)), { x: o.x, z: o.z });
   // лишние отцепленные — самый старый долой
   const loose = LIST.filter(q => q.loose);
   if (loose.length > HB.LOOSE) drop(loose[0]);
@@ -207,7 +207,7 @@ function collide (o) {
     ST.hits++;
     detach(o, -nx * hit * 0.8, -nz * hit * 0.8, hit);
     if (A.sparks) A.sparks(px, 0.8, pz, hit > 12 ? 12 : 5, -nx, -nz);
-    if (A.Snd && A.Snd.crash) A.Snd.crash(hit);
+    if (A.Snd && A.Snd.crash) A.Snd.crash(hit, { x: px, z: pz }, 'car');
     if (A.hurt) A.hurt((hit - 5) * 0.14, hit, px, pz);
     V.vx *= 0.88; V.vz *= 0.88;
     o.x -= nx * pen; o.z -= nz * pen;

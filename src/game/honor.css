@@ -1,0 +1,211 @@
+/* доска почёта (honor.js): пробковая доска в деревянной раме поверх меню карьеры.
+   Сверху — красная табличка «ДОСКА ПОЧЁТА» золотом, вкладки-ярлычки, полароид курьера;
+   середина — сетка грамот (достижения) или фото (рекорды), растянута на всю доску — без прокрутки
+   на Деке 1280×800 и 1280×720; на телефоне сетка листается внутри доски.
+   Внизу — записка о том, на чём курсор, и пометка «[B] назад». Стиль — «как накладная» (paper.css) */
+
+#honor { position: fixed; inset: 0; z-index: 48; display: flex; align-items: stretch; justify-content: center; box-sizing: border-box;
+         padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+         background: var(--pp-dim), rgba(26, 12, 18, .55); pointer-events: auto; color: var(--pp-ink);
+         font-family: "Press Start 2P", ui-monospace, monospace;
+         --hb-gold: #ffd85e; --hb-cork: #c38a52; --hb-wood: #6e3f1d; --hb-med: clamp(28px, min(3.6vw, 5.4vh), 50px); }
+#honor[hidden] { display: none; }
+
+/* ── доска: пробка с крапом, рама — дерево ── */
+.hb-board { position: relative; flex: 1; max-width: 1400px; min-height: 0; display: flex; flex-direction: column; gap: clamp(6px, 1.4vh, 14px);
+            box-sizing: border-box; padding: clamp(8px, 1.6vh, 16px) clamp(10px, 1.4vw, 20px);
+            background-color: var(--hb-cork);
+            background-image: radial-gradient(rgba(84, 42, 12, .38) 1px, transparent 1.6px), radial-gradient(rgba(255, 226, 170, .32) 1px, transparent 1.6px),
+                              radial-gradient(rgba(120, 66, 24, .25) 2px, transparent 2.6px);
+            background-size: 7px 7px, 11px 11px, 23px 19px; background-position: 0 0, 4px 6px, 9px 3px;
+            border: clamp(7px, 1.1vw, 14px) solid var(--hb-wood); border-radius: 6px;
+            box-shadow: inset 0 0 0 3px #4a2810, inset 0 6px 18px rgba(40, 18, 4, .45), 0 0 0 3px var(--pp-ink), 0 10px 0 var(--pp-ink), 0 30px 70px rgba(0, 0, 0, .55); }
+
+/* ── шапка ── */
+.hb-top { flex: none; display: flex; align-items: center; gap: clamp(8px, 1.4vw, 20px); min-width: 0; }
+/* табличка: красная, золотые буквы и звёзды, на двух гвоздиках */
+.hb-plaque { position: relative; flex: none; display: flex; flex-direction: column; align-items: center; gap: .45em; padding: .7em 1.6em .55em;
+             color: var(--hb-gold); background: linear-gradient(180deg, #e8473b, var(--pp-red) 55%, #b5241e); border: 3px solid var(--pp-ink); border-radius: 4px;
+             box-shadow: inset 0 0 0 3px rgba(255, 216, 94, .55), 0 5px 0 var(--pp-ink); text-align: center; }
+.hb-plaque::before, .hb-plaque::after { content: '★'; position: absolute; top: 50%; translate: 0 -50%; font-size: var(--pp-fs-m); color: var(--hb-gold); }
+.hb-plaque::before { left: .45em; }
+.hb-plaque::after { right: .45em; }
+.hb-plaque b { font-weight: normal; font-size: var(--pp-fs-l); line-height: 1.1; letter-spacing: .1em; text-transform: uppercase; text-shadow: 2px 2px 0 var(--pp-ink); }
+.hb-plaque small { font-size: calc(var(--pp-fs-s) * .9); line-height: 1.3; color: var(--pp-paper); opacity: .92; max-width: 30ch; }
+.hb-plaque small:empty { display: none; }
+
+/* вкладки — ярлычки папки, выбранная жёлтая; [LB] слева, [RB] справа */
+.hb-tabs { flex: 1; min-width: 0; display: flex; justify-content: center; gap: clamp(6px, 1vw, 14px); }
+.hb-tab { display: inline-flex; align-items: center; gap: .55em; min-height: 40px; padding: .75em 1.1em; font: inherit; font-size: var(--pp-fs-m); cursor: pointer;
+          color: var(--pp-ink); background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 8px 8px 3px 3px; box-shadow: 0 4px 0 rgba(51, 33, 12, .75);
+          transition: translate .18s var(--pp-spring), background .12s; }
+.hb-tab .pp-key { margin: 0; }
+.hb-tab em { font-style: normal; font-size: var(--pp-fs-s); color: var(--pp-rust); }
+.hb-tab:hover { translate: 0 -2px; }
+.hb-tab.cur { background: var(--pp-yellow); translate: 0 -3px; box-shadow: 0 7px 0 var(--pp-ink); }
+.hb-tab.cur em { color: var(--pp-ink); }
+
+/* полароид курьера — «лучший работник» */
+.hb-me { flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 0; padding: 5px 5px 6px; background: #fff;
+         box-shadow: 0 3px 0 rgba(51, 33, 12, .6), 0 6px 14px rgba(0, 0, 0, .3); max-width: 11em; }
+.hb-me img { display: block; width: clamp(36px, min(4vw, 6.6vh), 60px); height: clamp(36px, min(4vw, 6.6vh), 60px); object-fit: cover; image-rendering: pixelated; background: var(--pp-orange); }
+.hb-me img[hidden] { display: none; }
+.hb-me figcaption { max-width: 12em; font-size: calc(var(--pp-fs-s) * .9); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── середина: сетка на всю доску ── */
+.hb-body { flex: 1; min-height: 0; overflow: hidden; }
+.hb-grid { display: grid; gap: clamp(6px, 1vh, 12px) clamp(6px, .8vw, 12px); height: 100%; box-sizing: border-box; padding: 4px 2px 6px; }
+.hb-body { scroll-padding: 14px 0; }
+.hb-grid.hb-ach { grid-template-columns: repeat(8, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); }
+.hb-grid.hb-rec { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: clamp(10px, 2.4vh, 26px) clamp(14px, 2.4vw, 36px); padding: 8px clamp(10px, 4vw, 70px) 10px; }
+
+/* общая вещь на доске: кнопка, приколота гвоздиком цвета группы */
+.hb-it { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(3px, .8vh, 8px);
+         box-sizing: border-box; padding: clamp(10px, 1.6vh, 16px) 6px clamp(6px, 1vh, 10px); font: inherit; color: var(--pp-ink); cursor: pointer; text-align: center;
+         background: var(--pp-paper); border: 2px solid var(--pp-ink); border-radius: 3px; box-shadow: 0 4px 0 rgba(51, 33, 12, .65);
+         transition: translate .18s var(--pp-spring), box-shadow .18s var(--pp-spring), scale .18s var(--pp-spring); --g: var(--pp-orange); isolation: isolate; }
+.hb-pin { position: absolute; top: 4px; left: 50%; width: 11px; height: 11px; translate: -50% 0; border-radius: 50%; pointer-events: none;
+          background: radial-gradient(circle at 35% 35%, #fff 0 15%, var(--g) 35%, color-mix(in srgb, var(--g) 60%, #000) 100%); border: 1px solid rgba(51, 33, 12, .7);
+          box-shadow: 1px 2px 0 rgba(51, 33, 12, .35); }
+.g-progress { --g: var(--pp-orange); }
+.g-skill { --g: var(--pp-lime); }
+.g-chaos { --g: var(--pp-red); }
+.g-fun { --g: var(--pp-pink); }
+
+/* грамота: шапка-полоска цвета группы, медаль с лентами, название; закрытая — бледная, пунктиром */
+.hb-a { box-shadow: inset 0 5px 0 var(--g), 0 4px 0 rgba(51, 33, 12, .65); }
+.hb-med { position: relative; flex: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: var(--hb-med); height: var(--hb-med);
+          border-radius: 50%; border: 3px solid var(--pp-ink);
+          background: radial-gradient(circle at 50% 50%, var(--g) 0 52%, transparent 53%), radial-gradient(circle at 35% 30%, #fff6b8, var(--hb-gold) 45%, #d99a1e);
+          box-shadow: 0 3px 0 rgba(51, 33, 12, .55); }
+.hb-med b { font-weight: normal; font-size: calc(var(--hb-med) * .3); line-height: 1; color: var(--pp-ink); text-shadow: 1px 1px 0 rgba(255, 255, 255, .5); }
+.hb-med::before, .hb-med::after { content: ''; position: absolute; z-index: -1; bottom: -30%; width: 30%; height: 46%; background: var(--g); border: 2px solid var(--pp-ink);
+                                  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%); }
+.hb-med::before { left: 16%; rotate: 14deg; }
+.hb-med::after { right: 16%; rotate: -14deg; }
+.hb-nm { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; max-width: 100%;
+         font-size: var(--pp-fs-s); line-height: 1.3; overflow-wrap: anywhere; hyphens: auto; }
+.hb-bar { flex: none; display: block; width: 80%; height: 6px; background: rgba(51, 33, 12, .18); border: 1px solid rgba(51, 33, 12, .55); border-radius: 3px; overflow: hidden; }
+.hb-bar i { display: block; height: 100%; background: var(--g); }
+.hb-a.lock { background: rgba(255, 243, 214, .62); border-style: dashed; border-color: rgba(51, 33, 12, .7); box-shadow: 0 3px 0 rgba(51, 33, 12, .35); }
+.hb-a.lock .hb-med { background: radial-gradient(circle at 50% 50%, #cbbca2 0 52%, transparent 53%), radial-gradient(circle at 35% 30%, #efe6d4, #b9ab92 60%);
+                     border-color: rgba(51, 33, 12, .55); box-shadow: none; }
+.hb-a.lock .hb-med::before, .hb-a.lock .hb-med::after { background: #b9ab92; border-color: rgba(51, 33, 12, .45); }
+.hb-a.lock .hb-med b { color: rgba(51, 33, 12, .5); }
+.hb-a.lock .hb-nm { color: var(--pp-label); }
+.hb-a.lock .hb-pin { background: radial-gradient(circle at 35% 35%, #fff 0 15%, #a89a84 40%, #6b604f 100%); }
+.hb-a.secret .hb-nm { letter-spacing: .2em; }
+
+/* печать «НОВАЯ» на свежей грамоте */
+.hb-new.pp-seal { top: 3px; right: -6%; --pp-seal-rot: -12deg; font-style: normal; font-size: calc(var(--pp-fs-s) * .95); padding: .3em .45em .2em; border-width: 3px;
+                  background: rgba(255, 243, 214, .75); mix-blend-mode: normal; }
+
+/* ── фото рекорда: полароид, на фото — крупный значок на цветном фоне ── */
+.hb-r { justify-content: flex-start; padding: clamp(10px, 1.8vh, 18px) clamp(8px, 1vw, 14px) clamp(8px, 1.4vh, 14px); background: #fff; border: 0; border-radius: 2px;
+        box-shadow: 0 4px 0 rgba(51, 33, 12, .55), 0 10px 22px rgba(0, 0, 0, .28); --g: var(--pp-yellow); }
+.hb-r.c-lime { --g: var(--pp-lime); }
+.hb-r.c-pink { --g: var(--pp-pink); }
+.hb-r.c-orange { --g: var(--pp-orange); }
+.hb-r.c-red { --g: var(--pp-red); }
+.hb-r.c-yellow { --g: var(--pp-yellow); }
+.hb-r.c-sky { --g: #6fc7ff; }
+.hb-photo { position: relative; flex: 1; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; overflow: visible;
+            background: radial-gradient(circle at 28% 22%, rgba(255, 255, 255, .6), transparent 32%), linear-gradient(180deg, color-mix(in srgb, var(--g) 70%, #fff) 0, var(--g) 58%, color-mix(in srgb, var(--g) 55%, #5a2c10) 58%, color-mix(in srgb, var(--g) 40%, #3a1c08) 100%);
+            border: 2px solid rgba(51, 33, 12, .35); }
+.hb-photo b { font-weight: normal; font-size: clamp(26px, min(4.4vw, 8vh), 64px); line-height: 1; color: var(--pp-paper); text-shadow: 3px 3px 0 var(--pp-ink), -2px -2px 0 var(--pp-ink), 2px -2px 0 var(--pp-ink), -2px 2px 0 var(--pp-ink); }
+.hb-rl { flex: none; font-size: var(--pp-fs-s); line-height: 1.3; color: var(--pp-label); text-transform: uppercase; letter-spacing: .05em; }
+.hb-rv { flex: none; font-weight: normal; font-size: var(--pp-fs-l); line-height: 1.15; color: var(--pp-ink); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.hb-r.c-lime .hb-rv { color: var(--pp-money); }
+.hb-r.none .hb-rv { font-size: var(--pp-fs-m); color: var(--pp-label); }
+.hb-r.none .hb-photo { filter: grayscale(.75) brightness(.95); }
+.hb-seal.pp-seal { top: 10%; right: 4%; font-size: var(--pp-fs-m); background: rgba(255, 243, 214, .8); mix-blend-mode: normal; }
+
+/* ── курсор: жёлтое кольцо с чернильной обводкой, приподнят (паттерн «курсор геймпада», paper.css) ── */
+.hb-it:hover { translate: 0 -2px; }
+.hb-it.hb-on { z-index: 2; outline: 3px solid var(--pp-ink); outline-offset: 2px; scale: 1.05; translate: 0 -3px;
+               box-shadow: 0 0 0 7px var(--pp-yellow), 0 8px 0 rgba(51, 33, 12, .7); animation: pp-lift .2s var(--pp-spring); }
+.hb-a.lock.hb-on { background: var(--pp-paper); }
+
+/* ── низ: записка о выбранном и «[B] назад» ── */
+.hb-foot { flex: none; display: flex; align-items: stretch; gap: clamp(8px, 1.2vw, 16px); }
+.hb-cap { flex: 1; min-width: 0; display: flex; isolation: isolate; align-items: center; gap: clamp(8px, 1vw, 14px); box-sizing: border-box; min-height: calc(var(--hb-med) + 18px);
+          padding: .6em .9em; background: var(--pp-yellow); border: 2px solid var(--pp-ink); border-radius: 2px; box-shadow: 0 4px 0 rgba(51, 33, 12, .75); --hb-med: clamp(28px, min(3.2vw, 5.2vh), 44px); }
+.hb-cap.lock .hb-med { filter: grayscale(.8); opacity: .7; }
+.hb-cap.rec .hb-med { background: radial-gradient(circle at 35% 30%, #fff, var(--g) 55%, color-mix(in srgb, var(--g) 60%, #5a2c10)); }
+.hb-cap.rec .hb-med::before, .hb-cap.rec .hb-med::after { display: none; }
+.hb-cap.c-lime { --g: var(--pp-lime); } .hb-cap.c-pink { --g: var(--pp-pink); } .hb-cap.c-orange { --g: var(--pp-orange); }
+.hb-cap.c-red { --g: var(--pp-red); } .hb-cap.c-yellow { --g: var(--pp-paper); } .hb-cap.c-sky { --g: #6fc7ff; }
+.hb-ct { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .4em; }
+.hb-ct p { margin: 0; display: flex; align-items: baseline; gap: .8em; flex-wrap: wrap; }
+.hb-ct p b { font-weight: normal; font-size: var(--pp-fs-m); line-height: 1.3; }
+.hb-ct p small { font-size: calc(var(--pp-fs-s) * .9); color: var(--pp-rust); text-transform: uppercase; letter-spacing: .06em; }
+.hb-ct > span { font-size: var(--pp-fs-s); line-height: 1.45; color: var(--pp-ink); }
+.hb-st { flex: none; font-style: normal; font-size: var(--pp-fs-s); line-height: 1.3; padding: .5em .7em; color: var(--pp-rust); border: 2px dashed var(--pp-rust); border-radius: 3px;
+         white-space: nowrap; background: rgba(255, 243, 214, .6); }
+.hb-st.ok { color: var(--pp-money); border: 2px solid var(--pp-money); }
+.hb-cap.rec .hb-st.ok { color: var(--pp-ink); border-color: var(--pp-ink); font-size: var(--pp-fs-m); }
+.hb-back { flex: none; align-self: center; min-height: 44px; white-space: nowrap; }
+
+/* ── движение ── */
+@keyframes hb-fly { 0% { opacity: 0; transform: translate(-30vw, -60vh) rotate(-28deg) scale(2.4); }
+                    62% { opacity: 1; transform: translate(0, 0) rotate(3deg) scale(.92); }
+                    80% { transform: rotate(-1.5deg) scale(1.06); } 100% { transform: none; } }
+@keyframes hb-poke { 30% { transform: translateY(3px) scale(.96); } 65% { transform: translateY(-4px) rotate(-2deg) scale(1.04); } 100% { transform: none; } }
+.hb-wait { visibility: hidden; }
+.hb-fly { animation: hb-fly .55s cubic-bezier(.3, .9, .35, 1.15) both; z-index: 5; }
+.hb-poke { animation: hb-poke .32s var(--pp-spring); }
+@media (prefers-reduced-motion: reduce) { .hb-fly, .hb-poke { animation-duration: .15s !important; } }
+body.calm-fx .hb-fly, body.calm-fx .hb-poke { animation-duration: .15s !important; }
+
+/* карточка меню (menu.js): цвет пробки и «+N» новых грамот */
+.crm-card.k-honor { --acc: #d9a35c; }
+.crm-card.k-honor .crm-cb { position: relative; }
+.hb-badge { position: absolute; top: -10px; right: -8px; z-index: 3; padding: .45em .55em .35em; font-style: normal; font-size: var(--pp-fs-s); color: var(--pp-paper);
+            background: var(--pp-pink); border: 2px solid var(--pp-ink); border-radius: 999px; box-shadow: 0 3px 0 var(--pp-ink); rotate: 6deg;
+            animation: pp-pop .5s var(--pp-spring) .4s both; }
+
+/* ── узкие экраны ── */
+@media (max-width: 1000px) {
+  .hb-grid.hb-ach { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+/* 1280×720: длинные названия грамот («Предложение, от которого…») обрезались на второй строке — медаль меньше, строк влезает три */
+@media (max-height: 760px) and (min-height: 521px) {
+  #honor { --hb-med: clamp(26px, 4.4vh, 34px); }
+  .hb-it { gap: 3px; padding-bottom: 4px; }
+}
+/* телефон боком (низкий): шапка в строку поменьше, сетка листается внутри доски */
+@media (max-height: 520px) {
+  #honor { --hb-med: 30px; }
+  .hb-board { gap: 6px; padding: 6px 8px; }
+  .hb-plaque { padding: .45em 1.4em .4em; }
+  .hb-plaque small, .hb-me { display: none; }
+  .hb-tab { min-height: 34px; padding: .5em .8em; }
+  .hb-body { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  .hb-grid { height: auto; }
+  .hb-grid.hb-ach { grid-auto-rows: auto; }
+  .hb-grid.hb-ach .hb-it { min-height: 92px; }
+  .hb-grid.hb-rec { grid-auto-rows: 150px; padding: 6px 4px; }
+  .hb-cap { min-height: 0; padding: .4em .6em; }
+  .hb-ct > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+}
+/* телефон стоя: шапка в два ряда, сетка 3 в ряд и листается внутри доски, записка снизу */
+@media (max-width: 620px) {
+  #honor { padding: max(8px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)); --hb-med: 38px; }
+  .hb-board { padding: 8px 6px; border-width: 7px; }
+  .hb-top { flex-wrap: wrap; justify-content: center; gap: 8px; }
+  .hb-plaque { order: 0; flex: 1; }
+  .hb-me { order: 1; padding: 3px 3px 4px; }
+  .hb-me img { width: 40px; height: 40px; }
+  .hb-me figcaption { max-width: 6em; }
+  .hb-tabs { order: 2; flex: 1 1 100%; }
+  .hb-tab { flex: 1; justify-content: center; padding: .6em .5em; }
+  .hb-body { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  .hb-grid { height: auto; }
+  .hb-grid.hb-ach { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: auto; }
+  .hb-grid.hb-ach .hb-it { min-height: 112px; }
+  .hb-grid.hb-rec { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 170px; padding: 6px 4px; }
+  .hb-foot { flex-direction: column; gap: 8px; }
+  .hb-cap { flex-wrap: wrap; row-gap: 6px; }
+  .hb-cap .hb-st { flex: 1 1 100%; white-space: normal; text-align: center; }
+  .hb-back { align-self: stretch; justify-content: center; }
+}

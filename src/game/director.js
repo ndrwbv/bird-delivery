@@ -19,6 +19,7 @@
      DIRECTOR.can(kind)        — можно ли начать сейчас (перед своим жребием или сразу после него)
      DIRECTOR.start(kind, ttl) — началось (ttl, с — само кончится: мгновенные вроде приглашения)
      DIRECTOR.end(kind)        — кончилось
+     DIRECTOR.going([kinds])   — идёт ли что-то из них (музыка, music.js)
    Из game.js: init({ Store, S }), shiftStart(ride), delivered(), step(dt).
    Отладка: __dlv.DIRECTOR — state (сессия, уровни, что идёт, пауза), log (разрешения и отказы),
      relaunch(минут назад) — как будто игру перезапустили через столько минут, setN(n), reset().
@@ -127,6 +128,9 @@ export function end (kind) {
   ST.last[kind] = undefined;
   note('конец ' + kind);
 }
+
+/** идёт ли хоть одно из событий kinds (музыка: напряжённый трек — music.js) */
+export const going = kinds => ACT.some(e => kinds.includes(e.kind));
 
 export function step (dt) {
   if (!A) return;

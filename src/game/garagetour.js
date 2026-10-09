@@ -12,6 +12,9 @@
    «сбросить прогресс» его стирает (PROGRESS_KEYS в game.js). */
 import './garagetour.css';
 import { t } from '../i18n/index.js';
+import { keyHTML } from '../input/glyphs.js';     // [A] дальше · [B] пропустить — по вводу
+
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 export const KEY = 'dlv-garage-tut';
 const N_ = s => s;
@@ -46,7 +49,7 @@ export function start (host, api) {
   try { img.src = (A.face && A.face()) || ''; } catch (e) { img.src = ''; }
   img.hidden = !img.src;
   box.querySelector('.gt-head b').textContent = t('Дядя Женя');
-  box.querySelector('.gt-skip').textContent = t('пропустить');
+  box.querySelector('.gt-skip').innerHTML = keyHTML('back') + esc(t('пропустить'));
   box.querySelector('.gt-skip').addEventListener('click', e => { e.stopPropagation(); skip(); });
   box.querySelector('.gt-next').addEventListener('click', e => { e.stopPropagation(); next(); });
   box.querySelector('.gt-bub').addEventListener('click', () => next());
@@ -60,7 +63,7 @@ function show () {
   const s = STEPS[i];
   box.querySelector('.gt-bub p').textContent = t(s.text);
   box.querySelector('.gt-n').textContent = (i + 1) + '/' + STEPS.length;
-  box.querySelector('.gt-next').textContent = i === STEPS.length - 1 ? t('понял, Дядь Жень') : t('дальше') + ' ▸';
+  box.querySelector('.gt-next').innerHTML = keyHTML('ok') + esc(i === STEPS.length - 1 ? t('понял, Дядь Жень') : t('дальше') + ' ▸');
   box.querySelector('.gt-skip').hidden = i === STEPS.length - 1;
   box.classList.remove('pop'); void box.offsetWidth; box.classList.add('pop');
   place();
@@ -99,7 +102,7 @@ function place () {
 
 function next () {
   if (!live) return;
-  if (A.Snd && A.Snd.blip) A.Snd.blip(620 + i * 40, 0.04, 'square', 0.05);
+  if (A.Snd && A.Snd.click) A.Snd.click(620 + i * 40, 0.05, 0.04);
   if (++i >= STEPS.length) return end();
   show();
 }

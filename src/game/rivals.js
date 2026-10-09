@@ -338,7 +338,7 @@ function lotFront (c, LD) {
 /* точки на пустырях: тот же отбор, что у строек (construction.js freeLots) — участок под всю
    точку с полями, от стен домов ≥ WALL, от наших пиццерий ≥ PIZZA, от строек, костров и котлов
    (общий список занятых) — край + 15 м. Районы без пустыря — 1 точка у ТЦ (mallSites). */
-function findSites () {
+function* findSites () {                         // шагами (yield): поиск участков — CONSTR.freeLotsSteps
   const G = wallGrid(), LW = WT() + 2, LD = DT() + 1 + RIV.PUSH;
   const piz = (A.PIZZERIAS || []).map(p => [p.bx || p.x || 0, p.bz || p.z || 0]);
   const D = !!A.distAt, cap = D ? RIV.MAX : RIV.NODIST;
@@ -346,7 +346,7 @@ function findSites () {
     for (const p of piz) if (Math.hypot(p[0] - c.x, p[1] - c.z) < RIV.PIZZA) return false;
     return rectWall(G, c.x, c.z, c.ux, c.uz, LW / 2, LD / 2, RIV.WALL) >= RIV.WALL && !!lotFront(c, LD);
   };
-  const lots = CONSTR.freeLots({ W: LW, D: LD, max: cap, gap: RIV.GAP_ANY, salt: 31, per: 2, cap: RIV.PER_DIST * 2, ok, claim: false });
+  const lots = yield* CONSTR.freeLotsSteps({ W: LW, D: LD, max: cap, gap: RIV.GAP_ANY, salt: 31, per: 2, cap: RIV.PER_DIST * 2, ok, claim: false });
   ST.lots = lots.length;
   const per = new Map(), sites = [];
   const far = (c, chain, gapSame) => sites.every(s => s.chain !== chain || Math.hypot(s.cx - c.cx, s.cz - c.cz) > gapSame);
@@ -771,7 +771,7 @@ function buildGlass () {
   GLASS_P = null; GLASS_F = null;
 }
 function onGlassDown (it) {
-  if (A.Snd && A.Snd.blip) A.Snd.blip(1800, 0.08, 'triangle', 0.05);
+  if (A.Snd && A.Snd.fx) A.Snd.fx('glass-tink', s => s.blip(1800, 0.08, 'triangle', 0.05));
   hitShop(it.rshop);
 }
 function glassRestore (on) {
@@ -969,7 +969,7 @@ function hitMascot (m, sp) {
   const V = A.V;
   ST.mascotHits++;
   if (m.cool <= 0) { m.cool = RIV.MASCOT_COOL; respect('rivalMascot'); }
-  try { A.Snd.squish(); A.Snd.blip(140, 0.25, 'square', 0.08); } catch (e) { /* звук не обязателен */ }
+  try { A.Snd.fx('mascot', s => { A.Snd.squish(); s.blip(140, 0.25, 'square', 0.08); }); } catch (e) { /* звук не обязателен */ }
   if (A.ADULT) {
     // разлетается на ингредиенты
     if (m.kind === 'burger' && A.gibBurger) A.gibBurger(m.x, m.z);
@@ -1169,15 +1169,19 @@ export function blocks (x, z, m = 0) {
 }
 
 /* ═════════════ сборка, кадр, новая смена ═════════════ */
-export function build (api) {
+/* шагами (yield) — поздняя сборка (latebuild.js; при ?nolate — разом): на Деке весь кусок ~0,45 с */
+export function* build (api) {
   A = api;
   const t0 = performance.now();
   if (MOPEDS.MP) MOPEDS.MP.onRival = onSushiFall;
-  const sites = findSites();
-  sites.forEach((s, i) => build1(s, i));
+  const sites = yield* findSites();
+  yield 'sites';
+  for (let i = 0; i < sites.length; i++) { build1(sites[i], i); yield 'shop'; }
   buildSigns();
+  yield 'signs';
   buildGlass();
   buildGuests();
+  yield 'guests';
   buildMascots();
   ST.ms = Math.round(performance.now() - t0);
   DEBUG.list = SHOPS.map(s => ({ chain: s.chain, x: Math.round(s.x), z: Math.round(s.z), dist: s.dist, mascots: s.mascots.length, tables: s.tables.length }));

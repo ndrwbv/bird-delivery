@@ -182,7 +182,7 @@ function fire (m) {
     const tr = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xfff1b0, transparent: true, opacity: 0.9 }));
     A.scene.add(tr);
     M.fx.push({ o: fl, life: 0.07 }, { o: tr, life: 0.06, geo: g });
-    if (A.Snd) { A.Snd.noise(0.1, 0.34); A.Snd.blip(160, 0.07, 'square', 0.16); }
+    if (A.Snd) A.Snd.fx('shot', s => { s.noise(0.1, 0.34); s.blip(160, 0.07, 'square', 0.16); }, { x: p.x, z: p.z });
     if (hit) land(true, tx, tz);
     else if (A.sparks) A.sparks(tx, 0.1, tz, 4);
   } else {
@@ -195,7 +195,7 @@ function fire (m) {
     // упреждение: куда машина доедет за время полёта (наполовину)
     const T = 0.6, ax = tx + (V.vx || 0) * T * 0.5, az = tz + (V.vz || 0) * T * 0.5;
     M.fx.push({ o, life: T, fly: { x0: p.x, y0: p.y, z0: p.z, x1: ax, z1: az, T, t: 0, tomato }, geoKeep: true });
-    if (A.Snd) A.Snd.blip(520, 0.08, 'triangle', 0.1);
+    if (A.Snd) A.Snd.fx('throw', s => s.blip(520, 0.08, 'triangle', 0.1), { x: p.x, z: p.z });
   }
 }
 /* попало в машину или упало рядом */
@@ -205,7 +205,7 @@ function land (hit, x, z, tomato) {
   if (onCar) {
     M.stats.hits++;
     if (A.hurt) A.hurt(MAFIA.DMG);
-    if (A.ADULT) { if (A.sparks) A.sparks(V.x, 1, V.z, 6); if (A.Snd) A.Snd.blip(900, 0.04, 'square', 0.12); }
+    if (A.ADULT) { if (A.sparks) A.sparks(V.x, 1, V.z, 6); if (A.Snd) A.Snd.fx('bullet-hit', s => s.blip(900, 0.04, 'square', 0.12)); }
     else if (tomato) splat(V.x, (V.y || A.groundH(V.x, V.z)) + 1.2, V.z, 9);
     else if (A.puff) A.puff(V.x, 1.2, V.z);
   } else if (!A.ADULT) {
@@ -216,7 +216,7 @@ function land (hit, x, z, tomato) {
 /* помидор всмятку: красные брызги */
 const DROP_GEO = new THREE.BoxGeometry(0.09, 0.09, 0.09);
 function splat (x, y, z, n) {
-  if (A.Snd) A.Snd.noise(0.08, 0.14);
+  if (A.Snd) A.Snd.fx('splat', s => s.noise(0.08, 0.14), { x, z });
   for (let i = 0; i < n; i++) {
     const o = new THREE.Mesh(DROP_GEO, new THREE.MeshBasicMaterial({ color: chance(0.7) ? 0xd8261e : 0xff6a4a }));
     o.position.set(x, y, z);

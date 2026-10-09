@@ -16,8 +16,9 @@
      cash   — первые деньги за смену (карьера): после чека оплаты и денег в пачку;
      wallet — сразу за «cash»: копилка — все твои деньги, пачка ссыпается в неё в конце смены;
      respect — первый респект (карьера): что такое звезда; звезда подсвечена;
-     bump   — первый раз задел своего клиента (карьера): без чаевых, а быстрее 43 км/ч — заказ сорван.
-   «respect» и «bump» видят и ветераны — это правила, о которых раньше не говорили.
+     bump   — первый раз задел своего клиента (карьера): без чаевых, а быстрее 43 км/ч — заказ сорван;
+     back   — первый раз опоздал обратно в пиццерию (карьера, game.js backLate): «вернуться до» — тоже срок.
+   «respect», «bump» и «back» видят и ветераны — это правила, о которых раньше не говорили.
 
    Очередь вручения (ridequeue.js, UI-REVIEW № 41): пока на экране чек оплаты, деньги летят в пачку
    или только что написал Толик (RQ.busy) — подсказка спрятана, её время стоит, новая не открывается.
@@ -35,7 +36,7 @@
      HINTS.step(dt)     — каждый кадр
      HINTS.coffee()     — подобрал кофе; true — показали подсказку (тост «кофе +» не нужен)
      HINTS.stepan(ped)  — отдал учебный заказ
-   api: S, V, NOS, Store, Snd, ADULT, CAREER, sayBubble, puff, toast */
+   api: S, V, NOS, Store, Snd, ADULT, CAREER, sayBubble, puff, toast, money (₽ строкой) */
 import './hints.css';
 import { t } from '../i18n/index.js';
 import { readTime } from './dialog.js';
@@ -99,6 +100,7 @@ function make (id, extra) {
     case 'cash': return { hi: '#shiftcash', text: t('зелёная пачка — заработано за смену') };
     case 'wallet': return { hi: '#money', text: t('копилка — все твои деньги: в конце смены пачка ссыпается в неё') };
     case 'respect': return { hi: '#respect', text: t('звезда — респект района: за конкурентов, похитителя и помощь своим. копишь — растёт звание') };
+    case 'back': return { hi: '#timewrap', text: t('«вернуться до» — тоже срок: опоздал обратно в пиццерию — штраф {sum}', { sum: extra || '' }) };
     case 'bump': return { text: t('задел клиента — без чаевых; быстрее {kmh} км/ч — заказ сорван', { kmh: Math.round(CLIENT_HIT.HARD * 3.6) }) };
   }
   return null;
@@ -161,6 +163,8 @@ function push (id, extra, urgent) {
 export function respect () { if (A && A.CAREER) push('respect'); }
 /** первый раз задел своего клиента (game.js clientBump) */
 export function bump () { if (A && A.CAREER) push('bump'); }
+/** первый раз опоздал обратно в пиццерию (game.js backLate); fine — штраф в ₽, как видит игрок */
+export function backLate (fine) { if (A && A.CAREER) push('back', A.money ? A.money(fine) : fine + ' ₽'); }
 
 export function coffee () {
   if (!A || !need('nitro')) return false;
@@ -257,7 +261,7 @@ export function stepan (ped) {
       }, i * 60);
     }
     const Snd = A.Snd;
-    [250, 750, 1300].forEach(ms => setTimeout(() => { if (Snd && Snd.noise) { Snd.noise(0.12, 0.22); Snd.blip(80 + Math.random() * 30, 0.14, 'sawtooth', 0.16); } }, ms));
+    [250, 750, 1300].forEach(ms => setTimeout(() => { if (Snd && Snd.fx) Snd.fx('engine-cough', s => { s.noise(0.12, 0.22); s.blip(80 + Math.random() * 30, 0.14, 'sawtooth', 0.16); }, { eng: 1 }); }, ms));
     setTimeout(() => A.toast(t('кхе-кхе… в другой раз')), 500);
   }, 2600);
 }

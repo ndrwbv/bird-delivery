@@ -5,8 +5,15 @@
           padding: max(10px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
           --pcw: clamp(170px, min(20vw, 30vh), 280px); }
 #pausem .pm-desk[hidden] { display: none; }
-.pz-head { flex: none; display: flex; justify-content: center; padding: 2px 0 6px; }
-.pz-head .pm-t { font-size: clamp(18px, min(3vw, 5vh), 44px); }
+/* стол: тёплое затемнение города (paper.css), не синее */
+body #pausem { background: var(--pp-dim), rgba(30, 12, 20, .35); }
+/* «пауза» — жёлтый стикер на скотче (один наклонённый на экране вместе со штампом) */
+.pz-head { flex: none; display: flex; justify-content: center; padding: 10px 0 8px; }
+.pz-head .pm-t { position: relative; padding: .3em .8em .2em; font-size: clamp(16px, min(2.4vw, 4vh), 34px); color: var(--pp-ink); text-shadow: none;
+                 text-transform: uppercase; letter-spacing: .12em; background: var(--pp-yellow); border: 3px solid var(--pp-ink); border-radius: 3px;
+                 box-shadow: 0 5px 0 var(--pp-ink), 0 12px 26px rgba(0, 0, 0, .35); transform: rotate(-2deg); animation: pp-in .5s var(--pp-spring) both; }
+.pz-head .pm-t::before { content: ''; position: absolute; top: -11px; left: 50%; width: 60px; height: 18px; translate: -50% 0; rotate: 3deg;
+                         background: rgba(255, 243, 214, .6); border: 1px solid rgba(138, 107, 78, .4); }
 /* листки: чек слева (уже), накладная справа */
 .pz-top { flex: 1; min-height: 0; display: flex; justify-content: center; align-items: flex-start; gap: calc(var(--u) * 3);
           padding: calc(var(--u) * 1) calc(var(--u) * 1) calc(var(--u) * 1.4); color: #33210c; }
@@ -25,18 +32,39 @@
 .pz-cz .cz-card.far { opacity: .5; filter: saturate(.6) brightness(.66); }
 .pz-cz .cz-dots { padding: 6px 0 0; gap: 6px; }
 .pz-cz .cz-dots i { width: 8px; height: 8px; }
-.pz-card { display: flex; align-items: center; justify-content: center; color: #33210c; }
-.pz-card.pz-btn { height: calc(var(--cw) * .5); }
+.pz-card { display: flex; align-items: center; justify-content: center; color: var(--pp-ink); }
+.pz-card.pz-btn { height: calc(var(--cw) * .5); --acc: var(--pp-yellow); }
+/* ярлычок: бумага, слева — дырка под нитку в цветной полосе; «продолжить» — красный штамп */
 .pz-card.pz-btn > button {
-  width: 100%; height: 100%; box-sizing: border-box; font: inherit; font-size: clamp(9px, min(1.05vw, 2vh), 15px); line-height: 1.4; cursor: pointer;
-  color: #33210c; background: #ffd85e; border: 4px solid #33210c; border-radius: 14px; padding: 8px;
-  box-shadow: 0 6px 0 #33210c, 0 14px 32px rgba(0, 0, 0, .4); white-space: normal;
+  position: relative; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; box-sizing: border-box;
+  font: inherit; font-size: clamp(11px, min(1.15vw, 2.1vh), 16px); line-height: 1.4; cursor: pointer; white-space: normal; letter-spacing: 0;
+  color: var(--pp-ink); background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 4px 10px 10px 4px;
+  padding: 8px 10px 8px calc(10px + 2.2em); text-shadow: none;
+  box-shadow: inset 2.2em 0 0 var(--acc), inset calc(2.2em + 3px) 0 0 var(--pp-ink), 0 6px 0 var(--pp-ink), 0 14px 32px rgba(0, 0, 0, .4);
+  transition: translate .22s var(--pp-spring), box-shadow .22s var(--pp-spring);
 }
-.pz-card.pz-btn > button:active { transform: translateY(3px); box-shadow: 0 3px 0 #33210c; }
-.pz-card.pz-btn > #pm-go { background: #f0522a; color: #fff3d6; text-shadow: 3px 3px 0 #33210c; font-size: clamp(10px, min(1.3vw, 2.4vh), 19px); padding: 8px; white-space: normal; letter-spacing: 0; }
-.pz-card.pz-btn > #pm-menu { background: #fff3d6; }
-.pz-card.pz-btn > #pm-set, .pz-card.pz-btn > #pm-ctrl { background: #b9c3e6; }
-.pz-card.on > .padsel { outline: 4px solid #fff3d6 !important; outline-offset: 4px; }
+.pz-card.pz-btn > button::after { content: ''; position: absolute; left: calc(1.1em - 6px); top: 50%; width: 12px; height: 12px; translate: 0 -50%;
+  border-radius: 50%; background: var(--pp-hole); border: 2px solid var(--pp-ink); box-sizing: border-box; }
+.pz-card.pz-btn > button:hover { background: #fff8e6; }
+.pz-card.pz-btn > button:active { translate: 0 4px; transition-duration: .05s; }
+.pz-card.pz-btn > button .pp-key { margin-right: .6em; }
+.pz-card:not(.on) .pp-key { display: none; }
+.pz-card.pz-btn > #pm-map { --acc: var(--pp-lime); }
+.pz-card.pz-btn > #pm-set { --acc: #cdbfa3; }
+.pz-card.pz-btn > #pm-ctrl { --acc: var(--pp-pink); }
+.pz-card.pz-btn > #pm-menu { --acc: var(--pp-red); color: var(--pp-red); }
+/* «продолжить» — красный штамп с [A] */
+.pz-card.pz-btn > #pm-go { padding: 8px; font-size: clamp(12px, min(1.25vw, 2.3vh), 18px); letter-spacing: .02em;
+  color: var(--pp-paper); background: var(--pp-red); border-width: 4px; border-radius: 8px; rotate: -1deg; text-shadow: 2px 2px 0 var(--pp-ink);
+  box-shadow: 0 6px 0 var(--pp-ink), inset 0 -6px 0 rgba(0, 0, 0, .14), 0 14px 32px rgba(240, 82, 42, .35); }
+.pz-card.pz-btn > #pm-go::after { display: none; }
+.pz-card.pz-btn > #pm-go:hover { background: var(--pp-fire); }
+.pz-card.pz-btn > #pm-go .pp-key { color: var(--pp-red); background: var(--pp-paper); text-shadow: none; }
+.pz-card.pz-btn > #pm-go:has(.pp-key:not(:empty))::before { display: none; }   /* значок [A] вместо треугольника */
+/* курсор геймпада: чернильно-жёлтая обводка, ярлычок один раз приподнялся */
+.pz-card.on > .padsel, .pz-card.on > button:focus-visible { outline: 4px solid var(--pp-ink) !important; outline-offset: 3px;
+  box-shadow: 0 0 0 9px var(--pp-yellow), 0 6px 0 var(--pp-ink) !important; animation: pp-lift .2s var(--pp-spring); }
+.pz-card.on > .padsel:not(#pm-go) { background: color-mix(in srgb, var(--acc) 30%, var(--pp-paper)); }
 /* низкий экран (телефон боком): заголовок мельче, листки ниже */
 @media (max-height: 500px) {
   #pausem { --u: clamp(6px, 1.4vh, 10px); --pcw: clamp(140px, 20vw, 200px); }

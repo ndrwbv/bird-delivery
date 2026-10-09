@@ -73,10 +73,7 @@ function honk () {
   if (ST.honkCd > 0) return false;
   ST.honkCd = 1.2;
   for (const fn of HONK_CBS) { try { fn(A.V.x, A.V.z); } catch (e) { /* слушатель не ломает сигнал */ } }
-  if (A && A.Snd && A.Snd.blip) {
-    A.Snd.blip(392, 0.16, 'square', 0.09);
-    setTimeout(() => A.Snd.blip(392, 0.26, 'square', 0.09), 190);
-  }
+  if (A && A.Snd && A.Snd.fx) A.Snd.fx('horn', s => { s.blip(392, 0.16, 'square', 0.09); setTimeout(() => s.blip(392, 0.26, 'square', 0.09), 190); });
   for (const c of CREWS) {
     if (c.kind !== 'fight' || c.over) continue;
     if (Math.hypot(c.x - A.V.x, c.z - A.V.z) < C.HONK_R) scare(c);
@@ -313,7 +310,7 @@ function fightStep (crew, m, dt, near) {
       if (foe.down <= 0 && chance(0.45)) {
         foe.down = rand(1.4, 2.2);
         if (near < 70) {
-          A.Snd.blip(rand(150, 220), 0.06, 'square', 0.07);
+          A.Snd.fx('fight', s => s.blip(rand(150, 220), 0.06, 'square', 0.07), { x: foe.x, z: foe.z, far: 70 });
           if (A.ADULT && A.blood) A.blood(foe.x, 1.2, foe.z, 4);   // детская — без крови, только звёздочки
           else if (A.emote) A.emote(foe.x, 2, foe.z, 'angry', 1);
         }

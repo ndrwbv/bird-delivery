@@ -14,6 +14,7 @@
    --page=ui.html           другая страница сборки (index.html по умолчанию): ждём не __dlv, а загрузку
                             и window.__probeReady !== false. Песочница интерфейса: --page=ui.html — панель
                             (window.__uilab), --page=ui.html --q=frame — сам экран (window.__ui), docs/SANDBOX.md
+                            Редактор города: --page=editor.html (window.__editor; ждёт, пока город достроится)
    --size=desktop|phone|phone-land|deck|WxH   1280×720 / 390×844 с касаниями / 844×390 боком / 1280×800
    --js="код" | --eval=file.js     тело async-функции в странице. Есть: d (= __dlv), wait(ms),
                             until(fn, ms), run(secs, k) — дать игре идти secs секунд (k — ускорение
@@ -25,6 +26,13 @@
                             кадры и часы идут, числа конечные, в конце смена, журнал ошибок пуст)
                             → { ok, fail, m, ft, crash }. Журнал — d.crashlog (docs/CRASHES.md)
    --cpu=N                  процессор медленнее в N раз (после загрузки, как perf.cjs --deck; Дека ≈ 3)
+   --early                  не ждать, пока город достроится за меню (latebuild.js): скрипт — сразу с первым кадром меню
+   --bootcpu                --cpu уже с начала загрузки (замер запуска на «Деке»: window.__boot — мс от старта страницы)
+   --seed=N                 Math.random с зерном — город одинаковый от запуска к запуску (сравнить до/после)
+   --cpuprofile=f.cpuprofile  профиль процессора загрузки (до меню) — для разбора, что долго строится
+   --runprofile=f.cpuprofile  профиль процессора, пока идёт скрипт; --allocprofile=f.heapprofile — выборка
+                            выделений памяти (с мусором, что уже собран). Разбор — node tools/profsum.cjs f
+                            (имена функций — со сборкой без сжатия: --dir=папка от vite build --minify false)
    --secs=N                 после скрипта дать игре идти N секунд
    --shot=out.png [--scale=0.5]    кадр в конце
    --errors                 напечатать ошибки консоли (счётчик печатается всегда)
@@ -67,15 +75,23 @@ for (const f of fs.readdirSync(BASE)) {            // папки упавших 
 const UD = fs.mkdtempSync(path.join(BASE, 'ud-'));
 app.setPath('userData', UD);
 if (app.dock) app.dock.hide();
-protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
+protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);   // stream — <audio> музыки (music.js), как в electron/main.cjs
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+app.commandLine.appendSwitch('mute-audio');   // ни звука из проверок, даже если ?mute где-то не сработал (автор 09.10)
+if (arg('jsflags')) app.commandLine.appendSwitch('js-flags', arg('jsflags'));   // --jsflags="--trace-deopt" — флаги V8 (вывод — в stdout страницы), docs/AGENTS.md «Хвост кадров»
 
 function finish (code, report) {
   if (arg('report')) { try { fs.writeFileSync(path.resolve(arg('report')), JSON.stringify(report)); } catch (e) { err('probe: отчёт не записан:', e.message); } }
   try { fs.rmSync(UD, { recursive: true, force: true }); } catch (e) { /* — */ }
   app.exit(code);
 }
+
+// ошибка в самом probe — в stderr и выход, без окна Электрона «A JavaScript error occurred in the main process»
+// (агенты гоняют по 6 probe разом — окна сыпались автору на экран)
+const fatal = e => { err('probe: ошибка probe:', (e && e.stack) || e); finish(1, { ok: false, probeError: String((e && e.message) || e) }); };
+process.on('uncaughtException', fatal);
+process.on('unhandledRejection', fatal);
 
 const { PRELUDE, INSTALL } = require('./probe-page.cjs');   // помощники скрипта и автопилот — общие с perf.cjs
 
@@ -111,6 +127,10 @@ app.whenReady().then(async () => {
     Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: () => 5 });
     if (!('ontouchstart' in window)) window.ontouchstart = null;
     Object.defineProperty(Navigator.prototype, 'userAgent', { get: () => 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36' });`;
+  // --seed=N — Math.random с зерном: город строится одинаково от запуска к запуску (сравнить «до/после»)
+  const rnd = arg('seed') ? `(() => { let a = ${+arg('seed') >>> 0}; Math.random = () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    // каждый кусок поздней сборки — со своего зерна (latebuild.js): город один и тот же с ?nolate и без, что бы ни шло между кусками
+    window.__lateSeed = n => { let h = ${+arg('seed') >>> 0} ^ 0x9E3779B9; for (let i = 0; i < n.length; i++) h = Math.imul(h ^ n.charCodeAt(i), 0x01000193); a = h; }; })();` : '';
   fs.writeFileSync(pre, `try { const S = ${JSON.stringify(seed)}; for (const k in S) if (localStorage.getItem(k) === null) localStorage.setItem(k, JSON.stringify(S[k])); } catch (e) {}` + touch);
 
   const win = new BrowserWindow({ width: W, height: H, useContentSize: true, show: false,
@@ -137,21 +157,44 @@ app.whenReady().then(async () => {
   if (arg('map')) q.push('map=' + arg('map'));
   if (arg('q')) q.push(arg('q').replace(/^[?&]/, ''));
   const url = 'app://g/' + PAGE + '?' + q.join('&');
+  const dbg = win.webContents.debugger;
+  if ((has('bootcpu') && +arg('cpu', 1) > 1) || arg('cpuprofile') || rnd) {
+    try {
+      await win.loadURL('app://g/__blank').catch(() => {});   // тот же источник: рендерер не сменится при переходе на игру
+      dbg.attach('1.3');
+      if (has('bootcpu') && +arg('cpu', 1) > 1) await dbg.sendCommand('Emulation.setCPUThrottlingRate', { rate: +arg('cpu') });
+      if (rnd) { await dbg.sendCommand('Page.enable'); await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: rnd }); }
+      if (arg('cpuprofile')) { await dbg.sendCommand('Profiler.enable'); await dbg.sendCommand('Profiler.setSamplingInterval', { interval: 250 }); await dbg.sendCommand('Profiler.start'); }
+    } catch (e) { err('probe: отладчик загрузки:', e.message); }
+  }
   try { await win.loadURL(url); } catch (e) { err('probe: не открылась', url, e.message); }
   let ok = false;
-  for (let i = 0; i < 240; i++) {
-    try { ok = await js(GAME ? `!!(window.__dlv && __dlv.frame && __dlv.S && !document.body.classList.contains('booting'))` : `document.readyState === 'complete' && window.__probeReady !== false`); } catch (e) { /* — */ }
+  for (let i = 0; i < 450; i++) {                     // до 45 с: на «Деке» (--bootcpu) город достраивается за меню ~20 с
+    try { ok = await js(GAME ? `!!(window.__dlv && __dlv.frame && __dlv.S && !document.body.classList.contains('booting')${has('early') ? '' : ' && (!window.__boot || window.__boot.full)'})` : `document.readyState === 'complete' && window.__probeReady !== false`); } catch (e) { /* — */ }
     if (ok) break;
     await sleep(100);
   }
-  if (!ok) { err('probe: ' + (GAME ? 'игра' : PAGE) + ' не загрузилась за 24 с;', errors.length, 'ошибок:\n  ' + errors.slice(0, 5).join('\n  ')); clearTimeout(timer); return finish(1, { ok: false, loaded: false, errors }); }
+  if (!ok) { err('probe: ' + (GAME ? 'игра' : PAGE) + ' не загрузилась за 45 с;', errors.length, 'ошибок:\n  ' + errors.slice(0, 5).join('\n  ')); clearTimeout(timer); return finish(1, { ok: false, loaded: false, errors }); }
+  if (arg('cpuprofile')) {
+    try { const { profile } = await dbg.sendCommand('Profiler.stop'); fs.writeFileSync(path.resolve(arg('cpuprofile')), JSON.stringify(profile)); err('probe: профиль загрузки →', path.resolve(arg('cpuprofile'))); } catch (e) { err('probe: профиль не снят:', e.message); }
+  }
   await js(INSTALL);
   await sleep(200);                                   // модули дописывают себя в __dlv через setTimeout 0
   if (+arg('cpu', 1) > 1) {                           // --cpu=3 — как процессор Деки (сборку города не тормозим — только игру)
-    try { win.webContents.debugger.attach('1.3'); await win.webContents.debugger.sendCommand('Emulation.setCPUThrottlingRate', { rate: +arg('cpu') }); } catch (e) { err('probe: --cpu не вышло:', e.message); }
+    try { if (!dbg.isAttached()) dbg.attach('1.3'); await dbg.sendCommand('Emulation.setCPUThrottlingRate', { rate: +arg('cpu') }); } catch (e) { err('probe: --cpu не вышло:', e.message); }
   }
   const tLoad = Date.now() - T0;
 
+  /* --runprofile / --allocprofile — профиль процессора и выборка выделений памяти, пока идёт скрипт
+     (хвост кадров: кто тратит время и кто плодит мусор). Разбор — node tools/profsum.cjs файл */
+  const RUNP = arg('runprofile'), ALLOCP = arg('allocprofile');
+  if (RUNP || ALLOCP) {
+    try {
+      if (!dbg.isAttached()) dbg.attach('1.3');
+      if (RUNP) { await dbg.sendCommand('Profiler.enable'); await dbg.sendCommand('Profiler.setSamplingInterval', { interval: 500 }); await dbg.sendCommand('Profiler.start'); }
+      if (ALLOCP) { await dbg.sendCommand('HeapProfiler.enable'); await dbg.sendCommand('HeapProfiler.startSampling', { samplingInterval: 16384, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true }); }
+    } catch (e) { err('probe: профиль не включился:', e.message); }
+  }
   let result, evalErr = null;
   if (CODE) {
     try {
@@ -164,6 +207,8 @@ app.whenReady().then(async () => {
     }
   }
   const tEval = Date.now() - T0;
+  if (RUNP) { try { const { profile } = await dbg.sendCommand('Profiler.stop'); fs.writeFileSync(path.resolve(RUNP), JSON.stringify(profile)); err('probe: профиль скрипта →', path.resolve(RUNP)); } catch (e) { err('probe: профиль не снят:', e.message); } }
+  if (ALLOCP) { try { const { profile } = await dbg.sendCommand('HeapProfiler.stopSampling'); fs.writeFileSync(path.resolve(ALLOCP), JSON.stringify(profile)); err('probe: выделения памяти →', path.resolve(ALLOCP)); } catch (e) { err('probe: выделения не сняты:', e.message); } }
   if (+arg('secs', 0) > 0) await sleep(+arg('secs') * 1000);
   const logs = await js('window.__probe.logs').catch(() => []);
   const fstats = await js('window.__probe.stats()').catch(() => null);

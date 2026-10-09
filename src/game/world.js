@@ -104,6 +104,10 @@ export const STATS = { alleys: 0, alleyBenches: 0, alleyLamps: 0, heaps: 0, tras
    цвет, шейдер статики (paveMat) узнаёт его и рисует узор по мировым x/z.
    Гладкая — прежний цвет, её шейдер не трогает. */
 export const PAVE = { plain: '#e3ded4', brick: '#dbd1c4', speck: '#d5d3ce', path: '#ddd5c6' };
+/* ступенька плитки по высоте (О3, 09.10.2026): тротуары, дорожки и аллеи разной плитки лежат внахлёст на
+   перекрёстках — на одной высоте мерцали. Гладкая и дорожная — 0, брусчатка — 1, в крапинку — 2 (× шаг слоя) */
+const PAVE_STEP = { [PAVE.plain]: 0, [PAVE.path]: 0, [PAVE.brick]: 1, [PAVE.speck]: 2 };
+export const paveStep = hex => PAVE_STEP[hex] ?? 0;
 function paveKind (key, x, z, salt) {
   const d = hash(Math.floor(x / 420), Math.floor(z / 420), 3 + salt);   // район: где-то старый центр, где-то новостройки
   const h = key ? strHash(key + '#' + Math.floor(x / 420) + ',' + Math.floor(z / 420)) : hash(Math.round(x), Math.round(z), 5 + salt);
@@ -307,11 +311,11 @@ function drawAlleys () {
   for (const al of ALLEYS) {
     const pts = al.pts, W = al.w, r = rng(al.seed * 7 + 3);
     if (!al.own) {
-      const k = r();
-      LITM.color(k < 0.55 ? PAVE.brick : k < 0.8 ? PAVE.speck : PAVE.path);
+      const k = r(), ph = k < 0.55 ? PAVE.brick : k < 0.8 ? PAVE.speck : PAVE.path, ay = 0.075 + paveStep(ph) * 0.0008;   // разная плитка внахлёст — не на одной высоте (О3)
+      LITM.color(ph);
       for (let i = 1; i < pts.length; i++) {
-        LITM.ribbon(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], W, 0.075);
-        if (i < pts.length - 1) LITM.disc(pts[i][0], pts[i][1], W / 2, 0.075, 7);
+        LITM.ribbon(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], W, ay);
+        if (i < pts.length - 1) LITM.disc(pts[i][0], pts[i][1], W / 2, ay, 7);
       }
     }
     // вдоль аллеи: пары лавочек лицом друг к другу, фонари через один промежуток
@@ -378,8 +382,9 @@ function richLawns () {
       }
     }
     const U0 = R.u0 - m[0], U1 = R.u1 + m[1], V0 = R.v0 - m[2], V1 = R.v1 + m[3];
-    A.LITM.color(hash(U0, V0, 2) < 0.5 ? '#86c867' : '#7fc160');
-    A.LITM.poly([rectPt(R, U0, V0), rectPt(R, U1, V0), rectPt(R, U1, V1), rectPt(R, U0, V1)], 0.035);
+    const lv = hash(U0, V0, 2) < 0.5 ? 0 : 1;            // два оттенка — на 0,8 мм друг над другом: внахлёст не мерцают (О3)
+    A.LITM.color(lv ? '#7fc160' : '#86c867');
+    A.LITM.poly([rectPt(R, U0, V0), rectPt(R, U1, V0), rectPt(R, U1, V1), rectPt(R, U0, V1)], 0.035 + lv * 0.0008);
     // пара деревьев на газоне — по углам, подальше от дома
     const r = rng(Math.round(U0 * 11 + V0 * 7));
     for (let k = 0; k < 3; k++) {
@@ -791,7 +796,7 @@ function grillStep (dt) {
     if (!g.tip && sp > 3 && Math.hypot(g.x - V.x, g.z - V.z) < 1.8) {
       g.tip = 1; g.coal.visible = false;
       if (A.sparks) A.sparks(g.x, 0.9, g.z, 10);
-      if (A.Snd) A.Snd.noise(0.15, 0.2);
+      if (A.Snd) A.Snd.fx('smash', s => s.noise(0.15, 0.2), { x: g.x, z: g.z });
       for (const m of g.men) if (!m.dead) { m.shock = rand(2, 3.5); say(m, pick([t('Шашлык!!'), t('Ты чё творишь?!'), t('Мясо-о-о!')]), '#d9342c'); }
     }
     if (g.tip) { const c = g.grp.children[0]; c.rotation.z = damp(c.rotation.z, 1.45, 6, dt); c.position.y = damp(c.position.y, -0.35, 6, dt); }
@@ -1189,7 +1194,7 @@ function gangStep (dt) {
           m.swingT = rand(0.75, 1.2); m.swing = 1;
           const hx = V.x + (m.x - V.x) * 0.45, hz = V.z + (m.z - V.z) * 0.45;
           if (A.dent) A.dent(hx, hz, 16);
-          if (A.Snd) { A.Snd.noise(0.09, 0.22); A.Snd.blip(120 + Math.random() * 40, 0.08, 'square', 0.1); }
+          if (A.Snd) A.Snd.fx('bat', s => { s.noise(0.09, 0.22); s.blip(120 + Math.random() * 40, 0.08, 'square', 0.1); });
           if (A.sparks && chance(0.3)) A.sparks(hx, 1.0, hz, 3);
           if (S) S.shake = Math.max(S.shake || 0, 0.25);
         }
@@ -1200,7 +1205,7 @@ function gangStep (dt) {
         // детская версия: руками в машину и раскачивают
         const k = Math.sin(GE.t * 7 + m.slot);
         u.armR.rotation.x = -1.4 + k * 0.25; u.armL.rotation.x = -1.4 + k * 0.25;
-        if ((m.swingT -= dt) <= 0) { m.swingT = rand(0.9, 1.4); if (A.dent) A.dent(V.x + (m.x - V.x) * 0.45, V.z + (m.z - V.z) * 0.45, 6); if (A.Snd) A.Snd.noise(0.06, 0.12); }
+        if ((m.swingT -= dt) <= 0) { m.swingT = rand(0.9, 1.4); if (A.dent) A.dent(V.x + (m.x - V.x) * 0.45, V.z + (m.z - V.z) * 0.45, 6); if (A.Snd) A.Snd.fx('kick', s => s.noise(0.06, 0.12)); }
         if (S) S.shake = Math.max(S.shake || 0, 0.18);
       }
     } else {
@@ -1302,15 +1307,23 @@ export function drawMap (x, fmX, fmZ, s) {
 }
 
 /* ═════════════════ сборка и шаг ═════════════════ */
-export function build (api) {
+/* шагами (yield) — поздняя сборка (latebuild.js; при ?nolate — разом): на Деке весь кусок ~0,35 с */
+export function* build (api) {
   A = api;
   if (!CAREER) CAREER = !!api.CAREER;
   if (!MAPR) MAPR = (api.MAP && api.MAP.career) || null;
   const tm = (k, f) => { const t0 = performance.now(); f(); STATS.buildMs[k] = Math.round(performance.now() - t0); };
-  tm('alleys', () => { pathGrid(); planAlleys(); drawAlleys(); });
+  tm('grid', pathGrid);
+  yield 'grid';
+  tm('alleys', () => { planAlleys(); drawAlleys(); });
   if (!CAREER) return;
+  yield 'alleys';
   tm('rich', richLawns);
-  tm('trash', () => { planTrash(); trashBuild(Math.round(A.donated('trash') * 240) / 240); });
+  yield 'rich';
+  tm('trash', planTrash);
+  yield 'trash';
+  tm('trashb', () => trashBuild(Math.round(A.donated('trash') * 240) / 240));
+  yield 'trashb';
   tm('garages', planGarages);
 }
 

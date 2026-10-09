@@ -35,6 +35,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { snowAmt } from './seasons.js';
 import * as FADEJS from './fade.js';
+import { wet } from './streams.js';             // речки и пруды — без ёлок (streams.js)
 
 export const FOREST = {
   MIN: 30000, CELL: 48, SPACE: 5, JIT: 0.8,
@@ -241,7 +242,7 @@ function buildCell (i, j) {
   };
   const okAt = (x, z, r) => {
     const y = A.groundH(x, z);
-    if (y < 0.3 || !A.inBounds(x, z, -200)) return -1;
+    if (y < 0.3 || !A.inBounds(x, z, -200) || wet(x, z, r)) return -1;
     if (A.inHouse(x, z, 4) || A.inHouse(x, z, F.HOUSE)) return -1;
     const nr = A.nearestRoad(x, z, 9, 1);
     let dR = 99;
@@ -324,15 +325,17 @@ function hasForest (i, j) {
 /* собрать недостающие клетки ближе R, пока не кончится бюджет (мс) */
 function ensure (x, z, R, budget) {
   const C = FOREST.CELL, ci = Math.floor(x / C), cj = Math.floor(z / C), n = Math.ceil(R / C);
-  const todo = [];
+  // зовётся каждый кадр: без массива и Math.hypot, пока всё собрано (09.10.2026, мусор в кадре на Деке)
+  const lim = R + C * 0.71, lim2 = lim * lim;
+  let todo = null;
   for (let i = ci - n; i <= ci + n; i++)
     for (let j = cj - n; j <= cj + n; j++) {
-      const d = Math.hypot((i + 0.5) * C - x, (j + 0.5) * C - z);
-      if (d > R + C * 0.71 || CELLS.has(key(i, j))) continue;
+      const dx = (i + 0.5) * C - x, dz = (j + 0.5) * C - z, d2 = dx * dx + dz * dz;
+      if (d2 > lim2 || CELLS.has(key(i, j))) continue;
       if (!hasForest(i, j)) { CELLS.set(key(i, j), { i, j, empty: true }); continue; }
-      todo.push([d, i, j]);
+      (todo || (todo = [])).push([Math.sqrt(d2), i, j]);
     }
-  if (!todo.length) return false;
+  if (!todo) return false;
   todo.sort((a, b) => a[0] - b[0]);
   const t0 = performance.now();
   let any = false;
