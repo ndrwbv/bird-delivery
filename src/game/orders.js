@@ -727,7 +727,11 @@ export function payStop (o, st, onTime, tier) {
   st.done = true;                                         // отдали: пины карты и накладная в паузе
   SH.done += o.idx === o.stops.length - 1 ? 1 : 0;
   if (st.far) SH.far += onTime ? st.far : Math.round(st.far * PAY.LATE);   // «весь город»: премия за дальние за смену (итоги)
-  if (!onTime) { st.pay = { fee, bonus: 0, tip: 0, late: true, story: !!sp.story }; return Math.round(fee * PAY.LATE); }
+  if (!onTime) {
+    const gop = DOOR.stairsAdjust(st, fee, 0, 0).gop;     // откупился от гопников в подъезде, а всё равно опоздал — «чаевые» им уже отданы
+    st.pay = { fee, bonus: 0, tip: 0, late: true, story: !!sp.story, stairsGop: gop };
+    return Math.round(fee * PAY.LATE) - gop;
+  }
   const bonus = tier ? Math.round(fee * (PAY.SPEED_BONUS[tier] || 0)) : 0;
   const lunch = S.lunch === 'tips';
   const pc = DIST.pace();
@@ -745,10 +749,12 @@ export function payStop (o, st, onTime, tier) {
   const door = DOOR.payAdjust(st, fee, bonus, tip);
   // разговор у двери (doorstep.js talkAdjust): поддержал — +add; поторопил / шутка не зашла — минус cut из чаевых
   const talk = DOOR.talkAdjust(st, fee, tip);
+  // подъезд (doorstep.js stairsAdjust): взбежал быстро — +add; не успел — минус cut из «за скорость» и чаевых; откупился от гопников — минус gop
+  const stairs = DOOR.stairsAdjust(st, fee, bonus, tip);
   // из чего сложилась оплата — game.js покажет кучкой денег и чеком (popPay); сюжет — катсцена сама покажет награду
   st.pay = { fee, bonus, tip, rich: rich && tip > 0, late: false, story: !!sp.story, doorAdd: door.add, doorCut: door.cut, doorMode: st.door ? st.door.mode : '',
-    talkAdd: talk.add, talkCut: talk.cut, talkKind: talk.kind };
-  const extra = door.add - door.cut + talk.add - talk.cut;
+    talkAdd: talk.add, talkCut: talk.cut, talkKind: talk.kind, stairsAdd: stairs.add, stairsCut: stairs.cut, stairsGop: stairs.gop };
+  const extra = door.add - door.cut + talk.add - talk.cut + stairs.add - stairs.cut - stairs.gop;
   S.tips = (S.tips || 0) + bonus + tip + extra;   // чек смены: строка «чаевые и за скорость» (career.js; обнуляет startShift)
   return fee + bonus + tip + extra;
 }

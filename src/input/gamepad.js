@@ -45,7 +45,7 @@
 const CFG = { dead: 0.12, outer: 0.03, curve: 1.6, trigDead: 0.06, rumble: true };
 export function setPadConfig (o) { Object.assign(CFG, o); }
 
-const HOLD = ['hand', 'nitro', 'a', 'b'];
+const HOLD = ['hand', 'nitro', 'a', 'b', 'up', 'down'];
 const EDGES = ['pause', 'map', 'accept', 'choice1', 'choice2', 'choice3', 'sound', 'any', 'btnX', 'btnY', 'dDown',
   'menuUp', 'menuDown', 'menuLeft', 'menuRight', 'menuOk', 'menuBack', 'pageL', 'pageR', 'trigL', 'trigR'];
 
@@ -55,6 +55,7 @@ export const pad = {
   steer: 0, gas: 0, brake: 0, ly: 0, rx: 0, ry: 0,
   hand: false, nitro: false,
   a: false, b: false,       // A и B держат прямо сейчас — для диалогов и мини-игр со своим учётом нажатий
+  up: false, down: false,   // вверх / вниз держат (крестовина или левый стик) — мини-игра «подъезд» (minigames/stairs.js)
   pause: false, map: false, accept: false, choice1: false, choice2: false, choice3: false, sound: false, any: false,
   dDown: false,             // крестовина ↓ — только она (не стик): радио в езде
   menuUp: false, menuDown: false, menuLeft: false, menuRight: false, menuOk: false, menuBack: false,
@@ -169,6 +170,7 @@ export function pollPad () {
   pad.hand = b;
   pad.nitro = a || rb;            // нитро — на A (так просил автор), RB — запасная; X теперь свободна
   pad.a = a; pad.b = b;
+  pad.up = !!dUp || ly < -0.5; pad.down = !!dDown || ly > 0.5;
 
   const edge = (name, now) => { const was = prev[name] || false; prev[name] = now; return now && !was; };
   if (edge('a', a)) { pad.accept = true; pad.menuOk = true; }

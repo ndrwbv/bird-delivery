@@ -3371,19 +3371,114 @@ function makeCarLite (hex, model, taxi) {
     hz.visible = false;
     g.add(hz); hazard.push(hz);
   }
-  g.userData = dbl({ lite: true, hl: T.hl, wheels: [], steer: [], panels: [], glass: [], hazard, dmg: 0, bodyHex: hex, model, taxi: !!taxi });
+  g.userData = dbl({ lite: true, hl: T.hl, wheels: [], steer: [], panels: [], glass: [], hazard, dmg: 0, bodyHex: hex, model, taxi: !!taxi, full: undefined, _pose: undefined });   // _pose — cull.js moved()
   return g;
 }
 /* задели лёгкую машину — ставим полную: у неё панели мнутся по-настоящему */
 function fullCar (t) {
   if (!t.mesh.userData.lite) return;
-  const old = t.mesh;
-  t.mesh = makeCar(old.userData.bodyHex, false, old.userData.model, !!old.userData.taxi);
+  const old = t.mesh, u = old.userData;
+  t.mesh = u.full ? u.full(old) : makeCar(u.bodyHex, false, u.model, !!u.taxi);   // full — своя полная модель (курьеры: шашка, табличка — rivalLite)
   t.mesh.position.copy(old.position);
   t.mesh.rotation.copy(old.rotation);
   scene.remove(old);
-  old.children[0].geometry.dispose();
+  const g0 = old.children[0].geometry;
+  if (!g0.userData.shared) g0.dispose();
+  for (const c of old.children) if (c.isInstancedMesh) c.dispose();   // колёса курьера — буфер матриц
   scene.add(t.mesh);
+}
+
+/* Машина курьера (свои и конкуренты, 10.10.2026, вызовы отрисовки на Деке): полная модель — ~17
+   мешей, на старте смены у пиццерии в кадре их до четырёх (~70 вызовов). Теперь — как лёгкая: всё
+   неподвижное (кузов, панели, стёкла, шашка «Птицы Пиццы», фонари) — одна склейка в настоящих цветах
+   полной модели; фары — один меш; четыре колеса — один InstancedMesh (крутятся и рулят, как у полной:
+   userData.wheels / steer — пустые Object3D, из них в updateMatrixWorld собираются матрицы колёс; правые —
+   левое колесо, развёрнутое на 180°); аварийка — один меш на четыре огонька; тень-кружок — та же.
+   Шаблон — один на цвет × модель × шашку (их шесть), общий для всех появлений. Задели или горит —
+   fullCar ставит полную модель через userData.full (мнётся как раньше, табличка переезжает). */
+const RIV_LITE = {};
+function rivalTemplate (hex, model, roof) {
+  const key = hex + ':' + model + (roof ? ':roof' : '');
+  if (RIV_LITE[key]) return RIV_LITE[key];
+  const g = makeCar(hex, roof, model);
+  g.updateMatrixWorld(true);
+  const u = g.userData, skip = new Set([...u.wheels, ...u.hazard]);
+  const lit = [], flat = [], haz = [];
+  let shadow = null;
+  for (const m of u.hazard) haz.push(put([], m.geometry.clone().applyMatrix4(m.matrixWorld), '#ffa024', 0, 0, 0));
+  g.traverse(o => {
+    if (!o.isMesh || skip.has(o) || !o.visible || Array.isArray(o.material)) return;
+    if (o.material.transparent) { shadow = o; return; }            // тень-кружок — отдельно, как была
+    const geo = o.geometry.clone().applyMatrix4(o.matrixWorld);
+    if (o.material.vertexColors) {                                  // склейки (кузов, двери с ручками): цвет — свой по вершинам
+      if (!geo.index) geo.setIndex(Array.from({ length: geo.attributes.position.count }, (_, i) => i));
+      lit.push(geo); return;
+    }
+    put(o.material.isMeshBasicMaterial ? flat : lit, geo, '#' + o.material.color.getHexString(), 0, 0, 0);
+  });
+  const w0 = u.wheels[0];                                            // левое переднее: колесо с колпаком наружу (x < 0)
+  const T = {
+    lit: mergeGeos(lit), flat: flat.length ? mergeGeos(flat) : null, haz: mergeGeos(haz), hl: u.hl,
+    wheel: w0.geometry, wpos: u.wheels.map((w, i) => [w.parent.position.x, w.parent.position.y, w.parent.position.z, i < 2]),
+    shadow: shadow ? { geo: shadow.geometry, mat: shadow.material, y: shadow.position.y, sx: shadow.scale.x } : null,
+  };
+  for (const k of ['lit', 'flat', 'haz', 'wheel']) if (T[k]) T[k].userData.shared = true;
+  if (T.shadow) { T.shadow.geo.userData.shared = true; T.shadow.mat.userData.shared = true; }
+  g.traverse(o => {
+    if (!o.isMesh || (T.shadow && o === shadow)) return;
+    if (o !== w0) o.geometry.dispose();
+    if (!Array.isArray(o.material)) o.material.dispose();
+  });
+  return (RIV_LITE[key] = T);
+}
+const RW_FLIP = new THREE.Matrix4().makeRotationY(Math.PI), RW_M = new THREE.Matrix4();
+function rivalLite (hex, model, roof) {
+  const T = rivalTemplate(hex, model, roof);
+  const g = new THREE.Group();
+  g.rotation.order = 'YXZ';
+  g.add(new THREE.Mesh(T.lit, LITE_MAT));
+  if (T.flat) g.add(new THREE.Mesh(T.flat, model === 'cn' ? RL.LED_MAT : LITE_BASIC));
+  const hz = new THREE.Mesh(T.haz, LITE_HAZ);
+  hz.visible = false;
+  g.add(hz);
+  if (T.shadow) {
+    const sh = new THREE.Mesh(T.shadow.geo, T.shadow.mat);
+    sh.rotation.x = -Math.PI / 2; sh.position.y = T.shadow.y; sh.scale.set(T.shadow.sx, 1, 1);
+    g.add(sh);
+  }
+  // колёса: пустышки для езды (rotation.x — качение, у передних пивот rotation.y — руль) и один InstancedMesh
+  const wheels = [], steer = [];
+  for (const [x, y, z, front] of T.wpos) {
+    const pv = new THREE.Object3D();
+    pv.position.set(x, y, z);
+    const w = new THREE.Object3D();
+    pv.add(w); g.add(pv);
+    wheels.push(w); if (front) steer.push(pv);
+  }
+  const im = new THREE.InstancedMesh(T.wheel, LITE_MAT, 4);
+  const last = new Float64Array(8).fill(NaN);
+  const pose = () => {
+    let dirty = false;
+    for (let i = 0; i < 4; i++) {
+      const w = wheels[i], pv = w.parent;
+      if (last[i * 2] === w.rotation.x && last[i * 2 + 1] === pv.rotation.y) continue;
+      last[i * 2] = w.rotation.x; last[i * 2 + 1] = pv.rotation.y;
+      pv.updateMatrix(); w.updateMatrix();
+      RW_M.multiplyMatrices(pv.matrix, w.matrix);
+      if (pv.position.x > 0) RW_M.multiply(RW_FLIP);
+      im.setMatrixAt(i, RW_M);
+      dirty = true;
+    }
+    if (dirty) im.instanceMatrix.needsUpdate = true;
+  };
+  pose();
+  im.computeBoundingSphere();
+  im.boundingSphere.radius += 0.3;                                  // руль и качение — колёса чуть шевелятся
+  const umw = im.updateMatrixWorld;
+  im.updateMatrixWorld = function (force) { pose(); umw.call(this, force); };
+  g.add(im);
+  g.userData = dbl({ lite: true, hl: T.hl, wheels, steer, panels: [], glass: [], hazard: [hz], dmg: 0, bodyHex: hex, model, taxi: false, full: undefined, _pose: undefined });   // та же форма, что у makeCarLite
+  return g;
 }
 
 /* ─── рампы ───
@@ -7250,7 +7345,7 @@ function honk (t) {
 function svcGone (t) {
   t.gone = 1;
   scene.remove(t.mesh);
-  t.mesh.traverse(o => { if (o.isMesh) { if (!o.geometry.userData.shared) o.geometry.dispose(); if (o.material.dispose && o.material !== HUMAN_VC && !o.material.userData.shared) o.material.dispose(); } });   // общее у лёгких машин — не трогаем
+  t.mesh.traverse(o => { if (o.isMesh) { if (!o.geometry.userData.shared) o.geometry.dispose(); if (o.material.dispose && o.material !== HUMAN_VC && !o.material.userData.shared) o.material.dispose(); if (o.isInstancedMesh) o.dispose(); } });   // общее у лёгких машин — не трогаем; у колёс курьера — буфер матриц
 }
 
 /* ─────────────── скорая ───────────────
@@ -7486,8 +7581,10 @@ function nameTex (text, hex) {
 }
 
 function rivalCar (R) {
-  const m = makeCar(R.spec.hex, !R.foe, R.spec.model);   // шашка «Птицы Пиццы» — только у своих
-  const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: R.tagTex, transparent: true, depthWrite: false }));
+  // шашка «Птицы Пиццы» — только у своих; лёгкая склейка, задели — полная модель (rivalLite, fullCar)
+  const m = rivalLite(R.spec.hex, R.spec.model, !R.foe);
+  m.userData.full = () => { const f = makeCar(R.spec.hex, !R.foe, R.spec.model); f.add(tag); return f; };   // табличка переезжает на полную
+  const tag =new THREE.Sprite(new THREE.SpriteMaterial({ map: R.tagTex, transparent: true, depthWrite: false }));
   tag.scale.set(3.2, 0.8, 1); tag.position.set(0, 3.1, 0);
   // вплотную к камере табличка закрывала полэкрана — у камеры она тает
   const wp = new THREE.Vector3();
@@ -12128,7 +12225,7 @@ function checkArrival (dt) {
     const pp = st.pay;
     if (pp && !pp.story) {
       const rows = [[$t('заказ'), pp.fee, '']];
-      if (pp.late) rows.push([$t('опоздал'), part - pp.fee, 'neg']);
+      if (pp.late) rows.push([$t('опоздал'), part - pp.fee + (pp.stairsGop || 0), 'neg']);   // гопникам отдал отдельно — строкой ниже
       if (pp.bonus) rows.push([$t('за скорость'), pp.bonus, 'tip']);
       if (pp.tip) rows.push([pp.rich ? $t('чаевые от богача') : $t('чаевые'), pp.tip, 'tip']);
       if (pp.doorAdd) rows.push([pp.doorMode === 'broken' ? $t('достучался быстро') : $t('домофон с первого раза'), pp.doorAdd, 'tip']);   // мини-игра у подъезда (doorstep.js payAdjust)
@@ -12136,6 +12233,10 @@ function checkArrival (dt) {
       // разговор у двери (doorstep.js talkAdjust)
       if (pp.talkAdd) rows.push([pp.talkKind === 'fun' ? $t('клиент оценил шутку') : $t('поболтал с клиентом'), pp.talkAdd, 'tip']);
       if (pp.talkCut) rows.push([pp.talkKind === 'fun' ? $t('шутку не оценил') : $t('торопил клиента'), -pp.talkCut, 'neg']);
+      // подъезд: бегом на этаж (doorstep.js stairsAdjust)
+      if (pp.stairsAdd) rows.push([$t('взбежал быстро'), pp.stairsAdd, 'tip']);
+      if (pp.stairsCut) rows.push([$t('спускался сам'), -pp.stairsCut, 'neg']);
+      if (pp.stairsGop) rows.push([$t('откупился от гопников'), -pp.stairsGop, 'neg']);
       popPay(part, rows, pp.late ? (CAREER ? $t('клиент недоволен') : '') : tier === 2 && pp.bonus ? $t('А ты харош!') : tier && pp.bonus ? $t('Шустро!') : pp.rich ? $t('сдачи не надо!') : pp.tip ? $t('чаевые!') : '',
         st.persons[0] ? { person: st.persons[0], mood: payMood(st, onTime, tier) } : null);
       bossOnDeliver(o, st, onTime, tier);
