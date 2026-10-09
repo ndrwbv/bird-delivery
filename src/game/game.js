@@ -1103,15 +1103,15 @@ const LITM = Mesher();      // всё материальное: земля, до
 const FLATM = Mesher();     // разметка, окна, вывески — света не ловят
 
 /* ── земля, зелёнка, вода ── */
-/* 09.10.2026 (автор: «трава зелёная насыщенная, песочек рыжий»): зелень сочнее (было park #9ed07f, green #a2cf86,
-   pitch #8dcd93, cem #aacd93, земля #a2d086…#bcd293 — бледно-салатовая), площадки — тёплый рыжий песок (было #d3bd88) */
+/* площадки — тёплый рыжий песок (09.10.2026, было #d3bd88). Зелень — как до 09.10: сочную (#86c862…) автор вернул
+   10.10.2026 («трава слишком зелёная») */
 const GREEN_HEX = {
-  park: '#86c862', green: '#8cc96a', pitch: '#78c47c',
-  play: '#e0b26e', cem: '#98c47a', water: '#6fb0c9',
+  park: '#9ed07f', green: '#a2cf86', pitch: '#8dcd93',
+  play: '#e0b26e', cem: '#aacd93', water: '#6fb0c9',
 };
 
 /* цвет земли: пойма сочнее, на горе суше, дно под водой песчаное */
-const GROUND_LOW = new THREE.Color('#8ccb6a'), GROUND_HIGH = new THREE.Color('#a4c96e');
+const GROUND_LOW = new THREE.Color('#a2d086'), GROUND_HIGH = new THREE.Color('#bcd293');
 const GROUND_BED = '#c9c08f', GC = new THREE.Color();
 // высоты в карте — с шагом в десять сантиметров, разных значений немного: цвет по высоте — в памяти
 const GROUND_HEX = new Map();
@@ -1193,7 +1193,7 @@ function osmGround () {
   for (const g of CITY.green) {
     if (DMASK && g.p.every(q => farOut(q[0], q[1]))) continue;      // за забором далеко — не рисуем
     if (g.k === 'water') continue;                                   // пруды — в воде (water.js)
-    const gh = FOREST.isForest(g) ? FOREST.FOREST.FLOOR : GREEN_HEX[g.k] || '#84c164';
+    const gh = FOREST.isForest(g) ? FOREST.FOREST.FLOOR : GREEN_HEX[g.k] || '#95c579';
     LITM.color(gh);   // в ельнике земля темнее (forest.js)
     // разные зелёные куски (парк поверх двора, ельник поверх газона) — не на одной высоте: мерцали на стыке (О3)
     LITM.poly(g.p, g.k === 'water' ? 0.03 : 0.04 + flatRank(GREEN_RANK, gh, 5) * 0.0007);
