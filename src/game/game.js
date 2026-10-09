@@ -66,6 +66,7 @@ import * as PAVE from './pave.js';             // где ходят люди: т
 import * as LAWNP from './lawnprops.js';      // мелочь на газоне рядом с камерой: трава, заросли, покрышки, выбивалки, ракушки, мусор (lawnprops.js)
 import * as FOREST from './forest.js';         // ельник в больших лесах: ели и сосны инстансами, опушка, снег зимой (forest.js)
 import * as LWOOD from './leninwood.js';        // лес вдоль улицы Ленина: полоса ельника с полянами и проезжими тропами (leninwood.js)
+import * as RINGM from './rings.js';            // круги (кольцевые развязки): острова — газон с бордюром, клумбы, рощи, лес на Кольце (rings.js)
 import * as LM from './landmarks.js';            // заправки и каток
 import * as ECON from './econ.js';               // карьера: все числа и формулы (docs/CAREER.md)
 import * as DLG from './dialog.js';              // диалог с головой и печатающимся текстом
@@ -1627,8 +1628,9 @@ const WALLS = ['#e9bcc8', '#c7d9ef', '#f0dcae', '#c2e0cd', '#d9c8ea', '#eecfb4',
    иначе ствол встаёт между камерой и коробкой */
 const introClear = () => false;
 
-function tree (x, z, strip = 0, kind) {           // kind — порода силой (trees.js: дворы, кусты под окнами)
+function tree (x, z, strip = 0, kind, own) {      // kind — порода силой (trees.js: дворы, кусты под окнами); own — сажают круги или редактор
   if (introClear(x, z)) return;
+  if (!own && RINGM.blocks(x, z, 1)) return;       // острова кругов засаживает rings.js — уличные ряды и парки туда не сажают
   const y = groundH(x, z);
   if (y < 0.3) return;                         // в реке деревья не растут
   // парк в карте часто накрывает и улицу через него — дерево на полотне
@@ -3907,6 +3909,8 @@ function buildCity () {
   const tm = (k, f) => LATE.add(k, () => { const t0 = performance.now(), r = f(); BUILD_T[k] = Math.round(performance.now() - t0); return r && r.next ? timedSteps(k, r) : r; });
   if (ADULT && !INTRO) tm('nightlife', () => NIGHT.build(nightApi()));   // стрип-клуб и места «ночных бабочек» (nightlife.js) — до деревьев и лавочек: они обходят пристройку
   tm('world', () => WORLD.build(worldApi()));     // аллеи; в карьере — газоны особняков, мусор, гаражи (world.js) — до деревьев и лавочек
+  if (!new URLSearchParams(location.search).has('norings')) tm('rings', () => RINGM.build({ CITY, roadWidth, LITM, CURB_H, groundH, inHouse, tree, raise: (x, z) => RAISED.add(rkey(x, z)),
+    onPave: PAVE.onPave, onAlley: (x, z, m) => WORLD.onAlley(x, z, m) }));   // острова кругов: газон, бордюр, клумбы, рощи (rings.js) — после аллей, до всех деревьев; ?norings — без них
   if (!INTRO && !new URLSearchParams(location.search).has('nocons')) tm('construction', () => CONSTR.build(consApi()));   // стройки на пустырях — до деревьев и лавочек: участок обходят (construction.js); ?nocons — без них
   if (!INTRO && !new URLSearchParams(location.search).has('norivals')) tm('rivals', () => RIVS.build(rivApi()));   // точки конкурентов — тоже до деревьев, лавочек и smashBuild (rivals.js); ?norivals — без них
   if (!INTRO) tm('darknight', () => DARKN.build(darkApi()));   // тёмная ночь: места костров и котлов — свободные пустыри после строек (darknight.js)
@@ -3933,7 +3937,7 @@ function buildCity () {
   tm('yard', () => { osmPitches(); if (!INTRO) BUILD_T.workout = WORK.build({ THREE, PITCHES, LIT, box, obb, groundH, inHouse, nearestRoad, solidAt, BENCHES, onPave: PAVE.onPave }); });
   tm('yardbits', function* () { osmYardBits(); yield 'bits'; if (!INTRO) JUNK.yard(); yield 'junk'; osmVerandas(); });
   if (!INTRO) tm('yardtrees', function* () { BUILD_T.yardTrees = yield* TREES.plantYardsSteps({ CITY, tree, inHouse, inBounds, inPoly, groundH, nearestRoad, solidAt, SMASH, YARD_PATHS, PITCHES }); });   // шагами (latebuild.js)   // группы деревьев во дворах и кусты под окнами (trees.js)
-  tm('edits', () => EDL.apply({ THREE, scene, tree, bench, lamp: o => SL.lamp({ THREE, scene, LAMPH, LAMP_SPOTS, put, smashAdd, groundH, curbAt }, o), unlamp: SL.unlamp, smashAdd, put, box, LIT, obb, groundH, curbAt,
+  tm('edits', () => EDL.apply({ THREE, scene, tree: (x, z, s, k) => tree(x, z, s, k, true), bench, lamp: o => SL.lamp({ THREE, scene, LAMPH, LAMP_SPOTS, put, smashAdd, groundH, curbAt }, o), unlamp: SL.unlamp, smashAdd, put, box, LIT, obb, groundH, curbAt,
     BENCHES, PROPS, SOLIDS, SMASH, SMASH_GRID, SM_CHUNKS, SM_CELL, LAMPH, LAMP_SPOTS }));   // правки из редактора: поставить добавленное (editlayer.js)
   tm('seasonyard', SEAS.seasonYard);
   tm('smash', smashBuild);
@@ -13163,7 +13167,7 @@ HSTORY.init({ S, V, ADULT, CAREER, Snd, toast, shops: () => SIGNS, pizza: () => 
 LATE.add('stepa', () => STEPAB.init({ CITY, ADULT, CAREER, bench, realAddress }));
 const NO_E = /[?&]noE(&|$)/.test(location.search);   // ?noE — без леса у Ленина, змеев и качалок (сравнить кадр)
 /* змеи и дроны (kites.js): места в парках и на Ленина, люди — только рядом с камерой */
-if (!NO_E) LATE.add('kites', () => KITES.init({ THREE, scene, CITY, V, get ENV () { return ENV; }, groundH, inHouse, nearestRoad, solidAt, onPave: PAVE.onPave, makeHuman, dropMesh,
+if (!NO_E) LATE.add('kites', () => KITES.init({ THREE, scene, CITY, V, get ENV () { return ENV; }, groundH, inHouse, nearestRoad, solidAt, onPave: PAVE.onPave, wood: RINGM.wooded, makeHuman, dropMesh,
   CAR_L, CAR_W, gibHuman, runOver: () => { S.people++; Snd.squish(); } }));   // сбиваются, как прохожие
 /* площадки-качалки (workout.js): люди на турниках и брусьях, курьер подтягивается сам */
 if (!NO_E) WORK.init({ scene, V, S, get ENV () { return ENV; }, makeHuman, dropMesh, sayBubble, toast, Snd, CAR_L, CAR_W, gibHuman, runOver: () => { S.people++; Snd.squish(); }, shiftN: () => (+Store.get('dlv-shifts', 0) || 0) + 1,
@@ -13233,8 +13237,9 @@ LATE.add('forest', () => { FOREST_API = FOREST.init({ THREE, scene, cam, CITY, g
   onAlley: (x, z, m) => WORLD.onAlley(x, z, m), yardBlocks: (x, z, r) => YARDS.blocks(x, z, r), pzBlocks: PZD.blocks }); });
 /* лес вдоль Ленина (leninwood.js): полосы ельника в forest.js, тропы — один меш */
 if (!INTRO && !NO_E) LATE.add('lwood', () => LWOOD.init({ THREE, scene, CITY, groundH, inHouse, inBounds, solidAt, onPave: PAVE.onPave }));
+if (!INTRO) LATE.add('ringwood', RINGM.wood);    // лес на Кольце: ельник с полянами в forest.js (rings.js)
 /* мелочь на газоне (lawnprops.js): тоже клетками вокруг камеры */
-LATE.add('lawnp', () => LAWNP.init({ THREE, scene, cam, CITY, ADULT, forests: LWOOD.polys, groundH, inHouse, inBounds, nearestRoad, roadWidth, car: V, Snd,
+LATE.add('lawnp', () => LAWNP.init({ THREE, scene, cam, CITY, ADULT, forests: () => [...LWOOD.polys(), ...RINGM.polys()], groundH, inHouse, inBounds, nearestRoad, roadWidth, car: V, Snd,
   onAlley: (x, z, m) => WORLD.onAlley(x, z, m), yardBlocks: (x, z, r) => YARDS.blocks(x, z, r), pzBlocks: PZD.blocks, isForest: FOREST.isForest,
   claims: () => [...CONSTR.claimed(), ...CONSTR.DEBUG.SITES.map(s => ({ x: s.x, z: s.z, r: Math.hypot(s.W, s.D) / 2 + 2 }))],
   benches: BENCHES, stops: JUNK.DEBUG.STOPS, cans: JUNK.DEBUG.CANS_ALL, low: () => GFX.preset() === 'low',

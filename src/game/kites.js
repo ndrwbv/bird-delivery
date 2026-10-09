@@ -16,7 +16,7 @@
    Перф: геометрии и материалы общие, людей — не больше 2 × KT.ACTIVE.
 
    init(api) — game.js, после сборки: { THREE, scene, CITY, V, ENV, groundH, inHouse, nearestRoad,
-     solidAt, onPave, makeHuman, dropMesh, CAR_L, CAR_W, gibHuman, runOver }
+     solidAt, onPave, wood (в лесу ли — rings.js), makeHuman, dropMesh, CAR_L, CAR_W, gibHuman, runOver }
    step(dt)  — каждый кадр
    отладка: __dlv.KITES
    ────────────────────────────────────────────────────────────────────────── */
@@ -44,6 +44,7 @@ const area = p => { let a = 0; for (let i = 0; i < p.length; i++) { const q = p[
 
 function free (x, z) {
   if (A.groundH(x, z) < 0.3 || A.inHouse(x, z, 6) || A.onPave(x, z, 1.5) || A.solidAt(x, z, 1.5)) return false;
+  if (A.wood && A.wood(x, z, 8)) return false;                // не в лесу на Кольце (rings.js)
   const r = A.nearestRoad(x, z, 7, 1);
   if (r && r.d < r.seg.w / 2 + 4) return false;
   return !SPOTS.some(s => Math.hypot(s.x - x, s.z - z) < 60);
