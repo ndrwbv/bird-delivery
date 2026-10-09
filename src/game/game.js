@@ -3697,7 +3697,8 @@ const roadApi = () => ({
   walkLeg, walkSpawn, walkersAll, pushOut,          // pushOut — слетевший с мопеда обходит стены (mopeds.js)
   ZEBRAS, SIG_GROUPS, TRAFFIC, ACCIDENTS, newCar, placeTraffic, poseTraffic, poseOnSlope, svcGone, makeHuman, dropMesh, gibHuman, sayBubble, Snd, toast, calmStart, nearClient,
   onRunOver: () => { S.people++; },
-  deadendBlocks: e => DEADENDS.blocksExit(DE_API, e),   // ремонт тут оставит одностороннюю без выезда (deadends.js)
+  deadendBlocks: e => DEADENDS.blocksExit(DE_API, e),
+  shownAt: (x, z) => flowShown(x, z),              // место видно курьеру — машину потока отсюда не переставлять (deadends.js)   // ремонт тут оставит одностороннюю без выезда (deadends.js)
   get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get tG () { return tG; }, startClear,
 });
 let RL_API = null;
@@ -6308,11 +6309,14 @@ function trafficDensity (dt) {
   }
 }
 
+/* видно ли место курьеру: ближе 200 м или в кадре камеры. Машину потока оттуда не убираем и не
+   переставляем — на глазах машины не исчезают (deadends.js, docs/CAREER.md «Тупики односторонних улиц») */
+const flowShown = (x, z) => (x - V.x) ** 2 + (z - V.z) ** 2 < DEADENDS.DEADEND.HIDE ** 2 || CULL.inView(x, 1.2, z, 3);
 /* ставим машину на случайную полосу рядом с курьером: не под капотом,
    но и не на другом конце карты */
 function placeTraffic (t, rmin, rmax, why = 'other') {
   if (t.bus) { BUSES.relocate(t); return !t.gone; }   // автобус — только на свой маршрут (buses.js)
-  if (t.e && t.mesh.parent) DEADENDS.counted(Math.sqrt((t.x - V.x) ** 2 + (t.z - V.z) ** 2), t.x, t.z, why);   // счётчик перестановок на виду (deadends.js)
+  if (t.e && t.mesh.parent) DEADENDS.counted(Math.sqrt((t.x - V.x) ** 2 + (t.z - V.z) ** 2), t.x, t.z, why, CULL.inView(t.x, (t.gy || 0) + 1, t.z, 3));   // счётчик перестановок на виду (deadends.js)
   const L = nodesNear(V.x, V.z, rmin, rmax);       // кольцо узлов — один раз на все попытки
   for (let k = 0; k < 24; k++) {
     const a = nodeFrom(L, V.x, V.z);
@@ -6576,7 +6580,7 @@ function nodesNear (x, z, rmin, rmax) {
 const nodeFrom = (L, x, z) => (L.ok.length ? pick(L.ok) : L.best >= 0 ? L.best : nearestNode(x, z));
 function nodeNear (x, z, rmin, rmax) { return nodeFrom(nodesNear(x, z, rmin, rmax), x, z); }
 
-function respawnTraffic (t) {
+function respawnTraffic (t, why = 'respawn') {
   if (t.bus) { BUSES.relocate(t); return; }      // автобус — на свой маршрут ближе к курьеру (buses.js)
   t.wreck = 0; t.knock = 0; t.hp = 100; t.y = 0; t.roll = 0; t.smokeT = 0; t.gy = undefined;
   t.stalled = 0; t.angry = 0; t.chainT = 0;
@@ -6592,7 +6596,7 @@ function respawnTraffic (t) {
   RIVS.onRespawn(t);                              // была машиной-бургером — больше нет (rivals.js)
   // сразу ставим на новое место: иначе в следующем кадре машина всё ещё
   // числится за полкилометра и рождается заново — и так каждый кадр
-  placeTraffic(t, 120, 340, 'respawn');
+  placeTraffic(t, 120, 340, why);
 }
 
 /* все, кто ходит и ездит по тротуарам: машины перед ними тормозят */
@@ -6621,12 +6625,17 @@ function updateTraffic (dt0) {
     if (t.chainT > 0 && !t.wreck && (t.chainT -= dt) <= 0) { t.chainT = 0; wreckCar(t); S.wrecks++; }
     // укатилась за полкилометра — возвращаем в соседние кварталы
     if (!t.parked && !t.wreck && !t.knock && !t.driver && !t.svc &&
-        (t.x - V.x) * (t.x - V.x) + (t.z - V.z) * (t.z - V.z) > 520 * 520) { if (respN < 2) { respN++; respawnTraffic(t); } continue; }   // не больше двух за кадр: после прыжка (смерть, новая смена) машины перерождались пачкой по 15—20 — кадр 80—130 мс на Деке
+        (t.x - V.x) * (t.x - V.x) + (t.z - V.z) * (t.z - V.z) > 520 * 520) { if (respN < 2) { respN++; respawnTraffic(t, 'far'); } continue; }   // не больше двух за кадр: после прыжка (смерть, новая смена) машины перерождались пачкой по 15—20 — кадр 80—130 мс на Деке
     // сгоревшая, но ещё летящая сперва доигрывает падение
     if (t.wreck && !t.knock) {
       t.smokeT -= dt;
       if (t.smokeT <= 0) { t.smokeT = 0.25; puff(t.x, 1.4, t.z, true, rand(0.6, 1.1)); if (chance(0.4)) fire(t.x, 1.2, t.z); }
-      if ((t.wreckT -= dt) <= 0 && !t.parked) { if (t.svc) t.onWreck(t); else respawnTraffic(t); }
+      if ((t.wreckT -= dt) <= 0 && !t.parked) {
+        // сгоревшая на глазах не исчезает: тлеет, пока курьер ближе 200 м или она в кадре (deadends.js)
+        if (t.svc && !t.chase) t.onWreck(t);
+        else if (flowShown(t.x, t.z)) { t.wreckT = 1; DEADENDS.ST.kept++; }
+        else if (t.svc) t.onWreck(t); else respawnTraffic(t, 'wreck');
+      }
       else if (t.wreckT <= 0 && t.accident && !t.gone) svcGone(t);
       continue;
     }
@@ -6899,7 +6908,7 @@ function chaseStart (t) {
   t.chase = { T: rand(...C.T), brakeT: 0, brakeCd: 2, pathT: 0, stuckT: 0, sayT: 1.8, swerve: chance(0.5) ? 1 : -1, bubble };
   Object.assign(t, { svc: 'chase', aggr: 1, passT: 0, honkT: 0, acc: 7, corner: 0.55, gap: 1, peds: true, dot: '#ff3b30',
     cruise0: t.cruise, cruise: VMAX * C.VMAX_K, path: null, goal: { x: V.x, z: V.z }, repath: 1, turn: null, e: null });
-  t.onWreck = () => { chaseEnd(t, 'wreck'); respawnTraffic(t); };
+  t.onWreck = () => { chaseEnd(t, 'wreck'); respawnTraffic(t, 'wreck'); };
   honk(t);
   toast($t('водитель обиделся — гонится за тобой!'));
   return true;

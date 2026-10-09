@@ -809,6 +809,9 @@ function worksOk (A, e, ia, ib) {
   if (WORKS.some(w => Math.hypot(w.x - x, w.z - z) < 90)) return null;
   // на месте работ не должно стоять припаркованных и чужих машин с маршрутом
   if (A.TRAFFIC.some(q => (q.parked || q.svc || q.accident) && Math.abs((q.x - x) * e.ux + (q.z - z) * e.uz) < 12 && Math.abs((q.x - x) * e.rx + (q.z - z) * e.rz) < e.w / 2 + 3)) return null;
+  // машина потока на месте работ, а место видно курьеру — убрать её на глазах нельзя: ремонт не тут (deadends.js)
+  const HL = Math.min(6, room / 2 - 4), r = A.edgeOf(e.b, e.a);
+  if (A.shownAt && A.TRAFFIC.some(q => (q.e === e || q.e === r) && !q.parked && !q.svc && Math.abs((q.x - x) * e.ux + (q.z - z) * e.uz) < HL + 3 && A.shownAt(q.x, q.z))) return null;
   if (detourLen(A, ia, ib, e) > 1400) return null;
   if (A.deadendBlocks && A.deadendBlocks(e)) return null;   // единственный выезд с односторонней — машинам некуда (deadends.js)
   return { x, z, sMid };
@@ -966,7 +969,7 @@ function spawnWorks (A, e, at) {
   CLOSED.set(e, { sBar: sMid - HL - e.tA, w: W, len: HL * 2 });
   if (r) CLOSED.set(r, { sBar: (e.len - sMid) - HL - r.tA, w: W, len: HL * 2 });
   for (const q of A.TRAFFIC)
-    if ((q.e === e || q.e === r) && !q.parked && !q.svc && Math.abs((q.x - cx) * ux + (q.z - cz) * uz) < HL + 3) A.placeTraffic(q, 120, 340);
+    if ((q.e === e || q.e === r) && !q.parked && !q.svc && Math.abs((q.x - cx) * ux + (q.z - cz) * uz) < HL + 3) A.placeTraffic(q, 120, 340, 'works');
   for (const q of A.TRAFFIC) if (q.svc && q.goal) q.repath = 1;
   for (const list of A.walkersAll())
     for (const p of list || []) {
@@ -1034,6 +1037,8 @@ function laneOk (A, e) {
   if (run < 42) return null;
   if (n < 2 && (e.oneway || !r || r.closed || LANES.has(r))) return null;
   const L = Math.min(46, run - 22), s0 = (run - L) / 2, s1 = s0 + L;
+  // машина в закрываемой полосе на месте работ, а место видно курьеру — убрать её на глазах нельзя (deadends.js)
+  if (A.shownAt && A.TRAFFIC.some(q => q.e === e && !q.parked && !q.svc && q.lane === 0 && q.s > s0 - 3 && q.s < s1 + 3 && A.shownAt(q.x, q.z))) return null;
   const N = A.NODES[e.a], sm = e.tA + (s0 + s1) / 2, o = A.laneOff(e, 0);
   const x = N.x + e.ux * sm + e.rx * o, z = N.z + e.uz * sm + e.rz * o;
   if (!A.inBounds(x, z, 30) || Math.hypot(A.V.x - x, A.V.z - z) < 60) return null;
@@ -1132,7 +1137,7 @@ function spawnLane (A, e, at) {
   }
   // кто уже стоит в закрытой полосе на месте работ — в другое место
   for (const q of A.TRAFFIC)
-    if (q.e === e && !q.parked && !q.svc && q.lane === 0 && q.s > s0 - 3 && q.s < s1 + 3) A.placeTraffic(q, 120, 340);
+    if (q.e === e && !q.parked && !q.svc && q.lane === 0 && q.s > s0 - 3 && q.s < s1 + 3) A.placeTraffic(q, 120, 340, 'lane');
   WORKS.push(W8);
   RL.n.works++;
   RL.n.lanes = (RL.n.lanes || 0) + 1;
@@ -1266,7 +1271,9 @@ export function hold (c, dt) {
       if (c.speed < 0.5 && stop - c.s < 3) {
         if ((c.rlWait = (c.rlWait || 0) + dt) > 1.2) uturn(c);
       } else c.rlWait = 0;
-    } else if (c.s < C.sBar + C.len + 1) API.placeTraffic(c, 120, 340);     // оказалась на месте работ
+    } else if (c.s < C.sBar + C.len + 1) {       // оказалась на месте работ: вдали — в другое место, на глазах — проползает
+      if (API.shownAt && API.shownAt(c.x, c.z)) slow = Math.min(slow, 0.3); else API.placeTraffic(c, 120, 340, 'site');
+    }
   }
   if (LANES.size && API) slow = Math.min(slow, laneHold(c, dt));
   return slow;
@@ -1276,7 +1283,7 @@ function uturn (c) {
   const A = API, e = c.e, r = A.edgeOf(e.b, e.a);
   c.rlWait = 0;
   RL.n.uturns = (RL.n.uturns || 0) + 1;
-  if (!r) { A.placeTraffic(c, 120, 340); return; }
+  if (!r) { A.placeTraffic(c, 120, 340, 'uturn'); return; }
   c.jx = c.x; c.jz = c.z; c.jh = c.h; c.rejoin = 1;
   c.e = r; c.turn = null; c.lane = 0; c.pull = 0; c.speed = 0;
   c.s = clamp(A.edgeRun(e) - c.s, 0, A.edgeRun(r) * 0.98);

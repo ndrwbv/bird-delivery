@@ -30,6 +30,7 @@
 
 export const DEADEND = {
   HIDE: 200,          // м: ближе к курьеру машину потока не переставляем — стоит и ждёт
+  NEAR: 40,           // м: ближе — «на глазах», даже если вне кадра (камера крутится)
 };
 
 export const ST = {
@@ -39,10 +40,13 @@ export const ST = {
   list: [],           // места: { n: улица, x, z — конец, len — длина ребра, м, c — класс, end — сам тупик, lock — у закрытого района, edge — у края карты }
   tp: 0,              // перестановок машины потока ближе HIDE м к курьеру
   tpFar: 0,           // перестановок дальше (это нормально: вне кадра)
+  seen: 0,            // на глазах: ближе HIDE м и в кадре камеры (или ближе NEAR м) — должно быть 0
+  whySeen: {},        // то же по причинам
   why: {},            // ближние перестановки по причинам: turn — некуда ехать с конца ребра, rejoin — после удара, respawn — сгорела, …
   whyFar: {},         // то же дальше HIDE м
   waits: 0,           // раз машина встала у конца улицы, а не исчезла на глазах
   uturns: 0,          // разворотов в конце ловушки
+  kept: 0,            // секунд, что сгоревшая тлела дольше срока, потому что видна курьеру (game.js flowShown)
   last: null,         // последняя ближняя перестановка: { x, z, d, why }
   turnAt: [],         // где машине с конца улицы было некуда ехать: [x, z, до курьера] (первые 20)
 };
@@ -132,8 +136,9 @@ export function blocksExit (api, e) {
 }
 
 /* перестановка машины потока: d — сколько было до курьера, м; why — откуда */
-export function counted (d, x, z, why) {
+export function counted (d, x, z, why, vis) {
   if (why === 'turn' && ST.turnAt.length < 20) ST.turnAt.push([Math.round(x), Math.round(z), Math.round(d)]);
+  if (d < DEADEND.HIDE && (vis || d < DEADEND.NEAR)) { ST.seen++; ST.whySeen[why] = (ST.whySeen[why] || 0) + 1; }
   if (d < DEADEND.HIDE) {
     ST.tp++; ST.why[why] = (ST.why[why] || 0) + 1;
     ST.last = { x: Math.round(x), z: Math.round(z), d: Math.round(d), why };
