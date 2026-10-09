@@ -8256,11 +8256,6 @@
    "src/game/darknight.js:51"
   ]
  },
- "по городу клеят листовки: «{title}». народ закипает, смотри по столбам": {
-  "ctx": [
-   "src/game/protests.js:125"
-  ]
- },
  "по календарю": {
   "ctx": [
    "src/game/quickrun.js:137"
