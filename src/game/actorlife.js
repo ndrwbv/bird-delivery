@@ -43,6 +43,7 @@ export const CHAR = {
   zina: { walk: { speed: 0.8, step: 11, leg: 0.22, arm: 0.25, drag: 1, stoop: 0.16 }, talk: 'wag', idle: 'still' },        // баба Зина — шаркает, грозит пальцем
   stepa: { walk: { speed: 0.95, step: 6.5, leg: 0.5, arm: 1, sway: 0.06 }, talk: 'spread', idle: 'still' },               // вразвалку, разводит руками «брат»
   'stepa-bench': { walk: { speed: 0.95, step: 6.5, leg: 0.5, arm: 1, sway: 0.06 }, talk: 'spread', idle: 'still' },
+  'stepa-first': { walk: { speed: 0.95, step: 6.5, leg: 0.5, arm: 1, sway: 0.06 }, talk: 'spread', idle: 'still' },   // учебный заказ (stepafirst.js)
   arisha: { walk: { speed: 1.05, step: 8.5, leg: 0.55, arm: 0.7 }, talk: 'flap', idle: 'still' },                       // машет руками
   leha: { walk: { speed: 1.05, step: 9, leg: 0.6, arm: 0.5, hop: 0.04 }, talk: 'rub', idle: 'fidget' },                 // азартный: трёт руки, не стоит на месте
   zheka: { walk: { speed: 1, step: 7.5, leg: 0.55, arm: 0.35 }, talk: 'point', idle: 'still' },                         // рабочий: шаг ровный, тычет пальцем

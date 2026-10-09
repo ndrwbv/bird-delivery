@@ -31,6 +31,12 @@
      ['emote', кто, heart | note | star, n]
      ['scarf']                       — шарф на машину (и насовсем, в сохранении)
      ['wait', сек]
+     ['ask', кто, N_('вопрос'), { yes: N_('ответ [A]'), no: N_('ответ [X]'), emo }] — вопрос с двумя ответами
+                                     кнопками (A — yes, X — no; B и Esc — пропустить всю сцену, как везде);
+                                     ответ — дальше в условии { ans: 'yes' | 'no' } (учебный Стёпа, stepafirst.js)
+     ['do', fn, { wait }]            — своё действие истории: fn({ actor(кто), home, car, V, skip, wait(сек) });
+                                     вернула Promise — ждём (если не { wait: false })
+   Главу без награды (деньги и звёзды уже даны заказом) — { noReward: true } у главы.
    Последним аргументом шага можно дать условия: { if: 'ok' | 'bad' } — только если условие
    главы выполнено / провалено (успеть, не разбить, заехать по пути — herostories.js),
    { adult: true | false } — только во взрослой / только в детской, { when: () => bool } — своё условие
@@ -772,9 +778,12 @@ async function say (who, text, o = {}) {
   // выражение реплики ({ emo }): лицо актёра и голова в диалоге — с тем же выражением
   const emo = o.emo || '';
   if (a) LIFE.say(a, true, emo);
-  await DLG.say({ person, name: person.name, text: t(text, typeof o.vars === 'function' ? o.vars() : o.vars), color: COLOR, fillers: false, mood: o.mood || 'calm', cps: 42,
-    face: emo ? faceDataURL(person, 256, emo) : undefined });
+  // вопрос с двумя ответами (['ask']): A — yes, X — no; B / Esc остаются «пропустить сцену» (alt, dialog.js)
+  const two = o.yes && o.no ? { accept: t(o.yes), decline: t(o.no), alt: true } : {};
+  const r = await DLG.say({ person, name: person.name, text: t(text, typeof o.vars === 'function' ? o.vars() : o.vars), color: COLOR, fillers: false, mood: o.mood || 'calm', cps: 42,
+    face: emo ? faceDataURL(person, 256, emo) : undefined, ...two });
   if (a) { a.talk = false; LIFE.say(a, false); }
+  return r;
 }
 
 function face (who, target) {
@@ -791,6 +800,7 @@ async function run (s, c, idx) {
     if (CUT.skip) break;
     const o = step.slice(1).find(isOpt) || {};
     if (o.if && o.if !== CUT.cond) continue;                               // только при выполненном / проваленном условии
+    if (o.ans && o.ans !== CUT.ans) continue;                              // только при этом ответе на ['ask']
     if (o.adult === true && !API.ADULT) continue;
     if (o.adult === false && API.ADULT) continue;
     if (typeof o.when === 'function') { let ok = false; try { ok = !!o.when(); } catch (e) { /* — */ } if (!ok) continue; }   // своё условие (машина у Жеки)
@@ -802,6 +812,17 @@ async function run (s, c, idx) {
       case 'title': title(s, c, idx); break;
       case 'shot': setShot(args[0], args[1] && args[1].cut); break;
       case 'say': await say(args[0], args[1], args[2]); break;
+      case 'ask': {
+        const r = await say(args[0], args[1], args[2]);
+        if (r === true || r === false) CUT.ans = r ? 'yes' : 'no';
+        break;
+      }
+      case 'do': {
+        let r = null;
+        try { r = args[0]({ actor: n => CUT.actors[ROLE(n)], home: CUT.home, car: API.car, V: API.V, skip: CUT.skip, wait }); } catch (e) { console.warn('[story] do', e); }
+        if (r && typeof r.then === 'function' && !(args[1] && args[1].wait === false)) await r;
+        break;
+      }
       case 'walk': await walk(args[0], args[1], args[2]); break;
       case 'act': act(args[0], args[1], args[2]); break;
       case 'face': face(args[0], args[1]); break;
@@ -885,7 +906,7 @@ export async function play (storyId, chapter, o = {}) {
 
   CUT.story = s; CUT.home = h; CUT.skip = false; CUT.t = 0; CUT.waits = []; CUT.on = true;
   // условие главы (успеть, не разбить, заехать по пути): как прошло — свои реплики и награда
-  CUT.cond = 'ok';
+  CUT.cond = 'ok'; CUT.ans = null;
   if (s.cond) { try { CUT.cond = s.cond(o.order || {}) === 'bad' ? 'bad' : 'ok'; } catch (e) { console.warn('[story] cond', e); } }
   if (o.cond === 'ok' || o.cond === 'bad') CUT.cond = o.cond;
   if (!CP) { CP = V3(); CL = V3(); CPW = V3(); CLW = V3(); }
@@ -955,7 +976,7 @@ export async function play (storyId, chapter, o = {}) {
     const sh = o.shift !== undefined && o.shift !== null ? +o.shift : API.shift ? +API.shift() : NaN;
     p.ch = idx + 1; p.last = Number.isFinite(sh) ? sh : p.last; p.at = Date.now(); save();
   }
-  r = await reward(s, c);
+  r = c.noReward ? { stars: 0, money: 0 } : await reward(s, c);   // учебный Стёпа: деньги уже дал заказ (stepafirst.js)
   if (s.onDone) { try { s.onDone(idx, CUT.cond, o.order || null); } catch (e) { console.warn('[story] onDone', e); } }
   r.cond = CUT.cond;
   return r;

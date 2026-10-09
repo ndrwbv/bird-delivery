@@ -16,6 +16,8 @@
        timeoutText: t('ну лан (('),    // не успел — он это говорит и уходит
        meters: [{ name, v, p, color }], // полоски под текстом (Дядя Женя: мотор и ресурс), p — 0…1
        plain: true,                    // обе кнопки одного вида (приглашение клиентки: оба ответа — отказы)
+       alt: true,                      // второй ответ — на X (геймпад) / X (клавиатура), а не на B / Esc: в катсцене
+                                       // B и Esc — «пропустить сцену» (story.js ['ask'], учебный Стёпа)
      });                               // → true (принял) / false (отказался) / null (не успел)
    Очередь: несколько say подряд показываются по одному.
    На кнопках — значок, что жать: [A] / [B] на геймпаде, Enter / Esc на клавиатуре, на тач-экране без
@@ -108,6 +110,8 @@ function show (o, done) {
   yes.querySelector('span').textContent = o.accept || t('дальше');
   no.querySelector('span').textContent = o.decline || '';
   no.hidden = !two;
+  const noKey = no.querySelector('[data-pp-key]');
+  if (noKey) noKey.dataset.ppKey = o.alt ? 'x' : 'back';   // alt: второй ответ — на X
   $('.dlg-btns').classList.remove('on');
   $('.dlg-btns').classList.toggle('plain', !!o.plain);
   const glyphs = () => refreshKeys(root);           // значки [A]/[B] — по тому, чем сейчас играют (glyphs.js)
@@ -180,8 +184,10 @@ function show (o, done) {
       lit = on;
       mark(on);
       if (a && !padPrev.a && !waiting) { if (!typed) finish(); else close(pick !== no); }
-      if (b && !padPrev.b && typed && !waiting) close(two ? false : true);
-      padPrev = { a, b };
+      if (b && !padPrev.b && typed && !waiting && !o.alt) close(two ? false : true);   // alt: B — пропустить сцену (story.js), не ответ
+      const x = !!PAD.x;
+      if (o.alt && two && x && !padPrev.x && !waiting) { if (!typed) finish(); else close(false); }
+      padPrev = { a, b, x };
     }
   };
   raf = requestAnimationFrame(tick);
@@ -190,6 +196,8 @@ function show (o, done) {
   const key = e => {
     if (waiting) return;
     if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE') { e.preventDefault(); e.stopPropagation(); if (!typed) finish(); else if (!two || e.code !== 'Space') close(true); }
+    else if (o.alt && two && e.code === 'KeyX') { e.preventDefault(); e.stopPropagation(); if (!typed) finish(); else close(false); }
+    else if (o.alt && (e.code === 'Escape' || e.code === 'Backspace')) return;   // alt: Esc — пропустить сцену (story.js), не ответ
     else if (e.code === 'Escape' || e.code === 'Backspace') { e.preventDefault(); e.stopPropagation(); if (!typed) finish(); else close(two ? false : true); }
   };
   addEventListener('keydown', key, true);

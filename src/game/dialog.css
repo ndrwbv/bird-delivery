@@ -30,6 +30,7 @@
 .dlg-no { background: #3a4570; color: #fff3d6; }
 .dlg-btns.plain .dlg-yes { background: #3a4570; color: #fff3d6; }   /* приглашение клиентки: оба ответа — отказы, вид один */
 .dlg-btns button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.dlg-btns button[hidden] { display: none; }   /* одна кнопка «дальше»: пустой «Esc» рядом не рисуем (display выше перебивал hidden) */
 /* значок кнопки — общий .pp-key (paper.css, glyphs.js): [A] / [B] геймпада кружком, Enter / Esc клавиатуры клавишей */
 .dlg-btns .pp-key { margin-right: 0; font-size: 10px; }
 .dlg-btns button:active { transform: translateY(2px); box-shadow: 0 2px 0 #33210c; }

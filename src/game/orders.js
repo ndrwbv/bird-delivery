@@ -1068,7 +1068,7 @@ export function targetColor () {
   if (S.state === 'back') return '#3fd15e';                // в пиццерию — зелёный, как путь (game.js ROUTE_HEX)
   const st0 = S.order && S.order.stops && S.order.stops[S.order.idx];
   if (st0 && st0.pickup) return '#3fd15e';                 // развоз смены: сначала заехать за ними в пиццерию
-  const sp = S.order && S.order.ord;
+  const sp = S.order && (S.order.ord || S.order.look);    // look — учебный Стёпа: сюжетный вид без карьерного заказа (stepafirst.js)
   return sp ? sp.color : typeColor('pizza');
 }
 let tintHex = '';
@@ -1123,7 +1123,7 @@ export function pickStop (o) {
 export function activeStops () {
   const o = S.order;
   if (!o || !o.stops || S.state === 'side' || S.state === 'back' || S.state === 'handover') return [];
-  const col = o.ord ? o.ord.color : typeColor('pizza'), out = [];
+  const col = o.ord ? o.ord.color : o.look ? o.look.color : typeColor('pizza'), out = [];
   for (let i = o.idx; i < o.stops.length; i++) {
     const st = o.stops[i], p = stopAt(st);
     if (!p || st.pickup) continue;

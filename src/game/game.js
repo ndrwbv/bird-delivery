@@ -80,6 +80,7 @@ import * as STORY from './story.js';             // сюжетные заказ�
 import * as HSTORY from './herostories.js';      // герои города, этап 3: истории Стёпы, Ариши, Лёхи по главам (через story.js)
 import * as HEROQ from './heroquests.js';      // прогноз Игорька и удача Лёхи — у профиля свои (reprofile)
 import * as STEPAB from './stepabench.js';     // Стёпа на лавочке у Ленинградской, 8 сам заказывает пиццу (через story.js)
+import * as ST1 from './stepafirst.js';         // учебный заказ Стёпы — сюжетный: катсцена на вручении (через story.js)
 import * as WORK from './workout.js';         // площадки-качалки у коробок: турник и брусья, люди качаются, курьер подтягивается сам (workout.js)
 import * as KITES from './kites.js';          // воздушные змеи и дроны в парках и на Ленина (kites.js)
 import * as AUTO from './cars.js';               // карьера: 14 машин, мотор и ресурс, заглохла, ямы, гараж Дяди Жени
@@ -11548,6 +11549,7 @@ function showOrderCard (order) {
   elPhWhat.textContent = order.items;
   elPhWhy.textContent = order.why;
   if (order.ord) ORD.card(order);                 // карьера: полоса цвета вида (очередь «дальше» не показываем)
+  else if (order.look) ORD.card({ stops: order.stops, ord: order.look });   // учебный Стёпа — сюжетный: розовая полоса, «история · накладная»
   else elPhone.classList.remove('ord-typed', 'ord-urgent');
   elPhone.classList.add('on');
   document.body.classList.add('brief');
@@ -11793,30 +11795,38 @@ function stepanPerson () {
   }
   return STEPAN;
 }
-function stepanOrder (all) {
+/* учебный заказ — сюжетный (stepafirst.js): накладная «история», пин и радар — розовые, как главы героев */
+const TUT_LOOK = { type: 'story', color: STORY.COLOR };
+/* прохожий p становится Степаном */
+function asStepan (p) {
+  if (p.idle) releaseIdle(p);
+  p.path = null; p.w = null;
+  dropMesh(p.grp); p.person = stepanPerson(); p.grp = makeHuman(p.person); p.speed = p.base * p.grp.userData.pace; scene.add(p.grp);
+}
+/* relax — лавочки по правилам нет (10.10.2026: первая доставка — всегда Стёпа): дальше (30—900 м) и до дороги до 60 м */
+function stepanOrder (all, relax) {
   if (!all || !all.length) return null;
   let best = null, bs = Infinity;
+  const D0 = relax ? 30 : 45, D1 = relax ? 900 : 420, RD = relax ? 60 : 30;
   for (const b of BENCHES) {
     if (b.taken || (b.prop && b.prop.down)) continue;
     const d = Math.hypot(b.x - V.x, b.z - V.z);
-    if (d < 45 || d > 420 || (COURIER_SLOTS && COURIER_SLOTS.some(q => Math.hypot(q.x - b.x, q.z - b.z) < 25))) continue;
+    if (d < D0 || d > D1 || (COURIER_SLOTS && COURIER_SLOTS.some(q => Math.hypot(q.x - b.x, q.z - b.z) < 25))) continue;
     if (DISTRICTS && DIST.at(b.x, b.z) !== DIST.cur()) continue;           // в районе, где работаешь
     const r = nearestRoad(b.x, b.z, 7, 4);
-    if (!r || r.d > 30) continue;                   // к лавочке можно подъехать
+    if (!r || r.d > RD) continue;                   // к лавочке можно подъехать
     const sc = Math.abs(d - 130);
     if (sc < bs) { bs = sc; best = b; }
   }
   if (!best) return null;
   const p = all.find(q => !q.guest) || all[0];
-  if (p.idle) releaseIdle(p);
-  p.path = null; p.w = null;
-  dropMesh(p.grp); p.person = stepanPerson(); p.grp = makeHuman(p.person); p.speed = p.base * p.grp.userData.pace; scene.add(p.grp);
+  asStepan(p);
   p.x = best.x; p.z = best.z;
   p.idle = { b: best, phase: 'sit', t: 1e9, give: 0 }; best.taken = 1;        // сразу сидит: makeGuest оставит его на лавочке
   p.grp.rotation.y = best.ry;
   HK.guest(p, best);
   const why = ADULT ? $t('первый заказ: Степан на лавочке во дворе — ищи облака дыма') : $t('первый заказ: Степан на лавочке во дворе — ищи пар от самовара');
-  return { kind: 'solo', tut: true, stops: [{ peds: [p] }], why };
+  return { kind: 'solo', tut: true, stops: [{ peds: [p] }], why, look: TUT_LOOK };
 }
 
 function planOrder () {
@@ -11869,15 +11879,15 @@ function planOrder () {
      него прямо и один раз направо. Дальше — случайные заказы, и чем
      дальше смена, тем дальше адреса. */
   if (!tutDone()) {
-    const st = stepanOrder(all);                  // Степан Тугарев на лавочке с кальяном
+    const st = stepanOrder(all) || stepanOrder(all, true);   // Степан Тугарев на лавочке с кальяном
     if (st) return st;
+    // лавочки нет совсем — Степан стоит на углу первого перекрёстка (первая доставка — всегда Стёпа, 10.10.2026)
     const sp = tutorialSpot();
     if (sp && (!DISTRICTS || DIST.at(sp.x, sp.z) === DIST.cur())) {
-      const p = pick(all);
-      if (p.idle) releaseIdle(p);
-      p.path = null; p.w = null;
+      const p = all.find(q => !q.guest) || all[0];
+      asStepan(p);
       p.x = sp.x; p.z = sp.z;
-      return { kind: 'solo', tut: true, stops: [{ peds: [p] }], why: $t('первый заказ: прямо до перекрёстка, клиент справа') };
+      return { kind: 'solo', tut: true, stops: [{ peds: [p] }], why: $t('первый заказ: Степан — прямо до перекрёстка, он справа'), look: TUT_LOOK };
     }
   }
   // карьера: учебный не вышел — обычный заказ смены (orders.js: только открытый район, где работаешь),
@@ -11977,6 +11987,7 @@ function newOrder () {
   S.order = {
     kind: plan.kind,
     tut: !!plan.tut,
+    look: plan.look || null,                      // учебный Стёпа: вид сюжетного заказа без карьерного ord (цвет, накладная)
     surf: !!plan.surf,
     stops: plan.stops,
     idx: 0,
@@ -12162,25 +12173,27 @@ function handOver (st, onTime) {
   st.peds.forEach((ped, i) => {
     setTimeout(() => {
       if (ped.dead || S.state === 'over' || S.state === 'dying') return;
-      flyBox(trunkPoint(), { x: ped.x, y: (ped.surf ? 0.2 : groundH(ped.x, ped.z)) + 1.15, z: ped.z }, ped.surf ? 1.1 : 0.6, () => {
-        if (ped.dead) return;
-        const box = pizzaBox();
-        box.scale.setScalar(0.75);
-        box.position.set(0, ped.sitting ? 1.0 : 1.12, 0.32);
-        ped.grp.add(box);
-        ped.hold = box;
-        ped.served = 1;
-        ped.freeT = 16;
-        // что делать с пиццей дальше (afterStart); сюжетного клиента ведёт story.js — его не трогаем
-        ped.afterMood = st.pay && st.pay.story ? '' : !onTime || st.bumped ? 'angry' : 'happy';
-        // смену/заказ уже свернули (backToBase снимает гостя до того, как долетела коробка) — постоит с ней, потом afterStart
-        if (ped.afterMood && !ped.guest && !ped.surf && ped.base !== undefined) { if (ped.after) afterDrop(ped, true); ped.guest = true; ped.sitting = 0; ped.sitAt = null; ped.waitAt = null; if (ped.idle) { ped.idle.b.taken = 0; ped.idle = null; } }
-        if (ped.afterMood && afterCount() < AFTER.MAX) ped.freeT = onTime && !st.bumped ? AFTER.HOLD : AFTER.HOLD_ANGRY;
-        if (onTime) { ped.holdT = 7; emote(ped.x, 2.1, ped.z, 'heart', 5); }
-        else emote(ped.x, 2.1, ped.z, 'angry', 3);
-      });
+      flyBox(trunkPoint(), { x: ped.x, y: (ped.surf ? 0.2 : groundH(ped.x, ped.z)) + 1.15, z: ped.z }, ped.surf ? 1.1 : 0.6, () => takeBox(ped, st, onTime));
     }, 380 + i * 220);
   });
+}
+/* коробка — клиенту в руки (долетела из багажника; учебный Стёпа — сразу после катсцены, коробку ему отдал курьер) */
+function takeBox (ped, st, onTime) {
+  if (ped.dead) return;
+  const box = pizzaBox();
+  box.scale.setScalar(0.75);
+  box.position.set(0, ped.sitting ? 1.0 : 1.12, 0.32);
+  ped.grp.add(box);
+  ped.hold = box;
+  ped.served = 1;
+  ped.freeT = 16;
+  // что делать с пиццей дальше (afterStart); сюжетного клиента ведёт story.js — его не трогаем
+  ped.afterMood = st.pay && st.pay.story ? '' : !onTime || st.bumped ? 'angry' : 'happy';
+  // смену/заказ уже свернули (backToBase снимает гостя до того, как долетела коробка) — постоит с ней, потом afterStart
+  if (ped.afterMood && !ped.guest && !ped.surf && ped.base !== undefined) { if (ped.after) afterDrop(ped, true); ped.guest = true; ped.sitting = 0; ped.sitAt = null; ped.waitAt = null; if (ped.idle) { ped.idle.b.taken = 0; ped.idle = null; } }
+  if (ped.afterMood && afterCount() < AFTER.MAX) ped.freeT = onTime && !st.bumped ? AFTER.HOLD : AFTER.HOLD_ANGRY;
+  if (onTime) { ped.holdT = 7; emote(ped.x, 2.1, ped.z, 'heart', 5); }
+  else emote(ped.x, 2.1, ped.z, 'angry', 3);
 }
 
 function checkArrival (dt) {
@@ -12217,33 +12230,38 @@ function checkArrival (dt) {
     ACH.deliver({ n: st.peds.length, onTime, left, free: !!S.free, last: o.idx >= o.stops.length - 1, stops: o.stops.length,   // достижения (achievements.js)
       bundle: !!(o.ord && o.ord.bundle), allOnTime: o.stops.every(q => q.pay && !q.pay.late), urgent: !!(o.ord && o.ord.type === 'urgent') });
 
-    handOver(st, onTime);
+    // учебный Стёпа (stepafirst.js): вручение — катсцена, коробку отдаёт курьер в ней; чек — после сцены
+    const tutScene = !!(o.tut && o.look && o.idx >= o.stops.length - 1);
+    if (!tutScene) handOver(st, onTime);
     if (ADULT && !o.tut && !st.talk) FLIRT.onHand(st, onTime, { car: () => car, person: st.persons[0], speed: () => Math.hypot(V.vx, V.vz),   // клиентка изредка зовёт зайти — диалог, курьер отказывает (flirt.js)
       hold: on => { if (S.state === 'handover') S.handT = on ? 1e9 : 0.3; } });
     DIRECTOR.delivered();                           // доставка сессии: режиссёр открывает события по нарастающей (director.js)
     // оплата — кучкой денег и чеком (popPay); в сюжетном заказе награду покажет катсцена
     const pp = st.pay;
-    if (pp && !pp.story) {
-      const rows = [[$t('заказ'), pp.fee, '']];
-      if (pp.late) rows.push([$t('опоздал'), part - pp.fee + (pp.stairsGop || 0), 'neg']);   // гопникам отдал отдельно — строкой ниже
-      if (pp.bonus) rows.push([$t('за скорость'), pp.bonus, 'tip']);
-      if (pp.tip) rows.push([pp.rich ? $t('чаевые от богача') : $t('чаевые'), pp.tip, 'tip']);
-      if (pp.doorAdd) rows.push([pp.doorMode === 'broken' ? $t('достучался быстро') : $t('домофон с первого раза'), pp.doorAdd, 'tip']);   // мини-игра у подъезда (doorstep.js payAdjust)
-      if (pp.doorCut) rows.push([$t('спускался сам'), -pp.doorCut, 'neg']);
-      // разговор у двери (doorstep.js talkAdjust)
-      if (pp.talkAdd) rows.push([pp.talkKind === 'fun' ? $t('клиент оценил шутку') : $t('поболтал с клиентом'), pp.talkAdd, 'tip']);
-      if (pp.talkCut) rows.push([pp.talkKind === 'fun' ? $t('шутку не оценил') : $t('торопил клиента'), -pp.talkCut, 'neg']);
-      // подъезд: бегом на этаж (doorstep.js stairsAdjust)
-      if (pp.stairsAdd) rows.push([$t('взбежал быстро'), pp.stairsAdd, 'tip']);
-      if (pp.stairsCut) rows.push([$t('спускался сам'), -pp.stairsCut, 'neg']);
-      if (pp.stairsGop) rows.push([$t('откупился от гопников'), -pp.stairsGop, 'neg']);
-      popPay(part, rows, pp.late ? (CAREER ? $t('клиент недоволен') : '') : tier === 2 && pp.bonus ? $t('А ты харош!') : tier && pp.bonus ? $t('Шустро!') : pp.rich ? $t('сдачи не надо!') : pp.tip ? $t('чаевые!') : '',
-        st.persons[0] ? { person: st.persons[0], mood: payMood(st, onTime, tier) } : null);
-      bossOnDeliver(o, st, onTime, tier);
-    } else {
-      toast((onTime ? '+' : $t('опоздал') + ' · +') + money(part) + ' · ' + S.addr);
-      Snd.coin();
-    }
+    const showPay = () => {
+      if (pp && !pp.story) {
+        const rows = [[$t('заказ'), pp.fee, '']];
+        if (pp.late) rows.push([$t('опоздал'), part - pp.fee + (pp.stairsGop || 0), 'neg']);   // гопникам отдал отдельно — строкой ниже
+        if (pp.bonus) rows.push([o.tut && o.look && !st.bumped ? $t('чаевые Стёпы · за скорость') : $t('за скорость'), pp.bonus, 'tip']);   // учебный: те же деньги, Стёпа дал их в катсцене
+        if (pp.tip) rows.push([pp.rich ? $t('чаевые от богача') : $t('чаевые'), pp.tip, 'tip']);
+        if (pp.doorAdd) rows.push([pp.doorMode === 'broken' ? $t('достучался быстро') : $t('домофон с первого раза'), pp.doorAdd, 'tip']);   // мини-игра у подъезда (doorstep.js payAdjust)
+        if (pp.doorCut) rows.push([$t('спускался сам'), -pp.doorCut, 'neg']);
+        // разговор у двери (doorstep.js talkAdjust)
+        if (pp.talkAdd) rows.push([pp.talkKind === 'fun' ? $t('клиент оценил шутку') : $t('поболтал с клиентом'), pp.talkAdd, 'tip']);
+        if (pp.talkCut) rows.push([pp.talkKind === 'fun' ? $t('шутку не оценил') : $t('торопил клиента'), -pp.talkCut, 'neg']);
+        // подъезд: бегом на этаж (doorstep.js stairsAdjust)
+        if (pp.stairsAdd) rows.push([$t('взбежал быстро'), pp.stairsAdd, 'tip']);
+        if (pp.stairsCut) rows.push([$t('спускался сам'), -pp.stairsCut, 'neg']);
+        if (pp.stairsGop) rows.push([$t('откупился от гопников'), -pp.stairsGop, 'neg']);
+        popPay(part, rows, pp.late ? (CAREER ? $t('клиент недоволен') : '') : tier === 2 && pp.bonus ? $t('А ты харош!') : tier && pp.bonus ? $t('Шустро!') : pp.rich ? $t('сдачи не надо!') : pp.tip ? $t('чаевые!') : '',
+          st.persons[0] ? { person: st.persons[0], mood: payMood(st, onTime, tier) } : null);
+        bossOnDeliver(o, st, onTime, tier);
+      } else {
+        toast((onTime ? '+' : $t('опоздал') + ' · +') + money(part) + ' · ' + S.addr);
+        Snd.coin();
+      }
+    };
+    if (!tutScene) showPay();
 
     o.idx++;
     if (o.idx < o.stops.length) {
@@ -12262,7 +12280,15 @@ function checkArrival (dt) {
       S.state = 'handover'; S.handT = 0.9;
       addXP(o.ord && o.ord.bundle ? o.stops.length : 1);   // сборный: каждая пицца — заказ (рост курьера, econ.js BUNDLE)
       S.done = (S.done || 0) + 1;
-      if (o.tut) { Store.set('dlv-msk-tut', '1'); HINTS.stepan(st.peds[0]); }   // Степан зовёт в бизнес и дует облаком на машину (hints.js)
+      if (o.tut) {
+        Store.set('dlv-msk-tut', '1');
+        // катсцена Стёпы (stepafirst.js): знакомство, «вложишься в мой бизнес?», чаевые, облако на машину; после — коробка у него и чек
+        const ped = st.peds[0];
+        if (!(tutScene && ST1.play(ped, { tipped: !!(pp && pp.bonus && !pp.late && !st.bumped), done: () => { takeBox(ped, st, onTime); showPay(); } }))) {
+          if (tutScene) { handOver(st, onTime); showPay(); }
+          HINTS.stepan(ped);                          // сцены нет — старый прикол: зовёт в бизнес и дует облаком на машину (hints.js)
+        }
+      }
       else if (o.ord) ORD.delivered(o, st, onTime);   // карьера: поручение по SIDE_ORDERS, STORY.onDeliver
       else if (!S.ride && onTime && st.persons[0] && chance(0.45)) offerSide(st.peds[0], st.persons[0]);
     }
@@ -13284,6 +13310,8 @@ STORY.init({ THREE, scene, cam, V, S, IN, ADULT, CITY, MAP, Store, SPOTS, ground
 /* истории героев города по главам (herostories.js): встречи, условие главы в пути, бонусы */
 HSTORY.init({ S, V, ADULT, CAREER, Snd, toast, shops: () => SIGNS, pizza: () => PIZZA, shiftN: () => (+Store.get('dlv-shifts', 0) || 0) + 1,
   openAt: (x, z) => !DISTRICTS || DIST.isOpen(DIST.at(x, z)), heal: n => { S.hp = Math.min(S.hpMax, S.hp + n); hudHearts(); } });
+/* учебный заказ Стёпы (stepafirst.js): вручение — катсцена через story.js */
+ST1.init({ THREE, ADULT, V, fxAdd, puffGeo, groundH, Snd, sayBubble, makeHuman, stepanPerson });
 /* Стёпа на лавочке (stepabench.js): лавочка у Ленинградской, 8 и его заказ — через story.js */
 LATE.add('stepa', () => STEPAB.init({ CITY, ADULT, CAREER, bench, realAddress }));
 const NO_E = /[?&]noE(&|$)/.test(location.search);   // ?noE — без леса у Ленина, змеев и качалок (сравнить кадр)
@@ -14223,8 +14251,9 @@ function frameStep (now) {
   // повтор (replay.js): мир стоит, позы — из записи, камера своя
   if (REPLAY.on()) { if (!EXT.paused) { REPLAY.frame(raw); humanLod(); CULL.step(); renderer.render(scene, cam); } return; }
   if (SBX.nitro) NOS.tank = 1;                     // песочница: бесконечное нитро
-  // катсцена сюжетного заказа: мир стоит, ходят только актёры, камера — своя (story.js)
-  if (!S.paused && !EXT.paused && STORY.frame(dt, car)) { unview(); updateFX(dt); updateFly(dt); updateTrunk(dt); SEAS.updateSeasons(dt); humanLod(); CULL.step(); renderer.render(scene, cam); return; }
+  // катсцена сюжетного заказа: мир стоит, ходят только актёры, камера — своя (story.js); столб маркера адреса в кадре не нужен;
+  // облачка над головами (кот «мяу!», курьер «кхе-кхе…») — talk.js и в катсцене, иначе новое облачко не видно
+  if (!S.paused && !EXT.paused && STORY.frame(dt, car)) { marker.visible = false; unview(); updateFX(dt); updateFly(dt); updateTrunk(dt); TALK.step(dt, cam, V); SEAS.updateSeasons(dt); humanLod(); CULL.step(); renderer.render(scene, cam); return; }
   // вступление первого запуска (intro.js): мир стоит, дымят только кальян Степана и капот
   if (!S.paused && !EXT.paused && FIRST.frame(dt)) { unview(); HK.step(dt); updateFX(dt); SEAS.updateSeasons(dt); humanLod(); CULL.step(); renderer.render(scene, cam); return; }
   if (S.paused || EXT.paused || DLG.isOpen()) return;     // диалог — мир стоит
