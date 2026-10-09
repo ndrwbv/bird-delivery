@@ -12,6 +12,7 @@
 # В гит-релиз идут bird-pizza-deck.tar.gz + install-deck.sh (Deck), bird-pizza-setup.exe
 # (установщик для Windows) и bird-pizza-win.zip (та же игра папкой — для депота Steam и вручную).
 # Zip для Яндекса — только артефакт прогона: его заливают руками в консоль разработчика.
+# После релиза та же игра (сборка web) выкладывается на GitHub Pages — ndrwbv.github.io/bird-delivery.
 name: Релиз
 
 on:
@@ -214,3 +215,41 @@ jobs:
             assets/bird-pizza-setup.exe assets/bird-pizza-win.zip \
             --title "Птица Пицца $TAG" --notes-file notes.md --target "$GITHUB_SHA"
           echo "релиз: $TAG" >> "$GITHUB_STEP_SUMMARY"
+
+  # Браузерная версия на GitHub Pages (https://ndrwbv.github.io/bird-delivery/) — та же игра,
+  # что в релизе, сборка web. Ветка gh-pages каждый раз перезаписывается одним коммитом
+  # (история не копится). Идёт после релиза: не вышел релиз — Pages не трогаем.
+  pages:
+    needs: [meta, release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Сборка web
+        env:
+          BUILD_VERSION: ${{ needs.meta.outputs.version }}
+        run: npm run build:web
+      - name: Выложить в gh-pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.meta.outputs.tag }}
+        run: |
+          set -eu
+          cd dist/web
+          touch .nojekyll
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Сборка для GitHub Pages $TAG (${GITHUB_SHA:0:7})"
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
+          # подстраховка: попросить Pages пересобраться (пуш от github.token обычно и так запускает)
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/pages/builds" > /dev/null || true
+          echo "Pages: https://ndrwbv.github.io/bird-delivery/ ($TAG)" >> "$GITHUB_STEP_SUMMARY"
