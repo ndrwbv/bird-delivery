@@ -2,7 +2,7 @@
    из главного меню и из паузы (game.js renderSettings → SET.render). Правила словами —
    docs/CAREER.md «Главное меню, пауза и настройки».
 
-   Табы: игра (имя, профиль, сбросить прогресс, тестовые районы, версия и обновление, update.js) ·
+   Табы: игра (имя, профиль, мини-игры у клиента вкл / выкл, сбросить прогресс, тестовые районы, версия и обновление, update.js) ·
    графика (качество и 7 пунктов, gfx.js) · звук (вкл / выкл и три ползунка: музыка, звуки, мотор — docs/SOUNDS.md) · управление (какие кнопки за что — геймпад,
    клавиатура или палец) · язык (сетка языков). Внутри таба — обычный вертикальный список; не влез
    (телефон боком) — листается внутри таба, окно целиком не прокручивается.
@@ -131,6 +131,11 @@ export function render (focus, tab) {
         note(t('у каждого профиля свой прогресс: копилка, машины, районы'));
       else h += row(t('имя'), esc(name || '—'), 'set-name', focus);
     }
+    // мини-игры у клиента (doorstep.js): домофон у подъезда; выкл — только езда. Меняется и из паузы — со следующего адреса
+    if (A.door) {
+      h += row(t('мини-игры у клиента'), A.door.on() ? t('вкл') : t('выкл'), 'set-door', focus) +
+        note(t('домофон у подъезда и другие задачки при вручении; выкл — только езда'));
+    }
     // версия и обновление
     {
       const st = UPD.state(), v = UPD.version();
@@ -188,6 +193,7 @@ function wire (body) {
   body.querySelectorAll('[data-l]').forEach(b => b.addEventListener('click', () => A.setLang(b.dataset.l)));
   if ($('set-name')) $('set-name').onclick = () => A.askName(() => render('set-name'));
   if ($('set-prof')) $('set-prof').onclick = () => A.openProfiles();
+  if ($('set-door')) $('set-door').onclick = () => { A.door.set(!A.door.on()); render('set-door'); };
   if ($('set-unlock')) $('set-unlock').onclick = () => A.unlock.run();
   if ($('set-reset')) $('set-reset').onclick = () => A.reset();
   if ($('set-upd')) $('set-upd').onclick = () => { UPD.check(true); render('set-upd'); };

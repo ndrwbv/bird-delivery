@@ -43,6 +43,7 @@ import * as HURR from './hurricane.js';          // дома, унесённые
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 import * as GROW from './growth.js';            // пиццерия растёт: оплата, чаевые, размер сборных по ступени (econ.js GROWTH)
 import * as BEACH from './beach.js';            // пляж летом: заказ на полотенце (beach.js ORDER)
+import * as DOOR from './doorstep.js';          // домофон у подъезда: бонус «с первого раза» / «спускался сам» (econ.js DOOR)
 import { makePerson } from './people.js';
 import { ORDER_TYPES, SHIFT_PLAN, SIDE_ORDERS, STAFF_RIDE, BOSS } from './orders.config.js';
 
@@ -740,10 +741,12 @@ export function payStop (o, st, onTime, tier) {
   }
   if (tip > 0) tip = Math.round(tip * (RESPECT.perk('tipK') || 1) / 10) * 10;   // звание по респекту — чаевые больше (econ.js RESPECT.LEVELS)
   if (st.bumped) tip = 0;                                 // задел клиента машиной (game.js clientBump, ECON.CLIENT_HIT) — без чаевых
+  // домофон (doorstep.js): с первого раза и быстро — +add; не успел, клиент спускался сам — минус cut из «за скорость» и чаевых
+  const door = DOOR.payAdjust(st, fee, bonus, tip);
   // из чего сложилась оплата — game.js покажет кучкой денег и чеком (popPay); сюжет — катсцена сама покажет награду
-  st.pay = { fee, bonus, tip, rich: rich && tip > 0, late: false, story: !!sp.story };
-  S.tips = (S.tips || 0) + bonus + tip;                   // чек смены: строка «чаевые и за скорость» (career.js; обнуляет startShift)
-  return fee + bonus + tip;
+  st.pay = { fee, bonus, tip, rich: rich && tip > 0, late: false, story: !!sp.story, doorAdd: door.add, doorCut: door.cut, doorMode: st.door ? st.door.mode : '' };
+  S.tips = (S.tips || 0) + bonus + tip + door.add - door.cut;   // чек смены: строка «чаевые и за скорость» (career.js; обнуляет startShift)
+  return fee + bonus + tip + door.add - door.cut;
 }
 
 /* весь заказ отдан: сюжет, поручение */

@@ -27,8 +27,9 @@ export const NARROW = {
   PULL_K: 2.6,    // как быстро прижимается (1/с)
 };
 
-export const narrow = e => !!e && !e.oneway && e.w < NARROW.ONE_LANE;
-const tiny = e => narrow(e) && e.w < NARROW.ONE_WAY;
+// two — одностороння в тупик: для потока двусторонний тупик с разворотом (deadends.js), полосы — как у двусторонней
+export const narrow = e => !!e && (!e.oneway || !!e.two) && e.w < NARROW.ONE_LANE;
+const tiny = e => narrow(e) && !e.oneway && e.w < NARROW.ONE_WAY;
 /* насколько можно прижаться вправо от оси */
 export const pullMax = e => Math.max(0, Math.min(e.w / 4, e.w / 2 - NARROW.HALF_W - NARROW.MARGIN));
 

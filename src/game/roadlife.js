@@ -810,6 +810,7 @@ function worksOk (A, e, ia, ib) {
   // на месте работ не должно стоять припаркованных и чужих машин с маршрутом
   if (A.TRAFFIC.some(q => (q.parked || q.svc || q.accident) && Math.abs((q.x - x) * e.ux + (q.z - z) * e.uz) < 12 && Math.abs((q.x - x) * e.rx + (q.z - z) * e.rz) < e.w / 2 + 3)) return null;
   if (detourLen(A, ia, ib, e) > 1400) return null;
+  if (A.deadendBlocks && A.deadendBlocks(e)) return null;   // единственный выезд с односторонней — машинам некуда (deadends.js)
   return { x, z, sMid };
 }
 
@@ -1046,7 +1047,7 @@ function laneOk (A, e) {
 }
 function spawnLane (A, e, at) {
   const { groundH, box } = A, { s0, s1, n, r, run } = at;
-  const N = A.NODES[e.a], lw = (e.oneway ? e.w : e.w / 2) / n;
+  const N = A.NODES[e.a], lw = (e.oneway && !e.two ? e.w : e.w / 2) / n;   // two — одностороння в тупик (deadends.js)
   const o0 = A.laneOff(e, 0), oIn = o0 - lw / 2, oOut = o0 + lw / 2;          // граница с соседней полосой и бордюр
   const P = (s, o) => [N.x + e.ux * (e.tA + s) + e.rx * o, N.z + e.uz * (e.tA + s) + e.rz * o];
   const ryA = Math.atan2(e.ux, e.uz), ryN = Math.atan2(e.rz, e.rx), taper = 12;

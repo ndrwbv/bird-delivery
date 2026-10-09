@@ -1,0 +1,88 @@
+/* Домофон (minigames/intercom.js): бумажная панель поверх езды — накладная слева, панель домофона справа
+   (телефон стоя — одна под другой). Кнопки-цифры крупные: палец и Дека. Палитра — --pp-* (paper.css). */
+.dg { position: absolute; inset: 0; z-index: 26; display: flex; align-items: center; justify-content: center; box-sizing: border-box;
+      padding: clamp(8px, 2vh, 24px) 12px; overflow: auto; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none;
+      font-family: "Press Start 2P", ui-monospace, monospace; color: var(--pp-ink);
+      background: radial-gradient(ellipse at 50% 50%, rgba(255, 138, 43, .12), rgba(40, 14, 24, .5) 75%); }
+.dg-sheet { width: min(760px, 100%); padding-top: 4px; }
+.dg-sheet .pp-head { --pp-accent: var(--pp-orange); margin-bottom: .3em; }
+.dg-left { font-variant-numeric: tabular-nums; min-width: 4.5em; text-align: right; }
+
+/* фитиль: сколько осталось — полоса тает справа налево, в последние 30 % краснеет */
+.dg-fuse { height: 10px; margin: 0 0 .8em; border: 2px solid var(--pp-ink); border-radius: 6px; overflow: hidden; background: rgba(51, 33, 12, .1); }
+.dg-fuse i { display: block; height: 100%; background: var(--pp-lime); transform-origin: 0 50%; transition: background .2s; }
+.dg-fuse.dg-hot i { background: var(--pp-red); }
+
+.dg-body { display: flex; gap: clamp(10px, 2vw, 24px); align-items: stretch; }
+
+/* кусок накладной: номер квартиры крупно, пометка клиента — розовым стикером от руки */
+.dg-slip { position: relative; flex: 1 1 40%; display: flex; flex-direction: column; gap: .5em; justify-content: center; padding: .8em 1em;
+           background: #fffaf0; border: 2px dashed var(--pp-brown); border-radius: 4px; rotate: var(--pp-tilt, 0deg); }
+.dg-flat { font-size: clamp(22px, 3.4vw, 40px); line-height: 1.2; white-space: nowrap; font-weight: normal; letter-spacing: .04em; }
+.dg-note { margin: .2em 0 0; align-self: flex-start; padding: .7em .8em; font-size: var(--pp-fs-m); line-height: 1.5; color: var(--pp-ink);
+           background: color-mix(in srgb, var(--pp-pink) 55%, var(--pp-paper)); border: 2px solid var(--pp-ink); border-radius: 3px;
+           box-shadow: 0 3px 0 var(--pp-ink); rotate: 3deg; }
+.dg-task { margin: 0; }
+
+/* сама панель: экранчик сверху, кнопки 3×4 */
+.dg-unit { flex: 1 1 52%; display: flex; flex-direction: column; gap: .6em; padding: .7em; background: #e9dcc0;
+           border: 3px solid var(--pp-ink); border-radius: 10px; box-shadow: inset 0 -5px 0 rgba(51, 33, 12, .15), 0 4px 0 var(--pp-ink); }
+.dg-scr { position: relative; min-height: 3.2em; display: flex; flex-direction: column; gap: .3em; align-items: center; justify-content: center; padding: .4em .6em; text-align: center;
+          background: #263018; color: var(--pp-yellow); border: 3px solid var(--pp-ink); border-radius: 6px; font-size: var(--pp-fs-m); line-height: 1.5; }
+.dg-typed { font-weight: normal; font-size: var(--pp-fs-l); letter-spacing: .25em; }
+.dg-say[hidden], .dg-typed[hidden] { display: none; }
+.dg-say { display: block; font-size: var(--pp-fs-s); line-height: 1.6; color: #fff3d6; }
+.dg-say em { font-style: normal; color: var(--pp-yellow); }
+.dg-say.dg-bad { color: #ffb2a8; }
+.dg-say.dg-good { color: var(--pp-lime); font-size: var(--pp-fs-m); }
+
+.dg-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(5px, 1vh, 9px); }
+.dg-k { position: relative; min-height: clamp(44px, 8.6vh, 72px); padding: 0; font: inherit; font-size: var(--pp-fs-l); color: var(--pp-ink); cursor: pointer;
+        background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 8px; box-shadow: 0 4px 0 var(--pp-ink); touch-action: manipulation;
+        transition: translate .12s var(--pp-spring), box-shadow .12s; }
+.dg-k:active { translate: 0 3px; box-shadow: 0 1px 0 var(--pp-ink); }
+.dg-k-del { background: color-mix(in srgb, var(--pp-orange) 45%, var(--pp-paper)); }
+.dg-k-call { background: var(--pp-lime); }
+.dg-g { position: absolute; right: 3px; bottom: 2px; font: inherit; font-size: 9px; line-height: 1; color: var(--pp-label); }
+.dg-g:empty { display: none; }
+.dg-ky { color: var(--pp-ink); background: var(--pp-yellow); }
+
+/* сломан: табличка «не работает» и дверь — стучать */
+.dg-sign { align-self: center; padding: .5em .9em; font-size: var(--pp-fs-m); text-transform: uppercase; color: var(--pp-red);
+           background: #fff; border: 2px solid var(--pp-ink); rotate: -4deg; box-shadow: 0 2px 0 var(--pp-ink); }
+.dg-door { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .7em; min-height: clamp(120px, 26vh, 220px);
+           font: inherit; font-size: var(--pp-fs-l); color: var(--pp-paper); cursor: pointer; touch-action: manipulation;
+           background: #7a4a2a repeating-linear-gradient(90deg, transparent 0 22px, rgba(0, 0, 0, .12) 22px 25px);
+           border: 4px solid var(--pp-ink); border-radius: 6px; box-shadow: 0 5px 0 var(--pp-ink); text-shadow: 2px 2px 0 var(--pp-ink); }
+.dg-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; max-width: 90%; }
+.dg-dots i { width: 12px; height: 12px; border: 2px solid var(--pp-paper); border-radius: 50%; }
+.dg-dots i.on { background: var(--pp-yellow); }
+
+.dg-help { min-height: 1.2em; margin: .7em 0 0; font-size: var(--pp-fs-s); line-height: 2.2; color: var(--pp-label); text-align: center; }
+.dg-help .pp-key { margin-right: .4em; }
+.dg-seal { --pp-seal-top: 34%; --pp-seal-right: 50%; --pp-seal-rot: -9deg; translate: 50% 0; font-size: var(--pp-fs-l); white-space: nowrap; }
+
+/* движение — только на событии */
+.dg-pop { animation: dg-pop .16s var(--pp-spring); }
+@keyframes dg-pop { 0% { scale: .9; } 100% { scale: 1; } }
+.dg-shake .dg-unit { animation: dg-shake .3s; }
+@keyframes dg-shake { 25% { translate: -6px 0; } 50% { translate: 5px 0; } 75% { translate: -3px 0; } }
+.dg-ok .dg-scr { background: #1f4a22; }
+.dg-late .dg-unit { filter: saturate(.6); }
+@media (prefers-reduced-motion: reduce) { .dg-pop, .dg-shake .dg-unit { animation: none; } }
+body.calm-fx .dg-pop, body.calm-fx .dg-shake .dg-unit { animation: none; }
+
+/* телефон стоя и узкие окна: накладная над панелью */
+@media (max-width: 620px) {
+  .dg-body { flex-direction: column; }
+  .dg-slip { flex: none; }
+  .dg-k { min-height: clamp(52px, 7.6vh, 70px); }
+}
+/* низкие (телефон боком): кнопки ниже, всё в высоту экрана */
+@media (max-height: 460px) {
+  .dg { align-items: flex-start; }
+  .dg-sheet .pp-head { padding: .4em 0 .3em; }
+  .dg-k { min-height: 36px; font-size: var(--pp-fs-m); }
+  .dg-flat { font-size: 20px; }
+  .dg-help { display: none; }
+}

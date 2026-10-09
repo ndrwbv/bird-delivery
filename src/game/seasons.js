@@ -47,7 +47,7 @@ const toShifts = s => { const v = ((s % 4) + 4) % 4, q = Math.min(3, Math.floor(
 const fromShifts = u => { const w = ((u % YEAR_SHIFTS) + YEAR_SHIFTS) % YEAR_SHIFTS; let q = 0; while (q < 3 && w >= SEASON_CUM[q + 1]) q++; return q + (w - SEASON_CUM[q]) / SEASON_SHIFTS[q]; };
 /* сезон через n смен календаря от s */
 export const seasonAfter = (s, n) => fromShifts(toShifts(s) + n);
-const CELL = 100;                           // клетка склейки, как у статики
+const CELL = 200;                           // клетка склейки, как у статики (CHUNK в game.js; было 100 — деревья и сугробы давали ~37 вызовов отрисовки в кадре, 10.10.2026)
 
 let C = null;                               // что дала игра (init)
 let SEA = 0, FORCED = false;

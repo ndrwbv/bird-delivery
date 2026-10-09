@@ -181,7 +181,7 @@ function findStops () {
 /* Маршруты — по открытым районам: закрытые (e.lock) и вечный ремонт в путь не берём. Открылся район —
    строим заново (step следит за числом закрытых рёбер), по шагу за кадр; автобусы пересаживаются
    на маршрут, по которому стоят, или едут к ближайшему. Шаги — yield (latebuild.js STEPS) */
-const lockedE = e => !!e.lock;
+const lockedE = e => !!e.lock || !e.ok;           // !ok — разворот в тупике, который закрылся вместе с районом (deadends.js)
 function* routesGen () {
   const out = [];
   const open = STOPS.filter(s => !s.e.lock);

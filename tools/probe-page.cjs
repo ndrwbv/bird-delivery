@@ -204,6 +204,8 @@ const INSTALL = `(() => { if (window.__probe) return; const P = window.__probe =
     try {
       if (S.state === 'brief') { D.acceptOrder(); return; }
       if (D.CH && D.CH.opts && D.CH.opts.length && D.pickChoice) { D.pickChoice(1); return; }
+      // домофон у подъезда (doorstep.js): через ~0,6 с набирает верный номер и жмёт «вызов» (сломан — стучит)
+      if (D.DOOR && D.DOOR.on && D.DOOR.on()) { IN.joy = 0; IN.gas = 0; IN.brake = 0; const n = performance.now(); if (!A.doorT) A.doorT = n; else if (n - A.doorT > 600) { A.doorT = 0; D.DOOR.solve(); } return; }
       if (!['drive', 'back', 'side'].includes(S.state)) { IN.joy = 0; IN.gas = 0; IN.brake = 0; return; }
       const GR = D.route; if (!GR || GR.length < 2) { IN.joy = 0; IN.gas = 0; return; }
       // таймеры — в игровых секундах (run(secs, 3) ускоряет игру, а не performance.now)

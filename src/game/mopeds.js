@@ -137,7 +137,7 @@ export function lane (c, dt, A) {
   const m = c.mp;
   if (!m || !c.e || c.turn) return 1;
   if (m.fell) return 0;                               // седока нет — стоит
-  const e = c.e, n = A.laneCount(e), lw = (e.oneway ? e.w : e.w / 2) / n;
+  const e = c.e, n = A.laneCount(e), lw = (e.oneway && !e.two ? e.w : e.w / 2) / n;   // two — одностороння в тупик (deadends.js)
   // стоит за машиной — через секунду-две просачивается между рядами
   if (m.weave > 0) m.weave -= dt;
   else if (c.speed < 2.2) {
