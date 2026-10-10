@@ -31,33 +31,39 @@ import { kill as killLights } from './carlights.js';
 export const GLASS = { CRACK: 9, BREAK: 15, SHARDS: 14 };
 /* фары: BREAK / BOTH — м/с удара; END — удар в передней / задней такой доле половины длины; SHARDS — осколков на фару */
 export const LAMP = { BREAK: 8, BOTH: 16, END: 0.45, SHARDS: 10 };
-export const STATS = { cracked: 0, broken: 0, lamps: 0 };
+export const STATS = { cracked: 0, broken: 0, lamps: 0, lampCr: 0 };   // lampCr — задних фонарей в трещинах (cardent.js «следы сзади»)
 
-/* текстура: слева — целое стекло (блик пикселями), справа — то же в трещинах; NearestFilter — пиксели */
+/* текстура: слева — целое стекло, справа — то же в трещинах. Целое — ровного цвета с одним мягким широким бликом
+   (10.10.2026: блик «лесенкой» из пикселей с камеры читался как царапины и полосы на заднем стекле) */
 const TEX = new Map();
 function tex (tint) {
   const k = tint ? 't' : 'c';
   if (TEX.has(k)) return TEX.get(k);
-  const c = document.createElement('canvas'); c.width = 64; c.height = 32;
+  const c = document.createElement('canvas'); c.width = 128; c.height = 64;
   const x = c.getContext('2d');
   for (let cell = 0; cell < 2; cell++) {
-    const o = cell * 32;
-    x.fillStyle = tint ? 'rgba(18, 20, 26, 0.82)' : 'rgba(120, 160, 200, 0.38)'; x.fillRect(o, 0, 32, 32);
-    x.fillStyle = tint ? 'rgba(90, 100, 120, 0.5)' : 'rgba(230, 245, 255, 0.55)';   // блик по диагонали
-    for (let i = 0; i < 8; i++) x.fillRect(o + 4 + i * 2, 22 - i * 2, 3, 2);
+    const o = cell * 64;
+    x.fillStyle = tint ? 'rgba(18, 20, 26, 0.82)' : 'rgba(120, 160, 200, 0.38)'; x.fillRect(o, 0, 64, 64);
+    // блик: одна широкая мягкая полоса наискось, без лесенки
+    x.save(); x.beginPath(); x.rect(o, 0, 64, 64); x.clip();
+    x.fillStyle = tint ? 'rgba(90, 100, 120, 0.16)' : 'rgba(230, 245, 255, 0.16)';
+    x.beginPath(); x.moveTo(o + 20, 64); x.lineTo(o + 34, 64); x.lineTo(o + 58, 0); x.lineTo(o + 44, 0); x.closePath(); x.fill();
     if (cell) {
-      // трещины: из точки удара лучи пикселями и кольцо
-      x.fillStyle = 'rgba(245, 250, 255, 0.95)';
-      const cx = o + 13, cy = 14;
+      // трещины: из точки удара лучи и кольцо
+      x.strokeStyle = 'rgba(245, 250, 255, 0.95)'; x.lineWidth = 1.6; x.lineCap = 'round';
+      const cx = o + 26, cy = 28;
+      x.beginPath();
       for (const [dx, dy] of [[1, 0], [0.7, 0.7], [-0.2, 1], [-1, 0.3], [-0.6, -0.8], [0.4, -1], [1, -0.4]]) {
-        for (let r = 1; r < 18; r++) x.fillRect(Math.round(cx + dx * r + (r % 3 === 0 ? 1 : 0)), Math.round(cy + dy * r), 1, 1);
+        x.moveTo(cx, cy); x.lineTo(cx + dx * 20 + dy * 3, cy + dy * 20 - dx * 3); x.lineTo(cx + dx * 36, cy + dy * 36);
       }
-      for (let a = 0; a < 6.28; a += 0.35) x.fillRect(Math.round(cx + Math.cos(a) * 5), Math.round(cy + Math.sin(a) * 5), 1, 1);
-      x.fillStyle = 'rgba(255, 255, 255, 0.6)'; x.fillRect(cx - 1, cy - 1, 3, 3);
+      x.stroke();
+      x.beginPath(); x.arc(cx, cy, 10, 0, 7); x.stroke();
+      x.fillStyle = 'rgba(255, 255, 255, 0.6)'; x.beginPath(); x.arc(cx, cy, 3, 0, 7); x.fill();
     }
+    x.restore();                                  // трещины не вылезают на соседнюю клетку
   }
   const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace; t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.generateMipmaps = false;
+  t.colorSpace = THREE.SRGBColorSpace;
   const m = new THREE.MeshBasicMaterial({ map: t, transparent: true, side: THREE.DoubleSide, depthWrite: false });
   TEX.set(k, m);
   return m;
@@ -232,6 +238,40 @@ function breakLamp (car, c, end) {
     });
   }
 }
+/* задние фонари от любого удара (cardent.js «следы сзади»): k — 'rl' / 'rr'.
+   crackLamp — трещина: стекло пятнами (светлые трещины, тёмные сколы), 3 осколка, фонарь горит; smashLamp — разбит, как от удара в угол */
+const _cw = new THREE.Vector3();
+export function crackLamp (car, k) {
+  const c = car && lampsOf(car)[k];
+  if (!c || c.st || c.cr) return false;
+  c.cr = 1; STATS.lampCr++;
+  for (const p of c.parts) {
+    if (!p.idx) continue;
+    const col = p.m.geometry.attributes.color;
+    for (const i of p.idx) {
+      const h = Math.sin(i * 12.9898 + c.x * 78.233) * 43758.5453;
+      const f = h - Math.floor(h);              // пятнами: светлые трещины и тёмные сколы
+      if (f < 0.5) col.setXYZ(i, col.getX(i) + (1 - col.getX(i)) * 0.6, col.getY(i) + (0.92 - col.getY(i)) * 0.6, col.getZ(i) + (0.9 - col.getZ(i)) * 0.6);
+      else col.setXYZ(i, col.getX(i) * 0.5, col.getY(i) * 0.5, col.getZ(i) * 0.5);
+    }
+    col.needsUpdate = true;
+  }
+  car.updateMatrixWorld();
+  const floor = car.position.y + 0.02, n = _cw.set(0, 0, -1).transformDirection(car.matrixWorld).clone(), w = _cw;
+  for (let i = 0; i < 3; i++) {
+    w.set(c.x + (Math.random() - 0.5) * 0.15, c.y, c.z).applyMatrix4(car.matrixWorld);
+    PIX.spawn(w.x, w.y, w.z, { vx: n.x * 1.2 + (Math.random() - 0.5), vy: 0.6 + Math.random(), vz: n.z * 1.2 + (Math.random() - 0.5),
+      s: 0.04 + Math.random() * 0.04, life: 2 + Math.random() * 1.5, hex: SHARD.r[i % 2], g: 16, floor });
+  }
+  return true;
+}
+export function smashLamp (car, k) {
+  const c = car && lampsOf(car)[k];
+  if (!c || c.st) return false;
+  breakLamp(car, c, k[0] === 'f' ? 'f' : 'r');
+  return true;
+}
+
 /* сколько света у фар: целых передних / найденных (1 — нет данных) — для пятна на асфальте (game.js) */
 export function headK (ud) {
   const L = ud && ud.lamps;
@@ -240,11 +280,11 @@ export function headK (ud) {
   for (const k of ['fl', 'fr']) if (L[k]) { n++; if (!L[k].st) ok++; }
   return n ? ok / n : 1;
 }
-/* фары и фонари: «fl0 fr1 rl0 rr0» (1 — разбит) — для проверки (__dlv.cgLamps) */
+/* фары и фонари: «fl0 fr1 rl0 rrc» (1 — разбит, c — в трещинах) — для проверки (__dlv.cgLamps) */
 export function lampState (car) {
   if (!car || !car.userData) return '';
   const L = lampsOf(car);
-  return Object.keys(L).sort().map(k => k + L[k].st).join(' ');
+  return Object.keys(L).sort().map(k => k + (L[k].st ? 1 : L[k].cr ? 'c' : 0)).join(' ');   // c — в трещинах
 }
 
 /* сколько стёкол целых / в трещинах / разбито — для проверки (__dlv.CG) */

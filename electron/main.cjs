@@ -394,8 +394,10 @@ function createWindow() {
     width: 1280, height: 800, minWidth: 640, minHeight: 400,
     fullscreen: !has('--windowed'),
     autoHideMenuBar: true,
-    backgroundColor: '#000000',
+    backgroundColor: '#3d0d01',          // бордовый фон логотипа (--brand-bg): окно до первого кадра — как экран загрузки
     title: TITLE,
+    // значок окна и панели задач (Linux / Steam Deck; на Windows и Mac — иконка приложения из build/), tools/make-icons.py
+    ...(fs.existsSync(path.join(DIST, 'icon.png')) ? { icon: path.join(DIST, 'icon.png') } : {}),
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false, preload: path.join(__dirname, 'preload.cjs') },
   });
   if (has('--log')) {

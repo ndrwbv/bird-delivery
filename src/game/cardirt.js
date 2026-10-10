@@ -70,8 +70,8 @@ function patch (m) {
   m.needsUpdate = true;
   ST.mats++;
 }
-/* все матовые материалы машины: кузов, панели, колёса, наклейки (стёкла и фары — нет) */
-function dress (car) {
+/* все матовые материалы машины: кузов, панели, колёса, наклейки (стёкла и фары — нет); warmup.js — образец машины */
+export function dress (car) {
   ST.mats = 0;
   car.traverse(o => { if (o.isMesh && o.material && o.material.isMeshLambertMaterial) patch(o.material); });
 }

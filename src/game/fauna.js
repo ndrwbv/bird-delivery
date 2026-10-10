@@ -35,6 +35,9 @@
      приходит из леса в 10–20 м) подходит сзади и пристраивается — ритмичное покачивание
      DUR (4–6 с), над парой сердечки. Подъехал ближе SHOO (16 м) — пузырь «не мешай!»
      (не чаще раза в 6 с). Задел машиной — всё прекращается. Без анатомии.
+   Лось твёрдый (SOLID, 10.10.2026): сквозь машины потока, автобусы, припаркованные и людей не проходит —
+     скользит вдоль борта, рогатый упёрся — бодает с места; сам бодает машины и прохожих рядом (BUTT);
+     толкнул прохожего — падает и встаёт, с разбега — сбит, как машиной (hits.js; во взрослой — лежит).
    Лиса и заяц (SMALL): до SMALL.ON (3) рядом, в тех же лесах (заяц вдвое чаще лисы).
      Видят машину ближе FLEE (14 м) — удирают; задел — кувыркнулся и убежал, урона нет.
 
@@ -53,6 +56,10 @@ export const FAUNA = {
   SMALL: { ON: 3, R: [50, 220], FAR: 360, SHOW: 260, FLEE: 14, HARE: 0.67 },
   RAM: { FIRST: [30, 60], CD: [90, 180], TICK: 1, P: 0.3, SEE: [9, 30], AIM: 1.3, SPEED: 9, TURN: 0.6, RUN: 3.5, REACH: 1.1, PUSH: 9, ALONG: 0.4, HOME: 10 },
   LOVE: { FIRST: [50, 100], CD: [120, 240], RETRY: 10, VIEW: [25, 200], NEAR: 40, COME: 1.5, DUR: [4, 6], RATE: 1.7, WAIT: 25, SHOO: 16, SAY: 6 },
+  // лось твёрдый (10.10.2026): машины, автобусы, люди — сквозь них не ходит (solid ниже)
+  SOLID: { CELL: 16, EVERY: 0.2, R: 500, BODY: [0.75, 0.62], CAR_HW: 0.95, MOPED_HW: 0.45, PERSON_R: 0.35, SLIDE: 0.9, BLOCK: 1.6, GIVE_UP: 4, CAR_HIT: 3, SHOVE: 0.6 },
+  // лось бодает машины и людей (обе версии): кто рядом — раз в CD, на сигнал — с шансом HONK, упёрся — NUDGE
+  BUTT: { FIRST: [20, 45], CD: [35, 75], TICK: 1, P: 0.35, VIEW: 140, SEE: [6, 26], FORCE: 13, NUDGE: 8, HONK: 0.5, MIN_HP: 15 },
 };
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -60,7 +67,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 let A = null;
 const LIST = [];                     // живые звери
 let FOR = null;                      // леса: { p, x0, x1, z0, z1 }
-const ST = { spawnM: 3, spawnS: 2, cross: -1, hitToast: 0, ram: -1, love: -1 };
+const ST = { spawnM: 3, spawnS: 2, cross: -1, hitToast: 0, ram: -1, love: -1, butt: -1, butts: 0, buttCars: 0, buttPeople: 0, shoves: 0, carPush: 0, slides: 0 };
 const LIVE = ['drive', 'back', 'handover', 'side'];
 
 /* ── модели: коробки с плоским светом, как всё в игре ── */
@@ -224,6 +231,7 @@ function add (kind, x, z, f, h) {
     kind, ...m, x, z, y: A.groundH(x, z), h: h === undefined ? rand(0, Math.PI * 2) : h, f,
     v: 0, mode: 'graze', mt: rand(1, 5), chk: 0, ph: rand(0, 6), kx: 0, kz: 0, roll: 0, stun: 0, hitCd: 0,
     big: kind === 'moose', rad: kind === 'moose' ? FAUNA.MOOSE.RAD : 0.35,
+    tgt: null, resume: 0, blk: 0, blkP: 0, buttCd: 0,   // бодает кого (null — тебя), вернуться к переходу дороги, сколько упирается
   };
   a.g.rotation.order = 'YXZ';                      // наклон (x) — вдоль тела, после поворота
   a.g.position.set(x, a.y, z); a.g.rotation.y = a.h;
@@ -237,7 +245,8 @@ function drop (a) {
 }
 export function clear () {
   for (let i = LIST.length - 1; i >= 0; i--) drop(LIST[i]);
-  ST.cross = ST.ram = ST.love = -1;
+  ST.cross = ST.ram = ST.love = ST.butt = -1;
+  for (const k of ['cars', 'peo', 'sco', 'oth']) GRID[k].clear();
 }
 
 /* ── «лось на дороге!»: найти дорогу у леса впереди и выпустить на неё лося ── */
@@ -314,7 +323,11 @@ function think (a, dt, dCar) {
 
 /* ── бодание: лось замечает машину, опускает рога и бежит на неё ── */
 const turnTo = (h, want, max) => { let d = want - h; d = Math.atan2(Math.sin(d), Math.cos(d)); return h + clamp(d, -max, max); };
-function startRam (a) {
+/* tgt: null — бодает тебя; { car } — машину потока / автобус / припаркованную; { p, kind } — прохожего */
+function startRam (a, tgt = null) {
+  a.resume = a.mode === 'cross' || a.mode === 'stand' ? 1 : 0;   // переходил дорогу — боднёт и пойдёт дальше
+  if (a.love) loveEnd(a);
+  a.tgt = tgt;
   a.mode = 'aim'; a.mt = FAUNA.RAM.AIM; a.v = 0; a.hit = 0; a.x0 = a.x; a.z0 = a.z;   // сюда вернётся
   if (A.emote) A.emote(a.x, 2.8, a.z, 'angry', 2);
   if (A.Snd && A.Snd.fx) A.Snd.fx('moose', s => { s.noise(0.35, 0.16); s.blip(75, 0.3, 'sawtooth', 0.08); }, { x: a.x, z: a.z });   // фыркнул
@@ -325,13 +338,15 @@ function tryRam () {
     if (!a.big || !a.male || a.love || (a.mode !== 'graze' && a.mode !== 'walk')) continue;
     const d = Math.hypot(a.x - V.x, a.z - V.z);
     if (d < R.SEE[0] || d > R.SEE[1]) continue;
-    startRam(a);
+    startRam(a, null);
     return true;
   }
   return false;
 }
 function ramStep (a, dt) {
-  const R = FAUNA.RAM, V = A.V, want = Math.atan2(V.x - a.x, V.z - a.z);
+  const R = FAUNA.RAM, V = A.V, T = a.tgt;
+  if (T && (a.mode === 'aim' || a.mode === 'charge') && (T.car ? T.car.gone || T.car.wreck : T.p.dead)) { a.tgt = null; a.mode = 'home'; a.mt = R.HOME; }   // цель пропала
+  const tx = T ? (T.car || T.p).x : V.x, tz = T ? (T.car || T.p).z : V.z, want = Math.atan2(tx - a.x, tz - a.z);
   a.mt -= dt;
   if (a.mode === 'aim') {
     a.v = 0; a.h = turnTo(a.h, want, 3 * dt);
@@ -341,7 +356,7 @@ function ramStep (a, dt) {
   if (a.mode === 'charge') {
     a.v = R.SPEED; a.h = turnTo(a.h, want, R.TURN * dt);
     const ahead = A.inHouse(a.x + Math.sin(a.h) * 2, a.z + Math.cos(a.h) * 2, 0.3);
-    if (a.mt <= 0 || a.hit || ahead) { a.mode = 'home'; a.mt = R.HOME; }
+    if (a.mt <= 0 || a.hit || ahead) { a.tgt = null; if (a.resume && a.ex !== undefined) { a.mode = 'cross'; a.mid = 2; } else { a.mode = 'home'; a.mt = R.HOME; } }
     return;
   }
   // home: трусцой обратно на своё место
@@ -363,7 +378,8 @@ function ramHit (a, hx, hz) {
   if (A.Snd && A.Snd.fx) A.Snd.fx('moose-hit', s => s.blip(60, 0.25, 'square', 0.12));
   a.kx = -dx * 2; a.kz = -dz * 2;                       // отскочил назад
   if (A.emote) A.emote(a.x, 2.8, a.z, 'star', 3);
-  a.mode = 'home'; a.mt = R.HOME;
+  a.tgt = null;
+  if (a.resume && a.ex !== undefined) { a.mode = 'cross'; a.mid = 2; } else { a.mode = 'home'; a.mt = R.HOME; }
   ST.rams = (ST.rams || 0) + 1;
   if (ST.hitToast <= 0) { ST.hitToast = 8; A.toast(t('лось боднул машину!')); }
 }
@@ -484,6 +500,184 @@ function bump (a) {
   }
 }
 
+/* ── лось твёрдый: машины, автобусы, люди (10.10.2026: «лось прошёл сквозь автобус») ──
+   Соседи — по сетке SOLID.CELL м (машины потока и прохожие в SOLID.R м от тебя, пересобирается раз
+   в SOLID.EVERY с), лось смотрит только свои 3×3 клетки — не перебор всех машин города в кадре.
+   Тело лося — два круга вдоль туловища (BODY: ±0,75 м, радиус 0,62), машина — прямоугольник кузова
+   (автобус — свой, мопед — узкий). Упёрся в машину — скользит вдоль борта к ближнему краю (SLIDE);
+   упирается дольше BLOCK с — самец бодает её с места (NUDGE), самка поворачивает назад (GIVE_UP — бросает
+   переход дороги). На бегу (бодание) налетел — машину отбрасывает (FORCE), человека сбивает. Въехала в
+   лося машина быстрее CAR_HIT м/с (служба, летящая после удара) — лось шатается, её ход — вдвое.
+   Прохожий вплотную: лось стоит, через SHOVE с толкает — человек падает и встаёт (обе версии);
+   свой клиент и тот, кто ждёт заказ, — не трогает, просто не проходит сквозь. */
+const GRID = { cars: new Map(), peo: new Map(), sco: new Map(), oth: new Map(), t: 0 };
+const gkey = (ix, iz) => (ix + 4096) * 8192 + iz + 4096;
+function gput (M, x, z, o) {
+  const C = FAUNA.SOLID.CELL, k = gkey(Math.floor(x / C), Math.floor(z / C));
+  let L = M.get(k); if (!L) M.set(k, L = []);
+  L.push(o);
+}
+function gclear (M) { if (M.size > 6000) M.clear(); else for (const L of M.values()) L.length = 0; }
+function regrid () {
+  const V = A.V, R2 = FAUNA.SOLID.R ** 2;
+  gclear(GRID.cars); gclear(GRID.peo); gclear(GRID.sco); gclear(GRID.oth);
+  const TR = A.TRAFFIC || [];
+  for (let i = 0; i < TR.length; i++) { const t = TR[i]; if (!t.gone && (t.x - V.x) ** 2 + (t.z - V.z) ** 2 < R2) gput(GRID.cars, t.x, t.z, t); }
+  const W = A.walkers ? A.walkers() : [], PEO = A.PEOPLE, SCO = A.SCOOTS;
+  for (let li = 0; li < W.length; li++) {
+    const list = W[li], M = list === PEO ? GRID.peo : list === SCO ? GRID.sco : GRID.oth;
+    if (!list) continue;
+    for (let i = 0; i < list.length; i++) { const p = list[i]; if (p && !p.dead && typeof p.x === 'number' && (p.x - V.x) ** 2 + (p.z - V.z) ** 2 < R2) gput(M, p.x, p.z, p); }
+  }
+}
+/* соседи из сетки M вокруг (x, z): r клеток в каждую сторону — в общий массив NB (без мусора в кадре) */
+const NB = [];
+function near (M, x, z, r = 1) {
+  NB.length = 0;
+  const C = FAUNA.SOLID.CELL, ix = Math.floor(x / C), iz = Math.floor(z / C);
+  for (let i = -r; i <= r; i++) for (let j = -r; j <= r; j++) { const L = M.get(gkey(ix + i, iz + j)); if (L) for (let k = 0; k < L.length; k++) NB.push(L[k]); }
+  return NB;
+}
+/* круг (cx, cz, r) против кузова машины t → HB: pen, nx/nz (от машины к кругу), a (вдоль кузова); 0 — не касается */
+const HB = { pen: 0, nx: 0, nz: 0, a: 0 };
+function boxHit (t, cx, cz, r) {
+  const S = FAUNA.SOLID, hl = t.bus ? t.bus.hl : (t.hl || 2.2), hw = t.bus ? t.bus.W2 : t.model === 'moped' ? S.MOPED_HW : S.CAR_HW;
+  const dx = cx - t.x, dz = cz - t.z;
+  if (Math.abs(dx) > hl + hw + r || Math.abs(dz) > hl + hw + r) return 0;
+  const fx = Math.sin(t.h), fz = Math.cos(t.h), rx = -fz, rz = fx, a = dx * fx + dz * fz, s = dx * rx + dz * rz;
+  const ca = clamp(a, -hl, hl), cs = clamp(s, -hw, hw);
+  if (ca === a && cs === s) {                        // центр круга внутри кузова — наружу по ближней стороне
+    const pa = hl - Math.abs(a), ps = hw - Math.abs(s);
+    if (pa < ps) { const g = a < 0 ? -1 : 1; HB.nx = fx * g; HB.nz = fz * g; HB.pen = pa + r; }
+    else { const g = s < 0 ? -1 : 1; HB.nx = rx * g; HB.nz = rz * g; HB.pen = ps + r; }
+  } else {
+    const ea = a - ca, es = s - cs, d = Math.sqrt(ea * ea + es * es);
+    if (d >= r) return 0;
+    HB.nx = (fx * ea + rx * es) / d; HB.nz = (fz * ea + rz * es) / d; HB.pen = r - d;
+  }
+  HB.a = a;
+  return 1;
+}
+/* лось бодает машину t: толчок nx/nz с силой f (машину отбрасывает и мнёт — game.js butt) */
+function buttCar (a, t, nx, nz, f) {
+  const hx = a.x + Math.sin(a.h) * 1.4, hz = a.z + Math.cos(a.h) * 1.4;
+  if (A.butt) A.butt(t, nx, nz, f, hx, hz);
+  if (A.emote) A.emote(a.x, 2.8, a.z, 'angry', 1.5);
+  if (A.Snd && A.Snd.fx) A.Snd.fx('moose-hit', s => s.blip(60, 0.25, 'square', 0.12), { x: hx, z: hz });
+  a.hit = 1; a.blk = 0; a.buttCd = 3; a.kx = -Math.sin(a.h) * 1.5; a.kz = -Math.cos(a.h) * 1.5;
+  ST.butts++; ST.buttCars++; DEBUG.last = { t, f, mode: a.mode };
+  if (a.mode === 'charge') {
+    a.tgt = null;
+    if (a.resume && a.ex !== undefined) { a.mode = 'cross'; a.mid = 2; } else { a.mode = 'home'; a.mt = FAUNA.RAM.HOME; }
+  }
+}
+function solid (a, dt) {
+  const S = FAUNA.SOLID, fx = Math.sin(a.h), fz = Math.cos(a.h), OFF = S.BODY[0], R = S.BODY[1];
+  const charge = a.mode === 'charge' && !a.hit;
+  let blocked = null, bnx = 0, bnz = 0, ba = 0;
+  const cars = near(GRID.cars, a.x, a.z);
+  for (let i = 0; i < cars.length; i++) {
+    const t = cars[i];
+    if (t.gone || (t.gy !== undefined && Math.abs(t.gy - a.y) > 3)) continue;   // мост над лесной дорогой
+    for (let c = 0; c < 2; c++) {
+      const o = c ? -OFF : OFF;
+      if (!boxHit(t, a.x + fx * o, a.z + fz * o, R)) continue;
+      const nx = HB.nx, nz = HB.nz;
+      if (charge) { buttCar(a, t, -nx, -nz, FAUNA.BUTT.FORCE); return; }
+      a.x += nx * HB.pen; a.z += nz * HB.pen;          // лось не проходит сквозь
+      const tv = t.knock ? Math.hypot(t.kvx, t.kvz) : Math.abs(t.speed || 0);
+      const into = t.knock ? -(t.kvx * nx + t.kvz * nz) : -(Math.sin(t.h) * nx + Math.cos(t.h) * nz) * (t.speed || 0);
+      if (tv > S.CAR_HIT && into > S.CAR_HIT * 0.5 && a.hitCd <= 0) {
+        // машина въехала в лося: он шатается, она теряет ход
+        a.hitCd = 1.2; a.kx = nx * Math.min(5, 1.5 + tv * 0.2); a.kz = nz * Math.min(5, 1.5 + tv * 0.2);
+        a.roll = 0.3 * (Math.random() < 0.5 ? 1 : -1);
+        if (!LOVE_MODES.includes(a.mode) && a.mode !== 'aim' && a.mode !== 'home') { a.mode = 'stagger'; a.mt = FAUNA.HIT.STAGGER; }
+        if (t.knock) { t.kvx *= 0.5; t.kvz *= 0.5; } else t.speed *= 0.5;
+        if (A.emote) A.emote(a.x, 2.6, a.z, 'star', 3);
+        ST.carPush++;
+      } else if (a.v > 0.1 && fx * nx + fz * nz < -0.35) { blocked = t; bnx = nx; bnz = nz; ba = HB.a; }
+    }
+  }
+  if (blocked) {
+    // скользит вдоль борта — в ту сторону, куда и так шёл; в лоб — к ближнему краю кузова
+    let tx = -bnz, tz = bnx, dot = tx * fx + tz * fz;
+    if (Math.abs(dot) < 0.25) { const ex = Math.sin(blocked.h) * (ba < 0 ? -1 : 1), ez = Math.cos(blocked.h) * (ba < 0 ? -1 : 1); dot = tx * ex + tz * ez; }
+    if (dot < 0) { tx = -tx; tz = -tz; }
+    const sp = Math.max(a.v, FAUNA.MOOSE.WALK) * S.SLIDE * dt;
+    a.x += tx * sp; a.z += tz * sp;
+    a.blk += dt; ST.slides++;
+    if (a.blk > S.BLOCK && a.buttCd <= 0 && a.male && !a.love) {
+      buttCar(a, blocked, -bnx, -bnz, FAUNA.BUTT.NUDGE);    // упёрся — боднул с места
+    } else if (a.blk > S.GIVE_UP) {
+      a.blk = 0;                                          // не обойти — повернул назад
+      a.mode = 'walk'; a.mt = rand(4, 8); a.h += Math.PI * rand(0.7, 1.3); a.ex = undefined;
+    }
+  } else a.blk = Math.max(0, a.blk - dt);
+  // люди: на бегу сбивает, вплотную — стоит и толкает (падает и встаёт); своих клиентов — не трогает
+  const fast = charge || a.mode === 'stagger' || a.mode === 'home' && a.v > 1.5;
+  let touch = null, tk = '';
+  for (const kind of ['peo', 'sco', 'oth']) {
+    const L = near(GRID[kind], a.x, a.z);
+    for (let i = 0; i < L.length; i++) {
+      const p = L[i];
+      if (p.dead) continue;
+      const dx = p.x - a.x, dz = p.z - a.z;
+      if (Math.abs(dx) > 3 || Math.abs(dz) > 3) continue;
+      const al = clamp(dx * fx + dz * fz, -OFF, OFF), qx = a.x + fx * al, qz = a.z + fz * al;
+      const ex = p.x - qx, ez = p.z - qz, d = Math.hypot(ex, ez), need = R + S.PERSON_R;
+      if (d >= need) continue;
+      const mine = A.client && kind === 'peo' && A.client(p);
+      if (fast && !mine && kind !== 'oth' || charge && kind === 'oth' && A.PEDS && A.PEDS.includes(p)) {
+        const sp = Math.max(a.v, 4), hx = fx * sp + (d > 1e-3 ? ex / d : 0) * 2, hz = fz * sp + (d > 1e-3 ? ez / d : 0) * 2;
+        if (A.mooseHit && A.mooseHit(p, kind, hx, hz, charge)) {
+          ST.buttPeople++; ST.butts++;
+          if (charge && a.tgt && a.tgt.p === p) { a.hit = 1; a.tgt = null; if (a.resume && a.ex !== undefined) { a.mode = 'cross'; a.mid = 2; } else { a.mode = 'home'; a.mt = FAUNA.RAM.HOME; } }
+          continue;
+        }
+      }
+      // вплотную: лось отступает (сквозь не проходит)
+      const k = (need - d) / (d || 1);
+      a.x -= ex * k; a.z -= ez * k;
+      if (!mine && kind !== 'oth') { touch = p; tk = kind; }
+    }
+  }
+  if (touch && a.buttCd <= 0) {
+    if ((a.blkP += dt) > S.SHOVE) {
+      a.blkP = 0; a.buttCd = 2.5;
+      const dx = touch.x - a.x, dz = touch.z - a.z, l = Math.hypot(dx, dz) || 1;
+      if (A.mooseHit && A.mooseHit(touch, tk, dx / l * 3, dz / l * 3, false)) { ST.shoves++; if (A.emote) A.emote(a.x, 2.8, a.z, 'angry', 1.2); }
+    }
+  } else if (!touch) a.blkP = 0;
+}
+
+/* самец рядом с тобой замечает машину или прохожего и бодает их (раз в BUTT.CD, обе версии) */
+function tryButt () {
+  const B = FAUNA.BUTT, V = A.V;
+  for (const a of LIST) {
+    if (!a.big || !a.male || a.love || a.buttCd > 0 || (a.mode !== 'graze' && a.mode !== 'walk')) continue;
+    if (Math.hypot(a.x - V.x, a.z - V.z) > B.VIEW) continue;
+    let best = null, bd = B.SEE[1];
+    const cars = near(GRID.cars, a.x, a.z, 2);
+    for (let i = 0; i < cars.length; i++) {
+      const t = cars[i];
+      if (t.gone || t.bus || t.knock || t.wreck || t.chase) continue;
+      const d = Math.hypot(t.x - a.x, t.z - a.z);
+      if (d > B.SEE[0] && d < bd) { bd = d; best = { car: t }; }
+    }
+    const L = near(GRID.peo, a.x, a.z, 2);
+    for (let i = 0; i < L.length; i++) {
+      const p = L[i];
+      if (p.dead || p.fall || (A.client && A.client(p))) continue;
+      const d = Math.hypot(p.x - a.x, p.z - a.z);
+      if (d > B.SEE[0] && d < bd) { bd = d; best = { p, kind: 'peo' }; }
+    }
+    if (!best) continue;
+    startRam(a, best);
+    return true;
+  }
+  return false;
+}
+
 function animate (a, dt) {
   a.ph += dt * (a.v > 0 ? a.v / a.step * Math.PI : 0);
   const sw = a.v > 0 ? Math.sin(a.ph) * a.amp * Math.min(1, a.v / 0.8) : 0;
@@ -550,23 +744,28 @@ export function step (dt, api) {
     const R = FAUNA.RAM;
     if (ST.ram < 0) ST.ram = rand(...R.FIRST);
     if ((ST.ram -= dt) <= 0) ST.ram = S.state === 'drive' && Math.random() < R.P && DIRECTOR.can('moose') && tryRam() ? (DIRECTOR.start('moose', 12), rand(...R.CD)) : R.TICK;
+    const B = FAUNA.BUTT;                           // бодает машины и прохожих рядом (tryButt)
+    if (ST.butt < 0) ST.butt = rand(...B.FIRST);
+    if ((ST.butt -= dt) <= 0) ST.butt = Math.random() < B.P && tryButt() ? rand(...B.CD) : B.TICK;
     if (A.ADULT) {
       const L = FAUNA.LOVE;
       if (ST.love < 0) ST.love = rand(...L.FIRST);
       if ((ST.love -= dt) <= 0) ST.love = DIRECTOR.can('moose') && tryLove() ? (DIRECTOR.start('moose', 12), rand(...L.CD)) : L.RETRY;
     }
   }
+  if (LIST.length && (GRID.t -= dt) <= 0 && LIST.some(a => a.big)) { GRID.t = FAUNA.SOLID.EVERY; regrid(); }   // сетка соседей для лосей (solid)
   for (let i = LIST.length - 1; i >= 0; i--) {
     const a = LIST[i];
     const dCar = Math.hypot(a.x - V.x, a.z - V.z);
     if (dCar > (a.big ? FAUNA.MOOSE.FAR : FAUNA.SMALL.FAR)) { drop(a); continue; }
     a.g.visible = dCar < (a.big ? FAUNA.MOOSE.SHOW : FAUNA.SMALL.SHOW);
-    a.hitCd -= dt;
+    a.hitCd -= dt; a.buttCd -= dt;
     think(a, dt, dCar);
     a.x += (Math.sin(a.h) * a.v + a.kx) * dt;
     a.z += (Math.cos(a.h) * a.v + a.kz) * dt;
     const kd = Math.exp(-dt * 3);
     a.kx *= kd; a.kz *= kd;
+    if (a.big && a.mode !== 'love') solid(a, dt);   // машины, автобусы, люди — не насквозь (верхний в паре стоит вплотную — его не трогаем)
     if (dCar < 8) bump(a);
     if (!a.g.visible) continue;
     a.y = A.groundH(a.x, a.z);
@@ -606,7 +805,8 @@ export function trafficYield (t, dt) {
       A.Snd.fx('honk', s => { s.blip(400, 0.16, 'square', 0.07); setTimeout(() => s.blip(400, 0.28, 'square', 0.07), 200); }, { x: t.x, z: t.z, far: 70 });
     }
     if (A.emote && t.mooseN === 1) A.emote(who.x, 2.8, who.z, 'angry', 1.5);
-    if (t.mooseN >= YIELD.SHOO) shoo(who);
+    if (t.mooseN === YIELD.SHOO && who.male && !who.love && !t.bus && ['stand', 'cross', 'walk', 'graze'].includes(who.mode) && Math.random() < FAUNA.BUTT.HONK) startRam(who, { car: t });   // насигналили — боднёт машину
+    else if (t.mooseN >= YIELD.SHOO) shoo(who);
   }
   return slow;
 }
@@ -630,7 +830,10 @@ export const DEBUG = {
   cross: () => tryCross(),
   ram: a => { a = a || LIST.find(m => m.big); if (!a) return false; a.male = true; startRam(a); return true; },   // этот лось бодает
   love: () => !!(A && A.ADULT) && tryLove(),        // в детской — всегда false
-  get stats () { return { rams: ST.rams || 0, loves: ST.loves || 0, ram: ST.ram, love: ST.love, honks: ST.honks || 0 }; },
+  get stats () { return { rams: ST.rams || 0, loves: ST.loves || 0, ram: ST.ram, love: ST.love, honks: ST.honks || 0, butts: ST.butts, buttCars: ST.buttCars, buttPeople: ST.buttPeople, shoves: ST.shoves, carPush: ST.carPush, slides: ST.slides }; },
+  butt: (a, tgt) => { a = a || LIST.find(m => m.big); if (!a) return false; a.male = true; regrid(); startRam(a, tgt || null); return true; },   // бодает машину ({ car }) или прохожего ({ p, kind: 'peo' })
+  regrid: () => regrid(),
+  last: null,                                          // последнее бодание машины: { t, f, mode }
   at: (x, z, h) => add('moose', x, z, null, h),        // лось в точке (проверка: трафик тормозит)
   near: (kind = 'moose', d = 25) => { const V = A.V; return add(kind, V.x + Math.sin(V.h) * d, V.z + Math.cos(V.h) * d, null); },
 };

@@ -8,7 +8,8 @@
    и её перерисовываем, только когда меняется кадр: моргнул, открыл / закрыл рот, сменил
    выражение. Это 5—10 перерисовок в секунду на двух человек — даром.
      • моргает — раз в 2—5 с на 0,12 с (иногда дважды подряд);
-     • говорит — рот открывается и закрывается, пока висит его реплика, с паузами-вдохами;
+     • говорит — рот закрыт / приоткрыт / открыт (три кадра, как у портрета — talkface.js), пока его
+       реплика печатается, с паузами-вдохами; допечаталась — рот закрыт;
      • выражение реплики — { emo } в сценарии: happy | angry | sad | scared | surprised
        (people.js EMO_FACE: брови, глаза, рот); после реплики держится ещё EMO_HOLD с.
        Действие тоже даёт лицо: joy — радуется, sad — грустит.
@@ -20,17 +21,18 @@
      attach(a, kind)          — актёр story.js { grp, … } → a.life; kind — ключ CHAR (id героя)
      faceOnly(grp)            — только лицо (вступление: Стёпа на лавочке, руками водит guestStep)
      say(a, on, emo)          — начал / кончил реплику
+     hush(a)                  — реплика допечаталась: рот закрыт (жест и выражение — до конца реплики)
      emo(a, e, sec)           — выражение на время (действие joy / sad)
      pose(a, P, dt, t)        — поправить позу кадра: P { walking, ph, aL, aR, zL, zR, hx, hy, lift, legL, legR, roll }
      face(L, dt)              — шаг лица (L = a.life или то, что вернул faceOnly)
      detach(a | L)            — вернуть общее лицо, освободить свою текстуру
    ────────────────────────────────────────────────────────────────────────── */
 import { EMO_FACE, drawFaceFrame } from './people.js';
+import { nextMouth, calm } from './talkface.js';
 
 export const LIFE = {
   BLINK: [2, 5],        // пауза между морганиями, с
   BLINK_T: 0.12,        // глаза закрыты, с
-  TALK_HZ: 7.5,         // рот открыт-закрыт, раз в секунду (примерно)
   EMO_HOLD: 0.8,        // выражение после реплики держится, с
 };
 
@@ -68,17 +70,17 @@ function liveFace (grp) {
   tex.image = c; tex.needsUpdate = true;
   mat.map = tex; mat.userData = {};               // своя — dropMesh её освободит (keep нет)
   const L = { m, shared: m.material, mat, tex, c, ctx: c.getContext('2d'), Lk: u.look, skin: u.faceS.skin, Wp: u.faceS.Wp,
-    blinkIn: rnd(0.6, 2.5), blinkT: 0, talk: false, talkT: 0, mouth: false, emo: '', emoT: 0, key: '', draws: 0 };
+    blinkIn: rnd(0.6, 2.5), blinkT: 0, talk: false, talkT: 0, mouth: 0, emo: '', emoT: 0, key: '', draws: 0 };
   m.material = mat;
   draw(L);
   return L;
 }
 function draw (L) {
-  const open = L.talk && L.mouth, key = (L.blinkT > 0 ? 'b' : '-') + (open ? 'o' : '-') + L.emo;
+  const open = L.talk ? L.mouth : 0, key = (L.blinkT > 0 ? 'b' : '-') + open + L.emo;
   if (key === L.key) return;
   L.key = key;
   const Lk = L.emo && EMO_FACE[L.emo] ? Object.assign({}, L.Lk, EMO_FACE[L.emo]) : L.Lk;
-  drawFaceFrame(L.ctx, Lk, L.skin, L.Wp, { blink: L.blinkT > 0, talk: open });
+  drawFaceFrame(L.ctx, Lk, L.skin, L.Wp, { blink: L.blinkT > 0, half: open === 1, talk: open === 2 });
   L.tex.needsUpdate = true;
   L.draws++;
 }
@@ -87,13 +89,10 @@ export function face (L, dt) {
   // моргание: закрыл на BLINK_T, иногда — второй раз сразу
   if (L.blinkT > 0) { L.blinkT -= dt; if (L.blinkT <= 0 && Math.random() < 0.18) L.blinkIn = 0.16; }
   else if ((L.blinkIn -= dt) <= 0) { L.blinkT = LIFE.BLINK_T; L.blinkIn = rnd(LIFE.BLINK[0], LIFE.BLINK[1]); }
-  // рот: открыт-закрыт неровно, раз в ~1,5 с — вдох (закрыт подольше)
+  // рот: закрыт / приоткрыт / открыт неровно, иногда — вдох (закрыт подольше); talkface.js nextMouth — как у портрета
   if (L.talk) {
-    if ((L.talkT -= dt) <= 0) {
-      L.mouth = !L.mouth;
-      L.talkT = L.mouth ? rnd(0.07, 0.14) : Math.random() < 0.12 ? rnd(0.25, 0.45) : rnd(0.05, 0.11);
-    }
-  } else L.mouth = false;
+    if ((L.talkT -= dt) <= 0) { const [m, hold] = nextMouth(L.mouth); L.mouth = m; L.talkT = hold; }
+  } else L.mouth = 0;
   if (L.emoT > 0 && (L.emoT -= dt) <= 0) L.emo = '';
   draw(L);
 }
@@ -126,9 +125,14 @@ export function say (a, on, e) {
   const l = a && a.life;
   if (!l) return;
   l.talk = !!on;
-  if (l.face) { l.face.talk = !!on; if (on) { l.face.mouth = true; l.face.talkT = 0.1; } }
+  if (l.face) { l.face.talk = !!on && !calm(); if (on) { l.face.mouth = 1; l.face.talkT = 0.1; } }
   if (on) { if (e || !(l.emoT > 0)) setEmo(a, e, 0); l.gest = 0; }      // без пометки — лицо от действия (joy) досиживает своё
   else if (l.emo) setEmo(a, l.emo, LIFE.EMO_HOLD);
+}
+
+export function hush (a) {
+  const l = a && a.life;
+  if (l && l.face) { l.face.talk = false; l.face.mouth = 0; }
 }
 
 /* поза кадра: story.js actorStep собирает P (ходьба), здесь — характер и чувства */

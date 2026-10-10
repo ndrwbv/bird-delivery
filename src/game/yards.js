@@ -104,6 +104,16 @@ export function blocks (x, z, r) {
   return false;
 }
 
+/* стоячие заборчики и лавочки в прямоугольнике, по разу каждая — для проезда навигатора (routeyard.js) */
+export function each (x0, z0, x1, z1, fn) {
+  const seen = new Set();
+  for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL); i++)
+    for (let j = Math.floor(z0 / CELL); j <= Math.floor(z1 / CELL); j++) {
+      const a = GRID.get(i + ',' + j);
+      if (a) for (const it of a) if (!it.down && !seen.has(it)) { seen.add(it); fn(it); }
+    }
+}
+
 /* Расстановка — один раз, после подъездов и дорожек у стен (game.js osmEntrances).
    A: THREE, CITY, HOUSE_GRID, LITM, BENCHES, YARD_PATHS, box, put, smashAdd, groundH, inHouse,
       inBounds, inPoly, nearestRoad, benchOk, DRIVE_MAX, fenceNear (чужой забор ближе r — дорожку не ведём)

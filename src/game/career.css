@@ -21,20 +21,22 @@ body.career #money b { color: #ffe6ee; text-shadow: 2px 2px 0 #3a1020; }
   #cash { gap: 3px; }
 }
 
-/* ── обед: три карточки в ряд ── */
-#choice.big.cr-lunch .ch-box { width: min(620px, calc(100% - 32px)); background: #fff3d6; }
-#choice.big.cr-lunch #ch-t { color: #f0522a; }
-#choice.big.cr-lunch #ch-opts { flex-direction: row; gap: 10px; }
-#choice.big.cr-lunch #ch-opts button { min-height: 110px; justify-content: center; padding: 16px 10px; gap: 10px; }
+/* ── обед: три карточки в ряд, крупно — читается с дивана на Деке 1280×800 (автор 10.10.2026: «шире, он мелкий»);
+   курсор — стрелки / крестовина (game.js showChoice), как управлять — полоской внизу (.ch-ctl) ── */
+#choice.big.cr-lunch .ch-box { width: min(1080px, calc(100% - 64px)); gap: clamp(14px, 2.4vh, 24px); padding: clamp(22px, 4vh, 40px) clamp(18px, 2.6vw, 40px); background: #fff3d6; }
+#choice.big.cr-lunch #ch-t { color: #f0522a; font-size: clamp(26px, 3.6vw, 52px); text-shadow: 3px 3px 0 #33210c; margin-bottom: 4px; }
+#choice.big.cr-lunch #ch-s { font-size: clamp(11px, 1.25vw, 17px); line-height: 1.7; color: #33210c; }
+#choice.big.cr-lunch #ch-opts { flex-direction: row; gap: clamp(12px, 1.6vw, 22px); }
+#choice.big.cr-lunch #ch-opts button { min-height: clamp(150px, 26vh, 260px); justify-content: center; padding: clamp(18px, 3vh, 30px) clamp(10px, 1.2vw, 18px); gap: clamp(12px, 2vh, 20px); }
 #choice.big.cr-lunch #ch-opts button:nth-child(1) { background: #6fd3ff; }
 #choice.big.cr-lunch #ch-opts button:nth-child(2) { background: #ffd85e; }
 #choice.big.cr-lunch #ch-opts button:nth-child(3) { background: #ff9a9a; }
-#choice.big.cr-lunch #ch-opts button b { font-size: 11px; }
-#choice.big.cr-lunch #ch-opts button span { font-size: 7px; }
+#choice.big.cr-lunch #ch-opts button b { font-size: clamp(14px, 1.7vw, 24px); line-height: 1.4; }
+#choice.big.cr-lunch #ch-opts button span { font-size: clamp(10px, 1.1vw, 15px); line-height: 1.7; opacity: 1; }
 @media (max-width: 560px) { #choice.big.cr-lunch #ch-opts { flex-direction: column; } #choice.big.cr-lunch #ch-opts button { min-height: 0; } }
 
 /* ── экран конца смены — «чек смены» (career.js showEnd, shiftend.js; стиль — src/styles/paper.css, UI-REVIEW.md П1):
-   тёплое затемнение города, по центру чек, сбоку стикер Толика, под ними — пометки на полях.
+   тёплое затемнение города, по центру чек, сбоку сообщение Толика (пузырь iMessage), под ними — пометки на полях.
    Без прокрутки на 1280×720, Деке 1280×800, телефоне 390×844 и боком 844×390 (там чек в две колонки);
    не влезло (длинный язык) — career.js fitEnd чуть уменьшает. ── */
 #over.cr { padding: 0; align-items: stretch; justify-content: stretch; background: var(--pp-dim); }
@@ -64,8 +66,8 @@ body.career #money b { color: #ffe6ee; text-shadow: 2px 2px 0 #3a1020; }
                       font-size: clamp(14px, 1.45vw, 22px); line-height: 1.15; --pp-seal-rot: -10deg; }
 .cr-rc-stamp:empty { display: none; }
 .cr-rc .pp-stamp { margin-top: .8em; }
-/* стикер Толика — сбоку от чека (на узком — под ним) */
-.cr-tolik { width: min(320px, 100%); }
+/* сообщение Толика (пузырь iMessage, chat.css .en-tolik) — сбоку от чека (на узком — под ним) */
+.cr-tolik { width: min(340px, 100%); }
 
 /* пометки на полях: [Y] гараж и траты · [X] депнуть · [B] в меню (перебивают .ov-btns из delivery.css) */
 #over.cr .ov-btns { flex-wrap: wrap; justify-content: center; gap: 10px 14px; width: min(640px, 100%); margin: 0 auto; }
@@ -75,14 +77,36 @@ body.career #money b { color: #ffe6ee; text-shadow: 2px 2px 0 #3a1020; }
 #over.cr .ov-btns button.pp-red { color: var(--pp-red); }
 #over.cr .ov-btns button[hidden] { display: none; }
 #over:not(.cr) #ov-dep, #over:not(.cr) #ov-spend { display: none; }
+/* как управлять — одна бумажная полоска внизу экрана, как в меню и паузе (pausecz.css .pz-hint, dep.css .dep-keys);
+   значков на штампе и пометках нет (автор 10.10.2026); пальцем — полоски нет (career.js endKeys) */
+.cr-keys { display: none; }
+#over.cr .cr-keys { display: block; position: absolute; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); translate: -50% 0; max-width: calc(100% - 32px);
+  box-sizing: border-box; padding: .35em .9em .25em; text-align: center; white-space: nowrap; font-size: var(--pp-fs-s); line-height: 2; color: var(--pp-ink);
+  background: var(--pp-paper); border: 2px solid var(--pp-ink); border-radius: 2px; box-shadow: 0 3px 0 rgba(51, 33, 12, .7); pointer-events: none; transition: opacity .25s ease-out; }
+#over.cr .cr-keys[hidden] { display: none; }
+#over.cr .cr-keys .pp-key { margin: 0 .25em 0 .1em; }
+#over.cr .cr-keys i { font-style: normal; margin: 0 .6em; opacity: .5; }
+#over.cr.wait .cr-keys { opacity: 0; }
+#over.cr:has(.cr-keys:not([hidden])) .ov-box { padding-bottom: max(56px, 2.4vh + 44px); }
 
 /* пока чек печатается — штампа и пометок не видно и не нажать (место держим); штамп потом шлёпает (paperfx slam) */
 #over.cr .ov-btns { transition: opacity .25s ease-out; }
 #over.cr.wait .cr-rc-stamp, #over.cr.wait .ov-btns { opacity: 0; visibility: hidden; pointer-events: none; }
+/* чек въезжает снизу один раз, в своём настоящем размере: без scale и без пружины-перелёта (автор 10.10.2026: «сначала мелко,
+   потом крупно» — общий pp-in из paper.css начинает с 0,92 и пружинит). Пока въезжает — у #over нет прокрутки
+   (иначе на миг полоса прокрутки сужает экран и всё сдвигается) */
+#cr-stage .cr-rc.pp-in { animation: cr-rc-in .5s cubic-bezier(.2, .75, .25, 1) var(--pp-delay, 0s) both; }
+@keyframes cr-rc-in { 0% { opacity: 0; transform: translateY(45vh) rotate(4deg); } 30% { opacity: 1; } 100% { opacity: 1; transform: none; } }
+#over.cr.wait { overflow: hidden; }
+/* «уменьшить движение» — чек, строки, печать и сообщение Толика сразу на месте, без анимаций */
+@media (prefers-reduced-motion: reduce) {
+  #cr-stage .cr-rc, #cr-stage .cr-rc *, #cr-stage .cr-tolik, #cr-stage .cr-tolik * { animation: none !important; transition: none !important; }
+}
+body.calm-fx #cr-stage .cr-rc, body.calm-fx #cr-stage .cr-rc *, body.calm-fx #cr-stage .cr-tolik, body.calm-fx #cr-stage .cr-tolik * { animation: none !important; transition: none !important; }
 /* «допечатать сразу» — все анимации чека и стикера в конец */
-#cr-stage.cr-now .cr-rc, #cr-stage.cr-now .cr-rc *, #cr-stage.cr-now .cr-tolik { animation: none !important; }
+#cr-stage.cr-now .cr-rc, #cr-stage.cr-now .cr-rc *, #cr-stage.cr-now .cr-tolik, #cr-stage.cr-now .cr-tolik * { animation: none !important; }
 
-/* телефон боком и низкие окна: чек слева во всю высоту, справа столбиком — стикер Толика и пометки */
+/* телефон боком и низкие окна: чек слева во всю высоту, справа столбиком — сообщение Толика и пометки */
 @media (max-height: 540px) and (min-width: 600px) {
   #over.cr { --pp-fs-s: 10px; --pp-fs-m: 11px; --pp-fs-l: clamp(15px, 4.2vh, 18px); }
   #over.cr .ov-box { display: grid; grid-template-columns: minmax(0, 600px) minmax(150px, 220px); grid-template-areas: "rc tol" "rc btn";
@@ -94,10 +118,12 @@ body.career #money b { color: #ffe6ee; text-shadow: 2px 2px 0 #3a1020; }
   .cr-rc .pp-row { padding: .2em 0; }
   .cr-rc .pp-stamp { margin-top: .5em; padding: 8px 6px; }
   .cr-rc-hints > .pp-hint { margin-top: .3em; line-height: 1.5; }
-  .cr-tolik { grid-area: tol; align-self: end; width: 100%; padding: 1.1em .7em .7em; gap: .5em; }
-  .cr-tolik .pp-polaroid { width: 40px; height: 40px; border-width: 3px; border-bottom-width: 8px; }
+  .cr-tolik { grid-area: tol; align-self: end; width: 100%; gap: .5em; }
+  .cr-tolik > img, .cr-tolik > i { width: 36px; border-width: 2px; }
   #over.cr .ov-btns { grid-area: btn; align-self: start; flex-direction: column; align-items: stretch; width: 100%; gap: 8px; }
   #over.cr .ov-btns button { padding: .6em .8em; }
+  #over.cr .cr-keys { display: none; }
+  #over.cr:has(.cr-keys) .ov-box { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
 }
 
 /* ── «гараж и траты» — бумага (UI-REVIEW, «как накладная»): плитки — бланки с цветной полоской сверху,
@@ -105,6 +131,7 @@ body.career #money b { color: #ffe6ee; text-shadow: 2px 2px 0 #3a1020; }
 #cr-end { display: flex; flex-direction: column; gap: clamp(8px, 1.4vh, 14px); }
 #cr-wallet .pp-row.pp-total { margin-top: 0; border-top: 0; padding-top: .3em; }
 #cr-wallet .pp-hint { margin: .1em 0 0; }
+#cr-wallet .pg-ico { width: 1.9em; height: auto; vertical-align: -.35em; margin-right: .6em; image-rendering: pixelated; }   /* копилка — свинья, как на хаде */
 
 .cr-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(8px, 1.2vw, 14px); }
 .cr-tabs.n2 { grid-template-columns: repeat(2, 1fr); }

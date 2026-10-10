@@ -1,11 +1,12 @@
 /* ──────────────────────────────────────────────────────────────────────────
    Повтор для клипов (№ 10 IDEAS, 09.10.2026). Правила словами — docs/CAREER.md «Повтор».
 
-   ЗАПИСЬ — всё время, пока идёт смена (и пока машина «умирает»): 30 раз в секунду игрового
+   ЗАПИСЬ — всё время, пока идёт смена (и пока машина «умирает»): 20 раз в секунду игрового
    времени снимок поз всего, что ездит, ходит и летает рядом со своей машиной (RP.R м): верхние
    объекты сцены (машины потока, прохожие, свои и чужие обломки, сбитые столбы и лавочки, дым и
    искры), колёса своей машины, камера игры. Хранится последние RP.SECS секунд — кольцом в
-   готовых массивах (ничего не выделяем в кадре): ~2,9 МБ. Между снимками — плавно (интерполяция).
+   готовых массивах (ничего не выделяем в кадре): ~1,9 МБ. Между снимками — плавно (интерполяция); колёса своей
+   машины — не по короткой дуге, а на сколько машина проехала (WHEEL_R): на любой скорости крутятся вперёд.
 
    ПОВТОР — клавиша R / LB геймпада в езде, или «повтор» в паузе. Мир стоит, хад скрыт, сверху —
    плашка «ПОВТОР»; камера — 4 ракурса (сзади низко, сбоку как у трассы, облёт, как было в игре),
@@ -47,7 +48,9 @@ import * as IMPACT from './impact.js';
 import { fixDuration } from './webmdur.js';
 
 export const RP = {
-  HZ: 30,             // снимков в секунду игрового времени
+  HZ: 20,             // снимков в секунду игрового времени (было 30, 10.10.2026: запись дешевле на треть; между снимками — плавно, колёса — по пути машины)
+  HIT_V: 6,           // м/с: удар своей машины сильнее — снимок в этом же кадре, вне очереди (момент удара — точно, а не между снимками)
+  WHEEL_R: 0.46,      // м: радиус колеса своей машины, как в game.js (V.wheel += vf·dt / 0.46) — поворот колеса между снимками
   SECS: 10,           // сколько секунд хранить
   R: 140,             // м от своей машины: что дальше — не пишем (в повторе камера рядом, дальше — туман)
   E_AVG: 180,         // в среднем объектов в снимке (кольцо — на SECS·HZ·E_AVG; больше — окно чуть короче)
@@ -85,7 +88,7 @@ const FDL = 16;                                 // кадр: время, кам�
 const FD = new Float32Array(F_CAP * FDL);
 const FS = new Float64Array(F_CAP);             // номер первой записи кадра (сквозной)
 const FC = new Int32Array(F_CAP);               // сколько записей
-let FN = 0, F0 = 0, EN = 0, T = 0, ACC = 0, LIVE = false;
+let FN = 0, F0 = 0, EN = 0, T = 0, ACC = 0, LIVE = false, HIT = false;
 /* реестр: объект → номер; номер освобождается, когда его нет ни в одном живом снимке */
 const IDX = new Map();
 const OBJ = [], LAST = [], FREE = [];
@@ -196,8 +199,10 @@ export function rec (dt) {
   if (!LIVE) { clear(); LIVE = true; }
   T += dt; ACC += dt;
   const step = 1 / RP.HZ;
-  if (FN > F0 && ACC < step) return;
-  ACC = ACC >= 2 * step ? 0 : Math.max(0, ACC - step);
+  const hit = HIT && ACC >= step * 0.5;            // удар — вне очереди, но не чаще чем через полшага (иначе окно кольца короче)
+  if (FN > F0 && ACC < step && !hit) return;
+  ACC = hit || ACC >= 2 * step ? 0 : Math.max(0, ACC - step);
+  HIT = false;
   const t0 = performance.now();
   const cp = car.position, cx = cp.x, cz = cp.z;
   if (FN > F0) {
@@ -220,7 +225,7 @@ export function rec (dt) {
   const sw = CAND; CAND = NEXT; NEXT = sw;
   let n = SN;
   const wh = car.userData && car.userData.wheels;
-  if (wh) for (let i = 0; i < wh.length; i++) { const w = wh[i]; let id = IDX.get(w); if (id === undefined) id = register(w); put(id, w, 2); n++; }
+  if (wh) for (let i = 0; i < wh.length; i++) { const w = wh[i]; let id = IDX.get(w); if (id === undefined) id = register(w); put(id, w, 2 | 4); n++; }   // 4 — колесо (apply: поворот по пути)
   FC[slot] = n;
   const c = A.cam, b = slot * FDL;
   FD[b] = T;
@@ -363,6 +368,10 @@ function at (pt) {
 const AT = [0, 0];
 function apply (k, a) {
   const k2 = Math.min(F - 1, k + 1);
+  // колёса своей машины: на сколько они повернулись между снимками — по пути машины вдоль курса (м / радиус),
+  // а не по короткой дуге (быстрее ~100 км/ч при 20 снимках в секунду короткая дуга крутила бы их назад)
+  const c1 = k * FDL, c2 = k2 * FDL, ch = CD[c1 + 11];
+  const wexp = ((CD[c2 + 8] - CD[c1 + 8]) * Math.sin(ch) + (CD[c2 + 10] - CD[c1 + 10]) * Math.cos(ch)) / RP.WHEEL_R;
   for (let i = 0; i < TR.length; i++) {
     const tr = TR[i], o = tr.o, P = tr.pres, d = tr.d;
     const p1 = P[k], p2 = P[k2];
@@ -372,6 +381,19 @@ function apply (k, a) {
     if (b1 === b2) w = 0;
     const L = (j) => d[b1 + j] + (d[b2 + j] - d[b1 + j]) * w;
     o.position.set(L(0), L(1), L(2));
+    const fl = d[(w < 0.5 ? b1 : b2) + 11];
+    if ((fl & 4) && b1 !== b2 && Math.abs(d[b1 + 4]) + Math.abs(d[b1 + 5]) + Math.abs(d[b2 + 4]) + Math.abs(d[b2 + 5]) < 1e-3) {
+      // поворот только вокруг оси колеса (x): угол из кватерниона, лишние обороты — те, что ближе к пути машины
+      const a1 = 2 * Math.atan2(d[b1 + 3], d[b1 + 6]), a2 = 2 * Math.atan2(d[b2 + 3], d[b2 + 6]);
+      let da = a2 - a1;
+      da += Math.round((wexp - da) / (Math.PI * 2)) * Math.PI * 2;
+      const an = (a1 + da * w) / 2;
+      o.quaternion.set(Math.sin(an), 0, 0, Math.cos(an));
+      o.scale.set(L(7), L(8), L(9));
+      o.visible = true;
+      if (tr.frozen) { o.updateMatrix(); o.updateMatrixWorld(true); }
+      continue;
+    }
     // кватернион: nlerp по короткой дуге
     let qx = d[b2 + 3], qy = d[b2 + 4], qz = d[b2 + 5], qw = d[b2 + 6];
     if (d[b1 + 3] * qx + d[b1 + 4] * qy + d[b1 + 5] * qz + d[b1 + 6] * qw < 0) { qx = -qx; qy = -qy; qz = -qz; qw = -qw; }
@@ -379,7 +401,6 @@ function apply (k, a) {
     const n = Math.sqrt(x * x + y * y + z * z + ww * ww) || 1;
     o.quaternion.set(x / n, y / n, z / n, ww / n);
     o.scale.set(L(7), L(8), L(9));
-    const fl = d[(w < 0.5 ? b1 : b2) + 11];
     o.visible = (fl & 2) ? true : !!(fl & 1);
     const op = d[b1 + 10];
     if (op >= 0 && o.material) o.material.opacity = L(10);
@@ -729,6 +750,7 @@ async function done (blob, mime, ms) {
 /* ── сильный удар: короткое замедление, тряска, «вуух» ── */
 let SLOW_T = 0, SLOW_AT = -1e9;
 export function crash (vn) {
+  if (A && !OPEN && vn >= RP.HIT_V) HIT = true;
   if (!A || OPEN || !(vn >= RP.SLOW.V)) return;
   if (A.GFX && A.GFX.fxLow && A.GFX.fxLow()) return;   // «эффекты: меньше» — без замедления и тряски
   const now = performance.now() / 1000;

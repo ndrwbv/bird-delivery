@@ -8,6 +8,7 @@
 import { translit } from '../../i18n/index.js';
 import { ORDER_TYPES } from '../../game/orders.config.js';
 import { STORIES } from '../../game/story.js';
+import '../../game/ordertags.css';               // оттенок сюжетной накладной (#phone.ord-story)
 
 const ADDR = ['Ленинградская улица, 21', 'проспект Коммунистический, 51', 'улица Калинина, 85', 'улица Мира, 12', 'Северная улица, 7', 'улица Победы, 3', 'Солнечная улица, 40'];
 const NOTES = ['в подъезде живёт кот, он главный', 'стучать ногой, руками нельзя', 'если не открыл — значит открыл', 'просил без ананасов, но с ананасами',
@@ -52,7 +53,7 @@ export default function hudScreens (ctx) {
   const zina = STORIES.find(s => s.id === 'zina');
   const invoice = {
     id: 'invoice', group: 'Окна поверх езды', name: 'накладная (карточка заказа)',
-    note: 'Копия game.js showOrderCard: шапка с номером, таблица, фото на скрепке, «ГАЗ ГАЗ». Полоса цвета вида и печать «СРОЧНО» — настоящий orders.js card.',
+    note: 'Копия game.js showOrderCard: шапка с номером, таблица, фото на скрепке; кнопки нет — в игре сама падает к радару мини-карточкой (ordertags.js), тут — клик по листу. Полоса цвета вида, печать «СРОЧНО» и оттенок сюжета — настоящий orders.js card.',
     knobs: [
       { k: 'type', label: 'вид заказа', type: 'sel', def: 'pizza', opts: [['pizza', 'пицца'], ['urgent', 'срочно'], ['story', 'история (баба Зина)'], ['staff', 'развоз смены']] },
       { k: 'kind', label: 'сколько адресов', type: 'sel', def: 'solo', opts: [['solo', 'один адрес'], ['group', 'групповой (несколько человек на адресе)'], ['chain', 'последовательный'], ['bundle', 'сборный (свой адрес у каждого)']] },
@@ -62,8 +63,6 @@ export default function hudScreens (ctx) {
       { k: 'district', label: 'район доставки', type: 'sel', def: 0, opts: DIST.list().map((d, i) => [i, d.name]) },
       { k: 'fee', label: 'оплата, ₽', type: 'num', def: 3200, min: 0, max: 100000, step: 100 },
       { k: 'no', label: 'номер заказа', type: 'num', def: 7, min: 1, max: 9999, step: 1 },
-      { k: 'note', label: 'комментарий курьера', type: 'bool', def: true },
-      { k: 'gate', label: 'пометка «шлагбаум»', type: 'bool', def: false },
       { k: 'long', label: 'длинные имена', type: 'bool', def: false },
     ],
     async show (o) {
@@ -91,14 +90,13 @@ export default function hudScreens (ctx) {
       $('ph-kind').textContent = t('накладная') + ' · ' + (KIND_LABEL[order.kind] || t('заказ'));
       const src = el.querySelector('.ph-src');
       if (src) src.textContent = '№ ' + String(+o.no || 1).padStart(4, '0');
-      $('ph-accept').textContent = t('ГАЗ ГАЗ');
       const many = stops.length > 1;
       const face = (p, n) => '<div class="oc-p">' + (n ? '<em>' + n + '</em>' : '') + (p ? '<img src="' + faceDataURL(p) + '" alt="">' : '<i></i>') + '</div>';
       const persons = stops.flatMap(st => st.persons);
       const pics = stops.flatMap((st, i) => st.persons.map(p => face(p, many ? i + 1 : 0))).join('');
       const st0 = stops[0];
       const who = bundle ? stops.map((st, i) => '<b>' + (i + 1) + '. ' + st.persons.map(p => (p && p.name) || t('Иван Иванов')).join(', ') + '</b><small>' + st.addr + '</small>').join('')
-        : persons.map(p => '<b>' + ((p && p.name) || t('Иван Иванов')) + '</b>' + (p && p.desc ? '<small>' + p.desc + '</small>' : '')).join('');
+        : persons.map(p => '<b>' + ((p && p.name) || t('Иван Иванов')) + '</b>').join('');
       const di = Math.max(0, Math.min(DIST.count() - 1, +o.district || 0));
       const ZL = { rich: 'особняки', gang: 'бандитский район', garage: 'гаражи', ind: 'промзона', poor: 'частный сектор', normal: 'город' };
       const rows = [
@@ -108,8 +106,6 @@ export default function hudScreens (ctx) {
         // orders.js cardRows: район и оплата
         [t('район'), esc(t(DIST.list()[di].name)) + (o.zone && o.zone !== 'normal' ? ' · ' + esc(t(ZL[o.zone])) : '')],
         [t('оплата'), '<b class="oc-pay">' + money(+o.fee || 0) + '</b>'],
-        order.why ? [t('пометка'), order.why] : null,
-        st0.note ? [t('комментарий курьера'), '«' + st0.note + '»'] : null,
       ].filter(Boolean);
       $('ph-list').innerHTML = '<div class="oc-sheet"><table class="oc-inv">' + rows.map(([k, v]) => '<tr><th>' + k + '</th><td>' + v + '</td></tr>').join('') + '</table>' +
         '<div class="oc-photos' + (persons.length > 2 ? ' small' : '') + '"><i class="oc-clip"></i>' + pics + '</div></div>';
@@ -118,7 +114,7 @@ export default function hudScreens (ctx) {
       ORD.card(order);
       el.classList.add('on');
       document.body.classList.add('brief');
-      $('ph-accept').onclick = () => { el.classList.remove('on'); document.body.classList.remove('brief'); log('«ГАЗ ГАЗ» — заказ принят'); };
+      el.onclick = () => { el.classList.remove('on'); document.body.classList.remove('brief'); log('накладная свернулась'); };
     },
   };
 
@@ -228,22 +224,20 @@ export default function hudScreens (ctx) {
       word.classList.toggle('long', word.textContent.length > 20);
       $('wasted').hidden = false;
       document.body.classList.add('w-show');
-      const every = ECON.REVIVE.SALE_EVERY;
-      const saleLine = R.sale ? t('скидка: {sale} вместо {full}', { sale: money(R.price), full: money(R.full) }) + ' · ' + tn(every, 'раз в {n} смену|раз в {n} смены|раз в {n} смен')
-        : tn(R.wait, 'скидка {sale} — через {n} смену|скидка {sale} — через {n} смены|скидка {sale} — через {n} смен', { sale: money(ECON.REVIVE.SALE) });
+      // автор 10.10.2026: без строки скидки, без «заказ и смена — дальше», без зачёркнутой цены и значков клавиш на кнопках
       const choice = have < price
-        ? { title: t('воскреснуть — {money}', { money: money(price) }), sub: t('в копилке {money} — не хватает', { money: money(have) }) + ' · ' + saleLine,
+        ? { title: t('воскреснуть — {money}', { money: money(price) }), sub: t('в копилке {money} — не хватает', { money: money(have) }),
           opts: [{ label: t('ну что ж'), r: 'нет денег' }], timeout: 4 }
         : { title: R.sale ? t('воскреснуть со скидкой?') : t('воскреснуть?'),
           sub: t('новая машина спустится с неба · из копилки {money} (там {have})', { money: money(price), have: money(have) }),
-          opts: [{ label: t('воскреснуть · {money}', { money: money(price) }) + (R.sale ? ' <s>' + money(R.full) + '</s>' : ''), sub: t('заказ и смена — дальше') + ' · ' + saleLine, r: 'воскрес' },
-            { label: t('нет, всё'), r: 'нет, всё' }], timeout: 9 };
+          opts: [{ label: t('воскреснуть · {money}', { money: money(price) }), r: 'воскрес' },
+            { label: t('нет, закончить смену'), r: 'нет, всё' }], timeout: 9 };
       // game.js showChoice({ …, full: true })
       const el = $('choice');
       $('ch-face').innerHTML = '';
       $('ch-t').textContent = choice.title;
       $('ch-s').innerHTML = choice.sub || '';
-      $('ch-opts').innerHTML = choice.opts.map((q, i) => '<button type="button" data-i="' + i + '"><em>' + (i + 1) + '</em><b>' + q.label + '</b>' + (q.sub ? '<span>' + q.sub + '</span>' : '') + '</button>').join('');
+      $('ch-opts').innerHTML = choice.opts.map((q, i) => '<button type="button" data-i="' + i + '"' + (i === 0 ? ' class="ch-cur"' : '') + '><b>' + q.label + '</b>' + (q.sub ? '<span>' + q.sub + '</span>' : '') + '</button>').join('');
       el.classList.add('big', 'full');
       el.dataset.kind = '';
       el.style.setProperty('--ch-left', '1');

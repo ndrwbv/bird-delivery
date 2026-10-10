@@ -47,34 +47,36 @@ body #pausem { background: var(--pp-dim), rgba(30, 12, 20, .35); }
   border-radius: 50%; background: var(--pp-hole); border: 2px solid var(--pp-ink); box-sizing: border-box; }
 .pz-card.pz-btn > button:hover { background: #fff8e6; }
 .pz-card.pz-btn > button:active { translate: 0 4px; transition-duration: .05s; }
-.pz-card.pz-btn > button .pp-key { margin-right: .6em; }
-.pz-card:not(.on) .pp-key { display: none; }
 .pz-card.pz-btn > #pm-map { --acc: var(--pp-lime); }
 .pz-card.pz-btn > #pm-set { --acc: #cdbfa3; }
 .pz-card.pz-btn > #pm-ctrl { --acc: var(--pp-pink); }
 .pz-card.pz-btn > #pm-menu { --acc: var(--pp-red); color: var(--pp-red); }
-/* «продолжить» — красный штамп с [A] */
+/* «продолжить» — красный штамп с треугольником ▶ */
 .pz-card.pz-btn > #pm-go { padding: 8px; font-size: clamp(12px, min(1.25vw, 2.3vh), 18px); letter-spacing: .02em;
   color: var(--pp-paper); background: var(--pp-red); border-width: 4px; border-radius: 8px; rotate: -1deg; text-shadow: 2px 2px 0 var(--pp-ink);
   box-shadow: 0 6px 0 var(--pp-ink), inset 0 -6px 0 rgba(0, 0, 0, .14), 0 14px 32px rgba(240, 82, 42, .35); }
 .pz-card.pz-btn > #pm-go::after { display: none; }
 .pz-card.pz-btn > #pm-go:hover { background: var(--pp-fire); }
-.pz-card.pz-btn > #pm-go .pp-key { color: var(--pp-red); background: var(--pp-paper); text-shadow: none; }
-.pz-card.pz-btn > #pm-go:has(.pp-key:not(:empty))::before { display: none; }   /* значок [A] вместо треугольника */
 /* курсор геймпада: чернильно-жёлтая обводка, ярлычок один раз приподнялся */
 .pz-card.on > .padsel, .pz-card.on > button:focus-visible { outline: 4px solid var(--pp-ink) !important; outline-offset: 3px;
   box-shadow: 0 0 0 9px var(--pp-yellow), 0 6px 0 var(--pp-ink) !important; animation: pp-lift .2s var(--pp-spring); }
 .pz-card.on > .padsel:not(#pm-go) { background: color-mix(in srgb, var(--acc) 30%, var(--pp-paper)); }
+/* как выбрать — одна бумажная полоска внизу, как в главном меню (menu.css .crm-hint); значок — по вводу (glyphs.js) */
+.pz-hint { flex: none; align-self: center; margin-top: 6px; padding: .35em .9em .25em; text-align: center; font-size: var(--pp-fs-s); line-height: 2; color: var(--pp-ink);
+           background: var(--pp-paper); border: 2px solid var(--pp-ink); border-radius: 2px; box-shadow: 0 3px 0 rgba(51, 33, 12, .7); }
+.pz-hint .pp-key { margin: 0 .2em 0 .4em; }
 /* низкий экран (телефон боком): заголовок мельче, листки ниже */
 @media (max-height: 500px) {
   #pausem { --u: clamp(6px, 1.4vh, 10px); --pcw: clamp(140px, 20vw, 200px); }
   .pz-head { padding: 0; }
   .pz-head .pm-t { font-size: 16px; }
   .pz-top { padding-top: 4px; padding-bottom: 6px; }
+  .pz-hint { display: none; }
 }
 /* телефон стоймя: листки друг под другом, каждый — до половины места */
 @media (max-aspect-ratio: 1/1) {
   #pausem { --pcw: min(56vw, 240px); }
   .pz-top { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 14px; padding: 6px 4px 10px; }
   .pz-sheet { flex: 0 1 auto !important; max-height: 50%; }
+  .pz-hint { display: none; }
 }

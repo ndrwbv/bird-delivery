@@ -24,7 +24,7 @@ def make (W, H, name):
     dr = ImageDraw.Draw(im)
     size = int(H * .11)
     f = ImageFont.truetype(str(font), size) if lang not in ('ja', 'zh') else ImageFont.load_default(size)
-    ic = icon.resize((int(H * .3), int(H * .3)), Image.NEAREST)
+    ic = icon.resize((int(H * .3), int(H * .3)), Image.LANCZOS)   # иконка — крупный пиксель 512, уменьшаем без рваных линий
     tw = dr.textlength(title, font=f)
     x = (W - tw - ic.width - H * .05) / 2
     y = int(H * .79 - size / 2)

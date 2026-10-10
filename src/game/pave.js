@@ -20,6 +20,7 @@
      PAVE.init({ RSEG, CITY, onAlley })   — один раз (game.js, сразу после RSEG)
      PAVE.onPave(x, z, m)                 — '' (газон) или вид мощёного
      PAVE.walkHalf(seg)                   — от оси дороги до внешнего края тротуара, м
+     PAVE.each(x0, z0, x1, z1, fn)        — куски мощёного в прямоугольнике (проезд навигатора, routeyard.js)
    ────────────────────────────────────────────────────────────────────────── */
 
 export const PAVE = { WALK: 2.75, SIDE: 1, PATH: 1, CELL: 32, MAXM: 3 };
@@ -86,6 +87,21 @@ export function onPave (x, z, m = 0) {
   for (const s of PG.get(k) || []) if (segD(x, z, s[0], s[1], s[2], s[3]) < PAVE.PATH + m) return 'path';
   if (A.onAlley && A.onAlley(x, z, m)) return 'alley';
   return '';
+}
+
+/* мощёное в прямоугольнике, по разу каждый кусок — для проезда навигатора (routeyard.js):
+   fn(ax, az, bx, bz, half) — ось куска и от оси до края мощёного */
+export function each (x0, z0, x1, z1, fn) {
+  if (!A) return;
+  if (!G) index();
+  indexPaths();
+  const C = PAVE.CELL, seen = new Set();
+  for (let i = Math.floor(x0 / C); i <= Math.floor(x1 / C); i++)
+    for (let j = Math.floor(z0 / C); j <= Math.floor(z1 / C); j++) {
+      const k = key(i, j);
+      for (const s of G.get(k) || []) if (!seen.has(s)) { seen.add(s); fn(s.x1, s.z1, s.x2, s.z2, s.c <= 5 ? walkHalf(s) : s.w / 2 + PAVE.SIDE); }
+      for (const s of PG.get(k) || []) if (!seen.has(s)) { seen.add(s); fn(s[0], s[1], s[2], s[3], PAVE.PATH); }
+    }
 }
 
 export const DEBUG = { PAVE, onPave, walkHalf, get cells () { return G ? G.size : 0; }, get paths () { return PN; } };

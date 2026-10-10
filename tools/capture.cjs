@@ -137,7 +137,7 @@ async function main () {
     }, 1000 / 30);
     // постановка: анкета → проспект с нитро → вручение → вечер → дождь. Всего ~26 с
     await sleep(1800);                                  // анкета заказа в кадре
-    await js(`document.getElementById('ph-accept').click()`);
+    await js(`__dlv.acceptOrder()`);                  // накладная и так свернётся сама через ~2,6 с
     await js(AUTOPILOT);
     await sleep(1500);
     await js(`window.__ap.on = false`);
@@ -159,7 +159,7 @@ async function main () {
     app.quit(); return;
   }
 
-  await js(`document.getElementById('ph-accept').click()`);
+  await js(`__dlv.acceptOrder()`);                  // накладная и так свернётся сама через ~2,6 с
   await js(AUTOPILOT);
   await sleep(5000);
   await shot(mobile ? 'm-drive' : 'shot-2-drive');

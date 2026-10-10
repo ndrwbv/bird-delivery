@@ -34,6 +34,8 @@ import { t, N_, translit } from '../i18n/index.js';
 import { ADS as BB_ADS } from './billboards.js';
 
 export const RAD = {
+  HIDDEN: true,       // автор 10.10.2026: «Солнечный FM — скрой пока эту фичу»: радио нет совсем (ни станции, ни плашки, ни
+                      // ведущего, ни строки в настройках, F / ↓ ничего не делают) — играет музыка игры. Вернуть — false
   PLATE: 2,           // с — плашка станции после переключения
   FIRST: [25, 40],    // с — первая реплика ведущего после начала езды
   GAP: [60, 90],      // с — между репликами: не раньше 60 с (на стыке песен); без стыка — через 60—90 с
@@ -136,7 +138,7 @@ export function init (api) {
   A = api;
   const S = A.Store;
   if (S) {
-    ST.on = String(S.get(KEY_ON, '1')) !== '0';
+    ST.on = !RAD.HIDDEN && String(S.get(KEY_ON, '1')) !== '0';
     const i = +S.get(KEY_ST, 0);
     ST.i = Number.isFinite(i) && i >= -1 && i < STATIONS.length ? i : 0;
   }
@@ -144,7 +146,7 @@ export function init (api) {
 
 /* ── настройки ── */
 export const enabled = () => ST.on;
-export function setEnabled (on) { ST.on = !!on; if (A && A.Store) A.Store.set(KEY_ON, on ? '1' : '0'); if (!on) clear(); }
+export function setEnabled (on) { if (RAD.HIDDEN) return; ST.on = !!on; if (A && A.Store) A.Store.set(KEY_ON, on ? '1' : '0'); if (!on) clear(); }
 export const station = () => (ST.i >= 0 ? STATIONS[ST.i] : null);
 export const stationName = () => (ST.i >= 0 ? t(STATIONS[ST.i].name) : t('радио выкл'));
 
@@ -162,7 +164,7 @@ export function onSong (sl) {
 
 /* ── кнопка: следующая станция; после последней — «выкл» ── */
 export function next () {
-  if (!A) return;
+  if (!A || RAD.HIDDEN) return;
   if (!ST.on) { show(t('радио выключено в настройках'), '', t('настройки → звук'), RAD.PLATE + 1); return; }
   set(ST.i + 1 >= STATIONS.length ? -1 : ST.i + 1);
 }

@@ -56,7 +56,7 @@ export const ITEMS = [
 export const PRESETS = {
   low: { fps: 0, range: 0, menu: 0, px: 0, win: 0, fx: 0, far: 0, aa: 0 },
   mid: { fps: 3, range: 1, menu: 1, px: 1, win: 1, fx: 1, far: 1, aa: 1 },
-  high: { fps: 3, range: 2, menu: 2, px: 2, win: 1, fx: 1, far: 2, aa: 1 },
+  high: { fps: 3, range: 2, menu: 2, px: 2, win: 1, fx: 1, far: 1, aa: 1 },   // far: вдали раз в 2 кадра, как на средней (10.10.2026: на «Деке» поток −0,15 мс, люди и прохожие −0,1…0,2 мс; на средней так и было)
 };
 const ORDER = ['low', 'mid', 'high'];
 const NAMES = { low: N_('низкая'), mid: N_('средняя'), high: N_('высокая'), custom: N_('своя') };

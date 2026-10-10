@@ -14,6 +14,12 @@
      carrear.js), крышка багажника (седаны), зеркало (своё с каждой стороны),
      колпак колеса. Летят от удара с машиной, кувыркаются, падают, ложатся
      плашмя на дорогу, лежат PART.LIE с и исчезают (PART.FADE с).
+   • Следы сзади (10.10.2026, REARD): камера сзади — поэтому любой удар, и в
+     морду, и в бок, копит износ зада: фонари трескаются и бьются, задний
+     бампер перекашивает и он отваливается, крышка багажника (у хэтчбеков —
+     задняя дверь, carrear.js) приоткрывается и распахивается — видно пиццу.
+   • Место удара — настоящее: о стену бьёт тот край кузова (нос или корма),
+     которым въехал (game.js bump); до 10.10 удар о стену всегда шёл в морду.
    • Чинится вместе с кузовом: новая смена, «ещё раз», возрождение, смена
      или тюнинг машины и ремонт у Дяди Жени — машина собирается заново
      (resetCar в game.js).
@@ -31,9 +37,21 @@ export const DENT = { MIN: 4, FULL: 22, DEPTH: 0.3, R0: 0.45, R1: 0.6, IN_END: 0
    (TRUNK_BARE — если заднего бампера уже нет); MIRROR — зеркало от удара в бок рядом с ним (MIRROR_NEAR м),
    MIRROR_ANY — от удара в бок где угодно; HUB — колпак ближнего колеса, если удар ближе HUB_R м;
    LIE — с лежат на дороге, FADE — с тают; MAX — деталей на земле не больше */
-export const PART = { BUMPER: 17, ARMOR_F: 3, SUM: 1.6, TRUNK: 20, TRUNK_BARE: 13, MIRROR: 9, MIRROR_NEAR: 1.3, MIRROR_ANY: 15,
+export const PART = { BUMPER: 17, ARMOR_F: 3, SUM: 1.6, TRUNK: 24, TRUNK_BARE: 18, MIRROR: 9, MIRROR_NEAR: 1.3, MIRROR_ANY: 15,
   HUB: 13, HUB_R: 0.8, LIE: 15, FADE: 0.6, MAX: 10 };
-export const ST = { dents: 0, lost: [], ground: 0, flown: 0, verts: 0, car: null };
+/* «Следы сзади» (10.10.2026, автор: «игрок видит по большей части сзади всё»): любой удар — и в морду, и в бок —
+   копит износ зада W += сила удара 0…1 (как глубина вмятины: (м/с − MIN) / (FULL − MIN), с бронёй — меньше),
+   удар в корму — × REAR_K. Ступени: S1 / S2 / S3 износа или один удар силой ONE2 / ONE3 (0…1):
+     1 — задний фонарь с той стороны в трещинах, задний бампер чуть перекосило (SKEW1 рад, сел на DROP1 м);
+     2 — тот фонарь разбит, второй в трещинах; бампер висит одним краем (SKEW2, DROP2); крышка багажника
+         (у хэтчбеков и джипов — задняя дверь) приоткрылась на AJAR / DOOR_AJAR рад и болтается на ходу;
+     3 — оба фонаря разбиты, задний бампер отвалился (падает на дорогу), крышка / дверь распахнута (OPEN / DOOR_OPEN) —
+         видны коробки с пиццей */
+export const REARD = { REAR_K: 1.5, S1: 0.4, S2: 1.0, S3: 1.6, ONE2: 0.67, ONE3: 0.99,
+  SKEW1: 0.1, DROP1: 0.04, SKEW2: 0.2, DROP2: 0.08, AJAR: 0.24, OPEN: 1.15, DOOR_AJAR: 1.0, DOOR_OPEN: 1.5 };
+export const ST = { dents: 0, lost: [], ground: 0, flown: 0, verts: 0, car: null, rear: 0 };
+
+import { crackLamp, smashLamp } from './carglass.js';
 
 let API = null;
 /* api: scene, groundH(x, z), put, mergeGeos; onLand(x, z, v, key, again) — деталь ударилась об асфальт (звук, impact.js) */
@@ -119,6 +137,7 @@ export function hit (g, lx, lz, force) {
       if (force >= PART.MIRROR_ANY || (force >= PART.MIRROR && Math.abs(m.position.z - lz) < PART.MIRROR_NEAR)) { L[key] = 1; fly(g, m, key, nx, 0, force); }
     }
   }
+  rearWear(g, end && nz < 0 ? REARD.REAR_K : 1, k, end ? (Math.sign(lx) || 1) : nx, force);
   if (force >= PART.HUB) {
     let best = null, bd = PART.HUB_R;
     for (const w of u.wheels || []) {
@@ -129,6 +148,42 @@ export function hit (g, lx, lz, force) {
     }
     if (best) hubcap(g, best, force);
   }
+}
+
+/* ─── следы сзади от любого удара: фонари, задний бампер, крышка / задняя дверь (REARD) ───
+   w — вес удара (REAR_K — в корму), k — сила 0…1, sd — с какой стороны (+1 — левый по ходу, +X) */
+function rearWear (g, w, k, sd, force) {
+  const u = g.userData, R = u.rear || (u.rear = { w: 0, st: 0 });
+  R.w += k * w;
+  let st = R.w >= REARD.S3 ? 3 : R.w >= REARD.S2 ? 2 : R.w >= REARD.S1 ? 1 : 0;
+  if (k >= REARD.ONE3) st = 3; else if (k >= REARD.ONE2) st = Math.max(st, 2);
+  const near = 'r' + (sd > 0 ? 'l' : 'r'), far = 'r' + (sd > 0 ? 'r' : 'l');
+  while (R.st < st) {
+    R.st++;
+    if (R.st === 1) { crackLamp(g, near); skew(g, sd, REARD.SKEW1, REARD.DROP1); }
+    else if (R.st === 2) {
+      smashLamp(g, near); crackLamp(g, far); skew(g, sd, REARD.SKEW2, REARD.DROP2);
+      ajar(u, REARD.AJAR, REARD.DOOR_AJAR);
+    } else {
+      smashLamp(g, near); smashLamp(g, far);
+      if (!(u.lost || {}).bumperR) dropPanel(g, 'bumperR', 0, -1, Math.min(force, 6));   // не улетает — падает под машину
+      ajar(u, REARD.OPEN, REARD.DOOR_OPEN);
+    }
+  }
+  ST.rear = R.st;
+}
+/* задний бампер перекосило: одним краем (со стороны удара) ниже */
+function skew (g, sd, a, dy) {
+  const p = g.userData.panels.find(q => q.m.name === 'bumperR');
+  if (!p) return;
+  const m = p.m;
+  m.rotation.z = Math.max(-0.5, Math.min(0.5, m.rotation.z - sd * a));
+  m.rotation.x = Math.max(-0.4, Math.min(0.4, m.rotation.x + a * 0.5));    // низ — наружу
+  m.position.y -= dy;
+}
+function ajar (u, lid, door) {
+  if (u.trunk && !u.trunk.lost) u.trunk.ajar = Math.max(u.trunk.ajar || 0, lid);
+  if (u.rdoor) u.rdoor.ajar = Math.max(u.rdoor.ajar || 0, door);
 }
 
 /* вершины у точки (cx, cy, cz) — внутрь по −n на глубину depth, в радиусе r; не глубже плоскости lim от середины */
@@ -284,8 +339,8 @@ export function step (dt, car) {
 export function hurt (car) {
   const u = car && car.userData;
   if (!u) return false;
-  const lamps = u.lamps ? Object.values(u.lamps).some(l => l.st) : false;
-  return !!(u.dents || (u.lost && Object.keys(u.lost).length) || (u.cg && u.cg.panes.some(p => p.st)) || lamps);
+  const lamps = u.lamps ? Object.values(u.lamps).some(l => l.st || l.cr) : false;
+  return !!(u.dents || (u.rear && u.rear.st) || (u.lost && Object.keys(u.lost).length) || (u.cg && u.cg.panes.some(p => p.st)) || lamps);
 }
 
-export const DEBUG = { ST, DENT, PART, DEB, lost: car => Object.keys((car && car.userData.lost) || {}).sort().join(' ') };
+export const DEBUG = { ST, DENT, PART, REARD, DEB, rear: car => (car && car.userData.rear) || null, lost: car => Object.keys((car && car.userData.lost) || {}).sort().join(' ') };

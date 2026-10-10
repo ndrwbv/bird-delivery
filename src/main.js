@@ -34,6 +34,8 @@ if (Platform.id !== 'yandex' && !Platform.langChosen) {
 }
 await initI18n(Platform.lang);
 applyDom();
+// фразы экрана загрузки («Покупаем пиццу…», index.html) уже на языке игрока — показать
+document.getElementById('boot')?.classList.add('said');
 document.documentElement.dataset.platform = Platform.id;
 
 // Стим (и dev) — Северск, Яндекс — Москва; ?map= — для отладки

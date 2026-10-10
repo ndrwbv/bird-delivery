@@ -119,6 +119,8 @@ function chip (a) {
       + '#ach-toast small{display:block;color:#8a3b22;font-size:11px;text-transform:lowercase}#ach-toast b{font-weight:normal}'
       // доска почёта открыта — плашку не показываем: ложилась на её ярлычок «достижения», а грамота и так на доске
       + 'body:has(#honor:not([hidden])) #ach-toast{display:none}'
+      // пауза открылась, пока плашка висит, — прячем (поверх паузы не нужна)
+      + 'body:has(#pausem:not([hidden])) #ach-toast{display:none}'
       // телефон стоя: справа под радаром (слева — деньги с подписями); там же чат Толика — плашка ждёт, пока он уйдёт
       + '@media (max-width:560px){#ach-toast{left:auto;right:16px;top:116px;max-width:min(170px,44vw);transform:translateY(-8px);font-size:10px;padding:5px 7px}'
       + '#ach-toast.on{transform:none}#ach-toast small{font-size:10px}'
@@ -133,8 +135,10 @@ function chip (a) {
   if (!toastOn) { toastOn = true; RQ.whenQuiet(nextChip, 20000, chatGone); }
 }
 /* на узком экране плашка там же, где чат Толика (под радаром) — ждём, пока его сообщения уйдут */
-const chatGone = () => innerWidth > 560 || !document.querySelector('#chat .cm:not(.out)');
+// и не поверх паузы (автор 10.10.2026: «Ни царапины» висела поверх паузы) — ждёт, пока игру снимут с паузы, и показывается один раз
+const chatGone = () => !(A && A.S && A.S.paused) && (innerWidth > 560 || !document.querySelector('#chat .cm:not(.out)'));
 function nextChip () {
+  if (A && A.S && A.S.paused) { setTimeout(nextChip, 400); return; }   // пауза — ждём, не поверх неё
   const a = toastQ.shift();
   if (!a) { toastOn = false; return; }
   toastOn = true;

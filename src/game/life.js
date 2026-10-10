@@ -39,8 +39,7 @@ const deepWinter = () => cold() > 0.9;
 /* ─── общее для людей ─── */
 const gy = (x, z) => A.groundH(x, z) + A.curbAt(x, z);
 const far = o => Math.hypot(o.x - A.V.x, o.z - A.V.z);
-function member (person, o) {
-  const grp = A.makeHuman(person, o);
+function member (person, o, grp = A.makeHuman(person, o)) {
   A.scene.add(grp);
   STATE.stats.spawned++;
   return { grp, u: grp.userData, person, x: 0, z: 0, dead: 0, gone: 0, shock: 0, say: null, sayT: 0, ph: rand(0, 9), crossT: rand(20, 90), speed: 1.2 };
@@ -49,6 +48,8 @@ function unsay (m) { if (m.say) { if (m.say.parent) m.say.parent.remove(m.say); 
 function say (m, text, col, dur = 2.2) { unsay(m); if (!m.gone) { m.say = A.sayBubble(m.grp, text, col || '#5a4a9a', 2.7); m.sayT = dur; } }
 function sayStep (m, dt) { if (m.say && (m.sayT -= dt) <= 0) unsay(m); }
 function dropMember (m) { unsay(m); if (!m.gone) { A.dropMesh(m.grp); m.gone = 1; } m.dead = 1; }
+/* новый выдуманный человек (makePerson(po)) — готовый из запаса людей (humanpool.js), внешность та же */
+function newMember (po) { const grp = A.freshHuman({}, po); return member(grp.userData.person, {}, grp); }
 /* тротуар не нашёлся (глушь, промзона без улиц) — такого не водим: уберём при обходе */
 function walkable (p) {
   if (p.w || p.path || p.goTo) return true;
@@ -104,7 +105,7 @@ function onCarriage (o) {
    во взрослой бежит или замирает, в детской — стоит на коленях рядом. */
 function spawnCouple () {
   const fa = chance(0.5), fb = chance(0.82) ? !fa : fa;
-  const a = member(makePerson({ fem: fa })), b = member(makePerson({ fem: fb }));
+  const a = newMember({ fem: fa }), b = newMember({ fem: fb });
   const c = { a, b, x: 0, z: 0, h: 0, ph: rand(0, 9), crossT: rand(20, 90), yard: chance(0.3),
     speed: rand(1.0, 1.3) * Math.min(a.u.pace, b.u.pace), hands: chance(0.65),
     chat: 0, chatT: rand(10, 35), lookT: rand(2, 5), look: 0, heartT: rand(4, 10), shock: 0, react: null, fresh: 1, huddle: winter() };
@@ -919,7 +920,7 @@ function parkSpot () {
 function spawnFlyer (x, z) {
   kiteMats();
   const kite = !FLY.calm && chance(winter() ? 0.12 : 0.55);
-  const m = member(makePerson());
+  const m = newMember();
   m.x = x; m.z = z; place(m);
   const f = { m, kind: kite ? 'kite' : 'drone', t: rand(0, 60), seed: rand(0, 9), L: 1.5, Lmax: rand(18, 26), pack: 0, fall: null, gaze: rand(0, Math.PI * 2),
     p: new THREE.Vector3(x, gy(x, z) + 1.6, z), v: new THREE.Vector3(), mode: 'hover', zoomT: rand(6, 12), tgt: new THREE.Vector3(), gone: 0 };

@@ -318,6 +318,12 @@ export function redressHumans (cx, cz, fx, fz, max = 3, dFar = 60) {
   if (!stale) DIRTY = false;
   return n;
 }
+/* человек из запаса (humanpool.js) собран раньше: одет не по нынешней погоде — такого не выдают, собирают заново
+   (переодеть, как redressHumans, — не то же: голову с капюшоном и шапкой тот не пересобирает) */
+export function humanStale (g) {
+  const u = g.userData;
+  return !!u.look && Math.abs((u.warm || 0) - WARM) >= 0.005;
+}
 const COATS = ['#2b2a30', '#3b4a5a', '#1f2328', '#5a3a2e', '#6b2e2e', '#2e4a6b', '#3f5a3a', '#8a2a3a', '#d9d2c2', '#4a4550', '#c9476b', '#e0b13f', '#3fa8a0'];
 const SCARVES = ['#d95d5d', '#e0b13f', '#f4f1ea', '#4f7fd6', '#59b06a', '#c9476b', '#8e6fd0', '#2b2a30'];
 const FURS = ['#5a4a3a', '#3a3036', '#6b5a48', '#8a7a68', '#2b2a30'];
@@ -449,7 +455,8 @@ function buildSpec (Lk, o = {}) {
     for (const s of [-1, 1]) bx(5, 0.06, 0.6, D + 0.1, s * (Wd / 2 + 0.05), T - 0.28, -0.01, c);
   }
   const bc = o.face === false ? null : Lk.hairC, mus = () => bx(5, 0.22, 0.04, 0.03, 0, -0.1225, F + 0.015, bc);
-  const jaw = () => { for (const s of [-1, 1]) bx(5, 0.06, 0.3, D * 0.6, s * (Wd / 2 - 0.01), -0.12, F + 0.01 - D * 0.3, bc); };
+  // бакенбарды — ниже глаз и тонкие: высокие закрывали пол-лица (автор 10.10.2026, Стёпа в катсцене: «лицо закрыто волосами»)
+  const jaw = () => { for (const s of [-1, 1]) bx(5, 0.04, 0.2, D * 0.6, s * (Wd / 2 - 0.0), -0.17, F + 0.005 - D * 0.3, bc); };
   // бороды нет под маской (вор) — там и лица нет
   if (bc && Lk.beard === 'mustache') mus();
   if (bc && Lk.beard === 'goatee') { mus(); bx(5, 0.12, 0.1, 0.04, 0, -0.235, F + 0.01, bc); }
@@ -483,7 +490,8 @@ function hairBoxes (Lk, Wd, D, r, out) {
   const long = (fh, fw) => {
     top(); fringe(fh, fw);
     out.push(['back', Wd + 0.04, 0.74, 0.1, 0, T - 0.33, -F - 0.04, c]);
-    for (const s of [-1, 1]) out.push(['side', 0.07, 0.56, D + 0.02, s * (Wd / 2 + 0.03), T - 0.24, -0.01, c]);
+    // пряди по бокам — не до самого лица: от ~трети глубины головы назад (автор 10.10.2026: «лицо у Стёпы закрыто волосами»)
+    for (const s of [-1, 1]) out.push(['side', 0.07, 0.56, D * 0.55, s * (Wd / 2 + 0.03), T - 0.24, -D * 0.24, c]);
   };
   switch (Lk.hair) {
     case 'bald':
@@ -544,7 +552,10 @@ function hairBoxes (Lk, Wd, D, r, out) {
    с крупным пикселем — поэтому глаза и брови по два пикселя, без полутонов. */
 const faceKey = (Lk, skin, Wp) => [Wp, skin, Lk.eyes, Lk.eyeC, Lk.gaze, Lk.brows, Lk.browC, Lk.mouth, Lk.lip, Lk.glasses, Lk.glassC,
   Lk.freckles, Lk.blush, Lk.mole, Lk.stubble && Lk.hairC, Lk.wrinkles].join('|');
-/* fx — живое лицо в катсценах (actorlife.js): { blink — глаза закрыты, talk — рот открыт (кадр речи) } */
+/* fx — живое лицо (катсцены actorlife.js, портреты talkface.js): { blink — глаза закрыты, half — рот приоткрыт,
+   talk — рот открыт (кадры речи: закрыт → приоткрыт → открыт) } */
+const TALK_OPEN = { smile: 'laugh', open: 'oo', o: 'oo', frown: 'shout', grit: 'oo' };
+const TALK_HALF = { smile: 'grin', open: 'open', o: 'o', frown: 'frownH', grit: 'gritH' };
 function drawFace (x, Lk, skin, Wp, ox, oy, fx) {
   const px = (c, X, Y, w = 1, h = 1) => { x.fillStyle = c; x.fillRect(ox + X, oy + Y, w, h); };
   const cx = Wp / 2, e1 = cx - 4, e2 = cx + 2;
@@ -581,9 +592,13 @@ function drawFace (x, Lk, skin, Wp, ox, oy, fx) {
   // рот
   const lc = Lk.lip || mix(skin, '#5a1f1f', 0.5), hole = '#3a1a1a', teeth = '#f4f1ea';
   // говорит: рот открыт — какой, зависит от выражения (смеётся, кричит, ахает)
-  const mouth = fx && fx.talk ? ({ smile: 'laugh', open: 'oo', o: 'oo', frown: 'shout', grit: 'oo' }[Lk.mouth] || 'talk') : Lk.mouth;
+  const mouth = fx && fx.talk ? (TALK_OPEN[Lk.mouth] || 'talk') : fx && fx.half ? (TALK_HALF[Lk.mouth] || 'half') : Lk.mouth;
   switch (mouth) {
     case 'talk': px(hole, cx - 2, 12, 4, 2); px(lc, cx - 2, 14, 4); break;
+    case 'half': px(hole, cx - 2, 12, 4); px(lc, cx - 2, 13, 4); break;                                          // приоткрыт
+    case 'grin': px(lc, cx - 3, 11); px(lc, cx + 2, 11); px(teeth, cx - 2, 12, 4); px(lc, cx - 2, 13, 4); break;   // улыбка с зубами
+    case 'frownH': px(hole, cx - 2, 12, 4); px(lc, cx - 3, 13, 6); break;
+    case 'gritH': px(teeth, cx - 2, 12, 4); px(hole, cx - 2, 13, 4); px(lc, cx - 3, 12, 1, 2); px(lc, cx + 2, 12, 1, 2); break;
     case 'laugh': px(lc, cx - 3, 11); px(lc, cx + 2, 11); px(hole, cx - 2, 12, 4, 2); px(teeth, cx - 2, 12, 4); break;
     case 'shout': px(hole, cx - 2, 12, 4, 3); px(teeth, cx - 2, 12, 4); px(lc, cx - 3, 13); px(lc, cx + 2, 13); break;
     case 'oo': px(hole, cx - 1, 11, 2, 3); px(lc, cx - 2, 12, 1, 1); px(lc, cx + 1, 12, 1, 1); break;
@@ -681,9 +696,12 @@ export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
     u.lod.geometry.dispose(); u.lod.geometry = geo(S.parts.map((l, i) => [l, ...S.piv[i]]));
     u.colors.shirt = S.shirt; u.colors.pants = S.pants; u.warm = WARM;
   };
-  return function makeHuman (person, o = {}) {
+  /* сборка по шагам (запас людей, humanpool.js, — понемногу в спокойные кадры): yield между кусками,
+     человек — в return. makeHuman — то же разом. Внешность одна и та же: шаги ничего не решают сами */
+  function* steps (person, o = {}) {
     const Lk = person && person.look ? person.look : makeLook(newSeed(), { fem: o.fem });
-    const S = buildSpec(Lk, o);
+    const S = buildSpec(Lk, o), w0 = WARM;
+    yield;
     const g = new THREE.Group();
     const mk = (i, parent = g) => {
       const m = new THREE.Mesh(geo([[S.parts[i], 0, 0, 0]]), HUMAN_VC);
@@ -691,15 +709,19 @@ export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
       parent.add(m);
       return m;
     };
-    const legL = mk(0), legR = mk(1), bodyM = mk(2), armL = mk(3), armR = mk(4);
+    const legL = mk(0), legR = mk(1), bodyM = mk(2);
+    yield;
+    const armL = mk(3), armR = mk(4);
     // голова: свой материал цвета кожи — игра красит его (злой водитель, вор в маске)
     const head = new THREE.Mesh(geo([[S.parts[6], 0, 0, 0]]), new THREE.MeshLambertMaterial({ color: S.skin, flatShading: true }));
     head.position.set(0, HY, 0);
     g.add(head);
+    yield;
     if (o.face !== false) {
       const face = new THREE.Mesh(new THREE.PlaneGeometry(S.W, 0.56), faceMat(Lk, S));
       face.position.z = S.D / 2 + 0.002;
       head.add(face);
+      yield;
     }
     const hair = S.parts[5].length ? new THREE.Mesh(geo([[S.parts[5], 0, 0, 0]]), HUMAN_VC) : null;
     if (hair) head.add(hair);
@@ -709,10 +731,13 @@ export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
     g.add(lod);
     g.scale.setScalar(S.hs);
     g.userData = { legL, legR, armL, armR, head, faceM: head.children.find(m => m.geometry && m.geometry.type === 'PlaneGeometry') || null, faceS: { skin: S.skin, Wp: S.Wp }, colors: { skin: S.skin, shirt: S.shirt, pants: S.pants }, person, fem: S.fem, fat: S.fat, pace: S.pace,
-      lod, parts: [legL, legR, bodyM, armL, armR, head], far: false, look: Lk, o, hair, warm: WARM };
+      lod, parts: [legL, legR, bodyM, armL, armR, head], far: false, look: Lk, o, hair, warm: w0 };
     HUMANS.add(g);
     return g;
-  };
+  }
+  const makeHuman = (person, o = {}) => { const it = steps(person, o); let r = it.next(); while (!r.done) r = it.next(); return r.value; };
+  makeHuman.steps = steps;
+  return makeHuman;
 }
 
 /* ─────────────── портрет ───────────────
@@ -736,11 +761,12 @@ export function drawFaceFrame (ctx, Lk, skin, Wp, fx) {
   ctx.clearRect(0, 0, Wp, 16);
   drawFace(ctx, Lk, skin, Wp, 0, 0, fx);
 }
-export function faceDataURL (person, size = 128, mood = '') {
+/* talk — кадр речи (talkface.js): 0 — рот как у выражения, 1 — приоткрыт, 2 — открыт */
+export function faceDataURL (person, size = 128, mood = '', talk = 0) {
   if (!person) return '';
   let Lk = person.look || makeLook(person.seed >>> 0 || 1);
   if (MOOD_FACE[mood]) Lk = Object.assign({}, Lk, MOOD_FACE[mood]);
-  const key = (person.id || Lk.seed) + ':' + size + (mood ? ':' + mood : '');
+  const key = (person.id || Lk.seed) + ':' + size + (mood ? ':' + mood : '') + (talk ? ':t' + talk : '');
   const hit = PORTRAITS.get(key);
   if (hit) return hit;
   const S = buildSpec(Lk);
@@ -757,7 +783,7 @@ export function faceDataURL (person, size = 128, mood = '') {
   rects.push({ face: true, z: S.D / 2 + 0.002 });
   rects.sort((a, b) => a.z - b.z);
   for (const q of rects) {
-    if (q.face) { drawFace(x, Lk, S.skin, S.Wp, G / 2 - S.Wp / 2, PY - 8); continue; }
+    if (q.face) { drawFace(x, Lk, S.skin, S.Wp, G / 2 - S.Wp / 2, PY - 8, talk ? { talk: talk === 2, half: talk === 1 } : undefined); continue; }
     if (q.x1 <= q.x0 || q.y1 <= q.y0) continue;
     x.fillStyle = q.z < S.D / 2 - 0.04 ? mix(q.hex, '#000000', 0.18) : q.hex;
     x.fillRect(q.x0, q.y0, q.x1 - q.x0, q.y1 - q.y0);
@@ -779,6 +805,6 @@ export function faceDataURL (person, size = 128, mood = '') {
   o.drawImage(c, 0, 0, size, size);
   const url = out.toDataURL('image/png');
   PORTRAITS.set(key, url);
-  if (PORTRAITS.size > 300) PORTRAITS.delete(PORTRAITS.keys().next().value);
+  if (PORTRAITS.size > 400) PORTRAITS.delete(PORTRAITS.keys().next().value);
   return url;
 }

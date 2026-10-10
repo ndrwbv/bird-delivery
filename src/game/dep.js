@@ -10,7 +10,8 @@
      A / Enter — главная кнопка: «ДЕП» (крутить), после прокрутки — «пора на работу»; курсор сразу на ней
      X / Y     — выбрать красное / чёрное или первого / второго игрока (сразу, без крестовины);
                  после прокрутки X — «крутить ещё» (та же ставка и выбор, курсор — на «ДЕП»)
-     LB RB, ←→ — ставка −/+ (≈1/20 кошелька), ¼ · ½ · всё — курсором; B / Esc — назад
+     LB RB, ←→ — ставка −/+ (≈1/20 кошелька), «всё» — курсором; B / Esc — назад.
+     Значков клавиш на кнопках нет — как управлять, пишет строка внизу (.dep-keys), как в меню
    Выбор стоит сразу: совет Лёхи, иначе прошлый выбор в этой игре, иначе первый вариант.
    Выигрыш — «бах»: вспышка, печать «ВЫИГРЫШ ×N», монетки фонтаном, сумма щёлкает вверх.
 
@@ -24,7 +25,7 @@ import * as ACH from './achievements.js';          // «Всё на красно
 import * as HEROES from './heroes.js';             // теннисисты — герои города: те же лица
 import * as HQ from './heroquests.js';             // совет Лёхи, «наоборот» Игорька, кто играет матч
 import * as PFX from './paperfx.js';
-import { keyHTML } from '../input/glyphs.js';
+import { keyHTML, inputKind } from '../input/glyphs.js';
 import { t, N_ } from '../i18n/index.js';
 
 let A = null, SH = { slot: false, n: 0 }, H = {};
@@ -86,12 +87,14 @@ function box () {
       '<div class="dep-side">' +
         '<div class="dep-tip" hidden></div>' +
         '<div class="dep-sum"><div class="dep-pile"></div><b></b><span></span></div>' +
-        '<div class="dep-stake"><button type="button" class="dep-btn dep-minus">' + keyHTML('lb') + '−</button><input type="range"><button type="button" class="dep-btn dep-plus">+' + keyHTML('rb') + '</button></div>' +
-        '<div class="dep-quick">' + [[0.25, '¼'], [0.5, '½'], [1, '']].map(([k, l]) => '<button type="button" class="dep-btn" data-k="' + k + '">' + esc(l) + '</button>').join('') + '</div>' +
+        // автор 10.10.2026: без «¼ · ½» и без значков клавиш на кнопках — как управлять, пишет строка внизу (.dep-keys)
+        '<div class="dep-stake"><button type="button" class="dep-btn dep-minus">−</button><input type="range"><button type="button" class="dep-btn dep-plus">+</button></div>' +
+        '<div class="dep-quick"><button type="button" class="dep-btn" data-k="1"></button></div>' +
         '<button type="button" class="dep-go"></button>' +
         '<div class="dep-foot"><button type="button" class="dep-again" hidden></button><button type="button" class="dep-btn dep-close"></button></div>' +
       '</div>' +
     '</div>' +
+    '<div class="dep-keys"></div>' +
   '</div><div class="dep-stamp" hidden></div><div class="dep-flash"></div>';
   ($('game') || document.body).appendChild(md);
   md.querySelector('.dep-close').addEventListener('click', () => close());
@@ -105,6 +108,18 @@ function box () {
   md.querySelector('.dep-again').addEventListener('click', () => again());
   return md;
 }
+/* как управлять — одной строкой внизу, как в меню и паузе; значки — по вводу (glyphs.js); after — раунд сыгран */
+function keysHint (after) {
+  const h = $('cr-dep') && $('cr-dep').querySelector('.dep-keys');
+  if (!h) return;
+  if (inputKind().kind === 'touch') { h.hidden = true; return; }
+  h.hidden = false;
+  const k = n => keyHTML(n);
+  const pick = GAME !== 'slot' ? k('x') + k('y') + esc(t('выбор')) : '';
+  h.innerHTML = after
+    ? [k('ok') + esc(t('на работу')), k('x') + esc(t('крутить ещё')), k('back') + esc(t('назад'))].join('<i>·</i>')
+    : [k('lb') + k('rb') + esc(t('ставка')), pick, k('ok') + esc(t('деп')), k('back') + esc(t('назад'))].filter(Boolean).join('<i>·</i>');
+}
 /* шаг кнопок −/+: ~1/20 кошелька, круглым числом */
 function stakeStep () {
   const w = A.wallet(), raw = Math.max(ECON.SLOT.STEP, w / 20), p = 10 ** Math.floor(Math.log10(raw));
@@ -115,7 +130,7 @@ export function stake (d) { if (root() && !SH.slot && !SPINNING && d) setStake(S
 
 /* ── сцены игр ── */
 const cell = s => '<i style="--c:' + SYM_C[s] + '">' + SYM[s] + '</i>';
-const keyFor = i => keyHTML(i ? 'y' : 'x');
+const keyFor = () => '';                           // значков X / Y на выборе нет — они в строке внизу
 function face (id) {
   try { if (A.person && A.face) return A.face(HEROES.person(id) || A.person({ seed: PLAYER[id].seed, fem: PLAYER[id].fem }), 64); } catch (e) { /* — */ }
   return '';
@@ -169,11 +184,13 @@ export function open () {
   md.querySelector('.dep-t').textContent = t(NAME[GAME]);
   md.querySelector('.dep-g').textContent = t('депнуть') + ' · ' + t('выигрыш ×{k}', { k: mul(GAME) });
   md.querySelector('.dep-quick [data-k="1"]').textContent = t('всё');
-  md.querySelector('.dep-close').innerHTML = keyHTML('back') + esc(t('назад'));
+  md.querySelector('.dep-close').textContent = t('назад');
+  keysHint();
   md.querySelector('.dep-stage').innerHTML = stageHTML(GAME);
   md.querySelectorAll('.dep-pick').forEach(b => b.addEventListener('click', () => choose(b.dataset.p)));
   // совет Лёхи Арбуза (раз за смену, heroquests.js) — строкой над ставкой; выбор сразу стоит на его совете
-  const tip = HQ.tipFor(GAME), tipEl = md.querySelector('.dep-tip');
+  // у трёх семёрок Лёхи нет — ни совета, ни «Лёха опять слил» (автор 10.10.2026)
+  const tip = GAME === 'slot' ? null : HQ.tipFor(GAME), tipEl = md.querySelector('.dep-tip');
   tipEl.textContent = tip ? tip.text : ''; tipEl.hidden = !tip;
   const opts = options(GAME);
   PICK = !opts.length ? null : [tip && tip.pick, LAST_PICK[GAME]].find(p => opts.includes(p)) || opts[0];
@@ -228,6 +245,7 @@ function aim () {
 function again () {
   const md = root();
   if (!md || SPINNING || !SH.slot || stepDown(A.wallet()) <= 0) return;
+  keysHint();
   if (GAME === 'tennis') {                         // новый матч — новый соперник у Игорька
     MATCH = HQ.match();
     md.querySelector('.dep-stage').innerHTML = stageHTML(GAME);
@@ -267,7 +285,7 @@ function setStake (v, quiet) {
   md.querySelector('.dep-sum span').textContent = max <= 0 ? t('нечего ставить') : t('из копилки −{money} · останется {left}', { money: A.money(STAKE), left: A.money(A.wallet() - STAKE) });
   md.querySelectorAll('.dep-stake button, .dep-quick button').forEach(b => { b.disabled = max <= 0; });
   const go = md.querySelector('.dep-go');
-  go.innerHTML = keyHTML('ok') + '<span>' + esc(t('ДЕП · {money}', { money: A.money(STAKE) })) + '</span>';
+  go.innerHTML = '<span>' + esc(t('ДЕП · {money}', { money: A.money(STAKE) })) + '</span>';
   go.disabled = STAKE <= 0 || STAKE > A.wallet();
   const n = max ? Math.max(1, Math.round(PILE_MAX * STAKE / max)) : 0;
   pile(n, quiet);
@@ -317,7 +335,8 @@ function spin () {
   const finish = txt => {
     ACH.dep(win, allIn);                          // проиграл всё — «Всё на красное» (после анимации, не раньше)
     const res = md.querySelector('.dep-res');
-    const heroTxt = HQ.verdict(R).map(s => '<span class="dep-hq">' + esc(s) + '</span>').join('');   // «Лёха был прав!» / «Лёха опять слил»
+    // у трёх семёрок «Лёха опять слил» не пишем (автор 10.10.2026: «убери»)
+    const heroTxt = HQ.verdict(R).filter(() => GAME !== 'slot').map(s => '<span class="dep-hq">' + esc(s) + '</span>').join('');   // «Лёха был прав!» / «Лёха опять слил»
     md.querySelector('.dep-pile').innerHTML = '';
     const sumB = md.querySelector('.dep-sum b');
     if (win) {
@@ -340,10 +359,10 @@ function spin () {
     md.querySelector('.dep-sum span').textContent = t('в копилке {money}', { money: A.money(A.wallet()) });
     SPINNING = false;
     const go = md.querySelector('.dep-go');
-    go.innerHTML = keyHTML('ok') + '<span>' + esc(t('пора на работу')) + '</span>'; go.disabled = false;
+    go.innerHTML = '<span>' + esc(t('пора на работу')) + '</span>'; go.disabled = false;
     md.querySelector('.dep-close').disabled = false;
     const ag = md.querySelector('.dep-again');
-    ag.innerHTML = keyHTML('x') + esc(t('крутить ещё')); ag.hidden = stepDown(A.wallet()) <= 0;   // [X] — нарочно мелко (dep.css)
+    ag.textContent = t('крутить ещё'); keysHint(true); ag.hidden = stepDown(A.wallet()) <= 0;   // [X] — нарочно мелко (dep.css)
     if (H.refreshWallet) H.refreshWallet();
     if (H.refreshTabs) H.refreshTabs();
     aim();

@@ -1,7 +1,9 @@
 /* Главное меню карьеры (Стим). С 04.10.2026 — карусель карточек, как выбор машины в гараже
    (carousel.js); с 04.10 вечера — компактная полоса внизу экрана, верх — под живой город (камера
    медленно облетает пиццерию). Листать — свайп, ◀ ▶, ←→, стик и крестовина, LB/RB; выбрать —
-   A / Enter / тап. Сверху слева — логотип, справа — профиль: портрет курьера, имя и «сменить»
+   A / Enter / тап — как выбрать, подсказывает только строка внизу (на карточках значка кнопки нет, автор 10.10.2026).
+   Сверху слева — логотип бренда: квадратная птица с пиццей (public/brand/logo-px.png) и «Птица Пицца» жирным
+   Rubik Mono One (в переводе — как в словаре, t('Птица Пицца')), справа — профиль: портрет курьера, имя и «сменить»
    (окно профилей, profiles.js); (сборка с GitHub) плашка «есть новая версия — обновить» (update.js),
    внизу справа — номер версии. Правила — docs/CAREER.md «Главное меню».
 
@@ -24,7 +26,6 @@ import './menu.css';
 import { t } from '../i18n/index.js';
 import * as DIST from './districts.js';
 import * as CITY from './cityopen.js';
-import { SHIFT, clock, shiftLen } from './econ.js';
 import { keyHTML, onInput, inputKind } from '../input/glyphs.js';   // значки кнопок по текущему вводу
 import './fmlegend.js';                       // легенда полной карты — только то, что сейчас на карте
 import * as BOARD from './board.js';
@@ -50,7 +51,7 @@ function build () {
   el.id = 'cr-menu';
   el.innerHTML =
     '<div class="crm-top">' +
-      '<div class="crm-head"><div class="crm-logo"></div><div class="crm-tag"></div></div>' +
+      '<div class="crm-head"><img class="crm-mark" src="./brand/logo-px.png" alt=""><div class="crm-logo"></div></div>' +
       '<div class="crm-me"><img class="crm-ava" alt=""><div class="crm-who"><small></small><b></b></div>' +
         '<button type="button" class="crm-swap" data-a="profile"></button></div>' +
     '</div>' +
@@ -85,16 +86,14 @@ function act (a) {
 }
 
 /* карточка: одна большая кнопка (data-main — на неё встаёт геймпад) — бумажка на доске (UI-REVIEW № 45):
-   лист накладной на скотче, значок в цветном кружке, у карточки в центре — значок кнопки [A].
-   «На смену» — пропуск: шапка «ПРОПУСК ··· № 7» и красный штамп «[A] на смену», под ним — «Юг · ~4 мин» */
-function card (key, ico, title, sub, cls, pass) {
+   лист накладной на скотче, значок в цветном кружке, название, подпись. «На смену» — такая же бумажка,
+   только крупнее и с красным (без пропуска, номера смены, района и минут — автор, 10.10.2026) */
+function card (key, ico, title, sub, cls) {
   const c = document.createElement('div');
   c.className = 'crm-card k-' + key + (cls ? ' ' + cls : '');
   c.dataset.key = key; c.dataset.title = title;
   c.innerHTML = '<button type="button" class="crm-cb" data-a="' + key + '" data-main>' +
-    (pass ? '<em class="crm-pass"><span>' + esc(t('пропуск')) + '</span><u>' + esc(pass) + '</u></em>' +
-      '<b class="crm-stamp">' + keyHTML('ok') + esc(title) + '</b>'
-      : '<i class="crm-ico" aria-hidden="true">' + ico + '</i><b>' + keyHTML('ok') + esc(title) + '</b>') +
+    '<i class="crm-ico" aria-hidden="true">' + ico + '</i><b>' + esc(title) + '</b>' +
     (sub ? '<span>' + esc(sub) + '</span>' : '') + '</button>';
   c.querySelector('button').addEventListener('click', () => act(key));
   return c;
@@ -102,21 +101,10 @@ function card (key, ico, title, sub, cls, pass) {
 
 export function show () {
   if (!A || !build()) return;
-  const logo = $('big-t') ? $('big-t').textContent : '';
-  el.querySelector('.crm-logo').textContent = logo || t('Птица Пицца');
-  el.querySelector('.crm-tag').textContent = $('big-s') ? $('big-s').textContent : '';
-  const n = (+A.Store.get('dlv-shifts', 0) || 0) + 1;
-  // круглосуточная пиццерия (со второго района): смена с того часа, когда кончилась прошлая (career.js)
-  const allDay = DIST.has() && DIST.cur() >= (SHIFT.ALLDAY_FROM ?? 99);
-  const from0 = clock(A.Store.get('dlv-clock', '') === '' || A.Store.get('dlv-clock', null) == null ? 9 : +A.Store.get('dlv-clock', 9) || 0);
-  // «Юг · ~4 мин»: длина — та, что будет у этой смены (econ.js shiftLen, 4 / 6 / 8 мин)
-  const mins = Math.max(1, Math.round(SHIFT.BASE_S * shiftLen(n - 1).slow / 60));
-  const place = DIST.has() ? (DIST.city() ? t('весь город') : t(DIST.list()[DIST.cur()].name)) : '';
-  // номер смены — в шапке пропуска («ПРОПУСК ··· № 1»), под штампом — район и длина
-  const goSub = place
-    ? (allDay ? t('{place} · с {from} · ~{m} мин', { place, from: from0, m: mins }) : t('{place} · ~{m} мин', { place, m: mins }))
-    : t('~{m} мин', { m: mins });
-  const go = card('go', '▶', t('на смену'), goSub, 'main', '№ ' + n);
+  // надпись логотипа — название пиццерии на языке игрока (brands.js OWN.pizza → #big-t), по слову в строку
+  const logo = ($('big-t') ? $('big-t').textContent : '') || t('Птица Пицца');
+  el.querySelector('.crm-logo').innerHTML = logo.trim().split(/\s+/).map(w => '<span>' + esc(w) + '</span>').join('');
+  const go = card('go', '▶', t('на смену'), '', 'main');
   // вернуться в прежний район, пока открыты не все (открыто всё — выбор и так перед каждой сменой)
   if (DIST.has() && DIST.opened() > 1 && !DIST.allOpen()) {
     const b = document.createElement('button');

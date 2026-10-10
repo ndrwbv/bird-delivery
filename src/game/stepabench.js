@@ -140,4 +140,4 @@ export function init (api) {
   if (typeof window !== 'undefined') window.setTimeout(() => { if (window.__dlv) window.__dlv.STEPAB = DEBUG; }, 0);
 }
 
-const DEBUG = { SB, M, get place () { return M.place; }, force: () => STORY.orderFor('stepa-bench', 0) };
+export const DEBUG = { SB, M, get place () { return M.place; }, force: () => STORY.orderFor('stepa-bench', 0) };

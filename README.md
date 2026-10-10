@@ -114,5 +114,5 @@ https://github.com/ndrwbv/bird-delivery/releases/latest/download/bird-pizza-setu
 Отладка: `window.__dlv` — состояние игры; `?mute` — без звука, `?nolb` — не писать в
 таблицу, `?lang=de` — язык, `?mapcheck` — отчёт о карте.
 
-Данные карты — © участники OpenStreetMap, ODbL; рельеф — SRTM (NASA). Шрифт Press Start 2P —
-SIL OFL (`public/fonts/OFL.txt`).
+Данные карты — © участники OpenStreetMap, ODbL; рельеф — SRTM (NASA). Шрифты Press Start 2P —
+SIL OFL (`public/fonts/OFL.txt`) и Rubik Mono One — SIL OFL (`public/fonts/RubikMonoOne-OFL.txt`).

@@ -25,7 +25,8 @@
         puff, camClear, camTree(x, z, r) — нет дерева ближе r м, groundH, guestStep, hud, hearts */
 import './intro.css';
 import { t } from '../i18n/index.js';
-import { makePerson, faceDataURL } from './people.js';
+import { makePerson } from './people.js';
+import * as TF from './talkface.js';            // директор в облачке говорит ртом
 import { BOSS } from './orders.config.js';
 import { readTime } from './dialog.js';
 import * as LIFE from './actorlife.js';          // живое лицо Степана в кадре: моргает, улыбается (Н2)
@@ -184,10 +185,11 @@ function hideText () {
 /* облачко директора под сердцами: лицо, имя, реплика; стрелка смотрит на сердца */
 function tip (text) {
   const el = CUT.el.querySelector('.ic-tip');
-  if (!text) { el.classList.remove('on'); return; }
-  if (!BOSS_P) BOSS_P = makePerson({ seed: BOSS.seed, first: t(BOSS.first), last: t(BOSS.last), fem: !!BOSS.fem });
   const img = el.querySelector('img');
-  if (!img.getAttribute('src')) img.src = faceDataURL(BOSS_P, 96);
+  if (!text) { el.classList.remove('on'); TF.stop(img); return; }
+  if (!BOSS_P) BOSS_P = makePerson({ seed: BOSS.seed, first: t(BOSS.first), last: t(BOSS.last), fem: !!BOSS.fem });
+  if (!img.getAttribute('src')) TF.bind(img, BOSS_P, 96);
+  TF.talk(img, TF.talkTime(text));
   el.querySelector('em').textContent = BOSS_P.name + ' · ' + t(BOSS.role);
   el.querySelector('p').textContent = text;
   // ставим под сердцами по раскладке (без масштаба мигания): на телефоне хад ниже

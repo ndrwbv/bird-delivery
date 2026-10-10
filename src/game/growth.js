@@ -239,17 +239,19 @@ function buildDecor (d, i, s) {
     m.position.set(x, gy + 1.7, z); m.rotation.y = ry;
     A.scene.add(m); D.meshes.push(m); D.poster = m;
   }
-  // ещё два столика под шаром по бокам — с «растёт»; строятся один раз и стоят дальше
+  // ещё два столика у купола по бокам — с «растёт»; строятся один раз и стоят дальше
+  // (купол стоит на земле — столики снаружи, за светильниками цоколя: 10,9 м от центра при радиусе 9 м)
   if (G.TABLES[s - 1] > 0 && !D.tables) {
     D.tables = [];
     for (const sg of [-1, 1]) {
-      const [x, z] = at(sg * 6.9, 5.8);
+      const [x, z] = d.extra && d.extra.length ? d.extra[(sg + 1) / 2 % d.extra.length] : d.base ? at(sg * 8.6, 6.7) : at(sg * 6.9, 5.8);
       D.tables.push({ x, z, sg, m: table(x, z, ry, sg > 0 ? '#ffd23f' : '#f0522a') });
     }
   }
   if (D.tables) for (const tb of D.tables) tb.m.visible = G.TABLES[s - 1] > 0;
   // ореол вывески — с «растёт», у «процветает» дышит
-  if (s >= 3 && d.sign) {
+  if (d.letters) d.signGlow = s >= 5 ? 2 : s >= 3 ? 1 : 0;   // у купола вывеска — объёмные буквы: ореол — их свет (pizzadome.js step)
+  if (s >= 3 && d.sign && !d.letters) {
     if (!GLOW_MAT) GLOW_MAT = new THREE.MeshBasicMaterial({ color: '#ffb347', transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
     const sp = d.sign.position, w = (P.VW + 0.2) * 1.18;
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, w * 112 / 512 * 1.9), GLOW_MAT);
@@ -257,7 +259,7 @@ function buildDecor (d, i, s) {
     m.position.set(bx, sp.y, bz); m.rotation.y = ry;
     A.scene.add(m); D.meshes.push(m); D.glow = m;
   }
-  // гирлянды: по краю козырька тамбура (провисают) и по карнизу барабана — с «на подъёме»
+  // гирлянды: по краю козырька тамбура (провисают) и кольцом по куполу над тамбуром (d.ring) — с «на подъёме»
   if (s >= 4) {
     const pts = [];
     const y0 = gy + P.VH + 0.42;
@@ -266,10 +268,10 @@ function buildDecor (d, i, s) {
       const [x, z] = at(u, P.V1 + 0.32);
       pts.push([x, y0 - sag, z]);
     }
-    const RD = 6.4, HD = 4.4;
-    for (let k = 0; k < 44; k++) {
-      const a = k / 44 * Math.PI * 2, r = RD + 0.5;
-      pts.push([d.x + Math.sin(a) * r, gy + HD + 0.62 - Math.abs(Math.sin(a * 7)) * 0.12, d.z + Math.cos(a) * r]);
+    const ring = d.ring || { r: 6.9, y: gy + 5.02 };
+    for (let k = 0; k < 52; k++) {
+      const a = k / 52 * Math.PI * 2;
+      pts.push([d.x + Math.sin(a) * ring.r, ring.y - Math.abs(Math.sin(a * 7)) * 0.12, d.z + Math.cos(a) * ring.r]);
     }
     garland(pts, D.meshes);
   }
@@ -290,13 +292,14 @@ function buildDecor (d, i, s) {
       A.scene.add(m); D.meshes.push(m); D.balloons.push(m);
     }
   }
-  // гости за столиками: места — по два у каждого столика (два у шара + два новых)
-  const seats = [];
-  for (const sg of [-1, 1]) {
-    const [tx, tz] = at(sg * (P.VW / 2 + 3.4), P.V1 + 1.2);
+  // гости за столиками: места — по два у каждого столика (у купола — за 4 ближних ко входу столика веранды; иначе
+  // два у входа + два новых)
+  const seats = d.free ? d.free.slice(0, 4).map(p => p.slice()) : [];
+  if (!d.free) for (const sg of [-1, 1]) {
+    const [tx, tz] = at(sg * (P.TU || P.VW / 2 + 3.4), P.TV || P.V1 + 1.2);
     seats.push([tx, tz]);
   }
-  if (D.tables && G.TABLES[s - 1] > 0) for (const tb of D.tables) seats.push([tb.x, tb.z]);
+  if (!d.free && D.tables && G.TABLES[s - 1] > 0) for (const tb of D.tables) seats.push([tb.x, tb.z]);
   const rx = Math.cos(ry), rz = -Math.sin(ry);          // «вправо» (чем стулья стоят у столика)
   const chairs = [];
   for (const [tx, tz] of seats) for (const sg of [1, -1]) chairs.push([tx + rx * 0.9 * sg, tz + rz * 0.9 * sg, Math.atan2(-rx * sg, -rz * sg)]);
@@ -307,7 +310,10 @@ function buildDecor (d, i, s) {
     D.humans.push(human('guest', x, z, h, A.groundH(x, z) + 0.13));
   }
   // очередь у двери: от двери вбок вдоль тамбура
-  const Q = [[1.9, P.V1 + 0.85], [3.0, P.V1 + 1.05], [4.3, P.V1 + 0.6], [4.6, P.V1 - 0.4], [4.6, P.V1 - 1.3], [4.6, P.V1 - 2.2]];
+  // у купола — от ступенек входа (P.ST — их глубина) вбок и назад вдоль портала
+  const F = P.V1 + (P.ST || 0);
+  const Q = d.base ? [[1.3, F + 0.5], [2.2, F + 1.1], [3.1, F + 1.6], [4.2, F + 1.3], [4.6, F + 0.5], [4.8, F - 0.4]]
+    : [[1.9, P.V1 + 0.85], [3.0, P.V1 + 1.05], [4.3, P.V1 + 0.6], [4.6, P.V1 - 0.4], [4.6, P.V1 - 1.3], [4.6, P.V1 - 2.2]];
   for (let k = 0; k < Math.min(G.QUEUE[s - 1], Q.length); k++) {
     const [x, z] = at(Q[k][0], Q[k][1]);
     const [px, pz] = k ? at(Q[k - 1][0], Q[k - 1][1]) : at(1.9, P.V1);
@@ -315,7 +321,8 @@ function buildDecor (d, i, s) {
   }
   // оркестр — у «процветает»: с другой стороны тамбура, лицом к улице
   if (s >= 5) {
-    const B = [[-4.4, P.V1 - 0.2, 'trumpet'], [-4.9, P.V1 - 1.4, 'accordion'], [-4.4, P.V1 - 2.6, 'drum']];
+    const B = d.base ? [[-4.1, F + 0.6, 'trumpet'], [-4.9, F - 0.3, 'accordion'], [-4.7, F - 1.3, 'drum']]
+      : [[-4.4, P.V1 - 0.2, 'trumpet'], [-4.9, P.V1 - 1.4, 'accordion'], [-4.4, P.V1 - 2.6, 'drum']];
     for (const [u, v, inst] of B) {
       const [x, z] = at(u, v);
       D.humans.push(human('band', x, z, { h: ry + 0.35, inst }, A.groundH(x, z) + 0.13));

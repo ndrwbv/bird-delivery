@@ -118,6 +118,24 @@ const CHECKS = [
     if (e || !r) return { status: 'fail', info: e || 'нет результата' };
     return { status: r.ok ? 'ok' : 'fail', info: `тропинок дверей ${r.doors}, общих дорожек ${r.walks}, выходов ${r.links}, хвостов ${r.stub}; точек конкурентов ${r.shops}, с дорожкой ${r.branch}; не так ${r.bad}` + (r.bad ? ': ' + JSON.stringify(r.by) + ' ' + JSON.stringify(r.sample) : '') };
   } },
+  { id: 'routehouse', name: 'маршрут навигатора не сквозь дома', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/route-house.js')]);
+    const e = errLine(j), r = j.result;
+    if (e || !r) return { status: 'fail', info: e || 'нет результата' };
+    return { status: r.ok ? 'ok' : 'fail', info: `к клиенту ${r.n}: режут дом ${r.after} (по-старому ${r.before}); со двора ${r.yard}: ${r.afterYard} (по-старому ${r.beforeYard}); без дорог рядом ${r.noRoad}, улица дальше 230 м ${r.far}; ` +
+      `поиск по клеткам к клиенту p95 ${r.tail.p95} мс, со двора ${r.head.p95} мс` + (r.ok ? '' : ': ' + JSON.stringify(r.sample.slice(0, 2))) };
+  } },
+  { id: 'ghosts', name: 'машины не призраки и твёрдые, лось не сквозь', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/ghost-cars.js')]);
+    const e = errLine(j), r = j.result;
+    if (e || !r) return { status: 'fail', info: e || 'нет результата' };
+    const solid = r.solid.map(s => s.k + (s.pass ? ' НАСКВОЗЬ' : ' ок')).join(', '), m = r.moose;
+    const info = `${r.gameSecs} с смены: призраков ${r.orphans}, стоят > 30 с ${r.stand} (без причины ${r.unexplained}); твёрдые: ${solid}; лось: ` +
+      ['parked', 'bus'].filter(k => m[k]).map(k => k + ' ' + (m[k].pen < 0 ? 'не сквозь' : 'СКВОЗЬ ' + m[k].pen)).join(', ') + (m.butt ? `, боднул — машину на ${m.butt.moved} м` : '') +
+      (r.orphans ? ' · ' + JSON.stringify(r.orphanSample) : '') + (r.unexplained ? ' · ' + JSON.stringify(r.standSample) : '') +
+      r.solid.filter(s => s.pass).map(s => ' · ' + s.k + ': ' + JSON.stringify(s)).join('');
+    return { status: !r.ok ? 'fail' : r.unexplained ? 'warn' : 'ok', info };
+  } },
   { id: 'smoke-adult', name: '30 с автопилота: взрослая (web)', group: 3, run: smoke(['--mode=web'], 'взрослая') },
   { id: 'smoke-phone', name: '30 с автопилота: телефон (web)', group: 3, run: smoke(['--size=phone'], 'телефон') },
   { id: 'smoke-crashlog', name: 'журнал ошибок пуст после дымовых', group: 4, run: async () => (

@@ -3,28 +3,67 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#2a3766">
+  <meta name="theme-color" content="#3d0d01">
   <title>Птица Пицца</title>
-  <link rel="icon" type="image/png" href="./icon.png">
-  <!-- экран загрузки: стили прямо тут, чтобы он был виден раньше, чем приедет бандл -->
+  <link rel="icon" type="image/png" sizes="16x16" href="./icon-16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="./icon-32.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="./icon.png">
+  <!-- экран загрузки: стили прямо тут, чтобы он был виден раньше, чем приедет бандл.
+       Бордовый фон и логотип бренда (--brand-* в src/styles/paper.css; цвета тут — числами, бандла ещё нет).
+       Логотип — сетка 100×100 (public/brand/logo-px.png, ≈5 КБ, tools/make-icons.py), растянут без сглаживания.
+       Фразы под полоской сменяются сами каждые 1,4 с — только CSS (прозрачность и сдвиг идут и тогда, когда
+       главный поток занят стройкой города); с какой начать — случайно (скрипт ниже). Перевод — data-i18n:
+       main.js зовёт applyDom, когда язык известен; до того не на русском фразы спрятаны (.boot-nru) -->
   <style>
-    html, body { margin: 0; background: #1d2440; }
-    #boot { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px;
-            background: radial-gradient(circle at 50% 42%, #34448a, #1d2440 70%); transition: opacity .5s ease; }
+    @font-face { font-family: "Press Start 2P"; src: url("./fonts/PressStart2P-Regular.ttf") format("truetype"); font-display: swap; }
+    html, body { margin: 0; background: #3d0d01; }
+    #boot { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;
+            background: radial-gradient(circle at 50% 42%, #4d1205, #3d0d01 55%, #2a0800); transition: opacity .5s ease;
+            font-family: "Press Start 2P", ui-monospace, monospace; --say: 1.4s; --o: 0; }
     #boot.gone { opacity: 0; pointer-events: none; }
-    #boot img { width: 104px; height: 104px; image-rendering: pixelated; border-radius: 22px; box-shadow: 0 8px 0 #141a33;
+    #boot img { width: clamp(120px, 26vmin, 200px); height: clamp(120px, 26vmin, 200px); image-rendering: pixelated; border-radius: 18%;
+                box-shadow: 0 0 0 3px rgba(255, 179, 71, .28), 0 10px 0 #1e0600, 0 18px 40px rgba(0, 0, 0, .45);
                 animation: boot-bob .9s ease-in-out infinite alternate; }
-    #boot .boot-bar { width: 168px; height: 12px; box-sizing: border-box; border: 3px solid #141a33; border-radius: 4px; background: #2a3766; overflow: hidden; }
-    #boot .boot-bar i { display: block; width: 38%; height: 100%; background: #ffd85e; animation: boot-run 1.1s ease-in-out infinite; }
+    #boot .boot-bar { width: 168px; height: 12px; box-sizing: border-box; border: 3px solid #1e0600; border-radius: 4px; background: #5a1608; overflow: hidden; }
+    #boot .boot-bar i { display: block; width: 38%; height: 100%; background: #ffb347; animation: boot-run 1.1s ease-in-out infinite; }
+    #boot .boot-say { position: relative; width: min(92vw, 640px); height: 2.2em; font-size: clamp(10px, 1.6vmin, 14px); }
+    #boot .boot-say span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.5;
+                           color: #fff3d6; text-shadow: 2px 2px 0 #1e0600; opacity: 0;
+                           animation: boot-say calc(var(--say) * 12) linear infinite backwards; animation-delay: calc((var(--i) - var(--o)) * var(--say)); }
+    .boot-nru #boot:not(.said) .boot-say { visibility: hidden; }
     @keyframes boot-bob { from { transform: translateY(0) rotate(-3deg); } to { transform: translateY(-10px) rotate(3deg); } }
     @keyframes boot-run { from { transform: translateX(-110%); } to { transform: translateX(280%); } }
+    /* 12 фраз × 1,4 с: своя фраза видна 1/12 круга — въезжает снизу, стоит, уходит вверх */
+    @keyframes boot-say { 0% { opacity: 0; transform: translateY(10px); } .8% { opacity: 1; transform: translateY(0); }
+                          7.6% { opacity: 1; transform: translateY(0); } 8.33% { opacity: 0; transform: translateY(-10px); } 100% { opacity: 0; transform: translateY(-10px); } }
+    @media (prefers-reduced-motion: reduce) { #boot .boot-say span { animation-timing-function: steps(1, end); } }
     body.booting #game { opacity: 0; }
     #game { transition: opacity .5s ease; }
   </style>
 </head>
 <body class="booting">
 
-<div id="boot" aria-hidden="true"><img src="./icon.png" alt=""><div class="boot-bar"><i></i></div></div>
+<div id="boot" aria-hidden="true"><img src="./brand/logo-px.png" alt=""><div class="boot-bar"><i></i></div>
+  <div class="boot-say">
+    <span style="--i:0" data-i18n>Покупаем пиццу…</span>
+    <span style="--i:1" data-i18n>Прогреваем духовку…</span>
+    <span style="--i:2" data-i18n>Ремонтируем машины…</span>
+    <span style="--i:3" data-i18n>Заливаем бензин…</span>
+    <span style="--i:4" data-i18n>Будим курьеров…</span>
+    <span style="--i:5" data-i18n>Кормим птицу…</span>
+    <span style="--i:6" data-i18n>Ищем сдачу с пятитысячной…</span>
+    <span style="--i:7" data-i18n>Чистим бордюры…</span>
+    <span style="--i:8" data-i18n>Пересчитываем пепперони…</span>
+    <span style="--i:9" data-i18n>Уговариваем шлагбаум на КПП…</span>
+    <span style="--i:10" data-i18n>Ищем, где тут второй подъезд…</span>
+    <span style="--i:11" data-i18n>Подкачиваем колёса…</span>
+  </div>
+</div>
+<script>
+  /* загрузка: с какой фразы начать — случайно; не русский браузер — фразы ждут перевода (main.js → .said) */
+  (function () { var b = document.getElementById('boot'); if (b) b.style.setProperty('--o', Math.floor(Math.random() * 12));
+    if (!/^ru/i.test(navigator.language || '')) document.documentElement.classList.add('boot-nru'); })();
+</script>
 
 <div id="game">
 
@@ -74,7 +113,7 @@
     </div>
   </div>
 
-  <!-- ── анкета заказа: её собирает умный трекер, висит до «принять» ── -->
+  <!-- ── накладная заказа: висит ~2,6 с и сама падает к радару мини-карточкой (game.js briefStep, ordertags.js) ── -->
   <div id="phone">
     <div class="ph-top">
       <span class="ph-dot"></span>
@@ -96,7 +135,6 @@
         <div id="ph-list"></div>
         <div id="ph-why"></div>
       </div>
-      <button id="ph-accept" type="button" data-i18n>принять</button>
     </div>
   </div>
 

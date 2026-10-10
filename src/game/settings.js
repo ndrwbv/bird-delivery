@@ -2,7 +2,7 @@
    из главного меню и из паузы (game.js renderSettings → SET.render). Правила словами —
    docs/CAREER.md «Главное меню, пауза и настройки».
 
-   Табы: игра (имя, профиль, мини-игры у клиента вкл / выкл, сбросить прогресс, тестовые районы, версия и обновление, update.js) ·
+   Табы: игра (имя, профиль, мини-игры у клиента вкл / выкл, путь на дороге вкл / выкл (routeask.js), сбросить прогресс, тестовые районы, версия и обновление, update.js) ·
    графика (качество и 7 пунктов, gfx.js) · звук (вкл / выкл и три ползунка: музыка, звуки, мотор — docs/SOUNDS.md;
    радио в машине вкл / выкл и станция — radio.js) · управление (какие кнопки за что — геймпад,
    клавиатура или палец) · язык (сетка языков). Внутри таба — обычный вертикальный список; не влез
@@ -141,6 +141,12 @@ export function render (focus, tab) {
       h += row(t('мини-игры у клиента'), A.door.on() ? t('вкл') : t('выкл'), 'set-door', focus) +
         note(t('домофон у подъезда и разговоры с клиентами при вручении; выкл — только езда'));
     }
+    // путь на дороге (routeask.js): оранжевая полоса к клиенту, зелёная — в пиццерию; в первой смене горит всегда. Меняется и из паузы — сразу
+    if (A.route) {
+      h += row(t('путь на дороге'), A.route.on() ? t('вкл') : t('выкл'), 'set-route', focus) +
+        note(t('полоса на асфальте до клиента и обратно в пиццерию; в первой смене горит всегда') +
+          (A.route.first() ? ' · ' + t('сейчас первая смена — горит') : ''));
+    }
     // версия и обновление
     {
       const st = UPD.state(), v = UPD.version();
@@ -198,6 +204,7 @@ function wire (body) {
   body.querySelectorAll('[data-l]').forEach(b => b.addEventListener('click', () => A.setLang(b.dataset.l)));
   if ($('set-name')) $('set-name').onclick = () => A.askName(() => render('set-name'));
   if ($('set-prof')) $('set-prof').onclick = () => A.openProfiles();
+  if ($('set-route')) $('set-route').onclick = () => { A.route.set(!A.route.on()); render('set-route'); };
   if ($('set-door')) $('set-door').onclick = () => { A.door.set(!A.door.on()); render('set-door'); };
   if ($('set-radio')) $('set-radio').onclick = () => { A.radio.set(!A.radio.on()); render('set-radio'); };
   if ($('set-radio-st')) $('set-radio-st').onclick = () => { A.radio.next(); render('set-radio-st'); };

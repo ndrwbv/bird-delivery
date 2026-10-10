@@ -4,25 +4,35 @@
 
    Камера всегда сзади — поэтому зад машины игрока (makeCar opts.see) собран
    подробно; машины потока — как были (дальние, их много).
+     «Крупно и мало» (10.10.2026, автор: «много лишних деталей, ощущаются
+     грязно»): с камеры (6—8 м) читаются только крупные формы и 2—3 акцента —
+     фонари, номер, бампер. Мелочь, которая на «Деке» мельче пикселя, убрана:
+     заклёпки, замок и шильдик крышки, катафоты, крюк, хром брызговиков,
+     кольцо на трубе, швы и ручка задней двери, рифлёные полоски фонарей,
+     мелкие надписи на номере и наклейках.
      • выхлопная труба — сзади справа (−X, как у настоящей «семёрки»), с
        тёмным срезом и глушителем; оттуда же идут дым (exhaust.js) и пламя
        нитро (game.js) — точка трубы: car.userData.pipe. Двойной выхлоп
        (мотор 2-й ступени) — по краям, как был, со срезами;
      • задние фонари с глубиной: рамка-ниша вокруг каждого блока (стоп-сигнал
-       горит в глубине), рифлёное стекло, светлая «лампа» и белое стекло
-       заднего хода. Всё стекло фонаря — в меше фар (cars.js dress), поэтому
-       бьётся целиком, как раньше (carglass.js, carlights.js kill);
-     • бампер: резиновая полоса, катафоты, буксировочный крюк, рамка и номер
-       («А 070 ПЦ 70») — всё одним мешем с бампером: мнётся и отваливается
-       вместе с ним;
-     • крышка багажника (седаны): замок с личинкой, шильдик, обивка изнутри,
-       сверху — наклейка пиццерии (птичка и название). У машин без багажника
-       — швы задней двери, ручка и та же наклейка на двери;
-     • брызговики за задними колёсами;
+       горит в глубине), гладкое красное стекло и белое стекло заднего хода.
+       Всё стекло фонаря — в меше фар (cars.js dress), поэтому бьётся целиком,
+       как раньше (carglass.js, carlights.js kill);
+     • бампер: одна тёмная полоса во всю ширину, рамка и номер — светлая
+       плашка с крупными знаками «А 070 ПЦ» в ровной тёмной рамке; одним мешем
+       с бампером: мнётся и отваливается вместе с ним;
+     • крышка багажника (седаны): гладкая, обивка изнутри, сверху у заднего
+       края — один круглый логотип пиццерии (птичка). У машин без багажника —
+       тот же логотип посередине задней двери, у машин с запаской — на её колпаке;
+     • задняя дверь у машин без багажника (10.10.2026) — своя панель над
+       бампером, петля снизу: после аварии приоткрывается и распахивается
+       (cardent.js REARD), за ней тёмный проём и коробки с пиццей; у машин с
+       запаской на двери — как была, не открывается;
+     • брызговики за задними колёсами — чёрные;
      • багажник внутри (седаны): ванна с обивкой, термосумка, огнетушитель;
        коробки с пиццей — сколько их сейчас в машине (до PIZZAS), видно, когда
        крышка открыта (загрузка, вручение).
-   Кадр: почти всё — в общей склейке кузова; новые отрисовки — наклейки и номер
+   Кадр: почти всё — в общей склейке кузова; новые отрисовки — логотип и номер
    (по одной на крышку/дверь и бампер, одна текстура на все) и коробки в
    багажнике (только пока крышка открыта).
    ────────────────────────────────────────────────────────────────────────── */
@@ -35,39 +45,34 @@ const CORNER = BODY.CORNER;
 export const REAR = { PIPE_X: -0.42, PIPE_DUAL: 0.25, PIZZAS: 4 };
 export const STATS = { built: 0, cargo: 0, open: false };
 
-const PLATE_NUM = 'А 070 ПЦ', PLATE_REG = '70';       // номер — буквы как на настоящем, не переводится
+const PLATE_NUM = 'А 070 ПЦ';                        // номер — буквы как на настоящем, не переводится
 
-/* ─── текстура наклеек и номера: 512×256 ─── */
+/* ─── текстура логотипа и номера: 512×256 ───
+   «Крупно и мало» (10.10.2026, автор: «много лишних деталей, ощущаются грязно»): с камеры (6—8 м) читаются только
+   крупные формы — поэтому один круглый логотип и номер без мелочи (без региона, RUS и флажка): светлая плашка,
+   ровная тёмная рамка, крупные знаки */
 const ATLAS = new Map();
-const R = { strip: [0, 0, 512, 72], round: [0, 80, 128, 208], plate: [136, 92, 512, 172] };
+const R = { round: [0, 0, 256, 256], plate: [256, 101, 512, 155] };
 function atlas (brand, logo) {
-  if (ATLAS.has(brand)) return ATLAS.get(brand);
+  const key = 'own';                                // название больше не пишем (мелко) — текстура одна на всех
+  if (ATLAS.has(key)) return ATLAS.get(key);
   const c = document.createElement('canvas'); c.width = 512; c.height = 256;
   const x = c.getContext('2d');
   const rr = (x0, y0, w, h, r) => { x.beginPath(); x.moveTo(x0 + r, y0); x.arcTo(x0 + w, y0, x0 + w, y0 + h, r); x.arcTo(x0 + w, y0 + h, x0, y0 + h, r); x.arcTo(x0, y0 + h, x0, y0, r); x.arcTo(x0, y0, x0 + w, y0, r); x.closePath(); };
-  // полоса: оранжевая наклейка с белой каймой, птичка и название
-  x.fillStyle = '#ffffff'; rr(2, 2, 508, 68, 20); x.fill();
-  x.fillStyle = '#f0522a'; rr(8, 8, 496, 56, 16); x.fill();
-  if (logo) logo(x, 52, 40, 2.1);
-  x.fillStyle = '#ffffff'; x.font = 'bold 40px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.fillText(String(brand).toUpperCase(), 290, 38, 380);
-  // круглая: оранжевый круг, белое кольцо, птичка
-  x.fillStyle = '#ffffff'; x.beginPath(); x.arc(64, 144, 62, 0, 7); x.fill();
-  x.fillStyle = '#f0522a'; x.beginPath(); x.arc(64, 144, 54, 0, 7); x.fill();
-  if (logo) logo(x, 60, 150, 3);
-  // номер: белый, чёрная рамка, справа — регион с флажком
-  x.fillStyle = '#1b1a1f'; rr(136, 92, 376, 80, 8); x.fill();
-  x.fillStyle = '#f4f4f0'; rr(141, 97, 366, 70, 6); x.fill();
-  x.fillStyle = '#1b1a1f'; x.fillRect(420, 97, 4, 70);
-  x.font = 'bold 54px monospace'; x.fillText(PLATE_NUM, 282, 134, 270);
-  x.font = 'bold 34px monospace'; x.fillText(PLATE_REG, 465, 122);
-  x.font = 'bold 13px sans-serif'; x.fillText('RUS', 452, 155);
-  for (const [i, col] of ['#ffffff', '#2d4fa6', '#d8262e'].entries()) { x.fillStyle = col; x.fillRect(476, 149 + i * 4, 18, 4); }
+  // логотип: оранжевый круг в белом кольце, птичка посередине
+  x.fillStyle = '#ffffff'; x.beginPath(); x.arc(128, 128, 126, 0, 7); x.fill();
+  x.fillStyle = '#f0522a'; x.beginPath(); x.arc(128, 128, 108, 0, 7); x.fill();
+  if (logo) logo(x, 116, 140, 6);
+  // номер: тёмная рамка, светлая плашка, крупные знаки во всю высоту
+  x.fillStyle = '#1b1a1f'; rr(256, 101, 256, 54, 6); x.fill();
+  x.fillStyle = '#f4f4f0'; rr(260, 105, 248, 46, 4); x.fill();
+  x.fillStyle = '#1b1a1f'; x.font = 'bold 40px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText(PLATE_NUM, 384, 129, 232);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
   const m = { t };
-  ATLAS.set(brand, m);
+  ATLAS.set(key, m);
   return m;
 }
 /* наклейки одним мешем: q — { r: область атласа, w, h, at: [x, y, z], up — лежит сверху (иначе смотрит назад) } */
@@ -153,7 +158,7 @@ export function body (add, k) {
   return true;
 }
 
-/* задние фонари с глубиной: backs — стёкла фонарей сзади { w, h, x, y, face — z наружной грани, tail — красное };
+/* задние фонари с глубиной: красное стекло в рамке-нише и белое стекло заднего хода; backs — стёкла фонарей сзади { w, h, x, y, face — z наружной грани, tail — красное };
    k.minY — верх заднего бампера (рамка ниже не опускается), k.frameHex — цвет рамки;
    frame(geo, hex, x, y, z) — в склейку кузова, lens(geo, hex, x, y, z) — в меш фар (бьётся вместе с фонарём) */
 export function lampDepth (frame, lens, backs, k) {
@@ -167,13 +172,7 @@ export function lampDepth (frame, lens, backs, k) {
     if (k.minY !== undefined) y0 = Math.max(y0, k.minY);          // ниже — бампер: он и так закрывает низ фонаря
     if (y1 - y0 < 0.04) continue;
     const tails = mine.filter(b => b.tail);
-    // рифлёное стекло: тёмные полоски поперёк и светлая «лампа» в глубине красного
-    for (const b of tails) {
-      const n = Math.max(1, Math.floor(b.h / 0.045));
-      for (let i = 1; i <= n; i++) lens(Bx(b.w - 0.02, 0.008, 0.01), '#9c1626', b.x, b.y - b.h / 2 + i * b.h / (n + 1), face - 0.004);
-      const q = Math.min(b.w, b.h) * 0.26, by = Math.max(b.y + b.h * 0.08, y0 + q / 2 + 0.01);
-      lens(Bx(q, q, 0.01), '#ff6070', b.x + sg * b.w * 0.12, by, face - 0.005);
-    }
+    // стекло фонаря — гладкое, одним цветом (рифлёные полоски и «лампа» в глубине убраны 10.10.2026: с камеры — рябь)
     // белое стекло заднего хода — ближе к середине, где загорается фонарь заднего хода (carlights.js)
     if (tails.length) {
       const T = tails.reduce((a, b) => (Math.abs(b.x) < Math.abs(a.x) ? b : a));
@@ -198,64 +197,61 @@ export function lampDepth (frame, lens, backs, k) {
 export function rear (g, add, k) {
   const { S, W, hl, top, y0, CHR, dy } = k;
   STATS.built++;
-  // выхлоп: одна труба справа или двойная по краям (cars.js — сами трубы)
+  // выхлоп: одна труба справа или двойная по краям (cars.js — сами трубы); у трубы — только тёмный срез, без колец
   const py = y0 - 0.2;
   if (k.dual) {
     for (const s of [-1, 1]) add(Cz(0.036, 0.02), '#141215', s * REAR.PIPE_DUAL, py, -hl - 0.205);
     k.pipe = { x: REAR.PIPE_DUAL, y: py + dy, z: -hl - 0.22, dual: true };
   } else {
     const x = REAR.PIPE_X;
-    add(Cz(0.05, 0.36), '#8d9299', x, py, -hl + 0.03);
-    add(Cz(0.056, 0.05), '#a9aeb5', x, py, -hl - 0.13);                     // утолщение на срезе
-    add(Cz(0.036, 0.02), '#141215', x, py, -hl - 0.152);                   // тёмный срез — оттуда дым
+    add(Cz(0.05, 0.4), '#9aa0a8', x, py, -hl + 0.01);
+    add(Cz(0.036, 0.02), '#141215', x, py, -hl - 0.19);                    // тёмный срез — оттуда дым
     add(Bx(0.24, 0.15, 0.46), '#2a292d', x - 0.04, py + 0.03, -hl + 0.42);  // глушитель
     k.pipe = { x, y: py + dy, z: -hl - 0.17, dual: false };
   }
-  // брызговики за задними колёсами
+  // брызговики за задними колёсами — просто чёрные
   const yb = y0 - S.h / 2;
-  for (const s of [-1, 1]) {
-    add(Bx(0.26, 0.3, 0.025), '#1c1b1f', s * (W / 2 - 0.02), yb - 0.14, S.bz - S.r - 0.08);
-    add(Bx(0.2, 0.025, 0.03), '#a9aeb5', s * (W / 2 - 0.02), yb - 0.25, S.bz - S.r - 0.09);
-  }
-  // бампер: полоса, катафоты, рамка номера, крюк — одним мешем с ним; номер — наклейкой на нём
+  for (const s of [-1, 1]) add(Bx(0.26, 0.3, 0.025), '#1c1b1f', s * (W / 2 - 0.02), yb - 0.14, S.bz - S.r - 0.08);
+  // бампер: одна тёмная полоса во всю ширину и рамка номера — одним мешем с ним; номер — наклейкой на нём
+  // (катафоты и крюк убраны 10.10.2026 — с камеры они читались мелкими пятнами)
   if (k.bumper) {
-    const bz = -0.11, sw = W / 2 + 0.08 - 0.31;
-    const parts = [];
-    for (const s of [-1, 1]) {
-      parts.push([Bx(sw, 0.045, 0.02), '#1f1e22', s * (0.31 + sw / 2), 0.045, bz - 0.006]);
-      parts.push([Bx(0.12, 0.035, 0.012), '#a8202c', s * (W / 2 - 0.08), -0.025, bz - 0.004]);
-    }
-    parts.push([Bx(0.58, 0.14, 0.016), '#16151a', 0, -0.005, bz - 0.006]);
-    parts.push([Bx(0.06, 0.05, 0.12), '#2a292d', 0.38, -0.09, bz + 0.02]);
-    dressPanel(k.bumper, CHR, parts, k);
+    const bz = -0.11;
+    dressPanel(k.bumper, CHR, [
+      [Bx(W + 0.02, 0.045, 0.02), '#1f1e22', 0, 0.045, bz - 0.006],
+      [Bx(0.56, 0.13, 0.016), '#16151a', 0, -0.005, bz - 0.006],
+    ], k);
     decal(k.bumper, k.brand, k.logo, [{ r: 'plate', w: 0.52, h: 0.11, at: [0, -0.005, bz - 0.016] }]);
   }
   if (k.trunk) {
-    // крышка багажника: замок, шильдик, обивка снизу; наклейка — сверху у заднего края
-    const T = k.trunk.len, lw = W - 0.06;
-    dressPanel(k.trunk.m, k.bodyHex, [
-      [Bx(0.26, 0.045, 0.026), '#c9ced4', 0, -0.025, -T / 2 - 0.012],
-      [Cz(0.017, 0.02, 8), '#1a191d', 0, -0.025, -T / 2 - 0.026],
-      [Bx(0.12, 0.045, 0.014), '#c9ced4', lw / 2 - 0.3, 0.0, -T / 2 - 0.006],
-      [Bx(0.04, 0.03, 0.016), '#d8262e', lw / 2 - 0.3, 0.0, -T / 2 - 0.012],
-      [Bx(lw - 0.16, 0.02, T - 0.12), '#3b3940', 0, -0.088, 0],
-    ], k);
-    decal(k.trunk.m, k.brand, k.logo, [
-      { r: 'strip', w: Math.min(0.86, lw - 0.3), h: 0.12, at: [0, 0.082, -T / 2 + 0.16], up: true },
-      { r: 'round', w: 0.13, h: 0.13, at: [-(lw / 2 - 0.22), -0.005, -T / 2 - 0.002] },
-    ]);
+    // крышка багажника: гладкая, обивка снизу; сверху у заднего края — один круглый логотип (без замка, шильдика и надписей)
+    const T = k.trunk.len, lw = W - 0.06, q = Math.min(0.3, T * 0.4);
+    dressPanel(k.trunk.m, k.bodyHex, [[Bx(lw - 0.16, 0.02, T - 0.12), '#3b3940', 0, -0.088, 0]], k);
+    decal(k.trunk.m, k.brand, k.logo, [{ r: 'round', w: q, h: q, at: [0, 0.082, -T / 2 + 0.06 + q / 2], up: true }]);
     // ванна багажника: коробки с пиццей (одна отрисовка, только пока крышка открыта)
     if (k.tub) cargo(g, k);
   } else {
-    // дверь сзади: швы по краям, ручка, наклейка
-    const yT = top, yB = y0 + 0.04, zb = -hl - 0.004;
-    for (const s of [-1, 1]) add(Bx(0.012, yT - yB, 0.01), '#1b1a1f', s * (W / 2 - 0.1), (yT + yB) / 2, zb);
-    add(Bx(0.24, 0.04, 0.03), '#c9ced4', 0, yT - 0.04, -hl - 0.015);
-    add(Bx(0.1, 0.012, 0.012), '#1a191d', 0, yT - 0.06, -hl - 0.03);
-    const list = [];
-    if (k.spare) list.push({ r: 'round', w: 0.15, h: 0.15, at: [-(W / 2 - 0.24), yT - 0.1, -hl - 0.006] });
-    else list.push({ r: 'strip', w: Math.min(0.72, W - 0.5), h: 0.1, at: [0, yT - 0.13, -hl - 0.006] });
-    decal(g, k.brand, k.logo, list);                // занижение (dy) makeCar добавит сам, как всем детям
+    // дверь сзади: гладкая панель (без швов-полосок и ручки), посередине — круглый логотип
+    const yT = top, yB = y0 + 0.04, zb = -hl - 0.004, H = yT - yB, dw = W - 0.2;
+    const q = Math.min(0.3, H * 0.55);
+    if (!k.spare && H > 0.12) {
+      // своя панель двери (10.10.2026): от сильных ударов приоткрывается и распахивается (cardent.js REARD),
+      // за ней — тёмный проём и коробки с пиццей
+      add(Bx(dw - 0.02, H - 0.02, 0.006), '#1e1d22', 0, (yT + yB) / 2, -hl - 0.003);
+      const dm = add(Bx(dw, H, 0.02), k.bodyHex, 0, (yT + yB) / 2, -hl - 0.026, 'rdoor');
+      dressPanel(dm, k.bodyHex, [
+        [Bx(dw - 0.08, H - 0.06, 0.004), '#3b3940', 0, 0, 0.012],           // обивка изнутри
+      ], k);
+      decal(dm, k.brand, k.logo, [{ r: 'round', w: q, h: q, at: [0, H / 2 - 0.04 - q / 2, -0.012] }]);
+      k.rdoor = { m: dm, h: H, a: 0, ajar: 0, p: null };
+      k.tub = { yF: yB, x: -0.3, z: -hl + 0.17, max: Math.max(1, Math.floor((H - 0.068) / 0.062) + 1) };
+      cargo(g, k);
+    } else {
+      // запаска на двери (k.spare — { y, z, r }: середина и лицо колпака, cars.js LOOK.spare): логотип — на колпаке запаски
+      const sp = typeof k.spare === 'object' ? k.spare : null;
+      const list = sp ? [{ r: 'round', w: sp.r * 2, h: sp.r * 2, at: [0, top + sp.y, -hl - sp.z - 0.004] }]
+        : [{ r: 'round', w: q, h: q, at: [0, yT - 0.04 - q / 2, zb - 0.002] }];
+      decal(g, k.brand, k.logo, list);                // занижение (dy) makeCar добавит сам, как всем детям
+    }
   }
 }
 
@@ -271,16 +267,40 @@ function cargo (g, k) {
   m.visible = false;
   m.geometry.setDrawRange(0, 0);
   m.userData.per = 72;                              // индексов на коробку: два бокса
+  m.userData.max = t.max || REAR.PIZZAS;            // за задней дверью — сколько влезет по высоте проёма
   g.add(m);
   k.cargo = m;
 }
 
+/* крышка / дверь после удара (cardent.js REARD): ajar — на сколько приоткрыта (рад); на ходу болтается.
+   o — u.trunk или u.rdoor, v — скорость машины, м/с. Вернёт угол, к которому тянется */
+export const LID = { WOB: 0.07, WOB_V: 12, HZ: 11 };
+export function lidGoal (o, dt, v) {
+  const aj = o.ajar || 0;
+  if (!aj) return o.want || 0;
+  o.wt = (o.wt || 0) + dt;
+  const w = Math.sin(o.wt * LID.HZ) * LID.WOB * Math.min(1, v / LID.WOB_V) * (aj > 1 ? 0.4 : 1);
+  return Math.max(o.want || 0, aj + w);
+}
+
+const SPD = { car: null, x: 0, z: 0, v: 0 };
 /* каждый кадр: n — сколько коробок сейчас в машине (game.js) */
 export function step (dt, car, n) {
-  const u = car && car.userData, m = u && u.cargo, tr = u && u.trunk;
+  const u = car && car.userData, m = u && u.cargo, tr = u && u.trunk, d = u && u.rdoor;
+  if (d && !d.p) d.p = d.m.position.clone();        // закрытая — где стоит (уже с занижением)
+  if (d && d.ajar) {
+    // задняя дверь хэтчбека: петля снизу, над бампером — верх отваливается назад (камера сверху видит проём и коробки)
+    if (SPD.car !== car) { SPD.car = car; SPD.x = car.position.x; SPD.z = car.position.z; }
+    if (dt > 0) { SPD.v = Math.min(60, Math.hypot(car.position.x - SPD.x, car.position.z - SPD.z) / dt); SPD.x = car.position.x; SPD.z = car.position.z; }
+    d.a += (lidGoal(d, dt, SPD.v) - d.a) * Math.min(1, dt * 9);
+    const hy = d.p.y - d.h / 2;
+    d.m.rotation.x = -d.a;
+    d.m.position.y = hy + Math.cos(d.a) * d.h / 2;
+    d.m.position.z = d.p.z - Math.sin(d.a) * d.h / 2;
+  }
   if (!m) return;
-  const open = !!(tr && (tr.a > 0.03 || tr.lost));   // крышку сорвало (cardent.js) — коробки видно всегда
-  const k = open ? Math.max(0, Math.min(REAR.PIZZAS, n | 0)) : 0;
+  const open = !!(tr && (tr.a > 0.03 || tr.lost) || d && d.a > 0.03);   // крышку сорвало (cardent.js) — коробки видно всегда
+  const k = open ? Math.max(0, Math.min(m.userData.max || REAR.PIZZAS, n | 0)) : 0;
   m.visible = k > 0;
   if (m.visible) m.geometry.setDrawRange(0, k * m.userData.per);
   STATS.cargo = k; STATS.open = open;

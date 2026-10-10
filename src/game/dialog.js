@@ -18,17 +18,23 @@
        plain: true,                    // обе кнопки одного вида (приглашение клиентки: оба ответа — отказы)
        alt: true,                      // второй ответ — на X (геймпад) / X (клавиатура), а не на B / Esc: в катсцене
                                        // B и Esc — «пропустить сцену» (story.js ['ask'], учебный Стёпа)
+       emo: 'angry',                   // выражение лица на портрете (people.js EMO_FACE; катсцены story.js { emo })
+       onTyped: () => …,               // допечаталась (story.js: 3D-актёр закрывает рот)
      });                               // → true (принял) / false (отказался) / null (не успел)
    Очередь: несколько say подряд показываются по одному.
+   Портрет говорит ртом (talkface.js), пока текст печатается; допечатался — рот закрыт. o.face (готовая
+   картинка) — без рта, как было.
    На кнопках — значок, что жать: [A] / [B] на геймпаде, Enter / Esc на клавиатуре, на тач-экране без
    значков. Подсветка геймпада от простоя не гаснет (гасят мышь и клавиши, padmenu.js padLit); если её
    не было, первое ←→↑↓ только зажигает её (A без подсветки — «принять»).
 
    Реплика на ходу (события посреди езды — вместо плашки сверху экрана, docs/CAREER.md «Реплики на ходу»):
      DLG.line({ person, name, text, color })   // → Promise, когда ушла
-   Та же голова и облачко, но меньше и сверху по центру, без затемнения и кнопок: мир НЕ стоит,
+   Сообщение как в iMessage (круглая аватарка, имя, серый пузырь — как чат Толика, chat.css), сверху по
+   центру, без затемнения и кнопок; пузырь сразу по размеру всего текста, буквы проявляются в нём: мир НЕ стоит,
    клавиши и геймпад не перехватывает (пробел — ручник, A — нитро). Допечаталась — висит
-   readTime(текст) (1,5 с + 0,06 с на букву, не меньше 3 с) и уходит сама; клик — убрать сразу.
+   readTime(текст) (1,5 с + 0,06 с на букву, не меньше 3 с) и уходит сама; клик — убрать сразу. Аватарка говорит
+   ртом, пока буквы проявляются (talkface.js).
    Своя очередь: по одной, ждут не больше LIVE.Q (лишние — самые старые — выбрасываются).
    isOpen() её не считает. */
 import './dialog.css';
@@ -36,6 +42,7 @@ import { t } from '../i18n/index.js';
 import { pad as PAD } from '../input/gamepad.js';
 import { padLit } from '../input/padmenu.js';
 import { keyHTML, refreshKeys } from '../input/glyphs.js';
+import * as TF from './talkface.js';            // портрет говорит ртом, пока печатается
 
 /* значок кнопки — общий .pp-key (glyphs.js keyHTML, paper.css): геймпад — A / B (PlayStation — ✕ / ○),
    клавиатура — Enter / Esc, касание — без значка; меняется сам, когда игрок сменил ввод */
@@ -103,7 +110,8 @@ function show (o, done) {
   const two = !!o.decline;
   $('.dlg-bar').style.background = o.color || '#ff8a2b';
   const img = $('.dlg-head img');
-  img.src = o.face || (API.face && o.person ? API.face(o.person, 256) : '');
+  TF.stop(img);
+  if (o.face || !TF.bind(img, o.person, 256, o.emo)) img.src = o.face || (API.face && o.person ? API.face(o.person, 256) : '');
   img.hidden = !img.src;
   $('.dlg-name').textContent = o.name || '';
   const yes = $('.dlg-yes'), no = $('.dlg-no');
@@ -136,12 +144,15 @@ function show (o, done) {
   let left = 0, waiting = false;
   const finish = () => {
     if (typed) return; typed = true; el.textContent = full; $('.dlg-btns').classList.add('on'); $('.dlg-skip').textContent = '';
+    TF.stop(img);
+    if (o.onTyped) try { o.onTyped(); } catch (e) { console.warn('[dlg] onTyped', e); }
     if (o.timer) { left = o.timer; bar.classList.add('on'); }
   };
   // не успел ответить: он говорит своё «ну лан» и уходит сам
   const timeUp = () => {
     waiting = true; bar.classList.remove('on'); $('.dlg-btns').classList.remove('on');
     el.textContent = o.timeoutText || t('ну лан ((');
+    TF.talk(img, TF.talkTime(el.textContent));
     setTimeout(() => close(null), 1400);
   };
   const close = v => {
@@ -149,6 +160,7 @@ function show (o, done) {
     if (CUR === dismissMe) CUR = null;
     cancelAnimationFrame(raf);
     removeEventListener('keydown', key, true);
+    TF.stop(img);
     mark(false);
     root.classList.remove('on');
     setTimeout(() => { if (!open) root.hidden = true; }, 180);   // следующая реплика из очереди уже открылась — не прячем её
@@ -191,6 +203,7 @@ function show (o, done) {
     }
   };
   raf = requestAnimationFrame(tick);
+  TF.talk(img);                                  // говорит, пока печатается (finish — замолчал)
   const dismissMe = () => close(null);
   CUR = dismissMe;
   const key = e => {
@@ -231,17 +244,22 @@ function lineNext () {
   const o = it.o, $ = s => lroot.querySelector(s);
   $('.dlg-bar').style.background = o.color || '#3fae5a';
   const img = $('img');
-  img.src = o.face || (API.face && o.person ? API.face(o.person, 128) : '');
+  TF.stop(img);
+  if (o.face || !TF.bind(img, o.person, 128, o.emo)) img.src = o.face || (API.face && o.person ? API.face(o.person, 128) : '');
   img.hidden = !img.src;
   $('b').textContent = o.name || '';
   const el = $('p'), full = String(o.text == null ? '' : o.text);
-  el.textContent = '';
+  // пузырь сразу во весь текст: ещё не напечатанное стоит невидимым (.dll-rest) — пузырь не растёт по буквам
+  const shown = document.createElement('span'), rest = document.createElement('span');
+  rest.className = 'dll-rest'; rest.textContent = full;
+  el.replaceChildren(shown, rest);
   lroot.hidden = false;
   requestAnimationFrame(() => lroot.classList.add('on'));
   let i = 0, acc = 0, last = performance.now(), left = -1, raf = 0, done = false;
   const close = () => {
     if (done) return; done = true;
     cancelAnimationFrame(raf);
+    TF.stop(img);
     lroot.classList.remove('on');
     lroot.onclick = null;
     setTimeout(() => { if (!lcur) lroot.hidden = true; }, 200);
@@ -255,13 +273,16 @@ function lineNext () {
     if (i < full.length) {
       acc += dt * LIVE.CPS;
       while (acc >= 1 && i < full.length) { const c = full[i++]; acc -= c === '.' || c === '!' || c === '?' || c === '…' ? 5 : 1; }
-      el.textContent = full.slice(0, i);
-      if (i >= full.length) left = readTime(full);
+      shown.textContent = full.slice(0, i); rest.textContent = full.slice(i);
+      if (i >= full.length) { left = readTime(full); TF.stop(img); }
     } else if ((left -= dt) <= 0) close();
   };
   lcur = { close };
   lroot.onclick = close;
   raf = requestAnimationFrame(tick);
+  TF.talk(img);                                  // говорит, пока буквы проявляются
 }
 /* убрать реплику на ходу и очередь (конец смены, меню) */
 export function lineClear () { while (lq.length) lq.shift().res(false); if (lcur) lcur.close(); }
+/* для ?debug (__dlv.DLG.TALKDBG): говорящие портреты — state(img) → { mouth: 0 закрыт | 1 приоткрыт | 2 открыт, talking } */
+export const TALKDBG = TF.DEBUG;

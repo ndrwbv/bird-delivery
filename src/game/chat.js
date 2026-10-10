@@ -6,6 +6,7 @@
    крупное сразу уменьшается. prefers-reduced-motion — без увеличения, просто появляется.
    Видно сразу не больше трёх сообщений (четвёртое выталкивает самое старое),
    каждое висит (после крупного) 4 с + 1 с на каждые 25 букв (не дольше 8 с) и уезжает вправо.
+   Текст пришёл — аватарка Толика говорит ртом (talkface.js): ~14 букв в секунду, 0,7—2,6 с.
    Ввод не перехватывает. Место — под колонкой хада справа (кошелёк, часы смены,
    «закончить смену», на телефоне — радар и кнопки); не влезает по высоте — слева от неё.
    Пишет только на плохое и на очень хорошее, обычные доставки — молча.
@@ -26,7 +27,9 @@
    Из shiftend.js (экран Толика в конце смены):
      CHAT.avatar(size)                    — его лицо картинкой ('' — нет); CHAT.person() — он сам (диалог обеда)
      CHAT.shiftLine(mood)                 — что он пишет после смены: mood 'bad' | 'ok' | 'great' */
+import './chat.css';                  // вид iMessage: круглая аватарка, серые пузыри лентой (и для shiftend.js, cityopen.js, DLG.line)
 import { t, N_ } from '../i18n/index.js';
+import * as TF from './talkface.js';  // аватарка говорит ртом, когда сообщение пришло
 
 const TYPE_S = 0.5, MAX = 3;
 const hold = s => Math.min(8, 4 + s.length / 25);
@@ -182,8 +185,10 @@ export function say (text, onShow, angry) {
   while (C.items.length >= MAX) drop(C.items[0]);
   const row = document.createElement('div');
   row.className = 'cm';
-  const ava = C.person && C.face ? '<img src="' + C.face(C.person, 48) + '" alt="">' : '<i></i>';
+  const ava = C.person && C.face ? '<img alt="">' : '<i></i>';
   row.innerHTML = ava + '<div class="cm-b"><b>' + t('Толик управляющий') + '</b><p class="typing"><span></span><span></span><span></span></p></div>';
+  const img = row.querySelector('img');
+  if (img) TF.bind(img, C.person, 48);
   el.appendChild(row);
   const m = { el: row, onShow };
   C.items.push(m);
@@ -194,6 +199,7 @@ export function say (text, onShow, angry) {
     m.said = true;
     shown(m);
     ding(angry);
+    if (img) TF.talk(img, TF.talkTime(text));
     const big = grow(m) ? bigHold(text) : 0;
     if (big) m.t3 = setTimeout(() => shrink(m), big * 1000);
     m.t2 = setTimeout(() => drop(m), (big + hold(text)) * 1000);

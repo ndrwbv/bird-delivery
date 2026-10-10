@@ -18,16 +18,20 @@ body:has(#cr-garage:not([hidden])) .hud, body:has(#cr-garage:not([hidden])) #ctr
 .gr-back:hover { border-style: solid; border-color: var(--pp-ink); }
 .gr-back:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0, 0, 0, .55); }
 .gr-t { font-size: clamp(18px, 3vw, 34px); color: var(--pp-yellow); text-shadow: 4px 4px 0 var(--pp-ink); letter-spacing: .04em; }
-.gr-wallet { justify-self: end; font-size: var(--pp-fs-s); color: #e8cfa6; text-align: right; line-height: 1.5; }
-.gr-wallet b { font-weight: normal; font-size: var(--pp-fs-m); color: var(--pp-yellow); margin: 0 6px; }
-.gr-wallet em { font-style: normal; font-size: var(--pp-fs-s); color: var(--pp-paper); white-space: nowrap; }
-.gr-wallet .w-why { display: block; margin-top: 2px; font-size: var(--pp-fs-s); color: #c9a98a; }
+.gr-top { padding-bottom: clamp(6px, 1.4vh, 14px); }
+/* копилка — свинья с хада и сумма; звёзд тут нет (10.10.2026) */
+.gr-wallet { justify-self: end; display: inline-flex; align-items: center; gap: 10px; padding: 6px 14px 6px 10px; white-space: nowrap;
+             background: rgba(26, 14, 8, .55); border: 2px solid rgba(232, 207, 166, .35); border-radius: 999px; }
+.gr-wallet .pg-ico { width: clamp(30px, 2.6vw, 40px); height: auto; flex: none; image-rendering: pixelated; }
+.gr-wallet b { font-weight: normal; font-size: var(--pp-fs-m); color: var(--pp-yellow); text-shadow: 2px 2px 0 var(--pp-ink); }
 
 .gr-stage { position: relative; flex: 1; min-height: 0; touch-action: pan-y; user-select: none; }
 .gr-track { position: absolute; inset: 0; --drag: 0px; }
-/* карточка — лист техпаспорта: бумага, рамка чернилами, жёсткая тень, перфорация сверху */
+/* карточка — лист техпаспорта: бумага, рамка чернилами, жёсткая тень, перфорация сверху.
+   Узко — столбиком (шапка, картинка, имя, полоски, кнопки); широко — разворот (ниже, @media). Не влез по высоте —
+   лист в фокусе листается внутри себя (10.10.2026: на Деке кнопки и ряд «покрасить» уходили за край) */
 .gr-card { position: absolute; left: 50%; top: 50%; width: var(--cw); max-height: 100%; box-sizing: border-box;
-           display: flex; flex-direction: column; gap: clamp(4px, 1vh, 10px); padding: clamp(8px, 1.4vh, 16px) clamp(12px, 1.6vw, 20px) clamp(10px, 1.6vh, 18px);
+           display: flex; flex-direction: column; gap: clamp(8px, 1.5vh, 14px); padding: clamp(8px, 1.4vh, 16px) clamp(14px, 1.8vw, 24px) clamp(12px, 1.8vh, 20px);
            color: var(--pp-ink); background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 4px;
            box-shadow: 0 8px 0 var(--pp-ink), 0 22px 50px rgba(0, 0, 0, .5);
            transform: translate(-50%, -50%) translateX(calc(var(--o) * var(--step) + var(--drag))) scale(var(--s));
@@ -35,34 +39,40 @@ body:has(#cr-garage:not([hidden])) .hud, body:has(#cr-garage:not([hidden])) #ctr
 .gr-card::before { content: ''; position: absolute; left: 10px; right: 10px; top: -6px; height: 8px; pointer-events: none; background: var(--pp-perf); }
 .gr-track.drag .gr-card { transition: none; }
 .gr-card.on { z-index: 3; cursor: default; }
-.gr-card.side { z-index: 2; opacity: .55; filter: saturate(.55) brightness(.7); }
-.gr-card.far { z-index: 1; opacity: .2; filter: saturate(.4) brightness(.55); }
+.gr-card.on { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--pp-brown) transparent; }
+.gr-card.side { z-index: 2; opacity: .45; filter: saturate(.5) brightness(.62); }
+.gr-card.far { z-index: 1; opacity: .16; filter: saturate(.4) brightness(.5); }
+/* у соседей — только картинка и имя: их подписи, полоски и цены уводили взгляд с машины в фокусе (автор, 10.10.2026).
+   Места те же (visibility), высота карточек одна */
+.gr-card:not(.on) .gr-r, .gr-card:not(.on) .gr-note { visibility: hidden; }
 .gr-card.gone { opacity: 0; pointer-events: none; }
 .gr-card.cur { box-shadow: 0 8px 0 var(--pp-ink), 0 0 0 5px var(--pp-yellow), 0 22px 50px rgba(0, 0, 0, .5); }
 .gr-card:not(.on) .gr-acts { pointer-events: none; }
 
-.gr-pic { position: relative; flex: none; aspect-ratio: 16 / 10; width: 100%; max-height: 34vh; display: flex; justify-content: center; align-items: center; order: 1;
+.gr-l, .gr-r, .gr-id { display: flex; flex-direction: column; gap: clamp(8px, 1.5vh, 14px); min-width: 0; }
+.gr-id { gap: 4px; }
+.gr-pic { position: relative; flex: none; aspect-ratio: 16 / 10; width: 100%; max-height: 34vh; display: flex; justify-content: center; align-items: center;
           background: radial-gradient(ellipse at 50% 72%, rgba(255, 138, 43, .28), rgba(255, 216, 94, 0) 64%), #f6e2b8; border: 2px solid var(--pp-ink); border-radius: 3px; }
 .gr-pic { overflow: hidden; }
 .gr-pic canvas { width: 100%; height: 100%; object-fit: contain; transform: scale(1.4); transform-origin: 50% 58%; }
 /* «на смене» — жёлтая звезда в углу фото */
 .gr-card.cur .gr-pic::after { content: '★'; position: absolute; top: 4px; left: 8px; font-size: 16px; color: var(--pp-yellow); text-shadow: 2px 2px 0 var(--pp-ink); }
 
-/* шапка листа — над фото (order), имя, описание, полоски, кнопки — под ним */
-.gr-info { display: contents; }
-.gr-head { order: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: .5em 0 .45em; margin-top: .2em;
+/* шапка листа — над всем, подписью: бледнее имени и кнопок */
+.gr-head { flex: none; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: .5em 0 .45em; margin-top: .2em;
            border-bottom: 2px dashed var(--pp-brown); color: var(--pp-rust); font-size: var(--pp-fs-s); text-transform: uppercase; letter-spacing: .1em;
            box-shadow: 0 -5px 0 -1px var(--pp-orange); }
+.gr-head { opacity: .7; }
 .gr-head b { font-weight: normal; color: var(--pp-ink); letter-spacing: .04em; }
-.gr-name, .gr-note, .gr-stats, .gr-acts { order: 2; }
 .gr-name { font-size: var(--pp-fs-l); color: var(--pp-ink); line-height: 1.2; }
-.gr-note { font-size: var(--pp-fs-s); line-height: 1.6; color: var(--pp-label); }
+/* описание машины — тихой подписью: мельче и бледнее (автор, 10.10.2026: «подписи размывают фокус») */
+.gr-note { font-size: max(10px, calc(var(--pp-fs-s) * .9)); line-height: 1.6; color: var(--pp-label); opacity: .72; }
 
 /* полоски — общей сеткой (subgrid): подписи одной ширины, полоски начинаются в одном месте */
-.gr-stats { display: grid; grid-template-columns: max-content 1fr auto; column-gap: 10px; row-gap: 4px; }
+.gr-stats { display: grid; grid-template-columns: max-content 1fr auto; column-gap: 12px; row-gap: 6px; }
 .gr-st { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; padding: 1px 0; }
-.gr-st + .gr-st { border-top: 1px dashed rgba(138, 107, 78, .45); padding-top: 4px; }
-.gr-st span { font-size: var(--pp-fs-s); color: var(--pp-label); }
+.gr-st + .gr-st { border-top: 1px dashed rgba(138, 107, 78, .3); padding-top: 6px; }
+.gr-st span { font-size: var(--pp-fs-s); color: var(--pp-label); opacity: .8; }
 .gr-st b { font-weight: normal; font-size: var(--pp-fs-s); color: var(--pp-ink); min-width: 64px; text-align: right; white-space: nowrap; }
 .gr-bar { display: block; height: 10px; background: #ead2a6; border: 2px solid var(--pp-ink); border-radius: 2px; overflow: hidden; }
 .gr-bar > i { display: block; height: 100%; width: 0; background: var(--pp-orange); transition: width .7s cubic-bezier(.2, .9, .3, 1.2); }
@@ -75,7 +85,7 @@ body:has(#cr-garage:not([hidden])) .hud, body:has(#cr-garage:not([hidden])) #ctr
 .gr-st.up b { color: var(--pp-money); animation: gr-flash .6s steps(2) 3; }
 @keyframes gr-flash { 50% { color: var(--pp-ink); } }
 
-.gr-acts { display: flex; flex-direction: column; gap: 8px; margin-top: 2px; }
+.gr-acts { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
 .gr-btn { display: flex; align-items: center; justify-content: center; font: inherit; cursor: pointer; text-align: center; color: var(--pp-ink); background: var(--pp-paper);
           border: 3px solid var(--pp-ink); border-radius: 6px; box-shadow: 0 4px 0 var(--pp-ink); padding: clamp(8px, 1.3vh, 12px) 12px; font-size: var(--pp-fs-m); }
 .gr-btn:not(:disabled):hover { filter: brightness(1.05); }
@@ -178,6 +188,27 @@ body:has(#cr-garage:not([hidden])) .hud, body:has(#cr-garage:not([hidden])) #ctr
   .gr-pic { flex: 0 1 auto; min-height: 72px; }
   /* палитра и «точно продать?» — описание прячем: в покраске важнее видеть машину крупнее */
   .gr-card:has(.gr-paint, .gr-ask) .gr-note { display: none; } }
-@media (max-height: 560px) { .gr-note { display: none; } .gr-pic { max-height: 20vh; }
-  /* телефон боком (390 px): кнопки брони и мотора уходили под нижний край экрана — лист листается внутри себя */
-  .gr-card.on { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--pp-brown) transparent; } }
+@media (max-height: 560px) { .gr-note { display: none; } .gr-pic { max-height: 20vh; } }
+
+/* широкий экран (компьютер, Steam Deck): лист — разворот техпаспорта. Шапка во всю ширину, слева картинка, имя и
+   описание, справа полоски и кнопки. Ниже ростом — влезает в 1280×800 и меньше с запасом, и воздуха больше.
+   Последним в файле: перебивает «низкий экран» (там картинка 24vh — для столбика) */
+@media (min-width: 900px) and (min-aspect-ratio: 5 / 4) {
+  #cr-garage { --cw: clamp(660px, 74vw, 1100px); --step: calc(var(--cw) * .8); }
+  .gr-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto 1fr; column-gap: clamp(20px, 2.4vw, 40px);
+             row-gap: clamp(10px, 1.8vh, 18px); align-items: start; padding: clamp(10px, 1.8vh, 22px) clamp(18px, 2.2vw, 34px) clamp(16px, 2.4vh, 28px); }
+  .gr-head { grid-column: 1 / -1; }
+  .gr-pic { max-height: 46vh; }
+  .gr-r { justify-content: flex-start; }
+  /* полоски в полколонки выходили короткими — подпись и значение строкой, полоска под ними во всю ширину */
+  .gr-stats { grid-template-columns: 1fr auto; row-gap: 8px; }
+  .gr-st { row-gap: 3px; }
+  .gr-st span { grid-row: 1; grid-column: 1; }
+  .gr-st b { grid-row: 1; grid-column: 2; min-width: 0; }
+  .gr-st .gr-bar { grid-row: 2; grid-column: 1 / -1; height: 8px; }
+  .gr-btn.buy, .gr-btn.pick { letter-spacing: .03em; }
+  /* в развороте места хватает: описание не прячем и в палитре */
+  .gr-card:has(.gr-paint, .gr-ask) .gr-note { display: -webkit-box; -webkit-box-orient: vertical; }
+  .gr-arrow.l { left: max(0px, calc(50% - var(--cw) / 2 - 76px)); }
+  .gr-arrow.r { right: max(0px, calc(50% - var(--cw) / 2 - 76px)); }
+}

@@ -58,7 +58,7 @@ import { t, N_ } from '../i18n/index.js';
 import * as ECON from './econ.js';
 import * as DLG from './dialog.js';
 import { STORY_PEOPLE, ORDER_TYPES } from './orders.config.js';
-import { makePerson, faceDataURL } from './people.js';
+import { makePerson } from './people.js';
 import * as LIFE from './actorlife.js';          // живые лица и жесты актёров — только в катсцене (Н2)
 import { makeCatModel, FURS } from './cats.js';
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
@@ -601,6 +601,7 @@ function spot (where, who) {
     case 'door': return h.door ? [h.door.x + h.door.nx * 0.2, h.door.z + h.door.nz * 0.2] : [h.ex + h.nx * 0.2, h.ez + h.nz * 0.2];
     case 'in': return h.door ? [h.door.x - h.door.nx * 0.5, h.door.z - h.door.nz * 0.5] : [h.ex - h.nx * 0.5, h.ez - h.nz * 0.5];
     case 'front': return [h.ex + h.nx * 2.3, h.ez + h.nz * 2.3];
+    case 'close': return [h.ex + h.nx * 1.05, h.ez + h.nz * 1.05];      // на расстоянии руки — пожать руку
     case 'side': return [h.ex + h.nx * 1.4 + h.sx * CUT.side * 0.9, h.ez + h.nz * 1.4 + h.sz * CUT.side * 0.9];
     case 'car': { const d = Math.hypot(V.x - h.ex, V.z - h.ez); return d < 16 ? [V.x, V.z] : [h.ex + h.nx * 9, h.ez + h.nz * 9]; }
     default: return [h.ex + h.nx * 2, h.ez + h.nz * 2];
@@ -619,7 +620,7 @@ function walk (who, where, o = {}) {
   return o.wait === false ? Promise.resolve() : p;
 }
 
-const ACTS = { wave: 1.4, nod: 1, shake: 1, shrug: 1.2, give: 1, joy: 1.4, hug: 1.6, sad: 1.6, think: 1.4 };
+const ACTS = { wave: 1.4, nod: 1, shake: 1, shrug: 1.2, give: 1, joy: 1.4, hug: 1.6, sad: 1.6, think: 1.4, hand: 1.6 };
 function act (who, kind, sec) {
   const a = CUT.actors[who];
   if (!a) return;
@@ -674,6 +675,8 @@ function actorStep (a, dt) {
       case 'hug': aL = aR = -1.45 * env; zL = 0.35 * env; zR = -0.35 * env; if (k >= 1 && a.hugFrom) { a.to = { x: a.hugFrom[0], z: a.hugFrom[1] }; a.hugFrom = null; } break;
       case 'sad': hx = 0.3 * env; aL = aR = 0.08 * env; break;
       case 'think': aR = -1.9 * env; zR = 0.5 * env; hx = -0.15 * env; hy = 0.2 * env; break;
+      // «краб»: правая рука вперёд навстречу, два-три качка рукопожатия (Стёпа, учебный заказ)
+      case 'hand': aR = (-1.3 + Math.sin(q.t * 15) * 0.14 * Math.min(1, k * 3)) * env; zR = -0.12 * env; break;
     }
     if (k >= 1) a.act = null;
   }
@@ -681,6 +684,13 @@ function actorStep (a, dt) {
   if (a.talk && !q) hx += Math.sin(CUT.t * 7.3) * 0.05;
   if (a.sit) lift += a.sit;                  // сидит на лавочке
   if (u.armL) { u.armL.rotation.x = aL; u.armR.rotation.x = aR; u.armL.rotation.z = zL; u.armR.rotation.z = zR; }
+  // говорит — голова к камере (автор 10.10.2026: «герои говорят на камеру»), не больше ±1,1 рад; замолчал — обратно
+  {
+    const cp = API.cam && API.cam.position;
+    const want = a.talk && cp ? Math.max(-1.1, Math.min(1.1, dAng(a.h, Math.atan2(cp.x - a.x, cp.z - a.z)))) : 0;
+    a.camYaw = (a.camYaw || 0) + (want - (a.camYaw || 0)) * Math.min(1, dt * 6);
+    hy += a.camYaw;
+  }
   if (u.head) { u.head.rotation.x = hx; u.head.rotation.y = hy; }
   a.lift = lift;
 }
@@ -781,7 +791,7 @@ async function say (who, text, o = {}) {
   // вопрос с двумя ответами (['ask']): A — yes, X — no; B / Esc остаются «пропустить сцену» (alt, dialog.js)
   const two = o.yes && o.no ? { accept: t(o.yes), decline: t(o.no), alt: true } : {};
   const r = await DLG.say({ person, name: person.name, text: t(text, typeof o.vars === 'function' ? o.vars() : o.vars), color: COLOR, fillers: false, mood: o.mood || 'calm', cps: 42,
-    face: emo ? faceDataURL(person, 256, emo) : undefined, ...two });
+    emo, onTyped: () => { if (a) LIFE.hush(a); }, ...two });     // портрет говорит ртом с тем же выражением (talkface.js); допечаталось — и 3D-рот закрыт
   if (a) { a.talk = false; LIFE.say(a, false); }
   return r;
 }

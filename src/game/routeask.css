@@ -1,0 +1,23 @@
+/* окно «Оставить путь на дороге?» после первой смены (routeask.js) — лист накладной поверх чека смены */
+.ra-desk { position: absolute; z-index: 44; transition: opacity .25s; }
+.ra-desk.ra-out { opacity: 0; pointer-events: none; }
+.ra-sheet { width: min(max(560px, 44vw), 860px, 100%); text-align: center; --pp-tilt: -.8deg; }
+.ra-q { margin: .5em 0 .4em; font: inherit; font-size: var(--pp-fs-l); line-height: 1.35; color: var(--pp-ink); text-transform: none; }
+.ra-pic { display: block; width: min(max(300px, 24vw), 80%); height: auto; margin: .3em auto .2em; rotate: 1.5deg; }
+.ra-why { margin-top: .4em; }
+.ra-btns { display: flex; gap: clamp(10px, 2vw, 22px); margin: .2em 0 0; }
+.ra-btns .pp-stamp { flex: 1 1 0; min-width: 0; padding-inline: .4em; letter-spacing: .04em; white-space: nowrap; }
+.ra-btns .ra-yes { background: var(--pp-money); }
+.ra-btns .ra-yes:hover { background: #28963a; }
+.ra-btns .ra-no { color: var(--pp-ink); background: var(--pp-paper); text-shadow: none; rotate: 1deg; }
+.ra-btns .ra-no:hover { background: #ffe9b8; }
+.ra-set { margin-top: 1.5em; color: var(--pp-ink); }
+.ra-keys { margin: .9em 0 0; padding-top: .7em; border-top: 2px dashed var(--pp-brown); font-size: var(--pp-fs-s); line-height: 2; color: var(--pp-label); }
+.ra-keys .pp-key { margin: 0 .4em 0 0; }
+body.touch .ra-keys { display: none; }
+.ra-seal { --pp-seal-top: 34%; --pp-seal-right: 50%; translate: 50% 0; --pp-seal-rot: -9deg; }
+/* узкий экран (телефон стоя): кнопки и шапка мельче, шапка — в две строки */
+@media (max-width: 560px) {
+  .ra-sheet .pp-head { flex-wrap: wrap; gap: 2px 12px; }
+  .ra-btns .pp-stamp { font-size: var(--pp-fs-m); letter-spacing: .02em; }
+}

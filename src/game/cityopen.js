@@ -25,6 +25,7 @@ import './cityopen.css';
 import { t, N_ } from '../i18n/index.js';
 import * as DIST from './districts.js';
 import * as CHAT from './chat.js';
+import * as TF from './talkface.js';             // Толик говорит ртом, когда пузырь выскочил
 import * as DP from './distpick.js';             // выбор перед сменой — карусель карточек районов
 import { CITY as C, DISTRICT, cityFar } from './econ.js';
 import { keyHTML } from '../input/glyphs.js';     // «[A] ура!» — значок по вводу
@@ -79,12 +80,12 @@ export function party (done) {
   const cv = $c('canvas', 'cy-fx');
   const stage = $c('div', 'cy-stage');
   const ava = CHAT.avatar(128);
-  const n = DIST.count();
+  const n = DIST.count(), say = t(pick(LINES));
   stage.innerHTML =
     '<div class="cy-title">' + esc(t('ты открыл весь город!')) + '</div>' +
     '<div class="cy-sub">' + esc(t('все {n} районов Солнечного — твои', { n })) + '</div>' +
     '<div class="en-tolik cy-tolik">' + (ava ? '<img alt="" src="' + esc(ava) + '">' : '<i></i>') +
-      '<div class="en-tb"><b>' + esc(t('Толик управляющий')) + '</b><p>' + esc(t(pick(LINES))) + '</p></div></div>' +
+      '<div class="en-tb"><b>' + esc(t('Толик управляющий')) + '</b><p>' + esc(say) + '</p></div></div>' +
     '<ul class="cy-perks">' +
       '<li>' + esc(t('перед сменой — выбор: любая пиццерия или весь город сразу')) + '</li>' +
       '<li>' + esc(t('весь город: заказы во всех районах, за дальние — премия до +{max}', { max: A.money(C.FAR_MAX) })) + '</li>' +
@@ -95,6 +96,8 @@ export function party (done) {
   go.setAttribute('data-pad-main', '');
   root.append(cv, stage, go);
   host().appendChild(root);
+  const tImg = stage.querySelector('.cy-tolik img');
+  if (tImg && TF.bind(tImg, CHAT.person(), 128)) setTimeout(() => TF.talk(tImg, TF.talkTime(say)), 750);   // пузырь выскакивает на 0,6 с (cityopen.css cy-pop)
 
   /* салют и конфетти: частицы на canvas, ~7 с залпов, потом только конфетти */
   const x = cv.getContext('2d');

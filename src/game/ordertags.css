@@ -1,0 +1,76 @@
+/* Мини-карточки заказа над радаром (ordertags.js, docs/ORDERS.md «Накладная и мини-карточки»).
+   Бумажные бирки, как накладная (палитра --pp-* из src/styles/paper.css), тихий режим езды:
+   движение — только на событиях (упала накладная, сменилось лицо, отдал). */
+#otags {
+  left: 16px; bottom: calc(16px + min(148px, 22vw) + 10px);
+  display: flex; flex-direction: column; align-items: flex-start; gap: 5px;
+  text-shadow: none; line-height: 1.3;
+  visibility: hidden; opacity: 0; transition: opacity .2s, visibility 0s .2s;
+  z-index: 6;
+}
+#otags.on { visibility: visible; opacity: 1; transition: opacity .2s; }
+.otag {
+  position: relative; display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; column-gap: 7px; align-items: center;
+  box-sizing: border-box; max-width: min(220px, 40vw); padding: 3px 9px 3px 3px;
+  color: var(--pp-ink, #33210c); background: var(--pp-paper, #fff3d6);
+  border: 2px solid var(--pp-ink, #33210c); border-left: 5px solid var(--c, #ff8a2b); border-radius: 3px;
+  box-shadow: 0 3px 0 rgba(51, 33, 12, .55);
+  opacity: .78; transform: scale(.86); transform-origin: left bottom;
+  transition: opacity .25s, transform .25s;
+}
+/* сюжетный заказ — бумага с оттенком цвета сюжета (как накладная, orders.js card → ord-story) */
+.otag.story { background: color-mix(in srgb, var(--pp-paper, #fff3d6) 82%, var(--c, #ff3ea5) 18%); }
+.otag.cur { opacity: 1; transform: none; }
+.otag img { grid-row: 1 / 3; width: 30px; height: 30px; image-rendering: pixelated; background: #2a3766;
+            border: 2px solid #fff; border-radius: 2px; box-shadow: 0 1px 2px rgba(51, 33, 12, .4); }
+.otag.cur img { width: 36px; height: 36px; }
+.ot-nm { font-size: clamp(10px, .85vw, 13px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; align-self: end; }
+.ot-m { font-size: clamp(9px, .72vw, 11px); color: var(--pp-label, #75573b); white-space: nowrap; align-self: start; }
+.otag.cur .ot-nm { font-size: clamp(11px, .95vw, 14px); }
+.otag.cur .ot-m { font-size: clamp(10px, .8vw, 12px); color: var(--pp-rust, #8a3b22); }
+/* опоздал — бирка краснеет */
+.otag.late { border-left-color: var(--pp-red, #d9342c); background: color-mix(in srgb, var(--pp-paper, #fff3d6) 84%, var(--pp-red, #d9342c) 16%); }
+.otag.late .ot-m { color: var(--pp-red, #d9342c); }
+/* отдал — довольное лицо, имя и метры зачёркнуты ручкой, через пару секунд бирка уходит */
+.otag.done { opacity: 1; }
+.otag.done .ot-m { color: var(--pp-money, #1f7a2e); }
+.otag.done::after { content: ''; position: absolute; left: 40px; right: 6px; top: 50%; height: 3px; margin-top: -2px;
+                    background: #2a46a8; border-radius: 2px; transform-origin: left center; transform: rotate(-4deg) scaleX(1);
+                    animation: ot-pen .32s ease-out backwards; }
+.otag.cur.done::after { left: 46px; }
+.otag.gone { opacity: 0 !important; transform: translateX(-24px) scale(.86) !important; }
+@keyframes ot-pen { from { transform: rotate(-4deg) scaleX(0); } }
+/* накладная упала к радару — бирки «приземляются»: сверху, с лёгким отскоком */
+#otags.on.land .otag { animation: ot-land .38s var(--pp-spring, cubic-bezier(.2, 1.6, .45, 1)) backwards; }
+#otags.on.land .otag:nth-child(2) { animation-delay: .05s; } #otags.on.land .otag:nth-child(3) { animation-delay: .1s; }
+#otags.on.land .otag:nth-child(n+4) { animation-delay: .15s; }
+@keyframes ot-land { from { opacity: 0; transform: translateY(-26px) scale(1.15) rotate(-4deg); } }
+/* сменилось лицо — бирка коротко вздрагивает (один раз) */
+.otag.jolt { animation: ot-jolt .32s ease-out; }
+@keyframes ot-jolt { 30% { translate: -3px 0; } 60% { translate: 3px 0; } }
+@media (prefers-reduced-motion: reduce) { .otag, #otags.on.land .otag, .otag.jolt { animation: none !important; } }
+
+/* радио-плашка (radio.css) стоит над радаром — пока есть бирки, она над ними */
+body:not(.touch) #radio { bottom: calc(16px + min(148px, 22vw) + 12px + var(--otags-h, 0px)); }
+
+/* накладная «падает» к радару (game.js dropPhone): летит вниз с ускорением, сжимаясь в бирку */
+#phone.on.drop { transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) scale(.12) rotate(-9deg);
+                 opacity: 0; pointer-events: none;
+                 transition: transform .46s cubic-bezier(.55, -0.12, .8, .35), opacity .18s ease-in .3s; }
+/* сюжетный заказ — накладная на бумаге с оттенком цвета сюжета (orders.js card) */
+#phone.ord-story { background: color-mix(in srgb, var(--pp-paper, #fff3d6) 86%, var(--ord, #ff3ea5) 14%); }
+#phone.ord-story .oc-inv tr + tr th, #phone.ord-story .oc-inv tr + tr td { border-top-color: color-mix(in srgb, var(--pp-brown, #8a6b4e) 70%, var(--ord, #ff3ea5) 30%); }
+
+/* телефон: радар справа сверху — бирки под ним (под кнопкой паузы), к правому краю, сверху вниз */
+body.touch #otags { left: auto; bottom: auto; right: max(10px, env(safe-area-inset-right)); top: calc(max(10px, env(safe-area-inset-top)) + 148px);
+                    align-items: flex-end; }
+body.touch .otag { transform-origin: right top; max-width: 44vw; }
+body.touch .otag img { width: 24px; height: 24px; }
+body.touch .otag.cur img { width: 30px; height: 30px; }
+body.touch .ot-nm { font-size: 9px; } body.touch .otag.cur .ot-nm { font-size: 10px; }
+body.touch .ot-m { font-size: 8px; } body.touch .otag.cur .ot-m { font-size: 9px; }
+body.touch .otag.done::after { left: 32px; } body.touch .otag.cur.done::after { left: 38px; }
+/* телефон боком: под радаром мало места (кнопки) — бирки слева от радара, сверху вниз */
+@media (max-height: 460px) {
+  body.touch #otags { top: max(10px, env(safe-area-inset-top)); right: calc(max(10px, env(safe-area-inset-right)) + 108px); }
+}

@@ -22,7 +22,8 @@ import { MAP_IDS, MAP_META } from '../maps/index.js';
 import Platform from '../platform/index.js';
 import { t as $t, tn as $tn, N_, translit, lang as curLang, LANGS, LANG_NAMES } from '../i18n/index.js';
 import { sanitizePois, OWN } from './brands.js';
-import { makePerson, createHumanFactory, faceDataURL } from './people.js';
+import { makePerson, createHumanFactory, faceDataURL, humanStale } from './people.js';
+import * as HPOOL from './humanpool.js';      // запас готовых людей: собраны заранее, рождение берёт готового (humanpool.js)
 import { pollPad, applyToIN, rumble, pad as PAD } from '../input/gamepad.js';
 import { makePadMenu } from '../input/padmenu.js';
 import { fixMap, profileFn } from './mapcheck.js';
@@ -54,6 +55,7 @@ import * as HEROES from './heroes.js';           // герои города: Л�
 import * as HB from './horsebox.js';             // коневозки в потоке: прицеп за машиной, конь в окне (horsebox.js)
 import * as FLIRT from './flirt.js';            // взрослая: клиентка изредка заигрывает при вручении, курьер отказывает (flirt.js)
 import * as YARDS from './yards.js';             // дворы многоэтажек: лавочки у подъездов, тропинки, низкие заборчики (yards.js)
+import * as RYARD from './routeyard.js';       // навигатор во дворах: последние метры маршрута по клеткам, не сквозь дома (routeyard.js)
 import * as FAUNA from './fauna.js';             // лоси, лисы и зайцы в лесах; «лось на дороге!» (fauna.js)
 import * as CATS from './cats.js';               // продухи подвалов и коты на крышах и во дворах (cats.js)
 import * as WASTE from './wastelands.js';      // у пустырей назначение (огороды, битые машины, плиты, коробки, собаки, ларьки), тропинки и лужи (wastelands.js)
@@ -88,6 +90,7 @@ import * as FEST from './festivals.js';          // фестивали на па
 import * as HK from './hookah.js';               // кальянщики на лавочках (в детской — самовар)
 import * as CULL from './cull.js';
 import * as UPD from './update.js';              // обновление из меню: плашка «есть новая версия», настройки → версия (update.js)
+import * as RASK from './routeask.js';         // путь на дороге: всю первую смену горит, потом — вопрос «оставить?» и настройка (routeask.js)
 import * as SET from './settings.js';           // настройки — карусель карточек, одна и та же из меню и из паузы (settings.js)
 import * as PAUSE from './pausecz.js';             // пауза — карусель карточек: продолжить, чек, накладная, карта, настройки, управление, закончить смену
 import * as PIX from './pixfx.js';              // пиксельные частицы одним мешем: дымок из-под колёс, осколки стёкол (pixfx.js)
@@ -114,7 +117,7 @@ import * as CREWS from './crews.js';             // компании в форм
 import * as HITS from './hits.js';               // сила удара по людям: упал и встал / лежит в луже / разорвало; самокат отдельно
 import * as HINTS from './hints.js';             // подсказки первой смены одной строкой внизу, без пауз (hints.js)
 import * as RQ from './ridequeue.js';           // очередь того, что всплывает в езде: чек → деньги → Толик → подсказка → достижение (ridequeue.js)
-import { keyHTML, matchKey, setInput as glyphInput, inputKind } from '../input/glyphs.js';   // значки кнопок по вводу: [A] / Enter (glyphs.js)
+import { keyHTML, matchKey, setInput as glyphInput, inputKind, onInput as onGlyphInput } from '../input/glyphs.js';   // значки кнопок по вводу: [A] / Enter (glyphs.js)
 import * as COLM from './collect.js';            // «мои находки» — лист накладной в окне меню
 import * as FIRST from './intro.js';             // вступление первого запуска: пиццерия, Степан, машина (катсцена «как в ГТА»)
 import * as ACH from './achievements.js';          // достижения Стима: таблица, счётчики, вызов моста (achievements.js, docs/STEAM.md)
@@ -129,6 +132,7 @@ import * as LAWN from './lawn.js';              // пятна на газоне 
 import * as DEADENDS from './deadends.js';       // тупики потока: разворот вместо исчезновения (deadends.js)
 import * as NAR from './narrow.js';            // узкие дороги: одна полоса посередине, встречные прижимаются (narrow.js)
 import * as EDL from './editlayer.js';         // правки города из редактора (editor.html): убранное не ставим, добавленное — кусок 'edits' (editlayer.js)
+import * as WARM from './warmup.js';            // прогрев шейдеров: образцы на-ходу-материалов, программы не выгружаются (warmup.js)
 import * as LATE from './latebuild.js';         // поздняя сборка города: меню раньше, остальное — очередью после него (latebuild.js)
 import * as STREAMS from './streams.js';        // речки и пруды: русло, вода тем же шейдером, вброд и утонуть (streams.js)
 import * as WATER from './water.js';            // вода: волны, отражения неба и берега, блик, пена, круги от дождя (water.js)
@@ -137,6 +141,7 @@ import * as BEACH from './beach.js';            // пляж на Томи: на�
 import * as TALK from './talk.js';
 import * as PKINST from './pickinst.js';          // подбираемое инстансами: кофе, аптечки, быки, кольца — 4 вызова на все (pickinst.js)
 import * as REPLAY from './replay.js';         // повтор последних 10 с, замедление на аварии, ролик в «Видео» (replay.js, docs/CAREER.md «Повтор»)             // реплики над головами: читаемая плашка, крупнее вблизи, не больше нескольких (talk.js)
+import * as OTAGS from './ordertags.js';       // мини-карточки заказа над радаром: аватарка, имя, сколько метров; доставил — вычеркнуто (ordertags.js)
 EDL.buildStart();                                 // город (всё до конца buildCity) — с зерном: одинаковый каждый запуск, правки редактора находят свои предметы (editlayer.js)
 
 /* Прозрачное двустороннее three рисует в два прохода и перед каждым меняет material.side с needsUpdate —
@@ -2055,7 +2060,8 @@ function startGame (pt) {
   const players = [];
   for (let i = 0; i < 6; i++) {
     const team = i < 3 ? 0 : 1;
-    const grp = makeHuman(chance(0.3) ? nextPerson() : null, { shirt: team ? '#3f7fd6' : '#d95d5d', pants: '#f4f4ee', fat: chance(0.12) });
+    const o = { shirt: team ? '#3f7fd6' : '#d95d5d', pants: '#f4f4ee', fat: chance(0.12) };
+    const grp = chance(0.3) ? freshHuman(o) : makeHuman(null, o);
     const home = { a: (team ? 1 : -1) * pt.L * [0.35, 0.15, 0.2][i % 3], b: [0, -pt.W * 0.25, pt.W * 0.25][i % 3] };
     const x = pt.cx + pt.ux * home.a + pt.nx * home.b, z = pt.cz + pt.uz * home.a + pt.nz * home.b;
     grp.position.set(x, groundH(x, z), z);
@@ -2342,8 +2348,7 @@ function updateVerandas (dt) {
     if (!v.broken && !v.people.length && d < 150) {
       for (const st of v.seats) {
         if (!chance(0.6)) continue;
-        const person = nextPerson();
-        const grp = makeHuman(person, { fat: chance(0.25) });
+        const grp = freshHuman({ fat: chance(0.25) }), person = grp.userData.person;
         grp.rotation.y = st.ry;
         grp.userData.legL.rotation.x = grp.userData.legR.rotation.x = -1.45;
         grp.userData.armL.rotation.x = grp.userData.armR.rotation.x = -0.6;
@@ -3671,7 +3676,7 @@ function signTex () {
    возвращает пиццерию: куда подъезжать (x, z), дом (bx, bz, by), окно выдачи
    (wx, wy, wz), имя, места на парковке (slots) и курилку (smoke) */
 function dodoFacade (f, name) {
-  // пиццерия — отдельный оранжевый шар на свободном месте рядом (pizzadome.js); места нет — в доме, как раньше
+  // пиццерия — отдельный купол с птицей на свободном месте рядом (pizzadome.js); места нет — в доме, как раньше
   const D = PZD.build(pizzaApi(), f, { brand: OWN.pizza(), lots: RIVAL_SPEC.length + 1, lane: LANE });
   if (D) return Object.assign(D, { name: OWN.pizza() + ' · ' + translit(name || homeAddr()) });
   const ry = Math.atan2(f.ox, f.oz);                  // модель смотрит в +Z — значит, на улицу
@@ -3903,6 +3908,45 @@ const faunaApi = () => ({
   V, S, scene, cam, CITY, CAR_L, CAR_W, ADULT, groundH, inPoly, inHouse, inBounds, nearestRoad, toast, emote, sparks, sayBubble, Snd,
   hurt: (n, vn, x, z) => { ACH.add('moose'); hurtCar(n, vn, x, z, 'person'); },   // зовётся только при ударе о лося (звук — мягкое тело)
   ram: (vn, x, z) => hurtCar(0.5, vn, x, z, 'person'),      // лось боднул машину: половинка сердца и мятина (fauna.js RAM)
+  // лось твёрдый и бодается (fauna.js solid): машины потока, прохожие
+  TRAFFIC, PEOPLE, SCOOTS, PEDS, walkers: walkersAll,
+  client: p => !!p.guest || checkVictim(p),        // свой клиент / ждёт заказ — лось его не трогает
+  butt: (t, nx, nz, f, hx, hz) => {                 // лось боднул машину: отбрасывает и мнёт, но не взрывает
+    if (t.gone) return;
+    sparks(hx, 0.9, hz, 8, nx, nz);
+    Snd.impact(f, 'car', { x: hx, z: hz });
+    t.hitT = 0.5;
+    if (t.bus) return;                              // автобус не сдвинуть (buses.js)
+    fullCar(t);
+    dentCar(t.mesh, hx, hz, f * 1.6);
+    t.hp = Math.max(FAUNA.FAUNA.BUTT.MIN_HP, t.hp - f * 1.5);
+    knockCar(t, nx, nz, f);
+  },
+  /* лось сбил человека: hard — на бегу (как наезд: во взрослой — лежит, в детской — со звёздочками и встаёт,
+     hits.js), иначе — толкнул: падает и встаёт. Не на тебе: ни штрафа, ни «сбил» */
+  mooseHit: (p, kind, vx, vz, hard) => {
+    if (p.dead) return false;
+    if (kind === 'peo') {
+      if (p.guest || checkVictim(p)) return false;
+      if (!hard) {
+        if (p.fall) return false;
+        if (p.idle) releaseIdle(p);
+        HITS.fall(p, vx, vz);
+        Snd.impact(Math.hypot(vx, vz), 'person', { x: p.x, z: p.z });
+        return true;
+      }
+      p.dead = 1; p.deadT = rand(18, 26); p.fly = null; p.fall = null; p.grp.visible = false;
+      gibHuman(p, vx, vz, Math.hypot(vx, vz) * 3.6);
+      return true;
+    }
+    if (kind === 'sco') {                            // медленно (до HITS.TIER.FALL) — свалился и встал
+      const k = hard ? 1 : Math.min(1, 4 / (Math.hypot(vx, vz) || 1));
+      runOverScoot(p, vx * k, vz * k, 'moose');
+      return true;
+    }
+    if (hard && PEDS.includes(p)) { p.dead = 1; p.deadT = rand(6, 14); p.grp.visible = false; gibBurger(p.x, p.z); return true; }
+    return false;
+  },
 });
 let FAUNA_API = null;
 /* что нужно horsebox.js (коневозки в потоке) */
@@ -3926,7 +3970,7 @@ const motorApi = () => ({ TRAFFIC, V, live: () => isPlaying(), carId: () => (CAR
 const LIVE_DIRT = new Set(['drive', 'back', 'side', 'handover']);
 const DIRT_ENV = { rain: 0, snowFall: 0, snow: 0, mud: 0, wet: 0 };
 const DIRT_W = w => { w.rain = SEAS.snowy() ? 0 : ENV.rain; w.snowFall = SEAS.snowFall(); w.snow = SEAS.snowAmt(); w.mud = SEAS.mudAmt(); w.wet = SEAS.wetAmt(); return w; };
-const exhApi = () => ({ V, TRAFFIC, cam, career: CAREER, auto: AUTO, snd: Snd, car: () => car, gas: () => IN.gas,
+const exhApi = () => ({ V, TRAFFIC, cam, career: CAREER, auto: AUTO, snd: Snd, car: () => car, gas: () => IN.gas, beast: () => FXS.beastT > 0,
   live: () => isPlaying() && S.state !== 'loading', snow: SEAS.snowAmt, night: () => ENV.night });
 /* что нужно darknight.js (тёмная ночь: костры, котлы, привидения) */
 /* что нужно wastelands.js (назначение пустырей, тропинки, лужи) */
@@ -4762,7 +4806,7 @@ function makeCar (bodyHex, roofSign, model = 'sedan', taxi = false, opts = {}) {
   }
   // своя машина: зад подробно — труба, бампер с номером, крышка с замком и наклейкой, брызговики (carrear.js)
   if (RK) REARM.rear(g, add, Object.assign(RK, { top, CHR, dy, put, mergeGeos, bumper: bumperR, trunk, brand: OWN.pizza(), logo: birdLogo,
-    dual: !!opts.dual, spare: !!opts.spare || model === 'suv' }));
+    dual: !!opts.dual, spare: opts.spare || model === 'suv' }));
 
   if (roofSign) {   // шашка доставки — свою машину видно в потоке
     add(new THREE.BoxGeometry(1.3, 0.42, 0.62), '#ffffff', 0, top + S.ch + 0.3, S.cz);
@@ -4820,7 +4864,7 @@ function makeCar (bodyHex, roofSign, model = 'sedan', taxi = false, opts = {}) {
   g.add(sh);
 
   g.userData = { wheels, steer, panels, glass: cg ? [] : [wsF, wsB], cg, dmg: 0, smokeT: 0, bodyHex, hazard, hl, model, trunk,
-    pipe: RK ? RK.pipe : null, cargo: RK ? RK.cargo : null,   // труба и коробки в багажнике своей машины (carrear.js)
+    pipe: RK ? RK.pipe : null, cargo: RK ? RK.cargo : null, rdoor: RK ? RK.rdoor || null : null,   // труба, коробки в багажнике, задняя дверь хэтчбека своей машины (carrear.js)
     see: !!opts.see, W, y0: y0 + dy, mirrors, armor: opts.armor || 0,   // своя машина: мнётся формой, теряет детали (cardent.js)
     hood: hoodM ? { m: hoodM, y: hoodM.position.y, z: hoodM.position.z, len: S.hood } : null,
     // дописывают потом (cars.js — сразу, огни и дворники — в первом кадре езды): поля — с рождения, форма одна (dbl у V)
@@ -4836,9 +4880,8 @@ function dentCar (g, wx, wz, force) {
   const inv = new THREE.Vector3(wx - g.position.x, 0, wz - g.position.z);
   inv.applyAxisAngle(new THREE.Vector3(0, 1, 0), -g.rotation.y);
   const f = clamp(force / 26, 0.12, 1);
-  const gb = CG.STATS.broken, gc = CG.STATS.cracked, gl = CG.STATS.lamps;
+  const gb = CG.STATS.broken, gc = CG.STATS.cracked + CG.STATS.lampCr, gl = CG.STATS.lamps;
   if (u.cg) CG.hit(u.cg, inv.x, inv.z, force, g);   // своя машина: стекло у удара трескается или бьётся (carglass.js)
-  if (u.see) IMPACT.glass(CG.STATS.broken - gb, CG.STATS.cracked - gc, CG.STATS.lamps - gl, { x: wx, z: wz });   // и звенит (impact.js)
   u.dmg = clamp(u.dmg + f * 0.3, 0, 1);
   let best = null, bd = 1e9;
   for (const p of u.panels) {
@@ -4856,7 +4899,11 @@ function dentCar (g, wx, wz, force) {
   }
   // стёкла трескаются и мутнеют
   if (u.dmg > 0.45) for (const w of u.glass) w.material.color.lerp(new THREE.Color(0x2b2f36), 0.35);
-  if (u.see) { DENTM.hit(g, inv.x, inv.z, force); return; }   // своя машина: вершины вдавливаются, детали отлетают (cardent.js)
+  if (u.see) {                                     // своя машина: вершины вдавливаются, детали отлетают, сзади — следы любого удара (cardent.js)
+    DENTM.hit(g, inv.x, inv.z, force);
+    IMPACT.glass(CG.STATS.broken - gb, CG.STATS.cracked + CG.STATS.lampCr - gc, CG.STATS.lamps - gl, { x: wx, z: wz });   // и звенит (impact.js)
+    return;
+  }
   // бампер отваливается
   if (u.dmg > 0.7) {
     const b = u.panels.find(p => p.m.parent && p.m.geometry.parameters && p.m.geometry.parameters.depth === 0.22 && !p.dropped);
@@ -5318,9 +5365,19 @@ function dropMesh (g) {
 /* makeHuman(person, o): o — { fem, fat, h, skin, shirt, pants, cap, face: false }.
    Фабрику заводим при первом вызове: HUMANS объявлен ниже. */
 let humanFactory = null;
+function humanInit () {
+  humanFactory = createHumanFactory({ THREE, HUMAN_VC, HUMANS });
+  HPOOL.init({ build: humanFactory, steps: humanFactory.steps, makePerson, drop: dropMesh, stale: humanStale });
+}
+/* без человека (person — null) — готовый из запаса (humanpool.js), свой — собираем, как раньше */
 function makeHuman (person, o = {}) {
-  if (!humanFactory) humanFactory = createHumanFactory({ THREE, HUMAN_VC, HUMANS });
-  return humanFactory(person, o);
+  if (!humanFactory) humanInit();
+  return HPOOL.human(person, o);
+}
+/* новый выдуманный человек с телом — вместо makeHuman(nextPerson(), o): из запаса; человек — grp.userData.person */
+function freshHuman (o = {}, po) {
+  if (!humanFactory) humanInit();
+  return HPOOL.fresh(o, po);
 }
 /* все люди — для переключения ближний/дальний вариант (humanLod) */
 const HUMANS = new Set();
@@ -5515,7 +5572,14 @@ function idleSitStep (p, dt) {
   if ((p.idle.t -= dt) <= 0) releaseIdle(p);
 }
 
+/* встаёт с лавочки — шаг вперёд от сиденья, а не стоит внутри лавочки (автор 10.10.2026: «теперь он стоит в лавочке») */
+function offBench (p, ry) {
+  if (!Number.isFinite(ry)) return;
+  p.x += Math.sin(ry) * 0.8; p.z += Math.cos(ry) * 0.8;
+  if (p.grp) { p.grp.position.x = p.x; p.grp.position.z = p.z; }
+}
 function releaseIdle (p) {
+  if (p.idle && p.idle.phase === 'sit' && p.idle.b) offBench(p, p.idle.b.ry);
   if (p.idle) p.idle.b.taken = 0;
   p.idle = null;
   p.restT = rand(45, 110);
@@ -5632,6 +5696,7 @@ const GUEST_GAP = 0.9;                            // ближе к ждущем�
 function clearGuest (p) {
   if (!p.guest) return;
   if (p.sitAt) p.sitAt.taken = 0;
+  if (p.sitting) offBench(p, p.sitRy);
   p.guest = false; p.sitting = 0; p.sitAt = null; p.waitAt = null; p.party = false;
   p.resnap = !p.path;                             // дождался пиццы — дальше по тротуару
   p.grp.position.y = groundH(p.x, p.z);
@@ -5686,7 +5751,7 @@ function guestStep (p, dt) {
     // курьер подъехал не с той стороны — гость встаёт и разворачивается
     const toCar = Math.atan2(V.x - p.x, V.z - p.z);
     const off = Math.atan2(Math.sin(toCar - p.sitRy), Math.cos(toCar - p.sitRy));
-    if (Math.abs(off) > 1.9 && Math.hypot(V.x - p.x, V.z - p.z) < 26) { p.sitting = 0; p.sitAt = null; }
+    if (Math.abs(off) > 1.9 && Math.hypot(V.x - p.x, V.z - p.z) < 26) { offBench(p, p.sitRy); p.sitting = 0; p.sitAt = null; }
     u.legL.rotation.x = damp(u.legL.rotation.x, -1.45, 8, dt);
     u.legR.rotation.x = damp(u.legR.rotation.x, -1.45, 8, dt);
     u.armL.rotation.x = damp(u.armL.rotation.x, -0.3, 6, dt);
@@ -5816,7 +5881,7 @@ function afterDrop (p, keep) {
   if (A.k === 'door' && !keep) {
     p.hold = null;                                // коробка уходит вместе с мешем
     dropMesh(p.grp);
-    p.person = nextPerson(); p.grp = makeHuman(p.person); p.speed = p.base * p.grp.userData.pace;
+    p.grp = freshHuman(); p.person = p.grp.userData.person; p.speed = p.base * p.grp.userData.pace;
     scene.add(p.grp);
     walkSpawn(p, 90, 400); p.crossT = rand(20, 90); p.restT = rand(20, 70);
     return;
@@ -5963,8 +6028,8 @@ function updatePeople (dt) {
       if ((p.deadT -= dt) <= 0) {
         p.dead = 0; p.fly = null; p.fall = null;
         dropMesh(p.grp);                      // возвращается уже другим человеком
-        p.person = nextPerson();
-        p.grp = makeHuman(p.person);
+        p.grp = freshHuman();
+        p.person = p.grp.userData.person;
         p.speed = p.base * p.grp.userData.pace;
         p.panic = null; p.shock = 0;
         scene.add(p.grp);
@@ -6683,6 +6748,7 @@ const nodeFrom = (L, x, z) => (L.ok.length ? pick(L.ok) : L.best >= 0 ? L.best :
 function nodeNear (x, z, rmin, rmax) { return nodeFrom(nodesNear(x, z, rmin, rmax), x, z); }
 
 function respawnTraffic (t, why = 'respawn') {
+  if (t.gone) return;                            // уже убрана: новый меш остался бы на сцене без машины — призрак (updateTraffic)
   if (t.bus) { BUSES.relocate(t); return; }      // автобус — на свой маршрут ближе к курьеру (buses.js)
   t.wreck = 0; t.knock = 0; t.hp = 100; t.y = 0; t.roll = 0; t.smokeT = 0; t.gy = undefined;
   t.stalled = 0; t.angry = 0; t.chainT = 0;
@@ -6720,6 +6786,11 @@ function updateTraffic (dt0) {
   let respN = 0;
   const WALK = walkersAll();                       // списки пешеходов — раз на кадр, а не на каждую машину
   for (const t of TRAFFIC) {
+    // убранная (svcGone) ждёт вычёркивания в конце цикла — не трогаем. До 10.10.2026 trafficDensity убирал
+    // самую дальнюю машину (часто дальше 520 м), цикл тут же «перерождал» её рядом с курьером (respawnTraffic —
+    // новый меш на сцене), и в конце кадра её вычёркивали из списка: на улице оставалась машина-призрак —
+    // видна, стоит, сквозь неё проезжаешь. За минуту смены копилось до 75 таких
+    if (t.gone) continue;
     // вдали — раз в N кадров с накопленным временем (графика «машины и люди вдали», gfx.js); летящие, погоня, службы — всегда
     const dt = t.knock || t.chase || t.svc ? dt0 : GFX.lag(t, dt0, V.x, V.z);
     if (!dt) continue;
@@ -6896,9 +6967,11 @@ function initSmokers () {
   }
 }
 
-function smokerBody (p) {
+/* fresh — сбитого сменил новый человек: готовый из запаса (humanpool.js) */
+function smokerBody (p, fresh = false) {
   if (p.grp) dropMesh(p.grp);
-  p.grp = makeHuman(p.person);
+  p.grp = fresh ? freshHuman() : makeHuman(p.person);
+  if (fresh) p.person = p.grp.userData.person;
   // взрослая версия — сигарета, детская — стаканчик кофе с красной крышкой
   if (ADULT) {
     const cig = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.22), new THREE.MeshBasicMaterial({ color: 0xf4f1ea }));
@@ -6919,7 +6992,7 @@ function smokerBody (p) {
 function updateSmokers (dt) {
   for (const p of SMOKERS) {
     if (p.dead) {
-      if ((p.deadT -= dt) <= 0) { p.dead = 0; p.person = p.regular || nextPerson(); smokerBody(p); }
+      if ((p.deadT -= dt) <= 0) { p.dead = 0; if (p.regular) p.person = p.regular; smokerBody(p, !p.regular); }
       continue;
     }
     p.ph += dt;
@@ -7963,7 +8036,7 @@ function* accidentSteps () {
     const fighters = [];
     for (let i = 0; i < 2; i++) {
       const s2 = i ? 1 : -1, x = fx + Math.sin(dir) * 0.75 * s2, z = fz + Math.cos(dir) * 0.75 * s2;
-      const grp = makeHuman(chance(0.3) ? nextPerson() : null);
+      const grp = chance(0.3) ? freshHuman() : makeHuman(null);
       grp.rotation.y = Math.atan2(fx - x, fz - z);
       grp.position.set(x, groundH(x, z) + curbAt(x, z), z);
       scene.add(grp);
@@ -8071,8 +8144,7 @@ function spawnThief () {
   THIEF.p = p;
   // хозяин пиццы — в паре метров позади, тянет руки
   if (THIEF.c) dropOwner();
-  const person = nextPerson();
-  const og = makeHuman(person, { fat: false });
+  const og = freshHuman({ fat: false }), person = og.userData.person;
   og.userData.armL.rotation.x = og.userData.armR.rotation.x = -1.5;
   const c = { grp: og, person, x: p.x - 3, z: p.z, ph: 0, dead: 0, bubble: sayBubble(og, OWNER_LINES[0], '#4f7fd6'), line: 0, sayT: 1.5, leaveT: 0 };
   scene.add(og);
@@ -8557,7 +8629,7 @@ function takePickup (n) {
   if (n.kind === 'nos') {
     NOS.tank = Math.min(1, NOS.tank + NOS_CAN);
     Snd.nosPick();
-    if (!HINTS.coffee()) toast(NOS.tank >= 1 ? $t('кофе: полный бак · {key}', { key: nitroKey() }) : $t('кофе + · {key}', { key: nitroKey() }));
+    if (!HINTS.coffee()) toast(NOS.tank >= 1 ? $t('кофе: полный бак — нажми {key} и полетишь на кофейной тяге', { key: nitroKey() }) : $t('кофе + — нажми {key} и полетишь на кофейной тяге', { key: nitroKey() }));
   } else if (n.kind === 'shield') {
     FXS.shieldT = 10;
     Snd.nosPick();
@@ -8954,7 +9026,10 @@ let routePts = [];
    — конец — точка на дороге у клиента: выбираем по сумме «путь по дороге +
      пешком до клиента вдвое дороже», а если отрезок к клиенту проходит сквозь
      дом — штраф 400 м: двор с другой стороны квартала не берём. Последний
-     отрезок к клиенту — единственный не по асфальту (ждут во дворах).
+     отрезок к клиенту — единственный не по асфальту (ждут во дворах);
+   — прямая к клиенту (или от машины во дворе до улицы) режет дом — этот
+     кусок ищется по клеткам 2 м вокруг, дома и заборы — стены (routeyard.js,
+     docs/CAREER.md «Куда ведёт маршрут»).
    Куски улиц разложены по клеткам 40 м — свои, только для маршрута. */
 const RE_CELL = 40, RE_BACK = 20;
 let RE = null;                                    // { a, b: узлы кусков; grid: клетка → номера кусков }
@@ -8994,32 +9069,101 @@ function edgesNear (x, z, r, fn) {
       }
     }
 }
-/* отрезок к клиенту проходит сквозь дом? (концы не считаем: клиент стоит у стены) */
-function throughHouse (x0, z0, x1, z1) {
-  const l = Math.hypot(x1 - x0, z1 - z0);
-  for (let d = 1.5; d < l - 1.5; d += 2) { const x = lerp(x0, x1, d / l), z = lerp(z0, z1, d / l); if (inHouse(x, z) || FEST.blocks(x, z)) return true; }   // и сквозь фестиваль (festivals.js)
+/* точка в тоннеле арки (сквозной проезд во двор через дом, archFor) — для навигатора это не дом */
+function inArch (x, z) {
+  for (const a of ARCHES) {
+    const dx = x - a.mx, dz = z - a.mz;
+    if (Math.abs(dx) > a.t + 6 || Math.abs(dz) > a.t + 6) continue;
+    const l = dx * a.ix + dz * a.iz, w = dx * a.ux + dz * a.uz;
+    if (l > -1 && l < a.t + 1 && Math.abs(w) < ARCH_W / 2 - 0.4) return true;
+  }
   return false;
 }
+const houseNotArch = (x, z) => inHouse(x, z) && !inArch(x, z);
+/* отрезок к клиенту проходит сквозь дом? (концы не считаем: клиент стоит у стены); шаг 1 м — угол дома не проскочит */
+function throughHouse (x0, z0, x1, z1) {
+  const l = Math.hypot(x1 - x0, z1 - z0);
+  for (let d = 1.5; d < l - 1.5; d += 1) { const x = lerp(x0, x1, d / l), z = lerp(z0, z1, d / l); if (houseNotArch(x, z) || FEST.blocks(x, z)) return true; }   // и сквозь фестиваль (festivals.js)
+  return false;
+}
+/* Прямая к клиенту режет дом — проезд по клеткам 2 м (routeyard.js): стены — дома, твёрдое, вода;
+   заборы — дорого; дорожки и асфальт дешевле газона. Точки улиц — через 4 м по каждому куску рядом */
+RYARD.init({ HOUSE_GRID, inHouse: houseNotArch, solidAt: (x, z) => solidAt(x, z, 0.3), ARCHES, SOLID_GRID, SCELL, SMASH_GRID, SM_CELL, groundH,
+  yardsEach: YARDS.each, paveEach: PAVE.each, festBlocks: (x, z, m) => FEST.blocks(x, z, m) });
+const RG_TAIL = { PAD: 80, R0: 60, EXTRA: 60, STEP: 4, HEAD_PAD: 50, HEAD_EXTRA: 30 };
+function roadSamples (x, z, R, fn) {
+  edgesNear(x, z, R * 1.42, (a, b) => {
+    if (NODES[a].fx && NODES[a].fx.has(b)) return;    // сквозь фестиваль — закрыто
+    const P = NODES[a], Q = NODES[b], L = Math.hypot(Q.x - P.x, Q.z - P.z), m = Math.max(1, Math.ceil(L / RG_TAIL.STEP));
+    for (let k = 0; k <= m; k++) {
+      const px = lerp(P.x, Q.x, k / m), pz = lerp(P.z, Q.z, k / m);
+      if (Math.abs(px - x) < R - 3 && Math.abs(pz - z) < R - 3) fn(a, b, px, pz);
+    }
+  });
+}
 /* куда на дороге подъезжать к клиенту: кандидаты на ближних кусках улиц.
-   Клиент стоит на месте — считаем один раз на адрес */
-const RT = { key: NaN, cand: [], tail: new Map(), g: null, prev: null, stamp: null, gen: 0, hk: [], hv: [] };
+   Клиент стоит на месте — считаем один раз на адрес. Проезд по клеткам (если прямая режет дом) —
+   работа на несколько кадров (RT.job, routeJobTick): пока считается, хвост — прямой, как раньше;
+   досчиталась — кандидаты заменяются, маршрут пересчитывается сразу. RT.sync — сразу (проверка) */
+const RT = { key: NaN, cand: [], tail: new Map(), g: null, prev: null, stamp: null, gen: 0, hk: [], hv: [], F: null, paths: new Map(), head: null, headFail: null, hjob: null, job: null, jx: 0, jz: 0, jR: 0, jS: null, sync: false, BUDGET: 1.2 };
 function routeTail (x, z) {
   const key = Math.round(x * 2) * 1e6 + Math.round(z * 2);
   if (key === RT.key) return;
-  RT.key = key; RT.cand = []; RT.tail = new Map();
+  RT.key = key; RT.cand = []; RT.F = null; RT.paths = new Map(); RT.job = null;
   for (const r of [80, 200, 500, 1500]) {
     edgesNear(x, z, r, (a, b, px, pz, d) => {
       if (NODES[a].fx && NODES[a].fx.has(b)) return;   // проезд сквозь фестиваль закрыт блоками (festivals.js)
-      RT.cand.push({ a, b, x: px, z: pz, c: d * 2 + (d > 4 && throughHouse(px, pz, x, z) ? 400 : 0) });
+      const cut = d > 4 && throughHouse(px, pz, x, z);
+      RT.cand.push({ a, b, x: px, z: pz, d, cut, c: d * 2 + (cut ? 400 : 0) });
     });
     if (RT.cand.length) break;
   }
+  // хоть одна точка улицы рядом — прямая к клиенту сквозь дом: ищем проезд по клеткам (routeyard.js);
+  // цена точки — путь по клеткам (газон дороже дорожки, забор — много дороже), вдвое, как пешком.
+  // Точки дальше окна сетки, к которым прямая чистая, остаются как были
+  let dmin = Infinity, anyCut = false;
+  for (const q of RT.cand) { dmin = Math.min(dmin, q.d); if (q.cut) anyCut = true; }
+  if (anyCut && !RYARD.RY.OFF) {
+    const R = clamp(dmin + RG_TAIL.PAD, RG_TAIL.R0, RYARD.RY.RMAX), S0 = [], goals = [];
+    roadSamples(x, z, R, (a, b, px, pz) => { S0.push(a, b, px, pz); goals.push(px, pz); });
+    RT.job = RYARD.job(0, x, z, R, RG_TAIL.EXTRA, goals); RT.jx = x; RT.jz = z; RT.jR = R; RT.jS = S0;
+    if (RT.sync) { RT.job.step(); tailFromJob(); }
+  }
+  tailMap();
+}
+/* досчитанный проезд по клеткам → кандидаты: цена — путь по клеткам */
+function tailFromJob () {
+  const J = RT.job, F = J && J.result, S0 = RT.jS, R = RT.jR, gc = [];
+  RT.job = null;
+  if (!F) return;
+  for (let i = 0; i < S0.length; i += 4) {
+    const w = F.at(S0[i + 2], S0[i + 3]);
+    if (w < Infinity) gc.push({ a: S0[i], b: S0[i + 1], x: S0[i + 2], z: S0[i + 3], d: w, cut: false, grid: true, c: w * 2 });
+  }
+  if (!gc.length) return;                           // клиент заперт стенами — остаётся прямая
+  for (const q of RT.cand) if (!q.cut && (Math.abs(q.x - RT.jx) > R - 3 || Math.abs(q.z - RT.jz) > R - 3)) gc.push(q);
+  RT.cand = gc; RT.F = F; RT.paths = new Map();
+  tailMap();
+}
+function tailMap () {
+  RT.tail = new Map();
   RT.cand.forEach((q, i) => {
     for (const n of [q.a, q.b]) {
       const c = Math.hypot(NODES[n].x - q.x, NODES[n].z - q.z) + q.c, t = RT.tail.get(n);
       if (!t || c < t.c) RT.tail.set(n, { c, i });
     }
   });
+}
+/* каждый кадр: проезд по клеткам — не дольше RT.BUDGET мс за кадр; готов — маршрут заново */
+function routeJobTick () {
+  const t0 = performance.now();
+  if (RT.job) {
+    if (!RT.job.step(RT.BUDGET)) return;
+    tailFromJob();
+    if (S.target) rebuildRoutePath();
+  }
+  const left = RT.BUDGET - (performance.now() - t0);
+  if (RT.hjob && !RT.hjob.job.result && left > 0.3 && RT.hjob.job.step(left) && S.target) rebuildRoutePath();
 }
 function rtPush (k, v) {
   const K = RT.hk, H = RT.hv;
@@ -9060,6 +9204,49 @@ function roadPath (x0, z0, x1, z1, h, deck) {
       if (c < sc) { sc = c; sa = a; sb = b; spx = px; spz = pz; }
     });
     if (sa >= 0) break;
+  }
+  // машина во дворе и прямая к улице режет дом — выезд по клеткам (routeyard.js) к лучшей точке улицы.
+  // Выезд помним 3 с: едешь по нему (не дальше 4 м от линии) — берём его же, от ближайшей точки
+  let head = null;
+  if (sa >= 0 && sc > 5 && !RYARD.RY.OFF && throughHouse(x0, z0, spx, spz)) {
+    const H = RT.head, now = performance.now();
+    let k = -1;
+    if (H && now - H.t < 3000) {
+      let bd = 4;
+      for (let i = 1; i < H.pts.length; i++) {
+        const [ax, az] = H.pts[i - 1], [bx, bz] = H.pts[i], dx = bx - ax, dz = bz - az;
+        const t = clamp(((x0 - ax) * dx + (z0 - az) * dz) / (dx * dx + dz * dz || 1), 0, 1), d = Math.hypot(ax + dx * t - x0, az + dz * t - z0);
+        if (d < bd) { bd = d; k = i; }
+      }
+    }
+    if (k > 0) { sa = H.sa; sb = H.sb; spx = H.x; spz = H.z; head = [[x0, z0], ...H.pts.slice(k)]; }
+    else {
+      // поиск — тоже по кадрам (routeJobTick); пока считается — прямая, как раньше
+      let J = RT.hjob;
+      const HF = RT.headFail, failed = HF && now - HF.t < 3000 && Math.hypot(HF.x - x0, HF.z - z0) < 4;   // проезда нет — 3 с не ищем снова
+      if (!failed && (!J || Math.hypot(J.x - x0, J.z - z0) > 4)) {
+        const R = clamp(sc * 1.3 + 40, 40, RYARD.RY.RMAX), S0 = [], goals = [];
+        roadSamples(x0, z0, R, (a, b, px, pz) => { S0.push(a, b, px, pz); goals.push(px, pz); });
+        J = RT.hjob = { job: RYARD.job(1, x0, z0, R, RG_TAIL.HEAD_EXTRA, goals), S0, x: x0, z: z0 };
+        if (RT.sync) J.job.step();
+      }
+      const F = !failed && J.job.result;
+      if (F) {
+        RT.hjob = null;
+        const S0 = J.S0;
+        let bw = Infinity, bk = -1;
+        for (let i = 0; i < S0.length; i += 4) {
+          const w = F.at(S0[i + 2], S0[i + 3]) + (!!edgeOf(S0[i], S0[i + 1]).road.b !== deck ? 12 : 0);
+          if (w < bw) { bw = w; bk = i; }
+        }
+        const gp = bk >= 0 ? F.path(S0[bk + 2], S0[bk + 3]) : null;
+        if (gp) {
+          sa = S0[bk]; sb = S0[bk + 1]; spx = S0[bk + 2]; spz = S0[bk + 3];
+          head = gp.reverse(); head[0] = [x0, z0];
+          RT.head = { pts: head, t: now, sa, sb, x: spx, z: spz };
+        } else RT.headFail = { x: x0, z: z0, t: now };
+      }
+    }
   }
   routeTail(x1, z1);
   if (sa < 0 || !RT.cand.length) return [[x0, z0], [x1, z1]];
@@ -9107,9 +9294,20 @@ function roadPath (x0, z0, x1, z1, h, deck) {
     const q = bi >= 0 ? RT.cand[bi] : null, mid = [];
     for (let k = q ? bn : cn; k !== -1; k = PR[k]) mid.push([NODES[k].x, NODES[k].z]);
     mid.reverse();
-    return q ? [[x0, z0], [spx, spz], ...mid, [q.x, q.z], [x1, z1]] : [[x0, z0], [spx, spz], ...mid, [x1, z1]];
+    const start = head || [[x0, z0], [spx, spz]];
+    if (q) return [...start, ...mid, ...tailOf(bi, q, x1, z1)];
+    // до улицы клиента не доехать: от ближайшего узла — по клеткам, если он в окне проезда
+    const last = mid[mid.length - 1], gp = RT.F && last ? RT.F.path(last[0], last[1]) : null;
+    return gp ? [...start, ...mid, ...gp.slice(1)] : [...start, ...mid, [x1, z1]];
   }
   return [[x0, z0], [x1, z1]];
+}
+/* хвост от точки улицы до клиента: по клеткам (если искали) или прямая; ломаная по клеткам — одна на точку */
+function tailOf (i, q, x1, z1) {
+  if (!q.grid || !RT.F) return [[q.x, q.z], [x1, z1]];
+  let p = RT.paths.get(i);
+  if (!p) RT.paths.set(i, p = RT.F.path(q.x, q.z) || [[q.x, q.z], [x1, z1]]);
+  return p;
 }
 
 /* цвет пути — везде, где он нарисован (радар, большая карта, полоса на асфальте, кольцо-маркер — orders.js):
@@ -9285,7 +9483,8 @@ SET.init({
   canReset: () => !isPlaying() && !S.paused, reset: () => renderReset(),
   keys: () => keysInfo(),
   door: CAREER ? { on: () => DOOR.enabled(), set: v => DOOR.setEnabled(v) } : null,
-  radio: { on: () => RADIO.enabled(), set: v => RADIO.setEnabled(v), name: () => RADIO.stationName(), next: () => RADIO.next() },   // «радио в машине», «станция» (radio.js)   // «мини-игры у клиента: вкл / выкл» (doorstep.js)
+  route: { on: () => { const v = RASK.pref(); return v !== null ? v : getXP() < ROUTE_TUT; }, set: v => RASK.setPref(v), first: () => RASK.firstShift() },   // «путь на дороге: вкл / выкл» (routeask.js)
+  radio: RADIO.RAD.HIDDEN ? null : { on: () => RADIO.enabled(), set: v => RADIO.setEnabled(v), name: () => RADIO.stationName(), next: () => RADIO.next() },   // «радио в машине», «станция» (radio.js)   // «мини-игры у клиента: вкл / выкл» (doorstep.js)
   selected: () => padSel(), navReset: () => { padMenu.clear(); if (CAREER) CAREERM.kbClear(); },
 });
 function renderSettings (focus) { SET.render(focus); }
@@ -9296,9 +9495,9 @@ const padSel = () => { try { const el = padMenu.selected(); return el && el.isCo
    Стираем все ключи игры (dlv-*), кроме настроек из RESET_KEEP. Список PROGRESS_KEYS —
    на случай, если localStorage закрыт (Яндекс в iframe): ключи из него тоже обнуляются.
    Через Platform.store — так на Яндексе чистится и облако. Потом — перезагрузка. */
-const RESET_KEEP = ['dlv-lang', 'dlv-sound', 'dlv-doorgames', 'dlv-radio', 'dlv-radio-st', 'dlv-vol-music', 'dlv-vol-sfx', 'dlv-vol-eng', 'dlv-gfx', 'dlv-edition', 'dlv-name', 'dlv-map', 'dlv-money-x8', 'dlv-__ts', 'dlv-ach'];   // dlv-ach — достижения, как в Стиме, не стираются
+const RESET_KEEP = ['dlv-lang', 'dlv-sound', 'dlv-doorgames', 'dlv-route', 'dlv-radio', 'dlv-radio-st', 'dlv-vol-music', 'dlv-vol-sfx', 'dlv-vol-eng', 'dlv-gfx', 'dlv-edition', 'dlv-name', 'dlv-map', 'dlv-money-x8', 'dlv-__ts', 'dlv-ach'];   // dlv-ach — достижения, как в Стиме, не стираются
 const PROGRESS_KEYS = [
-  'dlv-msk-wallet', 'dlv-msk-cars', 'dlv-msk-car', 'dlv-msk-best', 'dlv-msk-xp', 'dlv-msk-col', 'dlv-msk-tut', 'dlv-msk-guide', 'dlv-msk-nostut', 'dlv-intro', 'dlv-garage-tut', 'dlv-hints',
+  'dlv-msk-wallet', 'dlv-msk-cars', 'dlv-msk-car', 'dlv-msk-best', 'dlv-msk-xp', 'dlv-msk-col', 'dlv-msk-tut', 'dlv-msk-guide', 'dlv-msk-nostut', 'dlv-intro', 'dlv-garage-tut', 'dlv-hints', 'dlv-route-ask',
   'dlv-shifts', 'dlv-stars', 'dlv-crew', 'dlv-story', 'dlv-season', 'dlv-used-addr', 'dlv-lb-local', 'dlv-boss', 'dlv-clock', 'dlv-rev-sale',
   'dlv-car-owned', 'dlv-car-cur', 'dlv-car-up', 'dlv-car-L', 'dlv-car-eng', 'dlv-car-paint', 'dlv-district', 'dlv-dist-shifts', 'dlv-dist-open', 'dlv-city-mode', 'dlv-city-party', 'dlv-knocked', 'dlv-pz-grow', 'dlv-delivered', 'dlv-honor',
   ...Object.keys(ECON.DONATE || {}).map(k => 'dlv-don-' + k),
@@ -9636,10 +9835,12 @@ function driveStep (dt) {
   // что видно на экране, и в просвет между машинами реально пролезаешь.
   const noseX = V.x + fx * CAR_L * 0.55, noseZ = V.z + fz * CAR_L * 0.55;
   const tailX = V.x - fx * CAR_L * 0.55, tailZ = V.z - fz * CAR_L * 0.55;
-  const bump = (vn, s) => {
+  // hx, hz — точка удара: край того круга кузова (нос или корма), которым въехал, со стороны стены.
+  // До 10.10.2026 удар всегда приходился в морду — задом в стену мялся перед
+  const bump = (vn, s, hx, hz) => {
     const mat = IMPACT.solidMat(s);                // во что: стена, столб, забор, дерево (звук удара — impact.js)
-    if (vn > 2.5) { sparks(V.x + fx * 2, 0.7, V.z + fz * 2, vn > 12 ? 9 : 4, 0, 0); Snd.impact(vn, mat, { x: V.x + fx * 2, z: V.z + fz * 2 }); }
-    if (vn > 13) hurtCar(wallDmg(vn), vn, V.x + fx * 2, V.z + fz * 2, mat);   // до SOFT_HIT.WALL — только мятина
+    if (vn > 2.5) { sparks(hx, 0.7, hz, vn > 12 ? 9 : 4, 0, 0); Snd.impact(vn, mat, { x: hx, z: hz }); }
+    if (vn > 13) hurtCar(wallDmg(vn), vn, hx, hz, mat);   // до SOFT_HIT.WALL — только мятина
   };
   // Стены домов стоят под любым углом, поэтому выталкиваем в осях самой
   // стены: сначала находим, с какой стороны коробки мы влезли, а потом
@@ -9672,7 +9873,7 @@ function driveStep (dt) {
       V.x += nx * pen; V.z += nz * pen;
       const vn = V.vx * nx + V.vz * nz;
       if (vn < 0) {
-        bump(-vn, s);
+        bump(-vn, s, cx - nx * r, cz - nz * r);
         V.vx -= vn * nx * 1.2; V.vz -= vn * nz * 1.2;
       }
       // трёшься бортом: скрежет-петля от скорости вдоль стены (impact.js)
@@ -10059,6 +10260,15 @@ function camStep (dt, vf) {
 const radarC = $('radarc');
 const rctx = radarC.getContext('2d');
 let radarSize = 132;
+const RADAR = { MS: 40, TURN: 0.35, JUMP: 10, t: -1e9, h: 0, x: 0, z: 0, tf: '', draws: 0, frames: 0 };
+/* стрелка игрока — не на холсте, а своей картинкой поверх (delivery.css .radar-me): холст между
+   перерисовками поворачивается (radarStep), а стрелка всегда смотрит вверх */
+{
+  const me = document.createElement('i');
+  me.className = 'radar-me';
+  me.innerHTML = '<svg viewBox="-6 -8 12 14.4" width="12" height="14.4"><path d="M0 -6.4L4.6 5.4L0 2.8L-4.6 5.4Z" fill="#fff" stroke="#33210c" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+  radarC.parentElement.appendChild(me);
+}
 
 function sizeRadar () {
   if (!radarC) return;
@@ -10067,9 +10277,27 @@ function sizeRadar () {
   radarC.width = radarSize * dpr;
   radarC.height = radarSize * dpr;
   rctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  RADAR.t = -1e9;                                  // размер сменился — перерисовать в этом же кадре
+}
+/* Радар рисуется не каждый кадр, а раз в RADAR.MS мс (~20 раз в секунду при 60 к/с; было 0,55—0,68 мс
+   каждый кадр на «Деке»). Между перерисовками картинку двигает CSS: холст поворачивается на сколько
+   повернула машина и сдвигается на сколько проехала — карта на глаз вращается плавно, каждый кадр.
+   Повернул резко (> RADAR.TURN рад) или прыгнул (> RADAR.JUMP м) — перерисовать сразу. */
+function radarStep () {
+  RADAR.frames++;
+  let dh = V.h - RADAR.h;
+  if (dh > Math.PI || dh < -Math.PI) dh -= Math.round(dh / (Math.PI * 2)) * Math.PI * 2;
+  const mx = V.x - RADAR.x, mz = V.z - RADAR.z;
+  if (performance.now() - RADAR.t >= RADAR.MS || Math.abs(dh) > RADAR.TURN || mx * mx + mz * mz > RADAR.JUMP * RADAR.JUMP) { drawRadar(); return; }
+  // старая картинка → новая: повернуть на dh вокруг центра (по часовой — как карта при повороте вправо) и сдвинуть на пройденное
+  const s = radarSize / 2 / 135, cs = Math.cos(V.h), sn = Math.sin(V.h);
+  // шаг — четверть пикселя и 0,002 рад (0,15 px у края): стоишь — стиль не трогаем, ползёшь — трогаем реже
+  const tx = Math.round(-(mz * sn - mx * cs) * s * 4) / 4, ty = Math.round((mx * sn + mz * cs) * s * 4) / 4, rq = Math.round(dh * 500) / 500;
+  const tf = 'translate(' + tx + 'px,' + ty + 'px) rotate(' + rq + 'rad)';
+  if (tf !== RADAR.tf) { RADAR.tf = tf; radarC.style.transform = tf; }
 }
 
-/* радар каждый кадр: вода — из готовой сетки (рельеф не меняется; было ~1100 вызовов groundH на кадр),
+/* радар (перерисовка — radarStep): вода — из готовой сетки (рельеф не меняется; было ~1100 вызовов groundH на кадр),
    улицы — по сплошной сетке RG и отметке кадра вместо нового Set (без мусора в кадре) */
 const RADAR_WST = 9, RADAR_WX0 = Math.floor(BOUNDS.x0 / RADAR_WST) - 20, RADAR_WZ0 = Math.floor(BOUNDS.z0 / RADAR_WST) - 20;
 const RADAR_WNX = Math.ceil(BOUNDS.x1 / RADAR_WST) + 20 - RADAR_WX0, RADAR_WNZ = Math.ceil(BOUNDS.z1 / RADAR_WST) + 20 - RADAR_WZ0;
@@ -10089,6 +10317,8 @@ const RADAR_W = new Map();                       // толщина линии �
    (сотни вызовов холста в кадре). Цвета непрозрачные — картинка та же */
 function drawRadar () {
   const R = radarSize / 2, s = R / 135;
+  RADAR.t = performance.now(); RADAR.h = V.h; RADAR.x = V.x; RADAR.z = V.z; RADAR.draws++;
+  if (RADAR.tf) { RADAR.tf = ''; radarC.style.transform = ''; }
   rctx.clearRect(0, 0, radarSize, radarSize);
   rctx.save();
   rctx.beginPath(); rctx.arc(R, R, R, 0, Math.PI * 2); rctx.clip();
@@ -10208,7 +10438,7 @@ function drawRadar () {
   rctx.beginPath();                                 // машины потока — одним путём (их ~300), со своим цветом — по одной
   for (let i = 0; i < TRAFFIC.length; i++) {
     const t = TRAFFIC[i];
-    if (t.dot) continue;
+    if (t.dot || (t.parked && !t.knock)) continue;  // стоящие на парковке — не на радаре (их 150—240, не двигаются); толкнули — едет, видно
     let a = rA(t.x, t.z), b = rB(t.x, t.z);
     const len = Math.sqrt(a * a + b * b);
     if (len > R - 7) { a *= (R - 7) / len; b *= (R - 7) / len; }
@@ -10217,10 +10447,7 @@ function drawRadar () {
   rctx.fillStyle = '#5b6b80'; rctx.fill();
   for (let i = 0; i < TRAFFIC.length; i++) { const t = TRAFFIC[i]; if (t.dot) blip(t.x, t.z, t.dot, 2.4); }
   rctx.globalAlpha = 1;
-  rctx.fillStyle = '#fff'; rctx.strokeStyle = '#33210c'; rctx.lineWidth = 1.4;
-  rctx.beginPath();
-  rctx.moveTo(0, -6.4); rctx.lineTo(4.6, 5.4); rctx.lineTo(0, 2.8); rctx.lineTo(-4.6, 5.4);
-  rctx.closePath(); rctx.fill(); rctx.stroke();
+  // стрелка игрока — картинкой поверх холста (.radar-me, выше у radarC)
   // куда везти — поверх всего: мигающий пин, а за краем радара — стрелка у края
   eachTarget((wx, wz, main, kind) => {
     const a = rA(wx, wz), b = rB(wx, wz), len = Math.hypot(a, b);
@@ -10818,9 +11045,10 @@ elFull.addEventListener('click', () => { if (FM.moved > 8) { FM.moved = 0; retur
    Как навигатор в ГТА: оранжевая полоса с бегущими к цели шевронами лежит
    на самой дороге — от капота по маршруту метров на двести, дальше тает.
    Раньше над машиной висела стрелка, но она смотрела на точку маршрута
-   наискосок и путала; по полосе поворот видно сам по себе. Горит всю
-   только первые ROUTE_TUT заказов за всё время (опыт — доставленные заказы,
-   'dlv-msk-xp'): дальше дорогу показывают радар и карта. Ширина 2,4 м —
+   наискосок и путала; по полосе поворот видно сам по себе. Горит или нет —
+   routeask.js (10.10.2026): всю первую смену карьеры — всегда, после неё —
+   вопрос «оставить?» и настройка «путь на дороге»; кого не спрашивали — как
+   раньше, первые ROUTE_TUT заказов за всё время ('dlv-msk-xp'). Ширина 2,4 м —
    с полосу, а не во всё полотно; цвет приглушённый и полупрозрачный,
    ночью темнеет вместе с городом, но слабее — видно, но не слепит.
    Высота — по настилу, где маршрут идёт по мосту, и по рельефу через пару
@@ -10937,7 +11165,7 @@ function buildRouteLine () {
 function updateRouteLine (dt) {
   const R = ROUTE_LINE;
   // опыт читаем, только когда маршрут пересчитан (раз в 0,35 с), а не каждый кадр
-  if (R.xpSrc !== routePts) { R.xpSrc = routePts; R.tut = getXP() < ROUTE_TUT; }
+  if (R.xpSrc !== routePts) { R.xpSrc = routePts; R.tut = RASK.wanted(getXP()); }   // первая смена — всегда, дальше — настройка (routeask.js)
   const on = R.tut && !S.ride && (S.state === 'drive' || S.state === 'back' || S.state === 'side') && routePts.length > 1;
   R.m.visible = on;
   if (!on) return;
@@ -11134,44 +11362,72 @@ function walletHud (dt) {
   RESPECT.hud(!S.ride && isPlaying());              // третья плашка — респект: прилетает значками с места (respect.js)
 }
 
+/* Хад пишет в DOM, только если строка сменилась: запись textContent / innerHTML — это новый узел и
+   пересчёт раскладки страницы, даже если текст тот же (было — каждый кадр). Числа (скорость, метры,
+   счётчики) сравниваем числом, без сборки строки; язык сменился — пересобрать (HUDC.lang) */
+const HUDC = { lang: '', money: NaN, bur: '', spd: -1, nos: -1, burn: null, fx: '', on: null, vis: '', key: '', dist: -1 };
+const hudTxt = (el, s) => { if (el._hs !== s) { el._hs = s; el.textContent = s; } };
+const hudHtml = (el, s) => { if (el._hs !== s) { el._hs = s; el.innerHTML = s; } };
 function hudStep (dt) {
-  if (CAREER) walletHud(dt); else elMoney.textContent = money(S.money);
+  const lg = curLang();
+  if (lg !== HUDC.lang) { HUDC.lang = lg; HUDC.money = NaN; HUDC.bur = ''; HUDC.spd = -1; HUDC.key = ''; HUDC.dist = -1; HUDC.fx = '#'; }
+  if (CAREER) walletHud(dt); else if (S.money !== HUDC.money) { HUDC.money = S.money; elMoney.textContent = money(S.money); }
   touchpadStep();
-  elBurgers.innerHTML = [S.burgers ? $t('респект {n}', { n: S.burgers }) : '', S.people ? $t('сбито {n}', { n: S.people }) : '',
-    S.scoots ? $t('самокатов {n}', { n: S.scoots }) : '', S.wrecks ? $t('всмятку {n}', { n: S.wrecks }) : ''].filter(Boolean).join('<br>');
-  elSpeed.textContent = $t('{n} км/ч', { n: Math.round(Math.hypot(V.vx, V.vz) * 3.6) });
-  elNitroBar.style.width = (NOS.tank * 100) + '%';
-  elNitro.classList.toggle('burn', NOS.burn);
-  // нитро — кольцом вокруг радара
-  const nv = NOS.tank.toFixed(3);
-  if (elRadarBox.style.getPropertyValue('--nos') !== nv) elRadarBox.style.setProperty('--nos', nv);
-  elRadarBox.classList.toggle('burn', NOS.burn);
-  if (TOUCH_NOS) {                                   // на телефоне бак — кольцом по краю кнопки нитро
-    if (TOUCH_NOS.style.getPropertyValue('--nos') !== nv) TOUCH_NOS.style.setProperty('--nos', nv);
-    TOUCH_NOS.classList.toggle('burn', NOS.burn);
+  const bk = S.burgers + '|' + S.people + '|' + S.scoots + '|' + S.wrecks;
+  if (bk !== HUDC.bur) {
+    HUDC.bur = bk;
+    elBurgers.innerHTML = [S.burgers ? $t('респект {n}', { n: S.burgers }) : '', S.people ? $t('сбито {n}', { n: S.people }) : '',
+      S.scoots ? $t('самокатов {n}', { n: S.scoots }) : '', S.wrecks ? $t('всмятку {n}', { n: S.wrecks }) : ''].filter(Boolean).join('<br>');
   }
-  const fx = [FXS.shieldT > 0 ? $t('щит {n}', { n: Math.ceil(FXS.shieldT) }) : '', FXS.beastT > 0 ? $t('бист-мод {n}', { n: Math.ceil(FXS.beastT) }) : ''].filter(Boolean).join(' · ');
-  if (elFx.textContent !== fx) elFx.textContent = fx;
+  const kmh = Math.round(Math.sqrt(V.vx * V.vx + V.vz * V.vz) * 3.6);
+  if (kmh !== HUDC.spd) { HUDC.spd = kmh; elSpeed.textContent = $t('{n} км/ч', { n: kmh }); }
+  // нитро — полоской и кольцом вокруг радара (--nos)
+  const nq = Math.round(NOS.tank * 1000);
+  if (nq !== HUDC.nos) {
+    HUDC.nos = nq;
+    const nv = (nq / 1000).toFixed(3);
+    elNitroBar.style.width = (nq / 10) + '%';
+    elRadarBox.style.setProperty('--nos', nv);
+    if (TOUCH_NOS) TOUCH_NOS.style.setProperty('--nos', nv);   // на телефоне бак — кольцом по краю кнопки нитро
+  }
+  if (NOS.burn !== HUDC.burn) {
+    HUDC.burn = NOS.burn;
+    elNitro.classList.toggle('burn', NOS.burn);
+    elRadarBox.classList.toggle('burn', NOS.burn);
+    if (TOUCH_NOS) TOUCH_NOS.classList.toggle('burn', NOS.burn);
+  }
+  const fk = (FXS.shieldT > 0 ? Math.ceil(FXS.shieldT) : 0) + '|' + (FXS.beastT > 0 ? Math.ceil(FXS.beastT) : 0);
+  if (fk !== HUDC.fx) {
+    HUDC.fx = fk;
+    elFx.textContent = [FXS.shieldT > 0 ? $t('щит {n}', { n: Math.ceil(FXS.shieldT) }) : '', FXS.beastT > 0 ? $t('бист-мод {n}', { n: Math.ceil(FXS.beastT) }) : ''].filter(Boolean).join(' · ');
+  }
   if (toastT > 0 && (toastT -= dt) <= 0) elToast.style.opacity = 0;
   if (phoneT > 0 && (phoneT -= dt) <= 0) hidePhone();
+  OTAGS.step(dt);                                  // мини-карточки заказа над радаром (ordertags.js)
 
   const on = S.state === 'drive' || S.state === 'back' || S.state === 'handover' || S.state === 'side';
-  elTimeWrap.style.visibility = on ? 'visible' : 'hidden';
+  const vis = on && !S.ride ? 'visible' : 'hidden';
+  if (vis !== HUDC.vis) { HUDC.vis = vis; elTimeWrap.style.visibility = vis; }
   if (on && S.ride) {
-    elTimeWrap.style.visibility = 'hidden';
-    elTask.textContent = $t('просто катаюсь');
-    elAddr.innerHTML = '<span class="sub">' + $t('без заказов и рекордов · esc — в меню') + '</span>';
-    elDist.textContent = '';
+    hudTxt(elTask, $t('просто катаюсь'));
+    hudHtml(elAddr, '<span class="sub">' + $t('без заказов и рекордов · esc — в меню') + '</span>');
+    hudTxt(elDist, '');
+    HUDC.key = ''; HUDC.dist = -1;
   } else if (on && S.target) {
-    const d = Math.hypot(S.target.x - V.x, S.target.z - V.z);
-    const o = S.order;
-    elTask.textContent = S.state === 'back' ? $t('в пиццерию')
-      : $t('заказ {n}', { n: S.orders }) + (o && o.stops.length > 1 ? ' · ' + $t('{i} из {n}', { i: o.idx + 1, n: o.stops.length }) : '');
-    elAddr.innerHTML = S.state === 'back' ? (PIZZA ? PIZZA.name.toLowerCase() : '')
-      : S.addr + (S.addrLine ? '<br><span class="sub">' + S.addrLine + '</span>' : '');
-    elDist.textContent = $t('{n} м', { n: Math.round(d) });
+    const o = S.order, back = S.state === 'back';
+    // заказ, адрес, «в пиццерию» — меняются редко: собираем строки, только когда сменился ключ
+    const key = (back ? 'b' : 'd') + S.orders + '|' + (o ? o.idx + '/' + o.stops.length : '') + '|' + S.addr + '|' + (S.addrLine || '');
+    if (key !== HUDC.key) {
+      HUDC.key = key;
+      hudTxt(elTask, back ? $t('в пиццерию')
+        : $t('заказ {n}', { n: S.orders }) + (o && o.stops.length > 1 ? ' · ' + $t('{i} из {n}', { i: o.idx + 1, n: o.stops.length }) : ''));
+      hudHtml(elAddr, back ? (PIZZA ? PIZZA.name.toLowerCase() : '')
+        : S.addr + (S.addrLine ? '<br><span class="sub">' + S.addrLine + '</span>' : ''));
+    }
+    const dx = S.target.x - V.x, dz = S.target.z - V.z, dm = Math.round(Math.sqrt(dx * dx + dz * dz));
+    if (dm !== HUDC.dist) { HUDC.dist = dm; hudTxt(elDist, $t('{n} м', { n: dm })); }
     dashStep();
-  } else { elTask.textContent = ''; elAddr.textContent = ''; elDist.textContent = ''; }
+  } else { hudTxt(elTask, ''); hudTxt(elAddr, ''); hudTxt(elDist, ''); HUDC.key = ''; HUDC.dist = -1; }
 }
 
 
@@ -11494,33 +11750,15 @@ const COURIER_NOTES = [
 const elPhone = $('phone'), elPhWhy = $('ph-why'), elPhList = $('ph-list'), elPhWhat = $('ph-what');
 let phoneT = 0;
 
-/* карточка-анкета: аватарка, имя, фамилия, адрес и пометка курьера */
+/* накладная заказа: кому (только имя), куда, что, оплата; фото на скрепке. Пометок и комментария курьера нет */
 const KIND_LABEL = { group: $t('групповой заказ'), chain: $t('последовательный заказ'), bundle: $t('сборный заказ'), solo: $t('заказ') };
 
-function personRow (p) {
-  const full = (p && p.name || $t('Иван Иванов')).split(/\s+/);
-  return '<div class="ph-who">' +
-    (p ? '<img src="' + faceDataURL(p) + '" alt="">' : '<i></i>') +
-    '<span class="ph-n">' + (full[0] || '') + '</span>' +
-    '<span class="ph-s">' + (full.slice(1).join(' ') || '') + '</span>' +
-    '<span class="ph-p">' + (p && p.pos ? p.pos : $t('коллега')) + '</span>' +
-    '</div>';
-}
-
-/* Анкета — про людей: крупно аватарка, имя и фамилия, кому везти.
-   Адрес, пицца и пометка курьера — мелко и приглушённо, это вторично.
-   Внизу — большая «принять». Фон за анкетой размыт, чтобы не отвлекал. */
-/* пометка накладной — только по делу: у обычного заказа («клиент ждёт · город») её нет, шлагбаум — остаётся */
-function orderWhy (order) {
-  if (!order || !order.why) return '';
-  return order.ord && order.ord.plain ? order.why.split(' · ').slice(2).join(' · ') : order.why;
-}
 function showOrderCard (order) {
-  // весь попап — накладная: шапка «накладная · заказ  № 0007», таблица, фото на скрепке, кнопка «ГАЗ ГАЗ»
+  // весь попап — накладная: шапка «накладная · заказ  № 0007», таблица, фото на скрепке; кнопки нет —
+  // повисит BRIEF.T с и сама «упадёт» к радару мини-карточкой (briefStep, dropPhone, ordertags.js)
   $('ph-kind').textContent = $t('накладная') + ' · ' + (KIND_LABEL[order.kind] || $t('заказ'));
   const src = elPhone.querySelector('.ph-src');
   if (src) src.textContent = '№ ' + String(S.orders).padStart(4, '0');
-  $('ph-accept').innerHTML = keyHTML('ok') + $t('ГАЗ ГАЗ');   // [A] / Enter — по вводу (glyphs.js)
   const many = order.stops.length > 1;
   // аватарки сверху — кому везёшь; имена и всё остальное — таблицей, как накладная
   const face = (p, n) => '<div class="oc-p">' + (n ? '<em>' + n + '</em>' : '') +
@@ -11531,31 +11769,67 @@ function showOrderCard (order) {
   // сборный (orders.js): у каждого получателя свой адрес, номер — как на фото; порядок развоза выбирает игрок
   const bundle = !!(order.ord && order.ord.bundle);
   const who = bundle ? order.stops.map((st, i) => '<b>' + (i + 1) + '. ' + st.persons.map(p => (p && p.name) || $t('Иван Иванов')).join(', ') + '</b><small>' + st.addr + '</small>').join('')
-    : persons.map(p => '<b>' + ((p && p.name) || $t('Иван Иванов')) + '</b>' + (p && p.desc ? '<small>' + p.desc + '</small>' : '')).join('');
+    : persons.map(p => '<b>' + ((p && p.name) || $t('Иван Иванов')) + '</b>').join('');   // у получателя — только имя (автор, 10.10.2026)
   const rows = [
     [$t('получатель'), who],
     bundle ? null : [$t('адрес'), st0.addr + (many ? ' → ' + $t('ещё {n}', { n: order.stops.length - 1 }) : '')],
     [$t('заказ'), order.items],
     ...(order.ord ? ORD.cardRows(order) : []),
-    // пометка — только по делу: у обычного заказа («клиент ждёт · город») её нет, шлагбаум — остаётся
-    (() => { const w = orderWhy(order); return w ? [$t('пометка'), w] : null; })(),
-    st0.note ? [$t('комментарий курьера'), '«' + st0.note + '»'] : null,
+    // «пометки» и «комментария курьера» нет (автор, 10.10.2026: «убери пометки и комментарии курьеров вообще из интерфейса»)
   ].filter(Boolean);
   elPhList.innerHTML =
     '<div class="oc-sheet"><table class="oc-inv">' + rows.map(([k, v]) => '<tr><th>' + k + '</th><td>' + v + '</td></tr>').join('') + '</table>' +
     '<div class="oc-photos' + (persons.length > 2 ? ' small' : '') + '"><i class="oc-clip"></i>' + people + '</div></div>' +
     (order.rush ? '<div class="oc-rush">⏱ ' + order.rushText + '<span>' + $t('после загрузки — полный бак кофе · оплата ×1,5') + '</span></div>' : '') +
-    (order.surf ? '<div class="oc-rush oc-surf">🏄 ' + $t(MAP.river.surfCard, { name: SURF.person ? SURF.person.first : '' }) + '<span>' + $t('подъедь к набережной и притормози — пицца долетит прямо на доску · оплата ×2') + '</span></div>' : '');
+    (order.surf ? '<div class="oc-rush oc-surf">🏄 ' + $t(MAP.river.surfCard, { name: SURF.person ? SURF.person.first : '' }) + '<span>' + $t('подъедь к набережной и притормози — пицца долетит прямо на доску · оплата ×2') + '</span></div>' : '') +
+    briefGoHTML();
   elPhWhat.textContent = order.items;
   elPhWhy.textContent = order.why;
   if (order.ord) ORD.card(order);                 // карьера: полоса цвета вида (очередь «дальше» не показываем)
   else if (order.look) ORD.card({ stops: order.stops, ord: order.look });   // учебный Стёпа — сюжетный: розовая полоса, «история · накладная»
-  else elPhone.classList.remove('ord-typed', 'ord-urgent');
+  else elPhone.classList.remove('ord-typed', 'ord-urgent', 'ord-story');
+  clearTimeout(BRIEF.drop);
+  elPhone.classList.remove('drop');
   elPhone.classList.add('on');
   document.body.classList.add('brief');
-  phoneT = 0;                 // висит, пока не нажмут «принять»
+  phoneT = 0;
+  BRIEF.t = 0; BRIEF.gasUp = !IN.gas;           // газ зажат с прошлого заказа — не считается, нужен новый нажим
 }
-const hidePhone = () => { elPhone.classList.remove('on'); document.body.classList.remove('brief'); phoneT = 0; };
+const hidePhone = () => { clearTimeout(BRIEF.drop); elPhone.classList.remove('on', 'drop'); document.body.classList.remove('brief'); phoneT = 0; };
+
+/* Накладная без кнопки (автор, 10.10.2026: «кнопку „ГАЗ ГАЗ“ вообще убрать»): висит BRIEF.T с
+   (первый заказ за всё время — BRIEF.TUT), пока не трогают — потом сама «падает» к радару и
+   сворачивается в мини-карточку (ordertags.js). Раньше — газ (новым нажимом, не с прошлого заказа;
+   не раньше BRIEF.MIN с), A / Enter или клик по листу. Пока поверх диалог, пауза, карта — не тикает. */
+const BRIEF = { T: 2.6, TUT: 3.4, MIN: 0.5, t: 0, gasUp: true, drop: 0 };
+function briefStep (dt) {
+  if (S.state !== 'brief' || !elPhone.classList.contains('on') || elPhone.classList.contains('drop')) return;
+  if (S.paused || FM.open || DLG.isOpen() || (CAREER && CAREERM.padRoot())) return;
+  BRIEF.t += dt;
+  if (!IN.gas) BRIEF.gasUp = true;
+  const gas = IN.gas && BRIEF.gasUp && BRIEF.t >= BRIEF.MIN;
+  if (gas || BRIEF.t >= (S.order && S.order.tut ? BRIEF.TUT : BRIEF.T)) acceptOrder();
+}
+/* лист летит вниз к текущей мини-карточке над радаром, сжимаясь; город сразу в фокусе */
+/* подсказка на накладной (автор 10.10.2026: «нужно делать подсказку, что можешь начать ехать, чтобы начать заказ»):
+   «[W] газ — поехали»; значок — по вводу: клавиатура W, геймпад RT / R2, палец — «газ» */
+function briefGoHTML () {
+  const ik = inputKind();
+  const key = ik.kind === 'pad' ? (ik.family === 'ps' ? 'R2' : 'RT') : 'W';
+  return '<div class="oc-go">' + (ik.kind === 'touch' ? escHtml($t('жми газ — поехали'))
+    : '<kbd class="pp-key">' + key + '</kbd>' + escHtml($t('газ — поехали'))) + '</div>';
+}
+function dropPhone () {
+  const to = OTAGS.anchor(), r = elPhone.getBoundingClientRect();
+  document.body.classList.remove('brief');
+  if (!to || !r.width) { hidePhone(); OTAGS.land(0); return; }
+  elPhone.style.setProperty('--dx', Math.round(to.x - (r.left + r.width / 2)) + 'px');
+  elPhone.style.setProperty('--dy', Math.round(to.y - (r.top + r.height / 2)) + 'px');
+  elPhone.classList.add('drop');
+  clearTimeout(BRIEF.drop);
+  BRIEF.drop = setTimeout(hidePhone, 520);
+  OTAGS.land(0.4);
+}
 
 /* ─────────────── куда везти ───────────────
    Гость ждёт не на тротуаре у проспекта, а в глубине квартала: у подъезда,
@@ -11803,12 +12077,22 @@ function asStepan (p) {
   p.path = null; p.w = null;
   dropMesh(p.grp); p.person = stepanPerson(); p.grp = makeHuman(p.person); p.speed = p.base * p.grp.userData.pace; scene.add(p.grp);
 }
-/* relax — лавочки по правилам нет (10.10.2026: первая доставка — всегда Стёпа): дальше (30—900 м) и до дороги до 60 м */
+/* Первый заказ — Стёпа на лавочке у своего дома, Ленинградская, 8 (stepabench.js, автор 10.10.2026: «первый заказ
+   Степану нужно везти на Ленинградскую, 8»), если она есть в карте, цела и в районе, где работаешь.
+   Нет — ближайшая подходящая лавочка во дворе (~130 м); relax — дальше (30—900 м) и до дороги до 60 м */
+function stepaHomeBench () {
+  if (!STEPAB.DEBUG.M.ready) { try { stepaBenchInit(); } catch (e) { console.warn('[stepa] bench', e); } }
+  const pr = STEPAB.DEBUG.M.prop;
+  if (!pr || pr.down) return null;
+  const b = BENCHES.find(q => q.prop === pr);
+  if (!b || b.taken || (DISTRICTS && DIST.at(b.x, b.z) !== DIST.cur())) return null;
+  return b;
+}
 function stepanOrder (all, relax) {
   if (!all || !all.length) return null;
-  let best = null, bs = Infinity;
+  let best = relax ? null : stepaHomeBench(), bs = best ? -1 : Infinity;
   const D0 = relax ? 30 : 45, D1 = relax ? 900 : 420, RD = relax ? 60 : 30;
-  for (const b of BENCHES) {
+  for (const b of (best ? [] : BENCHES)) {
     if (b.taken || (b.prop && b.prop.down)) continue;
     const d = Math.hypot(b.x - V.x, b.z - V.z);
     if (d < D0 || d > D1 || (COURIER_SLOTS && COURIER_SLOTS.some(q => Math.hypot(q.x - b.x, q.z - b.z) < 25))) continue;
@@ -11825,7 +12109,9 @@ function stepanOrder (all, relax) {
   p.idle = { b: best, phase: 'sit', t: 1e9, give: 0 }; best.taken = 1;        // сразу сидит: makeGuest оставит его на лавочке
   p.grp.rotation.y = best.ry;
   HK.guest(p, best);
-  const why = ADULT ? $t('первый заказ: Степан на лавочке во дворе — ищи облака дыма') : $t('первый заказ: Степан на лавочке во дворе — ищи пар от самовара');
+  const home = best.prop === STEPAB.DEBUG.M.prop;
+  const why = home ? (ADULT ? $t('первый заказ: Стёпа на лавочке у Ленинградской, 8 — ищи облака дыма') : $t('первый заказ: Стёпа на лавочке у Ленинградской, 8 — ищи пар от самовара'))
+    : ADULT ? $t('первый заказ: Степан на лавочке во дворе — ищи облака дыма') : $t('первый заказ: Степан на лавочке во дворе — ищи пар от самовара');
   return { kind: 'solo', tut: true, stops: [{ peds: [p] }], why, look: TUT_LOOK };
 }
 
@@ -12069,9 +12355,9 @@ function pizzasInCar () {
 function setTrunk (open) { const tr = car.userData.trunk; if (tr) tr.want = open ? 1.2 : 0; }
 function updateTrunk (dt) {
   const tr = car.userData.trunk;
-  if (!tr || (tr.a < 0.005 && tr.want === 0)) return;     // закрыт — вмятины на крышке не трогаем
-  tr.a = damp(tr.a, tr.want, 9, dt);
-  if (tr.want === 0 && tr.a < 0.01) { tr.a = 0; Snd.fx('trunk', s => s.blip(150, 0.06, 'square', 0.08)); }
+  if (!tr || (tr.a < 0.005 && tr.want === 0 && !tr.ajar)) return;     // закрыт — вмятины на крышке не трогаем
+  tr.a = damp(tr.a, REARM.lidGoal(tr, dt, Math.hypot(V.vx, V.vz)), 9, dt);   // после аварии приоткрыта и болтается (cardent.js REARD)
+  if (tr.want === 0 && !tr.ajar && tr.a < 0.01) { tr.a = 0; Snd.fx('trunk', s => s.blip(150, 0.06, 'square', 0.08)); }
   tr.m.rotation.x = tr.a;
   tr.m.position.set(tr.m.position.x, tr.hy + Math.sin(tr.a) * tr.len / 2, tr.hz - Math.cos(tr.a) * tr.len / 2);
 }
@@ -12080,10 +12366,10 @@ function updateTrunk (dt) {
    коробка, крышка хлопает, и только тогда отпускается руль и тикает срок */
 function acceptOrder () {
   if (S.state !== 'brief') return;
-  hidePhone();
+  dropPhone();                                    // накладная падает к радару мини-карточкой (ordertags.js)
   S.state = 'loading';
   // Полноэкранная реклама — раз в несколько доставок и только сразу после
-  // нажатия «принять»: это пауза между заказами, а не посреди езды
+  // того, как свернулась накладная: это пауза между заказами, а не посреди езды
   if (adDue()) { S.adDone = S.done; showAd().then(loadPizza); return; }
   loadPizza();
 }
@@ -12113,7 +12399,7 @@ function loadPizza () {
       S.time = S.timeMax;                       // срок пошёл с момента загрузки
       if (S.order && S.order.rush) {
         NOS.tank = 1;
-        popBonus($t('поторопись!'), $t('полный бак кофе — жми {key}', { key: nitroKey() }));
+        popBonus($t('поторопись!'), $t('полный бак кофе — нажми {key} и полетишь на кофейной тяге', { key: nitroKey() }));
       } else toast($t('пицца в машине — поехали'));
       if (S.coffeeNext) { S.coffeeNext = false; tossCoffee(); }
       Platform.gameplayStart();
@@ -12130,7 +12416,7 @@ function tossCoffee () {
   flyBox({ x: PIZZA.wx, y: PIZZA.wy, z: PIZZA.wz }, trunkPoint, 0.8, () => {
     cup.traverse(o => { if (o.geometry) o.geometry.dispose(); });   // материалы общие, геометрии — свои
     NOS.tank = Math.min(1, NOS.tank + 0.4);
-    toast($t('держи бонус: полный бак кофе'));
+    toast($t('держи бонус: полный бак кофе — нажми {key} и полетишь на кофейной тяге', { key: nitroKey() }));
     Snd.fx('coffee', s => s.blip(980, 0.08, 'triangle', 0.12));
   }, cup);
 }
@@ -12190,7 +12476,7 @@ function takeBox (ped, st, onTime) {
   // что делать с пиццей дальше (afterStart); сюжетного клиента ведёт story.js — его не трогаем
   ped.afterMood = st.pay && st.pay.story ? '' : !onTime || st.bumped ? 'angry' : 'happy';
   // смену/заказ уже свернули (backToBase снимает гостя до того, как долетела коробка) — постоит с ней, потом afterStart
-  if (ped.afterMood && !ped.guest && !ped.surf && ped.base !== undefined) { if (ped.after) afterDrop(ped, true); ped.guest = true; ped.sitting = 0; ped.sitAt = null; ped.waitAt = null; if (ped.idle) { ped.idle.b.taken = 0; ped.idle = null; } }
+  if (ped.afterMood && !ped.guest && !ped.surf && ped.base !== undefined) { if (ped.after) afterDrop(ped, true); ped.guest = true; if (ped.sitting) offBench(ped, ped.sitRy); else if (ped.idle && ped.idle.phase === 'sit') offBench(ped, ped.idle.b.ry); ped.sitting = 0; ped.sitAt = null; ped.waitAt = null; if (ped.idle) { ped.idle.b.taken = 0; ped.idle = null; } }
   if (ped.afterMood && afterCount() < AFTER.MAX) ped.freeT = onTime && !st.bumped ? AFTER.HOLD : AFTER.HOLD_ANGRY;
   if (onTime) { ped.holdT = 7; emote(ped.x, 2.1, ped.z, 'heart', 5); }
   else emote(ped.x, 2.1, ped.z, 'angry', 3);
@@ -12318,14 +12604,19 @@ function showChoice (o) {
   CH.opts = o.opts; CH.t = CH.t0 = o.timeout || 0; CH.onTimeout = o.onTimeout || null; CH.pause = !!o.pause;
   // full — окно на весь экран (воскреснуть или нет): игра идёт, но выбирают как в меню — стиком/крестовиной и A
   CH.full = !!o.full;
-  // на весь экран — значки кнопок по вводу (glyphs.js): первая — [A] / Enter, последняя — [B] / Esc; курсор сразу на первой
-  // (UI-REVIEW № 27). Карточка на паузе (обед): геймпад — [A] [X] [Y], каждая своей кнопкой; на ходу (просьба клиента) —
-  // крестовина ◀ ▲ ▶ (двух вариантов — ◀ ▶); клавиатура в обоих — цифры 1–3; пальцем — без значков (IDEAS И1, 09.10.2026)
+  // большое окно (на весь экран — воскреснуть; на паузе — обед): значков клавиш на кнопках нет (автор 10.10.2026: «рвётся от
+  // Enter»), курсор — как в меню: стрелки / крестовина / стик водят, [A] / Enter жмёт ту, на которой курсор, [B] / Esc —
+  // последняя (если она «нет»); как управлять — одной бумажной полоской внизу экрана (.ch-ctl), пальцем полоски нет.
+  // На ходу (просьба клиента, маленькая карточка) — как было: крестовина ◀ ▲ ▶ (двух вариантов — ◀ ▶) и цифры 1–3 (IDEAS И1)
+  const big = CH.pause || CH.full;
+  CH.back = CH.full && o.opts.length > 1 && o.back !== false;   // [B] / Esc — последний вариант («нет, закончить смену»)
+  CH.row = !!o.row;                                // варианты в ряд (обед): курсор ◀ ▶
   const DPAD = o.opts.length === 2 ? ['◀', '▶'] : ['◀', '▲', '▶'];
-  const em = i => CH.full ? (i === 0 ? keyHTML('ok') : i === o.opts.length - 1 ? keyHTML('back') : '')
-    : '<em class="ch-n">' + (i + 1) + '</em>' + (CH.pause ? keyHTML(['ok', 'x', 'y'][i] || '') : '<kbd class="pp-key ch-dpad">' + (DPAD[i] || '') + '</kbd>');
-  $('ch-opts').innerHTML = o.opts.map((q, i) => '<button type="button" data-i="' + i + '"' + (CH.full && i === 0 ? ' data-pad-main' : '') + '>' + em(i) + '<b>' + q.label + '</b>' +
+  const em = i => big ? '' : '<em class="ch-n">' + (i + 1) + '</em><kbd class="pp-key ch-dpad">' + (DPAD[i] || '') + '</kbd>';
+  $('ch-opts').innerHTML = o.opts.map((q, i) => '<button type="button" data-i="' + i + '"' + (big && i === 0 ? ' data-pad-main' : '') + '>' + em(i) + '<b>' + q.label + '</b>' +
     (q.sub ? '<span>' + q.sub + '</span>' : '') + '</button>').join('');
+  CH.okLabel = o.okLabel || '';
+  choiceCtl();
   const sec = $('choice').querySelector('.ch-sec');
   if (sec) sec.textContent = CH.full && CH.t0 ? String(Math.ceil(CH.t0)) : '';
   el.classList.toggle('big', CH.pause || CH.full);
@@ -12335,14 +12626,42 @@ function showChoice (o) {
   el.hidden = false;
   // arm — первые миллисекунды кнопки не жмутся: кто жал газ/ручник/A, не закроет окно не глядя
   CH.armAt = performance.now() + (o.arm || 0);
-  if (CH.full && !o.arm) { const b0 = $('ch-opts').querySelector('button'); if (b0) { b0.classList.add('ch-main'); try { b0.focus({ preventScroll: true }); } catch (e) { /* — */ } } }
+  if (big && !o.arm) { const b0 = $('ch-opts').querySelector('button'); if (b0) choiceGo(b0); }
   if (o.arm) {
     const bs = $('ch-opts').querySelectorAll('button');
     for (const b of bs) b.disabled = true;
-    setTimeout(() => { for (const b of bs) b.disabled = false; if (!el.hidden && bs[0]) { try { bs[0].focus({ preventScroll: true }); } catch (e) { /* — */ } } }, o.arm);
+    setTimeout(() => { for (const b of bs) b.disabled = false; if (!el.hidden && bs[0]) choiceGo(bs[0]); }, o.arm);
   }
   if (CH.pause) { S.paused = true; S.meal = true; Snd.engine(0); for (const k in IN) IN[k] = 0; joyReset(); }
 }
+/* как управлять большим окном выбора — одна бумажная полоска внизу, как в меню и паузе (menu.js / pausecz.js hint):
+   «▲▼ выбор · [A] ок · [B] нет»; значки — того, чем играют (glyphs.js), пальцем полоски нет */
+function choiceCtl () {
+  const el = $('choice');
+  if (!el) return;
+  let h = el.querySelector('.ch-ctl');
+  if (!h) { h = document.createElement('div'); h.className = 'ch-ctl'; el.appendChild(h); }
+  const big = CH.pause || CH.full;
+  if (!big || !CH.opts.length || inputKind().kind === 'touch') { h.hidden = true; return; }
+  h.hidden = false;
+  const arrows = '<kbd class="pp-key">' + (CH.row ? '◀ ▶' : '▲ ▼') + '</kbd>';
+  h.innerHTML = [CH.opts.length > 1 ? arrows + escHtml($t('выбор')) : '', keyHTML('ok') + escHtml(CH.okLabel || $t('ок')),
+    CH.back ? keyHTML('back') + escHtml($t('нет')) : ''].filter(Boolean).join('<i>·</i>');
+}
+onGlyphInput(() => { if (CH.opts.length) choiceCtl(); });
+/* курсор большого окна: на какой кнопке (фокус — его ставят и стрелки, и геймпад padmenu.js) */
+function choiceCur () {
+  const bs = [...$('ch-opts').querySelectorAll('button')];
+  return { bs, i: bs.findIndex(b => b.classList.contains('ch-cur')) };
+}
+/* поставить курсор на кнопку: подсветка .ch-cur (одна на окно) и фокус */
+function choiceGo (b) {
+  for (const x of $('ch-opts').querySelectorAll('.ch-cur')) if (x !== b) x.classList.remove('ch-cur');
+  b.classList.add('ch-cur');
+  try { b.focus({ preventScroll: true }); } catch (e) { /* — */ }
+}
+// геймпад (padmenu.js) водит фокус — курсор идёт за ним
+$('ch-opts').addEventListener('focusin', e => { const b = e.target.closest('button'); if (b && (CH.pause || CH.full)) choiceGo(b); });
 function hideChoice () {
   const el = $('choice');
   if (el) el.hidden = true;
@@ -12743,20 +13062,16 @@ function askRevive () {
   const R = revivePrice(), price = R.price, have = wallet();
   const money = n => moneyOf(n).replace(/\s/g, '\u00a0');   // цена не переносится посередине (UI-REVIEW № 27)
   const no = () => { DEATH.keep = null; dropRun(); };
-  // скидка: «1 000 ₽ вместо 3 000 ₽ · раз в 3 смены»; нет скидки — когда будет
-  const every = ECON.REVIVE.SALE_EVERY;
-  const saleLine = R.sale ? $t('скидка: {sale} вместо {full}', { sale: money(R.price), full: money(R.full) }) + ' · ' + $tn(every, 'раз в {n} смену|раз в {n} смены|раз в {n} смен')
-    : $tn(R.wait, 'скидка {sale} — через {n} смену|скидка {sale} — через {n} смены|скидка {sale} — через {n} смен', { sale: money(ECON.REVIVE.SALE) });
+  // автор 10.10.2026: без строки скидки и без «заказ и смена — дальше» под кнопкой, без зачёркнутой цены — кнопка короткая
   if (have < price) {
     showChoice({ title: $t('воскреснуть — {money}', { money: money(price) }),
-      sub: $t('в копилке {money} — не хватает', { money: money(have) }) + ' · ' + saleLine,
+      sub: $t('в копилке {money} — не хватает', { money: money(have) }),
       opts: [{ label: $t('ну что ж'), fn: no }], timeout: 4, onTimeout: no, full: true });
     return;
   }
   showChoice({ title: R.sale ? $t('воскреснуть со скидкой?') : $t('воскреснуть?'),
     sub: $t('новая машина спустится с неба · из копилки {money} (там {have})', { money: money(price), have: money(have) }),
-    opts: [{ label: $t('воскреснуть · {money}', { money: money(price) }) + (R.sale ? ' <s>' + money(R.full) + '</s>' : ''),
-      sub: (DEATH.keep && DEATH.keep.ice ? $t('пицца утонула — заказ сорван, смена — дальше') : $t('заказ и смена — дальше')) + ' · ' + saleLine, fn: () => { paidSeal(); revive(price, R.sale); } },
+    opts: [{ label: $t('воскреснуть · {money}', { money: money(price) }), fn: () => { paidSeal(); revive(price, R.sale); } },
       { label: $t('нет, закончить смену'), fn: no }],
     timeout: 9, onTimeout: no, full: true });
   Snd.order();
@@ -12994,8 +13309,7 @@ function orderInfo () {
       [$t('заказ'), o.items]);
     if (S.fee > 0) rows.push([$t('оплата'), money(S.fee)]);
   } else rows.push([$t('заказ'), '<b>' + $t('заказа пока нет') + '</b>']);
-  const why = orderWhy(S.order);
-  if (why && S.target && S.order && !S.ride && S.state !== 'side' && S.state !== 'back') rows.push([$t('пометка'), why]);
+  // «пометки» нет и тут (автор, 10.10.2026: пометки и комментарии курьеров — из интерфейса вообще)
   const faces = persons.filter(Boolean).slice(0, 2).map(p => '<div class="oc-p"><img src="' + faceDataURL(p) + '" alt=""></div>').join('');
   return '<div class="pm-inv-top"><span>' + head + '</span><span>№ ' + String(S.orders).padStart(4, '0') + '</span></div>' +
     '<div class="oc-sheet"><table class="oc-inv">' + rows.map(([k, v]) => '<tr><th>' + k + '</th><td>' + v + '</td></tr>').join('') + '</table>' +
@@ -13007,7 +13321,7 @@ function keysInfo () {
   const k = (...ks) => ks.map(x => '<kbd>' + x + '</kbd>').join('');
   const rows = pad ? [
     [k('RT'), $t('газ')], [k('LT'), $t('тормоз, назад')], [k($t('левый стик')), $t('руль')],
-    [k('B'), $t('ручник')], [k('A', 'RB'), $t('кофе — зажал и полетел')], [k('A'), $t('принять заказ')],
+    [k('B'), $t('ручник')], [k('A', 'RB'), $t('кофе — зажал и полетел')],
     [k('Y'), $t('карта района')], [k('←', '↑', '→'), $t('ответ клиенту')], [k('R3'), $t('звук')], [k('☰'), $t('пауза')],
     [k('LB'), $t('повтор последних 10 с')], [k('↓'), $t('радио: следующая станция')],
   ] : touch ? [
@@ -13085,8 +13399,8 @@ for (const ev of ['pointerdown']) $('nos').addEventListener(ev, e => { e.prevent
 for (const ev of ['pointerup', 'pointercancel', 'pointerleave'])
   $('nos').addEventListener(ev, () => { IN.nitro = 0; });
 
-/* «принять»: до него руль заблокирован */
-$('ph-accept').addEventListener('click', acceptOrder);
+/* накладная: клик или касание по листу — свернуть сразу (кнопки нет, сама сворачивается через BRIEF.T с) */
+elPhone.addEventListener('click', () => { if (S.state === 'brief' && elPhone.classList.contains('on')) acceptOrder(); });
 
 /* ─────────────── ввод ─────────────── */
 const KEY = {
@@ -13102,14 +13416,22 @@ addEventListener('keydown', e => {
     return;
   }
   if (CH.opts.length && /^Digit[1-3]$/.test(e.code)) { pickChoice(+e.code.slice(5) - 1); return; }
-  if (CH.full && CH.opts.length && !e.repeat) {      // воскрешение: Enter — первая (воскреснуть), Esc — последняя (нет)
-    if (matchKey('ok', e)) { e.preventDefault(); pickChoice(0); return; }
-    if (matchKey('back', e)) { e.preventDefault(); pickChoice(CH.opts.length - 1); return; }
+  // большое окно (воскрешение, обед): стрелки / WASD водят курсор, Enter / пробел — нажать ту, где курсор (нет курсора — первую),
+  // Esc — последняя («нет»), если она отказ; зажатый ручник (повтор) не жмёт
+  if ((CH.full || CH.pause) && CH.opts.length && !$('choice').hidden) {
+    const dir = { ArrowUp: -1, KeyW: -1, ArrowLeft: -1, KeyA: -1, ArrowDown: 1, KeyS: 1, ArrowRight: 1, KeyD: 1 }[e.code];
+    if (dir) {
+      e.preventDefault();
+      const { bs, i } = choiceCur();
+      const b = bs[i < 0 ? 0 : Math.max(0, Math.min(bs.length - 1, i + dir))];
+      if (b) choiceGo(b);
+      return;
+    }
+    if (matchKey('ok', e)) { e.preventDefault(); if (!e.repeat) { const { i } = choiceCur(); pickChoice(i < 0 ? 0 : i); } return; }
+    if (matchKey('back', e)) { e.preventDefault(); if (!e.repeat && CH.back) pickChoice(CH.opts.length - 1); if (CH.back || CH.pause) return; }
   }
-  // окно на паузе с одной кнопкой («понял»): Enter и пробел жмут её; зажатый ручник (повтор) — нет
-  if (CH.pause && CH.opts.length === 1 && /^(Enter|NumpadEnter|Space)$/.test(e.code)) { e.preventDefault(); if (!e.repeat) pickChoice(0); return; }
   if (CH.pause) return;
-  // накладная: Enter — «ГАЗ ГАЗ», как A на геймпаде (значок [Enter] на штампе; раньше с клавиатуры — только мышью)
+  // накладная: Enter — свернуть сразу, как A на геймпаде (без кнопки она и так свернётся сама)
   if (S.state === 'brief' && (e.code === 'Enter' || e.code === 'NumpadEnter') && !S.paused && !FM.open && !DLG.isOpen() && !(CAREER && CAREERM.padRoot())) {
     e.preventDefault();
     if (!e.repeat && elPhone.classList.contains('on')) acceptOrder();
@@ -13257,7 +13579,7 @@ if (CAREER) ORD.init({ S, V, CITY, MAP, THREE, Store, ADULT, SPOTS, LIFE, Snd, g
   alive, releaseIdle, pushOut, walkSpawn, nearestRoad, makeGuest, clearGuest, realAddress, routeLen, orderTime, rebuildRoutePath, syncTarget, pinFront,
   errandShop, startSide, declineSide, popBonus, toast, money, sayBubble, addWallet, donated, hidePhone, clearGate, showOrderCard, backToBase,
   newOrder, marker, level: () => levelOf(getXP()), gameplayStop: () => Platform.gameplayStop(),
-  rehuman: (p, person) => { dropMesh(p.grp); p.person = person || nextPerson(); p.grp = makeHuman(p.person); p.speed = p.base * p.grp.userData.pace; scene.add(p.grp); } });
+  rehuman: (p, person) => { dropMesh(p.grp); p.grp = person ? makeHuman(person) : freshHuman(); p.person = p.grp.userData.person; p.speed = p.base * p.grp.userData.pace; scene.add(p.grp); } });
 /* мини-игры у клиента (doorstep.js): домофон у подъезда многоэтажки и разговор у двери — до вручения, руль стоит, срок идёт */
 if (CAREER) DOOR.init({ ORD, S, Store, ADULT, Snd, root: () => $('game') || document.body, paused: () => !!(S.paused || EXT.paused || FM.open),
   entranceLv, shiftsDone: () => +Store.get('dlv-shifts', 0) || 0, onShiftStart: CAREERM.onShiftStart,
@@ -13275,6 +13597,11 @@ if (CAREER) { CAREERM.onShiftStart(ACH.shiftStart); CAREERM.onShiftEnd(ACH.shift
 /* таблица рекордов Стима (board.js): смена карьеры — в таблицу; ?nolb — проверочный прогон, не пишем */
 BOARD.init({ nolb: new URLSearchParams(location.search).has('nolb'), level: () => levelOf(getXP()), money });
 if (CAREER) CAREERM.onShiftEnd(BOARD.shiftEnd);
+/* путь на дороге (routeask.js): первая смена — всегда; после неё на чеке — «оставить путь?» */
+RASK.init({ CAREER, TUT: ROUTE_TUT, Snd, shifts: () => +Store.get('dlv-shifts', 0) || 0,
+  Store: { get: Store.get, set: Store.set, flush: () => Platform.store.flush && Platform.store.flush() },
+  endReady: () => { const ov = $('over'); return !!(ov && !ov.hidden && ov.classList.contains('cr') && !ov.classList.contains('wait') && !CAREERM.padRoot() && elPanel.hidden && !DLG.isOpen()); } });
+if (CAREER) CAREERM.onShiftEnd(RASK.shiftEnd);
 if (CAREER) CAREERM.init({ S, NOS, Snd, ADULT, get DAY_LEN () { return DAY_LEN; }, env: () => ENV, donated, money, wallet, addWallet, toast, popBonus, showChoice, hideChoice, hudHearts, isPlaying, countUp,
   Store: { get: Store.get, set: Store.set, flush: () => Platform.store.flush && Platform.store.flush() },
   choiceOpen: () => CH.opts.length > 0, endShift, rideOn, dropOrder: () => backToBase(), carChanged: () => { resetCar(); carStats(); },
@@ -13306,14 +13633,16 @@ if (DISTRICTS) CITYOPEN.init({ Store: { get: Store.get, set: Store.set, flush: (
 STORY.init({ THREE, scene, cam, V, S, IN, ADULT, CITY, MAP, Store, SPOTS, groundH, surfaceAt, inHouse, nearestRoad, makeHuman, dropMesh, emote, sayBubble, pizzaBox, realAddress, popBonus, money, Snd,
   get car () { return car; }, addMoney: n => { S.money += n; if (!S.freeRun) addWallet(n); }, addStars: CAREER ? CAREERM.addStars : null, shift: () => (+Store.get('dlv-shifts', 0) || 0) + 1,
   // гость, который ждал бабушку у точки, после катсцены уходит в другой квартал другим человеком
-  retirePed: p => { if (!p || p.dead || p.base === undefined) return; clearGuest(p); dropMesh(p.grp); p.person = nextPerson(); p.grp = makeHuman(p.person); p.speed = p.base * p.grp.userData.pace; p.hold = null; scene.add(p.grp); walkSpawn(p, 120, 380); } });
+  retirePed: p => { if (!p || p.dead || p.base === undefined) return; clearGuest(p); dropMesh(p.grp); p.grp = freshHuman(); p.person = p.grp.userData.person; p.speed = p.base * p.grp.userData.pace; p.hold = null; scene.add(p.grp); walkSpawn(p, 120, 380); } });
 /* истории героев города по главам (herostories.js): встречи, условие главы в пути, бонусы */
 HSTORY.init({ S, V, ADULT, CAREER, Snd, toast, shops: () => SIGNS, pizza: () => PIZZA, shiftN: () => (+Store.get('dlv-shifts', 0) || 0) + 1,
   openAt: (x, z) => !DISTRICTS || DIST.isOpen(DIST.at(x, z)), heal: n => { S.hp = Math.min(S.hpMax, S.hp + n); hudHearts(); } });
 /* учебный заказ Стёпы (stepafirst.js): вручение — катсцена через story.js */
-ST1.init({ THREE, ADULT, V, fxAdd, puffGeo, groundH, Snd, sayBubble, makeHuman, stepanPerson });
+ST1.init({ THREE, ADULT, V, fxAdd, puffGeo, groundH, Snd, sayBubble, makeHuman, stepanPerson, playerName: () => S.name, cam: () => cam });
 /* Стёпа на лавочке (stepabench.js): лавочка у Ленинградской, 8 и его заказ — через story.js */
-LATE.add('stepa', () => STEPAB.init({ CITY, ADULT, CAREER, bench, realAddress }));
+// первый заказ (stepanOrder) зовёт его и сам, если город ещё достраивается: лавочка Ленинградской, 8 нужна сразу
+const stepaBenchInit = () => STEPAB.init({ CITY, ADULT, CAREER, bench, realAddress });
+LATE.add('stepa', stepaBenchInit);
 const NO_E = /[?&]noE(&|$)/.test(location.search);   // ?noE — без леса у Ленина, змеев и качалок (сравнить кадр)
 /* змеи и дроны (kites.js): места в парках и на Ленина, люди — только рядом с камерой */
 if (!NO_E) LATE.add('kites', () => KITES.init({ THREE, scene, CITY, V, get ENV () { return ENV; }, groundH, inHouse, nearestRoad, solidAt, onPave: PAVE.onPave, wood: RINGM.wooded, makeHuman, dropMesh,
@@ -13484,6 +13813,14 @@ AMBI.init({ Snd, V, S, ENV, CITY, TRAFFIC, nearestRoad, inPoly, isPlaying, music
 // музыка: напряжённо — налёт, восстание, мафиози, погоня, ураган; тише — катсцена, диалог, Толик пишет, пауза (music.js)
 const musTense = () => DIRECTOR.going(['raid', 'riot', 'mafia']) || WTH.id() === 'hurricane' || TRAFFIC.some(t => t.chase);
 // радио в машине (radio.js): в смене вместо музыки дня / ночи — станция; ведущий молчит, пока эфир занят
+/* мини-карточки над радаром (ordertags.js): до текущей цели — по маршруту навигатора (routePts, пересчёт раз в 0,35 с) */
+OTAGS.init({ S, V, faceDataURL, routeLeft: () => {
+  const P = routePts, tg = S.target;
+  if (!tg || P.length < 2) return null;
+  let L = Math.hypot(P[0][0] - V.x, P[0][1] - V.z);
+  for (let i = 1; i < P.length; i++) L += Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]);
+  return L + Math.hypot(tg.x - P[P.length - 1][0], tg.z - P[P.length - 1][1]);
+} });
 RADIO.init({ Store, S, ADULT, Snd, isPlaying, root: () => $('game') || document.body,
   quiet: () => S.state === 'brief' || FM.open || CHAT.talking() || DLG.isOpen() || FIRST.on() || STORY.active() || DOOR.on() || musTense(),
   weather: () => WTH.id(), night: () => (ENV.night || 0) > 0.5, name: () => S.name,
@@ -13913,8 +14250,8 @@ function spawnCrowd (sp) {
     const a = turn + i / n * Math.PI * 2 + rand(-0.2, 0.2);
     const x = sp.x + Math.sin(a) * rad, z = sp.z + Math.cos(a) * rad;
     if (inHouse(x, z, 0.4)) continue;
-    const person = chance(0.35) ? nextPerson() : null;          // иногда среди них — коллега
-    const grp = makeHuman(person, { fat: chance(0.35) });
+    const fat = chance(0.35), grp = chance(0.35) ? freshHuman({ fat }) : makeHuman(null, { fat });   // иногда среди них — коллега
+    const person = grp.userData.person;
     // во взрослой — бутылка тёмного стекла, в детской — яркая баночка газировки
     const bottle = ADULT
       ? new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.28, 6), new THREE.MeshLambertMaterial({ color: chance(0.5) ? 0x5a3a16 : 0x2f5a2a }))
@@ -14003,14 +14340,20 @@ LATE.add('pubs', buildPubSpots);
 LATE.add('peds', initPeds);
 LATE.add('people', initPeople);
 LATE.add('scoots', initScoots);
+/* запас готовых людей (humanpool.js): частые «кого рождают на ходу» — сразу, остальное запас узнает сам.
+   [без имени 'a' / с именем 'p', опции makeHuman, опции makePerson, сколько] */
+LATE.add('humanpool', () => { if (!humanFactory) humanInit(); return HPOOL.prefill([
+  ['p', {}, null, 4], ['a', {}, null, 4], ['p', {}, { fem: true }, 2], ['p', {}, { fem: false }, 2],
+  ['a', { fat: false }, null, 3], ['p', { fat: false }, null, 2], ['a', { fat: true }, null, 1],
+  ['a', { shirt: '#eef2f4', pants: '#2f5fa8', fat: false }, null, 2],                                  // медики скорой (makeMedic)
+  ['a', { shirt: '#3f7fd6', pants: '#f4f4ee', fat: false }, null, 2], ['a', { shirt: '#d95d5d', pants: '#f4f4ee', fat: false }, null, 2],   // футбол (startGame)
+]); });
 if (!INTRO) {
   LATE.add('night', () => { buildNight(); initClouds(); initBirds(); });
-  // прогрев шейдеров: дождь, ночной свет и фары впервые появляются посреди
-  // смены — компиляция программ на лету давала заметный рывок
+  // дождь, ночной свет и фары появляются посреди смены — их программы собирает кусок 'shaders' ниже
+  // (renderer.compile берёт и невидимое); свой compile тут был лишним — ~80 мс меню на Деке (docs/AGENTS.md «Шейдеры на ходу»)
   LATE.add('compile', () => {
     const hid = [...NIGHT_OBJ, rainLines, headGlow];
-    for (const o of hid) o.visible = true;
-    renderer.compile(scene, cam);
     for (const o of hid) o.visible = false;
   });
 }
@@ -14078,7 +14421,7 @@ function unview () {
    Меню листаются крестовиной или стиком: какое сейчас открыто — то и
    листаем, остальное игнорируем. */
 const padMenu = makePadMenu({
-  onBack: () => { if (CAREER && CAREERM.back()) return; if (CH.full && CH.opts.length && !$('choice').hidden) { pickChoice(CH.opts.length - 1); return; } if (!elPanel.hidden) panelBack(); else if (S.paused) setPause(false); else if (FM.open) setFullMap(false); },
+  onBack: () => { if (CAREER && CAREERM.back()) return; if ((CH.full || CH.pause) && CH.opts.length && !$('choice').hidden) { if (CH.back) pickChoice(CH.opts.length - 1); return; } if (!elPanel.hidden) panelBack(); else if (S.paused) setPause(false); else if (FM.open) setFullMap(false); },
   // A на поле: фокус в поле (печатать с клавиатуры) и экранная клавиатура Steam (Deck): что ввёл — обратно в поле
   onText: el => { try { el.focus({ preventScroll: true }); } catch (e) { /* — */ } steamKeyboard(el, true); },
 });
@@ -14114,7 +14457,8 @@ function padStep () {
   if (OSKM.padGate(p)) return;                    // над полем висит клавиатура Стима — кнопки её, не игры (osk.js)
   if (p.any) { Snd.boot(); Snd.resume(); GFX.poke(); }
   if (REPLAY.pad(p)) return;                      // повтор: LB в езде — открыть; открыт — все кнопки его (replay.js)
-  if (FIRST.on()) { if (p.accept) FIRST.next(); else if (p.menuBack || p.pause) FIRST.skip(); return; }   // вступление: A — следующий план, B / Start — пропустить; до игры не доходит
+  if (FIRST.on()) { if (p.accept) FIRST.next(); else if (p.menuBack || p.pause) FIRST.skip(); return; }
+  if (RASK.root()) { RASK.pad(p); return; }      // «оставить путь на дороге?» поверх чека смены: все кнопки — его (routeask.js)   // вступление: A — следующий план, B / Start — пропустить; до игры не доходит
   const screen = padScreen();
   if (p.pause && !elPanel.hidden) closePanel();
   else if (p.pause && (S.paused || isPlaying())) setPause(!S.paused);
@@ -14124,20 +14468,14 @@ function padStep () {
     FM.padX = p.steer + p.rx; FM.padY = p.ly + p.ry; FM.padZ = p.gas - p.brake;
     if (p.menuBack) setFullMap(false);
   }
-  if (p.accept && S.state === 'brief' && !S.paused && !FM.open && !DLG.isOpen() && !(CAREER && CAREERM.padRoot())) acceptOrder();   // A — принять заказ
+  if (p.accept && S.state === 'brief' && !S.paused && !FM.open && !DLG.isOpen() && !(CAREER && CAREERM.padRoot())) acceptOrder();   // A — свернуть накладную сразу
   if (p.btnX && !screen && !S.paused && !FM.open && isPlaying() && GFX.offerYes()) p.btnX = false;   // X — «включить „среднюю“» на плашке «кадр не успевает» (gfx.js)
   if (p.sound) Snd.set(!Snd.on);
   if (p.dDown && !screen && !S.paused && !FM.open && isPlaying()) RADIO.next();   // крестовина ↓ — следующая станция радио (radio.js)
   // на ходу — крестовина ◀ ▲ ▶ (двух вариантов: ▶ — второй); на паузе (обед) — A, X, Y: первый, второй, третий (ниже)
   if (CH.opts.length && !CH.pause && !CH.full) { if (p.choice1) pickChoice(0); else if (p.choice2) pickChoice(1); else if (p.choice3) pickChoice(CH.opts.length === 2 ? 1 : 2); }
-  // обед (карточка на паузе, до трёх вариантов): каждая своей кнопкой — [A] первый, [X] второй, [Y] третий, значки стоят
-  // на вариантах намертво; курсора нет (раньше курсор уводили на второй, а [A] оставался на первом и жал второй)
-  const meal = screen === $('choice') && CH.pause && !CH.full && CH.opts.length <= 3;
-  if (meal) {
-    if (p.menuOk) pickChoice(0);
-    else if (p.btnX && CH.opts.length > 1) pickChoice(1);
-    else if (p.btnY && CH.opts.length > 2) pickChoice(2);
-  }
+  // обед (карточка на паузе) — как воскрешение и меню: крестовина / стик водят курсор, [A] жмёт, где курсор (padMenu ниже;
+  // значков [A] [X] [Y] на вариантах больше нет — автор 10.10.2026)
   if (screen && CAREER && screen === QR.root()) QR.pad(p);   // быстрый заезд: ←→ / LB RB — значение строки, A — поехали, X — условия (quickrun.js)
   if (screen && CAREER) CAREERM.padPre(p);      // гараж: ←→ и LB/RB листают машины
   // настройки — табы (settings.js): LB/RB и LT/RT — всегда, ←→ — со строки табов (иначе — по списку)
@@ -14150,8 +14488,11 @@ function padStep () {
     if (d) PAUSE.flip(d);
     p.menuLeft = p.menuRight = false;
   }
-  if (screen && !meal) { padMenu(p, screen); if (screen === elPanel && elPanel.dataset.kind === 'collect') COLM.sync(padMenu.selected()); }
-  else if (meal) padMenu(p, null);              // обед: подсветки курсора нет
+  if (screen) {
+    padMenu(p, screen);
+    if (screen === elPanel && elPanel.dataset.kind === 'collect') COLM.sync(padMenu.selected());
+    if (screen === $('choice')) { const b = padMenu.selected(); if (b && b.parentNode === $('ch-opts') && !b.classList.contains('ch-cur')) choiceGo(b); }   // курсор окна выбора — за геймпадом
+  }
   else if (!S.paused && !FM.open) applyToIN(IN, p);
 }
 
@@ -14171,7 +14512,7 @@ if (!INTRO) LATE.add('buses', () => BUSES.build(busApi()));
 const LIFE_API = {
   THREE, scene, cam, V, S, ENV, CITY, ADULT, HUMAN_VC, CAR_L, CAR_W, TRAFFIC, Snd,
   groundH, curbAt, inHouse, inPoly, inBounds, nearestRoad, pushOut, walkerStep, walkSpawn, walkBack, dodgeCar,
-  ARCHES, makeHuman, dropMesh, makeCar, newCar, poseOnSlope, gibHuman, handsUp, emote, puff, sayBubble, toast, put, mergeGeos,
+  ARCHES, makeHuman, freshHuman, dropMesh, makeCar, newCar, poseOnSlope, gibHuman, handsUp, emote, puff, sayBubble, toast, put, mergeGeos,
   onKill: () => { S.people++; Snd.squish(); },
 };
 // следы колёс (tracks.js): меш — сейчас, до renderer.compile, чтобы шейдер собрался под экраном загрузки
@@ -14273,6 +14614,7 @@ function frameStep (now) {
     vf = driveStep(dt);
     deathTick(dt);
   } else if (S.state === 'brief' || S.state === 'loading') {
+    briefStep(dt);                               // накладная сама сворачивается (газ — сразу); до обнуления IN
     touches.clear();
     for (const k in IN) IN[k] = 0;              // руль заблокирован до загрузки
     vf = driveStep(dt);
@@ -14320,7 +14662,7 @@ function frameStep (now) {
   CL.step('roadlife', RL.step, dt, RL_API || (RL_API = roadApi()));    // пробки, ремонт, знаки, фары потока (roadlife.js)
   CL.step('billboards', BB.step, dt, BB_API || (BB_API = bbApi()));   // смена рекламы на щитах (billboards.js)
   CL.step('radio', RADIO.step, dt);                // ведущий радио между песнями (radio.js)
-  CL.step('pizzadome', PZD.step, dt, ENV_API);    // пиццерия-шар: логотип крутится, ночью светится (pizzadome.js)
+  CL.step('pizzadome', PZD.step, dt, ENV_API);    // пиццерия-купол: птица на макушке крутит головой и машет крыльями, ночью светится (pizzadome.js)
   CL.step('forest', FOREST.step, dt, FOREST_API);
   CL.step('lwood', LWOOD.step, dt);                // тропы леса у Ленина зимой светлее (leninwood.js)
   CL.step('lawn', LAWNP.step, dt);                 // мелочь на газоне: какие клетки рядом и в кадре (lawnprops.js)  // ельник: какие ели рядом и в кадре (forest.js)
@@ -14401,6 +14743,7 @@ function frameStep (now) {
 
   // цель стоит на месте (pinStop); сборный: подъехал к другому неотданному адресу — он и цель (orders.js reachStop)
   if (S.state === 'drive' && S.order && ORD.reachStop(S.order)) { syncTarget(false); rebuildRoutePath(); }
+  if (RT.job || RT.hjob) CL.step('routeyard', routeJobTick, dt);   // проезд навигатора во двор — по кадрам (routeyard.js)
   if (S.state === 'side') {
     S.time -= dt;
     if (S.time < 6) { S.tickT += dt; if (S.tickT > 0.4) { S.tickT = 0; Snd.tick(); } }
@@ -14445,8 +14788,8 @@ function frameStep (now) {
   CL.at.ph = 'hud';
   CL.step('cull', cullFar);
   CL.step('lod', humanLod);
-  CL.step('radar', drawRadar);
-  hudStep(dt);
+  CL.step('radar', radarStep);                    // радар ~20 раз в секунду, между — поворот холста (radarStep)
+  CL.step('hud', hudStep, dt);
   CL.step('rivalhud', rivalsStep, dt);
 
   // машину потряхивает после удара
@@ -14461,6 +14804,7 @@ function frameStep (now) {
   }
 
   CL.done(tG);
+  CL.step('warm', WARM.step, dt);                   // собранные на ходу программы шейдеров не выгружаются (warmup.js)
   CL.step('carshadow', carShadow);                 // пятно-тень под машиной игрока (carshadow.js)
   if (S.state !== 'title' && S.state !== 'over') CL.step('replay', REPLAY.rec, dt); else REPLAY.idle();   // запись последних 10 с для повтора (replay.js)
   CL.at.ph = 'render';
@@ -14469,12 +14813,18 @@ function frameStep (now) {
   const wk = performance.now() - tWork;
   CULL.work(wk / 1000);
   GFX.work(wk);
+  CL.step('hpool', HPOOL.step, wk);               // запас готовых людей: короткий кадр — дособрать, ≤ 0,5 мс (humanpool.js)
   GFX.watch(isPlaying() && !S.paused && !FM.open && !REPLAY.on() && !(DLG.isOpen && DLG.isOpen()));             // кадр не успевает на Высокой — один раз предложить Среднюю
 }
 // шейдеры всех материалов города — сейчас, под экраном загрузки, а не рывком
 // в первый раз, когда кусок попадёт в кадр (зимой на Деке это было 150 мс)
 // (с поздней сборкой — после неё: первый кадр меню сам скомпилирует то, что видно)
 LATE.add('shaders', () => { try { renderer.compile(scene, cam); } catch (e) { /* — */ } });
+// прогрев на ходу-материалов, программы не выгружаются, первое использование — сейчас (warmup.js, docs/AGENTS.md «Шейдеры на ходу»)
+WARM.init({ THREE, renderer, scene, cam, drop: dropMesh,
+  extra: () => { const c = makeCourier(); DIRT.dress(c); return [['машина игрока в смене (грязь cardirt.js)', c]]; } });   // первая смена: машина с грязью — 3 новые программы
+LATE.add('warm', WARM.compile);
+LATE.add('warmUse', WARM.ready);
 LATE.add('freeze', () => CULL.freeze(scene, cam, PROPS));   // город собран: неподвижное — в заморозку и отсечение
 GFX.init({ resize });                             // настройки графики: дальность, окна, чёткость (gfx.js)
 /* повтор последних 10 с (replay.js, docs/CAREER.md «Повтор»): что ему нужно от игры */
@@ -14518,6 +14868,8 @@ requestAnimationFrame(frame);
 if (LATE.busy()) {
   setTimeout(() => LATE.start(), 1500);
   let replay = false;
+  // тот же экран загрузки, что при запуске (index.html: логотип, полоска, фразы — уже переведённые): берём, пока он ещё есть
+  const BOOT_HTML = (document.getElementById('boot') || {}).innerHTML || '<img src="./brand/logo-px.png" alt=""><div class="boot-bar"><i></i></div>';
   const hold = e => {
     if (!LATE.busy() || replay) return;
     const tgt = e.target;
@@ -14526,9 +14878,11 @@ if (LATE.busy()) {
     if (document.querySelector('.late-wait')) return;   // уже ждём
     const boot = document.createElement('div');
     boot.id = 'boot'; boot.className = 'late-wait';   // тот же экран загрузки (стили #boot — index.html)
-    boot.innerHTML = '<img src="./icon.png" alt=""><div class="boot-bar"><i></i></div>';
+    boot.innerHTML = BOOT_HTML;
+    boot.classList.add('said');
+    boot.style.setProperty('--o', Math.floor(Math.random() * 12));   // фразы — со случайной
     document.body.appendChild(boot);
-    // кадр — чтобы экран загрузки успел появиться (птица и полоска крутятся и без главного потока)
+    // кадр — чтобы экран загрузки успел появиться (птица, полоска и фразы крутятся и без главного потока)
     requestAnimationFrame(() => setTimeout(() => {
       LATE.flush();
       boot.remove();
@@ -14539,6 +14893,7 @@ if (LATE.busy()) {
   LATE.onDone(() => removeEventListener('click', hold, { capture: true }));
 }
 LATE.onDone(() => { const B = window.__boot; if (B) { B.full = Math.round(performance.now()); B.late = LATE.T; } });
+LATE.onDone(() => HPOOL.ready());           // город достроен (и при ?nolate — после всех кусков): люди — из запаса (humanpool.js)
 /* город за меню, пока достраивается, — не в фокусе (delivery.css body.late-haze): что строится, появляется
    за дымкой, а не разом на глазах. Достроился за меню — резкость наводится за 1,4 с; ушли из меню
    (смена, гараж, ждали на экране загрузки) — сразу */
@@ -14555,7 +14910,7 @@ if (LATE.busy()) {
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
 /* песочница (sandbox.html): бесконечное здоровье, нитро, «не глохнет» (noStall читает cars.js) */
 const SBX = { god: false, nitro: false, noStall: false };
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { inWall, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, PG: PG.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { inWall, RADAR, HUDC, RYARD: RYARD.DEBUG, RT, RASK: RASK.DEBUG, OTAGS: OTAGS.DEBUG, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, PG: PG.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get routeOn () { return ROUTE_LINE.m.visible; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта
@@ -14567,6 +14922,7 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) wi
   // песочница: сюжет, карта, сохранения, старт смены, кошелёк, читы
   STORY, STORY_DBG: STORY.DEBUG, MAP, Store, SBX, CARSM: AUTO, startRun, goRun, endShift, wallet, addWallet, hudHearts, marker, updateEnv, humanLod, get SPOTS_N () { return SPOTS.length; },
   DRIVERS, SMOKERS, NITRO_CANS, NOS, RESPECT: RESPECT.DEBUG, RESPECT_API: RESPECT, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, PIGEONS, FLOCKS, AMB, INCIDENTS, scare, RIVALS, FOES, THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, roadPath, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT, LOOT, XLIFE, askRevive, addWallet, RQ: RQ.DEBUG, HINTS_API: HINTS };
+if (window.__dlv) Object.assign(window.__dlv, { HPOOL: HPOOL.DEBUG, makeHuman, freshHuman, makePerson, setSeason: SEAS.setSeason });   // запас готовых людей: собрано на ходу / из запаса, ключи (humanpool.js)
 if (window.__dlv) { window.__dlv.BOARD = BOARD; window.__dlv.Platform = Platform; }   // таблица рекордов Стима (board.js)
 if (window.__dlv) window.__dlv.TREES = TREES.DEBUG;   // деревья и кусты: породы, группы во дворах (trees.js)
 if (window.__dlv) Object.assign(window.__dlv, { showTitle, CAREERM, renderSettings, closePanel, backToBase });   // меню, настройки — проверки интерфейса в probe; backToBase — «опоздал обратно» (К1)
@@ -14584,8 +14940,8 @@ if (window.__dlv) Object.assign(window.__dlv, { PIX: PIX.STATS, CG: CG.STATS, cg
   cgLamps: () => CG.lampState(car), EXH: EXH.DEBUG, WIPE: WIPE.STATS, DENT: DENTM.DEBUG, DIRT: DIRT.DEBUG, REAR: REARM.STATS, pizzasInCar, setTrunk });   // фары и фонари (carglass.js), выхлоп (exhaust.js), дворники (wipers.js)   // дымок, стёкла (pixfx.js, carglass.js)
 if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG, CONS: CONSTR.DEBUG, DARK: DARKN.DEBUG, WASTE: WASTE.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)
 if (window.__dlv) Object.defineProperties(window.__dlv, { reprofile: { value: reprofile }, REPROFILE_MS: { get: () => REPROFILE_MS } });   // смена профиля без перезагрузки
-if (window.__dlv) Object.assign(window.__dlv, { DIRECTOR: DIRECTOR.DEBUG, HB: HB.DEBUG, FLIRT: ADULT ? FLIRT.DEBUG : null, popBonus, CHAT_PERSON: () => CHAT.person() });   // коневозки, заигрывание (только взрослая)
-if (window.__dlv) { window.__dlv.FOREST = FOREST.DEBUG; window.__dlv.LAWN = LAWNP.DEBUG; window.__dlv.PAVE = PAVE.DEBUG; window.__dlv.PZD = PZD.DEBUG; window.__dlv.cam = cam; window.__dlv.RIV = RIVS.DEBUG; }   // ельник и пиццерия-шар (forest.js, pizzadome.js)
+if (window.__dlv) Object.assign(window.__dlv, { DIRECTOR: DIRECTOR.DEBUG, HB: HB.DEBUG, FLIRT: ADULT ? FLIRT.DEBUG : null, popBonus, CHAT_PERSON: () => CHAT.person(), CHAT });   // коневозки, заигрывание (только взрослая); CHAT — чат Толика (say, react)
+if (window.__dlv) { window.__dlv.WARM = WARM.DEBUG; window.__dlv.FOREST = FOREST.DEBUG; window.__dlv.LAWN = LAWNP.DEBUG; window.__dlv.PAVE = PAVE.DEBUG; window.__dlv.PZD = PZD.DEBUG; window.__dlv.cam = cam; window.__dlv.RIV = RIVS.DEBUG; }   // ельник и пиццерия-шар (forest.js, pizzadome.js)
 if (window.__dlv) window.__dlv.RELIEF = { STATS: RELIEF.STATS, at: RELIEF.reliefAt };   // неровный газон (relief.js)
 if (window.__dlv) Object.assign(window.__dlv, { CROWDS, PUB_SPOTS, spawnCrowd, ACCIDENTS, PITCHES });   // компании у подъездов, драки на авариях, футбол — проверка наезда в probe
 if (window.__dlv) window.__dlv.RW = RW.DEBUG;   // вид асфальта улиц (roadwear.js)

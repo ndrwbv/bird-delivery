@@ -15,6 +15,7 @@
 import './smalltalk.css';
 import { inputKind, onInput, glyph } from '../../input/glyphs.js';
 import { SITS, KIND, RUSH_ME, BONUS } from './smalltalk-lines.js';
+import * as TF from '../talkface.js';           // клиент говорит ртом, пока печатается его реплика
 
 const DT_MAX = 0.1;
 const CPS = 42;                // букв в секунду: клиент говорит
@@ -86,7 +87,13 @@ export default {
     const elFuse = q('.tk-fuse i'), elClock = q('.tk-clock'), elTxt = q('.tk-txt'), elSay = q('.tk-say'), elMe = q('.tk-me'), elNote = q('.tk-note'),
       elFace = q('.tk-face'), elWho = q('.tk-who'), elOpts = q('.tk-opts'), elOut = q('.tk-out'), elSheet = q('.tk-sheet');
     const btns = [...box.querySelectorAll('.tk-o')];
-    const setFace = mood => { const u = face(mood); if (u && elFace.getAttribute('src') !== u) elFace.src = u; if (!u) elFace.classList.add('tk-noface'); };
+    let faceMood = null;
+    const setFace = mood => {
+      if (mood === faceMood) return;
+      faceMood = mood;
+      if (person && api.faceDataURL && TF.bind(elFace, person, 128, mood)) return;   // кадры рта — talkface.js
+      const u = face(mood); if (u && elFace.getAttribute('src') !== u) elFace.src = u; if (!u) elFace.classList.add('tk-noface');
+    };
     setFace(sit.emo || 'ok');
 
     /* значки: геймпад — A / X / Y (PlayStation — ✕ □ △), клавиатура — 1 2 3, палец — без значков */
@@ -101,6 +108,7 @@ export default {
       elSay.classList.remove('tk-pop'); void elSay.offsetWidth; elSay.classList.add('tk-pop');
       elWho.classList.add('tk-talking');
       if (mood) setFace(mood);
+      TF.talk(elFace);
     };
     say(t(sit.say), sit.emo || 'ok');
 
@@ -154,7 +162,7 @@ export default {
     }
 
     function typeStep (dt) {
-      if (st.shown >= st.text.length) { elWho.classList.remove('tk-talking'); return true; }
+      if (st.shown >= st.text.length) { elWho.classList.remove('tk-talking'); TF.stop(elFace); return true; }
       st.tt += dt;
       const n = Math.min(st.text.length, Math.floor(st.tt * CPS));
       if (n !== st.shown) { st.shown = n; elTxt.textContent = st.text.slice(0, n); }
@@ -238,6 +246,7 @@ export default {
     return () => {
       removeEventListener('keydown', onKey, true);
       offInput();
+      TF.stop(elFace);
       if (raf) cancelAnimationFrame(raf);
       if (api.setStep) api.setStep(null);
       if (api.setPad) api.setPad(null);

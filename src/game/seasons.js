@@ -881,13 +881,14 @@ export function* seasonSteps () {
   LEAF_MESH = yield* LEAFP.steps(MESH_PILE[0] ? MESH_PILE[0].material : pileMat(), true);
   for (const list of LEAVES.values()) for (const d of list) d.mesh = LEAF_MESH.byKey.get(d.key);
   yield 'drift';
-  // гирлянды, сугробы, снег и комья впервые появятся посреди зимы — программы собираем сразу
+  // гирлянды, сугробы, снег и комья впервые появятся посреди зимы — на сцене заранее: их программы собирает
+  // кусок поздней сборки 'shaders' (game.js; renderer.compile берёт и невидимое). Свой compile тут был лишним —
+  // 60—120 мс «меню не отвечает» на Деке (10.10.2026, docs/AGENTS.md «Шейдеры на ходу»)
   initSky();
   chunks(0, -500, 0, 1, 0, 0);
   yield 'sky';
   const warm = [...MESH_GARL, ...DRIFT_MESH, ...LEAF_MESH, SNOWF, SPLASH.pts, ...CHUNKS.map(c => c.m)];
   for (const m of warm) m.visible = true;
-  C.renderer.compile(C.scene, C.cam);
   for (const c of CHUNKS) { c.life = 0; c.m.visible = false; }
   SNOWF.visible = false;
   yield 'compile';

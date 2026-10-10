@@ -20,6 +20,7 @@ import * as RESPECT from './respect.js';
 import './career.css';
 import * as ECON from './econ.js';
 import * as GARAGE from './garage.js';
+import { PIGGY } from './shiftcash.js';           // копилка — та же свинья, что на хаде и в гараже
 import * as MENU from './menu.js';
 import * as HONOR from './honor.js';            // доска почёта (honor.js): геймпад и «доставлено всего» профиля
 import * as DLG from './dialog.js';
@@ -35,7 +36,7 @@ import * as HQ from './heroquests.js';           // герои, этап 2: со
 import * as RAID from './raid.js';               // «потратить» → ёлка-турель у точки (raid.js)
 import * as QR from './quickrun.js';             // быстрый заезд: своя длина смены, с 9:00, свои итоги (quickrun.js)
 import { makePadMenu } from '../input/padmenu.js';
-import { keyHTML, matchKey } from '../input/glyphs.js';   // значки кнопок на штампе и пометках чека смены
+import { keyHTML, matchKey, inputKind, onInput } from '../input/glyphs.js';   // значки кнопок: полоска «как управлять» внизу чека смены, «гараж и траты»
 import * as PFX from './paperfx.js';
 import { t, tn, lang } from '../i18n/index.js';
 
@@ -135,7 +136,7 @@ export function startShift () {
   A.env().t = ECON.tOfHour(h0 < ECON.SHIFT.KEYS[0][1] ? h0 + 24 : h0);
   SH.tStart = A.env().t; SH.allDay = day;
   S.lunch = null;
-  SH.on = true; SH.phase = ''; SH.lunch = false; SH.hits = 0; SH.lastHurt = S.hurt || 0; SH.fine = 0; SH.back = 0; SH.stars = 0;
+  SH.on = true; SH.phase = ''; SH.home = false; SH.lunch = false; SH.hits = 0; SH.lastHurt = S.hurt || 0; SH.fine = 0; SH.back = 0; SH.stars = 0;
   SH.slot = false; SH.forceMood = ''; SH.lost = 0; SH.m = S.money || 0; S.tips = 0; SH.t0h = ECON.hourOf(A.env().t); SH.endH = SH.t0h; SH.n = +A.Store.get('dlv-shifts', 0) || 0;
   SH.len = QR.on() ? QR.len() : ECON.shiftLen(SH.n);   // быстрый заезд — длина, что выбрал игрок
   // волна щедрости: 1-я смена сессии — щедрая (econ.js PACE); быстрый заезд — обычная и волну не двигает
@@ -234,7 +235,12 @@ const LUNCH_SAY = /*i18n*/ [
 ];
 export function atBase (next) {
   if (!A || !SH.on || A.S.ride) return false;
-  if (SH.phase === 'late') return !!(ORD && ORD.staffHere && ORD.staffHere());
+  if (SH.phase === 'late') {
+    if (ORD && ORD.staffHere && ORD.staffHere()) return true;
+    // полночь застала в дороге (midnight): последний заказ отвёз и доехал до пиццерии — вот теперь смена всё
+    if (SH.home) { SH.home = false; endLate(); return true; }
+    return false;
+  }
   if (SH.lunch || SH.phase !== '') return false;
   const h = schedHour();
   if (h < ECON.SHIFT.LUNCH_H || h >= 24) return false;
@@ -263,7 +269,7 @@ function showLunch (next) {
   ];
   A.showChoice({
     title: t('обед'), sub: t('{time} — перерыв. что берёшь до конца смены?', { time: ECON.clock(hour()) }),
-    pause: true,
+    pause: true, row: true, okLabel: t('взять'),
     opts: opts.map(o => ({ label: o.label, sub: o.sub, fn: () => {
       S.lunch = o.id;
       lunchClass(false);
@@ -288,6 +294,19 @@ async function midnight () {
     try { ride = await ORD.staffRide(); } catch (e) { console.error('[career] staffRide', e); }
   }
   if (!SH.on || S.state === 'over' || S.state === 'title' || S.state === 'dying') return;   // смена уже кончилась иначе
+  // полночь застала в дороге (без развоза): смена не обрывается посреди улицы — довози, что везёшь, и
+  // возвращайся; кончится, когда доедешь до пиццерии (atBase). Новых заказов нет. Сколько бы ни ехал — смена ждёт
+  // (автор 10.10.2026: «всегда надо дать игроку доехать обратно и только потом показывать конец смены»); бросить — «сняться» в паузе
+  if (!ride && homeward(S)) {
+    SH.home = true;
+    A.toast(S.state === 'back' ? t('заказов больше нет — возвращайся в пиццерию') : t('это последний заказ — довези и возвращайся в пиццерию'));
+    return;
+  }
+  endLate(ride);
+}
+/* в дороге после полуночи: везёшь заказ, поручение, отдаёшь у двери или едешь назад */
+const homeward = S => ['back', 'drive', 'side'].includes(S.state) || (S.state === 'handover' && !!(S.order || S.side));
+function endLate (ride) {
   A.toast(SH.allDay ? (ride ? t('всех развёз — смена всё') : t('смена всё — {time}', { time: ECON.clock(hour()) }))
     : ride ? t('полночь — всех развёз, смена всё') : t('полночь — смена всё'));
   A.endShift('время');
@@ -298,10 +317,11 @@ async function midnight () {
 function lateGuard (dt) {
   const S = A.S, riding = S.order && S.order.ord && S.order.ord.type === 'staff';
   if (riding || DLG.isOpen() || A.choiceOpen() || (ORD && ORD.staffWaiting && ORD.staffWaiting())) { SH.lateT = 0; return; }   // едет за ними в пиццерию — ждём
+  // последний рейс после полуночи: ждём, пока доедешь до пиццерии (handover у пиццерии → atBase закрывает смену)
+  if (SH.home && (homeward(S) || S.state === 'handover')) { SH.lateT = 0; return; }
   if ((SH.lateT = (SH.lateT || 0) + dt) < 6) return;
   SH.lateT = -1e9;
-  A.toast(SH.allDay ? t('смена всё — {time}', { time: ECON.clock(hour()) }) : t('полночь — смена всё'));
-  A.endShift('время');
+  endLate();
 }
 
 /* ── сбил своего клиента ── */
@@ -415,10 +435,10 @@ export function showEnd (why, whyText, held) {
   buildEnd();
   closeSpend(); DEP.close();
   const again = $('ov-again');
-  again.innerHTML = keyHTML('ok') + esc(t('на новую смену'));
+  again.textContent = t('на новую смену');           // значков на кнопках нет (автор 10.10.2026) — как управлять, пишет полоска внизу (endKeys)
   again.className = 'pp-stamp';
   again.setAttribute('autofocus', ''); again.setAttribute('data-pad-main', '');
-  $('ov-menu').innerHTML = keyHTML('back') + esc(t('в меню'));
+  $('ov-menu').textContent = t('в меню');
   $('ov-menu').className = 'pp-note';
   refreshEnd();
   // пока чек печатается — штампа и пометок не видно и не нажать (любое нажатие — «допечатать сразу»)
@@ -428,6 +448,9 @@ export function showEnd (why, whyText, held) {
   const seal = wasOn ? sealOf(why, full, SH.mood) : null;
   const total = (S.money || 0) + (SH.bonus || 0);
   const stage = endStage();
+  // строка «лучшая смена» прошлого чека — вынуть из него, пока play не стёр старый чек вместе с ней (вернётся в новый — noteIn)
+  const note0 = $('st-note2');
+  if (note0 && stage.contains(note0)) stage.after(note0);
   END.play({
     host: stage, tap: ov, money: A.money, Snd: A.Snd, stamp: again,
     head: wasOn ? t('чек смены') + ' · ' + (SH.city ? t('весь город') : DIST.has() ? t(DIST.list()[SH.district >= 0 ? SH.district : DIST.cur()].name) : t('Солнечный'))
@@ -440,12 +463,17 @@ export function showEnd (why, whyText, held) {
     seal, party: seal && total > 0 ? seal.party : '',
     sticker: wasOn ? { line: END.tolikLine({ mood: SH.mood || 'ok', opened, killed: knocked(), adult: !!A.ADULT }) } : null,
   }, quick => {
-    const note = $('st-note2');
-    const col = stage.querySelector('.cr-rc-hints');
-    if (note && col) { note.className = 'ov-note pp-hint'; col.appendChild(note); }   // «лучшая смена! ты #N в мире» (board.js) — строкой в чеке
+    noteIn();
     fitEnd();
     setTimeout(() => { ov.classList.remove('wait'); KB.clear(); fitEnd(); }, quick ? 350 : 0);
   });
+  // «лучшая смена! ты #N в мире» (board.js) — строкой в чеке; переносим сразу, а не в конце печати: пока строка лежала
+  // под чеком, высота экрана была другой, и размер под экран (fitEnd) менялся в конце — лист прыгал
+  function noteIn () {
+    const note = $('st-note2'), col = stage.querySelector('.cr-rc-hints');
+    if (note && col && note.parentNode !== col) { note.className = 'ov-note pp-hint'; col.appendChild(note); }
+  }
+  noteIn();
   fitEnd();
 }
 
@@ -542,8 +570,31 @@ function fitEnd () {
   const ov = $('over'), box = ov && ov.querySelector('.ov-box');
   if (!box || ov.hidden || !ov.classList.contains('cr')) return;
   box.style.zoom = '';
-  const k = ov.clientHeight / Math.max(1, ov.scrollHeight);
+  // высота — по раскладке (offsetTop / offsetHeight), не scrollHeight: пока чек въезжает снизу (transform), scrollHeight
+  // раздут на 70vh — экран уменьшался до 0,7, а через 2 с прыгал в настоящий размер (автор 10.10.2026: «сначала мелко, потом крупно»)
+  const k = ov.clientHeight / Math.max(1, layoutH(box));
   if (k < 1) box.style.zoom = Math.max(0.6, Math.floor(k * 100) / 100);
+}
+/* сколько места по высоте занимает содержимое box без transform-движения: от верха первого до низа последнего
+   (display: contents — по детям; абсолютные полоски вроде .cr-keys не в счёт) + поля box и тень листа */
+function layoutH (box) {
+  const items = [];
+  const walk = el => { for (const c of el.children) {
+    const cs = getComputedStyle(c);
+    if (cs.display === 'contents') walk(c);
+    else if (cs.display !== 'none' && cs.position !== 'absolute' && cs.position !== 'fixed') items.push(c);
+  } };
+  walk(box);
+  if (!items.length) return box.scrollHeight;
+  // верх по раскладке — сумма offsetTop до страницы (у кого-то offsetParent — #cr-stage, у кого-то #over); transform в неё не входит
+  const absTop = el => { let y = 0; for (let e = el; e; e = e.offsetParent) y += e.offsetTop; return y; };
+  let top = Infinity, bot = -Infinity;
+  for (const c of items) {
+    const y = absTop(c);
+    top = Math.min(top, y); bot = Math.max(bot, y + c.offsetHeight + (parseFloat(getComputedStyle(c).marginBottom) || 0));
+  }
+  const cs = getComputedStyle(box);
+  return bot - top + (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0) + 10;
 }
 /* «потратить деньги» — так же (раскрытая вкладка доната может и прокрутиться — там список) */
 function fitBox (box) {
@@ -583,8 +634,8 @@ export function districtNext (delivered) {
 function refreshWallet () {
   const w = $('cr-wallet');
   if (!w) return;
-  // строка чека «в копилке ··· 227 600 ₽», звёзды — в шапке справа, что это — мелко под строкой
-  w.innerHTML = '<p class="pp-row pp-total"><span>' + esc(t('в копилке')) + '</span><i></i><b class="pp-plus">' + esc(A.money(A.wallet())) + '</b></p>' +
+  // строка чека «[свинья] в копилке ··· 227 600 ₽», звёзды — в шапке справа, что это — мелко под строкой
+  w.innerHTML = '<p class="pp-row pp-total"><span>' + PIGGY + esc(t('в копилке')) + '</span><i></i><b class="pp-plus">' + esc(A.money(A.wallet())) + '</b></p>' +
     '<p class="pp-hint">' + esc(t('звёзды — за хорошие смены, открывают крутые машины')) + '</p>';
   const st = $('cr-spend') && $('cr-spend').querySelector('.cr-sp-stars');
   if (st) st.textContent = '★ ' + tn(stars(), '{n} звезда|{n} звезды|{n} звёзд');
@@ -635,12 +686,27 @@ function refreshEnd () {
   if (dep) {
     dep.hidden = !A.ADULT || w < ECON.SLOT.STEP;
     dep.className = 'pp-note pp-red';
-    dep.innerHTML = keyHTML('x') + esc(t('депнуть'));
+    dep.textContent = t('депнуть');
     dep.title = DEP.label();
   }
-  if (sp) { sp.className = 'pp-note'; sp.innerHTML = keyHTML('y') + esc(t('гараж и траты')); sp.hidden = false; }   // гараж — первой плиткой
+  if (sp) { sp.className = 'pp-note'; sp.textContent = t('гараж и траты'); sp.hidden = false; }   // гараж — первой плиткой
   END.wallet(w);
+  endKeys();
 }
+/* чек смены: как управлять — одна бумажная полоска внизу экрана, как в меню, паузе и «депнуть» (.dep-keys):
+   «[A] на новую смену · [Y] гараж и траты · [X] депнуть · [B] в меню»; значки — того, чем играют (glyphs.js), пальцем — нет */
+function endKeys () {
+  const ov = $('over');
+  if (!ov || !ov.classList.contains('cr')) return;
+  let h = ov.querySelector('.cr-keys');
+  if (!h) { h = document.createElement('div'); h.className = 'cr-keys'; ov.appendChild(h); }
+  if (inputKind().kind === 'touch') { h.hidden = true; return; }
+  h.hidden = false;
+  const dep = $('ov-dep');
+  h.innerHTML = [keyHTML('ok') + esc(t('на новую смену')), keyHTML('y') + esc(t('гараж и траты')),
+    dep && !dep.hidden ? keyHTML('x') + esc(t('депнуть')) : '', keyHTML('back') + esc(t('в меню'))].filter(Boolean).join('<i>·</i>');
+}
+onInput(() => endKeys());
 
 /* гараж — отдельно: с экрана конца смены и из меню, на весь экран (garage.js) */
 function openGarage (onClose) { GARAGE.open(onClose); }
@@ -969,6 +1035,6 @@ const DEBUG = {
   schedHour, allDay, districtNext, shiftLeft,
   skipTo (h) { if (A) { A.env().t = SH.on ? (SH.tStart + ECON.tOfHour(h) - ECON.SHIFT.T0) % 1 : ECON.tOfHour(h); if (h > ECON.SHIFT.LUNCH_H + 0.05) SH.lunch = true; else if (h < ECON.SHIFT.LUNCH_H) SH.lunch = false; } },
   useCars (api) { CARS_MOCK = api || null; },
-  showLunch,                                        // обед сразу — проверить карточку (A / X / Y)
+  showLunch,                                        // обед сразу — проверить карточку (стрелки, Enter)
   crewBoard, crewLoad: () => (A ? crewLoad() : null), openDep: DEP.open, closeDep: DEP.close, openGarage, closeGarage: GARAGE.close, garageFlip: GARAGE.flip, openSpend, menu, askName, back,
 };

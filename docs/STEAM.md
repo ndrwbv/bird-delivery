@@ -36,10 +36,11 @@ v0.0.1 / v0.1.0 / v1.0.0). Этот номер попадает везде: те
 `/releases/latest` оттуда, установщик качается с `raw.githubusercontent.com/<REPO>/main/tools/`.
 Если репозиторий приватный — обновления и `curl | bash` работать не будут.
 
-**Иконки** — пока нет, `.exe` получит иконку Электрона. Положить `build/icon.ico` (256×256)
-и `build/icon.png` (512×512): electron-builder подхватит их сам. Для ярлыка на Deck
-`install-deck.sh` ищет `resources/icon.png` — добавить в `build.extraResources`
-`{ "from": "build/icon.png", "to": "icon.png" }`.
+**Иконки** (10.10.2026) — из логотипа (птица с куском пиццы на бордовом, `public/brand/`), собирает
+`python3 tools/make-icons.py`: `build/icon.png` 1024×1024 (Mac, Linux), `build/icon.ico` (Windows: 256…16),
+`public/icon.png` 512 (вкладка браузера, значок окна на Деке — `electron/main.cjs`, иконка Яндекса), `public/icon-32.png` и
+`icon-16.png` (вкладка). electron-builder подхватывает `build/` сам; для ярлыка на Деке `build/icon.png`
+кладётся в `resources/icon.png` (`build.extraResources` в package.json) — его ищет `install-deck.sh`.
 
 ## 2. Steamworks: разово
 

@@ -20,10 +20,18 @@
      PROF.keys()             — ключи прогресса текущего профиля (для «сбросить прогресс» в game.js)
      PROF.peek(id, fn)       — fn() так, будто текущий — профиль id (подписи в списке профилей)
      PROF.open(api) / root() / back() / submit()  — окно «профили» из главного меню (menu.js)
-       api: { money(n), info() → строка-подпись профиля (читает Store), face(id) → портрет, setName(n), Snd, onClose(), swap() } */
+       api: { money(n), info() → строка-подпись профиля (читает Store), face(id) → портрет, setName(n), Snd, onClose(), swap() }
+
+   Окно (10.10.2026): слева — карточка сотрудника «Птицы Пиццы» текущего профиля (шапка с логотипом,
+   фото, имя, должность, звание, место работы, стаж, доставлено, лучшая смена, копилка, штрихкод с
+   табельным номером, подпись и печать), под ней «переименовать» / «удалить»; справа — «трудовая
+   книжка»: другие профили (нажал — играешь им), «+ новый профиль», «назад». Геймпад и клавиатура —
+   общий padmenu.js по порядку кнопок; курсор сразу на «назад» (A не глядя — закрыть, как раньше). */
 import './profiles.css';
-import { t } from '../i18n/index.js';
+import { t, tn } from '../i18n/index.js';
 import { keyHTML } from '../input/glyphs.js';
+import * as DIST from './districts.js';             // карточка: район и сколько открыто (читает Store профиля — через peek)
+import { level as rankOf } from './respect.js';     // карточка: звание по респекту профиля
 
 export const MAX = 5;
 export const META = 'dlv-profiles';
@@ -40,7 +48,7 @@ const KNOWN = ['dlv-name', 'dlv-msk-wallet', 'dlv-msk-cars', 'dlv-msk-car', 'dlv
   'dlv-msk-guide', 'dlv-msk-nostut', 'dlv-intro', 'dlv-garage-tut', 'dlv-shifts', 'dlv-stars', 'dlv-crew', 'dlv-story', 'dlv-season',
   'dlv-used-addr', 'dlv-boss', 'dlv-clock', 'dlv-rev-sale', 'dlv-car-owned', 'dlv-car-cur', 'dlv-car-up', 'dlv-car-L', 'dlv-car-eng',
   'dlv-car-paint', 'dlv-district', 'dlv-dist-shifts', 'dlv-dist-open', 'dlv-city-mode', 'dlv-city-party', 'dlv-knocked', 'dlv-heroes',
-  'dlv-heroq', 'dlv-quick', 'dlv-don-trash', 'dlv-don-gang', 'dlv-respect', 'dlv-pz-grow', 'dlv-delivered', 'dlv-honor'];
+  'dlv-heroq', 'dlv-quick', 'dlv-don-trash', 'dlv-don-gang', 'dlv-respect', 'dlv-pz-grow', 'dlv-delivered', 'dlv-honor', 'dlv-route-ask'];
 
 let st = null, raw = null, meta = null, view = null;
 const OTHER = /^dlv-p\d+-/;                       // ключ чужого профиля (2…5)
@@ -215,6 +223,7 @@ const snd = k => { try { if (A && A.Snd && A.Snd[k]) A.Snd[k](); } catch (e) { /
 
 function render () {
   const b = box.querySelector('.prf-box');
+  b.classList.toggle('prf-wide', view.k === 'list');   // список — стол: карточка сотрудника и трудовая книжка
   if (view.k === 'name') {
     const p = view.id && meta.list.find(x => x.id === view.id);
     b.innerHTML = '<form class="prf-form" autocomplete="off"><label for="prf-in">' + esc(p ? t('новое имя профиля') : t('новый профиль — как тебя зовут?')) + '</label>' +
@@ -241,31 +250,42 @@ function render () {
       const wasCur = p.id === meta.cur;
       if (!remove(p.id)) return;
       snd('crash');
-      if (wasCur) { b.innerHTML = '<div class="prf-t">' + esc(t('загружаю профиль…')) + '</div>'; return; }
+      if (wasCur) { loading(b); return; }
       view = { k: 'list' }; render();
     });
     return;
   }
-  const rows = meta.list.map(p => {
-    const c = p.id === meta.cur;
-    return '<div class="prf-row' + (c ? ' cur' : '') + '">' +
-      '<button type="button" class="prf-pick" data-id="' + p.id + '"' + (c && !view.focus ? ' autofocus' : '') + '>' + ava(p.id) + '<i class="prf-pt"><b>' + esc(label(p)) + '</b>' +
-      '<span>' + esc((c ? t('играешь сейчас') + ' · ' : '') + info(p.id)) + '</span></i></button>' +
+  // другие профили — записи «трудовой книжки» справа; текущий — карточкой сотрудника слева
+  const rows = meta.list.filter(p => p.id !== meta.cur).map(p =>
+    '<div class="prf-row">' +
+      '<button type="button" class="prf-pick" data-id="' + p.id + '">' + ava(p.id) + '<i class="prf-pt"><b>' + esc(label(p)) + '</b>' +
+      '<span>' + esc(info(p.id)) + '</span></i></button>' +
       '<button type="button" class="prf-ren" data-id="' + p.id + '" title="' + esc(t('переименовать')) + '"' + (view.focus === p.id ? ' autofocus' : '') + '>' + esc(t('имя')) + '</button>' +
-      (meta.list.length > 1 ? '<button type="button" class="prf-del" data-id="' + p.id + '" title="' + esc(t('удалить')) + '">✕</button>' : '') +
-      '</div>';
-  }).join('');
-  // трудовая книжка (UI-REVIEW № 45): шапка капсом, у каждого профиля — запись с портретом-полароидом
-  b.innerHTML = '<header class="pp-head prf-head"><span>' + esc(t('трудовая книжка')) + '</span><b>' + esc(t('профили')) + '</b></header>' +
-    '<div class="prf-l">' + rows + '</div>' +
-    (meta.list.length < MAX ? '<button type="button" class="prf-new">+ ' + esc(t('новый профиль')) + '</button>' : '') +
-    '<div class="prf-note">' + esc(t('у каждого профиля своя копилка, машины, районы и сюжет. язык, звук и достижения — общие. до {n} профилей', { n: MAX })) + '</div>' +
-    '<button type="button" class="prf-close">' + keyHTML('back') + esc(t('назад')) + '</button>';
+      '<button type="button" class="prf-del" data-id="' + p.id + '" title="' + esc(t('удалить')) + '">✕</button>' +
+    '</div>').join('');
+  const me = meta.list.find(p => p.id === meta.cur);
+  const many = meta.list.length > 1;
+  b.innerHTML =
+    '<div class="prf-mine">' + card(me) +
+      '<div class="prf-acts">' +
+        '<button type="button" class="prf-ren" data-id="' + me.id + '"' + (view.focus === me.id ? ' autofocus' : '') + '>' + esc(t('переименовать')) + '</button>' +
+        (many ? '<button type="button" class="prf-del" data-id="' + me.id + '">✕ ' + esc(t('удалить')) + '</button>' : '') +
+      '</div>' +
+    '</div>' +
+    // трудовая книжка (UI-REVIEW № 45): шапка капсом, у каждого профиля — запись с портретом-полароидом
+    '<section class="prf-side">' +
+      '<header class="pp-head prf-head"><span>' + esc(t('трудовая книжка')) + '</span><b>' + meta.list.length + ' / ' + MAX + '</b></header>' +
+      (rows ? '<div class="prf-sub">' + esc(t('другие профили')) + '</div>' : '') +
+      (rows ? '<div class="prf-l">' + rows + '</div>' : '<div class="prf-empty">' + esc(t('пока ты один. позови друга — у нового профиля будет своя карточка')) + '</div>') +
+      (meta.list.length < MAX ? '<button type="button" class="prf-new">+ ' + esc(t('новый профиль')) + '</button>' : '') +
+      '<div class="prf-note">' + esc(t('у каждого профиля своя копилка, машины, районы и сюжет. язык, звук и достижения — общие. до {n} профилей', { n: MAX })) + '</div>' +
+      '<button type="button" class="prf-close"' + (view.focus ? '' : ' autofocus') + '>' + keyHTML('back') + esc(t('назад')) + '</button>' +
+    '</section>';
   b.querySelectorAll('.prf-pick').forEach(x => x.addEventListener('click', () => {
     const id = +x.dataset.id;
     if (id === meta.cur) { close(); return; }
     snd('coin');
-    b.innerHTML = '<div class="prf-t">' + esc(t('загружаю профиль…')) + '</div>';
+    loading(b);
     use(id);
   }));
   b.querySelectorAll('.prf-ren').forEach(x => x.addEventListener('click', () => { view = { k: 'name', id: +x.dataset.id }; render(); }));
@@ -274,6 +294,105 @@ function render () {
   if (nb) nb.addEventListener('click', () => { view = { k: 'name' }; render(); });
   b.querySelector('.prf-close').addEventListener('click', () => close());
   view.focus = null;
+}
+/* «загружаю профиль…» — обычный лист (карточка и книжка уходят) */
+function loading (b) {
+  b.classList.remove('prf-wide');
+  b.innerHTML = '<div class="prf-t">' + esc(t('загружаю профиль…')) + '</div>';
+}
+
+/* ── карточка сотрудника: всё читается из сохранения профиля (peek), новых счётчиков нет ── */
+const num = n => String(Math.max(0, Math.round(+n || 0))).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+const money = n => { try { return A && A.money ? A.money(n) : num(n) + ' ₽'; } catch (e) { return num(n); } };
+/* число из строки — одно и то же для профиля: табельный номер, штрихкод, роспись */
+function hash (s) { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+function stats (id) {
+  return peek(id, () => {
+    const g = (k, d) => { try { const v = st.get(k, d); return v == null || v === '' ? d : v; } catch (e) { return d; } };
+    const dl = g('dlv-delivered', null);
+    let place = '', dist = '';
+    try {
+      if (DIST.has()) {
+        const L = DIST.list(), k = DIST.opened(), n = DIST.count(), d = L[DIST.cur()];
+        place = g('dlv-city-mode', false) ? t('весь город') : d && d.name ? t('район «{name}»', { name: t(d.name) }) : '';
+        dist = k >= n ? t('весь город') : t('районов {k} из {n}', { k, n });
+      }
+    } catch (e) { /* — */ }
+    let rank = '';
+    try { rank = rankOf(Math.max(0, +g('dlv-respect', 0) || 0)).name; } catch (e) { rank = ''; }
+    return {
+      shifts: Math.max(0, +g('dlv-shifts', 0) || 0),
+      wallet: Math.max(0, +g('dlv-msk-wallet', 0) || 0),
+      best: Math.max(0, +g('dlv-msk-best', 0) || 0),
+      deliv: Math.max(0, +(dl != null ? dl : g('dlv-msk-xp', 0)) || 0),
+      respect: Math.max(0, +g('dlv-respect', 0) || 0),
+      rank, place, dist,
+    };
+  });
+}
+/* штрихкод: полоски 1…3 ед. из табельного номера, по краям — длинные «стоп»-полоски */
+function barcode (seed) {
+  let h = seed, x = 0, out = '';
+  const bar = (w, tall) => { out += '<rect x="' + x + '" y="0" width="' + w + '" height="' + (tall ? 30 : 26) + '"/>'; x += w; };
+  bar(1, 1); x += 1; bar(1, 1); x += 2;
+  for (let i = 0; i < 26; i++) { h = Math.imul(h ^ (h >>> 15), 2246822519) >>> 0; bar(1 + (h & 3) % 3); x += 1 + ((h >>> 3) & 1); }
+  x += 1; bar(1, 1); x += 1; bar(1, 1);
+  return '<svg class="prf-bar" viewBox="0 0 ' + x + ' 30" preserveAspectRatio="none" aria-hidden="true">' + out + '</svg>';
+}
+/* роспись: волнистая петля из имени — у каждого своя */
+function scribble (seed) {
+  let h = seed, d = 'M4 22';
+  for (let i = 0; i < 6; i++) {
+    h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+    const x = 10 + i * 17, up = 4 + (h % 12), dn = 22 + ((h >>> 5) % 8);
+    d += ' C' + (x - 6) + ' ' + up + ',' + (x + 8) + ' ' + up + ',' + (x + 2) + ' ' + dn;
+  }
+  d += ' Q 112 30, 124 14';
+  return '<svg class="prf-sig" viewBox="0 0 128 34" aria-hidden="true"><path d="' + d + '"/></svg>';
+}
+/* круглая печать пиццерии: по кругу — название и город, в середине — должность */
+function seal () {
+  const ring = (t('Птица Пицца') + ' · ' + t('Солнечный') + ' · ' + t('отдел кадров') + ' ·').toUpperCase();
+  const mid = t('курьер').toUpperCase();
+  const fs = Math.min(11, Math.floor(64 / Math.max(1, mid.length)));
+  return '<svg class="prf-seal" viewBox="0 0 120 120" aria-hidden="true">' +
+    '<defs><path id="prf-arc" d="M60 60 m-43 0 a43 43 0 1 1 86 0 a43 43 0 1 1 -86 0"/></defs>' +
+    '<circle cx="60" cy="60" r="56" fill="none" stroke-width="4"/><circle cx="60" cy="60" r="33" fill="none" stroke-width="2"/>' +
+    '<text font-size="8.5"><textPath href="#prf-arc" textLength="266" lengthAdjust="spacing">' + esc(ring) + '</textPath></text>' +
+    '<text x="60" y="' + (61 + fs / 2) + '" text-anchor="middle" font-size="' + fs + '">' + esc(mid) + '</text>' +
+    '<text x="60" y="' + (47 - fs / 4) + '" text-anchor="middle" font-size="8">★</text><text x="60" y="' + (82 + fs / 4) + '" text-anchor="middle" font-size="8">★</text>' +
+    '</svg>';
+}
+function card (p) {
+  const s = stats(p.id), name = label(p);
+  const no = String(1000 + (hash('dlv-prof-' + p.id) % 9000));
+  const face = (() => { try { return A && A.face ? A.face(p.id) : ''; } catch (e) { return ''; } })();
+  const field = (k, v, cls) => (v ? '<div class="prf-fd' + (cls ? ' ' + cls : '') + '"><dt>' + esc(k) + '</dt><dd>' + v + '</dd></div>' : '');
+  const cell = (k, v, cls) => '<div class="prf-st' + (cls ? ' ' + cls : '') + '"><small>' + esc(k) + '</small><b>' + esc(v) + '</b></div>';
+  return '<article class="prf-card">' +
+    '<header class="prf-ct"><img class="prf-logo" src="brand/logo-256.jpg" alt="">' +
+      '<div class="prf-brand"><b>' + esc(t('Птица Пицца')) + '</b><small>' + esc(t('удостоверение курьера')) + '</small></div>' +
+      '<span class="prf-on">' + esc(t('на смене')) + '</span></header>' +
+    '<div class="prf-cb">' +
+      '<figure class="prf-photo">' + (face ? '<img src="' + face + '" alt="">' : '<i></i>') + seal() + '</figure>' +
+      '<dl class="prf-fields">' +
+        field(t('фамилия, имя'), esc(name), 'prf-name') +
+        field(t('должность'), esc(t('курьер'))) +
+        field(t('звание'), s.rank ? esc(s.rank) + (s.respect ? ' <em>★ ' + num(s.respect) + '</em>' : '') : '') +
+        field(t('место работы'), s.place ? esc(s.place) + (s.dist ? ' <em>' + esc(s.dist) + '</em>' : '') : '') +
+      '</dl>' +
+    '</div>' +
+    '<div class="prf-stats">' +
+      cell(t('стаж'), s.shifts ? tn(s.shifts, '{n} смена|{n} смены|{n} смен') : t('новичок')) +
+      cell(t('доставлено'), num(s.deliv)) +
+      cell(t('лучшая смена'), s.best ? money(s.best) : t('ещё не было'), s.best ? 'prf-money' : '') +
+      cell(t('в копилке'), money(s.wallet), 'prf-money') +
+    '</div>' +
+    '<footer class="prf-cf">' +
+      '<div class="prf-code">' + barcode(hash(no + name)) + '<small>' + esc(t('табель № {n}', { n: no })) + '</small></div>' +
+      '<div class="prf-sign">' + scribble(hash(name || no)) + '<small>' + esc(t('подпись')) + '</small></div>' +
+    '</footer>' +
+  '</article>';
 }
 function saveName () {
   const inp = box.querySelector('#prf-in');
@@ -290,7 +409,7 @@ function saveName () {
     return;
   }
   snd('coin');
-  box.querySelector('.prf-box').innerHTML = '<div class="prf-t">' + esc(t('загружаю профиль…')) + '</div>';
+  loading(box.querySelector('.prf-box'));
   create(v);
 }
 

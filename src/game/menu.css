@@ -1,14 +1,19 @@
-/* главное меню карьеры (menu.js): сверху слева логотип, справа — пропуск сотрудника (портрет, имя, «[Y] сменить»);
+/* надпись логотипа — Rubik Mono One (SIL OFL, public/fonts/RubikMonoOne-OFL.txt): жирный, рубленый, моноширинный —
+   в рифму с пиксельной птицей; латиница и кириллица (в т. ч. казахская), японский и китайский — системным жирным */
+@font-face { font-family: "Rubik Mono One"; src: url("/fonts/RubikMonoOne-Regular.ttf") format("truetype"); font-display: swap; }
+
+/* главное меню карьеры (menu.js): сверху слева логотип бренда (птица и «Птица Пицца»), справа — пропуск сотрудника (портрет, имя, «[Y] сменить»);
    середина пустая — там живой город; внизу — компактная полоса карточек (carousel.js);
    номер версии — внизу справа, плашка «есть новая версия» — сверху.
    Стиль — «как накладная» (src/styles/paper.css, UI-REVIEW № 45): карточки — бумажки на доске на скотче,
-   «на смену» — «пропуск на смену № 0007» с красным штампом; движение — только акцентом (появилось, нажали) */
+   «на смену» — такая же бумажка, крупнее и с красным; значка кнопки на карточках нет — как выбрать, говорит строка внизу;
+   движение — только акцентом (появилось, нажали) */
 
 /* старая заставка в карьере не нужна: имя, «поехали», таблица рекордов, выбор карты, язык;
    полоса уровня и рейтинга (#topbar) — тоже: профиль теперь в .crm-me */
 body.career #big-main, body.career #st-lang, body.career #topbar { display: none !important; }
-/* тёплое затемнение сверху (под логотип) и снизу (под карточки), середина — живой город */
-body.career #big { background: linear-gradient(180deg, rgba(40, 14, 24, .58) 0, rgba(40, 14, 24, .08) 22%, rgba(40, 14, 24, 0) 48%, rgba(60, 22, 20, .5) 76%, rgba(36, 12, 20, .84) 100%);
+/* затемнение сверху — бордовым бренда (под логотип), снизу — тёплое (под карточки), середина — живой город */
+body.career #big { background: linear-gradient(180deg, rgba(61, 13, 1, .62) 0, rgba(61, 13, 1, .1) 22%, rgba(40, 14, 24, 0) 48%, rgba(60, 22, 20, .5) 76%, rgba(36, 12, 20, .84) 100%);
                    padding: 0; overflow: hidden; }
 body.career #build-v { display: none; }          /* версия — в .crm-ver, крупнее */
 
@@ -16,13 +21,22 @@ body.career #build-v { display: none; }          /* версия — в .crm-ver
            padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
            --mcw: clamp(170px, min(20vw, 32vh), 290px); color: var(--pp-ink); }
 .crm-top { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; min-height: 0; }
-.crm-head { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; text-align: left; min-width: 0; }
-.crm-logo { font-size: clamp(20px, min(3.2vw, 5.6vh), 46px); line-height: 1.12; color: var(--pp-yellow); letter-spacing: .04em;
-            text-shadow: 3px 3px 0 var(--pp-ink), -3px 3px 0 var(--pp-ink), 3px -3px 0 var(--pp-ink), -3px -3px 0 var(--pp-ink), 0 8px 0 rgba(0, 0, 0, .35); }
-/* подзаголовок — бумажная полоска на скотче */
-.crm-tag { position: relative; max-width: 42ch; padding: .55em .8em .45em; font-size: var(--pp-fs-s); line-height: 1.7; color: var(--pp-ink);
-           background: var(--pp-paper); border: 2px solid var(--pp-ink); border-radius: 2px; box-shadow: 0 4px 0 rgba(51, 33, 12, .7); }
-.crm-tag:empty { display: none; }
+/* логотип: квадратная птица со скруглёнными углами (как иконка игры) и рядом «ПТИЦА / ПИЦЦА» — по слову в строку,
+   оранжевым бренда с бордовой обводкой, чуть наискось; высота надписи = высоте птицы (всё — от font-size шапки) */
+.crm-head { --lf: clamp(20px, min(3vw, 5.4vh), 54px); display: flex; align-items: center; gap: calc(var(--lf) * .22); min-width: 0; font-size: var(--lf);
+            margin: clamp(6px, 1.4vh, 16px) 0 0 clamp(12px, 2.4vw, 40px);   /* от левого края — отступ, логотип вплотную к надписи (автор 10.10.2026) */
+            rotate: -3deg; transform-origin: left center;   /* логотип и надпись повёрнуты вместе, одним штампом (автор 10.10.2026) */
+            animation: pp-in .62s var(--pp-spring) both; }
+.crm-mark { flex: none; width: calc(var(--lf) * 3.3); height: calc(var(--lf) * 3.3); image-rendering: pixelated; border-radius: 18%;
+            background: var(--brand-bg); box-shadow: 0 0 0 3px var(--brand-glow), 0 0 0 6px var(--brand-bg), 0 8px 0 6px rgba(30, 6, 0, .55), 0 16px 34px rgba(0, 0, 0, .4); }
+.crm-logo { display: flex; flex-direction: column; min-width: 0;
+            font-family: "Rubik Mono One", "Hiragino Sans", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; font-weight: 900;
+            font-size: 1em; line-height: 1.12; letter-spacing: -.01em; text-transform: uppercase; color: var(--brand-glow);
+            text-shadow: 3px 3px 0 var(--brand-bg), -3px 3px 0 var(--brand-bg), 3px -3px 0 var(--brand-bg), -3px -3px 0 var(--brand-bg),
+                         0 3px 0 var(--brand-bg), 0 -3px 0 var(--brand-bg), 3px 0 0 var(--brand-bg), -3px 0 0 var(--brand-bg),
+                         0 7px 0 var(--brand-bg), 2px 9px 0 rgba(0, 0, 0, .35); }
+.crm-logo span { display: block; white-space: nowrap; }
+.crm-logo span:nth-child(2n) { color: var(--brand-orange); padding-left: .55em; }   /* вторая строка — сдвинута и потемнее, как в штампе */
 
 /* пропуск сотрудника: портрет-полароид, «профиль» и имя, «[Y] сменить»; бумага с ярким верхом и дыркой под шнурок */
 .crm-me { position: relative; flex: none; display: flex; align-items: center; gap: clamp(8px, 1vw, 12px); max-width: min(46%, 500px); box-sizing: border-box;
@@ -83,9 +97,8 @@ body.career #build-v { display: none; }          /* версия — в .crm-ver
            font-style: normal; font-size: clamp(14px, min(1.7vw, 3vh), 24px); line-height: 1; color: var(--pp-ink);
            background: var(--acc); border: 3px solid var(--pp-ink); border-radius: 50%; box-shadow: 0 3px 0 var(--pp-ink); }
 .crm-cb b { display: flex; align-items: center; justify-content: center; font-weight: normal; font-size: clamp(11px, min(1.3vw, 2.4vh), 18px); line-height: 1.3; color: var(--pp-ink); }
-.crm-cb b .pp-key { margin-right: .55em; }
 .crm-cb > span { font-size: var(--pp-fs-s); line-height: 1.5; color: var(--pp-label); max-width: 30ch; }   /* Дека 1280×800 — 12 px (UI-REVIEW № 35) */
-/* значок кнопки — только у карточки в центре (её и жмёт A) */
+/* значок горячей кнопки [X] «сменить район» — только у карточки в центре */
 .crm-card:not(.on) .pp-key, .crm-card.off .pp-key { display: none; }
 /* цвет каждой бумажки */
 .crm-card.k-quick { --acc: var(--pp-pink); }
@@ -97,22 +110,12 @@ body.career #build-v { display: none; }          /* версия — в .crm-ver
 .crm-card.k-quit { --acc: var(--pp-red); }
 .crm-card.k-quit .crm-ico { color: var(--pp-paper); }
 
-/* «на смену» — пропуск на смену: шапка «ПРОПУСК ··· № 7», красный штамп «[A] на смену», под ним — смена, район, минуты */
+/* «на смену» — главная бумажка: красный кружок с ▶, название крупнее и заглавными, тёплое свечение под ней */
 .crm-card.main { --acc: var(--pp-red); }
-.crm-card.main .crm-cb { justify-content: space-between; gap: clamp(4px, .9vh, 8px); padding-top: clamp(8px, 1.2vh, 12px);
-                         box-shadow: 0 6px 0 var(--pp-ink), 0 16px 36px rgba(240, 82, 42, .35); }
-.crm-card.main .crm-cb::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: -6px; height: 8px; pointer-events: none; background: var(--pp-perf); }
-.crm-pass { align-self: stretch; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: .5em 0 .45em;
-            font-style: normal; font-size: var(--pp-fs-s); color: var(--pp-rust); text-transform: uppercase; letter-spacing: .06em;
-            border-bottom: 2px dashed var(--pp-brown); box-shadow: 0 -5px 0 -1px var(--pp-orange); }
-.crm-pass span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
-.crm-pass u { flex: none; text-decoration: none; color: var(--pp-ink); letter-spacing: .02em; }
-.crm-card.main .crm-cb b.crm-stamp { align-self: stretch; padding: clamp(6px, 1.2vh, 12px) 6px; font-size: clamp(11px, min(1.2vw, 2.1vh), 19px); letter-spacing: .02em; text-transform: uppercase; white-space: nowrap;
-            color: var(--pp-paper); background: var(--pp-red); border: 3px solid var(--pp-ink); border-radius: 6px; rotate: -1deg;
-            box-shadow: 0 4px 0 var(--pp-ink), inset 0 -4px 0 rgba(0, 0, 0, .14); text-shadow: 2px 2px 0 var(--pp-ink); }
-.crm-card.main .crm-cb:hover b.crm-stamp { background: var(--pp-fire); }
-.crm-stamp .pp-key { margin-right: .45em; color: var(--pp-red); background: var(--pp-paper); text-shadow: none; }
-.crm-card.main .crm-cb > span { color: var(--pp-ink); }
+.crm-card.main .crm-cb { box-shadow: inset 0 -6px 0 var(--acc), 0 6px 0 var(--pp-ink), 0 16px 36px rgba(240, 82, 42, .4); }
+.crm-card.main .crm-ico { width: clamp(36px, min(4vw, 7vh), 60px); height: clamp(36px, min(4vw, 7vh), 60px); padding-left: .12em; color: var(--pp-paper); }
+.crm-card.main .crm-cb b { font-size: clamp(13px, min(1.55vw, 2.8vh), 22px); text-transform: uppercase; letter-spacing: .04em; }
+.crm-card.main .crm-cb:hover .crm-ico { background: var(--pp-fire); }
 /* «сменить район» — пометка на полях под пропуском (открыто больше одного района, но не все), [X] */
 .crm-sub { flex: none; display: inline-flex; align-items: center; justify-content: center; font: inherit; cursor: pointer; font-size: var(--pp-fs-s); padding: 5px 8px; min-height: 30px;
            color: var(--pp-ink); background: var(--pp-paper); border: 2px dashed var(--pp-brown); border-radius: 3px; box-shadow: 0 3px 0 rgba(51, 33, 12, .6);
@@ -175,14 +178,13 @@ body.career #build-v { display: none; }          /* версия — в .crm-ver
 @media (max-aspect-ratio: 1/1) {
   #cr-menu { --mcw: min(60vw, 260px); }
   .crm-top { flex-direction: column; align-items: stretch; gap: 10px; }
-  .crm-logo { font-size: clamp(22px, 8vw, 38px); }
-  .crm-tag { display: none; }
+  .crm-head { --lf: clamp(18px, 6.4vw, 32px); }
   .crm-me { align-self: flex-end; max-width: 100%; }
   .crm-hint { display: none; }
 }
 /* низкий экран (телефон боком): логотип в строку, полоса ниже */
 @media (max-height: 560px) {
-  .crm-tag { display: none; }
+  .crm-head { --lf: clamp(14px, 5vh, 22px); }
   .crm-hint { display: none; }
   .crm-upd { margin-top: 4px; padding: 6px 14px; }
   #cr-menu { --mcw: clamp(150px, 22vw, 230px); }
@@ -192,5 +194,4 @@ body.career #build-v { display: none; }          /* версия — в .crm-ver
   .crm-ava { width: 30px; height: 30px; border-width: 3px; border-bottom-width: 7px; }
   .crm-me { padding-top: 9px; }
   .crm-swap { min-height: 28px; padding: 5px 8px; }
-  .crm-pass { padding: .2em 0 .3em; }
 }

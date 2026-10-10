@@ -165,7 +165,7 @@ export const DEFS = [
     id: 'stepa', name: N_('Стёпа Тугарев'), color: '#8a3b9a', seed: 0x5e7a11, fem: false, h: 1.18,
     places: [['hookah', 3], ['garage', 1]],
     look: { age: 'adult', hair: 'long', hairC: '#2a1d16', browC: '#2a1d16', beard: 'full', stubble: false, head: 'none', glasses: 'none',
-      top: 'long', shirt: '#6b2e2e', bottom: 'pants', pants: '#2f3540', shoes: '#5a3a22', mouth: 'smile', brows: 'thick',
+      top: 'long', shirt: '#6b2e2e', bottom: 'pants', pants: '#2f3540', shoes: '#5a3a22', mouth: 'smile', brows: 'arched', nose: 'small', eyes: 'white', gaze: 0,   // брови тоньше, нос меньше, глаза с белками: в катсцене густые брови сливались с глазами (автор 10.10.2026: «лицо кривое»)
       skin: '#e8bb92', shape: 'normal', fat: false, pack: null, mole: -1, freckles: false, bg: '#c3a6e0' },
     intro: N_('Стёпа Тугарев. Кальяны, бизнес и болгарка — обращайся.'),
     introKids: N_('Стёпа Тугарев. Самовары, бизнес и болгарка — обращайся.'),

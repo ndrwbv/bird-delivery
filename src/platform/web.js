@@ -16,7 +16,7 @@ const player = {
 const Platform = {
   id: 'web',
   lang: 'ru',
-  features: { ads: true, leaderboard: 'local', externalLinks: true, nameInput: true, gore: true, adult: true, quit: false },
+  features: { ads: false, leaderboard: 'local', externalLinks: true, nameInput: true, gore: true, adult: true, quit: false },   // реклама — только в Яндексе (автор 10.10.2026), в браузере её нет совсем
 
   /** opts.langs — языки, для которых реально есть словари (по умолчанию SUPPORTED_LANGS). */
   async init (opts = {}) {

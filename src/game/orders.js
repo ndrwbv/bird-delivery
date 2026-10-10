@@ -663,6 +663,8 @@ export function card (order) {
   const sp = order.ord;
   el.classList.add('ord-typed');
   el.classList.toggle('ord-urgent', !!(sp && sp.urgent));
+  // сюжетный (главы героев, учебный Стёпа — order.look) — бумага с оттенком цвета сюжета (ordertags.css), видно сразу
+  el.classList.toggle('ord-story', !!(sp && sp.type === 'story'));
   // срочный — красная печать «СРОЧНО» наискось в углу накладной
   let stamp = el.querySelector(':scope > .oc-stamp');
   if (sp && sp.urgent) {
@@ -1192,6 +1194,8 @@ export function force (spec = {}) {
     if (k === 'beach') {                                   // пляж (beach.js): место под полотенце — без проверок лета и района
       const b = BEACH.orderSpot();
       if (b) sp = { type: 'pizza', kind: 'solo', beach: true, stops: [{ x: b.x, z: b.z, key: keyOf(b.x, b.z), zone: ZN.zoneAt(b.x, b.z), n: 1, addr: t('пляж на Томи, у воды') }] };
+    } else if (k === 'bundle') {                         // сборный (bundleSpec) — как с BUNDLE.FROM-го заказа за всё время
+      sp = bundleSpec(Math.max(lifeN(), BUNDLE.FROM + 40), D);
     } else if (spec.near) s = pickSpot({ near: spec.near, r: spec.r || 350, zone: spec.zone || null });
     else if (k === 'edge') { if (!POOL.length) buildPool(); s = edgeSpot(); }
     else if (k === 'urgent') s = urgentSpot(spec.zone);

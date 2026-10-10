@@ -54,7 +54,8 @@ export function init (api) {
 
 /* Кузов собирается тем же makeCar, что и весь поток (панели мнутся), но со
    своими габаритами (spec — как CAR_SPEC) и своей мордой (dress). lift —
-   клиренс: кузов выше, колёса на месте. chrome — цвет бамперов. */
+   клиренс: кузов выше, колёса на месте. chrome — цвет бамперов.
+   spare — запаска на задней двери: y — середина колпака над крыльями, z — его лицо за кормой, r — радиус логотипа на нём (м). */
 const LOOK = {
   semerka: {
     name: N_('Семёрка'), note: N_('ВАЗ-2107 в цветах пиццерии: хром, квадратные фары'), hex: '#f0522a', roof: '#fff3e2', chrome: '#d4d8dc', model: 'sedan', wheel: 'cap', molding: null, handle: '#c9ccd1', rake: { f: 0, b: 0.3 },
@@ -101,7 +102,7 @@ const LOOK = {
     spec: { L: 4.33, W: 1.8, h: 0.54, hood: 1.2, trunk: 0, cab: 2.55, cz: -0.6, ch: 0.64, r: 0.46, fz: 1.4, bz: -1.36 },
   },
   havalka: {
-    name: N_('Хавалка'), note: N_('квадратный китайский танк: круглые фары, запаска сзади, ямы не замечает'), hex: '#b8a37a', chrome: '#2a2a2e', model: 'hatch', wheel: 'alloy', flare: '#26252a', lift: 0.18,
+    name: N_('Хавалка'), note: N_('квадратный китайский танк: круглые фары, запаска сзади, ямы не замечает'), hex: '#b8a37a', chrome: '#2a2a2e', model: 'hatch', wheel: 'alloy', flare: '#26252a', lift: 0.18, spare: { y: 0.12, z: 0.185, r: 0.2 },
     spec: { L: 4.76, W: 1.93, h: 0.66, hood: 1.4, trunk: 0, cab: 3.0, cz: -0.7, ch: 0.84, r: 0.52, fz: 1.48, bz: -1.48 },
   },
   jilya: {
@@ -109,7 +110,7 @@ const LOOK = {
     spec: { L: 4.77, W: 1.9, h: 0.56, hood: 1.4, trunk: 0, cab: 2.85, cz: -0.72, ch: 0.68, r: 0.5, fz: 1.55, bz: -1.55 },
   },
   patriot: {
-    name: N_('Патриот'), note: N_('большой внедорожник: запаска на двери, ямы не замечает'), hex: '#3a4c3c', chrome: '#2a2a2e', model: 'hatch', wheel: 'steel', flare: '#26252a', lift: 0.2,
+    name: N_('Патриот'), note: N_('большой внедорожник: запаска на двери, ямы не замечает'), hex: '#3a4c3c', chrome: '#2a2a2e', model: 'hatch', wheel: 'steel', flare: '#26252a', lift: 0.2, spare: { y: 0.18, z: 0.3, r: 0.19 },
     spec: { L: 4.78, W: 1.9, h: 0.66, hood: 1.35, trunk: 0, cab: 3.05, cz: -0.72, ch: 0.82, r: 0.5, fz: 1.42, bz: -1.35 },
   },
 };
@@ -275,12 +276,12 @@ export const names = () => Object.fromEntries(CAR_LIST.map(c => [c.id, t(LOOK[c.
 export function makeModel (id, o = {}) {
   if (!LOOK[id]) id = START;
   const c = LOOK[id], u = o.up || ups(id);
-  // шашка доставки — только на «Семёрке» пиццерии: остальные — свои, по ним узнают прототип
+  // шашки доставки на крыше нет ни у одной своей машины (автор 10.10.2026: «семёрка, но без этой херни на крыше»)
   const hex = o.hex || hexOf(id);
-  const g = A.makeCar(hex, o.sign !== undefined ? !!o.sign : id === START, c.model, false, {
+  const g = A.makeCar(hex, !!o.sign, c.model, false, {
     spec: c.spec, lift: c.lift || 0, low: c.low, tint: c.tint, chrome: c.chrome || hex, roofHex: c.roof, see: !!o.see,   // see — салон со стёклами и курьером (carglass.js)
     armor: u.armor,                                 // броня — вмятины мельче, кенгурятник держит передний бампер (cardent.js)
-    dual: u.engine >= 2, spare: id === 'havalka' || id === 'patriot',   // зад своей машины (carrear.js): двойной выхлоп, запаска на двери
+    dual: u.engine >= 2, spare: c.spare || false,   // зад своей машины (carrear.js): двойной выхлоп, запаска на двери (логотип — на её колпаке)
     dress: (g, add, k) => dress(id, g, add, k, u),
     // кузов (carbody.js): диски, пластик арок, номер спереди, ручки и молдинг дверей, двухдверная
     wheel: c.wheel, flare: c.flare, rake: c.rake, plateF: c.plateF, handle: c.handle, molding: c.molding, two: c.two,
@@ -529,8 +530,8 @@ function dress (id, g, add, k, u) {
         B(0.06, 0.08, S.cab - 0.3, '#2b2a30', s * (W / 2 - 0.22), roof + 0.14, S.cz);   // рейлинги
       });
       // запаска на задней двери
-      Cy(0.44, 0.26, '#1f1b19', 0, top + 0.08, -hl - 0.16, 14);
-      Cy(0.22, 0.28, '#8f949b', 0, top + 0.08, -hl - 0.16, 10);
+      Cy(0.44, 0.26, '#1f1b19', 0, top + 0.18, -hl - 0.16, 14);              // над бампером: номер не закрывает
+      Cy(0.22, 0.28, '#8f949b', 0, top + 0.18, -hl - 0.16, 10);
       break;
     }
   }
@@ -549,7 +550,8 @@ function dress (id, g, add, k, u) {
   // мотор: на второй ступени — двойной выхлоп
   if (u.engine >= 2) both(s => add(new THREE.CylinderGeometry(0.05, 0.05, 0.3, 8).rotateX(Math.PI / 2), '#9aa0a8', s * 0.25, y0 - 0.2, -hl - 0.05));
   // своя машина: задние фонари в нише с рифлёным стеклом и белым стеклом заднего хода (carrear.js)
-  if (k.see) lampDepth(add, lamp, backs, { minY: y0 + 0.05, frameHex: LOOK[id].chrome && new THREE.Color(CHR).getHSL({}).l > 0.5 ? CHR : '#1d1b20' });
+  // рамка — хромом у хромированных седанов, у остальных — тёмным тоном цвета кузова (ниша, а не чёрный контур)
+  if (k.see) lampDepth(add, lamp, backs, { minY: y0 + 0.05, frameHex: LOOK[id].chrome && new THREE.Color(CHR).getHSL({}).l > 0.5 ? CHR : '#' + new THREE.Color(bodyHex).multiplyScalar(0.55).getHexString() });
   if (lamps.length) {
     const m = new THREE.Mesh(A.mergeGeos(lamps), new THREE.MeshBasicMaterial({ vertexColors: true }));
     m.position.y = -dy;                           // склейку сдвинет вместе с кузовом, put уже поднял

@@ -68,6 +68,12 @@
       ],
       "executableName": "bird-pizza"
     },
+    "extraResources": [
+      {
+        "from": "build/icon.png",
+        "to": "icon.png"
+      }
+    ],
     "asarUnpack": [
       "node_modules/steamworks.js/**",
       "node_modules/koffi/**",

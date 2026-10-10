@@ -1,6 +1,6 @@
 /* Гараж на весь экран (карьера): карусель больших карточек машин.
 
-     GARAGE.init(api)      — из career.js: { cars() → cars.js, A (кошелёк, Snd, carChanged, money), stars() }
+     GARAGE.init(api)      — из career.js: { cars() → cars.js, A (кошелёк-копилка, Snd, carChanged, money), stars() }
      GARAGE.open(onClose)  — из меню и с экрана итогов
      GARAGE.close()
      GARAGE.isOpen(), GARAGE.root() — для геймпада и клавиатуры (career.js)
@@ -22,14 +22,20 @@
    «продать» спрашивает «точно?» (да / нет; цена — econ.js SELL). Текущую и «Семёрку» не продать.
    Листнул — палитра и вопрос закрываются.
 
-   В фокусе одна большая карточка, соседи по бокам — меньше и темнее. Крутится
-   только картинка в фокусе, остальные — готовые кадры из кэша (PIC). */
+   В фокусе одна большая карточка, соседи по бокам — меньше и темнее (у них видно только картинку и имя).
+   Крутится только картинка в фокусе, остальные — готовые кадры из кэша (PIC).
+
+   Лист (10.10.2026, автор: «интерфейс не влазит»): на широком экране — разворот техпаспорта: слева
+   картинка, имя и описание, справа полоски и кнопки; на узком — всё столбиком. Не влез по высоте —
+   лист в фокусе листается внутри себя (курсор геймпада и обучение сами докручивают до нужного).
+   Вверху справа — только копилка (свинья и сумма): про звёзды там больше не пишем (автор, 10.10.2026). */
 import './garage.css';
 import * as ECON from './econ.js';
-import { t, tn } from '../i18n/index.js';
+import { t } from '../i18n/index.js';
 import * as TOUR from './garagetour.js';
 import { keyHTML, refreshKeys } from '../input/glyphs.js';
 import * as PFX from './paperfx.js';
+import { PIGGY } from './shiftcash.js';           // копилка — та же свинья, что на хаде
 
 let D = null, el = null, idx = 0, list = [], onCloseCb = null;
 let MODE = null;                       // у карточки в фокусе: null | 'paint' (палитра) | 'sell' («точно продать?»)
@@ -78,13 +84,16 @@ export function open (onClose) {
   refreshKeys(el);
   render();
   requestAnimationFrame(() => el.classList.add('on'));
-  if (TOUR.need(D.A.Store)) TOUR.start(el, { Store: D.A.Store, Snd: D.A.Snd, face: zhenyaFace });
+  if (TOUR.need(D.A.Store)) TOUR.start(el, { Store: D.A.Store, Snd: D.A.Snd, face: zhenyaFace, person: zhenya });
 }
-/* лицо Дяди Жени — того же, что стоит в гаражах (cars.js); гаражей нет — такой же по сиду */
+/* Дядя Женя — тот же, что стоит в гаражах (cars.js); гаражей нет — такой же по сиду */
+function zhenya () {
+  const C = D.cars(), g = C && C.garage ? C.garage() : null;
+  return (g && g.zh && g.zh.person) || (D.A.person ? D.A.person({ seed: 0x2E1A, fem: false, fat: true }) : null);
+}
 function zhenyaFace () {
   if (!D.A.face) return '';
-  const C = D.cars(), g = C && C.garage ? C.garage() : null;
-  const p = (g && g.zh && g.zh.person) || (D.A.person ? D.A.person({ seed: 0x2E1A, fem: false, fat: true }) : null);
+  const p = zhenya();
   return p ? D.A.face(p, 160) : '';
 }
 /** B / Esc: палитра или «точно продать?» — закрыть их (курсор — на ту же кнопку), иначе выйти из гаража */
@@ -151,7 +160,8 @@ const statsOf = c => [
 function render () {
   const tr = el.querySelector('.gr-track');
   if (tr.children.length !== list.length) {
-    tr.innerHTML = list.map((c, i) => '<div class="gr-card" data-i="' + i + '"><div class="gr-pic"></div><div class="gr-info"></div></div>').join('');
+    tr.innerHTML = list.map((c, i) => '<div class="gr-card" data-i="' + i + '"><div class="gr-head"></div>' +
+      '<div class="gr-l"><div class="gr-pic"></div><div class="gr-id"></div></div><div class="gr-r"></div></div>').join('');
     tr.querySelectorAll('.gr-card').forEach(card => card.addEventListener('click', e => {
       const i = +card.dataset.i;
       if (i !== idx && !DRAG.moved) { e.preventDefault(); go(i); }
@@ -163,14 +173,13 @@ function render () {
   place();
   pics();
 }
+/* копилка вверху справа: свинья (как на хаде) и сумма. Звёзд тут нет (автор, 10.10.2026: «справа про звёзды — убрать»):
+   сколько звёзд нужно машине — на её карточке («купить за … · ★ 5», «нужно ★ 5, у тебя ★ 3») */
 function wallet () {
-  el.querySelector('.gr-wallet').innerHTML = walletHTML(D.A.money(D.A.wallet()), D.stars());
-}
-/** кошелёк и звёзды (гараж и «потратить», career.js): «в копилке 12 000 ₽ · ★ 3 звезды» и что такое звёзды —
-    подписью под ними (было голое «★ 0», а ★ на хаде — респект, другое) */
-export function walletHTML (cash, n) {
-  return '<span>' + esc(t('в копилке')) + '</span> <b>' + esc(cash) + '</b> <em>★ ' + esc(tn(n, '{n} звезда|{n} звезды|{n} звёзд')) + '</em>' +
-    '<small class="w-why">' + esc(t('звёзды — за хорошие смены, открывают крутые машины')) + '</small>';
+  const w = el.querySelector('.gr-wallet');
+  w.innerHTML = PIGGY + '<b>' + esc(D.A.money(D.A.wallet())) + '</b>';
+  w.title = t('копилка');
+  w.setAttribute('aria-label', t('копилка') + ' ' + D.A.money(D.A.wallet()));
 }
 function dots () {
   const d = el.querySelector('.gr-dots');
@@ -197,16 +206,15 @@ function place () {
 /* что на карточке: имя, полоски (сердца — последней) и кнопки (кнопки — только у той, что в фокусе) */
 function fill (card, c, focus, oldP) {
   const st = statsOf(c);
-  const info = card.querySelector('.gr-info');
   const bars = '<div class="gr-stats">' + st.map((s, j) =>
     '<div class="gr-st gr-st-' + s.k + '"><span>' + esc(s.name) + '</span><i class="gr-bar"><i style="width:' + ((oldP ? oldP[j] : s.p) * 100).toFixed(1) + '%"></i></i><b>' + esc(s.v) + '</b></div>').join('') + '</div>';
   card.classList.toggle('cur', !!c.current);
   card.classList.toggle('own', !!c.owned);
-  // «техпаспорт № 0003» — шапкой, как у накладной (UI-REVIEW: гараж — техпаспорт)
-  info.innerHTML = '<div class="gr-head"><span>' + esc(t('техпаспорт')) + '</span><b>№ ' + String(list.indexOf(c) + 1).padStart(4, '0') + '</b></div>' +
-    '<div class="gr-name">' + esc(c.name) + '</div>' +
-    (c.note ? '<div class="gr-note">' + esc(c.note) + '</div>' : '') + bars +
-    '<div class="gr-acts">' + (focus ? acts(c) : ghostActs(c)) + '</div>';
+  // «техпаспорт № 0003» — шапкой, как у накладной (UI-REVIEW: гараж — техпаспорт); картинку (.gr-pic) не трогаем — в ней canvas
+  card.querySelector('.gr-head').innerHTML = '<span>' + esc(t('техпаспорт')) + '</span><b>№ ' + String(list.indexOf(c) + 1).padStart(4, '0') + '</b>';
+  card.querySelector('.gr-id').innerHTML = '<div class="gr-name">' + esc(c.name) + '</div>' + (c.note ? '<div class="gr-note">' + esc(c.note) + '</div>' : '');
+  card.querySelector('.gr-r').innerHTML = bars + '<div class="gr-acts">' + (focus ? acts(c) : ghostActs(c)) + '</div>';
+  if (!focus) card.scrollTop = 0;
   if (focus) { aim(card); wire(card, c); }
   if (oldP) requestAnimationFrame(() => requestAnimationFrame(() => {
     card.querySelectorAll('.gr-st .gr-bar > i').forEach((b, j) => {
