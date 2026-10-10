@@ -541,7 +541,7 @@ let travT = 0;
 function traffic (dt, c, t, Snd) {
   if ((travT -= dt) > 0) return;
   travT = ENG.TRAF.EVERY;
-  const T = A.TRAFFIC, V = A.V, live = A.live ? A.live() : true;
+  const T = A.ACT || A.TRAFFIC, V = A.V, live = A.live ? A.live() : true;   // без стоящих у бордюра (trafficgrid.js)
   // две ближние едущие
   let a = null, b = null, da = 1e9, db = 1e9;
   if (T && V && live && Snd.on) {

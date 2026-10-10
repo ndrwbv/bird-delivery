@@ -37,6 +37,7 @@ import { t, N_ } from '../i18n/index.js';
 import { hourOf } from './econ.js';
 import * as CONSTR from './construction.js';
 import * as HITS from './hits.js';
+import { part as fxPart } from './fxpool.js';    // частицы из общего запаса (fxpool.js)
 
 export const DARK = {
   FROM: 23, TO: 5,              // часы мира
@@ -99,7 +100,6 @@ function res () {
   R.liquid = keep(new THREE.MeshBasicMaterial({ color: '#7dff3a' }));
   R.bubble = new THREE.SphereGeometry(0.07, 6, 4);
   R.disc = new THREE.CircleGeometry(1, 22); R.disc.rotateX(-Math.PI / 2);
-  R.puffGeo = new THREE.IcosahedronGeometry(0.5, 0);
   // дикарь-бургер: тело одним мешем, руки и ноги — с шарниром наверху
   const P = A.put, cyl = (r1, r2, h, n = 12) => new THREE.CylinderGeometry(r1, r2, h, n);
   let L = [];
@@ -453,10 +453,9 @@ function potStep (s, dt, near) {
   }
 }
 function greenPuff (x, y, z, size) {
-  const m = new THREE.Mesh(R.puffGeo, new THREE.MeshBasicMaterial({ color: '#7dff4a', transparent: true, opacity: 0.6, depthWrite: false }));
-  m.position.set(x + rand(-0.3, 0.3), y, z + rand(-0.3, 0.3));
-  m.scale.setScalar(size);
-  A.fxAdd(m, { vy: rand(1.8, 3), vx: rand(-0.3, 0.3), vz: rand(-0.3, 0.3), life: rand(1.6, 2.4), max: 2.4, grow: 0.9, spin: rand(-1, 1) });
+  const px = x + rand(-0.3, 0.3), pz = z + rand(-0.3, 0.3);
+  // keep: свой икосаэдр раньше не прореживался на «эффекты: меньше»
+  fxPart('puff', px, y, pz, 0x7dff4a, size, 0.6, { vy: rand(1.8, 3), vx: rand(-0.3, 0.3), vz: rand(-0.3, 0.3), life: rand(1.6, 2.4), max: 2.4, grow: 0.9, spin: rand(-1, 1), keep: 1 });
 }
 /* лужа: растекается, лежит, улетучивается зелёным дымом */
 function puddleStep (dt) {

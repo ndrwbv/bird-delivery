@@ -1384,7 +1384,7 @@ function stepGlow (dt, A) {
   if (!GLOW.mesh.visible) return;
   const cx = A.cam.position.x, cz = A.cam.position.z;
   let n = 0;
-  for (const c of A.TRAFFIC) {
+  for (const c of A.ACT || A.TRAFFIC) {             // стоящие у бордюра — не в ACT (trafficgrid.js), им фар и не надо
     if (n >= GLOW.max) break;
     if (c.parked || c.wreck || c.knock || c.gone || !c.mesh.visible) continue;
     if (Math.abs(c.x - cx) > 110 || Math.abs(c.z - cz) > 110) continue;

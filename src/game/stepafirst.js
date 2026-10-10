@@ -25,6 +25,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import { t, N_ } from '../i18n/index.js';
 import * as STORY from './story.js';
+import { part as fxPart } from './fxpool.js';    // частицы из общего запаса (fxpool.js)
 import * as HEROES from './heroes.js';
 
 export const S1 = {
@@ -100,12 +101,11 @@ function boxOnBench (o) {
 }
 /* облака: дым кальяна (взрослая) или пар самовара (детская) — белые клубы из puffGeo */
 function cloud (x, y, z, vx, vz, n, big, life) {
-  const T = A.THREE, gy = A.groundH(x, z);
+  const gy = A.groundH(x, z);
   for (let k = 0; k < n; k++) {
-    const m = new T.Mesh(A.puffGeo, new T.MeshBasicMaterial({ color: A.ADULT ? (k % 3 ? 0xe9e7e2 : 0xf6f4f0) : 0xffffff, transparent: true, opacity: A.ADULT ? 0.7 : 0.55, depthWrite: false }));
-    m.position.set(x + rand(-0.15, 0.15), gy + y + rand(-0.05, 0.12), z + rand(-0.15, 0.15));
-    m.scale.setScalar(rand(0.35, 0.6) * big);
-    A.fxAdd(m, { vx: vx * rand(0.8, 1.15) + rand(-0.3, 0.3), vz: vz * rand(0.8, 1.15) + rand(-0.3, 0.3), vy: rand(0.25, 0.6), life: life || rand(3, 4.5), max: life || 4.5, grow: 0.5 });
+    const px = x + rand(-0.15, 0.15), py = gy + y + rand(-0.05, 0.12), pz = z + rand(-0.15, 0.15);
+    fxPart('puff', px, py, pz, A.ADULT ? (k % 3 ? 0xe9e7e2 : 0xf6f4f0) : 0xffffff, rand(0.35, 0.6) * big, A.ADULT ? 0.7 : 0.55,
+      { vx: vx * rand(0.8, 1.15) + rand(-0.3, 0.3), vz: vz * rand(0.8, 1.15) + rand(-0.3, 0.3), vy: rand(0.25, 0.6), life: life || rand(3, 4.5), max: life || 4.5, grow: 0.5 });
   }
 }
 /* затяжка: облако от Стёпы вперёд, пока он сидит (как кальянщики hookah.js) */

@@ -72,13 +72,14 @@ export function create (THREE, scene, { geos, ringGeo, ringHex }) {
       RING.setColorAt(j, COL[e.kind] || COL.nos);
     }
   }
+  const oneV = (e, g) => one(g, e);              // Map.forEach — без массива [g, e] на каждое (for…of по Map — мусор в каждом кадре)
   // в видеокарту — только занятая часть буфера, не все CAP
   const dirty = (a, n) => { a.clearUpdateRanges(); a.addUpdateRange(0, n); a.needsUpdate = true; };
   /* перед каждой отрисовкой кадра игры (и повтора) */
   function step () {
     for (const k in BODY) N[k] = 0;
     N._ring = 0;
-    for (const [g, e] of LIVE) one(g, e);
+    LIVE.forEach(oneV);
     for (let i = 0; i < GR.length; i++) { const g = GR[i][0]; if (g.parent === scene) one(g, GR[i][1]); }   // в повторе — снова на сцене
     let drawn = 0;
     for (const k in BODY) {

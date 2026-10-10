@@ -96,6 +96,7 @@ import * as RASK from './routeask.js';         // путь на дороге: в
 import * as SET from './settings.js';           // настройки — карусель карточек, одна и та же из меню и из паузы (settings.js)
 import * as PAUSE from './pausecz.js';             // пауза — карусель карточек: продолжить, чек, накладная, карта, настройки, управление, закончить смену
 import * as PIX from './pixfx.js';              // пиксельные частицы одним мешем: дымок из-под колёс, осколки стёкол (pixfx.js)
+import * as FXP from './fxpool.js';             // частицы эффектов из общего запаса: искры, дым, пламя, кровь, обломки — вид = одна отрисовка (fxpool.js)
 import * as CG from './carglass.js';            // стёкла своей машины: курьер внутри, трещины и осколки (carglass.js)
 import * as SFX from './sfx.js';                // звуки из файлов public/sfx вместо синтеза, звук в пространстве (sfx.js, docs/SOUNDS.md)
 import * as TONE from './sfxsynth.js';         // тёплый синтез: каждое имя звука — свой инструмент (низ, тело, мягкая атака, хвост, отзвук; sfxsynth.js, docs/SOUNDS.md)
@@ -135,6 +136,8 @@ import * as OSKM from './osk.js';                // экранная клави�
 import * as RW from './roadwear.js';            // асфальт разный: свежий, ровный, в заплатках, старый, разбитый (roadwear.js)
 import * as LAWN from './lawn.js';              // пятна на газоне — в краске земли (lawn.js)
 import * as DEADENDS from './deadends.js';       // тупики потока: разворот вместо исчезновения (deadends.js)
+import * as TGRID from './trafficgrid.js';     // машины: «кто рядом» по сетке, стоящие — вон из покадровых циклов (trafficgrid.js)
+import * as PARKI from './parkmerge.js';      // нетронутые припаркованные — склейкой по клеткам 160 м, вызов на клетку (parkmerge.js)
 import * as NAR from './narrow.js';            // узкие дороги: одна полоса посередине, встречные прижимаются (narrow.js)
 import * as EDL from './editlayer.js';         // правки города из редактора (editor.html): убранное не ставим, добавленное — кусок 'edits' (editlayer.js)
 import * as WARM from './warmup.js';            // прогрев шейдеров: образцы на-ходу-материалов, программы не выгружаются (warmup.js)
@@ -735,6 +738,7 @@ const scellKey = (x, z) => Math.floor(x / SCELL) + ',' + Math.floor(z / SCELL);
 
 function indexSolids () {
   SOLID_GRID.clear();
+  SN.size.fill(-1); SN.val.fill(NO_SOLIDS);       // кэш solidsNear — заново
   for (const s of SOLIDS)
     for (let i = Math.floor((s.cx - s.ex) / SCELL); i <= Math.floor((s.cx + s.ex) / SCELL); i++)
       for (let j = Math.floor((s.cz - s.ez) / SCELL); j <= Math.floor((s.cz + s.ez) / SCELL); j++) {
@@ -745,7 +749,18 @@ function indexSolids () {
       }
 }
 
-const solidsNear = (x, z) => SOLID_GRID.get(scellKey(x, z)) || NO_SOLIDS;
+/* клетка стен у точки — через маленький кэш по числовому ключу (11.10.2026): строка-ключ «i,j» на каждый вызов была
+   одним из главных источников мусора в кадре (люди — pushOut, езда, удары — десятки раз за кадр). Кэш верен, пока
+   у SOLID_GRID то же число клеток (новые клетки заводит только indexSolids и roadlife.js — set; удалений нет, кроме
+   clear в indexSolids — тогда кэш сбрасывается); содержимое клетки — тот же массив, его правят на месте */
+const SN = { bits: 10, key: new Int32Array(1024), size: new Int32Array(1024).fill(-1), val: new Array(1024).fill(NO_SOLIDS) };
+function solidsNear (x, z) {
+  const i = Math.floor(x / SCELL) | 0, j = Math.floor(z / SCELL) | 0, k = (i * 4099 + j) | 0, h = Math.imul(k, 0x9E3779B1) >>> (32 - SN.bits);
+  if (SN.key[h] === k && SN.size[h] === SOLID_GRID.size) return SN.val[h];
+  const a = SOLID_GRID.get(i + ',' + j) || NO_SOLIDS;
+  SN.key[h] = k; SN.size[h] = SOLID_GRID.size; SN.val[h] = a;
+  return a;
+}
 
 /* выталкиваем по меньшему проникновению — человек скользит вдоль стены */
 function pushOut (p, r) {
@@ -1299,6 +1314,20 @@ const RAISED = new CellSet(8000 * 8000);
 const rkey = (x, z) => (Math.round(x) + 4000) * 8000 + (Math.round(z) + 4000);
 const curbAt = (x, z) => (RAISED.has(rkey(x, z)) ? CURB_H : 0);
 
+/* кусок бордюра [d, dd] без заездов на стоянки курьеров (pizzeria.js DRIVEWAYS): куски, что остались
+   (не короче 0,5 м). at(t) — точка середины плиты тротуара на расстоянии t вдоль ребра */
+function curbCut (d, dd, at) {
+  if (!PZ.DRIVEWAYS.length) return [[d, dd]];
+  const out = [], STEP = 0.25;
+  let s0 = null;
+  for (let t = d; t <= dd + 1e-6; t += STEP) {
+    const tt = Math.min(t, dd), [x, z] = at(tt), cut = PZ.onDriveway(x, z, 0.3);
+    if (!cut && s0 === null) s0 = tt;
+    if (cut && s0 !== null) { if (tt - STEP - s0 >= 0.5) out.push([s0, tt - STEP]); s0 = null; }
+  }
+  if (s0 !== null && dd - s0 >= 0.5) out.push([s0, dd]);
+  return out;
+}
 function osmCurbs () {
   const SW0 = 2.75, STEP = 6;
   // плоская лента по высотам концов: на шести метрах склон почти прямой,
@@ -1334,6 +1363,9 @@ function osmCurbs () {
           if (circ) { arcCurb(circ, A.x + e.ux * d, A.z + e.uz * d, A.x + e.ux * dd, A.z + e.uz * dd, w, SW, r.g ? null : WORLD.paveRoad(r)); continue; }
           const o1 = sd * (w / 2), o2 = sd * (w / 2 + SW);
           const p = (dist, o) => [A.x + e.ux * dist + e.rx * o, A.z + e.uz * dist + e.rz * o];
+          // заезд на стоянку курьеров (pizzeria.js DRIVEWAYS): перед ней бордюр опущен — кусок режем по заезду
+          const cuts = curbCut(d, dd, t => p(t, (o1 + o2) / 2));
+          for (const [d, dd] of cuts) {
           const [ax, az] = p(d, o1), [bx, bz] = p(dd, o1);
           const mid = (o1 + o2) / 2;
           const [sx1, sz1] = p(d, mid), [sx2, sz2] = p(dd, mid);
@@ -1351,6 +1383,7 @@ function osmCurbs () {
               const so = sd * o;                    // как p(t, sd * o), без массива на каждую клетку
               RAISED.add(rkey(A.x + e.ux * t + e.rx * so, A.z + e.uz * t + e.rz * so));
             }
+          }
         }
       }
     }
@@ -3435,6 +3468,7 @@ function makeCarLite (hex, model, taxi) {
 }
 /* задели лёгкую машину — ставим полную: у неё панели мнутся по-настоящему */
 function fullCar (t) {
+  if (t.still) TGRID.wake(t);                      // стояла в склейке (parkmerge.js) — сперва своя лёгкая модель на сцену
   if (!t.mesh.userData.lite) return;
   const old = t.mesh, u = old.userData;
   t.mesh = u.full ? u.full(old) : makeCar(u.bodyHex, false, u.model, !!u.taxi);   // full — своя полная модель (курьеры: шашка, табличка — rivalLite)
@@ -3853,7 +3887,7 @@ const roadApi = () => ({
   THREE, scene, cam, V, S, CITY, box, put, mergeGeos, obb, smashAdd, smashMesh, SMASH, SOLIDS, SOLID_GRID, SCELL, PARKED, DRIVE_MAX,
   groundH, curbAt, inHouse, inPoly, inBounds, nearestRoad, NODES, NODE_IDX, edgeOf, edgeRun, laneCount, laneOff, routeNodes, nodeNear, nearestNode,
   walkLeg, walkSpawn, walkersAll, pushOut,          // pushOut — слетевший с мопеда обходит стены (mopeds.js)
-  ZEBRAS, SIG_GROUPS, TRAFFIC, ACCIDENTS, newCar, placeTraffic, poseTraffic, poseOnSlope, svcGone, makeHuman, dropMesh, gibHuman, sayBubble, Snd, toast, calmStart, nearClient,
+  ZEBRAS, SIG_GROUPS, TRAFFIC, ACT: TGRID.TG.ACT, TGRID, ACCIDENTS, newCar, placeTraffic, poseTraffic, poseOnSlope, svcGone, makeHuman, dropMesh, gibHuman, sayBubble, Snd, toast, calmStart, nearClient,
   onRunOver: () => { S.people++; },
   deadendBlocks: e => DEADENDS.blocksExit(DE_API, e),
   shownAt: (x, z) => flowShown(x, z),              // место видно курьеру — машину потока отсюда не переставлять (deadends.js)   // ремонт тут оставит одностороннюю без выезда (deadends.js)
@@ -3869,7 +3903,7 @@ let BB_API = null;
 /* что нужно construction.js (стройки на пустырях) */
 /* что нужно rivals.js (точки конкурентов, маскоты, курьеры-конкуренты) */
 const rivApi = () => ({
-  scene, CITY, ADULT, CAREER, LIT, LITM, LAMPH, V, S, SOLIDS, SMASH, NODES, PIZZERIAS, GEN_ENTR, TRAFFIC, CAR_L, CAR_W,
+  scene, CITY, ADULT, CAREER, LIT, LITM, LAMPH, V, S, SOLIDS, SMASH, NODES, PIZZERIAS, GEN_ENTR, TRAFFIC, ACT: TGRID.TG.ACT, CAR_L, CAR_W,
   box, put, boxGeo, mergeGeos, obb, smashAdd, smashMesh, addFoot: houseFoot, groundH, inHouse, inBounds, nearestRoad, roadWidth,
   edgeOf, edgeRun, poseTraffic, placeTraffic, newCar, svcGone, sayBubble, fxAdd, gibBurger, puff, Snd,
   distAt: DIST.has() ? (x, z) => DIST.at(x, z) : null,
@@ -3878,7 +3912,7 @@ const consApi = () => ({
   scene, CITY, ADULT, LIT, LITM, V, S, SOLIDS, GORE, SMASH, NODES, edgeOf, PIZZERIAS, GEN_ENTR, box, put, boxGeo, mergeGeos, obb, smashAdd, smashMesh,
   groundH, inHouse, inBounds, nearestRoad, roadWidth, pushOut, sparks, puff, Snd, hurt: hurtCar, addFoot: houseFoot,
   distAt: DIST.has() ? (x, z) => DIST.at(x, z) : null,
-  get TRAFFIC () { return TRAFFIC; },
+  get TRAFFIC () { return TRAFFIC; }, ACT: TGRID.TG.ACT,
 });
 const ENV_API = { get ENV () { return ENV; } };    // пиццерия-шар: ночная подсветка (pizzadome.js)
 /* что нужно citybits.js (забор, КПП, рельсы, крыши, купола, вывески ТЦ) */
@@ -4004,7 +4038,7 @@ const faunaApi = () => ({
 let FAUNA_API = null;
 /* что нужно horsebox.js (коневозки в потоке) */
 const hbApi = () => ({
-  V, S, scene, TRAFFIC, CAR_L, CAR_W, put, mergeGeos, surfaceAt, pushOut, sparks, puff, sayBubble, Snd,
+  V, S, scene, TRAFFIC, ACT: TGRID.TG.ACT, CAR_L, CAR_W, put, mergeGeos, surfaceAt, pushOut, sparks, puff, sayBubble, Snd,
   hurt: (n, vn, x, z) => hurtCar(n, vn, x, z, 'car'),
 });
 let HB_API = null;
@@ -4018,12 +4052,12 @@ let EXH_API = null;
 /* мотор (motor.js): что едет машина — из driveStep одним объектом без мусора в кадре; api — поток, ресурс мотора, хлопок */
 const MOTOR_IN = { live: true, dead: false, brake: 0, hand: 0, side: 0, air: false, nos: false, vmax: 48, surf: 1, id: '' };
 let MOTOR_API = null;
-const motorApi = () => ({ TRAFFIC, V, live: () => isPlaying(), carId: () => (CAREER ? AUTO.current().id : ''), health: () => (CAREER ? AUTO.engine().c : 100), pop: loud => EXH.liftPop(loud) });
+const motorApi = () => ({ TRAFFIC, ACT: TGRID.TG.ACT, V, live: () => isPlaying(), carId: () => (CAREER ? AUTO.current().id : ''), health: () => (CAREER ? AUTO.engine().c : 100), pop: loud => EXH.liftPop(loud) });
 /* грязь и снег на машине (cardirt.js): идёт ли смена и погода — одним объектом без мусора в кадре */
 const LIVE_DIRT = new Set(['drive', 'back', 'side', 'handover']);
 const DIRT_ENV = { rain: 0, snowFall: 0, snow: 0, mud: 0, wet: 0 };
 const DIRT_W = w => { w.rain = SEAS.snowy() ? 0 : ENV.rain; w.snowFall = SEAS.snowFall(); w.snow = SEAS.snowAmt(); w.mud = SEAS.mudAmt(); w.wet = SEAS.wetAmt(); return w; };
-const exhApi = () => ({ V, TRAFFIC, cam, career: CAREER, auto: AUTO, snd: Snd, car: () => car, gas: () => IN.gas, beast: () => FXS.beastT > 0,
+const exhApi = () => ({ V, TRAFFIC, ACT: TGRID.TG.ACT, cam, career: CAREER, auto: AUTO, snd: Snd, car: () => car, gas: () => IN.gas, beast: () => FXS.beastT > 0,
   live: () => isPlaying() && S.state !== 'loading', snow: SEAS.snowAmt, night: () => ENV.night });
 /* что нужно darknight.js (тёмная ночь: костры, котлы, привидения) */
 /* что нужно wastelands.js (назначение пустырей, тропинки, лужи) */
@@ -4087,7 +4121,6 @@ function buildCity () {
   tm0('ground', osmGround);
   RW.init({ CITY, MAP, nearestRoad, get ENV () { return ENV; } });   // вид асфальта улиц — до полотна (roadwear.js); ENV — позже, на дождь
   tm0('roads', osmRoads);
-  tm0('curbs', osmCurbs);
   tm0('marks', osmMarkings);
   tm0('bridges', osmBridges);
   tm0('edge', osmEdgeBlocks);
@@ -4097,6 +4130,7 @@ function buildCity () {
   if (house) { PIZZA = dodoFacade(house); COURIER_SLOTS = PIZZA.slots; SMOKE_SPOT = PIZZA.smoke; }
   else buildPizzeria(spot.x, spot.z, spot.ry);
   if (DISTRICTS && house) { buildDistrictPizzerias(); usePizzeria(DIST.cur()); }
+  tm0('curbs', osmCurbs);                        // бордюры — после пиццерий: перед стоянкой курьеров бордюр опущен (заезд, pizzeria.js DRIVEWAYS)
   // во вступлении место под кружок знаем заранее — его держим пустым
 
   // дальше — то, что в меню не главное: с поздней сборкой (latebuild.js) — очередью после первого кадра меню, в том же порядке
@@ -4431,14 +4465,17 @@ const TL = { t: 0, i: 0 };
 const lightOf = ph => (TL_PLAN[TL.i][0] === ph ? TL_PLAN[TL.i][1] : 'r');
 
 /* ─────────────── эффекты: искры, дым, огонь, кровь, следы ───────────────
-   Один список на всё: у частицы своя скорость, время жизни и то,
-   как она гаснет. Материалы клонируются — иначе гаснут все разом. */
+   Искры, клубы, пламя, кровь, обломки — частицы из общего запаса (fxpool.js,
+   fxPart: вид — один InstancedMesh, прозрачность у каждой своя). Список FX
+   (fxAdd) — для редкого «своего» меша: значки эмоций, куски маскотов. */
 
 const FX = [], DECALS = [];
 PIX.init(scene, GFX.fxLow, cam);                  // пул пиксельных частиц — одна отрисовка (pixfx.js)
 const sparkGeo = new THREE.BoxGeometry(0.11, 0.11, 0.11);
 const bitGeo = new THREE.BoxGeometry(0.22, 0.22, 0.22);
 const puffGeo = new THREE.IcosahedronGeometry(0.5, 0);
+FXP.init({ scene, cam, geo: { spark: sparkGeo, bit: bitGeo, puff: puffGeo }, fxLow: GFX.fxLow, fxDrop: GFX.fxDrop, fxLife: GFX.fxLife, legacy: (m, o, f) => fxAdd(m, o, f) });
+const fxPart = FXP.part;
 
 /* Высоты у эффектов передаются от земли: пол под частицей берём один
    раз, при рождении, — далеко она всё равно не улетает. */
@@ -4459,9 +4496,7 @@ function fxAdd (mesh, o, floor) {
 function sparks (x, y, z, n, dirx, dirz) {
   const f = floorAt(x, z);
   for (let i = 0; i < n; i++) {
-    const m = new THREE.Mesh(sparkGeo, new THREE.MeshBasicMaterial({ color: chance(0.5) ? 0xfff3c4 : 0xffa022 }));
-    m.position.set(x, f + y, z);
-    fxAdd(m, {
+    fxPart('spark', x, f + y, z, chance(0.5) ? 0xfff3c4 : 0xffa022, 1, 1, {
       vx: (dirx || 0) * rand(1, 4) + rand(-5, 5), vy: rand(1.5, 6), vz: (dirz || 0) * rand(1, 4) + rand(-5, 5),
       life: rand(0.25, 0.6), max: 0.6, gravity: 16, spin: rand(-20, 20),
     }, f);
@@ -4470,24 +4505,17 @@ function sparks (x, y, z, n, dirx, dirz) {
 
 /* дым из-под капота: чем хуже машине, тем чернее */
 function puff (x, y, z, dark, size) {
-  const m = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({
-    color: dark ? 0x3a3238 : 0xd8d5d0, transparent: true, opacity: 0.55, depthWrite: false,
-  }));
-  m.position.set(x, floorAt(x, z) + y, z);
-  m.scale.setScalar(size || 0.7);
-  fxAdd(m, { vy: rand(1.4, 2.6), vx: rand(-0.6, 0.6), vz: rand(-0.6, 0.6), life: rand(1, 1.8), max: 1.8, grow: 1.5, spin: rand(-1, 1) });
+  fxPart('puff', x, floorAt(x, z) + y, z, dark ? 0x3a3238 : 0xd8d5d0, size || 0.7, 0.55,
+    { vy: rand(1.4, 2.6), vx: rand(-0.6, 0.6), vz: rand(-0.6, 0.6), life: rand(1, 1.8), max: 1.8, grow: 1.5, spin: rand(-1, 1) });
 }
 
 /* пламя нитро: голубое, бьёт назад и быстро гаснет. Высота — готовая,
    от настила или земли под машиной */
 function nosFlame (x, y, z, bx, bz) {
   for (let i = 0; i < 2; i++) {
-    const m = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({
-      color: chance(0.5) ? 0x6fd3ff : 0xe6f7ff, transparent: true, opacity: 0.85, depthWrite: false,
-    }));
-    m.position.set(x + rand(-0.15, 0.15), y + rand(-0.1, 0.1), z + rand(-0.15, 0.15));
-    m.scale.setScalar(rand(0.25, 0.45));
-    fxAdd(m, { vx: bx * rand(8, 14) + V.vx * 0.6, vy: rand(0, 0.6), vz: bz * rand(8, 14) + V.vz * 0.6,
+    const hex = chance(0.5) ? 0x6fd3ff : 0xe6f7ff;
+    const px = x + rand(-0.15, 0.15), py = y + rand(-0.1, 0.1), pz = z + rand(-0.15, 0.15);
+    fxPart('puff', px, py, pz, hex, rand(0.25, 0.45), 0.85, { vx: bx * rand(8, 14) + V.vx * 0.6, vy: rand(0, 0.6), vz: bz * rand(8, 14) + V.vz * 0.6,
                life: rand(0.15, 0.3), max: 0.3, grow: 2.5 });
   }
 }
@@ -4496,22 +4524,14 @@ function nosFlame (x, y, z, bx, bz) {
 function splash (x, z) {
   const w = Math.max(0, groundH(x, z));
   for (let i = 0; i < 9; i++) {
-    const m = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({
-      color: 0xeaf6ff, transparent: true, opacity: 0.8, depthWrite: false,
-    }));
-    m.position.set(x + rand(-1.5, 1.5), w + rand(0.1, 0.6), z + rand(-1.5, 1.5));
-    m.scale.setScalar(rand(0.4, 0.8));
-    fxAdd(m, { vy: rand(2, 4.5), vx: rand(-1.5, 1.5), vz: rand(-1.5, 1.5), life: rand(0.5, 0.9), max: 0.9, grow: 1.2, gravity: 9 }, w);
+    const px = x + rand(-1.5, 1.5), py = w + rand(0.1, 0.6), pz = z + rand(-1.5, 1.5);
+    fxPart('puff', px, py, pz, 0xeaf6ff, rand(0.4, 0.8), 0.8, { vy: rand(2, 4.5), vx: rand(-1.5, 1.5), vz: rand(-1.5, 1.5), life: rand(0.5, 0.9), max: 0.9, grow: 1.2, gravity: 9 }, w);
   }
 }
 
 function fire (x, y, z) {
-  const m = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({
-    color: chance(0.5) ? 0xff8a2b : 0xffd34d, transparent: true, opacity: 0.85, depthWrite: false,
-  }));
-  m.position.set(x, floorAt(x, z) + y, z);
-  m.scale.setScalar(rand(0.5, 1.1));
-  fxAdd(m, { vy: rand(2, 4), vx: rand(-1.2, 1.2), vz: rand(-1.2, 1.2), life: rand(0.4, 0.8), max: 0.8, grow: 2.2 });
+  const hex = chance(0.5) ? 0xff8a2b : 0xffd34d;
+  fxPart('puff', x, floorAt(x, z) + y, z, hex, rand(0.5, 1.1), 0.85, { vy: rand(2, 4), vx: rand(-1.2, 1.2), vz: rand(-1.2, 1.2), life: rand(0.4, 0.8), max: 0.8, grow: 2.2 });
 }
 
 /* след на асфальте: кровь, копоть. Лежит и медленно выцветает */
@@ -4535,11 +4555,8 @@ function decal (x, z, hex, r, life) {
 function blood (x, y, z, n) {
   if (!GORE_ON) return;
   const f = floorAt(x, z);
-  for (let i = 0; i < n; i++) {
-    const m = new THREE.Mesh(bitGeo, new THREE.MeshBasicMaterial({ color: chance(0.4) ? 0x8f1f2b : 0xc42b32 }));
-    m.position.set(x, f + y, z);
-    fxAdd(m, { vx: rand(-6, 6), vy: rand(2, 7), vz: rand(-6, 6), life: rand(0.5, 1.2), max: 1.2, gravity: 17, spin: rand(-14, 14) }, f);
-  }
+  for (let i = 0; i < n; i++)
+    fxPart('bit', x, f + y, z, chance(0.4) ? 0x8f1f2b : 0xc42b32, 1, 1, { vx: rand(-6, 6), vy: rand(2, 7), vz: rand(-6, 6), life: rand(0.5, 1.2), max: 1.2, gravity: 17, spin: rand(-14, 14) }, f);
   for (let i = 0; i < 3; i++) decal(x + rand(-1.6, 1.6), z + rand(-1.6, 1.6), 0x8f1f2b, rand(0.7, 1.4), 40);
 }
 
@@ -4548,12 +4565,8 @@ function boom (x, z, r = 11) {
   for (let i = 0; i < 10; i++) puff(x + rand(-2, 2), rand(1, 3.5), z + rand(-2, 2), true, rand(0.9, 1.7));
   sparks(x, 1, z, 26);
   const f = floorAt(x, z);
-  for (let i = 0; i < 9; i++) {
-    const m = new THREE.Mesh(bitGeo, new THREE.MeshLambertMaterial({ color: 0x2a2530, flatShading: true }));
-    m.position.set(x, f + 1, z);
-    m.scale.setScalar(rand(0.8, 2.4));
-    fxAdd(m, { vx: rand(-9, 9), vy: rand(5, 12), vz: rand(-9, 9), life: rand(1.4, 2.4), max: 2.4, gravity: 18, spin: rand(-12, 12) }, f);
-  }
+  for (let i = 0; i < 9; i++)
+    fxPart('debris', x, f + 1, z, 0x2a2530, rand(0.8, 2.4), 1, { vx: rand(-9, 9), vy: rand(5, 12), vz: rand(-9, 9), life: rand(1.4, 2.4), max: 2.4, gravity: 18, spin: rand(-12, 12) }, f);
   decal(x, z, 0x231d24, 3.4, 60);
   Snd.boom({ x, z, far: 220 });
   blastAt(x, z, r);
@@ -4622,6 +4635,7 @@ function blastPeople (x, z, r) {
 }
 
 function updateFX (dt) {
+  FXP.step(dt);                                   // частицы из запаса (fxpool.js)
   for (let i = FX.length - 1; i >= 0; i--) {
     const f = FX[i], m = f.mesh;
     f.vy -= f.gravity * dt;
@@ -4696,12 +4710,8 @@ function emote (x, y, z, kind, n) {
 
 /* пар от горячей пиццы */
 function steam (x, y, z) {
-  const m = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({
-    color: 0xffffff, transparent: true, opacity: 0.4, depthWrite: false,
-  }));
-  m.position.set(x + rand(-0.1, 0.1), groundH(x, z) + y, z + rand(-0.1, 0.1));
-  m.scale.setScalar(0.16);
-  fxAdd(m, { vy: rand(0.6, 1.1), life: rand(0.9, 1.5), max: 1.5, grow: 1.2 });
+  const px = x + rand(-0.1, 0.1), pz = z + rand(-0.1, 0.1);
+  fxPart('puff', px, groundH(x, z) + y, pz, 0xffffff, 0.16, 0.4, { vy: rand(0.6, 1.1), life: rand(0.9, 1.5), max: 1.5, grow: 1.2 });
 }
 
 /* коробка с пиццей — и летящая, и та, что уже в руках */
@@ -5196,7 +5206,7 @@ function walkerStep (p, dt, legSwing) {
   if (p.resnap) { p.resnap = false; walkBack(p); }
   if (p.goTo) {
     // идёт к тротуару своим ходом, стены обходит выталкиванием
-    const G = p.goTo, dx = G.x - p.x, dz = G.z - p.z, d = Math.hypot(dx, dz);
+    const G = p.goTo, dx = G.x - p.x, dz = G.z - p.z, d = Math.sqrt(dx * dx + dz * dz);
     p.ph += dt * legSwing;
     if (d < 0.6 || (G.t -= dt) <= 0) { p.goTo = null; walkSnap(p); return NaN; }
     const k = Math.min(1, p.speed * dt / d);
@@ -5277,7 +5287,7 @@ function dodgeCar (p, dt) {
   let tx = 0, tz = 0, rx = p.x, rz = p.z;
   // шаг не двигал (ждёт у зебры) — в p.x ещё прошлый сдвиг: снимаем, чтобы не копился
   if (p.dpx === p.x && p.dpz === p.z) { rx -= p.dox || 0; rz -= p.doz || 0; }
-  const sp = Math.hypot(V.vx, V.vz);
+  const sp = Math.sqrt(V.vx * V.vx + V.vz * V.vz);   // не Math.hypot: он в V8 не встраивается и выделяет число (зовётся на каждого человека в кадре)
   if (sp < ECON.CLIENT_HIT.SOFT && !V.air && Math.abs(rx - V.x) < 6 && Math.abs(rz - V.z) < 6) {
     const fx = Math.sin(V.h), fz = Math.cos(V.h), dx = rx - V.x, dz = rz - V.z;
     const al = dx * fx + dz * fz, ac = dx * fz - dz * fx;
@@ -5291,7 +5301,7 @@ function dodgeCar (p, dt) {
   } else p.dodge = 0;
   if (p.goTo) { p.x = rx + tx; p.z = rz + tz; p.dox = p.doz = 0; p.dpx = p.dpz = NaN; return; }   // идёт своим ходом — сдвиг сразу и насовсем
   const k = DODGE.V * dt;
-  const ox = p.dox || 0, oz = p.doz || 0, ex = tx - ox, ez = tz - oz, el = Math.hypot(ex, ez);
+  const ox = p.dox || 0, oz = p.doz || 0, ex = tx - ox, ez = tz - oz, el = Math.sqrt(ex * ex + ez * ez);
   p.dox = el > k ? ox + ex / el * k : tx; p.doz = el > k ? oz + ez / el * k : tz;
   p.x = rx + p.dox; p.z = rz + p.doz;
   p.dpx = p.x; p.dpz = p.z;
@@ -5979,10 +5989,8 @@ function updateDoors (dt) {
 /* крошки от куска пиццы */
 function crumbs (x, y, z) {
   for (let i = 0; i < 3; i++) {
-    const m = new THREE.Mesh(sparkGeo, new THREE.MeshBasicMaterial({ color: chance(0.5) ? 0xe8b04a : 0xc96a2e }));
-    m.position.set(x + rand(-0.08, 0.08), y, z + rand(-0.08, 0.08));
-    m.scale.setScalar(0.6);
-    fxAdd(m, { vx: rand(-0.4, 0.4), vy: rand(0, 0.6), vz: rand(-0.4, 0.4), gravity: 9, life: rand(0.6, 0.9), max: 0.9, floor: floorAt(x, z) - 0.08 });
+    const hex = chance(0.5) ? 0xe8b04a : 0xc96a2e, px = x + rand(-0.08, 0.08), pz = z + rand(-0.08, 0.08);
+    fxPart('spark', px, y, pz, hex, 0.6, 1, { vx: rand(-0.4, 0.4), vy: rand(0, 0.6), vz: rand(-0.4, 0.4), gravity: 9, life: rand(0.6, 0.9), max: 0.9, floor: floorAt(x, z) - 0.08 });
   }
 }
 /* открытая коробка: крышка откинута, внутри пицца (дети box — p.hold) */
@@ -6407,29 +6415,64 @@ function updateLights (dt) {
 
 /* Пешеходы не должны проходить друг сквозь друга. Перебирать всех со
    всеми дорого, поэтому раскладываем их по клеткам пять на пять метров
-   и смотрим только соседние. Сидящих не трогаем. */
-const WGRID = new Map();
+   и смотрим только соседние. Сидящих не трогаем.
+   Сетка — без выделений памяти в кадре (11.10.2026; было ~100 массивов в кадр и Map заново):
+   ключ клетки — число i·4099+j (город ±4 км — клеток по 5 м меньше 2049), таблица с открытой
+   адресацией на типизированных массивах; «чья запись» — номер прохода `g` (очищать таблицу не надо).
+   В клетке — цепочка номеров в `list` в том же порядке, в каком раскладывали (люди, потом прохожие).
+   Читать (cats.js): for (let q = W.first(k); q >= 0; q = W.next[q]) { const p = W.list[q]; … } */
+const WGRID = {
+  list: [], n: 0, next: new Int32Array(256), g: 1,
+  key: new Int32Array(512), head: new Int32Array(512), tail: new Int32Array(512), gen: new Uint32Array(512), bits: 9,
+  /* ячейка таблицы клетки k; make — завести, если нет (иначе −1) */
+  slot (k, make) {
+    const mask = (1 << this.bits) - 1;
+    let h = Math.imul(k, 0x9E3779B1) >>> (32 - this.bits);
+    while (this.gen[h] === this.g) {
+      if (this.key[h] === k) return h;
+      h = (h + 1) & mask;
+    }
+    if (!make) return -1;
+    this.gen[h] = this.g; this.key[h] = k; this.head[h] = -1; this.tail[h] = -1;
+    return h;
+  },
+  first (k) { const s = this.slot(k, false); return s < 0 ? -1 : this.head[s]; },
+  /* таблица — с запасом вчетверо от числа людей (растёт раз-два за игру) */
+  fit (n) {
+    if (this.next.length < n) this.next = new Int32Array(n * 2);
+    if (n * 2 <= this.key.length) return;
+    let b = this.bits;
+    while ((1 << b) < n * 4) b++;
+    const N = 1 << b;
+    this.bits = b; this.key = new Int32Array(N); this.head = new Int32Array(N); this.tail = new Int32Array(N); this.gen = new Uint32Array(N);
+  },
+};
 
 function separateWalkers (dt) {
-  WGRID.clear();
-  const all = [];
-  for (const p of PEOPLE) if (!p.dead) all.push(p);
-  for (const p of PEDS) if (!p.dead) all.push(p);
-  for (const p of all) {
-    const k = Math.floor(p.x / 5) * 4099 + Math.floor(p.z / 5);   // число, а не строка «x,z»: без мусора в каждом кадре (город ±4 км — клеток по 5 м меньше 2049)
-    let b = WGRID.get(k);
-    if (!b) WGRID.set(k, b = []);
-    b.push(p);
+  const W = WGRID, L = W.list;
+  let n = 0;
+  for (let i = 0; i < PEOPLE.length; i++) { const p = PEOPLE[i]; if (!p.dead) L[n++] = p; }
+  for (let i = 0; i < PEDS.length; i++) { const p = PEDS[i]; if (!p.dead) L[n++] = p; }
+  for (let i = n; i < W.n; i++) L[i] = null;      // ушедших не держим
+  W.n = n;
+  W.fit(n);
+  W.g++;
+  const nx = W.next;
+  for (let i = 0; i < n; i++) {
+    const p = L[i], s = W.slot(((Math.floor(p.x / 5) | 0) * 4099 + (Math.floor(p.z / 5) | 0)) | 0, true);   // | 0 — целое: дробный ключ в вызов — новое число в памяти
+    nx[i] = -1;
+    if (W.head[s] < 0) W.head[s] = i; else nx[W.tail[s]] = i;
+    W.tail[s] = i;
   }
-  for (const p of all) {
+  for (let a = 0; a < n; a++) {
+    const p = L[a];
     if (p.sitting || (p.idle && p.idle.phase === 'sit')) continue;
-    const ci = Math.floor(p.x / 5), cj = Math.floor(p.z / 5);
+    const ci = Math.floor(p.x / 5) | 0, cj = Math.floor(p.z / 5) | 0;
     let moved = false;
     for (let i = ci - 1; i <= ci + 1; i++)
       for (let j = cj - 1; j <= cj + 1; j++) {
-        const b = WGRID.get(i * 4099 + j);
-        if (!b) continue;
-        for (const q of b) {
+        for (let b = W.first((i * 4099 + j) | 0); b >= 0; b = nx[b]) {
+          const q = L[b];
           if (q === p) continue;
           const dx = p.x - q.x, dz = p.z - q.z;
           const d2 = dx * dx + dz * dz;
@@ -6456,6 +6499,13 @@ function separateWalkers (dt) {
    попало, с аварийкой. */
 
 const TRAFFIC = [];
+/* стоящие у бордюра — склейкой по клеткам (parkmerge.js), «кто рядом» — по сетке (trafficgrid.js). Проснулась (толкнули,
+   задели, сдвинули) — из склейки прочь, своя лёгкая модель — на сцену, дальше как раньше */
+PARKI.init({ THREE, scene, LITE_MAT, LITE_BASIC, LED_MAT: RL.LED_MAT, now: () => REPLAY.recNow() });
+TGRID.init(TRAFFIC, t => PARKI.out(t));
+const TACT = TGRID.TG.ACT;                         // машины, что что-то делают (без стоящих) — для покадровых циклов
+const NBR = [], NBR2 = [], NBW = [];               // кандидаты «кто рядом» (TGRID.near) — без выделений в кадре
+const carWake = t => { if (t.still) TGRID.wake(t); };
 const CAR_HEX = ['#7fa8e0', '#8fd0a4', '#e6dfd2', '#d99ab8', '#e8cf8a', '#b9a7dd', '#f2f2ee', '#3c4048', '#9aa6b8', '#c85a4f'];
 const MODELS = ['sedan', 'sedan', 'hatch', 'hatch', 'hatch', 'smart', 'suv', 'suv', 'cn', 'cn', 'cn'];   // cn — китайцы, каждая четвёртая
 const TAXI_HEX = '#ffc400';
@@ -6494,6 +6544,9 @@ function carObj (mesh, model, taxi, parked, cruise, hp, stopCd) {
     cnRoll: 0, dump: undefined, rvRoll: 0, hbRoll: 0, bcar: undefined, rvGoal: undefined, rvHome: undefined, rvTrips: 0, hb: undefined, tow: 0,
     mooseT: 0, mooseN: 0, mooseHonk: 0, rlPull: 0, rlGo: 0, rlJam: undefined, rlWait: 0, rlOut: 0, mp: undefined,
     bus: undefined,                                // автобус (buses.js): маршрут, остановка, двери — у потока пусто
+    // стоящая в склейке (parkmerge.js, trafficgrid.js): still — не в покадровых циклах, pk — где она в склейке, tgF — кадр пересборки;
+    // plx, plz, ply — высота полотна под ней (paveLift) и где её мерили (poseOnSlope)
+    still: 0, pk: undefined, tgF: 0, tgA: 0, plx: 1e9, plz: 1e9, ply: 0,
   };
   return dbl(t, CAR_NUM || (CAR_NUM = Object.keys(t).filter(k => typeof t[k] === 'number' || k === 'cruise' || k === 'hp' || k === 'stopCd')));
 }
@@ -6511,7 +6564,7 @@ const TDEN = { t: 2, want: 0, n: 0, fr: new THREE.Frustum(), m: new THREE.Matrix
 function trafficDensity (dt) {
   if (INTRO || (TDEN.t -= dt) > 0) return;
   let n = 0;
-  for (const t of TRAFFIC) if (isFlow(t)) n++;
+  for (const t of TACT) if (isFlow(t)) n++;        // стоящие (не в TACT) — припаркованные, не поток
   const want = trafficWant(), T = ECON.TRAFFIC;
   TDEN.want = want; TDEN.n = n;
   TDEN.t = Math.abs(want - n) > 6 ? 0.3 : T.STEP_S;
@@ -6519,7 +6572,7 @@ function trafficDensity (dt) {
   else if (n > want) {
     TDEN.fr.setFromProjectionMatrix(TDEN.m.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
     let far = null, fd = 0;
-    for (const t of TRAFFIC) {
+    for (const t of TACT) {
       if (!isFlow(t) || t.knock || t.wreck || t.driver || t.stalled || t.hitT > 0 || t.chainT > 0) continue;
       const d = Math.hypot(t.x - V.x, t.z - V.z);
       if (d < 40) continue;
@@ -6591,11 +6644,16 @@ function paveLift (x, z) {
 /* Машину ставим на то, по чему она едет, и наклоняем по склону:
    высоту берём под передними и задними колёсами. */
 function poseOnSlope (t) {
+  if (t.still) TGRID.wake(t);                      // сдвинули стоящую — из склейки (parkmerge.js)
   const k = (t.hl || 2) * 0.72;
   const hx = Math.sin(t.h) * k, hz = Math.cos(t.h) * k;
   t.gy = surfaceAt(t.x, t.z, t.gy);
   const f = surfaceAt(t.x + hx, t.z + hz, t.gy), b = surfaceAt(t.x - hx, t.z - hz, t.gy);
-  t.mesh.position.set(t.x, t.gy + paveLift(t.x, t.z), t.z);   // колёса — на асфальт, а не в него (paveLift)
+  // высота полотна (paveLift — поиск ближайшей дороги, ~20 % времени потока на Деке) — заново, только когда
+  // машина отъехала от места замера на 1,5 м (TG.PL2; разница — сантиметры у бордюра): по полосе она одна и та же (11.10.2026)
+  const pdx = t.x - t.plx, pdz = t.z - t.plz;
+  if (!(pdx * pdx + pdz * pdz <= TGRID.TG.PL2)) { t.ply = paveLift(t.x, t.z); t.plx = t.x; t.plz = t.z; }   // NaN (нет plx) — тоже заново
+  t.mesh.position.set(t.x, t.gy + t.ply, t.z);   // колёса — на асфальт, а не в него (paveLift)
   t.mesh.rotation.set(-Math.atan((f - b) / (2 * k)), t.h, 0);
 }
 
@@ -6741,6 +6799,7 @@ function wreckCar (t) {
    подскоком, а не кувырком в небо. Крен — пружина: качнуло и вернуло. */
 function knockCar (t, nx, nz, force) {
   if (t.bus) return;                              // автобус не отбросить (buses.js)
+  if (t.still) TGRID.wake(t);                      // стояла в склейке — в ACT, полетит своей моделью (trafficgrid.js)
   const f = clamp(force, 6, 60);
   t.knock = 1;
   t.kvx = nx * f * 0.95 + t.kvx * 0.3;
@@ -6839,7 +6898,11 @@ function updateTraffic (dt0) {
   trafficDensity(dt0);
   let respN = 0;
   const WALK = walkersAll();                       // списки пешеходов — раз на кадр, а не на каждую машину
-  for (const t of TRAFFIC) {
+  // кто что делает и кто где (trafficgrid.js): стоящие у бордюра — мимо цикла, соседи — по сетке 20 м
+  TGRID.fresh();                                   // родившиеся с прошлого кадра — в TACT
+  TGRID.walkers(WALK);
+  const GRID = TGRID.TG.on;
+  for (const t of TACT) {
     // убранная (svcGone) ждёт вычёркивания в конце цикла — не трогаем. До 10.10.2026 trafficDensity убирал
     // самую дальнюю машину (часто дальше 520 м), цикл тут же «перерождал» её рядом с курьером (respawnTraffic —
     // новый меш на сцене), и в конце кадра её вычёркивали из списка: на улице оставалась машина-призрак —
@@ -6922,8 +6985,8 @@ function updateTraffic (dt0) {
     const ahead = aheadOf;
     let blocked = false;
     if (t.ghost > 0) t.ghost -= dt;
-    else for (let oi = 0; oi < TRAFFIC.length; oi++) {     // по индексу: машин ~300 × 300 в кадре — без объектов-итераторов
-      const o = TRAFFIC[oi];
+    else for (let oi = 0, on = TGRID.near(t.x, t.z, 16, NBR), OL = TGRID.TG.R; oi < on; oi++) {   // соседи по сетке (trafficgrid.js), а не все ~300
+      const o = OL[oi];
       if (o === t || Math.abs(o.x - t.x) > 16 || Math.abs(o.z - t.z) > 16) continue;
       // встречную не ждём: она в своей полосе
       if (!o.knock && !o.parked && Math.sin(o.h) * hx + Math.cos(o.h) * hz < -0.3) continue;
@@ -6933,8 +6996,13 @@ function updateTraffic (dt0) {
     }
     const bo = t.bus ? t.hl - 2 : 0;               // автобус длиннее: нос дальше от середины (buses.js)
     ahead(V.x, V.z, 6 + bo, 2.1 + bo * 0.1, 15 + bo);
-    // пешеходы и самокатчики на полотне: пропускаем
-    for (let li = 0; li < WALK.length; li++)
+    // пешеходы и самокатчики на полотне: пропускаем (рядом — по сетке, trafficgrid.js walkers)
+    if (GRID) for (let pi = 0, pn = TGRID.walkersNear(t.x, t.z, 13 + bo, NBW); pi < pn; pi++) {
+      const p = NBW[pi];
+      if (p.dead || Math.abs(p.x - t.x) > 13 + bo || Math.abs(p.z - t.z) > 13 + bo) continue;
+      ahead(p.x, p.z, 3.4 + bo, 1.8 + bo * 0.1, 12 + bo);
+    }
+    else for (let li = 0; li < WALK.length; li++)
       for (let pi = 0, list = WALK[li]; pi < list.length; pi++) {
         const p = list[pi];
         if (p.dead || Math.abs(p.x - t.x) > 13 + bo || Math.abs(p.z - t.z) > 13 + bo) continue;
@@ -6971,7 +7039,10 @@ function updateTraffic (dt0) {
     if (t.bus) slow = Math.min(slow, BUSES.drive(t, dt));   // остановка: прижаться, двери, 4—8 с; поворотники; мягкий разгон (buses.js)
     slow = Math.min(slow, RL.hold(t, dt));        // пробка за аварией, ремонт (roadlife.js)
     if (t.turn ? t.turn.ut : t.e.trap && edgeRun(t.e) - t.s < 18) slow = Math.min(slow, 0.3);   // к концу тупика и в развороте — медленно (startTurn, deadends.js)
-    if (!t.turn && NAR.narrow(t.e)) slow = Math.min(slow, NAR.step(t, dt, TRAFFIC, V));   // узкая: встречные прижимаются и сбавляют (narrow.js)
+    if (!t.turn && NAR.narrow(t.e)) {              // узкая: встречные прижимаются и сбавляют (narrow.js); встречные — по сетке, стоящие не в счёт
+      const nn = TGRID.near(t.x, t.z, NAR.NARROW.LOOK, NBR2, false);
+      slow = Math.min(slow, NAR.step(t, dt, TGRID.TG.R, V, nn));
+    }
     else NAR.relax(t, dt);
     t.speed = damp(t.speed, t.cruise * slow, 3.2, dt);
     if (slow < 0.02) t.speed = 0;                 // иначе доползает за стоп-линию
@@ -6993,7 +7064,7 @@ function updateTraffic (dt0) {
     }
     poseTraffic(t, dt);
   }
-  for (let i = TRAFFIC.length - 1; i >= 0; i--) if (TRAFFIC[i].gone) TRAFFIC.splice(i, 1);
+  TGRID.rebuild();                                 // убранные (gone) — из списка; TACT и сетка — для всех, кто после
 }
 
 /* ─────────────── кофе у пиццерии ───────────────
@@ -7062,10 +7133,8 @@ function updateSmokers (dt) {
       const fx = Math.sin(p.grp.rotation.y), fz = Math.cos(p.grp.rotation.y);
       if (ADULT) {
         // затяжка — облачко дыма у лица
-        const m = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({ color: 0xe9e7e2, transparent: true, opacity: 0.5, depthWrite: false }));
-        m.position.set(p.x + fx * 0.4, groundH(p.x, p.z) + 1.6, p.z + fz * 0.4);
-        m.scale.setScalar(0.22);
-        fxAdd(m, { vy: rand(0.5, 0.9), vx: fx * 0.4 + rand(-0.2, 0.2), vz: fz * 0.4 + rand(-0.2, 0.2), life: rand(1.4, 2.2), max: 2.2, grow: 1.3 });
+        fxPart('puff', p.x + fx * 0.4, groundH(p.x, p.z) + 1.6, p.z + fz * 0.4, 0xe9e7e2, 0.22, 0.5,
+          { vy: rand(0.5, 0.9), vx: fx * 0.4 + rand(-0.2, 0.2), vz: fz * 0.4 + rand(-0.2, 0.2), life: rand(1.4, 2.2), max: 2.2, grow: 1.3 });
       } else
       // пар от горячего кофе — маленький и у руки, а не облако у лица
       steam(p.x + fx * 0.35 + Math.cos(p.grp.rotation.y) * 0.3, 1.25, p.z + fz * 0.35 - Math.sin(p.grp.rotation.y) * 0.3);
@@ -7415,7 +7484,8 @@ function svcDrive (t, dt) {
   };
   if (t.ghost > 0) t.ghost -= dt;
   else {
-    for (const o of TRAFFIC) {
+    for (let oi = 0, on = TGRID.near(t.x, t.z, 18, NBR), OL = TGRID.TG.R; oi < on; oi++) {   // соседи по сетке (trafficgrid.js)
+      const o = OL[oi];
       if (o === t || Math.abs(o.x - t.x) > 18 || Math.abs(o.z - t.z) > 18) continue;
       if (!o.knock && !o.parked && Math.sin(o.h) * hx + Math.cos(o.h) * hz < -0.3) continue;   // встречная
       if (t.aggr) {
@@ -7963,7 +8033,8 @@ function updateRivals (dt) {
     // злой курьер расталкивает машины, которые не успели уйти с дороги
     if (t.aggr && t.speed > 7 && !t.knock) {
       const hx = Math.sin(t.h), hz = Math.cos(t.h);
-      for (const o of TRAFFIC) {
+      for (let oi = 0, on = TGRID.near(t.x, t.z, 7, NBR), OL = TGRID.TG.R; oi < on; oi++) {   // рядом — по сетке (trafficgrid.js), стоящие тоже
+        const o = OL[oi];
         if (o === t || o.svc || o.knock || o.wreck || o.hitT > 0) continue;
         const dx = o.x - t.x, dz = o.z - t.z;
         if (Math.abs(dx) > 7 || Math.abs(dz) > 7) continue;
@@ -9909,8 +9980,13 @@ function driveStep (dt) {
   // стены: сначала находим, с какой стороны коробки мы влезли, а потом
   // гасим скорость по её нормали — вдоль стены машина продолжает ехать.
   const r = CAR_W;
-  for (const [cx, cz] of [[noseX, noseZ], [tailX, tailZ]]) {
-    for (const s of FOREST.withTrees(LAWNP.withSolids(solidsNear(cx, cz), cx, cz), cx, cz)) {     // + ракушки (lawnprops.js)     // + стволы ельника (forest.js)
+  // циклы по номеру, не for…of (11.10.2026): driveStep большой и часто идёт не самым быстрым кодом — там каждый шаг
+  // for…of выделяет объект-итог, а [[нос], [корма]] — три массива на шаг
+  for (let ci = 0; ci < 2; ci++) {
+    const cx = ci ? tailX : noseX, cz = ci ? tailZ : noseZ;
+    const SL = FOREST.withTrees(LAWNP.withSolids(solidsNear(cx, cz), cx, cz), cx, cz);     // + ракушки (lawnprops.js)     // + стволы ельника (forest.js)
+    for (let si = 0; si < SL.length; si++) {
+      const s = SL[si];
       if (s.deckY !== undefined && V.y < s.deckY - 1.2) continue; // едем под мостом, не по нему
       // задняя стенка рампы держит только тех, кто заезжает сзади: кто уже
       // на скате или летит над ней — проезжает
@@ -9948,7 +10024,9 @@ function driveStep (dt) {
   // чужие машины: тоже два круга на кузов. Сильный удар по едущей не тормозит нас,
   // а раскидывает её — иначе таран ощущается как стена. Стоящая (припаркованная, в пробке,
   // на светофоре, с аварийкой) — твёрдая (CAR_STAND, 09.10.2026: «сквозь стоящие машины можно проехать»)
-  for (const t of TRAFFIC) {
+  // кто рядом — по сетке (trafficgrid.js): 16 м — с запасом на автобус (BUSES.hit — до hl + 4 м от его середины)
+  for (let oi = 0, on = TGRID.near(V.x, V.z, 16, NBR), OL = TGRID.TG.R; oi < on; oi++) {
+    const t = OL[oi];
     if (t.gone) continue;
     if (t.bus) { BUSES.hit(t, noseX, noseZ, tailX, tailZ); continue; }   // автобус — коробкой, его не сдвинуть (buses.js)
     if (Math.hypot(V.x - t.x, V.z - t.z) > 7) continue;
@@ -10041,7 +10119,8 @@ function driveStep (dt) {
 
   // уличный реквизит: не стена, а то, что сносится
   if (Math.abs(vf) > 4) {
-    for (const pr of PROPS) {
+    for (let i = 0; i < PROPS.length; i++) {
+      const pr = PROPS[i];
       if (pr.down) continue;
       if (Math.abs(pr.x - V.x) > 6 || Math.abs(pr.z - V.z) > 6) continue;
       const hit = Math.hypot(pr.x - noseX, pr.z - noseZ) < pr.r + CAR_W
@@ -10093,7 +10172,8 @@ function driveStep (dt) {
     return Math.abs(along) < CAR_L + 0.5 && Math.abs(across) < CAR_W + 0.35;
   };
 
-  for (const p of PEOPLE) {
+  for (let i = 0; i < PEOPLE.length; i++) {
+    const p = PEOPLE[i];
     if (p.dead) continue;
     if (!underCar(p.x, p.z)) continue;
     if (Math.abs(vf) < ECON.CLIENT_HIT.SOFT) continue;
@@ -10106,14 +10186,16 @@ function driveStep (dt) {
     V.vx *= 0.99; V.vz *= 0.99;
   }
 
-  for (const p of SCOOTS) {
+  for (let i = 0; i < SCOOTS.length; i++) {
+    const p = SCOOTS[i];
     if (p.dead || !underCar(p.x, p.z) || Math.abs(vf) < 3) continue;
     runOverScoot(p, V.vx, V.vz);
     S.shake = Math.max(S.shake, 0.3);
   }
 
   // бургеры: на скорости разлетаются, пешком — просто расталкиваются
-  for (const p of PEDS) {
+  for (let i = 0; i < PEDS.length; i++) {
+    const p = PEDS[i];
     if (p.dead) continue;
     if (!underCar(p.x, p.z)) continue;
     if (Math.abs(vf) < 3) continue;
@@ -10174,8 +10256,9 @@ function driveStep (dt) {
   car.position.set(V.x, V.y + V.kerb, V.z);
   car.rotation.y = V.h;
   car.rotation.x = V.pitch;
-  for (const w of car.userData.wheels) w.rotation.x = V.wheel;
-  for (const s of car.userData.steer) s.rotation.y = V.steerVis;
+  { const W = car.userData.wheels, St = car.userData.steer;
+    for (let i = 0; i < W.length; i++) W[i].rotation.x = V.wheel;
+    for (let i = 0; i < St.length; i++) St[i].rotation.y = V.steerVis; }
   V.lean = damp(V.lean || 0, -V.steerVis * clamp(Math.abs(vf) / VMAX, 0, 1) * 0.12, 6, dt);
   car.rotation.z = V.roll + V.lean;
   ICEM.pose(car, dt);                              // на трещащем льду проседает и качается, проломился — на бок (ice.js)
@@ -10454,7 +10537,7 @@ function drawRadar () {
   if (routePts.length > 1) {
     rctx.lineJoin = 'round'; rctx.lineCap = 'round';
     rctx.beginPath();
-    routePts.forEach((p, i) => { const [a, b] = tr(p[0], p[1]); i ? rctx.lineTo(a, b) : rctx.moveTo(a, b); });
+    for (let i = 0; i < routePts.length; i++) { const p = routePts[i], a = qx(p[0], p[1]), b = qy(p[0], p[1]); i ? rctx.lineTo(a, b) : rctx.moveTo(a, b); }   // без массива на точку (маршрут — сотни точек, 20 раз в секунду)
     rctx.strokeStyle = 'rgba(70, 30, 6, 0.6)'; rctx.lineWidth = 6; rctx.stroke();
     rctx.strokeStyle = routeHex(); rctx.lineWidth = 3.6; rctx.stroke();
     rctx.lineCap = 'butt';
@@ -10503,8 +10586,8 @@ function drawRadar () {
     if (Math.hypot(a, b) < R - 4) { rctx.fillStyle = PICK_HEX[n.kind]; rctx.fillRect(a - 1.5, b - 1.5, 3, 3); }
   }
   rctx.beginPath();                                 // машины потока — одним путём (их ~300), со своим цветом — по одной
-  for (let i = 0; i < TRAFFIC.length; i++) {
-    const t = TRAFFIC[i];
+  for (let i = 0; i < TACT.length; i++) {           // стоящие в склейке (trafficgrid.js) — не в TACT
+    const t = TACT[i];
     if (t.dot || (t.parked && !t.knock)) continue;  // стоящие на парковке — не на радаре (их 150—240, не двигаются); толкнули — едет, видно
     let a = rA(t.x, t.z), b = rB(t.x, t.z);
     const len = Math.sqrt(a * a + b * b);
@@ -10512,7 +10595,7 @@ function drawRadar () {
     rctx.rect(a - 1.6, b - 1.6, 3.2, 3.2);
   }
   rctx.fillStyle = '#5b6b80'; rctx.fill();
-  for (let i = 0; i < TRAFFIC.length; i++) { const t = TRAFFIC[i]; if (t.dot) blip(t.x, t.z, t.dot, 2.4); }
+  for (let i = 0; i < TACT.length; i++) { const t = TACT[i]; if (t.dot) blip(t.x, t.z, t.dot, 2.4); }
   rctx.globalAlpha = 1;
   // стрелка игрока — картинкой поверх холста (.radar-me, выше у radarC)
   // куда везти — поверх всего: мигающий пин, а за краем радара — стрелка у края
@@ -13837,6 +13920,7 @@ LATE.add('lawnp', () => LAWNP.init({ THREE, scene, cam, CITY, ADULT, forests: ()
 // вокруг него, а не вокруг центра карты — иначе первый заказ уезжает за
 // полтора километра, а у бордюра можно проснуться внутри чужой машины.
 startPose();                                      // с поздней сборкой — ещё раз в очереди (как раньше: после всего города)
+const PK_NEW = [];
 LATE.add('cars', () => {
   if (LATE.busy()) startPose();
   // припаркованные живут в общем списке машин: их так же мнёт, кидает и взрывает
@@ -13848,7 +13932,12 @@ LATE.add('cars', () => {
     poseOnSlope(t);
     scene.add(t.mesh);
     TRAFFIC.push(t);
+    if (TGRID.TG.on) PK_NEW.push(t);
   }
+  // нетронутые — в склейку по клеткам (parkmerge.js) и в сетку стоящих (trafficgrid.js): из покадровых циклов вон
+  PARKI.build(PK_NEW);
+  for (const t of PK_NEW) TGRID.sleep(t);
+  PK_NEW.length = 0;
 });
 // машин в потоке вокруг курьера (40–330 м): было 36 — на улицах Северска толпа, и на Деке
 // каждая машина — это ещё и расчёт её езды в каждом кадре. Припаркованные, мопеды и сервисные — сверху
@@ -13864,7 +13953,7 @@ LATE.add('weather', () => WTH.init({ THREE, scene, cam, renderer, Store, MAP, CI
 LATE.add('nitro', buildNitro);
 LATE.add('locks', districtLocks);                 // закрытые районы: перекрытия на въездах
 if (!INTRO) LATE.add('hookah', () => HK.init({ THREE, scene, BENCHES, V, S, ADULT, makeHuman, makePerson, dropMesh, gibHuman, groundH, curbAt, fxAdd, puffGeo, steam, toast, Snd, CAR_L, CAR_W, t: $t }));
-if (!INTRO && CAREER) FEST.init({ THREE, scene, V, S, CITY, ADULT, Store, obb, SOLIDS, indexSolids, NODES, TRAFFIC, put, mergeGeos, groundH, inHouse, inPoly, nearestRoad, solidAt,
+if (!INTRO && CAREER) FEST.init({ THREE, scene, V, S, CITY, ADULT, Store, obb, SOLIDS, indexSolids, NODES, TRAFFIC, parkOut: t => { if (t.still) { t.still = 0; PARKI.out(t, true); } }, put, mergeGeos, groundH, inHouse, inPoly, nearestRoad, solidAt,
   makeHuman, makePerson, dropMesh, sayBubble, fxAdd, puffGeo, steam, gibBurger, popBonus, toast, chat: s => CHAT.say(s), addWallet, money, CASH, Snd, CAR_L, CAR_W, HEROES, DIST,
   season: () => SEAS.seasonValue() });   // фестивали на парковках ТЦ (festivals.js)
 /* налёт на точку и ёлка-турель (raid.js) */
@@ -13906,7 +13995,7 @@ const RAIN_SKY = new THREE.Color('#8d97a3');
 const ENV = { t: 0.02, night: 0, rain: 0, rainWant: 0, rainT: 150, rainLeft: 0, phase: '' };
 AMBI.init({ Snd, V, S, ENV, CITY, TRAFFIC, nearestRoad, inPoly, isPlaying, musicK: () => 1 - MUS.MUS.AMB * MUS.level() });
 // музыка: напряжённо — налёт, восстание, мафиози, погоня, ураган; тише — катсцена, диалог, Толик пишет, пауза (music.js)
-const musTense = () => DIRECTOR.going(['raid', 'riot', 'mafia']) || WTH.id() === 'hurricane' || TRAFFIC.some(t => t.chase);
+const musTense = () => DIRECTOR.going(['raid', 'riot', 'mafia']) || WTH.id() === 'hurricane' || TACT.some(t => t.chase);
 // радио в машине (radio.js): в смене вместо музыки дня / ночи — станция; ведущий молчит, пока эфир занят
 /* мини-карточки над радаром (ordertags.js): до текущей цели — по маршруту навигатора (routePts, пересчёт раз в 0,35 с) */
 OTAGS.init({ S, V, faceDataURL, routeLeft: () => {
@@ -14181,12 +14270,12 @@ function updateEnv (dt) {
   sun.target.position.set(V.x, 0, V.z); sun.target.updateMatrixWorld();   // цель — под машиной, иначе вдали от центра карты свет почти горизонтальный
   // склейки без света: темнеют вместе с вечером
   const dk = lerp(1, 0.34, ENV.night) * (1 - R * 0.18);
-  for (const m of FLAT_MATS) m.color.setRGB(dk, dk, dk * (1 + ENV.night * 0.12));
+  for (let i = 0; i < FLAT_MATS.length; i++) FLAT_MATS[i].color.setRGB(dk, dk, dk * (1 + ENV.night * 0.12));   // по номеру, не for…of: тут сотни, а updateEnv часто идёт неоптимизированным — итератор сорит
   WINS.update(ENV.night, dk, dk * (1 + ENV.night * 0.12), SKY_C, performance.now() / 1000);
   const nOn = ENV.night > 0.05;
   POOL_MAT.opacity = ENV.night * 0.75; WIN_MAT.opacity = clamp(ENV.night * 1.1, 0, 0.95);
   WIN_U.uT.value = performance.now() / 1000;
-  for (const m of NIGHT_OBJ) m.visible = nOn;
+  for (let i = 0; i < NIGHT_OBJ.length; i++) NIGHT_OBJ[i].visible = nOn;
   // фары
   HEAD_MAT.opacity = clamp((ENV.night - 0.15) * 0.9 + R * 0.25, 0, 0.7) * CG.headK(car.userData);   // разбитые фары — пятно тусклее (carglass.js)
   headGlow.visible = HEAD_MAT.opacity > 0.02 && S.state !== 'title' && S.state !== 'over';
@@ -14495,11 +14584,13 @@ function cullFar () {
       g.visible = d <= R.people && CULL.inView(p.x, g.position.y + 0.9, p.z, 2.5);
       if (g.visible) farShrink(g, d, R.people, FAR_BAND.people);
     }
-  for (let i = 0; i < TRAFFIC.length; i++) {
-    const t = TRAFFIC[i], dx = t.x - V.x, dz = t.z - V.z, d = Math.sqrt(dx * dx + dz * dz), m = t.mesh;
+  for (let i = 0; i < TACT.length; i++) {           // стоящие у бордюра — склейка: дальность и сжатие считает видеокарта (parkmerge.js)
+    const t = TACT[i], dx = t.x - V.x, dz = t.z - V.z, d = Math.sqrt(dx * dx + dz * dz), m = t.mesh;
     m.visible = d <= R.cars && CULL.inView(t.x, m.position.y + 1, t.z, 7);
     if (m.visible && !t.knock) farShrink(m, d, R.cars, FAR_BAND.cars);
   }
+  PARKI.replay(Infinity);                          // повтор закрыт — показанные им машины склейки прочь (parkmerge.js)
+  PARKI.view(V.x, V.z, R.cars, FAR_BAND.cars, TGRID.TG.fullF);
 }
 /* катсцена и вступление: камера своя, а cullFar и updateNitro не идут — спрятанное «вне кадра»
    игры вернуть, как было раньше (по одной дальности) */
@@ -14508,7 +14599,8 @@ function unview () {
   VIEWED = false;
   const R = GFX.hideR();
   for (const list of CULL_FAR_LISTS) for (const p of list) if (!p.dead) p.grp.visible = Math.hypot(p.x - V.x, p.z - V.z) <= R.people;
-  for (const t of TRAFFIC) t.mesh.visible = Math.hypot(t.x - V.x, t.z - V.z) <= R.cars;
+  for (const t of TACT) t.mesh.visible = Math.hypot(t.x - V.x, t.z - V.z) <= R.cars;
+  PARKI.view(V.x, V.z, R.cars, 1e-3, TGRID.TG.fullF);   // стоящие — по одной дальности, без сжатия
   for (const n of NITRO_CANS) n.g.visible = n.t <= 0 && Math.abs(n.x - V.x) < 460 && Math.abs(n.z - V.z) < 460 && !(n.life < 5 && Math.floor(n.life * 6) % 2);
 }
 
@@ -14685,7 +14777,7 @@ function frameStep (now) {
   CL.track(S.state);
   if (CAREER && CAREERM.covered()) return;         // гараж и «потратить» закрывают весь экран — город не рисуем
   // повтор (replay.js): мир стоит, позы — из записи, камера своя
-  if (REPLAY.on()) { if (!EXT.paused) { REPLAY.frame(raw); humanLod(); CULL.step(); renderer.render(scene, cam); } return; }
+  if (REPLAY.on()) { if (!EXT.paused) { REPLAY.frame(raw); PARKI.replay(REPLAY.playAt()); PARKI.view(car.position.x, car.position.z, GFX.hideR().cars, FAR_BAND.cars, TGRID.TG.fullF); humanLod(); CULL.step(); renderer.render(scene, cam); } return; }   // стоящие (parkmerge.js) — вокруг машины в повторе
   if (SBX.nitro) NOS.tank = 1;                     // песочница: бесконечное нитро
   // катсцена сюжетного заказа: мир стоит, ходят только актёры, камера — своя (story.js); столб маркера адреса в кадре не нужен;
   // облачка над головами (кот «мяу!», курьер «кхе-кхе…») — talk.js и в катсцене, иначе новое облачко не видно
@@ -15005,7 +15097,7 @@ if (LATE.busy()) {
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
 /* песочница (sandbox.html): бесконечное здоровье, нитро, «не глохнет» (noStall читает cars.js) */
 const SBX = { god: false, nitro: false, noStall: false };
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { inWall, FACE: FACE_DEBUG, RADAR, HUDC, RYARD: RYARD.DEBUG, RT, RASK: RASK.DEBUG, OTAGS: OTAGS.DEBUG, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, PG: PG.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get routeOn () { return ROUTE_LINE.m.visible; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { inWall, FACE: FACE_DEBUG, RADAR, HUDC, RYARD: RYARD.DEBUG, RT, RASK: RASK.DEBUG, OTAGS: OTAGS.DEBUG, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, PG: PG.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, TACT, TG: TGRID.TG, PARKI: { ...PARKI.DEBUG, orphans: () => PARKI.orphans(TRAFFIC) }, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get routeOn () { return ROUTE_LINE.m.visible; }, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта
@@ -15017,6 +15109,7 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) wi
   // песочница: сюжет, карта, сохранения, старт смены, кошелёк, читы
   STORY, STORY_DBG: STORY.DEBUG, MAP, Store, SBX, CARSM: AUTO, startRun, goRun, endShift, wallet, addWallet, hudHearts, marker, updateEnv, humanLod, get SPOTS_N () { return SPOTS.length; },
   DRIVERS, SMOKERS, NITRO_CANS, NOS, RESPECT: RESPECT.DEBUG, RESPECT_API: RESPECT, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, PIGEONS, FLOCKS, AMB, INCIDENTS, scare, RIVALS, FOES, THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, roadPath, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT, LOOT, XLIFE, askRevive, addWallet, RQ: RQ.DEBUG, HINTS_API: HINTS };
+if (window.__dlv) Object.assign(window.__dlv, { FXP: { S: FXP.STATS, count: FXP.count, part: fxPart, FX, puff, fire, nosFlame, steam, splash, crumbs, emote }, FXQ: FXP.FXP });   // частицы из запаса (fxpool.js): S — родилось / живо / пик / рост / ?oldfx
 if (window.__dlv) Object.assign(window.__dlv, { HPOOL: HPOOL.DEBUG, makeHuman, freshHuman, makePerson, setSeason: SEAS.setSeason });   // запас готовых людей: собрано на ходу / из запаса, ключи (humanpool.js)
 if (window.__dlv) { window.__dlv.BOARD = BOARD; window.__dlv.Platform = Platform; }
 if (window.__dlv) Object.assign(window.__dlv, { callAmbulance });   // проверка сирены: вызвать скорую к точке (доплер — AMB.dop)   // таблица рекордов Стима (board.js)

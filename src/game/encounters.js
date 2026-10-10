@@ -39,6 +39,9 @@ export const EN = {
   RATS: 3,            // крыс у разбитого подъезда
   HOST_AT: 0.9,       // герой выходит из двери через столько секунд после начала (курьер ещё идёт от машины)
   LOOK: 1.2,          // столько секунд камера заглядывает в квартиру за героем
+  STAND: 3.6,         // курьер встаёт прямо перед дверью, м от стены (герой в проёме — 0,9 м): между ними 2,7 м — герой виден по пояс
+  EYE: 1.65,          // камера — глаза курьера, м над землёй
+  POV_BOX: { y: -0.3, z: -0.62, tilt: 0.6, s: 0.36 },   // коробка в «руках» внизу кадра: сдвиг от камеры, м; наклон; размер
   NOD: 0.5,           // реакция без хлопка дверью: кивок / пожал плечами — столько секунд на плане 'two'
   LEAVE: 0.8,         // курьер уходит к машине — столько секунд, и встреча кончается (не ждём, пока дойдёт)
   CPS: 50,            // букв в секунду в репликах встречи (сюжет — 42)
@@ -57,7 +60,7 @@ const HEROES = [
     char: { walk: { speed: 0.7, step: 5.5, leg: 0.45, arm: 0.9, sway: 0.16, drag: 0.5, stoop: 0.1 }, talk: 'spread', idle: 'sway' },
     own: { id: 'alkash-fall', emo: 'sad',
       say: N_('Ик… Пицца? Я, бля, не заказывал… Или заказывал? Давай.'),
-      a: { me: N_('Распишитесь тут'), re: N_('Левой распишусь. Правую на бургерной войне оставил.'), mood: 'sad', out: '0' },
+      a: { me: N_('Держи, дядь'), re: N_('Левой возьму. Правую на бургерной войне оставил.'), mood: 'sad', out: '0' },   // расписываться за пиццу не надо (автор, 11.10)
       b: { me: N_('Проспитесь, дядь'), re: N_('Я с девяносто восьмого не сплю. Пиздуй, малой.'), mood: 'angry', out: '0', slam: true },
       kids: { say: N_('Ик… Пицца? Я не заказывал… Или заказывал? Давай.'),
         b: { me: N_('Проспитесь, дядь'), re: N_('Я с девяносто восьмого не сплю. Иди, малой.'), mood: 'angry', out: '0', slam: true } } } },
@@ -166,54 +169,110 @@ function scriptOf (h, s) {
     ['do', o => setDecor(o)],
     ['shot', 'establish', { cut: true }],
     ['walk', 'courier', 'front', { wait: false }],
-    ['do', o => courierTo(o, false)],             // курьер встаёт не по центру, а сбоку от двери (камера видит героя мимо него)
+    ['do', o => { pov(o); return courierTo(o, false); }],   // от первого лица: курьера не видно, коробка — в «руках» внизу кадра
     ['wait', EN.HOST_AT],                         // курьер ещё идёт — а герой уже выходит
     ['walk', 'zina', 'out'],
-    ['do', o => hostTo(o)],                       // герой — чуть к камере: за ним видно квартиру
-    ['shot', 'cat', { cut: true }],               // заглянуть за дверь: квартира героя (план 'cat' — свой, у встреч кота нет)
+    ['face', 'zina', 'courier'],                  // встал в проёме — лицом к курьеру, то есть прямо в камеру
+    ['shot', 'cat'],                              // заглянуть за него: квартира героя (план 'cat' — свой, у встреч кота нет)
     ['wait', EN.LOOK],
     ['do', o => courierTo(o, true)],              // курьер дошёл (обычно уже стоит)
-    ['shot', 'zina', { cut: true }],
+    ['face', 'zina', 'courier'],
+    ['shot', 'zina'],
     ['ask', 'zina', s.say, { yes: s.a.me, no: s.b.me, emo: s.emo === 'ok' ? '' : s.emo }],
   ];
   for (const [r, ans] of [[s.a, 'yes'], [s.b, 'no']]) {
     out.push(['shot', 'two', { ans }]);
     if (r.re) out.push(['say', 'zina', r.re, { emo: r.mood === 'ok' ? '' : r.mood, ans }]);
-    out.push(['give', { ans }]);
+    out.push(['do', o => boxBack(o), { ans }], ['give', { ans }]);   // коробка из «рук» камеры — герою
     if (r.slam) {
       out.push(['do', () => { M.slam = true; return null; }, { ans }]);
       out.push(['walk', 'zina', 'in', { wait: false, ans }]);
       out.push(['wait', 0.5, { ans }]);
     } else out.push(['act', 'zina', ACT_OF[r.out] || 'nod', 1, { ans }], ['wait', EN.NOD, { ans }]);
   }
-  out.push(['shot', 'establish'], ['walk', 'courier', 'car', { wait: false }], ['wait', EN.LEAVE]);
+  out.push(['shot', 'car'], ['walk', 'courier', 'car', { wait: false }], ['wait', EN.LEAVE]);   // уходим: камера разворачивается к машине
   // конец: не ждём, пока курьер дойдёт до машины и герой скроется (story.js ждал бы до 3 с) — сцена кончается тут
   out.push(['do', o => { for (const n of ['courier', 'zina']) { const a = o.actor(n); if (a) a.to = null; } return null; }]);
   return out;
 }
 
-/* курьер — к своему месту у двери: 1,8 м от стены и 1,1 м вбок, сбоку (со стороны камеры — она смотрит через его плечо, а за героем
-   видно квартиру); wait — дождаться, пока дойдёт */
+/* курьер — к своему месту прямо перед дверью, EN.STAND м от стены (камера — его глаза; герой в проёме — в 0,9 м от стены);
+   wait — дождаться, пока дойдёт */
 function courierTo (o, wait) {
   const a = o.actor('courier'), h = o.home;
   if (!a || !h) return null;
-  const cs = -((STORY.DEBUG.CUT && STORY.DEBUG.CUT.side) || 1);
-  const x = h.ex - h.sx * cs * 1.1 + h.nx * 1.8, z = h.ez - h.sz * cs * 1.1 + h.nz * 1.8;
+  const x = h.ex + h.nx * EN.STAND, z = h.ez + h.nz * EN.STAND;
   if (o.skip) { a.x = x; a.z = z; a.to = null; return null; }
   a.to = { x, z };
   if (!wait) return null;
   return (async () => { for (let k = 0; k < 50 && a.to; k++) await o.wait(0.1); })();
 }
 
-/* герой из двери — на шаг к стороне камеры (0,2 м): проём за ним открыт */
-function hostTo (o) {
-  const a = o.actor('zina'), h = o.home;
-  if (!a || !h) return null;
-  const cs = -((STORY.DEBUG.CUT && STORY.DEBUG.CUT.side) || 1);
-  const x = h.ex - h.sx * cs * 0.2 + h.nx * 0.95, z = h.ez - h.sz * cs * 0.2 + h.nz * 0.95;
-  if (o.skip) { a.x = x; a.z = z; return null; }
-  a.to = { x, z };
+/* ─────────────── от первого лица (автор, 11.10.2026: «в катсцене надо показывать от первого лица») ───────────────
+   Камера — глаза курьера: сам он в кадре не виден (frame прячет его каждый кадр), коробка с пиццей и руки — внизу кадра,
+   прицеплены к камере. Перед ['give'] коробка возвращается курьеру (boxBack) — story.js отдаёт её герою как обычно. */
+const POV = { cam: null, addedCam: false, hands: null, box: null };
+function pov (o) {
+  const c = o.actor('courier'), cam = STORY.DEBUG.cam;
+  if (!c || !cam || POV.hands) return;
+  const T = A.THREE;
+  if (!cam.parent) { A.scene.add(cam); POV.addedCam = true; }
+  const z = o.actor('zina');                        // рост героя (макушка над землёй) — для плана 'zina'
+  if (z && z.grp && z.grp.userData.head) {
+    z.grp.updateMatrixWorld(true);
+    const b = new A.THREE.Box3().setFromObject(z.grp.userData.head);
+    M.headTop = b.max.y - A.groundH(z.x, z.z);
+  }
+  POV.cam = cam;
+  const g = new T.Group();
+  g.name = 'enc-pov';
+  const mat = hex => new T.MeshLambertMaterial({ color: hex, flatShading: true });
+  const skin = mat((c.grp.userData.faceS && c.grp.userData.faceS.skin) || '#f0c39a'), sleeve = mat('#ff6a13');
+  for (const sd of [-1, 1]) {                       // руки снизу держат коробку: рукав и кисть
+    const arm = new T.Mesh(new T.BoxGeometry(0.11, 0.11, 0.42), sleeve);
+    arm.position.set(sd * 0.2, -0.1, 0.16);
+    const hand = new T.Mesh(new T.BoxGeometry(0.1, 0.09, 0.12), skin);
+    hand.position.set(sd * 0.19, -0.06, -0.08);
+    g.add(arm, hand);
+  }
+  g.userData.mats = [skin, sleeve];
+  if (c.hold) {                                     // коробка курьера — сюда же
+    POV.box = c.hold;
+    POV.box.userData.encHold = { p: POV.box.position.clone(), s: POV.box.scale.x };
+    g.add(POV.box);
+    POV.box.position.set(0, 0, 0);
+    POV.box.rotation.set(0, 0, 0);
+    POV.box.scale.setScalar(EN.POV_BOX.s);
+  }
+  g.position.set(0, EN.POV_BOX.y, EN.POV_BOX.z);
+  g.rotation.x = EN.POV_BOX.tilt;
+  cam.add(g);
+  POV.hands = g;
+}
+/* коробку — назад курьеру (story.js ['give'] берёт её из его рук), руки — убрать */
+function boxBack (o) {
+  const c = o && o.actor ? o.actor('courier') : null;
+  if (POV.box && c) {
+    const k = POV.box.userData.encHold || { p: new A.THREE.Vector3(0, 1.12, 0.34), s: 0.75 };
+    c.grp.add(POV.box);
+    POV.box.position.copy(k.p); POV.box.rotation.set(0, 0, 0); POV.box.scale.setScalar(k.s);
+    c.hold = POV.box;
+  }
+  POV.box = null;
+  povClear();
   return null;
+}
+function povClear () {
+  if (POV.box && POV.box.parent) POV.box.parent.remove(POV.box);   // пропустили до «отдал» — коробка уходит вместе со сценой
+  POV.box = null;
+  if (POV.hands) {
+    if (POV.hands.parent) POV.hands.parent.remove(POV.hands);
+    POV.hands.traverse(m => { if (m.isMesh && m.geometry) m.geometry.dispose(); });
+    for (const m of POV.hands.userData.mats || []) m.dispose();
+    POV.hands = null;
+  }
+  if (POV.addedCam && POV.cam && POV.cam.parent) POV.cam.parent.remove(POV.cam);
+  POV.addedCam = false; POV.cam = null;
 }
 
 function register () {
@@ -239,33 +298,37 @@ function register () {
   }
 }
 
-/* планы камеры встречи: 'zina' (герой крупно) — мимо плеча курьера; 'cat' — заглянуть за дверь, в квартиру героя
-   (кота во встречах нет — имя плана свободно); 'two' — реакция, оба сбоку; 'establish' — подъезд целиком поближе
-   (мусор, крысы, цветы). 'courier' и 'car' — как у story.js */
-/* план 'zina' (герой крупно, 10.10.2026 — автор: «голова курьера сбоку закрывает героя»): камера в (px — вбок, «+» — к курьеру;
-   pz — от стены; py — высота), смотрит в (lx, lz, ly). Курьер — в (1,1; 1,8), герой — в (0,2; 0,95): камера с другой стороны оси
-   двери и в 5,4 м от стены — курьер краем кадра сбоку (спина и плечо), герой целиком от пояса до макушки над окном реплики */
-export const SHOT_ZINA = { px: -0.7, pz: 5.4, py: 1.6, lx: 0.2, lz: 0.95, ly: 0.92 };
+/* планы камеры встречи — от первого лица (автор, 11.10.2026): камера — глаза курьера (EN.EYE над землёй, чуть впереди
+   головы), идёт вместе с ним; story.js плавно догоняет план (camStep), поэтому подход — плавный наезд к двери.
+   Куда смотрит (POV_LOOK: z — м от стены, y — высота над землёй):
+     'establish' — на дверь подъезда (подход);
+     'cat'       — мимо героя в квартиру за ним (кота во встречах нет — имя плана свободно);
+     'zina'      — герой в проёме: макушка — на top доле высоты кадра сверху (0,2 — сразу под чёрной полосой), тогда
+                   он виден от пояса до макушки над окном реплики (герои разного роста: 1,6—2,2 м с головой-коробкой);
+     'two'       — реакция: чуть ниже — видно, как он берёт коробку;
+     'car'       — уходим: разворот к машине. */
+export const POV_LOOK = { establish: { z: 0.4, y: 1.3 }, cat: { z: -1.6, y: 1.0, side: 0.45 }, zina: { z: 0.9, top: 0.2 }, two: { z: 0.9, top: 0.24 } };
 function meetShot (name, h, side, gy) {
-  const cs = -side;
-  const W = (lx, lz) => [h.ex - h.sx * lx + h.nx * lz, h.ez - h.sz * lx + h.nz * lz];
-  if (name === 'zina') {                 // через плечо курьера: он — краем кадра сбоку, герой целиком по пояс, над окном реплики
-    const [px, pz] = W(cs * SHOT_ZINA.px, SHOT_ZINA.pz), [lx, lz] = W(cs * SHOT_ZINA.lx, SHOT_ZINA.lz);
-    return [[px, gy + SHOT_ZINA.py, pz], [lx, gy + SHOT_ZINA.ly, lz], [-h.nx * 0.03, 0, -h.nz * 0.03]];
+  const c = STORY.DEBUG.CUT && STORY.DEBUG.CUT.actors && STORY.DEBUG.CUT.actors.courier;
+  if (!c) return null;
+  const fx = Math.sin(c.h), fz = Math.cos(c.h);           // куда он смотрит (story.js: h = atan2(dx, dz))
+  const cy = A.groundH(c.x, c.z);
+  const eye = [c.x + fx * 0.12, cy + EN.EYE, c.z + fz * 0.12];
+  if (name === 'car') {
+    const V = A.V, vy = A.groundH(V.x, V.z);
+    return [eye, [V.x, vy + 1.0, V.z], [0, 0, 0]];
   }
-  if (name === 'cat') {                // story.js пускает только свои имена планов — 'cat' у встреч = «заглянуть в квартиру»
-    const [px, pz] = W(-cs * 0.1, 4.0), [lx, lz] = W(-cs * 0.5, 0.3);
-    return [[px, gy + 1.7, pz], [lx, gy + 0.98, lz], [h.sx * side * -0.06, 0.01, h.sz * side * -0.06]];
+  const L = POV_LOOK[name];
+  if (!L) return null;
+  const cs = -side, lat = (L.side || 0) * cs;
+  const lx = h.ex - h.sx * lat + h.nx * L.z, lz = h.ez - h.sz * lat + h.nz * L.z;
+  let ly = gy + (L.y || 1.1);
+  if (L.top !== undefined) {         // по макушке героя: она на L.top кадра сверху
+    const D = Math.hypot(lx - eye[0], lz - eye[2]) || 1, fov = (STORY.DEBUG.cam && STORY.DEBUG.cam.fov) || 52;
+    const up = Math.atan(((gy + (M.headTop || 1.85)) - eye[1]) / D), off = Math.atan((1 - 2 * L.top) * Math.tan(fov * Math.PI / 360));
+    ly = eye[1] + D * Math.tan(up - off);
   }
-  if (name === 'two') {                // реакция: оба сбоку, с дальней от курьера стороны
-    const [px, pz] = W(-cs * 2.6, 3.5), [lx, lz] = W(cs * 0.55, 1.3);
-    return [[px, gy + 1.85, pz], [lx, gy + 1.15, lz], [h.nx * 0.04, 0, h.nz * 0.04]];
-  }
-  if (name === 'establish') {
-    const [px, pz] = W(cs * 3.6, 7.6), [lx, lz] = W(0, 1.1);
-    return [[px, gy + 3.1, pz], [lx, gy + 1.15, lz], [h.sx * side * -0.12, 0, h.sz * side * -0.12]];
-  }
-  return null;
+  return [eye, [lx, ly, lz], [0, 0, 0]];
 }
 
 /* 3D-модель героя: человек; у деда — кот Барсик на плече */
@@ -761,6 +824,8 @@ function frame (dt, on) {
   const d = M.decor, CUT = STORY.DEBUG.CUT;
   M.t += dt;
   const a = CUT && CUT.actors && CUT.actors.zina;
+  const cr = CUT && CUT.actors && CUT.actors.courier;
+  if (cr && cr.grp) cr.grp.visible = false;           // от первого лица: курьер — это камера, его в кадре нет
   // прохожие у двери на время встречи — прочь из кадра (мир стоит; после сцены игра сама вернёт видимость)
   const sp = M.spot;
   if (sp && A.people) for (const list of A.people() || []) for (const p of list) {
@@ -823,10 +888,13 @@ export function play (id, i = 0, o = {}) {
     M.stats.last = { id, meet: h.meets[vi].id, ans: CUT.ans || null, skip: !!CUT.skip, ms: Math.round(performance.now() - t0) };
     return M.stats.last;
   }).finally(() => {
+    povClear();
     clearDecor();
     M.on = false; M.hero = null;
     // осталось ли что-то от встречи в сцене (антураж, актёры): должно быть 0
-    M.stats.leak = A.scene.children.filter(o => o.name === 'enc-decor').length + (STORY.DEBUG.CUT.actors && Object.keys(STORY.DEBUG.CUT.actors).length || 0);
+    const cam = STORY.DEBUG.cam;
+    M.stats.leak = A.scene.children.filter(o => o.name === 'enc-decor').length + (STORY.DEBUG.CUT.actors && Object.keys(STORY.DEBUG.CUT.actors).length || 0) +
+      (cam ? cam.children.filter(o => o.name === 'enc-pov').length : 0) + (POV.hands ? 1 : 0);
     M.stats.sceneDelta = A.scene.children.length - n0;  // для сведения: город вокруг сам достраивается (окна, прохожие)
   });
 }
@@ -840,4 +908,4 @@ export function init (api) {
   if (typeof window !== 'undefined') window.setTimeout(() => { if (window.__dlv) window.__dlv.ENC = DEBUG; }, 0);
 }
 
-const DEBUG = { EN, SHOT_ZINA, M, HEROES, list, play, get scene () { return A && A.scene; }, spotNear: (x, z) => spotNear(x, z), skip: () => STORY.DEBUG.skip(), get decor () { return M.decor; } };
+const DEBUG = { EN, POV_LOOK, POV, M, HEROES, list, play, get scene () { return A && A.scene; }, spotNear: (x, z) => spotNear(x, z), skip: () => STORY.DEBUG.skip(), get decor () { return M.decor; } };

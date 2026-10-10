@@ -12,7 +12,7 @@
    Курьера (игрока) это не касается — он едет где хочет; прижимаются перед ним машины потока.
 
    Из game.js: narrow(e) — одна полоса посередине; flowOk(e, deg) — можно ли потоку на ребро;
-   step(t, dt, TRAFFIC, V) → доля скорости (1 — не мешает), сдвиг вправо — t.nar (м).
+   step(t, dt, list, V, n) → доля скорости (1 — не мешает), сдвиг вправо — t.nar (м).
    ────────────────────────────────────────────────────────────────────────── */
 
 export const NARROW = {
@@ -43,7 +43,7 @@ const ST = { pulls: 0, waits: 0 };
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 
 /* машина t на узком ребре t.e: есть ли встречная впереди; двигает t.nar, возвращает долю скорости */
-export function step (t, dt, list, V) {
+export function step (t, dt, list, V, n) {          // n — сколько первых в list смотреть (соседи по сетке, trafficgrid.js); без него — весь
   const e = t.e, hx = Math.sin(t.h), hz = Math.cos(t.h);
   let near = Infinity, beside = false;
   const look = (ox, oz, oh, ohl) => {
@@ -53,7 +53,8 @@ export function step (t, dt, list, V) {
     if (Math.sin(oh) * hx + Math.cos(oh) * hz > -0.4) return;             // не навстречу
     if (fw > 0) near = Math.min(near, fw); else beside = true;
   };
-  for (const o of list) {
+  for (let i = 0, N = n === undefined ? list.length : n; i < N; i++) {
+    const o = list[i];
     if (o === t || o.parked || o.knock || o.gone || Math.abs(o.x - t.x) > NARROW.LOOK || Math.abs(o.z - t.z) > NARROW.LOOK) continue;
     look(o.x, o.z, o.h, o.hl || 2.3);
   }

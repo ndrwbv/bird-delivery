@@ -42,6 +42,7 @@ import * as THREE from '../vendor/three.module.min.js';
 import { t, N_ } from '../i18n/index.js';
 import * as DIST from './districts.js';
 import * as HITS from './hits.js';
+import { part as fxPart } from './fxpool.js';    // частицы из общего запаса (fxpool.js)
 import * as TALK from './talk.js';             // облачка реплик (talk.js)
 import { readTime } from './dialog.js';         // сколько читать реплику
 import { makePerson } from './people.js';
@@ -682,30 +683,25 @@ function pose (H, dt) {
   H.grp.rotation.y = H.h;
 }
 /* облако электронки (взрослая) или мыльные пузыри (детская) — изо рта, вперёд */
-let BUBBLE_GEO = null;
 function exhale (H) {
-  if (!A.fxAdd || !H.grp) return;
+  if (!H.grp) return;
   const fx = Math.sin(H.h), fz = Math.cos(H.h), s = H.grp.scale.y;
   const y = A.groundH(H.x, H.z) + 1.5 * s;
   if (A.ADULT) {
     for (let k = 0; k < 9; k++) {
-      const m = new THREE.Mesh(A.puffGeo, new THREE.MeshBasicMaterial({ color: k % 3 ? 0xeceae6 : 0xf8f7f4, transparent: true, opacity: 0.65, depthWrite: false }));
-      m.position.set(H.x + fx * (0.3 + k * 0.1), y + rand(-0.05, 0.12), H.z + fz * (0.3 + k * 0.1));
-      m.scale.setScalar(rand(0.45, 0.7));
+      const py = y + rand(-0.05, 0.12);
       // облако больше кальянного: к концу метра четыре, уже прозрачное
-      A.fxAdd(m, { vx: fx * rand(0.6, 1.2) + rand(-0.4, 0.4), vz: fz * rand(0.6, 1.2) + rand(-0.4, 0.4), vy: rand(0.4, 0.8), life: rand(3, 4.5), max: 4.5, grow: 0.55 });
+      fxPart('puff', H.x + fx * (0.3 + k * 0.1), py, H.z + fz * (0.3 + k * 0.1), k % 3 ? 0xeceae6 : 0xf8f7f4, rand(0.45, 0.7), 0.65,
+        { vx: fx * rand(0.6, 1.2) + rand(-0.4, 0.4), vz: fz * rand(0.6, 1.2) + rand(-0.4, 0.4), vy: rand(0.4, 0.8), life: rand(3, 4.5), max: 4.5, grow: 0.55 });
     }
   } else {
-    if (!BUBBLE_GEO) BUBBLE_GEO = new THREE.SphereGeometry(0.1, 8, 6);
-    const cols = [0xbfe6ff, 0xffd1ec, 0xd8ffd0, 0xfff3b0];
-    for (let k = 0; k < 10; k++) {
-      const m = new THREE.Mesh(BUBBLE_GEO, new THREE.MeshBasicMaterial({ color: cols[k % 4], transparent: true, opacity: 0.55, depthWrite: false }));
-      m.position.set(H.x + fx * 0.6, y - 0.1, H.z + fz * 0.6);
-      m.scale.setScalar(rand(0.6, 1.6));
-      A.fxAdd(m, { vx: fx * rand(0.4, 1.2) + rand(-0.6, 0.6), vz: fz * rand(0.4, 1.2) + rand(-0.6, 0.6), vy: rand(0.2, 0.6), life: rand(2.5, 4), max: 4, grow: 0 });
-    }
+    for (let k = 0; k < 10; k++)
+      fxPart('bubble', H.x + fx * 0.6, y - 0.1, H.z + fz * 0.6, BUBBLE_HEX[k % 4], rand(0.6, 1.6), 0.55,
+        { vx: fx * rand(0.4, 1.2) + rand(-0.6, 0.6), vz: fz * rand(0.4, 1.2) + rand(-0.6, 0.6), vy: rand(0.2, 0.6), life: rand(2.5, 4), max: 4, grow: 0 });
   }
 }
+
+const BUBBLE_HEX = [0xbfe6ff, 0xffd1ec, 0xd8ffd0, 0xfff3b0];
 
 function knock (H, kmh) {
   const V = A.V;

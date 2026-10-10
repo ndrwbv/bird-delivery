@@ -130,9 +130,9 @@ const CHECKS = [
     const e = errLine(j), r = j.result;
     if (e || !r) return { status: 'fail', info: e || 'нет результата' };
     const solid = r.solid.map(s => s.k + (s.pass ? ' НАСКВОЗЬ' : ' ок')).join(', '), m = r.moose;
-    const info = `${r.gameSecs} с смены: призраков ${r.orphans}, стоят > 30 с ${r.stand} (без причины ${r.unexplained}); твёрдые: ${solid}; лось: ` +
+    const info = `${r.gameSecs} с смены: призраков ${r.orphans}` + (r.merged !== undefined ? `, склейка стоящих: лишних ${r.merged}, без кузова ${r.noBody}` : '') + `, стоят > 30 с ${r.stand} (без причины ${r.unexplained}); твёрдые: ${solid}; лось: ` +
       ['parked', 'bus'].filter(k => m[k]).map(k => k + ' ' + (m[k].pen < 0 ? 'не сквозь' : 'СКВОЗЬ ' + m[k].pen)).join(', ') + (m.butt ? `, боднул — машину на ${m.butt.moved} м` : '') +
-      (r.orphans ? ' · ' + JSON.stringify(r.orphanSample) : '') + (r.unexplained ? ' · ' + JSON.stringify(r.standSample) : '') +
+      (r.orphans ? ' · ' + JSON.stringify(r.orphanSample) : '') + (r.merged ? ' · ' + JSON.stringify(r.mergedSample) : '') + (r.noBody ? ' · ' + JSON.stringify(r.noBodySample) : '') + (r.unexplained ? ' · ' + JSON.stringify(r.standSample) : '') +
       r.solid.filter(s => s.pass).map(s => ' · ' + s.k + ': ' + JSON.stringify(s)).join('');
     return { status: !r.ok ? 'fail' : r.unexplained ? 'warn' : 'ok', info };
   } },

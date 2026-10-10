@@ -965,6 +965,7 @@ function stepMascot (m, dt, V, sp, fx, fz, dC) {
 const PIECES = { roll: [['cyl', 0.5, 0.35, 0x1d3b2c], ['cyl', 0.45, 0.06, 0xf8f6ef], ['box', 0.3, 0.2, 0xf8f6ef], ['box', 0.25, 0.2, 0xf8f6ef], ['cyl', 0.2, 0.1, 0xf07a5a], ['box', 0.12, 0.1, 0x7fd06a]],
   oni: [['box', 0.6, 0.4, 0xf8f6ef], ['box', 0.4, 0.3, 0xf8f6ef], ['box', 0.3, 0.3, 0xf8f6ef], ['box', 0.6, 0.05, 0x1d3b2c], ['box', 0.2, 0.2, 0xf8f6ef]],
   burger: [['cyl', 0.8, 0.3, 0xe8b563], ['cyl', 0.8, 0.25, 0x7a4526], ['box', 1.2, 0.08, 0xffd34d], ['cyl', 0.8, 0.1, 0x5fbf4a], ['cyl', 0.7, 0.1, 0xe04836], ['cap', 0.8, 0, 0xe8a84f], ['cyl', 0.35, 0.18, 0xf2c230]] };
+const PIECE_GEO = {};
 function hitMascot (m, sp) {
   const V = A.V;
   ST.mascotHits++;
@@ -974,7 +975,9 @@ function hitMascot (m, sp) {
     // разлетается на ингредиенты
     if (m.kind === 'burger' && A.gibBurger) A.gibBurger(m.x, m.z);
     for (const [k, a, b, c] of PIECES[m.kind]) {
-      const geo = k === 'box' ? new THREE.BoxGeometry(a, b, a * 0.8) : k === 'cap' ? new THREE.SphereGeometry(a, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2) : new THREE.CylinderGeometry(a, a, b, 10);
+      // геометрия куска — одна на вид (fxAdd освобождает только материал: раньше каждый удар оставлял новые геометрии)
+      const gk = k + a + '/' + b;
+      const geo = PIECE_GEO[gk] || (PIECE_GEO[gk] = k === 'box' ? new THREE.BoxGeometry(a, b, a * 0.8) : k === 'cap' ? new THREE.SphereGeometry(a, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2) : new THREE.CylinderGeometry(a, a, b, 10));
       const piece = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: c, flatShading: true }));
       piece.position.set(m.x, m.y + rand(0.6, 1.8), m.z);
       A.fxAdd(piece, { vx: V.vx * 0.5 + rand(-6, 6), vy: rand(6, 12), vz: V.vz * 0.5 + rand(-6, 6), life: 3, max: 3, gravity: 18, spin: rand(-8, 8) }, m.y);
@@ -1072,7 +1075,7 @@ function toBcar (t, shop) {
   ST.bcars++;
 }
 function stepBcars () {
-  const TR = A.TRAFFIC;
+  const TR = A.ACT || A.TRAFFIC;                    // без стоящих у бордюра (trafficgrid.js): бургер-машиной им не стать
   let n = 0;
   for (const t of TR) if (t.bcar && !t.gone) n++;
   for (const t of TR) {
@@ -1102,7 +1105,7 @@ function stepSushi (dt) {
   SUSHI_T = 1.5;
   const V = A.V;
   let n = 0;
-  for (const c of A.TRAFFIC) if (c.mp && c.mp.br.rival === 'sushi' && !c.gone && !c.mp.gone) n++;
+  for (const c of A.ACT || A.TRAFFIC) if (c.mp && c.mp.br.rival === 'sushi' && !c.gone && !c.mp.gone) n++;
   ST.sushi = n;
   const [s, d] = nearestShop(V.x, V.z, 'sushi');
   const want = RIV.SUSHI + (s && d < RIV.SUSHI_R ? RIV.SUSHI_NEAR : 0);
@@ -1118,7 +1121,7 @@ function stepSushi (dt) {
 }
 /* у цели — следующая: от адреса — к точке, от точки — к новому адресу */
 function stepGoals () {
-  for (const c of A.TRAFFIC) {
+  for (const c of A.ACT || A.TRAFFIC) {
     if (!c.rvGoal || c.gone || !c.rvHome) continue;
     const g = c.rvGoal;
     if (Math.abs(g[0] - c.x) > 45 || Math.abs(g[1] - c.z) > 45) continue;

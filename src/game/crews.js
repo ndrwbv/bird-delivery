@@ -21,6 +21,7 @@ import { t, N_ } from '../i18n/index.js';
 import { RESPECT as R } from './econ.js';
 import * as RESPECT from './respect.js';
 import { TIER } from './hits.js';
+import { part as fxPart } from './fxpool.js';    // частицы из общего запаса (fxpool.js)
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 
 const C = R.CREW;
@@ -246,13 +247,11 @@ function hangStep (crew, m, dt, near) {
   u.armL.rotation.x = -0.2;
   u.head.rotation.y = Math.sin(m.ph * 0.4 + m.hz) * 0.35;
   m.h = damp(m.h, Math.atan2(crew.x - m.x, crew.z - m.z), 4, dt);
-  if (A.ADULT && near < 60 && (m.puffT -= dt) <= 0 && A.fxAdd && A.puffGeo) {
+  if (A.ADULT && near < 60 && (m.puffT -= dt) <= 0) {
     m.puffT = rand(2, 4);
     const fx = Math.sin(m.h), fz = Math.cos(m.h);
-    const p = new THREE.Mesh(A.puffGeo, new THREE.MeshBasicMaterial({ color: 0xe9e7e2, transparent: true, opacity: 0.5, depthWrite: false }));
-    p.position.set(m.x + fx * 0.4, A.groundH(m.x, m.z) + 1.6, m.z + fz * 0.4);
-    p.scale.setScalar(0.22);
-    A.fxAdd(p, { vy: rand(0.5, 0.9), vx: fx * 0.4, vz: fz * 0.4, life: rand(1.4, 2.2), max: 2.2, grow: 1.3 });
+    fxPart('puff', m.x + fx * 0.4, A.groundH(m.x, m.z) + 1.6, m.z + fz * 0.4, 0xe9e7e2, 0.22, 0.5,
+      { vy: rand(0.5, 0.9), vx: fx * 0.4, vz: fz * 0.4, life: rand(1.4, 2.2), max: 2.2, grow: 1.3 });
   }
   place(m);
 }

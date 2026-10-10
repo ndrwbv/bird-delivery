@@ -256,6 +256,10 @@ const MI = { live: true, dead: false, brake: 0, hand: 0, side: 0, air: false, no
 const SNAP = { px: 0, py: 0, pz: 0, qx: 0, qy: 0, qz: 0, qw: 1, fov: 60 };
 const CM = { x: 0, y: 0, z: 0, lx: 0, ly: 0, lz: 0, ok: false, h: 0, ang: 0, ax: 0, ay: 0, az: 0, anchor: false, side: 1 };
 export const on = () => OPEN;
+/** время записи (рост с каждым rec) и где сейчас повтор в той же шкале (закрыт — Infinity): стоящие машины, которых
+    толкнули в окне повтора, до толчка показывает склейка (parkmerge.js replay) */
+export const recNow = () => T;
+export const playAt = () => (OPEN ? PT + RT0 : Infinity);
 export const length = () => (FN - F0 > 1 ? FD[((FN - 1) % F_CAP) * FDL] - FD[(F0 % F_CAP) * FDL] : 0);
 
 /** повтор можно открыть сейчас (не катсцена, не диалог, не меню) и есть что показать */

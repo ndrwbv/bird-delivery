@@ -8,7 +8,7 @@
    Переменных игры модуль не видит — всё приходит в api (pizzaApi в game.js). */
 import { t } from '../i18n/index.js';
 import * as SL from './streetlamps.js';
-import { onPave } from './pave.js';
+import { onPave, walkHalf } from './pave.js';
 
 const BRAND = '#f0522a', CREAM = '#fff3d6';
 
@@ -103,12 +103,27 @@ export function cozyFront (A, f, gy, w) {
   A.scene.add(board);
 }
 
-/* Парковка курьеров: ряд мест поперёк тротуара у улицы, сбоку от
-   пиццерии. Места — носом к дому, выезд прямо на проезжую часть.
+/* Парковка курьеров: ряд мест за тротуаром улицы, сбоку от пиццерии.
+   Места — носом к дому, выезд через тротуар на проезжую часть: тротуар
+   идёт перед стоянкой целым, бордюр перед ней опущен (заезд, DRIVEWAYS →
+   osmCurbs в game.js). До 11.10.2026 стоянка лежала поперёк тротуара, и
+   поднятый тротуар (0,30 м) проходил сквозь её асфальт (0,16 м).
    Возвращает места [{ x, z, h }], h — куда смотрит машина на месте
    (к улице: так и выезжают). */
+/* заезды: полоса тротуара перед каждой стоянкой (от края полотна до внешнего края тротуара) —
+   там бордюр опущен. { x, z (середина у края полотна), ux, uz (вдоль улицы), nx, nz (от улицы), hw, d0, d1 } */
+export const DRIVEWAYS = [];
+export function onDriveway (x, z, m = 0) {
+  for (const q of DRIVEWAYS) {
+    const dx = x - q.x, dz = z - q.z, a = dx * q.ux + dz * q.uz, b = dx * q.nx + dz * q.nz;
+    if (Math.abs(a) < q.hw + m && b > q.d0 - m && b < q.d1 + m) return true;
+  }
+  return false;
+}
 /* Где встанет парковка: точка на улице (base) и оси. block(x, z) — ещё
-   занято (пиццерия-шар, которую только собираются поставить: pizzadome.js) */
+   занято (пиццерия-шар, которую только собираются поставить: pizzadome.js).
+   Асфальт стоянки начинается у внешнего края тротуара (walkHalf, pave.js) и не
+   ложится на тротуар, дорожку и аллею; если так места нет — хотя бы не на дом и чужое полотно */
 export function lotBase (A, f, count, block) {
   const r = f.road, s = r.seg;
   const L = Math.hypot(s.x2 - s.x1, s.z2 - s.z1) || 1;
@@ -116,28 +131,34 @@ export function lotBase (A, f, count, block) {
   // «наружу от дороги» — в сторону пиццерии
   let nx = -uz, nz = ux;
   if ((f.mx - r.x) * nx + (f.mz - r.z) * nz < 0) { nx = -nx; nz = -nz; }
-  const SW = 3.1, D = 5.6, W = count * SW, off = s.w / 2 + 0.4;
-  const ok = (cx, cz) => {
-    for (const [a, b] of [[-W / 2, 0], [W / 2, 0], [-W / 2, D], [W / 2, D], [0, D / 2], [-W / 4, D], [W / 4, D]]) {
+  const SW = 3.1, D = 5.6, W = count * SW, off = walkHalf(s) + 0.25;   // асфальт (с −0,2 м) — в 5 см за тротуаром
+  const ok = (cx, cz, strict) => {
+    for (const [a, b] of [[-W / 2, 0], [W / 2, 0], [-W / 2, D], [W / 2, D], [0, D / 2], [-W / 4, D], [W / 4, D], [-W / 4, 0], [W / 4, 0], [-W / 2, D / 2], [W / 2, D / 2]]) {
       const x = cx + ux * a + nx * (off + b), z = cz + uz * a + nz * (off + b);
       if (A.inHouse(x, z, 0.6) || A.onOtherRoad(x, z, s) || (block && block(x, z))) return false;
+      if (strict && onPave(x, z, 0.15)) return false;
     }
     return true;
   };
-  for (const d of [14, -14, 22, -22, 30, -30, 8, -8, 40, -40, 0]) {
-    const cx = r.x + ux * d, cz = r.z + uz * d;
-    if (ok(cx, cz)) return { base: [cx, cz], ux, uz, nx, nz, SW, D, W, off };
-  }
+  const DS = [14, -14, 22, -22, 30, -30, 8, -8, 40, -40, 0];
+  for (const strict of [true, false])
+    for (const d of DS) {
+      const cx = r.x + ux * d, cz = r.z + uz * d;
+      if (ok(cx, cz, strict)) return { base: [cx, cz], ux, uz, nx, nz, SW, D, W, off, edge: s.w / 2 };
+    }
   return null;
 }
 
-export function courierLot (A, f, count) {
+/* lb — уже найденное место (pizzadome.js: то же, что выбрал поиск купола), иначе ищем сами */
+export function courierLot (A, f, count, lb0) {
   const THREE = A.THREE;
-  const lb = lotBase(A, f, count);
+  const lb = lb0 || lotBase(A, f, count);
   if (!lb) return null;
-  const { base, ux, uz, nx, nz, SW, D, W, off } = lb;
+  const { base, ux, uz, nx, nz, SW, D, W, off, edge } = lb;
   const [bx, bz] = base, gy = A.groundH(bx + nx * (off + D / 2), bz + nz * (off + D / 2));
   const P = (a, b) => [bx + ux * a + nx * (off + b), bz + uz * a + nz * (off + b)];
+  // заезд: перед стоянкой бордюр опущен — от края полотна до асфальта стоянки (osmCurbs в game.js)
+  DRIVEWAYS.push({ x: bx + nx * edge, z: bz + nz * edge, ux, uz, nx, nz, hw: W / 2 + 0.3, d0: -0.5, d1: off - edge });
   // асфальт площадки и разметка мест
   A.LITM.color('#8f949d');
   { const [x1, z1] = P(-W / 2 - 0.3, D / 2), [x2, z2] = P(W / 2 + 0.3, D / 2); A.LITM.ribbon(x1, z1, x2, z2, D + 0.4, 0.16); }

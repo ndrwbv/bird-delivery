@@ -51,7 +51,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { courierLot, lotBase } from './pizzeria.js';
 import { seasonMat } from './seasons.js';
-import { onPave } from './pave.js';
+import { onPave, walkHalf } from './pave.js';
 import { t } from '../i18n/index.js';
 import SIGNFONT from './signfont.json';
 
@@ -482,6 +482,8 @@ function areaGrid (A, ox, oz, R) {
   return (x, z) => list.some(q => x > q.x0 && x < q.x1 && z > q.z0 && z < q.z1 && isIn(x, z, q.p));
 }
 
+/* стоянка курьеров не на куполе и его площади */
+const plazaBlock = (cx, cz) => (x, z) => Math.hypot(x - cx, z - cz) < DOME.R + DOME.PLAZA + 0.5;
 export function site (A, f, lots) {
   const t0 = performance.now(), D = DOME, R = D.R;
   const Rb = R;                                                // край купола (цоколь — на 0,35—0,5 м шире)
@@ -531,8 +533,7 @@ export function site (A, f, lots) {
       if (!ok) continue;
       // парковка курьеров рядом помещается
       const g = { mx: cx, mz: cz, road };
-      const block = (x, z) => Math.hypot(x - cx, z - cz) < Rb + D.PLAZA + 0.5;
-      if (lots && !lotBase(A, g, lots, block)) continue;
+      if (lots && !lotBase(A, g, lots, plazaBlock(cx, cz))) continue;
       ST.ms += performance.now() - t0;
       return { x: cx, z: cz, fx, fz, rx, rz, road, Rb, gy: A.groundH(cx, cz), dist: rad };
     }
@@ -569,17 +570,28 @@ export function build (A, f, opt = {}) {
   const local = (g, u, v, y) => g.applyMatrix4(M4.makeRotationY(ry)).translate(...((p) => [p[0], gy + y, p[1]])(at(u, v)));
 
   // площадь из светлой плитки с оранжевым кольцом и дорожка к улице
-  const PR = R + D.PLAZA;
-  LITM.color('#d9d3c9'); LITM.disc(cx, cz, PR, 0.13, 40);
-  FLATM.color(ORANGE);
-  for (let i = 0; i < 48; i++) {
-    const a = i / 48 * Math.PI * 2, b = (i + 1) / 48 * Math.PI * 2, rr = PR - 0.6;
-    FLATM.ribbon(cx + Math.cos(a) * rr, cz + Math.sin(a) * rr, cx + Math.cos(b) * rr, cz + Math.sin(b) * rr, 0.35, 0.15);
+  // Площадь — до тротуара (11.10.2026, пометки автора «коллизия текстур»): край, что лёг бы на тротуар или полотно
+  // (pave.js), подтянут к куполу — со стороны улицы площадь срезана по краю тротуара, оранжевое кольцо идёт по
+  // этому краю. Раньше круг заходил на тротуар (0,11 м) и под поднятую плиту (0,30 м): плитка, кольцо и тротуар
+  // лежали внахлёст. Слои на площади — каждый своей высоты: площадь 0,13, дорожка к улице 0,128, дорожка к стоянке
+  // 0,14, кольцо 0,15, штрихи 0,17 (над землёй, м)
+  const PR = R + D.PLAZA, NP = 64, rim = [];
+  const onWalk = (x, z) => { const k = onPave(x, z, 0); return k === 'walk' || k === 'road'; };
+  for (let i = 0; i < NP; i++) {
+    const a = i / NP * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
+    let rr = PR;
+    if (onWalk(cx + ca * rr, cz + sa * rr)) { while (rr > R + 0.9 && onWalk(cx + ca * rr, cz + sa * rr)) rr -= 0.05; rr = Math.min(PR, rr + 0.04); }   // встык к краю тротуара, без полоски травы
+    rim.push(rr);
   }
+  const rimAt = (i, k = 0) => { const a = (i % NP) / NP * Math.PI * 2, rr = rim[i % NP] - k; return [cx + Math.cos(a) * rr, cz + Math.sin(a) * rr]; };
+  LITM.color('#d9d3c9');
+  for (let i = 0; i < NP; i++) { const [x1, z1] = rimAt(i), [x2, z2] = rimAt(i + 1); LITM.dtri(cx, cz, x1, z1, x2, z2, 0.13); }
+  FLATM.color(ORANGE);
+  for (let i = 0; i < NP; i++) { const [x1, z1] = rimAt(i, 0.6), [x2, z2] = rimAt(i + 1, 0.6); FLATM.ribbon(x1, z1, x2, z2, 0.35, 0.15); }
   {
-    const [x1, z1] = at(0, PR - 0.5), ed = road.d - road.seg.w / 2;
-    const [x2, z2] = at(0, Math.max(PR, ed + 0.3));
-    LITM.color('#d9d3c9'); LITM.ribbon(x1, z1, x2, z2, 4.2, 0.13);
+    // дорожка к улице — до внешнего края тротуара, не поверх него
+    const v1 = road.d - walkHalf(road.seg) + 0.05;
+    if (v1 > PR - 0.5) { const [x1, z1] = at(0, PR - 0.5), [x2, z2] = at(0, v1); LITM.color('#d9d3c9'); LITM.ribbon(x1, z1, x2, z2, 4.2, 0.128); }
   }
   // цоколь: светлый, уходит в землю на SLOPE — на склоне купол не висит
   put(LIT, new THREE.CylinderGeometry(R + 0.35, R + 0.5, PL + D.SLOPE, 32), '#f1e2c4', cx, gy + (PL - D.SLOPE) / 2, cz);
@@ -592,7 +604,7 @@ export function build (A, f, opt = {}) {
   { const el = 79 * deg; put(LAMPH, new THREE.TorusGeometry(R * Math.cos(el) + 0.05, 0.14, 4, 32), GLOW, cx, cy + R * Math.sin(el), cz, Math.PI / 2, 0, 0); }
 
   // окно выдачи курьерам — сбоку, со стороны парковки
-  const lb = opt.lots ? lotBase(A, { mx: cx, mz: cz, road }, opt.lots) : null;
+  const lb = opt.lots ? lotBase(A, { mx: cx, mz: cz, road }, opt.lots, plazaBlock(cx, cz)) : null;   // то же место, что нашёл поиск (site)
   let side = 1;
   if (lb) { const lx = lb.base[0] + lb.nx * (lb.off + lb.D / 2), lz = lb.base[1] + lb.nz * (lb.off + lb.D / 2); side = (lx - cx) * rx + (lz - cz) * rz >= 0 ? 1 : -1; }
   const KA = side * 62 * deg, ku = Math.sin(KA), kv = Math.cos(KA);   // направление на окно выдачи
@@ -796,7 +808,7 @@ export function build (A, f, opt = {}) {
 
   // парковка курьеров — у улицы, сбоку от купола
   const g = { mx: cx, mz: cz, road };
-  const slots = opt.lots ? courierLot(A, g, opt.lots) : null;
+  const slots = opt.lots ? courierLot(A, g, opt.lots, lb) : null;
 
   // подъезжать — в ближнюю к куполу полосу улицы
   const ddx = cx - road.x, ddz = cz - road.z, dl = Math.hypot(ddx, ddz) || 1;

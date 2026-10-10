@@ -181,7 +181,7 @@ export function liftPop (loud = 0.8) {
 
 /* поток: старые седаны и хэтчбеки иногда коптят чёрным */
 function oldCars (dt) {
-  const T = A.TRAFFIC, cam = A.cam;
+  const T = A.ACT || A.TRAFFIC, cam = A.cam;          // без стоящих у бордюра (trafficgrid.js): коптят только едущие
   if (ST.old) {
     const t = ST.old;
     if ((ST.oldLeft -= dt) <= 0 || t.wreck || t.knock || t.parked || !t.mesh || !t.mesh.parent) { ST.old = null; return; }

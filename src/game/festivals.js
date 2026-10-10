@@ -28,6 +28,7 @@
         dropMesh, sayBubble, fxAdd, puffGeo, steam, gibBurger, popBonus, toast, chat(text),
         addWallet, money, CASH, Snd, CAR_L, CAR_W, HEROES, DIST, season() */
 import * as RESPECT from './respect.js';
+import { part as fxPart } from './fxpool.js';    // частицы из общего запаса (fxpool.js)
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 import { t, N_ } from '../i18n/index.js';
 
@@ -452,6 +453,7 @@ function start (kind, site) {
     const q = local(c.x, c.z);                            // площадка, дорожка перед ней и 3 м вокруг
     if (!(Math.abs(q.a) < L.W + 3 && q.b > -FEST.LANE - 2 && q.b < L.D + 3)) continue;
     A.TRAFFIC.splice(i, 1);
+    if (A.parkOut) A.parkOut(c);                         // стояла в склейке (parkmerge.js) — из склейки прочь; вернём своей моделью
     A.scene.remove(c.mesh);
     F.hidden.push(c);
   }
@@ -864,10 +866,9 @@ function puff (h) {
   if (!A.ADULT) { for (let k = 0; k < (h.big ? 4 : 2); k++) A.steam(p.x + rand(-0.2, 0.2), h.y - 0.4 + k * 0.3, p.z + rand(-0.2, 0.2)); return; }
   const n = h.big ? 7 : 3, gy = A.groundH(p.x, p.z);
   for (let k = 0; k < n; k++) {
-    const m = new THREE.Mesh(A.puffGeo, new THREE.MeshBasicMaterial({ color: k % 3 ? 0xe9e7e2 : 0xf6f4f0, transparent: true, opacity: 0.6, depthWrite: false }));
-    m.position.set(p.x + rand(-0.3, 0.3), gy + h.y + rand(0, 0.4), p.z + rand(-0.3, 0.3));
-    m.scale.setScalar(rand(0.5, 0.9) * big);
-    A.fxAdd(m, { vx: rand(-0.6, 0.6), vz: rand(-0.6, 0.6), vy: rand(0.5, 1.1), life: rand(3, 4.5), max: 4.5, grow: 0.42 });   // к концу — в ~6 раз больше, уже прозрачное
+    const px = p.x + rand(-0.3, 0.3), py = gy + h.y + rand(0, 0.4), pz = p.z + rand(-0.3, 0.3);
+    fxPart('puff', px, py, pz, k % 3 ? 0xe9e7e2 : 0xf6f4f0, rand(0.5, 0.9) * big, 0.6,
+      { vx: rand(-0.6, 0.6), vz: rand(-0.6, 0.6), vy: rand(0.5, 1.1), life: rand(3, 4.5), max: 4.5, grow: 0.42 });   // к концу — в ~6 раз больше, уже прозрачное
   }
 }
 

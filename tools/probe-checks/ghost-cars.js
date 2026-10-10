@@ -18,7 +18,7 @@ const carLike = o => o && o.userData && typeof o.userData.hl === 'number' && Arr
 const shown = o => { for (let p = o; p; p = p.parent) { if (!p.visible) return false; if (p === sc) return true; } return false; };
 const W = new d.THREE.Vector3();
 const kind = t => t.bus ? 'bus' : t.mp ? 'moped' : t.parked ? (t.accident ? 'accident' : 'parked') : t.svc || (t.chase ? 'chase' : t.stalled ? 'stalled' : 'flow');
-const out = { orphans: 0, orphanSample: [], stand: 0, unexplained: 0, standSample: [], solid: [], moose: {} };
+const out = { orphans: 0, orphanSample: [], merged: 0, mergedSample: [], noBody: 0, noBodySample: [], stand: 0, unexplained: 0, standSample: [], solid: [], moose: {} };
 
 /* ── 1. призраки и вставшие ── */
 const orphan = new Map(), st = new Map();
@@ -32,7 +32,17 @@ function scan () {
     if (t && Math.hypot(W.x - t.x, W.z - t.z) < 2) return;
     if (!orphan.has(o.uuid)) orphan.set(o.uuid, [Math.round(W.x), Math.round(W.z), o.userData.model, t ? 'desync ' + kind(t) : 'нет машины']);
   });
+  // стоящие склейкой (parkmerge.js, 11.10.2026): у каждой машины склейки — живая стоящая машина на том же месте;
+  // у каждой живой машины ближе 220 м — видимый кузов: своя модель на сцене или место в склейке
+  if (d.PARKI) {
+    for (const b of d.PARKI.orphans()) { const k = b.join(','); if (!mergedBad.has(k)) mergedBad.set(k, b); }
+    for (const t of TR) {
+      if (t.gone || t.bus || Math.hypot(t.x - V.x, t.z - V.z) > 220) continue;
+      if (t.still ? !t.pk : !t.mesh.parent) { const k = Math.round(t.x) + ',' + Math.round(t.z); if (!noBody.has(k)) noBody.set(k, [kind(t), t.model, Math.round(t.x), Math.round(t.z), t.still]); }
+    }
+  }
 }
+const mergedBad = new Map(), noBody = new Map();
 function why (t) {
   const r = [];
   if (t.knock || t.wreck || t.stalled || t.driver || t.rlOut) r.push('авария/водитель');
@@ -72,6 +82,7 @@ while (Date.now() - t0 < GSECS * 1000 / K) {
 }
 window.__warp = 1; autopilot(false);
 out.orphans = orphan.size; out.orphanSample = [...orphan.values()].slice(0, 5); out.gameSecs = Math.round(gt);
+out.merged = mergedBad.size; out.mergedSample = [...mergedBad.values()].slice(0, 5); out.noBody = noBody.size; out.noBodySample = [...noBody.values()].slice(0, 5);
 
 /* окно ждёт ответа (Толик, приглашение, обед) — мир на паузе: закрыть, как автопилот, и дальше */
 const stalled = () => !!(d.DLG && d.DLG.isOpen && d.DLG.isOpen()) || !!(d.CH && d.CH.opts && d.CH.opts.length) || (d.S.paused && d.S.state !== 'over');
@@ -156,6 +167,6 @@ if (F) {
   }
   noMoose();
 }
-out.ok = !out.orphans && out.solid.every(s => !s.pass) && Object.values(out.moose).every(m => m.pen === undefined || m.pen < 0)
+out.ok = !out.orphans && !out.merged && !out.noBody && out.solid.every(s => !s.pass) && Object.values(out.moose).every(m => m.pen === undefined || m.pen < 0)
   && (!out.moose.butt || out.moose.butt.moved > 1);
 return out;

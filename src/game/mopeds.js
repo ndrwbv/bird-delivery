@@ -151,9 +151,12 @@ export function lane (c, dt, A) {
   c.pull += (want - c.pull) * (1 - Math.exp(-(m.weave > 0 ? 4 : 2) * dt));
   return 1;
 }
+const NBM = [];                                      // кандидаты рядом (trafficgrid.js near) — без выделений
 function carAhead (c, A) {
   const hx = Math.sin(c.h), hz = Math.cos(c.h);
-  for (const o of A.TRAFFIC) {
+  const G = A.TGRID, n = G ? G.near(c.x, c.z, 12, NBM) : A.TRAFFIC.length, L = G ? G.TG.R : A.TRAFFIC;   // рядом — по сетке (trafficgrid.js)
+  for (let i = 0; i < n; i++) {
+    const o = L[i];
     if (o === c || o.model === 'moped' || Math.abs(o.x - c.x) > 12 || Math.abs(o.z - c.z) > 12) continue;
     const dx = o.x - c.x, dz = o.z - c.z, fw = dx * hx + dz * hz;
     if (fw > 0 && fw < 11 && Math.abs(-hz * dx + hx * dz) < 2.2) return true;
@@ -313,7 +316,8 @@ export function step (dt, A) {
   const V = A.V, cx = A.cam.position.x, cz = A.cam.position.z;
   const WIN = winter();
   let moving = 0;
-  for (const c of A.TRAFFIC) {
+  const TR = A.ACT || A.TRAFFIC;                    // мопеды не стоят в инстансах — все в ACT (trafficgrid.js)
+  for (const c of TR) {
     if (!c.mp) continue;
     if (c.model !== 'moped') { if (!c.gone && Math.hypot(c.x - cx, c.z - cz) > 90) A.svcGone(c); continue; }   // respawnTraffic сделал из него машину — лишняя
     if (c.gone) continue;
@@ -336,7 +340,7 @@ export function step (dt, A) {
     if (!c.knock && !c.wreck && !m.fell && Math.hypot(c.x - V.x, c.z - V.z) > 420) A.placeTraffic(c, 120, 330);
   }
   // брошенные и дальние — прочь, когда их не видно
-  for (const c of A.TRAFFIC) {
+  for (const c of TR) {
     if (!c.mp || c.gone || c.model !== 'moped' || !c.parked || c.mp.man) continue;
     if (Math.hypot(c.x - cx, c.z - cz) > 160) A.svcGone(c);
   }

@@ -917,7 +917,7 @@ function nearestSite (x, z, not) {
 }
 const okDump = t => !t.parked && !t.svc && !t.chase && !t.taxi && !t.gone && !t.accident && !t.rival && !t.knock && !t.wreck && !t.hb && t.model !== 'moped' && t.mesh && t.mesh.userData.lite;
 function stepDumps (dt) {
-  const TR = A.TRAFFIC;
+  const TR = A.ACT || A.TRAFFIC;                    // без стоящих у бордюра (trafficgrid.js): самосвалом им не стать
   let n = 0;
   for (const t of TR) if (t.dump && !t.gone) n++;
   ST.dumps = n;

@@ -231,8 +231,8 @@ export function onRespawn (t) {
 
 export function step (dt, api) {
   A = api;
-  // жребий для новых машин потока
-  for (const t of A.TRAFFIC) {
+  // жребий для новых машин потока (стоящие у бордюра — не в ACT: им и так не положено, trafficgrid.js)
+  for (const t of A.ACT || A.TRAFFIC) {
     if (t.hbRoll) continue;
     t.hbRoll = 1;
     if (!eligible(t)) continue;

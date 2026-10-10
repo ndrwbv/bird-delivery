@@ -639,19 +639,33 @@ function rails (cell, inCell) {
 function dropCell (k, c) {
   for (const n in c.L) ST.n[n] -= c.L[n].n;
   ST.items -= c.items.length;
-  CELLS.delete(k); ST.dropped++;
+  CELLS.delete(k); ST.dropped++; ENS.gone++;
 }
+/* перебор клеток — только когда что-то могло измениться (11.10.2026, как forest.js ensure): после прохода,
+   где всё собрано, — где стояли и «зазор» до ближайшей несобранной клетки рамки за радиусом; пока та же
+   клетка, тот же радиус, ничего не выброшено и отъехали меньше зазора — прохода нет (раньше — каждый кадр,
+   с массивом и Math.hypot) */
+const NONE = [];
+const ENS = { ci: NaN, cj: NaN, R: -1, x: 0, z: 0, gap: 0, gone: 0, at: -1, skip: 0, scan: 0 };
 function ensure (x, z, R, budget) {
   const C = LAWN.CELL, ci = Math.floor(x / C), cj = Math.floor(z / C), n = Math.ceil(R / C);
-  const todo = [];
+  if (!BUILDING && ci === ENS.ci && cj === ENS.cj && R === ENS.R && ENS.gone === ENS.at) {
+    const dx = x - ENS.x, dz = z - ENS.z;
+    if (dx * dx + dz * dz < ENS.gap * ENS.gap) { ENS.skip++; return false; }
+  }
+  ENS.scan++;
+  const lim = R + C * 0.71, lim2 = lim * lim;
+  let todo = null, gap = Infinity;
   for (let i = ci - n; i <= ci + n; i++)
     for (let j = cj - n; j <= cj + n; j++) {
+      const dx = (i + 0.5) * C - x, dz = (j + 0.5) * C - z, d2 = dx * dx + dz * dz;
       if (CELLS.has(key(i, j)) || (BUILDING && BUILDING.k === key(i, j))) continue;
-      const d = Math.hypot((i + 0.5) * C - x, (j + 0.5) * C - z);
-      if (d > R + C * 0.71) continue;
-      todo.push([d, i, j]);
+      if (d2 > lim2) { if (Math.sqrt(d2) - lim < gap) gap = Math.sqrt(d2) - lim; continue; }
+      (todo || (todo = [])).push([Math.sqrt(d2), i, j]);
     }
-  if (!todo.length && !BUILDING) return false;
+  if (!todo && !BUILDING) { ENS.ci = ci; ENS.cj = cj; ENS.R = R; ENS.x = x; ENS.z = z; ENS.gap = gap; ENS.at = ENS.gone; return false; }
+  ENS.R = -1;
+  if (!todo) todo = NONE;
   todo.sort((a, b) => a[0] - b[0]);
   const t0 = performance.now();
   DEADLINE = t0 + budget;
@@ -870,12 +884,18 @@ const S_LIST = [];
 export function withSolids (list, x, z) {
   if (!A) return list;
   S_LIST.length = 0;
-  cellsNear(x, z, 4, c => {
-    for (const s of c.sol) {
-      if (c.items[s.own].hid || c.items[s.own].ed || Math.abs(s.cx - x) > 6 || Math.abs(s.cz - z) > 6) continue;
-      S_LIST.push(s);
+  // как cellsNear(x, z, 4, …), но без замыкания на каждый вызов (шаг езды — дважды за шаг)
+  const C = LAWN.CELL;
+  for (let i = Math.floor((x - 4) / C); i <= Math.floor((x + 4) / C); i++)
+    for (let j = Math.floor((z - 4) / C); j <= Math.floor((z + 4) / C); j++) {
+      const c = CELLS.get(key(i, j));
+      if (!c) continue;
+      for (let q = 0; q < c.sol.length; q++) {
+        const s = c.sol[q];
+        if (c.items[s.own].hid || c.items[s.own].ed || Math.abs(s.cx - x) > 6 || Math.abs(s.cz - z) > 6) continue;
+        S_LIST.push(s);
+      }
     }
-  });
   return S_LIST.length ? list.concat(S_LIST) : list;
 }
 
@@ -913,7 +933,7 @@ const EDP = {
 };
 
 export const DEBUG = {
-  LAWN, CELLS, MESH, DOWN,
+  LAWN, CELLS, MESH, DOWN, ENS,
   get stats () {
     const kinds = {};
     for (const c of CELLS.values()) for (const it of c.items) kinds[it.kind] = (kinds[it.kind] || 0) + 1;

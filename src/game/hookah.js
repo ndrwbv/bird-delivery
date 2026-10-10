@@ -16,6 +16,8 @@
    api: THREE, scene, BENCHES, V, S, ADULT, makeHuman, makePerson, dropMesh, gibHuman, groundH, curbAt,
         fxAdd, puffGeo, steam, toast, Snd, CAR_L, CAR_W, nearestRoad, t */
 
+import { part as fxPart } from './fxpool.js';    // частицы из общего запаса (fxpool.js)
+
 const SPAWN_R = 230, DROP_R = 320;
 const SHARE = 0.09, MIN_GAP = 110, MAX_SPOTS = 60;   // доля лавочек с кальянщиками, не ближе друг к другу, всего не больше
 
@@ -118,23 +120,17 @@ function exhale (x, y, z, ry, big = 1) {
   if (Math.random() < 0.25) {
     // кольца: три бублика друг за другом
     for (let k = 0; k < 3; k++) setTimeout(() => {
-      const m = new THREE.Mesh(RING_GEO || (RING_GEO = new THREE.TorusGeometry(0.22, 0.07, 6, 14)),
-        new THREE.MeshBasicMaterial({ color: 0xeeece8, transparent: true, opacity: 0.7, depthWrite: false }));
-      m.position.set(x + fx * 0.4, gy + y, z + fz * 0.4);
-      m.rotation.y = ry;
-      A.fxAdd(m, { vx: fx * 1.3, vz: fz * 1.3, vy: 0.35, life: 3, max: 3, grow: 0.3 });
+      fxPart('ring', x + fx * 0.4, gy + y, z + fz * 0.4, 0xeeece8, 1, 0.7, { vx: fx * 1.3, vz: fz * 1.3, vy: 0.35, life: 3, max: 3, grow: 0.3, ry });
     }, k * 380);
     return;
   }
   const n = Math.round(6 * big);
   for (let k = 0; k < n; k++) {
-    const m = new THREE.Mesh(A.puffGeo, new THREE.MeshBasicMaterial({ color: k % 3 ? 0xe9e7e2 : 0xf6f4f0, transparent: true, opacity: 0.7, depthWrite: false }));
-    m.position.set(x + fx * (0.35 + k * 0.08), gy + y + rand(-0.05, 0.1), z + fz * (0.35 + k * 0.08));
-    m.scale.setScalar(rand(0.35, 0.6) * big);
-    A.fxAdd(m, { vx: fx * rand(0.6, 1.2) + rand(-0.3, 0.3), vz: fz * rand(0.6, 1.2) + rand(-0.3, 0.3), vy: rand(0.35, 0.8), life: rand(3, 4.5), max: 4.5, grow: 0.5 });     // к концу — облако метров семь, уже прозрачное
+    const py = gy + y + rand(-0.05, 0.1);
+    fxPart('puff', x + fx * (0.35 + k * 0.08), py, z + fz * (0.35 + k * 0.08), k % 3 ? 0xe9e7e2 : 0xf6f4f0, rand(0.35, 0.6) * big, 0.7,
+      { vx: fx * rand(0.6, 1.2) + rand(-0.3, 0.3), vz: fz * rand(0.6, 1.2) + rand(-0.3, 0.3), vy: rand(0.35, 0.8), life: rand(3, 4.5), max: 4.5, grow: 0.5 });     // к концу — облако метров семь, уже прозрачное
   }
 }
-let RING_GEO = null;
 
 function hitCheck (s) {
   const V = A.V, sp = Math.hypot(V.vx, V.vz);

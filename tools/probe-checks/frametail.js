@@ -3,6 +3,7 @@
    --q=tailsecs=75 — сколько секунд мерить (60 по умолчанию; первые 4 с после начала смены — разгон, не в счёт);
    --q=noview — без отсечения по кадру (cull.js), для сравнения; --runprofile=f.cpuprofile, потом
    node tools/profsum.cjs f.cpuprofile --spikes — что делали самые долгие кадры (имена — с несжатой сборкой).
+   Паузы сборщика и выделения памяти: --jsflags="--trace-gc", вывод — в файл, потом node tools/gcsum.cjs файл (окно — поле win).
    Ответ: кадр (промежутки между кадрами: p50/p95/p99, доля > 16,7 и > 33 мс), JS кадра (сам код игры
    с отрисовкой), отрисовка отдельно, calls — вызовов отрисовки в кадре в среднем, шаги мира CL.step — в среднем на кадр, худший раз и сколько раз > 2 мс.
    Числа на загруженной машине шумят на 10—20 %: сравнивать «до/после» лучше в одном запуске
@@ -30,7 +31,7 @@ const st = a => { const s = a.slice().sort((x, y) => x - y), n = s.length, q = p
   return { n, p50: q(0.5), p95: q(0.95), p99: q(0.99), max: +s[n - 1].toFixed(1), avg: +(a.reduce((x, y) => x + y, 0) / n).toFixed(2),
     'o16,7%': +(100 * a.filter(v => v > 16.7).length / n).toFixed(2), 'o33%': +(100 * a.filter(v => v > 33).length / n).toFixed(2) }; };
 const n = js.length;
-return { secs: +el.toFixed(1), frame: st(ft), js: st(js), render: st(rds), calls: Math.round(calls / (cn || 1)),
+return { secs: +el.toFixed(1), win: [Math.round(t0), Math.round(performance.now())], frame: st(ft), js: st(js), render: st(rds), calls: Math.round(calls / (cn || 1)),
   steps: Object.entries(ST).map(([k, v]) => [k, +(v.sum / n).toFixed(3), +v.max.toFixed(1), v.big]).sort((a, b) => b[1] - a[1]).slice(0, 15),
   worst: Object.entries(ST).map(([k, v]) => [k, +v.max.toFixed(1), v.big]).sort((a, b) => b[1] - a[1]).slice(0, 10),
   cull: { cells: d.CULL.cells, cellsOut: d.CULL.cellsOut, view: d.CULLV ? d.CULLV.on : null, q: d.CULLQ ? d.CULLQ.lvl : null },

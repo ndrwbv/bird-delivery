@@ -319,7 +319,7 @@ function dropCell (k, c) {
     ST.sp -= c.sp ? c.sp.n : 0; ST.pi -= c.pi ? c.pi.n : 0; ST.bu -= c.bu ? c.bu.n : 0;
     ST.trees -= (c.sp ? c.sp.n : 0) + (c.pi ? c.pi.n : 0); ST.sol -= c.sol.length / 2;
   }
-  CELLS.delete(k); ST.dropped++;
+  CELLS.delete(k); ST.dropped++; ENS.gone++;
 }
 
 /* ── есть ли вообще лес рядом с клеткой (по рамкам лесов) ── */
@@ -329,20 +329,32 @@ function hasForest (i, j) {
   return false;
 }
 
-/* собрать недостающие клетки ближе R, пока не кончится бюджет (мс) */
+/* собрать недостающие клетки ближе R, пока не кончится бюджет (мс).
+   Перебор клеток — только когда что-то могло измениться (11.10.2026): после полного прохода, где всё
+   уже собрано, запоминаем, где стояли (ENS), и «зазор» — насколько ближайшая несобранная клетка рамки
+   дальше радиуса. Пока та же клетка, тот же радиус, ничего не выбросили и отъехали меньше зазора —
+   новых клеток в радиусе быть не может, проход не нужен (раньше — 441 клетка каждый кадр). */
+const ENS = { ci: NaN, cj: NaN, R: -1, x: 0, z: 0, gap: 0, gone: 0, at: -1, skip: 0, scan: 0 };
 function ensure (x, z, R, budget) {
   const C = FOREST.CELL, ci = Math.floor(x / C), cj = Math.floor(z / C), n = Math.ceil(R / C);
-  // зовётся каждый кадр: без массива и Math.hypot, пока всё собрано (09.10.2026, мусор в кадре на Деке)
+  if (ci === ENS.ci && cj === ENS.cj && R === ENS.R && ENS.gone === ENS.at) {
+    const dx = x - ENS.x, dz = z - ENS.z;
+    if (dx * dx + dz * dz < ENS.gap * ENS.gap) { ENS.skip++; return false; }
+  }
+  ENS.scan++;
+  // без массива и Math.hypot, пока всё собрано (09.10.2026, мусор в кадре на Деке)
   const lim = R + C * 0.71, lim2 = lim * lim;
-  let todo = null;
+  let todo = null, gap = Infinity;
   for (let i = ci - n; i <= ci + n; i++)
     for (let j = cj - n; j <= cj + n; j++) {
       const dx = (i + 0.5) * C - x, dz = (j + 0.5) * C - z, d2 = dx * dx + dz * dz;
-      if (d2 > lim2 || CELLS.has(key(i, j))) continue;
+      if (d2 > lim2) { if (!todo && Math.sqrt(d2) - lim < gap && !CELLS.has(key(i, j))) gap = Math.sqrt(d2) - lim; continue; }
+      if (CELLS.has(key(i, j))) continue;
       if (!hasForest(i, j)) { CELLS.set(key(i, j), { i, j, empty: true }); continue; }
       (todo || (todo = [])).push([Math.sqrt(d2), i, j]);
     }
-  if (!todo) return false;
+  if (!todo) { ENS.ci = ci; ENS.cj = cj; ENS.R = R; ENS.x = x; ENS.z = z; ENS.gap = gap; ENS.at = ENS.gone; return false; }
+  ENS.R = -1;
   todo.sort((a, b) => a[0] - b[0]);
   const t0 = performance.now();
   let any = false;
@@ -429,7 +441,7 @@ export function addArea (p, hole) {
   const C = FOREST.CELL;
   for (const [k, c] of CELLS) {
     const cx0 = c.i * C, cz0 = c.j * C;
-    if (cx0 + C > x0 && cx0 < x1 && cz0 + C > z0 && cz0 < z1) { if (c.empty) CELLS.delete(k); else dropCell(k, c); }
+    if (cx0 + C > x0 && cx0 < x1 && cz0 + C > z0 && cz0 < z1) { if (c.empty) { CELLS.delete(k); ENS.gone++; } else dropCell(k, c); }
   }
   LAST.dirty = true;
   return true;
@@ -458,7 +470,7 @@ export function step (dt, api) {
     const R = FAR + 150;
     for (const [k, c] of CELLS) {
       const cx = c.empty ? (c.i + 0.5) * F.CELL : c.cx, cz = c.empty ? (c.j + 0.5) * F.CELL : c.cz;
-      if (Math.hypot(cx - x, cz - z) > R) { if (c.empty) CELLS.delete(k); else dropCell(k, c); }
+      if (Math.hypot(cx - x, cz - z) > R) { if (c.empty) { CELLS.delete(k); ENS.gone++; } else dropCell(k, c); }
     }
   }
 }
@@ -501,7 +513,7 @@ const EDP = {
 };
 
 /* стволы рядом с точкой — машина в них упирается (game.js: столкновения кузова) */
-const T_LIST = [];
+const T_LIST = [], T_POOL = [];   // стволы у точки (withTrees) — живут до следующего вызова: езда перебирает их сразу
 export function withTrees (list, x, z) {
   if (!FORESTS || !FORESTS.length) return list;
   const C = FOREST.CELL, T = FOREST.TRUNK, R = 3.5;
@@ -513,7 +525,10 @@ export function withTrees (list, x, z) {
       const s = c.sol;
       for (let k = 0; k < s.length; k += 2) {
         if (Math.abs(s[k] - x) > R || Math.abs(s[k + 1] - z) > R) continue;
-        T_LIST.push({ cx: s[k], cz: s[k + 1], hw: T, hd: T, cs: 1, sn: 0, ex: T, ez: T, tree: 1 });
+        // ствол — из запаса (11.10.2026: раньше новый объект на каждый ствол у машины на каждом шаге езды)
+        const n = T_LIST.length, o = T_POOL[n] || (T_POOL[n] = { cx: 0.5, cz: 0.5, hw: 0.5, hd: 0.5, cs: 1, sn: 0, ex: 0.5, ez: 0.5, tree: 1 });
+        o.cx = s[k]; o.cz = s[k + 1]; o.hw = o.hd = o.ex = o.ez = T;
+        T_LIST.push(o);
       }
     }
   return T_LIST.length ? list.concat(T_LIST) : list;
@@ -541,7 +556,7 @@ export function edgeAt (x, z, R = 40) {
 }
 
 export const DEBUG = {
-  FOREST, CELLS, MESH, edgeAt,
+  FOREST, CELLS, MESH, edgeAt, ENS,
   get stats () {
     return { forests: FORESTS ? FORESTS.length : 0, cells: [...CELLS.values()].filter(c => !c.empty).length, built: ST.built, dropped: ST.dropped,
       spruce: ST.sp, pine: ST.pi, bush: ST.bu, trees: ST.trees, solid: ST.sol, shown: ST.shown, refresh: ST.refresh,
