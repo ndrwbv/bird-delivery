@@ -9,6 +9,12 @@
    берём самую круглую. В Солнечном таких четыре: большое Кольцо у пиццерии (остров ~200 м),
    малый круг на Ленинградской и Победы, круг на площади Ленина и овал во дворах у Калинина.
 
+   Малый круг (ось до CIRCLE.R м, круглее CIRCLE.ROUND) — ровной окружностью (roundOff, 10.10.2026): при
+   загрузке точки оси — на окружность, между ними — через CIRCLE.STEP м по дуге; остров — ровно до края
+   асфальта круга; на острове нет фонарей, знаков, светофоров (streetlamps.js, roadlife.js, game.js —
+   blocks), разметки на круге и ближе CIRCLE.ZONE м к нему (game.js osmMarkings — nearCircle), тротуар
+   снаружи — кольцом по дуге (game.js arcCurb).
+
    Остров — от центра лучами до края асфальта (RAYS лучей, край — до 2 см).
      • остров меньше WOOD_R: поднят на высоту тротуара (бордюр, CURB_H) — сочный газон той же
        краской, что парки (сезоны и пятна газона — lawn.js, как везде), по краю — бордюрный
@@ -39,6 +45,10 @@ export const RING = {
   ROUND: 0.55,            // ближняя точка оси / дальняя (от центра) — не меньше: овал ещё круг
   LEN_K: 1.12,            // длина / (2π · средний радиус) — не больше
   MIN_R: 3,               // остров (до края асфальта) уже — не трогаем, м
+  // ровный круг (10.10.2026, автор: «бордюры пересекают друг друга, надо чтобы круглые были»): малый круг
+  // (средний радиус оси до CIRCLE.R м, круглее CIRCLE.ROUND) при загрузке становится настоящей окружностью —
+  // точки оси на окружность среднего радиуса, между ними — через CIRCLE.STEP м по дуге
+  CIRCLE: { R: 40, ROUND: 0.85, STEP: 2.5, ZONE: 10 },
   RAYS: 72,               // лучей от центра до края асфальта
   CURB_W: 0.24,           // бордюрный камень по краю острова, м
   LAWN_UP: 0.04,          // газон выше поднятого тротуара, м (камень — ещё на 2 см выше)
@@ -71,8 +81,9 @@ export const RING = {
 };
 
 let A = null;
+const CIRCLES = [];                    // ровные малые круги (roundOff): { c, R, w, ids }
 const LIST = [];                       // круги: { c, rho, isl, rIn, rMid, kind, ids, entries, ... }
-const ST = { cycles: 0, rings: 0, trees: 0, bushes: 0, flowers: 0, beds: 0, raised: 0, wood: 0, ms: 0, why: {} };
+const ST = { circles: 0, cycles: 0, rings: 0, trees: 0, bushes: 0, flowers: 0, beds: 0, raised: 0, wood: 0, ms: 0, why: {} };
 const OWN = new Map();                 // свои деревья по клеткам 8 м — «лес ли тут» для змеев
 
 /* ── мелочи ── */
@@ -169,6 +180,63 @@ function find (CITY, roadWidth) {
   for (const c of cand) if (!out.some(o => Math.hypot(o.c[0] - c.c[0], o.c[1] - c.c[1]) < Math.max(o.mean, c.mean))) out.push(c);
   return out;
 }
+
+/* ── малый круг — ровной окружностью ──
+   В карте круг — ломаная из нескольких прямых (выгрузка упрощает линии до метра), остров и бордюры
+   по ней шли углами. До всего, что строится из улиц (game.js, сразу после загрузки карты): точки оси
+   круга — на окружность среднего радиуса (та же точка у въездов — тоже, они концами в ней), между
+   соседними точками — новые через CIRCLE.STEP м по дуге. Граф, полосы, остров, бордюры — уже по кругу */
+export function roundOff (CITY) {
+  const t0 = performance.now();
+  CIRCLES.length = 0;
+  const C = RING.CIRCLE, R = CITY.roads || [];
+  const r2 = v => Math.round(v * 100) / 100;
+  for (const g of find(CITY, r => r.w || 9)) {
+    if (g.mean > C.R || g.round < C.ROUND) continue;
+    const [cx, cz] = g.c, Rm = g.mean;
+    const moved = new Map();
+    for (const j of g.ids) for (const q of R[j].p) {
+      const k = q[0] + ',' + q[1];
+      if (moved.has(k)) continue;
+      const d = Math.hypot(q[0] - cx, q[1] - cz) || 1;
+      moved.set(k, [r2(cx + (q[0] - cx) / d * Rm), r2(cz + (q[1] - cz) / d * Rm)]);
+    }
+    for (const r of R) for (const q of r.p || []) { const m = moved.get(q[0] + ',' + q[1]); if (m) { q[0] = m[0]; q[1] = m[1]; } }
+    for (const j of g.ids) {
+      const p = R[j].p, out = [p[0]];
+      for (let i = 1; i < p.length; i++) {
+        const a0 = Math.atan2(p[i - 1][1] - cz, p[i - 1][0] - cx);
+        let da = Math.atan2(p[i][1] - cz, p[i][0] - cx) - a0;
+        while (da > Math.PI) da -= Math.PI * 2;
+        while (da < -Math.PI) da += Math.PI * 2;
+        const n = Math.max(1, Math.ceil(Math.abs(da) * Rm / C.STEP));
+        for (let k = 1; k < n; k++) { const a = a0 + da * k / n; out.push([r2(cx + Math.cos(a) * Rm), r2(cz + Math.sin(a) * Rm)]); }
+        out.push(p[i]);
+      }
+      R[j].p = out;
+    }
+    CIRCLES.push({ c: [cx, cz], R: Rm, w: g.w, ids: g.ids });
+  }
+  ST.circles = CIRCLES.length;
+  ST.roundMs = Math.round(performance.now() - t0);
+  return CIRCLES;
+}
+/* ровный малый круг, к оси которого точка ближе m (или null) */
+export function circleAt (x, z, m = 0) {
+  for (const o of CIRCLES) if (Math.abs(Math.hypot(x - o.c[0], z - o.c[1]) - o.R) <= m) return o;
+  return null;
+}
+/* внутри ровного малого круга (ближе к центру, чем ось, минус m) */
+export function inCircle (x, z, m = 0) {
+  for (const o of CIRCLES) if (Math.hypot(x - o.c[0], z - o.c[1]) < o.R - m) return o;
+  return null;
+}
+/* у малого круга: ближе ZONE м к краю асфальта снаружи или на нём — разметки нет */
+export function nearCircle (x, z) {
+  for (const o of CIRCLES) if (Math.hypot(x - o.c[0], z - o.c[1]) < o.R + o.w / 2 + RING.CIRCLE.ZONE) return o;
+  return null;
+}
+export const circles = () => CIRCLES;
 
 /* ── остров: от центра лучами до края асфальта ── */
 function island (ring, CITY, roadWidth) {
@@ -388,6 +456,9 @@ export function build (api) {
     const isl = island(r, A.CITY, A.roadWidth);
     if (!isl) { ST.why.open = (ST.why.open || 0) + 1; continue; }
     const g = { ...r, ...isl, c: r.c };
+    // ровный малый круг: остров — ровно до края асфальта круга (въезды пошире круга углом под остров)
+    const cc = CIRCLES.find(o => Math.hypot(o.c[0] - r.c[0], o.c[1] - r.c[1]) < 2);
+    if (cc) { g.rho = new Float32Array(RING.RAYS).fill(cc.R - cc.w / 2 - 0.02); g.circle = cc; }
     g.rIn = Math.min(...g.rho); g.rMid = g.rho.reduce((s, v) => s + v, 0) / g.rho.length;
     if (g.rIn < RING.MIN_R) { ST.why.thin = (ST.why.thin || 0) + 1; continue; }
     g.kind = g.rMid >= RING.WOOD_R ? 'wood' : g.rMid >= RING.GROVE_R ? 'grove' : 'small';
@@ -446,7 +517,7 @@ export function wooded (x, z, m = 5) {
 export const polys = () => LIST.map(g => g.poly);
 
 export const DEBUG = {
-  RING, ST, LIST,
+  RING, ST, LIST, CIRCLES,
   get list () {
     return LIST.map(g => ({ c: g.c.map(Math.round), kind: g.kind, names: g.names, L: Math.round(g.L), axis: [+g.rmin.toFixed(1), +g.rmax.toFixed(1)],
       island: [+g.rIn.toFixed(1), +g.rMid.toFixed(1), +Math.max(...g.rho).toFixed(1)], round: +g.round.toFixed(2), entries: g.entries.length, planted: g.planted, decid: g.decid || 0, wood: !!g.wood }));

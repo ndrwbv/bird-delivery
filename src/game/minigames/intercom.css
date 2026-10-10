@@ -1,88 +1,49 @@
-/* Домофон (minigames/intercom.js): бумажная панель поверх езды — накладная слева, панель домофона справа
-   (телефон стоя — одна под другой). Кнопки-цифры крупные: палец и Дека. Палитра — --pp-* (paper.css). */
-.dg { position: absolute; inset: 0; z-index: 26; display: flex; align-items: center; justify-content: center; box-sizing: border-box;
-      padding: clamp(8px, 2vh, 24px) 12px; overflow: auto; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none;
-      font-family: "Press Start 2P", ui-monospace, monospace; color: var(--pp-ink);
-      background: radial-gradient(ellipse at 50% 50%, rgba(255, 138, 43, .12), rgba(40, 14, 24, .5) 75%); }
-.dg-sheet { width: min(760px, 100%); padding-top: 4px; }
-.dg-sheet .pp-head { --pp-accent: var(--pp-orange); margin-bottom: .3em; }
-.dg-left { font-variant-numeric: tabular-nums; min-width: 4.5em; text-align: right; }
+/* Домофон (minigames/intercom.js) на весь экран: фон — дверь подъезда снаружи (doorscene.js), на двери — сама панель
+   домофона крупно, как настоящая: решётка динамика, экранчик, металлические кнопки 1—9, ⌫, 0, 🔔 (жмёшь — кнопка
+   уходит внутрь). Поверх — плашки doorkit.css (часы, задание, реплики, свёрнутая накладная, строка управления). */
+.dg-unit { --pw: 240px; position: absolute; z-index: 2; box-sizing: border-box; display: flex; flex-direction: column; gap: calc(var(--pw) * .045);
+           padding: calc(var(--pw) * .1) calc(var(--pw) * .08) calc(var(--pw) * .05);
+           container-type: size; background: linear-gradient(160deg, #c9ccd0, #8d9298 55%, #6f747a); border: 3px solid #2a2622; border-radius: 10px;
+           box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .25), inset 0 -6px 0 rgba(0, 0, 0, .2), 0 10px 0 rgba(0, 0, 0, .35), 0 24px 40px rgba(0, 0, 0, .45); }
+.dg-unit::before, .dg-unit::after { content: ''; position: absolute; top: 2.4%; width: 3cqw; height: 3cqw; border-radius: 50%; background: #4a4e53;
+                                    box-shadow: 0 0 0 1px #2a2622, 0 calc(95cqh - 3cqw) 0 #4a4e53; }   /* винты */
+.dg-unit::before { left: 3%; } .dg-unit::after { right: 3%; }
+.dg-grill { position: relative; flex: 0 0 13%; border-radius: 6px; background: radial-gradient(circle, #23262a 30%, transparent 34%) 0 0 / 4.6cqw 4.6cqw, #5c6167;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, .5); }
+.dg-led { position: absolute; right: 4%; top: 50%; translate: 0 -50%; width: 3cqw; height: 3cqw; border-radius: 50%; background: #ff5a3c; box-shadow: 0 0 8px #ff5a3c; }
+.dg-ok .dg-led { background: #4fd65a; box-shadow: 0 0 10px #4fd65a; }
+.dg-scr { flex: 0 0 13%; display: flex; align-items: center; justify-content: center; background: #263018; color: #b6ff7a; border: 3px solid #2a2622; border-radius: 6px;
+          box-shadow: inset 0 0 12px rgba(0, 0, 0, .7); text-shadow: 0 0 6px rgba(160, 255, 110, .8); }
+.dg-typed { font-weight: normal; font-size: min(9cqw, 9cqh); letter-spacing: .2em; }
+.dg-ok .dg-scr { background: #1f4a22; }
 
-/* фитиль: сколько осталось — полоса тает справа налево, в последние 30 % краснеет */
-.dg-fuse { height: 10px; margin: 0 0 .8em; border: 2px solid var(--pp-ink); border-radius: 6px; overflow: hidden; background: rgba(51, 33, 12, .1); }
-.dg-fuse i { display: block; height: 100%; background: var(--pp-lime); transform-origin: 0 50%; transition: background .2s; }
-.dg-fuse.dg-hot i { background: var(--pp-red); }
+.dg-keys { flex: 1 1 auto; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(4, 1fr); gap: 3.2cqw; min-height: 0; }
+.dg-k { position: relative; padding: 0; font: inherit; font-size: min(9cqw, 6.5cqh); color: #2a2622; cursor: pointer; touch-action: manipulation;
+        background: radial-gradient(circle at 35% 30%, #f1f2f3, #b9bdc2 60%, #8c9197); border: 3px solid #2a2622; border-radius: 22%;
+        box-shadow: 0 .9cqh 0 #3a3d41, inset 0 -2px 0 rgba(0, 0, 0, .2); transition: translate .08s, box-shadow .08s; }
+.dg-k:active, .dg-k.dn { translate: 0 .8cqh; box-shadow: 0 .1cqh 0 #3a3d41, inset 0 3px 6px rgba(0, 0, 0, .35); background: radial-gradient(circle at 35% 30%, #d9dbdd, #9ea3a8 60%, #7c8187); }
+.dg-k-del { color: #8a3b22; }
+.dg-k-call { background: radial-gradient(circle at 35% 30%, #9cf0a2, #4fd65a 60%, #2f9a3a); }
+.dg-k-call.dn, .dg-k-call:active { background: radial-gradient(circle at 35% 30%, #7ed886, #3fb84a 60%, #267c30); }
+.dg-k.pp-focus { outline: 4px solid var(--pp-yellow); outline-offset: 2px; }
+.dg-brand { flex: none; align-self: center; font-size: min(3.6cqw, 3cqh); letter-spacing: .3em; color: #3a3d41; text-transform: uppercase; text-shadow: 0 1px 0 rgba(255, 255, 255, .4); }
 
-.dg-body { display: flex; gap: clamp(10px, 2vw, 24px); align-items: stretch; }
-
-/* кусок накладной: номер квартиры крупно, пометка клиента — розовым стикером от руки */
-.dg-slip { position: relative; flex: 1 1 40%; display: flex; flex-direction: column; gap: .5em; justify-content: center; padding: .8em 1em;
-           background: #fffaf0; border: 2px dashed var(--pp-brown); border-radius: 4px; rotate: var(--pp-tilt, 0deg); }
-.dg-flat { font-size: clamp(22px, 3.4vw, 40px); line-height: 1.2; white-space: nowrap; font-weight: normal; letter-spacing: .04em; }
-.dg-note { margin: .2em 0 0; align-self: flex-start; padding: .7em .8em; font-size: var(--pp-fs-m); line-height: 1.5; color: var(--pp-ink);
-           background: color-mix(in srgb, var(--pp-pink) 55%, var(--pp-paper)); border: 2px solid var(--pp-ink); border-radius: 3px;
-           box-shadow: 0 3px 0 var(--pp-ink); rotate: 3deg; }
-.dg-task { margin: 0; }
-
-/* сама панель: экранчик сверху, кнопки 3×4 */
-.dg-unit { flex: 1 1 52%; display: flex; flex-direction: column; gap: .6em; padding: .7em; background: #e9dcc0;
-           border: 3px solid var(--pp-ink); border-radius: 10px; box-shadow: inset 0 -5px 0 rgba(51, 33, 12, .15), 0 4px 0 var(--pp-ink); }
-.dg-scr { position: relative; min-height: 3.2em; display: flex; flex-direction: column; gap: .3em; align-items: center; justify-content: center; padding: .4em .6em; text-align: center;
-          background: #263018; color: var(--pp-yellow); border: 3px solid var(--pp-ink); border-radius: 6px; font-size: var(--pp-fs-m); line-height: 1.5; }
-.dg-typed { font-weight: normal; font-size: var(--pp-fs-l); letter-spacing: .25em; }
-.dg-say[hidden], .dg-typed[hidden] { display: none; }
-.dg-say { display: block; font-size: var(--pp-fs-s); line-height: 1.6; color: #fff3d6; }
-.dg-say em { font-style: normal; color: var(--pp-yellow); }
-.dg-say.dg-bad { color: #ffb2a8; }
-.dg-say.dg-good { color: var(--pp-lime); font-size: var(--pp-fs-m); }
-
-.dg-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(5px, 1vh, 9px); }
-.dg-k { position: relative; min-height: clamp(44px, 8.6vh, 72px); padding: 0; font: inherit; font-size: var(--pp-fs-l); color: var(--pp-ink); cursor: pointer;
-        background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 8px; box-shadow: 0 4px 0 var(--pp-ink); touch-action: manipulation;
-        transition: translate .12s var(--pp-spring), box-shadow .12s; }
-.dg-k:active { translate: 0 3px; box-shadow: 0 1px 0 var(--pp-ink); }
-.dg-k-del { background: color-mix(in srgb, var(--pp-orange) 45%, var(--pp-paper)); }
-.dg-k-call { background: var(--pp-lime); }
-.dg-g { position: absolute; right: 3px; bottom: 2px; font: inherit; font-size: 9px; line-height: 1; color: var(--pp-label); }
-.dg-g:empty { display: none; }
-.dg-ky { color: var(--pp-ink); background: var(--pp-yellow); }
-
-/* сломан: табличка «не работает» и дверь — стучать */
-.dg-sign { align-self: center; padding: .5em .9em; font-size: var(--pp-fs-m); text-transform: uppercase; color: var(--pp-red);
-           background: #fff; border: 2px solid var(--pp-ink); rotate: -4deg; box-shadow: 0 2px 0 var(--pp-ink); }
-.dg-door { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .7em; min-height: clamp(120px, 26vh, 220px);
-           font: inherit; font-size: var(--pp-fs-l); color: var(--pp-paper); cursor: pointer; touch-action: manipulation;
-           background: #7a4a2a repeating-linear-gradient(90deg, transparent 0 22px, rgba(0, 0, 0, .12) 22px 25px);
-           border: 4px solid var(--pp-ink); border-radius: 6px; box-shadow: 0 5px 0 var(--pp-ink); text-shadow: 2px 2px 0 var(--pp-ink); }
-.dg-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; max-width: 90%; }
-.dg-dots i { width: 12px; height: 12px; border: 2px solid var(--pp-paper); border-radius: 50%; }
+/* сломан: на экранчике пусто, бумажка «не работает» на скотче; стучать — по самой двери */
+.dg-broken .dg-scr { color: #ff8a6a; }
+.dg-sign { align-self: center; padding: .5em .9em; font-size: min(7cqw, 9cqh); text-transform: uppercase; color: var(--pp-red); background: #fff;
+           border: 2px solid var(--pp-ink); rotate: -5deg; box-shadow: 0 3px 0 rgba(0, 0, 0, .3); }
+.dg-door { position: absolute; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .8em; padding: 0;
+           font: inherit; font-size: clamp(18px, 3vw, 40px); color: #fff3d6; text-shadow: 3px 3px 0 #2a2622; cursor: pointer; touch-action: manipulation;
+           background: rgba(255, 216, 94, .06); border: 3px dashed rgba(255, 243, 214, .45); border-radius: 8px; }
+.dg-door:active { background: rgba(255, 216, 94, .18); }
+.dg-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 80%; }
+.dg-dots i { width: 14px; height: 14px; border: 2px solid #fff3d6; border-radius: 50%; }
 .dg-dots i.on { background: var(--pp-yellow); }
 
-.dg-help { min-height: 1.2em; margin: .7em 0 0; font-size: var(--pp-fs-s); line-height: 2.2; color: var(--pp-label); text-align: center; }
-.dg-help .pp-key { margin-right: .4em; }
-.dg-seal { --pp-seal-top: 34%; --pp-seal-right: 50%; --pp-seal-rot: -9deg; translate: 50% 0; font-size: var(--pp-fs-l); white-space: nowrap; }
-
-/* движение — только на событии */
 .dg-pop { animation: dg-pop .16s var(--pp-spring); }
-@keyframes dg-pop { 0% { scale: .9; } 100% { scale: 1; } }
+@keyframes dg-pop { 0% { scale: .94; } 100% { scale: 1; } }
 .dg-shake .dg-unit { animation: dg-shake .3s; }
 @keyframes dg-shake { 25% { translate: -6px 0; } 50% { translate: 5px 0; } 75% { translate: -3px 0; } }
-.dg-ok .dg-scr { background: #1f4a22; }
 .dg-late .dg-unit { filter: saturate(.6); }
 @media (prefers-reduced-motion: reduce) { .dg-pop, .dg-shake .dg-unit { animation: none; } }
 body.calm-fx .dg-pop, body.calm-fx .dg-shake .dg-unit { animation: none; }
-
-/* телефон стоя и узкие окна: накладная над панелью */
-@media (max-width: 620px) {
-  .dg-body { flex-direction: column; }
-  .dg-slip { flex: none; }
-  .dg-k { min-height: clamp(52px, 7.6vh, 70px); }
-}
-/* низкие (телефон боком): кнопки ниже, всё в высоту экрана */
-@media (max-height: 460px) {
-  .dg { align-items: flex-start; }
-  .dg-sheet .pp-head { padding: .4em 0 .3em; }
-  .dg-k { min-height: 36px; font-size: var(--pp-fs-m); }
-  .dg-flat { font-size: 20px; }
-  .dg-help { display: none; }
-}

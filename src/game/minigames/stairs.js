@@ -1,25 +1,41 @@
-/* Мини-игра у клиента: подъезд — найти квартиру и подняться на этаж (IDEAS блок 13, 09.10.2026).
+/* Мини-игра у клиента: подъезд — подняться на этаж (IDEAS блок 13, 09.10.2026; трек 10 п. 6, 10.10.2026).
    Правила словами — docs/ORDERS.md «Подъезд: подняться на этаж». Когда выпадает и что даёт деньгами — doorstep.js
    (числа — ECON.STAIRS, econ.js); здесь — только сам экран.
+
+   Автор 10.10.2026: «бабку убрать, интерфейс по ширине, в центре курьер, который поднимается, и явно прописанное
+   задание — поднимись и отдай заказ; накладная такая же, как вначале». Экран: сверху крупно задание (этаж, квартира,
+   подъезд, где ты сейчас) и рядом та же накладная (ordersheet.js; по ходу — ручкой: чужая дверь, «−N ₽ гопникам»,
+   «+N ₽ взбежал быстро»); ниже на всю ширину — подъезд в разрезе: лестница посередине (курьер всегда в центре),
+   двери квартир слева и справа на каждой площадке. Своего таймера нет — в шапке часы заказа (doorkit.js), реплики —
+   сообщениями с лицом того, кто говорит (жилец за дверью, гопник, клиент; свои — синие справа).
 
    Формат мини-игры песочницы (src/uilab/minigames.js): export default { id, name, note, knobs, mount }.
    mount(root, o, api) → убрать за собой.
      o: { lv (этажей в доме), floor (нужный этаж; 0 — случайный), per (квартир на этаже; 0 — случайно), entr (подъезд; 0 — случайно),
-          gop (гопники на площадке), time (с на всё; 0 — по формуле ECON.STAIRS.T), addr, who, K (числа; по умолчанию ECON.STAIRS) }
+          door (какая дверь на площадке), gop (гопники на площадке), time (с — эталон «быстро»; 0 — по формуле ECON.STAIRS.T),
+          addr, who, person (клиент), sheet (HTML листа ordersheet.js), clock() (часы заказа; нет — свои, ручка «срок»),
+          bonus ('+100 ₽'), gopPay ('−100 ₽'), K (числа; по умолчанию ECON.STAIRS) }
      api: t, ADULT, log(текст), done(итог) — кончилась (итог: { ok, timeout, fast, tries, t, floor, flat, gop: '' | 'dodge' | 'pay', mode: 'stairs' });
           в игре ещё: setStep(fn(dt)) — время идёт кадрами игры (пауза его стоит; без него — свой rAF),
           setPad(fn(p)) — кнопки геймпада (gamepad.js: a, b, up, down — держат; menuOk, menuUp/Down/Left/Right, menuBack, btnY — нажали),
           paused() — игра на паузе (клавиши не жмутся), sfx(имя) — звук (step, puff, ring, wrong, open, gop, beat, dodge, pay, fail).
-   Как играют: схема подъезда сбоку, лифт сломан. Вверх — A / ↑ / пробел / ▲ часто (держать — дыхалка тает, «одышка»),
-   вниз — B / ↓ / ▼. На площадке ← → — к двери, A / Enter / тап по двери — позвонить. Табличка на площадке — какие там квартиры.
-   Гопники: ← / → в такт стрелкам — обойти; Y / Enter — отдать «чаевые». Бабка в окне комментирует. */
+   Как играют: лифт сломан. Вверх — A / ↑ / пробел / ▲ часто (держать — дыхалка тает, «одышка»), вниз — B / ↓ / ▼.
+   На площадке ← → — к двери, A / Enter / тап по двери — позвонить. Табличка на площадке — какие там квартиры.
+   Гопники: ← / → в такт стрелкам — обойти; Y / Enter — отдать «чаевые». */
 import './stairs.css';
 import { inputKind, onInput } from '../../input/glyphs.js';
 import { STAIRS as K0 } from '../econ.js';
+import { faceDataURL } from '../people.js';
+import * as OS from '../ordersheet.js';
+import * as KIT from './doorkit.js';
+import * as SC from './doorscene.js';
 
 const N_ = s => s;
 const DT_MAX = 0.1;
-const X0 = 0.6, X1 = 0.9;            // доли ширины: низ пролёта (площадка) и промежуточная площадка с окном
+/* мир подъезда — в долях высоты этажа (FH): лестница посередине (курьер всегда в центре кадра), двери слева и справа */
+const XA = -0.3, XB = 0.3, XM = 0.56;          // низ пролёта (площадка), промежуточная площадка с окном (от XB до XM)
+const GAP = 0.44, DL0 = -0.82, DR0 = 0.92;     // шаг дверей, ближняя к лестнице слева и справа
+const DW = 0.27, DH = 0.58;                    // дверь: ширина и высота
 const rand = (a, b) => a + Math.random() * (b - a);
 const rint = (a, b) => Math.floor(rand(a, b + 1));
 const pick = a => a[(Math.random() * a.length) | 0];
@@ -44,19 +60,6 @@ const WRONG = {
     { who: N_('мужик'), say: N_('Ниже, ёпт! Глаза разуй!'), adult: true },
   ],
 };
-/* бабка в окне напротив: что говорит на событиях */
-const BABKA = {
-  start: [N_('Опять лифт сломан! Третий год чинят.'), N_('Пешочком, сынок, пешочком!'), N_('Лифт у нас для красоты, милок.')],
-  slow: [N_('Ползёт, как пенсия по почте…'), N_('Шевелись, пицца стынет!')],
-  puff: [N_('Молодой, а пыхтит, как паровоз!'), N_('Дыши, касатик, дыши!')],
-  over: [N_('Проскочил, торопыга!'), N_('Куда полетел? Мимо!')],
-  wrong: [N_('Ну кто ж так звонит…'), N_('Табличку читай, грамотей!')],
-  gop: [N_('Опять эти на площадке сидят! Милиции на них нет!')],
-  pay: [N_('Тьфу! Откупился!')],
-  dodge: [N_('Ловко! Как мой Петя в молодости.')],
-  win: [N_('Мне бы такого внучка!'), N_('Вот это я понимаю — доставка!')],
-  late: [N_('Всё, проворонил! Сам спускается.')],
-};
 const GOP = {
   ask: N_('Слышь, есть закурить?'),
   askKid: N_('Слышь, курьер, а пицца с чем? Поделись!'),
@@ -66,59 +69,52 @@ const GOP = {
   paid: N_('Во, нормальный пацан!'),
 };
 
-/* пиксельные спрайты (смотрят вправо, низ — ступни): буква — цвет из PAL, точка — пусто */
+/* пиксельные спрайты крупно (смотрят вправо, низ — ступни): буква — цвет из PAL, точка — пусто */
 const PAL = {
-  R: '#d8402f', S: '#f2c08a', K: '#33210c', O: '#ff8a2b', x: '#8a5a2a', X: '#d9a25a', B: '#3b4a7a', b: '#1d1a24', W: '#9fdcff',
-  G: '#24306a', g: '#141519', w: '#f4f0e6', k: '#1a1a1a', c: '#fff6e0', P: '#c8405e', p: '#f2d36b', C: '#6a5a8a', M: '#7a2a2a',
+  R: '#d8402f', r: '#9a2a22', S: '#f2c08a', s: '#d39a66', K: '#33210c', O: '#ff8a2b', o: '#c8641c', Y: '#ffe36a', X: '#d9a25a', x: '#a8743a', L: '#d8402f',
+  B: '#3b4a7a', b: '#283458', k: '#1d1a24', W: '#9fdcff', G: '#24306a', g: '#141519', w: '#f4f0e6', c: '#fff6e0', H: '#3a2a1e', h: '#5a4030',
 };
 const TOP = [
-  '...RRRR...',
-  '..RRRRRRR.',
-  '...SSSS...',
-  '...SSKS...',
-  '...SSSS...',
-  '..OOOOxXXx',
-  '.OOOOOXXXX',
-  '.OOOOSXXXX',
-  '.OOOOxXXXx',
-  '..OOO.....',
-  '..BBBB....',
-  '..BBBB....',
+  '...RRRRR....',
+  '..RRRRRRRr..',
+  '..rrrrRRRRRR',
+  '...HSSSSS...',
+  '...SSSKSS...',
+  '...sSSSSs...',
+  '....SSSS....',
+  '..OOOOOXXXXX',
+  '.OOOOOOXLLLX',
+  '.OYYYOOXXXXX',
+  '.OOOOOSSxxxx',
+  '.ooOOOO.....',
+  '..OOOOO.....',
+  '..YYYYY.....',
+  '..BBBBB.....',
 ];
 const MAN = {
-  stand: TOP.concat(['..BB.BB...', '..BB.BB...', '..BB.BB...', '..bb.bbb..']),
-  w1: TOP.concat(['.BB...BB..', '.BB...BB..', 'BB.....BB.', 'bb.....bbb']),
-  w2: TOP.concat(['..BBBBB...', '..BB..B...', '..BB......', '..bbb.....']),
-  puff: [
-    '..........', '..........', '....RRRR..', '...RRRRRRR', '....SSSS..', '..W.SSKS..', '...OSSSS..', '..OOOOxXXx',
-    '.OOOOOXXXX', '.OOOOSXXXX', '..OOOxXXXx', '..BBBB....', '..BB.BB...', '..BB.BB...', '..BB.BB...', '..bb.bbb..',
-  ],
+  stand: TOP.concat(['..BB..BB....', '..BB..BB....', '..BB..BB....', '..bb..bb....', '..kk..kkk...']),
+  w1: TOP.concat(['.BBB...BB...', '.BB.....BB..', 'BB.......BB.', 'bb.......bb.', 'kk.......kkk']),
+  w2: TOP.concat(['..BBBBBB....', '..BB..BB....', '..BB...BB...', '..bb...bb...', '..kkk..kkk..']),
 };
+MAN.puff = ['............'].concat(TOP.slice(0, TOP.length - 1).map((r, i) => (i === 4 ? '.W' + r.slice(2) : r)), MAN.stand.slice(TOP.length));
+/* гопник сидит на ступеньке */
 const GOPNIK = [
-  '...kkkk...',
-  '..kkkkkkk.',
-  '...SSSS...',
-  '...SSKS...',
-  '...SSSS...',
-  '..GGGGGG..',
-  '.GwGGGGwG.',
-  '.GGGGGGGS.',
-  'GGGGGGGG..',
-  'GwGGGGwG..',
-  'GG....GG..',
-  'bb....bb..',
+  '...kkkkk....',
+  '..kkkkkkkk..',
+  '...SSSSS....',
+  '...SSKSS....',
+  '...sSSSS....',
+  '..GGGGGGG...',
+  '.GwGGGGGwG..',
+  '.GGGGGGGGS..',
+  '.GwGGGGGG...',
+  '.GGGGGGGGGG.',
+  '.GwGGGGGGwG.',
+  '......GG.GG.',
+  '......GG.GG.',
+  '......gg.gg.',
 ];
-const BABKA_SPR = [
-  '..PPPP..',
-  '.PpPPpP.',
-  'PPSSSSPP',
-  'PSKSSKSP',
-  'PSSSSSSP',
-  'PSSKKSSP',
-  '.PSSSSP.',
-  '..CCCC..',
-  '.CCCCCC.',
-];
+const CAT = ['k...k.....', 'kk.kk.....', 'kkkkk....k', 'kWkWk...k.', 'kkkkkkkkk.', '.kkkkkkkk.', '.k.k..k.k.'];
 
 /* дом и квартира: этажей lv, квартир на этаже per, подъезд entr (квартиры нумеруются через весь дом), нужный этаж и дверь */
 export function plan (o = {}, K = K0) {
@@ -137,112 +133,116 @@ export function plan (o = {}, K = K0) {
 
 export default {
   id: 'stairs', name: 'подъезд: подняться на этаж',
-  note: 'Лифт сломан: вверх — A / ↑ / пробел / ▲ часто (держать — дыхалка тает), вниз — B / ↓. На площадке ← → к двери, A / Enter / тап — позвонить. Табличка — какие квартиры на этаже. Гопники: ← → в такт или Y / Enter — откупиться. 5—10 с.',
+  note: 'Задание крупно: «поднимись на N-й этаж и отдай заказ», рядом та же накладная. Лифт сломан: вверх — A / ↑ / пробел / ▲ часто (держать — дыхалка тает), вниз — B / ↓. На площадке ← → к двери, A / Enter / тап — позвонить. Гопники: ← → в такт или Y / Enter — откупиться. Своего таймера нет — идёт срок заказа.',
   knobs: [
     { k: 'lv', label: 'этажей в доме', type: 'num', def: 9, min: 5, max: 16, step: 1 },
     { k: 'floor', label: 'нужный этаж (0 — случайно)', type: 'num', def: 0, min: 0, max: 16, step: 1 },
     { k: 'per', label: 'квартир на этаже (0 — случайно)', type: 'num', def: 0, min: 0, max: 6, step: 1 },
     { k: 'entr', label: 'подъезд (0 — случайно)', type: 'num', def: 0, min: 0, max: 6, step: 1 },
     { k: 'gop', label: 'гопники на площадке', type: 'bool', def: false },
-    { k: 'time', label: 'секунд на всё (0 — по формуле)', type: 'num', def: 0, min: 0, max: 30, step: 0.5 },
+    { k: 'clockS', label: 'срок заказа, с', type: 'num', def: 45, min: 3, max: 120, step: 1 },
+    { k: 'look', label: 'подъезд', type: 'sel', def: 'shabby', opts: [['shabby', 'обшарпанный'], ['clean', 'чистый с цветами'], ['auto', 'по адресу']] },
+    { k: 'time', label: 'эталон «быстро», с (0 — по формуле)', type: 'num', def: 0, min: 0, max: 30, step: 0.5 },
   ],
   mount (root, o, api) {
     const t = api.t, K = Object.assign({}, K0, o.K || {});
     const P = plan(o, K);
     const { lv, per, floor, flat, first, time: limit } = P;
     const tgt = floor - 1;                                      // площадка нужного этажа (0 — первый этаж)
+    const nl = Math.ceil(per / 2), nr = per - nl;               // дверей слева и справа от лестницы
     const flatAt = (f, i) => first + f * per + i;
     const sfx = n => { try { if (api.sfx) api.sfx(n); } catch (e) { /* — */ } };
     const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';');
+    let fake = null, clock = o.clock;
+    if (typeof clock !== 'function') { fake = KIT.fakeClock(o.clockS || 45, t); clock = fake.get; }
+    let person = o.person || null, sheet = o.sheet, bonus = o.bonus, gopPay = o.gopPay;
+    if (!sheet) {   // песочница: заказ-образец на 1 000 ₽ с этой квартирой
+      const ord = KIT.fakeOrder(api, { home: { flat: String(flat) } });
+      person = person || ord.stops[0].persons[0] || null;
+      sheet = OS.html(ord, { extra: ord.extra, t });
+      const m = v => (api.money ? api.money(v) : v + ' ₽');
+      bonus = bonus || '+' + m(Math.round(1000 * K.FAST_BONUS));
+      gopPay = gopPay || '−' + m(Math.round(1000 * K.GOP_PAY));
+    }
     const st = {
       t: 0, phase: 'play', y: 0, v: 0, breath: 1, puff: 0, door: -1, walk: 0, lock: 0, arm: 0.35, tries: 0, lastTap: -9,
-      upHold: 0, stride: 0, leg: 0, bounce: 0, side: 0, sideT: 0, endT: 0, res: null, sayT: 0, babT: 0, babSay: 0, slowT: 0,
-      saidOver: false, cam: -0.12, pad: false, armA: false, last: {},
+      upHold: 0, stride: 0, leg: 0, bounce: 0, side: 0, sideT: 0, endT: 0, res: null, cam: -0.12, pad: false, armA: false,
+      last: {}, fl: -1,
     };
     const gop = P.gopAt ? { at: P.gopAt, done: false, how: '', state: '', i: 0, dirs: [], w: 0, tt: 0, arm: 0, flash: 0 } : null;
     const doors = new Map();                                    // квартира → { kind: 'wrong' | 'right', t, open }
     const keys = { up: false, down: false, act: false };
     const touch = { up: false, down: false };
     const padH = { up: false, down: false, a: false };
+    const client = () => o.who || (person && person.first) || t('клиент');
+
+    // подъезд по виду: обшарпанный или чистый — по дому (doorscene.js), стиль — общий с домофоном
+    const look = o.look === 'clean' || o.look === 'shabby' ? o.look : SC.lookOf(SC.hashStr(o.addr || String(flat)), o.zone);
+    const C = SC.PAL[look], seed = +o.seed || SC.hashStr((o.addr || '') + '|' + flat);
+    let faceUrl = '';
+    try { faceUrl = person ? faceDataURL(person, 48) : ''; } catch (e) { /* — */ }
 
     const box = document.createElement('div');
-    box.className = 'sx';
+    box.className = 'mk-full sx sx-' + look;
     box.innerHTML =
-      '<section class="pp-sheet sx-sheet pp-in">' +
-        '<header class="pp-head"><span>' + esc(t('подъезд · лифт не работает')) + '</span><b class="sx-left"></b></header>' +
-        '<div class="sx-fuse" aria-hidden="true"><i></i></div>' +
-        '<div class="sx-body">' +
-          '<div class="sx-slip pp-tilt-l">' +
-            '<span class="pp-label">' + esc(t('накладная')) + (o.addr ? ' · ' + esc(o.addr) : '') + '</span>' +
-            '<b class="sx-flat" style="--n:' + t('кв. {n}', { n: flat }).length + '">' + esc(t('кв. {n}', { n: flat })) + '</b>' +
-            (P.entr > 1 ? '<span class="sx-entr">' + esc(t('подъезд {n}', { n: P.entr })) + '</span>' : '') +
-            '<p class="sx-note">' + esc(t('лифт сломан (как всегда)')) + '</p>' +
-            '<span class="pp-hint sx-task">' + esc(t('этаж — по табличкам на площадках')) + '</span>' +
-          '</div>' +
-          '<div class="sx-scene">' +
-            '<canvas class="sx-cv"></canvas>' +
-            '<div class="sx-breath"><span>' + esc(t('дыхалка')) + '</span><i><b></b></i></div>' +
-            '<div class="sx-say" hidden></div>' +
-            '<div class="sx-babka" hidden></div>' +
-          '</div>' +
+      '<canvas class="mk-cv sx-cv"></canvas>' +
+      '<div class="mk-top">' + KIT.dashHTML() + '<div class="mk-fuse" aria-hidden="true"><i></i></div>' +
+        '<div class="mk-task sx-task"><b class="mk-goal">' + esc(t('Поднимись на {n}-й этаж и отдай заказ', { n: floor })) + '</b>' +
+          '<span class="mk-sub"><i>' + esc(t('кв. {n}', { n: flat })) + '</i>' + (P.entr > 1 ? '<i>' + esc(t('подъезд {n}', { n: P.entr })) + '</i>' : '') +
+          '<em class="sx-now"></em><span class="sx-breath"><span>' + esc(t('дыхалка')) + '</span><i><b></b></i></span></span>' +
         '</div>' +
-        '<div class="sx-bar sx-bar-go">' +
-          '<button type="button" tabindex="-1" data-a="down" class="sx-b sx-b-down">▼<kbd class="sx-g" data-g="down"></kbd></button>' +
-          '<button type="button" tabindex="-1" data-a="up" class="sx-b sx-b-up">▲ ' + esc(t('вверх')) + '<kbd class="sx-g" data-g="up"></kbd></button>' +
-          '<button type="button" tabindex="-1" data-a="left" class="sx-b">◀</button>' +
-          '<button type="button" tabindex="-1" data-a="right" class="sx-b">▶</button>' +
-          '<button type="button" tabindex="-1" data-a="ring" class="sx-b sx-b-ring">🔔<kbd class="sx-g" data-g="ring"></kbd></button>' +
-        '</div>' +
-        '<div class="sx-bar sx-bar-gop" hidden>' +
-          '<button type="button" tabindex="-1" data-a="left" class="sx-b sx-b-dir">◀</button>' +
-          '<button type="button" tabindex="-1" data-a="right" class="sx-b sx-b-dir">▶</button>' +
-          '<button type="button" tabindex="-1" data-a="pay" class="sx-b sx-b-pay">' + esc(t('отдать «чаевые» −{n} %', { n: Math.round(K.GOP_PAY * 100) })) + '<kbd class="sx-g" data-g="pay"></kbd></button>' +
-        '</div>' +
-        '<p class="sx-help"></p>' +
-      '</section>';
+      '</div>' +
+      '<div class="mk-say sx-feed"></div>' +
+      KIT.miniHTML(sheet, { t, short: t('кв. {n}', { n: flat }), face: faceUrl }) +
+      '<div class="sx-bar sx-bar-go">' +
+        '<button type="button" tabindex="-1" data-a="down" class="sx-b sx-b-down">▼</button>' +
+        '<button type="button" tabindex="-1" data-a="up" class="sx-b sx-b-up">▲ ' + esc(t('вверх')) + '</button>' +
+        '<button type="button" tabindex="-1" data-a="left" class="sx-b">◀</button>' +
+        '<button type="button" tabindex="-1" data-a="right" class="sx-b">▶</button>' +
+        '<button type="button" tabindex="-1" data-a="ring" class="sx-b sx-b-ring">🔔</button>' +
+      '</div>' +
+      '<div class="sx-bar sx-bar-gop" hidden>' +
+        '<button type="button" tabindex="-1" data-a="left" class="sx-b sx-b-dir">◀</button>' +
+        '<button type="button" tabindex="-1" data-a="right" class="sx-b sx-b-dir">▶</button>' +
+        '<button type="button" tabindex="-1" data-a="pay" class="sx-b sx-b-pay">' + esc(t('отдать «чаевые» −{n} %', { n: Math.round(K.GOP_PAY * 100) })) + '</button>' +
+      '</div>' +
+      '<p class="mk-help"></p>';
     const q = s => box.querySelector(s);
-    const elFuse = q('.sx-fuse i'), elLeft = q('.sx-left'), elSay = q('.sx-say'), elBab = q('.sx-babka'), elHelp = q('.sx-help'), elSheet = q('.sx-sheet');
+    const elFuse = q('.mk-fuse i'), elHelp = q('.mk-help'), elSheet = box, elNow = q('.sx-now'), elTask = q('.sx-task');
+    const mini = KIT.miniBind(q('.mk-mini')), elInv = mini.body;
     const elBreath = q('.sx-breath'), elBreathBar = q('.sx-breath b'), barGo = q('.sx-bar-go'), barGop = q('.sx-bar-gop');
     const cv = q('.sx-cv'), g = cv.getContext('2d');
+    const msgs = KIT.feed(q('.sx-feed'), { max: 3 });
+    const say = m => msgs.say(m);
 
-    /* значки и подсказка по вводу */
+    /* где ты сейчас: «ты на 3-м этаже» → «твой этаж! кв. 47» */
+    const where = () => {
+      const f = Math.round(st.y);
+      if (f === st.fl) return;
+      st.fl = f;
+      const here = f === tgt;
+      elTask.classList.toggle('mk-here', here);
+      elNow.textContent = here ? t('твой этаж! ищи кв. {n}', { n: flat }) : f > tgt ? t('ты на {n}-м — проскочил, ниже!', { n: f + 1 }) : t('ты на {n}-м этаже', { n: f + 1 });
+    };
+
+    /* подсказка по вводу — одной строкой внизу; на кнопках значков нет */
     const glyphs = () => {
       const k = inputKind().kind, ps = inputKind().family === 'ps';
       box.dataset.input = k;
       const A = ps ? '✕' : 'A', B = ps ? '○' : 'B', Y = ps ? '△' : 'Y';
-      const G = { pad: { up: A, down: B, ring: A, pay: Y }, kb: { up: '↑', down: '↓', ring: 'Enter', pay: 'Enter' } }[k] || {};
-      for (const el of box.querySelectorAll('.sx-g')) el.textContent = G[el.dataset.g] || '';
       const kbd = (s, kb) => '<kbd class="pp-key' + (kb ? ' pp-key-kb' : '') + '">' + esc(s) + '</kbd>';
+      mini.key(k === 'pad' ? (ps ? '□' : 'X') : k === 'kb' ? 'X' : '');
       if (st.phase === 'gop') {
         elHelp.innerHTML = k === 'pad' ? kbd('◀ ▶') + esc(t('в такт — обойти')) + ' · ' + kbd(Y) + esc(t('откупиться'))
           : k === 'kb' ? kbd('← →', 1) + esc(t('в такт — обойти')) + ' · ' + kbd('Enter', 1) + esc(t('откупиться'))
             : esc(t('жми ◀ ▶ в такт — или откупись'));
       } else {
-        elHelp.innerHTML = k === 'pad' ? kbd(A) + esc(t('вверх — жми часто')) + ' · ' + kbd(B) + esc(t('вниз')) + ' · ' + kbd('◀ ▶') + esc(t('к двери')) + ' · ' + kbd(A) + esc(t('у двери — звонок'))
-          : k === 'kb' ? kbd('↑', 1) + esc(t('вверх — жми часто')) + ' · ' + kbd('↓', 1) + esc(t('вниз')) + ' · ' + kbd('← →', 1) + esc(t('к двери')) + ' · ' + kbd('Enter', 1) + esc(t('звонок'))
+        elHelp.innerHTML = k === 'pad' ? kbd(A) + esc(t('вверх — жми часто')) + ' · ' + kbd(B) + esc(t('вниз')) + ' · ' + kbd('◀ ▶') + esc(t('к двери')) + ' · ' + kbd(A) + esc(t('у двери — звонок')) + ' · ' + kbd(ps ? '□' : 'X') + esc(t('накладная'))
+          : k === 'kb' ? kbd('↑', 1) + esc(t('вверх — жми часто')) + ' · ' + kbd('↓', 1) + esc(t('вниз')) + ' · ' + kbd('← →', 1) + esc(t('к двери')) + ' · ' + kbd('Enter', 1) + esc(t('звонок')) + ' · ' + kbd('X', 1) + esc(t('накладная'))
             : esc(t('жми ▲ часто · дверь — тап'));
       }
     };
     const pop = el => { if (!el) return; el.classList.remove('sx-pop'); void el.offsetWidth; el.classList.add('sx-pop'); };
-    const say = (who, text, cls, dur) => {
-      elSay.hidden = false;
-      elSay.className = 'sx-say ' + (cls || '');
-      elSay.innerHTML = (who ? '<em>' + esc(who) + ':</em> ' : '') + esc(text);
-      st.sayT = dur || 2.2;
-      pop(elSay);
-    };
-    const babka = (key, force) => {
-      if (!force && st.babT > 0) return;
-      const pool = BABKA[key];
-      if (!pool) return;
-      let s = pick(pool);
-      if (pool.length > 1 && s === st.last.bab) s = pool.find(x => x !== s);
-      st.last.bab = s;
-      elBab.hidden = false;
-      elBab.innerHTML = '<em>' + esc(t('бабка')) + ':</em> ' + esc(t(s));
-      st.babT = 2.6; st.babSay = 1.2;
-      pop(elBab);
-    };
 
     /* ── управление ── */
     function tapUp () {
@@ -261,14 +261,16 @@ export default {
       st.lastTap = st.t;
       st.v = Math.max(-K.DOWN_V * 1.2, Math.min(st.v, 0) - K.DOWN_TAP);
     }
+    /* на площадке: ← → по ряду [двери слева … лестница … двери справа] */
     function side (dir) {
       if (st.phase === 'gop') { gopPress(dir); return; }
       if (st.phase !== 'play' || st.arm > 0 || st.lock > 0) return;
       const f = Math.round(st.y);
       if (Math.abs(st.y - f) > K.SNAP) return;                 // посреди пролёта дверей нет
       st.y = f; st.v = 0;
-      if (st.door < 0) { if (dir < 0) st.door = per - 1; }
-      else { const n = st.door + dir; st.door = n >= per ? -1 : Math.max(0, n); }
+      let p = st.door < 0 ? nl : st.door < nl ? st.door : st.door + 1;
+      p = clamp(p + dir, 0, per);
+      st.door = p === nl ? -1 : p < nl ? p : p - 1;
     }
     function action () {
       if (st.phase !== 'play') return;
@@ -281,27 +283,30 @@ export default {
       if (n === flat) { doors.set(n, { kind: 'right', t: 99, open: 0 }); finish(true, false); return; }
       st.tries++;
       st.lock = K.WRONG_T;
-      doors.set(n, { kind: 'wrong', t: K.WRONG_T + 0.5, open: 0 });
       const rel = f === tgt ? 'same' : f < tgt ? 'up' : 'down';
       const pool = WRONG[rel].filter(w => !w.adult || api.ADULT);
       let w = pick(pool);
       if (pool.length > 1 && w === st.last.wrong) w = pool.find(x => x !== w);
       st.last.wrong = w;
-      say(t('кв. {n}', { n }) + ' · ' + t(w.who), t(w.say), 'sx-bad', 2.4);
+      doors.set(n, { kind: 'wrong', t: K.WRONG_T + 0.5, open: 0, who: w.who });
+      say({ person: KIT.stranger(w.who), kind: w.who, name: t('кв. {n}', { n }) + ' · ' + t(w.who), text: t(w.say), mood: 'angry', cls: 'mk-bad' });
+      const pens = elInv.querySelectorAll('.os-pen.os-x');
+      if (pens.length >= 3) pens[0].remove();
+      OS.pen(elInv, 'flat', String(n), 'os-x');                 // чужая дверь — ручкой на листе, зачёркнутой
+      mini.peek();
       setTimeout(() => sfx('wrong'), 180);
-      if (Math.random() < 0.5) babka('wrong');
       pop(q('.sx-scene'));
     }
 
     /* ── гопники ── */
     const setBars = () => { barGo.hidden = st.phase === 'gop'; barGop.hidden = st.phase !== 'gop'; glyphs(); };   // в конце кнопки остаются бледными — лист не прыгает
+    const gopP = () => KIT.stranger('гопник');
     function startGop () {
       st.phase = 'gop';
       st.v = 0; st.door = -1;
       gop.state = 'ask'; gop.tt = 0.9; gop.arm = 0.3; gop.i = 0;
       gop.dirs = Array.from({ length: K.GOP_STEPS }, () => (Math.random() < 0.5 ? -1 : 1));
-      say(t('гопник'), t(api.ADULT ? GOP.ask : GOP.askKid), 'sx-gop', 2.4);
-      babka('gop', true);
+      say({ person: gopP(), name: t('гопник'), text: t(api.ADULT ? GOP.ask : GOP.askKid), mood: 'angry' });
       sfx('gop');
       setBars();
     }
@@ -309,7 +314,7 @@ export default {
     function gopMiss () {
       gop.state = 'miss'; gop.tt = K.GOP_MISS;
       gop.dirs[gop.i] = Math.random() < 0.5 ? -1 : 1;
-      say(t('гопник'), t(pick(GOP.miss.concat(api.ADULT ? GOP.missAdult : []))), 'sx-gop', 1.6);
+      say({ person: gopP(), name: t('гопник'), text: t(pick(GOP.miss.concat(api.ADULT ? GOP.missAdult : []))), mood: 'angry', cls: 'mk-bad' });
       st.sideT = 0;
       sfx('wrong');
     }
@@ -331,8 +336,8 @@ export default {
       st.phase = 'play';
       st.y = gop.at + 0.04; st.v = how === 'dodge' ? 0.9 : 0.6;
       st.lastTap = st.t;
-      say(t('гопник'), t(how === 'pay' ? GOP.paid : GOP.pass), 'sx-gop', 1.6);
-      babka(how === 'pay' ? 'pay' : 'dodge', true);
+      say({ person: gopP(), name: t('гопник'), text: t(how === 'pay' ? GOP.paid : GOP.pass), mood: how === 'pay' ? 'happy' : 'angry' });
+      if (how === 'pay' && gopPay) { OS.pen(elInv, 'pay', gopPay + ' · ' + t('гопникам'), 'os-minus'); mini.peek(); }
       sfx(how === 'pay' ? 'pay' : 'dodge');
       setBars();
     }
@@ -349,18 +354,19 @@ export default {
       st.phase = 'end';
       const fast = ok && !timeout && st.tries === 0 && st.t <= limit * K.FAST;
       st.res = { ok, timeout: !!timeout, fast, tries: st.tries, t: +st.t.toFixed(2), limit: +limit.toFixed(2), floor, flat, gop: gop ? gop.how : '', mode: 'stairs' };
-      st.endT = 1.4;
+      st.endT = 1.5;
+      where();
       setBars();
       box.classList.add(ok ? 'sx-ok' : 'sx-late');
       const seal = document.createElement('div');
-      seal.className = 'pp-seal ' + (ok ? 'pp-seal-green' : 'pp-seal-rust') + ' sx-seal';
+      seal.className = 'pp-seal ' + (ok ? 'pp-seal-green' : 'pp-seal-rust') + ' mk-seal';
       seal.textContent = ok ? (fast ? t('с ветерком!') : t('дошёл')) : t('сам спустится');
       elSheet.appendChild(seal);
-      if (ok) say(t('клиент'), t('О, пицца! Даже не запыхался?'), 'sx-good', 9);
-      else say(t('клиент'), t('Да стой ты там, сам спущусь…'), 'sx-bad', 9);
-      babka(ok ? 'win' : 'late', true);
+      if (ok) say({ person, name: client(), text: t('О, пицца! Даже не запыхался?'), mood: 'happy', cls: 'mk-good' });
+      else say({ person, name: client(), text: t('Да стой ты там, сам спущусь…'), mood: 'angry', cls: 'mk-bad' });
+      if (fast && bonus) { OS.pen(elInv, 'pay', bonus + ' · ' + t('взбежал быстро'), 'os-plus'); mini.peek(); }
       sfx(ok ? 'open' : 'fail');
-      api.log && api.log((ok ? 'дошёл' : 'не успел') + ' за ' + st.res.t + ' из ' + st.res.limit + ' с, этаж ' + floor + ', ошибок ' + st.tries + (fast ? ', быстро' : '') + (gop ? ', гопники: ' + (gop.how || '—') : ''));
+      api.log && api.log((ok ? 'дошёл' : 'срок вышел') + ' за ' + st.res.t + ' с (быстро — до ' + (limit * K.FAST).toFixed(1) + '), этаж ' + floor + ', ошибок ' + st.tries + (fast ? ', быстро' : '') + (gop ? ', гопники: ' + (gop.how || '—') : ''));
     }
 
     /* ── шаг ── */
@@ -393,8 +399,7 @@ export default {
       st.breath = clamp(st.breath, 0, 1);
       if (st.breath <= 0 && !puffing) {
         st.puff = K.PUFF_T;
-        say(t('курьер'), t('уф… уф… щас…'), 'sx-me', 1.4);
-        babka('puff');
+        say({ out: true, text: t('уф… уф… щас…') });
         sfx('puff');
       }
       const y0 = st.y;
@@ -407,20 +412,16 @@ export default {
       st.stride += Math.abs(st.y - y0);
       st.leg += Math.abs(st.y - y0);
       if (st.stride > 0.25) { st.stride -= 0.25; sfx('step'); }
-      if (!st.saidOver && st.y > tgt + 0.6) { st.saidOver = true; babka('over', true); }
-      if (st.y < tgt - 0.5 && Math.abs(st.v) < 0.15 && st.t > 1.5 && !lock) st.slowT += dt; else if (st.slowT > 0) st.slowT = 0;
-      if (st.slowT > 1.6) { babka('slow'); st.slowT = -4; }
     }
 
     function step (dt) {
       dt = clamp(dt, 0, DT_MAX);
       if (st.phase === 'done') return;
-      if (st.sayT > 0) { st.sayT -= dt; if (st.sayT <= 0) elSay.hidden = true; }
-      if (st.babT > 0) { st.babT -= dt; if (st.babT <= 0) elBab.hidden = true; }
-      if (st.babSay > 0) st.babSay -= dt;
+      if (fake && (st.phase === 'play' || st.phase === 'gop')) fake.step(dt);
+      KIT.dashSet(box, clock(), elFuse);
       for (const [n, d] of doors) {
         d.t -= dt;
-        d.open += ((d.t > 0 ? (d.kind === 'right' ? 1 : 0.42) : 0) - d.open) * Math.min(1, dt * 9);
+        d.open += ((d.t > 0 ? (d.kind === 'right' ? 1 : 0.62) : 0) - d.open) * Math.min(1, dt * 9);
         if (d.t <= 0 && d.open < 0.02) doors.delete(n);
       }
       if (st.phase === 'end') {
@@ -430,218 +431,271 @@ export default {
         return;
       }
       st.t += dt; st.arm -= dt;
-      const left = Math.max(0, limit - st.t);
-      elFuse.style.transform = 'scaleX(' + (left / limit).toFixed(3) + ')';
-      elFuse.parentNode.classList.toggle('sx-hot', left < limit * 0.3);
-      elLeft.textContent = t('{n} с', { n: left.toFixed(1).replace('.', ',') });
-      if (left <= 0) { finish(false, true); anim(dt); draw(); return; }
+      const c = clock();
+      if (c && c.s <= 0) { finish(false, true); anim(dt); draw(); return; }   // срок заказа кончился — клиент спускается сам
       if (st.phase === 'gop') gopStep(dt); else climb(dt);
       elBreathBar.style.transform = 'scaleX(' + st.breath.toFixed(3) + ')';
       elBreath.classList.toggle('sx-low', st.breath < 0.3 || st.puff > 0);
       elBreath.classList.toggle('sx-puff', st.puff > 0);
+      where();
       anim(dt); draw();
     }
 
-    /* анимация: курьер идёт к двери и обратно, ноги, отскок */
+    /* ── мир подъезда (в долях этажа FH) и камера: едет за курьером вверх-вниз и вбок ── */
+    const doorX = i => (i < nl ? DL0 - (nl - 1 - i) * GAP : DR0 + (i - nl) * GAP);
+    const standX = i => doorX(i) + (doorX(i) < XA ? 0.21 : -0.21);    // где встаёт курьер у двери — сбоку, лицом к ней
+    const WL = Math.min(doorX(0) - 0.42, XA - 0.7), WR = Math.max(doorX(per - 1) + 0.42, XM + 0.55);
+    const hsh = (...n) => { let x = seed ^ 0x9e3779b9; for (const v of n) { x = Math.imul(x ^ (v + 0x7f4a7c15), 0x85ebca6b); x ^= x >>> 13; } x = Math.imul(x, 0xc2b2ae35); return ((x ^ (x >>> 16)) >>> 0) / 4294967296; };
+    const flickF = Math.floor(hsh(99) * lv);                          // на этом этаже лампа мигает (обшарпанный)
+    st.camX = 0; st.cam = 0;
+    function manX () {
+      const y = st.y, fr = y - Math.floor(y);
+      if (st.phase === 'gop') return XA - 0.1;
+      if (fr < 0.02) return XA + st.walk;
+      return fr < 0.5 ? lerp(XA, XB, fr / 0.5) : lerp(XB, XA, (fr - 0.5) / 0.5);
+    }
     function anim (dt) {
-      const want = st.door >= 0 ? doorX(st.door) - X0 : 0;
-      const d = want - st.walk, sp = 1.6 * dt;
+      const want = st.door >= 0 ? standX(st.door) - XA : 0;
+      const d = want - st.walk, sp = 1.9 * dt;
       st.walk = Math.abs(d) <= sp ? want : st.walk + Math.sign(d) * sp;
-      if (Math.abs(d) > 0.001) st.leg += sp * 0.9;
+      if (Math.abs(d) > 0.001) st.leg += sp * 0.8;
       if (st.bounce > 0) st.bounce = Math.max(0, st.bounce - dt * 7);
       if (st.sideT > 0) st.sideT -= dt;
-      const camWant = clamp(st.y - 0.45, -0.12, Math.max(-0.12, lv - 1.6));
-      st.cam += (camWant - st.cam) * Math.min(1, dt * 7);
+      st.cam += (clamp(st.y, 0, lv - 1) - st.cam) * Math.min(1, dt * 6);
+      const half = W / 2 / Math.max(1, FH);
+      const cx = WR - WL <= 2 * half ? (WL + WR) / 2 : clamp(manX(), WL + half, WR - half);
+      st.camX += (cx - st.camX) * Math.min(1, dt * 5);
     }
 
-    /* ── рисование: подъезд в разрезе ── */
-    let W = 0, H = 0, FH = 1, U = 2, dpr = 1;
-    const doorX = i => 0.03 + (i + 0.5) * 0.53 / per;          // середина двери, доля ширины
-    const sy = h => H * 0.86 - (h - st.cam) * FH;
-    const hash = n => { let x = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b); x ^= x >>> 13; x = Math.imul(x, 0xc2b2ae35); return ((x ^ (x >>> 16)) >>> 0) / 4294967296; };
-    function spr (rows, cx, by, u, flip, pal) {
-      const h = rows.length, w = rows[0].length;
-      const L = Math.round(cx - w * u / 2), T = Math.round(by - h * u);
-      for (let r = 0; r < h; r++) {
-        const row = rows[r];
-        for (let c = 0; c < w; c++) {
-          const ch = row[c];
-          if (ch === '.') continue;
-          g.fillStyle = (pal && pal[ch]) || PAL[ch];
-          g.fillRect(L + (flip ? w - 1 - c : c) * u, T + r * u, u, u);
-        }
-      }
-    }
-    const font = px => g.font = Math.round(px) + 'px "Press Start 2P", ui-monospace, monospace';
+    /* ── рисование: крупный кадр одного-двух пролётов, пиксель U ── */
+    let W = 0, H = 0, FH = 1, U = 2, Pp = 2, dpr = 1;
+    const SX = x => W / 2 + (x - st.camX) * FH;
+    const SY = h => H * 0.68 - (h - st.cam) * FH;
+    const R = (x, y, w, h, c) => SC.rect(g, x, y, w, h, c);
+    const faceImgs = new Map();
+    const faceOf = kind => {
+      if (faceImgs.has(kind)) return faceImgs.get(kind);
+      let im = null;
+      const p = kind === 'client' ? person : KIT.stranger(kind);
+      if (p) { im = new Image(); try { im.src = faceDataURL(p, 64, kind === 'client' ? 'happy' : 'angry'); } catch (e) { im = null; } }
+      faceImgs.set(kind, im);
+      return im;
+    };
     function flight (xa, ha, xb, hb, n, fill, nose, rail) {
-      const dx = (xb - xa) / n, dh = (hb - ha) / n, th = 0.1;
+      const dx = (xb - xa) / n, dh = (hb - ha) / n, th = 0.09;
       g.beginPath();
-      g.moveTo(xa, sy(ha));
-      for (let i = 0; i < n; i++) { const x = xa + dx * i, h = ha + dh * (i + 1); g.lineTo(x, sy(h)); g.lineTo(x + dx, sy(h)); }
-      g.lineTo(xb, sy(hb - th)); g.lineTo(xa, sy(ha - th)); g.closePath();
+      g.moveTo(SX(xa), SY(ha));
+      for (let i = 0; i < n; i++) { const x = xa + dx * i, h = ha + dh * (i + 1); g.lineTo(SX(x), SY(h)); g.lineTo(SX(x + dx), SY(h)); }
+      g.lineTo(SX(xb), SY(hb - th)); g.lineTo(SX(xa), SY(ha - th)); g.closePath();
       g.fillStyle = fill; g.fill();
-      g.fillStyle = nose;
-      for (let i = 0; i < n; i++) { const x = xa + dx * i, h = ha + dh * (i + 1); g.fillRect(Math.min(x, x + dx), sy(h), Math.abs(dx), Math.max(1, U * 0.6)); }
-      // перила: балясины и поручень
+      for (let i = 0; i < n; i++) { const x = xa + dx * i, h = ha + dh * (i + 1); R(Math.min(SX(x), SX(x + dx)), SY(h), Math.abs(dx) * FH, Math.max(2, U * 0.7), nose); }
+      // перила: балясины и деревянный поручень
       g.fillStyle = '#2d2a26';
-      for (let i = 1; i < n; i += 2) { const x = xa + dx * (i + 0.5), h = ha + dh * (i + 1); g.fillRect(x - U * 0.3, sy(h + 0.3), Math.max(1, U * 0.6), sy(h) - sy(h + 0.3)); }
-      g.strokeStyle = rail; g.lineWidth = Math.max(2, U * 1.1); g.lineCap = 'round';
-      g.beginPath(); g.moveTo(xa, sy(ha + 0.3)); g.lineTo(xb, sy(hb + 0.3)); g.stroke();
+      for (let i = 0; i < n; i += 2) { const x = xa + dx * (i + 0.5), h = ha + dh * (i + 1); R(SX(x) - U * 0.35, SY(h + 0.3), Math.max(2, U * 0.7), SY(h) - SY(h + 0.3), '#2d2a26'); }
+      g.strokeStyle = rail; g.lineWidth = Math.max(3, U * 1.3); g.lineCap = 'round';
+      g.beginPath(); g.moveTo(SX(xa), SY(ha + 0.31)); g.lineTo(SX(xb), SY(hb + 0.31)); g.stroke();
     }
     function door (f, i) {
-      const n = flatAt(f, i), cx = doorX(i) * W;
-      const dw = Math.min(W * 0.38 / per, FH * 0.3), top = sy(f + 0.5), bot = sy(f), dh = bot - top;
-      const L = cx - dw / 2;
-      const kinds = ['#7a3b2a', '#5b4636', '#7f858c', '#6b2f3f', '#4a5b3a'];
-      const col = kinds[(hash(n) * kinds.length) | 0];
-      g.fillStyle = '#33210c'; g.fillRect(L - U, top - U, dw + 2 * U, dh + U);       // коробка
+      const n = flatAt(f, i), x = doorX(i);
+      const L = SX(x - DW / 2), T = SY(f + DH), w = DW * FH, h = DH * FH;
+      R(L - U * 1.5, T - U * 1.5, w + U * 3, h + U * 1.5, C.frame);
       const d = doors.get(n), open = d ? d.open : 0;
-      if (open > 0.01) {
-        g.fillStyle = '#120c08'; g.fillRect(L, top, dw, dh);
-        if (d.kind === 'wrong') { g.fillStyle = '#fff6e0'; g.fillRect(L + dw * 0.12, top + dh * 0.3, U, U); g.fillRect(L + dw * 0.12 + U * 2, top + dh * 0.3, U, U); }
-        else spr(['.SSSS.', 'SSKSKS', 'SSSSSS', 'SKSSKS', '.SKKS.', '.OOOO.', 'OOOOOO', 'OOOOOO', 'OOOOOO'], L + dw * 0.3, bot - dh * 0.15, Math.max(1, U * 0.9), false);
+      if (open > 0.01) {   // за дверью: тёплый свет квартиры и тот, кто открыл
+        R(L, T, w, h, '#2a1a10'); R(L + U, T + U, w - 2 * U, h * 0.9, '#6a4628');
+        const im = d.kind === 'right' ? faceOf('client') : d.who && faceOf(d.who);
+        const s = Math.min(w * 0.62, h * 0.34);
+        if (im && im.complete && im.naturalWidth) { g.drawImage(im, L + (w - s) / 2, T + h * 0.2, s, s); R(L + (w - s) / 2, T + h * 0.2 + s, s, h * 0.3, '#8a4a5a'); }
+        else if (d.who) SC.text(g, d.who === 'собака' ? '🐕' : d.who === 'кот' ? '🐈' : '?', L + w / 2, T + h * 0.62, s * 0.7, '#fff');
       }
-      const w = dw * (1 - open * 0.85);
-      g.fillStyle = col; g.fillRect(L + dw - w, top, w, dh);
-      if (w > dw * 0.5) {
-        // дерматин с гвоздиками, ручка, табличка с номером
-        g.fillStyle = 'rgba(0,0,0,.18)';
-        for (let yy = top + dh * 0.12; yy < bot - dh * 0.08; yy += dh * 0.16) for (let xx = L + dw * 0.2; xx < L + dw * 0.85; xx += dw * 0.3) g.fillRect(xx, yy, Math.max(1, U * 0.6), Math.max(1, U * 0.6));
-        g.fillStyle = '#ffd85e'; g.fillRect(L + dw * 0.8, top + dh * 0.52, U * 1.2, U * 0.8);
-        const s = String(n), fs = Math.max(5 * dpr, Math.min(clamp(FH * 0.06, 8 * dpr, 13 * dpr), W * 0.5 / per / (s.length + 0.4)));   // узкие двери (6 на этаже, телефон) — мельче, но номер целиком
-        font(fs);
-        const tw = g.measureText(s).width;
-        g.fillStyle = '#fff3d6'; g.fillRect(cx - tw / 2 - U, top + dh * 0.1, tw + 2 * U, fs + 2 * U);
-        g.fillStyle = '#33210c'; g.textAlign = 'center'; g.textBaseline = 'top';
-        g.fillText(s, cx, top + dh * 0.1 + U * 1.2);
+      const lw = w * (1 - open * 0.86), lx = L + w - lw;
+      const kind = hsh(n, 3);
+      const steel = look === 'clean' ? kind < 0.45 : kind < 0.25;
+      const DCOL = look === 'clean' ? ['#7a4a2a', '#5b4636', '#6b2f3f', '#3f5a6b'] : ['#7a3b2a', '#4a3a30', '#6b2f3f', '#3a4a30', '#5a2f2a'];
+      const col = steel ? '#8a9096' : DCOL[(hsh(n, 4) * DCOL.length) | 0];
+      R(lx, T, lw, h, col);
+      if (lw > w * 0.55) {
+        if (steel) {
+          R(lx + U * 2, T + U * 2, lw - U * 4, h * 0.42, 'rgba(255,255,255,.1)'); R(lx + U * 2, T + h * 0.5, lw - U * 4, h * 0.46, 'rgba(0,0,0,.1)');
+        } else {   // дерматин: стёжка ромбами, гвоздики
+          g.fillStyle = 'rgba(0,0,0,.22)';
+          for (let yy = T + h * 0.08; yy < T + h * 0.94; yy += h * 0.12) for (let xx = lx + lw * 0.15; xx < lx + lw * 0.9; xx += lw * 0.24) {
+            const off = (((yy - T) / (h * 0.12)) | 0) % 2 ? lw * 0.12 : 0;
+            g.fillRect(Math.round(xx + off), Math.round(yy), Math.max(2, U * 0.7), Math.max(2, U * 0.7));
+          }
+          if (look === 'shabby' && hsh(n, 5) < 0.5) R(lx + lw * 0.2, T + h * 0.62, lw * 0.3, h * 0.14, '#c9a46a');   // порван — торчит поролон
+        }
+        // номерок, глазок, ручка, замок
+        const s = String(n), fs = Math.min(FH * 0.045, lw * 0.9 / (s.length + 0.6));
+        R(lx + lw / 2 - fs * (s.length * 0.55 + 0.4), T + h * 0.12, fs * (s.length * 1.1 + 0.8), fs * 1.8, '#d9b25a');
+        SC.text(g, s, lx + lw / 2, T + h * 0.12 + fs * 0.95, fs, '#33210c');
+        R(lx + lw / 2 - U, T + h * 0.34, U * 2, U * 2, '#1a1410');
+        R(lx + lw * 0.78, T + h * 0.52, U * 2.4, U * 1.2, '#e8d07a'); R(lx + lw * 0.8, T + h * 0.6, U * 1.2, U * 1.6, '#33210c');
       }
-      // выбранная дверь — жёлтая обводка (геймпад и клавиатура)
-      if (st.door === i && Math.round(st.y) === f && st.phase !== 'gop') {
-        g.strokeStyle = '#ffd85e'; g.lineWidth = Math.max(2, U * 1.2);
-        g.strokeRect(L - U * 2, top - U * 2, dw + U * 4, dh + U * 2);
+      if (st.door === i && Math.round(st.y) === f && st.phase !== 'gop') {   // выбранная — жёлтая рамка
+        g.strokeStyle = '#ffd85e'; g.lineWidth = Math.max(3, U * 1.3);
+        g.strokeRect(Math.round(L - U * 3), Math.round(T - U * 3), Math.round(w + U * 6), Math.round(h + U * 3));
       }
     }
+    function lamp (f, x) {
+      const on = !(C.flicker && f === flickF) || ((st.t * 7) | 0) % 9 > 1;
+      SC.bulb(g, SX(x), SY(f + 0.9), Math.max(2, U * 0.8), on, false);
+      return on;
+    }
     function wall (f) {
-      const top = sy(f + 1), bot = sy(f);
-      g.fillStyle = '#efe6cf'; g.fillRect(0, top, W, bot - top);
-      const pan = sy(f + 0.42);
-      g.fillStyle = '#6f9a7a'; g.fillRect(0, pan, W, bot - pan);
-      g.fillStyle = '#4c7356'; g.fillRect(0, pan, W, Math.max(2, U * 0.8));
-      // окно на промежуточной площадке
-      const wx = W * (X0 + X1) / 2, ww = W * 0.12, wt = sy(f + 0.92), wb = sy(f + 0.58);
-      g.fillStyle = '#33210c'; g.fillRect(wx - ww / 2 - U, wt - U, ww + 2 * U, wb - wt + 2 * U);
-      g.fillStyle = '#ffb36b'; g.fillRect(wx - ww / 2, wt, ww, wb - wt);
-      g.fillStyle = '#ff8a5e'; g.fillRect(wx - ww / 2, wt + (wb - wt) * 0.55, ww, (wb - wt) * 0.45);
-      g.fillStyle = '#33210c'; g.fillRect(wx - U * 0.5, wt, U, wb - wt); g.fillRect(wx - ww / 2, wt + (wb - wt) * 0.45, ww, U);
-      // этаж — трафаретом, табличка «кв. a—b» над дверями
-      const fsN = clamp(FH * 0.12, 12 * dpr, 28 * dpr);
-      font(fsN); g.textAlign = 'left'; g.textBaseline = 'alphabetic';
-      g.fillStyle = 'rgba(160, 50, 40, .55)'; g.fillText(String(f + 1), W * 0.012, sy(f + 0.62));
-      const a = flatAt(f, 0), b = flatAt(f, per - 1);
-      const txt = t('кв. {a}—{b}', { a, b }), fs = clamp(FH * 0.075, 9 * dpr, 16 * dpr);
-      font(fs);
-      const tw = g.measureText(txt).width, cx = W * 0.285, sTop = sy(f + 0.74);
-      g.fillStyle = '#33210c'; g.fillRect(cx - tw / 2 - U * 3, sTop - U, tw + U * 6, fs + U * 6);
-      g.fillStyle = f === Math.round(st.y) ? '#2f5fb0' : '#284f92'; g.fillRect(cx - tw / 2 - U * 2, sTop, tw + U * 4, fs + U * 4);
-      g.fillStyle = '#fff6e0'; g.textAlign = 'center'; g.textBaseline = 'top'; g.fillText(txt, cx, sTop + U * 2);
-      for (let i = 0; i < per; i++) door(f, i);
-      if (f === 0) {   // входная дверь подъезда
-        const L = W * 0.925, w = W * 0.06, tp = sy(0.48);
-        g.fillStyle = '#33210c'; g.fillRect(L - U, tp - U, w + 2 * U, bot - tp + U);
-        g.fillStyle = '#4b5a66'; g.fillRect(L, tp, w, bot - tp);
-        g.fillStyle = '#9fdcff'; g.fillRect(L + w * 0.25, tp + (bot - tp) * 0.12, w * 0.5, (bot - tp) * 0.2);
+      const top = SY(f + 1), bot = SY(f);
+      R(0, top, W, bot - top, C.wallTop);
+      const gr = g.createLinearGradient(0, top, 0, top + FH * 0.25);   // копоть у потолка
+      gr.addColorStop(0, 'rgba(40,30,20,' + (0.12 + C.grime * 0.5) + ')'); gr.addColorStop(1, 'rgba(40,30,20,0)');
+      g.fillStyle = gr; g.fillRect(0, top, W, FH * 0.25);
+      const pan = SY(f + 0.42);
+      R(0, pan, W, bot - pan, C.wallLow); R(0, pan, W, Math.max(3, U), C.stripe);
+      if (C.grime > 0.2) for (let i = 0; i < 6; i++) {   // трещины и пятна
+        const x = WL + hsh(f, i, 1) * (WR - WL), y = f + 0.1 + hsh(f, i, 2) * 0.8;
+        R(SX(x), SY(y), U * (2 + hsh(f, i, 3) * 8), U, 'rgba(50,40,30,.35)'); R(SX(x) + U * 3, SY(y) + U, U, U * 3, 'rgba(50,40,30,.3)');
       }
+      // торцы клетки — тёмные
+      R(0, top, Math.max(0, SX(WL)), bot - top, '#2a211a'); R(SX(WR), top, Math.max(0, W - SX(WR)), bot - top, '#2a211a');
+      // лестничная клетка посередине: окно над промежуточной площадкой, батарея под ним
+      R(SX(XA - 0.06), top, (XM - XA + 0.1) * FH, bot - top, 'rgba(51,33,12,.07)');
+      const wx = (XB + XM) / 2, ww = 0.22, wt = SY(f + 0.95), wb = SY(f + 0.62);
+      R(SX(wx - ww / 2) - U * 2, wt - U * 2, ww * FH + U * 4, wb - wt + U * 4, '#3a2a1e');
+      const sky = g.createLinearGradient(0, wt, 0, wb); sky.addColorStop(0, '#2b3a6b'); sky.addColorStop(1, '#f4a35a');
+      g.fillStyle = sky; g.fillRect(Math.round(SX(wx - ww / 2)), Math.round(wt), Math.round(ww * FH), Math.round(wb - wt));
+      R(SX(wx) - U * 0.6, wt, U * 1.2, wb - wt, '#3a2a1e'); R(SX(wx - ww / 2), wt + (wb - wt) * 0.42, ww * FH, U * 1.2, '#3a2a1e');
+      if (C.grime > 0.2 && hsh(f, 7) < 0.5) R(SX(wx - ww / 2) + U * 2, wt + U * 2, ww * FH * 0.4, (wb - wt) * 0.3, 'rgba(230,240,255,.35)');   // треснуло
+      R(SX(wx - ww / 2) - U * 3, wb + U * 2, ww * FH + U * 6, U * 2, '#9a9284');      // подоконник
+      if (C.flowers) SC.plant(g, SX(wx - 0.05), wb + U * 2, Math.max(2, U * 0.55), f % 3);
+      else { R(SX(wx + 0.03), wb - U * 3, U * 4, U * 5, 'rgba(200,220,200,.6)'); R(SX(wx + 0.03), wb - U * 1.5, U * 4, U * 3.5, '#8a7a5a'); }   // банка с окурками
+      // табличка этажа у лестницы: номер крупно и «кв. a—b»; нужный этаж — жёлтая рамка
+      const here = f === tgt, px = XA - 0.23, pw = 0.17, ptop = SY(f + 0.56), pb = SY(f + 0.3);   // на уровне глаз у лестницы
+      R(SX(px - pw / 2) - U, ptop - U, pw * FH + 2 * U, pb - ptop + 2 * U, here ? '#ffd85e' : '#f4efe2');
+      R(SX(px - pw / 2), ptop, pw * FH, pb - ptop, '#2f5fb0');
+      SC.text(g, String(f + 1), SX(px), ptop + (pb - ptop) * 0.42, (pb - ptop) * 0.5, '#fff6e0');
+      SC.text(g, t('кв. {a}—{b}', { a: flatAt(f, 0), b: flatAt(f, per - 1) }), SX(px), ptop + (pb - ptop) * 0.82, Math.min((pb - ptop) * 0.15, pw * FH / 11), '#fff6e0');
+      // над дверями: щиток, объявления, граффити (обшарпанный), картинка и почтовые ящики (первый этаж)
+      const slots = [];
+      for (let i = 0; i + 1 < nl; i++) slots.push((doorX(i) + doorX(i + 1)) / 2);
+      for (let i = nl; i + 1 < per; i++) slots.push((doorX(i) + doorX(i + 1)) / 2);
+      slots.push(WL + 0.2, WR - 0.2);
+      slots.forEach((x, k) => {
+        const r = hsh(f, k, 11);
+        if (f === 0 && k === slots.length - 2) {   // почтовые ящики у входа
+          for (let a = 0; a < 3; a++) for (let b = 0; b < 2; b++) R(SX(x - 0.12 + a * 0.08), SY(f + 0.62 - b * 0.07), 0.07 * FH, 0.06 * FH, b ? '#4f6f94' : '#5a7fa8');
+          return;
+        }
+        if (k === slots.length - 2) {   // щиток с проводами
+          R(SX(x - 0.07), SY(f + 0.62), 0.14 * FH, 0.22 * FH, '#7d858c'); R(SX(x - 0.06), SY(f + 0.6), 0.12 * FH, 0.18 * FH, '#6a7178');
+          R(SX(x - 0.01), SY(f + 1), U, SY(f + 0.62) - SY(f + 1), '#1d1a16'); R(SX(x + 0.03), SY(f + 1), U, SY(f + 0.62) - SY(f + 1), '#1d1a16');
+          SC.text(g, '⚡', SX(x), SY(f + 0.5), FH * 0.05, '#ffd85e');
+          return;
+        }
+        if (C.graffiti && r < 0.35) SC.graffiti(g, t(SC.GRAFFITI[(hsh(f, k, 12) * SC.GRAFFITI.length) | 0]), SX(x), SY(f + 0.8), FH * 0.028, ['#c8402e', '#2f5fb0', '#2a2622'][k % 3], -0.1 + r * 0.3);
+        else if (r < 0.7) SC.poster(g, SX(x - 0.07), SY(f + 0.9), 0.14 * FH, 0.14 * FH, Math.max(2, U * 0.5), SC.ADS[(hsh(f, k, 13) * SC.ADS.length) | 0], t);
+        else if (C.flowers) { R(SX(x - 0.07) - U, SY(f + 0.92) - U, 0.14 * FH + 2 * U, 0.12 * FH + 2 * U, '#8a6b4e'); R(SX(x - 0.07), SY(f + 0.92), 0.14 * FH, 0.12 * FH, '#9fc8e8'); R(SX(x - 0.07), SY(f + 0.85), 0.14 * FH, 0.05 * FH, '#6fa86a'); }
+      });
+      for (let i = 0; i < per; i++) door(f, i);
+    }
+    function floorItems (f) {
+      const y = SY(f);
+      for (let i = 0; i < per; i++) {   // коврики у дверей
+        const x = doorX(i), r = hsh(f, i, 21);
+        if (r < (look === 'clean' ? 0.85 : 0.5)) R(SX(x - DW * 0.42), y - U * 1.4, DW * 0.84 * FH, U * 1.6, ['#a8324a', '#5a3a2a', '#3f6a8a', '#6a8a3a'][(r * 40 | 0) % 4]);
+      }
+      const spots = [WL + 0.12, WR - 0.12, (doorX(0) + WL) / 2 + 0.05];
+      spots.forEach((x, k) => {
+        const r = hsh(f, k, 31);
+        if (C.trash && r < 0.45) {   // мусор: бутылка, пакет, коробка из-под пиццы конкурента
+          if (k % 3 === 0) { R(SX(x), y - U * 7, U * 2.4, U * 7, '#3f7a4a'); R(SX(x) + U * 0.6, y - U * 9, U * 1.2, U * 2, '#3f7a4a'); }
+          else if (k % 3 === 1) { R(SX(x) - U * 4, y - U * 6, U * 8, U * 6, '#d8d2c4'); R(SX(x) - U * 2, y - U * 7.5, U * 4, U * 2, '#d8d2c4'); }
+          else { R(SX(x) - U * 6, y - U * 2.4, U * 12, U * 2.4, '#c8a46a'); R(SX(x) - U * 3, y - U * 2.4, U * 4, U, '#d8402f'); }
+        } else if (C.flowers && r < 0.6) SC.plant(g, SX(x), y, Math.max(2, U * 0.75), k);
+      });
+      if (hsh(f, 41) < 0.18) SC.spr(g, CAT, SX(WR - 0.3), y, Math.max(2, Math.round(U * 0.9)), hsh(f, 42) < 0.5, { k: '#2a2622', W: '#ffd85e' });   // кот
     }
     function draw () {
       const r = cv.getBoundingClientRect();
-      dpr = Math.min(2, window.devicePixelRatio || 1);
-      const w = Math.max(50, Math.round(r.width * dpr)), h = Math.max(50, Math.round(r.height * dpr));
-      if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
-      W = w; H = h; FH = H / 2.35; U = Math.max(2, Math.round(FH / 44));
+      dpr = Math.min(1.5, window.devicePixelRatio || 1);
+      const cw = Math.max(50, Math.round(r.width * dpr)), ch = Math.max(50, Math.round(r.height * dpr));
+      if (cv.width !== cw || cv.height !== ch) { cv.width = cw; cv.height = ch; }
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.imageSmoothingEnabled = false;
-      g.fillStyle = '#2a1d14'; g.fillRect(0, 0, W, H);
-      const fLo = Math.max(0, Math.floor(st.cam - 0.5)), fHi = Math.min(lv - 1, Math.ceil(st.cam + 2.3));
+      W = cw / dpr; H = ch / dpr;
+      FH = Math.min(H / 1.45, W / 1.5); U = Math.max(2, Math.round(FH / 64)); Pp = U;
+      R(0, 0, W, H, '#120c08');
+      const hBot = st.cam - (H * 0.32) / FH - 0.2, hTop = st.cam + (H * 0.68) / FH;
+      const fLo = Math.max(0, Math.floor(hBot)), fHi = Math.min(lv - 1, Math.floor(hTop));
       for (let f = fLo; f <= fHi; f++) wall(f);
-      // крыша над последним этажом, подвал под первым
-      if (sy(lv) > 0) { g.fillStyle = '#3a2a1e'; g.fillRect(0, 0, W, sy(lv)); g.fillStyle = '#8a7f72'; g.fillRect(0, sy(lv) - U * 2, W, U * 3); }
-      if (sy(0) < H) { g.fillStyle = '#3a2a1e'; g.fillRect(0, sy(0), W, H - sy(0)); }
-      // промежуточные площадки и пролёты: дальний (назад к площадке выше) — темнее, за курьером
-      const n = 7, fr = st.y - Math.floor(st.y), onBack = fr >= 0.5 && st.phase !== 'gop';
-      for (let f = fLo; f <= Math.min(fHi, lv - 2); f++) {
-        g.fillStyle = '#8a7f72'; g.fillRect(W * X1, sy(f + 0.5), W * (1 - X1), FH * 0.07);
-        flight(W * X1, f + 0.5, W * X0, f + 1, n, '#6e675e', '#7f786e', '#4a3220');
+      if (SY(lv) > 0) { R(0, 0, W, SY(lv), '#2a211a'); R(0, SY(lv) - U * 3, W, U * 3, '#8a7f72'); }
+      if (SY(0) < H) { R(0, SY(0), W, H - SY(0), '#2a211a'); }
+      // пролёты: дальний (назад к площадке выше) — темнее, за курьером
+      const n = 9, fr = st.y - Math.floor(st.y), onBack = fr >= 0.5 && st.phase !== 'gop';
+      for (let f = Math.max(0, fLo - 1); f <= Math.min(fHi, lv - 2); f++) {
+        R(SX(XB), SY(f + 0.5), (XM - XB) * FH, FH * 0.06, '#8a7f72');
+        R(SX(XM - 0.12), SY(f + 0.58), 0.18 * FH, 0.07 * FH, look === 'clean' ? '#c9c2b0' : '#a39a8c');           // батарея
+        flight(XB, f + 0.5, XA, f + 1, n, '#6e675e', '#7f786e', '#4a3220');
       }
       if (onBack) man();
-      for (let f = fLo; f <= Math.min(fHi, lv - 2); f++) flight(W * X0, f, W * X1, f + 0.5, n, '#a39a8c', '#c4bba9', '#6b4426');
-      for (let f = fLo; f <= fHi; f++) {
-        g.fillStyle = '#8a7f72'; g.fillRect(0, sy(f), W * X0 + U, FH * 0.07);
-        g.fillStyle = '#5e564c'; g.fillRect(0, sy(f) + FH * 0.07 - U * 0.6, W * X0 + U, U * 0.6);
+      for (let f = Math.max(0, fLo - 1); f <= Math.min(fHi, lv - 2); f++) flight(XA, f, XB, f + 0.5, n, '#a39a8c', '#c4bba9', '#6b4426');
+      for (let f = fLo; f <= Math.min(lv - 1, fHi + 1); f++) {   // площадки — на всю клетку; выше первого — с проёмом лестницы (от XA до XM)
+        const slab = (a, b2) => { R(SX(a), SY(f), (b2 - a) * FH, FH * 0.07, '#8a7f72'); R(SX(a), SY(f) + FH * 0.07 - U, (b2 - a) * FH, U, '#5e564c'); };
+        if (f === 0) slab(WL, WR); else { slab(WL, XA + 0.02); slab(XM, WR); }
+        if (f <= fHi) floorItems(f);
       }
       if (gop) gopniks();
       if (!onBack) man();
       if (gop && st.phase === 'gop') arrows();
-      babkaWin();
+      // свет: лампочки на площадках, по краям — темнота
+      for (let f = fLo; f <= fHi; f++) for (const x of [(DL0 + XA) / 2 - 0.12, DR0 + 0.05]) {
+        if (lamp(f, x)) SC.glow(g, SX(x), SY(f + 0.82), FH * 0.75, C.light, 0.22 * C.lamp);
+      }
+      SC.vignette(g, W, H, look === 'clean' ? 0.45 : 0.62);
     }
     function man () {
-      const y = st.y, f = Math.floor(y), fr = y - f;
-      let x = fr < 0.5 ? lerp(X0, X1, fr / 0.5) : lerp(X1, X0, (fr - 0.5) / 0.5);
+      const y = st.y, fr = y - Math.floor(y);
       let flip = fr >= 0.5;                                     // вверх по ближнему пролёту — вправо, по дальнему — влево
       if (fr < 0.02 && st.phase !== 'gop') {
-        const want = st.door >= 0 ? doorX(st.door) - X0 : 0;
-        x = X0 + st.walk;
-        if (st.walk < -0.001) flip = want < st.walk - 0.001 || (st.door >= 0 && Math.abs(want - st.walk) <= 0.002);   // к двери и у двери — лицом к ней
+        const want = st.door >= 0 ? standX(st.door) - XA : 0, d = want - st.walk;
+        if (Math.abs(d) > 0.002) flip = d < 0;
+        else if (st.door >= 0) flip = doorX(st.door) < XA + st.walk;
+        else flip = false;
       }
-      if (st.phase === 'gop') x = X0 - 0.07;                    // гопники сидят на ступеньках — стоит перед ними
-      let px = x * W;
-      if (st.sideT > 0) px += st.side * U * 4 * Math.sin((1 - st.sideT / 0.28) * Math.PI);
-      const moving = Math.abs(st.v) > 0.08 || Math.abs(st.walk - (st.door >= 0 ? doorX(st.door) - X0 : 0)) > 0.002;
+      if (st.phase === 'gop') flip = false;
+      let px = SX(manX());
+      if (st.sideT > 0) px += st.side * U * 5 * Math.sin((1 - st.sideT / 0.28) * Math.PI);
+      const moving = Math.abs(st.v) > 0.08 || Math.abs(st.walk - (st.door >= 0 ? standX(st.door) - XA : 0)) > 0.002;
       const frame = st.puff > 0 ? MAN.puff : moving ? ((st.leg * 14) | 0) % 2 ? MAN.w1 : MAN.w2 : MAN.stand;
-      const lift = st.bounce * U * 1.5;
-      spr(frame, px, sy(y) - lift, U, flip);
+      // тень под ногами
+      g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(Math.round(px - U * 5), Math.round(SY(y) - U * 0.5), U * 10, U);
+      SC.spr(g, frame, px, SY(y) - st.bounce * U * 1.5, U, flip, PAL);
     }
     function gopniks () {
-      const f = gop.at, base = sy(f);
-      const xa = W * X0 + U * 3, xb = W * X0 + W * 0.085;
-      const g1 = api.ADULT ? GOPNIK.map((r, i) => (i === 4 ? '...SSSSc..' : r)) : GOPNIK;
-      spr(g1, xa, base, U, true);
-      spr(GOPNIK, xb, sy(f + 0.12), U, true, { G: '#141519', w: '#e8e8e8' });
+      const f = gop.at, U2 = U;
+      const g1 = api.ADULT ? GOPNIK.map((r, i) => (i === 4 ? '...sSSSSc...' : r)) : GOPNIK;
+      SC.spr(g, g1, SX(XA + 0.07), SY(f + 0.06), U2, true, PAL);
+      SC.spr(g, GOPNIK, SX(XA + 0.19), SY(f + 0.17), U2, true, Object.assign({}, PAL, { G: '#141519', w: '#e8e8e8' }));
       if (api.ADULT) {   // дымок сигареты
         g.fillStyle = 'rgba(240,240,240,.5)';
-        const tt = st.t * 2;
-        for (let i = 0; i < 3; i++) g.fillRect(xa - U * (2 + i) + Math.sin(tt + i) * U, base - U * (13 + i * 2.2) - ((tt * 4) % (U * 2)), U, U);
+        const tt = st.t * 2, bx = SX(XA + 0.07) - U * 5, by = SY(f + 0.06) - U * 11;
+        for (let i = 0; i < 3; i++) g.fillRect(Math.round(bx - U * i + Math.sin(tt + i) * U), Math.round(by - U * i * 2.2 - ((tt * 4) % (U * 2))), U, U);
       }
     }
     function arrows () {
       if (gop.state !== 'beat' && gop.state !== 'ok' && gop.state !== 'miss') return;
-      const cx = W * X0 + W * 0.04, cy = sy(gop.at) - FH * 0.62;
-      const R = U * 9, k = gop.state === 'beat' ? Math.max(0, gop.w / K.GOP_WIN) : 1;
+      const cx = SX(XA + 0.13), cy = SY(gop.at + 0.5);
+      const Rr = FH * 0.07, k = gop.state === 'beat' ? Math.max(0, gop.w / K.GOP_WIN) : 1;
       const dir = gop.dirs[Math.min(gop.i, gop.dirs.length - 1)];
-      g.fillStyle = gop.state === 'miss' ? 'rgba(217,52,44,.9)' : '#fff3d6';
-      g.strokeStyle = '#33210c'; g.lineWidth = Math.max(2, U);
-      g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill(); g.stroke();
+      g.fillStyle = gop.state === 'miss' ? 'rgba(217,52,44,.92)' : '#fff3d6';
+      g.strokeStyle = '#33210c'; g.lineWidth = Math.max(3, U);
+      g.beginPath(); g.arc(cx, cy, Rr, 0, Math.PI * 2); g.fill(); g.stroke();
       if (gop.state === 'beat') {   // кольцо сжимается — сколько осталось на эту стрелку
-        g.strokeStyle = k < 0.35 ? '#d9342c' : '#ff8a2b'; g.lineWidth = Math.max(3, U * 1.4);
-        g.beginPath(); g.arc(cx, cy, R + U * 2 + R * 1.2 * k, 0, Math.PI * 2); g.stroke();
+        g.strokeStyle = k < 0.35 ? '#d9342c' : '#ff8a2b'; g.lineWidth = Math.max(4, U * 1.5);
+        g.beginPath(); g.arc(cx, cy, Rr + U * 2 + Rr * 1.2 * k, 0, Math.PI * 2); g.stroke();
       }
       g.fillStyle = gop.state === 'miss' ? '#fff3d6' : '#33210c';
       g.beginPath();
-      const a = R * 0.55;
+      const a = Rr * 0.55;
       g.moveTo(cx + dir * a, cy); g.lineTo(cx - dir * a * 0.6, cy - a); g.lineTo(cx - dir * a * 0.6, cy + a); g.closePath(); g.fill();
-      // точки: сколько уже обошёл
-      for (let i = 0; i < gop.dirs.length; i++) {
-        g.fillStyle = i < gop.i ? '#4fd65a' : 'rgba(255,243,214,.6)';
-        g.fillRect(cx - (gop.dirs.length * 4 * U) / 2 + i * 4 * U + U, cy + R + U * 3, U * 2.4, U * 2.4);
-      }
-    }
-    function babkaWin () {
-      const u = Math.max(2, Math.round(U * 1.2)), fw = 12 * u, fh = 12 * u, L = U * 3, T = H - fh - U * 3;
-      g.fillStyle = '#33210c'; g.fillRect(L - u, T - u, fw + 2 * u, fh + 2 * u);
-      g.fillStyle = '#ffcf8a'; g.fillRect(L, T, fw, fh);
-      const rows = st.babSay > 0 && ((st.t * 8) | 0) % 2 ? BABKA_SPR.map((r, i) => (i === 5 ? 'PSSMMSSP' : r)) : BABKA_SPR;
-      spr(rows, L + fw / 2, T + fh, u, false);
-      g.fillStyle = '#ff5fa2'; g.fillRect(L, T, u * 2, fh); g.fillRect(L + fw - u * 2, T, u * 2, fh);   // занавески
-      g.fillStyle = '#8a5a2a'; g.fillRect(L - u * 2, T + fh, fw + 4 * u, u * 1.5);                       // подоконник
-      elBab.style.setProperty('--sx-bab-l', ((L + fw + u * 3) / dpr) + 'px');
+      for (let i = 0; i < gop.dirs.length; i++) R(cx - (gop.dirs.length * 4 * U) / 2 + i * 4 * U + U, cy + Rr + U * 4, U * 2.4, U * 2.4, i < gop.i ? '#4fd65a' : 'rgba(255,243,214,.7)');
     }
 
     /* ── ввод ── */
@@ -656,10 +710,12 @@ export default {
       else if (c === 'Space') k = 'act';
       else if (c === 'Enter' || c === 'NumpadEnter' || c === 'KeyE') k = 'ring';
       else if (c === 'KeyY') k = 'pay';
+      else if (c === 'KeyX') k = 'inv';
       else if (c === 'Tab') { e.preventDefault(); e.stopImmediatePropagation(); return; }   // карта — не во время мини-игры
       if (!k) return;
       e.preventDefault(); e.stopImmediatePropagation();
       if (e.repeat) return;
+      if (k === 'inv') { mini.toggle(); return; }
       if (k === 'up') { keys.up = true; tapUp(); }
       else if (k === 'down') { keys.down = true; tapDown(); }
       else if (k === 'left') side(-1);
@@ -684,6 +740,7 @@ export default {
       if (!p.a) st.armA = true;                                 // A держали ещё в машине (нитро) — не считаем, пока не отпустят
       padH.a = !!p.a; padH.up = !!p.up; padH.down = !!(p.b || p.down);
       if (p.menuOk || p.menuBack || p.btnY || p.menuUp || p.menuDown || p.menuLeft || p.menuRight) st.pad = true;
+      if (p.btnX) mini.toggle();                                // X — накладная
       if (st.phase === 'gop') {
         if (p.menuLeft) side(-1);
         if (p.menuRight) side(1);
@@ -707,12 +764,11 @@ export default {
       if (b && BTN[b.dataset.a]) { e.preventDefault(); BTN[b.dataset.a](); pop(b); return; }
       if (e.target !== cv || st.phase !== 'play') return;
       e.preventDefault();
-      const r = cv.getBoundingClientRect(), px = (e.clientX - r.left) * dpr, py = (e.clientY - r.top) * dpr;
+      const r = cv.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
       const f = Math.round(st.y);
-      if (Math.abs(st.y - f) <= K.SNAP && py < sy(f) && py > sy(f + 0.62)) {
+      if (Math.abs(st.y - f) <= K.SNAP && py < SY(f) && py > SY(f + DH)) {
         for (let i = 0; i < per; i++) {
-          const cx = doorX(i) * W, dw = Math.min(W * 0.38 / per, FH * 0.3);
-          if (Math.abs(px - cx) < dw / 2 + U * 3) {
+          if (Math.abs(px - SX(doorX(i))) < DW * FH / 2 + U * 3) {
             if (st.arm > 0 || st.lock > 0) return;
             st.y = f; st.v = 0; st.door = i; ring();
             return;
@@ -726,6 +782,8 @@ export default {
 
     root.appendChild(box);
     glyphs();
+    where();
+    KIT.dashSet(box, clock(), elFuse);
     const offInput = onInput(glyphs);
     let raf = 0, last = 0;
     if (api.setStep) api.setStep(step);
@@ -734,16 +792,16 @@ export default {
       raf = requestAnimationFrame(loop);
     }
     if (api.setPad) api.setPad(pad);
-    babka('start', true);
+    say({ person, name: client(), text: t('Лифт опять сломан — поднимайтесь пешком!') });
     draw();
 
     // для проверок (probe): пройти как игрок — гопников обойти (arg 'pay' — откупиться), подняться на нужный этаж и позвонить;
-    // 'wrong' — сначала позвонить в чужую дверь; 'late' — не успеть
+    // 'wrong' — сначала позвонить в чужую дверь; 'late' — не успеть (срок вышел)
     box.__solve = arg => {
       if (st.phase !== 'play' && st.phase !== 'gop') return;
       st.arm = 0; st.lock = 0;
       if (gop && !gop.done) { if (st.phase !== 'gop') { st.y = gop.at; startGop(); } gop.arm = 0; if (arg === 'pay') pay(); else gopPass('dodge'); }
-      if (arg === 'late') { st.t = limit; return; }
+      if (arg === 'late') { finish(false, true); return; }
       st.y = tgt; st.v = 0;
       if (arg === 'wrong' && per > 1) { st.door = (P.door + 1) % per; ring(); st.lock = 0; }
       st.door = P.door;
@@ -758,6 +816,8 @@ export default {
       removeEventListener('pointerup', release, true);
       removeEventListener('pointercancel', release, true);
       offInput();
+      msgs.clear();
+      mini.off();
       if (raf) cancelAnimationFrame(raf);
       if (api.setStep) api.setStep(null);
       if (api.setPad) api.setPad(null);

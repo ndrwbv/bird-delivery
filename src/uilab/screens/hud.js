@@ -8,6 +8,7 @@
 import { translit } from '../../i18n/index.js';
 import { ORDER_TYPES } from '../../game/orders.config.js';
 import { STORIES } from '../../game/story.js';
+import * as OS from '../../game/ordersheet.js';   // лист накладной — общий с игрой, домофоном и подъездом
 import '../../game/ordertags.css';               // оттенок сюжетной накладной (#phone.ord-story)
 
 const ADDR = ['Ленинградская улица, 21', 'проспект Коммунистический, 51', 'улица Калинина, 85', 'улица Мира, 12', 'Северная улица, 7', 'улица Победы, 3', 'Солнечная улица, 40'];
@@ -60,10 +61,10 @@ export default function hudScreens (ctx) {
       { k: 'stops', label: 'адресов (сборный, последовательный)', type: 'num', def: 3, min: 2, max: 7, step: 1 },
       { k: 'group', label: 'человек на адресе (групповой)', type: 'num', def: 3, min: 2, max: 5, step: 1 },
       { k: 'zone', label: 'район города', type: 'sel', def: 'normal', opts: ZONES },
-      { k: 'district', label: 'район доставки', type: 'sel', def: 0, opts: DIST.list().map((d, i) => [i, d.name]) },
       { k: 'fee', label: 'оплата, ₽', type: 'num', def: 3200, min: 0, max: 100000, step: 100 },
       { k: 'no', label: 'номер заказа', type: 'num', def: 7, min: 1, max: 9999, step: 1 },
       { k: 'long', label: 'длинные имена', type: 'bool', def: false },
+      { k: 'flat', label: 'квартира в адресе (многоэтажка)', type: 'bool', def: true },
     ],
     async show (o) {
       const el = $('phone');
@@ -90,25 +91,9 @@ export default function hudScreens (ctx) {
       $('ph-kind').textContent = t('накладная') + ' · ' + (KIND_LABEL[order.kind] || t('заказ'));
       const src = el.querySelector('.ph-src');
       if (src) src.textContent = '№ ' + String(+o.no || 1).padStart(4, '0');
-      const many = stops.length > 1;
-      const face = (p, n) => '<div class="oc-p">' + (n ? '<em>' + n + '</em>' : '') + (p ? '<img src="' + faceDataURL(p) + '" alt="">' : '<i></i>') + '</div>';
-      const persons = stops.flatMap(st => st.persons);
-      const pics = stops.flatMap((st, i) => st.persons.map(p => face(p, many ? i + 1 : 0))).join('');
-      const st0 = stops[0];
-      const who = bundle ? stops.map((st, i) => '<b>' + (i + 1) + '. ' + st.persons.map(p => (p && p.name) || t('Иван Иванов')).join(', ') + '</b><small>' + st.addr + '</small>').join('')
-        : persons.map(p => '<b>' + ((p && p.name) || t('Иван Иванов')) + '</b>').join('');
-      const di = Math.max(0, Math.min(DIST.count() - 1, +o.district || 0));
-      const ZL = { rich: 'особняки', gang: 'бандитский район', garage: 'гаражи', ind: 'промзона', poor: 'частный сектор', normal: 'город' };
-      const rows = [
-        [t('получатель'), who],
-        bundle ? null : [t('адрес'), st0.addr + (many ? ' → ' + t('ещё {n}', { n: stops.length - 1 }) : '')],
-        [t('заказ'), order.items],
-        // orders.js cardRows: район и оплата
-        [t('район'), esc(t(DIST.list()[di].name)) + (o.zone && o.zone !== 'normal' ? ' · ' + esc(t(ZL[o.zone])) : '')],
-        [t('оплата'), '<b class="oc-pay">' + money(+o.fee || 0) + '</b>'],
-      ].filter(Boolean);
-      $('ph-list').innerHTML = '<div class="oc-sheet"><table class="oc-inv">' + rows.map(([k, v]) => '<tr><th>' + k + '</th><td>' + v + '</td></tr>').join('') + '</table>' +
-        '<div class="oc-photos' + (persons.length > 2 ? ' small' : '') + '"><i class="oc-clip"></i>' + pics + '</div></div>';
+      // квартира в адресе — как в игре (doorstep.js homeOf: дома от 4 этажей); лист — общий с игрой (ordersheet.js)
+      stops.forEach((st, i) => { if (o.flat) st.home = { flat: String(12 + ((i * 37 + (+o.no || 0) * 11) % 140)) }; });
+      $('ph-list').innerHTML = OS.html(order, { t, extra: [[t('оплата'), '<b class="oc-pay">' + money(+o.fee || 0) + '</b>']] });
       $('ph-what').textContent = order.items;
       $('ph-why').textContent = order.why;
       ORD.card(order);

@@ -7,8 +7,8 @@
          head  — шапка чека («чек смены · Юг»), no — номер (7 → «№ 0007»), why — строка мелко под шапкой;
          rows  — [[подпись, значение, 'pp-plus' | 'pp-minus' | '']] — строки «подпись ··· значение»;
          total — { k: 'за смену', n: 5261, fmt: n => '+5 261 ₽', cls: 'pp-plus' } — итог крупно, щёлкает счётчиком;
-         hints — [{ text, mark, wal }] — мелкие строки под итогом (mark — жёлтым маркером; wal — «в копилке теперь»,
-                 сумму потом меняет END.wallet); seal — { text, color: 'green' | 'red' | 'rust' | 'pink' };
+         hints — [{ text, mark, wal } | { bar }] — мелкие строки под итогом (mark — жёлтым маркером; wal — «в копилке теперь»,
+                 сумму потом меняет END.wallet; bar — полоска «до следующего района», barHTML); seal — { text, color: 'green' | 'red' | 'rust' | 'pink' };
          party — 'coins' | 'confetti' | 'both' | '' — что вылетит из итога; sticker — { line, face } сообщение Толика (пузырь iMessage);
          stamp — кнопка-штамп (career.js переносит сюда #ov-again), встаёт внизу чека.
          0 с — чек влетает, 0,25 с — сбоку Толик «печатает…», 0,95 с — его сообщение пузырём со звуком, аватарка говорит ртом (talkface.js); с 0,3 с строки допечатываются по одной (0,09 с);
@@ -47,12 +47,23 @@ export function receiptHTML ({ head = '', no = 0, why = '', rows = [], total = n
         (total ? '<p class="pp-row pp-total"><span>' + esc(total.k) + '</span><i></i><b class="cr-rc-sum ' + (total.cls || '') + '">' +
           esc((total.fmt || money)(total.n)) + '</b></p>' : '') +
         '<div class="cr-rc-mid"><div class="cr-rc-hints">' +
-        hints.map(h => '<p class="pp-hint' + (h.wal ? ' cr-rc-wal' : '') + '">' + (h.mark ? '<span class="pp-mark">' + esc(h.text) + '</span>' : esc(h.text)) +
+        hints.filter(h => !h.bar).map(h => '<p class="pp-hint' + (h.wal ? ' cr-rc-wal' : '') + '">' + (h.mark ? '<span class="pp-mark">' + esc(h.text) + '</span>' : esc(h.text)) +
           (h.wal ? ' <b>' + esc(money(h.n || 0)) + '</b>' : '') + '</p>').join('') + '</div>' +
         (seal ? '<div class="pp-seal pp-seal-' + (seal.color || 'red') + ' cr-rc-seal">' + esc(seal.text) + '</div>' : '') + '</div>' +
+        hints.filter(h => h.bar).map(h => barHTML(h.bar)).join('') +          // полоска района — на всю ширину, под строками и печатью
         '<div class="cr-rc-stamp"></div>' +
       '</div>' +
     '</div></section>';
+}
+
+/* полоска «до следующего района» (career.js districtLine): { text, cells: [0…1 на каждую смену], done: «открыт!» } */
+function barHTML (b) {
+  const cells = (b.cells || []).map(f => '<i' + (f >= 1 ? ' class="on"' : '') + ' style="--f:' + Math.max(0, Math.min(1, +f || 0)).toFixed(2) + '"></i>').join('');
+  // куски «заказов 2 из 3» и «смен 1 из 4» не рвём переносом строки
+  const txt = String(b.text || '').split(' · ').map(p => p.split(': ').map((q, i) => (i ? '<span class="cr-nw">' + esc(q) + '</span>' : esc(q))).join(': '))
+    .map((p, i) => (i ? '<span class="cr-nw">' + p + '</span>' : p)).join(' · ');
+  return '<p class="cr-rc-bar' + (b.done ? ' open' : '') + '"><span class="cr-bar-t">' + txt +
+    (b.done ? ' <span class="pp-mark">' + esc(b.done) + '</span>' : '') + '</span><span class="cr-dbar">' + cells + '</span></p>';
 }
 
 export function play ({ host, tap = null, head = '', no = 0, why = '', rows = [], total = null, hints = [], seal = null, party = '', sticker = null,
@@ -73,7 +84,7 @@ export function play ({ host, tap = null, head = '', no = 0, why = '', rows = []
   const walEl = host.querySelector('.cr-rc-wal b');
   WAL = walEl ? { el: walEl, fmt: money } : null;
   const fmt = total ? (total.fmt || money) : money;
-  const lines = [...host.querySelectorAll('.cr-rc-why, .cr-rc-rows .pp-row, .cr-rc-end > .pp-row, .cr-rc-hints > .pp-hint')];
+  const lines = [...host.querySelectorAll('.cr-rc-why, .cr-rc-rows .pp-row, .cr-rc-end > .pp-row, .cr-rc-hints > .pp-hint, .cr-rc-end > .cr-rc-bar')];
 
   let finished = false, ended = false;
   const timers = [];

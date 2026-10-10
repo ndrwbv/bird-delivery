@@ -24,6 +24,7 @@
    lamp(A, o) — из world.js / pizzeria.js / landmarks.js, step(dt) — каждый кадр.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
+import { blocks as ringIsland } from './rings.js';   // остров малого круга: там ни фонарей, ни знаков (rings.js)
 
 /* числа — здесь; в docs/CAREER.md — они же словами */
 export const LAMP = {
@@ -284,6 +285,7 @@ export function streets (A) {
         if (A.inHouse(px, pz, 1) || A.introClear(px, pz, 9)) { if (small) STATS.skip.house++; continue; }
         if (A.startClear && A.startClear(px, pz)) { STATS.skip.start = (STATS.skip.start || 0) + 1; continue; }   // выезд со стоянки курьеров свободен (game.js START_CLEAR)
         if (zebra(px, pz)) { if (small) STATS.skip.zebra++; continue; }
+        if (ringIsland(px, pz, 1)) { STATS.skip.ring = (STATS.skip.ring || 0) + 1; continue; }   // на острове круга — газон и деревья, без столбов
         lamp(A, { x: px, z: pz, y: A.groundH(px, pz), style, dx: -nx, dz: -nz });
         if (big) {
           STATS.city++;

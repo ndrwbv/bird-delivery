@@ -1,0 +1,120 @@
+/* Мини-игры у двери (doorkit.js): сообщения, как у Толика (chat.css — iMessage: круглая аватарка, имя мелко, серый
+   пузырь с хвостиком; свои — синие справа), и часы заказа, как на приборке (delivery.css #timewrap). */
+.mk-feed { display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; min-width: 0; font-family: "Press Start 2P", ui-monospace, monospace; }
+.mk-m { display: flex; align-items: flex-end; gap: 8px; max-width: 100%; animation: mk-in .3s cubic-bezier(.2, .9, .3, 1.2) both; }
+.mk-m.mk-gone { animation: mk-out .25s ease-in both; }
+.mk-av { flex: none; width: clamp(34px, 3.4vw, 52px); height: auto; aspect-ratio: 1; border-radius: 50%; border: 2px solid #fff; image-rendering: pixelated;
+         background: #8a6b4e; box-shadow: 0 2px 6px rgba(0, 0, 0, .35); object-fit: cover; }
+i.mk-av.mk-emo { display: grid; place-items: center; font-style: normal; font-size: clamp(18px, 1.8vw, 28px); background: #f4e7c8; }
+.mk-b { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.mk-b b { font-weight: normal; font-size: 10px; color: var(--pp-label, #75573b); padding-left: 12px; white-space: nowrap; }
+.mk-b p { position: relative; margin: 0; padding: .7em 1em; font-size: clamp(11px, 1vw, 15px); line-height: 1.55; color: var(--im-text, #111114);
+          background: var(--im-bubble, #e9e9eb); border-radius: 18px 18px 18px 6px; box-shadow: 0 3px 8px rgba(0, 0, 0, .25); overflow-wrap: anywhere; }
+.mk-b p::before { --t: 14px; content: ''; position: absolute; left: calc(var(--t) * -.6); bottom: 0; width: var(--t); height: var(--t);
+                  background: radial-gradient(circle at 0 0, transparent calc(var(--t) - .5px), var(--im-bubble, #e9e9eb) var(--t)); }
+/* свои (курьер): синие, справа */
+.mk-out { align-self: flex-end; }
+.mk-out .mk-b { align-items: flex-end; }
+.mk-out .mk-b p { background: #2f80ff; color: #fff; border-radius: 18px 18px 6px 18px; }
+.mk-out .mk-b p::before { left: auto; right: calc(var(--t) * -.6); background: radial-gradient(circle at 100% 0, transparent calc(var(--t) - .5px), #2f80ff var(--t)); }
+/* злой ответ — пузырь чуть розовее; хороший конец — зеленее */
+.mk-bad .mk-b p { --im-bubble: #f6dcd6; }
+.mk-good .mk-b p { --im-bubble: #d9f3d4; }
+@keyframes mk-in { from { opacity: 0; transform: translateY(10px) scale(.92); } to { opacity: 1; transform: none; } }
+@keyframes mk-out { to { opacity: 0; transform: translateY(-8px); } }
+@media (prefers-reduced-motion: reduce) { .mk-m, .mk-m.mk-gone { animation-duration: .01s; } }
+body.calm-fx .mk-m, body.calm-fx .mk-m.mk-gone { animation-duration: .01s; }
+
+/* часы заказа в шапке листа: тёмное окошко, «сейчас» зелёным, плашка «доставить до» */
+.mk-dash { display: inline-flex; align-items: center; gap: 8px; padding: 4px 5px 4px 9px; background: #070b08; border: 2px solid #33210c; border-radius: 6px;
+           box-shadow: inset 0 0 0 2px #1a2a1d; line-height: 1; white-space: nowrap; text-transform: none; letter-spacing: .04em; }
+.mk-dash[hidden] { display: none; }
+.mk-now { font-weight: normal; font-size: clamp(12px, 1.1vw, 16px); color: #5dff8a; text-shadow: 0 0 4px rgba(93, 255, 138, .8); }
+.mk-due { display: flex; align-items: center; gap: 6px; padding: 5px 7px 4px; border-radius: 3px; background: #ffd85e; color: #1a1208; }
+.mk-due em { font-style: normal; font-size: 11px; }
+.mk-due b { font-weight: normal; font-size: 12px; }
+.mk-due b:empty { display: none; }
+.mk-dash[data-lvl="warn"] .mk-due { background: #ff9a3c; }
+.mk-dash[data-lvl="low"] .mk-due, .mk-dash[data-lvl="late"] .mk-due { background: #ff2d4a; color: #fff; animation: mk-blink .5s steps(2) infinite; }
+.mk-dash[data-lvl="late"] .mk-now { color: #ff6a7a; text-shadow: 0 0 4px rgba(255, 45, 74, .8); }
+@keyframes mk-blink { 50% { background: #5a0d18; color: #ff8a96; } }
+
+/* фитиль: сколько срока заказа осталось (тает вместе с часами) */
+.mk-fuse { height: 10px; margin: 0 0 .7em; border: 2px solid var(--pp-ink); border-radius: 6px; overflow: hidden; background: rgba(51, 33, 12, .1); }
+.mk-fuse[hidden] { display: none; }
+.mk-fuse i { display: block; height: 100%; background: var(--pp-lime); transform-origin: 0 50%; transition: background .2s; }
+.mk-fuse.mk-warn i { background: var(--pp-orange); }
+.mk-fuse.mk-hot i { background: var(--pp-red); }
+
+/* лист накладной внутри мини-игры: шрифты от размера листа, не от экрана целиком */
+.mk-inv { position: relative; min-width: 0; padding: .9em 1em; background: #fffaf0; border: 2px dashed var(--pp-brown); border-radius: 4px; rotate: -1deg; }
+.mk-inv .pp-label { display: block; margin-bottom: .4em; }
+.mk-inv .oc-sheet { gap: clamp(8px, 1.2vw, 18px); }
+.mk-inv .oc-inv { font-size: clamp(9px, .85vw, 13px); }
+.mk-inv .oc-inv th { font-size: clamp(8px, .7vw, 11px); padding: clamp(4px, .7vh, 8px) 10px clamp(4px, .7vh, 8px) 0; }
+.mk-inv .oc-inv td { padding: clamp(4px, .7vh, 8px) 0; }
+.mk-inv .oc-inv td b { font-size: clamp(11px, 1.15vw, 18px); }
+.mk-inv .oc-inv td small { font-size: clamp(8px, .75vw, 11px); }
+.mk-inv .oc-photos .oc-p img, .mk-inv .oc-photos .oc-p i { width: clamp(64px, 7vw, 120px); height: clamp(64px, 7vw, 120px); border-width: 5px; border-bottom-width: clamp(12px, 1.6vh, 20px); }
+.mk-inv .oc-photos.small .oc-p img, .mk-inv .oc-photos.small .oc-p i { width: clamp(44px, 4.4vw, 76px); height: clamp(44px, 4.4vw, 76px); }
+.mk-inv .os-flat { font-size: 1.1em; }
+
+/* подсказка управления — одной строкой внизу */
+.mk-help { min-height: 1.2em; margin: .7em 0 0; font-size: var(--pp-fs-s); line-height: 2.2; color: var(--pp-label); text-align: center; white-space: nowrap;
+           overflow: hidden; text-overflow: ellipsis; }
+.mk-help .pp-key { margin-right: .4em; }
+
+/* ── мини-игра у двери на весь экран (автор 10.10.2026: «полноценная игра внутри игры»): сцена — холст во весь экран
+   (doorscene.js), поверх — небольшие плашки: сверху по центру часы и задание, слева реплики, в углу свёрнутая накладная,
+   внизу одна строка управления ── */
+.mk-full { position: absolute; inset: 0; z-index: 26; overflow: hidden; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none;
+           font-family: "Press Start 2P", ui-monospace, monospace; color: var(--pp-ink); background: #120c08; }
+.mk-cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.mk-top { position: absolute; top: max(8px, env(safe-area-inset-top)); left: 50%; translate: -50% 0; z-index: 3; display: flex; flex-direction: column; align-items: center;
+          gap: 6px; width: min(640px, calc(100% - 24px)); pointer-events: none; }
+.mk-task { box-sizing: border-box; width: 100%; padding: .7em 1em .75em; text-align: center; background: var(--pp-paper); border: 3px solid var(--pp-ink);
+           border-radius: 6px; box-shadow: 0 5px 0 var(--pp-ink), 0 14px 30px rgba(0, 0, 0, .45); rotate: -.6deg; }
+.mk-goal { display: block; font-weight: normal; font-size: clamp(12px, 1.35vw, 22px); line-height: 1.4; }
+.mk-sub { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .4em .8em; margin-top: .5em; font-size: var(--pp-fs-m); }
+.mk-sub i { font-style: normal; padding: .3em .55em; background: var(--pp-yellow); border: 2px solid var(--pp-ink); border-radius: 4px; }
+.mk-sub i + i { background: color-mix(in srgb, var(--pp-orange) 40%, var(--pp-paper)); }
+.mk-sub em { font-style: normal; color: var(--pp-label); font-size: var(--pp-fs-s); }
+.mk-here .mk-sub em { color: var(--pp-money); }
+.mk-top .mk-fuse { width: 100%; box-sizing: border-box; margin: 0; background: rgba(255, 243, 214, .25); }
+
+/* реплики — слева сверху, на фоне сцены имя светлое */
+.mk-say { position: absolute; z-index: 2; left: max(14px, env(safe-area-inset-left)); top: 18px; width: min(26vw, 440px); pointer-events: none; }
+.mk-say .mk-b b { color: #fff3d6; text-shadow: 1px 1px 0 #33210c, 0 0 4px rgba(0, 0, 0, .7); }
+
+/* свёрнутая накладная в углу: наведение, клик или X — раскрыть; новая пометка — сама приоткрывается на 1,8 с */
+.mk-mini { position: absolute; z-index: 4; right: max(14px, env(safe-area-inset-right)); bottom: 52px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.mk-mini-tab { display: flex; align-items: center; gap: .6em; padding: .5em .7em; font: inherit; font-size: var(--pp-fs-s); color: var(--pp-ink); cursor: pointer;
+               background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 6px; box-shadow: 0 4px 0 var(--pp-ink); rotate: 1.5deg; }
+.mk-mini-tab img { width: 30px; height: 30px; border: 2px solid #fff; image-rendering: pixelated; }
+.mk-mini-tab b { font-weight: normal; color: var(--pp-rust); text-transform: uppercase; }
+.mk-mini-tab kbd { font: inherit; font-size: 9px; color: var(--pp-label); }
+.mk-mini-tab .mk-pen { display: none; color: var(--os-ink, #2448b8); }
+.mk-mini.mk-marked .mk-pen { display: inline; }
+.mk-mini-body { width: min(470px, calc(100vw - 28px)); box-sizing: border-box; background: var(--pp-paper); box-shadow: 0 6px 0 var(--pp-ink), 0 18px 40px rgba(0, 0, 0, .5);
+                border: 3px solid var(--pp-ink); border-style: solid; transform-origin: 100% 100%; transition: opacity .18s, scale .18s; }
+.mk-mini:not(.open):not(.peek) .mk-mini-body { opacity: 0; scale: .2; pointer-events: none; position: absolute; bottom: 0; right: 0; }
+@media (hover: hover) { .mk-mini:hover .mk-mini-body { opacity: 1; scale: 1; position: static; pointer-events: auto; } }
+
+/* строка управления — внизу по центру, на тёмной подложке */
+.mk-full .mk-help { position: absolute; z-index: 3; left: 50%; bottom: max(10px, env(safe-area-inset-bottom)); translate: -50% 0; max-width: calc(100% - 24px); margin: 0;
+                    padding: .25em 1em; color: #fff3d6; background: rgba(18, 12, 8, .72); border-radius: 999px; box-sizing: border-box; }
+.mk-full .mk-seal { position: absolute; z-index: 5; right: auto; left: 50%; top: 46%; translate: -50% -50%; --pp-seal-rot: -9deg; font-size: clamp(22px, 4vw, 54px); white-space: nowrap; }
+
+@media (max-width: 760px) {
+  .mk-say { top: auto; bottom: 120px; width: calc(100% - 28px); }
+  .mk-goal { font-size: 13px; }
+  .mk-mini { bottom: 96px; }
+}
+@media (max-height: 460px) {
+  .mk-task { padding: .4em .7em; }
+  .mk-goal { font-size: 12px; }
+  .mk-say { top: auto; bottom: 60px; width: 40%; }
+}
+.mk-full .pp-seal { background: var(--pp-paper); mix-blend-mode: normal; opacity: 1; box-shadow: 0 6px 0 rgba(0, 0, 0, .35); }
+.mk-mini-body .oc-photos .oc-p img, .mk-mini-body .oc-photos .oc-p i { width: clamp(56px, 5.5vw, 96px); height: clamp(56px, 5.5vw, 96px); }
+.mk-mini-body .oc-sheet { grid-template-columns: minmax(0, 1fr) auto; }

@@ -60,7 +60,7 @@ export const RP = {
   SPEEDS: [0.25, 0.5, 1],
   SCRUB: 2.5,         // перемотка зажатой стрелкой — во столько раз быстрее реального времени
   STEP: 1,            // с: шаг крестовины / кнопки ◀ ▶
-  SLOW: { V: 15, K: 0.3, SECS: 0.4, EASE: 0.12, GAP: 2.5, SHAKE: 0.9 },
+  SLOW: { ON: false, V: 15, K: 0.3, SECS: 0.4, EASE: 0.12, GAP: 2.5, SHAKE: 0.9 },   // ON — замедление выключено (автор 10.10.2026: «неприятная пауза, когда врезаешься» — убрать); тряска осталась
   REC_FPS: 30, REC_BPS: 8e6,
   SND: true,          // звуки в повторе (и в ролике): удары, гудки, мотор по записи
   EV_MAX: 400,        // звуков в кольце, не больше (старые выпадают)
@@ -755,9 +755,11 @@ export function crash (vn) {
   if (A.GFX && A.GFX.fxLow && A.GFX.fxLow()) return;   // «эффекты: меньше» — без замедления и тряски
   const now = performance.now() / 1000;
   if (now - SLOW_AT < RP.SLOW.GAP) return;
-  SLOW_AT = now; SLOW_T = RP.SLOW.SECS;
-  STATS.slow++;
+  SLOW_AT = now;
   if (A.shake) A.shake(RP.SLOW.SHAKE);
+  if (!RP.SLOW.ON) return;                        // без замедления и «вуух» — только тряска
+  SLOW_T = RP.SLOW.SECS;
+  STATS.slow++;
   if (A.Snd && A.Snd.fx) A.Snd.fx('slowmo', s => {
     const c = s.ctx, o = c.createOscillator(), g = c.createGain(), now2 = c.currentTime;
     o.type = 'sine'; o.frequency.setValueAtTime(170, now2); o.frequency.exponentialRampToValueAtTime(42, now2 + 0.55);

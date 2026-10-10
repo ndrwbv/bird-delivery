@@ -18,10 +18,17 @@
        plain: true,                    // обе кнопки одного вида (приглашение клиентки: оба ответа — отказы)
        alt: true,                      // второй ответ — на X (геймпад) / X (клавиатура), а не на B / Esc: в катсцене
                                        // B и Esc — «пропустить сцену» (story.js ['ask'], учебный Стёпа)
+       stack: true,                    // два ответа столбиком (вопрос в катсцене, story.js ['ask']): курсор ▶ у выбранного,
+                                       // ↑ ↓ / W S / крестовина — выбрать, Enter / пробел / A — ответить, 1 / 2 — сразу
+                                       // верхний / нижний, X — нижний; подсказка одной строкой внизу, на кнопках значков нет
+       auto: true,                     // одна кнопка «дальше»: допечаталась — пауза autoTime(текст) и дальше сама
+                                       // (число — своя пауза, с); Enter / клик — сразу (встречи у двери, encounters.js)
        emo: 'angry',                   // выражение лица на портрете (people.js EMO_FACE; катсцены story.js { emo })
        onTyped: () => …,               // допечаталась (story.js: 3D-актёр закрывает рот)
      });                               // → true (принял) / false (отказался) / null (не успел)
    Очередь: несколько say подряд показываются по одному.
+   В катсцене (body.story-cut) окно — внизу экрана, над чёрной полосой, компактнее (dialog.css).
+   stack — ответы и подсказка переезжают под облачко (.dlg-col), иначе — под всем окном, кнопки в ряд, как было.
    Портрет говорит ртом (talkface.js), пока текст печатается; допечатался — рот закрыт. o.face (готовая
    картинка) — без рта, как было.
    На кнопках — значок, что жать: [A] / [B] на геймпаде, Enter / Esc на клавиатуре, на тач-экране без
@@ -41,7 +48,7 @@ import './dialog.css';
 import { t } from '../i18n/index.js';
 import { pad as PAD } from '../input/gamepad.js';
 import { padLit } from '../input/padmenu.js';
-import { keyHTML, refreshKeys } from '../input/glyphs.js';
+import { keyHTML, refreshKeys, inputKind, glyph } from '../input/glyphs.js';
 import * as TF from './talkface.js';            // портрет говорит ртом, пока печатается
 
 /* значок кнопки — общий .pp-key (glyphs.js keyHTML, paper.css): геймпад — A / B (PlayStation — ✕ / ○),
@@ -56,6 +63,9 @@ const MOOD = { calm: [0.08, 0.03], nervous: [0.22, 0.14], drunk: [0.28, 0.08], s
    отсчёт после того, как допечаталась. Диалог выше (say) ждёт нажатия и сам не листается. */
 export const READ = { BASE: 1.5, PER_CHAR: 0.06, MIN: 3 };
 export const readTime = text => Math.max(READ.MIN, READ.BASE + READ.PER_CHAR * String(text == null ? '' : text).length);
+/* авто-продолжение реплики (say { auto }): после того как допечаталась — 0,8 с + 0,03 с на букву, от 1,2 до 2,5 с */
+export const AUTO = { BASE: 0.8, PER_CHAR: 0.03, MIN: 1.2, MAX: 2.5 };
+export const autoTime = text => Math.min(AUTO.MAX, Math.max(AUTO.MIN, AUTO.BASE + AUTO.PER_CHAR * String(text == null ? '' : text).length));
 
 let API = { pause: () => {}, face: null };
 let root = null, queue = Promise.resolve(), open = 0;
@@ -72,10 +82,10 @@ function build () {
   root.hidden = true;
   root.innerHTML = '<div class="dlg-box"><div class="dlg-bar"></div><div class="dlg-row">' +
     '<div class="dlg-head"><img alt=""><b class="dlg-name"></b></div>' +
-    '<div class="dlg-bubble"><p class="dlg-text"></p><div class="dlg-meters"></div><span class="dlg-skip"></span></div></div>' +
+    '<div class="dlg-col"><div class="dlg-bubble"><p class="dlg-text"></p><div class="dlg-meters"></div><span class="dlg-skip"></span></div></div></div>' +
     '<div class="dlg-timer"><i></i></div><div class="dlg-btns">' +
     '<button type="button" class="dlg-no">' + keyHTML('back') + '<span></span></button>' +
-    '<button type="button" class="dlg-yes">' + keyHTML('ok') + '<span></span></button></div></div>';
+    '<button type="button" class="dlg-yes">' + keyHTML('ok') + '<span></span></button></div><p class="dlg-hint" hidden></p></div>';
   (document.getElementById('game') || document.body).appendChild(root);
 }
 
@@ -108,6 +118,8 @@ function show (o, done) {
   API.pause(true);
   const $ = s => root.querySelector(s);
   const two = !!o.decline;
+  const stack = two && !!o.stack;                // столбиком: верхний — accept, нижний — decline, курсор ▶
+  const btns = $('.dlg-btns'), hintEl = $('.dlg-hint');
   $('.dlg-bar').style.background = o.color || '#ff8a2b';
   const img = $('.dlg-head img');
   TF.stop(img);
@@ -120,8 +132,14 @@ function show (o, done) {
   no.hidden = !two;
   const noKey = no.querySelector('[data-pp-key]');
   if (noKey) noKey.dataset.ppKey = o.alt ? 'x' : 'back';   // alt: второй ответ — на X
-  $('.dlg-btns').classList.remove('on');
-  $('.dlg-btns').classList.toggle('plain', !!o.plain);
+  btns.classList.remove('on');
+  btns.classList.toggle('plain', !!o.plain);
+  btns.classList.toggle('stack', stack);
+  // столбиком — ответы и подсказка под облачком, справа от портрета (окно ниже); иначе — под всем окном, как было
+  $('.dlg-box').classList.toggle('stack', stack);
+  if (stack) $('.dlg-col').append(btns, hintEl);
+  else $('.dlg-box').append(btns, hintEl);
+  hintEl.hidden = true; hintEl.textContent = '';
   const glyphs = () => refreshKeys(root);           // значки [A]/[B] — по тому, чем сейчас играют (glyphs.js)
   glyphs();
   $('.dlg-skip').textContent = t('пропустить ▸');
@@ -137,16 +155,33 @@ function show (o, done) {
   let i = 0, typed = false, closed = false, raf = 0, last = performance.now(), acc = 0, padPrev = {};
   let pick = yes;                                // что нажмёт A: по умолчанию «принять»
   let lit = false;                               // подсветка видна: первое ←→↑↓ без неё только будит
-  const mark = on => { yes.classList.toggle('padsel', on && pick === yes); no.classList.toggle('padsel', on && pick === no); };
+  const mark = on => {
+    if (stack) { yes.classList.toggle('dlg-cur', pick === yes); no.classList.toggle('dlg-cur', pick === no); yes.classList.remove('padsel'); no.classList.remove('padsel'); return; }
+    yes.classList.toggle('padsel', on && pick === yes); no.classList.toggle('padsel', on && pick === no);
+  };
+  // столбиком: подсказка управления одной строкой внизу — геймпад / клавиатура / палец (как разговор у двери, smalltalk.js)
+  let hintKind = '';
+  const hint = () => {
+    if (!stack || !typed || waiting) return;
+    const k = inputKind().kind;
+    if (k === hintKind) return;
+    hintKind = k; root.dataset.input = k;
+    hintEl.textContent = k === 'pad' ? t('крестовина — выбрать · {a} — ответить', { a: glyph('ok') })
+      : k === 'touch' ? t('нажми на ответ') : t('↑ ↓ — выбрать · Enter — ответить');
+    hintEl.hidden = false;
+  };
+  const auto = !two && !o.timer && o.auto ? (typeof o.auto === 'number' ? o.auto : autoTime(full)) : 0;
   const CPS = o.cps || 38;                       // букв в секунду; на многоточии — пауза
   const bar = $('.dlg-timer'), barI = bar.querySelector('i');
-  bar.classList.remove('on'); barI.style.transform = 'scaleX(1)';
+  bar.classList.remove('on', 'auto', 'low'); barI.style.transform = 'scaleX(1)';
   let left = 0, waiting = false;
   const finish = () => {
     if (typed) return; typed = true; el.textContent = full; $('.dlg-btns').classList.add('on'); $('.dlg-skip').textContent = '';
     TF.stop(img);
     if (o.onTyped) try { o.onTyped(); } catch (e) { console.warn('[dlg] onTyped', e); }
     if (o.timer) { left = o.timer; bar.classList.add('on'); }
+    else if (auto) { left = auto; bar.classList.add('on', 'auto'); }
+    if (stack) { mark(true); hint(); }
   };
   // не успел ответить: он говорит своё «ну лан» и уходит сам
   const timeUp = () => {
@@ -162,6 +197,8 @@ function show (o, done) {
     removeEventListener('keydown', key, true);
     TF.stop(img);
     mark(false);
+    yes.classList.remove('dlg-cur'); no.classList.remove('dlg-cur');
+    hintEl.hidden = true;
     root.classList.remove('on');
     setTimeout(() => { if (!open) root.hidden = true; }, 180);   // следующая реплика из очереди уже открылась — не прячем её
     open--;
@@ -183,12 +220,26 @@ function show (o, done) {
       barI.style.transform = 'scaleX(' + Math.max(0, left / o.timer).toFixed(3) + ')';
       bar.classList.toggle('low', left < o.timer * 0.3);
       if (left <= 0) timeUp();
+    } else if (auto && !closed) {                // авто-продолжение: полоска тает, кончилась — дальше
+      left -= (now - last) / 1000;
+      barI.style.transform = 'scaleX(' + Math.max(0, left / auto).toFixed(3) + ')';
+      if (left <= 0) { close(true); return; }
     }
     last = now;
     // геймпад: A — пропустить / принять, B — отказаться
     // раскладку (Xbox, сырой Deck) разбирает input/gamepad.js
     glyphs();
-    if (PAD.connected) {
+    if (stack) hint();
+    if (PAD.connected && stack) {                 // столбиком: крестовина / стик ↑↓ — курсор, A — ответить, X — нижний
+      const a = PAD.a, x = !!PAD.x;
+      if (typed && !waiting) {
+        if (PAD.menuUp) { pick = yes; mark(true); }
+        if (PAD.menuDown) { pick = no; mark(true); }
+      }
+      if (a && !padPrev.a && !waiting) { if (!typed) finish(); else close(pick !== no); }
+      if (x && !padPrev.x && !waiting) { if (!typed) finish(); else close(false); }
+      padPrev = { a, b: PAD.b, x };
+    } else if (PAD.connected) {
       const a = PAD.a, b = PAD.b;
       const on = padLit(PAD) && typed && !waiting;
       if (on && lit && two && (PAD.menuLeft || PAD.menuUp)) pick = no;      // «отказаться» — слева
@@ -208,13 +259,21 @@ function show (o, done) {
   CUR = dismissMe;
   const key = e => {
     if (waiting) return;
+    if (stack) {                                 // столбиком: стрелки / W S — курсор, Enter / пробел — ответить, 1 / 2 — сразу
+      const c = e.code, eat = () => { e.preventDefault(); e.stopPropagation(); };
+      if (c === 'Space' || c === 'Enter' || c === 'NumpadEnter' || c === 'KeyE') { eat(); if (!typed) finish(); else close(pick !== no); }
+      else if (c === 'ArrowUp' || c === 'KeyW' || c === 'ArrowDown' || c === 'KeyS') { eat(); if (typed) { pick = (c === 'ArrowUp' || c === 'KeyW') ? yes : no; mark(true); } }
+      else if (c === 'Digit1' || c === 'Numpad1') { eat(); if (typed) close(true); }
+      else if (c === 'Digit2' || c === 'Numpad2' || c === 'KeyX') { eat(); if (!typed) finish(); else close(false); }
+      return;                                    // Esc / Backspace — «пропустить сцену» (story.js)
+    }
     if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE') { e.preventDefault(); e.stopPropagation(); if (!typed) finish(); else if (!two || e.code !== 'Space') close(true); }
     else if (o.alt && two && e.code === 'KeyX') { e.preventDefault(); e.stopPropagation(); if (!typed) finish(); else close(false); }
     else if (o.alt && (e.code === 'Escape' || e.code === 'Backspace')) return;   // alt: Esc — пропустить сцену (story.js), не ответ
     else if (e.code === 'Escape' || e.code === 'Backspace') { e.preventDefault(); e.stopPropagation(); if (!typed) finish(); else close(two ? false : true); }
   };
   addEventListener('keydown', key, true);
-  $('.dlg-bubble').onclick = () => { if (!typed) finish(); };
+  $('.dlg-bubble').onclick = () => { if (!typed) finish(); else if (auto && !waiting) close(true); };
   yes.onclick = () => { if (typed && !waiting) close(true); };
   no.onclick = () => { if (typed && !waiting) close(false); };
 }

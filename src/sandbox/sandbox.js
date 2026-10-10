@@ -409,6 +409,14 @@ function build () {
   button(sb, 'пропустить катсцену', 'story', () => D().STORY_DBG.skip());
   button(sb, 'сбросить прогресс', 'story', () => { D().STORY.reset(); renderStory(); log('прогресс сюжета сброшен'); });
 
+  // встречи у двери (encounters.js): микрогерои катсценой у ближайшего подъезда
+  const mt = section('встречи');
+  mt.appendChild(el('p', 'dim', 'Катсцена у ближайшего подъезда: машина встаёт сама. B / Esc — пропустить. В игре пока не выпадают.'));
+  toggle(mt, 'детская версия (перезагрузка)', 'kids', null, () => reload());
+  toggle(mt, 'ночь (23:00; выкл — день, 13:00)', 'meetNight', 'time', () => {});
+  const ml = el('div', 'story-list'); ml.id = 'meet-list';
+  mt.appendChild(ml);
+
   // заказы
   const or = section('заказы');
   const orb = el('div', 'grid'); or.appendChild(orb);
@@ -478,7 +486,35 @@ function build () {
   const tp = section('телепорт');
   const tpb = el('div', 'grid'); tpb.id = 'poi-grid'; tp.appendChild(tpb);
 }
-let poiKey = '', storyKey = '';
+let poiKey = '', storyKey = '', meetKey = '';
+/* встречи у двери: герой → его встречи (своя и из smalltalk-lines.js), по кнопке на каждую */
+function renderMeets () {
+  const box = $('#meet-list'), d = D();
+  if (!box) return;
+  const L = d && d.ENC ? d.ENC.list() : null;
+  const key = L ? L.map(h => h.id + h.meets.length).join('|') + (CFG.kids ? 'k' : '') : '-';
+  if (key === meetKey && box.children.length) return;
+  meetKey = key;
+  box.innerHTML = '';
+  if (!L) { box.appendChild(el('span', 'dim', 'encounters.js не в __dlv (игра ещё грузится?)')); return; }
+  for (const h of L) {
+    box.appendChild(el('h3', '', h.name + ' <span class="dim">' + h.decor + '</span>'));
+    const grid = el('div', 'grid');
+    for (const m of h.meets) {
+      const b = el('button', 'btn sm story', '«' + m.say.slice(0, 38) + (m.say.length > 38 ? '…' : '') + '»'); b.type = 'button';
+      b.title = m.say + '\n[A] ' + m.a + '\n[X] ' + m.b;
+      b.addEventListener('click', async () => {
+        await ready(); await G.riding();
+        if (has('time')) await G.time(CFG.meetNight ? 23 : 13);
+        W().focus();
+        const r = await D().ENC.play(h.id, m.i);
+        log(r ? 'встреча «' + h.name + '» (' + r.meet + '): ответ ' + (r.ans || '—') + (r.skip ? ', пропущена' : '') + ', ' + (r.ms / 1000).toFixed(1) + ' с' : 'встреча не началась: нет подъезда рядом (до 320 м) или идёт катсцена', r ? '' : 'warn');
+      });
+      grid.appendChild(b);
+    }
+    box.appendChild(grid);
+  }
+}
 function renderPOI () {
   const g = $('#poi-grid');
   if (!g) return;
@@ -502,6 +538,7 @@ function renderStory () {
   box.innerHTML = '';
   if (!d || !d.STORY) { box.appendChild(el('span', 'dim', 'story.js не в __dlv')); return; }
   for (const s of d.STORY.list()) {
+    if (String(s.id).startsWith('meet-')) continue;           // встречи у двери — свой раздел «встречи»
     box.appendChild(el('h3', '', s.name + ' <span class="dim">пройдено ' + s.done + ' из ' + s.chapters.length + '</span>'));
     const grid = el('div', 'grid');
     for (const c of s.chapters) {
@@ -537,6 +574,7 @@ function refresh () {
   }
   renderPOI();
   renderStory();
+  renderMeets();
   const d = D();
   if (d && d.ENV && UI.hour && document.activeElement !== UI.hour.i) UI.hour.set(Math.min(24, Math.max(9, hourOf(d.ENV.t))));
   if (d && d.season && UI.sea && document.activeElement !== UI.sea.i) UI.sea.set(d.season.value);

@@ -1,101 +1,37 @@
-/* Подъезд (minigames/stairs.js): бумажный лист поверх езды — накладная слева, подъезд в разрезе справа (canvas,
-   пиксельный курьер), кнопки снизу (палец и мышь; на геймпаде и клавиатуре — значки). Телефон стоя — накладная полоской сверху.
-   Палитра — --pp-* (paper.css). */
-.sx { position: absolute; inset: 0; z-index: 26; display: flex; align-items: center; justify-content: center; box-sizing: border-box;
-      padding: clamp(8px, 2vh, 24px) 12px; overflow: auto; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none;
-      font-family: "Press Start 2P", ui-monospace, monospace; color: var(--pp-ink);
-      background: radial-gradient(ellipse at 50% 50%, rgba(255, 138, 43, .12), rgba(40, 14, 24, .5) 75%); }
-.sx-sheet { width: min(900px, 100%); padding-top: 4px; }
-.sx-sheet .pp-head { --pp-accent: var(--pp-orange); margin-bottom: .3em; }
-.sx-left { font-variant-numeric: tabular-nums; min-width: 4.5em; text-align: right; }
-
-.sx-fuse { height: 10px; margin: 0 0 .7em; border: 2px solid var(--pp-ink); border-radius: 6px; overflow: hidden; background: rgba(51, 33, 12, .1); }
-.sx-fuse i { display: block; height: 100%; background: var(--pp-lime); transform-origin: 0 50%; transition: background .2s; }
-.sx-fuse.sx-hot i { background: var(--pp-red); }
-
-.sx-body { display: flex; gap: clamp(10px, 1.6vw, 20px); align-items: stretch; }
-
-/* кусок накладной: квартира крупно, подъезд, розовая пометка «лифт сломан» */
-.sx-slip { position: relative; flex: 0 0 27%; display: flex; flex-direction: column; gap: .55em; justify-content: center; padding: .8em .9em;
-           background: #fffaf0; border: 2px dashed var(--pp-brown); border-radius: 4px; rotate: var(--pp-tilt, 0deg); min-width: 0; }
-.sx-slip { container-type: inline-size; }
-.sx-flat { font-size: min(36px, calc(92cqi / var(--n, 8))); line-height: 1.2; white-space: nowrap; font-weight: normal; letter-spacing: .04em; }
-.sx-entr { font-size: var(--pp-fs-m); color: var(--pp-rust); }
-.sx-note { margin: .2em 0 0; align-self: flex-start; padding: .6em .7em; font-size: var(--pp-fs-s); line-height: 1.6; color: var(--pp-ink);
-           background: color-mix(in srgb, var(--pp-pink) 55%, var(--pp-paper)); border: 2px solid var(--pp-ink); border-radius: 3px;
-           box-shadow: 0 3px 0 var(--pp-ink); rotate: 3deg; }
-.sx-task { margin: 0; line-height: 1.7; }
-
-/* подъезд в разрезе */
-.sx-scene { position: relative; flex: 1 1 auto; min-width: 0; height: clamp(230px, 50vh, 470px); border: 3px solid var(--pp-ink); border-radius: 8px;
-            overflow: hidden; background: #2a1d14; box-shadow: 0 4px 0 var(--pp-ink); }
-.sx-cv { display: block; width: 100%; height: 100%; image-rendering: pixelated; cursor: pointer; touch-action: none; }
-
-.sx-breath { position: absolute; top: 6px; right: 6px; display: flex; align-items: center; gap: .5em; padding: .35em .5em; font-size: 9px;
-             color: var(--pp-ink); background: var(--pp-paper); border: 2px solid var(--pp-ink); border-radius: 4px; box-shadow: 0 2px 0 var(--pp-ink); }
-.sx-breath i { display: block; width: clamp(50px, 8vw, 90px); height: 8px; border: 2px solid var(--pp-ink); border-radius: 4px; overflow: hidden; background: rgba(51, 33, 12, .12); }
+/* Подъезд (minigames/stairs.js) на весь экран: сцена — лестничная клетка изнутри (холст во весь экран, стиль — doorscene.js),
+   поверх — плашки doorkit.css: часы и задание сверху, реплики слева, свёрнутая накладная в углу, строка управления внизу.
+   Кнопки ▲ ▼ ◀ ▶ 🔔 — только для пальца (внизу); гопники: «отдать „чаевые“» — всегда (это выбор). */
+.sx-cv { cursor: pointer; }
+.sx-breath { display: inline-flex; align-items: center; gap: .5em; font-size: var(--pp-fs-s); color: var(--pp-label); }
+.sx-breath i { display: block; width: clamp(50px, 7vw, 110px); height: 9px; border: 2px solid var(--pp-ink); border-radius: 4px; overflow: hidden; background: rgba(51, 33, 12, .12); }
 .sx-breath b { display: block; height: 100%; background: #6fc3ff; transform-origin: 0 50%; }
 .sx-breath.sx-low b { background: var(--pp-orange); }
-.sx-breath.sx-puff { background: color-mix(in srgb, var(--pp-red) 30%, var(--pp-paper)); }
+.sx-breath.sx-puff { color: var(--pp-red); }
 .sx-breath.sx-puff b { background: var(--pp-red); }
 
-/* реплики: жилец / гопник / клиент — облако сверху; бабка — у своего окна снизу */
-.sx-say { position: absolute; top: 34px; left: 50%; translate: -50% 0; max-width: 88%; padding: .6em .8em; font-size: var(--pp-fs-s); line-height: 1.6;
-          color: var(--pp-ink); background: var(--pp-paper); border: 2px solid var(--pp-ink); border-radius: 8px; box-shadow: 0 3px 0 var(--pp-ink); text-align: center; }
-.sx-say em, .sx-babka em { font-style: normal; color: var(--pp-rust); }
-.sx-say.sx-bad { background: color-mix(in srgb, var(--pp-orange) 28%, var(--pp-paper)); }
-.sx-say.sx-gop { background: #2b2f3a; color: #fff3d6; }
-.sx-say.sx-gop em { color: var(--pp-yellow); }
-.sx-say.sx-good { background: color-mix(in srgb, var(--pp-lime) 35%, var(--pp-paper)); font-size: var(--pp-fs-m); }
-.sx-say.sx-me { background: #dff1ff; }
-.sx-say[hidden], .sx-babka[hidden] { display: none; }
-.sx-babka { position: absolute; left: var(--sx-bab-l, 64px); bottom: 10px; max-width: min(62%, 340px); padding: .55em .7em; font-size: var(--pp-fs-s); line-height: 1.6;
-            color: var(--pp-ink); background: #fff; border: 2px solid var(--pp-ink); border-radius: 8px 8px 8px 0; box-shadow: 0 3px 0 var(--pp-ink); rotate: -1.5deg; }
-
-/* кнопки: ▼ ▲ ◀ ▶ 🔔; у гопников — ◀ ▶ и «откупиться» */
-.sx-bar { display: flex; gap: clamp(5px, 1vw, 10px); margin-top: .7em; }
+.sx-bar { position: absolute; z-index: 4; left: 50%; translate: -50% 0; bottom: 52px; display: flex; gap: 8px; width: min(720px, calc(100% - 24px)); }
 .sx-bar[hidden] { display: none; }
-.sx-b { position: relative; flex: 1 1 0; min-height: clamp(42px, 7.5vh, 64px); padding: 0 .4em; font: inherit; font-size: var(--pp-fs-m); color: var(--pp-ink); cursor: pointer;
-        background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 8px; box-shadow: 0 4px 0 var(--pp-ink); touch-action: none;
-        transition: translate .12s var(--pp-spring), box-shadow .12s; }
+.sx:not([data-input="touch"]) .sx-bar-go { display: none; }
+.sx:not([data-input="touch"]) .sx-b-dir { display: none; }
+.sx:not([data-input="touch"]) .sx-bar-gop { width: auto; }
+.sx-b { flex: 1 1 0; min-height: clamp(46px, 7vh, 66px); padding: 0 .8em; font: inherit; font-size: var(--pp-fs-m); color: var(--pp-ink); cursor: pointer;
+        background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 8px; box-shadow: 0 4px 0 var(--pp-ink); touch-action: manipulation; }
 .sx-b:active { translate: 0 3px; box-shadow: 0 1px 0 var(--pp-ink); }
-.sx-b-up { flex: 2.2 1 0; background: var(--pp-lime); font-size: var(--pp-fs-l); }
-.sx-b-ring { background: var(--pp-yellow); font-size: var(--pp-fs-l); }
-.sx-b-dir { flex: 1.3 1 0; font-size: var(--pp-fs-l); background: var(--pp-yellow); }
-.sx-b-pay { flex: 2 1 0; font-size: var(--pp-fs-s); line-height: 1.5; background: color-mix(in srgb, var(--pp-orange) 45%, var(--pp-paper)); }
-.sx-g { position: absolute; right: 3px; bottom: 2px; font: inherit; font-size: 9px; line-height: 1; color: var(--pp-label); }
-.sx-g:empty { display: none; }
-
-.sx-help { min-height: 1.2em; margin: .7em 0 0; font-size: var(--pp-fs-s); line-height: 2.2; color: var(--pp-label); text-align: center; }
-.sx-help .pp-key { margin: 0 .4em; }
-.sx-seal { --pp-seal-top: 38%; --pp-seal-right: 50%; --pp-seal-rot: -9deg; translate: 50% 0; font-size: var(--pp-fs-l); white-space: nowrap; }
+.sx-b-up { flex: 2.2 1 0; background: var(--pp-lime); }
+.sx-b-ring { background: var(--pp-yellow); }
+.sx-b-pay { flex: 2.4 1 0; background: color-mix(in srgb, var(--pp-orange) 45%, var(--pp-paper)); }
+.sx-ok .sx-bar, .sx-late .sx-bar { opacity: .35; pointer-events: none; }
 
 .sx-pop { animation: sx-pop .16s var(--pp-spring); }
 @keyframes sx-pop { 0% { scale: .92; } 100% { scale: 1; } }
-.sx-scene.sx-pop { animation: sx-shake .3s; }
-@keyframes sx-shake { 25% { translate: -5px 0; } 50% { translate: 4px 0; } 75% { translate: -2px 0; } }
-.sx-late .sx-scene { filter: saturate(.6); }
-.sx-ok .sx-bar, .sx-late .sx-bar { opacity: .35; pointer-events: none; }
-@media (prefers-reduced-motion: reduce) { .sx-pop, .sx-scene.sx-pop { animation: none; } }
-body.calm-fx .sx-pop, body.calm-fx .sx-scene.sx-pop { animation: none; }
+.sx-late .sx-cv { filter: saturate(.6); }
+@media (prefers-reduced-motion: reduce) { .sx-pop { animation: none; } }
+body.calm-fx .sx-pop { animation: none; }
 
-/* телефон стоя и узкие окна: накладная полоской над подъездом */
-@media (max-width: 620px) {
-  .sx-body { flex-direction: column; gap: 8px; }
-  .sx-slip { flex: none; flex-direction: row; flex-wrap: wrap; align-items: center; gap: .4em .8em; padding: .5em .7em; rotate: 0deg; }
-  .sx-slip .pp-label { flex-basis: 100%; }
-  .sx-slip { container-type: normal; }
-  .sx-flat { font-size: 20px; }
-  .sx-note { margin: 0; rotate: 2deg; }
-  .sx-task { flex-basis: 100%; }
-  .sx-scene { height: clamp(240px, 46vh, 420px); }
-  .sx-b { min-height: 54px; }
-}
-/* низкие (телефон боком): всё в высоту экрана */
-@media (max-height: 460px) {
-  .sx { align-items: flex-start; }
-  .sx-sheet .pp-head { padding: .4em 0 .3em; }
-  .sx-scene { height: 58vh; }
-  .sx-slip .sx-task, .sx-help { display: none; }
-  .sx-b { min-height: 38px; }
+/* телефон: кнопки шире, реплики — над ними, накладная — выше кнопок */
+@media (max-width: 760px) {
+  .sx .mk-say { bottom: 190px; }
+  .sx .mk-mini { bottom: 128px; }
+  .sx-bar { bottom: 48px; }
+  .sx-b { min-height: 58px; }
 }

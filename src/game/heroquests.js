@@ -1,5 +1,8 @@
 /* ──────────────────────────────────────────────────────────────────────────
    Герои города, этап 2 — механики (docs/ORDERS.md «Герои города», числа — econ.js HEROQ).
+   В АРХИВЕ, автор 10.10.2026: сюжет героев убран (heroes.js HERO.STORY = false) — совета Лёхи и
+   «наоборот» Игорька нет; теннис в «депнуть» — двое безымянных игроков (ANON: слева и справа),
+   шанс 50 на 50, выигрыш ×2. Сохранение dlv-heroq не трогается. Реплики ниже — как были.
    Подменяет реплики встречи героев (heroes.js setLineHook) и вмешивается в «депнуть»
    (career.js spin). Работает только в карьере: init зовёт career.js.
 
@@ -38,6 +41,9 @@ const KEY = 'dlv-heroq';               // сохранение: прогноз �
 const OPP = ['andr', 'nast'];              // соперник Игорька в матче один на один
 const WHO_ACC = { andr: N_('на Андрюшу'), igor: N_('на Игорька'), nast: N_('на Настюшу') };
 const WHO = { andr: N_('Андрюша'), igor: N_('Игорёк'), nast: N_('Настюша') };
+/* сюжет героев в архиве (HERO.STORY = false): в теннисе — двое безымянных, слева и справа (dep.js PLAYER) */
+export const ANON = ['pl', 'pr'];
+const arch = () => !HEROES.HERO.STORY;
 
 /* ── реплики ── */
 const LEHA_TIP = {
@@ -163,7 +169,7 @@ function claim () {
   return M.claim;
 }
 /** кто играет ближайший матч: ['igor', 'andr' | 'nast'] — Игорёк слева */
-export const match = () => ['igor', claim().vs];
+export const match = () => (arch() ? ANON.slice() : ['igor', claim().vs]);
 /** Игорёк проговорился (глава «Финал», herostories.js): на ближайшем матче прогноз «проиграю» и он
  *  сбывается наоборот наверняка — Игорёк выигрывает. Держится до матча (и между сменами). */
 export function sureMatch () {
@@ -173,6 +179,7 @@ export function sureMatch () {
 }
 /** шансы на победу в матче один на один: { igor, <соперник> } (с учётом прогноза Игорька); кто не играет — 0 */
 export function tennisOdds () {
+  if (arch()) return { [ANON[0]]: 0.5, [ANON[1]]: 0.5 };   // сюжет в архиве: без прогноза Игорька — 50 на 50
   const c = claim(), F = c.sure ? 1 : HEROQ.IGOR.FLIP;
   const ig = c.claim === 'lose' ? F : 1 - F;
   return { andr: 0, nast: 0, igor: ig, [c.vs]: 1 - ig };
@@ -211,6 +218,7 @@ function lehaLine (first) {
 }
 /** совет Лёхи для окна «депнуть» этой игры: { text, pick } или null */
 export function tipFor (game) {
+  if (arch()) return null;                          // в архиве, автор 10.10.2026: совета Лёхи нет
   // героев на улице нет (heroes.js HERO.STREET): совет Лёха даёт сам — раз за смену, когда открыл «депнуть»
   if (!HEROES.HERO.STREET && adult() && game === GAME_OF() && (!M.tip || M.tip.n !== SHIFT_N())) makeTip();
   const tp = tipLive();
@@ -271,7 +279,7 @@ function hook (h) {
 /* ── ставка: исход (career.js spin) ── */
 export function roll ({ game, pick: p = null, base = 0.1, first = false }) {
   const L = HEROQ.LEHA;
-  const cl = game === 'tennis' ? { ...claim() } : null;
+  const cl = game === 'tennis' && !arch() ? { ...claim() } : null;
   let chance = game === 'tennis' ? tennisOdds()[p] || 0 : base;
   const plain = chance;
   const tp = tipLive();
@@ -287,9 +295,9 @@ export function roll ({ game, pick: p = null, base = 0.1, first = false }) {
   if (game === 'tennis') {
     if (win) champ = p;
     else {
-      champ = match().find(id => id !== p) || 'igor';   // один на один: проиграл — победил другой
+      champ = match().find(id => id !== p) || match()[0];   // один на один: проиграл — победил другой
     }
-    M.claim = null; save();                        // матч сыгран — у следующего свой прогноз
+    if (!arch()) { M.claim = null; save(); }       // матч сыгран — у следующего свой прогноз (в архиве — сохранение не трогаем)
   }
   M.stats.rolls++;
   M.last = { game, pick: p, win, chance, plain, champ, tip, claim: cl };

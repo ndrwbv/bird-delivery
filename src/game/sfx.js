@@ -123,6 +123,7 @@ export function node (out, sp) {
   STATS.spatial++;
   const g = ctx.createGain();
   g.gain.value = sp.g;
+  g.__bus = out; g.__sp = sp.g;                       // тёплый синтез (sfxsynth.js): отзвук — в шину, вдали глуше
   let p = null;
   if (ctx.createStereoPanner) { p = ctx.createStereoPanner(); p.pan.value = sp.pan; g.connect(p); p.connect(out); }
   else g.connect(out);

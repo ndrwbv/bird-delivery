@@ -14,6 +14,10 @@
        тротуар — на метр внахлёст, не на асфальт. Второй конец — тоже в сеть, если до неё ≤
        LINK.MAX2 (15 м), иначе дорожка кончается у крайней двери, без хвоста в газон. Кусок без
        выхода не кладём вовсе (и тропинки его дверей) — тупиков нет;
+     • сеть — до улицы (10.10.2026): если выход кончился на отмостке своего дома или на чужой дорожке,
+       а та сама ни к тротуару, ни к проезду, ни к аллее не ведёт (дом посреди большого газона —
+       остров дорожек), — ещё один выход: до тротуара, проезда, аллеи или дорожки, что ведёт к улице,
+       не длиннее FAR.MAX (160 м), не ближе FAR.HOUSE м к стенам (farLinks);
      • по обе стороны тропинки — низкий заборчик FENCE.H (0,55 м) в FENCE.U (2,9 м) от её оси
        (у FENCE.FLOWERS — 35 % подъездов — вместо него бордюр с цветами), кусками по 2,5 м:
        сбиваются на ходу, как дворовые заборчики (машину чуть тормозит, не держит);
@@ -42,11 +46,18 @@ export const YARD = {
   // выход общей дорожки в сеть: ширина, не длиннее MAX м, луч шагами STEP, внахлёст на OVER м,
   // DIRS направлений веером, старты — концы и каждые EVERY м (штраф PEN_MID м), веер — штраф PEN_FAN м
   LINK: { W: 1.5, MAX: 40, MAX2: 15, STEP: 0.7, FROM: 0.7, OVER: 1.5, DEEP: 0.6, DIRS: 16, EVERY: 12, OWN: 1.3, PEN_MID: 3, PEN_FAN: 1 },
+  // сеть двора — до улицы (10.10.2026): дорожки двора, что вышли только на отмостку своего дома или чужую
+  // дорожку, которая сама никуда не ведёт, тянем дальше — до тротуара, проезда, аллеи или дорожки, что
+  // ведёт к улице: не длиннее FAR.MAX м, лучи шагом FAR.STEP — прямо к улице, а если так длиннее FAR.FAN м
+  // или не вышло — ещё веером FAR.DIRS сторон; дорожки ближе
+  // FAR.JOIN м друг к другу — одна сеть
+  FAR: { MAX: 160, DIRS: 8, JOIN: 2.2, STEP: 1, FAN: 70, HOUSE: 1.4 },
   COLOR: '#d3c9b8',          // цвет-метка дворовых дорожек: зимой шейдер (seasons.js) оставляет их протоптанными
 };
 
 export const STATS = { ents: 0, multi: 0, doors: 0, paths: 0, doorRoad: 0, doorShort: 0, doorBlock: 0, doorHang: 0,
-  walks: 0, walkHang: 0, walkNoDoor: 0, trim: 0, links: 0, linkM: 0, to: {}, fences: 0, flowers: 0, benches: 0, ms: 0 };
+  walks: 0, walkHang: 0, walkNoDoor: 0, trim: 0, links: 0, linkM: 0, to: {}, fences: 0, flowers: 0, benches: 0, ms: 0,
+  island: 0, far: 0, farM: 0, farFail: 0, farMs: 0 };
 const NETS = [];         // для проверки: { doors: [[a, b]], walk, links: [[a, b, куда]] } — сеть одной стены
 
 /* Все дворовые дорожки (тропинки дверей, общие, выходы; и выходы отмосток из game.js) — сетка
@@ -287,6 +298,153 @@ export function* steps (A) {
     for (let i = 1; i < pts.length; i++) netAdd(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], half);
   };
   const BENCHQ = [];
+  const WALKS = [];                                  // общие дорожки двора: для прохода «сеть — до улицы»
+
+  /* ── сеть двора — до улицы ──
+     Выход общей дорожки часто кончается на отмостке своего же дома или на чужой дворовой дорожке —
+     а та сама к улице не ведёт: дома посреди большого газона стоят островом дорожек. Тут: все дорожки
+     (CITY.paths) — в сети по касанию (ближе FAR.JOIN м); сеть «у улицы», если хоть одна её точка на
+     тротуаре, проезде, пешеходке или аллее (pave.js). Общая дорожка двора в сети «не у улицы» — ещё один
+     выход: луч до тротуара, проезда, аллеи или дорожки сети «у улицы», не длиннее FAR.MAX м, не сквозь
+     дом, забор, воду, постройку. Ближние к улице — первыми: дальние потом выходят на их новые выходы. */
+  function* farLinks (list) {
+    let t1 = performance.now(), ms = 0;
+    const FC = 8, PJ = YARD.FAR.JOIN;
+    // отрезки всех дорожек — в сетку; сеть (кто с кем касается) выясняем лениво, обходом от нужного
+    // отрезка: дорожек в городе ~30 тыс. отрезков, а спрашиваем только про дворы
+    const SEG = [], SG = new Map(), comp = [], cStreet = [], seen = [];
+    let stamp = 0;
+    const ck = (gx, gz) => (gx + 4096) * 8192 + gz + 4096;
+    const ss = (a, b) => {                           // расстояние между отрезками (без пересечения — по концам)
+      const [ax, az, bx, bz] = a, [cx, cz, dx, dz] = b;
+      const d1 = (bx - ax) * (cz - az) - (bz - az) * (cx - ax), d2 = (bx - ax) * (dz - az) - (bz - az) * (dx - ax);
+      const d3 = (dx - cx) * (az - cz) - (dz - cz) * (ax - cx), d4 = (dx - cx) * (bz - cz) - (dz - cz) * (bx - cx);
+      if (((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0))) return 0;
+      return Math.min(segD(ax, az, cx, cz, dx, dz), segD(bx, bz, cx, cz, dx, dz), segD(cx, cz, ax, az, bx, bz), segD(dx, dz, ax, az, bx, bz));
+    };
+    const onStreet = (x, z) => { const k = onPave(x, z, 0.3); return k === 'road' || k === 'walk' || k === 'alley'; };
+    const stC = new Map();                           // ответ по точке (концы ломаных общие у соседних отрезков)
+    const onStreetC = (x, z) => { const k = Math.round(x * 2) * 100003 + Math.round(z * 2); let v = stC.get(k); if (v === undefined) stC.set(k, v = onStreet(x, z)); return v; };
+    const segStreet = g => onStreetC(g[0], g[1]) || onStreetC(g[2], g[3]) || (Math.hypot(g[2] - g[0], g[3] - g[1]) > 6 && onStreet((g[0] + g[2]) / 2, (g[1] + g[3]) / 2));
+    const addSeg = (ax, az, bx, bz) => {
+      const i = SEG.length;
+      SEG.push([ax, az, bx, bz]); comp.push(-1); seen.push(0);
+      for (let gx = Math.floor((Math.min(ax, bx) - PJ) / FC); gx <= Math.floor((Math.max(ax, bx) + PJ) / FC); gx++)
+        for (let gz = Math.floor((Math.min(az, bz) - PJ) / FC); gz <= Math.floor((Math.max(az, bz) + PJ) / FC); gz++) {
+          const k = ck(gx, gz);
+          let a = SG.get(k);
+          if (!a) SG.set(k, a = []);
+          a.push(i);
+        }
+      return i;
+    };
+    /* у улицы ли сеть отрезка i: обход по касанию до первого отрезка на тротуаре (или уже известной сети) */
+    const atStreet = i => {
+      if (comp[i] >= 0) return cStreet[comp[i]];
+      stamp++;
+      const vis = [i], q = [i];
+      seen[i] = stamp;
+      let res = null, cid = -1;
+      for (let h = 0; h < q.length && res === null; h++) {
+        const j = q[h], g = SEG[j];
+        if (segStreet(g)) { res = true; break; }
+        for (let gx = Math.floor((Math.min(g[0], g[2]) - PJ) / FC); gx <= Math.floor((Math.max(g[0], g[2]) + PJ) / FC) && res === null; gx++)
+          for (let gz = Math.floor((Math.min(g[1], g[3]) - PJ) / FC); gz <= Math.floor((Math.max(g[1], g[3]) + PJ) / FC) && res === null; gz++)
+            for (const k of SG.get(ck(gx, gz)) || []) {
+              if (seen[k] === stamp || ss(g, SEG[k]) >= PJ) continue;
+              if (comp[k] >= 0) { cid = comp[k]; res = cStreet[cid]; break; }
+              seen[k] = stamp; vis.push(k); q.push(k);
+            }
+      }
+      if (res === null) res = false;
+      if (cid < 0) { cid = cStreet.length; cStreet.push(res); }
+      for (const v of vis) comp[v] = cid;
+      return res;
+    };
+    const segOf = new Map();                         // ломаная (объект) → её первый отрезок
+    for (const q of CITY.paths) {
+      if (!q || q.length < 2) continue;
+      let first = -1;
+      for (let i = 1; i < q.length; i++) { const k = addSeg(q[i - 1][0], q[i - 1][1], q[i][0], q[i][1]); if (first < 0) first = k; }
+      segOf.set(q, first);
+    }
+    // дорожка «у улицы» под точкой
+    const streetPath = (x, z) => {
+      for (const j of SG.get(ck(Math.floor(x / FC), Math.floor(z / FC))) || []) {
+        const g = SEG[j];
+        if (segD(x, z, g[0], g[1], g[2], g[3]) < PAVE_PATH && atStreet(j)) return true;
+      }
+      return false;
+    };
+    ms += performance.now() - t1;
+    yield 'net-graph';
+    t1 = performance.now();
+    const lost = [];
+    for (const w of list) {
+      const i0 = segOf.get(w.pts);
+      if (i0 === undefined || atStreet(i0)) continue;
+      const r = A.nearestRoad(w.pts[0][0], w.pts[0][1], 7, 2);
+      lost.push({ w, i0, d: r ? r.d : 1e9 });
+    }
+    STATS.island = lost.length;
+    lost.sort((a, b) => a.d - b.d);
+    const FAR = YARD.FAR, ST = FAR.STEP;
+    /* выход от дорожки двора: прямо к ближайшей улице, а если не вышло или длинно — веером; цель — тротуар,
+       проезд, аллея или (okPath) дорожка, что ведёт к улице */
+    const reach = (w, MAXL, okPath) => {
+      let best = null;
+      const tryRay = (s, dx, dz, pen) => {
+        const maxL = Math.min(MAXL, best ? best.t + best.pen - pen : MAXL);
+        if (maxL < L.FROM) return;
+        for (let t = L.FROM; t <= maxL; t += ST) {
+          const x = s[0] + dx * t, z = s[1] + dz * t;
+          if (w.own(x, z)) continue;
+          if (blocked(x, z) || A.inHouse(x, z, FAR.HOUSE)) return;      // шаг метр — запас от стены побольше: угол дома не срезает
+          const k = onPave(x, z, 0);
+          if (!k) continue;
+          if (k === 'road' || onAsphalt(x, z, 0.25)) return;            // на асфальт — нет
+          if (k === 'path' && (!okPath || A.inHouse(x, z, 2.6) || !okPath(x, z))) continue;   // отмостка и дорожка-остров — мимо
+          if (!best || t + pen < best.t + best.pen) best = { sx: s[0], sz: s[1], ex: x + dx * 0.6, ez: z + dz * 0.6, t: t + 0.6, pen, to: k };
+          return;
+        }
+      };
+      for (const s of w.starts) {
+        const r = A.nearestRoad(s[0], s[1], 7, 2);
+        if (r && r.d > 0.5) tryRay(s, (r.x - s[0]) / r.d, (r.z - s[1]) / r.d, 0);
+      }
+      if (!best || best.t > FAR.FAN) for (const s of w.starts) for (let k = 0; k < FAR.DIRS; k++) {
+        const a = k / FAR.DIRS * Math.PI * 2;
+        tryRay(s, Math.cos(a), Math.sin(a), L.PEN_FAN);
+      }
+      if (best && onAsphalt(best.ex, best.ez, 0.25)) { best.ex -= (best.ex - best.sx) / best.t * 0.6; best.ez -= (best.ez - best.sz) / best.t * 0.6; }
+      return best;
+    };
+    const draw = (w, best, i0) => {
+      LITM.color(YARD.COLOR);
+      LITM.ribbon(best.sx, best.sz, best.ex, best.ez, L.W, 0.085);
+      LITM.disc(best.sx, best.sz, L.W / 2, 0.085, 6);
+      LITM.disc(best.ex, best.ez, L.W / 2, 0.085, 6);
+      const q = [[best.sx, best.sz], [best.ex, best.ez]];
+      q.far = 1;                                     // тропинка через газон: адресом заказа не служит (game.js buildSpots)
+      addPath(q, L.W / 2);
+      const j = addSeg(best.sx, best.sz, best.ex, best.ez);
+      if (i0 !== undefined && comp[i0] >= 0) { comp[j] = comp[i0]; cStreet[comp[i0]] = true; }   // сеть двора теперь у улицы
+      w.net.links.push([[best.sx, best.sz], [best.ex, best.ez], best.to === 'road' ? 'walk' : best.to]);
+      STATS.links++;
+    };
+    let nl = 0;
+    for (const it of lost) {
+      if (++nl % 24 === 0) { ms += performance.now() - t1; yield 'net-far'; t1 = performance.now(); }
+      if (cStreet[comp[it.i0]]) continue;            // соседа уже вывели — и эта сеть с ним
+      const best = reach(it.w, FAR.MAX, streetPath);
+      if (!best) { STATS.farFail++; continue; }
+      draw(it.w, best, it.i0);
+      STATS.far++; STATS.farM += best.t;
+    }
+    STATS.farM = Math.round(STATS.farM);
+    STATS.farMs = Math.round(ms + performance.now() - t1);
+  }
+  const PAVE_PATH = 1;                               // pave.js PAVE.PATH: от оси дорожки до края плитки
 
   let nHouse = 0;
   for (const [hb, set] of walls) {
@@ -367,7 +525,9 @@ export function* steps (A) {
           STATS.links++; STATS.to[l.to] = (STATS.to[l.to] || 0) + 1;
           STATS.linkM += l.t;
         }
-        NETS.push({ walk: pts, links: links.map(l => [[l.sx, l.sz], [l.ex, l.ez], l.to]), doors: doors.map(e => [at(e.u, P.FROM), at(e.u, e.nEnd)]) });
+        const net = { walk: pts, links: links.map(l => [[l.sx, l.sz], [l.ex, l.ez], l.to]), doors: doors.map(e => [at(e.u, P.FROM), at(e.u, e.nEnd)]) };
+        NETS.push(net);
+        WALKS.push({ net, pts, starts: [[...pts[0], 0, ua], [...pts[pts.length - 1], 0, ub]], own });
       }
       // 4) тропинки дверей: до общей дорожки (если она вышла в сеть) или до проезда двора
       for (const e of w.ents) {
@@ -406,6 +566,8 @@ export function* steps (A) {
       }
     }
   }
+  yield 'nets';
+  yield* farLinks(WALKS);
   for (const q of BENCHQ) {
     if (!A.benchOk(q.bx, q.bz) || nearPath(q.bx, q.bz, 1.1) || onPave(q.bx, q.bz, 0.55)) continue;   // на чужую дорожку и выход к тротуару — нет
     const it = A.smashAdd('bench', q.bx, q.bz, 1.2, benchGeo(A, q.bx, q.bz, q.ry), '#8a6b4e');

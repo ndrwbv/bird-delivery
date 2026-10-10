@@ -343,4 +343,15 @@ export function hurt (car) {
   return !!(u.dents || (u.rear && u.rear.st) || (u.lost && Object.keys(u.lost).length) || (u.cg && u.cg.panes.some(p => p.st)) || lamps);
 }
 
-export const DEBUG = { ST, DENT, PART, REARD, DEB, rear: car => (car && car.userData.rear) || null, lost: car => Object.keys((car && car.userData.lost) || {}).sort().join(' ') };
+/* насколько разбит зад — для «пицца остыла» (econ.js coldCut): trunk 0 — закрыт, 1 — приоткрыт (2-я ступень),
+   2 — нараспашку или крышки нет (3-я); bumper — заднего бампера нет */
+export function wear (car) {
+  const u = car && car.userData;
+  if (!u) return { trunk: 0, bumper: false };
+  const L = u.lost || {};
+  const lid = u.trunk && !u.trunk.lost ? u.trunk.ajar || 0 : 0, door = u.rdoor ? u.rdoor.ajar || 0 : 0;
+  const trunk = L.trunk || lid >= REARD.OPEN || door >= REARD.DOOR_OPEN ? 2 : lid > 0 || door > 0 ? 1 : 0;
+  return { trunk, bumper: !!L.bumperR };
+}
+
+export const DEBUG = { ST, DENT, PART, REARD, DEB, wear, rear: car => (car && car.userData.rear) || null, lost: car => Object.keys((car && car.userData.lost) || {}).sort().join(' ') };

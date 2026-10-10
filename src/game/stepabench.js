@@ -1,5 +1,7 @@
 /* ──────────────────────────────────────────────────────────────────────────
    Стёпа на лавочке (docs/ORDERS.md «Герои города» → «Стёпа на лавочке»).
+   В АРХИВЕ, автор 10.10.2026: сюжет героев убран (heroes.js HERO.STORY = false) — Стёпа сам не
+   заказывает; лавочка у подъезда ставится как раньше — на ней первый заказ (stepafirst.js).
    Стёпа Тугарев сидит на лавочке у своего дома — Ленинградская, 8 — и сам заказывает
    пиццу. Заказ — на лавочку, клиент — он. Вручил — сразу сюжетный разговор (катсцена
    story.js, как главы героев): «спасибо… постреляю из лука… пиво стынет… на жидкий хлеб»
@@ -102,6 +104,9 @@ function buildBench () {
 }
 
 function ready (ctx, p, shift) {
+  // в архиве, автор 10.10.2026: сюжет героев убран (heroes.js HERO.STORY) — Стёпа сам не заказывает;
+  // лавочка у Ленинградской, 8 по-прежнему ставится (на ней — первый заказ, stepafirst.js)
+  if (!HEROES.HERO.STORY) return false;
   if (!A || !A.CAREER || !M.place) return false;
   if (M.prop && M.prop.down) return false;                     // лавочку снесли
   if (shift < SB.FROM) return false;
@@ -118,6 +123,7 @@ function storyDef () {
   const def = HEROES.DEFS.find(d => d.id === 'stepa');
   return {
     id: 'stepa-bench', name: def.name,
+    arch: true,                                   // в архиве, автор 10.10.2026 (story.js nextOrder, heroes.js HERO.STORY)
     who: { seed: def.seed, fem: def.fem, look: def.look },
     items: CHAPTER.items,
     chapters: [CHAPTER],

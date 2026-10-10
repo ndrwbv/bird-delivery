@@ -3,65 +3,98 @@
    Правила словами — docs/ORDERS.md «Домофон у подъезда», «Подъезд: подняться на этаж» и «Разговор с клиентом»,
    числа — ECON.DOOR, ECON.STAIRS и ECON.TALK (econ.js).
 
-   Как встроено: подъехал к клиенту (orders.js onArrive, до вручения) — иногда у подъезда многоэтажки вместо
-   вручения сразу — 2D-экран домофона поверх игры; не выпал домофон — иногда подъезд (лифт сломан, бегом на этаж), не выпал
-   и он — иногда клиент заводит разговор (в одном заказе — что-то одно). Руль стоит (game.js: DOOR.on() — ввод езды обнулён, машина тормозит), а время заказа идёт.
-   Кончилась — вручение как обычно; итог — в st.door / st.talk, деньги правит payStop
-   (DOOR.payAdjust: «домофон с первого раза» +FAST_BONUS, «спускался сам» — «за скорость» и чаевые × SLOW_K;
+   Когда (автор 10.10.2026): общие часы настоящего времени — одна мини-игра раз в 5—10 минут игры на смене (ECON.DOORGAME);
+   подошли — на следующем подходящем адресе (обычная пицца, вовремя), какая — по месту: подъезд многоэтажки — домофон
+   или подъезд, клиент у двери — разговор (в одном заказе — что-то одно). Первая смена новичка — без мини-игр.
+   Как встроено: подъехал к клиенту (orders.js onArrive, до вручения) — 2D-экран поверх игры. Руль стоит
+   (game.js: DOOR.on() — ввод езды обнулён, машина тормозит), а срок заказа идёт: своего таймера у мини-игр нет.
+   Квартира клиента — в накладной с начала заказа (homeOf; лист — ordersheet.js, он же в домофоне и подъезде).
+   Кончилась — вручение как обычно; итог — в st.door / st.talk / st.stairs, деньги правит payStop
+   (DOOR.payAdjust: «домофон с первого раза» +FAST_BONUS; срок вышел — доставка опоздавшая, как обычно;
    DOOR.talkAdjust: «поболтал с клиентом» +KEEP_TIP, «торопил клиента» — чаевые × RUSH_K, смешной — +FUN_TIP или без чаевых).
 
-     DOOR.init(api)     — game.js после ORD.init: { ORD, S, Store, ADULT, Snd, root(), paused(), entranceLv(x, z), shiftsDone(), onShiftStart,
+     DOOR.init(api)     — game.js после ORD.init: { ORD, S, Store, ADULT, Snd, money, root(), paused(), entranceLv(x, z), shiftsDone(), onShiftStart,
                           respect(why), hintFind() → { name, where, m } | null — ближайшая ненайденная находка (и отметить на карте) }
      DOOR.on()          — мини-игра на экране (game.js: руль стоит, кнопки геймпада — её)
-     DOOR.step(dt)      — каждый кадр мира (пауза и карта её стоят)
+     DOOR.step(dt)      — каждый кадр мира (пауза и карта её стоят): часы мини-игр и сама мини-игра
+     DOOR.homeOf(st, lv) — квартира остановки (game.js showOrderCard): { lv, per, entr, floor, door, flat } | null
      DOOR.pad(p)        — кнопки геймпада (game.js padStep), пока on()
      DOOR.enabled() / DOOR.setEnabled(on) — настройка «мини-игры у клиента» (settings.js, ключ dlv-doorgames)
      DOOR.payAdjust(st, fee, bonus, tip) → { bonus, tip, add, cut } — orders.js payStop (домофон)
      DOOR.talkAdjust(st, fee, tip) → { add, cut, kind, win } — orders.js payStop (разговор)
      DOOR.stairsAdjust(st, fee, bonus, tip) → { add, cut, gop } — orders.js payStop (подъезд)
      DOOR.ZHENYA_KEY    — ключ сохранения: скидка на следующий ремонт у Дяди Жени (доля; cars.js offer)
-     DOOR.DEBUG         — __dlv.DOOR: force(mode), talk(id), stairs(o), solve(wrong | 'rush' | 'keep' | 'fun' | 'pay' | 'late'), last, lastTalk, lastStairs,
-                          n, talkN, stairsN, stairsState() */
+     DOOR.DEBUG         — __dlv.DOOR: timer, due(), force(mode), talk(id), stairs(o), solve(wrong | 'rush' | 'keep' | 'fun' | 'pay' | 'late'),
+                          last, lastTalk, lastStairs, n, talkN, stairsN, stairsState(), doorState(), homeOf */
 import { t } from '../i18n/index.js';
 import * as ECON from './econ.js';
 import INTERCOM from './minigames/intercom.js';
 import SMALLTALK from './minigames/smalltalk.js';
-import STAIRS from './minigames/stairs.js';
+import STAIRS, { plan as STAIRS_PLAN } from './minigames/stairs.js';
+import { swapDigits } from './minigames/intercom.js';
+import * as OS from './ordersheet.js';
+import * as SC from './minigames/doorscene.js';
 import { BONUS } from './minigames/smalltalk-lines.js';
 import { faceDataURL } from './people.js';
 
 const D = ECON.DOOR;
 const TK = ECON.TALK;
 const SR = ECON.STAIRS;
+const MG = ECON.DOORGAME;
 export const ZHENYA_KEY = 'dlv-zhenya-off';
 const KEY = 'dlv-doorgames';
 let A = null;
-const G = { cur: null, step: null, pad: null, force: null, n: 0, lastAt: -99, last: null, host: null };
-const TG = { force: null, n: 0, lastAt: -99, last: null };   // разговор: сколько за смену, на каком заказе был прошлый
-const SG = { force: null, n: 0, lastAt: -99, last: null };   // подъезд: то же
+const G = { cur: null, step: null, pad: null, force: null, n: 0, last: null, host: null };
+const TG = { force: null, n: 0, last: null };   // разговор: сколько за смену
+const SG = { force: null, n: 0, last: null };   // подъезд: то же
 const rand = (a, b) => a + Math.random() * (b - a);
 const rint = (a, b) => Math.floor(rand(a, b + 1));
 
 export function init (api) {
   A = api;
   if (api.ORD && api.ORD.onArrive) api.ORD.onArrive(arrive);
-  if (api.onShiftStart) api.onShiftStart(() => { G.n = 0; G.lastAt = -99; TG.n = 0; TG.lastAt = -99; SG.n = 0; SG.lastAt = -99; });
+  if (api.onShiftStart) api.onShiftStart(() => { G.n = 0; TG.n = 0; SG.n = 0; });
 }
 export const enabled = () => !A || !A.Store || String(A.Store.get(KEY, '1')) !== '0';
 export function setEnabled (on) { if (A && A.Store) A.Store.set(KEY, on ? '1' : '0'); }
 export const on = () => !!G.cur;
 
-/* сколько заказов отдано — счётчик для «не чаще раза в GAP заказов» */
-const doneN = () => (A && A.S ? A.S.done || 0 : 0);
+/* ── когда (автор 10.10.2026: «мини-игра показывается раз в 5—10 минут»): общие часы настоящего времени ──
+   Идут только на смене (не пауза, не карта, не меню; первая смена новичка — не считается), раз в DOORGAME.EVERY с
+   (случайно в окне). Подошли — мини-игра на следующем подходящем адресе, какая — по месту (pickKind). */
+const TM = { t: 0, next: rand(MG.EVERY[0], MG.EVERY[1]) };
+const LIVE = new Set(['brief', 'drive', 'back', 'handover', 'side']);
+function tick (dt) {
+  const S = A.S;
+  if (!S || !LIVE.has(S.state) || S.freeRun || (A.paused && A.paused()) || A.shiftsDone() < MG.FROM_SHIFT) return;
+  TM.t += dt;
+}
+const due = () => TM.t >= TM.next;
+function fired () { TM.t = 0; TM.next = rand(MG.EVERY[0], MG.EVERY[1]); }
 
-/* подъехал к клиенту: выпал домофон, подъезд или разговор — Promise (вручение ждёт), нет — ничего.
-   Порядок: домофон → подъезд → разговор; __dlv.DOOR.talk() / stairs() — другие не перебивают */
+/* подъехал к клиенту: подошли часы и место подходит — Promise (вручение ждёт), нет — ничего.
+   __dlv.DOOR.force() / talk() / stairs() — без часов и правил места */
 function arrive (ev) {
   if (!A || G.cur) return;
-  if (G.force) return door(ev) || talk(ev);
-  if (SG.force) return stairs(ev);
-  if (TG.force) return talk(ev);
-  return door(ev) || stairs(ev) || talk(ev);
+  if (G.force) return door(ev, true) || talk(ev, true);
+  if (SG.force) return stairs(ev, true);
+  if (TG.force) return talk(ev, true);
+  if (!due() || !plain(ev) || ev.order.mg || A.shiftsDone() < MG.FROM_SHIFT) return;
+  if (A.S && !A.S.free && A.S.time < MG.MIN_LEFT) return;    // срок почти вышел — не до мини-игр (часы ждут следующего адреса)
+  const kind = pickKind(ev);
+  const r = kind === 'door' ? door(ev) : kind === 'stairs' ? stairs(ev) : kind === 'talk' ? talk(ev) : null;
+  if (r) fired();
+  return r;
+}
+/* какая — по месту: у подъезда дома от DOOR.LV этажей — домофон, от STAIRS.LV — и подъезд; клиент у двери — разговор */
+function pickKind (ev) {
+  const lv = A.entranceLv(ev.x, ev.z), st = ev.stop;
+  const person = st.persons && st.persons[0], ped = st.peds && st.peds[0];
+  const can = { door: lv >= D.LV, stairs: lv >= SR.LV, talk: !!person && !(ped && ped.dead) };
+  const ks = Object.keys(can).filter(k => can[k] && (MG.W[k] || 0) > 0);
+  let sum = ks.reduce((a, k) => a + MG.W[k], 0), r = Math.random() * sum;
+  for (const k of ks) { r -= MG.W[k]; if (r <= 0) return k; }
+  return ks[0] || null;
 }
 
 /* обычная пицца, на которой бывают мини-игры (без force) */
@@ -73,46 +106,79 @@ function plain (ev) {
   return true;
 }
 
-function door (ev) {
-  const o = ev.order, st = ev.stop, sp = o && o.ord;
-  if (!sp || !st || st.door) return;
-  const forced = G.force;
-  if (!forced) {
-    if (!plain(ev) || o.mg) return;                            // в этом заказе уже был разговор
-    if (A.shiftsDone() < D.FROM_SHIFT) return;                 // первая смена новичка — без мини-игр
-    if (doneN() < G.lastAt) G.lastAt = -99;                    // счётчик заказов обнулился (новая смена)
-    if (G.n >= D.MAX || doneN() - G.lastAt < D.GAP) return;
-  } else if (ev.type === 'staff' || sp.story) return;
-  const lv = A.entranceLv(ev.x, ev.z);
-  if (!forced && lv < D.LV) return;
-  if (!forced && Math.random() >= D.CHANCE) return;
-  G.force = null;
-  G.n++; G.lastAt = doneN();
-  o.mg = 'door';
-  return play(st, pickMode(forced), Math.max(lv, 5), o);
+/* квартира остановки — с самого начала заказа (game.js showOrderCard пишет её в накладную): подъезд, этаж, дверь —
+   как в подъезде (stairs.js plan); дом ниже DOOR.LV этажей или не у подъезда — квартиры нет */
+export function homeOf (st, lv) {
+  if (!st) return null;
+  if (st.home !== undefined) return st.home;
+  st.home = lv >= D.LV ? Object.assign(STAIRS_PLAN({ lv, gop: false }), { lv }) : null;
+  if (st.home) st.home.flat = String(st.home.flat);
+  return st.home;
 }
 
-/* подъезд: дом от SR.LV этажей у двери подъезда, в заказе не было домофона и разговора; шанс CHANCE, не чаще GAP, не больше MAX;
-   гопники на площадке — с GOP_FROM-й смены, шанс GOP_P */
-function stairs (ev) {
+/* цена адреса — как в orders.js payStop: для приписок на листе («+120 ₽ · с первого раза», «−100 ₽ гопникам») */
+function feeOf (o, st) {
+  const sp = o.ord || {};
+  const S = A.S || {};
+  return st.fee || (sp.fees && sp.fees[o.idx]) || Math.round((S.fee || 0) / Math.max(1, o.stops.length));
+}
+const r10 = v => Math.round(v / 10) * 10;
+const money = v => (A.money ? A.money(v) : v + ' ₽');
+
+/* какой подъезд по виду (doorscene.js): обшарпанный или чистый — по адресу и району; номер подъезда и его квартиры */
+function sceneOf (order, st) {
+  const h = st.home || {}, seed = SC.hashStr(st.addr || '');
+  const range = h.first && h.per && h.lv ? t('кв. {a}—{b}', { a: h.first, b: h.first + h.lv * h.per - 1 }) : '';
+  return { look: SC.lookOf(seed, st.zone || (order.ord && order.ord.zone)), seed, entr: h.entr || 0, range };
+}
+
+/* лист накладной — тот же, что в начале заказа (ordersheet.js) */
+function sheetOf (o) {
+  try { return OS.html(o, { extra: A.ORD && A.ORD.cardRows ? A.ORD.cardRows(o) : [], t }); } catch (e) { return ''; }
+}
+/* часы заказа, как на приборке (game.js dashStep: #dash-now, #dash-due) — мини-игра своего таймера не держит */
+function clock () {
+  const S = A.S;
+  if (!S || S.free || !(S.timeMax > 0) || !Number.isFinite(S.time)) return null;
+  const now = document.getElementById('dash-now'), dd = document.getElementById('dash-due'), w = document.getElementById('timewrap');
+  const k = S.time / S.timeMax;
+  const lvl = S.time <= 0 ? 'late' : (k <= 0.18 || S.time < 10) ? 'low' : k <= 0.4 ? 'warn' : '';
+  return { s: S.time, k, now: now ? now.textContent : '', label: dd && dd.firstChild ? dd.firstChild.textContent : t('доставить до'),
+    due: dd && dd.lastChild ? dd.lastChild.textContent : '', lvl: w && w.classList.contains('late') ? 'late' : lvl };
+}
+
+function door (ev, forced) {
+  const o = ev.order, st = ev.stop, sp = o && o.ord;
+  if (!sp || !st || st.door) return;
+  if (forced) { if (ev.type === 'staff' || sp.story) return; }
+  else if (A.shiftsDone() < D.FROM_SHIFT) return;              // первая смена новичка — без мини-игр
+  const lv = A.entranceLv(ev.x, ev.z);
+  if (!forced && lv < D.LV) return;
+  const fm = G.force;
+  G.force = null;
+  G.n++;
+  o.mg = 'door';
+  return play(st, pickMode(fm), Math.max(lv, 5), o);
+}
+
+/* подъезд: дом от SR.LV этажей у двери подъезда; гопники на площадке — с GOP_FROM-й смены, шанс GOP_P */
+function stairs (ev, forced) {
   const o = ev.order, st = ev.stop, sp = o && o.ord;
   if (!sp || !st || st.door || st.talk || st.stairs) return;
-  const forced = SG.force;
-  if (!forced) {
-    if (!plain(ev) || o.mg) return;
-    if (A.shiftsDone() < SR.FROM_SHIFT) return;                // первая смена новичка — без мини-игр
-    if (doneN() < SG.lastAt) SG.lastAt = -99;
-    if (SG.n >= SR.MAX || doneN() - SG.lastAt < SR.GAP) return;
-  } else if (ev.type === 'staff' || sp.story) return;
+  if (forced) { if (ev.type === 'staff' || sp.story) return; }
+  else if (A.shiftsDone() < SR.FROM_SHIFT) return;             // первая смена новичка — без мини-игр
   const lv = A.entranceLv(ev.x, ev.z);
   if (!forced && lv < SR.LV) return;
-  if (!forced && Math.random() >= SR.CHANCE) return;
+  const fo = SG.force && typeof SG.force === 'object' ? SG.force : {};
   SG.force = null;
-  SG.n++; SG.lastAt = doneN();
+  SG.n++;
   o.mg = 'stairs';
-  const fo = forced && typeof forced === 'object' ? forced : {};
   const gop = fo.gop !== undefined ? !!fo.gop : A.shiftsDone() >= SR.GOP_FROM && Math.random() < SR.GOP_P;
-  return playStairs(st, o, Object.assign({ lv: Math.max(lv, SR.LV) }, fo, { gop }));
+  // квартира — та же, что в накладной (homeOf); дом ниже SR.LV или квартиры нет (force) — своя
+  const lvH = Math.max(lv, SR.LV);
+  let h = st.home && st.home.lv >= SR.LV && st.home.floor >= 2 ? st.home : null;
+  if (!h || fo.floor || fo.lv || fo.per || fo.entr) { st.home = Object.assign(STAIRS_PLAN(Object.assign({ lv: lvH }, fo, { gop: false })), { lv: fo.lv || lvH }); st.home.flat = String(st.home.flat); h = st.home; }
+  return playStairs(st, o, Object.assign({}, fo, { lv: h.lv, floor: h.floor, per: h.per, entr: h.entr, door: h.door, gop }));
 }
 
 function playStairs (st, order, opt) {
@@ -139,7 +205,11 @@ function playStairs (st, order, opt) {
       paused: () => !!(A.paused && A.paused()),
       sfx: name => stairsSound(name),
     };
-    cur.off = STAIRS.mount(h, Object.assign({ addr: st.addr || '', who: person ? person.name : '' }, opt), api);
+    const fee = feeOf(order, st);
+    cur.off = STAIRS.mount(h, Object.assign({
+      addr: st.addr || '', who: person ? person.first || person.name : '', person, sheet: sheetOf(order), clock,
+      bonus: '+' + money(r10(fee * SR.FAST_BONUS)), gopPay: '−' + money(r10(fee * SR.GOP_PAY)),
+    }, sceneOf(order, st), opt), api);
   });
 }
 
@@ -163,25 +233,20 @@ function stairsSound (name) {
   try { Snd.fx('stairs-' + name, SY[name]); } catch (e) { /* — */ }
 }
 
-/* разговор у двери: клиент есть и жив, в заказе не было домофона; шанс CHANCE, не чаще GAP, не больше MAX за смену */
-function talk (ev) {
+/* разговор у двери: клиент есть и жив, в заказе не было домофона и подъезда */
+function talk (ev, forced) {
   const o = ev.order, st = ev.stop, sp = o && o.ord;
   if (!sp || !st || st.talk || st.door || st.stairs) return;
   const person = st.persons && st.persons[0], ped = st.peds && st.peds[0];
   if (!person || (ped && ped.dead)) return;
-  const forced = TG.force;
-  if (!forced) {
-    if (!plain(ev) || o.mg) return;
-    if (A.shiftsDone() < TK.FROM_SHIFT) return;                // первая смена новичка — без мини-игр
-    if (doneN() < TG.lastAt) TG.lastAt = -99;
-    if (TG.n >= TK.MAX || doneN() - TG.lastAt < TK.GAP) return;
-    if (Math.random() >= TK.CHANCE) return;
-  } else if (ev.type === 'staff' || sp.story) return;
+  if (forced) { if (ev.type === 'staff' || sp.story) return; }
+  else if (A.shiftsDone() < TK.FROM_SHIFT) return;              // первая смена новичка — без мини-игр
+  const sit = TG.force;
   TG.force = null;
-  TG.n++; TG.lastAt = doneN();
+  TG.n++;
   o.mg = 'talk';
   const fem = person.fem !== undefined ? !!person.fem : ped && ped.grp && ped.grp.userData ? !!ped.grp.userData.fem : null;
-  return playTalk(st, o, person, fem, typeof forced === 'string' ? forced : '');
+  return playTalk(st, o, person, fem, typeof sit === 'string' ? sit : '');
 }
 
 function host () {
@@ -252,31 +317,26 @@ function talkSound (name) {
   try { Snd.fx('talk-' + name, SY[name]); } catch (e) { /* — */ }
 }
 
-/* что выпало: с TYPO_FROM-й смены — опечатка, с BROKEN_FROM-й — сломан */
+/* что выпало: с SMUDGE_FROM-й смены — пятно на цифре, с TYPO_FROM-й — опечатка, с BROKEN_FROM-й — сломан */
 function pickMode (forced) {
   if (forced && forced !== true) return forced;
   const n = A.shiftsDone();
   if (n >= D.BROKEN_FROM && Math.random() < D.BROKEN_P) return 'broken';
   if (n >= D.TYPO_FROM && Math.random() < D.TYPO_P) return 'typo';
+  if (n >= D.SMUDGE_FROM && Math.random() < D.SMUDGE_P) return 'smudge';
   return 'dial';
-}
-/* номер квартиры: в домах от LV3 этажей — бывает трёхзначный; для опечатки — две разные цифры */
-function flatFor (mode, lv) {
-  const three = mode !== 'typo' && lv >= D.LV3 && Math.random() < 0.5;
-  for (let k = 0; k < 20; k++) {
-    const n = three ? rint(100, Math.min(999, lv * 4 * 6)) : rint(12, 98);
-    const s = String(n);
-    if (mode === 'typo' && (s[0] === s[1] || s.includes('0'))) continue;
-    return s;
-  }
-  return '47';
 }
 
 function play (st, mode, lv, order) {
-  const flat = flatFor(mode, lv);
-  const time = mode === 'broken' ? D.T.knock : (flat.length >= 3 ? D.T.three : D.T.two) + (mode === 'typo' ? D.T.typo : 0);
+  // квартира — из накладной (homeOf); у force не у подъезда — своя
+  const h = homeOf(st, lv) || (st.home = { lv, flat: String(rint(12, 98)) });
+  const shown = String(h.flat);
+  if ((mode === 'typo' || mode === 'smudge') && (shown.length < 2 || (mode === 'typo' && swapDigits(shown) === shown))) mode = 'dial';
+  const flat = mode === 'typo' ? swapDigits(shown) : shown;
+  const time = mode === 'broken' ? D.T.knock : (flat.length >= 3 ? D.T.three : D.T.two) + (mode === 'typo' ? D.T.typo : 0) + (mode === 'smudge' ? D.T.smudge : 0);
+  const fee = feeOf(order, st);
   return new Promise(resolve => {
-    const h = host();
+    const hh = host();
     const person = st.persons && st.persons[0];
     const cur = G.cur = { type: 'door', st, order, mode, resolve, off: null, done: false };
     const end = res => {
@@ -298,7 +358,11 @@ function play (st, mode, lv, order) {
       paused: () => !!(A.paused && A.paused()),
       sfx: name => sound(name),
     };
-    cur.off = INTERCOM.mount(h, { mode, flat, time, knocks: D.KNOCKS, fast: D.FAST, fastPad: D.FAST_PAD, addr: st.addr || '', who: person ? person.name : '' }, api);
+    cur.off = INTERCOM.mount(hh, Object.assign({
+      mode, flat, print: shown, time, knocks: D.KNOCKS, fast: D.FAST, fastPad: D.FAST_PAD, wipeAfter: D.WIPE_AFTER,
+      addr: st.addr || '', who: person ? person.first || person.name : '', person,
+      sheet: sheetOf(order), bonus: '+' + money(r10(fee * D.FAST_BONUS)), clock,
+    }, sceneOf(order, st)), api);
     sound('ring');
   });
 }
@@ -319,6 +383,7 @@ function sound (name) {
 }
 
 export function step (dt) {
+  if (A) tick(dt);
   const c = G.cur;
   if (!c) return;
   const S = A.S;
@@ -365,7 +430,10 @@ export function stairsAdjust (st, fee, bonus, tip) {
 }
 
 export const DEBUG = {
-  /* следующий подъезд (любой обычный адрес) — домофон этого вида: 'dial' | 'typo' | 'broken' | true (как выпадет) */
+  /* общие часы мини-игр: сколько набежало и когда следующая, с; due() — «подошло», следующий подходящий адрес — мини-игра по месту */
+  get timer () { return { t: +TM.t.toFixed(1), next: +TM.next.toFixed(1), due: due() }; },
+  due: () => { TM.t = TM.next; return true; },
+  /* следующий подъезд (любой обычный адрес) — домофон этого вида: 'dial' | 'smudge' | 'typo' | 'broken' | true (как выпадет) */
   force: (mode = true) => { G.force = mode; return mode; },
   /* решить открытый, как игрок: верно (wrong — сначала одна ошибка) */
   /* следующий обычный адрес — разговор: true (случайная ситуация) или id ситуации (smalltalk-lines.js) */
@@ -390,6 +458,8 @@ export const DEBUG = {
   get lastStairs () { return SG.last; },
   get stairsN () { return SG.n; },
   stairsState: () => { const b = G.host && G.host.querySelector('.sx'); return b && b.__st ? b.__st() : null; },
+  doorState: () => { const b = G.host && G.host.querySelector('.dg'); return b && b.__st ? b.__st() : null; },
+  homeOf,
   get talkN () { return TG.n; },
   get sit () { const b = G.host && G.host.querySelector('.tk'); return b ? b.__sit : null; },
 };

@@ -34,6 +34,7 @@ import { narrow } from './narrow.js';           // узкие дороги: од
 import { t } from '../i18n/index.js';
 import * as MOPEDS from './mopeds.js';
 import { onPave } from './pave.js';
+import { blocks as ringIsland } from './rings.js';   // остров малого круга: знаков там нет (rings.js)
 
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -150,6 +151,7 @@ function placeSign (A, kind, x, z, fx, fz, street) {
   return true;
 }
 function putSign (A, kind, x, z, fx, fz) {
+  if (ringIsland(x, z, 1)) return false;              // на острове круга знаков нет (10.10.2026)
   const ci = Math.floor(x / SGC), cj = Math.floor(z / SGC);
   for (let i = ci - 1; i <= ci + 1; i++)
     for (let j = cj - 1; j <= cj + 1; j++)

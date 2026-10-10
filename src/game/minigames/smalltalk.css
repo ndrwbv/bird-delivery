@@ -1,5 +1,6 @@
-/* Разговор у двери (minigames/smalltalk.js): лист накладной внизу экрана — сверху видно город и клиента у двери.
-   Слева полароид клиента (лицо меняет выражение), справа его фраза облачком и ответ курьера; внизу три ответа-«пометки».
+/* Встреча у двери (minigames/smalltalk.js): лист накладной внизу экрана — сверху видно город и клиента у двери.
+   Слева полароид (говорит ртом, лицо меняет выражение), справа его реплика облачком; под ней два коротких ответа
+   столбиком с курсором ▶, внизу подсказка управления одной строкой. Ответил — синее облачко курьера и реакция.
    Палитра — --pp-* (paper.css). */
 .tk { position: absolute; inset: 0; z-index: 26; display: flex; align-items: flex-end; justify-content: center; box-sizing: border-box;
       padding: 12px 12px clamp(10px, 3vh, 34px); overflow: auto; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none;
@@ -12,10 +13,6 @@
 .tk-clock.tk-low, .tk-clock.tk-late { color: var(--pp-red); animation: tk-blink .6s steps(2) infinite; }
 @keyframes tk-blink { 50% { opacity: .35; } }
 
-/* фитиль: сколько ещё ждёт ответа */
-.tk-fuse { height: 8px; margin: 0 0 .8em; border: 2px solid var(--pp-ink); border-radius: 6px; overflow: hidden; background: rgba(51, 33, 12, .1); }
-.tk-fuse i { display: block; height: 100%; background: var(--pp-pink); transform-origin: 0 50%; }
-.tk-fuse.tk-hot i { background: var(--pp-red); }
 
 .tk-body { display: flex; gap: clamp(10px, 2vw, 22px); align-items: flex-start; }
 .tk-who { flex: none; margin: 0; display: flex; flex-direction: column; align-items: center; gap: .5em; rotate: var(--pp-tilt, 0deg); }
@@ -45,48 +42,51 @@
            border: 2px solid var(--pp-ink); box-shadow: 0 3px 0 var(--pp-ink); rotate: -2deg; }
 .tk-note::before { content: '★ '; color: var(--pp-rust); }
 
-/* три ответа: пометки на полях, каждая своей кнопкой */
-.tk-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(6px, 1.2vw, 12px); margin-top: .9em; }
-.tk-o { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: .5em; min-height: clamp(54px, 9vh, 92px); padding: .7em .8em .7em 3em;
-        font: inherit; font-size: var(--pp-fs-s); line-height: 1.55; text-align: left; color: var(--pp-ink); cursor: pointer; touch-action: manipulation;
+/* два ответа — столбиком, коротко; курсор ▶ у выбранного (стрелки / крестовина) */
+.tk-opts { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: min(30em, 100%); margin: .9em 0 0 auto; }
+.tk-o { position: relative; display: block; padding: .75em 1em .75em 2.4em; font: inherit; font-size: var(--pp-fs-m); line-height: 1.4;
+        text-align: left; color: var(--pp-ink); cursor: pointer; touch-action: manipulation;
         background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 8px; box-shadow: 0 4px 0 var(--pp-ink);
-        transition: translate .12s var(--pp-spring), box-shadow .12s, opacity .2s; }
+        transition: translate .12s var(--pp-spring), box-shadow .12s, background .12s; }
 .tk-o:disabled { cursor: default; }
 .tk-o b { font-weight: normal; }
-.tk-o span { color: var(--pp-label); font-size: 10px; line-height: 1.5; }
-.tk-o .tk-g { position: absolute; left: .55em; top: .6em; }
-.tk-o .tk-g:empty { display: none; }
-[data-input="touch"] .tk-o { padding-left: .8em; }
-.tk-rush { background: color-mix(in srgb, var(--pp-orange) 28%, var(--pp-paper)); }
-.tk-keep { background: color-mix(in srgb, var(--pp-lime) 26%, var(--pp-paper)); }
-.tk-fun { background: color-mix(in srgb, var(--pp-pink) 24%, var(--pp-paper)); }
+.tk-o::before { content: '▶'; position: absolute; left: .8em; top: 50%; translate: 0 -50%; font-size: .8em; color: var(--pp-rust); opacity: 0; }
+.tk-o.tk-cur { background: color-mix(in srgb, var(--pp-yellow) 55%, var(--pp-paper)); translate: -4px 0; }
+.tk-o.tk-cur::before { opacity: 1; animation: tk-nudge .6s ease-in-out infinite alternate; }
+@keyframes tk-nudge { to { translate: 3px -50%; } }
+[data-input="touch"] .tk-o { padding-left: 1em; }
+[data-input="touch"] .tk-o::before { display: none; }
+[data-input="touch"] .tk-o.tk-cur { background: var(--pp-paper); translate: none; }
 .tk-o:not(:disabled):active { translate: 0 3px; box-shadow: 0 1px 0 var(--pp-ink); }
-.tk-picked { outline: 4px solid var(--pp-ink); outline-offset: 2px; box-shadow: 0 0 0 8px var(--pp-yellow), 0 4px 0 var(--pp-ink); }
-.tk-off { opacity: .35; }
+/* подсказка управления — одной строкой */
+.tk-hint { margin: .8em 0 0; font-size: 10px; line-height: 1.5; text-align: right; color: var(--pp-label); }
+.tk-hint[hidden] { display: none; }
+/* дверь закрылась */
+.tk-slam { align-self: flex-start; margin: 0; font-size: var(--pp-fs-s); font-style: italic; color: var(--pp-label); }
+.tk-gone .pp-polaroid { filter: grayscale(1) brightness(.55); transition: filter .25s; }
 
-.tk-out { margin: .9em 0 0; padding: .6em 40% .5em 0; font-size: var(--pp-fs-m); line-height: 1.6; text-align: left; border-top: 2px dashed var(--pp-brown); }
+.tk-out { min-height: 2.6em; box-sizing: border-box; margin: .9em 0 0; padding: .6em 40% .5em 0; font-size: var(--pp-fs-m); line-height: 1.6; text-align: left; border-top: 2px dashed var(--pp-brown); }
 .tk-replied .tk-me { order: -1; }
 .tk-seal { top: auto; bottom: .5em; right: 5%; --pp-seal-rot: -8deg; }
 
 .tk-pop { animation: tk-pop .18s var(--pp-spring); }
 @keyframes tk-pop { 0% { scale: .94; } 100% { scale: 1; } }
-@media (prefers-reduced-motion: reduce) { .tk-pop, .tk-talking .pp-polaroid, .tk-caret, .tk-clock { animation: none; } }
-body.calm-fx .tk-pop, body.calm-fx .tk-talking .pp-polaroid { animation: none; }
+@media (prefers-reduced-motion: reduce) { .tk-pop, .tk-talking .pp-polaroid, .tk-caret, .tk-clock, .tk-o.tk-cur::before { animation: none; } }
+body.calm-fx .tk-pop, body.calm-fx .tk-talking .pp-polaroid, body.calm-fx .tk-o.tk-cur::before { animation: none; }
 
-/* телефон стоя и узкие окна: ответы — столбиком */
+/* телефон стоя и узкие окна */
 @media (max-width: 620px) {
-  .tk-opts { grid-template-columns: 1fr; gap: 7px; }
-  .tk-o { min-height: 0; padding-top: .6em; padding-bottom: .6em; }
+  .tk-opts { width: 100%; }
+  .tk-o { font-size: var(--pp-fs-s); }
   .tk-who .pp-polaroid { width: 60px; height: 60px; }
 }
 /* низкие (телефон боком): плотнее */
 @media (max-height: 460px) {
   .tk { padding-bottom: 6px; }
   .tk-sheet .pp-head { padding: .4em 0 .3em; }
-  .tk-fuse { margin-bottom: .4em; }
   .tk-say { min-height: 0; padding: .5em .8em; line-height: 1.5; }
   .tk-who .pp-polaroid { width: 52px; height: 52px; }
-  .tk-o { min-height: 0; padding-top: .45em; padding-bottom: .45em; }
-  .tk-o span { display: none; }
-  .tk-opts { margin-top: .5em; }
+  .tk-o { padding-top: .45em; padding-bottom: .45em; }
+  .tk-opts { margin-top: .5em; gap: 6px; }
+  .tk-hint { margin-top: .4em; }
 }

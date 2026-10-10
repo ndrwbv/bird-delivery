@@ -187,6 +187,27 @@ export function prepCity (CITY, MAP, career) {
   MAPR = (MAP && MAP.career) || null;
   if (!CAREER || !MAPR || !MAPR.rich) return;
   const R = MAPR.rich, out = [], gone = [];
+  // улицы и проезды у особняков: особняк на полотно не ставим (10.10.2026 — дом карты стоял поверх
+  // дворового проезда, и особняк на его месте резал дорогу и маршрут навигатора)
+  const RS = [];
+  for (const rd of CITY.roads || []) {
+    if (rd.b || !rd.p || rd.c === 6) continue;
+    const hw = (rd.w || 6) / 2 + 0.6;
+    for (let i = 1; i < rd.p.length; i++) {
+      const [ax, az] = rd.p[i - 1], [bx, bz] = rd.p[i];
+      if (segD(R.x, R.z, ax, az, bx, bz) < R.r + 60) RS.push(ax, az, bx, bz, hw);
+    }
+  }
+  const onRoad = p => {
+    const pts = p.slice();
+    for (let i = 0; i < p.length; i++) { const a = p[i], c = p[(i + 1) % p.length]; pts.push([(a[0] + c[0]) / 2, (a[1] + c[1]) / 2]); }
+    pts.push(centroid(p));
+    for (let k = 0; k < RS.length; k += 5) {
+      if (pts.some(q => segD(q[0], q[1], RS[k], RS[k + 1], RS[k + 2], RS[k + 3]) < RS[k + 4])) return true;
+      if (inPolyP(RS[k], RS[k + 1], p) || inPolyP(RS[k + 2], RS[k + 3], p) || inPolyP((RS[k] + RS[k + 2]) / 2, (RS[k + 1] + RS[k + 3]) / 2, p)) return true;
+    }
+    return false;
+  };
   for (const b of CITY.buildings) {
     const [cx, cz] = centroid(b.p);
     if (Math.hypot(cx - R.x, cz - R.z) > R.r || b.k === 'gar' || (b.k === 'pub' && b.n) || b.k === 'church' || b.k === 'mall') { out.push(b); continue; }
@@ -203,6 +224,7 @@ export function prepCity (CITY, MAP, career) {
       const dv = n > 1 ? (r() - 0.5) * Math.max(0, D - dep) : 0;
       const p = [rectPt(Rc, um - len / 2, vm + dv - dep / 2), rectPt(Rc, um + len / 2, vm + dv - dep / 2), rectPt(Rc, um + len / 2, vm + dv + dep / 2), rectPt(Rc, um - len / 2, vm + dv + dep / 2)]
         .map(q => [Math.round(q[0] * 10) / 10, Math.round(q[1] * 10) / 10]);
+      if (onRoad(p)) { STATS.villaRoad = (STATS.villaRoad || 0) + 1; continue; }
       const v = Object.assign({}, b, {
         p, k: 'res', st: 'villa', lv: r() < 0.55 ? 2 : 3, roof: r() < 0.6 ? 'h' : 'g',
         col: VILLA_WALL[(r() * VILLA_WALL.length) | 0], rc: VILLA_ROOF[(r() * VILLA_ROOF.length) | 0], rich: 1, n: undefined, style: undefined,

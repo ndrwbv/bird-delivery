@@ -20,6 +20,7 @@
      DIRECTOR.start(kind, ttl) — началось (ttl, с — само кончится: мгновенные вроде приглашения)
      DIRECTOR.end(kind)        — кончилось
      DIRECTOR.going([kinds])   — идёт ли что-то из них (музыка, music.js)
+     DIRECTOR.sessionShifts()  — сколько смен в сессии (поручения — со 2-й, orders.js)
    Из game.js: init({ Store, S }), shiftStart(ride), delivered(), step(dt).
    Отладка: __dlv.DIRECTOR — state (сессия, уровни, что идёт, пауза), log (разрешения и отказы),
      relaunch(минут назад) — как будто игру перезапустили через столько минут, setN(n), reset().
@@ -88,6 +89,9 @@ export function delivered () {
   save(); stamp();
   note('доставка ' + SES.n);
 }
+
+/** сколько смен в этой сессии, считая идущую («покататься» — не в счёт): поручения — со 2-й (orders.js, econ.js ERRAND) */
+export const sessionShifts = () => SES.shifts;
 
 const count = tier => ACT.reduce((a, e) => a + (e.tier === tier ? 1 : 0), 0);
 

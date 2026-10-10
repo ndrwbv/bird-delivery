@@ -8,6 +8,10 @@
    Кто и с какой смены — STORY_PEOPLE в orders.config.js; главы, реплики и
    сценарии — ниже, в STORIES. Прогресс — в сохранении 'dlv-story'.
 
+   В архиве, автор 10.10.2026: сюжет героев убран (heroes.js HERO.STORY = false) — истории с arch: true
+   (баба Зина, семь героев, «Стёпа на лавочке») nextOrder пропускает. Движок катсцен, register и новые
+   истории (без arch) — как были; первый заказ Стёпы (stepafirst.js) зовёт play напрямую.
+
    Для orders.js:
      STORY.nextOrder({ shift, hour, x, z })   → спецификация заказа или null
      STORY.stage(order)                        — поставить человека у двери (необязательно)
@@ -31,8 +35,9 @@
      ['emote', кто, heart | note | star, n]
      ['scarf']                       — шарф на машину (и насовсем, в сохранении)
      ['wait', сек]
-     ['ask', кто, N_('вопрос'), { yes: N_('ответ [A]'), no: N_('ответ [X]'), emo }] — вопрос с двумя ответами
-                                     кнопками (A — yes, X — no; B и Esc — пропустить всю сцену, как везде);
+     ['ask', кто, N_('вопрос'), { yes: N_('верхний ответ'), no: N_('нижний'), emo }] — вопрос с двумя ответами
+                                     столбиком (курсор ▶: ↑ ↓ / крестовина, Enter / A — выбранный, 1 / 2 / X — сразу;
+                                     B и Esc — пропустить всю сцену, как везде);
                                      ответ — дальше в условии { ans: 'yes' | 'no' } (учебный Стёпа, stepafirst.js)
      ['do', fn, { wait }]            — своё действие истории: fn({ actor(кто), home, car, V, skip, wait(сек) });
                                      вернула Promise — ждём (если не { wait: false })
@@ -52,7 +57,9 @@
      cond(order) → 'ok' | 'bad'  — как прошло условие главы; глава: moneyBad — награда при 'bad'
      onDone(idx, cond, order)    — после награды (мелкий бонус)
      kids: { items }, глава kids: { name, note, why } — для детской версии
-     catFur                      — номер окраса кота из cats.js FURS для ['cat', …] */
+     catFur                      — номер окраса кота из cats.js FURS для ['cat', …]
+     autoSay                     — реплики без ответов листаются сами (dialog.js auto; встречи у двери)
+     cps                         — букв в секунду в репликах (по умолчанию 42) */
 import './story.css';
 import { t, N_ } from '../i18n/index.js';
 import * as ECON from './econ.js';
@@ -62,6 +69,7 @@ import { makePerson } from './people.js';
 import * as LIFE from './actorlife.js';          // живые лица и жесты актёров — только в катсцене (Н2)
 import { makeCatModel, FURS } from './cats.js';
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
+import { HERO } from './heroes.js';           // HERO.STORY — сюжет героев в архиве (10.10.2026)
 import * as QR from './quickrun.js';             // быстрый заезд: глав нет
 import { keyHTML } from '../input/glyphs.js';     // «[B] пропустить» — значок по вводу (было «esc» всегда)
 import { pad as PAD } from '../input/gamepad.js';  // B на геймпаде — пропустить катсцену, как Esc
@@ -90,6 +98,7 @@ const COURIER_LOOK = {
 export const STORIES = [
   {
     id: 'zina',
+    arch: true,          // в архиве, автор 10.10.2026: сюжет героев убран (heroes.js HERO.STORY)
     who: { seed: 0x2a1a, fem: true, look: ZINA_LOOK },
     // панельная пятиэтажка на Ленинградской; нет такого дома в карте — ближайшая панелька к точке
     home: { addr: ['Ленинградская улица', '21'], near: [3099, 2876] },
@@ -347,6 +356,10 @@ export function nextOrder (ctx = {}) {
   // номер смены: orders.js его не передаёт — тогда берём из сохранения (API.shift)
   const shift = +ctx.shift || (API.shift ? +API.shift() || 0 : 0);
   for (const s of STORIES) {
+    // в архиве, автор 10.10.2026: сюжет героев убран (heroes.js HERO.STORY) — старые истории с arch: true
+    // (баба Зина, семь героев herostories.js, «Стёпа на лавочке» stepabench.js) в очередь не идут; их главы и
+    // прогресс dlv-story лежат как были. Новые истории (register без arch) и движок катсцен — как раньше
+    if (s.arch && !HERO.STORY) continue;
     const cfg = personCfg(s), p = prog(s.id);
     const c = s.chapters[p.ch];
     if (!c) continue;
@@ -517,6 +530,8 @@ let CP = null, CL = null, CPW = null, CLW = null;
 function shotPose (name) {
   const h = CUT.home, A = CUT.actors, V = API.V;
   const gy = API.groundH(h.ex + h.nx * 2, h.ez + h.nz * 2);
+  // свои планы истории (встречи у двери, encounters.js): shot(имя, дом, сторона камеры, высота земли) → [камера, куда смотрит, дрейф] | null
+  if (CUT.story && typeof CUT.story.shot === 'function') { const r = CUT.story.shot(name, h, CUT.side, gy); if (r) return r; }
   const z = A.zina, c = A.courier;
   const zx = z && !z.hidden ? z.x : h.ex + h.nx * 0.9, zz = z && !z.hidden ? z.z : h.ez + h.nz * 0.9;
   const cx = c ? c.x : h.ex + h.nx * 2.4, cz = c ? c.z : h.ez + h.nz * 2.4;
@@ -788,9 +803,11 @@ async function say (who, text, o = {}) {
   // выражение реплики ({ emo }): лицо актёра и голова в диалоге — с тем же выражением
   const emo = o.emo || '';
   if (a) LIFE.say(a, true, emo);
-  // вопрос с двумя ответами (['ask']): A — yes, X — no; B / Esc остаются «пропустить сцену» (alt, dialog.js)
-  const two = o.yes && o.no ? { accept: t(o.yes), decline: t(o.no), alt: true } : {};
-  const r = await DLG.say({ person, name: person.name, text: t(text, typeof o.vars === 'function' ? o.vars() : o.vars), color: COLOR, fillers: false, mood: o.mood || 'calm', cps: 42,
+  // вопрос с двумя ответами (['ask']): столбиком, курсор ▶ — ↑ ↓ / крестовина, Enter / A — выбранный, X — нижний;
+  // B / Esc остаются «пропустить сцену» (alt, stack — dialog.js)
+  // реплика без ответов у истории с autoSay (встречи у двери, encounters.js) — дальше сама: допечаталась, пауза 1,2—2,5 с
+  const two = o.yes && o.no ? { accept: t(o.yes), decline: t(o.no), alt: true, stack: true } : (CUT.story && CUT.story.autoSay ? { auto: true } : {});
+  const r = await DLG.say({ person, name: person.name, text: t(text, typeof o.vars === 'function' ? o.vars() : o.vars), color: COLOR, fillers: false, mood: o.mood || 'calm', cps: (CUT.story && CUT.story.cps) || 42,
     emo, onTyped: () => { if (a) LIFE.hush(a); }, ...two });     // портрет говорит ртом с тем же выражением (talkface.js); допечаталось — и 3D-рот закрыт
   if (a) { a.talk = false; LIFE.say(a, false); }
   return r;

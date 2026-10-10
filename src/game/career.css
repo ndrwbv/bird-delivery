@@ -59,6 +59,17 @@ body.career #money b { color: #ffe6ee; text-shadow: 2px 2px 0 #3a1020; }
 .cr-rc-why { margin: 0 0 .3em; }
 .cr-rc .pp-row > b.cr-rc-no { color: var(--pp-label); font-size: var(--pp-fs-s); }
 .cr-rc-wal b { font-weight: normal; color: var(--pp-ink); white-space: nowrap; }
+/* полоска «до следующего района» (shiftend.js barHTML): на всю ширину чека под мелкими строками и печатью;
+   подпись чернилами, клетки по сменам — как от руки по линейке (.cr-bar — другая, полоски «потратить») */
+.cr-rc-bar { margin: .7em 0 0; color: var(--pp-ink); font-size: var(--pp-fs-m); line-height: 1.35; }
+.cr-bar-t { display: block; }
+.cr-bar-t .cr-nw { white-space: nowrap; }
+.cr-dbar { display: flex; gap: 4px; margin-top: .35em; padding: 3px; border: 2px solid var(--pp-ink); border-radius: 4px 6px 5px 3px;
+           background: var(--pp-paper); rotate: -.4deg; box-shadow: 2px 2px 0 color-mix(in srgb, var(--pp-ink) 25%, transparent); }
+.cr-dbar > i { display: block; flex: 1; min-width: 0; height: .9em; border-radius: 2px;
+               background: linear-gradient(90deg, var(--pp-orange) calc(var(--f) * 100%), color-mix(in srgb, var(--pp-brown) 18%, transparent) 0); }
+.cr-dbar > i.on { background: var(--pp-orange); }
+.cr-rc-bar.open .cr-dbar > i { background: var(--pp-money); }
 .cr-rc .ov-note { min-height: 0; font-size: var(--pp-fs-s); line-height: 1.7; color: var(--pp-label); opacity: 1; }
 .cr-rc .ov-note:empty { display: none; }
 /* печать — справа от мелких строк, своё место (не поверх цифр), слова в две строки */

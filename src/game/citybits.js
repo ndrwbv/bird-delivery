@@ -206,7 +206,19 @@ export function gableRoof (A, p, h, wallHex, roofHex, hipped) {
 /* ── церковь ──
    Над храмом — барабан с луковичной главой и крестом, на вытянутом храме —
    ещё колокольня с шатром на дальнем от улицы торце. Главы золотые или
-   синие со звёздами — по хешу, одна и та же от запуска к запуску. */
+   синие со звёздами — по хешу, одна и та же от запуска к запуску.
+   Колокольня (10.10.2026, автор: «часть церкви парит в воздухе») — только целиком над храмом:
+   у храма крестом точка на 0,72 пути к дальнему углу попадала в выемку между крыльями, и башня
+   висела над газоном. Теперь двигаем её к середине, пока весь её квадрат не внутри контура (нет
+   такого места — колокольни нет), и ставим от земли (A.groundH), а не на высоте крыши. */
+const inPolyC = (x, z, p) => {
+  let c = false;
+  for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+    const a = p[i], b = p[j];
+    if ((a[1] > z) !== (b[1] > z) && x < (b[0] - a[0]) * (z - a[1]) / (b[1] - a[1]) + a[0]) c = !c;
+  }
+  return c;
+};
 export function churchTop (A, p, h, cx, cz, area, seed) {
   const THREE = A.THREE;
   const R = Math.max(1.6, Math.min(4.2, Math.sqrt(area) * 0.16));
@@ -230,8 +242,18 @@ export function churchTop (A, p, h, cx, cz, area, seed) {
   let far = null, fd = 0;
   for (const q of p) { const d = Math.hypot(q[0] - cx, q[1] - cz); if (d > fd) { fd = d; far = q; } }
   if (far && fd > R * 3) {
-    const bx = cx + (far[0] - cx) * 0.72, bz = cz + (far[1] - cz) * 0.72, s = R * 0.72;
-    A.box(A.LIT, s * 2, s * 3, s * 2, '#f3eee3', bx, h + s * 1.5, bz);
+    const s = R * 0.72;
+    let bx = 0, bz = 0, ok = false;
+    for (let k = 0.72; k >= 0.3 && !ok; k -= 0.03) {
+      bx = cx + (far[0] - cx) * k; bz = cz + (far[1] - cz) * k;
+      if (Math.hypot(bx - cx, bz - cz) < R + s + 0.3) break;            // к середине — уже барабан главы
+      ok = [[0, 0], [-1, -1], [1, -1], [1, 1], [-1, 1]].every(([ox, oz]) => inPolyC(bx + ox * (s + 0.3), bz + oz * (s + 0.3), p));
+    }
+    if (!ok) return;
+    // от земли до верха башни: у храма на склоне низ не висит
+    const g = A.groundH ? Math.min(A.groundH(bx, bz), A.groundH(bx - s, bz - s), A.groundH(bx + s, bz + s), A.groundH(bx - s, bz + s), A.groundH(bx + s, bz - s)) - 0.3 : h - s * 3;
+    const top = h + s * 3;
+    A.box(A.LIT, s * 2, top - g, s * 2, '#f3eee3', bx, (top + g) / 2, bz);
     A.put(A.LIT, new THREE.ConeGeometry(s * 1.2, s * 3.2, 8), '#5f7f5a', bx, h + s * 3 + s * 1.6, bz);
     A.box(A.LIT, 0.12, 1.6, 0.12, '#e2b53e', bx, h + s * 6.4, bz);
     A.box(A.LIT, 0.8, 0.1, 0.1, '#e2b53e', bx, h + s * 6.6, bz);

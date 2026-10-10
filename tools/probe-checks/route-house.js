@@ -53,6 +53,8 @@ const pass = (off, list, tag) => {
     const c = cutsFrom(pts, tx, tz, x0, z0);
     // старт дальше окна поиска (240 м) от ближайшей улицы — выезд по клеткам не ищется, прямая к улице
     if (c && c.seg === 1 && Math.hypot(pts[1][0] - x0, pts[1][1] - z0) > 230) { R.far++; continue; }
+    // и адрес дальше окна от улицы (точка в 300 м от дорог, промка на севере): последний кусок — тоже прямая
+    if (c && c.seg === pts.length - 1 && Math.hypot(pts[pts.length - 2][0] - tx, pts[pts.length - 2][1] - tz) > 230) { R.far++; continue; }
     if (c) { R.cut++; if (R.sample.length < 6) R.sample.push({ tag, to: [Math.round(tx), Math.round(tz)], from: [Math.round(x0), Math.round(z0)], ...c }); }
   }
   R.ms = +(R.ms / R.n).toFixed(2); R.msMax = +R.msMax.toFixed(1);

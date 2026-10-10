@@ -26,7 +26,7 @@ let A = null, THREE = null, V3 = null, V3b = null;
 /* для трафика: кого пропускать на зебре (x, z, dead) */
 export const WALKERS = [];
 const COUPLES = [], RICH = [], ARTISTS = [], FLYERS = [], LUX = [], WALLS = [], PARKS = [], TAGS = [];
-export const STATE = { COUPLES, RICH, ARTISTS, FLYERS, LUX, WALLS, PARKS, TAGS, CAP: null, stats: { tags: 0, spawned: 0, ms: 0, setupMs: 0 } };
+export const STATE = { COUPLES, RICH, ARTISTS, FLYERS, LUX, WALLS, PARKS, TAGS, CAP: null, stats: { tags: 0, spawned: 0, ms: 0, setupMs: 0, tagN: 0, tagMs: 0, tagMax: 0, tagPre: 0, tagLive: 0, preN: 0, preMs: 0, preMax: 0 } };
 let CAP = null;
 
 /* насколько холодно (0…1) — та же кривая, по которой одеваются люди (seasons.js, warm) */
@@ -588,7 +588,7 @@ function buildWalls () {
       const y0 = Math.max(A.groundH(sx, sz), hLo) + 0.3;
       const h = Math.min(w * rand(0.42, 0.55), 2.1, top - 0.25 - y0);
       if (h < 1.0) continue;
-      cand.push({ x: mx, z: mz, nx: ox, nz: oz, tx: oz, tz: -ox, w, h, y0, k, tag: null, busy: 0, cd: 0, seen: 0 });
+      cand.push({ x: mx, z: mz, nx: ox, nz: oz, tx: oz, tz: -ox, w, h, y0, k, tag: null, busy: 0, cd: 0, seen: 0, old: 0, pre: null, preQ: 0 });
     }
     for (let j = 0; j < (k === 'ind' ? 2 : 1) && cand.length; j++) WALLS.push(cand.splice((Math.random() * cand.length) | 0, 1)[0]);
   }
@@ -600,15 +600,50 @@ function buildWalls () {
     const nx = -R.ux * sd, nz = -R.uz * sd, g = A.groundH(x + nx, z + nz);
     const w = Math.min(R.t - 1.4, rand(3, 4.5)), h = Math.min(w * 0.5, 2.0, R.top - 0.5 - (g + 0.3));
     if (h < 1 || !A.inBounds(x, z, 10)) continue;
-    WALLS.push({ x, z, nx, nz, tx: nz, tz: -nx, w, h, y0: g + 0.3, k: 'arch', tag: null, busy: 0, cd: 0, seen: 0 });
+    WALLS.push({ x, z, nx, nz, tx: nz, tz: -nx, w, h, y0: g + 0.3, k: 'arch', tag: null, busy: 0, cd: 0, seen: 0, old: 0, pre: null, preQ: 0 });
   }
 }
 
 const CELL = 3, PXM = 22;
+/* Граффити рисуется заранее, в спокойные кадры (requestIdleCallback): стена ближе PRE_R — холст, пиксели и пятна
+   готовятся вне кадра (W.pre), makeTag в кадре только заводит меш. Не успели — рисуем в кадре, как раньше.
+   Холсты — «для чтения» (willReadFrequently, в памяти процессора): чтение пикселей не ждёт видеокарту
+   (docs/AGENTS.md «Граффити и портреты»). */
+const PRE_R = 260, PRE_DROP = 320, PRE = [];
+let preOn = false;
+const idle = fn => (typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 1500 }) : setTimeout(() => fn(null), 80));
+function preWant (W, old) {
+  if (W.tag || (W.pre && W.pre.old === old) || W.preQ) return;
+  W.preQ = old ? 2 : 1;
+  PRE.push(W);
+  if (!preOn) { preOn = true; idle(preStep); }
+}
+function preStep (dl) {
+  let n = 0;
+  while (PRE.length && (dl ? dl.timeRemaining() > 4 || (dl.didTimeout && !n) : !n)) {
+    const W = PRE.shift(), old = W.preQ === 2;
+    W.preQ = 0;
+    if (W.tag || !A) continue;
+    const V = A.V;
+    if (Math.abs(W.x - V.x) > PRE_DROP || Math.abs(W.z - V.z) > PRE_DROP) continue;
+    const t0 = performance.now();
+    W.pre = drawTag(W, old);
+    const e = performance.now() - t0, st = STATE.stats;
+    st.preN++; st.preMs += e; if (e > st.preMax) st.preMax = e;
+    n++;
+  }
+  if (PRE.length) idle(preStep); else preOn = false;
+}
 function makeTag (W, old) {
+  const t0 = performance.now(), T = makeTag0(W, old), e = performance.now() - t0, st = STATE.stats;
+  st.tagN++; st.tagMs += e; if (e > st.tagMax) st.tagMax = e;
+  return T;
+}
+function drawTag (W, old) {
   const cw = Math.max(16, Math.round(W.w * PXM)), ch = Math.max(8, Math.round(W.h * PXM));
   const fin = document.createElement('canvas');
   fin.width = cw; fin.height = ch;
+  fin.getContext('2d', { willReadFrequently: true });
   const style = old ? pick(['tag', 'tag', 'throw', 'piece']) : pick(['tag', 'throw', 'piece', 'piece']);
   const pal = drawGraffiti(fin, style);
   const img = fin.getContext('2d').getImageData(0, 0, cw, ch).data;
@@ -625,8 +660,15 @@ function makeTag (W, old) {
     if ((bx / (CELL * 2)) % 2) col.reverse();
     cells.push(...col);
   }
+  return { old, cw, ch, fin, style, pal, img, cells };
+}
+function makeTag0 (W, old) {
+  const hit = !!(W.pre && W.pre.old === old), P = hit ? W.pre : drawTag(W, old);
+  W.pre = null;
+  STATE.stats[hit ? 'tagPre' : 'tagLive']++;
+  const { cw, ch, fin, style, pal, img, cells } = P;
   const disp = old ? fin : document.createElement('canvas');
-  if (!old) { disp.width = cw; disp.height = ch; }
+  if (!old) { disp.width = cw; disp.height = ch; disp.getContext('2d', { willReadFrequently: true }); }
   const tex = new THREE.CanvasTexture(disp);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.magFilter = tex.minFilter = THREE.NearestFilter;
@@ -1099,14 +1141,21 @@ function scan () {
   let free = null, fd = Infinity, olds = 0;
   for (const W of WALLS) {
     const d = Math.hypot(W.x - V.x, W.z - V.z);
+    if (d > PRE_R) { if (W.pre && d > PRE_DROP) W.pre = null; continue; }
+    // есть ли на стене старое граффити — решается на подъезде (PRE_R): холст рисуется заранее, в спокойные кадры;
+    // на стену — ближе 200 м, не больше трёх за обход и по одному в кадр
+    if (!W.seen) { W.seen = 1; if (chance(W.k === 'gar' || W.k === 'arch' ? 0.35 : 0.15)) { W.old = 1; preWant(W, true); } }
     if (d > 200) continue;
-    if (!W.seen && olds < 3) { W.seen = 1; if (chance(W.k === 'gar' || W.k === 'arch' ? 0.35 : 0.15)) { LATER.push(() => makeTag(W, true)); olds++; } }   // не больше трёх холстов за раз — и по одному в кадр
+    if (W.old && olds < 3) { W.old = 0; olds++; if (!W.tag) LATER.push(() => { if (!W.tag) makeTag(W, true); }); }
     if (W.cd > 0) { W.cd -= 1; continue; }
-    if (W.busy || (W.tag && W.tag.done) || d < 35 || d > 150) continue;
+    if (W.busy || W.old || (W.tag && W.tag.done) || d < 35 || d > 150) continue;
     const s = d + rand(0, 60) - (W.k === 'arch' ? 35 : 0);       // арки-тоннели — любимое место
     if (s < fd) { fd = s; free = W; }
   }
-  if (free && ARTISTS.length < CAP.artists && !E.rainWant && chance(deepWinter() ? 0.08 : winter() ? 0.25 : 0.5)) LATER.push(() => { if (!free.busy && ARTISTS.length < CAP.artists) spawnArtist(free); });   // в лютый мороз не рисуют
+  if (free && ARTISTS.length < CAP.artists && !E.rainWant && chance(deepWinter() ? 0.08 : winter() ? 0.25 : 0.5)) {   // в лютый мороз не рисуют
+    if (!free.tag && !(free.pre && !free.pre.old)) preWant(free, false);         // холст — сначала в спокойные кадры, художник — в следующий обход
+    else LATER.push(() => { if (!free.busy && ARTISTS.length < CAP.artists) spawnArtist(free); });
+  }
   if (day && PARKS.length && FLYERS.length < want && chance(0.5)) { const at = parkSpot(); if (at) LATER.push(() => spawnFlyer(at[0], at[1])); }
 }
 
@@ -1129,7 +1178,7 @@ export function step (dt, api) {
   const V = A.V;
   for (const T of TAGS) T.mesh.visible = Math.abs(T.W.x - V.x) < 220 && Math.abs(T.W.z - V.z) < 220;
   STATE.stats.ms = STATE.stats.ms * 0.98 + (performance.now() - t0) * 0.02;       // сколько стоит кадр жизни, в среднем
-  if (window.__dlv && !window.__dlv.LIFE) window.__dlv.LIFE = Object.assign(STATE, { debug: { spawnCouple, spawnRich, spawnLux, spawnArtist, spawnFlyer, parkSpot, FLY, makeTag, winter, deepWinter, cold, richTip } });
+  if (window.__dlv && !window.__dlv.LIFE) window.__dlv.LIFE = Object.assign(STATE, { debug: { spawnCouple, spawnRich, spawnLux, spawnArtist, spawnFlyer, parkSpot, FLY, makeTag, drawTag, PRE, winter, deepWinter, cold, richTip } });
 }
 
 /* рядом кого-то сбили или взорвалось: парочки и богачи — руки вверх,

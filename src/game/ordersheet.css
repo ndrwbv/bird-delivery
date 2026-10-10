@@ -1,0 +1,30 @@
+/* Пометки на листе накладной (ordersheet.js): ручка курьера и клиента — синие чернила, от руки, чуть наискосок;
+   пятно соуса на цифре квартиры. Сам лист — delivery.css (.oc-*). */
+:root { --os-ink: #2448b8; }
+.os-flat { white-space: nowrap; }
+.os-n { letter-spacing: .03em; }
+/* пятно: цифру не прочитать — рыжая клякса поверх */
+.os-blot { position: relative; display: inline-block; font-style: normal; color: transparent; }
+.os-blot::after { content: ''; position: absolute; inset: -.5em -.45em; border-radius: 46% 54% 40% 60% / 55% 45% 58% 42%;
+                  background: radial-gradient(circle at 40% 40%, #c4532c 0 38%, rgba(196, 83, 44, .85) 52%, rgba(196, 83, 44, .35) 66%, transparent 72%);
+                  rotate: -12deg; pointer-events: none; }
+/* оттёрли: цифра видна, обведена ручкой, рыжий след остался */
+.os-wiped { font-style: normal; color: var(--os-ink); border-radius: 50%; box-shadow: 0 0 0 2px var(--os-ink);
+            background: radial-gradient(circle, rgba(196, 83, 44, .22) 0 60%, transparent 70%); padding: 0 .1em; }
+/* зачёркнуто ручкой: синяя черта наискосок через номер */
+.os-struck { position: relative; opacity: .75; }
+.os-struck::after { content: ''; position: absolute; left: -.2em; right: -.2em; top: 50%; height: 3px; background: var(--os-ink); border-radius: 2px;
+                    rotate: -7deg; animation: os-strike .25s ease-out both; transform-origin: 0 50%; }
+@keyframes os-strike { from { scale: 0 1; } to { scale: 1 1; } }
+/* от руки: исправление и приписки */
+.os-fix, .os-pen { display: inline-block; margin-left: .5em; font-style: normal; color: var(--os-ink); rotate: -4deg; white-space: nowrap;
+                   animation: os-write .3s ease-out both; }
+.os-fix { font-size: 1.15em; }
+.os-pen { font-size: 1em; }
+.os-pen.os-x { text-decoration: line-through 2px var(--os-ink); opacity: .8; }
+.os-pen.os-plus { color: var(--pp-money); }
+.os-pen.os-minus { color: var(--pp-red); }
+.os-pen.os-row { display: block; margin: .35em 0 0; width: max-content; }
+@keyframes os-write { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@media (prefers-reduced-motion: reduce) { .os-struck::after, .os-fix, .os-pen { animation: none; } }
+body.calm-fx .os-struck::after, body.calm-fx .os-fix, body.calm-fx .os-pen { animation: none; }

@@ -4,17 +4,21 @@
    --runprofile=f.cpuprofile, потом node tools/profsum.cjs f.cpuprofile --spikes --spike=33 — что делали долгие кадры.
    Ответ: JS кадра (p50/p95/p99/max, сколько кадров > 33, > 50, > 90 мс), десять худших кадров (мс, секунда замера,
    сколько людей собрано в этом кадре и мс на них), запас людей (__dlv.HPOOL: собрано на ходу / взято из запаса,
-   мс по тем, кто рождает). */
+   мс по тем, кто рождает). art — граффити и портреты (10.10.2026): сколько нарисовано в кадре и мс (life.js makeTag,
+   people.js faceDataURL), сколько заранее, в спокойные кадры; у десяти худших кадров — ещё мс на них в этом кадре. */
 const Q = new URLSearchParams(location.search), SECS = +(Q.get('hsecs') || 300);
 await onShift(); autopilot(true); await wait(4000);
 const H = d.HPOOL || null, st0 = H ? H.snap() : null;
 const raf = window.requestAnimationFrame, js = [], hum = [];
 let acc = 0, lastT = -1, odd = 0, hm0 = H ? H.S.buildMs : 0, hn0 = H ? H.S.built : 0;
+const LS = () => (d.LIFE && d.LIFE.stats) || {}, FS = () => (d.FACE && d.FACE.S) || {}, artMs = () => (LS().tagMs || 0) + (FS().ms || 0);
+const art0 = { L: { ...LS() }, F: { ...FS() } }, art = [];
+let am0 = artMs();
 const A = function __frameA (cb, t) { cb(t); }, B = function __frameB (cb, t) { cb(t); };
 const t0 = performance.now();
 window.requestAnimationFrame = cb => raf(t => {
   if (t !== lastT) {
-    if (lastT >= 0) { js.push(acc); const bm = H ? H.S.buildMs : 0, bn = H ? H.S.built : 0; hum.push([performance.now() - t0, bn - hn0, bm - hm0]); hm0 = bm; hn0 = bn; }
+    if (lastT >= 0) { js.push(acc); const bm = H ? H.S.buildMs : 0, bn = H ? H.S.built : 0; hum.push([performance.now() - t0, bn - hn0, bm - hm0]); hm0 = bm; hn0 = bn; const am = artMs(); art.push(am - am0); am0 = am; }
     acc = 0; lastT = t; odd ^= 1;
   }
   const s = performance.now(); (odd ? A : B)(cb, t); acc += performance.now() - s;
@@ -30,10 +34,16 @@ const n = js.length, s = js.slice().sort((x, y) => x - y), q = p => +s[Math.min(
 const idx = js.map((v, i) => i).sort((a, b) => js[b] - js[a]).slice(0, 10);
 const r = {
   secs: +((performance.now() - t0) / 1000).toFixed(0), shifts, frames: n,
-  js: { p50: q(0.5), p95: q(0.95), p99: q(0.99), max: +s[n - 1].toFixed(1), o33: js.filter(v => v > 33).length, o50: js.filter(v => v > 50).length, o90: js.filter(v => v > 90).length },
-  worst: idx.map(i => [+js[i].toFixed(1), +(hum[i][0] / 1000).toFixed(0), hum[i][1], +hum[i][2].toFixed(1)]),
+  js: { p50: q(0.5), p95: q(0.95), p99: q(0.99), max: +s[n - 1].toFixed(1), o17: js.filter(v => v > 16.7).length, o33: js.filter(v => v > 33).length, o50: js.filter(v => v > 50).length, o90: js.filter(v => v > 90).length },
+  worst: idx.map(i => [+js[i].toFixed(1), +(hum[i][0] / 1000).toFixed(0), hum[i][1], +hum[i][2].toFixed(1), +(art[i] || 0).toFixed(1)]),
   people: { people: d.PEOPLE.length }, crash: d.crashlog.count(),
 };
+{
+  const L = LS(), F = FS(), dl = k => +((L[k] || 0) - (art0.L[k] || 0)).toFixed(1), df = k => +((F[k] || 0) - (art0.F[k] || 0)).toFixed(1);
+  r.art = { tags: { inFrame: dl('tagN'), ms: dl('tagMs'), max: +(L.tagMax || 0).toFixed(1), ready: dl('tagPre'), live: dl('tagLive'), ahead: dl('preN'), aheadMs: dl('preMs') },
+    faces: { calls: df('n'), drawn: df('miss'), ms: df('ms'), max: +(F.max || 0).toFixed(1), ahead: df('soon'), aheadMs: df('soonMs') },
+    framesWithArt: art.filter(v => v > 0.05).length, framesArt2ms: art.filter(v => v > 2).length, worstArtFrame: +Math.max(0, ...art).toFixed(1) };
+}
 if (H) {
   const a = H.snap();
   r.pool = { built: a.built - st0.built, buildMs: +(a.buildMs - st0.buildMs).toFixed(1), buildMax: a.buildMax, taken: a.taken - st0.taken, refill: a.refill - st0.refill,

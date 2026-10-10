@@ -1,5 +1,7 @@
 /* ──────────────────────────────────────────────────────────────────────────
    Герои города, этап 3 — истории по главам (docs/ORDERS.md «Герои города» → «Этап 3»).
+   В АРХИВЕ, автор 10.10.2026: сюжет героев убран (heroes.js HERO.STORY = false) — главы не выдаются,
+   истории, реплики и прогресс лежат как были: брать людей и реплики для встреч у двери.
    Как баба Зина (story.js): глава — сюжетный заказ от героя, вручение — катсцена с
    репликами, награда. Движок — story.js: истории регистрируются в нём (STORY.register),
    прогресс — там же, в сохранении 'dlv-story' (сброс прогресса его стирает).
@@ -802,6 +804,7 @@ function storyOf (H) {
   const def = HEROES.DEFS.find(d => d.id === H.hero);
   return {
     id: H.hero, name: def.name, catFur: H.catFur || 0,
+    arch: true,                                   // в архиве, автор 10.10.2026 (story.js nextOrder, heroes.js HERO.STORY)
     who: { seed: def.seed, fem: def.fem, look: def.look },
     items: H.chapters[0].items,
     chapters: H.chapters,
@@ -824,6 +827,7 @@ function storyOf (H) {
 const afterOk = af => !af || (Array.isArray(af[0]) ? af : [af]).every(([id, n]) => (prog(id).ch || 0) >= n);
 
 function ready (H, ctx, p, shift) {
+  if (!HEROES.HERO.STORY) return false;                          // в архиве, автор 10.10.2026: сюжет героев убран
   if (!A || !A.CAREER) return false;
   const c = H.chapters[p.ch], need = (c && c.need) || {};
   if (!c) return false;

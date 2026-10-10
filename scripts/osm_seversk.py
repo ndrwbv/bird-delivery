@@ -1344,9 +1344,21 @@ def build():
     if OVR.exists():
         overrides = {k: v for k, v in json.loads(OVR.read_text()).items() if not k.startswith("_")}
     buildings, malls, worship = [], [], []
+    fuel_b = []                                  # здание АЗС (amenity=fuel на контуре) — не дом, а заправка
     why_stat = {}
     for b in raw_b:
         tg = b["tags"]
+        if tg.get("amenity") == "fuel" and not overrides.get(str(b["id"]), {}).get("keep"):
+            # «Роснефть» на Кольце угадайка ставила панелькой в 12 этажей (автор, 10.10.2026: «это
+            # должна быть заправка, а не дом»): контур не строим, а в точки — заправку в его середине;
+            # навес, колонки и магазинчик у ближайшей улицы ставит игра (landmarks.js)
+            nm = tg.get("name") or tg.get("brand") or ""
+            if nm:
+                fp = {"k": "fuel", "n": nm, "p": [round(b["c"][0], 1), round(b["c"][1], 1)]}
+                if tg.get("brand"):
+                    fp["b"] = tg["brand"]
+                fuel_b.append(fp)
+            continue
         r = classify(b)
         why_stat[r["why"]] = why_stat.get(r["why"], 0) + 1
         out = {"p": ints(b["p"]), "lv": r["lv"], "k": r["k"], "st": r["st"], "col": r["col"], "roof": r["roof"]}
@@ -1364,6 +1376,8 @@ def build():
             if ov.get("drop"):
                 continue
             for kk, vv in ov.items():
+                if kk == "keep":
+                    continue
                 if vv is None:
                     out.pop(kk, None)
                 else:
@@ -1988,6 +2002,10 @@ def build():
     # Томь за забором, но её видно: вода в сетке рельефа — значит, есть
     river = "Томь" if wet.mean() > 0.005 else None
     hv = np.clip(np.round(H * 10) + 1000, 0, 65535).astype("<u2")
+    # заправки из зданий АЗС — если точкой той же АЗС рядом её нет
+    for fp in fuel_b:
+        if near(fp["p"][0], fp["p"][1]) and not any(q["k"] == "fuel" and math.hypot(q["p"][0] - fp["p"][0], q["p"][1] - fp["p"][1]) < 60 for q in pois):
+            pois.append(fp)
     city = {
         "meta": {
             "city": "Северск",

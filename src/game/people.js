@@ -10,9 +10,26 @@
 
    makePerson()          — запись человека { id, name, first, last, acc, gen, … look }
    createHumanFactory()  — makeHuman(person, o) для игры: три.js-группа
-   faceDataURL(person)   — портрет в PNG для HTML-карточек
+   faceDataURL(person)   — портрет в PNG для HTML-карточек (кэш; faceSoon — дорисовать заранее, в спокойные кадры)
    setPeopleLocale(lang) — какие имена раздавать (по умолчанию язык игры)
    setPeopleSeason(w)    — как одеваться: 0 лето … 1 зима (seasons.js)
+
+   Особые черты (10.10.2026, встречи у двери — encounter-scenes.js): жребий их
+   не раздаёт, их ставят руками поверх look (Object.assign(p.look, {...}), как
+   у героев сюжета) — поэтому все прежние люди остались такими же:
+     scar: 'cheek' | 'eye' | 'brow'   — шрам на щеке / через глаз / через бровь
+     sleeve: 'L' | 'R'                — пустой рукав (руки нет), подколот
+     broad: true                      — широкие плечи (туловище и руки шире)
+     nose: 'huge', noseC: '#…'        — огромный нос; цвет носа (красный — пьющий)
+     eyes: 'bulge' | 'alien'          — выпученные (торчат из лица) / огромные чёрные
+     bags: true                       — мешки под глазами
+     bristle: true                    — щетина «три дня» (гуще обычной)
+     beard: 'horseshoe'               — усы-подкова
+     cig: true                        — сигарета во рту
+     bottle: '#…'                     — бутылка в руке (цвет стекла; белая — кефир)
+     cup: '#…'                        — стакан кофе с крышкой в руке
+     earring: true                    — серьга в ухе
+     antenna: '#…'                    — антенны на голове (цвет шариков)
    ────────────────────────────────────────────────────────────────────────── */
 
 import { t, lang } from '../i18n/index.js';
@@ -380,8 +397,8 @@ function buildSpec (Lk, o = {}) {
   const Wp = HEAD_W[fat && Lk.shape === 'thin' ? 'normal' : Lk.shape], Wd = Wp * U, D = HEAD_D[Lk.shape], F = D / 2;
   const parts = [[], [], [], [], [], [], []];
   const bx = (p, w, h, d, x, y, z, c) => parts[p].push([w, h, d, x, y, z, c]);
-  const tw = 0.44 * ws, td = 0.26 * (fat ? ws * 1.15 : 1);
-  const lw = fat ? 0.2 : ws < 0.95 ? 0.15 : 0.16, lx = fat ? 0.15 : 0.12, ax = tw / 2 + 0.07;
+  const tw = 0.44 * ws * (Lk.broad ? 1.42 : 1), td = 0.26 * (fat ? ws * 1.15 : 1) * (Lk.broad ? 1.12 : 1);
+  const lw = fat ? 0.2 : ws < 0.95 ? 0.15 : 0.16, lx = fat ? 0.15 : 0.12, ax = tw / 2 + (Lk.broad ? 0.09 : 0.07);
   // ноги: брюки или колготки под юбкой, шорты, ботинки
   for (const p of [0, 1]) {
     if (bottom === 'shorts') { bx(p, lw + 0.02, 0.3, lw + 0.02, 0, -0.15, 0, pants); bx(p, lw - 0.03, 0.4, lw - 0.03, 0, -0.5, 0, skin); }
@@ -419,9 +436,24 @@ function buildSpec (Lk, o = {}) {
   // руки: короткий рукав и голое предплечье или длинный рукав и кисть
   const sleeve = coat ? Wr.coat : top === 'jacket' ? Lk.jacket : topC;
   for (const p of [3, 4]) {
+    if (Lk.sleeve && p === (Lk.sleeve === 'R' ? 4 : 3)) {                       // пустой рукав: руки нет, рукав сплющен и подколот к боку
+      const sc = coat ? Wr.coat : sleeve, pin = mix(sc, '#000000', 0.25);
+      if (!coat && (top === 'tee' || top === 'dress')) bx(p, 0.14, 0.15, 0.1, 0, -0.08, 0, sc);
+      else { bx(p, 0.12, 0.3, 0.06, 0, -0.16, 0, sc); bx(p, 0.1, 0.14, 0.05, 0, -0.27, 0.035, pin); bx(p, 0.03, 0.03, 0.02, 0, -0.22, 0.065, '#c8ccd2'); }
+      continue;
+    }
     if (coat) { bx(p, 0.16, 0.48, 0.16, 0, -0.235, 0, sleeve); bx(p, 0.12, 0.1, 0.13, 0, -0.52, 0, Wr.mitt); }   // варежки
     else if (top === 'tee' || top === 'dress') { bx(p, 0.14, 0.2, 0.14, 0, -0.1, 0, sleeve); bx(p, 0.11, 0.35, 0.11, 0, -0.375, 0, skin); }
     else { bx(p, 0.13, 0.47, 0.13, 0, -0.235, 0, sleeve); bx(p, 0.11, 0.08, 0.11, 0, -0.51, 0, skin); }
+    if (Lk.broad) bx(p, 0.17, 0.2, 0.17, 0, -0.08, 0, coat ? Wr.coat : sleeve);    // плечо-шар
+    if (Lk.bottle && p === (Lk.sleeve === 'R' ? 3 : 4)) {                        // бутылка в кулаке: горлышком вверх
+      const gl = Lk.bottle;
+      bx(p, 0.08, 0.2, 0.08, 0, -0.56, 0.07, gl); bx(p, 0.035, 0.09, 0.035, 0, -0.42, 0.07, gl);
+      bx(p, 0.082, 0.06, 0.082, 0, -0.58, 0.07, gl === '#f4f1ea' ? '#3f7fd6' : '#e8dcb0');      // этикетка
+    }
+    if (Lk.cup && !Lk.bottle && p === (Lk.sleeve === 'R' ? 3 : 4)) {            // стакан кофе с крышкой
+      bx(p, 0.09, 0.15, 0.09, 0, -0.55, 0.08, Lk.cup); bx(p, 0.1, 0.025, 0.1, 0, -0.465, 0.08, '#2b2a30'); bx(p, 0.092, 0.05, 0.092, 0, -0.56, 0.08, '#8a5a3a');
+    }
   }
   // голова: волосы, убор, борода, нос, уши
   const hw = o.cap ? 'cap' : Wr.head || Lk.head, hc = o.cap || Lk.headC;
@@ -462,11 +494,21 @@ function buildSpec (Lk, o = {}) {
   if (bc && Lk.beard === 'goatee') { mus(); bx(5, 0.12, 0.1, 0.04, 0, -0.235, F + 0.01, bc); }
   if (bc && Lk.beard === 'full') { mus(); jaw(); bx(5, Wd - 0.04, 0.125, 0.05, 0, -0.2375, F - 0.005, bc); bx(5, Wd - 0.06, 0.06, D * 0.8, 0, -T - 0.02, 0, bc); }
   if (bc && Lk.beard === 'chin') { jaw(); bx(5, Wd - 0.04, 0.07, 0.05, 0, -0.26, F - 0.005, bc); }
-  const NS = { small: [0.07, 0.07, 0.05], long: [0.07, 0.12, 0.06], wide: [0.12, 0.07, 0.05], button: [0.08, 0.06, 0.07], big: [0.1, 0.11, 0.08] }[Lk.nose];
+  if (bc && Lk.beard === 'horseshoe') { mus(); for (const s of [-1, 1]) bx(5, 0.04, 0.17, 0.03, s * 0.1, -0.2, F + 0.015, bc); }   // усы-подкова: до подбородка
+  // особые черты (шапка файла): только у тех, кому их поставили руками
+  if (Lk.cig) { bx(5, 0.13, 0.026, 0.026, 0.07, -0.135, F + 0.05, '#f4f1ea'); bx(5, 0.028, 0.03, 0.03, 0.145, -0.135, F + 0.05, '#e0503f'); }
+  if (Lk.earring) bx(5, 0.03, 0.05, 0.03, Wd / 2 + 0.035, -0.1, -0.01, '#e8c040');
+  if (Lk.antenna) for (const s of [-1, 1]) { bx(5, 0.025, 0.24, 0.025, s * 0.09, T + 0.12, 0, '#3a4a3a'); bx(5, 0.07, 0.07, 0.07, s * 0.1, T + 0.26, 0, Lk.antenna); }
+  if (Lk.eyes === 'bulge') for (const s of [-1, 1]) {                           // глаза-плошки торчат из лица
+    bx(5, 0.13, 0.12, 0.05, s * 3 * U, 0.035, F + 0.025, '#f4f1ea');
+    bx(5, 0.045, 0.045, 0.012, s * 3 * U + (Lk.gaze ? 0.02 : -0.01), 0.03, F + 0.056, Lk.eyeC || '#1d1a1f');
+  }
+  const NS = { small: [0.07, 0.07, 0.05], long: [0.07, 0.12, 0.06], wide: [0.12, 0.07, 0.05], button: [0.08, 0.06, 0.07], big: [0.1, 0.11, 0.08], huge: [0.13, 0.19, 0.17] }[Lk.nose];
   // череп, нос, уши и второй подбородок — часть 6, один меш со своим
   // материалом цвета кожи: игра перекрашивает голову целиком
   bx(6, Wd, 0.56, D, 0, 0, 0, skin);
   bx(6, NS[0], NS[1], NS[2], 0, -NS[1] / 2, F + NS[2] / 2, mix(skin, '#7a3a2a', 0.12));
+  if (Lk.noseC) bx(5, NS[0] + 0.004, NS[1] * 0.55, NS[2] + 0.004, 0, -NS[1] * 0.72, F + NS[2] / 2, Lk.noseC);   // кончик носа другого цвета (голова красится целиком — поэтому в части 5)
   const hid = hw === 'hood' || hw === 'ushanka' || ['long', 'bangs', 'bob', 'afro'].includes(Lk.hair);          // уши под волосами
   if (!hid) {
     const E = { normal: [0.05, 0.12, 0.08], big: [0.07, 0.16, 0.09], small: [0.04, 0.09, 0.06] }[Lk.ears];
@@ -551,7 +593,8 @@ function hairBoxes (Lk, Wd, D, r, out) {
    краснеет целиком, а лицо остаётся). Игра рисует в половину разрешения
    с крупным пикселем — поэтому глаза и брови по два пикселя, без полутонов. */
 const faceKey = (Lk, skin, Wp) => [Wp, skin, Lk.eyes, Lk.eyeC, Lk.gaze, Lk.brows, Lk.browC, Lk.mouth, Lk.lip, Lk.glasses, Lk.glassC,
-  Lk.freckles, Lk.blush, Lk.mole, Lk.stubble && Lk.hairC, Lk.wrinkles].join('|');
+  Lk.freckles, Lk.blush, Lk.mole, Lk.stubble && Lk.hairC, Lk.wrinkles].join('|') +
+  (Lk.scar || Lk.bags || Lk.bristle ? '|' + [Lk.scar, Lk.bags, Lk.bristle && Lk.hairC].join('|') : '');   // особые черты — только у кого есть
 /* fx — живое лицо (катсцены actorlife.js, портреты talkface.js): { blink — глаза закрыты, half — рот приоткрыт,
    talk — рот открыт (кадры речи: закрыт → приоткрыт → открыт) } */
 const TALK_OPEN = { smile: 'laugh', open: 'oo', o: 'oo', frown: 'shout', grit: 'oo' };
@@ -565,10 +608,23 @@ function drawFace (x, Lk, skin, Wp, ox, oy, fx) {
   if (Lk.blush) { const bc = mix(skin, '#ff5f75', 0.4); px(bc, cx - 6, 10, 2); px(bc, cx + 4, 10, 2); }
   if (Lk.freckles) { const fc = mix(skin, '#8a4a2a', 0.45); for (const [X, Y] of [[-5, 9], [-4, 10], [-3, 9], [2, 9], [3, 10], [4, 9]]) px(fc, cx + X, Y); }
   if (Lk.mole >= 0) px(mix(skin, '#2a1810', 0.6), ...[[cx + 3, 11], [cx - 4, 11], [cx + 2, 3]][Lk.mole]);
+  // особые черты (шапка файла): щетина «три дня», мешки под глазами, шрам
+  if (Lk.bristle) { const sc = mix(skin, Lk.hairC, 0.42); for (let Y = 10; Y < 16; Y++) for (let X = 2; X < Wp - 2; X++) if ((X + Y) % 2 === 0 || (X * 5 + Y * 3) % 7 === 0) px(sc, X, Y); }
+  if (Lk.bags) { const bg = mix(skin, '#4a2a5a', 0.3); px(bg, e1, 8, 2); px(bg, e2, 8, 2); px(mix(skin, '#4a2a5a', 0.18), e1, 9, 2); px(mix(skin, '#4a2a5a', 0.18), e2, 9, 2); }
+  if (Lk.scar) {
+    const sc = mix(skin, '#8a2a2a', 0.5), st = mix(skin, '#f4e0d0', 0.5);
+    const L = Lk.scar === 'eye' ? [[e2 + 1, 3], [e2 + 1, 4], [e2 + 1, 5], [e2 + 1, 8], [e2 + 1, 9], [e2 + 1, 10]]
+      : Lk.scar === 'brow' ? [[e1 - 1, 2], [e1, 3], [e1 + 1, 4], [e1 + 2, 5]]
+        : [[cx + 3, 8], [cx + 4, 9], [cx + 4, 10], [cx + 5, 11], [cx + 5, 12]];
+    for (const [X, Y] of L) px(sc, X, Y);
+    if (Lk.scar === 'cheek') { px(st, cx + 3, 10); px(st, cx + 6, 11); }          // стежки
+  }
   // глаза
   const ec = Lk.eyeC;
   for (const [e, side] of [[e1, -1], [e2, 1]]) {
     if (fx && fx.blink) { px(dark, e, 7, 2, 1); if (Lk.eyes === 'lashes') px('#1d1a1f', side < 0 ? e - 1 : e + 2, 6); continue; }   // моргнул
+    if (Lk.eyes === 'bulge') { px('#f4f1ea', e - 1, 5, 4, 3); px(ec, e + (Lk.gaze ? 1 : 0), 6); }
+    if (Lk.eyes === 'alien') { px('#101014', side < 0 ? e - 2 : e, 5, 4, 3); px('#101014', side < 0 ? e - 1 : e, 8, 3); px('#e8f4ff', side < 0 ? e - 1 : e + 1, 5); }
     if (Lk.eyes === 'round' || Lk.eyes === 'lashes') px(ec, e, 6, 2, 2);
     if (Lk.eyes === 'lashes') px('#1d1a1f', side < 0 ? e - 1 : e + 2, 5);
     if (Lk.eyes === 'white') { px('#f4f1ea', e, 6, 2, 2); px(ec, e + Lk.gaze, 6, 1, 2); }
@@ -761,19 +817,47 @@ export function drawFaceFrame (ctx, Lk, skin, Wp, fx) {
   ctx.clearRect(0, 0, Wp, 16);
   drawFace(ctx, Lk, skin, Wp, 0, 0, fx);
 }
+/* Портреты — дорогие (рисование + PNG): кэш по человеку × размеру × выражению × кадру рта, самые давно не нужные — вон
+   (FACE_CAP_P). Холсты — свои, общие, «для чтения» (willReadFrequently): так они живут в памяти процессора, и чтение
+   пикселей (контур) и PNG не ждут видеокарту — было 2—5 мс за портрет на «Деке», стало ~0,5 (docs/AGENTS.md
+   «Граффити и портреты»). faceSoon — дорисовать заранее, в спокойные кадры (requestIdleCallback): кадры рта
+   говорящего (talkface.js), настроения мини-карточек заказа (ordertags.js). Картинки — пиксель в пиксель прежние. */
+const FACE_CAP_P = 500;
+export const FACE_STATS = { n: 0, hit: 0, miss: 0, ms: 0, max: 0, soon: 0, soonMs: 0, soonMax: 0, evict: 0 };
+let PCV = null;
+const portraitCanvas = () => {
+  if (PCV) return PCV;
+  const c = document.createElement('canvas'), out = document.createElement('canvas');
+  c.width = c.height = 32;
+  PCV = { c, x: c.getContext('2d', { willReadFrequently: true }), out, o: out.getContext('2d', { willReadFrequently: true }) };
+  return PCV;
+};
+const faceLook = (person, mood) => {
+  const Lk = person.look || makeLook(person.seed >>> 0 || 1);
+  return MOOD_FACE[mood] ? Object.assign({}, Lk, MOOD_FACE[mood]) : Lk;
+};
+const portraitKey = (person, Lk, size, mood, talk) => (person.id || Lk.seed) + ':' + size + (mood ? ':' + mood : '') + (talk ? ':t' + talk : '');
 /* talk — кадр речи (talkface.js): 0 — рот как у выражения, 1 — приоткрыт, 2 — открыт */
 export function faceDataURL (person, size = 128, mood = '', talk = 0) {
   if (!person) return '';
-  let Lk = person.look || makeLook(person.seed >>> 0 || 1);
-  if (MOOD_FACE[mood]) Lk = Object.assign({}, Lk, MOOD_FACE[mood]);
-  const key = (person.id || Lk.seed) + ':' + size + (mood ? ':' + mood : '') + (talk ? ':t' + talk : '');
+  FACE_STATS.n++;
+  const Lk = faceLook(person, mood), key = portraitKey(person, Lk, size, mood, talk);
   const hit = PORTRAITS.get(key);
-  if (hit) return hit;
+  if (hit) { FACE_STATS.hit++; PORTRAITS.delete(key); PORTRAITS.set(key, hit); return hit; }      // свежие — в конец очереди
+  const t0 = performance.now(), url = drawPortrait(Lk, size, talk), e = performance.now() - t0;
+  FACE_STATS.miss++; FACE_STATS.ms += e; if (e > FACE_STATS.max) FACE_STATS.max = e;
+  keepPortrait(key, url);
+  return url;
+}
+function keepPortrait (key, url) {
+  PORTRAITS.set(key, url);
+  if (PORTRAITS.size > FACE_CAP_P) { PORTRAITS.delete(PORTRAITS.keys().next().value); FACE_STATS.evict++; }
+}
+function drawPortrait (Lk, size, talk) {
   const S = buildSpec(Lk);
   const G = 32, PY = 14;
-  const c = document.createElement('canvas');
-  c.width = c.height = G;
-  const x = c.getContext('2d');
+  const { c, x, out, o } = portraitCanvas();
+  c.width = G;                                    // чистый холст и настройки по умолчанию — как у нового
   const rects = [];
   const add = (w, h, d, bx, by, bz, hex) => rects.push({
     x0: Math.round(G / 2 + (bx - w / 2) / U), x1: Math.round(G / 2 + (bx + w / 2) / U),
@@ -791,20 +875,67 @@ export function faceDataURL (person, size = 128, mood = '', talk = 0) {
   // контур: прозрачный пиксель рядом с непрозрачным — тёмный
   const im = x.getImageData(0, 0, G, G), a = im.data, edge = [];
   for (let yy = 0; yy < G; yy++) for (let xx = 0; xx < G; xx++) {
-    if (a[(yy * G + xx) * 4 + 3]) continue;
-    const on = (X, Y) => X >= 0 && Y >= 0 && X < G && Y < G && a[(Y * G + X) * 4 + 3] > 0;
-    if (on(xx - 1, yy) || on(xx + 1, yy) || on(xx, yy - 1) || on(xx, yy + 1)) edge.push(yy * G + xx);
+    const i = yy * G + xx;
+    if (a[i * 4 + 3]) continue;
+    if ((xx > 0 && a[i * 4 - 1] > 0) || (xx < G - 1 && a[i * 4 + 7] > 0) || (yy > 0 && a[(i - G) * 4 + 3] > 0) || (yy < G - 1 && a[(i + G) * 4 + 3] > 0)) edge.push(i);
   }
   for (const i of edge) { a[i * 4] = 0x33; a[i * 4 + 1] = 0x21; a[i * 4 + 2] = 0x0c; a[i * 4 + 3] = 255; }
-  x.putImageData(im, 0, 0);
-  const out = document.createElement('canvas');
+  // увеличить до size «по пикселям» на фоне — руками, как это делала видеокарта (drawImage без сглаживания): пиксель под
+  // центром нового. При дробном увеличении (48 из 32) центр иногда ровно на границе двух — тогда в первых 3/8 стороны
+  // берётся левый (верхний), дальше и в последней строке (столбце) — правый (нижний); так картинка 48 совпадает с прежней
+  // пиксель в пиксель (tools/probe-checks/portraits.js). Холст в памяти процессора сам увеличил бы иначе
   out.width = out.height = size;
-  const o = out.getContext('2d');
-  o.fillStyle = Lk.bg; o.fillRect(0, 0, size, size);
-  o.imageSmoothingEnabled = false;
-  o.drawImage(c, 0, 0, size, size);
-  const url = out.toDataURL('image/png');
-  PORTRAITS.set(key, url);
-  if (PORTRAITS.size > 400) PORTRAITS.delete(PORTRAITS.keys().next().value);
-  return url;
+  if (size % G === 0) {                           // целое увеличение — холст делает то же самое сам, быстрее
+    x.putImageData(im, 0, 0);
+    o.fillStyle = Lk.bg; o.fillRect(0, 0, size, size);
+    o.imageSmoothingEnabled = false;
+    o.drawImage(c, 0, 0, size, size);
+    return out.toDataURL('image/png');
+  }
+  const big = o.createImageData(size, size), B = big.data, bg = hexRgb(Lk.bg);
+  const map = (last) => { const m = new Int32Array(size); for (let X = 0; X < size; X++) { const v = (X + 0.5) * G / size, c = Math.ceil(v); m[X] = Math.min(G - 1, Math.max(0, c === v && (last || v * 8 > G * 3) ? c : c - 1)); } return m; };
+  const sx = map(false), sxL = map(true);
+  for (let Y = 0, p = 0; Y < size; Y++) {
+    const cols = Y === size - 1 ? sxL : sx, row = sx[Y] * G, rowL = sxL[Y] * G;   // последний столбец берёт строку как «последний»
+    for (let X = 0; X < size; X++, p += 4) {
+      const q = ((X === size - 1 ? rowL : row) + cols[X]) * 4, al = a[q + 3];
+      if (al === 255) { B[p] = a[q]; B[p + 1] = a[q + 1]; B[p + 2] = a[q + 2]; }
+      else if (!al) { B[p] = bg[0]; B[p + 1] = bg[1]; B[p + 2] = bg[2]; }
+      else { const k = al / 255; B[p] = Math.round(bg[0] + (a[q] - bg[0]) * k); B[p + 1] = Math.round(bg[1] + (a[q + 1] - bg[1]) * k); B[p + 2] = Math.round(bg[2] + (a[q + 2] - bg[2]) * k); }
+      B[p + 3] = 255;
+    }
+  }
+  o.putImageData(big, 0, 0);
+  return out.toDataURL('image/png');
 }
+/* дорисовать заранее: кадры talks (по умолчанию — закрыт, приоткрыт, открыт) для каждого выражения moods.
+   Рисуется в спокойные кадры, по портрету, пока у кадра есть запас > 3 мс; не успели за 1 с — по одному */
+const SOON = [];
+let soonOn = false;
+export function faceSoon (person, size = 128, moods = [''], talks = [0, 1, 2]) {
+  if (!person) return;
+  for (const m of moods) for (const k of talks) if (SOON.length < 240) SOON.push([person, size, m || '', k]);
+  if (!soonOn && SOON.length) { soonOn = true; idle(soonStep); }
+}
+const idle = fn => (typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 1000 }) : setTimeout(() => fn(null), 60));
+function soonStep (dl) {
+  let n = 0;
+  while (SOON.length && (dl ? dl.timeRemaining() > 3 || (dl.didTimeout && !n) : !n)) {
+    const [person, size, mood, talk] = SOON.shift(), Lk = faceLook(person, mood), key = portraitKey(person, Lk, size, mood, talk);
+    if (PORTRAITS.has(key)) continue;
+    const t0 = performance.now(), url = drawPortrait(Lk, size, talk), e = performance.now() - t0;
+    FACE_STATS.soon++; FACE_STATS.soonMs += e; if (e > FACE_STATS.soonMax) FACE_STATS.soonMax = e;
+    keepPortrait(key, url);
+    n++;
+  }
+  if (SOON.length) idle(soonStep); else soonOn = false;
+}
+/* готов ли кадр (без рисования) — talkface.js: не готов — пока показывает закрытый рот */
+export function faceReady (person, size = 128, mood = '', talk = 0) {
+  if (!person) return '';
+  const Lk = faceLook(person, mood), key = portraitKey(person, Lk, size, mood, talk), u = PORTRAITS.get(key);
+  if (u) { PORTRAITS.delete(key); PORTRAITS.set(key, u); }
+  return u || '';
+}
+faceDataURL.soon = faceSoon;
+export const FACE_DEBUG = { S: FACE_STATS, url: faceDataURL, soon: faceSoon, ready: faceReady, size: () => PORTRAITS.size, queue: () => SOON.length, clear: () => { PORTRAITS.clear(); SOON.length = 0; }, CAP: FACE_CAP_P };

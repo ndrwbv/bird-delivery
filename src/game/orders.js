@@ -14,7 +14,7 @@
      ORD.arrive(o, st, onTime)       — подъехал к клиенту; true — дальше не идти (развоз смены, ждём onArrive)
      ORD.payStop(o, st, onTime, tier) → сколько заплатили за остановку (ECON.orderPay / tipFor); разбивку (заказ, скорость, чаевые) кладёт в st.pay — её рисует popPay
      ORD.delivered(o, st, onTime)    — заказ весь отдан: поручение, STORY.onDeliver
-     ORD.step(dt)                    — каждый кадр: посадка работников, рамка срочного
+     ORD.step(dt)                    — каждый кадр: посадка работников, рамка срочного, таймер поручений
      ORD.targetColor(), ORD.tintMarker(marker), ORD.radarRing(ctx, a, b), ORD.bagMesh(bag)
    Пины всех адресов сборного на радаре и карте рисует game.js (eachTarget): o.stops[idx …) с st.done === false.
    Для других модулей:
@@ -181,16 +181,16 @@ function distRing () {
 }
 
 /* ─────────────── смена ─────────────── */
-const SH = { far: 0, last: 0, gen: 0, sideOwed: false, zones: new Set(), must: {}, h0: 9, done: 0, log: [], reserved: new Set(), pts: [], breather: false, k: 0, sz: 1, ones: 0, beach: 0, beachAt: -99 };
+const SH = { far: 0, last: 0, gen: 0, zones: new Set(), must: {}, h0: 9, done: 0, log: [], reserved: new Set(), pts: [], breather: false, k: 0, sz: 1, run: { kind: '', n: 0 }, beach: 0, beachAt: -99 };
 const Q = [];                                          // заказы наперёд (песочница может положить); в игре — собираем по одному, когда нужен
 
 export function resetShift () {
   staffAbort();
   dropQueue();
   SH.last = 0;
-  SH.gen = 0; SH.sideOwed = false;
+  SH.gen = 0;
   SH.zones = new Set(); SH.must = {}; SH.done = 0; SH.log = []; SH.reserved = new Set(); SH.pts = []; SH.breather = false;
-  SH.k = 0; SH.sz = 1; SH.ones = 0; SH.far = 0; SH.beach = 0; SH.beachAt = -99;
+  SH.k = 0; SH.sz = 1; SH.run = { kind: '', n: 0 }; SH.far = 0; SH.beach = 0; SH.beachAt = -99;
   SH.h0 = hourNow();
   buildPool();
 }
@@ -258,9 +258,22 @@ function stopOf (s, n = 1) {
   return { x: s.x, z: s.z, key: s.key, zone: s.zone, n, addr: A.realAddress(s.x, s.z) };
 }
 
+/* вид обычного заказа (SHIFT_PLAN.kinds): solo — один человек, group — несколько человек в одном месте,
+   multi — несколько адресов разом (сборный). Вперемешку по весам, но не больше SHIFT_PLAN.maxRun одного
+   вида подряд (считаются все заказы смены: срочный, «в конец района», сюжет, пляж — как одиночные).
+   multi=false — сборный нельзя (не нашлось адресов на сборный) */
+const visKind = spec => (spec.bundle ? 'multi' : spec.kind === 'group' ? 'group' : 'solo');
+function kindRoll (multi) {
+  const W = { ...(SHIFT_PLAN.kinds || { solo: 1 }) };
+  if (!multi) delete W.multi;
+  const cap = (SHIFT_PLAN.maxRun || {})[SH.run.kind];
+  if (cap && SH.run.n >= cap && Object.keys(W).length > 1) delete W[SH.run.kind];
+  return wpick(W) || 'solo';
+}
+
 /* одна спецификация заказа: кто, куда, какой вид */
 /* разминка: первые заказы смены (PACE.WARMUP, в щедрую — WARMUP_GEN) — близко к
-   пиццерии, один адрес, без поручений, срочных и сюжета. И передышка: после
+   пиццерии, один адрес (один человек или компания), без срочных и сюжета. И передышка: после
    срочного или «в конец района» следующий — тоже близкий */
 const warmCount = () => (DIST.pace().id === 'generous' ? ECON.PACE.WARMUP_GEN : ECON.PACE.WARMUP);
 function easySpec () {
@@ -270,7 +283,14 @@ function easySpec () {
   const s = pickSpot({ dmin: a, dmax: b });
   if (!s) return null;
   SH.breather = false;
-  return { type: 'pizza', kind: 'solo', easy: true, stops: [stopOf(s)] };
+  const life = lifeN();
+  let kind = life < BUNDLE.FROM ? 'solo' : kindRoll(true);
+  if (kind === 'multi') {                                  // и сборный — на два соседних дома
+    const bs = bundleSpec(life, { min: a, max: b }, 2);
+    if (bs) { bs.easy = true; return bs; }
+    kind = 'solo';
+  }
+  return { type: 'pizza', kind, easy: true, stops: [kind === 'group' ? stopOf(s, rint(SHIFT_PLAN.groupSize || [2, 3])) : stopOf(s)] };
 }
 
 function genSpec () {
@@ -313,22 +333,25 @@ function genSpec () {
   const life = lifeN();
   // пляж летом (beach.js ORDER): клиент загорает на полотенце — в среднем 1 из EVERY, если пляж в твоём районе
   if (!spec && !forced) spec = beachSpec(hAt);
-  // сборный: n пицц на n адресов разом (econ.js BUNDLE) — с 8-го заказа за всё время
-  if (!spec && !forced) spec = bundleSpec(life, D);
+  // вид — вперемешку (kindRoll): один человек, компания в одном месте или несколько адресов разом —
+  // сборный, n пицц на n адресов (econ.js BUNDLE); всё — с первого обычного заказа (после учебного)
+  let kind = 'solo';
+  // (и когда надо «добрать районы» — адреса сборного тоже районы смены; и когда срочному или «в конец района» не нашлось адреса)
+  if (!spec && life >= BUNDLE.FROM) {
+    kind = kindRoll(true);
+    if (kind === 'multi') { spec = bundleSpec(life, D); if (!spec) kind = kindRoll(false); }
+  }
   if (!spec) {
-    // обычная пицца: район по весам (или новый, если надо добрать районы), вид по kinds
+    // обычная пицца: район по весам (или новый, если надо добрать районы)
     const w = forced === 'zones' ? zoneWeights(D.min, D.max, z => !SH.zones.has(z)) : zoneWeights(D.min, D.max);
     const zone = wpick(w) || wpick(zoneWeights(D.min, D.max)) || null;
-    // первые заказы за всё время — по одному человеку на адрес
-    const kind = life < BUNDLE.FROM ? 'solo' : wpick(SHIFT_PLAN.kinds || { solo: 1 }) || 'solo';
+    if (kind === 'multi') kind = 'solo';
     const far = zone && ZMIN[zone] > D.max;                // район за кольцом — его ближние адреса
     const s = far ? pickSpot({ zone, dmin: ZMIN[zone], dmax: ZMIN[zone] + 600 }) : pickSpot({ zone, dmin: D.min, dmax: D.max });
     if (!s) return null;
     spec = { type: 'pizza', kind, stops: [] };
     if (kind === 'group') spec.stops.push(stopOf(s, rint(SHIFT_PLAN.groupSize || [2, 3])));
     else spec.stops.push(stopOf(s));
-    // поручение — с BUNDLE.SIDE_FROM-го заказа, шанс растёт (BUNDLE.SIDE); клиент попросит при вручении
-    if (SH.sideOwed || chance(ECON.sideChance(life))) { spec.side = true; SH.sideOwed = false; }
   }
   return finishSpec(spec, forced, hAt);
 }
@@ -356,11 +379,10 @@ function beachSpec (hAt) {
    столько пицц, сколько она даёт по максимуму, и реплика директора, если есть.
    Адреса — по всему кольцу района, порядок в спецификации — ближайший следующий
    от пиццерии (по нему считаются отрезки, оплата и срок), игрок развозит как хочет. */
-function bundleSpec (life, D) {
+function bundleSpec (life, D, most = 7) {
   const step = ECON.bundleStep(life);
   if (!step) return null;
-  let n = sizeRoll(Math.max(1, Math.min(7, (step.max || 2) + GROW.sizeAdd())));   // сколько пицц — «вперемешку» (SHIFT_PLAN.sizes); ступень пиццерии ± (GROWTH.SIZE)
-  if (n < 2) return null;                                  // одна — обычная пицца
+  let n = sizeRoll(Math.max(2, Math.min(most, (step.max || 2) + GROW.sizeAdd())));   // сколько пицц — «вперемешку» (SHIFT_PLAN.sizes), от 2; ступень пиццерии ± (GROWTH.SIZE)
   const told = toldGet();                                 // сколько пицц директор уже объявил
   let boss = null;
   if (told < 2) { n = 2; boss = 2; }                       // самый первый — знакомство, ровно две
@@ -390,16 +412,16 @@ function bundleSpec (life, D) {
   return { type: 'pizza', kind: 'bundle', bundle: { n: order.length, time: step.time, boss }, stops: order.map(s => stopOf(s)) };
 }
 
-/* сколько пицц в очередном заказе (SHIFT_PLAN.sizes): по весам, но потолок растёт с каждым
+/* сколько пицц в сборном (SHIFT_PLAN.sizes): по весам, от 2, но потолок растёт с каждым
    заказом смены (rampStart + rampStep × сколько уже было после разминки), не больше ступени
-   курьера (max), не выше прошлого + maxJump, после большого — маленький, после ones одиночных
-   подряд — хотя бы два. 1 — обычная пицца */
+   курьера (max), не выше прошлого + maxJump, после большого — маленький */
 function sizeRoll (max) {
-  const Z = SHIFT_PLAN.sizes || {}, W = Z.weights || { 1: 1, 2: 1 };
+  const Z = SHIFT_PLAN.sizes || {}, W = Z.weights || { 2: 1 };
   let cap = Math.min(max, (Z.rampStart || 2) + Math.floor(SH.k * (Z.rampStep === undefined ? 1 : Z.rampStep)));
   cap = Math.min(cap, (SH.sz || 1) + (Z.maxJump || 3));
   if ((SH.sz || 1) >= (Z.big || 4)) cap = Math.min(cap, Z.afterBig || 2);
-  const lo = Math.min(cap, SH.ones >= (Z.ones || 2) ? 2 : 1);
+  cap = Math.max(2, cap);
+  const lo = 2;
   const w = {};
   for (let k = lo; k <= cap; k++) w[k] = W[k] || 0;
   return +wpick(w) || lo;
@@ -467,10 +489,12 @@ function finishSpec (spec, forced, hAt) {
   // День угнетения бургеров (festivals.js): часть заказов — «вместо бургера», оплата ×FEST.BURGER_K
   if (!spec.story && !SIM) { const bk = FEST.burgerRoll(); if (bk) spec.burger = bk; }
   spec.n = ++SH.gen;
-  // ритм размеров (sizeRoll): сколько было после разминки, сколько пицц в прошлом, сколько одиночных подряд
+  // ритм размеров (sizeRoll): сколько было после разминки, сколько пицц в прошлом; серия одного вида (kindRoll)
   const size = spec.bundle ? spec.stops.length : 1;
   if (!spec.easy) SH.k++;
-  SH.sz = size; SH.ones = size === 1 ? SH.ones + 1 : 0;
+  SH.sz = size;
+  const vk = visKind(spec);
+  SH.run = SH.run.kind === vk ? { kind: vk, n: SH.run.n + 1 } : { kind: vk, n: 1 };
   spec.hour = +hAt.toFixed(2);
   SH.log.push({ n: spec.n, h: spec.hour, type: spec.type, kind: spec.kind, zone: spec.zone, edge: !!spec.edge, urgent: !!spec.urgent, side: !!spec.side, story: !!spec.story, m: spec.m.reduce((a, b) => a + b, 0), keys: spec.stops.map(s => s.key), forced });
   return spec;
@@ -753,10 +777,15 @@ export function payStop (o, st, onTime, tier) {
   const talk = DOOR.talkAdjust(st, fee, tip);
   // подъезд (doorstep.js stairsAdjust): взбежал быстро — +add; не успел — минус cut из «за скорость» и чаевых; откупился от гопников — минус gop
   const stairs = DOOR.stairsAdjust(st, fee, bonus, tip);
+  // пицца остыла (econ.js COLD): багажник нараспашку, нет бампера, сердца — чаевые и «за скорость» меньше, не меньше нуля
+  const cw = !o.tut && A.wear ? ECON.coldCut(A.wear()) : { k: 0, why: '' };
+  const coldLeft = Math.max(0, bonus + tip - door.cut - talk.cut - stairs.cut);
+  const cold = cw.k > 0 ? Math.min(coldLeft, Math.round((bonus + tip) * cw.k / 10) * 10) : 0;
   // из чего сложилась оплата — game.js покажет кучкой денег и чеком (popPay); сюжет — катсцена сама покажет награду
   st.pay = { fee, bonus, tip, rich: rich && tip > 0, late: false, story: !!sp.story, doorAdd: door.add, doorCut: door.cut, doorMode: st.door ? st.door.mode : '',
-    talkAdd: talk.add, talkCut: talk.cut, talkKind: talk.kind, stairsAdd: stairs.add, stairsCut: stairs.cut, stairsGop: stairs.gop };
-  const extra = door.add - door.cut + talk.add - talk.cut + stairs.add - stairs.cut - stairs.gop;
+    talkAdd: talk.add, talkCut: talk.cut, talkKind: talk.kind, stairsAdd: stairs.add, stairsCut: stairs.cut, stairsGop: stairs.gop,
+    cold, coldWhy: cold ? cw.why : '' };
+  const extra = door.add - door.cut + talk.add - talk.cut + stairs.add - stairs.cut - stairs.gop - cold;
   S.tips = (S.tips || 0) + bonus + tip + extra;   // чек смены: строка «чаевые и за скорость» (career.js; обнуляет startShift)
   return fee + bonus + tip + extra;
 }
@@ -779,14 +808,34 @@ export function delivered (o, st, onTime) {
     sp.story.late = !onTime;                              // условие «успеть» у глав героев (herostories.js)
     try { STORY.onDeliver(sp.story); } catch (e) { console.warn('[orders] STORY.onDeliver', e); }
   }
-  if (sp.side) {
-    // после разговора у двери (doorstep.js) просьбу не задаёт — попросит следующий
-    if (onTime && !S.ride && !st.talk && st.persons[0] && st.peds[0] && !st.peds[0].dead && DIRECTOR.can('errand') && offerSide(st.peds[0], st.persons[0])) return;
-    SH.sideOwed = true;                                   // не вышло — попросит следующий
+  // поручение по таймеру (errandStep): подошёл срок — просит этот клиент (и когда опоздал); после разговора у двери
+  // (doorstep.js), у сюжетного, на фестивале и без магазина рядом — не просит, попросит следующий
+  if (ERR.due) {
+    const no = sp.story ? 'сюжет' : sp.fest ? 'фестиваль' : S.ride ? 'покататься' : st.talk ? 'разговор у двери'
+      : !(st.persons[0] && st.peds[0] && !st.peds[0].dead) ? 'нет клиента' : !DIRECTOR.can('errand') ? 'режиссёр' : !offerSide(st.peds[0], st.persons[0]) ? 'нет магазина' : '';
+    if (no) { ERR.miss.push(no); if (ERR.miss.length > 30) ERR.miss.shift(); } else errandDone();
   }
 }
 
-/* ─────────────── поручения ─────────────── */
+/* ─────────────── поручения ───────────────
+   Когда: таймер настоящего времени (econ.js ERRAND) со 2-й смены сессии (DIRECTOR.sessionShifts):
+   первое — через FIRST с, дальше — каждые EVERY ± JITTER с. Секунды идут только в кадре смены
+   (game.js не зовёт ORD.step на паузе, в диалоге и катсцене), остаток переходит в следующую смену. */
+const ERR = { left: null, due: false, clock: 0, log: [], miss: [] };   // log — когда просили (с), miss — почему не попросили (отладка)
+const LIVE_ST = ['drive', 'back', 'handover', 'brief', 'loading', 'side'];
+function errandStep (dt) {
+  ERR.clock += dt;
+  if (ERR.due || S.ride || S.state === 'side' || !LIVE_ST.includes(S.state)) return;
+  if (!CAR || typeof CAR.shiftOn !== 'function' || !CAR.shiftOn()) return;
+  if (!(DIRECTOR.sessionShifts && DIRECTOR.sessionShifts() >= ECON.ERRAND.FROM_SHIFT)) return;
+  if (ERR.left === null) { ERR.left = rand(ECON.ERRAND.FIRST[0], ECON.ERRAND.FIRST[1]); return; }
+  if ((ERR.left -= dt) <= 0) ERR.due = true;
+}
+function errandDone () {
+  ERR.due = false;
+  ERR.left = ECON.ERRAND.EVERY + rand(-ECON.ERRAND.JITTER, ECON.ERRAND.JITTER);
+  ERR.log.push(Math.round(ERR.clock));
+}
 function sideOpts (ped) {
   return SIDE_ORDERS.filter(s => (!s.adult || A.ADULT) && (!s.kids || !A.ADULT))
     .map(s => ({ s, shop: A.errandShop({ kinds: s.shop.kinds || [], prefer: s.shop.prefer || /$^/, anyKind: !!s.shop.anyKind }, ped) }))
@@ -1010,6 +1059,7 @@ let urgOn = null;
 export function step (dt) {
   if (!A) return;
   if (window.__dlv && !window.__dlv.ORD) window.__dlv.ORD = DEBUG;
+  errandStep(dt);
   // посадка работников: дошёл до машины — пропал (в машине)
   const B = STAFF.board;
   if (B) {
@@ -1194,8 +1244,8 @@ export function force (spec = {}) {
     if (k === 'beach') {                                   // пляж (beach.js): место под полотенце — без проверок лета и района
       const b = BEACH.orderSpot();
       if (b) sp = { type: 'pizza', kind: 'solo', beach: true, stops: [{ x: b.x, z: b.z, key: keyOf(b.x, b.z), zone: ZN.zoneAt(b.x, b.z), n: 1, addr: t('пляж на Томи, у воды') }] };
-    } else if (k === 'bundle') {                         // сборный (bundleSpec) — как с BUNDLE.FROM-го заказа за всё время
-      sp = bundleSpec(Math.max(lifeN(), BUNDLE.FROM + 40), D);
+    } else if (k === 'bundle') {                         // сборный (bundleSpec) — как на 3-й ступени (BUNDLE.STEPS)
+      sp = bundleSpec(Math.max(lifeN(), 40), D);
     } else if (spec.near) s = pickSpot({ near: spec.near, r: spec.r || 350, zone: spec.zone || null });
     else if (k === 'edge') { if (!POOL.length) buildPool(); s = edgeSpot(); }
     else if (k === 'urgent') s = urgentSpot(spec.zone);
@@ -1254,7 +1304,7 @@ function simShift (n = 10, h0 = 9, h1 = 23.5, life = null, told = null) {
     for (const st of sp.stops) markUsed(st.key);
     SH.done++;
     const lvl = { urgent: !!sp.urgent, edge: !!sp.edge, level: A.level() };
-    out.push({ n: sp.n, life: LIFE_OVERRIDE, h: +HOUR_OVERRIDE.toFixed(1), type: sp.type, kind: sp.kind, zone: sp.zone, stops: sp.stops.length, edge: !!sp.edge, urgent: !!sp.urgent, side: !!sp.side, forced: sp.forced, m: sp.m, keys: sp.stops.map(s => s.key),
+    out.push({ n: sp.n, life: LIFE_OVERRIDE, h: +HOUR_OVERRIDE.toFixed(1), type: sp.type, kind: sp.kind, vk: visKind(sp), beach: !!sp.beach, easy: !!sp.easy, zone: sp.zone, stops: sp.stops.length, edge: !!sp.edge, urgent: !!sp.urgent, side: !!sp.side, forced: sp.forced, m: sp.m, keys: sp.stops.map(s => s.key),
       boss: sp.bundle ? sp.bundle.boss : null, fee: sp.stops.reduce((a, st, k) => a + ECON.orderPay(sp.m[k] || 0, st.zone, lvl), 0),
       far: DIST.has() && DIST.city() ? sp.m.map(ECON.cityFar) : null });
     if (sp.bundle && sp.bundle.boss) SIM_TOLD = Math.max(SIM_TOLD, Math.abs(sp.bundle.boss));
@@ -1270,6 +1320,6 @@ export const farEarned = () => SH.far || 0;
 export const DEBUG = {
   farEarned, Q, SH, get POOL () { return POOL; }, get USED () { return USED; }, STAFF, ARRIVE, simShift, resetShift, genSpec, pickSpot, staffRide, bagMesh,
   get CAR () { return CAR; }, get STORY () { return STORY; }, hourNow, offerSide, sideOpts, force, forceSide, nextPlan, card, onArrive,
-  lifeN, bundleSpec, activeStops, pickStop, reachStop,
+  lifeN, bundleSpec, activeStops, pickStop, reachStop, ERR,
   clearUsed () { USED = []; reindex(); A.Store.set(USED_KEY, USED); },
 };

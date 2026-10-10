@@ -4,6 +4,8 @@
      slot     — однорукий бандит: неон, автомат с лампочками, три барабана, рычаг — ×2 за 777
      roulette — красное или чёрное: зелёное сукно, колесо с номерами и шариком, фишки — ×2
      tennis   — теннис один на один: корт, табло, Игорёк против Андрюши или Настюши — ×2
+                (в архиве, автор 10.10.2026: сюжет героев убран, heroes.js HERO.STORY = false — на корте двое
+                безымянных, «левый» и «правый», каждый матч — новые лица, 50 на 50; совета Лёхи нет)
    Игра меняется по кругу (ECON.SLOT.GAMES), каждая смена — следующая.
 
    Управление (геймпад / клавиатура / касание):
@@ -37,7 +39,14 @@ const PLAYER = {
   andr: { name: N_('Андрюша'), seed: 41027, fem: false },
   igor: { name: N_('Игорёк'), seed: 77311, fem: false },
   nast: { name: N_('Настюша'), seed: 50923, fem: true },
+  // сюжет героев в архиве (heroquests.js ANON): двое безымянных; лица — новые на каждый матч (reseat)
+  pl: { name: N_('левый'), seed: 1, fem: false },
+  pr: { name: N_('правый'), seed: 2, fem: false },
 };
+/* безымянные игроки: новые лица на матч (у героев лица свои — не трогаем) */
+function reseat () {
+  for (const id of HQ.ANON) { PLAYER[id].seed = 1 + ((Math.random() * 1e6) | 0); PLAYER[id].fem = Math.random() < 0.4; }
+}
 const COLOR = { red: N_('красное'), black: N_('чёрное') };
 const SYM = ['7', '★', '♥', '₽', '◆', '♣'];
 const SYM_C = ['#ff3b6b', '#ffd85e', '#ff7fd0', '#6dff8a', '#5fe8ff', '#c9a0ff'];
@@ -178,6 +187,7 @@ export function open () {
   const md = box();
   GAME = game();
   MATCH = GAME === 'tennis' ? HQ.match() : [];
+  if (MATCH.some(p => HQ.ANON.includes(p))) reseat();
   const max = stepDown(A.wallet());
   STAKE = Math.min(max, stepDown(A.S.money || 0) || stepDown(max / 4) || max);
   md.dataset.game = GAME;
@@ -248,6 +258,7 @@ function again () {
   keysHint();
   if (GAME === 'tennis') {                         // новый матч — новый соперник у Игорька
     MATCH = HQ.match();
+    if (MATCH.some(p => HQ.ANON.includes(p))) reseat();
     md.querySelector('.dep-stage').innerHTML = stageHTML(GAME);
     md.querySelectorAll('.dep-pick').forEach(b => b.addEventListener('click', () => choose(b.dataset.p)));
     if (!MATCH.includes(PICK)) PICK = MATCH.includes(LAST_PICK.tennis) ? LAST_PICK.tennis : MATCH[0];

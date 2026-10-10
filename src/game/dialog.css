@@ -13,6 +13,7 @@
                 animation: dlg-talk .5s ease-in-out infinite alternate; }
 .dlg-head b { font-weight: normal; font-size: 11px; color: #ffd85e; text-align: center; max-width: 180px; }
 @keyframes dlg-talk { from { transform: translateY(0); } to { transform: translateY(-3px) rotate(-1deg); } }
+.dlg-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .dlg-bubble { position: relative; flex: 1; min-height: 120px; background: #fff3d6; color: #2a1d10; border: 3px solid #33210c;
               border-radius: 14px; padding: 16px 18px 26px; margin-bottom: 40px; cursor: pointer; }
 .dlg-bubble::before { content: ''; position: absolute; left: -20px; bottom: 26px; border: 10px solid transparent; border-right: 12px solid #33210c; }
@@ -43,6 +44,42 @@
   .dlg-text { font-size: 11px; }
   .dlg-btns { justify-content: stretch; } .dlg-btns button { flex: 1; }
 }
+
+/* два ответа столбиком (say { stack }: вопрос в катсцене, story.js ['ask']) — как разговор у двери (smalltalk.css):
+   друг под другом, верхний — первый, у выбранного курсор ▶; значков клавиш на кнопках нет — подсказка одной строкой внизу */
+.dlg-btns.stack { flex-direction: column; align-items: stretch; gap: 8px; width: min(30em, 100%); margin: 0 0 0 auto; box-sizing: border-box; padding: 0 0 4px; }
+.dlg-btns.stack .dlg-yes { order: -1; }
+.dlg-box.stack .dlg-bubble { margin-bottom: 10px; }
+.dlg-btns.stack button { justify-content: flex-start; text-align: left; padding: 10px 16px 10px 30px; position: relative;
+                         background: #3a4570; color: #fff3d6; box-shadow: 0 3px 0 #33210c; transition: translate .12s, background .12s; }
+.dlg-btns.stack .pp-key { display: none; }
+.dlg-btns.stack button::before { content: '▶'; position: absolute; left: 11px; top: 50%; translate: 0 -50%; font-size: 10px; color: #33210c; opacity: 0; }
+.dlg-btns.stack button.dlg-cur { background: #ffd85e; color: #2a1d10; translate: -4px 0; }
+.dlg-btns.stack button.dlg-cur::before { opacity: 1; animation: dlg-nudge .6s ease-in-out infinite alternate; }
+#dlg[data-input="touch"] .dlg-btns.stack button.dlg-cur { background: #3a4570; color: #fff3d6; translate: none; }
+#dlg[data-input="touch"] .dlg-btns.stack button::before { opacity: 0; animation: none; }
+@keyframes dlg-nudge { from { translate: 0 -50%; } to { translate: 3px -50%; } }
+.dlg-hint { margin: 0; padding: 6px 0 12px; font-size: 9px; line-height: 1.5; text-align: right; color: #9aa6d6; }
+.dlg-hint[hidden] { display: none; }
+@media (max-width: 560px) { .dlg-col { width: 100%; } .dlg-btns.stack button { flex: none; } .dlg-hint { padding: 4px 0 10px; } }
+@media (prefers-reduced-motion: reduce) { .dlg-btns.stack button.dlg-cur::before { animation: none; } }
+/* авто-продолжение (say { auto }): тонкая полоска тает — сколько реплика ещё повисит; не краснеет */
+.dlg-timer.auto { height: 4px; background: transparent; }
+.dlg-timer.auto i { background: #8a96c8; }
+/* в катсцене (body.story-cut) окно — внизу, над чёрной полосой: лица героев в верхней половине кадра видны;
+   затемнение слабее */
+body.story-cut #dlg { align-items: flex-end; padding-bottom: 3vh; background: rgba(12, 18, 40, .14); }
+/* и компактнее: портрет меньше, облачко по тексту — над окном героя видно по пояс */
+body.story-cut .dlg-row { padding: 12px 18px 4px; gap: 14px; }
+body.story-cut .dlg-head img { width: 104px; height: 104px; border-width: 3px; }
+body.story-cut .dlg-bubble { min-height: 0; padding: 12px 16px 20px; margin-bottom: 22px; }
+body.story-cut .dlg-bubble::before { bottom: 18px; }
+body.story-cut .dlg-bubble::after { bottom: 20px; }
+body.story-cut .dlg-text { line-height: 1.75; }
+body.story-cut .dlg-btns { padding: 6px 18px 12px; }
+body.story-cut .dlg-btns.stack { gap: 6px; }
+body.story-cut .dlg-btns.stack button { padding: 8px 14px 8px 28px; }
+body.story-cut .dlg-hint { padding: 4px 0 8px; }
 
 /* полоски под текстом (meters): «мотор 82 %», «ресурс 94 %» у Дяди Жени */
 .dlg-meters { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }

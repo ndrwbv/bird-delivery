@@ -30,6 +30,7 @@ import * as DP from './distpick.js';             // выбор района — 
 import * as GROW from './growth.js';             // пиццерия растёт: ступень на итогах смены (growth.js)
 import { farEarned } from './orders.js';
 import * as END from './shiftend.js';
+import * as DAILY from './daily.js';             // задания на день: строка «задания: 2 из 3» в чеке смены (daily.js)
 import * as CHAT from './chat.js';
 import * as DEP from './dep.js';                // «депнуть»: однорукий бандит, рулетка, теннис — свои экраны (dep.js)
 import * as HQ from './heroquests.js';           // герои, этап 2: совет Лёхи на ставке, «наоборот» Игорька, Жека про машину
@@ -477,7 +478,7 @@ export function showEnd (why, whyText, held) {
   fitEnd();
 }
 
-/* строки чека: [подпись, значение, класс]. Сходится: доставлено + чаевые − штрафы + бонус = итог «за смену».
+/* строки чека: [подпись, значение, класс]. Сходится: доставлено + чаевые + задания − штрафы + бонус = итог «за смену».
    «доставлено» — всё, что пришло за смену, кроме чаевых (заказы, премия за развоз, поручения); штрафы —
    все вычеты за смену (career.js watchMoney): за клиента и «опоздал обратно» — своими строками, остальное — «опоздания и штрафы» */
 function endRows (full) {
@@ -485,9 +486,12 @@ function endRows (full) {
   const tips = Math.max(0, Math.round(S.tips || 0)), lost = Math.max(0, Math.round(SH.lost || 0));
   const fine = Math.min(lost, Math.max(0, Math.round(SH.fine || 0)));
   const back = Math.min(lost - fine, Math.max(0, Math.round(SH.back || 0))), other = lost - fine - back;
-  const got = Math.max(0, (S.money || 0) - tips + lost);
+  const daily = Math.max(0, Math.round(DAILY.earned() || 0));            // задания на день — своей строкой
+  const got = Math.max(0, (S.money || 0) - tips - daily + lost);
   const rows = [[d ? tn(d, '{n} заказ доставлен|{n} заказа доставлено|{n} заказов доставлено') : t('заказов не доставлено'), (got ? '+' : '') + m(got), got ? 'pp-plus' : '']];
   if (tips) rows.push([t('чаевые и за скорость'), '+' + m(tips), 'pp-plus']);
+  const dr = DAILY.endRow();
+  if (dr) rows.push(dr);
   rows.push([t('удары'), String(SH.hits || 0), SH.hits ? '' : 'pp-plus']);
   if (fine) rows.push([t('штраф за клиента'), '−' + m(fine), 'pp-minus']);
   if (back) rows.push([t('опоздал обратно'), '−' + m(back), 'pp-minus']);
@@ -497,7 +501,7 @@ function endRows (full) {
   return rows;
 }
 
-/* мелко под итогом: копилка, одна строка про район, новости смены (жёлтым маркером) — не больше трёх новостей */
+/* мелко под итогом: копилка, полоска «до следующего района», новости смены (жёлтым маркером) — не больше трёх новостей */
 function endHints (wasOn, rankWas, placeWas) {
   const out = [{ text: t('в копилке теперь'), wal: true, n: A.wallet() }];
   if (!wasOn) return out;
@@ -513,25 +517,29 @@ function endHints (wasOn, rankWas, placeWas) {
   return out.concat(news.slice(0, 3));
 }
 
-/* одна строка про район: «открыт новый район: «Кольцо»», «до района «Кольцо» — ещё 3 смены»,
-   «для района «Кольцо» не в зачёт: 2 из 3 заказов · ещё 3 смены»; всё открыто или «весь город» — без строки */
+/* полоска «до следующего района» под итогом (автор 10.10.2026: вместо строки «для района «Кольцо» не в зачёт:
+   0 из 3 заказов · ещё 4 смены»): «до района «Кольцо»: заказов 2 из 3 · смен 1 из 4» и полоска из стольких
+   клеток, сколько нужно смен; засчитанные — залиты, незасчитанная эта смена — залита на долю заказов из 3.
+   Работаешь не в последнем открытом — «смен 1 из 4 в районе «Юг»», без заказов (эта смена туда не идёт).
+   Район открылся этой сменой — полоска целиком и отметка «открыт!». Всё открыто или «весь город» — без полоски */
 function districtLine () {
   if (!DIST.has()) return null;
-  if (SH.opened >= 0) return { text: t('открыт новый район: «{name}»', { name: t(DIST.list()[SH.opened].name) }), mark: true };
+  if (SH.opened >= 0) {
+    const n = Math.max(1, DIST.need(SH.opened - 1) || 1);
+    return { bar: { text: t('район «{name}»', { name: t(DIST.list()[SH.opened].name) }), done: t('открыт!'), cells: Array(n).fill(1) } };
+  }
   if (SH.city) return null;
   const last = DIST.opened() - 1;
   if (last >= DIST.count() - 1) return null;
-  const next = t(DIST.list()[last + 1].name), left = Math.max(1, DIST.need(last) - DIST.shiftsIn(last));
+  const next = t(DIST.list()[last + 1].name), need = Math.max(1, DIST.need(last)), have = Math.min(need, DIST.shiftsIn(last));
   const here = SH.district >= 0 ? SH.district : DIST.cur();
+  const cells = Array.from({ length: need }, (_, i) => (i < have ? 1 : 0));
   if (here !== last) {
-    return { text: tn(left, 'до района «{name}» — ещё {n} смена в районе «{where}»|до района «{name}» — ещё {n} смены в районе «{where}»|до района «{name}» — ещё {n} смен в районе «{where}»',
-      { name: next, where: t(DIST.list()[last].name) }) };
+    return { bar: { cells, text: t('до района «{name}»: смен {have} из {need} в районе «{where}»', { name: next, have, need, where: t(DIST.list()[last].name) }) } };
   }
-  const leftTxt = tn(left, 'ещё {n} смена|ещё {n} смены|ещё {n} смен');
-  if (!SH.counted) {
-    return { text: t('для района «{name}» не в зачёт: {have} из {need} заказов', { name: next, have: A.S.delivered || 0, need: ECON.DISTRICT.COUNT_MIN }) + ' · ' + leftTxt };
-  }
-  return { text: tn(left, 'до района «{name}» — ещё {n} смена|до района «{name}» — ещё {n} смены|до района «{name}» — ещё {n} смен', { name: next }) };
+  const min = ECON.DISTRICT.COUNT_MIN, got = Math.min(min, A.S.delivered || 0);
+  if (!SH.counted && have < need) cells[have] = got / min;              // эта смена не засчитана — клетка залита на долю заказов
+  return { bar: { cells, text: t('до района «{name}»: заказов {got} из {min} · смен {have} из {need}', { name: next, got: SH.counted ? min : got, min, have, need }) } };
 }
 
 /* быстрый заезд кончился (полночь, снялся, сгорел): карьере ничего — ни смены, ни бонуса, ни района, ни звёзд,
@@ -613,22 +621,6 @@ addEventListener('resize', () => {
   const md = $('cr-spend');
   if (md && !md.hidden && !TAB) fitBox(md.querySelector('.cr-sp-box'));
 });
-
-/* когда откроется следующий район — строки [что, текст] для итогов смены и паузы (game.js renderPause):
-   «новый район · «Кольцо» через 2 смены» и «смена в зачёт · от 3 заказов · сейчас 1».
-   delivered — сколько отвёз за эту смену (на паузе), иначе без «сейчас». Всё открыто — [] */
-export function districtNext (delivered) {
-  if (!DIST.has()) return [];
-  const last = DIST.opened() - 1;
-  if (last >= DIST.count() - 1) return [];
-  const left = Math.max(1, DIST.need(last) - DIST.shiftsIn(last)), next = t(DIST.list()[last + 1].name);
-  const where = DIST.cur() !== last ? ' ' + t('в районе «{name}»', { name: t(DIST.list()[last].name) }) : '';
-  const min = ECON.DISTRICT.COUNT_MIN;
-  return [
-    [t('новый район'), tn(left, '«{name}» через {n} смену|«{name}» через {n} смены|«{name}» через {n} смен', { name: next }) + where],
-    [t('смена в зачёт'), tn(min, 'от {n} заказа|от {n} заказов|от {n} заказов') + (delivered != null ? ' · ' + t('сейчас {n}', { n: delivered }) : '')],
-  ];
-}
 
 /* кошелёк и звёзды — строкой под заработком */
 function refreshWallet () {
@@ -1032,7 +1024,7 @@ const DEBUG = {
   hasOrders: () => !!(ORD && ORD.staffRide), hasCars: () => !!carsApi(),
   // перемотка за обед — обед считается прошедшим (иначе он всплывает в любом пресете песочницы)
   // h — по расписанию смены (9…24): в круглосуточной смене с ночи «23,9» — это тоже «почти конец смены»
-  schedHour, allDay, districtNext, shiftLeft,
+  schedHour, allDay, shiftLeft,
   skipTo (h) { if (A) { A.env().t = SH.on ? (SH.tStart + ECON.tOfHour(h) - ECON.SHIFT.T0) % 1 : ECON.tOfHour(h); if (h > ECON.SHIFT.LUNCH_H + 0.05) SH.lunch = true; else if (h < ECON.SHIFT.LUNCH_H) SH.lunch = false; } },
   useCars (api) { CARS_MOCK = api || null; },
   showLunch,                                        // обед сразу — проверить карточку (стрелки, Enter)

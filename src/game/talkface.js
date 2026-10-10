@@ -1,7 +1,8 @@
 /* Говорящий портрет: пока реплика печатается или сообщение только что пришло, рот на картинке-лице
    (people.js faceDataURL) открывается и закрывается — три кадра: закрыт / приоткрыт / открыт.
    Кадры рисуются один раз на человека, размер и выражение (кэш портретов people.js), дальше только
-   меняется src картинки раз в 0,08—0,12 с; иногда рот закрыт подольше — вдох. Выражение (mood) —
+   меняется src картинки раз в 0,08—0,12 с. Закрытый рот — сразу (bind), приоткрытый и открытый — заранее,
+   в спокойные кадры (people.js faceSoon); не успели к первому слову — пока рот закрыт, рисования в кадре нет; иногда рот закрыт подольше — вдох. Выражение (mood) —
    то же: рот говорит поверх него (злой кричит, весёлый смеётся, испуганный цедит сквозь зубы).
    Договорил — рот закрыт. «Меньше движения» (prefers-reduced-motion или body.calm-fx) — рот не двигается.
 
@@ -13,7 +14,7 @@
    Где: диалоги и катсцены, реплики на ходу (dialog.js), чат Толика (chat.js), его сообщение в конце смены
    (shiftend.js) и на празднике «весь город» (cityopen.js), Дядя Женя в гараже (garagetour.js),
    директор во вступлении (intro.js). */
-import { faceDataURL } from './people.js';
+import { faceDataURL, faceSoon, faceReady } from './people.js';
 
 export const TALK = {
   STEP: [0.08, 0.12],      // кадр рта держится, с
@@ -38,6 +39,7 @@ export const calm = () => {
 
 const B = new WeakMap();           // img → { person, size, mood, F: [закрыт, приоткрыт, открыт], m, to, end }
 const frame = (b, k) => (b.F[k] || (b.F[k] = faceDataURL(b.person, b.size, b.mood, k)));
+const ready = (b, k) => (b.F[k] || (b.F[k] = faceReady(b.person, b.size, b.mood, k)));     // '' — ещё не нарисован
 
 export function bind (img, person, size = 128, mood = '') {
   if (!img) return false;
@@ -46,6 +48,7 @@ export function bind (img, person, size = 128, mood = '') {
   const b = { person, size, mood: mood || '', F: [], m: 0, to: 0, end: 0 };
   B.set(img, b);
   img.src = frame(b, 0);
+  faceSoon(person, size, [b.mood], [1, 2]);       // кадры речи — в спокойные кадры, не в этом
   return true;
 }
 
@@ -55,12 +58,12 @@ export function talk (img, sec = 0) {
   clearTimeout(b.to); b.to = 0;
   if (calm()) { b.m = 0; img.src = frame(b, 0); return; }
   b.end = sec > 0 ? performance.now() + sec * 1000 : 0;
-  frame(b, 1); frame(b, 2);        // оба кадра — сразу, чтобы первый «открыл рот» не ждал рисования
+  if (!ready(b, 1) || !ready(b, 2)) faceSoon(b.person, b.size, [b.mood], [1, 2]);     // уже в очереди с bind — дубли пропустит
   const tick = () => {
     b.to = 0;
     if (!img.isConnected || (b.end && performance.now() >= b.end)) { b.m = 0; img.src = frame(b, 0); return; }
-    const [m, hold] = nextMouth(b.m);
-    b.m = m; img.src = frame(b, m);
+    const [m, hold] = nextMouth(b.m), u = m ? ready(b, m) : frame(b, 0);
+    b.m = u ? m : 0; img.src = u || frame(b, 0);
     b.to = setTimeout(tick, hold * 1000);
   };
   tick();

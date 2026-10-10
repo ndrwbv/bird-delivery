@@ -72,6 +72,7 @@ function build (o) {
     T.el.appendChild(el);
     const it = { st, i, el, img, nm, m, p: ps[0] || null, mood: null, txt: '', cur: null, done: false, goneT: 0 };
     setMood(it, '');
+    if (it.p && A.faceDataURL.soon) A.faceDataURL.soon(it.p, OTAG.FACE, ['ok', 'angry', 'happy'], [0]);   // другие лица карточки — заранее, в спокойные кадры (people.js)
     T.items.push(it);
   });
   T.stats.built++;
