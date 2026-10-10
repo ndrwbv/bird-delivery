@@ -686,9 +686,21 @@ const FACE_CAP = 240;
 
 /* ─────────────── человек в три.js ───────────────
    Фабрика, потому что общий материал и множество людей живут в игре.
-   Вызовов отрисовки на человека восемь: две ноги, туловище, две руки,
-   голова, лицо и всё, что на голове, одним мешем; плюс дальний вариант
-   одним мешем (виден вместо остальных дальше 45 метров). */
+   Ближний человек — два вызова отрисовки (11.10.2026; было 7—8 — по мешу на ногу, руку, туловище, голову, волосы, лицо):
+   - всё тело — один меш со скиннингом (u.skin, THREE.SkinnedMesh, общий HUMAN_VC с цветами вершин): ноги,
+     туловище, руки, голова с носом и ушами, волосы, убор, борода; у каждой вершины — номер её «кости»;
+   - лицо — плоскость с текстурой (u.faceM) на кости головы, как раньше на меше головы.
+   Кости — u.legL, u.legR, туловище (u.parts[2]), u.armL, u.armR, u.head: THREE.Bone, дети группы в тех же
+   шарнирах, где стояли меши частей. rotation / position / scale, предмет в руку (u.armR.add), localToWorld —
+   как раньше, ничего переписывать не надо. u.parts — [legL, legR, туловище, armL, armR, head, skin]: humanLod
+   прячет их разом. Матрицы костей уходят в видеокарту, только когда поза сменилась (HSkel.update).
+   Голова красится как раньше: u.head.material.color.set('#…') перекрашивает вершины головы в меше тела (злой
+   водитель, вор в маске, ведьма; цвета вершин головы — её цвет, нос и уши тоже, как у прежнего своего материала).
+   Коробка головы (Box3.setFromObject(u.head)) — по углам головы с волосами и убором: u.head.geometry, 8 точек,
+   не рисуется. Дальний вариант — весь человек одним мешем (u.lod, виден вместо остальных дальше 45 метров). */
+const BONE_OF = [0, 1, 2, 3, 4, 5, 5];               // часть → кость: волосы (5) и голова (6) — кость головы
+/* up — сколько раз матрицы костей ушли в видеокарту (поза сменилась), same — поза та же, не заливали (__dlv.HSK) */
+export const HSTATS = { up: 0, same: 0 };
 export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
   const B = new THREE.BoxGeometry(1, 1, 1);
   const BP = B.attributes.position.array, BN = B.attributes.normal.array, BI = B.index.array;
@@ -741,14 +753,126 @@ export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
     }
     return m;
   }
+  /* тело одним мешем: коробки частей в осях группы (от шарниров, как у дальнего варианта), у вершины — номер
+     кости; голова (часть 6) — одним цветом hc (раньше её красил свой материал, цвета вершин он не брал) */
+  let ONE = new Float32Array(0);
+  const weights = n => {                          // вес 1 у первой кости — один общий массив на всех
+    if (ONE.length < n * 4) { ONE = new Float32Array(Math.max(n * 4, ONE.length * 2, 16384)); for (let i = 0; i < ONE.length; i += 4) ONE[i] = 1; }
+    return ONE.subarray(0, n * 4);
+  };
+  function skinGeo (S, hc) {
+    let n = 0;
+    for (const l of S.parts) n += l.length;
+    const pos = new Float32Array(n * 72), nor = new Float32Array(n * 72), cl = new Float32Array(n * 72), idx = new Uint16Array(n * 36), si = new Uint8Array(n * 96);
+    let b = 0, h0 = 0;
+    for (let p = 0; p < 7; p++) {
+      const [ox, oy, oz] = S.piv[p], k = BONE_OF[p];
+      if (p === 6) h0 = b * 24;
+      for (const [w, h, d, x, y, z, hex] of S.parts[p]) {
+        const c = p === 6 ? hc : col(hex), o = b * 72;
+        for (let v = 0; v < 72; v += 3) {
+          pos[o + v] = BP[v] * w + x + ox; pos[o + v + 1] = BP[v + 1] * h + y + oy; pos[o + v + 2] = BP[v + 2] * d + z + oz;
+          nor[o + v] = BN[v]; nor[o + v + 1] = BN[v + 1]; nor[o + v + 2] = BN[v + 2];
+          cl[o + v] = c[0]; cl[o + v + 1] = c[1]; cl[o + v + 2] = c[2];
+        }
+        for (let v = 0; v < 24; v++) si[(b * 24 + v) * 4] = k;
+        for (let q = 0; q < 36; q++) idx[b * 36 + q] = BI[q] + b * 24;
+        b++;
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(cl, 3));
+    g.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4));
+    g.setAttribute('skinWeight', new THREE.BufferAttribute(weights(n * 24), 4));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    g.userData.head = [h0, n * 24];               // вершины головы (часть 6 — последняя): их красит u.head.material
+    return g;
+  }
+  /* углы головы с волосами и убором (части 5 и 6) в осях головы — для Box3.setFromObject(u.head) */
+  function headBox (S) {
+    let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+    for (const p of [5, 6]) for (const [w, h, d, x, y, z] of S.parts[p]) {
+      x0 = Math.min(x0, x - w / 2); x1 = Math.max(x1, x + w / 2); y0 = Math.min(y0, y - h / 2); y1 = Math.max(y1, y + h / 2); z0 = Math.min(z0, z - d / 2); z1 = Math.max(z1, z + d / 2);
+    }
+    const a = new Float32Array(24);
+    for (let i = 0; i < 8; i++) { a[i * 3] = i & 1 ? x1 : x0; a[i * 3 + 1] = i & 2 ? y1 : y0; a[i * 3 + 2] = i & 4 ? z1 : z0; }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(a, 3));
+    return g;
+  }
+  /* скелет: матрица кости = её матрица в группе × сдвиг от шарнира (вершины лежат в осях группы). В видеокарту —
+     только если поза сменилась: стоящий без движения человек текстуру костей не перезаливает */
+  class HSkel extends THREE.Skeleton {
+    constructor (bones, piv) { super(bones, bones.map(() => new THREE.Matrix4())); this.piv = piv; this.last = new Float64Array(bones.length * 12).fill(NaN); }
+    update () {
+      const b = this.bones, M = this.boneMatrices, L = this.last, P = this.piv;
+      let ch = false;
+      for (let i = 0; i < b.length; i++) {
+        const e = b[i].matrix.elements, o = i * 16, l = i * 12;
+        if (e[0] === L[l] && e[1] === L[l + 1] && e[2] === L[l + 2] && e[4] === L[l + 3] && e[5] === L[l + 4] && e[6] === L[l + 5] &&
+          e[8] === L[l + 6] && e[9] === L[l + 7] && e[10] === L[l + 8] && e[12] === L[l + 9] && e[13] === L[l + 10] && e[14] === L[l + 11]) continue;
+        L[l] = e[0]; L[l + 1] = e[1]; L[l + 2] = e[2]; L[l + 3] = e[4]; L[l + 4] = e[5]; L[l + 5] = e[6];
+        L[l + 6] = e[8]; L[l + 7] = e[9]; L[l + 8] = e[10]; L[l + 9] = e[12]; L[l + 10] = e[13]; L[l + 11] = e[14];
+        const p = P[i], px = p[0], py = p[1], pz = p[2];
+        M[o] = e[0]; M[o + 1] = e[1]; M[o + 2] = e[2]; M[o + 3] = 0;
+        M[o + 4] = e[4]; M[o + 5] = e[5]; M[o + 6] = e[6]; M[o + 7] = 0;
+        M[o + 8] = e[8]; M[o + 9] = e[9]; M[o + 10] = e[10]; M[o + 11] = 0;
+        M[o + 12] = e[12] - (e[0] * px + e[4] * py + e[8] * pz);
+        M[o + 13] = e[13] - (e[1] * px + e[5] * py + e[9] * pz);
+        M[o + 14] = e[14] - (e[2] * px + e[6] * py + e[10] * pz);
+        M[o + 15] = 1;
+        ch = true;
+      }
+      if (ch && this.boneTexture) this.boneTexture.needsUpdate = true;
+      HSTATS.up += ch ? 1 : 0; HSTATS.same += ch ? 0 : 1;
+    }
+  }
+  /* меш тела: та же поза и на процессоре (Box3 точно, raycast) — вершина в осях группы, как в шейдере */
+  class HSkin extends THREE.SkinnedMesh {
+    applyBoneTransform (i, v) {
+      const k = this.geometry.attributes.skinIndex.array[i * 4], S = this.skeleton, p = S.piv[k], e = S.bones[k].matrix.elements;
+      const x = v.x - p[0], y = v.y - p[1], z = v.z - p[2];
+      return v.set(e[0] * x + e[4] * y + e[8] * z + e[12], e[1] * x + e[5] * y + e[9] * z + e[13], e[2] * x + e[6] * y + e[10] * z + e[14]);
+    }
+  }
+  const IDENT = new THREE.Matrix4();
+  const SPHERE = new THREE.Sphere(new THREE.Vector3(0, 0.95, 0), 1.35);   // стоит, руки вверх, афро; лёг — повернётся вместе с группой
+  /* геометрия тела: освобождается вместе со скелетом (его текстура костей — тоже память видеокарты) */
+  function setSkinGeo (skin, g) {
+    const old = skin.geometry;
+    skin.geometry = g;
+    g.addEventListener('dispose', () => { if (skin.geometry === g && skin.skeleton) skin.skeleton.dispose(); });
+    if (old && old !== g && old.attributes.position) old.dispose();
+  }
+  /* «материал» головы: цвет красит вершины головы в меше тела (как раньше u.head.material.color.set) */
+  class HeadColor extends THREE.Color {
+    set (...a) { super.set(...a); this.paint(); return this; }
+    setHex (...a) { super.setHex(...a); this.paint(); return this; }
+    setRGB (...a) { super.setRGB(...a); this.paint(); return this; }
+    setStyle (...a) { super.setStyle(...a); this.paint(); return this; }
+    copy (c) { super.copy(c); this.paint(); return this; }
+    paint () {
+      const s = this.skin, g = s && s.geometry, h = g && g.userData.head;
+      if (!h) return;
+      const a = g.attributes.color, c = a.array;
+      for (let v = h[0]; v < h[1]; v++) { c[v * 3] = this.r; c[v * 3 + 1] = this.g; c[v * 3 + 2] = this.b; }
+      a.needsUpdate = true;
+    }
+  }
+  const headPaint = (skin, hex) => {
+    const c = new HeadColor();
+    c.skin = null; c.set(hex); c.skin = skin;      // сначала цвет, потом меш: красить на сборке нечего
+    return { color: c, map: null, isHeadPaint: true, userData: { keep: true }, dispose () {} };
+  };
   /* o: { fem, fat, h, skin, shirt, pants, cap, face: false — без лица (маска), summer — без зимней одежды } */
   HSET = HUMANS;
-  /* та же фигура и лицо, одежда — по нынешнему сезону */
+  /* та же фигура и лицо, одежда — по нынешнему сезону; цвет головы — какой был (перекрашенная так и остаётся) */
   REDRESS = g => {
-    const u = g.userData, S = buildSpec(u.look, u.o || {});
-    for (let i = 0; i < 5; i++) { const m = u.parts[i]; m.geometry.dispose(); m.geometry = geo([[S.parts[i], 0, 0, 0]]); }
-    if (u.hair) { u.hair.geometry.dispose(); if (S.parts[5].length) u.hair.geometry = geo([[S.parts[5], 0, 0, 0]]); else { u.head.remove(u.hair); u.hair = null; } }
-    else if (S.parts[5].length) { u.hair = new THREE.Mesh(geo([[S.parts[5], 0, 0, 0]]), HUMAN_VC); u.head.add(u.hair); }
+    const u = g.userData, S = buildSpec(u.look, u.o || {}), hc = u.head.material.color;
+    setSkinGeo(u.skin, skinGeo(S, [hc.r, hc.g, hc.b]));
+    u.head.geometry.dispose(); u.head.geometry = headBox(S);
     u.lod.geometry.dispose(); u.lod.geometry = geo(S.parts.map((l, i) => [l, ...S.piv[i]]));
     u.colors.shirt = S.shirt; u.colors.pants = S.pants; u.warm = WARM;
   };
@@ -759,35 +883,35 @@ export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
     const S = buildSpec(Lk, o), w0 = WARM;
     yield;
     const g = new THREE.Group();
-    const mk = (i, parent = g) => {
-      const m = new THREE.Mesh(geo([[S.parts[i], 0, 0, 0]]), HUMAN_VC);
-      m.position.set(...S.piv[i]);
-      parent.add(m);
-      return m;
-    };
-    const legL = mk(0), legR = mk(1), bodyM = mk(2);
+    // кости — в шарнирах частей (бедро, плечо, центр головы)
+    const bone = i => { const b = new THREE.Bone(); b.position.set(...S.piv[i]); g.add(b); return b; };
+    const legL = bone(0), legR = bone(1), bodyB = bone(2), armL = bone(3), armR = bone(4), head = bone(6);
+    const bones = [legL, legR, bodyB, armL, armR, head];
     yield;
-    const armL = mk(3), armR = mk(4);
-    // голова: свой материал цвета кожи — игра красит его (злой водитель, вор в маске)
-    const head = new THREE.Mesh(geo([[S.parts[6], 0, 0, 0]]), new THREE.MeshLambertMaterial({ color: S.skin, flatShading: true }));
-    head.position.set(0, HY, 0);
-    g.add(head);
+    const skin = new HSkin(undefined, HUMAN_VC);
+    setSkinGeo(skin, skinGeo(S, col(S.skin)));
+    skin.bindMode = THREE.DetachedBindMode;
+    skin.bind(new HSkel(bones, [S.piv[0], S.piv[1], S.piv[2], S.piv[3], S.piv[4], S.piv[6]]), IDENT);
+    skin.boundingSphere = SPHERE;
+    g.add(skin);
+    // голова: «свой материал цвета кожи» — игра красит его (злой водитель, вор в маске)
+    head.material = headPaint(skin, S.skin);
+    head.geometry = headBox(S);
     yield;
+    let faceM = null;
     if (o.face !== false) {
-      const face = new THREE.Mesh(new THREE.PlaneGeometry(S.W, 0.56), faceMat(Lk, S));
-      face.position.z = S.D / 2 + 0.002;
-      head.add(face);
+      faceM = new THREE.Mesh(new THREE.PlaneGeometry(S.W, 0.56), faceMat(Lk, S));
+      faceM.position.z = S.D / 2 + 0.002;
+      head.add(faceM);
       yield;
     }
-    const hair = S.parts[5].length ? new THREE.Mesh(geo([[S.parts[5], 0, 0, 0]]), HUMAN_VC) : null;
-    if (hair) head.add(hair);
     // дальний вариант: весь человек одним мешем
     const lod = new THREE.Mesh(geo(S.parts.map((l, i) => [l, ...S.piv[i]])), HUMAN_VC);
     lod.visible = false;
     g.add(lod);
     g.scale.setScalar(S.hs);
-    g.userData = { legL, legR, armL, armR, head, faceM: head.children.find(m => m.geometry && m.geometry.type === 'PlaneGeometry') || null, faceS: { skin: S.skin, Wp: S.Wp }, colors: { skin: S.skin, shirt: S.shirt, pants: S.pants }, person, fem: S.fem, fat: S.fat, pace: S.pace,
-      lod, parts: [legL, legR, bodyM, armL, armR, head], far: false, look: Lk, o, hair, warm: w0 };
+    g.userData = { legL, legR, armL, armR, head, faceM, faceS: { skin: S.skin, Wp: S.Wp }, colors: { skin: S.skin, shirt: S.shirt, pants: S.pants }, person, fem: S.fem, fat: S.fat, pace: S.pace,
+      lod, parts: [legL, legR, bodyB, armL, armR, head, skin], far: false, look: Lk, o, hair: null, warm: w0, skin };
     HUMANS.add(g);
     return g;
   }

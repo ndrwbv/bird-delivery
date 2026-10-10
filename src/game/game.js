@@ -22,7 +22,7 @@ import { MAP_IDS, MAP_META } from '../maps/index.js';
 import Platform from '../platform/index.js';
 import { t as $t, tn as $tn, N_, translit, lang as curLang, LANGS, LANG_NAMES } from '../i18n/index.js';
 import { sanitizePois, OWN } from './brands.js';
-import { makePerson, createHumanFactory, faceDataURL, humanStale, FACE_DEBUG } from './people.js';
+import { makePerson, createHumanFactory, faceDataURL, humanStale, FACE_DEBUG, HSTATS } from './people.js';
 import * as HPOOL from './humanpool.js';      // запас готовых людей: собраны заранее, рождение берёт готового (humanpool.js)
 import { pollPad, applyToIN, rumble, pad as PAD } from '../input/gamepad.js';
 import { makePadMenu } from '../input/padmenu.js';
@@ -5406,8 +5406,9 @@ const GRACE = 18;        // столько ещё терпят после сро
 
 /* Люди разные: мужчины и женщины, высокие и низкие, худые и толстые,
    причёски, бороды, кепки, очки, лица. Толстые и низкие ходят медленнее —
-   pace, множитель к скорости шага. Руки, ноги, туловище и всё на голове —
-   по мешу с общим материалом: людей на улице полсотни, лишние вызовы ни к чему. */
+   pace, множитель к скорости шага. Ближний человек — тело одним мешем со скиннингом
+   (кости — u.legL, u.armR, u.head…) и лицо: два вызова на человека (people.js). Общий материал —
+   людей на улице полсотни, лишние вызовы ни к чему. */
 const HUMAN_VC = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
 /* Убрать человека (или любую группу) насовсем — и освободить память
    видеокарты. Раньше каждый сбитый, ушедший или сменившийся человек
@@ -9258,12 +9259,15 @@ function routeTail (x, z) {
   let dmin = Infinity, anyCut = false;
   for (const q of RT.cand) { dmin = Math.min(dmin, q.d); if (q.cut) anyCut = true; }
   if (anyCut && !RYARD.RY.OFF) {
-    const R = clamp(dmin + RG_TAIL.PAD, RG_TAIL.R0, RYARD.RY.RMAX), S0 = [], goals = [];
-    roadSamples(x, z, R, (a, b, px, pz) => { S0.push(a, b, px, pz); goals.push(px, pz); });
-    RT.job = RYARD.job(0, x, z, R, RG_TAIL.EXTRA, goals); RT.jx = x; RT.jz = z; RT.jR = R; RT.jS = S0;
-    if (RT.sync) { RT.job.step(); tailFromJob(); }
+    tailJob(x, z, clamp(dmin + RG_TAIL.PAD, RG_TAIL.R0, RYARD.RY.RMAX));
+    if (RT.sync) while (RT.job) { RT.job.step(); tailFromJob(); }
   }
   tailMap();
+}
+function tailJob (x, z, R) {
+  const S0 = [], goals = [];
+  roadSamples(x, z, R, (a, b, px, pz) => { S0.push(a, b, px, pz); goals.push(px, pz); });
+  RT.job = RYARD.job(0, x, z, R, RG_TAIL.EXTRA, goals); RT.jx = x; RT.jz = z; RT.jR = R; RT.jS = S0;
 }
 /* досчитанный проезд по клеткам → кандидаты: цена — путь по клеткам */
 function tailFromJob () {
@@ -9274,7 +9278,9 @@ function tailFromJob () {
     const w = F.at(S0[i + 2], S0[i + 3]);
     if (w < Infinity) gc.push({ a: S0[i], b: S0[i + 1], x: S0[i + 2], z: S0[i + 3], d: w, cut: false, grid: true, c: w * 2 });
   }
-  if (!gc.length) return;                           // клиент заперт стенами — остаётся прямая
+  // до улиц в окне не дойти (ближняя улица — за стеной, проезд к ней дальше окна) — окно в 2,5 раза шире, до RMAX;
+  // и так нет — клиент заперт стенами, остаётся прямая
+  if (!gc.length) { if (R < RYARD.RY.RMAX) tailJob(RT.jx, RT.jz, Math.min(RYARD.RY.RMAX, R * 2.5)); return; }
   for (const q of RT.cand) if (!q.cut && (Math.abs(q.x - RT.jx) > R - 3 || Math.abs(q.z - RT.jz) > R - 3)) gc.push(q);
   RT.cand = gc; RT.F = F; RT.paths = new Map();
   tailMap();
@@ -9289,11 +9295,17 @@ function tailMap () {
   });
 }
 /* каждый кадр: проезд по клеткам — не дольше RT.BUDGET мс за кадр; готов — маршрут заново */
+function headJob (x, z, R) {
+  const S0 = [], goals = [];
+  roadSamples(x, z, R, (a, b, px, pz) => { S0.push(a, b, px, pz); goals.push(px, pz); });
+  return (RT.hjob = { job: RYARD.job(1, x, z, R, RG_TAIL.HEAD_EXTRA, goals), S0, x, z, R });
+}
 function routeJobTick () {
   const t0 = performance.now();
   if (RT.job) {
     if (!RT.job.step(RT.BUDGET)) return;
     tailFromJob();
+    if (RT.job) return;                             // окно шире — считаем дальше
     if (S.target) rebuildRoutePath();
   }
   const left = RT.BUDGET - (performance.now() - t0);
@@ -9359,12 +9371,16 @@ function roadPath (x0, z0, x1, z1, h, deck) {
       let J = RT.hjob;
       const HF = RT.headFail, failed = HF && now - HF.t < 3000 && Math.hypot(HF.x - x0, HF.z - z0) < 4;   // проезда нет — 3 с не ищем снова
       if (!failed && (!J || Math.hypot(J.x - x0, J.z - z0) > 4)) {
-        const R = clamp(sc * 1.3 + 40, 40, RYARD.RY.RMAX), S0 = [], goals = [];
-        roadSamples(x0, z0, R, (a, b, px, pz) => { S0.push(a, b, px, pz); goals.push(px, pz); });
-        J = RT.hjob = { job: RYARD.job(1, x0, z0, R, RG_TAIL.HEAD_EXTRA, goals), S0, x: x0, z: z0 };
+        J = headJob(x0, z0, clamp(sc * 1.3 + 40, 40, RYARD.RY.RMAX));
         if (RT.sync) J.job.step();
       }
-      const F = !failed && J.job.result;
+      let F = !failed && J.job.result;
+      // до улиц в окне не дойти (ближняя улица — за стеной) — окно в 2,5 раза шире, до RMAX
+      if (F && J.R < RYARD.RY.RMAX && !J.S0.some((v, i) => i % 4 === 2 && F.at(v, J.S0[i + 1]) < Infinity)) {
+        J = headJob(x0, z0, Math.min(RYARD.RY.RMAX, J.R * 2.5));
+        if (RT.sync) J.job.step();
+        F = J.job.result;
+      }
       if (F) {
         RT.hjob = null;
         const S0 = J.S0;
@@ -14127,16 +14143,41 @@ const headGlow = new THREE.Mesh(new THREE.PlaneGeometry(7, 14).rotateX(-Math.PI 
 headGlow.renderOrder = 3;
 scene.add(headGlow);
 
-/* дождь: косые струи вокруг камеры */
-const RAIN_N = 1400;
-const rainPos = new Float32Array(RAIN_N * 6);
+/* дождь: косые струи вокруг камеры. Движение — в вершинном шейдере (11.10.2026; раньше — цикл по 1 400 струям
+   и перезапись буфера каждый кадр): струя падает с 30 м до -8 м под камерой со скоростью 34 м/с, внизу появляется
+   снова наверху в новом случайном месте коробки 70×70 м (место — хеш от номера струи и номера круга).
+   В буфере неизменное: номер струи, высота на старте, конец (0 — низ, 1 — верх: +0,5 / +1,8 / +0,3 м). */
+const RAIN_N = 1400, RAIN_WRAP = 38 * 2048;             // uFall — пройденные метры по модулю целого числа кругов
+const rainPos = new Float32Array(RAIN_N * 6), rainEnd = new Float32Array(RAIN_N * 2);
+for (let i = 0; i < RAIN_N; i++) { const y = rand(-5, 30); rainPos[i * 6] = rainPos[i * 6 + 3] = i; rainPos[i * 6 + 1] = rainPos[i * 6 + 4] = y; rainEnd[i * 2 + 1] = 1; }
 const rainGeo = new THREE.BufferGeometry();
 rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
-const rainMat = new THREE.LineBasicMaterial({ color: 0xe4ecf7, transparent: true, opacity: 0, depthWrite: false });
+rainGeo.setAttribute('aEnd', new THREE.BufferAttribute(rainEnd, 1));
+const RAIN_U = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uFall: { value: 0 }, uA: { value: 0 }, uC: { value: new THREE.Color(0xe4ecf7) }, uTip: { value: new THREE.Vector3(0.5, 1.8, 0.3) } }]);
+const rainMat = new THREE.ShaderMaterial({ uniforms: RAIN_U, transparent: true, depthWrite: false, fog: true,
+  vertexShader: `attribute float aEnd;
+uniform float uFall; uniform vec3 uTip;
+#include <fog_pars_vertex>
+float h12 (vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+void main () {
+  float c = 30.0 - position.y + uFall, k = floor(c / 38.0);
+  vec3 p = vec3(h12(vec2(position.x, k)) * 70.0 - 35.0, 30.0 - (c - k * 38.0), h12(vec2(position.x * 1.37 + 91.0, k + 0.5)) * 70.0 - 35.0) + uTip * aEnd;
+  vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
+  gl_Position = projectionMatrix * mvPosition;
+  #include <fog_vertex>
+}`,
+  fragmentShader: `uniform vec3 uC; uniform float uA;
+#include <fog_pars_fragment>
+void main () {
+  gl_FragColor = vec4(uC, uA);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+  #include <fog_fragment>
+}` });
 const rainLines = new THREE.LineSegments(rainGeo, rainMat);
 rainLines.frustumCulled = false; rainLines.visible = false;
 scene.add(rainLines);
-for (let i = 0; i < RAIN_N; i++) { rainPos[i * 6] = rand(-35, 35); rainPos[i * 6 + 1] = rand(-5, 30); rainPos[i * 6 + 2] = rand(-35, 35); }
+let RAIN_F = 0;
 
 /* облака: плоские снизу кучки, плывут по ветру, держатся вокруг курьера */
 const CLOUD_MAT = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true, fog: false });
@@ -14291,18 +14332,11 @@ function updateEnv (dt) {
   }
   // дождь
   rainLines.visible = R > 0.03;
-  rainMat.opacity = R * 0.85;
+  RAIN_U.uA.value = R * 0.85;
   if (rainLines.visible) {
     rainLines.position.set(cam.position.x, cam.position.y - 8, cam.position.z);
-    const fall = 34 * dt;
-    for (let j = 0; j < RAIN_N; j++) {
-      const o = j * 6;
-      let y = rainPos[o + 1] - fall;
-      if (y < -8) { y = 30; rainPos[o] = rand(-35, 35); rainPos[o + 2] = rand(-35, 35); }
-      rainPos[o + 1] = y;
-      rainPos[o + 3] = rainPos[o] + 0.5; rainPos[o + 4] = y + 1.8; rainPos[o + 5] = rainPos[o + 2] + 0.3;
-    }
-    rainGeo.attributes.position.needsUpdate = true;
+    RAIN_F = (RAIN_F + 34 * dt) % RAIN_WRAP;            // струи падают в шейдере (rainMat) — буфер не трогаем
+    RAIN_U.uFall.value = RAIN_F;
   }
   // облака: ветер, дождь сереет, ночью темнеют сами от света
   CLOUD_MAT.color.setRGB(1 - R * 0.4, 1 - R * 0.38, 1 - R * 0.33);
@@ -15110,7 +15144,7 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) wi
   STORY, STORY_DBG: STORY.DEBUG, MAP, Store, SBX, CARSM: AUTO, startRun, goRun, endShift, wallet, addWallet, hudHearts, marker, updateEnv, humanLod, get SPOTS_N () { return SPOTS.length; },
   DRIVERS, SMOKERS, NITRO_CANS, NOS, RESPECT: RESPECT.DEBUG, RESPECT_API: RESPECT, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, PIGEONS, FLOCKS, AMB, INCIDENTS, scare, RIVALS, FOES, THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, roadPath, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT, LOOT, XLIFE, askRevive, addWallet, RQ: RQ.DEBUG, HINTS_API: HINTS };
 if (window.__dlv) Object.assign(window.__dlv, { FXP: { S: FXP.STATS, count: FXP.count, part: fxPart, FX, puff, fire, nosFlame, steam, splash, crumbs, emote }, FXQ: FXP.FXP });   // частицы из запаса (fxpool.js): S — родилось / живо / пик / рост / ?oldfx
-if (window.__dlv) Object.assign(window.__dlv, { HPOOL: HPOOL.DEBUG, makeHuman, freshHuman, makePerson, setSeason: SEAS.setSeason });   // запас готовых людей: собрано на ходу / из запаса, ключи (humanpool.js)
+if (window.__dlv) Object.assign(window.__dlv, { HPOOL: HPOOL.DEBUG, HSK: HSTATS, makeHuman, freshHuman, makePerson, setSeason: SEAS.setSeason });   // запас готовых людей: собрано на ходу / из запаса, ключи (humanpool.js)
 if (window.__dlv) { window.__dlv.BOARD = BOARD; window.__dlv.Platform = Platform; }
 if (window.__dlv) Object.assign(window.__dlv, { callAmbulance });   // проверка сирены: вызвать скорую к точке (доплер — AMB.dop)   // таблица рекордов Стима (board.js)
 if (window.__dlv) window.__dlv.TREES = TREES.DEBUG;   // деревья и кусты: породы, группы во дворах (trees.js)

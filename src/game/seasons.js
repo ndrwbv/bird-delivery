@@ -968,16 +968,32 @@ const SF_N = 3200, SP_N = 420, SF_R = 38, SF_IN = 1400, SF_RI = 15;   // пер�
 function initSky () {
   const g = new THREE.BufferGeometry();
   // хлопья — в мировых координатах, в коробке вокруг камеры (чуть впереди);
-  // ушедшие из коробки переносим на другой её край: едешь — снег летит навстречу
-  const p = new Float32Array(SF_N * 3);
-  for (let i = 0; i < SF_N; i++) { p[i * 3] = rnd(-SF_R, SF_R); p[i * 3 + 1] = rnd(-10, 30); p[i * 3 + 2] = rnd(-SF_R, SF_R); }
+  // ушедшие из коробки — на другом её краю: едешь — снег летит навстречу.
+  // Движение — в вершинном шейдере (11.10.2026; раньше — цикл по 3 200 хлопьям и перезапись буфера каждый кадр):
+  // место = начальное + снос ветром (uDx) + покачивание + падение (uFall × своя скорость), по модулю коробки вокруг камеры.
+  // В буфере неизменное: начальное место; aS — своя скорость падения (0,7…1,18), ближняя ли коробка, фаза покачивания.
+  const p = new Float32Array(SF_N * 3), sa = new Float32Array(SF_N * 3);
+  for (let i = 0; i < SF_N; i++) {
+    p[i * 3] = rnd(-SF_R, SF_R); p[i * 3 + 1] = rnd(-10, 30); p[i * 3 + 2] = rnd(-SF_R, SF_R);
+    sa[i * 3] = 0.7 + (i % 5) * 0.12; sa[i * 3 + 1] = i < SF_IN ? 1 : 0; sa[i * 3 + 2] = i % 6.283185307;
+  }
   g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+  g.setAttribute('aS', new THREE.BufferAttribute(sa, 3));
   /* Своя точка: ближние крупнее, с серо-голубой каймой — иначе белое на
      белом поле и бледном небе не видно; дальние — по пикселю. */
   const m = new THREE.ShaderMaterial({
-    uniforms: { uOp: { value: 0 }, uNight: U.uNight, uS: { value: 64 } },
-    vertexShader: `uniform float uS; varying float vD;
-      void main () { vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; vD = -mv.z; gl_PointSize = clamp(uS / max(vD, 0.5), 2.0, 6.0); }`,
+    uniforms: { uOp: { value: 0 }, uNight: U.uNight, uS: { value: 64 }, uFall: { value: 0 }, uDx: { value: 0 }, uW: { value: 0 },
+      uO: { value: new THREE.Vector3() }, uOi: { value: new THREE.Vector3() } },
+    vertexShader: `uniform float uS, uFall, uDx, uW; uniform vec3 uO, uOi; attribute vec3 aS; varying float vD;
+      void main () {
+        bool nr = aS.y > 0.5;
+        vec3 o = nr ? uOi : uO;
+        float R = nr ? ${SF_RI.toFixed(1)} : ${SF_R.toFixed(1)}, lo = o.y - (nr ? 8.0 : 12.0), span = nr ? 22.0 : 42.0;
+        vec3 q = vec3(position.x + uDx - 0.44444 * cos(uW * 0.9 + aS.z), position.y - uFall * aS.x, position.z);
+        q.x = o.x - R + mod(q.x - o.x + R, 2.0 * R);
+        q.z = o.z - R + mod(q.z - o.z + R, 2.0 * R);
+        q.y = lo + mod(q.y - lo, span);
+        vec4 mv = modelViewMatrix * vec4(q, 1.0); gl_Position = projectionMatrix * mv; vD = -mv.z; gl_PointSize = clamp(uS / max(vD, 0.5), 2.0, 6.0); }`,
     fragmentShader: `uniform float uOp, uNight; varying float vD;
       void main () { vec2 q = abs(gl_PointCoord * 2.0 - 1.0); float r = max(q.x, q.y);
         vec3 c = r > 0.52 && vD < 16.0 ? vec3(0.58, 0.66, 0.78) : vec3(1.0);
@@ -995,7 +1011,7 @@ function initSky () {
   SPLASH.pts.frustumCulled = false;
   C.scene.add(SPLASH.pts);
   const forceSnow = new URLSearchParams(location.search).has('snow');              // ?snow — снег идёт сразу (проверка)
-  SKY = { want: forceSnow ? 0.8 : 0, amt: forceSnow ? 0.8 : 0, t: forceSnow ? 9999 : rnd(10, 40), bg: new THREE.Color('#c6d0da'), fog: new THREE.Color('#e0e6ec'), gnd: new THREE.Color('#e4ebf2'), aut: new THREE.Color('#b8c6d0') };
+  SKY = { want: forceSnow ? 0.8 : 0, amt: forceSnow ? 0.8 : 0, t: forceSnow ? 9999 : rnd(10, 40), fall: 0.5, dx: 0.5, bg: new THREE.Color('#c6d0da'), fog: new THREE.Color('#e0e6ec'), gnd: new THREE.Color('#e4ebf2'), aut: new THREE.Color('#b8c6d0') };
   BALL_GEO = new THREE.IcosahedronGeometry(0.13, 0);
   BALL_MAT = new THREE.MeshLambertMaterial({ color: 0xf4f7fa, flatShading: true });
 }
@@ -1042,25 +1058,20 @@ function stepSky (dt) {
   if (hemi) hemi.groundColor.lerp(SKY.gnd, sn * 0.55);
   SNOWF.visible = SKY.amt > 0.02;
   if (!SNOWF.visible) return;
-  SNOWF.material.uniforms.uOp.value = Math.min(1, SKY.amt * 1.4);
-  const cam = C.cam, p = SNOWF.geometry.attributes.position.array, n = SF_N;
+  const u = SNOWF.material.uniforms;
+  u.uOp.value = Math.min(1, SKY.amt * 1.4);
+  const cam = C.cam;
   cam.getWorldDirection(CAM_DIR);
-  const hl = Math.hypot(CAM_DIR.x, CAM_DIR.z) || 1;
-  const cx = cam.position.x + CAM_DIR.x / hl * 14, cz = cam.position.z + CAM_DIR.z / hl * 14, cy = cam.position.y, R2 = SF_R * 2;
-  const fall = (2.0 + SKY.amt * 1.6) * dt, tt = U.uTime.value;
+  const hl = Math.sqrt(CAM_DIR.x * CAM_DIR.x + CAM_DIR.z * CAM_DIR.z) || 1, fx = CAM_DIR.x / hl, fz = CAM_DIR.z / hl, cp = cam.position;
+  // хлопья двигает шейдер (initSky): тут только коробки вокруг камеры (дальняя — на 14 м вперёд, ближняя — на 6 м)
+  // и пройденный путь; путь — по модулю, кратному всем коробкам и скоростям, чтобы число не росло и не было скачка
+  u.uO.value.set(cp.x + fx * 14, cp.y, cp.z + fz * 14);
+  u.uOi.value.set(cp.x + fx * 6, cp.y, cp.z + fz * 6);
+  SKY.fall = (SKY.fall + (2.0 + SKY.amt * 1.6) * dt) % 46200;     // 46 200 м × любая скорость 0,7…1,18 — целое число высот коробок 22 и 42 м
+  SKY.dx = (SKY.dx + 0.5 * dt) % 1140;                             // снос ветром 0,5 м/с; 1 140 — кратно ширине коробок 30 и 76 м
+  u.uFall.value = SKY.fall; u.uDx.value = SKY.dx;
+  u.uW.value = U.uTime.value % (6.283185307 / 0.9);                 // покачивание ±0,44 м с периодом 7 с
   SNOWF.geometry.setDrawRange(0, Math.floor(SF_N * Math.min(1, 0.35 + SKY.amt)));
-  for (let i = 0; i < n; i++) {
-    const o = i * 3;
-    let x = p[o], y = p[o + 1] - fall * (0.7 + (i % 5) * 0.12), z = p[o + 2];
-    x += (Math.sin(tt * 0.9 + i) * 0.4 + 0.5) * dt;
-    const R = i < SF_IN ? SF_RI : SF_R, RR = R * 2, ox = i < SF_IN ? cam.position.x + CAM_DIR.x / hl * 6 : cx, oz = i < SF_IN ? cam.position.z + CAM_DIR.z / hl * 6 : cz;
-    if (x < ox - R || x >= ox + R) x = ox - R + (((x - ox + R) % RR) + RR) % RR;
-    if (z < oz - R || z >= oz + R) z = oz - R + (((z - oz + R) % RR) + RR) % RR;
-    if (i < SF_IN) { if (y < cy - 8) y += 22; else if (y > cy + 14) y -= 22; }
-    else if (y < cy - 12) y += 42; else if (y > cy + 30) y -= 42;
-    p[o] = x; p[o + 1] = y; p[o + 2] = z;
-  }
-  SNOWF.geometry.attributes.position.needsUpdate = true;
 }
 
 /* Сугробы. Врезался на скорости — сугроб взрывается: белые комья,

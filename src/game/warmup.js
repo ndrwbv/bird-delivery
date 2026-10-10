@@ -38,8 +38,18 @@ function samples () {
   lg.setAttribute('position', new T.BufferAttribute(new Float32Array(6), 3));
   const map = new T.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
   const mesh = m => new T.Mesh(geo, m), inst = m => new T.InstancedMesh(geo, m, 1);
+  const skinned = m => {
+    const sg = geo.clone();
+    sg.setAttribute('skinIndex', new T.BufferAttribute(new Uint8Array(n * 4), 4));
+    sg.setAttribute('skinWeight', new T.BufferAttribute(new Float32Array(n * 4).fill(1), 4));
+    const s = new T.SkinnedMesh(sg, m), b = new T.Bone();
+    s.add(b); s.bindMode = T.DetachedBindMode; s.bind(new T.Skeleton([b], [new T.Matrix4()]), new T.Matrix4());
+    return s;
+  };
   return [
     ['нитка змея, поводок, хвосты (life.js kiteMats, LEASH_MAT)', new T.Line(lg, new T.LineBasicMaterial())],
+    // была у дождя (game.js rainMat) до 11.10.2026 — дождь теперь свой шейдер, а программа нужна этим
+    ['нитки змеев на пляже, трассеры (kites.js line, mafia.js, raid.js)', new T.Line(lg, new T.LineBasicMaterial({ transparent: true, opacity: 0.7 }))],
     ['змей (life.js KMAT.kite)', mesh(new T.MeshBasicMaterial({ vertexColors: true, side: D }))],
     ['змей на пляже (kites.js mat, side)', mesh(new T.MeshLambertMaterial({ flatShading: true, side: D }))],
     ['змей на пляже полупрозрачный (kites.js mat, op)', mesh(new T.MeshLambertMaterial({ flatShading: true, side: D, transparent: true, opacity: 0.5 }))],
@@ -51,6 +61,8 @@ function samples () {
     ['таблички протеста (protests.js MAT)', inst(new T.MeshLambertMaterial({ map, alphaTest: 0.45, side: D }))],
     ['осколки стекла (raid.js SHARD_MAT)', inst(new T.MeshLambertMaterial({ transparent: true, opacity: 0.8 }))],
     ['дворники (wipers.js mat)', mesh(new T.MeshBasicMaterial({ side: D }))],
+    ['таблички и мигалки ремонта (roadlife.js signMesh)', mesh(new T.MeshBasicMaterial({ map, side: D, vertexColors: true }))],
+    ['тело человека со скиннингом (people.js HSkin, HUMAN_VC)', skinned(new T.MeshLambertMaterial({ vertexColors: true, flatShading: true }))],
   ];
 }
 

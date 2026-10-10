@@ -878,7 +878,7 @@ function spawnWorks (A, e, at) {
   const room = e.len - e.tA - e.tB, HL = Math.min(6, room / 2 - 4);
   const P = (a, o) => [cx + ux * a + nx * o, cz + uz * a + nz * o];
   const L = [], FL = [], signQ = [], solids = [];
-  const W8 = { e, r, x: cx, z: cz, ux, uz, W, HL, t: rand(160, 240), warned: 0, grp: new THREE.Group(), solids, men: [], cones: [], blink: null };
+  const W8 = { e, r, x: cx, z: cz, ux, uz, W, HL, t: rand(160, 240), warned: 0, grp: new THREE.Group(), solids, men: [], cones: [], blink: null, blinkN: 0 };
   const sign = (x, z, y, fx, fz, w, h, low) => signQ.push([x, y, z, fx, fz, w, h, low]);
   // за полотном — синий забор стройки до ближайшего дома или чужой улицы, до двенадцати метров
   const reach = (k, s) => {
@@ -929,7 +929,7 @@ function spawnWorks (A, e, at) {
     box(L, 0.1, 2.5, 0.1, '#9aa0a8', sx, sy + 1.25, sz, ryA);
     sign(sx + ux * 0.08 * k, sz + uz * 0.08 * k, sy + 2.2, ux * k, uz * k, 1.7, 0.43, true);
     // конусы перед блоками
-    for (const o of [-0.32, 0, 0.32]) W8.cones.push(cone(A, W8, ...P((HL + 2.2) * k, o * W)));
+    for (const o of [-0.32, 0, 0.32]) W8.cones.push(cone(A, L, ...P((HL + 2.2) * k, o * W)));
   }
   // яма: чёрный провал в асфальте, отвалы земли по краям, доски, бочка
   const pw = Math.min(W * 0.55, 5.5), py = groundH(cx, cz);
@@ -942,25 +942,9 @@ function spawnWorks (A, e, at) {
   }
   { const [x, z] = P(-HL + 1.6, W / 2 - 1.1); box(L, 0.7, 0.9, 0.7, '#2b2a30', x, groundH(x, z) + 0.45, z, ryA); }
   { const [x, z] = P(HL - 1.8, -(W / 2 - 1.3)); box(L, 1.0, 0.75, 0.7, '#e0a526', x, groundH(x, z) + 0.4, z, ryA); box(L, 0.9, 0.08, 0.6, '#2b2a30', x, groundH(x, z) + 0.8, z, ryA); }
-  const stat = new THREE.Mesh(A.mergeGeos(L), WK_MAT || (WK_MAT = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })));
-  W8.grp.add(stat);
-  if (FL.length) { W8.blink = new THREE.Mesh(A.mergeGeos(FL), new THREE.MeshBasicMaterial({ vertexColors: true })); W8.grp.add(W8.blink); }
-  // таблички — одним мешем
-  {
-    const Pp = [], Uu = [], Ii = [];
-    for (const [x, y, z, fx, fz, w, h, low] of signQ) {
-      const rx = fz * w / 2, rz = -fx * w / 2, vi = Pp.length / 3, v0 = low ? 0 : 0.5, v1 = low ? 0.5 : 1;
-      Pp.push(x - rx, y - h / 2, z - rz, x + rx, y - h / 2, z + rz, x + rx, y + h / 2, z + rz, x - rx, y + h / 2, z - rz);
-      Uu.push(0, v0, 1, v0, 1, v1, 0, v1);
-      Ii.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(Pp, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(Uu, 2));
-    g.setIndex(Ii);
-    g.computeBoundingSphere();
-    W8.grp.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: WK_TEX || (WK_TEX = worksTex()), side: THREE.DoubleSide })));
-  }
+  statMesh(A, W8, L);
+  // таблички и мигалки — одним мешем
+  W8.grp.add(signMesh(A, W8, signQ.map(([x, y, z, fx, fz, w, h, low]) => [x, y, z, fx, fz, w, h, low ? 0 : 0.5, low ? 0.5 : 1]), WK_TEX || (WK_TEX = worksTex()), FL));
   // дорожники копают у ямы
   SHOVEL_GEO = SHOVEL_GEO || (() => { const S = []; box(S, 0.05, 1.1, 0.05, '#8a6b4e', 0, -0.35, 0.05); box(S, 0.26, 0.3, 0.04, '#6e6a72', 0, -0.95, 0.12); return A.mergeGeos(S); })();
   const nMen = 2 + (Math.random() < 0.5 ? 1 : 0);
@@ -993,7 +977,13 @@ function spawnWorks (A, e, at) {
   RL.n.works++;
 }
 
-function cone (A, W8, x, z) {
+/* Ремонт рисуется тремя-четырьмя вызовами (11.10.2026; было 9—24): всё неподвижное — блоки, щиты, стойки, забор, яма,
+   бочка и конусы — одна склейка (statMesh); таблички и мигалки — один меш (signMesh: мигалки — хвост индекса,
+   гаснут укороченным drawRange, цвет — вершин, картинка под ними — белый пиксель таблички); щит «объезд» у ремонта
+   полосы — свой меш. Конус в склейке, пока стоит: сбили — его вершины в склейке схлопываются в точку, летит
+   свой меш (cone.m), как раньше. */
+const wkMat = () => WK_MAT || (WK_MAT = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+function coneGeo (A) {
   if (!CONE_GEO) {
     const L = [];
     A.put(L, new THREE.CylinderGeometry(0.05, 0.24, 0.72, 6), '#ff6a13', 0, 0.36, 0);
@@ -1001,11 +991,68 @@ function cone (A, W8, x, z) {
     A.put(L, new THREE.BoxGeometry(0.5, 0.05, 0.5), '#2b2a30', 0, 0.02, 0);
     CONE_GEO = A.mergeGeos(L);
   }
-  const m = new THREE.Mesh(CONE_GEO, WK_MAT || (WK_MAT = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })));
-  const y = A.groundH(x, z) + 0.16;
-  m.position.set(x, y, z);
-  W8.grp.add(m);
-  return { m, x, z, y, vx: 0, vy: 0, vz: 0, fly: 0, spin: 0 };
+  return CONE_GEO;
+}
+/* конус стоит — копия в склейку ремонта (список L), на месте; v0…v1 — его вершины в склейке */
+function cone (A, L, x, z) {
+  const G = coneGeo(A), y = A.groundH(x, z) + 0.16, g = new THREE.BufferGeometry();
+  const p = G.attributes.position.array.slice();
+  for (let i = 0; i < p.length; i += 3) { p[i] += x; p[i + 1] += y; p[i + 2] += z; }
+  g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(G.attributes.normal.array.slice(), 3));
+  g.setAttribute('color', new THREE.BufferAttribute(G.attributes.color.array.slice(), 3));
+  g.setIndex(new THREE.BufferAttribute(G.index.array.slice(), 1));
+  let v0 = 0;
+  for (const q of L) v0 += q.attributes.position.count;
+  L.push(g);
+  return { m: null, stat: null, v0, v1: v0 + G.attributes.position.count, x, z, y, vx: 0, vy: 0, vz: 0, fly: 0, spin: 0 };
+}
+/* сбили стоящий конус: из склейки — вон, дальше летит своим мешем */
+function coneOut (W8, c) {
+  if (c.m) return;
+  const a = c.stat && c.stat.geometry.attributes.position;
+  if (a) {
+    const p = a.array, x = p[c.v0 * 3], y = p[c.v0 * 3 + 1], z = p[c.v0 * 3 + 2];
+    for (let v = c.v0; v < c.v1; v++) { p[v * 3] = x; p[v * 3 + 1] = y; p[v * 3 + 2] = z; }
+    a.needsUpdate = true;
+  }
+  c.m = new THREE.Mesh(CONE_GEO, wkMat());
+  c.m.position.set(c.x, c.y, c.z);
+  W8.grp.add(c.m);
+}
+function statMesh (A, W8, L) {
+  const stat = new THREE.Mesh(A.mergeGeos(L), wkMat());
+  W8.grp.add(stat);
+  for (const c of W8.cones) c.stat = stat;
+  return stat;
+}
+/* таблички: Q — [x, y, z, fx, fz, w, h, v0, v1] (v — полоса картинки); FL — коробки мигалок (склейка — в хвост) */
+const WHITE_UV = [12.5 / 256, 1 - 12.5 / 128];     // белый пиксель таблички «ДОРОГА ЗАКРЫТА» (worksTex): под мигалкой цвет — её
+function signMesh (A, W8, Q, map, FL) {
+  const Pp = [], Uu = [], Cc = [], Ii = [];
+  for (const [x, y, z, fx, fz, w, h, v0, v1] of Q) {
+    const rx = fz * w / 2, rz = -fx * w / 2, vi = Pp.length / 3;
+    Pp.push(x - rx, y - h / 2, z - rz, x + rx, y - h / 2, z + rz, x + rx, y + h / 2, z + rz, x - rx, y + h / 2, z - rz);
+    Uu.push(0, v0, 1, v0, 1, v1, 0, v1);
+    Cc.push(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+    Ii.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
+  }
+  const nSign = Ii.length;
+  if (FL && FL.length) {
+    const b = A.mergeGeos(FL), bp = b.attributes.position.array, bc = b.attributes.color.array, bi = b.index.array, o = Pp.length / 3;
+    for (let i = 0; i < bp.length; i++) { Pp.push(bp[i]); Cc.push(bc[i]); }
+    for (let i = 0; i < bp.length / 3; i++) Uu.push(WHITE_UV[0], WHITE_UV[1]);
+    for (let i = 0; i < bi.length; i++) Ii.push(bi[i] + o);
+    b.dispose();
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(Pp, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(Uu, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(Cc, 3));
+  g.setIndex(Ii);
+  g.computeBoundingSphere();
+  if (Ii.length > nSign) { W8.blink = g; W8.blinkN = nSign; }
+  return new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map, side: THREE.DoubleSide, vertexColors: true }));
 }
 
 function removeWorks (A, W8) {
@@ -1070,12 +1117,12 @@ function spawnLane (A, e, at) {
   const ryA = Math.atan2(e.ux, e.uz), ryN = Math.atan2(e.rz, e.rx), taper = 12;
   const L = [], FL = [], solids = [], signQ = [];
   const W8 = { e, r: null, lane: 1, opp: null, x: at.x, z: at.z, ux: e.ux, uz: e.uz, W: lw, HL: (s1 - s0) / 2, t: rand(150, 230), warned: 1,
-    grp: new THREE.Group(), solids, men: [], cones: [], blink: null };
+    grp: new THREE.Group(), solids, men: [], cones: [], blink: null, blinkN: 0 };
   // конусы: клин от бордюра к границе полосы, вдоль неё и обратно на выезде
   for (let s = s0 - taper; s <= s1 + 4.5; s += 3) {
     const o = s < s0 ? (oOut - 0.35) + (oIn + 0.3 - (oOut - 0.35)) * ((s - (s0 - taper)) / taper)
       : s > s1 ? (oIn + 0.3) + (oOut - 0.35 - oIn - 0.3) * ((s - s1) / 4.5) : oIn + 0.3;
-    W8.cones.push(cone(A, W8, ...P(s, o)));
+    W8.cones.push(cone(A, L, ...P(s, o)));
   }
   // блоки поперёк полосы — в начале и в конце; на въезде мигалки и щит «объезд левее»
   for (const s of [s0 + 0.4, s1 - 0.4]) {
@@ -1106,25 +1153,11 @@ function spawnLane (A, e, at) {
     solids.push(A.obb(x, z, (lw - 1.4) / 2, 1.4, ryN)); }
   { const [x, z] = P(sPit + 2.4, oOut - 0.8); A.put(L, new THREE.IcosahedronGeometry(0.7, 0), '#6e5646', x, groundH(x, z) + 0.3, z); }
   { const [x, z] = P(s1 - 3.5, o0 + 0.3); box(L, 0.7, 0.9, 0.7, '#e0a526', x, groundH(x, z) + 0.45, z, ryA); }
-  const stat = new THREE.Mesh(A.mergeGeos(L), WK_MAT || (WK_MAT = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })));
-  W8.grp.add(stat);
-  if (FL.length) { W8.blink = new THREE.Mesh(A.mergeGeos(FL), new THREE.MeshBasicMaterial({ vertexColors: true })); W8.grp.add(W8.blink); }
+  statMesh(A, W8, L);
+  // щит «объезд» — своя картинка; «РЕМОНТ» и мигалки — одним мешем
   for (const kind of ['arrow', 'low']) {
-    const Pp = [], Uu = [], Ii = [];
-    for (const [x, y, z, fx, fz, w, h, k] of signQ) {
-      if (k !== kind) continue;
-      const rx = fz * w / 2, rz = -fx * w / 2, vi = Pp.length / 3;
-      Pp.push(x - rx, y - h / 2, z - rz, x + rx, y - h / 2, z + rz, x + rx, y + h / 2, z + rz, x - rx, y + h / 2, z - rz);
-      if (kind === 'low') Uu.push(0, 0, 1, 0, 1, 0.5, 0, 0.5); else Uu.push(0, 0, 1, 0, 1, 1, 0, 1);
-      Ii.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(Pp, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(Uu, 2));
-    g.setIndex(Ii);
-    g.computeBoundingSphere();
-    const map = kind === 'arrow' ? (ARROW_TEX || (ARROW_TEX = arrowTex())) : (WK_TEX || (WK_TEX = worksTex()));
-    W8.grp.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map, side: THREE.DoubleSide })));
+    const Q = signQ.filter(q => q[7] === kind).map(([x, y, z, fx, fz, w, h]) => [x, y, z, fx, fz, w, h, 0, kind === 'low' ? 0.5 : 1]);
+    W8.grp.add(signMesh(A, W8, Q, kind === 'arrow' ? (ARROW_TEX || (ARROW_TEX = arrowTex())) : (WK_TEX || (WK_TEX = worksTex())), kind === 'low' ? FL : null));
   }
   // дорожники: один-два с лопатами у ямы
   SHOVEL_GEO = SHOVEL_GEO || (() => { const S = []; box(S, 0.05, 1.1, 0.05, '#8a6b4e', 0, -0.35, 0.05); box(S, 0.26, 0.3, 0.04, '#6e6a72', 0, -0.95, 0.12); return A.mergeGeos(S); })();
@@ -1217,7 +1250,7 @@ function stepWorks (dt, A) {
     const vis = d < 200;
     W8.grp.visible = vis;
     if (!vis) { for (const m of W8.men) if (!m.dead) m.grp.visible = false; continue; }
-    if (W8.blink) W8.blink.visible = blink;
+    if (W8.blink) W8.blink.setDrawRange(0, blink ? Infinity : W8.blinkN);   // мигалки — хвост индекса табличек
     // едет к ремонту: подписи снизу нет (04.10.2026 — информационные плашки убраны), видно мигалку и знаки
     if (!W8.warned && d < 70 && ((W8.x - V.x) * fx + (W8.z - V.z) * fz) > d * 0.5) W8.warned = 1;
     // дорожники: лопатой вниз-вверх, иногда передых; наезд — как на прохожего
@@ -1243,6 +1276,7 @@ function stepWorks (dt, A) {
     for (const c of W8.cones) {
       if (!c.fly && sp > 2.5 && Math.hypot(c.x - V.x, c.z - V.z) < 1.5) {
         c.fly = 1; c.vx = V.vx * 0.8 + rand(-1.5, 1.5); c.vz = V.vz * 0.8 + rand(-1.5, 1.5); c.vy = rand(3, 5.5); c.spin = rand(-9, 9);
+        coneOut(W8, c);                                // из склейки — своим мешем
         if (A.Snd) A.Snd.fx('cone', s => s.noise(0.08, 0.1));
       }
       if (c.fly === 1) {
