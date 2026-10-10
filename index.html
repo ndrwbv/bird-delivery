@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ru" data-map="moscow" translate="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#3d0d01">
+  <title>Птица Пицца</title>
+  <link rel="icon" type="image/png" sizes="16x16" href="./icon-16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="./icon-32.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="./icon.png">
+  <!-- экран загрузки: стили прямо тут, чтобы он был виден раньше, чем приедет бандл.
+       Бордовый фон и логотип бренда (--brand-* в src/styles/paper.css; цвета тут — числами, бандла ещё нет).
+       Логотип — сетка 100×100 (public/brand/logo-px.png, ≈5 КБ, tools/make-icons.py), растянут без сглаживания.
+       Фразы под полоской сменяются сами каждые 1,4 с — только CSS (прозрачность и сдвиг идут и тогда, когда
+       главный поток занят стройкой города); с какой начать — случайно (скрипт ниже). Перевод — data-i18n:
+       main.js зовёт applyDom, когда язык известен; до того не на русском фразы спрятаны (.boot-nru) -->
+  <style>
+    @font-face { font-family: "Press Start 2P"; src: url("./fonts/PressStart2P-Regular.ttf") format("truetype"); font-display: swap; }
+    html, body { margin: 0; background: #3d0d01; }
+    #boot { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;
+            background: radial-gradient(circle at 50% 42%, #4d1205, #3d0d01 55%, #2a0800); transition: opacity .5s ease;
+            font-family: "Press Start 2P", ui-monospace, monospace; --say: 1.4s; --o: 0; }
+    #boot.gone { opacity: 0; pointer-events: none; }
+    #boot img { width: clamp(120px, 26vmin, 200px); height: clamp(120px, 26vmin, 200px); image-rendering: pixelated; border-radius: 18%;
+                box-shadow: 0 0 0 3px rgba(255, 179, 71, .28), 0 10px 0 #1e0600, 0 18px 40px rgba(0, 0, 0, .45);
+                animation: boot-bob .9s ease-in-out infinite alternate; }
+    #boot .boot-bar { width: 168px; height: 12px; box-sizing: border-box; border: 3px solid #1e0600; border-radius: 4px; background: #5a1608; overflow: hidden; }
+    #boot .boot-bar i { display: block; width: 38%; height: 100%; background: #ffb347; animation: boot-run 1.1s ease-in-out infinite; }
+    #boot .boot-say { position: relative; width: min(92vw, 640px); height: 2.2em; font-size: clamp(10px, 1.6vmin, 14px); }
+    #boot .boot-say span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.5;
+                           color: #fff3d6; text-shadow: 2px 2px 0 #1e0600; opacity: 0;
+                           animation: boot-say calc(var(--say) * 12) linear infinite backwards; animation-delay: calc((var(--i) - var(--o)) * var(--say)); }
+    .boot-nru #boot:not(.said) .boot-say { visibility: hidden; }
+    @keyframes boot-bob { from { transform: translateY(0) rotate(-3deg); } to { transform: translateY(-10px) rotate(3deg); } }
+    @keyframes boot-run { from { transform: translateX(-110%); } to { transform: translateX(280%); } }
+    /* 12 фраз × 1,4 с: своя фраза видна 1/12 круга — въезжает снизу, стоит, уходит вверх */
+    @keyframes boot-say { 0% { opacity: 0; transform: translateY(10px); } .8% { opacity: 1; transform: translateY(0); }
+                          7.6% { opacity: 1; transform: translateY(0); } 8.33% { opacity: 0; transform: translateY(-10px); } 100% { opacity: 0; transform: translateY(-10px); } }
+    @media (prefers-reduced-motion: reduce) { #boot .boot-say span { animation-timing-function: steps(1, end); } }
+    body.booting #game { opacity: 0; }
+    #game { transition: opacity .5s ease; }
+  </style>
+  <script type="module" crossorigin src="./assets/index-BlEgyv9N.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/modulepreload-polyfill-B5Qt9EMX.js">
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-Ct5FWWRu.js">
+  <link rel="modulepreload" crossorigin href="./assets/glyphs-BxpT9Y_H.js">
+  <link rel="modulepreload" crossorigin href="./assets/index-hDNajNks.js">
+  <link rel="modulepreload" crossorigin href="./assets/econ-DTVKb2OR.js">
+  <link rel="modulepreload" crossorigin href="./assets/profiles-C10LRqCw.js">
+  <link rel="modulepreload" crossorigin href="./assets/crashlog-DKs8TcOf.js">
+  <link rel="stylesheet" crossorigin href="./assets/profiles-D0V5eDZV.css">
+  <link rel="stylesheet" crossorigin href="./assets/paper-Bplj7kIB.css">
+</head>
+<body class="booting">
+
+<div id="boot" aria-hidden="true"><img src="./brand/logo-px.png" alt=""><div class="boot-bar"><i></i></div>
+  <div class="boot-say">
+    <span style="--i:0" data-i18n>Покупаем пиццу…</span>
+    <span style="--i:1" data-i18n>Прогреваем духовку…</span>
+    <span style="--i:2" data-i18n>Ремонтируем машины…</span>
+    <span style="--i:3" data-i18n>Заливаем бензин…</span>
+    <span style="--i:4" data-i18n>Будим курьеров…</span>
+    <span style="--i:5" data-i18n>Кормим птицу…</span>
+    <span style="--i:6" data-i18n>Ищем сдачу с пятитысячной…</span>
+    <span style="--i:7" data-i18n>Чистим бордюры…</span>
+    <span style="--i:8" data-i18n>Пересчитываем пепперони…</span>
+    <span style="--i:9" data-i18n>Уговариваем шлагбаум на КПП…</span>
+    <span style="--i:10" data-i18n>Ищем, где тут второй подъезд…</span>
+    <span style="--i:11" data-i18n>Подкачиваем колёса…</span>
+  </div>
+</div>
+<script>
+  /* загрузка: с какой фразы начать — случайно; не русский браузер — фразы ждут перевода (main.js → .said) */
+  (function () { var b = document.getElementById('boot'); if (b) b.style.setProperty('--o', Math.floor(Math.random() * 12));
+    if (!/^ru/i.test(navigator.language || '')) document.documentElement.classList.add('boot-nru'); })();
+</script>
+
+<div id="game">
+
+  <canvas id="view"></canvas>
+
+  <!-- ── слева сверху: ресурс машины и задание ── -->
+  <div class="hud" id="hud-left">
+    <div id="hearts"></div>
+    <!-- деньги одним блоком под сердцами: копилка — кошелёк, пачка купюр — за смену (shiftcash.js) -->
+    <div id="cash"><div id="money">0 ₽</div></div>
+    <!-- рейтинг смены: ты и другие курьеры (только Москва) -->
+    <ol id="rivals" class="msk-only" hidden></ol>
+    <div id="task"></div>
+    <div id="addr"></div>
+  </div>
+
+  <!-- ── справа сверху: скорость, нитро, щит (деньги — слева под сердцами) ── -->
+  <div class="hud" id="hud-right">
+    <div id="dist"></div>
+    <div id="speed"></div>
+    <!-- бак нитро (только Москва): пополняется баллонами на улицах, жжётся на Shift -->
+    <div id="nitro" class="msk-only"><span data-i18n>кофе</span><b><i id="nitrobar"></i></b></div>
+    <!-- щит и бист-мод: сколько секунд осталось -->
+    <div id="fxs" class="msk-only"></div>
+    <!-- «сняться со смены» — только в меню паузы -->
+  </div>
+
+  <!-- ── время на заказ: часы как на приборке — сейчас и «до 14:35» (срок заказа) ── -->
+  <div class="hud" id="timewrap"><b id="dash-now"></b><span id="dash-due"><em></em><b></b></span></div>
+
+  <!-- ── карта квартала: в Москве по клику раскрывается во весь экран ── -->
+  <div class="hud" id="radar"><canvas id="radarc"></canvas></div>
+
+  <!-- ── полная карта района (только Москва): радар по клику, Tab ── -->
+  <div id="fullmap" hidden>
+    <div class="fm-box">
+      <div class="fm-top"><b data-i18n>Москва</b><span data-i18n>клик или esc — закрыть</span></div>
+      <div class="fm-view"><canvas id="fullmapc"></canvas></div>
+      <div class="fm-leg">
+        <span><i class="lg-to"></i><em data-i18n>заказ</em></span><span><i class="lg-me"></i><em data-i18n>ты</em></span><span><i class="lg-dodo"></i><em data-i18n>пиццерия</em></span><span><i class="lg-route"></i><em data-i18n>маршрут</em></span>
+        <span data-fm="career"><i class="lg-gang"></i><em data-i18n>бандиты — трясут мзду</em></span><span><i class="lg-jam"></i><em data-i18n>пробка</em></span>
+        <span data-fm="dist"><i class="lg-mine"></i><em data-i18n>твой район</em></span><span data-fm="dist"><i class="lg-lock"></i><em data-i18n>район закрыт</em></span>
+        <span data-fm="career"><i class="lg-gar"></i><em data-i18n>гараж</em></span><span data-fm="kpp"><i class="lg-kpp"></i><em data-i18n>КПП</em></span>
+        <span><i class="lg-sig"></i><em data-i18n>светофор</em></span>
+        <span><i class="lg-nos"></i><em data-i18n>кофе</em></span><span><i class="lg-col"></i><em data-i18n>находки</em></span><span><i class="lg-car"></i><em data-i18n>машины</em></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── накладная заказа: висит ~2,6 с и сама падает к радару мини-карточкой (game.js briefStep, ordertags.js) ── -->
+  <div id="phone">
+    <div class="ph-top">
+      <span class="ph-dot"></span>
+      <span id="ph-kind" data-i18n>заказ</span>
+      <span class="ph-src" data-i18n>умный трекер</span>
+    </div>
+    <div class="ph-body">
+      <div class="ph-main">
+        <div class="ph-items">
+          <svg class="ph-pizza" viewBox="0 0 32 32" aria-hidden="true">
+            <polygon points="16,2 28,28 4,28" fill="#ffd34d"/>
+            <polygon points="5.9,24 26.1,24 28,28 4,28" fill="#e8b563"/>
+            <circle cx="16" cy="12" r="2.4" fill="#e04836"/>
+            <circle cx="11" cy="19" r="2.1" fill="#e04836"/>
+            <circle cx="21" cy="19" r="2.1" fill="#e04836"/>
+          </svg>
+          <span id="ph-what"></span>
+        </div>
+        <div id="ph-list"></div>
+        <div id="ph-why"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── звук и пауза: не все догадаются про клавиши ── -->
+  <div id="ctrls">
+    <button id="sfx" type="button" data-i18n>звук вкл</button>
+    <button id="pause" type="button" aria-label="пауза" data-i18n-title="пауза"><i class="pz-ico" aria-hidden="true"></i></button>
+    <button id="mapbtn" class="msk-only" type="button" data-i18n>карта</button>
+    <button id="nos" class="msk-only" type="button" data-i18n>кофе</button>
+    <button id="menu" type="button" hidden data-i18n>в меню</button>
+  </div>
+  <!-- ── Москва: карточка выбора — обед и просьбы клиентов ── -->
+  <div id="choice" class="msk-only" hidden>
+    <div class="ch-box">
+      <div id="ch-face"></div>
+      <div class="ch-txt"><div id="ch-t"></div><div id="ch-s"></div></div>
+      <div id="ch-opts"></div>
+      <b class="ch-sec"></b>
+    </div>
+  </div>
+  <!-- ── Москва: меню паузы — всё, что не нужно на экране во время езды ── -->
+  <div id="pausem" class="msk-only" hidden>
+    <div class="pm-ver" aria-hidden="true"></div>
+    <!-- журнал ошибок не пуст (src/platform/crashlog.js, docs/CRASHES.md) — показать и скопировать -->
+    <button id="pm-crash" type="button" hidden data-i18n>отчёт об ошибке</button>
+    <!-- без общей рамки: на «столе» рядом лежат кнопки (главное), накладная текущего заказа,
+         записка с управлением и чек смены -->
+    <div class="pm-desk">
+      <div class="pm-l">
+        <div class="pm-t" data-i18n>пауза</div>
+        <div class="pm-btns">
+          <button id="pm-go" type="button" data-i18n>продолжить</button>
+          <button id="pm-map" type="button" data-i18n>карта района</button>
+          <button id="pm-sfx" type="button" data-i18n>звук вкл</button>
+          <button id="pm-menu" type="button" data-i18n>в главное меню</button>
+        </div>
+        <!-- чек смены: сколько развёз, заработал, сбил -->
+        <div id="pm-stats"></div>
+      </div>
+      <!-- текущий заказ накладной, как на карточке заказа -->
+      <div id="pm-order"></div>
+      <!-- записка: какие кнопки за что — геймпад, клавиатура или палец, смотря чем играют -->
+      <div id="pm-keys"></div>
+    </div>
+  </div>
+
+  <div class="hud" id="burgers"></div>
+  <div class="hud" id="toast"></div>
+
+  <!-- ── Москва: бонус за скорость и гайд по управлению ── -->
+  <!-- окна меню: коллекция и магазин машин -->
+  <div id="panel" class="msk-only" hidden>
+    <div class="pn-box">
+      <button id="pn-close" type="button" aria-label="close">×</button>
+      <div id="pn-body"></div>
+    </div>
+  </div>
+
+  <!-- телефон: руль — кнопками под левым пальцем, педали и нитро — под правым -->
+  <div id="touchpad" hidden>
+    <div class="tp-left">
+      <button type="button" data-k="left" aria-label="left">◀</button>
+      <button type="button" data-k="right" aria-label="right">▶</button>
+    </div>
+    <div class="tp-right">
+      <button type="button" data-k="hand" class="tp-hand" aria-label="handbrake">(P)</button>
+      <button type="button" data-k="nitro" class="tp-nos" data-i18n>кофе</button>
+      <button type="button" data-k="brake" class="tp-brake" data-i18n>тормоз</button>
+      <button type="button" data-k="gas" class="tp-gas" data-i18n>газ</button>
+    </div>
+  </div>
+  <!-- джойстик под пальцем: где положил — там центр (мышь; на телефоне — кнопки выше) -->
+  <div id="joy" class="msk-only" hidden><i id="joy-k"></i></div>
+  <div id="bonus" class="msk-only"></div>
+
+  <!-- ── кино смерти: надпись проявляется, пока камера уходит вверх ── -->
+  <div id="wasted" hidden>
+    <div class="w-inner">
+      <div id="w-word"></div>
+      <div id="w-sub"></div>
+    </div>
+  </div>
+
+  <!-- ── заставка и экран конца смены ── -->
+  <div id="big" hidden>
+    <!-- верхняя полоса: профиль курьера (уровень цифрой, имя, место в таблице) и язык -->
+    <div id="topbar">
+      <div id="profile">
+        <em id="pf-lvl" class="lvl">1</em>
+        <div class="pf-t">
+          <b id="pf-name"></b>
+          <span id="pf-rank"></span>
+          <i class="pf-bar"><i id="pf-xp"></i></i>
+        </div>
+      </div>
+      <!-- язык: значок-глобус и названия языков на своих языках (рекомендация Яндекса) -->
+      <button id="st-lang" type="button" aria-label="language"><span aria-hidden="true">🌐</span> <b id="st-lang-n"></b></button>
+    </div>
+
+    <div id="big-main">
+      <div id="big-t"></div>
+      <div id="big-s"></div>
+      <div id="big-k"></div>
+
+      <!-- ── сначала имя (кроме Яндекса — там оно из профиля), потом «поехали» ── -->
+      <form id="start" class="msk-only" autocomplete="off">
+        <label for="st-name" data-i18n>как тебя зовут</label>
+        <input id="st-name" type="text" maxlength="24" data-i18n-ph="имя и фамилия" autocomplete="off" spellcheck="false">
+        <button id="st-go" type="submit" disabled data-i18n>поехали</button>
+        <div id="st-lvl"></div>
+        <button id="st-ride" type="button" data-i18n>просто покататься</button>
+        <div class="st-row">
+          <button id="st-col" type="button" data-i18n>мои находки</button>
+          <button id="st-shop" type="button" data-i18n>гараж</button>
+        </div>
+        <div class="st-row">
+          <button id="st-map" type="button" hidden>🗺 <span id="st-map-n"></span></button>
+          <button id="st-set" type="button" data-i18n>настройки</button>
+          <button id="st-quit" type="button" hidden data-i18n>выйти из игры</button>
+        </div>
+        <div id="st-note"></div>
+      </form>
+
+      <!-- ── таблица рекордов: внизу, под кнопками, ничего не перекрывает ── -->
+      <aside id="board" class="msk-only">
+        <div class="bd-t" data-i18n>таблица рекордов</div>
+        <ol id="board-list"></ol>
+        <div id="board-me"></div>
+      </aside>
+    </div>
+    <!-- старые узлы, которые ещё читает код -->
+    <div id="lb-wrap" hidden><div id="lb-place"></div><ol id="lb-list"></ol></div>
+    <!-- версия сборки (vite: __BUILD__, заполняет src/main.js): в Москве — под таблицей, в карьере — в правом нижнем углу -->
+    <div id="build-v" aria-hidden="true"></div>
+  </div>
+
+  <!-- ── итоги смены: причина, цифры набегают, дальше — в меню или ещё раз ── -->
+  <div id="over" hidden>
+    <div class="ov-box">
+      <div id="ov-t"></div>
+      <div id="ov-why"></div>
+      <div id="ov-stats"></div>
+      <div id="ov-best"></div>
+      <div id="st-note2" class="ov-note"></div>
+      <!-- видео за награду (только по кнопке, награда — бонус) и вход в Яндекс ради таблицы -->
+      <div id="ov-extra" hidden>
+        <button id="ov-x2" type="button" hidden><b data-i18n>удвоить заработок</b><span data-i18n>за просмотр рекламы</span></button>
+        <button id="ov-auth" type="button" hidden data-i18n>войти, чтобы попасть в общую таблицу</button>
+      </div>
+      <div class="ov-btns">
+        <button id="ov-again" type="button" data-i18n>ещё раз</button>
+        <button id="ov-menu" type="button" data-i18n>в меню</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
