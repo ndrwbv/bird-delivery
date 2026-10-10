@@ -66,6 +66,7 @@ import * as ECON from './econ.js';
 import * as DLG from './dialog.js';
 import { STORY_PEOPLE, ORDER_TYPES } from './orders.config.js';
 import { makePerson } from './people.js';
+import * as FAHEAD from './faceahead.js';         // лица реплик — заранее, в спокойные кадры
 import * as LIFE from './actorlife.js';          // живые лица и жесты актёров — только в катсцене (Н2)
 import { makeCatModel, FURS } from './cats.js';
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
@@ -294,6 +295,24 @@ function courierPerson () {
   return p;
 }
 /* песочница интерфейса (src/uilab): портреты для реплик без катсцены — хозяин истории и курьер */
+/* лица реплик заранее (faceahead.js): при загрузке — первая реплика каждой главы у всех историй (и встреч у двери), курьер */
+export function faceAhead () {
+  // лицо без имени и без кэша людей (имя — по языку на момент сцены): ключ портрета тот же — id и внешность
+  const face = (id, seed, fem, look) => {
+    const c = PEOPLE_CACHE.get(id === 'story-courier' ? '_courier' : id.slice(6));
+    if (c) return c;
+    const p = makePerson({ seed, fem });
+    Object.assign(p.look, look); p.id = id;
+    return p;
+  };
+  const cour = face('story-courier', 0xc0de, false, COURIER_LOOK);
+  for (const s of STORIES) {
+    if (s.arch || !s.who) continue;
+    const host = face('story-' + s.id, s.who.seed, s.who.fem, s.who.look);
+    const who = k => (k === 'courier' ? cour : host);
+    for (const c of s.chapters || []) FAHEAD.lines(c.script, who, true);
+  }
+}
 export const PERSON = { host: id => { const s = STORIES.find(q => q.id === id); return s ? storyPerson(s) : null; }, courier: () => courierPerson() };
 
 /* ─────────────── где живёт ─────────────── */
@@ -909,6 +928,7 @@ export async function play (storyId, chapter, o = {}) {
   const idx = chapter === undefined || chapter === null ? prog(storyId).ch : +chapter;
   const c = s && s.chapters[idx];
   if (!API || !c) return { stars: 0, money: 0 };
+  FAHEAD.lines(c.script, k => (k === 'courier' ? courierPerson() : storyPerson(s)));   // все реплики главы — заранее, пока сцена разворачивается
   const h = homeOf(s);
   if (!h) return { stars: 0, money: 0 };
   const V = API.V;

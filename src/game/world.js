@@ -39,7 +39,7 @@ import * as ZN from './zones.js';
 import * as DLG from './dialog.js';
 import * as SEAS from './seasons.js';
 import * as SL from './streetlamps.js';
-import { makePerson } from './people.js';
+import { makePerson, holdFixed } from './people.js';
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 
 /* соседние модули карьеры — если уже есть: вечер (career.js), «подъехал к
@@ -971,15 +971,14 @@ function thug (lead) {
   for (const [part, h, y] of [[u.legL, 0.62, -0.34], [u.legR, 0.62, -0.34], [u.armL, 0.42, -0.23], [u.armR, 0.42, -0.23]]) {
     const g = [];
     for (const s of [-1, 1]) A.box(g, 0.02, h, 0.03, '#f2f2f0', s * 0.078, y, 0);
-    part.add(new THREE.Mesh(A.mergeGeos(g), A.HUMAN_VC));
+    holdFixed(part, new THREE.Mesh(A.mergeGeos(g), A.HUMAN_VC));   // лампасы и бита — в меш тела (people.js)
   }
   let bat = null;
   if (A.ADULT) {                                   // детская версия — без бит
     const g = [];
     A.box(g, 0.06, 0.5, 0.06, '#6b4a2e', 0, -0.62, 0.05);
     A.box(g, 0.09, 0.5, 0.09, '#9a7348', 0, -1.1, 0.05);
-    bat = new THREE.Mesh(A.mergeGeos(g), A.HUMAN_VC);
-    u.armR.add(bat);
+    bat = holdFixed(u.armR, new THREE.Mesh(A.mergeGeos(g), A.HUMAN_VC));   // m.bat — только «есть бита»
   }
   A.scene.add(grp);
   return { grp, u, person, x: 0, z: 0, h: 0, ph: rand(0, 6), dead: 0, slot: 0, swingT: rand(0.2, 1), swing: 0, bubble: null, bubT: 0, bat };

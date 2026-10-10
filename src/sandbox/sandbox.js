@@ -502,13 +502,16 @@ function renderMeets () {
     const grid = el('div', 'grid');
     for (const m of h.meets) {
       const b = el('button', 'btn sm story', '«' + m.say.slice(0, 38) + (m.say.length > 38 ? '…' : '') + '»'); b.type = 'button';
-      b.title = m.say + '\n[A] ' + m.a + '\n[X] ' + m.b;
+      b.title = m.say + '\n[A] ' + m.a + ' → ' + m.outA + '\n[X] ' + m.b + ' → ' + m.outB;   // итог ответа: tip тепло · big восторг · cut обида · none облом · 0 ну и ладно
       b.addEventListener('click', async () => {
         await ready(); await G.riding();
         if (has('time')) await G.time(CFG.meetNight ? 23 : 13);
         W().focus();
         const r = await D().ENC.play(h.id, m.i);
-        log(r ? 'встреча «' + h.name + '» (' + r.meet + '): ответ ' + (r.ans || '—') + (r.skip ? ', пропущена' : '') + ', ' + (r.ms / 1000).toFixed(1) + ' с' : 'встреча не началась: нет подъезда рядом (до 320 м) или идёт катсцена', r ? '' : 'warn');
+        // итог деньгами — на образце заказа 1 000 ₽ с чаевыми 100 ₽ (encounters.js EN.SAMPLE; в игре — чаевые этого заказа)
+        const sm = r && r.sample, d = sm ? sm.add - sm.cut : 0;
+        const pay = r && r.out ? ' → ' + (r.seal || r.out) + (r.row ? ' «' + r.row + '»' : '') + (sm ? ': ' + (d > 0 ? '+' : d < 0 ? '−' : '±') + Math.abs(d) + ' ₽ на заказе ' + sm.fee + ' ₽ (чаевые ' + sm.tip + ' ₽)' : '') + ', лицо ' + r.mood : '';
+        log(r ? 'встреча «' + h.name + '» (' + r.meet + '): ответ ' + (r.ans || '—') + pay + (r.skip ? ', пропущена' : '') + ', ' + (r.ms / 1000).toFixed(1) + ' с' : 'встреча не началась: нет подъезда рядом (до 320 м) или идёт катсцена', r ? '' : 'warn');
       });
       grid.appendChild(b);
     }

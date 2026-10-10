@@ -30,7 +30,7 @@ const REPLY_MIN = 1.4;         // с: от ответа до печати — н
 const RECENT = 8;              // столько последних встреч не повторяются
 
 /* итог ответа: вид для doorstep.js, печать, строка в чеке по умолчанию */
-const OUT = {
+export const OUT = {   // итоги ответов — и для встреч-катсцен (encounters.js)
   tip:  { kind: 'keep', seal: N_('тепло'), cls: 'pp-seal-green', row: N_('понравился клиенту'), plus: true },
   big:  { kind: 'fun', win: true, seal: N_('восторг'), cls: 'pp-seal-pink', row: N_('клиент в восторге'), plus: true },
   cut:  { kind: 'rush', seal: N_('обида'), cls: 'pp-seal-rust', row: N_('клиенту не понравилось') },

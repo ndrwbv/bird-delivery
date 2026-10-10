@@ -25,6 +25,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 import { t, N_ } from '../i18n/index.js';
+import { holdFixed } from './people.js';
 import * as DIST from './districts.js';
 import { TIER } from './hits.js';
 import { hourOf } from './econ.js';
@@ -650,7 +651,7 @@ function buildMarch (P) {
   // ведущий с мегафоном — настоящий человек: кричит речёвки
   const lg = A.makeHuman(null, { shirt: prob().col[0] });
   const u = lg.userData;
-  if (u.armR) { const g = []; A.put(g, new THREE.CylinderGeometry(0.07, 0.16, 0.34, 8), '#f2f2f0', 0, -0.62, 0.12, Math.PI / 2); u.armR.add(new THREE.Mesh(A.mergeGeos(g), A.HUMAN_VC)); }
+  if (u.armR) { const g = []; A.put(g, new THREE.CylinderGeometry(0.07, 0.16, 0.34, 8), '#f2f2f0', 0, -0.62, 0.12, Math.PI / 2); holdFixed(u.armR, new THREE.Mesh(A.mergeGeos(g), A.HUMAN_VC)); }   // мегафон — в меш тела (people.js)
   A.scene.add(lg);
   DIRECTOR.start('march');
   MA = { P, st: 'walk', S: rows * 1.5 + 3, t: 0, M, body, head, plac, rows, cols, half: (cols - 1) / 2 * 1.05 + 0.5,

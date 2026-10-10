@@ -22,6 +22,7 @@
      DOOR.enabled() / DOOR.setEnabled(on) — настройка «мини-игры у клиента» (settings.js, ключ dlv-doorgames)
      DOOR.payAdjust(st, fee, bonus, tip) → { bonus, tip, add, cut } — orders.js payStop (домофон)
      DOOR.talkAdjust(st, fee, tip) → { add, cut, kind, win } — orders.js payStop (разговор)
+     DOOR.meetDone(st, res) — итог встречи-катсцены (encounters.js) при вручении: в st.talk, как у разговора (тепло — респект)
      DOOR.stairsAdjust(st, fee, bonus, tip) → { add, cut, gop } — orders.js payStop (подъезд)
      DOOR.ZHENYA_KEY    — ключ сохранения: скидка на следующий ремонт у Дяди Жени (доля; cars.js offer)
      DOOR.DEBUG         — __dlv.DOOR: timer, due(), force(mode), talk(id), stairs(o), solve(wrong | 'rush' | 'keep' | 'fun' | 'pay' | 'late'),
@@ -414,6 +415,16 @@ export function talkAdjust (st, fee, tip) {
   if (r.kind === 'rush') return { add: 0, cut: tip > 0 ? (r.none ? tip : r10(tip * (1 - TK.RUSH_K))) : 0, kind: 'rush', win: false };
   if (r.kind === 'fun') return r.win ? { add: r10(fee * TK.FUN_TIP), cut: 0, kind: 'fun', win: true } : { add: 0, cut: tip, kind: 'fun', win: false };
   return { add: r10(fee * TK.KEEP_TIP), cut: 0, kind: 'keep', win: false };
+}
+
+/* встреча-катсцена у двери (encounters.js) прошла как вручение заказа: итог — туда же, где итог разговора (st.talk),
+   и дальше всё как у разговора: talkAdjust → payStop, строка в чеке (row), лицо на карточке оплаты (mood; person — герой).
+   res — { kind, win, out, row, mood, person, … } или null (пропустили до ответа — денег не меняет) */
+export function meetDone (st, res) {
+  if (!st) return;
+  st.talk = res || { aborted: true, enc: true };
+  TG.last = st.talk;
+  if (res && res.kind === 'keep' && A && A.respect && !(A.S && A.S.freeRun)) A.respect('chat');   // тепло — респект +1
 }
 
 /* деньги подъезда: дошёл с первого раза и быстро — +FAST_BONUS цены адреса; не успел — «за скорость» и чаевые × SLOW_K;

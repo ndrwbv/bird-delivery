@@ -10,7 +10,7 @@
    видит — всё нужное приходит в api (LIFE_API в game.js).
    ────────────────────────────────────────────────────────────────────────── */
 import { t } from '../i18n/index.js';
-import { makePerson } from './people.js';
+import { makePerson, holdFixed } from './people.js';
 import { MAP } from './map.js';
 import * as SEAS from './seasons.js';
 
@@ -302,8 +302,8 @@ function spawnRich () {
     }
   }));
   // в руке: мужчине — портфель, женщине — сумочка (поводок — в левой)
-  if (!fem) u.armR.add(bits(b => { b(0.42, 0.3, 0.1, pick(['#3a2a22', '#1f1c1a', '#5a3a22']), 0, -0.74, 0); b(0.14, 0.04, 0.03, '#1f1c1a', 0, -0.57, 0); b(0.3, 0.02, 0.11, GOLD, 0, -0.62, 0); }));
-  else (dog ? u.armR : u.armL).add(bits(b => { b(0.26, 0.2, 0.12, pick(['#8a2a2a', '#1f1c1a', '#e8e0d4', '#b08a2a']), 0, -0.5, 0.06); b(0.03, 0.2, 0.03, GOLD, 0, -0.34, 0.06); }));
+  if (!fem) holdFixed(u.armR, bits(b => { b(0.42, 0.3, 0.1, pick(['#3a2a22', '#1f1c1a', '#5a3a22']), 0, -0.74, 0); b(0.14, 0.04, 0.03, '#1f1c1a', 0, -0.57, 0); b(0.3, 0.02, 0.11, GOLD, 0, -0.62, 0); }));
+  else holdFixed(dog ? u.armR : u.armL, bits(b => { b(0.26, 0.2, 0.12, pick(['#8a2a2a', '#1f1c1a', '#e8e0d4', '#b08a2a']), 0, -0.5, 0.06); b(0.03, 0.2, 0.03, GOLD, 0, -0.34, 0.06); }));   // в меш тела (people.js)
   m.speed = rand(0.9, 1.15) * u.pace; m.yard = chance(0.2);
   const r = { m, dog: dog ? makeDog() : null, shock: 0, sayT: rand(8, 20), fresh: 1 };
   A.walkSpawn(m, 45, 170);
@@ -970,7 +970,7 @@ function spawnFlyer (x, z) {
   else {
     Object.assign(f, makeDrone());
     m.remote = bits(b => { b(0.24, 0.05, 0.14, '#2b2a30', 0.1, -0.58, 0.1); b(0.02, 0.16, 0.02, '#1b1a1f', 0.18, -0.5, 0.14); });
-    m.u.armR.add(m.remote);
+    holdFixed(m.u.armR, m.remote);
     f.p.set(x + Math.sin(f.gaze) * 0.8, gy(x, z) + 0.2, z + Math.cos(f.gaze) * 0.8);
   }
   m.grp.rotation.y = kite ? WIND : f.gaze;

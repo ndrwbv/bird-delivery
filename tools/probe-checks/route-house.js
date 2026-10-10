@@ -1,14 +1,15 @@
 /* Маршрут навигатора не режет дома (для npm run check; можно и так:
    npm run probe -- --eval=tools/probe-checks/route-house.js).
-   Адреса заказов (SPOTS) — случайные N штук (сид постоянный); к каждому два старта: от пиццерии
+   Адреса заказов (SPOTS, отсортированы по координатам) — случайные N штук (сид постоянный); к каждому два старта: от пиццерии
    и с дороги в 250—900 м от адреса; и выезд со двора: от адреса к адресу другого задания. Маршрут — тот же,
    что рисует игра (d.roadPath). По всей ломаной через 1 м: точка в доме (контур CITY.buildings, HOUSE_GRID; арка-проезд — не дом) — «режет дом»; последние 1,5 м у
    клиента и у старта со двора не считаем (стоят у стены). before — по-старому (RYARD.RY.OFF), after — сейчас.
    tail / head — время поиска проезда по клеткам (к клиенту — раз на адрес, со двора — раз на двор; в игре
    растянуты по кадрам, здесь — сразу, RT.sync), мс: p50, p95, худшее. noRoad — старт дальше 400 м от улиц, far — дальше 230 м (за окном поиска): не провал, считаем отдельно. */
-const N = +(window.__RH_N || 300);
+const Q0 = new URLSearchParams(location.search), N = +(Q0.get('rhn') || window.__RH_N || 300), YN = +(Q0.get('rhy') || 0);   // --q=rhn=1000&rhy=2000 — шире
 await until(() => d.SPOTS && d.SPOTS.length > 50 && (!d.LATE || !d.LATE.busy()), 30000);
-const pool = d.SPOTS;
+// адреса — по координатам, не в порядке поздней сборки (он зависит от того, как она разложилась по кадрам)
+const pool = d.SPOTS.slice().sort((a, b) => a.x - b.x || a.z - b.z);
 const inPoly = (x, z, p) => { let c = false; for (let i = 0, j = p.length - 1; i < p.length; j = i++) { const a = p[i], b = p[j]; if ((a[1] > z) !== (b[1] > z) && x < (b[0] - a[0]) * (z - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; };
 // арка — сквозной проезд во двор через дом (game.js archFor, ширина 5,2 м): не дом
 const inArch = (x, z) => d.ARCHES.some(a => { const dx = x - a.mx, dz = z - a.mz, l = dx * a.ix + dz * a.iz, w = dx * a.ux + dz * a.uz; return l > -1 && l < a.t + 1 && Math.abs(w) < 2.2; });
@@ -40,6 +41,7 @@ const cutsFrom = (R, tx, tz, sx, sz) => {
 };
 // выезд со двора: старт — адрес (машина там, где отдала заказ), цель — адрес другого задания
 const yardJobs = jobs.filter((j, i) => i % 2 === 0).map((j, i, A) => { const o = A[(i + 7) % A.length]; return [j[2], j[3], o[2], o[3], j[4]]; });
+for (let k = 0; k < YN; k++) { const a = pool[Math.floor(rnd() * pool.length)], b = pool[Math.floor(rnd() * pool.length)]; yardJobs.push([a.x, a.z, b.x, b.z, rnd() * 6.28]); }
 const pass = (off, list, tag) => {
   d.RYARD.RY.OFF = off; d.RT.key = NaN; d.RT.head = null; d.RT.sync = true;
   const R = { n: 0, cut: 0, noRoad: 0, far: 0, ms: 0, msMax: 0, sample: [] };

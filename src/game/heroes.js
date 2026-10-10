@@ -45,7 +45,7 @@ import * as HITS from './hits.js';
 import { part as fxPart } from './fxpool.js';    // частицы из общего запаса (fxpool.js)
 import * as TALK from './talk.js';             // облачка реплик (talk.js)
 import { readTime } from './dialog.js';         // сколько читать реплику
-import { makePerson } from './people.js';
+import { makePerson, holdFixed } from './people.js';
 import { makeCatModel, FURS } from './cats.js';
 
 export const HERO = {
@@ -325,7 +325,7 @@ const mat = (hex, o = {}) => {
 const bx = (w, h, d, hex, x, y, z, parent, o) => {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(hex, o));
   m.position.set(x, y, z);
-  if (parent) parent.add(m);
+  if (parent) { if (parent.isBone) holdFixed(parent, m); else parent.add(m); }   // на кость — в меш тела (people.js)
   return m;
 };
 /* ракетка: ручка, обод, струны. В группе — ручка вниз от начала координат */
@@ -361,7 +361,7 @@ const EXTRA = {
   igor (H, u) {
     const r = racket('#e0703f');
     r.position.set(0, -0.5, 0.05);
-    u.armL.add(r);
+    holdFixed(u.armL, r);
     if (A.ADULT) {                                     // электронка
       bx(0.04, 0.11, 0.025, '#3f7fd6', 0, -0.58, 0.07, u.armR);
       bx(0.03, 0.03, 0.03, '#1b1b20', 0, -0.5, 0.07, u.armR);
@@ -369,7 +369,7 @@ const EXTRA = {
       bx(0.02, 0.22, 0.02, '#e86f9a', 0, -0.62, 0.07, u.armR);
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.012, 4, 10), mat('#e86f9a'));
       ring.position.set(0, -0.76, 0.07);
-      u.armR.add(ring);
+      holdFixed(u.armR, ring);
     }
   },
   stepa (H, u) {
@@ -394,7 +394,7 @@ const EXTRA = {
     H.lift = 0.25;
     const r = racket('#59b06a');
     r.position.set(0, -0.5, 0.05);
-    u.armR.add(r);
+    holdFixed(u.armR, r);
   },
   arisha (H, u) {
     // кот на руках: Луша (серая) или Бизнес (рыжий) — по смене

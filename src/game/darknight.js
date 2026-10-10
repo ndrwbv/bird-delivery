@@ -34,6 +34,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 import { t, N_ } from '../i18n/index.js';
+import { holdFixed } from './people.js';
 import { hourOf } from './econ.js';
 import * as CONSTR from './construction.js';
 import * as HITS from './hits.js';
@@ -329,7 +330,7 @@ const MATS = {};
 const lam = hex => MATS[hex] || (MATS[hex] = keep(new THREE.MeshLambertMaterial({ color: hex, flatShading: true })));
 function addBox (parent, w, h, d, mat, x, y, z) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-  m.position.set(x, y, z); parent.add(m); return m;
+  m.position.set(x, y, z); if (parent.isBone) holdFixed(parent, m); else parent.add(m); return m;   // на кость — в меш тела (people.js)
 }
 function witch (seed) {
   const person = A.makePerson({ seed: (seed * 7919) >>> 0, fem: true, fat: false });
@@ -339,11 +340,11 @@ function witch (seed) {
   const u = grp.userData, body = u.parts[2];
   u.head.material.color.set('#9ccf6a');                                     // зелёное лицо
   const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.44, 0.78, 10), lam('#2a1838'));
-  robe.position.set(0, 0.4, 0); body.add(robe);
+  robe.position.set(0, 0.4, 0); holdFixed(body, robe);
   const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.44, 0.04, 12), lam('#141018'));
-  brim.position.set(0, 0.27, 0); u.head.add(brim);
+  brim.position.set(0, 0.27, 0); holdFixed(u.head, brim);
   const cone = new THREE.Mesh(new THREE.ConeGeometry(0.23, 0.62, 10), lam('#141018'));
-  cone.position.set(0.04, 0.58, -0.03); cone.rotation.z = -0.18; u.head.add(cone);
+  cone.position.set(0.04, 0.58, -0.03); cone.rotation.z = -0.18; holdFixed(u.head, cone);
   addBox(u.head, 0.47, 0.07, 0.47, lam('#6a2a8a'), 0, 0.32, 0);           // лента
   addBox(u.armR, 0.05, 1.0, 0.05, lam('#6a4a2a'), 0, -0.8, 0.1);           // поварёшка
   A.scene.add(grp);

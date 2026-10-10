@@ -21,6 +21,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 import { t } from '../i18n/index.js';
+import { holdFixed } from './people.js';
 import { checkMap, deadEnds as listDeadEnds, drivable } from './mapcheck.js';
 
 const lerp = (a, b, k) => a + (b - a) * k;
@@ -220,7 +221,7 @@ function works (api, d, W, face, sign, rollerG, shovelG) {
     const grp = makeHuman(null, { cap: '#ff8a00', shirt: '#ff8a00', pants: '#2f3540', fat: hash(x, z, 9 + i) < 0.2 });
     const u = grp.userData;
     const sh = new THREE.Mesh(shovelG, WORKS_MAT);
-    if (u.armR) { sh.rotation.x = 0.4; u.armR.add(sh); }
+    if (u.armR) { sh.rotation.x = 0.4; holdFixed(u.armR, sh); }   // лопата — в меш тела (people.js)
     // светоотражающая полоса на жилете
     if (u.parts) {
       const band = new THREE.Mesh(new THREE.BoxGeometry(0.47, 0.07, 0.29), new THREE.MeshBasicMaterial({ color: 0xe8f0f0 }));

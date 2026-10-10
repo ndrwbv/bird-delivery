@@ -19,10 +19,18 @@
    ready: () => false — очередь глав story.js их не берёт, флаг архива сюжета (heroes.js HERO.STORY)
    их не касается. Песочница игры (`npm run sandbox`) → раздел «Встречи».
 
-     ENC.init(api)              — один раз из game.js: { THREE, scene, CITY, V, ADULT, groundH, inHouse, makeHuman, people() — списки прохожих }
-     ENC.list()                 — герои и их встречи (для песочницы)
-     ENC.play(id, i) → Promise  — проиграть встречу i героя id у ближайшего подъезда (машина встаёт сама)
-   отладка: __dlv.ENC
+   Деньги (трек 10 п. 3, 11.10.2026) — как у разговора у двери: у каждого ответа поле out (tip — тепло, big — восторг,
+   cut — обида, none — облом, 0 — ну и ладно; таблица — smalltalk.js OUT). Встреча как вручение заказа (play с o.st) —
+   итог в st.talk (doorstep.js meetDone) → talkAdjust → orders.js payStop: чаевые этого заказа, строка row в чеке,
+   лицо героя по реакции на карточке оплаты. Без заказа (песочница) — итог в журнал и карточка оплаты «образцом»
+   на заказ EN.SAMPLE.FEE ₽ с чаевыми EN.SAMPLE.TIP ₽ (денег не даёт).
+
+     ENC.init(api)              — один раз из game.js: { THREE, scene, CITY, V, S, ORD, ADULT, car(), groundH, inHouse, makeHuman,
+                                  people() — списки прохожих, popPay(total, rows, title, face) — карточка оплаты, money(n) }
+     ENC.list()                 — герои и их встречи (для песочницы; у ответов — out)
+     ENC.play(id, i, o) → Promise — проиграть встречу i героя id у ближайшего подъезда (машина встаёт сама);
+                                  o.st — остановка заказа: встреча идёт как вручение (после — машина назад, итог — в оплату)
+   отладка: __dlv.ENC; ENC.next(id, i) — следующий подъехал к клиенту = эта встреча вместо вручения (в игре сами не выпадают)
    ────────────────────────────────────────────────────────────────────────── */
 import { t, N_ } from '../i18n/index.js';
 import * as STORY from './story.js';
@@ -30,6 +38,8 @@ import * as LIFE from './actorlife.js';
 import { makePerson } from './people.js';
 import { makeCatModel, FURS } from './cats.js';
 import * as LINES from './minigames/smalltalk-lines.js';
+import { OUT } from './minigames/smalltalk.js';
+import * as DOOR from './doorstep.js';
 
 export const EN = {
   NEAR: 320,          // подъезд для встречи — ближе стольких метров к машине
@@ -45,6 +55,7 @@ export const EN = {
   NOD: 0.5,           // реакция без хлопка дверью: кивок / пожал плечами — столько секунд на плане 'two'
   LEAVE: 0.8,         // курьер уходит к машине — столько секунд, и встреча кончается (не ждём, пока дойдёт)
   CPS: 50,            // букв в секунду в репликах встречи (сюжет — 42)
+  SAMPLE: { FEE: 1000, TIP: 100 },   // песочница без заказа: итог деньгами — на образце заказа 1 000 ₽ с чаевыми 100 ₽
 };
 
 /* ─────────────── герои ───────────────
@@ -72,7 +83,7 @@ const HEROES = [
     own: { id: 'granny-mat', emo: 'angry',
       say: N_('Ноги вытер? Я этот коврик тридцать лет стерегу.'),
       a: { me: N_('Вытер'), re: N_('Врёшь. Но пиццу давай.'), mood: 'angry', out: '0' },
-      b: { me: N_('Это просто коврик'), re: N_('Это — память. Пошёл вон.'), mood: 'angry', out: 'none', slam: true } } },
+      b: { me: N_('Это просто коврик'), re: N_('Это — память. Пошёл вон.'), mood: 'angry', out: 'none', slam: true, row: N_('обидел коврик') } } },
 
   { id: 'cop', who: 'corrupt_cop', name: N_('старлей Пахомов'), seed: 0xc0b, fem: false, decor: 'cop',
     look: { age: 'adult', hair: 'buzz', hairC: '#2a1d16', head: 'cap', headC: '#3b4a5a', capBack: false, beard: 'horseshoe', broad: true, scar: 'cheek', brows: 'thick', mouth: 'smirk', eyes: 'narrow',
@@ -80,7 +91,7 @@ const HEROES = [
     char: { walk: { speed: 0.9, step: 7, leg: 0.5, arm: 0.3 }, talk: 'point', idle: 'still' },
     own: { id: 'cop-boxes', emo: 'ok',
       say: N_('Коробки видишь? Это не взятки. Это подарки от благодарных граждан.'),
-      a: { me: N_('Понимаю'), re: N_('Понятливый. Далеко пойдёшь. Свободен.'), mood: 'happy', out: 'tip' },
+      a: { me: N_('Понимаю'), re: N_('Понятливый. Далеко пойдёшь. Свободен.'), mood: 'happy', out: 'tip', row: N_('понял про подарки') },
       b: { me: N_('А чек есть?'), re: N_('Чек… Фамилию свою скажи. Медленно.'), mood: 'angry', out: '0', slam: true } } },
 
   { id: 'dandy', who: 'dandy_coffee', name: N_('Арсений'), seed: 0xda4d, fem: false, decor: 'loft',
@@ -89,7 +100,7 @@ const HEROES = [
     char: { walk: { speed: 1, step: 9, leg: 0.45, arm: 0.4, sway: 0.08 }, talk: 'shrug', idle: 'sway' },
     own: { id: 'dandy-sour', emo: 'ok',
       say: N_('Пицца на закваске? Я без закваски не ем. Принципиально.'),
-      a: { me: N_('На закваске'), re: N_('Чувствую ложь. Но красивую. Держи.'), mood: 'happy', out: 'tip' },
+      a: { me: N_('На закваске'), re: N_('Чувствую ложь. Но красивую. Держи.'), mood: 'happy', out: 'tip', row: N_('красиво соврал') },
       b: { me: N_('На тесте'), re: N_('…Тесто. Как у всех. Грустно.'), mood: 'sad', out: '0' } } },
 
   { id: 'alien', who: 'alien', name: N_('жилец из 66-й'), seed: 0xa11e, decor: 'foil',
@@ -98,7 +109,7 @@ const HEROES = [
     char: { walk: { speed: 0.9, step: 12, leg: 0.25, arm: 0.1, hop: 0.06 }, talk: 'flap', idle: 'bounce' },
     own: { id: 'alien-round', emo: 'surprised',
       say: N_('Ваша еда… круглая. Как наши корабли. Земляне милые.'),
-      a: { me: N_('Это пицца'), re: N_('Пицца. Записываю. Ты меня не запомнишь… Уже не помнишь.'), mood: 'happy', out: 'tip' },
+      a: { me: N_('Это пицца'), re: N_('Пицца. Записываю. Ты меня не запомнишь… Уже не помнишь.'), mood: 'happy', out: 'tip', row: N_('научил землянина') },
       b: { me: N_('Кристаллы не берём'), re: N_('Тогда — рубли. Сам напечатал. Очень похожи.'), mood: 'happy', out: '0' } } },
 
   { id: 'hikan', who: 'hikan', name: N_('Тёмыч'), seed: 0x41ca, fem: false, decor: 'dark',
@@ -108,7 +119,7 @@ const HEROES = [
     char: { walk: { speed: 1.1, step: 8, leg: 0.5, arm: 0.3, stoop: 0.14 }, talk: 'small', idle: 'fidget' },
     own: { id: 'hikan-bar', emo: 'angry',
       say: N_('Чё так долго? Я на турнике вишу, пока ты едешь.'),
-      a: { me: N_('Пробки'), re: N_('Пробки — для слабых. Сдачи не надо.'), mood: 'ok', out: 'tip' },
+      a: { me: N_('Пробки'), re: N_('Пробки — для слабых. Сдачи не надо.'), mood: 'ok', out: 'tip', row: N_('сдачи не надо') },
       b: { me: N_('Сам бы сходил'), re: N_('Я в капюшоне, бля. Мне на улицу нельзя.'), mood: 'angry', out: '0', slam: true },
       kids: { b: { me: N_('Сам бы сходил'), re: N_('Я в капюшоне. Мне на улицу нельзя.'), mood: 'angry', out: '0', slam: true } } } },
 
@@ -118,8 +129,8 @@ const HEROES = [
     char: { walk: { speed: 0.75, step: 9, leg: 0.25, arm: 0.25, drag: 0.8, stoop: 0.12 }, talk: 'small', idle: 'still' },
     own: { id: 'grandpa-time', emo: 'happy',
       say: N_('Минута в минуту! Барсик, смотри — пицца приехала.'),
-      a: { me: N_('Приятного!'), re: N_('И вам! Заходите на чай — у Нины пирог.'), mood: 'happy', out: 'tip' },
-      b: { me: N_('Барсику кусочек'), re: N_('Он у нас гурман: только корочки. Держите на чай.'), mood: 'happy', out: 'tip' } } },
+      a: { me: N_('Приятного!'), re: N_('И вам! Заходите на чай — у Нины пирог.'), mood: 'happy', out: 'tip', row: N_('на чай от деда') },
+      b: { me: N_('Барсику кусочек'), re: N_('Он у нас гурман: только корочки. Держите на чай.'), mood: 'happy', out: 'tip', row: N_('корочки для Барсика') } } },
 
   { id: 'patriot', who: 'twofaced_patriot', name: N_('Геннадий Палыч'), seed: 0x9a71, fem: false, decor: 'order',
     look: { age: 'adult', hair: 'side', hairC: '#2a1d16', beard: 'mustache', glasses: 'square', glassC: '#1d1a1f', head: 'none', brows: 'thick', mouth: 'line', eyes: 'round',
@@ -127,14 +138,14 @@ const HEROES = [
     char: { walk: { speed: 0.95, step: 7, leg: 0.55, arm: 0.15 }, talk: 'point', idle: 'still' },
     own: { id: 'patriot-bed', emo: 'ok',
       say: N_('Ровно в срок. Уважаю. В городе должен быть порядок — во всём.'),
-      a: { me: N_('Так точно'), re: N_('Наш человек. Свободен.'), mood: 'happy', out: 'tip' },
+      a: { me: N_('Так точно'), re: N_('Наш человек. Свободен.'), mood: 'happy', out: 'tip', row: N_('наш человек') },
       b: { me: N_('А что у вас на кровати?'), re: N_('Это ваза. Для цветов. Государственная. Свободен, бля!'), mood: 'scared', out: '0', slam: true },
       kids: { b: { me: N_('А что у вас на кровати?'), re: N_('Это… вещдоки. Изъял у внуков. Свободен!'), mood: 'scared', out: '0', slam: true } } } },
 ];
 
 /* ─────────────── состояние ─────────────── */
 let A = null;
-const M = { on: false, hero: null, spot: null, decor: null, t: 0, slam: false, doorK: 0, stats: { played: 0, skipped: 0, last: null } };
+const M = { on: false, next: null, hero: null, spot: null, decor: null, t: 0, slam: false, doorK: 0, stats: { played: 0, skipped: 0, last: null } };
 const SID = h => 'meet-' + h.id;
 
 /* встречи героя: своя + из smalltalk-lines.js по полю who (с учётом взрослой / детской) */
@@ -870,14 +881,63 @@ function frame (dt, on) {
 const DECOR_NAME = { wreck: 'разбитый подъезд, крысы, бутылки', nice: 'чисто, цветы, коврик', granny: '«вытирай ноги!», ковёр на стене', cop: 'коробки с техникой, плазма',
   loft: 'кирпич, гирлянда, пластинки', foil: 'фольга, аквариумы', dark: 'темно, энергетики, турник', order: 'флаги, портрет — и бонг на кровати' };
 export function list () {
-  return HEROES.map(h => ({ id: h.id, name: t(h.name), who: h.who, decor: DECOR_NAME[h.decor] || h.decor, meets: (h.meets || []).map((s, i) => ({ i, id: s.id, say: t(s.say), a: t(s.a.me), b: t(s.b.me) })) }));
+  return HEROES.map(h => ({ id: h.id, name: t(h.name), who: h.who, decor: DECOR_NAME[h.decor] || h.decor, meets: (h.meets || []).map((s, i) => ({ i, id: s.id, say: t(s.say), a: t(s.a.me), b: t(s.b.me), outA: s.a.out || '0', outB: s.b.out || '0' })) }));
+}
+
+/* ─────────────── итог встречи — деньгами, как у разговора у двери ───────────────
+   ответ ('yes' — верхний, 'no' — нижний) → итог в формате smalltalk.js (doorstep.js talkAdjust читает kind / win / none);
+   не ответил (пропустил раньше вопроса) — null */
+function resultOf (h, s, ans) {
+  const x = ans === 'yes' ? s.a : ans === 'no' ? s.b : null;
+  if (!x) return null;
+  const out = x.out === undefined || x.out === null ? '0' : String(x.out);
+  const O = OUT[out] || OUT[0];
+  return { kind: O.kind, win: !!O.win, none: false, out, seal: O.seal, row: x.row || O.row, mood: x.mood || 'ok', who: h.who,
+    sit: s.id, pick: ans === 'yes' ? 0 : 1, enc: h.id, person: personOf(h), bonus: null, timeout: false };
+}
+/* деньги итога на заказе fee с чаевыми tip — той же формулой, что в оплате (doorstep.js talkAdjust) */
+function moneyOf (res, fee, tip) {
+  const r = DOOR.talkAdjust({ talk: res }, fee, tip);
+  return { add: r.add, cut: r.cut, d: r.add - r.cut };
+}
+/* песочница без заказа: карточка оплаты «образцом» — итог встречи на заказе EN.SAMPLE.FEE ₽ с чаевыми EN.SAMPLE.TIP ₽ (денег не даёт) */
+function sample (res) {
+  const m = moneyOf(res, EN.SAMPLE.FEE, EN.SAMPLE.TIP);
+  if (A.popPay) {
+    try {
+      const fee = A.money ? A.money(EN.SAMPLE.FEE) : EN.SAMPLE.FEE + ' ₽', tip = A.money ? A.money(EN.SAMPLE.TIP) : EN.SAMPLE.TIP + ' ₽';
+      const title = t('{seal} · образец: заказ {fee}, чаевые {tip}', { seal: t(res.seal), fee, tip });
+      A.popPay(m.d, [[res.row ? t(res.row) : t(res.seal), m.d, m.d > 0 ? 'tip' : m.d < 0 ? 'neg' : '']], title, { person: res.person, mood: res.mood });
+    } catch (e) { console.warn('[enc] sample', e); }
+  }
+  return m;
+}
+/* машина — туда, где стояла до встречи (встреча-вручение: после сцены курьер снова у клиента — вручение и оплата) */
+function carBack (b) {
+  const V = A.V;
+  V.x = b.x; V.z = b.z; V.h = b.h; V.y = b.y; V.vx = V.vz = 0;
+  const car = A.car ? A.car() : null;
+  if (car) { car.position.set(V.x, V.y, V.z); car.rotation.y = V.h; }
+  V.camX = V.x - Math.sin(V.h) * 11; V.camZ = V.z - Math.cos(V.h) * 11; V.camH = V.h; V.camY = V.y + 6;
+}
+
+/* подъехал к клиенту (orders.js onArrive): ENC.next(id, i) — эта встреча вместо обычного вручения (в игре сами пока не выпадают) */
+function arrive (ev) {
+  const n = M.next, o = ev.order, st = ev.stop, sp = o && o.ord;
+  if (!n || M.on || STORY.active() || DOOR.on()) return;
+  if (!sp || !st || sp.story || ev.type === 'staff' || st.talk || st.door || st.stairs) return;
+  M.next = null;
+  o.mg = 'meet';                                   // в одном заказе — что-то одно (doorstep.js)
+  return play(n.id, n.i, { st, order: o, x: ev.x, z: ev.z });
 }
 
 export function play (id, i = 0, o = {}) {
   const h = HEROES.find(q => q.id === id);
   if (!A || !h || STORY.active() || M.on) return Promise.resolve(null);
-  const sp = o.spot || spotNear(A.V.x, A.V.z);
-  if (!sp) return Promise.resolve(null);
+  const st = o.st || null;
+  const sp = o.spot || spotNear(Number.isFinite(o.x) ? o.x : A.V.x, Number.isFinite(o.z) ? o.z : A.V.z);
+  if (!sp) { if (st) DOOR.meetDone(st, null); return Promise.resolve(null); }
+  const back = st ? { x: A.V.x, z: A.V.z, h: A.V.h, y: A.V.y } : null;
   M.hero = h; M.spot = sp; M.on = true; M.slam = false; M.doorK = 0;
   const t0 = performance.now(), n0 = A.scene.children.length;
   M.stats.played++;
@@ -885,9 +945,17 @@ export function play (id, i = 0, o = {}) {
   return STORY.play(SID(h), vi, { teleport: true }).then(() => {
     const CUT = STORY.DEBUG.CUT;
     if (CUT.skip) M.stats.skipped++;
-    M.stats.last = { id, meet: h.meets[vi].id, ans: CUT.ans || null, skip: !!CUT.skip, ms: Math.round(performance.now() - t0) };
+    const s = h.meets[vi], res = resultOf(h, s, CUT.ans);
+    // вручение заказа — итог в оплату (st.talk); без заказа — образец на 1 000 ₽
+    let m = null;
+    if (st) { DOOR.meetDone(st, res); m = res ? moneyOf(res, st.fee || EN.SAMPLE.FEE, 0) : null; }
+    else if (res) m = sample(res);
+    M.stats.last = { id, meet: s.id, ans: CUT.ans || null, skip: !!CUT.skip, ms: Math.round(performance.now() - t0),
+      out: res ? res.out : null, seal: res ? t(res.seal) : '', row: res && res.row ? t(res.row) : '', mood: res ? res.mood : '',
+      order: !!st, sample: !st && m ? { fee: EN.SAMPLE.FEE, tip: EN.SAMPLE.TIP, add: m.add, cut: m.cut } : null };
     return M.stats.last;
   }).finally(() => {
+    if (back) carBack(back);
     povClear();
     clearDecor();
     M.on = false; M.hero = null;
@@ -905,7 +973,10 @@ export function init (api) {
   M.ready = true;
   register();
   STORY.onFrame(frame);
+  if (api.ORD && api.ORD.onArrive) api.ORD.onArrive(arrive);
   if (typeof window !== 'undefined') window.setTimeout(() => { if (window.__dlv) window.__dlv.ENC = DEBUG; }, 0);
 }
 
-const DEBUG = { EN, POV_LOOK, POV, M, HEROES, list, play, get scene () { return A && A.scene; }, spotNear: (x, z) => spotNear(x, z), skip: () => STORY.DEBUG.skip(), get decor () { return M.decor; } };
+const DEBUG = { EN, POV_LOOK, POV, M, HEROES, list, play,
+  /* следующий подъехал к клиенту — встреча id (i-я) как вручение: деньги — в оплату этого адреса; null — отменить */
+  next: (id, i = 0) => { M.next = id ? { id, i: +i || 0 } : null; return M.next; }, get scene () { return A && A.scene; }, spotNear: (x, z) => spotNear(x, z), skip: () => STORY.DEBUG.skip(), get decor () { return M.decor; } };

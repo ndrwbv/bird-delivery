@@ -18,6 +18,7 @@
      CREWS.DEBUG           — { list, stats, spawn(kind, opts), clear(), honk(), C } для probe */
 import * as THREE from '../vendor/three.module.min.js';
 import { t, N_ } from '../i18n/index.js';
+import { holdFixed } from './people.js';
 import { RESPECT as R } from './econ.js';
 import * as RESPECT from './respect.js';
 import { TIER } from './hits.js';
@@ -120,8 +121,7 @@ function prop (grp, kind) {
     m = A.warStick(kind === 'pillow' ? 0xf4f1ea : 0x5c4a3a);
     m.position.set(0, -0.56, 0.45);
   }
-  arm.add(m);
-  return m;
+  return holdFixed(arm, m);                       // в меш тела; сигарета светится — своим мешем (people.js)
 }
 function member (crew, brand, role, x, z) {
   const B = BRANDS[brand];

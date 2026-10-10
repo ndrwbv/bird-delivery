@@ -18,8 +18,8 @@
    домов через 1 м.
 
    Переменных игры модуль не видит — всё приходит объектом api (game.js):
-     init({ HOUSE_GRID, inHouse, solidAt, ARCHES, SOLID_GRID, SCELL, SMASH_GRID, SM_CELL,
-            yardsEach, paveEach, groundH, festBlocks })   — inHouse: в доме, но не в арке; solidAt — твёрдое
+     init({ HOUSE_GRID, inHouse, segHouse, solidAt, ARCHES, SOLID_GRID, SCELL, SMASH_GRID, SM_CELL,
+            yardsEach, paveEach, groundH, festBlocks })   — inHouse: в доме, но не в арке; segHouse(ax, az, bx, bz) — отрезок заходит в дом (точно); solidAt — твёрдое
      const J = job(slot, x, z, R, extra, goals)     — то же шагами: J.step(мс) → true, когда готово; J.result — F
      const F = field(slot, x, z, R, extra, goals)   — поле расстояний от (x, z) сразу:
        R — полуширина окна, м; goals — точки [x, z, ...] (улицы), extra — после
@@ -243,11 +243,8 @@ function freeNear (S, k, rings = 2) {
 
 function cornerOk (S, ui, uj, i, j) {
   const C = S.C, ax = S.ox + (ui + 0.5) * C, az = S.oz + (uj + 0.5) * C, bx = S.ox + (i + 0.5) * C, bz = S.oz + (j + 0.5) * C;
-  for (let t = 0.2; t < 0.9; t += 0.2) {
-    const x = ax + (bx - ax) * t, z = az + (bz - az) * t;
-    if (A.inHouse(x, z) || A.solidAt(x, z)) return false;
-  }
-  return true;
+  for (let t = 0.2; t < 0.9; t += 0.2) if (A.solidAt(ax + (bx - ax) * t, az + (bz - az) * t)) return false;
+  return !A.segHouse(ax, az, bx, bz);
 }
 /* куча на типизированных массивах (ключ — расстояние, значение — клетка); растёт вдвое */
 function push (S, k, v) {
@@ -390,11 +387,7 @@ function losFree (S, ax, az, bx, bz, maxW) {
   }
   return true;
 }
-function exactFree (ax, az, bx, bz) {
-  const L = Math.hypot(bx - ax, bz - az);
-  for (let d = 0.5; d < L; d += 1) { const t = d / L; if (A.inHouse(ax + (bx - ax) * t, az + (bz - az) * t)) return false; }
-  return true;
-}
+const exactFree = (ax, az, bx, bz) => !A.segHouse(ax, az, bx, bz);   // по контурам домов точно (game.js segHouse)
 function pathFrom (S, px, pz) {
   const t0 = performance.now(), r = pathRaw(S, px, pz);
   STATS.pathMax = Math.max(STATS.pathMax, performance.now() - t0);
@@ -423,7 +416,7 @@ function pathRaw (S, px, pz) {
       if (!losFree(S, raw[a][0], raw[a][1], raw[c][0], raw[c][1], Math.max(RY.LAWN, wc[a], wc[c]))) break;
       b = c;
     }
-    while (b > a + 1 && !exactFree(raw[a][0], raw[a][1], raw[b][0], raw[b][1])) b--;   // по контурам домов — ещё раз, через 1 м
+    while (b > a + 1 && !exactFree(raw[a][0], raw[a][1], raw[b][0], raw[b][1])) b--;   // по контурам домов — ещё раз, точно
     out.push(raw[b]);
     a = b;
   }

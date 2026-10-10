@@ -29,7 +29,7 @@ import * as THREE from '../vendor/three.module.min.js';
 import { t, N_ } from '../i18n/index.js';
 import * as ZN from './zones.js';
 import * as DIST from './districts.js';
-import { makePerson } from './people.js';
+import { makePerson, holdFixed } from './people.js';
 import { TIER } from './hits.js';
 import { DEBUG as WD } from './world.js';
 import { RESPECT as RG } from './econ.js';
@@ -90,13 +90,13 @@ function thug (bat) {
     if (!part) continue;
     const g = [];
     for (const s of [-1, 1]) A.box(g, 0.02, h, 0.03, '#f2f2f0', s * 0.078, y, 0);
-    part.add(new THREE.Mesh(A.mergeGeos(g), A.HUMAN_VC));
+    holdFixed(part, new THREE.Mesh(A.mergeGeos(g), A.HUMAN_VC));   // лампасы — в меш тела (people.js)
   }
   if (bat && A.ADULT && u.armR) {                  // детская версия — без бит
     const g = [];
     A.box(g, 0.06, 0.5, 0.06, '#6b4a2e', 0, -0.62, 0.05);
     A.box(g, 0.09, 0.5, 0.09, '#9a7348', 0, -1.1, 0.05);
-    u.armR.add(new THREE.Mesh(A.mergeGeos(g), A.HUMAN_VC));
+    holdFixed(u.armR, new THREE.Mesh(A.mergeGeos(g), A.HUMAN_VC));
   }
   A.scene.add(grp);
   return { grp, u, x: 0, z: 0, h: 0, ph: rand(0, 6), dead: 0, push: 0, pushT: rand(0.4, 1.4), bubble: null, bubT: 0, tx: 0, tz: 0 };

@@ -28,7 +28,7 @@ import * as THREE from '../vendor/three.module.min.js';
 import { t } from '../i18n/index.js';
 import * as ZN from './zones.js';
 import * as DIST from './districts.js';
-import { makePerson } from './people.js';
+import { makePerson, holdFixed } from './people.js';
 import { TIER } from './hits.js';
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 
@@ -76,7 +76,7 @@ function suit () {
     const grip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, 0.12), m);
     grip.position.set(0, -0.54, 0.06);
     gun.add(barrel, grip);
-    u.armR.add(gun);
+    gun = holdFixed(u.armR, gun, { anchor: true });   // в меш тела; на кости — пустая метка: откуда летит пуля
   }
   A.scene.add(grp);
   return { grp, u, person, gun, x: 0, z: 0, h: 0, ph: 0, dead: 0, st: 'idle', t: 0, life: MAFIA.LIFE, near: 0, fireT: 0, bubble: null, bubT: 0, aim: 0, kick: 0, stun: 0 };

@@ -35,6 +35,7 @@ import { CAR_LIST, UPGRADE, BREAK, upgradePrice, paintPrice, sellPrice, wearK, s
 import { cnCar } from './roadlife.js';
 import { lampDepth } from './carrear.js';
 import { t } from '../i18n/index.js';
+import { holdFixed } from './people.js';
 import * as DIST from './districts.js';
 import * as RW from './roadwear.js';
 import { KEY as TOUR_KEY } from './garagetour.js';
@@ -913,7 +914,7 @@ function buildZhenya () {
   if (u.armR) {
     const w = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.36, 0.05), new THREE.MeshLambertMaterial({ color: 0x9aa0a8 }));
     w.position.set(0, -0.62, 0.08);
-    u.armR.add(w);
+    holdFixed(u.armR, w);                           // ключ в руке — в меш тела (people.js)
   }
   const [x, z] = [GAR.ox + GAR.rx * -1.7 + GAR.fx * -2.4, GAR.oz + GAR.rz * -1.7 + GAR.fz * -2.4];
   fig.position.set(x, GAR.gy + 0.08, z);

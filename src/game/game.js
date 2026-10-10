@@ -22,7 +22,7 @@ import { MAP_IDS, MAP_META } from '../maps/index.js';
 import Platform from '../platform/index.js';
 import { t as $t, tn as $tn, N_, translit, lang as curLang, LANGS, LANG_NAMES } from '../i18n/index.js';
 import { sanitizePois, OWN } from './brands.js';
-import { makePerson, createHumanFactory, faceDataURL, humanStale, FACE_DEBUG, HSTATS } from './people.js';
+import { makePerson, createHumanFactory, faceDataURL, humanStale, FACE_DEBUG, HSTATS, holdFixed } from './people.js';
 import * as HPOOL from './humanpool.js';      // запас готовых людей: собраны заранее, рождение берёт готового (humanpool.js)
 import { pollPad, applyToIN, rumble, pad as PAD } from '../input/gamepad.js';
 import { makePadMenu } from '../input/padmenu.js';
@@ -115,6 +115,7 @@ import * as DAILY from './daily.js';               // задания на ден
 import * as GFX from './gfx.js';                 // настройки графики: пресеты, 30 к/с, дальность, город за меню (gfx.js, docs/CAREER.md)               // статика дальше камеры — со сцены, матрицы заморожены (Steam Deck)
 import * as TRK from './tracks.js';              // следы колёс на газоне и снегу
 import * as HAV from './havoc.js';             // Толик считает разрушения за смену: «красавчик, но лавочек уже 6» (havoc.js)
+import * as FAHEAD from './faceahead.js';       // портреты заранее: получатель заказа, Толик, герои катсцен (в спокойные кадры)
 import * as CHAT from './chat.js';             // «Толик управляющий» пишет справа сверху, как в iMessage (похвала, ругань, вычет за опоздание)
 import * as PG from './piggy.js';                // карьера: копилка-свинья на хаде — кошелёк, куда в конце смены падает пачка (piggy.js)
 import * as SC from './shiftcash.js';             // карьера: пачка купюр на хаде — заработок смены (shiftcash.js)
@@ -7102,13 +7103,13 @@ function smokerBody (p, fresh = false) {
   if (ADULT) {
     const cig = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.22), new THREE.MeshBasicMaterial({ color: 0xf4f1ea }));
     cig.position.set(0, -0.5, 0.12);
-    p.grp.userData.armR.add(cig);
+    holdFixed(p.grp.userData.armR, cig);           // светится (MeshBasic) — останется своим мешем
   } else {
   const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.055, 0.2, 8), new THREE.MeshLambertMaterial({ color: 0xf4f1ea }));
   const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.04, 8), new THREE.MeshLambertMaterial({ color: 0xf0522a }));
   lid.position.y = 0.11; cup.add(lid);
   cup.position.set(0, -0.55, 0.1);
-  p.grp.userData.armR.add(cup);
+  holdFixed(p.grp.userData.armR, cup);
   }
   p.grp.position.set(p.x, groundH(p.x, p.z), p.z);
   p.grp.rotation.y = Math.atan2(SMOKE_SPOT.x - p.x, SMOKE_SPOT.z - p.z);   // лицом в кружок
@@ -9215,15 +9216,60 @@ function inArch (x, z) {
   return false;
 }
 const houseNotArch = (x, z) => inHouse(x, z) && !inArch(x, z);
-/* отрезок к клиенту проходит сквозь дом? (концы не считаем: клиент стоит у стены); шаг 1 м — угол дома не проскочит */
+/* отрезок заходит в дом (не в арку)? Точно, по контурам: точки пересечения отрезка со стенами делят его на
+   куски, середина каждого куска — в доме или нет (выборка через 1 м проскакивала срезанный угол дома).
+   skip — сколько метров у концов не считать */
+const SH_T = [], SH_SEEN = new Set();
+function segHouse (x0, z0, x1, z1, skip = 0) {
+  const L = Math.hypot(x1 - x0, z1 - z0);
+  if (L <= 2 * skip + 0.05) return false;
+  const ux = (x1 - x0) / L, uz = (z1 - z0) / L;
+  const ax = x0 + ux * skip, az = z0 + uz * skip, bx = x1 - ux * skip, bz = z1 - uz * skip, dx = bx - ax, dz = bz - az;
+  SH_SEEN.clear();
+  const l = L - 2 * skip;
+  const test = b => {
+    if (SH_SEEN.has(b)) return false;
+    SH_SEEN.add(b);
+    const p = b.p;
+    SH_T.length = 0; SH_T.push(0, 1);
+    for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+      const px = p[j][0], pz = p[j][1], qx = p[i][0] - px, qz = p[i][1] - pz, den = dx * qz - dz * qx;
+      if (Math.abs(den) < 1e-12) continue;
+      const t = ((px - ax) * qz - (pz - az) * qx) / den, u = ((px - ax) * dz - (pz - az) * dx) / den;
+      if (t > 0 && t < 1 && u >= 0 && u <= 1) SH_T.push(t);
+    }
+    if (SH_T.length === 2 && !inPoly(ax + dx * 0.5, az + dz * 0.5, p)) return false;
+    SH_T.sort((a, c) => a - c);
+    for (let k = 1; k < SH_T.length; k++) {
+      const t0 = SH_T[k - 1], t1 = SH_T[k], t = (t0 + t1) / 2, x = ax + dx * t, z = az + dz * t;
+      if (t1 - t0 < 1e-6 || !inPoly(x, z, p)) continue;
+      if (!inArch(x, z)) return true;
+      // кусок в доме, середина — в арке: по куску через 0,25 м, весь ли он в тоннеле (заехал в арку наискосок — нет)
+      const m = Math.ceil((t1 - t0) * l / 0.25);
+      for (let q = 1; q < m; q++) { const tt = t0 + (t1 - t0) * q / m; if (!inArch(ax + dx * tt, az + dz * tt)) return true; }
+    }
+    return false;
+  };
+  const n = Math.max(1, Math.ceil(l / 10));
+  for (let s = 0; s <= n; s++) {                    // клетки сетки домов вдоль отрезка (через 10 м и соседние)
+    const ci = Math.floor((ax + dx * s / n) / 40), cj = Math.floor((az + dz * s / n) / 40);
+    for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
+      const a = HOUSE_GRID.get(i + ',' + j);
+      if (a) for (let k = 0; k < a.length; k++) if (test(a[k])) return true;
+    }
+  }
+  return false;
+}
+/* отрезок к клиенту проходит сквозь дом? (концы не считаем: клиент стоит у стены) */
 function throughHouse (x0, z0, x1, z1) {
+  if (segHouse(x0, z0, x1, z1, 1.5)) return true;
   const l = Math.hypot(x1 - x0, z1 - z0);
-  for (let d = 1.5; d < l - 1.5; d += 1) { const x = lerp(x0, x1, d / l), z = lerp(z0, z1, d / l); if (houseNotArch(x, z) || FEST.blocks(x, z)) return true; }   // и сквозь фестиваль (festivals.js)
+  for (let d = 1.5; d < l - 1.5; d += 1) { const x = lerp(x0, x1, d / l), z = lerp(z0, z1, d / l); if (FEST.blocks(x, z)) return true; }   // и сквозь фестиваль (festivals.js)
   return false;
 }
 /* Прямая к клиенту режет дом — проезд по клеткам 2 м (routeyard.js): стены — дома, твёрдое, вода;
    заборы — дорого; дорожки и асфальт дешевле газона. Точки улиц — через 4 м по каждому куску рядом */
-RYARD.init({ HOUSE_GRID, inHouse: houseNotArch, solidAt: (x, z) => solidAt(x, z, 0.3), ARCHES, SOLID_GRID, SCELL, SMASH_GRID, SM_CELL, groundH,
+RYARD.init({ HOUSE_GRID, inHouse: houseNotArch, segHouse: (ax, az, bx, bz) => segHouse(ax, az, bx, bz), solidAt: (x, z) => solidAt(x, z, 0.3), ARCHES, SOLID_GRID, SCELL, SMASH_GRID, SM_CELL, groundH,
   yardsEach: YARDS.each, paveEach: PAVE.each, festBlocks: (x, z, m) => FEST.blocks(x, z, m) });
 const RG_TAIL = { PAD: 80, R0: 60, EXTRA: 60, STEP: 4, HEAD_PAD: 50, HEAD_EXTRA: 30 };
 function roadSamples (x, z, R, fn) {
@@ -12437,6 +12483,7 @@ function newOrder () {
     why: plan.why,
     items: total + ' × ' + pick(PIZZAS),
   };
+  FAHEAD.client(S.order);                       // лица получателей для диалогов у двери — заранее (faceahead.js)
   S.state = 'brief';                            // накладная показалась; руль не блокируется (автор 10.10.2026), пицца сразу летит в багажник (briefStep)
   syncTarget();
 
@@ -12706,7 +12753,8 @@ function checkArrival (dt) {
         if (pp.cold) rows.push([{ trunk: $t('пицца остыла — багажник нараспашку'), ajar: $t('пицца остыла — багажник приоткрыт'),
           bumper: $t('пицца остыла — нет бампера') }[pp.coldWhy] || $t('пицца остыла — машина разбита'), -pp.cold, 'neg']);
         popPay(part, rows, pp.late ? (CAREER ? $t('клиент недоволен') : '') : tier === 2 && pp.bonus ? $t('А ты харош!') : tier && pp.bonus ? $t('Шустро!') : pp.rich ? $t('сдачи не надо!') : pp.tip ? $t('чаевые!') : '',
-          st.persons[0] ? { person: st.persons[0], mood: payMood(st, onTime, tier) } : null);
+          st.talk && st.talk.person && !st.talk.aborted ? { person: st.talk.person, mood: payMood(st, onTime, tier) }   // встреча-катсцена (encounters.js): лицо героя
+            : st.persons[0] ? { person: st.persons[0], mood: payMood(st, onTime, tier) } : null);
         bossOnDeliver(o, st, onTime, tier);
       } else {
         toast((onTime ? '+' : $t('опоздал') + ' · +') + money(part) + ' · ' + S.addr);
@@ -13830,7 +13878,7 @@ HSTORY.init({ S, V, ADULT, CAREER, Snd, toast, shops: () => SIGNS, pizza: () => 
 /* учебный заказ Стёпы (stepafirst.js): вручение — катсцена через story.js */
 ST1.init({ THREE, ADULT, V, fxAdd, puffGeo, groundH, Snd, sayBubble, makeHuman, stepanPerson, playerName: () => S.name, cam: () => cam });
 /* встречи у двери (encounters.js): катсцены микрогероев через story.js; в игре пока не выпадают — песочница «Встречи» */
-ENC.init({ THREE, scene, CITY, V, ADULT, groundH, inHouse, makeHuman, people: () => CULL_FAR_LISTS });
+ENC.init({ THREE, scene, CITY, V, S, ORD, ADULT, car: () => car, groundH, inHouse, makeHuman, people: () => CULL_FAR_LISTS, popPay, money });
 /* Стёпа на лавочке (stepabench.js): лавочка у Ленинградской, 8 и его заказ — через story.js */
 // первый заказ (stepanOrder) зовёт его и сам, если город ещё достраивается: лавочка Ленинградской, 8 нужна сразу
 const stepaBenchInit = () => STEPAB.init({ CITY, ADULT, CAREER, bench, realAddress });
@@ -14475,7 +14523,7 @@ function spawnCrowd (sp) {
       ? new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.28, 6), new THREE.MeshLambertMaterial({ color: chance(0.5) ? 0x5a3a16 : 0x2f5a2a }))
       : new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.2, 8), new THREE.MeshLambertMaterial({ color: pick([0xe04836, 0x4f7fd6, 0x59b06a, 0xffd23f, 0xff8ad0]) }));
     bottle.position.set(0, -0.55, 0.1);
-    grp.userData.armR.add(bottle);
+    holdFixed(grp.userData.armR, bottle);          // в меш тела: без своего вызова отрисовки (people.js)
     grp.rotation.y = Math.atan2(sp.x - x, sp.z - z);
     grp.position.set(x, groundH(x, z) + curbAt(x, z), z);
     scene.add(grp);
@@ -14575,6 +14623,7 @@ if (!INTRO) {
     for (const o of hid) o.visible = false;
   });
 }
+LATE.add('faces', () => { FAHEAD.boss(CHAT.person()); STORY.faceAhead(); });   // Толик и первые реплики катсцен — портреты в спокойные кадры (faceahead.js)
 if (!INTRO) LATE.add('smokers', initSmokers);      // во вступлении курилка — это кружок из кино
 
 LATE.add('cam', () => { V.camX = V.x + 14; V.camZ = V.z + 14; V.camY = V.y + 6; });
@@ -15144,7 +15193,7 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) wi
   STORY, STORY_DBG: STORY.DEBUG, MAP, Store, SBX, CARSM: AUTO, startRun, goRun, endShift, wallet, addWallet, hudHearts, marker, updateEnv, humanLod, get SPOTS_N () { return SPOTS.length; },
   DRIVERS, SMOKERS, NITRO_CANS, NOS, RESPECT: RESPECT.DEBUG, RESPECT_API: RESPECT, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, PIGEONS, FLOCKS, AMB, INCIDENTS, scare, RIVALS, FOES, THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, roadPath, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT, LOOT, XLIFE, askRevive, addWallet, RQ: RQ.DEBUG, HINTS_API: HINTS };
 if (window.__dlv) Object.assign(window.__dlv, { FXP: { S: FXP.STATS, count: FXP.count, part: fxPart, FX, puff, fire, nosFlame, steam, splash, crumbs, emote }, FXQ: FXP.FXP });   // частицы из запаса (fxpool.js): S — родилось / живо / пик / рост / ?oldfx
-if (window.__dlv) Object.assign(window.__dlv, { HPOOL: HPOOL.DEBUG, HSK: HSTATS, makeHuman, freshHuman, makePerson, setSeason: SEAS.setSeason });   // запас готовых людей: собрано на ходу / из запаса, ключи (humanpool.js)
+if (window.__dlv) Object.assign(window.__dlv, { HPOOL: HPOOL.DEBUG, HSK: HSTATS, holdFixed, FAHEAD: FAHEAD.STATS, makeHuman, freshHuman, makePerson, setSeason: SEAS.setSeason });   // запас готовых людей: собрано на ходу / из запаса, ключи (humanpool.js)
 if (window.__dlv) { window.__dlv.BOARD = BOARD; window.__dlv.Platform = Platform; }
 if (window.__dlv) Object.assign(window.__dlv, { callAmbulance });   // проверка сирены: вызвать скорую к точке (доплер — AMB.dop)   // таблица рекордов Стима (board.js)
 if (window.__dlv) window.__dlv.TREES = TREES.DEBUG;   // деревья и кусты: породы, группы во дворах (trees.js)

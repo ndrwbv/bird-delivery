@@ -3533,5 +3533,14 @@
   "one": "{n} bus stop",
   "other": "{n} bus stops"
  },
- "{a} и {b}": "{a} and {b}"
+ "{a} и {b}": "{a} and {b}",
+ "понял про подарки": "got the gift thing",
+ "обидел коврик": "insulted the doormat",
+ "красиво соврал": "a beautiful lie",
+ "научил землянина": "taught an earthling",
+ "сдачи не надо": "keep the change",
+ "на чай от деда": "a tip from grandpa",
+ "корочки для Барсика": "crusts for Barsik",
+ "наш человек": "one of us",
+ "{seal} · образец: заказ {fee}, чаевые {tip}": "{seal} · sample: order {fee}, tip {tip}"
 }

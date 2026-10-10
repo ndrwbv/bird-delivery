@@ -697,10 +697,24 @@ const FACE_CAP = 240;
    Голова красится как раньше: u.head.material.color.set('#…') перекрашивает вершины головы в меше тела (злой
    водитель, вор в маске, ведьма; цвета вершин головы — её цвет, нос и уши тоже, как у прежнего своего материала).
    Коробка головы (Box3.setFromObject(u.head)) — по углам головы с волосами и убором: u.head.geometry, 8 точек,
-   не рисуется. Дальний вариант — весь человек одним мешем (u.lod, виден вместо остальных дальше 45 метров). */
+   не рисуется. Дальний вариант — весь человек одним мешем (u.lod, виден вместо остальных дальше 45 метров).
+   Предмет, который не меняется на ходу (бутылка, лопата, портфель, бита, лампасы, шляпа ведьмы…), — holdFixed(кость, меш):
+   его вершины дописываются в меш тела с номером кости (u.held — куски, переодевание их сохраняет), вызова у него нет. */
 const BONE_OF = [0, 1, 2, 3, 4, 5, 5];               // часть → кость: волосы (5) и голова (6) — кость головы
 /* up — сколько раз матрицы костей ушли в видеокарту (поза сменилась), same — поза та же, не заливали (__dlv.HSK) */
-export const HSTATS = { up: 0, same: 0 };
+export const HSTATS = { up: 0, same: 0, held: 0, heldAdd: 0 };
+/* предмет в руке, который не меняется на ходу (бутылка, лопата, портфель, бита…), — в меш тела: +0 вызовов отрисовки.
+   holdFixed(u.armR, mesh) вместо u.armR.add(mesh): mesh — в осях кости, как для add. Вернёт mesh (уже не на сцене: двигать,
+   прятать и убирать его бесполезно — такие предметы, бросил / отдал / крутится, вешать как раньше, add), с { anchor: true } —
+   пустую метку на его месте (localToWorld). Не подходит по материалу — сам сделает add. held / heldAdd — в __dlv.HSK.
+   ?nohold — всё как раньше (add), для сравнения */
+let HOLD = null;
+const NOHOLD = typeof location !== 'undefined' && /[?&]nohold\b/.test(location.search || '');
+export function holdFixed (bone, obj, o) {
+  if (!bone || !obj) return obj;
+  if (!HOLD) { bone.add(obj); return obj; }
+  return HOLD(bone, obj, o);
+}
 export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
   const B = new THREE.BoxGeometry(1, 1, 1);
   const BP = B.attributes.position.array, BN = B.attributes.normal.array, BI = B.index.array;
@@ -871,10 +885,111 @@ export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
   /* та же фигура и лицо, одежда — по нынешнему сезону; цвет головы — какой был (перекрашенная так и остаётся) */
   REDRESS = g => {
     const u = g.userData, S = buildSpec(u.look, u.o || {}), hc = u.head.material.color;
-    setSkinGeo(u.skin, skinGeo(S, [hc.r, hc.g, hc.b]));
+    const body = skinGeo(S, [hc.r, hc.g, hc.b]);
+    setSkinGeo(u.skin, u.held ? withHeld(body, u.held) : body);         // предметы в руках — те же, в новое тело
     u.head.geometry.dispose(); u.head.geometry = headBox(S);
+    if (u.held) for (const c of u.held) if (c.k === 5) growHeadBox(u.head.geometry, c);
     u.lod.geometry.dispose(); u.lod.geometry = geo(S.parts.map((l, i) => [l, ...S.piv[i]]));
     u.colors.shirt = S.shirt; u.colors.pants = S.pants; u.warm = WARM;
+  };
+  /* ── предмет в руке — в меш тела (holdFixed, 11.10.2026) ──
+     Вершины предмета (меш или группа мешей в осях кости — как для bone.add) кладутся в меш тела с номером кости:
+     рука двигается — предмет с ней, вызова отрисовки у предмета больше нет. Подходит только «как тело»: Lambert без
+     картинки, непрозрачный, не светится, одна сторона; иначе (телефон и сигарета светятся — MeshBasic) — bone.add, как было.
+     Цвет — цвет материала (× цвета вершин, если материал их берёт), тени — плоские, как у тела (у гладкого цилиндра
+     бутылки грани видны чуть резче). */
+  const fusable = m => m && !Array.isArray(m) && m.isMeshLambertMaterial && !m.map && !m.alphaMap && !m.emissiveMap && !m.lightMap &&
+    !m.aoMap && !m.transparent && m.opacity === 1 && m.visible && m.side === THREE.FrontSide && m.alphaTest === 0 &&
+    !(m.emissive && (m.emissive.r || m.emissive.g || m.emissive.b));
+  const MR = new THREE.Matrix4(), NM = new THREE.Matrix3(), VV = new THREE.Vector3();
+  function heldChunk (skel, k, obj) {
+    const meshes = [];
+    let ok = true;
+    const walk = (o, M) => {
+      o.updateMatrix();
+      const m = new THREE.Matrix4().multiplyMatrices(M, o.matrix);
+      if (o.isMesh) {
+        if (o.isInstancedMesh || o.isSkinnedMesh || !o.visible || !fusable(o.material) || !o.geometry.attributes.position) ok = false;
+        else meshes.push([o, m]);
+      } else if (o.isSprite || o.isPoints || o.isLine || o.isLight) ok = false;
+      for (const c of o.children) walk(c, m);
+    };
+    walk(obj, MR.identity());
+    if (!ok || !meshes.length) return null;
+    let n = 0, ni = 0;
+    for (const [o] of meshes) { const g = o.geometry, c = g.attributes.position.count; n += c; ni += g.index ? g.index.count : c; }
+    const p = skel.piv[k], pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), cl = new Float32Array(n * 3), idx = new Uint32Array(ni);
+    let v0 = 0, i0 = 0, r = 0;
+    for (const [o, m] of meshes) {
+      const g = o.geometry, P = g.attributes.position, N = g.attributes.normal, C = o.material.vertexColors && g.attributes.color, mc = o.material.color;
+      NM.getNormalMatrix(m);
+      for (let i = 0; i < P.count; i++) {
+        VV.fromBufferAttribute(P, i).applyMatrix4(m);
+        const q = (v0 + i) * 3;
+        r = Math.max(r, VV.length());
+        pos[q] = VV.x + p[0]; pos[q + 1] = VV.y + p[1]; pos[q + 2] = VV.z + p[2];
+        if (N) { VV.fromBufferAttribute(N, i).applyMatrix3(NM).normalize(); nor[q] = VV.x; nor[q + 1] = VV.y; nor[q + 2] = VV.z; }
+        cl[q] = mc.r * (C ? C.getX(i) : 1); cl[q + 1] = mc.g * (C ? C.getY(i) : 1); cl[q + 2] = mc.b * (C ? C.getZ(i) : 1);
+      }
+      if (g.index) for (let i = 0; i < g.index.count; i++) idx[i0 + i] = g.index.getX(i) + v0;
+      else for (let i = 0; i < P.count; i++) idx[i0 + i] = v0 + i;
+      v0 += P.count; i0 += g.index ? g.index.count : P.count;
+    }
+    // до какого расстояния от центра тела достаёт предмет при любом повороте кости
+    const R = Math.hypot(p[0] - SPHERE.center.x, p[1] - SPHERE.center.y, p[2] - SPHERE.center.z) + r;
+    return { k, p, pos, nor, cl, idx, R };
+  }
+  /* геометрия тела + предметы: старые вершины как были (голова — тот же отрезок), предметы — в хвосте */
+  function withHeld (g0, chunks) {
+    const A = g0.attributes, n0 = A.position.count;
+    let n = n0, ni = g0.index.count;
+    for (const c of chunks) { n += c.pos.length / 3; ni += c.idx.length; }
+    const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), cl = new Float32Array(n * 3), si = new Uint8Array(n * 4);
+    const idx = n > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+    pos.set(A.position.array); nor.set(A.normal.array); cl.set(A.color.array); si.set(A.skinIndex.array); idx.set(g0.index.array);
+    let v = n0, i = g0.index.count;
+    for (const c of chunks) {
+      pos.set(c.pos, v * 3); nor.set(c.nor, v * 3); cl.set(c.cl, v * 3);
+      const m = c.pos.length / 3;
+      for (let j = 0; j < m; j++) si[(v + j) * 4] = c.k;
+      for (let j = 0; j < c.idx.length; j++) idx[i + j] = c.idx[j] + v;
+      v += m; i += c.idx.length;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(cl, 3));
+    g.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4));
+    g.setAttribute('skinWeight', new THREE.BufferAttribute(weights(n), 4));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    g.userData.head = g0.userData.head;
+    return g;
+  }
+  /* «геометрия» головы (Box3.setFromObject(u.head), не рисуется) — с вершинами предмета на голове, как когда он был её ребёнком */
+  function growHeadBox (hg, c) {
+    const a = hg.attributes.position.array, n = c.pos.length, b = new Float32Array(a.length + n), p = c.p;
+    b.set(a);
+    for (let i = 0; i < n; i += 3) { b[a.length + i] = c.pos[i] - p[0]; b[a.length + i + 1] = c.pos[i + 1] - p[1]; b[a.length + i + 2] = c.pos[i + 2] - p[2]; }
+    hg.setAttribute('position', new THREE.BufferAttribute(b, 3));
+    hg.boundingBox = hg.boundingSphere = null;
+  }
+  HOLD = (bone, obj, o) => {
+    const g = bone && bone.parent, u = g && g.userData, skin = u && u.skin, S = skin && skin.skeleton;
+    const k = S ? S.bones.indexOf(bone) : -1;
+    const c = k >= 0 && !NOHOLD ? heldChunk(S, k, obj) : null;
+    if (!c) { bone.add(obj); HSTATS.heldAdd++; return obj; }
+    (u.held || (u.held = [])).push(c);
+    setSkinGeo(skin, withHeld(skin.geometry, [c]));
+    if (k === 5) growHeadBox(u.head.geometry, c);
+    if (c.R > skin.boundingSphere.radius) skin.boundingSphere = new THREE.Sphere(SPHERE.center, c.R);
+    HSTATS.held++;
+    if (o && o.anchor) {                          // пустая метка на кости — для localToWorld (дуло пистолета)
+      const a = new THREE.Object3D();
+      obj.updateMatrix(); a.position.copy(obj.position); a.quaternion.copy(obj.quaternion); a.scale.copy(obj.scale);
+      bone.add(a);
+      return a;
+    }
+    return obj;                                   // уже не на сцене: годится как «есть ли предмет», двигать его бесполезно
   };
   /* сборка по шагам (запас людей, humanpool.js, — понемногу в спокойные кадры): yield между кусками,
      человек — в return. makeHuman — то же разом. Внешность одна и та же: шаги ничего не решают сами */

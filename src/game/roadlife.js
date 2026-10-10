@@ -32,6 +32,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { narrow } from './narrow.js';           // узкие дороги: одна полоса (narrow.js)
 import { t } from '../i18n/index.js';
+import { holdFixed } from './people.js';
 import * as MOPEDS from './mopeds.js';
 import { onPave } from './pave.js';
 import { blocks as ringIsland } from './rings.js';   // остров малого круга: знаков там нет (rings.js)
@@ -952,7 +953,7 @@ function spawnWorks (A, e, at) {
     const s = i % 2 ? 1 : -1, [x, z] = P(rand(-1.4, 1.4), s * (pw / 2 + 0.35));
     const grp = A.makeHuman(null, { cap: '#ff8a00', shirt: '#ff8a00', pants: '#2f3540' });
     const u = grp.userData;
-    if (u.armR) { const sh = new THREE.Mesh(SHOVEL_GEO, WK_MAT); sh.rotation.x = 0.4; u.armR.add(sh); }
+    if (u.armR) { const sh = new THREE.Mesh(SHOVEL_GEO, WK_MAT); sh.rotation.x = 0.4; holdFixed(u.armR, sh); }   // лопата — в меш тела (people.js)
     grp.rotation.y = Math.atan2(-nx * s, -nz * s);
     grp.position.set(x, groundH(x, z) + 0.18, z);
     A.scene.add(grp);
@@ -1165,7 +1166,7 @@ function spawnLane (A, e, at) {
     const s = i ? -1 : 1, [x, z] = P(sPit + s * 1.9, o0 + rand(-0.4, 0.4));
     const grp = A.makeHuman(null, { cap: '#ff8a00', shirt: '#ff8a00', pants: '#2f3540' });
     const u = grp.userData;
-    if (u.armR) { const sh = new THREE.Mesh(SHOVEL_GEO, WK_MAT); sh.rotation.x = 0.4; u.armR.add(sh); }
+    if (u.armR) { const sh = new THREE.Mesh(SHOVEL_GEO, WK_MAT); sh.rotation.x = 0.4; holdFixed(u.armR, sh); }   // лопата — в меш тела (people.js)
     grp.rotation.y = Math.atan2(-e.ux * s, -e.uz * s);
     grp.position.set(x, groundH(x, z) + 0.18, z);
     A.scene.add(grp);

@@ -37,6 +37,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 import { t, N_ } from '../i18n/index.js';
+import { holdFixed } from './people.js';
 import { RAID, TURRET, RESPECT as RCFG } from './econ.js';
 import * as RESPECT from './respect.js';
 import * as DIRECTOR from './director.js';   // режиссёр событий: налёт — крупное, не в начале сессии
@@ -120,7 +121,7 @@ function fighter (brand) {
   const st = new THREE.Mesh(A.ADULT ? BAT_GEO : PILLOW_GEO, A.ADULT ? BAT_MAT : PILLOW_MAT);
   st.userData.shared = true;
   st.position.set(0, -0.56, 0.45);
-  u.armR.add(st);
+  holdFixed(u.armR, st);                          // в меш тела (people.js): общая геометрия не на человеке — unshare не нужен
   A.scene.add(grp);
   return grp;
 }
