@@ -23,12 +23,19 @@ import { SIDE_TIPS, ORDER_TYPES } from './orders.config.js';
 
 /* где ищем отдающего: подъезд в MIN—MAX м от клиента; OFF — на сколько м от двери он стоит */
 export const GIVE = { MIN: 60, MAX: 380, OFF: 1.4 };
+/* песочница (docs/SANDBOX.md «Поручения»): near — магазин и отдающий не дальше near м (0 — как в игре, до 380);
+   force — исход у отдающего: 'give' | 'wrong' | 'none' (null — как выпадет); talk / paid — что было в последнем
+   разговоре и вручении (n — номер по счёту), их читает журнал песочницы */
+export const SBX = { near: 0, force: null, talk: null, paid: null, n: 0 };
 
 let A = null;
 const TR = { client: null, giver: null };
 /* api: { S, V, CITY, ADULT, alive, makeGuest, clearGuest, afterDrop, releaseIdle, pushOut, rehuman, pinFront, zoneOk,
         money(n) — сумма строкой, wallet() — сколько в кошельке, spend(n) — взять из кошелька → сколько взяли } */
-export function init (api) { A = api; }
+export function init (api) {
+  A = api;
+  if (typeof window !== 'undefined') window.setTimeout(() => { if (window.__dlv) window.__dlv.ERRS = DEBUG; }, 0);
+}
 
 const d2 = (a, x, z) => (a.x - x) ** 2 + (a.z - z) ** 2;
 const firstOf = p => (p && (p.first || (p.name || '').split(/\s+/)[0])) || '';
@@ -67,7 +74,7 @@ export function giverSpot (spec, ped) {
   const near = [], far = [];
   for (const e of E) {
     const d = Math.hypot(e[0] - ped.x, e[1] - ped.z);
-    if (d < GIVE.MIN || d > GIVE.MAX) continue;
+    if (d < GIVE.MIN || d > (SBX.near || GIVE.MAX)) continue;
     const x = e[0] + e[2] * GIVE.OFF, z = e[1] + e[3] * GIVE.OFF;
     if (A.zoneOk && !A.zoneOk(x, z)) continue;      // в районе, где работаешь, и не за перекрытием
     (d < 220 ? near : far).push({ x, z, nx: e[2], nz: e[3], e });
@@ -120,8 +127,15 @@ export async function giverTalk (Sd) {
   const r = await DLG.say({ ...base, text: t(tk.line), accept: t(tk.yes) + (cost ? ' (−' + A.money(cost) + ')' : ''), decline: t(tk.no) });
   let yes = r === true;
   let paid = 0;
-  if (yes && cost) { if (A.wallet() >= cost) paid = A.spend(cost); else yes = false; }   // денег в кошельке нет — как «нет»
-  const oc = wpick(yes ? tk.onYes : tk.onNo);
+  if (yes && cost && A.wallet() < cost) yes = false;   // денег в кошельке нет — как «нет»
+  let L = yes ? tk.onYes : tk.onNo, mine = true;
+  if (SBX.force) {                                     // песочница: исход задан — из ветки ответа, нет в ней — из другой
+    const a = L.filter(q => q.k === SBX.force), b = (yes ? tk.onNo : tk.onYes).filter(q => q.k === SBX.force);
+    if (a.length) L = a; else if (b.length) { L = b; mine = false; }
+  }
+  if (yes && cost && mine) paid = A.spend(cost);
+  const oc = wpick(L);
+  SBX.talk = { n: ++SBX.n, id: s.id, ans: r === true ? 'yes' : r === false ? 'no' : 'none', k: oc.k, item: oc.item ? t(oc.item) : '', cost: paid, force: SBX.force };
   await DLG.say({ ...base, text: t(oc.say), auto: true, emo: oc.k === 'none' ? 'angry' : undefined });
   return { k: oc.k, item: oc.item ? t(oc.item) : '', cost: paid };
 }
@@ -137,6 +151,7 @@ export function thanks (Sd) {
   if (oc.k !== 'give') {
     const q = oc.k === 'wrong' ? (b.wrong || { say: s.thanks, pay: 1 }) : wpick([].concat(b.none || { say: s.thanks, pay: 0, emo: 'angry' }));
     DLG.say({ person: Sd.person, name: firstOf(Sd.person), text: t(q.say), auto: true, emo: q.emo || undefined, fillers: false, color: ORDER_TYPES.side.color });
+    paidLog(Sd, oc.k, q.pay || 0, 0);
     return { tip: 0, k: q.pay || 0 };
   }
   const L = SIDE_TIPS.filter(q => (A.ADULT ? !q.kids : !q.adult));
@@ -144,7 +159,13 @@ export function thanks (Sd) {
   const th = t(s.thanks), tip = q ? q.tip : 0;
   const text = q ? th + (/[.!?…—]$/.test(th) ? ' ' : ', ') + t(q.say) : th;
   DLG.say({ person: Sd.person, name: firstOf(Sd.person), text, auto: true, emo: 'happy', fillers: false, color: ORDER_TYPES.side.color });
+  paidLog(Sd, 'give', 1, tip);
   return { tip, k: 1 };
+}
+/* для журнала песочницы: сколько заплатили — та же формула, что в game.js sideArrival */
+function paidLog (Sd, k, share, tip) {
+  const base = (Sd.it && Sd.it.pay) || 1000;
+  SBX.paid = { n: ++SBX.n, id: Sd.it && Sd.it.spec && Sd.it.spec.id, k, share, tip, base, pay: Math.round(base * share) + tip };
 }
 
 /* ── отпустить ── */
@@ -160,4 +181,4 @@ export function step () {
   if (TR.giver && (!Sd || Sd.giverPed !== TR.giver || (Sd.stage !== 'shop' && Sd.stage !== 'talk'))) { release(TR.giver); TR.giver = null; }
 }
 
-export const DEBUG = { TR, GIVE };
+export const DEBUG = { TR, GIVE, SBX };

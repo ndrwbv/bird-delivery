@@ -70,7 +70,7 @@ body.calm-fx .mk-m, body.calm-fx .mk-m.mk-gone { animation-duration: .01s; }
 .mk-full { position: absolute; inset: 0; z-index: 26; overflow: hidden; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none;
            font-family: "Press Start 2P", ui-monospace, monospace; color: var(--pp-ink); background: #120c08; }
 .mk-cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; }
-.mk-top { position: absolute; top: max(8px, env(safe-area-inset-top)); left: 50%; translate: -50% 0; z-index: 3; display: flex; flex-direction: column; align-items: center;
+.mk-top { position: absolute; top: max(8px, var(--sa-t, env(safe-area-inset-top))); left: 50%; translate: -50% 0; z-index: 3; display: flex; flex-direction: column; align-items: center;
           gap: 6px; width: min(640px, calc(100% - 24px)); pointer-events: none; }
 .mk-task { box-sizing: border-box; width: 100%; padding: .7em 1em .75em; text-align: center; background: var(--pp-paper); border: 3px solid var(--pp-ink);
            border-radius: 6px; box-shadow: 0 5px 0 var(--pp-ink), 0 14px 30px rgba(0, 0, 0, .45); rotate: -.6deg; }
@@ -83,13 +83,13 @@ body.calm-fx .mk-m, body.calm-fx .mk-m.mk-gone { animation-duration: .01s; }
 .mk-top .mk-fuse { width: 100%; box-sizing: border-box; margin: 0; background: rgba(255, 243, 214, .25); }
 
 /* реплики — слева сверху, на фоне сцены имя светлое */
-.mk-say { position: absolute; z-index: 2; left: max(14px, env(safe-area-inset-left)); top: 18px; width: min(26vw, 440px); pointer-events: none; }
+.mk-say { position: absolute; z-index: 2; left: max(14px, var(--sa-l, env(safe-area-inset-left))); top: 18px; width: min(26vw, 440px); pointer-events: none; }
 .mk-say .mk-b b { color: #fff3d6; text-shadow: 1px 1px 0 #33210c, 0 0 4px rgba(0, 0, 0, .7); }
 
 /* накладная (автор 11.10.2026: «показывать, а не скрывать»): раскрыта сразу, в углу; X / клик по листу — свернуть в плашку
    (наведение на плашку — показать); свёрнутая с новой пометкой — приоткрывается на 1,8 с. Домофон — справа от двери (.mk-side),
    подъезд — компактно в углу (.mk-compact). Телефон — свёрнута (doorkit.js miniSmall) */
-.mk-mini { position: absolute; z-index: 4; right: max(14px, env(safe-area-inset-right)); bottom: 52px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.mk-mini { position: absolute; z-index: 4; right: max(14px, var(--sa-r, env(safe-area-inset-right))); bottom: 52px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 .mk-mini-tab { display: flex; align-items: center; gap: .6em; padding: .5em .7em; font: inherit; font-size: var(--pp-fs-s); color: var(--pp-ink); cursor: pointer;
                background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 6px; box-shadow: 0 4px 0 var(--pp-ink); rotate: 1.5deg; }
 .mk-mini-tab img { width: 30px; height: 30px; border: 2px solid #fff; image-rendering: pixelated; }
@@ -127,7 +127,7 @@ body.calm-fx .mk-mini.mk-jolt .mk-mini-body { animation: none; }
 .mk-compact .mk-mini-body.mk-inv .oc-photos .oc-p img, .mk-compact .mk-mini-body.mk-inv .oc-photos .oc-p i { width: clamp(40px, 3.4vw, 60px); height: clamp(40px, 3.4vw, 60px); border-width: 3px; border-bottom-width: 9px; }
 
 /* строка управления — внизу по центру, на тёмной подложке */
-.mk-full .mk-help { position: absolute; z-index: 3; left: 50%; bottom: max(10px, env(safe-area-inset-bottom)); translate: -50% 0; max-width: calc(100% - 24px); margin: 0;
+.mk-full .mk-help { position: absolute; z-index: 3; left: 50%; bottom: max(10px, var(--sa-b, env(safe-area-inset-bottom))); translate: -50% 0; max-width: calc(100% - 24px); margin: 0;
                     padding: .25em 1em; color: #fff3d6; background: rgba(18, 12, 8, .72); border-radius: 999px; box-sizing: border-box; }
 .mk-full .mk-seal { position: absolute; z-index: 5; right: auto; left: 50%; top: 46%; translate: -50% -50%; --pp-seal-rot: -9deg; font-size: clamp(22px, 4vw, 54px); white-space: nowrap; }
 

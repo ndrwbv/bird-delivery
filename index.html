@@ -2,8 +2,17 @@
 <html lang="ru" data-map="moscow" translate="no">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- viewport-fit=cover — игра под вырезом и полоской «домой» (хад сам отступает: --sa-* в delivery.css);
+       PWA (на экран «Домой»): во весь экран, строка статуса — прозрачная поверх игры, без чёрной полосы сверху;
+       телефон — только боком (manifest orientation, orient.js) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#3d0d01">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Птица Пицца">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icon.png">
   <title>Птица Пицца</title>
   <link rel="icon" type="image/png" sizes="16x16" href="./icon-16.png">
   <link rel="icon" type="image/png" sizes="32x32" href="./icon-32.png">
@@ -193,12 +202,9 @@
     </div>
   </div>
 
-  <!-- телефон: руль — кнопками под левым пальцем, педали и нитро — под правым -->
+  <!-- телефон: руль под левым пальцем (рисует touchwheel.js), педали и нитро — под правым -->
   <div id="touchpad" hidden>
-    <div class="tp-left">
-      <button type="button" data-k="left" aria-label="left">◀</button>
-      <button type="button" data-k="right" aria-label="right">▶</button>
-    </div>
+    <div class="tp-left" role="slider" aria-label="steering wheel" aria-valuemin="-1" aria-valuemax="1"></div>
     <div class="tp-right">
       <button type="button" data-k="hand" class="tp-hand" aria-label="handbrake">(P)</button>
       <button type="button" data-k="nitro" class="tp-nos" data-i18n>кофе</button>

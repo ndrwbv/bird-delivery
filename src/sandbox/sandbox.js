@@ -18,7 +18,7 @@ const D = () => { try { return W() && W().__dlv; } catch (e) { return null; } };
 
 /* ── настройки песочницы: переживают перезагрузку ── */
 const LS = 'sbx-state';
-const CFG = Object.assign({ map: 'seversk', kids: false, fast: false, mute: true, god: false, nitro: false, noStall: false }, (() => { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch (e) { return {}; } })());
+const CFG = Object.assign({ map: 'seversk', kids: false, fast: false, mute: true, god: false, nitro: false, noStall: false, errNear: true, errOut: 'any' }, (() => { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch (e) { return {}; } })());
 const saveCfg = () => { try { localStorage.setItem(LS, JSON.stringify(CFG)); } catch (e) { /* — */ } };
 
 /* ── журнал ── */
@@ -167,6 +167,7 @@ const ready = () => READY || load();
 
 function applyToggles () {
   for (const k of ['god', 'nitro', 'noStall']) { const f = hook(k); if (f) f(CFG[k]); }
+  applyErr();
 }
 
 /* ─────────────── помощники для пресетов ─────────────── */
@@ -274,7 +275,7 @@ const PRESETS = [
   ...['condoms', 'sister', 'passport', 'vodka'].map(id => {
     const s = SIDE_ORDERS.find(q => q.id === id);
     return { group: 'поручения', name: 'Поручение: ' + (s ? s.what : id), needs: ['sideOrder'],
-      async run () { if (s && s.adult) await G.kids(false); await G.onShift(); await call('sideOrder', id); } };
+      run: () => (s ? startErrand(s) : call('sideOrder', id)) };
   }),
   { group: 'заказы', name: 'Срочный заказ', needs: ['forceOrder'], async run () { await G.onShift(); await call('forceOrder', { kind: 'urgent' }); } },
   { group: 'заказы', name: 'Заказ в конец района', needs: ['forceOrder'], async run () { await G.onShift(); await call('forceOrder', { kind: 'edge' }); } },
@@ -416,6 +417,10 @@ function build () {
   toggle(mt, 'ночь (23:00; выкл — день, 13:00)', 'meetNight', 'time', () => {});
   const ml = el('div', 'story-list'); ml.id = 'meet-list';
   mt.appendChild(ml);
+  // знакомые лица района (faces.js): Глеб — 4 появления по кнопкам, прогресс истории
+  mt.appendChild(el('h3', '', 'Глеб — знакомое лицо района <span class="dim">4 появления, по одному за смену</span>'));
+  const fl = el('div', 'story-list'); fl.id = 'face-list';
+  mt.appendChild(fl);
 
   // заказы
   const or = section('заказы');
@@ -423,11 +428,20 @@ function build () {
   button(orb, 'срочный', 'forceOrder', async () => { await G.onShift(); await call('forceOrder', { kind: 'urgent' }); });
   button(orb, 'в конец района', 'forceOrder', async () => { await G.onShift(); await call('forceOrder', { kind: 'edge' }); });
   button(orb, 'развоз смены', 'staffRide', async () => { await G.onShift(); const r = await call('staffRide'); log('развоз: ' + JSON.stringify(r)); });
-  const rs = row(or, 'поручение');
-  const side = el('select');
-  for (const s of SIDE_ORDERS) { const o = el('option', '', s.what + (s.adult ? ' · 18+' : s.kids ? ' · дет.' : '')); o.value = s.id; side.appendChild(o); }
-  rs.appendChild(side);
-  button(rs, 'сейчас', 'sideOrder', async () => { await G.onShift(); await call('sideOrder', side.value); }, 'sm');
+
+  // поручения (errands.js, SIDE_ORDERS): кнопка на каждое — смена и просьба ближайшего клиента; «рядом» и исход у человека
+  const er = section('поручения');
+  er.appendChild(el('p', 'dim', 'Нажал — смена (если не идёт), просит ближайший клиент: ответь «да». Цель — магазин или человек у подъезда. Список — по галочке «детская версия». Что выбрано, исход и сколько заплатили — в журнале.'));
+  toggle(er, 'детская версия (перезагрузка)', 'kids', null, () => reload());
+  toggle(er, 'рядом: магазин / человек ближе ' + ERR_NEAR + ' м', 'errNear', null, () => applyErr());
+  const ro = row(er, 'исход у человека');
+  const osel = el('select'); osel.id = 'err-out';
+  for (const [v, n] of ERR_OUT) { const o = el('option', '', n); o.value = v; osel.appendChild(o); }
+  osel.value = CFG.errOut;
+  osel.addEventListener('change', () => { CFG.errOut = osel.value; saveCfg(); applyErr(); renderErrands(); W().focus(); });
+  ro.appendChild(osel);
+  const elist = el('div', 'story-list'); elist.id = 'err-list';
+  er.appendChild(elist);
 
   // районы и волны щедрости (districts.js, econ.js DISTRICT / PACE)
   const ds = section('районы и волны');
@@ -486,7 +500,147 @@ function build () {
   const tp = section('телепорт');
   const tpb = el('div', 'grid'); tpb.id = 'poi-grid'; tp.appendChild(tpb);
 }
-let poiKey = '', storyKey = '', meetKey = '';
+let poiKey = '', storyKey = '', meetKey = '', faceKey = '', errKey = '';
+/* ── поручения (docs/SANDBOX.md «Поручения»): errands.js SBX — near (магазин и человек ближе N м), force (исход),
+   talk / paid (что было в разговоре и при вручении) ── */
+const ERR_NEAR = 150;
+const ERR_OUT = [['any', 'как выпадет'], ['give', 'отдаёт'], ['wrong', 'отдаёт не то'], ['none', 'не отдаёт'], ['cost', 'просит взамен']];
+const OUT_RU = { give: 'отдаёт', wrong: 'не то', none: 'не отдаёт', cost: 'просит взамен' };
+const rub = n => Math.round(n).toLocaleString('ru') + ' ₽';
+/* какие исходы бывают у человека (giver): по talk.onYes / onNo, «просит взамен» — если есть talk.cost */
+function errOuts (s) {
+  if (!s.giver || !s.talk) return [];
+  const ks = new Set([...s.talk.onYes, ...s.talk.onNo].map(q => q.k));
+  return ['give', 'wrong', 'none'].filter(k => ks.has(k)).concat(s.talk.cost ? ['cost'] : []);
+}
+function shopName (s) {
+  const p = s.shop && s.shop.prefer;
+  if (!p) return 'магазин';
+  for (const [w, n] of [['аптека', 'аптека'], ['алко', 'алкомаркет'], ['табак', 'табак'], ['мтс', 'салон связи'], ['зоо', 'зоомагазин'], ['продукт', 'продукты']]) if (p.test(w)) return n;
+  return s.shop.kinds && s.shop.kinds[0] === 'pharm' ? 'аптека' : 'магазин';
+}
+const payRange = s => Array.isArray(s.pay) ? rub(s.pay[0]).replace(' ₽', '') + '—' + rub(s.pay[1]) : s.pay ? rub(s.pay) : '';
+function applyErr () {
+  const d = D(), E = d && d.ERRS;
+  if (!E || !E.SBX) return null;
+  E.SBX.near = CFG.errNear ? ERR_NEAR : 0;
+  E.SBX.force = ['give', 'wrong', 'none'].includes(CFG.errOut) ? CFG.errOut : null;
+  return E;
+}
+/* поручение s сейчас: смена, просит ближайший клиент; нет магазина / человека ближе 150 м — ищем до 380 м */
+async function startErrand (s) {
+  if (s.adult && CFG.kids) await G.kids(false);
+  if (s.kids && !CFG.kids) await G.kids(true);
+  await G.onShift();
+  const d = D(), E = applyErr(), out = CFG.errOut, outs = errOuts(s);
+  if (!E) log('errands.js не в __dlv — «рядом» и исход не работают', 'warn');
+  if (s.giver && out !== 'any' && !outs.includes(out)) { log('у «' + s.what + '» нет исхода «' + OUT_RU[out] + '» — как выпадет', 'warn'); if (E) E.SBX.force = null; }
+  const cost = s.talk && s.talk.cost;
+  if (out === 'cost' && cost && d.wallet && d.addWallet && d.wallet() < cost) { const add = cost - Math.floor(d.wallet()); d.addWallet(add); log('в кошелёк +' + rub(add) + ' — чтобы было чем заплатить'); }
+  let ok = await call('sideOrder', s.id);
+  if (!ok && E && E.SBX.near) { log('ближе ' + ERR_NEAR + ' м нет — ищу до 380 м', 'warn'); E.SBX.near = 0; ok = await call('sideOrder', s.id); E.SBX.near = ERR_NEAR; }
+  if (!ok && !s.giver) ok = await errToShop(s);
+  if (!ok) { log('«' + s.what + '»: рядом нет ' + (s.giver ? 'подъезда' : 'нужного магазина') + ' в районе — отъедь и нажми снова', 'warn'); return; }
+  const force = E && E.SBX.force;
+  log('поручение «' + s.what + '»: «' + s.ask + '» — ответь «' + s.accept + '»' + (s.giver ? ' · исход: ' + (force ? OUT_RU[force] : out === 'cost' && cost ? 'просит взамен ' + rub(cost) + ' — ответь «' + s.talk.yes + '»' : 'как выпадет') : ''));
+  watchErrand(s);
+}
+/* рядом нет нужного магазина — машину к ближайшему подходящему в районе (в 70 м от него) и ещё раз;
+   просит ближайший к машине прохожий — он может стоять и дальше: сначала с «рядом», не вышло — до 380 м */
+async function errToShop (s) {
+  const d = D(), sh = s.shop, V = d.V, DI = d.DIST, E = d.ERRS, x0 = V.x, z0 = V.z;
+  if (!d.SIGNS || !sh) return false;
+  const inZone = q => !DI || !DI.at || (DI.city && DI.city()) || DI.at(q.x, q.z) === DI.cur();
+  const far = q => Math.hypot(q.x - x0, q.z - z0) || 1;
+  const L = d.SIGNS.filter(q => sh.kinds.includes(q.k) && (!sh.anyKind || sh.prefer.test(q.n0)) && inZone(q))
+    .sort((a, b) => (sh.prefer.test(b.n0) - sh.prefer.test(a.n0)) || far(a) - far(b)).slice(0, 3);
+  let ok = false;
+  for (const [i, q] of [...L, ...L].entries()) {
+    if (E && E.SBX) E.SBX.near = i < L.length && CFG.errNear ? ERR_NEAR : 0;
+    const m = far(q);
+    await G.tp({ x: q.x + (x0 - q.x) / m * 70, z: q.z + (z0 - q.z) / m * 70 });
+    await sleep(1200);                                            // прохожие вокруг — успеть подойти
+    if ((ok = !!(await call('sideOrder', s.id)))) { log('переехал к «' + q.n + '» (' + Math.round(m) + ' м отсюда)'); break; }
+  }
+  applyErr();
+  return ok;
+}
+/* журнал поручения: взял → куда (магазин / человек, сколько м) → разговор и исход → сколько заплатили */
+let ERR_WATCH = 0;
+async function watchErrand (s) {
+  const my = ++ERR_WATCH, t0 = Date.now(), E0 = D() && D().ERRS, n0 = E0 && E0.SBX ? E0.SBX.n : 0;
+  let Sd0 = null, stage = '';
+  while (my === ERR_WATCH && Date.now() - t0 < 30 * 60e3) {
+    await sleep(250);
+    const d = D();
+    if (!d || !d.S) return;                                       // игру перезагрузили
+    const Sd = d.S.side, X = d.ERRS && d.ERRS.SBX;
+    if (!Sd0) {
+      if (Sd && Sd.it && Sd.it.id === s.id) {
+        Sd0 = Sd; stage = Sd.stage;
+        const h = Sd.home || Sd.ped, tg = d.S.target, m = tg && h ? Math.round(Math.hypot(tg.x - h.x, tg.z - h.z)) : '?';
+        log('взял «' + s.what + '» за ' + rub(Sd.it.pay || 0) + ': ' + (Sd.giverPed ? Sd.shop.n + ' у подъезда' : 'магазин «' + Sd.shop.n + '»') + ', ' + m + ' м от клиента');
+      } else if (Date.now() - t0 > 1500 && d.S.state !== 'handover' && !(d.DLG && d.DLG.isOpen())) {
+        log('«' + s.what + '»: не взял (отказ или не успел ответить)', 'warn'); return;
+      }
+      continue;
+    }
+    if (Sd === Sd0) {
+      if (Sd.stage !== stage) {
+        stage = Sd.stage;
+        if (stage === 'back') {
+          const tk = X && X.talk && X.talk.n > n0 && X.talk.id === s.id ? X.talk : null;
+          if (tk) log('разговор: ' + (tk.ans === 'yes' ? '«' + s.talk.yes + '»' : tk.ans === 'no' ? '«' + s.talk.no + '»' : 'промолчал') + ' → ' +
+            (tk.k === 'give' ? 'отдаёт' : tk.k === 'wrong' ? 'отдаёт не то: ' + tk.item : 'ничего не дал') + (tk.cost ? ', взял из кошелька ' + rub(tk.cost) : '') + (tk.force ? ' (исход задан)' : '') + ' — обратно к клиенту');
+          else log('купил — обратно к клиенту');
+        }
+      }
+      continue;
+    }
+    const pd = X && X.paid && X.paid.n > n0 && X.paid.id === s.id ? X.paid : null;
+    if (pd) log('вручил «' + s.what + '»: <b>+' + rub(pd.pay) + '</b> — оплата ' + rub(pd.base) + (pd.share !== 1 ? ' × ' + Math.round(pd.share * 100) + ' %' : '') + (pd.tip ? ' + чаевые ' + rub(pd.tip) : '') +
+      (pd.k === 'wrong' ? ' (привёз не то)' : pd.k === 'none' ? ' (вернулся ни с чем)' : ''));
+    else log('«' + s.what + '»: кончилось без вручения (опоздал, клиент ушёл или смена кончилась)', 'warn');
+    return;
+  }
+}
+/* кнопки: из магазина и у человека у подъезда — во взрослой или детской (по галочке) */
+function renderErrands () {
+  const box = $('#err-list');
+  if (!box) return;
+  const L = SIDE_ORDERS.filter(s => (CFG.kids ? !s.adult : !s.kids));
+  const key = (CFG.kids ? 'k' : 'a') + CFG.errOut + L.map(s => s.id).join('|');
+  if (key === errKey && box.children.length) return;
+  errKey = key;
+  box.innerHTML = '';
+  const out = CFG.errOut;
+  for (const [title, part] of [['из магазина', L.filter(s => !s.giver)], ['у человека у подъезда', L.filter(s => s.giver)]]) {
+    if (!part.length) continue;
+    box.appendChild(el('h3', '', title + ' <span class="dim">' + part.length + '</span>'));
+    const grid = el('div', 'grid');
+    for (const s of part) {
+      const outs = errOuts(s), miss = s.giver && out !== 'any' && !outs.includes(out);
+      const sub = s.giver ? s.giver.who + (s.face ? ' · Глеб' : '') + ' · ' + outs.map(k => k === 'cost' ? 'за ' + rub(s.talk.cost) : OUT_RU[k]).join(', ') : shopName(s) + ' · ' + payRange(s);
+      const b = el('button', 'btn sm' + (s.giver ? ' story' : '') + (miss ? ' miss' : ''), s.what + '<small>' + sub + '</small>'); b.type = 'button';
+      b.title = '«' + s.ask + '»\n' + (s.giver ? 'забрать: ' + s.giver.who + (s.talk ? ' — «' + s.talk.line + '»\n[да] ' + s.talk.yes + ' · [нет] ' + s.talk.no : '') : 'купить: ' + shopName(s)) +
+        '\nплатит: ' + payRange(s) + (s.sex ? ' · просит ' + (s.sex === 'f' ? 'женщина' : 'мужчина') : '') + (miss ? '\nисхода «' + OUT_RU[out] + '» нет — будет как выпадет' : '');
+      b.addEventListener('click', () => runPreset({ name: 'поручение «' + s.what + '»', run: () => startErrand(s) }));
+      grid.appendChild(b);
+    }
+    box.appendChild(grid);
+  }
+}
+/* проиграть встречу m героя h у ближайшего подъезда (песочница: без заказа — деньги образцом) */
+async function playMeet (h, m) {
+  await ready(); await G.riding();
+  if (has('time')) await G.time(CFG.meetNight ? 23 : 13);
+  W().focus();
+  const r = await D().ENC.play(h.id, m.i);
+  // итог деньгами — на образце заказа 1 000 ₽ с чаевыми 100 ₽ (encounters.js EN.SAMPLE; в игре — чаевые этого заказа)
+  const sm = r && r.sample, d = sm ? sm.add - sm.cut : 0;
+  const pay = r && r.out ? ' → ' + (r.seal || r.out) + (r.row ? ' «' + r.row + '»' : '') + (sm ? ': ' + (d > 0 ? '+' : d < 0 ? '−' : '±') + Math.abs(d) + ' ₽ на заказе ' + sm.fee + ' ₽ (чаевые ' + sm.tip + ' ₽)' : '') + ', лицо ' + r.mood : '';
+  log(r ? 'встреча «' + h.name + '» (' + r.meet + '): ответ ' + (r.ans || '—') + pay + (r.skip ? ', пропущена' : '') + ', ' + (r.ms / 1000).toFixed(1) + ' с' : 'встреча не началась: нет подъезда рядом (до 320 м) или идёт катсцена', r ? '' : 'warn');
+}
 /* встречи у двери: герой → его встречи (своя и из smalltalk-lines.js), по кнопке на каждую */
 function renderMeets () {
   const box = $('#meet-list'), d = D();
@@ -503,20 +657,49 @@ function renderMeets () {
     for (const m of h.meets) {
       const b = el('button', 'btn sm story', '«' + m.say.slice(0, 38) + (m.say.length > 38 ? '…' : '') + '»'); b.type = 'button';
       b.title = m.say + '\n[A] ' + m.a + ' → ' + m.outA + '\n[X] ' + m.b + ' → ' + m.outB;   // итог ответа: tip тепло · big восторг · cut обида · none облом · 0 ну и ладно
-      b.addEventListener('click', async () => {
-        await ready(); await G.riding();
-        if (has('time')) await G.time(CFG.meetNight ? 23 : 13);
-        W().focus();
-        const r = await D().ENC.play(h.id, m.i);
-        // итог деньгами — на образце заказа 1 000 ₽ с чаевыми 100 ₽ (encounters.js EN.SAMPLE; в игре — чаевые этого заказа)
-        const sm = r && r.sample, d = sm ? sm.add - sm.cut : 0;
-        const pay = r && r.out ? ' → ' + (r.seal || r.out) + (r.row ? ' «' + r.row + '»' : '') + (sm ? ': ' + (d > 0 ? '+' : d < 0 ? '−' : '±') + Math.abs(d) + ' ₽ на заказе ' + sm.fee + ' ₽ (чаевые ' + sm.tip + ' ₽)' : '') + ', лицо ' + r.mood : '';
-        log(r ? 'встреча «' + h.name + '» (' + r.meet + '): ответ ' + (r.ans || '—') + pay + (r.skip ? ', пропущена' : '') + ', ' + (r.ms / 1000).toFixed(1) + ' с' : 'встреча не началась: нет подъезда рядом (до 320 м) или идёт катсцена', r ? '' : 'warn');
-      });
+      b.addEventListener('click', () => playMeet(h, m));
       grid.appendChild(b);
     }
     box.appendChild(grid);
   }
+}
+/* Глеб (faces.js): кнопка на каждое появление (3-е и 4-е — оба варианта: подписал / не подписал в 1-м), прогресс истории */
+function renderFaces () {
+  const box = $('#face-list'), d = D();
+  if (!box) return;
+  const L = d && d.ENC ? d.ENC.list(true) : null, st = d && d.FACES ? d.FACES.state : null;
+  const key = L && st ? JSON.stringify(st) + (CFG.kids ? 'k' : '') : '-';
+  if (key === faceKey && box.children.length) return;
+  faceKey = key;
+  box.innerHTML = '';
+  if (!L || !st) { box.appendChild(el('span', 'dim', 'faces.js не в __dlv (игра ещё грузится?)')); return; }
+  const sign = st.sign === 'yes' ? 'подписал' : st.sign === 'no' ? 'не подписал' : '—';
+  box.appendChild(el('p', 'dim', 'в игре: ' + (st.step < 4 ? 'следующее — ' + (st.step + 1) + ' из 4 (' + st.next + ')' : 'история кончилась, у подъезда — плакат') +
+    ' · ответ в 1-м: ' + sign + (st.key ? ' · подъезд запомнен' : '') + (st.last ? ' · было в смене ' + st.last : '')));
+  const gleb = L.find(h => h.id === 'gleb'), wife = L.find(h => h.id === 'glebwife');
+  const grid = el('div', 'grid');
+  const meetBtn = (label, h, i) => {
+    const m = h && h.meets[i];
+    if (!m) return;
+    const b = el('button', 'btn sm story', label); b.type = 'button';
+    b.title = m.say + '\n[A] ' + m.a + ' → ' + m.outA + '\n[X] ' + m.b + ' → ' + m.outB;
+    b.addEventListener('click', () => playMeet(h, m));
+    grid.appendChild(b);
+  };
+  // кнопки перерисовываются с прогрессом — без UI (список хуков панели не растёт)
+  const btn = (parent, label, fn, cls = 'sm') => { const b = el('button', 'btn ' + cls, label); b.type = 'button'; b.addEventListener('click', async () => { await ready(); await fn(); W().focus(); }); parent.appendChild(b); return b; };
+  meetBtn('1 · петиция', gleb, 0);
+  btn(grid, '2 · листовки (поручение)', async () => { await G.onShift(); await call('sideOrder', CFG.kids ? 'gleb-leaflets-k' : 'gleb-leaflets'); }, 'sm story');
+  meetBtn('3 · машина — подписал', gleb, 1);
+  meetBtn('3 · машина — не подписал', gleb, 2);
+  meetBtn('4 · жена — подписал', wife, 0);
+  meetBtn('4 · жена — не подписал', wife, 1);
+  box.appendChild(grid);
+  const g2 = el('div', 'grid');
+  btn(g2, 'историю — с начала', () => { D().FACES.reset(); log('история Глеба — с начала: в следующей смене (со 2-й, первый район) — петиция'); });
+  if (st.door) btn(g2, 'к подъезду Глеба', async () => { const [x, z, nx, nz] = D().FACES.state.door; await G.riding(); await G.tp({ x: x + nx * 10, z: z + nz * 10 }); });
+  btn(g2, 'кончить историю (плакат)', () => { const s2 = D().FACES.step(4); log(s2.poster ? 'история кончилась: плакат «Вернись, Глеб» у его подъезда' : 'история кончилась; плаката нет — подъезд ещё не запомнен (сыграй 1-е появление в смене)'); });
+  box.appendChild(g2);
 }
 function renderPOI () {
   const g = $('#poi-grid');
@@ -578,6 +761,8 @@ function refresh () {
   renderPOI();
   renderStory();
   renderMeets();
+  renderFaces();
+  renderErrands();
   const d = D();
   if (d && d.ENV && UI.hour && document.activeElement !== UI.hour.i) UI.hour.set(Math.min(24, Math.max(9, hourOf(d.ENV.t))));
   if (d && d.season && UI.sea && document.activeElement !== UI.sea.i) UI.sea.set(d.season.value);

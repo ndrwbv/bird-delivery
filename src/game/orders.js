@@ -42,6 +42,7 @@ import * as FEST from './festivals.js';
 import * as HURR from './hurricane.js';          // дома, унесённые ураганом: их адреса не выдаём (hurricane.js blocked)
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 import * as RHY from './rhythm.js';             // ритм смены: роль заказа на дуге, напряжение, встреча у двери (rhythm.js)
+import * as FACES from './faces.js';            // знакомые лица района: Глеб — его адрес, его поручение (faces.js)
 import * as GROW from './growth.js';            // пиццерия растёт: оплата, чаевые, размер сборных по ступени (econ.js GROWTH)
 import * as BEACH from './beach.js';            // пляж летом: заказ на полотенце (beach.js ORDER)
 import * as DOOR from './doorstep.js';          // домофон у подъезда: бонус «с первого раза» / «спускался сам» (econ.js DOOR)
@@ -323,7 +324,7 @@ function genSpec () {
   const fp = SIM ? null : FEST.passSpec(SH.gen);
   if (fp && R && R.meet) RHY.meetFailed();
   if (fp) return finishSpec({ type: 'pizza', kind: 'solo', fest: fp, stops: [{ x: fp.x, z: fp.z, key: keyOf(fp.x, fp.z), zone: ZN.zoneAt(fp.x, fp.z), n: 1, addr: fp.addr }] }, null, hourNow());
-  if (R && R.meet) { const ms = meetSpec(R, D, tgt); if (ms) return finishSpec(ms, null, hourNow()); RHY.meetFailed(); }
+  if (R && R.meet) { const ms = R.meet.face ? faceSpec(R, D, tgt) : meetSpec(R, D, tgt); if (ms) return finishSpec(ms, null, hourNow()); RHY.meetFailed(); }
   const easy = easySpec(R);
   if (easy) return finishSpec(easy, null, hourNow());
   const ahead = (A.S.order ? 1 : 0) + Q.length;          // сколько заказов до этого
@@ -585,6 +586,22 @@ function meetSpec (R, D, tgt) {
   return { type: 'pizza', kind: 'solo', meet: R.meet, stops: [stopOf(s)] };
 }
 
+/* знакомое лицо (faces.js, Глеб): адрес — всегда его подъезд (запомнен на первом появлении; на первом — как у встречи).
+   Встреча — заказ с meet (катсцена у двери, encounters.js), поручение — обычный заказ ему с face: при вручении он просит
+   поручение (delivered). Его подъезд занят другим заказом смены — не в этот раз (ритм попробует на следующем) */
+function faceSpec (R, D, tgt) {
+  const f = R.meet;
+  if (!f.key) {                                           // адрес ещё не запомнен — выбрать, как встрече (запомнится, когда появление случится)
+    if (f.kind === 'meet') return meetSpec(R, D, tgt);
+    const s0 = arcSpot({ dmin: D.min, dmax: D.max }, tgt, q => q.entr);
+    return s0 ? { type: 'pizza', kind: 'solo', face: f, stops: [stopOf(s0)] } : null;
+  }
+  const s = POOL.find(q => q.key === f.key);
+  if (!s || SH.reserved.has(s.key) || HURR.blocked(s.x, s.z)) return null;
+  SH.breather = false;
+  return f.kind === 'errand' ? { type: 'pizza', kind: 'solo', face: f, stops: [stopOf(s)] } : { type: 'pizza', kind: 'solo', meet: f, stops: [stopOf(s)] };
+}
+
 /* спецификация готова: резерв адресов, метры по дорогам, номер, лог */
 function finishSpec (spec, forced, hAt) {
   // считаем сразу: очередь — это уже план смены
@@ -612,7 +629,7 @@ function finishSpec (spec, forced, hAt) {
   const vk = visKind(spec);
   SH.run = SH.run.kind === vk ? { kind: vk, n: SH.run.n + 1 } : { kind: vk, n: 1 };
   spec.hour = +hAt.toFixed(2);
-  SH.log.push({ n: spec.n, h: spec.hour, type: spec.type, kind: spec.kind, zone: spec.zone, edge: !!spec.edge, urgent: !!spec.urgent, side: !!spec.side, story: !!spec.story, m: spec.m.reduce((a, b) => a + b, 0), keys: spec.stops.map(s => s.key), forced, meet: spec.meet ? spec.meet.id : '' });
+  SH.log.push({ n: spec.n, h: spec.hour, type: spec.type, kind: spec.kind, zone: spec.zone, edge: !!spec.edge, urgent: !!spec.urgent, side: !!spec.side, story: !!spec.story, m: spec.m.reduce((a, b) => a + b, 0), keys: spec.stops.map(s => s.key), forced, meet: spec.meet ? spec.meet.id : '', face: spec.face ? spec.face.id : '' });
   if (!SIM) RHY.ordered(spec);                           // журнал ритма смены (rhythm.js)
   return spec;
 }
@@ -676,6 +693,7 @@ function bindSpec (spec) {
     const p = place(f[(Math.random() * Math.min(4, f.length)) | 0], st.x, st.z);
     if (spec.story && spec.story.person && stops.length === 0) A.rehuman(p, spec.story.person);
     if (spec.meet && spec.meet.person && stops.length === 0) A.rehuman(p, spec.meet.person);   // встреча у двери: клиент — герой (encounters.js)
+    if (spec.face && spec.face.person && stops.length === 0) A.rehuman(p, spec.face.person);   // знакомое лицо с поручением: клиент — он (faces.js)
     const peds = [p];
     for (let i = 1; i < st.n; i++) {                   // групповой: остальные — рядом с первым, не на асфальте
       const b = free().sort((a, c) => d2(a, st) - d2(c, st))[0];
@@ -928,6 +946,18 @@ export function delivered (o, st, onTime) {
   }
   // поручение по таймеру (errandStep): подошёл срок — просит этот клиент (и когда опоздал); после разговора у двери
   // (doorstep.js), у сюжетного, на фестивале и без магазина рядом — не просит, попросит следующий
+  // знакомое лицо (faces.js): на этом заказе Глеб просит своё поручение — листовки у товарища (не по таймеру, ритм его уже
+  // посчитал); не вышло (нет товарища в районе рядом) — история ждёт следующей смены
+  if (sp.face && sp.face.kind === 'errand' && !sp.faceAsked) {
+    const ped = st.peds[0], per = st.persons[0];
+    if (!S.ride && per && ped && !ped.dead && offerSide(ped, per, sp.face.side)) {
+      sp.faceAsked = true;
+      errandDone();                                       // в счёт поручений (таймер — заново, ритм видит просьбу)
+      FACES.asked(sp.stops && sp.stops[0]);
+      return;
+    }
+    ERR.miss.push('Глеб: нет товарища рядом'); if (ERR.miss.length > 30) ERR.miss.shift();
+  }
   if (ERR.due) {
     const no = sp.story ? 'сюжет' : sp.fest ? 'фестиваль' : S.ride ? 'покататься' : st.talk ? 'разговор у двери'
       : !(st.persons[0] && st.peds[0] && !st.peds[0].dead) ? 'нет клиента' : !DIRECTOR.can('errand') ? 'режиссёр' : !offerSide(st.peds[0], st.persons[0]) ? 'нет магазина' : '';
@@ -954,15 +984,16 @@ function errandDone () {
   ERR.left = ECON.ERRAND.EVERY + rand(-ECON.ERRAND.JITTER, ECON.ERRAND.JITTER);
   ERR.log.push(Math.round(ERR.clock));
 }
-function sideOpts (ped) {
+function sideOpts (ped, only) {
   const f = ped && ped.person ? !!ped.person.f : null;      // sex — текст просьбы в мужском / женском роде
-  return SIDE_ORDERS.filter(s => (!s.adult || A.ADULT) && (!s.kids || !A.ADULT) && (!s.sex || f === null || (s.sex === 'f') === f))
+  // face — поручение знакомого лица (Глеб, faces.js): только когда просят именно его (only)
+  return SIDE_ORDERS.filter(s => (!s.adult || A.ADULT) && (!s.kids || !A.ADULT) && (!s.sex || f === null || (s.sex === 'f') === f) && (!s.face || s.id === only))
     // giver — забрать у человека у подъезда (errands.js giverSpot), иначе — магазин рядом
     .map(s => ({ s, shop: s.giver ? (A.errandGiver ? A.errandGiver(s, ped) : null) : A.errandShop({ kinds: s.shop.kinds || [], prefer: s.shop.prefer || /$^/, anyKind: !!s.shop.anyKind }, ped) }))
     .filter(o => o.shop);
 }
 function offerSide (ped, person, only) {
-  const opts = sideOpts(ped).filter(o => !only || o.s.id === only);
+  const opts = sideOpts(ped, only).filter(o => !only || o.s.id === only);
   if (!opts.length) return false;
   const { s, shop } = pick(opts);
   S.handT = 1e9;                                          // пока думаешь — дальше не едем
@@ -1390,13 +1421,20 @@ export function force (spec = {}) {
 export function forceSide (id) {
   if (!A || !['drive', 'back', 'handover', 'brief', 'side'].includes(S.state)) return false;
   let ped = null, person = null;
+  const fs = SIDE_ORDERS.find(s => s.id === id);
+  // sex — просит только мужчина / только женщина: клиент не того пола — просит ближайший прохожий того
+  const fit = p => !fs || !fs.sex || fs.face || (p.person ? !!p.person.f : null) === (fs.sex === 'f');
   const st = S.order && S.order.stops[S.order.idx];
-  if (st && st.peds[0] && !st.peds[0].dead) { ped = st.peds[0]; person = st.persons[0] || ped.person; }
+  // клиент текущего адреса — если он рядом с машиной (до 40 м), иначе — ближайший к машине прохожий
+  const cl = st && st.peds[0];
+  if (cl && !cl.dead && fit(cl) && (cl.x - V.x) ** 2 + (cl.z - V.z) ** 2 < 1600) { ped = cl; person = st.persons[0] || ped.person; }
   else {
-    const near = A.alive().filter(p => !p.guest && !p.dead).sort((a, b) => ((a.x - V.x) ** 2 + (a.z - V.z) ** 2) - ((b.x - V.x) ** 2 + (b.z - V.z) ** 2))[0];
+    const near = A.alive().filter(p => !p.guest && !p.dead && fit(p)).sort((a, b) => ((a.x - V.x) ** 2 + (a.z - V.z) ** 2) - ((b.x - V.x) ** 2 + (b.z - V.z) ** 2))[0];
     if (near) { ped = near; person = near.person; }
   }
   if (!ped || !person) return false;
+  // поручение знакомого лица (песочница: Глеб, faces.js) — просит он сам: клиент «переодевается» в него
+  if (fs && fs.face && A.rehuman) { const fp = RHY.DEBUG.PROV.person ? RHY.DEBUG.PROV.person(fs.face) : null; if (fp) { A.rehuman(ped, fp); person = ped.person; } }
   const keep = S.order && S.order.stops.some(q => q.peds.includes(ped));
   if (keep) { for (const q of S.order.stops) for (const p of q.peds) if (p !== ped && !p.served) A.clearGuest(p); S.order = null; A.hidePhone(); A.clearGate(); }
   else { dropCurrent(); A.makeGuest(ped); }

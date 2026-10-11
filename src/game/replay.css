@@ -11,7 +11,7 @@ body.replay-on #view { cursor: default; }
          font-family: "Press Start 2P", ui-monospace, monospace; color: var(--pp-ink); }
 .rp-ui.on { display: block; }
 
-.rp-top { position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 12px); translate: -50% 0; box-sizing: border-box;
+.rp-top { position: absolute; left: 50%; top: calc(var(--sa-t, env(safe-area-inset-top, 0px)) + 12px); translate: -50% 0; box-sizing: border-box;
           display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; width: max-content; max-width: calc(100vw - 24px); padding: 9px 14px 10px;
           font-size: var(--pp-fs-s); line-height: 1.4; background: var(--pp-paper); border: 2px solid var(--pp-ink); border-top: 5px solid var(--pp-red);
           border-radius: 3px; box-shadow: 0 4px 0 rgba(51, 33, 12, .75); animation: rp-in .25s var(--pp-spring, ease-out) both; }
@@ -27,7 +27,7 @@ body.replay-on #view { cursor: default; }
 .rp-ui.rec .rp-bar > i { background: var(--pp-red); }
 
 /* сообщение «ролик сохранён: путь» — записка под плашкой; в Стиме по клику — показать файл в папке */
-.rp-msg { position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 96px); translate: -50% 0; max-width: min(640px, calc(100vw - 24px));
+.rp-msg { position: absolute; left: 50%; top: calc(var(--sa-t, env(safe-area-inset-top, 0px)) + 96px); translate: -50% 0; max-width: min(640px, calc(100vw - 24px));
           padding: 8px 12px; font: inherit; font-size: var(--pp-fs-s); line-height: 1.6; text-align: center; word-break: break-all; pointer-events: auto; cursor: default;
           color: var(--pp-ink); background: var(--pp-yellow); border: 2px solid var(--pp-ink); border-radius: 3px; box-shadow: 0 3px 0 var(--pp-ink);
           transform: rotate(-1deg); animation: rp-in .2s ease-out both; }
@@ -35,7 +35,7 @@ body.replay-on #view { cursor: default; }
 .rp-msg[hidden] { display: none; }
 
 /* ярлычки кнопок внизу */
-.rp-keys { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); translate: -50% 0; box-sizing: border-box;
+.rp-keys { position: absolute; left: 50%; bottom: calc(var(--sa-b, env(safe-area-inset-bottom, 0px)) + 12px); translate: -50% 0; box-sizing: border-box;
            display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; width: max-content; max-width: calc(100vw - 24px); pointer-events: auto; }
 .rp-keys button { display: inline-flex; align-items: center; min-height: 34px; padding: .45em .75em; font: inherit; font-size: var(--pp-fs-s); cursor: pointer;
                   color: var(--pp-ink); background: var(--pp-paper); border: 2px solid var(--pp-ink); border-radius: 3px; box-shadow: 0 3px 0 var(--pp-ink); }

@@ -1,0 +1,16 @@
+/* «поверни телефон» — телефон стоя (orient.js). Как экран загрузки (index.html #boot): бордовый фон и логотип */
+#turn { position: fixed; inset: 0; z-index: 300; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+        padding: max(24px, var(--sa-t, env(safe-area-inset-top))) 24px max(24px, var(--sa-b, env(safe-area-inset-bottom)));
+        background: radial-gradient(circle at 50% 38%, #4d1205, #3d0d01 55%, #2a0800); color: #fff3d6; text-align: center;
+        font-family: "Press Start 2P", ui-monospace, monospace; touch-action: none; -webkit-user-select: none; user-select: none; }
+#turn.on { display: flex; }
+#turn .tn-logo { width: clamp(96px, 30vw, 150px); height: auto; image-rendering: pixelated; border-radius: 18%;
+                 box-shadow: 0 0 0 3px rgba(255, 179, 71, .28), 0 8px 0 #1e0600, 0 16px 32px rgba(0, 0, 0, .45); }
+#turn .tn-box { position: relative; width: 86px; height: 86px; display: flex; align-items: center; justify-content: center; }
+#turn .tn-ph { width: 54px; height: 86px; transform-origin: 50% 50%; animation: tn-turn 2.4s steps(1, end) infinite; }
+#turn .tn-arr { position: absolute; left: 62px; top: -14px; width: 40px; height: 40px; opacity: .9; }
+#turn .tn-t { font-weight: normal; font-size: clamp(14px, 4.6vw, 20px); line-height: 1.5; color: #ffd85e; text-shadow: 3px 3px 0 #1e0600; }
+#turn .tn-s { font-size: clamp(9px, 2.8vw, 12px); line-height: 1.7; max-width: 300px; text-shadow: 2px 2px 0 #1e0600; opacity: .85; }
+/* ложится набок шагами, как пиксельная анимация: стоя → 45° → боком, пауза, обратно */
+@keyframes tn-turn { 0% { transform: rotate(0deg); } 30% { transform: rotate(45deg); } 38% { transform: rotate(90deg); } 85% { transform: rotate(90deg); } 92% { transform: rotate(45deg); } }
+@media (prefers-reduced-motion: reduce) { #turn .tn-ph { animation: none; transform: rotate(90deg); } }

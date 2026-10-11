@@ -42,7 +42,7 @@ body.career #money b { color: #ffe6ee; text-shadow: 2px 2px 0 #3a1020; }
 #over.cr { padding: 0; align-items: stretch; justify-content: stretch; background: var(--pp-dim); }
 #over.cr .ov-box { width: 100%; max-width: none; min-height: 100%; margin: 0; box-sizing: border-box; background: none; border: 0; border-radius: 0; box-shadow: none;
                    align-items: center; justify-content: center; gap: clamp(10px, 2vh, 22px); text-align: left; color: var(--pp-ink);
-                   padding: max(12px, 2.4vh, env(safe-area-inset-top)) 16px max(12px, 2.4vh, env(safe-area-inset-bottom)); }
+                   padding: max(12px, 2.4vh, var(--sa-t, env(safe-area-inset-top))) 16px max(12px, 2.4vh, var(--sa-b, env(safe-area-inset-bottom))); }
 #over.cr #ov-t, #over.cr #ov-why, #over.cr #ov-stats, #over.cr #ov-best { display: none; }
 #over:not(.cr) #cr-stage { display: none; }
 #cr-stage { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: clamp(12px, 2.4vw, 32px); width: 100%; cursor: default; }
@@ -91,7 +91,7 @@ body.career #money b { color: #ffe6ee; text-shadow: 2px 2px 0 #3a1020; }
 /* как управлять — одна бумажная полоска внизу экрана, как в меню и паузе (pausecz.css .pz-hint, dep.css .dep-keys);
    значков на штампе и пометках нет (автор 10.10.2026); пальцем — полоски нет (career.js endKeys) */
 .cr-keys { display: none; }
-#over.cr .cr-keys { display: block; position: absolute; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); translate: -50% 0; max-width: calc(100% - 32px);
+#over.cr .cr-keys { display: block; position: absolute; left: 50%; bottom: max(14px, var(--sa-b, env(safe-area-inset-bottom))); translate: -50% 0; max-width: calc(100% - 32px);
   box-sizing: border-box; padding: .35em .9em .25em; text-align: center; white-space: nowrap; font-size: var(--pp-fs-s); line-height: 2; color: var(--pp-ink);
   background: var(--pp-paper); border: 2px solid var(--pp-ink); border-radius: 2px; box-shadow: 0 3px 0 rgba(51, 33, 12, .7); pointer-events: none; transition: opacity .25s ease-out; }
 #over.cr .cr-keys[hidden] { display: none; }
@@ -122,7 +122,7 @@ body.calm-fx #cr-stage .cr-rc, body.calm-fx #cr-stage .cr-rc *, body.calm-fx #cr
   #over.cr { --pp-fs-s: 10px; --pp-fs-m: 11px; --pp-fs-l: clamp(15px, 4.2vh, 18px); }
   #over.cr .ov-box { display: grid; grid-template-columns: minmax(0, 600px) minmax(150px, 220px); grid-template-areas: "rc tol" "rc btn";
                      align-content: center; justify-content: center; gap: 10px 14px;
-                     padding: max(8px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+                     padding: max(8px, var(--sa-t, env(safe-area-inset-top))) max(16px, var(--sa-r, env(safe-area-inset-right))) max(8px, var(--sa-b, env(safe-area-inset-bottom))) max(16px, var(--sa-l, env(safe-area-inset-left))); }
   #cr-stage { display: contents; }
   .cr-rc { grid-area: rc; width: 100%; align-self: center; margin-bottom: 10px; padding-top: 4px; padding-bottom: 8px; }
   .cr-rc .pp-head { padding: .7em 0 .45em; }
@@ -134,7 +134,7 @@ body.calm-fx #cr-stage .cr-rc, body.calm-fx #cr-stage .cr-rc *, body.calm-fx #cr
   #over.cr .ov-btns { grid-area: btn; align-self: start; flex-direction: column; align-items: stretch; width: 100%; gap: 8px; }
   #over.cr .ov-btns button { padding: .6em .8em; }
   #over.cr .cr-keys { display: none; }
-  #over.cr:has(.cr-keys) .ov-box { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  #over.cr:has(.cr-keys) .ov-box { padding-bottom: max(8px, var(--sa-b, env(safe-area-inset-bottom))); }
 }
 
 /* ── «гараж и траты» — бумага (UI-REVIEW, «как накладная»): плитки — бланки с цветной полоской сверху,
@@ -218,7 +218,7 @@ body.calm-fx #cr-stage .cr-rc, body.calm-fx #cr-stage .cr-rc *, body.calm-fx #cr
 #cr-spend.on { opacity: 1; }
 body:has(#cr-spend:not([hidden])) .hud, body:has(#cr-spend:not([hidden])) #ctrls { visibility: hidden; }
 .cr-sp-box { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: clamp(14px, 2.4vh, 26px); overflow: auto; box-sizing: border-box; width: 100%;
-             padding: max(16px, 3vh, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(14px, 2.4vh, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+             padding: max(16px, 3vh, var(--sa-t, env(safe-area-inset-top))) max(16px, var(--sa-r, env(safe-area-inset-right))) max(14px, 2.4vh, var(--sa-b, env(safe-area-inset-bottom))) max(16px, var(--sa-l, env(safe-area-inset-left)));
              scrollbar-width: thin; scrollbar-color: var(--pp-yellow) #1a0e08; }
 #cr-spend .cr-sp-sheet { width: min(980px, 100%); flex: none; }
 .cr-sp-head { --pp-accent: var(--pp-yellow); margin-bottom: .2em; }

@@ -5,7 +5,7 @@
    Внизу — записка о том, на чём курсор, и пометка «[B] назад». Стиль — «как накладная» (paper.css) */
 
 #honor { position: fixed; inset: 0; z-index: 48; display: flex; align-items: stretch; justify-content: center; box-sizing: border-box;
-         padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+         padding: max(10px, var(--sa-t, env(safe-area-inset-top))) max(12px, var(--sa-r, env(safe-area-inset-right))) max(10px, var(--sa-b, env(safe-area-inset-bottom))) max(12px, var(--sa-l, env(safe-area-inset-left)));
          background: var(--pp-dim), rgba(26, 12, 18, .55); pointer-events: auto; color: var(--pp-ink);
          font-family: "Press Start 2P", ui-monospace, monospace;
          --hb-gold: #ffd85e; --hb-cork: #c38a52; --hb-wood: #6e3f1d; --hb-med: clamp(28px, min(3.6vw, 5.4vh), 50px); }
@@ -190,7 +190,7 @@ body.calm-fx .hb-fly, body.calm-fx .hb-poke { animation-duration: .15s !importan
 }
 /* телефон стоя: шапка в два ряда, сетка 3 в ряд и листается внутри доски, записка снизу */
 @media (max-width: 620px) {
-  #honor { padding: max(8px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)); --hb-med: 38px; }
+  #honor { padding: max(8px, var(--sa-t, env(safe-area-inset-top))) max(6px, var(--sa-r, env(safe-area-inset-right))) max(8px, var(--sa-b, env(safe-area-inset-bottom))) max(6px, var(--sa-l, env(safe-area-inset-left))); --hb-med: 38px; }
   .hb-board { padding: 8px 6px; border-width: 7px; }
   .hb-top { flex-wrap: wrap; justify-content: center; gap: 8px; }
   .hb-plaque { order: 0; flex: 1; }

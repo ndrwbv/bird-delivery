@@ -42,7 +42,7 @@ let recent = [];
 /* кто подходит: взрослая / детская, пол клиента (у встречи или у её «кто») */
 const sitFem = s => (s.fem !== undefined ? s.fem : WHO[s.who] ? WHO[s.who].fem : undefined);
 export function pool (adult, fem) {
-  return SITS.filter(s => (!s.adult || adult) && (sitFem(s) === undefined || fem === null || fem === undefined || sitFem(s) === !!fem));
+  return SITS.filter(s => !s.face && (!s.adult || adult) && (sitFem(s) === undefined || fem === null || fem === undefined || sitFem(s) === !!fem));
 }
 /* встреча для показа: детская версия — с мягкими заменами (kids) */
 function view (s, adult) {

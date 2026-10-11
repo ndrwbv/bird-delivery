@@ -18,7 +18,7 @@ body.career #big { background: linear-gradient(180deg, rgba(61, 13, 1, .62) 0, r
 body.career #build-v { display: none; }          /* версия — в .crm-ver, крупнее */
 
 #cr-menu { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; box-sizing: border-box;
-           padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+           padding: max(12px, var(--sa-t, env(safe-area-inset-top))) max(14px, var(--sa-r, env(safe-area-inset-right))) max(8px, var(--sa-b, env(safe-area-inset-bottom))) max(14px, var(--sa-l, env(safe-area-inset-left)));
            --mcw: clamp(170px, min(20vw, 32vh), 290px); color: var(--pp-ink); }
 .crm-top { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; min-height: 0; }
 /* логотип: квадратная птица со скруглёнными углами (как иконка игры) и рядом «ПТИЦА / ПИЦЦА» — по слову в строку,
@@ -134,7 +134,7 @@ body.career #build-v { display: none; }          /* версия — в .crm-ver
 .crm-hint { flex: none; align-self: center; margin-top: 6px; padding: .35em .9em .25em; text-align: center; font-size: var(--pp-fs-s); line-height: 2; color: var(--pp-ink);
             background: var(--pp-paper); border: 2px solid var(--pp-ink); border-radius: 2px; box-shadow: 0 3px 0 rgba(51, 33, 12, .7); }
 .crm-hint .pp-key { margin: 0 .2em 0 .4em; }
-.crm-ver { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); font-size: 11px;
+.crm-ver { position: absolute; right: max(12px, var(--sa-r, env(safe-area-inset-right))); bottom: max(8px, var(--sa-b, env(safe-area-inset-bottom))); font-size: 11px;
            color: var(--pp-paper); opacity: .85; text-shadow: 2px 2px 0 var(--pp-ink); pointer-events: none; }
 
 .crm-dbox { width: min(560px, 100%); max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 22px 20px 18px; box-sizing: border-box;

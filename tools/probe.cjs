@@ -15,7 +15,12 @@
                             и window.__probeReady !== false. Песочница интерфейса: --page=ui.html — панель
                             (window.__uilab), --page=ui.html --q=frame — сам экран (window.__ui), docs/SANDBOX.md
                             Редактор города: --page=editor.html (window.__editor; ждёт, пока город достроится)
-   --size=desktop|phone|phone-land|deck|WxH   1280×720 / 390×844 с касаниями / 844×390 боком / 1280×800
+   --size=desktop|phone|phone-land|phone-se|phone-big|deck|WxH   1280×720 / 390×844 с касаниями (стоя — с ?portrait:
+                            игра на телефоне только боком, orient.js) / 844×390 боком / 667×375 iPhone SE боком /
+                            932×430 большой боком / 1280×800
+   поворот из скрипта: console.log('__proberesize:844x390') — окно сменит размер (повернуть телефон туда-обратно)
+   --turn                   --size=phone без ?portrait: как настоящий телефон стоя — заставка «поверни телефон» и пауза
+   --sa=L,B                 вырез и полоска «домой» боком, px (iPhone 15 — 59,21): отступы --sa-* хада вместо env()
    --js="код" | --eval=file.js     тело async-функции в странице. Есть: d (= __dlv), wait(ms),
                             until(fn, ms), run(secs, k) — дать игре идти secs секунд (k — ускорение
                             до 3), onShift() — начать смену и принять заказ, ride() — просто кататься,
@@ -60,10 +65,10 @@ const T0 = Date.now();
 const MODE = arg('mode', 'web');
 const PAGE = arg('page', 'index.html').replace(/^\/+/, '');
 const GAME = PAGE === 'index.html';
-const SIZES = { desktop: [1280, 720], phone: [390, 844], 'phone-land': [844, 390], deck: [1280, 800] };
+const SIZES = { desktop: [1280, 720], phone: [390, 844], 'phone-land': [844, 390], 'phone-se': [667, 375], 'phone-big': [932, 430], deck: [1280, 800] };
 const SZ = arg('size', 'desktop');
 const [W, H] = SIZES[SZ] || (/^\d+x\d+$/.test(SZ) ? SZ.split('x').map(Number) : SIZES.desktop);
-const PHONE = SZ === 'phone' || SZ === 'phone-land';
+const PHONE = SZ === 'phone' || SZ.startsWith('phone-');
 const MAXC = +arg('max', 4000);
 const err = (...a) => process.stderr.write(a.join(' ') + '\n');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -148,6 +153,8 @@ app.whenReady().then(async () => {
   let uncaught = 0;
   win.webContents.on('console-message', (e, level, msg, line, src) => {
     if (MEM && typeof msg === 'string' && msg.startsWith('__probemem:')) { memMark(msg.slice(11)); return; }
+    // повернуть «телефон» из скрипта: console.log('__proberesize:844x390') — окно меняет размер (orient.js, поворот туда-обратно)
+    if (typeof msg === 'string' && msg.startsWith('__proberesize:')) { const [w, h] = msg.slice(14).split('x').map(Number); if (w > 0 && h > 0) win.setContentSize(w, h); return; }
     if (has('console') || (level >= 3 && has('errors'))) err('[page]', msg.slice(0, 500));
     if (level >= 3) {
       const un = /^Uncaught/.test(msg);
@@ -199,6 +206,7 @@ app.whenReady().then(async () => {
   if (!has('fresh')) q.push('nointro');
   if (has('kids')) q.push('kids');
   if (arg('map')) q.push('map=' + arg('map'));
+  if (SZ === 'phone' && !has('turn')) q.push('portrait');   // стоя — без заставки «поверни телефон» (orient.js); --turn — с ней
   if (arg('q')) q.push(arg('q').replace(/^[?&]/, ''));
   const url = 'app://g/' + PAGE + '?' + q.join('&');
   const dbg = win.webContents.debugger;
@@ -238,6 +246,10 @@ app.whenReady().then(async () => {
     try { const { profile } = await dbg.sendCommand('Profiler.stop'); fs.writeFileSync(path.resolve(arg('cpuprofile')), JSON.stringify(profile)); err('probe: профиль загрузки →', path.resolve(arg('cpuprofile'))); } catch (e) { err('probe: профиль не снят:', e.message); }
   }
   await js(INSTALL);
+  if (arg('sa')) {                                    // --sa=59,21 — вырез по бокам и полоска «домой», как у iPhone боком
+    const [l, b] = arg('sa').split(',').map(Number);
+    await js(`(() => { const r = document.documentElement.style; r.setProperty('--sa-l', '${+l || 0}px'); r.setProperty('--sa-r', '${+l || 0}px'); r.setProperty('--sa-b', '${+b || 0}px'); })()`);
+  }
   await sleep(200);                                   // модули дописывают себя в __dlv через setTimeout 0
   if (+arg('cpu', 1) > 1) {                           // --cpu=3 — как процессор Деки (сборку города не тормозим — только игру)
     try { if (!dbg.isAttached()) dbg.attach('1.3'); await dbg.sendCommand('Emulation.setCPUThrottlingRate', { rate: +arg('cpu') }); } catch (e) { err('probe: --cpu не вышло:', e.message); }

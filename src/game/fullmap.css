@@ -41,7 +41,7 @@
 #fullmap .fm-leg > span[hidden], #fullmap .fm-leg > span.lg-off { display: none; }
 #fullmap .fm-leg em { font-style: normal; color: var(--pp-rust); text-transform: uppercase; letter-spacing: .04em; }
 #fullmap .fm-leg i { flex: none; margin-right: .5em; }
-body.touch #fullmap .fm-box { border-radius: 0; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+body.touch #fullmap .fm-box { border-radius: 0; padding: max(8px, var(--sa-t, env(safe-area-inset-top))) max(8px, var(--sa-r, env(safe-area-inset-right))) max(10px, var(--sa-b, env(safe-area-inset-bottom))) max(8px, var(--sa-l, env(safe-area-inset-left))); }
 body.touch #fullmap .fm-leg { font-size: 10px; gap: 4px 5px; }
 /* телефон стоя: легенда — за пометкой «легенда ▾» под картой (fmlegend.js), тап — раскрыть; карта выше на 5 строк */
 #fullmap .fm-legbtn { display: none; }

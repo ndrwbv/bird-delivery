@@ -5,7 +5,7 @@
    покрасить и продать — пометки на полях. Скупого синего нет. Шрифт — три размера --pp-fs-* (paper.css). */
 #cr-garage { position: absolute; inset: 0; z-index: 38; display: flex; flex-direction: column; opacity: 0; transition: opacity .2s;
              background: radial-gradient(ellipse at 50% 42%, #6b3a22 0, #3a2014 48%, #1a0e08 100%); overflow: hidden; overflow: clip; color: var(--pp-ink);   /* clip: курсор геймпада (scrollIntoView) на узком экране сдвигал весь гараж вбок на 200 px */
-             padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+             padding: max(14px, var(--sa-t, env(safe-area-inset-top))) max(16px, var(--sa-r, env(safe-area-inset-right))) max(12px, var(--sa-b, env(safe-area-inset-bottom))) max(16px, var(--sa-l, env(safe-area-inset-left)));
              box-sizing: border-box; --cw: clamp(360px, 38vw, 660px); --step: calc(var(--cw) * .8); }
 #cr-garage[hidden] { display: none; }
 #cr-garage.on { opacity: 1; }

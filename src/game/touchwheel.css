@@ -1,0 +1,15 @@
+/* руль на телефоне (touchwheel.js): слева внизу, под левым большим пальцем.
+   Зона касания — шире самого руля (палец не промахнётся), руль крутится вслед за пальцем,
+   отпустил — плавно в центр. Размер — от высоты экрана: боком на iPhone SE — 108 px, обычный — 128, большой — 136 */
+#touchpad .tp-left { pointer-events: auto; touch-action: none; position: relative; display: flex; align-items: center; justify-content: center;
+                     width: calc(var(--tw, 128px) + 36px); height: calc(var(--tw, 128px) + 20px); margin: 0 0 -10px -18px;
+                     -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; cursor: grab; }
+.tw-wheel { width: var(--tw, 128px); height: var(--tw, 128px); border-radius: 50%; transition: transform .22s cubic-bezier(.3, 1.6, .5, 1);
+            filter: drop-shadow(0 4px 0 rgba(0, 0, 0, .35)); opacity: .9; will-change: transform; }
+.tw-svg { display: block; width: 100%; height: 100%; }
+/* держишь — руль вслед за пальцем сразу, без задержки; чуть ярче */
+#touchpad .tp-left.on .tw-wheel { transition: none; opacity: 1; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .35)) drop-shadow(0 0 6px rgba(255, 216, 94, .55)); }
+@media (min-height: 420px) { #touchpad { --tw: 136px; } }
+@media (max-height: 380px) { #touchpad { --tw: 108px; } }
+/* телефон стоя (заставка «поверни» закрывает игру; на случай ?portrait) — поменьше */
+@media (max-width: 440px) { #touchpad { --tw: 112px; } }

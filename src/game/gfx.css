@@ -1,7 +1,7 @@
 /* «кадр не успевает — включить „среднюю“?» (gfx.js offer) — маленькая бумажка-записка в углу, в езде:
    одно короткое проявление (.pp-ride), без пружин; «[X] включить» — кнопкой X / клавишей X, «не надо» — пальцем */
 .gfx-offer {
-  position: fixed; right: max(12px, env(safe-area-inset-right, 0px)); top: calc(env(safe-area-inset-top, 0px) + 12px); z-index: 60;
+  position: fixed; right: max(12px, var(--sa-r, env(safe-area-inset-right, 0px))); top: calc(var(--sa-t, env(safe-area-inset-top, 0px)) + 12px); z-index: 60;
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; width: min(310px, 50vw); box-sizing: border-box; padding: 9px 10px 10px;
   font-family: "Press Start 2P", ui-monospace, monospace; font-size: var(--pp-fs-s); line-height: 1.5; color: var(--pp-ink);
   background: var(--pp-paper); border: 2px solid var(--pp-ink); border-top: 5px solid var(--pp-orange); border-radius: 3px;
@@ -12,8 +12,8 @@
 /* пауза, карта, повтор — записку прячем: там X не её (кадры в паузе не идут, gfx.js watch не зовётся) */
 body:has(#pausem:not([hidden]), #fullmap:not([hidden]), .rp-ui.on, #panel:not([hidden]), #dlg:not([hidden])) .gfx-offer { display: none; }
 /* телефон: справа сверху — радар и пауза, записка — под ними, уже */
-body.touch .gfx-offer { top: calc(env(safe-area-inset-top, 0px) + 150px); width: min(180px, 46vw); padding: 7px 8px 8px; }
-@media (max-height: 460px) { body.touch .gfx-offer { top: calc(env(safe-area-inset-top, 0px) + 120px); } }
+body.touch .gfx-offer { top: calc(var(--sa-t, env(safe-area-inset-top, 0px)) + 150px); width: min(180px, 46vw); padding: 7px 8px 8px; }
+@media (max-height: 460px) { body.touch .gfx-offer { top: calc(var(--sa-t, env(safe-area-inset-top, 0px)) + 120px); } }
 .gfx-offer button {
   display: inline-flex; align-items: center; font: inherit; font-size: var(--pp-fs-s); cursor: pointer; padding: .45em .7em; min-height: 32px;
   color: var(--pp-ink); background: var(--pp-yellow); border: 2px solid var(--pp-ink); border-radius: 3px; box-shadow: 0 3px 0 var(--pp-ink);

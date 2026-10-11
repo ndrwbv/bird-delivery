@@ -148,7 +148,7 @@ const CHECKS = [
      Порог — с запасом ~20 % над замером; было до правок: куча 706 / 822 МБ, след страницы пик 1477 МБ — вкладка Safari на iPhone умирала */
   { id: 'memory-phone', name: 'память на телефоне: куча JS, видео, след страницы', group: 2, run: async () => {
     const LIM = { menu: 520, shift: 620, gl: 360, foot: 1450 };
-    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/memory.js'), '--mem', '--early', '--size=phone', '--q=msecs=20'], 220);
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/memory.js'), '--mem', '--early', '--size=phone-land', '--q=msecs=20'], 220);
     const e = errLine(j), r = j.result;
     if (e || !r || !r.shift) return { status: 'fail', info: e || 'нет результата' };
     const foot = Math.max(0, ...((j.mem || []).map(m => m.footPeak || 0)));
@@ -159,7 +159,7 @@ const CHECKS = [
     return { status: bad.length ? 'fail' : r.shift.mobile ? 'ok' : 'warn', info: (bad.length ? bad.join('; ') + ' · ' : '') + info };
   } },
   { id: 'smoke-adult', name: '30 с автопилота: взрослая (web)', group: 3, run: smoke(['--mode=web'], 'взрослая') },
-  { id: 'smoke-phone', name: '30 с автопилота: телефон (web)', group: 3, run: smoke(['--size=phone'], 'телефон') },
+  { id: 'smoke-phone', name: '30 с автопилота: телефон боком (web)', group: 3, run: smoke(['--size=phone-land'], 'телефон') },
   { id: 'smoke-crashlog', name: 'журнал ошибок пуст после дымовых', group: 4, run: async () => (
     CRASHES.length ? { status: 'fail', info: CRASHES.length + ' записей:\n' + CRASHES.map(l => '    ' + l).join('\n') } : { status: 'ok', info: 'пуст' }) },
   // детская версия и сборка Яндекса — только по явной просьбе автора (Яндекс собираем по нужде)

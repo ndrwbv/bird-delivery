@@ -62,7 +62,7 @@ body:not(.touch) #radio { bottom: calc(16px + min(148px, 22vw) + 12px + var(--ot
 #phone.ord-story .oc-inv tr + tr th, #phone.ord-story .oc-inv tr + tr td { border-top-color: color-mix(in srgb, var(--pp-brown, #8a6b4e) 70%, var(--ord, #ff3ea5) 30%); }
 
 /* телефон: радар справа сверху — бирки под ним (под кнопкой паузы), к правому краю, сверху вниз */
-body.touch #otags { left: auto; bottom: auto; right: max(10px, env(safe-area-inset-right)); top: calc(max(10px, env(safe-area-inset-top)) + 148px);
+body.touch #otags { left: auto; bottom: auto; right: max(10px, var(--sa-r, env(safe-area-inset-right))); top: calc(max(10px, var(--sa-t, env(safe-area-inset-top))) + 148px);
                     align-items: flex-end; }
 body.touch .otag { transform-origin: right top; max-width: 44vw; }
 body.touch .otag img { width: 24px; height: 24px; }
@@ -72,5 +72,5 @@ body.touch .ot-m { font-size: 8px; } body.touch .otag.cur .ot-m { font-size: 9px
 body.touch .otag.done::after { left: 32px; } body.touch .otag.cur.done::after { left: 38px; }
 /* телефон боком: под радаром мало места (кнопки) — бирки слева от радара, сверху вниз */
 @media (max-height: 460px) {
-  body.touch #otags { top: max(10px, env(safe-area-inset-top)); right: calc(max(10px, env(safe-area-inset-right)) + 108px); }
+  body.touch #otags { top: max(10px, var(--sa-t, env(safe-area-inset-top))); right: calc(max(10px, var(--sa-r, env(safe-area-inset-right))) + 108px); }
 }

@@ -23,6 +23,9 @@
    ready: () => false — очередь глав story.js их не берёт, флаг архива сюжета (heroes.js HERO.STORY)
    их не касается. Песочница игры (`npm run sandbox`) → раздел «Встречи».
 
+   Знакомые лица района (faces.js, 11.10.2026): Глеб и его жена — герои со своими встречами (only), в случайные встречи
+   не попадают; их появление ставит ритм смены, сыгранная встреча на заказе двигает историю (FACES.met).
+
    Деньги (трек 10 п. 3, 11.10.2026) — как у разговора у двери: у каждого ответа поле out (tip — тепло, big — восторг,
    cut — обида, none — облом, 0 — ну и ладно; таблица — smalltalk.js OUT). Встреча как вручение заказа (play с o.st) —
    итог в st.talk (doorstep.js meetDone) → talkAdjust → orders.js payStop: чаевые этого заказа, строка row в чеке,
@@ -47,6 +50,8 @@ import * as LINES from './minigames/smalltalk-lines.js';
 import { OUT } from './minigames/smalltalk.js';
 import * as DOOR from './doorstep.js';
 import * as RHY from './rhythm.js';             // ритм смены ставит встречи (rhythm.js)
+import * as FACES from './faces.js';            // знакомые лица района: Глеб и его история (faces.js)
+import { FACE_HEROES, FACE_DECOR, FACE_PAL, FACE_DECOR_NAME } from './faces.js';
 
 export const EN = {
   NEAR: 320,          // подъезд для встречи — ближе стольких метров к машине
@@ -148,6 +153,9 @@ const HEROES = [
       a: { me: N_('Так точно'), re: N_('Наш человек. Свободен.'), mood: 'happy', out: 'tip', row: N_('наш человек') },
       b: { me: N_('А что у вас на кровати?'), re: N_('Это ваза. Для цветов. Государственная. Свободен, бля!'), mood: 'scared', out: '0', slam: true },
       kids: { b: { me: N_('А что у вас на кровати?'), re: N_('Это… вещдоки. Изъял у внуков. Свободен!'), mood: 'scared', out: '0', slam: true } } } },
+
+  // знакомые лица района (faces.js): Глеб и его жена — только в своей истории, в случайные встречи не попадают
+  ...FACE_HEROES,
 ];
 
 /* ─────────────── состояние ─────────────── */
@@ -158,6 +166,7 @@ const SID = h => 'meet-' + h.id;
 /* встречи героя: своя + из smalltalk-lines.js по полю who (с учётом взрослой / детской) */
 function meetsOf (h) {
   const adult = !!(A && A.ADULT);
+  if (h.only) return h.only.filter(s => !s.adult || adult).map(s => kidsOf(s, adult));   // знакомое лицо: только его встречи, по порядку
   const theirs = (Array.isArray(LINES.SITS) ? LINES.SITS : []).filter(s => s && s.who === h.who && s.a && s.b && (!s.adult || adult));
   return [h.own].concat(theirs).filter(s => !s.adult || adult).slice(0, EN.MAX_MEETS).map(s => kidsOf(s, adult));
 }
@@ -184,7 +193,7 @@ function personOf (h) {
 const ACT_OF = { tip: 'nod', big: 'joy', cut: 'shake', none: 'shake', 0: 'shrug' };
 function scriptOf (h, s) {
   const out = [
-    ['do', o => setDecor(o)],
+    ['do', o => setDecor(o, s)],
     ['shot', 'establish', { cut: true }],
     ['walk', 'courier', 'front', { wait: false }],
     ['do', o => { pov(o); return courierTo(o, false); }],   // от первого лица: курьера не видно, коробка — в «руках» внизу кадра
@@ -451,10 +460,11 @@ const PAL = {
   foil: { wall: '#5a6a7a', low: '#3a4a5a', floor: '#3a4048', door: '#3a4a5a', frame: '#c8ccd2', roof: '#6b7780', back: '#c8ccd2', lamp: '#b8ffb0' },
   dark: { wall: '#3a3a44', low: '#22222a', floor: '#26262c', door: '#1f1f24', frame: '#15151a', roof: '#4a4a52', back: '#2a2a32', lamp: '#8fb8ff' },
   order: { wall: '#ece8dc', low: '#2e4a6b', floor: '#8a6a4a', door: '#7a3a2a', frame: '#e0c060', roof: '#ece8dc', back: '#f4f1ea', lamp: '#fff4d0' },
+  ...FACE_PAL,                       // Глеб: «oppo» — его подъезд, «search» — после обыска (faces.js)
 };
 
 /* антураж ставится шагом ['do'] в начале встречи: тамбур к двери подъезда, кусок квартиры, подъезд вокруг */
-function setDecor (o) {
+function setDecor (o, s) {
   clearDecor();
   const h = o.home, H = M.hero;
   if (!h || !H || !A) return null;
@@ -534,7 +544,8 @@ function setDecor (o) {
   anim.door = door; anim.doorOpen = cs * 2.9;          // на сколько открыта (рад): наружу, почти к стене
 
   // ── квартира за дверью и подъезд вокруг — по герою
-  const ctx = { T, g, box, plane, cs, D, OW, WW, HT, hw, ow, P, R, adult: !!A.ADULT, anim, texs, mats, canvasTex: (w, hh, f) => canvasTex(T, w, hh, f) };
+  const ctx = { T, g, box, plane, cs, D, OW, WW, HT, hw, ow, P, R, adult: !!A.ADULT, anim, texs, mats, canvasTex: (w, hh, f) => canvasTex(T, w, hh, f),
+    scrawl, meet: s ? s.id : '' };
   try { (DECOR[H.decor] || DECOR.wreck)(ctx); } catch (e) { console.warn('[encounters] decor', e); }
 
   if (anim.fish.length) {                // рыбки в аквариумах — своими мешами (плавают)
@@ -836,6 +847,8 @@ const DECOR = {
   },
 };
 
+Object.assign(DECOR, FACE_DECOR);    // подъезды знакомых лиц (faces.js)
+
 /* ─────────────── кадр: лампа мигает, крысы бегают, дверь, пьяный качается ─────────────── */
 function frame (dt, on) {
   if (!M.on) return;
@@ -886,9 +899,10 @@ function frame (dt, on) {
 /* ─────────────── снаружи ─────────────── */
 /* для песочницы: какой подъезд и квартира (по-русски, игроку не показывается) */
 const DECOR_NAME = { wreck: 'разбитый подъезд, крысы, бутылки', nice: 'чисто, цветы, коврик', granny: '«вытирай ноги!», ковёр на стене', cop: 'коробки с техникой, плазма',
-  loft: 'кирпич, гирлянда, пластинки', foil: 'фольга, аквариумы', dark: 'темно, энергетики, турник', order: 'флаги, портрет — и бонг на кровати' };
-export function list () {
-  return HEROES.map(h => ({ id: h.id, name: t(h.name), who: h.who, decor: DECOR_NAME[h.decor] || h.decor, meets: (h.meets || []).map((s, i) => ({ i, id: s.id, say: t(s.say), a: t(s.a.me), b: t(s.b.me), outA: s.a.out || '0', outB: s.b.out || '0' })) }));
+  loft: 'кирпич, гирлянда, пластинки', foil: 'фольга, аквариумы', dark: 'темно, энергетики, турник', order: 'флаги, портрет — и бонг на кровати', ...FACE_DECOR_NAME };
+/* герои встреч; face — только знакомые лица (faces.js: Глеб и Лена), без — только случайные герои */
+export function list (face = false) {
+  return HEROES.filter(h => !!h.face === !!face).map(h => ({ id: h.id, name: t(h.name), who: h.who, decor: DECOR_NAME[h.decor] || h.decor, meets: (h.meets || []).map((s, i) => ({ i, id: s.id, say: t(s.say), a: t(s.a.me), b: t(s.b.me), outA: s.a.out || '0', outB: s.b.out || '0' })) }));
 }
 
 /* ─────────────── итог встречи — деньгами, как у разговора у двери ───────────────
@@ -932,7 +946,8 @@ function carBack (b) {
    (на улице его нет), мини-игры в этом заказе нет (o.mg) */
 export function plan (o) {
   const sp = o && o.ord;
-  if (!A || !sp || !sp.meet || o.meetPlanned || !o.stops || !o.stops[0]) return;
+  if (!A || !sp || o.meetPlanned || !o.stops || !o.stops[0]) return;
+  if (!sp.meet) { if (sp.face) o.mg = 'face'; return; }   // Глеб просит поручение (faces.js): мини-игры в этом заказе нет
   o.meetPlanned = true;
   o.mg = 'meet';                                   // в одном заказе — что-то одно (doorstep.js plan его пропустит)
   const st = o.stops[0];
@@ -973,6 +988,9 @@ export function play (id, i = 0, o = {}) {
     let m = null;
     if (st) { DOOR.meetDone(st, res); m = res ? moneyOf(res, st.fee || EN.SAMPLE.FEE, 0) : null; }
     else if (res) m = sample(res);
+    // знакомое лицо (faces.js): появление сыграно на заказе — история дальше (ответ в 1-м запоминается), адрес и подъезд — его
+    const ord = o.order && o.order.ord;
+    if (h.face && st && ord) FACES.met(h.id, CUT.ans || null, ord.stops && ord.stops[0], sp);
     M.stats.last = { id, meet: s.id, ans: CUT.ans || null, skip: !!CUT.skip, ms: Math.round(performance.now() - t0),
       out: res ? res.out : null, seal: res ? t(res.seal) : '', row: res && res.row ? t(res.row) : '', mood: res ? res.mood : '',
       order: !!st, sample: !st && m ? { fee: EN.SAMPLE.FEE, tip: EN.SAMPLE.TIP, add: m.add, cut: m.cut } : null };
@@ -981,6 +999,8 @@ export function play (id, i = 0, o = {}) {
     if (back) carBack(back);
     povClear();
     clearDecor();
+    // жена Глеба: в накладной был он, дверь открыла она — к двери за пиццей выходит она (faces.js)
+    if (h.face && h.fem && st && A.rehuman && st.peds && st.peds[0] && !st.peds[0].dead) { try { A.rehuman(st.peds[0], personOf(h)); } catch (e) { console.warn('[enc] rehuman', e); } }
     guestBack(st);                                 // герой вышел к двери — вручение как обычно
     if (st) RHY.meetOff(M.stats.last ? id + ' — ' + (M.stats.last.skip ? 'пропустил' : M.stats.last.seal || 'без ответа') : id);
     M.on = false; M.hero = null;
@@ -998,7 +1018,7 @@ export function init (api) {
   M.ready = true;
   register();
   // ритм смены (rhythm.js): герои для встреч, человек героя (клиент заказа), есть ли у адреса подъезд для сцены
-  RHY.provide({ heroes: HEROES.map(h => ({ id: h.id, name: t(h.name), n: (h.meets || []).length })),
+  RHY.provide({ heroes: HEROES.filter(h => !h.face).map(h => ({ id: h.id, name: t(h.name), n: (h.meets || []).length })),
     person: id => { const h = HEROES.find(q => q.id === id); return h ? personOf(h) : null; },
     door: (x, z) => { const s = spotNear(x, z); return !!s && Math.hypot(s.ex - x, s.ez - z) < 6; } });
   STORY.onFrame(frame);

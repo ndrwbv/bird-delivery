@@ -43,7 +43,7 @@ body:has(#over:not([hidden])) #daily-note, body:has(#honor:not([hidden])) #daily
 body.calm-fx #daily-note, body.calm-fx #daily-pop { transition: none; }
 /* телефон стоя: ниже сердец, денег, радара и мини-карточек (под ними — небо и дома впереди), с полями по 16 px */
 @media (max-width: 560px) {
-  #daily-note, #daily-pop { top: calc(env(safe-area-inset-top, 0px) + 205px); max-width: calc(100vw - 32px); width: max-content; font-size: 10px; padding: 5px 8px; }
+  #daily-note, #daily-pop { top: calc(var(--sa-t, env(safe-area-inset-top, 0px)) + 205px); max-width: calc(100vw - 32px); width: max-content; font-size: 10px; padding: 5px 8px; }
   #daily-pop small { font-size: 10px; } #daily-pop b { font-size: 13px; }
 }
 

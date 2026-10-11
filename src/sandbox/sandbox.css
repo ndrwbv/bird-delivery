@@ -74,3 +74,7 @@ body.busy .btn { cursor: progress; }
   #stage { flex: 0 0 56vh; }
   #panel { width: auto; flex: 1; border-left: 0; border-top: 3px solid var(--line); }
 }
+
+/* поручения: на кнопке — что везти и строкой ниже — где взять / исходы */
+.btn small { display: block; margin-top: 2px; font-size: 9px; opacity: .72; }
+.btn.miss { opacity: .55; }

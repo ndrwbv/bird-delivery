@@ -19,6 +19,8 @@
    Таймеры мини-игр и поручений идут как шли: подошёл срок — ждут, пока ритм пустит.
    Встречи у двери ставит ритм: только в районе MEET.DIST (первом), с MEET.FROM законченных смен, не в быстром
    заезде; разные герои, без героев прошлой смены (сохранение MEET.KEY).
+   Знакомое лицо (faces.js, Глеб): там же и тогда же, что встречи, — первым на первом заказе подъёма, где можно встречу;
+   одно появление за смену: встреча у двери (как встреча) или заказ ему с поручением (в счёт поручения).
 
    Из director.js: init(api), begin(ride), why(kind), started(kind), ended(kind), step(dt, live), quiet().
    Из orders.js: slot(n, left) → { n, role, k, meet } | null (null — ритма нет: «покататься», не карьера),
@@ -29,13 +31,14 @@
    ────────────────────────────────────────────────────────────────────────── */
 import { RHYTHM as C } from './econ.js';
 import * as DIST from './districts.js';
+import * as FACES from './faces.js';            // знакомые лица района: Глеб — по одному появлению за смену (faces.js)
 
 let A = null;          // { Store, S, career, quick(), doorOn(), errAsked() } — из game.js через director.init
 const PROV = { heroes: [], person: null, door: null };
 const R = {
   on: false, t: 0, len: 0, n: 0, role: '', k: 0, f: 0, peak: false,
   last: -9, quietTo: 0, act: [], pend: '', beats: {}, total: 0, budget: 0,
-  meetMax: 0, used: [], prev: [], shift: 0, door: false, side: false, err: 0,
+  meetMax: 0, used: [], prev: [], shift: 0, door: false, side: false, err: 0, face: false,
   log: [], plan: [],
 };
 
@@ -96,9 +99,29 @@ export function slot (n, left) {
   const k = role === 'open' || role === 'last' ? 0 : role === 'peak' ? 1 : Math.min(1, f / C.RAMP);
   R.role = role; R.k = k; R.f = f;
   let meet = null;
-  if (role === 'rise' && R.meetMax && !why('meet')) meet = pickHero();
+  R.face = false;
+  if (role === 'rise' && R.meetMax && !why('meet')) {
+    const fc = faceSlot();                          // знакомое лицо (Глеб) — первым
+    if (fc) {
+      register(fc.kind === 'errand' ? 'errand' : 'meet'); R.pend = fc.kind === 'errand' ? 'face' : 'meet'; R.face = true;
+      FACES.planned(R.shift);
+      return { n: R.n, role, k, f, meet: fc };
+    }
+    meet = pickHero();
+  }
   if (meet) { register('meet'); R.pend = 'meet'; R.used.push(meet.id); saveMeets(); }
   return { n: R.n, role, k, f, meet };
+}
+
+/* появление знакомого лица в этой смене (faces.js want): встреча или поручение — человек в накладной — он (Глеб) */
+function faceSlot () {
+  let w = null;
+  try { w = FACES.want(R.shift); } catch (e) { w = null; }
+  if (!w) return null;
+  if (w.kind === 'errand' && (R.beats.errand || 0) >= (C.MAX.errand || 1)) return null;
+  let person = null;
+  try { person = PROV.person ? PROV.person(w.face) : null; } catch (e) { person = null; }
+  return { ...w, person };
 }
 
 /* средний заказ этой смены, с (сколько прошло смены / сколько заказов было); в начале — 55 с */
@@ -125,10 +148,12 @@ function saveMeets () {
 }
 /** orders.js: у встречи нет подъезда — заказ обычный, встреча не в счёт */
 export function meetFailed () {
-  if (R.pend !== 'meet') return;
+  if (R.pend !== 'meet' && R.pend !== 'face') return;
+  const kind = R.pend === 'face' ? 'errand' : 'meet';
   R.pend = '';
-  R.beats.meet = Math.max(0, (R.beats.meet || 0) - 1); R.total = Math.max(0, R.total - 1);
+  R.beats[kind] = Math.max(0, (R.beats[kind] || 0) - 1); R.total = Math.max(0, R.total - 1);
   R.last = R.lastWas;
+  if (R.face) { R.face = false; FACES.unplan(); note('знакомое лицо не поставили: его адрес занят или нет подъезда'); return; }
   R.used.pop(); saveMeets();
   note('встречу не поставили: нет подъезда');
 }
@@ -144,10 +169,11 @@ export function ordered (sp) {
   const kind = sp.urgent ? 'срочный' : sp.edge ? 'в конец района' : sp.bundle ? 'сборный ×' + sp.stops.length : sp.fest ? 'фестиваль' : sp.beach ? 'пляж' : KIND[sp.kind] || sp.kind;
   const st = sp.stops && sp.stops[0];
   const rim = st && typeof DIST.rim === 'function' && DIST.has() ? +DIST.rim(st.x, st.z).toFixed(2) : 0;   // окраина района (districts.js)
-  const e = { n: sp.n, t: Math.round(R.t), role: R.role, k: +R.k.toFixed(2), kind, m, rim, meet: sp.meet ? sp.meet.id : '' };
+  const e = { n: sp.n, t: Math.round(R.t), role: R.role, k: +R.k.toFixed(2), kind, m, rim, meet: sp.meet ? sp.meet.id : '', face: sp.face || (sp.meet && sp.meet.face) ? (sp.face || sp.meet).what : '' };
   R.plan.push(e);
   note('заказ ' + sp.n + ' · ' + (ROLE[R.role] || R.role) + (R.role === 'rise' ? ' ' + e.k : '') + ' · ' + kind + ' · ' + m + ' м' +
-    (rim > 0 ? ' · окраина ' + rim : '') + (sp.meet ? ' · встреча: ' + sp.meet.name : ''));
+    (rim > 0 ? ' · окраина ' + rim : '') + (sp.meet ? ' · встреча: ' + sp.meet.name : '') +
+    ((sp.meet || sp.face) && (sp.meet || sp.face).face ? ' · знакомое лицо ' + (sp.meet || sp.face).what : ''));
 }
 
 /* событие случилось на этом заказе (в счёт бюджета) */
@@ -228,7 +254,7 @@ export const DEBUG = {
   get state () {
     return { on: R.on, t: Math.round(R.t), len: Math.round(R.len), n: R.n, role: R.role, k: +R.k.toFixed(2), f: +R.f.toFixed(2),
       quiet: Math.max(0, Math.ceil(R.quietTo - R.t)), act: R.act.slice(), beats: { ...R.beats }, total: R.total, budget: R.budget,
-      meetMax: R.meetMax, used: R.used.slice(), prev: R.prev.slice() };
+      meetMax: R.meetMax, used: R.used.slice(), prev: R.prev.slice(), face: R.face };
   },
   get log () { return R.log; },
   get plan () { return R.plan; },

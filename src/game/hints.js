@@ -87,7 +87,7 @@ function make (id, extra) {
   const pad = isPad(), touch = isTouch();
   switch (id) {
     case 'drive': return { text: pad ? t('{gas} газ · {steer} руль · {brake} тормоз', { gas: k('RT'), steer: k(t('стик')), brake: k('LT') })
-      : touch ? t('{steer} руль · справа — газ и тормоз', { steer: k('◀', '▶') })
+      : touch ? t('{steer} слева — палец вбок · справа — газ и тормоз', { steer: k(t('руль')) })
         : t('{gas} газ · {steer} руль · {brake} тормоз · {hand} ручник', { gas: k('W'), steer: k('A', 'D'), brake: k('S'), hand: k(t('пробел')) }) };
     case 'map': return { hi: '#radar', text: pad ? t('куда везти — точка на радаре · {key} — карта района', { key: k('Y') })
       : touch ? t('куда везти — точка на радаре · тык в радар — карта района')

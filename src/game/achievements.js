@@ -128,7 +128,7 @@ function chip (a) {
       + '@media (max-width:560px){#ach-toast{left:auto;right:16px;top:116px;max-width:min(170px,44vw);transform:translateY(-8px);font-size:10px;padding:5px 7px}'
       + '#ach-toast.on{transform:none}#ach-toast small{font-size:10px}'
       // чек смены на телефоне: под радаром (116 px) плашка закрывала шапку чека «ЧЕК СМЕНЫ · № 0004» — радара там нет, плашку выше
-      + 'body:has(#over:not([hidden])) #ach-toast{top:max(8px,env(safe-area-inset-top))}}';
+      + 'body:has(#over:not([hidden])) #ach-toast{top:max(8px,var(--sa-t, env(safe-area-inset-top)))}}';
     document.head.appendChild(st);
     TOAST = document.createElement('div');
     TOAST.id = 'ach-toast';

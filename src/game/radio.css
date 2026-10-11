@@ -21,11 +21,11 @@
 #radio.talk { border-left-color: var(--pp-yellow, #ffd85e); }
 
 /* телефон: внизу — палец-руль и кнопки, справа сверху — радар; плашка — слева сверху, под сердцами, до радара */
-body.touch #radio { left: max(10px, env(safe-area-inset-left)); bottom: auto; top: calc(max(10px, env(safe-area-inset-top)) + 40px);
+body.touch #radio { left: max(10px, var(--sa-l, env(safe-area-inset-left))); bottom: auto; top: calc(max(10px, var(--sa-t, env(safe-area-inset-top))) + 40px);
                     max-width: min(340px, calc(100vw - 96px - 36px)); transform: translateY(-6px); }
 body.touch #radio.on { transform: translateY(0); }
 /* телефон боком: сверху — кошелёк и часы; плашка — слева посередине, над пальцем-рулём */
-@media (max-height: 460px) { body.touch #radio { top: auto; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 104px); max-width: min(340px, 44vw); } }
+@media (max-height: 460px) { body.touch #radio { top: auto; bottom: calc(max(10px, var(--sa-b, env(safe-area-inset-bottom))) + 104px); max-width: min(340px, 44vw); } }
 
 /* катсцена, накладная, пауза — не мешать */
 body.intro-cut #radio, body.brief #radio { opacity: 0; }

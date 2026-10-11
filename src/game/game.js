@@ -86,6 +86,7 @@ import * as HEROQ from './heroquests.js';      // прогноз Игорька 
 import * as STEPAB from './stepabench.js';     // Стёпа на лавочке у Ленинградской, 8 сам заказывает пиццу (через story.js)
 import * as ST1 from './stepafirst.js';         // учебный заказ Стёпы — сюжетный: катсцена на вручении (через story.js)
 import * as ENC from './encounters.js';         // встречи у двери (трек 10): микрогерои катсценами через story.js — пока только песочница
+import * as FACES from './faces.js';            // знакомые лица района: Глеб, история на 4 появления (faces.js)
 import * as WORK from './workout.js';         // площадки-качалки у коробок: турник и брусья, люди качаются, курьер подтягивается сам (workout.js)
 import * as KITES from './kites.js';          // воздушные змеи и дроны в парках и на Ленина (kites.js)
 import * as AUTO from './cars.js';               // карьера: 14 машин, мотор и ресурс, заглохла, ямы, гараж Дяди Жени
@@ -145,6 +146,8 @@ import * as EDL from './editlayer.js';         // правки города из
 import * as WARM from './warmup.js';            // прогрев шейдеров: образцы на-ходу-материалов, программы не выгружаются (warmup.js)
 import * as LATE from './latebuild.js';         // поздняя сборка города: меню раньше, остальное — очередью после него (latebuild.js)
 import * as MOBM from './mobile.js';            // мобильный режим: телефон и планшет — графика «низкая» и бюджет памяти (mobile.js, docs/IOS.md «Память на телефоне»)
+import * as WHEEL from './touchwheel.js';       // руль на телефоне: палец вбок — плавный поворот, как стик (touchwheel.js)
+import * as ORIENT from './orient.js';          // телефон — только боком: стоя — заставка «поверни телефон» и пауза (orient.js)
 import * as STREAMS from './streams.js';        // речки и пруды: русло, вода тем же шейдером, вброд и утонуть (streams.js)
 import * as WATER from './water.js';            // вода: волны, отражения неба и берега, блик, пена, круги от дождя (water.js)
 import * as ICEM from './ice.js';              // лёд зимой: на Томь и пруды можно выехать, но лёд трещит и проваливается (ice.js)
@@ -9749,7 +9752,7 @@ const RESET_KEEP = ['dlv-lang', 'dlv-sound', 'dlv-doorgames', 'dlv-route', 'dlv-
 const PROGRESS_KEYS = [
   'dlv-msk-wallet', 'dlv-msk-cars', 'dlv-msk-car', 'dlv-msk-best', 'dlv-msk-xp', 'dlv-msk-col', 'dlv-msk-tut', 'dlv-msk-guide', 'dlv-msk-nostut', 'dlv-intro', 'dlv-garage-tut', 'dlv-shift-tut', 'dlv-hints', 'dlv-route-ask', 'dlv-wx-last',
   'dlv-shifts', 'dlv-stars', 'dlv-crew', 'dlv-story', 'dlv-season', 'dlv-used-addr', 'dlv-lb-local', 'dlv-boss', 'dlv-clock', 'dlv-rev-sale',
-  'dlv-car-owned', 'dlv-car-cur', 'dlv-car-up', 'dlv-car-L', 'dlv-car-eng', 'dlv-car-paint', 'dlv-district', 'dlv-dist-shifts', 'dlv-dist-open', 'dlv-city-mode', 'dlv-city-party', 'dlv-knocked', 'dlv-pz-grow', 'dlv-delivered', 'dlv-honor',
+  'dlv-car-owned', 'dlv-car-cur', 'dlv-car-up', 'dlv-car-L', 'dlv-car-eng', 'dlv-car-paint', 'dlv-district', 'dlv-dist-shifts', 'dlv-dist-open', 'dlv-city-mode', 'dlv-city-party', 'dlv-knocked', 'dlv-pz-grow', 'dlv-delivered', 'dlv-honor', 'dlv-faces',
   ...Object.keys(ECON.DONATE || {}).map(k => 'dlv-don-' + k),
 ];
 function renderReset () {
@@ -9801,7 +9804,7 @@ function reprofile () {
   S.name = Platform.features.nameInput ? Store.get('dlv-name', '') : (Platform.player.name || '');
   elName.value = S.name || '';
   STORY.reload(true); ORD.reloadUsed(); HEROES.reloadSave(); HSTORY.resetSession(); HEROQ.reload(); HINTS.reload(); GROW.reload();
-  RESPECT.DEBUG.reload(); DIRECTOR.reload(); SEAS.reloadSaved(); HUR.reload();
+  RESPECT.DEBUG.reload(); DIRECTOR.reload(); SEAS.reloadSaved(); HUR.reload(); FACES.reload();
   if (CAREER) { AUTO.reprofile(); CAREERM.reprofile(); }
   if (DISTRICTS) { CITYOPEN.repair(); usePizzeria(DIST.cur()); FM.dist = null; DW.seen.clear(); districtLocks(); }
   startPose();
@@ -13025,7 +13028,7 @@ function errandShop (it, ped) {
     const fit = it.kinds.includes(q.k) && (!it.anyKind || it.prefer.test(q.n0));
     if (!fit || (it.coffee && !COFFEE_RE.test(q.n0))) continue;
     const d = Math.hypot(q.x - ped.x, q.z - ped.z);
-    if (d < 45 || d > 380) continue;
+    if (d < 45 || d > (ERRS.SBX.near || 380)) continue;   // near — песочница «рядом» (errands.js SBX)
     if (!errandZoneOk(q.x, q.z)) continue;      // магазин — в районе, где работаешь, и не за перекрытием
     if (d < bd) { bd = d; shop = q; }
     if (it.prefer.test(q.n0) && d < pd) { pd = d; pref = q; }
@@ -13668,8 +13671,8 @@ function keysInfo () {
     [k('Y'), $t('карта района')], [k('←', '↑', '→'), $t('ответ клиенту')], [k('R3'), $t('звук')], [k('☰'), $t('пауза')],
     [k('LB'), $t('повтор последних 10 с')], [k('↓'), $t('радио: следующая станция')],
   ] : touch ? [
-    [k($t('палец')), $t('тянешь вверх — газ, вниз — тормоз, в стороны — руль')], [k($t('второй палец')), $t('ручник')],
-    [k($t('кофе')), $t('держать — ускорение')], [k($t('радар')), $t('карта района')],
+    [k($t('руль')), $t('слева: палец на руль и вбок — поворот')], [k($t('газ')), $t('газ')], [k($t('тормоз')), $t('тормоз, назад')],
+    [k('(P)'), $t('ручник')], [k($t('кофе')), $t('держать — ускорение')], [k($t('радар')), $t('карта района')],
   ] : [
     [k('W', '↑'), $t('газ')], [k('S', '↓'), $t('тормоз, назад')], [k('A', 'D'), $t('руль')],
     [k($t('пробел')), $t('ручник')], [k('Shift', 'N'), $t('кофе')], [k('Tab'), $t('карта района')],
@@ -13820,27 +13823,33 @@ function joyApply () {
   IN.hand = JOY.hand !== null ? 1 : 0;
   elKnob.style.transform = 'translate(' + (JOY.x * JOY_R) + 'px, ' + (JOY.y * JOY_R) + 'px)';
 }
-/* ── телефон: кнопки вместо джойстика ──
-   Как в казуальных гонках: руль ◀ ▶ под левым большим пальцем, газ,
-   тормоз, нитро и ручник — под правым. Каждая кнопка держит свой палец
-   (pointer capture), поэтому газ с рулём жмутся одновременно. */
+/* ── телефон: руль и кнопки вместо джойстика ──
+   Как в казуальных гонках: руль под левым большим пальцем (touchwheel.js — палец вбок, поворот
+   плавный, как стиком), газ, тормоз, нитро и ручник — под правым. Каждая кнопка и руль держат свой
+   палец (pointer capture), поэтому газ с рулём жмутся одновременно. */
 const TOUCH = matchMedia('(pointer: coarse)').matches || (navigator.maxTouchPoints > 0 && 'ontouchstart' in window);
 document.body.classList.toggle('touch', TOUCH);
 const elTouch = $('touchpad');
+WHEEL.init(elTouch.querySelector('.tp-left'), IN, () => { Snd.boot(); Snd.resume(); });
 for (const b of elTouch.querySelectorAll('button[data-k]')) {
   const k = b.dataset.k;
-  const on = e => { e.preventDefault(); Snd.boot(); Snd.resume(); try { b.setPointerCapture(e.pointerId); } catch (_) {} IN[k] = 1; IN.joy = 0; b.classList.add('on'); };
+  // IN.joy тут не трогаем: им рулит руль, и газ под другим пальцем не должен его сбрасывать
+  const on = e => { e.preventDefault(); Snd.boot(); Snd.resume(); try { b.setPointerCapture(e.pointerId); } catch (_) {} IN[k] = 1; b.classList.add('on'); };
   const off = () => { IN[k] = 0; b.classList.remove('on'); };
   b.addEventListener('pointerdown', on);
   for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(ev, off);
   b.addEventListener('contextmenu', e => e.preventDefault());
 }
 function touchpadStep () {
+  ORIENT.step();
+  // телефон стоя — заставка «поверни телефон» (orient.js), смена — на паузу; повернул — продолжить кнопкой
+  if (ORIENT.blocked() && isPlaying() && !S.paused) setPause(true);
   const show = TOUCH && isPlaying() && !S.paused && !FM.open;   // педали — и пока висит накладная: ехать можно сразу (автор 11.10.2026)
   if (elTouch.hidden === show) {
     elTouch.hidden = !show;
-    if (!show) for (const b of elTouch.querySelectorAll('.on')) { b.classList.remove('on'); IN[b.dataset.k] = 0; }
+    if (!show) { for (const b of elTouch.querySelectorAll('button.on')) { b.classList.remove('on'); IN[b.dataset.k] = 0; } WHEEL.reset(); }
   }
+  if (show) WHEEL.apply();                       // держишь руль — подтверждаем поворот каждый кадр
 }
 
 /* Палец считаем только если он лёг на саму картинку: кнопки хада и
@@ -13991,7 +14000,9 @@ HSTORY.init({ S, V, ADULT, CAREER, Snd, toast, shops: () => SIGNS, pizza: () => 
 /* учебный заказ Стёпы (stepafirst.js): вручение — катсцена через story.js */
 ST1.init({ THREE, ADULT, V, fxAdd, puffGeo, groundH, Snd, sayBubble, makeHuman, stepanPerson, playerName: () => S.name, cam: () => cam });
 /* встречи у двери (encounters.js): катсцены микрогероев через story.js; в игре пока не выпадают — песочница «Встречи» */
-ENC.init({ THREE, scene, CITY, V, S, ORD, ADULT, car: () => car, groundH, inHouse, makeHuman, people: () => CULL_FAR_LISTS, popPay, money, guestIn, guestOut });
+ENC.init({ THREE, scene, CITY, V, S, ORD, ADULT, car: () => car, groundH, inHouse, makeHuman, people: () => CULL_FAR_LISTS, popPay, money, guestIn, guestOut,
+  rehuman: (p, person) => { dropMesh(p.grp); p.grp = makeHuman(person); p.person = p.grp.userData.person; p.speed = p.base * p.grp.userData.pace; scene.add(p.grp); } });   // жена Глеба выходит к двери вместо него (faces.js)
+FACES.init({ Store, THREE, scene, groundH, ADULT });   // знакомые лица: прогресс истории, плакат «Вернись, Глеб»
 /* Стёпа на лавочке (stepabench.js): лавочка у Ленинградской, 8 и его заказ — через story.js */
 // первый заказ (stepanOrder) зовёт его и сам, если город ещё достраивается: лавочка Ленинградской, 8 нужна сразу
 const stepaBenchInit = () => STEPAB.init({ CITY, ADULT, CAREER, bench, realAddress });
