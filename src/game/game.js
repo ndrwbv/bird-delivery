@@ -14953,7 +14953,9 @@ CL.setSnapshot(() => {
    достроить сразу и дальше обычным кадром */
 let LATE_F = 0, LATE_R = -1e9;
 function lateFrame (now) {
-  if (S.state !== 'title' || S.paused || (CAREER && CAREERM.covered())) { LATE.flush(); return false; }
+  // настройки, доска почёта, находки (пауза над меню) — город достраивается дальше за ними, без загрузки (автор 11.10.2026:
+  // «захожу в настройки — опять загрузка, причём долгая»); достроить разом — только уход из меню и гараж / траты / деп
+  if (S.state !== 'title' || (CAREER && CAREERM.covered())) { LATE.flush(); return false; }
   last = now;
   padStep();
   if (LATE_F >= 3 && now - LATE_R < 200) return true;
@@ -15269,7 +15271,8 @@ requestAnimationFrame(frame);
 /* поздняя сборка (latebuild.js): очередь — после первых кадров меню (или через 1,5 с, если кадров нет — окно скрыто).
    Выбрал карточку меню (на смену, быстрый заезд, гараж, покататься, находки…) или «сменить профиль», а город ещё
    строится — снова экран загрузки (птица и полоска), остаток — разом, и тогда нажать (клик, Enter, A геймпада —
-   всё это click). Имя, настройки, листание — без ожидания. Смена, заезд и профиль и сами достраивают до начала */
+   всё это click). Имя, настройки, доска почёта, находки, рекорды, листание — без ожидания (город достраивается за
+   ними дальше). Смена, заезд и профиль и сами достраивают до начала */
 if (LATE.busy()) {
   setTimeout(() => LATE.start(), 1500);
   let replay = false;
@@ -15278,7 +15281,11 @@ if (LATE.busy()) {
   const hold = e => {
     if (!LATE.busy() || replay) return;
     const tgt = e.target;
-    if (!(tgt && tgt.closest && tgt.closest('.crm-card, .crm-swap'))) return;
+    const cardEl = tgt && tgt.closest && tgt.closest('.crm-card, .crm-swap');
+    if (!cardEl) return;
+    // ждать город — только тем, кому он нужен: смена, быстрый заезд, покататься, гараж, смена профиля;
+    // настройки, доска почёта, находки, рекорды, выход — сразу (автор 11.10.2026)
+    if (cardEl.classList.contains('crm-card') && ['settings', 'honor', 'collect', 'board', 'quit'].includes(cardEl.dataset.key)) return;
     e.preventDefault(); e.stopImmediatePropagation();
     if (document.querySelector('.late-wait')) return;   // уже ждём
     const boot = document.createElement('div');
