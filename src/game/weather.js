@@ -1,11 +1,13 @@
 /* ──────────────────────────────────────────────────────────────────────────
    Погода смены: каждый сезон — в нескольких вариантах (IDEAS блок 8, правила — docs/CAREER.md «Сезоны»).
 
-   Сезон по календарю (seasons.js) решает, ЧТО может быть, номер смены — ЧТО будет: вариант
-   выбирается в начале смены жребием от номера смены (dlv-shifts), то есть детерминированно —
-   та же смена того же сохранения всегда с той же погодой. Шансы — CHANCES ниже. Первые NEWBIE смен
-   карьеры — всегда «clear» и без дождя (09.10.2026: первая смена новичка выпадала «жарой» — оранжевая
-   дымка и выжженная трава, «осень и туман»).
+   С 11.10.2026 (автор: «смены всегда выпадают на рандомную как погоду, так и время года») в начале
+   каждой смены карьеры жребий (Math.random) выбирает сразу и сезон, и погоду: сезон — по SEASON_W
+   (место внутри сезона — SEASON_AT, тоже жребием), погода — по шансам этого сезона CHANCES. Пара
+   «сезон / погода» прошлой смены (dlv-wx-last) подряд не повторяется — жребий бросается заново.
+   Первая смена новичка (NEWBIE) — всегда разгар лета (NEWBIE_SEA) и «clear» без дождя: обучение не
+   путается. «Просто покататься» сезон не трогает — только погоду в нём; быстрый заезд ставит свой
+   сезон (forced) и погоду «по жребию» берёт из шансов этого сезона.
 
      clear  — как по календарю: изредка дождь (или снег) — шанс DRIZZLE, летом редко
      heat   — жаркое лето: небо и туман оранжевые, трава выжженная (соломенная, пятнами ещё зелёная,
@@ -40,17 +42,26 @@ import { onYard } from './yards.js';              // дворовые дорож
 import * as HUR from './hurricane.js';
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 
-/* шансы вариантов на смену, по сезону календаря (в сумме 100). 09.10.2026 (автор: «чаще ярко-солнечно»):
-   ясных больше, жары и затяжного дождя меньше; гроза и ураган — как были (было: лето 47/25/15/10/3,
-   осень 39/25/20/10/6, весна 52/30/15/3) */
+/* какой сезон выпадет на смену карьеры (в сумме 100; 11.10.2026): лето чаще — «чаще ярко-солнечно» (09.10.2026) */
+export const SEASON_W = { summer: 38, autumn: 22, winter: 18, spring: 22 };
+/* где внутри сезона встаёт смена (seasons.js: 0—1 лето, 1—2 осень, 2—3 зима, 3—4 весна) — жребием в этих границах:
+   лето — от начала до разгара; осень — от ранней (кроны желтеют) до поздней (голые деревья, лужи) — межсезонье;
+   зима — снег лежит, гирлянды; весна — от распутицы (тает, грязь) до сирени — тоже межсезонье */
+export const SEASON_AT = { summer: [0.12, 0.85], autumn: [1.1, 1.9], winter: [2.2, 2.82], spring: [3.1, 3.75] };
+/* шансы вариантов на смену, по сезону (в сумме 100). 11.10.2026 (сезон теперь тоже жребием): редкие — гроза, ураган,
+   снежная зима — реже (гроза 10/10/15 → 7/6/8, ураган 3/6/3 → 3/4/3, снежная зима 45 → 35), жара и золотая осень
+   чуть чаще (10 → 15, 26 → 30), затяжной дождь — обычный (было 12/8/20). До того (09.10.2026, «чаще ярко-солнечно»):
+   лето 65/10/12/10/3, осень 50/26/8/10/6, зима 55/45, весна 62/20/15/3 */
 export const CHANCES = {
-  summer: { clear: 65, heat: 10, rain: 12, storm: 10, hurricane: 3 },
-  autumn: { clear: 50, golden: 26, rain: 8, storm: 10, hurricane: 6 },
-  winter: { clear: 55, snowy: 45 },
-  spring: { clear: 62, rain: 20, storm: 15, hurricane: 3 },
+  summer: { clear: 62, heat: 15, rain: 13, storm: 7, hurricane: 3 },
+  autumn: { clear: 48, golden: 30, rain: 12, storm: 6, hurricane: 4 },
+  winter: { clear: 65, snowy: 35 },
+  spring: { clear: 64, rain: 25, storm: 8, hurricane: 3 },
 };
-/* первые смены новичка — всегда ясно, без дождя (первое впечатление и кадры для Стима): смены 1…NEWBIE */
-export const NEWBIE = 3;
+/* первая смена новичка — разгар лета, ясно, без дождя (обучение не путается; было: первые 3 смены — лето календаря) */
+export const NEWBIE = 1;
+export const NEWBIE_SEA = 0.4;
+const LAST = 'dlv-wx-last';                    // «сезон/погода» прошлой смены карьеры: подряд не повторяем
 /* обычная (ясная) смена: шанс, что на очередном «броске» (раз в 90—160 с) пойдёт дождь на 40—70 с.
    Было 0,22 всегда — за 15-минутную смену (~6 бросков) дождь шёл в ~4 из 5 «ясных» смен; теперь летом ~1 из 6, весной и осенью ~1 из 2 */
 export const DRIZZLE = { summer: 0.03, autumn: 0.12, spring: 0.12, winter: 0.22 };
@@ -94,12 +105,27 @@ export function bucket (s = SEAS.seasonValue()) {
   if (SEAS.snowAmt() > 0.45) return 'winter';
   return v >= 0.95 && v < 2.3 ? 'autumn' : v >= 2.3 && v < 3.75 ? 'spring' : 'summer';
 }
-/* вариант смены n: жребий от номера смены по шансам сезона */
-export function pickFor (n, b = bucket()) {
-  const tab = CHANCES[b] || CHANCES.summer;
-  let x = h01(n, 77) * 100;
+/* жребий по таблице весов { ключ: вес } (r — 0…1, по умолчанию Math.random) */
+function pickW (tab, r = Math.random()) {
+  let sum = 0;
+  for (const k in tab) sum += tab[k];
+  let x = r * sum;
   for (const k in tab) if ((x -= tab[k]) < 0) return k;
-  return 'clear';
+  return Object.keys(tab)[0];
+}
+/* погода смены в этом сезоне: жребий по его шансам */
+export const pickFor = (b = bucket(), r) => pickW(CHANCES[b] || CHANCES.summer, r);
+/* смена карьеры: сезон и погода жребием, пара прошлой смены (prev — 'summer/clear') подряд не повторяется.
+   hur — можно ли ураган (нет — вместо него гроза). → { s: 'autumn', v: 1.47, id: 'golden' } */
+export function rollShift (prev = '', hur = true) {
+  let s = 'summer', id = 'clear';
+  for (let k = 0; k < 16; k++) {
+    s = pickW(SEASON_W); id = pickFor(s);
+    if (id === 'hurricane' && !hur) id = 'storm';
+    if (s + '/' + id !== prev) break;
+  }
+  const [a, b] = SEASON_AT[s];
+  return { s, id, v: a + Math.random() * (b - a) };
 }
 const fits = (id, b) => id === 'clear' || (CHANCES[b] && CHANCES[b][id] !== undefined);
 
@@ -117,15 +143,25 @@ export function init (ctx) {
   else setTimeout(() => { if (window.__dlv) window.__dlv.weather = DEBUG; }, 0);
 }
 
-/* начало смены: снять вариант прошлой, выбрать новый */
+/* начало смены: снять вариант прошлой, выбрать новый (а в смене карьеры — и сезон) */
 export function shiftStart (ride) {
   if (!C) return;
   SEAS.setVariant(null);
   const done = +C.Store.get('dlv-shifts', 0) || 0, n = done + (ride ? 5003 : 0);
-  NEW = !ride && done < NEWBIE;                    // первые смены карьеры: ясно и сухо
-  let id = FORCE || (NEW ? 'clear' : pickFor(n, bucket()));
-  if (id === 'hurricane' && !FORCE && (ride || n < HUR.HUR.FROM || !DIRECTOR.can('hurricane'))) id = 'storm';   // режиссёр: не в первую смену сессии   // ураган — не в первые смены и не «просто покататься»
-  if (FORCE && !fits(FORCE, bucket())) SEAS.setSeason(HOME[FORCE], true);   // быстрый заезд: «жара» — значит лето
+  const career = !ride && !SEAS.seasonForced() && !FORCE;   // не «покататься», не быстрый заезд, не ?season= / ?weather=
+  NEW = !ride && done < NEWBIE;                    // первая смена карьеры: лето, ясно и сухо
+  const hur = !ride && n >= HUR.HUR.FROM && DIRECTOR.can('hurricane');   // ураган — не в первые смены, не «покататься»; режиссёр: не в первую смену сессии
+  let id;
+  if (FORCE) id = FORCE;
+  else if (NEW) { id = 'clear'; if (career) { SEAS.shiftSeason(NEWBIE_SEA); C.Store.set(LAST, 'summer/clear'); } }
+  else if (career) {
+    const r = rollShift(String(C.Store.get(LAST, '') || ''), hur);
+    SEAS.shiftSeason(r.v);
+    id = r.id;
+    C.Store.set(LAST, r.s + '/' + r.id);
+  } else id = pickFor(bucket());                  // покататься, быстрый заезд «по жребию»: погода в сезоне, какой стоит
+  if (id === 'hurricane' && !FORCE && !hur) id = 'storm';
+  if (FORCE && !fits(FORCE, bucket())) SEAS.setSeason(HOME[FORCE], true);   // ?weather=heat зимой — значит лето
   set(id, n);
   if (NEW && id === 'clear' && C.ENV) { C.ENV.rainWant = 0; C.ENV.rain = 0; }   // новичку — сухо с первой секунды
   if (id === 'hurricane') DIRECTOR.start('hurricane');   // до конца смены (режиссёр сам забудет на новой)
@@ -585,7 +621,20 @@ const DEBUG = {
   /* поставить вариант сейчас (и сезон, если не к месту) */
   set (v) { SEAS.setVariant(null); if (v !== 'clear' && !fits(v, bucket())) SEAS.setSeason(HOME[v], true); set(v); HUR.shiftStart(ID, false, N); return ID; },
   /* как разойдутся смены 0…n-1 по вариантам в этом сезоне */
-  spread (n = 1000, b = bucket()) { const o = {}; for (let i = 0; i < n; i++) { const k = pickFor(i, b); o[k] = (o[k] || 0) + 1; } return o; },
+  spread (n = 1000, b = bucket()) { const o = {}; for (let i = 0; i < n; i++) { const k = pickFor(b); o[k] = (o[k] || 0) + 1; } return o; },
+  /* n смен карьеры подряд (как в игре: без повтора пары, ураган с HUR.FROM) → { seasons, weather, pairs, repeats, list } */
+  run (n = 30, from = NEWBIE) {
+    const seasons = {}, weather = {}, pairs = {}, list = [];
+    let prev = '', repeats = 0;
+    for (let i = 0; i < n; i++) {
+      const r = rollShift(prev, from + i >= HUR.HUR.FROM), key = r.s + '/' + r.id;
+      if (key === prev) repeats++;
+      prev = key; list.push(key);
+      seasons[r.s] = (seasons[r.s] || 0) + 1; weather[r.id] = (weather[r.id] || 0) + 1; pairs[key] = (pairs[key] || 0) + 1;
+    }
+    return { seasons, weather, pairs, repeats, list };
+  },
+  rollShift, SEASON_W, SEASON_AT,
   get bolts () { return BOLT.n; }, get flash () { return BOLT.f; }, hold (on = true) { BOLT.hold = on; },
   get deep () { return { ...DSTAT, n: DEEP_LIST.length, sledSpots: SLED_SPOTS.length, meshes: DEEP_MESH.length, visible: DEEP_MESH.some(m => m.visible) }; },
   DEEP_LIST, get sleds () { return SLEDS.map(q => ({ st: q.st, s: +q.s.toFixed(2), x: Math.round(q.x), z: Math.round(q.z), y: +q.grp.position.y.toFixed(1) })); },

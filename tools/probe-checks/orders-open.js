@@ -7,6 +7,16 @@
 const DI = d.DIST, ORD = d.ORD, N = DI.list().length, LIFES = [0, 12, 40, 90], PER = 90;
 if (!N) return { skip: 'на этой карте нет районов' };
 const dec = k => { const [a, b] = k.split('.'); return { x: parseInt(a, 36) * 4, z: parseInt(b, 36) * 4 }; };
+/* весь город поделён (11.10.2026): каждый адрес (SPOTS), подъезд (GEN_ENTR) и дом (SOLIDS) — в районе 0…N−1,
+   ничьих нет. Заодно — сколько адресов района в центре / на окраине / на самом краю (DIST.rim) */
+const inDist = (x, z) => { const i = DI.at(x, z); return Number.isInteger(i) && i >= 0 && i < N; };
+const nobody = [];
+for (const s of d.SPOTS) if (!inDist(s.x, s.z)) nobody.push(['spot', Math.round(s.x), Math.round(s.z)]);
+for (const e of d.GEN_ENTR || []) if (!inDist(e[0], e[1])) nobody.push(['door', Math.round(e[0]), Math.round(e[1])]);
+for (const h of d.SOLIDS || []) if (Number.isFinite(h.cx) && !inDist(h.cx, h.cz)) nobody.push(['house', Math.round(h.cx), Math.round(h.cz)]);
+const rims = DI.list().map(() => [0, 0, 0]);
+for (const s of d.SPOTS) { const r = DI.rim ? DI.rim(s.x, s.z) : 0; rims[DI.at(s.x, s.z)][r <= 0 ? 0 : r < 1 ? 1 : 2]++; }
+const cover = { spots: d.SPOTS.length, doors: (d.GEN_ENTR || []).length, houses: (d.SOLIDS || []).length, nobody: nobody.length, sample: nobody.slice(0, 3), rims };
 let total = 0, unmapped = 0, shifts = 0;
 const bad = [];
 const t0 = performance.now();
@@ -28,4 +38,4 @@ for (let n = 1; n <= N; n++) {
     }
   }
 }
-return { ok: !bad.length, total, bad: bad.length, sample: bad.slice(0, 5), unmapped, shifts, ms: Math.round(performance.now() - t0) };
+return { ok: !bad.length && !nobody.length, cover, total, bad: bad.length, sample: bad.slice(0, 5), unmapped, shifts, ms: Math.round(performance.now() - t0) };

@@ -6,6 +6,11 @@
    Когда (автор 10.10.2026): общие часы настоящего времени — одна мини-игра раз в 5—10 минут игры на смене (ECON.DOORGAME);
    подошли — на следующем подходящем адресе (обычная пицца, вовремя), какая — по месту: подъезд многоэтажки — домофон
    или подъезд, клиент у двери — разговор (в одном заказе — что-то одно). Первая смена новичка — без мини-игр.
+   Решается заранее (автор 11.10.2026: «чел сидит на лавке, а я звоню в домофон»): при выдаче заказа (plan, из game.js
+   showOrderCard) — адрес и вид помечены в st.mgPlan; домофон и подъезд — клиент дома: game.js guestIn уводит его за
+   дверь подъезда (снаружи его нет), после мини-игры guestOut — он у двери, вручение как обычно.
+   «Клиент не дома» (домофон, mode 'away', 11.10.2026): набрал верно — клиент зовёт на другой адрес в D.AWAY.R м
+   (тот же открытый район); game.js guestMove переносит его туда (пин, маршрут, адрес), срок + путь туда.
    Как встроено: подъехал к клиенту (orders.js onArrive, до вручения) — 2D-экран поверх игры. Руль стоит
    (game.js: DOOR.on() — ввод езды обнулён, машина тормозит), а срок заказа идёт: своего таймера у мини-игр нет.
    Квартира клиента — в накладной с начала заказа (homeOf; лист — ordersheet.js, он же в домофоне и подъезде).
@@ -14,7 +19,11 @@
    DOOR.talkAdjust: «поболтал с клиентом» +KEEP_TIP, «торопил клиента» — чаевые × RUSH_K, смешной — +FUN_TIP или без чаевых).
 
      DOOR.init(api)     — game.js после ORD.init: { ORD, S, Store, ADULT, Snd, money, root(), paused(), entranceLv(x, z), shiftsDone(), onShiftStart,
-                          respect(why), hintFind() → { name, where, m } | null — ближайшая ненайденная находка (и отметить на карте) }
+                          respect(why), hintFind() → { name, where, m } | null — ближайшая ненайденная находка (и отметить на карте),
+                          guestIn(st) → bool — клиент дома (за дверью подъезда), guestOut(st) — вышел к двери,
+                          guestMove(st, x, z) — клиент ждёт в другом месте (пин, адрес, маршрут), SPOTS — точки адресов,
+                          nearestRoad(x, z, r, k), routeLen(x0, z0, x1, z1) }
+     DOOR.plan(order)   — game.js showOrderCard: часы подошли — пометить адрес и вид мини-игры заранее (st.mgPlan)
      DOOR.on()          — мини-игра на экране (game.js: руль стоит, кнопки геймпада — её)
      DOOR.step(dt)      — каждый кадр мира (пауза и карта её стоят): часы мини-игр и сама мини-игра
      DOOR.homeOf(st, lv) — квартира остановки (game.js showOrderCard): { lv, per, entr, floor, door, flat } | null
@@ -37,6 +46,9 @@ import * as OS from './ordersheet.js';
 import * as SC from './minigames/doorscene.js';
 import { BONUS } from './minigames/smalltalk-lines.js';
 import { faceDataURL } from './people.js';
+import { awayLine } from './minigames/intercom.js';
+import * as DIST from './districts.js';
+import * as ZN from './zones.js';
 
 const D = ECON.DOOR;
 const TK = ECON.TALK;
@@ -73,38 +85,73 @@ function tick (dt) {
 const due = () => TM.t >= TM.next;
 function fired () { TM.t = 0; TM.next = rand(MG.EVERY[0], MG.EVERY[1]); }
 
-/* подъехал к клиенту: подошли часы и место подходит — Promise (вручение ждёт), нет — ничего.
+/* заранее, при выдаче заказа (game.js showOrderCard): часы подошли — первый подходящий адрес заказа и вид по месту —
+   в st.mgPlan ('door' | 'stairs' | 'talk'); домофон и подъезд — клиент дома (guestIn), на улице и лавочке его нет.
+   __dlv.DOOR.force() / stairs() — тоже сразу: клиент дома с выдачи */
+export function plan (o) {
+  if (!A || !o || o.mgPlanned || !o.stops) return null;
+  o.mgPlanned = true;
+  const forced = G.force ? 'door' : SG.force ? 'stairs' : TG.force ? 'talk' : '';
+  if (forced) {
+    if (forced === 'talk') return null;
+    const st = o.stops.find(q => !q.done && q.peds && q.peds.length === 1 && !q.pickup && !q.surf);
+    if (st && A.guestIn && A.guestIn(st)) st.mgIn = true;
+    return null;
+  }
+  if (!due() || o.mg || A.shiftsDone() < MG.FROM_SHIFT || !planOk(o)) return null;
+  for (const st of o.stops) {
+    if (st.done || !stopOk(o, st)) continue;
+    const kind = pickKind({ order: o, stop: st, x: (st.at || st.peds[0]).x, z: (st.at || st.peds[0]).z });
+    if (!kind) continue;
+    st.mgPlan = kind;
+    if (kind !== 'talk' && A.guestIn && A.guestIn(st)) st.mgIn = true;   // домофон, подъезд — клиент дома
+    fired();
+    return kind;
+  }
+  return null;
+}
+/* заказ, на котором бывают мини-игры (без force; «вовремя» — уже на месте, arrive) */
+function planOk (o) {
+  const sp = o.ord;
+  if (!sp || !enabled() || o.tut) return false;
+  return sp.type === 'pizza' && !sp.urgent && !sp.beach && !sp.fest && !sp.story;
+}
+const stopOk = (o, st) => !!(st.peds && st.peds.length && !st.beach && !st.fest && !st.pickup && !st.surf && (st.zone || o.ord.zone) !== 'gang');
+/* клиент дома — вышел к двери за пиццей (после мини-игры, или она не случилась) */
+function out (st) { if (st && st.mgIn) { st.mgIn = false; if (A.guestOut) A.guestOut(st); } }
+
+/* подъехал к клиенту: адрес помечен заранее (plan) и вовремя — Promise (вручение ждёт), нет — ничего.
+   Не успел (опоздал, срока меньше MIN_LEFT, мини-игры выключили) — часы снова «подошли»: следующий заказ.
    __dlv.DOOR.force() / talk() / stairs() — без часов и правил места */
 function arrive (ev) {
   if (!A || G.cur) return;
-  if (G.force) return door(ev, true) || talk(ev, true);
-  if (SG.force) return stairs(ev, true);
-  if (TG.force) return talk(ev, true);
-  if (!due() || !plain(ev) || ev.order.mg || A.shiftsDone() < MG.FROM_SHIFT) return;
-  if (A.S && !A.S.free && A.S.time < MG.MIN_LEFT) return;    // срок почти вышел — не до мини-игр (часы ждут следующего адреса)
-  const kind = pickKind(ev);
-  const r = kind === 'door' ? door(ev) : kind === 'stairs' ? stairs(ev) : kind === 'talk' ? talk(ev) : null;
-  if (r) fired();
-  return r;
+  const st = ev.stop;
+  let r = null;
+  if (G.force) r = door(ev, true) || talk(ev, true);
+  else if (SG.force) r = stairs(ev, true);
+  else if (TG.force) r = talk(ev, true);
+  else if (st.mgPlan) {
+    const k = st.mgPlan;
+    st.mgPlan = null;
+    const late = !ev.onTime || (A.S && !A.S.free && A.S.time < MG.MIN_LEFT);
+    if (late || !enabled() || ev.order.mg) TM.t = Math.max(TM.t, TM.next);   // не сыграли — часы снова подошли
+    else r = k === 'door' ? door(ev) : k === 'stairs' ? stairs(ev) : talk(ev);
+  }
+  if (!r) { out(st); return; }
+  // домофон и подъезд — клиент за дверью; после мини-игры (не «не дома») — выходит к двери за пиццей
+  if (G.cur && G.cur.type !== 'talk' && !st.mgIn && A.guestIn && A.guestIn(st)) st.mgIn = true;
+  return r.then(() => { if (!(st.door && st.door.away)) out(st); });
 }
 /* какая — по месту: у подъезда дома от DOOR.LV этажей — домофон, от STAIRS.LV — и подъезд; клиент у двери — разговор */
 function pickKind (ev) {
   const lv = A.entranceLv(ev.x, ev.z), st = ev.stop;
   const person = st.persons && st.persons[0], ped = st.peds && st.peds[0];
-  const can = { door: lv >= D.LV, stairs: lv >= SR.LV, talk: !!person && !(ped && ped.dead) };
+  const one = !!st.peds && st.peds.length === 1;          // компания на улице (групповой) — только разговор: домой её не уведёшь
+  const can = { door: one && lv >= D.LV, stairs: one && lv >= SR.LV, talk: !!person && !(ped && ped.dead) };
   const ks = Object.keys(can).filter(k => can[k] && (MG.W[k] || 0) > 0);
   let sum = ks.reduce((a, k) => a + MG.W[k], 0), r = Math.random() * sum;
   for (const k of ks) { r -= MG.W[k]; if (r <= 0) return k; }
   return ks[0] || null;
-}
-
-/* обычная пицца, на которой бывают мини-игры (без force) */
-function plain (ev) {
-  const o = ev.order, st = ev.stop, sp = o.ord;
-  if (!enabled() || !ev.onTime) return false;
-  if (ev.type !== 'pizza' || sp.urgent || sp.beach || sp.fest || sp.story) return false;
-  if (o.tut || st.beach || st.fest || (st.zone || sp.zone) === 'gang') return false;   // бандиты у подъезда — им не до разговоров
-  return true;
 }
 
 /* квартира остановки — с самого начала заказа (game.js showOrderCard пишет её в накладную): подъезд, этаж, дверь —
@@ -318,10 +365,11 @@ function talkSound (name) {
   try { Snd.fx('talk-' + name, SY[name]); } catch (e) { /* — */ }
 }
 
-/* что выпало: с SMUDGE_FROM-й смены — пятно на цифре, с TYPO_FROM-й — опечатка, с BROKEN_FROM-й — сломан */
+/* что выпало: с AWAY.FROM-й смены — клиент не дома, с SMUDGE_FROM-й смены — пятно на цифре, с TYPO_FROM-й — опечатка, с BROKEN_FROM-й — сломан */
 function pickMode (forced) {
   if (forced && forced !== true) return forced;
   const n = A.shiftsDone();
+  if (n >= D.AWAY.FROM && Math.random() < D.AWAY.P) return 'away';
   if (n >= D.BROKEN_FROM && Math.random() < D.BROKEN_P) return 'broken';
   if (n >= D.TYPO_FROM && Math.random() < D.TYPO_P) return 'typo';
   if (n >= D.SMUDGE_FROM && Math.random() < D.SMUDGE_P) return 'smudge';
@@ -332,6 +380,9 @@ function play (st, mode, lv, order) {
   // квартира — из накладной (homeOf); у force не у подъезда — своя
   const h = homeOf(st, lv) || (st.home = { lv, flat: String(rint(12, 98)) });
   const shown = String(h.flat);
+  // не дома: куда зовёт — точка в D.AWAY.R м в том же открытом районе; не нашлась — обычный домофон
+  const aw = mode === 'away' ? awaySpot(st) : null;
+  if (mode === 'away' && !aw) mode = 'dial';
   if ((mode === 'typo' || mode === 'smudge') && (shown.length < 2 || (mode === 'typo' && swapDigits(shown) === shown))) mode = 'dial';
   const flat = mode === 'typo' ? swapDigits(shown) : shown;
   const time = mode === 'broken' ? D.T.knock : (flat.length >= 3 ? D.T.three : D.T.two) + (mode === 'typo' ? D.T.typo : 0) + (mode === 'smudge' ? D.T.smudge : 0);
@@ -345,6 +396,7 @@ function play (st, mode, lv, order) {
       cur.done = true;
       st.door = Object.assign({ mode }, res || { ok: false, aborted: true });
       G.last = st.door;
+      if (aw && res && res.away) moveAway(st, aw);
       if (typeof cur.off === 'function') cur.off();
       if (G.cur === cur) { G.cur = null; G.step = null; G.pad = null; }
       resolve();
@@ -363,9 +415,59 @@ function play (st, mode, lv, order) {
       mode, flat, print: shown, time, knocks: D.KNOCKS, fast: D.FAST, fastPad: D.FAST_PAD, wipeAfter: D.WIPE_AFTER,
       addr: st.addr || '', who: person ? person.first || person.name : '', person,
       sheet: sheetOf(order), bonus: '+' + money(r10(fee * D.FAST_BONUS)), clock,
+      away: aw ? { addr: aw.addr, say: awayLine(!!A.ADULT) } : null,
     }, sceneOf(order, st)), api);
     sound('ring');
   });
+}
+
+/* «клиент не дома»: точка в D.AWAY.R м (по прямой) от адреса — в том же районе, открытая (как orders.js openSpot: у
+   ближайшей дороги и на кольце 25 м район открыт), не у бандитов; путь по дорогам — не дальше 2 × по прямой (или R). → { x, z, addr, L } | null */
+const OPEN_R = 25;
+function openAt (x, z) {
+  if (!DIST.has()) return true;
+  const ok = (px, pz) => DIST.isOpen(DIST.at(px, pz));
+  const r = A.nearestRoad ? A.nearestRoad(x, z, 60, 1) : null;
+  if (r && !ok(r.x, r.z)) return false;
+  for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; if (!ok(x + Math.cos(a) * OPEN_R, z + Math.sin(a) * OPEN_R)) return false; }
+  return true;
+}
+function awaySpot (st) {
+  const at = st.at || (st.peds && st.peds[0]), SP = A.SPOTS || [];
+  if (!at || !SP.length || !A.guestMove) return null;
+  const [r0, r1] = D.AWAY.R, di = DIST.has() ? DIST.at(at.x, at.z) : -1;
+  const cand = [];
+  for (const q of SP) {
+    const d = Math.hypot(q.x - at.x, q.z - at.z);
+    if (d < r0 || d > r1) continue;
+    if (di >= 0 && DIST.at(q.x, q.z) !== di) continue;
+    cand.push(q);
+  }
+  for (let k = 0; k < 14 && cand.length; k++) {
+    const q = cand.splice((Math.random() * cand.length) | 0, 1)[0];
+    if (!openAt(q.x, q.z) || ZN.zoneAt(q.x, q.z) === 'gang') continue;
+    const L = A.routeLen ? A.routeLen(at.x, at.z, q.x, q.z) : Math.hypot(q.x - at.x, q.z - at.z) * 1.4;
+    if (!Number.isFinite(L) || L > Math.max(2 * Math.hypot(q.x - at.x, q.z - at.z), r1)) continue;   // по дорогам — не в объезд через полрайона
+    return { x: q.x, z: q.z, L, addr: A.realAddress ? A.realAddress(q.x, q.z) : '' };
+  }
+  return null;
+}
+/* клиент переехал: game.js guestMove — он там на улице (пин, маршрут, адрес); в накладной старый адрес зачёркнут
+   (st.addrWas), квартиры больше нет. Срок — + путь туда по дорогам (честно; опоздал уже — опоздал) */
+function moveAway (st, aw) {
+  const flat = st.home && st.home.flat;
+  st.addrWas = (st.addr || '') + (flat ? ', ' + t('кв. {n}', { n: flat }) : '');
+  st.home = null;
+  st.mgIn = false;
+  A.guestMove(st, aw.x, aw.z);
+  if (aw.addr && !st.addr) st.addr = aw.addr;
+  const S = A.S;
+  if (S && !S.free && S.time > 0) {
+    const add = Math.round(aw.L / D.AWAY.V * D.AWAY.SLACK + D.AWAY.ADD);
+    S.time += add; S.timeMax += add;
+    st.door.add = add;
+  }
+  st.door.to = { x: +aw.x.toFixed(1), z: +aw.z.toFixed(1), addr: st.addr, L: Math.round(aw.L) };
 }
 
 /* звуки домофона: файлы public/sfx (docs/SOUNDS.md), без них — синтез */
@@ -445,7 +547,7 @@ export const DEBUG = {
   get timer () { return { t: +TM.t.toFixed(1), next: +TM.next.toFixed(1), due: due() }; },
   due: () => { TM.t = TM.next; return true; },
   /* следующий подъезд (любой обычный адрес) — домофон этого вида: 'dial' | 'smudge' | 'typo' | 'broken' | true (как выпадет) */
-  force: (mode = true) => { G.force = mode; return mode; },
+  force: (mode = true) => { G.force = mode; return mode; },   // ещё 'away' — клиент не дома
   /* решить открытый, как игрок: верно (wrong — сначала одна ошибка) */
   /* следующий обычный адрес — разговор: true (случайная ситуация) или id ситуации (smalltalk-lines.js) */
   talk: (id = true) => { TG.force = id; return id; },
@@ -471,6 +573,8 @@ export const DEBUG = {
   stairsState: () => { const b = G.host && G.host.querySelector('.sx'); return b && b.__st ? b.__st() : null; },
   doorState: () => { const b = G.host && G.host.querySelector('.dg'); return b && b.__st ? b.__st() : null; },
   homeOf,
+  /* что помечено заранее у текущего заказа: [{ addr, plan, inside }] */
+  get planned () { const o = A && A.S && A.S.order; return o && o.stops ? o.stops.map(st => ({ addr: st.addr, plan: st.mgPlan || null, inside: !!st.mgIn, was: st.addrWas || null })) : null; },
   get talkN () { return TG.n; },
   get sit () { const b = G.host && G.host.querySelector('.tk'); return b ? b.__sit : null; },
 };

@@ -15,7 +15,11 @@
    Тексты: свои (у каждого героя одна «фирменная» встреча, под его квартиру) + встречи агента
    «диалог у двери» из minigames/smalltalk-lines.js (SITS с полем who, файл не правим — берём что есть).
 
-   В игре встречи пока НЕ выпадают (автор смотрит в песочнице): истории помечены kind: 'meet' и
+   В игре (11.10.2026, трек 11 п. 3) — пока только в первом районе: встречу ставит ритм смены (rhythm.js) — 1—2 за
+   смену, разные герои, без героев прошлой смены, не в первую смену новичка. Встреча = заказ герою: orders.js
+   собирает заказ одному человеку на адрес у подъезда (клиент — герой, rehuman), при выдаче (plan, game.js
+   showOrderCard) герой — дома (guestIn), подъехал — катсцена вместо вручения (arrive), после — вышел к двери
+   (guestOut), вручение и оплата как обычно, итог ответа — в деньгах. Истории помечены kind: 'meet' и
    ready: () => false — очередь глав story.js их не берёт, флаг архива сюжета (heroes.js HERO.STORY)
    их не касается. Песочница игры (`npm run sandbox`) → раздел «Встречи».
 
@@ -26,11 +30,13 @@
    на заказ EN.SAMPLE.FEE ₽ с чаевыми EN.SAMPLE.TIP ₽ (денег не даёт).
 
      ENC.init(api)              — один раз из game.js: { THREE, scene, CITY, V, S, ORD, ADULT, car(), groundH, inHouse, makeHuman,
-                                  people() — списки прохожих, popPay(total, rows, title, face) — карточка оплаты, money(n) }
+                                  people() — списки прохожих, popPay(total, rows, title, face) — карточка оплаты, money(n),
+                                  guestIn(st) / guestOut(st) — клиент дома, за дверью подъезда / вышел к двери }
+     ENC.plan(order)            — game.js showOrderCard: заказ-встреча (ord.meet от ритма) — герой дома, мини-игры нет
      ENC.list()                 — герои и их встречи (для песочницы; у ответов — out)
      ENC.play(id, i, o) → Promise — проиграть встречу i героя id у ближайшего подъезда (машина встаёт сама);
                                   o.st — остановка заказа: встреча идёт как вручение (после — машина назад, итог — в оплату)
-   отладка: __dlv.ENC; ENC.next(id, i) — следующий подъехал к клиенту = эта встреча вместо вручения (в игре сами не выпадают)
+   отладка: __dlv.ENC; ENC.next(id, i) — следующий подъехал к клиенту = эта встреча вместо вручения (без ритма)
    ────────────────────────────────────────────────────────────────────────── */
 import { t, N_ } from '../i18n/index.js';
 import * as STORY from './story.js';
@@ -40,6 +46,7 @@ import { makeCatModel, FURS } from './cats.js';
 import * as LINES from './minigames/smalltalk-lines.js';
 import { OUT } from './minigames/smalltalk.js';
 import * as DOOR from './doorstep.js';
+import * as RHY from './rhythm.js';             // ритм смены ставит встречи (rhythm.js)
 
 export const EN = {
   NEAR: 320,          // подъезд для встречи — ближе стольких метров к машине
@@ -921,24 +928,40 @@ function carBack (b) {
   V.camX = V.x - Math.sin(V.h) * 11; V.camZ = V.z - Math.cos(V.h) * 11; V.camH = V.h; V.camY = V.y + 6;
 }
 
-/* подъехал к клиенту (orders.js onArrive): ENC.next(id, i) — эта встреча вместо обычного вручения (в игре сами пока не выпадают) */
+/* заказ-встреча (ритм смены поставил ord.meet, orders.js meetSpec): при выдаче — герой дома, за дверью подъезда
+   (на улице его нет), мини-игры в этом заказе нет (o.mg) */
+export function plan (o) {
+  const sp = o && o.ord;
+  if (!A || !sp || !sp.meet || o.meetPlanned || !o.stops || !o.stops[0]) return;
+  o.meetPlanned = true;
+  o.mg = 'meet';                                   // в одном заказе — что-то одно (doorstep.js plan его пропустит)
+  const st = o.stops[0];
+  if (A.guestIn && A.guestIn(st)) st.meetIn = true;
+}
+function guestBack (st) { if (st && st.meetIn) { st.meetIn = false; if (A.guestOut) A.guestOut(st); } }
+
+/* подъехал к клиенту (orders.js onArrive): заказ-встреча (ord.meet) или ENC.next(id, i) — встреча вместо обычного вручения */
 function arrive (ev) {
-  const n = M.next, o = ev.order, st = ev.stop, sp = o && o.ord;
-  if (!n || M.on || STORY.active() || DOOR.on()) return;
-  if (!sp || !st || sp.story || ev.type === 'staff' || st.talk || st.door || st.stairs) return;
-  M.next = null;
+  const o = ev.order, st = ev.stop, sp = o && o.ord;
+  const own = !!(sp && sp.meet && st && !st.meetDone);
+  const n = M.next || (own ? sp.meet : null);
+  if (!n) return;
+  if (M.on || STORY.active() || DOOR.on() || !sp || !st || sp.story || ev.type === 'staff' || st.talk || st.door || st.stairs) { guestBack(st); return; }
+  if (n === M.next) M.next = null;
+  st.meetDone = true;
   o.mg = 'meet';                                   // в одном заказе — что-то одно (doorstep.js)
-  return play(n.id, n.i, { st, order: o, x: ev.x, z: ev.z });
+  return play(n.id, n.i, { st, order: o, x: ev.x, z: ev.z, rhythm: own });
 }
 
 export function play (id, i = 0, o = {}) {
   const h = HEROES.find(q => q.id === id);
-  if (!A || !h || STORY.active() || M.on) return Promise.resolve(null);
+  if (!A || !h || STORY.active() || M.on) { if (A) guestBack(o.st); return Promise.resolve(null); }
   const st = o.st || null;
   const sp = o.spot || spotNear(Number.isFinite(o.x) ? o.x : A.V.x, Number.isFinite(o.z) ? o.z : A.V.z);
-  if (!sp) { if (st) DOOR.meetDone(st, null); return Promise.resolve(null); }
+  if (!sp) { if (st) { DOOR.meetDone(st, null); guestBack(st); } return Promise.resolve(null); }
   const back = st ? { x: A.V.x, z: A.V.z, h: A.V.h, y: A.V.y } : null;
   M.hero = h; M.spot = sp; M.on = true; M.slam = false; M.doorK = 0;
+  if (st) RHY.meetOn(id);                          // ритм смены: встреча идёт (после неё — окно «покататься»)
   const t0 = performance.now(), n0 = A.scene.children.length;
   M.stats.played++;
   const vi = Math.max(0, Math.min((h.meets || []).length - 1, +i || 0));
@@ -958,6 +981,8 @@ export function play (id, i = 0, o = {}) {
     if (back) carBack(back);
     povClear();
     clearDecor();
+    guestBack(st);                                 // герой вышел к двери — вручение как обычно
+    if (st) RHY.meetOff(M.stats.last ? id + ' — ' + (M.stats.last.skip ? 'пропустил' : M.stats.last.seal || 'без ответа') : id);
     M.on = false; M.hero = null;
     // осталось ли что-то от встречи в сцене (антураж, актёры): должно быть 0
     const cam = STORY.DEBUG.cam;
@@ -972,6 +997,10 @@ export function init (api) {
   if (M.ready) return;
   M.ready = true;
   register();
+  // ритм смены (rhythm.js): герои для встреч, человек героя (клиент заказа), есть ли у адреса подъезд для сцены
+  RHY.provide({ heroes: HEROES.map(h => ({ id: h.id, name: t(h.name), n: (h.meets || []).length })),
+    person: id => { const h = HEROES.find(q => q.id === id); return h ? personOf(h) : null; },
+    door: (x, z) => { const s = spotNear(x, z); return !!s && Math.hypot(s.ex - x, s.ez - z) < 6; } });
   STORY.onFrame(frame);
   if (api.ORD && api.ORD.onArrive) api.ORD.onArrive(arrive);
   if (typeof window !== 'undefined') window.setTimeout(() => { if (window.__dlv) window.__dlv.ENC = DEBUG; }, 0);

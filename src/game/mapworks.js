@@ -269,11 +269,12 @@ function asphalt (CITY) {
   const t0 = performance.now();
   const ter = CITY.terrain, X0 = Math.floor(ter.x0) - 2, Z0 = Math.floor(ter.z0) - 2;
   const NX = Math.ceil(ter.nx * ter.g) + 4, NZ = Math.ceil(ter.nz * ter.g) + 4;
-  const M = new Uint8Array(NX * NZ);
+  // по биту на метр (11.10.2026; было по байту — 108 МБ в Северске на время сборки, телефону это лишнее): docs/AGENTS.md «Память на телефоне»
+  const M = new Uint8Array((NX * NZ + 7) >> 3);
   const row = (iz, xa, xb) => {
     if (iz < 0 || iz >= NZ) return;
     const a = Math.max(0, Math.ceil(xa - X0)), b = Math.min(NX - 1, Math.floor(xb - X0));
-    for (let ix = a; ix <= b; ix++) M[iz * NX + ix] = 1;
+    for (let ix = a, k = iz * NX + a; ix <= b; ix++, k++) M[k >> 3] |= 1 << (k & 7);
   };
   // прямоугольник вдоль отрезка — построчно, точно: на строке z оба условия
   // (вдоль и поперёк) линейны по x, пересечение — отрезок
@@ -304,7 +305,7 @@ function asphalt (CITY) {
     for (let i = 1; i < p.length - 1; i++) disc(p[i][0], p[i][1], hw);
   }
   WORKS.ms.asphalt = Math.round(performance.now() - t0);
-  return (ASPH = { M, X0, Z0, NX, NZ, at: (x, z) => { const ix = Math.round(x) - X0, iz = Math.round(z) - Z0; return ix >= 0 && iz >= 0 && ix < NX && iz < NZ && M[iz * NX + ix] === 1; } });
+  return (ASPH = { M, X0, Z0, NX, NZ, at: (x, z) => { const ix = Math.round(x) - X0, iz = Math.round(z) - Z0; if (!(ix >= 0 && iz >= 0 && ix < NX && iz < NZ)) return false; const k = iz * NX + ix; return (M[k >> 3] >> (k & 7) & 1) === 1; } });
 }
 export const onAsphalt = (CITY, x, z) => asphalt(CITY).at(x, z);
 /* растр по метру нужен только на сборке — после неё отпускаем (в Северске это сто мегабайт) */

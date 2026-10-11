@@ -2,11 +2,10 @@
    Времена года.
 
    Сезон — число от 0 до 4: 0 — начало лета, 1 — осень, 2 — зима, 3 — весна.
-   Каждая смена (не «просто покататься») сдвигает его на одну смену календаря:
-   сезоны разной длины — SEASON_SHIFTS (лето 14 смен, осень, зима и весна по 6,
-   год — 32; 09.10.2026, автор: «чаще ярко-солнечно», до того — по 8 смен).
-   И каждый заход в игру — ещё на SEASON_ENTER смены (первый запуск — нет): кто
-   заходит редко и на одну смену, всё равно со временем попадает в разные сезоны.
+   С 11.10.2026 (автор: «смены всегда выпадают на рандомную как погоду, так и время
+   года») календаря нет: сезон каждой смены карьеры выбирает жребий вместе с погодой
+   (weather.js shiftStart → shiftSeason(v)). Между сменами и при заходе в игру сезон
+   не сдвигается — в меню тот, что был на последней смене.
    Хранится в dlv-season, ?season=2.4 ставит своё значение и ничего не сохраняет.
 
    Статика города склеена в меши один раз при загрузке, поэтому сезон в ней
@@ -37,17 +36,6 @@ import { growTree } from './trees.js';
 import * as EDL from './editlayer.js';         // редактор города: прятать убранные деревья на месте
 import { YARD, onYard } from './yards.js';   // дворовые дорожки: зимой протоптаны, сугробы мимо (yards.js)
 
-/* сколько смен длится каждый сезон: лето, осень, зима, весна (год — 32 смены). Лето длиннее (09.10.2026):
-   первое впечатление и большая часть игры — ярко и зелено; осень и зима остаются, просто короче */
-export const SEASON_SHIFTS = [14, 6, 6, 6];
-export const SEASON_ENTER = 0.5;           // заход в игру — ещё на полсмены календаря (~12—28 заходов без смен — сезон)
-const SEASON_CUM = SEASON_SHIFTS.reduce((a, n) => (a.push(a[a.length - 1] + n), a), [0]);
-const YEAR_SHIFTS = SEASON_CUM[4];
-/* сезон (0…4) → номер смены в году (0…32) и обратно: внутри сезона — ровно */
-const toShifts = s => { const v = ((s % 4) + 4) % 4, q = Math.min(3, Math.floor(v)); return SEASON_CUM[q] + (v - q) * SEASON_SHIFTS[q]; };
-const fromShifts = u => { const w = ((u % YEAR_SHIFTS) + YEAR_SHIFTS) % YEAR_SHIFTS; let q = 0; while (q < 3 && w >= SEASON_CUM[q + 1]) q++; return q + (w - SEASON_CUM[q]) / SEASON_SHIFTS[q]; };
-/* сезон через n смен календаря от s */
-export const seasonAfter = (s, n) => fromShifts(toShifts(s) + n);
 const CELL = 200;                           // клетка склейки, как у статики (CHUNK в game.js; было 100 — деревья и сугробы давали ~37 вызовов отрисовки в кадре, 10.10.2026)
 
 let C = null;                               // что дала игра (init)
@@ -63,8 +51,8 @@ const curve = pts => s => {
   return pts[pts.length - 1][1];
 };
 const K = {
-  // год — 32 смены (SEASON_SHIFTS): лето 0—1 (14 смен), осень 1—2, зима 2—3, весна 3—4 (по 6).
-  // «Зимний вид» (снег, сугробы, пуховики) — только 2,0—3,0: 6 смен из 32 (docs/CAREER.md)
+  // лето 0—1, осень 1—2, зима 2—3, весна 3—4; где внутри сезона встаёт смена — weather.js SEASON_AT.
+  // «Зимний вид» (снег, сугробы, пуховики) — только 2,0—3,0 (docs/CAREER.md «Сезоны»)
   snow: curve([[0, 0], [1.92, 0], [2.1, 1], [2.85, 1], [3.08, 0], [4, 0]]),
   leaf: curve([[0, 1], [1.35, 1], [1.85, 0], [3.05, 0], [3.35, 1], [4, 1]]),
   yellow: curve([[0, 0], [0.92, 0], [1.4, 1], [2.95, 1], [3.0, 0], [4, 0]]),
@@ -454,21 +442,20 @@ export function initSeasons (ctx) {
   apply();
 }
 
-/* сдвинуть сезон: новая смена */
-export function advanceSeason () {
+/* новая смена карьеры: сезон, который выпал жребием (weather.js shiftStart); сугробы снова целые */
+export function shiftSeason (v) {
   if (FORCED) return;
-  SEA = wrap(seasonAfter(SEA, 1));
+  SEA = wrap(+v || 0);
   healDrifts();
   C.Store.set('dlv-season', SEA);
   apply();
 }
-/* forced — дальше не сдвигать (песочница, ?season=). Быстрый заезд (quickrun.js) ставит свой сезон
-   и потом возвращает прежний с прежним forced — сохранение не трогается */
+/* forced — дальше не трогать (песочница, ?season=). Быстрый заезд (quickrun.js) ставит свой сезон
+   и потом возвращает прежний с прежним forced — сохранение не трогается.
+   Заход в игру сезон не сдвигает (до 11.10.2026 — +полсмены календаря): какой был на последней смене */
 function readSaved () {
   const saved = C.Store.get('dlv-season', null);
-  // зашёл в игру — сезон чуть вперёд (сохранённый уже был: не первый запуск)
-  SEA = wrap(saved === null || saved === undefined ? 0 : seasonAfter(+saved || 0, SEASON_ENTER));
-  C.Store.set('dlv-season', SEA);
+  SEA = wrap(saved === null || saved === undefined ? 0 : +saved || 0);
 }
 /** сменили профиль без перезагрузки (game.js reprofile): сезон — сохранённый у нового профиля (как при входе в игру) */
 export function reloadSaved () { if (!C || FORCED) return; readSaved(); apply(); }
@@ -1439,7 +1426,7 @@ export const kit = () => ({ Pile, tpls, hsh, rngAt, splash: (x, y, z, n, k) => s
 
 /* для ?debug: __dlv.season */
 const DEBUG = {
-  get value () { return SEA; }, get name () { return seasonName(); }, get amounts () { return { ...A }; }, BUILT, set: setSeason, advance: advanceSeason,
+  get value () { return SEA; }, get name () { return seasonName(); }, get amounts () { return { ...A }; }, BUILT, set: setSeason, shift: shiftSeason,
   snowNow (a = 0.8) { SKY.want = a; SKY.amt = a; SKY.t = 9999; }, DRIFTS, GROW, burstDrift,
   FIGHTS, FIRS, SEA_ITEMS, DECID, SPRUCES, get meshes () { return [...MESH_PILE, ...MESH_GARL, ...DRIFT_MESH]; }, get drifts () { return BUILT.drifts; }, get ENV () { return C.ENV; },
 };

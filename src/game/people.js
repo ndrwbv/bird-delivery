@@ -33,6 +33,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 
 import { t, lang } from '../i18n/index.js';
+import { MOB } from './mobile.js';
 
 /* ─────────────── случайность от зерна ─────────────── */
 function rng (seed) {
@@ -682,7 +683,7 @@ function drawFace (x, Lk, skin, Wp, ox, oy, fx) {
 }
 
 /* текстуры лиц: одна на сочетание черт, общая для всех таких людей */
-const FACE_CAP = 240;
+const FACE_CAP = MOB.on ? MOB.faceMats : 240;   // мобильный режим — меньше (mobile.js, память)
 
 /* ─────────────── человек в три.js ───────────────
    Фабрика, потому что общий материал и множество людей живут в игре.
@@ -1061,7 +1062,7 @@ export function drawFaceFrame (ctx, Lk, skin, Wp, fx) {
    пикселей (контур) и PNG не ждут видеокарту — было 2—5 мс за портрет на «Деке», стало ~0,5 (docs/AGENTS.md
    «Граффити и портреты»). faceSoon — дорисовать заранее, в спокойные кадры (requestIdleCallback): кадры рта
    говорящего (talkface.js), настроения мини-карточек заказа (ordertags.js). Картинки — пиксель в пиксель прежние. */
-const FACE_CAP_P = 500;
+const FACE_CAP_P = MOB.on ? MOB.portraits : 500;   // мобильный режим — меньше (mobile.js, память)
 export const FACE_STATS = { n: 0, hit: 0, miss: 0, ms: 0, max: 0, soon: 0, soonMs: 0, soonMax: 0, evict: 0 };
 let PCV = null;
 const portraitCanvas = () => {

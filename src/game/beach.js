@@ -3,7 +3,7 @@
    выглядит» → «Пляж на Томи» и docs/ORDERS.md «Заказ на пляж».
 
    Где: место задаёт карта (MAP.beach: точка на урезе воды и направление
-   вдоль берега). В Солнечном — правый берег Томи в районе «Кольцо», ниже
+   вдоль берега). В Солнечном — правый берег Томи в районе «Юг» (до 11.10.2026 — «Кольцо»), ниже
    улицы вдоль берега: склон там самый пологий (≈ 12 %), а дорога в 100—140 м.
    Весь берег Томи в Солнечном — за забором закрытого города (забор идёт по
    бровке в 60—110 м от воды), поэтому пляж — «карман»: забор обходит его
@@ -495,8 +495,15 @@ function makeBeachHuman (person) {
   const u = grp.userData;
   if (person.look.f || u.fem) {                    // руки купальщицы — без рукавов
     const c = new THREE.Color(person.look.skin);
-    for (const m of [u.armL, u.armR]) {
-      const ca = m.geometry.attributes.color;
+    if (u.skin && u.skin.geometry) {                // человек одним мешем с костями (people.js): руки — вершины костей 3 и 4
+      const g = u.skin.geometry, ca = g.attributes.color, si = g.attributes.skinIndex;
+      if (ca && si) {
+        for (let i = 0; i < ca.count; i++) { const b = si.getX(i); if (b === 3 || b === 4) ca.setXYZ(i, c.r, c.g, c.b); }
+        ca.needsUpdate = true;
+      }
+    } else for (const m of [u.armL, u.armR]) {       // старый человек: руки — свои меши
+      const ca = m && m.geometry && m.geometry.attributes.color;
+      if (!ca) continue;
       for (let i = 0; i < ca.count; i++) ca.setXYZ(i, c.r, c.g, c.b);
       ca.needsUpdate = true;
     }

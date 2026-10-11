@@ -21,11 +21,14 @@
      DIRECTOR.end(kind)        — кончилось
      DIRECTOR.going([kinds])   — идёт ли что-то из них (музыка, music.js)
      DIRECTOR.sessionShifts()  — сколько смен в сессии (поручения — со 2-й, orders.js)
-   Из game.js: init({ Store, S }), shiftStart(ride), delivered(), step(dt).
+   Из game.js: init({ Store, S, career, quick(), doorOn(), errAsked() }), shiftStart(ride), delivered(), step(dt).
+   Ритм смены (rhythm.js, трек 11): дуга смены и события по ней — режиссёр спрашивает его в can (средние и крупные —
+   «сценка», поручение, мини-игра — 'mini', лёгкие — только окна и первый заказ); quiet() — окно «покататься».
    Отладка: __dlv.DIRECTOR — state (сессия, уровни, что идёт, пауза), log (разрешения и отказы),
      relaunch(минут назад) — как будто игру перезапустили через столько минут, setN(n), reset().
    ────────────────────────────────────────────────────────────────────────── */
 import { DIRECTOR as C } from './econ.js';
+import * as RHY from './rhythm.js';          // ритм смены: дуга, окна «покататься», бюджет событий (rhythm.js)
 
 export const KINDS = {
   gig: 'light', crew: 'light', thugs: 'light', flirt: 'light', moose: 'light',
@@ -67,6 +70,7 @@ function boot (now = Date.now()) {
 
 export function init (api) {
   A = api;
+  RHY.init(api);
   boot();
   if (typeof window !== 'undefined' && window.__dlv) window.__dlv.DIRECTOR = DEBUG;
 }
@@ -79,6 +83,7 @@ export function shiftStart (ride) {
   ACT.length = 0;
   ST.ride = !!ride;
   if (!ride) { SES.shifts++; save(); }
+  RHY.begin(ride);
   stamp();
   note('смена ' + SES.shifts + ' сессии' + (ride ? ' (покататься)' : ''));
 }
@@ -93,18 +98,25 @@ export function delivered () {
 /** сколько смен в этой сессии, считая идущую («покататься» — не в счёт): поручения — со 2-й (orders.js, econ.js ERRAND) */
 export const sessionShifts = () => SES.shifts;
 
+/** ритм смены (rhythm.js): мини-игра помечена у заказа (game.js после DOOR.plan); окно «покататься» — Толик молчит */
+export const planned = kind => RHY.planned(kind);
+export const quiet = () => RHY.quiet();
+
 const count = tier => ACT.reduce((a, e) => a + (e.tier === tier ? 1 : 0), 0);
 
 function why (kind) {
+  if (kind === 'mini') return RHY.why('mini');     // мини-игра у клиента: часы doorstep.js подошли — ждёт, пока ритм пустит
   const tier = KINDS[kind];
   if (!tier) return '';                            // незнакомое — не сдерживаем
   if (tier === 'light' && ST.ride) return count('light') >= C.MAX.light ? 'лёгких уже ' + C.MAX.light : '';
   if (SES.n < C.OPEN[tier]) return 'рано: доставок ' + SES.n + ' из ' + C.OPEN[tier];
   if (PLANNED.includes(kind) && SES.shifts < C.PLANNED_SHIFT) return 'первая смена сессии';
+  if (kind === 'errand') return RHY.why('errand');
   if (tier === 'story') return '';
   if (count(tier) >= C.MAX[tier]) return tier + ' уже идёт: ' + ACT.filter(e => e.tier === tier).map(e => e.kind).join(', ');
   if (ST.pause > 0 && (tier === 'major' || tier === 'medium')) return 'пауза после крупного ' + Math.ceil(ST.pause) + ' с';
-  return '';
+  if (PLANNED.includes(kind)) return '';         // фестиваль и ураган — на всю смену, их ритм не дозирует
+  return RHY.why(tier === 'light' ? 'light' : 'scene');
 }
 
 export function can (kind) {
@@ -122,6 +134,8 @@ export function start (kind, ttl = 0) {
   ACT.push({ kind, tier, age: 0, ttl: ttl || (PLANNED.includes(kind) ? 0 : C.AGE) });
   ST.last[kind] = undefined;
   note('начало ' + kind);
+  if (tier === 'light') RHY.light(kind);
+  else if (!PLANNED.includes(kind)) RHY.started(kind);
 }
 
 export function end (kind) {
@@ -131,6 +145,7 @@ export function end (kind) {
   if (e.tier === 'major' && !PLANNED.includes(kind)) ST.pause = C.PAUSE;
   ST.last[kind] = undefined;
   note('конец ' + kind);
+  if (e.tier !== 'light' && !PLANNED.includes(kind)) RHY.ended(kind);
 }
 
 /** идёт ли хоть одно из событий kinds (музыка: напряжённый трек — music.js) */
@@ -141,12 +156,13 @@ export function step (dt) {
   ST.clock += dt;
   if ((ST.writeT -= dt) <= 0) { ST.writeT = 60; stamp(); }
   const S = A.S;
+  RHY.step(dt, !!S && LIVE.includes(S.state) && !S.paused);
   if (!S || !LIVE.includes(S.state)) return;
   if (ST.pause > 0) ST.pause = Math.max(0, ST.pause - dt);
   for (let i = ACT.length - 1; i >= 0; i--) {
     const e = ACT[i];
     e.age += dt;
-    if (e.ttl && e.age >= e.ttl) { ACT.splice(i, 1); if (e.tier === 'major') ST.pause = C.PAUSE; note('само кончилось ' + e.kind); }
+    if (e.ttl && e.age >= e.ttl) { ACT.splice(i, 1); if (e.tier === 'major') ST.pause = C.PAUSE; note('само кончилось ' + e.kind); if (e.tier !== 'light') RHY.ended(e.kind); }
   }
 }
 
@@ -159,6 +175,7 @@ export const DEBUG = {
       active: ACT.map(e => e.kind + ':' + Math.round(e.age)), lastPlay: get('dlv-last-play', 0) };
   },
   log: LOG,
+  RHY: RHY.DEBUG,
   can: k => can(k),
   why: k => why(k),
   /* как будто игру закрыли min минут назад и запустили снова */

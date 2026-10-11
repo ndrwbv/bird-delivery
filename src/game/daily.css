@@ -46,3 +46,6 @@ body.calm-fx #daily-note, body.calm-fx #daily-pop { transition: none; }
   #daily-note, #daily-pop { top: calc(env(safe-area-inset-top, 0px) + 205px); max-width: calc(100vw - 32px); width: max-content; font-size: 10px; padding: 5px 8px; }
   #daily-pop small { font-size: 10px; } #daily-pop b { font-size: 13px; }
 }
+
+/* мини-игра у двери (#doorgame) идёт — записка и плашка заданий не поверх неё (11.10.2026) */
+body:has(#doorgame > *) #daily-note, body:has(#doorgame > *) #daily-pop { display: none; }

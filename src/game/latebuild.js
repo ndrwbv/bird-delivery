@@ -17,6 +17,7 @@
    Шаги — в тех же местах при ?nolate и без: зерно --seed — перед каждым шагом (имя#номер). start() — начать разбор очереди (после первого кадра меню), flush() —
    достроить всё сейчас, busy() — ещё строится, onDone(fn) — когда всё. */
 import * as CL from '../platform/crashlog.js';
+import { MOB } from './mobile.js';
 
 const Q = [];
 let STARTED = false, DONE = true, T0 = 0;
@@ -24,7 +25,12 @@ const WAIT = [];
 export const T = {};                       // сколько мс шёл каждый кусок — для отладки (__boot.late)
 export const MAX = {};                     // самый долгий шаг куска, мс (кусок без шагов — он сам целиком)
 export const STEPS = {};                   // мс по шагам у кусков с шагами — найти, какой шаг долгий
+const MEMHOOK = typeof window !== 'undefined' && typeof window.__lateMem === 'function';
 const BUDGET = 12;                         // мс подряд на мелкие куски, потом — отдать кадр
+/* мобильный режим: пауза между тиками 30 мс — сборщик мусора Safari успевает убрать отходы поздней сборки; пик памяти
+   страницы в Safari (симулятор iPhone, iOS 16) 1,2 ГБ → ~1,05, город достраивается на ~5 с дольше. ?lateidle=N — своя пауза */
+const IDLE_Q = typeof location !== 'undefined' ? (location.search.match(/[?&]lateidle=(\d+)/) || [])[1] : undefined;
+const IDLE = IDLE_Q !== undefined ? +IDLE_Q : MOB.on ? 30 : 0;
 
 export function enable (on) { DONE = !on; }
 export const busy = () => !DONE;
@@ -58,7 +64,7 @@ function one () {
   T[n] = (T[n] || 0) + ms;
   if (!(MAX[n] >= ms)) MAX[n] = Math.round(ms);
   if (q[2]) (STEPS[n] || (STEPS[n] = [])).push(lab ? lab + ':' + Math.round(ms) : Math.round(ms));   // yield 'имя' — подпись шага
-  if (end) { Q.shift(); T[n] = Math.round(T[n]); }
+  if (end) { Q.shift(); T[n] = Math.round(T[n]); if (MEMHOOK) window.__lateMem(n); }   // probe --mem: память по кускам
   if (!Q.length) finish();
 }
 function finish () {
@@ -73,20 +79,22 @@ const next = () => { if (MC) MC.port2.postMessage(0); else setTimeout(tick, 0); 
 if (MC) MC.port1.onmessage = () => tick();
 function tick () {
   if (DONE) return;
+  if (MEMHOOK && window.__lateHold) { setTimeout(tick, 50); return; }   // probe --mem ?latesnap: стоим, пока снимается куча
   const t0 = performance.now();
-  do one(); while (Q.length && performance.now() - t0 < BUDGET);
-  if (!DONE) setTimeout(next, 0);          // через таймер: сначала кадр (rAF), потом следующий кусок
+  do one(); while (Q.length && performance.now() - t0 < BUDGET && !(MEMHOOK && window.__lateHold));
+  if (!DONE) setTimeout(next, IDLE);       // через таймер: сначала кадр (rAF), потом следующий кусок
 }
 
 export function start () {
   if (STARTED || DONE) return;
   STARTED = true; T0 = performance.now();
+  if (MEMHOOK) window.__lateMem('(меню)');
   if (!Q.length) { finish(); return; }
   next();
 }
 export function flush () {
   if (DONE) return;
-  if (!STARTED) { STARTED = true; T0 = performance.now(); }
+  if (!STARTED) { STARTED = true; T0 = performance.now(); if (MEMHOOK) window.__lateMem('(меню)'); }
   const t0 = performance.now();
   while (Q.length) one();
   finish();

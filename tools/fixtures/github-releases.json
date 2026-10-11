@@ -1,0 +1,1004 @@
+[
+ {
+  "tag_name": "v0.12.3",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-10T20:12:06Z",
+  "published_at": "2026-10-10T20:15:37Z",
+  "body": "Плавнее:",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 113819156,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.12.3/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86895559,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.12.3/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 118155303,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.12.3/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.12.3/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.12.2",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-10T19:31:05Z",
+  "published_at": "2026-10-10T19:34:29Z",
+  "body": "Плавнее:",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 113820429,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.12.2/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86892548,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.12.2/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 118151872,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.12.2/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.12.2/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.12.1",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-10T18:43:38Z",
+  "published_at": "2026-10-10T18:47:11Z",
+  "body": "Новое:",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 113817417,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.12.1/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86891678,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.12.1/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 118148515,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.12.1/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.12.1/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.12.0",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-10T14:23:57Z",
+  "published_at": "2026-10-10T14:26:56Z",
+  "body": "Новое:",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 113811266,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.12.0/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86880029,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.12.0/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 118141143,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.12.0/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.12.0/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.11.0",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-10T11:02:28Z",
+  "published_at": "2026-10-10T11:05:53Z",
+  "body": "Новое:",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 113757565,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.11.0/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86832821,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.11.0/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 118086828,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.11.0/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.11.0/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.10.6",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-09T18:27:02Z",
+  "published_at": "2026-10-09T18:30:22Z",
+  "body": "Что нового:",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 113474811,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.6/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86501700,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.6/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 117792158,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.6/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.6/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.10.5",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-09T17:53:50Z",
+  "published_at": "2026-10-09T17:57:08Z",
+  "body": "Исправлено:",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 113467254,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.5/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86506134,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.5/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 117785752,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.5/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.5/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.10.4",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-09T17:19:00Z",
+  "published_at": "2026-10-09T17:22:02Z",
+  "body": "Что нового:",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 113468018,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.4/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86506523,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.4/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 117785859,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.4/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.4/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.10.3",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-09T16:40:26Z",
+  "published_at": "2026-10-09T16:43:27Z",
+  "body": "Что нового:",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 113422995,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.3/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86474244,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.3/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 117748257,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.3/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.3/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.10.2",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-09T15:25:38Z",
+  "published_at": "2026-10-09T15:28:57Z",
+  "body": "Что нового:",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 113166495,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.2/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86304195,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.2/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 117504842,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.2/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.2/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.10.1",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-09T14:48:33Z",
+  "published_at": "2026-10-09T14:51:51Z",
+  "body": "Что нового:",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 113166838,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.1/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86300262,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.1/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 117499676,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.1/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.1/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.10.0",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-09T14:01:06Z",
+  "published_at": "2026-10-09T14:04:35Z",
+  "body": "Что нового:",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 113140662,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.0/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86278043,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.0/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 117476283,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.0/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.10.0/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.9.1",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-09T04:02:59Z",
+  "published_at": "2026-10-09T05:13:16Z",
+  "body": "Что нового:",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 112982072,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.9.1/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86157255,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.9.1/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 117319639,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.9.1/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.9.1/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.9.0",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-08T18:11:58Z",
+  "published_at": "2026-10-08T18:16:28Z",
+  "body": "Новое:",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 112981702,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.9.0/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86155726,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.9.0/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 117319839,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.9.0/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.9.0/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.8.2",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-04T16:02:47Z",
+  "published_at": "2026-10-04T16:05:46Z",
+  "body": "Исправлено:",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 112964171,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.8.2/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86142512,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.8.2/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 117305934,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.8.2/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.8.2/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.8.1",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-04T14:35:45Z",
+  "published_at": "2026-10-04T14:38:58Z",
+  "body": "Что нового:",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 112958603,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.8.1/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86139424,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.8.1/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 117305501,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.8.1/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.8.1/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.8.0",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-04T12:53:36Z",
+  "published_at": "2026-10-04T12:57:38Z",
+  "body": "Что нового:",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 112961542,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.8.0/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86141169,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.8.0/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 117304368,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.8.0/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.8.0/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.7.1",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-04T09:40:05Z",
+  "published_at": "2026-10-04T09:47:06Z",
+  "body": "## Что нового",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 112940803,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.7.1/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86119393,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.7.1/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 117281576,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.7.1/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.7.1/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.7.0",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-04T09:39:27Z",
+  "published_at": "2026-10-04T09:41:55Z",
+  "body": "## Что нового",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 112937311,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.7.0/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86122188,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.7.0/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 117281567,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.7.0/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.7.0/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.6.0",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-04T07:29:07Z",
+  "published_at": "2026-10-04T07:32:25Z",
+  "body": "## Что нового",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 112934121,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.6.0/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86118456,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.6.0/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 117280275,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.6.0/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.6.0/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.5.0",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-04T06:40:07Z",
+  "published_at": "2026-10-04T06:43:40Z",
+  "body": "## Что нового",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 112913220,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.5.0/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86105234,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.5.0/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 117258861,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.5.0/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.5.0/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.4.0",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-04T06:01:31Z",
+  "published_at": "2026-10-04T06:04:42Z",
+  "body": "Сборка из b1fa7a6.",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 112876849,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.4.0/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 86080203,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.4.0/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 117221905,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.4.0/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.4.0/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.3.0",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-03T11:08:37Z",
+  "published_at": "2026-10-03T17:41:17Z",
+  "body": "Сборка из c1e0487.",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 112674423,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.3.0/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 85945427,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.3.0/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 117025329,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.3.0/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.3.0/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.2.0",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-02T17:42:39Z",
+  "published_at": "2026-10-02T17:45:07Z",
+  "body": "Исправлено зависание (мир вставал, а меню и карта работали) и добавлен журнал ошибок — кнопка «отчёт об ошибке» в паузе.",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 111230390,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.2.0/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 85098950,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.2.0/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 115846756,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.2.0/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.2.0/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.1.0",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-02T15:54:44Z",
+  "published_at": "2026-10-02T15:57:50Z",
+  "body": "Смена снова кончается, заказы ровнее и только в открытые районы, опоздание не конец смены. Новая карта с зумом и легендо",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 111160150,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.1.0/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 85058454,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.1.0/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 115780437,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.1.0/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.1.0/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.0.8",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-01T17:38:16Z",
+  "published_at": "2026-10-01T17:46:24Z",
+  "body": "Сборка из fa1e841.",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 111057954,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.0.8/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 84989587,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.0.8/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 115676913,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.0.8/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.0.8/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.0.7",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-01T16:06:46Z",
+  "published_at": "2026-10-01T16:40:29Z",
+  "body": "Сборка из 1bdda67.",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 111022779,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.0.7/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-setup.exe",
+    "state": "uploaded",
+    "size": 84964903,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.0.7/bird-pizza-setup.exe"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 115643343,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.0.7/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.0.7/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.0.6",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-01T15:47:21Z",
+  "published_at": "2026-10-01T15:51:09Z",
+  "body": "Сборка из 97fb026.",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 111004031,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.0.6/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 115632659,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.0.6/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.0.6/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.0.5",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-01T14:34:22Z",
+  "published_at": "2026-10-01T15:40:57Z",
+  "body": "Сборка из 5d01752.",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 111005186,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.0.5/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 115632580,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.0.5/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.0.5/install-deck.sh"
+   }
+  ]
+ },
+ {
+  "tag_name": "v0.0.4",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-01T13:31:51Z",
+  "published_at": "2026-10-01T13:39:14Z",
+  "body": "Сборка из 613ae10.",
+  "assets": [
+   {
+    "name": "bird-pizza-deck.tar.gz",
+    "state": "uploaded",
+    "size": 110995138,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.0.4/bird-pizza-deck.tar.gz"
+   },
+   {
+    "name": "bird-pizza-win.zip",
+    "state": "uploaded",
+    "size": 115626523,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.0.4/bird-pizza-win.zip"
+   },
+   {
+    "name": "install-deck.sh",
+    "state": "uploaded",
+    "size": 5272,
+    "browser_download_url": "https://github.com/ndrwbv/bird-delivery/releases/download/v0.0.4/install-deck.sh"
+   }
+  ]
+ }
+]

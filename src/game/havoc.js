@@ -119,7 +119,7 @@ export function reset () {
 
 export function counts () {
   const S = A.S || {};
-  return { ...H.n, people: (S.people || 0) + (S.scoots || 0), stop: S.stops || 0 };
+  return { ...H.n, people: (S.people || 0) + (S.scoots || 0), stop: S.stops || 0, other: H.other };   // other — мелочь (кусты, столики…): для «полного разноса» (daily.js)
 }
 
 export function smash (kind) {

@@ -17,6 +17,7 @@ const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
 const { spawn } = require('child_process');
+const { pickLatest, isNewer } = require('./release-pick.cjs');
 
 const NAME = 'BirdPizza';
 const TITLE = 'Птица Пицца';
@@ -173,7 +174,11 @@ ipcMain.handle('steam:floatKeyboard', async (e, x, y, w, h) => {
    Сравниваем тег, запечённый CI в electron/build-tag.json, с последним релизом. С 04.10.2026 окна
    «Вышла версия» при старте нет (в игровом режиме Деки оно могло не показаться): игра сама спрашивает
    update:latest и рисует на первом экране меню плашку «есть новая версия — обновить», по ней —
-   update:apply. Ход скачивания — событием update:progress. REPO — репозиторий с релизами (docs/STEAM.md). */
+   update:apply. Ход скачивания — событием update:progress. REPO — репозиторий с релизами (docs/STEAM.md).
+   С 11.10.2026 какую версию предлагать — electron/release-pick.cjs: из списка релизов самая новая по
+   номеру (числами), только готовая (файл под эту систему уже выложен); «обновить» перед скачиванием
+   спрашивает GitHub заново и ставит именно её (Дека — install-deck.sh --tag), а не ту, что была
+   последней на момент запуска игры. Ответы GitHub — мимо HTTP-кэша. */
 const REPO = 'ndrwbv/bird-delivery';
 const INSTALLER = `https://raw.githubusercontent.com/${REPO}/main/tools/install-deck.sh`;
 const SETUP = 'bird-pizza-setup.exe';
@@ -201,16 +206,15 @@ function updatable() {
 
 async function latestRelease() {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 6000);
+  const timer = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const r = await net.fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-      headers: { accept: 'application/vnd.github+json', 'user-agent': 'birdpizza-updater' }, signal: ctrl.signal,
+    // список, а не /releases/latest: выбираем сами — самый новый номер, у которого файлы уже выложены
+    const r = await net.fetch(`https://api.github.com/repos/${REPO}/releases?per_page=30`, {
+      headers: { accept: 'application/vnd.github+json', 'user-agent': 'birdpizza-updater', 'cache-control': 'no-cache' },
+      cache: 'no-store', signal: ctrl.signal,
     });
     if (!r.ok) return null;
-    const j = await r.json();
-    if (!j || !j.tag_name) return null;
-    const setup = (j.assets || []).find(a => a && a.name === SETUP);
-    return { tag: j.tag_name, notes: (j.body || '').slice(0, 400), setup: setup ? setup.browser_download_url : '' };
+    return pickLatest(await r.json(), process.platform);
   } catch (e) { return null; }
   finally { clearTimeout(timer); }
 }
@@ -222,9 +226,7 @@ async function checkUpdate(win, manual) {
   const cur = buildTag();
   const rel = await latestRelease();
   if (!rel) return { state: 'error', current: cur };
-  if (!cur || rel.tag === cur) return { state: 'fresh', current: cur, latest: rel.tag };
-  // в релизе нет установщика под Windows — предлагать нечего
-  if (process.platform === 'win32' && !rel.setup) return { state: 'error', current: cur, latest: rel.tag };
+  if (!isNewer(rel.tag, cur)) return { state: 'fresh', current: cur, latest: rel.tag };
   if (!updatable()) return { state: 'available', current: cur, latest: rel.tag };
   const ru = RU();
   const win32 = process.platform === 'win32';
@@ -243,7 +245,8 @@ async function checkUpdate(win, manual) {
     defaultId: 0, cancelId: 1, noLink: true,
   });
   if (response !== 0) return { state: 'declined', current: cur, latest: rel.tag };
-  applyUpdate(win, rel);
+  relCache = rel; relAt = Date.now();
+  applyUpdate(win);
   return { state: 'updating', current: cur, latest: rel.tag };
 }
 
@@ -255,19 +258,25 @@ async function latestInfo(force) {
   if (!app.isPackaged || steamLaunched() || has('--no-update') || process.env.BIRD_NO_UPDATE) return { ...base, state: 'off' };
   if (force || !relCache || Date.now() - relAt > 600e3) { const r = await latestRelease(); if (r) { relCache = r; relAt = Date.now(); } else if (force || !relCache) return { ...base, state: 'error' }; }
   const rel = relCache;
-  if (!cur || rel.tag === cur) return { ...base, state: 'fresh', latest: rel.tag };
-  if (process.platform === 'win32' && !rel.setup) return { ...base, state: 'error', latest: rel.tag };
+  if (!isNewer(rel.tag, cur)) return { ...base, state: 'fresh', latest: rel.tag };
   return { ...base, state: 'newer', latest: rel.tag, notes: rel.notes };
 }
 const progress = (win, d) => { try { if (win && !win.isDestroyed()) win.webContents.send('update:progress', d); } catch (e) { /* — */ } };
 
-function applyUpdate(win, rel) {
-  if (!rel) rel = relCache;
-  if (process.platform === 'win32') { applyUpdateWin(win, rel); return; }
+/* «обновить»: сначала спросить GitHub заново — игра могла быть открыта часами, и в памяти лежит
+   та версия, что была последней при запуске; ставим самую новую готовую (свежую или из памяти) */
+let applying = false;
+async function applyUpdate(win) {
+  if (applying) return;
+  applying = true;
+  let rel = await latestRelease();
+  if (rel) { relCache = rel; relAt = Date.now(); } else rel = relCache;
+  if (process.platform === 'win32') { await applyUpdateWin(win, rel); applying = false; return; }
+  if (!rel) { applying = false; progress(win, { stage: 'error', msg: 'no release' }); return; }
   progress(win, { stage: 'restart' });
-  // ждём, пока процесс отпустит папку, и ставим поверх тем же скриптом, что и в первый раз
-  const sh = spawn('bash', ['-c', 'sleep 2; curl -fsSL "$BIRD_INSTALLER" | bash -s -- --dir "$BIRD_DIR" --no-desktop --run'], {
-    env: { ...process.env, BIRD_INSTALLER: INSTALLER, BIRD_DIR: installDir() }, detached: true, stdio: 'ignore',
+  // ждём, пока процесс отпустит папку, и ставим поверх тем же скриптом, что и в первый раз — ровно выбранный тег
+  const sh = spawn('bash', ['-c', 'sleep 2; curl -fsSL "$BIRD_INSTALLER" | bash -s -- --dir "$BIRD_DIR" --tag "$BIRD_TAG" --no-desktop --run'], {
+    env: { ...process.env, BIRD_INSTALLER: INSTALLER, BIRD_DIR: installDir(), BIRD_TAG: rel.tag }, detached: true, stdio: 'ignore',
   });
   sh.unref();
   setTimeout(() => app.quit(), 300);
@@ -285,7 +294,6 @@ async function applyUpdateWin(win, rel) {
   const bar = p => { try { if (win && !win.isDestroyed()) win.setProgressBar(p); } catch (e) { /* — */ } };
   const file = path.join(app.getPath('temp'), SETUP);
   try {
-    if (!rel) rel = await latestRelease();
     if (!rel || !rel.setup) throw new Error('no ' + SETUP + ' in the latest release');
     const r = await net.fetch(rel.setup, { headers: { 'user-agent': 'birdpizza-updater' } });
     if (!r.ok || !r.body) throw new Error('HTTP ' + r.status);

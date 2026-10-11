@@ -193,7 +193,7 @@ export default {
         '</div>' +
       '</div>' +
       '<div class="mk-say sx-feed"></div>' +
-      KIT.miniHTML(sheet, { t, short: t('кв. {n}', { n: flat }), face: faceUrl }) +
+      KIT.miniHTML(sheet, { t, short: t('кв. {n}', { n: flat }), face: faceUrl, compact: true }) +
       '<div class="sx-bar sx-bar-go">' +
         '<button type="button" tabindex="-1" data-a="down" class="sx-b sx-b-down">▼</button>' +
         '<button type="button" tabindex="-1" data-a="up" class="sx-b sx-b-up">▲ ' + esc(t('вверх')) + '</button>' +

@@ -271,7 +271,7 @@ const PRESETS = [
   { group: 'донаты', name: 'Бандиты 0 %', needs: ['donate'], run: () => donate('gang', 0) },
   { group: 'донаты', name: 'Бандиты 100 %', needs: ['donate'], run: () => donate('gang', 1) },
 
-  ...['beer', 'snus', 'lemonade'].map(id => {
+  ...['condoms', 'sister', 'passport', 'vodka'].map(id => {
     const s = SIDE_ORDERS.find(q => q.id === id);
     return { group: 'поручения', name: 'Поручение: ' + (s ? s.what : id), needs: ['sideOrder'],
       async run () { if (s && s.adult) await G.kids(false); await G.onShift(); await call('sideOrder', id); } };

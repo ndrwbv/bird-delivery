@@ -86,7 +86,9 @@ body.calm-fx .mk-m, body.calm-fx .mk-m.mk-gone { animation-duration: .01s; }
 .mk-say { position: absolute; z-index: 2; left: max(14px, env(safe-area-inset-left)); top: 18px; width: min(26vw, 440px); pointer-events: none; }
 .mk-say .mk-b b { color: #fff3d6; text-shadow: 1px 1px 0 #33210c, 0 0 4px rgba(0, 0, 0, .7); }
 
-/* свёрнутая накладная в углу: наведение, клик или X — раскрыть; новая пометка — сама приоткрывается на 1,8 с */
+/* накладная (автор 11.10.2026: «показывать, а не скрывать»): раскрыта сразу, в углу; X / клик по листу — свернуть в плашку
+   (наведение на плашку — показать); свёрнутая с новой пометкой — приоткрывается на 1,8 с. Домофон — справа от двери (.mk-side),
+   подъезд — компактно в углу (.mk-compact). Телефон — свёрнута (doorkit.js miniSmall) */
 .mk-mini { position: absolute; z-index: 4; right: max(14px, env(safe-area-inset-right)); bottom: 52px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 .mk-mini-tab { display: flex; align-items: center; gap: .6em; padding: .5em .7em; font: inherit; font-size: var(--pp-fs-s); color: var(--pp-ink); cursor: pointer;
                background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 6px; box-shadow: 0 4px 0 var(--pp-ink); rotate: 1.5deg; }
@@ -95,10 +97,34 @@ body.calm-fx .mk-m, body.calm-fx .mk-m.mk-gone { animation-duration: .01s; }
 .mk-mini-tab kbd { font: inherit; font-size: 9px; color: var(--pp-label); }
 .mk-mini-tab .mk-pen { display: none; color: var(--os-ink, #2448b8); }
 .mk-mini.mk-marked .mk-pen { display: inline; }
-.mk-mini-body { width: min(470px, calc(100vw - 28px)); box-sizing: border-box; background: var(--pp-paper); box-shadow: 0 6px 0 var(--pp-ink), 0 18px 40px rgba(0, 0, 0, .5);
-                border: 3px solid var(--pp-ink); border-style: solid; transform-origin: 100% 100%; transition: opacity .18s, scale .18s; }
+.mk-mini-body { width: var(--mk-w, min(470px, calc(100vw - 28px))); box-sizing: border-box; cursor: pointer; background: var(--pp-paper);
+                box-shadow: 0 6px 0 var(--pp-ink), 0 18px 40px rgba(0, 0, 0, .5); border: 3px solid var(--pp-ink); border-style: solid;
+                transform-origin: 100% 100%; transition: opacity .18s, scale .18s; }
+.mk-mini-body .pp-label { display: flex; justify-content: space-between; align-items: baseline; gap: 1em; }
+.mk-mini-hide { font-size: 9px; color: var(--pp-label); text-transform: none; letter-spacing: 0; white-space: nowrap; }
+.mk-mini-hide kbd { font: inherit; margin-right: .4em; }
 .mk-mini:not(.open):not(.peek) .mk-mini-body { opacity: 0; scale: .2; pointer-events: none; position: absolute; bottom: 0; right: 0; }
-@media (hover: hover) { .mk-mini:hover .mk-mini-body { opacity: 1; scale: 1; position: static; pointer-events: auto; } }
+.mk-mini.open .mk-mini-tab { display: none; }
+.mk-mini.peek .mk-mini-hide, .mk-mini:not(.open) .mk-mini-hide { display: none; }
+@media (hover: hover) { .mk-mini:not(.open):hover .mk-mini-body { opacity: 1; scale: 1; position: static; pointer-events: auto; } }
+/* новая пометка ручкой на раскрытом листе — лист вздрагивает */
+.mk-mini.mk-jolt .mk-mini-body { animation: mk-jolt .45s var(--pp-spring, ease-out); }
+@keyframes mk-jolt { 30% { rotate: 1.6deg; scale: 1.03; } 70% { rotate: -.8deg; } }
+@media (prefers-reduced-motion: reduce) { .mk-mini.mk-jolt .mk-mini-body { animation: none; } }
+body.calm-fx .mk-mini.mk-jolt .mk-mini-body { animation: none; }
+/* домофон: справа от двери, верх — у панели (doorkit.js miniSide) */
+.mk-mini.mk-side:is(.open, .peek) { left: var(--mk-x); top: var(--mk-y); right: auto; bottom: auto; align-items: flex-start; }
+.mk-mini.mk-side .mk-mini-body { transform-origin: 0 0; rotate: .6deg; }
+/* подъезд: компактно в углу — не закрывает курьера и двери площадки */
+.mk-mini.mk-compact .mk-mini-body { --mk-w: min(360px, 27vw); padding: .6em .7em; }
+.mk-compact .mk-inv .oc-sheet { gap: 8px; }
+.mk-compact .mk-inv .oc-inv { font-size: clamp(8px, .66vw, 11px); }
+.mk-compact .mk-inv .oc-inv th { font-size: clamp(7px, .56vw, 9px); padding: 2px 8px 2px 0; }
+.mk-compact .mk-inv .oc-inv td { padding: 2px 0; }
+.mk-compact .mk-inv .oc-inv td b { font-size: clamp(9px, .8vw, 13px); }
+.mk-compact .mk-inv .pp-label { margin-bottom: .2em; }
+.mk-mini-body.mk-inv .oc-photos .oc-p img, .mk-mini-body.mk-inv .oc-photos .oc-p i { width: clamp(56px, 5.5vw, 96px); height: clamp(56px, 5.5vw, 96px); }
+.mk-compact .mk-mini-body.mk-inv .oc-photos .oc-p img, .mk-compact .mk-mini-body.mk-inv .oc-photos .oc-p i { width: clamp(40px, 3.4vw, 60px); height: clamp(40px, 3.4vw, 60px); border-width: 3px; border-bottom-width: 9px; }
 
 /* строка управления — внизу по центру, на тёмной подложке */
 .mk-full .mk-help { position: absolute; z-index: 3; left: 50%; bottom: max(10px, env(safe-area-inset-bottom)); translate: -50% 0; max-width: calc(100% - 24px); margin: 0;
@@ -116,5 +142,4 @@ body.calm-fx .mk-m, body.calm-fx .mk-m.mk-gone { animation-duration: .01s; }
   .mk-say { top: auto; bottom: 60px; width: 40%; }
 }
 .mk-full .pp-seal { background: var(--pp-paper); mix-blend-mode: normal; opacity: 1; box-shadow: 0 6px 0 rgba(0, 0, 0, .35); }
-.mk-mini-body .oc-photos .oc-p img, .mk-mini-body .oc-photos .oc-p i { width: clamp(56px, 5.5vw, 96px); height: clamp(56px, 5.5vw, 96px); }
 .mk-mini-body .oc-sheet { grid-template-columns: minmax(0, 1fr) auto; }

@@ -22,12 +22,13 @@
    snap(), keys().
    ────────────────────────────────────────────────────────────────────────── */
 import { lang } from '../i18n/index.js';
+import { MOB } from './mobile.js';
 
 let BUILD = null, STEPS = null, MAKEP = null, DROP = null, STALE = null;
 const Q = new Map();                  // ключ → { key, kind: 'a' | 'p', o, po, list: [{ g, lang }], want, last, f, burst, n, hit, miss }
 let JOB = null;                       // собирается сейчас: { r, it, lang }
 let FRAME = 0, POOLED = 0, READY = false;   // READY — город достроен: до этого собираем как раньше и спрос не считаем (загрузка рождает пачками)
-const CAP_KEY = 6, CAP_ALL = 48, IDLE = 240e3;
+const CAP_KEY = MOB.on ? MOB.humansKey : 6, CAP_ALL = MOB.on ? MOB.humans : 48, IDLE = 240e3;   // мобильный режим — меньше (mobile.js, память)
 const BUDGET = 0.5, QUIET = 14;       // мс на пополнение за кадр (шаг сборки — 0,03—0,1 мс на «Деке»); кадр дольше QUIET мс — не пополняем
 const QS = typeof location !== 'undefined' ? location.search : '';
 let ON = !/[?&]nopool\b/.test(QS);

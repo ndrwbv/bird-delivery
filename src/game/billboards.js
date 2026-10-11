@@ -20,6 +20,7 @@
    Всё нужное из игры — объектом api (bbApi в game.js).
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
+import { freeAfterUpload } from './mobile.js';
 import { t, N_ } from '../i18n/index.js';
 import * as EDL from './editlayer.js';          // редактор города: щит можно убрать (edits.json, editlayer.js)
 
@@ -252,7 +253,7 @@ function atlas (adult) {
     drawAd(x, ad);
     x.restore();
   });
-  TEX = new THREE.CanvasTexture(c);
+  TEX = freeAfterUpload(new THREE.CanvasTexture(c));   // мобильный режим: холст после загрузки — 1×1 (mobile.js)
   TEX.colorSpace = THREE.SRGBColorSpace;
   TEX.anisotropy = 4;
   DEBUG.ads = Math.min(LIST.length, COLS * ROWS);

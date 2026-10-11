@@ -10,8 +10,9 @@
        и запускает игру снова (~1 мин; сохранения в ~/.config/BirdPizza не трогает).
    Из Стима (обновляет Стим), в браузере, в dev — ничего нет (state 'off').
 
-     UPD.init(shell)  — из game.js; сразу спрашивает оболочку
-     UPD.check(force) — спросить заново (кнопка «проверить» в настройках)
+     UPD.init(shell)  — из game.js; сразу спрашивает оболочку, потом тихо раз в 15 мин
+                        (игра бывает открыта часами — плашка показывает самую новую, а не ту, что была при запуске)
+     UPD.check(force, quiet) — спросить заново (кнопка «проверить» в настройках); quiet — без «проверяю…»
      UPD.apply()      — поставить последнюю
      UPD.state()      — { st, cur, latest, p, updatable, msg }; st: off | wait | fresh | newer | error | download | restart | fail
      UPD.onChange(cb) — состояние поменялось (меню и настройки перерисовывают плашку)
@@ -36,14 +37,17 @@ export function init (shell) {
     emit();
   });
   check(false);
+  setInterval(() => { if (S.st !== 'off') check(false, true); }, 15 * 60e3);
 }
-export async function check (force) {
+export async function check (force, quiet) {
   if (!SH) return { ...S };
   if (S.st === 'download' || S.st === 'restart') return { ...S };
-  S.st = 'wait'; emit();
+  if (!quiet) { S.st = 'wait'; emit(); }
   let r = null;
   try { r = await SH.latest(!!force); } catch (e) { r = { state: 'error' }; }
   r = r || { state: 'error' };
+  if (S.st === 'download' || S.st === 'restart') return { ...S };   // пока ждали ответа — нажали «обновить»
+  if (quiet && r.state === 'error' && S.latest) return { ...S };     // тихая проверка без связи — плашку не трогаем
   if (r.current) S.cur = r.current;
   S.latest = r.latest || '';
   S.updatable = !!r.updatable;

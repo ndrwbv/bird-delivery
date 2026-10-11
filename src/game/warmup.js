@@ -21,6 +21,8 @@
    Проверка: npm run probe -- --eval=tools/probe-checks/shaders.js --cpu=3 --size=deck --max=0 --timeout=600
    (links — какие программы собрались посреди смены, waits — где ждали видеокарту). */
 
+import { MOB } from './mobile.js';
+
 let C = null, KEEP = null, SAMPLES = null, TICK = 0;
 const PINNED = new WeakSet(), USED = new WeakSet();
 const LIMIT = 600;                           // больше программ не держим: где-то ключ программы стал уникальным — пусть выгружаются
@@ -95,8 +97,11 @@ export function* compile () {
 }
 
 /* все собранные программы — до конца игры (usedTimes + 1: three.js не выгрузит при dispose) */
-export function keep () {
+export function keep (play = false) {
   if (!C || !C.renderer) return;
+  // мобильный режим: держим только собранные при загрузке (без них compileAsync меню ждёт выгруженные — ошибки GL);
+  // новые на ходу — выгружаются, как раньше (память видеокарты и страницы)
+  if (play && MOB.on && !MOB.pinPrograms) return;
   const P = C.renderer.info.programs;
   if (!P || P.length > LIMIT) return;
   for (const p of P) if (!PINNED.has(p)) { PINNED.add(p); p.usedTimes++; STATS.pinned++; }
@@ -112,7 +117,7 @@ export function* ready () {
     const t0 = performance.now();
     while (i < P.length && performance.now() - t0 < 6) {
       const p = P[i];
-      if (USED.has(p)) { i++; continue; }
+      if (USED.has(p) || !p.program) { i++; continue; }   // !p.program — уже выгружена (мобильный режим их не держит)
       if (!(p.isReady && p.isReady()) && tries < 20) break;
       try { p.getUniforms(); p.getAttributes(); } catch (e) { /* — */ }
       USED.add(p); STATS.ready++; i++; tries = 0;
@@ -127,7 +132,7 @@ export function* ready () {
 export function step (dt) {
   if ((TICK += dt) < 2) return;
   TICK = 0;
-  keep();
+  keep(true);
 }
 
 export const DEBUG = { STATS, get samples () { return SAMPLES ? SAMPLES.map(s => s[0]) : []; }, get kept () { return !!KEEP; } };

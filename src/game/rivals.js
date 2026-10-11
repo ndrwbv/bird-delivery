@@ -48,6 +48,7 @@ import { warmth } from './seasons.js';
 import * as RESPECT from './respect.js';
 import * as MOPEDS from './mopeds.js';
 import * as CONSTR from './construction.js';
+import * as DAILY from './daily.js';             // задание на день «сбей N бургеров» — маскоты в зачёт (daily.js)
 import { onPave, walkHalf } from './pave.js';
 import { addTrail, YARD } from './yards.js';
 
@@ -969,7 +970,7 @@ const PIECE_GEO = {};
 function hitMascot (m, sp) {
   const V = A.V;
   ST.mascotHits++;
-  if (m.cool <= 0) { m.cool = RIV.MASCOT_COOL; respect('rivalMascot'); }
+  if (m.cool <= 0) { m.cool = RIV.MASCOT_COOL; respect('rivalMascot'); DAILY.tally('burger'); }   // задание на день: маскот — как бургер
   try { A.Snd.fx('mascot', s => { A.Snd.squish(); s.blip(140, 0.25, 'square', 0.08); }); } catch (e) { /* звук не обязателен */ }
   if (A.ADULT) {
     // разлетается на ингредиенты

@@ -28,6 +28,7 @@
         dropMesh, sayBubble, fxAdd, puffGeo, steam, gibBurger, popBonus, toast, chat(text),
         addWallet, money, CASH, Snd, CAR_L, CAR_W, HEROES, DIST, season() */
 import * as RESPECT from './respect.js';
+import * as DAILY from './daily.js';             // задание на день «сбей N бургеров» — маскот фестиваля в зачёт (daily.js)
 import { part as fxPart } from './fxpool.js';    // частицы из общего запаса (fxpool.js)
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 import { t, N_ } from '../i18n/index.js';
@@ -781,6 +782,7 @@ function mascotStep (dt, dC) {
 function hitMascot (m, sp) {
   const V = A.V, S = A.S;
   F.mascotN++;
+  DAILY.tally('burger');
   const paid = F.mascotN <= FEST.MASCOT_MAX;
   if (paid) {
     const cash = A.CASH(FEST.MASCOT_PAY);

@@ -39,6 +39,7 @@
    самосвала, onRespawn(t), reset() — новая смена.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
+import { freeAfterUpload } from './mobile.js';
 import { reliefAt, RELIEF } from './relief.js';
 import { t, N_ } from '../i18n/index.js';
 import { onPave } from './pave.js';
@@ -139,7 +140,7 @@ function passAtlas () {
     drawPass(x, ps, i);
     x.restore();
   });
-  const tex = new THREE.CanvasTexture(c);
+  const tex = freeAfterUpload(new THREE.CanvasTexture(c));   // мобильный режим: холст после загрузки — 1×1 (mobile.js)
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
   return tex;

@@ -19,6 +19,7 @@
    в buildCity после склейки статики.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
+import { freeAfterUpload } from './mobile.js';
 
 /* жребий по строке: FNV-1a → [0, 1) */
 const strHash = (s, k = 0) => { let h = 2166136261 ^ k; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); h = Math.imul(h ^ (h >>> 15), 2246822507); return ((h ^ (h >>> 13)) >>> 0) / 4294967296; };
@@ -146,7 +147,7 @@ function atlas () {
     x.save(); x.translate(10, 14); x.scale((CW - 20) / CW, (CH - 28) / CH); d.draw(x); x.restore();   // поля в цвет фона: соседняя клетка не просвечивает
     x.restore();
   });
-  const tex = new THREE.CanvasTexture(c);
+  const tex = freeAfterUpload(new THREE.CanvasTexture(c));   // мобильный режим: холст после загрузки — 1×1 (mobile.js)
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
   ATLAS = tex;

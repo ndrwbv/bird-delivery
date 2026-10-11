@@ -39,6 +39,10 @@
    --console                печатать всю консоль страницы
    --max=4000               обрезать вывод JSON до N символов (0 — целиком)
    --report=file.json       полный отчёт (результат, ошибки, кадры, время) — для tools/check.cjs
+   --mem                    память (docs/AGENTS.md «Память на телефоне»): в скрипте mem('метка') → куча JS после сборки мусора,
+                            видеопамять по обёрткам WebGL (tools/probe-glmem.cjs: буферы, текстуры, кадр), renderer.info,
+                            память процессов Электрона (страница, видеокарта); memLate() — по кускам поздней сборки (с --early)
+   --heapsnap=папка         снимок кучи по heapSnap('метка') в скрипте → папка/метка.heapsnapshot; разбор — node tools/heapsum.cjs a [b]
    --timeout=120            секунд на всё
    Код выхода: 1 — необработанная ошибка в странице, исключение в скрипте, игра не загрузилась.
    Каждый запуск — с чистым сохранением (своя сессия в памяти и своя папка userData). */
@@ -79,7 +83,10 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: t
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 app.commandLine.appendSwitch('mute-audio');   // ни звука из проверок, даже если ?mute где-то не сработал (автор 09.10)
-if (arg('jsflags')) app.commandLine.appendSwitch('js-flags', arg('jsflags'));   // --jsflags="--trace-deopt" — флаги V8 (вывод — в stdout страницы), docs/AGENTS.md «Хвост кадров»
+const MEM = has('mem') || !!arg('heapsnap');
+if (MEM) app.commandLine.appendSwitch('enable-precise-memory-info');   // performance.memory — точные байты, не ступеньки
+const JSF = [arg('jsflags', ''), MEM ? '--expose-gc' : ''].filter(Boolean).join(' ');
+if (JSF) app.commandLine.appendSwitch('js-flags', JSF);   // --jsflags="--trace-deopt" — флаги V8 (вывод — в stdout страницы), docs/AGENTS.md «Хвост кадров»
 
 function finish (code, report) {
   if (arg('report')) { try { fs.writeFileSync(path.resolve(arg('report')), JSON.stringify(report)); } catch (e) { err('probe: отчёт не записан:', e.message); } }
@@ -94,6 +101,7 @@ process.on('uncaughtException', fatal);
 process.on('unhandledRejection', fatal);
 
 const { PRELUDE, INSTALL } = require('./probe-page.cjs');   // помощники скрипта и автопилот — общие с perf.cjs
+const { GLMEM } = require('./probe-glmem.cjs');                 // --mem: видеопамять по обёрткам WebGL
 
 app.whenReady().then(async () => {
   // --dir=папка — готовая сборка (например, релизная с BUILD_VERSION), без своей пересборки
@@ -114,9 +122,9 @@ app.whenReady().then(async () => {
     }
     return net.fetch(pathToFileURL(f).toString());
   });
-  // до первой страницы: язык выбран, гайд и учебный заказ пройдены (--fresh — как у новичка)
+  // до первой страницы: язык выбран, гайд, учебный заказ и обучение на чеке смены пройдены (--fresh — как у новичка)
   const LANG = arg('lang', 'ru');
-  const seed = has('fresh') ? { 'dlv-lang': LANG } : { 'dlv-lang': LANG, 'dlv-msk-guide': 1, 'dlv-msk-tut': '1', 'dlv-msk-nostut': 1 };
+  const seed = has('fresh') ? { 'dlv-lang': LANG } : { 'dlv-lang': LANG, 'dlv-msk-guide': 1, 'dlv-msk-tut': '1', 'dlv-msk-nostut': 1, 'dlv-shift-tut': 1 };
   const pre = path.join(UD, 'seed-preload.js');
   /* телефон: касания как у смартфона — matchMedia(pointer: coarse / hover: none), maxTouchPoints,
      ontouchstart. Эмуляция через DevTools (Emulation.*) в окне вне экрана роняет Электрон,
@@ -139,6 +147,7 @@ app.whenReady().then(async () => {
   const errors = [];
   let uncaught = 0;
   win.webContents.on('console-message', (e, level, msg, line, src) => {
+    if (MEM && typeof msg === 'string' && msg.startsWith('__probemem:')) { memMark(msg.slice(11)); return; }
     if (has('console') || (level >= 3 && has('errors'))) err('[page]', msg.slice(0, 500));
     if (level >= 3) {
       const un = /^Uncaught/.test(msg);
@@ -148,6 +157,41 @@ app.whenReady().then(async () => {
   });
   win.webContents.on('render-process-gone', (e, d) => { err('probe: страница упала:', d.reason); finish(1, { ok: false, crashed: d.reason, errors }); });
   const js = c => win.webContents.executeJavaScript(c, true);
+  /* --mem: память процессов Электрона по метке из страницы (mem('метка') в PRELUDE); --heapsnap — ещё и снимок кучи */
+  const MEMLOG = [];
+  async function memMark (raw) {
+    const heap = raw.startsWith('heap:'), label = heap ? raw.slice(5) : raw;
+    let r = {};
+    try {
+      const rpid = win.webContents.getOSProcessId(), MBk = 1024;
+      for (const m of app.getAppMetrics()) {
+        const k = m.pid === rpid ? 'page' : m.type === 'GPU' ? 'gpu' : null;
+        if (k) r[k] = Math.round(m.memory.workingSetSize / MBk);
+        if (k === 'page' && m.memory.privateBytes) r.pagePriv = Math.round(m.memory.privateBytes / MBk);
+      }
+      // macOS: «след» страницы (phys_footprint) — та же мера, по которой iOS убивает вкладку; и его пик с начала
+      if (process.platform === 'darwin') {
+        try {
+          const o = require('child_process').execFileSync('footprint', ['-p', String(rpid), '--noCategories'], { encoding: 'utf8', timeout: 20000 });
+          const mb = re => { const x = o.match(re); return x ? Math.round(+x[1] * (/GB/.test(x[2]) ? 1024 : /KB/.test(x[2]) ? 1 / 1024 : 1)) : null; };
+          r.foot = mb(/phys_footprint:\s*([\d.]+)\s*(GB|MB|KB)/); r.footPeak = mb(/phys_footprint_peak:\s*([\d.]+)\s*(GB|MB|KB)/);
+        } catch (e) { /* нет прав или утилиты — без следа */ }
+      }
+      if (heap && arg('heapsnap') && dbg.isAttached()) {
+        const dir = path.resolve(arg('heapsnap')); fs.mkdirSync(dir, { recursive: true });
+        const f = path.join(dir, label.replace(/[^\w.-]+/g, '_') + '.heapsnapshot'), out = fs.openSync(f, 'w');
+        const on = (ev, m, p) => { if (m === 'HeapProfiler.addHeapSnapshotChunk') fs.writeSync(out, p.chunk); };
+        dbg.on('message', on);
+        await dbg.sendCommand('HeapProfiler.enable');
+        await dbg.sendCommand('HeapProfiler.takeHeapSnapshot', { reportProgress: false, captureNumericValue: false });
+        dbg.removeListener('message', on); fs.closeSync(out);
+        r.snap = f; err('probe: снимок кучи →', f);
+      }
+    } catch (e) { r.err = String(e.message || e); }
+    MEMLOG.push({ label, ...r });
+    if (heap) js('window.__lateHold = false').catch(() => {});   // ?latesnap — поздняя сборка стояла, пока снимали кучу
+    js(`(window.__probeMemR || (window.__probeMemR = {}))[${JSON.stringify(raw)}] = ${JSON.stringify(r)}`).catch(() => {});
+  }
 
   const timer = setTimeout(() => { err('probe: время вышло (--timeout=' + arg('timeout', 120) + ')'); finish(1, { ok: false, timeout: true, errors }); }, +arg('timeout', 120) * 1000);
 
@@ -158,15 +202,30 @@ app.whenReady().then(async () => {
   if (arg('q')) q.push(arg('q').replace(/^[?&]/, ''));
   const url = 'app://g/' + PAGE + '?' + q.join('&');
   const dbg = win.webContents.debugger;
-  if ((has('bootcpu') && +arg('cpu', 1) > 1) || arg('cpuprofile') || rnd) {
+  if ((has('bootcpu') && +arg('cpu', 1) > 1) || arg('cpuprofile') || rnd || MEM) {
     try {
       await win.loadURL('app://g/__blank').catch(() => {});   // тот же источник: рендерер не сменится при переходе на игру
       dbg.attach('1.3');
       if (has('bootcpu') && +arg('cpu', 1) > 1) await dbg.sendCommand('Emulation.setCPUThrottlingRate', { rate: +arg('cpu') });
-      if (rnd) { await dbg.sendCommand('Page.enable'); await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: rnd }); }
+      if (rnd || MEM) await dbg.sendCommand('Page.enable');
+      if (rnd) await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: rnd });
+      if (MEM) await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: GLMEM });   // видеопамять — с первого вызова WebGL
       if (arg('cpuprofile')) { await dbg.sendCommand('Profiler.enable'); await dbg.sendCommand('Profiler.setSamplingInterval', { interval: 250 }); await dbg.sendCommand('Profiler.start'); }
     } catch (e) { err('probe: отладчик загрузки:', e.message); }
   }
+  /* --mem: пик памяти процессов за весь запуск (раз в 200 мс) — загрузка и поздняя сборка дают пики, которых нет в метках */
+  const PEAK = { page: 0, gpu: 0, pageT: 0, gpuT: 0, n: 0 };
+  const peakT = MEM ? setInterval(() => {
+    try {
+      const rpid = win.webContents.getOSProcessId(), t = Date.now() - T0;
+      for (const m of app.getAppMetrics()) {
+        const v = Math.round(m.memory.workingSetSize / 1024);
+        if (m.pid === rpid && v > PEAK.page) { PEAK.page = v; PEAK.pageT = t; }
+        if (m.type === 'GPU' && v > PEAK.gpu) { PEAK.gpu = v; PEAK.gpuT = t; }
+      }
+      PEAK.n++;
+    } catch (e) { /* — */ }
+  }, 200) : null;
   try { await win.loadURL(url); } catch (e) { err('probe: не открылась', url, e.message); }
   let ok = false;
   for (let i = 0; i < 450; i++) {                     // до 45 с: на «Деке» (--bootcpu) город достраивается за меню ~20 с
@@ -232,5 +291,7 @@ app.whenReady().then(async () => {
   const total = Date.now() - T0;
   err(`probe: ${MODE}${has('kids') ? ' kids' : ''} ${W}×${H} · ${(total / 1000).toFixed(1)} с (сборка ${b.built ? (b.ms / 1000).toFixed(1) + ' с' : 'свежая'}, загрузка ${((tLoad - tBuild) / 1000).toFixed(1)} с) · кадр p50 ${fstats ? fstats.p50 : '?'} p95 ${fstats ? fstats.p95 : '?'} мс · ошибок консоли ${errors.length}, необработанных ${uncaught}`);
   const code = uncaught || evalErr ? 1 : 0;
-  finish(code, { ok: !code, result, evalErr, errors, uncaught, frames: fstats, logs, ms: { total, build: b.built ? b.ms : 0, load: tLoad - tBuild, eval: tEval - tLoad } });
+  if (peakT) clearInterval(peakT);
+  if (MEM) err('probe: память процессов, МБ (страница/видеокарта):', MEMLOG.map(m => m.label + ' ' + m.page + '/' + m.gpu + (m.foot ? ' (след ' + m.foot + ', пик ' + m.footPeak + ')' : '')).join(', ') + (MEMLOG.length ? ', ' : '') + 'пик ' + PEAK.page + ' (на ' + (PEAK.pageT / 1000).toFixed(1) + ' с)/' + PEAK.gpu);
+  finish(code, { ok: !code, result, evalErr, errors, uncaught, frames: fstats, logs, mem: MEMLOG, memPeak: MEM ? PEAK : undefined, ms: { total, build: b.built ? b.ms : 0, load: tLoad - tBuild, eval: tEval - tLoad } });
 }).catch(e => { err('probe:', e && e.stack || e); finish(1, { ok: false, error: String(e) }); });

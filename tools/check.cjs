@@ -76,12 +76,20 @@ const CHECKS = [
     if (!j) return { status: 'fail', info: 'без ответа: ' + (r.err || r.out).trim().slice(0, 160) };
     return j.ok ? { status: 'ok', info: 'video:save → «Видео/Птица Пицца», Duration дописана' } : { status: 'fail', info: j.fail.join(' | ').slice(0, 200) };
   } },
-  { id: 'orders', name: 'заказы в открытых районах', group: 2, run: async () => {
+  { id: 'update', name: 'обновление: предлагается самая новая готовая версия', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'update-pick-test.cjs')], { timeout: 20 });
+    let j = null; try { j = JSON.parse(r.out.trim().split('\n').pop()); } catch (e) { /* — */ }
+    if (!j) return { status: 'fail', info: 'без ответа: ' + (r.err || r.out).trim().slice(0, 160) };
+    return j.ok ? { status: 'ok', info: `${j.cases} случаев: из 0.9.1 / 0.10.6 / 0.11.0 — сразу последняя` } : { status: 'fail', info: j.fail.join(' | ').slice(0, 200) };
+  } },
+  { id: 'orders', name: 'заказы в открытых районах, город поделён', group: 2, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/orders-open.js')]);
     const e = errLine(j), r = j.result;
     if (e || !r) return { status: 'fail', info: e || 'нет результата' };
     if (r.skip) return { status: 'warn', info: r.skip };
-    return { status: r.bad ? 'fail' : 'ok', info: `${r.total} адресов, ${r.shifts} смен, плохих ${r.bad}` + (r.bad ? ': ' + JSON.stringify(r.sample[0]) : '') };
+    const c = r.cover || {}, nob = c.nobody || 0;
+    return { status: r.bad || nob ? 'fail' : 'ok', info: `${r.total} адресов, ${r.shifts} смен, плохих ${r.bad}` + (r.bad ? ': ' + JSON.stringify(r.sample[0]) : '') +
+      (r.cover ? ` · весь город поделён: адресов ${c.spots}, подъездов ${c.doors}, домов ${c.houses}, ничьих ${nob}` + (nob ? ': ' + JSON.stringify(c.sample[0]) : '') : '') };
   } },
   { id: 'drifts', name: 'сугробы снежной зимы: не на дорогах и адресах', group: 2, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/weather-drifts.js')]);
@@ -135,6 +143,20 @@ const CHECKS = [
       (r.orphans ? ' · ' + JSON.stringify(r.orphanSample) : '') + (r.merged ? ' · ' + JSON.stringify(r.mergedSample) : '') + (r.noBody ? ' · ' + JSON.stringify(r.noBodySample) : '') + (r.unexplained ? ' · ' + JSON.stringify(r.standSample) : '') +
       r.solid.filter(s => s.pass).map(s => ' · ' + s.k + ': ' + JSON.stringify(s)).join('');
     return { status: !r.ok ? 'fail' : r.unexplained ? 'warn' : 'ok', info };
+  } },
+  /* память на телефоне (11.10.2026, docs/AGENTS.md «Память на телефоне»): мобильный режим, меню → город достроен → 20 с смены.
+     Порог — с запасом ~20 % над замером; было до правок: куча 706 / 822 МБ, след страницы пик 1477 МБ — вкладка Safari на iPhone умирала */
+  { id: 'memory-phone', name: 'память на телефоне: куча JS, видео, след страницы', group: 2, run: async () => {
+    const LIM = { menu: 520, shift: 620, gl: 360, foot: 1450 };
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/memory.js'), '--mem', '--early', '--size=phone', '--q=msecs=20'], 220);
+    const e = errLine(j), r = j.result;
+    if (e || !r || !r.shift) return { status: 'fail', info: e || 'нет результата' };
+    const foot = Math.max(0, ...((j.mem || []).map(m => m.footPeak || 0)));
+    const bad = [r.menu.heap > LIM.menu && `куча в меню ${r.menu.heap} > ${LIM.menu}`, r.shift.heap > LIM.shift && `куча в смене ${r.shift.heap} > ${LIM.shift}`,
+      r.shift.gl.total > LIM.gl && `видео ${r.shift.gl.total} > ${LIM.gl}`, foot > LIM.foot && `след страницы, пик ${foot} > ${LIM.foot}`].filter(Boolean);
+    const info = `куча JS, МБ: меню ${r.menu.heap}, достроен ${r.built.heap}, смена ${r.shift.heap} (пик ${r.shift.gl.heapPeak}); видео ${r.shift.gl.total} МБ` +
+      (foot ? `; след страницы, пик ${foot} МБ` : '') + ` · пороги ${LIM.menu} / ${LIM.shift} / ${LIM.gl}` + (foot ? ` / ${LIM.foot}` : '') + (r.shift.mobile ? '' : ' · НЕ мобильный режим');
+    return { status: bad.length ? 'fail' : r.shift.mobile ? 'ok' : 'warn', info: (bad.length ? bad.join('; ') + ' · ' : '') + info };
   } },
   { id: 'smoke-adult', name: '30 с автопилота: взрослая (web)', group: 3, run: smoke(['--mode=web'], 'взрослая') },
   { id: 'smoke-phone', name: '30 с автопилота: телефон (web)', group: 3, run: smoke(['--size=phone'], 'телефон') },

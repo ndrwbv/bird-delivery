@@ -20,6 +20,19 @@ const onShift = async () => {
   return d.S.state; };
 const ride = async () => { if (!d.S.ride || !['drive'].includes(d.S.state)) { d.startRun(true); await wait(200); } return d.S.state; };
 const autopilot = (on = true) => P.autopilot(on);
+/* probe --mem: память в эту минуту. heap — куча JS после двух сборок мусора, МБ (без массивов-буферов: они «внешние»);
+   gl — видеопамять по обёрткам WebGL (буферы, текстуры, буферы отрисовки, кадр холста), glJs — сколько из залитых буферов
+   ещё лежат копией в JS; geo/tex/prog — renderer.info; proc — память процессов Электрона (page — страница, gpu — видеокарта) */
+const memProc = async (label, heap) => { if (!window.__glmem) return null; const k = (heap ? 'heap:' : '') + label; console.debug('__probemem:' + k);
+  for (let i = 0; i < 600; i++) { const r = window.__probeMemR && window.__probeMemR[k]; if (r) return r; await wait(50); } return null; };
+const mem = async (label = 'mem') => {
+  if (window.gc) { gc(); await wait(30); gc(); }
+  const pm = performance.memory, r = d.renderer, MB = 1048576, g = window.__glmem;
+  return { label, heap: pm ? +(pm.usedJSHeapSize / MB).toFixed(1) : null, gl: g ? g.get() : null, glJs: g ? g.js() : null,
+    geo: r ? r.info.memory.geometries : null, tex: r ? r.info.memory.textures : null, prog: r ? r.info.programs.length : null, proc: await memProc(label) };
+};
+const heapSnap = async label => { if (window.gc) gc(); return memProc(label, true); };
+const memLate = () => window.__glmem ? window.__glmem.late() : null;
 /* что автопилот закрыл за прогон: { closed: {окно: сколько раз}, maxStall: самая долгая стойка мира, с } */
 const apStats = () => ({ closed: { ...P.ap.closed }, maxStall: +P.ap.maxStall.toFixed(1) });
 /* smoke(secs): смена на автопилоте и проверка, что игра жива. → { ok, fail: [что не так], m, frames, clock, ft }

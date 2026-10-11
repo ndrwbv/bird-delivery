@@ -25,6 +25,10 @@
 .os-pen.os-plus { color: var(--pp-money); }
 .os-pen.os-minus { color: var(--pp-red); }
 .os-pen.os-row { display: block; margin: .35em 0 0; width: max-content; }
+/* клиент не дома: адрес целиком зачёркнут (по строкам — переносится вместе с текстом), новый — от руки под ним */
+.os-addr.os-gone { text-decoration: line-through 2px var(--os-ink); text-decoration-skip-ink: none; opacity: .7; }
+.os-addr.os-gone .os-struck::after { display: none; }
+.os-fix.os-new { display: block; margin: .3em 0 0; white-space: normal; overflow-wrap: anywhere; font-size: 1.1em; }
 @keyframes os-write { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 @media (prefers-reduced-motion: reduce) { .os-struck::after, .os-fix, .os-pen { animation: none; } }
 body.calm-fx .os-struck::after, body.calm-fx .os-fix, body.calm-fx .os-pen { animation: none; }

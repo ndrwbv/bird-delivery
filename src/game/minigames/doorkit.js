@@ -127,27 +127,56 @@ export function fakeOrder (api, o = {}) {
   };
 }
 
-/* ── свёрнутая накладная в углу (весь лист — ordersheet.js; пометки ручкой — в .mk-mini-body) ── */
+/* ── накладная в мини-игре (автор 11.10.2026: «накладную надо показывать, а не скрывать»): лист раскрыт сразу —
+   в домофоне справа от двери (intercom.js ставит его, miniSide), в подъезде — в углу, компактно (o.compact);
+   X / клик по листу — свернуть в плашку, ещё раз — раскрыть. На телефоне (узко или низко) — свёрнут: плашка со значком ✎.
+   Весь лист — ordersheet.js; пометки ручкой — в .mk-mini-body ── */
 export function miniHTML (sheet, o = {}) {
   const t = o.t || (s => s);
-  return '<div class="mk-mini">' +
-    '<div class="mk-mini-body mk-inv"><span class="pp-label">' + esc(t('накладная')) + '</span>' + sheet + '</div>' +
+  return '<div class="mk-mini' + (o.compact ? ' mk-compact' : '') + '">' +
+    '<div class="mk-mini-body mk-inv"><span class="pp-label">' + esc(t('накладная')) + '<span class="mk-mini-hide"><kbd class="mk-kx"></kbd>' + esc(t('свернуть')) + '</span></span>' + sheet + '</div>' +
     '<button type="button" tabindex="-1" class="mk-mini-tab">' + (o.face ? '<img src="' + o.face + '" alt="">' : '') +
       '<b>' + esc(t('накладная')) + '</b><span>' + esc(o.short || '') + '</span><span class="mk-pen">✎</span><kbd class="mk-kx"></kbd></button>' +
   '</div>';
 }
-/* раскрыть / свернуть (клик, X), приоткрыть на sec с после новой пометки */
+/* мало места под раскрытый лист: телефон стоя (узко) или боком (низко) */
+export const miniSmall = () => typeof matchMedia === 'function' && matchMedia('(max-width: 760px), (max-height: 460px)').matches;
+/* раскрыт сразу (не телефон); клик по плашке или по листу, X — свернуть / раскрыть; новая пометка — свёрнутый
+   приоткрывается на sec с, раскрытый — вздрагивает */
 export function miniBind (el) {
   let to = 0;
-  const tab = el.querySelector('.mk-mini-tab');
-  const toggle = on => { el.classList.toggle('open', on === undefined ? !el.classList.contains('open') : !!on); };
-  tab.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); toggle(); });
+  const tab = el.querySelector('.mk-mini-tab'), body = el.querySelector('.mk-mini-body');
+  const toggle = on => { el.classList.toggle('open', on === undefined ? !el.classList.contains('open') : !!on); if (el.classList.contains('open')) el.classList.remove('peek'); };
+  const tap = e => { e.preventDefault(); e.stopPropagation(); toggle(); };
+  tab.addEventListener('pointerdown', tap);
+  body.addEventListener('pointerdown', tap);
+  if (!miniSmall()) el.classList.add('open');
   return {
-    body: el.querySelector('.mk-mini-body'),
+    body,
     toggle,
-    // узкий экран (телефон): лист закрыл бы всю сцену — только значок ✎ на плашке
-    peek (sec = 1.8) { el.classList.add('mk-marked'); if (innerWidth < 760) return; el.classList.add('peek'); clearTimeout(to); to = setTimeout(() => el.classList.remove('peek'), sec * 1000); },
-    key (s) { const k = el.querySelector('.mk-kx'); if (k) k.textContent = s ? '[' + s + ']' : ''; },
+    get open () { return el.classList.contains('open') || el.classList.contains('peek'); },
+    peek (sec = 1.8) {
+      el.classList.add('mk-marked');
+      if (el.classList.contains('open')) { el.classList.remove('mk-jolt'); void el.offsetWidth; el.classList.add('mk-jolt'); return; }
+      if (miniSmall()) return;      // телефон: лист закрыл бы всю сцену — только значок ✎ на плашке
+      el.classList.add('peek'); clearTimeout(to); to = setTimeout(() => el.classList.remove('peek'), sec * 1000);
+    },
+    key (s) { for (const k of el.querySelectorAll('.mk-kx')) k.textContent = s ? '[' + s + ']' : ''; },
     off () { clearTimeout(to); },
   };
+}
+/* домофон: раскрытый лист — справа от двери, верх — у панели домофона (door, panel — прямоугольники doorscene.js,
+   W, H — размер сцены). Справа меньше MIN_W px — в угол, как в подъезде */
+export function miniSide (el, W, H, door, panel) {
+  const x = Math.round(door.x + door.w + Math.min(40, Math.max(18, (W - door.x - door.w - 470) / 3))), w = Math.min(470, W - x - 16);
+  const key = W + 'x' + H + ':' + x + ':' + Math.round(panel.y);
+  if (el.__side === key) return;
+  el.__side = key;
+  if (w < 290 || W < 760) { el.classList.remove('mk-side'); return; }
+  el.classList.add('mk-side');
+  el.style.setProperty('--mk-x', x + 'px');
+  el.style.setProperty('--mk-w', w + 'px');
+  // верх — вровень с панелью, но лист целиком над строкой управления
+  const b = el.querySelector('.mk-mini-body'), h = b ? b.offsetHeight || 300 : 300;
+  el.style.setProperty('--mk-y', Math.round(Math.max(118, Math.min(panel.y, H - 58 - h))) + 'px');
 }

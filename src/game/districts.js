@@ -19,6 +19,16 @@
                                    заказы, кофе и аптечки — во всех районах, speed/pay/dist — ECON.CITY
      DIST.mine(i)                — район i — «твой» на этой смене: в режиме «весь город» любой открытый, иначе cur()
 
+   Центр и окраина района (11.10.2026, для ритма смены — выбор заказа в orders.js / director.js; числа — DISTRICT.RIM):
+     DIST.setPizza(i, { x, z })  — где на самом деле встала пиццерия района (game.js, после сборки куполов)
+     DIST.away(x, z)             — метров по прямой от пиццерии района, где точка
+     DIST.rim(x, z)              — 0 — центр (не дальше обычной дальности района DISTRICT.DIST[i][1]), дальше растёт
+                                   до 1 на RIM.SPAN × эта дальность сверх неё и больше не растёт: окраина
+                                   (дальние гаражи, пляж, Славского к Томску, посёлок у КПП)
+     DIST.rimWeight(x, z, p)     — вес адреса для выбора, p — доля смены 0…1 (номер заказа / сколько их будет):
+                                   центр — 1, окраина — от RIM.W0 в начале смены до RIM.W1 в конце, на самом
+                                   краю (rim 1) ещё × (1 − RIM.FADE): дальние — редко и всё чаще к концу
+
    Волны — по сменам этой сессии (с запуска игры): DIST.beginShift() в начале смены
    ставит режим по кругу PACE.WAVE, DIST.pace() → { id, …PACE.MODES[id] }. */
 import { DISTRICT, PACE, CITY } from './econ.js';
@@ -139,6 +149,27 @@ export const speed = i => (i === undefined && city() ? CITY.SPEED : pick(DISTRIC
 export const pay = i => (i === undefined && city() ? CITY.PAY : pick(DISTRICT.PAY, i ?? cur()));
 export const dist = i => (i === undefined && city() ? CITY.DIST : pick(DISTRICT.DIST, i ?? cur()));
 
+/* ── центр и окраина района ── */
+const PZ = [];
+export function setPizza (i, p) { if (p && Number.isFinite(p.x)) PZ[i] = { x: p.x, z: p.z }; }
+function pizzaOf (i) {
+  if (PZ[i]) return PZ[i];
+  const q = list()[i] && list()[i].pizza;
+  return q ? { x: q[0], z: q[1] } : { x: 0, z: 0 };
+}
+export function away (x, z) { const p = pizzaOf(at(x, z)); return Math.hypot(x - p.x, z - p.z); }
+export function rim (x, z) {
+  const i = at(x, z), core = pick(DISTRICT.DIST, i)[1], R = DISTRICT.RIM;
+  const p = pizzaOf(i), d = Math.hypot(x - p.x, z - p.z);
+  return d <= core ? 0 : Math.min(1, (d - core) / (core * R.SPAN));
+}
+export function rimWeight (x, z, prog) {
+  const r = rim(x, z), R = DISTRICT.RIM;
+  if (r <= 0) return 1;
+  const k = Math.max(0, Math.min(1, +prog || 0));
+  return (R.W0 + (R.W1 - R.W0) * k) * (1 - R.FADE * r);
+}
+
 /* ── волны щедрости ── */
 let SESSION = 0, MODE = 'generous';
 export function beginShift () {
@@ -153,7 +184,7 @@ export function setPace (id) { if (PACE.MODES[id]) MODE = id; }
 
 /* отладка: __dlv.DIST */
 export const DEBUG = {
-  list, at, cur, set, opened, shiftsIn, need, countShift, rebuild, speed, pay, dist, pace, setPace, beginShift, session, allOpen, city, setCity, mine,
+  list, at, cur, set, opened, shiftsIn, need, countShift, rebuild, speed, pay, dist, away, rim, rimWeight, pace, setPace, beginShift, session, allOpen, city, setCity, mine,
   unlockAll () { if (!A) return; A.Store.set(KEY_N, list().map((_, i) => need(i))); A.Store.set(KEY_O, count()); A.Store.flush && A.Store.flush(); },
   reset () { if (!A) return; A.Store.set(KEY_N, []); A.Store.set(KEY_O, 1); A.Store.set(KEY, 0); A.Store.set(KEY_C, 0); A.Store.flush && A.Store.flush(); },
 };

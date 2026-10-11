@@ -38,6 +38,7 @@ import { keyHTML } from '../input/glyphs.js';
 import Platform from '../platform/index.js';
 import * as CULL from './cull.js';
 import * as WINS from './windows.js';
+import { ON as MOBILE } from './mobile.js';
 
 export const KEY = 'dlv-gfx';
 const BASE_FAR = 490;
@@ -75,6 +76,7 @@ export function device () {
     if (import.meta.env.MODE === 'ios' || (window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() === 'ios')) return 'ios';
   } catch (e) { /* — */ }
   if ((Platform.steam && Platform.steam.deck) || /steamos|steam deck/i.test(navigator.userAgent || '')) return 'deck';
+  if (MOBILE) return 'phone';                    // мобильный режим (mobile.js): телефон, планшет, ?mobile
   if (Platform.id !== 'steam' && matchMedia('(pointer: coarse)').matches) return 'phone';
   return 'pc';
 }

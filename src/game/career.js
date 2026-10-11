@@ -30,6 +30,7 @@ import * as DP from './distpick.js';             // выбор района — 
 import * as GROW from './growth.js';             // пиццерия растёт: ступень на итогах смены (growth.js)
 import { farEarned } from './orders.js';
 import * as END from './shiftend.js';
+import * as STOUR from './shifttour.js';        // первый чек смены: Толик облачками показывает, что тут где (shifttour.js)
 import * as DAILY from './daily.js';             // задания на день: строка «задания: 2 из 3» в чеке смены (daily.js)
 import * as CHAT from './chat.js';
 import * as DEP from './dep.js';                // «депнуть»: однорукий бандит, рулетка, теннис — свои экраны (dep.js)
@@ -255,21 +256,22 @@ export function atBase (next) {
   return true;
 }
 
-/* ── обед (с 14:00, в пиццерии): одно из трёх до конца смены; next — после выбора ── */
+/* ── обед (с 14:00, в пиццерии): одно из трёх до конца смены; next — после выбора.
+   Едят пиццу (автор 11.10.2026): холодную, которую приготовили по ошибке, — не шаурму и не бизнес-ланч ── */
 function lunchClass (on) { const c = $('choice'); if (c) c.classList.toggle('cr-lunch', on); }
 function showLunch (next) {
   SH.lunch = true;
   const S = A.S, L = ECON.LUNCH, T = ECON.TIPS;
   const opts = [
-    { id: 'nitro', label: t('двойной раф'), sub: t('кофе: бак ×{k} и сразу полный', { k: fmtK(L.nitro.tank) }),
+    { id: 'nitro', label: t('пицца с кофейным кремом — повар перепутал начинку'), sub: t('кофе: бак ×{k} и сразу полный', { k: fmtK(L.nitro.tank) }),
       fn () { S.nosEff = (S.nosEff || 1) / L.nitro.tank; A.NOS.tank = 1; } },
-    { id: 'tips', label: t('бизнес-ланч'), sub: t('чаевые: шанс +{p} %, сумма ×{k}', { p: Math.round(T.LUNCH_CHANCE * 100), k: fmtK(T.LUNCH_MUL) }),
+    { id: 'tips', label: t('«Директорская» — Палыч заказал и не пришёл'), sub: t('чаевые: шанс +{p} %, сумма ×{k}', { p: Math.round(T.LUNCH_CHANCE * 100), k: fmtK(T.LUNCH_MUL) }),
       fn () { /* orders.js читает S.lunch === 'tips' */ } },
-    { id: 'hp', label: t('шаурма у ларька'), sub: tn(L.hp.hearts, '+{n} сердце|+{n} сердца|+{n} сердец'),
+    { id: 'hp', label: t('холодная пепперони — клиент не забрал'), sub: tn(L.hp.hearts, '+{n} сердце|+{n} сердца|+{n} сердец'),
       fn () { S.hpMax += L.hp.hearts; S.hp += L.hp.hearts; A.hudHearts(); } },
   ];
   A.showChoice({
-    title: t('обед'), sub: t('{time} — перерыв. что берёшь до конца смены?', { time: ECON.clock(hour()) }),
+    title: t('обед'), sub: t('{time} — перерыв. на кухне остыли пиццы, которые сделали по ошибке. какую берёшь?', { time: ECON.clock(hour()) }),
     pause: true, row: true, okLabel: t('взять'),
     opts: opts.map(o => ({ label: o.label, sub: o.sub, fn: () => {
       S.lunch = o.id;
@@ -466,7 +468,11 @@ export function showEnd (why, whyText, held) {
   }, quick => {
     noteIn();
     fitEnd();
-    setTimeout(() => { ov.classList.remove('wait'); KB.clear(); fitEnd(); }, quick ? 350 : 0);
+    setTimeout(() => {
+      ov.classList.remove('wait'); KB.clear(); fitEnd();
+      // первый чек профиля — обучение Толика поверх чека (вопрос «оставить путь?» routeask.js ждёт, пока оно не кончится)
+      if (wasOn && STOUR.need(A.Store) && !ov.hidden && A.S.state === 'over') tourEnd(ov);
+    }, quick ? 350 : 0);
   });
   // «лучшая смена! ты #N в мире» (board.js) — строкой в чеке; переносим сразу, а не в конце печати: пока строка лежала
   // под чеком, высота экрана была другой, и размер под экран (fitEnd) менялся в конце — лист прыгал
@@ -476,6 +482,15 @@ export function showEnd (why, whyText, held) {
   }
   noteIn();
   fitEnd();
+}
+
+/* обучение на чеке (shifttour.js): «чек — сколько заработал» → «гараж и траты» → «депнуть» → «на новую смену» */
+function tourEnd (ov) {
+  STOUR.start(ov, {
+    Store: A.Store, Snd: A.Snd, person: () => CHAT.person(), face: () => CHAT.avatar(96),
+    onStart: () => { KB.clear(); endKeys(); },
+    onEnd: () => { KB.clear(); endKeys(); const b = $('ov-again'); if (b && b.offsetParent) try { b.focus({ preventScroll: true }); } catch (e) { /* — */ } },
+  });
 }
 
 /* строки чека: [подпись, значение, класс]. Сходится: доставлено + чаевые + задания − штрафы + бонус = итог «за смену».
@@ -694,6 +709,7 @@ function endKeys () {
   if (!h) { h = document.createElement('div'); h.className = 'cr-keys'; ov.appendChild(h); }
   if (inputKind().kind === 'touch') { h.hidden = true; return; }
   h.hidden = false;
+  if (STOUR.on()) { h.innerHTML = keyHTML('ok') + esc(t('дальше')) + '<i>·</i>' + keyHTML('back') + esc(t('пропустить')); return; }   // обучение Толика поверх чека
   const dep = $('ov-dep');
   h.innerHTML = [keyHTML('ok') + esc(t('на новую смену')), keyHTML('y') + esc(t('гараж и траты')),
     dep && !dep.hidden ? keyHTML('x') + esc(t('депнуть')) : '', keyHTML('back') + esc(t('в меню'))].filter(Boolean).join('<i>·</i>');
@@ -850,7 +866,7 @@ const spendOpen = () => { const m = $('cr-spend'); return m && !m.hidden ? m : n
 /** непрозрачный экран поверх города (гараж, «потратить») — кадр мира можно не рисовать */
 export const covered = () => GARAGE.isOpen() || !!spendOpen() || !!DEP.root();
 /** что сейчас листает геймпад: окно имени, гараж, «депнуть», «потратить» — или null */
-export function padRoot () { return QR.root() || END.root() || CITY.root() || MENU.modal() || GARAGE.root() || DEP.root() || spendOpen(); }
+export function padRoot () { return STOUR.root() || QR.root() || END.root() || CITY.root() || MENU.modal() || GARAGE.root() || DEP.root() || spendOpen(); }
 /** до makePadMenu: в гараже ←→ и LB/RB листают машины, B — закрыть то, что сверху */
 export function padPre (p) {
   if (!A) return;
@@ -900,6 +916,7 @@ function endOn () {
 }
 /** назад: окно имени → гараж → «потратить»; true — что-то закрыли */
 export function back () {
+  if (STOUR.on()) { STOUR.skip(); return true; }   // обучение на чеке: B / Esc — пропустить
   if (QR.root()) return QR.back();
   if (CITY.root()) return CITY.back();
   if (MENU.modal()) return MENU.back();
@@ -1028,5 +1045,5 @@ const DEBUG = {
   skipTo (h) { if (A) { A.env().t = SH.on ? (SH.tStart + ECON.tOfHour(h) - ECON.SHIFT.T0) % 1 : ECON.tOfHour(h); if (h > ECON.SHIFT.LUNCH_H + 0.05) SH.lunch = true; else if (h < ECON.SHIFT.LUNCH_H) SH.lunch = false; } },
   useCars (api) { CARS_MOCK = api || null; },
   showLunch,                                        // обед сразу — проверить карточку (стрелки, Enter)
-  crewBoard, crewLoad: () => (A ? crewLoad() : null), openDep: DEP.open, closeDep: DEP.close, openGarage, closeGarage: GARAGE.close, garageFlip: GARAGE.flip, openSpend, menu, askName, back,
+  STOUR: STOUR.DEBUG, crewBoard, crewLoad: () => (A ? crewLoad() : null), openDep: DEP.open, closeDep: DEP.close, openGarage, closeGarage: GARAGE.close, garageFlip: GARAGE.flip, openSpend, menu, askName, back,
 };

@@ -96,7 +96,7 @@ function ownedCars () {
   try { l = (A.cars() && A.cars().list()) || []; } catch (e) { l = []; }
   return l.filter(c => c.owned);
 }
-/* погода, допустимая для сезона: «по календарю» + варианты из шансов сезона (weather.js CHANCES) —
+/* погода, допустимая для сезона: «как выпадет» (жребий по шансам сезона) + варианты из шансов сезона (weather.js CHANCES) —
    зима: обычная и снежная; лето: обычная, жара, дождь, гроза, ураган; и т. д. Жары зимой не бывает */
 function seasonBucket (id) {
   const W = A.weather;
@@ -134,7 +134,7 @@ function fields () {
   ];
   if (A.weather) {
     f.push({ key: 'weather', label: t('погода'), opts: weathers(SEL.season).map(id => id === 'auto'
-      ? { v: 'auto', name: t('по календарю'), sub: t('как выпадет') }
+      ? { v: 'auto', name: t('как выпадет'), sub: t('по шансам сезона') }
       : { v: id, name: A.weather.NAME[id](), sub: id === 'hurricane' ? t('уносит дома') : '' }) });
   }
   f.push({ key: 'len', label: t('длина'), opts: SHIFT.LENGTHS.map(l => ({ v: l.id, name: LEN_NAME[l.id] ? LEN_NAME[l.id]() : l.id, sub: t('~{n} мин', { n: mins(l) }) })) });
@@ -188,7 +188,7 @@ function render () {
   refreshKeys(box);
   fit(box);
 }
-/* значение строки key — на d вперёд (по кругу); сезон сменился — погода не к сезону → «по календарю» */
+/* значение строки key — на d вперёд (по кругу); сезон сменился — погода не к сезону → «как выпадет» */
 function flip (key, d) {
   const f = fieldOf(key);
   if (!f || !d) return;

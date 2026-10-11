@@ -9,6 +9,8 @@
      OS.blot(root, i, digit)             — пятно на цифре digit квартиры остановки i (не прочитать)
      OS.wipe(root, i)                    — пятно оттёрли: цифра видна, обведена ручкой
      OS.fix(root, i, text)               — номер зачёркнут ручкой, рядом от руки верный
+     OS.move(root, i, text)              — «клиент не дома»: весь адрес остановки i зачёркнут, рядом от руки новый
+                                           (в листе с начала: st.addrWas — старый адрес, st.addr — новый, так и рисуется)
      OS.pen(root, k, text, cls)          — приписка ручкой у строки k: 'flat' (у квартиры остановки 0) | 'pay' | 'addr' | …;
                                            cls: 'os-x' зачёркнуто, 'os-plus' зелёным, 'os-minus' красным */
 import './ordersheet.css';
@@ -26,17 +28,23 @@ const flatHTML = (st, i, t) => {
   return f ? '<span class="os-flat" data-i="' + i + '">' + f + '</span>' : '';
 };
 
+/* адрес остановки i: <span class="os-addr"> (OS.move зачёркивает его целиком); клиент переехал (st.addrWas) — старый
+   зачёркнут, новый от руки */
+const addrHTML = (st, i, t) => {
+  if (st.addrWas) return '<span class="os-addr os-gone" data-i="' + i + '">' + esc(st.addrWas) + '</span><em class="os-fix os-new">' + esc(st.addr || '') + '</em>';
+  return '<span class="os-addr" data-i="' + i + '">' + (st.addr || '') + (flatText(st, t) ? ', ' + flatHTML(st, i, t) : '') + '</span>';
+};
+
 /* строки листа: [ключ, подпись, значение] */
 export function rows (order, o = {}) {
   const t = o.t || T0, stops = order.stops || [], many = stops.length > 1;
   const bundle = !!(order.ord && order.ord.bundle);
   const persons = stops.flatMap(st => st.persons || []);
   const who = bundle
-    ? stops.map((st, i) => '<b>' + (i + 1) + '. ' + (st.persons || []).map(p => name(p, t)).join(', ') + '</b><small>' + st.addr +
-        (flatText(st, t) ? ', ' + flatHTML(st, i, t) : '') + '</small>').join('')
+    ? stops.map((st, i) => '<b>' + (i + 1) + '. ' + (st.persons || []).map(p => name(p, t)).join(', ') + '</b><small>' + addrHTML(st, i, t) + '</small>').join('')
     : persons.map(p => '<b>' + name(p, t) + '</b>').join('');   // у получателя — только имя (автор, 10.10.2026)
   const st0 = stops[0] || {};
-  const addr = (st0.addr || '') + (flatText(st0, t) ? ', ' + flatHTML(st0, 0, t) : '') + (many ? ' → ' + t('ещё {n}', { n: stops.length - 1 }) : '');
+  const addr = addrHTML(st0, 0, t) + (many ? ' → ' + t('ещё {n}', { n: stops.length - 1 }) : '');
   const extra = (o.extra || []).map((r, i) => [String(r[1]).includes('oc-pay') ? 'pay' : 'x' + i, r[0], r[1]]);
   return [
     ['who', t('получатель'), who],
@@ -81,6 +89,15 @@ export function fix (root, i, text) {
   el.classList.add('os-struck');
   let f = el.nextElementSibling;
   if (!f || !f.classList.contains('os-fix')) { f = document.createElement('em'); f.className = 'os-fix'; el.after(f); }
+  f.textContent = text;
+  return true;
+}
+export function move (root, i, text) {
+  const el = root && root.querySelector('.os-addr[data-i="' + i + '"]');
+  if (!el) return false;
+  el.classList.add('os-gone');
+  let f = el.nextElementSibling;
+  if (!f || !f.classList.contains('os-new')) { f = document.createElement('em'); f.className = 'os-fix os-new'; el.after(f); }
   f.textContent = text;
   return true;
 }

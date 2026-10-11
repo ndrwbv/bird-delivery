@@ -41,6 +41,7 @@ import * as DIST from './districts.js';
 import * as FEST from './festivals.js';
 import * as HURR from './hurricane.js';          // дома, унесённые ураганом: их адреса не выдаём (hurricane.js blocked)
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
+import * as RHY from './rhythm.js';             // ритм смены: роль заказа на дуге, напряжение, встреча у двери (rhythm.js)
 import * as GROW from './growth.js';            // пиццерия растёт: оплата, чаевые, размер сборных по ступени (econ.js GROWTH)
 import * as BEACH from './beach.js';            // пляж летом: заказ на полотенце (beach.js ORDER)
 import * as DOOR from './doorstep.js';          // домофон у подъезда: бонус «с первого раза» / «спускался сам» (econ.js DOOR)
@@ -90,7 +91,7 @@ function hookCareer (m) {
 }
 
 /* ─────────────── часы смены ─────────────── */
-let HOUR_OVERRIDE = null, SIM = false;                              // для прогона смен без езды (DEBUG.simShift)
+let HOUR_OVERRIDE = null, SIM = false, SIM_ARC = null;                              // для прогона смен без езды (DEBUG.simShift)
 function hourNow () {
   if (HOUR_OVERRIDE !== null) return HOUR_OVERRIDE;
   // часы по расписанию смены (9…24): в круглосуточной пиццерии смена может идти с ночи, а обязательные
@@ -181,7 +182,7 @@ function distRing () {
 }
 
 /* ─────────────── смена ─────────────── */
-const SH = { far: 0, last: 0, gen: 0, zones: new Set(), must: {}, h0: 9, done: 0, log: [], reserved: new Set(), pts: [], breather: false, k: 0, sz: 1, run: { kind: '', n: 0 }, beach: 0, beachAt: -99 };
+const SH = { far: 0, last: 0, gen: 0, zones: new Set(), must: {}, h0: 9, done: 0, log: [], reserved: new Set(), pts: [], breather: false, k: 0, sz: 1, run: { kind: '', n: 0 }, beach: 0, beachAt: -99, prevM: 0 };
 const Q = [];                                          // заказы наперёд (песочница может положить); в игре — собираем по одному, когда нужен
 
 export function resetShift () {
@@ -190,7 +191,7 @@ export function resetShift () {
   SH.last = 0;
   SH.gen = 0;
   SH.zones = new Set(); SH.must = {}; SH.done = 0; SH.log = []; SH.reserved = new Set(); SH.pts = []; SH.breather = false;
-  SH.k = 0; SH.sz = 1; SH.run = { kind: '', n: 0 }; SH.far = 0; SH.beach = 0; SH.beachAt = -99;
+  SH.k = 0; SH.sz = 1; SH.run = { kind: '', n: 0 }; SH.far = 0; SH.beach = 0; SH.beachAt = -99; SH.prevM = 0;
   SH.h0 = hourNow();
   buildPool();
 }
@@ -274,17 +275,18 @@ function kindRoll (multi) {
 /* одна спецификация заказа: кто, куда, какой вид */
 /* разминка: первые заказы смены (PACE.WARMUP, в щедрую — WARMUP_GEN) — близко к
    пиццерии, один адрес (один человек или компания), без срочных и сюжета. И передышка: после
-   срочного или «в конец района» следующий — тоже близкий */
+   срочного или «в конец района» следующий — тоже близкий.
+   С ритмом смены (rhythm.js, карьера) разминка — только первый заказ (один человек) и последний (без сборного) */
 const warmCount = () => (DIST.pace().id === 'generous' ? ECON.PACE.WARMUP_GEN : ECON.PACE.WARMUP);
-function easySpec () {
-  const warm = SH.gen < warmCount();
+function easySpec (R) {
+  const warm = R ? R.role === 'open' || R.role === 'last' : SH.gen < warmCount();
   if (!warm && !SH.breather) return null;
   const [a, b] = ECON.PACE.WARM_DIST;
-  const s = pickSpot({ dmin: a, dmax: b });
+  const s = R ? nearSpot(a, b) : pickSpot({ dmin: a, dmax: b });
   if (!s) return null;
   SH.breather = false;
   const life = lifeN();
-  let kind = life < BUNDLE.FROM ? 'solo' : kindRoll(true);
+  let kind = life < BUNDLE.FROM || (R && R.role === 'open') ? 'solo' : kindRoll(!(R && R.role === 'last'));
   if (kind === 'multi') {                                  // и сборный — на два соседних дома
     const bs = bundleSpec(life, { min: a, max: b }, 2);
     if (bs) { bs.easy = true; return bs; }
@@ -293,27 +295,62 @@ function easySpec () {
   return { type: 'pizza', kind, easy: true, stops: [kind === 'group' ? stopOf(s, rint(SHIFT_PLAN.groupSize || [2, 3])) : stopOf(s)] };
 }
 
+/* ритм смены: «близко» — и по дорогам (по прямой 350 м бывают и 900 м в объезд квартала): из нескольких адресов
+   кольца разминки — первый, до которого по дорогам не дальше RHYTHM.EASY_M, иначе самый близкий по дорогам */
+function nearSpot (a, b) {
+  let best = null, bl = Infinity;
+  for (let k = 0; k < 6; k++) {
+    const s = pickSpot({ dmin: a, dmax: b });
+    if (!s) break;
+    const L = A.routeLen(A.PIZZA.x, A.PIZZA.z, s.x, s.z);
+    if (L <= ECON.RHYTHM.EASY_M) return s;
+    if (L < bl) { bl = L; best = s; }
+  }
+  return best;
+}
+
+let RHY_ROLE = '';
 function genSpec () {
+  RHY_ROLE = '';
   if (SH.gen === 0 && !POOL.length) buildPool();
   else if (POOL_AT !== A.PIZZA) rebase();                 // «весь город»: вернулся в другую пиццерию
-  const D = distRing();
+  let D = distRing();
+  // ритм смены (rhythm.js): роль заказа на дуге (начало, подъём, кульминация, последний), напряжение k, встреча у двери
+  const R = SIM ? (SIM_ARC ? simSlot() : null) : RHY.slot(SH.gen, CAR && typeof CAR.shiftLeft === 'function' && CAR.shiftOn() ? CAR.shiftLeft() : -1);
+  const tgt = R ? arcTarget(R, D) : 0;                    // сколько метров по дорогам «хочется» этому заказу
+  if (R) { D = rampRing(D, R.k); RHY_ROLE = R.role; D.max = Math.max(D.min + 150, Math.min(D.max, Math.round(tgt))); }   // по прямой — не дальше «хочется» по дорогам
   // фестиваль кальянщиков: первый заказ смены и часть остальных — на сам фестиваль, к проходу (festivals.js)
   const fp = SIM ? null : FEST.passSpec(SH.gen);
+  if (fp && R && R.meet) RHY.meetFailed();
   if (fp) return finishSpec({ type: 'pizza', kind: 'solo', fest: fp, stops: [{ x: fp.x, z: fp.z, key: keyOf(fp.x, fp.z), zone: ZN.zoneAt(fp.x, fp.z), n: 1, addr: fp.addr }] }, null, hourNow());
-  const easy = easySpec();
+  if (R && R.meet) { const ms = meetSpec(R, D, tgt); if (ms) return finishSpec(ms, null, hourNow()); RHY.meetFailed(); }
+  const easy = easySpec(R);
   if (easy) return finishSpec(easy, null, hourNow());
   const ahead = (A.S.order ? 1 : 0) + Q.length;          // сколько заказов до этого
   const hAt = hourNow() + ahead / rate();
   let forced = null;
   // срочные и «в конец района» — не раньше PACE hardFrom: в щедрую смену — с 16:00
+  // ритм смены: «по шансу» — со второй половины подъёма (RHYTHM.HARD_K); к сроку — всё равно
+  const hard = !R || R.k >= ECON.RHYTHM.HARD_K;
   if (hAt >= (DIST.pace().hardFrom || 0)) for (const r of SHIFT_PLAN.must || []) {
+    if (R && r.what === 'edge') continue;                  // ритм: окраина — не обязательная, а по весу (rimSpot), редко
     const have = r.what === 'zones' ? SH.zones.size : SH.must[r.what] || 0;
     if (have >= r.count) continue;
     const need = r.count - have, slots = (r.byHour - hAt) * rate();
-    if (slots <= need + 0.5 || chance(need / Math.max(1, slots))) { forced = r.what; break; }
+    if (slots <= need + 0.5 || (hard && chance(need / Math.max(1, slots)))) { forced = r.what; break; }
   }
   // и сверх обязательного — иногда ещё срочный (econ.js URGENT: CHANCE, не больше MAX за смену)
-  if (!forced && hAt >= (DIST.pace().hardFrom || 0) && (SH.must.urgent || 0) < ECON.URGENT.MAX && chance(ECON.URGENT.CHANCE)) forced = 'urgent';
+  if (!forced && hard && hAt >= (DIST.pace().hardFrom || 0) && (SH.must.urgent || 0) < ECON.URGENT.MAX && chance(ECON.URGENT.CHANCE)) forced = 'urgent';
+  // кульминация смены (ритм): самый тяжёлый заказ — срочный, «в конец района» или большой сборный (RHYTHM.PEAK)
+  let big = false;
+  if (R && R.role === 'peak' && !forced) {
+    const W = {}, P = ECON.RHYTHM.PEAK;
+    if (hAt >= (DIST.pace().hardFrom || 0) && (SH.must.urgent || 0) < ECON.URGENT.MAX) W.urgent = P.urgent;
+    if (EDGE_D) W.edge = P.edge;
+    if (lifeN() >= BUNDLE.FROM && ECON.bundleStep(lifeN())) W.big = P.big;
+    const w = wpick(W);
+    if (w === 'big') big = true; else if (w) forced = w;
+  }
   let spec = null;
   if (forced === 'edge') {
     const s = edgeSpot();
@@ -332,14 +369,16 @@ function genSpec () {
   }
   const life = lifeN();
   // пляж летом (beach.js ORDER): клиент загорает на полотенце — в среднем 1 из EVERY, если пляж в твоём районе
-  if (!spec && !forced) spec = beachSpec(hAt);
+  if (!spec && !forced && (!R || R.k >= ECON.RHYTHM.HARD_K)) spec = beachSpec(hAt);   // ритм: пляж — окраина, со второй половины подъёма
   // вид — вперемешку (kindRoll): один человек, компания в одном месте или несколько адресов разом —
   // сборный, n пицц на n адресов (econ.js BUNDLE); всё — с первого обычного заказа (после учебного)
   let kind = 'solo';
   // (и когда надо «добрать районы» — адреса сборного тоже районы смены; и когда срочному или «в конец района» не нашлось адреса)
   if (!spec && life >= BUNDLE.FROM) {
-    kind = kindRoll(true);
-    if (kind === 'multi') { spec = bundleSpec(life, D); if (!spec) kind = kindRoll(false); }
+    // ритм: сборные — с напряжения MULTI_K, пицц не больше 2 + 5 × напряжение; кульминация — сборный побольше
+    const multiOk = !R || R.k >= ECON.RHYTHM.MULTI_K;
+    kind = big ? 'multi' : kindRoll(multiOk);
+    if (kind === 'multi') { spec = bundleSpec(life, D, R ? 2 + Math.round(R.k * 5) : 7, big, R ? ECON.RHYTHM.BUNDLE_R : 0); if (!spec) kind = kindRoll(false); }
   }
   if (!spec) {
     // обычная пицца: район по весам (или новый, если надо добрать районы)
@@ -347,9 +386,14 @@ function genSpec () {
     const zone = wpick(w) || wpick(zoneWeights(D.min, D.max)) || null;
     if (kind === 'multi') kind = 'solo';
     const far = zone && ZMIN[zone] > D.max;                // район за кольцом — его ближние адреса
-    const s = far ? pickSpot({ zone, dmin: ZMIN[zone], dmax: ZMIN[zone] + 600 }) : pickSpot({ zone, dmin: D.min, dmax: D.max });
+    // ритм смены: изредка — окраина района (districts.js rimWeight: в начале смены почти никогда, к концу — чаще)
+    const rs = R && !far && !SH.breather && (R.role === 'rise' || R.role === 'peak') ? rimSpot(R.f) : null;
+    // с ритмом вид места за кольцом не тянет заказ на окраину: окраина — только по весу (rimSpot), иначе — кольцо дуги
+    const s = rs || (R ? arcSpot({ zone: far ? null : zone, dmin: D.min, dmax: D.max }, tgt)
+      : far ? pickSpot({ zone, dmin: ZMIN[zone], dmax: ZMIN[zone] + 600 }) : pickSpot({ zone, dmin: D.min, dmax: D.max }));
     if (!s) return null;
-    spec = { type: 'pizza', kind, stops: [] };
+    spec = { type: 'pizza', kind, stops: [], rimPick: !!rs };
+    if (rs && DIST.rim(rs.x, rs.z) >= ECON.RHYTHM.EDGE_RIM) { spec.kind = kind = 'solo'; spec.edge = true; }   // дальняя окраина — «в конец района» (×EDGE)
     if (kind === 'group') spec.stops.push(stopOf(s, rint(SHIFT_PLAN.groupSize || [2, 3])));
     else spec.stops.push(stopOf(s));
   }
@@ -379,10 +423,10 @@ function beachSpec (hAt) {
    столько пицц, сколько она даёт по максимуму, и реплика директора, если есть.
    Адреса — по всему кольцу района, порядок в спецификации — ближайший следующий
    от пиццерии (по нему считаются отрезки, оплата и срок), игрок развозит как хочет. */
-function bundleSpec (life, D, most = 7) {
+function bundleSpec (life, D, most = 7, top = false, near = 0) {
   const step = ECON.bundleStep(life);
   if (!step) return null;
-  let n = sizeRoll(Math.max(2, Math.min(most, (step.max || 2) + GROW.sizeAdd())));   // сколько пицц — «вперемешку» (SHIFT_PLAN.sizes), от 2; ступень пиццерии ± (GROWTH.SIZE)
+  let n = sizeRoll(Math.max(2, Math.min(most, (step.max || 2) + GROW.sizeAdd())), top);   // сколько пицц — «вперемешку» (SHIFT_PLAN.sizes), от 2; ступень пиццерии ± (GROWTH.SIZE); top — кульминация смены: самый большой из можно
   const told = toldGet();                                 // сколько пицц директор уже объявил
   let boss = null;
   if (told < 2) { n = 2; boss = 2; }                       // самый первый — знакомство, ровно две
@@ -394,7 +438,9 @@ function bundleSpec (life, D, most = 7) {
   // «весь город» (econ.js CITY): остальные адреса — кучкой у первого, не через весь город
   const city = DIST.has() && DIST.city();
   for (let i = 0; i < n; i++) {
-    const s = pickSpot(city && pts.length ? { near: pts[0], r: ECON.CITY.BUNDLE_R } : { dmin: D.min, dmax: D.max });
+    // ритм смены (near): остальные адреса — кучкой у первого, не по разные стороны района
+    const nr = city ? ECON.CITY.BUNDLE_R : near;
+    const s = pickSpot(nr && pts.length ? { near: pts[0], r: nr } : { dmin: D.min, dmax: D.max });
     if (!s) break;
     SH.reserved.add(s.key); SH.pts.push({ x: s.x, z: s.z });
     pts.push(s);
@@ -415,12 +461,13 @@ function bundleSpec (life, D, most = 7) {
 /* сколько пицц в сборном (SHIFT_PLAN.sizes): по весам, от 2, но потолок растёт с каждым
    заказом смены (rampStart + rampStep × сколько уже было после разминки), не больше ступени
    курьера (max), не выше прошлого + maxJump, после большого — маленький */
-function sizeRoll (max) {
+function sizeRoll (max, top) {
   const Z = SHIFT_PLAN.sizes || {}, W = Z.weights || { 2: 1 };
   let cap = Math.min(max, (Z.rampStart || 2) + Math.floor(SH.k * (Z.rampStep === undefined ? 1 : Z.rampStep)));
   cap = Math.min(cap, (SH.sz || 1) + (Z.maxJump || 3));
   if ((SH.sz || 1) >= (Z.big || 4)) cap = Math.min(cap, Z.afterBig || 2);
   cap = Math.max(2, cap);
+  if (top) return cap;
   const lo = 2;
   const w = {};
   for (let k = lo; k <= cap; k++) w[k] = W[k] || 0;
@@ -471,6 +518,73 @@ function storyNear (s) {
   return Math.hypot(s.x - A.PIZZA.x, s.z - A.PIZZA.z) <= DIST.dist()[1] * 1.6;
 }
 
+/* ритм смены: кольцо дальности по напряжению k (0 — начало смены, 1 — к RHYTHM.RAMP): дальний край — от NEAR_K[0]
+   до полного кольца района, ближний — растёт на MIN_K кольца */
+function rampRing (D, k) {
+  const [a, b] = ECON.RHYTHM.NEAR_K;
+  const max = Math.round(D.max * (a + (b - a) * k));
+  const min = Math.round(Math.min(max * 0.6, D.min + (max - D.min) * ECON.RHYTHM.MIN_K * k));
+  return { min, max: Math.max(max, min + 150) };
+}
+/* ритм смены (автор: «заказы в какие-то ебеня редко, чаще — один за другим, постепенно»): сколько метров по дорогам
+   «хочется» заказу — от EASY_M в начале до FAR_K × дальности района к RAMP, но не больше прошлого заказа + STEP_M
+   (кульминация — + STEP_M × PEAK_STEP): дальность растёт от заказа к заказу плавно, окраины — редко */
+function arcTarget (R, D) {
+  const C = ECON.RHYTHM, far = D.max * C.FAR_K;
+  const want = C.EASY_M + Math.max(0, far - C.EASY_M) * R.k;
+  return Math.min(want, (SH.prevM || C.EASY_M) + C.STEP_M * (R.role === 'peak' ? C.PEAK_STEP : 1));
+}
+/* из нескольких адресов кольца — тот, до которого по дорогам ближе всего к target м (ok — ещё условие на адрес) */
+function arcSpot (o, target, ok) {
+  let best = null, bd = Infinity;
+  for (let k = 0; k < 8; k++) {
+    const s = pickSpot(o);
+    if (!s) break;
+    if (ok && !ok(s)) continue;
+    const d = Math.abs(A.routeLen(A.PIZZA.x, A.PIZZA.z, s.x, s.z) - target);
+    if (d < bd) { bd = d; best = s; }
+    if (d < 100) break;
+  }
+  return best;
+}
+/* окраина района (districts.js: rim > 0 — дальше обычной дальности района; посёлок у КПП, дальние гаражи, к Томску):
+   из RHYTHM.RIM_N адресов окраины — с шансом, равным их среднему весу DIST.rimWeight(доля смены) — один по весу.
+   Вес: центр 1, окраина от 0,02 в начале смены до 0,3 в конце, на самом краю ещё меньше — «в ебеня» редко и ближе к концу */
+function rimSpot (prog) {
+  if (!DIST.has() || DIST.city() || typeof DIST.rimWeight !== 'function') return null;
+  const core = DIST.dist()[1], cand = [], w = {};
+  for (let k = 0; k < ECON.RHYTHM.RIM_N; k++) {
+    // поровну ближней окраины и дальней (дальше 1,5 × дальности района): иначе самый край, где адресов мало, не выпадал бы
+    const s = pickSpot(k % 2 ? { dmin: core * 1.5, relax: false } : { dmin: core, dmax: core * 1.5, relax: false });
+    if (!s || !(DIST.rim(s.x, s.z) > 0) || cand.includes(s)) continue;
+    w[cand.length] = DIST.rimWeight(s.x, s.z, prog);
+    cand.push(s);
+  }
+  if (!cand.length) return null;
+  const mean = Object.values(w).reduce((a, b) => a + b, 0) / cand.length;
+  return chance(mean) ? cand[+wpick(w)] : null;
+}
+/* прогон смен с дугой (DEBUG.simShift(…, arc)): роль заказа — по номеру из n, как у ритма смены (rhythm.js slot) */
+function simSlot () {
+  const i = SH.gen, n = SIM_ARC.n, f = n > 1 ? i / (n - 1) : 0, C = ECON.RHYTHM;
+  let role = 'rise';
+  if (i === 0) role = 'open';
+  else if (i === n - 1) role = 'last';
+  else if (!SIM_ARC.peak && i >= 2 && f >= C.PEAK_AT) { role = 'peak'; SIM_ARC.peak = true; }
+  return { n: i + 1, role, f, k: role === 'open' || role === 'last' ? 0 : role === 'peak' ? 1 : Math.min(1, f / C.RAMP), meet: null };
+}
+
+/* встреча у двери (ритм смены, rhythm.js; encounters.js): один человек — герой, адрес — подъезд, перед дверью
+   свободно для сцены; дальность — по дуге (arcTarget). После тяжёлого (передышка) — близко */
+function meetSpec (R, D, tgt) {
+  const W = ECON.PACE.WARM_DIST, br = SH.breather;
+  const s = arcSpot(br ? { dmin: W[0], dmax: W[1] } : { dmin: D.min, dmax: D.max }, br ? ECON.RHYTHM.EASY_M * 0.7 : tgt,
+    q => q.entr && RHY.doorOk(q.x, q.z));
+  if (!s) return null;
+  SH.breather = false;
+  return { type: 'pizza', kind: 'solo', meet: R.meet, stops: [stopOf(s)] };
+}
+
 /* спецификация готова: резерв адресов, метры по дорогам, номер, лог */
 function finishSpec (spec, forced, hAt) {
   // считаем сразу: очередь — это уже план смены
@@ -484,6 +598,8 @@ function finishSpec (spec, forced, hAt) {
     return Math.round(A.routeLen(a.x, a.z, st.x, st.z));
   });
   spec.zone = spec.stops[0].zone;
+  SH.prevM = spec.m[0] || 0;
+  if (RHY_ROLE) spec.role = RHY_ROLE;                             // ритм: следующий заказ — не сильно дальше этого (arcTarget)
   spec.color = spec.color || typeColor(spec.type);
   spec.forced = forced;
   // День угнетения бургеров (festivals.js): часть заказов — «вместо бургера», оплата ×FEST.BURGER_K
@@ -496,7 +612,8 @@ function finishSpec (spec, forced, hAt) {
   const vk = visKind(spec);
   SH.run = SH.run.kind === vk ? { kind: vk, n: SH.run.n + 1 } : { kind: vk, n: 1 };
   spec.hour = +hAt.toFixed(2);
-  SH.log.push({ n: spec.n, h: spec.hour, type: spec.type, kind: spec.kind, zone: spec.zone, edge: !!spec.edge, urgent: !!spec.urgent, side: !!spec.side, story: !!spec.story, m: spec.m.reduce((a, b) => a + b, 0), keys: spec.stops.map(s => s.key), forced });
+  SH.log.push({ n: spec.n, h: spec.hour, type: spec.type, kind: spec.kind, zone: spec.zone, edge: !!spec.edge, urgent: !!spec.urgent, side: !!spec.side, story: !!spec.story, m: spec.m.reduce((a, b) => a + b, 0), keys: spec.stops.map(s => s.key), forced, meet: spec.meet ? spec.meet.id : '' });
+  if (!SIM) RHY.ordered(spec);                           // журнал ритма смены (rhythm.js)
   return spec;
 }
 
@@ -558,6 +675,7 @@ function bindSpec (spec) {
     f.sort((a, b) => d2(a, st) - d2(b, st));
     const p = place(f[(Math.random() * Math.min(4, f.length)) | 0], st.x, st.z);
     if (spec.story && spec.story.person && stops.length === 0) A.rehuman(p, spec.story.person);
+    if (spec.meet && spec.meet.person && stops.length === 0) A.rehuman(p, spec.meet.person);   // встреча у двери: клиент — герой (encounters.js)
     const peds = [p];
     for (let i = 1; i < st.n; i++) {                   // групповой: остальные — рядом с первым, не на асфальте
       const b = free().sort((a, c) => d2(a, st) - d2(c, st))[0];
@@ -837,8 +955,10 @@ function errandDone () {
   ERR.log.push(Math.round(ERR.clock));
 }
 function sideOpts (ped) {
-  return SIDE_ORDERS.filter(s => (!s.adult || A.ADULT) && (!s.kids || !A.ADULT))
-    .map(s => ({ s, shop: A.errandShop({ kinds: s.shop.kinds || [], prefer: s.shop.prefer || /$^/, anyKind: !!s.shop.anyKind }, ped) }))
+  const f = ped && ped.person ? !!ped.person.f : null;      // sex — текст просьбы в мужском / женском роде
+  return SIDE_ORDERS.filter(s => (!s.adult || A.ADULT) && (!s.kids || !A.ADULT) && (!s.sex || f === null || (s.sex === 'f') === f))
+    // giver — забрать у человека у подъезда (errands.js giverSpot), иначе — магазин рядом
+    .map(s => ({ s, shop: s.giver ? (A.errandGiver ? A.errandGiver(s, ped) : null) : A.errandShop({ kinds: s.shop.kinds || [], prefer: s.shop.prefer || /$^/, anyKind: !!s.shop.anyKind }, ped) }))
     .filter(o => o.shop);
 }
 function offerSide (ped, person, only) {
@@ -854,7 +974,7 @@ function offerSide (ped, person, only) {
     accept: t(s.accept), decline: t(s.decline), mood: s.mood || 'calm', color: typeColor('side'),
     timer: s.timer || 8, timeoutText: t(s.timeout || N_('ну лан ((')),
   }).then(r => {
-    if (r === true && S.state === 'handover' && !ped.dead) A.startSide(ped, person, shop, { id: s.id, ask: what, what, gotIt: t('купил: {what}', { what }), pay, bag: s.bag, side: true });
+    if (r === true && S.state === 'handover' && !ped.dead) A.startSide(ped, person, shop, { id: s.id, ask: what, what, gotIt: s.giver ? t('забрал: {what}', { what }) : t('купил: {what}', { what }), pay, bag: s.bag, side: true, spec: s });
     else A.declineSide(ped);
   });
   return true;
@@ -1291,7 +1411,8 @@ export function forceSide (id) {
    каждый «доставлен» (адрес — в dlv-used-addr). life — номер первого заказа за всё время
    (по умолчанию — настоящий), told — сколько пицц директор уже объявил (по умолчанию —
    из сохранения); сохранение счётчиков не трогает. Возвращает журнал. */
-function simShift (n = 10, h0 = 9, h1 = 23.5, life = null, told = null) {
+function simShift (n = 10, h0 = 9, h1 = 23.5, life = null, told = null, arc = false) {
+  SIM_ARC = arc ? { n, peak: false } : null;                // arc — с дугой ритма смены (роль заказа по номеру)
   LIFE_OVERRIDE = life !== null ? life : lifeN();
   SIM_TOLD = told !== null ? told : +A.Store.get('dlv-boss', 0) || 0;
   HOUR_OVERRIDE = h0; SIM = true;
@@ -1306,11 +1427,12 @@ function simShift (n = 10, h0 = 9, h1 = 23.5, life = null, told = null) {
     const lvl = { urgent: !!sp.urgent, edge: !!sp.edge, level: A.level() };
     out.push({ n: sp.n, life: LIFE_OVERRIDE, h: +HOUR_OVERRIDE.toFixed(1), type: sp.type, kind: sp.kind, vk: visKind(sp), beach: !!sp.beach, easy: !!sp.easy, zone: sp.zone, stops: sp.stops.length, edge: !!sp.edge, urgent: !!sp.urgent, side: !!sp.side, forced: sp.forced, m: sp.m, keys: sp.stops.map(s => s.key),
       boss: sp.bundle ? sp.bundle.boss : null, fee: sp.stops.reduce((a, st, k) => a + ECON.orderPay(sp.m[k] || 0, st.zone, lvl), 0),
-      far: DIST.has() && DIST.city() ? sp.m.map(ECON.cityFar) : null });
+      far: DIST.has() && DIST.city() ? sp.m.map(ECON.cityFar) : null,
+      ...(SIM_ARC ? { role: sp.role, rimPick: !!sp.rimPick, away: Math.round(DIST.away(sp.stops[0].x, sp.stops[0].z)), rim: +DIST.rim(sp.stops[0].x, sp.stops[0].z).toFixed(2) } : {}) });
     if (sp.bundle && sp.bundle.boss) SIM_TOLD = Math.max(SIM_TOLD, Math.abs(sp.bundle.boss));
     LIFE_OVERRIDE += sp.bundle ? sp.stops.length : 1;
   }
-  LIFE_OVERRIDE = null; HOUR_OVERRIDE = null; SIM = false;
+  LIFE_OVERRIDE = null; HOUR_OVERRIDE = null; SIM = false; SIM_ARC = null;
   dropQueue();
   SH.last = 0;
   return out;

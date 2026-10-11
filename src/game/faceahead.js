@@ -8,6 +8,7 @@
    - катсцена началась (story.js play) — все реплики главы с их выражениями: пока герой выходит из подъезда, они готовы.
    ?noahead — без этого (сравнить). Счётчики — __dlv.FAHEAD. */
 import { faceSoon } from './people.js';
+import { MOB } from './mobile.js';
 
 export const AHEAD = {
   CLIENT: [[256, ''], [128, 'ok']],             // [размер, выражение] — у получателя заказа
@@ -37,6 +38,7 @@ export function boss (p) { for (const [s, m] of AHEAD.BOSS) ask(p, s, m); }
 /* реплики сценария (story.js: ['say' | 'ask', кто, текст, { emo }]); who(кто) → человек; first — только первая */
 export function lines (script, who, first = false) {
   if (!Array.isArray(script)) return;
+  if (first && MOB.on && !MOB.storyFaces) return;   // мобильный режим: при загрузке — только Толик (память, mobile.js); катсцена — как была
   const seen = new Set();
   for (const q of script) {
     if (!Array.isArray(q) || (q[0] !== 'say' && q[0] !== 'ask')) continue;

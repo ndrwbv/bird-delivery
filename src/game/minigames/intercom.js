@@ -8,7 +8,8 @@
 
    Формат мини-игры песочницы (src/uilab/minigames.js): export default { id, name, note, knobs, mount }.
    mount(root, o, api) → убрать за собой.
-     o: { mode: 'dial' | 'typo' | 'smudge' | 'broken', flat: '47' (верный номер), print: '74' (что в накладной при опечатке),
+     o: { mode: 'dial' | 'typo' | 'smudge' | 'broken' | 'away' (клиент не дома: набрал верно — зовёт на o.away.addr,
+          реплика o.away.say или случайная из AWAY; итог { ok: true, away: true, addr }), flat: '47' (верный номер), print: '74' (что в накладной при опечатке),
           blot: 1 (какая цифра под пятном), time: 5 (с — эталон «быстро»), fast: 0.55, fastPad: 0.8 (доли эталона: клавиатура
           и палец / геймпад), knocks: 12 (стук), wipeAfter: 2 (после стольких ошибок пятно оттирают), sheet (HTML листа
           ordersheet.js), person (клиент — лицо), who, addr, bonus ('+120 ₽' — приписка за «с первого раза»),
@@ -39,6 +40,29 @@ const WRONG = [
   { who: N_('соседка'), say: N_('Опять не туда! Петровы этажом выше, сколько можно!') },
   { who: N_('мужик'), say: N_('Ты на часы смотрел, мудила? Я с ночной!'), adult: true },
 ];
+/* «клиент не дома» (11.10.2026): набрал верно — отвечает сам клиент, он не дома и зовёт на другой адрес ({addr}).
+   adult — только во взрослой. Без глаголов в роде — подходит и ему, и ей */
+export const AWAY = [
+  { say: N_('Ой, я не дома! Я у тёщи, {addr}. Подъезжай туда!') },
+  { say: N_('А я не дома… Я у кума в гараже, {addr}. Вези сюда!') },
+  { say: N_('Ой, а я с собакой гуляю! {addr}. Догоняй!') },
+  { say: N_('Я в бане! {addr}. Выйду в полотенце — не пугайся.') },
+  { say: N_('Я у мамы, {addr}! Она тоже пиццу хочет. Давай туда.') },
+  { say: N_('Я в очереди в поликлинику, {addr}. Вези, тут все голодные.') },
+  { say: N_('Я в гостях, {addr}. Не спрашивай. Просто вези.') },
+  { say: N_('Ой, я же в бильярдной, {addr}! Подъезжай, сыграем.') },
+  { say: N_('Я на работе, {addr}! Начальник не отпускает — вези сюда.') },
+  { say: N_('Бля, я не дома. Я у любовницы, {addr}. Жене — ни слова!'), adult: true },
+  { say: N_('Я в отделении, {addr}. Отпустят через час, а жрать охота — вези, сука, сюда.'), adult: true },
+  { say: N_('Ёпт, я в гараже у кума, {addr}. Бухаем. Вези, родной!'), adult: true },
+  { say: N_('Я у бывшей, {addr}. Долгая, блядь, история. Вези быстрее.'), adult: true },
+  { say: N_('Слышь, я на хате у кента, {addr}. Звони два раза и не ссы — тут свои.'), adult: true },
+  { say: N_('Нахуй дом, я на рыбалке, {addr}! Подъезжай, удочку подержишь.'), adult: true },
+];
+export function awayLine (adult) {
+  const pool = AWAY.filter(a => !a.adult || adult);
+  return pool[(Math.random() * pool.length) | 0].say;
+}
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'call'];
 const DT_MAX = 0.1;
 
@@ -50,9 +74,10 @@ export function swapDigits (s) {
 
 export default {
   id: 'intercom', name: 'домофон',
-  note: 'Набрать квартиру из накладной и нажать «вызов». Своего таймера нет — идёт срок заказа (часы в шапке). Пятно: цифру вспомнить (после 2 ошибок оттирается). Опечатка: клиент пишет верный номер, в накладной — зачёркнуто и исправлено. Сломан — стучать быстро. Геймпад: крестовина + A, B стереть, Y вызов; клавиатура: цифры, Backspace, Enter.',
+  note: 'Набрать квартиру из накладной и нажать «вызов». Своего таймера нет — идёт срок заказа (часы в шапке). Пятно: цифру вспомнить (после 2 ошибок оттирается). Опечатка: клиент пишет верный номер, в накладной — зачёркнуто и исправлено. Сломан — стучать быстро. Клиент не дома: набрал верно — клиент зовёт на другой адрес, в накладной адрес зачёркнут, рядом новый. Геймпад: крестовина + A, B стереть, Y вызов; клавиатура: цифры, Backspace, Enter.',
   knobs: [
-    { k: 'mode', label: 'вид', type: 'sel', def: 'dial', opts: [['dial', 'набрать номер'], ['smudge', 'пятно на цифре'], ['typo', 'опечатка в накладной'], ['broken', 'сломан — стучать']] },
+    { k: 'mode', label: 'вид', type: 'sel', def: 'dial', opts: [['dial', 'набрать номер'], ['smudge', 'пятно на цифре'], ['typo', 'опечатка в накладной'], ['broken', 'сломан — стучать'], ['away', 'клиент не дома']] },
+    { k: 'awayAddr', label: 'куда зовёт (не дома)', type: 'text', def: 'улица Курчатова, 9' },
     { k: 'flat', label: 'квартира (в накладной)', type: 'num', def: 47, min: 1, max: 999, step: 1 },
     { k: 'clockS', label: 'срок заказа, с', type: 'num', def: 40, min: 3, max: 120, step: 1 },
     { k: 'time', label: 'эталон «быстро», с', type: 'num', def: 5, min: 2, max: 30, step: 0.5 },
@@ -62,7 +87,10 @@ export default {
   ],
   mount (root, o, api) {
     const t = api.t;
-    let mode = ['typo', 'broken', 'smudge'].includes(o.mode) ? o.mode : 'dial';
+    let mode = ['typo', 'broken', 'smudge', 'away'].includes(o.mode) ? o.mode : 'dial';
+    // не дома: куда зовёт клиент (в игре — doorstep.js нашёл точку рядом; в песочнице — ручка) и его реплика
+    const awayAddr = mode === 'away' ? String((o.away && o.away.addr) || o.awayAddr || t('улица Курчатова, 9')) : '';
+    const awaySay = mode === 'away' ? ((o.away && o.away.say) || awayLine(api.ADULT)) : '';
     // песочница: номер из ручки — он и в накладной; опечатка — верный другой
     const shown = String(o.print || o.flat || 47);
     if ((mode === 'typo' || mode === 'smudge') && shown.length < 2) mode = 'dial';
@@ -113,7 +141,7 @@ export default {
       '<p class="mk-help"></p>';
     const q = s => box.querySelector(s);
     const elFuse = q('.mk-fuse i'), elTyped = q('.dg-typed'), elHelp = q('.mk-help'), elSheet = box, elUnit = q('.dg-unit'), elDoor = q('.dg-door');
-    const mini = KIT.miniBind(q('.mk-mini')), elInv = mini.body;
+    const elMini = q('.mk-mini'), mini = KIT.miniBind(elMini), elInv = mini.body;
     const keyEls = [...box.querySelectorAll('.dg-k')];
     const msgs = KIT.feed(q('.dg-feed'), { max: 3 });
     const cv = q('.mk-cv'), g = cv.getContext('2d');
@@ -127,6 +155,7 @@ export default {
       g.imageSmoothingEnabled = false;
       const L = SC.entrance(g, W, H, { look, seed, entr: o.entr, range: o.range, t, flicker: flick });
       const pnl = L.panel, D = L.door;
+      KIT.miniSide(elMini, W, H, D, pnl);              // накладная — справа от двери, рядом с панелью
       const ph = mode === 'broken' ? pnl.h * 0.42 : pnl.h;
       const key = [pnl.x, pnl.y, pnl.w, ph].map(Math.round).join(',');
       if (elUnit.__k !== key) {
@@ -173,6 +202,7 @@ export default {
       const fast = ok && !timeout && st.tries === 0 && st.t <= limit * (st.pad ? (+o.fastPad || 0.8) : (+o.fast || 0.55));
       st.res = { ok, timeout: !!timeout, fast, tries: st.tries, t: +st.t.toFixed(2), mode };
       st.endT = 1.3;
+      if (mode === 'away') { away(); return; }
       box.classList.add(ok ? 'dg-ok' : 'dg-late');
       const seal = document.createElement('div');
       seal.className = 'pp-seal ' + (ok ? 'pp-seal-green' : 'pp-seal-rust') + ' mk-seal';
@@ -184,6 +214,25 @@ export default {
       sfx(ok ? 'open' : 'fail');
       cursor();
       api.log && api.log((ok ? 'открыли' : 'срок вышел') + ' за ' + st.res.t + ' с, ошибок ' + st.tries + (fast ? ', быстро' : ''));
+    }
+
+    /* не дома: отвечает сам клиент (с лицом) — он в другом месте; адрес в накладной зачёркнут, рядом от руки новый.
+       И на «срок вышел» — тоже (дома-то его нет): ехать всё равно туда */
+    function away () {
+      st.res.ok = true; st.res.fast = false; st.res.away = true; st.res.addr = awayAddr;
+      st.endT = 3.6;                                   // успеть прочитать, куда ехать
+      box.classList.add('dg-ok', 'dg-away');
+      const seal = document.createElement('div');
+      seal.className = 'pp-seal pp-seal-rust mk-seal';
+      seal.textContent = t('не дома');
+      elSheet.appendChild(seal);
+      msgs.say({ person, name: client(), text: t(awaySay, { addr: awayAddr }), mood: 'surprised' });
+      setTimeout(() => { if (st.phase === 'end') msgs.say({ out: true, text: t('Понял, еду…') }); }, 1700);
+      OS.move(elInv, 0, awayAddr);
+      mini.peek(3.2);
+      sfx('wrong');
+      cursor();
+      api.log && api.log('клиент не дома → ' + awayAddr);
     }
 
     function press (k) {
@@ -326,7 +375,7 @@ export default {
       for (const ch of flat) press(ch);
       press('call');
     };
-    box.__st = () => ({ mode, flat, shown, blot: blotAt, wiped: st.wiped, tries: st.tries, typed: st.typed, phase: st.phase, t: +st.t.toFixed(2), res: st.res });
+    box.__st = () => ({ mode, awayAddr, flat, shown, blot: blotAt, wiped: st.wiped, tries: st.tries, typed: st.typed, phase: st.phase, t: +st.t.toFixed(2), res: st.res });
     return () => {
       removeEventListener('keydown', onKey, true);
       offInput();

@@ -54,6 +54,7 @@ import { seasonMat } from './seasons.js';
 import { onPave, walkHalf } from './pave.js';
 import { t } from '../i18n/index.js';
 import SIGNFONT from './signfont.json';
+import { MOB } from './mobile.js';
 
 export const DOME = { R: 9, PLINTH: 0.45, BIRD: 1.3, GAP: [2, 12], SEARCH: 200, STEP: 4, SLOPE: 1.6, PLAZA: 4.6, PORCH: 1.6 };
 
@@ -155,6 +156,8 @@ function hallTex () {
 }
 function winMat () {
   if (WIN_MAT) return WIN_MAT;
+  // мобильный режим: без зала за стеклом (холст 1024×512 и тяжёлый шейдер) — тёплый ровный цвет, как у купола издалека
+  if (MOB.on && !MOB.hall) return (WIN_MAT = new THREE.MeshBasicMaterial({ color: 0xd9652a }));
   HU.uHall.value = hallTex();
   const m = new THREE.MeshBasicMaterial({ color: 0xffffff });
   m.onBeforeCompile = sh => {
