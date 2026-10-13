@@ -102,6 +102,7 @@ import * as FXP from './fxpool.js';             // частицы эффекто
 import * as CG from './carglass.js';            // стёкла своей машины: курьер внутри, трещины и осколки (carglass.js)
 import * as REALCAR from './realcar.js';         // проба: настоящая «Семёрка» (ветка test/real-car)
 import * as GRITM from './grit.js';               // проба: глубина города — пятна, зерно, потёки на всём «Ламберте» (G)
+import * as CBLOOD from './carblood.js';          // кровь на машинах, что сбили человека (carblood.js)
 import * as SFX from './sfx.js';                // звуки из файлов public/sfx вместо синтеза, звук в пространстве (sfx.js, docs/SOUNDS.md)
 import * as TONE from './sfxsynth.js';         // тёплый синтез: каждое имя звука — свой инструмент (низ, тело, мягкая атака, хвост, отзвук; sfxsynth.js, docs/SOUNDS.md)
 import * as IMPACT from './impact.js';         // удары слоями: тело по материалу, металл, стекло, обломки, скрежет бортом (impact.js, docs/SOUNDS.md)
@@ -8246,6 +8247,7 @@ function updateRivals (dt) {
         if (p.dead || p.guest || !under(p)) continue;
         p.dead = 1; p.deadT = rand(18, 26); p.fly = null; p.grp.visible = false;
         gibHuman(p, hx * t.speed, hz * t.speed);
+        if (GORE_ON) CBLOOD.hit(t.mesh, p.x, p.z, Math.abs(t.speed) * 3.6);   // и на машине, что сбила (carblood.js)
       }
       for (const p of SCOOTS) {
         if (p.dead || !p.grp.visible || !under(p)) continue;
