@@ -37,10 +37,21 @@ const MODELS = {
     /* колёса «Семёрки»: ось на высоте радиуса, база 2,41 м; в колесо — треугольники днища целиком внутри R */
     WHEEL: { from: 'Car_Bottom_0', r: 0.29, R: 0.36, x: 0.55, z: 1.206, xc: 0.72, keep: 0.3, err: 0.006 },
   },
+  /* «Копейка» — «VAZ 2101», Javkal, CC-BY-4.0: кузов, детали и днище — одна часть и одна картинка; колёса — свои части;
+     салона нет (торпедо, руль, курьер — свои, realcar.js). Краска — бежевая: светлая и мало насыщенная, ржавчина — пятнами */
+  vaz2101: {
+    K: 0.01,
+    axes: (x, y, z) => [-z, y, x],                // модель на скелете: длина — по x (перед +x), вверх — y, ширина — z; поворот без зеркала
+    PART: {
+      kopeika_kopeika_0: { keep: 0.6, err: 0.006, tex: 128, colors: 8, median: 7, role: 'body', paint: { hue: [18, 70], sat: [0.05, 0.45], v: 0.5 } },
+      kopeika_glass_0: { keep: 1, tex: 0, role: 'glass' },
+    },
+    WHEELS: { LF: 'w_FD_kopeika_0', RF: 'w_FP_kopeika_0', LB: 'w_RD_kopeika_0', RB: 'w_RP_kopeika_0', keep: 0.8, err: 0.004 },
+  },
 };
 const MODEL = process.argv[4] || 'vaz2107', CFG = MODELS[MODEL];
 if (!CFG) { console.log('нет модели', MODEL, '— есть:', Object.keys(MODELS).join(', ')); process.exit(1); }
-const PART = CFG.PART, WHEEL = CFG.WHEEL;
+const PART = CFG.PART, WHEEL = CFG.WHEEL, WHEELS = CFG.WHEELS;
 const COLORS = 12, MEDIAN = 3, K = CFG.K;           // палитра по умолчанию; MEDIAN — сгладить крапинки (автор 13.10: «текстуру попроще»)                      // модель в сантиметрах → метры
 
 await MeshoptSimplifier.ready;
@@ -79,7 +90,8 @@ async function texture (name, mat, P) {
     const hsv = i => { const r = data[i] / 255, g = data[i + 1] / 255, b = data[i + 2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
       let h = 0; if (d) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
       return [(h * 60 + 360) % 360, mx ? d / mx : 0, mx]; };
-    const isPaint = ([h, sa, v]) => (P.paint.hue[0] > P.paint.hue[1] ? h >= P.paint.hue[0] || h <= P.paint.hue[1] : h >= P.paint.hue[0] && h <= P.paint.hue[1]) && sa > P.paint.sat && v > 0.12;
+    const sat = [].concat(P.paint.sat), vmin = P.paint.v || 0.12;   // sat — от (или [от, до]), v — не темнее
+    const isPaint = ([h, sa, v]) => (P.paint.hue[0] > P.paint.hue[1] ? h >= P.paint.hue[0] || h <= P.paint.hue[1] : h >= P.paint.hue[0] && h <= P.paint.hue[1]) && sa > sat[0] && (sat[1] === undefined || sa <= sat[1]) && v > vmin;
     const vs = [];
     for (let i = 0; i < data.length; i += 4) { const c = hsv(i); if (isPaint(c)) vs.push(c[2]); }
     vs.sort((a, b) => a - b);
@@ -96,11 +108,11 @@ async function texture (name, mat, P) {
   return (texFile[name] = file);
 }
 
-function emit (name, file, mat, P, g, pivot) {
+function emit (name, file, mat, P, g, pivot, role) {
   const a = mat ? mat.getBaseColorFactor()[3] : 1;
   const ix = g.pos.length / 3 > 65535 ? g.idx : new Uint16Array(g.idx);
   parts.push({
-    name, file, pivot, blend: !!(mat && mat.getAlphaMode() === 'BLEND'), alpha: P.alpha !== undefined ? P.alpha : a,
+    name, file, pivot, role: role || P.role || (/CarBody/.test(name) ? 'body' : /Details_0/.test(name) ? 'detail' : null), blend: !!(mat && mat.getAlphaMode() === 'BLEND'), alpha: P.alpha !== undefined ? P.alpha : a,
     pos: [push(g.pos), g.pos.length], uv: [push(g.uv), g.uv.length], idx: [push(ix), ix.length, ix.BYTES_PER_ELEMENT],
   });
   return g.idx.length / 3;
@@ -109,13 +121,14 @@ function emit (name, file, mat, P, g, pivot) {
 for (const node of doc.getRoot().listNodes()) {
   const mesh = node.getMesh();
   if (!mesh) continue;
-  const name = node.getName(), P = PART[name] || { keep: 0.5, tex: 128 };
+  const name = mesh.getName() || node.getName(), P = PART[name] || { keep: 0.5, tex: 128 };
   for (const prim of mesh.listPrimitives()) {
     transformPrimitive(prim, node.getWorldMatrix());
     const src = prim.getAttribute('POSITION').getArray(), uv = Float32Array.from(prim.getAttribute('TEXCOORD_0').getArray());
     const idx = prim.getIndices().getArray(), mat = prim.getMaterial();
     const pos = new Float32Array(src.length);
     for (let i = 0; i < src.length; i++) pos[i] = src[i] * K;
+    if (CFG.axes) for (let i = 0; i < pos.length; i += 3) { const v = CFG.axes(pos[i], pos[i + 1], pos[i + 2]); pos[i] = v[0]; pos[i + 1] = v[1]; pos[i + 2] = v[2]; }   // свои оси модели → оси игры
     for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) { box.min[k] = Math.min(box.min[k], pos[i + k]); box.max[k] = Math.max(box.max[k], pos[i + k]); }
     const file = await texture(name, mat, P);
     let rest = idx;
@@ -128,6 +141,18 @@ for (const node of doc.getRoot().listNodes()) {
       }
       console.log('торпедо модели — долой:', (idx.length - keep.length) / 3, 'треугольников');
       rest = keep;
+    }
+    const wk = WHEELS && Object.keys(WHEELS).find(k => WHEELS[k] === name);
+    if (wk) {
+      // колесо готовой частью: ось — середина его рамки; L / R и F / B — по месту (а не по имени: у моделей своё «водитель / пассажир»)
+      const lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+      for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], pos[i + k]); hi[k] = Math.max(hi[k], pos[i + k]); }
+      const pv = [0, 1, 2].map(k => (lo[k] + hi[k]) / 2);
+      const g = simplify(pos, uv, idx, WHEELS.keep, WHEELS.err);
+      for (let i = 0; i < g.pos.length; i += 3) { g.pos[i] -= pv[0]; g.pos[i + 1] -= pv[1]; g.pos[i + 2] -= pv[2]; }
+      const k2 = (pv[0] > 0 ? 'L' : 'R') + (pv[2] > 0 ? 'F' : 'B');
+      console.log(('wheel' + k2).padEnd(28), 'ось', pv.map(v => v.toFixed(2)).join(' '), 'треугольников', emit('wheel' + k2, file, mat, P, g, pv, 'wheel'));
+      continue;
     }
     if (WHEEL && name === WHEEL.from) {
       // колёса: треугольник целиком в цилиндре радиуса R вокруг оси колеса — колесо
@@ -151,7 +176,7 @@ for (const node of doc.getRoot().listNodes()) {
       }
       rest = R;
     }
-    if (name === 'Car_Windows_0') {
+    if (name === 'Car_Windows_0' || P.role === 'glass') {
       // стёкла: по нормали треугольника — бок (L / R) или лобовое / заднее (F / B); UV — плоская проекция 0…1
       // (на неё в игре ложатся трещины и кровь)
       const G = { winF: [], winB: [], winL: [], winR: [] };

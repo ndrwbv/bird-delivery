@@ -30,7 +30,8 @@ const ROOT = (import.meta.env.BASE_URL || './') + 'models/';
    k — во сколько раз больше настоящей (люди в игре рослые: в настоящий размер машина рядом с ними игрушечная);
    eye — глаза водителя; sw — руль (C — середина, R — радиус, tilt — наклон верхом к водителю, turn — рад на весь руль);
    dash — щиток приборов; box — полуширина и полудлина кузова (вмятины, кровь);
-   torpedo — панель: W — полуширина, top — верх, lip — кромка (z), low — низ лица, back — у лобового (z), floor — пол */
+   torpedo — панель: W — полуширина, top — верх, lip — кромка (z), low — низ лица, back — у лобового (z), floor — пол,
+   visor — козырьки [высота, z] (зеркало — от них) */
 export const MODELS = {
   semerka: {
     dir: 'vaz2107', k: 1.2,
@@ -40,6 +41,17 @@ export const MODELS = {
     box: { W2: 0.89, HL: 2.08 },
     torpedo: { W: 0.68, top: 0.95, lip: 0.68, low: 0.6, back: 1.0, floor: 0.4 },
     driver: { x: 0.36, seat: 0.5, z: 0.1 },        // курьер: середина сиденья (x), его высота, где голова по длине
+  },
+  /* «Копейка» — «VAZ 2101», Javkal, CC-BY-4.0: https://sketchfab.com/3d-models/vaz-2101-95d34f63b5b14e2197fd41383776e031
+     Модель в 1,13 раза крупнее настоящей — k меньше; салона нет — всё своё, как у «Семёрки» × 1,12 и ближе к стеклу на 0,1 м */
+  kopeyka: {
+    dir: 'vaz2101', k: 1.06,
+    eye: [0.4, 1.33, 0.37],
+    sw: { C: [0.4, 1.0, 0.74], R: 0.19, tilt: -0.5, turn: 2.2 },
+    dash: { C: [0.4, 1.08, 0.84], tilt: -0.3, KMH: 180, RPM: 8 },
+    box: { W2: 0.95, HL: 2.34 },
+    torpedo: { W: 0.76, top: 1.06, lip: 0.86, low: 0.67, back: 1.15, floor: 0.45, visor: [1.52, 0.7] },
+    driver: { x: 0.4, seat: 0.56, z: 0.22 },
   },
 };
 export const REAL = { on: true, k: 1.2, eye: new THREE.Vector3(0.36, 1.19, 0.24) };   // текущая (для game.js camStep и отладки)
@@ -109,9 +121,10 @@ function torpedo (T) {
   parts.push({ geo: new THREE.CylinderGeometry(0.008, 0.01, 0.22, 8), m: M4(0, gy + 0.15, gz - 0.025, -0.25), hex: DASHC.chrome });
   parts.push({ geo: new THREE.SphereGeometry(0.03, 12, 8), m: M4(0, gy + 0.26, gz - 0.055), hex: DASHC.dark });
   // зеркало заднего вида и козырьки
-  parts.push({ geo: new THREE.CylinderGeometry(0.008, 0.008, 0.07, 6), m: M4(0, 1.36, 0.66, 0.5), hex: DASHC.dark });
-  parts.push({ geo: new THREE.BoxGeometry(0.16, 0.05, 0.02), m: M4(0, 1.32, 0.64, 0.15), hex: DASHC.dark });
-  for (const sx of [-1, 1]) parts.push({ geo: new THREE.BoxGeometry(0.36, 0.012, 0.15), m: M4(sx * 0.32, 1.39, 0.6, -0.12), hex: DASHC.visor });
+  const [vy, vz] = T.visor || [1.39, 0.6];          // козырьки — под крышей у лобового; зеркало — чуть ниже и ближе к стеклу
+  parts.push({ geo: new THREE.CylinderGeometry(0.008, 0.008, 0.07, 6), m: M4(0, vy - 0.03, vz + 0.06, 0.5), hex: DASHC.dark });
+  parts.push({ geo: new THREE.BoxGeometry(0.16, 0.05, 0.02), m: M4(0, vy - 0.07, vz + 0.04, 0.15), hex: DASHC.dark });
+  for (const sx of [-1, 1]) parts.push({ geo: new THREE.BoxGeometry(0.36, 0.012, 0.15), m: M4(sx * 0.32, vy, vz, -0.12), hex: DASHC.visor });
   const mesh = new THREE.Mesh(merge(parts), new THREE.MeshLambertMaterial({ vertexColors: true }));
   mesh.name = 'torpedo';
   // лицо магнитолы и часов — холст
@@ -406,7 +419,7 @@ function load (C) {
   CACHE[C.dir] = Promise.all([fetch(BASE + 'car.json').then(r => r.json()), fetch(BASE + 'car.bin').then(r => r.arrayBuffer())])
     .then(([J, bin]) => {
       const g = new THREE.Group(), tl = new THREE.TextureLoader(), mats = {};
-      const cz = (J.box.min[2] + J.box.max[2]) / 2;      // середина по длине — в ноль, как у кузова игры
+      const cz = (J.box.min[2] + J.box.max[2]) / 2, gy = J.box.min[1];   // середина по длине и низ колёс — в ноль, как у кузова игры
       for (const p of J.parts) {
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(bin, p.pos[0], p.pos[1]), 3));
@@ -426,19 +439,20 @@ function load (C) {
             mat.map = t;
           }
           if (p.blend) { mat.transparent = true; mat.opacity = Math.min(1, p.alpha); mat.depthWrite = false; }
-          mat.userData.body = !p.blend && /CarBody|Details_0/.test(p.name);   // кровь — на кузове и деталях
-          mat.userData.paint = /CarBody/.test(p.name);                        // краска маской — только кузов
+          const role = p.role || (/CarBody/.test(p.name) ? 'body' : /Details_0/.test(p.name) ? 'detail' : '');
+          mat.userData.body = !p.blend && (role === 'body' || role === 'detail');   // кровь — на кузове и деталях
+          mat.userData.paint = role === 'body';                                  // краска маской — только кузов
         }
         const m = new THREE.Mesh(geo, mat);
         m.name = 'real:' + p.name;
         if (p.blend || pane) m.renderOrder = 2;
         if (p.pivot) {
           const steer = new THREE.Group(), spin = new THREE.Group();
-          steer.position.set(p.pivot[0], p.pivot[1], p.pivot[2] - cz);
+          steer.position.set(p.pivot[0], p.pivot[1] - gy, p.pivot[2] - cz);
           spin.add(m); steer.add(spin); g.add(steer);
           steer.name = p.name;
         } else {
-          geo.translate(0, 0, -cz);
+          geo.translate(0, -gy, -cz);
           g.add(m);
         }
         geo.computeVertexNormals();
