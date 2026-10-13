@@ -42,3 +42,31 @@ npm run carlab
 4. В `src/game/realcar.js` — запись в `MODELS` с id машины игры (`cars.js`): папка, `k`, глаза
    водителя, руль, щиток, торпедо, полуширина и полудлина кузова.
 5. Проверить в песочнице машин: вид со всех сторон, из-за руля, удары, кровь, цвета.
+
+## Кандидаты (Sketchfab, можно скачать, 13.10.2026)
+
+Все — CC-BY (автора в титры), кроме отмеченных. «тр.» — треугольников; больше ~30 тыс. — ужимать сильнее
+(колёса и днище — в первую очередь). Салон у большинства не проверен — смотреть на странице модели.
+
+| машина игры | модель | тр. | автор | ссылка |
+|---|---|---|---|---|
+| Копейка (ВАЗ-2101) | VAZ 2101 | 5,5 тыс. | Javkal | [sketchfab](https://sketchfab.com/3d-models/95d34f63b5b14e2197fd41383776e031) |
+| Копейка | VAZ 2101 (серия) | 3,3 тыс. | eightismore | [sketchfab](https://sketchfab.com/3d-models/140b7a3b112c40698a3a9521631516a7) |
+| Волжанка (ГАЗ-24) | GAZ-24 Volga Black (серия) | 4 тыс. | eightismore | [sketchfab](https://sketchfab.com/3d-models/ac19841adca7495586838a0f8d52e209) |
+| Волжанка | GAZ 24 Volga | 36 тыс. | maxdragonn | [sketchfab](https://sketchfab.com/3d-models/19074d0e6287462ea5e2be3e0a115665) |
+| Буханка (УАЗ-452) | Uaz 452 | 8 тыс. | Sergey Egelsky | [sketchfab](https://sketchfab.com/3d-models/4f45aa2e9180437b9687b3d567069ca9) |
+| Буханка | UAZ 452 Buhanka | 8,8 тыс. | YouRun | [sketchfab](https://sketchfab.com/3d-models/8b37ef5dde0d45bc8d0420ccbfeccfc3) |
+| Нивка | Low poly lada niva | 5,8 тыс. | RitiWox | [sketchfab](https://sketchfab.com/3d-models/b67df18b55ab497ba30cdbd6be7dee19) |
+| Нивка | Lada Niva | 75 тыс. | Greg McKechnie | [sketchfab](https://sketchfab.com/3d-models/26ebf5872bce4ff4ad2baee41882d6b2) |
+| Приорик | LADA Priora VAZ-2170 | 12 тыс. | Okopchi | [sketchfab](https://sketchfab.com/3d-models/4c67aa9408564f989460878c374dcb0f) |
+| Вестачка | Low Poly Lada Vesta | 5,6 тыс. | kulonee | [sketchfab](https://sketchfab.com/3d-models/b804fab0498f42be8b40f0201d7ed7c0) |
+| Патриот | UAZ Patriot | 27,5 тыс. | tiunov.se | [sketchfab](https://sketchfab.com/3d-models/35ba1f77bf7748b4ad2aa89f5dd75e9f) |
+| поток: Москвич-412 | Moskvich 412 | 10 тыс. | Alexander Bakhtin | [sketchfab](https://sketchfab.com/3d-models/b6eb96e28f184cf5a8098f68570f2314) |
+| поток: ВАЗ-2104 | VAZ-2104 FREE | 27 тыс. | sMoKi | [sketchfab](https://sketchfab.com/3d-models/ba563a31b4754a66a5f0e7f893145922) |
+| поток: ВАЗ-2103 | Soviet Car. VAZ-2103 | 77 тыс. | assg709 | [sketchfab](https://sketchfab.com/3d-models/0afaec0b8352486b836e921c77381859) |
+| поток: ВАЗ-2106 | VAZ-2106 Handpainted | 5 тыс. | reramil | [sketchfab](https://sketchfab.com/3d-models/ec5c5781e6d840829c4cbdf4da12124c) |
+| поток: милиция, скорая | VAZ 2101 Road Police, Volga Ambulance (серия) | 3,5—4,5 тыс. | eightismore | [2101 ГАИ](https://sketchfab.com/3d-models/da518db0b8ff41088db45b55122267d3), [скорая](https://sketchfab.com/3d-models/a04313f53b754133971c87075500d831) |
+
+Серия eightismore (2101, ГАЗ-24, универсал, ГАИ, скорая) — в одном стиле и лёгкая: хороша для машин
+на дороге. Нельзя в игру: «Moskvich 412» Renafox и «Lada Zhiguli (Riva)» — CC-BY-NC (некоммерческая);
+«Free Standard» (Sketchfab) — читать условия отдельно.

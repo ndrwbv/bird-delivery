@@ -36,9 +36,10 @@ export const MODELS = {
     dir: 'vaz2107', k: 1.2,
     eye: [0.36, 1.19, 0.24],
     sw: { C: [0.36, 0.9, 0.58], R: 0.17, tilt: -0.5, turn: 2.2 },
-    dash: { C: [0.36, 1.02, 0.72], tilt: -0.3, KMH: 180, RPM: 8 },
+    dash: { C: [0.36, 0.97, 0.66], tilt: -0.3, KMH: 180, RPM: 8 },   // щиток — колодцем из кромки торпедо (низ в панели, не висит)
     box: { W2: 0.89, HL: 2.08 },
     torpedo: { W: 0.68, top: 0.95, lip: 0.68, low: 0.6, back: 1.0, floor: 0.4 },
+    driver: { x: 0.36, seat: 0.5, z: 0.1 },        // курьер: середина сиденья (x), его высота, где голова по длине
   },
 };
 export const REAL = { on: true, k: 1.2, eye: new THREE.Vector3(0.36, 1.19, 0.24) };   // текущая (для game.js camStep и отладки)
@@ -130,6 +131,23 @@ function torpedo (T) {
   face.rotation.set(-0.35, Math.PI, 0);
   const g = new THREE.Group();
   g.add(mesh, face);
+  return g;
+}
+
+/* курьер за рулём (как люди в игре — из коробок): оранжевая куртка, кепка, руки к рулю. Из-за руля (V) не виден */
+const DRV = { jacket: 0xf0522a, dark: 0xc93f1f, skin: 0xe2b48c, pants: 0x2f3440 };
+function driver (D, SW) {
+  const parts = [], B = (w, h, d, hex, x, y, z, rx = 0) => parts.push({ geo: new THREE.BoxGeometry(w, h, d), m: M4(x, y, z, rx), hex });
+  const y0 = D.seat;
+  B(0.4, 0.14, 0.42, DRV.pants, 0, y0 + 0.07, D.z + 0.18);                 // бёдра на сиденье
+  B(0.42, 0.5, 0.26, DRV.jacket, 0, y0 + 0.4, D.z - 0.02, -0.12);           // торс, чуть откинут
+  B(0.2, 0.22, 0.21, DRV.skin, 0, y0 + 0.75, D.z + 0.01);                   // голова
+  B(0.22, 0.07, 0.23, DRV.jacket, 0, y0 + 0.88, D.z);                       // кепка
+  B(0.2, 0.025, 0.11, DRV.dark, 0, y0 + 0.86, D.z + 0.16);                  // козырёк
+  for (const s of [-1, 1]) B(0.08, 0.08, 0.4, DRV.jacket, s * 0.17, y0 + 0.47, D.z + 0.2, -0.45);   // руки к рулю
+  const g = new THREE.Mesh(merge(parts), new THREE.MeshLambertMaterial({ vertexColors: true }));
+  g.position.x = D.x;
+  g.name = 'driver';
   return g;
 }
 
@@ -251,7 +269,7 @@ function crackTex () {
 /* ─── краска и кровь на кузове (своя программа поверх «Ламберта») ───
    uPaint — цвет машины (маска краски — прозрачность картинки кузова); uBlood[i] — пятно: xyz — центр
    в осях модели, w — радиус (0 — нет). Ниже центра пятно вытянуто — стекает */
-const BODY_BLOOD = { N: 24, GROW: 0.9, DRIP: 0.07, DRIP_MIN: 0.3 };
+const BODY_BLOOD = { N: 40, GROW: 0.9, DRIP: 0.07, DRIP_MIN: 0.3, K: 1.5 };   // K — пятна крупнее (автор 13.10: «кровищи больше»)
 function bodyShader (mat, U, paint) {
   mat.userData.dirt = 1;                            // cardirt.js свою программу не ставит — грязь и снег вставляем сами
   mat.onBeforeCompile = sh => {
@@ -303,7 +321,7 @@ const RED = ['#7d0a10', '#9b0f15', '#b3161b'];
 function glassBlood (B, side) {
   // брызги: со стороны удара гуще; каждая растёт от точки до своего размера за ~0,25 с; мелкие капли вокруг; потёки
   const cx = BLOOD.W * (0.5 + side * 0.25);
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 22; i++) {
     const x = Math.max(2, Math.min(BLOOD.W - 2, cx + (Math.random() - 0.5) * BLOOD.W * 0.9)), y = BLOOD.H * (0.1 + Math.random() * 0.8);
     B.drops.push({ x, y, r: 0.5, R: 3 + Math.random() * 7, vy: 0, t: 0, life: 0.3, hex: RED[i % 3] });
     for (let k = 0; k < 5; k++) B.drops.push({ x: x + (Math.random() - 0.5) * 22, y: y + (Math.random() - 0.5) * 14, r: 0.3, R: 0.6 + Math.random() * 1.2, vy: 0, t: 0, life: 0.2, hex: RED[k % 3] });
@@ -342,9 +360,10 @@ export function blood (car, wx, wz, kmh = 40) {
     const v = R.bloodU.value[R.bloodI++ % BODY_BLOOD.N];
     v.set(px, py, pz, 0.01);
     R.splats = R.splats.filter(s => s.v !== v);
-    R.splats.push({ v, R: r, t: 0, drip });
+    R.splats.push({ v, R: r * BODY_BLOOD.K, t: 0, drip });
   };
   add(x, 0.6, z * 0.98, 0.3 + Math.random() * 0.15, 0);                      // удар — морда / бок
+  add(x + (Math.random() - 0.5) * 0.6, 0.45, z * 0.99, 0.25, 1);                // бампер, стекает
   add(x + (Math.random() - 0.5) * 0.4, 0.75, z * 0.95, 0.18, 1);              // потёк
   if (end && nz > 0) { add(x * 0.8, 0.98, HL - 0.5 - Math.random() * 0.3, 0.35, 0); add(x * 0.5, 1.2, 0.9, 0.2, 0); }   // капот и стойки
   else if (!end) add(x, 1.0, z, 0.25, 1);                                       // дверь повыше
@@ -426,6 +445,7 @@ function load (C) {
         geo.computeBoundingSphere();
       }
       if (C.torpedo) g.add(torpedo(C.torpedo));
+      if (C.driver) g.add(driver(C.driver, C.sw));
       if (C.sw) g.add(steeringWheel(C.sw));
       if (C.dash) g.add(cluster(C.dash));
       if (window.__dlv) window.__dlv.REAL = REAL;
@@ -485,6 +505,7 @@ export function dress (car, id = 'semerka', hex) {
       }
       if (/^wheel/.test(o.name)) { R.wheels.push(o.children[0]); if (o.name[6] === 'F') R.front.push(o); }
       if (o.name === 'sw-rot') R.sw = o;
+      if (o.name === 'driver') R.driver = o;
       if (o.name === 'needle0') R.needles[0] = o;
       if (o.name === 'needle1') R.needles[1] = o;
     });
@@ -497,6 +518,12 @@ export function dress (car, id = 'semerka', hex) {
     REAL.k = C.k; REAL.eye.set(...C.eye);
     ud.real = R;
   });
+}
+
+/* вид из-за руля (game.js camStep): курьера не видно — ни головы, ни рук */
+export function fp (car, on) {
+  const R = car && car.userData.real;
+  if (R && R.driver) R.driver.visible = !on;
 }
 
 /* перекрасить на ходу (гараж, песочница машин) */
@@ -515,9 +542,10 @@ function dull (c) {
    Числа — как у старого кузова (DENT в cardent.js): с 4 м/с, во всю глубину 0,3 м с 22 м/с, радиус 0,45—1,05 м;
    глубже 0,5 м от морды / кормы и 0,28 м от бока не мнётся — машина не складывается */
 const DENT = { MIN: 4, FULL: 22, DEPTH: 0.3, R0: 0.45, R1: 0.6, IN_END: 0.5, IN_SIDE: 0.28 };
-export function dent (car, lx, lz, force) {
+export function dent (car, lx, lz, force, rear) {
   const R = car && car.userData.real;
   if (!R || !(force > DENT.MIN)) return;
+  if (!rear) rearDent(car, lx, lz, force);
   const K = R.C.k, { W2, HL } = R.C.box, x = lx / K, z = lz / K, k = Math.min(1, (force - DENT.MIN) / (DENT.FULL - DENT.MIN));
   const end = Math.abs(z) / HL >= Math.abs(x) / W2;
   const nx = end ? 0 : Math.sign(x) || 1, nz = end ? Math.sign(z) || 1 : 0;
@@ -537,6 +565,15 @@ export function dent (car, lx, lz, force) {
     }
     if (hit) { a.needsUpdate = true; g.computeBoundingSphere(); }
   }
+}
+/* «Следы сзади» (как cardent.js REARD; автор 13.10: «ломаться чаще сзади» — камера сзади): любой удар не в корму
+   мнёт и корму — REAR.K силы, в случайном месте по ширине, на высоте бампера */
+const REAR = { K: 0.55 };
+function rearDent (car, lx, lz, force) {
+  const R = car.userData.real, { W2, HL } = R.C.box;
+  if (lz / R.C.k < -HL * 0.6) return;                 // и так в корму
+  const f = DENT.MIN + (force - DENT.MIN) * REAR.K;
+  if (f > DENT.MIN) dent(car, (Math.random() - 0.5) * W2 * 1.4 * R.C.k, -(HL + 0.3) * R.C.k, f, true);
 }
 
 /* каждый кадр (game.js после колёс): spin — угол колёс, steerY — поворот передних, steer — руль −1…1,
@@ -563,6 +600,9 @@ export function step (car, spin, steerY, steer, vf, dt = 1 / 60) {
     if (p.st === 1) { mt.map = crackTex(); mt.opacity = GLASS.CRACK; mt.color.setHex(0xffffff); mt.needsUpdate = true; }
     if (p.st === 2) { q.m.visible = false; if (p.k === 'f' && R.blood) R.blood.m.visible = false; }
   }
+  // заднее стекло — от износа зада (cardent.js REARD: 2 — трещины, 3 — разбито), как фонари у старого кузова
+  const rw = car.userData.rear && car.userData.rear.st, pb = cg && cg.panes.find(p => p.k === 'b');
+  if (pb && rw >= 2 && pb.st < (rw >= 3 ? 2 : 1)) pb.st = rw >= 3 ? 2 : 1;
   // кровь на кузове: пятна растут, потёки сползают вниз
   for (const s of R.splats) {
     if (s.t > 4) continue;

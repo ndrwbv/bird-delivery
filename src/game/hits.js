@@ -381,6 +381,46 @@ function throwBody (p, vx, vz, kmh, up, lie, y0) {
   return B;
 }
 
+/* переехал лежащего (или ещё летящего, но уже упавшего на дорогу) — снова отлетает, как от первого удара (THROW),
+   с фонтаном крови; после REHIT.SKEL переездов — скелет (белые тонкие кости) и больше ни на что не реагирует.
+   Только взрослая версия (в детской сбитые встают и уходят). cx, cz — середина машины, fx, fz — куда смотрит,
+   L, W — полудлина и полуширина, vx, vz — скорость машины. Возвращает, сколько тел задел (проба 13.10.2026) */
+export const REHIT = { MIN: 3, SKEL: 2, PAD: 0.4, BONE: 0xe4ddca };
+let BONE = null;
+export function rehit (cx, cz, fx, fz, L, W, vx, vz) {
+  const sp = Math.hypot(vx, vz);
+  if (!A || !A.adult || sp < REHIT.MIN) return 0;
+  let n = 0;
+  for (const B of BODIES) {
+    if (B.skel || B.up || (B.mode !== 'lie' && !(B.mode === 'fly' && B.landed))) continue;
+    const dx = B.root.position.x - cx, dz = B.root.position.z - cz;
+    if (Math.abs(dx * fx + dz * fz) > L + REHIT.PAD || Math.abs(dx * fz - dz * fx) > W + REHIT.PAD) continue;
+    const kmh = sp * 3.6, l = sp, side = rand(-1, 1) * (THROW.SIDE0 + kmh * THROW.SIDE_K);
+    B.hits = (B.hits || 1) + 1;
+    B.mode = 'fly'; B.t = 0; B.landed = 0; B.life = B.lie;
+    B.root.position.y += 0.35;
+    B.vx = vx * THROW.FWD + side * -vz / l; B.vz = vz * THROW.FWD + side * vx / l;
+    B.vy = clamp(THROW.UP0 + kmh / THROW.UP_K, 3, THROW.UP_MAX);
+    B.spin = rand(5, 9) * (Math.random() < 0.5 ? -1 : 1); B.roll = rand(-3, 3);
+    if (A.spray) A.spray({ x: B.root.position.x, z: B.root.position.z }, vx, vz, kmh);
+    if (A.Snd.impact) A.Snd.impact(Math.max(sp, 6), 'person', { x: B.root.position.x, z: B.root.position.z });
+    if (B.hits > REHIT.SKEL) skeleton(B);
+    n++;
+  }
+  return n;
+}
+/* скелет: кости — белые и тоньше, без одежды */
+function skeleton (B) {
+  B.skel = 1;
+  if (!BONE) BONE = new A.THREE.MeshLambertMaterial({ color: REHIT.BONE });
+  for (const k in B.parts) {
+    const m = B.parts[k];
+    if (!m) continue;
+    m.material = BONE;
+    if (k !== 'head') m.scale.set(m.scale.x * 0.55, m.scale.y, m.scale.z * 0.55);
+  }
+}
+
 function fadeBody (B) { if (B.mode !== 'fade') { B.mode = 'fade'; B.t = 0; } }
 
 /* оторвать руку или ногу: летит своим кусочком, где упала — маленькая лужица */

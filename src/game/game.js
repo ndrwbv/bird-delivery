@@ -10370,6 +10370,9 @@ function driveStep (dt) {
     V.vx *= 0.99; V.vz *= 0.99;
   }
 
+  // сбитые лежат — их можно переехать ещё раз: отлетают снова, после второго раза — скелет (hits.js rehit)
+  if (HITS.rehit(V.x, V.z, fx, fz, CAR_L, CAR_W, V.vx, V.vz)) { S.shake = Math.max(S.shake, 0.25); if (GORE_ON) REALCAR.blood(car, V.x + fx * 3, V.z + fz * 3, Math.abs(vf) * 3.6); }
+
   for (let i = 0; i < SCOOTS.length; i++) {
     const p = SCOOTS[i];
     if (p.dead || !underCar(p.x, p.z) || Math.abs(vf) < 3) continue;
@@ -10558,6 +10561,7 @@ function camStep (dt, vf) {
     V.camX = cam.position.x; V.camZ = cam.position.z; V.camY = cam.position.y + 2; V.camH = V.h; V.camPull = 0;
     return;
   }
+  if (car.userData.real) REALCAR.fp(car, FPV.on);   // из-за руля курьера не видно
   if (FPV.on && car.userData.real) {                // настоящая «Семёрка» (realcar.js): глаза водителя, видно торпедо и руль
     V.hero = 0;
     car.updateMatrixWorld();

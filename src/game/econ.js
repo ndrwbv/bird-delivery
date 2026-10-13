@@ -730,7 +730,7 @@ export const GROWTH = {
    Прокачка на каждую машину: броня (+1 сердце) и мотор (+4 % скорости), по три
    ступени, ступень — 15 % цены машины (у бесплатной «Семёрки» — от 6 400 ₽). */
 export const CAR_LIST = [
-  { id: 'semerka', price: 0,      stars: 0,  hp: 4,  L: 3,   vmax: 44, acc: 34, handling: 5 },
+  { id: 'semerka', price: 0,      stars: 0,  hp: 4,  L: 3,   vmax: 44, acc: 29, handling: 5 },   // acc 34 → 29 (13.10.2026, автор: «туже разгоняться — это семёрка»)
   { id: 'matiz',   price: 40000,  stars: 0,  hp: 3,  L: 2,   vmax: 46.5, acc: 39.8, handling: 8 },
   { id: 'kopeyka', price: 88000,  stars: 0,  hp: 5,  L: 4,   vmax: 44.8, acc: 34.9, handling: 4 },
   { id: 'cheri',   price: 120000, stars: 0,  hp: 4,  L: 3,   vmax: 48.1, acc: 39, handling: 9 },
