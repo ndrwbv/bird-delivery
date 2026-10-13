@@ -6714,7 +6714,7 @@ function carObj (mesh, model, taxi, parked, cruise, hp, stopCd) {
     x: 0, z: 0, h: 0, wheel: 0, hp, wreck: 0, wreckT: 0, hitT: 0,
     knock: 0, kvx: 0, kvy: 0, kvz: 0, spin: 0, y: 0, roll: 0, smokeT: 0,
     rejoin: 0, jx: 0, jz: 0, jh: 0, waitT: 0, ghost: 0, pull: 0, stopT: 0, stopCd,
-    gy: undefined, rollV: 0, nar: 0, chainT: 0, stalled: 0, stallT: 0, angry: 0, moved: 0, driver: null, gone: 0,
+    gy: undefined, rollV: 0, nar: 0, chainT: 0, stalled: 0, stallT: 0, angry: 0, moved: 0, driver: null, noDriver: 0, gone: 0,
     accident: 0, lux: 0, onBoom: undefined, _lag: 0, _lk: undefined,
     // службы и погоня (newSvc, chaseStart): у потока — пусто
     svc: undefined, path: undefined, pi: 0, goal: undefined, arrived: 0, repath: 0, acc: undefined, corner: undefined, gap: undefined, peds: undefined,
@@ -6776,8 +6776,9 @@ function placeTraffic (t, rmin, rmax, why = 'other') {
     const opts = NODES[a].nb.map(b => edgeOf(a, b)).filter(e => e.ok && e.c <= 5 && edgeRun(e) > 8 && !e.closed && !e.lock && NAR.flowOk(e, nodeDeg) && inBounds(NODES[e.b].x, NODES[e.b].z) && inBounds(NODES[e.a].x, NODES[e.a].z));
     if (!opts.length) continue;
     const e = pick(opts);
+    if (!t.mesh.userData.realLite && why !== 'jam') realSwap(t);   // проба: перестановка вне кадра — может стать настоящей моделью
     t.e = e; t.s = rand(0, edgeRun(e) * 0.8); t.lane = (Math.random() * laneCount(e)) | 0; t.turn = null;
-    t.rejoin = 0; t.pull = 0; t.stopT = 0;
+    t.rejoin = 0; t.pull = 0; t.stopT = 0; t.noDriver = 0;   // переставили — это уже другая машина, со своим водителем
     t.gy = undefined;              // высота — с нового места: со старой машину на мосту сажало на землю под настилом
     poseTraffic(t, 0);
     // не рождаться внутри другой машины — но и без места не оставаться
@@ -7470,7 +7471,7 @@ function updateDrivers (dt) {
       // водителя задавили — машина без хозяина так и стоит с аварийкой:
       // вести её некому. Раньше она тут же «оживала» и прыгала на полосу —
       // выглядело так, будто водитель превратился в машину
-      t.driver = null;
+      t.driver = null; t.noDriver = 1;              // машина без хозяина: новые удары больше никого не «выпускают» (было — бесконечно)
       if (t.wreck) t.stalled = 0;
       else t.stallT = Infinity;
       DRIVERS.splice(i, 1);
@@ -10277,7 +10278,7 @@ function driveStep (dt) {
         S.shake = Math.max(S.shake, 0.6);
         t.ramT = 0; t.repath = 1;
       } else if (t.chase) chaseEnd(t, 'caught');   // догнал и врезались — остыл, едет дальше
-      else if (!t.parked && hit > 6 && !t.driver) t.angry = 1;     // приземлится — выйдет разбираться (или погонится — chaseStart)
+      else if (!t.parked && hit > 6 && !t.driver && !t.noDriver) t.angry = 1;     // приземлится — выйдет разбираться (или погонится — chaseStart); водителя задавили — больше никто не выйдет
       hurtCar(carDmg(hit), hit, hx, hz, 'car');   // лёгкий удар (до SOFT_HIT.CAR) — только мятина
       t.hitT = 0.5;
       if (stand) {
@@ -14050,7 +14051,24 @@ ZN.init({ CITY, MAP, donated });
 DLG.init({ pause: on => { for (const k in IN) IN[k] = 0; if (on) Snd.engine(0); }, face: (p, size) => faceDataURL(p, size) });
 HITS.init({ THREE, scene, box, mergeGeos, HUMAN_VC, groundH, surfaceAt, curbAt, nearestRoad, driftTop: SEAS.driftTop, pavedLift: TRK.pavedLift, groundNormal, emote, puff, pushOut, Snd,
   burst: burstHuman, scare, callAmbulance, adult: GORE_ON, shred: shredHit, spray: bloodSpray, bounce: bounceBody });
-REALCAR.preloadTraffic();                        // проба: настоящие машины в потоке — облегчённые модели заранее (realcar.js TRAFFIC)
+/* проба: настоящие машины в потоке (realcar.js TRAFFIC). realSwap — лёгкую машину потока меняет на настоящую «Семёрку» /
+   «Копейку» с вероятностью SHARE: когда модели загрузились (первые машины смены ставятся раньше) — те, что сейчас не
+   на глазах; и при каждой перестановке машины потока (placeTraffic — поток перевыставляет те же машины, а не новые) */
+function realSwap (t, force) {
+  const u = t.mesh && t.mesh.userData;
+  if (!u || !u.lite || u.realLite || t.taxi || !isFlow(t) || t.knock || t.wreck || t.still || !REALCAR.trafficReady()) return;
+  if (!force && !chance(REALCAR.TRAFFIC.SHARE)) return;
+  const rc = REALCAR.trafficCar(u.bodyHex);
+  if (!rc) return;
+  const old = t.mesh, m = rc.g, R = m.userData.real;
+  m.userData = dbl({ lite: true, realLite: true, real: R, hl: rc.hl, wheels: [], steer: [], panels: [], glass: [], hazard: [], dmg: 0, bodyHex: u.bodyHex, model: 'sedan', taxi: false, full: undefined, _pose: undefined });
+  m.position.copy(old.position); m.rotation.copy(old.rotation);
+  if (old.parent) { old.parent.add(m); old.parent.remove(old); }
+  t.mesh = m; t.model = 'sedan'; t.hl = rc.hl;
+}
+REALCAR.preloadTraffic(() => {
+  for (const t of TRAFFIC) if (!(Math.hypot(t.x - V.x, t.z - V.z) < 60 && CULL.inView(t.x, 1.2, t.z, 3))) realSwap(t);   // на глазах не подменяем
+});
 HAV.init({ S, adult: ADULT });                   // счёт разрушений за смену для Толика (havoc.js)
 CHAT.init({ adult: ADULT, person: makePerson({ seed: 0x2E4A17, fem: false }), face: (p, size) => faceDataURL(p, size), blip: (f, d, ty, v) => Snd.blip(f, d, ty, v), fx: (n, synth) => Snd.fx(n, synth) });
 /* заказы карьеры (orders.js): очередь, поручения, развоз смены — через это */

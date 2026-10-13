@@ -37,7 +37,7 @@ export const MODELS = {
     dir: 'vaz2107', k: 1.2,
     eye: [0.36, 1.19, 0.24],
     sw: { C: [0.36, 0.9, 0.58], R: 0.17, tilt: -0.5, turn: 2.2 },
-    dash: { C: [0.36, 0.97, 0.66], tilt: -0.3, KMH: 180, RPM: 8 },   // щиток — колодцем из кромки торпедо (низ в панели, не висит)
+    dash: { C: [0.36, 0.84, 0.655], tilt: 0.08, KMH: 180, RPM: 8 },   // щиток — заподлицо в нарисованной рамке на лице торпедо
     box: { W2: 0.89, HL: 2.08 },
     torpedo: { W: 0.68, top: 0.95, lip: 0.68, low: 0.6, back: 1.0, floor: 0.4 },
     driver: { x: 0.36, seat: 0.5, z: 0.1 },        // курьер: середина сиденья (x), его высота, где голова по длине
@@ -48,9 +48,9 @@ export const MODELS = {
     dir: 'vaz2101', k: 1.06,
     eye: [0.4, 1.33, 0.37],
     sw: { C: [0.4, 1.0, 0.74], R: 0.19, tilt: -0.5, turn: 2.2 },
-    dash: { C: [0.4, 1.08, 0.84], tilt: -0.3, KMH: 180, RPM: 8 },
+    dash: { C: [0.4, 0.95, 0.835], tilt: 0.08, KMH: 180, RPM: 8 },
     box: { W2: 0.95, HL: 2.34 },
-    torpedo: { W: 0.76, top: 1.06, lip: 0.86, low: 0.67, back: 1.15, floor: 0.45, visor: [1.52, 0.7] },
+    torpedo: { W: 0.76, top: 1.06, lip: 0.86, low: 0.67, back: 1.15, floor: 0.45, visor: [1.52, 0.7], seats: [0.4, 0.5, 0.1] },
     driver: { x: 0.4, seat: 0.56, z: 0.22 },
   },
 };
@@ -78,10 +78,55 @@ function merge (parts) {
 }
 const M4 = (x, y, z, rx = 0, ry = 0, rz = 0, s = [1, 1, 1]) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(...s));
 
-/* ─── торпедо: панель (профиль сбоку, вытянут по ширине, скруглён), консоль, дефлекторы, бардачок,
-   рычаг КПП в чехле, зеркало заднего вида, козырьки. Цвета: чёрный пластик, хром, обивка ─── */
-const DASHC = { plastic: 0x2a292e, dark: 0x18171b, trim: 0x3a3840, chrome: 0xa9aeb5, boot: 0x1f1e22, visor: 0x8b8378 };
-function torpedo (T) {
+/* ─── торпедо: объём — один (профиль сбоку, вытянут по ширине, скруглён) + консоль, рычаг КПП, зеркало, козырьки;
+   вся приборка — нарисована на лицевой панели (как у моделей с картинкой-салоном): рамка щитка с двумя малыми
+   приборами по бокам (живые спидометр и тахометр — cluster, заподлицо в рамке), дефлекторы, магнитола с часами,
+   бардачок с ручкой. Сиденья — если у модели их нет (T.seats) ─── */
+const DASHC = { plastic: 0x55504a, dark: 0x1d1c20, chrome: 0xa9aeb5, boot: 0x1f1e22, visor: 0x8b8378, seat: 0x7a5232, seatD: 0x5d3d24 };
+function dashFace (T, D) {
+  const W = 512, H = 128, c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  const u = mx => (0.5 - mx / (2 * T.W)) * W;      // x машины → холст (лицом к водителю: слева — водитель, +x)
+  x.fillStyle = '#4c4844'; x.fillRect(0, 0, W, H);
+  for (let i = 0; i < 900; i++) { x.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.04)'; x.fillRect(Math.random() * W, Math.random() * H, 2, 2); }
+  x.fillStyle = '#3a3734'; x.fillRect(0, 0, W, 10);                                   // кромка сверху темнее
+  x.fillStyle = '#625d57'; x.fillRect(0, 34, W, 3);                                   // молдинг
+  const rr = (X, Y, w, h, r) => { x.beginPath(); x.moveTo(X + r, Y); x.arcTo(X + w, Y, X + w, Y + h, r); x.arcTo(X + w, Y + h, X, Y + h, r); x.arcTo(X, Y + h, X, Y, r); x.arcTo(X, Y, X + w, Y, r); x.closePath(); };
+  // щиток: рамка; два малых прибора по бокам (топливо, температура); середина — живые приборы (cluster)
+  const fh = T.top - 0.06 - (T.low + 0.04);           // высота лица, м (как в torpedo)
+  const cx = u(D.C[0]), cw = 0.3 / (2 * T.W) * W + 10, ch = 0.15 / fh * H + 10;   // рамка — по живым приборам (0,3 × 0,15 м) + поля
+  const cy = (T.top - 0.06 - (D.C[1] - 0.025)) / fh * H - ch / 2;
+  x.fillStyle = '#121114'; rr(cx - cw / 2 - 26, cy, cw + 52, ch, 14); x.fill();
+  x.strokeStyle = '#8e8a84'; x.lineWidth = 3; rr(cx - cw / 2 - 26, cy, cw + 52, ch, 14); x.stroke();
+  for (const sx of [-1, 1]) {
+    const gx = cx + sx * (cw / 2 + 6), gy = cy + ch / 2;
+    x.fillStyle = '#0b0b0d'; x.beginPath(); x.arc(gx, gy, 15, 0, Math.PI * 2); x.fill();
+    x.strokeStyle = '#b9b2a4'; x.lineWidth = 2; x.beginPath(); x.arc(gx, gy, 15, 0, Math.PI * 2); x.stroke();
+    x.strokeStyle = '#f3ecdc'; x.lineWidth = 1.5; for (let k = 0; k < 5; k++) { const a = Math.PI * (0.75 + k * 0.125); x.beginPath(); x.moveTo(gx + Math.cos(a) * 9, gy + Math.sin(a) * 9); x.lineTo(gx + Math.cos(a) * 13, gy + Math.sin(a) * 13); x.stroke(); }
+    x.strokeStyle = '#ff6a2a'; x.lineWidth = 2; x.beginPath(); x.moveTo(gx, gy); x.lineTo(gx + Math.cos(Math.PI * (1.05 + sx * 0.12)) * 11, gy + Math.sin(Math.PI * (1.05 + sx * 0.12)) * 11); x.stroke();
+  }
+  // середина: решётка дефлекторов, магнитола, часы
+  const mx = u(0);
+  x.fillStyle = '#1b1a1d'; rr(mx - 60, 16, 120, 30, 5); x.fill();
+  x.fillStyle = '#5b5752'; for (let k = 0; k < 6; k++) x.fillRect(mx - 56, 20 + k * 4.4, 112, 2);
+  x.fillStyle = '#121115'; rr(mx - 58, 54, 116, 34, 4); x.fill();
+  x.fillStyle = '#3d2a12'; x.fillRect(mx - 50, 60, 70, 12); x.fillStyle = '#ffb347'; for (let k = 0; k < 8; k++) x.fillRect(mx - 46 + k * 8, 64, 1, 6);
+  x.fillStyle = '#ff3b1f'; x.fillRect(mx - 18, 61, 2, 10);
+  x.fillStyle = '#9da2a9'; for (const kx of [-42, 6]) { x.beginPath(); x.arc(mx + kx, 80, 5, 0, Math.PI * 2); x.fill(); }
+  x.strokeStyle = '#e8e2d2'; x.lineWidth = 2; x.beginPath(); x.arc(mx + 38, 71, 11, 0, Math.PI * 2); x.stroke();
+  x.beginPath(); x.moveTo(mx + 38, 71); x.lineTo(mx + 38, 63); x.moveTo(mx + 38, 71); x.lineTo(mx + 44, 74); x.stroke();
+  // бардачок (пассажир): шов крышки и хромовая ручка
+  const bx = u(-T.W * 0.55);
+  x.strokeStyle = '#2e2b28'; x.lineWidth = 2; rr(bx - 85, 42, 170, 62, 8); x.stroke();
+  x.fillStyle = '#b8bcc2'; x.fillRect(bx - 18, 48, 36, 5);
+  // круглые боковые дефлекторы по краям
+  for (const ex of [16, W - 16]) { x.fillStyle = '#141316'; x.beginPath(); x.arc(ex + (ex < W / 2 ? 8 : -8), 30, 13, 0, Math.PI * 2); x.fill(); x.strokeStyle = '#a9aeb5'; x.lineWidth = 2; x.stroke(); }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return t;
+}
+function torpedo (T, D) {
   const parts = [];
   // профиль панели (по x шейпа — z машины, по y — высота): от лобового по верху назад, скруглённая кромка, вниз к коленям
   const s = new THREE.Shape();
@@ -94,21 +139,6 @@ function torpedo (T) {
   s.lineTo(T.back, T.top - 0.03);
   const panel = new THREE.ExtrudeGeometry(s, { depth: T.W * 2, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.012, bevelSegments: 2, curveSegments: 6 });
   parts.push({ geo: panel, m: M4(T.W, 0, 0, 0, -Math.PI / 2, 0), hex: DASHC.plastic });   // шейп в (z, y), выдавлен поперёк машины
-  parts.push({ geo: new THREE.BoxGeometry(T.W * 2 - 0.08, 0.035, 0.01), m: M4(0, T.top - 0.12, T.lip - 0.005, 0.08), hex: DASHC.trim });   // накладка по лицу
-  // центральные дефлекторы: рамка + ламели
-  for (const sx of [-1, 1]) {
-    const x = sx * 0.07;
-    parts.push({ geo: new THREE.BoxGeometry(0.11, 0.07, 0.02), m: M4(x, T.top - 0.17, T.lip + 0.005), hex: DASHC.dark });
-    for (let i = 0; i < 4; i++) parts.push({ geo: new THREE.BoxGeometry(0.1, 0.006, 0.012), m: M4(x, T.top - 0.195 + i * 0.016, T.lip - 0.004, 0.3), hex: DASHC.trim });
-  }
-  // боковые круглые дефлекторы
-  for (const sx of [-1, 1]) {
-    parts.push({ geo: new THREE.CylinderGeometry(0.035, 0.035, 0.02, 16), m: M4(sx * (T.W - 0.06), T.top - 0.09, T.lip + 0.02, Math.PI / 2), hex: DASHC.dark });
-    parts.push({ geo: new THREE.TorusGeometry(0.035, 0.006, 6, 16), m: M4(sx * (T.W - 0.06), T.top - 0.09, T.lip + 0.008), hex: DASHC.chrome });
-  }
-  // бардачок (пассажир — −x): крышка чуть выступает, хромовая ручка
-  parts.push({ geo: new THREE.BoxGeometry(0.34, 0.13, 0.015), m: M4(-0.38, T.top - 0.2, T.lip + 0.003, 0.1), hex: DASHC.trim });
-  parts.push({ geo: new THREE.BoxGeometry(0.06, 0.012, 0.012), m: M4(-0.38, T.top - 0.15, T.lip - 0.008, 0.1), hex: DASHC.chrome });
   // консоль: от панели вниз-назад к полу
   const cs = new THREE.Shape();
   cs.moveTo(T.lip + 0.02, T.low + 0.12); cs.lineTo(T.lip - 0.02, T.low - 0.02);
@@ -125,23 +155,20 @@ function torpedo (T) {
   parts.push({ geo: new THREE.CylinderGeometry(0.008, 0.008, 0.07, 6), m: M4(0, vy - 0.03, vz + 0.06, 0.5), hex: DASHC.dark });
   parts.push({ geo: new THREE.BoxGeometry(0.16, 0.05, 0.02), m: M4(0, vy - 0.07, vz + 0.04, 0.15), hex: DASHC.dark });
   for (const sx of [-1, 1]) parts.push({ geo: new THREE.BoxGeometry(0.36, 0.012, 0.15), m: M4(sx * 0.32, vy, vz, -0.12), hex: DASHC.visor });
+  // сиденья (если у модели своих нет): подушка и спинка с подголовником, коричневый кожзам
+  if (T.seats) for (const sx of [-1, 1]) {
+    const [sxw, sy, sz] = T.seats, X = sx * sxw;
+    parts.push({ geo: new THREE.BoxGeometry(0.46, 0.12, 0.5), m: M4(X, sy, sz), hex: DASHC.seat });
+    parts.push({ geo: new THREE.BoxGeometry(0.46, 0.58, 0.12), m: M4(X, sy + 0.34, sz - 0.27, -0.18), hex: DASHC.seat });
+    parts.push({ geo: new THREE.BoxGeometry(0.26, 0.16, 0.1), m: M4(X, sy + 0.72, sz - 0.34, -0.18), hex: DASHC.seatD });
+  }
   const mesh = new THREE.Mesh(merge(parts), new THREE.MeshLambertMaterial({ vertexColors: true }));
   mesh.name = 'torpedo';
-  // лицо магнитолы и часов — холст
-  const c = document.createElement('canvas'); c.width = 128; c.height = 64;
-  const x = c.getContext('2d');
-  x.fillStyle = '#121115'; x.fillRect(0, 0, 128, 64);
-  x.fillStyle = '#3d2a12'; x.fillRect(8, 10, 80, 16);
-  x.fillStyle = '#ffb347'; for (let i = 0; i < 9; i++) x.fillRect(12 + i * 9, 18, 1, 6);
-  x.fillStyle = '#ff3b1f'; x.fillRect(44, 12, 2, 12);
-  x.fillStyle = '#9da2a9'; for (const cx of [16, 80]) { x.beginPath(); x.arc(cx, 44, 8, 0, Math.PI * 2); x.fill(); }
-  x.fillStyle = '#0b0b0c'; x.fillRect(96, 8, 26, 26);
-  x.strokeStyle = '#e8e2d2'; x.lineWidth = 2; x.beginPath(); x.arc(109, 21, 10, 0, Math.PI * 2); x.stroke();
-  x.beginPath(); x.moveTo(109, 21); x.lineTo(109, 14); x.moveTo(109, 21); x.lineTo(114, 23); x.stroke();
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.magFilter = THREE.NearestFilter;
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.1), new THREE.MeshBasicMaterial({ map: t }));
-  face.position.set(0, T.low + 0.035, T.lip - 0.02);
-  face.rotation.set(-0.35, Math.PI, 0);
+  // лицевая панель — нарисованная приборка; чуть впереди кромки, наклон — как у лица
+  const fh = T.top - 0.06 - (T.low + 0.04);
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(T.W * 2 - 0.02, fh), new THREE.MeshLambertMaterial({ map: dashFace(T, D) }));
+  face.position.set(0, T.low + 0.04 + fh / 2, T.lip + 0.003);
+  face.rotation.set(-0.08, Math.PI, 0);
   const g = new THREE.Group();
   g.add(mesh, face);
   return g;
@@ -227,10 +254,6 @@ function gaugeFace () {
 }
 function cluster (D) {
   const g = new THREE.Group();
-  const hood = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.34, 18, 1, true, -Math.PI / 2, Math.PI), lambert(0x1d1c20));
-  hood.material.side = THREE.DoubleSide;
-  hood.rotation.z = Math.PI / 2; hood.scale.set(1, 1, 0.7); hood.position.set(0, 0, -0.02);
-  g.add(hood);
   const face = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.15), new THREE.MeshBasicMaterial({ map: gaugeFace() }));
   face.rotation.y = Math.PI;
   face.position.set(0, -0.025, 0.03);
@@ -253,7 +276,7 @@ function cluster (D) {
 }
 
 /* ─── стёкла: светлые и прозрачные; трещины — общий холст «паутина» ─── */
-const GLASS = { CLEAR: 0.14, CRACK: 0.6, HEX: 0xdcecf7 };
+const GLASS = { CLEAR: 0.14, CRACK: 0.6, HEX: 0xdcecf7, TINT: 0x1c2630, TINT_A: 0.88 };   // TINT — стёкла машин потока
 let CRACK = null;
 function crackTex () {
   if (CRACK) return CRACK;
@@ -435,7 +458,9 @@ function load (C, lite) {
         const key = pane ? p.name : p.file + '|' + p.blend + '|' + p.alpha;
         let mat = mats[key];
         if (!mat && pane) {
-          mat = mats[key] = new THREE.MeshBasicMaterial({ color: GLASS.HEX, transparent: true, opacity: GLASS.CLEAR, depthWrite: false, side: THREE.DoubleSide });
+          // у потока салона нет — стёкла тёмные, тонированные (пустоты не видно); у своей — светлые, почти прозрачные
+          mat = mats[key] = lite ? new THREE.MeshLambertMaterial({ color: GLASS.TINT, transparent: true, opacity: GLASS.TINT_A, side: THREE.DoubleSide })
+            : new THREE.MeshBasicMaterial({ color: GLASS.HEX, transparent: true, opacity: GLASS.CLEAR, depthWrite: false, side: THREE.DoubleSide });
         } else if (!mat) {
           mat = mats[key] = new THREE.MeshLambertMaterial({ flatShading: true, side: THREE.DoubleSide });
           if (p.file) {
@@ -465,14 +490,14 @@ function load (C, lite) {
         geo.computeBoundingSphere();
       }
       if (lite) { g.userData.liteOf = C; return g; }   // поток: без салона, руля и курьера
-      if (C.torpedo) g.add(torpedo(C.torpedo));
+      if (C.torpedo) g.add(torpedo(C.torpedo, C.dash));
       if (C.driver) g.add(driver(C.driver, C.sw));
       if (C.sw) g.add(steeringWheel(C.sw));
       if (C.dash) g.add(cluster(C.dash));
       if (window.__dlv) window.__dlv.REAL = REAL;
       return g;
     })
-    .catch(e => { console.warn('realcar: модель не загрузилась', C.dir, e); return null; });
+    .catch(e => { console.error('realcar: модель не загрузилась', C.dir, e); return null; });   // ошибкой: проверки (probe --errors, npm run check) её видят
   return CACHE[key];
 }
 
@@ -503,8 +528,9 @@ export const has = id => REAL.on && !!MODELS[id];
 export const TRAFFIC = { MODELS: ['semerka', 'kopeyka'], SHARE: 0.5, WEAR: [0, 1] };
 const GLASS_HIT = { CRACK: 9, BREAK: 15 };
 const LITE = {};
-export function preloadTraffic () {
-  for (const id of TRAFFIC.MODELS) if (MODELS[id]) load(MODELS[id], true).then(g => { if (g) LITE[id] = g; });
+export function preloadTraffic (onReady) {
+  const all = TRAFFIC.MODELS.filter(id => MODELS[id]).map(id => load(MODELS[id], true).then(g => { if (g) LITE[id] = g; }));
+  Promise.all(all).then(() => { if (onReady && Object.keys(LITE).length) onReady(); });
 }
 export const trafficReady = () => REAL.on && Object.keys(LITE).length > 0;
 export function trafficCar (hex) {

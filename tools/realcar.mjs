@@ -68,12 +68,15 @@ const push = (ta) => { const b = Buffer.from(ta.buffer, ta.byteOffset, ta.byteLe
 const box = { min: [1e9, 1e9, 1e9], max: [-1e9, -1e9, -1e9] };
 
 /* ужать: индексы → meshopt → только нужные вершины */
-function simplify (pos, uv, idx, keep, err) {
+function simplify (pos, uv, idx, keep, err, rough) {   // rough — можно грубо (колёса, днище): кузов грубое рвёт
   if (LITE) { keep *= LITE.K; err = Math.max(err || 0.004, LITE.ERR); }
   let ix = Uint32Array.from(idx);
   const target = Math.max(3, Math.floor(ix.length * keep / 3) * 3);
-  if (keep < 1) ix = LITE ? MeshoptSimplifier.simplifySloppy(ix, pos, 3, null, target, err)[0]   // поток: грубо, швы картинки не бережём — издалека не видно
-    : MeshoptSimplifier.simplify(ix, pos, 3, target, err, [])[0];
+  if (keep < 1) {
+    ix = MeshoptSimplifier.simplify(ix, pos, 3, target, err, [])[0];
+    // поток: обычное упрощение упёрлось в швы картинки (колёса «Семёрки») — грубое; на кузове грубое рвёт дыры («прозрачная Копейка»)
+    if (LITE && rough && ix.length > target * 1.6) ix = MeshoptSimplifier.simplifySloppy(Uint32Array.from(idx), pos, 3, null, target, err)[0];
+  }
   const map = new Map(), P = [], U = [], I = new Uint32Array(ix.length);
   for (let i = 0; i < ix.length; i++) {
     let v = map.get(ix[i]);
@@ -169,7 +172,7 @@ for (const node of doc.getRoot().listNodes()) {
       const lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
       for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], pos[i + k]); hi[k] = Math.max(hi[k], pos[i + k]); }
       const pv = [0, 1, 2].map(k => (lo[k] + hi[k]) / 2);
-      const g = simplify(pos, uv, idx, WHEELS.keep, WHEELS.err);
+      const g = simplify(pos, uv, idx, WHEELS.keep, WHEELS.err, true);
       for (let i = 0; i < g.pos.length; i += 3) { g.pos[i] -= pv[0]; g.pos[i + 1] -= pv[1]; g.pos[i + 2] -= pv[2]; }
       const k2 = (pv[0] > 0 ? 'L' : 'R') + (pv[2] > 0 ? 'F' : 'B');
       console.log(('wheel' + k2).padEnd(28), 'ось', pv.map(v => v.toFixed(2)).join(' '), 'треугольников', emit('wheel' + k2, file, mat, P, g, pv, 'wheel'));
@@ -190,7 +193,7 @@ for (const node of doc.getRoot().listNodes()) {
         else R.push(idx[t], idx[t + 1], idx[t + 2]);
       }
       for (const k in W) {
-        const g = simplify(pos, uv, W[k], WHEEL.keep, WHEEL.err);
+        const g = simplify(pos, uv, W[k], WHEEL.keep, WHEEL.err, true);
         const pv = [(k[0] === 'L' ? 1 : -1) * WHEEL.xc, WHEEL.r, (k[1] === 'F' ? 1 : -1) * WHEEL.z];
         for (let i = 0; i < g.pos.length; i += 3) { g.pos[i] -= pv[0]; g.pos[i + 1] -= pv[1]; g.pos[i + 2] -= pv[2]; }
         console.log(('wheel' + k).padEnd(28), 'треугольников', W[k].length / 3, '→', emit('wheel' + k, file, mat, P, g, pv));
@@ -223,7 +226,7 @@ for (const node of doc.getRoot().listNodes()) {
       }
       continue;
     }
-    const g = simplify(pos, uv, rest, P.keep, P.err || 0.004);
+    const g = simplify(pos, uv, rest, P.keep, P.err || 0.004, WHEEL && name === WHEEL.from);
     console.log(name.padEnd(28), 'треугольников', rest.length / 3, '→', emit(name, file, mat, P, g, null));
   }
 }
