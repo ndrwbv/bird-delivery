@@ -283,7 +283,8 @@ export function fallStep (p, dt) {
 export function hit (p, vx, vz, kmh, o = {}) {
   if (kmh == null) kmh = kmhOf(vx, vz);
   if (!o.up) {                                      // сбит: «бум» в точке удара и глухой удар
-    flashAt(p.x, A.groundH(p.x, p.z) + 1.1 + (o.y0 || 0), p.z);
+    // взрослая — фонтан крови во все стороны (game.js spray, проба 13.10.2026: «символ удара — не прикольно»); детская — звёздочка
+    if (A.adult && A.spray) A.spray(p, vx, vz, kmh); else flashAt(p.x, A.groundH(p.x, p.z) + 1.1 + (o.y0 || 0), p.z);
     // удар слоями (impact.js): тело hit-person-<сила>, нет файла — hit-person; без слоёв — как раньше
     if (A.Snd.impact) A.Snd.impact(Math.max(kmh / 3.6, 8), 'person', { x: p.x, z: p.z });
     else A.Snd.fx('hit-person', s => { s.blip(62, 0.2, 'sine', 0.34); s.noise(0.08, 0.16); }, { x: p.x, z: p.z });
@@ -351,6 +352,11 @@ function buildBody (c) {
   return { root, parts };
 }
 
+/* отлёт сбитого (проба 13.10.2026, автор: «проходят сквозь машину, на большой скорости не разлетаются»):
+   FWD — доля скорости машины вперёд (было 0,42 — машина догоняла тело), SIDE0 + км/ч × SIDE_K — разброс вбок, м/с;
+   вверх — UP0 + км/ч / UP_K, не больше UP_MAX; AHEAD — м вперёд от места удара. TRAIL — м между кровавыми следами
+   там, где тело касается земли (взрослая) */
+export const THROW = { FWD: 1.15, SIDE0: 1.5, SIDE_K: 0.06, UP0: 3, UP_K: 11, UP_MAX: 12, AHEAD: 0.6, TRAIL: 1.4 };
 function throwBody (p, vx, vz, kmh, up, lie, y0) {
   const c = (p.grp && p.grp.userData.colors) || { skin: '#e0b48c', shirt: '#4a6fa5', pants: '#333' };
   const { root, parts } = buildBody(c);
@@ -362,10 +368,12 @@ function throwBody (p, vx, vz, kmh, up, lie, y0) {
   root.rotation.y = Math.atan2(vx / l, vz / l);     // +Z — куда толкнули
   A.scene.add(root);
   if (!BX) { BX = new A.THREE.Box3(); V3 = new A.THREE.Vector3(); }
-  const k = clamp(kmh / 50, 0.35, 1.6);
+  const k = clamp(kmh / 50, 0.35, 1.6), side = rand(-1, 1) * (THROW.SIDE0 + kmh * THROW.SIDE_K);
+  root.position.x += vx / l * THROW.AHEAD; root.position.z += vz / l * THROW.AHEAD;   // чуть впереди морды — не в капоте
   const B = {
     root, parts, s, t: 0, mode: 'fly', up, lie, life: lie, shadow: shadowFor(), floor: fl, settle: 0,
-    vx: vx * 0.42 + rand(-1.5, 1.5), vy: clamp(2.5 + kmh / 18, 3, 9), vz: vz * 0.42 + rand(-1.5, 1.5),
+    // вперёд — быстрее машины (×THROW.FWD): иначе машина догоняет тело и проезжает сквозь; вбок — разброс, растёт со скоростью
+    vx: vx * THROW.FWD + side * -vz / l, vy: clamp(THROW.UP0 + kmh / THROW.UP_K, 3, THROW.UP_MAX), vz: vz * THROW.FWD + side * vx / l,
     spin: rand(5, 9) * k * (Math.random() < 0.5 ? -1 : 1), roll: rand(-3, 3) * k, landed: 0, puddle: null, starT: 0, wx: 0, wz: 0,
   };
   BODIES.push(B);
@@ -459,6 +467,8 @@ export function burst (p, vx, vz, low) {
   for (const q of CHUNKS) { if (over <= 0) break; if (q.life > TIME.SINK) { q.life = TIME.SINK; over--; } }
 }
 /* лужица под куском: общий круг, свой материал (тает своим темпом) */
+/* пятно крови на земле (game.js spray — куда долетели брызги) */
+export const stain = (x, z, R) => (A && A.adult ? splat(x, z, R) : null);
 function splat (x, z, R) {
   const T = A.THREE;
   if (!PUD_GEO) PUD_GEO = new T.CircleGeometry(1, 18);
@@ -621,6 +631,12 @@ function stepBody (B, dt) {
       r.position.y += B.floor + 0.01 - lo;
       if (B.shatter) { shatter(B); return; }
       if (!B.landed) { B.landed = 1; B.lx = nearest(r.rotation.x, Math.PI, Math.PI / 2); B.lz = nearest(r.rotation.z, TAU, 0); lieTargets(B); }
+      // след: где тело ударилось или проехало по земле — пятно крови, не чаще чем через THROW.TRAIL м
+      const hv = Math.hypot(B.vx, B.vz);
+      if (A.adult && !B.up && (hv > 2 || B.vy < -3) && Math.hypot(r.position.x - (B.tx ?? 1e9), r.position.z - (B.tz ?? 1e9)) > THROW.TRAIL) {
+        B.tx = r.position.x; B.tz = r.position.z;
+        splat(r.position.x, r.position.z, clamp(0.35 + hv * 0.04, 0.4, 0.9) * B.s);
+      }
       B.vy = B.vy < 0 ? -B.vy * 0.25 : B.vy; B.vx *= 0.55; B.vz *= 0.55;
       if (Math.hypot(B.vx, B.vz) < 0.7 && Math.abs(B.vy) < 0.9) {
         B.mode = 'lie'; B.t = 0;

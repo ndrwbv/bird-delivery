@@ -329,7 +329,7 @@ function bloodTick (B, dt) {
 export const bloodWet = car => { const B = car && car.userData.real && car.userData.real.blood; return B && B.n > 0 ? BLOOD.WET : 0; };
 
 /* сбил человека: wx, wz — где он был (мир) */
-export function blood (car, wx, wz) {
+export function blood (car, wx, wz, kmh = 40) {
   const R = car && car.userData.real;
   if (!R) return;
   const C = R.C, L = new THREE.Vector3(wx === undefined ? car.position.x : wx, car.position.y + 0.8, wz === undefined ? car.position.z + 9 * Math.cos(car.rotation.y) : wz);
@@ -348,6 +348,10 @@ export function blood (car, wx, wz) {
   add(x + (Math.random() - 0.5) * 0.4, 0.75, z * 0.95, 0.18, 1);              // потёк
   if (end && nz > 0) { add(x * 0.8, 0.98, HL - 0.5 - Math.random() * 0.3, 0.35, 0); add(x * 0.5, 1.2, 0.9, 0.2, 0); }   // капот и стойки
   else if (!end) add(x, 1.0, z, 0.25, 1);                                       // дверь повыше
+  // камера сзади — брызги перелетают на крышу, заднее стекло и корму (чем быстрее, тем больше)
+  const n = kmh > 25 ? 1 + Math.floor(Math.min(3, kmh / 35)) : 0;
+  for (let i = 0; i < n; i++) add((Math.random() - 0.5) * 1.2, 1.46, -0.6 + Math.random() * 1.2, 0.18 + Math.random() * 0.15, 0);   // крыша
+  if (n > 1) { add((Math.random() - 0.5) * 1.0, 0.98, -HL + 0.55, 0.22, 1); add((Math.random() - 0.5) * 1.2, 0.75, -HL, 0.2, 1); }   // крышка багажника и корма
   if (R.blood && end && nz > 0 && R.panes.f && R.panes.f.st < 2) glassBlood(R.blood, Math.sign(x) || 0);
 }
 
@@ -464,7 +468,7 @@ export function dress (car, id = 'semerka', hex) {
     const m = M.clone();
     m.scale.setScalar(C.k);
     car.add(m);
-    const U = { id: ++SEQ, paint: { value: new THREE.Color(hex || '#f0522a') }, blood: { value: Array.from({ length: BODY_BLOOD.N }, () => new THREE.Vector4(0, 0, 0, 0)) } };   // w = 0 — пятна нет (у Vector4 по умолчанию w = 1)
+    const U = { id: ++SEQ, paint: { value: dull(new THREE.Color(hex || '#f0522a')) }, blood: { value: Array.from({ length: BODY_BLOOD.N }, () => new THREE.Vector4(0, 0, 0, 0)) } };   // w = 0 — пятна нет (у Vector4 по умолчанию w = 1)
     const R = { C, m, wheels: [], front: [], sw: null, needles: [], dent: [], panes: {}, glassF: null, blood: null, bloodU: U.blood, bloodI: 0, splats: [], paint: U.paint };
     const own = new Map();                           // у каждой машины свои материалы: взрыв красит их в чёрный (game.js gameOver)
     m.traverse(o => {
@@ -498,7 +502,13 @@ export function dress (car, id = 'semerka', hex) {
 /* перекрасить на ходу (гараж, песочница машин) */
 export function paint (car, hex) {
   const R = car && car.userData.real;
-  if (R) R.paint.value.set(hex);
+  if (R) dull(R.paint.value.set(hex));
+}
+/* краска чуть тусклее заводской (автор 13.10: «цвета чуть тусклее, не такие яркие»): к серому на DULL.GRAY, темнее ×DULL.DARK */
+const DULL = { GRAY: 0.22, DARK: 0.88 };
+function dull (c) {
+  const g = c.r * 0.3 + c.g * 0.59 + c.b * 0.11;
+  return c.lerp(new THREE.Color(g, g, g), DULL.GRAY).multiplyScalar(DULL.DARK);
 }
 
 /* вмятина (game.js dentCar → тут же, как cardent.js hit): lx, lz — точка удара в осях машины, force — м/с.

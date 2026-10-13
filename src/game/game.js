@@ -1839,7 +1839,7 @@ function addProp (x, z, ry, kind, build, r) {
   build(inner);
   pivot.add(inner);
   scene.add(pivot);
-  const p = { pivot, inner, x, z, ry, kind, r, down: 0, tilt: 0, tiltV: 0, ax: 1, az: 0 };
+  const p = { pivot, inner, x, z, ry, kind, r, down: 0, tilt: 0, tiltV: 0, ax: 1, az: 0, slideX: 0, slideZ: 0 };
   PROPS.push(p);
   return p;
 }
@@ -6381,6 +6381,25 @@ function updateGore (dt) {
   }
 }
 
+/* фонтан крови при наезде (взрослая; hits.js hit вместо звёздочки; проба 13.10.2026): капли летят вперёд по ходу,
+   в стороны и вверх — часть назад, на крышу и корму; где упадут — пятна на асфальте (hits.js stain).
+   SPRAY: N — капель, FWD — доля скорости машины вперёд, SIDE — разброс вбок, м/с, STAINS — пятен на земле */
+const SPRAY = { N: 46, FWD: [0.3, 1.1], SIDE: [3, 0.12], UP: [2, 7], STAINS: 5 };
+function bloodSpray (p, vx, vz, kmh) {
+  const l = Math.hypot(vx, vz) || 1, fx = vx / l, fz = vz / l, y = groundH(p.x, p.z) + 1.1, floor = groundH(p.x, p.z) + 0.05;
+  const side = SPRAY.SIDE[0] + kmh * SPRAY.SIDE[1];
+  for (let i = 0; i < SPRAY.N; i++) {
+    const f = rand(SPRAY.FWD[0], SPRAY.FWD[1]) * l * (Math.random() < 0.18 ? -0.35 : 1);   // каждая шестая — назад, на машину
+    const sd = rand(-side, side);
+    PIX.spawn(p.x, y + rand(-0.3, 0.4), p.z, { vx: fx * f - fz * sd, vy: rand(SPRAY.UP[0], SPRAY.UP[1]), vz: fz * f + fx * sd,
+      s: rand(0.06, 0.15), life: rand(0.8, 1.6), hex: Math.random() < 0.5 ? 0x7d0a10 : 0xa3121a, g: 18, floor });
+  }
+  for (let i = 0; i < SPRAY.STAINS; i++) {
+    const d = rand(1, 3 + kmh / 12), sd = rand(-1, 1) * (1 + kmh / 40);
+    HITS.stain(p.x + fx * d - fz * sd, p.z + fz * d + fx * sd, rand(0.25, 0.6));
+  }
+}
+
 function runOver (p, vx, vz) {
   const victim = p.person;
   const wasTarget = checkVictim(p);
@@ -6388,7 +6407,7 @@ function runOver (p, vx, vz) {
   p.fly = null; p.fall = null;
   p.grp.visible = false;
   gibHuman(p, vx, vz);
-  if (GORE_ON) REALCAR.blood(car, p.x, p.z);       // проба: кровь на кузове и лобовом, дворники стирают (realcar.js)
+  if (GORE_ON) REALCAR.blood(car, p.x, p.z, Math.hypot(vx, vz) * 3.6);   // проба: кровь на кузове, крыше, корме и лобовом (realcar.js)
   S.people++;
   Snd.squish();
   // карьера: сбил своего клиента — заказ сорван и штраф в цену его заказа (CLIENT_KILL); со смены снимают, только если END_SHIFT
@@ -6422,6 +6441,8 @@ function knockProp (p, nx, nz, force) {
     return;
   }
 
+  // столб сносит вперёд по ходу машины (проба 13.10.2026: «проходят сквозь машину») — скользит, пока не встанет
+  p.slideX = nx * force * POLE_SLIDE.K; p.slideZ = nz * force * POLE_SLIDE.K;
   // столб валится в ту сторону, куда его ударили
   TILT_AXIS.set(-nz, 0, nx).normalize();
   p.ax = TILT_AXIS.x; p.az = TILT_AXIS.z;
@@ -6432,8 +6453,14 @@ function knockProp (p, nx, nz, force) {
   Snd.fx('pole', s => { s.noise(0.35, 0.34); s.blip(120, 0.2, 'sawtooth', 0.16); }, { x: p.x, z: p.z });
 }
 
+const POLE_SLIDE = { K: 0.9, DRAG: 2.6 };          // сбитый столб: скорость вперёд = скорость машины × K, гаснет за ~1 с
 function updateProps (dt) {
   for (const p of PROPS) {
+    if (p.down && (p.slideX || p.slideZ)) {
+      p.pivot.position.x += p.slideX * dt; p.pivot.position.z += p.slideZ * dt;
+      const k = Math.exp(-POLE_SLIDE.DRAG * dt); p.slideX *= k; p.slideZ *= k;
+      if (Math.hypot(p.slideX, p.slideZ) < 0.2) p.slideX = p.slideZ = 0;
+    }
     if (!p.down || p.tilt >= 1.45) continue;
     p.tilt = Math.min(1.45, p.tilt + p.tiltV * dt);
     p.tiltV += 5 * dt;                       // разгоняется, пока падает
@@ -13982,7 +14009,7 @@ EDL.buildEnd();
 ZN.init({ CITY, MAP, donated });
 DLG.init({ pause: on => { for (const k in IN) IN[k] = 0; if (on) Snd.engine(0); }, face: (p, size) => faceDataURL(p, size) });
 HITS.init({ THREE, scene, box, mergeGeos, HUMAN_VC, groundH, surfaceAt, curbAt, nearestRoad, driftTop: SEAS.driftTop, pavedLift: TRK.pavedLift, groundNormal, emote, puff, pushOut, Snd,
-  burst: burstHuman, scare, callAmbulance, adult: GORE_ON, shred: shredHit });
+  burst: burstHuman, scare, callAmbulance, adult: GORE_ON, shred: shredHit, spray: bloodSpray });
 HAV.init({ S, adult: ADULT });                   // счёт разрушений за смену для Толика (havoc.js)
 CHAT.init({ adult: ADULT, person: makePerson({ seed: 0x2E4A17, fem: false }), face: (p, size) => faceDataURL(p, size), blip: (f, d, ty, v) => Snd.blip(f, d, ty, v), fx: (n, synth) => Snd.fx(n, synth) });
 /* заказы карьеры (orders.js): очередь, поручения, развоз смены — через это */
