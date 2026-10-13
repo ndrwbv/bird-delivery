@@ -4685,7 +4685,7 @@ function blastPeople (x, z, r) {
     if (!S.freeRun) RESPECT.add(null, 'burger', true);   // +1, не больше 10 за смену (econ.js RESPECT.CAP), без всплывашки
   }
   for (const p of SCOOTS) {
-    if (!p.dead && Math.hypot(p.x - x, p.z - z) < r) runOverScoot(p, p.x - x, p.z - z, null, 100);
+    if (!p.dead && p.grp.visible && Math.hypot(p.x - x, p.z - z) < r) runOverScoot(p, p.x - x, p.z - z, null, 100);
   }
   smashNear(x, z, it => { const d = Math.hypot(it.x - x, it.z - z); if (d < r) smashHit(it, (it.x - x) / (d || 1), (it.z - z) / (d || 1), 20, true); });
   LAWNP.boom(x, z, r);                             // мелочь на газоне (lawnprops.js)
@@ -5628,7 +5628,10 @@ function initScoots () {
 }
 
 function updateScoots (dt) {
+  const winter = SEAS.snowy();                    // снег лежит — на самокатах не катаются (автор 13.10.2026): прячем, не сбить
   for (const p of SCOOTS) {
+    if (p.grp.visible === winter && !p.dead) p.grp.visible = !winter;
+    if (winter && !p.dead) continue;
     if (p.dead) {
       if ((p.deadT -= dt) <= 0) {
         p.dead = 0;
@@ -8233,7 +8236,7 @@ function updateRivals (dt) {
         gibHuman(p, hx * t.speed, hz * t.speed);
       }
       for (const p of SCOOTS) {
-        if (p.dead || !under(p)) continue;
+        if (p.dead || !p.grp.visible || !under(p)) continue;
         runOverScoot(p, hx * t.speed, hz * t.speed, R.name);
       }
       for (const p of PEDS) {
@@ -10369,7 +10372,7 @@ function driveStep (dt) {
 
   for (let i = 0; i < SCOOTS.length; i++) {
     const p = SCOOTS[i];
-    if (p.dead || !underCar(p.x, p.z) || Math.abs(vf) < 3) continue;
+    if (p.dead || !p.grp.visible || !underCar(p.x, p.z) || Math.abs(vf) < 3) continue;
     runOverScoot(p, V.vx, V.vz);
     S.shake = Math.max(S.shake, 0.3);
   }

@@ -35,8 +35,14 @@ vec3 gritCol (vec3 c, float dist) {
   float streak = gN(vec3(p.x * 2.5, p.y * 0.22, p.z * 2.5) + 13.0);
   float near = smoothstep(70.0, 20.0, dist);
   float k = 1.0 + (grain - 0.5) * 0.08 * near + (stain - 0.5) * 0.18 - smoothstep(0.5, 0.9, streak) * 0.08;
-  c = mix(c, c * vec3(0.93, 0.87, 0.78), smoothstep(0.5, 0.85, 1.0 - stain) * 0.25);   // бурый налёт в тёмных пятнах
-  return mix(c, c * k, uGrit.x);
+  // снег (светлое и почти без цвета) — не грязный: без бурого налёта и затемнения, только лёгкие голубоватые
+  // ямки и бугры — глубина (автор 13.10: «снег серый — пусть глубокий, но не грязный»); дороги темнее — им грязь можно
+  float lum = dot(c, vec3(0.3, 0.59, 0.11)), sat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
+  float snow = smoothstep(0.6, 0.78, lum) * (1.0 - smoothstep(0.07, 0.18, sat));
+  vec3 dirt = mix(c, c * vec3(0.93, 0.87, 0.78), smoothstep(0.5, 0.85, 1.0 - stain) * 0.25);   // бурый налёт в тёмных пятнах
+  vec3 drift = c * mix(vec3(1.02, 1.02, 1.02), vec3(0.9, 0.94, 1.0), smoothstep(0.35, 0.75, 1.0 - stain)) * (1.0 + (grain - 0.5) * 0.03 * near);
+  c = mix(mix(dirt, dirt * k, uGrit.x), mix(c, drift, uGrit.x), snow);
+  return c;
 }
 `;
 
