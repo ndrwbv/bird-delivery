@@ -313,9 +313,9 @@ function bodyShader (mat, U, paint, traffic) {
     sh.uniforms.uWear = U.wear || { value: 0 };
     sh.uniforms.uGrit = { value: { x: 0.35, y: 0 } };   // глубина города (grit.js) на машине — втрое слабее: не сереет
     sh.uniforms.uPaint = U.paint;
-    sh.uniforms.uBlood = U.blood;
+    sh.uniforms.uRBlood = U.blood;
     sh.vertexShader = 'varying vec3 vBLoc;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvBLoc = transformed;');
-    sh.fragmentShader = `uniform vec3 uPaint;\nuniform float uWear;\nuniform vec4 uBlood[${BODY_BLOOD.N}];\nvarying vec3 vBLoc;\n
+    sh.fragmentShader = `uniform vec3 uPaint;\nuniform float uWear;\nuniform vec4 uRBlood[${BODY_BLOOD.N}];\nvarying vec3 vBLoc;\n
 float bH (vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }\n` +
       sh.fragmentShader
         .replace('#include <map_fragment>', paint ? `#ifdef USE_MAP
@@ -327,7 +327,7 @@ float bH (vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x 
   float bl = 0.0;
   vec3 q = floor(vBLoc * 22.0) / 22.0;
   for (int i = 0; i < ${BODY_BLOOD.N}; i++) {
-    vec4 s = uBlood[i];
+    vec4 s = uRBlood[i];
     if (s.w <= 0.0) continue;
     vec3 d = q - s.xyz;
     if (d.y < 0.0) d.y *= 0.3;
