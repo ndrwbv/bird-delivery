@@ -6388,7 +6388,7 @@ function runOver (p, vx, vz) {
   p.fly = null; p.fall = null;
   p.grp.visible = false;
   gibHuman(p, vx, vz);
-  if (GORE_ON) REALCAR.blood(car);                 // проба: кровь на лобовом, дворники стирают (realcar.js)
+  if (GORE_ON) REALCAR.blood(car, p.x, p.z);       // проба: кровь на кузове и лобовом, дворники стирают (realcar.js)
   S.people++;
   Snd.squish();
   // карьера: сбил своего клиента — заказ сорван и штраф в цену его заказа (CLIENT_KILL); со смены снимают, только если END_SHIFT
@@ -9603,7 +9603,8 @@ const owned = () => { const v = Store.get('dlv-msk-cars', ['dodo']); return Arra
 const curCar = () => CAREER ? AUTO.current() : CARS.find(c => c.id === Store.get('dlv-msk-car', 'dodo') && owned().includes(c.id)) || CARS[0];
 const makeCourier = () => {
   const c = curCar(), g = CAREER ? AUTO.makeModel(c.id, { see: true }) : makeCar(c.hex, true, c.model, false, Object.assign({}, c, { see: true }));
-  if (!CAREER || c.id === 'semerka') REALCAR.dress(g);   // проба: настоящая «Семёрка» вместо кубиков (realcar.js, ветка test/real-car)
+  const rid = CAREER ? c.id : 'semerka';
+  if (REALCAR.has(rid)) REALCAR.dress(g, rid, CAREER ? AUTO.paintOf(c.id) : c.hex);   // проба: настоящая модель вместо кубиков (realcar.js, ветка test/real-car)
   return g;
 };   // see — курьер за стёклами (carglass.js)
 /* карьера: четырнадцать машин, поломки, ямы и гараж Дяди Жени — cars.js. Кошелёк
@@ -10390,7 +10391,7 @@ function driveStep (dt) {
   { const W = car.userData.wheels, St = car.userData.steer;
     for (let i = 0; i < W.length; i++) W[i].rotation.x = V.wheel;
     for (let i = 0; i < St.length; i++) St[i].rotation.y = V.steerVis; }
-  if (car.userData.real) REALCAR.step(car, V.wheel, V.steerVis, V.steer || 0, vf);   // проба: колёса, руль и стрелки настоящей «Семёрки» (realcar.js)
+  if (car.userData.real) REALCAR.step(car, V.wheel, V.steerVis, V.steer || 0, vf, dt);   // проба: колёса, руль и стрелки настоящей «Семёрки» (realcar.js)
   V.lean = damp(V.lean || 0, -V.steerVis * clamp(Math.abs(vf) / VMAX, 0, 1) * 0.12, 6, dt);
   car.rotation.z = V.roll + V.lean;
   ICEM.pose(car, dt);                              // на трещащем льду проседает и качается, проломился — на бок (ice.js)
@@ -10463,7 +10464,9 @@ function hurtCar (dmg, vn, hx, hz, mat) {          // mat — во что (зв�
 }
 
 /* ─────────────── камера ─────────────── */
-const FPV = { on: 0, hid: 0, p: 0, at: new THREE.Vector3() };                   // вид из кабины (V): on — включён, hid — машина спрятана в этом кадре
+const FPV = { on: 0, hid: 0, p: 0, at: new THREE.Vector3() };
+/* песочница машин (carlab.html): orbit — камера облетает машину на этот угол от морды, рад (null — обычная), dist — м */
+const CARLAB = { orbit: null, dist: 7.5 };                   // вид из кабины (V): on — включён, hid — машина спрятана в этом кадре
 const camInWall = (x, z) => {
   for (const s of solidsNear(x, z)) {
     if (s.deckY !== undefined) continue;          // перила низкие, камера над ними
@@ -10494,6 +10497,14 @@ function camStep (dt, vf) {
      возвращают машину сами: FPV.hid сбрасывается в начале кадра. */
   const near = FPV.on && car.userData.real ? 0.05 : 0.4;   // в салоне руль в полуметре — ближняя граница кадра ближе
   if (cam.near !== near) { cam.near = near; cam.updateProjectionMatrix(); }
+  if (CARLAB.orbit !== null && !FPV.on) {          // песочница машин: облёт
+    V.hero = 0;
+    const a = V.h + CARLAB.orbit;
+    cam.position.set(V.x + Math.sin(a) * CARLAB.dist, V.y + 2.4, V.z + Math.cos(a) * CARLAB.dist);
+    cam.lookAt(V.x, V.y + 0.8, V.z);
+    V.camX = cam.position.x; V.camZ = cam.position.z; V.camY = cam.position.y + 2; V.camH = V.h; V.camPull = 0;
+    return;
+  }
   if (FPV.on && car.userData.real) {                // настоящая «Семёрка» (realcar.js): глаза водителя, видно торпедо и руль
     V.hero = 0;
     car.updateMatrixWorld();
@@ -15399,6 +15410,25 @@ if (window.__dlv) Object.assign(window.__dlv, { cam, renderer, scene });   // к
 if (window.__dlv) window.__dlv.crashlog = CL;        // журнал ошибок: entries(), text(), disabled() (docs/CRASHES.md)
 if (window.__dlv) window.__dlv.CULLV = CULL.VIEW;      // отсечение по кадру: CULLV.on = false — без него (замеры до/после, cull.js)
 if (window.__dlv) Object.assign(window.__dlv, { pinFront, nearClient, PIN });   // пин перед клиентом, кто у клиента лишний (docs/ORDERS.md)
+/* песочница машин (carlab.html, docs/CARS3D.md): выбрать, перекрасить, ударить, забрызгать, облёт, из-за руля */
+const labPoint = side => {
+  const L = { front: [0, 3.2], rear: [0, -3.2], left: [2.2, 0.4], right: [-2.2, 0.4] }[side] || [0, 3.2];
+  car.updateMatrixWorld();
+  return car.localToWorld(new THREE.Vector3(L[0], 0.6, L[1]));
+};
+if (window.__dlv) window.__dlv.carlab = {
+  list: () => (AUTO.list ? AUTO.list() : []).map(c => ({ id: c.id, name: $t(c.name), hex: AUTO.paintOf(c.id), real: REALCAR.has(c.id), current: c.current })),
+  paints: AUTO.PAINTS.map(p => ({ hex: p.hex, name: $t(p.name) })),
+  use: id => AUTO.labUse(id),
+  paint: hex => { const id = car.userData.careerId; if (!AUTO.labPaint(id, hex)) return false; if (car.userData.real) REALCAR.paint(car, hex); else resetCar(); return true; },
+  hit: (side, kmh) => { const w = labPoint(side); dentCar(car, w.x, w.z, kmh / 3.6); },
+  blood: side => { const w = labPoint(side); REALCAR.blood(car, w.x, w.z); },
+  orbit: a => { CARLAB.orbit = a === null || a === undefined ? null : +a; },
+  fp: on => { FPV.on = on ? 1 : 0; },
+  repair: () => resetCar(),
+  stop: () => { V.vx = V.vz = 0; for (const k in IN) IN[k] = 0; },
+  state: () => ({ id: car.userData.careerId, real: !!car.userData.real, glass: CG.state(car.userData.cg), dents: car.userData.dents || 0, fp: !!FPV.on, orbit: CARLAB.orbit }),
+};
 if (window.__dlv) Object.assign(window.__dlv, { GRIT: GRITM.GRIT, REALCAR, PIX: PIX.STATS, CG: CG.STATS, cgState: () => CG.state(car.userData.cg), hurtCar,
   cgLamps: () => CG.lampState(car), EXH: EXH.DEBUG, WIPE: WIPE.STATS, DENT: DENTM.DEBUG, DIRT: DIRT.DEBUG, REAR: REARM.STATS, pizzasInCar, setTrunk });   // фары и фонари (carglass.js), выхлоп (exhaust.js), дворники (wipers.js)   // дымок, стёкла (pixfx.js, carglass.js)
 if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG, CONS: CONSTR.DEBUG, DARK: DARKN.DEBUG, WASTE: WASTE.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)

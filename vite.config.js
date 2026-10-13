@@ -89,7 +89,7 @@ export default defineConfig(({ mode }) => ({
     // ui.html — песочница интерфейса (экраны без мира, docs/SANDBOX.md): только в web (и в dev).
     // В Стиме рядом с игрой — ещё страница диагностики геймпада (--page=pad.html)
     // editor.html — редактор города (docs/SANDBOX.md): только dev; в сборку — лишь для probe (BIRD_EDITOR=1, tools/probe-build.cjs)
-    ...(mode !== 'yandex' ? { rollupOptions: { input: { index: 'index.html', sandbox: 'sandbox.html', ...(mode === 'web' ? { ui: 'ui.html' } : {}), ...(mode === 'steam' ? { pad: 'pad.html' } : {}), ...(process.env.BIRD_EDITOR ? { editor: 'editor.html' } : {}) } } } : {}),
+    ...(mode !== 'yandex' ? { rollupOptions: { input: { index: 'index.html', sandbox: 'sandbox.html', carlab: 'carlab.html', ...(mode === 'web' ? { ui: 'ui.html' } : {}), ...(mode === 'steam' ? { pad: 'pad.html' } : {}), ...(process.env.BIRD_EDITOR ? { editor: 'editor.html' } : {}) } } } : {}),
   },
   // AGENT=1 — dev-сервер для агентов: не перезагружается от чужих правок (docs/AGENTS.md); свежий код — F5
   server: { host: '127.0.0.1', ...(process.env.AGENT ? { watch: null, hmr: false } : {}) },

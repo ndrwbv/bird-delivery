@@ -1,5 +1,5 @@
 /* Настоящая модель машины → в стиль игры (проба, ветка test/real-car, 13.10.2026).
-   node tools/realcar.mjs <папка с scene.gltf> [выход=public/models/vaz2107]
+   node tools/realcar.mjs <папка с scene.gltf> [выход=public/models/<модель>] [модель=vaz2107]   (как добавить машину — docs/CARS3D.md)
    • все узлы запекаются в оси игры: +z — вперёд, +y — вверх, +x — левый борт (водитель); метры
    • четыре колеса вырезаются из днища отдельными частями (pivot — ось колеса): в игре крутятся,
      передние поворачивают; их почти не ужимаем — остаются круглыми
@@ -15,22 +15,33 @@ import sharp from 'sharp';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const SRC = process.argv[2], OUT = process.argv[3] || 'public/models/vaz2107';
-if (!SRC) { console.log('node tools/realcar.mjs <папка с scene.gltf> [выход]'); process.exit(1); }
+const SRC = process.argv[2], OUT = process.argv[3] || 'public/models/' + (process.argv[4] || 'vaz2107');
+if (!SRC) { console.log('node tools/realcar.mjs <папка с scene.gltf> [выход] [модель]'); process.exit(1); }
 
-/* keep — доля треугольников, err — допустимая ошибка (доля размера), tex — сторона текстуры,
-   colors — цветов в палитре, hue/sat/bri — цвет (к оранжевому пиццерии), alpha — прозрачность (у стёкол своя карта — тут ровная) */
-const PART = {
-  Car_CarBody_0: { keep: 0.5, err: 0.006, tex: 64, colors: 5, median: 9, hue: 10, sat: 1.5, bri: 1.35 },   // гладкая краска: крапинки и ржавчина сглажены
-  Car_Details_0: { keep: 0.4, err: 0.01, tex: 256, colors: 12, sat: 1.2, bri: 1.1 },   // номера и фары — мельче не читаются
-  Car_Details_Transparent_0: { keep: 1, tex: 128, sat: 1.2, bri: 1.1, alpha: 0.5 },
-  Car_Bottom_0: { keep: 0.15, err: 0.03, tex: 64, colors: 8, sat: 1.1, bri: 1.05 },
-  Car_Interior_0: { keep: 0.8, err: 0.004, tex: 64, colors: 8, sat: 1.2, bri: 1.15 },
-  Car_Windows_0: { keep: 1, tex: 0 },          // стёкла — без картинки: в игре светлые и прозрачные, по одному на сторону (трескаются)
+/* Модели (папка public/models/<имя>): PART — части модели по именам узлов, WHEEL — колёса в днище, K — единицы → метры.
+   keep — доля треугольников, err — допустимая ошибка (доля размера), tex — сторона текстуры (0 — без картинки),
+   colors — цветов в палитре, median — сгладить крапинки, hue/sat/bri — цвет;
+   paint — краска маской: красно-оранжевые пиксели → серый оттенок + прозрачность-метка, в игре × цвет машины
+   (перекраска в гараже); остальное (хром, резина, фары) — как есть. Новая машина — новая запись (docs/CARS3D.md) */
+const MODELS = {
+  vaz2107: {
+    K: 0.01,                                      // модель в сантиметрах
+    PART: {
+      Car_CarBody_0: { keep: 0.5, err: 0.006, tex: 64, colors: 6, median: 9, paint: { hue: [330, 45], sat: 0.3 } },
+      Car_Details_0: { keep: 0.4, err: 0.01, tex: 256, colors: 12, sat: 1.2, bri: 1.1 },   // номера и фары — мельче не читаются
+      Car_Details_Transparent_0: { keep: 1, tex: 128, sat: 1.2, bri: 1.1, alpha: 0.5 },
+      Car_Bottom_0: { keep: 0.15, err: 0.03, tex: 64, colors: 8, sat: 1.1, bri: 1.05 },
+      Car_Interior_0: { keep: 0.8, err: 0.004, tex: 64, colors: 8, sat: 1.2, bri: 1.15, cut: 0.15 },   // cut — торпедо модели (z > 0,15 м в осях модели = 0,4 м от середины машины) — своё в игре
+      Car_Windows_0: { keep: 1, tex: 0 },          // стёкла — без картинки: в игре светлые и прозрачные, по одному на сторону (трескаются)
+    },
+    /* колёса «Семёрки»: ось на высоте радиуса, база 2,41 м; в колесо — треугольники днища целиком внутри R */
+    WHEEL: { from: 'Car_Bottom_0', r: 0.29, R: 0.36, x: 0.55, z: 1.206, xc: 0.72, keep: 0.3, err: 0.006 },
+  },
 };
-/* колёса «Семёрки»: ось на высоте радиуса, база 2,41 м; в колесо — треугольники днища целиком внутри R */
-const WHEEL = { r: 0.29, R: 0.36, x: 0.55, z: 1.206, xc: 0.72, keep: 0.3, err: 0.006 };
-const COLORS = 12, MEDIAN = 3, K = 0.01;           // палитра по умолчанию; MEDIAN — сгладить крапинки (автор 13.10: «текстуру попроще»)                      // модель в сантиметрах → метры
+const MODEL = process.argv[4] || 'vaz2107', CFG = MODELS[MODEL];
+if (!CFG) { console.log('нет модели', MODEL, '— есть:', Object.keys(MODELS).join(', ')); process.exit(1); }
+const PART = CFG.PART, WHEEL = CFG.WHEEL;
+const COLORS = 12, MEDIAN = 3, K = CFG.K;           // палитра по умолчанию; MEDIAN — сгладить крапинки (автор 13.10: «текстуру попроще»)                      // модель в сантиметрах → метры
 
 await MeshoptSimplifier.ready;
 const doc = await new NodeIO().read(path.join(SRC, 'scene.gltf'));
@@ -59,11 +70,29 @@ const texFile = {};
 async function texture (name, mat, P) {
   const tex = mat && mat.getBaseColorTexture();
   if (!tex || !P.tex) return null;
-  if (texFile[name]) return texFile[name];
+  if (texFile[name]) return texFile[name];   // одна картинка на часть
   const file = name.replace(/^Car_|_0$/g, '').toLowerCase() + '.png';
-  await sharp(Buffer.from(tex.getImage())).resize(P.tex, P.tex, { kernel: 'lanczos3' }).median(P.median || MEDIAN)
-    .modulate({ saturation: P.sat || 1, brightness: P.bri || 1, hue: P.hue || 0 })
-    .png({ palette: true, colours: P.colors || COLORS, dither: 0 }).toFile(path.join(OUT, file));
+  let img = sharp(Buffer.from(tex.getImage())).resize(P.tex, P.tex, { kernel: 'lanczos3' }).median(P.median || MEDIAN);
+  if (P.paint) {
+    // краска: оттенок в hue[0]…hue[1] и насыщенность > sat — серый по яркости (самая яркая краска — белый) и метка alpha 255
+    const { data, info } = await img.ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const hsv = i => { const r = data[i] / 255, g = data[i + 1] / 255, b = data[i + 2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+      let h = 0; if (d) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return [(h * 60 + 360) % 360, mx ? d / mx : 0, mx]; };
+    const isPaint = ([h, sa, v]) => (P.paint.hue[0] > P.paint.hue[1] ? h >= P.paint.hue[0] || h <= P.paint.hue[1] : h >= P.paint.hue[0] && h <= P.paint.hue[1]) && sa > P.paint.sat && v > 0.12;
+    const vs = [];
+    for (let i = 0; i < data.length; i += 4) { const c = hsv(i); if (isPaint(c)) vs.push(c[2]); }
+    vs.sort((a, b) => a - b);
+    const vref = vs[Math.floor(vs.length * 0.9)] || 1;
+    for (let i = 0; i < data.length; i += 4) {
+      const c = hsv(i);
+      if (isPaint(c)) { const g = Math.round(255 * Math.min(1, 0.55 + 0.45 * c[2] / vref)); data[i] = data[i + 1] = data[i + 2] = g; data[i + 3] = 255; }
+      else data[i + 3] = 0;
+    }
+    img = sharp(data, { raw: info });
+    console.log('краска:', vs.length, 'из', data.length / 4, 'пикселей');
+  } else img = img.modulate({ saturation: P.sat || 1, brightness: P.bri || 1, hue: P.hue || 0 });
+  await img.png({ palette: true, colours: P.colors || COLORS, dither: 0 }).toFile(path.join(OUT, file));
   return (texFile[name] = file);
 }
 
@@ -90,7 +119,17 @@ for (const node of doc.getRoot().listNodes()) {
     for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) { box.min[k] = Math.min(box.min[k], pos[i + k]); box.max[k] = Math.max(box.max[k], pos[i + k]); }
     const file = await texture(name, mat, P);
     let rest = idx;
-    if (name === 'Car_Bottom_0') {
+    if (P.cut !== undefined) {
+      // торпедо модели — грубое: всё, что дальше P.cut от середины машины вперёд, выкинуть (своё торпедо — в игре)
+      const keep = [];
+      for (let t = 0; t < idx.length; t += 3) {
+        const z = (pos[idx[t] * 3 + 2] + pos[idx[t + 1] * 3 + 2] + pos[idx[t + 2] * 3 + 2]) / 3;
+        if (z <= P.cut) keep.push(idx[t], idx[t + 1], idx[t + 2]);
+      }
+      console.log('торпедо модели — долой:', (idx.length - keep.length) / 3, 'треугольников');
+      rest = keep;
+    }
+    if (WHEEL && name === WHEEL.from) {
       // колёса: треугольник целиком в цилиндре радиуса R вокруг оси колеса — колесо
       const W = { LF: [], RF: [], LB: [], RB: [] }, R = [];
       const where = v => {

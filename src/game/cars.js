@@ -135,6 +135,7 @@ export const PAINTS = [
   { hex: '#1b1c21', name: N_('чёрный') },
 ];
 const hexOf = id => { const v = obj(K_PAINT)[id]; return typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : LOOK[id].hex; };
+export const paintOf = id => (LOOK[id] ? hexOf(id) : null);   // цвет машины — для настоящих моделей (realcar.js)
 /* мотор: { c — состояние %, r — ресурс (потолок ремонта) %, km — пробег с покупки, n — ремонтов } */
 const r2 = v => Math.round(v * 100) / 100;
 function eng (id) {
@@ -210,6 +211,18 @@ export function select (id) {
   sset(K_CUR, id);
   PREV.delete(id);
   if (A && A.resetCar) A.resetCar();
+  return true;
+}
+/* песочница машин (carlab.html): любая машина и любой цвет — без денег и без покупки */
+export function labUse (id) {
+  if (!BY_ID.has(id)) return false;
+  if (!ownedIds().includes(id)) sset(K_OWN, ownedIds().concat(id));
+  return select(id);
+}
+export function labPaint (id, hex) {
+  if (!LOOK[id] || !/^#[0-9a-f]{6}$/i.test(hex)) return false;
+  const m = obj(K_PAINT); m[id] = hex.toLowerCase(); sset(K_PAINT, m);
+  PREV.delete(id);
   return true;
 }
 export function upgrade (id, kind, api = A) {

@@ -4,6 +4,8 @@
 npm run sandbox          # dev-сервер и сразу /sandbox.html
 ```
 
+Песочница **машин** (вид, краска, удары, стёкла, кровь, из-за руля) — `npm run carlab`, [CARS3D.md](CARS3D.md).
+
 `sandbox.html` — отдельная страница: игра в iframe (`index.html?debug&sandbox&map=…`), справа —
 панель ручек. Ручки работают через `window.__dlv` игры (он есть только с `?debug` и в dev).
 Собирается в `web` и `steam` (`vite.config.js`, `rollupOptions.input`), в `yandex` её нет.

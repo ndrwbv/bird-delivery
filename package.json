@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite --port 5190 --strictPort",
     "sandbox": "vite --port 5193 --mode web --open /sandbox.html",
+    "carlab": "vite --port 5197 --mode web --open /carlab.html",
     "ui": "vite --port 5194 --mode web --open /ui.html",
     "editor": "vite --port 5195 --mode web --open /editor.html",
     "dev:yandex": "vite --port 5191 --strictPort --mode yandex",
