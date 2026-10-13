@@ -100,6 +100,7 @@ import * as PAUSE from './pausecz.js';             // пауза — карус�
 import * as PIX from './pixfx.js';              // пиксельные частицы одним мешем: дымок из-под колёс, осколки стёкол (pixfx.js)
 import * as FXP from './fxpool.js';             // частицы эффектов из общего запаса: искры, дым, пламя, кровь, обломки — вид = одна отрисовка (fxpool.js)
 import * as CG from './carglass.js';            // стёкла своей машины: курьер внутри, трещины и осколки (carglass.js)
+import * as REALCAR from './realcar.js';         // проба: настоящая «Семёрка» (ветка test/real-car)
 import * as SFX from './sfx.js';                // звуки из файлов public/sfx вместо синтеза, звук в пространстве (sfx.js, docs/SOUNDS.md)
 import * as TONE from './sfxsynth.js';         // тёплый синтез: каждое имя звука — свой инструмент (низ, тело, мягкая атака, хвост, отзвук; sfxsynth.js, docs/SOUNDS.md)
 import * as IMPACT from './impact.js';         // удары слоями: тело по материалу, металл, стекло, обломки, скрежет бортом (impact.js, docs/SOUNDS.md)
@@ -9597,7 +9598,11 @@ const wallet = () => +Store.get('dlv-msk-wallet', 0) || 0;
 const addWallet = n => Store.set('dlv-msk-wallet', wallet() + n);
 const owned = () => { const v = Store.get('dlv-msk-cars', ['dodo']); return Array.isArray(v) ? v : ['dodo']; };
 const curCar = () => CAREER ? AUTO.current() : CARS.find(c => c.id === Store.get('dlv-msk-car', 'dodo') && owned().includes(c.id)) || CARS[0];
-const makeCourier = () => { const c = curCar(); return CAREER ? AUTO.makeModel(c.id, { see: true }) : makeCar(c.hex, true, c.model, false, Object.assign({}, c, { see: true })); };   // see — курьер за стёклами (carglass.js)
+const makeCourier = () => {
+  const c = curCar(), g = CAREER ? AUTO.makeModel(c.id, { see: true }) : makeCar(c.hex, true, c.model, false, Object.assign({}, c, { see: true }));
+  if (!CAREER || c.id === 'semerka') REALCAR.dress(g);   // проба: настоящая «Семёрка» вместо кубиков (realcar.js, ветка test/real-car)
+  return g;
+};   // see — курьер за стёклами (carglass.js)
 /* карьера: четырнадцать машин, поломки, ямы и гараж Дяди Жени — cars.js. Кошелёк
    career.js может подменить: AUTO.init({ wallet, addWallet }) */
 if (CAREER) AUTO.init({ THREE, scene, MAP, CITY, Store, Platform, Snd, DLG, ZN, donated, money, wallet, addWallet, rumble,
@@ -10452,7 +10457,7 @@ function hurtCar (dmg, vn, hx, hz, mat) {          // mat — во что (зв�
 }
 
 /* ─────────────── камера ─────────────── */
-const FPV = { on: 0, hid: 0 };                   // вид из кабины (V): on — включён, hid — машина спрятана в этом кадре
+const FPV = { on: 0, hid: 0, at: new THREE.Vector3() };                   // вид из кабины (V): on — включён, hid — машина спрятана в этом кадре
 const camInWall = (x, z) => {
   for (const s of solidsNear(x, z)) {
     if (s.deckY !== undefined) continue;          // перила низкие, камера над ними
@@ -10481,6 +10486,20 @@ function camStep (dt, vf) {
   /* Вид из кабины (проба, автор 13.10.2026): V — переключить. Машину прячем на кадр,
      глаза водителя — над сиденьем, взгляд вперёд по ходу. Остальные камеры (смерть, повтор)
      возвращают машину сами: FPV.hid сбрасывается в начале кадра. */
+  const near = FPV.on && car.userData.real ? 0.05 : 0.4;   // в салоне руль в полуметре — ближняя граница кадра ближе
+  if (cam.near !== near) { cam.near = near; cam.updateProjectionMatrix(); }
+  if (FPV.on && car.userData.real) {                // настоящая «Семёрка» (realcar.js): глаза водителя, видно торпедо и руль
+    V.hero = 0;
+    car.updateMatrixWorld();
+    const E = REALCAR.REAL.eye, sh = S.shake * 0.15;
+    cam.position.copy(E).applyMatrix4(car.matrixWorld);
+    if (sh) { cam.position.x += rand(-sh, sh); cam.position.y += rand(-sh, sh); }
+    FPV.at.set(E.x, E.y - 0.6, E.z + 10).applyMatrix4(car.matrixWorld);
+    cam.lookAt(FPV.at);
+    V.camX = cam.position.x; V.camZ = cam.position.z; V.camY = cam.position.y + 4; V.camH = V.h; V.camPull = 0;
+    S.shake = Math.max(0, S.shake - dt * 2.2);
+    return;
+  }
   if (FPV.on) {
     V.hero = 0;
     car.visible = false; FPV.hid = 1;
