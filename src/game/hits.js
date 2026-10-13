@@ -385,7 +385,9 @@ function throwBody (p, vx, vz, kmh, up, lie, y0) {
    с фонтаном крови; после REHIT.SKEL переездов — скелет (белые тонкие кости) и больше ни на что не реагирует.
    Только взрослая версия (в детской сбитые встают и уходят). cx, cz — середина машины, fx, fz — куда смотрит,
    L, W — полудлина и полуширина, vx, vz — скорость машины. Возвращает, сколько тел задел (проба 13.10.2026) */
-export const REHIT = { MIN: 3, SKEL: 2, PAD: 0.4, BONE: 0xe4ddca };
+/* повторный переезд — мягче первого удара (автор 13.10: «подскакивают вверх, не надо сильно»): вперёд FWD скорости
+   машины, вверх UP0 + км/ч / UP_K (не больше UP_MAX), вбок — SIDE разброса первого удара, LIFT — м над землёй */
+export const REHIT = { MIN: 3, SKEL: 2, PAD: 0.4, BONE: 0xe4ddca, FWD: 0.6, UP0: 1.2, UP_K: 40, UP_MAX: 3.5, SIDE: 0.5, LIFT: 0.15 };
 let BONE = null;
 export function rehit (cx, cz, fx, fz, L, W, vx, vz) {
   const sp = Math.hypot(vx, vz);
@@ -395,13 +397,13 @@ export function rehit (cx, cz, fx, fz, L, W, vx, vz) {
     if (B.skel || B.up || (B.mode !== 'lie' && !(B.mode === 'fly' && B.landed))) continue;
     const dx = B.root.position.x - cx, dz = B.root.position.z - cz;
     if (Math.abs(dx * fx + dz * fz) > L + REHIT.PAD || Math.abs(dx * fz - dz * fx) > W + REHIT.PAD) continue;
-    const kmh = sp * 3.6, l = sp, side = rand(-1, 1) * (THROW.SIDE0 + kmh * THROW.SIDE_K);
+    const kmh = sp * 3.6, l = sp, side = rand(-1, 1) * (THROW.SIDE0 + kmh * THROW.SIDE_K) * REHIT.SIDE;
     B.hits = (B.hits || 1) + 1;
     B.mode = 'fly'; B.t = 0; B.landed = 0; B.life = B.lie;
-    B.root.position.y += 0.35;
-    B.vx = vx * THROW.FWD + side * -vz / l; B.vz = vz * THROW.FWD + side * vx / l;
-    B.vy = clamp(THROW.UP0 + kmh / THROW.UP_K, 3, THROW.UP_MAX);
-    B.spin = rand(5, 9) * (Math.random() < 0.5 ? -1 : 1); B.roll = rand(-3, 3);
+    B.root.position.y += REHIT.LIFT;
+    B.vx = vx * REHIT.FWD + side * -vz / l; B.vz = vz * REHIT.FWD + side * vx / l;
+    B.vy = Math.min(REHIT.UP_MAX, REHIT.UP0 + kmh / REHIT.UP_K);
+    B.spin = rand(2, 4) * (Math.random() < 0.5 ? -1 : 1); B.roll = rand(-1.5, 1.5);
     if (A.spray) A.spray({ x: B.root.position.x, z: B.root.position.z }, vx, vz, kmh);
     if (A.Snd.impact) A.Snd.impact(Math.max(sp, 6), 'person', { x: B.root.position.x, z: B.root.position.z });
     if (B.hits > REHIT.SKEL) skeleton(B);
