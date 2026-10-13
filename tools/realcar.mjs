@@ -50,6 +50,9 @@ const MODELS = {
   },
 };
 const MODEL = process.argv[4] || 'vaz2107', CFG = MODELS[MODEL];
+/* lite — машина потока (5-й аргумент «lite»): без салона, треугольников × LITE.K, колёса на месте (не крутятся),
+   стёкла — одной частью, части с одной картинкой — одним куском (одна отрисовка). Выход — car_lite.json / car_lite.bin */
+const LITE = process.argv[5] === 'lite' ? { K: 0.4, ERR: 0.05 } : null;   // ERR — допуск упрощения: издалека не видно
 if (!CFG) { console.log('нет модели', MODEL, '— есть:', Object.keys(MODELS).join(', ')); process.exit(1); }
 const PART = CFG.PART, WHEEL = CFG.WHEEL, WHEELS = CFG.WHEELS;
 const COLORS = 12, MEDIAN = 3, K = CFG.K;           // палитра по умолчанию; MEDIAN — сгладить крапинки (автор 13.10: «текстуру попроще»)                      // модель в сантиметрах → метры
@@ -66,8 +69,11 @@ const box = { min: [1e9, 1e9, 1e9], max: [-1e9, -1e9, -1e9] };
 
 /* ужать: индексы → meshopt → только нужные вершины */
 function simplify (pos, uv, idx, keep, err) {
+  if (LITE) { keep *= LITE.K; err = Math.max(err || 0.004, LITE.ERR); }
   let ix = Uint32Array.from(idx);
-  if (keep < 1) ix = MeshoptSimplifier.simplify(ix, pos, 3, Math.max(3, Math.floor(ix.length * keep / 3) * 3), err, [])[0];
+  const target = Math.max(3, Math.floor(ix.length * keep / 3) * 3);
+  if (keep < 1) ix = LITE ? MeshoptSimplifier.simplifySloppy(ix, pos, 3, null, target, err)[0]   // поток: грубо, швы картинки не бережём — издалека не видно
+    : MeshoptSimplifier.simplify(ix, pos, 3, target, err, [])[0];
   const map = new Map(), P = [], U = [], I = new Uint32Array(ix.length);
   for (let i = 0; i < ix.length; i++) {
     let v = map.get(ix[i]);
@@ -77,11 +83,12 @@ function simplify (pos, uv, idx, keep, err) {
   return { pos: new Float32Array(P), uv: new Float32Array(U), idx: I };
 }
 
-const texFile = {};
+const texFile = {}, TEX_BY = new Map();
 async function texture (name, mat, P) {
   const tex = mat && mat.getBaseColorTexture();
   if (!tex || !P.tex) return null;
   if (texFile[name]) return texFile[name];   // одна картинка на часть
+  if (TEX_BY.has(tex)) return (texFile[name] = TEX_BY.get(tex));   // та же картинка у другой части (колёса «Копейки» — с кузовом)
   const file = name.replace(/^Car_|_0$/g, '').toLowerCase() + '.png';
   let img = sharp(Buffer.from(tex.getImage())).resize(P.tex, P.tex, { kernel: 'lanczos3' }).median(P.median || MEDIAN);
   if (P.paint) {
@@ -105,11 +112,24 @@ async function texture (name, mat, P) {
     console.log('краска:', vs.length, 'из', data.length / 4, 'пикселей');
   } else img = img.modulate({ saturation: P.sat || 1, brightness: P.bri || 1, hue: P.hue || 0 });
   await img.png({ palette: true, colours: P.colors || COLORS, dither: 0 }).toFile(path.join(OUT, file));
+  TEX_BY.set(tex, file);
   return (texFile[name] = file);
 }
 
+const LITE_G = {};                                // lite: картинка → { pos, uv, idx, ... } — склеить в конце
 function emit (name, file, mat, P, g, pivot, role) {
   const a = mat ? mat.getBaseColorFactor()[3] : 1;
+  if (LITE) {
+    if (pivot) for (let i = 0; i < g.pos.length; i += 3) { g.pos[i] += pivot[0]; g.pos[i + 1] += pivot[1]; g.pos[i + 2] += pivot[2]; }   // колесо — на место
+    const glass = /^win/.test(name) || P.role === 'glass';
+    const key = glass ? 'glass' : file + '|' + !!(mat && mat.getAlphaMode() === 'BLEND');
+    const G = LITE_G[key] || (LITE_G[key] = { name: glass ? 'glass' : name, file: glass ? null : file, blend: glass || !!(mat && mat.getAlphaMode() === 'BLEND'),
+      alpha: glass ? 0.14 : (P.alpha !== undefined ? P.alpha : a), role: glass ? 'glass' : (role || P.role || (/CarBody/.test(name) ? 'body' : /Details_0/.test(name) ? 'detail' : null)), pos: [], uv: [], idx: [] });
+    if (!glass && (role || P.role) === 'body') G.role = 'body';
+    const v0 = G.pos.length / 3;
+    G.pos.push(...g.pos); G.uv.push(...g.uv); for (const i of g.idx) G.idx.push(i + v0);
+    return g.idx.length / 3;
+  }
   const ix = g.pos.length / 3 > 65535 ? g.idx : new Uint16Array(g.idx);
   parts.push({
     name, file, pivot, role: role || P.role || (/CarBody/.test(name) ? 'body' : /Details_0/.test(name) ? 'detail' : null), blend: !!(mat && mat.getAlphaMode() === 'BLEND'), alpha: P.alpha !== undefined ? P.alpha : a,
@@ -130,6 +150,7 @@ for (const node of doc.getRoot().listNodes()) {
     for (let i = 0; i < src.length; i++) pos[i] = src[i] * K;
     if (CFG.axes) for (let i = 0; i < pos.length; i += 3) { const v = CFG.axes(pos[i], pos[i + 1], pos[i + 2]); pos[i] = v[0]; pos[i + 1] = v[1]; pos[i + 2] = v[2]; }   // свои оси модели → оси игры
     for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) { box.min[k] = Math.min(box.min[k], pos[i + k]); box.max[k] = Math.max(box.max[k], pos[i + k]); }
+    if (LITE && (P.role === 'interior' || /Interior/.test(name))) { console.log(name.padEnd(28), '— салон, в потоке не нужен'); continue; }
     const file = await texture(name, mat, P);
     let rest = idx;
     if (P.cut !== undefined) {
@@ -206,6 +227,14 @@ for (const node of doc.getRoot().listNodes()) {
     console.log(name.padEnd(28), 'треугольников', rest.length / 3, '→', emit(name, file, mat, P, g, null));
   }
 }
-fs.writeFileSync(path.join(OUT, 'car.bin'), Buffer.concat(chunks));
-fs.writeFileSync(path.join(OUT, 'car.json'), JSON.stringify({ box, parts }, null, 1));
+if (LITE) for (const k in LITE_G) {
+  const G = LITE_G[k], n = G.pos.length / 3;
+  const ix = n > 65535 ? new Uint32Array(G.idx) : new Uint16Array(G.idx);
+  parts.push({ name: G.name, file: G.file, pivot: null, role: G.role, blend: G.blend, alpha: G.alpha,
+    pos: [push(new Float32Array(G.pos)), G.pos.length], uv: [push(new Float32Array(G.uv)), G.uv.length], idx: [push(ix), ix.length, ix.BYTES_PER_ELEMENT] });
+  console.log('поток:', G.name.padEnd(22), G.file || '—', 'треугольников', G.idx.length / 3);
+}
+const NAME = LITE ? 'car_lite' : 'car';
+fs.writeFileSync(path.join(OUT, NAME + '.bin'), Buffer.concat(chunks));
+fs.writeFileSync(path.join(OUT, NAME + '.json'), JSON.stringify({ box, parts }, null, 1));
 console.log('рамка', box, 'bin', off, 'байт');

@@ -932,7 +932,7 @@ function stepDumps (dt) {
           const old = t.mesh, m = makeDump();
           m.position.copy(old.position); m.rotation.copy(old.rotation);
           A.scene.remove(old);
-          old.children[0].geometry.dispose();
+          if (old.children[0] && old.children[0].geometry) old.children[0].geometry.dispose();   // настоящая модель потока (realcar.js) — группа, без своей сетки сверху
           A.scene.add(m);
           t.mesh = m; t.model = 'dump'; t.hl = 3.7; t.cruise = rand(8, 11);
           t.hbRoll = 1;                                              // коневозкой не станет

@@ -283,14 +283,15 @@ function crackTex () {
    uPaint — цвет машины (маска краски — прозрачность картинки кузова); uBlood[i] — пятно: xyz — центр
    в осях модели, w — радиус (0 — нет). Ниже центра пятно вытянуто — стекает */
 const BODY_BLOOD = { N: 40, GROW: 0.9, DRIP: 0.07, DRIP_MIN: 0.3, K: 1.5 };   // K — пятна крупнее (автор 13.10: «кровищи больше»)
-function bodyShader (mat, U, paint) {
+function bodyShader (mat, U, paint, traffic) {
   mat.userData.dirt = 1;                            // cardirt.js свою программу не ставит — грязь и снег вставляем сами
   mat.onBeforeCompile = sh => {
-    dirtInject(sh);
+    if (!traffic) dirtInject(sh);                   // грязь и снег — своей машине (считаются от неё); у потока — износ uWear
+    sh.uniforms.uWear = U.wear || { value: 0 };
     sh.uniforms.uPaint = U.paint;
     sh.uniforms.uBlood = U.blood;
     sh.vertexShader = 'varying vec3 vBLoc;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvBLoc = transformed;');
-    sh.fragmentShader = `uniform vec3 uPaint;\nuniform vec4 uBlood[${BODY_BLOOD.N}];\nvarying vec3 vBLoc;\n
+    sh.fragmentShader = `uniform vec3 uPaint;\nuniform float uWear;\nuniform vec4 uBlood[${BODY_BLOOD.N}];\nvarying vec3 vBLoc;\n
 float bH (vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }\n` +
       sh.fragmentShader
         .replace('#include <map_fragment>', paint ? `#ifdef USE_MAP
@@ -310,11 +311,15 @@ float bH (vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x 
     bl = max(bl, smoothstep(1.0, 0.7, r));
   }
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.32, 0.015, 0.02), bl * 0.92);
+  // износ (машины потока): ржавые пятна крупным пикселем, чем старше — тем больше; краска тусклее
+  float wn = bH(floor(vBLoc * 7.0)) * 0.6 + bH(floor(vBLoc * 2.0) + 3.0) * 0.4;
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.62, 0.45, 0.33), uWear * smoothstep(0.62 - uWear * 0.3, 0.9, wn));
+  diffuseColor.rgb *= 1.0 - uWear * 0.18;
 }`);
   };
   // ключ — свой у каждой машины: three вызывает onBeforeCompile только для новой программы, и вторая машина
   // с тем же ключом осталась бы без своих uPaint / uBlood — с цветом и кровью первой (после «починить», воскрешения)
-  mat.customProgramCacheKey = () => 'realcar-body' + (paint ? '-paint-' : '-') + U.id;
+  mat.customProgramCacheKey = () => 'realcar-body' + (paint ? '-paint-' : '-') + (traffic ? 'traffic-' : '') + U.id;
 }
 
 /* ─── кровь на лобовом: холст на геометрии стекла; брызги растут, потёки текут вниз ─── */
@@ -413,10 +418,11 @@ function wipeBlood (R, W) {
   }
 }
 
-function load (C) {
-  if (CACHE[C.dir]) return CACHE[C.dir];
-  const BASE = ROOT + C.dir + '/';
-  CACHE[C.dir] = Promise.all([fetch(BASE + 'car.json').then(r => r.json()), fetch(BASE + 'car.bin').then(r => r.arrayBuffer())])
+function load (C, lite) {
+  const key = C.dir + (lite ? ':lite' : '');
+  if (CACHE[key]) return CACHE[key];
+  const BASE = ROOT + C.dir + '/', NAME = lite ? 'car_lite' : 'car';
+  CACHE[key] = Promise.all([fetch(BASE + NAME + '.json').then(r => r.json()), fetch(BASE + NAME + '.bin').then(r => r.arrayBuffer())])
     .then(([J, bin]) => {
       const g = new THREE.Group(), tl = new THREE.TextureLoader(), mats = {};
       const cz = (J.box.min[2] + J.box.max[2]) / 2, gy = J.box.min[1];   // середина по длине и низ колёс — в ноль, как у кузова игры
@@ -425,7 +431,7 @@ function load (C) {
         geo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(bin, p.pos[0], p.pos[1]), 3));
         geo.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(bin, p.uv[0], p.uv[1]), 2));
         geo.setIndex(new THREE.BufferAttribute(p.idx[2] === 4 ? new Uint32Array(bin, p.idx[0], p.idx[1]) : new Uint16Array(bin, p.idx[0], p.idx[1]), 1));
-        const pane = /^win/.test(p.name);
+        const pane = /^win/.test(p.name) || p.role === 'glass';
         const key = pane ? p.name : p.file + '|' + p.blend + '|' + p.alpha;
         let mat = mats[key];
         if (!mat && pane) {
@@ -458,6 +464,7 @@ function load (C) {
         geo.computeVertexNormals();
         geo.computeBoundingSphere();
       }
+      if (lite) { g.userData.liteOf = C; return g; }   // поток: без салона, руля и курьера
       if (C.torpedo) g.add(torpedo(C.torpedo));
       if (C.driver) g.add(driver(C.driver, C.sw));
       if (C.sw) g.add(steeringWheel(C.sw));
@@ -466,7 +473,7 @@ function load (C) {
       return g;
     })
     .catch(e => { console.warn('realcar: модель не загрузилась', C.dir, e); return null; });
-  return CACHE[C.dir];
+  return CACHE[key];
 }
 
 /* лобовое для дворников (wipers.js): O — середина низа снаружи, ex — вбок, ey — вверх по стеклу, n — наружу, H, w;
@@ -487,6 +494,53 @@ function glassFrame (win, k) {
 }
 
 export const has = id => REAL.on && !!MODELS[id];
+
+/* ─── машины потока (проба 13.10.2026, автор: «такие же машины на дороге — разного цвета, износа, низкополигональные,
+   и бились так же, как моя»). TRAFFIC.MODELS — какие модели ездят; TRAFFIC.SHARE — доля потока (game.js newCar).
+   Облегчённая модель (tools/realcar.mjs … lite): без салона, ~1,5—2,5 тыс. треугольников, колёса не крутятся;
+   у каждой машины — свой цвет, свой износ (ржавчина пятнами, тусклее), своя сетка (мнётся, как твоя: dent),
+   стёкла трескаются с GLASS_HIT.CRACK м/с и бьются с GLASS_HIT.BREAK */
+export const TRAFFIC = { MODELS: ['semerka', 'kopeyka'], SHARE: 0.5, WEAR: [0, 1] };
+const GLASS_HIT = { CRACK: 9, BREAK: 15 };
+const LITE = {};
+export function preloadTraffic () {
+  for (const id of TRAFFIC.MODELS) if (MODELS[id]) load(MODELS[id], true).then(g => { if (g) LITE[id] = g; });
+}
+export const trafficReady = () => REAL.on && Object.keys(LITE).length > 0;
+export function trafficCar (hex) {
+  const ids = Object.keys(LITE);
+  if (!REAL.on || !ids.length) return null;
+  const id = ids[Math.floor(Math.random() * ids.length)], C = MODELS[id];
+  const g = new THREE.Group();
+  g.rotation.order = 'YXZ';
+  const m = LITE[id].clone();
+  m.scale.setScalar(C.k);
+  g.add(m);
+  const U = { id: ++SEQ, paint: { value: dull(new THREE.Color(hex)) }, blood: { value: Array.from({ length: BODY_BLOOD.N }, () => new THREE.Vector4(0, 0, 0, 0)) },
+    wear: { value: TRAFFIC.WEAR[0] + Math.random() ** 1.5 * (TRAFFIC.WEAR[1] - TRAFFIC.WEAR[0]) } };
+  const R = { C, m, dent: [], glass: [], traffic: true };
+  const own = new Map();
+  m.traverse(o => {
+    if (!o.isMesh) return;
+    if (!own.has(o.material)) {
+      const mt = o.material.clone();
+      if (o.material.userData.body) bodyShader(mt, U, o.material.userData.paint, true);
+      own.set(o.material, mt);
+    }
+    o.material = own.get(o.material);
+    o.geometry = o.geometry.clone();                 // своя: мнётся (и её можно выбросить — game.js fullCar и стройки так делают)
+    if (o.material.transparent && !o.material.map) R.glass.push(o); else R.dent.push(o.geometry);
+  });
+  g.userData.real = R;
+  return { g, hl: C.box.HL * C.k, id };
+}
+/* стёкла машины потока: одним куском — трескаются все и бьются все */
+function trafficGlass (R, force) {
+  for (const o of R.glass) {
+    if (force >= GLASS_HIT.BREAK) o.visible = false;
+    else if (force >= GLASS_HIT.CRACK && !o.material.map) { o.material.map = crackTex(); o.material.opacity = GLASS.CRACK; o.material.color.setHex(0xffffff); o.material.needsUpdate = true; }
+  }
+}
 
 export function dress (car, id = 'semerka', hex) {
   const C = MODELS[id];
@@ -559,6 +613,7 @@ const DENT = { MIN: 4, FULL: 22, DEPTH: 0.3, R0: 0.45, R1: 0.6, IN_END: 0.5, IN_
 export function dent (car, lx, lz, force, rear) {
   const R = car && car.userData.real;
   if (!R || !(force > DENT.MIN)) return;
+  if (R.traffic && !rear) trafficGlass(R, force);
   if (!rear) rearDent(car, lx, lz, force);
   const K = R.C.k, { W2, HL } = R.C.box, x = lx / K, z = lz / K, k = Math.min(1, (force - DENT.MIN) / (DENT.FULL - DENT.MIN));
   const end = Math.abs(z) / HL >= Math.abs(x) / W2;

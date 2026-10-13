@@ -3557,7 +3557,7 @@ function makeCarLite (hex, model, taxi) {
 /* задели лёгкую машину — ставим полную: у неё панели мнутся по-настоящему */
 function fullCar (t) {
   if (t.still) TGRID.wake(t);                      // стояла в склейке (parkmerge.js) — сперва своя лёгкая модель на сцену
-  if (!t.mesh.userData.lite) return;
+  if (!t.mesh.userData.lite || t.mesh.userData.realLite) return;   // настоящая модель потока (realcar.js) мнётся сама — не подменяем
   const old = t.mesh, u = old.userData;
   t.mesh = u.full ? u.full(old) : makeCar(u.bodyHex, false, u.model, !!u.taxi);   // full — своя полная модель (курьеры: шашка, табличка — rivalLite)
   t.mesh.position.copy(old.position);
@@ -6688,8 +6688,16 @@ function newCar (parked) {
   // Поток — лёгкие машины (один-два меша вместо двадцати), как на парковке:
   // полную модель с мнущимися панелями ставим, когда задели (fullCar).
   // Такси — тоже лёгкие (три меша: кузов с шашечками, фары, надпись; аварийка — четвёртый, мигает)
-  const mesh = makeCarLite(taxi ? TAXI_HEX : pick(CAR_HEX), model, taxi);
-  return carObj(mesh, model, taxi, !!parked, (taxi ? rand(12, 17) : rand(9, 14)) * (night ? ECON.TRAFFIC.NIGHT_SPEED : 1), 100, rand(8, 30));
+  const hex = taxi ? TAXI_HEX : pick(CAR_HEX);
+  // проба (13.10.2026): часть потока — настоящие «Семёрка» и «Копейка» своего цвета и износа, мнутся как твоя (realcar.js TRAFFIC)
+  const rc = !parked && !taxi && REALCAR.trafficReady() && chance(REALCAR.TRAFFIC.SHARE) ? REALCAR.trafficCar(hex) : null;
+  let mesh;
+  if (rc) {
+    mesh = rc.g;
+    const R = mesh.userData.real;
+    mesh.userData = dbl({ lite: true, realLite: true, real: R, hl: rc.hl, wheels: [], steer: [], panels: [], glass: [], hazard: [], dmg: 0, bodyHex: hex, model: 'sedan', taxi: false, full: undefined, _pose: undefined });
+  } else mesh = makeCarLite(hex, model, taxi);
+  return carObj(mesh, rc ? 'sedan' : model, taxi, !!parked, (taxi ? rand(12, 17) : rand(9, 14)) * (night ? ECON.TRAFFIC.NIGHT_SPEED : 1), 100, rand(8, 30));
 }
 /* Машина в TRAFFIC — сразу со ВСЕМИ полями, в одном порядке, даже с теми, что потом заводят другие
    модули (коневозка, самосвал, бургер-машина, лось, пробка, погоня, скорая, мопед…). Значения — те же,
@@ -14042,6 +14050,7 @@ ZN.init({ CITY, MAP, donated });
 DLG.init({ pause: on => { for (const k in IN) IN[k] = 0; if (on) Snd.engine(0); }, face: (p, size) => faceDataURL(p, size) });
 HITS.init({ THREE, scene, box, mergeGeos, HUMAN_VC, groundH, surfaceAt, curbAt, nearestRoad, driftTop: SEAS.driftTop, pavedLift: TRK.pavedLift, groundNormal, emote, puff, pushOut, Snd,
   burst: burstHuman, scare, callAmbulance, adult: GORE_ON, shred: shredHit, spray: bloodSpray, bounce: bounceBody });
+REALCAR.preloadTraffic();                        // проба: настоящие машины в потоке — облегчённые модели заранее (realcar.js TRAFFIC)
 HAV.init({ S, adult: ADULT });                   // счёт разрушений за смену для Толика (havoc.js)
 CHAT.init({ adult: ADULT, person: makePerson({ seed: 0x2E4A17, fem: false }), face: (p, size) => faceDataURL(p, size), blip: (f, d, ty, v) => Snd.blip(f, d, ty, v), fx: (n, synth) => Snd.fx(n, synth) });
 /* заказы карьеры (orders.js): очередь, поручения, развоз смены — через это */
@@ -15488,7 +15497,7 @@ if (window.__dlv) window.__dlv.carlab = {
   stop: () => { V.vx = V.vz = 0; for (const k in IN) IN[k] = 0; },
   state: () => ({ id: car.userData.careerId, real: !!car.userData.real, glass: CG.state(car.userData.cg), dents: car.userData.dents || 0, fp: !!FPV.on, orbit: CARLAB.orbit }),
 };
-if (window.__dlv) Object.assign(window.__dlv, { GRIT: GRITM.GRIT, REALCAR, bounceBody, SOLIDS, PIX: PIX.STATS, CG: CG.STATS, cgState: () => CG.state(car.userData.cg), hurtCar,
+if (window.__dlv) Object.assign(window.__dlv, { GRIT: GRITM.GRIT, REALCAR, bounceBody, SOLIDS, dentCar, PIX: PIX.STATS, CG: CG.STATS, cgState: () => CG.state(car.userData.cg), hurtCar,
   cgLamps: () => CG.lampState(car), EXH: EXH.DEBUG, WIPE: WIPE.STATS, DENT: DENTM.DEBUG, DIRT: DIRT.DEBUG, REAR: REARM.STATS, pizzasInCar, setTrunk });   // фары и фонари (carglass.js), выхлоп (exhaust.js), дворники (wipers.js)   // дымок, стёкла (pixfx.js, carglass.js)
 if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG, CONS: CONSTR.DEBUG, DARK: DARKN.DEBUG, WASTE: WASTE.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)
 if (window.__dlv) Object.defineProperties(window.__dlv, { reprofile: { value: reprofile }, REPROFILE_MS: { get: () => REPROFILE_MS } });   // смена профиля без перезагрузки

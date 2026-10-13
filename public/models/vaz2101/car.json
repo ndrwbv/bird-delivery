@@ -119,7 +119,7 @@
   },
   {
    "name": "wheelLF",
-   "file": "w_fd_kopeika.png",
+   "file": "kopeika_kopeika.png",
    "pivot": [
     0.7762489914894104,
     -1.242433249950409,
@@ -144,7 +144,7 @@
   },
   {
    "name": "wheelRF",
-   "file": "w_fp_kopeika.png",
+   "file": "kopeika_kopeika.png",
    "pivot": [
     -0.786247581243515,
     -1.242433249950409,
@@ -169,7 +169,7 @@
   },
   {
    "name": "wheelLB",
-   "file": "w_rd_kopeika.png",
+   "file": "kopeika_kopeika.png",
    "pivot": [
     0.7762492895126343,
     -1.2331750690937042,
@@ -194,7 +194,7 @@
   },
   {
    "name": "wheelRB",
-   "file": "w_rp_kopeika.png",
+   "file": "kopeika_kopeika.png",
    "pivot": [
     -0.7862472534179688,
     -1.2331750690937042,
