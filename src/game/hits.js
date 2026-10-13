@@ -25,7 +25,7 @@ export const TIME = {
   CHUNK: [25, 40],      // взрослая, «разорвало»: кусок лежит в крови столько секунд…
   SINK: 3,              //   … потом за столько уходит в землю и тает
 };
-export const CAP = { BODIES: 12, LIMBS: 12, PUDDLES: 10, WRECKS: 8, CHUNKS: 30, SPLATS: 30 };
+export const CAP = { BODIES: 12, LIMBS: 12, PUDDLES: 10, WRECKS: 8, CHUNKS: 30, SPLATS: 60 };   // SPLATS 30 → 60: кровь везде, где ударился (13.10)
 const PUDDLE_HEX = 0x5a0e16;
 const FALL_LIFT = 0.17;   // упал и встал: спина над верхом слоя (толщина модели прохожего)
 const UP = { x: 0, y: 1, z: 0 };
@@ -283,7 +283,8 @@ export function fallStep (p, dt) {
 export function hit (p, vx, vz, kmh, o = {}) {
   if (kmh == null) kmh = kmhOf(vx, vz);
   if (!o.up) {                                      // сбит: «бум» в точке удара и глухой удар
-    flashAt(p.x, A.groundH(p.x, p.z) + 1.1 + (o.y0 || 0), p.z);
+    // взрослая — фонтан крови во все стороны (game.js spray, проба 13.10.2026: «символ удара — не прикольно»); детская — звёздочка
+    if (A.adult && A.spray) A.spray(p, vx, vz, kmh); else flashAt(p.x, A.groundH(p.x, p.z) + 1.1 + (o.y0 || 0), p.z);
     // удар слоями (impact.js): тело hit-person-<сила>, нет файла — hit-person; без слоёв — как раньше
     if (A.Snd.impact) A.Snd.impact(Math.max(kmh / 3.6, 8), 'person', { x: p.x, z: p.z });
     else A.Snd.fx('hit-person', s => { s.blip(62, 0.2, 'sine', 0.34); s.noise(0.08, 0.16); }, { x: p.x, z: p.z });
@@ -351,6 +352,14 @@ function buildBody (c) {
   return { root, parts };
 }
 
+/* отлёт сбитого (проба 13.10.2026, автор: «проходят сквозь машину, на большой скорости не разлетаются»):
+   FWD — доля скорости машины вперёд (было 0,42 — машина догоняла тело), SIDE0 + км/ч × SIDE_K — разброс вбок, м/с;
+   вверх — UP0 + км/ч / UP_K, не больше UP_MAX; AHEAD — м вперёд от места удара. TRAIL — м между кровавыми следами
+   там, где тело касается земли (взрослая) */
+export const THROW = { FWD: 1.15, SIDE0: 1.5, SIDE_K: 0.06, UP0: 3, UP_K: 11, UP_MAX: 12, AHEAD: 0.6, TRAIL: 1.4,
+  /* соразмерно удару (автор 13.10: «легонько бьёшь — отлетают сильно»): с FALL (20 км/ч) до FULL км/ч отлёт растёт
+     от лёгкого (вперёд FWD0 скорости машины, вверх UP_LO м/с, вбок ×SIDE_LO) до полного (FWD, UP0 + км/ч / UP_K) */
+  FULL: 70, FWD0: 0.85, UP_LO: 1.8, SIDE_LO: 0.3 };
 function throwBody (p, vx, vz, kmh, up, lie, y0) {
   const c = (p.grp && p.grp.userData.colors) || { skin: '#e0b48c', shirt: '#4a6fa5', pants: '#333' };
   const { root, parts } = buildBody(c);
@@ -362,15 +371,63 @@ function throwBody (p, vx, vz, kmh, up, lie, y0) {
   root.rotation.y = Math.atan2(vx / l, vz / l);     // +Z — куда толкнули
   A.scene.add(root);
   if (!BX) { BX = new A.THREE.Box3(); V3 = new A.THREE.Vector3(); }
-  const k = clamp(kmh / 50, 0.35, 1.6);
+  const q = clamp((kmh - TIER.FALL) / (THROW.FULL - TIER.FALL), 0, 1);   // 0 — лёгкий удар, 1 — с THROW.FULL км/ч
+  const k = clamp(kmh / 50, 0.35, 1.6), side = rand(-1, 1) * (THROW.SIDE0 + kmh * THROW.SIDE_K) * (THROW.SIDE_LO + (1 - THROW.SIDE_LO) * q);
+  const fwd = THROW.FWD0 + (THROW.FWD - THROW.FWD0) * q, upFull = clamp(THROW.UP0 + kmh / THROW.UP_K, 3, THROW.UP_MAX);
+  root.position.x += vx / l * THROW.AHEAD; root.position.z += vz / l * THROW.AHEAD;   // чуть впереди морды — не в капоте
   const B = {
     root, parts, s, t: 0, mode: 'fly', up, lie, life: lie, shadow: shadowFor(), floor: fl, settle: 0,
-    vx: vx * 0.42 + rand(-1.5, 1.5), vy: clamp(2.5 + kmh / 18, 3, 9), vz: vz * 0.42 + rand(-1.5, 1.5),
+    // вперёд — быстрее машины (×THROW.FWD): иначе машина догоняет тело и проезжает сквозь; вбок — разброс, растёт со скоростью
+    vx: vx * fwd + side * -vz / l, vy: THROW.UP_LO + (upFull - THROW.UP_LO) * q, vz: vz * fwd + side * vx / l,
     spin: rand(5, 9) * k * (Math.random() < 0.5 ? -1 : 1), roll: rand(-3, 3) * k, landed: 0, puddle: null, starT: 0, wx: 0, wz: 0,
   };
   BODIES.push(B);
   if (BODIES.length > CAP.BODIES) for (const q of BODIES) if (q.mode !== 'gone') { fadeBody(q); break; }
   return B;
+}
+
+/* переехал лежащего (или ещё летящего, но уже упавшего на дорогу) — снова отлетает, как от первого удара (THROW),
+   с фонтаном крови. Пролежал нетронутым REHIT.SKEL_T с — скелет (белые тонкие кости), больше ни на что не реагирует,
+   на TIME.BODY с — тает (автор 13.10: «скелетом — через время, когда не трогают, и потом исчезает»).
+   Только взрослая версия (в детской сбитые встают и уходят). cx, cz — середина машины, fx, fz — куда смотрит,
+   L, W — полудлина и полуширина, vx, vz — скорость машины. Возвращает, сколько тел задел (проба 13.10.2026) */
+/* повторный переезд — мягче первого удара (автор 13.10: «подскакивают вверх, не надо сильно»): вперёд FWD скорости
+   машины, вверх UP0 + км/ч / UP_K (не больше UP_MAX), вбок — SIDE разброса первого удара, LIFT — м над землёй */
+export const REHIT = { MIN: 3, SKEL_T: 12, PAD: 0.4, COOL: 0.8, WOB: 0.5,   // COOL — с между переездами одного тела (после дёрганья), WOB — с дёргается
+  BONE: 0xe4ddca, FWD: 0.6, UP0: 1.2, UP_K: 40, UP_MAX: 3.5, SIDE: 0.5, LIFT: 0.15 };
+let BONE = null;
+export function rehit (cx, cz, fx, fz, L, W, vx, vz) {
+  const sp = Math.hypot(vx, vz);
+  if (!A || !A.adult || sp < REHIT.MIN) return 0;
+  let n = 0;
+  for (const B of BODIES) {
+    if (B.skel || B.up || (B.mode !== 'lie' && !(B.mode === 'fly' && B.landed))) continue;
+    if (B.wob > -REHIT.COOL) continue;                                       // только что задели — не каждый кадр (застревал в машине)
+    const dx = B.root.position.x - cx, dz = B.root.position.z - cz;
+    const across = dx * fz - dz * fx;
+    if (Math.abs(dx * fx + dz * fz) > L + REHIT.PAD || Math.abs(across) > W + REHIT.PAD) continue;
+    // не подлетает (автор 13.10: «стрёмно подпрыгивает — просто пулькать кровью и слегка болтать»): лежит, где лежал,
+    // дёргается REHIT.WOB с, из-под машины — немного крови, под ним — пятно; отсчёт «до скелета» — заново
+    if (!(B.wob > -REHIT.COOL)) B.wy = B.root.position.y;   // высота, у которой дёргается
+    B.reT = 1; B.wob = REHIT.WOB; B.hits = (B.hits || 1) + 1;
+    if (B.mode === 'lie') B.t = Math.min(B.t, 1.5);
+    if (A.spray) A.spray({ x: B.root.position.x, z: B.root.position.z }, vx * 0.25, vz * 0.25, 12, true);
+    splat(B.root.position.x + rand(-0.4, 0.4), B.root.position.z + rand(-0.4, 0.4), rand(0.4, 0.7) * B.s);
+    if (A.Snd.impact) A.Snd.impact(Math.max(sp * 0.5, 4), 'person', { x: B.root.position.x, z: B.root.position.z });
+    n++;
+  }
+  return n;
+}
+/* скелет: кости — белые и тоньше, без одежды */
+function skeleton (B) {
+  B.skel = 1;
+  if (!BONE) BONE = new A.THREE.MeshLambertMaterial({ color: REHIT.BONE });
+  for (const k in B.parts) {
+    const m = B.parts[k];
+    if (!m) continue;
+    m.material = BONE;
+    if (k !== 'head') m.scale.set(m.scale.x * 0.55, m.scale.y, m.scale.z * 0.55);
+  }
 }
 
 function fadeBody (B) { if (B.mode !== 'fade') { B.mode = 'fade'; B.t = 0; } }
@@ -459,18 +516,27 @@ export function burst (p, vx, vz, low) {
   for (const q of CHUNKS) { if (over <= 0) break; if (q.life > TIME.SINK) { q.life = TIME.SINK; over--; } }
 }
 /* лужица под куском: общий круг, свой материал (тает своим темпом) */
-function splat (x, z, R) {
+/* пятно крови на земле (game.js spray — куда долетели брызги) */
+export const stain = (x, z, R) => (A && A.adult ? splat(x, z, R) : null);
+/* w — на стене или машине (не на земле): { y, nx, nz, parent } — высота, наружу от стены, к чему прицепить (машина едет — пятно с ней) */
+function splat (x, z, R, w) {
   const T = A.THREE;
   if (!PUD_GEO) PUD_GEO = new T.CircleGeometry(1, 18);
   const mat = new T.MeshBasicMaterial({ color: PUDDLE_HEX, transparent: true, opacity: 0.9, depthWrite: false,
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   const m = new T.Mesh(PUD_GEO, mat);
-  const y = puddleY(x, z, R), flat = y - A.groundH(x, z) > LAYER.CURB + 0.05;
-  const nrm = flat ? UP : A.groundNormal(x, z), lift = 0.022 + SPLATS.length * 0.0015;
-  m.position.set(x + nrm.x * lift, y + nrm.y * lift, z + nrm.z * lift);
-  m.lookAt(m.position.x + nrm.x, m.position.y + nrm.y, m.position.z + nrm.z);
+  if (w) {
+    m.position.set(x + w.nx * 0.03, w.y, z + w.nz * 0.03);
+    m.lookAt(m.position.x + w.nx, m.position.y, m.position.z + w.nz);
+  } else {
+    const y = puddleY(x, z, R), flat = y - A.groundH(x, z) > LAYER.CURB + 0.05;
+    const nrm = flat ? UP : A.groundNormal(x, z), lift = 0.022 + SPLATS.length * 0.0015;
+    m.position.set(x + nrm.x * lift, y + nrm.y * lift, z + nrm.z * lift);
+    m.lookAt(m.position.x + nrm.x, m.position.y + nrm.y, m.position.z + nrm.z);
+  }
   m.scale.set(0.01, 0.01, 1);
   A.scene.add(m);
+  if (w && w.parent) w.parent.attach(m);
   const S = { m, mat, t: 0, R, sx: rand(0.8, 1.25), sy: rand(0.8, 1.25), fade: 0 };
   SPLATS.push(S);
   let live = SPLATS.filter(q => !q.fade).length;
@@ -517,7 +583,7 @@ function stepChunks (dt) {
     S.m.scale.set(r * S.sx, r * S.sy, 1);
     if (S.fade) {
       S.mat.opacity -= dt * 0.3;                      // ~3 с, вместе с куском
-      if (S.mat.opacity <= 0) { A.scene.remove(S.m); S.mat.dispose(); SPLATS.splice(i, 1); }
+      if (S.mat.opacity <= 0) { S.m.removeFromParent(); S.mat.dispose(); SPLATS.splice(i, 1); }   // на машине — у неё, не в сцене
     }
   }
 }
@@ -595,12 +661,26 @@ function shatter (B) {
   B.mode = 'gone';
 }
 
+const BO = { x: 0, z: 0, y: 0, vx: 0, vz: 0, nx: 0, nz: 0, t: null, thin: false };   // отскок: что спросить у game.js bounceBody (n — наружу от стены, t — машина)
 function stepBody (B, dt) {
   const r = B.root, P = B.parts;
   B.t += dt;
   if (B.mode === 'fly') {
+    if (B.wob > -REHIT.COOL) B.wob -= dt;
     B.vy -= 19 * dt;
     r.position.x += B.vx * dt; r.position.y += B.vy * dt; r.position.z += B.vz * dt;
+    if (A.bounce) {                                   // о дом, стену, дерево, машину — отскок (game.js bounceBody)
+      BO.x = r.position.x; BO.z = r.position.z; BO.y = r.position.y - B.floor; BO.vx = B.vx; BO.vz = B.vz;
+      if (A.bounce(BO)) {
+        r.position.x = BO.x; r.position.z = BO.z; B.vx = BO.vx; B.vz = BO.vz;
+        B.spin = -B.spin * 0.6; B.roll = rand(-4, 4);
+        if (A.adult && !B.up) {
+          if (BO.thin) splat(r.position.x, r.position.z, rand(0.35, 0.6) * B.s);   // ствол, столб — тонкие: пятно на земле у основания
+          else splat(r.position.x - BO.nx * 0.38, r.position.z - BO.nz * 0.38, rand(0.35, 0.65) * B.s,   // кровь на стене / борту машины
+            { y: r.position.y, nx: BO.nx, nz: BO.nz, parent: BO.t && BO.t.mesh });
+        }
+      }
+    }
     const g0 = A.groundH(r.position.x, r.position.z);
     B.floor = r.position.y < g0 + 2.2 * B.s ? topAt(r.position.x, r.position.z, r.position.y) : g0;   // высоко — слой не нужен
     if (!B.landed) {
@@ -621,6 +701,12 @@ function stepBody (B, dt) {
       r.position.y += B.floor + 0.01 - lo;
       if (B.shatter) { shatter(B); return; }
       if (!B.landed) { B.landed = 1; B.lx = nearest(r.rotation.x, Math.PI, Math.PI / 2); B.lz = nearest(r.rotation.z, TAU, 0); lieTargets(B); }
+      // след: где тело ударилось или проехало по земле — пятно крови, не чаще чем через THROW.TRAIL м
+      const hv = Math.hypot(B.vx, B.vz);
+      if (A.adult && !B.up && (hv > 2 || B.vy < -3) && Math.hypot(r.position.x - (B.tx ?? 1e9), r.position.z - (B.tz ?? 1e9)) > THROW.TRAIL) {
+        B.tx = r.position.x; B.tz = r.position.z;
+        splat(r.position.x, r.position.z, clamp(0.35 + hv * 0.04, 0.4, 0.9) * B.s);
+      }
       B.vy = B.vy < 0 ? -B.vy * 0.25 : B.vy; B.vx *= 0.55; B.vz *= 0.55;
       if (Math.hypot(B.vx, B.vz) < 0.7 && Math.abs(B.vy) < 0.9) {
         B.mode = 'lie'; B.t = 0;
@@ -638,6 +724,15 @@ function stepBody (B, dt) {
       rest(B, true);
       placeShadow(B, 1);
     }
+    if (B.wob > -REHIT.COOL) {                       // переехали — коротко дёргается
+      B.wob -= dt;
+      const w = Math.max(0, B.wob) / REHIT.WOB;
+      r.rotation.y += Math.sin(B.t * 45) * 0.05 * w;
+      r.position.y = B.wy + Math.abs(Math.sin(B.t * 30)) * 0.05 * w;
+      B.calm = 0;
+    }
+    B.calm = (B.calm || 0) + dt;
+    if (A.adult && !B.up && !B.skel && B.calm >= REHIT.SKEL_T) skeleton(B);   // пролежал нетронутым — скелет
     if (B.up && (B.starT -= dt) <= 0) { B.starT = 0.7; A.emote(r.position.x, B.floor - A.groundH(r.position.x, r.position.z) + 0.75, r.position.z, 'star', 1); }
     if (B.t >= B.lie) {
       if (B.up) { B.mode = 'rise'; B.t = 0; B.x0 = r.rotation.x - nearest(r.rotation.x, TAU, 0); B.lz = r.rotation.z - nearest(r.rotation.z, TAU, 0); B.y0 = r.position.y; }
@@ -701,6 +796,10 @@ export function update (dt) {
       L.vy -= 19 * dt;
       m.position.x += L.vx * dt; m.position.y += L.vy * dt; m.position.z += L.vz * dt;
       m.rotation.x += L.spin * dt; m.rotation.z += L.spin * 0.6 * dt;
+      if (A.bounce) {                                 // рука или нога — тоже от стен и машин
+        BO.x = m.position.x; BO.z = m.position.z; BO.y = m.position.y - A.groundH(m.position.x, m.position.z); BO.vx = L.vx; BO.vz = L.vz;
+        if (A.bounce(BO)) { m.position.x = BO.x; m.position.z = BO.z; L.vx = BO.vx; L.vz = BO.vz; L.spin = -L.spin; }
+      }
       const g0 = A.groundH(m.position.x, m.position.z);
       const fl = m.position.y < g0 + 1 ? topAt(m.position.x, m.position.z, m.position.y) : g0;
       if (m.position.y < fl + 0.12) {

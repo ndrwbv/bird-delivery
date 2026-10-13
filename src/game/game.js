@@ -100,6 +100,7 @@ import * as PAUSE from './pausecz.js';             // пауза — карус�
 import * as PIX from './pixfx.js';              // пиксельные частицы одним мешем: дымок из-под колёс, осколки стёкол (pixfx.js)
 import * as FXP from './fxpool.js';             // частицы эффектов из общего запаса: искры, дым, пламя, кровь, обломки — вид = одна отрисовка (fxpool.js)
 import * as CG from './carglass.js';            // стёкла своей машины: курьер внутри, трещины и осколки (carglass.js)
+import * as GRITM from './grit.js';               // проба: глубина города — пятна, зерно, потёки на всём «Ламберте» (G)
 import * as SFX from './sfx.js';                // звуки из файлов public/sfx вместо синтеза, звук в пространстве (sfx.js, docs/SOUNDS.md)
 import * as TONE from './sfxsynth.js';         // тёплый синтез: каждое имя звука — свой инструмент (низ, тело, мягкая атака, хвост, отзвук; sfxsynth.js, docs/SOUNDS.md)
 import * as IMPACT from './impact.js';         // удары слоями: тело по материалу, металл, стекло, обломки, скрежет бортом (impact.js, docs/SOUNDS.md)
@@ -814,6 +815,33 @@ function solidsNear (x, z) {
   const a = SOLID_GRID.get(i + ',' + j) || NO_SOLIDS;
   SN.key[h] = k; SN.size[h] = SOLID_GRID.size; SN.val[h] = a;
   return a;
+}
+
+/* сбитый в полёте (hits.js) отскакивает от домов, стен, деревьев и машин (проба 13.10.2026, автор: «пролетают
+   сквозь дома и машины»): выталкиваем по меньшему проникновению, скорость к стене — назад с потерей (BOUNCE.K).
+   o: { x, z, y — высота над землёй, vx, vz }; true — ударился. Над машиной (выше BOUNCE.CAR_H м) — пролетает */
+const BOUNCE = { K: 0.45, R: 0.4, CAR_H: 1.7, THIN: 0.6 };   // THIN — полуширина, тоньше — ствол / столб (кровь — на землю)
+function bounceBody (o) {
+  let hit = false;
+  o.t = null;
+  const hitBox = (cx, cz, hw, hd, cs, sn, t) => {
+    const dx = o.x - cx, dz = o.z - cz, lx = dx * cs + dz * sn, lz = -dx * sn + dz * cs;
+    const px = hw + BOUNCE.R - Math.abs(lx), pz = hd + BOUNCE.R - Math.abs(lz);
+    if (px <= 0 || pz <= 0) return;
+    let nx, nz, pen;
+    if (px < pz) { const g = lx < 0 ? -1 : 1; nx = g * cs; nz = g * sn; pen = px; }
+    else { const g = lz < 0 ? -1 : 1; nx = -g * sn; nz = g * cs; pen = pz; }
+    o.x += nx * pen; o.z += nz * pen; o.nx = nx; o.nz = nz; o.thin = !t && Math.max(hw, hd) < BOUNCE.THIN; if (t) o.t = t;
+    const vn = o.vx * nx + o.vz * nz;
+    if (vn < 0) { o.vx -= (1 + BOUNCE.K) * vn * nx; o.vz -= (1 + BOUNCE.K) * vn * nz; }
+    hit = true;
+  };
+  for (const s of solidsNear(o.x, o.z)) if (s.deckY === undefined) hitBox(s.cx, s.cz, s.hw, s.hd, s.cs, s.sn);
+  if (o.y < BOUNCE.CAR_H) for (const t of TRAFFIC) {
+    if (Math.abs(t.x - o.x) > 6 || Math.abs(t.z - o.z) > 6) continue;
+    hitBox(t.x, t.z, CAR_W, t.hl || CAR_L, Math.cos(t.h), -Math.sin(t.h), t);
+  }
+  return hit;
 }
 
 /* выталкиваем по меньшему проникновению — человек скользит вдоль стены */
@@ -1837,7 +1865,7 @@ function addProp (x, z, ry, kind, build, r) {
   build(inner);
   pivot.add(inner);
   scene.add(pivot);
-  const p = { pivot, inner, x, z, ry, kind, r, down: 0, tilt: 0, tiltV: 0, ax: 1, az: 0 };
+  const p = { pivot, inner, x, z, ry, kind, r, down: 0, tilt: 0, tiltV: 0, ax: 1, az: 0, slideX: 0, slideZ: 0 };
   PROPS.push(p);
   return p;
 }
@@ -6378,6 +6406,26 @@ function updateGore (dt) {
   }
 }
 
+/* фонтан крови при наезде (взрослая; hits.js hit вместо звёздочки; проба 13.10.2026): капли летят вперёд по ходу,
+   в стороны и вверх — часть назад, на крышу и корму; где упадут — пятна на асфальте (hits.js stain).
+   SPRAY: N — капель, FWD — доля скорости машины вперёд, SIDE — разброс вбок, м/с, STAINS — пятен на земле */
+const SPRAY = { N: 46, FWD: [0.3, 1.1], SIDE: [3, 0.12], UP: [2, 7], STAINS: 5 };
+function bloodSpray (p, vx, vz, kmh, small) {   // small — переехал лежащего: треть капель, невысоко, без пятен вокруг
+  const l = Math.hypot(vx, vz) || 1, fx = vx / l, fz = vz / l, y = groundH(p.x, p.z) + 1.1, floor = groundH(p.x, p.z) + 0.05;
+  const side = SPRAY.SIDE[0] + kmh * SPRAY.SIDE[1];
+  for (let i = 0; i < (small ? SPRAY.N / 3 : SPRAY.N); i++) {
+    const f = rand(SPRAY.FWD[0], SPRAY.FWD[1]) * l * (Math.random() < 0.18 ? -0.35 : 1);   // каждая шестая — назад, на машину
+    const sd = rand(-side, side);
+    PIX.spawn(p.x, small ? floor + 0.2 : y + rand(-0.3, 0.4), p.z, { vx: fx * f - fz * sd, vy: small ? rand(1, 3) : rand(SPRAY.UP[0], SPRAY.UP[1]), vz: fz * f + fx * sd,
+      s: rand(0.06, 0.15), life: rand(0.8, 1.6), hex: Math.random() < 0.5 ? 0x7d0a10 : 0xa3121a, g: 18, floor });
+  }
+  if (small) return;
+  for (let i = 0; i < SPRAY.STAINS; i++) {
+    const d = rand(1, 3 + kmh / 12), sd = rand(-1, 1) * (1 + kmh / 40);
+    HITS.stain(p.x + fx * d - fz * sd, p.z + fz * d + fx * sd, rand(0.25, 0.6));
+  }
+}
+
 function runOver (p, vx, vz) {
   const victim = p.person;
   const wasTarget = checkVictim(p);
@@ -6418,6 +6466,8 @@ function knockProp (p, nx, nz, force) {
     return;
   }
 
+  // столб сносит вперёд по ходу машины (проба 13.10.2026: «проходят сквозь машину») — скользит, пока не встанет
+  p.slideX = nx * force * POLE_SLIDE.K; p.slideZ = nz * force * POLE_SLIDE.K;
   // столб валится в ту сторону, куда его ударили
   TILT_AXIS.set(-nz, 0, nx).normalize();
   p.ax = TILT_AXIS.x; p.az = TILT_AXIS.z;
@@ -6428,8 +6478,14 @@ function knockProp (p, nx, nz, force) {
   Snd.fx('pole', s => { s.noise(0.35, 0.34); s.blip(120, 0.2, 'sawtooth', 0.16); }, { x: p.x, z: p.z });
 }
 
+const POLE_SLIDE = { K: 0.9, DRAG: 2.6 };          // сбитый столб: скорость вперёд = скорость машины × K, гаснет за ~1 с
 function updateProps (dt) {
   for (const p of PROPS) {
+    if (p.down && (p.slideX || p.slideZ)) {
+      p.pivot.position.x += p.slideX * dt; p.pivot.position.z += p.slideZ * dt;
+      const k = Math.exp(-POLE_SLIDE.DRAG * dt); p.slideX *= k; p.slideZ *= k;
+      if (Math.hypot(p.slideX, p.slideZ) < 0.2) p.slideX = p.slideZ = 0;
+    }
     if (!p.down || p.tilt >= 1.45) continue;
     p.tilt = Math.min(1.45, p.tilt + p.tiltV * dt);
     p.tiltV += 5 * dt;                       // разгоняется, пока падает
@@ -6647,7 +6703,7 @@ function carObj (mesh, model, taxi, parked, cruise, hp, stopCd) {
     x: 0, z: 0, h: 0, wheel: 0, hp, wreck: 0, wreckT: 0, hitT: 0,
     knock: 0, kvx: 0, kvy: 0, kvz: 0, spin: 0, y: 0, roll: 0, smokeT: 0,
     rejoin: 0, jx: 0, jz: 0, jh: 0, waitT: 0, ghost: 0, pull: 0, stopT: 0, stopCd,
-    gy: undefined, rollV: 0, nar: 0, chainT: 0, stalled: 0, stallT: 0, angry: 0, moved: 0, driver: null, gone: 0,
+    gy: undefined, rollV: 0, nar: 0, chainT: 0, stalled: 0, stallT: 0, angry: 0, moved: 0, driver: null, noDriver: 0, gone: 0,
     accident: 0, lux: 0, onBoom: undefined, _lag: 0, _lk: undefined,
     // службы и погоня (newSvc, chaseStart): у потока — пусто
     svc: undefined, path: undefined, pi: 0, goal: undefined, arrived: 0, repath: 0, acc: undefined, corner: undefined, gap: undefined, peds: undefined,
@@ -6710,7 +6766,7 @@ function placeTraffic (t, rmin, rmax, why = 'other') {
     if (!opts.length) continue;
     const e = pick(opts);
     t.e = e; t.s = rand(0, edgeRun(e) * 0.8); t.lane = (Math.random() * laneCount(e)) | 0; t.turn = null;
-    t.rejoin = 0; t.pull = 0; t.stopT = 0;
+    t.rejoin = 0; t.pull = 0; t.stopT = 0; t.noDriver = 0;   // переставили — это уже другая машина, со своим водителем
     t.gy = undefined;              // высота — с нового места: со старой машину на мосту сажало на землю под настилом
     poseTraffic(t, 0);
     // не рождаться внутри другой машины — но и без места не оставаться
@@ -7403,7 +7459,7 @@ function updateDrivers (dt) {
       // водителя задавили — машина без хозяина так и стоит с аварийкой:
       // вести её некому. Раньше она тут же «оживала» и прыгала на полосу —
       // выглядело так, будто водитель превратился в машину
-      t.driver = null;
+      t.driver = null; t.noDriver = 1;              // машина без хозяина: новые удары больше никого не «выпускают» (было — бесконечно)
       if (t.wreck) t.stalled = 0;
       else t.stallT = Infinity;
       DRIVERS.splice(i, 1);
@@ -9960,10 +10016,10 @@ let VBOOST = 62;                                  // потолок на нит�
 /* в районе подальше машина быстрее: ECON.DISTRICT.SPEED — к максималке и разгону */
 /* управляемость машины (econ.js HANDLING, CAR_LIST.handling 1…10): поворот, «тупеет» на скорости, руль, снос.
    Нет числа (детская версия, машины вне карьеры) — как было: руль мгновенный, всё ×1 */
-let HANDLE = { h: 5, turn: 1, fall: 1, rate: Infinity, side: 1 };
+let HANDLE = { h: 5, turn: 1, fall: 1, rate: Infinity, side: 1, rmin: 6 };
 function carStats () {
   const c = curCar(), k = DISTRICTS ? DIST.speed() : 1; VMAX = (c.vmax || 48) * k; ACC = (c.acc || 36) * k; VBOOST = VMAX + 14;
-  HANDLE = c.handling != null ? ECON.handlingK(c.handling) : { h: 5, turn: 1, fall: 1, rate: Infinity, side: 1 };
+  HANDLE = c.handling != null ? ECON.handlingK(c.handling) : { h: 5, turn: 1, fall: 1, rate: Infinity, side: 1, rmin: 6 };
 }
 /* габариты кузова: по ним считаются все попадания, а не по одному кругу */
 const CAR_L = 2.2, CAR_W = 1.0;
@@ -10028,7 +10084,9 @@ function driveStep (dt) {
   const sv = V.steer = Number.isFinite(sr) ? (V.steer || 0) + clamp(want - (V.steer || 0), -sr, sr) : want;
   const spd = Math.abs(vf);
   const grip = clamp(spd / 8, 0, 1) / (1 + spd * 0.014 * HANDLE.fall) * (V.air ? 0.15 : 1);
-  V.h += sv * TURN * HANDLE.turn * grip * (IN.hand ? 1.5 : 1) * Math.sign(vf || 1) * dt;
+  // радиус разворота не меньше HANDLE.rmin (econ.js RMIN): на малой скорости не крутится на пятачке; ручник — резче, как было
+  const turnW = clamp(sv * TURN * HANDLE.turn * grip, -spd / HANDLE.rmin, spd / HANDLE.rmin);
+  V.h += turnW * (IN.hand ? 1.5 : 1) * Math.sign(vf || 1) * dt;
   V.steerVis = damp(V.steerVis, sv * 0.42, 10, dt);
 
   V.vx = fx * vf + sx * vl;
@@ -10203,7 +10261,7 @@ function driveStep (dt) {
         S.shake = Math.max(S.shake, 0.6);
         t.ramT = 0; t.repath = 1;
       } else if (t.chase) chaseEnd(t, 'caught');   // догнал и врезались — остыл, едет дальше
-      else if (!t.parked && hit > 6 && !t.driver) t.angry = 1;     // приземлится — выйдет разбираться (или погонится — chaseStart)
+      else if (!t.parked && hit > 6 && !t.driver && !t.noDriver) t.angry = 1;     // приземлится — выйдет разбираться (или погонится — chaseStart); водителя задавили — больше никто не выйдет
       hurtCar(carDmg(hit), hit, hx, hz, 'car');   // лёгкий удар (до SOFT_HIT.CAR) — только мятина
       t.hitT = 0.5;
       if (stand) {
@@ -10305,6 +10363,9 @@ function driveStep (dt) {
     S.shake = Math.max(S.shake, 0.35);
     V.vx *= 0.99; V.vz *= 0.99;
   }
+
+  // сбитые лежат — переехал: дёргается и брызгает кровью, не подлетает (hits.js rehit)
+  if (HITS.rehit(V.x, V.z, fx, fz, CAR_L, CAR_W, V.vx, V.vz)) S.shake = Math.max(S.shake, 0.12);   // кочка; кровь — только у тела, не на машину
 
   for (let i = 0; i < SCOOTS.length; i++) {
     const p = SCOOTS[i];
@@ -13810,6 +13871,7 @@ addEventListener('keydown', e => {
   if (phoneT > 0 && e.code !== 'KeyM') hidePhone();
   if (e.code === 'KeyM' && !e.repeat) { Snd.set(!Snd.on); toast(Snd.on ? $t('звук вкл') : $t('звук выкл')); }
   if (matchKey('radio', e) && !e.repeat && !S.paused && isPlaying()) RADIO.next();   // F — следующая станция радио (radio.js)
+  if (e.code === 'KeyG' && !e.repeat && !S.paused && isPlaying()) toast(GRITM.toggle() ? $t('город с глубиной') : $t('город гладкий'));   // G — глубина города вкл/выкл (проба, grit.js)
   if (e.code === 'KeyV' && !e.repeat && !S.paused && isPlaying()) { FPV.on = FPV.on ? 0 : 1; toast(FPV.on ? $t('вид из кабины') : $t('вид сзади')); }   // V — 1-е / 3-е лицо (проба)
   if ((e.code === 'Escape' || e.code === 'KeyP') && !FM.open && !e.repeat) setPause(!S.paused);
 });
@@ -13941,7 +14003,7 @@ EDL.buildEnd();
 ZN.init({ CITY, MAP, donated });
 DLG.init({ pause: on => { for (const k in IN) IN[k] = 0; if (on) Snd.engine(0); }, face: (p, size) => faceDataURL(p, size) });
 HITS.init({ THREE, scene, box, mergeGeos, HUMAN_VC, groundH, surfaceAt, curbAt, nearestRoad, driftTop: SEAS.driftTop, pavedLift: TRK.pavedLift, groundNormal, emote, puff, pushOut, Snd,
-  burst: burstHuman, scare, callAmbulance, adult: GORE_ON, shred: shredHit });
+  burst: burstHuman, scare, callAmbulance, adult: GORE_ON, shred: shredHit, spray: bloodSpray, bounce: bounceBody });
 HAV.init({ S, adult: ADULT });                   // счёт разрушений за смену для Толика (havoc.js)
 CHAT.init({ adult: ADULT, person: makePerson({ seed: 0x2E4A17, fem: false }), face: (p, size) => faceDataURL(p, size), blip: (f, d, ty, v) => Snd.blip(f, d, ty, v), fx: (n, synth) => Snd.fx(n, synth) });
 /* заказы карьеры (orders.js): очередь, поручения, развоз смены — через это */
@@ -15369,7 +15431,7 @@ if (window.__dlv) Object.assign(window.__dlv, { cam, renderer, scene });   // к
 if (window.__dlv) window.__dlv.crashlog = CL;        // журнал ошибок: entries(), text(), disabled() (docs/CRASHES.md)
 if (window.__dlv) window.__dlv.CULLV = CULL.VIEW;      // отсечение по кадру: CULLV.on = false — без него (замеры до/после, cull.js)
 if (window.__dlv) Object.assign(window.__dlv, { pinFront, nearClient, PIN });   // пин перед клиентом, кто у клиента лишний (docs/ORDERS.md)
-if (window.__dlv) Object.assign(window.__dlv, { PIX: PIX.STATS, CG: CG.STATS, cgState: () => CG.state(car.userData.cg), hurtCar,
+if (window.__dlv) Object.assign(window.__dlv, { GRIT: GRITM.GRIT, bounceBody, SOLIDS, dentCar, PIX: PIX.STATS, CG: CG.STATS, cgState: () => CG.state(car.userData.cg), hurtCar,
   cgLamps: () => CG.lampState(car), EXH: EXH.DEBUG, WIPE: WIPE.STATS, DENT: DENTM.DEBUG, DIRT: DIRT.DEBUG, REAR: REARM.STATS, pizzasInCar, setTrunk });   // фары и фонари (carglass.js), выхлоп (exhaust.js), дворники (wipers.js)   // дымок, стёкла (pixfx.js, carglass.js)
 if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG, CONS: CONSTR.DEBUG, DARK: DARKN.DEBUG, WASTE: WASTE.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)
 if (window.__dlv) Object.defineProperties(window.__dlv, { reprofile: { value: reprofile }, REPROFILE_MS: { get: () => REPROFILE_MS } });   // смена профиля без перезагрузки
