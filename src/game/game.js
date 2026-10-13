@@ -10452,6 +10452,7 @@ function hurtCar (dmg, vn, hx, hz, mat) {          // mat — во что (зв�
 }
 
 /* ─────────────── камера ─────────────── */
+const FPV = { on: 0, hid: 0 };                   // вид из кабины (V): on — включён, hid — машина спрятана в этом кадре
 const camInWall = (x, z) => {
   for (const s of solidsNear(x, z)) {
     if (s.deckY !== undefined) continue;          // перила низкие, камера над ними
@@ -10477,6 +10478,22 @@ function camStep (dt, vf) {
   // на нитро кадр расходится шире — скорость видно
   const fov = damp(cam.fov, NOS.burn ? 80 : FXS.beastT > 0 ? (IN.nitro ? 84 : 72) : 64, 3.5, dt);
   if (Math.abs(fov - cam.fov) > 0.02) { cam.fov = fov; cam.updateProjectionMatrix(); }
+  /* Вид из кабины (проба, автор 13.10.2026): V — переключить. Машину прячем на кадр,
+     глаза водителя — над сиденьем, взгляд вперёд по ходу. Остальные камеры (смерть, повтор)
+     возвращают машину сами: FPV.hid сбрасывается в начале кадра. */
+  if (FPV.on) {
+    V.hero = 0;
+    car.visible = false; FPV.hid = 1;
+    const fx = Math.sin(V.h), fz = Math.cos(V.h);
+    const ex = V.x + fx * 0.3, ez = V.z + fz * 0.3, ey = V.y + 1.45;
+    const sh = S.shake;
+    cam.position.set(ex + (sh ? rand(-sh, sh) * 0.3 : 0), ey + (sh ? rand(-sh, sh) * 0.3 : 0), ez);
+    const ax = V.x + fx * 20, az = V.z + fz * 20;
+    cam.lookAt(ax, lerp(ey, surfaceAt(ax, az, V.y) + 1.45, 0.5), az);
+    V.camX = ex; V.camZ = ez; V.camY = ey + 4; V.camH = V.h; V.camPull = 0;   // вернулись в 3-е лицо — без рывка из-за спины
+    S.shake = Math.max(0, S.shake - dt * 2.2);
+    return;
+  }
   /* Смена начинается на парковке: за спиной дом, и камера сзади упёрлась бы
      в стену. Пока машина стоит — кадр спереди-сбоку: машина и светящаяся
      пиццерия за ней. Тронулся — камера плавно уходит за спину. */
@@ -13793,6 +13810,7 @@ addEventListener('keydown', e => {
   if (phoneT > 0 && e.code !== 'KeyM') hidePhone();
   if (e.code === 'KeyM' && !e.repeat) { Snd.set(!Snd.on); toast(Snd.on ? $t('звук вкл') : $t('звук выкл')); }
   if (matchKey('radio', e) && !e.repeat && !S.paused && isPlaying()) RADIO.next();   // F — следующая станция радио (radio.js)
+  if (e.code === 'KeyV' && !e.repeat && !S.paused && isPlaying()) { FPV.on = FPV.on ? 0 : 1; toast(FPV.on ? $t('вид из кабины') : $t('вид сзади')); }   // V — 1-е / 3-е лицо (проба)
   if ((e.code === 'Escape' || e.code === 'KeyP') && !FM.open && !e.repeat) setPause(!S.paused);
 });
 addEventListener('keyup', e => { if (KEY[e.code]) { IN[KEY[e.code]] = 0; e.preventDefault(); } });
@@ -15011,6 +15029,7 @@ function frameStep (now) {
   tG += dt;
   if (isPlaying() && !S.ride && S.state !== 'brief' && S.state !== 'loading') S.shiftT = (S.shiftT || 0) + dt;
 
+  if (FPV.hid) { car.visible = true; FPV.hid = 0; }   // вид из кабины прячет машину только на свой кадр (camStep)
   let vf = 0;
   if (S.state === 'dying' && DEATH.rev) {
     for (const k in IN) IN[k] = 0;
