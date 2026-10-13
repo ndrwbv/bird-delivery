@@ -393,7 +393,8 @@ function throwBody (p, vx, vz, kmh, up, lie, y0) {
    L, W — полудлина и полуширина, vx, vz — скорость машины. Возвращает, сколько тел задел (проба 13.10.2026) */
 /* повторный переезд — мягче первого удара (автор 13.10: «подскакивают вверх, не надо сильно»): вперёд FWD скорости
    машины, вверх UP0 + км/ч / UP_K (не больше UP_MAX), вбок — SIDE разброса первого удара, LIFT — м над землёй */
-export const REHIT = { MIN: 3, SKEL_T: 12, PAD: 0.4, BONE: 0xe4ddca, FWD: 0.6, UP0: 1.2, UP_K: 40, UP_MAX: 3.5, SIDE: 0.5, LIFT: 0.15 };
+export const REHIT = { MIN: 3, SKEL_T: 12, PAD: 0.4, COOL: 0.8, OUT: 3,   // COOL — с между переездами одного тела, OUT — м/с вбок из-под машины
+  BONE: 0xe4ddca, FWD: 0.6, UP0: 1.2, UP_K: 40, UP_MAX: 3.5, SIDE: 0.5, LIFT: 0.15 };
 let BONE = null;
 export function rehit (cx, cz, fx, fz, L, W, vx, vz) {
   const sp = Math.hypot(vx, vz);
@@ -401,13 +402,19 @@ export function rehit (cx, cz, fx, fz, L, W, vx, vz) {
   let n = 0;
   for (const B of BODIES) {
     if (B.skel || B.up || (B.mode !== 'lie' && !(B.mode === 'fly' && B.landed))) continue;
+    if (B.reT && B.t < REHIT.COOL && B.mode === 'fly') continue;            // только что задели — не каждый кадр (застревал в машине)
     const dx = B.root.position.x - cx, dz = B.root.position.z - cz;
-    if (Math.abs(dx * fx + dz * fz) > L + REHIT.PAD || Math.abs(dx * fz - dz * fx) > W + REHIT.PAD) continue;
-    const kmh = sp * 3.6, l = sp, side = rand(-1, 1) * (THROW.SIDE0 + kmh * THROW.SIDE_K) * REHIT.SIDE;
+    const across = dx * fz - dz * fx;
+    if (Math.abs(dx * fx + dz * fz) > L + REHIT.PAD || Math.abs(across) > W + REHIT.PAD) continue;
+    // из-под машины — вбок, на ближнюю сторону: машина проезжает мимо, а не тащит тело на себе
+    const sg = across < 0 ? -1 : 1, out = W + REHIT.PAD + 0.1 - Math.abs(across);
+    B.root.position.x += fz * sg * out; B.root.position.z += -fx * sg * out;
+    B.reT = 1;
+    const kmh = sp * 3.6;
     B.hits = (B.hits || 1) + 1;
     B.mode = 'fly'; B.t = 0; B.landed = 0; B.life = B.lie;
     B.root.position.y += REHIT.LIFT;
-    B.vx = vx * REHIT.FWD + side * -vz / l; B.vz = vz * REHIT.FWD + side * vx / l;
+    B.vx = vx * REHIT.FWD + fz * sg * REHIT.OUT; B.vz = vz * REHIT.FWD - fx * sg * REHIT.OUT;   // вперёд и в сторону от машины
     B.vy = Math.min(REHIT.UP_MAX, REHIT.UP0 + kmh / REHIT.UP_K);
     B.spin = rand(2, 4) * (Math.random() < 0.5 ? -1 : 1); B.roll = rand(-1.5, 1.5);
     if (A.spray) A.spray({ x: B.root.position.x, z: B.root.position.z }, vx, vz, kmh);
@@ -659,7 +666,7 @@ function shatter (B) {
   B.mode = 'gone';
 }
 
-const BO = { x: 0, z: 0, y: 0, vx: 0, vz: 0, nx: 0, nz: 0, t: null };   // отскок: что спросить у game.js bounceBody (n — наружу от стены, t — машина)
+const BO = { x: 0, z: 0, y: 0, vx: 0, vz: 0, nx: 0, nz: 0, t: null, thin: false };   // отскок: что спросить у game.js bounceBody (n — наружу от стены, t — машина)
 function stepBody (B, dt) {
   const r = B.root, P = B.parts;
   B.t += dt;
@@ -671,8 +678,11 @@ function stepBody (B, dt) {
       if (A.bounce(BO)) {
         r.position.x = BO.x; r.position.z = BO.z; B.vx = BO.vx; B.vz = BO.vz;
         B.spin = -B.spin * 0.6; B.roll = rand(-4, 4);
-        if (A.adult && !B.up) splat(r.position.x - BO.nx * 0.38, r.position.z - BO.nz * 0.38, rand(0.35, 0.65) * B.s,   // кровь на стене / борту машины
-          { y: r.position.y, nx: BO.nx, nz: BO.nz, parent: BO.t && BO.t.mesh });
+        if (A.adult && !B.up) {
+          if (BO.thin) splat(r.position.x, r.position.z, rand(0.35, 0.6) * B.s);   // ствол, столб — тонкие: пятно на земле у основания
+          else splat(r.position.x - BO.nx * 0.38, r.position.z - BO.nz * 0.38, rand(0.35, 0.65) * B.s,   // кровь на стене / борту машины
+            { y: r.position.y, nx: BO.nx, nz: BO.nz, parent: BO.t && BO.t.mesh });
+        }
       }
     }
     const g0 = A.groundH(r.position.x, r.position.z);

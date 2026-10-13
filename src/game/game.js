@@ -821,7 +821,7 @@ function solidsNear (x, z) {
 /* сбитый в полёте (hits.js) отскакивает от домов, стен, деревьев и машин (проба 13.10.2026, автор: «пролетают
    сквозь дома и машины»): выталкиваем по меньшему проникновению, скорость к стене — назад с потерей (BOUNCE.K).
    o: { x, z, y — высота над землёй, vx, vz }; true — ударился. Над машиной (выше BOUNCE.CAR_H м) — пролетает */
-const BOUNCE = { K: 0.45, R: 0.4, CAR_H: 1.7 };
+const BOUNCE = { K: 0.45, R: 0.4, CAR_H: 1.7, THIN: 0.6 };   // THIN — полуширина, тоньше — ствол / столб (кровь — на землю)
 function bounceBody (o) {
   let hit = false;
   o.t = null;
@@ -832,7 +832,7 @@ function bounceBody (o) {
     let nx, nz, pen;
     if (px < pz) { const g = lx < 0 ? -1 : 1; nx = g * cs; nz = g * sn; pen = px; }
     else { const g = lz < 0 ? -1 : 1; nx = -g * sn; nz = g * cs; pen = pz; }
-    o.x += nx * pen; o.z += nz * pen; o.nx = nx; o.nz = nz; if (t) o.t = t;
+    o.x += nx * pen; o.z += nz * pen; o.nx = nx; o.nz = nz; o.thin = !t && Math.max(hw, hd) < BOUNCE.THIN; if (t) o.t = t;
     const vn = o.vx * nx + o.vz * nz;
     if (vn < 0) { o.vx -= (1 + BOUNCE.K) * vn * nx; o.vz -= (1 + BOUNCE.K) * vn * nz; }
     hit = true;
