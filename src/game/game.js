@@ -6412,15 +6412,16 @@ function updateGore (dt) {
    в стороны и вверх — часть назад, на крышу и корму; где упадут — пятна на асфальте (hits.js stain).
    SPRAY: N — капель, FWD — доля скорости машины вперёд, SIDE — разброс вбок, м/с, STAINS — пятен на земле */
 const SPRAY = { N: 46, FWD: [0.3, 1.1], SIDE: [3, 0.12], UP: [2, 7], STAINS: 5 };
-function bloodSpray (p, vx, vz, kmh) {
+function bloodSpray (p, vx, vz, kmh, small) {   // small — переехал лежащего: треть капель, невысоко, без пятен вокруг
   const l = Math.hypot(vx, vz) || 1, fx = vx / l, fz = vz / l, y = groundH(p.x, p.z) + 1.1, floor = groundH(p.x, p.z) + 0.05;
   const side = SPRAY.SIDE[0] + kmh * SPRAY.SIDE[1];
-  for (let i = 0; i < SPRAY.N; i++) {
+  for (let i = 0; i < (small ? SPRAY.N / 3 : SPRAY.N); i++) {
     const f = rand(SPRAY.FWD[0], SPRAY.FWD[1]) * l * (Math.random() < 0.18 ? -0.35 : 1);   // каждая шестая — назад, на машину
     const sd = rand(-side, side);
-    PIX.spawn(p.x, y + rand(-0.3, 0.4), p.z, { vx: fx * f - fz * sd, vy: rand(SPRAY.UP[0], SPRAY.UP[1]), vz: fz * f + fx * sd,
+    PIX.spawn(p.x, small ? floor + 0.2 : y + rand(-0.3, 0.4), p.z, { vx: fx * f - fz * sd, vy: small ? rand(1, 3) : rand(SPRAY.UP[0], SPRAY.UP[1]), vz: fz * f + fx * sd,
       s: rand(0.06, 0.15), life: rand(0.8, 1.6), hex: Math.random() < 0.5 ? 0x7d0a10 : 0xa3121a, g: 18, floor });
   }
+  if (small) return;
   for (let i = 0; i < SPRAY.STAINS; i++) {
     const d = rand(1, 3 + kmh / 12), sd = rand(-1, 1) * (1 + kmh / 40);
     HITS.stain(p.x + fx * d - fz * sd, p.z + fz * d + fx * sd, rand(0.25, 0.6));
@@ -10371,8 +10372,8 @@ function driveStep (dt) {
     V.vx *= 0.99; V.vz *= 0.99;
   }
 
-  // сбитые лежат — их можно переехать ещё раз: отлетают снова, после второго раза — скелет (hits.js rehit)
-  if (HITS.rehit(V.x, V.z, fx, fz, CAR_L, CAR_W, V.vx, V.vz)) { S.shake = Math.max(S.shake, 0.25); if (GORE_ON) REALCAR.blood(car, V.x + fx * 3, V.z + fz * 3, Math.abs(vf) * 3.6); }
+  // сбитые лежат — переехал: дёргается и брызгает кровью, не подлетает (hits.js rehit)
+  if (HITS.rehit(V.x, V.z, fx, fz, CAR_L, CAR_W, V.vx, V.vz)) S.shake = Math.max(S.shake, 0.12);   // кочка; кровь — только у тела, не на машину
 
   for (let i = 0; i < SCOOTS.length; i++) {
     const p = SCOOTS[i];
