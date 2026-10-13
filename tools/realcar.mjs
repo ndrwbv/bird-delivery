@@ -5,7 +5,7 @@
      передние поворачивают; их почти не ужимаем — остаются круглыми
    • остальное — меньше треугольников (meshoptimizer, своя доля на часть), нормали и тангенты
      выкинуты — в игре гранёный свет (flatShading), как у всех машин
-   • текстуры — только цвет: 2K → 128—256 px, насыщеннее, палитра ~24 цвета, без сглаживания
+   • текстуры — только цвет: 2K → 64—256 px, крапинки сглажены, насыщеннее, палитра 8—12 цветов, без сглаживания
      (в игре — NearestFilter, крупный пиксель)
    Выход: car.json (части, смещения), car.bin (вершины, UV, индексы), <часть>.png */
 import { NodeIO } from '@gltf-transform/core';
@@ -19,18 +19,18 @@ const SRC = process.argv[2], OUT = process.argv[3] || 'public/models/vaz2107';
 if (!SRC) { console.log('node tools/realcar.mjs <папка с scene.gltf> [выход]'); process.exit(1); }
 
 /* keep — доля треугольников, err — допустимая ошибка (доля размера), tex — сторона текстуры,
-   hue/sat/bri — цвет (к оранжевому пиццерии), alpha — прозрачность (у стёкол своя карта — тут ровная) */
+   colors — цветов в палитре, hue/sat/bri — цвет (к оранжевому пиццерии), alpha — прозрачность (у стёкол своя карта — тут ровная) */
 const PART = {
-  Car_CarBody_0: { keep: 0.5, err: 0.006, tex: 256, hue: 8, sat: 1.35, bri: 1.12 },
-  Car_Details_0: { keep: 0.4, err: 0.01, tex: 256, sat: 1.2, bri: 1.1 },
+  Car_CarBody_0: { keep: 0.5, err: 0.006, tex: 128, colors: 8, hue: 8, sat: 1.35, bri: 1.12 },
+  Car_Details_0: { keep: 0.4, err: 0.01, tex: 256, colors: 12, sat: 1.2, bri: 1.1 },   // номера и фары — мельче не читаются
   Car_Details_Transparent_0: { keep: 1, tex: 128, sat: 1.2, bri: 1.1, alpha: 0.5 },
-  Car_Bottom_0: { keep: 0.15, err: 0.03, tex: 128, sat: 1.1, bri: 1.05 },
-  Car_Interior_0: { keep: 0.8, err: 0.004, tex: 128, sat: 1.2, bri: 1.15 },
+  Car_Bottom_0: { keep: 0.15, err: 0.03, tex: 64, colors: 8, sat: 1.1, bri: 1.05 },
+  Car_Interior_0: { keep: 0.8, err: 0.004, tex: 64, colors: 8, sat: 1.2, bri: 1.15 },
   Car_Windows_0: { keep: 1, tex: 128, sat: 1, bri: 1.6, alpha: 0.28 },
 };
 /* колёса «Семёрки»: ось на высоте радиуса, база 2,41 м; в колесо — треугольники днища целиком внутри R */
 const WHEEL = { r: 0.29, R: 0.36, x: 0.55, z: 1.206, xc: 0.72, keep: 0.3, err: 0.006 };
-const COLORS = 24, K = 0.01;                      // модель в сантиметрах → метры
+const COLORS = 12, MEDIAN = 3, K = 0.01;           // палитра по умолчанию; MEDIAN — сгладить крапинки (автор 13.10: «текстуру попроще»)                      // модель в сантиметрах → метры
 
 await MeshoptSimplifier.ready;
 const doc = await new NodeIO().read(path.join(SRC, 'scene.gltf'));
@@ -61,9 +61,9 @@ async function texture (name, mat, P) {
   if (!tex) return null;
   if (texFile[name]) return texFile[name];
   const file = name.replace(/^Car_|_0$/g, '').toLowerCase() + '.png';
-  await sharp(Buffer.from(tex.getImage())).resize(P.tex, P.tex, { kernel: 'lanczos3' })
+  await sharp(Buffer.from(tex.getImage())).resize(P.tex, P.tex, { kernel: 'lanczos3' }).median(MEDIAN)
     .modulate({ saturation: P.sat || 1, brightness: P.bri || 1, hue: P.hue || 0 })
-    .png({ palette: true, colours: COLORS, dither: 0 }).toFile(path.join(OUT, file));
+    .png({ palette: true, colours: P.colors || COLORS, dither: 0 }).toFile(path.join(OUT, file));
   return (texFile[name] = file);
 }
 
