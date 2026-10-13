@@ -101,6 +101,7 @@ import * as PIX from './pixfx.js';              // пиксельные част
 import * as FXP from './fxpool.js';             // частицы эффектов из общего запаса: искры, дым, пламя, кровь, обломки — вид = одна отрисовка (fxpool.js)
 import * as CG from './carglass.js';            // стёкла своей машины: курьер внутри, трещины и осколки (carglass.js)
 import * as GRITM from './grit.js';               // проба: глубина города — пятна, зерно, потёки на всём «Ламберте» (G)
+import * as CBLOOD from './carblood.js';          // кровь на машинах, что сбили человека (carblood.js)
 import * as SFX from './sfx.js';                // звуки из файлов public/sfx вместо синтеза, звук в пространстве (sfx.js, docs/SOUNDS.md)
 import * as TONE from './sfxsynth.js';         // тёплый синтез: каждое имя звука — свой инструмент (низ, тело, мягкая атака, хвост, отзвук; sfxsynth.js, docs/SOUNDS.md)
 import * as IMPACT from './impact.js';         // удары слоями: тело по материалу, металл, стекло, обломки, скрежет бортом (impact.js, docs/SOUNDS.md)
@@ -6436,6 +6437,7 @@ function runOver (p, vx, vz) {
   p.fly = null; p.fall = null;
   p.grp.visible = false;
   gibHuman(p, vx, vz);
+  if (GORE_ON) CBLOOD.hit(car, p.x, p.z, Math.hypot(vx, vz) * 3.6, true);   // кровь на кузове своей машины (carblood.js)
   S.people++;
   Snd.squish();
   // карьера: сбил своего клиента — заказ сорван и штраф в цену его заказа (CLIENT_KILL); со смены снимают, только если END_SHIFT
@@ -8234,6 +8236,7 @@ function updateRivals (dt) {
         if (p.dead || p.guest || !under(p)) continue;
         p.dead = 1; p.deadT = rand(18, 26); p.fly = null; p.grp.visible = false;
         gibHuman(p, hx * t.speed, hz * t.speed);
+        if (GORE_ON) CBLOOD.hit(t.mesh, p.x, p.z, Math.abs(t.speed) * 3.6);   // и на машине, что сбила (carblood.js)
       }
       for (const p of SCOOTS) {
         if (p.dead || !p.grp.visible || !under(p)) continue;
@@ -15226,6 +15229,7 @@ function frameStep (now) {
   CL.step('exhaust', EXH.step, dt, vf, EXH_API || (EXH_API = exhApi()));   // дым из выхлопа по мотору (exhaust.js)
   CL.step('motor', MOTOR.step, dt, MOTOR_API || (MOTOR_API = motorApi()));   // мотор из записей, визг шин, нитро, гул потока (motor.js)
   CL.step('wipers', WIPE.step, dt, car, Math.max(SEAS.snowy() ? 0 : ENV.rain, SEAS.snowFall()));   // дворники в дождь и снегопад (wipers.js)
+  if (GORE_ON) CL.step('carblood', CBLOOD.step, dt);   // кровь на машинах: растёт и стекает (carblood.js)
   CL.step('cardent', DENTM.step, dt, car);           // отлетевшие бампер, крышка, зеркала, колпаки на дороге (cardent.js)
   CL.step('cardirt', DIRT.step, dt, car, LIVE_DIRT.has(S.state) ? vf : 0, DIRT_W(DIRT_ENV));   // грязь и снег на машине (cardirt.js)
   S.hurt = Math.max(0, S.hurt - dt);
@@ -15434,7 +15438,7 @@ if (window.__dlv) Object.assign(window.__dlv, { cam, renderer, scene });   // к
 if (window.__dlv) window.__dlv.crashlog = CL;        // журнал ошибок: entries(), text(), disabled() (docs/CRASHES.md)
 if (window.__dlv) window.__dlv.CULLV = CULL.VIEW;      // отсечение по кадру: CULLV.on = false — без него (замеры до/после, cull.js)
 if (window.__dlv) Object.assign(window.__dlv, { pinFront, nearClient, PIN });   // пин перед клиентом, кто у клиента лишний (docs/ORDERS.md)
-if (window.__dlv) Object.assign(window.__dlv, { GRIT: GRITM.GRIT, bounceBody, SOLIDS, dentCar, PIX: PIX.STATS, CG: CG.STATS, cgState: () => CG.state(car.userData.cg), hurtCar,
+if (window.__dlv) Object.assign(window.__dlv, { GRIT: GRITM.GRIT, CBLOOD, bounceBody, SOLIDS, dentCar, PIX: PIX.STATS, CG: CG.STATS, cgState: () => CG.state(car.userData.cg), hurtCar,
   cgLamps: () => CG.lampState(car), EXH: EXH.DEBUG, WIPE: WIPE.STATS, DENT: DENTM.DEBUG, DIRT: DIRT.DEBUG, REAR: REARM.STATS, pizzasInCar, setTrunk });   // фары и фонари (carglass.js), выхлоп (exhaust.js), дворники (wipers.js)   // дымок, стёкла (pixfx.js, carglass.js)
 if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG, CONS: CONSTR.DEBUG, DARK: DARKN.DEBUG, WASTE: WASTE.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)
 if (window.__dlv) Object.defineProperties(window.__dlv, { reprofile: { value: reprofile }, REPROFILE_MS: { get: () => REPROFILE_MS } });   // смена профиля без перезагрузки

@@ -25,6 +25,7 @@
 import { t, N_ } from '../i18n/index.js';
 
 export const FC = {
+  ON: false,             // 13.10.2026, автор: «убери оппозиционера из игры» — Глеб не появляется, плаката нет (вернуть — true)
   KEY: 'dlv-faces',      // сохранение профиля: { gleb: { step, last, sign, … } }
   STEPS: 4,              // появлений у Глеба
   POSTER: { side: 0.12, y: 1.45, off: 0.12, w: 0.42, h: 0.58 },   // плакат «Вернись, Глеб» — на двери подъезда: сдвиг вдоль стены, высота центра, от стены, размер
@@ -207,7 +208,7 @@ const WHAT = ['встреча: петиция', 'поручение: листо�
 /** rhythm.js slot: появление знакомого лица в этой смене → { face, step, kind: 'meet' | 'errand', id, i, name, what, key, side } | null.
     Одно за смену; после 4-го — никогда. Адрес — его подъезд (key; пока не запомнен — пусто: выберут, как встрече, и запомнят) */
 export function want (shift) {
-  if (!A) return null;
+  if (!A || !FC.ON) return null;
   const g = gleb();
   if (g.step >= FC.STEPS || g.last === shift || PLANNED === shift) return null;
   const signed = g.sign === 'yes';
@@ -263,6 +264,7 @@ function drawGleb (g, X, Y, s) {
 }
 function poster () {
   clearPoster();
+  if (!FC.ON) return;                               // выключен — плаката «Вернись, Глеб» нет
   const g = gleb();
   if (!A || !A.THREE || !A.scene || g.step < FC.STEPS || !g.door) return;
   const T = A.THREE, [ex, ez, nx, nz] = g.door, P = FC.POSTER;

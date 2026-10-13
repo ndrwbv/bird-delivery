@@ -17,6 +17,7 @@
    step(dt, car, vf, w) — w: { rain, snowFall, snow, mud, wet } из game.js.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
+import * as CBLOOD from './carblood.js';
 
 /* KM — км по сухому до полной грязи; WET / MUD / WINTER — во сколько раз быстрее в ливень, распутицу, зимой */
 export const DIRT = { KM: 9, WET: 3, MUD: 3, WINTER: 1.5 };
@@ -27,10 +28,10 @@ export const ST = { dirt: 0, snow: 0, km: 0, car: null, mats: 0 };
 
 /* цвета грязи (линейные): пыль, бурая грязь, слякоть */
 const DUST = new THREE.Color(0.36, 0.3, 0.22), MUD = new THREE.Color(0.1, 0.066, 0.036), SLUSH = new THREE.Color(0.3, 0.3, 0.3);
-const U = { uDirt: { value: 0 }, uSnowC: { value: 0 }, uMudC: { value: DUST.clone() }, uCarInv: { value: new THREE.Matrix4() } };
+const U = { uDirt: { value: 0 }, uSnowC: { value: 0 }, uMudC: { value: DUST.clone() }, uCarInv: { value: new THREE.Matrix4() }, uBlood: CBLOOD.PLAYER.U.uBlood };   // uBlood — кровь на своей машине (carblood.js)
 const M4 = new THREE.Matrix4(), ONE = new THREE.Vector3(1, 1, 1);
 
-const FRAG = `
+const FRAG = CBLOOD.GLSL + `
 uniform float uDirt, uSnowC; uniform vec3 uMudC; varying vec3 vCL;
 float cdH (vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
 float cdN (vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -64,7 +65,7 @@ function patch (m) {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = 'uniform mat4 uCarInv;\nvarying vec3 vCL;\n' +
       sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvCL = (uCarInv * modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = FRAG + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = carDirt(diffuseColor.rgb);');
+    sh.fragmentShader = FRAG + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = carBlood(carDirt(diffuseColor.rgb), vCL);');
   };
   m.customProgramCacheKey = () => 'carDirt';
   m.needsUpdate = true;
@@ -73,6 +74,7 @@ function patch (m) {
 /* все матовые материалы машины: кузов, панели, колёса, наклейки (стёкла и фары — нет); warmup.js — образец машины */
 export function dress (car) {
   ST.mats = 0;
+  CBLOOD.resetPlayer();                             // новая машина — чистая
   car.traverse(o => { if (o.isMesh && o.material && o.material.isMeshLambertMaterial) patch(o.material); });
 }
 

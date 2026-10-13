@@ -455,7 +455,7 @@ export function shiftSeason (v) {
    Заход в игру сезон не сдвигает (до 11.10.2026 — +полсмены календаря): какой был на последней смене */
 function readSaved () {
   const saved = C.Store.get('dlv-season', null);
-  SEA = wrap(saved === null || saved === undefined ? 0 : +saved || 0);
+  SEA = wrap(saved === null || saved === undefined ? 2.5 : +saved || 0);   // новичок в меню — зима (13.10.2026, «по базе зима»)
 }
 /** сменили профиль без перезагрузки (game.js reprofile): сезон — сохранённый у нового профиля (как при входе в игру) */
 export function reloadSaved () { if (!C || FORCED) return; readSaved(); apply(); }
