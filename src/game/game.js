@@ -818,6 +818,32 @@ function solidsNear (x, z) {
   return a;
 }
 
+/* сбитый в полёте (hits.js) отскакивает от домов, стен, деревьев и машин (проба 13.10.2026, автор: «пролетают
+   сквозь дома и машины»): выталкиваем по меньшему проникновению, скорость к стене — назад с потерей (BOUNCE.K).
+   o: { x, z, y — высота над землёй, vx, vz }; true — ударился. Над машиной (выше BOUNCE.CAR_H м) — пролетает */
+const BOUNCE = { K: 0.45, R: 0.4, CAR_H: 1.7 };
+function bounceBody (o) {
+  let hit = false;
+  const hitBox = (cx, cz, hw, hd, cs, sn) => {
+    const dx = o.x - cx, dz = o.z - cz, lx = dx * cs + dz * sn, lz = -dx * sn + dz * cs;
+    const px = hw + BOUNCE.R - Math.abs(lx), pz = hd + BOUNCE.R - Math.abs(lz);
+    if (px <= 0 || pz <= 0) return;
+    let nx, nz, pen;
+    if (px < pz) { const g = lx < 0 ? -1 : 1; nx = g * cs; nz = g * sn; pen = px; }
+    else { const g = lz < 0 ? -1 : 1; nx = -g * sn; nz = g * cs; pen = pz; }
+    o.x += nx * pen; o.z += nz * pen;
+    const vn = o.vx * nx + o.vz * nz;
+    if (vn < 0) { o.vx -= (1 + BOUNCE.K) * vn * nx; o.vz -= (1 + BOUNCE.K) * vn * nz; }
+    hit = true;
+  };
+  for (const s of solidsNear(o.x, o.z)) if (s.deckY === undefined) hitBox(s.cx, s.cz, s.hw, s.hd, s.cs, s.sn);
+  if (o.y < BOUNCE.CAR_H) for (const t of TRAFFIC) {
+    if (Math.abs(t.x - o.x) > 6 || Math.abs(t.z - o.z) > 6) continue;
+    hitBox(t.x, t.z, CAR_W, t.hl || CAR_L, Math.cos(t.h), -Math.sin(t.h));
+  }
+  return hit;
+}
+
 /* выталкиваем по меньшему проникновению — человек скользит вдоль стены */
 function pushOut (p, r) {
   for (const s of solidsNear(p.x, p.z)) {
@@ -14009,7 +14035,7 @@ EDL.buildEnd();
 ZN.init({ CITY, MAP, donated });
 DLG.init({ pause: on => { for (const k in IN) IN[k] = 0; if (on) Snd.engine(0); }, face: (p, size) => faceDataURL(p, size) });
 HITS.init({ THREE, scene, box, mergeGeos, HUMAN_VC, groundH, surfaceAt, curbAt, nearestRoad, driftTop: SEAS.driftTop, pavedLift: TRK.pavedLift, groundNormal, emote, puff, pushOut, Snd,
-  burst: burstHuman, scare, callAmbulance, adult: GORE_ON, shred: shredHit, spray: bloodSpray });
+  burst: burstHuman, scare, callAmbulance, adult: GORE_ON, shred: shredHit, spray: bloodSpray, bounce: bounceBody });
 HAV.init({ S, adult: ADULT });                   // счёт разрушений за смену для Толика (havoc.js)
 CHAT.init({ adult: ADULT, person: makePerson({ seed: 0x2E4A17, fem: false }), face: (p, size) => faceDataURL(p, size), blip: (f, d, ty, v) => Snd.blip(f, d, ty, v), fx: (n, synth) => Snd.fx(n, synth) });
 /* заказы карьеры (orders.js): очередь, поручения, развоз смены — через это */
@@ -15456,7 +15482,7 @@ if (window.__dlv) window.__dlv.carlab = {
   stop: () => { V.vx = V.vz = 0; for (const k in IN) IN[k] = 0; },
   state: () => ({ id: car.userData.careerId, real: !!car.userData.real, glass: CG.state(car.userData.cg), dents: car.userData.dents || 0, fp: !!FPV.on, orbit: CARLAB.orbit }),
 };
-if (window.__dlv) Object.assign(window.__dlv, { GRIT: GRITM.GRIT, REALCAR, PIX: PIX.STATS, CG: CG.STATS, cgState: () => CG.state(car.userData.cg), hurtCar,
+if (window.__dlv) Object.assign(window.__dlv, { GRIT: GRITM.GRIT, REALCAR, bounceBody, SOLIDS, PIX: PIX.STATS, CG: CG.STATS, cgState: () => CG.state(car.userData.cg), hurtCar,
   cgLamps: () => CG.lampState(car), EXH: EXH.DEBUG, WIPE: WIPE.STATS, DENT: DENTM.DEBUG, DIRT: DIRT.DEBUG, REAR: REARM.STATS, pizzasInCar, setTrunk });   // фары и фонари (carglass.js), выхлоп (exhaust.js), дворники (wipers.js)   // дымок, стёкла (pixfx.js, carglass.js)
 if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG, CONS: CONSTR.DEBUG, DARK: DARKN.DEBUG, WASTE: WASTE.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)
 if (window.__dlv) Object.defineProperties(window.__dlv, { reprofile: { value: reprofile }, REPROFILE_MS: { get: () => REPROFILE_MS } });   // смена профиля без перезагрузки

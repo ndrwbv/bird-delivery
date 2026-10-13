@@ -605,12 +605,21 @@ function shatter (B) {
   B.mode = 'gone';
 }
 
+const BO = { x: 0, z: 0, y: 0, vx: 0, vz: 0 };     // отскок: что спросить у game.js bounceBody
 function stepBody (B, dt) {
   const r = B.root, P = B.parts;
   B.t += dt;
   if (B.mode === 'fly') {
     B.vy -= 19 * dt;
     r.position.x += B.vx * dt; r.position.y += B.vy * dt; r.position.z += B.vz * dt;
+    if (A.bounce) {                                   // о дом, стену, дерево, машину — отскок (game.js bounceBody)
+      BO.x = r.position.x; BO.z = r.position.z; BO.y = r.position.y - B.floor; BO.vx = B.vx; BO.vz = B.vz;
+      if (A.bounce(BO)) {
+        r.position.x = BO.x; r.position.z = BO.z; B.vx = BO.vx; B.vz = BO.vz;
+        B.spin = -B.spin * 0.6; B.roll = rand(-4, 4);
+        if (A.adult && !B.up && Math.hypot(B.vx, B.vz) > 3) splat(r.position.x, r.position.z, rand(0.4, 0.7) * B.s);   // кровь у стены
+      }
+    }
     const g0 = A.groundH(r.position.x, r.position.z);
     B.floor = r.position.y < g0 + 2.2 * B.s ? topAt(r.position.x, r.position.z, r.position.y) : g0;   // высоко — слой не нужен
     if (!B.landed) {
@@ -717,6 +726,10 @@ export function update (dt) {
       L.vy -= 19 * dt;
       m.position.x += L.vx * dt; m.position.y += L.vy * dt; m.position.z += L.vz * dt;
       m.rotation.x += L.spin * dt; m.rotation.z += L.spin * 0.6 * dt;
+      if (A.bounce) {                                 // рука или нога — тоже от стен и машин
+        BO.x = m.position.x; BO.z = m.position.z; BO.y = m.position.y - A.groundH(m.position.x, m.position.z); BO.vx = L.vx; BO.vz = L.vz;
+        if (A.bounce(BO)) { m.position.x = BO.x; m.position.z = BO.z; L.vx = BO.vx; L.vz = BO.vz; L.spin = -L.spin; }
+      }
       const g0 = A.groundH(m.position.x, m.position.z);
       const fl = m.position.y < g0 + 1 ? topAt(m.position.x, m.position.z, m.position.y) : g0;
       if (m.position.y < fl + 0.12) {
