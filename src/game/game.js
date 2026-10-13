@@ -9965,10 +9965,10 @@ let VBOOST = 62;                                  // потолок на нит�
 /* в районе подальше машина быстрее: ECON.DISTRICT.SPEED — к максималке и разгону */
 /* управляемость машины (econ.js HANDLING, CAR_LIST.handling 1…10): поворот, «тупеет» на скорости, руль, снос.
    Нет числа (детская версия, машины вне карьеры) — как было: руль мгновенный, всё ×1 */
-let HANDLE = { h: 5, turn: 1, fall: 1, rate: Infinity, side: 1 };
+let HANDLE = { h: 5, turn: 1, fall: 1, rate: Infinity, side: 1, rmin: 6 };
 function carStats () {
   const c = curCar(), k = DISTRICTS ? DIST.speed() : 1; VMAX = (c.vmax || 48) * k; ACC = (c.acc || 36) * k; VBOOST = VMAX + 14;
-  HANDLE = c.handling != null ? ECON.handlingK(c.handling) : { h: 5, turn: 1, fall: 1, rate: Infinity, side: 1 };
+  HANDLE = c.handling != null ? ECON.handlingK(c.handling) : { h: 5, turn: 1, fall: 1, rate: Infinity, side: 1, rmin: 6 };
 }
 /* габариты кузова: по ним считаются все попадания, а не по одному кругу */
 const CAR_L = 2.2, CAR_W = 1.0;
@@ -10033,7 +10033,9 @@ function driveStep (dt) {
   const sv = V.steer = Number.isFinite(sr) ? (V.steer || 0) + clamp(want - (V.steer || 0), -sr, sr) : want;
   const spd = Math.abs(vf);
   const grip = clamp(spd / 8, 0, 1) / (1 + spd * 0.014 * HANDLE.fall) * (V.air ? 0.15 : 1);
-  V.h += sv * TURN * HANDLE.turn * grip * (IN.hand ? 1.5 : 1) * Math.sign(vf || 1) * dt;
+  // радиус разворота не меньше HANDLE.rmin (econ.js RMIN): на малой скорости не крутится на пятачке; ручник — резче, как было
+  const turnW = clamp(sv * TURN * HANDLE.turn * grip, -spd / HANDLE.rmin, spd / HANDLE.rmin);
+  V.h += turnW * (IN.hand ? 1.5 : 1) * Math.sign(vf || 1) * dt;
   V.steerVis = damp(V.steerVis, sv * 0.42, 10, dt);
 
   V.vx = fx * vf + sx * vl;

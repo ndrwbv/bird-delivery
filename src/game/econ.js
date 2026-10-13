@@ -753,16 +753,19 @@ export const CAR_LIST = [
              поворот слабеет на 25 %, у резкой — на 10 %
      RATE  — как быстро крутится руль до упора, долей упора в секунду: 2 + 1,2·H → H1 за 0,31 с,
              H5 за 0,13 с, H10 за 0,07 с; к центру — в RETURN раз быстрее
+     RMIN  — радиус разворота не меньше 7 − 0,2·H м (13.10.2026, автор: «резко поворачивается, в реальности не так»):
+             H1 6,8 м, H5 6 м, H10 5 м; было ~3,5 м у всех до 29 км/ч. Выше ~40 км/ч не мешает — там радиус и так больше
      SIDE  — как быстро гаснет снос вбок (и на сухом, и в дождь): × (0,82 + 0,036·H) → H1 ×0,86, H10 ×1,18;
              в ливень у баржи 5,5 × 0,86 ≈ 4,7 1/с — сносит чуть сильнее, но не как до 03.10 (2,6)
    Прокачки «подвеска» нет — управляемость у машины заводская. */
 export const HANDLING = {
   DEF: 5,
   TURN: [0.75, 0.05], FALL: [1.5, -0.1], RATE: [2, 1.2], RETURN: 1.5, SIDE: [0.82, 0.036],
+  RMIN: [7, -0.2],                                 // радиус разворота не меньше, м: H1 6,8 · H5 6 · H10 5 (13.10.2026)
 };
 export function handlingK (h) {
   const H = Math.max(1, Math.min(10, Number.isFinite(+h) ? +h : HANDLING.DEF)), L = HANDLING;
-  return { h: H, turn: L.TURN[0] + L.TURN[1] * H, fall: L.FALL[0] + L.FALL[1] * H, rate: L.RATE[0] + L.RATE[1] * H, side: L.SIDE[0] + L.SIDE[1] * H };
+  return { h: H, turn: L.TURN[0] + L.TURN[1] * H, fall: L.FALL[0] + L.FALL[1] * H, rate: L.RATE[0] + L.RATE[1] * H, side: L.SIDE[0] + L.SIDE[1] * H, rmin: L.RMIN[0] + L.RMIN[1] * H };
 }
 export const UPGRADE = { STEPS: 3, SHARE: 0.15, MIN: 6400, HP: 1, VMAX: 0.04 };
 export const upgradePrice = (car, step) => Math.max(UPGRADE.MIN, Math.round(car.price * UPGRADE.SHARE / 100) * 100) * (step + 1);
