@@ -28,9 +28,9 @@ const MODELS = {
     K: 0.01,                                      // модель в сантиметрах
     PART: {
       Car_CarBody_0: { keep: 0.5, err: 0.006, tex: 64, colors: 6, median: 9, paint: { hue: [330, 45], sat: 0.3 } },
-      Car_Details_0: { keep: 0.4, err: 0.01, tex: 256, colors: 12, sat: 1.2, bri: 1.1 },   // номера и фары — мельче не читаются
+      Car_Details_0: { keep: 0.4, err: 0.01, tex: 256, colors: 12, sat: 1.35, bri: 1.3 },   // номера и фары — мельче не читаются; светлее (хром, фары)
       Car_Details_Transparent_0: { keep: 1, tex: 128, sat: 1.2, bri: 1.1, alpha: 0.5 },
-      Car_Bottom_0: { keep: 0.15, err: 0.03, tex: 64, colors: 8, sat: 1.1, bri: 1.05 },
+      Car_Bottom_0: { keep: 0.15, err: 0.03, tex: 64, colors: 8, sat: 1.1, bri: 1.2 },
       Car_Interior_0: { keep: 0.8, err: 0.004, tex: 64, colors: 8, sat: 1.2, bri: 1.15, cut: 0.15 },   // cut — торпедо модели (z > 0,15 м в осях модели = 0,4 м от середины машины) — своё в игре
       Car_Windows_0: { keep: 1, tex: 0 },          // стёкла — без картинки: в игре светлые и прозрачные, по одному на сторону (трескаются)
     },
@@ -55,7 +55,9 @@ const MODEL = process.argv[4] || 'vaz2107', CFG = MODELS[MODEL];
 const LITE = process.argv[5] === 'lite' ? { K: 0.4, ERR: 0.05 } : null;   // ERR — допуск упрощения: издалека не видно
 if (!CFG) { console.log('нет модели', MODEL, '— есть:', Object.keys(MODELS).join(', ')); process.exit(1); }
 const PART = CFG.PART, WHEEL = CFG.WHEEL, WHEELS = CFG.WHEELS;
-const COLORS = 12, MEDIAN = 3, K = CFG.K;           // палитра по умолчанию; MEDIAN — сгладить крапинки (автор 13.10: «текстуру попроще»)                      // модель в сантиметрах → метры
+const COLORS = 12, MEDIAN = 3, K = CFG.K;
+/* краска: самая тёмная складка — PAINT_SHADE от цвета машины (было 0,55 — машины серые рядом с яркими кубиками; автор 13.10: «ярче, как другие») */
+const PAINT_SHADE = 0.8;           // палитра по умолчанию; MEDIAN — сгладить крапинки (автор 13.10: «текстуру попроще»)                      // модель в сантиметрах → метры
 
 await MeshoptSimplifier.ready;
 const doc = await new NodeIO().read(path.join(SRC, 'scene.gltf'));
@@ -108,7 +110,7 @@ async function texture (name, mat, P) {
     const vref = vs[Math.floor(vs.length * 0.9)] || 1;
     for (let i = 0; i < data.length; i += 4) {
       const c = hsv(i);
-      if (isPaint(c)) { const g = Math.round(255 * Math.min(1, 0.55 + 0.45 * c[2] / vref)); data[i] = data[i + 1] = data[i + 2] = g; data[i + 3] = 255; }
+      if (isPaint(c)) { const g = Math.round(255 * Math.min(1, PAINT_SHADE + (1 - PAINT_SHADE) * c[2] / vref)); data[i] = data[i + 1] = data[i + 2] = g; data[i + 3] = 255; }
       else data[i + 3] = 0;
     }
     img = sharp(data, { raw: info });

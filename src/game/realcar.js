@@ -44,7 +44,7 @@ export const MODELS = {
   },
   /* «Копейка» — «VAZ 2101», Javkal, CC-BY-4.0: https://sketchfab.com/3d-models/vaz-2101-95d34f63b5b14e2197fd41383776e031
      Модель в 1,13 раза крупнее настоящей — k меньше; салона нет — всё своё, как у «Семёрки» × 1,12 и ближе к стеклу на 0,1 м */
-  kopeyka: {
+  kopeyka_off: {                                 // выключена (автор 13.10: «копейка оч плохо вышла») — id не совпадает с машиной игры
     dir: 'vaz2101', k: 1.06,
     eye: [0.4, 1.33, 0.37],
     sw: { C: [0.4, 1.0, 0.74], R: 0.19, tilt: -0.5, turn: 2.2 },
@@ -311,6 +311,7 @@ function bodyShader (mat, U, paint, traffic) {
   mat.onBeforeCompile = sh => {
     if (!traffic) dirtInject(sh);                   // грязь и снег — своей машине (считаются от неё); у потока — износ uWear
     sh.uniforms.uWear = U.wear || { value: 0 };
+    sh.uniforms.uGrit = { value: { x: 0.35, y: 0 } };   // глубина города (grit.js) на машине — втрое слабее: не сереет
     sh.uniforms.uPaint = U.paint;
     sh.uniforms.uBlood = U.blood;
     sh.vertexShader = 'varying vec3 vBLoc;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvBLoc = transformed;');
@@ -336,8 +337,8 @@ float bH (vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x 
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.32, 0.015, 0.02), bl * 0.92);
   // износ (машины потока): ржавые пятна крупным пикселем, чем старше — тем больше; краска тусклее
   float wn = bH(floor(vBLoc * 7.0)) * 0.6 + bH(floor(vBLoc * 2.0) + 3.0) * 0.4;
-  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.62, 0.45, 0.33), uWear * smoothstep(0.62 - uWear * 0.3, 0.9, wn));
-  diffuseColor.rgb *= 1.0 - uWear * 0.18;
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.7, 0.52, 0.38), uWear * 0.8 * smoothstep(0.68 - uWear * 0.25, 0.92, wn));
+  diffuseColor.rgb *= 1.0 - uWear * 0.06;
 }`);
   };
   // ключ — свой у каждой машины: three вызывает onBeforeCompile только для новой программы, и вторая машина
@@ -525,7 +526,7 @@ export const has = id => REAL.on && !!MODELS[id];
    Облегчённая модель (tools/realcar.mjs … lite): без салона, ~1,5—2,5 тыс. треугольников, колёса не крутятся;
    у каждой машины — свой цвет, свой износ (ржавчина пятнами, тусклее), своя сетка (мнётся, как твоя: dent),
    стёкла трескаются с GLASS_HIT.CRACK м/с и бьются с GLASS_HIT.BREAK */
-export const TRAFFIC = { MODELS: ['semerka', 'kopeyka'], SHARE: 0.5, WEAR: [0, 1] };
+export const TRAFFIC = { MODELS: ['semerka'], SHARE: 0.5, WEAR: [0, 0.8] };   // «Копейка» — вышла плохо (автор 13.10), ждёт модель получше
 const GLASS_HIT = { CRACK: 9, BREAK: 15 };
 const LITE = {};
 export function preloadTraffic (onReady) {
@@ -625,8 +626,8 @@ export function paint (car, hex) {
   const R = car && car.userData.real;
   if (R) dull(R.paint.value.set(hex));
 }
-/* краска чуть тусклее заводской (автор 13.10: «цвета чуть тусклее, не такие яркие»): к серому на DULL.GRAY, темнее ×DULL.DARK */
-const DULL = { GRAY: 0.22, DARK: 0.88 };
+/* краска: к серому на DULL.GRAY, темнее ×DULL.DARK (13.10: сперва «тусклее», потом «ярче, как другие машины» — почти без приглушения) */
+const DULL = { GRAY: 0.04, DARK: 1.0 };   // было 0,22 / 0,88 — серые рядом с яркими машинами города (автор 13.10: «ярче»)
 function dull (c) {
   const g = c.r * 0.3 + c.g * 0.59 + c.b * 0.11;
   return c.lerp(new THREE.Color(g, g, g), DULL.GRAY).multiplyScalar(DULL.DARK);
