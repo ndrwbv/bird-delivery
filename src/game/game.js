@@ -5009,6 +5009,7 @@ function dentCar (g, wx, wz, force) {
   const f = clamp(force / 26, 0.12, 1);
   const gb = CG.STATS.broken, gc = CG.STATS.cracked + CG.STATS.lampCr, gl = CG.STATS.lamps;
   if (u.cg) CG.hit(u.cg, inv.x, inv.z, force, g);   // своя машина: стекло у удара трескается или бьётся (carglass.js)
+  if (u.real) REALCAR.dent(g, inv.x, inv.z, force);   // проба: настоящая «Семёрка» мнётся так же (realcar.js)
   u.dmg = clamp(u.dmg + f * 0.3, 0, 1);
   let best = null, bd = 1e9;
   for (const p of u.panels) {
@@ -6387,6 +6388,7 @@ function runOver (p, vx, vz) {
   p.fly = null; p.fall = null;
   p.grp.visible = false;
   gibHuman(p, vx, vz);
+  if (GORE_ON) REALCAR.blood(car);                 // проба: кровь на лобовом, дворники стирают (realcar.js)
   S.people++;
   Snd.squish();
   // карьера: сбил своего клиента — заказ сорван и штраф в цену его заказа (CLIENT_KILL); со смены снимают, только если END_SHIFT
@@ -10461,7 +10463,7 @@ function hurtCar (dmg, vn, hx, hz, mat) {          // mat — во что (зв�
 }
 
 /* ─────────────── камера ─────────────── */
-const FPV = { on: 0, hid: 0, at: new THREE.Vector3() };                   // вид из кабины (V): on — включён, hid — машина спрятана в этом кадре
+const FPV = { on: 0, hid: 0, p: 0, at: new THREE.Vector3() };                   // вид из кабины (V): on — включён, hid — машина спрятана в этом кадре
 const camInWall = (x, z) => {
   for (const s of solidsNear(x, z)) {
     if (s.deckY !== undefined) continue;          // перила низкие, камера над ними
@@ -10495,10 +10497,14 @@ function camStep (dt, vf) {
   if (FPV.on && car.userData.real) {                // настоящая «Семёрка» (realcar.js): глаза водителя, видно торпедо и руль
     V.hero = 0;
     car.updateMatrixWorld();
-    const E = REALCAR.REAL.eye, sh = S.shake * 0.15;
+    const E = REALCAR.REAL.eye, sh = S.shake * 0.03;  // автор 13.10: «внутри не должно трясти так сильно» — тряска почти вся гасится
     cam.position.copy(E).multiplyScalar(REALCAR.REAL.k).applyMatrix4(car.matrixWorld);
     if (sh) { cam.position.x += rand(-sh, sh); cam.position.y += rand(-sh, sh); }
-    FPV.at.set(E.x, E.y - 0.6, E.z + 10).multiplyScalar(REALCAR.REAL.k).applyMatrix4(car.matrixWorld);
+    // взгляд — по курсу, наклон кузова — сглаженный, крена нет: кочки и удары не дёргают картинку
+    FPV.p = damp(FPV.p || 0, V.pitch || 0, 4, dt);
+    const cp = Math.cos(FPV.p);
+    FPV.at.set(Math.sin(V.h) * cp, -Math.sin(FPV.p) - 0.07, Math.cos(V.h) * cp).multiplyScalar(10).add(cam.position);
+    cam.up.set(0, 1, 0);
     cam.lookAt(FPV.at);
     V.camX = cam.position.x; V.camZ = cam.position.z; V.camY = cam.position.y + 4; V.camH = V.h; V.camPull = 0;
     S.shake = Math.max(0, S.shake - dt * 2.2);
@@ -15184,7 +15190,7 @@ function frameStep (now) {
   if (CAREER) AUTO.step(dt, vf);                  // заглохла, ямы, гараж Дяди Жени
   CL.step('exhaust', EXH.step, dt, vf, EXH_API || (EXH_API = exhApi()));   // дым из выхлопа по мотору (exhaust.js)
   CL.step('motor', MOTOR.step, dt, MOTOR_API || (MOTOR_API = motorApi()));   // мотор из записей, визг шин, нитро, гул потока (motor.js)
-  CL.step('wipers', WIPE.step, dt, car, Math.max(SEAS.snowy() ? 0 : ENV.rain, SEAS.snowFall()));   // дворники в дождь и снегопад (wipers.js)
+  CL.step('wipers', WIPE.step, dt, car, Math.max(SEAS.snowy() ? 0 : ENV.rain, SEAS.snowFall(), REALCAR.bloodWet(car)));   // дворники в дождь и снегопад (wipers.js)
   CL.step('cardent', DENTM.step, dt, car);           // отлетевшие бампер, крышка, зеркала, колпаки на дороге (cardent.js)
   CL.step('cardirt', DIRT.step, dt, car, LIVE_DIRT.has(S.state) ? vf : 0, DIRT_W(DIRT_ENV));   // грязь и снег на машине (cardirt.js)
   S.hurt = Math.max(0, S.hurt - dt);
@@ -15393,7 +15399,7 @@ if (window.__dlv) Object.assign(window.__dlv, { cam, renderer, scene });   // к
 if (window.__dlv) window.__dlv.crashlog = CL;        // журнал ошибок: entries(), text(), disabled() (docs/CRASHES.md)
 if (window.__dlv) window.__dlv.CULLV = CULL.VIEW;      // отсечение по кадру: CULLV.on = false — без него (замеры до/после, cull.js)
 if (window.__dlv) Object.assign(window.__dlv, { pinFront, nearClient, PIN });   // пин перед клиентом, кто у клиента лишний (docs/ORDERS.md)
-if (window.__dlv) Object.assign(window.__dlv, { GRIT: GRITM.GRIT, PIX: PIX.STATS, CG: CG.STATS, cgState: () => CG.state(car.userData.cg), hurtCar,
+if (window.__dlv) Object.assign(window.__dlv, { GRIT: GRITM.GRIT, REALCAR, PIX: PIX.STATS, CG: CG.STATS, cgState: () => CG.state(car.userData.cg), hurtCar,
   cgLamps: () => CG.lampState(car), EXH: EXH.DEBUG, WIPE: WIPE.STATS, DENT: DENTM.DEBUG, DIRT: DIRT.DEBUG, REAR: REARM.STATS, pizzasInCar, setTrunk });   // фары и фонари (carglass.js), выхлоп (exhaust.js), дворники (wipers.js)   // дымок, стёкла (pixfx.js, carglass.js)
 if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG, CONS: CONSTR.DEBUG, DARK: DARKN.DEBUG, WASTE: WASTE.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)
 if (window.__dlv) Object.defineProperties(window.__dlv, { reprofile: { value: reprofile }, REPROFILE_MS: { get: () => REPROFILE_MS } });   // смена профиля без перезагрузки

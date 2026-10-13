@@ -149,22 +149,82 @@
    ]
   },
   {
-   "name": "Car_Windows_0",
-   "file": "windows.png",
+   "name": "winF",
+   "file": null,
    "pivot": null,
    "blend": true,
-   "alpha": 0.28,
+   "alpha": 0.14,
    "pos": [
     129224,
-    402
+    105
    ],
    "uv": [
-    130832,
-    268
+    129644,
+    70
    ],
    "idx": [
-    131904,
-    504,
+    129924,
+    144,
+    2
+   ]
+  },
+  {
+   "name": "winB",
+   "file": null,
+   "pivot": null,
+   "blend": true,
+   "alpha": 0.14,
+   "pos": [
+    130212,
+    105
+   ],
+   "uv": [
+    130632,
+    70
+   ],
+   "idx": [
+    130912,
+    144,
+    2
+   ]
+  },
+  {
+   "name": "winL",
+   "file": null,
+   "pivot": null,
+   "blend": true,
+   "alpha": 0.14,
+   "pos": [
+    131200,
+    96
+   ],
+   "uv": [
+    131584,
+    64
+   ],
+   "idx": [
+    131840,
+    108,
+    2
+   ]
+  },
+  {
+   "name": "winR",
+   "file": null,
+   "pivot": null,
+   "blend": true,
+   "alpha": 0.14,
+   "pos": [
+    132056,
+    96
+   ],
+   "uv": [
+    132440,
+    64
+   ],
+   "idx": [
+    132696,
+    108,
     2
    ]
   },

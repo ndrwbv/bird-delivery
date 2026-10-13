@@ -46,13 +46,13 @@ function build (car) {
   const ud = car.userData, cg = ud.cg;
   if (!cg) return null;
   const arms = [];
-  const F = glass(cg, false, ud.ws);
+  const F = ud.realGlass || glass(cg, false, ud.ws);   // realGlass — лобовое настоящей «Семёрки» (realcar.js, проба)
   if (F) {
     const len = Math.min(F.H * 0.9, F.w * 0.42);
     // опоры: одна ближе к краю, другая у середины; лежат вдоль низа стекла
     arms.push({ F, px: F.w * 0.4, len, k: 1, n: 0 }, { F, px: F.w * 0.04, len, k: 1, n: 0.006 });
   }
-  const B = ud.hatch ? glass(cg, true, ud.wsB) : null;
+  const B = ud.hatch && !ud.realGlass ? glass(cg, true, ud.wsB) : null;
   if (B) arms.push({ F: B, px: 0, len: Math.min(B.H * 0.85, B.w * 0.45), k: WIPE.MAX_B / WIPE.MAX, n: 0 });   // задний — опора посередине
   if (!arms.length) return null;
   const nv = arms.length * 8;

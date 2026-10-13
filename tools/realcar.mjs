@@ -21,12 +21,12 @@ if (!SRC) { console.log('node tools/realcar.mjs <папка с scene.gltf> [вы
 /* keep — доля треугольников, err — допустимая ошибка (доля размера), tex — сторона текстуры,
    colors — цветов в палитре, hue/sat/bri — цвет (к оранжевому пиццерии), alpha — прозрачность (у стёкол своя карта — тут ровная) */
 const PART = {
-  Car_CarBody_0: { keep: 0.5, err: 0.006, tex: 128, colors: 8, hue: 8, sat: 1.35, bri: 1.12 },
+  Car_CarBody_0: { keep: 0.5, err: 0.006, tex: 64, colors: 5, median: 9, hue: 10, sat: 1.5, bri: 1.35 },   // гладкая краска: крапинки и ржавчина сглажены
   Car_Details_0: { keep: 0.4, err: 0.01, tex: 256, colors: 12, sat: 1.2, bri: 1.1 },   // номера и фары — мельче не читаются
   Car_Details_Transparent_0: { keep: 1, tex: 128, sat: 1.2, bri: 1.1, alpha: 0.5 },
   Car_Bottom_0: { keep: 0.15, err: 0.03, tex: 64, colors: 8, sat: 1.1, bri: 1.05 },
   Car_Interior_0: { keep: 0.8, err: 0.004, tex: 64, colors: 8, sat: 1.2, bri: 1.15 },
-  Car_Windows_0: { keep: 1, tex: 128, sat: 1, bri: 1.6, alpha: 0.28 },
+  Car_Windows_0: { keep: 1, tex: 0 },          // стёкла — без картинки: в игре светлые и прозрачные, по одному на сторону (трескаются)
 };
 /* колёса «Семёрки»: ось на высоте радиуса, база 2,41 м; в колесо — треугольники днища целиком внутри R */
 const WHEEL = { r: 0.29, R: 0.36, x: 0.55, z: 1.206, xc: 0.72, keep: 0.3, err: 0.006 };
@@ -58,10 +58,10 @@ function simplify (pos, uv, idx, keep, err) {
 const texFile = {};
 async function texture (name, mat, P) {
   const tex = mat && mat.getBaseColorTexture();
-  if (!tex) return null;
+  if (!tex || !P.tex) return null;
   if (texFile[name]) return texFile[name];
   const file = name.replace(/^Car_|_0$/g, '').toLowerCase() + '.png';
-  await sharp(Buffer.from(tex.getImage())).resize(P.tex, P.tex, { kernel: 'lanczos3' }).median(MEDIAN)
+  await sharp(Buffer.from(tex.getImage())).resize(P.tex, P.tex, { kernel: 'lanczos3' }).median(P.median || MEDIAN)
     .modulate({ saturation: P.sat || 1, brightness: P.bri || 1, hue: P.hue || 0 })
     .png({ palette: true, colours: P.colors || COLORS, dither: 0 }).toFile(path.join(OUT, file));
   return (texFile[name] = file);
@@ -111,6 +111,32 @@ for (const node of doc.getRoot().listNodes()) {
         console.log(('wheel' + k).padEnd(28), 'треугольников', W[k].length / 3, '→', emit('wheel' + k, file, mat, P, g, pv));
       }
       rest = R;
+    }
+    if (name === 'Car_Windows_0') {
+      // стёкла: по нормали треугольника — бок (L / R) или лобовое / заднее (F / B); UV — плоская проекция 0…1
+      // (на неё в игре ложатся трещины и кровь)
+      const G = { winF: [], winB: [], winL: [], winR: [] };
+      const v = (i, k) => pos[i * 3 + k];
+      for (let t = 0; t < idx.length; t += 3) {
+        const [a, b, c] = [idx[t], idx[t + 1], idx[t + 2]];
+        const ux = v(b, 0) - v(a, 0), uy = v(b, 1) - v(a, 1), uz = v(b, 2) - v(a, 2), wx = v(c, 0) - v(a, 0), wy = v(c, 1) - v(a, 1), wz = v(c, 2) - v(a, 2);
+        const nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx, nl = Math.hypot(nx, ny, nz) || 1;
+        const mx = (v(a, 0) + v(b, 0) + v(c, 0)) / 3, mz = (v(a, 2) + v(b, 2) + v(c, 2)) / 3;
+        const k = Math.abs(nx / nl) > 0.6 ? (mx > 0 ? 'winL' : 'winR') : (mz > (box.min[2] + box.max[2]) / 2 ? 'winF' : 'winB');
+        G[k].push(a, b, c);
+      }
+      for (const k in G) {
+        const g = simplify(pos, uv, G[k], 1, 0);
+        const side = k === 'winL' || k === 'winR', lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+        for (let i = 0; i < g.pos.length; i += 3) for (let j = 0; j < 3; j++) { lo[j] = Math.min(lo[j], g.pos[i + j]); hi[j] = Math.max(hi[j], g.pos[i + j]); }
+        for (let i = 0, q = 0; i < g.pos.length; i += 3, q += 2) {
+          const h = side ? 2 : 0;
+          g.uv[q] = (g.pos[i + h] - lo[h]) / (hi[h] - lo[h] || 1);
+          g.uv[q + 1] = (g.pos[i + 1] - lo[1]) / (hi[1] - lo[1] || 1);
+        }
+        console.log(k.padEnd(28), 'треугольников', emit(k, null, mat, { alpha: 0.14 }, g, null));
+      }
+      continue;
     }
     const g = simplify(pos, uv, rest, P.keep, P.err || 0.004);
     console.log(name.padEnd(28), 'треугольников', rest.length / 3, '→', emit(name, file, mat, P, g, null));
