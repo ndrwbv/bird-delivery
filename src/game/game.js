@@ -10385,6 +10385,7 @@ function driveStep (dt) {
   { const W = car.userData.wheels, St = car.userData.steer;
     for (let i = 0; i < W.length; i++) W[i].rotation.x = V.wheel;
     for (let i = 0; i < St.length; i++) St[i].rotation.y = V.steerVis; }
+  if (car.userData.real) REALCAR.step(car, V.wheel, V.steerVis, V.steer || 0, vf);   // проба: колёса, руль и стрелки настоящей «Семёрки» (realcar.js)
   V.lean = damp(V.lean || 0, -V.steerVis * clamp(Math.abs(vf) / VMAX, 0, 1) * 0.12, 6, dt);
   car.rotation.z = V.roll + V.lean;
   ICEM.pose(car, dt);                              // на трещащем льду проседает и качается, проломился — на бок (ice.js)

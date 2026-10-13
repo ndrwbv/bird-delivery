@@ -1,20 +1,21 @@
 {
  "box": {
   "min": [
-   -0.8833377361297607,
-   0.0034780995920300484,
+   -0.8898853063583374,
+   -4.348844981905131e-7,
    -2.331904649734497
   ],
   "max": [
-   0.8833380341529846,
-   1.47166109085083,
-   1.826752781867981
+   0.8898857235908508,
+   1.480064868927002,
+   1.8319669961929321
   ]
  },
  "parts": [
   {
    "name": "Car_Interior_0",
    "file": "interior.png",
+   "pivot": null,
    "blend": false,
    "alpha": 1,
    "pos": [
@@ -32,39 +33,137 @@
    ]
   },
   {
-   "name": "Car_Bottom_0",
+   "name": "wheelLF",
    "file": "bottom.png",
+   "pivot": [
+    0.72,
+    0.29,
+    1.206
+   ],
    "blend": false,
    "alpha": 1,
    "pos": [
     18664,
-    11763
+    2250
    ],
    "uv": [
-    65716,
-    7842
+    27664,
+    1500
    ],
    "idx": [
-    97084,
-    7935,
+    33664,
+    2013,
+    2
+   ]
+  },
+  {
+   "name": "wheelRF",
+   "file": "bottom.png",
+   "pivot": [
+    -0.72,
+    0.29,
+    1.206
+   ],
+   "blend": false,
+   "alpha": 1,
+   "pos": [
+    37692,
+    2166
+   ],
+   "uv": [
+    46356,
+    1444
+   ],
+   "idx": [
+    52132,
+    1929,
+    2
+   ]
+  },
+  {
+   "name": "wheelLB",
+   "file": "bottom.png",
+   "pivot": [
+    0.72,
+    0.29,
+    -1.206
+   ],
+   "blend": false,
+   "alpha": 1,
+   "pos": [
+    55992,
+    2217
+   ],
+   "uv": [
+    64860,
+    1478
+   ],
+   "idx": [
+    70772,
+    1977,
+    2
+   ]
+  },
+  {
+   "name": "wheelRB",
+   "file": "bottom.png",
+   "pivot": [
+    -0.72,
+    0.29,
+    -1.206
+   ],
+   "blend": false,
+   "alpha": 1,
+   "pos": [
+    74728,
+    2181
+   ],
+   "uv": [
+    83452,
+    1454
+   ],
+   "idx": [
+    89268,
+    1944,
+    2
+   ]
+  },
+  {
+   "name": "Car_Bottom_0",
+   "file": "bottom.png",
+   "pivot": null,
+   "blend": false,
+   "alpha": 1,
+   "pos": [
+    93156,
+    4737
+   ],
+   "uv": [
+    112104,
+    3158
+   ],
+   "idx": [
+    124736,
+    2244,
     2
    ]
   },
   {
    "name": "Car_Windows_0",
    "file": "windows.png",
+   "pivot": null,
    "blend": true,
    "alpha": 0.28,
    "pos": [
-    112956,
+    129224,
     402
    ],
    "uv": [
-    114564,
+    130832,
     268
    ],
    "idx": [
-    115636,
+    131904,
     504,
     2
    ]
@@ -72,37 +171,39 @@
   {
    "name": "Car_Details_0",
    "file": "details.png",
+   "pivot": null,
    "blend": false,
    "alpha": 1,
    "pos": [
-    116644,
-    8448
+    132912,
+    8442
    ],
    "uv": [
-    150436,
-    5632
+    166680,
+    5628
    ],
    "idx": [
-    172964,
-    4326,
+    189192,
+    4335,
     2
    ]
   },
   {
    "name": "Car_Details_Transparent_0",
    "file": "details_transparent.png",
+   "pivot": null,
    "blend": true,
    "alpha": 0.5,
    "pos": [
-    181616,
+    197864,
     624
    ],
    "uv": [
-    184112,
+    200360,
     416
    ],
    "idx": [
-    185776,
+    202024,
     360,
     2
    ]
@@ -110,18 +211,19 @@
   {
    "name": "Car_CarBody_0",
    "file": "carbody.png",
+   "pivot": null,
    "blend": false,
    "alpha": 1,
    "pos": [
-    186496,
+    202744,
     6393
    ],
    "uv": [
-    212068,
+    228316,
     4262
    ],
    "idx": [
-    229116,
+    245364,
     6174,
     2
    ]
