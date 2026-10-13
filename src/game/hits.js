@@ -387,12 +387,13 @@ function throwBody (p, vx, vz, kmh, up, lie, y0) {
 }
 
 /* переехал лежащего (или ещё летящего, но уже упавшего на дорогу) — снова отлетает, как от первого удара (THROW),
-   с фонтаном крови; после REHIT.SKEL переездов — скелет (белые тонкие кости) и больше ни на что не реагирует.
+   с фонтаном крови. Пролежал нетронутым REHIT.SKEL_T с — скелет (белые тонкие кости), больше ни на что не реагирует,
+   на TIME.BODY с — тает (автор 13.10: «скелетом — через время, когда не трогают, и потом исчезает»).
    Только взрослая версия (в детской сбитые встают и уходят). cx, cz — середина машины, fx, fz — куда смотрит,
    L, W — полудлина и полуширина, vx, vz — скорость машины. Возвращает, сколько тел задел (проба 13.10.2026) */
 /* повторный переезд — мягче первого удара (автор 13.10: «подскакивают вверх, не надо сильно»): вперёд FWD скорости
    машины, вверх UP0 + км/ч / UP_K (не больше UP_MAX), вбок — SIDE разброса первого удара, LIFT — м над землёй */
-export const REHIT = { MIN: 3, SKEL: 2, PAD: 0.4, BONE: 0xe4ddca, FWD: 0.6, UP0: 1.2, UP_K: 40, UP_MAX: 3.5, SIDE: 0.5, LIFT: 0.15 };
+export const REHIT = { MIN: 3, SKEL_T: 12, PAD: 0.4, BONE: 0xe4ddca, FWD: 0.6, UP0: 1.2, UP_K: 40, UP_MAX: 3.5, SIDE: 0.5, LIFT: 0.15 };
 let BONE = null;
 export function rehit (cx, cz, fx, fz, L, W, vx, vz) {
   const sp = Math.hypot(vx, vz);
@@ -411,7 +412,6 @@ export function rehit (cx, cz, fx, fz, L, W, vx, vz) {
     B.spin = rand(2, 4) * (Math.random() < 0.5 ? -1 : 1); B.roll = rand(-1.5, 1.5);
     if (A.spray) A.spray({ x: B.root.position.x, z: B.root.position.z }, vx, vz, kmh);
     if (A.Snd.impact) A.Snd.impact(Math.max(sp, 6), 'person', { x: B.root.position.x, z: B.root.position.z });
-    if (B.hits > REHIT.SKEL) skeleton(B);
     n++;
   }
   return n;
@@ -718,6 +718,7 @@ function stepBody (B, dt) {
       rest(B, true);
       placeShadow(B, 1);
     }
+    if (A.adult && !B.up && !B.skel && B.t >= REHIT.SKEL_T) skeleton(B);   // пролежал нетронутым — скелет
     if (B.up && (B.starT -= dt) <= 0) { B.starT = 0.7; A.emote(r.position.x, B.floor - A.groundH(r.position.x, r.position.z) + 0.75, r.position.z, 'star', 1); }
     if (B.t >= B.lie) {
       if (B.up) { B.mode = 'rise'; B.t = 0; B.x0 = r.rotation.x - nearest(r.rotation.x, TAU, 0); B.lz = r.rotation.z - nearest(r.rotation.z, TAU, 0); B.y0 = r.position.y; }
