@@ -16,7 +16,9 @@
 import * as THREE from '../vendor/three.module.min.js';
 
 const BASE = (import.meta.env.BASE_URL || './') + 'models/vaz2107/';
-export const REAL = { on: true, eye: new THREE.Vector3(0.36, 1.2, 0.06) };
+/* k — во сколько раз больше настоящей: люди в игре рослые, в настоящий размер (4,16 м) машина меньше
+   прежних кубиков (4,53 м) и рядом с людьми — игрушечная. eye — в осях модели, до увеличения */
+export const REAL = { on: true, k: 1.2, eye: new THREE.Vector3(0.36, 1.2, 0.06) };
 let MODEL = null, LOADING = null;
 
 function load () {
@@ -64,6 +66,7 @@ export function dress (car) {
     for (const c of [...car.children]) old.add(c);   // позиции детей — в осях машины, подгруппа без сдвига: всё на месте
     car.add(old);
     const m = M.clone();
+    m.scale.setScalar(REAL.k);
     car.add(m);
     car.userData.real = m;
   });

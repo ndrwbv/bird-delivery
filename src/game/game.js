@@ -10492,9 +10492,9 @@ function camStep (dt, vf) {
     V.hero = 0;
     car.updateMatrixWorld();
     const E = REALCAR.REAL.eye, sh = S.shake * 0.15;
-    cam.position.copy(E).applyMatrix4(car.matrixWorld);
+    cam.position.copy(E).multiplyScalar(REALCAR.REAL.k).applyMatrix4(car.matrixWorld);
     if (sh) { cam.position.x += rand(-sh, sh); cam.position.y += rand(-sh, sh); }
-    FPV.at.set(E.x, E.y - 0.6, E.z + 10).applyMatrix4(car.matrixWorld);
+    FPV.at.set(E.x, E.y - 0.6, E.z + 10).multiplyScalar(REALCAR.REAL.k).applyMatrix4(car.matrixWorld);
     cam.lookAt(FPV.at);
     V.camX = cam.position.x; V.camZ = cam.position.z; V.camY = cam.position.y + 4; V.camH = V.h; V.camPull = 0;
     S.shake = Math.max(0, S.shake - dt * 2.2);
