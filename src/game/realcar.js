@@ -39,6 +39,7 @@ export const MODELS = {
     sw: { C: [0.36, 0.9, 0.58], R: 0.17, tilt: -0.5, turn: 2.2 },
     dash: { C: [0.36, 0.84, 0.655], tilt: 0.08, KMH: 180, RPM: 8 },   // щиток — заподлицо в нарисованной рамке на лице торпедо
     box: { W2: 0.89, HL: 2.08 },
+    taxi: { x: 0.885, y: 0.78, z: [-1.55, 1.35], roof: 1.47, roofZ: -0.2 },   // такси потока: шашечки по бортам (x, высота, от–до по длине), фонарь на крыше
     torpedo: { W: 0.68, top: 0.95, lip: 0.68, low: 0.6, back: 1.0, floor: 0.4 },
     driver: { x: 0.36, seat: 0.5, z: 0.1 },        // курьер: середина сиденья (x), его высота, где голова по длине
   },
@@ -534,8 +535,8 @@ export function preloadTraffic (onReady) {
   Promise.all(all).then(() => { if (onReady && Object.keys(LITE).length) onReady(); });
 }
 export const trafficReady = () => REAL.on && Object.keys(LITE).length > 0;
-export function trafficCar (hex) {
-  const ids = Object.keys(LITE);
+export function trafficCar (hex, taxi) {
+  const ids = Object.keys(LITE).filter(id => !taxi || MODELS[id].taxi);
   if (!REAL.on || !ids.length) return null;
   const id = ids[Math.floor(Math.random() * ids.length)], C = MODELS[id];
   const g = new THREE.Group();
@@ -558,9 +559,54 @@ export function trafficCar (hex) {
     o.geometry = o.geometry.clone();                 // своя: мнётся (и её можно выбросить — game.js fullCar и стройки так делают)
     if (o.material.transparent && !o.material.map) R.glass.push(o); else R.dent.push(o.geometry);
   });
+  if (taxi) { m.add(taxiDecor(C.taxi)); U.wear.value *= 0.4; }   // такси — ухоженнее
   g.userData.real = R;
   return { g, hl: C.box.HL * C.k, id };
 }
+/* ─── такси потока (своё, не из чужой модели): жёлтая краска — маской, как у всех; шашечки двумя рядами вдоль
+   бортов и фонарь «ТАКСИ» на крыше — одна сетка на одну картинку (верх — шашки, низ — надпись) ─── */
+let TAXI_TEX = null;
+function taxiTex () {
+  if (TAXI_TEX) return TAXI_TEX;
+  const c = document.createElement('canvas'); c.width = 128; c.height = 64;
+  const x = c.getContext('2d');
+  for (let i = 0; i < 16; i++) for (let j = 0; j < 2; j++) { x.fillStyle = (i + j) % 2 ? '#141414' : '#ffd21f'; x.fillRect(i * 8, j * 8, 8, 8); }   // шашки: 0—16 px
+  x.fillStyle = '#ffd21f'; x.fillRect(0, 16, 128, 48);
+  x.fillStyle = '#141414'; x.font = 'bold 22px monospace'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('ТАКСИ', 64, 42);
+  TAXI_TEX = new THREE.CanvasTexture(c); TAXI_TEX.colorSpace = THREE.SRGBColorSpace; TAXI_TEX.magFilter = THREE.NearestFilter;
+  return TAXI_TEX;
+}
+function taxiDecor (T) {
+  const P = [], U = [], I = [];
+  const quad = (a, b, c, d, uv) => {                 // a b c d — углы (по часовой с левого нижнего), uv — [u0, v0, u1, v1]
+    const v = P.length / 3;
+    P.push(...a, ...b, ...c, ...d);
+    U.push(uv[0], uv[1], uv[2], uv[1], uv[2], uv[3], uv[0], uv[3]);
+    I.push(v, v + 1, v + 2, v, v + 2, v + 3);
+  };
+  const CH = [0, 0.75, 1, 1], TX = [0, 0, 1, 0.75];   // шашки — верхняя четверть картинки (flipY), надпись — остальное
+  const [z0, z1] = T.z, h = 0.13;
+  for (const sx of [-1, 1]) {                         // ряды шашек на бортах
+    const X = sx * T.x;
+    quad([X, T.y - h / 2, sx > 0 ? z0 : z1], [X, T.y - h / 2, sx > 0 ? z1 : z0], [X, T.y + h / 2, sx > 0 ? z1 : z0], [X, T.y + h / 2, sx > 0 ? z0 : z1], CH);
+  }
+  // фонарь: коробка 0,46 × 0,15 × 0,16, надпись — спереди и сзади, шашки — по бокам и сверху
+  const w = 0.23, d = 0.08, y0 = T.roof, y1 = T.roof + 0.15, zc = T.roofZ;
+  quad([-w, y0, zc + d], [w, y0, zc + d], [w, y1, zc + d], [-w, y1, zc + d], TX);
+  quad([w, y0, zc - d], [-w, y0, zc - d], [-w, y1, zc - d], [w, y1, zc - d], TX);
+  quad([w, y0, zc + d], [w, y0, zc - d], [w, y1, zc - d], [w, y1, zc + d], CH);
+  quad([-w, y0, zc - d], [-w, y0, zc + d], [-w, y1, zc + d], [-w, y1, zc - d], CH);
+  quad([-w, y1, zc + d], [w, y1, zc + d], [w, y1, zc - d], [-w, y1, zc - d], CH);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+  geo.setIndex(I);
+  geo.computeVertexNormals();
+  const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: taxiTex(), side: THREE.DoubleSide }));
+  m.name = 'taxi';
+  return m;
+}
+
 /* стёкла машины потока: одним куском — трескаются все и бьются все */
 function trafficGlass (R, force) {
   for (const o of R.glass) {

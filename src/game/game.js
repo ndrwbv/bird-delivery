@@ -6694,12 +6694,12 @@ function newCar (parked) {
   // Такси — тоже лёгкие (три меша: кузов с шашечками, фары, надпись; аварийка — четвёртый, мигает)
   const hex = taxi ? TAXI_HEX : pick(CAR_HEX);
   // проба (13.10.2026): часть потока — настоящие «Семёрка» и «Копейка» своего цвета и износа, мнутся как твоя (realcar.js TRAFFIC)
-  const rc = !parked && !taxi && REALCAR.trafficReady() && chance(REALCAR.TRAFFIC.SHARE) ? REALCAR.trafficCar(hex) : null;
+  const rc = !parked && REALCAR.trafficReady() && chance(REALCAR.TRAFFIC.SHARE) ? REALCAR.trafficCar(hex, taxi) : null;   // такси — тоже (жёлтая «Семёрка» с шашками)
   let mesh;
   if (rc) {
     mesh = rc.g;
     const R = mesh.userData.real;
-    mesh.userData = dbl({ lite: true, realLite: true, real: R, hl: rc.hl, wheels: [], steer: [], panels: [], glass: [], hazard: [], dmg: 0, bodyHex: hex, model: 'sedan', taxi: false, full: undefined, _pose: undefined });
+    mesh.userData = dbl({ lite: true, realLite: true, real: R, hl: rc.hl, wheels: [], steer: [], panels: [], glass: [], hazard: [], dmg: 0, bodyHex: hex, model: 'sedan', taxi: !!taxi, full: undefined, _pose: undefined });
   } else mesh = makeCarLite(hex, model, taxi);
   return carObj(mesh, rc ? 'sedan' : model, taxi, !!parked, (taxi ? rand(12, 17) : rand(9, 14)) * (night ? ECON.TRAFFIC.NIGHT_SPEED : 1), 100, rand(8, 30));
 }
@@ -14061,12 +14061,12 @@ HITS.init({ THREE, scene, box, mergeGeos, HUMAN_VC, groundH, surfaceAt, curbAt, 
    на глазах; и при каждой перестановке машины потока (placeTraffic — поток перевыставляет те же машины, а не новые) */
 function realSwap (t, force) {
   const u = t.mesh && t.mesh.userData;
-  if (!u || !u.lite || u.realLite || t.taxi || !isFlow(t) || t.knock || t.wreck || t.still || !REALCAR.trafficReady()) return;
+  if (!u || !u.lite || u.realLite || !isFlow(t) || t.knock || t.wreck || t.still || !REALCAR.trafficReady()) return;
   if (!force && !chance(REALCAR.TRAFFIC.SHARE)) return;
-  const rc = REALCAR.trafficCar(u.bodyHex);
+  const rc = REALCAR.trafficCar(u.bodyHex, t.taxi);
   if (!rc) return;
   const old = t.mesh, m = rc.g, R = m.userData.real;
-  m.userData = dbl({ lite: true, realLite: true, real: R, hl: rc.hl, wheels: [], steer: [], panels: [], glass: [], hazard: [], dmg: 0, bodyHex: u.bodyHex, model: 'sedan', taxi: false, full: undefined, _pose: undefined });
+  m.userData = dbl({ lite: true, realLite: true, real: R, hl: rc.hl, wheels: [], steer: [], panels: [], glass: [], hazard: [], dmg: 0, bodyHex: u.bodyHex, model: 'sedan', taxi: !!t.taxi, full: undefined, _pose: undefined });
   m.position.copy(old.position); m.rotation.copy(old.rotation);
   if (old.parent) { old.parent.add(m); old.parent.remove(old); }
   t.mesh = m; t.model = 'sedan'; t.hl = rc.hl;
