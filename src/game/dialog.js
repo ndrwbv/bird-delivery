@@ -126,8 +126,10 @@ const appName = o => {
   return ap && ap.nick && n && (n === p.name || n === p.first) ? ap.nick : n;
 };
 
+/* o.skip() — спросить, когда подошла очередь: реплика ещё к месту? true — не показывать, say вернёт null
+   (обед Толика стоял в очереди за другим разговором, а смена тем временем кончилась — career.js) */
 export function say (o) {
-  const run = () => new Promise(res => show(o, res));
+  const run = () => (o.skip && o.skip() ? null : new Promise(res => show(o, res)));
   const p = queue.then(run);
   queue = p.catch(() => {});
   return p;

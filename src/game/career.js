@@ -269,12 +269,26 @@ export function atBase (next) {
   if (h < ECON.SHIFT.LUNCH_H || h >= 24) return false;
   SH.lunch = true;
   A.S.handT = 1e9;                                  // пока обедаешь — следующий заказ не берём
-  const go = () => { if (SH.on && A.S.state === 'handover' && !A.S.order) showLunch(next); };
+  const go = () => { LUNCH_TALK.on = false; if (lunchFits()) showLunch(next); };
   const p = CHAT.person && CHAT.person();
   if (!p) { go(); return true; }
+  // реплика может постоять в очереди за другим разговором — к своей очереди смена уже могла кончиться (полночь,
+  // сняли, «в меню»): тогда Толик молчит, а открытую реплику конец смены закрывает сам (lunchOff)
   DLG.say({ person: p, name: t('Толик управляющий'), head: t('пиццерия'), text: lunchLine(),
-    accept: t('давай'), mood: 'calm', color: '#3fae5a' }).then(go, go);
+    accept: t('давай'), mood: 'calm', color: '#3fae5a',
+    skip: () => !(LUNCH_TALK.on = lunchFits()) }).then(go, go);
   return true;
+}
+/* обед ещё к месту: смена идёт, до полуночи, стоишь в пиццерии без заказа.
+   Гонка (IDEAS «Баги» 5): обед открылся поверх чека, когда смену оборвали, пока Толик говорил «на, похавай» */
+const LUNCH_TALK = { on: false };                   // реплика Толика про обед сейчас на экране
+function lunchFits () {
+  const S = A && A.S;
+  return !!S && SH.on && SH.phase === '' && S.state === 'handover' && !S.order && !S.ride;
+}
+/* конец смены (полночь, чек, быстрый заезд): реплика про обед на экране — закрыть; карточку обеда снимает endShift */
+function lunchOff () {
+  if (LUNCH_TALK.on) { LUNCH_TALK.on = false; DLG.dismiss(); }
 }
 
 /* ── обед (с 14:00, в пиццерии): одно из трёх до конца смены; next — после выбора.
@@ -309,6 +323,7 @@ const fmtK = k => Number(k).toLocaleString(lang() === 'zh' ? 'zh-CN' : lang());
 /* ── полночь: сначала, может быть, развоз смены, потом итоги ── */
 async function midnight () {
   SH.phase = 'late'; SH.lateT = 0;
+  lunchOff();
   const S = A.S;
   let ride = false;
   // развоз — только если едешь: в полночь на карточке заказа или на погрузке смена просто кончается
@@ -438,6 +453,8 @@ function sealOf (why, full, mood) {
 export function showEnd (why, whyText, held) {
   if (!A) return;
   const S = A.S;
+  lunchOff();
+  if ($('choice') && $('choice').classList.contains('cr-lunch')) A.hideChoice();   // карточка обеда поверх чека — никогда
   if (QR.on()) { quickEnd(why, whyText); return; }
   if (!held && SH.on && CHAT.busy()) { CHAT.idle(() => { if (A.S.state === 'over') showEnd(why, whyText, true); }); return; }
   CHAT.clear();
@@ -607,6 +624,7 @@ function districtLine () {
 const QTITLE = { 'смена окончена': () => t('ты сам закончил заезд'), 'время': () => t('заезд окончен'), 'сбил клиента': () => t('сняли с заезда') };
 function quickEnd (why, whyText) {
   const S = A.S;
+  lunchOff();
   CHAT.clear();
   if (SH.on) SH.endH = hour();
   SH.on = false; SH.phase = 'done'; SH.bonus = 0;

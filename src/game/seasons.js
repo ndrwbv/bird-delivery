@@ -354,7 +354,7 @@ function Pile (CH = CELL) {                      // CH — клетка скле
         const g = new THREE.BufferGeometry();
         const pa = new THREE.BufferAttribute(c.p.slice(0, c.n * 3), 3), ca = new THREE.BufferAttribute(c.c.slice(0, c.n * 3), 3, true), aa = new THREE.BufferAttribute(c.a.slice(0, c.n * 4), 4, true);
         g.setAttribute('position', pa); g.setAttribute('color', ca); g.setAttribute('aux', aa);
-        g.computeBoundingSphere();
+        g.computeBoundingSphere(); g.computeBoundingBox();          // коробка — для отсечения по кадру (cull.js)
         for (const at of keep ? [ca, aa] : [pa, ca, aa]) at.onUpload(dropArr);
         const m = new THREE.Mesh(g, mat);
         C.scene.add(m);
@@ -363,9 +363,64 @@ function Pile (CH = CELL) {                      // CH — клетка скле
       cells.clear(); byNum.clear();
       return out;
     },
+    cells: () => cells,
+    clear () { cells.clear(); byNum.clear(); },
   };
 }
 function dropArr () { this.array = null; }
+
+/* Несколько склеек с одним материалом — одним мешем на клетку (17.10.2026, docs/AGENTS.md «Слои статики»): сугробы, кучи
+   листьев и деревья лежали тремя мешами в одной клетке 200 м — три вызова отрисовки вместо одного (~20 лишних в кадре
+   на «Деке»). Видно их и так по шейдеру (вид и зерно в aux против uDrift / uFallen / uLeaf), прятать меш сугробов не нужно.
+   piles — склейки по порядку, первые nKeep — «живые» (их вершины правят на ходу: сугробы разбиваются, листья — тоже):
+   они идут в начале клетки, и после загрузки в видеокарту в памяти JS остаётся только их кусок позиций (как раньше —
+   их отдельные массивы), а не вся клетка с деревьями. Ответ: меши и для каждой склейки — сдвиг её вершин в клетке
+   (offs[i].get(ключ клетки) — прибавить к v0 записи). */
+function* jointSteps (piles, mat, nKeep) {
+  const keys = new Set();
+  for (const P of piles) for (const k of P.cells().keys()) keys.add(k);
+  const out = [], offs = piles.map(() => new Map());
+  out.byKey = new Map();
+  let i = 0;
+  for (const k of keys) {
+    if (++i % 24 === 0) yield 'pile';
+    let n = 0, nk = 0;
+    const parts = piles.map((P, pi) => { const c = P.cells().get(k), cn = c ? c.n : 0; n += cn; if (pi < nKeep) nk += cn; return c; });
+    if (!n) continue;
+    const pp = new Float32Array(n * 3), cc = new Uint8Array(n * 3), aa = new Uint8Array(n * 4);
+    let o = 0;
+    for (let pi = 0; pi < parts.length; pi++) {
+      const c = parts[pi];
+      if (!c || !c.n) continue;
+      pp.set(c.p.subarray(0, c.n * 3), o * 3); cc.set(c.c.subarray(0, c.n * 3), o * 3); aa.set(c.a.subarray(0, c.n * 4), o * 4);
+      offs[pi].set(k, o);
+      o += c.n;
+    }
+    const g = new THREE.BufferGeometry();
+    const pa = new THREE.BufferAttribute(pp, 3), ca = new THREE.BufferAttribute(cc, 3, true), xa = new THREE.BufferAttribute(aa, 4, true);
+    g.setAttribute('position', pa); g.setAttribute('color', ca); g.setAttribute('aux', xa);
+    g.computeBoundingSphere(); g.computeBoundingBox();
+    ca.onUpload(dropArr); xa.onUpload(dropArr);
+    pa.onUpload(nk ? keepHead(nk * 3) : dropArr);
+    const m = new THREE.Mesh(g, mat);
+    C.scene.add(m);
+    out.push(m); out.byKey.set(k, m);
+  }
+  for (const P of piles) P.clear();
+  return { out, offs };
+}
+/* после загрузки — только начало массива (живые вершины). three.js сверяет размер массива с буфером в видеокарте
+   (byteLength) и правит буфер кусками (addUpdateRange: bufferSubData со сдвигом и в буфере, и в массиве), поэтому
+   короткому массиву — прежний byteLength: правки живых вершин ложатся куда надо, остальное в видеокарте не трогается */
+function keepHead (len) {
+  return function () {
+    const a = this.array;
+    if (!a || a.length <= len) return;
+    const h = a.slice(0, len);
+    Object.defineProperty(h, 'byteLength', { value: a.byteLength });
+    this.array = h;
+  };
+}
 
 /* шаблоны: коробка, икосаэдр, конус, плашка стоймя (+Z) и лёжа (вверх) */
 let TPL = null;
@@ -432,6 +487,8 @@ const SLIDES = [];
 /* ледяные горки дворов { x, z, ry, H, L, k, it } — на них катаются люди (yardlife.js) */
 export const slides = () => SLIDES;
 let MESH_GARL = [], MESH_PILE = [];
+/* ?nojoint — сугробы, листья и деревья по-старому, тремя мешами на клетку (для замера «до/после») */
+const JOINT_OFF = typeof location !== 'undefined' && /[?&]nojoint(&|$)/.test(location.search);
 const BUILT = { trees: 0, pile: 0, garl: 0, drifts: 0, bulbs: 0, items: 0 };
 
 /* ctx: THREE, scene, cam, renderer, Store, MAP, CITY, V, S, groundH, curbAt, nearestRoad, roadWidth, drivable,
@@ -442,7 +499,7 @@ export function initSeasons (ctx) {
   const q = new URLSearchParams(location.search).get('season');
   if (q !== null && q !== '' && !Number.isNaN(+q)) { SEA = wrap(+q); FORCED = true; }
   else readSaved();
-  PILE = Pile(); GARL = Pile(); DRIFTP = Pile(); LEAFP = Pile();
+  PILE = Pile(); GARL = Pile(CELL * 2); DRIFTP = Pile(); LEAFP = Pile();   // гирлянды редкие и мелкие — клетки 400 м (17.10.2026): вдвое меньше вызовов, лишних вершин за кадром — мало
   smashMat(C.SMASH_MAT);
   apply();
 }
@@ -871,18 +928,29 @@ export function* seasonSteps () {
   BUILT.bulbs = bulbs;
   yield 'garl2';
   BUILT.pile = PILE.tris(); BUILT.garl = GARL.tris();
-  MESH_PILE = yield* PILE.steps(pileMat(), EDL.ED.on);   // редактор: вершины деревьев — в памяти (прятать убранное на месте)
-  if (EDL.ED.on) EDL.PILE_OF.get = key => MESH_PILE.byKey.get(key);
-  yield 'pile';
+  if (EDL.ED.on || JOINT_OFF) {
+    MESH_PILE = yield* PILE.steps(pileMat(), EDL.ED.on);   // редактор: вершины деревьев — в памяти (прятать убранное на месте)
+    if (EDL.ED.on) EDL.PILE_OF.get = key => MESH_PILE.byKey.get(key);
+    yield 'pile';
+  }
   MESH_GARL = yield* GARL.steps(garlandMat());
   yield 'garlmesh';
-  // сугробы — отдельно: их позиции живые (разбиваются и отрастают)
-  DRIFT_MESH = yield* DRIFTP.steps(MESH_PILE[0] ? MESH_PILE[0].material : pileMat(), true);
-  for (const list of DRIFTS.values()) for (const d of list) d.mesh = DRIFT_MESH.byKey.get(d.key);
-  yield 'drift';
-  LEAF_MESH = yield* LEAFP.steps(MESH_PILE[0] ? MESH_PILE[0].material : pileMat(), true);
-  for (const list of LEAVES.values()) for (const d of list) d.mesh = LEAF_MESH.byKey.get(d.key);
-  yield 'drift';
+  if (EDL.ED.on || JOINT_OFF) {
+    // сугробы — отдельно: их позиции живые (разбиваются и отрастают)
+    DRIFT_MESH = yield* DRIFTP.steps(MESH_PILE[0] ? MESH_PILE[0].material : pileMat(), true);
+    for (const list of DRIFTS.values()) for (const d of list) d.mesh = DRIFT_MESH.byKey.get(d.key);
+    yield 'drift';
+    LEAF_MESH = yield* LEAFP.steps(MESH_PILE[0] ? MESH_PILE[0].material : pileMat(), true);
+    for (const list of LEAVES.values()) for (const d of list) d.mesh = LEAF_MESH.byKey.get(d.key);
+    yield 'drift';
+  } else {
+    // сугробы, кучи листьев и деревья — одним мешем на клетку (jointSteps): живые сугробы и листья — в начале клетки
+    const J = yield* jointSteps([DRIFTP, LEAFP, PILE], pileMat(), 2);
+    MESH_PILE = J.out; DRIFT_MESH = []; LEAF_MESH = [];
+    for (const list of DRIFTS.values()) for (const d of list) { d.mesh = J.out.byKey.get(d.key); d.v0 += J.offs[0].get(d.key) || 0; }
+    for (const list of LEAVES.values()) for (const d of list) { d.mesh = J.out.byKey.get(d.key); d.v0 += J.offs[1].get(d.key) || 0; }
+    yield 'pile';
+  }
   // гирлянды, сугробы, снег и комья впервые появятся посреди зимы — на сцене заранее: их программы собирает
   // кусок поздней сборки 'shaders' (game.js; renderer.compile берёт и невидимое). Свой compile тут был лишним —
   // 60—120 мс «меню не отвечает» на Деке (10.10.2026, docs/AGENTS.md «Шейдеры на ходу»)

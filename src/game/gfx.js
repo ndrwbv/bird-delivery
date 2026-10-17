@@ -18,6 +18,9 @@
      aa      нет               сглаживание    сглаживание   (MSAA ×4 на маленьком кадре —
              края и огни вдали не рябят; меняется после перезапуска игры)
 
+   Отдельно от пресета — «тяжёлый кадр» (dynres.js): видеокарта не успевает — на миг
+   меньшее разрешение, «мыло вместо рывка». Вкл на Деке и телефоне, на компьютере выкл.
+
    Правило: графика не меняет игру. Пресет трогает только то, что видно и что
    далеко: сколько машин и людей, где они рождаются, кто клиент, физика —
    одинаково. «Вдали» — дальше LAG_R от машины игрока: там прохожие и так не
@@ -128,13 +131,31 @@ export const winQ = () => (val('win') ? { interior: 1, lod: 70 } : { interior: 0
    (lawnprops.js) — радиус клеток R, трава / одуванчики / мусор — до small, доля травы,
    зарослей и мусора — thin; краска газона (lawn.js) — полная (1) или облегчённая (0:
    без тени-рельефа и мелких октав шума — на Деке это ~треть времени видеокарты на землю) */
+/* small — до края, где трава уже исчезла; полоса роста из земли — 14 м и ещё 6 м запаса (lawnprops.js FADE_S, FADE_LAG):
+   видно примерно до small − 13 м. 17.10.2026: средняя 50 → 64 (трава видна до ~51 м, как до 04.10, а не до ~37),
+   высокая 60 → 72 (~59 м) — чтобы высокая не была ближе средней; на «Деке» кадр тот же (травы в кадре сотни штук) */
 export const DETAIL = [
   { R: 80, small: 40, thin: 0.5, lawn: 0 },     // низкая
-  { R: 100, small: 50, thin: 0.7, lawn: 0 },    // средняя (Steam Deck)
-  { R: 120, small: 60, thin: 1, lawn: 1 },      // высокая
+  { R: 100, small: 64, thin: 0.7, lawn: 0 },    // средняя (Steam Deck)
+  { R: 120, small: 72, thin: 1, lawn: 1 },      // высокая
 ];
 export const detail = () => DETAIL[O.range] || DETAIL[2];
 export const hideR = () => (O.far === 0 ? { people: 100, cars: 200, lod: 32 } : { people: 130, cars: 220, lod: 45 });
+
+/* ── «тяжёлый кадр»: мыло вместо рывка (dynres.js) ──
+   Вкл / выкл — отдельно от пресета (в «свою» не превращает), по виду устройства, в том же ключе dlv-gfx
+   (поле dyn). По умолчанию вкл на Деке и телефоне — там видеокарта слабая, а пиксель и так крупный;
+   на компьютере выкл — игрок сам выбирает чёткость. ?dyn=0 / ?dyn=1 — на этот запуск, не сохраняется. */
+export const DYN_DEF = { ios: 1, phone: 1, deck: 1, pc: 0 };
+const DYN_Q = Q.get('dyn');
+let DYN = (() => { const v = readAll().dyn; return v && (v[DEV] === 0 || v[DEV] === 1) ? v[DEV] : DYN_DEF[DEV]; })();
+if (DYN_Q === '0' || DYN_Q === '1') DYN = +DYN_Q;
+export const dynOn = () => DYN;
+export function setDyn (v) {
+  DYN = v ? 1 : 0;
+  if (DYN_Q === '0' || DYN_Q === '1') return;
+  const all = readAll(); all.dyn = { ...(all.dyn || {}), [DEV]: DYN }; writeAll(all);
+}
 
 /* ── применить: что меняется без перезагрузки ── */
 let H = null;                       // хуки game.js: { resize }
@@ -295,7 +316,8 @@ export function panel (body, focus, card) {
   const row = (label, id, txt, main) => '<div class="set-row"><span>' + label + '</span>' + btn(id, txt, main) + '</div>';
   body.innerHTML = (card ? '' : '<div class="pn-t">' + t('графика') + '</div>') +
     row('<b>' + t('качество') + '</b>', 'gfx-p', presetName(), true) +
-    '<div class="set-rows">' + ITEMS.map(it => row(t(it.label), 'gfx-' + it.id, itemText(it, O[it.id]))).join('') + '</div>' +
+    '<div class="set-rows">' + ITEMS.map(it => row(t(it.label), 'gfx-' + it.id, itemText(it, O[it.id]))).join('') +
+    row(t('тяжёлый кадр'), 'gfx-dyn', DYN ? t('мыло вместо рывка') : t('рывок вместо мыла')) + '</div>' +
     '<div class="pn-n">' + t('графика не меняет игру: машины и люди рядом, клиенты и физика — одинаковые на любой') + '</div>';
   const again = id => panel(body, id, card);
   body.querySelector('#gfx-p').onclick = () => {
@@ -304,12 +326,13 @@ export function panel (body, focus, card) {
     again('gfx-p');
   };
   for (const it of ITEMS) body.querySelector('#gfx-' + it.id).onclick = () => { set(it.id, (O[it.id] + 1) % it.vals.length); again('gfx-' + it.id); };
+  body.querySelector('#gfx-dyn').onclick = () => { setDyn(!DYN); again('gfx-dyn'); };
 }
 
 /* отладка: __dlv.GFX */
 export const DEBUG = {
   get dev () { return DEV; }, get preset () { return PRESET; }, get opts () { return { ...O }; },
-  set, setPreset, STATS, ITEMS, PRESETS, DETAIL, poke,
+  set, setPreset, STATS, ITEMS, PRESETS, DETAIL, poke, get dyn () { return DYN; }, setDyn,
   offer: () => { offerEl = null; offer(); return true; },   // показать плашку «кадр не успевает» сразу (проверка вида)
   /* время кадра CPU за последние n кадров: p50 / p95, мс */
   work (n = 300) { const s = STATS.work.slice(-n).sort((a, b) => a - b), q = p => (s.length ? +s[Math.min(s.length - 1, Math.floor(p * s.length))].toFixed(2) : 0); return { n: s.length, p50: q(0.5), p95: q(0.95) }; },

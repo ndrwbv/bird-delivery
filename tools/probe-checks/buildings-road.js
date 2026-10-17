@@ -4,7 +4,7 @@
      • свои постройки-«дома» (контуры, что модули кладут как дом): пустыри (wastelands.js), точки
        конкурентов (rivals.js), стройки (construction.js), пиццерии-шары (pizzadome.js), клуб — ни одна
        точка контура не на асфальте;
-     • участки строек, пустырей, костров и котлов (darknight.js), пляж (beach.js) — прямоугольник целиком не на асфальте;
+     • участки строек, пустырей, костров и котлов (darknight.js), пляж (beach.js), корты (courts.js) — прямоугольник целиком не на асфальте;
      • гаражи-ракушки (lawnprops.js) — собираем клетки у каждого 20-го подъезда, коробка не на асфальте;
      • коробки-постройки из редактора города (edits.json) — ни одна точка не на асфальте. */
 const RS = d.RSEG, G = new Map(), CELL = 40;
@@ -58,6 +58,7 @@ for (const s of (d.CONS && d.CONS.SITES) || []) rect('стройка', s);
 for (const s of (d.WASTE && d.WASTE.LOTS) || []) rect('пустырь', s);
 for (const s of (d.DARK && d.DARK.CAMPS) || []) rect('костёр', s);
 for (const s of (d.DARK && d.DARK.POTS) || []) rect('котёл', s);
+for (const c of (d.COURTS && d.COURTS.LIST) || []) rect('корт', { x: c.x, z: c.z, ux: c.ux, uz: c.uz, W: c.L, D: c.W });   // корты (courts.js) — прямоугольник с оградой
 if (d.BEACH && d.BEACH.rect) rect('пляж', d.BEACH.rect);   // песок пляжа с ларьком и кабинкой (beach.js)
 // 3) гаражи-ракушки газона (собираются у камеры — соберём сами у части подъездов)
 if (d.LAWN) {

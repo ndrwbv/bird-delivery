@@ -112,7 +112,7 @@ export function kindOf (r) {
   if (r._wear !== undefined) return r._wear;
   let k = 'smooth';
   if (!OFF && A && !r.b && r.c !== 6 && WEAR.P[r.c]) {
-    const m = r.p[(r.p.length / 2) | 0] || r.p[0];
+    const m = r.m0 || r.p[(r.p.length / 2) | 0] || r.p[0];   // m0 — середина улицы до разрезки на куски разной ширины (roadwiden.js)
     const sx = Math.floor(m[0] / WEAR.SECT), sz = Math.floor(m[1] / WEAR.SECT);
     const key = r.n ? r.n + '#' + sx + ',' + sz : Math.round(m[0]) + ',' + Math.round(m[1]);
     const zone = zoneAt(m[0], m[1]);

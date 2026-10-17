@@ -52,6 +52,7 @@ import * as DOOR from './doorstep.js';
 import * as RHY from './rhythm.js';             // ритм смены ставит встречи (rhythm.js)
 import * as FACES from './faces.js';            // знакомые лица района: Глеб и его история (faces.js)
 import { FACE_HEROES, FACE_DECOR, FACE_PAL, FACE_DECOR_NAME } from './faces.js';
+import * as LOCALS from './locals.js';          // жители Юга: их катсцены у подъезда (locals.js LOCAL_HEROES)
 
 export const EN = {
   NEAR: 320,          // подъезд для встречи — ближе стольких метров к машине
@@ -156,6 +157,8 @@ const HEROES = [
 
   // знакомые лица района (faces.js): Глеб и его жена — только в своей истории, в случайные встречи не попадают
   ...FACE_HEROES,
+  // жители Юга (locals.js): Людмила Петровна, Серёга, Петя, Костя, Олеся и новый жилец — только в своих историях
+  ...LOCALS.LOCAL_HEROES,
 ];
 
 /* ─────────────── состояние ─────────────── */
@@ -1001,7 +1004,7 @@ export function play (id, i = 0, o = {}) {
     else if (res) m = sample(res);
     // знакомое лицо (faces.js): появление сыграно на заказе — история дальше (ответ в 1-м запоминается), адрес и подъезд — его
     const ord = o.order && o.order.ord;
-    if (h.face && st && ord) FACES.met(h.id, CUT.ans || null, ord.stops && ord.stops[0], sp);
+    if (h.face && st && ord) { if (h.local) LOCALS.met(h.local, CUT.ans || null, ord.stops && ord.stops[0]); else FACES.met(h.id, CUT.ans || null, ord.stops && ord.stops[0], sp); }
     M.stats.last = { id, meet: s.id, ans: CUT.ans || null, skip: !!CUT.skip, ms: Math.round(performance.now() - t0),
       out: res ? res.out : null, seal: res ? t(res.seal) : '', row: res && res.row ? t(res.row) : '', mood: res ? res.mood : '',
       order: !!st, sample: !st && m ? { fee: EN.SAMPLE.FEE, tip: EN.SAMPLE.TIP, add: m.add, cut: m.cut } : null };
@@ -1011,7 +1014,8 @@ export function play (id, i = 0, o = {}) {
     povClear();
     clearDecor();
     // жена Глеба: в накладной был он, дверь открыла она — к двери за пиццей выходит она (faces.js)
-    if (h.face && h.fem && st && A.rehuman && st.peds && st.peds[0] && !st.peds[0].dead) { try { A.rehuman(st.peds[0], personOf(h)); } catch (e) { console.warn('[enc] rehuman', e); } }
+    // жители Юга (locals.js): swap — дверь открыл другой (новый жилец), к двери выходит он
+    if (h.face && (h.local ? h.swap : h.fem) && st && A.rehuman && st.peds && st.peds[0] && !st.peds[0].dead) { try { A.rehuman(st.peds[0], personOf(h)); } catch (e) { console.warn('[enc] rehuman', e); } }
     guestBack(st);                                 // герой вышел к двери — вручение как обычно
     if (st) RHY.meetOff(M.stats.last ? id + ' — ' + (M.stats.last.skip ? 'пропустил' : M.stats.last.seal || 'без ответа') : id);
     M.on = false; M.hero = null;

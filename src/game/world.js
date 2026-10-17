@@ -117,7 +117,7 @@ function paveKind (key, x, z, salt) {
 }
 /* тротуар улицы — по имени улицы и району: вся улица в районе одинаковая */
 export function paveRoad (r) {
-  const p = r.p[(r.p.length / 2) | 0] || r.p[0];
+  const p = r.m0 || r.p[(r.p.length / 2) | 0] || r.p[0];   // m0 — середина улицы до разрезки (roadwiden.js)
   return PAVE[paveKind(r.n || '', p[0], p[1], 0)];
 }
 export function pavePath (q) {

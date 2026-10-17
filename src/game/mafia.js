@@ -164,7 +164,9 @@ const TOMATO_GEO = new THREE.SphereGeometry(0.13, 7, 5);
 const SHOE_GEO = new THREE.BoxGeometry(0.12, 0.1, 0.28);
 function muzzle (m) {
   const p = new THREE.Vector3(0, -0.76, 0.02);
-  (m.gun || m.u.armR).localToWorld(p);
+  const b = m.gun || m.u.armR;
+  b.updateWorldMatrix(true, false);                 // дальний человек: кости спрятаны, их матрицы cull.js не считает
+  b.localToWorld(p);
   return p;
 }
 function fire (m) {
@@ -189,7 +191,7 @@ function fire (m) {
     // детская: помидор или ботинок по дуге, долетает за 0,6 с
     const tomato = chance(0.6);
     const o = new THREE.Mesh(tomato ? TOMATO_GEO : SHOE_GEO, lam(tomato ? '#e0322c' : '#4a3426'));
-    const p = new THREE.Vector3(0, -0.6, 0); m.u.armR.localToWorld(p);
+    const p = new THREE.Vector3(0, -0.6, 0); m.u.armR.updateWorldMatrix(true, false); m.u.armR.localToWorld(p);
     o.position.copy(p);
     A.scene.add(o);
     // упреждение: куда машина доедет за время полёта (наполовину)

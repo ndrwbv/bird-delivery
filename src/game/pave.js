@@ -20,6 +20,7 @@
      PAVE.init({ RSEG, CITY, onAlley })   — один раз (game.js, сразу после RSEG)
      PAVE.onPave(x, z, m)                 — '' (газон) или вид мощёного
      PAVE.walkHalf(seg)                   — от оси дороги до внешнего края тротуара, м
+     PAVE.roadGap(x, z, extra)            — до края асфальта по каждой дороге рядом (не по ближайшей осевой), м
      PAVE.each(x0, z0, x1, z1, fn)        — куски мощёного в прямоугольнике (проезд навигатора, routeyard.js)
    ────────────────────────────────────────────────────────────────────────── */
 
@@ -89,6 +90,21 @@ export function onPave (x, z, m = 0) {
   return '';
 }
 
+/* до края асфальта, м — по каждой дороге рядом, а не по ближайшей осевой (как construction.js): узкий
+   проезд рядом с широкой улицей — осевая ближе у проезда, а асфальт ближе у улицы. < 0 — на асфальте.
+   extra(seg) — свой запас у дороги (вычитается: «пешеходке — 0,8 м, остальным — 1 м»).
+   Точно до ~4 м от края (дальше кусок может не попасть в клетку — тогда больше настоящего, 99 — дорог рядом нет) */
+export function roadGap (x, z, extra) {
+  if (!A) return 99;
+  if (!G) index();
+  let g = 99;
+  for (const s of G.get(key(Math.floor(x / PAVE.CELL), Math.floor(z / PAVE.CELL))) || []) {
+    const v = segD(x, z, s.x1, s.z1, s.x2, s.z2) - s.w / 2 - (extra ? extra(s) : 0);
+    if (v < g) g = v;
+  }
+  return g;
+}
+
 /* мощёное в прямоугольнике, по разу каждый кусок — для проезда навигатора (routeyard.js):
    fn(ax, az, bx, bz, half) — ось куска и от оси до края мощёного */
 export function each (x0, z0, x1, z1, fn) {
@@ -104,4 +120,4 @@ export function each (x0, z0, x1, z1, fn) {
     }
 }
 
-export const DEBUG = { PAVE, onPave, walkHalf, get cells () { return G ? G.size : 0; }, get paths () { return PN; } };
+export const DEBUG = { PAVE, onPave, walkHalf, roadGap, get cells () { return G ? G.size : 0; }, get paths () { return PN; } };

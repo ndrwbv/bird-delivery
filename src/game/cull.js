@@ -27,7 +27,7 @@ const CULL_EVERY = 12;
 const MAX_R = 400;              // больше — это юбка земли и река: они всегда на сцене
 
 let LIST = [], SCENE = null, CAM = null, PROPS = [], tick = 0;
-export const STATS = { frozen: 0, culled: 0, groups: 0, props: 0, propsOff: 0, cells: 0, cellsOut: 0, outMeshes: 0 };
+export const STATS = { frozen: 0, culled: 0, groups: 0, props: 0, propsOff: 0, cells: 0, cellsOut: 0, outMeshes: 0, big: 0, boxOut: 0, mwSkip: 0 };
 
 /* ── что в кадре: клетки статики (09.10.2026, хвост кадров на Деке) ──
    three.js в каждом кадре проверяет КАЖДЫЙ видимый меш сцены на попадание в кадр (projectObject →
@@ -37,8 +37,14 @@ export const STATS = { frozen: 0, culled: 0, groups: 0, props: 0, propsOff: 0, c
    раз в кадр — проверка коробки клетки (сотни проверок вместо тысяч), и у кусков клетки вне кадра
    выключен слой (layers.mask = 0) — three.js проходит их, не считая. Видимость (visible) не
    трогаем: её переключают сезоны. Слои в игре больше никто не использует.
-   Камера та же для всех отрисовок (главная, катсцены, меню) — inView() годится и для машин и людей. */
+   Камера та же для всех отрисовок (главная, катсцены, меню) — inView() годится и для машин и людей.
+   Большие куски (клетки статики 200 м: земля, разметка, склейки реквизита, деревья — радиус от BIG_R м; таких ~6 тыс. на город) в клетке, что в кадре,
+   проверяются ещё и своей коробкой (17.10.2026): шар клетки 200 м — радиус ~140 м, он задевает кадр куда чаще, чем сама
+   клетка (сзади и сбоку камеры, над и под ней) — ~5 лишних вызовов отрисовки в кадре на «Деке» (docs/AGENTS.md «Слои статики»). Коробку кладёт тот, кто
+   собрал геометрию (game.js boundSphere, seasons.js Pile), или она считается здесь, пока вершины ещё в памяти. */
 const VIEW_CELL = 128;
+const BIG_R = 80;
+const BOX_ON = typeof location === 'undefined' || !/[?&]nobox(&|$)/.test(location.search);   // ?nobox — без коробок, для замера
 /* VIEW.on = false (или ?noview) — без отсечения по кадру: для сравнения замеров (tools/perf.cjs, probe) */
 export const VIEW = { on: typeof location === 'undefined' || !/[?&]noview(&|$)/.test(location.search) };
 let CELLS = [], masked = false;
@@ -63,8 +69,9 @@ function buildCells () {
   for (const e of LIST) {
     const k = Math.floor(e.x / VIEW_CELL) + ',' + Math.floor(e.z / VIEW_CELL);
     let c = M.get(k);
-    if (!c) M.set(k, c = { box: new THREE.Box3(), list: [], vis: true, cx: 0, cz: 0, rad: 0 });
+    if (!c) M.set(k, c = { box: new THREE.Box3(), list: [], big: [], vis: true, cx: 0, cz: 0, rad: 0 });
     c.list.push(e);
+    if (e.box) c.big.push(e);
     c.box.expandByPoint(BOX.min.set(e.x - e.r, e.y - e.r, e.z - e.r));
     c.box.expandByPoint(BOX.max.set(e.x + e.r, e.y + e.r, e.z + e.r));
   }
@@ -83,18 +90,27 @@ function nearCells () {
   nearX = px; nearZ = pz;
 }
 function cellCull () {
-  let out = 0, om = 0;
+  let out = 0, om = 0, bo = 0;
   masked = true;
   for (let i = 0; i < NEAR.length; i++) {
     const c = NEAR[i], v = FR.intersectsBox(c.box);
     if (v !== c.vis) {
       c.vis = v;
       const L = c.list, mask = v ? 1 : 0;
-      for (let j = 0; j < L.length; j++) if (!L[j].gone) L[j].m.layers.mask = mask;
+      for (let j = 0; j < L.length; j++) if (!L[j].gone) { L[j].m.layers.mask = mask; L[j].bw = mask; }
     }
-    if (!v) { out++; om += c.list.length; }
+    if (!v) { out++; om += c.list.length; continue; }
+    // клетка в кадре — большие куски ещё и своей коробкой
+    const B = c.big;
+    for (let j = 0; j < B.length; j++) {
+      const e = B[j];
+      if (e.gone || !e.on) continue;
+      const w = FR.intersectsBox(e.box) ? 1 : 0;
+      if (w !== e.bw) { e.bw = w; e.m.layers.mask = w; }
+      if (!w) bo++;
+    }
   }
-  STATS.cellsOut = out; STATS.outMeshes = om;
+  STATS.cellsOut = out; STATS.outMeshes = om; STATS.boxOut = bo;
 }
 
 const still = o => o.position.x === 0 && o.position.y === 0 && o.position.z === 0 &&
@@ -113,12 +129,18 @@ function take (m, parent) {
   const s = g.boundingSphere;
   if (!s || !(s.radius < MAX_R)) return;
   if (parent === SCENE) m.matrixWorldAutoUpdate = false;   // step() не зовёт ему updateMatrixWorld каждый кадр (их тысячи); сдвинут — cullFar вернёт
-  LIST.push({ m, parent, x: s.center.x, y: s.center.y, z: s.center.z, r: s.radius, on: true });
+  let box = null;
+  if (BOX_ON && s.radius >= BIG_R) {
+    if (!g.boundingBox && g.attributes.position && g.attributes.position.array) g.computeBoundingBox();
+    // запас 3 м: ветер урагана клонит кроны, разбитый сугроб чуть шире — коробка геометрии их не знает
+    if (g.boundingBox && !g.boundingBox.isEmpty()) { box = g.boundingBox.clone().expandByScalar(3); STATS.big++; }
+  }
+  LIST.push({ m, parent, x: s.center.x, y: s.center.y, z: s.center.z, r: s.radius, on: true, box, bw: 1 });
 }
 
 export function freeze (scene, cam, props) {
   for (const c of CELLS) for (const e of c.list) if (!e.gone) e.m.layers.mask = 1;   // второй раз — с чистого листа
-  CELLS = []; NEAR = []; OFF = 0;
+  CELLS = []; NEAR = []; OFF = 0; STATS.big = 0;
   SCENE = scene; CAM = cam; LIST = []; PROPS = props || [];
   POFF = PROPS.filter(p => p._fz && p._on === false).length;
   for (const c of scene.children.slice()) {
@@ -185,19 +207,45 @@ export function step () {
   if (jump) cullFar(); else cullFar(tick % CULL_EVERY, CULL_EVERY);
   if (jump || tick % CULL_EVERY === 0) nearCells();
   if (VIEW.on) { viewFrustum(); cellCull(); }
-  else if (masked) { masked = false; frOk = false; for (const c of CELLS) { c.vis = true; for (const e of c.list) if (!e.gone) e.m.layers.mask = 1; } STATS.cellsOut = STATS.outMeshes = 0; }
+  else if (masked) { masked = false; frOk = false; for (const c of CELLS) { c.vis = true; for (const e of c.list) if (!e.gone) { e.m.layers.mask = 1; e.bw = 1; } } STATS.cellsOut = STATS.outMeshes = STATS.boxOut = 0; }
   // матрицы — только у видимого и живого (см. freeze): спрятанные группы,
   // замороженный реквизит, склейки города и стоящие лёгкие машины пропускаем
   let g = 0, still2 = 0;
+  SKIP = 0;
   for (const c of SCENE.children) {
     if (c.isGroup && c.matrixAutoUpdate) {
       let on = c.visible;
       if (on && c.userData.lite && !moved(c)) { on = false; still2++; }
       c.matrixWorldAutoUpdate = on; g++;
     }
-    if (c.visible && c.matrixWorldAutoUpdate) c.updateMatrixWorld();
+    if (c.visible && c.matrixWorldAutoUpdate) { if (MW_SKIP) upd(c, false); else c.updateMatrixWorld(); }
   }
-  STATS.groups = g; STATS.stillCars = still2;
+  STATS.groups = g; STATS.stillCars = still2; STATS.mwSkip = SKIP;
+}
+
+/* updateMatrixWorld three.js, только спрятанное внутри видимого (visible = false) не обходим (17.10.2026): у дальнего
+   человека (humanLod) спрятаны кости, тело и всё, что у него в руках, — ~340 узлов из ~960 в кадре на «Деке» считались
+   зря. Спрятанному ставим matrixWorldNeedsUpdate: покажут — пересчитается в том же кадре, до отрисовки, вместе с детьми.
+   Кто читает matrixWorld спрятанного сам (localToWorld у кости дальнего) — сначала updateWorldMatrix(true, false).
+   У кого свой updateMatrixWorld (колёса лёгких машин курьеров, SkinnedMesh) — зовём его, как раньше.
+   ?mwall — как раньше (обходить всё), для замеров */
+const UMW = THREE.Object3D.prototype.updateMatrixWorld;
+const MW_SKIP = typeof location === 'undefined' || !/[?&]mwall(&|$)/.test(location.search);
+let SKIP = 0;
+function upd (o, force) {
+  if (o.updateMatrixWorld !== UMW) { o.updateMatrixWorld(force); return; }
+  if (o.matrixAutoUpdate) o.updateMatrix();
+  if (o.matrixWorldNeedsUpdate || force) {
+    if (o.matrixWorldAutoUpdate) { const p = o.parent; if (p === null) o.matrixWorld.copy(o.matrix); else o.matrixWorld.multiplyMatrices(p.matrixWorld, o.matrix); }
+    o.matrixWorldNeedsUpdate = false;
+    force = true;
+  }
+  const ch = o.children;
+  for (let i = 0, n = ch.length; i < n; i++) {
+    const k = ch[i];
+    if (k.visible) upd(k, force);
+    else { k.matrixWorldNeedsUpdate = true; SKIP++; }
+  }
 }
 
 /* part, of — каждый of-й элемент, начиная с part (по кусочку в кадр); без них — весь список */

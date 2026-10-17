@@ -36,7 +36,8 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { snowAmt, seasonValue, heatAmt } from './seasons.js';
 import * as GFX from './gfx.js';
-import { onPave, walkHalf } from './pave.js';
+import { onPave, walkHalf, roadGap } from './pave.js';
+const LAWN_EXTRA = s => (s.c > 5 ? 0.8 : 1.0);
 import { wet } from './streams.js';             // речки и пруды — не газон (streams.js)
 import * as FADEJS from './fade.js';
 import * as EDL from './editlayer.js';          // редактор города: убранная мелочь (edits.json, вид lawn; ключ — место вещи)
@@ -181,9 +182,10 @@ function spot (x, z, m = 0) {
   const y = A.groundH(x, z);
   if (y < 0.3) return null;
   if (A.inHouse(x, z, 1.2 + m)) return null;
+  // до края каждой дороги рядом, не до ближайшей осевой (pave.js roadGap, как construction.js): у пешеходки запас 0,8 м, у остальных — 1 м
+  if (roadGap(x, z, LAWN_EXTRA) < m) return null;
   const nr = A.nearestRoad(x, z, 9, 1);
-  let edge = 99;
-  if (nr) { edge = nr.d - nr.seg.w / 2; if (edge < (nr.seg.c > 5 ? 0.8 : 1.0) + m) return null; }
+  const edge = Math.min(nr ? nr.d - nr.seg.w / 2 : 99, roadGap(x, z));
   if (onPath(x, z, 1.1 + m) || A.onAlley(x, z, 0.8 + m) || A.yardBlocks(x, z, 0.8 + m) || A.pzBlocks(x, z, 1 + m)) return null;
   if (inPolys(POLYS, x, z) || claimed(x, z, 4 + m)) return null;
   if (onPave(x, z, 0.3 + m)) return null;              // тротуары, пешеходки, дорожки, аллеи (pave.js)

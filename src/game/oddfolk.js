@@ -16,6 +16,7 @@
       Только в карьере, не на учебном и сюжетном заказе, не после разговора у двери (st.talk).
       После сценки клиент поручение не просит (orders.js delivered: st.odd) и клиентка не заигрывает.
 
+   0. Жители Юга (locals.js, 17.10) — их заказ: окно разговора жителя (или его поручение), больше ничего.
    3. Клиенты автора у двери (regulars.js, 17.10) — до сценки: мэр, певица, лудоман, «папины дети»… Сценка и герой —
       не в одной смене; встреча у двери (сценка, герой, разговор у двери) — не на двух вручениях подряд (DOOR).
 
@@ -33,6 +34,7 @@ import * as DIRECTOR from './director.js';
 import * as TALK from './talk.js';             // облачка над головами (talk.js)
 import * as DLG from './dialog.js';            // окно разговора (без таймеров)
 import * as REGS from './regulars.js';         // клиенты автора у двери: мэр, певица, лудоман, «папины дети» (regulars.js)
+import * as LOCALS from './locals.js';         // жители Юга: заказ к его двери — окно разговора (locals.js)
 import { makePerson } from './people.js';
 
 export const SHOUT = { P: 0.15, SAY: 0.9, HOLD: 3.0, SORRY: 2.6, SORRY_HOLD: 2.8, COL: '#c0392b', SORRY_COL: '#3a6fb0' };
@@ -278,6 +280,9 @@ export function onHand (st, onTime, o, api) {
   if (o && (o.tut || (st.pay && st.pay.story))) return '';
   ST.ok++;
   ST.hand = { fem: !!(p.grp.userData && p.grp.userData.fem), onTime: !!onTime, n: st.peds.length, ord: !!(o && o.ord), shift: shiftNo() };
+  // житель Юга (locals.js): заказ к его двери — его окно разговора; его поручение — просит orders.js. Больше ничего на вручении
+  const lc = LOCALS.hand(st, onTime, o, api, A);
+  if (lc) { DOOR = ST.hands; st.odd = 'local'; return 'scene'; }
   const reg = REGS.roll(st, onTime, o, { shift: shiftNo(), gapOk: ST.hands - DOOR >= REGS.REG.GAP,   // клиент автора (regulars.js)
     sceneShift: load().shift === shiftNo(), dirOk: () => DIRECTOR.can('odd') });
   if (reg) { DOOR = ST.hands; st.odd = 'reg'; ST.regs = (ST.regs || 0) + 1; REGS.play(reg, st, api); return 'scene'; }

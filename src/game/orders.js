@@ -44,6 +44,7 @@ import * as HURR from './hurricane.js';          // дома, унесённые
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 import * as RHY from './rhythm.js';             // ритм смены: роль заказа на дуге, напряжение, встреча у двери (rhythm.js)
 import * as FACES from './faces.js';            // знакомые лица района: Глеб — его адрес, его поручение (faces.js)
+import * as LOCALS from './locals.js';          // жители Юга: их адреса и поручения (locals.js)
 import * as GROW from './growth.js';            // пиццерия растёт: оплата, чаевые, размер сборных по ступени (econ.js GROWTH)
 import * as BEACH from './beach.js';            // пляж летом: заказ на полотенце (beach.js ORDER)
 import * as DOOR from './doorstep.js';          // домофон у подъезда: бонус «с первого раза» / «спускался сам» (econ.js DOOR)
@@ -653,15 +654,18 @@ function meetSpec (R, D, tgt) {
    поручение (delivered). Его подъезд занят другим заказом смены — не в этот раз (ритм попробует на следующем) */
 function faceSpec (R, D, tgt) {
   const f = R.meet;
+  // жители Юга (locals.js): kind 'door' — заказ ему, при вручении окно разговора (как поручение — через face)
+  const of = s => (f.kind === 'meet' ? { type: 'pizza', kind: 'solo', meet: f, stops: [stopOf(s)] } : { type: 'pizza', kind: 'solo', face: f, stops: [stopOf(s)] });
   if (!f.key) {                                           // адрес ещё не запомнен — выбрать, как встрече (запомнится, когда появление случится)
-    if (f.kind === 'meet') return meetSpec(R, D, tgt);
-    const s0 = arcSpot({ dmin: D.min, dmax: D.max }, tgt, q => q.entr);
-    return s0 ? { type: 'pizza', kind: 'solo', face: f, stops: [stopOf(s0)] } : null;
+    if (f.kind === 'meet' && !f.local) return meetSpec(R, D, tgt);
+    // житель: подъезд, где можно сыграть катсцену потом, и не чужой (у каждого свой)
+    const s0 = arcSpot({ dmin: D.min, dmax: D.max }, tgt, q => q.entr && (!f.local || (RHY.doorOk(q.x, q.z) && !(f.avoid || []).includes(q.key))));
+    return s0 ? of(s0) : null;
   }
   const s = POOL.find(q => q.key === f.key);
   if (!s || SH.reserved.has(s.key) || HURR.blocked(s.x, s.z)) return null;
   SH.breather = false;
-  return f.kind === 'errand' ? { type: 'pizza', kind: 'solo', face: f, stops: [stopOf(s)] } : { type: 'pizza', kind: 'solo', meet: f, stops: [stopOf(s)] };
+  return of(s);
 }
 
 /* спецификация готова: резерв адресов, метры по дорогам, номер, лог */
@@ -1031,10 +1035,11 @@ export function delivered (o, st, onTime) {
     if (!S.ride && per && ped && !ped.dead && offerSide(ped, per, sp.face.side)) {
       sp.faceAsked = true;
       errandDone();                                       // в счёт поручений (таймер — заново, ритм видит просьбу)
-      FACES.asked(sp.stops && sp.stops[0]);
+      if (sp.face.local) LOCALS.asked(sp.face, sp.stops && sp.stops[0]); else FACES.asked(sp.stops && sp.stops[0]);
       return;
     }
-    ERR.miss.push('Глеб: нет товарища рядом'); if (ERR.miss.length > 30) ERR.miss.shift();
+    ERR.miss.push(sp.face.local ? sp.face.name + ': нет магазина или человека рядом' : 'Глеб: нет товарища рядом'); if (ERR.miss.length > 30) ERR.miss.shift();
+    if (sp.face.local) LOCALS.missed(sp.face);            // житель Юга: не вышло дважды — история дальше без поручения
   }
   if (ERR.due) {
     const no = sp.story ? 'сюжет' : sp.fest ? 'фестиваль' : S.ride ? 'покататься' : st.talk ? 'разговор у двери' : st.odd && st.odd !== 'shout' ? 'сценка у двери'

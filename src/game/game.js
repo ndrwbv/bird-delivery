@@ -91,6 +91,7 @@ import * as STEPAB from './stepabench.js';     // Стёпа на лавочке
 import * as ST1 from './stepafirst.js';         // учебный заказ Стёпы — сюжетный: катсцена на вручении (через story.js)
 import * as ENC from './encounters.js';         // встречи у двери (трек 10): микрогерои катсценами через story.js — пока только песочница
 import * as FACES from './faces.js';            // знакомые лица района: Глеб, история на 4 появления (faces.js)
+import * as LOCALS from './locals.js';          // жители Юга: пятеро с историями на 4 появления (locals.js)
 import * as YLIFE from './yardlife.js';      // жизнь во дворах: бабки на лавочке, компании, шашлык, домино, мяч, горки, снеговик, гуляющие с собаками (yardlife.js)
 import * as WORK from './workout.js';         // площадки-качалки у коробок: турник и брусья, люди качаются, курьер подтягивается сам (workout.js)
 import * as KITES from './kites.js';          // воздушные змеи и дроны в парках и на Ленина (kites.js)
@@ -122,6 +123,7 @@ import * as DIRT from './cardirt.js';           // грязь и снег на �
 import * as BODYM from './carbody.js';             // кузов не из кубиков: скосы, арки, швы, ручки, номера, диски (carbody.js)
 import * as DENTM from './cardent.js';             // своя машина мнётся формой и теряет бампер, крышку, зеркала, колпаки (cardent.js)
 import * as DAILY from './daily.js';               // задания на день: 2—3 на смену, выполнил — деньги (daily.js, econ.js DAILY)
+import * as DYN from './dynres.js';             // «тяжёлый кадр»: видеокарта не успевает — на миг меньшее разрешение (dynres.js)
 import * as GFX from './gfx.js';                 // настройки графики: пресеты, 30 к/с, дальность, город за меню (gfx.js, docs/CAREER.md)               // статика дальше камеры — со сцены, матрицы заморожены (Steam Deck)
 import * as TRK from './tracks.js';              // следы колёс на газоне и снегу
 import * as HAV from './havoc.js';             // Толик считает разрушения за смену: «красавчик, но лавочек уже 6» (havoc.js)
@@ -154,8 +156,10 @@ import * as BACKB from './backblock.js';         // перекрытие на о
 import * as TGRID from './trafficgrid.js';     // машины: «кто рядом» по сетке, стоящие — вон из покадровых циклов (trafficgrid.js)
 import * as PARKI from './parkmerge.js';      // нетронутые припаркованные — склейкой по клеткам 160 м, вызов на клетку (parkmerge.js)
 import * as YCARS from './yardcars.js';       // машины во дворах: карманы парковки у проездов, стоящие — InstancedMesh, 1—3 едут у курьера (yardcars.js)
+import * as COURTS from './courts.js';         // теннисные корты (облезлые) и падел у особняков: сетка, разметка, играют (courts.js)
 import * as YMAZE from './yardmaze.js';       // дворы сложнее: заборы вдоль тротуаров (твёрдые и сбиваемые), большие клумбы, кусты, лесочки (yardmaze.js)
 import * as NAR from './narrow.js';            // узкие дороги: одна полоса посередине, встречные прижимаются (narrow.js)
+import * as WIDEN from './roadwiden.js';       // полосы шире: полотно улиц ×1,2, у домов вплотную — поджато по месту (roadwiden.js)
 import * as EDL from './editlayer.js';         // правки города из редактора (editor.html): убранное не ставим, добавленное — кусок 'edits' (editlayer.js)
 import * as WARM from './warmup.js';            // прогрев шейдеров: образцы на-ходу-материалов, программы не выгружаются (warmup.js)
 import * as LATE from './latebuild.js';         // поздняя сборка города: меню раньше, остальное — очередью после него (latebuild.js)
@@ -490,6 +494,31 @@ function mergeLite (list) {
   out.setIndex(new THREE.BufferAttribute(idx, 1));
   return out;
 }
+/* Вывески и стёкла (FLAT) — в клетки разметки и окон (FLATM) до их склейки (17.10.2026, docs/AGENTS.md «Слои статики»):
+   материал тот же (бейсик, цвет вершин, две стороны, дыры урагана, ночью темнеет так же — FLAT_MATS), а склеивались они
+   отдельно — второй вызов отрисовки на клетку 200 м (~10—12 в кадре на «Деке»). Цвет — байтами в линейном (как у FLATM
+   и как у FLAT в мобильном режиме), треугольник — в клетку своей середины, как всё в Mesher. Что попадёт в FLAT позже
+   (после куска 'mesh'), склеится по-старому (mergeChunked). ?noflatm — по-старому, для замера */
+const NO_FLATM = /[?&]noflatm(&|$)/.test(location.search);
+function flatToMesher (list, M) {
+  let tris = 0;
+  const rgbB = (r, g, b) => (Math.round(r * 255) << 16) | (Math.round(g * 255) << 8) | Math.round(b * 255);
+  for (const g of list) {
+    const p = g.p || g.attributes.position.array, ix = g.p ? g.i : g.index ? g.index.array : null;
+    const col = g.p ? null : g.attributes.color ? g.attributes.color.array : null;
+    const one = g.p ? rgbB(g.r, g.g, g.b) : col ? 0 : 0xffffff;
+    const cOf = v => (col ? rgbB(col[v * 3], col[v * 3 + 1], col[v * 3 + 2]) : one);
+    const nt = ix ? ix.length : p.length / 3;
+    for (let t = 0; t < nt; t += 3) {
+      const a = ix ? ix[t] : t, b = ix ? ix[t + 1] : t + 1, c = ix ? ix[t + 2] : t + 2;
+      M.tri3(p[a * 3], p[a * 3 + 1], p[a * 3 + 2], p[b * 3], p[b * 3 + 1], p[b * 3 + 2], p[c * 3], p[c * 3 + 1], p[c * 3 + 2], cOf(a), cOf(b), cOf(c));
+      tris++;
+    }
+    if (!g.p) g.dispose();
+  }
+  list.length = 0;
+  return tris;
+}
 /* копия шаблона в масштабе — как g.clone().scale(sx, sy, sz) для склейки (вершины,
    нормали, индекс), только без постройки шаблона заново: clone() у Torus- и
    IcosahedronGeometry сначала строит фигуру по умолчанию и лишь потом копирует */
@@ -602,6 +631,7 @@ function mergeGeos (list, noNormal, bytes) {      // bytes — цвет верш
    Омега-мост через реку: настоящего в рамке нет. x на восток, z на юг. */
 
 const CITY = MAP.data;
+WIDEN.widen(CITY, { off: new URLSearchParams(location.search).has('nowiden') });   // полосы шире — до всего, что строится из улиц (roadwiden.js)
 sanitizePois(CITY.pois);                       // чужие вывески → пародии и выдуманные (brands.js)
 if (!new URLSearchParams(location.search).has('norings')) RINGM.roundOff(CITY);   // малые круги — ровной окружностью, до всего, что строится из улиц (rings.js)
 /* ТЦ: подсказки стиля из генератора карты (malls[].style) — на сам дом */
@@ -1036,6 +1066,17 @@ function Mesher () {
     /* цвет по месту: fn(x, z, байты, i) кладёт цвет вершины в байты[i…i+2] (плавный стык асфальта,
        roadwear.js); null — снова один цвет на треугольник */
     grad (fn) { GRAD = fn || null; return api; },
+    /* треугольник с цветом на вершину: c0…c2 — 0xRRGGBB байтами (как кладёт color) — для склейки FLAT в клетки FLATM (flatToMesher) */
+    tri3 (ax, ay, az, bx, by, bz, cx, cy, cz, c0, c1, c2) {
+      const b = bucket(ax, az, bx, bz, cx, cz);
+      room(b, 3);
+      const p = b.pos, c = b.col, i = b.n * 3;
+      p[i] = ax; p[i + 1] = ay; p[i + 2] = az; p[i + 3] = bx; p[i + 4] = by; p[i + 5] = bz; p[i + 6] = cx; p[i + 7] = cy; p[i + 8] = cz;
+      c[i] = c0 >> 16; c[i + 1] = (c0 >> 8) & 255; c[i + 2] = c0 & 255;
+      c[i + 3] = c1 >> 16; c[i + 4] = (c1 >> 8) & 255; c[i + 5] = c1 & 255;
+      c[i + 6] = c2 >> 16; c[i + 7] = (c2 >> 8) & 255; c[i + 8] = c2 & 255;
+      b.n += 3; n += 3;
+    },
     quad (ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz, nx, ny, nz) {
       api.tri(ax, ay, az, bx, by, bz, cx, cy, cz, nx, ny, nz);
       api.tri(ax, ay, az, cx, cy, cz, dx, dy, dz, nx, ny, nz);
@@ -1212,6 +1253,7 @@ function boundSphere (g) {
     if (d > r2) r2 = d;
   }
   g.boundingSphere = new THREE.Sphere(new THREE.Vector3(cx, cy, cz), Math.sqrt(r2));
+  g.boundingBox = new THREE.Box3(new THREE.Vector3(x0, y0, z0), new THREE.Vector3(x1, y1, z1));   // отсечение по кадру своей коробкой (cull.js)
   return g.boundingSphere;
 }
 function dropArr () { this.array = null; }
@@ -1565,7 +1607,7 @@ function osmMarkings () {
         spans = spans.flatMap(([s0, s1]) => (z1 <= s0 || z0 >= s1) ? [[s0, s1]] : [[s0, z0], [z1, s1]]);
       }
       // и стоп-линии: за ними на своей стороне — только зебра
-      const n = e.two ? e.lanes || Math.max(1, Math.round(e.w / 3.3)) : laneCount(e), lw = (e.oneway ? e.w : e.w / 2) / n;   // разметка односторонней в тупик — как была (deadends.js)
+      const n = e.two ? e.lanes || Math.max(1, Math.round(WIDEN.laneW(e) / 3.3)) : laneCount(e), lw = (e.oneway ? e.w : e.w / 2) / n;   // разметка односторонней в тупик — как была (deadends.js)
       for (const [s0, s1] of spans) {
         if (s1 - s0 < 0.5) continue;
         const dashed = (o, wd) => {
@@ -2254,6 +2296,7 @@ function* osmPitches () {
   };
   for (const g of CITY.green) {
     if (g.k !== 'pitch') continue;
+    if (g.n && /теннис|tennis/i.test(g.n)) continue;   // теннисные корты из карты — courts.js (не футбол)
     if (++ng % 10 === 0) yield 'pitch';
     const o = obb(g.p);
     if (o.len < 16 || o.wid < 9) continue;
@@ -4284,6 +4327,9 @@ const ymApi = () => ({ THREE, CITY, HOUSE_GRID, LIT, put, box, obb, smashAdd, tr
   pzBlocks: PZD.blocks, rivBlocks: RIVS.blocks, startClear, isForest: FOREST.isForest, forests: () => [...LWOOD.polys(), ...RINGM.polys(), ...(MAP.woods || [])],
   claims: () => [...CONSTR.claimed(), ...CONSTR.DEBUG.SITES.map(s => ({ x: s.x, z: s.z, r: Math.hypot(s.W, s.D) / 2 + 2 }))],
   pizzerias: () => (PIZZERIAS.length ? PIZZERIAS : [PIZZA]), stops: JUNK.DEBUG.STOPS, PARKINGS, PITCHES, fuelPads: LM.FUEL_PADS, mobile: () => TOUCH || MOBM.ON });
+/* что нужно courts.js: то же, что лабиринту дворов, плюс сцена, сбиваемые меши, люди */
+const courtsApi = () => ({ ...ymApi(), scene, smashMesh, LITM, FLATM, rich: MAP.career && MAP.career.rich, V, get ENV () { return ENV; }, CAR_L, CAR_W,
+  makeHuman, freshHuman, dropMesh, gibHuman, sayBubble, puff, intro: () => INTRO || STORY.active(), runOver: () => { S.people++; CBUMP.hit(V, 'person'); Snd.squish(); } });
 let RINK = null;                                 // каток с катающимися (landmarks.js), если он есть в карте
 
 /* ─── сборка города ─── */
@@ -4355,6 +4401,7 @@ function buildCity () {
   if (!INTRO && !new URLSearchParams(location.search).has('noyc')) tm('yardcars', () => YCARS.build(ycApi()));   // карманы парковки у дворовых проездов — после деревьев дворов, до сугробов (yardcars.js); ?noyc — без них
   if (!INTRO) tm('yardmaze', () => YMAZE.build(ymApi()));   // дворы сложнее: заборы у тротуаров, клумбы, кусты, лесочки — после карманов парковки, до сугробов и smashBuild (yardmaze.js); ?nomaze — без них
   tm('seasonyard', SEAS.seasonYard);
+  if (!INTRO) tm('courts', () => COURTS.build(courtsApi()));   // теннисные и падел-корты — после горок дворов, до smashBuild (courts.js); ?nocourts — без них
   tm('smash', smashBuild);
   tm('seasons', SEAS.seasonSteps);                // сугробы, ёлки, гирлянды — шагами (latebuild.js)
   if (!INTRO) tm('trails', WASTE.trails);         // тропинки наискосок, вытоптанное у лавочек, лужи — после дворов и лавочек (wastelands.js)
@@ -4372,7 +4419,7 @@ function buildCity () {
     try { renderer.compileAsync(scene, cam).catch(() => {}); } catch (e) { /* — */ }
   }
   BUILD_T.mesh = Math.round(performance.now() - tq);
-  LATE.add('mesh', () => { const t0 = performance.now(); meshNow(); BUILD_T.meshLate = Math.round(performance.now() - t0); });
+  LATE.add('mesh', () => { const t0 = performance.now(); if (!EDL.ED.on && !NO_FLATM) BUILD_T.flatToM = flatToMesher(FLAT, FLATM); meshNow(); BUILD_T.meshLate = Math.round(performance.now() - t0); });
   WINS.build(scene);                              // окна — по клеткам, один материал (windows.js)
   PAINT.build(scene);                             // муралы — один меш (citypaint.js)
   /* Всю статику — сразу в видеокарту, одним кадром в крохотную цель:
@@ -4437,7 +4484,7 @@ const ukey = (a, b) => (a < b ? ekey(a, b) : ekey(b, a));    // ребро бе�
     const ux = (B.x - A.x) / len, uz = (B.z - A.z) / len, w = roadWidth(r);
     const mk = (from, to, ok, sg) => ({
       a: from, b: to, len, ux: ux * sg, uz: uz * sg, rx: -uz * sg, rz: ux * sg,
-      w, c: r.c, ok, oneway: !!r.o, lanes: r.l || 0, road: r, tA: 0, tB: 0, sig: null, stopAt: 0,
+      w, w0: r.w0 || w, c: r.c, ok, oneway: !!r.o, lanes: r.l || 0, road: r, tA: 0, tB: 0, sig: null, stopAt: 0,
     });
     A.nb.push(b); B.nb.push(a);
     EDGES.set(ekey(a, b), mk(a, b, okAB, 1));
@@ -4513,9 +4560,9 @@ function routeNodes (fromX, fromZ, toX, toZ) {
    на односторонней всё полотно. Полоса 0 — крайняя правая, у бордюра;
    смещение считается от осевой вдоль правой нормали ребра. */
 function laneCount (e) {
-  if (e.oneway && !e.two) return e.lanes || Math.max(1, Math.round(e.w / 3.3));
+  if (e.oneway && !e.two) return e.lanes || Math.max(1, Math.round(WIDEN.laneW(e) / 3.3));   // число полос — по прежней ширине: полосы шире, их не больше (roadwiden.js)
   if (NAR.narrow(e)) return 1;                     // узкая двусторонняя — одна полоса посередине (narrow.js)
-  return e.lanes ? Math.max(1, Math.floor(e.lanes / 2)) : (e.w >= 12.5 ? 2 : 1);
+  return e.lanes ? Math.max(1, Math.floor(e.lanes / 2)) : (WIDEN.laneW(e) >= 12.5 ? 2 : 1);
 }
 function laneOff (e, k) {
   if (NAR.narrow(e)) return 0;
@@ -5649,13 +5696,17 @@ function freshHuman (o = {}, po) {
 /* все люди — для переключения ближний/дальний вариант (humanLod) */
 const HUMANS = new Set();
 const LOD_P = new THREE.Vector3();
+/* с запасом LOD_HYST м в обе стороны (17.10.2026): человек на самой границе 45 м (камера покачивается, он идёт вдоль)
+   щёлкал подробный ↔ простой каждые несколько кадров; теперь простым становится дальше 48 м, подробным — ближе 42 */
+const LOD_HYST = 3;
 function humanLod () {
   const cx = cam.position.x, cz = cam.position.z, L = GFX.hideR().lod;   // 45 м; на Низкой — 32 (gfx.js)
+  const FAR2 = (L + LOD_HYST) ** 2, NEAR2 = (L - LOD_HYST) ** 2;
   for (const g of HUMANS) {
     const p = g.parent === scene ? g.position : g.parent ? g.parent.position : null;
     if (!p) continue;
-    const far = (p.x - cx) ** 2 + (p.z - cz) ** 2 > L * L;
-    const u = g.userData;
+    const u = g.userData, d2 = (p.x - cx) ** 2 + (p.z - cz) ** 2;
+    const far = u.far ? d2 > NEAR2 : d2 > FAR2;
     if (u.far === far) continue;
     u.far = far;
     u.lod.visible = far;
@@ -10100,7 +10151,7 @@ const RESET_KEEP = ['dlv-lang', 'dlv-sound', 'dlv-doorgames', 'dlv-route', 'dlv-
 const PROGRESS_KEYS = [
   'dlv-msk-wallet', 'dlv-msk-cars', 'dlv-msk-car', 'dlv-msk-best', 'dlv-msk-xp', 'dlv-msk-col', 'dlv-msk-tut', 'dlv-msk-guide', 'dlv-msk-nostut', 'dlv-intro', 'dlv-garage-tut', 'dlv-shift-tut', 'dlv-hints', 'dlv-route-ask', 'dlv-wx-last',
   'dlv-shifts', 'dlv-stars', 'dlv-crew', 'dlv-story', 'dlv-season', 'dlv-used-addr', 'dlv-lb-local', 'dlv-boss', 'dlv-clock', 'dlv-rev-sale',
-  'dlv-car-owned', 'dlv-car-cur', 'dlv-car-up', 'dlv-car-L', 'dlv-car-eng', 'dlv-car-paint', 'dlv-district', 'dlv-dist-shifts', 'dlv-dist-open', 'dlv-city-mode', 'dlv-city-party', 'dlv-knocked', 'dlv-pz-grow', 'dlv-delivered', 'dlv-honor', 'dlv-faces',
+  'dlv-car-owned', 'dlv-car-cur', 'dlv-car-up', 'dlv-car-L', 'dlv-car-eng', 'dlv-car-paint', 'dlv-district', 'dlv-dist-shifts', 'dlv-dist-open', 'dlv-city-mode', 'dlv-city-party', 'dlv-knocked', 'dlv-pz-grow', 'dlv-delivered', 'dlv-honor', 'dlv-faces', 'dlv-locals',
   ...Object.keys(ECON.DONATE || {}).map(k => 'dlv-don-' + k),
 ];
 function renderReset () {
@@ -10152,7 +10203,7 @@ function reprofile () {
   S.name = Platform.features.nameInput ? Store.get('dlv-name', '') : (Platform.player.name || '');
   elName.value = S.name || '';
   STORY.reload(true); ORD.reloadUsed(); HEROES.reloadSave(); HSTORY.resetSession(); HEROQ.reload(); HINTS.reload(); GROW.reload();
-  RESPECT.DEBUG.reload(); DIRECTOR.reload(); SEAS.reloadSaved(); HUR.reload(); FACES.reload();
+  RESPECT.DEBUG.reload(); DIRECTOR.reload(); SEAS.reloadSaved(); HUR.reload(); FACES.reload(); LOCALS.reload();
   if (CAREER) { AUTO.reprofile(); CAREERM.reprofile(); }
   if (DISTRICTS) { CITYOPEN.repair(); usePizzeria(DIST.cur()); FM.dist = null; DW.seen.clear(); districtLocks(); }
   startPose();
@@ -14472,6 +14523,8 @@ ST1.init({ THREE, ADULT, V, fxAdd, puffGeo, groundH, Snd, sayBubble, makeHuman, 
 ENC.init({ THREE, scene, CITY, V, S, ORD, ADULT, car: () => car, groundH, inHouse, makeHuman, people: () => CULL_FAR_LISTS, popPay, money, guestIn, guestOut,
   rehuman: (p, person) => { dropMesh(p.grp); p.grp = makeHuman(person); p.person = p.grp.userData.person; p.speed = p.base * p.grp.userData.pace; scene.add(p.grp); } });   // жена Глеба выходит к двери вместо него (faces.js)
 FACES.init({ Store, THREE, scene, groundH, ADULT });   // знакомые лица: прогресс истории, плакат «Вернись, Глеб»
+LOCALS.init({ Store, ADULT, money,   // жители Юга (locals.js): к двери выходит другой человек (мама) — rehuman
+  rehuman: (p, person) => { dropMesh(p.grp); p.grp = makeHuman(person); p.person = p.grp.userData.person; p.speed = p.base * p.grp.userData.pace; scene.add(p.grp); } });
 /* Стёпа на лавочке (stepabench.js): лавочка у Ленинградской, 8 и его заказ — через story.js */
 // первый заказ (stepanOrder) зовёт его и сам, если город ещё достраивается: лавочка Ленинградской, 8 нужна сразу
 const stepaBenchInit = () => STEPAB.init({ CITY, ADULT, CAREER, bench, realAddress });
@@ -14514,7 +14567,7 @@ const BUILD_MS = performance.now() - T0;          // сколько собира
 /* память (11.10.2026, docs/AGENTS.md «Память на телефоне»): склейка — без нормалей (материалы склеек их не читают), копия вершин
    в JS отпускается после загрузки в видеокарту (кроме клеток, где кто-то двигает свои вершины — плафоны фонарей, и редактора),
    исходные коробки (LIT, FLAT, LAMPH) после склейки — вон: в Северске ~100 тыс. коробок, ~145 МБ кучи держались всю игру */
-function* mergeChunked (list, mat) {                // шагами (yield) по 6 клеток (раскладка — по 15 тыс. коробок) — поздняя сборка, latebuild.js
+function* mergeChunked (list, mat, cell = CHUNK) {   // cell — клетка склейки, м; шагами (yield) по 6 клеток (раскладка — по 15 тыс. коробок) — поздняя сборка, latebuild.js
   const buckets = new Map();
   let nl = 0;
   for (const g of list) {
@@ -14523,7 +14576,7 @@ function* mergeChunked (list, mat) {                // шагами (yield) по
     const a = g.p || g.attributes.position.array;
     let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
     for (let i = 0; i < a.length; i += 3) { const x = a[i], z = a[i + 2]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; }
-    const k = a.length ? Math.floor((x0 + x1) * 0.5 / CHUNK) + ',' + Math.floor((z0 + z1) * 0.5 / CHUNK) : '0,0';
+    const k = a.length ? Math.floor((x0 + x1) * 0.5 / cell) + ',' + Math.floor((z0 + z1) * 0.5 / cell) : '0,0';
     let b = buckets.get(k);
     if (!b) buckets.set(k, b = []);
     b.push(g);
@@ -14550,14 +14603,14 @@ LATE.add('props', function* () {                  // шагами (latebuild.js)
   yield* mergeChunked(LIT, HUR.holeMat(SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), 0.4)));
   yield 'lit';
   yield* mergeChunked(FLAT, HUR.holeMat(new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
-  { const m = HUR.holeMat(new THREE.MeshBasicMaterial({ vertexColors: true })); m.userData.glow = 1; if (LAMPH.length) yield* mergeChunked(LAMPH, m); }
+  { const m = HUR.holeMat(new THREE.MeshBasicMaterial({ vertexColors: true })); m.userData.glow = 1; if (LAMPH.length) yield* mergeChunked(LAMPH, m, CHUNK * 2); }   // плафоны редкие и мелкие — клетки вдвое крупнее (17.10.2026): ~5 → ~2,5 вызова в кадре
   yield 'flat';
   indexSolids();
 });
 /* ельник (forest.js): клетки собираются на ходу вокруг камеры — уже после всего города */
 let FOREST_API = null;
 LATE.add('forest', () => { FOREST_API = FOREST.init({ THREE, scene, cam, CITY, groundH, inHouse, inBounds, nearestRoad, solidAt,
-  onAlley: (x, z, m) => WORLD.onAlley(x, z, m), yardBlocks: (x, z, r) => YARDS.blocks(x, z, r) || YCARS.blocks(x, z, r) || YMAZE.blocks(x, z, r), pzBlocks: PZD.blocks }); });
+  onAlley: (x, z, m) => WORLD.onAlley(x, z, m), yardBlocks: (x, z, r) => YARDS.blocks(x, z, r) || YCARS.blocks(x, z, r) || YMAZE.blocks(x, z, r) || COURTS.blocks(x, z, r), pzBlocks: PZD.blocks }); });
 /* лес вдоль Ленина (leninwood.js): полосы ельника в forest.js, тропы — один меш */
 if (!INTRO && !NO_E) LATE.add('lwood', () => LWOOD.init({ THREE, scene, CITY, groundH, inHouse, inBounds, solidAt, onPave: PAVE.onPave }));
 if (!INTRO) LATE.add('ringwood', RINGM.wood);    // лес на Кольце: ельник с полянами в forest.js (rings.js)
@@ -14565,7 +14618,7 @@ if (!INTRO) LATE.add('ringwood', RINGM.wood);    // лес на Кольце: е
 if (!INTRO && MAP.woods) LATE.add('mapwoods', () => { for (const p of MAP.woods) FOREST.addArea(p, (x, z, r) => !!PAVE.onPave(x, z, FOREST.FOREST.PATH + r)); });
 /* мелочь на газоне (lawnprops.js): тоже клетками вокруг камеры */
 LATE.add('lawnp', () => LAWNP.init({ THREE, scene, cam, CITY, ADULT, forests: () => [...LWOOD.polys(), ...RINGM.polys(), ...(MAP.woods || [])], groundH, inHouse, inBounds, nearestRoad, roadWidth, car: V, Snd,
-  onAlley: (x, z, m) => WORLD.onAlley(x, z, m), yardBlocks: (x, z, r) => YARDS.blocks(x, z, r) || YCARS.blocks(x, z, r) || YMAZE.blocks(x, z, r), pzBlocks: PZD.blocks, isForest: FOREST.isForest,
+  onAlley: (x, z, m) => WORLD.onAlley(x, z, m), yardBlocks: (x, z, r) => YARDS.blocks(x, z, r) || YCARS.blocks(x, z, r) || YMAZE.blocks(x, z, r) || COURTS.blocks(x, z, r), pzBlocks: PZD.blocks, isForest: FOREST.isForest,
   claims: () => [...CONSTR.claimed(), ...CONSTR.DEBUG.SITES.map(s => ({ x: s.x, z: s.z, r: Math.hypot(s.W, s.D) / 2 + 2 }))],
   benches: BENCHES, stops: JUNK.DEBUG.STOPS, cans: JUNK.DEBUG.CANS_ALL, low: () => GFX.preset() === 'low',
   pins: () => {                                    // пины и клиенты текущего заказа: рядом с ними мелочь прячется
@@ -15485,13 +15538,13 @@ function frameStep (now) {
   CL.track(S.state);
   if (CAREER && CAREERM.covered()) return;         // гараж и «потратить» закрывают весь экран — город не рисуем
   // повтор (replay.js): мир стоит, позы — из записи, камера своя
-  if (REPLAY.on()) { if (!EXT.paused) { REPLAY.frame(raw); PARKI.replay(REPLAY.playAt()); PARKI.view(car.position.x, car.position.z, GFX.hideR().cars, FAR_BAND.cars, TGRID.TG.fullF); YCARS.view(car.position.x, car.position.z, GFX.hideR().cars, FAR_BAND.cars); humanLod(); CULL.step(); renderer.render(scene, cam); } return; }   // стоящие (parkmerge.js) — вокруг машины в повторе
+  if (REPLAY.on()) { if (!EXT.paused) { REPLAY.frame(raw); PARKI.replay(REPLAY.playAt()); PARKI.view(car.position.x, car.position.z, GFX.hideR().cars, FAR_BAND.cars, TGRID.TG.fullF); YCARS.view(car.position.x, car.position.z, GFX.hideR().cars, FAR_BAND.cars); humanLod(); CULL.step(); DYN.idle(); renderer.render(scene, cam); } return; }   // стоящие (parkmerge.js) — вокруг машины в повторе
   if (SBX.nitro) NOS.tank = 1;                     // песочница: бесконечное нитро
   // катсцена сюжетного заказа: мир стоит, ходят только актёры, камера — своя (story.js); столб маркера адреса в кадре не нужен;
   // облачка над головами (кот «мяу!», курьер «кхе-кхе…») — talk.js и в катсцене, иначе новое облачко не видно
-  if (!S.paused && !EXT.paused && STORY.frame(dt, car)) { marker.visible = false; unview(); updateFX(dt); updateFly(dt); updateTrunk(dt); TALK.step(dt, cam, V); SEAS.updateSeasons(dt); humanLod(); CULL.step(); renderer.render(scene, cam); return; }
+  if (!S.paused && !EXT.paused && STORY.frame(dt, car)) { marker.visible = false; unview(); updateFX(dt); updateFly(dt); updateTrunk(dt); TALK.step(dt, cam, V); SEAS.updateSeasons(dt); humanLod(); CULL.step(); DYN.idle(); renderer.render(scene, cam); return; }
   // вступление первого запуска (intro.js): мир стоит, дымят только кальян Степана и капот
-  if (!S.paused && !EXT.paused && FIRST.frame(dt)) { unview(); HK.step(dt); updateFX(dt); SEAS.updateSeasons(dt); humanLod(); CULL.step(); renderer.render(scene, cam); return; }
+  if (!S.paused && !EXT.paused && FIRST.frame(dt)) { unview(); HK.step(dt); updateFX(dt); SEAS.updateSeasons(dt); humanLod(); CULL.step(); DYN.idle(); renderer.render(scene, cam); return; }   // DYN.idle — разрешение полное (dynres.js)
   if (S.paused || EXT.paused) return;
   // окно разговора (dialog.js) мир не останавливает: часы заказа и смены идут, поток едет; машина стоит (dlgHold ниже)
   const dlgHold = DLG.isOpen();
@@ -15627,6 +15680,7 @@ function frameStep (now) {
   CL.step('surf', updateSurf, dt);
   CL.step('football', updateFootball, dt);
   CL.step('yardlife', YLIFE.step, dt);            // жизнь во дворах: сцены и гуляющие рядом с курьером (yardlife.js)
+  CL.step('courts', COURTS.step, dt);             // корты: играют, чистят снег, катаются — рядом с курьером (courts.js)
   CL.step('workout', WORK.step, dt);              // площадки-качалки: люди качаются, курьер подтягивается (workout.js)
   CL.step('kites', KITES.step, dt);                // змеи и дроны (kites.js)
   CL.step('talk', TALK.step, dt, cam, V);                            // реплики над головами: ближние, крупнее вблизи (talk.js)
@@ -15711,10 +15765,13 @@ function frameStep (now) {
   CL.step('carshadow', carShadow);                 // пятно-тень под машиной игрока (carshadow.js)
   if (S.state !== 'title' && S.state !== 'over') CL.step('replay', REPLAY.rec, dt); else REPLAY.idle();   // запись последних 10 с для повтора (replay.js)
   CL.at.ph = 'render';
-  CULL.step();
+  CL.step('cullstep', CULL.step);              // отсечение клеток статики и матрицы подвижного (cull.js) — виден в frametail.js
+  DYN.begin();                                    // таймер видеокарты вокруг отрисовки (dynres.js)
   renderer.render(scene, cam);
+  DYN.end();
   const wk = performance.now() - tWork;
   CULL.work(wk / 1000);
+  DYN.step(raw, wk, isPlaying());                 // видеокарта не успевает — на миг меньшее разрешение, потом обратно
   GFX.work(wk);
   CL.step('hpool', HPOOL.step, wk);               // запас готовых людей: короткий кадр — дособрать, ≤ 0,5 мс (humanpool.js)
   GFX.watch(isPlaying() && !S.paused && !FM.open && !REPLAY.on() && !(DLG.isOpen && DLG.isOpen()));             // кадр не успевает на Высокой — один раз предложить Среднюю
@@ -15761,6 +15818,7 @@ LATE.add('warm', WARM.compile);
 LATE.add('warmUse', WARM.ready);
 LATE.add('freeze', () => CULL.freeze(scene, cam, PROPS));   // город собран: неподвижное — в заморозку и отсечение
 GFX.init({ resize });                             // настройки графики: дальность, окна, чёткость (gfx.js)
+DYN.init({ renderer });   // «тяжёлый кадр»: мыло вместо рывка (dynres.js)
 /* повтор последних 10 с (replay.js, docs/CAREER.md «Повтор»): что ему нужно от игры */
 REPLAY.init({
   scene, cam, canvas, Snd, GFX, inHouse, groundH, unview, toast,
@@ -15850,7 +15908,7 @@ if (LATE.busy()) {
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
 /* песочница (sandbox.html): бесконечное здоровье, нитро, «не глохнет» (noStall читает cars.js) */
 const SBX = { god: false, nitro: false, noStall: false };
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { inWall, FACE: FACE_DEBUG, RADAR, HUDC, RYARD: RYARD.DEBUG, RT, RASK: RASK.DEBUG, OTAGS: OTAGS.DEBUG, NICK, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, PG: PG.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, TACT, TG: TGRID.TG, PARKI: { ...PARKI.DEBUG, orphans: () => PARKI.orphans(TRAFFIC) }, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get routeOn () { return ROUTE_LINE.slots.some(q => q.m.visible); }, ROUTE_LINE, RP, rebuildRoutePath, updateRouteLine, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { inWall, WIDEN: { ...WIDEN.WIDEN, STATS: WIDEN.STATS }, FACE: FACE_DEBUG, RADAR, HUDC, RYARD: RYARD.DEBUG, RT, RASK: RASK.DEBUG, OTAGS: OTAGS.DEBUG, NICK, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, PG: PG.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, TACT, TG: TGRID.TG, PARKI: { ...PARKI.DEBUG, orphans: () => PARKI.orphans(TRAFFIC) }, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get routeOn () { return ROUTE_LINE.slots.some(q => q.m.visible); }, ROUTE_LINE, RP, rebuildRoutePath, updateRouteLine, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, DYNRES: DYN.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта
@@ -15892,7 +15950,7 @@ if (window.__dlv) window.__dlv.RW = RW.DEBUG;   // вид асфальта ул�
 if (window.__dlv) window.__dlv.LATE = LATE;
 if (window.__dlv) window.__dlv.CREWC = Object.assign(CREWC.DEBUG, { roster: CREWC.roster, pick: CREWC.pick, person: CREWC.person });   // составы пиццерий (crewcast.js)
 if (window.__dlv) window.__dlv.CREWRANK = CREWR.DEBUG;   // рейтинг смены: log — что писали, moves — смены места (crewrank.js)
-if (window.__dlv) { window.__dlv.YMAZE = YMAZE.DEBUG; window.__dlv.YCARS = YCARS.DEBUG; window.__dlv.SVCP = SVCP.DEBUG; window.__dlv.GROW = GROW.DEBUG; }   // путь курьеров и скорой: STATS — сколько искали, мс, кусков сквозь дом (svcpath.js)
+if (window.__dlv) { window.__dlv.YMAZE = YMAZE.DEBUG; window.__dlv.COURTS = COURTS.DEBUG; window.__dlv.YCARS = YCARS.DEBUG; window.__dlv.SVCP = SVCP.DEBUG; window.__dlv.GROW = GROW.DEBUG; }   // путь курьеров и скорой: STATS — сколько искали, мс, кусков сквозь дом (svcpath.js)
 if (window.__dlv) window.__dlv.BUS = BUSES.DEBUG;   // автобусы: routes(), buses(), people(), nextStop(i), ST (buses.js)   // поздняя сборка города: busy(), left(), T — мс по кускам (latebuild.js)
 if (window.__dlv) window.__dlv.ENDS = ENDS.DEBUG;   // стыки широкой с узкой (roadends.js)
 if (window.__dlv) window.__dlv.EDL = EDL.DEBUG;   // правки из редактора и его камера (editlayer.js)

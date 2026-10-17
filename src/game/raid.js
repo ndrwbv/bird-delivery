@@ -479,6 +479,7 @@ function turretStep (dt) {
 }
 function muzzle () {
   const p = new THREE.Vector3(0, 0, 1.7);
+  TUR.head.updateWorldMatrix(true, false);          // спрятанное cull.js не пересчитывает
   TUR.head.localToWorld(p);
   return p;
 }

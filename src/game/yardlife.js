@@ -39,6 +39,7 @@ import * as FXP from './fxpool.js';
 import * as YARDS from './yards.js';
 import * as YCARS from './yardcars.js';
 import * as YMAZE from './yardmaze.js';          // клумбы, кусты, лесочки, заборы у тротуаров (yardmaze.js)
+import * as COURTS from './courts.js';          // корты: сцены внутрь не встают (courts.js)
 import * as LAWNP from './lawnprops.js';
 import { onPave } from './pave.js';
 import { inView } from './cull.js';
@@ -135,6 +136,7 @@ function ptOk (x, z, m, pave = true) {
   if (YCARS.blocks(x, z, 0.8)) return false;
   if (YARDS.blocks(x, z, 0.4)) return false;
   if (YMAZE.blocks(x, z, 0.4)) return false;
+  if (COURTS.blocks(x, z, 0.4)) return false;
   if (A.solidAt(x, z, 0.5)) return false;
   if (LAWNP.busy(x, z, 1)) return false;
   return true;
