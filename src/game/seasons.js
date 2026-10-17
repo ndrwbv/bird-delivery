@@ -205,15 +205,35 @@ function yardMark () {
 }
 /* propK — склейка земли с реквизитом (game.js LITM, 17.10.2026): у вершин с признаком «реквизит» (четвёртый байт цвета,
    S_LAND ложно) сухость травы propK, у земли — dryK */
-export function seasonMat (m, dryK = 1, propK) {
+/* smashJ — в той же склейке и мелочь дворов (game.js smashToMesher, 17.10.2026): четвёртый байт цвета 254 — мелочь (сухость
+   0,6), 128…253 — куст: 128 + палитра × 42 + зерно (0…41), листва — как у smashMat (aux) */
+const SMJ_FRAG = (dryK, propK) => `
+#ifdef USE_COLOR_ALPHA
+float sjF = floor(vColor.a * 255.0 + 0.5);
+if (sjF > 127.5 && sjF < 253.5) {
+  float sjB = sjF - 128.0, sjP = floor(sjB / 42.0), sjS = (sjB - sjP * 42.0 + 0.5) / 42.0;
+  vec3 c0 = diffuseColor.rgb;
+  float leafy = smoothstep(0.03, 0.12, c0.g - max(c0.r, c0.b));
+  vec3 c = mix(c0, autPal(min(sjP, 2.0), sjS), clamp(uYellow * 1.7 - sjS * 0.7, 0.0, 1.0));
+  c = mix(c, vec3(0.13, 0.09, 0.06), clamp((1.0 - uLeaf) * 1.4 - sjS * 0.4, 0.0, 1.0));
+  c = mix(c, vec3(0.2, 0.5, 0.08), uFresh * 0.5);
+  diffuseColor.rgb = mix(c0, c, leafy);
+}
+float sjDry = S_LAND ? ${dryK.toFixed(2)} : sjF > 254.5 ? ${propK.toFixed(2)} : sjF > 253.5 ? 0.6 : 0.0;
+#else
+float sjDry = ${dryK.toFixed(2)};
+#endif
+diffuseColor.rgb = seasonTint(diffuseColor.rgb, sjDry, 1.0);`;
+export function seasonMat (m, dryK = 1, propK, smashJ) {
   const dry = propK === undefined ? dryK.toFixed(2) : '(S_LAND ? ' + dryK.toFixed(2) + ' : ' + propK.toFixed(2) + ')';
   m.onBeforeCompile = sh => {
     yardMark();
     Object.assign(sh.uniforms, U);
     sh.vertexShader = 'varying vec3 vSW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n' + WPOS);
-    sh.fragmentShader = TINT + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = seasonTint(diffuseColor.rgb, ' + dry + ', 1.0);');
+    sh.fragmentShader = (smashJ ? 'uniform float uYellow, uLeaf;\n' : '') + TINT + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' +
+      (smashJ ? SMJ_FRAG(dryK, propK === undefined ? dryK : propK) : 'diffuseColor.rgb = seasonTint(diffuseColor.rgb, ' + dry + ', 1.0);'));
   };
-  m.customProgramCacheKey = () => 'season' + dryK + (propK === undefined ? '' : 'p' + propK);
+  m.customProgramCacheKey = () => 'season' + dryK + (propK === undefined ? '' : 'p' + propK) + (smashJ ? 's' : '');
   return m;
 }
 

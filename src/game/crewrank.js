@@ -26,6 +26,7 @@ import * as CHAT from './chat.js';
 
 export const RANK = {
   GAP: 30,            // с — не чаще одной фразы про рейтинг
+  GAP_PH: 60,         // с — то же на телефоне (чат там узкой колонкой над педалями — реже; ревью 17.10, Р12)
   EVERY: [120, 180],  // с — сводка «как идёшь», если ничего не случилось
   GRACE: 40,          // с — начало смены: все по нулям, молчат
   LEAD: 100,          // с — коллеги подкалывают друг друга (сменился первый среди них) не чаще
@@ -225,7 +226,7 @@ export function update (el, rows, live) {
   ST.lead = top ? top.R : null;
   ST.above = above; ST.place = me + 1; ST.n = n;
 
-  if (!live || n < 2 || ST.clock < RANK.GRACE || ST.clock - ST.last < RANK.GAP || CHAT.busy()) return;
+  if (!live || n < 2 || ST.clock < RANK.GRACE || ST.clock - ST.last < (CHAT.phone() ? RANK.GAP_PH : RANK.GAP) || CHAT.busy()) return;
   const ev = ST.ev;
   if (ev) {
     ST.ev = null;

@@ -8,7 +8,7 @@
    (places: вызовов в кадре в среднем и по местам) — для «до/после» на одном и том же городе (--seed). Флаги игры для сравнения
    одной сборкой: ?nobox (без коробок, cull.js), ?nojoint (сугробы, листья, деревья — тремя мешами), ?noflatm (вывески
    отдельно от разметки), ?mwall (матрицы и у спрятанного), ?nolitj (реквизит своей склейкой), ?nolampm (плафоны своей склейкой),
-   ?farold (дальнее CULL.step по-старому). Птицы — InstancedMesh с единичной матрицей: попадают в stat. */
+   ?farold (дальнее CULL.step по-старому), ?nolix (клетки без общих вершин), ?nosmj (мелочь дворов своей склейкой). Птицы — InstancedMesh с единичной матрицей: попадают в stat. */
 const Q = new URLSearchParams(location.search), SECS = +(Q.get('dcsecs') || 30), PLACES = +(Q.get('dcplaces') || 0);
 const R = d.renderer, r0 = R.render, T = d.THREE;
 await onShift();

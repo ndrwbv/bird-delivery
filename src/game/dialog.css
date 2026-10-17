@@ -86,8 +86,38 @@ body.calm-fx .dlg-pop, body.calm-fx #dlg.dlg-talking .dlg-head img { animation: 
   .dlg-bubble { min-height: 0; padding: .5em .8em 1.2em; line-height: 1.5; }
   .dlg-btns { margin-top: .5em; gap: 8px; }
   .dlg-btns button { padding: .45em .9em; }
-  body.dlg-open #chat { opacity: 0; transition: opacity .2s; }   /* чат Толика справа сверху лёг бы на облачко — пока окно открыто, не видно */
+  body.dlg-open #chat:not(.ph) { opacity: 0; transition: opacity .2s; }   /* чат Толика справа сверху лёг бы на облачко — пока окно открыто, не видно;
+                                                                            на телефоне (#chat.ph) он колонкой над педалями — выше листа, виден */
 }
+
+/* телефон боком (ревью 17.10, Р16): лист — низкой полосой внизу (~30 % экрана, было ~60 %), чтобы над ним были видны своя
+   машина и «место N из M» на хаде. Шапка в одну мелкую строку (срок справа — как был); портрет 40 px, справа от него имя и
+   сумма; облачко — текст 11 px (до 720 px шириной — 10) в 2—3 строки, без «пропустить ▸»; ответы — справа от облачка друг над другом. Катсцена (story-cut) и два ответа
+   столбиком (.stack) — как были */
+@media (max-height: 500px) {
+  body:not(.story-cut) #dlg { padding: 0 8px 4px; background: linear-gradient(to top, rgba(40, 14, 24, .45), transparent 42%); }
+  body:not(.story-cut) #dlg .dlg-box:not(.stack) { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; align-items: end;
+                                                   width: min(880px, 100%); padding: 0 10px 8px; }
+  body:not(.story-cut) #dlg .dlg-box:not(.stack) > .dlg-top { grid-column: 1 / -1; }
+  body:not(.story-cut) #dlg .dlg-box:not(.stack) > .dlg-row { grid-column: 1; grid-row: 2; }
+  body:not(.story-cut) #dlg .dlg-box:not(.stack) > .dlg-btns { grid-column: 2; grid-row: 2; flex-direction: column; flex-wrap: nowrap; align-items: stretch;
+                                                               gap: 6px; margin: 0; max-width: 12em; }
+  body:not(.story-cut) #dlg .dlg-top { padding: .35em 0 .25em; margin-bottom: .35em; font-size: 10px; }
+  body:not(.story-cut) #dlg .dlg-row { gap: 8px; align-items: center; }
+  body:not(.story-cut) #dlg .dlg-head { display: grid; grid-template-columns: auto auto; column-gap: 6px; row-gap: 3px; align-items: center;
+                                        max-width: 17em; rotate: none; }
+  body:not(.story-cut) #dlg .dlg-head img.pp-polaroid { grid-row: 1 / 3; width: 40px; height: 40px; rotate: -3deg; }
+  body:not(.story-cut) #dlg .dlg-name { grid-column: 2; align-self: end; max-width: 11em; text-align: left; font-size: 10px; line-height: 1.3; }
+  body:not(.story-cut) #dlg .dlg-pay { grid-column: 2; align-self: start; justify-self: start; margin: 0; padding: .25em .4em; gap: .2em; box-shadow: 0 2px 0 var(--pp-ink); }
+  body:not(.story-cut) #dlg .dlg-head:has(.dlg-pay[hidden]) .dlg-name { grid-row: 1 / 3; align-self: center; }
+  body:not(.story-cut) #dlg .dlg-bubble { min-height: 0; padding: .45em .7em; font-size: 11px; line-height: 1.45; border-width: 2px; box-shadow: 0 3px 0 var(--pp-ink); }
+  body:not(.story-cut) #dlg .dlg-bubble::before { top: .8em; }
+  body:not(.story-cut) #dlg .dlg-skip { display: none; }   /* «пропустить ▸» — строка лишней высоты; тап по облачку и так допечатывает */
+  body:not(.story-cut) #dlg .dlg-btns button { font-size: 10px; padding: .55em .8em; border-width: 2px; box-shadow: 0 3px 0 var(--pp-ink); }
+  body:not(.story-cut) #dlg .dlg-meters { margin-top: 6px; gap: 4px 6px; }
+}
+/* маленький телефон боком (667×375): облачко уже — текст 10 px, чтобы фраза гопника влезала в 3 строки, а не в 4 */
+@media (max-height: 500px) and (max-width: 720px) { body:not(.story-cut) #dlg .dlg-bubble { font-size: 10px; } }
 
 /* два ответа столбиком (say { stack }: вопрос в катсцене, story.js ['ask']) — как разговор у двери (smalltalk.css):
    друг под другом, верхний — первый, у выбранного курсор ▶; значков клавиш на кнопках нет — подсказка одной строкой внизу */

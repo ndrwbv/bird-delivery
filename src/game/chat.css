@@ -83,3 +83,17 @@ body.calm-fx .en-in .en-tb p:not(.en-msg), body.calm-fx .en-tolik.said .en-msg {
 /* телефон боком: накладная висит по центру ~2,6 с (body.brief) — чат справа ложился на её фото и строки; пока она
    на экране, чат прозрачный (сообщения не теряются — висят дальше своё время) (ревью 17.10) */
 @media (max-height: 500px) { body.brief #chat { opacity: 0; transition: opacity .2s; } }
+
+/* ── телефон (chat.js placePhone, #chat.ph; ревью 17.10, Р12): узкая колонка под мини-карточкой, слева от радара, над
+   педалями. Имя — в начале пузыря одной строкой с текстом («Олег: …»), над пузырём его нет; аватарка 24 px; пузырь
+   плотнее; едешь — прочитанные сообщения полупрозрачные (.ph-drive, свежее .fresh — целиком) ── */
+#chat .cm-n { display: none; font-style: normal; color: #8a4b14; }
+#chat.ph { gap: 3px; transition: top .25s ease-out; }
+#chat.ph .cm { gap: 6px; }
+#chat.ph .cm-b b { display: none !important; }
+#chat.ph .cm.cm-head .cm-n { display: inline; }
+#chat.ph .cm-b p { font-size: 10px; line-height: 1.45; padding: 6px 10px; border-radius: 14px; }
+#chat.ph .cm-b p.typing { padding: 9px 11px; }
+#chat.ph .cm > img, #chat.ph .cm > i { width: 24px; height: 24px; }
+#chat.ph .cm > * { transition: opacity .4s; }
+#chat.ph.ph-drive .cm:not(.fresh) > * { opacity: .72; }

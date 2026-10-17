@@ -10,11 +10,14 @@
    Текст пришёл — аватарка Толика говорит ртом (talkface.js): ~14 букв в секунду, 0,7—2,6 с.
    Ввод не перехватывает. Место — под колонкой хада справа (кошелёк, часы смены,
    «закончить смену», на телефоне — радар и кнопки); не влезает по высоте — слева от неё.
+   Телефон (Р12, PH ниже): узкая колонка под мини-карточкой, слева от радара, над педалями; имя в пузыре одной строкой,
+   не больше 2 сообщений, «крупно» — ×1,12 на 0,3 с, едешь — прочитанные полупрозрачные.
    Пишет только на плохое и на очень хорошее, обычные доставки — молча.
    Что и когда пишет — docs/ORDERS.md «Толик управляющий».
 
    Из game.js:
-     CHAT.init({ face, person, adult, blip }) — face(person, size) → картинка; adult — взрослая версия (мат);
+     CHAT.init({ face, person, adult, blip, speed }) — face(person, size) → картинка; adult — взрослая версия (мат);
+                                            speed() — скорость машины, м/с; CHAT.phone() — телефонный вид чата
                                             blip(f, d, type, v) — звук (Snd.blip); fx — Snd.fx (файлы chat / chat-angry)
      CHAT.react(kind, onShow?)            — kind: 'fast' | 'late' | 'bump' | 'kill' | 'bundle' | 'urgent' | 'back';
                                             onShow() — в момент, когда текст появился (списание денег)
@@ -37,7 +40,12 @@ const TYPE_S = 0.5, MAX = 3;
 const hold = s => Math.min(8, 4 + s.length / 25);
 /* крупно: во сколько раз, сколько держится, выскок и уменьшение (мс) */
 const BIG = { S: 1.8, MIN: 1.2, PER: 150, MAX: 2, IN: 380, OUT: 450 };
-const bigHold = s => Math.min(BIG.MAX, BIG.MIN + s.length / BIG.PER);
+/* телефон (касания, высота ≤ 500 или ширина ≤ 900 px; ревью 17.10, Р12): чат — узкой колонкой под мини-карточкой
+   заказа, слева от радара, над педалями (не на педалях, руле, радаре и сердцах); сообщения в одну строку с именем
+   («Олег: …»), видно не больше 2; «крупно» — чуть-чуть (×1,12) и на долю секунды; едешь (быстрее DRIVE м/с) —
+   сообщение через FRESH с после прихода полупрозрачное (72 %, chat.css .ph-drive) */
+export const PH = { MAX: 2, W: 240, BIG_S: 1.12, BIG_HOLD: 0.3, DRIVE: 4, FRESH: 1.5 };
+const bigHold = s => (C.ph ? PH.BIG_HOLD : Math.min(BIG.MAX, BIG.MIN + s.length / BIG.PER));
 const calm = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
 
 /* фразы: общие и взрослые/детские (мат — только во взрослой) */
@@ -75,13 +83,16 @@ const KIDS_LINES = {
     N_('отвёз — и пропал! в пиццерию живо, а штраф я уже вычел')],
 };
 
-const C = { el: null, face: null, person: null, adult: false, blip: null, fx: null, items: [], last: {}, wait: 0, pl: 0 };
+const C = { el: null, face: null, person: null, adult: false, blip: null, fx: null, speed: null, items: [], last: {}, wait: 0, pl: 0, ph: false, bot: 0 };
 const PEND = new Set();                                  // отложенные сообщения (later)
 const ANGRY = new Set(['late', 'bump', 'kill', 'urgent', 'back']);
 
-export function init ({ face, person, adult, blip, fx }) {
-  C.face = face; C.person = person; C.adult = !!adult; C.blip = blip || null; C.fx = fx || null;
+/* speed() — скорость машины, м/с (на телефоне едешь — старые сообщения прозрачнее) */
+export function init ({ face, person, adult, blip, fx, speed }) {
+  C.face = face; C.person = person; C.adult = !!adult; C.blip = blip || null; C.fx = fx || null; C.speed = speed || null;
 }
+/* телефон: касания и низкий (боком) или узкий экран. Дека, компьютер, планшет боком — как было */
+export const phone = () => document.body.classList.contains('touch') && (innerHeight <= 500 || innerWidth <= 900);
 
 /* звук «пришло сообщение»: два коротких тона, ругань — ниже */
 function ding (angry) {
@@ -97,7 +108,7 @@ function bigTf (m) {
   const row = m.el, b = row.querySelector('.cm-b'), c = C.el.getBoundingClientRect();
   const x0 = row.offsetLeft, x1 = b ? b.offsetLeft + b.offsetWidth : x0 + row.offsetWidth;
   const cw = Math.max(1, x1 - x0), h = Math.max(1, row.offsetHeight);
-  const s = Math.max(1, Math.min(BIG.S, (c.left + x1 - 10) / cw, (innerHeight - 10 - c.top - row.offsetTop) / h));
+  const s = Math.max(1, Math.min(C.ph ? PH.BIG_S : BIG.S, (c.left + x1 - 10) / cw, (innerHeight - 10 - c.top - row.offsetTop) / h));
   return { origin: cw.toFixed(1) + 'px 0px', s, dx: 0, dy: 0 };
 }
 const tf = (g, k) => 'translate(' + (g.dx * k).toFixed(1) + 'px, ' + (g.dy * k).toFixed(1) + 'px) scale(' + (1 + (g.s - 1) * k).toFixed(3) + ')';
@@ -143,6 +154,10 @@ function box () {
 function place () {
   if (!C.el) return;
   const W = innerWidth, H = innerHeight;
+  C.ph = phone();
+  C.el.classList.toggle('ph', C.ph);
+  if (C.ph) { placePhone(W, H); return; }
+  C.bot = H - 6;
   const ids = ['hud-right', 'cr-clock'].concat(document.body.classList.contains('touch') ? ['radar', 'ctrls'] : []);
   let top = 1e9, bottom = 0, left = W, right = 0;
   for (const id of ids) {
@@ -160,14 +175,56 @@ function place () {
   fit(H);
 }
 
+/* видимый прямоугольник элемента (нет, спрятан, прозрачный — null) */
+function rectOf (sel) {
+  const e = document.querySelector(sel);
+  if (!e || e.hidden) return null;
+  const r = e.getBoundingClientRect();
+  if (!r.width || !r.height) return null;
+  const cs = getComputedStyle(e);
+  if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity < 0.05) return null;
+  return r;
+}
+
+/* телефон (Р12): узкая колонка в свободном месте справа — под мини-карточкой заказа (#otags), слева от радара и
+   паузы, над педалями (#tp-right); левее середины экрана не заходит (там машина и сердца). Тост, подсказка,
+   реплика Толика на ходу и грамота сверху по центру — колонка уходит под них, пока они видны */
+function placePhone (W, H) {
+  const rad = rectOf('#radar'), ctr = rectOf('#ctrls'), tags = rectOf('#otags'), ped = rectOf('#touchpad .tp-right'), hl = rectOf('#hud-left');
+  let right = W - 10;
+  for (const r of [rad, ctr]) if (r && r.left > W / 2) right = Math.min(right, r.left - 8);
+  let top = tags ? tags.bottom + 6 : rad ? rad.top : 10;
+  const bot = ped ? ped.top - 6 : H - 10;
+  const lim = Math.max(hl ? hl.right + 12 : 10, W * 0.5 - 40);   // левее — машина посередине и колонка хада слева
+  const w = Math.round(Math.max(140, Math.min(PH.W, right - lim)));
+  for (const r of [rectOf('#toast'), rectOf('#hint'), rectOf('#dlg-live'), rectOf('#ach-toast')]) {
+    if (r && r.right > right - w && r.left < right && r.top < bot && r.bottom > top - 4) top = Math.max(top, r.bottom + 6);
+  }
+  C.bot = Math.max(top + 40, bot);
+  C.el.style.top = Math.round(top) + 'px';
+  C.el.style.right = Math.round(W - right) + 'px';
+  C.el.style.width = w + 'px';
+  C.maxW = Math.max(w, Math.round(right - lim));
+  drive();
+  fit(H);
+}
+
+/* едешь — сообщения, что уже прочитаны (пришли раньше FRESH с), полупрозрачные: дорогу за ними видно */
+function drive () {
+  const v = C.speed ? +C.speed() || 0 : 0, now = performance.now();
+  C.el.classList.toggle('ph-drive', v > PH.DRIVE);
+  for (const m of C.items) m.el.classList.toggle('fresh', !m.said || now - (m.at || 0) < PH.FRESH * 1000);
+}
+
 /* не влезает по высоте (телефон боком: чат под радаром, а коллеги пишут втроём с именами, Толик — длинное объявление
    праздника): сначала шире (до 46 % экрана — меньше строк), потом уходят самые старые сообщения; последнее остаётся
    всегда (ревью 17.10: низ объявления Нового года уезжал за край экрана). Крупное (grow) — transform, высоту не меняет */
 function fit (H) {
   // уходящие (.out) ещё 0,35 с в ленте — не считаем их, только живые сообщения
-  const over = () => { let h = C.el.getBoundingClientRect().top; for (const m of C.items) h += m.el.offsetHeight + 3; return h > H - 6; };
+  // телефон — до верха педалей (C.bot), шире — только до середины экрана (C.maxW, placePhone)
+  const over = () => { let h = C.el.getBoundingClientRect().top; for (const m of C.items) h += m.el.offsetHeight + 3; return h > (C.bot || H - 6); };
   if (!C.items.length || !over()) return;
-  const w = parseFloat(C.el.style.width) || 270, wide = Math.round(Math.min(innerWidth * 0.46, 420));
+  const w = parseFloat(C.el.style.width) || 270, wide = C.ph ? C.maxW : Math.round(Math.min(innerWidth * 0.46, 420));
   if (wide > w) C.el.style.width = wide + 'px';
   while (C.items.length > 1 && over()) drop(C.items[0]);
 }
@@ -210,7 +267,7 @@ export function say (text, onShow, angry, who) {
   // хад мог появиться или спрятаться, пока сообщения висят (написал в катсцене — хада нет, чат встал в самый верх;
   // катсцена кончилась — он лёг на кошелёк и радар): пока есть сообщения, место пересчитываем
   if (!C.pl) C.pl = setInterval(() => { if (!C.items.length) { clearInterval(C.pl); C.pl = 0; return; } place(); }, 400);
-  while (C.items.length >= MAX) drop(C.items[0]);
+  while (C.items.length >= (C.ph ? PH.MAX : MAX)) drop(C.items[0]);
   const row = document.createElement('div');
   row.className = 'cm';
   const pers = who && who.person ? who.person : C.person;
@@ -227,6 +284,12 @@ export function say (text, onShow, angry, who) {
     const p = row.querySelector('p');
     p.className = '';
     p.textContent = text;
+    // телефон: имя — в начале пузыря, одной строкой с текстом («Олег: …»); не телефон — спрятано (chat.css)
+    const nm = document.createElement('i');
+    nm.className = 'cm-n';
+    nm.textContent = (who && who.name ? who.name : t('Толик')) + ': ';
+    p.prepend(nm);
+    m.at = performance.now();
     place();                                              // текст пришёл — влезает ли по высоте (fit), до «крупно»
     m.said = true;
     shown(m);

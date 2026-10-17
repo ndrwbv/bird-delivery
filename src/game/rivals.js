@@ -132,31 +132,41 @@ function signCanvas (ch) {
   x.fillText(txt, (SIGN_W + 190) / 2, SIGN_H / 2 + 4);
   return c;
 }
-/* все вывески сети — одним мешем с одной текстурой */
+/* все вывески сетей — одним мешем с одной текстурой (17.10.2026: обе сети — один холст в две строки, было по мешу и текстуре на
+   сеть — лишний вызов отрисовки в каждом кадре, docs/AGENTS.md «Слои статики») */
 const SIGNQ = { sushi: [], burger: [] };   // [x, y, z, ux, uz, w, h] — плоскость лицом в (−uz, ux)… задаётся нормалью
 function signQuad (key, cx, cy, cz, ax, az, w, h) { SIGNQ[key].push([cx, cy, cz, ax, az, w, h]); }
+const SIGN_GAP = 16;                        // зазор между строками холста: края строк не текут друг в друга на мелких мипах
 function buildSigns () {
-  for (const key of ['sushi', 'burger']) {
-    const Q = SIGNQ[key];
-    if (!Q.length) continue;
-    const P = [], U = [], I = [];
-    for (const [cx, cy, cz, ax, az, w, h] of Q) {
+  const keys = ['sushi', 'burger'].filter(k => SIGNQ[k].length);
+  if (!keys.length) return;
+  const CH_H = keys.length * SIGN_H + (keys.length - 1) * SIGN_GAP;
+  const c = document.createElement('canvas');
+  c.width = SIGN_W; c.height = CH_H;
+  const x = c.getContext('2d');
+  const P = [], U = [], I = [];
+  keys.forEach((key, row) => {
+    const y0 = row * (SIGN_H + SIGN_GAP);
+    x.drawImage(signCanvas(CH[key]), 0, y0);
+    // холст в текстуре — снизу вверх (flipY): строка row — v от 1 − (y0 + H) / CH_H до 1 − y0 / CH_H
+    const v0 = 1 - (y0 + SIGN_H) / CH_H, v1 = 1 - y0 / CH_H;
+    for (const [cx, cy, cz, ax, az, w, h] of SIGNQ[key]) {
       const o = P.length / 3, hx = ax * w / 2, hz = az * w / 2;
       P.push(cx - hx, cy - h / 2, cz - hz, cx + hx, cy - h / 2, cz + hz, cx + hx, cy + h / 2, cz + hz, cx - hx, cy + h / 2, cz - hz);
-      U.push(0, 0, 1, 0, 1, 1, 0, 1);
+      U.push(0, v0, 1, v0, 1, v1, 0, v1);
       I.push(o, o + 1, o + 2, o, o + 2, o + 3);
     }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
-    g.setIndex(I);
-    g.computeBoundingSphere();
-    const tex = new THREE.CanvasTexture(signCanvas(CH[key]));
-    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: tex }));
-    m.matrixAutoUpdate = false; m.name = 'rival-signs-' + key;
-    A.scene.add(m);
-  }
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+  g.setIndex(I);
+  g.computeBoundingSphere();
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: tex }));
+  m.matrixAutoUpdate = false; m.name = 'rival-signs';
+  A.scene.add(m);
 }
 
 /* ═════════════ поиск места ═════════════ */

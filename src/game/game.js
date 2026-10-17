@@ -510,11 +510,18 @@ const NO_FLATM = /[?&]noflatm(&|$)/.test(location.search);
    не кладёт плитку, износ и газон, сухость травы — 0,4 (seasons.js seasonMat propK). Цвет — байтами, как в мобильном режиме
    (на компьютере может сдвинуться на 1/255). Реквизит теперь с двух сторон, как земля. Что попадёт в LIT позже куска 'mesh',
    склеится по-старому. ?nolitj — по-старому, для замера.
-   Мобильный режим (телефон, mobile.js) — по-старому всегда: склейка реквизита у себя индексная (у коробки 24 вершины, у
-   шара и цилиндра общих вершин ещё больше), в клетках земли — без индекса (36 вершин на коробку), и клетки земли заливаются в
-   видеокарту все сразу (кусок 'upload'), а свои клетки реквизита — когда попали в кадр: на телефоне видео росло 285 → 376 МБ
-   (порог проверки 360). На компьютере и «Деке» — склеено: −9…10 вызовов, куча JS меньше на ~60 МБ, видео больше на ~90 МБ */
-const NO_LITJ = MOBM.ON || /[?&]nolitj(&|$)/.test(location.search);
+   Мобильный режим (телефон) до третьего захода склеивал реквизит по-старому: в клетках земли без индекса у коробки 36 вершин,
+   видео росло 285 → 376 МБ (порог 360). С общими вершинами клетки (ixCell, у коробки 8) и кусками ссылкой (blockM) — склеено
+   и там: видео меньше, чем было (293 → 279 МБ вместе с мелочью дворов) */
+const NO_LITJ = /[?&]nolitj(&|$)/.test(location.search);
+/* Мелочь дворов (SMASH: заборчики, лавочки, урны, кусты…) — тоже в клетки LITM (17.10.2026, docs/AGENTS.md «Слои статики»,
+   третий заход): была своя склейка по тем же клеткам 200 м со своим материалом (seasonSmash) — второй вызов на клетку. Кусок
+   клетки мелочи ложится в клетку LITM «спереди» как есть (block: те же вершины в том же порядке, свой индекс), у вещей
+   меняется только меш и сдвиг (it.mesh, it.v0) — сбил, горки и снеговики по сезону, мусор, стройки правят вершины, как раньше:
+   позиции куска спереди остаются в памяти (keepFront), остальное после загрузки отпускается. Вид мелочи — четвёртый байт
+   цвета: 254 — просто мелочь (сухость травы 0,6), 128…253 — куст (палитра осени и зерно — для листвы, как aux у smashMat).
+   ?nosmj — по-старому, для замера */
+const NO_SMJ = /[?&]nosmj(&|$)/.test(location.search);
 /* Плафоны фонарей и прочее, что светится (LAMPH), — тоже в клетки FLATM (17.10.2026): признак «светится» — четвёртый байт
    цвета 255, шейдер FLATM у таких вершин не берёт ночное затемнение материала (как было у своего материала с glow). Сбиваемые
    плафоны — в начале клетки, их позиции остаются в памяти: сбитый фонарь прячет плафон под землю (streetlamps.js hide).
@@ -525,10 +532,17 @@ const NO_LAMPM = /[?&]nolampm(&|$)/.test(location.search);
 function flatToMesher (list, M, trk) {
   let tris = 0;
   const rgbB = (r, g, b) => (Math.round(r * 255) << 16) | (Math.round(g * 255) << 8) | Math.round(b * 255);
-  for (const g of list) {
+  for (let li = 0; li < list.length; li++) {
+    const g = list[li];
+    list[li] = null;                                // прочитан — отпускаем сразу (пик памяти: реквизит на телефоне)
     if (trk) { const f = g.userData && g.userData.track; M.front(!!f); M.track(f); }
     const p = g.p || g.attributes.position.array, ix = g.p ? g.i : g.index ? g.index.array : null;
     const col = g.p ? null : g.attributes.color ? g.attributes.color.array : null;
+    if (!NO_LIX && !(trk && g.userData && g.userData.track)) {   // кусок целиком, ссылкой (Mesher blockM): копия — сразу в склейку клетки (ixCell)
+      M.blockM(p, ix, g.p ? rgbB(g.r, g.g, g.b) : col ? -1 : 0xffffff, col);
+      tris += (ix ? ix.length : p.length / 3) / 3;
+      continue;
+    }
     const one = g.p ? rgbB(g.r, g.g, g.b) : col ? 0 : 0xffffff;
     const cOf = v => (col ? rgbB(col[v * 3], col[v * 3 + 1], col[v * 3 + 2]) : one);
     const nt = ix ? ix.length : p.length / 3;
@@ -1019,6 +1033,10 @@ function Mesher (opt) {
   const ZMID = ++ZF_ID;
   const C = new THREE.Color();
   const CS = opt && opt.alpha ? 4 : 3;           // байт цвета на вершину
+  /* в основном клетки признак всегда 0 (реквизит, плафоны без столба — кусками blockM, у них свой признак): там цвет — тремя
+     байтами, четвёртый (0) добавит склейка (ixCell). Без общих вершин (?nolix) куски кладутся треугольниками — четыре байта.
+     У каждой клетки и куска спереди своя ширина: b.cs (спереди — всегда CS) */
+  const CSI = CS === 4 && opt.mainRGB && !NO_LIX ? 3 : CS;
   let cr = 0, cg = 0, cb = 0, ca = 0, GRAD = null;
   /* Треугольник сразу ложится в свою клетку (см. mesh): общий массив на весь
      город с последующей раскладкой по клеткам весил в Северске сотни мегабайт
@@ -1029,9 +1047,10 @@ function Mesher (opt) {
     const x0 = Math.fround(ax), z0 = Math.fround(az), x1 = Math.fround(bx), z1 = Math.fround(bz), x2 = Math.fround(cx), z2 = Math.fround(cz);
     const span = Math.max(Math.abs(x1 - x0), Math.abs(x2 - x0), Math.abs(z1 - z0), Math.abs(z2 - z0));
     const k = span > CHUNK ? -1 : (Math.floor((x0 + x1 + x2) / 3 / CHUNK) + 50000) * 100000 + Math.floor((z0 + z1 + z2) / 3 / CHUNK) + 50000;
-    if (k === lastK) return lastB;
+    if (k === lastK && !lastB.done) return lastB;
     let b = ids.get(k);
-    if (b === undefined) { b = { cap: 1 << 10, n: 0, pos: new Float32Array(3 << 10), col: new Uint8Array(CS << 10) }; ids.set(k, b); BK.push(b); }
+    // done — клетка уже склеена заранее (prep), её массивы отпущены: дописанное — в новую клетку с тем же ключом
+    if (b === undefined || b.done) { b = { cap: 1 << 10, n: 0, pos: new Float32Array(3 << 10), col: new Uint8Array(CSI << 10), cs: CSI }; ids.set(k, b); BK.push(b); }
     lastK = k; lastB = b;
     return b;
   }
@@ -1043,18 +1062,58 @@ function Mesher (opt) {
   function slot (ax, az, bx, bz, cx, cz) {
     const b = bucket(ax, az, bx, bz, cx, cz);
     if (!FRONT) return b;
-    return b.f || (b.f = { cap: 64, n: 0, pos: new Float32Array(64 * 3), col: new Uint8Array(64 * CS), trk: [], n0: 0 });
+    if (b.f && b.f.blocks && b.f.blocks.length) matF(b.f);
+    return b.f || (b.f = { cap: 64, n: 0, pos: new Float32Array(64 * 3), col: new Uint8Array(64 * CS), cs: CS, trk: [], n0: 0 });
+  }
+  /* куски blockM (ссылками) — треугольниками в основное клетки, как раньше клал tri3 */
+  function matMB (B) {
+    const MB = B.mb;
+    B.mb = null; B.mbi = 0;
+    if (!MB) return;
+    for (const q of MB) {
+      const p = q.pos, ix = q.idx, c = q.col;
+      room(B, ix.length);
+      const P = B.pos, C = B.col;
+      for (let k = 0; k < ix.length; k++) {
+        const v = ix[k], o = (B.n + k) * 3, oc = (B.n + k) * B.cs;
+        P[o] = p[v * 3]; P[o + 1] = p[v * 3 + 1]; P[o + 2] = p[v * 3 + 2];
+        if (c) { C[oc] = Math.round(c[v * 3] * 255); C[oc + 1] = Math.round(c[v * 3 + 1] * 255); C[oc + 2] = Math.round(c[v * 3 + 2] * 255); }
+        else { C[oc] = q.rgb >> 16; C[oc + 1] = (q.rgb >> 8) & 255; C[oc + 2] = q.rgb & 255; }
+        if (B.cs === 4) C[oc + 3] = q.fl;
+      }
+      B.n += ix.length;
+    }
+  }
+  /* куски block спереди (ссылками) — в свои массивы: в клетку дописывают треугольники спереди или склеивают без ixCell */
+  function matF (f) {
+    const BL = f.blocks;
+    f.blocks = null;
+    if (!BL || !BL.length) return;
+    f.cap = Math.max(64, f.n * 2);
+    f.pos = new Float32Array(f.cap * 3); f.col = new Uint8Array(f.cap * CS);
+    let ni = 0; for (const q of BL) ni += q.idx.length;
+    f.ix = new Uint32Array(Math.max(1024, ni * 2)); f.ixn = 0;
+    for (const q of BL) {
+      f.pos.set(q.pos, q.v0 * 3); q.fill(f.col, q.v0 * CS);
+      for (let i = 0; i < q.idx.length; i++) f.ix[f.ixn++] = q.idx[i] + q.v0;
+    }
   }
   function note (f) {                               // треугольник спереди только что лёг с вершины f.n - 3
+    if (f.ix) { ixRoom(f, 3); f.ix[f.ixn++] = f.n - 3; f.ix[f.ixn++] = f.n - 2; f.ix[f.ixn++] = f.n - 1; }   // в клетке есть кусок со своим индексом (block) — спереди всё с индексом
     if (!TRK) return;
     const L = f.trk[f.trk.length - 1];
     if (L && L[0] === TRK && L[1] + L[2] === f.n - 3) L[2] += 3;
     else f.trk.push([TRK, f.n - 3, 3]);
   }
+  function ixRoom (f, add) {                         // индекс куска спереди (block): запас вдвое
+    if (f.ixn + add <= f.ix.length) return;
+    let c = f.ix.length; while (f.ixn + add > c) c *= 2;
+    const a = new Uint32Array(c); a.set(f.ix.subarray(0, f.ixn)); f.ix = a;
+  }
   function room (b, add) {
     if (b.n + add <= b.cap) return;
     while (b.n + add > b.cap) b.cap *= 2;
-    const p2 = new Float32Array(b.cap * 3), c2 = new Uint8Array(b.cap * CS);
+    const p2 = new Float32Array(b.cap * 3), c2 = new Uint8Array(b.cap * b.cs);
     p2.set(b.pos); c2.set(b.col);
     b.pos = p2; b.col = c2;
   }
@@ -1101,11 +1160,11 @@ function Mesher (opt) {
     tri (ax, ay, az, bx, by, bz, cx, cy, cz) {
       const b = slot(ax, az, bx, bz, cx, cz);
       room(b, 3);
-      const p = b.pos, c = b.col, i = b.n * 3, j = b.n * CS;
+      const W = b.cs, p = b.pos, c = b.col, i = b.n * 3, j = b.n * W;
       p[i] = ax; p[i + 1] = ay; p[i + 2] = az; p[i + 3] = bx; p[i + 4] = by; p[i + 5] = bz; p[i + 6] = cx; p[i + 7] = cy; p[i + 8] = cz;
-      if (GRAD) { GRAD(ax, az, c, j); GRAD(bx, bz, c, j + CS); GRAD(cx, cz, c, j + CS * 2); }
-      else { c[j] = c[j + CS] = c[j + CS * 2] = cr; c[j + 1] = c[j + CS + 1] = c[j + CS * 2 + 1] = cg; c[j + 2] = c[j + CS + 2] = c[j + CS * 2 + 2] = cb; }
-      if (CS === 4) c[j + 3] = c[j + 7] = c[j + 11] = ca;
+      if (GRAD) { GRAD(ax, az, c, j); GRAD(bx, bz, c, j + W); GRAD(cx, cz, c, j + W * 2); }
+      else { c[j] = c[j + W] = c[j + W * 2] = cr; c[j + 1] = c[j + W + 1] = c[j + W * 2 + 1] = cg; c[j + 2] = c[j + W + 2] = c[j + W * 2 + 2] = cb; }
+      if (W === 4) c[j + 3] = c[j + 7] = c[j + 11] = ca;
       b.n += 3; n += 3;
       if (FRONT) note(b);
     },
@@ -1114,6 +1173,40 @@ function Mesher (opt) {
     /* следующие треугольники — в начало клетки, позиции после загрузки остаются в памяти (см. slot) */
     front (on) { FRONT = !!on; if (!on) TRK = null; return api; },
     track (fn) { TRK = fn || null; return api; },
+    /* готовый кусок со своим индексом — спереди клетки точки (cx, cz), вершины по порядку (не сливаются): pos — Float32Array
+       (x, y, z), fill(байты, с какого байта) — кладёт цвет куска (CS байт на вершину, с признаком), idx — индекс по вершинам куска.
+       Не копируется: клетка держит ссылки, копия — сразу в склейку (ixCell). fn(меш, первая вершина, вершин) позовут, когда меш
+       клетки готов. Мелочь дворов (SMASH) в клетках LITM — 17.10.2026; клетка с таким куском — всегда с индексом */
+    block (pos, fill, idx, cx, cz, fn) {
+      const b = bucket(cx, cz, cx, cz, cx, cz);
+      const f = b.f || (b.f = { cap: 64, n: 0, pos: new Float32Array(64 * 3), col: new Uint8Array(64 * CS), cs: CS, trk: [], n0: 0, blocks: [] });
+      const nv = pos.length / 3, v0 = f.n;
+      if (!f.blocks) {                              // спереди уже треугольники — кусок копией в массивы
+        if (!f.ix) { f.ix = new Uint32Array(Math.max(1024, f.n)); f.ixn = 0; for (let v = 0; v < f.n; v++) f.ix[f.ixn++] = v; }
+        room(f, nv);
+        f.pos.set(pos, v0 * 3); fill(f.col, v0 * CS);
+        ixRoom(f, idx.length);
+        for (let i = 0; i < idx.length; i++) f.ix[f.ixn++] = idx[i] + v0;
+      } else f.blocks.push({ pos, fill, idx, v0 });
+      f.n += nv; n += idx.length;
+      if (fn) f.trk.push([fn, v0, nv]);
+      return api;
+    },
+    /* готовый кусок (вершины pos, индекс idx или null — треугольники подряд) в основное клетки середины его коробки — ссылкой,
+       без копии: вершины сольются с соседними при склейке (ixCell), без неё — разложатся треугольниками (matMB). Цвет: rgb —
+       0xRRGGBB байтами на весь кусок, или col — цвет вершин (0…1, rgb = −1); признак — текущий (flag). Реквизит и вывески (LIT,
+       FLAT) — 17.10.2026: раньше раскладывались треугольниками сразу (у коробки 36 вершин) — пик памяти поздней сборки */
+    blockM (pos, idx, rgb, col) {
+      let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+      for (let i = 0; i < pos.length; i += 3) { const x = pos[i], z = pos[i + 2]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; }
+      if (!(x1 >= x0)) return api;
+      const b = bucket(x0, z0, x1, z1, (x0 + x1) / 2, (z0 + z1) / 2);
+      if (!idx) { idx = new Uint32Array(pos.length / 3); for (let i = 0; i < idx.length; i++) idx[i] = i; }
+      (b.mb || (b.mb = [])).push({ pos, idx, rgb, col, fl: ca });
+      b.mbi = (b.mbi || 0) + idx.length;
+      n += idx.length;
+      return api;
+    },
     /* цвет по месту: fn(x, z, байты, i) кладёт цвет вершины в байты[i…i+2] (плавный стык асфальта,
        roadwear.js); null — снова один цвет на треугольник */
     grad (fn) { GRAD = fn || null; return api; },
@@ -1121,12 +1214,12 @@ function Mesher (opt) {
     tri3 (ax, ay, az, bx, by, bz, cx, cy, cz, c0, c1, c2) {
       const b = slot(ax, az, bx, bz, cx, cz);
       room(b, 3);
-      const p = b.pos, c = b.col, i = b.n * 3, j = b.n * CS;
+      const W = b.cs, p = b.pos, c = b.col, i = b.n * 3, j = b.n * W;
       p[i] = ax; p[i + 1] = ay; p[i + 2] = az; p[i + 3] = bx; p[i + 4] = by; p[i + 5] = bz; p[i + 6] = cx; p[i + 7] = cy; p[i + 8] = cz;
       c[j] = c0 >> 16; c[j + 1] = (c0 >> 8) & 255; c[j + 2] = c0 & 255;
-      c[j + CS] = c1 >> 16; c[j + CS + 1] = (c1 >> 8) & 255; c[j + CS + 2] = c1 & 255;
-      c[j + CS * 2] = c2 >> 16; c[j + CS * 2 + 1] = (c2 >> 8) & 255; c[j + CS * 2 + 2] = c2 & 255;
-      if (CS === 4) c[j + 3] = c[j + 7] = c[j + 11] = ca;
+      c[j + W] = c1 >> 16; c[j + W + 1] = (c1 >> 8) & 255; c[j + W + 2] = c1 & 255;
+      c[j + W * 2] = c2 >> 16; c[j + W * 2 + 1] = (c2 >> 8) & 255; c[j + W * 2 + 2] = c2 & 255;
+      if (W === 4) c[j + 3] = c[j + 7] = c[j + 11] = ca;
       b.n += 3; n += 3;
       if (FRONT) note(b);
     },
@@ -1245,33 +1338,15 @@ function Mesher (opt) {
        вон), новые клетки — новые меши. Так кусков и вызовов отрисовки столько же, как при сборке разом */
     mesh (mat, keep) {
       const grp = new THREE.Group();
-      const geo = B => {
-        // хвост запаса не копируем: вид на тот же буфер, после загрузки его отпустит dropArr
-        let P = B.pos.subarray(0, B.n * 3), Cc = B.col.subarray(0, B.n * CS);
-        const F = B.f && B.f.n ? B.f : null;
-        if (F) {                                    // кусок «спереди» (front) — в начало
-          const P2 = new Float32Array((F.n + B.n) * 3), C2 = new Uint8Array((F.n + B.n) * CS);
-          P2.set(F.pos.subarray(0, F.n * 3)); P2.set(P, F.n * 3); C2.set(F.col.subarray(0, F.n * CS)); C2.set(Cc, F.n * CS);
-          P = P2; Cc = C2;
-        }
-        const g = new THREE.BufferGeometry();
-        const pa = new THREE.BufferAttribute(P, 3), cA = new THREE.BufferAttribute(Cc, CS, true);
-        g.setAttribute('position', pa);
-        g.setAttribute('color', cA);
-        boundSphere(g);
-        // после загрузки в видеокарту копия в памяти JS не нужна (сбитый плафон спереди прячет streetlamps.js hide — коротким
-        // массивом до своего куска и правкой диапазоном)
-        pa.onUpload(dropArr); cA.onUpload(dropArr);
-        return g;
-      };
-      const tracks = (B, me) => { if (B.f) { for (const [f, v0, nv] of B.f.trk) f(me, v0, nv); B.f.trk.length = 0; } };
+      const IX = opt && opt.index && !NO_LIX && !keep;   // общие вершины (ixCell) — при последней склейке; клетки меню (keep) — без них, их склеят заново
       for (const B of BK) {
+        if (B.done) { tracks(B, B.me); continue; }    // склеена заранее (prep) — меш готов и уже в видеокарте
         // поздняя сборка держит клетки до конца (keep): запас «на вырост» (до ×2) — обрезать, в Северске это десятки МБ на всё меню
-        if (keep && B.cap > B.n + 1024) { const c = Math.max(B.n, 16); B.pos = B.pos.slice(0, c * 3); B.col = B.col.slice(0, c * CS); B.cap = c; }
+        if (keep && B.cap > B.n + 1024) { const c = Math.max(B.n, 16); B.pos = B.pos.slice(0, c * 3); B.col = B.col.slice(0, c * B.cs); B.cap = c; }
         if (B.me) {                                   // клетка уже с мешем (keep): дописалось — склейка заново
-          if (B.n > B.n0 || (B.f && B.f.n > B.f.n0)) {
+          if (B.n > B.n0 || (B.f && B.f.n > B.f.n0) || B.mb || (IX && !B.ix)) {   // или клетка меню без общих вершин
             // кусок спереди вырос — вершины основного сдвинулись: прежние метки (track) остаются верны, они все спереди
-            const old = B.me.geometry; B.me.geometry = geo(B); old.dispose(); BUILD_T.meshGrow = (BUILD_T.meshGrow || 0) + 1;
+            const old = B.me.geometry; B.me.geometry = geoOf(B, IX, keep); old.dispose(); BUILD_T.meshGrow = (BUILD_T.meshGrow || 0) + 1;
             B.n0 = B.n; if (B.f) B.f.n0 = B.f.n;
           }
           tracks(B, B.me);
@@ -1279,7 +1354,7 @@ function Mesher (opt) {
         }
         // статика не двигается: матрицы не пересчитываем каждый кадр —
         // в Северске таких кусков десятки тысяч, обход съедал десятую часть кадра
-        const me = new THREE.Mesh(geo(B), mat);
+        const me = new THREE.Mesh(geoOf(B, IX, keep), mat);
         me.matrixAutoUpdate = false;
         grp.add(me);
         tracks(B, me);
@@ -1292,11 +1367,207 @@ function Mesher (opt) {
       // они весили за гигабайт и держались в памяти всю игру
       BUILT_TRIS += n / 3;
       n = 0; ids = new Map(); BK = []; lastK = NaN; lastB = null;
+      ixFree();
       return grp;
+    },
+    /* последняя склейка шагами (поздняя сборка, latebuild.js): клетка за клеткой — общие вершины (ixCell), меш (клетке меню —
+       новая геометрия, новой — новый меш в grp), в видеокарту — пачкой через up(меши) (~300 тыс. вершин на шаг), и свои массивы
+       клетки сразу отпускаем. Так копии клеток не копятся до конца склейки (пик памяти поздней сборки на телефоне), а старые
+       склейки мелочи уходят по мере готовности клеток (track). Дописать в такую клетку (done) — новая клетка с тем же ключом,
+       её склеит mesh() */
+    *prep (mat, grp, up) {
+      if (!(opt && opt.index) || NO_LIX) return;
+      let w = 0, batch = [];
+      for (const B of BK) {
+        if (B.done) continue;
+        const nv = B.n + (B.f ? B.f.n : 0) + (B.mbi || 0);
+        const g = geoOf(B, true);
+        let me = B.me;
+        if (me) { const old = me.geometry; me.geometry = g; old.dispose(); }
+        else { me = new THREE.Mesh(g, mat); me.matrixAutoUpdate = false; grp.add(me); B.me = me; }
+        B.n0 = B.n; if (B.f) B.f.n0 = B.f.n;
+        tracks(B, me);
+        B.done = true; B.pos = B.col = null; B.cap = 0; B.mb = null;
+        if (B.f) { B.f.pos = B.f.col = B.f.ix = B.f.blocks = null; B.f.cap = 0; }
+        batch.push(me);
+        if ((w += nv) > 300000) { up(batch); batch = []; w = 0; yield 'ix'; }
+      }
+      if (batch.length) up(batch);
     },
     verts () { return n; },
   };
+  /* геометрия клетки: IX — общие вершины (ixCell); кусок со своим индексом (block) — индекс всегда */
+  function geoOf (B, IX, keep) {
+    const nf = B.f && B.f.n ? B.f.n : 0;
+    const ix = IX || !!(nf && (B.f.ix || (B.f.blocks && B.f.blocks.length)));
+    let X = null, P = null, Cc = null, cs = CS;
+    if (ix) X = ixCell(nf ? B.f : null, B.pos.subarray(0, B.n * 3), B.col.subarray(0, B.n * B.cs), B.n, CS, !IX, B.mb, B.cs);
+    if (!X) ({ P, Cc, cs } = cellArr(B, keep));     // выгоды нет — без индекса (куски ссылками — треугольниками)
+    const g = new THREE.BufferGeometry();
+    B.ix = IX; B.mb = null; B.mbi = 0;
+    if (X) { P = X.p; Cc = X.c; const ia = new THREE.BufferAttribute(X.i, 1); g.setIndex(ia); ia.onUpload(dropArr); }
+    const pa = new THREE.BufferAttribute(P, 3), cA = new THREE.BufferAttribute(Cc, cs, true);
+    g.setAttribute('position', pa);
+    g.setAttribute('color', cA);
+    boundSphere(g);
+    // после загрузки в видеокарту копия в памяти JS не нужна (сбитый плафон спереди прячет streetlamps.js hide — коротким
+    // массивом до своего куска и правкой диапазоном); opt.keepFront — позиции куска спереди остаются (мелочь дворов: сбил —
+    // её вершины в точку прямо в массиве, keepHead)
+    pa.onUpload(opt && opt.keepFront && nf ? keepHead(nf * 3) : dropArr); cA.onUpload(dropArr);
+    return g;
+  }
+  function tracks (B, me) { if (B.f) { for (const [f, v0, nv] of B.f.trk) f(me, v0, nv); B.f.trk.length = 0; } }
+  /* вершины клетки одним куском: «спереди» (front) — в начало; хвост запаса не копируем — вид на тот же буфер, после загрузки
+     его отпустит dropArr */
+  function cellArr (B, rgb) {
+    if (B.f && B.f.blocks) matF(B.f);
+    if (B.mb) matMB(B);
+    let P = B.pos.subarray(0, B.n * 3), Cc = B.col.subarray(0, B.n * B.cs);
+    const F0 = B.f && B.f.n ? B.f : null;
+    if (rgb && !F0) return { P, Cc, nf: 0, cs: B.cs };   // клетка меню (keep): цвет как лежит, без копии — склеят заново
+    if (B.cs !== CS) {                                // основное тремя байтами — до четырёх (признак 0)
+      const C4 = new Uint8Array(B.n * CS);
+      for (let v = 0; v < B.n; v++) { C4[v * CS] = Cc[v * 3]; C4[v * CS + 1] = Cc[v * 3 + 1]; C4[v * CS + 2] = Cc[v * 3 + 2]; }
+      Cc = C4;
+    }
+    const F = B.f && B.f.n ? B.f : null;
+    if (F) {
+      const P2 = new Float32Array((F.n + B.n) * 3), C2 = new Uint8Array((F.n + B.n) * CS);
+      P2.set(F.pos.subarray(0, F.n * 3)); P2.set(P, F.n * 3); C2.set(F.col.subarray(0, F.n * CS)); C2.set(Cc, F.n * CS);
+      P = P2; Cc = C2;
+    }
+    return { P, Cc, nf: F ? F.n : 0, cs: CS };
+  }
   return api;
+}
+
+/* Общие вершины клетки (17.10.2026, docs/AGENTS.md «Слои статики», третий заход): Mesher кладёт треугольники без индекса —
+   у каждого три свои вершины, хотя у соседних кусков рельефа, ленты дороги, коробки реквизита углы общие (тот же цвет, та же
+   точка). При склейке клетки (mesh) одинаковые вершины (позиция до бита + цвет с признаком) сливаются в одну, треугольники
+   ссылаются на них индексом. Плоская заливка считает свет по грани (производные позиции), а не по вершине, — вид тот же.
+   Кусок «спереди» (front: плафоны, их правят по номеру вершины) не сливается — его вершины остаются по порядку и в начале.
+   Клетка, где выгоды нет (индекс дороже сэкономленного), остаётся без индекса. ?nolix — по-старому, для замера */
+const NO_LIX = /[?&]nolix(&|$)/.test(location.search);
+const IXS = { n: 0, u: 0, cells: 0, plain: 0, ms: 0 };   // вершин было / стало, клеток с индексом / без, мс — для отладки (__dlv.IXS)
+/* F — кусок «спереди» клетки ({ pos, col, n, ix, ixn } или null): по порядку, не сливается; его индекс — свой (block) или
+   треугольники подряд. MP, MC, nm — основное (позиции, байты цвета, вершин). noMerge — не сливать и основное (индекс по порядку:
+   клетка с куском block при ?nolix). Рабочие массивы — общие на все клетки (IXB, растут по нужде; ixFree — отпустить), иначе
+   каждая клетка оставляла бы сборщику мусора ~30 байт на вершину — пик памяти поздней сборки на телефоне */
+let IXB = null;
+function ixBuf (N, CS) {
+  if (!IXB || IXB.n < N) {
+    let n = 1 << 12; while (n < N) n <<= 1;
+    IXB = { n, tab: new Int32Array(n * 2), oP: new Float32Array(n * 3), oC: new Uint8Array(n * 4), I: new Uint32Array(n * 2) };
+    IXB.oU = new Uint32Array(IXB.oP.buffer); IXB.oCU = new Uint32Array(IXB.oC.buffer);
+  }
+  return IXB;
+}
+function ixFree () { IXB = null; }
+function ixCell (F, MP, MC, nm, CS, noMerge, MB, CSm = CS) {   // CSm — байт цвета в основном (MC): 3 — признак 0
+  const t0 = performance.now();
+  let mv = 0, mi = 0;                             // куски blockM: вершин, индекса
+  if (MB) for (const q of MB) { mv += q.pos.length / 3; mi += q.idx.length; }
+  const BL = F && F.blocks && F.blocks.length ? F.blocks : null;   // куски block ссылками (Mesher block)
+  const nf = F ? F.n : 0, fi = F && !BL && F.ix ? F.ix.subarray(0, F.ixn) : null, N = nf + nm + mv;
+  let fl = fi ? fi.length : 0;
+  if (BL) for (const q of BL) fl += q.idx.length;
+  const own = !!fi || !!BL || !!MB;               // у куска спереди свой индекс; куски blockM — только с индексом (их признак)
+  if (N < 64 && !own) return null;
+  const mo = fi || BL ? fl : nf;                 // индекс куска спереди: свой — fl, иначе треугольники подряд — nf
+  const W = ixBuf(Math.max(N, mo + nm + mi), CS);
+  const PU = new Uint32Array(MP.buffer, MP.byteOffset, nm * 3);
+  const CU = CSm === 4 && MC.byteOffset % 4 === 0 ? new Uint32Array(MC.buffer, MC.byteOffset, nm) : null;
+  let size = 64; while (size < (nm + mv) * 2) size <<= 1;
+  const mask = size - 1, tab = W.tab.subarray(0, size).fill(-1);
+  const oP = W.oP, oU = W.oU, oC = W.oC, oCU = CS === 4 ? W.oCU : null, I = W.I;
+  // спереди — как есть, в начало; индекс — свой или треугольники подряд
+  if (BL) {
+    let k = 0;
+    for (const q of BL) {
+      oP.set(q.pos, q.v0 * 3); q.fill(oC, q.v0 * CS);
+      const ix = q.idx, v0 = q.v0;
+      for (let i = 0; i < ix.length; i++) I[k++] = ix[i] + v0;
+    }
+  } else {
+    if (nf) { oP.set(F.pos.subarray(0, nf * 3)); oC.set(F.col.subarray(0, nf * CS)); }
+    if (fi) I.set(fi); else for (let v = 0; v < nf; v++) I[v] = v;
+  }
+  let u = nf;
+  for (let v = 0; v < nm; v++) {
+    const x = PU[v * 3], y = PU[v * 3 + 1], z = PU[v * 3 + 2];
+    const c = CU ? CU[v] : CSm === 4 ? (MC[v * 4] | (MC[v * 4 + 1] << 8) | (MC[v * 4 + 2] << 16) | (MC[v * 4 + 3] << 24)) >>> 0 : MC[v * 3] | (MC[v * 3 + 1] << 8) | (MC[v * 3 + 2] << 16);
+    let w = -1;
+    if (!noMerge) {
+      let h = Math.imul(x, 0x9E3779B1) ^ Math.imul(y ^ 0x5bd1e995, 0x85EBCA6B) ^ Math.imul(z, 0xC2B2AE35) ^ Math.imul(c, 0x27D4EB2F);
+      h ^= h >>> 15; h = Math.imul(h, 0x2C1B3C6D); h ^= h >>> 12;
+      let s = h & mask;
+      for (;;) {
+        const e = tab[s];
+        if (e < 0) { tab[s] = u; break; }
+        if (oU[e * 3] === x && oU[e * 3 + 1] === y && oU[e * 3 + 2] === z && (oCU ? oCU[e] === c : (oC[e * 3] | (oC[e * 3 + 1] << 8) | (oC[e * 3 + 2] << 16)) === c)) { w = e; break; }
+        s = (s + 1) & mask;
+      }
+    }
+    if (w < 0) {
+      w = u++;
+      oU[w * 3] = x; oU[w * 3 + 1] = y; oU[w * 3 + 2] = z;
+      if (oCU) oCU[w] = c; else { oC[w * 3] = c & 255; oC[w * 3 + 1] = (c >> 8) & 255; oC[w * 3 + 2] = (c >> 16) & 255; }
+    }
+    I[mo + v] = w;
+  }
+  if (MB) {                                       // куски blockM: свои вершины — через ту же таблицу, индекс — через их номера
+    let k = mo + nm;
+    const R = W.R && W.R.length >= 1024 ? W.R : (W.R = new Int32Array(1 << 16));
+    for (const q of MB) {
+      const p = q.pos, nv = p.length / 3, qi = q.idx, qc = q.col, fl = q.fl, Rq = nv <= R.length ? R : (W.R = new Int32Array(nv * 2));
+      const QU = new Uint32Array(p.buffer, p.byteOffset, nv * 3);
+      const rgb = q.rgb, r0 = rgb >> 16, g0 = (rgb >> 8) & 255, b0 = rgb & 255;
+      for (let v = 0; v < nv; v++) {
+        const x = QU[v * 3], y = QU[v * 3 + 1], z = QU[v * 3 + 2];
+        const r = qc ? Math.round(qc[v * 3] * 255) : r0, g = qc ? Math.round(qc[v * 3 + 1] * 255) : g0, b = qc ? Math.round(qc[v * 3 + 2] * 255) : b0;
+        const c = CS === 4 ? (r | (g << 8) | (b << 16) | (fl << 24)) >>> 0 : r | (g << 8) | (b << 16);
+        let w = -1;
+        if (!noMerge) {
+          let h = Math.imul(x, 0x9E3779B1) ^ Math.imul(y ^ 0x5bd1e995, 0x85EBCA6B) ^ Math.imul(z, 0xC2B2AE35) ^ Math.imul(c, 0x27D4EB2F);
+          h ^= h >>> 15; h = Math.imul(h, 0x2C1B3C6D); h ^= h >>> 12;
+          let s = h & mask;
+          for (;;) {
+            const e = tab[s];
+            if (e < 0) { tab[s] = u; break; }
+            if (oU[e * 3] === x && oU[e * 3 + 1] === y && oU[e * 3 + 2] === z && (oCU ? oCU[e] === c : (oC[e * 3] | (oC[e * 3 + 1] << 8) | (oC[e * 3 + 2] << 16)) === c)) { w = e; break; }
+            s = (s + 1) & mask;
+          }
+        }
+        if (w < 0) {
+          w = u++;
+          oU[w * 3] = x; oU[w * 3 + 1] = y; oU[w * 3 + 2] = z;
+          if (oCU) oCU[w] = c; else { oC[w * 3] = r; oC[w * 3 + 1] = g; oC[w * 3 + 2] = b; }
+        }
+        Rq[v] = w;
+      }
+      for (let i = 0; i < qi.length; i++) I[k++] = Rq[qi[i]];
+    }
+  }
+  const ib = u <= 65535 ? 2 : 4;
+  IXS.ms += performance.now() - t0;
+  const NT = nf + nm + mi;                        // вершин было бы без индекса (куски blockM — треугольниками)
+  if (!own && (NT - u) * (12 + CS) <= (mo + nm + mi) * ib * 1.1) { IXS.plain++; IXS.n += NT; IXS.u += NT; return null; }   // выгоды нет
+  IXS.cells++; IXS.n += NT; IXS.u += u;
+  // mo — с какого места индекса основное (до него — кусок спереди), fi — у куска спереди свой индекс
+  const ii = I.subarray(0, mo + nm + mi);
+  return { p: oP.slice(0, u * 3), c: oC.slice(0, u * CS), i: ib === 2 ? Uint16Array.from(ii) : ii.slice(), mo, fi: !!(fi || BL) };
+}
+/* после загрузки — только начало массива позиций (кусок спереди: мелочь дворов). three.js сверяет размер массива с буфером в
+   видеокарте (byteLength), поэтому короткому массиву — прежний byteLength (как keepHead в seasons.js); needsUpdate заливает
+   только это начало */
+function keepHead (len) {
+  return function () {
+    const a = this.array;
+    if (!a || a.length <= len) return;
+    const h = a.slice(0, len);
+    Object.defineProperty(h, 'byteLength', { value: a.byteLength });
+    this.array = h;
+  };
 }
 
 let BUILT_TRIS = 0;         // сколько треугольников статики собрано (для отладки)
@@ -1330,8 +1601,8 @@ const CHUNK = MAP.border ? 200 : 100;
 WINS.init(CHUNK);
 // окна с комнатами — настройка графики (gfx.js): на Низкой комнаты за стеклом нет — рама, шторы и свет остаются (windows.js)
 WINS.quality(GFX.winQ());
-const LITM = Mesher({ alpha: !NO_LITJ });   // всё материальное: земля, дороги, дома; с 17.10.2026 и склейки реквизита (LIT) — признак «реквизит» в четвёртом байте цвета
-const FLATM = Mesher({ alpha: true });   // разметка, окна, вывески — света не ловят; с 17.10.2026 и плафоны (LAMPH) — признак «светится» в четвёртом байте цвета
+const LITM = Mesher({ alpha: !NO_LITJ || !NO_SMJ, index: true, keepFront: true, mainRGB: true });   // всё материальное: земля, дороги, дома; с 17.10.2026 и склейки реквизита (LIT) — признак «реквизит» в четвёртом байте цвета
+const FLATM = Mesher({ alpha: true, index: true, mainRGB: true });   // разметка, окна, вывески — света не ловят; с 17.10.2026 и плафоны (LAMPH) — признак «светится» в четвёртом байте цвета
 
 /* ── земля, зелёнка, вода ── */
 /* площадки — тёплый рыжий песок (09.10.2026, было #d3bd88). Зелень — как до 09.10: сочную (#86c862…) автор вернул
@@ -2105,9 +2376,46 @@ function* smashBuild () {
     const m = new THREE.Mesh(mergeGeos(ch.geos, true, MOBM.ON), SMASH_MAT);
     boundSphere(m.geometry);
     scene.add(m);
+    ch.mesh = m;                                    // склейка клетки — потом в клетку LITM (smashToMesher)
     for (const it of ch.items) it.mesh = m;
     ch.geos = null;
   }
+}
+
+/* Склейки мелочи — в клетки LITM «спереди» (block), см. NO_SMJ. Признак в четвёртом байте цвета — из aux (seasons.js: у куста
+   вид 1, зерно, палитра): куст — 128 + палитра × 42 + зерно (0…41), прочее — 254. Старые меши уходят со сцены после склейки
+   LITM (smashSwap) — до неё вещи правят старые (вершины те же: копия берётся здесь, в том же шаге поздней сборки) */
+const SMJ_OLD = [];
+function smashToMesher (M) {
+  let nv = 0;
+  for (const ch of SM_CHUNKS.values()) {
+    const m = ch.mesh;
+    if (!m || m.material !== SMASH_MAT || !ch.items.length) continue;
+    const g = m.geometry, pa = g.attributes.position, ca = g.attributes.color, xa = g.attributes.aux, n = pa.count;
+    if (!pa.array || !ca.array || !g.index) continue;
+    const c = ca.array, x = xa && xa.array, fl = ca.normalized ? 1 : 255;
+    // цвет байтами и признак — прямо в склейку клетки (копии куска не держим: пик памяти поздней сборки на телефоне)
+    const fill = (col, o) => {
+      for (let v = 0; v < n; v++, o += 4) {
+        col[o] = Math.round(c[v * 3] * fl); col[o + 1] = Math.round(c[v * 3 + 1] * fl); col[o + 2] = Math.round(c[v * 3 + 2] * fl);
+        col[o + 3] = x && x[v * 4] === 1 ? 128 + Math.min(2, x[v * 4 + 2]) * 42 + Math.round((Math.max(1, x[v * 4 + 1]) - 1) / 253 * 41) : 254;
+      }
+    };
+    const bs = g.boundingSphere, items = ch.items;
+    for (const it of items) it.vb = it.v0;
+    M.block(pa.array, fill, g.index.array, bs.center.x, bs.center.z, (me, v0) => {
+      for (const it of items) if (it.mesh === m || it.mesh === me) { it.mesh = me; it.v0 = it.vb + v0; }
+      if (ch.mesh === m) { scene.remove(m); m.geometry.dispose(); ch.mesh = null; }   // клетка LITM готова — старая склейка вон сразу
+    });
+    SMJ_OLD.push(ch);
+    nv += n;
+  }
+  return nv;
+}
+/* после склейки LITM: старые меши мелочи — со сцены и из видеокарты */
+function smashSwap () {
+  for (const ch of SMJ_OLD) if (ch.mesh) { scene.remove(ch.mesh); ch.mesh.geometry.dispose(); ch.mesh = null; }   // и ссылку — иначе её массивы живут в куче
+  SMJ_OLD.length = 0;
 }
 
 /* снести: вершины — в точку у земли, вместо вещи — обломки */
@@ -4531,27 +4839,53 @@ function buildCity () {
   /* склейка статики: сначала то, что уже собрано (земля, дороги, дома — их видно в меню), потом —
      после поздних кусков — их полотно, плитка и ямы отдельными мешами по тем же клеткам и с тем же материалом */
   const tq = performance.now();
-  const litMat = HUR.holeMat(LAWN.lawnMat(RW.wearMat(WORLD.paveMat(SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }), 1, 0.4)))));   // + узор плитки (world.js), + вид асфальта (roadwear.js), + пятна газона (lawn.js), + ураган (hurricane.js); у реквизита (признак в цвете) сухость травы 0,4 и без плитки, износа и газона
+  const litMat = HUR.holeMat(LAWN.lawnMat(RW.wearMat(WORLD.paveMat(SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }), 1, 0.4, !NO_SMJ && !EDL.ED.on)))));   // + узор плитки (world.js), + вид асфальта (roadwear.js), + пятна газона (lawn.js), + ураган (hurricane.js); у реквизита (признак в цвете) сухость травы 0,4 и без плитки, износа и газона
   const flatMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
   // светится (признак в цвете — плафоны LAMPH): ночное затемнение материала (FLAT_MATS) не берём, цвет — как есть
   flatMat.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n#ifdef USE_COLOR_ALPHA\nif (vColor.a > 0.5) diffuseColor.rgb = vColor.rgb;\n#endif'); };
   flatMat.customProgramCacheKey = () => 'flatGlow';
   HUR.holeMat(flatMat);
   const groups = [];
+  let warm4 = null;                               // прогрев шейдера склейки с признаком (см. ниже)
   const meshNow = keep => { for (const g of [LITM.mesh(litMat, keep), FLATM.mesh(flatMat, keep)]) { if (g.children.length) { groups.push(g); scene.add(g); } } };
   if (LATE.busy()) {                              // поздняя сборка: видимое — в сцену сразу, в видеокарту — при первом кадре
     meshNow(true);
+    /* клетки меню — цвет тремя байтами (как лежит), последняя склейка — четырьмя (признак: реквизит, мелочь, плафоны) — это
+       свой вариант шейдера. Греем его вместе с остальными: вырожденный треугольник с цветом в четыре байта (не виден, уберёт
+       кусок 'mesh'), иначе компиляция — посреди поздней сборки */
+    const wg = new THREE.BufferGeometry();
+    wg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3));
+    wg.setAttribute('color', new THREE.BufferAttribute(new Uint8Array(12), 4, true));
+    warm4 = [litMat, flatMat].map(m => { const w = new THREE.Mesh(wg, m); w.frustumCulled = false; scene.add(w); return w; });
     // шейдеры города — видеокарта компилирует их сама, пока здесь строится остальное (первый кадр меню не ждёт компиляции)
     try { renderer.compileAsync(scene, cam).catch(() => {}); } catch (e) { /* — */ }
   }
   BUILD_T.mesh = Math.round(performance.now() - tq);
-  LATE.add('mesh', () => {
-    const t0 = performance.now();
+  // шагами (latebuild.js): общие вершины клеток (ixCell, Mesher prep) — пачками по ~300 тыс. вершин, на Деке ~0,1 с каждая
+  LATE.add('mesh', function* () {
+    let t0 = performance.now(), ms = 0;
     if (!EDL.ED.on && !NO_FLATM) BUILD_T.flatToM = flatToMesher(FLAT, FLATM);
     if (!EDL.ED.on && !NO_LITJ) { LITM.flag(255); BUILD_T.litToM = flatToMesher(LIT, LITM); LITM.flag(0); }
     if (!EDL.ED.on && !NO_LAMPM) { FLATM.flag(255); BUILD_T.lampToM = flatToMesher(LAMPH, FLATM, true); FLATM.flag(0); }
+    if (!EDL.ED.on && !NO_SMJ) BUILD_T.smashToM = smashToMesher(LITM);
+    // клетки — по одной: склеить, в видеокарту (пачкой в крохотную цель, как кусок 'upload'), свои массивы — отпустить
+    const ut = new THREE.Scene(), urt = new THREE.WebGLRenderTarget(4, 4);
+    const up = list => {
+      const par = list.map(m => m.parent);
+      for (const m of list) { m.frustumCulled = false; ut.add(m); }
+      renderer.setRenderTarget(urt); renderer.render(ut, cam); renderer.setRenderTarget(null);
+      list.forEach((m, i) => { m.frustumCulled = true; par[i].add(m); });
+    };
+    for (const [M, mat] of [[LITM, litMat], [FLATM, flatMat]]) {
+      const g = new THREE.Group(); g.matrixAutoUpdate = false; g.matrixWorldAutoUpdate = false;
+      scene.add(g); groups.push(g);
+      for (const s of M.prep(mat, g, up)) { ms += performance.now() - t0; yield s; t0 = performance.now(); }
+    }
+    urt.dispose();
     meshNow();
-    BUILD_T.meshLate = Math.round(performance.now() - t0);
+    smashSwap();
+    if (warm4) { for (const w of warm4) scene.remove(w); warm4[0].geometry.dispose(); warm4 = null; }
+    BUILD_T.meshLate = Math.round(ms + performance.now() - t0);
   });
   WINS.build(scene);                              // окна — по клеткам, один материал (windows.js)
   PAINT.build(scene);                             // муралы — один меш (citypaint.js)
@@ -14630,7 +14964,8 @@ HITS.init({ THREE, scene, box, mergeGeos, HUMAN_VC, groundH, surfaceAt, curbAt, 
 HAV.init({ S, adult: ADULT });                   // счёт разрушений за смену для Толика (havoc.js)
 CREWR.init({ adult: ADULT });
 CREWC.init({ THREE, ADULT, makePerson, faceDataURL, put, mergeGeos, spec: m => CAR_SPEC[m] || CAR_SPEC.sedan, districtId: i => (DIST.list()[i] || {}).id });
-CHAT.init({ adult: ADULT, person: makePerson({ seed: 0x2E4A17, fem: false }), face: (p, size) => faceDataURL(p, size), blip: (f, d, ty, v) => Snd.blip(f, d, ty, v), fx: (n, synth) => Snd.fx(n, synth) });
+CHAT.init({ adult: ADULT, person: makePerson({ seed: 0x2E4A17, fem: false }), face: (p, size) => faceDataURL(p, size), blip: (f, d, ty, v) => Snd.blip(f, d, ty, v), fx: (n, synth) => Snd.fx(n, synth),
+  speed: () => Math.hypot(V.vx || 0, V.vz || 0) });   // телефон: едешь — прочитанные сообщения чата прозрачнее (chat.js PH)
 /* заказы карьеры (orders.js): очередь, поручения, развоз смены — через это */
 if (CAREER) ORD.init({ S, V, CITY, MAP, THREE, Store, ADULT, SPOTS, LIFE, Snd, get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get DAY_LEN () { return DAY_LEN; }, lang: curLang,
   alive, releaseIdle, pushOut, walkSpawn, nearestRoad, makeGuest, clearGuest, realAddress, routeLen, orderTime, rebuildRoutePath, syncTarget, pinFront,
@@ -16121,7 +16456,7 @@ if (LATE.busy()) {
   addEventListener('click', hold, { capture: true });
   LATE.onDone(() => removeEventListener('click', hold, { capture: true }));
 }
-LATE.onDone(() => { const B = window.__boot; if (B) { B.full = Math.round(performance.now()); B.late = LATE.T; } });
+LATE.onDone(() => { const B = window.__boot; if (B) { B.full = Math.round(performance.now()); B.late = LATE.T; B.lateMax = LATE.MAX; B.lateSteps = LATE.STEPS; } });
 LATE.onDone(() => HPOOL.ready());           // город достроен (и при ?nolate — после всех кусков): люди — из запаса (humanpool.js)
 /* город за меню, пока достраивается, — не в фокусе (delivery.css body.late-haze): что строится, появляется
    за дымкой, а не разом на глазах. Достроился за меню — резкость наводится за 1,4 с; ушли из меню
@@ -16152,7 +16487,7 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) wi
   STORY, STORY_DBG: STORY.DEBUG, MAP, Store, SBX, CARSM: AUTO, startRun, goRun, endShift, wallet, addWallet, hudHearts, marker, updateEnv, humanLod, get SPOTS_N () { return SPOTS.length; },
   DRIVERS, SMOKERS, NITRO_CANS, NOS, RESPECT: RESPECT.DEBUG, RESPECT_API: RESPECT, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, PIGEONS, FLOCKS, AMB, INCIDENTS, scare, RIVALS, FOES, THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, roadPath, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT, LOOT, XLIFE, askRevive, addWallet, RQ: RQ.DEBUG, HINTS_API: HINTS };
 if (window.__dlv) Object.assign(window.__dlv, { FXP: { S: FXP.STATS, count: FXP.count, part: fxPart, FX, puff, fire, nosFlame, steam, splash, crumbs, emote }, FXQ: FXP.FXP });   // частицы из запаса (fxpool.js): S — родилось / живо / пик / рост / ?oldfx
-if (window.__dlv) Object.assign(window.__dlv, { LITN: () => { let b = 0; for (const L of [LIT, FLAT, LAMPH]) for (const g of L) b += g.p ? g.p.byteLength : g.attributes.position.array.byteLength * 2; return { lit: LIT.length, flat: FLAT.length, lamph: LAMPH.length, mb: +(b / 1048576).toFixed(1), smash: SMASH.length }; }, HPOOL: HPOOL.DEBUG, HSK: HSTATS, holdFixed, FAHEAD: FAHEAD.STATS, makeHuman, freshHuman, makePerson, setSeason: SEAS.setSeason });   // запас готовых людей: собрано на ходу / из запаса, ключи (humanpool.js)
+if (window.__dlv) Object.assign(window.__dlv, { IXS, LITN: () => { let b = 0; for (const L of [LIT, FLAT, LAMPH]) for (const g of L) b += g.p ? g.p.byteLength : g.attributes.position.array.byteLength * 2; return { lit: LIT.length, flat: FLAT.length, lamph: LAMPH.length, mb: +(b / 1048576).toFixed(1), smash: SMASH.length }; }, HPOOL: HPOOL.DEBUG, HSK: HSTATS, holdFixed, FAHEAD: FAHEAD.STATS, makeHuman, freshHuman, makePerson, setSeason: SEAS.setSeason });   // запас готовых людей: собрано на ходу / из запаса, ключи (humanpool.js)
 if (window.__dlv) window.__dlv.CBUMP = { STATS: CBUMP.STATS, BUMP: CBUMP.BUMP, YAW: CBUMP.YAW, hit: CBUMP.hit };   // толчки от людей, столбов, кустов (carbump.js)
 if (window.__dlv) { window.__dlv.BOARD = BOARD; window.__dlv.Platform = Platform; }
 if (window.__dlv) Object.assign(window.__dlv, { callAmbulance });   // проверка сирены: вызвать скорую к точке (доплер — AMB.dop)   // таблица рекордов Стима (board.js)
