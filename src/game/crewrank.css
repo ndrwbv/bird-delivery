@@ -1,0 +1,33 @@
+/* ── рейтинг смены на хаде (crewrank.js): место сменилось — строка «место N из M» на миг вспыхивает
+   (вверх — зелёным, вниз — красным) и рядом штампом шлёпается стрелка ↑ / ↓ на бумажке, наклон −8°;
+   всё вместе 1,4 с, потом стрелка тает — в покое ничего не движется (UI-REVIEW: в езде не отвлекать).
+   Меньше движения — без увеличения и тряски, только цвет. docs/CAREER.md «Рейтинг смены». ── */
+#rivals li.cr-up, #rivals li.cr-down { --cr: #3fd16b; position: relative; border-radius: 3px; animation: cr-flash 1.4s ease-out both; }
+#rivals li.cr-down { --cr: #ff4d5e; }
+#rivals li.cr-up b, #rivals li.cr-down b { animation: cr-pop 1s ease-out both; }   /* текст на миг белый — плашка не растёт, стрелку не задевает */
+/* стрелка — справа от плашки, поверх города: строка не раздвигается и не прыгает */
+#rivals li em.cr-arr { position: absolute; left: calc(100% + 20px); top: 50%; width: 18px; height: 18px; margin-top: -11px; display: flex; align-items: center; justify-content: center;
+                       color: var(--cr); background: #fff3d6; border: 2px solid var(--cr); border-radius: 3px; box-shadow: 1px 2px 0 #33210c;
+                       animation: cr-stamp 1.4s cubic-bezier(.2, .9, .3, 1.2) both; }
+#rivals li em.cr-arr svg { width: 13px; height: 13px; fill: currentColor; }
+#rivals li.cr-down em.cr-arr svg { transform: rotate(180deg); }
+@keyframes cr-flash {
+  0%, 35% { background: color-mix(in srgb, var(--cr) 75%, transparent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--cr) 75%, transparent); }
+  100% { background: transparent; box-shadow: 0 0 0 4px transparent; }
+}
+@keyframes cr-pop { 0%, 30% { color: #fff; } }
+@keyframes cr-stamp {
+  0% { transform: scale(2.4) rotate(-20deg); opacity: 0; }
+  14% { transform: scale(.9) rotate(-8deg); opacity: 1; }
+  24% { transform: scale(1.05) rotate(-8deg); }
+  32%, 78% { transform: rotate(-8deg); opacity: 1; }
+  100% { transform: rotate(-8deg); opacity: 0; }
+}
+@keyframes cr-fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+@media (max-width: 560px), (max-height: 430px) { #rivals li em.cr-arr { width: 15px; height: 15px; margin-top: -9px; } #rivals li em.cr-arr svg { width: 11px; height: 11px; } }
+@media (prefers-reduced-motion: reduce) {
+  #rivals li.cr-up b, #rivals li.cr-down b { animation: none; }
+  #rivals li em.cr-arr { animation: cr-fade 1.4s both; transform: rotate(-8deg); }
+}
+body.calm-fx #rivals li.cr-up b, body.calm-fx #rivals li.cr-down b { animation: none; }
+body.calm-fx #rivals li em.cr-arr { animation: cr-fade 1.4s both; transform: rotate(-8deg); }

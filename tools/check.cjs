@@ -133,6 +133,15 @@ const CHECKS = [
     return { status: r.ok ? 'ok' : 'fail', info: `к клиенту ${r.n}: режут дом ${r.after} (по-старому ${r.before}); со двора ${r.yard}: ${r.afterYard} (по-старому ${r.beforeYard}); без дорог рядом ${r.noRoad}, улица дальше 230 м ${r.far}; ` +
       `поиск по клеткам к клиенту p95 ${r.tail.p95} мс, со двора ${r.head.p95} мс` + (r.ok ? '' : ': ' + JSON.stringify(r.sample.slice(0, 2))) };
   } },
+  { id: 'yardmaze', name: 'дворы сложнее: клиенты достижимы, навигатор не сквозь заборы и лесочки', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/yard-maze.js')]);
+    const e = errLine(j), r = j.result;
+    if (e || !r) return { status: 'fail', info: e || 'нет результата' };
+    const m = r.maze || {};
+    return { status: r.ok ? 'ok' : 'fail', info: `адресов ${r.n}: доехать ${r.strict + r.soft} (мягко ${r.soft}), заперты ${r.none}, далеко ${r.far}; маршрут сквозь лабиринт ${r.thru} из ${r.thruN}; ` +
+      `прямая через двор перекрыта у ${r.lineCut} из ${r.pairs}; заборы ${m.solidM} м твёрдых / ${m.smashM} м сбиваемых, клумб ${m.beds}, кустов ${m.hedges}, лесочков ${m.groves}` +
+      (r.ok ? '' : ': ' + JSON.stringify({ none: r.none_at, thru: r.thru_at })) };
+  } },
   { id: 'ghosts', name: 'машины не призраки и твёрдые, лось не сквозь', group: 2, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/ghost-cars.js')]);
     const e = errLine(j), r = j.result;

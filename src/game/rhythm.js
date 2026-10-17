@@ -16,6 +16,7 @@
      — после события — окно «просто покататься» QUIET с: ни событий (и лёгких сценок), ни лишнего чата Толика;
      — встреча — только если на прошлом заказе события не было (её ставит сам ритм, заранее);
      — не больше BUDGET за смену, каждого вида — не больше MAX; сценки — с напряжения SCENE_K.
+     — «малые» (мини-игра, поручение — SMALL, 17.10.2026): бюджет не тратят, окно «покататься» ждут не дольше SMALL_GAP с.
    Таймеры мини-игр и поручений идут как шли: подошёл срок — ждут, пока ритм пустит.
    Встречи у двери ставит ритм: только в районе MEET.DIST (первом), с MEET.FROM законченных смен, не в быстром
    заезде; разные герои, без героев прошлой смены (сохранение MEET.KEY).
@@ -37,7 +38,7 @@ let A = null;          // { Store, S, career, quick(), doorOn(), errAsked() } �
 const PROV = { heroes: [], person: null, door: null };
 const R = {
   on: false, t: 0, len: 0, n: 0, role: '', k: 0, f: 0, peak: false,
-  last: -9, quietTo: 0, act: [], pend: '', beats: {}, total: 0, budget: 0,
+  last: -9, quietTo: 0, calmAt: -999, act: [], pend: '', beats: {}, total: 0, budget: 0,
   meetMax: 0, used: [], prev: [], shift: 0, door: false, side: false, err: 0, face: false,
   log: [], plan: [],
 };
@@ -51,6 +52,8 @@ function note (s) {
   R.log.push(mmss(R.t) + ' ' + s);
   if (R.log.length > C.LOG) R.log.splice(0, R.log.length - C.LOG);
 }
+/* «малые» события (мини-игра, поручение — RHYTHM.SMALL): бюджет смены не тратят, окно «покататься» ждут не дольше SMALL_GAP с */
+const small = kind => (C.SMALL || []).includes(kind);
 const errN = () => { try { return A && A.errAsked ? +A.errAsked() || 0 : 0; } catch (e) { return 0; } };
 
 export function init (api) { A = api; }
@@ -72,7 +75,7 @@ function loadMeets () {
 export function begin (ride) {
   const quick = !!(A && A.quick && A.quick());
   Object.assign(R, { on: !!(A && A.career) && !ride, t: 0, len: 0, n: 0, role: '', k: 0, f: 0, peak: false,
-    last: -9, quietTo: 0, act: [], pend: '', beats: {}, total: 0, budget: C.BUDGET[0], used: [], log: [], plan: [],
+    last: -9, quietTo: 0, calmAt: -999, act: [], pend: '', beats: {}, total: 0, budget: C.BUDGET[0], used: [], log: [], plan: [],
     door: false, side: !!(A && A.S && A.S.side), err: errN() });
   if (!R.on) return;
   R.shift = (+get('dlv-shifts', 0) || 0) + 1;
@@ -151,7 +154,7 @@ export function meetFailed () {
   if (R.pend !== 'meet' && R.pend !== 'face') return;
   const kind = R.pend === 'face' ? 'errand' : 'meet';
   R.pend = '';
-  R.beats[kind] = Math.max(0, (R.beats[kind] || 0) - 1); R.total = Math.max(0, R.total - 1);
+  R.beats[kind] = Math.max(0, (R.beats[kind] || 0) - 1); if (!small(kind)) R.total = Math.max(0, R.total - 1);
   R.last = R.lastWas;
   if (R.face) { R.face = false; FACES.unplan(); note('знакомое лицо не поставили: его адрес занят или нет подъезда'); return; }
   R.used.pop(); saveMeets();
@@ -181,7 +184,7 @@ function register (kind) {
   R.lastWas = R.last;
   R.last = R.n;
   R.beats[kind] = (R.beats[kind] || 0) + 1;
-  R.total++;
+  if (!small(kind)) R.total++;                    // мини-игра и поручение бюджет смены не тратят
 }
 /* событие идёт (машина встала, сценка на улице, едешь по поручению) */
 function begin2 (kind, name) {
@@ -198,6 +201,7 @@ function end2 (kind) {
   if (R.act.length) return;
   const w = rand(C.QUIET[0], C.QUIET[1]);
   R.quietTo = Math.max(R.quietTo, R.t + w);
+  R.calmAt = R.t;
   note('окно «покататься» ' + Math.round(w) + ' с (до ' + mmss(R.quietTo) + ')');
 }
 
@@ -205,13 +209,15 @@ function end2 (kind) {
 export function why (kind) {
   if (!R.on) return '';
   if (R.role === '' || R.role === 'open') return 'ритм: первый заказ — без событий';
-  if (R.t < R.quietTo - (kind === 'meet' || kind === 'mini' ? C.AHEAD : 0)) return 'ритм: окно «покататься» ещё ' + Math.ceil(R.quietTo - R.t) + ' с';
+  // малые (мини-игра, поручение) ждут окно не дольше SMALL_GAP с после конца события
+  const calm = small(kind) ? Math.min(R.quietTo, R.calmAt + (C.SMALL_GAP || 0)) : R.quietTo;
+  if (R.t < calm - (kind === 'meet' || kind === 'mini' ? C.AHEAD : 0)) return 'ритм: окно «покататься» ещё ' + Math.ceil(calm - R.t) + ' с';
   if (kind === 'light') return '';
   if (R.role === 'last') return 'ритм: последний заказ — лёгкий';
   if (R.act.length) return 'ритм: идёт ' + R.act.join(', ');
   if (R.last === R.n) return 'ритм: на этом заказе событие уже было';
   if (kind === 'meet' && R.n - R.last < 2) return 'ритм: событие было на прошлом заказе';
-  if (R.total >= R.budget) return 'ритм: события смены кончились (' + R.budget + ')';
+  if (!small(kind) && R.total >= R.budget) return 'ритм: события смены кончились (' + R.budget + ')';
   if ((R.beats[kind] || 0) >= (C.MAX[kind] || 1)) return 'ритм: ' + kind + ' за смену уже ' + R.beats[kind];
   if (kind === 'scene' && R.k < C.SCENE_K) return 'ритм: рано для сценки (' + R.k.toFixed(2) + ')';
   return '';

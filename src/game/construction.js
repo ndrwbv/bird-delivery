@@ -22,7 +22,7 @@
      поддоны, стенд, ворота — сносятся как дворовая мелочь. Бытовка и
      техника — тяжёлые: упираются, толкаются (бытовка — как полторы машины,
      экскаватор — как четыре), крутятся от удара сбоку, на ударе быстрее
-     DENT мнутся там, куда въехал; быстрее HURT — полсердца, HURT2 — сердце.
+     DENT мнутся там, куда въехал; быстрее HURT — полсердца (с 17.10.2026 и HURT2 — полсердца, game.js hitHearts).
      Колонны каркаса, стенки фундамента и башня крана — стены.
      На новой смене всё стоит на местах.
    • Самосвалы: машина потока, родившаяся ближе DUMP_R м к стройке, с шансом
@@ -56,7 +56,7 @@ export const CONS = {
   DUMP_P: 0.16, DUMP_R: 450, DUMP_MAX: 3,
   MASS: { cabin: 1.5, digger: 4, mixer: 3.5 },   // в массах машины игрока
   FRICT: { cabin: 9, digger: 14, mixer: 10 },    // трение, м/с²
-  DENT: 6, HURT: 50 / 3.6, HURT2: 80 / 3.6,      // м/с: мнётся; полсердца; сердце
+  DENT: 6, HURT: 50 / 3.6, HURT2: 80 / 3.6,      // м/с: мнётся; полсердца; «сильно» (с 17.10.2026 — тоже полсердца)
 };
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -417,10 +417,13 @@ export function* freeLotsSteps ({ W, D, max, gap, salt = 11, per = 1, cap = Infi
   if (!A) return [];
   const why = ST.why; ST.why = {};                 // отказы чужого поиска не путаем со своими
   const F = finder(), out = [], perD = new Map();
+  yield 'finder';
   const R = Math.hypot(W, D) / 2;
   const cands = [];
+  let nr = 0;
   for (const r of A.CITY.roads) {
     if (r.c < 2 || r.c > 4 || r.b || r.x) continue;
+    if (++nr % 300 === 0) yield 'cands';
     const w = A.roadWidth(r);
     let acc = CONS.STEP / 2;
     for (let i = 1; i < r.p.length; i++) {
@@ -438,8 +441,9 @@ export function* freeLotsSteps ({ W, D, max, gap, salt = 11, per = 1, cap = Infi
       acc -= L;
     }
   }
-  cands.sort((a, b) => a.pr - b.pr);
   yield 'cands';
+  cands.sort((a, b) => a.pr - b.pr);
+  yield 'sort';
   let nt = 0;
   const clear = c => SITES.every(s => Math.hypot(s.x - c.x, s.z - c.z) > R + Math.hypot(s.W, s.D) / 2 + 15)
     && avoid.every(a => Math.hypot(a.x - c.x, a.z - c.z) > R + a.r + 15)

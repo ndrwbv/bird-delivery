@@ -452,13 +452,15 @@ function padAt (x, z, ux, uz, n, seed) {
   return true;
 }
 
-/* у подъездов — мусор, во дворах — площадки с контейнерами. Жребий — по месту подъезда */
-export function yard () {
-  const t0 = performance.now();
+/* у подъездов — мусор, во дворах — площадки с контейнерами. Жребий — по месту подъезда.
+   Шагами (function*, latebuild.js): на Деке ~0,19 с одним куском — шаг через каждые 250 подъездов */
+export function* yard () {
+  let t0 = performance.now(), ms = 0, n = 0;
   const clean = A.CAREER ? A.donated('trash') : 0;        // карьера: город вычищен донатом — мусора меньше
   const pLit = LITTER.P * (1 - clean), pPad = CANS.PAD_P;
   const pads = [];
   for (const [x, z, nx, nz] of A.CITY.entrances) {
+    if (++n % 250 === 0) { ms += performance.now() - t0; yield 'junk'; t0 = performance.now(); }
     if (!A.inBounds(x, z, -40)) continue;
     const tx = nz, tz = -nx, h = hash(x, z, 5), seed = Math.round(x * 31 + z * 17);
     if (h < pLit && STATS.litter < LITTER.CAP) {
@@ -473,7 +475,7 @@ export function yard () {
       if (padAt(px, pz, tx, tz, 2 + ((hash(x, z, 12) * 3) | 0), seed + 3)) pads.push([px, pz]);
     }
   }
-  STATS.ms = Math.round(performance.now() - t0);
+  STATS.ms = Math.round(ms + performance.now() - t0);
 }
 
 /* ═════════════════ каждый кадр и новая смена ═════════════════ */

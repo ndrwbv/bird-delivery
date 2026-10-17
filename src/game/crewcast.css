@@ -1,0 +1,4 @@
+/* ── таблица смены в паузе (crewcast.js badge): перед именем коллеги — портрет и машинка его цвета ── */
+.pm-rc-r .cc-face { width: 1.55em; height: 1.55em; vertical-align: -.35em; margin-right: .3em; border-radius: 3px; border: 1px solid #b39678;
+  image-rendering: pixelated; background: #fff3d6; }
+.pm-rc-r .cc-car { width: 2.1em; height: .95em; vertical-align: -.1em; margin-right: .35em; }

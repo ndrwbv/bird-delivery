@@ -21,11 +21,14 @@
           paused() — игра на паузе (клавиши не жмутся), sfx(имя) — звук (step, puff, ring, wrong, open, gop, beat, dodge, pay, fail).
    Как играют: лифт сломан. Вверх — A / ↑ / пробел / ▲ часто (держать — дыхалка тает, «одышка»), вниз — B / ↓ / ▼.
    На площадке ← → — к двери, A / Enter / тап по двери — позвонить. Табличка на площадке — какие там квартиры.
-   Гопники: ← / → в такт стрелкам — обойти; Y / Enter — отдать «чаевые». */
+   Гопники: ← / → в такт стрелкам — обойти; Y / Enter — отдать «чаевые».
+   Отказ — «пусть сам спустится» (doorkit.js selfHTML: Q / RB / тап по пометке под заданием; и при гопниках): курьер спускается
+   на первый этаж и ждёт o.selfWait с (срок заказа идёт), итог { ok: false, self: true }. */
 import './stairs.css';
 import { inputKind, onInput } from '../../input/glyphs.js';
 import { STAIRS as K0 } from '../econ.js';
 import { faceDataURL } from '../people.js';
+import * as NICK from '../nicks.js';            // накладная: аватарка и ник клиента из приложения (nicks.js)
 import * as OS from '../ordersheet.js';
 import * as KIT from './doorkit.js';
 import * as SC from './doorscene.js';
@@ -143,6 +146,7 @@ export default {
     { k: 'clockS', label: 'срок заказа, с', type: 'num', def: 45, min: 3, max: 120, step: 1 },
     { k: 'look', label: 'подъезд', type: 'sel', def: 'shabby', opts: [['shabby', 'обшарпанный'], ['clean', 'чистый с цветами'], ['auto', 'по адресу']] },
     { k: 'time', label: 'эталон «быстро», с (0 — по формуле)', type: 'num', def: 0, min: 0, max: 30, step: 0.5 },
+    { k: 'learnOn', label: 'первый раз (подсказка Толика)', type: 'bool', def: false },
   ],
   mount (root, o, api) {
     const t = api.t, K = Object.assign({}, K0, o.K || {});
@@ -180,7 +184,7 @@ export default {
     const look = o.look === 'clean' || o.look === 'shabby' ? o.look : SC.lookOf(SC.hashStr(o.addr || String(flat)), o.zone);
     const C = SC.PAL[look], seed = +o.seed || SC.hashStr((o.addr || '') + '|' + flat);
     let faceUrl = '';
-    try { faceUrl = person ? faceDataURL(person, 48) : ''; } catch (e) { /* — */ }
+    try { faceUrl = person ? NICK.avatar(person, 48) : ''; } catch (e) { /* — */ }   // плашка накладной — аватарка из приложения
 
     const box = document.createElement('div');
     box.className = 'mk-full sx sx-' + look;
@@ -191,6 +195,7 @@ export default {
           '<span class="mk-sub"><i>' + esc(t('кв. {n}', { n: flat })) + '</i>' + (P.entr > 1 ? '<i>' + esc(t('подъезд {n}', { n: P.entr })) + '</i>' : '') +
           '<em class="sx-now"></em><span class="sx-breath"><span>' + esc(t('дыхалка')) + '</span><i><b></b></i></span></span>' +
         '</div>' +
+        KIT.selfHTML(t) +
       '</div>' +
       '<div class="mk-say sx-feed"></div>' +
       KIT.miniHTML(sheet, { t, short: t('кв. {n}', { n: flat }), face: faceUrl, compact: true }) +
@@ -210,6 +215,7 @@ export default {
     const q = s => box.querySelector(s);
     const elFuse = q('.mk-fuse i'), elHelp = q('.mk-help'), elSheet = box, elNow = q('.sx-now'), elTask = q('.sx-task');
     const mini = KIT.miniBind(q('.mk-mini')), elInv = mini.body;
+    const elSelf = q('.mk-self'), elGoal = q('.mk-goal');
     const elBreath = q('.sx-breath'), elBreathBar = q('.sx-breath b'), barGo = q('.sx-bar-go'), barGop = q('.sx-bar-gop');
     const cv = q('.sx-cv'), g = cv.getContext('2d');
     const msgs = KIT.feed(q('.sx-feed'), { max: 3 });
@@ -232,6 +238,7 @@ export default {
       const A = ps ? '✕' : 'A', B = ps ? '○' : 'B', Y = ps ? '△' : 'Y';
       const kbd = (s, kb) => '<kbd class="pp-key' + (kb ? ' pp-key-kb' : '') + '">' + esc(s) + '</kbd>';
       mini.key(k === 'pad' ? (ps ? '□' : 'X') : k === 'kb' ? 'X' : '');
+      KIT.selfGlyph(elSelf, k, inputKind().family);
       if (st.phase === 'gop') {
         elHelp.innerHTML = k === 'pad' ? kbd('◀ ▶') + esc(t('в такт — обойти')) + ' · ' + kbd(Y) + esc(t('откупиться'))
           : k === 'kb' ? kbd('← →', 1) + esc(t('в такт — обойти')) + ' · ' + kbd('Enter', 1) + esc(t('откупиться'))
@@ -350,10 +357,12 @@ export default {
 
     /* ── конец ── */
     function finish (ok, timeout) {
-      if (st.phase === 'end' || st.phase === 'done') return;
+      if (st.phase === 'end' || st.phase === 'done' || st.phase === 'self') return;
       st.phase = 'end';
+      elSelf.hidden = true;
       const fast = ok && !timeout && st.tries === 0 && st.t <= limit * K.FAST;
-      st.res = { ok, timeout: !!timeout, fast, tries: st.tries, t: +st.t.toFixed(2), limit: +limit.toFixed(2), floor, flat, gop: gop ? gop.how : '', mode: 'stairs' };
+      // idle — с места не сдвинулся, пока не кончился срок: по своей воле не стал играть (likes.js — вес подъезда ниже)
+      st.res = { ok, timeout: !!timeout, fast, tries: st.tries, t: +st.t.toFixed(2), limit: +limit.toFixed(2), floor, flat, gop: gop ? gop.how : '', mode: 'stairs', idle: !ok && !!timeout && !st.tries && st.y < 0.3 && !(gop && gop.how) };
       st.endT = 1.5;
       where();
       setBars();
@@ -367,6 +376,43 @@ export default {
       if (fast && bonus) { OS.pen(elInv, 'pay', bonus + ' · ' + t('взбежал быстро'), 'os-plus'); mini.peek(); }
       sfx(ok ? 'open' : 'fail');
       api.log && api.log((ok ? 'дошёл' : 'срок вышел') + ' за ' + st.res.t + ' с (быстро — до ' + (limit * K.FAST).toFixed(1) + '), этаж ' + floor + ', ошибок ' + st.tries + (fast ? ', быстро' : '') + (gop ? ', гопники: ' + (gop.how || '—') : ''));
+    }
+
+    /* «пусть сам спустится» (econ.js DOORGAME.SELF): отказ своей кнопкой (и посреди гопников) — курьер спускается на первый
+       этаж и ждёт o.selfWait с (срок заказа идёт), потом вручение у подъезда как обычно (без бонуса «быстро») */
+    function selfDown () {
+      if (st.phase !== 'play' && st.phase !== 'gop') return;
+      if (gop && st.phase === 'gop') gop.state = '';
+      st.phase = 'self';
+      st.selfT = KIT.selfWait(o); st.replyT = 0.7; st.door = -1; st.puff = 0;
+      st.res = { ok: false, timeout: false, fast: false, self: true, tries: st.tries, t: +st.t.toFixed(2), limit: +limit.toFixed(2), floor, flat, gop: gop ? gop.how : '', mode: 'stairs', idle: false };
+      box.classList.add('sx-self');
+      setBars();
+      say({ out: true, text: t('Спуститесь сами, пожалуйста! Я внизу подожду.') });
+      elGoal.textContent = t('клиент спускается сам — жди внизу');
+      KIT.selfOn(elSelf, t, st.selfT);
+      const seal = document.createElement('div');
+      seal.className = 'pp-seal pp-seal-rust mk-seal';
+      seal.textContent = t('сам спустится');
+      elSheet.appendChild(seal);
+      api.log && api.log('пусть сам спустится: ждать ' + st.selfT.toFixed(1) + ' с, с ' + (Math.round(st.y) + 1) + '-го этажа');
+    }
+    /* ждёт: сначала вниз по лестнице на первый этаж (камера едет за ним), там стоит */
+    function selfStep (dt) {
+      st.selfT -= dt;
+      if (st.replyT > 0 && (st.replyT -= dt) <= 0) say({ person, name: client(), text: t('Ладно, щас спущусь. Жди.'), mood: 'angry' });
+      const y0 = st.y;
+      st.v = st.y > 0.001 ? -K.DOWN_V * 1.4 : 0;
+      st.y = Math.max(0, st.y + st.v * dt);
+      st.stride += y0 - st.y; st.leg += y0 - st.y;
+      if (st.stride > 0.25) { st.stride -= 0.25; sfx('step'); }
+      KIT.selfOn(elSelf, t, st.selfT);
+      where();
+      if (st.selfT <= 0) {
+        st.phase = 'end'; st.endT = 0.7; st.v = 0;
+        say({ person, name: client(), text: t('Ну, давай пиццу.'), cls: 'mk-good' });
+        sfx('open');
+      }
     }
 
     /* ── шаг ── */
@@ -417,7 +463,7 @@ export default {
     function step (dt) {
       dt = clamp(dt, 0, DT_MAX);
       if (st.phase === 'done') return;
-      if (fake && (st.phase === 'play' || st.phase === 'gop')) fake.step(dt);
+      if (fake && (st.phase === 'play' || st.phase === 'gop' || st.phase === 'self')) fake.step(dt);
       KIT.dashSet(box, clock(), elFuse);
       for (const [n, d] of doors) {
         d.t -= dt;
@@ -430,6 +476,7 @@ export default {
         if (st.endT <= 0) { st.phase = 'done'; api.done && api.done(st.res); }
         return;
       }
+      if (st.phase === 'self') { selfStep(dt); anim(dt); draw(); return; }   // «пусть сам спустится»: ждёт внизу, часы заказа идут
       st.t += dt; st.arm -= dt;
       const c = clock();
       if (c && c.s <= 0) { finish(false, true); anim(dt); draw(); return; }   // срок заказа кончился — клиент спускается сам
@@ -711,11 +758,13 @@ export default {
       else if (c === 'Enter' || c === 'NumpadEnter' || c === 'KeyE') k = 'ring';
       else if (c === 'KeyY') k = 'pay';
       else if (c === 'KeyX') k = 'inv';
+      else if (KIT.selfCode(c)) k = 'self';
       else if (c === 'Tab') { e.preventDefault(); e.stopImmediatePropagation(); return; }   // карта — не во время мини-игры
       if (!k) return;
       e.preventDefault(); e.stopImmediatePropagation();
       if (e.repeat) return;
       if (k === 'inv') { mini.toggle(); return; }
+      if (k === 'self') { selfDown(); return; }
       if (k === 'up') { keys.up = true; tapUp(); }
       else if (k === 'down') { keys.down = true; tapDown(); }
       else if (k === 'left') side(-1);
@@ -741,6 +790,7 @@ export default {
       padH.a = !!p.a; padH.up = !!p.up; padH.down = !!(p.b || p.down);
       if (p.menuOk || p.menuBack || p.btnY || p.menuUp || p.menuDown || p.menuLeft || p.menuRight) st.pad = true;
       if (p.btnX) mini.toggle();                                // X — накладная
+      if (KIT.selfPad(p)) { st.pad = true; selfDown(); return; }   // RB / R1 — «пусть сам спустится»
       if (st.phase === 'gop') {
         if (p.menuLeft) side(-1);
         if (p.menuRight) side(1);
@@ -756,7 +806,7 @@ export default {
 
     /* палец и мышь: кнопки внизу (▲ ▼ держать можно), тап по двери своей площадки — подойти и позвонить, тап по лестнице — вверх */
     const BTN = { up: () => { touch.up = true; tapUp(); }, down: () => { touch.down = true; tapDown(); }, left: () => side(-1), right: () => side(1),
-      ring: () => (st.door >= 0 ? ring() : side(-1)), pay: () => pay() };
+      ring: () => (st.door >= 0 ? ring() : side(-1)), pay: () => pay(), self: () => selfDown() };
     const release = () => { touch.up = false; touch.down = false; };
     box.addEventListener('pointerdown', e => {
       if (api.paused && api.paused()) return;
@@ -784,7 +834,17 @@ export default {
     glyphs();
     where();
     KIT.dashSet(box, clock(), elFuse);
-    const offInput = onInput(glyphs);
+    /* первый раз (doorstep.js learnFirst, ECON.DOORGAME.LEARN): Толик пишет, что делать, — кнопками того, чем играешь */
+    const ln = o.learn || (o.learnOn ? { name: t('Толик'), add: 20, k: 2 } : null);
+    let learnUpd = () => {};
+    const learnGo = () => KIT.learn(msgs, ln, (k, fam) => {
+      const ps = fam === 'ps', K = KIT.key, A = ps ? '✕' : 'A', v = { n: floor, f: flat };
+      const line = N_('Первый раз в подъезде? Лифт сломан: жми {up} часто — беги на {n}-й (держать — выдохнешься). На этаже {side} к кв. {f}, {ok} — звонок.');
+      return (k === 'pad' ? KIT.keysLine(t, line, { up: K(A), side: K('◀ ▶'), ok: K(A) }, v)
+        : k === 'kb' ? KIT.keysLine(t, line, { up: K('↑', 1), side: K('← →', 1), ok: K('Enter', 1) }, v)
+          : KIT.keysLine(t, N_('Первый раз в подъезде? Лифт сломан: тапай ▲ часто — беги на {n}-й. На этаже — тап по двери кв. {f}.'), {}, v)) + KIT.learnAdd(ln, t);
+    });
+    const offInput = onInput(() => { glyphs(); learnUpd(); });
     let raf = 0, last = 0;
     if (api.setStep) api.setStep(step);
     else {
@@ -793,12 +853,14 @@ export default {
     }
     if (api.setPad) api.setPad(pad);
     say({ person, name: client(), text: t('Лифт опять сломан — поднимайтесь пешком!') });
+    learnUpd = learnGo();                                       // подсказка первого раза — под репликой клиента
     draw();
 
     // для проверок (probe): пройти как игрок — гопников обойти (arg 'pay' — откупиться), подняться на нужный этаж и позвонить;
     // 'wrong' — сначала позвонить в чужую дверь; 'late' — не успеть (срок вышел)
     box.__solve = arg => {
       if (st.phase !== 'play' && st.phase !== 'gop') return;
+      if (arg === 'self') { selfDown(); return; }               // «пусть сам спустится»
       st.arm = 0; st.lock = 0;
       if (gop && !gop.done) { if (st.phase !== 'gop') { st.y = gop.at; startGop(); } gop.arm = 0; if (arg === 'pay') pay(); else gopPass('dodge'); }
       if (arg === 'late') { finish(false, true); return; }
@@ -808,7 +870,7 @@ export default {
       ring();
     };
     box.__st = () => ({ phase: st.phase, y: +st.y.toFixed(3), v: +st.v.toFixed(3), breath: +st.breath.toFixed(3), puff: st.puff > 0, door: st.door,
-      t: +st.t.toFixed(2), limit, floor, flat, per, lv, entr: P.entr, want: P.door, gopAt: P.gopAt, gop: gop ? { state: gop.state, i: gop.i, dir: gop.dirs[gop.i], done: gop.done, how: gop.how } : null, res: st.res });
+      t: +st.t.toFixed(2), limit, floor, flat, per, lv, entr: P.entr, want: P.door, gopAt: P.gopAt, selfT: st.phase === 'self' ? +st.selfT.toFixed(2) : null, gop: gop ? { state: gop.state, i: gop.i, dir: gop.dirs[gop.i], done: gop.done, how: gop.how } : null, res: st.res });
     return () => {
       removeEventListener('keydown', onKey, true);
       removeEventListener('keyup', onKeyUp, true);

@@ -13,10 +13,13 @@
      отдаёт / отдаёт не то / ничего не даёт / просит взамен (talk в SIDE_ORDERS). Едешь к клиенту в любом случае.
    - thanks(): при вручении клиент говорит одну реплику: привёз — thanks и чаевые сленгом из SIDE_TIPS
      («на тебе фиолет» — +500 ₽); не то или ни с чем — back (злится, смеётся, даёт за попытку).
-     Диалог в одну кнопку, дальше сам (DLG auto, ~2—4 с).
+     Диалог в одну кнопку «понятно» — закрывает игрок (таймера нет, автор 16.10.2026); чаевые — под портретом.
    - step(): каждый кадр — поручение кончилось любым путём (выполнил, опоздал, смена, меню) —
-     клиента и отдающего отпускаем (p.errand снимается, идут дальше). */
-import { t } from '../i18n/index.js';
+     клиента и отдающего отпускаем (p.errand снимается, идут дальше).
+   - bump(): сбил того, кто ждёт поручения (клиента или отдающего; автор 16.10.2026: «лучше бы он сбивался, но не
+     умирал») — падает без крови, полежал ~2 с, встаёт и ругается репликой над головой (OUCH, каждый раз другой);
+     поручение идёт дальше, он остаётся на своём месте. */
+import { t, N_ } from '../i18n/index.js';
 import * as DLG from './dialog.js';
 import { makePerson } from './people.js';
 import { SIDE_TIPS, ORDER_TYPES } from './orders.config.js';
@@ -30,8 +33,52 @@ export const SBX = { near: 0, force: null, talk: null, paid: null, n: 0 };
 
 let A = null;
 const TR = { client: null, giver: null };
+/* сбил ждущего (bump): что он скажет, когда встанет. client — тот, кто попросил; giver — человек у подъезда.
+   adult — взрослая (мат), kids — детская. SAY — через сколько с после удара (встаёт — hits.js fallStep, ~2,7 с),
+   SHOW — сколько с висит облачко */
+const OUCH = {
+  SAY: 2.4, SHOW: 2.8,
+  adult: {
+    client: [
+      N_('ты охуел?! я тебя за делом послал, а не меня давить'),
+      N_('сука, я ж тебя тут жду! не на капоте же'),
+      N_('ёб твою мать… цел. всё, гони давай, я тут стою'),
+      N_('опять?! ты специально, что ли, блядь'),
+      N_('нормально, нормально… полежал — и хватит. гони уже'),
+      N_('я тебя не за этим звал, долбоёб'),
+      N_('хуй ты меня собьёшь, я девяностые пережил'),
+      N_('бля, спина… ладно, жду. только объезжай меня, сука'),
+    ],
+    giver: [
+      N_('ты чё, бля?! я тебе тут вещи отдаю, а ты давишь'),
+      N_('сука, жду его, жду — и он меня же сбивает'),
+      N_('ну пиздец. кто тебе права продал?'),
+      N_('ещё раз — и я тебе сам фары разобью, понял?'),
+      N_('ёпта… ладно, живы будем. подъезжай нормально'),
+    ],
+  },
+  kids: {
+    client: [
+      N_('ой! осторожнее, я же тебя жду!'),
+      N_('эй! я просил сгонять, а не сбивать'),
+      N_('опять?! смотри на дорогу!'),
+      N_('ничего, ничего, мне не больно. почти. давай быстрее!'),
+      N_('ну ты даёшь! чуть коленку не разбил'),
+      N_('ай-ай… ну и водитель! я тут подожду'),
+    ],
+    giver: [
+      N_('ой! я же тут тебя жду!'),
+      N_('эй! кто тебя водить учил?'),
+      N_('осторожнее! я тут стою вообще-то'),
+      N_('ай! ну и курьер пошёл…'),
+    ],
+  },
+};
+const DECK = { client: [], giver: [], last: { client: '', giver: '' } };
+const OUCHQ = [];                                  // { p, t, line, b } — ждёт, когда встанет / облачко висит
 /* api: { S, V, CITY, ADULT, alive, makeGuest, clearGuest, afterDrop, releaseIdle, pushOut, rehuman, pinFront, zoneOk,
-        money(n) — сумма строкой, wallet() — сколько в кошельке, spend(n) — взять из кошелька → сколько взяли } */
+        money(n) — сумма строкой, wallet() — сколько в кошельке, spend(n) — взять из кошелька → сколько взяли,
+        fall(p, vx, vz) — упал и встал (hits.js), sayBubble(grp, text, col, y), toast(text) } */
 export function init (api) {
   A = api;
   if (typeof window !== 'undefined') window.setTimeout(() => { if (window.__dlv) window.__dlv.ERRS = DEBUG; }, 0);
@@ -121,10 +168,11 @@ function wpick (L) {
 export async function giverTalk (Sd) {
   const p = Sd.giverPed, g = Sd.shop && Sd.shop.giver, s = Sd.it && Sd.it.spec, tk = s && s.talk;
   if (!p || !g || p.dead) return { k: 'none' };
-  const name = firstOf(p.person) + ' · ' + t(g.who), base = { person: p.person, name, emo: g.emo || undefined, fillers: false, color: ORDER_TYPES.side.color };
+  const name = firstOf(p.person) + ' · ' + t(g.who), base = { person: p.person, name, head: t('поручение'), emo: g.emo || undefined, fillers: false, color: ORDER_TYPES.side.color };
   if (!tk) return { k: 'give' };
   const cost = tk.cost || 0;
-  const r = await DLG.say({ ...base, text: t(tk.line), accept: t(tk.yes) + (cost ? ' (−' + A.money(cost) + ')' : ''), decline: t(tk.no) });
+  // просит взамен — сумма под портретом, красным (автор 12.10.2026: «сумма отдельно под аватаркой»)
+  const r = await DLG.say({ ...base, text: t(tk.line), accept: t(tk.yes), decline: t(tk.no), ...(cost ? { pay: '−' + A.money(cost), payLabel: t('отдать') } : {}) });
   let yes = r === true;
   let paid = 0;
   if (yes && cost && A.wallet() < cost) yes = false;   // денег в кошельке нет — как «нет»
@@ -136,7 +184,7 @@ export async function giverTalk (Sd) {
   if (yes && cost && mine) paid = A.spend(cost);
   const oc = wpick(L);
   SBX.talk = { n: ++SBX.n, id: s.id, ans: r === true ? 'yes' : r === false ? 'no' : 'none', k: oc.k, item: oc.item ? t(oc.item) : '', cost: paid, force: SBX.force };
-  await DLG.say({ ...base, text: t(oc.say), auto: true, emo: oc.k === 'none' ? 'angry' : undefined });
+  await DLG.say({ ...base, text: t(oc.say), accept: t('понятно'), emo: oc.k === 'none' ? 'angry' : undefined });
   return { k: oc.k, item: oc.item ? t(oc.item) : '', cost: paid };
 }
 
@@ -150,7 +198,7 @@ export function thanks (Sd) {
   const oc = Sd.outcome || { k: 'give' }, b = s.back || {};
   if (oc.k !== 'give') {
     const q = oc.k === 'wrong' ? (b.wrong || { say: s.thanks, pay: 1 }) : wpick([].concat(b.none || { say: s.thanks, pay: 0, emo: 'angry' }));
-    DLG.say({ person: Sd.person, name: firstOf(Sd.person), text: t(q.say), auto: true, emo: q.emo || undefined, fillers: false, color: ORDER_TYPES.side.color });
+    DLG.say({ person: Sd.person, name: firstOf(Sd.person), head: t('поручение'), text: t(q.say), accept: t('понятно'), emo: q.emo || undefined, fillers: false, color: ORDER_TYPES.side.color });
     paidLog(Sd, oc.k, q.pay || 0, 0);
     return { tip: 0, k: q.pay || 0 };
   }
@@ -158,7 +206,8 @@ export function thanks (Sd) {
   const q = L.length ? wpick(L) : null;
   const th = t(s.thanks), tip = q ? q.tip : 0;
   const text = q ? th + (/[.!?…—]$/.test(th) ? ' ' : ', ') + t(q.say) : th;
-  DLG.say({ person: Sd.person, name: firstOf(Sd.person), text, auto: true, emo: 'happy', fillers: false, color: ORDER_TYPES.side.color });
+  DLG.say({ person: Sd.person, name: firstOf(Sd.person), head: t('поручение'), text, accept: t('понятно'), emo: 'happy', fillers: false, color: ORDER_TYPES.side.color,
+    ...(tip > 0 ? { pay: '+' + A.money(tip), payLabel: t('чаевые') } : {}) });
   paidLog(Sd, 'give', 1, tip);
   return { tip, k: 1 };
 }
@@ -168,17 +217,65 @@ function paidLog (Sd, k, share, tip) {
   SBX.paid = { n: ++SBX.n, id: Sd.it && Sd.it.spec && Sd.it.spec.id, k, share, tip, base, pay: Math.round(base * share) + tip };
 }
 
+/* ── сбил ждущего: падает и встаёт ──
+   p — человек, которого задела машина (или взрыв); vx, vz — куда толкнули. true — это ждущий поручения: он упал
+   (hits.js fall — как от лёгкого удара: без крови, без «сбит», без скорой), дальше с ним ничего не делать.
+   Сбить можно сколько угодно раз — каждый раз встаёт; реплики идут колодой: подряд одна и та же не выпадает */
+function nextLine (who) {
+  const L = OUCH[A.ADULT ? 'adult' : 'kids'][who];
+  let D = DECK[who];
+  if (!D.length) {
+    D = DECK[who] = L.slice().sort(() => Math.random() - 0.5);
+    if (D.length > 1 && D[D.length - 1] === DECK.last[who]) D.unshift(D.pop());   // берём с конца: прошлая — не первой
+  }
+  return (DECK.last[who] = D.pop());
+}
+export function bump (p, vx, vz) {
+  if (!A || !p || !p.errand || p.dead) return false;
+  const who = p === TR.client ? 'client' : p === TR.giver ? 'giver' : null;
+  if (!who) return false;
+  if (p.fall) return true;                         // ещё лежит — второй раз не роняем
+  if (p.idle) A.releaseIdle(p);
+  A.fall(p, vx, vz);
+  p.shock = 0;
+  p.ouch = (p.ouch || 0) + 1;
+  for (let i = OUCHQ.length - 1; i >= 0; i--) if (OUCHQ[i].p === p) { unsay(OUCHQ[i]); OUCHQ.splice(i, 1); }
+  OUCHQ.push({ p, t: OUCH.SAY, line: t(nextLine(who)), b: null, who });
+  SBX.ouch = { n: ++SBX.n, who, line: OUCHQ[OUCHQ.length - 1].line, times: p.ouch };
+  return true;
+}
+function unsay (q) {
+  if (!q.b) return;
+  if (q.b.parent) q.b.parent.remove(q.b);
+  if (q.b.material) q.b.material.dispose();
+  q.b = null;
+}
+function ouchStep (dt) {
+  for (let i = OUCHQ.length - 1; i >= 0; i--) {
+    const q = OUCHQ[i];
+    if (q.p.dead) { unsay(q); OUCHQ.splice(i, 1); continue; }
+    q.t -= dt;
+    if (!q.b && q.t <= 0) {                        // встаёт — ругается
+      q.b = A.sayBubble ? A.sayBubble(q.p.grp, q.line, '#d9342c', 2.7) : null;
+      if (A.toast) A.toast(t('{who}: «{line}»', { who: firstOf(q.p.person) || (q.who === 'giver' ? t('отдающий') : t('клиент')), line: q.line }));
+      q.t = OUCH.SHOW;
+      if (!q.b) { OUCHQ.splice(i, 1); continue; }
+    } else if (q.b && q.t <= 0) { unsay(q); OUCHQ.splice(i, 1); }
+  }
+}
+
 /* ── отпустить ── */
 function release (p) {
   if (!p) return;
   p.errand = false;
   if (p.guest && !p.served) A.clearGuest(p);      // с пиццей в руках — постоит p.freeT и пойдёт сам (game.js guestStep)
 }
-export function step () {
+export function step (dt = 1 / 60) {
   if (!A) return;
+  if (OUCHQ.length) ouchStep(dt);
   const Sd = A.S.side;
   if (TR.client && (!Sd || Sd.ped !== TR.client)) { release(TR.client); TR.client = null; }
   if (TR.giver && (!Sd || Sd.giverPed !== TR.giver || (Sd.stage !== 'shop' && Sd.stage !== 'talk'))) { release(TR.giver); TR.giver = null; }
 }
 
-export const DEBUG = { TR, GIVE, SBX };
+export const DEBUG = { TR, GIVE, SBX, OUCH, OUCHQ, bump };

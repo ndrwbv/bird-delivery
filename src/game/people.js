@@ -18,7 +18,7 @@
    не раздаёт, их ставят руками поверх look (Object.assign(p.look, {...}), как
    у героев сюжета) — поэтому все прежние люди остались такими же:
      scar: 'cheek' | 'eye' | 'brow'   — шрам на щеке / через глаз / через бровь
-     sleeve: 'L' | 'R'                — пустой рукав (руки нет), подколот
+     sleeve: 'L' | 'R' | 'LR'         — пустой рукав (руки нет), подколот; 'LR' — оба (regulars.js, Света)
      broad: true                      — широкие плечи (туловище и руки шире)
      nose: 'huge', noseC: '#…'        — огромный нос; цвет носа (красный — пьющий)
      eyes: 'bulge' | 'alien'          — выпученные (торчат из лица) / огромные чёрные
@@ -271,7 +271,7 @@ const BG = ['#8fb8de', '#f2c57c', '#a8d5a2', '#e8a0a8', '#c3a6e0', '#9fd3cf', '#
 function makeLook (seed, o = {}) {
   const r = rng(seed), C = p => r() < p;
   const f = o.fem !== undefined ? !!o.fem : C(0.5);
-  const age = W(r, { young: 35, adult: 50, old: 15 });
+  const age0 = W(r, { young: 35, adult: 50, old: 15 }), age = o.age || age0;   // o.age — бабки на лавочке (yardlife.js): возраст задан, остальное — от зерна
   const si = +W(r, o.skinW || SKIN_W), skin = SKINS[si];
   let hairC = age === 'old' && C(0.7) ? P(r, ['#b8b2aa', '#d4d0ca', '#9a948c']) : W(r, si >= 5 ? HAIR_DARK : HAIR_LIGHT);
   if (age !== 'old' && C(0.05)) hairC = P(r, HAIR_DYE);
@@ -381,7 +381,7 @@ function mix (a, b, k) {
 const U = 0.035, HY = 1.58, T = 0.28;
 const HEAD_W = { thin: 14, normal: 16, chubby: 18 };            // ширина головы в пикселях лица
 const HEAD_D = { thin: 0.28, normal: 0.3, chubby: 0.33 };
-/* o: { fem, fat, h, skin, shirt, pants, cap } — как у старого makeHuman */
+/* o: { fem, fat, h, skin, shirt, pants, cap, hat } — как у старого makeHuman (hat — убор силой, как в зиму не переодевать) */
 function buildSpec (Lk, o = {}) {
   const r = rng(Lk.seed ^ 0x51AB5EED);
   const fat = o.fat !== undefined ? !!o.fat : Lk.fat;
@@ -445,7 +445,7 @@ function buildSpec (Lk, o = {}) {
   // руки: короткий рукав и голое предплечье или длинный рукав и кисть
   const sleeve = coat ? Wr.coat : top === 'jacket' ? Lk.jacket : topC;
   for (const p of [3, 4]) {
-    if (Lk.sleeve && p === (Lk.sleeve === 'R' ? 4 : 3)) {                       // пустой рукав: руки нет, рукав сплющен и подколот к боку
+    if (Lk.sleeve && (Lk.sleeve === 'LR' || p === (Lk.sleeve === 'R' ? 4 : 3))) {   // пустой рукав: руки нет, рукав сплющен и подколот к боку ('LR' — оба)
       const sc = coat ? Wr.coat : sleeve, pin = mix(sc, '#000000', 0.25);
       if (!coat && (top === 'tee' || top === 'dress')) bx(p, 0.14, 0.15, 0.1, 0, -0.08, 0, sc);
       else { bx(p, 0.12, 0.3, 0.06, 0, -0.16, 0, sc); bx(p, 0.1, 0.14, 0.05, 0, -0.27, 0.035, pin); bx(p, 0.03, 0.03, 0.02, 0, -0.22, 0.065, '#c8ccd2'); }
@@ -468,7 +468,7 @@ function buildSpec (Lk, o = {}) {
     }
   }
   // голова: волосы, убор, борода, нос, уши
-  const hw = o.cap ? 'cap' : Wr.head || Lk.head, hc = o.cap || Lk.headC;
+  const hw = o.cap ? 'cap' : o.hat || Wr.head || Lk.head, hc = o.cap || Lk.headC;   // o.hat — убор силой (костюм Деда Мороза: шапка с помпоном, holidays.js)
   const H = [];
   hairBoxes(Lk, Wd, D, r, H);
   const covers = hw === 'cap' || hw === 'beanie' || hw === 'bandana' || hw === 'hood' || hw === 'ushanka';

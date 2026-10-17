@@ -53,14 +53,18 @@ export function init (api) {
 }
 
 /** все стоящие разом (LATE 'cars'): cars — лёгкие машины на сцене (дети — кузов и, если есть, фары); ставит t.pk */
-export function build (cars) {
+/* шагами (function*, latebuild.js): склейка клетки — шаг; клетки подряд, пока набралось меньше 40 машин */
+export function* build (cars) {
   const per = new Map(), v = new THREE.Vector3();
+  let nc = 0;
   for (const t of cars) {
     const k = Math.floor(t.x / CELL) + ',' + Math.floor(t.z / CELL);
     if (!per.has(k)) per.set(k, []);
     per.get(k).push(t);
   }
   for (const L of per.values()) {
+    if (nc >= 40) { nc = 0; yield 'parkmerge'; }
+    nc += L.length;
     let vn = 0, iN = 0;
     for (const t of L) for (const m of t.mesh.children) { vn += m.geometry.attributes.position.count; iN += m.geometry.index.count; }
     const pos = new Float32Array(vn * 3), nor = new Float32Array(vn * 3), col = new Float32Array(vn * 3), aC = new Float32Array(vn * 3), aF = new Float32Array(vn);

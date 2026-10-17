@@ -81,6 +81,17 @@ body.calm-fx .mk-m, body.calm-fx .mk-m.mk-gone { animation-duration: .01s; }
 .mk-sub em { font-style: normal; color: var(--pp-label); font-size: var(--pp-fs-s); }
 .mk-here .mk-sub em { color: var(--pp-money); }
 .mk-top .mk-fuse { width: 100%; box-sizing: border-box; margin: 0; background: rgba(255, 243, 214, .25); }
+/* «пусть сам спустится» (doorkit.js selfHTML) — пометка на полях под заданием, справа; нажали — «клиент спускается… N с» */
+.mk-self { align-self: flex-end; pointer-events: auto; display: inline-flex; align-items: center; gap: .5em; margin-top: 2px; padding: .4em .7em;
+           font: inherit; font-size: var(--pp-fs-s); line-height: 1.3; color: var(--pp-ink); cursor: pointer; background: var(--pp-paper);
+           border: 2px dashed var(--pp-label); border-radius: 4px; box-shadow: 0 3px 0 rgba(18, 12, 8, .55); touch-action: manipulation; }
+.mk-self .pp-key { margin: 0; }
+.mk-self .pp-key[hidden] { display: none; }
+.mk-self:active { translate: 0 2px; box-shadow: 0 1px 0 rgba(18, 12, 8, .55); }
+.mk-self.on { cursor: default; color: var(--pp-rust); border-style: solid; border-color: var(--pp-rust); }
+.mk-self[hidden] { display: none; }
+[data-input="touch"] .mk-self { min-height: 40px; }
+.mk-full.dg-self .mk-seal, .mk-full.sx-self .mk-seal { top: 64%; }   /* ждёшь — печать ниже: «клиент спускается… N с» под заданием видно и на телефоне */
 
 /* реплики — слева сверху, на фоне сцены имя светлое */
 .mk-say { position: absolute; z-index: 2; left: max(14px, var(--sa-l, env(safe-area-inset-left))); top: 18px; width: min(26vw, 440px); pointer-events: none; }

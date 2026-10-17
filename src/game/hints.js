@@ -98,7 +98,7 @@ function make (id, extra) {
       return { hi: touch ? '#touchpad .tp-nos' : '#radar', text: extra === 'coffee' ? t('кофе в баке! нажми {key} и полетишь на кофейной тяге', { key })
         : t('прямая! нажми {key} и полетишь на кофейной тяге', { key }) };
     }
-    case 'hp': return { hi: '#hearts', text: t('сердца — жизни тачки: врезался — минус сердце, легонько — половинка') };
+    case 'hp': return { hi: '#hearts', text: t('сердца — жизни тачки: врезался — минус половинка, со всей дури — целое') };
     case 'cash': return { hi: '#shiftcash', text: t('зелёная пачка — заработано за смену') };
     case 'wallet': return { hi: '#money', text: t('копилка — все твои деньги: в конце смены пачка ссыпается в неё') };
     case 'respect': return { hi: '#respect', text: t('звезда — респект района: за конкурентов, похитителя и помощь своим. копишь — растёт звание') };

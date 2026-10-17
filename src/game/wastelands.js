@@ -581,9 +581,11 @@ export function* build (api) {
 
 /* ═════════════ тропинки, вытоптанное, лужи ═════════════ */
 const TRAIL_HEX = ['#8f7a5a', '#94805e', '#87735a'], EDGE_HEX = '#a3a072';
-export function trails () {
+/* шагами (function*, latebuild.js): на Деке ~0,19 с одним куском — шаг через каждые 400 подъездов */
+export function* trails () {
   if (!A) return;
-  const t0 = performance.now();
+  let t0 = performance.now(), ms = 0;
+  const pause = () => { ms += performance.now() - t0; }, resume = () => { t0 = performance.now(); };
   const C = A.CITY;
   entGrid();                                        // свои подъезды (GEN_ENTR) к этому времени уже в CITY.entrances
   // стены (заборы, гаражи) — своей сеткой: SOLID_GRID игры соберётся позже
@@ -657,9 +659,12 @@ export function trails () {
     return pts;
   };
   const ents = C.entrances;
+  pause(); yield 'grid'; resume();
+  let ne = 0;
   // подъезды: сначала к целям (остановка, ларёк, гаражи, коробка), потом наискосок к соседнему дому
   for (const e of ents) {
     if (STATS.trails >= TRAIL.MAX_N) break;
+    if (++ne % 400 === 0) { pause(); yield 'trails'; resume(); }
     const seed = e[0] * 0.37 + e[1] * 0.11;
     if (hash(e[0], e[1], 77) > TRAIL.SHARE) continue;
     const ox = e[2] || 0, oz = e[3] || 0, ol = Math.hypot(ox, oz) || 1;
@@ -689,6 +694,7 @@ export function trails () {
     }
     if (best) { draw(best, seed + 1); const l = best[best.length - 1]; DONE.push([sx, sz, l[0], l[1]]); }
   }
+  pause(); yield 'trails'; resume();
   // вытоптано у лавочек; лужа рядом — иногда
   for (const b of A.BENCHES || []) {
     if (hash(b.x, b.z, 31) > TRAIL.BENCH) continue;
@@ -700,9 +706,11 @@ export function trails () {
   }
   for (const s of SPOTS) if (hash(s.x, s.z, 33) < 0.45) puddle(s.x + (hash(s.x, s.z, 34) - 0.5) * s.r, s.z + (hash(s.x, s.z, 35) - 0.5) * s.r, PUD.R[0] + hash(s.x, s.z, 36) * (PUD.R[1] - PUD.R[0]), s.x * 3 + s.z);
   STATS.spots = SPOTS.length;
+  pause(); yield 'bench'; resume();
   buildPuddles();
   STATS.trailM = Math.round(STATS.trailM);
-  STATS.trailMs = Math.round(performance.now() - t0);
+  pause();
+  STATS.trailMs = Math.round(ms);
 }
 function puddle (x, z, r, seed) {
   const h = hash(seed, 11, 5), tier = h < 0.3 ? 0 : h < 0.65 ? 1 : 2;

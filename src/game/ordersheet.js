@@ -15,9 +15,10 @@
                                            cls: 'os-x' зачёркнуто, 'os-plus' зелёным, 'os-minus' красным */
 import './ordersheet.css';
 import { t as T0 } from '../i18n/index.js';
-import { faceDataURL } from './people.js';
+import * as NICK from './nicks.js';
 
-const name = (p, t) => (p && p.name) || t('Иван Иванов');
+/* получатель — как подписался в приложении: ник или имя (nicks.js); аватарка — оттуда же */
+const name = (p, t) => esc(NICK.label(p, t('Иван Иванов')));
 
 export function flatText (st, t = T0) {
   const h = st && st.home;
@@ -58,7 +59,7 @@ export function rows (order, o = {}) {
 export function html (order, o = {}) {
   const stops = order.stops || [], many = stops.length > 1;
   const persons = stops.flatMap(st => st.persons || []);
-  const face = (p, n) => '<div class="oc-p">' + (n ? '<em>' + n + '</em>' : '') + (p ? '<img src="' + faceDataURL(p) + '" alt="">' : '<i></i>') + '</div>';
+  const face = (p, n) => '<div class="oc-p">' + (n ? '<em>' + n + '</em>' : '') + (p ? '<img src="' + NICK.avatar(p) + '" alt="">' : '<i></i>') + '</div>';
   const pics = stops.flatMap((st, i) => (st.persons || []).map(p => face(p, many ? i + 1 : 0))).join('');
   return '<div class="oc-sheet"><table class="oc-inv">' +
     rows(order, o).map(([k, th, td]) => '<tr data-k="' + k + '"><th>' + th + '</th><td>' + td + '</td></tr>').join('') + '</table>' +

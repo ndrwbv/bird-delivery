@@ -153,9 +153,11 @@ function ridgeOf (p, h, hipped) {
 }
 
 /* api: { CITY, FLATM, ARCHES, groundH, inHouse, inPoly, hexOf } — после подъездов (osmEntrances) */
-export function build (api) {
+/* шагами (function*, latebuild.js): на Деке ~0,11 с одним куском — шаг через каждые 500 домов */
+export function* build (api) {
   A = api;
-  const t0 = performance.now(), VT = CATS.VENT, F = A.FLATM, C = new THREE.Color();
+  let t0 = performance.now(), ms = 0, nb = 0;
+  const VT = CATS.VENT, F = A.FLATM, C = new THREE.Color();
   const EG = new Map();
   for (const e of A.CITY.entrances) { gput(EG, 10, e[0], e[1], e); ENTR.push(e); }
   for (const a of A.ARCHES || []) for (const q of [[a.mx, a.mz], [a.mx + a.ix * a.t, a.mz + a.iz * a.t]]) gput(EG, 10, q[0], q[1], [q[0], q[1], 0, 0, 1]);
@@ -167,6 +169,7 @@ export function build (api) {
     return false;
   };
   for (const b of A.CITY.buildings) {
+    if (++nb % 500 === 0) { ms += performance.now() - t0; yield 'vents'; t0 = performance.now(); }
     if (b.k !== 'res' || !b._hex || !STYLES.includes(b.st)) continue;
     const p = b.p, n = p.length;
     let hHi = -Infinity, s2 = 0, cx = 0, cz = 0;
@@ -238,7 +241,7 @@ export function build (api) {
     }
   }
   STATS.roofs = ROOFS.length;
-  STATS.ms = Math.round(performance.now() - t0);
+  STATS.ms = Math.round(ms + performance.now() - t0);
   return STATS;
 }
 

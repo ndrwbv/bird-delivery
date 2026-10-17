@@ -31,7 +31,7 @@ import { DIRECTOR as C } from './econ.js';
 import * as RHY from './rhythm.js';          // ритм смены: дуга, окна «покататься», бюджет событий (rhythm.js)
 
 export const KINDS = {
-  gig: 'light', crew: 'light', thugs: 'light', flirt: 'light', moose: 'light',
+  gig: 'light', crew: 'light', thugs: 'light', flirt: 'light', moose: 'light', odd: 'light',   // odd — сценка у двери (oddfolk.js)
   story: 'story', errand: 'story',
   gang: 'medium', march: 'medium', mafia: 'medium',
   raid: 'major', riot: 'major', fest: 'major', hurricane: 'major',

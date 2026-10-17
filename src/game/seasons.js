@@ -75,6 +75,8 @@ const NAMES = () => [t('начало лета'), t('разгар лета'), t('
   t('начало зимы'), t('разгар зимы'), t('конец зимы'), t('ранняя весна'), t('разгар весны'), t('поздняя весна')];
 export const seasonName = (s = SEA) => NAMES()[Math.floor(((s % 4) + 4) % 4 * 3) % 12];
 export const seasonValue = () => SEA;
+/* новогодние ёлки (у пиццерии — первая): где и какого размера (k — 1 обычная) — праздник их наряжает ярче (holidays.js) */
+export const firs = () => FIRS.map(f => ({ x: f.x, z: f.z, k: f.hw / 3.1 }));
 /* насколько холодно, 0 — лето … 1 — зима (кривая warm): одежда людей, снежки и горки (life.js) */
 export const warmth = () => A.warm || 0;
 /* насколько скользко: зимой — как лёгкий дождь */
@@ -426,6 +428,9 @@ const pickR = (r, a) => a[(r() * a.length) | 0];
 /* ─────────────── инициализация ─────────────── */
 let PILE = null, GARL = null, DRIFTP = null, DRIFT_MESH = [], LEAFP = null, LEAF_MESH = [];
 const DECID = [], SPRUCES = [], SEA_ITEMS = [], DRIFTS = new Map(), LEAVES = new Map(), FIRS = [], FIGHT_SPOTS = [];
+const SLIDES = [];
+/* ледяные горки дворов { x, z, ry, H, L, k, it } — на них катаются люди (yardlife.js) */
+export const slides = () => SLIDES;
 let MESH_GARL = [], MESH_PILE = [];
 const BUILT = { trees: 0, pile: 0, garl: 0, drifts: 0, bulbs: 0, items: 0 };
 
@@ -520,7 +525,7 @@ export function seasonTree (x, z, y, kind) {
 }
 
 /* ─────────────── двор: ледяные горки и снеговики (до smashBuild) ─────────────── */
-export function seasonYard () {
+export function* seasonYard () {                  // шагами (latebuild.js): на Деке ~0,1 с одним куском
   const { CITY, put, smashAdd, SMASH, groundH, inHouse, inPoly, inBounds, nearestRoad } = C;
   const B = (w, h, d) => new THREE.BoxGeometry(w, h, d);
   const free = (x, z, m) => {
@@ -563,8 +568,12 @@ export function seasonYard () {
     [px, pz] = W(0, (1.2 * k + L) / 2 - 0.3);
     smashAdd('ice', px, pz, 2.2 * k, g, '#dfe6ee');
     track();
-    FIGHT_SPOTS.push({ x: x + 5, z: z + 5, slide: { x, z, ry, H, L, k } });
+    const sl = { x, z, ry, H, L, k, it: SMASH[SMASH.length - 1] };   // it — сама горка в мелочи (снесли — it.down)
+    FIGHT_SPOTS.push({ x: x + 5, z: z + 5, slide: sl });
+    SLIDES.push(sl);
   };
+  nearSmash(1e9, 1e9, 0);                          // клетки мелочи — сразу, своим шагом
+  yield 'index';
   // площадки: горка рядом с песочницей; большие парки — побольше
   let slides = 0;
   for (const pl of CITY.green) {
@@ -598,13 +607,16 @@ export function seasonYard () {
     track();
     men++;
   };
+  yield 'slides';
   const E = CITY.entrances;
   for (let i = 0; i < E.length && men < 110; i++) {
+    if (i && i % 2000 === 0) yield 'men';
     const [ex, ez, nx, nz] = E[i];
     if (hsh(ex, ez, 9) > 0.1) continue;
     const s = hsh(ex, ez, 2) < 0.5 ? 1 : -1;
     man(ex + nx * 5 + nz * 3.5 * s, ez + nz * 5 - nx * 3.5 * s, Math.atan2(nx, nz));
   }
+  yield 'men';
   for (const pl of CITY.green) {
     if ((pl.k !== 'park' && pl.k !== 'green') || men > 150) continue;
     let cx = 0, cz = 0;
@@ -624,9 +636,12 @@ export function* seasonSteps () {
   const svk = C.MAP.id === 'seversk';
   // копии вершин горок и снеговиков: чтобы вернуть их к зиме
   for (const it of SEA_ITEMS) if (it.mesh) it.seaPos = it.mesh.geometry.attributes.position.array.slice(it.v0 * 3, (it.v0 + it.nv) * 3);
+  yield 'sea';
   // кусты: вид 1 и зерно в aux склеек мелочи — их листву красит smashMat
   const SMA = new Map();
+  let nsm = 0;
   for (const it of C.SMASH) {
+    if (++nsm % 5000 === 0) yield 'bush';
     if (!it.mesh || it.mesh.material !== C.SMASH_MAT) continue;
     let a = SMA.get(it.mesh);
     if (!a) { a = new Uint8Array(it.mesh.geometry.attributes.position.count * 4); SMA.set(it.mesh, a); }

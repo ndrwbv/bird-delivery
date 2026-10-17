@@ -523,6 +523,7 @@ function regrid () {
   gclear(GRID.cars); gclear(GRID.peo); gclear(GRID.sco); gclear(GRID.oth);
   const TR = A.TRAFFIC || [];
   for (let i = 0; i < TR.length; i++) { const t = TR[i]; if (!t.gone && (t.x - V.x) ** 2 + (t.z - V.z) ** 2 < R2) gput(GRID.cars, t.x, t.z, t); }
+  if (A.yardCars) A.yardCars(V.x, V.z, FAUNA.SOLID.R, t => { if ((t.x - V.x) ** 2 + (t.z - V.z) ** 2 < R2) gput(GRID.cars, t.x, t.z, t); });   // стоящие во дворах — не в TRAFFIC (yardcars.js)
   const W = A.walkers ? A.walkers() : [], PEO = A.PEOPLE, SCO = A.SCOOTS;
   for (let li = 0; li < W.length; li++) {
     const list = W[li], M = list === PEO ? GRID.peo : list === SCO ? GRID.sco : GRID.oth;

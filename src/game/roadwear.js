@@ -383,10 +383,13 @@ export function potAt (x, z) {
 }
 /* все ямы разбитых улиц: обход полотна шагом 2 м вдоль (и 6 м за концы) и 1,5 м поперёк (±6 м) —
    ни одна клетка, где potAt найдёт яму, не пропущена */
-function brokenPots () {
+function brokenPots () { const it = brokenPotsSteps(); for (;;) { const r = it.next(); if (r.done) return r.value; } }
+function* brokenPotsSteps () {                      // шагами — через каждые 40 разбитых улиц (cars.js buildSteps)
   const seen = new Set(), out = [];
+  let nr = 0;
   for (const r of A.CITY.roads) {
     if (r._wear !== 'broken') continue;
+    if (++nr % 40 === 0) yield 'broken';
     for (let i = 1; i < r.p.length; i++) {
       const [x1, z1] = r.p[i - 1], [x2, z2] = r.p[i], L = Math.hypot(x2 - x1, z2 - z1) || 1, ux = (x2 - x1) / L, uz = (z2 - z1) / L;
       for (let t = -6; t <= L + 6; t += 2) for (let o = -6; o <= 6; o += 1.5) {
@@ -408,11 +411,14 @@ function brokenPots () {
    цвет-метка дна, как у ям cars.js: в дождь вблизи шейдер кладёт туда лужу */
 const POTHEX = { rim: '#cdc9c1', lit: '#8c8a84', wall: '#55534e', bottom: '#323339' };
 /* ямы разбитого асфальта — в статику (cars.js buildPotholes, вместе со своими ямами) */
-export function drawPots (M) {
+export function drawPots (M) { const it = drawPotsSteps(M); for (;;) { const r = it.next(); if (r.done) return r.value; } }
+export function* drawPotsSteps (M) {               // шагами (cars.js buildSteps → latebuild.js): на Деке ~0,1 с одним куском
   if (OFF || !A || !A.nearestRoad) return 0;
-  const t0 = performance.now(), K = 9, j = new Array(K);
-  const pots = brokenPots();
+  let t0 = performance.now(), np = 0;
+  const K = 9, j = new Array(K);
+  const pots = yield* brokenPotsSteps();
   for (const p of pots) {
+    if (++np % 400 === 0) { DEBUG.ms += performance.now() - t0; yield 'pots'; t0 = performance.now(); }
     const R = rng((Math.round(p.x * 31.7) * 7919) ^ Math.round(p.z * 17.3) ^ 0x7a3);
     const a0 = R() * Math.PI * 2, lift = 0.206 + (7 - p.c) * 0.001;
     for (let i = 0; i < K; i++) j[i] = 0.9 + R() * 0.2;    // рваный край: у всех колец одна форма — вложены друг в друга

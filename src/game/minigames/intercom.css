@@ -45,5 +45,6 @@
 .dg-shake .dg-unit { animation: dg-shake .3s; }
 @keyframes dg-shake { 25% { translate: -6px 0; } 50% { translate: 5px 0; } 75% { translate: -3px 0; } }
 .dg-late .dg-unit { filter: saturate(.6); }
+.dg-self .dg-unit, .dg-self .dg-door { filter: saturate(.6); opacity: .75; pointer-events: none; }   /* «пусть сам спустится»: ждёшь, панель не нужна */
 @media (prefers-reduced-motion: reduce) { .dg-pop, .dg-shake .dg-unit { animation: none; } }
 body.calm-fx .dg-pop, body.calm-fx .dg-shake .dg-unit { animation: none; }

@@ -33,6 +33,7 @@ export const WHEEL_BY_MODEL = { sedan: 'cap', coupe: 'alloy', hatch: 'steel', sm
 export const STATS = { built: 0 };
 
 const SEAM = '#1a191e', TIRE = '#221c19', CHROME = '#c9ccd1';
+const RIM = { alloy: ['#b9bec5', '#c7cbd1'], gold: ['#d9b54a', '#e8c95e'], black: ['#2e2e33', '#3c3c42'], red: ['#c23a3a', '#d84a4a'] };   // обод, спицы
 
 /* ─── коробка со скосами ───
    o.c — скос вертикальных углов (в плане), o.t — скос верхних рёбер, o.ends: 1 — только спереди (+Z), −1 — только сзади;
@@ -162,12 +163,13 @@ export function wheel (parts, put, r, s, style) {
       put(parts, quad(0.05, 0.022, s > 0 ? '+x' : '-x').rotateX(a), '#2a292e', f + s * 0.006, Math.cos(a) * r * 0.28, Math.sin(a) * r * 0.28);
     }
   } else {
-    // литьё: светлый обод, тёмное поле, пять спиц, колпачок
-    disc(r * 0.66, 12, '#b9bec5', f);
+    // литьё: светлый обод, тёмное поле, пять спиц, колпачок; gold / black / red — крашеные диски машин коллег (crewcast.js)
+    const rim = RIM[style] || RIM.alloy;
+    disc(r * 0.66, 12, rim[0], f);
     disc(r * 0.56, 12, '#232328', f + s * 0.002);
     for (let i = 0; i < 5; i++) {
       const a = i * Math.PI * 2 / 5;
-      put(parts, quad(0.075, r * 0.5, s > 0 ? '+x' : '-x').rotateX(a), '#c7cbd1', f + s * 0.004, Math.cos(a) * r * 0.29, Math.sin(a) * r * 0.29);
+      put(parts, quad(0.075, r * 0.5, s > 0 ? '+x' : '-x').rotateX(a), rim[1], f + s * 0.004, Math.cos(a) * r * 0.29, Math.sin(a) * r * 0.29);
     }
     disc(r * 0.13, 8, '#dfe2e6', f + s * 0.006);
   }

@@ -4,28 +4,31 @@
 
    Как идёт (5—10 с): портрет человека (говорит ртом — talkface.js), его реплика, под ней ДВА коротких ответа столбиком.
    Курсор — стрелки / W S / крестовина (стик), выбрать — Enter / пробел / A, палец — тап; 1 / 2 — сразу ответ.
-   Ответил — одна короткая реакция (или молча закрыл дверь), печать итога — и всё. Отдельного таймера нет: идёт срок заказа.
-   Не ответил за T.wait — человек закрывает дверь сам (итог «ничего»).
+   Ответил — одна короткая реакция (или молча закрыл дверь), печать итога и кнопка «понятно» — закрывает игрок
+   (автор 16.10.2026: «не надо по таймеру убирать»). Своего таймера нет и сам ответ не выбирается: идёт срок заказа
+   (в шапке — «срок идёт / горит / вот-вот опоздаешь»). Нажатие во время реакции — допечатать её сразу, второе —
+   печать итога, третье («понятно») — закрыть.
 
    Формат мини-игры песочницы (src/uilab/minigames.js): export default { id, name, note, knobs, mount }.
    mount(root, o, api) → убрать за собой.
      o: { sit: id встречи ('' — случайная), person, fem (true / false / null), who (имя на подписи),
-          T: { arm, end, wait } (с), pct: { rush, keep, fun } (проценты для итога), clock() → { s, k } | null }
+          T: { arm } (с; прежние end / wait — не работают: окно закрывает игрок), pct: { rush, keep, fun } (проценты для итога), clock() → { s, k } | null }
      api: t, ADULT, faceDataURL, makePerson (песочница), log, done(итог), setStep, setPad, paused, sfx (pick, blab, coin, sad), bonus(вид).
    Итог (doorstep.js talkAdjust читает kind / win / none — деньги считает он):
      { kind: 'keep' | 'fun' | 'rush' | '', win, none, out, row, mood, who, bonus, timeout, sit, pick: 0 | 1, t }
        out 'tip' → kind 'keep' (+KEEP_TIP, респект) · 'big' → 'fun' + win (+FUN_TIP) · 'cut' → 'rush' (чаевые × RUSH_K) ·
        'none' → 'fun' без win (без чаевых) · '0' → '' (ничего); row — строка в чеке (ru-ключ), mood — лицо на мини-карточке. */
 import './smalltalk.css';
-import { inputKind, onInput, glyph } from '../../input/glyphs.js';
+import { inputKind, onInput, glyph, keyHTML, refreshKeys } from '../../input/glyphs.js';
 import { SITS, WHO } from './smalltalk-lines.js';
+import { nowPart } from '../daytime.js';       // встречи с when — только в эту пору суток по часам мира («первый за ночь» — ночью)
 import * as TF from '../talkface.js';           // человек говорит ртом, пока печатается его реплика
 
 const N_ = s => s;
 const DT_MAX = 0.1;
 const CPS = 40;                // букв в секунду: человек говорит
 const ME_T = 0.45;             // с: ответ курьера — потом реакция
-const READ_T = 0.9;            // с: реакция допечаталась — ещё столько висит
+const READ_T = 0.4;            // с: реакция допечаталась — через столько печать итога (раньше — если нажал)
 const REPLY_MIN = 1.4;         // с: от ответа до печати — не меньше
 const RECENT = 8;              // столько последних встреч не повторяются
 
@@ -42,7 +45,8 @@ let recent = [];
 /* кто подходит: взрослая / детская, пол клиента (у встречи или у её «кто») */
 const sitFem = s => (s.fem !== undefined ? s.fem : WHO[s.who] ? WHO[s.who].fem : undefined);
 export function pool (adult, fem) {
-  return SITS.filter(s => !s.face && (!s.adult || adult) && (sitFem(s) === undefined || fem === null || fem === undefined || sitFem(s) === !!fem));
+  const pt = nowPart();
+  return SITS.filter(s => !s.face && (!s.adult || adult) && (!s.when || !pt || s.when.includes(pt)) && (sitFem(s) === undefined || fem === null || fem === undefined || sitFem(s) === !!fem));
 }
 /* встреча для показа: детская версия — с мягкими заменами (kids) */
 function view (s, adult) {
@@ -73,15 +77,15 @@ function dress (person, who) {
 
 export default {
   id: 'smalltalk', name: 'встреча у двери',
-  note: 'Человек говорит одну-две фразы, у курьера два коротких ответа столбиком: стрелки / крестовина — выбрать, Enter / A — ответить (1 / 2 — сразу). Реакция — и всё, 5—10 с.',
+  note: 'Человек говорит одну-две фразы, у курьера два коротких ответа столбиком: стрелки / крестовина — выбрать, Enter / A — ответить (1 / 2 — сразу). Реакция, печать итога — и «понятно» (закрывает игрок, таймера нет).',
   knobs: [
     { k: 'sit', label: 'встреча', type: 'sel', def: '', opts: [['', 'случайная']].concat(SITS.map(s => [s.id, s.id + ' · ' + s.who + (s.adult ? ' (18+)' : '')])) },
     { k: 'fem', label: 'клиент — женщина', type: 'bool', def: false },
+    { k: 'learnOn', label: 'первый раз (подсказка Толика)', type: 'bool', def: false },
   ],
   mount (root, o, api) {
     const t = api.t;
-    const T = Object.assign({ arm: 0.45, end: 1.1, wait: 20 }, o.T || {});
-    if (!(T.wait > 0)) T.wait = 20;
+    const T = Object.assign({ arm: 0.45 }, o.T || {});
     const PCT = Object.assign({ rush: 50, keep: 15, fun: 30 }, o.pct || {});
     const fem = o.fem === undefined ? null : o.fem;
     const sit = pickSit(!!api.ADULT, fem, o.sit);
@@ -110,11 +114,13 @@ export default {
         '</div>' +
         '<div class="tk-opts">' + ans.map((x, i) => '<button type="button" tabindex="-1" data-i="' + i + '" class="tk-o' + (i === 0 ? ' tk-cur' : '') + '" disabled><b>' + esc(t(x.me)) + '</b></button>').join('') + '</div>' +
         '<p class="tk-out" hidden></p>' +
+        '<div class="tk-end" hidden><button type="button" tabindex="-1" class="tk-ok">' + keyHTML('ok') + '<span>' + esc(t('понятно')) + '</span></button></div>' +
         '<p class="tk-hint"></p>' +
       '</section>';
     const q = s => box.querySelector(s);
     const elClock = q('.tk-clock'), elTxt = q('.tk-txt'), elSay = q('.tk-say'), elMe = q('.tk-me'), elNote = q('.tk-note'),
-      elFace = q('.tk-face'), elWho = q('.tk-who'), elOpts = q('.tk-opts'), elOut = q('.tk-out'), elSheet = q('.tk-sheet'), elHint = q('.tk-hint');
+      elFace = q('.tk-face'), elWho = q('.tk-who'), elOpts = q('.tk-opts'), elOut = q('.tk-out'), elSheet = q('.tk-sheet'), elHint = q('.tk-hint'),
+      elEnd = q('.tk-end'), elOk = q('.tk-ok');
     const btns = [...box.querySelectorAll('.tk-o')];
     let faceMood = null;
     const setFace = mood => {
@@ -132,8 +138,15 @@ export default {
     const hint = () => {
       const k = inputKind().kind;
       box.dataset.input = k;
-      elHint.textContent = k === 'pad' ? t('крестовина — выбрать · {a} — ответить', { a: glyph('ok') })
+      refreshKeys(box);                                       // значок на «понятно» — по вводу
+      if (st.phase !== 'ask') { elHint.textContent = ''; return; }   // дальше — кнопка «понятно» со значком
+      const ctl = k === 'pad' ? t('крестовина — выбрать · {a} — ответить', { a: glyph('ok') })
         : k === 'touch' ? t('нажми на ответ') : t('↑ ↓ — выбрать · Enter — ответить');
+      // первый раз (doorstep.js learnFirst, ECON.DOORGAME.LEARN): над управлением — что делать, от Толика
+      const ln = o.learn || (o.learnOn ? { add: 10 } : null);
+      if (ln) elHint.innerHTML = '<b class="tk-learn">' + esc(t('Толик: первый раз у двери? Клиент заговорил — выбери ответ. Поддержишь — чаевые больше, поторопишь — меньше.')) +
+        (ln.add > 0 ? ' ' + esc(t('На первый раз к сроку +{n} с.', { n: ln.add })) : '') + '</b>' + esc(ctl);
+      else elHint.textContent = ctl;
     };
     const setCur = i => {
       if (st.phase !== 'ask') return;
@@ -154,6 +167,7 @@ export default {
     /* ответил: что сказал курьер и что выпало */
     function pick (i, timeout) {
       if (st.phase !== 'ask' || (!timeout && st.t < T.arm)) return;
+      st.armT = 0;
       const x = timeout ? { me: '', re: N_('…Ну и стой.'), mood: 'angry', out: '0', slam: true } : ans[i];
       if (!x) return;
       st.phase = 'reply'; st.pick = timeout ? -1 : i; st.timeout = !!timeout; st.rt = 0; st.x = x;
@@ -176,7 +190,10 @@ export default {
 
     function finish () {
       st.phase = 'end';
-      st.endT = T.end;
+      st.endT = 0;                                            // «понятно» жмётся не сразу (кто долбил Enter — не закроет не глядя)
+      elEnd.hidden = false; elSheet.classList.add('tk-ended');   // печать — выше, над «понятно»
+      elWho.classList.remove('tk-talking'); TF.stop(elFace);
+      hint();
       const x = st.x, O = OUT[x.out] || OUT[0];
       const seal = document.createElement('div');
       seal.className = 'pp-seal ' + O.cls + ' tk-seal';
@@ -218,22 +235,39 @@ export default {
         st.t += dt;
         typeStep(dt);
         if (st.t >= T.arm && btns[0].disabled) btns.forEach(b => { b.disabled = false; });
-        if (st.t >= T.wait) pick(-1, true);
       } else if (st.phase === 'reply') {
-        st.t += dt; st.rt += dt;
+        st.t += dt; st.rt += dt; st.armT = (st.armT || 0) + dt;
         if (st.rt >= ME_T && !st.replyAt) { st.replyAt = st.rt; say(t(st.x.re || ''), st.x.mood); }
         const typed = st.replyAt ? typeStep(dt) : false;
         if (typed && st.note && elNote.hidden) { elNote.hidden = false; elNote.textContent = st.note; elNote.classList.add('tk-pop'); }
         if (typed && st.x.slam && !st.slam) { st.slam = true; elWho.classList.add('tk-gone'); const s = document.createElement('p'); s.className = 'tk-slam'; s.textContent = t('хлоп! — дверь закрылась'); q('.tk-talk').appendChild(s); sfx('sad'); }
-        if (typed && st.rt >= Math.max(REPLY_MIN, st.replyAt + (st.text.length / CPS) + READ_T)) finish();
+        if (typed && !st.typedAt) st.typedAt = st.rt;
+        if (typed && (st.skip || st.rt >= Math.max(REPLY_MIN, st.typedAt + READ_T))) finish();
       } else if (st.phase === 'end') {
-        st.endT -= dt;
-        if (st.endT <= 0) { st.phase = 'done'; api.done && api.done(st.res); }
+        st.t += dt; st.endT += dt;
       }
+    }
+    /* нажал (Enter / пробел / A / тап) после ответа: реакция ещё не началась — сразу; печатается — допечатать;
+       допечаталась — печать итога; печать стоит — «понятно», закрыть */
+    function advance () {
+      if (st.phase === 'reply') {
+        if (st.armT < 0.25) return;                           // тот же нажим, что выбрал ответ, — не дальше
+        st.armT = 0;
+        if (!st.replyAt) { st.replyAt = st.rt = Math.max(st.rt, ME_T); say(t(st.x.re || ''), st.x.mood); }
+        if (st.shown < st.text.length) { st.shown = st.text.length; st.tt = st.text.length / CPS + 1; elTxt.textContent = st.text; }
+        else st.skip = true;
+        step(0);
+      } else if (st.phase === 'end' && st.endT >= 0.3) close();
+    }
+    function close () {
+      if (st.phase !== 'end') return;
+      st.phase = 'done';
+      sfx('pick');
+      api.done && api.done(st.res);
     }
 
     function pad (p) {
-      if (st.phase !== 'ask') return;
+      if (st.phase !== 'ask') { if (p.menuOk || p.accept) advance(); return; }
       if (p.menuUp) setCur(st.cur - 1);
       else if (p.menuDown || p.dDown) setCur(st.cur + 1);
       else if (p.menuOk || p.accept) pick(st.cur);
@@ -250,7 +284,8 @@ export default {
       else if (c === 'Tab') { e.preventDefault(); e.stopImmediatePropagation(); return; }   // карта — не во время встречи
       if (!act) return;
       e.preventDefault(); e.stopImmediatePropagation();
-      if (e.repeat || st.phase !== 'ask') return;
+      if (e.repeat) return;
+      if (st.phase !== 'ask') { if (act === 'ok') advance(); return; }
       if (act === 'up') setCur(st.cur - 1);
       else if (act === 'down') setCur(st.cur + 1);
       else if (act === 'ok') pick(st.cur);
@@ -258,8 +293,15 @@ export default {
     };
     addEventListener('keydown', onKey, true);
     box.addEventListener('pointerdown', e => {
+      if (api.paused && api.paused()) return;
+      if (st.phase === 'reply' || st.phase === 'end') {       // после ответа: тап по листу — дальше, по «понятно» — закрыть
+        if (!e.target.closest('.tk-sheet')) return;
+        e.preventDefault();
+        advance();
+        return;
+      }
       const b = e.target.closest('.tk-o');
-      if (!b || (api.paused && api.paused())) return;
+      if (!b) return;
       e.preventDefault();
       setCur(+b.dataset.i);
       pick(+b.dataset.i);
@@ -277,10 +319,14 @@ export default {
     }
     if (api.setPad) api.setPad(pad);
     // для проверок (probe): ответить как игрок — 0 / 'a' верхний (и прежние 'rush', как автопилот), 1 / 'b' нижний ('keep', 'fun')
+    // после ответа — как игрок жмёт дальше: допечатать реакцию, печать, «понятно»
     box.__solve = (arg = 0) => {
+      if (st.phase !== 'ask') { st.armT = Math.max(st.armT || 0, 0.25); st.endT = Math.max(st.endT, 0.3); advance(); return; }
       const i = arg === 1 || arg === 'b' || arg === 'keep' || arg === 'fun' ? 1 : 0;
       st.t = Math.max(st.t, T.arm); setCur(i); pick(i);
     };
+    box.__phase = () => st.phase;
+    box.__st = () => ({ phase: st.phase, armT: +(st.armT || 0).toFixed(2), shown: st.shown, len: st.text.length, rt: +st.rt.toFixed(2), endT: +st.endT.toFixed(2) });
     box.__sit = sit.id;
     box.__who = sit.who;
     return () => {

@@ -175,6 +175,7 @@ function inSolid (A, x, z, r) {
 }
 
 /* ── места стоянки: у дверей заведений и у подъездов, на тротуаре ── */
+export const warm = A => { if (A) spots(A); };   // места у ТЦ — заранее (game.js 'first'), не в первом кадре после сборки
 function spots (A) {
   if (MP.spots) return MP.spots;
   const out = [];

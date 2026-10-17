@@ -843,8 +843,9 @@ function knock (c, it, nx, nz, force, quiet) {
   if (!quiet && A.Snd) A.Snd.fx('smash', s => s.noise(0.15, it.kind === 'sand' || it.kind === 'trash' ? 0.12 : 0.2), null, it.kind === 'sand' || it.kind === 'trash' ? 0.6 : 1);
 }
 
-/* машина: сносит мелочь быстрее 9 км/ч (game.js — рядом с дворовой мелочью). → во сколько скорость */
-export function car (noseX, noseZ, tailX, tailZ, rc, vf, vx, vz) {
+/* машина: сносит мелочь быстрее 9 км/ч (game.js — рядом с дворовой мелочью). → во сколько скорость.
+   bump(kind) — game.js: столбы (выбивалка, бельевой) тормозят и уводят сами (carbump.js), тогда true */
+export function car (noseX, noseZ, tailX, tailZ, rc, vf, vx, vz, bump) {
   if (!A || Math.abs(vf) <= LAWN.SLOW) return 1;
   let k = 1;
   const l = Math.hypot(vx, vz) || 1;
@@ -855,7 +856,7 @@ export function car (noseX, noseZ, tailX, tailZ, rc, vf, vx, vz) {
       for (const [px, pz, pr] of it.pts) {
         if (Math.hypot(px - noseX, pz - noseZ) < pr + rc || Math.hypot(px - tailX, pz - tailZ) < pr + rc) {
           knock(c, it, vx / l, vz / l, Math.abs(vf));
-          k *= it.slow || 0.96;
+          if (!(bump && bump(it.kind))) k *= it.slow || 0.96;
           break;
         }
       }
@@ -897,6 +898,29 @@ export function withSolids (list, x, z) {
       }
     }
   return S_LIST.length ? list.concat(S_LIST) : list;
+}
+
+/* ── жизнь во дворах (yardlife.js) ── */
+/* стоит ли крупная вещь газона (ракушка, бельё, выбивалка, песок, покрышки, оградка, мусор у баков) ближе r к точке */
+export function busy (x, z, r) {
+  if (!A) return false;
+  const C = LAWN.CELL, R = r + 4;
+  for (let i = Math.floor((x - R) / C); i <= Math.floor((x + R) / C); i++)
+    for (let j = Math.floor((z - R) / C); j <= Math.floor((z + R) / C); j++) {
+      const c = CELLS.get(key(i, j));
+      if (!c) continue;
+      for (const it of c.items) {
+        if (it.down || it.ed) continue;
+        const ex = it.kind === 'garage' ? 3.2 : (it.pts[0][2] || 0) + 1.5;      // ракушка 5,4 м длиной — от середины
+        for (const q of it.pts) if (Math.abs(q[0] - x) < R + ex && Math.abs(q[1] - z) < R + ex && Math.hypot(q[0] - x, q[1] - z) < r + ex) return true;
+      }
+    }
+  return false;
+}
+/* вещи вида kind ближе R к точке (стоят, не сбиты): fn(it) — у it есть x, z */
+export function itemsNear (kind, x, z, R, fn) {
+  if (!A) return;
+  cellsNear(x, z, R, c => { for (const it of c.items) if (it.kind === kind && !it.down && !it.ed && Math.hypot(it.x - x, it.z - z) < R) fn(it); });
 }
 
 /* ── редактор города (editlayer.js): что стоит у точки; список «убрать» поменялся — пометить заново ── */

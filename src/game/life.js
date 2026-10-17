@@ -1160,10 +1160,16 @@ function scan () {
 }
 
 const OFF = new URLSearchParams(location.search).has('nolife');     // ?nolife — без жизни улиц: сравнить кадр
+/* первый шаг — заготовки (стены для граффити, парки…): кусок поздней сборки game.js 'first', а не первый кадр после неё */
+export function init (api) {
+  if (OFF || A) return;
+  const t0 = performance.now();
+  A = api; setup(); STATE.stats.setupMs = Math.round(performance.now() - t0);
+}
 export function step (dt, api) {
   if (OFF) return;
   const t0 = performance.now();
-  if (!A) { A = api; setup(); STATE.stats.setupMs = Math.round(performance.now() - t0); }
+  if (!A) init(api);
   if ((scanT -= dt) <= 0) { scanT = 1; scan(); }
   else if (LATER.length) LATER.shift()();
   WIND += Math.sin(performance.now() / 23000) * 0.02 * dt;

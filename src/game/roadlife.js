@@ -752,6 +752,10 @@ function stepMen (dt, A, J) {
 /* ═════════════════ ремонт: улицу закрыли ═════════════════ */
 const WORKS = [];
 const CLOSED = new Map();                      // направленное ребро → { sBar, w }
+/* перекрытия на обратном пути (backblock.js): навигатор их объезжает (game.js roadPath) — ключ ребра a * 100000 + b,
+   как ekey в game.js; NAVW — сами перекрытия (красная черта на радаре и карте) */
+export const NAVX = new Set();
+const NAVW = [];
 const WK = { cd: 25, checkT: 0, anyT: rand(60, 110) };
 let WK_TEX = null, WK_MAT = null, CONE_GEO = null, SHOVEL_GEO = null;
 function worksTex () {
@@ -782,8 +786,9 @@ function worksTex () {
   return tex;
 }
 
-/* путь в обход закрытого ребра: Дейкстра в радиусе километра */
-function detourLen (A, ia, ib, e) {
+/* путь в обход закрытого ребра: Дейкстра в радиусе километра; strict — ещё и не через другие закрытые
+   улицы и не в закрытый район (перекрытие на обратном пути, backblock.js: игрок не должен оказаться заперт) */
+function detourLen (A, ia, ib, e, strict) {
   const { NODES } = A, M = NODES[ia], dist = new Map([[ia, 0]]), done = new Set(), heap = [[0, ia]];
   let pops = 0;
   while (heap.length && pops++ < 6000) {
@@ -800,6 +805,7 @@ function detourLen (A, ia, ib, e) {
       const q = A.edgeOf(n, m);
       if (!q || q.c > 5) continue;
       const Nm = NODES[m];
+      if (strict && (q.closed || Nm.out || Nm.lock || NAVX.has(n * 100000 + m))) continue;
       if (Math.abs(Nm.x - M.x) > 900 || Math.abs(Nm.z - M.z) > 900) continue;
       const nd = d + q.len;
       if (nd < (dist.get(m) ?? Infinity)) { dist.set(m, nd); heap.push([nd, m]); }
@@ -808,27 +814,43 @@ function detourLen (A, ia, ib, e) {
   return Infinity;
 }
 
-/* годится ли ребро под ремонт */
-function worksOk (A, e, ia, ib) {
+/* годится ли ребро под ремонт; strict — перекрытие на обратном пути (backblock.js), число — сколько метров куска нужно
+   (ремонт 17, фура и ДТП 12): объезд — мимо других закрытых улиц, не на краю закрытого района */
+function worksOk (A, e, ia, ib, strict) {
+  if (!e) return null;
   const room = e.len - e.tA - e.tB;
-  if (!e || e.c > 5 || e.road.b || room < 28) return null;
-  const Na = A.NODES[e.a], sMid = e.tA + room / 2;
-  const x = Na.x + e.ux * sMid, z = Na.z + e.uz * sMid;
-  if (!A.inBounds(x, z, 30)) return null;
-  const tg = A.S.target;
-  if (tg && Math.hypot(tg.x - x, tg.z - z) < 55) return null;
-  if (A.PIZZA && Math.hypot(A.PIZZA.x - x, A.PIZZA.z - z) < 60) return null;
-  if (A.ACCIDENTS.some(a => Math.hypot(a.x - x, a.z - z) < 70)) return null;
-  if (WORKS.some(w => Math.hypot(w.x - x, w.z - z) < 90)) return null;
-  // на месте работ не должно стоять припаркованных и чужих машин с маршрутом
-  if (A.TRAFFIC.some(q => (q.parked || q.svc || q.accident) && Math.abs((q.x - x) * e.ux + (q.z - z) * e.uz) < 12 && Math.abs((q.x - x) * e.rx + (q.z - z) * e.rz) < e.w / 2 + 3)) return null;
-  // машина потока на месте работ, а место видно курьеру — убрать её на глазах нельзя: ремонт не тут (deadends.js)
-  const HL = Math.min(6, room / 2 - 4), r = A.edgeOf(e.b, e.a);
-  if (A.shownAt && A.TRAFFIC.some(q => (q.e === e || q.e === r) && !q.parked && !q.svc && Math.abs((q.x - x) * e.ux + (q.z - z) * e.uz) < HL + 3 && A.shownAt(q.x, q.z))) return null;
-  if (detourLen(A, ia, ib, e) > 1400) return null;
-  if (A.deadendBlocks && A.deadendBlocks(e)) return null;   // единственный выезд с односторонней — машинам некуда (deadends.js)
-  return { x, z, sMid };
+  if (e.c > 5 || e.road.b || room < (strict || 28)) return wokNo('room');   // на обратном пути (strict — сколько надо места, м) — и короткий кусок
+  const Na = A.NODES[e.a], HL = Math.min(6, room / 2 - 4), r = A.edgeOf(e.b, e.a);
+  if (strict && (A.NODES[ia].out || A.NODES[ia].lock || A.NODES[ib].out || A.NODES[ib].lock)) return wokNo('lock');
+  // место работ — середина куска; перекрытие на обратном пути (strict) — ещё и сдвиг вдоль, если в середине стоят машины
+  const slack = Math.max(0, room / 2 - HL - 4), shifts = strict ? [0, -0.5, 0.5, -1, 1] : [0];
+  let at = null;
+  for (const f of shifts) {
+    const sMid = e.tA + room / 2 + f * slack;
+    if (f && !slack) break;
+    const x = Na.x + e.ux * sMid, z = Na.z + e.uz * sMid;
+    if (!A.inBounds(x, z, 30)) { wokNo('bounds'); continue; }
+    const tg = A.S.target;
+    if (tg && Math.hypot(tg.x - x, tg.z - z) < 55) { wokNo('target'); continue; }
+    if (A.PIZZA && Math.hypot(A.PIZZA.x - x, A.PIZZA.z - z) < 60) { wokNo('pizza'); continue; }
+    const near = strict ? 45 : 70;                 // на обратном пути — и рядом с ремонтом на маршруте (он есть почти всегда)
+    if (A.ACCIDENTS.some(a => Math.hypot(a.x - x, a.z - z) < near)) { wokNo('accident'); continue; }
+    if (WORKS.some(w => Math.hypot(w.x - x, w.z - z) < near + 20)) { wokNo('works'); continue; }
+    // на месте работ не должно стоять припаркованных и чужих машин с маршрутом
+    if (A.TRAFFIC.some(q => (q.parked || q.svc || q.accident) && Math.abs((q.x - x) * e.ux + (q.z - z) * e.uz) < 12 && Math.abs((q.x - x) * e.rx + (q.z - z) * e.rz) < e.w / 2 + 3)) { wokNo('parked'); continue; }
+    // машина потока на месте работ, а место видно курьеру — убрать её на глазах нельзя: ремонт не тут (deadends.js)
+    if (A.shownAt && A.TRAFFIC.some(q => (q.e === e || q.e === r) && !q.parked && !q.svc && Math.abs((q.x - x) * e.ux + (q.z - z) * e.uz) < HL + 3 && A.shownAt(q.x, q.z))) { wokNo('seenCar'); continue; }
+    at = { x, z, sMid };
+    break;
+  }
+  if (!at) return null;
+  if (detourLen(A, ia, ib, e, strict) > 1400) return wokNo('detour');
+  if (A.deadendBlocks && A.deadendBlocks(e)) return wokNo('deadend');   // единственный выезд с односторонней — машинам некуда (deadends.js)
+  return at;
 }
+/* почему ремонт не встал (отладка: __dlv.RL.WOK) */
+const WOK = {};
+function wokNo (k) { WOK[k] = (WOK[k] || 0) + 1; return null; }
 
 function spawnOnRoute (A) {
   const V = A.V, tg = A.S.target;
@@ -872,14 +894,16 @@ function spawnSomewhere (A) {
   return false;
 }
 
-function spawnWorks (A, e, at) {
+/* o (backblock.js) — { kind, t, nav, build }: build(ctx) ставит своё (фура, ДТП) вместо ямы со щитами; nav — навигатор объезжает */
+function spawnWorks (A, e, at, o) {
   const { groundH, box, put } = A;
   const r = A.edgeOf(e.b, e.a), { x: cx, z: cz, sMid } = at;
   const ux = e.ux, uz = e.uz, nx = e.rx, nz = e.rz, W = e.w + 0.4, ryA = Math.atan2(ux, uz);
-  const room = e.len - e.tA - e.tB, HL = Math.min(6, room / 2 - 4);
+  const room = e.len - e.tA - e.tB, HL = o && o.build ? Math.min(6, Math.max(4, room / 2 - 4), room / 2 - 1) : Math.min(6, room / 2 - 4);   // фура, ДТП — на коротком куске щиты не нужны, трафик встаёт в 4 м
   const P = (a, o) => [cx + ux * a + nx * o, cz + uz * a + nz * o];
   const L = [], FL = [], signQ = [], solids = [];
-  const W8 = { e, r, x: cx, z: cz, ux, uz, W, HL, t: rand(160, 240), warned: 0, grp: new THREE.Group(), solids, men: [], cones: [], blink: null, blinkN: 0 };
+  const W8 = { e, r, x: cx, z: cz, ux, uz, W, HL, t: o && o.t ? o.t : rand(160, 240), warned: 0, grp: new THREE.Group(), solids, men: [], cones: [], blink: null, blinkN: 0,
+    bb: o ? 1 : 0, kind: (o && o.kind) || 'works', nav: 0, onGone: null };
   const sign = (x, z, y, fx, fz, w, h, low) => signQ.push([x, y, z, fx, fz, w, h, low]);
   // за полотном — синий забор стройки до ближайшего дома или чужой улицы, до двенадцати метров
   const reach = (k, s) => {
@@ -893,6 +917,12 @@ function spawnWorks (A, e, at) {
     }
     return o;
   };
+  if (o && o.build) {
+    // фура поперёк, ДТП (backblock.js): своё неподвижное — в ту же склейку, мигалки — один меш
+    o.build({ A, e, P, W, HL, ux, uz, nx, nz, ryA, L, FL, solids, reach, W8, men: W8.men, cone: (x, z) => W8.cones.push(cone(A, L, x, z)) });
+    statMesh(A, W8, L);
+    if (FL.length) W8.grp.add(signMesh(A, W8, [], WK_TEX || (WK_TEX = worksTex()), FL));
+  } else {
   for (const k of [-1, 1]) {
     const [bx, bz] = P(HL * k, 0), by = groundH(bx, bz);
     // пластиковые блоки красно-белые поперёк полотна
@@ -959,10 +989,12 @@ function spawnWorks (A, e, at) {
     A.scene.add(grp);
     W8.men.push({ grp, x, z, ph: rand(0, 6), dead: 0 });
   }
+  }
   A.scene.add(W8.grp);
   for (const s of solids) addSolid(A, s);
   // трафик: на это ребро больше не сворачивают, кто стоит на месте работ — в другое место
   e.closed = 1; if (r) r.closed = 1;
+  if (o && o.nav) { W8.nav = 1; NAVX.add(e.a * 100000 + e.b); NAVX.add(e.b * 100000 + e.a); NAVW.push(W8); }
   CLOSED.set(e, { sBar: sMid - HL - e.tA, w: W, len: HL * 2 });
   if (r) CLOSED.set(r, { sBar: (e.len - sMid) - HL - r.tA, w: W, len: HL * 2 });
   for (const q of A.TRAFFIC)
@@ -1065,6 +1097,8 @@ function removeWorks (A, W8) {
   });
   for (const m of W8.men) if (!m.dead) A.dropMesh(m.grp);
   for (const s of W8.solids) delSolid(A, s);
+  if (W8.onGone) { W8.onGone(); W8.onGone = null; }             // машины ДТП (backblock.js)
+  if (W8.nav) { W8.nav = 0; NAVX.delete(W8.e.a * 100000 + W8.e.b); NAVX.delete(W8.e.b * 100000 + W8.e.a); const k = NAVW.indexOf(W8); if (k >= 0) NAVW.splice(k, 1); }
   if (W8.lane) { LANES.delete(W8.e); if (W8.opp) LANES.delete(W8.opp); return; }
   W8.e.closed = 0; if (W8.r) W8.r.closed = 0;
   CLOSED.delete(W8.e); if (W8.r) CLOSED.delete(W8.r);
@@ -1247,7 +1281,8 @@ function stepWorks (dt, A) {
   for (let i = WORKS.length - 1; i >= 0; i--) {
     const W8 = WORKS[i], d = Math.hypot(W8.x - V.x, W8.z - V.z);
     W8.t -= dt;
-    if ((W8.t <= 0 && d > 110) || W8.t < -240) { removeWorks(A, W8); WORKS.splice(i, 1); continue; }
+    // перекрытие на обратном пути (bb) — ещё и не на глазах: дальше 200 м и не в кадре (backblock.js)
+    if ((W8.t <= 0 && d > 110 && !(W8.bb && A.shownAt && A.shownAt(W8.x, W8.z))) || W8.t < -240) { removeWorks(A, W8); WORKS.splice(i, 1); continue; }
     const vis = d < 200;
     W8.grp.visible = vis;
     if (!vis) { for (const m of W8.men) if (!m.dead) m.grp.visible = false; continue; }
@@ -1260,10 +1295,12 @@ function stepWorks (dt, A) {
       const g = m.grp, u = g.userData;
       g.visible = d < 150;
       m.ph += dt * 3.1;
-      const k = Math.sin(m.ph), rest = Math.sin(m.ph * 0.13) > 0.8;
-      if (u.armR) u.armR.rotation.x = rest ? -0.2 : -0.75 + k * 0.55;
-      if (u.armL) u.armL.rotation.x = rest ? 0 : -0.5 + k * 0.35;
-      g.rotation.x = rest ? 0 : 0.12 + k * 0.1;
+      if (!m.still) {                                // водитель фуры, участники ДТП (backblock.js) — стоят
+        const k = Math.sin(m.ph), rest = Math.sin(m.ph * 0.13) > 0.8;
+        if (u.armR) u.armR.rotation.x = rest ? -0.2 : -0.75 + k * 0.55;
+        if (u.armL) u.armL.rotation.x = rest ? 0 : -0.5 + k * 0.35;
+        g.rotation.x = rest ? 0 : 0.12 + k * 0.1;
+      }
       if (sp > 3) {
         const dx = m.x - V.x, dz = m.z - V.z;
         if (Math.abs(dx * fx + dz * fz) < 2.3 && Math.abs(dx * fz - dz * fx) < 1.25) {
@@ -1435,6 +1472,7 @@ function stepGlow (dt, A) {
 }
 
 /* ═════════════════ шаг и рисование на радаре/карте ═════════════════ */
+export const warm = A => MOPEDS.warm(A);           // заготовки мопедов — кусок поздней сборки (game.js 'first')
 export function step (dt, A) {
   if (RL_OFF) return;
   API = A;
@@ -1455,25 +1493,51 @@ function jamPolys (A, fn) {
     }
   }
 }
+/* перекрытие на обратном пути — красная черта поперёк улицы (шире полотна), fn(x1, z1, x2, z2) */
+function navBars (fn) {
+  for (const W of NAVW) {
+    const h = W.W / 2 + 3, nx = W.e.rx, nz = W.e.rz;
+    fn(W.x - nx * h, W.z - nz * h, W.x + nx * h, W.z + nz * h);
+  }
+}
 export function drawRadar (ctx, tr, s) {
-  if (!API || !JAMS.length) return;
+  if (!API || (!JAMS.length && !NAVW.length)) return;
   ctx.strokeStyle = '#e8323c'; ctx.lineCap = 'round';
   jamPolys(API, (x1, z1, x2, z2, w) => {
     ctx.lineWidth = Math.max(2, w * 0.5 * s);
     const [a, b] = tr(x1, z1), [c, d] = tr(x2, z2);
     ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c, d); ctx.stroke();
   });
+  ctx.lineWidth = Math.max(4, 6 * s);
+  navBars((x1, z1, x2, z2) => {
+    const [a, b] = tr(x1, z1), [c, d] = tr(x2, z2);
+    ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c, d); ctx.stroke();
+  });
   ctx.lineCap = 'butt';
 }
 export function drawMap (x, fmX, fmZ, s) {
-  if (!API || !JAMS.length) return;
+  if (!API || (!JAMS.length && !NAVW.length)) return;
   x.strokeStyle = '#e8323c'; x.lineCap = 'round';
   jamPolys(API, (x1, z1, x2, z2) => {
     x.lineWidth = 7 * s;
     x.beginPath(); x.moveTo(fmX(x1), fmZ(z1)); x.lineTo(fmX(x2), fmZ(z2)); x.stroke();
   });
+  x.lineWidth = 9 * s;
+  navBars((x1, z1, x2, z2) => { x.beginPath(); x.moveTo(fmX(x1), fmZ(z1)); x.lineTo(fmX(x2), fmZ(z2)); x.stroke(); });
   x.lineCap = 'butt';
 }
 
+/* перекрытие на обратном пути (backblock.js): ребро ia → ib годится (как ремонт, но строже) — поставить; вернёт ремонт или null */
+export function closeBack (A, ia, ib, o) {
+  API = API || A;
+  const e = A.edgeOf(ia, ib);
+  if (!e) return null;
+  const at = worksOk(A, e, ia, ib, o.room || 17);
+  if (!at) return null;
+  const n0 = WORKS.length;
+  spawnWorks(A, e, at, o);
+  return WORKS.length > n0 ? WORKS[WORKS.length - 1] : null;
+}
+
 /* для отладки: __dlv.RL */
-export const DEBUG = { MOPEDS: MOPEDS.DEBUG, RL, JAMS, WORKS, CLOSED, LANES, SG, spawnLane: () => { if (!API) return false; for (let k = 0; k < 40; k++) { const ia = API.nodeNear(API.V.x, API.V.z, 70, 220), N = API.NODES[ia]; if (!N || !N.nb.length) continue; const e = API.edgeOf(ia, pick(N.nb)), ok = laneOk(API, e); if (ok) { spawnLane(API, e, ok); return ok; } } return false; }, spawnOnRoute: () => API && spawnOnRoute(API), spawnSomewhere: () => API && spawnSomewhere(API) };
+export const DEBUG = { MOPEDS: MOPEDS.DEBUG, RL, JAMS, WORKS, CLOSED, LANES, NAVX, NAVW, WOK, SG, spawnLane: () => { if (!API) return false; for (let k = 0; k < 40; k++) { const ia = API.nodeNear(API.V.x, API.V.z, 70, 220), N = API.NODES[ia]; if (!N || !N.nb.length) continue; const e = API.edgeOf(ia, pick(N.nb)), ok = laneOk(API, e); if (ok) { spawnLane(API, e, ok); return ok; } } return false; }, spawnOnRoute: () => API && spawnOnRoute(API), spawnSomewhere: () => API && spawnSomewhere(API) };

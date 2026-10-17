@@ -71,3 +71,12 @@
 @keyframes en-said { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .en-in .en-tb p:not(.en-msg), .en-tolik.said .en-msg { animation: pp-fade .15s both; } }
 body.calm-fx .en-in .en-tb p:not(.en-msg), body.calm-fx .en-tolik.said .en-msg { animation: pp-fade .15s both; }
+
+/* ── пишут разные: Толик и коллеги в чате пиццерии (рейтинг смены, crewrank.js). chat.js mark(): .cm-head — первое
+   сообщение того, кто пишет (имя над ним), .cm-tail — последнее подряд (аватарка и хвостик). Один Толик — как было ── */
+#chat .cm.cm-head:not(.out) .cm-b b { display: block; }
+#chat .cm.cm-tail > img, #chat .cm.cm-tail > i { visibility: visible; }
+#chat .cm.cm-tail .cm-b p::before {
+  --t: 14px; content: ''; position: absolute; left: calc(var(--t) * -.6); bottom: 0; width: var(--t); height: var(--t);
+  background: radial-gradient(circle at 0 0, transparent calc(var(--t) - .5px), var(--im-bubble) var(--t)); }
+#chat .cm.cm-tail .cm-b p { border-bottom-left-radius: 6px; }

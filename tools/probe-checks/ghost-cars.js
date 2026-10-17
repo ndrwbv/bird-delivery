@@ -157,7 +157,11 @@ if (F) {
   const t = lone[1] || lone[0];
   if (t && F.butt) {
     await tick(0); noMoose(); tp(t.x + 45, t.z + 45);
-    const a = F.at(t.x + Math.sin(t.h + 1.57) * 12, t.z + Math.cos(t.h + 1.57) * 12, 0);
+    // сторона разбега — та, где между лосём и машиной нет твёрдого забора у тротуара (yardmaze.js): из-за забора лось не добежит,
+    // а машину, отброшенную в забор, он не сдвинет на метр
+    const sideOk = s => { const px = t.x + Math.sin(t.h + 1.57 * s) * 12, pz = t.z + Math.cos(t.h + 1.57 * s) * 12, Y = d.YMAZE; return !Y || !Y.segHits(px, pz, t.x, t.z, 0.5) && !Y.segHits(t.x, t.z, t.x - (px - t.x) * 0.5, t.z - (pz - t.z) * 0.5, 0.5); };
+    const sd = sideOk(1) ? 1 : sideOk(-1) ? -1 : 1;
+    const a = F.at(t.x + Math.sin(t.h + 1.57 * sd) * 12, t.z + Math.cos(t.h + 1.57 * sd) * 12, 0);
     const pos = new Map(TR.map(o => [o, [o.x, o.z]])), b0 = F.stats.buttCars;
     F.butt(a, { car: t });
     for (let i = 0; i < 100 && F.stats.buttCars === b0; i++) await tick(50);

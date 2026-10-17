@@ -17,7 +17,8 @@
                                             blip(f, d, type, v) — звук (Snd.blip); fx — Snd.fx (файлы chat / chat-angry)
      CHAT.react(kind, onShow?)            — kind: 'fast' | 'late' | 'bump' | 'kill' | 'bundle' | 'urgent' | 'back';
                                             onShow() — в момент, когда текст появился (списание денег)
-     CHAT.say(text, onShow?)              — своё сообщение
+     CHAT.say(text, onShow?, angry?, who?) — своё сообщение; who = { name, person } — пишет не Толик, а он
+                                            (коллеги в чате пиццерии — рейтинг смены, crewrank.js)
      CHAT.clear()                         — убрать всё (конец смены, меню)
      CHAT.later(ms, fn)                   — отложенное сообщение; пока не вышло — чат «занят»
      CHAT.busy() / CHAT.idle(cb, max)     — есть ли отложенное, «печатает…» или крупное; cb — когда всё
@@ -168,6 +169,18 @@ function drop (m) {
   shown(m);                                               // убрали, не дождавшись текста, — списание всё равно
   m.el.classList.add('out');
   setTimeout(() => m.el.remove(), 350);
+  mark();
+}
+
+/* пишут разные (Толик и коллеги): имя — над первым сообщением каждого подряд, аватарка и хвостик — у последнего
+   (chat.css .cm-head / .cm-tail); пишет один Толик — как было: имя над первым, аватарка у последнего */
+function mark () {
+  const L = C.items;
+  for (let i = 0; i < L.length; i++) {
+    const w = L[i].w;
+    L[i].el.classList.toggle('cm-head', !i || L[i - 1].w !== w);
+    L[i].el.classList.toggle('cm-tail', i === L.length - 1 || L[i + 1].w !== w);
+  }
 }
 
 function shown (m) {
@@ -176,7 +189,8 @@ function shown (m) {
   if (f) try { f(); } catch (e) { console.warn('[chat]', e); }
 }
 
-export function say (text, onShow, angry) {
+/* who — кто пишет, если не Толик: { name, person } (коллеги в чате пиццерии — crewrank.js) */
+export function say (text, onShow, angry, who) {
   const el = box();
   place();
   // хад мог появиться или спрятаться, пока сообщения висят (написал в катсцене — хада нет, чат встал в самый верх;
@@ -185,13 +199,16 @@ export function say (text, onShow, angry) {
   while (C.items.length >= MAX) drop(C.items[0]);
   const row = document.createElement('div');
   row.className = 'cm';
-  const ava = C.person && C.face ? '<img alt="">' : '<i></i>';
-  row.innerHTML = ava + '<div class="cm-b"><b>' + t('Толик управляющий') + '</b><p class="typing"><span></span><span></span><span></span></p></div>';
+  const pers = who && who.person ? who.person : C.person;
+  const ava = pers && C.face ? '<img alt="">' : '<i></i>';
+  row.innerHTML = ava + '<div class="cm-b"><b></b><p class="typing"><span></span><span></span><span></span></p></div>';
+  row.querySelector('b').textContent = who && who.name ? who.name : t('Толик управляющий');
   const img = row.querySelector('img');
-  if (img) TF.bind(img, C.person, 48);
+  if (img) TF.bind(img, pers, 48);
   el.appendChild(row);
-  const m = { el: row, onShow };
+  const m = { el: row, onShow, w: who && who.name ? who.name : '' };
   C.items.push(m);
+  mark();
   m.t1 = setTimeout(() => {
     const p = row.querySelector('p');
     p.className = '';

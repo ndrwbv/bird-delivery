@@ -27,3 +27,14 @@ body.story-cut .dlg-btns { padding: 6px 18px 12px; }
 }
 
 #story-cut .sc-skip .pp-key { font-size: 10px; margin-right: .6em; }   /* [B] / Esc — по вводу (glyphs.js) */
+
+/* низкий экран (телефон боком, ~844×390; автор 11.10.2026: «в катсцене ничего не видно»): полосы кино тонкие,
+   «пропустить» мельче — кадр не съедают; окно реплики компактное (dialog.css, тот же порог) */
+@media (max-height: 500px) {
+  #story-cut .sc-bar { height: 22px; }
+  #story-cut .sc-skip { font-size: 8px; padding: 2px 6px; right: 8px; border-width: 1px; }
+  #story-cut .sc-skip .pp-key { font-size: 8px; }
+  #story-cut .sc-title { gap: 1px; }
+  #story-cut .sc-title em { font-size: 7px; }
+  #story-cut .sc-title b { font-size: 10px; text-shadow: 2px 2px 0 #33210c; }
+}

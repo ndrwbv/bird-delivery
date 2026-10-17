@@ -741,6 +741,7 @@ function patch (M, x, z, ang, R, lift) {
    только ближайший, дальние (> 250 м) спрятаны. */
 let GARS = [], GAR = null, ZHENYA = null;
 const GW = 5.8, GD = 8.4, GH = 3.3, DOOR = 3.4;
+const GATE_OUT = 6, GATE_SIDE = 3.6;          // зона «подъехал»: до 6 м перед воротами, ±3,6 м вбок (дальше — край улицы)
 const garagePoints = () => { const C = A.MAP.career; return C ? C.garages || (C.garage ? [C.garage] : []) : []; };
 const garOpen = g => !DIST.has() || DIST.at(g.ox, g.oz) < DIST.opened();
 
@@ -776,6 +777,7 @@ function garageSpot (G) {
           if (blocked(g.ox + g.rx * u + g.fx * v, g.oz + g.rz * u + g.fz * v)) ok = false;
       if (!ok) continue;
       g.road = { x: road.x, z: road.z, w };
+      g.roadV = (road.x - g.ox) * fx + (road.z - g.oz) * fz - w / 2;   // от ворот до края улицы, м
       return g;
     }
   }
@@ -808,10 +810,11 @@ function signMat () {
   return new THREE.MeshBasicMaterial({ map: tex });
 }
 
-function buildGarage (G) {
+function* buildGarage (G) {                         // шагами (buildSteps): место, бокс, Дядя Женя
   const g = garageSpot(G);
   if (!g) return;
   GAR = g; GARS.push(g);
+  yield 'spot';
   const { THREE, LIT, FLAT, box, put, obb } = A;
   const { fx, fz, rx, rz, ry, gy } = g;
   const at = (u, v) => [g.ox + rx * u + fx * v, g.oz + rz * u + fz * v];   // u — вбок, v — наружу (внутри гаража v < 0)
@@ -889,6 +892,7 @@ function buildGarage (G) {
   A.scene.add(new THREE.Mesh(sg, signMat()));
   B(5.0, 1.0, 0.1, '#6b4f3a', 0, GH + 0.62, -0.05);
   for (const s of [-1, 1]) B(0.08, 0.5, 0.08, '#2b2a30', s * 2.2, GH + 0.1, -0.05);
+  yield 'box';
   buildZhenya();
   g.zh = ZHENYA;
 }
@@ -925,16 +929,23 @@ function buildZhenya () {
   ZHENYA = { fig, person, t: 0 };
 }
 
-export function build () {
+/* шагами (function*, latebuild.js): на Деке ~0,2 с одним куском — районы, гаражи, ямы, ямы разбитого асфальта */
+export function* buildSteps () {
   if (!A) return;
-  const t0 = performance.now();
+  let t0 = performance.now(), ms = 0;
+  const pause = () => { ms += performance.now() - t0; };
   if (A.ZN && A.ZN.init) A.ZN.init({ CITY: A.CITY, MAP: A.MAP, donated: A.donated || (() => 0) });   // районы нужны ямам уже сейчас
-  for (const G of garagePoints()) buildGarage(G);
+  pause(); yield 'zones'; t0 = performance.now();
+  for (const G of garagePoints()) { const it = buildGarage(G); for (let r = it.next(); !r.done; r = it.next()) { pause(); yield 'garage'; t0 = performance.now(); } pause(); yield 'garage'; t0 = performance.now(); }
   GAR = GARS[0] || null; ZHENYA = GAR ? GAR.zh : null;
+  pause(); yield 'garage'; t0 = performance.now();
   buildPotholes();
-  const broken = RW.drawPots(A.LITM);              // ямы разбитого асфальта (roadwear.js) — тоже в статику, там же, где трясёт
-  return { ms: Math.round(performance.now() - t0), potholes: POT.length, brokenPots: broken, garage: !!GAR, garages: GARS.length };
+  pause(); yield 'pots'; t0 = performance.now();
+  const broken = yield* RW.drawPotsSteps(A.LITM);              // ямы разбитого асфальта (roadwear.js) — тоже в статику, там же, где трясёт
+  pause();
+  return { ms: Math.round(ms), potholes: POT.length, brokenPots: broken, garage: !!GAR, garages: GARS.length };
 }
+export function build () { const it = buildSteps(); let r; do r = it.next(); while (!r.done); return r.value; }
 export const potholes = () => POT;
 export const garage = () => GAR;
 export const garages = () => GARS;
@@ -1190,7 +1201,10 @@ function garageStep (dt, vf) {
     if (ud.armL) ud.armL.rotation.x = Math.sin(ZHENYA.t * 1.3 + 1) * 0.05;
     if (ud.head) ud.head.rotation.y = near ? Math.max(-0.7, Math.min(0.7, Math.atan2(V.x - ZHENYA.fig.position.x, V.z - ZHENYA.fig.position.z) - ZHENYA.fig.rotation.y)) : Math.sin(ZHENYA.t * 0.4) * 0.3;
   }
-  const inside = Math.abs(u) < GW / 2 - 0.4 && v < -1.2 && v > -GD + 0.6;
+  /* подъехал и встал (автор 12.10.2026: «как только подъехал и остановился, а не вглубь») — внутри бокса
+     или на площадке перед воротами: до GATE_OUT м от ворот, ±GATE_SIDE м вбок; с улицы (её край — g.roadV) не ловит */
+  const outV = Math.max(2.5, Math.min(GATE_OUT, (GAR.roadV ?? 99) - 1.2));
+  const inside = v > -GD + 0.6 && (v < 0 ? Math.abs(u) < GW / 2 - 0.4 : v < outV && Math.abs(u) < GATE_SIDE);
   const ok = inside && Math.abs(vf) < 0.8 && !ST.on && !GS.offered && !GS.busy && (DRIVING.has(S.state) || S.ride);
   GS.stillT = ok ? GS.stillT + dt : 0;
   if (GS.stillT > 0.6) { GS.offered = true; GS.stillT = 0; offer(); }
@@ -1215,35 +1229,36 @@ async function offer () {
   // скидка от клиента (разговор у двери, doorstep.js ZHENYA_KEY: «скажи, что от меня») — на один ремонт, вместе со скидкой звания
   const talkOff = Math.min(0.5, Math.max(0, +(A.Store ? A.Store.get(ZHENYA_KEY, 0) : 0) || 0));
   const price = Math.round(q.price * (1 - (RESPECT.perk('garageOff') || 0) - talkOff) / 10) * 10;   // звание по респекту — скидка (econ.js RESPECT.LEVELS)
-  const face = ZHENYA ? ZHENYA.person : null, name = t('Дядя Женя'), color = '#6f8a3a';
+  const face = ZHENYA ? ZHENYA.person : null, name = t('Дядя Женя'), color = '#6f8a3a', head = t('гараж');
   const pc = n => String(Math.round(n));
   GS.busy = true;
   try {
     // первый раз в гараже на районе (а экран гаража ещё не открывали) — знакомится и зовёт в гараж меню
     if (!GS.met && A.Store && !A.Store.get(TOUR_KEY, 0)) {
       GS.met = true;
-      await DLG.say({ person: face, name, color, text: t('о, новенький! я Дядя Женя. тут я чиню: заехал, встал — подшаманю. а тачки купить и прокачать — это в гараже в меню, там всё покажу'), accept: t('понял') });
+      await DLG.say({ person: face, name, color, head, text: t('о, новенький! я Дядя Женя. тут я чиню: подъехал к воротам, встал — подшаманю. а тачки купить и прокачать — это в гараже в меню, там всё покажу'), accept: t('понял') });
     }
     if (q.pct < BREAK.REPAIR_MIN_PCT) {
       if (bodyHurt()) {                              // мотор цел, а кузов мятый — выправит даром (cardent.js)
-        await DLG.say({ person: face, name, color, mood: 'calm', meters: meters(e),
+        await DLG.say({ person: face, name, color, head, mood: 'calm', meters: meters(e),
           text: t('мотор в порядке, крутить нечего. а кузов выправлю: вмятины, бампер, зеркала, стёкла — даром, по-соседски'), accept: t('спасибо!') });
         bodyFix();
         A.toast(t('кузов как новый'));
         return;
       }
-      await DLG.say({ person: face, name, color, meters: meters(e),
+      await DLG.say({ person: face, name, color, head, meters: meters(e),
         text: e.r >= 80 ? t('о, здорово. машина как часы — нечего тут крутить. езжай давай')
           : t('мотор {c} % — больше из него не выжму, ресурс {r} %.', { c: pc(e.c), r: pc(e.r) }) + ceilWord(e.r),
         accept: t('ну ок') });
       return;
     }
     if (wallet(A) < price) {
-      await DLG.say({ person: face, name, color, meters: meters(e), text: t('ну чё, опять стучит? мотор {c} %, подтяну до {r} % за {money}, но у тебя столько нет. заезжай, как заработаешь', { c: pc(e.c), r: pc(e.r), money: A.money(price) }), accept: t('ладно') });
+      await DLG.say({ person: face, name, color, head, meters: meters(e), text: t('ну чё, опять стучит? мотор {c} %, подтяну до {r} % за {money}, но у тебя столько нет. заезжай, как заработаешь', { c: pc(e.c), r: pc(e.r), money: A.money(price) }), accept: t('ладно') });
       return;
     }
-    const yes = await DLG.say({ person: face, name, color, mood: 'calm', meters: meters(e),
+    const yes = await DLG.say({ person: face, name, color, head, mood: 'calm', meters: meters(e),
       text: t('ну чё, опять стучит? мотор {c} %, подтяну до {r} % за {money}.', { c: pc(e.c), r: pc(e.r), money: A.money(price) }) + ceilWord(e.r),
+      pay: '−' + A.money(price), payLabel: t('ремонт'),                     // цена — под портретом (автор 12.10.2026)
       accept: t('давай, Дядь Жень'), decline: t('не, потом') });
     if (!yes) return;
     if (!pay(A, price)) return;
@@ -1251,7 +1266,7 @@ async function offer () {
     const now = fix(id);
     bodyFix();                                       // заодно выправил кузов: вмятины, детали, стёкла (cardent.js)
     if (A.Snd) A.Snd.fx('repair', s => [0, 140, 300, 420].forEach((d, i) => setTimeout(() => s.blip(900 + i * 140, 0.06, 'square', 0.08), d)));
-    await DLG.say({ person: face, name, color, meters: meters(now),
+    await DLG.say({ person: face, name, color, head, meters: meters(now),
       text: (now.r >= 90 ? t('во, другое дело. мотор {c} %, езжай аккуратней', { c: pc(now.c) })
         : t('ну вот, мотор {c} %. а ресурс теперь {r} % — как новая уже не будет', { c: pc(now.c), r: pc(now.r) })) + (now.r < 60 ? ceilWord(now.r) : ''),
       accept: t('спасибо!') });

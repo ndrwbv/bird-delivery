@@ -20,7 +20,7 @@
 .sx-b-up { flex: 2.2 1 0; background: var(--pp-lime); }
 .sx-b-ring { background: var(--pp-yellow); }
 .sx-b-pay { flex: 2.4 1 0; background: color-mix(in srgb, var(--pp-orange) 45%, var(--pp-paper)); }
-.sx-ok .sx-bar, .sx-late .sx-bar { opacity: .35; pointer-events: none; }
+.sx-ok .sx-bar, .sx-late .sx-bar, .sx-self .sx-bar { opacity: .35; pointer-events: none; }
 
 .sx-pop { animation: sx-pop .16s var(--pp-spring); }
 @keyframes sx-pop { 0% { scale: .92; } 100% { scale: 1; } }

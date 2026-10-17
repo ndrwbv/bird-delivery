@@ -133,9 +133,11 @@ const fits = (id, b) => id === 'clear' || (CHANCES[b] && CHANCES[b][id] !== unde
 /* ctx: THREE, scene, cam, Store, MAP, CITY, V, S, SPOTS, ZEBRAS, Snd, toast, groundH, curbAt, nearestRoad, roadWidth, drivable,
    inHouse, inPoly, inBounds, makeHuman, dropMesh, gibHuman, CAR_L, CAR_W, isPlaying, intro;
    геттеры: ENV, sun, hemi, amb, PIZZERIAS */
-export function init (ctx) {
+/* шагами (function*, latebuild.js): сугробы снежной зимы на Деке ~0,27 с одним куском */
+export function* init (ctx) {
   C = ctx; THREE = ctx.THREE;
-  if (!ctx.intro) { try { buildDeep(); } catch (e) { console.error('[weather] сугробы', e); } }
+  if (!ctx.intro) { try { yield* buildDeep(); } catch (e) { console.error('[weather] сугробы', e); } }
+  yield 'deep';
   if (!ctx.intro) { try { HUR.init(ctx); } catch (e) { console.error('[weather] ураган', e); } }
   SEAS.addDriftTop(deepTop);
   const q = new URLSearchParams(location.search).get('weather');
@@ -356,8 +358,9 @@ let DEEP_MESH = [];
 const DEEP = new Map(), DEEP_LIST = [], SLED_SPOTS = [];
 const DSTAT = { house: 0, road: 0, ms: 0, tris: 0 };
 const gk = (i, j) => i * 100003 + j;
-function buildDeep () {
-  const t0 = performance.now();
+const DEEP_STEP = 1500;                     // проверок места на шаг (по счёту — город с ?nolate и без одинаковый)
+function* buildDeep () {
+  let t0 = performance.now(), ms = 0, work = 0;
   const K = SEAS.kit(), P = K.Pile(200), T = K.tpls(), hsh = K.hsh, rngAt = K.rngAt;
   const { CITY, groundH, curbAt, nearestRoad, roadWidth, drivable, inHouse, inPoly, inBounds } = C;
   const svk = C.MAP.id === 'seversk';
@@ -408,6 +411,7 @@ function buildDeep () {
     for (let i = 0; i < p.length; i++) { const a = p[i], c = p[(i + 1) % p.length]; cx += a[0] / p.length; cz += a[1] / p.length; ar += a[0] * c[1] - c[0] * a[1]; }
     ar = Math.abs(ar) / 2;
     if (!inBounds(cx, cz, 0) || hsh(cx, cz, 301) > 0.6) continue;
+    if (work >= DEEP_STEP) { work = 0; ms += performance.now() - t0; yield 'house'; t0 = performance.now(); }
     const lv = b.lv || (ar > 1200 ? 5 : ar > 600 ? 4 : ar > 220 ? 2 : 1), tall = lv >= 2;
     const r = rngAt(cx, cz, 302);
     for (let i = 0; i < p.length && DSTAT.house < CAP_H; i++) {
@@ -420,6 +424,7 @@ function buildDeep () {
         if (r() < 0.25) continue;
         const Wd = tall ? 2.0 + r() * 1.0 : 1.3 + r() * 0.6, L = tall ? 2.6 + r() * 1.4 : 1.8 + r() * 0.8, H = tall ? 3.4 + r() * 1.8 : 1.5 + r() * 0.8;
         const x = a[0] + dx / len * d + nx * Wd * 0.45, z = a[1] + dz / len * d + nz * Wd * 0.45;
+        work++;
         if (!fits(x, z, nx, nz, Wd, L, false)) continue;
         add(x, z, nx, nz, Wd, L, H, true);
         DSTAT.house++;
@@ -430,6 +435,7 @@ function buildDeep () {
   for (const rd of CITY.roads) {
     if (DSTAT.road >= CAP_R) break;
     if (!drivable(rd) || rd.b || rd.c > 5) continue;
+    if (work >= DEEP_STEP) { work = 0; ms += performance.now() - t0; yield 'road'; t0 = performance.now(); }
     const w = roadWidth(rd);
     for (let i = 1; i < rd.p.length && DSTAT.road < CAP_R; i++) {
       const [x1, z1] = rd.p[i - 1], [x2, z2] = rd.p[i];
@@ -440,6 +446,7 @@ function buildDeep () {
           if (r() > 0.2) continue;
           const Wd = 1.1 + r() * 0.6, L = 2.4 + r() * 2, H = 1.7 + r() * 1.0, off = w / 2 + 2.75 + Wd + 0.6;
           const nx = -uz * sd, nz = ux * sd, x = x1 + ux * d + nx * off, z = z1 + uz * d + nz * off;
+          work++;
           if (!fits(x, z, nx, nz, Wd, L, true)) continue;
           add(x, z, nx, nz, Wd, L, H, false);
           DSTAT.road++;
@@ -447,10 +454,13 @@ function buildDeep () {
       }
     }
   }
+  ms += performance.now() - t0;
+  yield 'road';
+  t0 = performance.now();
   DSTAT.tris = P.tris();
   DEEP_MESH = P.build(K.mat(), false);
   for (const m of DEEP_MESH) m.visible = false;
-  DSTAT.ms = Math.round(performance.now() - t0);
+  DSTAT.ms = Math.round(ms + performance.now() - t0);   // без пауз между шагами
 }
 /* верх сугроба (сбитые и пятна ложатся на него): профиль кучи — как у moundTpl */
 const prof = e => (e < 0.62 ? 1 - 0.3 * e / 0.62 : 0.7 - 0.78 * (e - 0.62) / 0.38);

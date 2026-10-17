@@ -31,6 +31,7 @@ import { TIER } from './hits.js';
 import { hourOf } from './econ.js';
 import * as RESPECT from './respect.js';
 import * as FEST from './festivals.js';
+import { freeAfterUpload } from './mobile.js';   // телефон: холст атласа после загрузки — 1×1 (атлас рисуется заново на новый холст)
 import * as DIRECTOR from './director.js';   // режиссёр событий: концерт — лёгкое, марш — среднее, восстание — крупное
 
 export const PROT = {
@@ -177,10 +178,11 @@ function resolve () {
 }
 
 /* ─────────────── атлас: баннеры, граффити, листовки, флаг ───────────────
-   2048², ячейки 512×256 (4 × 8): 0 — главный лозунг, 1…3 — лозунги, 4…5 — свои баннеры,
+   Рисуется в координатах 2048², а холст — 1024² (AT_PX, 17.10.2026: ~5 МБ видеопамяти вместо ~21; висит всегда —
+   тумбы с листовками стоят на любой ступени). Ячейки 512×256 (4 × 8): 0 — главный лозунг, 1…3 — лозунги, 4…5 — свои баннеры,
    6 — «мы победили», 7 — флаг, 8…15 — граффити (прозрачные), 16…31 — по две листовки
    256×256: 0…13 — протестные, 14…29 — свои проблемы, 31 — серый (тумба). */
-const AT = 2048, CW = 512, CH = 256;
+const AT = 2048, AT_PX = 1024, CW = 512, CH = 256;
 let MAT = null, CMAT = null, TEX = null;
 const cellUV = i => { const x = (i % 4) * CW, y = ((i / 4) | 0) * CH; return [x / AT, 1 - (y + CH) / AT, (x + CW) / AT, 1 - y / AT]; };
 const leafUV = L => { const c = 16 + (L >> 1), x = (c % 4) * CW + (L & 1) * 256, y = ((c / 4) | 0) * CH; return [x / AT, 1 - (y + CH) / AT, (x + 256) / AT, 1 - y / AT]; };
@@ -211,8 +213,9 @@ function atlas () {
   if (ST.atlasP === ST.p && ST.atlasAdult === A.ADULT && TEX) return;
   ST.atlasP = ST.p; ST.atlasAdult = A.ADULT;
   const c = document.createElement('canvas');
-  c.width = c.height = AT;
+  c.width = c.height = AT_PX;
   const g = c.getContext('2d');
+  g.scale(AT_PX / AT, AT_PX / AT);                  // рисуем в 2048², холст вдвое меньше
   const at = i => [(i % 4) * CW, ((i / 4) | 0) * CH];
   const ban = (i, txt, bg, fg, sub) => {
     const [x, y] = at(i);
@@ -267,7 +270,7 @@ function atlas () {
   }
   { const c2 = 31, x = (c2 % 4) * CW + 256, y = ((c2 / 4) | 0) * CH; g.fillStyle = '#6f7378'; g.fillRect(x, y, 256, 256); }
   if (TEX) TEX.dispose();
-  TEX = new THREE.CanvasTexture(c);
+  TEX = freeAfterUpload(new THREE.CanvasTexture(c));
   TEX.anisotropy = 4;
   if ('colorSpace' in TEX) TEX.colorSpace = THREE.SRGBColorSpace;
   if (!MAT) {

@@ -24,6 +24,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import { t } from '../i18n/index.js';
 import './ordertags.css';
+import * as NICK from './nicks.js';
 
 export const OTAG = {
   EVERY: 0.25,      // метры и лица — раз в столько секунд
@@ -48,7 +49,7 @@ export function init (api) {
   T.el = el;
 }
 
-const firstName = p => (p && (p.first || (p.name || '').split(/\s+/)[0])) || t('клиент');
+const firstName = p => NICK.short(p, t('клиент'));   // клиент заказа — ник из приложения целиком, иначе только имя (nicks.js)
 const delivered = (o, st, i) => st.done || (i < o.idx && st.done !== false);
 const colorOf = o => { const sp = o.ord || o.look; return (sp && sp.color) || '#ff8a2b'; };
 const storyOf = o => { const sp = o.ord || o.look; return !!(sp && sp.type === 'story'); };
@@ -72,7 +73,7 @@ function build (o) {
     T.el.appendChild(el);
     const it = { st, i, el, img, nm, m, p: ps[0] || null, mood: null, txt: '', cur: null, done: false, goneT: 0 };
     setMood(it, '');
-    if (it.p && A.faceDataURL.soon) A.faceDataURL.soon(it.p, OTAG.FACE, ['ok', 'angry', 'happy'], [0]);   // другие лица карточки — заранее, в спокойные кадры (people.js)
+    if (it.p && NICK.isFace(it.p) && A.faceDataURL.soon) A.faceDataURL.soon(it.p, OTAG.FACE, ['ok', 'angry', 'happy'], [0]);   // другие лица карточки — заранее, в спокойные кадры (people.js)
     T.items.push(it);
   });
   T.stats.built++;
@@ -84,7 +85,8 @@ function setMood (it, mood) {
   if (it.mood === mood) return;
   const first = it.mood === null;
   it.mood = mood;
-  if (it.p) { const src = A.faceDataURL(it.p, OTAG.FACE, mood); if (src && it.img.src !== src) it.img.src = src; }
+  if (it.p) { const src = NICK.avatar(it.p, OTAG.FACE, mood);   // аватарка из приложения: лицо или мазня с наклейкой настроения (nicks.js)
+    if (src && it.img.src !== src) it.img.src = src; }
   if (!first) { T.stats.moods++; it.el.classList.remove('jolt'); void it.el.offsetWidth; it.el.classList.add('jolt'); }
 }
 

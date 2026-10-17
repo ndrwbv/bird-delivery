@@ -8,6 +8,7 @@
      ползёт вверх, брызги выше порогов, зад машины грязнее всего (его и видно),
      поверх всего — лёгкий налёт. Полная грязь — за DIRT.KM км по сухому;
      в дождь и распутицу — в разы быстрее (DIRT.WET, DIRT.MUD), зимой — DIRT.WINTER.
+     Видно её слегка (DIRT.MAX от прежней густой), зимой — почти нет (DIRT.SNOWVIS).
    • Снег на крыше, капоте и багажнике: зимой машина выезжает со снегом
      (простояла ночь во дворе — SNOW.START), в снегопад его прибавляется,
      на скорости сдувает до SNOW.KEEP, без зимы — тает.
@@ -19,8 +20,10 @@
 import * as THREE from '../vendor/three.module.min.js';
 import * as CBLOOD from './carblood.js';
 
-/* KM — км по сухому до полной грязи; WET / MUD / WINTER — во сколько раз быстрее в ливень, распутицу, зимой */
-export const DIRT = { KM: 9, WET: 3, MUD: 3, WINTER: 1.5 };
+/* KM — км по сухому до полной грязи; WET / MUD / WINTER — во сколько раз быстрее в ливень, распутицу, зимой;
+   MAX — какая «полная» грязь на кузове (доля от прежней густой: автор 12.10 — «слегка, чтобы была»);
+   SNOWVIS — сколько от неё видно в зиму (под снегом и солью почти не видно) */
+export const DIRT = { KM: 20, WET: 3, MUD: 3, WINTER: 1, MAX: 0.4, SNOWVIS: 0.12 };
 /* START — снега на крыше в начале зимней смены; FALL — с снегопада до полного; KEEP — сколько остаётся на скорости;
    BLOW — быстрее этого (м/с) сдувает; MELT — с до таяния без зимы */
 export const SNOW = { START: 0.75, FALL: 40, KEEP: 0.35, BLOW: 16, MELT: 25 };
@@ -98,7 +101,7 @@ export function step (dt, car, vf, w) {
   if (v > SNOW.BLOW && ST.snow > SNOW.KEEP) ST.snow = Math.max(SNOW.KEEP, ST.snow - dt * 0.012 * (v - SNOW.BLOW) / 10);
   // цвет: пыль → грязь (дождь, распутица) → слякоть (зима)
   U.uMudC.value.copy(DUST).lerp(MUD, Math.min(1, Math.max(wetK, mudK))).lerp(SLUSH, winK);
-  U.uDirt.value = ST.dirt;
+  U.uDirt.value = ST.dirt * DIRT.MAX * (1 - (1 - DIRT.SNOWVIS) * winK);   // слегка; зимой — почти не видно
   U.uSnowC.value = ST.snow;
   U.uCarInv.value.copy(M4.compose(car.position, car.quaternion, ONE)).invert();
 }
