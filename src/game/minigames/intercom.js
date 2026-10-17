@@ -162,6 +162,7 @@ export default {
       const L = SC.entrance(g, W, H, { look, seed, entr: o.entr, range: o.range, t, flicker: flick });
       const pnl = L.panel, D = L.door;
       KIT.miniSide(elMini, W, H, D, pnl);              // накладная — справа от двери, рядом с панелью
+      placeSelf(L.plate, W);
       const ph = mode === 'broken' ? pnl.h * 0.42 : pnl.h;
       const key = [pnl.x, pnl.y, pnl.w, ph].map(Math.round).join(',');
       if (elUnit.__k !== key) {
@@ -175,6 +176,24 @@ export default {
             : { left: Math.round(D.x) + 'px', top: Math.round(D.y) + 'px', width: Math.round(pnl.x - D.x - 8) + 'px', height: Math.round(D.h) + 'px' });
         }
       }
+    }
+    /* пометка «пусть сам спустится» лежит под заданием справа и на Деке закрывала табличку подъезда с квартирами
+       (UI-REVIEW Р15, 17.10.2026): легла на табличку — сдвинуть вправо от неё, не влезает — влево, иначе — ниже таблички */
+    function placeSelf (pl, W) {
+      if (!elSelf || elSelf.hidden || !pl) return;
+      const k = [Math.round(W), Math.round(pl.x), Math.round(pl.y), elSelf.textContent.length, elSelf.className].join(',');
+      if (elSelf.__pk === k) return;
+      elSelf.__pk = k;
+      elSelf.style.left = ''; elSelf.style.top = '';
+      const b = box.getBoundingClientRect(), r = elSelf.getBoundingClientRect();
+      const x0 = r.left - b.left, y0 = r.top - b.top, x1 = x0 + r.width, y1 = y0 + r.height, gap = 12, pad = 14;
+      if (x1 <= pl.x - 4 || x0 >= pl.x + pl.w + 4 || y1 <= pl.y - 4 || y0 >= pl.y + pl.h + 4) return;   // не на табличке
+      let dx = 0, dy = 0;
+      if (pl.x + pl.w + gap + r.width <= W - pad) dx = pl.x + pl.w + gap - x0;
+      else if (pl.x - gap - r.width >= pad) dx = pl.x - gap - r.width - x0;
+      else dy = pl.y + pl.h + 6 - y0;
+      elSelf.style.position = 'relative';
+      elSelf.style.left = Math.round(dx) + 'px'; elSelf.style.top = Math.round(dy) + 'px';
     }
     const dots = q('.dg-dots');
     if (dots) dots.innerHTML = '<i></i>'.repeat(need);

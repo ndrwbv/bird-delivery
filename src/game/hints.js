@@ -95,8 +95,8 @@ function make (id, extra) {
     case 'brake': return { text: t('у гостя притормози — пицца отдастся сама') };
     case 'nitro': {
       const key = pad ? k('A') : touch ? k(t('кофе')) : k('Shift');
-      return { hi: touch ? '#touchpad .tp-nos' : '#radar', text: extra === 'coffee' ? t('кофе в баке! нажми {key} и полетишь на кофейной тяге', { key })
-        : t('прямая! нажми {key} и полетишь на кофейной тяге', { key }) };
+      return { hi: touch ? '#touchpad .tp-nos' : '#radar', text: extra === 'coffee' ? t('кофе в баке! нажми {key} и помчишь на кофейной тяге', { key })
+        : t('прямая! нажми {key} и помчишь на кофейной тяге', { key }) };
     }
     case 'hp': return { hi: '#hearts', text: t('сердца — жизни тачки: врезался — минус половинка, со всей дури — целое') };
     case 'cash': return { hi: '#shiftcash', text: t('зелёная пачка — заработано за смену') };

@@ -27,7 +27,7 @@ const CULL_EVERY = 12;
 const MAX_R = 400;              // больше — это юбка земли и река: они всегда на сцене
 
 let LIST = [], SCENE = null, CAM = null, PROPS = [], tick = 0;
-export const STATS = { frozen: 0, culled: 0, groups: 0, props: 0, propsOff: 0, cells: 0, cellsOut: 0, outMeshes: 0, big: 0, boxOut: 0, mwSkip: 0 };
+export const STATS = { frozen: 0, culled: 0, groups: 0, props: 0, propsOff: 0, cells: 0, cellsOut: 0, outMeshes: 0, big: 0, boxOut: 0, mwSkip: 0, farMs: 0 };
 
 /* ── что в кадре: клетки статики (09.10.2026, хвост кадров на Деке) ──
    three.js в каждом кадре проверяет КАЖДЫЙ видимый меш сцены на попадание в кадр (projectObject →
@@ -140,7 +140,7 @@ function take (m, parent) {
 
 export function freeze (scene, cam, props) {
   for (const c of CELLS) for (const e of c.list) if (!e.gone) e.m.layers.mask = 1;   // второй раз — с чистого листа
-  CELLS = []; NEAR = []; OFF = 0; STATS.big = 0;
+  CELLS = []; NEAR = []; OFF = 0; STATS.big = 0; SCH = null;
   SCENE = scene; CAM = cam; LIST = []; PROPS = props || [];
   POFF = PROPS.filter(p => p._fz && p._on === false).length;
   for (const c of scene.children.slice()) {
@@ -189,7 +189,7 @@ function propThaw (p) {
 }
 
 /** камера прыгнула далеко (смена профиля в меню, game.js reprofile): дальние — сразу, не через CULL_EVERY кадров */
-export function refresh () { if (SCENE) cullFar(); }
+export function refresh () { if (SCENE) { if (FAR_OLD) cullFar(); else farAll(); } }
 export function step () {
   if (!SCENE) return;
   let np = 0;
@@ -204,7 +204,11 @@ export function step () {
      (смерть, новая смена, телепорт) — сразу всё */
   tick++;
   const jump = Math.abs(CAM.position.x - nearX) + Math.abs(CAM.position.z - nearZ) > 60;
-  if (jump) cullFar(); else cullFar(tick % CULL_EVERY, CULL_EVERY);
+  const tf = performance.now();
+  if (FAR_OLD) { if (jump) cullFar(); else cullFar(tick % CULL_EVERY, CULL_EVERY); }
+  else if (jump || !SCH) farAll();
+  else farStep(tick % CULL_EVERY, CULL_EVERY);
+  STATS.farMs += (performance.now() - tf - STATS.farMs) * 0.02;   // дальнее, мс на кадр (сглажено) — для замеров
   if (jump || tick % CULL_EVERY === 0) nearCells();
   if (VIEW.on) { viewFrustum(); cellCull(); }
   else if (masked) { masked = false; frOk = false; for (const c of CELLS) { c.vis = true; for (const e of c.list) if (!e.gone) { e.m.layers.mask = 1; e.bw = 1; } } STATS.cellsOut = STATS.outMeshes = STATS.boxOut = 0; }
@@ -248,7 +252,76 @@ function upd (o, force) {
   }
 }
 
-/* part, of — каждый of-й элемент, начиная с part (по кусочку в кадр); без них — весь список */
+/* Дальнее по расписанию (17.10.2026, docs/AGENTS.md «Слои статики»): было — каждый кадр 1/12 списка (~620 кусков из ~7,4 тыс.:
+   сдвинут ли и дальше ли дальности), ~0,2 мс кадра на «Деке». Кусок не может перейти границу дальности, пока камера не
+   проехала (плюс сколько сдвинулась сама дальность — страховка govern) столько, сколько от него до границы: после проверки
+   он ложится в корзину «путь камеры» = сейчас + этот зазор (корзины по FSTEP м), и до неё его не трогают. В кадр — только
+   корзины, до которых доехали (обычно пусто или десяток-другой кусков у края дальности). «Сдвинут ли» — отдельно, по
+   кусочку: весь список за ~STILL_PASS кадров (кто-то сдвинул замороженное — больше не наш, как было). Камера прыгнула —
+   всё разом и расписание заново. ?farold — по-старому, для замера */
+const FAR_OLD = typeof location !== 'undefined' && /[?&]farold(&|$)/.test(location.search);
+const FSTEP = 4, STILL_PASS = 48;
+let SCH = null, ODO = 0, odoK = 0, oX = NaN, oZ = NaN, oF = NaN, stillI = 0;
+function farOne (e, px, pz, far) {
+  const m = e.m, dx = e.x - px, dz = e.z - pz, lim = far + e.r, d2 = dx * dx + dz * dz;
+  const want = d2 < lim * lim;
+  if (want !== e.on) {
+    e.on = want;
+    if (want) { e.parent.add(m); OFF--; } else { e.parent.remove(m); OFF++; }
+  }
+  const gap = Math.abs(Math.sqrt(d2) - lim);
+  const k = Math.max(odoK + 1, Math.floor((ODO + Math.max(gap, FSTEP)) / FSTEP));
+  const L = SCH.get(k);
+  if (L) L.push(e); else SCH.set(k, [e]);
+}
+function unfreeze (e, i) {                          // кто-то сдвинул — больше не наш
+  const m = e.m;
+  m.matrixAutoUpdate = true; m.matrixWorldAutoUpdate = true;
+  e.gone = true; m.layers.mask = 1;                 // и не в клетках «что в кадре», и не в расписании
+  if (!e.on) { e.parent.add(m); OFF--; }
+  LIST.splice(i, 1);
+}
+function farAll () {
+  const px = CAM.position.x, pz = CAM.position.z, far = CAM.far + 20;
+  SCH = new Map(); oX = px; oZ = pz; oF = far; odoK = Math.floor(ODO / FSTEP);
+  for (let i = LIST.length - 1; i >= 0; i--) { const e = LIST[i]; if (!still(e.m)) { unfreeze(e, i); continue; } farOne(e, px, pz, far); }
+  STATS.culled = OFF;
+  propsFar(0, 1, px, pz, far);
+}
+function farStep (part, of) {
+  const px = CAM.position.x, pz = CAM.position.z, far = CAM.far + 20;
+  ODO += Math.sqrt((px - oX) * (px - oX) + (pz - oZ) * (pz - oZ)) + Math.abs(far - oF);
+  oX = px; oZ = pz; oF = far;
+  const kNow = Math.floor(ODO / FSTEP);
+  let n = 0;
+  while (odoK < kNow) {
+    odoK++;
+    const L = SCH.get(odoK);
+    if (!L) continue;
+    SCH.delete(odoK);
+    for (let j = 0; j < L.length; j++) { const e = L[j]; if (!e.gone) { farOne(e, px, pz, far); n++; } }
+  }
+  // сдвинут ли — по кусочку
+  const per = Math.ceil(LIST.length / STILL_PASS);
+  for (let c = 0; c < per && LIST.length; c++) {
+    if (stillI >= LIST.length) stillI = 0;
+    const e = LIST[stillI];
+    if (!still(e.m)) unfreeze(e, stillI); else stillI++;
+  }
+  STATS.culled = OFF; STATS.farN = n;
+  propsFar(part, of, px, pz, far);
+}
+function propsFar (part, of, px, pz, far) {
+  for (let i = part; i < PROPS.length; i += of) {
+    const p = PROPS[i];
+    if (!p._fz) continue;
+    const dx = p.x - px, dz = p.z - pz, want = dx * dx + dz * dz < far * far;
+    if (want !== p._on) { p._on = want; if (want) { SCENE.add(p.pivot); POFF--; } else { SCENE.remove(p.pivot); POFF++; } }
+  }
+  STATS.propsOff = POFF;
+}
+
+/* part, of — каждый of-й элемент, начиная с part (по кусочку в кадр); без них — весь список (по-старому: ?farold) */
 let OFF = 0, POFF = 0;
 function cullFar (part = 0, of = 1) {
   const px = CAM.position.x, pz = CAM.position.z, far = CAM.far + 20;

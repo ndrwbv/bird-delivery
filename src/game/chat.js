@@ -4,7 +4,8 @@
    правого верхнего угла влево-вниз (×1,8, не вылезая за экран, с отскоком и звуком), держится 1,2 с
    + 1 с на 150 букв (не дольше 2 с) и за 0,45 с уменьшается до обычной. Пришло новое — прежнее
    крупное сразу уменьшается. prefers-reduced-motion — без увеличения, просто появляется.
-   Видно сразу не больше трёх сообщений (четвёртое выталкивает самое старое),
+   Видно сразу не больше трёх сообщений (четвёртое выталкивает самое старое; не влезают по высоте — чат шире,
+   потом уходят старые, последнее видно целиком — fit),
    каждое висит (после крупного) 4 с + 1 с на каждые 25 букв (не дольше 8 с) и уезжает вправо.
    Текст пришёл — аватарка Толика говорит ртом (talkface.js): ~14 букв в секунду, 0,7—2,6 с.
    Ввод не перехватывает. Место — под колонкой хада справа (кошелёк, часы смены,
@@ -156,6 +157,19 @@ function place () {
   C.el.style.top = Math.round(below ? bottom + 8 : top) + 'px';
   C.el.style.right = Math.round(below ? Math.max(10, W - right) : W - left + 8) + 'px';
   C.el.style.width = Math.round(Math.max(150, Math.min(270, (below ? W : left) - 24))) + 'px';
+  fit(H);
+}
+
+/* не влезает по высоте (телефон боком: чат под радаром, а коллеги пишут втроём с именами, Толик — длинное объявление
+   праздника): сначала шире (до 46 % экрана — меньше строк), потом уходят самые старые сообщения; последнее остаётся
+   всегда (ревью 17.10: низ объявления Нового года уезжал за край экрана). Крупное (grow) — transform, высоту не меняет */
+function fit (H) {
+  // уходящие (.out) ещё 0,35 с в ленте — не считаем их, только живые сообщения
+  const over = () => { let h = C.el.getBoundingClientRect().top; for (const m of C.items) h += m.el.offsetHeight + 3; return h > H - 6; };
+  if (!C.items.length || !over()) return;
+  const w = parseFloat(C.el.style.width) || 270, wide = Math.round(Math.min(innerWidth * 0.46, 420));
+  if (wide > w) C.el.style.width = wide + 'px';
+  while (C.items.length > 1 && over()) drop(C.items[0]);
 }
 
 function drop (m) {
@@ -213,6 +227,7 @@ export function say (text, onShow, angry, who) {
     const p = row.querySelector('p');
     p.className = '';
     p.textContent = text;
+    place();                                              // текст пришёл — влезает ли по высоте (fit), до «крупно»
     m.said = true;
     shown(m);
     ding(angry);

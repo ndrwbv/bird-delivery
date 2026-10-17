@@ -16,15 +16,26 @@
    от простоя на открытом меню не гаснет. При показе экрана курсор сразу стоит на главном
    действии — кнопке с autofocus (или data-pad-main), нет такой — на первой. Если подсветки не было
    (меню показали, пока играли мышью), первое ↑↓←→ только зажигает её, никуда не уводя; A — жмёт,
-   только если курсор на главном (не глядя — всегда «главное»). */
+   только если курсор на главном (не глядя — всегда «главное»). Жать на экране нечего (все кнопки серые —
+   гараж, чужая машина не по карману) — курсор всё равно стоит на серой главной, а не пропадает (17.10.2026).
+   Правый стик ↑↓ прокручивает длинный лист, если он не влез (курсор стоит). */
 
 const FOCUSABLE = 'button, a[href], select, input:not([type=hidden]), textarea, .btn, [data-pad]';
 
-const shown = el => {
-  if (el.hidden || el.disabled || el.closest('[hidden]') || el.closest('[data-pad-skip]')) return false;   // data-pad-skip — соседние карточки карусели (carousel.js)
+const visible = el => {
+  if (el.hidden || el.closest('[hidden]') || el.closest('[data-pad-skip]')) return false;   // data-pad-skip — соседние карточки карусели (carousel.js)
   const r = el.getBoundingClientRect();
   return r.width > 0 && r.height > 0;
 };
+const shown = el => !el.disabled && visible(el);
+/* правый стик ↑↓ — прокрутить то, что в окне прокручивается (длинный лист не влез): само окно или первый
+   прокручиваемый блок в нём. Курсор при этом не двигается */
+function scrollBy (root, ry) {
+  const can = el => el.scrollHeight > el.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(el).overflowY);
+  let box = can(root) ? root : null;
+  if (!box) for (const el of root.querySelectorAll('*')) if (el.scrollHeight > el.clientHeight + 2 && can(el)) { box = el; break; }
+  if (box) box.scrollTop += ry * 16;
+}
 const MAIN = '[autofocus], [data-pad-main]';
 
 /* когда последний раз трогали мышь, тач или клавиши: позже геймпада — подсветку геймпада прячем.
@@ -67,9 +78,16 @@ export function makePadMenu (opts = {}) {
     if (root !== lastRoot) { mark(null); lastRoot = root; }
     if (p.lastUse != null) DIMS.add(dim);        // настоящий геймпад (у KB карьеры lastUse нет — его не гасим)
     if (!root || !p.connected) { if (sel) mark(null); return; }
+    if (p.ry) scrollBy(root, p.ry);              // правый стик — прокрутить длинный лист (курсор не трогаем)
     if (!padLit(p)) { dim(); return; }
     const items = Array.prototype.filter.call(root.querySelectorAll(FOCUSABLE), shown);
-    if (!items.length) { mark(null); return; }
+    if (!items.length) {
+      // жать нечего (гараж: чужая машина, на которую не хватает денег) — курсор всё равно виден: на серой главной кнопке
+      const dead = Array.prototype.filter.call(root.querySelectorAll(FOCUSABLE), el => el.disabled && visible(el));
+      const d0 = dead.find(el => el.matches(MAIN)) || dead[0] || null;
+      if (sel !== d0 || (d0 && !lit)) mark(d0);
+      return;
+    }
 
     const main = items.find(el => el.matches(MAIN)) || items[0];
     const woke = !lit;                           // подсветки не было — это нажатие только будит

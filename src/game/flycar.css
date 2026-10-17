@@ -1,7 +1,9 @@
 /* летающий родстер (flycar.js): полоска «полёт» на хаде под скоростью и кнопка на телефоне.
    В стиле полоски «кофе»: подпись мелко, полоска в тёмной рамке; цвет — красный кузова, полная — светится */
-#flyhud { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 6px; font-size: 7px; color: #ff8f7a; }
+#flyhud { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 6px; font-size: 11px; color: #ff8f7a; }   /* подпись ≥ 11 px (было 7 — «[Z] полёт» не читался) */
 #flyhud[hidden] { display: none; }
+/* телефон: заряд показывает кольцо на красной кнопке «полёт», а полоску справа сверху закрывала мини-карточка заказа — не рисуем */
+body.touch #flyhud { display: none; }
 #flyhud b { display: block; width: 84px; height: 8px; background: #33210c; border: 2px solid #33210c; border-radius: 2px; overflow: hidden; }
 #flyhud i { display: block; height: 100%; width: 100%; background: #9a3a30;
             background-image: repeating-linear-gradient(90deg, transparent 0 9px, rgba(51, 33, 12, .55) 9px 10px); }

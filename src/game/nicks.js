@@ -386,8 +386,9 @@ function draw (av, seed, mood) {
 
 /* наклейка настроения в углу мазни (у мини-карточки и оплаты лицо-настроение — тут его нет) */
 function moodSticker (x, mood) {
-  const cx = 51, cy = 51, R = 11;
-  x.setTransform(1, 0, 0, 1, 0, 0);
+  // крупнее (ревью 17.10): на мини-карточке аватарка ~30 px, и наклейка R 11 из 64 была точкой в 5 px — настроения не видно
+  const cx = 47, cy = 47, R = 11, k = 15 / R;            // рисуем в мерке R 11, увеличено до 15
+  x.setTransform(k, 0, 0, k, cx * (1 - k), cy * (1 - k));
   x.fillStyle = mood === 'angry' ? '#e53935' : mood === 'happy' ? '#43a047' : '#fbc02d';
   x.strokeStyle = '#ffffff'; x.lineWidth = 2;
   x.beginPath(); x.arc(cx, cy, R, 0, Math.PI * 2); x.fill(); x.stroke();
@@ -398,6 +399,7 @@ function moodSticker (x, mood) {
   else if (mood === 'angry') { x.arc(cx, cy + 8, 5, 1.2 * Math.PI, 1.8 * Math.PI); x.moveTo(cx - 7, cy - 7); x.lineTo(cx - 2, cy - 4.5); x.moveTo(cx + 7, cy - 7); x.lineTo(cx + 2, cy - 4.5); }
   else { x.moveTo(cx - 4.5, cy + 4); x.lineTo(cx + 4.5, cy + 4); }
   x.stroke();
+  x.setTransform(1, 0, 0, 1, 0, 0);
 }
 
 /* отладка: доли на n случайных людей (зерна подряд) — { nick, name, typo, face, av: { q: …, … } } */

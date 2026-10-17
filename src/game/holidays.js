@@ -155,6 +155,7 @@ export function shiftStart (o = {}) {
   const want = ST.forced;
   ST.forced = null;
   end();
+  ST.lastRibbon = null;          // лента прошлого праздника — только в его чек (до 17.10 висела во всех чеках до следующего праздника)
   if (o.ride || o.quick) return;
   let h = null;
   const plan = CYCLE.holiday();                     // круг сезонов (17.10.2026): Новый год — во вторую смену зимы, Хэллоуин — в последнюю осени
@@ -174,6 +175,7 @@ export function shiftStart (o = {}) {
 function begin (h) {
   CUR = { h, n: 0, corp: 0, chimes: false, got: 0, seen: new WeakSet() };
   ST.lastRibbon = null;
+  CYCLE.held(h.id, +A.Store.get('dlv-shifts', 0) || 0);   // круг сезонов: такой же праздник по плану скоро — не встанет и не обещается
   // Новый год: сезон — где новогодние ёлки и гирлянды стоят (seasons.js K.ny)
   const v = SEAS.seasonValue();
   if (h.seaAt && !SEAS.seasonForced() && (v < h.seaAt[0] || v > h.seaAt[1])) SEAS.shiftSeason(rand(h.seaAt[0], h.seaAt[1]));

@@ -8,7 +8,8 @@
                                  город — по зерну адреса (60 % обшарпанных)
      PAL[look]                 — цвета стен, дверей, света
      rng(seed)                 — детерминированный случайный (одинаковый подъезд у одного адреса)
-     entrance(g, W, H, o)      — нарисовать дверь подъезда снаружи (css px; g уже в масштабе dpr) → { door, panel } (прямоугольники)
+     entrance(g, W, H, o)      — нарисовать дверь подъезда снаружи (css px; g уже в масштабе dpr) → { door, panel, plate } (прямоугольники;
+                                 plate — табличка над дверью с рамкой)
      helpers: rect, spr, glow, vignette, poster, sticker, graffiti, plant, urn, bulb, text */
 
 const N_ = s => s;
@@ -119,7 +120,9 @@ export function entranceLayout (W, H) {
   const pw = Math.min(dw * 0.62, H * 0.36), ph = Math.min(pw * 1.55, dh * 0.78);
   const narrow = W < 640;
   const px = narrow ? dx + (dw - pw) / 2 : dx + dw * 0.93 - pw, py = dy + dh * (narrow ? 0.24 : 0.17);
-  return { door: { x: dx, y: dy, w: dw, h: dh }, panel: { x: px, y: py, w: pw, h: ph } };
+  // табличка над дверью «подъезд N · кв. …» (рамка — на P шире): intercom.js не кладёт на неё пометку «пусть сам спустится»
+  const P = Math.max(2, Math.round(H / 110)), plW = Math.min(dw * 0.8, P * 46), plH = P * 9, plY = dy - P * 2 - plH + P * 1;
+  return { door: { x: dx, y: dy, w: dw, h: dh }, panel: { x: px, y: py, w: pw, h: ph }, plate: { x: W / 2 - plW / 2 - P, y: plY - P, w: plW + 2 * P, h: plH + 2 * P } };
 }
 export function entrance (g, W, H, o) {
   const C = PAL[o.look] || PAL.shabby, R = rng(o.seed || 1), t = o.t || (s => s);

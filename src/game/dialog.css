@@ -30,7 +30,7 @@
 .dlg-pay { display: flex; flex-direction: column; align-items: center; gap: .3em; margin: .1em 0 0; padding: .45em .6em .4em; rotate: 2deg;
            background: #fff; border: 2px solid var(--pp-ink); border-radius: 4px; box-shadow: 0 3px 0 var(--pp-ink); }
 .dlg-pay[hidden] { display: none; }
-.dlg-pay span { font-size: 9px; line-height: 1.3; color: var(--pp-label); text-align: center; }
+.dlg-pay span { font-size: var(--pp-fs-s); line-height: 1.3; color: var(--pp-label); text-align: center; }
 .dlg-pay span:empty { display: none; }
 .dlg-pay b { font-weight: normal; font-size: clamp(13px, 1.5vw, 20px); line-height: 1.1; white-space: nowrap; }
 .dlg-pay.pp-plus b { color: var(--pp-money); }
@@ -42,7 +42,7 @@
 .dlg-bubble::before { content: ''; position: absolute; left: -13px; top: 1.1em; width: 0; height: 0;
                       border: 8px solid transparent; border-right: 12px solid var(--pp-ink); border-left: 0; }
 .dlg-text { margin: 0; font-size: inherit; line-height: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
-.dlg-skip { position: absolute; right: .9em; bottom: .45em; font-size: 8px; color: var(--pp-label); }
+.dlg-skip { position: absolute; right: .9em; bottom: .45em; font-size: var(--pp-fs-s); color: var(--pp-label); }
 /* ответы — бумажные кнопки справа внизу листа; «принять» — жёлтая, «отказаться» — бумага */
 .dlg-btns { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin: .9em 0 0; visibility: hidden; }
 .dlg-btns.on { visibility: visible; }
@@ -50,8 +50,9 @@
                    padding: .7em 1.1em; color: var(--pp-ink); cursor: pointer; touch-action: manipulation; text-align: left;
                    background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 8px; box-shadow: 0 4px 0 var(--pp-ink);
                    transition: translate .12s var(--pp-spring, ease-out), box-shadow .12s, background .12s; }
-.dlg-yes { background: color-mix(in srgb, var(--pp-yellow) 60%, var(--pp-paper)); }
-.dlg-no { background: var(--pp-paper); }
+/* через .dlg-btns: правило кнопок выше (.dlg-btns button — бумага) сильнее одиночного класса, и «принять» было бумажным (ревью 17.10) */
+.dlg-btns .dlg-yes { background: color-mix(in srgb, var(--pp-yellow) 60%, var(--pp-paper)); }
+.dlg-btns .dlg-no { background: var(--pp-paper); }
 .dlg-btns.plain .dlg-yes { background: var(--pp-paper); }   /* приглашение клиентки: оба ответа — отказы, вид один */
 .dlg-btns button[hidden] { display: none; }   /* одна кнопка «дальше»: пустой «Esc» рядом не рисуем (display выше перебивал hidden) */
 /* значок кнопки — общий .pp-key (paper.css, glyphs.js): [A] / [B] геймпада кружком, Enter / Esc клавиатуры клавишей */
@@ -81,7 +82,7 @@ body.calm-fx .dlg-pop, body.calm-fx #dlg.dlg-talking .dlg-head img { animation: 
   .dlg-head img.pp-polaroid { width: 48px; height: 48px; }
   .dlg-pay { padding: .3em .45em; }
   .dlg-pay b { font-size: 12px; }
-  .dlg-pay span { font-size: 7px; }
+  .dlg-pay span { font-size: 10px; }   /* «заплатит», «мзда» — не мельче 10 px на телефоне (было 7) */
   .dlg-bubble { min-height: 0; padding: .5em .8em 1.2em; line-height: 1.5; }
   .dlg-btns { margin-top: .5em; gap: 8px; }
   .dlg-btns button { padding: .45em .9em; }
@@ -101,7 +102,7 @@ body.calm-fx .dlg-pop, body.calm-fx #dlg.dlg-talking .dlg-head img { animation: 
 #dlg[data-input="touch"] .dlg-btns.stack button.dlg-cur { background: var(--pp-paper); translate: none; }
 #dlg[data-input="touch"] .dlg-btns.stack button::before { opacity: 0; animation: none; }
 @keyframes dlg-nudge { from { translate: 0 -50%; } to { translate: 3px -50%; } }
-.dlg-hint { margin: .7em 0 0; font-size: 10px; line-height: 1.5; text-align: right; color: var(--pp-label); }
+.dlg-hint { margin: .7em 0 0; font-size: var(--pp-fs-s); line-height: 1.5; text-align: right; color: var(--pp-label); }
 .dlg-hint[hidden] { display: none; }
 @media (max-width: 560px) { .dlg-btns.stack button { flex: none; } }
 @media (prefers-reduced-motion: reduce) { .dlg-btns.stack button.dlg-cur::before { animation: none; } }
@@ -119,9 +120,10 @@ body.story-cut #dlg .dlg-btns.stack button { padding: .55em .9em .55em 2.2em; }
 body.story-cut #dlg .dlg-hint { margin-top: .4em; }
 
 /* полоски под текстом (meters): «мотор 82 %», «ресурс 94 %» у Дяди Жени */
-.dlg-meters { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+/* полоски — одной сеткой на все строки: подписи «мотор» / «ресурс» любой длины (и en), полоски начинаются ровно */
+.dlg-meters { display: grid; grid-template-columns: max-content 1fr max-content; align-items: center; gap: 6px 8px; margin-top: 10px; font-size: var(--pp-fs-s); }
 .dlg-meters[hidden] { display: none; }
-.dlg-m { display: grid; grid-template-columns: 72px 1fr 48px; align-items: center; gap: 8px; font-size: 10px; }
+.dlg-m { display: contents; }
 .dlg-m > i { display: block; height: 10px; background: #e8d9b8; border: 2px solid #33210c; border-radius: 5px; overflow: hidden; }
 .dlg-m > i > i { display: block; height: 100%; }
 .dlg-m b { font-weight: normal; text-align: right; }

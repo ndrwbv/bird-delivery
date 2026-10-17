@@ -113,6 +113,11 @@ export function setGale (amp, dx = 1, dz = 0) { U.uGale.value = amp; U.uGaleD.va
    Классы по цвету вершины (цвета линейные): зелёное — трава, серое и
    тёмное — асфальт, синее — вода. */
 const TINT = `
+#ifdef USE_COLOR_ALPHA
+#define S_LAND (vColor.a < 0.5)
+#else
+#define S_LAND true
+#endif
 uniform float uSnow, uDry, uMud, uFresh, uWet, uHeat, uGold, uTime;
 uniform vec3 uYardP;
 varying vec3 vSW;
@@ -198,14 +203,17 @@ function yardMark () {
   const c = new THREE.Color(YARD.COLOR);         // как Mesher кладёт цвет вершины: байтами
   U.uYardP.value = [Math.round(c.r * 255) / 255, Math.round(c.g * 255) / 255, Math.round(c.b * 255) / 255];
 }
-export function seasonMat (m, dryK = 1) {
+/* propK — склейка земли с реквизитом (game.js LITM, 17.10.2026): у вершин с признаком «реквизит» (четвёртый байт цвета,
+   S_LAND ложно) сухость травы propK, у земли — dryK */
+export function seasonMat (m, dryK = 1, propK) {
+  const dry = propK === undefined ? dryK.toFixed(2) : '(S_LAND ? ' + dryK.toFixed(2) + ' : ' + propK.toFixed(2) + ')';
   m.onBeforeCompile = sh => {
     yardMark();
     Object.assign(sh.uniforms, U);
     sh.vertexShader = 'varying vec3 vSW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n' + WPOS);
-    sh.fragmentShader = TINT + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = seasonTint(diffuseColor.rgb, ' + dryK.toFixed(2) + ', 1.0);');
+    sh.fragmentShader = TINT + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = seasonTint(diffuseColor.rgb, ' + dry + ', 1.0);');
   };
-  m.customProgramCacheKey = () => 'season' + dryK;
+  m.customProgramCacheKey = () => 'season' + dryK + (propK === undefined ? '' : 'p' + propK);
   return m;
 }
 

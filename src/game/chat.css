@@ -80,3 +80,6 @@ body.calm-fx .en-in .en-tb p:not(.en-msg), body.calm-fx .en-tolik.said .en-msg {
   --t: 14px; content: ''; position: absolute; left: calc(var(--t) * -.6); bottom: 0; width: var(--t); height: var(--t);
   background: radial-gradient(circle at 0 0, transparent calc(var(--t) - .5px), var(--im-bubble) var(--t)); }
 #chat .cm.cm-tail .cm-b p { border-bottom-left-radius: 6px; }
+/* телефон боком: накладная висит по центру ~2,6 с (body.brief) — чат справа ложился на её фото и строки; пока она
+   на экране, чат прозрачный (сообщения не теряются — висят дальше своё время) (ревью 17.10) */
+@media (max-height: 500px) { body.brief #chat { opacity: 0; transition: opacity .2s; } }

@@ -371,7 +371,7 @@ async function talk (h, m, ctx) {
   const last = m.s.length - 1;
   for (let i = 0; i < last; i++) {
     const l = m.s[i];
-    const r = await DLG.say(Object.assign({}, base, speaker(h, l.w), { emo: l.e, text: t(l.s), accept: t('…') }));
+    const r = await DLG.say(Object.assign({}, base, speaker(h, l.w), { emo: l.e, text: t(l.s), accept: t('… промолчать') }));
     if (r === null) return { ans: null, tip: 0 };
   }
   const l = m.s[last];

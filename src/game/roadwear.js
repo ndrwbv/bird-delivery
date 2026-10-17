@@ -513,7 +513,7 @@ const RW_GLSL = `
   wd = abs(wc - uRwT[1]); if (max(wd.r, max(wd.g, wd.b)) < 0.0022) wk = 3.0;   // старый
   wd = abs(wc - uRwT[2]); if (max(wd.r, max(wd.g, wd.b)) < 0.0022) wk = 4.0;   // разбитый
   wd = abs(wc - uRwT[3]); if (max(wd.r, max(wd.g, wd.b)) < 0.0022) wk = 9.0;   // дно ямы
-  if (wk >= 0.0) {
+  if (S_LAND && wk >= 0.0) {                  // S_LAND — не реквизит (seasons.js: признак в цвете вершины склейки LITM)
     vec2 q = vSW.xz;
     float near = 1.0 - smoothstep(${fl(NEAR[0])}, ${fl(NEAR[1])}, distance(q, cameraPosition.xz));
     if (wk > 8.0) {

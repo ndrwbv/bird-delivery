@@ -35,3 +35,9 @@ body.calm-fx .sx-pop { animation: none; }
   .sx-bar { bottom: 48px; }
   .sx-b { min-height: 58px; }
 }
+/* телефон боком: кнопки ▲ ▼ ◀ ▶ стоят выше низа (52 px + ~46 px), а реплики (doorkit.css: снизу 60 px) уходили под них —
+   подсказка Толика первого раза обрезалась (ревью 17.10). Реплики — над кнопками, шире и мельче, чтобы не лезть на задание */
+@media (max-height: 460px) {
+  .sx .mk-say { bottom: 108px; width: 48%; }
+  .sx .mk-say .mk-b p { font-size: 10px; line-height: 1.45; }
+}

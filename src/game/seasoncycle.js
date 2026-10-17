@@ -25,6 +25,8 @@
    Из weather.js: shiftStart(done) — шаг этой смены карьеры ({ key, sea, v, wx, … }), clear() — смена не карьеры.
    Из holidays.js: holiday() — id праздника этой смены, '' — без, undefined — круг сейчас не решает.
    Из orders.js: perk() — пометка сезонного заказа или null. Из career.js: receipt() — календарик в чек.
+   Из holidays.js: held(id, at) — праздник пошёл (по плану или отладкой): такой же по плану в ближайшие CYC.HOL_GAP смен
+   не встаёт и календарик его не обещает.
    Из game.js: init(api), announce() — после праздника.  api: Store, chat(text), playing(), ADULT
    Отладка: __dlv.CYCLE — at(pos), plan(n), sim(n), info(), receipt(), CUR.
    ────────────────────────────────────────────────────────────────────────── */
@@ -43,6 +45,8 @@ export const CYC = {
   FORECAST_AT: [45, 75],  // с — прогноз Толика за смену до стыка
   CAL: 8,                 // клеток календарика в чеке
   HOL_SOON: 7,            // «до Нового года — N смен» — когда праздник в пределах стольких смен
+  HOL_GAP: 8,             // праздник уже был (отладкой поставлен не по плану) меньше стольких смен назад — плановый такой же
+                          // пропускается, и календарик его не обещает (17.10.2026; обычный год — 16+ смен, по плану не задевает)
 };
 
 /* сезоны: что придёт (в чеке), имя, «до …» (родительный, плюралы), сезонный заказ, объявление в первой смене */
@@ -179,7 +183,10 @@ function load () {
   try {
     const v = A.Store.get(CYC.KEY, null);
     const o = typeof v === 'string' ? JSON.parse(v) : v;
-    if (o && typeof o === 'object' && Number.isFinite(+o.base)) return { base: +o.base, seed: (+o.seed | 0) || 1 };
+    if (o && typeof o === 'object' && Number.isFinite(+o.base)) {
+      const h = o.hol && typeof o.hol === 'object' && o.hol.id && Number.isFinite(+o.hol.at) ? { id: String(o.hol.id), at: +o.hol.at } : null;
+      return { base: +o.base, seed: (+o.seed | 0) || 1, hol: h };
+    }
   } catch (e) { /* испорчено — заново */ }
   return null;
 }
@@ -193,6 +200,19 @@ function cycle (done) {
   return c;
 }
 const doneNow = () => (A ? +A.Store.get('dlv-shifts', 0) || 0 : 0);
+/* праздник шага s по плану, если его не «съел» такой же праздник недавно (поставленный отладкой не по плану) */
+function holOf (s, c) {
+  if (!s || !s.hol) return '';
+  const at = c.base + s.pos, h = c.hol;
+  return h && h.id === s.hol && h.at < at && at - h.at < CYC.HOL_GAP ? '' : s.hol;
+}
+/** holidays.js: праздник шёл в смену, когда законченных смен было at (по плану или отладкой) — запомнить */
+export function held (id, at) {
+  if (!A || !id) return;
+  const c = load();
+  if (!c) return;
+  try { A.Store.set(CYC.KEY, JSON.stringify({ base: c.base, seed: c.seed, hol: { id, at: Math.max(0, at | 0) } })); } catch (e) { /* — */ }
+}
 
 export function init (api) {
   A = api;
@@ -219,7 +239,8 @@ export const current = () => CUR;
 /** праздник этой смены по плану: id, '' — без праздника, undefined — решает старый жребий holidays.js */
 export function holiday () {
   if (!CUR) return undefined;
-  return CUR.hol || '';
+  const c = load();
+  return c ? holOf(CUR, c) : CUR.hol || '';
 }
 
 /** сезонный заказ (orders.js): в первую смену сезона часть пицц — сезонные. → пометка как у праздника или null */
@@ -252,8 +273,8 @@ export function hello (st = CUR) {
 /** прогноз накануне ('' — завтра то же самое) */
 export function forecast (st = CUR) {
   if (!st || !st.next) return '';
-  const n = st.next;
-  if (n.hol && HOL_CAST[n.hol]) return t(HOL_CAST[n.hol]);
+  const n = st.next, c = load(), nh = c ? holOf(n, c) : n.hol;     // праздник, поставленный отладкой, «съедает» плановый
+  if (nh && HOL_CAST[nh]) return t(HOL_CAST[nh]);
   if (n.trans || (n.first && n.key !== st.key)) return STEP[n.key] && STEP[n.key].cast ? (st.surprise ? t('теперь синоптики клянутся: ') : '') + t(STEP[n.key].cast) : '';
   return '';
 }
@@ -273,7 +294,7 @@ export function receipt (done = doneNow()) {
   if (!CYC.ON || !A) return null;
   const c = load();
   if (!c) return null;
-  const P = planned(Math.max(0, done - c.base), c.seed, CYC.CAL);
+  const P = planned(Math.max(0, done - c.base), c.seed, CYC.CAL).map(s => ({ ...s, hol: holOf(s, c) }));
   if (!P.length) return null;
   const p0 = P[0];
   let text = '', sub = '';

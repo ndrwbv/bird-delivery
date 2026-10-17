@@ -772,7 +772,7 @@ export async function meet (id, step) {
   const last = m.s.length - 1;
   for (let i = 0; i < last; i++) {
     const l = m.s[i], sp = speaker(h, l.w);
-    const r = await DLG.say(Object.assign({}, base, sp, { emo: l.e, text: t(l.s), accept: t('…') }));
+    const r = await DLG.say(Object.assign({}, base, sp, { emo: l.e, text: t(l.s), accept: t('… промолчать') }));
     if (r === null) return { ans: null, tip: 0 };
   }
   const l = m.s[last], sp = speaker(h, l.w);

@@ -157,10 +157,28 @@ export function edHide (it, on) {
   }
 }
 
-/* вершины куска склейки — под землю (как знаки в roadlife.js) */
+/* вершины куска склейки — под землю (как знаки в roadlife.js). Плафоны в клетках FLATM (game.js, 17.10.2026) позиций в памяти
+   не держат (отпущены после загрузки в видеокарту): тогда массив — временный, только до конца этого куска (плафоны лежат в
+   начале клетки — он короткий), с прежним byteLength (three.js сверяет), кусок — в одну точку (треугольники пропадают), в
+   видеокарту — только диапазоном (addUpdateRange); после заливки массив снова отпускается (onUpload склейки) */
 function hide ([m, v0, nv]) {
-  const pos = m.geometry.attributes.position, a = pos.array;
-  for (let v = v0; v < v0 + nv; v++) a[v * 3 + 1] = -60;
+  const pos = m.geometry.attributes.position;
+  let a = pos.array;
+  if (a && !a.part && a.length === pos.count * 3) {
+    for (let v = v0; v < v0 + nv; v++) a[v * 3 + 1] = -60;
+    pos.needsUpdate = true;
+    return;
+  }
+  const len = (v0 + nv) * 3;
+  if (!a || a.length < len) {
+    const b = new Float32Array(len);
+    if (a) b.set(a);
+    Object.defineProperty(b, 'byteLength', { value: pos.count * 3 * 4 });
+    b.part = 1;                                   // временный: остальное в нём — нули, целиком не заливать
+    a = pos.array = b;
+  }
+  for (let v = v0; v < v0 + nv; v++) { a[v * 3] = 0; a[v * 3 + 1] = -60; a[v * 3 + 2] = 0; }
+  pos.addUpdateRange(v0 * 3, nv * 3);
   pos.needsUpdate = true;
 }
 

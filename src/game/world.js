@@ -135,7 +135,7 @@ const PAVE_GLSL = `
   vec3 pvc = vColor.rgb;
   vec3 pdB = abs(pvc - uPvB), pdS = abs(pvc - uPvS);
   float isB = step(max(pdB.r, max(pdB.g, pdB.b)), 0.0022), isS = step(max(pdS.r, max(pdS.g, pdS.b)), 0.0022);
-  if (isB + isS > 0.5) {
+  if (S_LAND && isB + isS > 0.5) {          // S_LAND — не реквизит (seasons.js: признак в цвете вершины склейки LITM)
     vec2 q = vSW.xz;
     if (isB > 0.5) {
       // брусчатка: ровный тёплый тон и лёгкие полоски рядов через 0,8 м — без

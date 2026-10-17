@@ -214,7 +214,7 @@ const PLAY = {
     const back = stranger('behind');
     const r = await chain([
       { person: k, name, emo: 'angry', mood: 'calm',
-        text: t('Ты такой слабый. Просто дрищуган. Я бы тебя сложил и затолкал бы этому долбаёбу в жопу.'), accept: t('…') },
+        text: t('Ты такой слабый. Просто дрищуган. Я бы тебя сложил и затолкал бы этому долбаёбу в жопу.'), accept: t('… промолчать') },
       { person: back, name: t('из-за спины'), emo: 'scared', mood: 'nervous',
         text: t('Эээ, братан, не надо… оно болит ещё с того раза…'), accept: t('дальше') },
       { person: k, name, emo: 'ok', mood: 'calm',
@@ -243,7 +243,7 @@ const PLAY = {
     const beats = [N_('Слышь.'), N_('Слышь.'), N_('Э.'), N_('Купишь крэк?')];
     for (const b of beats) {
       ST.win++;
-      const r = await DLG.say({ head: t('у подъезда'), color: SCENE.COL, fillers: false, person: p, name, emo: 'ok', text: t(b), accept: t('…') });
+      const r = await DLG.say({ head: t('у подъезда'), color: SCENE.COL, fillers: false, person: p, name, emo: 'ok', text: t(b), accept: t('… промолчать') });
       if (r === null) return { ans: null };
     }
     ST.win++;

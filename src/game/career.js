@@ -544,7 +544,29 @@ export function showEnd (why, whyText, held) {
     if (note && col && note.parentNode !== col) { note.className = 'ov-note pp-hint'; col.appendChild(note); }
   }
   noteIn();
+  placeCal();
   fitEnd();
+}
+
+/* календарик сезонов (seasoncycle.js receipt): на широком экране (career.css, ≥ 980 px и выше 540) — отдельным листком
+   справа от чека, под сообщением Толика: так длинный чек влезает на Деке без уменьшения. На телефоне боком (ниже 541 и
+   шире 599, 17.10.2026, Р13) — тоже справа, мелким листком между Толиком и пометками: в чеке он с праздничной лентой
+   выталкивал шапку за экран и всё уменьшалось до ×0,76 (подписи ~7 px). На узком стоя — в чеке, как был */
+const WIDE_END = '(min-width: 980px) and (min-height: 541px), (max-height: 540px) and (min-width: 600px)';
+function placeCal () {
+  const stage = $('cr-stage');
+  if (!stage) return;
+  let side = stage.querySelector('.cr-side-cal');
+  const cal = stage.querySelector('.cr-rc-cal');
+  if (!cal) { if (side) side.remove(); return; }
+  if (matchMedia(WIDE_END).matches) {
+    if (!side) { side = document.createElement('aside'); side.className = 'cr-side-cal'; stage.appendChild(side); }
+    if (cal.parentNode !== side) side.appendChild(cal);
+  } else if (side && cal.parentNode === side) {
+    const slot = stage.querySelector('.cr-rc-end > .cr-rc-stamp');
+    if (slot) slot.before(cal);
+    side.remove();
+  }
 }
 
 /* обучение на чеке (shifttour.js): «чек — сколько заработал» → «гараж и траты» → «депнуть» → «на новую смену» */
@@ -697,6 +719,7 @@ function fitBox (box) {
 }
 addEventListener('resize', () => {
   if (!A) return;
+  placeCal();
   fitEnd();
   const md = $('cr-spend');
   if (md && !md.hidden && !TAB) fitBox(md.querySelector('.cr-sp-box'));

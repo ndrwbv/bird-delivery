@@ -181,6 +181,8 @@ function render () {
     '<section class="pp-sheet pp-in qr-sheet">' +
       '<header class="pp-head"><span>' + esc(t('путевой лист')) + '</span><b>' + num(runs + 1) + '</b></header>' +
       '<div class="qr-fields">' + fields().map(rowHTML).join('') + '</div>' +
+      // как менять строки (геймпад и клавиатура; пальцем — ◀ ▶ видно и так): курсор стоит на «поехали», строки — выше
+      '<p class="pp-hint qr-how"><kbd class="pp-key">▲ ▼</kbd>' + esc(t('строка')) + '<i>·</i><kbd class="pp-key">◀ ▶</kbd>' + esc(t('поменять')) + '</p>' +
       '<p class="qr-warn">' + esc(t('в копилку не идёт, сюжета нет')) + '</p>' +
       '<button type="button" class="pp-stamp qr-go" data-pad-main>' + keyHTML('ok') + esc(t('поехали')) + '</button>' +
     '</section>' +

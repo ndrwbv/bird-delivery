@@ -504,10 +504,29 @@ function mergeLite (list) {
    и как у FLAT в мобильном режиме), треугольник — в клетку своей середины, как всё в Mesher. Что попадёт в FLAT позже
    (после куска 'mesh'), склеится по-старому (mergeChunked). ?noflatm — по-старому, для замера */
 const NO_FLATM = /[?&]noflatm(&|$)/.test(location.search);
-function flatToMesher (list, M) {
+/* Склейки реквизита (LIT: коробки, столбы, киоски, ограды…) — в клетки земли и дорог (LITM) до их склейки (17.10.2026,
+   docs/AGENTS.md «Слои статики»): было два материала Ламберта (земля — сезон + плитка + износ + газон, реквизит — сезон с
+   сухостью травы 0,4) — два вызова на клетку 200 м. Теперь у вершины реквизита четвёртый байт цвета 255: шейдер земли по нему
+   не кладёт плитку, износ и газон, сухость травы — 0,4 (seasons.js seasonMat propK). Цвет — байтами, как в мобильном режиме
+   (на компьютере может сдвинуться на 1/255). Реквизит теперь с двух сторон, как земля. Что попадёт в LIT позже куска 'mesh',
+   склеится по-старому. ?nolitj — по-старому, для замера.
+   Мобильный режим (телефон, mobile.js) — по-старому всегда: склейка реквизита у себя индексная (у коробки 24 вершины, у
+   шара и цилиндра общих вершин ещё больше), в клетках земли — без индекса (36 вершин на коробку), и клетки земли заливаются в
+   видеокарту все сразу (кусок 'upload'), а свои клетки реквизита — когда попали в кадр: на телефоне видео росло 285 → 376 МБ
+   (порог проверки 360). На компьютере и «Деке» — склеено: −9…10 вызовов, куча JS меньше на ~60 МБ, видео больше на ~90 МБ */
+const NO_LITJ = MOBM.ON || /[?&]nolitj(&|$)/.test(location.search);
+/* Плафоны фонарей и прочее, что светится (LAMPH), — тоже в клетки FLATM (17.10.2026): признак «светится» — четвёртый байт
+   цвета 255, шейдер FLATM у таких вершин не берёт ночное затемнение материала (как было у своего материала с glow). Сбиваемые
+   плафоны — в начале клетки, их позиции остаются в памяти: сбитый фонарь прячет плафон под землю (streetlamps.js hide).
+   Плафоны теперь с двух сторон, как вывески. ?nolampm — по-старому (своими клетками 400 м), для замера */
+const NO_LAMPM = /[?&]nolampm(&|$)/.test(location.search);
+/* trk — плафоны фонарей (LAMPH): у кого есть userData.track (сбиваемый фонарь), кладётся «спереди» клетки (Mesher front) —
+   позиции остаются в памяти, track узнает меш и вершины, как раньше от mergeChunked */
+function flatToMesher (list, M, trk) {
   let tris = 0;
   const rgbB = (r, g, b) => (Math.round(r * 255) << 16) | (Math.round(g * 255) << 8) | Math.round(b * 255);
   for (const g of list) {
+    if (trk) { const f = g.userData && g.userData.track; M.front(!!f); M.track(f); }
     const p = g.p || g.attributes.position.array, ix = g.p ? g.i : g.index ? g.index.array : null;
     const col = g.p ? null : g.attributes.color ? g.attributes.color.array : null;
     const one = g.p ? rgbB(g.r, g.g, g.b) : col ? 0 : 0xffffff;
@@ -520,6 +539,7 @@ function flatToMesher (list, M) {
     }
     if (!g.p) g.dispose();
   }
+  if (trk) M.front(false);
   list.length = 0;
   return tris;
 }
@@ -991,11 +1011,15 @@ const ZFLOG = typeof location !== 'undefined' && /[?&]zfight/.test(location.sear
 const ZFTAGS = ZFLOG && /[?&]zfight=tag/.test(location.search);   // ещё и кто положил (имя функции из стека; сборка медленнее в разы)
 let ZF_ID = 0;
 const ZFTAG = new Map();
-function Mesher () {
+/* opt.alpha — цвет вершины четырьмя байтами: четвёртый — признак (api.flag): у LITM — «реквизит», а не земля (17.10.2026,
+   docs/AGENTS.md «Слои статики»: склейки реквизита LIT — в клетки земли, один материал; шейдер по признаку не кладёт на
+   реквизит плитку, износ асфальта и пятна газона, а сухость травы у него 0,4 — как было у своего материала) */
+function Mesher (opt) {
   let n = 0;
   const ZMID = ++ZF_ID;
   const C = new THREE.Color();
-  let cr = 0, cg = 0, cb = 0, GRAD = null;
+  const CS = opt && opt.alpha ? 4 : 3;           // байт цвета на вершину
+  let cr = 0, cg = 0, cb = 0, ca = 0, GRAD = null;
   /* Треугольник сразу ложится в свою клетку (см. mesh): общий массив на весь
      город с последующей раскладкой по клеткам весил в Северске сотни мегабайт
      и стоил лишнего копирования. Клетки — в порядке первого треугольника */
@@ -1007,14 +1031,30 @@ function Mesher () {
     const k = span > CHUNK ? -1 : (Math.floor((x0 + x1 + x2) / 3 / CHUNK) + 50000) * 100000 + Math.floor((z0 + z1 + z2) / 3 / CHUNK) + 50000;
     if (k === lastK) return lastB;
     let b = ids.get(k);
-    if (b === undefined) { b = { cap: 1 << 10, n: 0, pos: new Float32Array(3 << 10), col: new Uint8Array(3 << 10) }; ids.set(k, b); BK.push(b); }
+    if (b === undefined) { b = { cap: 1 << 10, n: 0, pos: new Float32Array(3 << 10), col: new Uint8Array(CS << 10) }; ids.set(k, b); BK.push(b); }
     lastK = k; lastB = b;
     return b;
+  }
+  /* «спереди» (api.front): треугольники — в начало своей клетки (b.f): плафоны фонарей в клетках FLATM. Сбитый фонарь прячет
+     свой плафон, когда позиций в памяти JS уже нет (отпущены после загрузки), — коротким массивом до своего куска (streetlamps.js
+     hide): спереди он короткий. api.track(fn) — fn(меш, первая вершина, вершин) позовут, когда меш клетки будет готов
+     (кусок по клетке — отдельно) */
+  let FRONT = false, TRK = null;
+  function slot (ax, az, bx, bz, cx, cz) {
+    const b = bucket(ax, az, bx, bz, cx, cz);
+    if (!FRONT) return b;
+    return b.f || (b.f = { cap: 64, n: 0, pos: new Float32Array(64 * 3), col: new Uint8Array(64 * CS), trk: [], n0: 0 });
+  }
+  function note (f) {                               // треугольник спереди только что лёг с вершины f.n - 3
+    if (!TRK) return;
+    const L = f.trk[f.trk.length - 1];
+    if (L && L[0] === TRK && L[1] + L[2] === f.n - 3) L[2] += 3;
+    else f.trk.push([TRK, f.n - 3, 3]);
   }
   function room (b, add) {
     if (b.n + add <= b.cap) return;
     while (b.n + add > b.cap) b.cap *= 2;
-    const p2 = new Float32Array(b.cap * 3), c2 = new Uint8Array(b.cap * 3);
+    const p2 = new Float32Array(b.cap * 3), c2 = new Uint8Array(b.cap * CS);
     p2.set(b.pos); c2.set(b.col);
     b.pos = p2; b.col = c2;
   }
@@ -1059,27 +1099,36 @@ function Mesher () {
       return api;
     },
     tri (ax, ay, az, bx, by, bz, cx, cy, cz) {
-      const b = bucket(ax, az, bx, bz, cx, cz);
+      const b = slot(ax, az, bx, bz, cx, cz);
       room(b, 3);
-      const p = b.pos, c = b.col, i = b.n * 3;
+      const p = b.pos, c = b.col, i = b.n * 3, j = b.n * CS;
       p[i] = ax; p[i + 1] = ay; p[i + 2] = az; p[i + 3] = bx; p[i + 4] = by; p[i + 5] = bz; p[i + 6] = cx; p[i + 7] = cy; p[i + 8] = cz;
-      if (GRAD) { GRAD(ax, az, c, i); GRAD(bx, bz, c, i + 3); GRAD(cx, cz, c, i + 6); }
-      else { c[i] = c[i + 3] = c[i + 6] = cr; c[i + 1] = c[i + 4] = c[i + 7] = cg; c[i + 2] = c[i + 5] = c[i + 8] = cb; }
+      if (GRAD) { GRAD(ax, az, c, j); GRAD(bx, bz, c, j + CS); GRAD(cx, cz, c, j + CS * 2); }
+      else { c[j] = c[j + CS] = c[j + CS * 2] = cr; c[j + 1] = c[j + CS + 1] = c[j + CS * 2 + 1] = cg; c[j + 2] = c[j + CS + 2] = c[j + CS * 2 + 2] = cb; }
+      if (CS === 4) c[j + 3] = c[j + 7] = c[j + 11] = ca;
       b.n += 3; n += 3;
+      if (FRONT) note(b);
     },
+    /* признак в четвёртом байте цвета (Mesher({ alpha: true })): 0…255 — всем следующим треугольникам */
+    flag (v) { ca = v | 0; return api; },
+    /* следующие треугольники — в начало клетки, позиции после загрузки остаются в памяти (см. slot) */
+    front (on) { FRONT = !!on; if (!on) TRK = null; return api; },
+    track (fn) { TRK = fn || null; return api; },
     /* цвет по месту: fn(x, z, байты, i) кладёт цвет вершины в байты[i…i+2] (плавный стык асфальта,
        roadwear.js); null — снова один цвет на треугольник */
     grad (fn) { GRAD = fn || null; return api; },
     /* треугольник с цветом на вершину: c0…c2 — 0xRRGGBB байтами (как кладёт color) — для склейки FLAT в клетки FLATM (flatToMesher) */
     tri3 (ax, ay, az, bx, by, bz, cx, cy, cz, c0, c1, c2) {
-      const b = bucket(ax, az, bx, bz, cx, cz);
+      const b = slot(ax, az, bx, bz, cx, cz);
       room(b, 3);
-      const p = b.pos, c = b.col, i = b.n * 3;
+      const p = b.pos, c = b.col, i = b.n * 3, j = b.n * CS;
       p[i] = ax; p[i + 1] = ay; p[i + 2] = az; p[i + 3] = bx; p[i + 4] = by; p[i + 5] = bz; p[i + 6] = cx; p[i + 7] = cy; p[i + 8] = cz;
-      c[i] = c0 >> 16; c[i + 1] = (c0 >> 8) & 255; c[i + 2] = c0 & 255;
-      c[i + 3] = c1 >> 16; c[i + 4] = (c1 >> 8) & 255; c[i + 5] = c1 & 255;
-      c[i + 6] = c2 >> 16; c[i + 7] = (c2 >> 8) & 255; c[i + 8] = c2 & 255;
+      c[j] = c0 >> 16; c[j + 1] = (c0 >> 8) & 255; c[j + 2] = c0 & 255;
+      c[j + CS] = c1 >> 16; c[j + CS + 1] = (c1 >> 8) & 255; c[j + CS + 2] = c1 & 255;
+      c[j + CS * 2] = c2 >> 16; c[j + CS * 2 + 1] = (c2 >> 8) & 255; c[j + CS * 2 + 2] = c2 & 255;
+      if (CS === 4) c[j + 3] = c[j + 7] = c[j + 11] = ca;
       b.n += 3; n += 3;
+      if (FRONT) note(b);
     },
     quad (ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz, nx, ny, nz) {
       api.tri(ax, ay, az, bx, by, bz, cx, cy, cz, nx, ny, nz);
@@ -1198,21 +1247,34 @@ function Mesher () {
       const grp = new THREE.Group();
       const geo = B => {
         // хвост запаса не копируем: вид на тот же буфер, после загрузки его отпустит dropArr
-        const P = B.pos.subarray(0, B.n * 3), Cc = B.col.subarray(0, B.n * 3);
+        let P = B.pos.subarray(0, B.n * 3), Cc = B.col.subarray(0, B.n * CS);
+        const F = B.f && B.f.n ? B.f : null;
+        if (F) {                                    // кусок «спереди» (front) — в начало
+          const P2 = new Float32Array((F.n + B.n) * 3), C2 = new Uint8Array((F.n + B.n) * CS);
+          P2.set(F.pos.subarray(0, F.n * 3)); P2.set(P, F.n * 3); C2.set(F.col.subarray(0, F.n * CS)); C2.set(Cc, F.n * CS);
+          P = P2; Cc = C2;
+        }
         const g = new THREE.BufferGeometry();
-        const pa = new THREE.BufferAttribute(P, 3), ca = new THREE.BufferAttribute(Cc, 3, true);
+        const pa = new THREE.BufferAttribute(P, 3), cA = new THREE.BufferAttribute(Cc, CS, true);
         g.setAttribute('position', pa);
-        g.setAttribute('color', ca);
+        g.setAttribute('color', cA);
         boundSphere(g);
-        // после загрузки в видеокарту копия в памяти JS не нужна
-        pa.onUpload(dropArr); ca.onUpload(dropArr);
+        // после загрузки в видеокарту копия в памяти JS не нужна (сбитый плафон спереди прячет streetlamps.js hide — коротким
+        // массивом до своего куска и правкой диапазоном)
+        pa.onUpload(dropArr); cA.onUpload(dropArr);
         return g;
       };
+      const tracks = (B, me) => { if (B.f) { for (const [f, v0, nv] of B.f.trk) f(me, v0, nv); B.f.trk.length = 0; } };
       for (const B of BK) {
         // поздняя сборка держит клетки до конца (keep): запас «на вырост» (до ×2) — обрезать, в Северске это десятки МБ на всё меню
-        if (keep && B.cap > B.n + 1024) { const c = Math.max(B.n, 16); B.pos = B.pos.slice(0, c * 3); B.col = B.col.slice(0, c * 3); B.cap = c; }
+        if (keep && B.cap > B.n + 1024) { const c = Math.max(B.n, 16); B.pos = B.pos.slice(0, c * 3); B.col = B.col.slice(0, c * CS); B.cap = c; }
         if (B.me) {                                   // клетка уже с мешем (keep): дописалось — склейка заново
-          if (B.n > B.n0) { const old = B.me.geometry; B.me.geometry = geo(B); old.dispose(); BUILD_T.meshGrow = (BUILD_T.meshGrow || 0) + 1; }
+          if (B.n > B.n0 || (B.f && B.f.n > B.f.n0)) {
+            // кусок спереди вырос — вершины основного сдвинулись: прежние метки (track) остаются верны, они все спереди
+            const old = B.me.geometry; B.me.geometry = geo(B); old.dispose(); BUILD_T.meshGrow = (BUILD_T.meshGrow || 0) + 1;
+            B.n0 = B.n; if (B.f) B.f.n0 = B.f.n;
+          }
+          tracks(B, B.me);
           continue;
         }
         // статика не двигается: матрицы не пересчитываем каждый кадр —
@@ -1220,7 +1282,8 @@ function Mesher () {
         const me = new THREE.Mesh(geo(B), mat);
         me.matrixAutoUpdate = false;
         grp.add(me);
-        if (keep) { B.me = me; B.n0 = B.n; }
+        tracks(B, me);
+        if (keep) { B.me = me; B.n0 = B.n; if (B.f) B.f.n0 = B.f.n; }
       }
       grp.matrixAutoUpdate = false;
       grp.matrixWorldAutoUpdate = false;
@@ -1267,8 +1330,8 @@ const CHUNK = MAP.border ? 200 : 100;
 WINS.init(CHUNK);
 // окна с комнатами — настройка графики (gfx.js): на Низкой комнаты за стеклом нет — рама, шторы и свет остаются (windows.js)
 WINS.quality(GFX.winQ());
-const LITM = Mesher();      // всё материальное: земля, дороги, дома
-const FLATM = Mesher();     // разметка, окна, вывески — света не ловят
+const LITM = Mesher({ alpha: !NO_LITJ });   // всё материальное: земля, дороги, дома; с 17.10.2026 и склейки реквизита (LIT) — признак «реквизит» в четвёртом байте цвета
+const FLATM = Mesher({ alpha: true });   // разметка, окна, вывески — света не ловят; с 17.10.2026 и плафоны (LAMPH) — признак «светится» в четвёртом байте цвета
 
 /* ── земля, зелёнка, вода ── */
 /* площадки — тёплый рыжий песок (09.10.2026, было #d3bd88). Зелень — как до 09.10: сочную (#86c862…) автор вернул
@@ -4468,8 +4531,12 @@ function buildCity () {
   /* склейка статики: сначала то, что уже собрано (земля, дороги, дома — их видно в меню), потом —
      после поздних кусков — их полотно, плитка и ямы отдельными мешами по тем же клеткам и с тем же материалом */
   const tq = performance.now();
-  const litMat = HUR.holeMat(LAWN.lawnMat(RW.wearMat(WORLD.paveMat(SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }))))));   // + узор плитки (world.js), + вид асфальта (roadwear.js), + пятна газона (lawn.js), + ураган (hurricane.js)
-  const flatMat = HUR.holeMat(new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+  const litMat = HUR.holeMat(LAWN.lawnMat(RW.wearMat(WORLD.paveMat(SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }), 1, 0.4)))));   // + узор плитки (world.js), + вид асфальта (roadwear.js), + пятна газона (lawn.js), + ураган (hurricane.js); у реквизита (признак в цвете) сухость травы 0,4 и без плитки, износа и газона
+  const flatMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  // светится (признак в цвете — плафоны LAMPH): ночное затемнение материала (FLAT_MATS) не берём, цвет — как есть
+  flatMat.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n#ifdef USE_COLOR_ALPHA\nif (vColor.a > 0.5) diffuseColor.rgb = vColor.rgb;\n#endif'); };
+  flatMat.customProgramCacheKey = () => 'flatGlow';
+  HUR.holeMat(flatMat);
   const groups = [];
   const meshNow = keep => { for (const g of [LITM.mesh(litMat, keep), FLATM.mesh(flatMat, keep)]) { if (g.children.length) { groups.push(g); scene.add(g); } } };
   if (LATE.busy()) {                              // поздняя сборка: видимое — в сцену сразу, в видеокарту — при первом кадре
@@ -4478,7 +4545,14 @@ function buildCity () {
     try { renderer.compileAsync(scene, cam).catch(() => {}); } catch (e) { /* — */ }
   }
   BUILD_T.mesh = Math.round(performance.now() - tq);
-  LATE.add('mesh', () => { const t0 = performance.now(); if (!EDL.ED.on && !NO_FLATM) BUILD_T.flatToM = flatToMesher(FLAT, FLATM); meshNow(); BUILD_T.meshLate = Math.round(performance.now() - t0); });
+  LATE.add('mesh', () => {
+    const t0 = performance.now();
+    if (!EDL.ED.on && !NO_FLATM) BUILD_T.flatToM = flatToMesher(FLAT, FLATM);
+    if (!EDL.ED.on && !NO_LITJ) { LITM.flag(255); BUILD_T.litToM = flatToMesher(LIT, LITM); LITM.flag(0); }
+    if (!EDL.ED.on && !NO_LAMPM) { FLATM.flag(255); BUILD_T.lampToM = flatToMesher(LAMPH, FLATM, true); FLATM.flag(0); }
+    meshNow();
+    BUILD_T.meshLate = Math.round(performance.now() - t0);
+  });
   WINS.build(scene);                              // окна — по клеткам, один материал (windows.js)
   PAINT.build(scene);                             // муралы — один меш (citypaint.js)
   /* Всю статику — сразу в видеокарту, одним кадром в крохотную цель:
@@ -9192,7 +9266,7 @@ function takePickup (n) {
   if (n.kind === 'nos') {
     NOS.tank = Math.min(1, NOS.tank + NOS_CAN);
     Snd.nosPick();
-    if (!HINTS.coffee()) toast(NOS.tank >= 1 ? $t('кофе: полный бак — нажми {key} и полетишь на кофейной тяге', { key: nitroKey() }) : $t('кофе + — нажми {key} и полетишь на кофейной тяге', { key: nitroKey() }));
+    if (!HINTS.coffee()) toast(NOS.tank >= 1 ? $t('кофе: полный бак — нажми {key} и помчишь на кофейной тяге', { key: nitroKey() }) : $t('кофе + — нажми {key} и помчишь на кофейной тяге', { key: nitroKey() }));
   } else if (n.kind === 'shield') {
     FXS.shieldT = 10;
     Snd.nosPick();
@@ -13261,7 +13335,7 @@ function loadPizza () {
       S.time = S.timeMax;                       // срок пошёл с момента загрузки
       if (S.order && S.order.rush) {
         NOS.tank = 1;
-        popBonus($t('поторопись!'), $t('полный бак кофе — нажми {key} и полетишь на кофейной тяге', { key: nitroKey() }));
+        popBonus($t('поторопись!'), $t('полный бак кофе — нажми {key} и помчишь на кофейной тяге', { key: nitroKey() }));
       } else toast($t('пицца в машине — поехали'));
       if (S.coffeeNext) { S.coffeeNext = false; tossCoffee(); }
       Platform.gameplayStart();
@@ -13278,7 +13352,7 @@ function tossCoffee () {
   flyBox({ x: PIZZA.wx, y: PIZZA.wy, z: PIZZA.wz }, trunkPoint, 0.8, () => {
     cup.traverse(o => { if (o.geometry) o.geometry.dispose(); });   // материалы общие, геометрии — свои
     NOS.tank = Math.min(1, NOS.tank + 0.4);
-    toast($t('держи бонус: полный бак кофе — нажми {key} и полетишь на кофейной тяге', { key: nitroKey() }));
+    toast($t('держи бонус: полный бак кофе — нажми {key} и помчишь на кофейной тяге', { key: nitroKey() }));
     Snd.fx('coffee', s => s.blip(980, 0.08, 'triangle', 0.12));
   }, cup);
 }
@@ -15042,15 +15116,50 @@ const BIRD_BODY = new THREE.BoxGeometry(0.16, 0.14, 0.42);
 const BIRD_WING = (() => { const g = []; for (const s of [-1, 1]) { const w = new THREE.BoxGeometry(0.46, 0.03, 0.2); w.rotateZ(s * 0.35); w.translate(s * 0.26, 0.06, 0); put(g, w, '#ffffff', 0, 0, 0); } return mergeGeos(g); })();
 const BIRD_MAT = new THREE.MeshLambertMaterial({ color: 0x5b5e66, flatShading: true });
 const PIGEON_MAT = new THREE.MeshLambertMaterial({ color: 0x8a8f9c, flatShading: true });
+/* Птицы — два InstancedMesh на всех (17.10.2026, docs/AGENTS.md «Слои статики»): тела и крылья, цвет — у каждой своей
+   (стая темнее, голуби светлее). Было по два меша на птицу (27 птиц, в кадре ~6—7 вызовов), стало 2. У птицы — пустышка
+   g (Object3D, не на сцене): положение, поворот, масштаб, visible и g.userData.wing.scale — как раньше, матрицы инстансов
+   собирает birdsDraw() в конце updateBirds. Спрятанная — нулевой масштаб */
+const BIRDS = [];
+let BIRD_IM = null;
 function makeBird (mat, s) {
-  const g = new THREE.Group();
-  g.add(new THREE.Mesh(BIRD_BODY, mat));
-  const w = new THREE.Mesh(BIRD_WING, mat);
+  const g = new THREE.Object3D();
+  const w = new THREE.Object3D();
   g.add(w);
   g.scale.setScalar(s);
   g.userData.wing = w;
-  scene.add(g);
+  g.userData.col = mat.color;
+  BIRDS.push(g);
   return g;
+}
+function birdsInst () {
+  const grp = new THREE.Group();
+  grp.name = 'birds';
+  const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true });
+  const mk = geo => {
+    const im = new THREE.InstancedMesh(geo, mat, BIRDS.length);
+    im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    for (let i = 0; i < BIRDS.length; i++) im.setColorAt(i, BIRDS[i].userData.col);
+    im.frustumCulled = false;                       // стая кружит вокруг курьера, голуби — в 50—260 м: общий шар — почти всегда в кадре
+    im.matrixAutoUpdate = false;
+    grp.add(im);
+    return im;
+  };
+  BIRD_IM = [mk(BIRD_BODY), mk(BIRD_WING)];
+  scene.add(grp);
+}
+const BM = new THREE.Matrix4(), BZ = new THREE.Matrix4().makeScale(0, 0, 0);
+function birdsDraw () {
+  if (!BIRD_IM) return;
+  const [ib, iw] = BIRD_IM;
+  for (let i = 0; i < BIRDS.length; i++) {
+    const g = BIRDS[i];
+    if (!g.visible) { ib.setMatrixAt(i, BZ); iw.setMatrixAt(i, BZ); continue; }
+    g.updateMatrix(); ib.setMatrixAt(i, g.matrix);
+    const w = g.userData.wing; w.updateMatrix();
+    iw.setMatrixAt(i, BM.multiplyMatrices(g.matrix, w.matrix));
+  }
+  ib.instanceMatrix.needsUpdate = true; iw.instanceMatrix.needsUpdate = true;
 }
 const FLOCKS = [], PIGEONS = [];
 /* крыша под точкой: высота верха дома (рельеф + 3,15 м на этаж + 1,1), m — запас от стены; нет дома — -Infinity.
@@ -15085,6 +15194,8 @@ function initBirds () {
     placePigeons(grp);
     PIGEONS.push(grp);
   }
+  birdsInst();
+  birdsDraw();
 }
 /* голуби садятся на тротуар у скамейки или на дворовую дорожку рядом с курьером */
 function placePigeons (grp) {
@@ -15253,6 +15364,7 @@ function updateBirds (dt) {
       if (grp.t > 9 && (d > 70 || grp.t > 40)) placePigeons(grp);   // улетели — сядут где-то ещё (сели на крышу рядом — посидят, пока не отъедешь)
     }
   }
+  birdsDraw();
 }
 
 /* ─────────────── ночные компании ───────────────
@@ -16027,7 +16139,7 @@ if (LATE.busy()) {
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
 /* песочница (sandbox.html): бесконечное здоровье, нитро, «не глохнет» (noStall читает cars.js) */
 const SBX = { god: false, nitro: false, noStall: false };
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { inWall, FLY: FLYC, inTallHouse, WIDEN: { ...WIDEN.WIDEN, STATS: WIDEN.STATS }, FACE: FACE_DEBUG, RADAR, HUDC, RYARD: RYARD.DEBUG, RT, RASK: RASK.DEBUG, OTAGS: OTAGS.DEBUG, NICK, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, PG: PG.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, TACT, TG: TGRID.TG, PARKI: { ...PARKI.DEBUG, orphans: () => PARKI.orphans(TRAFFIC) }, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get routeOn () { return ROUTE_LINE.slots.some(q => q.m.visible); }, ROUTE_LINE, RP, rebuildRoutePath, updateRouteLine, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, DYNRES: DYN.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { inWall, FLY: FLYC, inTallHouse, WIDEN: { ...WIDEN.WIDEN, STATS: WIDEN.STATS }, FACE: FACE_DEBUG, RADAR, HUDC, RYARD: RYARD.DEBUG, RT, RASK: RASK.DEBUG, OTAGS: OTAGS.DEBUG, NICK, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, PG: PG.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, TACT, TG: TGRID.TG, PARKI: { ...PARKI.DEBUG, orphans: () => PARKI.orphans(TRAFFIC) }, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get routeOn () { return ROUTE_LINE.slots.some(q => q.m.visible); }, ROUTE_LINE, RP, rebuildRoutePath, updateRouteLine, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, CULLREFRESH: CULL.refresh, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, DYNRES: DYN.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта

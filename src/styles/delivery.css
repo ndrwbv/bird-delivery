@@ -1265,6 +1265,16 @@ html[data-map] #phone { width: min(920px, 76vw); }
   html #phone.ord-many .oc-inv tr:first-child td b { display: inline; }
   html #phone.ord-many .oc-inv tr:first-child td small { display: inline; margin: 0 0 0 .7em; }
   html #phone.ord-many .oc-inv tr:first-child td small::after { content: ''; display: block; margin-bottom: 3px; }
+  /* групповой (4—5 человек на адресе): имена через запятую, фото — не больше трёх; иначе строка «оплата» и «газ —
+     поехали» уезжали за низ листа, а прокрутить за 2,6 с никто не успевает (ревью 17.10) */
+  html #phone:not(.ord-many) .oc-inv tr[data-k="who"] td b { display: inline; }
+  html #phone:not(.ord-many) .oc-inv tr[data-k="who"] td b + b::before { content: ', '; }
+  html #phone:not(.ord-many) .oc-photos.small .oc-p:nth-of-type(n+4) { display: none; }
+}
+/* телефон боком, сердец много (с запасными и бронёй — до 18 в ряд): ряд доходил до подсказок сверху по центру (#toast
+   с 242 px) — сердца мельче, ряд 18 сердец ~230 px вместо 306 (ревью 17.10) */
+@media (max-height: 460px) {
+  body.touch #hearts:has(> i:nth-child(13)) i { width: 10px; height: 9px; margin-right: 2px; }
 }
 /* телефон стоя: фото сборного (две колонки) — кучкой по центру, а не по краям листа */
 @media (max-width: 520px) { #phone .oc-photos.many { justify-content: center; column-gap: 14px; } }
@@ -1289,3 +1299,6 @@ body.touch #phone, body.touch #phone.on { top: 50%; bottom: auto; }
 body.touch #phone { transform: translate(-50%, -46%) scale(.96); }
 body.touch #phone.on { transform: translate(-50%, -50%) scale(1); }
 body.touch #phone.on.drop { transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) scale(.12) rotate(-9deg); }
+/* телефон боком: 52 % высоты — это ~200 px, и у группового / сборного «оплата» и «газ — поехали» оставались под
+   прокруткой; лист по центру может быть выше (ревью 17.10) */
+@media (max-height: 460px) { html body.touch #phone, html[data-map] body.touch #phone { max-height: 76vh; } }
