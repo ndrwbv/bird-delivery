@@ -1,6 +1,10 @@
 /* ──────────────────────────────────────────────────────────────────────────
    Погода смены: каждый сезон — в нескольких вариантах (IDEAS блок 8, правила — docs/CAREER.md «Сезоны»).
 
+   С 17.10.2026 сезон смены карьеры решает круг сезонов (seasoncycle.js): с зимы по кругу, с переходными сменами
+   (оттепель, листопад, первый снег) и редкими сюрпризами; погода — жребием по шансам сезона (CHANCES) или своя у
+   перехода / сюрприза (pickStep). Жребий сезона ниже (SEASON_W, rollShift) — запасной, когда круг выключен (CYC.ON).
+
    С 11.10.2026 (автор: «смены всегда выпадают на рандомную как погоду, так и время года») в начале
    каждой смены карьеры жребий (Math.random) выбирает сразу и сезон, и погоду: сезон — по SEASON_W
    (место внутри сезона — SEASON_AT, тоже жребием), погода — по шансам этого сезона CHANCES. Пара
@@ -41,6 +45,7 @@ import * as SEAS from './seasons.js';
 import { onYard } from './yards.js';              // дворовые дорожки и выходы к тротуару — сугробы мимо (yards.js)
 import * as HUR from './hurricane.js';
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
+import * as CYCLE from './seasoncycle.js';   // сезоны по кругу с зимы: шаг смены, переходы, сюрпризы (seasoncycle.js, 17.10.2026)
 
 /* какой сезон выпадет на смену карьеры (в сумме 100; 11.10.2026): лето чаще — «чаще ярко-солнечно» (09.10.2026) */
 /* 13.10.2026 (автор: «по базе делай погоду зиму»): всегда зима — жребий только на погоду в ней. Было: лето 38, осень 22, зима 18, весна 22 */
@@ -67,8 +72,11 @@ const LAST = 'dlv-wx-last';                    // «сезон/погода» п
    Было 0,22 всегда — за 15-минутную смену (~6 бросков) дождь шёл в ~4 из 5 «ясных» смен; теперь летом ~1 из 6, весной и осенью ~1 из 2 */
 export const DRIZZLE = { summer: 0.03, autumn: 0.12, spring: 0.12, winter: 0.22 };
 export const IDS = ['clear', 'heat', 'golden', 'snowy', 'rain', 'storm', 'hurricane'];
+/* погода переходных смен и сюрпризов круга сезонов (seasoncycle.js) — не на выбор в быстром заезде:
+   thaw — оттепель (мокро и грязно, лужи), firstsnow — первый снег (идёт снег), maysnow — снег в мае (зелень в снегу) */
+export const SPECIAL = ['thaw', 'firstsnow', 'maysnow'];
 /* где вариант к месту: быстрый заезд с «жарой» зимой ставит сезон отсюда */
-const HOME = { heat: 0.45, golden: 1.45, snowy: 2.5, rain: 3.5, storm: 0.6, hurricane: 1.3 };
+const HOME = { heat: 0.45, golden: 1.45, snowy: 2.5, rain: 3.5, storm: 0.6, hurricane: 1.3, thaw: 3.02, firstsnow: 2.04, maysnow: 3.65 };
 const W = {
   RAIN_ON: [60, 120], RAIN_OFF: [15, 35],      // дождь: сколько льёт и сколько перерыв, с
   BOLT_EVERY: [6, 16], BOLT_DIST: [320, 1100], // молния: раз в 6—16 с, в 320—1 100 м
@@ -87,6 +95,9 @@ const OVER = {
   rain: { wet: v => Math.max(v, 0.65) },
   storm: { wet: v => Math.max(v, 0.85) },
   hurricane: { wet: v => Math.max(v, 0.85), fallen: v => Math.max(v, 0.5) },
+  thaw: { wet: v => Math.max(v, 0.9), mud: v => Math.max(v, 0.85) },
+  firstsnow: { snowfall: 0.42 },
+  maysnow: { snow: v => Math.max(v, 0.6), warm: v => Math.max(v, 0.7), wet: v => Math.max(v, 0.4), mud: 0, snowfall: 0.55 },
 };
 
 let C = null, THREE = null;
@@ -141,7 +152,7 @@ export function* init (ctx) {
   if (!ctx.intro) { try { HUR.init(ctx); } catch (e) { console.error('[weather] ураган', e); } }
   SEAS.addDriftTop(deepTop);
   const q = new URLSearchParams(location.search).get('weather');
-  if (q && IDS.includes(q)) { FORCE = q; setTimeout(() => set(q), 0); }   // ENV игры заводится позже
+  if (q && (IDS.includes(q) || SPECIAL.includes(q))) { FORCE = q; setTimeout(() => set(q), 0); }   // ENV игры заводится позже
   if (window.__dlv) window.__dlv.weather = DEBUG;
   else setTimeout(() => { if (window.__dlv) window.__dlv.weather = DEBUG; }, 0);
 }
@@ -155,9 +166,15 @@ export function shiftStart (ride) {
   NEW = !ride && done < NEWBIE;                    // первая смена карьеры: лето, ясно и сухо
   const hur = !ride && n >= HUR.HUR.FROM && DIRECTOR.can('hurricane');   // ураган — не в первые смены, не «покататься»; режиссёр: не в первую смену сессии
   let id;
+  CYCLE.clear();
+  const cyc = career ? CYCLE.shiftStart(done) : null;   // круг сезонов: шаг этой смены (null — выключен)
   if (FORCE) id = FORCE;
-  else if (NEW) { id = 'clear'; if (career) { SEAS.shiftSeason(NEWBIE_SEA); C.Store.set(LAST, 'winter/clear'); } }
-  else if (career) {
+  else if (NEW) { id = 'clear'; if (career) { SEAS.shiftSeason(cyc ? cyc.v : NEWBIE_SEA); C.Store.set(LAST, 'winter/clear'); } }
+  else if (cyc) {
+    SEAS.shiftSeason(cyc.v);
+    id = pickStep(cyc, String(C.Store.get(LAST, '') || ''), hur);
+    C.Store.set(LAST, cyc.sea + '/' + id);
+  } else if (career) {
     const r = rollShift(String(C.Store.get(LAST, '') || ''), hur);
     SEAS.shiftSeason(r.v);
     id = r.id;
@@ -170,9 +187,20 @@ export function shiftStart (ride) {
   if (id === 'hurricane') DIRECTOR.start('hurricane');   // до конца смены (режиссёр сам забудет на новой)
   HUR.shiftStart(id, ride, n);
 }
+/* погода шага круга сезонов: своя у перехода и сюрприза (wx), иначе — шансы сезона; пара прошлой смены подряд не повторяется */
+export function pickStep (st, prev = '', hur = true) {
+  const tab = st.wx || CHANCES[st.sea] || CHANCES.winter;
+  let id = 'clear';
+  for (let k = 0; k < 16; k++) {
+    id = pickW(tab);
+    if (id === 'hurricane' && !hur) id = 'storm';
+    if (st.wx || st.sea + '/' + id !== prev) break;
+  }
+  return id;
+}
 /* поставить вариант сейчас */
 function set (id, n = N) {
-  if (!IDS.includes(id)) id = 'clear';
+  if (!IDS.includes(id) && !SPECIAL.includes(id)) id = 'clear';
   ID = id; N = n;
   SEAS.setVariant(OVER[id]);
   TEMP = W.HEAT_T[0] + Math.floor(h01(n, 5) * (W.HEAT_T[1] - W.HEAT_T[0] + 1));
@@ -186,7 +214,7 @@ function set (id, n = N) {
   BOLT.t = id === 'storm' || id === 'hurricane' ? rnd(2, 5) : 0;
 }
 export const id = () => ID;
-export function force (v) { FORCE = v && IDS.includes(v) ? v : null; }
+export function force (v) { FORCE = v && (IDS.includes(v) || SPECIAL.includes(v)) ? v : null; }
 export const forced = () => FORCE;
 
 /* Погоду игроку не называем (04.10.2026): ни подписи в начале смены, ни в накладной, итогах и чате —
@@ -204,7 +232,7 @@ export const drizzle = () => (NEW && !FORCE ? 0 : DRIZZLE[bucket()] ?? 0.22);
 
 /* дождь: true — расписанием управляет вариант (game.js updateEnv своё не крутит) */
 export function rainControl (ENV, dt) {
-  if (ID === 'clear') return false;
+  if (ID === 'clear' || ID === 'thaw' || ID === 'firstsnow') return false;   // оттепель и первый снег — как обычная: изредка дождь / снег
   if (ID === 'storm' || ID === 'hurricane') ENV.rainWant = 1;
   else if (ID === 'rain') {
     if ((RT -= dt) <= 0) {
@@ -389,7 +417,7 @@ function* buildDeep () {
     const pts = [[x + nx * Wd, z + nz * Wd], [x + tx * L, z + tz * L], [x - tx * L, z - tz * L],
       [x + nx * Wd * 0.7 + tx * L * 0.7, z + nz * Wd * 0.7 + tz * L * 0.7], [x + nx * Wd * 0.7 - tx * L * 0.7, z + nz * Wd * 0.7 - tz * L * 0.7]];
     if (inner) pts.push([x - nx * Wd, z - nz * Wd], [x - nx * Wd * 0.7 + tx * L * 0.7, z - nz * Wd * 0.7 + tz * L * 0.7], [x - nx * Wd * 0.7 - tx * L * 0.7, z - nz * Wd * 0.7 - tz * L * 0.7], [x, z]);
-    for (const [px, pz] of pts) if (!inBounds(px, pz, -20) || inHouse(px, pz) || !offRoad(px, pz, 0.6) || onYard(px, pz, 0.3)) return false;
+    for (const [px, pz] of pts) if (!inBounds(px, pz, -20) || inHouse(px, pz) || !offRoad(px, pz, 0.6) || onYard(px, pz, 0.3) || (C.jumpBlocks && C.jumpBlocks(px, pz, 0.5))) return false;   // не на большом трамплине и его разгоне (jumps.js)
     if (onYard(x, z, Math.max(Wd, L))) return false;
     return !nearAddr(x, z, Math.max(Wd, L) + 3.5) && !nearPizza(x, z);
   };

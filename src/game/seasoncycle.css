@@ -1,0 +1,22 @@
+/* календарик сезонов в чеке смены (seasoncycle.js receipt, shiftend.js calHTML): «до весны — 2 смены», что придёт,
+   клетки следующих смен цветом сезона — как от руки цветными карандашами; переход — косой половинкой двух сезонов,
+   праздник — звезда, следующая смена — обведена жирнее */
+.cr-rc-cal { margin: .7em 0 0; color: var(--pp-ink); font-size: var(--pp-fs-m); line-height: 1.35; }
+.cr-rc-cal .sc-t { margin: 0; }
+.cr-rc-cal .sc-t b { font-weight: 700; color: #b0262c; white-space: nowrap; }
+.cr-rc-cal .sc-s { margin: .15em 0 0; font-size: var(--pp-fs-s); color: var(--pp-label); }
+.cr-rc-cal .sc-row { display: flex; gap: 4px; margin: .35em 0 0; padding: 3px; border: 2px dashed color-mix(in srgb, var(--pp-ink) 55%, transparent);
+                     border-radius: 5px 3px 6px 4px; rotate: .5deg; }
+.sc-c { --a: #9cc6e8; --b: var(--a); display: flex; align-items: center; justify-content: center; flex: 1; min-width: 0; height: 1.8em;
+        border-radius: 3px; font-style: normal; font-size: 1.15em; line-height: 1; color: rgba(30, 28, 34, .72);
+        background: linear-gradient(135deg, var(--a) 50%, var(--b) 50%); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12); }
+.sc-winter { --a: #a9cff0; }
+.sc-spring { --a: #9fd977; }
+.sc-summer { --a: #ffd54a; }
+.sc-autumn { --a: #f08a3a; }
+.sc-to-winter { --b: #a9cff0; }
+.sc-to-spring { --b: #9fd977; }
+.sc-to-autumn { --b: #f08a3a; }
+.sc-to-summer { --b: #ffd54a; }
+.sc-c.sc-next { box-shadow: inset 0 0 0 2px var(--pp-ink); }
+.sc-c.sc-hol { color: #b0262c; font-size: 1.3em; }

@@ -474,7 +474,7 @@ function buildSpec (Lk, o = {}) {
   const covers = hw === 'cap' || hw === 'beanie' || hw === 'bandana' || hw === 'hood' || hw === 'ushanka';
   for (const b of H) {
     const k = b[0];
-    if ((covers || hw === 'hat') && k === 'top') continue;
+    if ((covers || hw === 'hat' || hw === 'witch') && k === 'top') continue;
     if (covers && hw !== 'hood' && k === 'fringe') continue;
     if (hw === 'hood' && (k === 'back' || k === 'side' || k === 'tail')) continue;
     bx(5, ...b.slice(1));
@@ -490,6 +490,11 @@ function buildSpec (Lk, o = {}) {
     const fd = mix(Wr.fur, '#000000', 0.25);
     bx(5, Wd + 0.1, 0.2, D + 0.1, 0, T + 0.07, 0, Wr.fur); bx(5, Wd + 0.14, 0.11, 0.06, 0, T + 0.02, F + 0.06, fd);
     for (const s of [-1, 1]) bx(5, 0.07, 0.3, D * 0.62, s * (Wd / 2 + 0.05), T - 0.16, -0.01, Wr.fur);
+  }
+  if (hw === 'witch') {                          // остроконечная шляпа ведьмы (Хэллоуин, holidays.js): широкие поля, конус ступеньками набок, лента
+    bx(5, Wd + 0.36, 0.03, D + 0.36, 0, T, 0, hc); bx(5, Wd - 0.02, 0.16, D - 0.02, 0, T + 0.09, 0, hc);
+    bx(5, Wd * 0.62, 0.16, D * 0.62, 0, T + 0.25, -0.02, hc); bx(5, Wd * 0.34, 0.15, D * 0.34, 0, T + 0.4, -0.05, hc);
+    bx(5, 0.06, 0.12, 0.06, 0, T + 0.52, -0.1, hc); bx(5, Wd, 0.04, D, 0, T + 0.035, 0, Lk.tieC || '#7a3fb0');
   }
   if (hw === 'headband') bx(5, Wd + 0.03, 0.05, D + 0.03, 0, T - 0.07, 0, hc);
   if (hw === 'bandana') { bx(5, Wd + 0.04, 0.12, D + 0.04, 0, T + 0.02, 0, hc); bx(5, 0.08, 0.14, 0.06, 0, T - 0.08, -F - 0.04, hc); }

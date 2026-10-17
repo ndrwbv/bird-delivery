@@ -69,6 +69,7 @@ export const LIST = [
   { id: 'SEMERKA_50', group: 'fun', stat: 'semerka', need: 50, name: N_('Верность Семёрке'), desc: N_('Доставить 50 заказов на «Семёрке»') },
   { id: 'BUHANKA_20', group: 'fun', stat: 'buhanka', need: 20, name: N_('Хлебовоз'), desc: N_('Доставить 20 заказов на «Буханке»') },
   { id: 'ALL_IN', group: 'fun', stat: 'allin', need: 1, hidden: true, name: N_('Всё на красное'), desc: N_('Депнуть всю копилку и проиграть') },
+  { id: 'ROOFTOP', group: 'fun', stat: 'roof', need: 1, name: N_('Карлсон'), desc: N_('Запрыгнуть на машине на крышу дома') },
   { id: 'TOLIK_MDAA', group: 'fun', stat: 'mdaa', need: 1, name: N_('Мдаа'), desc: N_('Услышать от Толика «мдаа» в конце смены') },
   // в архиве, автор 10.10.2026: сюжет героев убран (heroes.js HERO.STORY) — глав бабы Зины нет, достижение спрятано
   // (story: true — только при HERO.STORY; уже полученное остаётся в сохранении и в Стиме, на доске почёта — видно)

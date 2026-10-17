@@ -98,6 +98,7 @@ import * as KITES from './kites.js';          // воздушные змеи и 
 import * as AUTO from './cars.js';               // карьера: 14 машин, мотор и ресурс, заглохла, ямы, гараж Дяди Жени
 import * as FEST from './festivals.js';          // фестивали на парковках ТЦ: кальянщики, тыква, День угнетения бургеров (festivals.js)
 import * as HOL from './holidays.js';            // праздничная смена: Новый год — гирлянды, Деды Морозы, салют, праздничные заказы (holidays.js)
+import * as CYCLE from './seasoncycle.js';      // сезоны по кругу с зимы: переходы, сюрпризы, прогноз Толика, календарик в чеке (seasoncycle.js)
 import * as HK from './hookah.js';               // кальянщики на лавочках (в детской — самовар)
 import * as CULL from './cull.js';
 import * as UPD from './update.js';              // обновление из меню: плашка «есть новая версия», настройки → версия (update.js)
@@ -143,6 +144,9 @@ import { keyHTML, matchKey, setInput as glyphInput, inputKind, onInput as onGlyp
 import * as COLM from './collect.js';            // «мои находки» — лист накладной в окне меню
 import * as FIRST from './intro.js';             // вступление первого запуска: пиццерия, Степан, машина (катсцена «как в ГТА»)
 import * as ACH from './achievements.js';          // достижения Стима: таблица, счётчики, вызов моста (achievements.js, docs/STEAM.md)
+import * as ROOFM from './roofs.js';               // крыши низких домов твёрдые сверху, «высота опоры» (roofs.js, CAREER.md «Трамплины и крыши»)
+import * as JUMPS from './jumps.js';               // большие трамплины у низких домов: песок, плиты, эстакада, автовоз (jumps.js)
+import * as FLYC from './flycar.js';             // летающий родстер: открытый салон, полёт по кнопке, полоска на хаде (flycar.js, CAREER.md «Тесло Родстер: полёт»)
 import * as BOARD from './board.js';               // таблица рекордов «лучшая смена» в Стим-сборке (board.js, docs/STEAM.md §4.2)
 import * as PROF from './profiles.js';           // профили: прогресс каждого под своими ключами, сброс — только текущего (profiles.js)
 import * as QR from './quickrun.js';               // быстрый заезд из меню: сезон, длина, машина; сохранение карьеры не трогает (quickrun.js)
@@ -2867,6 +2871,7 @@ function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch) {
         const tx = cx + rand(-1, 1) * Math.sqrt(area) * 0.18, tz = cz + rand(-1, 1) * Math.sqrt(area) * 0.18;
         if (!inPoly(tx, tz, p)) continue;
         box(LIT, k === 'off' ? 2.6 : 2.2, k === 'off' ? 1.4 : 2.2, k === 'off' ? 1.6 : 2.2, k === 'off' ? '#c4c9cf' : '#9c8f96', tx, h + 0.7, tz);
+        if (b._lowRoof) obb(tx, tz, k === 'off' ? 1.3 : 1.1, k === 'off' ? 0.8 : 1.1, 0).topY = h + (k === 'off' ? 1.4 : 1.8);   // на низкой крыше — твёрдая (roofs.js)
       }
     }
   }
@@ -3039,6 +3044,15 @@ function osmBuildings (skip) {
     const hex = PAINT.wallHex(b) || b.col || (b.k === 'off' ? OFFICE_WALLS[seed % OFFICE_WALLS.length]   // жилые — палитра по номеру дома (citypaint.js)
       : KIND_WALL[b.k] || WALLS[seed % WALLS.length]);
     b._hex = hex;
+    b._top = h;                                    // верх стен — летающий родстер ниже него в дом не влетит (inTallHouse, flycar.js)
+
+    // низкая крыша — твёрдая сверху (roofs.js): на неё можно запрыгнуть с трамплина, стены выше topY кузов не держат
+    let topY;
+    if (h - hLo <= ROOFM.ROOF.MAX_H && b.k !== 'church') {
+      const gab = (b.roof === 'g' || b.roof === 'h') && b.k !== 'gar' ? ROOFM.gableOf(p, h, b.roof === 'h') : null;
+      const tent = !gab && b.k !== 'gar' && b.roof && b.roof !== 'f' && area < 420 && n <= 10 && lv <= 4;   // шатёр (facade) — не крыша
+      if (!tent && ROOFM.add(p, h, { kind: b.k || 'res', gable: gab })) { topY = gab ? gab.y0 : h; b._lowRoof = true; }
+    }
 
     // стены и препятствия
     const arch = archFor(b, p, ccw, lv, area);
@@ -3060,7 +3074,8 @@ function osmBuildings (skip) {
         obb(a[0] + ux * (g1 + len) / 2, a[1] + uz * (g1 + len) / 2, (len - g1) / 2, 0.5, ry);
       } else {
         LITM.wall(a[0], a[1], c[0], c[1], hLo - 0.6, h);
-        obb((a[0] + c[0]) / 2, (a[1] + c[1]) / 2, len / 2, 0.5, Math.atan2(dz, dx));
+        const ws = obb((a[0] + c[0]) / 2, (a[1] + c[1]) / 2, len / 2, 0.5, Math.atan2(dz, dx));
+        if (topY !== undefined) ws.topY = topY;   // выше — стоишь на крыше (roofs.js)
       }
 
       // какая стена ближе к проезжей части — та и станет фасадом
@@ -3247,6 +3262,21 @@ function inHouse (x, z, m = 0) {
     const p = a[i].p;
     if (inPoly(x, z, p)) return true;
     if (m && (inPoly(x + m, z, p) || inPoly(x - m, z, p) || inPoly(x, z + m, p) || inPoly(x, z - m, p))) return true;
+  }
+  return false;
+}
+/* летающий родстер (flycar.js): точка внутри дома, верх которого выше днища y — значит, влетел в стену (арка и
+   пролёты — тоже). Дома из карты — по верху стен (b._top), свои постройки без высоты — FLY_TOP м над землёй;
+   точки конкурентов, стройки, пустыри — низкие, над ними пролетаешь */
+const FLY_TOP = { pizza: 11, club: 7 };
+function inTallHouse (x, z, y) {
+  const a = HOUSE_GRID.get(Math.floor(x / 40) + ',' + Math.floor(z / 40));
+  if (!a) return false;
+  for (let i = 0; i < a.length; i++) {
+    const b = a[i];
+    let top = b._top;
+    if (top === undefined) { const k = FLY_TOP[b.k]; if (!k) continue; top = groundH(b.p[0][0], b.p[0][1]) + k; }
+    if (y < top - FLYC.FLY.PASS && inPoly(x, z, b.p)) return true;
   }
   return false;
 }
@@ -3780,9 +3810,26 @@ function rivalLite (hex, model, roof, mem) {
    а над ней в полёте пролетаешь. */
 const RAMPS = [];
 const RAMP_L = 6, RAMP_W = 3.6, RAMP_H = 1.3;
+const RAMP_SMALL = { H: RAMP_H, L: RAMP_L };
 
-function addRamp (x, z, ux, uz) {
+/* o (большие трамплины, jumps.js): { L, W, H, kind, mesh: false — свой вид рисует jumps.js, sides — бока держат
+   тех, кто въезжает сбоку ниже верха } */
+function addRamp (x, z, ux, uz, o) {
   const rx = -uz, rz = ux, y = groundH(x, z);
+  if (o) {
+    const r = { x, z, ux, uz, y, L: o.L, W: o.W, H: o.H, kind: o.kind, reach: Math.hypot(o.L, o.W) / 2 + 0.3 };
+    const ry = Math.atan2(uz, ux);
+    const back = obb(x + ux * (o.L / 2 - 0.4), z + uz * (o.L / 2 - 0.4), 0.4, o.W / 2, ry);
+    back.ramp = y + o.H; back.rux = ux; back.ruz = uz;
+    if (o.sides) for (const sd of [-1, 1]) {        // бока верхних двух третей: сбоку ниже кромки — стенка
+      const u0 = -o.L / 2 + o.L * 0.35, uc = (u0 + o.L / 2) / 2;
+      const so = o.sideOut || 0, vo = o.W / 2 - 0.3 + so / 2;   // sideOut — склоны кучи шире ската: стенка — по склону
+      const s = obb(x + ux * uc + rx * sd * vo, z + uz * uc + rz * sd * vo, (o.L / 2 - u0) / 2, 0.3 + so / 2, ry);
+      s.ramp = y + o.H * 0.35; s.rux = 0; s.ruz = 0; s.rside = 1;
+    }
+    RAMPS.push(r);
+    return r;
+  }
   const P = (u, v, h) => [x + ux * u + rx * v, y + h, z + uz * u + rz * v];
   const quad = (a, b, c, d, hex) => {
     LITM.color(hex);
@@ -3805,7 +3852,7 @@ function addRamp (x, z, ux, uz) {
   const back = obb(x + ux * (RAMP_L / 2 - 0.4), z + uz * (RAMP_L / 2 - 0.4), 0.4, RAMP_W / 2, Math.atan2(uz, ux));
   back.ramp = y + RAMP_H;
   back.rux = ux; back.ruz = uz;                     // куда смотрит скат: съезжающих вперёд стенка не держит
-  RAMPS.push({ x, z, ux, uz, y });
+  RAMPS.push({ x, z, ux, uz, y, L: RAMP_L, W: RAMP_W, H: RAMP_H, kind: 'small', reach: 5 });
 }
 
 function osmRamps () {
@@ -3820,14 +3867,16 @@ function osmRamps () {
   }
 }
 
-/* высота рампы в точке: 0 — не на ней */
+/* высота рампы в точке: 0 — не на ней. RAMP_ON — на какой (размер свой у каждой: большие — jumps.js) */
+let RAMP_ON = null;
 function rampLift (x, z) {
-  for (const r of RAMPS) {
-    const dx = x - r.x, dz = z - r.z;
-    if (Math.abs(dx) > 5 || Math.abs(dz) > 5) continue;
+  for (let i = 0; i < RAMPS.length; i++) {
+    const r = RAMPS[i], dx = x - r.x, dz = z - r.z;
+    if (Math.abs(dx) > r.reach || Math.abs(dz) > r.reach) continue;
     const u = dx * r.ux + dz * r.uz, v = -dx * r.uz + dz * r.ux;
-    if (Math.abs(v) > RAMP_W / 2 || u < -RAMP_L / 2 || u > RAMP_L / 2) continue;
-    return RAMP_H * (u + RAMP_L / 2) / RAMP_L;
+    if (Math.abs(v) > r.W / 2 || u < -r.L / 2 || u > r.L / 2) continue;
+    RAMP_ON = r;
+    return r.H * (u + r.L / 2) / r.L;
   }
   return 0;
 }
@@ -4327,6 +4376,15 @@ const ymApi = () => ({ THREE, CITY, HOUSE_GRID, LIT, put, box, obb, smashAdd, tr
   pzBlocks: PZD.blocks, rivBlocks: RIVS.blocks, startClear, isForest: FOREST.isForest, forests: () => [...LWOOD.polys(), ...RINGM.polys(), ...(MAP.woods || [])],
   claims: () => [...CONSTR.claimed(), ...CONSTR.DEBUG.SITES.map(s => ({ x: s.x, z: s.z, r: Math.hypot(s.W, s.D) / 2 + 2 }))],
   pizzerias: () => (PIZZERIAS.length ? PIZZERIAS : [PIZZA]), stops: JUNK.DEBUG.STOPS, PARKINGS, PITCHES, fuelPads: LM.FUEL_PADS, mobile: () => TOUCH || MOBM.ON });
+/* что нужно jumps.js (большие трамплины): где свободно и как ставить горку */
+const jumpApi = () => ({ CITY, SOLIDS, LITM, LIT, box, obb, addRamp, RAMPS, groundH, inHouse, inBounds, inPoly, nearestRoad, onPave: PAVE.onPave,
+  busy: (x, z, r) => YARDS.blocks(x, z, r) || YCARS.blocks(x, z, r) || YMAZE.blocks(x, z, r) || COURTS.blocks(x, z, r) || PZD.blocks(x, z, r) || RIVS.blocks(x, z, r),
+  smashNear: (x, z, r) => { let hit = false; smashNear(x, z, it => { if (!hit && Math.hypot(it.x - x, it.z - z) < r + (it.r || 0.5)) hit = true; }); return hit; },
+  pizzerias: () => (PIZZERIAS.length ? PIZZERIAS : [PIZZA]) });
+/* сел на крышу (driveStep): достижение «Карлсон», Толик — раз за смену (jumps.js) */
+function roofLanded () {
+  JUMPS.landed({ ach: k => ACH.add(k), canSay: () => CAREER && isPlaying() && !S.ride, say: s => CHAT.say(s) });
+}
 /* что нужно courts.js: то же, что лабиринту дворов, плюс сцена, сбиваемые меши, люди */
 const courtsApi = () => ({ ...ymApi(), scene, smashMesh, LITM, FLATM, rich: MAP.career && MAP.career.rich, V, get ENV () { return ENV; }, CAR_L, CAR_W,
   makeHuman, freshHuman, dropMesh, gibHuman, sayBubble, puff, intro: () => INTRO || STORY.active(), runOver: () => { S.people++; CBUMP.hit(V, 'person'); Snd.squish(); } });
@@ -4402,6 +4460,7 @@ function buildCity () {
   if (!INTRO) tm('yardmaze', () => YMAZE.build(ymApi()));   // дворы сложнее: заборы у тротуаров, клумбы, кусты, лесочки — после карманов парковки, до сугробов и smashBuild (yardmaze.js); ?nomaze — без них
   tm('seasonyard', SEAS.seasonYard);
   if (!INTRO) tm('courts', () => COURTS.build(courtsApi()));   // теннисные и падел-корты — после горок дворов, до smashBuild (courts.js); ?nocourts — без них
+  if (!INTRO && !new URLSearchParams(location.search).has('nojumps')) tm('jumps', () => JUMPS.build(jumpApi()));   // большие трамплины у низких крыш — после дворов и кортов, до smashBuild (jumps.js); ?nojumps — без них
   tm('smash', smashBuild);
   tm('seasons', SEAS.seasonSteps);                // сугробы, ёлки, гирлянды — шагами (latebuild.js)
   if (!INTRO) tm('trails', WASTE.trails);         // тропинки наискосок, вытоптанное у лавочек, лужи — после дворов и лавочек (wastelands.js)
@@ -5063,24 +5122,26 @@ function makeCar (bodyHex, roofSign, model = 'sedan', taxi = false, opts = {}) {
   // салон: стойки и крыша (у смарта — каркасом другого цвета)
   const cy = top + S.ch / 2, gh = S.ch * 0.72;
   // своя машина (opts.see): салон — рама и стёкла, внутри курьер; стёкла трескаются и бьются (carglass.js)
-  const cg = opts.see ? CG.cabin(g, add, { S, W, top, cy, gh, frame, tint: !!opts.tint, dy, rb: opts.rake ? opts.rake.b : 0 }) : null;
+  const open = !!opts.open;                         // кабриолет (летающий родстер): без крыши и стёкол — сиденья, курьер, манекен (flycar.js)
+  const cg = opts.see && !open ? CG.cabin(g, add, { S, W, top, cy, gh, frame, tint: !!opts.tint, dy, rb: opts.rake ? opts.rake.b : 0 }) : null;
+  if (open) FLYC.openCabin(add, { S, W, top, GLASS, frame, body: bodyHex });
   // машины потока (без своей морды): салон-трапеция — наклонные стёкла и стойки (carbody.js)
   const door = Math.min(1.85, S.cab * 0.85), four = model !== 'smart' && model !== 'coupe' && !opts.two;
   // машины гаража со своей мордой — салон как был, только у классических седанов наклонное заднее стекло (LOOK.rake)
   const rake = opts.dress ? opts.rake : BODYM.RAKE[model];
-  const TR = !cg && rake ? BODYM.cabin(add, { S, W, top, frame, GLASS, rake, four, tuck: opts.dress ? 0 : undefined, doorTop: top - 0.1 + (S.h + 0.08) / 2 }) : null;
-  if (!cg && !TR) add(new THREE.BoxGeometry(W - 0.12, S.ch, S.cab), frame, 0, cy, S.cz);
+  const TR = !cg && !open && rake ? BODYM.cabin(add, { S, W, top, frame, GLASS, rake, four, tuck: opts.dress ? 0 : undefined, doorTop: top - 0.1 + (S.h + 0.08) / 2 }) : null;
+  if (!cg && !TR && !open) add(new THREE.BoxGeometry(W - 0.12, S.ch, S.cab), frame, 0, cy, S.cz);
   const roofZ = TR ? TR.roofZ : cg ? cg.roofZ : S.cz, roofLen = TR ? TR.roofLen : cg ? cg.roofLen : S.cab;
-  add(bev(TR ? TR.roofW - 0.02 : W - 0.24, 0.12, roofLen - 0.05, { t: BB.ROOF }), frame, 0, top + S.ch + 0.04, roofZ, 'roof');
+  if (!open) add(bev(TR ? TR.roofW - 0.02 : W - 0.24, 0.12, roofLen - 0.05, { t: BB.ROOF }), frame, 0, top + S.ch + 0.04, roofZ, 'roof');
   // двери: шов, ручки, молдинг — в меше двери (мнутся и двигаются с ней)
   for (const s of [-1, 1]) {
     const dm = add(new THREE.BoxGeometry(0.1, S.h + 0.08, door), dark, s * (W / 2 + 0.02), top - 0.1, S.cz + 0.02, s < 0 ? 'doorL' : 'doorR');
     if (!taxi) REARM.dressPanel(dm, dark, BODYM.doorParts(s, S.h + 0.08, door, { four, handle: opts.handle, molding: opts.molding === undefined ? '#26252b' : opts.molding }), { put, mergeGeos });
   }
   // стёкла (у своей машины — carglass.js, выше)
-  const wsF = cg ? null : TR ? add(TR.front, GLASS, 0, 0, 0, 'keep') : add(new THREE.BoxGeometry(W - 0.28, gh, 0.1), GLASS, 0, cy + 0.02, S.cz + S.cab / 2 + 0.01, 'keep');
-  const wsB = cg ? null : TR ? add(TR.back, GLASS, 0, 0, 0, 'keep') : add(new THREE.BoxGeometry(W - 0.28, gh * 0.9, 0.1), GLASS, 0, cy + 0.02, S.cz - S.cab / 2 - 0.01, 'keep');
-  if (!cg && !TR) {
+  const wsF = cg || open ? null : TR ? add(TR.front, GLASS, 0, 0, 0, 'keep') : add(new THREE.BoxGeometry(W - 0.28, gh, 0.1), GLASS, 0, cy + 0.02, S.cz + S.cab / 2 + 0.01, 'keep');
+  const wsB = cg || open ? null : TR ? add(TR.back, GLASS, 0, 0, 0, 'keep') : add(new THREE.BoxGeometry(W - 0.28, gh * 0.9, 0.1), GLASS, 0, cy + 0.02, S.cz - S.cab / 2 - 0.01, 'keep');
+  if (!cg && !TR && !open) {
     add(new THREE.BoxGeometry(0.1, gh * 0.84, S.cab - 0.3), GLASS, -W / 2 + 0.05, cy + 0.03, S.cz);
     add(new THREE.BoxGeometry(0.1, gh * 0.84, S.cab - 0.3), GLASS, W / 2 - 0.05, cy + 0.03, S.cz);
   }
@@ -5176,7 +5237,7 @@ function makeCar (bodyHex, roofSign, model = 'sedan', taxi = false, opts = {}) {
   sh.rotation.x = -Math.PI / 2; sh.position.y = 0.03; sh.scale.set(W / (L + 0.5) * 1.15, 1, 1);
   g.add(sh);
 
-  g.userData = { wheels, steer, panels, glass: cg ? [] : [wsF, wsB], cg, dmg: 0, smokeT: 0, bodyHex, hazard, hl, model, trunk,
+  g.userData = { wheels, steer, panels, glass: cg || open ? [] : [wsF, wsB], cg, dmg: 0, smokeT: 0, bodyHex, hazard, hl, model, trunk,
     pipe: RK ? RK.pipe : null, cargo: RK ? RK.cargo : null, rdoor: RK ? RK.rdoor || null : null,   // труба, коробки в багажнике, задняя дверь хэтчбека своей машины (carrear.js)
     see: !!opts.see, W, y0: y0 + dy, mirrors, armor: opts.armor || 0,   // своя машина: мнётся формой, теряет детали (cardent.js)
     hood: hoodM ? { m: hoodM, y: hoodM.position.y, z: hoodM.position.z, len: S.hood } : null,
@@ -6960,7 +7021,7 @@ function spawnTraffic (n, rmin = 40, rmax = 330) {
 /* тень под машиной игрока (carshadow.js): по позе кузова; в прыжке — на земле под ним */
 CSH.init(scene);
 function carShadow () {
-  const p = car.position, gy = V.air ? surfaceAt(V.x, V.z, V.y) + 0.15 : p.y;
+  const p = car.position, gy = V.air || FLYC.on() ? supportAt(V.x, V.z, V.y) + 0.15 : p.y;   // и в полёте родстера (flycar.js)   // в прыжке — на крыше под ним, если есть (roofs.js)
   CSH.step(p.x, p.z, car.rotation.y, gy, p.y, car.rotation.x, car.rotation.z, ENV.night || 0, car.visible && car.parent === scene && V.sink === undefined, sun.position.x - V.x, sun.position.z - V.z);
 }
 
@@ -10149,7 +10210,7 @@ const padSel = () => { try { const el = padMenu.selected(); return el && el.isCo
    Через Platform.store — так на Яндексе чистится и облако. Потом — перезагрузка. */
 const RESET_KEEP = ['dlv-lang', 'dlv-sound', 'dlv-doorgames', 'dlv-route', 'dlv-radio', 'dlv-radio-st', 'dlv-vol-music', 'dlv-vol-sfx', 'dlv-vol-eng', 'dlv-gfx', 'dlv-edition', 'dlv-name', 'dlv-map', 'dlv-money-x8', 'dlv-__ts', 'dlv-ach'];   // dlv-ach — достижения, как в Стиме, не стираются
 const PROGRESS_KEYS = [
-  'dlv-msk-wallet', 'dlv-msk-cars', 'dlv-msk-car', 'dlv-msk-best', 'dlv-msk-xp', 'dlv-msk-col', 'dlv-msk-tut', 'dlv-msk-guide', 'dlv-msk-nostut', 'dlv-intro', 'dlv-garage-tut', 'dlv-shift-tut', 'dlv-hints', 'dlv-route-ask', 'dlv-wx-last',
+  'dlv-msk-wallet', 'dlv-msk-cars', 'dlv-msk-car', 'dlv-msk-best', 'dlv-msk-xp', 'dlv-msk-col', 'dlv-msk-tut', 'dlv-msk-guide', 'dlv-msk-nostut', 'dlv-intro', 'dlv-garage-tut', 'dlv-shift-tut', 'dlv-hints', 'dlv-route-ask', 'dlv-wx-last', 'dlv-cycle',
   'dlv-shifts', 'dlv-stars', 'dlv-crew', 'dlv-story', 'dlv-season', 'dlv-used-addr', 'dlv-lb-local', 'dlv-boss', 'dlv-clock', 'dlv-rev-sale',
   'dlv-car-owned', 'dlv-car-cur', 'dlv-car-up', 'dlv-car-L', 'dlv-car-eng', 'dlv-car-paint', 'dlv-district', 'dlv-dist-shifts', 'dlv-dist-open', 'dlv-city-mode', 'dlv-city-party', 'dlv-knocked', 'dlv-pz-grow', 'dlv-delivered', 'dlv-honor', 'dlv-faces', 'dlv-locals',
   ...Object.keys(ECON.DONATE || {}).map(k => 'dlv-don-' + k),
@@ -10325,8 +10386,9 @@ const IN = dbl({ gas: 0, brake: 0, left: 0, right: 0, hand: 0, nitro: 0, joy: 0,
 
 /* после сгоревшей смены кузов возвращается целым и некопчёным */
 function resetCar () {
-  V.sink = undefined; V.sinkL = undefined; V.wade = 0;
+  V.sink = undefined; V.sinkL = undefined; V.wade = 0; V.roof = false;
   ICEM.reset();                                   // треск льда — с нуля (ice.js)
+  FLYC.reset();                                   // летающий родстер: на земле, заряд полный (flycar.js)
   dropMesh(car);
   car = makeCourier();
   car.position.set(V.x, V.y, V.z);
@@ -10386,11 +10448,21 @@ const LAWN_BUMP = kind => { const k = CBUMP.kindOf(kind); if (k !== 'post') retu
 function driveSub (dt) {
   const n = Math.max(1, Math.ceil(dt * 60 - 0.05));
   let vf = 0;
+  FLYC.tick(dt);                                   // летающий родстер: перезарядка, полоска на хаде (flycar.js)
   for (let i = 0; i < n; i++) vf = driveStep(dt / n);
   return vf;
 }
 /* по чему едет колесо, с замёрзшей Томью: лёд на уровне воды (ice.js floor) */
 const iceSurf = (x, z, y) => Math.max(surfaceAt(x, z, y), ICEM.floor());
+/* Высота опоры под машиной (17.10.2026, roofs.js): земля / мост / лёд — или крыша низкого дома, если кузов уже
+   примерно на её высоте (y не ниже ROOFM.ROOF.STEP от крыши): сверху садишься, сбоку держит стена. Что победило —
+   SUP_ROOF (крыша). Летающий родстер садится той же функцией */
+let SUP_ROOF = false;
+function supportAt (x, z, y) {
+  const g = iceSurf(x, z, y), r = ROOFM.at(x, z, y);
+  SUP_ROOF = r > g;
+  return SUP_ROOF ? r : g;
+}
 function driveStep (dt) {
   const fx = Math.sin(V.h), fz = Math.cos(V.h);
   const sx = fz, sz = -fx;
@@ -10399,9 +10471,10 @@ function driveStep (dt) {
   const px0 = V.x, pz0 = V.z;
 
   // уклон под колёсами: разница высот под передней и задней осью
-  const hN = iceSurf(V.x + fx * 1.4, V.z + fz * 1.4, V.y), hT = iceSurf(V.x - fx * 1.45, V.z - fz * 1.45, V.y);
+  const hN = supportAt(V.x + fx * 1.4, V.z + fz * 1.4, V.y), hT = supportAt(V.x - fx * 1.45, V.z - fz * 1.45, V.y);   // + скат крыши (roofs.js)
   const slope = (hN - hT) / 2.85;
-  if (IN.gas || IN.brake || Math.abs(vf) > 1.2) vf -= slope * SLOPE_G * dt;
+  const flyOn = FLYC.on(), flyHi = flyOn && FLYC.high();   // летающий родстер (flycar.js): в полёте; выше потока — пролетает людей, машины, мелочь
+  if (!flyOn && (IN.gas || IN.brake || Math.abs(vf) > 1.2)) vf -= slope * SLOPE_G * dt;
 
   const dead = CAREER && AUTO.stalled();          // заглохла: ни газа, ни нитро, катится накатом (cars.js)
   const bk = !dead && FXS.beastT > 0;             // бист-мод: потолок и разгон выше (BEAST)
@@ -10416,14 +10489,14 @@ function driveStep (dt) {
   }
   NOS.was = NOS.burn;
 
-  const sand = V.air ? 0 : BEACH.sandAt(V.x, V.z);  // песок пляжа: вязнет — разгон меньше, тормозит, сильнее заносит (beach.js SAND)
-  if (IN.gas && !V.air && !dead) vf += acc * Math.max(0.25, 1 - vf / vmax) * (sand ? 1 - BEACH.SAND.ACC * Math.min(1, sand) : 1) * dt;
+  const sand = V.air || flyOn ? 0 : BEACH.sandAt(V.x, V.z);  // песок пляжа: вязнет — разгон меньше, тормозит, сильнее заносит (beach.js SAND)
+  if (IN.gas && !V.air && !dead) vf += acc * Math.max(flyOn ? 0 : 0.25, 1 - vf / vmax) * (sand ? 1 - BEACH.SAND.ACC * Math.min(1, sand) : 1) * dt;
   const wet = Math.min(1, ENV.rain + SEAS.slip());   // дождь, а зимой и снег
   if (IN.brake) vf -= (vf > 0.4 ? BRK * (1 - wet * WET.BRAKE) : dead ? 0 : ACC * 0.5) * dt;
   if (dead) vf -= vf * 0.55 * dt;                 // без мотора — накатом до остановки
   vf = clamp(vf, -15, beast ? VMAX * BEAST.NITRO : Math.max(VBOOST, vmax));
   if (!NOS.burn && !beast && vf > vmax) vf -= (vf - vmax) * 1.4 * dt;   // после нитро сбрасывает, а не упирается
-  vf -= vf * 0.3 * dt;
+  vf -= vf * 0.3 * (flyOn ? FLYC.FLY.DRAG : 1) * dt;   // в полёте скорость почти не гаснет (flycar.js)
   if (V.wade && !V.air) vf -= vf * STREAMS.drag(V.wade) * dt;   // вброд по речке или у берега пруда — сильно тормозит (streams.js)
   if (IN.hand) vf -= vf * 1.1 * dt;
   if (sand) vf -= vf * BEACH.SAND.DRAG * sand * dt;
@@ -10470,11 +10543,12 @@ function driveStep (dt) {
   const live = S.state === 'drive' || S.state === 'back' || S.state === 'handover' || S.state === 'side';
   // речка и пруд (streams.js): мелко — вброд, глубже метра — тонешь, как в Томи
   const wd = V.sink === undefined ? STREAMS.at(V.x, V.z, V.y) : null;
-  V.wade = wd && !(V.air && V.y > wd.y + 0.2) ? wd.d : 0;
+  V.wade = wd && !flyOn && !(V.air && V.y > wd.y + 0.2) ? wd.d : 0;
   if (V.sink !== undefined) {
     V.vx *= Math.exp(-2.2 * dt); V.vz *= Math.exp(-2.2 * dt);
-  } else if (wd && wd.d >= STREAMS.CFG.DROWN && live && !(V.air && V.y > wd.y + 0.2)) {
+  } else if (wd && wd.d >= STREAMS.CFG.DROWN && live && !flyOn && !(V.air && V.y > wd.y + 0.2)) {
     drown(wd.y);
+  } else if (flyOn) {                             // летающий родстер над водой — не тонет и не отбрасывает (сесть на воду не даст flycar.js)
   } else if (iceSurf(V.x, V.z, V.y) < -0.15 - BEACH.wade(V.x, V.z) && live && !(V.air && V.y > 0.2)) {   // у пляжа — по колено можно (beach.js)
     drown();
   } else if (iceSurf(V.x, V.z, V.y) < -0.15 - BEACH.wade(V.x, V.z)) {
@@ -10489,7 +10563,7 @@ function driveStep (dt) {
     }
   }
   // лёд зимой (ice.js): глубже 0,5 м под льдом — трещит, треск 1 — проломился, машина уходит под воду
-  if (V.sink === undefined && live && !V.air) {
+  if (V.sink === undefined && live && !V.air && !flyOn) {
     const br = ICEM.drive(dt, Math.hypot(V.vx, V.vz));
     if (br) drown(br.y);
   }
@@ -10519,6 +10593,8 @@ function driveStep (dt) {
     for (let si = 0; si < SL.length; si++) {
       const s = SL[si];
       if (s.deckY !== undefined && V.y < s.deckY - 1.2) continue; // едем под мостом, не по нему
+      if (s.topY !== undefined && V.y > s.topY - ROOFM.ROOF.PASS) continue;   // стена низкого дома: кузов выше — на крыше или летит над ней (roofs.js)
+      if (flyOn && FLYC.passSolid(s, V.y)) continue;   // летающий родстер: над заборами, столбами, деревьями и низкими домами; высокий дом — стена (flycar.js)
       // задняя стенка рампы держит только тех, кто заезжает сзади: кто уже
       // на скате или летит над ней — проезжает
       if (s.ramp !== undefined && (V.y > s.ramp - 0.5 || (V.rlift || 0) > 0 || V.air || V.rampSafe > 0 ||
@@ -10551,6 +10627,16 @@ function driveStep (dt) {
       break;
     }
   }
+  // летающий родстер выше потока: заборы и стены он пролетает (выше), а в дом выше днища — нет (flycar.js, inTallHouse):
+  // нос, середина или корма в контуре — назад, где был, отскок и удар как о стену (сердца — wallDmg, как на земле)
+  if (flyHi && (inTallHouse(noseX, noseZ, V.y) || inTallHouse(V.x, V.z, V.y) || inTallHouse(tailX, tailZ, V.y))) {
+    const vn = Math.hypot(V.vx, V.vz), hx = noseX, hz = noseZ;
+    V.x = px0; V.z = pz0;
+    if (vn > 2.5) { sparks(hx, V.y - floorAt(hx, hz) + 0.7, hz, vn > 12 ? 9 : 4, 0, 0); Snd.impact(vn, 'wall', { x: hx, z: hz }); }
+    if (vn > 13) hurtCar(wallDmg(vn), vn, hx, hz, 'wall');
+    V.vx *= -0.3; V.vz *= -0.3;
+    FLYC.STATS.wallHits++;
+  }
 
   // чужие машины: тоже два круга на кузов. Сильный удар по едущей не тормозит нас,
   // а раскидывает её — иначе таран ощущается как стена. Стоящая (припаркованная, в пробке,
@@ -10559,6 +10645,7 @@ function driveStep (dt) {
   for (let oi = 0, on = TGRID.near(V.x, V.z, 16, NBR), OL = TGRID.TG.R; oi < on; oi++) {
     const t = OL[oi];
     if (t.gone) continue;
+    if (flyHi) break;                              // летающий родстер над потоком и автобусами — пролетает (flycar.js)
     if (t.bus) { BUSES.hit(t, noseX, noseZ, tailX, tailZ); continue; }   // автобус — коробкой, его не сдвинуть (buses.js)
     if (Math.hypot(V.x - t.x, V.z - t.z) > 7) continue;
     const tfx = Math.sin(t.h), tfz = Math.cos(t.h);
@@ -10648,8 +10735,8 @@ function driveStep (dt) {
     }
   }
 
-  // уличный реквизит: не стена, а то, что сносится
-  if (Math.abs(vf) > 4) {
+  // уличный реквизит: не стена, а то, что сносится (летящий выше потока родстер — над ним)
+  if (Math.abs(vf) > 4 && !flyHi) {
     for (let i = 0; i < PROPS.length; i++) {
       const pr = PROPS[i];
       if (pr.down) continue;
@@ -10671,7 +10758,7 @@ function driveStep (dt) {
   // рекламные стелы) медленнее POST_KNOCK — твёрдые: упираешься, как в тумбы протеста (08.10.2026)
   {
     const sp = Math.abs(vf), l = Math.hypot(V.vx, V.vz) || 1;
-    if (sp > 2.5 || POST_N) smashNear(V.x, V.z, it => {
+    if ((sp > 2.5 || POST_N) && !flyHi) smashNear(V.x, V.z, it => {
       if (it.heavy) return;                       // остановки и контейнеры — ниже и в стенах (junk.js)
       if (!it.post && sp <= 2.5) return;
       const rr = it.r + CAR_W, dn = Math.hypot(it.x - noseX, it.z - noseZ), dt2 = Math.hypot(it.x - tailX, it.z - tailZ);
@@ -10695,9 +10782,11 @@ function driveStep (dt) {
     });
   }
 
-  { const k = LAWNP.car(noseX, noseZ, tailX, tailZ, CAR_W, vf, V.vx, V.vz, LAWN_BUMP); if (k !== 1) { V.vx *= k; V.vz *= k; } }   // мелочь на газоне (lawnprops.js)
-  JUNK.car(noseX, noseZ, tailX, tailZ, CAR_W);    // контейнеры: упираются, толкаются, опрокидываются (junk.js)
-  CONSTR.car(noseX, noseZ, tailX, tailZ, CAR_W);  // бытовки и техника строек: толкаются, мнутся (construction.js)
+  if (!flyHi) {                                    // в полёте выше потока — над мелочью, контейнерами, стройками (flycar.js)
+    { const k = LAWNP.car(noseX, noseZ, tailX, tailZ, CAR_W, vf, V.vx, V.vz, LAWN_BUMP); if (k !== 1) { V.vx *= k; V.vz *= k; } }   // мелочь на газоне (lawnprops.js)
+    JUNK.car(noseX, noseZ, tailX, tailZ, CAR_W);    // контейнеры: упираются, толкаются, опрокидываются (junk.js)
+    CONSTR.car(noseX, noseZ, tailX, tailZ, CAR_W);  // бытовки и техника строек: толкаются, мнутся (construction.js)
+  }
 
   // пешеходов ловим прямоугольником кузова, а не кругом вокруг центра
   const underCar = (px, pz) => {
@@ -10706,7 +10795,7 @@ function driveStep (dt) {
     return Math.abs(along) < CAR_L + 0.5 && Math.abs(across) < CAR_W + 0.35;
   };
 
-  for (let i = 0; i < PEOPLE.length; i++) {
+  for (let i = 0; !flyHi && i < PEOPLE.length; i++) {   // летящий родстер — над головами (flycar.js)
     const p = PEOPLE[i];
     if (p.dead) continue;
     if (!underCar(p.x, p.z)) continue;
@@ -10722,9 +10811,9 @@ function driveStep (dt) {
   }
 
   // сбитые лежат — переехал: дёргается и брызгает кровью, не подлетает (hits.js rehit)
-  if (HITS.rehit(V.x, V.z, fx, fz, CAR_L, CAR_W, V.vx, V.vz)) S.shake = Math.max(S.shake, 0.12);   // кочка; кровь — только у тела, не на машину
+  if (!flyHi && HITS.rehit(V.x, V.z, fx, fz, CAR_L, CAR_W, V.vx, V.vz)) S.shake = Math.max(S.shake, 0.12);   // кочка; кровь — только у тела, не на машину
 
-  for (let i = 0; i < SCOOTS.length; i++) {
+  for (let i = 0; !flyHi && i < SCOOTS.length; i++) {
     const p = SCOOTS[i];
     if (p.dead || !p.grp.visible || !underCar(p.x, p.z) || Math.abs(vf) < 3) continue;
     runOverScoot(p, V.vx, V.vz);
@@ -10733,7 +10822,7 @@ function driveStep (dt) {
   }
 
   // бургеры: на скорости разлетаются, пешком — просто расталкиваются
-  for (let i = 0; i < PEDS.length; i++) {
+  for (let i = 0; !flyHi && i < PEDS.length; i++) {
     const p = PEDS[i];
     if (p.dead) continue;
     if (!underCar(p.x, p.z)) continue;
@@ -10752,28 +10841,41 @@ function driveStep (dt) {
   // визуал: машина стоит на склоне — тангаж по осям, крен по бортам
   // Земля под колёсами — рельеф, мост или рампа. С верхней кромки рампы
   // машина уходит в полёт: вертикальная скорость — по уклону клина.
+  // Опора — supportAt: земля, мост, лёд или крыша низкого дома (roofs.js); у большого трамплина свой размер (jumps.js)
   const lift = rampLift(V.x, V.z);
-  const gnd = iceSurf(V.x, V.z, V.y - (V.rlift || 0)) + lift;
-  if (V.air) {
+  if (lift > 0) V.ramp = RAMP_ON;
+  const gnd = supportAt(V.x, V.z, V.y - (V.rlift || 0)) + lift;
+  const onRoof = SUP_ROOF && !lift;
+  const rp = V.ramp || RAMP_SMALL;
+  if (flyOn) {
+    // летающий родстер (flycar.js): взлёт, держит высоту, снижается и садится на опору (земля, мост, твёрдая крыша) без удара
+    V.y = FLYC.fly(dt, gnd); V.vy = 0; V.air = false;
+    if (!FLYC.on() && onRoof) roofLanded();        // сел на крышу — как с трамплина (jumps.js)
+  } else if (V.air) {
     V.vy -= 22 * dt;
     V.y += V.vy * dt;
     if (V.y <= gnd) {
       if (V.vy < -7) { S.shake = Math.max(S.shake, clamp(-V.vy * 0.04, 0.2, 0.7)); sparks(V.x, 0.3, V.z, 8); Snd.crash(-V.vy, null, 'wall'); }
       V.y = gnd; V.vy = 0; V.air = false;
       V.rampSafe = 1.5;
+      if (onRoof) roofLanded();                   // сел на крышу: достижение, Толик (jumps.js)
     }
-  } else if ((V.rlift || 0) > RAMP_H * 0.7 && lift < 0.2 && vf > 6) {
+  } else if ((V.rlift || 0) > rp.H * 0.7 && lift < 0.2 && vf > 6) {
     // трамплин не бьёт, а подкидывает: плюс четверть скорости и полёт
     // без урона — в воздухе и ещё полторы секунды после приземления
     const boost = Math.min(1.25, (VMAX * 1.3) / Math.max(vf, 1));
     V.vx *= boost; V.vz *= boost;
     V.air = true;
     V.rampSafe = 1.5;
-    V.vy = vf * boost * RAMP_H / RAMP_L * 1.15;
+    V.vy = vf * boost * rp.H / rp.L * 1.15;
     V.y = V.y + V.vy * dt;
-    S.shake = Math.max(S.shake, 0.15);
+    S.shake = Math.max(S.shake, rp.H > 2 ? 0.3 : 0.15);
     Snd.nosFire();
+  } else if ((V.roof || (V.rlift || 0) > 0) && V.y - gnd > ROOFM.ROOF.DROP && V.sink === undefined) {
+    // опора ушла из-под колёс — съехал с края крыши или с верха трамплина шагом: падает, без урона
+    V.air = true; V.vy = 0; V.rampSafe = 1.5;
   } else V.y = gnd;
+  V.roof = !V.air && !FLYC.on() && onRoof;
   if (V.sink !== undefined) {
     // тонет: сначала качается на воде, потом нос вниз и ко дну
     V.sink += dt;
@@ -10785,15 +10887,16 @@ function driveStep (dt) {
   }
   V.rlift = lift;
   if (!V.air && V.rampSafe > 0) V.rampSafe -= dt;
-  let f2 = iceSurf(V.x + fx * 1.4, V.z + fz * 1.4, V.y) + rampLift(V.x + fx * 1.4, V.z + fz * 1.4);
-  let t2 = iceSurf(V.x - fx * 1.45, V.z - fz * 1.45, V.y) + rampLift(V.x - fx * 1.45, V.z - fz * 1.45);
-  let l2 = iceSurf(V.x + sx * 0.9, V.z + sz * 0.9, V.y), r2 = iceSurf(V.x - sx * 0.9, V.z - sz * 0.9, V.y);
+  let f2 = supportAt(V.x + fx * 1.4, V.z + fz * 1.4, V.y) + rampLift(V.x + fx * 1.4, V.z + fz * 1.4);
+  let t2 = supportAt(V.x - fx * 1.45, V.z - fz * 1.45, V.y) + rampLift(V.x - fx * 1.45, V.z - fz * 1.45);
+  let l2 = supportAt(V.x + sx * 0.9, V.z + sz * 0.9, V.y), r2 = supportAt(V.x - sx * 0.9, V.z - sz * 0.9, V.y);
   // в полёте нос идёт за траекторией, на земле — за уклоном
   if (V.sink !== undefined) { f2 = t2 + clamp(V.sink - 0.5, 0, 1) * -1.3; l2 = r2 = 0; }
-  V.pitch = damp(V.pitch, V.air ? -Math.atan2(V.vy, Math.max(4, Math.abs(vf))) * 0.8 : -Math.atan((f2 - t2) / 2.85), V.air ? 4 : 12, dt);
-  V.roll = damp(V.roll, V.air ? 0 : Math.atan((l2 - r2) / 1.8), 12, dt);
+  const flyNow = FLYC.on();                        // в полёте родстера кузов ровный: нос чуть вверх на взлёте (flycar.js pitch)
+  V.pitch = damp(V.pitch, flyNow ? FLYC.pitch() : V.air ? -Math.atan2(V.vy, Math.max(4, Math.abs(vf))) * 0.8 : -Math.atan((f2 - t2) / 2.85), V.air || flyNow ? 4 : 12, dt);
+  V.roll = damp(V.roll, V.air || flyNow ? 0 : Math.atan((l2 - r2) / 1.8), 12, dt);
   // бордюр: тротуар выше дороги — заехал, и кузов стоит на нём
-  V.kerb = damp(V.kerb || 0, V.air || lift > 0 ? 0 : Math.max(curbAt(V.x, V.z), paveLift(V.x, V.z)) - STREAMS.sinkBy(V.wade || 0), 22, dt);   // + верх асфальта и плитки (paveLift): колёса не в асфальте
+  V.kerb = damp(V.kerb || 0, V.air || flyNow || lift > 0 || V.roof ? 0 : Math.max(curbAt(V.x, V.z), paveLift(V.x, V.z)) - STREAMS.sinkBy(V.wade || 0), 22, dt);   // + верх асфальта и плитки (paveLift): колёса не в асфальте
   car.position.set(V.x, V.y + V.kerb, V.z);
   car.rotation.y = V.h;
   car.rotation.x = V.pitch;
@@ -12612,6 +12715,7 @@ function* buildSpots () {
     const street = nearestRoad(x, z, 5, 1);
     if (street && street.d < street.seg.w / 2 + 12) continue;   // у самой улицы — не вглубь
     if (near(x, z)) continue;
+    if (JUMPS.blocks(x, z, 4)) continue;                       // не на горке, разгоне и полёте большого трамплина (jumps.js)
     const s = { x, z };
     SPOTS.push(s);
     const k = gk6(Math.floor(x / 6), Math.floor(z / 6)); const a = G.get(k); if (a) a.push(s); else G.set(k, [s]);
@@ -13248,6 +13352,7 @@ function checkArrival (dt) {
   if (S.state === 'drive') {
     // к гостю надо подъехать и притормозить, а не влететь
     if (d > (S.order.stops[S.order.idx].reach || 6) || speed > 6) return;
+    if (FLYC.blocksHand()) return;                 // летающий родстер: вручить — только на земле (flycar.js)
     const o = S.order;
     const st = o.stops[o.idx];
     const onTime = S.free || S.time > 0;
@@ -13346,7 +13451,7 @@ function checkArrival (dt) {
   } else if (S.state === 'side') {
     sideArrival(d, speed);
   } else if (S.state === 'back') {
-    if (d > 7) return;
+    if (d > 7 || FLYC.on()) return;                // за пиццей в пиццерию — тоже на земле (flycar.js)
     S.state = 'handover'; S.handT = 0.8;
     clearGate();
     // иногда к следующей пицце в багажник кидают и стаканчик кофе — плюс к нитро (loadPizza);
@@ -14064,6 +14169,7 @@ function startRun (ride) {
   THIEF.cd = rand(35, 60);
   S.state = 'drive'; S.hp = S.hpMax; S.money = 0; S.orders = 0; S.burgers = 0; S.shiftT = 0;
   S.people = 0; S.wrecks = 0; S.delivered = 0; S.scoots = 0; S.revives = 0;
+  JUMPS.reset();                                   // Толик про крышу — снова раз за смену (jumps.js)
   JUNK.reset();                                    // снесённые остановки и контейнеры — на место, S.stops = 0 (junk.js)
   HAV.reset();                                     // счёт разрушений за смену — с нуля (havoc.js)
   LAWNP.reset();                                   // сбитая мелочь на газоне — на место (lawnprops.js)
@@ -14075,6 +14181,7 @@ function startRun (ride) {
   if (CAREER) RAID.shiftStart({ ride: S.ride, quick: QR.on() });   // налёт на точку в эту смену? (raid.js)
   if (CAREER) { FEST.shiftStart({ ride: S.ride, quick: QR.on(), holiday: !!HOL.active() }); if (!S.ride) FEST.announce(); }   // фестиваль в эту смену? в праздник — нет (festivals.js)
   if (CAREER && !S.ride) HOL.announce();         // праздник: Толик объявляет в чате (holidays.js)
+  if (CAREER && !S.ride && !INTRO) CYCLE.announce();   // новый сезон, переход, сюрприз — Толик в чате; накануне стыка — прогноз (seasoncycle.js)
   if (CAREER && !S.ride) CAREERM.startShift();   // часы — на 9:00, обед, звёзды за смену; волна щедрости (districts.js)
   NOS.tank = DISTRICTS && !S.ride ? DIST.pace().tank : 0.5; NOS.burn = false;
   for (const n of NITRO_CANS) { n.t = 0; }
@@ -14344,6 +14451,16 @@ for (const b of elTouch.querySelectorAll('button[data-k]')) {
   for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(ev, off);
   b.addEventListener('contextmenu', e => e.preventDefault());
 }
+/* летающий родстер (flycar.js): кнопка Z / J, X на геймпаде (padStep), кнопка на телефоне; полоска «полёт» на хаде */
+const FLY_STATES = ['drive', 'back', 'side', 'brief'];
+FLYC.init({ V, S, Snd, toast: s => toast(s),
+  isFlyer: () => !!(CAREER && car && car.userData.careerId === FLYC.FLY.ID),
+  canUse: hud => isPlaying() && !S.paused && !FM.open && (hud || (FLY_STATES.includes(S.state) && !DLG.isOpen() && !DOOR.on())),
+  // сюда не сесть: дом без твёрдой крыши (roofs.js) или вода; из-под арки не взлететь
+  noLand: (x, z, y) => (inWall(x, z, 1.6) && !(ROOFM.at(x, z, y) > -Infinity)) || iceSurf(x, z, y) < -0.15 - BEACH.wade(x, z)
+    || (() => { const w = STREAMS.at(x, z, y); return !!(w && w.d >= STREAMS.CFG.DROWN * 0.5); })(),
+  noTakeoff: (x, z) => inWall(x, z),
+});
 function touchpadStep () {
   ORIENT.step();
   // телефон стоя — заставка «поверни телефон» (orient.js), смена — на паузу; повернул — продолжить кнопкой
@@ -14618,7 +14735,7 @@ if (!INTRO) LATE.add('ringwood', RINGM.wood);    // лес на Кольце: е
 if (!INTRO && MAP.woods) LATE.add('mapwoods', () => { for (const p of MAP.woods) FOREST.addArea(p, (x, z, r) => !!PAVE.onPave(x, z, FOREST.FOREST.PATH + r)); });
 /* мелочь на газоне (lawnprops.js): тоже клетками вокруг камеры */
 LATE.add('lawnp', () => LAWNP.init({ THREE, scene, cam, CITY, ADULT, forests: () => [...LWOOD.polys(), ...RINGM.polys(), ...(MAP.woods || [])], groundH, inHouse, inBounds, nearestRoad, roadWidth, car: V, Snd,
-  onAlley: (x, z, m) => WORLD.onAlley(x, z, m), yardBlocks: (x, z, r) => YARDS.blocks(x, z, r) || YCARS.blocks(x, z, r) || YMAZE.blocks(x, z, r) || COURTS.blocks(x, z, r), pzBlocks: PZD.blocks, isForest: FOREST.isForest,
+  onAlley: (x, z, m) => WORLD.onAlley(x, z, m), yardBlocks: (x, z, r) => YARDS.blocks(x, z, r) || YCARS.blocks(x, z, r) || YMAZE.blocks(x, z, r) || COURTS.blocks(x, z, r) || JUMPS.blocks(x, z, r), pzBlocks: PZD.blocks, isForest: FOREST.isForest,
   claims: () => [...CONSTR.claimed(), ...CONSTR.DEBUG.SITES.map(s => ({ x: s.x, z: s.z, r: Math.hypot(s.W, s.D) / 2 + 2 }))],
   benches: BENCHES, stops: JUNK.DEBUG.STOPS, cans: JUNK.DEBUG.CANS_ALL, low: () => GFX.preset() === 'low',
   pins: () => {                                    // пины и клиенты текущего заказа: рядом с ними мелочь прячется
@@ -14674,7 +14791,7 @@ const TRAFFIC_N = 24;
 LATE.add('traffic', () => spawnTraffic(INTRO ? 22 : Math.min(TRAFFIC_N, trafficWant())));
 if (!INTRO) LATE.add('spots', function* () { yield* buildSpots(); yield 'spots'; buildCollect(); });
 /* погода смены (weather.js): сугробы снежной зимы — после адресов, чтобы их не завалить */
-LATE.add('weather', () => WTH.init({ THREE, scene, cam, renderer, Store, MAP, CITY, V, S, SPOTS, ZEBRAS, Snd, toast, groundH, curbAt, nearestRoad, roadWidth, drivable, inHouse, inPoly, inBounds,
+LATE.add('weather', () => WTH.init({ THREE, scene, cam, renderer, Store, MAP, CITY, V, S, SPOTS, ZEBRAS, Snd, toast, groundH, curbAt, nearestRoad, roadWidth, drivable, inHouse, inPoly, inBounds, jumpBlocks: JUMPS.blocks,
   makeHuman, dropMesh, gibHuman, CAR_L, CAR_W, isPlaying, intro: INTRO, PIZZERIAS, get PIZZA () { return PIZZA; },
   ARCHES, realAddress, puff, quick: () => QR.on(),   // ураган (hurricane.js): дома с аркой не уносит, адрес в подписи, пыль, быстрый заезд не сохраняет
   get ENV () { return ENV; }, get sun () { return sun; }, get hemi () { return hemi; }, get amb () { return amb; } }));
@@ -14684,6 +14801,7 @@ if (!INTRO) LATE.add('hookah', () => HK.init({ THREE, scene, BENCHES, V, S, ADUL
 if (!INTRO && CAREER) FEST.init({ THREE, scene, V, S, CITY, ADULT, Store, obb, SOLIDS, indexSolids, NODES, TRAFFIC, parkOut: t => { if (t.still) { t.still = 0; PARKI.out(t, true); } }, put, mergeGeos, groundH, inHouse, inPoly, nearestRoad, solidAt,
   makeHuman, makePerson, dropMesh, sayBubble, fxAdd, puffGeo, steam, gibBurger, popBonus, toast, chat: s => CHAT.say(s), addWallet, money, CASH, Snd, CAR_L, CAR_W, HEROES, DIST,
   season: () => SEAS.seasonValue() });   // фестивали на парковках ТЦ (festivals.js)
+if (!INTRO && CAREER) CYCLE.init({ Store, ADULT, chat: s => CHAT.say(s), playing: isPlaying });   // круг сезонов (seasoncycle.js)
 if (!INTRO && CAREER) HOL.init({ THREE, scene, cam, renderer, Store, CITY, ADULT, V, S, groundH, inBounds, inHouse, inPoly, sayBubble, get PIZZA () { return PIZZA; },
   night: () => ENV.night || 0, hour: () => CAREERM.hour(), env: () => ENV, playing: isPlaying, chat: s => CHAT.say(s), onArrive: cb => ORD.onArrive(cb),
   dayRate: () => 1 / (DAY_LEN * (CAREERM.shiftOn() ? CAREERM.shiftSlow() : 1)), people: () => PEOPLE,
@@ -15417,7 +15535,8 @@ function padStep () {
   if (p.accept && briefShown() && !S.paused && !FM.open && !DLG.isOpen() && !(CAREER && CAREERM.padRoot())) acceptOrder();   // A — свернуть накладную сразу
   if (p.btnX && !screen && !S.paused && !FM.open && isPlaying() && GFX.offerYes()) p.btnX = false;   // X — «включить „среднюю“» на плашке «кадр не успевает» (gfx.js)
   if (p.sound) Snd.set(!Snd.on);
-  if (p.dDown && !screen && !S.paused && !FM.open && isPlaying()) RADIO.next();   // крестовина ↓ — следующая станция радио (radio.js)
+  if (p.dDown && !screen && !S.paused && !FM.open && isPlaying()) RADIO.next();
+  if (p.btnX && !screen && !S.paused && !FM.open && isPlaying()) FLYC.press();   // X — полёт летающего родстера (flycar.js; на другой машине ничего)   // крестовина ↓ — следующая станция радио (radio.js)
   // на ходу — крестовина ◀ ▲ ▶ (двух вариантов: ▶ — второй); на паузе (обед) — A, X, Y: первый, второй, третий (ниже)
   if (CH.opts.length && !CH.pause && !CH.full) { if (p.choice1) pickChoice(0); else if (p.choice2) pickChoice(1); else if (p.choice3) pickChoice(CH.opts.length === 2 ? 1 : 2); }
   // обед (карточка на паузе) — как воскрешение и меню: крестовина / стик водят курсор, [A] жмёт, где курсор (padMenu ниже;
@@ -15908,7 +16027,7 @@ if (LATE.busy()) {
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
 /* песочница (sandbox.html): бесконечное здоровье, нитро, «не глохнет» (noStall читает cars.js) */
 const SBX = { god: false, nitro: false, noStall: false };
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { inWall, WIDEN: { ...WIDEN.WIDEN, STATS: WIDEN.STATS }, FACE: FACE_DEBUG, RADAR, HUDC, RYARD: RYARD.DEBUG, RT, RASK: RASK.DEBUG, OTAGS: OTAGS.DEBUG, NICK, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, PG: PG.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, TACT, TG: TGRID.TG, PARKI: { ...PARKI.DEBUG, orphans: () => PARKI.orphans(TRAFFIC) }, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get routeOn () { return ROUTE_LINE.slots.some(q => q.m.visible); }, ROUTE_LINE, RP, rebuildRoutePath, updateRouteLine, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, DYNRES: DYN.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { inWall, FLY: FLYC, inTallHouse, WIDEN: { ...WIDEN.WIDEN, STATS: WIDEN.STATS }, FACE: FACE_DEBUG, RADAR, HUDC, RYARD: RYARD.DEBUG, RT, RASK: RASK.DEBUG, OTAGS: OTAGS.DEBUG, NICK, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, PG: PG.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, TACT, TG: TGRID.TG, PARKI: { ...PARKI.DEBUG, orphans: () => PARKI.orphans(TRAFFIC) }, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get routeOn () { return ROUTE_LINE.slots.some(q => q.m.visible); }, ROUTE_LINE, RP, rebuildRoutePath, updateRouteLine, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, DYNRES: DYN.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта
@@ -15934,6 +16053,7 @@ if (window.__dlv) window.__dlv.STREAMS = STREAMS.DEBUG;   // речки и пр�
 if (window.__dlv) window.__dlv.ICE = ICEM.DEBUG;   // лёд: треск, где лёд, сколько секунд до пролома (ice.js)
 if (window.__dlv) window.__dlv.WATER = WATER.DEBUG;   // вода: юниформы, уровень, лёд вручную (water.js)
 if (window.__dlv) window.__dlv.BEACH = BEACH.DEBUG;   // пляж: место, песок, люди, места под полотенце (beach.js)
+if (window.__dlv) Object.assign(window.__dlv, { ROOFS: ROOFM.DEBUG, JUMPS: JUMPS.DEBUG, supportAt });   // крыши и большие трамплины (roofs.js, jumps.js)
 if (window.__dlv) Object.assign(window.__dlv, { cam, renderer, scene });   // камера и отрисовка — кадры земли сверху в probe (мерцание стыков, пятна газона)
 if (window.__dlv) window.__dlv.crashlog = CL;        // журнал ошибок: entries(), text(), disabled() (docs/CRASHES.md)
 if (window.__dlv) window.__dlv.CULLV = CULL.VIEW;      // отсечение по кадру: CULLV.on = false — без него (замеры до/после, cull.js)

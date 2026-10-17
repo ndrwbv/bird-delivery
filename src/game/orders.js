@@ -40,6 +40,7 @@ import * as ZN from './zones.js';
 import * as DIST from './districts.js';
 import * as FEST from './festivals.js';
 import * as HOL from './holidays.js';            // праздничная смена: оливье-пицца, «к бою курантов», корпоратив, чаевые щедрее (holidays.js)
+import * as CYCLE from './seasoncycle.js';      // первая смена сезона: сезонные пиццы, оплата ×k (seasoncycle.js perk)
 import * as HURR from './hurricane.js';          // дома, унесённые ураганом: их адреса не выдаём (hurricane.js blocked)
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 import * as RHY from './rhythm.js';             // ритм смены: роль заказа на дуге, напряжение, встреча у двери (rhythm.js)
@@ -690,7 +691,7 @@ function finishSpec (spec, forced, hAt) {
   // День угнетения бургеров (festivals.js): часть заказов — «вместо бургера», оплата ×FEST.BURGER_K
   if (!spec.story && !SIM) { const bk = (spec.fest && spec.fest.burger) || FEST.burgerRoll(); if (bk) spec.burger = bk; }   // заказ на сам митинг — всегда «вместо бургера»
   // праздник (holidays.js): обычная пицца — иногда праздничная (оливье-пицца), оплата ×k
-  if (!spec.story && !SIM && !spec.hol && !spec.fest && !spec.beach && !spec.bundle && !spec.urgent && spec.type === 'pizza') { const h = HOL.olivier(); if (h) spec.hol = h; }
+  if (!spec.story && !SIM && !spec.hol && !spec.fest && !spec.beach && !spec.bundle && !spec.urgent && spec.type === 'pizza') { const h = HOL.olivier() || CYCLE.perk(); if (h) spec.hol = h; }   // не праздник — может быть сезонная (seasoncycle.js)
   spec.n = ++SH.gen;
   // ритм размеров (sizeRoll): сколько было после разминки, сколько пицц в прошлом; серия одного вида (kindRoll)
   const size = spec.bundle ? spec.stops.length : 1;
@@ -935,7 +936,7 @@ export function cardRows (order) {
     [t('оплата'), '<b class="oc-pay">' + A.money(S.fee) + '</b>'],
     ...(far > 0 ? [[t('за дальний'), '<b class="oc-far">+' + A.money(far) + '</b>' + ' · ' + esc(t('премия, уже в оплате'))]] : []),
     ...(brg > 0 ? [[t('вместо бургера'), '<b class="oc-far">+' + A.money(brg) + '</b>' + ' · ' + esc(t('День угнетения бургеров, уже в оплате'))]] : []),
-    ...(hol > 0 ? [[t('к празднику'), '<b class="oc-far">+' + A.money(hol) + '</b>' + ' · ' + esc(t('{name}, уже в оплате', { name: HOL.name() || t('праздник') }))]] : []),
+    ...(hol > 0 ? [[sp.hol && sp.hol.label ? t(sp.hol.label) : t('к празднику'), '<b class="oc-far">+' + A.money(hol) + '</b>' + ' · ' + esc(t('{name}, уже в оплате', { name: (sp.hol && sp.hol.name ? t(sp.hol.name) : HOL.name()) || t('праздник') }))]] : []),
   ];
 }
 

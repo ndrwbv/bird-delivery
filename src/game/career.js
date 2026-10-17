@@ -43,6 +43,7 @@ import { keyHTML, matchKey, inputKind, onInput } from '../input/glyphs.js';   //
 import * as PFX from './paperfx.js';
 import * as DAYT from './daytime.js';            // время суток словами: обед / ужин, «полночь» — по часам мира (daytime.js)
 import * as HOL from './holidays.js';            // праздничная смена: лента в чеке (holidays.js)
+import * as CYCLE from './seasoncycle.js';      // календарик сезонов в чеке: «до весны — 2 смены» (seasoncycle.js)
 import { t, tn, lang } from '../i18n/index.js';
 
 /* соседние модули карьеры — если уже есть: заказы (развоз смены) и машины (гараж) */
@@ -591,7 +592,8 @@ function endHints (wasOn, rankWas, placeWas) {
   for (const [k, v, where] of GROW.rows()) if (where === 'new') news.push({ text: k + (v ? ' · ' + v : ''), mark: true });   // «пиццерия «Юг» выросла · ★★★☆☆»
   const place = crewPlace();
   if (placeWas > 0 && place > 0 && place < placeWas) news.push({ text: t('ты #{n} среди курьеров', { n: place }) });
-  return out.concat(news.slice(0, 3));
+  const cal = CYCLE.receipt();                       // что будет дальше: сезоны и праздник (seasoncycle.js)
+  return out.concat(news.slice(0, 3), cal ? [{ cal }] : []);
 }
 
 /* полоска «до следующего района» под итогом (автор 10.10.2026: вместо строки «для района «Кольцо» не в зачёт:

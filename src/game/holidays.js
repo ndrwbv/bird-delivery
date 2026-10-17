@@ -29,6 +29,7 @@ import * as ECON from './econ.js';
 import * as SEAS from './seasons.js';
 import { DEBUG as SLD } from './streetlamps.js';   // фонари: где столбы, сбит ли (streetlamps.js)
 import { makePerson } from './people.js';
+import * as CYCLE from './seasoncycle.js';      // круг сезонов: праздник сезона — по плану (seasoncycle.js holiday)
 import './holidays.css';
 
 /* частота — на все праздники вместе */
@@ -90,9 +91,9 @@ export const HOLIDAYS = [
     ribbon: { title: N_('С Новым годом!'), sub: N_('праздничная смена · новогодних заказов: {n}'), none: N_('праздничная смена') },
   },
   {
-    // каркас: включить, когда вернутся сезоны (weather.js SEASON_W). Украшения 'pumpkins' и 'ghosts' ещё не написаны —
-    // DECOR_BUILD пропускает неизвестные; костюмы 'witch' и 'ghost' — тоже (COSTUME)
-    id: 'halloween', on: false, season: 'autumn', seaAt: [1.55, 1.85], weight: 1,
+    // 17.10.2026: включён вместе с кругом сезонов (seasoncycle.js) — последняя смена осени. Тыквы со светящимися рожицами
+    // и привидения-простыни — DECOR_BUILD pumpkins / ghosts, костюмы ведьм и привидений — COSTUME
+    id: 'halloween', on: true, season: 'autumn', seaAt: [1.55, 1.85], weight: 1,
     name: N_('Хэллоуин'),
     decor: {
       build: ['roofs', 'lamps', 'pumpkins', 'ghosts'],
@@ -101,10 +102,17 @@ export const HOLIDAYS = [
       tinsel: ['#ff8a1e', '#2b2a30', '#9b4dff'],
       roofs: 0.18, lamps: 0.35, fireworks: false,
     },
-    folk: [{ kind: 'witch', n: 3 }, { kind: 'ghost', n: 3 }],
-    announce: { adult: N_('сегодня Хэллоуин: город в тыквах, по улицам ходят ведьмы. не пугайся'), kids: N_('сегодня Хэллоуин: город в тыквах, по улицам ходят ведьмы. не пугайся') },
-    orders: { olivier: { share: 0.3, k: 1.2, items: [N_('тыквенная пицца')], why: N_('к празднику · оплата ×{k}') } },
-    lines: { all: [N_('Сладость или гадость? Ладно, пицца.')], adult: [], kids: [] },
+    folk: [{ kind: 'witch', n: 4 }, { kind: 'ghost', n: 4 }],
+    announce: {
+      adult: N_('сегодня Хэллоуин! город в тыквах, над дворами летают привидения, по улицам ходят ведьмы. ведьм не сбивай — проклянут. тыквенную пиццу везём с наценкой'),
+      kids: N_('сегодня Хэллоуин! город в тыквах, над дворами летают привидения, по улицам ходят ведьмы. тыквенную пиццу везём с наценкой'),
+    },
+    orders: { olivier: { share: 0.35, k: 1.2, items: [N_('тыквенная пицца'), N_('пицца «Кровавая Мэри» (томатная)'), N_('пицца «Ведьмин котёл»')], why: N_('к Хэллоуину · оплата ×{k}') } },
+    lines: {
+      all: [N_('Сладость или гадость? Ладно, пицца.'), N_('Ой, курьер! А я думал — привидение.'), N_('Тыквенная? Жуть как вкусно!')],
+      adult: [N_('Заходи, у нас вечеринка вампиров! А, ты за рулём…')],
+      kids: [N_('Хочешь конфетку? Хэллоуин же!')],
+    },
     ribbon: { title: N_('Хэллоуин'), sub: N_('праздничная смена · праздничных заказов: {n}'), none: N_('праздничная смена') },
   },
 ];
@@ -149,10 +157,16 @@ export function shiftStart (o = {}) {
   end();
   if (o.ride || o.quick) return;
   let h = null;
+  const plan = CYCLE.holiday();                     // круг сезонов (17.10.2026): Новый год — во вторую смену зимы, Хэллоуин — в последнюю осени
+  const shifts = +A.Store.get('dlv-shifts', 0) || 0;
   if (want) h = byId(want);
-  else {
+  else if (plan !== undefined) {
+    h = plan && shifts >= HOL.FROM ? byId(plan) : null;
+    if (h && !h.on) h = null;
+    if (h) { const sv = load(); sv.since = 0; sv.last = shifts; sv.id = h.id; save(sv); }
+  } else {
     const sv = load();
-    h = decide(+A.Store.get('dlv-shifts', 0) || 0, sv, SEASON_OF(SEAS.seasonValue()));
+    h = decide(shifts, sv, SEASON_OF(SEAS.seasonValue()));
     save(sv);
   }
   if (h) begin(h);
@@ -209,6 +223,7 @@ function stepIn (dt) {
   if (!CUR) return;
   lampStep(dt);
   folkStep(dt);
+  ghostStep();
 }
 
 /* ═════════════════════ украшения ═════════════════════
@@ -449,11 +464,214 @@ const DECOR_BUILD = {
   },
 };
 
+/* ═════════════════════ Хэллоуин: тыквы и привидения ═════════════════════
+   По-детски жутко, кодом. Тыква — приплюснутый шар с рёбрами и хвостиком, рожица — плоская картинка с треугольными
+   глазами и зубастым ртом без света (видна и днём, ночью светится, как фонарик). Тыквы стоят у подъездов (сбоку от
+   двери, смотрят наружу; у пиццерии — гуще, PUMPKIN); склейка — InstancedMesh на клетку 800 м
+   (вне кадра не рисуются). Привидение — простыня с волнистым подолом, чёрные глаза-овалы и рот «о»: GHOST.N штук
+   висят у стен домов на 2,6—5 м рядом с курьером (уехал — дальние переселяются вперёд, вне кадра), покачиваются
+   и плавают вверх-вниз */
+const PUMPKIN = { CAP: 1600, NEAR: 900, NEAR_P: 0.5, FAR_P: 0.08, CELL: 800, SIZE: [1.3, 2.1] };
+const GHOST = { N: 36, H: [2.6, 5], NEAR: [45, 190], FAR: 230, CELL: 100, SPOTS: 12000, CHECK: 0.12 };
+function pumpkinGeo () {
+  const g = new THREE.SphereGeometry(0.34, 14, 9);
+  const p = g.attributes.position, col = [];
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), a = Math.atan2(z, x), rib = 1 + 0.09 * Math.cos(a * 8);
+    p.setXYZ(i, x * rib, y * 0.74 + 0.25, z * rib);
+    const k = 0.82 + 0.18 * Math.cos(a * 8);
+    col.push(0.93 * k, 0.42 * k, 0.05 * k);
+  }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  const st = new THREE.CylinderGeometry(0.035, 0.05, 0.14, 6);
+  st.translate(0.01, 0.53, 0);
+  const sc = [];
+  for (let i = 0; i < st.attributes.position.count; i++) sc.push(0.25, 0.32, 0.12);
+  st.setAttribute('color', new THREE.Float32BufferAttribute(sc, 3));
+  return mergeTwo(g, st);
+}
+function mergeTwo (a, b) {
+  const A1 = a.index ? a.toNonIndexed() : a, B1 = b.index ? b.toNonIndexed() : b, out = new THREE.BufferGeometry();
+  for (const k of ['position', 'normal', 'color']) {
+    const x = A1.attributes[k].array, y = B1.attributes[k].array, z = new Float32Array(x.length + y.length);
+    z.set(x); z.set(y, x.length);
+    out.setAttribute(k, new THREE.BufferAttribute(z, 3));
+  }
+  return out;
+}
+function faceTex () {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 96;
+  const g = c.getContext('2d');
+  g.fillStyle = '#ffd23f';
+  const tri = (x, y, w, h) => { g.beginPath(); g.moveTo(x - w / 2, y + h / 2); g.lineTo(x + w / 2, y + h / 2); g.lineTo(x, y - h / 2); g.closePath(); g.fill(); };
+  tri(36, 30, 30, 26); tri(92, 30, 30, 26); tri(64, 50, 14, 12);
+  g.beginPath();                                   // зубастый рот
+  g.moveTo(16, 62);
+  for (let i = 0; i <= 8; i++) g.lineTo(16 + i * 12, 62 + (i % 2 ? 8 : 0));
+  g.lineTo(112, 62); g.quadraticCurveTo(64, 104, 16, 62); g.closePath(); g.fill();
+  g.fillStyle = 'rgba(0,0,0,0)';
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace || t.colorSpace;
+  return t;
+}
+function ghostGeo () {
+  // профиль простыни: голова-купол → плечи → расширяющийся подол
+  const pr = [[0.001, 1.25], [0.16, 1.22], [0.27, 1.12], [0.32, 0.98], [0.33, 0.8], [0.37, 0.5], [0.45, 0.18], [0.5, 0]];
+  const g = new THREE.LatheGeometry(pr.map(q => new THREE.Vector2(q[0], q[1])), 14);
+  const p = g.attributes.position, col = [];
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), a = Math.atan2(z, x);
+    if (y < 0.05) p.setY(i, y + 0.08 * Math.sin(a * 6));        // волнистый подол
+    col.push(0.95, 0.95, 0.97);
+  }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  let G = g;
+  // глаза и рот: тёмные овалы на лице (смотрит по +z)
+  for (const [x, y, sx, sy] of [[-0.1, 1.0, 0.055, 0.08], [0.1, 1.0, 0.055, 0.08], [0, 0.84, 0.05, 0.06]]) {
+    const e = new THREE.SphereGeometry(1, 8, 6);
+    e.scale(sx, sy, 0.03); e.translate(x, y, y > 0.9 ? 0.31 : 0.325);
+    const ec = [];
+    for (let i = 0; i < e.attributes.position.count; i++) ec.push(0.06, 0.05, 0.08);
+    e.setAttribute('color', new THREE.Float32BufferAttribute(ec, 3));
+    G = mergeTwo(G, e);
+  }
+  return G;
+}
+/* наружу от подъезда: свой вектор (сгенерированные подъезды) или ищем сторону, где не дом */
+function doorOut (e) {
+  if (e.length >= 4 && Number.isFinite(e[2])) return [e[2], e[3]];
+  for (let k = 0; k < 8; k++) {
+    const a = k / 8 * Math.PI * 2, ox = Math.sin(a), oz = Math.cos(a);
+    if (!A.inHouse(e[0] + ox * 1.4, e[1] + oz * 1.4, 0) && A.inHouse(e[0] - ox * 1.0, e[1] - oz * 1.0, 0)) return [ox, oz];
+  }
+  return null;
+}
+const DUMMY = { o: null };
+const obj = () => DUMMY.o || (DUMMY.o = new THREE.Object3D());
+DECOR_BUILD.pumpkins = function* (X) {
+  const E = A.CITY.entrances || [], PZ = A.PIZZA, spots = [];
+  let n = 0;
+  for (const e of E) {
+    if (++n % 300 === 0) yield;
+    if (spots.length >= PUMPKIN.CAP) break;
+    const dn = PZ ? Math.hypot(e[0] - PZ.x, e[1] - PZ.z) : 1e9;
+    if (hsh(e[0], e[1], 401) > (dn < PUMPKIN.NEAR ? PUMPKIN.NEAR_P : PUMPKIN.FAR_P) || !A.inBounds(e[0], e[1], 0)) continue;
+    const o = doorOut(e);
+    if (!o) continue;
+    const [ox, oz] = o, side = hsh(e[0], e[1], 405) < 0.5 ? 1 : -1, two = hsh(e[0], e[1], 406) < 0.35;
+    for (const sd of two ? [side, -side] : [side]) {
+      const x = e[0] + ox * 0.75 + oz * sd * 1.8, z = e[1] + oz * 0.75 - ox * sd * 1.8;   // сбоку от двери — мимо урны и лавочки
+      if (!A.inHouse(x, z, 0.25)) spots.push({ x, z, a: Math.atan2(ox, oz) + sd * 0.35 });
+    }
+  }
+  if (!spots.length) return;
+  // по клеткам: InstancedMesh тела и рожицы на клетку, своя граница — вне кадра не рисуются
+  const cells = new Map();
+  for (const q of spots) { const k = Math.floor(q.x / PUMPKIN.CELL) + ',' + Math.floor(q.z / PUMPKIN.CELL); if (!cells.has(k)) cells.set(k, []); cells.get(k).push(q); }
+  const geo = pumpkinGeo(), bodyM = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x3a1500 });   // чуть светится изнутри — ночью видно
+  const fg = new THREE.PlaneGeometry(0.36, 0.27);
+  fg.translate(0, 0.27, 0.38);
+  const faceM = new THREE.MeshBasicMaterial({ map: faceTex(), transparent: true, alphaTest: 0.4, color: 0xffffff });
+  faceM.userData.glow = 1;
+  const o = obj();
+  for (const list of cells.values()) {
+    const body = new THREE.InstancedMesh(geo, bodyM, list.length), face = new THREE.InstancedMesh(fg, faceM, list.length);
+    list.forEach((q, i) => {
+      const s = PUMPKIN.SIZE[0] + hsh(q.x, q.z, 402) * (PUMPKIN.SIZE[1] - PUMPKIN.SIZE[0]);
+      o.position.set(q.x, A.groundH(q.x, q.z) - 0.03, q.z);
+      o.rotation.set(0, q.a + (hsh(q.x, q.z, 403) - 0.5) * 0.5, 0);
+      o.scale.set(s, s * (0.85 + hsh(q.x, q.z, 404) * 0.3), s);
+      o.updateMatrix();
+      body.setMatrixAt(i, o.matrix); face.setMatrixAt(i, o.matrix);
+    });
+    for (const m of [body, face]) { m.visible = false; m.matrixAutoUpdate = false; m.instanceMatrix.needsUpdate = true; m.computeBoundingSphere(); A.scene.add(m); X.extra.push(m); }
+    yield;
+  }
+  X.out.pumpkins = spots.length; X.out.pumpkinCells = cells.size;
+};
+DECOR_BUILD.ghosts = function* (X) {
+  // места: середины длинных стен жилых домов, 0,6 м наружу (сетка GHOST.CELL м)
+  const B = A.CITY.buildings || [], grid = new Map();
+  let n = 0, cnt = 0;
+  for (const b of B) {
+    if (++n % 400 === 0) yield;
+    if (cnt >= GHOST.SPOTS) break;
+    if (b.k === 'gar' || b.k === 'ind' || !b.p || b.p.length < 3 || hsh(b.p[0][0], b.p[0][1], 411) > 0.7) continue;
+    for (let i = 0; i < b.p.length; i++) {
+      const a = b.p[i], c = b.p[(i + 1) % b.p.length], dx = c[0] - a[0], dz = c[1] - a[1], len = Math.hypot(dx, dz);
+      if (len < 6 || hsh(a[0], a[1], 412) > 0.8) continue;
+      let nx = dz / len, nz = -dx / len;
+      const mx = (a[0] + c[0]) / 2, mz = (a[1] + c[1]) / 2;
+      if (A.inPoly(mx + nx * 0.5, mz + nz * 0.5, b.p)) { nx = -nx; nz = -nz; }
+      const x = mx + nx * 1.4, z = mz + nz * 1.4;
+      if (!A.inBounds(x, z, 0)) continue;
+      const k = Math.floor(x / GHOST.CELL) + ',' + Math.floor(z / GHOST.CELL);
+      if (!grid.has(k)) grid.set(k, []);
+      grid.get(k).push({ x, z, a: Math.atan2(nx, nz), y: A.groundH(x, z) });
+      cnt++;
+    }
+  }
+  const mat = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x3a3f4a });
+  const m = new THREE.InstancedMesh(ghostGeo(), mat, GHOST.N);
+  m.visible = false; m.frustumCulled = false; m.matrixAutoUpdate = false;
+  A.scene.add(m);
+  X.extra.push(m);
+  X.ghosts = { m, grid, list: Array.from({ length: GHOST.N }, (_, i) => ({ x: 0, z: 0, y: -999, a: 0, ph: i * 1.7, s: 0.85 + (i % 5) * 0.12, on: false })), i: 0, t: 0, moved: 0 };
+  X.out.ghosts = GHOST.N; X.out.ghostSpots = cnt;
+  yield;
+};
+/* одно привидение — на стену рядом с курьером (вне кадра или дальше 120 м); нет места — прячется */
+function ghostPlace (G, q) {
+  const V = A.V, c = A.cam.position;
+  if (!FV) FV = new THREE.Vector3();
+  A.cam.getWorldDirection(FV);
+  const ci = Math.floor(V.x / GHOST.CELL), cj = Math.floor(V.z / GHOST.CELL), R = Math.ceil(GHOST.NEAR[1] / GHOST.CELL);
+  for (let k = 0; k < 24; k++) {
+    const cell = G.grid.get((ci + Math.round((Math.random() * 2 - 1) * R)) + ',' + (cj + Math.round((Math.random() * 2 - 1) * R)));
+    if (!cell || !cell.length) continue;
+    const p = cell[(Math.random() * cell.length) | 0], d = Math.hypot(p.x - V.x, p.z - V.z);
+    if (d < GHOST.NEAR[0] || d > GHOST.NEAR[1]) continue;
+    const dx = p.x - c.x, dz = p.z - c.z;
+    if (d < 120 && dx * FV.x + dz * FV.z > 0) continue;              // в кадре и близко — не появляться на глазах
+    if (G.list.some(o => o.on && Math.abs(o.x - p.x) < 6 && Math.abs(o.z - p.z) < 6)) continue;
+    q.x = p.x; q.z = p.z; q.a = p.a; q.y = p.y + GHOST.H[0] + Math.random() * (GHOST.H[1] - GHOST.H[0]); q.on = true;
+    G.moved++;
+    return;
+  }
+  q.on = false;
+}
+/* привидения плавают: вверх-вниз 0,25 м, качаются ±0,18 рад, поворачиваются туда-сюда; дальние — переселяются */
+let GH_T = 0;
+function ghostStep () {
+  const R = DECOR.get(CUR.h.id), G = R && R.ghosts;
+  if (!G || !G.m.visible) return;
+  const dt = 1 / 60;
+  if (!G.filled) { G.filled = true; for (const q of G.list) ghostPlace(G, q); }   // праздник начался — сразу все вокруг
+  if ((G.t -= dt) <= 0) {                                    // по одному за раз: кто далеко или не стоит — к курьеру
+    G.t = GHOST.CHECK;
+    const q = G.list[G.i = (G.i + 1) % G.list.length];
+    if (!q.on || Math.hypot(q.x - A.V.x, q.z - A.V.z) > GHOST.FAR) ghostPlace(G, q);
+  }
+  if ((GH_T = (GH_T + 1) % 2)) return;                       // матрицы — через кадр: движение медленное
+  const tm = U.uTime.value, o = obj();
+  for (let i = 0; i < G.list.length; i++) {
+    const q = G.list[i];
+    o.position.set(q.x, q.on ? q.y + Math.sin(tm * 1.3 + q.ph) * 0.25 : -999, q.z);
+    o.rotation.set(Math.sin(tm * 0.9 + q.ph) * 0.12, q.a + Math.sin(tm * 0.5 + q.ph) * 0.5, Math.sin(tm * 1.1 + q.ph * 2) * 0.18);
+    o.scale.setScalar(q.on ? q.s : 0.001);
+    o.updateMatrix();
+    G.m.setMatrixAt(i, o.matrix);
+  }
+  G.m.instanceMatrix.needsUpdate = true;
+}
+
 function* buildGen (h) {
   const t0 = performance.now();
-  const X = { D: h.decor, cells: Cells(), lamps: [], out: { houses: 0, roof: 0, lamps: 0, lampBulbs: 0, firs: 0, firBulbs: 0, tinsel: 0 } };
+  const X = { D: h.decor, cells: Cells(), lamps: [], extra: [], ghosts: null, out: { houses: 0, roof: 0, lamps: 0, lampBulbs: 0, firs: 0, firBulbs: 0, tinsel: 0 } };
   for (const k of h.decor.build) if (DECOR_BUILD[k]) yield* DECOR_BUILD[k](X);
-  const R = { pts: [], tin: [], lamps: X.lamps, out: X.out, n: 0, ms: 0 };
+  const R = { pts: [], tin: [], lamps: X.lamps, extra: X.extra, ghosts: X.ghosts, out: X.out, n: 0, ms: 0 };
   let nc = 0;
   for (const c of X.cells.m.values()) {
     if (c.p.length) {
@@ -496,10 +714,11 @@ function buildStep () {
 function show (R, on) {
   for (const m of R.pts) m.visible = on;
   for (const m of R.tin) m.visible = on;
+  for (const m of R.extra || []) m.visible = on;
 }
 function decorOn (h) {
   const R = DECOR.get(h.id);
-  if (R) { show(R, true); return; }
+  if (R) { if (R.ghosts) R.ghosts.filled = false; show(R, true); return; }   // привидения — заново вокруг курьера
   if (BUILD.gen && BUILD.id === h.id) return;
   BUILD.gen = buildGen(h); BUILD.id = h.id; BUILD.ms = 0;
 }
@@ -536,12 +755,27 @@ const COSTUME = {
     Object.assign(p.look, { age: 'young', hair: 'braid', hairC: '#e8cf8f', browC: '#a57a4a', headC: '#e6f2ff', pompom: true, tieC: '#ffffff', bottom: 'skirt', skirt: '#5aa0dc', legs: '#eef3fa', glasses: 'none' });
     return { person: p, o: { shirt: '#5aa0dc', hat: 'beanie', fem: true } };
   },
+  /* Хэллоуин: ведьма — чёрное платье, полосатые колготки, остроконечная шляпа (people.js 'witch'), зелёный нос */
+  witch () {
+    const p = makePerson({ fem: true, first: t('Ведьма'), last: '' });
+    Object.assign(p.look, { hair: 'long', hairC: Math.random() < 0.5 ? '#e0602a' : '#2b2a30', headC: '#2b2a30', tieC: '#7a3fb0', bottom: 'skirt', skirt: '#3a1f4a', legs: '#7a3fb0', glasses: 'none', noseC: '#7ab84a' });
+    return { person: p, o: { shirt: '#2b2a30', hat: 'witch', fem: true } };
+  },
+  /* привидение: человек в белой простыне с капюшоном, глаза-плошки */
+  ghost () {
+    const p = makePerson({ fem: Math.random() < 0.5, first: t('Привидение'), last: '' });
+    Object.assign(p.look, { eyes: 'bulge', eyeC: '#1d1a1f', glasses: 'none', beard: 'none', shoes: '#f4f4f6' });
+    return { person: p, o: { shirt: '#f4f4f6', pants: '#f4f4f6', hat: 'hood', skin: '#eef0f4' } };
+  },
 };
 const FOLK_LINES = {
   moroz: [N_('Хо-хо-хо!'), N_('С наступающим!'), N_('Где моя Снегурочка?'), N_('Подарки — по списку, не толкаемся')],
   drunk: [N_('Снегурочка… ик… ты где?'), N_('Я Дед Мороз! А ты кто такой?'), N_('Мешок потерял… с подарками… ёлки-палки'), N_('Наливай, внучка!')],
   snegurochka: [N_('Дедушка, не убегай!'), N_('С Новым годом!'), N_('Дедушка опять потерялся…')],
+  witch: [N_('Хи-хи-хи!'), N_('Сладость или гадость?'), N_('Где моя метла?!'), N_('Прокляну! …шучу')],
+  ghost: [N_('У-у-у-у!'), N_('Бу!'), N_('Я страшное привидение!'), N_('У-у… а пицца с чем?')],
 };
+const FOLK_COL = { snegurochka: '#3a7fc0', witch: '#7a3fb0', ghost: '#5a5a6a' };
 const F = { t: 0, sayT: 4 };
 const tagged = p => p.hol && p.grp === p.holGrp;
 function folkStep (dt) {
@@ -560,7 +794,7 @@ function folkStep (dt) {
     const near = P.filter(p => tagged(p) && !p.dead && !p.guest && Math.hypot(p.x - V.x, p.z - V.z) < 24);
     if (near.length) {
       const p = pick(near), k = p.holDrunk ? 'drunk' : p.hol;
-      say(p.grp, t(pick(FOLK_LINES[k] || FOLK_LINES.moroz)), p.hol === 'snegurochka' ? '#3a7fc0' : '#c0392b', 3);
+      say(p.grp, t(pick(FOLK_LINES[k] || FOLK_LINES.moroz)), FOLK_COL[p.hol] || '#c0392b', 3);
     }
   }
 }
@@ -830,5 +1064,5 @@ export const DEBUG = {
       gapMax: gaps.length ? Math.max(...gaps) : 0, gapMean: gaps.length ? +(gaps.reduce((a, b) => a + b, 0) / gaps.length).toFixed(2) : 0,
       twoInRow: gaps.filter(g => g === 1).length, at: hits.slice(0, 30) };
   },
-  get CUR () { return CUR; }, FW,
+  get CUR () { return CUR; }, FW, DECOR,
 };
