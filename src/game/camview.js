@@ -25,6 +25,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import './camview.css';
 import { t } from '../i18n/index.js';
+import * as TEL from './telemetry.js';          // анонимная статистика: смена вида камеры (telemetry.js)
 
 export const MODES = ['high', 'near', 'cab'];
 const KEY = 'dlv-cam';
@@ -79,6 +80,7 @@ export function set (m, save = true) {
 /** следующий вид по кругу: высоко → близко → из-за руля → высоко; say — всплывашка «камера: …» */
 export function cycle (say) {
   set(MODES[(MODES.indexOf(MODE) + 1) % MODES.length]);
+  TEL.ev('setting', { id: 'cam', v: MODE, how: say ? 'key' : 'menu' });
   if (say && A && A.toast) A.toast(t('камера: {v}', { v: label() }));
   return MODE;
 }

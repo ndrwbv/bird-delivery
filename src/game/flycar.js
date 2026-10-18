@@ -17,8 +17,9 @@
    стену на земле (сердца — по той же силе удара); заказ не вручить и за пиццей не заехать — только на земле
    (game.js checkArrival → blocksHand). Взлететь из-под арки нельзя — над тобой дом (noTakeoff).
 
+   Крылья (WINGS) — то же на любой машине карьеры, купившей их в гараже: ниже, короче, дольше заряжается.
    Переменных игры модуль не видит: всё — через init(api):
-     V, S, isFlyer() — сейчас родстер, canUse() — смена идёт, не пауза, не карта, не разговор,
+     V, S, isFlyer() — сейчас родстер, wings() — на машине купленные крылья (числа — WINGS), canUse() — смена идёт, не пауза, не карта, не разговор,
      noLand(x, z, y) — сюда не сесть (дом без крыши, вода), noTakeoff(x, z) — над тобой дом (арка), toast(text), Snd
    game.js зовёт: tick(dt) — каждый кадр езды; fly(dt, gnd) — вместо V.y, пока on(); pitch() — наклон
    кузова в полёте; passSolid(s, y) — пролетаешь ли это препятствие; high() — выше потока; reset() — новая смена.
@@ -41,6 +42,14 @@ export const FLY = {
   PASS: 0.15,       // днище выше верха стены минус PASS — стена не держит (пролетаешь над домом)
   DRAG: 0.03,       // сопротивление в полёте — доля земного: за полёт теряет ~5 % скорости
   HINT: 2.5,        // с — не чаще: «не сесть — под тобой дом / вода», «садись — с неба не вручить»
+};
+/* крылья (18.10.2026, автор: «летающую функцию для машины можно докупить»): улучшение в гараже для любой машины
+   карьеры, кроме родстера (econ.js ADDON.wings, cars.js upgrade(id, 'wings')). Та же кнопка и полоска, но слабее
+   родстера: ниже, короче, дольше заряжается. Остальное (взлёт, снижение, где не сесть, что пролетаешь) — как у FLY */
+export const WINGS = {
+  H: 5,             // м над опорой: одноэтажки (4,25 м) и гаражи — ещё под тобой, двухэтажки — стена
+  HOLD: 3,          // с — держит высоту (родстер 4,5)
+  CD: 40,           // с — перезарядка (родстер 25)
 };
 export const STATS = { flights: 0, maxUp: 0, airT: 0, lastAir: 0, landV: 0, blockedLand: 0, wallHits: 0 };
 
@@ -86,18 +95,22 @@ export function init (api) {
   onInput(() => { lastCls = ''; lastK = -1; });   // значок кнопки — по тому, чем играют
 }
 
-const isFlyer = () => !!(A && A.isFlyer && A.isFlyer());
+const winged = () => !!(A && A.wings && A.wings());
+const isFlyer = () => !!(A && ((A.isFlyer && A.isFlyer()) || winged()));
+/** число полёта: у крыльев H, HOLD, CD свои (WINGS), у родстера и остальное — FLY */
+const par = k => (k in WINGS && winged() && !(A.isFlyer && A.isFlyer()) ? WINGS[k] : FLY[k]);
+export const kind = () => (A && A.isFlyer && A.isFlyer() ? 'roadster' : winged() ? 'wings' : null);
 export const on = () => ST.ph !== 'ground';
 export const high = () => ST.hi;
 export const ready = () => ST.ph === 'ground' && ST.cd <= 0;
 /** заряд 0…1: на земле — сколько набралось, в полёте — сколько ещё держит высоту */
 export function charge () {
-  if (ST.ph === 'ground') return ST.cd > 0 ? 1 - ST.cd / FLY.CD : 1;
+  if (ST.ph === 'ground') return ST.cd > 0 ? Math.max(0, 1 - ST.cd / par('CD')) : 1;
   if (ST.ph === 'up') return 1;
-  if (ST.ph === 'hold') return Math.max(0, 1 - ST.t / FLY.HOLD);
+  if (ST.ph === 'hold') return Math.max(0, 1 - ST.t / par('HOLD'));
   return 0;
 }
-export const state = () => ({ ph: ST.ph, t: ST.t, y: ST.y, alt: ST.alt, cd: ST.cd, hi: ST.hi, gnd: ST.gnd, charge: charge(), flyer: isFlyer() });
+export const state = () => ({ ph: ST.ph, t: ST.t, y: ST.y, alt: ST.alt, cd: ST.cd, hi: ST.hi, gnd: ST.gnd, charge: charge(), flyer: isFlyer(), kind: kind(), H: par('H'), HOLD: par('HOLD'), CD: par('CD') });
 
 /* нажали «полёт»: можно — взлетаем; заряжается — короткая подсказка */
 export function press () {
@@ -110,7 +123,7 @@ export function press () {
     hint(t('крылья заряжаются: {n} с', { n: String(Math.ceil(ST.cd)) }));
     return false;
   }
-  ST.ph = 'up'; ST.t = 0; ST.y0 = ST.y = V.y; ST.alt = V.y + FLY.H; ST.air = 0;
+  ST.ph = 'up'; ST.t = 0; ST.y0 = ST.y = V.y; ST.alt = V.y + par('H'); ST.air = 0;
   STATS.flights++; STATS.maxUp = 0;
   if (A.Snd && A.Snd.nosFire) A.Snd.nosFire();     // тот же «вжух», что у нитро — своих звуков нет
   if (A.S) A.S.shake = Math.max(A.S.shake || 0, 0.15);
@@ -147,7 +160,7 @@ export function fly (dt, gnd) {
     ST.t += dt;
     const top = Math.max(ST.alt, gnd + FLY.GAP);
     y += (top - y) * Math.min(1, 6 * dt);
-    if (ST.t >= FLY.HOLD) { ST.ph = 'down'; ST.t = 0; }
+    if (ST.t >= par('HOLD')) { ST.ph = 'down'; ST.t = 0; }
   } else if (ST.ph === 'down') {
     ST.t += dt;
     if (A.noLand && A.noLand(V.x, V.z, y)) {
@@ -161,7 +174,7 @@ export function fly (dt, gnd) {
       if (y <= gnd + 0.02) {
         STATS.landV = v; STATS.lastAir = ST.air; STATS.airT += ST.air;
         y = gnd;
-        ST.ph = 'ground'; ST.t = 0; ST.cd = FLY.CD; ST.hi = false; ST.y = y;
+        ST.ph = 'ground'; ST.t = 0; ST.cd = par('CD'); ST.hi = false; ST.y = y;
         return y;
       }
     }
@@ -225,6 +238,32 @@ function drawHud () {
     const g = glyph('fly');
     if (hudLab) hudLab.textContent = cls === 'fly' ? t('в небе') : cls === 'wait' ? t('заряд крыльев') : (g ? '[' + g + '] ' : '') + t('полёт');
   }
+}
+
+/* ─────────────── крылышки (WINGS) ───────────────
+   Зовёт cars.js dress, если куплены крылья: в склейку кузова (add(geo, hex, x, y, z)). k: { S, W, top, hl }.
+   По бортам по линии пояса (под окнами) — короткие стреловидные крылышки (выступают на ~0,5 м) с оранжевой законцовкой
+   и килем, на корме — узкое антикрыло на двух стойках. Коллизия машины не меняется — только вид */
+export function wingsLook (add, k) {
+  const { S, W, top, hl } = k;
+  const B = (w, h, d, hex, x, y, z, rx = 0, ry = 0, rz = 0) => {
+    const g = new THREE.BoxGeometry(w, h, d);
+    if (rx) g.rotateX(rx); if (ry) g.rotateY(ry); if (rz) g.rotateZ(rz);
+    add(g, hex, x, y, z);
+  };
+  const WING = '#e6e8ec', TIP = '#f0522a', DARK = '#2b2c31';
+  const y = top - 0.03, z = S.cz - S.cab * 0.12;
+  for (const s of [-1, 1]) {
+    B(0.56, 0.05, 0.7, WING, s * (W / 2 + 0.24), y, z, 0, s * 0.42, s * -0.1);     // плоскость: стреловидная, чуть вверх
+    B(0.05, 0.26, 0.34, TIP, s * (W / 2 + 0.5), y + 0.1, z - 0.2, 0, 0, s * 0.12);  // киль-законцовка
+    B(0.14, 0.09, 0.34, DARK, s * (W / 2 + 0.03), y - 0.01, z + 0.04);             // крепление к борту
+  }
+  // антикрыло на корме: две стойки и узкая плоскость над крышкой багажника
+  // без багажника (хэтчбек, джип, фургон) — козырьком над задним краем крыши, на коротких стойках
+  const boot = S.trunk > 0.3, zb = boot ? -hl + 0.32 : S.cz - S.cab / 2 + 0.22, yb = boot ? top + 0.05 : top + S.ch - 0.16;
+  for (const s of [-1, 1]) B(0.06, 0.28, 0.1, DARK, s * W * 0.32, yb + 0.14, zb);
+  B(W * 0.86, 0.04, 0.28, WING, 0, yb + 0.3, zb - 0.02, -0.08);
+  for (const s of [-1, 1]) B(0.04, 0.14, 0.3, TIP, s * W * 0.43, yb + 0.33, zb - 0.02);
 }
 
 /* ─────────────── открытый салон кабриолета ───────────────

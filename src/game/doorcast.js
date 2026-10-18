@@ -281,7 +281,7 @@ function bubble (grp, text, col, y, hold, name) {
   const b = new THREE.Sprite(new THREE.SpriteMaterial({ map: TALK.tex(text, col, name || ''), transparent: true, depthWrite: false }));
   b.position.set(0, y, 0);
   grp.add(b);
-  TALK.track(b);
+  TALK.track(b, 1);                                // у двери — важное, без очереди фоновых (talk.js)
   setTimeout(() => { if (b.parent) b.parent.remove(b); b.material.dispose(); }, hold * 1000);
   return b;
 }
@@ -295,13 +295,17 @@ export function dog (ped, o = {}) {
   const [x, z] = petSpot(X, 0.8);
   const m = dogMesh();
   m.scale.setScalar(1.15);
-  m.position.set(x, gh(x, z), z);
-  m.rotation.y = X.c ? angTo(x, z, X.c.x, X.c.z) : 0;
+  // o.from — выбегает оттуда (из машины, unboard) к ногам клиента и там садится
+  const sx = o.from ? o.from.x : x, sz = o.from ? o.from.z : z;
+  m.position.set(sx, gh(sx, sz), sz);
+  m.rotation.y = o.from ? angTo(sx, sz, x, z) : X.c ? angTo(x, z, X.c.x, X.c.z) : 0;
   A.scene.add(m);
-  const D = { m, x, z, ph: 0, wag: 0, sit: !!o.sit, barkQ: 0, barkT: 0.25, word: o.word || t('Гав!'), t: 0, sec: o.sec || 0, to: null,
+  const D = { m, x: sx, z: sz, ph: 0, wag: 0, sit: !!o.sit && !o.from, sitAt: !!o.sit, barkQ: 0, barkT: 0.25, word: o.word || t('Гав!'), t: 0, sec: o.sec || 0,
+    to: o.from ? { x, z, stay: true, look: X.c ? { x: X.c.x, z: X.c.z } : null } : null, jump: o.from ? JUMP.OUT : 0, s0: 1.15,
     door: { x: X.px + X.dx * 3.5, z: X.pz + X.dz * 3.5 } };
   D.bark = (n = 1) => { D.barkQ += n; };
-  D.go = () => { if (D.m && !D.to) { D.to = { x: D.door.x, z: D.door.z }; D.sit = false; } };
+  D.go = () => { if (D.m && !D.board && (!D.to || D.to.stay)) { D.to = { x: D.door.x, z: D.door.z }; D.sit = false; D.look = null; } };
+  if (D.to && D.to.look) D.look = D.to.look;
   D.bark(o.barks === undefined ? 2 : o.barks);
   DOGS.add(D); ST.dogs++;
   return D;
@@ -309,18 +313,29 @@ export function dog (ped, o = {}) {
 function dogStep (D, dt) {
   if (!D.m) return;
   D.t += dt;
-  if (D.sec && D.t > D.sec) D.go();
+  if (D.sec && D.t > D.sec && !D.board) D.go();
   const u = D.m.userData.dog;
   let moving = false;
-  if (D.to) {
+  if (D.board) {                                                     // бежит к машине и запрыгивает в салон (board)
+    const r = boardStep(D, dt, JUMP.DOG_RUN);
+    if (r === true) { dogDrop(D); return; }
+    moving = r === 'run';
+    if (r === 'hop') { legsStill(u); return; }
+  } else if (D.to) {
     const dx = D.to.x - D.x, dz = D.to.z - D.z, d = Math.hypot(dx, dz);
-    if (d < 0.2 || D.t > (D.sec || 0) + 60) { dogDrop(D); return; }
-    const st = Math.min(d, 3.2 * dt);
-    D.x += dx / d * st; D.z += dz / d * st; moving = true;
-    D.m.rotation.y += dAng(D.m.rotation.y, Math.atan2(dx, dz)) * Math.min(1, dt * 10);
-    D.ph += dt * 16;
+    if (d < 0.2 && D.to.stay) { D.to = null; D.sit = D.sitAt; }   // выбежал из машины — у ног клиента, садится
+    else if (d < 0.2 || D.t > (D.sec || 0) + 60) { dogDrop(D); return; }
+    else {
+      const st = Math.min(d, 3.2 * dt);
+      D.x += dx / d * st; D.z += dz / d * st; moving = true;
+      D.m.rotation.y += dAng(D.m.rotation.y, Math.atan2(dx, dz)) * Math.min(1, dt * 10);
+      D.ph += dt * 16;
+    }
   }
-  D.m.position.set(D.x, gh(D.x, D.z) + (moving ? Math.abs(Math.sin(D.ph)) * 0.05 : 0), D.z);
+  if (!D.to && D.look) D.m.rotation.y += dAng(D.m.rotation.y, angTo(D.x, D.z, D.look.x, D.look.z)) * Math.min(1, dt * 6);
+  let jy = 0;
+  if (D.jump > 0) { D.jump -= dt; jy = Math.sin(Math.max(0, D.jump) / JUMP.OUT * Math.PI) * 0.55; }   // спрыгнул с сиденья
+  D.m.position.set(D.x, gh(D.x, D.z) + jy + (moving ? Math.abs(Math.sin(D.ph)) * 0.05 : 0), D.z);
   D.m.rotation.x = D.sit && !moving ? -0.35 : 0;
   for (let i = 0; i < 4; i++) u.legs[i].rotation.x = moving ? Math.sin(D.ph + (i % 2 ? Math.PI : 0) + (i > 1 ? Math.PI / 2 : 0)) * 0.6 : 0;
   // хвост виляет (сидит — довольный, быстрее); лает — голова дёргается вверх
@@ -340,17 +355,31 @@ export function cat (ped, o = {}) {
   if (!A || !A.scene || !ped || !ped.grp) return null;
   const X = axes(ped);
   const [x, z] = petSpot(X, 0.6);
+  // o.from — выбегает оттуда (из машины, unboard) к ногам клиента; «Мяу» — когда добежал
+  const sx = o.from ? o.from.x : x, sz = o.from ? o.from.z : z;
+  const C = catAt(sx, sz, o.from ? angTo(sx, sz, x, z) : X.c ? angTo(x, z, X.c.x, X.c.z) : 0, o);
+  if (!C) return null;
+  C.door = { x: X.px + X.dx * 3.5, z: X.pz + X.dz * 3.5 };
+  if (o.from) { C.to = { x, z, stay: true }; C.jump = JUMP.OUT; C.word = o.word || t('Мяу'); C.look = X.c ? { x: X.c.x, z: X.c.z } : null; }
+  else meow(C, o.word);
+  return C;
+}
+/* кот в точке x, z (у ветеринара, у тёщи вместо Бобика — потом board) */
+function catAt (x, z, h, o = {}) {
+  if (!A || !A.scene) return null;
   let m = null;
   try { m = makeCatModel(THREE, FURS[o.fur || ((Math.random() * FURS.length) | 0)] || FURS[0], true); } catch (e) { return null; }
   m.position.set(x, gh(x, z), z);
-  m.rotation.y = X.c ? angTo(x, z, X.c.x, X.c.z) : 0;
+  m.rotation.y = h;
   A.scene.add(m);
-  const C = { m, x, z, t: 0, to: null, cat: true, door: { x: X.px + X.dx * 3.5, z: X.pz + X.dz * 3.5 } };
-  C.go = () => { if (C.m && !C.to) C.to = { x: C.door.x, z: C.door.z }; };
-  bubble(m, o.word || t('Мяу'), DC.DOG_COL, 0.75, 1.4);
-  try { if (A.Snd) A.Snd.fx('meow', s => s.blip(1100, 0.08, 'triangle', 0.03), { x, z, far: 30 }); } catch (e) { /* — */ }
+  const C = { m, x, z, t: 0, to: null, cat: true, s0: m.scale.x || 1, jump: 0, door: { x, z } };
+  C.go = () => { if (C.m && !C.board && (!C.to || C.to.stay)) { C.to = { x: C.door.x, z: C.door.z }; C.look = null; } };
   CATS.add(C); ST.cats = (ST.cats || 0) + 1;
   return C;
+}
+function meow (C, word) {
+  bubble(C.m, word || t('Мяу'), DC.DOG_COL, 0.75, 1.4);
+  try { if (A.Snd) A.Snd.fx('meow', s => s.blip(1100, 0.08, 'triangle', 0.03), { x: C.x, z: C.z, far: 30 }); } catch (e) { /* — */ }
 }
 function catDrop (C) {
   CATS.delete(C);
@@ -363,17 +392,98 @@ function catStep (C, dt) {
   if (!C.m) return;
   C.t += dt;
   const u = C.m.userData;
-  if (C.to) {
+  let walk = false;
+  if (C.board) {                                                     // бежит к машине и запрыгивает в салон (board)
+    const r = boardStep(C, dt, JUMP.CAT_RUN);
+    if (r === true) { catDrop(C); return; }
+    if (r === 'hop') return;
+    walk = true;
+  } else if (C.to) {
     const dx = C.to.x - C.x, dz = C.to.z - C.z, d = Math.hypot(dx, dz);
-    if (d < 0.2 || C.t > 60) { catDrop(C); return; }
-    const st = Math.min(d, 1.6 * dt);
-    C.x += dx / d * st; C.z += dz / d * st;
-    C.m.rotation.y += dAng(C.m.rotation.y, Math.atan2(dx, dz)) * Math.min(1, dt * 8);
-    if (u.legs) for (let i = 0; i < 4; i++) u.legs[i].rotation.x = Math.sin(C.t * 12 + (i % 2 ? Math.PI : 0) + (i > 1 ? Math.PI / 2 : 0)) * 0.5;
+    if (d < 0.2 && C.to.stay) { C.to = null; meow(C, C.word); }      // выбежал из машины — у ног клиента: «Мяу»
+    else if (d < 0.2 || C.t > 60) { catDrop(C); return; }
+    else {
+      const st = Math.min(d, (C.to.stay ? 2.6 : 1.6) * dt);
+      C.x += dx / d * st; C.z += dz / d * st;
+      C.m.rotation.y += dAng(C.m.rotation.y, Math.atan2(dx, dz)) * Math.min(1, dt * 8);
+      walk = true;
+    }
   }
-  C.m.position.set(C.x, gh(C.x, C.z), C.z);
+  if (walk && u.legs) for (let i = 0; i < 4; i++) u.legs[i].rotation.x = Math.sin(C.t * 12 + (i % 2 ? Math.PI : 0) + (i > 1 ? Math.PI / 2 : 0)) * 0.5;
+  if (!walk && C.look) C.m.rotation.y += dAng(C.m.rotation.y, angTo(C.x, C.z, C.look.x, C.look.z)) * Math.min(1, dt * 6);
+  let jy = 0;
+  if (C.jump > 0) { C.jump -= dt; jy = Math.sin(Math.max(0, C.jump) / JUMP.OUT * Math.PI) * 0.5; }
+  C.m.position.set(C.x, gh(C.x, C.z) + jy, C.z);
   if (u.tail) u.tail.rotation.y = Math.sin(C.t * 2.4) * 0.5;
 }
+
+/* ── живое поручение (errands.js: «забери Бобика у тёщи», «кот от ветеринара») ──
+   Зверь бежит к ближнему боку машины, запрыгивает в салон (дуга, уменьшается) и пропадает — у машины «Гав!» / «Мяу»
+   облачком и звуком. У клиента — выпрыгивает из машины и бежит к его ногам (dog / cat с o.from), там лает / мяукает. */
+export const JUMP = { SIDE: 1.15, HOP: 0.42, OUT: 0.35, DOG_RUN: 4.6, CAT_RUN: 3.6, MAX: 6 };
+/** зверь у ног того, кто отдаёт: kind 'dog' | 'cat', ped — у кого (как dog / cat), o — как у них */
+export function pet (kind, ped, o = {}) { return kind === 'cat' ? cat(ped, o) : dog(ped, o); }
+/** выпрыгнуть из машины к ногам клиента ped: o — как у dog / cat (sit, barks, sec, word) */
+export function unboard (kind, ped, o = {}) {
+  const c = carPos();
+  if (!c || !ped) return null;
+  const fx = Math.sin(c.h || 0), fz = Math.cos(c.h || 0), sx = fz, sz = -fx;
+  const sg = (ped.x - c.x) * sx + (ped.z - c.z) * sz >= 0 ? 1 : -1;
+  ST.unboards = (ST.unboards || 0) + 1;
+  return pet(kind, ped, Object.assign({}, o, { from: { x: c.x + sx * sg * JUMP.SIDE, z: c.z + sz * sg * JUMP.SIDE } }));
+}
+/** зверь P (из dog / cat / pet) бежит к машине и запрыгивает в салон; o.word — что скажет у машины, o.done() — запрыгнул */
+export function board (P, o = {}) {
+  if (!P || !P.m) return false;
+  P.board = { t: 0, hop: -1, word: o.word || (P.cat ? t('Мяу') : t('Гав!')), done: o.done || null };
+  P.sit = false; P.to = null; P.barkQ = 0; P.look = null; P.jump = 0;
+  ST.boards = (ST.boards || 0) + 1;
+  return true;
+}
+/* шаг посадки → 'run' (бежит), 'hop' (в прыжке — позу ставит сам), true — в салоне (убрать) */
+function boardStep (P, dt, run) {
+  const B = P.board, c = carPos();
+  B.t += dt;
+  if (!c || B.t > JUMP.MAX) { boarded(P, c); return true; }
+  if (B.hop < 0) {
+    const fx = Math.sin(c.h || 0), fz = Math.cos(c.h || 0), sx = fz, sz = -fx;
+    const sg = (P.x - c.x) * sx + (P.z - c.z) * sz >= 0 ? 1 : -1;
+    const tx = c.x + sx * sg * JUMP.SIDE, tz = c.z + sz * sg * JUMP.SIDE, dx = tx - P.x, dz = tz - P.z, d = Math.hypot(dx, dz);
+    if (d < 0.35) { B.hop = 0; B.x0 = P.x; B.z0 = P.z; return 'hop'; }
+    const st = Math.min(d, run * dt);
+    P.x += dx / d * st; P.z += dz / d * st;
+    P.m.rotation.y += dAng(P.m.rotation.y, Math.atan2(dx, dz)) * Math.min(1, dt * 10);
+    P.ph = (P.ph || 0) + dt * 16;
+    P.m.position.set(P.x, gh(P.x, P.z), P.z);
+    return 'run';
+  }
+  B.hop += dt / JUMP.HOP;
+  const k = Math.min(1, B.hop);
+  const x = B.x0 + (c.x - B.x0) * k * 0.75, z = B.z0 + (c.z - B.z0) * k * 0.75;
+  P.x = x; P.z = z;
+  P.m.rotation.y += dAng(P.m.rotation.y, angTo(x, z, c.x, c.z)) * Math.min(1, dt * 12);
+  P.m.position.set(x, gh(x, z) + Math.sin(k * Math.PI) * 0.7 + k * 0.5, z);
+  P.m.scale.setScalar((P.s0 || 1) * (1 - 0.65 * k));
+  if (k >= 1) { boarded(P, c); return true; }
+  return 'hop';
+}
+function boarded (P, c) {
+  const B = P.board;
+  if (c && A && A.scene) {
+    const g = new THREE.Group();
+    g.position.set(c.x, gh(c.x, c.z), c.z);
+    A.scene.add(g);
+    bubble(g, B.word, DC.DOG_COL, 1.9, 1.3, '');
+    setTimeout(() => { if (g.parent) g.parent.remove(g); }, 1400);
+    try {
+      if (A.Snd) { if (P.cat) A.Snd.fx('meow', s => s.blip(1100, 0.08, 'triangle', 0.03), { x: c.x, z: c.z, far: 30 }); else A.Snd.fx('bark', synBark, { x: c.x, z: c.z, far: 40 }); }
+    } catch (e) { /* — */ }
+  }
+  ST.boarded = (ST.boarded || 0) + 1;
+  P.board = null;
+  if (B.done) { try { B.done(); } catch (e) { /* — */ } }
+}
+function legsStill (u) { if (u && u.legs) for (let i = 0; i < 4; i++) u.legs[i].rotation.x = 0.5; }
 
 /** облачко «из квартиры» — у клиента за спиной (дверь), низко: голос или звук оттуда */
 export function offstage (ped, text, o = {}) {
@@ -454,7 +564,9 @@ export function clear () {
 export const DEBUG = {
   DC, ST,
   get actors () { return [...ACT].map(a => ({ own: a.own, x: +(a.grp ? a.grp.position.x : a.x).toFixed(1), z: +(a.grp ? a.grp.position.z : a.z).toFixed(1), kid: a.grp ? +a.grp.scale.y.toFixed(2) : 1, walking: !!a.to, talk: a.talk, mouth: a.L ? a.L.mouth : null, face: !!a.L, seen: a.seen })); },
-  get dogs () { return [...DOGS].map(D => ({ x: +D.x.toFixed(1), z: +D.z.toFixed(1), sit: D.sit, going: !!D.to, barksLeft: D.barkQ })); },
+  get dogs () { return [...DOGS].map(D => ({ x: +D.x.toFixed(1), z: +D.z.toFixed(1), sit: D.sit, going: !!D.to, board: !!D.board, barksLeft: D.barkQ })); },
+  get cats () { return [...CATS].map(C => ({ x: +C.x.toFixed(1), z: +C.z.toFixed(1), going: !!C.to, board: !!C.board })); },
+  JUMP,
   /* голова на экране (NDC y: 1 — верх) */
   screen (a) { if (!a || !a.grp || !A || !A.cam) return null; const g = a.grp.position; PV.set(g.x, g.y + 1.6 * (a.grp.scale.y || 1), g.z).project(A.cam); return { x: +PV.x.toFixed(2), y: +PV.y.toFixed(2) }; },
   get list () { return [...ACT]; },

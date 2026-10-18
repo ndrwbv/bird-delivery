@@ -29,6 +29,7 @@ import * as HQ from './heroquests.js';             // совет Лёхи, «н�
 import * as PFX from './paperfx.js';
 import { keyHTML, inputKind } from '../input/glyphs.js';
 import { t, N_ } from '../i18n/index.js';
+import * as TEL from './telemetry.js';          // анонимная статистика: ставки в «депнуть» (telemetry.js)
 
 let A = null, SH = { slot: false, n: 0 }, H = {};
 const $ = id => document.getElementById(id);
@@ -334,6 +335,7 @@ function spin () {
   const R = HQ.roll({ game: GAME, pick: PICK, base: cfg.win != null ? cfg.win : ECON.SLOT.WIN, first: ECON.SLOT.FIRST_WIN && DEP_SESSION === 1 });
   const win = R.win;
   A.addWallet(-st);
+  TEL.ev('dep', { game: GAME, stake: Math.round(st), win: win ? 1 : 0, wallet: Math.round(A.wallet()) });
   const allIn = stepDown(A.wallet()) <= 0;        // поставил всё — для достижения ALL_IN (achievements.js)
   A.Store.flush();
   if (H.refreshWallet) H.refreshWallet();

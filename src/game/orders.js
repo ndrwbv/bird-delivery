@@ -974,6 +974,8 @@ export function payStop (o, st, onTime, tier) {
   SH.done += o.idx === o.stops.length - 1 ? 1 : 0;
   if (st.far) SH.far += onTime ? st.far : Math.round(st.far * PAY.LATE);   // «весь город»: премия за дальние за смену (итоги)
   TEL.count(onTime ? 'ontime' : 'late');                 // анонимная статистика: вовремя / опоздал (telemetry.js)
+  if (!onTime && st.x !== undefined) TEL.heat('late', st.x, st.z, { type: sp.type || '' });   // опоздал сюда — тепловая карта
+  TEL.first('delivery1', { late: onTime ? 0 : 1 });       // воронка новичка: первая доставка
   if (!onTime) {
     const gop = DOOR.stairsAdjust(st, fee, 0, 0).gop;     // откупился от гопников в подъезде, а всё равно опоздал — «чаевые» им уже отданы
     st.pay = { fee, bonus: 0, tip: 0, late: true, story: !!sp.story, stairsGop: gop };
@@ -1294,7 +1296,7 @@ function staffArrive (o, st) {
     p.x = V.x + Math.cos(V.h) * 1.9; p.z = V.z - Math.sin(V.h) * 1.9;
     A.pushOut(p, 0.5);
     A.makeGuest(p, { x: st.at.x, z: st.at.z });
-    const b = A.sayBubble(p.grp, line, '#8a6a00', 2.7);
+    const b = A.sayBubble(p.grp, line, '#8a6a00', 2.7, 1);
     STAFF.drops.push({ p, b, t: 7 });
   }
   A.toast(line + ' · +' + A.money(pay));

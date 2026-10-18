@@ -24,6 +24,8 @@ STEAM-ACCOUNT.local.md
 *.local.json
 *.local.key
 *.local.pem
+# копия выгрузки статистики (npm run stats)
+tools/telemetry/.cache/
 # старые звуки после npm run sfx -- --force
 .sfx-old/
 promo/

@@ -44,6 +44,7 @@ import { t } from '../i18n/index.js';
 import { readTime } from './dialog.js';
 import * as NQ from './notifyq.js';
 import { CLIENT_HIT } from './econ.js';
+import * as TEL from './telemetry.js';          // анонимная статистика: подсказки новичку — воронка (telemetry.js)
 
 const KEY = 'dlv-hints';
 const PLAY = ['drive', 'back', 'side', 'loading', 'handover'];
@@ -129,6 +130,7 @@ function highlight (sel) {
 function open (h) {
   ui();
   H.cur = h; H.t = 0; H.shown = 0;
+  TEL.first('hint.' + h.id);
   TXT.innerHTML = h.text;
   seen(h.id);
   highlight(h.hi);
@@ -251,7 +253,7 @@ export function stepan (ped) {
   const live = () => !ped.dead && ped.grp.parent && PLAY.includes(S.state);
   setTimeout(() => {
     if (!live()) return;
-    const b = A.sayBubble(ped.grp, t('Брат, вложишься в мой бизнес?'), '#7a4cc2');
+    const b = A.sayBubble(ped.grp, t('Брат, вложишься в мой бизнес?'), '#7a4cc2', 2.7, 1);
     setTimeout(() => { ped.grp.remove(b); if (b.material) b.material.dispose(); }, 3600);
   }, 1100);
   // облако — прямо на машину

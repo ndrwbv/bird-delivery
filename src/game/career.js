@@ -45,6 +45,7 @@ import * as DAYT from './daytime.js';            // время суток сло
 import * as HOL from './holidays.js';            // праздничная смена: лента в чеке (holidays.js)
 import * as CYCLE from './seasoncycle.js';      // календарик сезонов в чеке: «до весны — 2 смены» (seasoncycle.js)
 import { t, tn, lang } from '../i18n/index.js';
+import * as TEL from './telemetry.js';          // анонимная статистика: открытие района, донаты (telemetry.js)
 
 /* соседние модули карьеры — если уже есть: заказы (развоз смены) и машины (гараж) */
 const ORD = import.meta.glob('./orders.js', { eager: true })['./orders.js'] || null;
@@ -474,7 +475,8 @@ export function showEnd (why, whyText, held) {
     // район: смена засчитана (отвёз хотя бы DISTRICT.COUNT_MIN), открылся следующий — сразу туда
     const r = DIST.countShift(S.delivered || 0);
     SH.counted = r.counted; SH.opened = r.opened;
-    if (r.opened >= 0) TRANS.mark(A.Store, r.opened, SH.district);   // следующая смена — там: в её начале Толик скажет про перевод
+    if (r.opened >= 0) TRANS.mark(A.Store, r.opened, SH.district);
+    if (r.opened >= 0) { TEL.ev('district', { opened: r.opened, shifts: SH.n + 1 }); TEL.first('district' + (r.opened + 1)); }   // следующая смена — там: в её начале Толик скажет про перевод
     // бонус за смену — только досидел до конца (econ.js SHIFT_BONUS), сразу в кошелёк
     SH.bonus = full ? ECON.shiftBonus(S.delivered || 0, DIST.has() ? (SH.city ? ECON.CITY.PAY : DIST.pay(SH.district >= 0 ? SH.district : DIST.cur())) : 1) : 0;
     if (SH.bonus) A.addWallet(SH.bonus);
@@ -1124,6 +1126,7 @@ function paneDonate (p, k) {
     const v = Math.min(+r.value || 0, Math.floor(Math.min(A.wallet(), Math.max(0, D.goal - (+A.Store.get(key, 0) || 0))) / D.step) * D.step);
     if (v <= 0) return;
     A.addWallet(-v);
+    TEL.ev('donate', { k: String(key).replace(/^dlv-/, ''), v: Math.round(v) });
     A.Store.set(key, (+A.Store.get(key, 0) || 0) + v);
     A.Store.flush();
     A.Snd.coin();

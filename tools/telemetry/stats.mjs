@@ -4,7 +4,10 @@
      npm run stats -- --test      — только проверочные (probe с ?tel, dev-сборки) — посмотреть, что сводка работает
      npm run stats -- --all       — всё вместе
      npm run stats -- --print     — только напечатать, docs/STATS.md не трогать
-   Доступ — `yc --profile personal` (вход автора) или ключ telemetry-reader.local.json. docs/ANALYTICS.md */
+     npm run stats -- --fresh     — забыть копию на диске и выгрузить всё заново
+   Доступ — `yc --profile personal` (вход автора) или ключ telemetry-reader.local.json. docs/ANALYTICS.md
+   Копия выгрузки — tools/telemetry/.cache/events.json (в .gitignore): из базы каждый раз тянутся только дни с
+   последнего выгруженного (чтение тоже тратит операции бесплатного уровня). */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,20 +19,45 @@ const arg = (k, d) => { const a = process.argv.find(s => s === '--' + k || s.sta
 const DAYS = Math.max(1, +arg('days', 30) || 30);
 const MODE = arg('all') ? 'all' : arg('test') ? 'test' : 'real';
 
-/* ── выгрузка постранично по первичному ключу ── */
-async function load (d) {
+/* ── выгрузка: копия на диске + постранично по ключу (день, установка, запуск, время, номер) только новые дни ── */
+const CACHE = path.join(here, '.cache', 'events.json');
+const dayStr = d => new Date(d).toISOString().slice(0, 10);
+async function fetchDays (d, from) {
   const rows = [];
   let last = null;
-  const testCond = MODE === 'all' ? '' : MODE === 'test' ? ' AND test = true' : ' AND (test IS NULL OR test = false)';
-  for (let page = 0; page < 500; page++) {
-    const after = last ? ` AND (install_id, session_id, ts, seq) > ("${last.installId}"u, "${last.sessionId}"u, Timestamp("${last.ts.toISOString()}"), ${last.seq}u)` : '';
-    const part = await q(d, `SELECT install_id, session_id, ts, seq, event, version, build, device, data, test FROM \`${CONF.table}\`
-      WHERE ts > CurrentUtcTimestamp() - Interval("P${DAYS}D")${testCond}${after}
-      ORDER BY install_id, session_id, ts, seq LIMIT 2000;`);
-    for (const r of part) { try { r.d = r.data ? JSON.parse(r.data) : {}; } catch (e) { r.d = {}; } rows.push(r); }
+  for (let page = 0; page < 1000; page++) {
+    const after = last ? ` AND (day, install_id, session_id, ts, seq) > (Date("${dayStr(last.day)}"), "${last.installId}"u, "${last.sessionId}"u, Timestamp("${last.ts.toISOString()}"), ${last.seq}u)` : '';
+    const part = await q(d, `SELECT day, install_id, session_id, ts, seq, event, version, build, device, data, test FROM \`${CONF.table}\`
+      WHERE day >= Date("${from}")${after} ORDER BY day, install_id, session_id, ts, seq LIMIT 2000;`);
+    for (const x of part) rows.push({ day: dayStr(x.day), installId: x.installId, sessionId: x.sessionId, ts: x.ts.toISOString(), seq: x.seq, event: x.event, version: x.version, build: x.build, device: x.device, data: x.data, test: !!x.test });
     if (part.length < 2000) break;
     last = part[part.length - 1];
   }
+  return rows;
+}
+async function load (d) {
+  let cache = { days: {} };
+  if (!arg('fresh')) { try { cache = JSON.parse(fs.readFileSync(CACHE, 'utf8')); } catch (e) { /* нет копии */ } }
+  const since = dayStr(Date.now() - DAYS * 86400000);
+  const have = Object.keys(cache.days || {}).sort();
+  const from = have.length && have[have.length - 1] > since ? have[have.length - 1] : since;   // последний день — заново (мог дописаться)
+  const fresh = await fetchDays(d, from);
+  for (const k of Object.keys(cache.days)) if (k >= from) delete cache.days[k];
+  for (const x of fresh) (cache.days[x.day] = cache.days[x.day] || []).push(x);
+  cache.at = new Date().toISOString();
+  try { fs.mkdirSync(path.dirname(CACHE), { recursive: true }); fs.writeFileSync(CACHE, JSON.stringify(cache)); } catch (e) { /* — */ }
+  console.error('из базы — дни с ' + from + ': ' + fresh.length + ' событий');
+  const rows = [];
+  for (const [k, list] of Object.entries(cache.days)) {
+    if (k < since) continue;
+    for (const x of list) {
+      if (MODE === 'real' && x.test) continue;
+      if (MODE === 'test' && !x.test) continue;
+      let dd = {}; try { dd = x.data ? JSON.parse(x.data) : {}; } catch (e) { dd = {}; }
+      rows.push({ ...x, ts: new Date(x.ts), d: dd });
+    }
+  }
+  rows.sort((a, b) => a.ts - b.ts || a.seq - b.seq);
   return rows;
 }
 
@@ -166,9 +194,131 @@ function report (rows) {
     for (const [k, [a, y, nn]] of Object.entries(ch).sort((x, z) => z[1][0] - x[1][0]).slice(0, 12)) p(`- ${k} — ${a}: принял ${pct(y, a)}, отказался ${pct(nn, a)}`);
     p('');
   }
-  const mm = {}; for (const r of ends) for (const [k, v] of Object.entries(r.d.m || {})) if (!k.startsWith('ev.') && k !== 'ontime' && k !== 'late') inc(mm, k, v);
+  const mm = {}; for (const r of ends) for (const [k, v] of Object.entries(r.d.m || {})) if (!/^(ev\.|pick\.|air$|nitro_s$|replay$|stuck$|ontime$|late$)/.test(k)) inc(mm, k, v);
   const MM = { fly: 'полёты на родстере', roof: 'прыжки на крышу', block: 'перекрытия на обратном пути' };
   if (Object.keys(mm).length) { p(`За смены: ${top(mm).map(([k, v]) => (MM[k] || k) + ' — ' + n0(v) + ' (' + n1(v / Math.max(1, ends.length)) + ' на смену)').join(', ')}.`); p(''); }
+
+  /* прогресс и покупки */
+  p('## Прогресс и покупки');
+  p('');
+  const buys = rows.filter(x => x.event === 'buy');
+  if (buys.length) {
+    const BW = { car: 'машина', armor: 'броня', engine: 'мотор', paint: 'покраска', repair: 'ремонт', sell: 'продажа' };
+    const g = {}; for (const r of buys) { const k = (BW[r.d.what] || r.d.what) + (r.d.id ? ' · ' + r.d.id : ''); const e = g[k] = g[k] || [0, 0]; e[0]++; e[1] += r.d.price || 0; }
+    p(`Покупки и продажи (${buys.length}):`);
+    p('');
+    for (const [k, [n, sum]] of Object.entries(g).sort((a, b) => b[1][0] - a[1][0]).slice(0, 15)) p(`- ${k} — ${n} раз, ${n0(sum)} ₽`);
+    p('');
+  }
+  const rev = rows.filter(x => x.event === 'revive');
+  if (rev.length) p(`- Воскрешений ${rev.length}, в среднем за ${n0(avg(rev.map(r => r.d.price || 0)))} ₽ (со скидкой ${pct(rev.filter(r => r.d.sale).length, rev.length)}).`);
+  const dep = rows.filter(x => x.event === 'dep');
+  if (dep.length) { const byG = {}; for (const r of dep) inc(byG, r.d.game || '?'); p(`- «Депнуть»: ставок ${dep.length} (${top(byG).map(([k, v]) => k + ' ' + v).join(', ')}), выиграно ${pct(dep.filter(r => r.d.win).length, dep.length)}, поставлено ${n0(dep.reduce((a, r) => a + (r.d.stake || 0), 0))} ₽.`); }
+  const dists = rows.filter(x => x.event === 'district');
+  if (dists.length) { const byD = {}; for (const r of dists) inc(byD, 'район ' + (r.d.opened + 1)); p(`- Открыто районов: ${top(byD, 9).map(([k, v]) => k + ' — ' + v).join(', ')}; в среднем на смене № ${n1(avg(dists.map(r => r.d.shifts || 0)))}.`); }
+  const ranks = rows.filter(x => x.event === 'rank');
+  if (ranks.length) p(`- Звания: повышений ${ranks.filter(r => r.d.up).length}, понижений ${ranks.filter(r => !r.d.up).length}; самое высокое — ${Math.max(...ranks.map(r => r.d.i || 0))}.`);
+  const don = rows.filter(x => x.event === 'donate');
+  if (don.length) { const byK = {}; for (const r of don) inc(byK, r.d.k, r.d.v || 0); p(`- Донаты: ${top(byK).map(([k, v]) => k + ' ' + n0(v) + ' ₽').join(', ')}.`); }
+  const wl = rows.filter(x => x.event === 'shift_start' && typeof x.d.wallet === 'number').map(x => x.d.wallet);
+  if (wl.length) p(`- Копилка в начале смены: в среднем ${n0(avg(wl))} ₽, половина — меньше ${n0(med(wl))} ₽.`);
+  const tm = rows.filter(x => x.event === 'test_money');
+  if (tm.length) p(`- ⚠ Тестовая кнопка денег нажата ${tm.length} раз у ${new Set(tm.map(r => r.installId)).size} установок — их копилка не настоящая.`);
+  if (!buys.length && !rev.length && !dep.length && !dists.length) p('Покупок и открытий пока не было.');
+  p('');
+
+  /* воронка новичка */
+  p('## Воронка новичка');
+  p('');
+  const fun = rows.filter(x => x.event === 'funnel');
+  const news = new Set(rows.filter(r => r.event === 'session_start' && r.d.first).map(r => r.installId));
+  if (!fun.length) p('Шагов воронки пока нет.');
+  else {
+    const ORDER = ['shift1', 'hint.drive', 'hint.map', 'hint.nitro', 'hint.brake', 'tut_order', 'delivery1', 'hint.cash', 'hint.wallet', 'shift1_end', 'tour.shift', 'tour.garage', 'buy1', 'shift2', 'boom1', 'district2', 'shift5', 'shift10'];
+    const FW = { shift1: 'начал первую смену', tut_order: 'отвёз учебный заказ', delivery1: 'первая доставка', shift1_end: 'досидел первую смену', 'tour.shift': 'обучение на чеке', 'tour.garage': 'обучение в гараже', buy1: 'первая покупка', shift2: 'вторая смена', boom1: 'первый взрыв', district2: 'открыл 2-й район', shift5: 'пятая смена', shift10: 'десятая смена', intro: 'вступление' };
+    const by = {}; for (const r of fun) (by[r.d.k] = by[r.d.k] || []).push(r);
+    const keys = [...ORDER.filter(k => by[k]), ...Object.keys(by).filter(k => !ORDER.includes(k)).sort()];
+    const base = news.size || new Set(fun.map(r => r.installId)).size;
+    p(`Из ${base} новых установок дошли до шага (время от первого запуска — половина быстрее):`);
+    p('');
+    for (const k of keys) {
+      const list = by[k], who = new Set(list.map(r => r.installId)).size;
+      const sk = list.filter(r => r.d.skip).length;
+      p(`- ${FW[k] || (k.startsWith('hint.') ? 'подсказка «' + k.slice(5) + '»' : k)} — ${who} (${pct(who, base)}), через ${mins(med(list.map(r => r.d.t || 0)))}${sk ? ', пропустили ' + pct(sk, list.length) : ''}`);
+    }
+  }
+  p('');
+
+  /* тепловая карта */
+  p('## Тепловая карта: где разбиваются, гибнут, опаздывают, застревают');
+  p('');
+  const heat = rows.filter(x => x.event === 'heat');
+  if (!heat.length) p('Точек пока нет.');
+  else {
+    const HK = { boom: 'взрыв', death: 'срыв смены', hit: 'сильный удар', late: 'опоздание', stuck: 'застрял' };
+    const byK = {}; for (const r of heat) inc(byK, HK[r.d.k] || r.d.k);
+    p(`Всего ${heat.length}: ${top(byK).map(([k, v]) => k + ' ' + v).join(', ')}. Клетки 100 × 100 м, сверху — где чаще всего:`);
+    p('');
+    const cells = {};
+    for (const r of heat) { const k = r.d.cx + ':' + r.d.cz; const c = cells[k] = cells[k] || { n: 0, k: {}, a: {}, d: r.d.d }; c.n++; inc(c.k, HK[r.d.k] || r.d.k); if (r.d.a) inc(c.a, r.d.a); }
+    for (const [k, c] of Object.entries(cells).sort((a, b) => b[1].n - a[1].n).slice(0, 15)) {
+      const a = top(c.a, 1)[0];
+      p(`- ${a ? a[0] : 'клетка ' + k} (клетка ${k}${c.d != null ? ', район ' + (c.d + 1) : ''}) — ${c.n}: ${top(c.k).map(([kk, v]) => kk + ' ' + v).join(', ')}`);
+    }
+  }
+  p('');
+
+  /* экраны и настройки */
+  p('## Экраны и настройки');
+  p('');
+  const scr = rows.filter(x => x.event === 'screen');
+  if (scr.length) {
+    const SW = { shift: 'смена', pause: 'пауза', title: 'главное меню', garage: 'гараж', replay: 'повтор', over: 'чек смены', 'panel.settings': 'настройки', 'panel.collect': 'находки', 'panel.shop': 'магазин' };
+    const t1 = {}, n1x = {}; for (const r of scr) { inc(t1, r.d.s, r.d.sec || 0); inc(n1x, r.d.s); }
+    p('Сколько времени на каком экране (всего, раз, в среднем):');
+    p('');
+    for (const [k, v] of top(t1, 15)) p(`- ${SW[k] || k} — ${mins(v)}, ${n1x[k]} раз, по ${mins(v / n1x[k])}`);
+    p('');
+  }
+  const sets = rows.filter(x => x.event === 'setting');
+  if (sets.length) {
+    const g = {}; for (const r of sets) inc(g, r.d.id + ' → ' + r.d.v);
+    p(`Смены настроек (${sets.length}):`);
+    p('');
+    for (const [k, v] of top(g, 15)) p(`- ${k} — ${v}`);
+    p('');
+    const off = sets.filter(r => r.d.id === 'tel');
+    if (off.length) p(`Статистику включали заново ${off.length} раз (выключение не видно — после него игра молчит).`);
+  }
+  const mmx = {}; for (const r of ends) for (const [k, v] of Object.entries(r.d.m || {})) if (/^(pick\.|air|nitro_s|replay|stuck)/.test(k)) inc(mmx, k, v);
+  if (Object.keys(mmx).length) { const PW = { 'pick.nos': 'кофе', 'pick.shield': 'щит', air: 'прыжков', nitro_s: 'секунд нитро', replay: 'повторов', stuck: 'застреваний' }; p(`За смену в среднем: ${top(mmx, 12).map(([k, v]) => (PW[k] || k) + ' ' + n1(v / Math.max(1, ends.length))).join(', ')}.`); p(''); }
+
+  /* падения */
+  p('## Падения целиком');
+  p('');
+  const cp = rows.filter(x => x.event === 'crash_prev'), ue = rows.filter(x => x.event === 'unclean_exit');
+  if (!cp.length && !ue.length) p('Падений и нечистых выходов не было.');
+  else {
+    if (cp.length) {
+      const g = {}; for (const r of cp) { const k = (r.d.kind || '?') + ' · ' + (r.d.msg || '').slice(0, 80); const e = g[k] = g[k] || { n: 0, dev: {}, v: {} }; e.n++; inc(e.dev, DEV[r.device] || r.device); inc(e.v, r.d.v || r.version); }
+      p(`Оболочка Стима записала (падение страницы, «не отвечает», видеокарта) — ${cp.length}:`);
+      p('');
+      for (const [k, e] of Object.entries(g).sort((a, b) => b[1].n - a[1].n).slice(0, 10)) p(`- ${k} — ${e.n}; ${top(e.dev).map(([a, b]) => a + ' ' + b).join(', ')}; версии ${top(e.v, 4).map(([a]) => a).join(', ')}`);
+      p('');
+    }
+    if (ue.length) {
+      const inShift = ue.filter(r => r.d.sh).length, hid = ue.filter(r => r.d.hid).length;
+      const byW = {}; for (const r of ue) inc(byW, whereWord(r.d.w));
+      p(`Прошлый запуск кончился без выхода: ${ue.length} (${pct(ue.length, S.length)} запусков); посреди смены — ${inShift}; свёрнутым (скорее закрыли или выгрузила система) — ${hid}, на экране (похоже на падение) — ${ue.length - hid}. Где: ${top(byW).map(([k, v]) => k + ' ' + v).join(', ')}.`);
+      const byDV = {}; for (const r of ue.filter(x => !x.d.hid)) inc(byDV, (DEV[r.device] || r.device) + ' ' + (r.d.v || ''));
+      if (Object.keys(byDV).length) p(`На экране — по устройствам и версиям: ${top(byDV, 8).map(([k, v]) => k + ' — ' + v).join(', ')}.`);
+    }
+  }
+  const gl = rows.filter(x => x.event === 'error' && x.d.kind === 'gl');
+  if (gl.length) p(`Видеокарта теряла контекст WebGL ${gl.length} раз (${top((() => { const o = {}; for (const r of gl) inc(o, DEV[r.device] || r.device); return o; })()).map(([k, v]) => k + ' ' + v).join(', ')}).`);
+  const mh = rows.filter(x => x.event === 'mem_high');
+  if (mh.length) p(`Память на исходе (куча JS > 85 % предела): ${mh.length} запусков, в среднем ${n0(avg(mh.map(r => r.d.mem || 0)))} из ${n0(avg(mh.map(r => r.d.limit || 0)))} МБ.`);
+  p('');
 
   /* ошибки */
   p('## Ошибки и зависания');
@@ -190,6 +340,11 @@ function report (rows) {
   }
   p('');
 
+  const rf = rows.filter(x => x.event === 'res_fail');
+  if (rf.length) { const g = {}; for (const r of rf) inc(g, r.d.src + ' · ' + r.d.msg); p('Файлы не загрузились:'); p(''); for (const [k, v] of top(g, 10)) p(`- ${k} — ${v}`); p(''); }
+  const wr = {}; for (const r of rows) { const list = (r.event === 'perf' || r.event === 'warn') && (r.d.warn || r.d.top); if (Array.isArray(list)) for (const [k, v] of list) inc(wr, k, v); }
+  if (Object.keys(wr).length) { p('Предупреждения и пойманные ошибки в консоли (warn / error), топ:'); p(''); for (const [k, v] of top(wr, 10)) p(`- ${k} — ${v}`); p(''); }
+
   /* скорость */
   p('## Скорость по устройствам');
   p('');
@@ -205,6 +360,34 @@ function report (rows) {
       p(`- ${k} — ${list.length} мин: кадр ${n1(p50)} / ${n1(p95)} мс (~${Math.round(1000 / Math.max(1, p50))} к/с), провалов ${n1(dr)} в минуту${mem ? ', память ' + mem + ' МБ' : ''}`);
     }
   }
+  p('');
+  const slowAll = {}; let sfAll = 0;
+  for (const r of perf) { sfAll += r.d.sf || 0; for (const [k, n, mx, av] of r.d.slow || []) { const e = slowAll[k] = slowAll[k] || { n: 0, max: 0, sum: 0 }; e.n += n; e.sum += av * n; if (mx > e.max) e.max = mx; } }
+  if (Object.keys(slowAll).length) {
+    p('');
+    p(`Медленные шаги мира (замер — каждый 30-й кадр, ${n0(sfAll)} кадров; шаг дольше 4 мс):`);
+    p('');
+    for (const [k, e] of Object.entries(slowAll).sort((a, b) => b[1].n - a[1].n).slice(0, 10)) p(`- ${k} — ${e.n} раз (${pct(e.n, sfAll)} замеров), в среднем ${n1(e.sum / e.n)} мс, самое долгое ${n1(e.max)} мс`);
+  }
+  const boot = rows.filter(x => x.event === 'boot');
+  if (boot.length) {
+    p('');
+    const byD = {}; for (const r of boot) (byD[DEV[r.device] || r.device] = byD[DEV[r.device] || r.device] || []).push(r.d);
+    p('Запуск (половина быстрее): ' + Object.entries(byD).map(([k, l]) => `${k} — до меню ${n1(med(l.map(x => x.menu || 0)) / 1000)} с, город достроен ${n1(med(l.map(x => x.built || 0)) / 1000)} с (${l.length})`).join('; ') + '.');
+  }
+  const gpus = {}; for (const r of rows.filter(x => x.event === 'session_start' && x.d.gpu)) inc(gpus, (DEV[r.device] || r.device) + ' · ' + r.d.gpu);
+  if (Object.keys(gpus).length) { p(''); p('Видеокарты: ' + top(gpus, 10).map(([k, v]) => k + ' (' + v + ')').join(', ') + '.'); }
+  const upd = rows.filter(x => x.event === 'update');
+  if (upd.length) { const g = {}; for (const r of upd) inc(g, r.d.from + ' → ' + r.d.to); p(''); p('Обновились: ' + top(g, 8).map(([k, v]) => k + ' (' + v + ')').join(', ') + '.'); }
+  p('');
+
+  /* объём */
+  p('## Объём и бесплатный уровень');
+  p('');
+  const playMin = Math.max(1, plays.reduce((a, b) => a + b, 0) / 60), allMin = Math.max(1, durs.reduce((a, b) => a + b, 0) / 60);
+  const perMin = rows.length / allMin;
+  p(`- ${n0(rows.length)} событий за ${mins(allMin * 60)} в игре — ${n1(perMin)} в минуту. Пачка — раз в минуту (+ при сворачивании и закрытии): ~1 вызов функции на минуту игры.`);
+  p(`- Бесплатно в месяц: функция — 1 млн вызовов (~${n0(1e6 / 60)} ч игры); база — 1 млн операций, запись ~0,5 операции на событие (замер 18.10.2026) → ~${n0(2e6 / Math.max(1, perMin) / 60)} ч игры при нынешних ${n1(perMin)} событиях в минуту; место — 1 ГБ (~2—3 млн строк, строки старше года стираются).`);
   p('');
   return L.join('\n') + '\n';
 }

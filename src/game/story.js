@@ -773,7 +773,7 @@ async function cat (what) {
     if (!k) return;
     k.sit = true; k.orbit = false;
     if (CUT.skip) return;
-    const b = API.sayBubble(k.grp, t('мяу!'), '#e0873f', 1.05);
+    const b = API.sayBubble(k.grp, t('мяу!'), '#e0873f', 1.05, 1);
     b.scale.set(1.3, 0.65, 1);
     API.Snd && API.Snd.fx && API.Snd.fx('meow', s => { s.blip(900, 0.12, 'triangle', 0.08); setTimeout(() => s.blip(700, 0.18, 'triangle', 0.07), 120); });
     await wait(1.1);

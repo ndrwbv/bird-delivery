@@ -13,6 +13,14 @@
        не занимает; налезает на ближнее — дальнее поднимается над ним.
    Кто создаёт облачко, тот его и убирает (как раньше): снятое со сцены облачко отсюда уходит само.
 
+   Меньше болтовни (автор 18.10.2026: «много мусорных диалогов… раздражает и ещё через стены показывается»):
+     • облачко — только в прямой видимости: луч от камеры до головы не режет дом (blocked из game.js); при появлении
+       и потом раз в LOS_T с — зашёл за дом, облачко прячется;
+     • фоновое (прохожие, компании, курьеры, водители, дворы…) — не больше одного на GAP с вокруг тебя и не дальше
+       AMB_FAR м: решается один раз, когда облачко впервые попало в кадр; не повезло (бюджет занят или за домом) —
+       так и не покажется;
+     • важное (track(s, 1) / sayBubble(…, 1): клиент, герои, гопники, сценки, вор пиццы, Стёпа…) — без бюджета.
+
    Из game.js: sayBubble/rageTex → tex + track; step(dt, cam, V) — каждый кадр (CL.step 'talk').
    Из flirt.js, heroes.js — tex + track напрямую.
    ────────────────────────────────────────────────────────────────────────── */
@@ -26,6 +34,11 @@ export const TALK = {
   SMALL: 0.019,   // …и у FAR (~14 px)
   MAX: 4,         // облачков одновременно
   LIFT: 0.3,      // м: низ облачка ниже прежней точки (раньше там был центр)
+  GAP: 25,        // с: фоновое облачко — не чаще одного на столько (важные — без очереди)
+  AMB_FAR: 40,    // м: фоновое дальше — не начинается
+  LOS_T: 0.35,    // с: как часто перепроверять, не зашло ли показанное облачко за дом
+  SHOUT: 0.2,     // доля вышедших из машины водителей (авария, пробка), что кричат реплику; остальные — молча, жестами
+  GATE: true,     // false — по-старому (для сравнения в проверке)
 };
 
 /* ═════════════ текстура ═════════════ */
@@ -74,6 +87,7 @@ export function tex (text, col = '#5a4a9a', name = '') {
   t.colorSpace = THREE.SRGBColorSpace;
   t.minFilter = THREE.LinearFilter; t.generateMipmaps = false;
   t.userData.lines = L.length + (name ? 0.65 : 0);
+  t.userData.text = String(text);
   t.userData.lineH = lh;
   CACHE.set(key, t);
   if (CACHE.size > CACHE_MAX) { const k = CACHE.keys().next().value; CACHE.get(k).dispose(); CACHE.delete(k); }
@@ -88,9 +102,17 @@ function light (col) {
 
 /* ═════════════ кого показать и каким размером ═════════════ */
 const LIVE = new Set();
-const ST = { tracked: 0, shown: 0, hidden: 0 };
-export function track (s) {
+/* tracked/shown/hidden — сейчас; дальше — с начала (reset() — обнулить): old — сколько облачков попало бы на экран
+   по-старому (в кадре ближе FAR), oldWall — из них за домом; amb — фоновых показано, vip — важных, noGap — фоновых
+   не показано из-за бюджета, noWall — из-за дома, noFar — фоновое дальше AMB_FAR */
+const ST = { tracked: 0, shown: 0, hidden: 0, old: 0, oldWall: 0, amb: 0, vip: 0, noGap: 0, noWall: 0, noFar: 0, log: [] };
+let BLOCKED = null, CLOCK = 0, LAST_AMB = -1e9;
+/* game.js: blocked(ax, ay, az, bx, by, bz) — отрезок от камеры до головы режет дом? */
+export function init (o) { if (o && o.blocked) BLOCKED = o.blocked; }
+export function reset () { Object.assign(ST, { old: 0, oldWall: 0, amb: 0, vip: 0, noGap: 0, noWall: 0, noFar: 0 }); ST.log.length = 0; LAST_AMB = -1e9; }
+export function track (s, vip) {
   if (!s || !s.isSprite) return s;
+  if (vip) s.userData.vip = 1;
   s.center.set(0.5, 0);                            // низом — над головой, растёт вверх
   if (!s.userData.talk) s.position.y -= TALK.LIFT;
   s.userData.talk = 1;
@@ -106,8 +128,12 @@ export function retext (s, text, col, name) { s.material.map = tex(text, col, na
 const P = new THREE.Vector3(), Q = new THREE.Vector3(), WS = new THREE.Vector3(), LIST = [], RECTS = [];
 const sstep = (a, b, v) => { const k = Math.max(0, Math.min(1, (v - a) / (b - a))); return k * k * (3 - 2 * k); };
 function onScene (s) { let o = s; while (o.parent) o = o.parent; return o.isScene; }
+/* голова говорящего (облачко висит над ней) видна с камеры? */
+function seen (cam, P) { return !BLOCKED || !BLOCKED(cam.position.x, cam.position.y, cam.position.z, P.x, P.y - 0.9, P.z); }
+const txt = s => { const m = s.material.map; return (m && m.userData.text) || ''; };
 
 export function step (dt, cam, V) {
+  CLOCK += dt;
   LIST.length = 0;
   for (const s of LIVE) {
     if (!s.parent) { LIVE.delete(s); continue; }
@@ -131,6 +157,24 @@ export function step (dt, cam, V) {
     const dc = Math.max(1, P.distanceTo(cam.position));
     Q.copy(P).project(cam);
     if (Q.z > 1 || Q.x < -1.15 || Q.x > 1.15 || Q.y < -1.2 || Q.y > 1.1) { s.visible = false; continue; }   // не в кадре — место не занимает
+    // впервые в кадре: решаем, показывать ли вообще (фоновое — бюджет, всё — прямая видимость)
+    const u = s.userData;
+    if (!u.gate) {
+      const vis = seen(cam, P);
+      ST.old++; if (!vis) ST.oldWall++;
+      if (!TALK.GATE) u.gate = 'ok';
+      else if (u.vip) { u.gate = 'ok'; ST.vip++; }
+      else if (d > TALK.AMB_FAR) { u.gate = 'no'; ST.noFar++; }
+      else if (CLOCK - LAST_AMB < TALK.GAP) { u.gate = 'no'; ST.noGap++; }
+      else if (!vis) { u.gate = 'no'; ST.noWall++; }
+      else { u.gate = 'ok'; LAST_AMB = CLOCK; ST.amb++; }
+      u.los = vis; u.losT = TALK.LOS_T;
+      ST.log.push([Math.round(CLOCK), u.vip ? 'vip' : 'amb', u.gate === 'ok' ? 1 : 0, vis ? 1 : 0, +d.toFixed(0), txt(s)]);
+      if (ST.log.length > 200) ST.log.shift();
+    }
+    if (u.gate === 'no') { s.visible = false; continue; }
+    if ((u.losT -= dt) <= 0) { u.losT = TALK.LOS_T; u.los = seen(cam, P); }
+    if (TALK.GATE && !u.los) { s.visible = false; continue; }             // зашёл за дом
     const k = sstep(TALK.NEAR, TALK.FAR, d);
     const line = TALK.BIG + (TALK.SMALL - TALK.BIG) * k;                    // доля экрана на строку
     const hf = line * img.height / (m.userData.lineH || LH);                // доля высоты экрана на всю плашку
@@ -157,4 +201,4 @@ export function step (dt, cam, V) {
   ST.tracked = LIVE.size; ST.shown = shown; ST.hidden = LIST.length - shown;
 }
 
-export const DEBUG = { TALK, ST, LIVE, tex, track, get list () { return LIST.map(([d, s]) => ({ d: +d.toFixed(1), vis: s.visible, sy: +s.scale.y.toFixed(2), op: +s.material.opacity.toFixed(2) })); } };
+export const DEBUG = { TALK, ST, LIVE, tex, track, reset, get list () { return LIST.map(([d, s]) => ({ d: +d.toFixed(1), vis: s.visible, sy: +s.scale.y.toFixed(2), op: +s.material.opacity.toFixed(2) })); } };

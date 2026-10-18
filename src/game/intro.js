@@ -31,6 +31,7 @@ import { BOSS } from './orders.config.js';
 import { readTime } from './dialog.js';
 import * as LIFE from './actorlife.js';          // живое лицо Степана в кадре: моргает, улыбается (Н2)
 import { keyHTML } from '../input/glyphs.js';     // «[B] пропустить» — значок по вводу (было «esc» всегда)
+import * as TEL from './telemetry.js';          // анонимная статистика: вступление досмотрел / пропустил — воронка (telemetry.js)
 
 const KEY = 'dlv-intro';
 let A = null, P = null, L = null, T1 = null, T2 = null;
@@ -395,6 +396,7 @@ export function next () {
 function finish () {
   if (!CUT.on) return;
   CUT.on = false;
+  { const all = CUT.segs.reduce((a, s) => a + s.d, 0); TEL.first('intro', { sec: Math.round(CUT.t), of: Math.round(all), skip: CUT.t < all - 0.5 ? 1 : 0 }); }
   A.Store.set(KEY, 1);
   removeEventListener('keydown', onKey, true);
   // клавиша, которой пропустили, отпускается уже над накладной — до игры не доходит

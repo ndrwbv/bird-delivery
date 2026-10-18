@@ -16,6 +16,9 @@
      Диалог в одну кнопку «понятно» — закрывает игрок (таймера нет, автор 16.10.2026); чаевые — под портретом.
    - step(): каждый кадр — поручение кончилось любым путём (выполнил, опоздал, смена, меню) —
      клиента и отдающего отпускаем (p.errand снимается, идут дальше).
+   - Живое (live в SIDE_ORDERS: Бобик у тёщи, кот от ветеринара) — не пакет: зверь сидит у ног отдающего (подъезжаешь
+     ближе LIVE.NEAR — уже там), отдали — бежит к машине и запрыгивает в салон с «Гав!» (boardLive); у клиента выпрыгивает
+     к его ногам, лает / мяукает, через LIVE.SEC с убегает с ним в подъезд (unboardLive). Модель и прыжки — doorcast.js.
    - bump(): сбил того, кто ждёт поручения (клиента или отдающего; автор 16.10.2026: «лучше бы он сбивался, но не
      умирал») — падает без крови, полежал ~2 с, встаёт и ругается репликой над головой (OUCH, каждый раз другой);
      поручение идёт дальше, он остаётся на своём месте. */
@@ -33,7 +36,11 @@ export const GIVE = { MIN: 60, MAX: 380, OFF: 1.4 };
 export const SBX = { near: 0, force: null, talk: null, paid: null, n: 0 };
 
 let A = null;
-const TR = { client: null, giver: null };
+/* pet — живой у отдающего (Бобик у тёщи, doorcast.js dog): сидит у его ног, пока не запрыгнет в машину или не уйдёт домой */
+const TR = { client: null, giver: null, pet: null };
+/* живое поручение (live в SIDE_ORDERS): NEAR — с какого расстояния машины зверь уже сидит у отдающего (ближе — появится
+   у него на глазах), SEC — сколько с зверь у ног клиента после вручения, потом убегает с ним в подъезд */
+export const LIVE = { NEAR: 90, SEC: 7, ST: { pets: 0, boarded: 0, unboarded: 0, last: '' } };
 /* сбил ждущего (bump): что он скажет, когда встанет. client — тот, кто попросил; giver — человек у подъезда.
    adult — взрослая (мат), kids — детская. SAY — через сколько с после удара (встаёт — hits.js fallStep, ~2,7 с),
    SHOW — сколько с висит облачко */
@@ -172,6 +179,7 @@ export async function giverTalk (Sd) {
   const name = firstOf(p.person) + ' · ' + t(g.who), base = { person: p.person, name, head: t('поручение'), emo: g.emo || undefined, fillers: false, color: ORDER_TYPES.side.color };
   if (!tk) return { k: 'give' };
   const cost = tk.cost || 0;
+  if (TR.pet && TR.pet.bark && !TR.pet.board) TR.pet.bark(2);   // Бобик у ног тёщи гавкает на машину (doorcast.js)
   // просит взамен — сумма под портретом, красным (автор 12.10.2026: «сумма отдельно под аватаркой»)
   const r = await DLG.say({ ...base, text: t(tk.line), accept: t(tk.yes), decline: t(tk.no), ...(cost ? { pay: '−' + A.money(cost), payLabel: t('отдать') } : {}) });
   let yes = r === true;
@@ -186,7 +194,47 @@ export async function giverTalk (Sd) {
   const oc = wpick(L);
   SBX.talk = { n: ++SBX.n, id: s.id, ans: r === true ? 'yes' : r === false ? 'no' : 'none', k: oc.k, item: oc.item ? t(oc.item) : '', cost: paid, force: SBX.force };
   await DLG.say({ ...base, text: t(oc.say), accept: t('понятно'), emo: oc.k === 'none' ? 'angry' : undefined });
-  return { k: oc.k, item: oc.item ? t(oc.item) : '', cost: paid };
+  return { k: oc.k, item: oc.item ? t(oc.item) : '', cost: paid, live: oc.live || null };
+}
+
+/* ── живое поручение: зверь, а не пакет ──
+   liveKind(Sd) → 'dog' | 'cat' | null — что везёшь сейчас: привёз то, что просил, — live поручения; не то — live исхода
+   (кошка вместо Бобика), ни с чем — ничего. */
+export function liveKind (Sd) {
+  const s = Sd && Sd.it && Sd.it.spec;
+  if (!s) return null;
+  const oc = Sd.outcome;
+  if (oc && oc.k === 'none') return null;
+  if (oc && oc.k === 'wrong') return oc.live || null;
+  return s.live || null;
+}
+/* забрал (from — откуда, у отдающего или у двери магазина): зверь бежит к машине и запрыгивает в салон («Гав!»).
+   → true — живой, коробку не кидать. Не тот (кошка вместо Бобика) — кошка запрыгивает, Бобик остаётся у тёщи и лает */
+export function boardLive (Sd, from) {
+  const kind = liveKind(Sd);
+  if (!kind || !from) return false;
+  let P = TR.pet && TR.pet.m && kind === 'dog' && !TR.pet.cat ? TR.pet : null;
+  if (P) TR.pet = null;                                    // Бобик уходит от тёщи — у неё его больше нет
+  else {
+    const g = Sd.giverPed && !Sd.giverPed.dead ? Sd.giverPed : null;
+    P = g ? DCAST.pet(kind, g, { sit: true, barks: 0 }) : DCAST.pet(kind, { x: from.x, z: from.z, grp: true }, { sit: true, barks: 0 });
+    if (TR.pet && TR.pet.bark) TR.pet.bark(2);            // не отдала Бобика — он лает вслед
+  }
+  if (!P) return false;
+  DCAST.board(P);
+  LIVE.ST.boarded++; LIVE.ST.last = 'board:' + kind;
+  return true;
+}
+/* вручение живого: выпрыгивает из машины к ногам клиента (собака лает и виляет, кот мяукает), через LIVE.SEC с —
+   с ним в подъезд. → true — живой (коробку не кидать) */
+export function unboardLive (Sd) {
+  const kind = liveKind(Sd), p = Sd && Sd.ped;
+  if (!kind || !p || p.dead) return false;
+  const P = DCAST.unboard(kind, p, kind === 'dog' ? { sit: true, barks: 3, sec: LIVE.SEC } : {});
+  if (!P) return false;
+  if (kind === 'cat') setTimeout(() => P.go(), LIVE.SEC * 1000);
+  LIVE.ST.unboarded++; LIVE.ST.last = 'unboard:' + kind;
+  return true;
 }
 
 /* ── вручение: реплика и деньги по исходу ──
@@ -260,7 +308,7 @@ function ouchStep (dt) {
     if (q.p.dead) { unsay(q); OUCHQ.splice(i, 1); continue; }
     q.t -= dt;
     if (!q.b && q.t <= 0) {                        // встаёт — ругается
-      q.b = A.sayBubble ? A.sayBubble(q.p.grp, q.line, '#d9342c', 2.7) : null;
+      q.b = A.sayBubble ? A.sayBubble(q.p.grp, q.line, '#d9342c', 2.7, 1) : null;
       if (A.toast) A.toast(t('{who}: «{line}»', { who: firstOf(q.p.person) || (q.who === 'giver' ? t('отдающий') : t('клиент')), line: q.line }));
       q.t = OUCH.SHOW;
       if (!q.b) { OUCHQ.splice(i, 1); continue; }
@@ -280,6 +328,17 @@ export function step (dt = 1 / 60) {
   const Sd = A.S.side;
   if (TR.client && (!Sd || Sd.ped !== TR.client)) { release(TR.client); TR.client = null; }
   if (TR.giver && (!Sd || Sd.giverPed !== TR.giver || (Sd.stage !== 'shop' && Sd.stage !== 'talk'))) { release(TR.giver); TR.giver = null; }
+  // живой у отдающего: подъезжаешь (ближе LIVE.NEAR) — он уже сидит у его ног; поручение ушло дальше — убегает к подъезду
+  const s = Sd && Sd.it && Sd.it.spec, g = TR.giver;
+  if (!TR.pet && g && !g.dead && s && s.live && Sd.stage === 'shop' && A.V && Math.hypot(g.x - A.V.x, g.z - A.V.z) < LIVE.NEAR) {
+    TR.pet = DCAST.pet(s.live, g, { sit: true, barks: 0 });
+    if (TR.pet) LIVE.ST.pets++;
+  }
+  if (TR.pet && (!TR.pet.m || (!TR.giver && !(Sd && Sd.stage === 'talk')))) {
+    const P = TR.pet;                                       // лает вслед (не отдали) — догавкает и уйдёт
+    if (P.m && P.barkQ > 0) P.sec = P.t + 1.8; else if (P.m && P.go) P.go();
+    TR.pet = null;
+  }
 }
 
-export const DEBUG = { TR, GIVE, SBX, OUCH, OUCHQ, bump };
+export const DEBUG = { TR, GIVE, SBX, OUCH, OUCHQ, LIVE, bump, liveKind };

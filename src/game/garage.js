@@ -6,6 +6,7 @@
      GARAGE.isOpen(), GARAGE.root() — для геймпада и клавиатуры (career.js)
      GARAGE.flip(±1)       — листать: ◀ ▶, стрелки, LB/RB (Q/E), крестовина, свайп, перетаскивание мышью
      GARAGE.act('armor' | 'engine') — прямые кнопки: [X] броня, [Y] мотор (геймпад и клавиши X / Y, career.js)
+     крылья и гранатомёт (18.10.2026, econ.js ADDON) — кнопками под мотором, один раз на машину (A на кнопке)
      GARAGE.back()         — B / Esc: закрыть палитру или «точно продать?», иначе — выйти из гаража
      GARAGE.mode()         — null | 'paint' | 'sell': в палитре ←→ ходят по цветам, а не листают машины
 
@@ -35,7 +36,9 @@ import { t } from '../i18n/index.js';
 import * as TOUR from './garagetour.js';
 import { keyHTML, refreshKeys } from '../input/glyphs.js';
 import * as PFX from './paperfx.js';
-import { PIGGY } from './shiftcash.js';           // копилка — та же свинья, что на хаде
+import { PIGGY } from './shiftcash.js';
+import { WINGS } from './flycar.js';             // числа крыльев — на кнопке
+import { GUN } from './turret.js';               // и гранатомёта           // копилка — та же свинья, что на хаде
 
 let D = null, el = null, idx = 0, list = [], onCloseCb = null;
 let MODE = null;                       // у карточки в фокусе: null | 'paint' (палитра) | 'sell' («точно продать?»)
@@ -253,7 +256,23 @@ function acts (c) {
     if (pr == null) h += '<button type="button" class="gr-btn up max" disabled><b>' + esc(name) + '</b><span>' + esc(t('до упора')) + '</span><i>' + pips(lv) + '</i></button>';
     else h += '<button type="button" class="gr-btn up" data-a="' + kind + '"' + (cash < pr ? ' disabled' : '') + '>' + keyHTML(key) + '<b>' + esc(name) + '</b><span>' + esc(gain + ' · ' + money(pr)) + '</span><i>' + pips(lv) + '</i></button>';
   }
-  return h + extraActs(c);
+  return h + addonActs(c) + extraActs(c);
+}
+/* крылья и гранатомёт (econ.js ADDON): один раз на машину, без прямой кнопки; у родстера крыльев нет — летает и так.
+   Стоит — серая «стоят» / «стоит · 12 на смену»; гранатомёт в детской — водомёт */
+function addonActs (c) {
+  const cash = D.A.wallet(), money = D.A.money, C = D.cars(), adult = !C || !C.adult || C.adult();
+  let h = '';
+  for (const [kind, name, gain, on1] of [
+    ['wings', t('крылья'), t('полёт {s} с, раз в {cd} с', { s: WINGS.HOLD, cd: WINGS.CD }), t('стоят')],
+    ['gun', adult ? t('гранатомёт на крыше') : t('водомёт на крыше'), adult ? t('сам бьёт конкурентов') : t('сам глушит конкурентов'), t('стоит · {n} на смену', { n: GUN.AMMO })],
+  ]) {
+    if (kind === 'wings' && c.fly) continue;
+    const on = !!(c.up && c.up[kind]), pr = c.upPrice ? c.upPrice[kind] : null;
+    if (on || pr == null) h += '<button type="button" class="gr-btn up max addon" disabled><b>' + esc(name) + '</b><span>' + esc(on1) + '</span><i>●</i></button>';
+    else h += '<button type="button" class="gr-btn up addon" data-a="' + kind + '"' + (cash < pr ? ' disabled' : '') + '><b>' + esc(name) + '</b><span>' + esc(gain + ' · ' + money(pr)) + '</span><i>○</i></button>';
+  }
+  return h;
 }
 /* покраска и продажа — один ряд; открытая палитра или «точно продать?» встают на его место */
 function extraActs (c) {
@@ -291,7 +310,7 @@ function ghostActs (c) {
    то, что жали в прошлый раз (тот же цвет), если оно ещё жмётся; иначе главное — «купить» / «выбрать»,
    у своей на смене — броня, мотор, покрасить; в палитре — первый чужой цвет; в «точно продать?» — «да» */
 const MAIN_ORDER = { paint: ['.gr-sw:not(.on)', '[data-a="close"]'], sell: ['[data-a="sell"]', '[data-a="close"]'],
-  '': ['[data-a="buy"]', '[data-a="pick"]', '[data-a="armor"]', '[data-a="engine"]', '[data-a="paintOpen"]', '[data-a="sellAsk"]'] };
+  '': ['[data-a="buy"]', '[data-a="pick"]', '[data-a="armor"]', '[data-a="engine"]', '[data-a="wings"]', '[data-a="gun"]', '[data-a="paintOpen"]', '[data-a="sellAsk"]'] };
 function aim (card) {
   const acts = card.querySelector('.gr-acts');
   if (!acts) return;
@@ -349,7 +368,7 @@ function wire (card, c) {
       if (a !== 'pick' && nCard) fill(nCard, nc, true, oldP);      // полоски доезжают до нового
       if (nCard) {
         nCard.classList.remove('pop'); void nCard.offsetWidth; nCard.classList.add('pop');
-        const gain = a === 'armor' ? '+1 ♥' : a === 'engine' ? '+' + Math.round(U.VMAX * 100) + ' %' : a === 'buy' || a === 'paint' ? '✓'
+        const gain = a === 'armor' ? '+1 ♥' : a === 'engine' ? '+' + Math.round(U.VMAX * 100) + ' %' : a === 'buy' || a === 'paint' || a === 'wings' || a === 'gun' ? '✓'
           : a === 'sell' ? '+' + D.A.money(v && v.price || 0) : '';
         if (gain) floatText(nCard, gain);
       }

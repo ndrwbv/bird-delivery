@@ -115,7 +115,7 @@ function victim () {
 function say (m, text, col) {
   if (!A.sayBubble || !m || m.dead) return;
   if (m.bubble) { m.grp.remove(m.bubble); m.bubble.material.dispose(); }
-  m.bubble = A.sayBubble(m.grp, text, col || '#5a4a9a', 2.7);
+  m.bubble = A.sayBubble(m.grp, text, col || '#5a4a9a', 2.7, 1);
   m.bubT = 2.6;
 }
 function unsay (m) { if (m && m.bubble) { m.grp.remove(m.bubble); m.bubble.material.dispose(); m.bubble = null; } }

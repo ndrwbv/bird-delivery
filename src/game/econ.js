@@ -888,6 +888,12 @@ export function handlingK (h) {
 }
 export const UPGRADE = { STEPS: 3, SHARE: 0.15, MIN: 6400, HP: 1, VMAX: 0.04 };
 export const upgradePrice = (car, step) => Math.max(UPGRADE.MIN, Math.round(car.price * UPGRADE.SHARE / 100) * 100) * (step + 1);
+/* ── крылья и гранатомёт (18.10.2026, автор: «летающую функцию для машины можно докупить», «можно купить автоматический
+   гранатомёт, который отстреливает конкурентов»). Покупаются в гараже один раз на машину, цена одна для любой —
+   дороже средних машин («Круиз» 720 000): крылья — полёт по кнопке, как у «Тесло Родстера», но слабее (flycar.js WINGS),
+   у самого родстера их нет — он летает и так; гранатомёт на крыше сам бьёт по машинам конкурентов (turret.js GUN),
+   в детской — водомёт. При продаже машины — половина назад, как броня и мотор (SELL.UP). */
+export const ADDON = { wings: 900000, gun: 800000 };
 
 /* ── покраска и продажа в гараже (02.10.2026) ──
    Покраска своей машины: SHARE цены машины, не меньше MIN и не больше MAX (округлено до 100 ₽):
@@ -903,6 +909,7 @@ export const SELL = { CAR: 0.5, UP: 0.5, WORN_MIN: 0.4 };
 export function upgradeSpent (car, up = {}) {
   let n = 0;
   for (const k of ['armor', 'engine']) for (let s = 0; s < Math.min(UPGRADE.STEPS, +up[k] || 0); s++) n += upgradePrice(car, s);
+  for (const k in ADDON) if (up[k]) n += ADDON[k];   // крылья и гранатомёт
   return n;
 }
 /* ceil — ресурс мотора, % (нет — 100): чем меньше ресурс, тем дешевле машину берут (до SELL.WORN_MIN) */

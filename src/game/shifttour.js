@@ -21,6 +21,7 @@
 import './garagetour.css';
 import { t } from '../i18n/index.js';
 import * as TF from './talkface.js';              // Толик говорит ртом
+import * as TEL from './telemetry.js';          // анонимная статистика: обучение досмотрел / пропустил — воронка (telemetry.js)
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -139,6 +140,7 @@ function next () {
 export function skip () { if (live && performance.now() >= armAt) end(); }
 function end () {
   live = false;
+  TEL.first('tour.shift', { step: Math.min(i + 1, steps.length), of: steps.length, skip: i + 1 < steps.length ? 1 : 0 });
   removeEventListener('resize', place);
   try { A.Store.set(KEY, 1); if (A.Store.flush) A.Store.flush(); } catch (e) { console.error('[shift tour]', e); }
   const wrap = box && box.parentElement;

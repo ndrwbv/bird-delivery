@@ -85,7 +85,7 @@ function suit () {
 function say (m, text, col) {
   if (!A.sayBubble || m.dead) return;
   if (m.bubble) { m.grp.remove(m.bubble); m.bubble.material.dispose(); }
-  m.bubble = A.sayBubble(m.grp, text, col || '#1b1b20', 2.8);
+  m.bubble = A.sayBubble(m.grp, text, col || '#1b1b20', 2.8, 1);
   m.bubT = 3;
 }
 

@@ -1,8 +1,11 @@
-/* Таблица событий в YDB (идемпотентно: есть — не трогает). node tools/telemetry/setup.mjs. docs/ANALYTICS.md */
+/* Таблица событий в YDB (идемпотентно: есть — не трогает). node tools/telemetry/setup.mjs. docs/ANALYTICS.md
+   Ключ начинается с дня события (day): сводка читает только нужные дни, а не всю таблицу — чтение стоит операций
+   бесплатного уровня. Повторная пачка (тот же день, установка, запуск, время, номер) не задваивается. */
 import { connect, q, CONF } from './ydb.mjs';
 
 const DDL = `
 CREATE TABLE IF NOT EXISTS \`${CONF.table}\` (
+  day Date NOT NULL,
   install_id Utf8 NOT NULL,
   session_id Utf8 NOT NULL,
   ts Timestamp NOT NULL,
@@ -14,7 +17,7 @@ CREATE TABLE IF NOT EXISTS \`${CONF.table}\` (
   data Json,
   test Bool,
   received Timestamp,
-  PRIMARY KEY (install_id, session_id, ts, seq)
+  PRIMARY KEY (day, install_id, session_id, ts, seq)
 ) WITH (
   AUTO_PARTITIONING_BY_SIZE = ENABLED,
   TTL = Interval("P365D") ON received

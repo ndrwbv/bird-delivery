@@ -1,0 +1,71 @@
+/* лист «что собираем» (privacy.js): политика конфиденциальности на бумаге накладной — тот же лист, что настройки
+   (settings.css «анкета сотрудника»): перфорация, шапка капсом, внизу — пометка «[B] назад» и кнопка вкл / выкл.
+   Текст листается внутри листа: колесо, палец, крестовина (курсор идёт по абзацам и пунктам), правый стик. */
+#panel[data-kind="privacy"] { --u: clamp(10px, min(1.2vw, 2.1vh), 18px); background: var(--pp-dim), rgba(30, 12, 20, .35); }
+#panel[data-kind="privacy"] .pn-box {
+  width: min(1000px, calc(100% - 16px)); height: calc(100% - 24px); max-height: none; overflow: visible;
+  display: flex; flex-direction: column; padding: calc(var(--u) * .6) calc(var(--u) * 1.4) calc(var(--u) * .6);
+  color: var(--pp-ink); background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 4px;
+  box-shadow: 0 8px 0 var(--pp-ink), 0 24px 60px rgba(0, 0, 0, .5);
+}
+#panel[data-kind="privacy"] .pn-box::before, #panel[data-kind="privacy"] .pn-box::after { content: ''; position: absolute; left: 10px; right: 10px; height: 8px; pointer-events: none; background: var(--pp-perf); }
+#panel[data-kind="privacy"] .pn-box::before { top: -6px; }
+#panel[data-kind="privacy"] .pn-box::after { bottom: -6px; }
+#panel[data-kind="privacy"] #pn-close { display: none; }       /* назад — пометкой «[B] назад» внизу */
+#panel[data-kind="privacy"] #pn-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+/* шапка: «АНОНИМНАЯ СТАТИСТИКА ··· что собираем» */
+#panel[data-kind="privacy"] .pn-t.pv-head { flex: none; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; text-align: left;
+  margin: 0 0 calc(var(--u) * .5); padding: calc(var(--u) * .9) 0 calc(var(--u) * .55); font-size: var(--pp-fs-m); line-height: 1.3;
+  color: var(--pp-rust); text-transform: uppercase; letter-spacing: .08em; border-bottom: 2px dashed var(--pp-brown); box-shadow: 0 -5px 0 -1px var(--pp-orange); }
+#panel .pn-t.pv-head > span { color: var(--pp-rust); font-size: inherit; margin: 0; min-width: 0; }
+.pv-head b { flex: none; font-weight: normal; color: var(--pp-ink); letter-spacing: .04em; }
+
+/* текст: листается сам, строка не шире ~60 знаков — читать удобно */
+.pv-pane { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; scrollbar-width: thin; scrollbar-color: var(--pp-brown) transparent;
+           padding: 0 calc(var(--u) * .3) calc(var(--u) * .6); }
+.pv-list { max-width: calc(var(--u) * 50); margin: 0 auto; color: var(--pp-ink); font-size: calc(var(--u) * .78); line-height: 1.75; }
+.pv-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: calc(var(--u) * .5) calc(var(--u) * 1); padding: calc(var(--u) * .3) 0 calc(var(--u) * .2); }
+.pv-date { font-size: max(10px, calc(var(--u) * .62)); color: var(--pp-label); }
+.pv-seal { font-size: max(11px, calc(var(--u) * .8)); padding: .25em .6em .15em; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
+           color: var(--pv-c, var(--pp-money)); border: 3px solid var(--pv-c, var(--pp-money)); border-radius: 5px; rotate: -4deg; mix-blend-mode: multiply; }
+.pv-seal.off { --pv-c: var(--pp-red); }
+.pv-list h3 { margin: calc(var(--u) * 1) 0 calc(var(--u) * .3); font-weight: normal; font-size: max(11px, calc(var(--u) * .82)); color: var(--pp-rust);
+              text-transform: uppercase; letter-spacing: .06em; }
+.pv-list p { margin: 0 0 calc(var(--u) * .4); }
+.pv-list ul { margin: 0; padding: 0; list-style: none; }
+.pv-list li { position: relative; padding: calc(var(--u) * .2) 0 calc(var(--u) * .2) calc(var(--u) * 1.3); border-bottom: 1px dashed rgba(138, 107, 78, .45); }
+.pv-list li::before { content: '□'; position: absolute; left: 0; color: var(--pp-brown); }
+.pv-sec { border-bottom: 2px dashed rgba(138, 107, 78, .45); padding-bottom: calc(var(--u) * .5); }
+.pv-sec:last-child { border-bottom: 0; }
+/* курсор геймпада на абзаце — маркер, без подскока */
+.pv-pad { outline: none; border-radius: 3px; scroll-margin: calc(var(--u) * 1.2) 0; }
+#panel[data-kind="privacy"] .pv-pad.padsel { background: color-mix(in srgb, var(--pp-yellow) 55%, transparent); box-shadow: -6px 0 0 var(--pp-orange) !important; outline: 0 !important; transform: none; }
+.pv-list .pv-link { font-weight: normal; color: var(--pp-rust); word-break: break-all; }
+
+/* низ листа: «[B] назад» и «выключить статистику / включить статистику» */
+.pv-foot { flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: calc(var(--u) * .6) calc(var(--u) * 1);
+           padding-top: calc(var(--u) * .5); border-top: 2px dashed var(--pp-brown); }
+.pv-foot .pv-back { flex: none; padding: .5em .9em; font-size: calc(var(--u) * .9); min-height: 40px; }
+.pv-foot .pv-tel { flex: none; min-height: 40px; padding: calc(var(--u) * .5) calc(var(--u) * .9); font: inherit; font-size: calc(var(--u) * .9); cursor: pointer;
+  color: var(--pp-ink); background: var(--pp-yellow); border: 3px solid var(--pp-ink); border-radius: 6px; box-shadow: 0 4px 0 var(--pp-ink);
+  transition: translate .18s var(--pp-spring), box-shadow .18s var(--pp-spring); }
+.pv-foot .pv-tel.on { color: var(--pp-red); background: var(--pp-paper); border-style: dashed; border-color: var(--pp-red); }
+.pv-foot .pv-tel:hover { background: var(--pp-orange); color: var(--pp-ink); }
+.pv-foot .pv-tel:active { translate: 0 3px; box-shadow: 0 1px 0 var(--pp-ink); transition-duration: .05s; }
+#panel[data-kind="privacy"] :is(.pv-back, .pv-tel).padsel { outline: 4px solid var(--pp-ink) !important; outline-offset: 2px;
+  box-shadow: 0 0 0 8px var(--pp-yellow), 0 4px 0 var(--pp-ink) !important; animation: pp-lift .2s var(--pp-spring); }
+
+/* телефон боком: мельче, не меньше 10 px; кнопки ниже */
+@media (max-height: 560px) {
+  #panel[data-kind="privacy"] { --u: clamp(10px, 2.6vh, 12px); }
+  #panel[data-kind="privacy"] .pn-box { height: calc(100% - 16px); }
+  #panel[data-kind="privacy"] .pn-t.pv-head { margin-bottom: 2px; padding: 6px 0 4px; }
+  .pv-list { max-width: none; font-size: max(10px, calc(var(--u) * .85)); line-height: 1.6; }
+  .pv-foot .pv-back, .pv-foot .pv-tel { min-height: 30px; padding: .3em .7em; }
+}
+/* телефон стоймя: поля уже, кнопки — во всю ширину */
+@media (max-aspect-ratio: 1/1) {
+  #panel[data-kind="privacy"] .pn-box { padding-left: 12px; padding-right: 12px; }
+  .pv-foot { flex-direction: column-reverse; align-items: stretch; gap: 6px; }
+}

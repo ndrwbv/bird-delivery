@@ -3,7 +3,8 @@
    Игра шлёт POST (text/plain — без предварительного OPTIONS) с пачкой событий:
      { k: 'bp1', i: install_id, s: session_id, v: версия, b: 'web'|'steam', d: 'desktop'|'deck'|'phone', t: true — проверка,
        e: [[seq, ts_ms, 'event', { data }], …] }
-   Проверяет размер и формат, пишет пачку одним BulkUpsert в таблицу YDB `events`, отвечает 204.
+   Проверяет размер и формат, пишет пачку одним BulkUpsert в таблицу YDB `events` (ключ — день события, установка,
+   запуск, время, номер; ~0,5 операции YDB на строку), отвечает 204.
    IP и заголовки не сохраняются. Мусор — 400 без записи. */
 'use strict';
 const { Driver, TokenAuthService, Types, TypedValues } = require('ydb-sdk');
@@ -38,6 +39,7 @@ function getDriver () {
 }
 
 const ROW = Types.struct({
+  day: Types.DATE,
   install_id: Types.UTF8,
   session_id: Types.UTF8,
   ts: Types.TIMESTAMP,
@@ -84,7 +86,8 @@ function parse (raw, now) {
       js = JSON.stringify(data);
       if (js.length > MAX_DATA) js = JSON.stringify({ cut: js.length });
     }
-    rows.push({ install_id: p.i, session_id: p.s, ts: new Date(Math.round(t)), seq, event: name, version: p.v, build, device, data: js, test, received });
+    const ms = Math.round(t);
+    rows.push({ day: new Date(ms - ms % DAY), install_id: p.i, session_id: p.s, ts: new Date(ms), seq, event: name, version: p.v, build, device, data: js, test, received });
   }
   return rows.length ? rows : 'events';
 }

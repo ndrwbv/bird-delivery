@@ -42,7 +42,7 @@ export const SHARED = new Set([
   'dlv-ach',                // достижения и их счётчики — как в Стиме, на весь аккаунт
   'dlv-lb-local',           // таблица рекордов на устройстве — все профили по именам
   'dlv-money-x8', 'dlv-__ts', 'dlv-crashlog',               // служебное
-  'dlv-tel', 'dlv-tel-id', 'dlv-tel-q',                     // анонимная статистика: выключатель, номер установки, неотправленное (telemetry.js)
+  'dlv-tel', 'dlv-tel-id', 'dlv-tel-q', 'dlv-tel-t0', 'dlv-tel-once', 'dlv-tel-last', 'dlv-tel-ver', 'dlv-tel-crash-at',   // анонимная статистика (telemetry.js TEL.KEYS): выключатель, номер установки, неотправленное, воронка, прошлый запуск
 ]);
 /* ключи прогресса, которые стираем у профиля, даже если перебор localStorage не сработал */
 const KNOWN = ['dlv-name', 'dlv-msk-wallet', 'dlv-msk-cars', 'dlv-msk-car', 'dlv-msk-best', 'dlv-msk-xp', 'dlv-msk-col', 'dlv-msk-tut',

@@ -2,7 +2,7 @@
    из главного меню и из паузы (game.js renderSettings → SET.render). Правила словами —
    docs/CAREER.md «Главное меню, пауза и настройки».
 
-   Табы: игра (имя, профиль, камера — три вида по кругу (camview.js), мини-игры у клиента вкл / выкл, путь на дороге вкл / выкл (routeask.js), анонимная статистика вкл / выкл (telemetry.js, только взрослая), сбросить прогресс, тестовые районы, версия и обновление, update.js) ·
+   Табы: игра (имя, профиль, камера — три вида по кругу (camview.js), мини-игры у клиента вкл / выкл, путь на дороге вкл / выкл (routeask.js), анонимная статистика вкл / выкл (telemetry.js, только взрослая) и под ней «что собираем ▸» — лист с текстом политики (privacy.js), сбросить прогресс, тестовые районы, версия и обновление, update.js) ·
    графика (качество и 7 пунктов, gfx.js) · звук (вкл / выкл и три ползунка: музыка, звуки, мотор — docs/SOUNDS.md;
    музыка в игре вкл / выкл и «трек ▶» — music.js; радио в машине вкл / выкл и станция — radio.js) · управление (какие кнопки за что — геймпад,
    клавиатура или палец) · язык (сетка языков). Внутри таба — обычный вертикальный список; не влез
@@ -25,6 +25,7 @@ import { t } from '../i18n/index.js';
 import * as UPD from './update.js';
 import { keyHTML } from '../input/glyphs.js';
 import * as TEL from './telemetry.js';          // «анонимная статистика: вкл / выкл» — только взрослая версия (telemetry.js, docs/ANALYTICS.md)
+import * as PV from './privacy.js';             // «что собираем ▸» — лист с текстом политики (privacytext.js), офлайн
 
 let A = null, TAB = 'game', TABS = [];
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';');
@@ -32,6 +33,19 @@ const TAB_NAMES = { game: 'игра', gfx: 'графика', snd: 'звук', ct
 
 export function init (api) {
   A = api;
+  // смена настройки — в анонимную статистику (telemetry.js): какая (id кнопки) и что стало (надпись кнопки / ползунок).
+  // Камеру пишет camview.js, саму статистику — telemetry.js set; табы и открытие окон — не настройки
+  const pb = A.body && A.body();
+  if (pb && !pb.dataset.tel) {
+    pb.dataset.tel = '1';
+    pb.addEventListener('click', e => {
+      const el = e.target && e.target.closest ? e.target.closest('button[id^="set-"], button[id^="gfx-"]') : null;
+      if (!el || !on() || /^set-(tab-|cam$|tel$|prof$|name$|l-)/.test(el.id)) return;
+      const id = el.id;
+      setTimeout(() => { const n = document.getElementById(id); TEL.ev('setting', { id: id.replace(/^set-/, ''), v: n ? n.textContent.trim().slice(0, 30) : '' }); }, 40);
+    });
+    pb.addEventListener('change', e => { const el = e.target; if (el && el.dataset && el.dataset.vol && on()) TEL.ev('setting', { id: 'vol-' + el.dataset.vol, v: +el.value }); });
+  }
   UPD.onChange(() => { if (on() && TAB === 'game') render(focusId()); });
   // Q / E и PageUp / PageDown — соседний таб (клавиатура)
   addEventListener('keydown', e => {
@@ -82,6 +96,7 @@ const still = html => '<div class="set-still" data-pad tabindex="-1">' + html + 
 export function render (focus, tab) {
   if (!A) return;
   const P = A.panel(), body = A.body();
+  if (!focus && P.dataset.kind === PV.KIND) { focus = 'set-privacy'; tab = 'game'; }   // B / Esc с листа «что собираем» — обратно на его кнопку
   P.dataset.kind = 'settings'; P.dataset.back = ''; P.dataset.sub = '';
   const menu = A.inMenu();                          // из главного меню (не посреди смены)
   const onlyMenu = t('меняется в главном меню');
@@ -161,7 +176,8 @@ export function render (focus, tab) {
     // анонимная статистика (telemetry.js): только взрослая версия; в детской строки нет. Меняется и из паузы — сразу
     if (TEL.available()) {
       h += row(t('анонимная статистика'), TEL.on() ? t('вкл') : t('выкл'), 'set-tel', focus) +
-        note(t('сколько играешь, что включается в смене, ошибки и плавность — без имени и адресов; помогает чинить игру'));
+        note(t('сколько играешь, что включается в смене, ошибки и плавность — без имени и адресов; помогает чинить игру')) +
+        row(t('конфиденциальность'), t('что собираем ▸'), 'set-privacy', focus);   // полный текст политики — лист privacy.js, офлайн
     }
     // версия и обновление
     {
@@ -226,13 +242,14 @@ function wire (body) {
   if ($('set-cam')) $('set-cam').onclick = () => { A.cam.next(); render('set-cam'); };
   if ($('set-route')) $('set-route').onclick = () => { A.route.set(!A.route.on()); render('set-route'); };
   if ($('set-tel')) $('set-tel').onclick = () => { TEL.set(!TEL.on()); render('set-tel'); };
+  if ($('set-privacy')) $('set-privacy').onclick = () => { PV.open(A.panel(), A.body(), () => { render('set-privacy'); A.navReset(); }); A.navReset(); };
   if ($('set-door')) $('set-door').onclick = () => { A.door.set(!A.door.on()); render('set-door'); };
   if ($('set-mus')) $('set-mus').onclick = () => { A.music.set(); render('set-mus'); };
   if ($('set-mus-next')) $('set-mus-next').onclick = () => { A.music.next(); setTimeout(() => { if (on() && TAB === 'snd') render('set-mus-next'); }, 60); };
   if ($('set-radio')) $('set-radio').onclick = () => { A.radio.set(!A.radio.on()); render('set-radio'); };
   if ($('set-radio-st')) $('set-radio-st').onclick = () => { A.radio.next(); render('set-radio-st'); };
   if ($('set-unlock')) $('set-unlock').onclick = () => A.unlock.run();
-  if ($('set-cash')) $('set-cash').onclick = () => { A.cash.run(); render('set-cash'); };
+  if ($('set-cash')) $('set-cash').onclick = () => { A.cash.run(); TEL.ev('test_money', { to: A.cash.to }); render('set-cash'); };   // тестовая кнопка денег — пометка в статистике
   if ($('set-reset')) $('set-reset').onclick = () => A.reset();
   if ($('set-upd')) $('set-upd').onclick = () => { UPD.check(true); render('set-upd'); };
   if ($('set-upd-go')) $('set-upd-go').onclick = () => { UPD.apply(); render(); };

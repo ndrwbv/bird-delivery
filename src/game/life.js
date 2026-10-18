@@ -1102,7 +1102,7 @@ export function richTip (peds, share) {
   const ok = RICH.some(r => !r.m.dead && near(r.m.x, r.m.z, 70)) || LUX.some(l => near(l.x, l.z, 90)) || POSH.some(q => near(q[0], q[1], 40));
   if (!ok || !chance(1 / 8)) return 0;
   if (p.grp) {
-    const b = A.sayBubble(p.grp, t('Сдачи не надо!'), '#8a6a1a', 2.7);
+    const b = A.sayBubble(p.grp, t('Сдачи не надо!'), '#8a6a1a', 2.7, 1);
     setTimeout(() => { if (b.parent) b.parent.remove(b); b.material.dispose(); }, 2600);
   }
   return Math.max(300, Math.round(share * rand(1.5, 3) / 50) * 50);

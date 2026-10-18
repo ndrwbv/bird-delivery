@@ -267,6 +267,9 @@ export function init () {
   });
   addEventListener('unhandledrejection', e => { report('promise', (e && e.reason) || '?', 'rejection'); });
   addEventListener('pagehide', save);
+  // видеокарта отобрала контекст WebGL (драйвер упал, мало видеопамяти) — картинка встанет: в журнал (и в статистику)
+  document.addEventListener('webglcontextlost', () => report('webgl', { message: 'webgl context lost', stack: '' }, 'gl'), true);
+  document.addEventListener('webglcontextrestored', () => event('webgl context restored'), true);
   const hook = () => {
     const b = document.getElementById('pm-crash');
     if (b && !b.dataset.on) { b.dataset.on = '1'; b.addEventListener('click', ev => { ev.stopPropagation(); openPanel(); }); }

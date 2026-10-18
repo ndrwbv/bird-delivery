@@ -35,11 +35,16 @@ export const BRANDS = {
 const RIVAL_IDS = ['sushi', 'burger'];
 const SHIFT_STATES = ['drive', 'back', 'handover', 'side'];
 
-/* реплики: болтовня на перекуре, клич нападавших, крик избиваемых, «спасибо» */
+/* реплики: болтовня на перекуре, клич нападавших, крик избиваемых, «спасибо».
+   Болтовня — живая, не про работу (автор 18.10.2026: «курьеры общаются о термосумках — не интересно»): шутки,
+   подколы, байки; про сумки, адреса и смену — нет */
 const CHAT = {
-  pizza: [N_('опять ананасы заказали'), N_('у меня сегодня шесть адресов'), N_('кто брал мою термосумку?'), N_('пицца сама себя не довезёт')],
-  sushi: [N_('роллы не ждут'), N_('палочки опять забыли'), N_('у нас доставка за 30 минут… иногда'), N_('васаби кончился')],
-  burger: [N_('булка — это жизнь'), N_('королева нами довольна'), N_('картошку не забудь'), N_('соус кончился, опять')],
+  pizza: [N_('опять ананасы заказали'), N_('мне вчера дверь открыл мужик в костюме курицы'), N_('кто съел мой обед из холодильника?'),
+    N_('Палыч опять в новых кроссовках. откуда деньги, Палыч?'), N_('бабка с девятого дала мне пирожок и номер внучки')],
+  sushi: [N_('у нас доставка за 30 минут… иногда'), N_('я суши вообще не ем. только пиццу. тсс'), N_('клиент просил «без риса». это просто рыба, брат'),
+    N_('мне снилось, что я ролл')],
+  burger: [N_('булка — это жизнь'), N_('я на работе съел четыре бургера. это не кража, это дегустация'), N_('королева нас не видела ни разу. может, её нет?'),
+    N_('от меня даже кот пахнет картошкой')],
 };
 const CRY = {
   pizza: [N_('это наш район!'), N_('пицца — сила!'), N_('за Птицу!')],
@@ -187,9 +192,10 @@ function drop (crew) {
 }
 function clear () { for (const c of CREWS) drop(c); CREWS.length = 0; WALKERS.length = 0; }
 
-function say (crew, m, text, col) {
+/* vip — драка и «спасибо» (сценка — без очереди фоновых облачков, talk.js); болтовня на перекуре — фоновая */
+function say (crew, m, text, col, vip = 0) {
   if (!m || m.dead || crew.bubbles.length >= 2) return;
-  const s = A.sayBubble(m.grp, text, col || BRANDS[m.brand].say, 2.6);
+  const s = A.sayBubble(m.grp, text, col || BRANDS[m.brand].say, 2.6, vip);
   crew.bubbles.push({ s, t: 2.2 });
 }
 
@@ -216,7 +222,7 @@ function finish (crew, how) {
       if (cash > 0) { A.S.money += cash; A.addWallet(cash); }
       if (A.popBonus) A.popBonus(t('{brand} благодарит!', { brand: t(BRANDS.pizza.name) }), t('помог избиваемому коллеге · +{money}', { money: A.money(cash) }));
       const v = crew.people.find(m => m.role === 'vic' && !m.dead);
-      if (v) say(crew, v, t(pick(THANKS)));
+      if (v) say(crew, v, t(pick(THANKS)), null, 1);
     } else if (crew.seen) {
       ST.stats.passed++;
       RESPECT.gain('passCrew');
@@ -366,13 +372,13 @@ function crewStep (crew, dt) {
   if (crew.over) crew.overT -= dt;
   // реплики — только когда рядом
   if (near < 60 && (crew.sayT -= dt) <= 0) {
-    crew.sayT = crew.kind === 'fight' ? rand(1.6, 2.6) : rand(4, 8);
+    crew.sayT = crew.kind === 'fight' ? rand(3, 5) : rand(4, 8);       // драка — одна реплика за раз (было по две каждые 1,6—2,6 с)
     const alive = crew.people.filter(m => !m.dead && m.down <= 0 && !m.flee);
     if (crew.kind === 'hang') { const m = pick(alive); if (m) say(crew, m, t(pick(CHAT[m.brand]))); }
     else if (!crew.over) {
       const a = pick(alive.filter(m => m.role === 'att')), v = pick(alive.filter(m => m.role === 'vic'));
-      if (a) say(crew, a, t(A.ADULT && chance(0.35) ? pick(CRY_ADULT) : pick(CRY[a.brand])));
-      if (v) say(crew, v, t(pick(HELP)), '#d9342c');
+      if (v && (!a || chance(0.5))) say(crew, v, t(pick(HELP)), '#d9342c', 1);
+      else if (a) say(crew, a, t(A.ADULT && chance(0.35) ? pick(CRY_ADULT) : pick(CRY[a.brand])), null, 1);
     }
   }
   for (const m of crew.people) {

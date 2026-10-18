@@ -53,7 +53,7 @@ function bubble (grp, text, col, y, hold) {
   const b = new THREE.Sprite(new THREE.SpriteMaterial({ map: TALK.tex(text, col), transparent: true, depthWrite: false }));
   b.position.set(0, y, 0);
   grp.add(b);
-  TALK.track(b);                                   // читаемая плашка, размер по расстоянию (talk.js)
+  TALK.track(b, 1);                                // читаемая плашка, размер по расстоянию; важное — без очереди (talk.js)
   setTimeout(() => { if (b.parent) b.parent.remove(b); b.material.dispose(); }, hold * 1000);
   return b;
 }

@@ -70,6 +70,11 @@ const CHECKS = [
     if (r.code !== 0 || errs) return { status: 'fail', info: `ошибок ${errs}: ` + lines.filter(l => /^\s{3}/.test(l)).slice(0, 2).map(s => s.trim()).join(' | ') };
     return { status: miss ? 'warn' : 'ok', info: miss ? `без перевода ${miss} строк (на все языки)` : 'всё переведено' };
   } },
+  // политика конфиденциальности: public/privacy.html = src/game/privacytext.js (текст листа «что собираем» в игре)
+  { id: 'privacy', name: 'privacy.html совпадает с текстом в игре', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'privacy-html.mjs'), '--check'], { timeout: 20 });
+    return r.code === 0 ? { status: 'ok', info: 'страница = privacytext.js' } : { status: 'fail', info: (r.err || r.out).trim().split('\n').slice(0, 2).join(' | ') };
+  } },
   { id: 'video', name: 'ролик повтора: сохранение в Стиме, длительность webm', group: 1, run: async () => {
     const r = await sh(process.execPath, [path.join(__dirname, 'video-save-test.cjs')], { timeout: 30 });
     let j = null; try { j = JSON.parse(r.out.trim().split('\n').pop()); } catch (e) { /* — */ }

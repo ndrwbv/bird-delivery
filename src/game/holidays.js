@@ -860,9 +860,9 @@ function folkOff () {
 
 /* облачка: реплики костюмов и клиентов */
 const BUB = [];
-function say (grp, text, col, dur) {
+function say (grp, text, col, dur, vip = 0) {
   if (!A.sayBubble || !grp) return;
-  const b = A.sayBubble(grp, text, col, 2.75);
+  const b = A.sayBubble(grp, text, col, 2.75, vip);   // vip — реплика клиента: без очереди фоновых (talk.js)
   if (b) BUB.push({ b, t: dur });
 }
 function drop (q) { if (q.b.parent) q.b.parent.remove(q.b); if (q.b.material) q.b.material.dispose(); }
@@ -879,7 +879,7 @@ function onArrive (ev) {
   if (Math.random() >= HOL.LINE_P) return;
   const L = CUR.h.lines, pool = [...L.all, ...(A.ADULT ? L.adult : L.kids)];
   const p = ev.stop.peds && ev.stop.peds[0];
-  if (pool.length && p && p.grp && !p.dead) setTimeout(() => { if (p.grp && !p.dead) say(p.grp, t(pick(pool)), '#c0392b', 3.4); }, 350);
+  if (pool.length && p && p.grp && !p.dead) setTimeout(() => { if (p.grp && !p.dead) say(p.grp, t(pick(pool)), '#c0392b', 3.4, 1); }, 350);
 }
 
 /* ═════════════════════ заказы (orders.js) ═════════════════════ */

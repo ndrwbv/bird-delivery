@@ -15,7 +15,7 @@
      list()               — все машины: цена, звёзды, сердца, мотор/ресурс, куплена ли, прокачка
      buy(id[, api])       — { ok, why: 'owned' | 'stars' | 'money' | 'unknown' }
      select(id)           — выбрать купленную
-     upgrade(id, kind)    — kind: 'armor' (+1 сердце) | 'engine' (+4 % скорости)
+     upgrade(id, kind)    — kind: 'armor' (+1 сердце) | 'engine' (+4 % скорости) | 'wings' (полёт, flycar.js) | 'gun' (гранатомёт, turret.js)
      paint(id, hex)       — покрасить свою за деньги (PAINTS — палитра, econ.js PAINT — цена)
      sell(id)             — продать свою (не текущую и не «Семёрку»): { ok, price } (econ.js SELL)
      current()            — выбранная машина с учётом прокачки (hp, vmax, acc, L…)
@@ -26,12 +26,12 @@
      previewCanvas(id, { w, h, spin }) — картинка машины для карточки магазина
 
    Сохранения: dlv-car-owned (массив id), dlv-car-cur (id), dlv-car-up
-   ({ id: { armor, engine } }), dlv-car-eng ({ id: { c, r, km, n } } — мотор, ресурс, пробег км,
+   ({ id: { armor, engine, wings, gun } }), dlv-car-eng ({ id: { c, r, km, n } } — мотор, ресурс, пробег км,
    ремонтов), dlv-car-paint ({ id: '#hex' }). Звёзды — dlv-stars. Старое dlv-car-L ({ id: L },
    до 03.10.2026) читается один раз, когда у машины ещё нет dlv-car-eng (econ.js BREAK.OLD_L). */
 import * as RESPECT from './respect.js';
 import * as DENT from './cardent.js';
-import { CAR_LIST, UPGRADE, BREAK, upgradePrice, paintPrice, sellPrice, wearK, stallChance, repairQuote } from './econ.js';
+import { CAR_LIST, UPGRADE, ADDON, BREAK, upgradePrice, paintPrice, sellPrice, wearK, stallChance, repairQuote } from './econ.js';
 import { cnCar } from './roadlife.js';
 import { lampDepth } from './carrear.js';
 import { t } from '../i18n/index.js';
@@ -42,6 +42,9 @@ import { KEY as TOUR_KEY } from './garagetour.js';
 import { ZHENYA_KEY } from './doorstep.js';
 import { pad as PAD } from '../input/gamepad.js';
 import './cars.css';
+import * as TEL from './telemetry.js';
+import { wingsLook } from './flycar.js';        // крылышки на борту (улучшение «крылья»)
+import * as GUNM from './turret.js';             // гранатомёт на крыше: подставка и поворотная голова (turret.js)          // анонимная статистика: покупки, улучшения, продажа, ремонт (telemetry.js)
 
 const N_ = s => s;
 let A = null;
@@ -132,7 +135,10 @@ const flush = () => { const p = A && A.Platform; if (p && p.store && p.store.flu
 const obj = k => { const v = sget(k, {}); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; };
 const ownedIds = () => { const v = sget(K_OWN, [START]); const a = Array.isArray(v) ? v.filter(id => BY_ID.has(id)) : []; if (!a.includes(START)) a.unshift(START); return a; };
 const curId = () => { const id = sget(K_CUR, START); return BY_ID.has(id) && ownedIds().includes(id) ? id : START; };
-const ups = id => { const u = obj(K_UP)[id] || {}; return { armor: Math.min(UPGRADE.STEPS, +u.armor || 0), engine: Math.min(UPGRADE.STEPS, +u.engine || 0) }; };
+const ups = id => { const u = obj(K_UP)[id] || {}; return { armor: Math.min(UPGRADE.STEPS, +u.armor || 0), engine: Math.min(UPGRADE.STEPS, +u.engine || 0),
+  wings: u.wings && !(BY_ID.get(id) || {}).fly ? 1 : 0, gun: u.gun ? 1 : 0 }; };   // крылья и гранатомёт — один раз (econ.js ADDON); у родстера крыльев нет — летает и так
+/* докупить можно: крылья — не родстеру; что уже стоит — null */
+const addonPrice = (id, u, k) => (u[k] || (k === 'wings' && (BY_ID.get(id) || {}).fly) ? null : ADDON[k]);
 /* палитра покраски: 10 цветов; «заводской» — свой у каждой машины (LOOK.hex) */
 export const PAINTS = [
   { hex: '#d8262e', name: N_('красный') }, { hex: '#f0522a', name: N_('оранжевый') }, { hex: '#f2c21b', name: N_('жёлтый') },
@@ -186,7 +192,9 @@ function spec (id) {
     vmaxBase: c.vmax, vmax: Math.round(c.vmax * (1 + u.engine * UPGRADE.VMAX) * 10) / 10, acc: c.acc,
     Lbase: c.L, wearK: wearK(c), offroad: !!c.offroad, up: u, handling: c.handling ?? 5,
     cond: Math.round(e.c), ceil: Math.round(e.r), km: Math.round(e.km), repairs: e.n, stallP: stallP(id, e), L: (100 - e.c) / 10,
-    upPrice: { armor: u.armor < UPGRADE.STEPS ? upgradePrice(c, u.armor) : null, engine: u.engine < UPGRADE.STEPS ? upgradePrice(c, u.engine) : null },
+    upPrice: { armor: u.armor < UPGRADE.STEPS ? upgradePrice(c, u.armor) : null, engine: u.engine < UPGRADE.STEPS ? upgradePrice(c, u.engine) : null,
+      wings: addonPrice(id, u, 'wings'), gun: addonPrice(id, u, 'gun') },
+    fly: !!c.fly,                                   // родстер летает с завода — крыльев не предлагаем
     paintPrice: paintPrice(c), sellPrice: sellPrice(c, u, e.r),
   };
 }
@@ -209,6 +217,7 @@ export function buy (id, api = A) {
   newEng(id);                                       // новая: мотор 100 %, ресурс 100 %, обкатка
   select(id);
   flush();                                          // покупка — сохранить сразу
+  TEL.ev('buy', { what: 'car', id, price: c.price }); TEL.first('buy1', { what: 'car', id });
   return { ok: true };
 }
 export function select (id) {
@@ -220,18 +229,21 @@ export function select (id) {
 }
 export function upgrade (id, kind, api = A) {
   const c = BY_ID.get(id);
-  if (!c || (kind !== 'armor' && kind !== 'engine')) return { ok: false, why: 'unknown' };
+  const add = kind === 'wings' || kind === 'gun';  // крылья и гранатомёт — один раз, цена одна (econ.js ADDON)
+  if (!c || (kind !== 'armor' && kind !== 'engine' && !add)) return { ok: false, why: 'unknown' };
   if (!ownedIds().includes(id)) return { ok: false, why: 'owned' };
   const u = ups(id);
-  if (u[kind] >= UPGRADE.STEPS) return { ok: false, why: 'max' };
-  const price = upgradePrice(c, u[kind]);
+  if (add && kind === 'wings' && c.fly) return { ok: false, why: 'unknown' };
+  if (add ? u[kind] : u[kind] >= UPGRADE.STEPS) return { ok: false, why: 'max' };
+  const price = add ? ADDON[kind] : upgradePrice(c, u[kind]);
   if (wallet(api) < price || !pay(api, price)) return { ok: false, why: 'money', need: price };
   const all = obj(K_UP);
   all[id] = { ...u, [kind]: u[kind] + 1 };
   sset(K_UP, all);
   flush();
   PREV.delete(id);
-  if (id === curId() && A && A.resetCar) A.resetCar();   // кенгурятник виден сразу
+  if (id === curId() && A && A.resetCar) A.resetCar();   // кенгурятник, крылья, гранатомёт видны сразу
+  TEL.ev('buy', { what: kind, id, price, lv: u[kind] + 1 }); TEL.first('buy1', { what: kind, id });
   return { ok: true, price };
 }
 /* покраска: hex — из PAINTS или заводской; тот же цвет второй раз не продаём */
@@ -249,6 +261,7 @@ export function paint (id, hex, api = A) {
   flush();
   PREV.delete(id);
   if (id === curId() && A && A.resetCar) A.resetCar();
+  TEL.ev('buy', { what: 'paint', id, price }); TEL.first('buy1', { what: 'paint', id });
   return { ok: true, price };
 }
 /* продажа: половина цены × ресурс (econ.js SELL) + половина вложенного в броню и мотор; прокачка, цвет и мотор — сброс */
@@ -265,6 +278,7 @@ export function sell (id, api = A) {
   api.addWallet(price);
   flush();
   PREV.delete(id);
+  TEL.ev('buy', { what: 'sell', id, price });
   return { ok: true, price };
 }
 /* сделать хуже / лучше (бандиты, сюжет): worsen(n) — мотор −BREAK.GANG_WEAR × n %;
@@ -274,6 +288,7 @@ export function repair (pct = 10, id = curId()) { const e = eng(id); return setE
 /* ремонт у Дяди Жени: мотор до ресурса, ресурс −quote.drop, без денег (деньги — в offer) */
 export function fix (id = curId()) {
   const e = eng(id), q = repairQuote(e.c, e.r);
+  TEL.ev('buy', { what: 'repair', id, price: q.price, pct: q.pct });
   return setEng(id, { ...e, c: e.r, r: e.r - q.drop, n: e.n + 1 });
 }
 export const names = () => Object.fromEntries(CAR_LIST.map(c => [c.id, t(LOOK[c.id].name)]));
@@ -298,11 +313,24 @@ export function makeModel (id, o = {}) {
   g.userData.ws = WS.run ? { run: WS.run, rise: WS.rise } : null;   // наклонное лобовое: дворники ложатся на него (wipers.js)
   g.userData.wsB = WS.brun ? { run: WS.brun, rise: WS.brise } : null;   // наклонное заднее — задний дворник на нём
   g.userData.hatch = !c.spec.trunk;               // без багажника (хэтчбек, джип, фургон) — есть задний дворник
+  g.userData.wings = !!u.wings;                    // крылья: полёт, как у родстера, но слабее (flycar.js WINGS)
+  // гранатомёт: голова — отдельной группой над подставкой (крутится, turret.js); точка — из dress
+  if (u.gun && GUNAT.y !== null) {
+    const h = GUNM.head(A.put, A.mergeGeos, gunAdult());
+    h.position.set(GUNAT.x, GUNAT.y + 0.1 + GUNAT.dy, GUNAT.z);
+    g.add(h);
+    g.userData.gun = h;
+  } else g.userData.gun = null;
+  GUNAT.y = null;
   WS.run = WS.brun = 0;
   return g;
 }
 
 const WS = { run: 0, rise: 0, brun: 0, brise: 0 };                    // наклон лобового последней собранной машины (dress → makeModel)
+const GUNAT = { x: 0, y: null, z: 0, dy: 0 };                         // где подставка гранатомёта (dress → makeModel)
+/* взрослая — гранатомёт, детская (?kids, Яндекс) — водомёт; A.adult даёт game.js */
+const gunAdult = () => !!(A && A.adult);
+export const adult = gunAdult;                   // гараж: «гранатомёт» или «водомёт»
 /* морда, корма и мелочи — всё, кроме фар, в общий склеенный меш кузова;
    фары и фонари — один меш без света, чтобы горели ночью */
 function dress (id, g, add, k, u) {
@@ -576,6 +604,14 @@ function dress (id, g, add, k, u) {
   if (u.armor >= 3) {
     B(W * 0.7, 0.06, 0.12, '#2b2c31', 0, roof + 0.12, cf - 0.2);
     for (let i = -1; i <= 1; i++) round(0.07, HEAD, i * 0.3, roof + 0.2, cf - 0.14);
+  }
+  // крылья (flycar.js WINGS): крылышки по бортам и антикрыло на корме
+  if (u.wings) wingsLook(add, { S, W, top, hl });
+  // гранатомёт (turret.js): подставка на крыше, у кабриолета — на палубе за сиденьями; голова — в makeModel
+  if (u.gun) {
+    const at = LOOK[id].open ? { x: 0, y: top + 0.08, z: cb - 0.3 } : { x: 0, y: roof, z: S.cz - 0.05 };
+    GUNM.mount(add, at, gunAdult());
+    GUNAT.x = at.x; GUNAT.y = at.y; GUNAT.z = at.z; GUNAT.dy = dy || 0;
   }
   // мотор: на второй ступени — двойной выхлоп
   if (u.engine >= 2) both(s => add(new THREE.CylinderGeometry(0.05, 0.05, 0.3, 8).rotateX(Math.PI / 2), '#9aa0a8', s * 0.25, y0 - 0.2, -hl - 0.05));

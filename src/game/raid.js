@@ -193,7 +193,7 @@ function unshare (g) {
 function say (m, text, col) {
   if (!A.sayBubble || m.st === 'gone') return;
   if (m.bubble) { m.grp.remove(m.bubble); m.bubble.material.dispose(); }
-  m.bubble = A.sayBubble(m.grp, text, col || BRANDS[R.brand].bubble, 2.8);
+  m.bubble = A.sayBubble(m.grp, text, col || BRANDS[R.brand].bubble, 2.8, 1);
   m.bubT = 2.4;
 }
 const standing = () => R.men.filter(m => m.st === 'in' || m.st === 'smash' || m.st === 'charge').length;

@@ -116,7 +116,7 @@ function bubble (grp, text, col, y, hold, name) {
   const b = new THREE.Sprite(new THREE.SpriteMaterial({ map: TALK.tex(text, col, name || ''), transparent: true, depthWrite: false }));
   b.position.set(0, y, 0);
   grp.add(b);
-  TALK.track(b);
+  TALK.track(b, 1);                                // у двери — важное, без очереди фоновых (talk.js)
   setTimeout(() => { if (b.parent) b.parent.remove(b); b.material.dispose(); }, hold * 1000);
   return b;
 }

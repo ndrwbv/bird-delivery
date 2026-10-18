@@ -1115,7 +1115,7 @@ function gangLeave (line, col, cd = 45) {
 function gsay (m, text, col) {
   if (!A.sayBubble || m.dead) return;
   if (m.bubble) { m.grp.remove(m.bubble); m.bubble.material.dispose(); }
-  m.bubble = A.sayBubble(m.grp, text, col || '#3a3a42', 2.7);
+  m.bubble = A.sayBubble(m.grp, text, col || '#3a3a42', 2.7, 1);
   m.bubT = 2.8;
 }
 function gangTalk () {

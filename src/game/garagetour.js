@@ -15,6 +15,7 @@ import './garagetour.css';
 import { t } from '../i18n/index.js';
 import { keyHTML } from '../input/glyphs.js';     // [A] дальше · [B] пропустить — по вводу
 import * as TF from './talkface.js';              // Дядя Женя говорит ртом
+import * as TEL from './telemetry.js';          // анонимная статистика: обучение досмотрел / пропустил — воронка (telemetry.js)
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -140,6 +141,7 @@ function next () {
 export function skip () { if (live) end(); }
 function end () {
   live = false;
+  TEL.first('tour.garage', { step: Math.min(i + 1, STEPS.length), of: STEPS.length, skip: i + 1 < STEPS.length ? 1 : 0 });
   removeEventListener('resize', place);
   try { A.Store.set(KEY, 1); if (A.Store.flush) A.Store.flush(); } catch (e) { console.error('[garage tour]', e); }
   const wrap = box && box.parentElement;

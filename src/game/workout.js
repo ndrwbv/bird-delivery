@@ -174,7 +174,7 @@ function meStart (s) {
 }
 function bubble (p, txt) {
   if (ME.bubble) { p.grp.remove(ME.bubble); ME.bubble.material.dispose(); }
-  ME.bubble = A.sayBubble(p.grp, txt, '#ff6a13', 2.5);
+  ME.bubble = A.sayBubble(p.grp, txt, '#ff6a13', 2.5, 1);
 }
 function meDone (full) {
   const p = ME.p;

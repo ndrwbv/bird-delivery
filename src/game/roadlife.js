@@ -36,6 +36,7 @@ import { holdFixed } from './people.js';
 import * as MOPEDS from './mopeds.js';
 import { onPave } from './pave.js';
 import { blocks as ringIsland } from './rings.js';   // остров малого круга: знаков там нет (rings.js)
+import { TALK } from './talk.js';             // доля вышедших водителей, что говорят (talk.js SHOUT)
 
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -581,7 +582,8 @@ function delSolid (A, s) {
 /* ═════════════════ пробки за авариями ═════════════════ */
 const JAMS = [];
 const JAM_BY = new Map();                   // направленное ребро → пробка
-const LOOK_LINES = () => [t('ну чё там?'), t('опять авария…'), t('надолго встали'), t('кто там встал?!'), t('пропустите!'), t('гаишников вызвали?')];
+/* вышел из машины посмотреть: в большинстве случаев — молча (автор 18.10.2026), с шансом TALK.SHOUT — одна реплика */
+const LOOK_LINES = () => [t('ну чё там?'), t('опять авария…'), t('надолго встали'), t('кто там встал?!'), t('гаишников вызвали?'), t('я сегодня уже не успею никуда')];
 
 function makeJam (A, a) {
   const road = A.nearestRoad(a.x, a.z, 5, 1);
@@ -732,7 +734,7 @@ function stepMen (dt, A, J) {
       const tx = m.st === 'go' ? m.tx : (carOk ? c.x + Math.cos(c.h) * 1.25 : m.bx), tz = m.st === 'go' ? m.tz : (carOk ? c.z - Math.sin(c.h) * 1.25 : m.bz);
       const dx = tx - m.x, dz = tz - m.z, d = Math.hypot(dx, dz), v = (m.st === 'back' && J.done ? 2.4 : 1.3) * dt;
       if (d < 0.25) {
-        if (m.st === 'go') { m.st = 'look'; m.T = rand(5, 8); m.bubble = A.sayBubble(m.grp, pick(LOOK_LINES()), '#4f7fd6', 2.6); }
+        if (m.st === 'go') { m.st = 'look'; m.T = rand(5, 8); if (Math.random() < TALK.SHOUT) m.bubble = A.sayBubble(m.grp, pick(LOOK_LINES()), '#4f7fd6', 2.6); }
         else { A.dropMesh(m.grp); if (c) c.rlOut = 0; J.men.splice(i, 1); continue; }
       } else { m.x += dx / d * Math.min(v, d); m.z += dz / d * Math.min(v, d); m.h = Math.atan2(dx, dz); walk = true; }
     } else if (m.st === 'look') {
