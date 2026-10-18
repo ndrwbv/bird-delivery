@@ -18,7 +18,7 @@
 
 let A = null;
 export const CFG = { off: false };              // отладка: true — по-старому (замер до/после)
-export const STATS = { calls: 0, ok: 0, same: 0, fail: 0, ms: 0, max: 0, cut: 0, edges: 0, pops: 0, wall: 0, jump: 0, at: [] };   // wall — кадров «упёрся в стену», jump — перенос на улицу (game.js svcWall)
+export const STATS = { calls: 0, ok: 0, same: 0, fail: 0, ms: 0, max: 0, cut: 0, edges: 0, pops: 0, wall: 0, jump: 0, warmed: 0, at: [] };   // wall — кадров «упёрся в стену», jump — перенос на улицу (game.js svcWall)
 let G = null, PR = null, SG = null, HK = [], HV = [], gen = 0;
 
 /* api: { NODES, edgeOf(a, b), segCut(ax, az, bx, bz) — режет дом?, DRIVE_MAX } */
@@ -30,7 +30,7 @@ function push (k, v) {
   while (i > 0) {
     const p = (i - 1) >> 1;
     if (HK[p] <= HK[i]) break;
-    [HK[p], HK[i]] = [HK[i], HK[p]]; [HV[p], HV[i]] = [HV[i], HV[p]];
+    const tk = HK[p], tv = HV[p]; HK[p] = HK[i]; HV[p] = HV[i]; HK[i] = tk; HV[i] = tv;   // без [a, b] = [b, a]: тот выделяет массив
     i = p;
   }
 }
@@ -47,7 +47,7 @@ function pop () {
       if (l < HK.length && HK[l] < HK[m]) m = l;
       if (r < HK.length && HK[r] < HK[m]) m = r;
       if (m === i) break;
-      [HK[m], HK[i]] = [HK[i], HK[m]]; [HV[m], HV[i]] = [HV[i], HV[m]];
+      const tk = HK[m], tv = HV[m]; HK[m] = HK[i]; HV[m] = HV[i]; HK[i] = tk; HV[i] = tv;
       i = m;
     }
   }
@@ -77,6 +77,25 @@ function cuts (e, u, v) {
   return e.svcCut === 1;
 }
 
+/* в спокойные кадры (game.js после отрисовки, wk — сколько занял кадр, мс): заранее проверить все куски улиц «режет ли
+   дом» — раньше это делал первый путь курьера через новый край города, разом: на «Деке» 7—11 мс в одном кадре (18.10.2026).
+   Не больше ~0,4 мс за кадр и только если кадр сам короче 12 мс; весь город — за несколько секунд смены */
+let WI = 0, WJ = 0;
+export function warm (wk) {
+  if (!A || CFG.off || WI < 0 || !(wk < 12) || !A.NODES.length) return;
+  const N = A.NODES, MAXC = A.DRIVE_MAX, t0 = performance.now();
+  while (WI < N.length) {
+    const nb = N[WI].nb || [];
+    while (WJ < nb.length) {
+      const v = nb[WJ++], e = A.edgeOf(WI, v);
+      if (e && e.svcCut === undefined && !(e.c > MAXC)) cuts(e, WI, v);
+      if (performance.now() - t0 > 0.4) return;
+    }
+    WI++; WJ = 0;
+  }
+  WI = -1; STATS.warmed = 1;
+}
+
 /* r0, r1 — точки на улице у старта и у цели (nearestRoad: { x, z, seg }).
    Возвращает узлы пути (NODES[…]) от конца куска старта до конца куска цели; [] — тот же кусок;
    null — не нашлось (тогда game.js — по-старому) */
@@ -95,7 +114,7 @@ export function route (r0, r1) {
   gen++;
   HK.length = 0; HV.length = 0;
   const ex = r1.x, ez = r1.z;
-  const h = k => Math.hypot(N[k].x - ex, N[k].z - ez);
+  const h = k => { const dx = N[k].x - ex, dz = N[k].z - ez; return Math.sqrt(dx * dx + dz * dz); };   // не Math.hypot: в горячем цикле он не встраивается
   const relax = (k, g, p) => {
     if (SG[k] === gen && G[k] <= g) return;
     SG[k] = gen; G[k] = g; PR[k] = p;

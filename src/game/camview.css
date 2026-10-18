@@ -1,0 +1,10 @@
+/* кнопка смены вида камеры (camview.js): только на телефоне, в столбике под радаром, под паузой.
+   Значок — фотоаппаратик; какой вид включился — скажет всплывашка «камера: …» */
+#cambtn { display: none; }
+body.touch #ctrls #cambtn { display: flex; align-items: center; justify-content: center; min-width: 34px; touch-action: manipulation; }
+#cambtn .cam-ico { position: relative; display: block; width: 14px; height: 10px; border: 2px solid currentColor; border-radius: 2px; box-sizing: border-box; }
+#cambtn .cam-ico::before { content: ''; position: absolute; left: 2px; top: 1px; width: 4px; height: 4px; border: 2px solid currentColor; border-radius: 50%; box-sizing: border-box; }
+#cambtn .cam-ico::after { content: ''; position: absolute; left: 2px; top: -5px; width: 4px; height: 3px; background: currentColor; }
+/* из-за руля — значок голубой, как «включено» */
+#cambtn[data-cam="cab"] { color: #6fd3ff; border-color: #6fd3ff; }
+#cambtn[data-cam="near"] { color: #ffe9a8; }

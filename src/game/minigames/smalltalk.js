@@ -23,6 +23,8 @@ import { inputKind, onInput, glyph, keyHTML, refreshKeys } from '../../input/gly
 import { SITS, WHO } from './smalltalk-lines.js';
 import { nowPart } from '../daytime.js';       // встречи с when — только в эту пору суток по часам мира («первый за ночь» — ночью)
 import * as TF from '../talkface.js';           // человек говорит ртом, пока печатается его реплика
+import * as COACH from './doorcoach.js';        // обучение первого раза: пауза, подсветка ответов, «понятно»
+import { keysLine } from './doorkit.js';
 
 const N_ = s => s;
 const DT_MAX = 0.1;
@@ -92,6 +94,10 @@ export default {
     const wfem = sitFem(sit);
     const base = o.person || (api.makePerson ? api.makePerson({ seed: 0x5A11 + sit.id.length * 977 + sit.who.length * 131, fem: wfem !== undefined ? wfem : !!fem }) : null);
     const person = dress(base, sit.who);
+    // в мире (doorstep.js → doorcast.js): клиент у двери — с этим же лицом, говорит ртом; у «угадай, как зовут собаку» — собака у ног
+    let spoke = false;
+    const speak = (on, mood) => { if (on === spoke && !on) return; spoke = on; try { if (api.speak) api.speak(on, mood); } catch (e) { /* — */ } };
+    try { if (api.cast) api.cast(person, sit); } catch (e) { console.warn('[smalltalk] cast', e); }
     const who = o.who || (base ? (base.first || String(base.name || '').split(/\s+/)[0]) : '') || t('клиент');
     const ans = [sit.a, sit.b];
     const st = { t: 0, phase: 'ask', cur: 0, pick: -1, timeout: false, bonus: null, note: '', rt: 0,
@@ -139,14 +145,10 @@ export default {
       const k = inputKind().kind;
       box.dataset.input = k;
       refreshKeys(box);                                       // значок на «понятно» — по вводу
-      if (st.phase !== 'ask') { elHint.textContent = ''; return; }   // дальше — кнопка «понятно» со значком
+      if (st.phase !== 'ask') { elHint.textContent = ''; return; }   // дальше — кнопка «понятно» со значком; обучение — своя записка
       const ctl = k === 'pad' ? t('крестовина — выбрать · {a} — ответить', { a: glyph('ok') })
         : k === 'touch' ? t('нажми на ответ') : t('↑ ↓ — выбрать · Enter — ответить');
-      // первый раз (doorstep.js learnFirst, ECON.DOORGAME.LEARN): над управлением — что делать, от Толика
-      const ln = o.learn || (o.learnOn ? { add: 10 } : null);
-      if (ln) elHint.innerHTML = '<b class="tk-learn">' + esc(t('Толик: первый раз у двери? Клиент заговорил — выбери ответ. Поддержишь — чаевые больше, поторопишь — меньше.')) +
-        (ln.add > 0 ? ' ' + esc(t('На первый раз к сроку +{n} с.', { n: ln.add })) : '') + '</b>' + esc(ctl);
-      else elHint.textContent = ctl;
+      elHint.textContent = ctl;
     };
     const setCur = i => {
       if (st.phase !== 'ask') return;
@@ -161,8 +163,14 @@ export default {
       if (!text) return;
       elWho.classList.add('tk-talking');
       TF.talk(elFace);
+      speak(true, mood);
     };
-    say(t(sit.say), sit.emo || 'ok');
+    // первый раз (doorstep.js learnFirst, ECON.DOORGAME.LEARN; doorcoach.js, автор 18.10.2026): сначала записка Толика с
+    // подсветкой ответов — разговор и срок заказа стоят (api.hold); «понятно» — клиент заговорил
+    const ln = o.learn || (o.learnOn ? { name: t('Толик'), add: 10 } : null);
+    let coach = null;
+    if (ln) st.phase = 'learn';
+    else say(t(sit.say), sit.emo || 'ok');
 
     /* ответил: что сказал курьер и что выпало */
     function pick (i, timeout) {
@@ -212,7 +220,7 @@ export default {
     }
 
     function typeStep (dt) {
-      if (st.shown >= st.text.length) { elWho.classList.remove('tk-talking'); TF.stop(elFace); return true; }
+      if (st.shown >= st.text.length) { elWho.classList.remove('tk-talking'); TF.stop(elFace); speak(false); return true; }
       st.tt += dt;
       const n = Math.min(st.text.length, Math.floor(st.tt * CPS));
       if (n !== st.shown) { st.shown = n; elTxt.textContent = st.text.slice(0, n); }
@@ -231,6 +239,7 @@ export default {
         elClock.textContent = lvl === 'late' ? t('опоздал') : lvl === 'low' ? t('вот-вот опоздаешь!') : lvl === 'warn' ? t('срок горит') : lvl ? t('срок идёт') : '';
         elClock.className = 'tk-clock' + (lvl ? ' tk-' + lvl : '');
       }
+      if (st.phase === 'learn') { if (coach) coach.layout(); return; }
       if (st.phase === 'ask') {
         st.t += dt;
         typeStep(dt);
@@ -267,6 +276,7 @@ export default {
     }
 
     function pad (p) {
+      if (st.phase === 'learn') { if (coach) coach.pad(p); return; }
       if (st.phase !== 'ask') { if (p.menuOk || p.accept) advance(); return; }
       if (p.menuUp) setCur(st.cur - 1);
       else if (p.menuDown || p.dDown) setCur(st.cur + 1);
@@ -274,7 +284,7 @@ export default {
     }
     /* клавиатура — раньше игры (capture): стрелки / W S, Enter / пробел, 1 2; Esc — пауза игры, не наша */
     const onKey = e => {
-      if (st.phase === 'done' || (api.paused && api.paused())) return;
+      if (st.phase === 'done' || st.phase === 'learn' || (api.paused && api.paused())) return;
       const c = e.code;
       let act = '';
       if (c === 'ArrowUp' || c === 'KeyW') act = 'up';
@@ -310,6 +320,25 @@ export default {
 
     root.appendChild(box);
     hint();
+    if (ln) {
+      const KB = COACH.kbd, L = (s, keys) => keysLine(t, s, keys || {});
+      if (api.hold) api.hold(true);
+      coach = COACH.coach(box, {
+        t, ln, goLabel: t('понятно'), paused: () => !!(api.paused && api.paused()),
+        steps: [{ go: true, el: () => elOpts,
+          text: (k, fam) => L(N_('Сейчас клиент заговорит — выбери один из двух ответов. Поддержишь — чаевые больше, поторопишь — меньше.')) + ' ' +
+            (k === 'touch' ? L(N_('Тапни по ответу.')) : k === 'pad' ? L(N_('Крестовиной — выбрать, {ok} — ответить.'), { ok: KB(fam === 'ps' ? '✕' : 'A') })
+              : L(N_('{ud} — выбрать, {ok} — ответить.'), { ud: KB('↑ ↓', 1), ok: KB('Enter', 1) })) +
+            (ln.add > 0 ? ' ' + esc(t('На первый раз к сроку +{n} с.', { n: ln.add })) : '') }],
+        onEnd: skipped => {
+          st.phase = 'ask'; st.t = 0;
+          if (api.hold) api.hold(false);
+          say(t(sit.say), sit.emo || 'ok');
+          hint();
+          api.log && api.log('обучение ' + (skipped ? 'пропущено' : 'пройдено'));
+        },
+      });
+    }
     const offInput = onInput(hint);
     let raf = 0, last = 0;
     if (api.setStep) api.setStep(step);
@@ -321,18 +350,23 @@ export default {
     // для проверок (probe): ответить как игрок — 0 / 'a' верхний (и прежние 'rush', как автопилот), 1 / 'b' нижний ('keep', 'fun')
     // после ответа — как игрок жмёт дальше: допечатать реакцию, печать, «понятно»
     box.__solve = (arg = 0) => {
+      if (coach && coach.on()) coach.skip();                   // обучение первого раза — пропустить, как кнопкой
       if (st.phase !== 'ask') { st.armT = Math.max(st.armT || 0, 0.25); st.endT = Math.max(st.endT, 0.3); advance(); return; }
       const i = arg === 1 || arg === 'b' || arg === 'keep' || arg === 'fun' ? 1 : 0;
       st.t = Math.max(st.t, T.arm); setCur(i); pick(i);
     };
     box.__phase = () => st.phase;
+    box.__coach = () => (coach && coach.on() ? coach.state() : null);
     box.__st = () => ({ phase: st.phase, armT: +(st.armT || 0).toFixed(2), shown: st.shown, len: st.text.length, rt: +st.rt.toFixed(2), endT: +st.endT.toFixed(2) });
     box.__sit = sit.id;
     box.__who = sit.who;
     return () => {
       removeEventListener('keydown', onKey, true);
       offInput();
+      if (coach) coach.off();
       TF.stop(elFace);
+      speak(false);
+      try { if (api.uncast) api.uncast(); } catch (e) { /* — */ }
       if (raf) cancelAnimationFrame(raf);
       if (api.setStep) api.setStep(null);
       if (api.setPad) api.setPad(null);

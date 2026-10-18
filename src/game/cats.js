@@ -30,6 +30,7 @@
    материалом на всех; дальше SHOW — спрятан; люди вокруг — раз в 0,3 с.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
+import * as PETW from './petwear.js';          // зимой часть дворовых котов в свитерах (petwear.js)
 
 export const CATS = {
   VENT: { STEP: 6, MIN_WALL: 7, W: 0.85, H: 0.4, Y: 0.1, OPEN: 0.1, BROKEN: 0.1, DOOR: 2.4, ARCH: 4.5 },
@@ -91,15 +92,25 @@ function catGeos (T, f) {
     leg: merge(T, [[0.07, 0.16, 0.07, f.leg, 0, -0.08, 0]]),
   };
 }
-const GEOS = new Map();
+const GEOS = new Map(), COATED = new Map();
+/* туловище в одёжке (petwear.js): своя склейка на окрас × цвет × вид, общая для всех таких котов */
+function coatBody (T, f, C) {
+  const k = FURS.indexOf(f) + ':' + C.ci + ':' + C.k;
+  let g = COATED.get(k);
+  if (g) return g;
+  const body = [[0.26, 0.22, 0.5, f.base, 0, 0, 0], [0.2, 0.08, 0.36, f.belly, 0, -0.11, 0.02]];
+  PETW.wear((w, h, d, hex, x, y, z) => body.push([w, h, d, hex, x, y, z]), { w: 0.26, h: 0.22, d: 0.5, y: 0, z: 0 }, C);
+  COATED.set(k, g = merge(T, body));
+  return g;
+}
 /* кот: Group с userData { head, tail, tailBox, body, legs[4] } — легенда в шапке.
    own — свои геометрии (story.js отдаёт кота в dropMesh, а тот их освобождает) */
-export function makeCatModel (T, fur = FURS[0], own = false) {
+export function makeCatModel (T, fur = FURS[0], own = false, coat = null) {   // coat — одёжка зимой (petwear.js coatFor), не у своих
   let G = own ? null : GEOS.get(fur);
   if (!G) { G = catGeos(T, fur); if (!own) GEOS.set(fur, G); }
   const M = catMat(T), g = new T.Group();
   const mesh = (geo, x, y, z, parent = g) => { const o = new T.Mesh(geo, M); o.position.set(x, y, z); parent.add(o); return o; };
-  const body = mesh(G.body, 0, 0.25, 0);
+  const body = mesh(coat && !own ? coatBody(T, fur, coat) : G.body, 0, 0.25, 0);
   const legs = [[-0.08, 0.18], [0.08, 0.18], [-0.08, -0.18], [0.08, -0.18]].map(([x, z]) => mesh(G.leg, x, 0.16, z));
   const head = mesh(G.head, 0, 0.42, 0.28);
   const tail = new T.Group(); tail.position.set(0, 0.32, -0.24); g.add(tail);
@@ -260,7 +271,7 @@ const hidden = (x, y, z) => Math.hypot(x - A.V.x, z - A.V.z) > CATS.VIEW || !inV
 function onRoad (x, z, m) { const r = A.nearestRoad(x, z); return !!r && r.d < (r.seg.w || 7) / 2 + m; }
 
 function add (kind, x, y, z, h, extra) {
-  const g = makeCatModel(THREE, pick(FURS));
+  const g = makeCatModel(THREE, pick(FURS), false, kind === 'roof' ? null : PETW.coatFor(PETW.PW.CAT, ['sweater', 'vest']));   // на крышах — бездомные, без одёжек
   g.scale.setScalar(CATS.SCALE);
   const c = { kind, g, u: g.userData, x, y, z, h, v: 0, mode: 'sit', mt: rand(2, 6), ph: rand(0, 6), look: 0, lookT: 0,
     groom: rand(6, 16), sitK: 1, jy: 0, jump: 0, ...extra };

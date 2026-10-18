@@ -562,10 +562,20 @@ function addSolid (A, s) {
       a.push(s);
     }
 }
+/* вынуть — только из тех клеток, куда положил addSolid (18.10.2026: перебор всех клеток города на каждый кусок
+   ограды ремонта — на «Деке» 4—8 мс в кадре, когда ремонт снимали) */
 function delSolid (A, s) {
   const i0 = A.SOLIDS.indexOf(s);
   if (i0 >= 0) A.SOLIDS.splice(i0, 1);
-  for (const a of A.SOLID_GRID.values()) { const k = a.indexOf(s); if (k >= 0) a.splice(k, 1); }
+  const C = A.SCELL;
+  if (!(C > 0) || !Number.isFinite(s.cx + s.ex + s.cz + s.ez)) { for (const a of A.SOLID_GRID.values()) { const k = a.indexOf(s); if (k >= 0) a.splice(k, 1); } return; }
+  for (let i = Math.floor((s.cx - s.ex) / C); i <= Math.floor((s.cx + s.ex) / C); i++)
+    for (let j = Math.floor((s.cz - s.ez) / C); j <= Math.floor((s.cz + s.ez) / C); j++) {
+      const a = A.SOLID_GRID.get(i + ',' + j);
+      if (!a) continue;
+      const k = a.indexOf(s);
+      if (k >= 0) a.splice(k, 1);
+    }
 }
 
 /* ═════════════════ пробки за авариями ═════════════════ */

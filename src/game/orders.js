@@ -33,6 +33,7 @@
    note, why, pay, time, timeK (срок × от обычного), color, reach, noGuest }. why/items/note — уже переведённые; noGuest — человека
    у двери ставит story.js, прохожего не зовём (иначе ждёт прохожий, person — его лицо). */
 import * as RESPECT from './respect.js';
+import * as TEL from './telemetry.js';          // анонимная статистика: поручения и опоздания (telemetry.js)
 import { t, tn } from '../i18n/index.js';
 import * as ECON from './econ.js';
 import * as DLG from './dialog.js';
@@ -972,6 +973,7 @@ export function payStop (o, st, onTime, tier) {
   if (sp.type !== 'staff' && !o.tut) SKILL.stop(onTime, !!st.bumped, !!sp.bundle);   // умение курьера: вовремя и чисто — растёт, опоздал — падает (skill.js)
   SH.done += o.idx === o.stops.length - 1 ? 1 : 0;
   if (st.far) SH.far += onTime ? st.far : Math.round(st.far * PAY.LATE);   // «весь город»: премия за дальние за смену (итоги)
+  TEL.count(onTime ? 'ontime' : 'late');                 // анонимная статистика: вовремя / опоздал (telemetry.js)
   if (!onTime) {
     const gop = DOOR.stairsAdjust(st, fee, 0, 0).gop;     // откупился от гопников в подъезде, а всё равно опоздал — «чаевые» им уже отданы
     st.pay = { fee, bonus: 0, tip: 0, late: true, story: !!sp.story, stairsGop: gop };
@@ -1101,6 +1103,7 @@ function offerSide (ped, person, only) {
   }).then(r => {
     // ответ игрока — в вес вида (likes.js): «да» — чаще, «нет» — реже; закрыли без ответа (смена кончилась) — не в счёт
     if (!s.face) { if (r === true) LIKES.yes('err', s.id); else if (r === false) LIKES.no('err', s.id); }
+    TEL.ev('errand', { id: s.id, r: r === true ? 1 : r === false ? 0 : -1 });
     if (r === true && S.state === 'handover' && !ped.dead) A.startSide(ped, person, shop, { id: s.id, ask: what, what, gotIt: s.giver ? t('забрал: {what}', { what }) : t('купил: {what}', { what }), pay, bag: s.bag, side: true, spec: s });
     else A.declineSide(ped);
   });

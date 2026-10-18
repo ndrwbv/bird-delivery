@@ -1,0 +1,48 @@
+/* Своя музыка кодом (chiptunes.js, docs/MUSIC.md «Своя музыка кодом»).
+   Плашка «♪ трек» — маленькая бумажка справа внизу над кнопкой паузы (слева над радаром — карточки заказов),
+   в езде не мешает: без тряски, въезд снизу, сама уходит через 2,6 с; на телефоне — слева над рулём.
+   Полоска в главном меню — бумажный ярлычок сверху по центру: «♪ трек ▶» (следующий) и «выкл / вкл». */
+#chip-plate {
+  position: absolute; z-index: 8; right: 16px; bottom: 66px;
+  box-sizing: border-box; display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: baseline;
+  width: max-content; max-width: min(360px, calc(100vw - 32px));
+  padding: 6px 10px 6px; font-family: "Press Start 2P", ui-monospace, monospace; font-size: var(--pp-fs-s, 11px); line-height: 1.6;
+  color: var(--pp-ink, #33210c); background: var(--pp-paper, #fff3d6);
+  border: 2px solid var(--pp-ink, #33210c); border-left: 5px solid var(--pp-yellow, #ffd85e); border-radius: 3px;
+  box-shadow: 0 3px 0 rgba(51, 33, 12, .7);
+  pointer-events: none; user-select: none;
+  opacity: 0; transform: translateY(10px) rotate(-.6deg); transition: opacity .22s, transform .22s;
+}
+#chip-plate.on { opacity: 1; transform: translateY(0) rotate(-.6deg); }
+#chip-plate i { font-style: normal; color: var(--pp-rust, #8a3b22); }
+#chip-plate b { font-weight: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#chip-plate small { grid-column: 2; color: var(--pp-label, #75573b); font-size: .8em; white-space: nowrap; }
+#chip-plate [hidden] { display: none; }
+
+/* телефон (только боком): внизу слева — руль, справа — педали, сверху — часы, подсказки и радар;
+   плашка — слева над рулём, под деньгами */
+body.touch #chip-plate { right: auto; left: max(10px, var(--sa-l, env(safe-area-inset-left))); bottom: calc(max(10px, var(--sa-b, env(safe-area-inset-bottom))) + 152px);
+                         max-width: min(300px, 44vw); font-size: 10px; }
+/* катсцена, накладная — не мешать */
+body.intro-cut #chip-plate, body.brief #chip-plate { opacity: 0; }
+
+#chip-strip {
+  position: fixed; z-index: 6; left: 50%; top: max(10px, var(--sa-t, env(safe-area-inset-top)));
+  display: flex; align-items: stretch; max-width: min(420px, calc(100vw - 32px));
+  font-family: "Press Start 2P", ui-monospace, monospace; font-size: 10px; line-height: 1.5;
+  color: var(--pp-ink, #33210c); background: var(--pp-paper, #fff3d6);
+  border: 2px solid var(--pp-ink, #33210c); border-radius: 3px; box-shadow: 0 3px 0 rgba(51, 33, 12, .7);
+  transform: translateX(-50%) rotate(.5deg);
+}
+#chip-strip[hidden] { display: none; }
+#chip-strip button { font: inherit; color: inherit; background: none; border: 0; margin: 0; padding: 6px 9px 5px; cursor: pointer; min-height: 28px; }
+#chip-strip .cs-next { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+#chip-strip .cs-next b { font-weight: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#chip-strip .cs-next i { font-style: normal; color: var(--pp-rust, #8a3b22); }
+#chip-strip .cs-next em { font-style: normal; color: var(--pp-rust, #8a3b22); }
+#chip-strip .cs-off { border-left: 2px dashed var(--pp-ink, #33210c); color: var(--pp-label, #75573b); text-transform: uppercase; }
+#chip-strip button:hover, #chip-strip button:focus-visible { background: var(--pp-yellow, #ffd85e); outline: none; }
+#chip-strip.off .cs-next { opacity: .45; }
+/* телефон боком: сверху логотип и профиль — полоска ниже, мельче */
+@media (max-height: 460px) { #chip-strip { top: auto; bottom: max(8px, var(--sa-b, env(safe-area-inset-bottom))); left: max(10px, var(--sa-l, env(safe-area-inset-left))); transform: rotate(.5deg); font-size: 9px; } }
+@media (prefers-reduced-motion: reduce) { #chip-plate, #chip-plate.on { transition: opacity .15s; transform: none; } }

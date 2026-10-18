@@ -13,6 +13,7 @@ import { t } from '../i18n/index.js';
 import { makePerson, holdFixed } from './people.js';
 import { MAP } from './map.js';
 import * as SEAS from './seasons.js';
+import * as PETW from './petwear.js';          // зимой собачка в свитере или попонке (petwear.js)
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[(Math.random() * a.length) | 0];
@@ -314,7 +315,7 @@ function spawnRich () {
 /* собачка: туловище одним мешем, передние и задние ноги — парами */
 const LEASH_MAT = { m: null };
 function makeDog () {
-  const col = pick(['#f4f1ea', '#e0c8a0', '#2b2a30', '#b07a4a', '#d9d2c2']), dk = shadeHex(col, 0.7);
+  const col = pick(['#f4f1ea', '#e0c8a0', '#2b2a30', '#b07a4a', '#d9d2c2']), dk = shadeHex(col, 0.7), coat = PETW.coatFor(1, ['sweater', 'vest']);
   const g = new THREE.Group();
   g.add(bits(b => {
     b(0.22, 0.2, 0.44, col, 0, 0.3, 0);
@@ -324,6 +325,7 @@ function makeDog () {
     b(0.04, 0.04, 0.04, '#1b1410', -0.05, 0.49, 0.38); b(0.04, 0.04, 0.04, '#1b1410', 0.05, 0.49, 0.38);
     b(0.05, 0.05, 0.22, col, 0, 0.42, -0.28, -0.7);
     b(0.23, 0.05, 0.05, '#c23a3a', 0, 0.42, 0.17);
+    PETW.wear(b, { w: 0.22, h: 0.2, d: 0.44, y: 0.3, z: 0 }, coat);   // зимой — свитер или попонка (petwear.js)
   }));
   const legs = [];
   for (const zz of [0.15, -0.15]) {

@@ -23,6 +23,7 @@ import { t, N_ } from '../i18n/index.js';
 import * as DLG from './dialog.js';
 import { makePerson } from './people.js';
 import { SIDE_TIPS, ORDER_TYPES } from './orders.config.js';
+import * as DCAST from './doorcast.js';        // кот у ног клиента, когда ему привезли корм / забрали от ветеринара (doorcast.js)
 
 /* где ищем отдающего: подъезд в MIN—MAX м от клиента; OFF — на сколько м от двери он стоит */
 export const GIVE = { MIN: 60, MAX: 380, OFF: 1.4 };
@@ -206,6 +207,9 @@ export function thanks (Sd) {
   const q = L.length ? wpick(L) : null;
   const th = t(s.thanks), tip = q ? q.tip : 0;
   const text = q ? th + (/[.!?…—]$/.test(th) ? ' ' : ', ') + t(q.say) : th;
+  // pet — к кому это (кот): выходит к ногам клиента, «Мяу» (doorcast.js) — «Барсик, жри» говорят тому, кого видно
+  const pet = s.pet === 'cat' && Sd.ped && !Sd.ped.dead ? DCAST.cat(Sd.ped) : null;
+  if (pet) setTimeout(() => pet.go(), 7000);
   DLG.say({ person: Sd.person, name: firstOf(Sd.person), head: t('поручение'), text, accept: t('понятно'), emo: 'happy', fillers: false, color: ORDER_TYPES.side.color,
     ...(tip > 0 ? { pay: '+' + A.money(tip), payLabel: t('чаевые') } : {}) });
   paidLog(Sd, 'give', 1, tip);

@@ -28,7 +28,7 @@ import * as AUTO from './cars.js';
 import * as SL from './streetlamps.js';
 import * as STORY from './story.js';
 import { HERO } from './heroes.js';                // HERO.STORY — сюжет героев в архиве (10.10.2026)
-import * as RQ from './ridequeue.js';               // плашка достижения — после чека, Толика и подсказки (ridequeue.js)
+import * as NQ from './notifyq.js';                 // плашка достижения — в общей очереди уведомлений: после чека, Толика и рейтинга (notifyq.js)
 
 export const KEY = 'dlv-ach';
 
@@ -109,9 +109,10 @@ function send (id) {
 }
 
 /* своя плашка — только без Стима. Маленькая «грамота» сверху по центру (на телефоне — между часами и
-   радаром), не на радаре и не на руле (UI-REVIEW № 30). В езде — после чека оплаты, денег в пачку,
-   Толика и подсказки (ridequeue.js whenQuiet): одна вещь за раз; одно короткое проявление, без тряски */
-let TOAST = null, toastQ = [], toastOn = false;
+   радаром), не на радаре и не на руле (UI-REVIEW № 30). В езде — в общей очереди уведомлений (notifyq.js, важность
+   «достижение»: после чека оплаты, Толика и таблицы рейтинга): одна вещь за раз; висит 4 с, одно короткое проявление,
+   без тряски; ждёт до 60 с (пауза и окна его держат), дольше — не показываем (грамота и так на доске почёта) */
+let TOAST = null;
 function chip (a) {
   if (typeof document === 'undefined') return;
   if (!TOAST) {
@@ -135,23 +136,20 @@ function chip (a) {
     TOAST.id = 'ach-toast';
     document.body.appendChild(TOAST);
   }
-  toastQ.push(a);
-  if (!toastOn) { toastOn = true; RQ.whenQuiet(nextChip, 20000, chatGone); }
+  NQ.push({ kind: 'ach', text: t(a.name), ms: 4300, wait: 60, fresh: 2.5, ready: chatGone, show: () => showChip(a), hide: hideChip });
 }
 /* на узком экране плашка там же, где чат Толика (под радаром) — ждём, пока его сообщения уйдут */
 // и не поверх паузы (автор 10.10.2026: «Ни царапины» висела поверх паузы) — ждёт, пока игру снимут с паузы, и показывается один раз
 const chatGone = () => !(A && A.S && A.S.paused) && (innerWidth > 560 || !document.querySelector('#chat .cm:not(.out)'));
-function nextChip () {
-  if (A && A.S && A.S.paused) { setTimeout(nextChip, 400); return; }   // пауза — ждём, не поверх неё
-  const a = toastQ.shift();
-  if (!a) { toastOn = false; return; }
-  toastOn = true;
+let chipT = 0;
+function hideChip () { clearTimeout(chipT); if (TOAST) TOAST.classList.remove('on'); }
+function showChip (a) {
   TOAST.innerHTML = '<i></i><div><small></small><b></b></div>';
   TOAST.querySelector('small').textContent = t('достижение');
   TOAST.querySelector('b').textContent = t(a.name);
   requestAnimationFrame(() => TOAST.classList.add('on'));
-  RQ.hold(4300);                                   // пока плашка висит — следующая подсказка ждёт (ridequeue.js)
-  setTimeout(() => { TOAST.classList.remove('on'); setTimeout(() => RQ.whenQuiet(nextChip, 20000, chatGone), 350); }, 4000);
+  clearTimeout(chipT);
+  chipT = setTimeout(hideChip, 4000);
 }
 
 function grant (a) {

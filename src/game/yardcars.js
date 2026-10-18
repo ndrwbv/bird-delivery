@@ -277,6 +277,8 @@ function paintPocket (P, ax, az, sA, sB, e0, G, list) {
 }
 
 /* ── отрисовка: InstancedMesh на модель ── */
+import * as CSNOW from './carsnow.js';    // зимой во дворах машины заметены (байт снега — в данных экземпляра aSnI)
+
 const U = { uBasic: { value: null }, uLed: { value: null } };
 const MODELS = [];        // { model, im, geo, cap, n, col, cov }
 let MAT = null;
@@ -297,8 +299,9 @@ function material (base) {
     sh.fragmentShader = 'uniform vec3 uBasic, uLed;\nvarying float vF;\n' +
       sh.fragmentShader.replace('#include <opaque_fragment>', `if (vF > 0.5) outgoingLight = vColor * (vF > 1.5 ? uLed : uBasic);   // фары — без света, как у лёгкой машины
 #include <opaque_fragment>`);
+    CSNOW.inject(sh, 'inst');
   };
-  m.customProgramCacheKey = () => 'yardcars';
+  m.customProgramCacheKey = () => 'yardcars:snow';
   m.userData.shared = true;
   return m;
 }
@@ -354,6 +357,8 @@ function ensureIM (M, cap) {
   im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(c * 3), 3);
   M.cov = new THREE.InstancedBufferAttribute(new Float32Array(c), 1);
   M.geo.setAttribute('aCov', M.cov);
+  M.sn = new THREE.InstancedBufferAttribute(new Uint8Array(c), 1, true);
+  M.geo.setAttribute('aSnI', M.sn);
   im.count = 0; im.visible = false;
   im.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1);
   im.name = 'yardcars';
@@ -371,12 +376,12 @@ function hollow (hex, model, hl) {
 }
 
 /* машина t (лёгкая или пустая, стоит на месте s) — в общую отрисовку */
-function adopt (t, s, hex, cov, inT) {
+function adopt (t, s, hex, cov, inT, sn) {
   const M = modelOf(t.model), g = t.mesh;
   A.poseOnSlope(t);
   g.updateMatrix();
   t.pk = { x: t.x, z: t.z, h: t.h, mesh: g, yc: s, mi: MI.get(t.model), m: Float32Array.from(g.matrix.elements), hex, cov: cov ? 1 : 0, inT: !!inT,
-    r: 0, gg: 0, b: 0 };
+    r: 0, gg: 0, b: 0, sn: sn !== undefined ? sn : CSNOW.byteOf('yard') };
   const c = new THREE.Color(hex);
   t.pk.r = c.r; t.pk.gg = c.g; t.pk.b = c.b;
   s.t = t; s.res = null;
@@ -431,7 +436,7 @@ export function out (t, bare) {
   if (!P || !P.yc) return false;
   t.pk = undefined;
   if (!P.inT && !t.gone) A.TRAFFIC.push(t);       // в общий список: дальше её двигает поток (trafficgrid.js fresh)
-  const L = A.makeCarLite(P.hex, t.model, false);
+  const L = A.makeCarLite(P.hex, t.model, false, P.sn);   // снег — тот же, что был в общей отрисовке
   for (const c of [...L.children]) t.mesh.add(c);
   if (P.cov) { const m = t.mesh.children[0]; if (m && m.geometry) coverPaint(m.geometry, P.hex); }
   if (P.cov && t.mesh.children[1]) t.mesh.children[1].visible = false;   // фары под тентом не видно
@@ -475,7 +480,7 @@ export function view (x, z, R, band) {
         e[o + 12] = m[12]; e[o + 13] = m[13]; e[o + 14] = m[14]; e[o + 15] = 1;
         const ca = M.im.instanceColor.array, co = M.k * 3;
         ca[co] = P.r; ca[co + 1] = P.gg; ca[co + 2] = P.b;
-        M.cov.array[M.k] = P.cov;
+        M.cov.array[M.k] = P.cov; M.sn.array[M.k] = P.sn;
         if (d + 4 > M.rad) M.rad = d + 4;
         M.k++; drawn++;
       }
@@ -489,6 +494,7 @@ export function view (x, z, R, band) {
     im.instanceMatrix.needsUpdate = true; im.instanceMatrix.clearUpdateRanges(); im.instanceMatrix.addUpdateRange(0, M.k * 16);
     im.instanceColor.needsUpdate = true; im.instanceColor.clearUpdateRanges(); im.instanceColor.addUpdateRange(0, M.k * 3);
     M.cov.needsUpdate = true; M.cov.clearUpdateRanges(); M.cov.addUpdateRange(0, M.k);
+    M.sn.needsUpdate = true; M.sn.clearUpdateRanges(); M.sn.addUpdateRange(0, M.k);
     im.boundingSphere.center.set(x, 0, z); im.boundingSphere.radius = M.rad + 3;
   }
   ST.drawn = drawn;
@@ -843,10 +849,11 @@ function settle (m) {
   svcOff(t); t.parked = true; t.speed = 0; t.moved = 0;
   const g = t.mesh, u = g.userData;
   if (!u.lite || u.dmg > 0 || s.t) { ST.mov.parked++; return; }   // мятая — стоит своей моделью
-  const hex = u.bodyHex;
+  const hex = u.bodyHex, sa = g.children[0] && g.children[0].geometry && g.children[0].geometry.attributes.aSnw;
+  const sn = sa ? sa.array[0] : 0;               // снег — какой был у приехавшей (carsnow.js), а не как у простоявшей ночь
   A.scene.remove(g);
   for (const c of [...g.children]) { g.remove(c); if (c.geometry && !c.geometry.userData.shared) c.geometry.dispose(); }
-  adopt(t, s, hex, false, true);                 // она и так в TRAFFIC
+  adopt(t, s, hex, false, true, sn);             // она и так в TRAFFIC
   ST.mov.parked++;
 }
 

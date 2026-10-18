@@ -13,12 +13,13 @@
    | RB                  | нитро (держать), запасная      | nitro                 | —                          |
    | X                   | полёт родстера (flycar.js)     | btnX                  | пометка [X] на «бумаге»    |
    | Y                   | карта района                   | map, btnY             | закрыть карту; пометка [Y] |
-   | Back / View / Select| карта района                   | map                   | —                          |
+   | Back / View / Select| вид камеры: высоко → близко → из-за руля (camview.js); на карте — закрыть | view | —      |
    | на карте района     | RT/LT — зум, стик — двигать, B — закрыть (game.js, padStep → FM) |   |                |
    | Start / Menu (☰)    | пауза, меню                    | pause                 | продолжить                 |
    | крестовина ← ↑ →    | ответ 1 / 2 / 3 на карточке     | choice1..3            | выбор (menu*)              |
    | крестовина ↓        | радио: следующая станция (radio.js) | dDown            | вниз (menuDown)            |
    | R3 (нажать правый)  | звук вкл/выкл                  | sound                 | —                          |
+   | L3 (нажать левый)   | музыка вкл/выкл (music.js)     | music                 | —                          |
    | LB                  | повтор последних 10 с (replay.js) | pageL              | LB/RB — листать (pageL/R) |
    | правый стик         | свободен (в повторе — перемотка) | rx, ry (сырые)      | —                          |
 
@@ -46,7 +47,7 @@ const CFG = { dead: 0.12, outer: 0.03, curve: 1.6, trigDead: 0.06, rumble: true 
 export function setPadConfig (o) { Object.assign(CFG, o); }
 
 const HOLD = ['hand', 'nitro', 'a', 'b', 'x', 'up', 'down'];
-const EDGES = ['pause', 'map', 'accept', 'choice1', 'choice2', 'choice3', 'sound', 'any', 'btnX', 'btnY', 'dDown',
+const EDGES = ['pause', 'map', 'view', 'accept', 'choice1', 'choice2', 'choice3', 'sound', 'music', 'any', 'btnX', 'btnY', 'dDown',
   'menuUp', 'menuDown', 'menuLeft', 'menuRight', 'menuOk', 'menuBack', 'pageL', 'pageR', 'trigL', 'trigR'];
 
 // один объект на всё время: не мусорим каждый кадр
@@ -57,7 +58,7 @@ export const pad = {
   a: false, b: false,       // A и B держат прямо сейчас — для диалогов и мини-игр со своим учётом нажатий
   x: false,                 // X держат прямо сейчас — второй ответ в диалоге катсцены (dialog.js alt)
   up: false, down: false,   // вверх / вниз держат (крестовина или левый стик) — мини-игра «подъезд» (minigames/stairs.js)
-  pause: false, map: false, accept: false, choice1: false, choice2: false, choice3: false, sound: false, any: false,
+  pause: false, map: false, view: false, accept: false, choice1: false, choice2: false, choice3: false, sound: false, music: false, any: false,
   dDown: false,             // крестовина ↓ — только она (не стик): радио в езде
   menuUp: false, menuDown: false, menuLeft: false, menuRight: false, menuOk: false, menuBack: false,
   pageL: false, pageR: false,   // LB / RB — листать страницы (гараж карьеры)
@@ -178,9 +179,10 @@ export function pollPad () {
   if (edge('b', b)) pad.menuBack = true;
   if (edge('y', y)) { pad.map = true; pad.btnY = true; }
   if (edge('x', x)) pad.btnX = true;
-  if (edge('back', btn(B.back))) pad.map = true;
+  if (edge('back', btn(B.back))) pad.view = true;   // View — вид камеры (до 18.10.2026 — вторая кнопка карты, карта осталась на Y)
   if (edge('start', btn(B.start))) pad.pause = true;
   if (edge('r3', btn(B.r3))) pad.sound = true;
+  if (edge('l3', btn(B.l3))) pad.music = true;     // L3 — музыка вкл / выкл (music.js)
   if (edge('lb', btn(B.lb))) pad.pageL = true;
   if (edge('rb', rb)) pad.pageR = true;
   if (edge('lt', pad.brake > 0.5)) pad.trigL = true;

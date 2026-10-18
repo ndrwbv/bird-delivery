@@ -42,13 +42,14 @@ export const SHARED = new Set([
   'dlv-ach',                // достижения и их счётчики — как в Стиме, на весь аккаунт
   'dlv-lb-local',           // таблица рекордов на устройстве — все профили по именам
   'dlv-money-x8', 'dlv-__ts', 'dlv-crashlog',               // служебное
+  'dlv-tel', 'dlv-tel-id', 'dlv-tel-q',                     // анонимная статистика: выключатель, номер установки, неотправленное (telemetry.js)
 ]);
 /* ключи прогресса, которые стираем у профиля, даже если перебор localStorage не сработал */
 const KNOWN = ['dlv-name', 'dlv-msk-wallet', 'dlv-msk-cars', 'dlv-msk-car', 'dlv-msk-best', 'dlv-msk-xp', 'dlv-msk-col', 'dlv-msk-tut',
   'dlv-msk-guide', 'dlv-msk-nostut', 'dlv-intro', 'dlv-garage-tut', 'dlv-shifts', 'dlv-stars', 'dlv-crew', 'dlv-story', 'dlv-season',
   'dlv-used-addr', 'dlv-boss', 'dlv-clock', 'dlv-rev-sale', 'dlv-car-owned', 'dlv-car-cur', 'dlv-car-up', 'dlv-car-L', 'dlv-car-eng',
   'dlv-car-paint', 'dlv-district', 'dlv-dist-shifts', 'dlv-dist-open', 'dlv-city-mode', 'dlv-city-party', 'dlv-knocked', 'dlv-heroes',
-  'dlv-heroq', 'dlv-quick', 'dlv-don-trash', 'dlv-don-gang', 'dlv-respect', 'dlv-pz-grow', 'dlv-delivered', 'dlv-honor', 'dlv-route-ask', 'dlv-shift-tut', 'dlv-wx-last', 'dlv-faces', 'dlv-cycle'];
+  'dlv-heroq', 'dlv-quick', 'dlv-don-trash', 'dlv-don-gang', 'dlv-respect', 'dlv-pz-grow', 'dlv-delivered', 'dlv-honor', 'dlv-route-ask', 'dlv-shift-tut', 'dlv-wx-last', 'dlv-faces', 'dlv-cycle', 'dlv-nicks'];
 
 let st = null, raw = null, meta = null, view = null;
 const OTHER = /^dlv-p\d+-/;                       // ключ чужого профиля (2…5)

@@ -32,9 +32,9 @@ import * as THREE from '../vendor/three.module.min.js';
 import { t, N_ } from '../i18n/index.js';
 import * as DIRECTOR from './director.js';
 import * as TALK from './talk.js';             // облачка над головами (talk.js)
-import * as DLG from './dialog.js';            // окно разговора (без таймеров)
 import * as REGS from './regulars.js';         // клиенты автора у двери: мэр, певица, лудоман, «папины дети» (regulars.js)
 import * as LOCALS from './locals.js';         // жители Юга: заказ к его двери — окно разговора (locals.js)
+import * as DCAST from './doorcast.js';        // кто говорит — виден в 3D: незнакомец подходит, второй из-за спины, собака, рот (doorcast.js)
 import { makePerson } from './people.js';
 
 export const SHOUT = { P: 0.15, SAY: 0.9, HOLD: 3.0, SORRY: 2.6, SORRY_HOLD: 2.8, COL: '#c0392b', SORRY_COL: '#3a6fb0' };
@@ -48,7 +48,7 @@ const ADULT_SHOUT = /*i18n*/ [
   { s: N_('Выключи нахуй телевизор, там опять про забор!') },
   { s: N_('Мама, ну ёб твою мать, положи нож! Это не тебе пицца!') },
   { s: N_('Дети, сука, кто опять кота в морозилку положил?!') },
-  { s: N_('Рекс, фу! Фу, блядь! Это не человек, это курьер!') },
+  { s: N_('Рекс, фу! Фу, блядь! Это не человек, это курьер!'), dog: true },   // собака — у ног, лает (doorcast.js)
   { s: N_('Тамара Петровна, ёбаный в рот, верните пульт!'), sex: 'm' },
   { s: N_('Ещё раз постучишь по батарее, сосед, — я тебе её в жопу засуну!') },
   { s: N_('Галя, не выходи! Тебя ищут!'), sex: 'm' },
@@ -65,7 +65,7 @@ const ADULT_SORRY = /*i18n*/ [
   N_('Извини. Семья.'),
 ];
 const KIDS_SHOUT = /*i18n*/ [
-  { s: N_('Рекс, фу! Это не человек, это курьер!') },
+  { s: N_('Рекс, фу! Это не человек, это курьер!'), dog: true },
   { s: N_('Дети, кто опять кота в стиральную машину посадил?!') },
   { s: N_('Выключи телевизор, там опять про забор!') },
   { s: N_('Мама, это не тебе пицца! Положи вилку!') },
@@ -133,24 +133,31 @@ function shoutPool (fem) {
   return L.filter(q => !q.sex || (q.sex === 'f') === !!fem);
 }
 /* текст крика и извинения (без показа) */
-function shoutLines (fem) {
-  const pool = shoutPool(fem);
+function shoutLines (fem, dog) {
+  const pool = dog ? shoutPool(fem).filter(q => q.dog) : shoutPool(fem);
   const q = pool[(() => { let k = Math.floor(Math.random() * pool.length); if (pool.length > 1 && pool[k].s === ST.lastShout) k = (k + 1) % pool.length; return k; })()];
   ST.lastShout = q.s;
   const sorry = pickNew(A && A.ADULT ? ADULT_SORRY : KIDS_SORRY, 'r');
   ST.lastSorry = sorry;
-  return { shout: t(q.s), sorry: t(sorry) };
+  return { shout: t(q.s), sorry: t(sorry), dog: !!q.dog };
 }
-function shout (p) {
-  const L = shoutLines(!!(p.grp && p.grp.userData && p.grp.userData.fem));
+function shout (p, dog) {
+  const L = shoutLines(!!(p.grp && p.grp.userData && p.grp.userData.fem), dog);
   ST.shouts++;
   ST.last = { kind: 'shout', shout: L.shout, sorry: L.sorry };
+  // «Рекс, фу!» — собака тут же, у ног: выскочила из двери и лает на курьера, на крик — убегает домой (doorcast.js)
+  const pup = L.dog && !dry ? DCAST.dog(p, { barks: 2, sec: SHOUT.SAY + SHOUT.SORRY + 0.4 }) : null;
+  if (pup) ST.dogs = (ST.dogs || 0) + 1;
+  // кричит — говорит ртом (doorcast.js), облачко над головой
+  const mouth = (on, sec) => { const a = on ? DCAST.client(p, { nofocus: true }) : null; if (a) { DCAST.talk(a, true, on); setTimeout(() => { DCAST.talk(a, false); DCAST.leave(a); }, sec * 1000); } };
   setTimeout(() => {
     if (p.dead || !p.grp || !p.grp.parent) return;
-    bubble(p.grp, L.shout, SHOUT.COL, 2.9, SHOUT.HOLD, t('кричит в квартиру'));
+    bubble(p.grp, L.shout, SHOUT.COL, 2.9, SHOUT.HOLD, L.dog ? t('кричит на собаку') : t('кричит в квартиру'));
+    mouth('angry', 1.6);
     setTimeout(() => {
       if (p.dead || !p.grp || !p.grp.parent) return;
       bubble(p.grp, L.sorry, SHOUT.SORRY_COL, 2.9, SHOUT.SORRY_HOLD);
+      mouth('ok', 1.1);
     }, SHOUT.SORRY * 1000);
   }, SHOUT.SAY * 1000);
   return L;
@@ -196,59 +203,71 @@ function mark (id) {
   save(sv);
 }
 
-/* окна сценки по очереди; null — закрыли снаружи (смена кончилась) — дальше не идём */
+/* окна сценки по очереди; null — закрыли снаружи (смена кончилась) — дальше не идём. s.who — кто говорит в мире (doorcast.js) */
 async function chain (steps) {
   let r;
   for (const s of steps) {
     ST.win++;
-    r = await DLG.say(Object.assign({ head: t('у двери'), color: SCENE.COL, fillers: false }, s));
+    r = await DCAST.say(s.who || null, Object.assign({ head: t('у двери'), color: SCENE.COL, fillers: false }, s));
     if (r === null) return null;
   }
   return r;
 }
 
+/* PLAY[id](person, ped, pre): person — клиент из накладной, ped — он в мире (нет — сценка без мира, песочница),
+   pre — клиент уже переодет под роль (playScene: rehuman при вручении, до того как долетела коробка) */
 const PLAY = {
   /* качок: «ты такой слабый…», второй из-за спины, «на тебе Хабаровск» — +5 000 ₽ */
-  async kachok (person) {
-    const k = dress(person || makePerson({ fem: false }), 'kachok'), name = firstOf(person) || t('качок');
+  async kachok (person, ped, pre) {
+    const k = pre || dress(person || makePerson({ fem: false }), 'kachok'), name = firstOf(person) || t('качок');
     const back = stranger('behind');
+    const me = DCAST.client(ped);
+    let two = null;                                                    // второй выходит из-за спины на своей реплике
     const r = await chain([
-      { person: k, name, emo: 'angry', mood: 'calm',
+      { who: me, person: k, name, emo: 'angry', mood: 'calm',
         text: t('Ты такой слабый. Просто дрищуган. Я бы тебя сложил и затолкал бы этому долбаёбу в жопу.'), accept: t('… промолчать') },
-      { person: back, name: t('из-за спины'), emo: 'scared', mood: 'nervous',
+      { get who () { return two || (two = ped ? DCAST.extra(back, ped, 0, 1, { back: true }) : null); },
+        person: back, name: t('из-за спины'), emo: 'scared', mood: 'nervous',
         text: t('Эээ, братан, не надо… оно болит ещё с того раза…'), accept: t('дальше') },
-      { person: k, name, emo: 'ok', mood: 'calm',
+      { who: me, person: k, name, emo: 'ok', mood: 'calm',
         text: t('Тише, тише… На тебе Хабаровск. Больше не приезжай сюда.'), accept: t('взять'),
         pay: '+' + (A && A.money ? A.money(SCENE.HABAR) : SCENE.HABAR + ' ₽'), payLabel: t('чаевые') },
     ]);
+    DCAST.leave(two); DCAST.leave(me);
     if (r === null) return { paid: 0 };
     const paid = A && A.pay ? A.pay(SCENE.HABAR, t('Хабаровск от качка'), k) : 0;
     ST.paid += paid || 0;
     return { paid };
   },
   /* кожа: монолог и два ответа (итога деньгами нет) */
-  async skin (person) {
+  async skin (person, ped, pre) {
     const fem = !!(person && person.f);
-    const s = dress(person || makePerson({}), 'skin');
+    const s = pre || dress(person || makePerson({}), 'skin');
+    const me = DCAST.client(ped);
     ST.win++;
-    const r = await DLG.say({ head: t('у двери'), color: SCENE.COL, fillers: false, person: s, name: firstOf(person) || t('клиент'), emo: 'sad', mood: 'calm', stack: true,
+    const r = await DCAST.say(me, { head: t('у двери'), color: SCENE.COL, fillers: false, person: s, name: firstOf(person) || t('клиент'), emo: 'sad', mood: 'calm', stack: true,
       text: fem ? t('Моя собственная кожа… она отказалась от меня. Предательство, которого я никогда не ждала. Собственный кожаный чехол выталкивает меня наружу.')
         : t('Моя собственная кожа… она отказалась от меня. Предательство, которого я никогда не ждал. Собственный кожаный чехол выталкивает меня наружу.'),
       accept: t('Сочувствую'), decline: t('Приятного аппетита') });
+    DCAST.leave(me);
     return { ans: r === true ? 0 : r === false ? 1 : null };
   },
-  /* «слышь»: незнакомец у подъезда — «Слышь.» «Слышь.» «Э.» «Купишь крэк?» «Брат.» — два ответа */
-  async slysh () {
-    const p = stranger('slysh'), name = t('незнакомец');
+  /* «слышь»: незнакомец в капюшоне подходит к машине (руки в карманах), встаёт рядом лицом к курьеру — «Слышь.» «Слышь.» «Э.»
+     «Купишь крэк?» «Брат.» — два ответа; ответил — уходит дальше по тротуару (doorcast.js) */
+  async slysh (person, ped, pre, man) {
+    const p = (man && man.person) || stranger('slysh'), name = t('незнакомец');
+    const who = man || (ped !== undefined ? DCAST.stranger(p, ped) : null);
+    if (who && who.ready) await who.ready;                             // дошёл — заговорил
     const beats = [N_('Слышь.'), N_('Слышь.'), N_('Э.'), N_('Купишь крэк?')];
     for (const b of beats) {
       ST.win++;
-      const r = await DLG.say({ head: t('у подъезда'), color: SCENE.COL, fillers: false, person: p, name, emo: 'ok', text: t(b), accept: t('… промолчать') });
-      if (r === null) return { ans: null };
+      const r = await DCAST.say(who, { head: t('у подъезда'), color: SCENE.COL, fillers: false, person: p, name, emo: 'ok', text: t(b), accept: t('… промолчать') });
+      if (r === null) { DCAST.leave(who); return { ans: null }; }
     }
     ST.win++;
-    const r = await DLG.say({ head: t('у подъезда'), color: SCENE.COL, fillers: false, person: p, name, emo: 'ok', stack: true,
+    const r = await DCAST.say(who, { head: t('у подъезда'), color: SCENE.COL, fillers: false, person: p, name, emo: 'ok', stack: true,
       text: t('Брат.'), accept: t('Ты ебнутый? Нет, конечно'), decline: t('Сори, брат, занят') });
+    DCAST.leave(who);
     return { ans: r === true ? 0 : r === false ? 1 : null };
   },
 };
@@ -261,12 +280,20 @@ function playScene (id, st, api) {
   if (dry) return;
   DIRECTOR.start('odd', 30);
   const person = st && st.persons ? st.persons[0] : null;
+  const ped = st && st.peds && st.peds[0];
   const hold = on => { try { if (api && api.hold) api.hold(on); } catch (e) { /* — */ } };
+  // клиент в мире — тот, чьё лицо в окне: качок / «кожа» переодеты сразу, пока коробка ещё летит (держать её будет новое тело)
+  let pre = null;
+  if ((id === 'kachok' || id === 'skin') && person && ped && !ped.dead && A.rehuman) {
+    try { pre = dress(person, id); A.rehuman(ped, pre); if (st.persons) st.persons[0] = ped.person || pre; } catch (e) { console.warn('[odd] rehuman', e); pre = null; }
+  }
+  // «слышь»: незнакомец выходит сразу — пока коробка летит, он уже идёт к машине
+  const man = id === 'slysh' ? DCAST.stranger(stranger('slysh'), ped || null) : null;
+  if (man) man.person = man.grp && man.grp.userData && man.grp.userData.person;
   setTimeout(() => {
-    const p = st && st.peds && st.peds[0];
-    if (id !== 'slysh' && p && (p.dead || !p.grp || !p.grp.parent)) { DIRECTOR.end('odd'); return; }
+    if (id !== 'slysh' && ped && (ped.dead || !ped.grp || !ped.grp.parent)) { DIRECTOR.end('odd'); return; }
     hold(true);
-    PLAY[id](person).then(res => { ST.last.res = res; }, () => {}).finally(() => { hold(false); DIRECTOR.end('odd'); });
+    PLAY[id](person, ped || null, pre, man).then(res => { ST.last.res = res; }, () => {}).finally(() => { hold(false); DIRECTOR.end('odd'); });
   }, SCENE.SAY * 1000);
 }
 
@@ -289,7 +316,7 @@ export function onHand (st, onTime, o, api) {
   const id = sceneRoll(st, onTime, o);
   if (id) DOOR = ST.hands;
   if (id) { st.odd = id; playScene(id, st, api); return 'scene'; }
-  if (force === 'shout' || Math.random() < SHOUT.P) { if (force === 'shout') force = ''; st.odd = 'shout'; shout(p); return 'shout'; }
+  if (force === 'shout' || force === 'shout-dog' || Math.random() < SHOUT.P) { const fd = force === 'shout-dog'; if (force === 'shout' || fd) force = ''; st.odd = 'shout'; shout(p, fd); return 'shout'; }
   return '';
 }
 
@@ -326,9 +353,14 @@ export const DEBUG = {
     return { rows, tot };
   },
   /* сценку сейчас, без заказа: person — клиент (нет — случайный) */
-  play (id, person) { if (!PLAY[id]) return null; ST.last = { kind: 'scene', id, res: null }; ST.by[id] = (ST.by[id] || 0) + 1; return PLAY[id](person).then(res => (ST.last.res = res)); },
+  play (id, person, ped) { if (!PLAY[id]) return null; ST.last = { kind: 'scene', id, res: null }; ST.by[id] = (ST.by[id] || 0) + 1;
+    const man = id === 'slysh' && ped !== undefined ? DCAST.stranger(stranger('slysh'), ped) : null;
+    if (man) man.person = man.grp && man.grp.userData && man.grp.userData.person;
+    let pre = null;                                // ped — клиент в мире: качок / «кожа» переодеваются, как при вручении
+    if ((id === 'kachok' || id === 'skin') && ped && !ped.dead && A && A.rehuman) { pre = dress(person || ped.person, id); A.rehuman(ped, pre); }
+    return PLAY[id](person || (ped && ped.person), ped, pre, man || undefined).then(res => (ST.last.res = res)); },
   /* крик над человеком p (прохожий / клиент с grp); без него — только тексты */
-  shout (p, fem) { return p && p.grp ? shout(p) : shoutLines(!!fem); },
+  shout (p, fem, dog) { return p && p.grp ? shout(p, dog) : shoutLines(!!fem, dog); },   // dog — «Рекс, фу!» (собака у ног)
   /* вручение как из game.js (st — { peds, persons, pay }, o — { ord }) → 'scene' | 'shout' | '' */
   hand: (st, onTime, o, api) => onHand(st, onTime, o, api),
 };

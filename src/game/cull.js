@@ -370,7 +370,7 @@ const LEVELS = [1, 0.85, 0.72];
 /* base — полная дальность по настройке графики (gfx.js: 250 / 370 / 490 м), fps — на сколько
    кадров в секунду рассчитан кадр (ограничение 30 к/с — пороги вдвое длиннее, иначе 30 к/с
    сами по себе выглядели бы «не успевает») */
-export const Q = { lvl: 0, k: 1, base: 490, fps: 60 };
+export const Q = { lvl: 0, k: 1, base: 490, fps: 60, t: 1 };   // t — облегчение тяжёлого кадра (tune.js M.far, ставит game.js каждый кадр)
 let ema = 1 / 60, busy = 1 / 120, slowT = 0, fastT = 0, coolT = 0, clock = 0, upAt = -1e9, downAt = -1e9, upWait = 12, farF = 490;
 /* сколько занял сам кадр игры (секунды) — зовётся после рендера */
 export function work (sec) { if (sec > 0 && sec < 0.2) busy += (sec - busy) * 0.05; }
@@ -380,7 +380,7 @@ export function govern (raw, active) {
     const d = want - Q.k, st = Math.min(0.1, raw > 0 ? raw : 0) * 0.1;
     Q.k = Math.abs(d) <= st ? want : Q.k + Math.sign(d) * st;
   }
-  if (CAM && Q.base * Q.k !== farF) { farF = Q.base * Q.k; CAM.far = farF; CAM.updateProjectionMatrix(); }
+  if (CAM && Q.base * Q.k * Q.t !== farF) { farF = Q.base * Q.k * Q.t; CAM.far = farF; CAM.updateProjectionMatrix(); }
   if (!active || !(raw > 0) || raw > 0.1) return;
   clock += raw;
   ema += (raw - ema) * 0.05;

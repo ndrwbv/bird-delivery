@@ -11,6 +11,7 @@
    Держится BB.LIFE с; уехал дальше BB.FAR — срок вышел сразу; убирается, когда не на глазах (дальше 200 м и не в кадре).
    ?nobackblock — выключено. Отладка — __dlv.BACKB (ST — счётчики, LOG — где и что, force() — поставить сейчас). */
 import * as RL from './roadlife.js';
+import * as TEL from './telemetry.js';          // анонимная статистика: сколько перекрытий за смену (telemetry.js)
 
 export const BB = {
   GAP: [2, 3],        // после перекрытия столько вручений подряд — без него (не два подряд: ~1 из 3—4 заказов)
@@ -140,6 +141,7 @@ function tryPut (A, X, force) {
     gap = irand(BB.GAP); lastKind = kind; pend = null;
     ST.put++; ST[kind]++;
     const r = e.road;
+    TEL.count('block');
     LOG.push({ kind, ord: ST.orders, a0: Math.round(c.a0), d: Math.round(c.d), past: c.past, x: Math.round(W8.x), z: Math.round(W8.z), road: r ? (typeof r === 'string' ? r : r.n || '') : '', w: +e.w.toFixed(1) });
     if (LOG.length > 30) LOG.shift();
     X.reroute();

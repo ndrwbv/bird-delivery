@@ -13,16 +13,26 @@
       в RANK.GAP с; сводка — раз в RANK.EVERY с; первые RANK.GRACE с смены — молча.
       Фраза не повторяется подряд (последние RANK.MEM не берутся).
 
+   3. Таблица после вручения (автор 18.10.2026: «после каждого заказа подробную таблицу, и потом она
+      уменьшается до того, какая она сейчас есть»): деньги за заказ упали, чек оплаты улетел — строка
+      «место N из M» разворачивается листком: место, лицо, имя (ты — маркером), заказов, денег за
+      смену; кто сменил место с прошлой таблицы — строка проезжает на новое место и стрелка ↑ / ↓.
+      SHEET.HOLD с — и сворачивается обратно в строку. Накладная, разговор, диалог — ждёт; долго ждала —
+      короче; окно открылось поверх — сворачивается сразу. Меньше движения — без анимаций.
+
    Место — по деньгам за смену (как таблица в паузе); «на 2 заказа» — разница в деньгах,
    делённая на средний заказ коллег этой смены.
 
-   Из game.js: CR.init({ adult }); CR.reset() — новая смена; CR.tick(dt) — каждый кадр смены;
-   CR.update(el, rows, live) — раз в 0,5 с: rows — rivalBoard() (у коллег поле R), live —
-   можно писать (едешь, не учебный заказ). Отладка: __dlv.CREWRANK (log, moves).
+   Из game.js: CR.init({ adult, money, face }); CR.reset() — новая смена; CR.tick(dt) — каждый кадр смены;
+   CR.update(el, rows, live) — раз в 0,5 с: rows — rivalBoard() (у коллег поле R, у всех d — заказов), live —
+   можно писать (едешь, не учебный заказ). CR.delivered() — упали деньги за заказ; CR.sheet(dt, on, free,
+   clash, rowsFn, el) — каждый кадр: on — хад рейтинга виден, free — больше не нужен (экран — из notifyq.js), clash —
+   окно поверх (накладная, разговор). Отладка: __dlv.CREWRANK (log, moves, sheets, SH).
    ────────────────────────────────────────────────────────────────────────── */
 import './crewrank.css';
 import { t, tn, N_ } from '../i18n/index.js';
 import * as CHAT from './chat.js';
+import * as NQ from './notifyq.js';             // таблица и фразы — в общей очереди уведомлений (одно за раз)
 
 export const RANK = {
   GAP: 30,            // с — не чаще одной фразы про рейтинг
@@ -92,16 +102,34 @@ const L = {
   ],
 };
 
-const ST = { leadT: -1e9, adult: false, clock: 0, last: -1e9, next: 0, above: null, place: 0, n: 0, ev: null, recent: [], key: '', lead: null };
-export const DEBUG = { log: [], moves: [], L, RANK, ST };
+/* ── таблица после вручения (3) ── */
+export const SHEET = {
+  HOLD: 3.6,          // с — держится развёрнутой
+  SHORT: 1.8,         // с — короткая: долго ждала, пока уйдут другие окна
+  LATE: 10,           // с — ждала дольше — покажется короткой (с 18.10.2026 ждёт в очереди уведомлений за чеком и Толиком — было 6)
+  DROP: 20,           // с — так и не дождалась — не показываем (стрелки копятся к следующей таблице)
+  MIN: 0.4,           // с — после вручения не раньше: чек оплаты успевает встать в очередь (popPay → notifyq.js)
+  OPEN: 0.3,          // с — развернуться из строки
+  MOVE: 0.75,         // с — строки переставляются (после разворота)
+  CLOSE: 0.35,        // с — свернуться в строку
+  ROWS: 8,            // строк максимум на компьютере / Деке
+  ROWS_PH: 5,         // на телефоне: ты и соседи ±2
+};
 
-export function init ({ adult } = {}) { ST.adult = !!adult; }
+const ST = { leadT: -1e9, adult: false, clock: 0, last: -1e9, next: 0, above: null, place: 0, n: 0, ev: null, recent: [], key: '', lead: null,
+  money: n => Math.round(n || 0) + ' ₽', face: null };
+// st: idle → wait (вручил) → show → close → idle; snap — порядок строк на прошлой таблице (стрелки — от него)
+const SH = { st: 'idle', t: 0, hold: 0, go: false, again: false, snap: null, el: null };
+export const DEBUG = { log: [], moves: [], sheets: [], L, RANK, SHEET, ST, SH };
+
+export function init ({ adult, money, face } = {}) { ST.adult = !!adult; if (money) ST.money = money; if (face) ST.face = face; }
 
 /** новая смена: всё с нуля */
 export function reset () {
   ST.clock = 0; ST.last = -1e9; ST.next = RANK.GRACE + rnd(RANK.EVERY[0], RANK.EVERY[1]) * 0.5;
   ST.leadT = -1e9; ST.above = null; ST.place = 0; ST.n = 0; ST.ev = null; ST.key = ''; ST.lead = null;
-  DEBUG.log.length = 0; DEBUG.moves.length = 0;
+  DEBUG.log.length = 0; DEBUG.moves.length = 0; DEBUG.sheets.length = 0;
+  sheetHide(); SH.st = 'idle'; SH.again = false; SH.snap = null;
 }
 export function tick (dt) { ST.clock += dt; }
 
@@ -110,15 +138,16 @@ const pick = a => a[(Math.random() * a.length) | 0];
 
 /* ── хад: «место 2 из 5»; сменилось — вспышка и стрелка (crewrank.css) ── */
 const ARROW = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M5 .8 9.4 5.6H6.6V9.2H3.4V5.6H.6Z"/></svg>';
-function hud (el, place, n) {
+function hud (el, place, n, quiet) {
   const key = place + '/' + n;
   if (key === ST.key) return;
   const was = ST.key ? +ST.key.split('/')[0] : 0, sameN = ST.key && +ST.key.split('/')[1] === n;
   ST.key = key;
-  const dir = was && sameN && place !== was ? (place < was ? 'up' : 'down') : '';
+  const moved = was && sameN && place !== was ? (place < was ? 'up' : 'down') : '';
+  const dir = quiet ? '' : moved;   // своё вручение: перемену покажет таблица (стрелка там) — строка без вспышки
   el.innerHTML = '<li class="me' + (dir ? ' cr-' + dir : '') + '"><i class="you"></i><b>' + t('место {i} из {n}', { i: place, n }) + '</b>' +
     (dir ? '<em class="cr-arr">' + ARROW + '</em>' : '') + '</li>';
-  if (dir) DEBUG.moves.push({ t: Math.round(ST.clock), from: was, to: place, n });
+  if (moved) DEBUG.moves.push({ t: Math.round(ST.clock), from: was, to: place, n, sheet: !!quiet });
 }
 
 /* ── чат ── */
@@ -144,7 +173,8 @@ function speak (cands, rows) {
   const text = t(fem && l.f ? l.f : l.m, {
     loser: c.loser ? c.loser.name : '', who: R ? R.name : '', gen: R ? (R.person && R.person.firstGen) || R.name : '', gap: c.gap ? gapText(c.gap) : '',
   });
-  CHAT.say(text, null, false, by ? { name: by.name, person: by.person } : null);
+  // «Серёга · курьер» (chat.js); rank — фраза про рейтинг: в очереди уведомлений самая неважная (notifyq.js)
+  CHAT.say(text, null, false, by ? { name: by.name, person: by.person, role: t('курьер'), rank: true } : { rank: true });
   ST.last = ST.clock; ST.next = ST.clock + rnd(RANK.EVERY[0], RANK.EVERY[1]);
   ST.recent.push(l.k); while (ST.recent.length > RANK.MEM) ST.recent.shift();
   DEBUG.log.push({ t: Math.round(ST.clock), k: l.k, by: by ? by.name : t('Толик управляющий'), text });
@@ -158,7 +188,7 @@ function own (rows) {
   for (const r of rows) if (r.R && !r.out && r.R.lines) r.R.lines.forEach((m, i) => { const k = 'own:' + r.R.name + i; if (!ST.recent.includes(k)) cs.push({ R: r.R, m, k }); });
   if (!cs.length) return false;
   const c = pick(cs);
-  CHAT.say(c.m, null, false, { name: c.R.name, person: c.R.person });
+  CHAT.say(c.m, null, false, { name: c.R.name, person: c.R.person, role: t('курьер'), rank: true });
   ST.last = ST.clock; ST.next = ST.clock + rnd(RANK.EVERY[0], RANK.EVERY[1]);
   ST.recent.push(c.k); while (ST.recent.length > RANK.MEM) ST.recent.shift();
   DEBUG.log.push({ t: Math.round(ST.clock), k: c.k, by: c.R.name, text: c.m });
@@ -207,7 +237,8 @@ function status (rows, me) {
 export function update (el, rows, live) {
   const me = rows.findIndex(r => r.me), n = rows.length;
   if (me < 0) return;
-  if (el) hud(el, me + 1, n);
+  if (!SH.snap) SH.snap = rows.map(rowKey);          // начало смены — от этого порядка первые стрелки таблицы
+  if (el) hud(el, me + 1, n, SH.st !== 'idle');
   // кто впереди тебя: сравнить с прошлым разом — кого обогнал, кто обогнал
   const above = new Set(rows.slice(0, me).map(r => r.R));
   if (ST.above && ST.n === n) {
@@ -237,4 +268,102 @@ export function update (el, rows, live) {
   if (ST.clock >= ST.next) {
     if (!((Math.random() < RANK.OWN && own(rows)) || speak(status(rows, me), rows))) ST.next = ST.clock + 15;
   }
+}
+
+/* ── 3. таблица после вручения: строка «место N из M» разворачивается листком и сворачивается обратно ──
+   Лист ложится ровно поверх строки (тот же левый верхний угол), растёт из неё и в неё же схлопывается
+   (crewrank.css #rank-sheet). Строки — в новом порядке; кто сменил место с прошлой таблицы, стартует со
+   старого места и проезжает на новое (номера мест слева стоят), потом штамп стрелки. */
+const rowKey = r => (r.me ? 'me' : r.R || r.n);
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+const BOX = '<svg class="rk-box" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 3h8v6H1z" fill="#e8b45a" stroke="#33210c" stroke-width="1"/><path d="M1 3 2.4 1h5.2L9 3" fill="#f3cf86" stroke="#33210c" stroke-width="1"/><path d="M3.6 5.6h2.8" stroke="#d9342c" stroke-width="1.2"/></svg>';
+const calmFx = () => (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) ||
+  !!(document.body && document.body.classList.contains('calm-fx'));
+
+/** упали деньги за заказ (game.js checkArrival) — после чека оплаты развернуть таблицу */
+export function delivered () {
+  if (SH.st === 'show' || SH.st === 'close') { SH.again = true; return; }
+  if (SH.st !== 'wait') { SH.st = 'wait'; SH.t = 0; }
+}
+
+function face (r) {
+  if (r.me) return '<i class="rk-you"></i>';
+  let src = '';
+  try { src = ST.face && r.R && r.R.person ? ST.face(r.R.person, 32) : ''; } catch (e) { src = ''; }
+  return src ? '<img class="rk-face" src="' + src + '" alt="">' : '<i class="rk-you" style="background:' + esc(r.hex || '#8a6b4e') + '"></i>';
+}
+
+function sheetOpen (rows, anchor, hold) {
+  const n = rows.length, me = rows.findIndex(r => r.me);
+  const prev = new Map((SH.snap || []).map((k, i) => [k, i]));
+  const cap = Math.min(n, CHAT.phone() ? SHEET.ROWS_PH : SHEET.ROWS);
+  const lo = Math.max(0, Math.min(me - (cap >> 1), n - cap)), hi = lo + cap - 1;
+  const calm = calmFx(), moves = [];
+  let nums = '', body = '';
+  for (let i = lo; i <= hi; i++) {
+    const r = rows[i], k = rowKey(r), was = prev.has(k) ? prev.get(k) : i;
+    const dir = was === i ? '' : i < was ? 'up' : 'down';
+    if (dir) moves.push({ who: r.me ? 'ты' : r.n, from: was + 1, to: i + 1 });
+    const y0 = Math.max(-1, Math.min(cap, was - lo)) - (i - lo);      // на сколько строк сдвинута в начале (со старого места)
+    nums += '<i>' + (i + 1) + '</i>';
+    body += '<div class="rk-row' + (r.me ? ' me' : '') + (r.out ? ' out' : '') + (dir ? ' rk-' + dir : '') + (was < lo || was > hi ? ' rk-new' : '') +
+      '" style="--dy:' + y0 + '">' + face(r) + '<b>' + (r.me ? esc(t('ты')) : r.out ? '<s>' + esc(r.n) + '</s>' : esc(r.n)) + '</b>' +
+      '<span class="rk-d">' + BOX + (r.d || 0) + '</span><span class="rk-m">' + esc(ST.money(r.m)) + '</span>' +
+      (dir ? '<em class="rk-arr">' + ARROW + '</em>' : '') + '</div>';
+  }
+  let el = SH.el;
+  const host = anchor.offsetParent || anchor.parentNode;
+  if (!el || el.parentNode !== host) { if (el) el.remove(); el = SH.el = document.createElement('div'); el.id = 'rank-sheet'; el.setAttribute('aria-hidden', 'true'); host.appendChild(el); }
+  el.className = calm ? 'rk-calm' : '';
+  el.style.left = anchor.offsetLeft + 'px'; el.style.top = anchor.offsetTop + 'px';
+  el.innerHTML = '<div class="rk-head"><i class="rk-you"></i><b>' + esc(t('место {i} из {n}', { i: me + 1, n })) + '</b><span>' + esc(t('рейтинг смены')) + '</span></div>' +
+    '<div class="rk-body"><div class="rk-nums">' + nums + '</div><div class="rk-rows">' + body + '</div></div>';
+  el.hidden = false;
+  // растёт из строки «место N из M»: стартовый масштаб — её размер к размеру листа (один замер на показ)
+  const w = el.offsetWidth || 1, h = el.offsetHeight || 1;
+  // телефон: внизу слева руль — лист растёт из строки вверх (поверх сердец и денег), низ — по низу строки
+  if (CHAT.phone()) { el.classList.add('rk-tall'); el.style.top = Math.max(0, anchor.offsetTop + anchor.offsetHeight - h) + 'px'; }
+  el.style.setProperty('--sx', Math.min(1, (anchor.offsetWidth || w) / w).toFixed(3));
+  el.style.setProperty('--sy', Math.min(1, (anchor.offsetHeight || h) / h).toFixed(3));
+  el.style.setProperty('--mv', SHEET.MOVE + 's');
+  if (!calm) { void el.offsetWidth; el.classList.add('rk-open'); }
+  SH.st = 'show'; SH.t = 0; SH.hold = hold; SH.go = calm;
+  if (calm) el.classList.add('rk-go');
+  SH.snap = rows.map(rowKey);
+  DEBUG.sheets.push({ t: Math.round(ST.clock), place: me + 1, n, rows: hi - lo + 1, hold, moves });
+  if (DEBUG.sheets.length > 100) DEBUG.sheets.shift();
+}
+
+function sheetClose () {
+  SH.st = 'close'; SH.t = 0;
+  if (!SH.el || SH.el.classList.contains('rk-calm')) { sheetHide(); return; }
+  SH.el.classList.remove('rk-open'); void SH.el.offsetWidth; SH.el.classList.add('rk-close');
+}
+
+function sheetHide () {
+  if (SH.el) { SH.el.hidden = true; SH.el.className = ''; SH.el.innerHTML = ''; }
+  NQ.release('rank');                                // экран свободен — следующее уведомление (notifyq.js)
+  if (SH.st === 'show' || SH.st === 'close') { SH.st = SH.again ? 'wait' : 'idle'; SH.t = 0; SH.again = false; }
+}
+
+/** каждый кадр смены (game.js rivalsStep) */
+export function sheet (dt, on, free, clash, rowsFn, anchor) {
+  if (SH.st === 'idle') return;
+  SH.t += dt;
+  if (SH.st === 'wait') {
+    if (SH.t > SHEET.DROP) { SH.st = 'idle'; DEBUG.sheets.push({ t: Math.round(ST.clock), skip: true }); return; }
+    if (!on || clash || SH.t < SHEET.MIN || !anchor || anchor.hidden) return;
+    if (!NQ.claim('rank')) return;                   // экран занят (чек оплаты, Толик…) — ждёт своей очереди (notifyq.js)
+    const rows = rowsFn();
+    if (rows.length < 2 || rows.findIndex(r => r.me) < 0) NQ.release('rank');
+    if (rows.length < 2 || rows.findIndex(r => r.me) < 0) { SH.st = 'idle'; return; }
+    sheetOpen(rows, anchor, SH.t > SHEET.LATE ? SHEET.SHORT : SHEET.HOLD);
+    return;
+  }
+  if (!on) { sheetHide(); return; }
+  if (SH.st === 'show') {
+    if (!SH.go && SH.t >= SHEET.OPEN) { SH.go = true; SH.el.classList.add('rk-go'); }   // развернулась — строки поехали
+    if (clash || !NQ.claim('rank')) SH.hold = Math.min(SH.hold, SH.t);    // поверх открылась накладная / разговор или перебило срочное — свернуться сразу
+    if (SH.t >= SH.hold) sheetClose();
+  } else if (SH.st === 'close') { NQ.claim('rank'); if (SH.t >= SHEET.CLOSE) sheetHide(); }
 }

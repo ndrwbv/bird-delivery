@@ -140,10 +140,10 @@ export const SIDE_ORDERS = [
     thanks: N_('тёпленькие… всё, поживу у Серёги, пока она не остынет'),
     pay: [1200, 2000], mood: 'shy', timer: 8, accept: N_('держись, мужик'), decline: N_('мирись лучше'), timeout: N_('ну лан ((') },
   { id: 'catfood', adult: true, ask: N_('купи корм коту, он злой — уже тапки сожрал и смотрит на меня. «Вискас», бля, быстрее'), what: N_('корм для кота'),
-    shop: SHOP_PET, bag: { color: BAG.white, item: 'box' }, thanks: N_('Барсик, жри, только меня не ешь. спасибо, братан'),
+    shop: SHOP_PET, bag: { color: BAG.white, item: 'box' }, pet: 'cat', thanks: N_('Барсик, жри, только меня не ешь. спасибо, братан'),
     pay: [1200, 2080], mood: 'nervous', timer: 8, accept: N_('ради кота — да'), decline: N_('кот подождёт'), timeout: N_('ну всё, он меня съест') },
   { id: 'vetcat', adult: true, ask: N_('забери кота у ветеринара, а? я боюсь — его там кастрировали, он теперь меня убьёт'), what: N_('кот от ветеринара'),
-    shop: { kinds: ['pharm', 'shop'], prefer: /ветеринар|ветклиник|зоо|айболит|petshop|pet shop/i, anyKind: true }, bag: { color: BAG.blue, item: 'box' }, thanks: N_('Барсик! не смотри так, это всё он (показывает на тебя)'),
+    shop: { kinds: ['pharm', 'shop'], prefer: /ветеринар|ветклиник|зоо|айболит|petshop|pet shop/i, anyKind: true }, bag: { color: BAG.blue, item: 'box' }, pet: 'cat', thanks: N_('Барсик! не смотри так, это всё он (показывает на тебя)'),
     pay: [2000, 3200], mood: 'shy', timer: 8, accept: N_('заберу'), decline: N_('сам виноват'), timeout: N_('ну лан ((') },
   // забрать у человека, а не в магазине: он ждёт у подъезда — короткий разговор (talk): его реплика и два
   // ответа, исход — по ответу и случаю: give — отдаёт, wrong — отдаёт не то (item), none — ничего не даёт;
@@ -273,7 +273,7 @@ export const SIDE_ORDERS = [
     shop: SHOP_PHONE, bag: { color: BAG.black, item: 'box' }, thanks: N_('звоню маме! спасибо огромное'),
     pay: [2000, 3200], mood: 'nervous', timer: 8, accept: N_('куплю'), decline: N_('не, некогда'), timeout: N_('ну лан ((') },
   { id: 'kcatfood', kids: true, ask: N_('у меня кот голодный орёт, а я в тапках — корм захватишь?'), what: N_('корм для кота'),
-    shop: SHOP_PET, bag: { color: BAG.white, item: 'box' }, thanks: N_('Мурзик, кушать! он тебе мурлычет'),
+    shop: SHOP_PET, bag: { color: BAG.white, item: 'box' }, pet: 'cat', thanks: N_('Мурзик, кушать! он тебе мурлычет'),
     pay: [1200, 2080], mood: 'calm', timer: 8, accept: N_('ради кота — да'), decline: N_('кот подождёт'), timeout: N_('ну лан ((') },
   { id: 'console', sex: 'm', kids: true, ask: N_('сестра забрала мою приставку и не отдаёт! она у подъезда рядом. заберёшь?'), what: N_('приставка'),
     giver: { who: N_('сестра'), fem: true, emo: 'angry' }, bag: { color: BAG.black, item: 'box' },

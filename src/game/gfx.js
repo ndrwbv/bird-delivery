@@ -19,7 +19,9 @@
              края и огни вдали не рябят; меняется после перезапуска игры)
 
    Отдельно от пресета — «тяжёлый кадр» (dynres.js): видеокарта не успевает — на миг
-   меньшее разрешение, «мыло вместо рывка». Вкл на Деке и телефоне, на компьютере выкл.
+   меньшее разрешение, «мыло вместо рывка». По умолчанию выкл везде (автор 18.10.2026: «что за блюр?»).
+   Вместо него — «тяжёлое место» (tune.js, вкл везде, без пункта): кадр не успевает — ненадолго и плавно ближе
+   туман, люди и машины вдали, комнаты за окнами, мелочь газона (viewR, detail, lag ниже), потом обратно.
 
    Правило: графика не меняет игру. Пресет трогает только то, что видно и что
    далеко: сколько машин и людей, где они рождаются, кто клиент, физика —
@@ -42,6 +44,7 @@ import Platform from '../platform/index.js';
 import * as CULL from './cull.js';
 import * as WINS from './windows.js';
 import { ON as MOBILE } from './mobile.js';
+import * as TUNE from './tune.js';
 
 export const KEY = 'dlv-gfx';
 const BASE_FAR = 490;
@@ -139,14 +142,30 @@ export const DETAIL = [
   { R: 100, small: 64, thin: 0.7, lawn: 0 },    // средняя (Steam Deck)
   { R: 120, small: 72, thin: 1, lawn: 1 },      // высокая
 ];
-export const detail = () => DETAIL[O.range] || DETAIL[2];
+/* 18.10.2026: мелочь газона ближе, пока кадр тяжёлый (tune.js «облегчение»: small × M.small; у края она и так растёт из земли) */
+const DET_T = { R: 0, small: 0, thin: 0, lawn: 0 };
+export const detail = () => {
+  const D = DETAIL[O.range] || DETAIL[2], m = TUNE.M.small;
+  if (m >= 1) return D;
+  DET_T.R = D.R; DET_T.small = D.small * m; DET_T.thin = D.thin; DET_T.lawn = D.lawn;
+  return DET_T;
+};
 export const hideR = () => (O.far === 0 ? { people: 100, cars: 200, lod: 32 } : { people: 130, cars: 220, lod: 45 });
+/* что видно сейчас (game.js cullFar, humanLod, стоящие машины): hideR, а пока кадр тяжёлый — ближе (tune.js);
+   плотность и рождение (yardlife.js и др.) — по hideR, чтобы облегчение не меняло, сколько жизни вокруг */
+const VIEW_R = { people: 0, cars: 0, lod: 0 };
+export const viewR = () => {
+  const R = hideR(), M = TUNE.M;
+  VIEW_R.people = R.people * M.people; VIEW_R.cars = R.cars * M.cars; VIEW_R.lod = R.lod * M.lod;
+  return VIEW_R;
+};
 
 /* ── «тяжёлый кадр»: мыло вместо рывка (dynres.js) ──
    Вкл / выкл — отдельно от пресета (в «свою» не превращает), по виду устройства, в том же ключе dlv-gfx
-   (поле dyn). По умолчанию вкл на Деке и телефоне — там видеокарта слабая, а пиксель и так крупный;
-   на компьютере выкл — игрок сам выбирает чёткость. ?dyn=0 / ?dyn=1 — на этот запуск, не сохраняется. */
-export const DYN_DEF = { ios: 1, phone: 1, deck: 1, pc: 0 };
+   (поле dyn). ?dyn=0 / ?dyn=1 — на этот запуск, не сохраняется.
+   18.10.2026 (автор: «что за блюр появляется? зачем?») — по умолчанию выкл на всех устройствах; кто включил сам
+   (значение dyn сохранено игроком в настройках) — у того остаётся (до 18.10 было вкл на Деке, телефоне и iOS) */
+export const DYN_DEF = { ios: 0, phone: 0, deck: 0, pc: 0 };
 const DYN_Q = Q.get('dyn');
 let DYN = (() => { const v = readAll().dyn; return v && (v[DEV] === 0 || v[DEV] === 1) ? v[DEV] : DYN_DEF[DEV]; })();
 if (DYN_Q === '0' || DYN_Q === '1') DYN = +DYN_Q;
@@ -229,7 +248,7 @@ export function work (ms) { const w = STATS.work; w.push(ms); if (w.length > 600
    по своему номеру, чтобы не все в один кадр. */
 let SEQ = 0;
 export function lag (o, dt, px, pz) {
-  const n = val('far');
+  const n = val('far') + TUNE.M.extraLag;        // тяжёлый кадр — вдали ещё реже (tune.js)
   const near = (o.x - px) ** 2 + (o.z - pz) ** 2 < LAG_R * LAG_R;
   if (n <= 1 || near) { if (o._lag) { dt += o._lag; o._lag = 0; } return Math.min(dt, 0.2); }
   if (o._lk === undefined) o._lk = SEQ++;

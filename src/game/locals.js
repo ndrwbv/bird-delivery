@@ -26,10 +26,10 @@
    отладка: __dlv.LOCALS — state, list, reset(), step(id, n), force(id) — следующее появление его, play(id, n) — окно сейчас
    ────────────────────────────────────────────────────────────────────────── */
 import { t, N_ } from '../i18n/index.js';
-import * as DLG from './dialog.js';
 import * as DIRECTOR from './director.js';
 import * as RHY from './rhythm.js';
 import { makePerson } from './people.js';
+import * as DCAST from './doorcast.js';        // кто говорит — стоит у двери в 3D и говорит ртом (doorcast.js)
 
 export const LC = {
   ON: true,
@@ -364,23 +364,36 @@ function speaker (h, w) {
   return { person: crewOf(h, w), name: t(c.name || h.name) };
 }
 const ST = { plays: 0, paid: 0, last: null };
-/** окна разговора по очереди → { ans: 0 | 1 | null, tip } */
-async function talk (h, m, ctx) {
+/* актёры в мире (doorcast.js): w0 — кто открыл (клиент у двери: сам житель или crew при swap), остальные — рядом с ним */
+function castFor (h, m, ped, w0) {
+  if (!ped) return null;
+  const who = { [w0]: DCAST.client(ped) }, own = [];
+  let n = 0;
+  const add = w => { if (!ped.grp || !ped.grp.parent) return null; const a = DCAST.extra(speaker(h, w).person, ped, n++, 2); if (a) own.push(a); return a; };
+  for (const w of new Set(m.s.map(l => l.w || 0).concat(m.a.map(q => q.w || 0)))) if (!(w in who)) who[w] = add(w);
+  return { get: w => (w in who ? who[w] : null), done: () => { for (const a of own) DCAST.leave(a); DCAST.leave(who[w0]); } };
+}
+/** окна разговора по очереди → { ans: 0 | 1 | null, tip }; cast — актёры в мире (castFor) или null */
+async function talk (h, m, ctx, cast) {
+  try { return await talkWin(h, m, ctx, cast); } finally { if (cast) cast.done(); }
+}
+async function talkWin (h, m, ctx, cast) {
+  const who = w => (cast ? cast.get(w || 0) : null);
   ST.plays++;
   const base = { head: t('у двери'), color: LC.COL, fillers: false, mood: 'calm' };
   const last = m.s.length - 1;
   for (let i = 0; i < last; i++) {
     const l = m.s[i];
-    const r = await DLG.say(Object.assign({}, base, speaker(h, l.w), { emo: l.e, text: t(l.s), accept: t('… промолчать') }));
+    const r = await DCAST.say(who(l.w), Object.assign({}, base, speaker(h, l.w), { emo: l.e, text: t(l.s), accept: t('… промолчать') }));
     if (r === null) return { ans: null, tip: 0 };
   }
   const l = m.s[last];
-  const r = await DLG.say(Object.assign({}, base, speaker(h, l.w), { emo: l.e, text: t(l.s), stack: true, accept: t(m.a[0].a), decline: t(m.a[1].a) }));
+  const r = await DCAST.say(who(l.w), Object.assign({}, base, speaker(h, l.w), { emo: l.e, text: t(l.s), stack: true, accept: t(m.a[0].a), decline: t(m.a[1].a) }));
   if (r === null) return { ans: null, tip: 0 };
   const ans = r === true ? 0 : 1, q = m.a[ans], sq = speaker(h, q.w);
   const money = (ctx && ctx.money) || (A && A.money);
   const tipS = q.tip ? '+' + (money ? money(q.tip) : q.tip + ' ₽') : null;
-  const r2 = await DLG.say(Object.assign({}, base, sq, { emo: q.e, text: t(q.r), accept: q.tip ? t('взять') : t('пока'), pay: tipS, payLabel: q.tip ? t('чаевые') : '' }));
+  const r2 = await DCAST.say(who(q.w), Object.assign({}, base, sq, { emo: q.e, text: t(q.r), accept: q.tip ? t('взять') : t('пока'), pay: tipS, payLabel: q.tip ? t('чаевые') : '' }));
   let tip = 0;
   const pay = (ctx && ctx.pay) || (A && A.pay);
   if (r2 !== null && q.tip && pay) { tip = pay(q.tip, t(q.row || 'чаевые'), sq.person) || 0; ST.paid += tip; }
@@ -409,7 +422,7 @@ export function hand (st, onTime, o, api, ctx) {
   const hold = on => { try { if (api && api.hold) api.hold(on); } catch (e) { /* — */ } };
   setTimeout(() => {
     hold(true);                                                  // вручение уже идёт: следующий заказ не берётся, пока окно открыто
-    talk(h, m, ctx).then(res => { ST.last.res = res; answer(f.local, step, res.ans); }, e => console.warn('[locals] talk', e))
+    talk(h, m, ctx, castFor(h, m, st.peds && st.peds[0], stp.swap || 0)).then(res => { ST.last.res = res; answer(f.local, step, res.ans); }, e => console.warn('[locals] talk', e))
       .finally(() => { hold(false); DIRECTOR.end('odd'); try { RHY.faceOff(ST.last && ST.last.res ? (ST.last.res.ans === null ? 'без ответа' : ST.last.res.ans === 0 ? 'верхний ответ' : 'нижний ответ') : ''); } catch (e) { /* — */ } });
   }, LC.SAY * 1000);
   return 'door';

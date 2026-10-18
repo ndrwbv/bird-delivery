@@ -5,12 +5,15 @@
    заборы стоят»). Правила словами — docs/CAREER.md «Город: как выглядит» → «Дворы сложнее».
 
    1. Заборы вдоль тротуаров (FEN). По внешнему краю тротуара улиц (класс 1—4, со стороны газона, у дворов —
-      ближе ENT_NEAR м есть подъезд) — низкое советское ограждение из труб. Сторона улицы режется на куски по RUN м,
+      ближе ENT_NEAR м есть подъезд) — забор. Сторона улицы режется на куски по RUN м,
       у каждого куска жребий по месту: твёрдое (SOLID), сбиваемое (SMASH) или ничего.
-        • твёрдое — как стена (SOLIDS: машина упирается, на скорости — удар как о стену); каждые PED м — проход
-          для людей PED_W м (машине не пролезть); каждые PIECE м — проезд CAR_GAP м (или кусок сбиваемого):
-          двор за забором всегда достижим;
-        • сбиваемое — секции по 2,5 м, как дворовые заборчики (smashAdd 'fence').
+      Твёрдое и сбиваемое — разной формы (автор 18.10: «по ним непонятно, сбиваются они или нет»):
+        • твёрдое — тяжёлое, серое, толстое (STY: бетонный парапет, бетонные столбы с толстой трубой, кирпичные
+          столбы с кованой решёткой); как стена (SOLIDS: машина упирается, на скорости — удар как о стену); каждые
+          PED м — проход для людей PED_W м (машине не пролезть) с тумбами в красно-белых шапках по краям; каждые
+          PIECE м — проезд CAR_GAP м (или кусок сбиваемого): двор за забором всегда достижим;
+        • сбиваемое — хлипкое, светлое (SMASH_HEX): тонкие крашеные трубы или штакетник, секции по 2,5 м, как дворовые
+          заборчики (smashAdd 'fence'). Советского ограждения из труб в твёрдом больше нет.
       Не встаёт: на чужое полотно, тротуар, дорожку, аллею (въезды во дворы, перекрёстки, тропинки — разрывы сами
       собой), у фасада (дом ближе FRONT м), у подъезда, остановки, въезда на стоянку и АЗС, у пиццерии и точки
       конкурента, на стройке, у кармана парковки, у дерева, будки, фонаря, лавочки и чужого забора.
@@ -49,8 +52,16 @@ export const MAZE = {
     ENT_NEAR: 70,              // у дворов: подъезд ближе, м
     FRONT: 3.2,                // дом ближе — это фасад, забора нет
     ENT: 7, STOP: 8, PARK: 10, PIZZA: 45, FUEL: 7,
-    TH: 0.12,                  // полутолщина твёрдого для удара, м
-    COLORS: ['#3f7a4a', '#2f6a4a', '#4f6fa8', '#3a3d42', '#c9a63a', '#8a3b3b'],
+    TH: 0.16,                  // полутолщина твёрдого для удара, м (на вид — 0,3—0,48 м)
+    // твёрдое — тяжёлое и серое: доли видов (парапет, столбы с трубой, кирпич с решёткой) и цвета
+    STY: [0.35, 0.4, 0.25],
+    CONCRETE: ['#8f8c84', '#827f78', '#9a968b'],
+    PIPE: ['#34373c', '#2e4a3a', '#4a3a30'],   // толстая труба: графит, тёмно-зелёная, тёмно-коричневая
+    BRICK: ['#8c4632', '#7b3c2c', '#955a40'],
+    // сбиваемое — светлое и яркое: тонкие трубы (половина) или штакетник
+    SMASH_HEX: ['#f0c63c', '#7cc3ea', '#86cf6e', '#f2eee4', '#f08a3c'],
+    PICKET_HEX: ['#e3c48e', '#f4f1e8', '#a8dc90', '#a8d0ee'],
+    PICKET: 0.5,
   },
   YARD: {
     SHARE: 0.85,               // у такой доли подъездов — что-то во дворе (перед дверью)
@@ -74,7 +85,7 @@ export const MAZE = {
   HEDGE: { LEN: [6, 14], SOLID: 0.55, STEP_S: 1.5, STEP_B: 1.15, CLUMP: 0.35 },
   GROVE: { R: [5.5, 9.5], R_MOB: 7.5, STEP: 2.6, MIX: { spruce: 34, pine: 30, birch: 22, rowan: 8, poplar: 6 } },
 };
-export const ST = { ms: 0, fen: { solidM: 0, smashM: 0, solidRuns: 0, peds: 0, carGaps: 0, smashSec: 0, sides: 0, tried: 0 },
+export const ST = { ms: 0, fen: { solidM: 0, smashM: 0, solidRuns: 0, peds: 0, carGaps: 0, smashSec: 0, pickets: 0, sty: [0, 0, 0], sides: 0, tried: 0 },
   fill: 0, beds: 0, tires: 0, hedges: 0, hedgeSolid: 0, bushes: 0, shrubs: 0, groves: 0, groveTrees: 0, tried: 0, rej: {} };
 
 let A = null, THREE = null, OFF = new Set(), MOBK = 1;
@@ -267,10 +278,10 @@ function* fences () {
     for (const sd of [-1, 1]) {
       ST.fen.sides++;
       // состояние стороны: тип куска, сколько до нового жребия, кусок твёрдого, проход людям
-      let type = 0, left = 0, piece = 0, pieceAt = 0, ped = 0, pedAt = 0, gap = 0, gapSmash = false, hex = F.COLORS[0];
+      let type = 0, left = 0, piece = 0, pieceAt = 0, ped = 0, pedAt = 0, gap = 0, gapSmash = false, sty = 0, hex = '', sk = null;
       let run = null;                              // текущий твёрдый кусок: { ax, az, ay, ux, uz, len }
       const flush = (trim = 0) => {
-        if (run && run.len - trim > 1.2) solidRun(run, run.len - trim, hex);
+        if (run && run.len - trim > 1.2) solidRun(run, run.len - trim, sty, hex);
         run = null;
       };
       for (let i = 1; i < r.p.length; i++) {
@@ -287,7 +298,13 @@ function* fences () {
             const h = hsh(cx, cz, 7), rr = rng(cx, cz, 8);
             type = h < F.SOLID ? 1 : h < F.SOLID + F.SMASH ? 2 : 0;
             left = F.RUN[0] + rr() * (F.RUN[1] - F.RUN[0]);
-            hex = F.COLORS[Math.floor(rr() * F.COLORS.length)];
+            // твёрдое: вид и цвет; сбиваемое (и секции в проездах твёрдого): трубы или штакетник, светлое
+            const w = rr();
+            sty = w < F.STY[0] ? 0 : w < F.STY[0] + F.STY[1] ? 1 : 2;
+            const pal = sty === 2 ? F.BRICK : sty === 1 ? F.PIPE : F.CONCRETE;
+            hex = pal[Math.floor(rr() * pal.length)];
+            const pk = rr() < F.PICKET, sp = pk ? F.PICKET_HEX : F.SMASH_HEX;
+            sk = { pk, hex: sp[Math.floor(rr() * sp.length)] };
             piece = 0; pieceAt = F.PIECE[0] + rr() * (F.PIECE[1] - F.PIECE[0]);
             ped = 0; pedAt = F.PED[0] + rr() * (F.PED[1] - F.PED[0]);
           }
@@ -299,13 +316,13 @@ function* fences () {
           // проезд между твёрдыми кусками: пусто или сбиваемые секции
           if (type === 1 && gap > 0) {
             gap--;
-            if (gapSmash) smashSec(cx, cz, ux, uz, hex);
+            if (gapSmash) smashSec(cx, cz, ux, uz, sk);
             continue;
           }
-          if (type === 2) { smashSec(cx, cz, ux, uz, hex); continue; }
+          if (type === 2) { smashSec(cx, cz, ux, uz, sk); continue; }
           // твёрдое
           const ax = cx - ux * F.SEC / 2, az = cz - uz * F.SEC / 2;
-          if (!run) run = { ax, az, ux, uz, len: 0 };
+          if (!run) run = { ax, az, ux, uz, len: 0, rx: -nx, rz: -nz };
           run.len += F.SEC; piece += F.SEC; ped += F.SEC;
           if (piece >= pieceAt) {                  // кусок кончился — проезд для машин
             flush(); piece = 0; ped = 0; gap = F.CAR_GAP; gapSmash = hsh(cx, cz, 9) < 0.5; ST.fen.carGaps++;
@@ -337,32 +354,85 @@ function fenceOk (cx, cz, ux, uz) {
   if (taken(cx, cz, 2)) return rej('пиццерия');
   return true;
 }
-function solidRun (run, len, hex) {
+/* стенка от t0 до t1 по рельефу (концы — на земле): от земли −0,25 до top, толщина w; середина — сдвиг put */
+function wall (run, t0, t1, top, w, hex) {
+  const { ax, az, ux, uz } = run, x0 = ax + ux * t0, z0 = az + uz * t0, x1 = ax + ux * t1, z1 = az + uz * t1;
+  const y0 = A.groundH(x0, z0), y1 = A.groundH(x1, z1), h = top + 0.25;
+  A.put(LIT, railGeo(x0, y0, z0, x1, y1, z1, w, h), hex, (x0 + x1) / 2, (y0 + y1) / 2 + top - h / 2, (z0 + z1) / 2);
+}
+/* столб s × s высотой top над землёй (и 0,2 м в землю) в точке t; ry — вдоль забора */
+function pillar (run, t, s, top, hex, ry) {
+  const x = run.ax + run.ux * t, z = run.az + run.uz * t, gy = A.groundH(x, z);
+  A.box(LIT, s, top + 0.2, s, hex, x, gy + top / 2 - 0.1, z, ry);
+  return gy;
+}
+/* твёрдое: тяжёлое и серое, три вида (MAZE.FEN.STY); по краям куска — тумбы с красно-белой шапкой (проход людям,
+   проезд машинам — видно, где кончается стена) */
+function solidRun (run, len, sty, hex) {
   const F = MAZE.FEN, { ax, az, ux, uz } = run, bx = ax + ux * len, bz = az + uz * len;
   const ay = A.groundH(ax, az), by = A.groundH(bx, bz), cx = (ax + bx) / 2, cz = (az + bz) / 2;
-  // две трубы (верх, низ) и средняя — по рельефу, стойки через 2,5 м
-  for (const [y, t] of [[F.H, 0.1], [0.52, 0.07], [0.2, 0.07]]) A.put(LIT, railGeo(ax, ay + y, az, bx, by + y, bz, t, t), hex, cx, (ay + by) / 2 + y, cz);
-  const posts = Math.max(1, Math.round(len / F.SEC));
-  for (let k = 0; k <= posts; k++) {
-    const t = Math.min(len, k * len / posts), x = ax + ux * t, z = az + uz * t;
-    A.box(LIT, 0.11, F.H + 0.4, 0.11, hex, x, A.groundH(x, z) + (F.H - 0.4) / 2 + 0.04, z);
+  const n = Math.max(1, Math.round(len / F.SEC)), sl = len / n, ry = Math.atan2(-uz, ux);
+  const cap = (gy, t, s, top) => {                 // красно-белая шапка тумбы: видно издали и ночью в фарах
+    const x = ax + ux * t, z = az + uz * t;
+    A.box(LIT, s + 0.02, 0.14, s + 0.02, '#c8352e', x, gy + top - 0.21, z, ry);
+    A.box(LIT, s + 0.03, 0.14, s + 0.03, '#f1ede4', x, gy + top - 0.07, z, ry);
+  };
+  if (sty === 0) {
+    // бетонный парапет 0,7 м, 0,32 толщиной, с плитой-крышкой; секции через одну чуть другого серого — стыки
+    const alt = hex === F.CONCRETE[1] ? F.CONCRETE[0] : F.CONCRETE[1];
+    for (let k = 0; k < n; k++) {
+      wall(run, k * sl, (k + 1) * sl, 0.62, 0.32, k % 2 ? alt : hex);
+      wall(run, k * sl + 0.02, (k + 1) * sl - 0.02, 0.7, 0.4, '#c9c5bb');     // крышка: выше на 8 см, шире
+    }
+    for (const t of [0, len]) cap(pillar(run, t, 0.46, 1.05, hex, ry), t, 0.46, 1.05);
+  } else if (sty === 1) {
+    // бетонные столбы 0,34 через 2,5 м, бетонный поребрик внизу, толстая труба (0,2) поверху
+    const conc = F.CONCRETE[0];
+    for (let k = 0; k < n; k++) wall(run, k * sl, (k + 1) * sl, 0.3, 0.3, '#a9a59a');
+    for (let k = 1; k < n; k++) pillar(run, k * sl, 0.34, 1.0, conc, ry);
+    for (const t of [0, len]) cap(pillar(run, t, 0.44, 1.15, conc, ry), t, 0.44, 1.15);
+    A.put(LIT, railGeo(ax, ay + 0.8, az, bx, by + 0.8, bz, 0.2, 0.2), hex, cx, (ay + by) / 2 + 0.8, cz);
+  } else {
+    // кирпичные столбы с бетонной шапкой через 5 м, высокий кирпичный цоколь 0,55, кованая решётка: верхний брус и прутья
+    // (цоколь и столбы — чтобы не путать с высокими чёрными сбиваемыми заборами частных домов)
+    const top = 1.06, base = 0.55;
+    for (let k = 0; k < n; k++) {
+      wall(run, k * sl, (k + 1) * sl, base, 0.36, hex);
+      for (let b = 1; b <= 3; b++) {
+        const t = (k + b / 4) * sl, x = ax + ux * t, z = az + uz * t, gy = A.groundH(x, z);
+        A.box(LIT, 0.045, top - base + 0.02, 0.045, '#1d1f22', x, gy + (top + base) / 2, z, ry);
+      }
+    }
+    A.put(LIT, railGeo(ax, ay + top, az, bx, by + top, bz, 0.07, 0.07), '#1d1f22', cx, (ay + by) / 2 + top, cz);
+    for (let k = 0; k <= n; k++) {
+      if (k % 2 && k !== n) continue;
+      const gy = pillar(run, k * sl, 0.5, 1.22, hex, ry), x = ax + ux * k * sl, z = az + uz * k * sl;
+      A.box(LIT, 0.6, 0.09, 0.6, '#cbc6ba', x, gy + 1.26, z, ry);
+    }
   }
   const s = A.obb(cx, cz, len / 2, F.TH, Math.atan2(uz, ux));
   s.rail = 1; s.maze = 1;                          // удар — как о забор (impact.js), лабиринт — для отладки
-  const o = { seg: 1, ax, az, bx, bz, th: F.TH, solid: 1, kind: 'fence' };
+  const o = { seg: 1, ax, az, bx, bz, th: F.TH, solid: 1, kind: 'fence', sty, rx: run.rx, rz: run.rz };   // rx, rz — к дороге (отладка)
   FEN.push(o);
   gput(Math.min(ax, bx) - 1, Math.min(az, bz) - 1, Math.max(ax, bx) + 1, Math.max(az, bz) + 1, o);
-  ST.fen.solidM += len; ST.fen.solidRuns++;
+  ST.fen.solidM += len; ST.fen.solidRuns++; ST.fen.sty[sty]++;
 }
-function smashSec (cx, cz, ux, uz, hex) {
-  const F = MAZE.FEN, gy = A.groundH(cx, cz), g = [], ry = Math.atan2(-uz, ux);
-  A.box(g, F.SEC, 0.08, 0.07, hex, cx, gy + F.H - 0.05, cz, ry);
-  A.box(g, F.SEC, 0.06, 0.05, hex, cx, gy + 0.32, cz, ry);
-  for (const o of [-1.2, 1.2]) A.box(g, 0.08, F.H + 0.1, 0.08, hex, cx + ux * o, gy + F.H / 2, cz + uz * o);
+/* сбиваемое: хлипкое и светлое — тонкие крашеные трубы (2 трубы, 2 стойки) или штакетник (2 жердины, 4 планки) */
+function smashSec (cx, cz, ux, uz, sk) {
+  const F = MAZE.FEN, gy = A.groundH(cx, cz), g = [], ry = Math.atan2(-uz, ux), hex = sk.hex;
+  if (sk.pk) {
+    A.box(g, F.SEC, 0.06, 0.03, hex, cx, gy + 0.72, cz, ry);
+    A.box(g, F.SEC, 0.06, 0.03, hex, cx, gy + 0.28, cz, ry);
+    for (const o of [-0.94, -0.31, 0.31, 0.94]) A.box(g, 0.1, 0.92, 0.025, hex, cx + ux * o, gy + 0.46, cz + uz * o, ry);
+  } else {
+    A.box(g, F.SEC, 0.045, 0.045, hex, cx, gy + F.H - 0.05, cz, ry);
+    A.box(g, F.SEC, 0.045, 0.045, hex, cx, gy + 0.4, cz, ry);
+    for (const o of [-1.2, 1.2]) A.box(g, 0.05, F.H, 0.05, hex, cx + ux * o, gy + F.H / 2, cz + uz * o);
+  }
   A.smashAdd('fence', cx, cz, 1.3, g, hex);
   const o = { seg: 1, ax: cx - ux * 1.25, az: cz - uz * 1.25, bx: cx + ux * 1.25, bz: cz + uz * 1.25, th: 0.1, solid: 0, kind: 'sfence' };
   gput(cx - 2, cz - 2, cx + 2, cz + 2, o);
-  ST.fen.smashM += F.SEC; ST.fen.smashSec++;
+  ST.fen.smashM += F.SEC; ST.fen.smashSec++; if (sk.pk) ST.fen.pickets++;
 }
 
 /* ═════════════ 2. дворы: клумбы, кусты, лесочки ═════════════ */
@@ -434,7 +504,7 @@ function bed (x, z, r) {
       A.put(LIT, g, k % 2 ? tireHex : '#f4f1ea', px, gy + 0.22, pz, Math.PI / 2, ry + Math.PI / 2, 0);
     } else {
       const hex = stripe ? (k % 2 ? '#d9342c' : '#f4f1ea') : (k % 5 ? '#ece8df' : '#dcd7cc');
-      A.box(LIT, 2 * Math.PI * R / n + 0.04, 0.62, 0.26, hex, px, gy + 0.16, pz, ry);   // верх — 0,47 м над землёй
+      A.box(LIT, 2 * Math.PI * R / n + 0.1, 0.72, 0.4, hex, px, gy + 0.17, pz, ry);    // толстый (0,4 м): верх — 0,53 м над землёй
     }
   }
   // земля горкой
@@ -452,8 +522,8 @@ function bed (x, z, r) {
   }
   if (tires) ST.tires++;
   // твёрдое: 4 вытянутые коробки — почти круг (не дальше 1,08 R от середины)
-  for (let k = 0; k < 4; k++) { const s = A.obb(x, z, R + 0.08, (R + 0.08) * 0.4142, k * Math.PI / 4); s.mat = 'wall'; s.maze = 1; }
-  const o = { x, z, r: R + 0.1, solid: 1, kind: 'bed' };
+  for (let k = 0; k < 4; k++) { const s = A.obb(x, z, R + 0.16, (R + 0.16) * 0.4142, k * Math.PI / 4); s.mat = 'wall'; s.maze = 1; }
+  const o = { x, z, r: R + 0.2, solid: 1, kind: 'bed' };
   OBJ.push(o);
   gput(x - R - 1, z - R - 1, x + R + 1, z + R + 1, o);
   ST.beds++;
@@ -483,7 +553,7 @@ function hedge (x, z, r, tx, tz) {
   for (const [px, pz] of pts) {
     if (solid) { if (A.tree(px, pz, 0, kind)) { planted.push([px, pz]); ST.shrubs++; } }
     else {
-      const gy = A.groundH(px, pz), g = [], hex = ['#4f8f3f', '#5aa04a', '#467f38'][Math.floor(r() * 3)];
+      const gy = A.groundH(px, pz), g = [], hex = ['#79c055', '#8acd62', '#6cb34c'][Math.floor(r() * 3)];   // светлее изгороди: сбиваемое — лёгкое
       const s1 = 0.7 + r() * 0.3;                // один комок (не два): сбиваемое держит вершины в памяти (smashAdd)
       A.put(g, scaled(TPL.ico, s1, s1 * 0.85, s1), hex, px, gy + 0.6, pz);
       A.smashAdd('bush', px, pz, 0.9, g, hex);
@@ -596,6 +666,14 @@ export function* build (api) {
   ST.fen.solidM = Math.round(ST.fen.solidM); ST.fen.smashM = Math.round(ST.fen.smashM);
   ST.ms = Math.round(performance.now() - t0);
   return ST;
+}
+
+/* чужая вещь двора (yarddecor.js: палисадники, клумбы у подъездов, холмики) — в ту же сетку: мелочь, ельник, сцены жизни
+   дворов и трамплины их обходят (blocks); твёрдое (solid) — и прямая навигатора (segHits) */
+export function addObj (o) {
+  const r = (o.r || 0) + 1;
+  OBJ.push(o);
+  gput(o.x - r, o.z - r, o.x + r, o.z + r, o);
 }
 
 export const DEBUG = { MAZE, ST, FEN, OBJ, blocks, segHits };

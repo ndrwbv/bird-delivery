@@ -584,6 +584,7 @@ function dress (id, g, add, k, u) {
   if (k.see) lampDepth(add, lamp, backs, { minY: y0 + 0.05, frameHex: LOOK[id].chrome && new THREE.Color(CHR).getHSL({}).l > 0.5 ? CHR : '#' + new THREE.Color(bodyHex).multiplyScalar(0.55).getHexString() });
   if (lamps.length) {
     const m = new THREE.Mesh(A.mergeGeos(lamps), new THREE.MeshBasicMaterial({ vertexColors: true }));
+    if (k.see) m.material.userData.glow = 1;      // своя машина: фары и фонари ночью не темнеют вместе с городом (FLAT_MATS) — горят (carlights.js)
     m.position.y = -dy;                           // склейку сдвинет вместе с кузовом, put уже поднял
     g.add(m);
   }
@@ -1037,7 +1038,7 @@ function stall (why) {
   const Snd = A.Snd;
   if (Snd) Snd.fx('engine-stall', s => { s.blip(70, 0.35, 'sawtooth', 0.2); setTimeout(() => s.blip(52, 0.4, 'square', 0.14), 160); s.noise(0.3, 0.2); }, { eng: 1 });
   if (A.rumble) A.rumble(0.5, 300);
-  A.toast(why === 'pothole' ? t('ой… в яме заглохла') : t('заглохла!'));
+  A.toast(why === 'pothole' ? t('ой… в яме заглохла') : t('заглохла!'), { urgent: true });   // срочное — перебивает уведомление на экране (notifyq.js)
 }
 function showGame () {
   ui();

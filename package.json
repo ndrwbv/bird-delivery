@@ -27,6 +27,7 @@
     "sfx:index": "node tools/sfx-index.mjs",
     "probe": "electron tools/probe.cjs",
     "check": "node tools/check.cjs",
+    "stats": "test -d tools/telemetry/node_modules/ydb-sdk || npm --prefix tools/telemetry install --no-audit --no-fund; node tools/telemetry/stats.mjs",
     "media": "npm run build:yandex && for l in ru en es; do electron tools/capture.cjs --lang=$l && electron tools/capture.cjs --lang=$l --mobile && electron tools/capture.cjs --lang=$l --video; done && node tools/media-post.mjs"
   },
   "build": {

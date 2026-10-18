@@ -8,7 +8,7 @@
      matchKey('x', e)       → true, если keydown e — клавиатурная пара действия (KeyX и т. п.)
 
    Действия: ok (главное, штамп) · back (назад) · x · y (пометки на полях) · lb · rb (страницы) ·
-   pause · replay (повтор: LB / R) · radio (радио в машине: крестовина ↓ / F, radio.js) · fly (полёт родстера: X / Z, flycar.js). Ввод: 'pad' (Xbox / Steam Deck — A B X Y LB RB; PlayStation — ✕ ○ □ △ L1 R1),
+   pause · replay (повтор: LB / R) · radio (радио в машине: крестовина ↓ / F, radio.js) · fly (полёт родстера: X / Z, flycar.js) · music (музыка вкл / выкл: L3 / B, music.js). Ввод: 'pad' (Xbox / Steam Deck — A B X Y LB RB; PlayStation — ✕ ○ □ △ L1 R1),
    'kb' (клавиатура и мышь), 'touch' (палец — значков нет, жмут сам штамп).
 
    Как понимаем, чем играют: первое же нажатие геймпада (game.js padStep → setInput('pad'), по
@@ -20,8 +20,8 @@
    Песочница (без game.js) переключает руками: setInput('pad' | 'kb' | 'touch', 'xbox' | 'ps'). */
 
 const PAD = {
-  xbox: { ok: 'A', back: 'B', x: 'X', y: 'Y', lb: 'LB', rb: 'RB', pause: '☰', replay: 'LB', radio: '↓', fly: 'X' },
-  ps: { ok: '✕', back: '○', x: '□', y: '△', lb: 'L1', rb: 'R1', pause: '☰', replay: 'L1', radio: '↓', fly: '□' },
+  xbox: { ok: 'A', back: 'B', x: 'X', y: 'Y', lb: 'LB', rb: 'RB', pause: '☰', replay: 'LB', radio: '↓', fly: 'X', music: 'L3' },
+  ps: { ok: '✕', back: '○', x: '□', y: '△', lb: 'L1', rb: 'R1', pause: '☰', replay: 'L1', radio: '↓', fly: '□', music: 'L3' },
 };
 // клавиатура: что нарисовано на значке и какие e.code его жмут (matchKey)
 const KB = {
@@ -35,6 +35,7 @@ const KB = {
   replay: ['R', ['KeyR']],      // повтор последних 10 с (replay.js): в езде LB / R
   radio: ['F', ['KeyF']],       // радио в машине (radio.js): следующая станция; геймпад — крестовина ↓
   fly: ['Z', ['KeyZ', 'KeyJ']], // полёт летающего родстера (flycar.js); геймпад — X
+  music: ['B', ['KeyB']],       // музыка вкл / выкл (music.js); геймпад — L3. Следующий трек — кнопка радио F / ↓, пока радио скрыто
 };
 
 let kind = matchMedia('(pointer: coarse)').matches ? 'touch' : 'kb';

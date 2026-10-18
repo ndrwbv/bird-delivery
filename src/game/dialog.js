@@ -30,6 +30,7 @@
                                        // верхний / нижний, X — нижний; подсказка одной строкой внизу, на кнопках значков нет
        emo: 'angry',                   // выражение лица на портрете (people.js EMO_FACE; катсцены story.js { emo })
        onTyped: () => …,               // допечаталась (story.js: 3D-актёр закрывает рот)
+       onShow: () => …,                // окно этой реплики открылось, печать пошла (doorcast.js: 3D-человек открывает рот)
      });                               // → true (принял) / false (отказался) / null (закрыли снаружи: dismiss)
    Прежние timer / timeoutText / auto (ответ по таймеру, реплика листается сама) больше не работают — окно ждёт нажатия.
    Очередь: несколько say подряд показываются по одному.
@@ -42,20 +43,24 @@
    не было, первое ←→↑↓ только зажигает её (A без подсветки — «принять»).
 
    Реплика на ходу (события посреди езды — вместо плашки сверху экрана, docs/CAREER.md «Реплики на ходу»):
-     DLG.line({ person, name, text, color })   // → Promise, когда ушла
+     DLG.line({ person, name, text, color, urgent, onShow })   // → Promise, когда ушла (true) или выброшена (false);
+                                               // onShow — в момент показа (звук монетки)
    Сообщение как в iMessage (круглая аватарка, имя, серый пузырь — как чат Толика, chat.css), сверху по
    центру, без затемнения и кнопок; пузырь сразу по размеру всего текста, буквы проявляются в нём: мир НЕ стоит,
    клавиши и геймпад не перехватывает (пробел — ручник, A — нитро). Допечаталась — висит
    lineTime(текст) (2,5 с + 0,06 с на букву, не меньше 4 с — успеть прочитать на ходу) и уходит сама; клик — убрать
    сразу. Аватарка говорит ртом, пока буквы проявляются (talkface.js).
-   Своя очередь: по одной, ждут не больше LIVE.Q (лишние — самые старые — выбрасываются).
+   Очередь — общая очередь уведомлений (notifyq.js): по одной, после чека оплаты, ждут не больше LIVE.Q (лишние — самые
+   старые — выбрасываются) и не дольше LIVE.WAIT с; o.urgent — срочная, перебивает то, что на экране.
    isOpen() её не считает. */
 import './dialog.css';
+import * as TEL from './telemetry.js';          // анонимная статистика: ответ в окне с двумя кнопками (telemetry.js)
 import { t } from '../i18n/index.js';
 import { pad as PAD } from '../input/gamepad.js';
 import { padLit } from '../input/padmenu.js';
 import { keyHTML, refreshKeys, inputKind, glyph } from '../input/glyphs.js';
 import * as TF from './talkface.js';            // портрет говорит ртом, пока печатается
+import * as NQ from './notifyq.js';             // реплика на ходу — в общей очереди уведомлений (одно за раз)
 
 /* значок кнопки — общий .pp-key (glyphs.js keyHTML, paper.css): геймпад — A / B (PlayStation — ✕ / ○),
    клавиатура — Enter / Esc, касание — без значка; меняется сам, когда игрок сменил ввод */
@@ -132,6 +137,8 @@ export function say (o) {
   const run = () => (o.skip && o.skip() ? null : new Promise(res => show(o, res)));
   const p = queue.then(run);
   queue = p.catch(() => {});
+  // два ответа (поручение, приглашение, гопники, Толик…) — в статистику: шапка и ответ (1 принял, 0 отказался, -1 закрыли)
+  if (o.decline) p.then(r => TEL.ev('choice', { h: String(o.head || '').slice(0, 40), r: r === true ? 1 : r === false ? 0 : -1 }), () => {});
   return p;
 }
 
@@ -289,6 +296,7 @@ function show (o, done) {
   };
   raf = requestAnimationFrame(tick);
   TF.talk(img);                                  // говорит, пока печатается (finish — замолчал)
+  if (o.onShow) try { o.onShow(); } catch (e) { console.warn('[dlg] onShow', e); }
   root.classList.add('dlg-talking');
   const dismissMe = () => close(null);
   CUR = dismissMe;
@@ -315,20 +323,30 @@ function show (o, done) {
 }
 
 /* ── реплика на ходу (line) ── */
-export const LIVE = { Q: 2, CPS: 40 };
+export const LIVE = { Q: 2, CPS: 40, WAIT: 20 };
 let lroot = null, lcur = null;
 const lq = [];
 export const lineOpen = () => !!lcur;
+/* Реплика — в общей очереди уведомлений (notifyq.js, автор 18.10.2026: «одно уведомление за раз»): важность
+   «менеджер» — после чека оплаты, до рейтинга и достижений; ждут не больше LIVE.Q (лишние, самые старые, выбрасываются),
+   ждёт дольше LIVE.WAIT с — устарела. o.urgent — срочное («опаздываешь», «поторопись!»): перебивает то, что на экране */
 export function line (o) {
   return new Promise(res => {
-    lq.push({ o, res });
-    while (lq.length > LIVE.Q) lq.shift().res(false);
-    if (!lcur) lineNext();
+    const it = { o, res };
+    lq.push(it);
+    const q = NQ.push({
+      kind: 'line', text: o.text, manual: true, fresh: 2, group: 'line', max: LIVE.Q, wait: LIVE.WAIT, urgent: !!o.urgent, key: o.key,
+      show: n => { it.nq = n; lineNext(it); if (o.onShow) try { o.onShow(); } catch (e) { console.warn('[dlg]', e); } },
+      hide: () => { if (lcur && lcur.it === it) lcur.close(); },
+      drop: () => { const i = lq.indexOf(it); if (i >= 0) lq.splice(i, 1); res(false); },
+    });
+    if (!q) { const i = lq.indexOf(it); if (i >= 0) lq.splice(i, 1); }
   });
 }
-function lineNext () {
-  const it = lq.shift();
-  if (!it) { lcur = null; return; }
+function lineNext (it) {
+  const i0 = lq.indexOf(it);
+  if (i0 >= 0) lq.splice(i0, 1);
+  if (lcur) lcur.close();
   if (!lroot) {
     lroot = document.createElement('div');
     lroot.id = 'dlg-live';
@@ -360,7 +378,7 @@ function lineNext () {
     setTimeout(() => { if (!lcur) lroot.hidden = true; }, 200);
     lcur = null;
     it.res(true);
-    setTimeout(() => { if (!lcur) lineNext(); }, 220);
+    if (it.nq) NQ.done(it.nq);                   // ушла — следующее уведомление после паузы (notifyq.js)
   };
   const tick = now => {
     raf = requestAnimationFrame(tick);
@@ -372,12 +390,12 @@ function lineNext () {
       if (i >= full.length) { left = lineTime(full); TF.stop(img); }
     } else if ((left -= dt) <= 0) close();
   };
-  lcur = { close };
+  lcur = { close, it };
   lroot.onclick = close;
   raf = requestAnimationFrame(tick);
   TF.talk(img);                                  // говорит, пока буквы проявляются
 }
 /* убрать реплику на ходу и очередь (конец смены, меню) */
-export function lineClear () { while (lq.length) lq.shift().res(false); if (lcur) lcur.close(); }
+export function lineClear () { NQ.clear('line'); while (lq.length) lq.shift().res(false); if (lcur) lcur.close(); }
 /* для ?debug (__dlv.DLG.TALKDBG): говорящие портреты — state(img) → { mouth: 0 закрыт | 1 приоткрыт | 2 открыт, talking } */
 export const TALKDBG = TF.DEBUG;

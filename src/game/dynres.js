@@ -32,10 +32,11 @@
    Работает только в смене (не в меню, не в паузе, не в повторе и катсцене) — вне её
    разрешение сразу полное.
 
-   Настройка — gfx.js «тяжёлый кадр» (вкл / выкл; по умолчанию вкл на Деке и телефоне,
-   на компьютере выкл). ?dyn=0 / ?dyn=1 — на этот запуск. Отладка — __dlv.DYNRES.
+   Настройка — gfx.js «тяжёлый кадр» (вкл / выкл; с 18.10.2026 по умолчанию выкл на всех устройствах —
+   автор: «что за блюр?»; кто включил сам — у того остаётся). ?dyn=0 / ?dyn=1 — на этот запуск. Отладка — __dlv.DYNRES.
    ────────────────────────────────────────────────────────────────────────── */
 import * as GFX from './gfx.js';
+import * as TUNE from './tune.js';
 
 export const LV = [1, 0.85, 0.72, 0.6];       // ступени: доля разрешения по стороне
 const HI = 0.9, FIT = 0.8, UP_FIT = 0.75;     // доли бюджета: «тяжёлый», спуск — влезть, подъём — влезть с запасом
@@ -68,6 +69,8 @@ export function init (hooks) {
   try { H.renderer.domElement.addEventListener('webglcontextrestored', () => { glDrop(); pool.length = pend.length = 0; open = null; }); } catch (e) { /* — */ }
 }
 export const k = () => K;
+/* есть ли таймер видеокарты (облегчение кадра — tune.js: без него смотрит на промежутки между кадрами) */
+export const timer = () => !!ext && !DEBUG.noTimer;
 const on = () => (DEBUG.force !== null ? DEBUG.force : !!GFX.dynOn());
 const budget = () => { const f = GFX.fpsCap(); return 1000 / Math.min(f || 60, 60); };
 
@@ -141,7 +144,7 @@ export function begin () {
   const t0 = performance.now();
   lowBegin();
   const t1 = performance.now() - t0; if (t1 > STATS.cpuMax[0]) STATS.cpuMax[0] = +t1.toFixed(2);
-  if (!ext || DEBUG.noTimer || open || !(on() || DEBUG.timing)) return;
+  if (!ext || DEBUG.noTimer || open || !(on() || DEBUG.timing || !TUNE.DEBUG.off)) return;   // таймер нужен и облегчению кадра (tune.js)
   const q = pool.pop() || gl.createQuery();
   try { gl.beginQuery(ext.TIME_ELAPSED_EXT, q); open = { q, k: K }; } catch (e) { pool.push(q); }
 }
@@ -190,7 +193,7 @@ function reset () { if (lvl) setLvl(0); hiN = 0; calm = 0; checkAt = 0; after.le
    с отрисовкой (мс), active — идёт смена (в меню и на итогах разрешение полное) */
 export function step (raw, work, active) {
   const got = ext && pend.length ? poll() : null;
-  if (got) for (const g of got) { keep(STATS.gpu, +g.ms.toFixed(2)); if (DEBUG.sink) DEBUG.sink.push(g.ms); }
+  if (got) for (const g of got) { keep(STATS.gpu, +g.ms.toFixed(2)); if (DEBUG.sink) DEBUG.sink.push(g.ms); if (Math.abs(g.k - K) < 1e-3) TUNE.gpu(g.ms); }
   if (DEBUG.pin !== null) { setLvl(Math.max(0, Math.min(LV.length - 1, DEBUG.pin | 0))); return; }
   if (!on() || !active) { reset(); warm = WARM_T; return; }
   if (!(raw > 0) || raw > 0.25) { warm = Math.max(warm, 0.5); return; }   // после паузы / загрузки — не замер
@@ -234,7 +237,9 @@ function untimed (ms, work, B) {
       return;
     }
   }
-  const heavy = ms > 1.6 * B && work < ms * 0.5;
+  // 18.10.2026: при 30 к/с (телефон, «низкая») кадр по сетке экрана — 33 / 50 / 67 мс; порог 1,6 кадра (53 мс) пропускал
+  // кадры по 50 мс (20 к/с) — «мыло» в Сафари (таймера видеокарты нет) не включалось. С ограничением к/с — 1,25 кадра
+  const heavy = ms > (B > 20 ? 1.25 : 1.6) * B && work < ms * 0.5;
   win = ((win << 1) | (heavy ? 1 : 0)) & 31;      // последние 5 кадров: долгие и короткие вперемешку (17 / 33 / 50) — тоже тяжело
   hiN = (win & 1) + (win >> 1 & 1) + (win >> 2 & 1) + (win >> 3 & 1) + (win >> 4 & 1);
   if (heavy) { hv.push(ms); if (hv.length > 3) hv.shift(); }

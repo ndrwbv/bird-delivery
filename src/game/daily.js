@@ -4,7 +4,7 @@
 
    На смену карьеры — 2—3 задания из набора, не те, что были в прошлую смену (сохранение dlv-daily-last);
    первая смена новичка — без заданий. Выполнил — галочка, звук task-done и плашка «+N ₽» сверху по центру
-   (в очереди ridequeue.js — после чека оплаты, денег и Толика), деньги — купюрами в пачку «за смену».
+   (в общей очереди уведомлений notifyq.js — после чека оплаты, Толика и рейтинга), деньги — купюрами в пачку «за смену».
    Где видно: в начале смены — записка сверху (сама уходит через 7 с, не окно), в паузе — список с галочками
    (записка под накладной, pauseSheet), в чеке смены — строка «задания: 2 из 3 ··· +N ₽» (career.js endRows).
 
@@ -21,7 +21,7 @@
    В отладке — __dlv.DAILY: D (состояние), set(['bundle', …]), done(id), tally(kind, n). */
 import './daily.css';
 import * as ECON from './econ.js';
-import * as RQ from './ridequeue.js';
+import * as NQ from './notifyq.js';
 import * as QR from './quickrun.js';
 import * as DIST from './districts.js';
 import * as HAV from './havoc.js';
@@ -141,8 +141,7 @@ function complete (q) {
   S.money = (S.money || 0) + q.pay;                    // купюрами в пачку «за смену» (shiftcash.js следит за S.money)
   if (!S.freeRun) A.addWallet(q.pay);
   D.earned += q.pay;
-  POP.push(q);
-  if (!popOn) { popOn = true; RQ.whenQuiet(nextPop, 20000, () => !A.S.paused && !document.querySelector('#doorgame > *')); }
+  NQ.push({ kind: 'daily', text: label(q), ms: 4300, wait: 60, fresh: 2.5, show: () => showPop(q), hide: hidePop });
 }
 
 /* ── каждый кадр смены ── */
@@ -162,7 +161,7 @@ export function step (dt) {
   // записка в начале смены: когда поехал с первым заказом и на экране тихо
   if (!D.noted && S.state === 'drive' && S.order) {
     D.waitT += dt;
-    if (D.waitT > 1.2 && RQ.quiet()) showNote();
+    if (D.waitT > 1.2) { D.noted = true; NQ.push({ kind: 'note', text: t('задания на день'), ms: 7300, wait: 25, fresh: 4, show: showNote, hide: hideNote }); }
   }
 }
 
@@ -247,25 +246,20 @@ function showNote () {
     '<div class="dl-row"><i class="dl-box"></i><span>' + esc(label(q)) + '</span><b>+' + esc(A.money(q.pay)) + '</b></div>').join('');
   NOTE.hidden = false;
   requestAnimationFrame(() => NOTE && NOTE.classList.add('on'));
-  RQ.mark('daily', true);                              // грамота достижения ждёт, пока записка уйдёт (то же место)
   clearTimeout(noteT);
   noteT = setTimeout(hideNote, 7000);
 }
 function hideNote () {
   clearTimeout(noteT);
-  RQ.mark('daily', false);
   if (!NOTE) return;
   NOTE.classList.remove('on');
   setTimeout(() => { if (NOTE && !NOTE.classList.contains('on')) NOTE.hidden = true; }, 300);
 }
 
 /* ── выполнил: галочка, звук, «+N ₽» ── */
-let POPEL = null, popOn = false;
-const POP = [];
-function nextPop () {
-  if (A.S.paused) { setTimeout(nextPop, 400); return; }
-  const q = POP.shift();
-  if (!q) { popOn = false; return; }
+let POPEL = null, popT = 0;
+function hidePop () { clearTimeout(popT); if (POPEL) POPEL.classList.remove('on'); }
+function showPop (q) {
   if (NOTE && NOTE.classList.contains('on')) hideNote();
   if (!POPEL) { POPEL = document.createElement('div'); POPEL.id = 'daily-pop'; POPEL.className = 'pp-ride'; document.body.appendChild(POPEL); }
   POPEL.innerHTML = '<i class="dl-box"></i><div><small>' + esc(t('задание выполнено')) + '</small><span>' + esc(label(q)) + '</span></div><b>+' + esc(A.money(q.pay)) + '</b>';
@@ -274,8 +268,8 @@ function nextPop () {
   requestAnimationFrame(() => POPEL && POPEL.classList.add('on'));
   // sfx-names: task-done
   try { A.Snd.fx('task-done', s => [784, 1046, 1568].forEach((f, i) => setTimeout(() => s.blip(f, i === 2 ? 0.22 : 0.09, 'triangle', 0.12), i * 80))); } catch (e) { /* — */ }
-  RQ.hold(4300);
-  setTimeout(() => { POPEL.classList.remove('on'); setTimeout(() => RQ.whenQuiet(nextPop, 20000, () => !A.S.paused && !document.querySelector('#doorgame > *')), 350); }, 4000);
+  clearTimeout(popT);
+  popT = setTimeout(hidePop, 4000);
 }
 
 const DEBUG = {

@@ -51,6 +51,7 @@ import * as CONSTR from './construction.js';
 import * as DAILY from './daily.js';             // задание на день «сбей N бургеров» — маскоты в зачёт (daily.js)
 import { onPave, walkHalf, roadGap } from './pave.js';
 import { addTrail, YARD } from './yards.js';
+import * as GFX from './gfx.js';                // дальность — гостей за столиками дальше тумана не рисуем
 
 export const RIV = {
   PER_DIST: 2, MAX: 26, NODIST: 6,     // точек сети в районе; всего; без районов на карте
@@ -489,6 +490,7 @@ function build1 (s, idx) {
       LITM.color(YARD.COLOR);                                    // цвет дворовых дорожек: зимой протоптана (seasons.js)
       LITM.ribbon(bx, bz, cx, cz, RIV.BRANCH_W, 0.13);
       shop.branch = [[bx, bz], [cx, cz]];
+      shop.branch.hw = RIV.BRANCH_W / 2; shop.branch.lift = 0.13;   // бордюрам по краям (curbs.js)
       A.CITY.paths.push(shop.branch);
       addTrail(shop.branch, RIV.BRANCH_W / 2);
       ST.branches++;
@@ -757,25 +759,38 @@ function buildGuests () {
   G_HEAD = new THREE.InstancedMesh(hg, mat, SEAT.length);
   G_BODY.frustumCulled = G_HEAD.frustumCulled = false;
   G_BODY.name = 'rival-guests';
-  const c = new THREE.Color();
   for (const q of SEAT) {
-    G_BODY.setColorAt(q.k, c.set(SHIRTS[(hash(q.x, q.z, 1) * SHIRTS.length) | 0]));
-    G_HEAD.setColorAt(q.k, c.set(SKINS[(hash(q.x, q.z, 2) * SKINS.length) | 0]));
+    q.cb = new THREE.Color(SHIRTS[(hash(q.x, q.z, 1) * SHIRTS.length) | 0]);
+    q.ch = new THREE.Color(SKINS[(hash(q.x, q.z, 2) * SKINS.length) | 0]);
   }
+  G_BODY.setColorAt(0, SEAT[0].cb); G_HEAD.setColorAt(0, SEAT[0].ch);   // цвет инстансов — сразу (иначе программа шейдера сменится на ходу)
   ST.guests = SEAT.length;
   A.scene.add(G_BODY, G_HEAD);
   poseGuests();
 }
-const GM = new THREE.Matrix4(), GR = new THREE.Matrix4(), ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
+/* 18.10.2026: рисуем только гостей ближе дальности (туман) — их ~сотни по городу, и раньше все шли в каждый кадр
+   (спрятанные — нулевым размером, видеокарта всё равно считала вершины: ~50 тыс. треугольников в кадре на телефоне).
+   Ближние — подряд в начале инстансов (count), пересобираем, когда машина отъехала на G_MOVE м или кто-то сбежал */
+const GM = new THREE.Matrix4(), GR = new THREE.Matrix4(), ZERO = new THREE.Matrix4().makeScale(0, 0, 0);   // ZERO — спрятанные маскоты
+const G_MOVE = 30;
+let G_AT = { x: 1e9, z: 1e9 };
 function poseGuests () {
   if (!G_BODY) return;
+  const V = A.V, R = GFX.rangeK() * 490 + 40;
+  let n = 0;
   for (const q of SEAT) {
-    if (!q.on) { G_BODY.setMatrixAt(q.k, ZERO); G_HEAD.setMatrixAt(q.k, ZERO); continue; }
+    if (!q.on || Math.abs(q.x - V.x) > R || Math.abs(q.z - V.z) > R) continue;
     GR.makeRotationY(q.ry + (q.nod || 0) * 0.15);
     GM.copy(GR).setPosition(q.x, q.y, q.z);
-    G_BODY.setMatrixAt(q.k, GM); G_HEAD.setMatrixAt(q.k, GM);
+    G_BODY.setMatrixAt(n, GM); G_HEAD.setMatrixAt(n, GM);
+    G_BODY.setColorAt(n, q.cb); G_HEAD.setColorAt(n, q.ch);
+    n++;
   }
+  G_BODY.count = G_HEAD.count = n;
+  G_BODY.visible = G_HEAD.visible = n > 0;
   G_BODY.instanceMatrix.needsUpdate = true; G_HEAD.instanceMatrix.needsUpdate = true;
+  if (G_BODY.instanceColor) { G_BODY.instanceColor.needsUpdate = true; G_HEAD.instanceColor.needsUpdate = true; }
+  G_AT = { x: V.x, z: V.z };
   GUESTS_DIRTY = 0;
 }
 
@@ -1257,7 +1272,7 @@ export function step (dt) {
   }
   if (dirty && MI) for (const k of ['leg', 'arm', 'chop', 'scep']) MI[k].instanceMatrix.needsUpdate = true;
   if (dirty && MI) for (const k in MI.body) MI.body[k].instanceMatrix.needsUpdate = true;
-  if (GUESTS_DIRTY) poseGuests();
+  if (GUESTS_DIRTY || Math.abs(V.x - G_AT.x) > G_MOVE || Math.abs(V.z - G_AT.z) > G_MOVE) poseGuests();
   // курьеры конкурентов
   stepBcars();
   stepSushi(dt);

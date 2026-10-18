@@ -9,8 +9,14 @@
 
    Один человек — один ник и одна аватарка навсегда: всё выводится из его зерна (person.seed), так что тот же
    клиент в другой смене — с тем же ником (язык ников — по языку игры в момент заказа).
+   Без тёзок (автор 18.10.2026: «ник Шпашка два раза попался, но это разные заказы»): у разных клиентов подпись в
+   приложении не повторяется в этой смене и в NK.WIN прошлых — журнал «подпись → чьё зерно, в какой смене»
+   (сохранение NK.KEY). Выпало занятое — другое того же вида: обычное имя — другое обычное имя (другая форма или с
+   ошибкой), ник — свободный ник; ников свободных нет — обычное имя; совсем ничего — повтор (на 200 заказах подряд — 0).
+   Тот же человек в окне — та же подпись.
 
-     NICK.init({ adult })          — один раз из game.js (взрослое — только при ADULT)
+     NICK.init({ adult, store })   — один раз из game.js (взрослое — только при ADULT; store — Store игры: журнал
+                                     подписей и номер смены dlv-shifts)
      NICK.tagOrder(order)          — заказ принят (game.js newOrder): получателям — ник и аватарка (person.app)
      NICK.of(person)               — { nick, kind: 'nick' | 'name' | 'typo', av: 'face' | 'q' | 'bat' | … } (и ставит person.app)
      NICK.label(person, fallback)  — что написано в приложении: ник, если клиент заказа; иначе — имя
@@ -28,13 +34,60 @@ export const NK = {
   FACE: 0.40,        // аватарка — обычное лицо; остальное — мазня по весам AV
   PX: 64,            // мазня рисуется в 64 × 64
   CAP: 160,          // картинок мазни в кэше (самые давно не нужные — вон)
+  WIN: 5,            // подпись не повторяется у разных клиентов в этой смене и в стольких прошлых
+  KEY: 'dlv-nicks',  // сохранение профиля: журнал подписей [[подпись, зерно, смена], …]
 };
 /* мазня: вид → вес (среди 60 % не-лиц). dick — только во взрослой */
 const AV = { q: 12, bat: 7, fat: 7, scribble: 9, cat: 9, car: 6, sunset: 7, eye: 5, pix: 7, dark: 6, flower: 6, dick: 5 };
 
-let ADULT = false;
-export const stats = { tagged: 0, drawn: 0, hit: 0 };
-export function init (o = {}) { ADULT = !!o.adult; }
+let ADULT = false, STORE = null;
+export const stats = { tagged: 0, drawn: 0, hit: 0, swapped: 0 };
+export function init (o = {}) { ADULT = !!o.adult; STORE = o.store || null; REG.loaded = false; }
+
+/* ─────────────── журнал подписей: без тёзок в окне смен ───────────────
+   by — подпись (нормализованная: маленькими, «ё» → «е») → { s: зерно, sh: смена, n: подпись как есть };
+   of — зерно → подпись (нормализованная). Номер смены — dlv-shifts (career.js: идёт смена n, в конце n + 1). */
+const REG = { by: new Map(), of: new Map(), loaded: false, sh: -1 };
+const norm = s => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
+const shiftNow = () => { try { return STORE ? (+STORE.get('dlv-shifts', 0) || 0) : 0; } catch (e) { return 0; } };
+function regLoad () {
+  REG.by.clear(); REG.of.clear(); REG.loaded = true;
+  let v = null;
+  try { v = STORE ? STORE.get(NK.KEY, null) : null; } catch (e) { v = null; }
+  const cut = shiftNow() - NK.WIN;
+  if (Array.isArray(v)) for (const e of v) if (Array.isArray(e) && typeof e[0] === 'string' && (+e[2] || 0) >= cut) regPut(e[0], e[1] >>> 0, +e[2] || 0);
+}
+function regPut (nick, seed, sh) {
+  const k = norm(nick), old = REG.of.get(seed);
+  if (old !== undefined && old !== k && REG.by.get(old) && REG.by.get(old).s === seed) REG.by.delete(old);
+  REG.by.set(k, { s: seed, sh, n: nick });
+  REG.of.set(seed, k);
+}
+function regSave () {
+  if (!STORE) return;
+  const cut = shiftNow() - NK.WIN, out = [];
+  for (const [k, e] of REG.by) { if (e.sh < cut) { REG.by.delete(k); if (REG.of.get(e.s) === k) REG.of.delete(e.s); } else out.push([e.n, e.s, e.sh]); }
+  try { STORE.set(NK.KEY, out); } catch (e) { /* — */ }
+}
+const taken = (nick, seed) => { const e = REG.by.get(norm(nick)); return !!e && e.s !== seed && e.sh >= shiftNow() - NK.WIN; };
+/* подпись клиента заказа: своя из журнала (тот же человек в окне), иначе — от зерна; занята другим — свободная */
+function claim (p, a, seed) {
+  if (STORE || !REG.loaded) regLoad();   // из сохранения каждый раз (раз на клиента): сменил профиль без перезагрузки — журнал его
+  const sh = shiftNow();
+  const mine = REG.of.get(seed), e = mine !== undefined && REG.by.get(mine);
+  if (e && e.s === seed && e.sh >= sh - NK.WIN) { a.nick = e.n; if (e.sh !== sh) { e.sh = sh; regSave(); } return; }
+  if (taken(a.nick, seed)) {
+    const r = rng(seed ^ 0xA11CE5), fem = !!p.f;
+    const free = list => list.filter(n => !taken(n, seed));
+    let nick = '';
+    if (a.kind !== 'nick') for (let k = 0; k < 8 && !nick; k++) { const n = a.kind === 'typo' ? typo(plainName(p, r), r) : plainName(p, r); if (n && !taken(n, seed)) nick = n; }
+    if (!nick) { const f = free(fitList(ruFam() ? RU : EN, fem)); if (f.length) { nick = P(r, f); a.kind = 'nick'; } }
+    for (let k = 0; k < 8 && !nick; k++) { const n = plainName(p, r); if (n && !taken(n, seed)) { nick = n; a.kind = 'name'; } }   // ники кончились — обычное имя
+    if (nick) { a.nick = nick; stats.swapped++; }
+  }
+  regPut(a.nick, seed, sh);
+  regSave();
+}
 
 /* ─────────────── случайность от зерна ─────────────── */
 function rng (seed) {
@@ -156,7 +209,7 @@ function typo (s, r) {
 }
 
 /* ник и аватарка человека — от зерна, раз и навсегда (кэш — person.app) */
-export function of (p) {
+export function of (p, dry) {
   if (!p) return null;
   if (p.app && p.app.adult === ADULT) return p.app;
   const seed = (p.seed !== undefined ? p.seed : hashStr(String(p.id || p.name || ''))) >>> 0;
@@ -167,16 +220,25 @@ export function of (p) {
   else if (x < NK.NICK + NK.NAME) { kind = 'name'; nick = plainName(p, r); }
   else { kind = 'typo'; nick = typo(plainName(p, r), r); }
   const av = r() < NK.FACE ? 'face' : W(r, ADULT ? AV : Object.assign({}, AV, { dick: 0 }));
-  p.app = { nick: nick || String(p.name || ''), kind, av, avSeed: (r() * 4294967296) >>> 0, adult: ADULT };
-  return p.app;
+  const a = { nick: nick || String(p.name || ''), kind, av, avSeed: (r() * 4294967296) >>> 0, adult: ADULT };
+  if (!dry) { claim(p, a, seed); a.sh = shiftNow(); }
+  p.app = a;
+  return a;
 }
 const hashStr = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; };
 
 /* заказ принят: всем получателям — ник и аватарка. Сюжетные и учебный — со своими именами (не зовём) */
 export function tagOrder (order) {
   if (!order || !order.stops) return;
-  for (const st of order.stops) for (const p of st.persons || []) if (p && !p.app) { of(p); stats.tagged++; }
+  for (const st of order.stops) for (const p of st.persons || []) {
+    if (!p) continue;
+    if (!p.app) { of(p); stats.tagged++; continue; }
+    // тот же человек снова клиент (другая смена — журнал мог забыть его подпись или её взял другой): перепроверить
+    if (p.app.sh !== shiftNow()) { const seed = (p.seed !== undefined ? p.seed : hashStr(String(p.id || p.name || ''))) >>> 0; claim(p, p.app, seed); p.app.sh = shiftNow(); }
+  }
 }
+/* отладка: журнал подписей — [[подпись, зерно, смена], …] */
+export const journal = () => { if (!REG.loaded) regLoad(); return [...REG.by.values()].map(e => [e.n, e.s, e.sh]); };
 
 /* что написано в приложении: клиент заказа — ник; кто-то другой — его имя как есть */
 export function label (p, fallback = '') {
@@ -407,7 +469,7 @@ export function roll (n = 1000, mk) {
   const out = { nick: 0, name: 0, typo: 0, face: 0, av: {} };
   for (let i = 0; i < n; i++) {
     const p = mk ? mk(i) : { seed: (i * 2654435761) >>> 0, first: 'Ирина', last: 'Белова', name: 'Ирина Белова', f: i % 2 === 0 };
-    const a = of(p);
+    const a = of(p, true);
     out[a.kind]++;
     if (a.av === 'face') out.face++; else out.av[a.av] = (out.av[a.av] || 0) + 1;
   }

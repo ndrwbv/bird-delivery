@@ -169,10 +169,32 @@ function inPolys (G, x, z) {
   for (const b of near(G, LAWN.CELL, x, z) || []) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1 && inP(x, z, b.p)) return true;
   return false;
 }
-let CLAIMS = null;
+/* занятые места (стройки, костры, точки конкурентов) — по сетке CLG м (18.10.2026: раньше каждая проба места шла по всему
+   списку с Math.hypot — сборка клетки газона на телефоне давала рывки до 10—17 мс и ~75 МБ мусора за 2 мин езды) */
+let CLAIMS = null, CL_GRID = null;
+const CLG = 32, CL_M = 8;                          // CL_M — запас под отступ m (в spot до 5 м)
 function claimed (x, z, m) {
-  if (!CLAIMS) CLAIMS = A.claims() || [];
-  for (const c of CLAIMS) if (Math.hypot(c.x - x, c.z - z) < c.r + m) return true;
+  if (!CLAIMS) {
+    CLAIMS = A.claims() || [];
+    CL_GRID = new Map();
+    for (const c of CLAIMS) {
+      const r = c.r + CL_M;
+      for (let i = Math.floor((c.x - r) / CLG); i <= Math.floor((c.x + r) / CLG); i++)
+        for (let j = Math.floor((c.z - r) / CLG); j <= Math.floor((c.z + r) / CLG); j++) {
+          const k = key(i, j);
+          let a = CL_GRID.get(k);
+          if (!a) CL_GRID.set(k, a = []);
+          a.push(c);
+        }
+    }
+  }
+  const a = CL_GRID.get(key(Math.floor(x / CLG), Math.floor(z / CLG)));
+  if (!a) return false;
+  for (let q = 0; q < a.length; q++) {
+    const c = a[q], dx = c.x - x, dz = c.z - z, rr = c.r + m;
+    if (m <= CL_M ? dx * dx + dz * dz < rr * rr : Math.sqrt(dx * dx + dz * dz) < rr) return true;
+  }
+  if (m > CL_M) for (const c of CLAIMS) if (Math.sqrt((c.x - x) ** 2 + (c.z - z) ** 2) < c.r + m) return true;   // большой отступ — по всему списку, как было
   return false;
 }
 
@@ -481,8 +503,8 @@ function * buildCell (i, j) {
       }
       if (late()) yield;
     }
-  // 2) оградки вдоль улиц, со стороны газона
-  rails(cell, inCell);
+  // 2) оградки вдоль улиц, со стороны газона (18.10.2026: кусками — целиком это 4—10 мс за раз на телефоне)
+  yield * rails(cell, inCell);
   if (late()) yield;
   // 3) мусор у баков
   for (const c of A.cans || []) {
@@ -607,7 +629,7 @@ const free = (taken, x, z, r) => taken.every(t => Math.hypot(t[0] - x, t[1] - z)
 function gridHot (x, z) { gridPut(HOT, 20, x, z, x, z, [x, z]); }
 
 /* оградки: у улиц (и редких дворовых проездов) с одной стороны, кусками по 2,44 м */
-function rails (cell, inCell) {
+function * rails (cell, inCell) {
   const seen = new Set(), C = A.CITY.roads;
   for (const [ri, si] of ROADS.get(key(cell.i, cell.j)) || []) {
     const id = ri * 4096 + si;
@@ -622,6 +644,7 @@ function rails (cell, inCell) {
       const ux = (bx - ax) / len, uz = (bz - az) / len, nx = -uz * sd, nz = ux * sd, off = walkHalf({ w: A.roadWidth(rd), c: rd.c, g: rd.g }) + 0.5;   // за тротуаром, по краю газона
       const ry = Math.atan2(-uz, ux);
       for (let d = 7; d + 2.44 < len - 7; d += 2.44) {
+        if (late()) yield;
         // у края газона, сразу за тротуаром (или чуть дальше, если там занято)
         let x = 0, z = 0, sp = null;
         for (const o of [off, off + 1.2, off + 2.4]) {

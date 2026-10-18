@@ -29,6 +29,7 @@ import * as OS from '../ordersheet.js';
 import * as KIT from './doorkit.js';
 import { DOOR } from '../econ.js';
 import * as SC from './doorscene.js';
+import * as COACH from './doorcoach.js';     // обучение первого раза: пауза, подсветка кнопок, «поехали!»
 import { faceDataURL } from '../people.js';
 import * as NICK from '../nicks.js';            // накладная: аватарка и ник клиента из приложения (nicks.js)
 
@@ -337,6 +338,7 @@ export default {
       // лампа над козырьком у обшарпанного подъезда иногда мигает
       flick = Math.random() < 0.03 ? Math.random() * 0.1 : Math.min(1, flick + dt * 6);
       draw();
+      if (st.phase === 'learn') { if (coach) coach.layout(); return; }   // обучение первого раза: всё стоит, срок тоже
       if (st.phase === 'play') {
         st.t += dt;
         // опечатка: клиент пишет верный номер, в накладной — зачёркнуто его ручкой и исправлено
@@ -366,6 +368,7 @@ export default {
     }
 
     function pad (p) {
+      if (st.phase === 'learn') { if (coach) coach.pad(p); return; }
       if (st.phase !== 'play') return;
       if (KIT.selfPad(p)) { st.pad = true; selfDown(); return; }   // RB / R1 — «пусть сам спустится»
       if (p.menuOk || p.accept || p.menuBack || p.btnX || p.btnY || p.menuUp || p.menuDown || p.menuLeft || p.menuRight) st.pad = true;
@@ -422,19 +425,56 @@ export default {
     screen();
     glyphs();
     tick();
-    /* первый раз (doorstep.js learnFirst, ECON.DOORGAME.LEARN): Толик пишет, что делать, — кнопками того, чем играешь */
+    /* первый раз (doorstep.js learnFirst, ECON.DOORGAME.LEARN; doorcoach.js, автор 18.10.2026): домофон стоит, срок заказа
+       тоже (api.hold) — по шагам подсвечено, что жать: номер в накладной, цифры, вызов (сломан — дверь); «поехали!» — игра */
     const ln = o.learn || (o.learnOn ? { name: t('Толик'), add: 15, k: 2 } : null);
-    const learnUpd = KIT.learn(msgs, ln, (k, fam) => {
-      const ps = fam === 'ps', K = KIT.key, L = KIT.keysLine;
-      const ok = k === 'pad' ? K(ps ? '✕' : 'A') : K('Space', 1), sheetK = k === 'pad' ? K(ps ? '□' : 'X') : K('X', 1);
-      return (mode === 'broken'
-        ? (k === 'touch' ? L(t, N_('Первый раз? Домофон сломан — тапай по двери быстро, пока не откроют.'))
-          : L(t, N_('Первый раз? Домофон сломан — стучи в дверь: жми {ok} быстро, пока не откроют.'), { ok }))
-        : k === 'pad' ? L(t, N_('Первый раз у домофона? Номер квартиры — в накладной {sheet}. Крестовиной к цифре, {ok} — нажать, {call} — вызов.'), { sheet: sheetK, ok, call: K(ps ? '△' : 'Y') })
-          : k === 'kb' ? L(t, N_('Первый раз у домофона? Номер квартиры — в накладной {sheet}. Набери его цифрами и жми {call}.'), { sheet: sheetK, call: K('Enter', 1) })
-            : L(t, N_('Первый раз у домофона? Номер квартиры — в накладной в углу. Тапни цифры, потом 🔔.'))) + KIT.learnAdd(ln, t);
-    });
-    const offInput = onInput(() => { glyphs(); learnUpd(); });
+    let coach = null;
+    if (ln) {
+      const KB = COACH.kbd, L = (s, keys, v) => KIT.keysLine(t, s, keys || {}, v || {});
+      const ps = () => inputKind().family === 'ps', A = () => (ps() ? '✕' : 'A');
+      const digit = c => /^(Digit|Numpad)\d$/.test(c);
+      const steps = mode === 'broken' ? [
+        { el: () => elDoor,
+          text: k => (k === 'touch' ? L(N_('Домофон сломан — тапай по двери быстро, {n} раз, пока не откроют.'), {}, { n: need })
+            : L(N_('Домофон сломан — стучи в дверь: жми {ok} быстро, {n} раз, пока не откроют.'), { ok: k === 'pad' ? KB(A()) : KB('Space', 1) }, { n: need })),
+          keys: k => (k === 'pad' ? [[A()]] : [['Space', 1]]),
+          hit: c => c === 'Space' || c === 'Enter' || c === 'NumpadEnter', pad: p => !!(p.menuOk || p.accept || p.btnY) },
+      ] : [
+        { el: () => (elMini.classList.contains('open') ? elInv.querySelector('.os-flat') || q('.mk-mini-body') : q('.mk-mini-tab')),
+          text: k => (k === 'touch' ? L(N_('Номер квартиры — в накладной: тут кв. {f}. Накладная — плашка в углу, тап — раскрыть.'), {}, { f: shown })
+            : L(N_('Номер квартиры — в накладной: тут кв. {f}. Свернуть или раскрыть накладную — {x}.'), { x: k === 'pad' ? KB(ps() ? '□' : 'X') : KB('X', 1) }, { f: shown })),
+          keys: k => (k === 'pad' ? [[ps() ? '□' : 'X']] : [['X', 1]]),
+          hit: c => c === 'KeyX', pad: p => !!p.btnX },
+        { el: () => q('.dg-keys'),
+          text: k => (k === 'touch' ? L(N_('Тапай цифры на домофоне — номер появится на экранчике.'))
+            : k === 'pad' ? L(N_('Крестовиной — к цифре, {ok} — нажать. Номер появится на экранчике.'), { ok: KB(A()) })
+              : L(N_('Набери номер цифрами на клавиатуре — он появится на экранчике домофона.'))),
+          keys: k => (k === 'pad' ? [[A()]] : [['0…9', 1]]),
+          hit: digit, pad: p => !!(p.menuOk || p.accept || p.menuUp || p.menuDown || p.menuLeft || p.menuRight) },
+        { el: () => q('.dg-k-call'),
+          text: k => (k === 'touch' ? L(N_('Набрал — 🔔, вызов. Ошибся цифрой — ⌫.'))
+            : L(N_('Набрал — {call}, вызов. Ошибся цифрой — {del}.'), k === 'pad' ? { call: KB(ps() ? '△' : 'Y'), del: KB(ps() ? '○' : 'B') } : { call: KB('Enter', 1), del: KB('Bksp', 1) })),
+          keys: k => (k === 'pad' ? [[ps() ? '△' : 'Y']] : [['Enter', 1]]),
+          hit: c => c === 'Enter' || c === 'NumpadEnter', pad: p => !!p.btnY },
+      ];
+      steps.push({ go: true,
+        text: (k, fam) => L(N_('Готов? Жмёшь «поехали» — и пошёл срок заказа.')) + ' ' +
+          (k === 'touch' ? L(N_('Не хочешь набирать — «пусть сам спустится» под заданием, но без бонуса за скорость.'))
+            : L(N_('Не хочешь набирать — {self} «пусть сам спустится», но без бонуса за скорость.'), { self: KB(KIT.selfKey(k, fam), k === 'kb') })) + KIT.learnAdd(ln, t) });
+      st.phase = 'learn';
+      cursor();                                                   // рамка выбора — только когда домофон пошёл
+      if (api.hold) api.hold(true);
+      coach = COACH.coach(box, {
+        t, ln, steps, paused: () => !!(api.paused && api.paused()),
+        onEnd: skipped => {
+          st.phase = 'play';
+          if (api.hold) api.hold(false);
+          cursor();
+          api.log && api.log('обучение ' + (skipped ? 'пропущено' : 'пройдено'));
+        },
+      });
+    }
+    const offInput = onInput(() => { glyphs(); });
     let raf = 0, last = 0;
     if (api.setStep) api.setStep(step);
     else {
@@ -444,6 +484,7 @@ export default {
     if (api.setPad) api.setPad(pad);
     // для проверок (probe): решить как игрок — верный номер и «вызов» / нужное число стуков
     box.__solve = (wrong) => {
+      if (coach && coach.on()) coach.skip();                      // обучение первого раза — пропустить, как кнопкой
       if (wrong === 'self') { selfDown(); return; }               // «пусть сам спустится»
       if (mode === 'broken') { while (st.phase === 'play') knock(); return; }
       if (wrong) { for (const ch of shown === flat ? '1' + flat : shown) press(ch); press('call'); }
@@ -451,11 +492,13 @@ export default {
       for (const ch of flat) press(ch);
       press('call');
     };
+    box.__coach = () => (coach && coach.on() ? coach.state() : null);
     box.__st = () => ({ mode, awayAddr, flat, shown, blot: blotAt, wiped: st.wiped, tries: st.tries, typed: st.typed, phase: st.phase, t: +st.t.toFixed(2), limit, res: st.res,
       selfT: st.phase === 'self' ? +st.selfT.toFixed(2) : null });
     return () => {
       removeEventListener('keydown', onKey, true);
       offInput();
+      if (coach) coach.off();
       msgs.clear();
       mini.off();
       if (raf) cancelAnimationFrame(raf);

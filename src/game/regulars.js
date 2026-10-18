@@ -22,15 +22,16 @@
    ────────────────────────────────────────────────────────────────────────── */
 import { t, N_ } from '../i18n/index.js';
 import * as DIRECTOR from './director.js';
-import * as DLG from './dialog.js';
 import { makePerson } from './people.js';
+import * as DCAST from './doorcast.js';        // кто говорит — стоит у двери в 3D и говорит ртом (doorcast.js)
 
 export const REG = { P: 0.14, FROM_SHIFT: 1, EVERY: 3, GAP: 2, SAY: 0.6, COL: '#6a4a8a' };
 const KEY = 'dlv-regulars';
 
 /* Герои. sex — пол (клиент у двери того же пола), adult — только во взрослой, fam — «папины дети», papa — папа (после
    всех детей). look — поверх внешности по зерну (people.js makeLook; особые черты — шапка people.js).
-   crew — кто ещё говорит (w: 1, 2…). Встреча: s — реплики { s, e (лицо), w (кто) }, a — ответы курьера { a, r (ответ
+   crew — кто ещё говорит (w: 1, 2…): стоит у двери рядом (doorcast.js; kid — рост ×, back — выходит из-за спины на своей
+   реплике, off — голос из квартиры, в мире его нет). kid у героя — рост клиента у двери. Встреча: s — реплики { s, e (лицо), w (кто) }, a — ответы курьера { a, r (ответ
    героя), e, w, tip (чаевые ₽, как видит игрок), row (строка чека) }. */
 const L = (s, e, w) => ({ s, e: e || 'ok', w: w || 0 });
 const A2 = (a, r, e, w, tip, row) => ({ a, r, e: e || 'ok', w: w || 0, tip: tip || 0, row: row || '' });
@@ -54,7 +55,7 @@ const HEROES = /*i18n*/ [
   { id: 'exmayor', sex: 'm', name: N_('Пётр Ильич, бывший мэр'),
     look: { age: 'old', hair: 'bald', beard: 'none', bags: true, sweater: '#b8a060', top: 'long', shirt: '#5a4a3a', glasses: 'none', head: 'none', brows: 'sad', mouth: 'line' },
     meets: [
-      { s: [L(N_('Я тут раньше всё решал. Видишь лавочку у подъезда? Моя. В смысле — при мне поставили.')),
+      { s: [L(N_('Я тут раньше всё решал. Лавочку у третьего подъезда знаешь? Моя. В смысле — при мне поставили.')),
         L(N_('Сейчас решаю только, какую пиццу. И то жена.'), 'sad')],
         a: [A2(N_('Хорошая лавочка'), N_('Шатается. Как всё, что при мне ставили. Но стоит же!'), 'happy'),
           A2(N_('А что случилось?'), N_('Выборы. Ну, как выборы. Позвонили.'), 'sad')] },
@@ -80,10 +81,11 @@ const HEROES = /*i18n*/ [
           A2(N_('Я за рулём'), N_('Правильно. А тост всё равно прими. Бесплатно. Первый раз в жизни — бесплатно.'))] },
     ] },
   { id: 'mom', sex: 'f', name: N_('Кристина, мама двух ангелочков'),
-    crew: [{ sex: 'm', name: N_('из-за спины, тонко'), look: { age: 'young', hair: 'bowl', beard: 'none', glasses: 'none', head: 'none', brows: 'angry', mouth: 'smirk', shape: 'thin', fat: false } }],
+    crew: [{ sex: 'm', kid: 0.6, back: true, name: N_('из-за спины, тонко'), look: { age: 'young', hair: 'bowl', beard: 'none', glasses: 'none', head: 'none', brows: 'angry', mouth: 'smirk', shape: 'thin', fat: false } }],
     look: { age: 'adult', hair: 'ponytail', bags: true, glasses: 'none', head: 'none', top: 'long', shirt: '#e8a0a8', brows: 'sad', mouth: 'smile' },
     meets: [
-      { s: [L(N_('Тише, тише, ангелочки спят! …Это был не взрыв. Это они во сне. Они очень активно спят.'), 'scared')],
+      { noise: N_('БА-БАХ!'),   // из квартиры — облачком и звуком до её реплики (doorcast.js offstage): «это был не взрыв» — про то, что слышно
+        s: [L(N_('Тише, тише, ангелочки спят! …Это был не взрыв. Это они во сне. Они очень активно спят.'), 'scared')],
         a: [A2(N_('Милые'), N_('Ты их не видел. Видел бы — не говорил.'), 'sad'),
           A2(N_('Это был пожар?'), N_('Это был шкаф. Был.'), 'sad')] },
       { s: [L(N_('Ангелочки хотят с тобой поздороваться! Тимоша, скажи дяде «здравствуйте»!'), 'happy'),
@@ -201,10 +203,10 @@ const HEROES = /*i18n*/ [
         a: [A2(N_('Поставьте'), N_('«Ла-ла-лаааа… кха-кха-кха…» …Это аранжировка такая. Авторская.'), 'happy'),
           A2(N_('Не надо'), N_('Правильно. Сначала надо купить. Сто рублей, перевод по номеру.'), 'angry')] },
     ] },
-  { id: 'girls', sex: 'f', name: N_('Настя'),
-    crew: [{ sex: 'f', name: N_('Вика'), look: { age: 'young', hair: 'ponytail', glasses: 'none', head: 'none', brows: 'angry' } },
-      { sex: 'f', name: N_('Соня'), look: { age: 'young', hair: 'bob', glasses: 'round', head: 'none', brows: 'raised' } },
-      { sex: 'f', name: N_('Лера'), look: { age: 'young', hair: 'curly', glasses: 'none', head: 'headband', brows: 'arched' } }],
+  { id: 'girls', sex: 'f', kid: 0.85, name: N_('Настя'),
+    crew: [{ sex: 'f', kid: 0.85, name: N_('Вика'), look: { age: 'young', hair: 'ponytail', glasses: 'none', head: 'none', brows: 'angry' } },
+      { sex: 'f', kid: 0.85, name: N_('Соня'), look: { age: 'young', hair: 'bob', glasses: 'round', head: 'none', brows: 'raised' } },
+      { sex: 'f', kid: 0.85, name: N_('Лера'), look: { age: 'young', hair: 'curly', glasses: 'none', head: 'headband', brows: 'arched' } }],
     look: { age: 'young', hair: 'pigtails', glasses: 'none', head: 'none', brows: 'angry', mouth: 'open' },
     meets: [
       { s: [L(N_('Я открою!'), 'angry'), L(N_('Нет, я! Я заказывала!'), 'angry', 1),
@@ -275,7 +277,8 @@ const HEROES = /*i18n*/ [
   { id: 'veteran', sex: 'm', adult: true, name: N_('Саня, ветеран бургерной войны'),
     look: { age: 'adult', hair: 'buzz', bristle: true, beard: 'stubble', stubble: true, scar: 'cheek', bags: true, broad: true, top: 'jacket', jacket: '#3f5a3a', glasses: 'none', head: 'none', eyes: 'narrow', brows: 'angry', mouth: 'line' },
     meets: [
-      { s: [L(N_('Стой. Медленно. Что в коробке?'), 'angry'),
+      { look: { gun: true },   // в руке пистолет — в мире видно (people.js gun)
+        s: [L(N_('Стой. Медленно. Что в коробке?'), 'angry'),
         L(N_('Пицца? Вскрой. …Шучу. Не шучу. Ладно, шучу.')),
         L(N_('Не смотри на ствол. Я так руку держу. Привычка. Он сам туда-сюда.'))],
         a: [A2(N_('Уберите пистолет'), N_('Он не мой. Он мой, но не мой. Короче, он сам. Иди.'), 'angry'),
@@ -371,7 +374,7 @@ const HEROES = /*i18n*/ [
           A2(N_('Кот вернётся'), N_('Коты возвращаются туда, где кормят. Буду кормить через окно. У меня план.'), 'happy')] },
       { s: [L(N_('Я в порядке! Записалась на бокс. Бью грушу. Дала груше его имя.'), 'happy'),
         L(N_('Тренер говорит — талант. Особенно когда кричу «колонку верни!».'), 'happy')],
-        a: [A2(N_('Красава'), N_('Спасибо. Кот, кстати, вернулся. Сам. Сел на коврик. Нас теперь двое. Мы сильные.'), 'happy'),
+        a: [Object.assign(A2(N_('Красава'), N_('Спасибо. Кот, кстати, вернулся. Сам. Сел на коврик. Нас теперь двое. Мы сильные.'), 'happy'), { pet: 'cat' }),   // кот выходит к ногам (doorcast.js)
           A2(N_('Полегче там'), N_('Поздно. Две груши порвала. И его колонку. Она случайно оказалась в зале.'), 'angry')] },
     ] },
   { id: 'cutlets', sex: 'm', name: N_('Борис Аркадьевич'),
@@ -539,7 +542,7 @@ const HEROES = /*i18n*/ [
           A2(N_('Так кто прав?'), N_('Узнаю — расскажу. Лет через десять. Если клевать будет.'))] },
     ] },
   { id: 'praporshik', sex: 'm', adult: true, name: N_('Олег, прапорщик в отставке'),
-    crew: [{ sex: 'm', name: N_('Юра, из кухни'), look: { age: 'adult', hair: 'side', glasses: 'round', beard: 'none', head: 'none', top: 'long', shirt: '#f4f1ea', brows: 'raised', mouth: 'smile' } }],
+    crew: [{ sex: 'm', off: true, name: N_('Юра, из кухни'), look: { age: 'adult', hair: 'side', glasses: 'round', beard: 'none', head: 'none', top: 'long', shirt: '#f4f1ea', brows: 'raised', mouth: 'smile' } }],
     look: { age: 'adult', hair: 'buzz', hairC: '#6b6560', beard: 'mustache', broad: true, glasses: 'none', head: 'none', top: 'long', shirt: '#3f5a3a', brows: 'thick', mouth: 'line' },
     meets: [
       { s: [L(N_('Юра, пиццу принесли! …Юра — это сосед. По квартире. Двадцать два года.')),
@@ -720,7 +723,7 @@ export function roll (st, onTime, o, ctx) {
   ST.rolls++;
   if (force && BY[force]) {
     const f = force;
-    if ((BY[f].sex === 'f') !== fem || (BY[f].adult && !A.ADULT)) return '';
+    if (BY[f].adult && !A.ADULT) return '';                          // пол — любой: клиент у двери всё равно станет героем (play)
     force = '';
     return pick(f, n, sv);
   }
@@ -763,42 +766,84 @@ export function lines (id, step) {
   return { name: t(h.name), s: m.s.map(l => speaker(h, l.w).name + ': ' + t(l.s)), a: m.a.map(q => t(q.a) + ' → ' + speaker(h, q.w).name + ': ' + t(q.r) + (q.tip ? ' (+' + q.tip + ')' : '')) };
 }
 
-/** встреча окнами разговора → { ans: 0 | 1 | null, tip } */
-export async function meet (id, step) {
+/* кто открывает дверь: тот, чья первая реплика (обычно сам герой; «Оля в душе» — Марина) */
+const opener = m => (m && m.s[0] && m.s[0].w) || 0;
+const crewOf = (h, w) => (w ? (h.crew || [])[w - 1] || {} : h);
+
+/* актёры встречи в мире (doorcast.js): opener — клиент у двери, остальные — рядом, по первой своей реплике (back) или сразу */
+function castFor (h, m, ped) {
+  if (!ped) return null;
+  const w0 = opener(m), who = { [w0]: DCAST.client(ped) }, own = [];
+  let n = 0;
+  const add = w => {
+    const c = crewOf(h, w);
+    if (c.off || !ped.grp || !ped.grp.parent) return null;            // голос из квартиры — в мире его нет
+    const a = DCAST.extra(speaker(h, w).person, ped, n++, 3, { kid: c.kid, back: !!c.back });
+    if (a) own.push(a);
+    return a;
+  };
+  const ws = [...new Set(m.s.map(l => l.w || 0).concat(m.a.map(q => q.w || 0)))].filter(w => w !== w0);
+  for (const w of ws) if (!crewOf(h, w).back) who[w] = add(w);           // остальные — сразу у двери, рядом
+  const pets = [];
+  return { get: w => (w in who ? who[w] : (who[w] = add(w))),
+    pet: kind => { const c = kind === 'cat' ? DCAST.cat(ped) : DCAST.dog(ped, { sit: true }); if (c) pets.push(c); },
+    noise: text => DCAST.offstage(ped, text, { snd: 'home-bang', syn: s => { s.noise(0.4, 0.32); s.blip(70, 0.35, 'sawtooth', 0.14); } }),
+    done: () => { for (const a of own) DCAST.leave(a); DCAST.leave(who[w0]); for (const c of pets) c.go(); } };
+}
+
+/** встреча окнами разговора → { ans: 0 | 1 | null, tip }; cast — актёры в мире (castFor) или null */
+export async function meet (id, step, cast) {
   const h = BY[id], m = h && h.meets[step];
   if (!m) return { ans: null, tip: 0 };
   ST.plays++;
-  const base = { head: t('у двери'), color: REG.COL, fillers: false, mood: 'calm' };
-  const last = m.s.length - 1;
-  for (let i = 0; i < last; i++) {
-    const l = m.s[i], sp = speaker(h, l.w);
-    const r = await DLG.say(Object.assign({}, base, sp, { emo: l.e, text: t(l.s), accept: t('… промолчать') }));
+  const who = w => (cast ? cast.get(w || 0) : null);
+  try {
+    const base = { head: t('у двери'), color: REG.COL, fillers: false, mood: 'calm' };
+    if (m.noise && cast) { cast.noise(t(m.noise)); await new Promise(r => setTimeout(r, 900)); }   // шум из квартиры — до первой реплики
+    const last = m.s.length - 1;
+    for (let i = 0; i < last; i++) {
+      const l = m.s[i], sp = speaker(h, l.w);
+      const r = await DCAST.say(who(l.w), Object.assign({}, base, sp, { emo: l.e, text: t(l.s), accept: t('… промолчать') }));
+      if (r === null) return { ans: null, tip: 0 };
+    }
+    const l = m.s[last], sp = speaker(h, l.w);
+    const r = await DCAST.say(who(l.w), Object.assign({}, base, sp, { emo: l.e, text: t(l.s), stack: true, accept: t(m.a[0].a), decline: t(m.a[1].a) }));
     if (r === null) return { ans: null, tip: 0 };
-  }
-  const l = m.s[last], sp = speaker(h, l.w);
-  const r = await DLG.say(Object.assign({}, base, sp, { emo: l.e, text: t(l.s), stack: true, accept: t(m.a[0].a), decline: t(m.a[1].a) }));
-  if (r === null) return { ans: null, tip: 0 };
-  const ans = r === true ? 0 : 1, q = m.a[ans], sq = speaker(h, q.w);
-  const tipS = q.tip ? '+' + (A && A.money ? A.money(q.tip) : q.tip + ' ₽') : null;
-  const r2 = await DLG.say(Object.assign({}, base, sq, { emo: q.e, text: t(q.r), accept: q.tip ? t('взять') : t('пока'),
-    pay: tipS, payLabel: q.tip ? t('чаевые') : '' }));
-  let tip = 0;
-  if (r2 !== null && q.tip && A && A.pay) { tip = A.pay(q.tip, t(q.row || 'чаевые'), sq.person) || 0; ST.paid += tip; }
-  return { ans, tip };
+    const ans = r === true ? 0 : 1, q = m.a[ans], sq = speaker(h, q.w);
+    const tipS = q.tip ? '+' + (A && A.money ? A.money(q.tip) : q.tip + ' ₽') : null;
+    if (q.pet && cast) cast.pet(q.pet);
+    const r2 = await DCAST.say(who(q.w), Object.assign({}, base, sq, { emo: q.e, text: t(q.r), accept: q.tip ? t('взять') : t('пока'),
+      pay: tipS, payLabel: q.tip ? t('чаевые') : '' }));
+    let tip = 0;
+    if (r2 !== null && q.tip && A && A.pay) { tip = A.pay(q.tip, t(q.row || 'чаевые'), sq.person) || 0; ST.paid += tip; }
+    return { ans, tip };
+  } finally { if (cast) cast.done(); }
 }
 
-/** сыграть встречу на вручении: через REG.SAY с, держит вручение, режиссёр — лёгкое 'odd' */
+/** сыграть встречу на вручении: через REG.SAY с, держит вручение, режиссёр — лёгкое 'odd'.
+    Клиент у двери сразу становится тем, кто открывает (лицо и рост — как в окне), пока коробка ещё летит */
 export function play (key, st, api) {
   const [id, s] = String(key).split(':'), step = +s || 0;
   ST.last = { id, step, res: null };
   if (dry) return;
+  const h = BY[id], m = h && h.meets[step];
+  const ped = st && st.peds && st.peds[0];
+  if (m && ped && !ped.dead && A && A.rehuman) {
+    try {
+      const w0 = opener(m), c = crewOf(h, w0), sp = speaker(h, w0).person;
+      // m.look — что у него в этой встрече в руках (пистолет): своя копия человека, лицо то же
+      A.rehuman(ped, m.look ? Object.assign({}, sp, { id: sp.id + '~' + step, look: Object.assign({}, sp.look, m.look) }) : sp);
+      if (c.kid && ped.grp) ped.grp.scale.setScalar(c.kid);
+      if (st.persons) st.persons[0] = ped.person;
+    } catch (e) { console.warn('[reg] rehuman', e); }
+  }
   DIRECTOR.start('odd', 40);
   const hold = on => { try { if (api && api.hold) api.hold(on); } catch (e) { /* — */ } };
   setTimeout(() => {
     const p = st && st.peds && st.peds[0];
     if (p && (p.dead || !p.grp || !p.grp.parent)) { DIRECTOR.end('odd'); return; }
     hold(true);
-    meet(id, step).then(res => { ST.last.res = res; }, () => {}).finally(() => { hold(false); DIRECTOR.end('odd'); });
+    meet(id, step, castFor(h, m, p)).then(res => { ST.last.res = res; }, () => {}).finally(() => { hold(false); DIRECTOR.end('odd'); });
   }, REG.SAY * 1000);
 }
 
@@ -811,7 +856,9 @@ export const DEBUG = {
   set dry (v) { dry = !!v; }, get dry () { return dry; },
   get state () { return load(); },
   reset () { save({ p: {}, shift: -1 }); },
+  /** следующая встреча героя — n-я (с 0), без отметки «был недавно» */
+  step (id, n) { const sv = load(); if (!BY[id]) return null; sv.p[id] = { step: Math.max(0, +n || 0), last: -99 }; save(sv); return sv.p[id]; },
   lines: (id, step) => lines(id, step || 0),
-  play: (id, step) => meet(id, step || 0).then(res => (ST.last = { id, step, res })),
+  play: (id, step, ped) => meet(id, step || 0, ped && BY[id] ? castFor(BY[id], BY[id].meets[step || 0], ped) : null).then(res => (ST.last = { id, step, res })),
   face: (id, w) => BY[id] ? speaker(BY[id], w || 0) : null,
 };

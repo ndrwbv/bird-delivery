@@ -153,6 +153,21 @@ const CHECKS = [
       r.solid.filter(s => s.pass).map(s => ' · ' + s.k + ': ' + JSON.stringify(s)).join('');
     return { status: !r.ok ? 'fail' : r.unexplained ? 'warn' : 'ok', info };
   } },
+  /* одно уведомление за раз (18.10.2026, notifyq.js, docs/CAREER.md «Одно уведомление за раз»): 60 с средней смены на автопилоте,
+     через 6 с езды машину переносит к адресу (вручений втрое больше — теснее, чем у игрока); раз в 50 мс по самой странице —
+     сколько всплывающего видно сразу (чек оплаты, реплика, новое сообщение чата, тост, грамота, задание, подсказка, таблица).
+     Двух сразу — 0; было до очереди: 4—9 раз за 3 мин (до трёх сразу) */
+  // группа 3 (с дымовыми), не 2: рядом с «призраками» под нагрузкой лось не успевал боднуть машину
+  { id: 'notify-one', name: 'одно уведомление за раз', group: 3, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/notify-one.js'), '--q=nsecs=60&nshift=6&ntp=6'], 150);
+    const e = errLine(j), r = j.result;
+    if (e || !r) return { status: 'fail', info: e || 'нет результата' };
+    const kinds = Object.entries(r.shown).map(([k, n]) => k + ' ' + n).join(', ');
+    const info = `${r.liveSec} с езды, вручений ${r.delivered}: показано ${kinds}; два и больше сразу — ${r.overlaps} раз (${r.overSec} с)` +
+      (r.nq ? `, выброшено устаревших ${r.nq.stale}, перебито ${r.nq.cut}, дольше всех ждало ${r.nq.maxWait} с` : '') +
+      (r.overlaps ? ' · ' + r.examples.slice(0, 3).map(x => x.t + ' с: ' + x.kinds + ' («' + x.texts + '»)').join('; ') : '');
+    return { status: r.overlaps ? 'fail' : r.delivered < 3 ? 'warn' : 'ok', info: info + (r.delivered < 3 ? ' (мало вручений — проверка слабая)' : '') };
+  } },
   /* память на телефоне (11.10.2026, docs/AGENTS.md «Память на телефоне»): мобильный режим, меню → город достроен → 20 с смены.
      Порог — с запасом ~20 % над замером; было до правок: куча 706 / 822 МБ, след страницы пик 1477 МБ — вкладка Safari на iPhone умирала */
   { id: 'memory-phone', name: 'память на телефоне: куча JS, видео, след страницы', group: 2, run: async () => {

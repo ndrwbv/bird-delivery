@@ -9,7 +9,6 @@
 import './doorkit.css';
 import { makePerson } from '../people.js';
 import * as TF from '../talkface.js';
-import { inputKind } from '../../input/glyphs.js';
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';');
 export const N_ = s => s;
@@ -76,23 +75,10 @@ export function feed (el, o = {}) {
   return { say, clear: () => { for (const im of imgs) TF.stop(im); imgs.clear(); el.replaceChildren(); } };
 }
 
-/* ── первый раз (doorstep.js learnFirst, ECON.DOORGAME.LEARN): Толик в ленте пишет, что делать, — кнопками того, чем
-   играешь (lines(k) → HTML, k: 'pad' | 'kb' | 'touch', fam: 'ps' | 'xbox'); сменил ввод — тот же пузырь, другие кнопки.
-   → upd() — позвать, когда ввод сменился (glyphs() мини-игры); без learn — ничего */
+/* ── первый раз (doorstep.js learnFirst, ECON.DOORGAME.LEARN): до 18.10.2026 Толик писал подсказку пузырём в ленте поверх
+   игры — на телефоне она накладывалась на подъезд; теперь — пошаговое обучение до старта, doorcoach.js. Здесь — значок
+   клавиши и строка с кнопками для его записок */
 export const key = (s, kb) => '<kbd class="pp-key' + (kb ? ' pp-key-kb' : '') + '">' + esc(s) + '</kbd>';
-export function learn (msgs, ln, lines) {
-  if (!ln || !msgs) return () => {};
-  let m = null, last = '';
-  const upd = () => {
-    const ik = inputKind(), html = lines(ik.kind, ik.family);
-    if (html === last) return;
-    last = html;
-    if (!m) m = msgs.say({ person: ln.person, name: ln.name, html, mood: 'happy', cls: 'mk-learn' });
-    else { const p = m.querySelector('.mk-b p'); if (p) p.innerHTML = html; }
-  };
-  upd();
-  return upd;
-}
 /* строка с кнопками целиком одним ключом перевода: t(s, vars) с {имя} кнопок из keys (HTML <kbd>), остальное экранировано */
 export function keysLine (t, s, keys = {}, vars = {}) {
   const ks = Object.keys(keys), tok = {};

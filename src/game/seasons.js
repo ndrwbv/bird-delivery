@@ -35,6 +35,7 @@ import { setPeopleSeason, redressHumans } from './people.js';
 import { growTree } from './trees.js';
 import * as EDL from './editlayer.js';         // редактор города: прятать убранные деревья на месте
 import { YARD, onYard } from './yards.js';   // дворовые дорожки: зимой протоптаны, сугробы мимо (yards.js)
+import { mat as fakeShadowMat } from './fakeshadows.js';   // тени домов на сугробах, листьях и кронах (fakeshadows.js)
 
 const CELL = 200;                           // клетка склейки, как у статики (CHUNK в game.js; было 100 — деревья и сугробы давали ~37 вызовов отрисовки в кадре, 10.10.2026)
 
@@ -284,7 +285,7 @@ function pileMat () {
       diffuseColor.rgb = seasonTint(diffuseColor.rgb, 0.0, vK == 0.0 || vK == 4.0 ? 0.62 : 1.0);`);
   };
   m.customProgramCacheKey = () => 'seasonPile';
-  return m;
+  return fakeShadowMat(m);
 }
 
 /* гирлянды: без света, мигают каждая лампочка по-своему, ночью ярче */

@@ -135,6 +135,14 @@ await phase('повтор', () => { const ok = d.REPLAY.open(); setTimeout(() =>
 await phase('край-1', () => { tp(-1500, -1500); });
 await phase('край-2', () => { tp(1500, 1500); });
 await phase('край-3', () => { tp(-1500, 1500); });
+// 18.10.2026: праздники, сезоны, корты, дворы (новое 16—17.10)
+await phase('зима-нг', () => { d.season.set(2.45); d.HOL.start('newyear'); d.ENV.t = NIGHT; const P = d.PIZZERIAS[0]; if (P) tp(P.x + 30, P.z + 30); });
+await phase('салют', () => { d.HOL.boom(4); setTimeout(() => d.HOL.boom(4), 1500); });
+await phase('хэллоуин', () => { d.HOL.stop(); d.season.set(1.7); d.HOL.start('halloween'); d.ENV.t = d.ECON.tOfHour(20); });
+await phase('лето', () => { d.HOL.stop(); d.season.set(0.5); d.ENV.t = DAY; });
+await phase('весна', () => { d.season.set(3.5); });
+await phase('корт', () => { const c = d.COURTS && d.COURTS.nearest(V.x, V.z); if (!c) return false; d.COURTS.force('play'); tp(c.x + 15, c.z + 15); });
+await phase('двор', () => { const S = d.YCARS && d.YCARS.SPOTS, y = S && S[(S.length / 3) | 0]; if (!y) return false; tp(y.x, y.z); });
 HOOK = false;
 autopilot(false);
 window.requestAnimationFrame = raf;

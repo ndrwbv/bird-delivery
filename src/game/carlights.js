@@ -19,12 +19,24 @@
    ореолы (прозрачные, складываются с картинкой), видны, только когда горят.
    step(car, dt, vf, steer, brake, gas, night) — из driveStep каждый кадр.
    kill(car, угол) — фонарь разбит (carglass.js): его плашки больше не горят.
+
+   • Фары и задние фонари ночью (автор 18.10.2026: «ночью у машины моей всегда должны светить
+     фары»): с сумерек до рассвета (ENV.night ≥ HEAD.ON) и в ливень / сильный снегопад (≥ HEAD.WX)
+     горят обе фары — тёплый ореол на каждом стекле фары — и задние фонари — красный ореол.
+     Включаются за ~0,2 с, выключаются с запасом (HEAD.OFF / HEAD.WX_OFF) — не мигают на границе.
+     Разбитая фара или фонарь (carglass.js → kill) гаснет только она. Пятно света на асфальте
+     перед машиной рисует game.js (headGlow) — его сила тоже отсюда: headK().
+     lights(car, dt, night, wx) — из updateEnv каждый кадр, в любом состоянии игры (смерть,
+     воскрешение, катсцена, повтор, вид из-за руля): огни не зависят от того, едешь ли ты.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 
 export const TURN = { OFF: true, HOLD: 1.0, PERIOD: 0.7, ON: 0.4, MIN: 0.08 };   // OFF — у игрока не мигают; с; доля руля, с которой мигает
 const BRAKE_V = 0.4;                                                 // м/с: медленнее — уже не тормоз, а стоим
 const REV_V = 0.3;                                                   // м/с назад — горит задний ход
+/* фары своей машины: ON / OFF — ENV.night, с которой включаются / выключаются (сумерки: 0,35 на закате,
+   0,3 на рассвете); WX / WX_OFF — сила дождя или снегопада (0…1); FADE — 1/с, как быстро разгораются */
+export const HEAD = { ON: 0.12, OFF: 0.06, WX: 0.5, WX_OFF: 0.3, FADE: 9, k: 0, on: false, night: 0, wx: 0 };   // night, wx — что видели в последнем кадре (__dlv.CARL.HEAD)
 
 let GLOW = null;
 function glowTex () {
@@ -35,6 +47,27 @@ function glowTex () {
   x.fillStyle = g; x.fillRect(0, 0, 64, 64);
   GLOW = new THREE.CanvasTexture(c); GLOW.colorSpace = THREE.SRGBColorSpace;
   return GLOW;
+}
+
+/* пятно фар на асфальте (game.js headGlow): луч от машины вперёд — узкий у бампера, шире и тусклее вдали.
+   Верх картинки — у машины, низ — дальний край (плоскость повёрнута, как в game.js) */
+let BEAM = null;
+export function beamTex () {
+  if (BEAM) return BEAM;
+  const W = 64, H = 128, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d'), img = x.createImageData(W, H), d = img.data;
+  const ss = (a, b, t) => { const q = Math.min(1, Math.max(0, (t - a) / (b - a))); return q * q * (3 - 2 * q); };
+  for (let py = 0; py < H; py++) {
+    const v = py / (H - 1), hw = 0.24 + 0.76 * Math.sqrt(v);
+    const along = ss(0.02, 0.14, v) * (1 - ss(0.5, 1, v)) * (0.8 + 0.2 * ss(0.1, 0.4, v));
+    for (let px = 0; px < W; px++) {
+      const u = Math.abs((px + 0.5) / W * 2 - 1) / hw, a = along * (1 - ss(0.25, 1, u)), o = (py * W + px) * 4;
+      d[o] = 255; d[o + 1] = 246; d[o + 2] = 222; d[o + 3] = Math.round(255 * a);
+    }
+  }
+  x.putImageData(img, 0, 0);
+  BEAM = new THREE.CanvasTexture(c); BEAM.colorSpace = THREE.SRGBColorSpace;
+  return BEAM;
 }
 
 /* плашки (лампа) и ореол одним мешем каждая: q — [x, y, z, w, h, назад?] */
@@ -68,6 +101,58 @@ function lampSet (car, list, hex, haloK, haloMin) {
   lamp.frustumCulled = halo.frustumCulled = false;
   car.add(lamp, halo);
   return { lamp, halo, on: false };
+}
+
+/* только ореол (без плашки): фары и задние фонари ночью */
+function haloSet (car, list, hex, haloK, haloMin) {   // одна сторона: фары видно спереди, фонари — сзади
+  const halo = new THREE.Mesh(quads(list, haloK, haloMin), new THREE.MeshBasicMaterial({
+    color: hex, map: glowTex(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
+  halo.visible = false; halo.renderOrder = 3; halo.frustumCulled = false;
+  car.add(halo);
+  return { lamp: halo, halo, on: false };
+}
+
+/* где у модели передние фары: светлые вершины меша фар у переднего края ниже крыши (рамки по сторонам,
+   по высоте — отдельными стёклами: фара и противотуманка — два ореола). У простой машины — свои меши фар (0xfff1c8) */
+function findHeads (car, hl, top) {
+  const pts = [[], []], v = new THREE.Vector3();
+  for (const m of car.children) {
+    if (!m.isMesh || !m.material || !m.material.isMeshBasicMaterial || m.material.map) continue;
+    m.updateMatrix();
+    const pos = m.geometry.attributes.position;
+    if (!pos) continue;
+    if (m.material.vertexColors) {
+      const col = m.geometry.attributes.color;
+      if (!col) continue;
+      for (let i = 0; i < pos.count; i++) {
+        const r = col.getX(i), g = col.getY(i), b = col.getZ(i);
+        if (!(r > 0.45 && g > 0.7 && b > 0.5)) continue;              // белые, тёплые и холодные стёкла фар
+        v.fromBufferAttribute(pos, i).applyMatrix4(m.matrix);
+        if (v.z < hl * 0.55 || v.y > top + 0.15) continue;           // люстра на крыше, задний ход — не фары
+        pts[v.x > 0 ? 1 : 0].push([v.x, v.y, v.z]);
+      }
+    } else if (m.material.color.getHex() === 0xfff1c8 && m.position.z > 0) {
+      if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+      const bb = m.geometry.boundingBox;
+      for (const x of [bb.min.x, bb.max.x]) for (const y of [bb.min.y, bb.max.y]) for (const z of [bb.min.z, bb.max.z]) {
+        v.set(x, y, z).applyMatrix4(m.matrix);
+        pts[m.position.x > 0 ? 1 : 0].push([v.x, v.y, v.z]);
+      }
+    }
+  }
+  const out = [[], []];
+  for (const s of [0, 1]) {
+    const P = pts[s].sort((a, b) => a[1] - b[1]);
+    let c = null;
+    const flush = () => { if (c) out[s].push([(c.x0 + c.x1) / 2, (c.y0 + c.y1) / 2, c.z1 + 0.02, c.x1 - c.x0 + 0.04, c.y1 - c.y0 + 0.04, 0]); c = null; };
+    for (const p of P) {
+      if (c && p[1] - c.y1 > 0.1) flush();
+      if (!c) c = { x0: p[0], x1: p[0], y0: p[1], y1: p[1], z1: p[2] };
+      c.x0 = Math.min(c.x0, p[0]); c.x1 = Math.max(c.x1, p[0]); c.y1 = Math.max(c.y1, p[1]); c.z1 = Math.max(c.z1, p[2]);
+    }
+    flush();
+  }
+  return out;
 }
 
 /* где у модели задние красные и оранжевые: рамки по сторонам */
@@ -106,7 +191,13 @@ function rig (car) {
   // углы кузова — по аварийке (makeCar): x = ±(W/2 − 0,1), y = верх борта + 0,08, z = ±(hl − 0,05)
   const W2 = Math.abs(hz[1].position.x) + 0.1, top = hz[0].position.y - 0.08, hlF = hz[0].position.z + 0.05, hlB = -hz[2].position.z + 0.05;
   const F = findLamps(car);
-  const brake = [], rev = [], turn = [[], []];
+  const brake = [], rev = [], turn = [[], []], tailPlate = [];
+  const H = findHeads(car, hlF, top), head = [], headSide = [];
+  for (const s of [0, 1]) {
+    const sg = s ? 1 : -1;
+    if (!H[s].length) H[s].push([sg * (W2 - 0.27), top - 0.12, hlF + 0.02, 0.3, 0.16, 0]);   // не нашли — по углу морды
+    for (const q of H[s]) { head.push(q); headSide.push(s); }
+  }
   for (const s of [0, 1]) {
     const sg = s ? 1 : -1;
     const T = F.tail[s];
@@ -114,6 +205,7 @@ function rig (car) {
     const tb = T.n ? T : { x0: sg > 0 ? W2 - 0.41 : -W2 + 0.03, x1: sg > 0 ? W2 - 0.03 : -W2 + 0.41, y0: top - 0.12, y1: top + 0.04, z0: -hlB - 0.02, n: 0 };
     const tz = tb.z0 - 0.015, tw = tb.x1 - tb.x0 + 0.04, th = tb.y1 - tb.y0 + 0.04, tx = (tb.x0 + tb.x1) / 2, ty = (tb.y0 + tb.y1) / 2;
     brake.push([tx, ty, tz, tw, th, 1]);
+    tailPlate.push([tx, ty, tz + 0.005, tw - 0.04, th - 0.04, 1]);
     // задний ход — белая плашка ближе к середине от фонаря
     const inner = sg > 0 ? tb.x0 : tb.x1;
     rev.push([inner - sg * 0.11, ty, tz, 0.14, Math.min(0.12, th), 1]);
@@ -128,8 +220,12 @@ function rig (car) {
     brake: lampSet(car, brake, '#ff2626', 3.2, 0.7),
     rev: lampSet(car, rev, '#f2f6ff', 4, 0.5),
     turn: [lampSet(car, turn[0], '#ffa21f', 4, 0.55), lampSet(car, turn[1], '#ffa21f', 4, 0.55)],
+    head: haloSet(car, head, '#fff1d0', 2.8, 0.6), headSide,
+    tail: haloSet(car, brake, '#ff2a2a', 2.4, 0.5),
+    // простая машина: задние фонари в склейке кузова (темнеют ночью) — поверх своя красная плашка
+    tailLamp: F.tail[0].n + F.tail[1].n ? null : lampSet(car, tailPlate, '#c8141e', 1, 0),
     side: 0, hold: 0, blinkT: 0,
-    state: { brake: false, reverse: false, left: false, right: false, side: 0, found: { tail: F.tail[0].n + F.tail[1].n, ambR: F.ambR[0].n + F.ambR[1].n, ambF: F.ambF[0].n + F.ambF[1].n } },
+    state: { head: false, brake: false, reverse: false, left: false, right: false, side: 0, found: { tail: F.tail[0].n + F.tail[1].n, ambR: F.ambR[0].n + F.ambR[1].n, ambF: F.ambF[0].n + F.ambF[1].n } },
   };
   DEBUG.L = L;
   ud.lights = L;
@@ -155,8 +251,14 @@ function collapse (set, q) {
 }
 function apply (L, k) {
   const s = k[1] === 'l' ? 1 : 0;
-  if (k[0] === 'r') { collapse(L.brake, s); collapse(L.rev, s); collapse(L.turn[s], 0); }
-  else collapse(L.turn[s], 1);
+  if (k[0] === 'r') {
+    collapse(L.brake, s); collapse(L.rev, s); collapse(L.turn[s], 0);
+    if (L.tail) collapse(L.tail, s);
+    if (L.tailLamp) collapse(L.tailLamp, s);
+  } else {
+    collapse(L.turn[s], 1);
+    if (L.head) for (let q = 0; q < L.headSide.length; q++) if (L.headSide[q] === s) collapse(L.head, q);
+  }
 }
 
 function set (S, on, op) {
@@ -189,4 +291,23 @@ export function step (car, dt, vf, steer, brake, gas, night = 0) {
   st.brake = braking; st.reverse = reverse; st.side = haz ? 0 : L.side; st.left = blink && L.side > 0; st.right = blink && L.side < 0;
 }
 
-export const DEBUG = { L: null, TURN, step };
+/* фары и задние фонари своей машины: night — ENV.night (0…1), wx — дождь или снегопад (0…1).
+   Каждый кадр из updateEnv (game.js), в любом состоянии игры: огни собираются здесь же, если ещё нет */
+export function lights (car, dt, night = 0, wx = 0) {
+  if (!car) return;
+  const L = car.userData.lights === undefined ? rig(car) : car.userData.lights;
+  HEAD.night = night; HEAD.wx = wx;
+  HEAD.on = HEAD.on ? night >= HEAD.OFF || wx >= HEAD.WX_OFF : night >= HEAD.ON || wx >= HEAD.WX;
+  HEAD.k += ((HEAD.on ? 1 : 0) - HEAD.k) * Math.min(1, HEAD.FADE * dt);
+  if (!HEAD.on && HEAD.k < 0.01) HEAD.k = 0;
+  if (!L || !L.head) return;
+  const k = HEAD.k, on = k > 0;
+  set(L.head, on, k * (0.45 + 0.4 * night));               // днём в непогоду — тусклее, ночью — ярко
+  set(L.tail, on, k * (0.3 + 0.35 * night));
+  if (L.tailLamp) set(L.tailLamp, on, 0.4 * k);
+  L.state.head = HEAD.on;
+}
+/* сила света фар 0…1 — для пятна на асфальте (game.js headGlow) */
+export const headK = () => HEAD.k;
+
+export const DEBUG = { L: null, TURN, HEAD, step, lights };

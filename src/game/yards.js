@@ -41,7 +41,7 @@ export const YARD = {
   STEP: 6,                                       // домов за шаг поздней сборки (latebuild.js): на Деке шаг ~30—60 мс
   PATH: { W: 1.6, FROM: 2.3, MIN: 3 },
   WALK: { OFF: 7.5, W: 1.8, EXT: 4, STEP: 3, ROAD_MAX: 40 },
-  FENCE: { U: 2.9, H: 0.55, SEG: 2.5, FROM: 2.9, FLOWERS: 0.35, COLORS: ['#3f7a4a', '#4f6fa8', '#d8d2c8', '#8a3b3b', '#c9803a'] },
+  FENCE: { U: 2.9, H: 0.55, SEG: 2.5, FROM: 2.9, FLOWERS: 0.35, COLORS: ['#5aa860', '#6a9ad8', '#ece6da', '#c45a48', '#e0943e'] },   // светлые: сбиваемое (твёрдое — серое, yardmaze.js)
   BENCH: { SHARE: 0.8, U: 1.9, N: 3.9 },
   // выход общей дорожки в сеть: ширина, не длиннее MAX м, луч шагами STEP, внахлёст на OVER м,
   // DIRS направлений веером, старты — концы и каждые EVERY м (штраф PEN_MID м), веер — штраф PEN_FAN м
@@ -294,6 +294,7 @@ export function* steps (A) {
   }
   const segsNear = (segs, x, z, r) => { for (const q of segs) if (segD(x, z, q[0], q[1], q[2], q[3]) < r) return true; return false; };
   const addPath = (pts, half) => {
+    pts.hw = half;                                 // полуширина — бордюрам по краям (curbs.js)
     A.YARD_PATHS.push(pts); CITY.paths.push(pts);
     for (let i = 1; i < pts.length; i++) netAdd(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], half);
   };

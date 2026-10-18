@@ -32,6 +32,7 @@ import * as NICK from '../nicks.js';            // накладная: ават�
 import * as OS from '../ordersheet.js';
 import * as KIT from './doorkit.js';
 import * as SC from './doorscene.js';
+import * as COACH from './doorcoach.js';     // обучение первого раза: пауза, подсветка кнопок, «поехали!»
 
 const N_ = s => s;
 const DT_MAX = 0.1;
@@ -147,6 +148,7 @@ export default {
     { k: 'look', label: 'подъезд', type: 'sel', def: 'shabby', opts: [['shabby', 'обшарпанный'], ['clean', 'чистый с цветами'], ['auto', 'по адресу']] },
     { k: 'time', label: 'эталон «быстро», с (0 — по формуле)', type: 'num', def: 0, min: 0, max: 30, step: 0.5 },
     { k: 'learnOn', label: 'первый раз (подсказка Толика)', type: 'bool', def: false },
+    { k: 'learnGop', label: 'первые гопники (обучение)', type: 'bool', def: false },
   ],
   mount (root, o, api) {
     const t = api.t, K = Object.assign({}, K0, o.K || {});
@@ -239,7 +241,7 @@ export default {
       const kbd = (s, kb) => '<kbd class="pp-key' + (kb ? ' pp-key-kb' : '') + '">' + esc(s) + '</kbd>';
       mini.key(k === 'pad' ? (ps ? '□' : 'X') : k === 'kb' ? 'X' : '');
       KIT.selfGlyph(elSelf, k, inputKind().family);
-      if (st.phase === 'gop') {
+      if (st.phase === 'gop' || (st.phase === 'learn' && st.back === 'gop')) {
         elHelp.innerHTML = k === 'pad' ? kbd('◀ ▶') + esc(t('в такт — обойти')) + ' · ' + kbd(Y) + esc(t('откупиться'))
           : k === 'kb' ? kbd('← →', 1) + esc(t('в такт — обойти')) + ' · ' + kbd('Enter', 1) + esc(t('откупиться'))
             : esc(t('жми ◀ ▶ в такт — или откупись'));
@@ -316,6 +318,9 @@ export default {
       say({ person: gopP(), name: t('гопник'), text: t(api.ADULT ? GOP.ask : GOP.askKid), mood: 'angry' });
       sfx('gop');
       setBars();
+      // первые гопники за всё время (doorstep.js api.first): подъезд стоит, обучение — обойти в такт или откупиться
+      const firstGop = api.first ? api.first('gop') : !!o.learnGop;
+      if (firstGop) learnStart(gopSteps(), 'gop');
     }
     function gopBeat () { gop.state = 'beat'; gop.w = K.GOP_WIN; sfx('beat'); }
     function gopMiss () {
@@ -463,6 +468,12 @@ export default {
     function step (dt) {
       dt = clamp(dt, 0, DT_MAX);
       if (st.phase === 'done') return;
+      if (st.phase === 'learn') {                               // обучение первого раза: всё стоит, сцена рисуется, рамка — за целью
+        KIT.dashSet(box, clock(), elFuse);
+        anim(dt); draw();
+        if (coach) coach.layout();
+        return;
+      }
       if (fake && (st.phase === 'play' || st.phase === 'gop' || st.phase === 'self')) fake.step(dt);
       KIT.dashSet(box, clock(), elFuse);
       for (const [n, d] of doors) {
@@ -745,6 +756,82 @@ export default {
       for (let i = 0; i < gop.dirs.length; i++) R(cx - (gop.dirs.length * 4 * U) / 2 + i * 4 * U + U, cy + Rr + U * 4, U * 2.4, U * 2.4, i < gop.i ? '#4fd65a' : 'rgba(255,243,214,.7)');
     }
 
+    /* ── обучение первого раза (doorcoach.js; автор 18.10.2026: «сначала обучение с постепенной анимацией, подсвечивающей,
+       куда нажимать, и потом уже даёшь подняться»): подъезд стоит (фаза 'learn'), срок заказа тоже (api.hold), шаги —
+       ▲ вверх, ◀ ▶ к двери, звонок; «поехали!» — и только тогда бежать. Первые гопники за всё время — так же: в такт, откуп ── */
+    const ln = o.learn || (o.learnOn ? { name: t('Толик'), add: 20, k: 2 } : null);
+    let coach = null;
+    const ps = () => inputKind().family === 'ps';
+    const padA = () => (ps() ? '✕' : 'A');
+    /* где на сцене курьер и двери площадки (в координатах экрана мини-игры) — для рамки на клавиатуре и геймпаде */
+    const manRect = () => { const px = SX(manX()), by = SY(st.y); return { x: px - 7 * U, y: by - 21 * U, w: 14 * U, h: 22 * U }; };
+    const doorRect = i => { const f = Math.round(st.y), x = doorX(i); return { x: SX(x - DW / 2) - U * 2, y: SY(f + DH) - U * 2, w: DW * FH + U * 4, h: DH * FH + U * 3 }; };
+    const join = (...rs) => { const x0 = Math.min(...rs.map(r => r.x)), y0 = Math.min(...rs.map(r => r.y)); return { x: x0, y: y0, w: Math.max(...rs.map(r => r.x + r.w)) - x0, h: Math.max(...rs.map(r => r.y + r.h)) - y0 }; };
+    const L = (s, keys, v) => KIT.keysLine(t, s, keys || {}, v || {});
+    const KB = COACH.kbd;
+    function mainSteps () {
+      const v = { n: floor, f: flat };
+      return [
+        { el: k => (k === 'touch' ? q('.sx-b-up') : null), rect: k => (k === 'touch' ? null : manRect()),
+          text: k => (k === 'touch' ? L(N_('Лифт сломан — бежим на {n}-й пешком. Тапай ▲ часто: курьер бежит вверх. Зажмёшь — выдохнется и встанет.'), {}, v)
+            : L(N_('Лифт сломан — бежим на {n}-й пешком. Жми {up} часто: курьер бежит вверх. Зажмёшь — выдохнется и встанет.'), { up: k === 'pad' ? KB(padA()) : KB('↑', 1) }, v)),
+          keys: k => (k === 'pad' ? [[padA()]] : [['↑', 1]]),
+          hit: c => c === 'ArrowUp' || c === 'KeyW' || c === 'Space', pad: p => !!(p.menuOk || p.menuUp) },
+        { el: k => (k === 'touch' ? [...barGo.querySelectorAll('[data-a="left"], [data-a="right"]')] : null),
+          rect: k => (k === 'touch' ? null : join(doorRect(Math.max(0, nl - 1)), manRect())),
+          text: k => (k === 'touch' ? L(N_('На своём этаже ◀ ▶ — к двери. Какие квартиры на этаже — на синей табличке у лестницы. Тебе — кв. {f}.'), {}, v)
+            : L(N_('На своём этаже {side} — к двери. Какие квартиры на этаже — на синей табличке у лестницы. Тебе — кв. {f}.'), { side: k === 'pad' ? KB('◀ ▶') : KB('← →', 1) }, v)),
+          keys: k => (k === 'pad' ? [['◀'], ['▶']] : [['←', 1], ['→', 1]]),
+          hit: c => c === 'ArrowLeft' || c === 'ArrowRight' || c === 'KeyA' || c === 'KeyD', pad: p => !!(p.menuLeft || p.menuRight) },
+        { el: k => (k === 'touch' ? q('.sx-b-ring') : null), rect: k => (k === 'touch' ? null : doorRect(Math.max(0, nl - 1))),
+          text: k => (k === 'touch' ? L(N_('У двери 🔔 — звонок (или тапни по самой двери). Не та квартира — жилец наругает, а срок идёт.'))
+            : L(N_('У двери {ok} — звонок. Не та квартира — жилец наругает, а срок идёт.'), { ok: k === 'pad' ? KB(padA()) : KB('Enter', 1) })),
+          keys: k => (k === 'pad' ? [[padA()]] : [['Enter', 1]]),
+          hit: c => c === 'Enter' || c === 'NumpadEnter' || c === 'KeyE', pad: p => !!p.menuOk },
+        { go: true,
+          text: (k, fam) => L(N_('Готов? Жмёшь «поехали» — и пошёл срок заказа.')) + ' ' +
+            (k === 'touch' ? L(N_('Не хочешь бегать — «пусть сам спустится» под заданием, но без бонуса за скорость.'))
+              : L(N_('Не хочешь бегать — {self} «пусть сам спустится», но без бонуса за скорость.'), { self: KB(KIT.selfKey(k, fam), k === 'kb') })) + KIT.learnAdd(ln, t) },
+      ];
+    }
+    function gopSteps () {
+      const gopR = () => { const cy = SY(gop.at + 0.5), Rr = FH * 0.07, x0 = SX(XA - 0.12) - 7 * U, x1 = SX(XA + 0.26) + 7 * U, y0 = cy - Rr * 2.6; return { x: x0, y: y0, w: x1 - x0, h: SY(gop.at) - y0 }; };
+      const n = Math.round(K.GOP_PAY * 100);
+      return [
+        { el: k => (k === 'touch' ? [...barGop.querySelectorAll('.sx-b-dir')] : null), rect: k => (k === 'touch' ? null : gopR()),
+          text: k => (k === 'touch' ? L(N_('Гопники! Над ними стрелка — жми ◀ или ▶ в её сторону, в такт, пока кольцо не сжалось. Сбился — заново.'))
+            : L(N_('Гопники! Над ними стрелка — жми {dir} в её сторону, в такт, пока кольцо не сжалось. Сбился — заново.'), { dir: k === 'pad' ? KB('◀ ▶') : KB('← →', 1) })),
+          keys: k => (k === 'pad' ? [['◀'], ['▶']] : [['←', 1], ['→', 1]]),
+          hit: c => c === 'ArrowLeft' || c === 'ArrowRight' || c === 'KeyA' || c === 'KeyD', pad: p => !!(p.menuLeft || p.menuRight) },
+        { el: () => q('.sx-b-pay'),
+          text: k => (k === 'touch' ? L(N_('Некогда — жми «отдать „чаевые“»: минус {n} % цены адреса.'), {}, { n })
+            : L(N_('Некогда — откупись {pay}: минус {n} % цены адреса.'), { pay: k === 'pad' ? KB(ps() ? '△' : 'Y') : KB('Enter', 1) }, { n })),
+          keys: k => (k === 'pad' ? [[ps() ? '△' : 'Y']] : [['Enter', 1]]),
+          hit: c => c === 'Enter' || c === 'NumpadEnter' || c === 'KeyY', pad: p => !!p.btnY },
+        { go: true, text: () => L(N_('Гопники ждут ответа. Жмёшь «поехали» — пошли стрелки.')) },
+      ];
+    }
+    function learnStart (steps, kind) {
+      if (coach && coach.on()) return;
+      const back = st.back = st.phase;
+      st.phase = 'learn';
+      keys.up = keys.down = keys.act = false; touch.up = touch.down = false; st.v = 0;
+      if (api.hold) api.hold(true);
+      let who = ln && ln.person ? ln : null;
+      if (!who) { let p = null; try { p = api.tolik ? api.tolik() : null; } catch (e) { p = null; } who = { person: p, name: t('Толик') }; }
+      coach = COACH.coach(box, {
+        t, ln: who, steps, paused: () => !!(api.paused && api.paused()),
+        onEnd: skipped => {
+          st.phase = back;
+          st.arm = Math.max(st.arm, 0.3); st.lastTap = st.t;
+          if (gop && kind === 'gop') { gop.arm = 0.3; gop.tt = Math.max(gop.tt, 0.9); }
+          if (api.hold) api.hold(false);
+          glyphs();
+          api.log && api.log('обучение (' + kind + ') ' + (skipped ? 'пропущено' : 'пройдено'));
+        },
+      });
+    }
+
     /* ── ввод ── */
     const onKey = e => {
       if ((st.phase !== 'play' && st.phase !== 'gop') || (api.paused && api.paused())) return;
@@ -785,6 +872,7 @@ export default {
     addEventListener('blur', onBlur);
 
     function pad (p) {
+      if (st.phase === 'learn') { if (coach) coach.pad(p); return; }
       if (st.phase !== 'play' && st.phase !== 'gop') return;
       if (!p.a) st.armA = true;                                 // A держали ещё в машине (нитро) — не считаем, пока не отпустят
       padH.a = !!p.a; padH.up = !!p.up; padH.down = !!(p.b || p.down);
@@ -834,17 +922,7 @@ export default {
     glyphs();
     where();
     KIT.dashSet(box, clock(), elFuse);
-    /* первый раз (doorstep.js learnFirst, ECON.DOORGAME.LEARN): Толик пишет, что делать, — кнопками того, чем играешь */
-    const ln = o.learn || (o.learnOn ? { name: t('Толик'), add: 20, k: 2 } : null);
-    let learnUpd = () => {};
-    const learnGo = () => KIT.learn(msgs, ln, (k, fam) => {
-      const ps = fam === 'ps', K = KIT.key, A = ps ? '✕' : 'A', v = { n: floor, f: flat };
-      const line = N_('Первый раз в подъезде? Лифт сломан: жми {up} часто — беги на {n}-й (держать — выдохнешься). На этаже {side} к кв. {f}, {ok} — звонок.');
-      return (k === 'pad' ? KIT.keysLine(t, line, { up: K(A), side: K('◀ ▶'), ok: K(A) }, v)
-        : k === 'kb' ? KIT.keysLine(t, line, { up: K('↑', 1), side: K('← →', 1), ok: K('Enter', 1) }, v)
-          : KIT.keysLine(t, N_('Первый раз в подъезде? Лифт сломан: тапай ▲ часто — беги на {n}-й. На этаже — тап по двери кв. {f}.'), {}, v)) + KIT.learnAdd(ln, t);
-    });
-    const offInput = onInput(() => { glyphs(); learnUpd(); });
+    const offInput = onInput(() => { glyphs(); });
     let raf = 0, last = 0;
     if (api.setStep) api.setStep(step);
     else {
@@ -853,22 +931,24 @@ export default {
     }
     if (api.setPad) api.setPad(pad);
     say({ person, name: client(), text: t('Лифт опять сломан — поднимайтесь пешком!') });
-    learnUpd = learnGo();                                       // подсказка первого раза — под репликой клиента
     draw();
+    if (ln) learnStart(mainSteps(), 'stairs');                  // первый подъезд — сначала обучение, потом бежать
 
     // для проверок (probe): пройти как игрок — гопников обойти (arg 'pay' — откупиться), подняться на нужный этаж и позвонить;
     // 'wrong' — сначала позвонить в чужую дверь; 'late' — не успеть (срок вышел)
     box.__solve = arg => {
+      if (coach && coach.on()) coach.skip();                    // обучение первого раза — пропустить, как кнопкой
       if (st.phase !== 'play' && st.phase !== 'gop') return;
       if (arg === 'self') { selfDown(); return; }               // «пусть сам спустится»
       st.arm = 0; st.lock = 0;
-      if (gop && !gop.done) { if (st.phase !== 'gop') { st.y = gop.at; startGop(); } gop.arm = 0; if (arg === 'pay') pay(); else gopPass('dodge'); }
+      if (gop && !gop.done) { if (st.phase !== 'gop') { st.y = gop.at; startGop(); if (coach && coach.on()) coach.skip(); } gop.arm = 0; if (arg === 'pay') pay(); else gopPass('dodge'); }
       if (arg === 'late') { finish(false, true); return; }
       st.y = tgt; st.v = 0;
       if (arg === 'wrong' && per > 1) { st.door = (P.door + 1) % per; ring(); st.lock = 0; }
       st.door = P.door;
       ring();
     };
+    box.__coach = () => (coach && coach.on() ? coach.state() : null);
     box.__st = () => ({ phase: st.phase, y: +st.y.toFixed(3), v: +st.v.toFixed(3), breath: +st.breath.toFixed(3), puff: st.puff > 0, door: st.door,
       t: +st.t.toFixed(2), limit, floor, flat, per, lv, entr: P.entr, want: P.door, gopAt: P.gopAt, selfT: st.phase === 'self' ? +st.selfT.toFixed(2) : null, gop: gop ? { state: gop.state, i: gop.i, dir: gop.dirs[gop.i], done: gop.done, how: gop.how } : null, res: st.res });
     return () => {
@@ -878,6 +958,7 @@ export default {
       removeEventListener('pointerup', release, true);
       removeEventListener('pointercancel', release, true);
       offInput();
+      if (coach) coach.off();
       msgs.clear();
       mini.off();
       if (raf) cancelAnimationFrame(raf);

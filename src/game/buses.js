@@ -24,6 +24,8 @@
    ────────────────────────────────────────────────────────────────────────── */
 import { t as $t } from '../i18n/index.js';
 import { makePerson } from './people.js';
+import * as CSNOW from './carsnow.js';    // зимой — снег на крыше (carsnow.js)
+import * as WARM from './warmup.js';      // прогрев шейдеров при загрузке (warmup.js samplesFrom)
 
 /* числа автобусов — здесь (docs/CAREER.md «Автобусы») */
 export const BUS = {
@@ -356,6 +358,7 @@ function template (M) {
   // поворотники: правые и левые (углы + повторитель на борту)
   const bl = (s) => { const L2 = []; box(L2, 0.14, 0.12, 0.06, '#ffffff', s * (hw - 0.1), 0.86, hl + 0.04); box(L2, 0.14, 0.12, 0.06, '#ffffff', s * (hw - 0.1), 1.2, -hl - 0.04); box(L2, 0.03, 0.1, 0.2, '#ffffff', s * (hw + 0.02), 1.22, hl - 0.7); return A.mergeGeos(L2); };
   const T = { lit: A.mergeGeos(lit), glow: A.mergeGeos(glow), win: A.mergeGeos(win), open: A.mergeGeos(open), blinkR: bl(-1), blinkL: bl(1), gl: [] };
+  CSNOW.tag(T.open, CSNOW.tag(T.lit, 'bus'));       // снег на крыше зимой — один на модель (carsnow.js)
   TPL.set(M, T);
   return T;
 }
@@ -848,6 +851,8 @@ export function* build (api) {
   if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('nobus')) return;   // ?nobus — без автобусов (сравнить кадр)
   const t0 = performance.now();
   BODY_MAT = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  CSNOW.patch(BODY_MAT, 'bus');
+  WARM.samplesFrom((T, geo) => [['кузов автобуса со снегом (buses.js BODY_MAT, carsnow.js)', new T.Mesh(geo, BODY_MAT)]]);   // 18.10.2026: программа — при загрузке, не с первым автобусом в кадре
   atlas();
   GLOW_MAT = new THREE.MeshBasicMaterial({ vertexColors: true, map: ATLAS_TEX });
   WIN_MAT = new THREE.MeshBasicMaterial({ color: '#3b4a58' });

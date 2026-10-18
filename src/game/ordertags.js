@@ -47,6 +47,16 @@ export function init (api) {
   el.setAttribute('aria-hidden', 'true');
   ((document.getElementById('game')) || document.body).appendChild(el);
   T.el = el;
+  /* высота стопки — от ResizeObserver (после раскладки, сам браузер), а не чтением offsetHeight раз в секунду: чтение
+     посреди кадра заставляло пересчитать раскладку всей страницы — на «Деке» 4—9 мс в одном кадре (18.10.2026) */
+  try { new ResizeObserver(es => { const b = es[0] && es[0].borderBoxSize && es[0].borderBoxSize[0]; RO_H = Math.round(b ? b.blockSize : el.offsetHeight); applyH(); }).observe(el); RO = true; } catch (e) { RO = false; }
+}
+let RO = false, RO_H = 0;
+function applyH () {
+  const h = T.el.classList.contains('on') ? RO_H : 0;
+  if (h === T.h) return;
+  T.h = h;
+  document.documentElement.style.setProperty('--otags-h', h ? h + 8 + 'px' : '0px');   // радио-плашка — над стопкой (ordertags.css)
 }
 
 const firstName = p => NICK.short(p, t('клиент'));   // клиент заказа — ник из приложения целиком, иначе только имя (nicks.js)
@@ -148,6 +158,7 @@ function update () {
    (T.h < 0: собрали, убрали бирку, сменилась текущая, показали/спрятали) и на всякий случай раз в секунду */
 function syncHeight () {
   T.hT = 0; T.stats.measured++;
+  if (RO) { applyH(); return; }                     // высоту знаем от ResizeObserver — не читаем раскладку
   const h = T.el.classList.contains('on') ? Math.round(T.el.offsetHeight) : 0;
   if (h === T.h) return;
   T.h = h;

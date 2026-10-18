@@ -1,0 +1,12 @@
+{
+  "profile": "personal",
+  "cloud": "cloud-ndrwbv",
+  "folder": "bird-pizza",
+  "folderId": "b1g9o7ujbufpq1ibib3r",
+  "databaseName": "bird-stats",
+  "endpoint": "grpcs://ydb.serverless.yandexcloud.net:2135",
+  "database": "/ru-central1/b1g9aadebop5730o2cke/etn3tr56i5tosghq80nv",
+  "table": "events",
+  "function": "bird-ingest",
+  "serviceAccount": "bird-ingest"
+}

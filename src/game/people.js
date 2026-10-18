@@ -28,6 +28,7 @@
      cig: true                        — сигарета во рту
      bottle: '#…'                     — бутылка в руке (цвет стекла; белая — кефир)
      cup: '#…'                        — стакан кофе с крышкой в руке
+     gun: true                        — пистолет в руке, стволом вперёд (regulars.js, Саня: «не смотри на ствол»)
      earring: true                    — серьга в ухе
      antenna: '#…'                    — антенны на голове (цвет шариков)
      sweater: '#…'                    — вязаный свитер: высокое горло и полоса узора на груди (цвет узора;
@@ -356,11 +357,17 @@ function wearOf (Lk, o) {
   const coat = o.shirt || P(r, COATS), scarf = r() < 0.7 ? P(r, SCARVES) : null, fur = P(r, FURS);
   const hx = r();
   let head = null;
-  if (!o.cap) {
-    if (lvl === 3) head = hx < (Lk.age === 'young' ? 0.12 : 0.34) ? 'ushanka' : hx < 0.8 ? 'beanie' : hx < 0.9 ? 'hood' : Lk.head === 'hat' ? 'hat' : 'beanie';
-    else if (lvl === 2 && Lk.head === 'none' && hx < 0.28) head = 'beanie';
-    else if (lvl === 0 && Lk.head === 'beanie') head = 'cap';               // летом без шапки
+  /* зимой голых голов нет (автор 18.10.2026: «люди не должны ходить без шапок на улице»): в пуховике — ушанка, шапка,
+     капюшон или шляпа; в куртке (первый снег, оттепель, поздняя осень) — у большинства шапка; ирокез и афро — под
+     капюшоном; форменная кепка (курьеры, дорожники, гопники) — шапкой того же цвета */
+  const odd = Lk.hair === 'mohawk' || Lk.hair === 'afro';
+  if (o.cap) { if (lvl >= 2) head = hx < (lvl === 3 ? 0.28 : 0.1) ? 'ushanka' : 'beanie'; }
+  else if (lvl === 3) head = odd ? 'hood' : hx < (Lk.age === 'young' ? 0.12 : 0.34) ? 'ushanka' : hx < 0.8 ? 'beanie' : hx < 0.9 ? 'hood' : Lk.head === 'hat' ? 'hat' : 'beanie';
+  else if (lvl === 2) {
+    if (Lk.head === 'hat' || Lk.head === 'hood' || Lk.head === 'beanie') head = Lk.head;
+    else if (hx < (WARM > 0.6 ? 0.78 : 0.35)) head = odd || hx < 0.1 ? 'hood' : 'beanie';
   }
+  else if (lvl === 0 && Lk.head === 'beanie') head = 'cap';               // летом без шапки
   return { lvl, coat, scarf, fur, head, mitt: P(r, ['#2b2a30', '#6b2e2e', '#3b4a5a', '#e0b13f', '#f4f1ea']) };
 }
 
@@ -463,12 +470,15 @@ function buildSpec (Lk, o = {}) {
     if (Lk.cup && !Lk.bottle && p === (Lk.sleeve === 'R' ? 3 : 4)) {            // стакан кофе с крышкой
       bx(p, 0.09, 0.15, 0.09, 0, -0.55, 0.08, Lk.cup); bx(p, 0.1, 0.025, 0.1, 0, -0.465, 0.08, '#2b2a30'); bx(p, 0.092, 0.05, 0.092, 0, -0.56, 0.08, '#8a5a3a');
     }
+    if (Lk.gun && !Lk.bottle && !Lk.cup && p === (Lk.sleeve === 'R' ? 3 : 4)) {   // пистолет: рукоять в кулаке, ствол вперёд
+      bx(p, 0.045, 0.11, 0.07, 0, -0.58, 0.05, '#2b2a30'); bx(p, 0.045, 0.06, 0.2, 0, -0.52, 0.13, '#3a3a40');
+    }
     if (Lk.leaflets && !Lk.bottle && !Lk.cup && p === (Lk.sleeve === 'R' ? 3 : 4)) {   // пачка листовок: бумага, сверху — красный заголовок
       bx(p, 0.05, 0.2, 0.15, 0.02, -0.56, 0.06, Lk.leaflets); bx(p, 0.052, 0.05, 0.12, 0.02, -0.5, 0.06, '#d9342c');
     }
   }
   // голова: волосы, убор, борода, нос, уши
-  const hw = o.cap ? 'cap' : o.hat || Wr.head || Lk.head, hc = o.cap || Lk.headC;   // o.hat — убор силой (костюм Деда Мороза: шапка с помпоном, holidays.js)
+  const hw = o.hat || Wr.head || (o.cap ? 'cap' : Lk.head), hc = o.cap || Lk.headC;   // форменная кепка зимой — шапка (wearOf)   // o.hat — убор силой (костюм Деда Мороза: шапка с помпоном, holidays.js)
   const H = [];
   hairBoxes(Lk, Wd, D, r, H);
   const covers = hw === 'cap' || hw === 'beanie' || hw === 'bandana' || hw === 'hood' || hw === 'ushanka';
@@ -534,7 +544,7 @@ function buildSpec (Lk, o = {}) {
   if (Lk.shape === 'chubby') bx(6, Wd - 0.12, 0.06, D - 0.08, 0, -T - 0.02, 0.01, skin);   // второй подбородок
   const piv = [[-lx, 0.7, 0], [lx, 0.7, 0], [0, 0, 0], [-ax, 1.3, 0], [ax, 1.3, 0], [0, HY, 0], [0, HY, 0]];
   const pace = fat ? Lk.pace0 : hs < 0.92 ? 0.82 : 1;
-  return { parts, piv, Wp, W: Wd, D, skin, shirt: coat ? Wr.coat : shirt, pants, hs, fat, pace, fem: Lk.f, face: faceKey(Lk, skin, Wp) };
+  return { parts, piv, Wp, W: Wd, D, skin, shirt: coat ? Wr.coat : shirt, pants, hs, fat, pace, fem: Lk.f, face: faceKey(Lk, skin, Wp), hw, lvl: Wr.lvl };
 }
 
 /* Причёски — коробки в осях головы: [вид, w, h, d, x, y, z, цвет].
@@ -907,7 +917,7 @@ export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
     u.head.geometry.dispose(); u.head.geometry = headBox(S);
     if (u.held) for (const c of u.held) if (c.k === 5) growHeadBox(u.head.geometry, c);
     u.lod.geometry.dispose(); u.lod.geometry = geo(S.parts.map((l, i) => [l, ...S.piv[i]]));
-    u.colors.shirt = S.shirt; u.colors.pants = S.pants; u.warm = WARM;
+    u.colors.shirt = S.shirt; u.colors.pants = S.pants; u.warm = WARM; u.hw = S.hw;
   };
   /* ── предмет в руке — в меш тела (holdFixed, 11.10.2026) ──
      Вершины предмета (меш или группа мешей в осях кости — как для bone.add) кладутся в меш тела с номером кости:
@@ -1043,7 +1053,7 @@ export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
     g.add(lod);
     g.scale.setScalar(S.hs);
     g.userData = { legL, legR, armL, armR, head, faceM, faceS: { skin: S.skin, Wp: S.Wp }, colors: { skin: S.skin, shirt: S.shirt, pants: S.pants }, person, fem: S.fem, fat: S.fat, pace: S.pace,
-      lod, parts: [legL, legR, bodyB, armL, armR, head, skin], far: false, look: Lk, o, hair: null, warm: w0, skin };
+      lod, parts: [legL, legR, bodyB, armL, armR, head, skin], far: false, look: Lk, o, hair: null, warm: w0, skin, hw: S.hw };
     HUMANS.add(g);
     return g;
   }

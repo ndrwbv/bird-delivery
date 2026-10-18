@@ -20,9 +20,9 @@
      back   — первый раз опоздал обратно в пиццерию (карьера, game.js backLate): «вернуться до» — тоже срок.
    «respect», «bump» и «back» видят и ветераны — это правила, о которых раньше не говорили.
 
-   Очередь вручения (ridequeue.js, UI-REVIEW № 41): пока на экране чек оплаты, деньги летят в пачку
-   или только что написал Толик (RQ.busy) — подсказка спрятана, её время стоит, новая не открывается.
-   Пока подсказка на экране — RQ.mark('hint'): достижение ждёт её.
+   Общая очередь уведомлений (notifyq.js, автор 18.10.2026: «одно уведомление за раз»): подсказка держит экран
+   (NQ.claim('hint', soft)), пока видна; что-то важнее (чек оплаты, Толик, рейтинг, достижение) — перебивает: подсказка
+   прячется, её время стоит, после — покажется заново целиком; новая не открывается, пока экран занят.
 
    Подсказка висит не меньше, чем её прочитать (readTime, dialog.js), следующая ждёт, пока
    уйдёт текущая (+0,6 с). «hp» и кофе — срочные: сменяют текущую, та встаёт в очередь.
@@ -42,7 +42,7 @@
 import './hints.css';
 import { t } from '../i18n/index.js';
 import { readTime } from './dialog.js';
-import * as RQ from './ridequeue.js';
+import * as NQ from './notifyq.js';
 import { CLIENT_HIT } from './econ.js';
 
 const KEY = 'dlv-hints';
@@ -128,7 +128,6 @@ function highlight (sel) {
 }
 function open (h) {
   ui();
-  RQ.mark('hint', true);
   H.cur = h; H.t = 0; H.shown = 0;
   TXT.innerHTML = h.text;
   seen(h.id);
@@ -139,7 +138,6 @@ function close () {
   if (!H.cur) return;
   const id = H.cur.id;
   H.cur = null; H.gap = GAP;
-  RQ.mark('hint', false);
   highlight(null);
   if (EL) EL.classList.remove('on');
   if (id === 'drive' && need('map')) { const h = make('map'); H.queue.unshift(Object.assign({ id: 'map', min: Math.max(3, readTime(h.text.replace(/<[^>]+>/g, ''))) }, h)); }   // радар — сразу следом
@@ -157,7 +155,7 @@ function push (id, extra, urgent) {
     open(h);
     return true;
   }
-  if (!H.cur && H.gap <= 0 && !RQ.busy()) open(h); else H.queue.push(h);
+  if (!H.cur && H.gap <= 0 && NQ.claim('hint', true)) open(h); else H.queue.push(h);
   return true;
 }
 
@@ -193,9 +191,12 @@ export function step (dt) {
   if (!A) return;
   const S = A.S, V = A.V;
   const live = !S.paused && PLAY.includes(S.state) && !S.ride;
-  const wait = RQ.busy();                          // чек оплаты, деньги в пачку, Толик — подсказка ждёт (ridequeue.js)
+  // экран — из общей очереди (notifyq.js): есть что показать — держим; занято или перебили — ждём
+  const want = live && !!(H.cur || (H.queue.length && H.gap <= 0));
+  let own = false;
+  if (want) own = NQ.claim('hint', true); else NQ.release('hint');
+  const wait = want && !own;
   if (EL) EL.classList.toggle('on', !!(H.cur && live && !wait));
-  RQ.mark('hint', !!(H.cur && live && !wait));      // достижение ждёт, пока подсказка на экране; следующая — после него (RQ.hold)
   if (!live) {
     if (H.hiEl) H.hiEl.classList.remove('hn-hi');
     if (S.state === 'title' || S.state === 'over') { H.driveAt = null; H.lastHp = null; H.lastMoney = null; }
@@ -221,14 +222,14 @@ export function step (dt) {
   // первый удар: сердце убыло
   if (H.lastHp !== null && S.hp < H.lastHp && S.hp > 0) push('hp', null, true);
   H.lastHp = S.hp;
-  // первые деньги за смену — в очередь: откроется, когда чек и деньги в пачку уйдут (RQ.busy)
+  // первые деньги за смену — в очередь: откроется, когда чек и Толик уйдут (notifyq.js)
   if (A.CAREER) {
     if (H.lastMoney !== null && S.money > H.lastMoney) push('cash');
     H.lastMoney = S.money;
   }
 
   // ── показ ──
-  if (wait) {                                      // занято (чек, деньги, Толик): текущая — обратно в очередь, покажется заново целиком
+  if (wait) {                                      // занято (чек, Толик, рейтинг…): текущая — обратно в очередь, покажется заново целиком
     if (H.cur) { const was = H.cur; highlight(null); H.cur = null; H.gap = GAP; if (was.id !== 'brake') H.queue.unshift(was); }
     return;
   }

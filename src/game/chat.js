@@ -10,7 +10,8 @@
    Текст пришёл — аватарка Толика говорит ртом (talkface.js): ~14 букв в секунду, 0,7—2,6 с.
    Ввод не перехватывает. Место — под колонкой хада справа (кошелёк, часы смены,
    «закончить смену», на телефоне — радар и кнопки); не влезает по высоте — слева от неё.
-   Телефон (Р12, PH ниже): узкая колонка под мини-карточкой, слева от радара, над педалями; имя в пузыре одной строкой,
+   Телефон (Р12, PH ниже): узкая колонка под мини-карточкой, слева от радара, над педалями; имя с должностью в пузыре
+   одной строкой («Толик, управляющий: …»),
    не больше 2 сообщений, «крупно» — ×1,12 на 0,3 с, едешь — прочитанные полупрозрачные.
    Пишет только на плохое и на очень хорошее, обычные доставки — молча.
    Что и когда пишет — docs/ORDERS.md «Толик управляющий».
@@ -21,8 +22,11 @@
                                             blip(f, d, type, v) — звук (Snd.blip); fx — Snd.fx (файлы chat / chat-angry)
      CHAT.react(kind, onShow?)            — kind: 'fast' | 'late' | 'bump' | 'kill' | 'bundle' | 'urgent' | 'back';
                                             onShow() — в момент, когда текст появился (списание денег)
-     CHAT.say(text, onShow?, angry?, who?) — своё сообщение; who = { name, person } — пишет не Толик, а он
-                                            (коллеги в чате пиццерии — рейтинг смены, crewrank.js)
+     CHAT.say(text, onShow?, angry?, who?, o?) — своё сообщение (в общую очередь уведомлений, notifyq.js — ниже SLOT);
+                                            o.key — такое же уже ждёт — не ставить; who.rank — фраза про рейтинг (самая неважная);
+                                            who = { name, person, role } — пишет не Толик, а он
+                                            (коллеги в чате пиццерии — рейтинг смены, crewrank.js); подпись — с
+                                            должностью: «Серёга · курьер» / «Толик · управляющий», телефон — «Серёга, курьер:»
      CHAT.clear()                         — убрать всё (конец смены, меню)
      CHAT.later(ms, fn)                   — отложенное сообщение; пока не вышло — чат «занят»
      CHAT.busy() / CHAT.idle(cb, max)     — есть ли отложенное, «печатает…» или крупное; cb — когда всё
@@ -35,6 +39,17 @@
 import './chat.css';                  // вид iMessage: круглая аватарка, серые пузыри лентой (и для shiftend.js, cityopen.js, DLG.line)
 import { t, N_ } from '../i18n/index.js';
 import * as TF from './talkface.js';  // аватарка говорит ртом, когда сообщение пришло
+import * as NQ from './notifyq.js';  // одно уведомление за раз: сообщение ждёт своей очереди (notifyq.js)
+
+/* Место в общей очереди уведомлений (notifyq.js, автор 18.10.2026: «одно уведомление за раз»): новое сообщение
+   ждёт, пока уйдёт то, что на экране (чек оплаты, тост, подсказка…), и держит экран «печатает…» + прочитать:
+   1,5 с + 0,045 с на букву, не меньше 2,5 и не больше 5,5 с (и не меньше, чем оно крупно). Толик — важность «менеджер»
+   (после чека оплаты, до рейтинга и достижений), ждёт до BOSS_WAIT с; коллеги и Толик про рейтинг (who.rank) — самые
+   неважные: ждут до CREW_WAIT с, в очереди — не больше одного (новое вытесняет старое), Толик пришёл — их ждущее
+   выбрасывается. Одинаковые реакции (react: две похвалы, два опоздания) не копятся — вторая не ставится (вычет — всё равно).
+   Перебило срочное или чек оплаты в первые FRESH с — сообщение уходит из ленты и придёт заново целиком; позже — остаётся мелко */
+export const SLOT = { MIN: 2.5, BASE: 1.5, PER: 0.045, MAX: 5.5, BOSS_WAIT: 45, CREW_WAIT: 12, FRESH: 2.1 };
+let QN = 0;                                              // ждут в очереди (busy — конец смены их подождёт)
 
 const TYPE_S = 0.5, MAX = 3;
 const hold = s => Math.min(8, 4 + s.length / 25);
@@ -260,8 +275,28 @@ function shown (m) {
   if (f) try { f(); } catch (e) { console.warn('[chat]', e); }
 }
 
-/* who — кто пишет, если не Толик: { name, person } (коллеги в чате пиццерии — crewrank.js) */
-export function say (text, onShow, angry, who) {
+/* who — кто пишет, если не Толик: { name, person, role } (коллеги в чате пиццерии — crewrank.js; role — должность:
+   «курьер»; без who — Толик, «управляющий») */
+export function say (text, onShow, angry, who, o) {
+  text = String(text == null ? '' : text);
+  const crew = !!(who && (who.name || who.rank));
+  const rec = { m: null, onShow };
+  QN++;
+  if (!crew) NQ.clear('crew', true);                    // Толик пишет — ждущие фразы коллег про рейтинг не нужны
+  const slot = TYPE_S + Math.max(C.ph ? PH.BIG_HOLD : Math.min(BIG.MAX, BIG.MIN + text.length / BIG.PER),
+    Math.min(SLOT.MAX, Math.max(SLOT.MIN, SLOT.BASE + SLOT.PER * text.length)));
+  NQ.push({
+    kind: crew ? 'crew' : 'boss', text, ms: slot * 1000, fresh: SLOT.FRESH, key: o && o.key,
+    wait: crew ? SLOT.CREW_WAIT : SLOT.BOSS_WAIT, group: crew ? 'crew' : undefined, max: crew ? 1 : undefined,
+    show: () => { QN--; const f = rec.onShow; rec.onShow = null; rec.m = sayNow(text, f, angry, who); },
+    // перебило срочное или чек оплаты: только пришло — убираем из ленты, покажется заново целиком (вычет — один раз);
+    // уже прочитали крупно — остаётся в ленте мелко
+    hide: (it, again) => { if (!rec.m) return; if (again) { QN++; drop(rec.m); rec.m = null; } else { rec.m.calm = true; shrink(rec.m); } },
+    drop: () => { QN--; const f = rec.onShow; rec.onShow = null; if (f) try { f(); } catch (e) { console.warn('[chat]', e); } },   // не показали — вычет всё равно
+  });
+  return rec;
+}
+function sayNow (text, onShow, angry, who) {
   const el = box();
   place();
   // хад мог появиться или спрятаться, пока сообщения висят (написал в катсцене — хада нет, чат встал в самый верх;
@@ -273,7 +308,10 @@ export function say (text, onShow, angry, who) {
   const pers = who && who.person ? who.person : C.person;
   const ava = pers && C.face ? '<img alt="">' : '<i></i>';
   row.innerHTML = ava + '<div class="cm-b"><b></b><p class="typing"><span></span><span></span><span></span></p></div>';
-  row.querySelector('b').textContent = who && who.name ? who.name : t('Толик управляющий');
+  // кто пишет — с должностью (автор 18.10: «когда смс пишет курьер, я не понимаю, что это курьер»): «Серёга · курьер»,
+  // «Толик · управляющий»; на телефоне — в пузыре коротко «Серёга, курьер:»
+  const nm0 = who && who.name ? who.name : t('Толик'), role = who && who.name ? who.role || '' : t('управляющий');
+  row.querySelector('b').textContent = role ? nm0 + ' · ' + role : nm0;
   const img = row.querySelector('img');
   if (img) TF.bind(img, pers, 48);
   el.appendChild(row);
@@ -287,7 +325,7 @@ export function say (text, onShow, angry, who) {
     // телефон: имя — в начале пузыря, одной строкой с текстом («Олег: …»); не телефон — спрятано (chat.css)
     const nm = document.createElement('i');
     nm.className = 'cm-n';
-    nm.textContent = (who && who.name ? who.name : t('Толик')) + ': ';
+    nm.textContent = (role ? nm0 + ', ' + role : nm0) + ': ';
     p.prepend(nm);
     m.at = performance.now();
     place();                                              // текст пришёл — влезает ли по высоте (fit), до «крупно»
@@ -295,7 +333,7 @@ export function say (text, onShow, angry, who) {
     shown(m);
     ding(angry);
     if (img) TF.talk(img, TF.talkTime(text));
-    const big = grow(m) ? bigHold(text) : 0;
+    const big = !m.calm && grow(m) ? bigHold(text) : 0;
     if (big) m.t3 = setTimeout(() => shrink(m), big * 1000);
     m.t2 = setTimeout(() => drop(m), (big + hold(text)) * 1000);
   }, TYPE_S * 1000);
@@ -309,7 +347,7 @@ export function react (kind, onShow) {
   let k = Math.floor(Math.random() * pool.length);
   if (pool.length > 1 && k === C.last[kind]) k = (k + 1) % pool.length;
   C.last[kind] = k;
-  return say(t(pool[k]), onShow, ANGRY.has(kind));
+  return say(t(pool[k]), onShow, ANGRY.has(kind), null, { key: 'react:' + kind });
 }
 
 /* ── экран Толика в конце смены (shiftend.js): одна фраза по смене, «мдаа» — тоже фраза ── */
@@ -335,7 +373,7 @@ export function shiftLine (mood) {
   return t(pool[Math.floor(Math.random() * pool.length)]);
 }
 
-export function clear () { for (const m of C.items.slice()) drop(m); }
+export function clear () { NQ.clear(['boss', 'crew']); for (const m of C.items.slice()) drop(m); }   // ждущие в очереди — тоже (вычеты — всё равно)
 
 /* отложенное сообщение: пока таймер не вышел, чат «занят» (конец смены его подождёт); clear() его не
    отменяет — вычет за опоздание должен случиться и после конца смены */
@@ -344,7 +382,7 @@ export function later (ms, fn) {
   PEND.add(id);
   return id;
 }
-export const busy = () => PEND.size > 0 || C.items.some(m => !m.said || m.big || m.anim);
+export const busy = () => PEND.size > 0 || QN > 0 || C.items.some(m => !m.said || m.big || m.anim);
 export const waiting = () => C.wait > 0;
 /** Толик сейчас «говорит»: печатает или сообщение крупно (музыка приглушается — music.js) */
 export const talking = () => C.items.some(m => !m.said || m.big);

@@ -1,0 +1,9 @@
+{
+  "name": "bird-telemetry-tools",
+  "private": true,
+  "type": "module",
+  "description": "Птица Пицца: таблица и сводка анонимной статистики (YDB). docs/ANALYTICS.md",
+  "dependencies": {
+    "ydb-sdk": "5.11.1"
+  }
+}

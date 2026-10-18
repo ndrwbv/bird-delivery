@@ -34,6 +34,7 @@ import * as THREE from '../vendor/three.module.min.js';
 import { t, N_ } from '../i18n/index.js';
 import { holdFixed } from './people.js';
 import * as SEAS from './seasons.js';
+import * as PETW from './petwear.js';          // зимой собаки в одёжках (petwear.js)
 import * as HITS from './hits.js';
 import * as FXP from './fxpool.js';
 import * as YARDS from './yards.js';
@@ -787,7 +788,7 @@ function sledStep (sc, p, dt, near) {
 /* ─────────────── гуляющие ─────────────── */
 function dogMesh () {
   const C = pick(['#c9a46a', '#2b2a30', '#f4f1ea', '#8a5a3a', '#6b6560', '#d9b36a']), D = '#2b2a30';
-  const s = rand(0.75, 1.15);
+  const s = rand(0.75, 1.15), coat = PETW.coatFor(PETW.PW.HOME);   // с хозяином — зимой все одеты
   const m = propMesh(b => {
     b(0.26 * s, 0.24 * s, 0.62 * s, C, 0, 0.42 * s, 0);
     b(0.2 * s, 0.2 * s, 0.24 * s, C, 0, 0.58 * s, 0.38 * s);
@@ -796,6 +797,8 @@ function dogMesh () {
     for (const sd of [-1, 1]) b(0.06 * s, 0.1 * s, 0.05 * s, C, sd * 0.07 * s, 0.71 * s, 0.33 * s);
     for (const [lx, lz] of [[-0.09, 0.22], [0.09, 0.22], [-0.09, -0.22], [0.09, -0.22]]) b(0.07 * s, 0.32 * s, 0.07 * s, C, lx * s, 0.16 * s, lz * s);
     b(0.05 * s, 0.05 * s, 0.26 * s, C, 0, 0.55 * s, -0.4 * s, -0.7, 0, 0);
+    PETW.wear(b, { w: 0.26 * s, h: 0.24 * s, d: 0.62 * s, y: 0.42 * s, z: 0 }, coat,
+      [[-0.09, 0.22], [0.09, 0.22], [-0.09, -0.22], [0.09, -0.22]].map(([lx, lz]) => [lx * s, lz * s, 0.07 * s, 0.32 * s, 0.32 * s]));
   });
   return m;
 }
@@ -907,7 +910,7 @@ function dogStep (p, dt) {
 }
 
 /* ─────────────── кадр ─────────────── */
-let scanT = 0;
+let scanT = 0, WALK_DUE = 0;
 function caps (M) {
   const k = LOW ? 0.6 : A.hideR().people < 130 ? 0.75 : 1;
   return { scenes: Math.max(1, Math.round(YL.SCENES[M.key] * k)), walk: Math.max(1, Math.round(YL.WALK[M.key] * k)) };
@@ -1010,6 +1013,7 @@ export function scare (x, z, r = 26) {
 export function step (dt) {
   if (!A || OFF || A.intro()) return;
   const V = A.V, M = mode();
+  let busy = 0;                                    // в этом кадре уже родили сцену или гуляющего — человек сцены подождёт кадр
   if ((scanT -= dt) <= 0) {
     scanT = YL.SCAN;
     const t0 = performance.now();
@@ -1023,18 +1027,21 @@ export function step (dt) {
       if (d > YL.DROP || gone || misfit || full) { dropScene(sc); SCENES.splice(i, 1); ST.scenes--; }
     }
     FRESH = 3;
-    if (SCENES.length < C.scenes && ST.people < YL.PEOPLE) trySpawn(M);
+    const made = SCENES.length < C.scenes && ST.people < YL.PEOPLE ? trySpawn(M) : null;
     for (let i = WALKERS.length - 1; i >= 0; i--) {
       const p = WALKERS[i], d = dist(p.x, p.z);
       if (p.dead || d > YL.WALKER.DROP || (p.home && !p.tgt) || (WALKERS.length > C.walk && d > 90 && !inView(p.x, 1, p.z, 2))) { dropWalker(p); WALKERS.splice(i, 1); }
     }
-    if (WALKERS.length < C.walk && ST.people < YL.PEOPLE) spawnWalker(M);
+    // гуляющий — не в том же кадре, что новая сцена (её вещи — склейка, ~1—3 мс на «Деке»), а в следующем (18.10.2026)
+    if (made) busy = 1;
+    if (WALKERS.length < C.walk && ST.people < YL.PEOPLE) { if (made) WALK_DUE = 1; else if (spawnWalker(M)) busy = 1; }
     const ms = performance.now() - t0;
     if (ms > ST.scanMax) ST.scanMax = ms;
     if (ms > 2) ST.scanBig++;
   }
+  else if (WALK_DUE) { WALK_DUE = 0; if (WALKERS.length < caps(M).walk && ST.people < YL.PEOPLE && spawnWalker(M)) busy = 1; }
   // по человеку в кадр из очередей сцен
-  for (const sc of SCENES) if (sc.q.length) {
+  if (!busy) for (const sc of SCENES) if (sc.q.length) {
     const t0 = performance.now();
     sc.ppl.push(spawnPerson(sc, sc.q.shift()));
     const ms = performance.now() - t0;

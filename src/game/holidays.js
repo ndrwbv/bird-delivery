@@ -30,6 +30,8 @@ import * as SEAS from './seasons.js';
 import { DEBUG as SLD } from './streetlamps.js';   // фонари: где столбы, сбит ли (streetlamps.js)
 import { makePerson } from './people.js';
 import * as CYCLE from './seasoncycle.js';      // круг сезонов: праздник сезона — по плану (seasoncycle.js holiday)
+import * as WARM from './warmup.js';           // прогрев шейдеров украшений при загрузке (warmSamples)
+import { MOB } from './mobile.js';              // телефон: тыквы проще (PUMPKIN.CELL_MOB, SEG_MOB)
 import './holidays.css';
 
 /* частота — на все праздники вместе */
@@ -127,6 +129,7 @@ const SEASON_OF = v => ['summer', 'autumn', 'winter', 'spring'][Math.floor(((v %
 
 export function init (api) {
   A = api; THREE = api.THREE;
+  WARM.samplesFrom(warmSamples);
   if (A.onArrive) A.onArrive(onArrive);
   setTimeout(() => { if (window.__dlv) window.__dlv.HOL = DEBUG; }, 0);
 }
@@ -292,6 +295,22 @@ function tinMat () {
   Object.assign(TMAT.uniforms, U);
   TMAT.userData.keep = true; TMAT.userData.glow = 1;
   return TMAT;
+}
+
+/* прогрев шейдеров (warmup.js, 18.10.2026): программы украшений собираются при загрузке, а не в момент, когда
+   праздник начался (на телефоне программы на ходу не держатся, а сборка в Сафари — десятки мс за каждую).
+   Материалы — те же (огоньки, мишура, салют) или тех же настроек (тыквы, рожицы, привидения). */
+function warmSamples (T, geo) {
+  const inst = m => new T.InstancedMesh(geo, m, 1);
+  const map = new T.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+  return [
+    ['огоньки праздника (holidays.js ptsMat)', new T.Points(geo, ptsMat())],
+    ['мишура (holidays.js tinMat)', new T.Mesh(geo, tinMat())],
+    ['салют (holidays.js fwMat)', new T.Points(geo, fwMat())],
+    ['тыквы (holidays.js pumpkins bodyM)', inst(new T.MeshLambertMaterial({ vertexColors: true, emissive: 0x3a1500 }))],
+    ['рожицы тыкв (holidays.js pumpkins faceM)', inst(new T.MeshBasicMaterial({ map, transparent: true, alphaTest: 0.4, color: 0xffffff }))],
+    ['привидения (holidays.js ghosts)', inst(new T.MeshLambertMaterial({ vertexColors: true, emissive: 0x3a3f4a }))],
+  ];
 }
 
 /* клетки: точки (огоньки) и полоски (мишура) */
@@ -473,10 +492,11 @@ const DECOR_BUILD = {
    (вне кадра не рисуются). Привидение — простыня с волнистым подолом, чёрные глаза-овалы и рот «о»: GHOST.N штук
    висят у стен домов на 2,6—5 м рядом с курьером (уехал — дальние переселяются вперёд, вне кадра), покачиваются
    и плавают вверх-вниз */
-const PUMPKIN = { CAP: 1600, NEAR: 900, NEAR_P: 0.5, FAR_P: 0.08, CELL: 800, SIZE: [1.3, 2.1] };
+const PUMPKIN = { CAP: 1600, NEAR: 900, NEAR_P: 0.5, FAR_P: 0.08, CELL: 800, SIZE: [1.3, 2.1],
+  CELL_MOB: 250, SEG_MOB: [10, 7] };   // телефон (18.10.2026): клетка мельче — дальше тумана не рисуются (камера отсекает по дальности), тыква проще (~130 треуг. вместо ~260)
 const GHOST = { N: 36, H: [2.6, 5], NEAR: [45, 190], FAR: 230, CELL: 100, SPOTS: 12000, CHECK: 0.12 };
 function pumpkinGeo () {
-  const g = new THREE.SphereGeometry(0.34, 14, 9);
+  const g = MOB.on ? new THREE.SphereGeometry(0.34, PUMPKIN.SEG_MOB[0], PUMPKIN.SEG_MOB[1]) : new THREE.SphereGeometry(0.34, 14, 9);
   const p = g.attributes.position, col = [];
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i), a = Math.atan2(z, x), rib = 1 + 0.09 * Math.cos(a * 8);
@@ -571,7 +591,8 @@ DECOR_BUILD.pumpkins = function* (X) {
   if (!spots.length) return;
   // по клеткам: InstancedMesh тела и рожицы на клетку, своя граница — вне кадра не рисуются
   const cells = new Map();
-  for (const q of spots) { const k = Math.floor(q.x / PUMPKIN.CELL) + ',' + Math.floor(q.z / PUMPKIN.CELL); if (!cells.has(k)) cells.set(k, []); cells.get(k).push(q); }
+  const PC = MOB.on ? PUMPKIN.CELL_MOB : PUMPKIN.CELL;
+  for (const q of spots) { const k = Math.floor(q.x / PC) + ',' + Math.floor(q.z / PC); if (!cells.has(k)) cells.set(k, []); cells.get(k).push(q); }
   const geo = pumpkinGeo(), bodyM = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x3a1500 });   // чуть светится изнутри — ночью видно
   const fg = new THREE.PlaneGeometry(0.36, 0.27);
   fg.translate(0, 0.27, 0.38);
@@ -915,16 +936,11 @@ export function ribbon () {
    у земли в 14—40 м от машины раз в 4—11 с: вспышка и искры */
 const FW = { N: 1600, pts: null, i: 0, alive: 0, next: 2, petT: 6, rockets: [] };
 const FW_PAL = ['#ff4a3c', '#ffd23f', '#4dff6e', '#4aa8ff', '#ff6ae0', '#ffffff', '#ff9a2a', '#b06aff'];
-function fwInit () {
-  const N = FW.N;
-  FW.p = new Float32Array(N * 3).fill(0); FW.v = new Float32Array(N * 3); FW.c = new Float32Array(N * 3);
-  FW.l = new Float32Array(N * 2); FW.life = new Float32Array(N); FW.max = new Float32Array(N); FW.drag = new Float32Array(N); FW.grav = new Float32Array(N);
-  for (let i = 0; i < N; i++) FW.p[i * 3 + 1] = -9999;
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(FW.p, 3).setUsage(THREE.DynamicDrawUsage));
-  g.setAttribute('color', new THREE.BufferAttribute(FW.c, 3).setUsage(THREE.DynamicDrawUsage));
-  g.setAttribute('aL', new THREE.BufferAttribute(FW.l, 2).setUsage(THREE.DynamicDrawUsage));
-  const m = new THREE.ShaderMaterial({
+/* материал салюта — один на игру (образец для прогрева шейдеров — warmSamples) */
+let FW_MAT = null;
+function fwMat () {
+  if (FW_MAT) return FW_MAT;
+  FW_MAT = new THREE.ShaderMaterial({
     uniforms: { uScale: U.uScale },
     vertexShader: `attribute vec2 aL; uniform float uScale; varying vec3 vC; varying float vA;
       void main () { vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv;
@@ -934,7 +950,19 @@ function fwInit () {
         float f = 1.0 - r; gl_FragColor = vec4(vC + vec3(f * f * 0.6), vA * f); }`,
     vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   });
-  m.userData.keep = true; m.userData.glow = 1;
+  FW_MAT.userData.keep = true; FW_MAT.userData.glow = 1;
+  return FW_MAT;
+}
+function fwInit () {
+  const N = FW.N;
+  FW.p = new Float32Array(N * 3).fill(0); FW.v = new Float32Array(N * 3); FW.c = new Float32Array(N * 3);
+  FW.l = new Float32Array(N * 2); FW.life = new Float32Array(N); FW.max = new Float32Array(N); FW.drag = new Float32Array(N); FW.grav = new Float32Array(N);
+  for (let i = 0; i < N; i++) FW.p[i * 3 + 1] = -9999;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(FW.p, 3).setUsage(THREE.DynamicDrawUsage));
+  g.setAttribute('color', new THREE.BufferAttribute(FW.c, 3).setUsage(THREE.DynamicDrawUsage));
+  g.setAttribute('aL', new THREE.BufferAttribute(FW.l, 2).setUsage(THREE.DynamicDrawUsage));
+  const m = fwMat();
   FW.pts = new THREE.Points(g, m);
   FW.pts.frustumCulled = false; FW.pts.renderOrder = 5; FW.pts.visible = false;
   A.scene.add(FW.pts);
