@@ -147,14 +147,34 @@ function combo (F, q) {
       const nm = P.pal[k].name;
       const role = SKIN_RE.test(nm) ? 'skin' : HAIR_RE.test(nm) ? 'hair' : k === top ? (P.type === 'legs' ? 'pants' : 'shirt')
         : P.type === 'all' && /pants/i.test(nm) ? 'pants' : null;
-      pal.push({ rgb: P.pal[k].rgb, role });
+      pal.push({ rgb: P.pal[k].rgb, role, name: nm });
     }
     for (let i = 0; i < P.nI; i++) idx[i0 + i] = P.idx[i] + v0;
     if (P.type === 'head' || P.type === 'all') eye = P.eye;
     v0 += P.nV; i0 += P.nI;
   }
+  // чья вершина (главная кость): 1 — плечо и предплечье, 2 — бедро и голень, 3 — кисть, 4 — голова, 5 — туловище;
+  // зимой голая кожа рук, ног и туловища — цвета рукава / штанов (своих рукавов у маек и платьев нет)
+  if (!F.cls) {
+    const J = F.J, cls = new Uint8Array(F.nJ), sub = (j, c) => { cls[j] = c; for (const k of F.order) if (F.parent[k] >= 0 && cls[F.parent[k]] === c && k !== j && !cls[k]) cls[k] = c; };
+    for (const n of ['Hips', 'Abdomen', 'Torso', 'Chest', 'Body']) { const j = F.names.indexOf(n); if (j >= 0) cls[j] = 5; }
+    for (const j of [J.head]) if (j >= 0) sub(j, 4);
+    for (const j of [J.elbowL, J.elbowR]) if (j >= 0) sub(j, 3);
+    for (const j of [J.elbowL, J.elbowR, J.armL, J.armR]) if (j >= 0) cls[j] = 1;
+    for (const j of [J.legL, J.legR, J.kneeL, J.kneeR]) if (j >= 0) cls[j] = 2;
+    for (const j of [J.footL, J.footR]) if (j >= 0) sub(j, 6);   // 6 — ступня: зимой голая — в сапоге
+    F.cls = cls;
+  }
+  const vcls = new Uint8Array(nV), sk = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+  for (let v = 0; v < nV; v++) {
+    let b = 0, bj = 0;
+    for (let c = 0; c < 4; c++) if (sw[v * 4 + c] > b) { b = sw[v * 4 + c]; bj = si[v * 4 + c]; }
+    vcls[v] = F.cls[bj];
+    if (vcls[v] === 4 && pal[mat[v]].role === 'skin') for (let a = 0; a < 3; a++) { sk[a] = Math.min(sk[a], pos[v * 3 + a]); sk[a + 3] = Math.max(sk[a + 3], pos[v * 3 + a]); }
+  }
+  const helmet = pal.some(p => /yellow|helmet|crown|hat/i.test(p.name || ''));
   C = {
-    nV, pal, mat, eye,
+    nV, pal, mat, eye, vcls, skull: sk[0] < Infinity ? sk : null, helmet,
     pos: new THREE.BufferAttribute(pos, 3), si: new THREE.BufferAttribute(si, 4), sw: new THREE.BufferAttribute(sw, 4, true),
     idx: new THREE.BufferAttribute(idx, 1), lod: new THREE.BufferAttribute(neutral(F, pos, si, sw, nV), 3),
   };
@@ -163,7 +183,7 @@ function combo (F, q) {
   return C;
 }
 
-const lin = new Map();
+const lin = new Map(), BOOT = [0.02, 0.018, 0.022];   // сапоги — почти чёрные (линейный цвет)
 const col = hex => {
   let c = lin.get(hex);
   if (!c) { const k = new THREE.Color(hex); c = [k.r, k.g, k.b]; lin.set(hex, c); }
@@ -184,8 +204,16 @@ export function buildQ (g, q, S, Lk, mat) {
   // цвета человека игры
   const want = { skin: S.skin, shirt: S.shirt, pants: S.pants, hair: Lk.hairC };
   const pc = C.pal.map(p => p.role && want[p.role] ? col(want[p.role]) : p.rgb);
+  const lvl = S.lvl || 0, sl = col(S.shirt || '#555'), pl = col(S.pants || '#333');   // 0 лето … 3 зима (people.js wearOf)
   const cl = new Float32Array(C.nV * 3);
-  for (let i = 0; i < C.nV; i++) { const c = pc[C.mat[i]]; cl[i * 3] = c[0]; cl[i * 3 + 1] = c[1]; cl[i * 3 + 2] = c[2]; }
+  for (let i = 0; i < C.nV; i++) {
+    let c = pc[C.mat[i]];
+    if (lvl && C.pal[C.mat[i]].role === 'skin') {
+      const k = C.vcls[i];
+      if (k === 1 || (k === 5 && lvl >= 2)) c = sl; else if (k === 2 && lvl >= 2) c = pl; else if (k === 6 && lvl >= 2) c = BOOT;
+    }
+    cl[i * 3] = c[0]; cl[i * 3 + 1] = c[1]; cl[i * 3 + 2] = c[2];
+  }
   const ca = new THREE.BufferAttribute(cl, 3);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', C.pos); geo.setAttribute('color', ca);
@@ -200,6 +228,8 @@ export function buildQ (g, q, S, Lk, mat) {
   skin.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, F.h * 0.5 + F.y0, 0), F.h * 0.8);
   // очки (если они есть во внешности человека игры) — на кость головы
   if (Lk.glasses && C.eye && F.J.head >= 0 && C.eye.lengthSq() > 0) bones[F.J.head].add(glasses(F, C.eye, Lk));
+  // шапка зимой (ушанка / вязаная), если на голове не каска и не корона
+  if (lvl >= 3 && C.skull && !C.helmet && F.J.head >= 0 && /ushanka|beanie|hood|hat/.test(S.hw || '')) bones[F.J.head].add(hat(F, C.skull, S, Lk));
   // дальний вариант (humanLod, дальше 45 м): та же модель одним мешем — стоит, руки опущены
   const lg = new THREE.BufferGeometry();
   lg.setAttribute('position', C.lod); lg.setAttribute('color', ca); lg.setIndex(C.idx);
@@ -214,7 +244,7 @@ export function buildQ (g, q, S, Lk, mat) {
   root.position.y = -F.y0 * k;
   g.add(root);
   const st = { F, C, bones, root, skel, g, k, WQ: F.RQ.map(x => x.clone()), WP: F.RP.map(x => x.clone()), dq: new Array(F.nJ).fill(null), ang: {},
-    frame: -1, lastT: 0, lx: 0, lz: 0, v: 0, swing: 0, w: 0, t: Math.random() * 10, run: 0 };
+    frame: -1, nb: 0, nh: 0, lastT: 0, lx: 0, lz: 0, v: 0, swing: 0, w: 0, t: Math.random() * 10, run: 0 };
   skin.userData.q = st;
   skin.onBeforeRender = poseHook;
   QP.built++;
@@ -222,6 +252,30 @@ export function buildQ (g, q, S, Lk, mat) {
 }
 
 function KEEP () {}
+
+/* шапка по черепу (кожа головы в покое): вязаная с помпоном или ушанка с ушами; в осях кости головы */
+const HATS = ['#c9476b', '#2e4a6b', '#e0b13f', '#3f5a3a', '#8a2a3a', '#d9d2c2', '#4f7fd6', '#2b2a30'], FURS = ['#5a4a3a', '#3a3036', '#6b5a48', '#8a7a68'];
+const HAT_MAT = new Map();
+const hatMat = hex => { let m = HAT_MAT.get(hex); if (!m) { m = new THREE.MeshLambertMaterial({ color: hex, flatShading: true }); HAT_MAT.set(hex, m); } return m; };
+function hat (F, sk, S, Lk) {
+  const W = Math.max(sk[3] - sk[0], sk[5] - sk[2]) * 1.25, cx = (sk[0] + sk[3]) / 2, cz = (sk[2] + sk[5]) / 2 - W * 0.04, top = sk[4];
+  const g = new THREE.Group(), r = (Lk.seed >>> 5);
+  const add = (geo, hex, x, y, z) => { const m = new THREE.Mesh(geo, hatMat(hex)); m.position.set(x, y, z); g.add(m); };
+  if (S.hw === 'ushanka') {
+    const fur = FURS[r % FURS.length];
+    add(new THREE.CylinderGeometry(W * 0.6, W * 0.62, W * 0.42, 8), fur, cx, top - W * 0.05, cz);
+    for (const sx of [-1, 1]) add(new THREE.BoxGeometry(W * 0.12, W * 0.42, W * 0.36), fur, cx + sx * W * 0.55, top - W * 0.38, cz);
+    add(new THREE.BoxGeometry(W * 0.9, W * 0.14, W * 0.12), fur, cx, top + W * 0.02, cz + W * 0.55);
+  } else {
+    const hex = S.hw === 'hood' ? S.shirt : HATS[r % HATS.length];
+    add(new THREE.CylinderGeometry(W * 0.5, W * 0.58, W * 0.5, 8), hex, cx, top - W * 0.08, cz);
+    if (S.hw !== 'hood') add(new THREE.BoxGeometry(W * 0.2, W * 0.2, W * 0.2), HATS[(r >> 3) % HATS.length], cx, top + W * 0.22, cz);
+  }
+  const j = F.J.head, iq = F.RQ[j].clone().invert();
+  g.quaternion.copy(iq);
+  g.position.copy(F.RP[j]).negate().applyQuaternion(iq);
+  return g;
+}
 
 /* очки: две тёмные рамки и перемычка у глаз, в осях кости головы */
 const GLASS_MAT = new THREE.MeshLambertMaterial({ color: 0x1d1a1f, flatShading: true });
@@ -300,6 +354,11 @@ function poseHook () {
   st.frame = FRAME;
   const u = st.g.userData, F = st.F, J = F.J;
   if (!u.legL) return;
+  // коробки, которые игра вешает на кости туловища и головы человека (форма, юбки, маски, шапки), сшиты под коробочное
+  // тело — на модели они висели бы квадратами: прячем (предметы в руках остаются)
+  const bd = u.parts && u.parts[2], hd = u.head;
+  if (bd && bd.children.length !== st.nb) { for (const c of bd.children) if (!c.isSprite) c.visible = false; st.nb = bd.children.length; }
+  if (hd && hd.children.length !== st.nh) { for (const c of hd.children) if (!c.isSprite) c.visible = false; st.nh = hd.children.length; }
   const dt = st.lastT ? Math.min(0.1, (now - st.lastT) / 1000) : 0;
   st.lastT = now;
   // скорость: где группа человека в мире сейчас и кадр назад
