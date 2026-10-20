@@ -17,6 +17,9 @@
   (открытые — `done: false`; сделал — `done: true`), его правки предметов — `edits.json` ([docs/SANDBOX.md](docs/SANDBOX.md)).
 - Музыка — [docs/MUSIC.md](docs/MUSIC.md) (файлы — в `public/music`).
 - Звуки: имена файлов и что где звучит — [docs/SOUNDS.md](docs/SOUNDS.md) (файлы — в `public/sfx`).
+- **Лор и персонажи** (город, ЕНО, управляющие, клиенты с историей, кто уже есть в игре) — [docs/LORE.md](docs/LORE.md);
+  что из новых идей спорит с игрой — [docs/LORE-CONFLICTS.md](docs/LORE-CONFLICTS.md). Новый персонаж — сначала свериться
+  со справочником имён там.
 - Словарь терминов автора (сессия, смена, событие, хад…) — [docs/TERMS.md](docs/TERMS.md); новое
   неочевидное слово автора — сразу туда.
 - Код: `src/game/*.js`. `game.js` огромный (13 тыс. строк) — не читать целиком, грепать.
