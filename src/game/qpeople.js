@@ -39,8 +39,8 @@ export function pickQ (Lk) {
   const r = rng((Lk.seed >>> 0) ^ 0x51A7E);
   if (!QP.all && r() >= QP.rate) return null;
   const fam = Lk.f ? (r() < 0.65 ? 'F' : 'A') : 'M';
-  const F = family(fam), n = F.models.length, k = () => (r() * n) | 0;
-  return fam === 'A' ? { fam, all: k() } : { fam, head: k(), body: k(), legs: k(), feet: k() };
+  const F = family(fam), ok = F.models.map((m, i) => i).filter(i => F.models[i].name !== 'winter'), k = () => ok[(r() * ok.length) | 0];
+  return fam === 'A' ? { fam, all: k(), seed: Lk.seed } : { fam, head: k(), body: k(), legs: k(), feet: k(), seed: Lk.seed };
 }
 
 /* ── семейство из qpeople.data.js: разбор один раз ── */
@@ -117,13 +117,34 @@ function family (fam) {
   return F;
 }
 
+/* ── по сезону (S.lvl: 0 лето … 3 зима, people.js wearOf): шорты — на брюки; с куртки (2) — пуховик из Blender,
+   зимой (3) — сапоги и шапка (ушанка или вязаная, как у человека игры); цельные женщины (A) зимой — модульные (F) ── */
+function dress (q, S, Lk) {
+  const lvl = S.lvl || 0;
+  if (!lvl) return q;
+  if (q.fam === 'A' && lvl >= 2) { const r = rng((Lk.seed >>> 0) ^ 0xC0A7), F = family('F'), ok = F.models.map((m, i) => i).filter(i => F.models[i].name !== 'winter'), k = () => ok[(r() * ok.length) | 0]; q = { fam: 'F', head: k(), body: k(), legs: k(), feet: k(), seed: Lk.seed }; }
+  if (q.fam === 'A') return q;
+  const F = family(q.fam), W = F.models.findIndex(m => m.name === 'winter'), r = rng((Lk.seed >>> 0) ^ 0x5EA5);
+  q = { ...q };
+  if (F.models[q.legs] && /beach/.test(F.models[q.legs].name)) { const ok = F.models.map((m, i) => i).filter(i => !/beach|winter/.test(F.models[i].name)); q.legs = ok[(r() * ok.length) | 0]; }
+  if (W < 0) return q;
+  if (lvl >= 2) q.body = W;
+  if (lvl >= 3) {
+    q.feet = W;
+    const helmet = /worker|king/.test(F.models[q.head].name);
+    if (!helmet && /ushanka|beanie|hood|hat/.test(S.hw || '')) { q.hatM = W; q.hat = S.hw === 'ushanka' ? 'hatu' : 'hatb'; }
+  }
+  return q;
+}
+
 /* ── части в один меш (общий на всех с тем же набором частей): места, кости, веса, индексы, поза «стоит» ── */
 const SKIN_RE = /skin/i, HAIR_RE = /^(hair|eyebrow|moustache|beard)/i, KEEP_RE = /^(eye|eyes|earrings|gold|metal)/i;
 function combo (F, q) {
-  const key = q.fam === 'A' ? 'a' + q.all : [q.head, q.body, q.legs, q.feet].join(',');
+  const key = q.fam === 'A' ? 'a' + q.all : [q.head, q.body, q.legs, q.feet, q.hat || ''].join(',');
   let C = F.combos.get(key);
   if (C) return C;
   const list = q.fam === 'A' ? [F.models[q.all].parts.all] : [F.models[q.head].parts.head, F.models[q.body].parts.body, F.models[q.legs].parts.legs, F.models[q.feet].parts.feet];
+  if (q.hat && F.models[q.hatM].parts[q.hat]) list.push(F.models[q.hatM].parts[q.hat]);
   let nV = 0, nI = 0;
   for (const P of list) { nV += P.nV; nI += P.nI; }
   const pos = new Float32Array(nV * 3), si = new Uint8Array(nV * 4), sw = new Uint8Array(nV * 4), mat = new Uint8Array(nV);
@@ -145,7 +166,7 @@ function combo (F, q) {
     }
     for (let k = 0; k < P.pal.length; k++) {
       const nm = P.pal[k].name;
-      const role = SKIN_RE.test(nm) ? 'skin' : HAIR_RE.test(nm) ? 'hair' : k === top ? (P.type === 'legs' ? 'pants' : 'shirt')
+      const role = nm === 'Hat' ? 'hat' : SKIN_RE.test(nm) ? 'skin' : HAIR_RE.test(nm) ? 'hair' : k === top ? (P.type === 'legs' ? 'pants' : 'shirt')
         : P.type === 'all' && /pants/i.test(nm) ? 'pants' : null;
       pal.push({ rgb: P.pal[k].rgb, role, name: nm });
     }
@@ -192,6 +213,7 @@ const col = hex => {
 
 /* надеть модель: в группу человека g (кости игры уже в ней) — корень модели со скелетом, меш и дальний меш */
 export function buildQ (g, q, S, Lk, mat) {
+  q = dress(q, S, Lk);
   const F = family(q.fam), C = combo(F, q);
   const bones = [];
   for (let j = 0; j < F.nJ; j++) {
@@ -202,7 +224,7 @@ export function buildQ (g, q, S, Lk, mat) {
   const root = new THREE.Group();
   for (let j = 0; j < F.nJ; j++) (F.parent[j] < 0 ? root : bones[F.parent[j]]).add(bones[j]);
   // цвета человека игры
-  const want = { skin: S.skin, shirt: S.shirt, pants: S.pants, hair: Lk.hairC };
+  const want = { skin: S.skin, shirt: S.shirt, pants: S.pants, hair: Lk.hairC, hat: HATS[(Lk.seed >>> 5) % HATS.length] };
   const pc = C.pal.map(p => p.role && want[p.role] ? col(want[p.role]) : p.rgb);
   const lvl = S.lvl || 0, sl = col(S.shirt || '#555'), pl = col(S.pants || '#333');   // 0 лето … 3 зима (people.js wearOf)
   const cl = new Float32Array(C.nV * 3);
@@ -229,7 +251,7 @@ export function buildQ (g, q, S, Lk, mat) {
   // очки (если они есть во внешности человека игры) — на кость головы
   if (Lk.glasses && C.eye && F.J.head >= 0 && C.eye.lengthSq() > 0) bones[F.J.head].add(glasses(F, C.eye, Lk));
   // шапка зимой (ушанка / вязаная), если на голове не каска и не корона
-  if (lvl >= 3 && C.skull && !C.helmet && F.J.head >= 0 && /ushanka|beanie|hood|hat/.test(S.hw || '')) bones[F.J.head].add(hat(F, C.skull, S, Lk));
+  if (lvl >= 3 && !q.hat && C.skull && !C.helmet && F.J.head >= 0 && /ushanka|beanie|hood|hat/.test(S.hw || '')) bones[F.J.head].add(hat(F, C.skull, S, Lk));   // нет шапки из Blender — простая
   // дальний вариант (humanLod, дальше 45 м): та же модель одним мешем — стоит, руки опущены
   const lg = new THREE.BufferGeometry();
   lg.setAttribute('position', C.lod); lg.setAttribute('color', ca); lg.setIndex(C.idx);
