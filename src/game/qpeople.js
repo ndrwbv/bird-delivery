@@ -2,82 +2,89 @@
    Люди Quaternius — проба (ветка test/people, 21.10.2026, docs/IDEAS.md трек 15).
 
    Автор: «не нравится, что модели людей сделаны тобой». Пробуем бесплатные модели художника Quaternius (CC0,
-   quaternius.com; файлы — с poly.pizza): рабочий в каске, парень в худи, мужчина в костюме, женщина. Их меши и кости
-   сжаты скриптом в qpeople.data.js (без их анимаций — только поза покоя).
+   quaternius.com; файлы — с poly.pizza), сжатые скриптом в qpeople.data.js. Три семейства — у каждого свой скелет:
+     M — мужчины «Ultimate Modular Men» (рабочий, худи, костюм, рубашка, фермер, панк, пляжник),
+     F — женщины «Ultimate Modular Women» (повседневная, нарядная, панк),
+     A — женщины «Animated Women» (в футболке, в майке, в платье) — цельные.
+   У M и F каждый разрезан на голову, тело, ноги, ступни: человек собирается из частей разных моделей
+   (7⁴ сочетаний у мужчин, 3⁴ у женщин), цвета — его: рубашка, штаны, кожа, волосы; очки — если есть в его внешности.
 
    Как надеты: человек игры собирается как раньше (people.js steps) — те же шесть «костей» (ноги, туловище, руки,
-   голова), их крутит вся игра (ходьба, лавка, удар, катсцены). Вместо коробочного меша — модель Quaternius со своим
-   скелетом (62 или 31 кость); каждый кадр, когда её видно, поворот наших костей переносится на её кости:
-     ноги → UpperLeg, руки → UpperArm (руки опущены вдоль тела, у модели они в покое разведены), туловище → Abdomen,
-     голова → Head; колени и локти сгибаются сами от взмаха ноги и руки; ступни (у Quaternius они не дети голени) —
-     следом за голенью.
-   Рост — как у человека игры (1,80, у женщин 1,72, × его рост), цвета — его: рубашка, штаны, кожа, волосы.
+   голова), их крутит вся игра. Вместо коробок — модель со своим скелетом; каждый кадр, когда её видно:
+   • идёт (группа двигается 0,25—7 м/с и игра машет ему ногами) — настоящая ходьба / бег художника, шаг в такт
+     скорости: клип крутится так, чтобы ступня на земле ехала назад ровно со скоростью человека (не «летит»);
+   • иначе — повороты наших костей переносятся на её кости: ноги → UpperLeg, руки → UpperArm (опущены вдоль тела),
+     туловище → Abdomen, голова → Head; колени и локти сгибаются от взмаха; ступни — за голенью. Так работают лавка,
+     взмах рукой, удары, катсцены. Между ними — плавный переход за ~0,2 с.
 
-   Кто: каждый третий (QP.rate) по зерну человека; женщины — женская модель, мужчины — одна из трёх.
-     ?qp=0 — как было (никого), ?qpall — все люди такие.
-   Чего нет в пробе: зимней одежды (зимой — та же модель, верх цвета пуховика), живых лиц катсцен (у моделей свои
-   нарисованные лица), дальней упрощённой модели (видно целиком на любом расстоянии), шапок и предметов «в меш». */
+   Кто: каждый третий (QP.rate) по зерну человека. ?qp=0 — как было (никого), ?qpall — все люди такие.
+   Чего нет в пробе: зимней одежды и шапок (верх зимой — цвета пуховика), живых лиц катсцен (у моделей свои лица).
+   Дальний вариант (дальше 45 м) — та же модель одним мешем, стоит. */
 import * as THREE from '../vendor/three.module.min.js';
 import { QDATA } from './qpeople.data.js';
 
 const SRCH = typeof location !== 'undefined' ? location.search || '' : '';
-export const QP = { on: !/[?&]qp=0\b/.test(SRCH), all: /[?&]qpall\b/.test(SRCH), rate: 0.34, built: 0, posed: 0 };
-if (typeof window !== 'undefined') window.__qp = QP;   // отладка: сколько собрано и сколько поз за всё время
+export const QP = { on: !/[?&]qp=0\b/.test(SRCH), all: /[?&]qpall\b/.test(SRCH), rate: 0.34, built: 0, posed: 0, walk: 0, combos: 0 };
+if (typeof window !== 'undefined') window.__qp = QP;   // отладка: сколько собрано, поз, кадров ходьбы
 
-const MEN = ['worker', 'hoodie', 'business'], FEM = ['woman'];
-/* чья краска: рубашка, штаны, кожа, волосы человека игры (остальное — как у художника) */
-const ROLES = {
-  worker: { Skin: 'skin', Moustache: 'hair', Eyebrows: 'hair' },
-  hoodie: { Purple: 'shirt', LightBlue: 'pants', Skin: 'skin', Hair: 'hair', Eyebrows: 'hair' },
-  business: { Skin: 'skin', Hair: 'hair', Eyebrows: 'hair' },
-  woman: { Shirt: 'shirt', Pants: 'pants', Skin: 'skin', Hair: 'hair', HairBase: 'hair' },
-};
-
-/* какую модель надеть человеку (или null — как раньше) */
-export function pickQ (Lk) {
-  if (!QP.on || !Lk) return null;
-  const h = Math.imul((Lk.seed >>> 0) ^ 0x9E3779B9, 2654435761) >>> 0;
-  if (!QP.all && (h % 1000) / 1000 >= QP.rate) return null;
-  const list = Lk.f ? FEM : MEN;
-  return list[(h >>> 10) % list.length];
+/* случайность от зерна человека */
+function rng (seed) {
+  let a = seed >>> 0;
+  return () => { a = (a + 0x6D2B79F5) >>> 0; let q = a; q = Math.imul(q ^ (q >>> 15), q | 1); q ^= q + Math.imul(q ^ (q >>> 7), q | 61); return ((q ^ (q >>> 14)) >>> 0) / 4294967296; };
 }
 
-/* ── модель из qpeople.data.js: разбор один раз ── */
-const MODELS = new Map();
-function model (name) {
-  let m = MODELS.get(name);
-  if (m) return m;
-  const bin = Uint8Array.from(atob(QDATA[name]), c => c.charCodeAt(0));
+/* кого и из чего собрать (или null — как раньше) */
+export function pickQ (Lk) {
+  if (!QP.on || !Lk) return null;
+  const r = rng((Lk.seed >>> 0) ^ 0x51A7E);
+  if (!QP.all && r() >= QP.rate) return null;
+  const fam = Lk.f ? (r() < 0.65 ? 'F' : 'A') : 'M';
+  const F = family(fam), n = F.models.length, k = () => (r() * n) | 0;
+  return fam === 'A' ? { fam, all: k() } : { fam, head: k(), body: k(), legs: k(), feet: k() };
+}
+
+/* ── семейство из qpeople.data.js: разбор один раз ── */
+const FAMS = new Map();
+function family (fam) {
+  let F = FAMS.get(fam);
+  if (F) return F;
+  const bin = Uint8Array.from(atob(QDATA[fam]), c => c.charCodeAt(0));
   const dv = new DataView(bin.buffer);
   let o = 0;
-  const u8 = () => bin[o++], u32 = () => { const v = dv.getUint32(o, true); o += 4; return v; };
-  const f32 = () => { const v = dv.getFloat32(o, true); o += 4; return v; };
-  const str = () => { const n = u8(), s = new TextDecoder().decode(bin.subarray(o, o + n)); o += n; return s; };
-  const nJ = u32(), nV = u32(), nI = u32(), nP = u32();
-  const pal = [];
-  for (let i = 0; i < nP; i++) pal.push({ name: str(), rgb: [f32(), f32(), f32()] });
+  const u32 = () => { const v = dv.getUint32(o, true); o += 4; return v; }, f32 = () => { const v = dv.getFloat32(o, true); o += 4; return v; };
+  const str = () => { const n = bin[o++], s = new TextDecoder().decode(bin.subarray(o, o + n)); o += n; return s; };
+  const nJ = u32(), nM = u32(), nC = u32();
   const names = [], parent = [], RP = [], RQ = [];
   for (let i = 0; i < nJ; i++) {
     names.push(str()); parent.push(dv.getInt16(o, true)); o += 2;
-    RP.push(new THREE.Vector3(f32(), f32(), f32()));
-    RQ.push(new THREE.Quaternion(f32(), f32(), f32(), f32()));
+    RP.push(new THREE.Vector3(f32(), f32(), f32())); RQ.push(new THREE.Quaternion(f32(), f32(), f32(), f32()));
   }
-  const mn = [f32(), f32(), f32()], mx = [f32(), f32(), f32()];
-  const pos = new Float32Array(nV * 3);
-  for (let i = 0; i < nV * 3; i++) {
-    const c = i % 3, q = dv.getInt16(o, true); o += 2;
-    pos[i] = mn[c] + (q + 32768) / 65535 * (mx[c] - mn[c]);
+  const clips = {};
+  for (let c = 0; c < nC; c++) {
+    const name = str(), nF = u32(), fps = f32(), speed = f32();
+    const data = new Float32Array(bin.buffer.slice(o, o + nF * nJ * 7 * 4)); o += nF * nJ * 7 * 4;
+    clips[/run/i.test(name) ? 'run' : 'walk'] = { nF, fps, speed, data, T: nF / fps };
   }
-  const mat = bin.slice(o, o + nV); o += nV;
-  const si = bin.slice(o, o + nV * 4); o += nV * 4;
-  const sw8 = bin.slice(o, o + nV * 4); o += nV * 4;
-  const sw = new Float32Array(nV * 4);
-  for (let i = 0; i < sw.length; i++) sw[i] = sw8[i] / 255;
-  const idx = nV > 65535 ? new Uint32Array(bin.buffer.slice(o, o + nI * 4)) : new Uint16Array(bin.buffer.slice(o, o + nI * 2));
-  // порядок: родитель раньше детей
+  const models = [];
+  for (let mI = 0; mI < nM; mI++) {
+    const name = str(), nP = u32(), parts = {};
+    for (let p = 0; p < nP; p++) {
+      const type = str(), nV = u32(), nI = u32(), nPal = u32(), pal = [];
+      for (let i = 0; i < nPal; i++) pal.push({ name: str(), rgb: [f32(), f32(), f32()] });
+      const eye = new THREE.Vector3(f32(), f32(), f32()), mn = [f32(), f32(), f32()], mx = [f32(), f32(), f32()];
+      const pos = new Float32Array(nV * 3);
+      for (let i = 0; i < nV * 3; i++) { const c = i % 3; pos[i] = mn[c] + (dv.getInt16(o, true) + 32768) / 65535 * (mx[c] - mn[c]); o += 2; }
+      const mat = bin.slice(o, o + nV); o += nV;
+      const si = bin.slice(o, o + nV * 4); o += nV * 4;
+      const sw = bin.slice(o, o + nV * 4); o += nV * 4;
+      const big = nV > 65535, idx = big ? new Uint32Array(bin.buffer.slice(o, o + nI * 4)) : new Uint16Array(bin.buffer.slice(o, o + nI * 2));
+      o += nI * (big ? 4 : 2);
+      parts[type] = { type, nV, nI, pal, eye, pos, mat, si, sw, idx, y0: mn[1], y1: mx[1] };
+    }
+    models.push({ name, parts });
+  }
   const depth = j => { let d = 0; while (parent[j] >= 0) { j = parent[j]; d++; } return d; };
   const order = [...names.keys()].sort((a, b) => depth(a) - depth(b));
-  // поворот и сдвиг каждой кости относительно родителя в покое
   const LQ = RQ.map((q, j) => parent[j] < 0 ? q.clone() : RQ[parent[j]].clone().invert().multiply(q));
   const LP = RP.map((p, j) => parent[j] < 0 ? p.clone() : p.clone().sub(RP[parent[j]]).applyQuaternion(RQ[parent[j]].clone().invert()));
   // наши кости: левая у нас — с минусом по x (people.js piv), ищем у модели кость на той же стороне
@@ -94,8 +101,7 @@ function model (name) {
   const FIX = names.map(() => new THREE.Quaternion());
   for (const [a, e, s] of [[J.armL, J.elbowL, -1], [J.armR, J.elbowR, 1]]) {
     if (a < 0 || e < 0) continue;
-    const d = RP[e].clone().sub(RP[a]).normalize();
-    FIX[a].setFromUnitVectors(d, new THREE.Vector3(s * 0.13, -1, 0).normalize());
+    FIX[a].setFromUnitVectors(RP[e].clone().sub(RP[a]).normalize(), new THREE.Vector3(s * 0.13, -1, 0).normalize());
   }
   // ступня — следом за голенью: где она относительно голени в покое
   const FOOT = [];
@@ -104,9 +110,57 @@ function model (name) {
     const iq = RQ[k].clone().invert();
     FOOT.push({ f, k, q: iq.clone().multiply(RQ[f]), p: RP[f].clone().sub(RP[k]).applyQuaternion(iq) });
   }
-  m = { name, nJ, nV, names, parent, RP, RQ, LP, LQ, order, J, FIX, FOOT, pal, mat, pos, si, sw, idx, h: mx[1] - mn[1], y0: mn[1], roles: ROLES[name] || {} };
-  MODELS.set(name, m);
-  return m;
+  let y0 = Infinity, y1 = -Infinity;
+  for (const m of models) for (const t in m.parts) { y0 = Math.min(y0, m.parts[t].y0); y1 = Math.max(y1, m.parts[t].y1); }
+  F = { fam, nJ, names, parent, RP, RQ, LP, LQ, order, J, FIX, FOOT, clips, models, y0, h: y1 - y0, combos: new Map() };
+  FAMS.set(fam, F);
+  return F;
+}
+
+/* ── части в один меш (общий на всех с тем же набором частей): места, кости, веса, индексы, поза «стоит» ── */
+const SKIN_RE = /skin/i, HAIR_RE = /^(hair|eyebrow|moustache|beard)/i, KEEP_RE = /^(eye|eyes|earrings|gold|metal)/i;
+function combo (F, q) {
+  const key = q.fam === 'A' ? 'a' + q.all : [q.head, q.body, q.legs, q.feet].join(',');
+  let C = F.combos.get(key);
+  if (C) return C;
+  const list = q.fam === 'A' ? [F.models[q.all].parts.all] : [F.models[q.head].parts.head, F.models[q.body].parts.body, F.models[q.legs].parts.legs, F.models[q.feet].parts.feet];
+  let nV = 0, nI = 0;
+  for (const P of list) { nV += P.nV; nI += P.nI; }
+  const pos = new Float32Array(nV * 3), si = new Uint8Array(nV * 4), sw = new Uint8Array(nV * 4), mat = new Uint8Array(nV);
+  const idx = nV > 65535 ? new Uint32Array(nI) : new Uint16Array(nI), pal = [];
+  let v0 = 0, i0 = 0, eye = null;
+  for (const P of list) {
+    pos.set(P.pos, v0 * 3); si.set(P.si, v0 * 4); sw.set(P.sw, v0 * 4);
+    const b = pal.length, cnt = new Array(P.pal.length).fill(0);
+    for (let i = 0; i < P.nV; i++) { mat[v0 + i] = b + P.mat[i]; cnt[P.mat[i]]++; }
+    // роль краски: кожа, волосы, рубашка (самая частая на теле), штаны (самая частая на ногах), остальное — как у художника
+    let top = -1;
+    if (P.type === 'body' || P.type === 'legs' || P.type === 'all') {
+      const want = /shirt|dress|body|top/i;
+      for (let k = 0; k < P.pal.length; k++) {
+        const nm = P.pal[k].name;
+        if (SKIN_RE.test(nm) || HAIR_RE.test(nm) || KEEP_RE.test(nm) || /shoe|sock/i.test(nm)) continue;
+        if (P.type === 'all' ? want.test(nm) : top < 0 || cnt[k] > cnt[top]) top = k;
+      }
+    }
+    for (let k = 0; k < P.pal.length; k++) {
+      const nm = P.pal[k].name;
+      const role = SKIN_RE.test(nm) ? 'skin' : HAIR_RE.test(nm) ? 'hair' : k === top ? (P.type === 'legs' ? 'pants' : 'shirt')
+        : P.type === 'all' && /pants/i.test(nm) ? 'pants' : null;
+      pal.push({ rgb: P.pal[k].rgb, role });
+    }
+    for (let i = 0; i < P.nI; i++) idx[i0 + i] = P.idx[i] + v0;
+    if (P.type === 'head' || P.type === 'all') eye = P.eye;
+    v0 += P.nV; i0 += P.nI;
+  }
+  C = {
+    nV, pal, mat, eye,
+    pos: new THREE.BufferAttribute(pos, 3), si: new THREE.BufferAttribute(si, 4), sw: new THREE.BufferAttribute(sw, 4, true),
+    idx: new THREE.BufferAttribute(idx, 1), lod: new THREE.BufferAttribute(neutral(F, pos, si, sw, nV), 3),
+  };
+  F.combos.set(key, C);
+  QP.combos++;
+  return C;
 }
 
 const lin = new Map();
@@ -116,112 +170,121 @@ const col = hex => {
   return c;
 };
 
-/* надеть модель: в группу человека g (кости игры уже в ней) — корень модели со скелетом и мешем.
-   Вернёт меш (u.skin) — его прячет humanLod вместе с частями */
-export function buildQ (g, name, S, Lk, mat) {
-  const m = model(name);
+/* надеть модель: в группу человека g (кости игры уже в ней) — корень модели со скелетом, меш и дальний меш */
+export function buildQ (g, q, S, Lk, mat) {
+  const F = family(q.fam), C = combo(F, q);
   const bones = [];
-  for (let j = 0; j < m.nJ; j++) {
+  for (let j = 0; j < F.nJ; j++) {
     const b = new THREE.Bone();
-    b.name = m.names[j];
-    b.position.copy(m.LP[j]); b.quaternion.copy(m.LQ[j]);
+    b.position.copy(F.LP[j]); b.quaternion.copy(F.LQ[j]);
     bones.push(b);
   }
   const root = new THREE.Group();
-  for (let j = 0; j < m.nJ; j++) (m.parent[j] < 0 ? root : bones[m.parent[j]]).add(bones[j]);
+  for (let j = 0; j < F.nJ; j++) (F.parent[j] < 0 ? root : bones[F.parent[j]]).add(bones[j]);
   // цвета человека игры
   const want = { skin: S.skin, shirt: S.shirt, pants: S.pants, hair: Lk.hairC };
-  const pc = m.pal.map(p => { const r = m.roles[p.name]; return r && want[r] ? col(want[r]) : p.rgb; });
-  const cl = new Float32Array(m.nV * 3);
-  for (let i = 0; i < m.nV; i++) { const c = pc[m.mat[i]]; cl[i * 3] = c[0]; cl[i * 3 + 1] = c[1]; cl[i * 3 + 2] = c[2]; }
+  const pc = C.pal.map(p => p.role && want[p.role] ? col(want[p.role]) : p.rgb);
+  const cl = new Float32Array(C.nV * 3);
+  for (let i = 0; i < C.nV; i++) { const c = pc[C.mat[i]]; cl[i * 3] = c[0]; cl[i * 3 + 1] = c[1]; cl[i * 3 + 2] = c[2]; }
+  const ca = new THREE.BufferAttribute(cl, 3);
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(m.pos.slice(), 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(cl, 3));
-  geo.setAttribute('skinIndex', new THREE.BufferAttribute(m.si.slice(), 4));
-  geo.setAttribute('skinWeight', new THREE.BufferAttribute(m.sw.slice(), 4));
-  geo.setIndex(new THREE.BufferAttribute(m.idx.slice(), 1));
+  geo.setAttribute('position', C.pos); geo.setAttribute('color', ca);
+  geo.setAttribute('skinIndex', C.si); geo.setAttribute('skinWeight', C.sw);
+  geo.setIndex(C.idx);
   const skin = new THREE.SkinnedMesh(geo, mat);
   root.add(skin);
   root.updateMatrixWorld(true);                     // корень пока без масштаба и вне группы: кости в покое — в осях модели, как вершины
   const skel = new THREE.Skeleton(bones);
   skel.calculateInverses();
   skin.bind(skel, new THREE.Matrix4());
-  skin.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, m.h * 0.5 + m.y0, 0), m.h * 0.8);
+  skin.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, F.h * 0.5 + F.y0, 0), F.h * 0.8);
+  // очки (если они есть во внешности человека игры) — на кость головы
+  if (Lk.glasses && C.eye && F.J.head >= 0 && C.eye.lengthSq() > 0) bones[F.J.head].add(glasses(F, C.eye, Lk));
   // дальний вариант (humanLod, дальше 45 м): та же модель одним мешем — стоит, руки опущены
   const lg = new THREE.BufferGeometry();
-  lg.setAttribute('position', new THREE.BufferAttribute(neutral(m).slice(), 3));
-  lg.setAttribute('color', new THREE.BufferAttribute(cl, 3));
-  lg.setIndex(new THREE.BufferAttribute(m.idx.slice(), 1));
+  lg.setAttribute('position', C.lod); lg.setAttribute('color', ca); lg.setIndex(C.idx);
   const lod = new THREE.Mesh(lg, mat);
   lod.visible = false;
   root.add(lod);
-  const k = (Lk.f ? 1.72 : 1.8) / m.h;              // рост — как у человека игры (дальше × его рост, g.scale)
+  const k = (Lk.f ? 1.72 : 1.8) / F.h;              // рост — как у человека игры (дальше × его рост, g.scale)
   root.scale.setScalar(k);
-  root.position.y = -m.y0 * k;
+  root.position.y = -F.y0 * k;
   g.add(root);
-  const st = { m, bones, root, skel, g, WQ: m.RQ.map(q => q.clone()), WP: m.RP.map(p => p.clone()), dq: new Array(m.nJ).fill(null), ang: {}, frame: -1 };
+  const st = { F, bones, root, skel, g, k, WQ: F.RQ.map(x => x.clone()), WP: F.RP.map(x => x.clone()), dq: new Array(F.nJ).fill(null), ang: {},
+    frame: -1, lastT: 0, lx: 0, lz: 0, v: 0, swing: 0, w: 0, t: Math.random() * 10, run: 0 };
   skin.userData.q = st;
   skin.onBeforeRender = poseHook;
   QP.built++;
   return { skin, lod };
 }
 
-/* ── поза: наши повороты (dq — по костям модели) → мировые повороты и места всех её костей; bones — и в сами кости ── */
-const T = new THREE.Quaternion(), IQ = new THREE.Quaternion(), ID = new THREE.Quaternion(), V = new THREE.Vector3();
+/* очки: две тёмные рамки и перемычка у глаз, в осях кости головы */
+const GLASS_MAT = new THREE.MeshLambertMaterial({ color: 0x1d1a1f, flatShading: true });
+function glasses (F, eye, Lk) {
+  const s = F.h / 1.83, g = new THREE.Group();
+  const add = (w, h, d, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w * s, h * s, d * s), GLASS_MAT); m.position.set(x * s, y * s, z * s); g.add(m); };
+  for (const x of [-0.035, 0.035]) { add(0.05, 0.008, 0.008, x, 0.02, 0); add(0.05, 0.008, 0.008, x, -0.02, 0); add(0.008, 0.045, 0.008, x - 0.025, 0, 0); add(0.008, 0.045, 0.008, x + 0.025, 0, 0); }
+  add(0.022, 0.008, 0.008, 0, 0.012, 0);
+  if (Lk.glasses === 'sun') for (const x of [-0.035, 0.035]) add(0.045, 0.035, 0.004, x, 0, 0.002);
+  const j = F.J.head, iq = F.RQ[j].clone().invert();
+  g.quaternion.copy(iq);
+  g.position.copy(eye).add(new THREE.Vector3(0, 0, 0.012 * s)).sub(F.RP[j]).applyQuaternion(iq);
+  return g;
+}
+
+/* ── поза наших костей → мировые повороты и места всех костей модели; bones — и в сами кости ── */
+const T = new THREE.Quaternion(), IQ = new THREE.Quaternion(), ID = new THREE.Quaternion(), V = new THREE.Vector3(), CQ = new THREE.Quaternion(), CQ2 = new THREE.Quaternion();
 const AX = new THREE.Vector3(1, 0, 0);
-function solve (m, dq, ang, WQ, WP, bones) {
-  const J = m.J;
-  for (const j of m.order) {
-    const p = m.parent[j], Wp = p < 0 ? ID : WQ[p], d = dq[j];
+function solve (F, dq, ang, WQ, WP, bones) {
+  const J = F.J;
+  for (const j of F.order) {
+    const p = F.parent[j], Wp = p < 0 ? ID : WQ[p], d = dq[j];
     const b = j === J.kneeL ? 'kneeL' : j === J.kneeR ? 'kneeR' : j === J.elbowL ? 'elbL' : j === J.elbowR ? 'elbR' : null;
-    if (d) T.copy(d).multiply(m.FIX[j]).multiply(m.RQ[j]);
-    else if (b) T.setFromAxisAngle(AX, ang[b] || 0).multiply(Wp).multiply(m.LQ[j]);
-    else T.copy(Wp).multiply(m.LQ[j]);
+    if (d) T.copy(d).multiply(F.FIX[j]).multiply(F.RQ[j]);
+    else if (b) T.setFromAxisAngle(AX, ang[b] || 0).multiply(Wp).multiply(F.LQ[j]);
+    else T.copy(Wp).multiply(F.LQ[j]);
     WQ[j].copy(T);
-    if (p < 0) WP[j].copy(m.LP[j]);
-    else WP[j].copy(m.LP[j]).applyQuaternion(Wp).add(WP[p]);
-    if (bones && (d || b)) bones[j].quaternion.copy(IQ.copy(Wp).invert().multiply(T));
+    if (p < 0) WP[j].copy(F.LP[j]); else WP[j].copy(F.LP[j]).applyQuaternion(Wp).add(WP[p]);
+    if (bones) { bones[j].quaternion.copy(IQ.copy(Wp).invert().multiply(T)); bones[j].position.copy(F.LP[j]); }
   }
   // ступни — за голенью (у Quaternius они дети корня, а не голени)
-  for (const F of m.FOOT) {
-    const p = m.parent[F.f], Wp = p < 0 ? ID : WQ[p];
-    T.copy(WQ[F.k]).multiply(F.q);
-    V.copy(F.p).applyQuaternion(WQ[F.k]).add(WP[F.k]);
-    WQ[F.f].copy(T); WP[F.f].copy(V);
+  for (const Ft of F.FOOT) {
+    const p = F.parent[Ft.f], Wp = p < 0 ? ID : WQ[p];
+    T.copy(WQ[Ft.k]).multiply(Ft.q);
+    V.copy(Ft.p).applyQuaternion(WQ[Ft.k]).add(WP[Ft.k]);
+    WQ[Ft.f].copy(T); WP[Ft.f].copy(V);
     if (bones) {
       IQ.copy(Wp).invert();
-      bones[F.f].quaternion.copy(IQ).multiply(T);
+      bones[Ft.f].quaternion.copy(IQ).multiply(T);
       if (p >= 0) V.sub(WP[p]);
-      bones[F.f].position.copy(V.applyQuaternion(IQ));
+      bones[Ft.f].position.copy(V.applyQuaternion(IQ));
     }
   }
 }
 
-/* вершины модели в позе «стоит, руки опущены» — для дальнего варианта (один раз на модель) */
-function neutral (m) {
-  if (m.neutral) return m.neutral;
-  const dq = new Array(m.nJ).fill(null);
-  for (const k of ['legL', 'legR', 'armL', 'armR', 'head', 'body']) if (m.J[k] >= 0) dq[m.J[k]] = new THREE.Quaternion();
-  const WQ = m.RQ.map(q => q.clone()), WP = m.RP.map(p => p.clone());
-  solve(m, dq, { elbL: -0.22, elbR: -0.22 }, WQ, WP, null);
+/* вершины набора частей в позе «стоит, руки опущены» — для дальнего варианта */
+function neutral (F, pos, si, sw, nV) {
+  const dq = new Array(F.nJ).fill(null);
+  for (const k of ['legL', 'legR', 'armL', 'armR', 'head', 'body']) if (F.J[k] >= 0) dq[F.J[k]] = new THREE.Quaternion();
+  const WQ = F.RQ.map(q => q.clone()), WP = F.RP.map(p => p.clone());
+  solve(F, dq, { elbL: -0.22, elbR: -0.22 }, WQ, WP, null);
   const M = [], A = new THREE.Matrix4(), B = new THREE.Matrix4(), ONE = new THREE.Vector3(1, 1, 1);
-  for (let j = 0; j < m.nJ; j++) M.push(A.compose(WP[j], WQ[j], ONE).clone().multiply(B.compose(m.RP[j], m.RQ[j], ONE).invert()));
-  const out = new Float32Array(m.nV * 3), t = new THREE.Vector3();
-  for (let i = 0; i < m.nV; i++) {
+  for (let j = 0; j < F.nJ; j++) M.push(A.compose(WP[j], WQ[j], ONE).clone().multiply(B.compose(F.RP[j], F.RQ[j], ONE).invert()));
+  const out = new Float32Array(nV * 3), t = new THREE.Vector3();
+  for (let i = 0; i < nV; i++) {
     let x = 0, y = 0, z = 0;
     for (let c = 0; c < 4; c++) {
-      const w = m.sw[i * 4 + c];
+      const w = sw[i * 4 + c] / 255;
       if (!w) continue;
-      t.set(m.pos[i * 3], m.pos[i * 3 + 1], m.pos[i * 3 + 2]).applyMatrix4(M[m.si[i * 4 + c]]);
+      t.set(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]).applyMatrix4(M[si[i * 4 + c]]);
       x += w * t.x; y += w * t.y; z += w * t.z;
     }
     out[i * 3] = x; out[i * 3 + 1] = y; out[i * 3 + 2] = z;
   }
-  m.neutral = out;
   return out;
 }
 
-/* ── каждый кадр, когда модель в кадре: позу наших костей — на её кости ── */
+/* ── каждый кадр, когда модель в кадре ── */
 let FRAME = 0, LAST = 0;
 function poseHook () {
   const now = performance.now();
@@ -229,8 +292,20 @@ function poseHook () {
   const st = this.userData.q;
   if (!st || st.frame === FRAME) return;
   st.frame = FRAME;
-  const u = st.g.userData, m = st.m, J = m.J;
+  const u = st.g.userData, F = st.F, J = F.J;
   if (!u.legL) return;
+  const dt = st.lastT ? Math.min(0.1, (now - st.lastT) / 1000) : 0;
+  st.lastT = now;
+  // скорость: где группа человека в мире сейчас и кадр назад
+  const e = st.g.matrixWorld.elements, x = e[12], z = e[14];
+  if (dt > 0) st.v += (Math.min(Math.hypot(x - st.lx, z - st.lz) / dt, 20) - st.v) * Math.min(1, dt * 8);
+  st.lx = x; st.lz = z;
+  // игра машет ему ногами (идёт), а не стоит / сидит / лежит / едет в машине
+  st.swing = Math.max(st.swing * Math.exp(-dt * 3), Math.abs(u.legL.rotation.x), Math.abs(u.legR.rotation.x));
+  const sitting = u.legL.rotation.x < -0.8 && u.legR.rotation.x < -0.8;
+  const walking = st.v > 0.25 && st.v < 7 && st.swing > 0.08 && !sitting && Math.abs(st.g.rotation.x) < 0.3 && Math.abs(st.g.rotation.z) < 0.3;
+  st.w += ((walking ? 1 : 0) - st.w) * Math.min(1, dt * 6);
+  // наши кости → кости модели
   const dq = st.dq;
   if (J.legL >= 0) dq[J.legL] = u.legL.quaternion; if (J.legR >= 0) dq[J.legR] = u.legR.quaternion;
   if (J.armL >= 0) dq[J.armL] = u.armL.quaternion; if (J.armR >= 0) dq[J.armR] = u.armR.quaternion;
@@ -241,7 +316,27 @@ function poseHook () {
   const a = st.ang;
   a.kneeL = knee(u.legL.rotation.x); a.kneeR = knee(u.legR.rotation.x);
   a.elbL = elb(u.armL.rotation.x); a.elbR = elb(u.armR.rotation.x);
-  solve(m, dq, a, st.WQ, st.WP, st.bones);
+  solve(F, dq, a, st.WQ, st.WP, st.bones);
+  // ходьба / бег художника, шаг в такт скорости: ступня на земле — назад со скоростью человека
+  if (st.w > 0.01 && F.clips.walk) {
+    const sc = st.k * (st.g.scale.x || 1);                 // единицы модели → метры мира
+    st.run += ((st.v > 2.4 && F.clips.run ? 1 : 0) - st.run) * Math.min(1, dt * 5);
+    const c = st.run > 0.5 ? F.clips.run : F.clips.walk;
+    st.t += dt * st.v / (c.speed * sc);
+    const ph = (st.t / c.T) % 1, fi = ph * c.nF, f0 = fi | 0, f1 = (f0 + 1) % c.nF, fr = fi - f0;
+    const D = c.data, nJ = F.nJ, w = st.w;
+    for (let j = 0; j < nJ; j++) {
+      const o0 = (f0 * nJ + j) * 7, o1 = (f1 * nJ + j) * 7, b = st.bones[j];
+      CQ.set(D[o0], D[o0 + 1], D[o0 + 2], D[o0 + 3]); CQ2.set(D[o1], D[o1 + 1], D[o1 + 2], D[o1 + 3]);
+      CQ.slerp(CQ2, fr);
+      b.quaternion.slerp(CQ, w);
+      V.set(D[o0 + 4] + (D[o1 + 4] - D[o0 + 4]) * fr, D[o0 + 5] + (D[o1 + 5] - D[o0 + 5]) * fr, D[o0 + 6] + (D[o1 + 6] - D[o0 + 6]) * fr);
+      b.position.lerp(V, w);
+    }
+    // голова — куда смотрит игра (на машину, на собеседника)
+    if (J.head >= 0 && u.head.rotation.y) st.bones[J.head].rotateY(u.head.rotation.y * w);
+    QP.walk++;
+  }
   st.root.updateMatrixWorld(true);                  // поза — в этот же кадр, без запаздывания
   st.skel.update();
   QP.posed++;
