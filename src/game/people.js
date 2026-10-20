@@ -38,7 +38,7 @@
 
 import { t, lang } from '../i18n/index.js';
 import { MOB } from './mobile.js';
-import { pickQ, buildQ } from './qpeople.js';
+import { pickQ, buildQ, qPortrait } from './qpeople.js';
 
 /* ─────────────── случайность от зерна ─────────────── */
 function rng (seed) {
@@ -1112,6 +1112,9 @@ const portraitKey = (person, Lk, size, mood, talk) => (person.id || Lk.seed) + '
 /* talk — кадр речи (talkface.js): 0 — рот как у выражения, 1 — приоткрыт, 2 — открыт */
 export function faceDataURL (person, size = 128, mood = '', talk = 0) {
   if (!person) return '';
+  // проба (ветка test/people): человек-модель Quaternius — снимок её головы (qpeople.js qPortrait)
+  const qp = person.look && qPortrait(person.look, () => buildSpec(person.look, {}), size, person.id || person.look.seed);
+  if (qp) return qp;
   FACE_STATS.n++;
   const Lk = faceLook(person, mood), key = portraitKey(person, Lk, size, mood, talk);
   const hit = PORTRAITS.get(key);

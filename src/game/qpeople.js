@@ -206,17 +206,22 @@ export function buildQ (g, q, S, Lk, mat) {
   const lod = new THREE.Mesh(lg, mat);
   lod.visible = false;
   root.add(lod);
+  // места, кости и индексы — общие на всех с этим набором частей: человек ушёл — их из видеокарты не выгружать
+  // (иначе у остальных пропадёт меш); цвета — свои, в пробе остаются (~150 КБ на человека)
+  geo.dispose = lg.dispose = KEEP;
   const k = (Lk.f ? 1.72 : 1.8) / F.h;              // рост — как у человека игры (дальше × его рост, g.scale)
   root.scale.setScalar(k);
   root.position.y = -F.y0 * k;
   g.add(root);
-  const st = { F, bones, root, skel, g, k, WQ: F.RQ.map(x => x.clone()), WP: F.RP.map(x => x.clone()), dq: new Array(F.nJ).fill(null), ang: {},
+  const st = { F, C, bones, root, skel, g, k, WQ: F.RQ.map(x => x.clone()), WP: F.RP.map(x => x.clone()), dq: new Array(F.nJ).fill(null), ang: {},
     frame: -1, lastT: 0, lx: 0, lz: 0, v: 0, swing: 0, w: 0, t: Math.random() * 10, run: 0 };
   skin.userData.q = st;
   skin.onBeforeRender = poseHook;
   QP.built++;
   return { skin, lod };
 }
+
+function KEEP () {}
 
 /* очки: две тёмные рамки и перемычка у глаз, в осях кости головы */
 const GLASS_MAT = new THREE.MeshLambertMaterial({ color: 0x1d1a1f, flatShading: true });
@@ -268,6 +273,7 @@ function neutral (F, pos, si, sw, nV) {
   for (const k of ['legL', 'legR', 'armL', 'armR', 'head', 'body']) if (F.J[k] >= 0) dq[F.J[k]] = new THREE.Quaternion();
   const WQ = F.RQ.map(q => q.clone()), WP = F.RP.map(p => p.clone());
   solve(F, dq, { elbL: -0.22, elbR: -0.22 }, WQ, WP, null);
+  F.NWP = WP;                                       // где кости в позе «стоит» — для оторванной руки/ноги (qLimb)
   const M = [], A = new THREE.Matrix4(), B = new THREE.Matrix4(), ONE = new THREE.Vector3(1, 1, 1);
   for (let j = 0; j < F.nJ; j++) M.push(A.compose(WP[j], WQ[j], ONE).clone().multiply(B.compose(F.RP[j], F.RQ[j], ONE).invert()));
   const out = new Float32Array(nV * 3), t = new THREE.Vector3();
@@ -340,4 +346,92 @@ function poseHook () {
   st.root.updateMatrixWorld(true);                  // поза — в этот же кадр, без запаздывания
   st.skel.update();
   QP.posed++;
+}
+
+/* ── тело сбитого (hits.js throwBody): вместо шести коробок — та же модель, что у человека; куски тела hits.js
+   (ноги, туловище, руки, голова — пустые шарниры в тех же местах) крутят её кости, как кости человека ── */
+export function corpseQ (gu, mat) {
+  const root = new THREE.Group();
+  root.rotation.order = 'YXZ';
+  const mk = (x, y) => { const o = new THREE.Group(); o.position.set(x, y, 0); root.add(o); return o; };
+  const parts = { legL: mk(-0.12, -0.25), legR: mk(0.12, -0.25), torso: mk(0, 0.05), armL: mk(-0.3, 0.57), armR: mk(0.3, 0.57), head: mk(0, 0.63) };
+  const holder = new THREE.Group();
+  holder.position.y = -0.95;                        // таз тела hits.js — на 0,95 над землёй, ступни модели — на земле
+  holder.userData = { legL: parts.legL, legR: parts.legR, armL: parts.armL, armR: parts.armR, head: parts.head, parts: [null, null, parts.torso] };
+  root.add(holder);
+  const c = gu.colors || {};
+  const { skin } = buildQ(holder, gu.q, { skin: c.skin, shirt: c.shirt, pants: c.pants }, gu.look, mat);
+  return { root, parts, qskin: skin };
+}
+/* оторвать руку/ногу у тела-модели: кость сложить (не видно), а кусок — отдельным мешем в позе «висит», с места
+   сустава; вешается на кусок hits.js, который улетает */
+export function qLimb (skin, key) {
+  const st = skin.userData.q, F = st && st.F, C = st && st.C;
+  if (!F || !F.NWP) return null;
+  const J = F.J, top = J[key], foot = key === 'legL' ? J.footL : key === 'legR' ? J.footR : -1;
+  if (top < 0) return null;
+  const set = new Set([top]);
+  if (foot >= 0) set.add(foot);
+  for (const j of F.order) if (set.has(F.parent[j])) set.add(j);
+  for (const j of [top, foot]) if (j >= 0) st.bones[j].scale.setScalar(0.001);
+  const P = C.lod.array, si = C.si.array, sw = C.sw.array, I = C.idx.array, col = skin.geometry.attributes.color.array;
+  const mine = v => { let b = 0, bj = 0; for (let c = 0; c < 4; c++) if (sw[v * 4 + c] > b) { b = sw[v * 4 + c]; bj = si[v * 4 + c]; } return set.has(bj); };
+  const map = new Map(), pos = [], cl = [], idx = [], o = F.NWP[top];
+  for (let t = 0; t < I.length; t += 3) {
+    const a = I[t], b = I[t + 1], c = I[t + 2];
+    if (!mine(a) || !mine(b) || !mine(c)) continue;
+    for (const v of [a, b, c]) {
+      let n = map.get(v);
+      if (n === undefined) { n = pos.length / 3; map.set(v, n); pos.push(P[v * 3] - o.x, P[v * 3 + 1] - o.y, P[v * 3 + 2] - o.z); cl.push(col[v * 3], col[v * 3 + 1], col[v * 3 + 2]); }
+      idx.push(n);
+    }
+  }
+  if (!idx.length) return null;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3));
+  g.setIndex(idx);
+  const m = new THREE.Mesh(g, skin.material);
+  m.scale.setScalar(st.k);
+  return m;
+}
+
+/* ── портрет для окон разговора, карточки заказа и чата (people.js faceDataURL): у человека-модели — снимок её
+   головы (свой маленький рендер, 48 точек, увеличен без сглаживания — крупный пиксель, как у портретов игры),
+   фон — пастельный по зерну; один на человека и размер (настроение и рот не меняются) ── */
+const PCACHE = new Map(), PASTEL = ['#f6d6c8', '#d8e8f6', '#e2f2d4', '#f4e6bc', '#ead8f2', '#d4f0ec', '#f6dce6'];
+let PR = null;
+export function qPortrait (Lk, spec, size, id) {
+  const q = pickQ(Lk);
+  if (!q || typeof document === 'undefined') return null;
+  const key = id + ':' + size;
+  let url = PCACHE.get(key);
+  if (url) return url;
+  if (!PR) {
+    const r = new THREE.WebGLRenderer({ antialias: false, alpha: false, preserveDrawingBuffer: true });
+    r.setPixelRatio(1); r.setSize(48, 48, false);
+    const sc = new THREE.Scene();
+    sc.add(new THREE.HemisphereLight(0xeaf7ff, 0xb6c8a6, 1.7));
+    const sun = new THREE.DirectionalLight(0xfff6e4, 1.45); sun.position.set(-2, 3, 4); sc.add(sun);
+    sc.add(new THREE.AmbientLight(0xdfeaff, 0.5));
+    PR = { r, sc, cam: new THREE.PerspectiveCamera(22, 1, 0.05, 20), mat: new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }) };
+  }
+  const S = spec(), g = new THREE.Group(), o = () => new THREE.Object3D();
+  g.userData = { legL: o(), legR: o(), armL: o(), armR: o(), head: o(), parts: [null, null, o()] };
+  const { skin } = buildQ(g, q, S, Lk, PR.mat);
+  PR.sc.add(g);
+  g.updateMatrixWorld(true);
+  poseHook.call(skin);                              // руки опущены, голова прямо
+  const st = skin.userData.q, e = st.C.eye && st.C.eye.lengthSq() ? st.C.eye : st.F.RP[st.F.J.head];
+  const hx = e.x * st.k, hy = (e.y - st.F.y0) * st.k, hz = e.z * st.k;
+  PR.cam.position.set(hx + 0.2, hy + 0.06, hz + 1.4); PR.cam.lookAt(hx, hy - 0.03, hz);
+  PR.r.setClearColor(PASTEL[(Lk.seed >>> 3) % PASTEL.length], 1);
+  PR.r.render(PR.sc, PR.cam);
+  PR.sc.remove(g);
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+  x.drawImage(PR.r.domElement, 0, 0, size, size);
+  url = c.toDataURL();
+  PCACHE.set(key, url);
+  return url;
 }

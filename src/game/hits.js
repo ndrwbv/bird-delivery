@@ -30,6 +30,8 @@ const PUDDLE_HEX = 0x5a0e16;
 const FALL_LIFT = 0.17;   // упал и встал: спина над верхом слоя (толщина модели прохожего)
 const UP = { x: 0, y: 1, z: 0 };
 
+import { corpseQ, qLimb } from './qpeople.js';
+
 let A;
 /* api: THREE, scene, box, mergeGeos, HUMAN_VC, groundH, surfaceAt, curbAt, nearestRoad, driftTop, pavedLift, groundNormal,
    emote, puff, pushOut, burst (кусками — старый gibHuman), scare, callAmbulance, Snd, adult */
@@ -362,7 +364,8 @@ export const THROW = { FWD: 1.15, SIDE0: 1.5, SIDE_K: 0.06, UP0: 3, UP_K: 11, UP
   FULL: 70, FWD0: 0.85, UP_LO: 1.8, SIDE_LO: 0.3 };
 function throwBody (p, vx, vz, kmh, up, lie, y0) {
   const c = (p.grp && p.grp.userData.colors) || { skin: '#e0b48c', shirt: '#4a6fa5', pants: '#333' };
-  const { root, parts } = buildBody(c);
+  // проба (ветка test/people): человек — модель Quaternius → и тело та же модель (qpeople.js corpseQ)
+  const { root, parts, qskin } = p.grp && p.grp.userData.q ? corpseQ(p.grp.userData, A.HUMAN_VC) : buildBody(c);
   const s = (p.grp && p.grp.scale.x) || 1;
   root.scale.setScalar(s);
   const fl = A.groundH(p.x, p.z) + A.curbAt(p.x, p.z);
@@ -376,7 +379,7 @@ function throwBody (p, vx, vz, kmh, up, lie, y0) {
   const fwd = THROW.FWD0 + (THROW.FWD - THROW.FWD0) * q, upFull = clamp(THROW.UP0 + kmh / THROW.UP_K, 3, THROW.UP_MAX);
   root.position.x += vx / l * THROW.AHEAD; root.position.z += vz / l * THROW.AHEAD;   // чуть впереди морды — не в капоте
   const B = {
-    root, parts, s, t: 0, mode: 'fly', up, lie, life: lie, shadow: shadowFor(), floor: fl, settle: 0,
+    root, parts, qskin, s, t: 0, mode: 'fly', up, lie, life: lie, shadow: shadowFor(), floor: fl, settle: 0,
     // вперёд — быстрее машины (×THROW.FWD): иначе машина догоняет тело и проезжает сквозь; вбок — разброс, растёт со скоростью
     vx: vx * fwd + side * -vz / l, vy: THROW.UP_LO + (upFull - THROW.UP_LO) * q, vz: vz * fwd + side * vx / l,
     spin: rand(5, 9) * k * (Math.random() < 0.5 ? -1 : 1), roll: rand(-3, 3) * k, landed: 0, puddle: null, starT: 0, wx: 0, wz: 0,
@@ -422,6 +425,7 @@ export function rehit (cx, cz, fx, fz, L, W, vx, vz) {
 function skeleton (B) {
   B.skel = 1;
   if (!BONE) BONE = new A.THREE.MeshLambertMaterial({ color: REHIT.BONE });
+  if (B.qskin) B.qskin.material = BONE;             // тело-модель (qpeople.js) — целиком цвета кости
   for (const k in B.parts) {
     const m = B.parts[k];
     if (!m) continue;
@@ -437,6 +441,7 @@ function tearLimb (B) {
   const keys = ['armL', 'armR', 'legL', 'legR'];
   const k = keys[Math.floor(Math.random() * 4)];
   const m = B.parts[k];
+  if (B.qskin) { const lm = qLimb(B.qskin, k); if (lm) m.add(lm); }   // тело-модель: рука/нога модели летит с куском
   B.root.updateMatrixWorld(true);
   A.scene.attach(m);
   B.parts[k] = null;
@@ -611,7 +616,7 @@ function dispose (o) {
   o.traverse(m => {
     if (!m.isMesh) return;
     if (m.geometry !== PUD_GEO) m.geometry.dispose();
-    if (m.material !== A.HUMAN_VC) m.material.dispose();
+    if (m.material !== A.HUMAN_VC && m.material !== BONE) m.material.dispose();
   });
 }
 
