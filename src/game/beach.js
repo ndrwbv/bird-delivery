@@ -495,7 +495,7 @@ function makeBeachHuman (person) {
   const u = grp.userData;
   if (person.look.f || u.fem) {                    // руки купальщицы — без рукавов
     const c = new THREE.Color(person.look.skin);
-    if (u.skin && u.skin.geometry) {                // человек одним мешем с костями (people.js): руки — вершины костей 3 и 4
+    if (u.skin && u.skin.geometry && !u.q) {        // человек одним мешем с костями (people.js): руки — вершины костей 3 и 4 (не у модели Quaternius — qpeople.js)
       const g = u.skin.geometry, ca = g.attributes.color, si = g.attributes.skinIndex;
       if (ca && si) {
         for (let i = 0; i < ca.count; i++) { const b = si.getX(i); if (b === 3 || b === 4) ca.setXYZ(i, c.r, c.g, c.b); }
