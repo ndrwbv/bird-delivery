@@ -37,7 +37,7 @@ def top_group (o, v):
     return best[1] or ''
 
 HAND = ('Fist', 'Hand', 'Thumb', 'Index', 'Middle', 'Ring', 'Pinky', 'Finger')
-DROP = HAND + ('Head', 'Neck')
+DROP = HAND + ('Head',)   # шею не вырезаем — раздутая, она и есть горло куртки (вырезанная оставляла дыры у плеч)
 
 # ── пуховик из тела ──
 coat = clone(BODY, 'Coat_Body')
@@ -58,10 +58,9 @@ wz = lambda v: (M @ v.co).z
 bnd = [e for e in bm.edges if e.is_boundary]
 cx = sum((M @ v.co).x for v in bm.verts) / len(bm.verts)
 mid = [e for e in bnd if all(abs((M @ v.co).x - cx) < 0.2 for v in e.verts)]
-zs = sorted(wz(v) for e in mid for v in e.verts)
-lo_z, hi_z = zs[0], zs[-1]
-hem = [e for e in mid if all(wz(v) < lo_z + 0.06 for v in e.verts)]
-col = [e for e in mid if all(wz(v) > hi_z - 0.06 for v in e.verts)]
+zs = sorted(wz(v) for e in mid for v in e.verts) or [0.0]
+lo_z = zs[0]
+hem = [e for e in mid if all(wz(v) < lo_z + 0.06 for v in e.verts)]   # нет открытого низа (тело закрыто) — без подола
 def extrude (edges, dz, grow):
     r = bmesh.ops.extrude_edge_only(bm, edges=edges)
     nv = [g for g in r['geom'] if isinstance(g, bmesh.types.BMVert)]
@@ -71,15 +70,13 @@ def extrude (edges, dz, grow):
         w = Vector((c.x + (w.x - c.x) * grow, c.y + (w.y - c.y) * grow, w.z + dz))
         v.co = M.inverted() @ w
     return nv
-hemv = extrude(hem, -0.13, 1.05)
-extrude(col, 0.05, 1.12)
+hemv = extrude(hem, -0.13, 1.05) if hem else []
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces)   # все грани — наружу (вывернутые в игре не видны — дыры)
 bm.to_mesh(me); bm.free()
-# стёжка: полосы по высоте
+# одна краска (стёжка тёмными гранями выглядела дырами)
 me.materials.clear()
-me.materials.append(mat('Coat', (0.25, 0.3, 0.35))); me.materials.append(mat('Coat_Seam', (0.12, 0.14, 0.16)))
-for p in me.polygons:
-    z = (M @ p.center).z
-    p.material_index = 1 if (z % 0.11) < 0.018 else 0
+me.materials.append(mat('Coat', (0.25, 0.3, 0.35)))
+for p in me.polygons: p.material_index = 0
 
 # ── сапоги из ступней: голенище вверх до середины икры, на кости голени ──
 boot = clone(FEET, 'Boots_Feet')
@@ -98,6 +95,7 @@ else:                                               # закрытая обув�
     top = [f for f in bm.faces if all((M @ v.co).z > zt - 0.03 for v in f.verts)]
     r = bmesh.ops.extrude_face_region(bm, geom=top)
 shaft = [g for g in r['geom'] if isinstance(g, bmesh.types.BMVert)]
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
 for v in shaft:
     w = M @ v.co; v.co = M.inverted() @ Vector((w.x, w.y, w.z + 0.16))
 ids = [v.index for v in shaft]
@@ -168,5 +166,8 @@ if PNG:   # картинка для проверки: одежда на теле
     sc.render.engine = 'BLENDER_WORKBENCH'; sc.render.resolution_x = 480; sc.render.resolution_y = 640
     sc.display.shading.color_type = 'MATERIAL'
     cam = bpy.data.objects.new('cam', bpy.data.cameras.new('cam')); bpy.context.collection.objects.link(cam)
-    cam.location = (1.6, -3.2, 1.3); cam.rotation_euler = (math.radians(84), 0, math.radians(27)); sc.camera = cam
-    sc.render.filepath = PNG; bpy.ops.render.render(write_still=True)
+    sc.display.shading.show_backface_culling = True
+    sc.camera = cam
+    for i, (loc, rz) in enumerate((((1.6, -3.2, 1.3), 27), ((-1.6, 3.2, 1.3), 207))):
+        cam.location = loc; cam.rotation_euler = (math.radians(84), 0, math.radians(rz))
+        sc.render.filepath = PNG.replace('.png', '_%d.png' % i); bpy.ops.render.render(write_still=True)
