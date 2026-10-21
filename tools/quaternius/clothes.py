@@ -134,9 +134,13 @@ def hat_obj (name, build, mats):
     o.parent = arm
     o.matrix_parent_inverse = arm.matrix_world.inverted()
     o.vertex_groups.new(name='Head').add([v.index for v in me.vertices], 1.0, 'REPLACE')
+    # сгладить: подразделение поверхности (купол, помпон, уши — круглые, без углов)
+    sub = o.modifiers.new('Sub', 'SUBSURF'); sub.levels = 1; sub.render_levels = 1
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.modifier_apply(modifier='Sub')
     o.modifiers.new('Armature', 'ARMATURE').object = arm
     return o
-def sphere (bm, c, r, sx=1, sy=1, sz=1, seg=10, ring=6, cut=None, mi=0):
+def sphere (bm, c, r, sx=1, sy=1, sz=1, seg=16, ring=8, cut=None, mi=0):
     g = bmesh.ops.create_uvsphere(bm, u_segments=seg, v_segments=ring, radius=r)
     vs = g['verts']
     for v in vs: v.co = Vector((c.x + v.co.x * sx, c.y + v.co.y * sy, c.z + v.co.z * sz))
@@ -151,13 +155,13 @@ def box (bm, c, s, mi=0):
 R = W * 0.64
 def beanie (bm):   # купол до ушей, отворот по низу, помпон
     sphere(bm, C - Vector((0, 0, W * 0.32)), R, sz=1.0, cut=C.z - W * 0.32, mi=0)
-    sphere(bm, C - Vector((0, 0, W * 0.34)), R * 1.05, sz=0.28, seg=10, ring=4, mi=1)            # отворот
-    sphere(bm, C + Vector((0, 0, R * 0.62)), R * 0.26, seg=8, ring=5, mi=1)                        # помпон
+    sphere(bm, C - Vector((0, 0, W * 0.34)), R * 1.05, sz=0.28, seg=16, ring=6, mi=1)            # отворот
+    sphere(bm, C + Vector((0, 0, R * 0.62)), R * 0.26, seg=12, ring=6, mi=1)                        # помпон
 def ushanka (bm):  # мех куполом, отворот по кругу, уши до щёк, отворот спереди
     sphere(bm, C - Vector((0, 0, W * 0.3)), R * 1.06, sz=0.92, cut=C.z - W * 0.3, mi=0)
-    sphere(bm, C - Vector((0, 0, W * 0.32)), R * 1.14, sz=0.32, seg=10, ring=4, mi=0)
-    for s in (-1, 1): box(bm, C + Vector((s * R * 1.02, 0.01, -W * 0.62)), Vector((W * 0.13, W * 0.46, W * 0.5)), mi=0)
-    box(bm, C + Vector((0, -R * 1.02, -W * 0.18)), Vector((W * 0.95, W * 0.12, W * 0.24)), mi=1)   # отворот спереди (−y — лицо)
+    sphere(bm, C - Vector((0, 0, W * 0.32)), R * 1.14, sz=0.32, seg=16, ring=6, mi=0)
+    for s in (-1, 1): sphere(bm, C + Vector((s * R * 1.0, 0.01, -W * 0.6)), 1, sx=W * 0.08, sy=W * 0.24, sz=W * 0.28, seg=12, ring=6, mi=0)   # уши
+    sphere(bm, C + Vector((0, -R * 1.0, -W * 0.18)), 1, sx=W * 0.5, sy=W * 0.07, sz=W * 0.14, seg=12, ring=6, mi=1)   # отворот спереди (−y — лицо)
 fur, fur2 = mat('Fur', (0.2, 0.14, 0.09)), mat('Fur_Dark', (0.12, 0.08, 0.05))
 knit, knit2 = mat('Hat', (0.5, 0.05, 0.08)), mat('Hat_Trim', (0.85, 0.85, 0.8))
 hb = hat_obj('Beanie_HatB', beanie, [knit, knit2])
