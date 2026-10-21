@@ -16,16 +16,18 @@
 export const TIER = { FALL: 20, HIGH: 55, BURST: 85 };          // км/ч; BURST — только детская (лежит дольше)
 /* жизни прохожего (автор 21.10.2026, ветка test/people: «больше жизней, чтобы пережили чуть больше ударов»): удар слабее
    MAX км/ч отнимает жизнь — пока она не последняя, человек падает и встаёт (как медленнее FALL); последняя — сбит.
-   Быстрее MAX — сбит сразу, как раньше. Лежащего (ещё не встал) — добивает удар быстрее FALL, но не первые GRACE с */
+   Быстрее MAX — сбит сразу, как раньше. Лежащий — так же: удар отнимает жизнь, падает заново; первые GRACE с после
+   удара (машина ещё на нём) — не считается. Жизни кончились — труп (hit не «поднимет» его второй раз) */
 export const LIVES = { N: 3, MAX: 55, GRACE: 1.5 };   // GRACE — с после удара, пока лежащего не добивает
 export function survive (p, kmh) {
   const u = p && p.grp && p.grp.userData;
-  if (!A.adult || !u || kmh >= LIVES.MAX) return false;
-  // лежит (ещё не встал): только что сбила и упал под машину — GRACE с не добивает (машина ещё на нём; иначе
-  // «легонько задел — умер»), потом — добивает. Уже встал и грозит кулаком — стоит: удар снова отнимает жизнь
-  if (p.fall && p.fall.t < 0.95 + TIME.FALL_LIE) return !!(u.graceT && performance.now() < u.graceT);
+  if (!A.adult || !u) return false;
+  if (kmh >= LIVES.MAX) { u.hp = 0; return false; }
+  const now = performance.now();
+  if (u.graceT && now < u.graceT && (u.hp ?? LIVES.N) > 0) return true;   // только что сбила — машина ещё на нём: не добивает
   u.hp = (u.hp ?? LIVES.N) - 1;
-  if (u.hp > 0) { u.graceT = performance.now() + LIVES.GRACE * 1000; if (p.fall) p.fall = null; return true; }
+  if (u.hp > 0) { u.graceT = now + LIVES.GRACE * 1000; if (p.fall) p.fall = null; return true; }   // стоит или лежит — падает заново
+  u.hp = 0;
   return false;
 }
 export const LIMB = { MID: 0.15, HIGH: 0.4 };                   // шанс оторвать руку/ногу на нитро 20–55 км/ч (HIGH); MID не используется
@@ -264,6 +266,18 @@ export function fallStep (p, dt) {
   const F = p.fall, g = p.grp, u = g.userData;
   const t = (F.t += dt);
   const T1 = 0.35, T2 = T1 + TIME.FALL_LIE, T3 = T2 + 0.6, T4 = T3 + 1.1;
+  if (u.q) {                                         // модель Quaternius (qpeople.js): падает навзничь клипом художника,
+    if (t < T1 + 0.3) { const k = 1 - t / (T1 + 0.3); p.x += F.vx * k * dt; p.z += F.vz * k * dt; A.pushOut(p, 0.45); }   // лежит, встаёт (тот же клип назад), грозит кулаком
+    g.rotation.order = 'YXZ'; g.rotation.set(0, F.yaw, 0);
+    g.position.set(p.x, A.groundH(p.x, p.z) + A.curbAt(p.x, p.z), p.z);
+    for (const b of [u.legL, u.legR, u.armL, u.armR]) b.rotation.set(0, 0, 0);
+    u.qAnim = t < T2 ? { c: 'death', f: t / (T1 + 0.55) } : t < T3 ? { c: 'death', f: 1 - (t - T2) / (T3 - T2) } : { c: 'punch', f: ((t - T3) * 1.4) % 1 };
+    if (t >= T3 && !F.mad) { F.mad = 1; A.emote(p.x, 2.1, p.z, 'angry', 3); }
+    if (t < T4) return true;
+    u.qAnim = null; g.rotation.order = 'XYZ';
+    p.fall = null;
+    return false;
+  }
   if (t < T1 + 0.3) {                              // по инерции проезжает по асфальту
     const k = 1 - t / (T1 + 0.3);
     p.x += F.vx * k * dt; p.z += F.vz * k * dt;

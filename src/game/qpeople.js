@@ -63,7 +63,7 @@ function family (fam) {
   for (let c = 0; c < nC; c++) {
     const name = str(), nF = u32(), fps = f32(), speed = f32();
     const data = new Float32Array(bin.buffer.slice(o, o + nF * nJ * 7 * 4)); o += nF * nJ * 7 * 4;
-    clips[/run/i.test(name) ? 'run' : 'walk'] = { nF, fps, speed, data, T: nF / fps };
+    clips[/run/i.test(name) ? 'run' : /death/i.test(name) ? 'death' : /punch/i.test(name) ? 'punch' : 'walk'] = { nF, fps, speed, data, T: nF / fps };
   }
   const models = [];
   for (let mI = 0; mI < nM; mI++) {
@@ -367,7 +367,7 @@ function glasses (F, eye, Lk) {
 
 /* ── поза наших костей → мировые повороты и места всех костей модели; bones — и в сами кости ── */
 const T = new THREE.Quaternion(), IQ = new THREE.Quaternion(), ID = new THREE.Quaternion(), V = new THREE.Vector3(), CQ = new THREE.Quaternion(), CQ2 = new THREE.Quaternion();
-const AX = new THREE.Vector3(1, 0, 0);
+const AX = new THREE.Vector3(1, 0, 0), FM = new THREE.Matrix4(), IM = new THREE.Matrix4(), ONE3 = new THREE.Vector3(1, 1, 1), SC3 = new THREE.Vector3();
 function solve (F, dq, ang, WQ, WP, bones) {
   const J = F.J;
   for (const j of F.order) {
@@ -418,6 +418,19 @@ function neutral (F, pos, si, sw, nV) {
   return out;
 }
 
+/* кадр клипа (fi — дробный номер кадра) — в кости, с весом w поверх того, что в них уже есть */
+function clipPose (st, c, fi, loop, w) {
+  const F = st.F, D = c.data, nJ = F.nJ, f0 = Math.floor(fi), f1 = loop ? (f0 + 1) % c.nF : Math.min(f0 + 1, c.nF - 1), fr = fi - f0;
+  for (let j = 0; j < nJ; j++) {
+    const o0 = (f0 * nJ + j) * 7, o1 = (f1 * nJ + j) * 7, b = st.bones[j];
+    CQ.set(D[o0], D[o0 + 1], D[o0 + 2], D[o0 + 3]); CQ2.set(D[o1], D[o1 + 1], D[o1 + 2], D[o1 + 3]);
+    CQ.slerp(CQ2, fr);
+    b.quaternion.slerp(CQ, w);
+    V.set(D[o0 + 4] + (D[o1 + 4] - D[o0 + 4]) * fr, D[o0 + 5] + (D[o1 + 5] - D[o0 + 5]) * fr, D[o0 + 6] + (D[o1 + 6] - D[o0 + 6]) * fr);
+    b.position.lerp(V, w);
+  }
+}
+
 /* ── каждый кадр, когда модель в кадре ── */
 let FRAME = 0, LAST = 0;
 function poseHook () {
@@ -456,24 +469,27 @@ function poseHook () {
   a.kneeL = knee(u.legL.rotation.x); a.kneeR = knee(u.legR.rotation.x);
   a.elbL = elb(u.armL.rotation.x); a.elbR = elb(u.armR.rotation.x);
   solve(F, dq, a, st.WQ, st.WP, st.bones);
+  // анимация художника, которую задаёт игра (hits.js fallStep: падает навзничь, лежит, встаёт, грозит кулаком)
+  const an = u.qAnim, ac = an && F.clips[an.c];
+  if (ac) {
+    clipPose(st, ac, Math.max(0, Math.min(1, an.f)) * (ac.nF - 1), false, 1);
+    // ступни у Quaternius — цели ног, в этих клипах не следуют за ногой: пристегнуть к голени, как в покое
+    st.root.updateMatrixWorld(true);
+    for (const Ft of F.FOOT) {
+      const fb = st.bones[Ft.f], kb = st.bones[Ft.k];
+      FM.compose(Ft.p, Ft.q, ONE3).premultiply(kb.matrixWorld).premultiply(IM.copy(fb.parent.matrixWorld).invert());
+      FM.decompose(fb.position, fb.quaternion, SC3);
+    }
+  }
   // ходьба / бег художника, шаг в такт скорости: ступня на земле — назад со скоростью человека
-  if (st.w > 0.01 && F.clips.walk) {
+  else if (st.w > 0.01 && F.clips.walk) {
     const sc = st.k * (st.g.scale.x || 1);                 // единицы модели → метры мира
     st.run += ((st.v > 2.4 && F.clips.run ? 1 : 0) - st.run) * Math.min(1, dt * 5);
     const c = st.run > 0.5 ? F.clips.run : F.clips.walk;
     st.t += dt * st.v / (c.speed * sc);
-    const ph = (st.t / c.T) % 1, fi = ph * c.nF, f0 = fi | 0, f1 = (f0 + 1) % c.nF, fr = fi - f0;
-    const D = c.data, nJ = F.nJ, w = st.w;
-    for (let j = 0; j < nJ; j++) {
-      const o0 = (f0 * nJ + j) * 7, o1 = (f1 * nJ + j) * 7, b = st.bones[j];
-      CQ.set(D[o0], D[o0 + 1], D[o0 + 2], D[o0 + 3]); CQ2.set(D[o1], D[o1 + 1], D[o1 + 2], D[o1 + 3]);
-      CQ.slerp(CQ2, fr);
-      b.quaternion.slerp(CQ, w);
-      V.set(D[o0 + 4] + (D[o1 + 4] - D[o0 + 4]) * fr, D[o0 + 5] + (D[o1 + 5] - D[o0 + 5]) * fr, D[o0 + 6] + (D[o1 + 6] - D[o0 + 6]) * fr);
-      b.position.lerp(V, w);
-    }
+    clipPose(st, c, ((st.t / c.T) % 1) * c.nF, true, st.w);
     // голова — куда смотрит игра (на машину, на собеседника)
-    if (J.head >= 0 && u.head.rotation.y) st.bones[J.head].rotateY(u.head.rotation.y * w);
+    if (J.head >= 0 && u.head.rotation.y) st.bones[J.head].rotateY(u.head.rotation.y * st.w);
     QP.walk++;
   }
   st.root.updateMatrixWorld(true);                  // поза — в этот же кадр, без запаздывания
