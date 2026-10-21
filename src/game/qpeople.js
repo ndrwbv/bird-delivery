@@ -1,5 +1,5 @@
 /* ──────────────────────────────────────────────────────────────────────────
-   Люди Quaternius — проба (ветка test/people, 21.10.2026, docs/IDEAS.md трек 15).
+   Люди Quaternius (21.10.2026; проба в ветке test/people, стиль утверждён автором).
 
    Автор: «не нравится, что модели людей сделаны тобой». Пробуем бесплатные модели художника Quaternius (CC0,
    quaternius.com; файлы — с poly.pizza), сжатые скриптом в qpeople.data.js. Три семейства — у каждого свой скелет:
@@ -17,14 +17,14 @@
      туловище → Abdomen, голова → Head; колени и локти сгибаются от взмаха; ступни — за голенью. Так работают лавка,
      взмах рукой, удары, катсцены. Между ними — плавный переход за ~0,2 с.
 
-   Кто: каждый третий (QP.rate) по зерну человека. ?qp=0 — как было (никого), ?qpall — все люди такие.
+   Кто: все люди (стиль утверждён автором 21.10.2026). ?qp=0 — старые коробочные (для сравнения), ?qpmix — каждый третий.
    Чего нет в пробе: зимней одежды и шапок (верх зимой — цвета пуховика), живых лиц катсцен (у моделей свои лица).
    Дальний вариант (дальше 45 м) — та же модель одним мешем, стоит. */
 import * as THREE from '../vendor/three.module.min.js';
 import { QDATA } from './qpeople.data.js';
 
 const SRCH = typeof location !== 'undefined' ? location.search || '' : '';
-export const QP = { on: !/[?&]qp=0\b/.test(SRCH), all: /[?&]qpall\b/.test(SRCH), rate: 0.34, built: 0, posed: 0, walk: 0, combos: 0 };
+export const QP = { on: !/[?&]qp=0\b/.test(SRCH), all: !/[?&]qpmix\b/.test(SRCH), rate: 0.34, built: 0, posed: 0, walk: 0, combos: 0 };
 if (typeof window !== 'undefined') window.__qp = QP;   // отладка: сколько собрано, поз, кадров ходьбы
 
 /* случайность от зерна человека */
@@ -96,7 +96,9 @@ function family (fam) {
     legL: side('UpperLeg', -1), legR: side('UpperLeg', 1), armL: side('UpperArm', -1), armR: side('UpperArm', 1),
     kneeL: side('LowerLeg', -1), kneeR: side('LowerLeg', 1), elbowL: side('LowerArm', -1), elbowR: side('LowerArm', 1),
     footL: side('Foot', -1), footR: side('Foot', 1), body: names.indexOf('Abdomen'), head: names.indexOf('Head'),
+    handL: -1, handR: -1,
   };
+  J.handL = parent.findIndex((p, j) => p === J.elbowL && p >= 0); J.handR = parent.findIndex((p, j) => p === J.elbowR && p >= 0);   // кисть — первая кость под предплечьем
   // руки — вниз вдоль тела, чуть в сторону (у модели в покое разведены)
   const FIX = names.map(() => new THREE.Quaternion());
   for (const [a, e, s] of [[J.armL, J.elbowL, -1], [J.armR, J.elbowR, 1]]) {
@@ -264,8 +266,8 @@ const col = hex => {
 };
 
 /* надеть модель: в группу человека g (кости игры уже в ней) — корень модели со скелетом, меш и дальний меш */
-export function buildQ (g, q, S, Lk, mat) {
-  q = dress(q, S, Lk);
+export function buildQ (g, q, S, Lk, mat, dressed = false) {
+  if (!dressed) q = dress(q, S, Lk);
   const F = family(q.fam), C = combo(F, q);
   const bones = [];
   for (let j = 0; j < F.nJ; j++) {
@@ -317,7 +319,7 @@ export function buildQ (g, q, S, Lk, mat) {
   root.scale.setScalar(k);
   root.position.y = -F.y0 * k;
   g.add(root);
-  const st = { F, C, bones, root, skel, g, k, y0: root.position.y, lift: 0, liftT: 0, WQ: F.RQ.map(x => x.clone()), WP: F.RP.map(x => x.clone()), dq: new Array(F.nJ).fill(null), ang: {},
+  const st = { F, C, bones, root, skel, g, k, qd: q, S: { skin: S.skin, shirt: S.shirt, pants: S.pants, lvl: S.lvl, hw: S.hw }, y0: root.position.y, lift: 0, liftT: 0, WQ: F.RQ.map(x => x.clone()), WP: F.RP.map(x => x.clone()), dq: new Array(F.nJ).fill(null), ang: {},
     frame: -1, nb: 0, nh: 0, lastT: 0, lx: 0, lz: 0, v: 0, swing: 0, w: 0, t: Math.random() * 10, run: 0 };
   skin.userData.q = st;
   skin.onBeforeRender = poseHook;
@@ -366,7 +368,7 @@ function glasses (F, eye, Lk) {
 }
 
 /* ── поза наших костей → мировые повороты и места всех костей модели; bones — и в сами кости ── */
-const T = new THREE.Quaternion(), IQ = new THREE.Quaternion(), ID = new THREE.Quaternion(), V = new THREE.Vector3(), CQ = new THREE.Quaternion(), CQ2 = new THREE.Quaternion();
+const V2 = new THREE.Vector3(), T = new THREE.Quaternion(), IQ = new THREE.Quaternion(), ID = new THREE.Quaternion(), V = new THREE.Vector3(), CQ = new THREE.Quaternion(), CQ2 = new THREE.Quaternion();
 const AX = new THREE.Vector3(1, 0, 0), FM = new THREE.Matrix4(), IM = new THREE.Matrix4(), ONE3 = new THREE.Vector3(1, 1, 1), SC3 = new THREE.Vector3();
 function solve (F, dq, ang, WQ, WP, bones) {
   const J = F.J;
@@ -497,10 +499,20 @@ function poseHook () {
   if (QP.topAt && !st.noWalk) {
     if (now - st.liftT > 200) { st.liftT = now; const top = QP.topAt(x, z); st.want = Math.max(0, Math.min(0.15, top - e[13])); }
     st.lift += ((st.want || 0) - st.lift) * Math.min(1, dt * 10);
-    st.root.position.y = st.y0 + st.lift / (st.g.scale.y || 1);
   }
+  // сидит (обе ноги вперёд): игра сажает по тазу коробочного человека (0,7 над подошвой), у модели таз выше — опустить
+  const sit = Math.max(0, Math.min(1, (-Math.max(u.legL.rotation.x, u.legR.rotation.x) - 0.8) / 0.5));
+  if (st.hip === undefined) st.hip = J.legL >= 0 ? (F.RP[J.legL].y - F.y0) * st.k - 0.7 : 0;
+  st.root.position.y = st.y0 + (st.noWalk ? 0 : st.lift / (st.g.scale.y || 1)) - sit * st.hip;
   st.root.updateMatrixWorld(true);                  // поза — в этот же кадр, без запаздывания
   st.skel.update();
+  // вещи в руках (бутылка, лопата, портфель) висят на наших руках-костях: кисть коробочного человека — в 0,58 под
+  // плечом, у модели кисть ниже и дальше. Сдвигаем нашу «руку» так, чтобы её кисть была в кисти модели
+  for (const [arm, h] of [[u.armL, J.handL], [u.armR, J.handR]]) {
+    if (h < 0 || !arm.children.length) continue;
+    st.bones[h].getWorldPosition(V); st.g.worldToLocal(V);
+    arm.position.copy(V).sub(V2.set(0, -0.58, 0).applyQuaternion(arm.quaternion));
+  }
   QP.posed++;
 }
 
@@ -515,8 +527,8 @@ export function corpseQ (gu, mat) {
   holder.position.y = -0.95;                        // таз тела hits.js — на 0,95 над землёй, ступни модели — на земле
   holder.userData = { legL: parts.legL, legR: parts.legR, armL: parts.armL, armR: parts.armR, head: parts.head, parts: [null, null, parts.torso] };
   root.add(holder);
-  const c = gu.colors || {};
-  const { skin } = buildQ(holder, gu.q, { skin: c.skin, shirt: c.shirt, pants: c.pants }, gu.look, mat);
+  const c = gu.colors || {}, was = gu.skin && gu.skin.userData.q;   // тот же человек: те же части (одет по сезону) и цвета
+  const { skin } = was ? buildQ(holder, was.qd, was.S, gu.look, mat, true) : buildQ(holder, gu.q, { skin: c.skin, shirt: c.shirt, pants: c.pants }, gu.look, mat);
   skin.userData.q.noWalk = true;                    // тело не «шагает», даже когда скользит по земле
   return { root, parts, qskin: skin };
 }
