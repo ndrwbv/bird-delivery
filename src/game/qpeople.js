@@ -516,3 +516,13 @@ export function qPortrait (Lk, spec, size, id) {
   PCACHE.set(key, url);
   return url;
 }
+
+/* отладка (tools/probe-checks/qcatalog.js): человек из заданных частей в цветах художника — лист всей одежды */
+QP.families = () => ['M', 'F', 'A'].map(f => ({ fam: f, models: family(f).models.map(m => m.name) }));
+QP.make = (spec, lvl = 0, hw = '') => {
+  const g = new THREE.Group(), o = () => new THREE.Object3D();
+  g.userData = { legL: o(), legR: o(), armL: o(), armR: o(), head: o(), parts: [null, null, o()] };
+  QP.mat = QP.mat || new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  buildQ(g, spec, { lvl, hw }, { seed: 7, f: spec.fam !== 'M' }, QP.mat);
+  return g;
+};

@@ -48,10 +48,18 @@ bm.verts.ensure_lookup_table()
 bmesh.ops.delete(bm, geom=[bm.verts[i] for i in drop], context='VERTS')
 # сшить разрезанные по граням вершины (плоская модель) — иначе при раздувании грани разойдутся трещинами
 bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.002 / wscale(coat))
-# раздуть по нормалям (мировые 3,5 см)
+# туловище — сгладить (грудь, талия, пресс не проступают: куртка сидит мешком, а не по голому телу)
+dl = bm.verts.layers.deform.active
+TORSO = ('Hips', 'Abdomen', 'Torso', 'Chest', 'Neck', 'Body', 'Shoulder')
+def gname (v):
+    it = list(v[dl].items()) if dl else []
+    return coat.vertex_groups[max(it, key=lambda kv: kv[1])[0]].name if it else ''
+tv = [v for v in bm.verts if gname(v).startswith(TORSO)]
+for _ in range(10): bmesh.ops.smooth_vert(bm, verts=tv, factor=0.6, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+# раздуть по нормалям: туловище — 5 см, рукава — 3,5 см
 bm.normal_update()
-t = 0.035 / wscale(coat)
-for v in bm.verts: v.co += v.normal * t
+k = 1 / wscale(coat)
+for v in bm.verts: v.co += v.normal * (0.05 if v in tv else 0.035) * k
 M = coat.matrix_world
 wz = lambda v: (M @ v.co).z
 # края: подол — нижняя петля, воротник — верхняя у шеи (не рукава: у тех x далеко от середины)
