@@ -1057,7 +1057,7 @@ export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
     const lod = qm ? qm.lod : new THREE.Mesh(geo(S.parts.map((l, i) => [l, ...S.piv[i]])), HUMAN_VC);
     lod.visible = false;
     if (!qm) g.add(lod);
-    g.scale.setScalar(S.hs);
+    g.scale.setScalar(qm ? Math.max(S.hs, 0.97) : S.hs);   // модель Quaternius: не ниже 97 % — никто не похож на ребёнка
     g.userData = { legL, legR, armL, armR, head, faceM, faceS: { skin: S.skin, Wp: S.Wp }, colors: { skin: S.skin, shirt: S.shirt, pants: S.pants }, person, fem: S.fem, fat: S.fat, pace: S.pace,
       lod, parts: [legL, legR, bodyB, armL, armR, head, skin], far: false, look: Lk, o, hair: null, warm: w0, skin, hw: S.hw, q: qn };
     HUMANS.add(g);

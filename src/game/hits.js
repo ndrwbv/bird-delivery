@@ -14,6 +14,16 @@
    Сколько всего одновременно — CAP: лишнее самое старое тает. */
 
 export const TIER = { FALL: 20, HIGH: 55, BURST: 85 };          // км/ч; BURST — только детская (лежит дольше)
+/* жизни прохожего (автор 21.10.2026, ветка test/people: «больше жизней, чтобы пережили чуть больше ударов»): удар слабее
+   MAX км/ч отнимает жизнь — пока она не последняя, человек падает и встаёт (как медленнее FALL); последняя — сбит.
+   Быстрее MAX — сбит сразу, как раньше. Лежащего (ещё не встал) — добивает любой удар быстрее FALL */
+export const LIVES = { N: 3, MAX: 55 };
+export function survive (p, kmh) {
+  const u = p && p.grp && p.grp.userData;
+  if (!A.adult || !u || p.fall || kmh >= LIVES.MAX) return false;
+  u.hp = (u.hp ?? LIVES.N) - 1;
+  return u.hp > 0;
+}
 export const LIMB = { MID: 0.15, HIGH: 0.4 };                   // шанс оторвать руку/ногу на нитро 20–55 км/ч (HIGH); MID не используется
 export const TIME = {
   FALL_LIE: 1.8,        // упал и встал: сколько лежит
@@ -30,7 +40,7 @@ const PUDDLE_HEX = 0x5a0e16;
 const FALL_LIFT = 0.17;   // упал и встал: спина над верхом слоя (толщина модели прохожего)
 const UP = { x: 0, y: 1, z: 0 };
 
-import { corpseQ, qLimb } from './qpeople.js';
+import { corpseQ, qLimb, qPose } from './qpeople.js';
 
 let A;
 /* api: THREE, scene, box, mergeGeos, HUMAN_VC, groundH, surfaceAt, curbAt, nearestRoad, driftTop, pavedLift, groundNormal,
@@ -642,6 +652,7 @@ function poseLimbs (B, dt, k) {
 /* поставить тело на верх слоя: самая низкая вершина — на 1 см над ним */
 function rest (B, again) {
   const r = B.root;
+  if (B.qskin) { r.updateMatrixWorld(true); qPose(B.qskin); }   // тело-модель: поза — нынешняя, не с прошлого кадра в кадре (иначе висит в воздухе)
   r.updateMatrixWorld(true);
   const lo = lowest(r);
   if (!again) B.floor = floorUnder(r, B.s);         // где лёг — считаем раз, дальше только поза

@@ -11370,7 +11370,8 @@ function driveStep (dt) {
     // свой клиент и удар несильный (ECON.CLIENT_HIT) — цел, но без чаевых
     if (Math.abs(vf) < ECON.CLIENT_HIT.HARD && clientBump(p, fx, fz, sx, sz)) continue;
     // медленно (HITS.TIER.FALL) — упал и встал, не «сбит»
-    if (HITS.isFall(Math.abs(vf) * 3.6)) { if (!p.fall) { if (p.idle) releaseIdle(p); HITS.fall(p, V.vx, V.vz); Snd.impact(Math.abs(vf), 'person', { x: p.x, z: p.z }); CBUMP.hit(V, 'person'); } continue; }
+    // жизни (hits.js LIVES): удар слабее 55 км/ч, пока жизнь не последняя, — тоже упал и встал
+    if (HITS.isFall(Math.abs(vf) * 3.6) || HITS.survive(p, Math.abs(vf) * 3.6)) { if (!p.fall) { if (p.idle) releaseIdle(p); HITS.fall(p, V.vx, V.vz); Snd.impact(Math.abs(vf), 'person', { x: p.x, z: p.z }); CBUMP.hit(V, 'person'); } continue; }
     runOver(p, V.vx, V.vz);
     S.shake = Math.max(S.shake, 0.35);
     CBUMP.hit(V, 'person');                         // каждый сбитый чуть тормозит и уводит машину (carbump.js)

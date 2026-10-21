@@ -442,7 +442,7 @@ function poseHook () {
   // игра машет ему ногами (идёт), а не стоит / сидит / лежит / едет в машине
   st.swing = Math.max(st.swing * Math.exp(-dt * 3), Math.abs(u.legL.rotation.x), Math.abs(u.legR.rotation.x));
   const sitting = u.legL.rotation.x < -0.8 && u.legR.rotation.x < -0.8;
-  const walking = st.v > 0.25 && st.v < 7 && st.swing > 0.08 && !sitting && Math.abs(st.g.rotation.x) < 0.3 && Math.abs(st.g.rotation.z) < 0.3;
+  const walking = !st.noWalk && st.v > 0.25 && st.v < 7 && st.swing > 0.08 && !sitting && Math.abs(st.g.rotation.x) < 0.3 && Math.abs(st.g.rotation.z) < 0.3;
   st.w += ((walking ? 1 : 0) - st.w) * Math.min(1, dt * 6);
   // наши кости → кости модели
   const dq = st.dq;
@@ -494,7 +494,15 @@ export function corpseQ (gu, mat) {
   root.add(holder);
   const c = gu.colors || {};
   const { skin } = buildQ(holder, gu.q, { skin: c.skin, shirt: c.shirt, pants: c.pants }, gu.look, mat);
+  skin.userData.q.noWalk = true;                    // тело не «шагает», даже когда скользит по земле
   return { root, parts, qskin: skin };
+}
+/* позу модели — сейчас, не дожидаясь кадра (тело кладут на землю по самой низкой точке — и за кадром тоже) */
+export function qPose (skin) {
+  const st = skin && skin.userData.q;
+  if (!st) return;
+  st.frame = -1;
+  poseHook.call(skin);
 }
 /* оторвать руку/ногу у тела-модели: кость сложить (не видно), а кусок — отдельным мешем в позе «висит», с места
    сустава; вешается на кусок hits.js, который улетает */
