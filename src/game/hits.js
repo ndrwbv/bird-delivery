@@ -305,6 +305,9 @@ export function hit (p, vx, vz, kmh, o = {}) {
     if (A.Snd.impact) A.Snd.impact(Math.max(kmh / 3.6, 8), 'person', { x: p.x, z: p.z });
     else A.Snd.fx('hit-person', s => { s.blip(62, 0.2, 'sine', 0.34); s.noise(0.08, 0.16); }, { x: p.x, z: p.z });
   }
+  // жизни (LIVES): во взрослой удар слабее MAX, пока жизнь не последняя, — отлетает, полежит и встанет, как в детской.
+  // Сюда приходят все смерти от машины (game.js gibHuman): и очереди, и протесты, и шашлыки — у них своей проверки нет
+  if (!o.up && !o.over && survive(p, kmh)) o = { ...o, up: true };
   if (o.over) {
     const B = throwOver(p, vx, vz, kmh, o);
     if (!o.up) { A.scare(p.x, p.z); if (!B.shatter) A.callAmbulance(p.x, p.z); }   // разбился — скорая к кускам
