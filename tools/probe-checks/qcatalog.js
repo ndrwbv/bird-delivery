@@ -14,8 +14,8 @@ for (const { fam, models } of QP.families()) {
   models.forEach((n, i) => { if (n !== 'winter') list.push([n, fam === 'A' ? { fam, all: i } : { fam, head: i, body: i, legs: i, feet: i }]); });
   if (W >= 0) {
     const h = models.findIndex(n => n !== 'winter' && !/worker|king/.test(n)), l = models.findIndex(n => /business|wformal|wcasual/.test(n));
-    list.push(['зима: пуховик, шапка', { fam, head: h, body: W, legs: l < 0 ? h : l, feet: W, hat: 'hatb', hatM: W }]);
-    list.push(['зима: ушанка', { fam, head: models.length > 2 ? 2 : h, body: W, legs: l < 0 ? h : l, feet: W, hat: 'hatu', hatM: W }]);
+    // шапки на разных головах: подгонка под череп, волосы под шапкой убраны
+    models.forEach((n, i) => { if (n === 'winter' || /worker|king|farmer/.test(n)) return; list.push([(i % 2 ? 'ушанка · ' : 'шапка · ') + n, { fam, head: i, body: W, legs: l < 0 ? h : l, feet: W, hat: i % 2 ? 'hatu' : 'hatb', hatM: W }]); });
   }
   rows.push({ fam, list });
 }

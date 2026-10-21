@@ -131,7 +131,7 @@ function dress (q, S, Lk) {
   if (lvl >= 2) q.body = W;
   if (lvl >= 3) {
     q.feet = W;
-    const helmet = /worker|king/.test(F.models[q.head].name);
+    const helmet = /worker|king|farmer/.test(F.models[q.head].name);   // каска, корона, шляпа фермера — без зимней шапки
     if (!helmet && /ushanka|beanie|hood|hat/.test(S.hw || '')) { q.hatM = W; q.hat = S.hw === 'ushanka' ? 'hatu' : 'hatb'; }
   }
   return q;
@@ -144,14 +144,27 @@ function combo (F, q) {
   let C = F.combos.get(key);
   if (C) return C;
   const list = q.fam === 'A' ? [F.models[q.all].parts.all] : [F.models[q.head].parts.head, F.models[q.body].parts.body, F.models[q.legs].parts.legs, F.models[q.feet].parts.feet];
-  if (q.hat && F.models[q.hatM].parts[q.hat]) list.push(F.models[q.hatM].parts[q.hat]);
+  let hatFit = null;
+  if (q.hat && F.models[q.hatM].parts[q.hat]) {
+    list.push(F.models[q.hatM].parts[q.hat]);
+    // шапки сделаны в Blender по черепу образца (M — худи, F — повседневная): масштаб и сдвиг — под череп этой головы
+    const ref = F.models.find(m => m.name === (q.fam === 'M' ? 'hoodie' : 'wcasual')), a = skull(ref.parts.head), b = skull(F.models[q.head].parts.head);
+    if (a && b) hatFit = { s: b.w / a.w, a, b };
+  }
   let nV = 0, nI = 0;
   for (const P of list) { nV += P.nV; nI += P.nI; }
   const pos = new Float32Array(nV * 3), si = new Uint8Array(nV * 4), sw = new Uint8Array(nV * 4), mat = new Uint8Array(nV);
   const idx = nV > 65535 ? new Uint32Array(nI) : new Uint16Array(nI), pal = [];
   let v0 = 0, i0 = 0, eye = null;
+  let iN = 0;
   for (const P of list) {
     pos.set(P.pos, v0 * 3); si.set(P.si, v0 * 4); sw.set(P.sw, v0 * 4);
+    if (hatFit && /^hat/.test(P.type)) {                     // шапка — по черепу этой головы
+      const { s: k, a, b } = hatFit;
+      for (let i = v0; i < v0 + P.nV; i++) {
+        pos[i * 3] = b.x + (pos[i * 3] - a.x) * k; pos[i * 3 + 1] = b.y + (pos[i * 3 + 1] - a.y) * k; pos[i * 3 + 2] = b.z + (pos[i * 3 + 2] - a.z) * k;
+      }
+    }
     const b = pal.length, cnt = new Array(P.pal.length).fill(0);
     for (let i = 0; i < P.nV; i++) { mat[v0 + i] = b + P.mat[i]; cnt[P.mat[i]]++; }
     // роль краски: кожа, волосы, рубашка (самая частая на теле), штаны (самая частая на ногах), остальное — как у художника
@@ -170,7 +183,13 @@ function combo (F, q) {
         : P.type === 'all' && /pants/i.test(nm) ? 'pants' : null;
       pal.push({ rgb: P.pal[k].rgb, role, name: nm });
     }
-    for (let i = 0; i < P.nI; i++) idx[i0 + i] = P.idx[i] + v0;
+    // под шапкой волос нет (иначе пробивают её насквозь)
+    const bald = hatFit && P.type === 'head' ? P.pal.map(p => /^hair/i.test(p.name)) : null;
+    for (let i = 0; i < P.nI; i += 3) {
+      const x0 = P.idx[i], x1 = P.idx[i + 1], x2 = P.idx[i + 2];
+      if (bald && (bald[P.mat[x0]] || bald[P.mat[x1]] || bald[P.mat[x2]])) continue;
+      idx[iN++] = x0 + v0; idx[iN++] = x1 + v0; idx[iN++] = x2 + v0;
+    }
     if (P.type === 'head' || P.type === 'all') eye = P.eye;
     v0 += P.nV; i0 += P.nI;
   }
@@ -197,11 +216,25 @@ function combo (F, q) {
   C = {
     nV, pal, mat, eye, vcls, skull: sk[0] < Infinity ? sk : null, helmet,
     pos: new THREE.BufferAttribute(pos, 3), si: new THREE.BufferAttribute(si, 4), sw: new THREE.BufferAttribute(sw, 4, true),
-    idx: new THREE.BufferAttribute(idx, 1), lod: new THREE.BufferAttribute(neutral(F, pos, si, sw, nV), 3),
+    idx: new THREE.BufferAttribute(idx.slice(0, iN), 1), lod: new THREE.BufferAttribute(neutral(F, pos, si, sw, nV), 3),
   };
   F.combos.set(key, C);
   QP.combos++;
   return C;
+}
+
+/* череп головы: кожа (без волос) — ширина, середина и макушка, в осях модели; по нему садится шапка */
+function skull (P) {
+  if (!P) return null;
+  if (P.skull !== undefined) return P.skull;
+  let x0 = Infinity, x1 = -Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity, n = 0;
+  for (let i = 0; i < P.nV; i++) {
+    if (!SKIN_RE.test(P.pal[P.mat[i]].name)) continue;
+    const x = P.pos[i * 3], y = P.pos[i * 3 + 1], z = P.pos[i * 3 + 2];
+    x0 = Math.min(x0, x); x1 = Math.max(x1, x); y1 = Math.max(y1, y); z0 = Math.min(z0, z); z1 = Math.max(z1, z); n++;
+  }
+  P.skull = n ? { w: Math.max(x1 - x0, z1 - z0), x: (x0 + x1) / 2, y: y1, z: (z0 + z1) / 2 } : null;
+  return P.skull;
 }
 
 const lin = new Map(), BOOT = [0.02, 0.018, 0.022];   // сапоги — почти чёрные (линейный цвет)

@@ -148,16 +148,16 @@ def box (bm, c, s, mi=0):
     for v in g['verts']: v.co = Vector((c.x + v.co.x * s.x, c.y + v.co.y * s.y, c.z + v.co.z * s.z))
     for f in bm.faces:
         if all(v in g['verts'] for v in f.verts): f.material_index = mi
-R = W * 0.58
-def beanie (bm):
-    sphere(bm, C - Vector((0, 0, W * 0.18)), R, sz=0.95, cut=C.z - W * 0.18, mi=0)
-    sphere(bm, C - Vector((0, 0, W * 0.2)), R * 1.04, sz=0.25, seg=10, ring=4, mi=1)             # отворот
-    sphere(bm, C + Vector((0, 0, R * 0.8)), R * 0.3, seg=8, ring=5, mi=1)                         # помпон
-def ushanka (bm):
-    sphere(bm, C - Vector((0, 0, W * 0.15)), R * 1.08, sz=0.85, cut=C.z - W * 0.15, mi=0)
-    sphere(bm, C - Vector((0, 0, W * 0.16)), R * 1.14, sz=0.3, seg=10, ring=4, mi=0)
-    for s in (-1, 1): box(bm, C + Vector((s * R * 1.0, 0, -W * 0.45)), Vector((W * 0.12, W * 0.42, W * 0.42)), mi=0)
-    box(bm, C + Vector((0, -R * 0.95, -W * 0.08)), Vector((W * 0.9, W * 0.1, W * 0.2)), mi=1)    # отворот спереди (−y — лицо)
+R = W * 0.64
+def beanie (bm):   # купол до ушей, отворот по низу, помпон
+    sphere(bm, C - Vector((0, 0, W * 0.32)), R, sz=1.0, cut=C.z - W * 0.32, mi=0)
+    sphere(bm, C - Vector((0, 0, W * 0.34)), R * 1.05, sz=0.28, seg=10, ring=4, mi=1)            # отворот
+    sphere(bm, C + Vector((0, 0, R * 0.62)), R * 0.26, seg=8, ring=5, mi=1)                        # помпон
+def ushanka (bm):  # мех куполом, отворот по кругу, уши до щёк, отворот спереди
+    sphere(bm, C - Vector((0, 0, W * 0.3)), R * 1.06, sz=0.92, cut=C.z - W * 0.3, mi=0)
+    sphere(bm, C - Vector((0, 0, W * 0.32)), R * 1.14, sz=0.32, seg=10, ring=4, mi=0)
+    for s in (-1, 1): box(bm, C + Vector((s * R * 1.02, 0.01, -W * 0.62)), Vector((W * 0.13, W * 0.46, W * 0.5)), mi=0)
+    box(bm, C + Vector((0, -R * 1.02, -W * 0.18)), Vector((W * 0.95, W * 0.12, W * 0.24)), mi=1)   # отворот спереди (−y — лицо)
 fur, fur2 = mat('Fur', (0.2, 0.14, 0.09)), mat('Fur_Dark', (0.12, 0.08, 0.05))
 knit, knit2 = mat('Hat', (0.5, 0.05, 0.08)), mat('Hat_Trim', (0.85, 0.85, 0.8))
 hb = hat_obj('Beanie_HatB', beanie, [knit, knit2])
