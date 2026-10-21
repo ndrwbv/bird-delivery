@@ -128,7 +128,7 @@ function dress (q, S, Lk) {
   q = { ...q };
   if (F.models[q.legs] && /beach/.test(F.models[q.legs].name)) { const ok = F.models.map((m, i) => i).filter(i => !/beach|winter/.test(F.models[i].name)); q.legs = ok[(r() * ok.length) | 0]; }
   if (W < 0) return q;
-  if (lvl >= 2) q.body = W;
+  if (lvl >= 2) { q.hands = q.body; q.body = W; }
   if (lvl >= 3) {
     q.feet = W;
     const helmet = /worker|king|farmer/.test(F.models[q.head].name);   // каска, корона, шляпа фермера — без зимней шапки
@@ -137,13 +137,43 @@ function dress (q, S, Lk) {
   return q;
 }
 
+/* чья вершина (главная кость): 1 — плечо и предплечье, 2 — бедро и голень, 3 — кисть, 4 — голова, 5 — туловище;
+  // зимой голая кожа рук, ног и туловища — цвета рукава / штанов (своих рукавов у маек и платьев нет) */
+function classes (F) {
+  if (!F.cls) {
+    const J = F.J, cls = new Uint8Array(F.nJ), sub = (j, c) => { cls[j] = c; for (const k of F.order) if (F.parent[k] >= 0 && cls[F.parent[k]] === c && k !== j && !cls[k]) cls[k] = c; };
+    for (const n of ['Hips', 'Abdomen', 'Torso', 'Chest', 'Body']) { const j = F.names.indexOf(n); if (j >= 0) cls[j] = 5; }
+    for (const j of [J.head]) if (j >= 0) sub(j, 4);
+    for (const j of [J.elbowL, J.elbowR]) if (j >= 0) sub(j, 3);
+    for (const j of [J.elbowL, J.elbowR, J.armL, J.armR]) if (j >= 0) cls[j] = 1;
+    for (const j of [J.legL, J.legR, J.kneeL, J.kneeR]) if (j >= 0) cls[j] = 2;
+    for (const j of [J.footL, J.footR]) if (j >= 0) sub(j, 6);   // 6 — ступня: зимой голая — в сапоге
+    F.cls = cls;
+  }
+  return F.cls;
+}
+
+/* кисти из тела модели (под пуховиком своего тела нет — кисти берём от прежнего) */
+function handsOf (F, P) {
+  if (P.handsPart) return P.handsPart;
+  const cls = classes(F), keep = new Int32Array(P.nV).fill(-1), dom = v => { let b = 0, bj = 0; for (let c = 0; c < 4; c++) if (P.sw[v * 4 + c] > b) { b = P.sw[v * 4 + c]; bj = P.si[v * 4 + c]; } return bj; };
+  let n = 0;
+  for (let v = 0; v < P.nV; v++) if (cls[dom(v)] === 3) keep[v] = n++;
+  const pos = new Float32Array(n * 3), mat = new Uint8Array(n), si = new Uint8Array(n * 4), sw = new Uint8Array(n * 4), idx = [];
+  for (let v = 0; v < P.nV; v++) { const k = keep[v]; if (k < 0) continue; pos.set(P.pos.subarray(v * 3, v * 3 + 3), k * 3); mat[k] = P.mat[v]; si.set(P.si.subarray(v * 4, v * 4 + 4), k * 4); sw.set(P.sw.subarray(v * 4, v * 4 + 4), k * 4); }
+  for (let i = 0; i < P.nI; i += 3) { const a = keep[P.idx[i]], b = keep[P.idx[i + 1]], c = keep[P.idx[i + 2]]; if (a >= 0 && b >= 0 && c >= 0) idx.push(a, b, c); }
+  P.handsPart = { type: 'hands', nV: n, nI: idx.length, pal: P.pal, eye: new THREE.Vector3(), pos, mat, si, sw, idx: new Uint16Array(idx), y0: P.y0, y1: P.y1 };
+  return P.handsPart;
+}
+
 /* ── части в один меш (общий на всех с тем же набором частей): места, кости, веса, индексы, поза «стоит» ── */
 const SKIN_RE = /skin/i, HAIR_RE = /^(hair|eyebrow|moustache|beard)/i, KEEP_RE = /^(eye|eyes|earrings|gold|metal)/i;
 function combo (F, q) {
-  const key = q.fam === 'A' ? 'a' + q.all : [q.head, q.body, q.legs, q.feet, q.hat || ''].join(',');
+  const key = q.fam === 'A' ? 'a' + q.all : [q.head, q.body, q.legs, q.feet, q.hat || '', q.hands ?? ''].join(',');
   let C = F.combos.get(key);
   if (C) return C;
   const list = q.fam === 'A' ? [F.models[q.all].parts.all] : [F.models[q.head].parts.head, F.models[q.body].parts.body, F.models[q.legs].parts.legs, F.models[q.feet].parts.feet];
+  if (q.hands !== undefined && F.models[q.hands].parts.body) list.push(handsOf(F, F.models[q.hands].parts.body));
   let hatFit = null;
   if (q.hat && F.models[q.hatM].parts[q.hat]) {
     list.push(F.models[q.hatM].parts[q.hat]);
@@ -193,18 +223,7 @@ function combo (F, q) {
     if (P.type === 'head' || P.type === 'all') eye = P.eye;
     v0 += P.nV; i0 += P.nI;
   }
-  // чья вершина (главная кость): 1 — плечо и предплечье, 2 — бедро и голень, 3 — кисть, 4 — голова, 5 — туловище;
-  // зимой голая кожа рук, ног и туловища — цвета рукава / штанов (своих рукавов у маек и платьев нет)
-  if (!F.cls) {
-    const J = F.J, cls = new Uint8Array(F.nJ), sub = (j, c) => { cls[j] = c; for (const k of F.order) if (F.parent[k] >= 0 && cls[F.parent[k]] === c && k !== j && !cls[k]) cls[k] = c; };
-    for (const n of ['Hips', 'Abdomen', 'Torso', 'Chest', 'Body']) { const j = F.names.indexOf(n); if (j >= 0) cls[j] = 5; }
-    for (const j of [J.head]) if (j >= 0) sub(j, 4);
-    for (const j of [J.elbowL, J.elbowR]) if (j >= 0) sub(j, 3);
-    for (const j of [J.elbowL, J.elbowR, J.armL, J.armR]) if (j >= 0) cls[j] = 1;
-    for (const j of [J.legL, J.legR, J.kneeL, J.kneeR]) if (j >= 0) cls[j] = 2;
-    for (const j of [J.footL, J.footR]) if (j >= 0) sub(j, 6);   // 6 — ступня: зимой голая — в сапоге
-    F.cls = cls;
-  }
+  classes(F);
   const vcls = new Uint8Array(nV), sk = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
   for (let v = 0; v < nV; v++) {
     let b = 0, bj = 0;

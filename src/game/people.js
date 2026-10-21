@@ -1208,6 +1208,9 @@ function soonStep (dl) {
 /* готов ли кадр (без рисования) — talkface.js: не готов — пока показывает закрытый рот */
 export function faceReady (person, size = 128, mood = '', talk = 0) {
   if (!person) return '';
+  // проба (ветка test/people): у человека-модели кадры разговора — тот же снимок головы, не старое лицо (talkface.js)
+  const qp = person.look && qPortrait(person.look, () => buildSpec(person.look, {}), size, person.id || person.look.seed);
+  if (qp) return qp;
   const Lk = faceLook(person, mood), key = portraitKey(person, Lk, size, mood, talk), u = PORTRAITS.get(key);
   if (u) { PORTRAITS.delete(key); PORTRAITS.set(key, u); }
   return u || '';
