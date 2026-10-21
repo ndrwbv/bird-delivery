@@ -16,13 +16,17 @@
 export const TIER = { FALL: 20, HIGH: 55, BURST: 85 };          // км/ч; BURST — только детская (лежит дольше)
 /* жизни прохожего (автор 21.10.2026, ветка test/people: «больше жизней, чтобы пережили чуть больше ударов»): удар слабее
    MAX км/ч отнимает жизнь — пока она не последняя, человек падает и встаёт (как медленнее FALL); последняя — сбит.
-   Быстрее MAX — сбит сразу, как раньше. Лежащего (ещё не встал) — добивает любой удар быстрее FALL */
-export const LIVES = { N: 3, MAX: 55 };
+   Быстрее MAX — сбит сразу, как раньше. Лежащего (ещё не встал) — добивает удар быстрее FALL, но не первые GRACE с */
+export const LIVES = { N: 3, MAX: 55, GRACE: 1.5 };   // GRACE — с после удара, пока лежащего не добивает
 export function survive (p, kmh) {
   const u = p && p.grp && p.grp.userData;
-  if (!A.adult || !u || p.fall || kmh >= LIVES.MAX) return false;
+  if (!A.adult || !u || kmh >= LIVES.MAX) return false;
+  // лежит (ещё не встал): только что сбила и упал под машину — GRACE с не добивает (машина ещё на нём; иначе
+  // «легонько задел — умер»), потом — добивает. Уже встал и грозит кулаком — стоит: удар снова отнимает жизнь
+  if (p.fall && p.fall.t < 0.95 + TIME.FALL_LIE) return !!(u.graceT && performance.now() < u.graceT);
   u.hp = (u.hp ?? LIVES.N) - 1;
-  return u.hp > 0;
+  if (u.hp > 0) { u.graceT = performance.now() + LIVES.GRACE * 1000; if (p.fall) p.fall = null; return true; }
+  return false;
 }
 export const LIMB = { MID: 0.15, HIGH: 0.4 };                   // шанс оторвать руку/ногу на нитро 20–55 км/ч (HIGH); MID не используется
 export const TIME = {

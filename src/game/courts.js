@@ -859,7 +859,7 @@ function carHit (p, sp, fx, fz, kmh) {
   if (sp < 3 || p.fall) return false;
   const dx = p.x - A.V.x, dz = p.z - A.V.z;
   if (Math.abs(dx * fx + dz * fz) >= A.CAR_L + 0.5 || Math.abs(dx * fz - dz * fx) >= A.CAR_W + 0.35) return false;
-  if (HITS.isFall(kmh)) { p.grp.rotation.z = 0; HITS.fall(p, A.V.vx, A.V.vz); ST.falls++; return true; }
+  if ((HITS.isFall(kmh) || HITS.survive(p, kmh))) { p.grp.rotation.z = 0; HITS.fall(p, A.V.vx, A.V.vz); ST.falls++; return true; }
   A.dropMesh(p.grp); p.dead = 1; ST.people--; ST.hits++;
   A.gibHuman(p, A.V.vx, A.V.vz, kmh);
   if (A.runOver) A.runOver();

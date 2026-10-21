@@ -227,7 +227,7 @@ export function step (dt) {
       if (sp > 3 && A.CAR_L) {
         const dx = p.x - V.x, dz = p.z - V.z;
         if (Math.abs(dx * fx + dz * fz) < A.CAR_L + 0.9 && Math.abs(dx * fz - dz * fx) < A.CAR_W + 0.35) {
-          if (HITS.isFall(kmh)) { HITS.fall(p, V.vx, V.vz); ST.falls++; continue; }
+          if ((HITS.isFall(kmh) || HITS.survive(p, kmh))) { HITS.fall(p, V.vx, V.vz); ST.falls++; continue; }
           s.people.splice(i, 1); ST.people--; ST.hit++;
           A.dropMesh(p.grp);
           A.gibHuman(p, V.vx, V.vz, kmh);

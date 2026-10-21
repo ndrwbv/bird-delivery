@@ -596,7 +596,7 @@ function mobStep (o, dt, sp) {
     const kmh = sp * 3.6;
     poseStand(o.grp);
     o.grp.position.set(o.x, A.groundH(o.x, o.z), o.z);
-    if (HITS.isFall(kmh)) { if (!o.fall) HITS.fall(o, V.vx, V.vz); o.t = 'stand'; o.h = Math.atan2(V.x - o.x, V.z - o.z); return; }   // упал и встал — стоит, грозит
+    if ((HITS.isFall(kmh) || HITS.survive(o, kmh))) { if (!o.fall) HITS.fall(o, V.vx, V.vz); o.t = 'stand'; o.h = Math.atan2(V.x - o.x, V.z - o.z); return; }   // упал и встал — стоит, грозит
     o.dead = 1;
     A.dropMesh(o.grp);
     A.gibHuman(o, V.vx, V.vz, kmh);

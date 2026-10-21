@@ -6414,7 +6414,7 @@ function runOverScoot (p, vx, vz, by, kmh) {
   const u = p.grp.userData;
   const blast = kmh != null;
   if (kmh == null) kmh = HITS.kmhOf(vx, vz);
-  const up = HITS.isFall(kmh);
+  const up = HITS.isFall(kmh) || HITS.survive(p, kmh);   // жизни (hits.js LIVES)
   if (u.scoot) { HITS.wreck(u.scoot, vx, vz); u.scoot = null; }
   p.grp.visible = false;
   // машина — через руль вперёд по ходу самоката (hits.js throwOver); взрыв (kmh задан) — от взрыва
