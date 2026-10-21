@@ -46,12 +46,12 @@ const PUDDLE_HEX = 0x5a0e16;
 const FALL_LIFT = 0.17;   // упал и встал: спина над верхом слоя (толщина модели прохожего)
 const UP = { x: 0, y: 1, z: 0 };
 
-import { corpseQ, qLimb, qPose } from './qpeople.js';
+import { corpseQ, qLimb, qPose, QP } from './qpeople.js';
 
 let A;
 /* api: THREE, scene, box, mergeGeos, HUMAN_VC, groundH, surfaceAt, curbAt, nearestRoad, driftTop, pavedLift, groundNormal,
    emote, puff, pushOut, burst (кусками — старый gibHuman), scare, callAmbulance, Snd, adult */
-export function init (api) { A = api; }
+export function init (api) { A = api; QP.topAt = (x, z) => topAt(x, z); }   // люди-модели: подошва — на видимый слой (qpeople.js)
 
 /* ── по чему лежать: верх того, что нарисовано в точке ──
    Рельеф (groundH) — только подложка: поверх него лежат полотно, тротуар, бордюр, плитка, а
@@ -269,9 +269,18 @@ export function fallStep (p, dt) {
   if (u.q) {                                         // модель Quaternius (qpeople.js): падает навзничь клипом художника,
     if (t < T1 + 0.3) { const k = 1 - t / (T1 + 0.3); p.x += F.vx * k * dt; p.z += F.vz * k * dt; A.pushOut(p, 0.45); }   // лежит, встаёт (тот же клип назад), грозит кулаком
     g.rotation.order = 'YXZ'; g.rotation.set(0, F.yaw, 0);
-    g.position.set(p.x, A.groundH(p.x, p.z) + A.curbAt(p.x, p.z), p.z);
     for (const b of [u.legL, u.legR, u.armL, u.armR]) b.rotation.set(0, 0, 0);
     u.qAnim = t < T2 ? { c: 'death', f: t / (T1 + 0.55) } : t < T3 ? { c: 'death', f: 1 - (t - T2) / (T3 - T2) } : { c: 'punch', f: ((t - T3) * 1.4) % 1 };
+    // лёг — самая низкая точка позы на 1 см над видимым слоем (как у коробочных лежачих fallLift); меряем раз, когда лёг
+    if (t < T1 + 0.3 || F.top === undefined) F.top = topAt(p.x, p.z);
+    const lie = t < T1 + 0.55 ? t / (T1 + 0.55) : t < T2 ? 1 : t < T3 ? 1 - (t - T2) / (T3 - T2) : 0;
+    if (F.qLift === undefined && t >= T1 + 0.55 && u.skin) {
+      if (!BX) { BX = new A.THREE.Box3(); V3 = new A.THREE.Vector3(); }
+      g.position.set(p.x, F.top, p.z); g.updateMatrixWorld(true); qPose(u.skin);
+      BX.makeEmpty(); BX.expandByObject(u.skin, true);
+      F.qLift = BX.isEmpty() ? 0 : Math.max(-0.3, Math.min(0.3, F.top + 0.01 - BX.min.y));
+    }
+    g.position.set(p.x, F.top + (F.qLift || 0) * lie, p.z);
     if (t >= T3 && !F.mad) { F.mad = 1; A.emote(p.x, 2.1, p.z, 'angry', 3); }
     if (t < T4) return true;
     u.qAnim = null; g.rotation.order = 'XYZ';

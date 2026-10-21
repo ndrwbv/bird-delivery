@@ -317,7 +317,7 @@ export function buildQ (g, q, S, Lk, mat) {
   root.scale.setScalar(k);
   root.position.y = -F.y0 * k;
   g.add(root);
-  const st = { F, C, bones, root, skel, g, k, WQ: F.RQ.map(x => x.clone()), WP: F.RP.map(x => x.clone()), dq: new Array(F.nJ).fill(null), ang: {},
+  const st = { F, C, bones, root, skel, g, k, y0: root.position.y, lift: 0, liftT: 0, WQ: F.RQ.map(x => x.clone()), WP: F.RP.map(x => x.clone()), dq: new Array(F.nJ).fill(null), ang: {},
     frame: -1, nb: 0, nh: 0, lastT: 0, lx: 0, lz: 0, v: 0, swing: 0, w: 0, t: Math.random() * 10, run: 0 };
   skin.userData.q = st;
   skin.onBeforeRender = poseHook;
@@ -491,6 +491,13 @@ function poseHook () {
     // голова — куда смотрит игра (на машину, на собеседника)
     if (J.head >= 0 && u.head.rotation.y) st.bones[J.head].rotateY(u.head.rotation.y * st.w);
     QP.walk++;
+  }
+  // подошва — на видимый слой (асфальт, плитка, тротуар): игра ставит людей на рельеф, а слой выше на 6—7 см —
+  // тонкие подошвы модели в нём тонули (у коробочных людей толстый «ботинок» это прятал). Раз в 0,2 с — высота слоя
+  if (QP.topAt && !st.noWalk) {
+    if (now - st.liftT > 200) { st.liftT = now; const top = QP.topAt(x, z); st.want = Math.max(0, Math.min(0.15, top - e[13])); }
+    st.lift += ((st.want || 0) - st.lift) * Math.min(1, dt * 10);
+    st.root.position.y = st.y0 + st.lift / (st.g.scale.y || 1);
   }
   st.root.updateMatrixWorld(true);                  // поза — в этот же кадр, без запаздывания
   st.skel.update();
