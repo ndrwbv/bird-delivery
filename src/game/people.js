@@ -38,6 +38,7 @@
 
 import { t, lang } from '../i18n/index.js';
 import { MOB } from './mobile.js';
+import { pickQ, buildQ, qPortrait } from './qpeople.js';
 
 /* ─────────────── случайность от зерна ─────────────── */
 function rng (seed) {
@@ -344,7 +345,7 @@ export function redressHumans (cx, cz, fx, fz, max = 3, dFar = 60) {
    (переодеть, как redressHumans, — не то же: голову с капюшоном и шапкой тот не пересобирает) */
 export function humanStale (g) {
   const u = g.userData;
-  return !!u.look && Math.abs((u.warm || 0) - WARM) >= 0.005;
+  return !!u.look && !u.q && Math.abs((u.warm || 0) - WARM) >= 0.005;
 }
 const COATS = ['#2b2a30', '#3b4a5a', '#1f2328', '#5a3a2e', '#6b2e2e', '#2e4a6b', '#3f5a3a', '#8a2a3a', '#d9d2c2', '#4a4550', '#c9476b', '#e0b13f', '#3fa8a0'];
 const SCARVES = ['#d95d5d', '#e0b13f', '#f4f1ea', '#4f7fd6', '#59b06a', '#c9476b', '#8e6fd0', '#2b2a30'];
@@ -911,6 +912,7 @@ export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
   HSET = HUMANS;
   /* та же фигура и лицо, одежда — по нынешнему сезону; цвет головы — какой был (перекрашенная так и остаётся) */
   REDRESS = g => {
+    if (g.userData.q) { g.userData.warm = WARM; return; }     // модель Quaternius (проба) — по сезону не переодеваем
     const u = g.userData, S = buildSpec(u.look, u.o || {}), hc = u.head.material.color;
     const body = skinGeo(S, [hc.r, hc.g, hc.b]);
     setSkinGeo(u.skin, u.held ? withHeld(body, u.held) : body);         // предметы в руках — те же, в новое тело
@@ -1030,30 +1032,34 @@ export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
     const legL = bone(0), legR = bone(1), bodyB = bone(2), armL = bone(3), armR = bone(4), head = bone(6);
     const bones = [legL, legR, bodyB, armL, armR, head];
     yield;
-    const skin = new HSkin(undefined, HUMAN_VC);
-    setSkinGeo(skin, skinGeo(S, col(S.skin)));
-    skin.bindMode = THREE.DetachedBindMode;
-    skin.bind(new HSkel(bones, [S.piv[0], S.piv[1], S.piv[2], S.piv[3], S.piv[4], S.piv[6]]), IDENT);
-    skin.boundingSphere = SPHERE;
-    g.add(skin);
+    // проба (ветка test/people): каждый третий — модель Quaternius на тех же костях (qpeople.js)
+    const qn = pickQ(Lk), qm = qn ? buildQ(g, qn, S, Lk, HUMAN_VC) : null;
+    const skin = qm ? qm.skin : new HSkin(undefined, HUMAN_VC);
+    if (!qm) {
+      setSkinGeo(skin, skinGeo(S, col(S.skin)));
+      skin.bindMode = THREE.DetachedBindMode;
+      skin.bind(new HSkel(bones, [S.piv[0], S.piv[1], S.piv[2], S.piv[3], S.piv[4], S.piv[6]]), IDENT);
+      skin.boundingSphere = SPHERE;
+      g.add(skin);
+    }
     // голова: «свой материал цвета кожи» — игра красит его (злой водитель, вор в маске)
     head.material = headPaint(skin, S.skin);
     head.geometry = headBox(S);
     yield;
     let faceM = null;
-    if (o.face !== false) {
+    if (o.face !== false && !qm) {
       faceM = new THREE.Mesh(new THREE.PlaneGeometry(S.W, 0.56), faceMat(Lk, S));
       faceM.position.z = S.D / 2 + 0.002;
       head.add(faceM);
       yield;
     }
     // дальний вариант: весь человек одним мешем
-    const lod = new THREE.Mesh(geo(S.parts.map((l, i) => [l, ...S.piv[i]])), HUMAN_VC);
+    const lod = qm ? qm.lod : new THREE.Mesh(geo(S.parts.map((l, i) => [l, ...S.piv[i]])), HUMAN_VC);
     lod.visible = false;
-    g.add(lod);
-    g.scale.setScalar(S.hs);
+    if (!qm) g.add(lod);
+    g.scale.setScalar(qm ? Math.max(S.hs, 0.97) : S.hs);   // модель Quaternius: не ниже 97 % — никто не похож на ребёнка
     g.userData = { legL, legR, armL, armR, head, faceM, faceS: { skin: S.skin, Wp: S.Wp }, colors: { skin: S.skin, shirt: S.shirt, pants: S.pants }, person, fem: S.fem, fat: S.fat, pace: S.pace,
-      lod, parts: [legL, legR, bodyB, armL, armR, head, skin], far: false, look: Lk, o, hair: null, warm: w0, skin, hw: S.hw };
+      lod, parts: [legL, legR, bodyB, armL, armR, head, skin], far: false, look: Lk, o, hair: null, warm: w0, skin, hw: S.hw, q: qn };
     HUMANS.add(g);
     return g;
   }
@@ -1106,6 +1112,9 @@ const portraitKey = (person, Lk, size, mood, talk) => (person.id || Lk.seed) + '
 /* talk — кадр речи (talkface.js): 0 — рот как у выражения, 1 — приоткрыт, 2 — открыт */
 export function faceDataURL (person, size = 128, mood = '', talk = 0) {
   if (!person) return '';
+  // проба (ветка test/people): человек-модель Quaternius — снимок её головы (qpeople.js qPortrait)
+  const qp = person.look && qPortrait(person.look, () => buildSpec(person.look, {}), size, person.id || person.look.seed);
+  if (qp) return qp;
   FACE_STATS.n++;
   const Lk = faceLook(person, mood), key = portraitKey(person, Lk, size, mood, talk);
   const hit = PORTRAITS.get(key);
@@ -1199,6 +1208,9 @@ function soonStep (dl) {
 /* готов ли кадр (без рисования) — talkface.js: не готов — пока показывает закрытый рот */
 export function faceReady (person, size = 128, mood = '', talk = 0) {
   if (!person) return '';
+  // проба (ветка test/people): у человека-модели кадры разговора — тот же снимок головы, не старое лицо (talkface.js)
+  const qp = person.look && qPortrait(person.look, () => buildSpec(person.look, {}), size, person.id || person.look.seed);
+  if (qp) return qp;
   const Lk = faceLook(person, mood), key = portraitKey(person, Lk, size, mood, talk), u = PORTRAITS.get(key);
   if (u) { PORTRAITS.delete(key); PORTRAITS.set(key, u); }
   return u || '';

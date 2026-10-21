@@ -818,7 +818,7 @@ function humanStep (s, o, dt, sp) {
   if (o.fall) { if (HITS.fallStep(o, dt)) return; }
   if (sp > 3 && carHits(o.x, o.z, 0.35)) {
     const kmh = sp * 3.6;
-    if (HITS.isFall(kmh)) { if (!o.fall) HITS.fall(o, V.vx, V.vz); return; }
+    if ((HITS.isFall(kmh) || HITS.survive(o, kmh))) { if (!o.fall) HITS.fall(o, V.vx, V.vz); return; }
     o.dead = 1;
     A.dropMesh(o.grp);
     A.gibHuman(o, V.vx, V.vz, kmh);

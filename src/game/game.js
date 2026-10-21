@@ -6414,7 +6414,7 @@ function runOverScoot (p, vx, vz, by, kmh) {
   const u = p.grp.userData;
   const blast = kmh != null;
   if (kmh == null) kmh = HITS.kmhOf(vx, vz);
-  const up = HITS.isFall(kmh);
+  const up = HITS.isFall(kmh) || HITS.survive(p, kmh);   // жизни (hits.js LIVES)
   if (u.scoot) { HITS.wreck(u.scoot, vx, vz); u.scoot = null; }
   p.grp.visible = false;
   // машина — через руль вперёд по ходу самоката (hits.js throwOver); взрыв (kmh задан) — от взрыва
@@ -11370,7 +11370,8 @@ function driveStep (dt) {
     // свой клиент и удар несильный (ECON.CLIENT_HIT) — цел, но без чаевых
     if (Math.abs(vf) < ECON.CLIENT_HIT.HARD && clientBump(p, fx, fz, sx, sz)) continue;
     // медленно (HITS.TIER.FALL) — упал и встал, не «сбит»
-    if (HITS.isFall(Math.abs(vf) * 3.6)) { if (!p.fall) { if (p.idle) releaseIdle(p); HITS.fall(p, V.vx, V.vz); Snd.impact(Math.abs(vf), 'person', { x: p.x, z: p.z }); CBUMP.hit(V, 'person'); } continue; }
+    // жизни (hits.js LIVES): удар слабее 55 км/ч, пока жизнь не последняя, — тоже упал и встал
+    if (HITS.isFall(Math.abs(vf) * 3.6) || HITS.survive(p, Math.abs(vf) * 3.6)) { if (!p.fall) { if (p.idle) releaseIdle(p); HITS.fall(p, V.vx, V.vz); Snd.impact(Math.abs(vf), 'person', { x: p.x, z: p.z }); CBUMP.hit(V, 'person'); } continue; }
     runOver(p, V.vx, V.vz);
     S.shake = Math.max(S.shake, 0.35);
     CBUMP.hit(V, 'person');                         // каждый сбитый чуть тормозит и уводит машину (carbump.js)

@@ -423,7 +423,7 @@ function potStep (s, dt, near) {
   if (w.fall) { if (HITS.fallStep(w, dt)) return; }
   if (sp > 3 && carHits(w.x, w.z, 0.35)) {
     const kmh = sp * 3.6;
-    if (HITS.isFall(kmh)) { if (!w.fall) HITS.fall(w, V.vx, V.vz); return; }
+    if ((HITS.isFall(kmh) || HITS.survive(w, kmh))) { if (!w.fall) HITS.fall(w, V.vx, V.vz); return; }
     w.dead = 1;
     if (s.bubble && s.bubble.parent === g) dropBubble(s);
     A.dropMesh(g);

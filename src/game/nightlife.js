@@ -276,7 +276,7 @@ function workStep (dt) {
       if (sp > 3) {
         const dx = p.x - V.x, dz = p.z - V.z;
         if (Math.abs(dx * fx + dz * fz) < A.CAR_L + 0.5 && Math.abs(dx * fz - dz * fx) < A.CAR_W + 0.35) {
-          if (HITS.isFall(kmh)) { if (!p.fall) HITS.fall(p, V.vx, V.vz); continue; }
+          if ((HITS.isFall(kmh) || HITS.survive(p, kmh))) { if (!p.fall) HITS.fall(p, V.vx, V.vz); continue; }
           p.dead = 1;
           if (s.bubble && s.bubble.parent === g) dropBubble(s);
           A.dropMesh(g);
