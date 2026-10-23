@@ -800,13 +800,38 @@ function worksTex () {
 
 /* путь в обход закрытого ребра: Дейкстра в радиусе километра; strict — ещё и не через другие закрытые
    улицы и не в закрытый район (перекрытие на обратном пути, backblock.js: игрок не должен оказаться заперт) */
+/* куча для detourLen: ближайший — сверху (было — перебор всего списка на каждый шаг: на Деке до 4—7 мс на перекрытие) */
+const DH = { k: [], v: [] };
+function dhPush (k, v) {
+  const K = DH.k, H = DH.v;
+  let i = K.length;
+  K.push(k); H.push(v);
+  while (i > 0) { const p = (i - 1) >> 1; if (K[p] <= k) break; K[i] = K[p]; H[i] = H[p]; i = p; }
+  K[i] = k; H[i] = v;
+}
+function dhPop () {                                // → узел; ключ — в DH.top
+  const K = DH.k, H = DH.v, v = H[0];
+  DH.top = K[0];
+  const k = K.pop(), w = H.pop(), n = K.length;
+  if (n) {
+    let i = 0;
+    for (;;) {
+      let c = 2 * i + 1;
+      if (c >= n) break;
+      if (c + 1 < n && K[c + 1] < K[c]) c++;
+      if (K[c] >= k) break;
+      K[i] = K[c]; H[i] = H[c]; i = c;
+    }
+    K[i] = k; H[i] = w;
+  }
+  return v;
+}
 function detourLen (A, ia, ib, e, strict) {
-  const { NODES } = A, M = NODES[ia], dist = new Map([[ia, 0]]), done = new Set(), heap = [[0, ia]];
+  const { NODES } = A, M = NODES[ia], dist = new Map([[ia, 0]]), done = new Set();
+  DH.k.length = 0; DH.v.length = 0; dhPush(0, ia);
   let pops = 0;
-  while (heap.length && pops++ < 6000) {
-    let bi = 0;
-    for (let k = 1; k < heap.length; k++) if (heap[k][0] < heap[bi][0]) bi = k;
-    const [d, n] = heap[bi]; heap[bi] = heap[heap.length - 1]; heap.pop();
+  while (DH.k.length && pops++ < 6000) {
+    const n = dhPop(), d = DH.top;
     if (done.has(n)) continue;
     done.add(n);
     if (n === ib) return d;
@@ -820,7 +845,7 @@ function detourLen (A, ia, ib, e, strict) {
       if (strict && (q.closed || Nm.out || Nm.lock || NAVX.has(n * 100000 + m))) continue;
       if (Math.abs(Nm.x - M.x) > 900 || Math.abs(Nm.z - M.z) > 900) continue;
       const nd = d + q.len;
-      if (nd < (dist.get(m) ?? Infinity)) { dist.set(m, nd); heap.push([nd, m]); }
+      if (nd < (dist.get(m) ?? Infinity)) { dist.set(m, nd); dhPush(nd, m); }
     }
   }
   return Infinity;
@@ -993,13 +1018,7 @@ function spawnWorks (A, e, at, o) {
   const nMen = 2 + (Math.random() < 0.5 ? 1 : 0);
   for (let i = 0; i < nMen; i++) {
     const s = i % 2 ? 1 : -1, [x, z] = P(rand(-1.4, 1.4), s * (pw / 2 + 0.35));
-    const grp = A.makeHuman(null, { cap: '#ff8a00', shirt: '#ff8a00', pants: '#2f3540' });
-    const u = grp.userData;
-    if (u.armR) { const sh = new THREE.Mesh(SHOVEL_GEO, WK_MAT); sh.rotation.x = 0.4; holdFixed(u.armR, sh); }   // лопата — в меш тела (people.js)
-    grp.rotation.y = Math.atan2(-nx * s, -nz * s);
-    grp.position.set(x, groundH(x, z) + 0.18, z);
-    A.scene.add(grp);
-    W8.men.push({ grp, x, z, ph: rand(0, 6), dead: 0 });
+    menLater(W8, x, groundH(x, z) + 0.18, z, Math.atan2(-nx * s, -nz * s));
   }
   }
   A.scene.add(W8.grp);
@@ -1210,13 +1229,7 @@ function spawnLane (A, e, at) {
   SHOVEL_GEO = SHOVEL_GEO || (() => { const S = []; box(S, 0.05, 1.1, 0.05, '#8a6b4e', 0, -0.35, 0.05); box(S, 0.26, 0.3, 0.04, '#6e6a72', 0, -0.95, 0.12); return A.mergeGeos(S); })();
   for (let i = 0; i < 1 + (Math.random() < 0.6 ? 1 : 0); i++) {
     const s = i ? -1 : 1, [x, z] = P(sPit + s * 1.9, o0 + rand(-0.4, 0.4));
-    const grp = A.makeHuman(null, { cap: '#ff8a00', shirt: '#ff8a00', pants: '#2f3540' });
-    const u = grp.userData;
-    if (u.armR) { const sh = new THREE.Mesh(SHOVEL_GEO, WK_MAT); sh.rotation.x = 0.4; holdFixed(u.armR, sh); }   // лопата — в меш тела (people.js)
-    grp.rotation.y = Math.atan2(-e.ux * s, -e.uz * s);
-    grp.position.set(x, groundH(x, z) + 0.18, z);
-    A.scene.add(grp);
-    W8.men.push({ grp, x, z, ph: rand(0, 6), dead: 0 });
+    menLater(W8, x, groundH(x, z) + 0.18, z, Math.atan2(-e.ux * s, -e.uz * s));
   }
   A.scene.add(W8.grp);
   for (const q of solids) addSolid(A, q);
@@ -1272,6 +1285,18 @@ function pullBack (c, dt) {
   if (Math.abs(c.pull) < 0.03) { c.pull = 0; c.rlPull = 0; c.rlGo = 0; }
 }
 
+/* дорожники — не вместе с ремонтом, а по одному за кадр (stepWorks): человек собирается на Деке 3—5 мс, двое-трое разом
+   с ремонтом давали шаг roadlife до 11 мс */
+function menLater (W8, x, y, z, ry) { (W8.menQ || (W8.menQ = [])).push({ x, y, z, ry, ph: rand(0, 6) }); }
+function makeMan (A, W8, q) {
+  const grp = A.makeHuman(null, { cap: '#ff8a00', shirt: '#ff8a00', pants: '#2f3540' });
+  const u = grp.userData;
+  if (u.armR) { const sh = new THREE.Mesh(SHOVEL_GEO, WK_MAT); sh.rotation.x = 0.4; holdFixed(u.armR, sh); }   // лопата — в меш тела (people.js)
+  grp.rotation.y = q.ry;
+  grp.position.set(q.x, q.y, q.z);
+  A.scene.add(grp);
+  W8.men.push({ grp, x: q.x, z: q.z, ph: q.ph, dead: 0 });
+}
 function stepWorks (dt, A) {
   const V = A.V, S = A.S, live = ['drive', 'back', 'side'].includes(S.state);
   if (S.state === 'title' || S.state === 'over') { while (WORKS.length) removeWorks(A, WORKS.pop()); return; }
@@ -1290,9 +1315,11 @@ function stepWorks (dt, A) {
     }
   }
   const T = A.tG, blink = Math.floor(T * 2.2) % 2 === 0, sp = Math.hypot(V.vx, V.vz), fx = Math.sin(V.h), fz = Math.cos(V.h);
+  let made = false;
   for (let i = WORKS.length - 1; i >= 0; i--) {
     const W8 = WORKS[i], d = Math.hypot(W8.x - V.x, W8.z - V.z);
     W8.t -= dt;
+    if (!made && W8.menQ && W8.menQ.length) { made = true; makeMan(A, W8, W8.menQ.shift()); }   // один дорожник за кадр
     // перекрытие на обратном пути (bb) — ещё и не на глазах: дальше 200 м и не в кадре (backblock.js)
     if ((W8.t <= 0 && d > 110 && !(W8.bb && A.shownAt && A.shownAt(W8.x, W8.z))) || W8.t < -240) { removeWorks(A, W8); WORKS.splice(i, 1); continue; }
     const vis = d < 200;

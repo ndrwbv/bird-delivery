@@ -20,6 +20,9 @@ const onShift = async () => {
   return d.S.state; };
 const ride = async () => { if (!d.S.ride || !['drive'].includes(d.S.state)) { d.startRun(true); await wait(200); } return d.S.state; };
 const autopilot = (on = true) => P.autopilot(on);
+/* probe: снимок посреди скрипта (как --shot — крупный пиксель кадра и хад поверх); ждёт, пока файл записан. → { w, h, sharp } */
+const shot = async path => { const k = String(path); if (window.__probeShots) delete window.__probeShots[k]; console.debug('__probeshot:' + k);
+  for (let i = 0; i < 300; i++) { const r = window.__probeShots && window.__probeShots[k]; if (r) return r; await wait(50); } return null; };
 /* probe --mem: память в эту минуту. heap — куча JS после двух сборок мусора, МБ (без массивов-буферов: они «внешние»);
    gl — видеопамять по обёрткам WebGL (буферы, текстуры, буферы отрисовки, кадр холста), glJs — сколько из залитых буферов
    ещё лежат копией в JS; geo/tex/prog — renderer.info; proc — память процессов Электрона (page — страница, gpu — видеокарта) */

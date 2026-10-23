@@ -1196,7 +1196,15 @@ const idle = fn => (typeof requestIdleCallback === 'function' ? requestIdleCallb
 function soonStep (dl) {
   let n = 0;
   while (SOON.length && (dl ? dl.timeRemaining() > 3 || (dl.didTimeout && !n) : !n)) {
-    const [person, size, mood, talk] = SOON.shift(), Lk = faceLook(person, mood), key = portraitKey(person, Lk, size, mood, talk);
+    const [person, size, mood, talk] = SOON.shift();
+    /* человек-модель (qpeople.js): его лицо — снимок головы (faceDataURL берёт его, а не рисованное) — снимаем заранее его
+       (кэш по человеку и размеру, рот и выражение не важны); снимок на Деке — 3—8 мс: в кадре, где лицо впервые нужно
+       (таблица мест после вручения, чат коллеги), это был рывок шага до 9 мс */
+    if (person.look && pickQ(person.look)) {
+      const t0 = performance.now();
+      if (qPortrait(person.look, () => buildSpec(person.look, {}), size, person.id || person.look.seed)) { FACE_STATS.soonQ = (FACE_STATS.soonQ || 0) + 1; n++; FACE_STATS.soonMs += performance.now() - t0; continue; }
+    }
+    const Lk = faceLook(person, mood), key = portraitKey(person, Lk, size, mood, talk);
     if (PORTRAITS.has(key)) continue;
     const t0 = performance.now(), url = drawPortrait(Lk, size, talk), e = performance.now() - t0;
     FACE_STATS.soon++; FACE_STATS.soonMs += e; if (e > FACE_STATS.soonMax) FACE_STATS.soonMax = e;

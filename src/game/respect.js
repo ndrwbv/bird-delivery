@@ -19,6 +19,7 @@
    вылетает значками с места (машина на экране — api.from) и летит в чип, как деньги в пачку;
    «+3 респект · сбил конкурента» справа от чипа (respect.css). Звание — в паузе. */
 import './respect.css';
+import { restart as reanim, afterPaint } from './reanim.js';   // анимация чипа и полёт — без принудительной раскладки
 import { t, N_ } from '../i18n/index.js';
 import { RESPECT as R } from './econ.js';
 import * as TEL from './telemetry.js';          // анонимная статистика: новое звание (telemetry.js)
@@ -95,7 +96,9 @@ export function add (n, why, quiet) {
   log.push({ n, why: why || '', v: val });
   if (log.length > 40) log.shift();
   const lv = level();
-  if (!quiet && d) pop(d, why);
+  // полёт значков читает, где чип (getBoundingClientRect), — после отрисовки кадра: посреди кадра смены это раскладка всей
+  // страницы, на Деке 3—5 мс (марш: сбил митингующего — шаг протеста до 9 мс)
+  if (!quiet && d) afterPaint(() => pop(d, why));
   else paint(d);
   if (lv.i !== before) TEL.ev('rank', { i: lv.i, up: lv.i > before ? 1 : 0, why: why || '' });
   if (lv.i !== before && A.toast) A.toast(lv.i > before ? t('новое звание: {name}', { name: lv.name }) : t('звание упало: {name}', { name: lv.name }));
@@ -131,7 +134,7 @@ function paint (d) {
   if (!EL) return;
   const txt = String(Math.max(0, val - PEND));
   if (txt !== SHOWN) { SHOWN = txt; NUM.textContent = txt; }
-  if (d) { EL.classList.remove('bump', 'hurt'); void EL.offsetWidth; EL.classList.add(d > 0 ? 'bump' : 'hurt'); }
+  if (d) reanim(EL, d > 0 ? 'bump' : 'hurt', 'bump', 'hurt');
 }
 export function hud (on) {
   if (!EL) { mount(); if (!EL) return; paint(); }

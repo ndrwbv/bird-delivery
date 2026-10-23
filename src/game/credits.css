@@ -20,9 +20,12 @@
   box-shadow: 0 0 0 8px var(--pp-yellow), 0 4px 0 var(--pp-ink) !important; animation: pp-lift .2s var(--pp-spring); }
 
 .cr-item .cr-name { font-weight: normal; color: var(--pp-ink); }
-.cr-item .cr-lic { display: inline-block; margin-left: .4em; padding: 0 .4em; font-size: .85em; color: var(--pp-rust); border: 2px solid var(--pp-rust); border-radius: 4px; rotate: -2deg; }
+.cr-item .cr-lic { display: inline-block; margin-left: .4em; padding: 0 .4em; font-size: max(10px, .85em); color: var(--pp-rust); border: 2px solid var(--pp-rust); border-radius: 4px; rotate: -2deg; }
 .cr-item .cr-who { color: var(--pp-label); }
-.cr-item .cr-url { font-size: .85em; }
+.cr-item .cr-url { font-size: max(10px, .85em); }   /* телефон: не мельче 10 px (ревью 23.10, Р23-8) */
+#panel[data-kind="credits"] .pv-foot .pv-back { font-size: max(11px, calc(var(--u) * .9)); }
+/* строка титров — сердечко «спасибо», а не пустой квадратик анкеты (□ — как галочка, которую надо поставить; Р23-9) */
+#panel[data-kind="credits"] .pv-list li::before { content: '♥'; color: var(--pp-red); }
 .pv-seal.cr-seal { --pv-c: var(--pp-rust); }
 
 @media (max-height: 560px) {

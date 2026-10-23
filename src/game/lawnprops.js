@@ -57,11 +57,11 @@ export const LAWN = {
   SLOW: 2.5, SNOW: 0.35,
   FADE: 22, FADE_S: 14, FADE_LAG: 6,         // рост из земли у края дальности: полоса крупного / мелкого, запас, м (fade.js)
   CAPS: { grass: 7000, dand: 3000, weed: 2500, burdock: 1500, tall: 5000, reed: 5000, hog: 2500,
-    rail: 1500, tire: 1200, flower: 1200, shell: 300, sand: 200, cube: 5000, lit: 4000, bottle: 2000 },
+    rail: 1500, tire: 1200, flower: 1200, shell: 300, sand: 200, cube: 7000, lit: 4000, bottle: 2000, ytrunk: 1600, ycrown: 2600 },
 };
 const SMALL = { grass: 1, dand: 1, lit: 1, bottle: 1 };                          // ближе R_SMALL
 const BEND = { grass: 1, dand: 1, weed: 1, burdock: 1, tall: 1, reed: 1, hog: 1, flower: 1 };
-const WINTER_OFF = { grass: 1, dand: 1, burdock: 1, flower: 1, lit: 1, bottle: 1, weed: 1 };   // зимой под снегом (бурьян у стен ~1,2 м — тоже, 0п12)
+const WINTER_OFF = { grass: 1, dand: 1, burdock: 1, flower: 1, lit: 1, bottle: 1, weed: 1, ycrown: 1 };   // + кроны и кусты дворов (yardfill.js): зимой голые   // зимой под снегом (бурьян у стен ~1,2 м — тоже, 0п12)
 /* заросли пустыря зимой (автор 23.10.2026, 0п12: «зимой высокая трава и камыши не растут»): под снегом, торчат только
    сухие верхушки у WINTER_TOP.KEEP самых высоких кустов (жребий по месту) — утоплены в снег на SINK м */
 const WINTER_TOP = { KEEP: 0.15, SINK: 1.35, KINDS: { tall: 1, reed: 1, hog: 1 } };
@@ -322,6 +322,18 @@ function geos () {
   { const g = new THREE.IcosahedronGeometry(1, 1), p = g.attributes.position;
     for (let i = 0; i < p.count; i++) p.setY(i, Math.max(0, p.getY(i)) * 0.55 - 0.02);
     G.sand = merge([paint(g, '#e2b26c')]); }
+  // дерево двора (yardfill.js): ствол с ветками и крона из комков — низ комка темнее, верх светлее (как деревья города, trees.js);
+  // цвет — у экземпляра (порода), куст — та же крона, ниже и мельче
+  { const P = [paint(new THREE.CylinderGeometry(0.11, 0.18, 3.2, 5).translate(0, 1.6, 0), '#ffffff')];
+    for (const [a, h, l] of [[0.4, 2.5, 1.3], [2.5, 2.8, 1.2], [4.4, 3.1, 1.1]]) P.push(paint(Bx(0.07, l, 0.07).translate(0, l / 2, 0).rotateZ(0.7).rotateY(a).translate(0, h, 0), '#ffffff'));
+    G.ytrunk = merge(P); }
+  { const P = [];
+    for (const [x, y, z, rr] of [[0, 3.7, 0, 1.55], [0.85, 3.25, 0.35, 1.15], [-0.7, 3.35, -0.45, 1.2], [-0.2, 3.2, 0.8, 1.05], [0.1, 4.65, -0.1, 1.05]]) {
+      const g = new THREE.IcosahedronGeometry(rr, 0).translate(x, y, z), q = g.attributes.position, c = new Float32Array(q.count * 3);
+      for (let i = 0; i < q.count; i++) { const k = 0.66 + 0.34 * Math.max(0, Math.min(1, (q.getY(i) - y + rr) / (2 * rr))) * (0.8 + y / 23); c[i * 3] = c[i * 3 + 1] = c[i * 3 + 2] = k; }
+      g.setAttribute('color', new THREE.BufferAttribute(c, 3)); g.deleteAttribute('uv'); P.push(g);
+    }
+    G.ycrown = merge(P); }
   G.cube = merge([paint(Bx(1, 1, 1), '#ffffff')]);
   G.lit = G.cube;
   G.bottle = merge([paint(new THREE.CylinderGeometry(0.035, 0.035, 0.2, 6).translate(0, 0.1, 0), '#ffffff'),
@@ -414,6 +426,9 @@ function * buildCell (i, j) {
   const taken = [];                                     // большие вещи клетки: [x, z, r]
   const free = (x, z, r) => taken.every(t => Math.hypot(t[0] - x, t[1] - z) > t[2] + r);
   const tires = [];
+  // 0) дворы без пустых мест (yardfill.js): деревья, кусты, площадки, сушилки, будки — места уже выбраны
+  const fl = A.fills && A.fills(i, j);
+  if (fl) for (const f of fl) { fillThing(cell, f); taken.push([f.x, f.z, f.k === 'play' ? 5 : f.k === 'tree' || f.k === 'shrub' ? 1.5 : 3.5]); if (late()) yield; }
   // 1) точки сетки
   for (let gx = x0 + S / 2; gx < x1; gx += S)
     for (let gz = z0 + S / 2; gz < z1; gz += S) {
@@ -491,7 +506,8 @@ function * buildCell (i, j) {
         for (let k = 0; k < n; k++) litter(cell, x + (r() - 0.5) * 2.4, z + (r() - 0.5) * 2.4, r, kids);
       }
       // большое во дворе: выбивалка, бельё, песок, ракушки — по одной на кусок 20×20
-      if (!entNear && !nearEnt(x, z, F.ENT_BIG) && sp.edge > 4 && !A.inHouse(x, z, 8) && A.inHouse(x, z, 35) && free(x, z, 6) && inYard(x, z)) {
+      // во дворах многоэтажек крупное ставит yardfill.js (A.fillZone) — вместе с деревьями и площадками, не поверх них
+      if (!entNear && !nearEnt(x, z, F.ENT_BIG) && sp.edge > 4 && !A.inHouse(x, z, 8) && A.inHouse(x, z, 35) && free(x, z, 6) && inYard(x, z) && !(A.fillZone && A.fillZone(x, z))) {
         const h = hsh(Math.floor(x / 20), Math.floor(z / 20), 31);
         const b = F.BIG;
         const claimKey = Math.floor(x / 20) + ',' + Math.floor(z / 20);
@@ -630,6 +646,119 @@ function bigThing (cell, kind, x, z, r, taken, kids) {
   return true;
 }
 const free = (taken, x, z, r) => taken.every(t => Math.hypot(t[0] - x, t[1] - z) > t[2] + r);
+/* ── дворы без пустых мест (yardfill.js): место и вид уже выбраны, здесь — как выглядит ──
+   дерево — ствол и крона (порода — цвет), куст — крона у земли; площадка — песочница, горка и качели; сушилка — как
+   бельевые столбы газона; трансформаторная будка (её стены — в SOLIDS, yardfill.js). Жребий — по месту */
+const YT = { birch: ['#86c055', '#ece8de'], maple: ['#4f8f3a', '#6b5646'], lime: ['#62a044', '#6b5646'], poplar: ['#5a9a48', '#7a6a58'], rowan: ['#55963f', '#6b5646'] };
+const SHRUB_HEX = ['#5a9a45', '#4f8f3f', '#6aa850'];
+function fillThing (cell, f) {
+  const r = rng(f.x, f.z, 61), x = f.x, z = f.z, y0 = A.groundH(x, z);
+  if (f.k === 'tree') {
+    const c = YT[f.t] || YT.birch, s = f.s, tall = f.t === 'poplar' ? 1.35 : f.t === 'birch' ? 1.12 : 1, wide = f.t === 'poplar' ? 0.7 : f.t === 'maple' ? 1.12 : 1;
+    inst(cell, 'ytrunk', x, y0 - 0.05, z, f.a, s, s * tall, s, c[1], -1, r());
+    inst(cell, 'ycrown', x, y0 - 0.05, z, f.a, s * wide, s * tall, s * wide, c[0], -1, r());
+    return;
+  }
+  if (f.k === 'shrub') {
+    const own = item(cell, 'shrub', [[x, z, 0.8]], SHRUB_HEX[f.c] || SHRUB_HEX[0], { slow: 0.95 });
+    inst(cell, 'ycrown', x, y0 - 1.15 * f.s, z, f.a, 0.5 * f.s, 0.42 * f.s, 0.5 * f.s, SHRUB_HEX[f.c] || SHRUB_HEX[0], own, r());
+    return;
+  }
+  const ux = Math.cos(f.a), uz = Math.sin(f.a), ry = Math.atan2(-uz, ux);       // локальная x — вдоль (ux, uz), z — поперёк
+  const L = (lx, lz) => [x + ux * lx - uz * lz, z + uz * lx + ux * lz];
+  const cube = (lx, lz, y, sx, sy, sz, hex, own, rx = 0, rz = 0) => { const [px, pz] = L(lx, lz); inst(cell, 'cube', px, A.groundH(px, pz) + y, pz, ry, sx, sy, sz, hex, own, r(), rx, rz); };
+  if (f.k === 'play') {
+    // песочница (как у площадок из карты, game.js) — посередине, качели — с одной стороны, горка — с другой
+    const O = -0.6, frame = pick(r, ['#4f7fd6', '#e04836', '#3f8f4f', '#f08a30']);
+    const sb = O - 0.6, [sx, sz] = L(sb, 0);
+    const own1 = item(cell, 'psand', [[sx, sz, 1.6]], '#c9803a', { slow: 0.9 });
+    for (const [a, b, w, dd] of [[0, 1.4, 3.0, 0.2], [0, -1.4, 3.0, 0.2], [1.4, 0, 0.2, 2.6], [-1.4, 0, 0.2, 2.6]]) cube(sb + a, b, 0.15, w, 0.3, dd, '#c9803a', own1);
+    cube(sb, 0, 0.08, 2.6, 0.12, 2.6, '#e8d49a', own1);
+    // горка: площадка на 1,8 м, скат вниз от площадки, лесенка
+    const pl = O + 3.0, [px, pz] = L(pl, 0), [cx2, cz2] = L(pl + 1.75, 0);
+    const own2 = item(cell, 'pslide', [[px, pz, 0.9], [cx2, cz2, 0.6]], '#ffd23f');
+    cube(pl, 0, 1.8, 1.2, 0.12, 1.2, '#e04836', own2);
+    for (const [a, b] of [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]]) cube(pl + a, b, 0.9, 0.1, 1.8, 0.1, frame, own2);
+    /* скат (0п29, 23.10.2026): верх — на 0,1 м внутри края площадки, на её высоте (земля — под площадкой), низ — в 2,45 м
+       дальше, на земле там; длина и угол — по двум концам (было — каждый кусок на земле под своей серединой: на склоне скат
+       отходил от площадки, бортики торчали над ней) */
+    const gP = A.groundH(px, pz), top = gP + 1.78, run = 2.45, [bx, bz] = L(pl + 0.5 + run, 0), bot = A.groundH(bx, bz) + 0.05;
+    const sl = Math.hypot(run, top - bot), sa = Math.atan2(top - bot, run), mid = pl + 0.5 + run / 2;
+    const slab = (lz, dy, sy, sz, hex) => { const [qx, qz] = L(mid, lz); inst(cell, 'cube', qx, (top + bot) / 2 + dy, qz, ry, sl, sy, sz, hex, own2, r(), 0, -sa); };
+    slab(0, 0, 0.08, 0.8, '#ffd23f');
+    for (const b of [-0.42, 0.42]) slab(b, 0.07, 0.14, 0.06, frame);
+    cube(pl - 0.93, 0, 0.95, 0.08, 1.95, 0.6, frame, own2, 0, -0.35);
+    for (let k = 0; k < 4; k++) cube(pl - 1.13 + k * 0.134, 0, 0.4 + k * 0.368, 0.08, 0.05, 0.62, '#d8d8d8', own2);
+    // качели: две А-рамы, перекладина, два сиденья на тросах (сбили — всё целиком)
+    const sw = O - 3.9, legs = [];
+    for (const b of [-1.3, 1.3]) for (const a of [-1, 1]) legs.push([a, b, ...L(sw + a * 0.7, b)]);
+    const own3 = item(cell, 'pswing', legs.map(q => [q[2], q[3], 0.4]), frame);
+    for (const [a, b] of legs) cube(sw + a * 0.35, b, 1.1, 0.08, 2.31, 0.08, frame, own3, 0, a * 0.31);
+    cube(sw, 0, 2.2, 0.08, 0.08, 2.75, frame, own3);
+    for (const b of [-0.6, 0.6]) {
+      cube(sw, b, 0.55, 0.32, 0.05, 0.5, pick(r, ['#e04836', '#ffd23f', '#4f7fd6']), own3);
+      for (const e of [-0.2, 0.2]) cube(sw, b + e, 1.38, 0.02, 1.64, 0.02, '#9a9a9a', own3);
+    }
+    return;
+  }
+  if (f.k === 'dryer') {
+    // как бельевые столбы газона (bigThing 'line'): два Т-столба, три верёвки, у половины — бельё
+    const W = 6 + r() * 1, hex = pick(r, ['#7a7a80', '#3f6fa8', '#a8463a', '#3f7a4a']);
+    const ends = [L(-W / 2, 0), L(W / 2, 0)], own = item(cell, 'line', ends.map(([qx, qz]) => [qx, qz, 0.4]), hex);
+    for (const [qx, qz] of ends) {
+      const y = A.groundH(qx, qz);
+      inst(cell, 'cube', qx, y + 1.05, qz, ry, 0.08, 2.3, 0.08, hex, own, r());
+      inst(cell, 'cube', qx, y + 2.15, qz, ry, 0.06, 0.06, 1.1, hex, own, r());
+    }
+    for (const o of [-0.45, 0, 0.45]) cube(0, o, 2.1, W, 0.02, 0.02, '#e8e4d8', own);
+    if (r() < 0.55) for (let k = 0, n = 2 + Math.floor(r() * 5); k < n; k++) {
+      const t = (r() - 0.5) * (W - 1.4), o = pick(r, [-0.45, 0, 0.45]), w = 0.45 + r() * 0.5, h = 0.4 + r() * 0.5;
+      cube(t, o, 2.1 - h / 2, w, h, 0.02, pick(r, ['#f2f2f2', '#e05a4a', '#4f8fd6', '#f2c230', '#59b06a', '#d0a0d8', '#f2f2f2']), own);
+    }
+    return;
+  }
+  if (f.k === 'garage') {
+    // ракушки рядом, дверью к проезду (как bigThing 'garage')
+    const dx = Math.cos(f.a), dz = Math.sin(f.a), tx = dz, tz = -dx, rot = Math.atan2(-tz, tx);
+    for (let k = 0; k < f.n; k++) {
+      const o = (k - (f.n - 1) / 2) * 3.3, gx = x + tx * o, gz = z + tz * o;
+      const own = item(cell, 'garage', [[gx, gz, 0]], '#888', { solid: 1 });
+      inst(cell, 'shell', gx, A.groundH(gx, gz) - 0.05, gz, rot, 1.5, 1.95, 5.4, pick(r, ['#7fa07a', '#7f95b8', '#c0c0b8', '#b07a5a', '#e8e8e0', '#6f8f9f']), own, r());
+      const cs = tx, sn = tz, hw = 1.5, hd = 2.7;
+      cell.sol.push({ cx: gx, cz: gz, hw, hd, cs, sn, ex: Math.abs(cs) * hw + Math.abs(sn) * hd, ez: Math.abs(sn) * hw + Math.abs(cs) * hd, own, mat: 'bin' });
+      gridHot(gx, gz);
+    }
+    return;
+  }
+  if (f.k === 'beater') {
+    const W = 2.6, hex = pick(r, ['#a8463a', '#3f6fa8', '#3f7a4a', '#c9803a', '#7a7a80']), ends = [L(-W / 2, 0), L(W / 2, 0)];
+    const own = item(cell, 'beater', ends.map(([qx, qz]) => [qx, qz, 0.4]), hex);
+    for (const [qx, qz] of ends) inst(cell, 'cube', qx, A.groundH(qx, qz) + 0.9, qz, ry, 0.08, 2.0, 0.08, hex, own, r());
+    cube(0, 0, 1.88, W + 0.1, 0.07, 0.07, hex, own);
+    cube(0, 0, 1.25, W, 0.06, 0.06, hex, own);
+    if (r() < 0.25) cube(0, 0, 1.35, 1.6, 1.1, 0.04, pick(r, ['#9a2a2a', '#7a2a5a', '#2a4a7a']), own);   // ковёр
+    return;
+  }
+  if (f.k === 'sand') {
+    const own = item(cell, 'sand', [[x, z, 1.3]], '#e2b26c', { slow: 0.9 });
+    inst(cell, 'sand', x, y0, z, f.a, 1.2 + r() * 0.5, 1 + r() * 0.4, 1 + r() * 0.4, '#ffffff', own, r());
+    if (r() < 0.4) inst(cell, 'cube', x + 0.8, y0 + 0.5, z, r() * 6.3, 0.05, 1.1, 0.05, '#8a6b4e', own, r(), 0.4, 0.2);   // лопата
+    return;
+  }
+  if (f.k === 'booth') {
+    // трансформаторная будка 2,1 × 2,9 × 2,6 м: цоколь, стены, плоская крыша, две железные двери к дороге, табличка-молния
+    const wall = pick(r, ['#d9d2c2', '#c9b28a', '#a8584a', '#cfd6d0', '#e0d6b8']), door = pick(r, ['#5c6670', '#4f6a58', '#6a5a4a']);
+    cube(0, 0, 0.15, 2.2, 0.3, 3.0, '#8f8c84', -1);
+    cube(0, 0, 1.35, 2.1, 2.3, 2.9, wall, -1);
+    cube(0, 0, 2.6, 2.4, 0.16, 3.2, '#5d5f63', -1);
+    for (const b of [-0.62, 0.62]) cube(1.07, b, 1.12, 0.05, 1.85, 1.02, door, -1);
+    cube(1.1, 0.62, 1.62, 0.03, 0.34, 0.34, '#f2c230', -1);
+    cube(1.12, 0.62, 1.62, 0.03, 0.24, 0.05, '#c8322a', -1, 0.5, 0);
+    for (const b of [-1.47, 1.47]) cube(0, b, 2.05, 1.0, 0.32, 0.04, '#45474b', -1);
+    return;
+  }
+}
+
 function gridHot (x, z) { gridPut(HOT, 20, x, z, x, z, [x, z]); }
 
 /* оградки: у улиц (и редких дворовых проездов) с одной стороны, кусками по 2,44 м */
@@ -789,8 +918,8 @@ function refresh (cam) {
   }
   // краски сезона: осенью трава желтеет, зимой бурьян и заросли — бурые
   const tint = (k, r, g, b) => { const a = MESH[k].instanceColor.array; for (let q = 0; q < n[k] * 3; q += 3) { a[q] *= r; a[q + 1] *= g; a[q + 2] *= b; } };
-  if (SEA.autumn > 0) { const t = SEA.autumn; tint('grass', 1 + 0.35 * t, 1 - 0.05 * t, 1 - 0.5 * t); tint('weed', 1 + 0.3 * t, 1 - 0.1 * t, 1 - 0.4 * t); tint('burdock', 1 + 0.2 * t, 1 - 0.1 * t, 1 - 0.3 * t); }
-  if (SEA.heat > 0) { const t = SEA.heat; tint('grass', 1 + 0.45 * t, 1 - 0.02 * t, 1 - 0.6 * t); tint('weed', 1 + 0.35 * t, 1 - 0.05 * t, 1 - 0.5 * t); tint('burdock', 1 + 0.25 * t, 1 - 0.05 * t, 1 - 0.4 * t); for (const k of ['tall', 'reed', 'hog']) tint(k, 1 + 0.3 * t, 1 - 0.04 * t, 1 - 0.45 * t); }
+  if (SEA.autumn > 0) { const t = SEA.autumn; tint('ycrown', 1 + 0.75 * t, 1 - 0.02 * t, 1 - 0.7 * t); tint('grass', 1 + 0.35 * t, 1 - 0.05 * t, 1 - 0.5 * t); tint('weed', 1 + 0.3 * t, 1 - 0.1 * t, 1 - 0.4 * t); tint('burdock', 1 + 0.2 * t, 1 - 0.1 * t, 1 - 0.3 * t); }
+  if (SEA.heat > 0) { const t = SEA.heat; tint('ycrown', 1 + 0.12 * t, 1, 1 - 0.2 * t); tint('grass', 1 + 0.45 * t, 1 - 0.02 * t, 1 - 0.6 * t); tint('weed', 1 + 0.35 * t, 1 - 0.05 * t, 1 - 0.5 * t); tint('burdock', 1 + 0.25 * t, 1 - 0.05 * t, 1 - 0.4 * t); for (const k of ['tall', 'reed', 'hog']) tint(k, 1 + 0.3 * t, 1 - 0.04 * t, 1 - 0.45 * t); }
   if (SEA.winter) for (const k in DRY) tint(k, 1.25, 0.82, 0.55);
   else if (SEA.autumn > 0) for (const k of ['tall', 'reed', 'hog']) tint(k, 1 + 0.25 * SEA.autumn, 1 - 0.08 * SEA.autumn, 1 - 0.35 * SEA.autumn);
   for (const k in MESH) {

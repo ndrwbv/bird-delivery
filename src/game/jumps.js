@@ -58,14 +58,28 @@ function flight (k, v, base, top, wallAt) {
   return null;
 }
 
+/* занятое — ещё и по клеткам CC м (рамка + CR): blocks зовут сотни тысяч раз (дворы без пустых мест, yardfill.js) — не перебирать
+   все горки города; вопрос с запасом r > CR — перебором, как раньше */
+const CC = 32, CR = 8, CGRID = new Map();
+const cck = (i, j) => (i + 8192) * 16384 + j + 8192;
 function claim (cx, cz, ux, uz, hl, hw) {
   const ex = Math.abs(ux) * hl + Math.abs(uz) * hw, ez = Math.abs(uz) * hl + Math.abs(ux) * hw;
-  CLAIMS.push({ cx, cz, ux, uz, hl, hw, x0: cx - ex, x1: cx + ex, z0: cz - ez, z1: cz + ez });
+  const c = { cx, cz, ux, uz, hl, hw, x0: cx - ex, x1: cx + ex, z0: cz - ez, z1: cz + ez };
+  CLAIMS.push(c);
+  for (let i = Math.floor((c.x0 - CR) / CC); i <= Math.floor((c.x1 + CR) / CC); i++)
+    for (let j = Math.floor((c.z0 - CR) / CC); j <= Math.floor((c.z1 + CR) / CC); j++) {
+      const k = cck(i, j);
+      let a = CGRID.get(k);
+      if (!a) CGRID.set(k, a = []);
+      a.push(c);
+    }
 }
 /* занято ли: горка, разгон и полёт */
 export function blocks (x, z, r = 0) {
-  for (let i = 0; i < CLAIMS.length; i++) {
-    const c = CLAIMS[i];
+  const L = r <= CR ? CGRID.get(cck(Math.floor(x / CC), Math.floor(z / CC))) : CLAIMS;
+  if (!L) return false;
+  for (let i = 0; i < L.length; i++) {
+    const c = L[i];
     if (x < c.x0 - r || x > c.x1 + r || z < c.z0 - r || z > c.z1 + r) continue;
     const dx = x - c.cx, dz = z - c.cz, u = dx * c.ux + dz * c.uz, v = -dx * c.uz + dz * c.ux;
     if (Math.abs(u) < c.hl + r && Math.abs(v) < c.hw + r) return true;

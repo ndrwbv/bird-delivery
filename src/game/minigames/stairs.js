@@ -234,6 +234,7 @@ export default {
       st.fl = f;
       const here = f === tgt;
       elTask.classList.toggle('mk-here', here);
+      barGo.classList.toggle('sx-here', here);       // ◀ ▶ 🔔 на телефоне — только на своём этаже (ревью 23.10, Р23-15; stairs.css)
       elNow.textContent = here ? t('твой этаж — ищи дверь') : f > tgt ? t('проскочил — вниз на {n}', { n: f - tgt })
         : tn(tgt - f, 'ещё {n} этаж|ещё {n} этажа|ещё {n} этажей');
       if (here !== st.here) { st.here = here; glyphs(); }
@@ -781,26 +782,29 @@ export default {
     const join = (...rs) => { const x0 = Math.min(...rs.map(r => r.x)), y0 = Math.min(...rs.map(r => r.y)); return { x: x0, y: y0, w: Math.max(...rs.map(r => r.x + r.w)) - x0, h: Math.max(...rs.map(r => r.y + r.h)) - y0 }; };
     const L = (s, keys, v) => KIT.keysLine(t, s, keys || {}, v || {});
     const KB = COACH.kbd;
+    /* обучение на лестнице: ◀ ▶ 🔔 там ещё не видны (только на своём этаже) — на шагах про дверь и звонок
+       их показываем заранее, «вот такие будут» (Р23-15); на шаге «поехали» и после — снова как по месту */
+    const peek = on => barGo.classList.toggle('sx-peek', !!on);
     function mainSteps () {
       const v = { n: floor, f: flat };
       return [
-        { el: k => (k === 'touch' ? q('.sx-b-up') : null), rect: k => (k === 'touch' ? null : manRect()),
+        { el: k => { peek(false); return k === 'touch' ? q('.sx-b-up') : null; }, rect: k => (k === 'touch' ? null : manRect()),
           text: k => (k === 'touch' ? L(N_('Лифт сломан — бежим на {n}-й пешком. Тапай ▲ часто: курьер бежит вверх. Зажмёшь — выдохнется и встанет.'), {}, v)
             : L(N_('Лифт сломан — бежим на {n}-й пешком. Жми {up} часто: курьер бежит вверх. Зажмёшь — выдохнется и встанет.'), { up: k === 'pad' ? KB(padA()) : KB('↑', 1) }, v)),
           keys: k => (k === 'pad' ? [[padA()]] : [['↑', 1]]),
           hit: c => c === 'ArrowUp' || c === 'KeyW' || c === 'Space', pad: p => !!(p.menuOk || p.menuUp) },
-        { el: k => (k === 'touch' ? [...barGo.querySelectorAll('[data-a="left"], [data-a="right"]')] : null),
+        { el: k => { peek(k === 'touch'); return k === 'touch' ? [...barGo.querySelectorAll('[data-a="left"], [data-a="right"]')] : null; },
           rect: k => (k === 'touch' ? null : join(doorRect(Math.max(0, nl - 1)), manRect())),
-          text: k => (k === 'touch' ? L(N_('На своём этаже ◀ ▶ — к двери. Какие квартиры на этаже — на синей табличке у лестницы. Тебе — кв. {f}.'), {}, v)
+          text: k => (k === 'touch' ? L(N_('На своём этаже внизу появятся ◀ ▶ — к двери. Какие квартиры на этаже — на синей табличке у лестницы. Тебе — кв. {f}.'), {}, v)
             : L(N_('На своём этаже {side} — к двери. Какие квартиры на этаже — на синей табличке у лестницы. Тебе — кв. {f}.'), { side: k === 'pad' ? KB('◀ ▶') : KB('← →', 1) }, v)),
           keys: k => (k === 'pad' ? [['◀'], ['▶']] : [['←', 1], ['→', 1]]),
           hit: c => c === 'ArrowLeft' || c === 'ArrowRight' || c === 'KeyA' || c === 'KeyD', pad: p => !!(p.menuLeft || p.menuRight) },
-        { el: k => (k === 'touch' ? q('.sx-b-ring') : null), rect: k => (k === 'touch' ? null : doorRect(Math.max(0, nl - 1))),
-          text: k => (k === 'touch' ? L(N_('У двери 🔔 — звонок (или тапни по самой двери). Не та квартира — жилец наругает, а срок идёт.'))
+        { el: k => { peek(k === 'touch'); return k === 'touch' ? q('.sx-b-ring') : null; }, rect: k => (k === 'touch' ? null : doorRect(Math.max(0, nl - 1))),
+          text: k => (k === 'touch' ? L(N_('Рядом с ними 🔔 — звонок у двери (или тапни по самой двери). Не та квартира — жилец наругает, а срок идёт.'))
             : L(N_('У двери {ok} — звонок. Не та квартира — жилец наругает, а срок идёт.'), { ok: k === 'pad' ? KB(padA()) : KB('Enter', 1) })),
           keys: k => (k === 'pad' ? [[padA()]] : [['Enter', 1]]),
           hit: c => c === 'Enter' || c === 'NumpadEnter' || c === 'KeyE', pad: p => !!p.menuOk },
-        { go: true,
+        { go: true, el: () => { peek(false); return null; },
           text: (k, fam) => L(N_('Готов? Жмёшь «поехали» — и пошёл срок заказа.')) + ' ' +
             (k === 'touch' ? L(N_('Не хочешь бегать — «пусть сам спустится» под заданием, но без бонуса за скорость.'))
               : L(N_('Не хочешь бегать — {self} «пусть сам спустится», но без бонуса за скорость.'), { self: KB(KIT.selfKey(k, fam), k === 'kb') })) + KIT.learnAdd(ln, t) },
@@ -835,6 +839,7 @@ export default {
         t, ln: who, steps, paused: () => !!(api.paused && api.paused()),
         onEnd: skipped => {
           st.phase = back;
+          peek(false);
           st.arm = Math.max(st.arm, 0.3); st.lastTap = st.t;
           if (gop && kind === 'gop') { gop.arm = 0.3; gop.tt = Math.max(gop.tt, 0.9); }
           if (api.hold) api.hold(false);

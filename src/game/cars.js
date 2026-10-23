@@ -43,7 +43,6 @@ import { ZHENYA_KEY } from './doorstep.js';
 import { pad as PAD } from '../input/gamepad.js';
 import './cars.css';
 import * as TEL from './telemetry.js';
-import { wingsLook } from './flycar.js';        // крылышки на борту (улучшение «крылья»)
 import * as GUNM from './turret.js';             // гранатомёт на крыше: подставка и поворотная голова (turret.js)          // анонимная статистика: покупки, улучшения, продажа, ремонт (telemetry.js)
 
 const N_ = s => s;
@@ -227,6 +226,28 @@ export function select (id) {
   PREV.delete(id);
   if (A && A.resetCar) A.resetCar();
   return true;
+}
+/* ТЕСТ «накинуть» (econ.js TEST_MONEY, 12аг): все машины куплены, на каждой все улучшения (броня и мотор — до конца,
+   крылья — кроме родстера, гранатомёт); звёзд — сколько нужно самой «звёздной» машине. Деньги и районы — game.js cash.run */
+export function testAll () {
+  const all = obj(K_UP), own = ownedIds();
+  for (const c of CAR_LIST) {
+    if (!own.includes(c.id)) { own.push(c.id); newEng(c.id); }
+    all[c.id] = { armor: UPGRADE.STEPS, engine: UPGRADE.STEPS, wings: c.fly ? 0 : 1, gun: 1 };
+    PREV.delete(c.id);
+  }
+  sset(K_OWN, own);
+  sset(K_UP, all);
+  const need = Math.max(0, ...CAR_LIST.map(c => c.stars || 0));
+  if (A && A.Store && (+A.Store.get('dlv-stars', 0) || 0) < need) A.Store.set('dlv-stars', need);
+  flush();
+  if (A && A.resetCar) A.resetCar();
+  return { cars: own.length, stars: need };
+}
+/* все ли открыто тестовой кнопкой (машины и улучшения) */
+export function testAllDone () {
+  const own = ownedIds();
+  return CAR_LIST.every(c => { const u = ups(c.id); return own.includes(c.id) && u.armor >= UPGRADE.STEPS && u.engine >= UPGRADE.STEPS && u.gun && (c.fly || u.wings); });
 }
 /* песочница машин (carlab.html): любая машина и любой цвет — без денег и без покупки */
 export function labUse (id) {
@@ -618,8 +639,7 @@ function dress (id, g, add, k, u) {
     B(W * 0.7, 0.06, 0.12, '#2b2c31', 0, roof + 0.12, cf - 0.2);
     for (let i = -1; i <= 1; i++) round(0.07, HEAD, i * 0.3, roof + 0.2, cf - 0.14);
   }
-  // крылья (flycar.js WINGS): крылышки по бортам и антикрыло на корме
-  if (u.wings) wingsLook(add, { S, W, top, hl });
+  // крылья (flycar.js WINGS): снаружи не видно — в полёте из-под днища выдвигаются ракетные сопла (flycar.js NOZ, автор 23.10.2026)
   // гранатомёт (turret.js): подставка на крыше, у кабриолета — на палубе за сиденьями; голова — в makeModel
   if (u.gun) {
     const at = LOOK[id].open ? { x: 0, y: top + 0.08, z: cb - 0.3 } : { x: 0, y: roof, z: S.cz - 0.05 };

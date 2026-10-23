@@ -15,6 +15,7 @@
    `python3 clipadd.py ../../src/game/qpeople.clips.js "M:Interact:worker.glb" "F:Interact:qJ2gsTUBHL.glb"` — модель та же,
    что первой шла в семейство (скрипт сверяет кости). У семейства A клипа нет — наклон своими костями.
    С 23.10.2026 (12аф, уворот от машины — peddodge.js) там же бег вбок и кувырок — скрипт пишет файл целиком, перечислять все:
-   `python3 clipadd.py ../../src/game/qpeople.clips.js "M:Interact,Run_Left,Run_Right,Roll:worker.glb" "F:Interact,Run_Left,Run_Right,Roll:qJ2gsTUBHL.glb"`
+   `python3 clipadd.py ../../src/game/qpeople.clips.js "M:Interact,Run_Left,Run_Right,Roll,Kick_Right:worker.glb" "F:Interact,Run_Left,Run_Right,Roll,Kick_Right:qJ2gsTUBHL.glb"`
+   (23.10.2026, 12ар: + пинок «Kick_Right» — водитель пинает твою машину и лобовое, foewreck.js; ключ клипа — 'kick', +~64 / 80 КБ)
    (шаг бега вбок меряется по земле — x и z; печатает, куда едет ступня на земле: у Run_Left — к −x, тело — к +x, влево).
    Каждый клип — ~40—90 КБ на семейство; память телефона — `npm run check -- --only=build-web,memory-phone`.

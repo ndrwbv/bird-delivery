@@ -688,7 +688,7 @@ function build1 (s, idx) {
   for (let k = 0; k < nm && shop.roam.length; k++) shop.mascots.push(newMascot(shop, ch.mascots[k % ch.mascots.length]));
 
   { const r = A.nearestRoad(s.fx, s.fz, 10, 3); shop.door = r ? [r.x, r.z] : [s.fx, s.fz]; }
-  SHOPS.push(shop);
+  SHOPS.push(shop); shopGrid(shop);
 }
 
 /* ── сбили вещь точки ── */
@@ -1216,8 +1216,23 @@ export function onRespawn (t) {
 }
 
 /* участок точки (деревья, лавочки не встают) */
+/* точки по клеткам 32 м (вокруг фасада ±30 м — дальше blocks их и так пропускает): blocks зовут сотни тысяч раз при сборке
+   (дворы без пустых мест, трамплины) — не перебирать все точки города */
+const SHG = new Map();
+const shk = (i, j) => (i + 8192) * 16384 + j + 8192;
+function shopGrid (s) {
+  for (let i = Math.floor((s.fx - 30) / 32); i <= Math.floor((s.fx + 30) / 32); i++)
+    for (let j = Math.floor((s.fz - 30) / 32); j <= Math.floor((s.fz + 30) / 32); j++) {
+      const k = shk(i, j);
+      let a = SHG.get(k);
+      if (!a) SHG.set(k, a = []);
+      a.push(s);
+    }
+}
 export function blocks (x, z, m = 0) {
-  for (const s of SHOPS) {
+  const L = SHG.get(shk(Math.floor(x / 32), Math.floor(z / 32)));
+  if (!L) return false;
+  for (const s of L) {
     const dx = x - s.fx, dz = z - s.fz;
     if (Math.abs(dx) > 30 || Math.abs(dz) > 30) continue;
     const a = dx * s.ux + dz * s.uz, b = dx * s.nx + dz * s.nz;

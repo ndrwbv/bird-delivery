@@ -86,6 +86,9 @@ function glowTex (inner, outer) {
   return tx;
 }
 const add = { blending: THREE.AdditiveBlending, transparent: true, depthWrite: false };
+/* материалы, текстуры свечения и заготовки костров — заранее (game.js, кусок 'first' поздней сборки): у первого костра
+   ночью это было ~3—6 мс в одном шаге */
+export function warm () { if (A) res(); }
 function res () {
   if (R.ok) return R;
   R.ok = 1;

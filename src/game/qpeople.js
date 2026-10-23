@@ -67,7 +67,7 @@ function family (fam) {
   }
   const clips = {};
   // Run_Left / Run_Right — бег вбок, Roll — кувырок (уворот от машины, peddodge.js): до «run», иначе перепишут бег
-  const clipKey = name => /run_?left/i.test(name) ? 'runl' : /run_?right/i.test(name) ? 'runr' : /roll/i.test(name) ? 'roll' : /run/i.test(name) ? 'run' : /death/i.test(name) ? 'death' : /punch/i.test(name) ? 'punch' : /interact|pick/i.test(name) ? 'interact' : /walk/i.test(name) ? 'walk' : name.toLowerCase();
+  const clipKey = name => /run_?left/i.test(name) ? 'runl' : /run_?right/i.test(name) ? 'runr' : /roll/i.test(name) ? 'roll' : /kick/i.test(name) ? 'kick' : /run/i.test(name) ? 'run' : /death/i.test(name) ? 'death' : /punch/i.test(name) ? 'punch' : /interact|pick/i.test(name) ? 'interact' : /walk/i.test(name) ? 'walk' : name.toLowerCase();
   for (let c = 0; c < nC; c++) {
     const name = str(), nF = u32(), fps = f32(), speed = f32();
     const data = new Float32Array(bin.buffer.slice(o, o + nF * nJ * 7 * 4)); o += nF * nJ * 7 * 4;
@@ -823,6 +823,10 @@ export function qPortrait (Lk, spec, size, id) {
   const c = document.createElement('canvas'); c.width = c.height = size;
   const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
   x.drawImage(PR.r.domElement, 0, 0, size, size);
+  // снимок не вышел (контекст рендера портретов потерян — память видеокарты, телефон; холст пустой): угол — не пастельный
+  // фон, а чёрный / прозрачный. Тогда — обычный портрет игры (people.js), не чёрный квадрат; не в кэш — в другой раз снимет
+  const k0 = x.getImageData(0, 0, 1, 1).data;
+  if (PR.r.getContext().isContextLost() || k0[3] < 200 || k0[0] + k0[1] + k0[2] < 300) { QP.fails = (QP.fails || 0) + 1; return null; }
   url = c.toDataURL();
   PCACHE.set(key, url);
   return url;

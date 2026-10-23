@@ -112,6 +112,14 @@ const CHECKS = [
     const n = Object.entries(r.n).map(([k, v]) => k + ' ' + v).join(', ');
     return { status: r.ok ? 'ok' : 'fail', info: `${n}; на асфальте ${r.bad}` + (r.bad ? ': ' + JSON.stringify(r.by) + " " + JSON.stringify(r.sample) : '') };
   } },
+  { id: 'shoparch', name: 'магазины не на окнах и не в арках, сквозь каждую арку — проезд', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/shop-arch.js'), '--q=winlog']);
+    const e = errLine(j), r = j.result;
+    if (e || !r) return { status: 'fail', info: e || 'нет результата' };
+    if (r.err) return { status: 'fail', info: r.err };
+    return { status: r.ok ? 'ok' : 'fail', info: `магазинов ${r.shops}, окно на вывеске / двери / витрине у ${r.shopBad} (окон ${r.winBad}: ${JSON.stringify(r.by)}); арок ${r.arches}: в устье дверь, магазин или ворота ${r.archItems}, без проезда ${r.archNoRoad}` +
+      (r.ok ? '' : ' · ' + JSON.stringify(r.sample.slice(0, 2)) + JSON.stringify(r.itemSample.slice(0, 2)) + JSON.stringify(r.archSample.slice(0, 2))) };
+  } },
   { id: 'edits', name: 'правки редактора города применены', group: 2, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/edits.js')]);
     const e = errLine(j), r = j.result;
@@ -132,6 +140,15 @@ const CHECKS = [
     const e = errLine(j), r = j.result;
     if (e || !r) return { status: 'fail', info: e || 'нет результата' };
     return { status: r.ok ? 'ok' : 'fail', info: `тропинок дверей ${r.doors}, общих дорожек ${r.walks}, выходов ${r.links}, хвостов ${r.stub}; точек конкурентов ${r.shops}, с дорожкой ${r.branch}; не так ${r.bad}` + (r.bad ? ': ' + JSON.stringify(r.by) + ' ' + JSON.stringify(r.sample) : '') };
+  } },
+  { id: 'yardempty', name: 'дворы без пустых мест', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/yard-empty.js')]);
+    const e = errLine(j), r = j.result;
+    if (e || !r) return { status: 'fail', info: e || 'нет результата' };
+    if (r.err) return { status: 'fail', info: r.err };
+    const pl = Object.entries(r.placed || {}).map(([k, v]) => k + ' ' + v).join(', ');
+    return { status: r.ok ? 'ok' : r.bad || r.pieces > 20 ? 'fail' : 'warn', info: `пустых кусков ${r.pieces} (${r.m2} м²); поставлено ${r.things}: ${pl}; деревьев ${r.trees}, кустов ${r.bushes}, сборка ${r.buildMs} мс; на мощёном и в доме ${r.bad}` +
+      (r.pieces ? ': ' + JSON.stringify(r.list.slice(0, 4)) : '') + (r.bad ? ' ' + JSON.stringify(r.by) + ' ' + JSON.stringify(r.sample) : '') };
   } },
   { id: 'routehouse', name: 'маршрут навигатора не сквозь дома', group: 2, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/route-house.js')]);

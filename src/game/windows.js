@@ -32,6 +32,9 @@
 import * as THREE from '../vendor/three.module.min.js';
 
 export const STATS = { windows: 0, meshes: 0, verts: 0, ms: 0, interior: 1, lod: 70 };
+/* ?winlog — для проверок (tools/probe-checks/shop-arch.js): каждое окно — середина, нормаль, ширина, высота; иначе не копим */
+const LOG = typeof location !== 'undefined' && /[?&]winlog(&|$)/.test(location.search) ? [] : null;
+if (LOG) STATS.log = LOG;
 
 let CH = 100;
 const BUCKETS = new Map();
@@ -78,6 +81,7 @@ export function add (w, from, to, y0, y1, out, sty) {
   b.x0 = Math.min(b.x0, px, qx); b.x1 = Math.max(b.x1, px, qx); b.z0 = Math.min(b.z0, pz, qz); b.z1 = Math.max(b.z1, pz, qz);
   b.y0 = Math.min(b.y0, y0); b.y1 = Math.max(b.y1, y1);
   STATS.windows++;
+  if (LOG) LOG.push([+cx.toFixed(2), +cy.toFixed(2), +cz.toFixed(2), w.ox, w.oz, +ww.toFixed(2), +hh.toFixed(2)]);
 }
 
 /* ── атлас: мебель задней стены, фигуры в глубине, подоконник ──

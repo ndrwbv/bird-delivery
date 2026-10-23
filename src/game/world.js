@@ -255,15 +255,22 @@ function alleyIndex (x1, z1, x2, z2, w) {
   const s = [x1, z1, x2, z2, w];
   for (let a = Math.floor((Math.min(x1, x2) - w) / AL_C); a <= Math.floor((Math.max(x1, x2) + w) / AL_C); a++)
     for (let b = Math.floor((Math.min(z1, z2) - w) / AL_C); b <= Math.floor((Math.max(z1, z2) + w) / AL_C); b++) {
-      const k = a + ',' + b;
+      const k = alk(a, b);
       if (!AL_GRID.has(k)) AL_GRID.set(k, []);
       AL_GRID.get(k).push(s);
     }
 }
+const alk = (a, b) => (a + 8192) * 16384 + b + 8192;   // числом, не строкой: onAlley зовут сотни тысяч раз при сборке (бордюры, мощёное)
 /* на аллее ли точка: деревья и случайные лавочки парка туда не ставим (game.js) */
 export function onAlley (x, z, m = 1.2) {
   if (!AL_GRID.size) return false;
-  for (const [x1, z1, x2, z2, w] of AL_GRID.get(Math.floor(x / AL_C) + ',' + Math.floor(z / AL_C)) || []) if (segD(x, z, x1, z1, x2, z2) < w / 2 + m) return true;
+  const a = AL_GRID.get(alk(Math.floor(x / AL_C), Math.floor(z / AL_C)));
+  if (!a) return false;
+  for (let i = 0; i < a.length; i++) {
+    const s = a[i], x1 = s[0], z1 = s[1], dx = s[2] - x1, dz = s[3] - z1, l2 = dx * dx + dz * dz || 1;
+    const q = clamp(((x - x1) * dx + (z - z1) * dz) / l2, 0, 1), ex = x - x1 - dx * q, ez = z - z1 - dz * q;
+    if (Math.sqrt(ex * ex + ez * ez) < s[4] / 2 + m) return true;   // segD без Math.hypot
+  }
   return false;
 }
 function roadClear (x, z, m) {

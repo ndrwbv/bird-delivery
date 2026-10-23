@@ -436,23 +436,33 @@ function spawnLux () {
     A.poseOnSlope(car);
     A.scene.add(mesh);
     A.TRAFFIC.push(car);
-    const drv = member(null, { shirt: '#1f2328', pants: '#1f2328', cap: '#1b1a1f', fat: false });
-    drv.x = px; drv.z = pz; drv.h = Math.atan2(nx, nz) + rand(-0.6, 0.6);
-    drv.grp.rotation.y = drv.h;
-    place(drv);
-    LUX.push({ car, drv, x: cx, z: cz, angry: 0, watchT: rand(4, 10), watch: 0, T: rand(0, 9) });
+    const l = { car, drv: null, x: cx, z: cz, angry: 0, watchT: rand(4, 10), watch: 0, T: rand(0, 9) };
+    LUX.push(l);
+    // шофёр — следующим кадром (LATER): машина и человек в одном кадре — шаг life до 5—9 мс на Деке
+    const h = Math.atan2(nx, nz) + rand(-0.6, 0.6);
+    LATER.unshift(() => {
+      if (l.gone) return;
+      const drv = member(null, { shirt: '#1f2328', pants: '#1f2328', cap: '#1b1a1f', fat: false });
+      drv.x = px; drv.z = pz; drv.h = h;
+      drv.grp.rotation.y = drv.h;
+      place(drv);
+      l.drv = drv;
+    });
     return;
   }
 }
 function dropLux (l) {
-  dropMember(l.drv);
+  l.gone = 1;
+  if (l.drv) dropMember(l.drv);
   const c = l.car;
   c.gone = 1;                                   // трафик сам вычеркнет из списка
   A.scene.remove(c.mesh);
   c.mesh.traverse(o => { if (o.isMesh) { o.geometry.dispose(); if (o.material.dispose) o.material.dispose(); } });
 }
 function luxStep (l, dt) {
-  const m = l.drv, c = l.car, u = m.u;
+  const m = l.drv, c = l.car;
+  if (!m) return;                               // шофёр ещё не вышел (spawnLux — следующим кадром)
+  const u = m.u;
   sayStep(m, dt);
   if (m.dead) return;
   const d = far(m);
@@ -1196,7 +1206,7 @@ export function scare (x, z, r = 26) {
   const near = o => Math.hypot(o.x - x, o.z - z) < r;
   for (const c of COUPLES) if (!c.react && (!c.a.dead || !c.b.dead) && near(c)) { c.shock = rand(1.5, 3); c.chat = 0; }
   for (const q of RICH) if (!q.m.dead && near(q.m)) q.shock = rand(1.5, 2.8);
-  for (const l of LUX) if (!l.drv.dead && near(l.drv)) l.drv.shock = rand(1.5, 2.5);
+  for (const l of LUX) if (l.drv && !l.drv.dead && near(l.drv)) l.drv.shock = rand(1.5, 2.5);
   for (const a of ARTISTS) if (!a.m.dead && a.st === 'paint' && near(a.m)) flee(a);
   for (const f of FLYERS) if (!f.m.dead && near(f.m)) f.m.shock = rand(1.2, 2.2);
 }

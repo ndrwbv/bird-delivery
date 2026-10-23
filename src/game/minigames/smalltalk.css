@@ -60,7 +60,7 @@
 [data-input="touch"] .tk-o.tk-cur { background: var(--pp-paper); translate: none; }
 .tk-o:not(:disabled):active { translate: 0 3px; box-shadow: 0 1px 0 var(--pp-ink); }
 /* подсказка управления — одной строкой */
-.tk-hint { margin: .8em 0 0; font-size: 10px; line-height: 1.5; text-align: right; color: var(--pp-label); }
+.tk-hint { margin: .8em 0 0; font-size: var(--pp-fs-s);   /* ≥ 11 px на компьютере и Деке, 10 — телефон (ревью 23.10, Р23-2) */ line-height: 1.5; text-align: right; color: var(--pp-label); }
 .tk-hint[hidden] { display: none; }
 /* дверь закрылась */
 .tk-slam { align-self: flex-start; margin: 0; font-size: var(--pp-fs-s); font-style: italic; color: var(--pp-label); }

@@ -27,6 +27,7 @@ import './camview.css';
 import { t } from '../i18n/index.js';
 import * as TEL from './telemetry.js';          // анонимная статистика: смена вида камеры (telemetry.js)
 import { carMats as shadeMats } from './fakeshadows.js';   // в тени дома салон и капот темнее, как асфальт за стеклом (fakeshadows.js carMat)
+import { LK, LOOK } from './camlook.js';        // осмотреться: голова из-за руля, камера вокруг машины сзади (camlook.js)
 
 export const MODES = ['high', 'near', 'cab'];
 const KEY = 'dlv-cam';
@@ -109,7 +110,8 @@ export function near (dt, vf, sh) {
   const { V, cam } = A, N = CAMV.NEAR, sp = clamp(Math.abs(vf) / (A.vmax() || 48), 0, 1);
   V.camH = damp(V.camH, V.h, N.yawK, dt);
   const full = N.dist + sp * N.distFast;
-  const sx = Math.sin(V.camH), sz = Math.cos(V.camH);
+  const yaw = LK.yaw;                              // осмотреться (camlook.js): камера обходит машину, отпустил — за спину
+  const sx = Math.sin(V.camH + yaw), sz = Math.cos(V.camH + yaw);
   let back = full;
   for (let d = 1.6; d <= full; d += 0.5) if (!A.camClear(V.x - sx * d, V.z - sz * d)) { back = Math.max(N.minBack, d - 1.2); break; }
   const pull = full - back;
@@ -119,11 +121,11 @@ export function near (dt, vf, sh) {
   V.camX = damp(V.camX, tx, N.posK, dt);
   V.camZ = damp(V.camZ, tz, N.posK, dt);
   if (!A.camClear(V.camX, V.camZ)) { V.camX = tx; V.camZ = tz; }   // отстающая камера оказалась в стене — сразу на место
-  const want = Math.max(V.y + N.h + V.camPull * N.pullRaise, A.groundH(V.camX, V.camZ) + 1.6);
+  const want = Math.max(V.y + N.h + V.camPull * N.pullRaise - LK.pitch * 6, A.groundH(V.camX, V.camZ) + 1.6);   // смотрит вверх — камера ниже
   V.camY = damp(V.camY, want, 8, dt);
   sh = sh || 0;
   cam.position.set(V.camX + (sh ? (Math.random() * 2 - 1) * sh * 0.7 : 0), V.camY + (sh ? (Math.random() * 2 - 1) * sh * 0.7 : 0), V.camZ);
-  const ax = V.x + Math.sin(V.h) * N.ahead, az = V.z + Math.cos(V.h) * N.ahead;
+  const ax = V.x + Math.sin(V.h + yaw) * N.ahead, az = V.z + Math.cos(V.h + yaw) * N.ahead;
   const gy = V.air ? V.y : lerp(V.y, A.surfaceAt(ax, az, V.y), 0.6);    // в прыжке и полёте — на машину, не на землю под ней
   cam.lookAt(ax, gy + N.lookH, az);
 }
@@ -144,6 +146,14 @@ export function cab (dt, vf, sh) {
   const jit = sp * (Math.sin(K.tt * 13.7) * 0.0025 + Math.sin(K.tt * 7.1) * 0.0018);
   K.e.copy(K.eye);
   K.e.x -= (V.steerVis || 0) / 0.42 * sp * C.sway;
+  // осмотреться (camlook.js): голова поворачивается вокруг шеи (вправо — глаза к середине салона; влево — нет: окно
+  // и так в полуметре, дверь и крыша ушли бы из кадра); через правое плечо курьер подаётся к середине салона
+  const yaw = LK.yaw;
+  if (yaw || LK.pitch) {
+    if (yaw < 0) K.e.x += Math.sin(yaw) * LOOK.NECK;
+    K.e.z += (Math.cos(yaw) - 1) * LOOK.NECK;
+    if (yaw < 0) { const k = clamp((-yaw - 1.2) / 1.2, 0, 1); K.e.x -= k * k * (3 - 2 * k) * LOOK.LEAN; }
+  }
   K.e.applyMatrix4(K.M);
   K.e.y += bob + jit;
   const s = (sh || 0) * C.shakeK;
@@ -151,9 +161,10 @@ export function cab (dt, vf, sh) {
   cam.position.copy(K.e);
   // взгляд — по курсу, наклон кузова — сглаженный, крена нет: кочки не дёргают картинку, качается салон
   K.p = damp(K.p, V.pitch || 0, 4, dt);
-  const p = K.p - C.pitch, cp = Math.cos(p);
+  const sd = Math.sin(Math.min(Math.abs(yaw), Math.PI / 2));   // вбок и назад взгляд чуть ниже — в кадре край двери, полка, багажник
+  const p = K.p - C.pitch - LK.pitch + sd * sd * LOOK.SIDE_DN, cp = Math.cos(p), hh = V.h + yaw;
   cam.up.set(0, 1, 0);
-  cam.lookAt(K.e.x + Math.sin(V.h) * cp * 10, K.e.y - Math.sin(p) * 10, K.e.z + Math.cos(V.h) * cp * 10);
+  cam.lookAt(K.e.x + Math.sin(hh) * cp * 10, K.e.y - Math.sin(p) * 10, K.e.z + Math.cos(hh) * cp * 10);
   // салон: в осях машины
   K.root.matrix.copy(K.M);
   K.root.matrixWorldNeedsUpdate = true;
@@ -258,7 +269,7 @@ function build (car) {
   const u = car.userData || {}, S = u.spec || SPEC0, W = u.W || S.W || 1.74, dy = u.dy || 0;
   const y0 = 0.2 + S.h / 2 + 0.22 + dy, top = y0 + S.h / 2;
   const ch = S.ch, cy = top + ch / 2, gh = ch * 0.72, gb = cy + 0.02 - gh / 2, gt = cy + 0.02 + gh / 2, roof = top + ch;
-  const cf = S.cz + S.cab / 2, dz = cf - Math.min(0.78, S.cab * 0.38), dx = W * 0.22;
+  const cf = S.cz + S.cab / 2, cr = S.cz - S.cab / 2, dz = cf - Math.min(0.78, S.cab * 0.38), dx = W * 0.22;
   const hl = u.hl || S.L / 2;
   const ey = gb + 0.23, ez = dz + 0.04;           // глаза — на 23 см выше низа лобового: у низких кабриолетов торпедо не закрывает дорогу
   const scene = old ? old.scene : new THREE.Scene();
@@ -366,13 +377,40 @@ function build (car) {
   for (const s of [1, -1]) box(0.06, top - 0.2 - fy, ez + 0.9 - fz0, TRIM, s * (W / 2 - 0.05), (top - 0.2 + fy) / 2, (fz0 + ez + 0.9) / 2);   // низ дверей — до пола
   box(0.5, 0.12, 0.5, '#5d3d24', -dx, fy + 0.26, ez - 0.02);                                 // сиденье пассажира: подушка
   box(0.5, 0.62, 0.12, '#7a5232', -dx, fy + 0.62, ez - 0.32, -0.18);                         // спинка
+  /* зад салона (12ак, 23.10.2026: «вертеть головой» — оглянулся через плечо): стойки за дверью, заднее сиденье, полка
+     и рама заднего стекла, борта и пол до конца салона, крышка багажника за стеклом. Короткий салон (родстер) — без
+     заднего сиденья. */
+  const rw = Math.min(cr + 0.02, fz0 - 0.05);                // где кончается салон (низ заднего стекла)
+  if (fz0 - rw > 0.05) {
+    box(W - 0.1, 0.04, fz0 - rw, '#2c2a2e', 0, fy, (fz0 + rw) / 2);                                  // пол — до конца салона
+    for (const s of [1, -1]) box(0.06, gb - fy, fz0 - rw, TRIM, s * (W / 2 - 0.05), (gb + fy) / 2, (fz0 + rw) / 2);   // борта сзади, до окон
+  }
+  for (const s of [1, -1]) box(0.06, gb - (top - 0.2), Math.max(0.02, (ez - 0.7) - Math.max(rw, fz0)), TRIM, s * (W / 2 - 0.05), (gb + top - 0.2) / 2, ((ez - 0.7) + Math.max(rw, fz0)) / 2);   // задняя дверь у окна
+  for (const s of [1, -1]) box(0.1, 0.035, (ez - 0.7) - rw, PANEL, s * (W / 2 - 0.07), gb + 0.005, (ez - 0.7 + rw) / 2);   // верх задних дверей у стекла
+  box(W - 0.12, gb - fy, 0.06, TRIM, 0, (gb + fy) / 2, rw - 0.03);                                     // стенка за задним сиденьем
+  box(W - 0.16, 0.03, 0.3, '#24222a', 0, gb - 0.005, rw + 0.12);                                      // полка под задним стеклом
+  if (ez - rw > 1.05) {                                                                                // заднее сиденье
+    const sb = gb + 0.04 - (fy + 0.3);
+    box(W - 0.34, 0.12, 0.46, '#5d3d24', 0, fy + 0.24, rw + 0.62);
+    box(W - 0.34, sb, 0.12, '#7a5232', 0, fy + 0.3 + sb / 2, rw + 0.38, -0.2);
+  }
+  if ((S.trunk || 0) > 0.2) box(W - 0.02, 0.05, S.trunk - 0.06, paintDk, 0, top - 0.02, rw - 0.02 - (S.trunk - 0.06) / 2);   // крышка багажника за стеклом
+  if (!open) {
+    const bz = Math.max(rw + 0.4, ez - 0.62);
+    for (const s of [1, -1]) {
+      box(0.07, gt - gb + 0.06, 0.12, TRIM, s * (W / 2 - 0.08), (gt + gb) / 2, bz);                    // средняя стойка — за плечом
+      bar(0.085, 0.11, TRIM, [s * (W / 2 - 0.1), gb - 0.02, rw - 0.02], [s * (W / 2 - 0.13), gt + 0.02, rw + 0.24]);   // задняя стойка
+      box(0.07, 0.05, (cf - 0.26) - (rw + 0.24), TRIM, s * (W / 2 - 0.1), gt + 0.03, (cf - 0.26 + rw + 0.24) / 2);     // край крыши над дверями
+    }
+    box(W - 0.2, 0.06, 0.1, TRIM, 0, gt + 0.04, rw + 0.25);                   // верх рамы заднего стекла
+  } else box(W - 0.24, 0.04, 0.05, TRIM, 0, gb + 0.12, rw + 0.04, 0.6, 0, 0);   // кабриолет: низкая рамка сзади
   // дворники лежат у низа лобового
   for (const x of [0.32, -0.18]) box(0.5, 0.012, 0.014, '#141317', x, gb + 0.015, cf + 0.03, 0, 0.12, 0);
   // рама лобового, крыша изнутри, козырьки, зеркало (у кабриолета — только низкая рамка стекла)
   if (!open) {
     for (const s of [1, -1]) bar(0.085, 0.11, TRIM, [s * (W / 2 - 0.1), gb - 0.02, cf + 0.02], [s * (W / 2 - 0.13), gt + 0.02, cf - 0.26]);
     box(W - 0.2, 0.06, 0.1, TRIM, 0, gt + 0.04, cf - 0.27);                  // верх рамы
-    box(W - 0.14, 0.04, Math.max(0.3, cf - 0.3 - (ez - 0.6)), LINING, 0, roof - 0.04, (cf - 0.3 + ez - 0.6) / 2);
+    box(W - 0.14, 0.04, Math.max(0.3, cf - 0.3 - Math.min(ez - 0.6, rw + 0.28)), LINING, 0, roof - 0.04, (cf - 0.3 + Math.min(ez - 0.6, rw + 0.28)) / 2);   // крыша — до заднего стекла
     for (const s of [1, -1]) box(0.34, 0.015, 0.16, LINING, s * dx, gt - 0.005, cf - 0.4, -0.25, 0, 0);
     box(0.03, 0.05, 0.03, PANEL, 0, gt + 0.0, cf - 0.22);
     box(0.17, 0.05, 0.022, PANEL, 0, gt - 0.045, cf - 0.21);                 // зеркало заднего вида

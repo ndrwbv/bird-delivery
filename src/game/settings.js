@@ -196,9 +196,9 @@ export function render (focus, tab) {
     h += row(t('авторы и лицензии'), t('титры ▸'), 'set-credits', focus);
     // ТЕСТ: «открыть все районы» — в релизе (BUILD_VERSION, __RELEASE__) нет, с ?debug — есть
     if (menu && A.unlock.on()) h += row(t('районы') + ' <small class="set-msg">' + t('для тестов') + '</small>', A.unlock.all() ? t('все открыты') : t('открыть все районы'), 'set-unlock', focus);
-    // ТЕСТ: «накинуть денег» — копилка до TEST_MONEY.TO (econ.js); перед Стимом выключить
+    // ТЕСТ «накинуть»: копилка до TEST_MONEY.TO (econ.js), все районы, машины, улучшения, звёзды; TEST_MONEY.ON: false (Стим) — кнопки нет
     if (A.cash && A.cash.on()) h += row(t('копилка') + ' <small class="set-msg">' + t('для тестов') + '</small>',
-      A.cash.wallet() >= A.cash.to ? esc(A.cash.money(A.cash.wallet())) : t('накинуть до {sum}', { sum: esc(A.cash.money(A.cash.to)) }), 'set-cash', focus);
+      A.cash.done && A.cash.done() ? t('всё открыто') : t('накинуть {sum} и открыть всё', { sum: esc(A.cash.money(A.cash.to)) }), 'set-cash', focus);
     if (menu && A.canReset()) h += '<button type="button" id="set-reset" class="set-danger"' + ('set-reset' === focus ? ' autofocus' : '') + '>' + t('сбросить прогресс') + '</button>';
     if (!menu) h += note(t('сбросить прогресс — в главном меню'));
     list.innerHTML = h;

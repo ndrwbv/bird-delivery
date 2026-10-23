@@ -23,6 +23,7 @@
    отладка: __dlv.OTAGS
    ────────────────────────────────────────────────────────────────────────── */
 import { t } from '../i18n/index.js';
+import { restart as reanim } from './reanim.js';   // толчок и посадка бирки — без принудительной раскладки
 import './ordertags.css';
 import * as NICK from './nicks.js';
 
@@ -97,7 +98,7 @@ function setMood (it, mood) {
   it.mood = mood;
   if (it.p) { const src = NICK.avatar(it.p, OTAG.FACE, mood);   // аватарка из приложения: лицо или мазня с наклейкой настроения (nicks.js)
     if (src && it.img.src !== src) it.img.src = src; }
-  if (!first) { T.stats.moods++; it.el.classList.remove('jolt'); void it.el.offsetWidth; it.el.classList.add('jolt'); }
+  if (!first) { T.stats.moods++; reanim(it.el, 'jolt'); }
 }
 
 function clearAll () {
@@ -215,7 +216,7 @@ export function anchor () {
 export function land (delay = 0.4) {
   if (!T.el) return;
   T.holdT = delay;
-  T.el.classList.remove('land'); void T.el.offsetWidth; T.el.classList.add('land');
+  reanim(T.el, 'land');
 }
 
 export const DEBUG = { T, OTAG, get items () { return T.items.map(it => ({ nm: it.nm.textContent, m: it.m.textContent, mood: it.mood, cur: it.cur, done: it.done })); } };

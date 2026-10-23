@@ -41,5 +41,5 @@ for spec in sys.argv[2:]:
         print(fam, 'clip', cn, 'frames', nF, 'fps', round(fps, 1), 'speed', round(sp, 3), 'foot x', [round(v, 3) for v in SIDE]); SIDE.clear()
         b += S(cn) + struct.pack('<I2f', nF, fps, sp) + d.astype('<f4').tobytes()
     fams.append((fam, base64.b64encode(bytes(b)).decode()))
-open(out, 'w').write('/* Добавочные клипы людей Quaternius (CC0) для qpeople.js: наклон «Interact» (поднять с земли), бег вбок «Run_Left» / «Run_Right» и кувырок «Roll» (уворот от машины, peddodge.js). Собрано tools/quaternius/clipadd.py */\nexport const QCLIPS = {\n' + '\n'.join("  %s: '%s'," % f for f in fams) + '\n};\n')
+open(out, 'w').write('/* Добавочные клипы людей Quaternius (CC0) для qpeople.js: наклон «Interact» (поднять с земли), бег вбок «Run_Left» / «Run_Right» кувырок «Roll» (уворот от машины, peddodge.js) и пинок «Kick_Right» (водитель пинает твою машину, foewreck.js). Собрано tools/quaternius/clipadd.py */\nexport const QCLIPS = {\n' + '\n'.join("  %s: '%s'," % f for f in fams) + '\n};\n')
 print('bytes', [(f, len(s)) for f, s in fams])

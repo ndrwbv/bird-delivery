@@ -1,6 +1,6 @@
 /* Подъезд (minigames/stairs.js) на весь экран: сцена — лестничная клетка изнутри (холст во весь экран, стиль — doorscene.js),
    поверх — плашки doorkit.css: часы и задание сверху, реплики слева, свёрнутая накладная в углу, строка управления внизу.
-   Кнопки ▲ ▼ ◀ ▶ 🔔 — только для пальца (внизу); гопники: «отдать „чаевые“» — всегда (это выбор). */
+   Кнопки ▲ ▼ ◀ ▶ 🔔 — только для пальца (внизу), ◀ ▶ 🔔 — только на своём этаже; гопники: «отдать „чаевые“» — всегда (это выбор). */
 .sx-cv { cursor: pointer; }
 .sx-breath[hidden] { display: none; }
 .sx-breath { display: inline-flex; align-items: center; gap: .5em; font-size: var(--pp-fs-s); color: var(--pp-label); }
@@ -21,6 +21,12 @@
 .sx-b:active { translate: 0 3px; box-shadow: 0 1px 0 var(--pp-ink); }
 .sx-b-up { flex: 2.2 1 0; background: var(--pp-lime); }
 .sx-b-ring { background: var(--pp-yellow); }
+/* ◀ ▶ 🔔 — только на своём этаже (ревью 23.10, Р23-15): на лестнице их нет, место за ними держится — ▼ ▲ не прыгают
+   под пальцем, когда добежал. Появляются плавно; в обучении первого раза — заранее, на шагах про дверь и звонок (.sx-peek) */
+.sx-bar-go .sx-b[data-a="left"], .sx-bar-go .sx-b[data-a="right"], .sx-bar-go .sx-b-ring {
+  visibility: hidden; opacity: 0; transition: opacity .18s, visibility 0s .18s; }
+.sx-bar-go:is(.sx-here, .sx-peek) .sx-b:is([data-a="left"], [data-a="right"], .sx-b-ring) {
+  visibility: visible; opacity: 1; transition: opacity .18s; }
 .sx-b-pay { flex: 2.4 1 0; background: color-mix(in srgb, var(--pp-orange) 45%, var(--pp-paper)); }
 .sx-ok .sx-bar, .sx-late .sx-bar, .sx-self .sx-bar { opacity: .35; pointer-events: none; }
 
@@ -41,5 +47,6 @@ body.calm-fx .sx-pop { animation: none; }
    подсказка Толика первого раза обрезалась (ревью 17.10). Реплики — над кнопками, шире и мельче, чтобы не лезть на задание */
 @media (max-height: 460px) {
   .sx .mk-say { bottom: 108px; width: 48%; }
+  .sx .mk-mini { bottom: 106px; }   /* свёрнутая накладная лежала под рядом кнопок (🔔 и край листа между ними) — над ним (ревью 23.10, Р23-4) */
   .sx .mk-say .mk-b p { font-size: 10px; line-height: 1.45; }
 }

@@ -739,7 +739,13 @@ html[data-map="moscow"] #radar.burn {
 .pm-rc-r { display: flex; align-items: baseline; gap: calc(var(--u) * .5); padding: calc(var(--u) * .3) 0; }
 .pm-rc-r span { color: #5a4026; }
 .pm-rc-r i { flex: 1; min-width: calc(var(--u) * 1); border-bottom: 2px dotted #b39678; transform: translateY(-.3em); }
-.pm-rc-r b { font-weight: normal; color: #33210c; }
+.pm-rc-r b { font-weight: normal; color: #33210c; white-space: nowrap; }
+/* рейтинг смены в паузе (ревью 23.10): подзаголовок бурым по пунктиру, ник — в одну строку с многоточием, твоя строка — маркером */
+.pm-rc-h { margin-top: calc(var(--u) * .5); padding: calc(var(--u) * .45) 0 calc(var(--u) * .2); border-top: 2px dashed #8a6b4e; color: #8a3b22;
+           font-size: .85em; text-transform: uppercase; letter-spacing: .08em; }
+.pm-rc-r.pm-rk span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pm-rc-r.pm-me span { color: #33210c; background: linear-gradient(transparent 45%, rgba(255, 216, 94, .75) 45%); }
+.pm-rc-r.pm-rk + .pm-rc-r:not(.pm-rk) { margin-top: calc(var(--u) * .5); padding-top: calc(var(--u) * .45); border-top: 2px dashed #8a6b4e; }
 .pm-rc-r:nth-child(3) b { color: #d9342c; }
 /* накладная: тот же лист, что у карточки заказа (.oc-*), крупно, чуть наискосок */
 #pm-order { position: relative; padding: calc(var(--u) * .4) calc(var(--u) * 1.8) calc(var(--u) * 1.8); background: #fff3d6; color: #33210c;

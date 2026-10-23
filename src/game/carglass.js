@@ -65,10 +65,14 @@ function tex (tint) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   const m = new THREE.MeshBasicMaterial({ map: t, transparent: true, side: THREE.DoubleSide, depthWrite: false });
+  m.userData.shared = true;                       // общий на все машины со стёклами (своя, подробные копии чужих — foewreck.js): не освобождать
   TEX.set(k, m);
   return m;
 }
 
+/* материал стёкол (целое | в трещинах — две клетки картинки): трещины на стёклах автобусов и грузовиков (foewreck.js) —
+   та же программа, что у стёкол салона */
+export const glassMat = tint => tex(!!tint);
 /* салон вместо сплошной коробки: зовёт makeCar (game.js) при opts.see.
    add — в склейку кузова; k: S, W, top, cy, gh, frame, tint, dy. Возвращает состояние стёкол */
 export function cabin (g, add, k) {
@@ -91,13 +95,19 @@ export function cabin (g, add, k) {
   B(W - 0.34, 0.1, 0.28, '#26252a', 0, gb + 0.05, cf - 0.2);
   const dz = cf - Math.min(0.78, S.cab * 0.38);                          // где сидит водитель (от лобового)
   for (const sx of [-1, 1]) B(0.42, 0.12, 0.1, '#3a3640', sx * W * 0.22, gb + 0.06, dz - 0.2);   // низкие: курьера сзади не закрывают
-  // курьер слева (водитель — слева по ходу, +x): плечи в куртке, голова, кепка с козырьком, руки к рулю
+  // курьер слева (водитель — слева по ходу, +x): плечи в куртке, голова, кепка с козырьком, руки к рулю.
+  // Чужая машина (foewreck.js, k.drv): водитель в своей одежде, без кепки — своим мешем (k.drvAdd): вышел — его не видно
   const q = Math.min(1, gh / 0.42), dx = W * 0.22, by = gb - 0.1;   // сидит пониже: сверху-сбоку голову не прячет верх рамы
-  B(0.42 * q, 0.2 * q, 0.26 * q, '#f0522a', dx, by + 0.1 * q, dz);                       // плечи
-  B(0.2 * q, 0.19 * q, 0.2 * q, '#e2b48c', dx, by + 0.29 * q, dz + 0.01);                // голова
-  B(0.22 * q, 0.06 * q, 0.22 * q, '#f0522a', dx, by + 0.41 * q, dz);                     // кепка
-  B(0.2 * q, 0.025 * q, 0.11 * q, '#c93f1f', dx, by + 0.39 * q, dz + 0.15 * q);          // козырёк
-  for (const s of [-1, 1]) B(0.07 * q, 0.07 * q, 0.3 * q, '#f0522a', dx + s * 0.15 * q, by + 0.14 * q, dz + 0.17 * q);   // руки
+  const Dv = k.drv, DB = Dv && k.drvAdd ? (w, h, d, hex, x, y, z) => k.drvAdd(new THREE.BoxGeometry(w, h, d), hex, x, y, z) : B;
+  const JK = Dv ? Dv.shirt : '#f0522a', SK = Dv ? Dv.skin : '#e2b48c';
+  DB(0.42 * q, 0.2 * q, 0.26 * q, JK, dx, by + 0.1 * q, dz);                             // плечи
+  DB(0.2 * q, 0.19 * q, 0.2 * q, SK, dx, by + 0.29 * q, dz + 0.01);                      // голова
+  if (Dv) DB(0.21 * q, 0.05 * q, 0.21 * q, Dv.hair, dx, by + 0.4 * q, dz - 0.01);        // волосы
+  else {
+    B(0.22 * q, 0.06 * q, 0.22 * q, '#f0522a', dx, by + 0.41 * q, dz);                   // кепка
+    B(0.2 * q, 0.025 * q, 0.11 * q, '#c93f1f', dx, by + 0.39 * q, dz + 0.15 * q);        // козырёк
+  }
+  for (const s of [-1, 1]) DB(0.07 * q, 0.07 * q, 0.3 * q, JK, dx + s * 0.15 * q, by + 0.14 * q, dz + 0.17 * q);   // руки
   B(0.26 * q, 0.26 * q, 0.03, '#1b1a1f', dx, by + 0.17 * q, dz + 0.36 * q);              // руль
 
   // стёкла: четыре квадрата одним мешем (вершины и UV на стекло — 4 подряд)
@@ -185,6 +195,12 @@ function lampsOf (car) {
   if (ud.lamps) return ud.lamps;
   const hl = ud.hl || 2, C = {}, v = new THREE.Vector3();
   const at = k => C[k] || (C[k] = { k, st: 0, n: 0, x: 0, y: 0, z: 0, parts: [] });
+  // настоящая модель (realcar.js): фары и фонари — по её местам; гаснут сами пиксели модели (carlights.js kill)
+  const RP = ud.real && ud.real.lampPts;
+  if (RP) {
+    for (const k in RP) { const c = at(k); c.x = RP[k][0]; c.y = RP[k][1]; c.z = RP[k][2]; c.n = 1; }
+    return (ud.lamps = C);
+  }
   const hz = ud.hazard || [];
   for (const m of car.children) {
     if (!m.isMesh || !m.material || !m.material.isMeshBasicMaterial || hz.includes(m)) continue;

@@ -68,6 +68,36 @@ const inPoly = (P, x, z) => {
   }
   return c;
 };
+/* то же inPoly для большого пруда: рёбра — полосами по z (s.zb, при первом вопросе). Ребро меняет «внутри» только если
+   z между его концами — значит, лежит в полосе точки; остальные проверять не надо, ответ тот же. wet() зовут на каждую
+   клетку двора (yardfill.js), у пруда — сотни вершин */
+function inPolyS (s, x, z) {
+  const P = s.p, n = P.length;
+  if (n < 24) return inPoly(P, x, z);
+  let B = s.zb;
+  if (!B) {
+    let z0 = Infinity, z1 = -Infinity;
+    for (const q of P) { if (q[1] < z0) z0 = q[1]; if (q[1] > z1) z1 = q[1]; }
+    const nb = Math.max(1, Math.min(256, n >> 1)), h = Math.max(1e-3, (z1 - z0) / nb);
+    const e = Array.from({ length: nb }, () => []);
+    for (let i = 0, k = n - 1; i < n; k = i++) {
+      const a = Math.min(P[i][1], P[k][1]), b = Math.max(P[i][1], P[k][1]);
+      if (a === b) continue;                         // ровно по z — «внутри» не меняет никогда
+      const b0 = Math.max(0, Math.floor((a - z0) / h)), b1 = Math.min(nb - 1, Math.floor((b - z0) / h));
+      for (let q = b0; q <= b1; q++) e[q].push(i);
+    }
+    B = s.zb = { z0, z1, h, nb, e };
+  }
+  if (!(z >= B.z0 && z < B.z1)) return false;      // выше и ниже всех вершин — ни одно ребро не пересекает
+  const L = B.e[Math.min(B.nb - 1, Math.floor((z - B.z0) / B.h))];
+  let c = false;
+  for (let q = 0; q < L.length; q++) {
+    const i = L[q], k = i === 0 ? n - 1 : i - 1;
+    const xi = P[i][0], zi = P[i][1], xk = P[k][0], zk = P[k][1];
+    if ((zi > z) !== (zk > z) && x < xi + (z - zi) / (zk - zi) * (xk - xi)) c = !c;
+  }
+  return c;
+}
 /* расстояние до берега пруда, не дальше cap (дальше — cap): рёбра — сеткой по EG м, смотрим 3×3 клетки */
 const EG = 36;
 function shoreD (P, x, z, cap = EG) {
@@ -362,7 +392,7 @@ export function wet (x, z, m = 0) {
     if (s.p) {
       const b = s.bb;
       if (x < b.x0 - m || x > b.x1 + m || z < b.z0 - m || z > b.z1 + m) continue;
-      if (inPoly(s.p, x, z) || (m > 0 && shoreD(s, x, z, m) < m)) return true;
+      if (inPolyS(s, x, z) || (m > 0 && shoreD(s, x, z, m) < m)) return true;
     } else if (segD(x, z, s[0], s[1], s[2], s[3]) < s[4] + CFG.BANK + m) return true;
   }
   return false;

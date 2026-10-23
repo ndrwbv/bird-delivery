@@ -264,7 +264,7 @@ function addonActs (c) {
   const cash = D.A.wallet(), money = D.A.money, C = D.cars(), adult = !C || !C.adult || C.adult();
   let h = '';
   for (const [kind, name, gain, on1] of [
-    ['wings', t('крылья'), t('полёт {s} с, раз в {cd} с', { s: WINGS.HOLD, cd: WINGS.CD }), t('стоят')],
+    ['wings', t('ракеты'), t('полёт {s} с, раз в {cd} с', { s: WINGS.HOLD, cd: WINGS.CD }), t('стоят')],
     ['gun', adult ? t('гранатомёт на крыше') : t('водомёт на крыше'), adult ? t('сам бьёт конкурентов') : t('сам глушит конкурентов'), t('стоит · {n} на смену', { n: GUN.AMMO })],
   ]) {
     if (kind === 'wings' && c.fly) continue;

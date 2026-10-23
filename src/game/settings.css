@@ -65,6 +65,7 @@
 #panel[data-kind="settings"] .set-tag { color: var(--pp-rust); }
 #panel[data-kind="settings"] .set-msg { color: var(--pp-money); }
 .set-list .set-rows { display: flex; flex-direction: column; }
+.set-list .set-rows .set-aa-n { grid-column: 1 / -1; }   /* пояснение под строками графики — во всю ширину и в две колонки */
 /* ползунки громкости (звук): линейка анкеты — чернильная рамка, жёлтая заливка до значения, ручка — оранжевый брусок */
 .set-sl { flex: 0 1 calc(var(--u) * 17); min-width: min(100%, calc(var(--u) * 11)); display: flex; align-items: center; gap: calc(var(--u) * .6); cursor: pointer; }
 .set-sl b { flex: none; min-width: 3.6em; text-align: right; font-weight: normal; font-size: calc(var(--u) * .95); color: var(--pp-ink); }

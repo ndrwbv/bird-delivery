@@ -9,6 +9,7 @@
    Анимация — Web Animations (только transform/opacity), без работы в кадре.
    Видно только во время смены (не в свободной езде и не в меню). */
 import './shiftcash.css';
+import { restart as reanim } from './reanim.js';   // вспышка числа — без принудительной раскладки
 
 const UP_T = 1.1;          // «+сумма» всплывает столько секунд
 const MIN = 1;             // меньше — не всплывает (копейки от округления)
@@ -186,7 +187,7 @@ function pop (d) {
   e.textContent = (d > 0 ? '+' : '−') + A.money(Math.abs(d));
   EL.appendChild(e);
   setTimeout(() => e.remove(), UP_T * 1000);
-  EL.classList.remove('bump', 'hurt'); void EL.offsetWidth; EL.classList.add(d > 0 ? 'bump' : 'hurt');
+  reanim(EL, d > 0 ? 'bump' : 'hurt', 'bump', 'hurt');
 }
 
 /* отладка: что сейчас на хаде; flying — сколько купюр в воздухе, pend — сколько денег ещё летит */

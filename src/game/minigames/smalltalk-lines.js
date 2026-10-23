@@ -7,7 +7,7 @@
      angry_granny kind_granny snitch_granny kind_oldman_cat lonely_oldman bettor alcoholic_onearm hikan corrupt_cop gopnik
      dandy_coffee alien shy_burger bandit90s taxi oppositionist oppositionist_wife massage prostitute twofaced_patriot
      zozh_blogger kind_auntie happy_dad fake_nice tired_mom henpecked sweatsuit_noleg student drunk_neighbor conspiracist
-     blogger fisher jock car_guy normis
+     blogger fisher jock car_guy party_host normis
 
    Встреча (единый формат): { id, who, adult?, emo, say, a, b, kids? }
      who   — кто это (ключ WHO ниже): внешность портрета, пол (глаголы в роде), подсказка для 3D-сцены подъезда;
@@ -101,6 +101,8 @@ export const WHO = {
               look: { age: 'young', hair: 'buzz', beard: 'none' } },
   car_guy:      { name: 'мужик с машиной', fem: false, home: 'запчасти на балконе, карбюратор на кухне',
               look: { beard: 'mustache', head: 'cap', headC: '#2e4a6b' } },
+  party_host:   { name: 'хозяин вечеринки (Макс, docs/lore/east.md)', fem: false, home: 'музыка, толпа, гирлянды, гавайки',
+              look: { age: 'young', mouth: 'smile', brows: 'raised' } },
 };
 
 export const SITS = [
@@ -280,6 +282,11 @@ export const SITS = [
     say: N_('Братан! Выпьем за пиццу! За круглую!'),
     a: { me: N_('Я за рулём'), re: N_('А я за всех. За тебя!'), mood: 'happy', out: 'tip' },
     b: { me: N_('Наливай'), re: N_('Нету. Выпил. Иди.'), mood: 'sad', out: '0', slam: true } },
+  { id: 'party', who: 'party_host', emo: 'happy', when: ['evening', 'night'],   // 12аз, текст автора 23.10.2026
+    say: N_('У нас тут вечеринка, сосед в больничку уехал с камнями в почках. Заебал орать в толчке уже'),
+    kids: { say: N_('У нас тут вечеринка, сосед в больничку уехал — громко очень было') },
+    a: { me: N_('Здоровья ему'), re: N_('Ему? Нам! Тишина наконец. На, за праздник.'), mood: 'happy', out: 'tip' },
+    b: { me: N_('Может, навестите?'), re: N_('Навестим. Когда пицца кончится. Пока.'), mood: 'ok', out: '0', slam: true } },
   { id: 'inlaw', who: 'henpecked', emo: 'scared', adult: true,
     say: N_('Слышь, зайди, а? Тёща приехала. Одному — пиздец.'),
     a: { me: N_('Держитесь'), re: N_('Держусь. Девятый день.'), mood: 'sad', out: 'tip' },

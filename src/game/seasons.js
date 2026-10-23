@@ -344,7 +344,7 @@ function Pile (CH = CELL) {                      // CH — клетка скле
   }
   function room (c, add) {
     if (c.n + add <= c.cap) return;
-    while (c.n + add > c.cap) c.cap *= 2;
+    while (c.n + add > c.cap) c.cap = Math.ceil(c.cap * 1.5);   // запас ×1,5 (был ×2: на телефоне ~28 МБ пустого из 90 к пику поздней сборки, 23.10.2026)
     const p = new Float32Array(c.cap * 3), cc = new Uint8Array(c.cap * 3), a = new Uint8Array(c.cap * 4);
     p.set(c.p); cc.set(c.c); a.set(c.a);
     c.p = p; c.c = cc; c.a = a;
@@ -403,6 +403,18 @@ function Pile (CH = CELL) {                      // CH — клетка скле
     },
     cells: () => cells,
     clear () { cells.clear(); byNum.clear(); },
+    /* клетку уже переложили в склейку (jointSteps): её массивы — вон сразу, а не после всех клеток (на телефоне исходники
+       деревьев и сугробов ~150 МБ жили рядом с готовыми склейками — пик поздней сборки, 23.10.2026) */
+    drop (k) {
+      const c = cells.get(k);
+      if (!c) return;
+      cells.delete(k);
+      const [i, j] = k.split(',').map(Number);
+      byNum.delete((i + 50000) * 100000 + j + 50000);
+      c.p = c.c = c.a = null; c.n = c.cap = 0;
+    },
+    /* память клеток (отладка): МБ занято массивами / из них вершинами */
+    mem () { let cap = 0, used = 0; for (const c of cells.values()) { cap += c.cap * 10; used += c.n * 10; } return { cells: cells.size, cap: +(cap / 1048576).toFixed(1), used: +(used / 1048576).toFixed(1) }; },
   };
 }
 function dropArr () { this.array = null; }
@@ -414,6 +426,24 @@ function dropArr () { this.array = null; }
    они идут в начале клетки, и после загрузки в видеокарту в памяти JS остаётся только их кусок позиций (как раньше —
    их отдельные массивы), а не вся клетка с деревьями. Ответ: меши и для каждой склейки — сдвиг её вершин в клетке
    (offs[i].get(ключ клетки) — прибавить к v0 записи). */
+/* computeBoundingSphere + computeBoundingBox одним проходом по массиву (те же числа, что у three.js: центр — середина рамки,
+   радиус — до самой дальней вершины): у three.js — через Vector3 на вершину, на Деке ~0,2 с за склейку сугробов */
+function bounds (g) {
+  const a = g.attributes.position.array, n = a.length;
+  if (!n) { g.computeBoundingSphere(); g.computeBoundingBox(); return; }
+  let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+  for (let i = 0; i < n; i += 3) {
+    const x = a[i], y = a[i + 1], z = a[i + 2];
+    if (x < x0) x0 = x; if (x > x1) x1 = x;
+    if (y < y0) y0 = y; if (y > y1) y1 = y;
+    if (z < z0) z0 = z; if (z > z1) z1 = z;
+  }
+  const cx = (x0 + x1) * 0.5, cy = (y0 + y1) * 0.5, cz = (z0 + z1) * 0.5;
+  let r2 = 0;
+  for (let i = 0; i < n; i += 3) { const dx = cx - a[i], dy = cy - a[i + 1], dz = cz - a[i + 2], d = dx * dx + dy * dy + dz * dz; if (d > r2) r2 = d; }
+  g.boundingSphere = new THREE.Sphere(new THREE.Vector3(cx, cy, cz), Math.sqrt(r2));
+  g.boundingBox = new THREE.Box3(new THREE.Vector3(x0, y0, z0), new THREE.Vector3(x1, y1, z1));
+}
 function* jointSteps (piles, mat, nKeep) {
   const keys = new Set();
   for (const P of piles) for (const k of P.cells().keys()) keys.add(k);
@@ -434,10 +464,11 @@ function* jointSteps (piles, mat, nKeep) {
       offs[pi].set(k, o);
       o += c.n;
     }
+    for (const P of piles) P.drop(k);
     const g = new THREE.BufferGeometry();
     const pa = new THREE.BufferAttribute(pp, 3), ca = new THREE.BufferAttribute(cc, 3, true), xa = new THREE.BufferAttribute(aa, 4, true);
     g.setAttribute('position', pa); g.setAttribute('color', ca); g.setAttribute('aux', xa);
-    g.computeBoundingSphere(); g.computeBoundingBox();
+    bounds(g);
     ca.onUpload(dropArr); xa.onUpload(dropArr);
     pa.onUpload(nk ? keepHead(nk * 3) : dropArr);
     const m = new THREE.Mesh(g, mat);
@@ -532,6 +563,8 @@ const BUILT = { trees: 0, pile: 0, garl: 0, drifts: 0, bulbs: 0, items: 0 };
 /* ctx: THREE, scene, cam, renderer, Store, MAP, CITY, V, S, groundH, curbAt, nearestRoad, roadWidth, drivable,
    inHouse, inPoly, inBounds, put, smashAdd, SMASH, SMASH_MAT, LAMP_SPOTS, ZEBRAS, NODE_IDX, nodeDeg,
    makeHuman, dropMesh, gibHuman, toast, Snd, CAR_L, CAR_W, isPlaying, sayBubble; геттеры: PIZZA, ENV, rainLines, hemi */
+/* память склеек до их сборки (отладка, __dlv.SEASMEM) */
+export const pileMem = () => ({ pile: PILE && PILE.mem(), drift: DRIFTP && DRIFTP.mem(), leaf: LEAFP && LEAFP.mem(), garl: GARL && GARL.mem() });
 export function initSeasons (ctx) {
   C = ctx; THREE = ctx.THREE;
   const q = new URLSearchParams(location.search).get('season');

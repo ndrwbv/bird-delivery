@@ -85,10 +85,17 @@ function dropProp (m) {
 
 /* ── компания на лавочке ── */
 const SEAT = [[-0.5, 0], [0.5, 0], [0.95, 0.9]];       // вдоль лавочки, вперёд: двое сидят, третий стоит сбоку
+/* компания садится по одному человеку за кадр (step): человек собирается на Деке 2—4 мс, трое разом — шаг до 7 мс */
 function spawn (s) {
-  const b = s.b, ax = Math.cos(b.ry), az = -Math.sin(b.ry), fx = Math.sin(b.ry), fz = Math.cos(b.ry);
   s.people = [];
-  for (let i = 0; i < s.n; i++) {
+  s.pend = [];
+  for (let i = 0; i < s.n; i++) s.pend.push(i);
+  s.prop = placeProp(s.b);
+  s.live = true;
+}
+function seatOne (s, i) {
+  const b = s.b, ax = Math.cos(b.ry), az = -Math.sin(b.ry), fx = Math.sin(b.ry), fz = Math.cos(b.ry);
+  {
     const [u, f] = s.n === 1 && i === 0 ? [0, 0] : SEAT[i];
     const x = b.x + ax * u + fx * f, z = b.z + az * u + fz * f;
     const person = A.makePerson({ seed: ((hash(b.x, b.z, 20 + i) * 4294967295) >>> 0) + s.gen });
@@ -103,12 +110,10 @@ function spawn (s) {
     A.scene.add(grp);
     s.people.push(p);
   }
-  s.prop = placeProp(b);
-  s.live = true;
 }
 function despawn (s) {
   for (const p of s.people) A.dropMesh(p.grp);
-  s.people = [];
+  s.people = []; s.pend = null;
   dropProp(s.prop); s.prop = null;
   s.live = false;
 }
@@ -210,8 +215,10 @@ export function step (dt) {
       else if (s.live && s.b.prop && s.b.prop.down && !s.scat) scatter(s);
     }
   }
+  let seated = false;
   for (const s of SPOTS) {
     if (!s.live) continue;
+    if (!seated && s.pend && s.pend.length && !s.scat) { seated = true; seatOne(s, s.pend.shift()); }   // один человек за кадр
     if (s.scat) { scatStep(s, dt); continue; }
     for (const p of s.people) {
       if (p.dead) continue;

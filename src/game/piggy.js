@@ -12,6 +12,7 @@
 
      init({ el, money, wallet, S, shiftOn, playing }) — el — #money; step(dt) — каждый кадр */
 import { heat, FLY_COIN, PIGGY } from './shiftcash.js';
+import { restart as reanim } from './reanim.js';   // вспышка числа — без принудительной раскладки
 
 const FLY = { T: 0.65, SPREAD: 0.25, OUT: 0.8 };   // полёт монеты в свинью / из неё, с
 const UP_T = 1.1;
@@ -128,7 +129,7 @@ function pop (d) {
   e.textContent = (d > 0 ? '+' : '−') + A.money(Math.abs(d));
   EL.appendChild(e);
   setTimeout(() => e.remove(), UP_T * 1000);
-  EL.classList.remove('bump', 'hurt'); void EL.offsetWidth; EL.classList.add(d > 0 ? 'bump' : 'hurt');
+  reanim(EL, d > 0 ? 'bump' : 'hurt', 'bump', 'hurt');
 }
 
 function clearFly () {

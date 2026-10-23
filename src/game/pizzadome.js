@@ -4,8 +4,8 @@
    Пиццерия — не первый этаж жилого дома, а отдельное здание: полусфера-купол
    в цветах логотипа (бордовый #3d0d01 / #5a1608, оранжевый, светлая обводка
    #ffb347) — DOME.R = 9 м (18 м в поперечнике, 9 м высотой) на низком светлом
-   цоколе DOME.PLINTH = 0,45 м. Купол — 12 долек двух оранжевых тонов без тёмных
-   полос, светлая макушка со светящимся ободком; на ней сидит большая птица из
+   цоколе DOME.PLINTH = 0,45 м. Купол — 12 долек двух бордовых тонов (#6e1a0b / #5a1608,
+   с 23.10.2026; были оранжевые) без тёмных полос, светлая макушка со светящимся ободком; на ней сидит большая птица из
    логотипа (DOME.BIRD = 1,3 → ~7 м, верх — ~17 м над землёй) с куском пиццы в
    лапе: одна сетка, голова и крылья двигаются в шейдере.
    • Окна — 14: круги-«пепперони» и 2 дольки пиццы (0,75—1,35 м) на разной
@@ -60,6 +60,8 @@ export const DOME = { R: 9, PLINTH: 0.45, BIRD: 1.3, GAP: [2, 12], SEARCH: 200, 
 
 /* цвета логотипа (src/styles/paper.css --brand-*) */
 const BRD = '#3d0d01', BRD2 = '#5a1608', ORANGE = '#ff9636', ORANGE2 = '#ffae52', GLOW = '#ffb347', CREAM = '#ffe3b0';
+// купол — бордовый бренда (автор 21.10): дольки двух тонов, светлее фона логотипа (#3d0d01) — на свету не уходит в чёрный
+const DOME1 = '#6e1a0b', DOME2 = '#5a1608';
 const DOMES = [];                       // { x, z, R, base, gy, bird, ry, dist, sign, letters, signGlow, road, free, extra, porch, ring }
 let DOME_MAT = null, BIRD_MAT = null, BIRD_GEO = null, WIN_MAT = null;
 const ST = { tries: 0, ms: 0, night: -1, t: 0 };
@@ -341,7 +343,7 @@ function domeGeo (R) {
     const x = (p.getX(i) + p.getX(i + 1) + p.getX(i + 2)) / 3, y = (p.getY(i) + p.getY(i + 1) + p.getY(i + 2)) / 3, z = (p.getZ(i) + p.getZ(i + 1) + p.getZ(i + 2)) / 3;
     const el = Math.asin(Math.min(1, y / R)) * 180 / Math.PI, az = (Math.atan2(x, z) + Math.PI * 2) % (Math.PI * 2);
     const gore = Math.floor(az / (Math.PI / 6));
-    c.set(el > 79 ? CREAM : gore % 2 ? ORANGE2 : ORANGE);
+    c.set(el > 79 ? CREAM : gore % 2 ? DOME2 : DOME1);
     for (let k = 0; k < 3; k++) { col[(i + k) * 3] = c.r; col[(i + k) * 3 + 1] = c.g; col[(i + k) * 3 + 2] = c.b; }
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -349,7 +351,8 @@ function domeGeo (R) {
   return g;
 }
 
-/* птица с логотипа: перёд — +Z, лапы — y = 0. part: 1 — голова, 2/3 — левое/правое крыло */
+/* птица с логотипа: тёплое оранжевое тело, хвост, хохолок и тёмные перья крыльев — бордово-красные, как тени на логотипе
+   (23.10.2026: купол бордовый — птица не сливается: тело светлее купола, светлая кромка крыльев). Перёд — +Z, лапы — y = 0. part: 1 — голова, 2/3 — левое/правое крыло */
 const B_HEAD = new THREE.Vector3(0, 3.25, 0.45), B_WING = new THREE.Vector3(1.0, 2.85, -0.15);
 function birdGeo () {
   if (BIRD_GEO) return BIRD_GEO;
@@ -362,7 +365,7 @@ function birdGeo () {
   // тело, брюхо, хвост
   piece(ball(8), '#f26c2c', 0, [0, 2.15, 0], [-0.35, 0, 0], [1.3, 1.55, 1.65]);
   piece(ball(7), '#ffb650', 0, [0, 1.95, 0.62], [-0.3, 0, 0], [0.95, 1.2, 1.15]);
-  for (const [a, l, hex] of [[-0.42, 2.1, '#a8341a'], [0, 2.4, '#c8481e'], [0.42, 2.1, '#a8341a']])
+  for (const [a, l, hex] of [[-0.42, 2.1, '#8a2214'], [0, 2.4, '#b3361a'], [0.42, 2.1, '#8a2214']])
     piece(new THREE.BoxGeometry(0.62, 0.16, l).translate(0, 0, -l / 2), hex, 0, [0, 1.25, -1.25], [-0.55, a, 0], [1, 1, 1], 'YXZ');
   // лапы: левая стоит, правая держит кусок пиццы перед грудью
   for (const s of [1, -1]) {
@@ -389,12 +392,12 @@ function birdGeo () {
     piece(ball(5), '#1b1a1f', 1, [0.56 * s, 4.15, 1.48], [0, 0, 0], [0.15, 0.17, 0.12]);
   }
   for (const [y, z, a, h] of [[4.75, 0.65, -0.45, 0.9], [4.6, 0.25, -0.8, 0.75], [4.35, -0.05, -1.1, 0.6]])
-    piece(new THREE.ConeGeometry(0.2, h, 4), '#c2401b', 1, [0, y, z], [a, 0, 0]);
+    piece(new THREE.ConeGeometry(0.2, h, 4), '#9a2616', 1, [0, y, z], [a, 0, 0]);
   // крылья «галочкой», как на логотипе: веер перьев от плеча вверх и назад
   for (const s of [1, -1]) {
     const part = s > 0 ? 2 : 3, px = B_WING.x * s;
     piece(ball(6), '#d9541f', part, [px + 0.25 * s, B_WING.y + 0.1, B_WING.z], [0, 0, 0.6 * s], [0.75, 0.45, 0.85]);
-    const F = [[0.72, 2.4, 0.1, '#f08a2a'], [0.92, 2.9, 0.22, '#c2401b'], [1.1, 3.1, 0.34, '#e8762a'], [1.27, 2.8, 0.46, '#a8341a'], [1.42, 2.3, 0.58, '#c2401b']];
+    const F = [[0.72, 2.4, 0.1, '#f08a2a'], [0.92, 2.9, 0.22, '#a82a16'], [1.1, 3.1, 0.34, '#e8762a'], [1.27, 2.8, 0.46, '#8a2214'], [1.42, 2.3, 0.58, '#a82a16']];
     for (const [a, l, sw, hex] of F)
       piece(new THREE.BoxGeometry(l, 0.15, 0.62).translate(l / 2, 0, 0).scale(s, 1, 1), hex, part, [px, B_WING.y, B_WING.z], [0, sw * s, a * s], [1, 1, 1], 'YZX');
     // светлая кромка, как обводка на логотипе
@@ -599,7 +602,7 @@ export function build (A, f, opt = {}) {
   // цоколь: светлый, уходит в землю на SLOPE — на склоне купол не висит
   put(LIT, new THREE.CylinderGeometry(R + 0.35, R + 0.5, PL + D.SLOPE, 32), '#f1e2c4', cx, gy + (PL - D.SLOPE) / 2, cz);
 
-  // купол: дольки двух оранжевых тонов, светлая макушка; ночью светится своим цветом; снег — как у города (seasons.js)
+  // купол: бордовые дольки двух тонов, светлая макушка; ночью светится своим цветом; снег — как у города (seasons.js)
   if (!DOME_MAT) { const m = seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, emissive: '#ffffff', emissiveIntensity: DAYGLOW }), 0.4); DOME_MAT = glowOwn(m, 'season0.4dome', m.onBeforeCompile); }
   const G0 = ry + 15 * deg;                                    // дольки — от входа: перёд — середина дольки
   A.scene.add(new THREE.Mesh(domeGeo(R).rotateY(G0).translate(cx, cy, cz), DOME_MAT));

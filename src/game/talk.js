@@ -117,6 +117,9 @@ export function track (s, vip) {
   if (!s.userData.talk) s.position.y -= TALK.LIFT;
   s.userData.talk = 1;
   s.material.depthTest = false; s.material.transparent = true;
+  // трафарет 1 — «мягкие края» (fxaa.js, dynres.js) обходят облачко: буквы остаются чёткими (это состояние GL, не новый шейдер)
+  s.material.stencilWrite = true; s.material.stencilRef = 1; s.material.stencilFunc = THREE.AlwaysStencilFunc;
+  s.material.stencilZPass = THREE.ReplaceStencilOp; s.material.stencilFail = s.material.stencilZFail = THREE.KeepStencilOp;
   s.renderOrder = 30;
   s.visible = false;                               // покажет step(), когда решит, что можно
   LIVE.add(s);

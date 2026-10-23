@@ -37,6 +37,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import * as GFX from './gfx.js';
 import * as TUNE from './tune.js';
+import * as FXAA from './fxaa.js';
 
 export const LV = [1, 0.85, 0.72, 0.6];       // ступени: доля разрешения по стороне
 const HI = 0.9, FIT = 0.8, UP_FIT = 0.75;     // доли бюджета: «тяжёлый», спуск — влезть, подъём — влезть с запасом
@@ -51,10 +52,11 @@ let checkAt = 0, before = 0, after = [], fails = 0, offUntil = 0;   // пров�
 let win = 0;
 const hv = [];                                // без таймера: последние долгие промежутки, мс
 export const STATS = { timer: false, gpu: [], k: [], cpuMax: [0, 0],   // cpuMax — самое долгое: до отрисовки / после (мс процессора)
-  downs: 0, ups: 0, useless: 0, frames: 0, low: 0, disjoint: 0 };
-export const DEBUG = { force: null, timing: false, sink: null, noTimer: false, pin: null, trace: null };
+  downs: 0, ups: 0, useless: 0, frames: 0, low: 0, disjoint: 0, edge: 0 };   // edge — кадров с «мягкими краями» (fxaa.js)
+export const DEBUG = { force: null, timing: false, sink: null, noTimer: false, pin: null, trace: null, edge: null, edgePlain: false };
 /* force: true/false — включить/выключить мимо настройки; timing — мерить и выключенным; sink — массив: класть туда каждый
-   замер видеокарты (мс); noTimer — вести себя, как будто таймера нет (проверка запасного пути); pin — держать ступень 0…3 (кадр для глаз) */
+   замер видеокарты (мс); noTimer — вести себя, как будто таймера нет (проверка запасного пути); pin — держать ступень 0…3 (кадр для глаз);
+   edge: true/false — «мягкие края» (fxaa.js) вкл/выкл мимо настройки; edgePlain — вместо сглаживания простая копия (замер: сколько стоит сама копия) */
 
 export function init (hooks) {
   H = hooks || {};
@@ -82,6 +84,9 @@ const budget = () => { const f = GFX.fpsCap(); return 1000 / Math.min(f || 60, 6
    (copyTexSubImage2D), и текстура растягивается на весь холст одним треугольником с мягкой выборкой —
    это и есть «мыло». Копия и растяжка — ~0,1—0,3 мс видеокарты на кадр, только пока разрешение снижено. */
 let tex = null, texW = 0, texH = 0, prog = null, vao = null, uS = null, uM = null, vw = 0, vh = 0, low = false, bad = false;
+/* «мягкие края» (fxaa.js): своя программа по тому же треугольнику и той же текстуре; не собралась — без краёв */
+let progA = null, aS = null, aM = null, aP = null, badA = false;
+const edgeOn = () => !badA && (DEBUG.edge !== null ? DEBUG.edge : GFX.edge());
 const VS = '#version 300 es\nout vec2 v; void main () { vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2)); v = p; gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }';
 const FS = '#version 300 es\nprecision mediump float; uniform sampler2D t; uniform vec2 s, m; in vec2 v; out vec4 o; void main () { o = vec4(texture(t, min(v * s, m)).rgb, 1.0); }';
 function glInit () {
@@ -91,6 +96,11 @@ function glInit () {
   gl.linkProgram(prog);
   if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { bad = true; return; }   // не собралась — дальше без «мыла»
   uS = gl.getUniformLocation(prog, 's'); uM = gl.getUniformLocation(prog, 'm');
+  progA = gl.createProgram();
+  gl.attachShader(progA, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(progA, sh(gl.FRAGMENT_SHADER, FXAA.FS));
+  gl.linkProgram(progA);
+  if (!gl.getProgramParameter(progA, gl.LINK_STATUS)) { badA = true; progA = null; }
+  else { aS = gl.getUniformLocation(progA, 's'); aM = gl.getUniformLocation(progA, 'm'); aP = gl.getUniformLocation(progA, 'px'); }
   vao = gl.createVertexArray();
   tex = gl.createTexture(); texW = texH = 0;
 }
@@ -104,7 +114,7 @@ function texFit () {
   texW = W; texH = Hh;
   H.renderer.resetState();
 }
-function glDrop () { prog = vao = tex = null; texW = texH = 0; }
+function glDrop () { prog = progA = vao = tex = null; texW = texH = 0; }
 /* перед отрисовкой сцены: снижено — рисуем в угол */
 function lowBegin () {
   low = false;
@@ -116,9 +126,18 @@ function lowBegin () {
   H.renderer.setViewport(0, 0, vw, vh);
   low = true;
 }
-/* после: угол — в текстуру, текстуру — на весь холст; состояние three.js — сбросить, viewport — обратно */
+/* после: угол (или, с «мягкими краями», весь кадр) — в текстуру, текстуру — на весь холст: растяжкой или сглаживанием
+   краёв (fxaa.js); состояние three.js — сбросить, viewport — обратно */
 function lowEnd () {
-  if (!low) return;
+  const ed = edgeOn() && !bad && gl && !gl.isContextLost();
+  if (!low && !ed) return;
+  if (!low) {                                     // полное разрешение, только края
+    if (!prog) { glInit(); if (bad || badA) return; }   // после потери контекста
+    const W0 = gl.drawingBufferWidth, H0 = gl.drawingBufferHeight;
+    if (W0 !== texW || H0 !== texH) texFit();
+    vw = W0; vh = H0;
+  }
+  const full = !low;                              // кадр в полном разрешении: облачка с текстом (talk.js, трафарет 1) края не трогают
   low = false;
   const R = H.renderer, W = texW, Hh = texH;
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -128,8 +147,17 @@ function lowEnd () {
   gl.viewport(0, 0, W, Hh);
   gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE); gl.disable(gl.SCISSOR_TEST); gl.disable(gl.STENCIL_TEST);
   gl.colorMask(true, true, true, true);
-  gl.useProgram(prog);
-  gl.uniform2f(uS, vw / W, vh / Hh); gl.uniform2f(uM, (vw - 0.5) / W, (vh - 0.5) / Hh);
+  if (ed && full) {                               // буквы облачков — как есть: FXAA их мылит (трафарет пишут облачка, talk.js track)
+    gl.enable(gl.STENCIL_TEST); gl.stencilFunc(gl.NOTEQUAL, 1, 0xff); gl.stencilMask(0); gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
+  }
+  if (ed && !DEBUG.edgePlain) {
+    gl.useProgram(progA);
+    gl.uniform2f(aS, vw / W, vh / Hh); gl.uniform2f(aM, (vw - 0.5) / W, (vh - 0.5) / Hh); gl.uniform2f(aP, 1 / W, 1 / Hh);
+    STATS.edge++;
+  } else {
+    gl.useProgram(prog);
+    gl.uniform2f(uS, vw / W, vh / Hh); gl.uniform2f(uM, (vw - 0.5) / W, (vh - 0.5) / Hh);
+  }
   gl.bindVertexArray(vao);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   gl.bindVertexArray(null);
@@ -255,10 +283,19 @@ function untimed (ms, work, B) {
 
 /* кадр мимо смены (повтор, катсцена, вступление) — перед его отрисовкой: разрешение полное */
 export function idle () { if (lvl) reset(); warm = WARM_T; }
+/* после отрисовки кадра мимо begin / end (повтор, катсцена, вступление, меню, пока город достраивается): «мягкие края» —
+   и тут, чтобы края не прыгали при входе в катсцену и выходе из неё */
+export function post () {
+  if (!edgeOn()) return;
+  const t0 = performance.now();
+  lowEnd();
+  const t1 = performance.now() - t0; if (t1 > STATS.cpuMax[1]) STATS.cpuMax[1] = +t1.toFixed(2);
+}
 
 Object.defineProperties(DEBUG, Object.getOwnPropertyDescriptors({   // с геттерами (Object.assign скопировал бы значения)
   get lvl () { return lvl; }, get k () { return K; }, get on () { return on(); }, get budget () { return budget(); },
   get upWait () { return upWait; }, get offUntil () { return offUntil; }, LV, STATS, set: n => setLvl(n | 0), reset,
+  get edgeOn () { return edgeOn(); }, get edgeBad () { return badA; }, post,
   /* доля кадров на пониженном разрешении и сколько раз спускались */
   info () { return { timer: STATS.timer, on: on(), k: K, frames: STATS.frames, lowShare: STATS.frames ? +(STATS.low / STATS.frames).toFixed(3) : 0, downs: STATS.downs, ups: STATS.ups, useless: STATS.useless, disjoint: STATS.disjoint }; },
 }));

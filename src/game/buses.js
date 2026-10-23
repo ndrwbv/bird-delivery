@@ -313,8 +313,10 @@ function template (M) {
   const { L, W } = M, put = A.put, B = THREE.BoxGeometry, hl = L / 2, hw = W / 2;
   const lit = [], glow = [], win = [], open = [];
   const box = (list, w, h, d, hex, x, y, z) => put(list, new B(w, h, d), hex, x, y, z);
-  box(lit, W, 1.05, L, M.body, 0, 0.95, 0);                                 // низ кузова
-  box(lit, W + 0.02, 0.16, L + 0.02, M.stripe, 0, 1.36, 0);                 // полоса
+  // низ кузова и полоса — частой сеткой (шаг ~0,35 м): удар мнёт борт у места удара, а не весь борт клином (foewreck.js, 12ар)
+  const seg = (w, h, d) => [Math.max(1, Math.round(w / 0.35)), Math.max(1, Math.round(h / 0.35)), Math.max(1, Math.round(d / 0.35))];
+  put(lit, new B(W, 1.05, L, ...seg(W, 1.05, L)), M.body, 0, 0.95, 0);      // низ кузова
+  put(lit, new B(W + 0.02, 0.16, L + 0.02, ...seg(W, 0.16, L)), M.stripe, 0, 1.36, 0);   // полоса
   box(lit, W, 0.34, L, M.top, 0, 2.62, 0);                                   // над окнами
   box(lit, W - 0.14, 0.16, L - 0.3, M.top, 0, 2.86, 0);                     // крыша
   box(lit, 0.9, 0.12, 1.1, '#d6d0c0', 0, 2.97, hl * 0.35);                  // люки
@@ -574,6 +576,7 @@ export function hit (t, nx0, nz0, tx0, tz0) {
     A.sparks(hx, 0.8, hz, hv > 10 ? 12 : 4, -nx, -nz);
     A.Snd.impact(hv, 'car', { x: hx, z: hz });
     A.S.shake = Math.max(A.S.shake, Math.min(0.6, hv * 0.035));
+    if (A.onHit) A.onHit(t, hv, hx, hz);             // качнулся, вмятина, трещины на стёклах, фары (foewreck.js, 12ар)
     if (hv > BUS.SOLID.HURT) {
       A.hurtCar(A.carDmg(hv), hv, hx, hz, 'car');   // мятина своей (dentCar) и удар; слабый — без сердец
       A.Snd.fx('honk', s => s.blip(250, 0.45, 'square', 0.07), { x: t.x, z: t.z, far: 90 });   // водитель автобуса гудит

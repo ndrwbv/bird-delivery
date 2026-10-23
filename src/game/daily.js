@@ -85,7 +85,7 @@ export function shiftStart ({ n = 1 } = {}) {
   D.len = len === 'short' ? 0 : len === 'medium' ? 1 : 2;
   let last = [];
   try { const v = A.Store.get(LAST_KEY, []); last = Array.isArray(v) ? v : String(v || '').split(' '); } catch (e) { /* — */ }
-  set(pick(count, last));
+  set(pick(count, last, n <= ECON.DAILY.FROM));   // первое в жизни задание (5-я смена) — спокойное: не «сбей 4 человека» (ревью 23.10, Р23-11)
   A.Store.set(LAST_KEY, D.list.map(q => q.id));
 }
 /* можно ли дать задание: версия (взрослая / детская), стройка в районе для самосвала */
@@ -102,8 +102,8 @@ function avail (id) {
 }
 const clash = (a, b) => (ECON.DAILY.CLASH || []).some(g => (g[0] === a && g.includes(b)) || (g[0] === b && g.includes(a)));
 /* count заданий: каждое место — «угарное» с шансом WILD_P (нет таких — обычное, и наоборот); сначала те, что
-   не были в прошлую смену; не ставим в одну смену мешающие друг другу (CLASH) */
-function pick (count, last = []) {
+   не были в прошлую смену; не ставим в одну смену мешающие друг другу (CLASH); calm — только обычные (первый день заданий) */
+function pick (count, last = [], calm0 = false) {
   const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const ids = Object.keys(ECON.DAILY.TASKS).filter(avail);
   const order = list => shuffle(list.filter(id => !last.includes(id))).concat(shuffle(list.filter(id => last.includes(id))));
@@ -111,7 +111,7 @@ function pick (count, last = []) {
   const out = [];
   const take = src => { const i = src.findIndex(id => !out.some(o => clash(o, id))); if (i < 0) return false; out.push(src.splice(i, 1)[0]); return true; };
   for (let k = 0; k < count; k++) {
-    const w = Math.random() < (ECON.DAILY.WILD_P ?? 0.5);
+    const w = !calm0 && Math.random() < (ECON.DAILY.WILD_P ?? 0.5);
     if (!take(w ? wild : calm)) take(w ? calm : wild);
   }
   return out;

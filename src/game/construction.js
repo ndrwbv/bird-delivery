@@ -445,10 +445,18 @@ export function* freeLotsSteps ({ W, D, max, gap, salt = 11, per = 1, cap = Infi
   cands.sort((a, b) => a.pr - b.pr);
   yield 'sort';
   let nt = 0;
-  const clear = c => SITES.every(s => Math.hypot(s.x - c.x, s.z - c.z) > R + Math.hypot(s.W, s.D) / 2 + 15)
-    && avoid.every(a => Math.hypot(a.x - c.x, a.z - c.z) > R + a.r + 15)
-    && CLAIM.every(a => Math.hypot(a.x - c.x, a.z - c.z) > R + a.r + 15)
-    && out.every(o => Math.hypot(o.x - c.x, o.z - c.z) > gap);
+  /* «дальше T от всех» — то же, что every(hypot > T), только без гипотенузы там, где и по одной оси дальше T (hypot ≥ |dx|):
+     кандидатов тысячи, мест — сотни, на Деке это было ~0,3 с и ~80 МБ мусора на три поиска */
+  const far = (L, c, add, T0) => {
+    for (let i = 0; i < L.length; i++) {
+      const o = L[i], T = add(o, T0), dx = o.x - c.x, dz = o.z - c.z;
+      if (Math.abs(dx) > T || Math.abs(dz) > T) continue;
+      if (!(Math.hypot(dx, dz) > T)) return false;
+    }
+    return true;
+  };
+  const tSite = s => R + Math.hypot(s.W, s.D) / 2 + 15, tR = a => R + a.r + 15, tGap = () => gap;
+  const clear = c => far(SITES, c, tSite) && far(avoid, c, tR) && far(CLAIM, c, tR) && far(out, c, tGap);
   for (let round = 0; round < 2 && out.length < max; round++) {
     const lim = !A.distAt ? Infinity : round === 0 ? per : cap;
     for (const c of cands) {

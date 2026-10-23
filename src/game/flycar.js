@@ -20,7 +20,8 @@
    Крылья (WINGS) — то же на любой машине карьеры, купившей их в гараже: ниже, короче, дольше заряжается.
    Переменных игры модуль не видит: всё — через init(api):
      V, S, isFlyer() — сейчас родстер, wings() — на машине купленные крылья (числа — WINGS), canUse() — смена идёт, не пауза, не карта, не разговор,
-     noLand(x, z, y) — сюда не сесть (дом без крыши, вода), noTakeoff(x, z) — над тобой дом (арка), toast(text), Snd
+     noLand(x, z, y) — сюда не сесть (дом без крыши, вода), noTakeoff(x, z) — над тобой дом (арка), toast(text), Snd,
+     car() — машина игрока (к ней крепятся ракетные сопла)
    game.js зовёт: tick(dt) — каждый кадр езды; fly(dt, gnd) — вместо V.y, пока on(); pitch() — наклон
    кузова в полёте; passSolid(s, y) — пролетаешь ли это препятствие; high() — выше потока; reset() — новая смена.
    ────────────────────────────────────────────────────────────────────────── */
@@ -28,6 +29,7 @@ import * as THREE from '../vendor/three.module.min.js';
 import { t } from '../i18n/index.js';
 import { glyph, onInput } from '../input/glyphs.js';
 import './flycar.css';
+import * as WARM from './warmup.js';       // прогрев шейдеров сопел и пламени при загрузке (warmup.js samplesFrom)
 
 export const FLY = {
   ID: 'roadster',   // какая машина летает (econ.js CAR_LIST)
@@ -120,7 +122,7 @@ export function press () {
   if (V.air || V.sink !== undefined) return false;
   if (A.noTakeoff && A.noTakeoff(V.x, V.z)) { hint(t('тут не взлететь — над тобой дом')); return false; }
   if (ST.cd > 0) {
-    hint(t('крылья заряжаются: {n} с', { n: String(Math.ceil(ST.cd)) }));
+    hint(t('ракеты заряжаются: {n} с', { n: String(Math.ceil(ST.cd)) }));
     return false;
   }
   ST.ph = 'up'; ST.t = 0; ST.y0 = ST.y = V.y; ST.alt = V.y + par('H'); ST.air = 0;
@@ -142,6 +144,7 @@ export function tick (dt) {
   ST.hintT -= dt;
   if (ST.ph === 'ground' && ST.cd > 0) ST.cd = Math.max(0, ST.cd - dt);
   if (ST.ph !== 'ground' && !isFlyer()) reset();   // пересел (гараж, воскрешение) — полёт кончился
+  nozStep(dt);                                     // ракетные сопла под днищем
   drawHud();
 }
 
@@ -236,35 +239,77 @@ function drawHud () {
     if (hud) hud.className = cls;
     if (btn) btn.className = 'tp-fly ' + cls;
     const g = glyph('fly');
-    if (hudLab) hudLab.textContent = cls === 'fly' ? t('в небе') : cls === 'wait' ? t('заряд крыльев') : (g ? '[' + g + '] ' : '') + t('полёт');
+    if (hudLab) hudLab.textContent = cls === 'fly' ? t('в небе') : cls === 'wait' ? t('заряд ракет') : (g ? '[' + g + '] ' : '') + t('полёт');
   }
 }
 
-/* ─────────────── крылышки (WINGS) ───────────────
-   Зовёт cars.js dress, если куплены крылья: в склейку кузова (add(geo, hex, x, y, z)). k: { S, W, top, hl }.
-   По бортам по линии пояса (под окнами) — короткие стреловидные крылышки (выступают на ~0,5 м) с оранжевой законцовкой
-   и килем, на корме — узкое антикрыло на двух стойках. Коллизия машины не меняется — только вид */
-export function wingsLook (add, k) {
-  const { S, W, top, hl } = k;
-  const B = (w, h, d, hex, x, y, z, rx = 0, ry = 0, rz = 0) => {
-    const g = new THREE.BoxGeometry(w, h, d);
-    if (rx) g.rotateX(rx); if (ry) g.rotateY(ry); if (rz) g.rotateZ(rz);
-    add(g, hex, x, y, z);
+/* ─────────────── ракетные сопла (12ад, автор 23.10.2026: «при взлёте из-под днища выдвигаются ракетные сопла
+   с пламенем; крылышки убрать») ───────────────
+   У любой летающей машины (родстер и купленные «крылья»): четыре сопла под днищем — у колёс, ближе к середине. На
+   земле спрятаны в днище; взлёт — выдвигаются на NOZ.OUT м за NOZ.T с, из каждого бьёт пламя вниз (на взлёте — длинное,
+   NOZ.FLAME[0] м, пока держит высоту — NOZ.FLAME[1], на снижении — NOZ.FLAME[2]), языки дрожат. Ниже NOZ.LOW м над
+   опорой на снижении пламя гаснет, сопла уходят обратно — машина садится на колёса. Вещи three.js — при первом взлёте
+   (не до стройки города), прикреплены к машине: наклон и повороты — вместе с кузовом. Коллизия не меняется — только вид */
+export const NOZ = { OUT: 0.24, T: 0.35, FLAME: [1.25, 0.7, 0.42], LOW: 0.9 };
+let NZ = null;
+const noz = { e: 0, f: 0, tt: 0 };
+function nozMats () {
+  return {
+    metal: new THREE.MeshLambertMaterial({ color: 0x3a3c43 }),
+    lip: new THREE.MeshLambertMaterial({ color: 0x8c8f97 }),
+    hot: new THREE.MeshBasicMaterial({ color: 0xff4a12, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
+    core: new THREE.MeshBasicMaterial({ color: 0xffc44a, transparent: true, opacity: 0.95, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
   };
-  const WING = '#e6e8ec', TIP = '#f0522a', DARK = '#2b2c31';
-  const y = top - 0.03, z = S.cz - S.cab * 0.12;
-  for (const s of [-1, 1]) {
-    B(0.56, 0.05, 0.7, WING, s * (W / 2 + 0.24), y, z, 0, s * 0.42, s * -0.1);     // плоскость: стреловидная, чуть вверх
-    B(0.05, 0.26, 0.34, TIP, s * (W / 2 + 0.5), y + 0.1, z - 0.2, 0, 0, s * 0.12);  // киль-законцовка
-    B(0.14, 0.09, 0.34, DARK, s * (W / 2 + 0.03), y - 0.01, z + 0.04);             // крепление к борту
-  }
-  // антикрыло на корме: две стойки и узкая плоскость над крышкой багажника
-  // без багажника (хэтчбек, джип, фургон) — козырьком над задним краем крыши, на коротких стойках
-  const boot = S.trunk > 0.3, zb = boot ? -hl + 0.32 : S.cz - S.cab / 2 + 0.22, yb = boot ? top + 0.05 : top + S.ch - 0.16;
-  for (const s of [-1, 1]) B(0.06, 0.28, 0.1, DARK, s * W * 0.32, yb + 0.14, zb);
-  B(W * 0.86, 0.04, 0.28, WING, 0, yb + 0.3, zb - 0.02, -0.08);
-  for (const s of [-1, 1]) B(0.04, 0.14, 0.3, TIP, s * W * 0.43, yb + 0.33, zb - 0.02);
 }
+WARM.samplesFrom((T, geo) => { const m = nozMats(); return [['сопла полёта (flycar.js, металл)', new T.Mesh(geo, m.metal)], ['пламя сопел (flycar.js, сложение цвета)', new T.Mesh(geo, m.hot)]]; });
+function nozBuild (car) {
+  const u = car.userData, W = u.W || 1.7, hl = u.hl || 2.1;
+  const y0 = Math.max(0.25, Math.min(0.7, (u.y0 || 0.67) - ((u.spec && u.spec.h) || 0.5) / 2));   // низ кузова (makeCar: y0 — середина нижней коробки)
+  const M = nozMats();
+  const grp = new THREE.Group();
+  grp.name = 'fly-nozzles';
+  const bell = new THREE.CylinderGeometry(0.075, 0.13, 0.2, 10, 1, true), ring = new THREE.CylinderGeometry(0.085, 0.085, 0.12, 10);
+  const lipG = new THREE.TorusGeometry(0.13, 0.02, 4, 12).rotateX(Math.PI / 2);
+  const fl = new THREE.ConeGeometry(0.13, 1, 9, 1, true).rotateX(Math.PI).translate(0, -0.5, 0);   // язык — вниз от нуля, длина 1
+  const cf = new THREE.ConeGeometry(0.055, 1, 7, 1, true).rotateX(Math.PI).translate(0, -0.5, 0);
+  const parts = [];
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const n = new THREE.Group();
+    n.position.set(sx * W * 0.27, y0, sz * hl * 0.42);
+    const r = new THREE.Mesh(ring, M.metal); r.position.y = 0.04; n.add(r);
+    const b = new THREE.Mesh(bell, M.metal); b.position.y = -0.1; n.add(b);
+    const l = new THREE.Mesh(lipG, M.lip); l.position.y = -0.2; n.add(l);
+    const f = new THREE.Mesh(fl, M.hot); f.position.y = -0.17; n.add(f);
+    const c = new THREE.Mesh(cf, M.core); c.position.y = -0.17; n.add(c);
+    grp.add(n);
+    parts.push({ n, f, c, y0, ph: (sx + 2) * 1.7 + (sz + 2) * 0.9 });
+  }
+  car.add(grp);
+  return { car, grp, parts };
+}
+/* каждый кадр (tick): выдвинуть / спрятать сопла, пламя по фазе полёта */
+function nozStep (dt) {
+  const car = A.car ? A.car() : null;
+  const want = ST.ph === 'up' || ST.ph === 'hold' || (ST.ph === 'down' && ST.y - ST.gnd > NOZ.LOW);
+  noz.e = Math.max(0, Math.min(1, noz.e + (want ? dt : -dt) / NOZ.T));
+  if (!car || (!NZ && noz.e <= 0)) return;
+  if (!NZ || NZ.car !== car) { if (NZ) NZ.grp.removeFromParent(); NZ = nozBuild(car); }
+  NZ.grp.visible = noz.e > 0;
+  if (!NZ.grp.visible) return;
+  noz.tt += dt;
+  const fT = !want ? 0 : ST.ph === 'up' ? NOZ.FLAME[0] : ST.ph === 'hold' ? NOZ.FLAME[1] : NOZ.FLAME[2];
+  noz.f += (fT - noz.f) * Math.min(1, dt * 8);
+  const ext = smooth(noz.e);
+  for (const q of NZ.parts) {
+    q.n.position.y = q.y0 + 0.2 - (NOZ.OUT + 0.2) * ext;            // спрятано — колокол в днище
+    const L = noz.f * ext * (0.85 + 0.15 * Math.sin(noz.tt * 41 + q.ph) + 0.08 * Math.sin(noz.tt * 67 + q.ph * 2));
+    const on = L > 0.04;
+    q.f.visible = q.c.visible = on;
+    if (on) { q.f.scale.set(1, L, 1); q.c.scale.set(1, L * 0.62, 1); }
+  }
+}
+/* сопла — как есть (для кадра и проверок) */
+export const nozzles = () => ({ e: +noz.e.toFixed(2), flame: +noz.f.toFixed(2), built: !!NZ, visible: !!(NZ && NZ.grp.visible) });
 
 /* ─────────────── открытый салон кабриолета ───────────────
    Зовёт makeCar (game.js) вместо крыши и стёкол, когда opts.open. add(geo, hex, x, y, z) — в склейку кузова.

@@ -115,7 +115,7 @@ const _v = new THREE.Vector3(), _d = new THREE.Vector3(), _c = new THREE.Vector3
 /* удар по своей машине: lx, lz — точка удара в осях машины (как в dentCar), force — м/с удара */
 export function hit (g, lx, lz, force) {
   const u = g && g.userData;
-  if (!u || !u.see || !(force > DENT.MIN)) return;
+  if (!u || !(u.see || u.dent) || !(force > DENT.MIN)) return;   // dent — подробная копия чужой машины (foewreck.js, 12ар)
   const W = u.W || 1.8, hl = u.hl || 2.1;
   // сторона удара: морда / корма или бок — по тому, к какому краю точка ближе в долях габарита
   const end = Math.abs(lz) / hl >= Math.abs(lx) / (W / 2);
@@ -314,8 +314,10 @@ function hubcap (g, wm, force) {
 function end (d) {
   if (!d) return;
   API.scene.remove(d.m);
-  d.m.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+  d.m.traverse(o => { if (o.isMesh) { if (!o.geometry.userData.shared) o.geometry.dispose(); if (!o.userData.keepMat && !o.material.userData.shared) o.material.dispose(); } });   // keepMat — материал общий с машиной (колесо чужой «Семёрки», foewreck.js)
 }
+/* деталь чужой машины слетает так же (foewreck.js: колесо, бампер настоящей модели) */
+export const fling = (g, m, key, nx, nz, force) => fly(g, m, key, nx, nz, force);
 
 /* каждый кадр: скорость машины (от неё летят детали) и детали на дороге */
 export function step (dt, car) {

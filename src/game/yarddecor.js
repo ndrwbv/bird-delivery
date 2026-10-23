@@ -70,13 +70,35 @@ function near (G, C, x, z, r, fn) {
 
 /* ── сетки на время сборки ── */
 let SG = null, SMG = null, ENTG = null, ZN = null, AREAG = null, GREENG = null, OWN = null;
-const solidNear = (x, z, r) => near(SG, 30, x, z, r + 12, s => {
-  if (s.deckY !== undefined) return false;
-  const dx = x - s.cx, dz = z - s.cz, lx = dx * s.cs + dz * s.sn, lz = -dx * s.sn + dz * s.cs;
-  return Math.abs(lx) < s.hw + r && Math.abs(lz) < s.hd + r;
-});
+/* solidNear / smashNear — тем же обходом, что near(), но без замыкания на каждый вопрос: их зовут сотни тысяч раз,
+   замыкания и числа в них — ~0,2 ГБ мусора за сборку города (сборщик на Деке) */
+function solidNear (x, z, r) {
+  const R = r + 12, C = 30;
+  for (let i = Math.floor((x - R) / C); i <= Math.floor((x + R) / C); i++)
+    for (let j = Math.floor((z - R) / C); j <= Math.floor((z + R) / C); j++) {
+      const a = SG.get(gk(i, j));
+      if (a) for (let k = 0; k < a.length; k++) {
+        const s = a[k];
+        if (s.deckY !== undefined) continue;
+        const dx = x - s.cx, dz = z - s.cz, lx = dx * s.cs + dz * s.sn, lz = -dx * s.sn + dz * s.cs;
+        if (Math.abs(lx) < s.hw + r && Math.abs(lz) < s.hd + r) return true;
+      }
+    }
+  return false;
+}
 /* сбиваемое ближе r: у заборчиков (есть ax…bz) — до самого отрезка, у остального — до круга */
-const smashNear = (x, z, r) => near(SMG, 20, x, z, r + 2, it => !it.down && (it.ax !== undefined ? segD(x, z, it.ax, it.az, it.bx, it.bz) < r + 0.1 : Math.hypot(it.x - x, it.z - z) < r + Math.min(it.r || 1, 1.0)));
+function smashNear (x, z, r) {
+  const R = r + 2, C = 20;
+  for (let i = Math.floor((x - R) / C); i <= Math.floor((x + R) / C); i++)
+    for (let j = Math.floor((z - R) / C); j <= Math.floor((z + R) / C); j++) {
+      const a = SMG.get(gk(i, j));
+      if (a) for (let k = 0; k < a.length; k++) {
+        const it = a[k];
+        if (!it.down && (it.ax !== undefined ? segD(x, z, it.ax, it.az, it.bx, it.bz) < r + 0.1 : Math.hypot(it.x - x, it.z - z) < r + Math.min(it.r || 1, 1.0))) return true;
+      }
+    }
+  return false;
+}
 const segD = (x, z, ax, az, bx, bz) => {
   const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz || 1;
   const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2));

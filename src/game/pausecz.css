@@ -23,6 +23,15 @@ body #pausem { background: var(--pp-dim), rgba(30, 12, 20, .35); }
 .pz-sheet > #pm-stats { margin: 0; }
 .pz-sheet > #pm-stats::after { display: none; }
 .pz-sheet > #pm-order .oc-photos { width: auto; margin: 0; }
+/* лист не влез (Р23-14): внизу — затухание бумаги и жёлтый ярлычок «ещё ▼», прилипают к низу листа (pausecz.js moreTab);
+   места в листе не занимают (отрицательный отступ); долистал до конца — их нет */
+.pz-more-b { display: none; position: sticky; bottom: calc(var(--u) * -1.4); z-index: 2; height: 3em; margin-top: -3em; box-sizing: border-box;
+             align-items: flex-end; justify-content: center; padding-bottom: 2px; cursor: pointer;
+             font-size: max(11px, calc(var(--u) * .95)); line-height: 1.2; text-shadow: none;
+             background: linear-gradient(rgba(255, 243, 214, 0), rgba(255, 243, 214, .95) 60%); }
+.pz-sheet.pz-more > .pz-more-b { display: flex; }
+.pz-more-b span { padding: .25em .7em .15em; color: var(--pp-ink); background: var(--pp-yellow); border: 2px solid var(--pp-ink); border-radius: 3px;
+                  box-shadow: 0 2px 0 var(--pp-ink); text-transform: uppercase; letter-spacing: .08em; transform: rotate(-1.5deg); }
 /* полоса кнопок */
 .pz-host { flex: none; display: flex; height: calc(var(--pcw) * .5 + 30px); }
 .cz.pz-cz { flex: 1; --cw: var(--pcw); --step: calc(var(--cw) * .97); }
@@ -70,6 +79,18 @@ body #pausem { background: var(--pp-dim), rgba(30, 12, 20, .35); }
   .pz-head .pm-t { font-size: 16px; }
   .pz-top { padding-top: 4px; padding-bottom: 6px; }
   .pz-hint { display: none; }
+  /* чек «за смену» шире: подписи в одну строку, рейтинг и звание не уходят под обрез листа (ревью 23.10, Р23-6) */
+  .pz-sheet:first-child { flex-basis: calc(var(--u) * 58); }
+  .pz-sheet:last-child { flex-basis: calc(var(--u) * 56); }
+  #pm-stats .pm-rc-r { padding: 1px 0; }
+  /* и всё равно «сбито» и «звание» уходили под обрез (Р23-14): нули «сбито» не показываем (звание — уже под респектом,
+     game.js renderPause), строки плотнее, полоска прокрутки — чернилами, не жёлтым по бумаге */
+  #pm-stats .pm-zero { display: none; }
+  #pm-stats { line-height: 1.32; padding-top: calc(var(--u) * .9); }
+  #pm-stats .pm-rc-t { padding-bottom: calc(var(--u) * .35); margin-bottom: calc(var(--u) * .3); }
+  #pm-stats .pm-rc-h { margin-top: calc(var(--u) * .3); padding-top: calc(var(--u) * .3); }
+  #pm-stats .pm-rc-r.pm-rk + .pm-rc-r:not(.pm-rk) { margin-top: calc(var(--u) * .3); padding-top: calc(var(--u) * .3); }
+  .pz-sheet { scrollbar-width: auto; scrollbar-color: rgba(51, 33, 12, .75) rgba(51, 33, 12, .12); }
 }
 /* телефон стоймя: листки друг под другом, каждый — до половины места */
 @media (max-aspect-ratio: 1/1) {

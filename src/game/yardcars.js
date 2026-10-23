@@ -4,9 +4,14 @@
 
    1. Карманы парковки вдоль дворовых проездов (класс 7, «service» в карте, без проездов стоянок):
       • двор — это проезд в YC.ENT_R м от подъезда многоэтажки (промзоны, гаражи, пустыри — мимо);
-      • карман — асфальт за краем проезда (EDGE м от полотна): вдоль (PAR — машины друг за другом)
-        или «ёлочкой» поперёк (PERP — носом к дому, с белыми полосами между местами); мест в кармане
-        PAR_N / PERP_N, между карманами GAP м, начало кармана — жребий START на каждые STEP м;
+      • карман — асфальт за краем проезда (EDGE м от полотна) по форме проезда: идёт по всей ломаной, через
+        пологие изломы (до TURN) — полосой той же кривизны, а не прямым куском одного отрезка; у перекрёстка и
+        крутого излома — ENDS м без мест. Вдоль (PAR — машины друг за другом) или «ёлочкой» поперёк (PERP — носом
+        к дому, с белыми полосами между местами); мест в кармане PAR_N / PERP_N, между карманами GAP м,
+        начало кармана — жребий START на каждые STEP м;
+      • вдоль дома (дом в HOUSE м за карманом) — плотнее: жребий START_H, мест PAR_NH / PERP_NH, пусто GAP_H;
+      • SKEW машин стоит криво: повёрнута на SKEW_A и сдвинута от проезда на SKEW_OUT — колёсами на газоне
+        (если там не дом, не дорожка, не дверь и не твёрдое);
       • место не встаёт в дом, на чужое полотно, тротуар, дорожку, аллею, в стоянку и площадку, в дерево,
         будку, забор, лавочку, урну, в воду, ближе ENT_MIN м к двери подъезда, у пиццерии и точки
         конкурента, на стройку; занято FILL мест (остальные — пусто), COVER машин — под тентом.
@@ -37,10 +42,17 @@ export const YC = {
   ENT_R: 55,              // м: от подъезда до места — двор
   ENT_MIN: 6,             // м: от двери подъезда до любой точки места — свободно (клиент, пин, тропинка)
   STEP: 4,                // м: шаг по проезду между жребиями «здесь карман»
-  START: 0.075,           // жребий на начало кармана на каждом шаге (на телефоне — × START_TOUCH)
-  START_TOUCH: 0.6,
-  GAP: [12, 40],          // м: после кармана — пусто
-  ENDS: 5,                // м: от концов куска проезда (перекрёсток, излом) — без мест
+  START: 0.05,            // жребий на начало кармана на каждом шаге вдали от домов (на телефоне — × START_TOUCH; до 23.10.2026 — 0,075 везде)
+  START_TOUCH: 0.45,      // телефон: машин — как до 23.10.2026 (~1 800, потолок MAX_TOUCH), память
+  GAP: [14, 45],          // м: после кармана — пусто (до 23.10.2026 — 12—40)
+  ENDS: 5,                // м: от перекрёстка, конца проезда и крутого излома — без мест
+  TURN: 0.6,              // рад (~35°): излом круче — карман через него не идёт (до 23.10.2026 карман — только в пределах отрезка)
+  BLEND: 2.5,             // м: у излома машина поворачивается плавно (касательная — средняя двух отрезков)
+  // вдоль дома (23.10.2026, автор: «вдоль домов обычно стоит много машин»): дом ближе HOUSE м за карманом
+  HOUSE: 11, START_H: 0.3, GAP_H: [3, 12], PAR_NH: [3, 7], PERP_NH: [5, 12],
+  SKEW: 0.22,             // доля машин, что стоят криво (колёсами на газоне)
+  SKEW_A: [0.07, 0.2],    // рад: поворот (вдоль; поперёк — вдвое меньше)
+  SKEW_OUT: [0.45, 0.95], // м: сдвиг от проезда, на газон
   PERP: 0.3,              // доля карманов поперёк (носом к дому)
   PAR_N: [2, 5], PERP_N: [3, 8],
   PAR: { SP: 6.1, D: 2.3 },     // вдоль: на машину 6,1 м проезда, глубина кармана 2,3 м
@@ -71,7 +83,7 @@ export const YC = {
   },
 };
 
-export const ST = { rej: {}, segs: 0, spots: 0, cars: 0, pockets: 0, perp: 0, cover: 0, ms: 0, msCars: 0, woke: 0, drawn: 0,
+export const ST = { rej: {}, segs: 0, spots: 0, cars: 0, pockets: 0, perp: 0, house: 0, bent: 0, skew: 0, cover: 0, ms: 0, msCars: 0, woke: 0, drawn: 0,
   mov: { now: 0, out: 0, in: 0, flow: 0, parked: 0, gone: 0, fail: 0 }, yard: { nodes: 0, mouths: 0 } };
 
 let A = null, THREE = null;
@@ -96,8 +108,17 @@ function inRect (P, x, z, r) {
   const dx = x - P.cx, dz = z - P.cz;
   return Math.abs(dx * P.ux + dz * P.uz) < P.hl + r && Math.abs(dx * P.nx + dz * P.nz) < P.hd + r;
 }
+/* карманы ещё и по клеткам с запасом PG1_M: вопрос с r ≤ PG1_R — одна клетка точки (было 2×2 клетки на каждый вопрос;
+   blocks зовут сотни тысяч раз при сборке — бордюры, дворы без пустых мест). Ответ тот же: карман, что задевает точку
+   с запасом r, лежит рамкой не дальше 1,42·r от неё — значит, в клетке точки */
+const PG1 = new Map(), PG1_R = 4, PG1_M = PG1_R * 1.42 + 0.01;
 export function blocks (x, z, r = 0) {
   if (!POCKETS.length) return false;
+  if (r <= PG1_R) {
+    const a = PG1.get(gk(Math.floor(x / PGC), Math.floor(z / PGC)));
+    if (a) for (let k = 0; k < a.length; k++) if (inRect(a[k], x, z, r)) return true;
+    return false;
+  }
   const i0 = Math.floor((x - r - 8) / PGC), i1 = Math.floor((x + r + 8) / PGC), j0 = Math.floor((z - r - 8) / PGC), j1 = Math.floor((z + r + 8) / PGC);
   for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
     const a = PG.get(gk(i, j));
@@ -114,6 +135,11 @@ function putPocket (P) {
       if (seen.has(k)) continue;
       seen.add(k);
       let a = PG.get(k); if (!a) PG.set(k, a = []); a.push(P);
+    }
+  for (let i = Math.floor((P.cx - ex - PG1_M) / PGC); i <= Math.floor((P.cx + ex + PG1_M) / PGC); i++)
+    for (let j = Math.floor((P.cz - ez - PG1_M) / PGC); j <= Math.floor((P.cz + ez + PG1_M) / PGC); j++) {
+      const k = gk(i, j);
+      let a = PG1.get(k); if (!a) PG1.set(k, a = []); a.push(P);
     }
   POCKETS.push(P);
 }
@@ -163,7 +189,7 @@ export function* build (api) {
         }
     return k;
   };
-  const cap = A.mobile() ? YC.MAX_TOUCH : YC.MAX, START = YC.START * (A.mobile() ? YC.START_TOUCH : 1);
+  const cap = A.mobile() ? YC.MAX_TOUCH : YC.MAX, START = YC.START * (A.mobile() ? YC.START_TOUCH : 1), START_H = YC.START_H * (A.mobile() ? YC.START_TOUCH : 1);
   let nCars = 0, nSeg = 0;
   ms += performance.now() - tt; yield 'index'; tt = performance.now();
   const roads = A.CITY.roads.filter(r => r.c === 7 && !r.x && !r.b && r.s !== 'parking_aisle' && r.s !== 'drive-through');
@@ -172,56 +198,100 @@ export function* build (api) {
   const E = YC.EDGE;
   for (const r of roads) {
     if (nCars >= cap) break;
-    const w = A.roadWidth(r), p = r.p, hw = w / 2;
-    for (let si = 1; si < p.length; si++) {
-      const ax = p[si - 1][0], az = p[si - 1][1], bx = p[si][0], bz = p[si][1];
-      const len = Math.hypot(bx - ax, bz - az);
-      if (len < 2 * YC.ENDS + 5) continue;
-      const mx = (ax + bx) / 2, mz = (az + bz) / 2;
-      if (!A.inBounds(mx, mz, 30) || entD(mx, mz, YC.ENT_R + len / 2) > YC.ENT_R + len / 2) continue;
-      const kind = nearKind(mx, mz);
-      if (kind === 'ind' || kind === 'gar') continue;
-      if (++nSeg % 20 === 0) { ms += performance.now() - tt; yield 'yardcars'; tt = performance.now(); }
-      const ux = (bx - ax) / len, uz = (bz - az) / len;
-      const na = A.NODE_IDX.get(ax + ',' + az), nb = A.NODE_IDX.get(bx + ',' + bz);
-      for (const side of [1, -1]) {
-        const nx = -uz * side, nz = ux * side;          // наружу от проезда
-        let s = YC.ENDS + rand(0, 6);
-        while (s < len - YC.ENDS - 3 && nCars < cap) {
-          if (Math.random() > START) { s += YC.STEP; continue; }
-          const perp = Math.random() < YC.PERP;
-          const G = perp ? YC.PERP_ : YC.PAR;
-          const want = perp ? irand(YC.PERP_N[0], YC.PERP_N[1]) : irand(YC.PAR_N[0], YC.PAR_N[1]);
-          const list = [];
-          let s1 = s;
-          for (let k = 0; k < want && s1 + G.SP <= len - YC.ENDS; k++, s1 += G.SP) {
-            const sc = s1 + G.SP / 2, off = hw + E + G.D / 2;
-            const cx = ax + ux * sc + nx * off, cz = az + uz * sc + nz * off;
-            if (!spotOk(cx, cz, ux, uz, nx, nz, G.SP / 2 - 0.15, G.D / 2, hw, entD, inLot, claimed, nearPizza, ramps)) { if (list.length) break; s = s1 + G.SP; continue; }
-            list.push({ sc, cx, cz });
+    const w = A.roadWidth(r), p = r.p, hw = w / 2, np = p.length;
+    if (np < 2) continue;
+    // ломаная: длины, направления отрезков; изломы, через которые карман не идёт (перекрёсток, крутой поворот)
+    const S = [0], U = [], brk = [true];
+    for (let i = 1; i < np; i++) {
+      const dx = p[i][0] - p[i - 1][0], dz = p[i][1] - p[i - 1][1], l = Math.hypot(dx, dz) || 1e-6;
+      S.push(S[i - 1] + l); U.push([dx / l, dz / l]);
+    }
+    for (let i = 1; i < np - 1; i++) {
+      const n = A.NODE_IDX.get(p[i][0] + ',' + p[i][1]), a = U[i - 1], b = U[i];
+      const ang = Math.acos(clamp(a[0] * b[0] + a[1] * b[1], -1, 1));
+      brk.push((n !== undefined && A.NODES[n].nb.length >= 3) || ang > YC.TURN || S[i] - S[i - 1] < 0.3);
+    }
+    brk.push(true);
+    const kinds = [];                                   // ближний дом у отрезка — жилой? (по разу на отрезок)
+    const segOk = si => {
+      if (kinds[si] === undefined) {
+        const mx = (p[si][0] + p[si + 1][0]) / 2, mz = (p[si][1] + p[si + 1][1]) / 2, k = nearKind(mx, mz);
+        kinds[si] = k !== 'ind' && k !== 'gar';
+      }
+      return kinds[si];
+    };
+    // точка на ломаной в sv м от начала: отрезок, ось, касательная (у излома — плавно)
+    const segAt = sv => { let i = 0; while (i < np - 2 && S[i + 1] < sv) i++; return i; };
+    const PT = { si: 0, x: 0, z: 0, ux: 0, uz: 0 };
+    const at = (sv, a0, a1) => {
+      const i = segAt(sv), u = U[i], t = sv - S[i];
+      let ux = u[0], uz = u[1];
+      if (t < YC.BLEND && i > 0 && S[i] > a0 + 0.01) { const k = 0.5 + 0.5 * t / YC.BLEND, q = U[i - 1]; ux = q[0] * (1 - k) + u[0] * k; uz = q[1] * (1 - k) + u[1] * k; }
+      else if (S[i + 1] - sv < YC.BLEND && i < np - 2 && S[i + 1] < a1 - 0.01) { const k = 0.5 + 0.5 * (S[i + 1] - sv) / YC.BLEND, q = U[i + 1]; ux = q[0] * (1 - k) + u[0] * k; uz = q[1] * (1 - k) + u[1] * k; }
+      const l = Math.hypot(ux, uz) || 1;
+      PT.si = i; PT.x = p[i][0] + u[0] * t; PT.z = p[i][1] + u[1] * t; PT.ux = ux / l; PT.uz = uz / l;
+      return PT;
+    };
+    // куски между изломами-преградами
+    for (let b0 = 0; b0 < np - 1;) {
+      let b1 = b0 + 1;
+      while (!brk[b1]) b1++;
+      const a0 = S[b0], a1 = S[b1];
+      const lo = a0 + YC.ENDS, hi = a1 - YC.ENDS;
+      if (hi - lo >= 5 && A.inBounds((p[b0][0] + p[b1][0]) / 2, (p[b0][1] + p[b1][1]) / 2, 30)) {
+        if (++nSeg % 20 === 0) { ms += performance.now() - tt; yield 'yardcars'; tt = performance.now(); }
+        for (const side of [1, -1]) {
+          let s = lo + rand(0, 6);
+          while (s < hi - 3 && nCars < cap) {
+            const q0 = at(s, a0, a1), si0 = q0.si;
+            const nx0 = -q0.uz * side, nz0 = q0.ux * side;
+            const yard = entD(q0.x, q0.z, YC.ENT_R) <= YC.ENT_R && segOk(si0);
+            if (!yard) { s += YC.STEP; continue; }
+            // дом вдоль (за карманом, в HOUSE м) — карман вероятнее, длиннее, пусто между ними — короче
+            let house = false;
+            for (const k of [1.5, 4, 7, YC.HOUSE]) { const o = hw + E + 2.3 + k; if (A.inHouse(q0.x + nx0 * o, q0.z + nz0 * o, 0)) { house = true; break; } }
+            if (Math.random() > (house ? START_H : START)) { s += YC.STEP; continue; }
+            const perp = Math.random() < YC.PERP;
+            const G = perp ? YC.PERP_ : YC.PAR;
+            const NN = house ? (perp ? YC.PERP_NH : YC.PAR_NH) : (perp ? YC.PERP_N : YC.PAR_N);
+            const want = irand(NN[0], NN[1]);
+            const list = [];
+            let s1 = s;
+            for (let k = 0; k < want && s1 + G.SP <= hi; k++, s1 += G.SP) {
+              const sc = s1 + G.SP / 2, q = at(sc, a0, a1), off = hw + E + G.D / 2;
+              const nx = -q.uz * side, nz = q.ux * side;
+              const cx = q.x + nx * off, cz = q.z + nz * off;
+              if (!spotOk(cx, cz, q.ux, q.uz, nx, nz, G.SP / 2 - 0.15, G.D / 2, hw, entD, inLot, claimed, nearPizza, ramps)) { if (list.length) break; s = s1 + G.SP; continue; }
+              list.push({ sc, cx, cz, si: q.si, ax: q.x, az: q.z, ux: q.ux, uz: q.uz, nx, nz });
+            }
+            if (!list.length) { s += YC.STEP; continue; }
+            // карман: асфальт под всеми местами подряд — по форме проезда (через пологие изломы)
+            const sA = list[0].sc - G.SP / 2, sB = list[list.length - 1].sc + G.SP / 2;
+            pocket(p, S, U, sA, sB, side, hw + E, G, list, perp);
+            ST.pockets++; if (perp) ST.perp++; if (house) ST.house++;
+            if (list[0].si !== list[list.length - 1].si) ST.bent++;
+            for (const q of list) {
+              const si = q.si, ax = p[si][0], az = p[si][1], bx = p[si + 1][0], bz = p[si + 1][1];
+              const len = S[si + 1] - S[si], na = A.NODE_IDX.get(ax + ',' + az), nb = A.NODE_IDX.get(bx + ',' + bz);
+              const ux = U[si][0], uz = U[si][1];
+              const sp = { x: q.cx, z: q.cz, h: 0, perp, ux, uz, nx: -uz * side, nz: ux * side, w, sa: clamp(q.sc - S[si], 0, len), len, na, nb,
+                ax: q.ax, az: q.az, t: null, res: null, i: SPOTS.length };
+              sp.h = perp ? Math.atan2(q.nx, q.nz) : Math.atan2(q.ux, q.uz);
+              if (Math.random() < YC.FILL) {
+                sp.want = 1; nCars++;
+                if (Math.random() < YC.SKEW) skew(sp, q, perp, G, entD);
+              }
+              SPOTS.push(sp);
+              const e = [sp.x, sp.z, sp.h];
+              e.yc = sp;                                   // game.js 'cars': эти — не свои модели, их ставит yardcars.js
+              A.PARKED.push(e);
+              if (na !== undefined && nb !== undefined) { const k = ekey(na, nb); let a = EDGE_SPOTS.get(k); if (!a) EDGE_SPOTS.set(k, a = []); a.push(sp); }
+            }
+            s = sB + (house ? rand(YC.GAP_H[0], YC.GAP_H[1]) : rand(YC.GAP[0], YC.GAP[1]));
           }
-          if (!list.length) { s += YC.STEP; continue; }
-          // карман: асфальт под всеми местами подряд
-          const sA = list[0].sc - G.SP / 2, sB = list[list.length - 1].sc + G.SP / 2;
-          const P = { cx: ax + ux * (sA + sB) / 2 + nx * (hw + E + G.D / 2), cz: az + uz * (sA + sB) / 2 + nz * (hw + E + G.D / 2),
-            ux, uz, nx, nz, hl: (sB - sA) / 2, hd: G.D / 2, perp, n: list.length };
-          putPocket(P);
-          paintPocket(P, ax, az, sA, sB, hw + E, G, list);
-          ST.pockets++; if (perp) ST.perp++;
-          for (const q of list) {
-            const sp = { x: q.cx, z: q.cz, h: 0, perp, ux, uz, nx, nz, w, sa: q.sc, len, na, nb,
-              ax: ax + ux * q.sc, az: az + uz * q.sc, t: null, res: null, i: SPOTS.length };
-            sp.h = perp ? Math.atan2(nx, nz) : Math.atan2(ux, uz);
-            SPOTS.push(sp);
-            const e = [q.cx, q.cz, sp.h];
-            e.yc = sp;                                   // game.js 'cars': эти — не свои модели, их ставит yardcars.js
-            A.PARKED.push(e);
-            if (Math.random() < YC.FILL) { sp.want = 1; nCars++; }
-            if (na !== undefined && nb !== undefined) { const k = ekey(na, nb); let a = EDGE_SPOTS.get(k); if (!a) EDGE_SPOTS.set(k, a = []); a.push(sp); }
-          }
-          s = sB + rand(YC.GAP[0], YC.GAP[1]);
         }
       }
+      b0 = b1;
     }
   }
   ST.segs = nSeg; ST.spots = SPOTS.length;
@@ -264,16 +334,72 @@ function spotOk (cx, cz, ux, uz, nx, nz, hl, hd, hw, entD, inLot, claimed, nearP
   return true;
 }
 
-function paintPocket (P, ax, az, sA, sB, e0, G, list) {
-  const { ux, uz, nx, nz } = P;
-  const pt = (s, o) => [ax + ux * s + nx * o, az + uz * s + nz * o];
+/* Карман от sA до sB м по ломаной проезда p (S — длины, U — направления), по сторону side, от e0 до e0 + G.D от оси:
+   асфальт кусками по отрезкам (на изломе — по биссектрисе, без щели), места для blocks() — прямоугольник на кусок,
+   у поперечного — белые полосы между местами (по касательной там же, где стоят машины) */
+function pocket (p, S, U, sA, sB, side, e0, G, list, perp) {
+  const nrm = i => [-U[i][1] * side, U[i][0] * side];
+  const samp = [];                                  // [sv, отрезок, нормаль (с удлинением на изломе)]
+  let i = 0;
+  while (i < S.length - 2 && S[i + 1] < sA) i++;
+  samp.push([sA, i, nrm(i), 1]);
+  for (; i < S.length - 2 && S[i + 1] < sB; i++) {
+    const a = nrm(i), b = nrm(i + 1);
+    let mx = a[0] + b[0], mz = a[1] + b[1]; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
+    const k = 1 / Math.max(0.8, mx * a[0] + mz * a[1]);
+    samp.push([S[i + 1], i + 1, [mx, mz], k]);
+  }
+  samp.push([sB, i, nrm(i), 1]);
+  const ptOf = (q, o) => { const [sv, si, n, k] = q, t = sv - S[si], u = U[si]; return [p[si][0] + u[0] * t + n[0] * o * k, p[si][1] + u[1] * t + n[1] * o * k]; };
   A.LITM.color(YC.HEX);
-  A.LITM.poly([pt(sA, e0 - 0.05), pt(sB, e0 - 0.05), pt(sB, e0 + G.D), pt(sA, e0 + G.D)], YC.Y);
-  if (!P.perp) return;
+  for (let j = 1; j < samp.length; j++) {
+    const q0 = samp[j - 1], q1 = samp[j];
+    if (q1[0] - q0[0] < 0.02) continue;
+    const a = ptOf(q0, e0 - 0.05), b = ptOf(q1, e0 - 0.05), c = ptOf(q1, e0 + G.D), d = ptOf(q0, e0 + G.D);
+    A.LITM.dtri(a[0], a[1], b[0], b[1], c[0], c[1], YC.Y);
+    A.LITM.dtri(a[0], a[1], c[0], c[1], d[0], d[1], YC.Y);
+    // место для blocks(): прямоугольник куска (по отрезку)
+    const si = q0[1];                               // кусок лежит на отрезке, с которого начинается
+    const ux = U[si][0], uz = U[si][1], nx = -uz * side, nz = ux * side;
+    const cx = (a[0] + b[0] + c[0] + d[0]) / 4, cz = (a[1] + b[1] + c[1] + d[1]) / 4;
+    putPocket({ cx, cz, ux, uz, nx, nz, hl: (q1[0] - q0[0]) / 2 + 0.05, hd: G.D / 2 + 0.03, perp, n: list.length });
+  }
+  if (!perp) return;
   A.FLATM.color(YC.LINE);
   const bounds = [list[0].sc - G.SP / 2];
   for (const q of list) bounds.push(q.sc + G.SP / 2);
-  for (const s of bounds) { const a = pt(s, e0 + 0.35), b = pt(s, e0 + G.D - 0.25); A.FLATM.ribbon(a[0], a[1], b[0], b[1], 0.12, YC.Y + 0.03); }
+  for (let b = 0; b < bounds.length; b++) {
+    // касательная — как у соседнего места (машины стоят по ней)
+    const q = list[Math.min(list.length - 1, Math.max(0, b - (b === bounds.length - 1 ? 1 : 0)))], sv = bounds[b];
+    const nq = list[Math.min(list.length - 1, b)], pq = list[Math.max(0, b - 1)];
+    let nx = (nq.nx + pq.nx) / 2, nz = (nq.nz + pq.nz) / 2; const l = Math.hypot(nx, nz) || 1; nx /= l; nz /= l;
+    const ox = q.ax + (q.ux) * (sv - q.sc), oz = q.az + (q.uz) * (sv - q.sc);
+    const a0 = [ox + nx * (e0 + 0.35), oz + nz * (e0 + 0.35)], a1 = [ox + nx * (e0 + G.D - 0.25), oz + nz * (e0 + G.D - 0.25)];
+    A.FLATM.ribbon(a0[0], a0[1], a1[0], a1[1], 0.12, YC.Y + 0.03);
+  }
+}
+
+/* стоит криво: повёрнута и сдвинута от проезда, колёсами на газоне — если весь след машины свободен
+   (не дом, не мощёное кроме своего кармана, не твёрдое, не мелочь двора, не у двери, не вода) */
+function skew (sp, q, perp, G, entD) {
+  const out = rand(YC.SKEW_OUT[0], YC.SKEW_OUT[1]) * (perp ? 0.8 : 1);
+  const da = rand(YC.SKEW_A[0], YC.SKEW_A[1]) * (perp ? 0.5 : 1) * (Math.random() < 0.5 ? -1 : 1);
+  const x = sp.x + q.nx * out, z = sp.z + q.nz * out, h = sp.h + da;
+  const fx = Math.sin(h), fz = Math.cos(h), rx = fz, rz = -fx;      // вперёд и вбок
+  const HL = 2.35, HW = 1.0;
+  for (const a of [-1, -0.5, 0, 0.5, 1]) for (const b of [-1, 0, 1]) {
+    const px = x + fx * HL * a + rx * HW * b, pz = z + fz * HL * a + rz * HW * b;
+    if (A.groundH(px, pz) < 0.3 || A.inHouse(px, pz, 0.5)) return rej('skew');
+    const pv = A.onPave(px, pz, 0);
+    if (pv === 'road' || pv === 'path' || pv === 'alley') return rej('skew');
+    if (pv === 'walk') { const nr = A.nearestRoad(px, pz, 7, 1); if (!nr || nr.seg.c !== 7 || nr.d < nr.seg.w / 2 + 0.2) return rej('skew'); }
+    if (A.solidAt(px, pz, 0.3) || A.yardBlocks(px, pz, 0.3)) return rej('skew');
+    if (entD(px, pz, YC.ENT_MIN) < YC.ENT_MIN) return rej('skew');
+  }
+  sp.x = x; sp.z = z; sp.h = h; sp.skew = 1;
+  putPocket({ cx: x, cz: z, ux: fx, uz: fz, nx: rx, nz: rz, hl: HL, hd: HW, perp, n: 1, car: 1 });   // след машины на газоне — тоже занят (мелочь, клумбы, сугробы)
+  ST.skew++;
+  return true;
 }
 
 /* ── отрисовка: InstancedMesh на модель ── */

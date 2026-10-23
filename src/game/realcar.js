@@ -8,7 +8,7 @@
    CC-BY-4.0 (в титры): https://sketchfab.com/3d-models/old-car-vaz-2107-91270dab9d1a47c7ba7ffaaf8c8b0beb
 
    dress(car, id, hex) — своя машина: прежний кузов (рама, панели, стёкла, колёса, курьер) уходит
-   в спрятанную подгруппу — вмятины, стёкла, фары у него считаются как раньше, — а модель встаёт
+   в спрятанную подгруппу — вмятины и стёкла у него считаются как раньше, — а модель встаёт
    на его место. У каждой машины свои материалы (взрыв красит их в чёрный — новая после
    воскрешения чистая) и своя сетка кузова (мнётся).
    • Краска — маской (tools/realcar.mjs paint): серый оттенок × цвет машины из гаража (hex) —
@@ -18,6 +18,8 @@
      зеркало, козырьки — своё (неподвижное — одной склейкой).
    • Стёкла светлые и прозрачные; трескаются и бьются вместе со стёклами старого кузова.
    • Вмятины — от тех же ударов (game.js dentCar → dent), числа — как в cardent.js.
+   • Фары и фонари (23.10.2026) — светятся сами пиксели модели в местах C.lamps (LAMP, lampInject); сила — carlights.js
+     (своя), trafficLamps (поток); разбитая — гаснет (carglass.js → carlights.js kill; поток — dent).
    • Кровь (только взрослая версия): сбил человека — на кузове с той стороны пятна растут
      и стекают (до BODY_BLOOD.N пятен, копятся — машина «в кровище»), на лобовом — брызги,
      растекаются и текут вниз; дворники машут, пока стекло в крови, и стирают её.
@@ -25,6 +27,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { inject as dirtInject } from './cardirt.js';
 import { carMats as shadeMats, shadeInject } from './fakeshadows.js';   // тень домов на кузове (fakeshadows.js carMat)
+import { samplesFrom } from './warmup.js';
 
 const ROOT = (import.meta.env.BASE_URL || './') + 'models/';
 /* всё — в осях модели до увеличения k (метры настоящей машины): x — влево по ходу, y — вверх, z — вперёд, 0 — середина длины.
@@ -43,6 +46,14 @@ export const MODELS = {
     taxi: { x: 0.885, y: 0.78, z: [-1.55, 1.35], roof: 1.47, roofZ: -0.2 },   // такси потока: шашечки по бортам (x, высота, от–до по длине), фонарь на крыше
     torpedo: { W: 0.68, top: 0.95, lip: 0.68, low: 0.6, back: 1.0, floor: 0.4 },
     driver: { x: 0.36, seat: 0.5, z: 0.1 },        // курьер: середина сиденья (x), его высота, где голова по длине
+    lamps: {                                       // где фары и фонари (по вершинам и картинке деталей, 23.10.2026); светятся детали и стёкла фар
+      on: ['detail', 'lens'], zF: 1.9, zB: -1.92,
+      head: [0.35, 0.62, 0.59, 0.81],              // ближний свет: |x| от—до, высота от—до (снаружи — оранжевый поворотник, не светит)
+      turnF: [0.62, 0.71, 0.59, 0.81],
+      tail: [0.3, 0.7, 0.665, 0.785],              // верхний ряд фонаря — габарит и стоп-сигнал
+      rev: [0.3, 0.5, 0.575, 0.665],               // нижний ряд у середины — задний ход (снаружи — поворотник)
+      turnB: [0.5, 0.7, 0.575, 0.665],
+    },
   },
   /* «Копейка» — «VAZ 2101», Javkal, CC-BY-4.0: https://sketchfab.com/3d-models/vaz-2101-95d34f63b5b14e2197fd41383776e031
      Модель в 1,13 раза крупнее настоящей — k меньше; салона нет — всё своё, как у «Семёрки» × 1,12 и ближе к стеклу на 0,1 м */
@@ -54,6 +65,11 @@ export const MODELS = {
     box: { W2: 0.95, HL: 2.34 },
     torpedo: { W: 0.76, top: 1.06, lip: 0.86, low: 0.67, back: 1.15, floor: 0.45, visor: [1.52, 0.7], seats: [0.4, 0.5, 0.1] },
     driver: { x: 0.4, seat: 0.56, z: 0.22 },
+    lamps: {                                       // по вершинам картинки кузова (проба 23.10: модель выключена, в потоке — через TRAFFIC.MODELS); краска — не светит
+      on: ['body'], zF: 2.15, zB: -2.2,
+      head: [0.54, 0.78, 0.62, 0.84], turnF: [0.8, 0.86, 0.5, 0.6],
+      tail: [0.58, 0.88, 0.55, 0.82], rev: [0, 0, 0, 0], turnB: [0.58, 0.88, 0.55, 0.82],   // фонарь на картинке — одно пятно: заднего хода нет
+    },
   },
 };
 /* on — настоящие модели вместо коробочных (?oldcar — прежние, коробочные: их код остаётся, автор 23.10 «может потом вернём»);
@@ -323,7 +339,75 @@ function crackTex () {
    uPaint — цвет машины (маска краски — прозрачность картинки кузова); uBlood[i] — пятно: xyz — центр
    в осях модели, w — радиус (0 — нет). Ниже центра пятно вытянуто — стекает */
 const BODY_BLOOD = { N: 40, GROW: 0.9, DRIP: 0.07, DRIP_MIN: 0.3, K: 1.5 };   // K — пятна крупнее (автор 13.10: «кровищи больше»)
-function bodyShader (mat, U, paint, traffic) {
+
+/* ─── фары и фонари (0а, автор 23.10.2026: «горят ровно там, где фары на модели, а не коробочные огни поверх») ───
+   Светятся сами пиксели модели: в программе детали (и стёкла фар) внутри коробок C.lamps — свечение поверх света
+   (emissive), узор фары — по картинке, краска кузова не светит. Ни мешей, ни материалов, ни отрисовок — только две
+   униформы машины: uLampOn — x ближний свет, y габариты, z стоп-сигнал, w задний ход (0…1);
+   uLampDead — разбиты: x левая фара (+x), y правая, z левый фонарь, w правый (1 — не горит).
+   Своя машина — силу ставит carlights.js (ночь, тормоз, задний ход), ореолы и пятно на асфальте — там же и в game.js;
+   поток — trafficLamps (ночь, тормозит или стоит), пятно на асфальте — roadlife.js */
+const LAMP = { HEAD: [1.0, 0.9, 0.7], TAIL: [1.0, 0.04, 0.03], REV: [0.95, 0.97, 1.0], TAIL_K: 0.45, BRAKE_K: 1.1, HEAD_K: 1.15, LENS_A: 0.92,
+  NIGHT: [0.08, 0.3],                              // поток: фары с ночи 0,08 (сумерки), в полную силу — с 0,3
+  DECEL: 1.6, HOLD: 0.5, STOP_V: 0.4,              // поток: стоп-сигнал — тормозит сильнее 1,6 м/с² (и ещё 0,5 с) или стоит (медленнее 0,4 м/с)
+  HIT: 8, BOTH: 16 };                              // поток: удар у угла с 8 м/с — фара (фонарь) той стороны гаснет, с 16 — обе на этом конце
+const f3 = a => a.map(n => (+n).toFixed(3)).join(', ');
+function lampGLSL (L, paint) {
+  return `uniform vec4 uLampOn;\nuniform vec4 uLampDead;
+float lBox (vec3 p, vec4 b) { float ax = abs(p.x); return step(b.x, ax) * step(ax, b.y) * step(b.z, p.y) * step(p.y, b.w); }
+vec3 lampGlow (vec3 p, vec4 tx) {
+  float side = step(0.0, p.x);
+  float k = ${paint ? '(1.0 - tx.a)' : '1.0'} * (0.5 + 0.8 * dot(tx.rgb, vec3(0.3, 0.59, 0.11)));
+  if (p.z > ${f3([L.zF])}) return vec3(${f3(LAMP.HEAD)}) * (uLampOn.x * ${f3([LAMP.HEAD_K])} * lBox(p, vec4(${f3(L.head)})) * (1.0 - mix(uLampDead.y, uLampDead.x, side)) * k);
+  if (p.z < ${f3([L.zB])}) return (vec3(${f3(LAMP.TAIL)}) * ((uLampOn.y * ${f3([LAMP.TAIL_K])} + uLampOn.z * ${f3([LAMP.BRAKE_K])}) * lBox(p, vec4(${f3(L.tail)})))
+    + vec3(${f3(LAMP.REV)}) * (uLampOn.w * lBox(p, vec4(${f3(L.rev)})))) * ((1.0 - mix(uLampDead.w, uLampDead.z, side)) * k);
+  return vec3(0.0);
+}
+`;
+}
+/* в программу Ламберта: lens — стекло фары (полупрозрачное): где горит — плотнее */
+function lampInject (sh, U, L, paint, lens) {
+  sh.uniforms.uLampOn = U.lampOn;
+  sh.uniforms.uLampDead = U.lampDead;
+  if (lens) sh.vertexShader = 'varying vec3 vBLoc;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvBLoc = transformed;');
+  sh.fragmentShader = (lens ? 'varying vec3 vBLoc;\n' : '') + lampGLSL(L, paint) + sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+{
+#ifdef USE_MAP
+  vec4 ltx = texture2D(map, vMapUv);
+#else
+  vec4 ltx = vec4(1.0, 1.0, 1.0, 0.0);
+#endif
+  vec3 lg = lampGlow(vBLoc, ltx);
+  totalEmissiveRadiance += lg;${lens ? `\n  diffuseColor.a = max(diffuseColor.a, min(${f3([LAMP.LENS_A])}, dot(lg, vec3(0.8))));` : ''}
+}`);
+}
+const lampOf = (C, role) => (C && C.lamps && C.lamps.on.includes(role) ? C.lamps : null);
+function lensShader (mat, U, C) {
+  const L = lampOf(C, 'lens');
+  if (!L) return;
+  mat.onBeforeCompile = sh => lampInject(sh, U, L, false, true);
+  mat.customProgramCacheKey = () => 'realcar-lens-' + C.dir;   // одна программа на модель (униформы — свои у каждого материала)
+}
+/* места огней в осях машины (× k): lampQ — плашки ореолов carlights.js [x, y, z, w, h, назад?], по сторонам [−x, +x];
+   lampPts — середины фар и фонарей для carglass.js (удар у угла — бьётся; fl — левая фара, +x) */
+function lampPlaces (C) {
+  const L = C.lamps;
+  if (!L) return { lampQ: null, lampPts: null };
+  const k = C.k, zf = (L.zF + 0.15) * k, zb = (L.zB - 0.12) * k;
+  const q = (b, s, z, back) => [s * (b[0] + b[1]) / 2 * k, (b[2] + b[3]) / 2 * k, z, (b[1] - b[0]) * k, (b[3] - b[2]) * k, back];
+  const two = (b, z, back) => [q(b, -1, z, back), q(b, 1, z, back)];
+  const pt = (b, s, z) => [s * (b[0] + b[1]) / 2 * k, (b[2] + b[3]) / 2 * k, z];
+  return {
+    lampQ: { head: two(L.head, zf, 0), tail: two(L.tail, zb, 1), rev: two(L.rev, zb, 1),
+      turn: [-1, 1].map(s => [q(L.turnB || L.tail, s, zb, 1), q(L.turnF || L.head, s, zf, 0)]) },
+    lampPts: { fl: pt(L.head, 1, zf), fr: pt(L.head, -1, zf), rl: pt(L.tail, 1, zb), rr: pt(L.tail, -1, zb) },
+  };
+}
+export const LAMP_KEY = { fl: 'x', fr: 'y', rl: 'z', rr: 'w' };   // разбитая фара → компонента uLampDead
+const lampU = () => ({ lampOn: { value: new THREE.Vector4(0, 0, 0, 0) }, lampDead: { value: new THREE.Vector4(0, 0, 0, 0) } });
+
+function bodyShader (mat, U, paint, traffic, C) {
+  const L = lampOf(C, mat.userData.role);
   mat.userData.dirt = 1;                            // cardirt.js свою программу не ставит — грязь и снег вставляем сами
   mat.onBeforeCompile = sh => {
     if (!traffic) dirtInject(sh);                   // грязь и снег — своей машине (считаются от неё); у потока — износ uWear
@@ -358,10 +442,12 @@ float bH (vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x 
   diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.7, 0.52, 0.38), uWear * 0.8 * smoothstep(0.68 - uWear * 0.25, 0.92, wn));
   diffuseColor.rgb *= 1.0 - uWear * 0.06;
 }`);
+    if (L) lampInject(sh, U, L, paint, false);
   };
-  // ключ — свой у каждой машины: three вызывает onBeforeCompile только для новой программы, и вторая машина
-  // с тем же ключом осталась бы без своих uPaint / uBlood — с цветом и кровью первой (после «починить», воскрешения)
-  mat.customProgramCacheKey = () => 'realcar-body' + (paint ? '-paint-' : '-') + (traffic ? 'traffic-' : '') + U.id;
+  // ключ — общий у машин одной модели (23.10.2026; был свой у каждой машины — каждая новая «Семёрка» потока собирала
+  // две программы посреди езды, ~2—30 мс на «Деке»). three.js r169 зовёт onBeforeCompile у каждого нового материала
+  // (свои униформы uPaint / uBlood / uLampOn), программа — общая по ключу
+  mat.customProgramCacheKey = () => 'realcar-body' + (paint ? '-paint-' : '-') + (traffic ? 'traffic-' : '') + (L ? 'lamp-' + C.dir : '');
 }
 
 /* ─── кровь на лобовом: холст на геометрии стекла; брызги растут, потёки текут вниз ─── */
@@ -492,6 +578,7 @@ function load (C, lite) {
           const role = p.role || (/CarBody/.test(p.name) ? 'body' : /Details_0/.test(p.name) ? 'detail' : '');
           mat.userData.body = !p.blend && (role === 'body' || role === 'detail');   // кровь — на кузове и деталях
           mat.userData.paint = role === 'body';                                  // краска маской — только кузов
+          mat.userData.role = p.blend ? 'lens' : role;                           // lens — полупрозрачные стёкла фар и фонарей (C.lamps.on)
         }
         const m = new THREE.Mesh(geo, mat);
         m.name = 'real:' + p.name;
@@ -546,12 +633,44 @@ export const has = id => REAL.on && !!MODELS[id];
    у каждой машины — свой цвет, свой износ (ржавчина пятнами, тусклее), своя сетка (мнётся, как твоя: dent),
    стёкла трескаются с GLASS_HIT.CRACK м/с и бьются с GLASS_HIT.BREAK */
 export const TRAFFIC = { MODELS: ['semerka'], SHARE: 0.5, WEAR: [0, 0.8] };   // «Копейка» — вышла плохо (автор 13.10), ждёт модель получше
-const GLASS_HIT = { CRACK: 9, BREAK: 15 };
+const GLASS_HIT = { CRACK: 9, BREAK: 15, BOTH: 24 };   // BOTH — подробная копия: с такого удара трескаются и остальные стёкла
 const LITE = {};
 export function preloadTraffic (onReady) {
   const all = TRAFFIC.MODELS.filter(id => MODELS[id]).map(id => load(MODELS[id], true).then(g => { if (g) LITE[id] = g; }));
   Promise.all(all).then(() => { if (onReady && Object.keys(LITE).length) onReady(); });
 }
+/* прогрев (warmup.js): программы кузова, деталей и стёкол фар машин потока — при загрузке, а не с первой «Семёркой» в кадре
+   (ключ общий у модели — bodyShader, lensShader). Материалы — тех же настроек, что у trafficCar (картинка — любая) */
+samplesFrom((T, geo) => {
+  if (!REAL.on) return [];
+  const out = [], map = new T.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+  for (const id of TRAFFIC.MODELS) {
+    const C = MODELS[id];
+    if (!C) continue;
+    const U = { paint: { value: new T.Color(1, 1, 1) }, blood: { value: Array.from({ length: BODY_BLOOD.N }, () => new T.Vector4(0, 0, 0, 0)) }, wear: { value: 0 }, ...lampU() };
+    for (const role of ['body', 'detail']) {
+      const mt = new T.MeshLambertMaterial({ flatShading: true, side: T.DoubleSide, map });
+      mt.userData.role = role;
+      bodyShader(mt, U, role === 'body', true, C);
+      out.push(['настоящая машина потока: ' + id + ' ' + role + ' (realcar.js bodyShader)', new T.Mesh(geo, mt)]);
+    }
+    if (lampOf(C, 'lens')) {
+      const mt = new T.MeshLambertMaterial({ flatShading: true, side: T.DoubleSide, map, transparent: true, opacity: 0.5, depthWrite: false });
+      mt.userData.role = 'lens';
+      lensShader(mt, U, C);
+      const m = new T.Mesh(geo, mt);
+      shadeMats(m);                                  // как у машины: тень домов поверх (ключ «…|fsc»)
+      out.push(['стёкла фар настоящей машины: ' + id + ' (realcar.js lensShader)', m]);
+    }
+  }
+  // треснувшие стёкла машин потока: облегчённой (trafficGlass) и подробной копии (paneGlass, 12ар) — картинка трещин на тонированном
+  for (const [hex, a] of [[GLASS.TINT, GLASS.TINT_A], [DET.GLASS, DET.A]]) {
+    const m = new T.Mesh(geo, new T.MeshLambertMaterial({ color: hex, transparent: true, opacity: a, side: T.DoubleSide, map }));
+    shadeMats(m);
+    out.push(['треснувшее стекло машины потока (realcar.js trafficGlass / paneGlass)', m]);
+  }
+  return out;
+});
 export const trafficReady = () => REAL.on && Object.keys(LITE).length > 0;
 export function trafficCar (hex, taxi) {
   const ids = Object.keys(LITE).filter(id => !taxi || MODELS[id].taxi);
@@ -563,14 +682,15 @@ export function trafficCar (hex, taxi) {
   m.scale.setScalar(C.k);
   g.add(m);
   const U = { id: ++SEQ, paint: { value: dull(new THREE.Color(hex)) }, blood: { value: Array.from({ length: BODY_BLOOD.N }, () => new THREE.Vector4(0, 0, 0, 0)) },
-    wear: { value: TRAFFIC.WEAR[0] + Math.random() ** 1.5 * (TRAFFIC.WEAR[1] - TRAFFIC.WEAR[0]) } };
-  const R = { C, m, dent: [], glass: [], traffic: true };
+    wear: { value: TRAFFIC.WEAR[0] + Math.random() ** 1.5 * (TRAFFIC.WEAR[1] - TRAFFIC.WEAR[0]) }, ...lampU() };
+  const R = { C, m, dent: [], glass: [], traffic: true, lamp: { on: U.lampOn.value, dead: U.lampDead.value }, lv: 0, bkT: 0, U, det: null, broke: [] };   // lv — скорость в прошлом кадре, bkT — стоп-сигнал ещё горит, с; U — униформы (подробная копия — те же), det — подробная копия, broke — стёкла, разбитые последним ударом
   const own = new Map();
   m.traverse(o => {
     if (!o.isMesh) return;
     if (!own.has(o.material)) {
       const mt = o.material.clone();
-      if (o.material.userData.body) bodyShader(mt, U, o.material.userData.paint, true);
+      if (o.material.userData.body) bodyShader(mt, U, o.material.userData.paint, true, C);
+      else if (o.material.userData.role === 'lens') lensShader(mt, U, C);
       own.set(o.material, mt);
     }
     o.material = own.get(o.material);
@@ -581,6 +701,117 @@ export function trafficCar (hex, taxi) {
   shadeMats(m);                                      // в тени дома — темнее, как асфальт (до первой отрисовки: одна программа, без перекомпиляции)
   g.userData.real = R;
   return { g, hl: C.box.HL * C.k, id };
+}
+/* ─── подробная копия машины потока (12ар, 23.10.2026; автор: «ударенная мнётся в месте удара, стёкла трескаются и
+   бьются, фары гаснут, на сильном ударе отлетают колёса и бамперы»). Облегчённая — одна сетка стёкол (трескаются все
+   сразу), колёса в днище. Ударили (foewreck.js решает, кому — не больше FW.SLOTS ближних) — облегчённую прячем, в ту же
+   группу ставим полную модель (как своя: стёкла по одному, четыре колеса, салон с сиденьями), с теми же униформами
+   (цвет, износ, огни — один в один) и программами (ключи bodyShader / lensShader общие). Стёкла — светлее облегчённых
+   (DET.A): через них видно водителя. Облегчённая мнётся вместе с ней (dent) — undetail возвращает её битой.
+     detail(car)    — поставить (false — полной модели ещё нет: грузится, preloadFull)
+     undetail(car)  — вернуть облегчённую
+     wheel(car, k)  — группа колеса 'LF' / 'RF' / 'LB' / 'RB' (отлетает — foewreck.js)
+     bumper(car, e) — 'f' / 'r': бампер вырезается из кузова и деталей модели своей сеткой (BUMPER — где он) */
+const FULL = {};
+const DET = { GLASS: 0x2c3946, A: 0.5 };
+export const TST = { details: 0, back: 0, cracked: 0, broken: 0, bumpers: 0 };
+export function preloadFull () {
+  for (const id of TRAFFIC.MODELS) if (MODELS[id] && !FULL[id]) load(MODELS[id]).then(g => { if (g) FULL[id] = g; });
+}
+const SHARE_GEO = /^real:(win|Car_Interior|wheel)/;   // не мнутся: сетка общая с моделью (respawnTraffic её не выбрасывает)
+export function detail (car) {
+  const u = car && car.userData, R1 = u && u.real;
+  if (!R1 || !R1.traffic || R1.detail || R1.det) return false;
+  const id = Object.keys(MODELS).find(k => MODELS[k] === R1.C), M = id && FULL[id];
+  if (!M) { preloadFull(); return false; }
+  const C = R1.C, U = R1.U, m = new THREE.Group();
+  m.name = 'real-detail';
+  m.scale.setScalar(C.k);
+  for (const c of M.children) if (/^real:/.test(c.name) || /^wheel/.test(c.name)) m.add(c.clone());   // без торпедо, руля и коробочного курьера
+  const R2 = { C, m, dent: [], glass: [], panes: {}, wheelG: {}, traffic: true, detail: true, lite: R1, U, lamp: R1.lamp, lv: R1.lv, bkT: R1.bkT, broke: [], own: [], cut: {} };
+  const own = new Map();
+  m.traverse(o => {
+    if (/^wheel(LF|RF|LB|RB)$/.test(o.name)) R2.wheelG[o.name.slice(5)] = o;
+    if (!o.isMesh) return;
+    const src = o.material;
+    if (!own.has(src)) {
+      let mt;
+      if (/^real:win/.test(o.name)) mt = new THREE.MeshLambertMaterial({ color: DET.GLASS, transparent: true, opacity: DET.A, side: THREE.DoubleSide });
+      else {
+        mt = src.clone();
+        if (src.userData.body) bodyShader(mt, U, src.userData.paint, true, C);
+        else if (src.userData.role === 'lens') lensShader(mt, U, C);
+      }
+      own.set(src, mt); R2.own.push(mt);
+    }
+    o.material = own.get(src);
+    if (SHARE_GEO.test(o.name)) o.geometry.userData.shared = true;
+    else { o.geometry = o.geometry.clone(); R2.dent.push(o.geometry); }
+    const pk = /^real:win([FBLR])$/.exec(o.name);
+    if (pk) R2.panes[pk[1].toLowerCase()] = { m: o, st: 0 };
+  });
+  shadeMats(m);
+  R1.m.visible = false;
+  car.add(m);
+  R1.det = R2;
+  u.real = R2;
+  u._pose = undefined;                              // стоящая машина потока матрицы не пересчитывает (cull.js moved) — пересчитать
+  car.updateMatrixWorld(true);
+  TST.details++;
+  return true;
+}
+export function undetail (car) {
+  const u = car && car.userData, R2 = u && u.real;
+  if (!R2 || !R2.detail) return false;
+  const R1 = R2.lite;
+  if (R2.m.parent) R2.m.parent.remove(R2.m);
+  for (const g of R2.dent) g.dispose();
+  for (const mt of R2.own) { if (mt.map === CRACK) mt.map = null; mt.dispose(); }
+  R1.m.visible = true;
+  R1.det = null;
+  u.real = R1;
+  u._pose = undefined;                              // облегчённая была спрятана — её матрицы старые (cull.js moved)
+  car.updateMatrixWorld(true);
+  TST.back++;
+  return true;
+}
+export const wheel = (car, k) => { const R = car && car.userData.real; return R && R.detail ? R.wheelG[k] || null : null; };
+/* бампер в осях модели: z дальше этого (морда) / ближе (корма), высота от—до; |x| до — весь по ширине */
+const BUMPER = { f: { z: 1.93, y: [0.3, 0.57] }, r: { z: -1.9, y: [0.27, 0.56] }, X: 0.95 };
+export function bumper (car, e) {
+  const R = car && car.userData.real;
+  if (!R || !R.detail || R.cut[e] !== undefined) return null;
+  R.cut[e] = null;
+  const Q = BUMPER[e], P = [], N = [], UV = [];
+  let mat = null;
+  R.m.traverse(o => {
+    if (!o.isMesh || !/^real:Car_(CarBody|Details)_0$/.test(o.name) || !o.geometry.index) return;
+    const g = o.geometry, pa = g.attributes.position, ua = g.attributes.uv, I = g.index.array, keep = [];
+    let took = 0;
+    for (let t = 0; t < I.length; t += 3) {
+      let ok = true;
+      for (let j = 0; j < 3 && ok; j++) {
+        const i = I[t + j], z = pa.getZ(i), y = pa.getY(i);
+        ok = (e === 'f' ? z > Q.z : z < Q.z) && y >= Q.y[0] && y <= Q.y[1] && Math.abs(pa.getX(i)) <= BUMPER.X;
+      }
+      if (!ok) { keep.push(I[t], I[t + 1], I[t + 2]); continue; }
+      if (!mat || /Details/.test(o.name)) mat = o.material;   // деталь (хром, резина) — её картинка; иначе кузов
+      for (let j = 0; j < 3; j++) { const i = I[t + j]; P.push(pa.getX(i), pa.getY(i), pa.getZ(i)); UV.push(ua.getX(i), ua.getY(i)); }
+      took++;
+    }
+    if (took) g.setIndex(keep);
+  });
+  if (P.length < 9 * 6) return null;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(UV, 2));
+  geo.computeVertexNormals();
+  const m = new THREE.Mesh(geo, mat);
+  m.name = 'real:bumper-' + e;
+  R.m.add(m);
+  R.cut[e] = m;
+  TST.bumpers++;
+  return m;
 }
 /* ─── такси потока (своё, не из чужой модели): жёлтая краска — маской, как у всех; шашечки двумя рядами вдоль
    бортов и фонарь «ТАКСИ» на крыше — одна сетка на одну картинку (верх — шашки, низ — надпись) ─── */
@@ -629,9 +860,29 @@ function taxiDecor (T) {
 /* стёкла машины потока: одним куском — трескаются все и бьются все */
 function trafficGlass (R, force) {
   for (const o of R.glass) {
-    if (force >= GLASS_HIT.BREAK) o.visible = false;
+    if (force >= GLASS_HIT.BREAK) { if (o.visible) R.broke.push(o); o.visible = false; }
     else if (force >= GLASS_HIT.CRACK && !o.material.map) { o.material.map = crackTex(); o.material.opacity = GLASS.CRACK; o.material.color.setHex(0xffffff); o.material.needsUpdate = true; }
   }
+}
+/* подробная копия (12ар): стёкла по одному, как у своей — ближнее к удару трескается с GLASS_HIT.CRACK, бьётся с
+   GLASS_HIT.BREAK или вторым ударом по треснувшему; сильный удар (с GLASS_HIT.BOTH) — заодно трескает соседние */
+const PANE_Z = { F: 0.22, B: -0.3 };                 // доли полудлины: дальше вперёд — лобовое, назад — заднее, между — бок
+function paneOf (R, x, z) {
+  const HL = R.C.box.HL;
+  return z > HL * PANE_Z.F ? 'f' : z < HL * PANE_Z.B ? 'b' : x > 0 ? 'l' : 'r';
+}
+function crackPane (q) {
+  const mt = q.m.material;
+  q.st = 1; TST.cracked++;
+  mt.map = crackTex(); mt.opacity = GLASS.CRACK; mt.color.setHex(0xffffff); mt.needsUpdate = true;
+}
+function paneGlass (R, x, z, force) {
+  const k = paneOf(R, x, z), q = R.panes[k];
+  if (q && q.st < 2 && force >= GLASS_HIT.CRACK) {
+    if (force >= GLASS_HIT.BREAK || q.st === 1) { q.st = 2; q.m.visible = false; R.broke.push(q.m); TST.broken++; }
+    else crackPane(q);
+  }
+  if (force >= GLASS_HIT.BOTH) for (const n in R.panes) { const o = R.panes[n]; if (o !== q && o.st === 0) crackPane(o); }
 }
 
 export function dress (car, id = 'semerka', hex) {
@@ -648,14 +899,16 @@ export function dress (car, id = 'semerka', hex) {
     const m = M.clone();
     m.scale.setScalar(C.k);
     car.add(m);
-    const U = { id: ++SEQ, paint: { value: dull(new THREE.Color(hex || '#f0522a')) }, blood: { value: Array.from({ length: BODY_BLOOD.N }, () => new THREE.Vector4(0, 0, 0, 0)) } };   // w = 0 — пятна нет (у Vector4 по умолчанию w = 1)
-    const R = { C, m, wheels: [], front: [], sw: null, needles: [], dent: [], panes: {}, glassF: null, blood: null, bloodU: U.blood, bloodI: 0, splats: [], paint: U.paint };
+    const U = { id: ++SEQ, paint: { value: dull(new THREE.Color(hex || '#f0522a')) }, blood: { value: Array.from({ length: BODY_BLOOD.N }, () => new THREE.Vector4(0, 0, 0, 0)) }, ...lampU() };   // w = 0 — пятна нет (у Vector4 по умолчанию w = 1)
+    const R = { C, m, wheels: [], front: [], sw: null, needles: [], dent: [], panes: {}, glassF: null, blood: null, bloodU: U.blood, bloodI: 0, splats: [], paint: U.paint,
+      lamp: { on: U.lampOn.value, dead: U.lampDead.value }, ...lampPlaces(C) };   // огни: силу ставит carlights.js, места — lampQ (ореолы) и lampPts (carglass.js: бьются)
     const own = new Map();                           // у каждой машины свои материалы: взрыв красит их в чёрный (game.js gameOver)
     m.traverse(o => {
       if (o.isMesh) {
         if (!own.has(o.material)) {
           const mt = o.material.clone();
-          if (o.material.userData.body) bodyShader(mt, U, o.material.userData.paint);
+          if (o.material.userData.body) bodyShader(mt, U, o.material.userData.paint, false, C);
+          else if (o.material.userData.role === 'lens') lensShader(mt, U, C);
           own.set(o.material, mt);
         }
         o.material = own.get(o.material);
@@ -678,6 +931,10 @@ export function dress (car, id = 'semerka', hex) {
     shadeMats(m);                                    // тень домов: хром, резина, стёкла — до первой отрисовки (кузов — в грязи)
     REAL.k = C.k; REAL.eye.set(...C.eye);
     ud.real = R;
+    // огни — по местам модели: собранные по старому кузову (ушли в old-body, коробочные углы) — заново (carlights.js rig);
+    // фары и фонари для ударов (carglass.js lampsOf) — тоже; разбитые раньше — не горят
+    if (R.lampQ) { ud.lights = undefined; ud.lamps = undefined; }
+    if (ud.lampDead) for (const kk in ud.lampDead) if (LAMP_KEY[kk]) R.lamp.dead[LAMP_KEY[kk]] = 1;
   });
 }
 
@@ -706,9 +963,18 @@ const DENT = { MIN: 4, FULL: 22, DEPTH: 0.3, R0: 0.45, R1: 0.6, IN_END: 0.5, IN_
 export function dent (car, lx, lz, force, rear) {
   const R = car && car.userData.real;
   if (!R || !(force > DENT.MIN)) return;
-  if (R.traffic && !rear) trafficGlass(R, force);
+  if (R.traffic && !rear) { if (R.detail) paneGlass(R, lx / R.C.k, lz / R.C.k, force); else trafficGlass(R, force); }
   if (!rear) rearDent(car, lx, lz, force);
+  dentR(R, lx, lz, force, rear);
+  if (R.lite) { dentR(R.lite, lx, lz, force, rear); if (!rear) { trafficGlass(R.lite, force); R.lite.broke.length = 0; } }   // подробная копия: облегчённая (спрятана) мнётся тоже — вернётся битой
+}
+function dentR (R, lx, lz, force, rear) {
   const K = R.C.k, { W2, HL } = R.C.box, x = lx / K, z = lz / K, k = Math.min(1, (force - DENT.MIN) / (DENT.FULL - DENT.MIN));
+  // поток: удар у угла — фара (фонарь) той стороны гаснет, сильный — обе на этом конце (своя — carglass.js, как у старого кузова)
+  if (R.traffic && R.lamp && !rear && force >= LAMP.HIT && Math.abs(z) > HL * 0.5) {
+    const e = z > 0 ? 'f' : 'r', both = force >= LAMP.BOTH || Math.abs(x) < 0.12;
+    for (const s of both ? ['l', 'r'] : [x > 0 ? 'l' : 'r']) R.lamp.dead[LAMP_KEY[e + s]] = 1;
+  }
   const end = Math.abs(z) / HL >= Math.abs(x) / W2;
   const nx = end ? 0 : Math.sign(x) || 1, nz = end ? Math.sign(z) || 1 : 0;
   const cx = end ? Math.max(-W2, Math.min(W2, x)) : nx * W2, cz = end ? nz * HL : Math.max(-HL, Math.min(HL, z)), cy = 0.6;
@@ -774,4 +1040,24 @@ export function step (car, spin, steerY, steer, vf, dt = 1 / 60) {
   }
   bloodTick(R.blood, dt);
   wipeBlood(R, car.userData.wipers);
+}
+
+/* огни настоящих машин потока, каждый кадр (game.js, CL.step 'carlamps'): A.list — машины в движении (TACT), A.env — ENV.
+   Фары и габариты — с сумерек (LAMP.NIGHT), стоп-сигнал — тормозит (быстрее LAMP.DECEL м/с²; горит ещё LAMP.HOLD с)
+   или стоит на ходу (светофор, пробка); разбитая — не горит ничего, водитель вышел — не горит стоп-сигнал */
+const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+export function trafficLamps (dt, A) {
+  if (!REAL.on || !A || !A.list || !(dt > 0)) return;
+  const nk = smooth(LAMP.NIGHT[0], LAMP.NIGHT[1], (A.env && A.env.night) || 0);
+  for (const t of A.list) {
+    const u = t.mesh && t.mesh.userData, R = u && u.realLite ? u.real : null;
+    if (!R || !R.lamp) continue;
+    const on = R.lamp.on, v = t.speed || 0;
+    if (t.wreck || t.knock || t.gone) { on.set(0, 0, 0, 0); R.lv = v; continue; }   // разбита, отлетает, уехала
+    if ((R.lv - v) / dt > LAMP.DECEL && v > LAMP.STOP_V) R.bkT = LAMP.HOLD;
+    else if (R.bkT > 0) R.bkT -= dt;
+    R.lv = v;
+    on.x = nk; on.y = nk;
+    on.z = !t.stalled && !t.noDriver && (R.bkT > 0 || v < LAMP.STOP_V) ? 1 : 0;   // водитель вышел (stallCar) — на тормозе никого
+  }
 }

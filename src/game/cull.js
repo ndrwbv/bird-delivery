@@ -158,6 +158,8 @@ export function freeze (scene, cam, props) {
   scene.matrixAutoUpdate = false;
   scene.matrixWorldAutoUpdate = false;
   buildCells();
+  // дальнее и ближние клетки — сразу, а не в первом кадре мира после сборки (на Деке он и так самый долгий: ~10 мс отсюда)
+  if (CAM) { farAll(); nearCells(); }
   return STATS;
 }
 

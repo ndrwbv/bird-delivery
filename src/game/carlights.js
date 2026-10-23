@@ -19,6 +19,8 @@
    ореолы (прозрачные, складываются с картинкой), видны, только когда горят.
    step(car, dt, vf, steer, brake, gas, night) — из driveStep каждый кадр.
    kill(car, угол) — фонарь разбит (carglass.js): его плашки больше не горят.
+   Настоящая модель (realcar.js, 23.10.2026): плашек нет — светятся сами фары и фонари модели (сила — в ud.real.lamp),
+   здесь — только ореолы на их местах (rigReal).
 
    • Фары и задние фонари ночью (автор 18.10.2026: «ночью у машины моей всегда должны светить
      фары»): с сумерек до рассвета (ENV.night ≥ HEAD.ON) и в ливень / сильный снегопад (≥ HEAD.WX)
@@ -185,8 +187,28 @@ function findLamps (car) {
   return F;
 }
 
+/* настоящая модель (realcar.js): фары и фонари светятся сами (программа кузова, униформы ud.real.lamp) — здесь только
+   ореолы на их местах (ud.real.lampQ), без коробочных плашек; разбитые — гаснут (kill → ud.real.lamp.dead) */
+function rigReal (car, Q) {
+  const ud = car.userData;
+  const L = {
+    brake: haloSet(car, Q.tail, '#ff2626', 2.6, 0.6),
+    rev: haloSet(car, Q.rev, '#f2f6ff', 3, 0.45),
+    turn: [haloSet(car, Q.turn[0], '#ffa21f', 4, 0.55), haloSet(car, Q.turn[1], '#ffa21f', 4, 0.55)],
+    head: haloSet(car, Q.head, '#fff1d0', 2.8, 0.6), headSide: [0, 1],
+    tail: haloSet(car, Q.tail, '#ff2a2a', 2.2, 0.5),
+    tailLamp: null, real: ud.real.lamp,
+    side: 0, hold: 0, blinkT: 0,
+    state: { head: false, brake: false, reverse: false, left: false, right: false, side: 0, found: { tail: 2, ambR: 2, ambF: 2, real: 1 } },
+  };
+  DEBUG.L = L;
+  ud.lights = L;
+  if (ud.lampDead) for (const k in ud.lampDead) apply(L, k);
+  return L;
+}
 function rig (car) {
   const ud = car.userData, hz = ud.hazard || [];
+  if (ud.real && ud.real.lampQ) return rigReal(car, ud.real.lampQ);
   if (hz.length < 4) return (ud.lights = null);           // мопед и «лёгкие» машины — без огней
   // углы кузова — по аварийке (makeCar): x = ±(W/2 − 0,1), y = верх борта + 0,08, z = ±(hl − 0,05)
   const W2 = Math.abs(hz[1].position.x) + 0.1, top = hz[0].position.y - 0.08, hlF = hz[0].position.z + 0.05, hlB = -hz[2].position.z + 0.05;
@@ -240,6 +262,8 @@ export function kill (car, k) {
   if (!ud) return;
   (ud.lampDead || (ud.lampDead = {}))[k] = 1;
   if (ud.lights) apply(ud.lights, k);
+  const RL = ud.real && ud.real.lamp, c = { fl: 'x', fr: 'y', rl: 'z', rr: 'w' }[k];   // настоящая модель: гаснет сам пиксель фары
+  if (RL && c) RL.dead[c] = 1;
 }
 function collapse (set, q) {
   for (const m of [set.lamp, set.halo]) {
@@ -287,6 +311,7 @@ export function step (car, dt, vf, steer, brake, gas, night = 0) {
   set(L.rev, reverse, op * 0.8);
   set(L.turn[1], blink && L.side > 0, op);                  // +X — левый бок
   set(L.turn[0], blink && L.side < 0, op);
+  if (L.real) { L.real.on.z = braking ? 1 : 0; L.real.on.w = reverse ? 1 : 0; }   // настоящая модель: стоп-сигнал и задний ход — в программе кузова
   const st = L.state;
   st.brake = braking; st.reverse = reverse; st.side = haz ? 0 : L.side; st.left = blink && L.side > 0; st.right = blink && L.side < 0;
 }
@@ -305,6 +330,7 @@ export function lights (car, dt, night = 0, wx = 0) {
   set(L.head, on, k * (0.45 + 0.4 * night));               // днём в непогоду — тусклее, ночью — ярко
   set(L.tail, on, k * (0.3 + 0.35 * night));
   if (L.tailLamp) set(L.tailLamp, on, 0.4 * k);
+  if (L.real) { L.real.on.x = k * (0.75 + 0.25 * night); L.real.on.y = k; }   // настоящая модель: фары и габариты (днём в непогоду — тусклее)
   L.state.head = HEAD.on;
 }
 /* сила света фар 0…1 — для пятна на асфальте (game.js headGlow) */

@@ -144,17 +144,17 @@ export function dashSet (root, c, fuse) {
   }
 }
 const pad2 = n => String(n).padStart(2, '0');
-/* песочница: свои часы — срок sec с, «сейчас» с 14:20, минута игры ≈ 2 с */
+/* песочница: свои часы — срок sec с; плашка как в игре (11о): «до опоздания 0:40» — минуты:секунды, без часов игры
+   (было «14:21 · доставить до 14:42» — песочница показывала не то, что игрок; ревью 23.10, Р23-1) */
 export function fakeClock (sec, t) {
   const total = Math.max(1, +sec || 40);
   let left = total;
-  const hhmm = m => pad2(Math.floor(m / 60) % 24) + ':' + pad2(Math.floor(m) % 60);
   return {
     step: dt => { left -= dt; },
     get: () => {
       const k = left / total, lvl = left <= 0 ? 'late' : (k <= 0.18 || left < 10) ? 'low' : k <= 0.4 ? 'warn' : '';
-      const now = 14 * 60 + 20 + (total - left) / 2;
-      return { s: left, k, now: hhmm(now), label: left <= 0 ? t('опоздал') : t('доставить до'), due: hhmm(now + Math.max(0, left) / 2), lvl };
+      const n = Math.max(0, Math.ceil(left));
+      return { s: left, k, now: '', label: left <= 0 ? t('опоздал') : t('до опоздания'), due: Math.floor(n / 60) + ':' + pad2(n % 60), lvl };
     },
   };
 }

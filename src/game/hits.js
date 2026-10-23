@@ -212,13 +212,101 @@ function shadowFor () {
 
 /* самая низкая точка тела (по вершинам, без новых объектов) и подъём, чтобы она легла на верх
    слоя: смотрим под серединой и под обоими концами — на краю бордюра тело не проваливается */
+/* Быстро (23.10.2026): было Box3.expandByObject(m, true) на каждый видимый кусок — у тела-модели (Quaternius, кожа на
+   костях) three.js на каждую вершину и вес перемножал матрицы кости и перекладывал векторы, да ещё по разу на каждого
+   предка-меша: 4—5 мс в каждом кадре полёта и укладки на Деке. Теперь — те же куски (видимые меши и всё под ними,
+   каждый раз один), матрицы — разом: у кости — одна строка «высота» (мир · bindMatrixInverse · кость · boneInverse ·
+   bindMatrix), у вершины — сумма по весам. Морфы, сжатые веса, перспективная матрица — по-старому, через three.js */
+const LOWSEEN = new Set(), LOWLIST = [];
+let LOWROW = new Float64Array(256);
+const lowAdd = m => { if (!LOWSEEN.has(m)) { LOWSEEN.add(m); LOWLIST.push(m); } };
+const LOWV = m => { if (m.isMesh) m.traverse(lowAdd); };
 function lowest (o) {
   if (!BX) { BX = new A.THREE.Box3(); V3 = new A.THREE.Vector3(); }   // самокат (wreck) мог упасть раньше первого тела
-  BX.makeEmpty();
-  o.traverseVisible(LOW);
-  return BX.isEmpty() ? o.position.y : BX.min.y;
+  LOWSEEN.clear(); LOWLIST.length = 0;
+  o.traverseVisible(LOWV);                         // как раньше: видимые меши — и всё под ними (expandByObject шёл вглубь)
+  let lo = Infinity, any = false;
+  for (let i = 0; i < LOWLIST.length; i++) {
+    const m = LOWLIST[i];
+    m.updateWorldMatrix(false, false);
+    const g = m.geometry, pa = g && g.attributes && g.attributes.position;
+    if (!pa) continue;
+    any = true;
+    const y = lowOf(m, g, pa);
+    if (y < lo) lo = y;
+  }
+  return any && lo !== Infinity ? lo : o.position.y;
 }
-const LOW = m => { if (m.isMesh && m.geometry && m.geometry.attributes.position) BX.expandByObject(m, true); };
+/* самая низкая вершина куска в мире */
+function lowOf (m, g, pa) {
+  const e = m.matrixWorld.elements, n = pa.count;
+  const plain = a => a && !a.isInterleavedBufferAttribute && !a.normalized && a.itemSize === (a === pa ? 3 : 4);
+  if (m.isInstancedMesh) {                         // как у three.js: рамка с копиями, не вершины
+    if (m.boundingBox === null) m.computeBoundingBox();
+    BX.copy(m.boundingBox).applyMatrix4(m.matrixWorld);
+    return BX.isEmpty() ? Infinity : BX.min.y;
+  }
+  const morph = g.morphAttributes && g.morphAttributes.position && m.morphTargetInfluences;
+  if (morph || !plain(pa) || e[3] !== 0 || e[7] !== 0 || e[11] !== 0 || e[15] !== 1) return lowSlow(m, pa);
+  const P = pa.array;
+  if (!m.isSkinnedMesh) {
+    let lo = Infinity;
+    const a = e[1], b = e[5], c = e[9], d = e[13];
+    for (let v = 0, k = 0; v < n; v++, k += 3) { const y = a * P[k] + b * P[k + 1] + c * P[k + 2] + d; if (y < lo) lo = y; }
+    return lo;
+  }
+  const SI = g.attributes.skinIndex, SW = g.attributes.skinWeight, sk = m.skeleton;
+  // веса у моделей — байтами (нормированные): как three.js denormalize — делим на 255 / 65535
+  const wd = !SW || SW.isInterleavedBufferAttribute || SW.itemSize !== 4 ? 0 : !SW.normalized ? 1 : SW.array instanceof Uint8Array ? 255 : SW.array instanceof Uint16Array ? 65535 : 0;
+  if (!sk || !plain(SI) || !wd) return lowSlow(m, pa);
+  const bones = sk.bones, inv = sk.boneInverses, nb = bones.length;
+  if (LOWROW.length < nb * 4) LOWROW = new Float64Array(nb * 8);
+  // строка «высота» мира · bindMatrixInverse — потом на каждую кость · кость · boneInverse · bindMatrix
+  const r0 = rowMul(e[1], e[5], e[9], e[13], m.bindMatrixInverse.elements), a0 = r0[0], a1 = r0[1], a2 = r0[2], a3 = r0[3];
+  const R = LOWROW;
+  for (let j = 0; j < nb; j++) {
+    const b = bones[j];
+    if (!b) { R[j * 4] = R[j * 4 + 1] = R[j * 4 + 2] = R[j * 4 + 3] = 0; continue; }
+    let q = rowMul(a0, a1, a2, a3, b.matrixWorld.elements);
+    q = rowMul(q[0], q[1], q[2], q[3], inv[j].elements);
+    q = rowMul(q[0], q[1], q[2], q[3], m.bindMatrix.elements);
+    R[j * 4] = q[0]; R[j * 4 + 1] = q[1]; R[j * 4 + 2] = q[2]; R[j * 4 + 3] = q[3];
+  }
+  const I = SI.array, W = SW.array;
+  let lo = Infinity;
+  for (let v = 0, k = 0, w4 = 0; v < n; v++, k += 3, w4 += 4) {
+    const x = P[k], y0 = P[k + 1], z = P[k + 2];
+    let y = 0;
+    for (let c = 0; c < 4; c++) {
+      const w = wd === 1 ? W[w4 + c] : W[w4 + c] / wd;
+      if (w === 0) continue;
+      const o = I[w4 + c] * 4;
+      y += w * (R[o] * x + R[o + 1] * y0 + R[o + 2] * z + R[o + 3]);
+    }
+    if (y < lo) lo = y;
+  }
+  return lo;
+}
+const ROWT = new Float64Array(4);
+/* строка (a b c d) × матрица 4×4 three.js (по столбцам) */
+function rowMul (a, b, c, d, M) {
+  for (let col = 0; col < 4; col++) ROWT[col] = a * M[col * 4] + b * M[col * 4 + 1] + c * M[col * 4 + 2] + d * M[col * 4 + 3];
+  return ROWT;
+}
+/* сверка (probe): новый lowest и прежний — Box3.expandByObject(m, true) по видимым мешам */
+export const LOWDBG = {
+  lowest: o => lowest(o),
+  old (o) { const B = new A.THREE.Box3(); o.traverseVisible(m => { if (m.isMesh && m.geometry && m.geometry.attributes.position) B.expandByObject(m, true); }); return B.isEmpty() ? o.position.y : B.min.y; },
+};
+function lowSlow (m, pa) {                         // как было: через three.js (morph, сжатые атрибуты)
+  let lo = Infinity;
+  for (let i = 0; i < pa.count; i++) {
+    if (m.isMesh) m.getVertexPosition(i, V3); else V3.fromBufferAttribute(pa, i);
+    V3.applyMatrix4(m.matrixWorld);
+    if (V3.y < lo) lo = V3.y;
+  }
+  return lo;
+}
 function floorUnder (r, s) {
   const ax = Math.sin(r.rotation.y) * 0.4 * s, az = Math.cos(r.rotation.y) * 0.4 * s, py = r.position.y;
   const x = r.position.x, z = r.position.z;

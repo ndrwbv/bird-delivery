@@ -310,7 +310,7 @@ function* fences () {
           }
           left -= F.SEC;
           if (!type) continue;
-          if (++n % 150 === 0) yield 'заборы';
+          if (++n % 80 === 0) yield 'заборы';      // ≤ ~40 мс на Деке (без Math.random — шаги можно двигать)
           ST.fen.tried++;
           if (!fenceOk(cx, cz, ux, uz)) { flush(); piece = 0; ped = 0; continue; }
           // проезд между твёрдыми кусками: пусто или сбиваемые секции

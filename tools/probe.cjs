@@ -19,7 +19,8 @@
                             игра на телефоне только боком, orient.js) / 844×390 боком / 667×375 iPhone SE боком /
                             932×430 большой боком / 1280×800
    поворот из скрипта: console.log('__proberesize:844x390') — окно сменит размер (повернуть телефон туда-обратно)
-   кадр посреди скрипта: console.log('__probeshot:/путь/a.png') + wait(500) — снимок окна (несколько экранов за один запуск)
+   кадр посреди скрипта: await shot('/путь/a.png') — снимок как --shot (несколько экранов за один запуск);
+                            по-старому console.log('__probeshot:/путь/a.png') + wait(800)
    --turn                   --size=phone без ?portrait: как настоящий телефон стоя — заставка «поверни телефон» и пауза
    --sa=L,B                 вырез и полоска «домой» боком, px (iPhone 15 — 59,21): отступы --sa-* хада вместо env()
    --js="код" | --eval=file.js     тело async-функции в странице. Есть: d (= __dlv), wait(ms),
@@ -40,7 +41,9 @@
                             выделений памяти (с мусором, что уже собран). Разбор — node tools/profsum.cjs f
                             (имена функций — со сборкой без сжатия: --dir=папка от vite build --minify false)
    --secs=N                 после скрипта дать игре идти N секунд
-   --shot=out.png [--scale=0.5]    кадр в конце
+   --shot=out.png [--scale=2]      кадр в конце — как видит игрок: кадр игры крупным пикселем (растянут «ближайшим», без
+                            размытия) и интерфейс поверх; размер — окна (1280×800 при --size=deck). --scale только кратно:
+                            2, 3 — крупнее (2 — как на ретине), 0.5, 0.33 — мельче, тоже без размытия кадра. Автору — без --scale
    --errors                 напечатать ошибки консоли (счётчик печатается всегда)
    --console                печатать всю консоль страницы
    --max=4000               обрезать вывод JSON до N символов (0 — целиком)
@@ -52,7 +55,7 @@
    --timeout=120            секунд на всё
    Код выхода: 1 — необработанная ошибка в странице, исключение в скрипте, игра не загрузилась.
    Каждый запуск — с чистым сохранением (своя сессия в памяти и своя папка userData). */
-const { app, BrowserWindow, protocol, net, session } = require('electron');
+const { app, BrowserWindow, protocol, net, session, nativeImage } = require('electron');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -156,14 +159,11 @@ app.whenReady().then(async () => {
     if (MEM && typeof msg === 'string' && msg.startsWith('__probemem:')) { memMark(msg.slice(11)); return; }
     // повернуть «телефон» из скрипта: console.log('__proberesize:844x390') — окно меняет размер (orient.js, поворот туда-обратно)
     if (typeof msg === 'string' && msg.startsWith('__proberesize:')) { const [w, h] = msg.slice(14).split('x').map(Number); if (w > 0 && h > 0) win.setContentSize(w, h); return; }
-    // кадр посреди скрипта: console.log('__probeshot:/путь/кадр.png') — снимок окна (--scale тот же); подождать ~0,5 с
+    // кадр посреди скрипта: await shot('/путь/кадр.png') (PRELUDE) или console.log('__probeshot:/путь/кадр.png') + wait(800)
     if (typeof msg === 'string' && msg.startsWith('__probeshot:')) {
-      const f = path.resolve(msg.slice(12));
-      win.webContents.capturePage().then(img => {
-        const tw = Math.round(W * (+arg('scale', 1) || 1));
-        if (img.getSize().width !== tw) img = img.resize({ width: tw, quality: 'good' });
-        fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, img.toPNG());
-      }).catch(e => err('probe: кадр не снят:', e.message));
+      const raw = msg.slice(12), f = path.resolve(raw);
+      shot(f).then(r => { err('probe: кадр →', f, r.w + '×' + r.h + (r.sharp ? '' : ' (без растяжки кадра: ' + (r.skip || 'нет холста') + ')')); return r; }, e => { err('probe: кадр не снят:', e.message); return { err: e.message }; })
+        .then(r => js(`(window.__probeShots || (window.__probeShots = {}))[${JSON.stringify(raw)}] = ${JSON.stringify(r)}`).catch(() => {}));
       return;
     }
     if (has('console') || (level >= 3 && has('errors'))) err('[page]', msg.slice(0, 500));
@@ -209,6 +209,71 @@ app.whenReady().then(async () => {
     MEMLOG.push({ label, ...r });
     if (heap) js('window.__lateHold = false').catch(() => {});   // ?latesnap — поздняя сборка стояла, пока снимали кучу
     js(`(window.__probeMemR || (window.__probeMemR = {}))[${JSON.stringify(raw)}] = ${JSON.stringify(r)}`).catch(() => {});
+  }
+
+  /* снимок как видит игрок (автор 23.10: «скрины жёстко заблюренные»). Игра рисует маленький кадр (~1152×720, dynres)
+     и растягивает его на экран с image-rendering: pixelated; capturePage окна вне экрана тянет его плавно, а уменьшение
+     ещё мылит. Поэтому: (1) кадр игры — прямо из холста (в rAF сразу после отрисовки игры), растянут «ближайшим»;
+     (2) интерфейс — два снимка окна без холста, на чёрном и на белом: из разницы — прозрачность каждого пикселя
+     хада, и он ложится поверх кадра как в браузере (тексты, полупрозрачные плашки, тени). Холст под фильтром
+     (размытие брифа) или кадр не достался — просто снимок окна. --scale: ≥ 1 — целое, < 1 — 1/n */
+  const SC = (() => { const s = +arg('scale', 1) || 1; return s >= 1 ? Math.max(1, Math.round(s)) : 1 / Math.max(2, Math.round(1 / s)); })();
+  const GRAB = `(async () => {
+    const v = document.getElementById('view'); if (!v || !v.width || !v.isConnected) return null;
+    const cs = getComputedStyle(v); if ((cs.filter && cs.filter !== 'none') || cs.visibility !== 'visible' || cs.display === 'none' || +cs.opacity < 1) return { skip: 'filter' };
+    const c = document.createElement('canvas'); c.width = v.width; c.height = v.height;
+    const g = c.getContext('2d', { willReadFrequently: true }); let ok = false;
+    for (let i = 0; i < 30 && !ok; i++) {
+      await new Promise(r => requestAnimationFrame(() => { try { g.clearRect(0, 0, c.width, c.height); g.drawImage(v, 0, 0); } catch (e) {} r(); }));
+      const px = g.getImageData(0, 0, c.width, c.height).data;
+      for (let k = 0; k < px.length; k += 4 * 389) if (px[k] | px[k + 1] | px[k + 2]) { ok = true; break; }   // кадр не стёрт (холст без preserveDrawingBuffer)
+    }
+    if (!ok) return { skip: 'empty' };
+    const r = v.getBoundingClientRect();
+    return { url: c.toDataURL('image/png'), x: r.left, y: r.top, w: r.width, h: r.height };
+  })()`;
+  const KEY = col => `(async () => {
+    let st = document.getElementById('__probekey');
+    if (!st) { st = document.createElement('style'); st.id = '__probekey'; document.head.appendChild(st);
+      for (let e = document.getElementById('view').parentElement; e; e = e.parentElement) e.setAttribute('data-probekey', ''); }
+    st.textContent = '#view { visibility: hidden !important } [data-probekey] { background: ${col} !important }';
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  })()`;
+  const UNKEY = `(() => { const st = document.getElementById('__probekey'); if (st) st.remove(); for (const e of document.querySelectorAll('[data-probekey]')) e.removeAttribute('data-probekey'); })()`;
+  const fit = (img, w, h) => { const z = img.getSize(); return z.width === w && z.height === h ? img : img.resize({ width: w, height: h, quality: 'best' }); };
+  async function shot (file) {
+    const [cw, ch] = win.getContentSize(), TW = Math.round(cw * SC), TH = Math.round(ch * SC);
+    let fr = null;
+    try { fr = await js(GRAB); } catch (e) { fr = null; }
+    let out;
+    if (!fr || !fr.url) out = fit(await win.webContents.capturePage(), TW, TH);
+    else {
+      let B, Wt;
+      try { await js(KEY('#000')); await sleep(40); B = await win.webContents.capturePage(); await js(KEY('#fff')); await sleep(40); Wt = await win.webContents.capturePage(); }
+      finally { await js(UNKEY).catch(() => {}); }
+      const b = fit(B, TW, TH).toBitmap(), w = fit(Wt, TW, TH).toBitmap();
+      const F = nativeImage.createFromDataURL(fr.url), fz = F.getSize(), f = F.toBitmap();
+      const o = Buffer.alloc(TW * TH * 4);
+      // какой пиксель кадра попадает в пиксель снимка — «ближайший»; вне холста — фон 0
+      const cx = new Int32Array(TW), cy = new Int32Array(TH), s = TW / cw;
+      for (let X = 0; X < TW; X++) { const u = ((X + 0.5) / s - fr.x) / fr.w; cx[X] = u >= 0 && u < 1 ? Math.floor(u * fz.width) : -1; }
+      for (let Y = 0; Y < TH; Y++) { const u = ((Y + 0.5) / s - fr.y) / fr.h; cy[Y] = u >= 0 && u < 1 ? Math.floor(u * fz.height) : -1; }
+      for (let Y = 0; Y < TH; Y++) {
+        const fy = cy[Y];
+        for (let X = 0; X < TW; X++) {
+          const i = (Y * TW + X) * 4, fx = cx[X], j = fy >= 0 && fx >= 0 ? (fy * fz.width + fx) * 4 : -1;
+          for (let k = 0; k < 3; k++) {
+            const bk = b[i + k], t = w[i + k] - bk;          // t/255 — сколько хад пропускает (1 — пусто, 0 — плотный)
+            const v = bk + (j >= 0 && t > 0 ? t * f[j + k] / 255 : 0);
+            o[i + k] = v > 255 ? 255 : v;
+          }
+          o[i + 3] = 255;
+        }
+      }
+      out = nativeImage.createFromBitmap(o, { width: TW, height: TH });
+    }
+    fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, out.toPNG());
+    return { w: out.getSize().width, h: out.getSize().height, sharp: !!(fr && fr.url), skip: fr && fr.skip };
   }
 
   const timer = setTimeout(() => { err('probe: время вышло (--timeout=' + arg('timeout', 120) + ')'); finish(1, { ok: false, timeout: true, errors }); }, +arg('timeout', 120) * 1000);
@@ -295,14 +360,8 @@ app.whenReady().then(async () => {
   const logs = await js('window.__probe.logs').catch(() => []);
   const fstats = await js('window.__probe.stats()').catch(() => null);
   if (arg('shot')) {
-    let img = await win.webContents.capturePage();
-    // в CSS-пикселях окна (на ретине кадр вдвое больше — приводим), --scale — ещё меньше
-    const sc = +arg('scale', 1) || 1, tw = Math.round(W * sc);
-    if (img.getSize().width !== tw) img = img.resize({ width: tw, quality: 'good' });
     const f = path.resolve(arg('shot'));
-    fs.mkdirSync(path.dirname(f), { recursive: true });
-    fs.writeFileSync(f, img.toPNG());
-    err('probe: кадр →', f, img.getSize().width + '×' + img.getSize().height);
+    try { const r = await shot(f); err('probe: кадр →', f, r.w + '×' + r.h + (r.sharp ? '' : ' (без растяжки кадра: ' + (r.skip || 'нет холста') + ')')); } catch (e) { err('probe: кадр не снят:', e.message); }
   }
   clearTimeout(timer);
 

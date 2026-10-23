@@ -11,7 +11,8 @@
 
      PZ.init(elPause, { settings(tab), navReset, replay, music(), musicLabel() }) — из game.js один раз
      PZ.reset()      — при открытии паузы: в центр «продолжить»
-     PZ.flip(±1), PZ.on() — листать (game.js padStep, career.js onKey) */
+     PZ.flip(±1), PZ.on() — листать (game.js padStep, career.js onKey)
+     PZ.more()       — после renderPause: лист не влез — внизу «ещё ▼» (Р23-14) */
 import './pausecz.css';
 import { t } from '../i18n/index.js';
 import { carousel } from './carousel.js';
@@ -31,7 +32,8 @@ export function init (el, api) {
   // сверху — чек смены и накладная: просто листки, геймпад на них не встаёт
   const top = document.createElement('div');
   top.className = 'pz-top';
-  for (const id of ['pm-stats', 'pm-order']) { const n = $(id); if (n) { const w = document.createElement('div'); w.className = 'pz-sheet'; w.appendChild(n); top.appendChild(w); } }
+  for (const id of ['pm-stats', 'pm-order']) { const n = $(id); if (n) { const w = document.createElement('div'); w.className = 'pz-sheet'; w.appendChild(n); top.appendChild(w); moreTab(w); } }
+  addEventListener('resize', () => { if (on()) more(); });
   const host = document.createElement('div');
   host.className = 'pz-host';
   const hint = document.createElement('div');
@@ -98,6 +100,26 @@ function hint () {
     : esc(t('листай ◀ ▶')) + ' · ' + esc(t('выбрать')) + ' ' + keyHTML('ok');
 }
 onInput(() => hint());
+/* лист не влез (телефон боком, ревью 23.10 Р23-14): полоска прокрутки на телефоне почти не видна, и «звание», «сбито»
+   терялись под обрезом. Пока лист не долистан до конца — внизу листа бумажная плашка «ещё ▼» поверх светлого
+   затухания (прилипает к низу листа); тап по ней — лист листается вниз. Долистал — плашки нет.
+   PZ.more() — после renderPause (game.js) и на повороте экрана */
+function moreTab (w) {
+  const b = document.createElement('div');
+  b.className = 'pz-more-b';
+  b.setAttribute('aria-hidden', 'true');
+  b.addEventListener('click', e => { e.stopPropagation(); w.scrollBy({ top: Math.max(40, w.clientHeight * 0.7), behavior: 'smooth' }); });
+  w.appendChild(b);
+  w.addEventListener('scroll', () => moreOne(w), { passive: true });
+  // портреты в накладной догружаются позже — высота листа меняется после renderPause
+  if (typeof ResizeObserver === 'function' && w.firstElementChild) new ResizeObserver(() => moreOne(w)).observe(w.firstElementChild);
+}
+function moreOne (w) {
+  const b = w.querySelector('.pz-more-b');
+  if (b) b.innerHTML = '<span>' + esc(t('ещё ▼')) + '</span>';
+  w.classList.toggle('pz-more', w.scrollHeight - w.scrollTop - w.clientHeight > 6);
+}
+export function more () { if (root) for (const w of root.querySelectorAll('.pz-sheet')) { w.scrollTop = 0; moreOne(w); } }
 export function reset () { if (CZ) { CZ.go(0, true); label(); } }
 export const on = () => !!(CZ && root && !root.hidden);
 export function flip (d) { return on() && CZ.flip(d); }
