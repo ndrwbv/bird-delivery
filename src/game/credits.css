@@ -1,0 +1,35 @@
+/* лист «авторы и лицензии» (credits.js): тот же лист накладной, что «что собираем» (privacy.css — классы pv-*);
+   здесь — только рамка окна под свой data-kind и мелочь строк титров */
+#panel[data-kind="credits"] { --u: clamp(10px, min(1.2vw, 2.1vh), 18px); background: var(--pp-dim), rgba(30, 12, 20, .35); }
+#panel[data-kind="credits"] .pn-box {
+  width: min(1000px, calc(100% - 16px)); height: calc(100% - 24px); max-height: none; overflow: visible;
+  display: flex; flex-direction: column; padding: calc(var(--u) * .6) calc(var(--u) * 1.4) calc(var(--u) * .6);
+  color: var(--pp-ink); background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 4px;
+  box-shadow: 0 8px 0 var(--pp-ink), 0 24px 60px rgba(0, 0, 0, .5);
+}
+#panel[data-kind="credits"] .pn-box::before, #panel[data-kind="credits"] .pn-box::after { content: ''; position: absolute; left: 10px; right: 10px; height: 8px; pointer-events: none; background: var(--pp-perf); }
+#panel[data-kind="credits"] .pn-box::before { top: -6px; }
+#panel[data-kind="credits"] .pn-box::after { bottom: -6px; }
+#panel[data-kind="credits"] #pn-close { display: none; }
+#panel[data-kind="credits"] #pn-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+#panel[data-kind="credits"] .pn-t.pv-head { flex: none; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; text-align: left;
+  margin: 0 0 calc(var(--u) * .5); padding: calc(var(--u) * .9) 0 calc(var(--u) * .55); font-size: var(--pp-fs-m); line-height: 1.3;
+  color: var(--pp-rust); text-transform: uppercase; letter-spacing: .08em; border-bottom: 2px dashed var(--pp-brown); box-shadow: 0 -5px 0 -1px var(--pp-orange); }
+#panel[data-kind="credits"] .pv-pad.padsel { background: color-mix(in srgb, var(--pp-yellow) 55%, transparent); box-shadow: -6px 0 0 var(--pp-orange) !important; outline: 0 !important; transform: none; }
+#panel[data-kind="credits"] .pv-back.padsel { outline: 4px solid var(--pp-ink) !important; outline-offset: 2px;
+  box-shadow: 0 0 0 8px var(--pp-yellow), 0 4px 0 var(--pp-ink) !important; animation: pp-lift .2s var(--pp-spring); }
+
+.cr-item .cr-name { font-weight: normal; color: var(--pp-ink); }
+.cr-item .cr-lic { display: inline-block; margin-left: .4em; padding: 0 .4em; font-size: .85em; color: var(--pp-rust); border: 2px solid var(--pp-rust); border-radius: 4px; rotate: -2deg; }
+.cr-item .cr-who { color: var(--pp-label); }
+.cr-item .cr-url { font-size: .85em; }
+.pv-seal.cr-seal { --pv-c: var(--pp-rust); }
+
+@media (max-height: 560px) {
+  #panel[data-kind="credits"] { --u: clamp(10px, 2.6vh, 12px); }
+  #panel[data-kind="credits"] .pn-box { height: calc(100% - 16px); }
+  #panel[data-kind="credits"] .pn-t.pv-head { margin-bottom: 2px; padding: 6px 0 4px; }
+}
+@media (max-aspect-ratio: 1/1) {
+  #panel[data-kind="credits"] .pn-box { padding-left: 12px; padding-right: 12px; }
+}

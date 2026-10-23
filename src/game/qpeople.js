@@ -19,12 +19,15 @@
 
    Кто: все люди (стиль утверждён автором 21.10.2026). ?qp=0 — старые коробочные (для сравнения), ?qpmix — каждый третий.
    Чего нет в пробе: зимней одежды и шапок (верх зимой — цвета пуховика), живых лиц катсцен (у моделей свои лица).
-   Дальний вариант (дальше 45 м) — та же модель одним мешем, стоит. */
+   Дальний вариант (дальше 45 м) — та же модель одним мешем, стоит.
+   23.10.2026: коробку с пиццей держит двумя руками на кистях (CARRY); сбитый — та же модель с цветами живого и тем, что
+   надето поверх (corpseQ); на куски — та же модель (qPieces); наклон «Interact» — qpeople.clips.js. */
 import * as THREE from '../vendor/three.module.min.js';
 import { QDATA } from './qpeople.data.js';
+import { QCLIPS } from './qpeople.clips.js';      // добавочные клипы (наклон «Interact» — поднять с земли), tools/quaternius/clipadd.py
 
 const SRCH = typeof location !== 'undefined' ? location.search || '' : '';
-export const QP = { on: !/[?&]qp=0\b/.test(SRCH), all: !/[?&]qpmix\b/.test(SRCH), rate: 0.34, built: 0, posed: 0, walk: 0, combos: 0 };
+export const QP = { on: !/[?&]qp=0\b/.test(SRCH), all: !/[?&]qpmix\b/.test(SRCH), rate: 0.34, built: 0, posed: 0, walk: 0, combos: 0, carry: 0 };
 if (typeof window !== 'undefined') window.__qp = QP;   // отладка: сколько собрано, поз, кадров ходьбы
 
 /* случайность от зерна человека */
@@ -60,10 +63,23 @@ function family (fam) {
     RP.push(new THREE.Vector3(f32(), f32(), f32())); RQ.push(new THREE.Quaternion(f32(), f32(), f32(), f32()));
   }
   const clips = {};
+  const clipKey = name => /run/i.test(name) ? 'run' : /death/i.test(name) ? 'death' : /punch/i.test(name) ? 'punch' : /interact|pick/i.test(name) ? 'interact' : /walk/i.test(name) ? 'walk' : name.toLowerCase();
   for (let c = 0; c < nC; c++) {
     const name = str(), nF = u32(), fps = f32(), speed = f32();
     const data = new Float32Array(bin.buffer.slice(o, o + nF * nJ * 7 * 4)); o += nF * nJ * 7 * 4;
-    clips[/run/i.test(name) ? 'run' : /death/i.test(name) ? 'death' : /punch/i.test(name) ? 'punch' : 'walk'] = { nF, fps, speed, data, T: nF / fps };
+    clips[clipKey(name)] = { nF, fps, speed, data, T: nF / fps };
+  }
+  // добавочные клипы (qpeople.clips.js): у семейства A (цельные женщины) наклона нет — игра наклоняет своими костями
+  if (QCLIPS[fam]) {
+    const xb = Uint8Array.from(atob(QCLIPS[fam]), c => c.charCodeAt(0)), xv = new DataView(xb.buffer);
+    let p = 8;
+    if (xv.getUint32(0, true) === nJ) {
+      for (let c = 0, n = xv.getUint32(4, true); c < n; c++) {
+        const ln = xb[p++], name = new TextDecoder().decode(xb.subarray(p, p + ln)); p += ln;
+        const nF = xv.getUint32(p, true), fps = xv.getFloat32(p + 4, true), speed = xv.getFloat32(p + 8, true); p += 12;
+        clips[clipKey(name)] = { nF, fps, speed, data: new Float32Array(xb.buffer.slice(p, p + nF * nJ * 28)), T: nF / fps }; p += nF * nJ * 28;
+      }
+    }
   }
   const models = [];
   for (let mI = 0; mI < nM; mI++) {
@@ -355,12 +371,36 @@ function hat (F, sk, S, Lk) {
 
 /* очки: две тёмные рамки и перемычка у глаз, в осях кости головы */
 const GLASS_MAT = new THREE.MeshLambertMaterial({ color: 0x1d1a1f, flatShading: true });
+/* 23.10.2026: рамки — одной склейкой на человека (было 9—11 мешей — столько же вызовов отрисовки на каждого в очках);
+   вершины — общие на семейство и вид очков (GLASS_ARR), геометрия — своя (dropMesh её освобождает), выглядит так же */
+const GLASS_ARR = new Map();
+function glassGeo (s, sun) {
+  const key = s.toFixed(4) + (sun ? 's' : '');
+  let A = GLASS_ARR.get(key);
+  if (!A) {
+    const P = [], N = [], I = [];
+    const add = (w, h, d, x, y, z) => {
+      const b = new THREE.BoxGeometry(w * s, h * s, d * s), bp = b.attributes.position, bn = b.attributes.normal, o = P.length / 3;
+      for (let i = 0; i < bp.count; i++) { P.push(bp.getX(i) + x * s, bp.getY(i) + y * s, bp.getZ(i) + z * s); N.push(bn.getX(i), bn.getY(i), bn.getZ(i)); }
+      for (const k of b.index.array) I.push(k + o);
+      b.dispose();
+    };
+    for (const x of [-0.035, 0.035]) { add(0.05, 0.008, 0.008, x, 0.02, 0); add(0.05, 0.008, 0.008, x, -0.02, 0); add(0.008, 0.045, 0.008, x - 0.025, 0, 0); add(0.008, 0.045, 0.008, x + 0.025, 0, 0); }
+    add(0.022, 0.008, 0.008, 0, 0.012, 0);
+    if (sun) for (const x of [-0.035, 0.035]) add(0.045, 0.035, 0.004, x, 0, 0.002);
+    A = { P: new Float32Array(P), N: new Float32Array(N), I: new Uint16Array(I) };
+    GLASS_ARR.set(key, A);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(A.P, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(A.N, 3));
+  geo.setIndex(new THREE.BufferAttribute(A.I, 1));
+  geo.computeBoundingSphere();
+  return geo;
+}
 function glasses (F, eye, Lk) {
   const s = F.h / 1.83, g = new THREE.Group();
-  const add = (w, h, d, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w * s, h * s, d * s), GLASS_MAT); m.position.set(x * s, y * s, z * s); g.add(m); };
-  for (const x of [-0.035, 0.035]) { add(0.05, 0.008, 0.008, x, 0.02, 0); add(0.05, 0.008, 0.008, x, -0.02, 0); add(0.008, 0.045, 0.008, x - 0.025, 0, 0); add(0.008, 0.045, 0.008, x + 0.025, 0, 0); }
-  add(0.022, 0.008, 0.008, 0, 0.012, 0);
-  if (Lk.glasses === 'sun') for (const x of [-0.035, 0.035]) add(0.045, 0.035, 0.004, x, 0, 0.002);
+  g.add(new THREE.Mesh(glassGeo(s, Lk.glasses === 'sun'), GLASS_MAT));
   const j = F.J.head, iq = F.RQ[j].clone().invert();
   g.quaternion.copy(iq);
   g.position.copy(eye).add(new THREE.Vector3(0, 0, 0.012 * s)).sub(F.RP[j]).applyQuaternion(iq);
@@ -421,9 +461,10 @@ function neutral (F, pos, si, sw, nV) {
 }
 
 /* кадр клипа (fi — дробный номер кадра) — в кости, с весом w поверх того, что в них уже есть */
-function clipPose (st, c, fi, loop, w) {
+function clipPose (st, c, fi, loop, w, skip) {
   const F = st.F, D = c.data, nJ = F.nJ, f0 = Math.floor(fi), f1 = loop ? (f0 + 1) % c.nF : Math.min(f0 + 1, c.nF - 1), fr = fi - f0;
   for (let j = 0; j < nJ; j++) {
+    if (skip && skip[j]) continue;                 // руки заняты (несёт коробку) — ходьба им не машет
     const o0 = (f0 * nJ + j) * 7, o1 = (f1 * nJ + j) * 7, b = st.bones[j];
     CQ.set(D[o0], D[o0 + 1], D[o0 + 2], D[o0 + 3]); CQ2.set(D[o1], D[o1 + 1], D[o1 + 2], D[o1 + 3]);
     CQ.slerp(CQ2, fr);
@@ -431,6 +472,24 @@ function clipPose (st, c, fi, loop, w) {
     V.set(D[o0 + 4] + (D[o1 + 4] - D[o0 + 4]) * fr, D[o0 + 5] + (D[o1 + 5] - D[o0 + 5]) * fr, D[o0 + 6] + (D[o1 + 6] - D[o0 + 6]) * fr);
     b.position.lerp(V, w);
   }
+}
+
+/* ── коробка с пиццей в руках (game.js pizzaBox — userData.pbox; закрытая, без откинутой крышки — openBox) ──
+   Автор 23.10.2026 (0п9): «клиент берёт пиццу — коробка проходит сквозь него». Держит двумя руками перед собой:
+   плечи вперёд на ARM, локти согнуты на ELB (предплечья почти горизонтально), чуть внутрь (IN); коробка лежит на кистях
+   модели (Y — м над запястьями), не ближе ZMIN м перед осью тела (задний край — перед животом). Ходьба художника рукам
+   не машет. Так держат все: клиент у двери, на лавочке, по дороге домой, в катсценах */
+export const CARRY = { ARM: -0.5, ELB: -1.0, IN: 0.1, Y: 0.035, ZMIN: 0.47 };
+const CQL = new THREE.Quaternion().setFromEuler(new THREE.Euler(CARRY.ARM, 0, CARRY.IN)), CQR = new THREE.Quaternion().setFromEuler(new THREE.Euler(CARRY.ARM, 0, -CARRY.IN));
+function carriedBox (st) {
+  const g = st.g;
+  if (g.children.length !== st.nc || (st.box && st.box.parent !== g)) { st.nc = g.children.length; st.box = null; for (const c of g.children) if (c.userData && c.userData.pbox) { st.box = c; break; } }
+  const b = st.box;
+  return b && b.parent === g && b.visible && b.children.length <= 2 ? b : null;
+}
+function armMask (F) {
+  if (!F.armMask) { const cls = classes(F); F.armMask = new Uint8Array(F.nJ); for (let j = 0; j < F.nJ; j++) if (cls[j] === 1 || cls[j] === 3) F.armMask[j] = 1; }
+  return F.armMask;
 }
 
 /* ── каждый кадр, когда модель в кадре ── */
@@ -473,11 +532,23 @@ function poseHook () {
   const a = st.ang;
   a.kneeL = knee(u.legL.rotation.x); a.kneeR = knee(u.legR.rotation.x);
   a.elbL = elb(u.armL.rotation.x); a.elbR = elb(u.armR.rotation.x);
+  const box = !u.qAnim && !st.noWalk ? carriedBox(st) : null;   // несёт коробку: руки вперёд, коробка — на кистях (CARRY)
+  if (box) { if (J.armL >= 0) dq[J.armL] = CQL; if (J.armR >= 0) dq[J.armR] = CQR; a.elbL = a.elbR = CARRY.ELB; }
   solve(F, dq, a, st.WQ, st.WP, st.bones);
-  // анимация художника, которую задаёт игра (hits.js fallStep: падает навзничь, лежит, встаёт, грозит кулаком)
+  // анимация художника, которую задаёт игра (hits.js fallStep: падает навзничь, лежит, встаёт, грозит кулаком;
+  // carried.js: наклон «Interact» — поднять с земли то, что выронил)
   const an = u.qAnim, ac = an && F.clips[an.c];
   if (ac) {
     clipPose(st, ac, Math.max(0, Math.min(1, an.f)) * (ac.nF - 1), false, 1);
+    // наклон поверх клипа (carried.js: «Interact» тянется рукой вперёд — а вещь на земле): туловище вперёд на bend рад
+    // вокруг оси x группы, с ним грудь, руки и голова
+    if (an.bend && J.body >= 0) {
+      const b = st.bones[J.body];
+      CQ.identity();
+      for (let o = b.parent; o && o !== st.root; o = o.parent) CQ.premultiply(o.quaternion);
+      V.copy(AX).applyQuaternion(CQ.invert());
+      b.quaternion.premultiply(CQ2.setFromAxisAngle(V, an.bend));
+    }
     // ступни у Quaternius — цели ног, в этих клипах не следуют за ногой: пристегнуть к голени, как в покое
     st.root.updateMatrixWorld(true);
     for (const Ft of F.FOOT) {
@@ -492,7 +563,7 @@ function poseHook () {
     st.run += ((st.v > 2.4 && F.clips.run ? 1 : 0) - st.run) * Math.min(1, dt * 5);
     const c = st.run > 0.5 ? F.clips.run : F.clips.walk;
     st.t += dt * st.v / (c.speed * sc);
-    clipPose(st, c, ((st.t / c.T) % 1) * c.nF, true, st.w);
+    clipPose(st, c, ((st.t / c.T) % 1) * c.nF, true, st.w, box || u.qArms ? armMask(F) : null);   // qArms — руки заняты (митингующий держит плакат, protests.js): ходьба им не машет
     // голова — куда смотрит игра (на машину, на собеседника)
     if (J.head >= 0 && u.head.rotation.y) st.bones[J.head].rotateY(u.head.rotation.y * st.w);
     QP.walk++;
@@ -516,12 +587,20 @@ function poseHook () {
     st.bones[h].getWorldPosition(V); st.g.worldToLocal(V);
     arm.position.copy(V).sub(V2.set(0, -0.58, 0).applyQuaternion(arm.quaternion));
   }
+  // коробка — на кистях: между запястьями, дном на них, перед животом
+  if (box && J.handL >= 0 && J.handR >= 0) {
+    st.bones[J.handL].getWorldPosition(V); st.g.worldToLocal(V);
+    st.bones[J.handR].getWorldPosition(V2); st.g.worldToLocal(V2);
+    box.position.set((V.x + V2.x) / 2, (V.y + V2.y) / 2 + 0.11 * box.scale.y + CARRY.Y, Math.max((V.z + V2.z) / 2 + 0.03, CARRY.ZMIN));
+    box.rotation.set(0, 0, 0);
+    QP.carry++;
+  }
   QP.posed++;
 }
 
 /* ── тело сбитого (hits.js throwBody): вместо шести коробок — та же модель, что у человека; куски тела hits.js
    (ноги, туловище, руки, голова — пустые шарниры в тех же местах) крутят её кости, как кости человека ── */
-export function corpseQ (gu, mat) {
+export function corpseQ (gu, mat, grp) {
   const root = new THREE.Group();
   root.rotation.order = 'YXZ';
   const mk = (x, y) => { const o = new THREE.Group(); o.position.set(x, y, 0); root.add(o); return o; };
@@ -533,7 +612,25 @@ export function corpseQ (gu, mat) {
   const c = gu.colors || {}, was = gu.skin && gu.skin.userData.q;   // тот же человек: те же части (одет по сезону) и цвета
   const { skin } = was ? buildQ(holder, was.qd, was.S, gu.look, mat, true) : buildQ(holder, gu.q, { skin: c.skin, shirt: c.shirt, pants: c.pants }, gu.look, mat);
   skin.userData.q.noWalk = true;                    // тело не «шагает», даже когда скользит по земле
+  // автор 23.10.2026 (0аз): «сбил человека в чёрном — улетает в белом». Тот же человек в той же одежде:
+  // цвета вершин — с живого (та же сборка — те же вершины; перекрашенная голова — маска, злое лицо — тоже)
+  const lc = gu.skin && gu.skin.geometry && gu.skin.geometry.attributes.color, nc = skin.geometry.attributes.color;
+  if (was && lc && lc.array.length === nc.array.length) { nc.array.set(lc.array); nc.needsUpdate = true; }
+  // и то, что игра надела прямо на группу человека поверх модели (шуба и воротник, галстук и цепь богача…) — копией на тело
+  if (grp) for (const o of grp.children) if (isDecor(o, gu, was)) { const k = o.clone(); k.visible = true; k.userData = {}; holder.add(k); }
   return { root, parts, qskin: skin };
+}
+/* надетое на группу человека поверх модели (hits.js fallStep прячет, пока он лежит: группа стоит, модель лежит клипом) */
+export function decorOf (grp) {
+  const gu = grp && grp.userData, st = gu && gu.skin && gu.skin.userData.q;
+  return gu ? grp.children.filter(o => isDecor(o, gu, st)) : [];
+}
+/* надето на группу человека (не кость, не модель, не коробка с пиццей, не надпись над головой) — на тело тоже */
+function isDecor (o, gu, st) {
+  if (o.isBone || o.isSprite || (!o.visible && !(o.userData && o.userData.fallHid)) || (st && o === st.root) || o === gu.lod || (o.userData && (o.userData.pbox || o.userData.noDecor))) return false;
+  let mesh = false, model = false;
+  o.traverse(m => { if (m.isSkinnedMesh || m.isBone) model = true; else if (m.isMesh) mesh = true; });
+  return mesh && !model;
 }
 /* позу модели — сейчас, не дожидаясь кадра (тело кладут на землю по самой низкой точке — и за кадром тоже) */
 export function qPose (skin) {
@@ -573,6 +670,61 @@ export function qLimb (skin, key) {
   const m = new THREE.Mesh(g, skin.material);
   m.scale.setScalar(st.k);
   return m;
+}
+
+/* ── на куски (hits.js burst, нитро быстрее 55 км/ч; автор 23.10.2026, 0п21: «разлетается кусками старой коробочной
+   модели»): та же модель, что у человека, — голова, туловище, руки, ноги, в позе «стоит», цвета — его (с живого меша);
+   у каждого куска — места разрезов (шея, плечи, бёдра), вершины ближе BLOOD_R м к разрезу — цвета крови (blood — hex,
+   только взрослая решает в hits.js). Кусок — обычный меш (общий материал людей), начало — середина куска ── */
+const BLOOD_R = 0.09;
+export function qPieces (skin, blood) {
+  const st = skin && skin.userData.q, F = st && st.F, C = st && st.C;
+  if (!F || !F.NWP || !skin.geometry.attributes.color) return null;
+  const J = F.J, own = new Int8Array(F.nJ).fill(1);   // 0 голова, 1 туловище, 2—3 руки, 4—5 ноги
+  const TOPS = [[J.head, -1, 0], [J.armL, -1, 2], [J.armR, -1, 3], [J.legL, J.footL, 4], [J.legR, J.footR, 5]];
+  for (const [top, foot, k] of TOPS) {
+    if (top < 0) continue;
+    const set = new Set([top]); if (foot >= 0) set.add(foot);
+    for (const j of F.order) if (set.has(F.parent[j])) set.add(j);
+    for (const j of set) own[j] = k;
+  }
+  const P = C.lod.array, si = C.si.array, sw = C.sw.array, I = C.idx.array, vc = skin.geometry.attributes.color.array;
+  const nV = C.nV, vp = new Int8Array(nV);
+  for (let v = 0; v < nV; v++) { let b = 0, bj = 0; for (let c = 0; c < 4; c++) if (sw[v * 4 + c] > b) { b = sw[v * 4 + c]; bj = si[v * 4 + c]; } vp[v] = own[bj]; }
+  const cutOf = k => { const j = [J.head, J.body, J.armL, J.armR, J.legL, J.legR][k]; return j >= 0 ? F.NWP[j] : null; };
+  const cuts = [[cutOf(0)], [cutOf(0), cutOf(2), cutOf(3), cutOf(4), cutOf(5)], [cutOf(2)], [cutOf(3)], [cutOf(4)], [cutOf(5)]].map(l => l.filter(Boolean));
+  const bc = blood ? col(blood) : null, R = BLOOD_R / st.k, out = [];
+  for (let k = 0; k < 6; k++) {
+    const map = new Map(), pos = [], cl = [], idx = [];
+    for (let t = 0; t < I.length; t += 3) {
+      const a = I[t], b = I[t + 1], c = I[t + 2];
+      const pa = vp[a], tk = pa === vp[b] || pa === vp[c] ? pa : vp[b] === vp[c] ? vp[b] : pa;   // по большинству вершин — без дыр
+      if (tk !== k) continue;
+      for (const v of [a, b, c]) {
+        let n = map.get(v);
+        if (n === undefined) {
+          n = pos.length / 3; map.set(v, n);
+          const x = P[v * 3], y = P[v * 3 + 1], z = P[v * 3 + 2];
+          pos.push(x, y, z);
+          const red = bc && cuts[k].some(q => (q.x - x) ** 2 + (q.y - y) ** 2 + (q.z - z) ** 2 < R * R);
+          if (red) cl.push(bc[0], bc[1], bc[2]); else cl.push(vc[v * 3], vc[v * 3 + 1], vc[v * 3 + 2]);
+        }
+        idx.push(n);
+      }
+    }
+    if (!idx.length) continue;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3));
+    g.setIndex(idx);
+    g.computeBoundingBox();
+    const c = new THREE.Vector3(); g.boundingBox.getCenter(c);
+    g.translate(-c.x, -c.y, -c.z);                  // начало — середина куска: кувыркается вокруг себя
+    const m = new THREE.Mesh(g, skin.material);
+    m.scale.setScalar(st.k);
+    out.push({ key: ['head', 'torso', 'armL', 'armR', 'legL', 'legR'][k], m, x: c.x * st.k, y: (c.y - F.y0) * st.k, z: c.z * st.k });
+  }
+  return out;
 }
 
 /* ── портрет для окон разговора, карточки заказа и чата (people.js faceDataURL): у человека-модели — снимок её

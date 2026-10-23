@@ -20,8 +20,8 @@
       SHEET.HOLD с — и сворачивается обратно в строку. Накладная, разговор, диалог — ждёт; долго ждала —
       короче; окно открылось поверх — сворачивается сразу. Меньше движения — без анимаций.
 
-   Место — по деньгам за смену (как таблица в паузе); «на 2 заказа» — разница в деньгах,
-   делённая на средний заказ коллег этой смены.
+   Место — по числу доставок за смену (автор 23.10.2026, 11п; при равных — по деньгам), как таблица в паузе;
+   «на 2 заказа» — разница в доставках. В таблице у тебя — твой ник (имя курьера, 0я), не «ты».
 
    Из game.js: CR.init({ adult, money, face }); CR.reset() — новая смена; CR.tick(dt) — каждый кадр смены;
    CR.update(el, rows, live) — раз в 0,5 с: rows — rivalBoard() (у коллег поле R, у всех d — заказов), live —
@@ -41,8 +41,7 @@ export const RANK = {
   GRACE: 40,          // с — начало смены: все по нулям, молчат
   LEAD: 100,          // с — коллеги подкалывают друг друга (сменился первый среди них) не чаще
   STALE: 20,          // с — событие (обогнал / обогнали) не успели сказать — старое, не говорим
-  CLOSE: 0.75,        // меньше стольких заказов — «рядом», «дышит в спину»
-  FEE: 1300,          // ₽ — средний заказ, пока никто из коллег не довёз
+  CLOSE: 1,           // не больше стольких доставок разницы — «рядом», «дышит в спину»
   MEM: 4,             // последние столько фраз подряд не повторяются
   OWN: 0.4,           // доля сводок, когда вместо неё коллега пишет свою фразу (у каждого 1—2 своих — crewcast.js)
   FLASH: 1400,        // мс — вспышка строки и стрелка на хаде
@@ -151,11 +150,6 @@ function hud (el, place, n, quiet) {
 }
 
 /* ── чат ── */
-function avgFee (rows) {
-  let m = 0, d = 0;
-  for (const r of rows) if (r.R && r.R.done) { m += r.R.money; d += r.R.done; }
-  return d ? m / d : RANK.FEE;
-}
 const gapText = n => tn(n, '{n} заказ|{n} заказа|{n} заказов');
 
 /* сказать фразу из pool (уже отобранной по ситуации): who — коллега из события (row) */
@@ -216,19 +210,17 @@ function stillTrue (ev, rows, me) {
   return false;
 }
 
+/* разница — в доставках (место по ним, 11п) */
 function status (rows, me) {
-  const fee = avgFee(rows), n = rows.length, my = rows[me];
+  const n = rows.length, my = rows[me], d = r => r.d || 0;
   const out = [];
-  const add = (sit, who, gapM) => {
-    const g = Math.max(0, gapM) / fee;
-    out.push(...cands(L.status.filter(l => l.sit === sit), who, rows, Math.max(1, Math.round(g))));
-  };
-  if (me === 0) { const g = (my.m - rows[1].m) / fee; add(g < RANK.CLOSE ? 'firstNear' : 'firstFar', rows[1], my.m - rows[1].m); }
-  else if (me === n - 1) add('last', rows[me - 1], rows[me - 1].m - my.m);
+  const add = (sit, who, gap) => out.push(...cands(L.status.filter(l => l.sit === sit), who, rows, Math.max(1, gap)));
+  if (me === 0) { const g = d(my) - d(rows[1]); add(g <= RANK.CLOSE ? 'firstNear' : 'firstFar', rows[1], g); }
+  else if (me === n - 1) add('last', rows[me - 1], d(rows[me - 1]) - d(my));
   else {
     const up = rows[me - 1], dn = rows[me + 1];
-    add((up.m - my.m) / fee < RANK.CLOSE ? 'upNear' : 'upFar', up, up.m - my.m);
-    if ((my.m - dn.m) / fee < RANK.CLOSE) add('downNear', dn, my.m - dn.m);
+    add(d(up) - d(my) <= RANK.CLOSE ? 'upNear' : 'upFar', up, d(up) - d(my));
+    if (d(my) - d(dn) <= RANK.CLOSE) add('downNear', dn, d(my) - d(dn));
   }
   return out;
 }
@@ -253,7 +245,7 @@ export function update (el, rows, live) {
   }
   // среди коллег сменился первый (не из-за тебя): подкалывают друг друга — если сказать больше нечего
   const top = rows.find(r => r.R);
-  if (top && ST.lead && top.R !== ST.lead && me > 0 && top.m > 0 && !ST.ev && ST.clock - ST.leadT > RANK.LEAD && top.R.name !== ST.lead.name) ST.ev = { kind: 'lead', who: top, loser: ST.lead, at: ST.clock };
+  if (top && ST.lead && top.R !== ST.lead && me > 0 && top.d > 0 && !ST.ev && ST.clock - ST.leadT > RANK.LEAD && top.R.name !== ST.lead.name) ST.ev = { kind: 'lead', who: top, loser: ST.lead, at: ST.clock };
   ST.lead = top ? top.R : null;
   ST.above = above; ST.place = me + 1; ST.n = n;
 
@@ -307,7 +299,7 @@ function sheetOpen (rows, anchor, hold) {
     const y0 = Math.max(-1, Math.min(cap, was - lo)) - (i - lo);      // на сколько строк сдвинута в начале (со старого места)
     nums += '<i>' + (i + 1) + '</i>';
     body += '<div class="rk-row' + (r.me ? ' me' : '') + (r.out ? ' out' : '') + (dir ? ' rk-' + dir : '') + (was < lo || was > hi ? ' rk-new' : '') +
-      '" style="--dy:' + y0 + '">' + face(r) + '<b>' + (r.me ? esc(t('ты')) : r.out ? '<s>' + esc(r.n) + '</s>' : esc(r.n)) + '</b>' +
+      '" style="--dy:' + y0 + '">' + face(r) + '<b>' + (r.me ? esc(r.n || t('ты')) : r.out ? '<s>' + esc(r.n) + '</s>' : esc(r.n)) + '</b>' +
       '<span class="rk-d">' + BOX + (r.d || 0) + '</span><span class="rk-m">' + esc(ST.money(r.m)) + '</span>' +
       (dir ? '<em class="rk-arr">' + ARROW + '</em>' : '') + '</div>';
   }

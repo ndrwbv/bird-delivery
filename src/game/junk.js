@@ -12,6 +12,9 @@
      третьего подъезда — жребий по месту подъезда, всегда одинаково. Проехал
      — разлетается, без урона, чуть тормозит (это делает game.js, как с
      дворовой мелочью).
+   • Кучи мусора у домов (world.js, карьера): въехал быстрее HEAP.MIN — куча разлетается (debris.js heap):
+     чёрные мешки отлетают по ходу машины, катятся и ложатся, бутылки, бумага, коробки — веером; от кучи
+     остаётся пятно грязи; машина теряет 1 − HEAP.SLOW скорости. До новой смены (reset).
    • Контейнеры (can): 2–4 на бетонной площадке во дворах и по 2 у дворовых
      парковок. Тяжёлые: упираются, толкаются, на сильном ударе
      опрокидываются и вываливают мусор; совсем сильный удар — полсердца.
@@ -25,6 +28,7 @@
    smashBuild, car — каждый шаг машины, step — каждый кадр, reset — новая смена.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
+import * as DEBRIS from './debris.js';          // разлёт кучи мусора — куски из запаса (debris.js)
 
 /* числа — здесь; в docs/CAREER.md — они же словами */
 export const STOP = {
@@ -42,7 +46,9 @@ export const CANS = {
   HURT: 50 / 3.6,                         // м/с: с этой — полсердца
   FRICT: 7,                               // м/с² — трение по асфальту
 };
-export const STATS = { litter: 0, pads: 0, cans: 0, stops: 0, tris: 0, broken: 0, dyn: 0 };
+export const STATS = { litter: 0, pads: 0, cans: 0, stops: 0, tris: 0, broken: 0, dyn: 0, heapsHit: 0 };
+/* кучи мусора у домов (world.js HEAPS, только карьера): машина въехала — куча разлетается, машину чуть тормозит */
+export const HEAP = { MIN: 0.8, SLOW: 0.86, R_K: 0.8 };   // м/с — медленнее не разносит; доля скорости после; радиус кучи для удара — доля видимого
 
 let A = null;
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -58,7 +64,7 @@ const tris = g => (g.index ? g.index.count : g.attributes.position.count) / 3;
 
 export function init (api) {
   A = api;
-  if (typeof location !== 'undefined' && (import.meta.env.DEV || new URLSearchParams(location.search).has('debug'))) window.__junk = { STOPS, CANS_ALL, DYN, STATS, stopHit, reset };
+  if (typeof location !== 'undefined' && (import.meta.env.DEV || new URLSearchParams(location.search).has('debug'))) window.__junk = { STOPS, CANS_ALL, DYN, STATS, stopHit, reset, HEAP, DEBRIS: DEBRIS.DEBUG, get HEAPS () { return A.heaps ? A.heaps() : []; }, get GORE () { return A.GORE; } };
 }
 
 /* вершины вещи в склейке: спрятать (в точку под землю) и вернуть */
@@ -252,16 +258,8 @@ function litterGeos (x, z, r, out) {
 }
 function litterHit (it, nx, nz, force) {
   hide(it);
-  const f = 0.4 + Math.min(force, 30) / 30;
-  for (let i = 0; i < 5; i++) {
-    const bag = i < 3, s = bag ? rand(0.18, 0.3) : 0.1;
-    const m = new THREE.Mesh(bag ? new THREE.IcosahedronGeometry(s, 0) : new THREE.CylinderGeometry(0.055, 0.06, 0.3, 6),
-      new THREE.MeshLambertMaterial({ color: bag ? BAG[(Math.random() * BAG.length) | 0] : BOTTLE[(Math.random() * BOTTLE.length) | 0], flatShading: true }));
-    m.position.set(it.x + rand(-0.4, 0.4), A.groundH(it.x, it.z) + rand(0.2, 0.6), it.z + rand(-0.4, 0.4));
-    A.scene.add(m);
-    A.GORE.push({ m, vx: nx * rand(2, 6) * f + rand(-2, 2), vy: rand(2, 5) * f, vz: nz * rand(2, 6) * f + rand(-2, 2),
-      spin: rand(-10, 10), life: rand(10, 16), bleed: 1e9, rest: 0 });
-  }
+  const sp = Math.max(2, Math.min(force, 30));
+  DEBRIS.heap(A, { x: it.x, z: it.z, R: 0.6, rs: 0.6, H: 0.5 }, nx * sp, nz * sp, sp, 0.4);   // куски из запаса (debris.js)
   A.Snd.fx('smash', s => s.noise(0.12, 0.12), { x: it.x, z: it.z }, 0.6);
 }
 function litterAt (x, z, seed) {
@@ -367,8 +365,36 @@ function spill (o, nx, nz, rel) {
 
 /* удар машины: нос и корма — два круга радиуса rc. Возвращает, было ли касание */
 const NEAR = [];
+function heapHit (hp, V, sp) {
+  const pos = hp.mesh.geometry.attributes.position, a = pos.array;
+  if (!hp.orig) hp.orig = a.slice(hp.v0 * 3, (hp.v0 + hp.nv) * 3);
+  const gy = A.groundH(hp.x, hp.z) - 1;
+  for (let i = hp.v0; i < hp.v0 + hp.nv; i++) { a[i * 3] = hp.x; a[i * 3 + 1] = gy; a[i * 3 + 2] = hp.z; }
+  pos.needsUpdate = true;
+  hp.gone = 1;
+  STATS.heapsHit++;
+  DEBRIS.heap(A, hp, V.vx, V.vz, sp);
+  V.vx *= HEAP.SLOW; V.vz *= HEAP.SLOW;
+  if (A.puff) A.puff(hp.x, 0.4, hp.z, false, 0.8);
+  A.Snd.fx('smash', s => { s.noise(0.25, 0.2); s.blip(110, 0.12, 'triangle', 0.08); }, { x: hp.x, z: hp.z }, 0.8);
+  A.S.shake = Math.max(A.S.shake || 0, 0.12);
+}
+function heapsNear (noseX, noseZ, tailX, tailZ, rc) {
+  const L = A.heaps ? A.heaps() : null, V = A.V;
+  if (!L || !L.length) return;
+  const sp = Math.hypot(V.vx, V.vz);
+  if (sp < HEAP.MIN) return;
+  for (let i = 0; i < L.length; i++) {
+    const hp = L[i];
+    if (hp.gone || !hp.mesh || Math.abs(hp.x - V.x) > 8 || Math.abs(hp.z - V.z) > 8) continue;
+    const R = (hp.rs || hp.R) * HEAP.R_K + rc * 0.8;
+    if (Math.hypot(noseX - hp.x, noseZ - hp.z) < R || Math.hypot(tailX - hp.x, tailZ - hp.z) < R) heapHit(hp, V, sp);
+  }
+}
+
 export function car (noseX, noseZ, tailX, tailZ, rc) {
   const V = A.V;
+  heapsNear(noseX, noseZ, tailX, tailZ, rc);
   NEAR.length = 0;
   const ci = Math.floor(V.x / CG), cj = Math.floor(V.z / CG);
   for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) for (const o of CAN_GRID.get(i + ',' + j) || []) NEAR.push(o);
@@ -502,6 +528,12 @@ export function reset () {
   }
   DYN.length = 0; STATS.dyn = 0;
   for (const it of A.SMASH) if (it.kind === 'litter' && it.down) unhide(it);
+  for (const hp of (A.heaps && A.heaps()) || []) {      // кучи мусора — снова лежат
+    if (!hp.gone || !hp.orig || !hp.mesh) continue;
+    const pos = hp.mesh.geometry.attributes.position;
+    pos.array.set(hp.orig, hp.v0 * 3); pos.needsUpdate = true;
+    hp.gone = 0;
+  }
   if (A.S) A.S.stops = 0;
 }
 

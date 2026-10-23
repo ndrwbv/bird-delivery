@@ -117,11 +117,11 @@ export function selfOn (el, t, left) {
   if (s && el.__n !== n) { el.__n = n; s.textContent = t('клиент спускается… {n} с', { n }); }
 }
 
-/* ── часы заказа: «сейчас» и «доставить до …», как на приборке ── */
+/* ── срок заказа, как на хаде: «до опоздания 2:15» (11о; «сейчас» — пусто, спрятано) ── */
 export function dashHTML () {
   return '<span class="mk-dash"><b class="mk-now"></b><span class="mk-due"><em></em><b></b></span></span>';
 }
-/* c: { now: '14:21', label: 'доставить до', due: '14:35', lvl: '' | 'warn' | 'low' | 'late', k: 0…1 } */
+/* c: { now: '', label: 'до опоздания', due: '2:15', lvl: '' | 'warn' | 'low' | 'late', k: 0…1 } */
 export function dashSet (root, c, fuse) {
   const d = root.querySelector('.mk-dash');
   if (!d) return;
@@ -130,7 +130,8 @@ export function dashSet (root, c, fuse) {
   const key = c.now + '|' + c.label + '|' + c.due + '|' + c.lvl;
   if (d.__k !== key) {
     d.__k = key;
-    d.querySelector('.mk-now').textContent = c.now || '';
+    const nw = d.querySelector('.mk-now');
+    nw.textContent = c.now || ''; nw.hidden = !c.now;              // часов игры больше нет (11о) — только отсчёт
     d.querySelector('.mk-due em').textContent = c.label || '';
     d.querySelector('.mk-due b').textContent = c.lvl === 'late' ? '' : c.due || '';
     d.dataset.lvl = c.lvl || '';

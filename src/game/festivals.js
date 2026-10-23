@@ -657,7 +657,8 @@ function crowd (free) {
     q.x = p.x; q.z = p.z; q.y = A.groundH(p.x, p.z);
     q.ry = faceTo(toS.x - p.x, toS.z - p.z) + rand(-0.6, 0.6);
     q.s = rand(0.88, 1.1); q.ph = rand(0, 6.28); q.amp = Math.random() < 0.55 ? rand(0.08, 0.3) : 0.02; q.hop = 0; q.vx = 0; q.vz = 0;
-    body.setColorAt(i, c.set(pick(SHIRTS)));
+    q.shirt = pick(SHIRTS);
+    body.setColorAt(i, c.set(q.shirt));
     head.setColorAt(i, c.set(pick(SKINS)));
   }
   F.crowd = { P, body, head, m: new THREE.Matrix4(), r: new THREE.Matrix4(), t: 0 };
@@ -665,11 +666,30 @@ function crowd (free) {
   A.scene.add(body, head);
   F.objs.push(body, head);
 }
+/* ближние из толпы — настоящие люди (23.10.2026, автор: «сборища — коробочные»): не больше FQ.MAX ближайших к машине
+   в FQ.NEAR м — человек из общего сборщика (makeHuman: модель Quaternius, как прохожие), его коробка-инстанс спрятана;
+   ушёл дальше FQ.FAR (или вытеснили ближние) — снова коробка. Собираем не больше FQ.BUILD за кадр.
+   Толпа фестиваля — 30—320 человек: настоящих все сразу не потянуть (каждый — свой вызов отрисовки) */
+export const FQ = { NEAR: 40, FAR: 48, MAX: 8, BUILD: 2, live: 0, built: 0 };
+const BOXCROWD = typeof location !== 'undefined' && /[?&]boxcrowd\b/.test(location.search);
+function qRank (C, dt) {
+  if ((C.rankT = (C.rankT || 0) - dt) > 0) return;
+  C.rankT = 0.4;
+  const V = A.V, L = [];
+  for (const q of C.P) { q.d = Math.hypot(q.x - V.x, q.z - V.z); q.want = 0; if (q.d < FQ.FAR) L.push(q); }
+  L.sort((a, b) => a.d - b.d);
+  for (let i = 0; i < L.length; i++) { const q = L[i]; q.want = (i < FQ.MAX && q.d < FQ.NEAR) || (q.grp && i < FQ.MAX + 4) ? 1 : 0; }
+}
+function qDropAll (C) { for (const q of C.P) if (q.grp) { A.dropMesh(q.grp); q.grp = null; FQ.live--; } }
+let ZM = null;                                       // нулевая матрица — спрятать коробку того, кто сейчас настоящий
 function pose (dt, all) {
   const C = F.crowd;
   C.t += dt;
   const beat = C.t * 4.2;
   const { m, r } = C;
+  if (!ZM) ZM = new THREE.Matrix4().makeScale(0, 0, 0);
+  if (!all && A.makeHuman && !BOXCROWD) qRank(C, dt);
+  let budget = FQ.BUILD;
   for (let i = 0; i < C.P.length; i++) {
     const q = C.P[i];
     if (q.hop > 0) {                                    // отпрыгнул от машины
@@ -677,10 +697,22 @@ function pose (dt, all) {
       q.x += q.vx * dt; q.z += q.vz * dt;
       q.vx *= 0.9; q.vz *= 0.9;
     }
-    const y = q.y + Math.max(0, Math.sin(beat + q.ph)) * q.amp + (q.hop > 0 ? Math.sin(q.hop / 0.6 * Math.PI) * 0.9 : 0);
-    r.makeRotationY(q.ry + (all ? 0 : Math.sin(beat * 0.25 + q.ph) * 0.15));
+    if (q.grp && !q.want) { A.dropMesh(q.grp); q.grp = null; FQ.live--; }
+    else if (!q.grp && q.want && budget > 0) { budget--; q.grp = A.makeHuman(null, { shirt: q.shirt }); A.scene.add(q.grp); FQ.live++; FQ.built++; }
+    const bob = Math.max(0, Math.sin(beat + q.ph)) * q.amp, jump = q.hop > 0 ? Math.sin(q.hop / 0.6 * Math.PI) * 0.9 : 0;
+    const ry = q.ry + (all ? 0 : Math.sin(beat * 0.25 + q.ph) * 0.15);
+    if (q.grp) {
+      // настоящий: пританцовывает (кто «прыгает» выше — машет рукой в такт), отпрыгнул — отбегает своей походкой
+      const g = q.grp, u = g.userData, sw = q.hop > 0 ? Math.sin(C.t * 11 + q.ph) * 0.7 : 0;
+      if (u.legL) { u.legL.rotation.x = sw; u.legR.rotation.x = -sw; }
+      if (u.armR) u.armR.rotation.x = q.amp > 0.2 ? -2.5 + Math.sin(beat + q.ph) * 0.4 : 0;
+      g.position.set(q.x, q.y + bob * 0.4 + jump, q.z); g.rotation.y = q.hop > 0 ? Math.atan2(q.vx, q.vz) : ry; g.scale.setScalar(q.s);
+      C.body.setMatrixAt(i, ZM); C.head.setMatrixAt(i, ZM);
+      continue;
+    }
+    r.makeRotationY(ry);
     m.makeScale(q.s, q.s, q.s).premultiply(r);
-    m.setPosition(q.x, y, q.z);
+    m.setPosition(q.x, q.y + bob + jump, q.z);
     C.body.setMatrixAt(i, m); C.head.setMatrixAt(i, m);
   }
   C.body.instanceMatrix.needsUpdate = true; C.head.instanceMatrix.needsUpdate = true;
@@ -837,6 +869,7 @@ export function step (dt) {
   const show = dC < FEST.SHOW_R;
   if (F.crowd) {
     F.crowd.body.visible = F.crowd.head.visible = show;
+    if ((!show || dC >= 240) && FQ.live) qDropAll(F.crowd);   // ушёл далеко — настоящих людей толпы вон
     if (show && dC < 240) pose(dt);
     if (insideRect(V.x, V.z, 1.5)) dodge();
   }
@@ -880,6 +913,7 @@ function puff (h) {
 export function stop () {
   if (!F) return;
   DIRECTOR.end('fest');
+  if (F.crowd) qDropAll(F.crowd);
   for (const o of F.objs) {
     if (o.parent) o.parent.remove(o);
     if (o === F.stepa) continue;
@@ -959,7 +993,7 @@ export const where = () => (F ? { x: F.site.x, z: F.site.z } : null);
 
 /* ─────────────── отладка: __dlv.FEST ─────────────── */
 export const DEBUG = {
-  FEST,
+  FEST, FQ,
   sites: () => sites().map(s => ({ mall: s.mall, di: s.di, x: Math.round(s.x), z: Math.round(s.z), w: +(s.hu * 2).toFixed(1), d: +(s.hv * 2).toFixed(1), area: s.area })),
   /* запустить сейчас: kind — hookah | pumpkin | burger, site — номер из sites() или имя ТЦ */
   start: (kind = 'hookah', site = 0) => {

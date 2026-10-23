@@ -5,7 +5,7 @@
 /* главное меню карьеры (menu.js): сверху слева логотип бренда (птица и «Птица Пицца»), справа — пропуск сотрудника (портрет, имя, «[Y] сменить»);
    середина пустая — там живой город; внизу — компактная полоса карточек (carousel.js);
    номер версии — внизу справа, плашка «есть новая версия» — сверху.
-   Стиль — «как накладная» (src/styles/paper.css, UI-REVIEW № 45): карточки — бумажки на доске на скотче,
+   Стиль — «как накладная» (src/styles/paper.css, UI-REVIEW № 45): карточки — бумажки на доске (без скотча — 11ш),
    «на смену» — такая же бумажка, крупнее и с красным; значка кнопки на карточках нет — как выбрать, говорит строка внизу;
    движение — только акцентом (появилось, нажали) */
 
@@ -82,14 +82,12 @@ body.career #build-v { display: none; }          /* версия — в .crm-ver
 .crm-cz .cz-dots { padding: 8px 0 0; gap: 6px; }
 .crm-cz .cz-dots i { width: 8px; height: 8px; }
 .crm-card { display: flex; flex-direction: column; gap: 6px; height: calc(var(--cw) * .66); --acc: var(--pp-yellow); }
-/* бумажка: лист накладной, сверху скотч; значок — в кружке цвета карточки */
+/* бумажка: лист накладной; значок — в кружке цвета карточки */
 .crm-cb { position: relative; flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(4px, 1vh, 9px);
           font: inherit; cursor: pointer; text-align: center; padding: clamp(10px, 1.6vh, 16px) clamp(8px, 1vw, 14px) clamp(8px, 1.2vh, 12px); color: var(--pp-ink);
           background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 4px;
           box-shadow: inset 0 -5px 0 var(--acc), 0 6px 0 var(--pp-ink), 0 16px 36px rgba(0, 0, 0, .45);
           transition: translate .22s var(--pp-spring), box-shadow .22s var(--pp-spring); }
-.crm-cb::before { content: ''; position: absolute; top: -10px; left: 50%; width: 64px; height: 18px; translate: -50% 0; rotate: -3deg; pointer-events: none;
-                  background: rgba(255, 243, 214, .6); border: 1px solid rgba(138, 107, 78, .4); }
 .crm-cb:hover { background: #fff8e6; }
 .crm-cb:active { translate: 0 4px; box-shadow: inset 0 -5px 0 var(--acc), 0 2px 0 var(--pp-ink); transition-duration: .05s; }
 .crm-ico { flex: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box;

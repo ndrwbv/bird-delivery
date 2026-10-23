@@ -2,7 +2,7 @@
    из главного меню и из паузы (game.js renderSettings → SET.render). Правила словами —
    docs/CAREER.md «Главное меню, пауза и настройки».
 
-   Табы: игра (имя, профиль, камера — три вида по кругу (camview.js), мини-игры у клиента вкл / выкл, путь на дороге вкл / выкл (routeask.js), анонимная статистика вкл / выкл (telemetry.js, только взрослая) и под ней «что собираем ▸» — лист с текстом политики (privacy.js), сбросить прогресс, тестовые районы, версия и обновление, update.js) ·
+   Табы: игра (имя, профиль, камера — три вида по кругу (camview.js), мини-игры у клиента вкл / выкл, путь на дороге вкл / выкл (routeask.js), анонимная статистика вкл / выкл (telemetry.js, только взрослая) и под ней «что собираем ▸» — лист с текстом политики (privacy.js), сбросить прогресс, тестовые районы, версия и обновление, update.js; «авторы и лицензии ▸» — титры, credits.js) ·
    графика (качество и 7 пунктов, gfx.js) · звук (вкл / выкл и три ползунка: музыка, звуки, мотор — docs/SOUNDS.md;
    музыка в игре вкл / выкл и «трек ▶» — music.js; радио в машине вкл / выкл и станция — radio.js) · управление (какие кнопки за что — геймпад,
    клавиатура или палец) · язык (сетка языков). Внутри таба — обычный вертикальный список; не влез
@@ -26,6 +26,7 @@ import * as UPD from './update.js';
 import { keyHTML } from '../input/glyphs.js';
 import * as TEL from './telemetry.js';          // «анонимная статистика: вкл / выкл» — только взрослая версия (telemetry.js, docs/ANALYTICS.md)
 import * as PV from './privacy.js';             // «что собираем ▸» — лист с текстом политики (privacytext.js), офлайн
+import * as CR from './credits.js';             // «авторы и лицензии ▸» — титры: OSM, модели CC-BY, шрифты, three.js
 
 let A = null, TAB = 'game', TABS = [];
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';');
@@ -97,6 +98,7 @@ export function render (focus, tab) {
   if (!A) return;
   const P = A.panel(), body = A.body();
   if (!focus && P.dataset.kind === PV.KIND) { focus = 'set-privacy'; tab = 'game'; }   // B / Esc с листа «что собираем» — обратно на его кнопку
+  if (!focus && P.dataset.kind === CR.KIND) { focus = 'set-credits'; tab = 'game'; }   // и с титров — на «авторы и лицензии ▸»
   P.dataset.kind = 'settings'; P.dataset.back = ''; P.dataset.sub = '';
   const menu = A.inMenu();                          // из главного меню (не посреди смены)
   const onlyMenu = t('меняется в главном меню');
@@ -190,6 +192,8 @@ export function render (focus, tab) {
           can ? 'set-upd-go' : 'set-upd', focus, { extra: !can && UPD.line() ? '<small class="set-msg">' + esc(UPD.line()) + '</small>' : '' });
       } else h += note(A.steam ? t('игру обновляет Стим') : t('в браузере — всегда последняя версия'));
     }
+    // титры (credits.js): авторы моделей (CC-BY — подпись обязательна), карта OSM, шрифты, программы
+    h += row(t('авторы и лицензии'), t('титры ▸'), 'set-credits', focus);
     // ТЕСТ: «открыть все районы» — в релизе (BUILD_VERSION, __RELEASE__) нет, с ?debug — есть
     if (menu && A.unlock.on()) h += row(t('районы') + ' <small class="set-msg">' + t('для тестов') + '</small>', A.unlock.all() ? t('все открыты') : t('открыть все районы'), 'set-unlock', focus);
     // ТЕСТ: «накинуть денег» — копилка до TEST_MONEY.TO (econ.js); перед Стимом выключить
@@ -243,6 +247,7 @@ function wire (body) {
   if ($('set-route')) $('set-route').onclick = () => { A.route.set(!A.route.on()); render('set-route'); };
   if ($('set-tel')) $('set-tel').onclick = () => { TEL.set(!TEL.on()); render('set-tel'); };
   if ($('set-privacy')) $('set-privacy').onclick = () => { PV.open(A.panel(), A.body(), () => { render('set-privacy'); A.navReset(); }); A.navReset(); };
+  if ($('set-credits')) $('set-credits').onclick = () => { CR.open(A.panel(), A.body(), () => { render('set-credits'); A.navReset(); }, !!A.steam); A.navReset(); };
   if ($('set-door')) $('set-door').onclick = () => { A.door.set(!A.door.on()); render('set-door'); };
   if ($('set-mus')) $('set-mus').onclick = () => { A.music.set(); render('set-mus'); };
   if ($('set-mus-next')) $('set-mus-next').onclick = () => { A.music.next(); setTimeout(() => { if (on() && TAB === 'snd') render('set-mus-next'); }, 60); };

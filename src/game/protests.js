@@ -34,6 +34,7 @@ import * as FEST from './festivals.js';
 import { freeAfterUpload } from './mobile.js';   // телефон: холст атласа после загрузки — 1×1 (атлас рисуется заново на новый холст)
 import * as DIRECTOR from './director.js';   // режиссёр событий: концерт — лёгкое, марш — среднее, восстание — крупное
 
+const SRCH = typeof location !== 'undefined' ? location.search || '' : '';   // ?boxcrowd — толпы коробками, как до 23.10.2026 (сравнить)
 export const PROT = {
   FROM: 1,                   // с какой законченной смены протест (первая смена новичка — тихая)
   STAGES: [2, 2, 2, 1, 1],   // сколько смен длится ступень 1…5 (цикл — 8 смен)
@@ -511,7 +512,10 @@ function chunksStep () {
 }
 
 /* ─────────────── толпа инстансами (марш, слушатели) ─────────────── */
-let BODY = null, HEAD = null, MBODY = null, PLAC = null;
+let BODY = null, HEAD = null, MBODY = null, PLAC = null, POLE = null;
+/* древко и плакат (геометрия — по оси человека) ставим со сдвигом в осях человека: коробка держит над правой рукой,
+   настоящий человек — двумя руками перед грудью (у модели поднятая рука сгибается в локте — плакат «в кулаке» не выходит) */
+const POLE_FAR = [0.3, 0, 0.1], POLE_NEAR = [0, -0.35, 0.36];
 function crowdGeo () {
   if (BODY) return;
   const B = (w, h, d) => new THREE.BoxGeometry(w, h, d);
@@ -520,11 +524,13 @@ function crowdGeo () {
   A.put(b, B(0.12, 0.58, 0.14), '#ffffff', -0.3, 1.12, 0, 0, 0, -0.12);
   A.put(b, B(0.12, 0.58, 0.14), '#ffffff', 0.3, 1.12, 0, 0, 0, 0.12);
   BODY = A.mergeGeos(b);
-  const m = legs();                                   // митингующий: правая рука вверх, древко плаката
+  const m = legs();                                   // митингующий: правая рука вверх (древко плаката — POLE, у всех)
   A.put(m, B(0.12, 0.58, 0.14), '#ffffff', -0.3, 1.12, 0, 0, 0, -0.12);
   A.put(m, B(0.12, 0.58, 0.14), '#ffffff', 0.3, 1.6, 0.04);
-  A.put(m, B(0.05, 1.3, 0.05), '#8a6a4a', 0.3, 1.95, 0.1);
   MBODY = A.mergeGeos(m);
+  const pl = [];
+  A.put(pl, B(0.05, 1.3, 0.05), '#8a6a4a', 0, 1.95, 0);
+  POLE = A.mergeGeos(pl);
   const h = [];
   A.put(h, B(0.26, 0.28, 0.26), '#ffffff', 0, 1.56, 0);
   A.put(h, B(0.28, 0.08, 0.28), '#3a2a20', 0, 1.72, -0.01);
@@ -533,7 +539,7 @@ function crowdGeo () {
     const g = new THREE.PlaneGeometry(0.9, 0.45);
     const uv = cellUV(i), a = g.attributes.uv;
     for (let k = 0; k < a.count; k++) a.setXY(k, a.getX(k) ? uv[2] : uv[0], a.getY(k) ? uv[3] : uv[1]);
-    g.translate(0.3, 2.55, 0.12);
+    g.translate(0, 2.55, 0.02);
     return g;
   });
 }
@@ -545,6 +551,37 @@ function setInst (meshes, i, x, y, z, ry, s) {
 }
 function hideInst (meshes, i) { M4.makeScale(0, 0, 0); for (const m of meshes) if (m) m.setMatrixAt(i, M4); }
 function dropInst (m) { if (!m) return; A.scene.remove(m); m.dispose(); }
+
+/* ── толпа вблизи — настоящие люди (23.10.2026, автор: «сборища — коробочные; протестующие — те же люди, что на улице»):
+   ближе QP.NEAR м к машине — человек из общего сборщика (makeHuman: модель Quaternius, лицо, походка — как у прохожих),
+   его инстанс-коробка спрятана; дальше QP.FAR — человек уходит (dropMesh), снова коробка (вдали её не отличить, а
+   людей толпы 10—20: каждый настоящий — свой вызов и скиннинг ~15 тыс. вершин). Настоящих — не больше QP.MAX сразу,
+   собираем не больше QP.BUILD за кадр на все толпы ── */
+export const QP = { NEAR: 45, FAR: 55, MAX: 10, BUILD: 2, built: 0, live: 0 };   // MAX — настоящих на все толпы сразу (кадр «Деки»)
+let qBudget = 0;
+/* m — член толпы ({ x, z, shirt, grp }); prep(grp) — поза; true — он сейчас человек */
+function qNear (m, prep) {
+  const d = Math.hypot(m.x - A.V.x, m.z - A.V.z);
+  if (m.grp && d > QP.FAR) { A.dropMesh(m.grp); m.grp = null; QP.live--; }
+  else if (!m.grp && d < QP.NEAR && qBudget > 0 && QP.live < QP.MAX && !/[?&]boxcrowd\b/.test(SRCH)) {
+    qBudget--;
+    m.grp = A.makeHuman(null, { shirt: m.shirt });
+    m.u = m.grp.userData;
+    if (prep) prep(m);
+    A.scene.add(m.grp);
+    QP.built++; QP.live++;
+  }
+  return !!m.grp;
+}
+function qDrop (m) { if (m.grp) { A.dropMesh(m.grp); m.grp = null; QP.live--; } }
+/* сбит член толпы: настоящий — по общим правилам (hits.js) своим телом, коробка — подменяем человеком */
+function qKnock (m) {
+  if (!m.grp) { knockInst(m.x, m.z, m.ry, m.shirt); return; }
+  const g = m.grp; m.grp = null; QP.live--;
+  A.dropMesh(g);
+  A.gibHuman({ x: m.x, z: m.z, grp: g }, A.V.vx, A.V.vz);
+  if (A.onRunOver) A.onRunOver();
+}
 
 /* наезд: в кузове? → { al, ac, fx, fz } */
 function inCar (x, z) {
@@ -649,7 +686,7 @@ function buildMarch (P) {
     const v = i % 4;
     M.push({ row: (i / cols) | 0, lat: ((i % cols) - (cols - 1) / 2) * 1.05 + rand(-0.15, 0.15), ox: 0, oz: 0, dead: 0, ph: rand(0, 6), v, j: pl[v]++, shirt: pick(SHIRTS), x: 0, z: 0, ry: 0 });
   }
-  const body = inst(MBODY, CMAT, n), head = inst(HEAD, CMAT, n), plac = PLAC.map((g, v) => inst(g, MAT, pl[v]));
+  const body = inst(MBODY, CMAT, n), head = inst(HEAD, CMAT, n), pole = inst(POLE, CMAT, n), plac = PLAC.map((g, v) => inst(g, MAT, pl[v]));
   M.forEach((m, i) => { body.setColorAt(i, COL.set(m.shirt)); head.setColorAt(i, COL.set(pick(SKINS))); });
   // ведущий с мегафоном — настоящий человек: кричит речёвки
   const lg = A.makeHuman(null, { shirt: prob().col[0] });
@@ -657,17 +694,22 @@ function buildMarch (P) {
   if (u.armR) { const g = []; A.put(g, new THREE.CylinderGeometry(0.07, 0.16, 0.34, 8), '#f2f2f0', 0, -0.62, 0.12, Math.PI / 2); holdFixed(u.armR, new THREE.Mesh(A.mergeGeos(g), A.HUMAN_VC)); }   // мегафон — в меш тела (people.js)
   A.scene.add(lg);
   DIRECTOR.start('march');
-  MA = { P, st: 'walk', S: rows * 1.5 + 3, t: 0, M, body, head, plac, rows, cols, half: (cols - 1) / 2 * 1.05 + 0.5,
+  MA = { P, st: 'walk', S: rows * 1.5 + 3, t: 0, M, body, head, pole, plac, rows, cols, half: (cols - 1) / 2 * 1.05 + 0.5,
     lead: { grp: lg, u, x: 0, z: 0, dead: 0, bubble: null, bubT: 0, ph: 0 }, sayT: 1, rowPts: [], cx: P.pts[0].x, cz: P.pts[0].z, rad: 0, heldNow: 0, held: 0, ko: 0 };
   STATS.marches++;
 }
 function clearMarch () {
   if (!MA) return;
   DIRECTOR.end('march');
-  dropInst(MA.body); dropInst(MA.head); for (const m of MA.plac) dropInst(m);
+  for (const m of MA.M) qDrop(m);
+  dropInst(MA.body); dropInst(MA.head); dropInst(MA.pole); for (const m of MA.plac) dropInst(m);
   if (!MA.lead.dead) { unsay(MA.lead); A.dropMesh(MA.lead.grp); }
   MA = null;
 }
+/* настоящий митингующий: правая рука вверх — держит древко (древко и плакат — инстансы над рукой) */
+function marcherPose (m) { m.u.qArms = 1; m.u.armL.rotation.x = m.u.armR.rotation.x = -1.15; }   // qArms — ходьба модели руками не машет (qpeople.js)
+/* сдвиг [x, y, z] в осях человека (поворот ry) → сдвиг по миру [dx, dz] */
+function offs (ry, o) { const c = Math.cos(ry), s = Math.sin(ry); return [o[0] * c + o[2] * s, -o[0] * s + o[2] * c]; }
 function marchStep (dt) {
   const C = PROT.MARCH, V = A.V, P = MA.P;
   MA.t += dt;
@@ -710,8 +752,8 @@ function marchStep (dt) {
       const c = inCar(m.x, m.z);
       if (c) {
         if (hit) {
-          m.dead = 1; hideInst([MA.body, MA.head], i); hideInst([MA.plac[m.v]], m.j);
-          knockInst(m.x, m.z, m.ry, m.shirt); MA.ko++; STATS.marchKo++;
+          m.dead = 1; hideInst([MA.body, MA.head, MA.pole], i); hideInst([MA.plac[m.v]], m.j);
+          qKnock(m); MA.ko++; STATS.marchKo++;
           try { RESPECT.add(null, 'marcher'); } catch (e) { /* без респекта */ }
           if (!L.dead) say(L, t(pick(MARCH_HIT)), '#d9342c');
           continue;
@@ -719,12 +761,26 @@ function marchStep (dt) {
         const [ex, ez] = pushOut(c); m.ox += ex; m.oz += ez; m.x += ex; m.z += ez;
       }
     }
-    const y = ground(m.x, m.z) + Math.abs(Math.sin(beat + m.ph)) * 0.07;
-    setInst([MA.body, MA.head], i, m.x, y, m.z, m.ry, 1);
-    setInst([MA.plac[m.v]], m.j, m.x, y + Math.max(0, Math.sin(beat * 0.5 + m.ph)) * 0.18, m.z, m.ry, 1);
+    const gy = ground(m.x, m.z), pump = Math.max(0, Math.sin(beat * 0.5 + m.ph)) * 0.18;
+    if (qNear(m, marcherPose)) {
+      // настоящий человек: идёт своей походкой (машем ногами — модель шагает в такт), правая рука держит древко
+      hideInst([MA.body, MA.head], i);
+      const sw = MA.st === 'walk' ? Math.sin(beat + m.ph) * 0.5 : 0;
+      m.u.legL.rotation.x = sw; m.u.legR.rotation.x = -sw;
+      m.u.armL.rotation.x = m.u.armR.rotation.x = -1.15 - pump * 0.8;     // плакат вверх-вниз в такт — руками
+      m.grp.position.set(m.x, gy, m.z); m.grp.rotation.y = m.ry;
+      const [ox, oz] = offs(m.ry, POLE_NEAR), py = gy + POLE_NEAR[1] + pump;
+      setInst([MA.pole], i, m.x + ox, py, m.z + oz, m.ry, 1);
+      setInst([MA.plac[m.v]], m.j, m.x + ox, py, m.z + oz, m.ry, 1);
+    } else {
+      const y = gy + Math.abs(Math.sin(beat + m.ph)) * 0.07, [ox, oz] = offs(m.ry, POLE_FAR);
+      setInst([MA.body, MA.head], i, m.x, y, m.z, m.ry, 1);
+      setInst([MA.pole], i, m.x + ox, y, m.z + oz, m.ry, 1);
+      setInst([MA.plac[m.v]], m.j, m.x + ox, y + pump, m.z + oz, m.ry, 1);
+    }
     sx += m.x; sz += m.z; cnt++;
   }
-  MA.body.instanceMatrix.needsUpdate = MA.head.instanceMatrix.needsUpdate = true;
+  MA.body.instanceMatrix.needsUpdate = MA.head.instanceMatrix.needsUpdate = MA.pole.instanceMatrix.needsUpdate = true;
   for (const pm of MA.plac) pm.instanceMatrix.needsUpdate = true;
   // где колонна — для машин потока: середина каждого ряда и ведущий
   MA.rowPts.length = 0;
@@ -923,6 +979,7 @@ function clearGig (G) {
   DIRECTOR.end('gig');
   A.scene.remove(G.stage); G.stage.geometry.dispose();
   for (const m of G.musicians) if (!m.dead) { unsay(m); A.dropMesh(m.grp); }
+  for (const q of G.L) qDrop(q);
   dropInst(G.body); dropInst(G.head);
 }
 function gigStep (dt) {
@@ -961,13 +1018,22 @@ function gigStep (dt) {
         const dx = q.x - V.x, dz = q.z - V.z, d = Math.hypot(dx, dz);
         if (d < 4.2 && sp > 2 && q.hop <= 0.2) { const kk = 7 / (d || 1); q.vx = dx * kk; q.vz = dz * kk; q.hop = 0.6; }
         const c = d < 3.5 && inCar(q.x, q.z);
-        if (c && hit) { q.dead = 1; hideInst([G.body, G.head], i); knockInst(q.x, q.z, q.ry, q.shirt); STATS.gigKo++; continue; }
+        if (c && hit) { q.dead = 1; hideInst([G.body, G.head], i); qKnock(q); STATS.gigKo++; continue; }
       }
       if (G.st === 'run' && !q.vx && !q.vz) { const dx = q.x - G.x, dz = q.z - G.z, d = Math.hypot(dx, dz) || 1; q.vx = dx / d * 4.5; q.vz = dz / d * 4.5; q.ry = Math.atan2(dx, dz); }
       if (q.hop > 0) { q.hop = Math.max(0, q.hop - dt); q.x += q.vx * dt; q.z += q.vz * dt; q.vx *= 0.9; q.vz *= 0.9; }
       else if (G.st === 'run') { q.x += q.vx * dt; q.z += q.vz * dt; }
-      const y = q.y + (music ? Math.max(0, Math.sin(beat + q.ph)) * q.amp : 0) + (q.hop > 0 ? Math.sin(q.hop / 0.6 * Math.PI) * 0.8 : 0);
-      setInst([G.body, G.head], i, q.x, y, q.z, q.ry + (music ? Math.sin(beat * 0.25 + q.ph) * 0.15 : 0), q.s);
+      const bob = music ? Math.max(0, Math.sin(beat + q.ph)) * q.amp : 0, jump = q.hop > 0 ? Math.sin(q.hop / 0.6 * Math.PI) * 0.8 : 0;
+      const ry = q.ry + (music ? Math.sin(beat * 0.25 + q.ph) * 0.15 : 0);
+      if (qNear(q)) {
+        // настоящий слушатель: пританцовывает (кто «танцует» — машет рукой в такт), убегает — бежит своей походкой
+        hideInst([G.body, G.head], i);
+        const u = q.u, runs = G.st === 'run' || q.hop > 0, sw = runs ? Math.sin(G.t * 11 + q.ph) * 0.7 : 0;
+        u.legL.rotation.x = sw; u.legR.rotation.x = -sw;
+        if (u.armR) u.armR.rotation.x = music && q.amp > 0.15 ? -2.5 + Math.sin(beat + q.ph) * 0.4 : 0;
+        q.grp.position.set(q.x, (q.y + bob * 0.4 + jump), q.z); q.grp.rotation.y = runs ? Math.atan2(q.vx, q.vz) || ry : ry;
+        q.grp.scale.setScalar(q.s);
+      } else setInst([G.body, G.head], i, q.x, q.y + bob + jump, q.z, ry, q.s);
     }
     G.body.instanceMatrix.needsUpdate = G.head.instanceMatrix.needsUpdate = true;
   }
@@ -1026,6 +1092,7 @@ export function step (dt, api) {
   postsCar();                                      // тумбы: сбиваются или держат (PROT.HIT)
   if (FALLEN.length) fallenStep(dt);
   if (!live()) return;
+  qBudget = QP.BUILD;                              // людей толпы вблизи — не больше стольких за кадр (qNear)
   if (ST.annT > 0 && (ST.annT -= dt) <= 0) announce();
   // марш (ступени 3—4)
   if (MA) marchStep(dt);
@@ -1048,7 +1115,7 @@ export function crowds () {
 }
 
 export const DEBUG = {
-  PROT, GIG, ST, STATS,
+  PROT, GIG, ST, STATS, QP,
   problems: () => PROBLEMS.map(p => p.id),
   /* стадия сейчас (n = 0…5, null — по сменам) и проблема (id) */
   stage (n = null, id) {

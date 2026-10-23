@@ -2,7 +2,7 @@
    Числа — econ.js RESPECT.CREW и RESPECT.GAIN.
 
    По тротуарам Солнечного стоят группы по 3—5 человек в форме сети: оранжевая «Птица Пицца» (твоя),
-   голубая «Вселенная суши», жёлто-синяя «Королева Бургеров». Узнаются только по форме (футболка,
+   синяя «Вселенная суши», жёлтая «Королева Бургеров» (UNIFORM). Узнаются только по форме (футболка,
    штаны, кепка) — никаких черт внешности по сетям.
      перекур  — стоят кружком, курят (взрослая) или едят мороженое (детская), болтают;
      драка    — двое-трое с битами (в детской — подушками) бьют одного-двоих из другой сети:
@@ -26,11 +26,14 @@ import { part as fxPart } from './fxpool.js';    // частицы из обще
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 
 const C = R.CREW;
+/* цвет формы сетей-конкурентов — один на всю игру (автор 23.10.2026: «насыщенный»): синий «Вселенной суши» и жёлтый
+   «Королевы Бургеров». Им же — мопеды и машины курьеров суши (mopeds.js, game.js FOE_SPEC), курьеры бургерной (rivals.js) */
+export const UNIFORM = { sushi: '#1a8cff', sushiPants: '#123a7a', burger: '#ffd000', burgerPants: '#1f4fa8' };
 /* форма сетей: футболка, штаны, кепка; цвет облачка с репликами */
 export const BRANDS = {
   pizza: { name: N_('Птица Пицца'), shirt: '#ff8a1c', pants: '#4a2c14', cap: '#ff8a1c', say: '#d9620f' },
-  sushi: { name: N_('Вселенная суши'), shirt: '#4fc8e8', pants: '#1d3557', cap: '#f4f1ea', say: '#1f8fb5' },
-  burger: { name: N_('Королева Бургеров'), shirt: '#f2c230', pants: '#2a4fb8', cap: '#2a4fb8', say: '#2a4fb8' },
+  sushi: { name: N_('Вселенная суши'), shirt: UNIFORM.sushi, pants: UNIFORM.sushiPants, cap: UNIFORM.sushi, say: '#1670d0' },
+  burger: { name: N_('Королева Бургеров'), shirt: UNIFORM.burger, pants: UNIFORM.burgerPants, cap: UNIFORM.burger, say: '#c79a00' },
 };
 const RIVAL_IDS = ['sushi', 'burger'];
 const SHIFT_STATES = ['drive', 'back', 'handover', 'side'];

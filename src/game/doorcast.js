@@ -509,7 +509,7 @@ export function frame (dt) {
     if (!alive(a)) { release(a); continue; }
     if (a.L) LIFE.face(a.L, dt);
     a.t += dt;
-    if (a.t > DC.LIFE) { drop(a); continue; }                        // страховка: забытый актёр не держит камеру и лицо
+    if (a.t > DC.LIFE && !DLG.isOpen()) { drop(a); continue; }       // страховка: забытый актёр не держит камеру и лицо (окно открыто — держим)
     if (!a.own) {                                                    // клиента двигает game.js; пока разговор — стоит у двери, не уходит с пиццей
       if (a.ped && !a.nofocus && !a.leaving && a.ped.freeT !== undefined && a.ped.freeT < 0.6) a.ped.freeT = 0.6;
       continue;

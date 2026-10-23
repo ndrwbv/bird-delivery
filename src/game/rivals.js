@@ -2,8 +2,8 @@
    Точки конкурентов (docs/IDEAS.md, блок 9; правила — docs/CAREER.md
    «Респект и войны брендов» → «Точки конкурентов, маскоты, их курьеры»).
 
-   • Две чужие сети: «Вселенная суши» (голубая) и «Королева Бургеров»
-     (жёлто-синяя). В каждом районе — по точке каждой сети, где хватает
+   • Две чужие сети: «Вселенная суши» (синяя) и «Королева Бургеров»
+     (жёлтая; форма — crews.js UNIFORM). В каждом районе — по точке каждой сети, где хватает
      места — по второй (RIV.PER_DIST). Место — пустырь у улицы тем же
      отбором, что стройки (construction.js freeLots), участок ~24 × 23 м,
      от стен домов ≥ WALL, от наших пиццерий ≥ PIZZA, от строек, костров и
@@ -1094,6 +1094,9 @@ function makeBcar () {
   g.userData = { lite: false, hl: 2.2, wheels: [], steer: [], panels: [], glass: [], hazard: [], dmg: 0, bodyHex: '#e8a84f', model: 'bcar' };
   return g;
 }
+/* машина-бургер для курьера-конкурента «Королевы Бургеров» (game.js FOE_SPEC bcar: их курьер ездит только на ней);
+   до сборки точек (нет api) — null, тогда game.js берёт обычную машину */
+export function bcarMesh () { return A && A.put ? makeBcar() : null; }
 function nearestShop (x, z, chain) {
   let best = null, bd = Infinity;
   for (const s of SHOPS) { if (chain && s.chain !== chain) continue; const d = Math.hypot(s.x - x, s.z - z); if (d < bd) { bd = d; best = s; } }

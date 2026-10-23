@@ -171,7 +171,10 @@ const CHECKS = [
     const info = `${r.liveSec} с езды, вручений ${r.delivered}: показано ${kinds}; два и больше сразу — ${r.overlaps} раз (${r.overSec} с)` +
       (r.nq ? `, выброшено устаревших ${r.nq.stale}, перебито ${r.nq.cut}, дольше всех ждало ${r.nq.maxWait} с` : '') +
       (r.overlaps ? ' · ' + r.examples.slice(0, 3).map(x => x.t + ' с: ' + x.kinds + ' («' + x.texts + '»)').join('; ') : '');
-    return { status: r.overlaps ? 'fail' : r.delivered < 3 ? 'warn' : 'ok', info: info + (r.delivered < 3 ? ' (мало вручений — проверка слабая)' : '') };
+    // плашка достижения ушла за ≤ 6 с (0п14, v0.20.0: висела и не пропадала) и не залипла после «спрятали до первого кадра»
+    const ach = r.ach || {}, achBad = ach.maxSec > 6 || ach.stuckAfterRace;
+    const achInfo = `; грамот ${ach.n}, дольше всех висела ${ach.maxSec} с (≤ 6)` + (ach.stuckAfterRace ? ', ЗАЛИПЛА после показа-и-сразу-спрятать' : '');
+    return { status: r.overlaps || achBad ? 'fail' : r.delivered < 3 ? 'warn' : 'ok', info: info + achInfo + (r.delivered < 3 ? ' (мало вручений — проверка слабая)' : '') };
   } },
   /* память на телефоне (11.10.2026, docs/AGENTS.md «Память на телефоне»): мобильный режим, меню → город достроен → 20 с смены.
      Порог — с запасом ~20 % над замером; было до правок: куча 706 / 822 МБ, след страницы пик 1477 МБ — вкладка Safari на iPhone умирала */

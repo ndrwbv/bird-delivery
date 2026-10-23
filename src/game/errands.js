@@ -4,7 +4,8 @@
 
    - Клиент, который попросил, ЖДЁТ ТАМ ЖЕ, где взял пиццу (баг 11.10.2026: после покупки пин уезжал
      за район — клиент с пиццей уходил в подъезд, и прохожий-«он» возрождался в 90—400 м другим человеком,
-     а цель ставилась на его новое место). hold() — помечает его p.errand: стоит с пиццей и не уходит;
+     а цель ставилась на его новое место). hold() — помечает его p.errand: стоит с пиццей и не уходит, не идёт к лавочке
+     и по своему пути; отошёл дальше PIN м — шагом обратно (step → pinClient; 23.10.2026, 0ш);
      ensureClient() — когда едешь обратно: если его всё-таки сдвинули или подменили — возвращает на место
      тем же человеком. Цель обратно — пин перед его точкой (Sd.at), а не его координаты.
    - Человек у подъезда (giver в SIDE_ORDERS: сестра, бывшая, сосед): giverSpot() — подъезд в том же районе
@@ -103,7 +104,21 @@ export function hold (Sd) {
   p.errand = true;
   if (p.after) A.afterDrop(p, true);
   if (!p.guest) A.makeGuest(p, { x: p.x, z: p.z });
+  // ждёт ровно тут (автор 18.10.2026, 0ш: «вернулся с покупкой — он стоит в другом месте, хотя ничего не писал»):
+  // не идёт ни к лавочке, к которой шёл до пиццы, ни дальше по своему пути; сидит на лавочке — там и сидит
+  p.path = null; p.w = null;
+  if (!p.sitting && p.sitAt) { p.sitAt.taken = 0; p.sitAt = null; }
+  p.waitAt = null;
   TR.client = p;
+}
+/* каждый кадр, пока ждёт: отошёл от своего места (толкнули, упал и встал, повёл кто-то ещё) — шагом обратно (game.js guestStep) */
+const PIN = 0.8;
+function pinClient (p, Sd) {
+  const h = Sd && Sd.home;
+  if (!h || !p || p.dead || p.fall || p.sitting || !p.guest) return;
+  if (p.path || p.w) { p.path = null; p.w = null; }
+  if (p.sitAt) { p.sitAt.taken = 0; p.sitAt = null; }
+  if (!p.waitAt && Math.hypot(p.x - h.x, p.z - h.z) > PIN) p.waitAt = { x: h.x, z: h.z };
 }
 /* едешь обратно: клиент на своём месте и тем же человеком */
 export function ensureClient (Sd) {
@@ -327,6 +342,7 @@ export function step (dt = 1 / 60) {
   if (OUCHQ.length) ouchStep(dt);
   const Sd = A.S.side;
   if (TR.client && (!Sd || Sd.ped !== TR.client)) { release(TR.client); TR.client = null; }
+  if (TR.client) pinClient(TR.client, Sd);
   if (TR.giver && (!Sd || Sd.giverPed !== TR.giver || (Sd.stage !== 'shop' && Sd.stage !== 'talk'))) { release(TR.giver); TR.giver = null; }
   // живой у отдающего: подъезжаешь (ближе LIVE.NEAR) — он уже сидит у его ног; поручение ушло дальше — убегает к подъезду
   const s = Sd && Sd.it && Sd.it.spec, g = TR.giver;

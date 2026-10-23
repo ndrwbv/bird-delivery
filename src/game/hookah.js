@@ -17,6 +17,7 @@
         fxAdd, puffGeo, steam, toast, Snd, CAR_L, CAR_W, nearestRoad, t */
 
 import { part as fxPart } from './fxpool.js';    // частицы из общего запаса (fxpool.js)
+import * as HITS from './hits.js';               // лавочку снесли — сидевшие падают с неё и встают (hits.js fall)
 
 const SPAWN_R = 230, DROP_R = 320;
 const SHARE = 0.09, MIN_GAP = 110, MAX_SPOTS = 60;   // доля лавочек с кальянщиками, не ближе друг к другу, всего не больше
@@ -154,6 +155,44 @@ function hitCheck (s) {
   }
 }
 
+/* лавочку снесли (автор 23.10.2026, 0п2: «сидящие зависают в позе»): сидевшие падают с неё (hits.js fall — полежал,
+   встал, погрозил кулаком), стоявший — сразу; потом все уходят от лавочки в разные стороны и через SCAT.T с пропадают
+   (или когда отъедешь) */
+const SCAT = { T: 14, SPEED: 1.5 };
+function scatter (s) {
+  s.scat = 1; s.scatT = 0;
+  const V = A.V, b = s.b;
+  for (const p of s.people) {
+    if (p.dead) continue;
+    const u = p.grp.userData;
+    let ax = p.x - b.x, az = p.z - b.z;
+    if (Math.hypot(ax, az) < 0.2) { ax = Math.sin(b.ry); az = Math.cos(b.ry); }
+    const l = Math.hypot(ax, az) || 1, a = Math.atan2(ax / l, az / l) + rand(-0.6, 0.6);
+    p.away = { x: Math.sin(a), z: Math.cos(a) };
+    if (p.sit) {
+      p.sit = false;
+      u.legL.rotation.x = u.legR.rotation.x = 0;
+      p.grp.position.y = A.groundH(p.x, p.z) + A.curbAt(p.x, p.z);
+      HITS.fall(p, V.vx || p.away.x * 4, V.vz || p.away.z * 4);
+    }
+  }
+}
+function scatStep (s, dt) {
+  for (const p of s.people) {
+    if (p.dead) continue;
+    if (p.fall) { if (HITS.fallStep(p, dt)) continue; p.fall = null; }
+    const u = p.grp.userData, w = p.away;
+    p.ph += dt * 7;
+    p.x += w.x * SCAT.SPEED * dt; p.z += w.z * SCAT.SPEED * dt;
+    p.grp.rotation.y = Math.atan2(w.x, w.z);
+    p.grp.position.set(p.x, A.groundH(p.x, p.z) + A.curbAt(p.x, p.z) + Math.abs(Math.sin(p.ph)) * 0.04, p.z);
+    const sw = Math.sin(p.ph) * 0.75;
+    u.legL.rotation.x = sw; u.legR.rotation.x = -sw; u.armL.rotation.x = -sw * 0.7; u.armR.rotation.x = sw * 0.7;
+    u.head.rotation.y = 0;
+  }
+  hitCheck(s);
+}
+
 /* на лавочке сейчас кальянщики — другим не садиться (клиент с пиццей, game.js afterStart) */
 export const busy = b => SPOTS.some(s => s.live && s.b === b);
 /* где сидят компании — герои города встают рядом (heroes.js) */
@@ -166,12 +205,14 @@ export function step (dt) {
     for (const s of SPOTS) {
       const d = Math.hypot(s.b.x - V.x, s.b.z - V.z);
       s.deadT = Math.max(0, s.deadT - 0.5);
-      if (!s.live && d < SPAWN_R && !s.deadT && !(s.b.prop && s.b.prop.down) && !s.b.taken) { s.gen = (s.gen || 0) + (s.people.length ? 1 : 0); spawn(s); }
-      else if (s.live && (d > DROP_R || (s.b.prop && s.b.prop.down))) despawn(s);
+      if (!s.live && d < SPAWN_R && !s.deadT && !(s.b.prop && s.b.prop.down) && !s.b.taken) { s.gen = (s.gen || 0) + (s.people.length ? 1 : 0); spawn(s); s.scat = 0; }
+      else if (s.live && (d > DROP_R || (s.scat && (s.scatT += 0.5) > SCAT.T))) despawn(s);
+      else if (s.live && s.b.prop && s.b.prop.down && !s.scat) scatter(s);
     }
   }
   for (const s of SPOTS) {
     if (!s.live) continue;
+    if (s.scat) { scatStep(s, dt); continue; }
     for (const p of s.people) {
       if (p.dead) continue;
       p.ph += dt;

@@ -10,7 +10,9 @@
    --q=nsecs=180&nshift=6&nwarp=1 — сколько секунд ехать, какая по счёту смена (6 — средняя, с коллегами и сезоном) и
    ускорение мира (2 — доставок вдвое больше, а часы уведомлений — настоящие: проверка на тесноту); ntp=10 — через
    10 с езды к адресу (или назад) машину переносит к цели: вручений втрое больше — проверка тесноты после вручения.
-   → { secs, shifts, delivered, shown: {вид: сколько раз}, overlaps: эпизодов «два и больше сразу», overSec, maxAt,
+   Плашка достижения (#ach-toast.on) — сколько подряд видна, в любом состоянии: дольше 6 с — висит (0п14); и гонка
+   «спрятали до первого кадра» (ACH.chipRace) — после неё плашка не видна.
+   → { ach: { n, maxSec, stuckAfterRace }, secs, shifts, delivered, shown: {вид: сколько раз}, overlaps: эпизодов «два и больше сразу», overSec, maxAt,
        examples: [{ t, kinds, texts }], log: [[t, вид, текст]] } */
 const q = new URLSearchParams(location.search);
 const SECS = +(q.get('nsecs') || 180), NSHIFT = +(q.get('nshift') || 6), WARP = +(q.get('nwarp') || 1), NTP = +(q.get('ntp') || 0);
@@ -55,6 +57,7 @@ const start = async () => { await onShift(); autopilot(true); shifts++; lastDel 
 await start();
 window.__warp = WARP;
 const shown = {}, examples = [], tl = [];
+let achT = 0, achN = 0, achMax = 0;
 let tpKey = '', tpT = 0, apOff = 0, prev = new Set(), was = 0, overlaps = 0, overMs = 0, maxAt = 0, live = 0;
 const t0 = Date.now();
 while (Date.now() - t0 < SECS * 1000) {
@@ -71,6 +74,12 @@ while (Date.now() - t0 < SECS * 1000) {
       if (d.car) d.car.position.set(x, V.y, z);
       autopilot(false); apOff = Date.now() + 2000; tpT = Date.now() + 4000;
     }
+  }
+  {   // плашка достижения уходит сама (0п14): сколько подряд видна (класс on), в любом состоянии — и в паузе, и вне смены
+    const a = document.getElementById('ach-toast'), onNow = !!(a && a.classList.contains('on'));
+    if (onNow && !achT) { achT = Date.now(); achN++; }
+    if (achT) achMax = Math.max(achMax, (Date.now() - achT) / 1000);
+    if (!onNow) achT = 0;
   }
   if (!quietNow()) { was = 0; continue; }
   live += 50;
@@ -90,6 +99,15 @@ while (Date.now() - t0 < SECS * 1000) {
 }
 autopilot(false);
 window.__warp = 1;
+// гонка «спрятали раньше, чем проявилась» (0п14: плашка висела навсегда): показать и тут же спрятать — через 2 кадра не видна
+let achRace = null;
+if (d.ACH && d.ACH.chipRace) {
+  d.ACH.chipRace();
+  await wait(300);
+  const a = document.getElementById('ach-toast');
+  achRace = !!(a && a.classList.contains('on'));
+  if (a) a.classList.remove('on');
+}
 delivered += Math.max(0, (d.S.delivered || 0) - lastDel);
-return { secs: SECS, liveSec: Math.round(live / 1000), shifts, delivered, shown, overlaps, overSec: +(overMs / 1000).toFixed(1), maxAt, examples, log: tl,
+return { ach: { n: achN, maxSec: +achMax.toFixed(1), stuckAfterRace: achRace }, secs: SECS, liveSec: Math.round(live / 1000), shifts, delivered, shown, overlaps, overSec: +(overMs / 1000).toFixed(1), maxAt, examples, log: tl,
   nq: window.__NQ ? window.__NQ.stats() : null };

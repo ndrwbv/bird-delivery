@@ -3,12 +3,13 @@
    Автор: «5—8 жителей первого района, которые встречаются снова (заказ → поручение → встреча у двери), у каждого
    маленькая история на 3—4 появления». Первый район — самый важный: зацепить игрока, «а что будет дальше?».
 
-   Пятеро, у каждого — свой подъезд в Юге (запоминается на первом появлении) и история на 4 появления разного вида:
+   Четверо, у каждого — свой подъезд в Юге (запоминается на первом появлении) и история на 4 появления разного вида:
      door   — заказ к его двери, при вручении — окно разговора (реплики, два ответа, ответ в ответ);
      errand — заказ ему, при вручении он просит поручение (orders.config.js SIDE_ORDERS, face: его герой) — в магазин
               или к человеку у подъезда (встреча на улице);
      meet   — заказ к его подъезду, вместо вручения — встреча-катсцена у подъезда (encounters.js, герои LOCAL_HEROES);
-     развязка — последнее появление: дверь открывает другой человек (мама, новый жилец) или он сам — уже другой.
+     развязка — последнее появление: дверь открывает другой человек (мама) или он сам — уже другой.
+   (История Людмилы Петровны с «майором Ковалёвым» вырезана 23.10.2026 по просьбе автора, IDEAS.md 12ае.)
    Ответы в некоторых появлениях запоминаются: от них зависит развязка (by).
 
    Когда: только карьера, только первый район («Юг», не «весь город», не быстрый заезд), с 1-й смены игрока. Ставит
@@ -51,22 +52,6 @@ const A2 = (a, r, e, w, tip, row) => ({ a, r, e: e || 'ok', w: w || 0, tip: tip 
      { kind: 'errand', side — id поручения в SIDE_ORDERS }
      { kind: 'meet', hero — герой катсцены (по умолчанию сам), i | by + i: [если 0, если 1] — встреча героя по счёту } */
 const LOCALS = /*i18n*/ [
-  /* Людмила Петровна — пенсионерка, которую обрабатывают телефонные мошенники («майор Ковалёв из службы безопасности») */
-  { id: 'ludmila', name: N_('Людмила Петровна'), fem: true, seed: 0x1d3a, decor: 'granny', who: 'local_ludmila',
-    look: { age: 'old', wrinkles: true, hair: 'bun', hairC: '#d4d0ca', glasses: 'round', glassC: '#6b3a22', head: 'none', eyes: 'round', brows: 'sad', mouth: 'small',
-      top: 'long', shirt: '#7a5a8a', sweater: '#e8dcc0', bottom: 'skirt', skirt: '#4a3a4a', pants: '#4a3a4a', shoes: '#3a2a22', fat: false, shape: 'normal', blush: true, pack: null },
-    char: { walk: { speed: 0.7, step: 9, leg: 0.22, arm: 0.2, drag: 0.6, stoop: 0.16 }, talk: 'small', idle: 'fidget' },
-    steps: [
-      { kind: 'door', what: 'у двери: «вы не из банка?»',
-        talk: { s: [L(N_('Вы не из банка? Мне звонили из службы безопасности. Сказали никому не открывать.'), 'scared'),
-          L(N_('…Но про пиццу ничего не говорили. Давайте.'))],
-        a: [A2(N_('Я из пиццерии'), N_('Вот и хорошо. А то майор Ковалёв сказал: вокруг одни мошенники. Кроме него.')),
-          A2(N_('Не верьте звонкам'), N_('Майор так и сказал: «Не верьте тем, кто скажет не верить». Умный человек.'), 'happy')] } },
-      { kind: 'errand', side: 'lc-ludmila-sim', what: 'поручение: новая симка' },
-      { kind: 'meet', i: 0, what: 'у подъезда: «ты от майора?»' },
-      { kind: 'meet', hero: 'lc-tenant', by: 2, i: [1, 0], what: 'развязка: новый жилец' },
-    ] },
-
   /* Серёга — двенадцать лет на КПП закрытого города, сам ни разу не выезжал */
   { id: 'guard', name: N_('Серёга'), fem: false, seed: 0x6a2d, decor: 'nice', who: 'local_guard',
     look: { age: 'adult', hair: 'buzz', hairC: '#3a2a1e', beard: 'mustache', head: 'none', glasses: 'none', eyes: 'narrow', brows: 'thick', mouth: 'line', broad: true,
@@ -161,22 +146,6 @@ const LOCALS = /*i18n*/ [
 
 /* встречи-катсцены у подъезда (формат encounters.js / smalltalk-lines.js: say, a / b — { me, re, mood, out, row, slam }) */
 const MEETS = /*i18n*/ {
-  ludmila: [
-    { id: 'lc-ludmila-major', emo: 'scared',
-      say: N_('Майор Ковалёв велел снять всё с книжки и отдать курьеру. Ты курьер. Ты от майора?'),
-      a: { me: N_('Нет! Не отдавайте!'), re: N_('Майор предупреждал, что придёт ненастоящий курьер. Иди, милок.'), mood: 'sad', out: '0', slam: true },
-      b: { me: N_('Я с пиццей'), re: N_('С пиццей… Значит, другой придёт. Майор сказал — к семи. На вот, на чай.'), mood: 'ok', out: 'tip', row: N_('на чай от Людмилы Петровны') } },
-  ],
-  tenant: [
-    { id: 'lc-tenant-warned', emo: 'ok',
-      say: N_('Людмила Петровна тут больше не живёт. Квартиру продала. Говорят, какой-то курьер её отговаривал. Не послушала.'),
-      a: { me: N_('Где она?'), re: N_('У сестры в Томске. Или в доме престарелых. Майор не уточнял.'), mood: 'ok', out: '0' },
-      b: { me: N_('Приятного аппетита'), re: N_('Спасибо. Хорошая квартира. Даже ковёр оставила.'), mood: 'happy', out: 'tip', row: N_('чаевые нового жильца') } },
-    { id: 'lc-tenant-safe', emo: 'ok',
-      say: N_('Людмила Петровна тут больше не живёт. Квартира теперь «безопасная». Пицца на её имя? Оплачено с её карты — давай.'),
-      a: { me: N_('Где она?'), re: N_('У сестры в Томске. Или в доме престарелых. Майор не уточнял.'), mood: 'ok', out: '0' },
-      b: { me: N_('Приятного аппетита'), re: N_('Спасибо. Хорошая квартира. Даже ковёр оставила.'), mood: 'happy', out: 'tip', row: N_('чаевые нового жильца') } },
-  ],
   guard: [
     { id: 'lc-guard-leave', emo: 'surprised',
       say: N_('Взял отпуск. Первый за двенадцать лет. Сам себе пропуск подписал — рука дрожала.'),
@@ -206,13 +175,7 @@ const MEETS = /*i18n*/ {
 /* герои катсцен для encounters.js (поля — как у HEROES там; face — чей заказ, local — чья история; в случайные встречи
    не попадают; swap — после катсцены к двери за пиццей выходит он, а не тот, кто в накладной) */
 export const LOCAL_HEROES = LOCALS.map(h => ({ id: 'lc-' + h.id, face: 'lc-' + h.id, local: h.id, who: h.who, name: h.name, seed: h.seed, fem: h.fem,
-  decor: h.decor, look: h.look, char: h.char, only: MEETS[h.id] || [] })).concat([
-  { id: 'lc-tenant', face: 'lc-ludmila', local: 'ludmila', swap: true, who: 'local_tenant', name: N_('новый жилец'), seed: 0x7e4a, fem: false, decor: 'cop',
-    look: { age: 'adult', hair: 'buzz', hairC: '#1a1a1a', head: 'none', beard: 'none', bristle: true, glasses: 'none', eyes: 'narrow', brows: 'thick', mouth: 'smirk', broad: true,
-      top: 'stripe', shirt: '#2b2a30', stripe: '#f4f1ea', bottom: 'pants', pants: '#2b2a30', shoes: '#f4f1ea', fat: false, shape: 'normal', pack: null },
-    char: { walk: { speed: 0.9, step: 7, leg: 0.5, arm: 0.3 }, talk: 'shrug', idle: 'still' },
-    only: MEETS.tenant },
-]);
+  decor: h.decor, look: h.look, char: h.char, only: MEETS[h.id] || [] }));
 
 const BY = {};
 for (const h of LOCALS) BY[h.id] = h;
@@ -235,13 +198,13 @@ function rec (sv, id) {
   return r;
 }
 function note (s) { LOG.push('смена ' + cur() + ': ' + s); if (LOG.length > 40) LOG.shift(); }
-const pool = () => LOCALS;                                     // все пятеро — и во взрослой, и в детской (без мата)
+const pool = () => LOCALS;                                     // все четверо — и во взрослой, и в детской (без мата)
 
 /* какой вариант появления: by — по ответу в появлении № by (нет ответа — второй вариант) */
 const pickBy = (st, r, arr) => (Array.isArray(arr) ? arr[st.by !== undefined && r.ans[st.by] === 0 ? 0 : arr.length > 1 ? 1 : 0] : arr);
 
 /** rhythm.js: появление жителя в этой смене (или null). Очередь: первые два появления — знакомства, дальше через раз
-    (знакомство ↔ продолжение самой продвинутой начатой истории; нет нужного — другое): Л1 С1 Л2 П1 Л3 К1 Л4 О1, потом
+    (знакомство ↔ продолжение самой продвинутой начатой истории; нет нужного — другое): С1 П1 С2 К1 С3 О1 С4, потом
     продолжения. Короткие первые смены дают ~1 появление — за 4 смены Юга игрок знакомится с тремя-четырьмя */
 export function want (shift) {
   if (!A || !LC.ON) return null;
@@ -332,7 +295,7 @@ export function missed (f) {
 const seedOf = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
 const PEOPLE = {};
 /** человек жителя — с настоящим именем «в приложении» (nicks.js: ник = имя, аватарка — лицо), чтобы в окнах и накладной
-    был «Людмила Петровна», а не случайный ник. rhythm.js зовёт для клиента заказа, тут — для своих окон */
+    был «Серёга», а не случайный ник. rhythm.js зовёт для клиента заказа, тут — для своих окон */
 export function own (p, name) {
   if (p && (!p.app || p.app.adult !== !!(A && A.ADULT) || p.app.nick !== name)) p.app = { nick: name, kind: 'name', av: 'face', avSeed: (p.seed >>> 0) || 1, adult: !!(A && A.ADULT) };
   return p;
@@ -428,9 +391,30 @@ export function hand (st, onTime, o, api, ctx) {
   return 'door';
 }
 
+/* проверка записей окон (как regulars.js check): кто говорит — сам житель (0) или есть в crew; чаевые — число ₽ со строкой */
+export function check () {
+  const bad = [];
+  for (const h of LOCALS) {
+    const n = (h.crew || []).length;
+    h.steps.forEach((st, i) => {
+      for (const m of st.talks || (st.talk ? [st.talk] : [])) {
+        for (const l of m.s.concat(m.a)) {
+          const where = h.id + ':' + i + ' «' + String(l.a || l.s).slice(0, 24) + '»';
+          if (!Number.isInteger(l.w) || l.w < 0 || l.w > n) bad.push(where + ' — w=' + l.w + ' (crew ' + n + ')');
+          if (typeof l.e !== 'string') bad.push(where + ' — лицо ' + l.e);
+          if (l.a !== undefined && (typeof l.tip !== 'number' || l.tip < 0 || (l.tip > 0 && !l.row))) bad.push(where + ' — чаевые ' + l.tip + ' / ' + l.row);
+        }
+      }
+    });
+  }
+  return bad;
+}
+
 export function init (api) {
   A = api;
   reload();
+  const bad = check();
+  if (bad.length) console.warn('[locals] записи окон с ошибкой', bad);
   if (typeof window !== 'undefined') window.setTimeout(() => { if (window.__dlv) window.__dlv.LOCALS = DEBUG; }, 0);
 }
 /** смена профиля (game.js reprofile): ничего не поставлено */
@@ -438,7 +422,7 @@ export function reload () { CUR = ''; FORCE = ''; }
 
 /* для probe и песочницы: __dlv.LOCALS */
 export const DEBUG = {
-  LC, LOG, LOCALS, MEETS, ST,
+  LC, LOG, LOCALS, MEETS, ST, check,
   get state () {
     const sv = load();
     return { n: sv.n || 0, shift: cur(), cur: CUR, force: FORCE,

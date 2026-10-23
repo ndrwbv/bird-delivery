@@ -7,13 +7,11 @@
 #pausem .pm-desk[hidden] { display: none; }
 /* стол: тёплое затемнение города (paper.css), не синее */
 body #pausem { background: var(--pp-dim), rgba(30, 12, 20, .35); }
-/* «пауза» — жёлтый стикер на скотче (один наклонённый на экране вместе со штампом) */
+/* «пауза» — жёлтый стикер (один наклонённый на экране вместе со штампом); скотча нет — 11ш */
 .pz-head { flex: none; display: flex; justify-content: center; padding: 10px 0 8px; }
 .pz-head .pm-t { position: relative; padding: .3em .8em .2em; font-size: clamp(16px, min(2.4vw, 4vh), 34px); color: var(--pp-ink); text-shadow: none;
                  text-transform: uppercase; letter-spacing: .12em; background: var(--pp-yellow); border: 3px solid var(--pp-ink); border-radius: 3px;
                  box-shadow: 0 5px 0 var(--pp-ink), 0 12px 26px rgba(0, 0, 0, .35); transform: rotate(-2deg); animation: pp-in .5s var(--pp-spring) both; }
-.pz-head .pm-t::before { content: ''; position: absolute; top: -11px; left: 50%; width: 60px; height: 18px; translate: -50% 0; rotate: 3deg;
-                         background: rgba(255, 243, 214, .6); border: 1px solid rgba(138, 107, 78, .4); }
 /* листки: чек слева (уже), накладная справа */
 .pz-top { flex: 1; min-height: 0; display: flex; justify-content: center; align-items: flex-start; gap: calc(var(--u) * 3);
           padding: calc(var(--u) * 1) calc(var(--u) * 1) calc(var(--u) * 1.4); color: #33210c; }

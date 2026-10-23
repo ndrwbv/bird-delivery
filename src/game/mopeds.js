@@ -28,18 +28,21 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { t } from '../i18n/index.js';
 import { seasonValue, snowAmt } from './seasons.js';
+import { UNIFORM } from './crews.js';            // цвета формы сетей-конкурентов
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[(Math.random() * a.length) | 0];
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 
+/* «Вселенная суши» — насыщенный синий: форма курьеров и их мопеды (цвет — crews.js UNIFORM, один на всю игру) */
+const SUSHI_BLUE = UNIFORM.sushi;
 /* службы: цвет короба и шлема, цвет полосы, доля */
 /* цвета приглушены (автор 04.10.2026: «слишком яркие»): горчичный, пыльно-розовый, серо-зелёный */
 const BRANDS = [
   { i: 0, hex: '#bfa04e', stripe: '#2b2a2e', w: 0.5 },
   { i: 1, hex: '#b07a8e', stripe: '#d9d4ca', w: 0.25 },
   { i: 2, hex: '#5f8a69', stripe: '#d9d4ca', w: 0.25 },
-  { i: 3, hex: '#2fa8e0', stripe: '#ffffff', w: 0, rival: 'sushi', roll: 1 },   // «Вселенная суши»: короб-ролл (rivals.js)
+  { i: 3, hex: SUSHI_BLUE, stripe: '#ffffff', w: 0, rival: 'sushi', roll: 1, body: SUSHI_BLUE, pants: UNIFORM.sushiPants },   // «Вселенная суши»: короб-ролл (rivals.js); форма и мопед — насыщенный синий (автор 23.10: 0п8, 11э)
 ];
 const pickBrand = () => { let r = Math.random(); for (const b of BRANDS) if ((r -= b.w) <= 0) return b; return BRANDS[0]; };
 const BODY_HEX = ['#cfcac0', '#3c4048', '#8a4a4a', '#7f8a96'];
@@ -100,7 +103,7 @@ function riderGeo (A, br, look) {
 function rollBox (A, L, y, z) {
   const P = A.put, Q = Math.PI / 2;
   P(L, new THREE.CylinderGeometry(0.31, 0.31, 0.62, 12), '#1d3b2c', 0, y, z, 0, 0, Q);
-  P(L, new THREE.CylinderGeometry(0.315, 0.315, 0.1, 12), '#2fa8e0', 0, y, z, 0, 0, Q);
+  P(L, new THREE.CylinderGeometry(0.315, 0.315, 0.1, 12), SUSHI_BLUE, 0, y, z, 0, 0, Q);
   for (const s of [-1, 1]) {
     P(L, new THREE.CylinderGeometry(0.27, 0.27, 0.02, 12), '#f8f6ef', s * 0.315, y, z, 0, 0, Q);
     P(L, new THREE.CylinderGeometry(0.11, 0.11, 0.03, 8), '#f07a5a', s * 0.32, y, z, 0, 0, Q);
@@ -108,14 +111,39 @@ function rollBox (A, L, y, z) {
 }
 const vcMat = () => new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
 
+/* седок (23.10.2026, 0п8): человек из общего сборщика (makeHuman — модель Quaternius, как все люди игры), сидит:
+   бёдра вперёд, руки к рулю; на спине — короб службы. Форма — цвета службы (шлем-кепка, куртка).
+   Человек — прямой ребёнок мопеда (дальний / ближний вариант считается от положения мопеда), в userData.men —
+   game.js svcGone / respawnTraffic отдают его dropMesh. ?qp=0 / нет makeHuman — прежний коробочный (riderGeo) */
+export const RIDER = { y: 0.14, z: -0.2, leg: -1.45, arm: -0.8, armZ: 0.3 };
+let MAKEH = null;                                    // makeHuman из api дороги (roadlife.js): мопед суши рождает rivals.js своим api, где его нет
+function makeRider (A, br) {
+  const mk = A.makeHuman || MAKEH;
+  if (!mk || /[?&]boxrider\b/.test(typeof location !== 'undefined' ? location.search : '')) return new THREE.Mesh(riderGeo(A, br, (Math.random() * 3) | 0).clone(), vcMat());
+  const man = mk(null, { cap: br.hex, shirt: br.hex, pants: br.pants || '#2f3540' });
+  seat(man);
+  const bag = new THREE.Mesh(riderBagGeo(A, br), vcMat());
+  bag.position.set(0, 1.36 - RIDER.y - 1.34, -0.52 - RIDER.z + 0.4);   // короб — на прежнем месте над багажником
+  man.add(bag);
+  man.position.set(0, RIDER.y, RIDER.z);
+  man.userData.mopedRider = 1;
+  return man;
+}
+/* поза седока: сидит, ноги на подножке, руки на руле, голова прямо */
+function seat (man) {
+  const u = man.userData;
+  if (u.legL) { u.legL.rotation.x = RIDER.leg; u.legR.rotation.x = RIDER.leg; }
+  if (u.armL) { u.armL.rotation.x = RIDER.arm; u.armR.rotation.x = RIDER.arm; u.armL.rotation.z = RIDER.armZ; u.armR.rotation.z = -RIDER.armZ; }
+  if (u.head) u.head.rotation.x = 0;
+}
 function makeMopedMesh (A, br) {
   const g = new THREE.Group();
   g.rotation.order = 'YXZ';
   const body = BODY_HEX[(Math.random() * BODY_HEX.length) | 0];
-  g.add(new THREE.Mesh(mopedGeo(A, Math.random() < 0.45 ? br.hex : body).clone(), vcMat()));      // своя копия: svcGone/respawn её выбросят
-  const rider = new THREE.Mesh(riderGeo(A, br, (Math.random() * 3) | 0).clone(), vcMat());
+  g.add(new THREE.Mesh(mopedGeo(A, br.body || (Math.random() < 0.45 ? br.hex : body)).clone(), vcMat()));      // своя копия: svcGone/respawn её выбросят; у сети-конкурента мопед — в цвет формы
+  const rider = makeRider(A, br);
   g.add(rider);
-  g.userData = { wheels: [], steer: [], panels: [], glass: [], hazard: [], dmg: 0, hl: HL, model: 'moped', bodyHex: br.hex, rider };
+  g.userData = { wheels: [], steer: [], panels: [], glass: [], hazard: [], dmg: 0, hl: HL, model: 'moped', bodyHex: br.hex, rider, men: rider.isMesh ? null : [rider] };
   return g;
 }
 
@@ -177,7 +205,7 @@ function inSolid (A, x, z, r) {
 }
 
 /* ── места стоянки: у дверей заведений и у подъездов, на тротуаре ── */
-export const warm = A => { if (A) spots(A); };   // места у ТЦ — заранее (game.js 'first'), не в первом кадре после сборки
+export const warm = A => { if (A) { if (A.makeHuman) MAKEH = A.makeHuman; spots(A); } };   // места у ТЦ — заранее (game.js 'first'), не в первом кадре после сборки
 function spots (A) {
   if (MP.spots) return MP.spots;
   const out = [];
@@ -203,7 +231,7 @@ function parkAt (A, sp) {
   A.poseOnSlope(c);
   c.mesh.userData.rider.visible = false;               // седок слез
   // курьер рядом: шлем и короб его службы, в руке телефон
-  const br = c.mp.br, grp = A.makeHuman(null, { cap: br.hex, shirt: br.hex, pants: '#2f3540' });
+  const br = c.mp.br, grp = A.makeHuman(null, { cap: br.hex, shirt: br.hex, pants: br.pants || '#2f3540' });
   const bag = new THREE.Mesh(riderBagGeo(A, br), vcMat());
   bag.position.set(0, 0, 0); grp.add(bag);
   const u = grp.userData;
@@ -242,7 +270,7 @@ function fall (A, c) {
   u.rider.visible = false;
   c.angry = 0;                                          // это не водитель машины — разбираться не выйдет
   const sp = Math.hypot(c.kvx, c.kvz), br = m.br;
-  const grp = A.makeHuman(null, { cap: br.hex, shirt: br.hex, pants: '#2f3540' });
+  const grp = A.makeHuman(null, { cap: br.hex, shirt: br.hex, pants: br.pants || '#2f3540' });
   grp.add(new THREE.Mesh(riderBagGeo(A, br), vcMat()));
   const x = c.x, z = c.z;
   if (sp > 16 || c.wreck) {
@@ -318,6 +346,7 @@ function stepFly (dt, A) {
 /* зима — мопеды в гараже: сезон 2…3 (начало — конец зимы) или лежит снег */
 export const winter = () => { const s = ((seasonValue() % 4) + 4) % 4; return (s >= 2 && s < 3) || snowAmt() > 0.3; };
 export function step (dt, A) {
+  if (A.makeHuman) MAKEH = A.makeHuman;
   const V = A.V, cx = A.cam.position.x, cz = A.cam.position.z;
   const WIN = winter();
   let moving = 0;

@@ -149,6 +149,8 @@ export function buildFuel (A, pois) {
 /* ── каток ──
    Лёд с разметкой, борта с синей кромкой, ворота, мачты со светом и
    катающиеся по кругу люди. Коробка — многоугольник площадки из карты. */
+/* ворота катка: створ в стольких м от торца (от борта), глубина и ширина, м — игра в хоккей на катке бьёт сюда */
+export const RINK_GOAL = 2.2, RINK_GOAL_D = 0.9, RINK_GOAL_W = 1.8;
 export function buildRink (A, green, spot) {
   const [qx, qz] = spot;
   let best = null, bd = 60;
@@ -203,11 +205,16 @@ export function buildRink (A, green, spot) {
     }
   };
   side(-hu, -hn, hu, -hn); side(-hu, hn, hu, hn); side(-hu, -hn, -hu, hn); side(hu, -hn, hu, hn);
-  // хоккейные ворота у торцов
+  // хоккейные ворота у торцов (23.10.2026, 0п6): створ — на линии RINK_GOAL м от середины, открыт к середине льда
+  // (раньше задняя стенка стояла на линии створа, а ворота смотрели в борт); за створом — стойки, крыша и задняя
+  // стенка-сетка глубиной RINK_GOAL_D. Шайба в игре (game.js pitchAt, коробка катка) — гол, когда пересекла створ
+  const gl = hu - RINK_GOAL, gd = RINK_GOAL_D, gw = RINK_GOAL_W;
   for (const s of [-1, 1]) {
-    const [x, z] = pt(s * (hu - 2.2), 0);
-    box(A.LIT, 0.12, 1.2, 1.8, '#d8363a', x, gy + 0.75, z, ry);
-    box(A.LIT, 0.9, 0.1, 1.8, '#d8363a', x + ux * s * 0.45, gy + 1.35, z + uz * s * 0.45, ry);
+    for (const o of [-1, 1]) { const [px, pz] = pt(s * gl, o * gw / 2); box(A.LIT, 0.1, 1.2, 0.1, '#d8363a', px, gy + 0.6, pz, ry); }   // стойки створа
+    const [bx, bz] = pt(s * (gl + gd), 0);
+    box(A.LIT, 0.08, 1.2, gw, '#f1f1ee', bx, gy + 0.6, bz, ry);                         // задняя стенка-сетка
+    const [cx2, cz2] = pt(s * (gl + gd / 2), 0);
+    box(A.LIT, gd + 0.1, 0.1, gw + 0.1, '#d8363a', cx2, gy + 1.22, cz2, ry);            // крыша от створа назад
   }
   // мачты со светом по углам
   for (const [u, n] of [[-hu - 1, -hn - 1], [hu + 1, -hn - 1], [-hu - 1, hn + 1], [hu + 1, hn + 1]]) {
@@ -222,7 +229,7 @@ export function buildRink (A, green, spot) {
   for (let i = 0; i < k; i++) {
     skaters.push({ g: null, a: i / k * Math.PI * 2 + Math.random() * 0.4, ru: hu * (0.55 + Math.random() * 0.25), rn: hn * (0.45 + Math.random() * 0.25), w: (0.25 + Math.random() * 0.15) * (i % 4 === 3 ? -1 : 1), ph: Math.random() * 6 });
   }
-  return { cx, cz, ux, uz, nx, nz, gy, skaters, A, on: 0 };
+  return { cx, cz, ux, uz, nx, nz, hu, hn, gy, skaters, A, on: 0, goal: gl, goalW: gw };
 }
 
 export function stepRink (R, dt, px, pz) {

@@ -16,10 +16,12 @@
    Хэллоуин — в последнюю смену осени. holidays.js спрашивает holiday().
 
    Что дразнит:
-     • чек смены — календарик (receipt): «до весны — 2 смены», что придёт («весна: ручьи и лужи, сирень, первые
+     • чек смены — календарик (receipt): то, что будет на деле (real — с сюрпризами; сюрприз — клеткой своего сезона,
+       без имени, объявляет Толик в начале смены): «до весны — 2 смены», что придёт («весна: ручьи и лужи, сирень, первые
        шашлыки»), клетки следующих смен по цвету сезона, звезда на празднике, «до Нового года — 3 смены»;
-     • Толик за смену до стыка — прогноз (CYC.FORECAST_AT с после начала);
-     • первая смена сезона / перехода / сюрприза — объявление Толика (CYC.SAY_AT с), в первой смене сезона —
+     • Толик за смену до стыка — прогноз (CYC.FORECAST_AT с после начала) — выключен (CYC.TALK.forecast, 11н);
+     • первая смена сезона / перехода — объявление Толика — выключено (CYC.TALK.season, 11н: сезон видно, календарик
+       в чеке); сюрприз — короткой строкой (CYC.SAY_AT с). В первой смене сезона —
        сезонный заказ (perk): часть пицц — сезонные, оплата × CYC.PERK.k.
 
    Из weather.js: shiftStart(done) — шаг этой смены карьеры ({ key, sea, v, wx, … }), clear() — смена не карьеры.
@@ -42,6 +44,9 @@ export const CYC = {
   SURPRISE: 0.2,          // шанс сюрприза на стыке (4 стыка в год — в среднем 0,8 сюрприза в год)
   PERK: { share: 0.35, k: 1.15 },   // первая смена сезона: доля сезонных пицц и множитель оплаты
   SAY_AT: 6,              // с — объявление Толика в начале смены (праздник говорит в 2,5 с)
+  // что Толик пишет в чат (автор 18.10.2026, 11н: «наступила осень», «по радио обещают лето» — убрать: сезон и так видно,
+  // есть календарик в чеке). Пишет только про сюрприз — смену «не по прогнозу» (её календарик не называет), коротко
+  TALK: { season: false, forecast: false, surprise: true },
   FORECAST_AT: [45, 75],  // с — прогноз Толика за смену до стыка
   CAL: 8,                 // клеток календарика в чеке
   HOL_SOON: 7,            // «до Нового года — N смен» — когда праздник в пределах стольких смен
@@ -100,13 +105,13 @@ const STEP = {
     cast: N_('обещают первый снег. летнюю резину — на балкон, если что') },
   // сюрпризы: прогноз был на следующий шаг, а пришло это (одна смена)
   frost: { sea: 'winter', v: [2.74, 2.8], wx: { snowy: 100 }, surprise: true, name: N_('зима не сдаётся'),
-    hello: N_('синоптики соврали: обещали оттепель — а намело по колено. зима не сдаётся, ещё смена') },
+    hello: N_('обещали оттепель — а намело. зима ещё на смену') },
   maysnow: { sea: 'spring', v: [3.6, 3.7], wx: { maysnow: 100 }, surprise: true, name: N_('снег в мае'),
-    hello: N_('ну синоптики… обещали лето — выпал снег. в мае! сирень в снегу, народ опять в пуховиках') },
+    hello: N_('снег в мае! сирень в снегу') },
   hotagain: { sea: 'summer', v: [0.8, 0.86], wx: { heat: 100 }, surprise: true, name: N_('опять жара'),
-    hello: N_('обещали похолодание — а там +33. лето не отпускает, ещё смена жары') },
+    hello: N_('обещали похолодание — а там +33. ещё смена жары') },
   indian: { sea: 'autumn', v: [1.4, 1.5], wx: { golden: 100 }, surprise: true, name: N_('бабье лето'),
-    hello: N_('обещали первый снег — а тут бабье лето: тепло, всё золотое. наслаждайся, пока дают') },
+    hello: N_('бабье лето! тепло, всё золотое') },
 };
 /* стыки: после какого сезона, какой сюрприз может встать перед следующим шагом */
 const SEAMS = [{ after: 'winter', surprise: 'frost' }, { after: 'spring', surprise: 'maysnow' }, { after: 'summer', surprise: 'hotagain' }, { after: 'autumn', surprise: 'indian' }];
@@ -170,11 +175,17 @@ export function at (pos, seed = 1) {
     if (y > 500) return { ...Y[Y.length - 1], pos };
   }
 }
-/* что игрок ждёт с pos: n шагов по плану — сюрпризы (с pos и дальше) не видны */
+/* что Толик обещает с pos: n шагов по прогнозу — сюрпризы (с pos и дальше) не видны (прогноз накануне врёт) */
 export function planned (pos, seed = 1, n = CYC.CAL) {
   const out = [];
   for (let p = pos; out.length < n && p < pos + n * 3; p++) { const s = at(p, seed); if (!s.surprise) out.push(s); }
   return out;
+}
+/* что будет на деле с pos: n шагов подряд, сюрпризы — на своих местах (календарик чека, автор 18.10.2026: «следующая смена —
+   лето, а пришла весна» — календарик не врёт). Сюрприз в календарике — просто смена своего сезона (снег в мае — весна),
+   без имени: что именно он такое, Толик объявит в начале той смены (hello) */
+export function real (pos, seed = 1, n = CYC.CAL) {
+  return Array.from({ length: n }, (_, i) => at(pos + i, seed));
 }
 
 /* ─────────────── сохранение ─────────────── */
@@ -282,22 +293,24 @@ export function forecast (st = CUR) {
 export function announce () {
   const st = CUR;
   if (!st) return;
-  const h = hello(st), f = forecast(st);
+  const h = st.surprise ? (CYC.TALK.surprise ? hello(st) : '') : CYC.TALK.season ? hello(st) : '';
+  const f = CYC.TALK.forecast ? forecast(st) : '';
   if (h) later(st, CYC.SAY_AT, () => say(h));
   if (f) later(st, CYC.FORECAST_AT[0] + Math.random() * (CYC.FORECAST_AT[1] - CYC.FORECAST_AT[0]), () => say(f));
 }
 
 /* ─────────────── чек смены: календарик ─────────────── */
-const nameOf = s => (s.trans || s.surprise ? t(STEP[s.key].name) : t(SEA[s.sea].name));
+const nameOf = s => (s.trans ? t(STEP[s.key].name) : t(SEA[s.sea].name));   // сюрприз — именем сезона (объявят в начале смены)
 /** календарик в чек (career.js) — после того как смена засчитана (dlv-shifts уже +1). → { text, sub, hol, cells } или null */
 export function receipt (done = doneNow()) {
   if (!CYC.ON || !A) return null;
   const c = load();
   if (!c) return null;
-  const P = planned(Math.max(0, done - c.base), c.seed, CYC.CAL).map(s => ({ ...s, hol: holOf(s, c) }));
+  const P = real(Math.max(0, done - c.base), c.seed, CYC.CAL).map(s => ({ ...s, hol: holOf(s, c) }));
   if (!P.length) return null;
   const p0 = P[0];
   let text = '', sub = '';
+  // сюрприз (не первая смена сезона, не переход) — дальше как обычная смена своего сезона: «до лета — 1 смена»
   if (p0.trans) {
     text = t('следующая смена — {name}!', { name: t(STEP[p0.key].name) });
     sub = t(STEP[p0.key].hint) + ' · ' + t('потом {season}: {what}', { season: t(SEA[p0.trans].name), what: t(SEA[p0.trans].what) });
@@ -324,7 +337,7 @@ export function receipt (done = doneNow()) {
 /* ═════════════════════ отладка: __dlv.CYCLE ═════════════════════ */
 const short = s => s.key + (s.hol ? '+' + s.hol : '') + (s.first ? '*' : '');
 export const DEBUG = {
-  CYC, STEP, SEA, at, planned, year, hello, forecast, receipt,
+  CYC, STEP, SEA, at, planned, real, year, hello, forecast, receipt,
   get CUR () { return CUR; },
   get save () { return load(); },
   /* n смен с новой игры при зерне seed: ключи шагов (* — первая смена сезона, +праздник) */

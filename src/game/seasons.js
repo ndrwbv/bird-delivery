@@ -34,7 +34,8 @@ import { t } from '../i18n/index.js';
 import { setPeopleSeason, redressHumans } from './people.js';
 import { growTree } from './trees.js';
 import * as EDL from './editlayer.js';         // редактор города: прятать убранные деревья на месте
-import { YARD, onYard } from './yards.js';   // дворовые дорожки: зимой протоптаны, сугробы мимо (yards.js)
+import { YARD, onYard } from './yards.js';
+import { inView } from './cull.js';             // снежки: бой не заводится на глазах (cull.js)   // дворовые дорожки: зимой протоптаны, сугробы мимо (yards.js)
 import { mat as fakeShadowMat } from './fakeshadows.js';   // тени домов на сугробах, листьях и кронах (fakeshadows.js)
 
 const CELL = 200;                           // клетка склейки, как у статики (CHUNK в game.js; было 100 — деревья и сугробы давали ~37 вызовов отрисовки в кадре, 10.10.2026)
@@ -713,6 +714,17 @@ export function* seasonYard () {                  // шагами (latebuild.js)
   BUILT.items = SEA_ITEMS.length;
 }
 
+/* Форма сугроба (автор 23.10.2026, 0п22: «узкий высокий сугроб — нелепо, высокий всегда широкий»): ширина у основания
+   (меньшая из двух, 2·W и 2·L — W, L — полуоси) не меньше DRIFT_RATIO высот. Выше — срезаем высоту, склоны пологие.
+   Так же — сугробы снежной зимы (weather.js) и кучи листьев. narrowDrifts() — сколько сугробов сезона уже (проверка) */
+export const DRIFT_RATIO = 2.5;
+export const driftH = (H, W, L) => Math.min(H, 2 * Math.min(W, L) / DRIFT_RATIO);
+export function narrowDrifts () {
+  let n = 0;
+  for (const m of [DRIFTS, LEAVES]) for (const list of m.values()) for (const d of list) if (2 * Math.min(d.W, d.L) < DRIFT_RATIO * d.H - 1e-6) n++;
+  return n;
+}
+
 /* ─────────────── сугробы, ёлки, гирлянды — в конце сборки города ───────────────
    seasonSteps — итератором, шагами для поздней сборки (latebuild.js; при ?nolate — разом): на Деке весь
    кусок ~0,65 с, меню между шагами отвечает. Шаги — по счёту улиц и домов, не по времени */
@@ -748,6 +760,7 @@ export function* seasonSteps () {
     (SL.some(q => Math.hypot(q.x - x, q.z - z) < 9) || PZT.some(it => Math.hypot(it.x - x, it.z - z) < (it.r || 1) + 2.5));
   const drift = (x, z, L, H, W, ry, seed) => {
     if (busy(x, z) || onYard(x, z, Math.max(L, W) * 0.8)) return;   // на дворовые дорожки и выходы к тротуару — нет (yards.js)
+    H = driftH(H, W, L);                                       // не уже 2,5 высоты (0п22)
     const y = groundH(x, z) + C.curbAt(x, z) + 0.02;
     const at = DRIFTP.add(T.mound, x, y, z, W, H, L, 0, ry, 0, DRIFT_HEX, 3, seed);
     const k = Math.floor(x / 20) + ',' + Math.floor(z / 20);
@@ -765,6 +778,7 @@ export function* seasonSteps () {
   };
   const LEAF_HEX = ['#e8862a', '#f2b438', '#d8502a', '#eca232', '#e06a22'];   // яркие, не бурые (осень золотая, не грязная)
   const leafPile = (x, y, z, L, H, W, ry, seed) => {
+    H = driftH(H, W, L);
     const at = LEAFP.add(T.mound, x, y, z, W, H, L, 0, ry, 0, LEAF_HEX[(hsh(x, z, 94) * LEAF_HEX.length) | 0], 2, seed);
     const k = Math.floor(x / 20) + ',' + Math.floor(z / 20);
     if (!LEAVES.has(k)) LEAVES.set(k, []);
@@ -927,26 +941,8 @@ export function* seasonSteps () {
       }
     }
   }
-  // снежинки на фонарях: через один, два креста из лампочек
-  let flakes = 0;
-  for (let i = 0; i < LAMP_SPOTS.length && flakes < (svk ? 500 : 300); i += 2) {
-    const [lx, lz] = LAMP_SPOTS[i];
-    if (!inBounds(lx, lz, 0)) continue;
-    const gy = groundH(lx, lz), cy = gy + 5.2, seed = 0.02 + hsh(lx, lz, 31) * 0.95, hex = hsh(lx, lz, 32) < 0.5 ? '#bfe4ff' : '#ffd98a';
-    for (const plane of [0, Math.PI / 2]) {
-      const ux = Math.cos(plane), uz = -Math.sin(plane);
-      for (let ln = 0; ln < 3; ln++) {
-        const an = ln * Math.PI / 3;
-        for (let k = -2; k <= 2; k++) {
-          if (!k && (ln || plane)) continue;
-          const h = Math.cos(an) * k * 0.26, v = Math.sin(an) * k * 0.26;
-          G.add(T.quad, lx + ux * h, cy + v, lz + uz * h, 0.14, 0.14, 1, 0, plane, 0, hex, 4, seed, (hsh(lx + k, lz + ln, 33) * 255) | 0);
-          bulbs++;
-        }
-      }
-    }
-    flakes++;
-  }
+  // снежинок из лампочек у фонарей больше нет (автор 23.10.2026, 0п20): висели в воздухе у пятна света и оставались,
+  // когда фонарь сбит, — свет фонаря только пятном на земле и горящим плафоном
   // ели у дорог — в гирлянде спиралью
   for (const f of SPRUCES) {
     if (hsh(f.x, f.z, 41) > 0.32) continue;
@@ -1455,7 +1451,15 @@ function stepFights (dt) {
     fightScan = 1.2;
     for (let i = FIGHTS.length - 1; i >= 0; i--) if (Math.hypot(FIGHTS[i].sp.x - V.x, FIGHTS[i].sp.z - V.z) > 230) { dropFight(FIGHTS[i]); FIGHTS.splice(i, 1); }
     if (FIGHTS.length < 3) {
-      const near = fightSpots().filter(p => !p.on && !p.slide && !p.cool && (d => d > 25 && d < 160)(Math.hypot(p.x - V.x, p.z - V.z)));
+      // не появляются на глазах и не за спиной рядом, пока стоишь (0п0, автор 23.10.2026: «после доставки рядом множество людей»):
+      // в кадре — дальше 70 м, вне кадра — дальше 30 м, стоишь (у двери) — дальше 70 м и вне кадра
+      const still = Math.hypot(V.vx, V.vz) < 2;
+      const near = fightSpots().filter(p => {
+        if (p.on || p.slide || p.cool) return false;
+        const d = Math.hypot(p.x - V.x, p.z - V.z);
+        if (d >= 160 || d <= 30) return false;
+        return d > 70 || (!still && !inView(p.x, 1, p.z, 6));
+      });
       if (near.length) { const sp = near[(Math.random() * near.length) | 0]; spawnFight(sp); }
     }
   }

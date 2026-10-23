@@ -1195,7 +1195,7 @@ function staffAsk () {
   DLG.say({
     person: crew[0], name: crew[0].first + ' · ' + t('пиццерия'), head: t('развоз смены'),
     text: t(DAYT.fresh('staffAsk', (STAFF_RIDE.asks || [STAFF_RIDE.ask]).concat(staffMidnight() ? STAFF_RIDE.asksMidnight || [] : CAR && CAR.allDay && CAR.allDay() ? STAFF_RIDE.asksDay || [] : []))),
-    accept: t(STAFF_RIDE.accept), decline: t(STAFF_RIDE.decline), mood: 'shy', color: typeColor('staff'),
+    accept: t(STAFF_RIDE.accept), decline: t(STAFF_RIDE.decline), mood: 'calm', color: typeColor('staff'),   // уставшие, не смущённые: без запинок
   }).then(r => { if (r === true && STAFF.crew === crew) beginStaff(crew); else staffDone(false); });
 }
 /** развоз ждёт, пока вернёшься в пиццерию (career.js lateGuard не закрывает смену) */

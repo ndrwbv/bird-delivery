@@ -28,7 +28,7 @@
 .dg-k.pp-focus { outline: 4px solid var(--pp-yellow); outline-offset: 2px; }
 .dg-brand { flex: none; align-self: center; font-size: min(3.6cqw, 3cqh); letter-spacing: .3em; color: #3a3d41; text-transform: uppercase; text-shadow: 0 1px 0 rgba(255, 255, 255, .4); }
 
-/* сломан: на экранчике пусто, бумажка «не работает» на скотче; стучать — по самой двери */
+/* сломан: на экранчике пусто, бумажка «не работает»; стучать — по самой двери */
 .dg-broken .dg-scr { color: #ff8a6a; }
 .dg-sign { align-self: center; padding: .5em .9em; font-size: min(7cqw, 9cqh); text-transform: uppercase; color: var(--pp-red); background: #fff;
            border: 2px solid var(--pp-ink); rotate: -5deg; box-shadow: 0 3px 0 rgba(0, 0, 0, .3); }

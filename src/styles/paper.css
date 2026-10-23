@@ -174,7 +174,7 @@ body.touch { --pp-fs-s: 10px; --pp-fs-m: clamp(10px, 2.9vw, 13px); --pp-fs-l: cl
 .pp-seal-rust { --pp-seal-c: var(--pp-rust); }
 .pp-seal-pink { --pp-seal-c: #e0287a; }
 
-/* ── стикер: жёлтая записка на скотче, с полароидом; в покое не шевелится. Толик стикером больше не пишет —
+/* ── стикер: жёлтая записка, с полароидом (скотча в интерфейсе нет — автор 23.10.2026, 11ш); в покое не шевелится. Толик стикером больше не пишет —
    у него сообщения как в iMessage (src/game/chat.css, автор 10.10.2026) ── */
 .pp-sticker { position: relative; box-sizing: border-box; display: flex; align-items: flex-start; gap: .9em; width: min(330px, 100%);
               padding: 1.3em 1em 1em; color: var(--pp-ink); background: var(--pp-sticker-c, var(--pp-yellow)); font-size: var(--pp-fs-m); line-height: 1.6;
@@ -182,8 +182,6 @@ body.touch { --pp-fs-s: 10px; --pp-fs-m: clamp(10px, 2.9vw, 13px); --pp-fs-l: cl
               transform-origin: 50% 0; }
 .pp-sticker.pp-pink { --pp-sticker-c: var(--pp-pink); }
 .pp-sticker.pp-orange { --pp-sticker-c: var(--pp-orange); }
-.pp-sticker::before { content: ''; position: absolute; top: -10px; left: 50%; width: 76px; height: 20px; translate: -50% 0; rotate: -4deg;
-                      background: rgba(255, 243, 214, .55); border: 1px solid rgba(138, 107, 78, .35); }
 .pp-sticker > p { margin: 0; }
 .pp-sticker .pp-label { display: block; margin-bottom: .3em; color: var(--pp-rust); text-transform: uppercase; letter-spacing: .06em; }
 .pp-sticker .pp-polaroid { rotate: 0deg; }   /* стикер уже наклонён — второй наклон лишний (правило 6) */

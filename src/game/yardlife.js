@@ -47,7 +47,11 @@ import { inView } from './cull.js';
 import { MOB } from './mobile.js';
 
 export const YL = {
-  WANT: 150, MIN_IN: 70, MIN_OUT: 22, DROP: 215, SCAN: 1,
+  WANT: 150, MIN_IN: 70, MIN_OUT: 30, DROP: 215, SCAN: 1,
+  /* стоишь (медленнее STILL м/с: у клиента, домофон, разговор) — новые сцены и гуляющие не ближе MIN_IN, даже вне кадра
+     (автор 23.10.2026, 0п0: «привёз заказ — после доставки рядом появляется множество людей»: пока стоял у двери,
+     двор за спиной камеры заполнялся сценами с 22 м — развернулся, а вокруг толпа) */
+  STILL: 2,
   SPOT_R: 118,                                   // место сцены у подъезда считаем, только когда подъезд ближе (мелочь газона уже собрана)
   SCENES: { day: 7, night: 3, rain: 3 },         // сцен рядом с курьером
   WALK: { day: 5, night: 2, rain: 2 },           // гуляющих
@@ -568,7 +572,12 @@ function unprop (sc) {
   if (sc.kind === 'snowman') sc.ex.ph = 'done';
   for (const p of sc.ppl) {
     if (p.dead) continue;
-    if (p.seat || p.wasSeat) { p.seat = 0; p.wasSeat = 0; p.u.legL.rotation.x = p.u.legR.rotation.x = 0; if (!p.fall && !p.flee) p.grp.position.y = p.gy; }
+    if (p.seat || p.wasSeat) {
+      const sat = p.seat && !p.fall && !p.flee;
+      p.seat = 0; p.wasSeat = 0; p.u.legL.rotation.x = p.u.legR.rotation.x = 0; if (!p.fall && !p.flee) p.grp.position.y = p.gy;
+      // сидела на снесённой лавочке — падает с неё и встаёт (автор 23.10.2026, 0п2: «сидящие зависают в позе»)
+      if (sat && sc.kind === 'bench') { const V = A.V; HITS.fall(p, V.vx || Math.sin(p.face) * 4, V.vz || Math.cos(p.face) * 4); ST.falls++; }
+    }
     if (p.role === 'domino' || p.role === 'griller' || p.role === 'roller' || p.role === 'babka' || p.role === 'kick') p.role = 'watch';
   }
 }
@@ -811,6 +820,7 @@ function spawnWalker (M) {
     if (!w || A.nearClient(w.x, w.z, YL.CLIENT)) continue;
     const d = dist(w.x, w.z);
     if (d < 90 && inView(w.x, 1, w.z, 2)) continue;
+    if (d < YL.MIN_IN && still()) continue;                  // стоишь — не рядом за спиной (0п0)
     const ski = M.sea === 'win' && !M.night && chance(YL.WALKER.SKI), dog = !ski && chance(YL.WALKER.DOG);
     const grp = chance(0.4) ? A.freshHuman({}, {}) : A.makeHuman(null, { fat: chance(0.2) });
     if (ski) { skis(grp); hold(grp, 'pole'); }
@@ -922,10 +932,11 @@ function farFrom (x, z, gap, kind) {
   }
   return true;
 }
+const still = () => { const V = A.V; return V.vx * V.vx + V.vz * V.vz < YL.STILL * YL.STILL; };
 function okDist (x, z) {
   const d = dist(x, z);
   if (d > YL.WANT) return false;
-  return d > (inView(x, 1, z, 4) ? YL.MIN_IN : YL.MIN_OUT);
+  return d > (still() || inView(x, 1, z, 4) ? YL.MIN_IN : YL.MIN_OUT);
 }
 /* кандидаты на новую сцену вида kind → [{ x, z, make }] */
 function candidates (kind, M) {

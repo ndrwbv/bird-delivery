@@ -377,8 +377,10 @@ function thunderSynth (c, out, dist) {
 }
 
 /* ─────────────── снежная зима: сугробы до второго этажа ───────────────
-   Вдоль стен домов (у 60 % домов, с разрывами) — кучи высотой 3,4—5,2 м у домов в 2 этажа и
-   выше, 1,5—2,3 м у одноэтажных. Вдоль улиц — валы 1,7—2,7 м сразу за тротуаром. Ни один не
+   Вдоль стен домов (у 60 % домов, с разрывами) — кучи высотой 2,6—3,4 м у домов в 2 этажа и
+   выше, 1,2—1,7 м у одноэтажных. Вдоль улиц — валы 1,2—1,8 м сразу за тротуаром. Высокий сугроб
+   всегда широкий (автор 23.10.2026, 0п22): ширина у основания не меньше SEAS.DRIFT_RATIO (2,5) высот —
+   у дома куча в 3 м выходит от стены на ~5,5 м, пологая, без «стенок». Ни один не
    залезает на асфальт (проезды во дворах тоже) и не стоит ближе своего размера + 3,5 м к адресу
    заказа или двери подъезда; у пиццерии (45 м), зебр и остановок — нет. Одна склейка по клеткам
    200 м с тем же материалом, что сугробы сезона (новых программ нет), видна только в снежную зиму. */
@@ -418,17 +420,23 @@ function* buildDeep () {
       [x + nx * Wd * 0.7 + tx * L * 0.7, z + nz * Wd * 0.7 + tz * L * 0.7], [x + nx * Wd * 0.7 - tx * L * 0.7, z + nz * Wd * 0.7 - tz * L * 0.7]];
     if (inner) pts.push([x - nx * Wd, z - nz * Wd], [x - nx * Wd * 0.7 + tx * L * 0.7, z - nz * Wd * 0.7 + tz * L * 0.7], [x - nx * Wd * 0.7 - tx * L * 0.7, z - nz * Wd * 0.7 - tz * L * 0.7], [x, z]);
     for (const [px, pz] of pts) if (!inBounds(px, pz, -20) || inHouse(px, pz) || !offRoad(px, pz, 0.6) || onYard(px, pz, 0.3) || (C.jumpBlocks && C.jumpBlocks(px, pz, 0.5))) return false;   // не на большом трамплине и его разгоне (jumps.js)
+    // у дома внутренняя половина — в стене; где выходит из-за угла или тонкого дома — тоже не на асфальт
+    if (!inner) for (let k = 4; k <= 12; k++) {      // край внутренней половины — 9 точек, как в check()
+      const a = k / 16 * Math.PI * 2, px = x + nx * Wd * Math.cos(a) + tx * L * Math.sin(a), pz = z + nz * Wd * Math.cos(a) + tz * L * Math.sin(a);
+      if (!inHouse(px, pz) && !offRoad(px, pz, 0.6)) return false;
+    }
     if (onYard(x, z, Math.max(Wd, L))) return false;
     return !nearAddr(x, z, Math.max(Wd, L) + 3.5) && !nearPizza(x, z);
   };
   const add = (x, z, nx, nz, Wd, L, H, house) => {
+    H = SEAS.driftH(H, Wd, L);
     const y = groundH(x, z) + curbAt(x, z) + 0.02, ry = Math.atan2(-nz, nx);
     P.add(T.mound, x, y, z, Wd, H, L, 0, ry, 0, '#e8edf4', 3, 0.02);
     const d = { x, y, z, W: Wd, L, H, cs: nx, sn: -nz, nx, nz, house, sled: 0 };
     const k = gk(Math.floor(x / 20), Math.floor(z / 20));
     let a = DEEP.get(k); if (!a) DEEP.set(k, a = []);
     a.push(d); DEEP_LIST.push(d);
-    if (house && H > 3.3) SLED_SPOTS.push(d);
+    if (house && H > 2.5) SLED_SPOTS.push(d);
   };
   // у домов
   for (const b of CITY.buildings) {
@@ -450,8 +458,9 @@ function* buildDeep () {
       if (inPoly(mx + nx * 0.5, mz + nz * 0.5, p)) { nx = -nx; nz = -nz; }
       for (let d = 2 + r() * 2; d < len - 2; d += 5.5 + r() * 3) {
         if (r() < 0.25) continue;
-        const Wd = tall ? 2.0 + r() * 1.0 : 1.3 + r() * 0.6, L = tall ? 2.6 + r() * 1.4 : 1.8 + r() * 0.8, H = tall ? 3.4 + r() * 1.8 : 1.5 + r() * 0.8;
-        const x = a[0] + dx / len * d + nx * Wd * 0.45, z = a[1] + dz / len * d + nz * Wd * 0.45;
+        // форма — SEAS.driftH: ширина у основания не меньше DRIFT_RATIO высот (0п22) — высокий сугроб всегда широкий
+        const H = tall ? 2.6 + r() * 0.8 : 1.2 + r() * 0.5, Wd = H * (1.02 + r() * 0.15) * SEAS.DRIFT_RATIO / 2, L = Math.max(Wd, tall ? 3.6 + r() * 1.4 : 1.9 + r() * 0.8);
+        const x = a[0] + dx / len * d + nx * Wd * 0.35, z = a[1] + dz / len * d + nz * Wd * 0.35;
         work++;
         if (!fits(x, z, nx, nz, Wd, L, false)) continue;
         add(x, z, nx, nz, Wd, L, H, true);
@@ -472,7 +481,7 @@ function* buildDeep () {
       for (let d = 8; d < len - 8; d += 9 + r() * 6) {
         for (const sd of [-1, 1]) {
           if (r() > 0.2) continue;
-          const Wd = 1.1 + r() * 0.6, L = 2.4 + r() * 2, H = 1.7 + r() * 1.0, off = w / 2 + 2.75 + Wd + 0.6;
+          const H = 1.2 + r() * 0.6, Wd = H * (1.02 + r() * 0.15) * SEAS.DRIFT_RATIO / 2, L = Math.max(Wd, 2.6 + r() * 2), off = w / 2 + 2.75 + Wd + 0.6;
           const nx = -uz * sd, nz = ux * sd, x = x1 + ux * d + nx * off, z = z1 + uz * d + nz * off;
           work++;
           if (!fits(x, z, nx, nz, Wd, L, true)) continue;
@@ -681,7 +690,8 @@ const DEBUG = {
   /* сколько стоит кадр: update — мс в среднем с прошлого сброса, рисование — вызовы и треугольники */
   perf (reset) { const o = { updMs: +(PERF.ms / Math.max(1, PERF.n)).toFixed(3), frames: PERF.n, calls: C.renderer ? C.renderer.info.render.calls : null, tris: C.renderer ? C.renderer.info.render.triangles : null }; if (reset) PERF.ms = PERF.n = 0; return o; },
   /* npm run check (tools/probe-checks/weather-drifts.js): край каждого сугроба снежной зимы (16 точек) —
-     не на асфальте; ни адрес заказа (SPOTS), ни дверь подъезда — не в сугробе и не ближе 1,5 м к нему */
+     не на асфальте; ни адрес заказа (SPOTS), ни дверь подъезда — не в сугробе и не ближе 1,5 м к нему;
+     ни один сугроб (снежной зимы и сезона) не уже 2,5 высоты у основания (narrow, narrowSeason) */
   check () {
     const { nearestRoad, inHouse, SPOTS, CITY } = C, road = [], addr = [];
     for (const d of DEEP_LIST) for (let k = 0; k < 16; k++) {
@@ -699,6 +709,10 @@ const DEBUG = {
         if (e < 1) addr.push({ x: Math.round(x), z: Math.round(z), kind });
       }
     }
-    return { n: DEEP_LIST.length, addrs: pts.length, road: road.length, addr: addr.length, sample: [...road.slice(0, 3), ...addr.slice(0, 3)] };
+    // уже DRIFT_RATIO высот у основания (узкий высокий — «стенка», 0п22): снежная зима и сугробы сезона
+    const K = SEAS.DRIFT_RATIO, narrowOf = d => 2 * Math.min(d.W, d.L) < K * d.H - 1e-6;
+    const narrow = DEEP_LIST.filter(narrowOf).length, narrowSeason = SEAS.narrowDrifts();
+    let hMax = 0; for (const d of DEEP_LIST) hMax = Math.max(hMax, d.H);
+    return { n: DEEP_LIST.length, addrs: pts.length, road: road.length, addr: addr.length, narrow, narrowSeason, hMax: +hMax.toFixed(2), sledSpots: SLED_SPOTS.length, sample: [...road.slice(0, 3), ...addr.slice(0, 3)] };
   },
 };

@@ -111,7 +111,7 @@ function send (id) {
 /* своя плашка — только без Стима. Маленькая «грамота» сверху по центру (на телефоне — между часами и
    радаром), не на радаре и не на руле (UI-REVIEW № 30). В езде — в общей очереди уведомлений (notifyq.js, важность
    «достижение»: после чека оплаты, Толика и таблицы рейтинга): одна вещь за раз; висит 4 с, одно короткое проявление,
-   без тряски; ждёт до 60 с (пауза и окна его держат), дольше — не показываем (грамота и так на доске почёта) */
+   без тряски (дольше 5,5 с не висит никогда — 0п14); ждёт до 60 с (пауза и окна его держат), дольше — не показываем (грамота и так на доске почёта) */
 let TOAST = null;
 function chip (a) {
   if (typeof document === 'undefined') return;
@@ -141,15 +141,34 @@ function chip (a) {
 /* на узком экране плашка там же, где чат Толика (под радаром) — ждём, пока его сообщения уйдут */
 // и не поверх паузы (автор 10.10.2026: «Ни царапины» висела поверх паузы) — ждёт, пока игру снимут с паузы, и показывается один раз
 const chatGone = () => !(A && A.S && A.S.paused) && (innerWidth > 560 || !document.querySelector('#chat .cm:not(.out)'));
-let chipT = 0;
-function hideChip () { clearTimeout(chipT); if (TOAST) TOAST.classList.remove('on'); }
+/* 0п14 (v0.20.0: плашка висела и не пропадала): «проявить» — в следующем кадре (rAF), а спрятать могли раньше —
+   перебил чек оплаты в тот же кадр, долгий кадр конца смены, вкладка в фоне (таймер идёт, кадров нет). Тогда кадр
+   приходил после hideChip и включал плашку уже без таймера — навсегда. Теперь у показа свой номер: спрятали — кадр
+   опоздавшего показа ничего не делает; и предохранитель — плашка, видимая дольше CHIP_MAX с, снимается сама. */
+const CHIP_MS = 4000, CHIP_MAX = 5.5;
+let chipT = 0, chipRaf = 0, chipGen = 0, chipAt = 0;
+function hideChip () {
+  chipGen++;
+  clearTimeout(chipT); chipT = 0;
+  if (chipRaf) { try { cancelAnimationFrame(chipRaf); } catch (e) { /* — */ } chipRaf = 0; }
+  chipAt = 0;
+  if (TOAST) TOAST.classList.remove('on');
+}
 function showChip (a) {
+  hideChip();
   TOAST.innerHTML = '<i></i><div><small></small><b></b></div>';
   TOAST.querySelector('small').textContent = t('достижение');
   TOAST.querySelector('b').textContent = t(a.name);
-  requestAnimationFrame(() => TOAST.classList.add('on'));
-  clearTimeout(chipT);
-  chipT = setTimeout(hideChip, 4000);
+  const gen = chipGen;
+  chipRaf = requestAnimationFrame(() => { chipRaf = 0; if (gen === chipGen && TOAST) TOAST.classList.add('on'); });
+  chipAt = performance.now();
+  chipT = setTimeout(hideChip, CHIP_MS);
+}
+/* предохранитель (зовётся из step): видна дольше CHIP_MAX с — снять */
+function chipGuard () {
+  if (!TOAST || !TOAST.classList.contains('on')) return;
+  if (!chipAt) chipAt = performance.now();
+  else if (performance.now() - chipAt > CHIP_MAX * 1000) hideChip();
 }
 
 function grant (a) {
@@ -279,7 +298,7 @@ export function step (dt) {
     if (on && !stallWas) { let why = ''; try { why = AUTO.stallInfo().why; } catch (e) { why = ''; } if (why === 'pothole') add('pothole'); }
     stallWas = on;
   }
-  if ((pollT += dt) >= 0.5) { pollT = 0; poll(); }
+  if ((pollT += dt) >= 0.5) { pollT = 0; poll(); chipGuard(); }
   if (dirty && (saveT += dt) >= 5) save();
 }
 
@@ -305,6 +324,8 @@ export function markSeen () {
 }
 export const DEBUG = {
   LIST, SH, LAST, sent: SENT, stats, got, list, unlock, add, cityOpen, unseen, markSeen,
+  /** проверка 0п14 (notify-one): показать плашку и тут же спрятать, до первого кадра — после кадра она должна быть не видна */
+  chipRace (id) { const a = BY_ID.get(id) || LIST[0]; if (!TOAST) { chip(a); NQ.clear(['ach']); } showChip(a); hideChip(); return !!TOAST; },
   get platform () { return Platform; },
   /** стереть только локальную запись (в Стиме — Platform.steam.clearAchievement руками) */
   wipe () { D = { got: {}, n: {}, seen: {} }; for (const k in LAST) delete LAST[k]; save(); },

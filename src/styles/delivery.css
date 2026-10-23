@@ -25,6 +25,7 @@ html, body {
   position: fixed;
   inset: 0;
   overflow: hidden;
+  overflow: clip;     /* 0аб: не прокручивается и фокусом / scrollIntoView (hidden — прокручивается, и верх хада срезало) */
 }
 
 #view {
@@ -71,8 +72,8 @@ html, body {
 #dist  { color: #fff3d6; }
 #speed { color: #bcd0e8; font-size: 8px; }
 
-/* часы заказа — как на приборке: тёмное окошко, зелёные светящиеся цифры (сейчас),
-   рядом плашкой «доставить до 14:35»; мало времени — плашка красная и мигает */
+/* срок заказа — обратный отсчёт (11о, 23.10.2026): тёмное окошко с плашкой «до опоздания 2:15»; мало времени —
+   плашка красная и мигает; часов игры («сейчас», #dash-now) на хаде больше нет; срока нет — окошка нет */
 #timewrap {
   top: 12px; left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; gap: 8px;
@@ -87,8 +88,9 @@ html, body {
             text-shadow: 0 0 4px rgba(93, 255, 138, .8), 0 0 10px rgba(93, 255, 138, .35); }
 #dash-due { display: flex; align-items: center; gap: 6px; padding: 5px 7px 4px; border-radius: 3px;
             background: #ffd85e; color: #1a1208; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .25); }
-#dash-due[hidden] { display: none; }
-#dash-due em { font-style: normal; font-size: 11px; }   /* «доставить до» — не мельче 11 px (UI-REVIEW № 32) */
+#dash-due[hidden], #dash-now[hidden], #timewrap.none { display: none; }
+#timewrap:has(#dash-now[hidden]) { padding: 4px; }
+#dash-due em { font-style: normal; font-size: 11px; }   /* «до опоздания» — не мельче 11 px (UI-REVIEW № 32) */
 #dash-due b { font-weight: normal; font-size: 12px; }
 #dash-due b:empty { display: none; }
 #timewrap.warn #dash-due { background: #ff9a3c; }
@@ -759,12 +761,10 @@ html[data-map="moscow"] #radar.burn {
 #pm-order .oc-photos .oc-p img { width: calc(var(--u) * 8); height: calc(var(--u) * 8); border-width: calc(var(--u) * .45); border-bottom-width: calc(var(--u) * 1.3); }
 #pm-order .oc-photos.small .oc-p img { width: calc(var(--u) * 5.6); height: calc(var(--u) * 5.6); border-width: calc(var(--u) * .35); border-bottom-width: calc(var(--u) * .9); }
 #pm-order .oc-clip { left: 30%; width: calc(var(--u) * 1.2); height: calc(var(--u) * 3.2); }
-/* записка с управлением: жёлтый листок на скотче, «клавиша — что делает» в две колонки */
+/* записка с управлением: жёлтый листок, «клавиша — что делает» в две колонки */
 #pm-keys { position: relative; padding: calc(var(--u) * 2.2) calc(var(--u) * 1.8) calc(var(--u) * 1.8); background: #ffd85e; color: #33210c;
            transform: rotate(1.8deg); box-shadow: 0 calc(var(--u) * .5) 0 #b8892a, 0 calc(var(--u) * 1.2) calc(var(--u) * 2.4) rgba(0, 0, 0, .4);
            background-image: linear-gradient(180deg, rgba(255, 255, 255, .25), transparent 30%); }
-#pm-keys::before { content: ''; position: absolute; top: calc(var(--u) * -1); left: 50%; width: calc(var(--u) * 9); height: calc(var(--u) * 2.2);
-                   transform: translateX(-50%) rotate(-3deg); background: rgba(255, 243, 214, .62); box-shadow: 0 1px 2px rgba(0, 0, 0, .2); }
 .pm-keys-t { font-size: max(13px, calc(var(--u) * 1.3)); color: #8a3b22; margin-bottom: calc(var(--u) * 1.2); text-transform: uppercase; letter-spacing: .08em; }
 .pm-keys-g { display: grid; grid-template-columns: auto 1fr; gap: calc(var(--u) * .75) calc(var(--u) * .9); align-items: center;
              font-size: max(12px, calc(var(--u) * 1)); line-height: 1.45; }

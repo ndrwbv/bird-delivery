@@ -15,7 +15,7 @@
    Только в карьере (CAREER):
    • кучи мусора у жилых домов — у подъездов и в углах дворов, мешки и
      хлам. Чем больше донат «борьба с мусором», тем они меньше; на цели —
-     нет совсем. Никто этого не объясняет. Кучи — склейка по клеткам, при
+     нет совсем. Въехал — куча разлетается (junk.js heaps, debris.js heap), до новой смены. Никто этого не объясняет. Кучи — склейка по клеткам, при
      смене доната пересобирается только она (trash*);
    • бандитские районы (ZN.gangZones): размытые красные пятна на радаре и карте;
      адрес в районе — 3–4 гопника в спортивках (днём 6 из 10, вечером всегда) ждут у пина
@@ -647,19 +647,27 @@ function* trashSteps (k) {                          // шагами (build): к�
   if (s <= 0.004 || !HEAPS.length) return;
   const by = new Map();
   let nh = 0;
+  const heapsBy = new Map();                         // клетка → её кучи: где чьи вершины (разлёт от машины — junk.js heaps)
   for (const hp of HEAPS) {
     if (++nh % 60 === 0) yield 'heaps';
     const key = Math.floor(hp.x / 400) + ',' + Math.floor(hp.z / 400);
-    if (!by.has(key)) by.set(key, []);
-    heapGeos(hp, s, by.get(key));
+    if (!by.has(key)) { by.set(key, []); heapsBy.set(key, []); }
+    const list = by.get(key), i0 = list.length;
+    heapGeos(hp, s, list);
+    hp.gi = [i0 + 1, list.length];                   // первым — пятно грязи: оно остаётся, когда кучу разнесли
+    hp.rs = hp.R * (0.45 + 0.55 * s); hp.gone = 0; hp.mesh = null; hp.orig = null;
+    heapsBy.get(key).push(hp);
   }
-  for (const list of by.values()) {
+  for (const [key, list] of by) {
     if (!list.length) continue;
     yield 'merge';
+    const pre = [0];
+    for (const q of list) pre.push(pre[pre.length - 1] + q.attributes.position.count);
     const g = A.mergeGeos(list);
     g.computeBoundingSphere();
     const m = new THREE.Mesh(g, TRASH.mat);
     m.matrixAutoUpdate = false;
+    for (const hp of heapsBy.get(key)) { hp.mesh = m; hp.v0 = pre[hp.gi[0]]; hp.nv = pre[hp.gi[1]] - pre[hp.gi[0]]; }
     TRASH.grp.add(m);
     TRASH.chunks.push(m);
     STATS.trashTris += g.index.count / 3;

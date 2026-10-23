@@ -46,12 +46,19 @@ const PUDDLE_HEX = 0x5a0e16;
 const FALL_LIFT = 0.17;   // упал и встал: спина над верхом слоя (толщина модели прохожего)
 const UP = { x: 0, y: 1, z: 0 };
 
-import { corpseQ, qLimb, qPose, QP } from './qpeople.js';
+import { corpseQ, qLimb, qPose, qPieces, decorOf, QP } from './qpeople.js';
+import * as CARRYM from './carried.js';          // вещи в руках при ударе: вылетают, упавший подбирает (carried.js)
+export const CARRY = CARRYM.DEBUG;
 
 let A;
 /* api: THREE, scene, box, mergeGeos, HUMAN_VC, groundH, surfaceAt, curbAt, nearestRoad, driftTop, pavedLift, groundNormal,
    emote, puff, pushOut, burst (кусками — старый gibHuman), scare, callAmbulance, Snd, adult */
-export function init (api) { A = api; QP.topAt = (x, z) => topAt(x, z); }   // люди-модели: подошва — на видимый слой (qpeople.js)
+export function init (api) {
+  A = api;
+  QP.topAt = (x, z) => topAt(x, z);              // люди-модели: подошва — на видимый слой (qpeople.js)
+  CARRYM.init({ THREE: api.THREE, scene: api.scene, groundH: api.groundH, curbAt: api.curbAt, pushOut: api.pushOut, HUMAN_VC: api.HUMAN_VC,
+    get bounce () { return A.bounce; }, topAt });
+}
 
 /* ── по чему лежать: верх того, что нарисовано в точке ──
    Рельеф (groundH) — только подложка: поверх него лежат полотно, тротуар, бордюр, плитка, а
@@ -235,7 +242,11 @@ export const STATS = { BODIES, LIMBS, PUDDLES, WRECKS, CHUNKS, SPLATS, LAST: nul
 /* ── упал и встал: живой человек из PEOPLE, его же модель ── */
 export function fall (p, vx, vz) {
   const l = Math.hypot(vx, vz) || 1;
+  const was = p.fall;
+  if (was && was.decor) for (const o of was.decor) { o.visible = true; o.userData.fallHid = 0; }   // упал заново, не поднявшись
+  if (p.pk) { if (p.pk.L) p.pk.L.claim = 0; p.pk = null; }             // наклонился за вещью — и снова сбили
   p.fall = { t: 0, yaw: Math.atan2(-vx, -vz), vx: vx / l * 2.6, vz: vz / l * 2.6, mad: 0 };
+  CARRYM.drop(p, vx, vz, true);                    // из рук — на землю; встанет — подберёт (carried.js)
   A.Snd.fx('fall', s => s.noise(0.12, 0.2), { x: p.x, z: p.z });
   A.puff(p.x, 0.3, p.z, false, 0.5);
 }
@@ -264,9 +275,13 @@ function fallLift (g) {
 /* шаг «упал и встал»; true — ещё лежит/встаёт (остальную логику человека пропускаем) */
 export function fallStep (p, dt) {
   const F = p.fall, g = p.grp, u = g.userData;
+  if (F.pick) return CARRYM.pickStep(p, dt) || fallEnd(p);   // встал — идёт за своими вещами (carried.js)
   const t = (F.t += dt);
   const T1 = 0.35, T2 = T1 + TIME.FALL_LIE, T3 = T2 + 0.6, T4 = T3 + 1.1;
   if (u.q) {                                         // модель Quaternius (qpeople.js): падает навзничь клипом художника,
+    // то, что игра надела прямо на группу (шуба, галстук), с моделью не ложится — пока лежит, не видно
+    if (!F.decor) { F.decor = decorOf(g); for (const o of F.decor) { o.visible = false; o.userData.fallHid = 1; } }
+    if (t >= T3 && F.decor.length && !F.shown) { F.shown = 1; for (const o of F.decor) { o.visible = true; o.userData.fallHid = 0; } }
     if (t < T1 + 0.3) { const k = 1 - t / (T1 + 0.3); p.x += F.vx * k * dt; p.z += F.vz * k * dt; A.pushOut(p, 0.45); }   // лежит, встаёт (тот же клип назад), грозит кулаком
     g.rotation.order = 'YXZ'; g.rotation.set(0, F.yaw, 0);
     for (const b of [u.legL, u.legR, u.armL, u.armR]) b.rotation.set(0, 0, 0);
@@ -283,9 +298,7 @@ export function fallStep (p, dt) {
     g.position.set(p.x, F.top + (F.qLift || 0) * lie, p.z);
     if (t >= T3 && !F.mad) { F.mad = 1; A.emote(p.x, 2.1, p.z, 'angry', 3); }
     if (t < T4) return true;
-    u.qAnim = null; g.rotation.order = 'XYZ';
-    p.fall = null;
-    return false;
+    return pickOrEnd(p, dt);
   }
   if (t < T1 + 0.3) {                              // по инерции проезжает по асфальту
     const k = 1 - t / (T1 + 0.3);
@@ -308,7 +321,20 @@ export function fallStep (p, dt) {
     u.armR.rotation.x = -2.7 + Math.sin(t * 24) * 0.35;
   }
   if (t < T4) return true;
-  g.rotation.set(0, F.yaw, 0); g.rotation.order = 'XYZ';
+  g.rotation.set(0, F.yaw, 0);
+  return pickOrEnd(p, dt);
+}
+/* поднялся: выронил что-то — сначала подобрать (carried.js), иначе — дальше как жил */
+function pickOrEnd (p, dt) {
+  if (p.drops && p.drops.length) { p.fall.pick = 1; if (CARRYM.pickStep(p, dt)) return true; }
+  return fallEnd(p);
+}
+function fallEnd (p) {
+  const g = p.grp, u = g.userData, F = p.fall;
+  if (F && F.decor) for (const o of F.decor) { o.visible = true; o.userData.fallHid = 0; }
+  u.qAnim = null;
+  const ry = g.rotation.y;
+  g.rotation.order = 'XYZ'; g.rotation.set(0, ry, 0);
   u.armL.rotation.x = 0; u.armR.rotation.x = 0; u.legL.rotation.x = 0; u.legR.rotation.x = 0;
   p.fall = null;
   return false;
@@ -321,6 +347,7 @@ export function fallStep (p, dt) {
    летит вперёд через руль, во взрослой разбивается о землю. Возвращает true — «сбит» (считать). */
 export function hit (p, vx, vz, kmh, o = {}) {
   if (kmh == null) kmh = kmhOf(vx, vz);
+  CARRYM.drop(p, vx, vz, false);                   // что было в руках — вылетает и лежит (carried.js)
   if (!o.up) {                                      // сбит: «бум» в точке удара и глухой удар
     // взрослая — фонтан крови во все стороны (game.js spray, проба 13.10.2026: «символ удара — не прикольно»); детская — звёздочка
     if (A.adult && A.spray) A.spray(p, vx, vz, kmh); else flashAt(p.x, A.groundH(p.x, p.z) + 1.1 + (o.y0 || 0), p.z);
@@ -405,7 +432,7 @@ export const THROW = { FWD: 1.15, SIDE0: 1.5, SIDE_K: 0.06, UP0: 3, UP_K: 11, UP
 function throwBody (p, vx, vz, kmh, up, lie, y0) {
   const c = (p.grp && p.grp.userData.colors) || { skin: '#e0b48c', shirt: '#4a6fa5', pants: '#333' };
   // проба (ветка test/people): человек — модель Quaternius → и тело та же модель (qpeople.js corpseQ)
-  const { root, parts, qskin } = p.grp && p.grp.userData.q ? corpseQ(p.grp.userData, A.HUMAN_VC) : buildBody(c);
+  const { root, parts, qskin } = p.grp && p.grp.userData.q ? corpseQ(p.grp.userData, A.HUMAN_VC, p.grp) : buildBody(c);
   const s = (p.grp && p.grp.scale.x) || 1;
   root.scale.setScalar(s);
   const fl = A.groundH(p.x, p.z) + A.curbAt(p.x, p.z);
@@ -454,8 +481,8 @@ export function rehit (cx, cz, fx, fz, L, W, vx, vz) {
     if (!(B.wob > -REHIT.COOL)) B.wy = B.root.position.y;   // высота, у которой дёргается
     B.reT = 1; B.wob = REHIT.WOB; B.hits = (B.hits || 1) + 1;
     if (B.mode === 'lie') B.t = Math.min(B.t, 1.5);
-    if (A.spray) A.spray({ x: B.root.position.x, z: B.root.position.z }, vx * 0.25, vz * 0.25, 12, true);
-    splat(B.root.position.x + rand(-0.4, 0.4), B.root.position.z + rand(-0.4, 0.4), rand(0.4, 0.7) * B.s);
+    if (A.spray) A.spray({ x: B.root.position.x, z: B.root.position.z, sprayY: B.floor }, vx * 0.25, vz * 0.25, 12, true);
+    splat(B.root.position.x + rand(-0.4, 0.4), B.root.position.z + rand(-0.4, 0.4), rand(0.4, 0.7) * B.s, null, B.floor);
     if (A.Snd.impact) A.Snd.impact(Math.max(sp * 0.5, 4), 'person', { x: B.root.position.x, z: B.root.position.z });
     n++;
   }
@@ -465,7 +492,11 @@ export function rehit (cx, cz, fx, fz, L, W, vx, vz) {
 function skeleton (B) {
   B.skel = 1;
   if (!BONE) BONE = new A.THREE.MeshLambertMaterial({ color: REHIT.BONE });
-  if (B.qskin) B.qskin.material = BONE;             // тело-модель (qpeople.js) — целиком цвета кости
+  if (B.qskin) {                                   // тело-модель (qpeople.js) — целиком цвета кости, надетое поверх — долой
+    B.qskin.material = BONE;
+    const h = B.qskin.parent && B.qskin.parent.parent;
+    if (h) for (const c of h.children) if (c !== B.qskin.parent) c.visible = false;
+  }
   for (const k in B.parts) {
     const m = B.parts[k];
     if (!m) continue;
@@ -490,26 +521,36 @@ function tearLimb (B) {
   if (LIMBS.length > CAP.LIMBS) { const q = LIMBS.find(q => q.life > 1); if (q) q.life = 1; }
 }
 
-/* высота лужи: середина и четыре точки на 0,6 радиуса — по большинству (медиана). Лужа у края
-   тротуара не висит над асфальтом, а уходит под плиту — будто стекает с бордюра */
-const PY = [0, 0, 0, 0, 0];
-function puddleY (x, z, R) {
-  const o = R * 0.6;
-  PY[0] = topAt(x, z); PY[1] = topAt(x + o, z); PY[2] = topAt(x - o, z); PY[3] = topAt(x, z + o); PY[4] = topAt(x, z - o);
-  PY.sort((a, b) => a - b);
-  return PY[2];
+/* высота лужи / пятна: верх слоя в середине, и если хоть одна из четырёх точек на FLAT_R радиуса ниже, чем
+   продолжение склона из середины (край тротуара, бордюр, сугроб, ступень плитки), — опустить до неё: круг плоский,
+   иначе его край висит в воздухе над асфальтом (автор 23.10.2026, 0п3: «кровь иногда разливается в воздухе»).
+   Лужа у края тротуара уходит под плиту — будто стекает с бордюра. py — высота того, что лежит (тело, кусок):
+   под мостом — земля под мостом, а не настил над ним */
+const FLAT_R = 0.8, STEP = 0.03;
+function puddleY (x, z, R, py) {
+  const c = topAt(x, z, py), g = A.groundH(x, z), flat = c - g > LAYER.CURB + 0.05;
+  const n = flat ? UP : A.groundNormal(x, z), kx = n.x / n.y, kz = n.z / n.y, o = R * FLAT_R;
+  let lo = 0;
+  for (let i = 0; i < 4; i++) {
+    const dx = i === 0 ? o : i === 1 ? -o : 0, dz = i === 2 ? o : i === 3 ? -o : 0;
+    const r = topAt(x + dx, z + dz, py) - (c - kx * dx - kz * dz);   // ниже плоскости склона — ступенька вниз
+    if (r < lo) lo = r;
+  }
+  return lo < -STEP ? c + lo : c;
 }
+/* для пятен game.js decal: та же высота */
+export const flatY = (x, z, R, py) => puddleY(x, z, R, py);
 
 /* лужа: тёмно-красный круг под телом, растёт до R за несколько секунд */
 let PUD_GEO = null;
-function puddle (x, z, R) {
+function puddle (x, z, R, py) {
   const T = A.THREE;
   if (!PUD_GEO) PUD_GEO = new T.CircleGeometry(1, 18);
   const mat = new T.MeshBasicMaterial({ color: PUDDLE_HEX, transparent: true, opacity: 0.9, depthWrite: false,
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   const m = new T.Mesh(PUD_GEO, mat);
   // на верх слоя (асфальт, тротуар, сугроб), чуть выше — без мерцания; на мосту и сугробе — плоско
-  const y = puddleY(x, z, R), g = A.groundH(x, z), flat = y - g > LAYER.CURB + 0.05;
+  const y = puddleY(x, z, R, py), g = A.groundH(x, z), flat = y - g > LAYER.CURB + 0.05;
   const nrm = flat ? UP : A.groundNormal(x, z), lift = 0.025 + PUDDLES.length * 0.003;
   m.position.set(x + nrm.x * lift, y + nrm.y * lift, z + nrm.z * lift);
   m.lookAt(m.position.x + nrm.x, m.position.y + nrm.y, m.position.z + nrm.z);
@@ -546,10 +587,26 @@ export function burst (p, vx, vz, low) {
   ];
   const fl = topAt(p.x, p.z);
   if (!BX) { BX = new A.THREE.Box3(); V3 = new A.THREE.Vector3(); }
+  // человек-модель (qpeople.js): куски той же модели — голова, туловище, руки, ноги его одежды, у разрезов в крови
+  // (автор 23.10.2026, 0п21: «разлетается кусками старой коробочной модели»); коробочный — коробки, как раньше
+  const qs = p.skin || (p.grp && p.grp.userData.q ? p.grp.userData.skin : null);
+  const qp = qs ? qPieces(qs, BLOOD) : null;
+  const s = p.s || (p.grp && p.grp.scale.x) || 1, ry = p.grp ? p.grp.rotation.y : rand(0, TAU), cy = Math.cos(ry), sy = Math.sin(ry);
+  const QK = { head: 0, torso: 1, armL: 2, armR: 3, legL: 4, legR: 5 };
   for (let i = 0; i < kinds.length; i++) {
-    const l = []; kinds[i](l);
-    const m = part(l, p.x + rand(-0.25, 0.25), fl + (low ? rand(0.15, 0.6) : rand(0.6, 1.4)), p.z + rand(-0.25, 0.25));
-    m.rotation.set(rand(0, TAU), rand(0, TAU), rand(0, TAU));
+    const q = qp && i < 6 ? qp.find(o => QK[o.key] === i) : null;
+    if (qp && i < 6 && !q) continue;
+    let m;
+    if (q) {                                        // на своём месте тела: голова сверху, ноги снизу
+      m = q.m; m.scale.multiplyScalar(s);
+      const ox = q.x * s, oz = q.z * s;
+      m.position.set(p.x + ox * cy + oz * sy + rand(-0.1, 0.1), fl + (low ? q.y * s * 0.45 + 0.15 : q.y * s + 0.1), p.z - ox * sy + oz * cy + rand(-0.1, 0.1));
+      m.rotation.set(rand(-0.6, 0.6), ry, rand(-0.6, 0.6));
+    } else {
+      const l = []; kinds[i](l);
+      m = part(l, p.x + rand(-0.25, 0.25), fl + (low ? rand(0.15, 0.6) : rand(0.6, 1.4)), p.z + rand(-0.25, 0.25));
+      m.rotation.set(rand(0, TAU), rand(0, TAU), rand(0, TAU));
+    }
     A.scene.add(m);
     const long = i >= 1 && i <= 5;                  // туловище, руки, ноги — ложатся вдоль земли
     // low — разбился о землю: куски катятся дальше по ходу полёта и подскакивают невысоко
@@ -562,9 +619,9 @@ export function burst (p, vx, vz, low) {
 }
 /* лужица под куском: общий круг, свой материал (тает своим темпом) */
 /* пятно крови на земле (game.js spray — куда долетели брызги) */
-export const stain = (x, z, R) => (A && A.adult ? splat(x, z, R) : null);
+export const stain = (x, z, R, py) => (A && A.adult ? splat(x, z, R, null, py) : null);
 /* w — на стене или машине (не на земле): { y, nx, nz, parent } — высота, наружу от стены, к чему прицепить (машина едет — пятно с ней) */
-function splat (x, z, R, w) {
+function splat (x, z, R, w, py) {
   const T = A.THREE;
   if (!PUD_GEO) PUD_GEO = new T.CircleGeometry(1, 18);
   const mat = new T.MeshBasicMaterial({ color: PUDDLE_HEX, transparent: true, opacity: 0.9, depthWrite: false,
@@ -574,7 +631,7 @@ function splat (x, z, R, w) {
     m.position.set(x + w.nx * 0.03, w.y, z + w.nz * 0.03);
     m.lookAt(m.position.x + w.nx, m.position.y, m.position.z + w.nz);
   } else {
-    const y = puddleY(x, z, R), flat = y - A.groundH(x, z) > LAYER.CURB + 0.05;
+    const y = puddleY(x, z, R, py), flat = y - A.groundH(x, z) > LAYER.CURB + 0.05;
     const nrm = flat ? UP : A.groundNormal(x, z), lift = 0.022 + SPLATS.length * 0.0015;
     m.position.set(x + nrm.x * lift, y + nrm.y * lift, z + nrm.z * lift);
     m.lookAt(m.position.x + nrm.x, m.position.y + nrm.y, m.position.z + nrm.z);
@@ -608,7 +665,7 @@ function stepChunks (dt) {
           const lo = lowest(m), f2 = topUnder(m.position.x, m.position.z, m.position.y);
           m.position.y += f2 + 0.01 - lo;             // плашмя на верх слоя (с краёв — тоже)
           C.y = m.position.y;
-          C.splat = splat(m.position.x, m.position.z, C.R);
+          C.splat = splat(m.position.x, m.position.z, C.R, null, m.position.y);
         }
       }
     }
@@ -702,7 +759,7 @@ function placeShadow (B, fade) {
 function shatter (B) {
   const r = B.root;
   if (STATS.LAST) { STATS.LAST.x = r.position.x; STATS.LAST.z = r.position.z; }
-  A.burst({ x: r.position.x, z: r.position.z, c: B.c }, B.vx, B.vz, true);   // куски, брызги, пятно, скорая
+  A.burst({ x: r.position.x, z: r.position.z, c: B.c, skin: B.qskin, s: B.s }, B.vx, B.vz, true);   // куски, брызги, пятно, скорая
   A.Snd.fx('splat', s => s.noise(0.1, 0.2), { x: r.position.x, z: r.position.z });
   B.mode = 'gone';
 }
@@ -721,7 +778,7 @@ function stepBody (B, dt) {
         r.position.x = BO.x; r.position.z = BO.z; B.vx = BO.vx; B.vz = BO.vz;
         B.spin = -B.spin * 0.6; B.roll = rand(-4, 4);
         if (A.adult && !B.up) {
-          if (BO.thin) splat(r.position.x, r.position.z, rand(0.35, 0.6) * B.s);   // ствол, столб — тонкие: пятно на земле у основания
+          if (BO.thin) splat(r.position.x, r.position.z, rand(0.35, 0.6) * B.s, null, B.floor);   // ствол, столб — тонкие: пятно на земле у основания
           else splat(r.position.x - BO.nx * 0.38, r.position.z - BO.nz * 0.38, rand(0.35, 0.65) * B.s,   // кровь на стене / борту машины
             { y: r.position.y, nx: BO.nx, nz: BO.nz, parent: BO.t && BO.t.mesh });
         }
@@ -751,13 +808,13 @@ function stepBody (B, dt) {
       const hv = Math.hypot(B.vx, B.vz);
       if (A.adult && !B.up && (hv > 2 || B.vy < -3) && Math.hypot(r.position.x - (B.tx ?? 1e9), r.position.z - (B.tz ?? 1e9)) > THROW.TRAIL) {
         B.tx = r.position.x; B.tz = r.position.z;
-        splat(r.position.x, r.position.z, clamp(0.35 + hv * 0.04, 0.4, 0.9) * B.s);
+        splat(r.position.x, r.position.z, clamp(0.35 + hv * 0.04, 0.4, 0.9) * B.s, null, B.floor);
       }
       B.vy = B.vy < 0 ? -B.vy * 0.25 : B.vy; B.vx *= 0.55; B.vz *= 0.55;
       if (Math.hypot(B.vx, B.vz) < 0.7 && Math.abs(B.vy) < 0.9) {
         B.mode = 'lie'; B.t = 0;
         rest(B);
-        if (A.adult && !B.up) B.puddle = puddle(r.position.x, r.position.z, rand(1.1, 1.5) * B.s);
+        if (A.adult && !B.up) B.puddle = puddle(r.position.x, r.position.z, rand(1.1, 1.5) * B.s, B.floor);
       }
     }
     placeShadow(B, 1);
@@ -827,6 +884,7 @@ function stepBody (B, dt) {
 }
 
 export function update (dt) {
+  CARRYM.update(dt);
   for (let i = BODIES.length - 1; i >= 0; i--) {
     const B = BODIES[i];
     stepBody(B, dt);
@@ -858,7 +916,7 @@ export function update (dt) {
           const lo = lowest(m), f2 = topUnder(m.position.x, m.position.z, m.position.y);
           m.position.y += f2 + 0.01 - lo;                    // плашмя на верх асфальта/плитки (с краёв — тоже)
           // шарнир на конце куска: центр лужицы — середина руки/ноги
-          L.puddle = puddle(m.position.x, m.position.z + 0.3, 0.45);
+          L.puddle = puddle(m.position.x, m.position.z + 0.3, 0.45, m.position.y);
         }
       }
     }

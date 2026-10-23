@@ -255,7 +255,7 @@ function clock () {
   const now = document.getElementById('dash-now'), dd = document.getElementById('dash-due'), w = document.getElementById('timewrap');
   const k = S.time / S.timeMax;
   const lvl = S.time <= 0 ? 'late' : (k <= 0.18 || S.time < 10) ? 'low' : k <= 0.4 ? 'warn' : '';
-  return { s: S.time, k, now: now ? now.textContent : '', label: dd && dd.firstChild ? dd.firstChild.textContent : t('доставить до'),
+  return { s: S.time, k, now: now ? now.textContent : '', label: dd && dd.firstChild ? dd.firstChild.textContent : t('до опоздания'),
     due: dd && dd.lastChild ? dd.lastChild.textContent : '', lvl: w && w.classList.contains('late') ? 'late' : lvl };
 }
 

@@ -26,8 +26,8 @@
    ходу быстрее 9 км/ч (как дворовая мелочь: летят куски, машину чуть тормозит) и
    лежат до новой смены; ракушки — твёрдые, как стена.
 
-   Сезоны: зимой трава, цветы, лопухи и мелкий мусор под снегом; бурьян и заросли —
-   сухие бурые стебли. Осенью трава желтеет. Графика «низкая» — меньше радиус и вдвое
+   Сезоны: зимой трава, цветы, лопухи, бурьян у стен и мелкий мусор под снегом; заросли пустыря (бурьян,
+   камыш, борщевик) — тоже, торчат только сухие бурые верхушки у 15 % (WINTER_TOP). Осенью трава желтеет. Графика «низкая» — меньше радиус и вдвое
    реже мелочь.
 
    Перф: 15 общих InstancedMesh на всё (у каждого вида — свой), один материал на
@@ -61,7 +61,11 @@ export const LAWN = {
 };
 const SMALL = { grass: 1, dand: 1, lit: 1, bottle: 1 };                          // ближе R_SMALL
 const BEND = { grass: 1, dand: 1, weed: 1, burdock: 1, tall: 1, reed: 1, hog: 1, flower: 1 };
-const WINTER_OFF = { grass: 1, dand: 1, burdock: 1, flower: 1, lit: 1, bottle: 1 };
+const WINTER_OFF = { grass: 1, dand: 1, burdock: 1, flower: 1, lit: 1, bottle: 1, weed: 1 };   // зимой под снегом (бурьян у стен ~1,2 м — тоже, 0п12)
+/* заросли пустыря зимой (автор 23.10.2026, 0п12: «зимой высокая трава и камыши не растут»): под снегом, торчат только
+   сухие верхушки у WINTER_TOP.KEEP самых высоких кустов (жребий по месту) — утоплены в снег на SINK м */
+const WINTER_TOP = { KEEP: 0.15, SINK: 1.35, KINDS: { tall: 1, reed: 1, hog: 1 } };
+const topKeep = (x, z) => { const v = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453; return v - Math.floor(v) < WINTER_TOP.KEEP; };
 const DRY = { weed: 1, tall: 1, reed: 1, hog: 1 };                               // зимой — бурые
 const THIN = { grass: 1, dand: 1, lit: 1, bottle: 1, tall: 1, reed: 1, hog: 1, weed: 1 };   // на «низкой» — вдвое реже
 
@@ -761,7 +765,8 @@ function refresh (cam) {
       const src = c.L[k], M = MESH[k], cap = M.instanceMatrix.count;
       const want = thin < 1 && THIN[k] ? Math.ceil(src.n * thin) : src.n;
       const ma = M.instanceMatrix.array, ca = M.instanceColor.array;
-      if (!c.down && !c.pinNear) {
+      const dry = SEA.winter && WINTER_TOP.KINDS[k];   // зима: заросли под снегом, торчат редкие верхушки
+      if (!c.down && !c.pinNear && !dry) {
         const q = Math.min(want, cap - n[k]);
         if (q <= 0) continue;
         ma.set(q === src.n ? src.m : src.m.subarray(0, q * 16), n[k] * 16);
@@ -774,7 +779,9 @@ function refresh (cam) {
         const o = src.own[q];
         if (o >= 0 && (c.items[o].down || c.items[o].hid)) continue;
         if (o < 0 && thick && c.pinNear && hideNear(src.m[q * 16 + 12], src.m[q * 16 + 14], false)) continue;
+        if (dry && !topKeep(src.m[q * 16 + 12], src.m[q * 16 + 14])) continue;
         ma.set(src.m.subarray(q * 16, q * 16 + 16), n[k] * 16);
+        if (dry) ma[n[k] * 16 + 13] -= WINTER_TOP.SINK;
         ca.set(src.c.subarray(q * 3, q * 3 + 3), n[k] * 3);
         n[k]++;
       }

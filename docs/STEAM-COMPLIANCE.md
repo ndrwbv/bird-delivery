@@ -14,7 +14,7 @@
 | 2 | Нет наготы с реальными людьми | нет; реальные аватары убраны, люди генерируются | ✅ |
 | 3 | Контент для взрослых — помечен | кровь, биты, пиво/водка/снюс в поручениях, слот-машина; ночью — девушки у обочины в откровенной одежде с шутками и стрип-клуб «Клубничка» с танцовщицами в купальниках (без наготы, docs/CONTENT.md «Ночная жизнь») | 📝 Mature Content Survey: насилие и кровь, алкоголь и табак, **имитация азартных игр**, **sexual themes / suggestive content (no nudity)** — сексуальные темы и откровенная одежда, наготы нет; упомянуть «детский режим» — в нём этого нет |
 | 4 | Нет клеветы | пародии на реальные бренды («Газпромнефтик», «Лукоед», «Дикая ягода»…) — пародия, не утверждения | ✅ бандитские районы на карте и в репликах без названий («наш район») |
-| 5 | Только контент, на который есть права | карта — OpenStreetMap (ODbL), рельеф — SRTM, шрифты Press Start 2P (OFL, © 2012 The Press Start 2P Project Authors — `public/fonts/OFL.txt`) и Rubik Mono One (надпись «Птица Пицца» в главном меню; OFL, © 2015 The Rubik Project Authors — `public/fonts/RubikMonoOne-OFL.txt`), three.js (MIT) | 🔧 экран «Авторы и лицензии» в меню: «© OpenStreetMap contributors», ODbL; OFL и MIT; файл `THIRD_PARTY_NOTICES` в сборке |
+| 5 | Только контент, на который есть права | карта — OpenStreetMap (ODbL), рельеф — SRTM, шрифты Press Start 2P (OFL, © 2012 The Press Start 2P Project Authors — `public/fonts/OFL.txt`) и Rubik Mono One (надпись «Птица Пицца» в главном меню; OFL, © 2015 The Rubik Project Authors — `public/fonts/RubikMonoOne-OFL.txt`), three.js (MIT); модели машин «Old Car – VAZ 2107» (Arkady Gribachev) и «VAZ 2101» (Javkal) — CC BY 4.0, Sketchfab (`public/models/*/LICENSE.txt`, подпись обязательна); люди — Quaternius (CC0) | ✅ экран «Авторы и лицензии» (настройки → игра → «титры ▸», `src/game/credits.js`, 23.10.2026): OSM/ODbL, SRTM, модели CC BY, Quaternius, шрифты OFL, three.js / Electron / steamworks.js MIT · 🔧 файл `THIRD_PARTY_NOTICES` в сборке |
 | 6 | Не нарушать законы стран распространения | алкоголь/табак — только упоминание в поручениях, без покупки за реальные деньги; азарт — только игровая валюта | ✅ / ⚠ в некоторых странах ограничения на имитацию азарта — оставить слот-машину только во взрослой версии (так и сделано) |
 | 7 | Не шок-контент намеренно | кровь мультяшная, пиксельная | ✅, отметить в опросе |
 | 8 | Ничего про эксплуатацию несовершеннолетних | нет | ✅ |
@@ -60,8 +60,9 @@ Store Page → **Privacy Policy**; короткий текст ниже — вн
 
 ## Что сделать в игре
 
-- [ ] Экран «Авторы и лицензии» (OSM, SRTM, шрифты Press Start 2P и Rubik Mono One, three.js, steamworks.js) + `THIRD_PARTY_NOTICES`
-      в сборке.
+- [x] Экран «Авторы и лицензии» (OSM, SRTM, модели машин CC BY, люди Quaternius, шрифты Press Start 2P и Rubik Mono One,
+      three.js, Electron, steamworks.js) — настройки → игра → «титры ▸» (23.10.2026, `credits.js`).
+- [ ] `THIRD_PARTY_NOTICES` в сборке (тексты лицензий OFL, MIT, CC BY).
 - [x] Бандитские районы — без реальных названий.
 - [ ] Проверить, что в «детском режиме» нет алкоголя, табака, крови и слот-машины.
 - [ ] Текст «Анонимная статистика» (выше) — внизу описания на странице; в поле Privacy Policy в Steamworks — адрес https://ndrwbv.github.io/bird-delivery/privacy.html (страница готова 18.10).

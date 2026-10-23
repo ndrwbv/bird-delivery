@@ -32,6 +32,7 @@ import { farEarned } from './orders.js';
 import * as END from './shiftend.js';
 import * as STOUR from './shifttour.js';        // первый чек смены: Толик облачками показывает, что тут где (shifttour.js)
 import * as DAILY from './daily.js';             // задания на день: строка «задания: 2 из 3» в чеке смены (daily.js)
+import * as IDLEB from './idleboss.js';          // простой за смену: строка «простой · 3:20» в чеке (idleboss.js)
 import * as CHAT from './chat.js';
 import * as DEP from './dep.js';                // «депнуть»: однорукий бандит, рулетка, теннис — свои экраны (dep.js)
 import * as HQ from './heroquests.js';           // герои, этап 2: совет Лёхи на ставке, «наоборот» Игорька, Жека про машину
@@ -599,6 +600,8 @@ function endRows (full) {
   if (back) rows.push([t('опоздал обратно'), '−' + m(back), 'pp-minus']);
   if (other) rows.push([t('опоздания и штрафы'), '−' + m(other), 'pp-minus']);
   if (S.people) rows.push([t('прохожих сбито'), String(S.people), '']);
+  const ir = IDLEB.endRow();                                              // управляющий заметил простой (idleboss.js)
+  if (ir) rows.push(ir);
   rows.push(full ? [t('бонус за смену'), '+' + m(SH.bonus || 0), 'pp-plus'] : [t('бонус за смену'), t('только до конца'), 'cr-rc-no']);
   return rows;
 }
@@ -786,7 +789,7 @@ function refreshEnd () {
     dep.textContent = t('депнуть');
     dep.title = DEP.label();
   }
-  if (sp) { sp.className = 'pp-note'; sp.textContent = t('гараж и траты'); sp.hidden = false; }   // гараж — первой плиткой
+  if (sp) { sp.className = 'pp-note'; sp.textContent = spendName(); sp.hidden = false; }   // пока трат нет — сразу гараж (0аа)
   END.wallet(w);
   endKeys();
 }
@@ -801,7 +804,7 @@ function endKeys () {
   h.hidden = false;
   if (STOUR.on()) { h.innerHTML = keyHTML('ok') + esc(t('дальше')) + '<i>·</i>' + keyHTML('back') + esc(t('пропустить')); return; }   // обучение Толика поверх чека
   const dep = $('ov-dep');
-  h.innerHTML = [keyHTML('ok') + esc(t('на новую смену')), keyHTML('y') + esc(t('гараж и траты')),
+  h.innerHTML = [keyHTML('ok') + esc(t('на новую смену')), keyHTML('y') + esc(spendName()),
     dep && !dep.hidden ? keyHTML('x') + esc(t('депнуть')) : '', keyHTML('back') + esc(t('в меню'))].filter(Boolean).join('<i>·</i>');
 }
 onInput(() => endKeys());
@@ -811,12 +814,17 @@ function openGarage (onClose) { GARAGE.open(onClose); }
 
 let TAB = '';
 const SPEND_MORE = false;   // «гараж и траты»: донаты городу и ёлка-турель — пока скрыты (автор, 09.10.2026)
+/* [Y] на чеке смены (0аа, автор 18.10: «перейти в гараж» — а внутри «депнуть», хотя у него своя кнопка; в гараже — только
+   гараж): пока других трат нет (SPEND_MORE) — пометка «гараж» и сразу гараж; есть — «гараж и траты», лист с плитками
+   (гараж, донаты, ёлка). «Депнуть» — никогда не плиткой: только своя пометка [X] на чеке */
+const spendName = () => (SPEND_MORE ? t('гараж и траты') : t('гараж'));
+function openYard () { if (SPEND_MORE) openSpend(); else openGarage(() => { rerender(); refreshEnd(); }); }
 function buildEnd () {
   // пометки на полях: [Y] гараж и траты · [X] депнуть · [B] в меню («гараж» отдельно и «покататься» убраны 09.10.2026:
   // гараж — первая плитка «гаража и трат», покататься — в меню)
   if (!$('ov-dep')) {
     const mk = (id, fn) => { const b = document.createElement('button'); b.type = 'button'; b.id = id; b.addEventListener('click', fn); return b; };
-    $('ov-menu').before(mk('ov-spend', openSpend), mk('ov-dep', () => { A.Snd.boot && A.Snd.boot(); DEP.open(); }));
+    $('ov-menu').before(mk('ov-spend', openYard), mk('ov-dep', () => { A.Snd.boot && A.Snd.boot(); DEP.open(); }));
   }
   let el = $('cr-end');
   if (!el) {
@@ -825,11 +833,10 @@ function buildEnd () {
     spendBox().querySelector('.cr-sp-body').appendChild(el);
   }
   // 05.10.2026: у каждой плитки — что даёт (было только «0 % цели города»); гараж — тоже сюда: главная трата.
-  // 09.10.2026 (автор): пока только две плитки — «перейти в гараж» и «депнуть»; донаты (мусор, насилие) и ёлка-турель
-  // скрыты флагом SPEND_MORE — код на месте, вернуть — SPEND_MORE = true
+  // 09.10.2026 (автор): донаты (мусор, насилие) и ёлка-турель скрыты флагом SPEND_MORE — код на месте, вернуть —
+  // SPEND_MORE = true; плитки «депнуть» тут нет с 23.10.2026 (0аа) — у него своя пометка [X] на чеке
   const tabs = [
     ['garage', t('перейти в гараж'), '', t('машины, броня, мотор, покраска')],
-    !SPEND_MORE && A.ADULT ? ['dep', t('депнуть'), '', ''] : null,
     SPEND_MORE ? ['trash', t('борьба с мусором'), 'bar', t('меньше мусора у подъездов и на дорогах')] : null,
     SPEND_MORE ? ['gang', t('борьба с насилием'), 'bar', t('бандитские круги меньше, гопники подходят реже')] : null,
     SPEND_MORE && RAID.ready() ? ['turret', t('ёлка-турель'), '', ''] : null,
