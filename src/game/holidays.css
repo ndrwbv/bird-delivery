@@ -1,0 +1,43 @@
+/* Праздники (holidays.js): лента в чеке смены — красная, наискось, над ней нитка огоньков (shiftend.js receiptHTML ribbon) */
+.cr-rc-ribbon {
+  position: relative;
+  margin: 10px -8px 6px;
+  padding: 7px 12px 8px;
+  text-align: center;
+  color: #fff8e6;
+  background: linear-gradient(180deg, #c8282e, #a51d23);
+  font-weight: 800;
+  font-size: 1.12em;
+  letter-spacing: .02em;
+  transform: rotate(-1.4deg);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, .18);
+}
+.cr-rc-ribbon small {
+  display: block;
+  margin-top: 1px;
+  font-weight: 600;
+  font-size: .68em;
+  letter-spacing: 0;
+  opacity: .92;
+}
+/* нитка огоньков: разноцветные точки поверх провода */
+.cr-rc-ribbon::before {
+  content: '';
+  position: absolute;
+  left: 4px; right: 4px; top: -7px; height: 10px;
+  background:
+    radial-gradient(circle, #ffd23f 0 2.6px, transparent 3.2px) 0 2px / 40px 8px repeat-x,
+    radial-gradient(circle, #3fd060 0 2.6px, transparent 3.2px) 10px 2px / 40px 8px repeat-x,
+    radial-gradient(circle, #4aa8ff 0 2.6px, transparent 3.2px) 20px 2px / 40px 8px repeat-x,
+    radial-gradient(circle, #ff5ad0 0 2.6px, transparent 3.2px) 30px 2px / 40px 8px repeat-x,
+    linear-gradient(#2b2a30, #2b2a30) 0 5px / 100% 1px no-repeat;
+}
+/* уголки-«хвосты» ленты */
+.cr-rc-ribbon::after {
+  content: '';
+  position: absolute;
+  left: -6px; right: -6px; bottom: -6px; height: 6px;
+  background:
+    linear-gradient(135deg, #7a1418 50%, transparent 50%) 0 0 / 6px 6px no-repeat,
+    linear-gradient(225deg, #7a1418 50%, transparent 50%) 100% 0 / 6px 6px no-repeat;
+}

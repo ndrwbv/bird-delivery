@@ -45,7 +45,7 @@ const LAWN_GLSL = `
   float lgr = smoothstep(0.05, 0.18, lc0.g - max(lc0.r, lc0.b));
   vec3 lN = normalize(cross(dFdx(vSW), dFdy(vSW)));
   lgr *= smoothstep(0.42, 0.8, lN.y);
-  if (lgr > 0.0) {
+  if (S_LAND && lgr > 0.0) {                  // S_LAND — не реквизит (seasons.js: признак в цвете вершины склейки LITM)
     vec2 q = vSW.xz;
     vec3 c = diffuseColor.rgb, c0 = c;
     // крупные пятна: светлее / темнее (~40 и ~17 м), желтее / сочнее (~55 м)

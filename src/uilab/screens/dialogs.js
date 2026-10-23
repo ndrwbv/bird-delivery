@@ -89,8 +89,8 @@ export default function dialogScreens (ctx) {
     id: 'side:' + s.id, group: 'Поручения клиентов', name: s.id + (s.adult ? ' (взрослая)' : s.kids ? ' (детская)' : ''),
     lines: () => {
       const p = makePerson({ seed: 9100 + i * 13 }), pay = Math.round(((s.pay ? (s.pay[0] + s.pay[1]) / 2 : 1500)) / 10) * 10;
-      return [{ person: p, name: p.first || p.name.split(/\s+/)[0], text: t(s.ask) + ' (+' + money(pay) + ')', accept: t(s.accept), decline: t(s.decline),
-        mood: s.mood || 'calm', color: ORDER_TYPES.side.color, timer: s.timer || 8, timeoutText: t(s.timeout || 'ну лан ((') }];
+      return [{ person: p, name: p.first || p.name.split(/\s+/)[0], text: t(s.ask), head: t('поручение'), pay: '+' + money(pay), payLabel: t('заплатит'),
+        accept: t(s.accept), decline: t(s.decline), mood: s.mood || 'calm', color: ORDER_TYPES.side.color }];
     },
   }));
   // ── развоз смены ──
@@ -111,8 +111,8 @@ export default function dialogScreens (ctx) {
         : t('Эй, курьер! Это наш двор. Проезд платный — {money}. Заплатишь — катайся.', { money: sum });
       const say = s => [{ person: p, name: ADULT ? t('Гопник') : t('Пацан со двора'), text: s, fillers: false, color: '#d9342c' }];
       return [{ person: p, name: ADULT ? t('Гопник') : t('Пацан со двора'), text, mood: 'calm', color: '#d9342c',
-        accept: t('заплатить {money}', { money: sum }), decline: t('не буду'), timer: 9,
-        timeoutText: ADULT ? t('Молчишь? Ну, сам виноват') : t('Молчишь? Ну держись!'),
+        head: ADULT ? t('наезд') : t('двор'), pay: '−' + sum, payLabel: t('мзда'),
+        accept: t('заплатить {money}', { money: sum }), decline: t('не буду'),
         after: r => (r === true ? say(ADULT ? t('Другое дело. Катайся.') : t('Во, нормально. Езжай.')) : say(ADULT ? t('Сам напросился!') : t('Ща покачаем!'))) }];
     },
   });

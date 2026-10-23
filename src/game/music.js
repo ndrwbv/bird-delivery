@@ -27,9 +27,18 @@
      load()        — прочитать список файлов (из game.js сразу при загрузке)
      init(api)     — { Snd, S, ENV, isPlaying, tense, cut, dialog, chat, radio }: Snd.ctx / musicBus / vol / on;
                      radio — radio.js (slot(): null | 'off' | 'radio-<id>', onSong)
-     has()         — есть ли хоть один трек (настройки: пометка «скоро» у ползунка — только если нет)
+     has()         — есть ли музыка: свой синтез (MUS.CHIP) или хоть один файл (настройки: пометка «скоро» у ползунка — только если нет)
      level()       — 0…1, насколько сейчас слышна музыка (для фона города)
-     DEBUG         — __dlv.Snd.MUS: state, STATS, list, force(slot), MUS */
+     DEBUG         — __dlv.Snd.MUS: state, STATS, list, force(slot), MUS, chip (chiptunes.js)
+
+   Своя музыка кодом (18.10.2026, chiptunes.js): у места нет файлов — играет синтез, 6 треков по кругу.
+   Трек — по настроению (chipMood): меню, день, ночь, зима, лето, Новый год; кончился — следующий того же
+   настроения; настроение сменилось (стемнело, другой сезон) — плавно на трек нового. Выбранный игроком
+   («следующий трек») доигрывает до конца, потом снова по настроению.
+     next()        — следующий трек (клавиша F / крестовина ↓, пока радио скрыто; строка в настройках)
+     toggle()      — музыка вкл / выкл (клавиша B, L3; настройки); сохраняется (dlv-music), звуки не трогает
+     cycle()       — пауза, карточка «музыка»: следующий трек → … → после последнего «выкл» → снова первый
+     label()       — «музыка: Тёплый асфальт» / «музыка: выкл» (пауза, меню, настройки); title() — только название */
 
 export const MUS = {
   XF: 2.5,            // с — переход между треками (и между вариантами одного слота)
@@ -42,7 +51,12 @@ export const MUS = {
   AMB: 0.3,           // фон города тише на столько при музыке на 100 %
   TICK: 100,          // мс — как часто решаем
   RADIO_XF: 0.7,      // с — переход между станциями радио (крутишь ручку — быстрее, чем смена дня и ночи)
+  CHIP: true,         // своя музыка кодом (chiptunes.js), когда у места нет файлов; false — тишина, как до 18.10
+  NEXT_XF: 1.2,       // с — переход, когда игрок сам жмёт «следующий трек»
 };
+
+import * as CHIPT from './chiptunes.js';
+import { t } from '../i18n/index.js';
 
 const BASE = 'music/';
 export const SLOTS = ['menu', 'day', 'night', 'tense', 'shiftend'];
@@ -54,7 +68,9 @@ let CUR = null;                                // { slot, file, el, src, g, t0 }
 const OLD = [];                                // гаснущие
 const NEXT = {};                               // слот → номер следующего варианта
 const BAD = new Set();                         // файлы, что не играют
-const ST = { want: null, night: false, tenseT: 0, duck: 1, dg: 1, forced: null, last: 0, radio: null };
+const ST = { want: null, night: false, tenseT: 0, duck: 1, dg: 1, forced: null, last: 0, radio: null,
+  off: false, pin: false, chipLast: -1, cyc: 0, mood: '', skip: false, plated: -1 };
+const KEY_ON = 'dlv-music';
 export const STATS = { listed: 0, started: {}, switches: 0, errors: [], log: [] };
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -74,11 +90,12 @@ export function load () {
 
 export function init (api) {
   A = api;
+  try { ST.off = !!(A.Store && String(A.Store.get(KEY_ON, '1')) === '0'); } catch (e) { /* — */ }
   if (typeof setInterval === 'function') setInterval(() => { try { tick(); } catch (e) { STATS.errors.push('tick: ' + ((e && e.message) || e)); } }, MUS.TICK);
 }
 
 const files = slot => (LIST[slot] || []).filter(f => !BAD.has(f));
-export const has = () => Object.keys(LIST).some(s => files(s).length > 0);
+export const has = () => MUS.CHIP || Object.keys(LIST).some(s => files(s).length > 0);   // своя музыка кодом — тоже музыка (пометки «скоро» нет)
 
 /** насколько сейчас слышна музыка: 0…1 (ползунок «музыка» × приглушение), 0 — не играет */
 export function level () {
@@ -130,7 +147,17 @@ function bus () {
   return D;
 }
 
-function start (slot, secs = MUS.XF) {
+/* своя музыка: трек i — плеер синтеза в ту же шину (приглушение, ползунок) */
+function startChip (i, secs) {
+  let pl;
+  try { pl = CHIPT.play(A.Snd.ctx, bus(), i, secs); } catch (e) { STATS.errors.push('chip: ' + ((e && e.message) || e)); MUS.CHIP = false; return null; }   // не вышло — тишина, без повторов
+  ST.chipLast = pl.i;
+  STATS.started.chip = (STATS.started.chip || 0) + 1;
+  return { slot: 'chip', file: null, chip: pl, track: pl.i, t0: now() };
+}
+
+function start (slot, secs = MUS.XF, track) {
+  if (slot === 'chip') return startChip(track, secs);
   const f = nextFile(slot);
   if (!f) return null;
   const c = A.Snd.ctx, el = new Audio();
@@ -158,25 +185,27 @@ function start (slot, secs = MUS.XF) {
 }
 
 function fade (ch, secs) {
-  const c = A.Snd.ctx, t = c.currentTime, g = ch.g.gain;
-  g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(0, t + secs);
+  if (ch.chip) ch.chip.fade(secs);
+  else { const c = A.Snd.ctx, t = c.currentTime, g = ch.g.gain; g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(0, t + secs); }
   OLD.push(ch);
   setTimeout(() => stop(ch), secs * 1000 + 300);
 }
 function stop (ch) {
   const i = OLD.indexOf(ch);
   if (i >= 0) OLD.splice(i, 1);
+  if (ch.chip) { ch.chip.stop(); return; }
   try { ch.el.pause(); ch.el.removeAttribute('src'); ch.el.load(); } catch (e) { /* — */ }
   try { ch.src.disconnect(); ch.g.disconnect(); } catch (e) { /* — */ }
 }
 
 /* перейти на слот (или на следующий вариант того же) с плавным переходом */
-function swap (slot, secs = MUS.XF) {
+function swap (slot, secs = MUS.XF, track) {
   const was = CUR;
   if (was) fade(was, secs);
-  CUR = slot ? start(slot, secs) : null;
+  CUR = slot ? start(slot, secs, track) : null;
   STATS.switches++;
-  note((was ? was.slot : '—') + ' → ' + (slot || '—') + (CUR ? ' (' + CUR.file + ')' : ''));
+  note((was ? was.slot : '—') + ' → ' + (slot || '—') + (CUR ? ' (' + (CUR.chip ? CUR.chip.id : CUR.file) + ')' : ''));
+  if (CUR && CUR.chip && ST.plated !== STATS.switches) chipPlate();
   if (CUR && A.radio && A.radio.onSong) try { A.radio.onSong(CUR.slot, CUR.file); } catch (e) { /* — */ }
 }
 
@@ -186,9 +215,12 @@ function tick () {
   ST.last = t;
   const Snd = A.Snd;
   if (!Snd || !Snd.ctx || !Snd.musicBus) return;
-  const slot = Snd.on ? resolve(wantSlot(dt)) : null;
+  const want = Snd.on && !ST.off ? wantSlot(dt) : null;
+  let slot = resolve(want);
+  if (!slot && want && MUS.CHIP) slot = 'chip';     // у места нет файлов — своя музыка кодом
   ST.want = slot;
-  if (!slot) { if (CUR) swap(null, Snd.on ? MUS.XF : MUS.OUT); }
+  if (!slot) { if (CUR) swap(null, Snd.on && !ST.off ? MUS.XF : MUS.OUT); ST.pin = false; }
+  else if (slot === 'chip') chipTick(want);
   else if (!CUR || CUR.slot !== slot) swap(slot, CUR && isRadio(CUR.slot) && isRadio(slot) ? MUS.RADIO_XF : MUS.XF);
   else {
     // к концу трека — следующий вариант (или он же сначала), с переходом
@@ -208,22 +240,115 @@ function tick () {
     ST.dg = k;
   }
   ST.duck = k;
+  try { CHIPT.step(); } catch (e) { STATS.errors.push('chip step: ' + ((e && e.message) || e)); }
+  menuStrip();
+}
+
+/* ═════════════ своя музыка: настроение и смена треков ═════════════ */
+/* настроение: Новый год → зима / лето → ночь → день; в меню и на чеке — по сезону, без ночи */
+function chipMood (want) {
+  let hol = '', sea = -1;
+  try { hol = (A.hol && A.hol()) || ''; } catch (e) { /* — */ }
+  try { sea = A.sea ? Math.floor(((+A.sea() % 4) + 4) % 4) : -1; } catch (e) { /* — */ }
+  const menu = want === 'menu' || want === 'shiftend';
+  if (hol === 'newyear') return 'newyear';
+  if (sea === 2) return !menu && ST.night ? 'winterNight' : 'winter';      // seasons.js: 0 лето, 1 осень, 2 зима, 3 весна
+  if (!menu && ST.night) return 'night';
+  if (sea === 0) return 'summer';
+  return menu ? 'menu' : 'day';
+}
+function chipTick (want) {
+  const mood = chipMood(want);
+  ST.mood = mood;
+  if (!CUR || CUR.slot !== 'chip') { swap('chip', MUS.XF, CHIPT.pick(mood, ST.chipLast)); return; }
+  const P = CHIPT.pool(mood);
+  if (!ST.pin && !P.includes(CUR.track)) { swap('chip', MUS.XF, CHIPT.pick(mood, CUR.track)); return; }
+  if (CUR.chip.left() < MUS.XF) { ST.pin = false; swap('chip', MUS.XF, CHIPT.after(mood, CUR.track)); }
+}
+/* плашка «♪ трек» — в езде (в меню и на паузе название и так на виду) */
+function chipPlate () {
+  ST.plated = STATS.switches;
+  if (!A || !A.S || A.S.paused || A.S.state === 'title' || !CUR || !CUR.chip) return;
+  CHIPT.plate(CHIPT.name(CUR.track));
+}
+/* полоска в главном меню (мышь, палец): «♪ трек ▶ | выкл» */
+let STRIP_API = null;
+function menuStrip () {
+  let on = false;
+  try { on = !!(A.strip && A.strip()); } catch (e) { /* — */ }
+  if (!on) { CHIPT.strip(false); return; }
+  if (!STRIP_API) STRIP_API = { next: () => next(), toggle: () => toggle() };
+  CHIPT.strip(true, ST.off || !A.Snd.on ? t('музыка выкл') : title() || t('музыка'), STRIP_API, ST.off);
+}
+
+/* ═════════════ кнопки ═════════════ */
+export const on = () => !ST.off;
+/** название того, что играет: трек своей музыки; файл автора — «файл» без расширения; ничего — '' */
+export function title () {
+  if (!CUR) return '';
+  if (CUR.chip) return CHIPT.name(CUR.track);
+  return String(CUR.file || '').replace(/\.[a-z0-9]+$/i, '');
+}
+/** «музыка: Тёплый асфальт» / «музыка: выкл» */
+export function label () {
+  if (ST.off) return t('музыка: выкл');
+  const n = title();
+  return n ? t('музыка: {name}', { name: n }) : t('музыка: вкл');
+}
+/** следующий трек (своя музыка — по кругу всех шести, файлы — следующий вариант места) */
+export function next (quiet) {
+  if (!A || !A.Snd) return false;
+  A.Snd.boot && A.Snd.boot(); A.Snd.resume && A.Snd.resume();
+  if (ST.off) { toggle(); return true; }
+  if (!A.Snd.ctx || !CUR) return false;
+  ST.plated = STATS.switches + 1;                 // своя плашка ниже, не из swap
+  if (CUR.chip) {
+    ST.pin = true;
+    swap('chip', MUS.NEXT_XF, (CUR.track + 1) % CHIPT.count());
+  } else swap(CUR.slot, MUS.NEXT_XF);
+  ST.cyc++;
+  if (!quiet && CUR) CHIPT.plate(title() || t('музыка'), t('следующий трек'));
+  return true;
+}
+/** музыка вкл / выкл (звуки и мотор не трогает; общий звук — M / R3) */
+export function toggle () {
+  ST.off = !ST.off;
+  ST.cyc = 0; ST.pin = false;
+  try { if (A && A.Store) A.Store.set(KEY_ON, ST.off ? '0' : '1'); } catch (e) { /* — */ }
+  if (A && A.Snd) { A.Snd.boot && A.Snd.boot(); A.Snd.resume && A.Snd.resume(); }
+  ST.plated = STATS.switches + 1;                 // своя плашка ниже, не из swap
+  try { tick(); } catch (e) { /* — */ }
+  if (ST.off) CHIPT.plate(t('музыка выкл'));
+  else CHIPT.plate(title() || t('музыка вкл'), A && A.Snd && A.Snd.on ? '' : t('звук выключен — M'));
+  return !ST.off;
+}
+/** одна кнопка на всё (пауза, телефон): следующий трек → … → после последнего «выкл» → снова вкл */
+export function cycle () {
+  if (ST.off) { toggle(); return; }
+  const n = CUR && CUR.chip ? CHIPT.count() : Math.max(1, files(CUR ? CUR.slot : '').length);
+  if (ST.cyc >= n - 1 || !CUR) { toggle(); return; }
+  next();
 }
 
 export const DEBUG = {
   MUS, STATS,
   get list () { return JSON.parse(JSON.stringify(LIST)); },
+  chip: CHIPT.DEBUG, next, toggle, cycle, label,
   get bad () { return [...BAD]; },
   get state () {
     return {
       want: ST.want, radio: ST.radio, slot: CUR ? CUR.slot : null, file: CUR ? CUR.file : null, night: ST.night, tense: +ST.tenseT.toFixed(1),
       duck: ST.duck, level: +level().toFixed(3), fading: OLD.length,
-      gain: CUR ? +CUR.g.gain.value.toFixed(3) : 0, duckGain: D ? +D.gain.value.toFixed(3) : 1,
+      off: ST.off, mood: ST.mood, pin: ST.pin, track: CUR && CUR.chip ? CUR.chip.id : null, title: title(), chip: CUR && CUR.chip ? CUR.chip.pos() : null,
+      gain: CUR ? (CUR.chip ? CUR.chip.gain : +CUR.g.gain.value.toFixed(3)) : 0, duckGain: D ? +D.gain.value.toFixed(3) : 1,
       bus: A && A.Snd && A.Snd.musicBus ? +A.Snd.musicBus.gain.value.toFixed(3) : null,
-      t: CUR ? +CUR.el.currentTime.toFixed(2) : 0, dur: CUR && Number.isFinite(CUR.el.duration) ? +CUR.el.duration.toFixed(1) : null, paused: CUR ? CUR.el.paused : null,
+      t: CUR && CUR.el ? +CUR.el.currentTime.toFixed(2) : 0, dur: CUR && CUR.el && Number.isFinite(CUR.el.duration) ? +CUR.el.duration.toFixed(1) : null, paused: CUR && CUR.el ? CUR.el.paused : null,
     };
   },
   /* держать слот (проверки): 'day' | 'night' | 'tense' | 'menu' | 'shiftend' | 'radio-disco' …; null — снова по игре */
   force (slot) { ST.forced = slot && (SLOTS.includes(slot) || isRadio(slot)) ? slot : null; return ST.forced; },
+  /* своя музыка: сыграть трек i (0…5) сразу, держать до конца */
+  play (i) { if (!A || !A.Snd.ctx) return null; ST.pin = true; swap('chip', MUS.NEXT_XF, i); return CUR && CUR.chip ? CUR.chip.id : null; },
+  seek (bar) { if (CUR && CUR.chip) CUR.chip.seek(bar); return CUR && CUR.chip ? CUR.chip.pos() : null; },
   reload: () => load(),
 };

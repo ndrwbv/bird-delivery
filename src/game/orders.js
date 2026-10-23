@@ -33,20 +33,29 @@
    note, why, pay, time, timeK (срок × от обычного), color, reach, noGuest }. why/items/note — уже переведённые; noGuest — человека
    у двери ставит story.js, прохожего не зовём (иначе ждёт прохожий, person — его лицо). */
 import * as RESPECT from './respect.js';
+import * as TEL from './telemetry.js';          // анонимная статистика: поручения и опоздания (telemetry.js)
 import { t, tn } from '../i18n/index.js';
 import * as ECON from './econ.js';
 import * as DLG from './dialog.js';
 import * as ZN from './zones.js';
 import * as DIST from './districts.js';
 import * as FEST from './festivals.js';
+import * as HOL from './holidays.js';            // праздничная смена: оливье-пицца, «к бою курантов», корпоратив, чаевые щедрее (holidays.js)
+import * as CYCLE from './seasoncycle.js';      // первая смена сезона: сезонные пиццы, оплата ×k (seasoncycle.js perk)
 import * as HURR from './hurricane.js';          // дома, унесённые ураганом: их адреса не выдаём (hurricane.js blocked)
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 import * as RHY from './rhythm.js';             // ритм смены: роль заказа на дуге, напряжение, встреча у двери (rhythm.js)
 import * as FACES from './faces.js';            // знакомые лица района: Глеб — его адрес, его поручение (faces.js)
+import * as LOCALS from './locals.js';          // жители Юга: их адреса и поручения (locals.js)
 import * as GROW from './growth.js';            // пиццерия растёт: оплата, чаевые, размер сборных по ступени (econ.js GROWTH)
 import * as BEACH from './beach.js';            // пляж летом: заказ на полотенце (beach.js ORDER)
 import * as DOOR from './doorstep.js';          // домофон у подъезда: бонус «с первого раза» / «спускался сам» (econ.js DOOR)
 import { makePerson } from './people.js';
+import * as NICK from './nicks.js';             // ники клиентов «как в приложении» (nicks.js)
+import * as DAYT from './daytime.js';            // время суток словами: «полночь» — только когда на часах полночь (daytime.js)
+import * as MIX from './routemix.js';
+import * as LIKES from './likes.js';             // что нравится игроку: вес вида поручения — выбор и таймер (likes.js, econ.js LIKES)
+import * as SKILL from './skill.js';             // умение курьера: потолок напряжения, срок, доля сложных по тому, как возишь (skill.js, econ.js SKILL)              // разные маршруты: другая сторона от пиццерии и другая улица, чем недавние (routemix.js)
 import { ORDER_TYPES, SHIFT_PLAN, SIDE_ORDERS, STAFF_RIDE, BOSS } from './orders.config.js';
 
 const N_ = s => s;
@@ -81,6 +90,8 @@ export function init (api) {
   A = api; S = api.S; V = api.V;
   for (const [k, f] of Object.entries(OPT)) f().then(m => { if (k.includes('career')) hookCareer(m); else STORY = m; }).catch(e => console.warn('[orders]', k, e));
   loadUsed();
+  MIX.init(api);
+  LIKES.init(api.Store);
   css();
 }
 
@@ -192,8 +203,10 @@ export function resetShift () {
   SH.last = 0;
   SH.gen = 0;
   SH.zones = new Set(); SH.must = {}; SH.done = 0; SH.log = []; SH.reserved = new Set(); SH.pts = []; SH.breather = false;
-  SH.k = 0; SH.sz = 1; SH.run = { kind: '', n: 0 }; SH.far = 0; SH.beach = 0; SH.beachAt = -99; SH.prevM = 0;
+  SH.k = 0; SH.sz = 1; SH.run = { kind: '', n: 0 }; SH.far = 0; SH.beach = 0; SH.beachAt = -99; SH.prevM = 0; SH.shortLast = false;
   SH.h0 = hourNow();
+  MIX.beginShift();
+  if (!SIM) SKILL.beginShift();                          // умение курьера: новая смена — × SKILL.CARRY (skill.js)
   buildPool();
 }
 
@@ -232,8 +245,22 @@ function pickSpot (o = {}) {
   const apart = fresh.filter(s => !SH.pts.some(q => Math.abs(q.x - s.x) < 45 && Math.abs(q.z - s.z) < 45));
   if (apart.length) fresh = apart;
   const door = fresh.filter(s => s.entr);                // подъезд лучше дорожки во дворе
-  if (door.length) return pick(door);
-  if (fresh.length) return pick(fresh);
+  // разные маршруты (routemix.js): в другую сторону от пиццерии и на другую улицу, чем недавние заказы
+  const mix = l => (o.from || o.mix === false ? l : MIX.prefer(l));
+  if (door.length) return pick(mix(door));
+  if (fresh.length) return pick(mix(fresh));
+  // все адреса кольца уже видели (у пиццерии в Гаражах и Частном секторе их 20—40, на дальней окраине — единицы, редкого
+  // вида места в кольце — 1—2): сначала любой вид места, потом шире кольцо (до 2 раз: ближе ×0,8, дальше ×1,25), повтор —
+  // только если и там все были; окраине (fresh) — не повтор, а ничего
+  if (o.fresh) return null;
+  if (o.zone && o.relax !== false) {
+    const w = pickSpot({ ...o, zone: null });
+    if (w && !UIDX.has(w.key)) return w;
+  }
+  if ((o.dmin !== undefined || o.dmax !== undefined) && (o.wide || 0) < 2) {
+    const w = pickSpot({ ...o, dmin: o.dmin !== undefined ? o.dmin * 0.8 : undefined, dmax: o.dmax !== undefined ? o.dmax * 1.25 : undefined, wide: (o.wide || 0) + 1 });
+    if (w && !UIDX.has(w.key)) return w;
+  }
   let best = null, bi = Infinity;                        // все были — самый давний
   for (const s of ok) { const i = UIDX.get(s.key); if (i < bi) { bi = i; best = s; } }
   return best;
@@ -251,7 +278,7 @@ function zoneWeights (dmin, dmax, only) {
     // все адреса района уже видели — реже: повторы только когда совсем некуда
     const lo = ZMIN[z] <= dmax ? dmin : ZMIN[z], hi = ZMIN[z] <= dmax ? dmax : ZMIN[z] + 600;
     const fresh = POOL.some(s => s.zone === z && s.d >= lo && s.d <= hi && !UIDX.has(s.key) && !SH.reserved.has(s.key));
-    w[z] = SHIFT_PLAN.zoneWeights[z] * k * (fresh ? 1 : 0.15);
+    w[z] = SHIFT_PLAN.zoneWeights[z] * k * (fresh ? 1 : 0.15) * (z === 'gang' ? SKILL.hard() : 1);   // бандитские адреса — по умению (skill.js)
   }
   return w;
 }
@@ -268,6 +295,7 @@ const visKind = spec => (spec.bundle ? 'multi' : spec.kind === 'group' ? 'group'
 function kindRoll (multi) {
   const W = { ...(SHIFT_PLAN.kinds || { solo: 1 }) };
   if (!multi) delete W.multi;
+  else if (W.multi) W.multi *= SKILL.hard();             // умение курьера: сборных больше или меньше (skill.js)
   const cap = (SHIFT_PLAN.maxRun || {})[SH.run.kind];
   if (cap && SH.run.n >= cap && Object.keys(W).length > 1) delete W[SH.run.kind];
   return wpick(W) || 'solo';
@@ -299,34 +327,43 @@ function easySpec (R) {
 /* ритм смены: «близко» — и по дорогам (по прямой 350 м бывают и 900 м в объезд квартала): из нескольких адресов
    кольца разминки — первый, до которого по дорогам не дальше RHYTHM.EASY_M, иначе самый близкий по дорогам */
 function nearSpot (a, b) {
-  let best = null, bl = Infinity;
-  for (let k = 0; k < 6; k++) {
-    const s = pickSpot({ dmin: a, dmax: b });
+  let best = null, bl = Infinity, ok = null, op = Infinity;
+  for (let k = 0; k < 8; k++) {
+    // разные маршруты (routemix.js): половина адресов — «в другую сторону и на другую улицу»; из близких по дорогам — с меньшим
+    // штрафом за повтор, без штрафа — сразу
+    const s = pickSpot(k % 2 ? { dmin: a, dmax: b, mix: false } : { dmin: a, dmax: b });
     if (!s) break;
     const L = A.routeLen(A.PIZZA.x, A.PIZZA.z, s.x, s.z);
-    if (L <= ECON.RHYTHM.EASY_M) return s;
-    if (L < bl) { bl = L; best = s; }
+    if (L <= ECON.RHYTHM.EASY_M) {
+      const p = MIX.penalty(s);
+      if (p < 0.5) return s;
+      if (p < op) { op = p; ok = s; }
+    } else if (L < bl) { bl = L; best = s; }
   }
-  return best;
+  return ok || best;
 }
 
-let RHY_ROLE = '';
+let RHY_ROLE = '', RHY_K = -1;
 function genSpec () {
-  RHY_ROLE = '';
+  RHY_ROLE = ''; RHY_K = -1;
   if (SH.gen === 0 && !POOL.length) buildPool();
   else if (POOL_AT !== A.PIZZA) rebase();                 // «весь город»: вернулся в другую пиццерию
   let D = distRing();
   // ритм смены (rhythm.js): роль заказа на дуге (начало, подъём, кульминация, последний), напряжение k, встреча у двери
   const R = SIM ? (SIM_ARC ? simSlot() : null) : RHY.slot(SH.gen, CAR && typeof CAR.shiftLeft === 'function' && CAR.shiftOn() ? CAR.shiftLeft() : -1);
+  if (R) { R.k0 = R.k; R.k = SKILL.k(R.k); RHY_K = R.k; }   // умение курьера: потолок напряжения (skill.js) — дальность, сборные, срочные «по шансу»
   const tgt = R ? arcTarget(R, D) : 0;                    // сколько метров по дорогам «хочется» этому заказу
   if (R) { D = rampRing(D, R.k); RHY_ROLE = R.role; D.max = Math.max(D.min + 150, Math.min(D.max, Math.round(tgt))); }   // по прямой — не дальше «хочется» по дорогам
-  // фестиваль кальянщиков: первый заказ смены и часть остальных — на сам фестиваль, к проходу (festivals.js)
+  // фестиваль кальянщиков и митинг Дня угнетения бургеров: первый заказ смены и часть остальных — на сам фестиваль, к проходу (festivals.js)
   const fp = SIM ? null : FEST.passSpec(SH.gen);
   if (fp && R && R.meet) RHY.meetFailed();
   if (fp) return finishSpec({ type: 'pizza', kind: 'solo', fest: fp, stops: [{ x: fp.x, z: fp.z, key: keyOf(fp.x, fp.z), zone: ZN.zoneAt(fp.x, fp.z), n: 1, addr: fp.addr }] }, null, hourNow());
   if (R && R.meet) { const ms = R.meet.face ? faceSpec(R, D, tgt) : meetSpec(R, D, tgt); if (ms) return finishSpec(ms, null, hourNow()); RHY.meetFailed(); }
   const easy = easySpec(R);
   if (easy) return finishSpec(easy, null, hourNow());
+  // праздник (holidays.js): «к бою курантов» — срочный, срок до 00:00 по часам мира; адрес — чтобы успеть
+  const chm = SIM ? 0 : HOL.chimesDue();
+  if (chm) { const s = chimesSpot(chm, D); if (s) { if (R && R.meet) RHY.meetFailed(); return finishSpec({ type: 'urgent', kind: 'solo', urgent: true, hol: HOL.tag('chimes'), stops: [stopOf(s)] }, 'urgent', hourNow()); } }
   const ahead = (A.S.order ? 1 : 0) + Q.length;          // сколько заказов до этого
   const hAt = hourNow() + ahead / rate();
   let forced = null;
@@ -335,18 +372,19 @@ function genSpec () {
   const hard = !R || R.k >= ECON.RHYTHM.HARD_K;
   if (hAt >= (DIST.pace().hardFrom || 0)) for (const r of SHIFT_PLAN.must || []) {
     if (R && r.what === 'edge') continue;                  // ритм: окраина — не обязательная, а по весу (rimSpot), редко
+    if (r.what === 'urgent' && !SKILL.urgentOk()) continue;   // умение курьера: срочные — с SKILL.URGENT_FROM (skill.js)
     const have = r.what === 'zones' ? SH.zones.size : SH.must[r.what] || 0;
     if (have >= r.count) continue;
     const need = r.count - have, slots = (r.byHour - hAt) * rate();
     if (slots <= need + 0.5 || (hard && chance(need / Math.max(1, slots)))) { forced = r.what; break; }
   }
   // и сверх обязательного — иногда ещё срочный (econ.js URGENT: CHANCE, не больше MAX за смену)
-  if (!forced && hard && hAt >= (DIST.pace().hardFrom || 0) && (SH.must.urgent || 0) < ECON.URGENT.MAX && chance(ECON.URGENT.CHANCE)) forced = 'urgent';
+  if (!forced && hard && hAt >= (DIST.pace().hardFrom || 0) && (SH.must.urgent || 0) < ECON.URGENT.MAX && SKILL.urgentOk() && chance(ECON.URGENT.CHANCE * SKILL.hard())) forced = 'urgent';
   // кульминация смены (ритм): самый тяжёлый заказ — срочный, «в конец района» или большой сборный (RHYTHM.PEAK)
   let big = false;
   if (R && R.role === 'peak' && !forced) {
     const W = {}, P = ECON.RHYTHM.PEAK;
-    if (hAt >= (DIST.pace().hardFrom || 0) && (SH.must.urgent || 0) < ECON.URGENT.MAX) W.urgent = P.urgent;
+    if (hAt >= (DIST.pace().hardFrom || 0) && (SH.must.urgent || 0) < ECON.URGENT.MAX && SKILL.urgentOk()) W.urgent = P.urgent * SKILL.hard();
     if (EDGE_D) W.edge = P.edge;
     if (lifeN() >= BUNDLE.FROM && ECON.bundleStep(lifeN())) W.big = P.big;
     const w = wpick(W);
@@ -373,6 +411,8 @@ function genSpec () {
   if (!spec && !forced && (!R || R.k >= ECON.RHYTHM.HARD_K)) spec = beachSpec(hAt);   // ритм: пляж — окраина, со второй половины подъёма
   // вид — вперемешку (kindRoll): один человек, компания в одном месте или несколько адресов разом —
   // сборный, n пицц на n адресов (econ.js BUNDLE); всё — с первого обычного заказа (после учебного)
+  // праздник (holidays.js): корпоратив — сборный (не первый заказ смены, не больше двух)
+  if (!spec && !forced && !SIM && life >= BUNDLE.FROM && HOL.wantCorp(SH.gen)) { spec = bundleSpec(life, D, 4, false, R ? ECON.RHYTHM.BUNDLE_R : 0); if (spec) spec.hol = HOL.tag('corp'); }
   let kind = 'solo';
   // (и когда надо «добрать районы» — адреса сборного тоже районы смены; и когда срочному или «в конец района» не нашлось адреса)
   if (!spec && life >= BUNDLE.FROM) {
@@ -390,10 +430,15 @@ function genSpec () {
     // ритм смены: изредка — окраина района (districts.js rimWeight: в начале смены почти никогда, к концу — чаще)
     const rs = R && !far && !SH.breather && (R.role === 'rise' || R.role === 'peak') ? rimSpot(R.f) : null;
     // с ритмом вид места за кольцом не тянет заказ на окраину: окраина — только по весу (rimSpot), иначе — кольцо дуги
-    const s = rs || (R ? arcSpot({ zone: far ? null : zone, dmin: D.min, dmax: D.max }, tgt)
+    // разные маршруты (econ.js ROUTEMIX.SHORT): заказ подъёма иногда — «короткий», 50—75 % от «хочется», не два подряд:
+    // дальность вперемешку, а не всё дальше и дальше; следующий «хочется» считает от несостоявшегося дальнего (finishSpec)
+    const MX = ECON.ROUTEMIX;
+    const short = R && !rs && R.role === 'rise' && !SH.shortLast && tgt > ECON.RHYTHM.EASY_M * 1.3 && chance(MX.SHORT) ? Math.round(tgt * rand(MX.SHORT_K[0], MX.SHORT_K[1])) : 0;
+    const s = rs || (R ? arcSpot({ zone: far ? null : zone, dmin: short ? Math.min(D.min, Math.round(short * 0.4)) : D.min, dmax: D.max }, short || tgt)
       : far ? pickSpot({ zone, dmin: ZMIN[zone], dmax: ZMIN[zone] + 600 }) : pickSpot({ zone, dmin: D.min, dmax: D.max }));
     if (!s) return null;
     spec = { type: 'pizza', kind, stops: [], rimPick: !!rs };
+    if (short && s !== rs) spec.short = Math.round(tgt);
     if (rs && DIST.rim(rs.x, rs.z) >= ECON.RHYTHM.EDGE_RIM) { spec.kind = kind = 'solo'; spec.edge = true; }   // дальняя окраина — «в конец района» (×EDGE)
     if (kind === 'group') spec.stops.push(stopOf(s, rint(SHIFT_PLAN.groupSize || [2, 3])));
     else spec.stops.push(stopOf(s));
@@ -427,7 +472,7 @@ function beachSpec (hAt) {
 function bundleSpec (life, D, most = 7, top = false, near = 0) {
   const step = ECON.bundleStep(life);
   if (!step) return null;
-  let n = sizeRoll(Math.max(2, Math.min(most, (step.max || 2) + GROW.sizeAdd())), top);   // сколько пицц — «вперемешку» (SHIFT_PLAN.sizes), от 2; ступень пиццерии ± (GROWTH.SIZE); top — кульминация смены: самый большой из можно
+  let n = sizeRoll(Math.max(2, Math.min(most, SKILL.size(), (step.max || 2) + GROW.sizeAdd())), top);   // умение курьера: пицц не больше SKILL size   // сколько пицц — «вперемешку» (SHIFT_PLAN.sizes), от 2; ступень пиццерии ± (GROWTH.SIZE); top — кульминация смены: самый большой из можно
   const told = toldGet();                                 // сколько пицц директор уже объявил
   let boss = null;
   if (told < 2) { n = 2; boss = 2; }                       // самый первый — знакомство, ровно две
@@ -441,7 +486,9 @@ function bundleSpec (life, D, most = 7, top = false, near = 0) {
   for (let i = 0; i < n; i++) {
     // ритм смены (near): остальные адреса — кучкой у первого, не по разные стороны района
     const nr = city ? ECON.CITY.BUNDLE_R : near;
-    const s = pickSpot(nr && pts.length ? { near: pts[0], r: nr } : { dmin: D.min, dmax: D.max });
+    // разные маршруты: первый адрес — в другую сторону и на другую улицу, чем недавние заказы; остальные — кучкой у первого, как
+    // выпало (они и так в разные стороны от него; подбор улиц внутри кучки удлинял сборный на 10—20 %)
+    const s = pickSpot(nr && pts.length ? { near: pts[0], r: nr, mix: false } : { dmin: D.min, dmax: D.max, mix: pts.length ? false : undefined });
     if (!s) break;
     SH.reserved.add(s.key); SH.pts.push({ x: s.x, z: s.z });
     pts.push(s);
@@ -512,6 +559,20 @@ function urgentSpot (zone) {
   }
   return best;
 }
+/* «к бою курантов» (holidays.js): left — секунд до полуночи; адрес, до которого по дорогам не дальше
+   (left − CHIMES_PAD) × CHIMES_V м от пиццерии — из таких самый дальний; не нашли — null (будет обычный заказ) */
+function chimesSpot (left, D) {
+  const maxL = (left - HOL.HOL.CHIMES_PAD) * HOL.HOL.CHIMES_V;
+  if (maxL < 250 || !A.PIZZA) return null;
+  let best = null, bl = 0;
+  for (let k = 0; k < 8; k++) {
+    const s = pickSpot({ dmin: Math.min(D.min, maxL * 0.3), dmax: maxL * 0.8 });
+    if (!s) break;
+    const L = A.routeLen(A.PIZZA.x, A.PIZZA.z, s.x, s.z);
+    if (L <= maxL && L > bl) { bl = L; best = s; }
+  }
+  return best;
+}
 /* сюжет: дом героя не дальше 1,6 × дальности района от пиццерии (иначе глава ждёт района поближе) */
 function storyNear (s) {
   if (!DIST.has() || !Number.isFinite(s.x) || !Number.isFinite(s.z) || !A.PIZZA) return true;
@@ -531,20 +592,24 @@ function rampRing (D, k) {
    «хочется» заказу — от EASY_M в начале до FAR_K × дальности района к RAMP, но не больше прошлого заказа + STEP_M
    (кульминация — + STEP_M × PEAK_STEP): дальность растёт от заказа к заказу плавно, окраины — редко */
 function arcTarget (R, D) {
-  const C = ECON.RHYTHM, far = D.max * C.FAR_K;
+  const C = ECON.RHYTHM, far = D.max * C.FAR_K * SKILL.far();   // умение курьера: дальше или ближе (skill.js)
   const want = C.EASY_M + Math.max(0, far - C.EASY_M) * R.k;
   return Math.min(want, (SH.prevM || C.EASY_M) + C.STEP_M * (R.role === 'peak' ? C.PEAK_STEP : 1));
 }
 /* из нескольких адресов кольца — тот, до которого по дорогам ближе всего к target м (ok — ещё условие на адрес) */
+/* разные маршруты (routemix.js): половина адресов — уже «в другую сторону и на другую улицу», половина — любые; берём
+   меньшее «промах по дальности / ROUTEMIX.TOL + штраф за повтор» — дальность дуги держится, повтор стороны стоит ~TOL × 3 м */
 function arcSpot (o, target, ok) {
-  let best = null, bd = Infinity;
-  for (let k = 0; k < 8; k++) {
-    const s = pickSpot(o);
+  const MX = ECON.ROUTEMIX;
+  let best = null, bc = Infinity;
+  for (let k = 0; k < MX.ARC_N; k++) {
+    const s = pickSpot(k % 2 ? { ...o, mix: false } : o);
     if (!s) break;
     if (ok && !ok(s)) continue;
     const d = Math.abs(A.routeLen(A.PIZZA.x, A.PIZZA.z, s.x, s.z) - target);
-    if (d < bd) { bd = d; best = s; }
-    if (d < 100) break;
+    const c = d / MX.TOL + MIX.penalty(s);
+    if (c < bc) { bc = c; best = s; }
+    if (c < 100 / MX.TOL) break;
   }
   return best;
 }
@@ -556,14 +621,14 @@ function rimSpot (prog) {
   const core = DIST.dist()[1], cand = [], w = {};
   for (let k = 0; k < ECON.RHYTHM.RIM_N; k++) {
     // поровну ближней окраины и дальней (дальше 1,5 × дальности района): иначе самый край, где адресов мало, не выпадал бы
-    const s = pickSpot(k % 2 ? { dmin: core * 1.5, relax: false } : { dmin: core, dmax: core * 1.5, relax: false });
+    const s = pickSpot(k % 2 ? { dmin: core * 1.5, relax: false, fresh: true } : { dmin: core, dmax: core * 1.5, relax: false, fresh: true });   // окраина — только где не был
     if (!s || !(DIST.rim(s.x, s.z) > 0) || cand.includes(s)) continue;
     w[cand.length] = DIST.rimWeight(s.x, s.z, prog);
     cand.push(s);
   }
   if (!cand.length) return null;
   const mean = Object.values(w).reduce((a, b) => a + b, 0) / cand.length;
-  return chance(mean) ? cand[+wpick(w)] : null;
+  return chance(mean * SKILL.hard()) ? cand[+wpick(w)] : null;   // умение курьера: окраина чаще или реже (skill.js)
 }
 /* прогон смен с дугой (DEBUG.simShift(…, arc)): роль заказа — по номеру из n, как у ритма смены (rhythm.js slot) */
 function simSlot () {
@@ -591,21 +656,25 @@ function meetSpec (R, D, tgt) {
    поручение (delivered). Его подъезд занят другим заказом смены — не в этот раз (ритм попробует на следующем) */
 function faceSpec (R, D, tgt) {
   const f = R.meet;
+  // жители Юга (locals.js): kind 'door' — заказ ему, при вручении окно разговора (как поручение — через face)
+  const of = s => (f.kind === 'meet' ? { type: 'pizza', kind: 'solo', meet: f, stops: [stopOf(s)] } : { type: 'pizza', kind: 'solo', face: f, stops: [stopOf(s)] });
   if (!f.key) {                                           // адрес ещё не запомнен — выбрать, как встрече (запомнится, когда появление случится)
-    if (f.kind === 'meet') return meetSpec(R, D, tgt);
-    const s0 = arcSpot({ dmin: D.min, dmax: D.max }, tgt, q => q.entr);
-    return s0 ? { type: 'pizza', kind: 'solo', face: f, stops: [stopOf(s0)] } : null;
+    if (f.kind === 'meet' && !f.local) return meetSpec(R, D, tgt);
+    // житель: подъезд, где можно сыграть катсцену потом, и не чужой (у каждого свой)
+    const s0 = arcSpot({ dmin: D.min, dmax: D.max }, tgt, q => q.entr && (!f.local || (RHY.doorOk(q.x, q.z) && !(f.avoid || []).includes(q.key))));
+    return s0 ? of(s0) : null;
   }
   const s = POOL.find(q => q.key === f.key);
   if (!s || SH.reserved.has(s.key) || HURR.blocked(s.x, s.z)) return null;
   SH.breather = false;
-  return f.kind === 'errand' ? { type: 'pizza', kind: 'solo', face: f, stops: [stopOf(s)] } : { type: 'pizza', kind: 'solo', meet: f, stops: [stopOf(s)] };
+  return of(s);
 }
 
 /* спецификация готова: резерв адресов, метры по дорогам, номер, лог */
 function finishSpec (spec, forced, hAt) {
   // считаем сразу: очередь — это уже план смены
   for (const st of spec.stops) { SH.reserved.add(st.key); SH.zones.add(st.zone); SH.pts.push({ x: st.x, z: st.z }); }
+  MIX.note(spec.stops);                                  // разные маршруты: куда вёл этот (сторона, улицы) — следующие поведут в другие
   if (spec.edge) SH.must.edge = (SH.must.edge || 0) + 1;
   if (spec.urgent) SH.must.urgent = (SH.must.urgent || 0) + 1;
   if ((spec.edge || spec.urgent) && ECON.PACE.WARMUP >= 0) SH.breather = true;      // после тяжёлого — близкий
@@ -615,12 +684,15 @@ function finishSpec (spec, forced, hAt) {
     return Math.round(A.routeLen(a.x, a.z, st.x, st.z));
   });
   spec.zone = spec.stops[0].zone;
-  SH.prevM = spec.m[0] || 0;
-  if (RHY_ROLE) spec.role = RHY_ROLE;                             // ритм: следующий заказ — не сильно дальше этого (arcTarget)
+  SH.prevM = spec.short ? Math.max(spec.m[0] || 0, SH.prevM) : spec.m[0] || 0;   // «короткий» (ROUTEMIX.SHORT) — дуга не проседает, стоит на прошлом
+  SH.shortLast = !!spec.short;
+  if (RHY_ROLE) { spec.role = RHY_ROLE; spec.tk = RHY_K; }                             // ритм: следующий заказ — не сильно дальше этого (arcTarget)
   spec.color = spec.color || typeColor(spec.type);
   spec.forced = forced;
   // День угнетения бургеров (festivals.js): часть заказов — «вместо бургера», оплата ×FEST.BURGER_K
-  if (!spec.story && !SIM) { const bk = FEST.burgerRoll(); if (bk) spec.burger = bk; }
+  if (!spec.story && !SIM) { const bk = (spec.fest && spec.fest.burger) || FEST.burgerRoll(); if (bk) spec.burger = bk; }   // заказ на сам митинг — всегда «вместо бургера»
+  // праздник (holidays.js): обычная пицца — иногда праздничная (оливье-пицца), оплата ×k
+  if (!spec.story && !SIM && !spec.hol && !spec.fest && !spec.beach && !spec.bundle && !spec.urgent && spec.type === 'pizza') { const h = HOL.olivier() || CYCLE.perk(); if (h) spec.hol = h; }   // не праздник — может быть сезонная (seasoncycle.js)
   spec.n = ++SH.gen;
   // ритм размеров (sizeRoll): сколько было после разминки, сколько пицц в прошлом; серия одного вида (kindRoll)
   const size = spec.bundle ? spec.stops.length : 1;
@@ -719,6 +791,7 @@ function whyOf (sp) {
   if (sp.story) return sp.story.why || t('особый заказ');
   if (sp.fest) return sp.fest.why;
   if (sp.beach) return t('пляж: клиент загорает на полотенце · на песке машина вязнет');
+  if (sp.hol) return HOL.why(sp.hol, { n: sp.stops.length, k: fmtK((sp.urgent ? PAY.URGENT : 1) * sp.hol.k) });   // праздник (holidays.js)
   const z = t(ZONE_LABEL[sp.zone] || ZONE_LABEL.normal);
   if (sp.urgent) return t('срочно: времени в обрез · оплата ×{k} · не успеешь — штраф', { k: fmtK(PAY.URGENT) });
   if (sp.edge) return t('в самый конец района · оплата ×{k}', { k: fmtK(PAY.EDGE) });
@@ -753,6 +826,10 @@ export function setup (plan) {
   // «вместо бургера» (День угнетения бургеров): надбавка — в цене остановки
   sp.burgerAdd = sp.burger ? sp.fees.map(f => Math.round(f * (sp.burger - 1) / 10) * 10) : null;
   if (sp.burgerAdd) sp.fees = sp.fees.map((f, i) => f + sp.burgerAdd[i]);
+  // праздничный заказ (holidays.js): надбавка — в цене остановки; в накладной — праздничная пицца
+  sp.holAdd = sp.hol && sp.hol.k > 1 ? sp.fees.map(f => Math.round(f * (sp.hol.k - 1) / 10) * 10) : null;
+  if (sp.holAdd) sp.fees = sp.fees.map((f, i) => f + sp.holAdd[i]);
+  if (sp.hol && sp.hol.item) o.items = o.stops.reduce((n, st) => n + Math.max(1, st.peds.length), 0) + ' × ' + sp.hol.item;
   S.fee = sp.fees.reduce((a, b) => a + b, 0);
   // оплата и район — на самой остановке: в сборном игрок развозит в своём порядке, o.stops переставляются
   o.stops.forEach((st, i) => { st.fee = sp.fees[i]; st.far = sp.far[i]; if (!st.zone && sp.stops[i]) st.zone = sp.stops[i].zone; st.done = false; });
@@ -762,9 +839,13 @@ export function setup (plan) {
       // сборный: срок один на весь развоз — путь ближайшим следующим от пиццерии × ступень (BUNDLE.STEPS time)
       : sp.bundle ? bundleTime(sp.m.reduce((a, b) => a + b, 0), o.stops.length, sp.bundle.time || 1)
         : A.orderTime(L, 1, S.orders);
+  // умение курьера (skill.js): запас срока по тому, как возишь (не меньше «доехать реально»; срочный строже не бывает)
+  if (!sp.story && sp.type !== 'staff') S.timeMax = SKILL.time(S.timeMax, sp.bundle ? sp.m.reduce((a, b) => a + b, 0) : L, o.stops.length, !!sp.urgent);
   if (!(sp.story && Number.isFinite(sp.story.time))) S.timeMax *= DIST.pace().time || 1;   // щедрая — времени больше
   if (sp.story && Number.isFinite(sp.story.timeK)) S.timeMax *= sp.story.timeK;             // глава героя: «успеть» / крюк (herostories.js)
+  if (sp.hol && sp.hol.kind === 'chimes') S.timeMax = Math.max(15, HOL.toMidnight());       // «к бою курантов»: срок — ровно до 00:00 по часам мира (holidays.js)
   S.time = S.timeMax;
+  if (sp.type !== 'staff') SKILL.begin();                 // умение курьера: сердца заказа — с нуля, Толик — если умение сдвинулось
   if (sp.bundle && sp.bundle.boss) bossSays(sp.bundle.boss);
 }
 
@@ -783,7 +864,7 @@ function bossSays (k) {
   const line = k > 0 && BOSS.lines[k];
   if (!line) return;
   if (!BOSS_P) BOSS_P = makePerson({ seed: BOSS.seed, first: t(BOSS.first), last: t(BOSS.last), fem: !!BOSS.fem });
-  DLG.say({ person: BOSS_P, name: BOSS_P.name + ' · ' + t(BOSS.role), text: t(line), accept: t(BOSS.ok), mood: 'calm', fillers: false, color: typeColor('pizza') });
+  DLG.say({ person: BOSS_P, name: BOSS_P.name + ' · ' + t(BOSS.role), head: t('пиццерия'), text: t(line), accept: t(BOSS.ok), mood: 'calm', fillers: false, color: typeColor('pizza') });
 }
 
 /* сюжетный заказ без прохожего: у двери его человек (story.js), game.js зовёт вместо сборки S.order */
@@ -850,11 +931,13 @@ export function cardRows (order) {
   // премия за дальний («весь город») — отдельной строкой (она уже в оплате)
   const far = (sp.far || []).reduce((a, b) => a + b, 0);
   const brg = (sp.burgerAdd || []).reduce((a, b) => a + b, 0);
+  const hol = (sp.holAdd || []).reduce((a, b) => a + b, 0);
   return [
     // оплата — крупно, это главное число накладной; «срочно» тут не пишем — есть печать и шапка
     [t('оплата'), '<b class="oc-pay">' + A.money(S.fee) + '</b>'],
     ...(far > 0 ? [[t('за дальний'), '<b class="oc-far">+' + A.money(far) + '</b>' + ' · ' + esc(t('премия, уже в оплате'))]] : []),
     ...(brg > 0 ? [[t('вместо бургера'), '<b class="oc-far">+' + A.money(brg) + '</b>' + ' · ' + esc(t('День угнетения бургеров, уже в оплате'))]] : []),
+    ...(hol > 0 ? [[sp.hol && sp.hol.label ? t(sp.hol.label) : t('к празднику'), '<b class="oc-far">+' + A.money(hol) + '</b>' + ' · ' + esc(t('{name}, уже в оплате', { name: (sp.hol && sp.hol.name ? t(sp.hol.name) : HOL.name()) || t('праздник') }))]] : []),
   ];
 }
 
@@ -887,8 +970,12 @@ export function payStop (o, st, onTime, tier) {
   const zone = st.zone || sp.zone;
   markUsed(st.key);
   st.done = true;                                         // отдали: пины карты и накладная в паузе
+  if (sp.type !== 'staff' && !o.tut) SKILL.stop(onTime, !!st.bumped, !!sp.bundle);   // умение курьера: вовремя и чисто — растёт, опоздал — падает (skill.js)
   SH.done += o.idx === o.stops.length - 1 ? 1 : 0;
   if (st.far) SH.far += onTime ? st.far : Math.round(st.far * PAY.LATE);   // «весь город»: премия за дальние за смену (итоги)
+  TEL.count(onTime ? 'ontime' : 'late');                 // анонимная статистика: вовремя / опоздал (telemetry.js)
+  if (!onTime && st.x !== undefined) TEL.heat('late', st.x, st.z, { type: sp.type || '' });   // опоздал сюда — тепловая карта
+  TEL.first('delivery1', { late: onTime ? 0 : 1 });       // воронка новичка: первая доставка
   if (!onTime) {
     const gop = DOOR.stairsAdjust(st, fee, 0, 0).gop;     // откупился от гопников в подъезде, а всё равно опоздал — «чаевые» им уже отданы
     st.pay = { fee, bonus: 0, tip: 0, late: true, story: !!sp.story, stairsGop: gop };
@@ -898,7 +985,7 @@ export function payStop (o, st, onTime, tier) {
   const lunch = S.lunch === 'tips';
   const pc = DIST.pace();
   const gTip = st.x !== undefined ? GROW.tipAdd(st.x, st.z) : GROW.tipAdd();   // ступень пиццерии (econ.js GROWTH.TIP)
-  let tip = ECON.tipFor(fee, zone, { lunch, clean: A.donated('trash'), extra: (pc.tipChance || 0) + gTip, mul: pc.tipMul || 1 }), rich = zone === 'rich' && tip > 0;
+  let tip = ECON.tipFor(fee, zone, { lunch, clean: A.donated('trash'), extra: (pc.tipChance || 0) + gTip + HOL.tipChance(), mul: (pc.tipMul || 1) * HOL.tipMul() }), rich = zone === 'rich' && tip > 0;   // праздник — щедрее (holidays.js)
   // богач рядом (LIFE.richTip) — клиент считается как из особняков: чаевые по-богатому
   if (!tip && zone !== 'rich' && A.LIFE && A.LIFE.richTip(st.peds, fee)) {
     const [a, b] = TIPS.RICH_AMOUNT;
@@ -953,35 +1040,41 @@ export function delivered (o, st, onTime) {
     if (!S.ride && per && ped && !ped.dead && offerSide(ped, per, sp.face.side)) {
       sp.faceAsked = true;
       errandDone();                                       // в счёт поручений (таймер — заново, ритм видит просьбу)
-      FACES.asked(sp.stops && sp.stops[0]);
+      if (sp.face.local) LOCALS.asked(sp.face, sp.stops && sp.stops[0]); else FACES.asked(sp.stops && sp.stops[0]);
       return;
     }
-    ERR.miss.push('Глеб: нет товарища рядом'); if (ERR.miss.length > 30) ERR.miss.shift();
+    ERR.miss.push(sp.face.local ? sp.face.name + ': нет магазина или человека рядом' : 'Глеб: нет товарища рядом'); if (ERR.miss.length > 30) ERR.miss.shift();
+    if (sp.face.local) LOCALS.missed(sp.face);            // житель Юга: не вышло дважды — история дальше без поручения
   }
   if (ERR.due) {
-    const no = sp.story ? 'сюжет' : sp.fest ? 'фестиваль' : S.ride ? 'покататься' : st.talk ? 'разговор у двери'
+    const no = sp.story ? 'сюжет' : sp.fest ? 'фестиваль' : S.ride ? 'покататься' : st.talk ? 'разговор у двери' : st.odd && st.odd !== 'shout' ? 'сценка у двери'
       : !(st.persons[0] && st.peds[0] && !st.peds[0].dead) ? 'нет клиента' : !DIRECTOR.can('errand') ? 'режиссёр' : !offerSide(st.peds[0], st.persons[0]) ? 'нет магазина' : '';
     if (no) { ERR.miss.push(no); if (ERR.miss.length > 30) ERR.miss.shift(); } else errandDone();
   }
 }
 
 /* ─────────────── поручения ───────────────
-   Когда: таймер настоящего времени (econ.js ERRAND) со 2-й смены сессии (DIRECTOR.sessionShifts):
+   Когда: таймер настоящего времени (econ.js ERRAND) с FROM_SHIFT-й смены сессии (DIRECTOR.sessionShifts; с 17.10.2026 — с 1-й,
+   но не в первой смене новичка, FROM_DONE):
    первое — через FIRST с, дальше — каждые EVERY ± JITTER с. Секунды идут только в кадре смены
-   (game.js не зовёт ORD.step на паузе, в диалоге и катсцене), остаток переходит в следующую смену. */
+   (game.js не зовёт ORD.step на паузе и в катсцене; окно разговора мир не стоит — тут ждём, пока закроют), остаток переходит в следующую смену. */
 const ERR = { left: null, due: false, clock: 0, log: [], miss: [] };   // log — когда просили (с), miss — почему не попросили (отладка)
 const LIVE_ST = ['drive', 'back', 'handover', 'brief', 'loading', 'side'];
 function errandStep (dt) {
+  if (DLG.isOpen()) return;                               // идёт разговор — часы просьб стоят (просьба поверх просьбы не нужна)
   ERR.clock += dt;
   if (ERR.due || S.ride || S.state === 'side' || !LIVE_ST.includes(S.state)) return;
   if (!CAR || typeof CAR.shiftOn !== 'function' || !CAR.shiftOn()) return;
   if (!(DIRECTOR.sessionShifts && DIRECTOR.sessionShifts() >= ECON.ERRAND.FROM_SHIFT)) return;
+  if ((+A.Store.get('dlv-shifts', 0) || 0) < (ECON.ERRAND.FROM_DONE || 0)) return;   // первая смена новичка — без поручений
   if (ERR.left === null) { ERR.left = rand(ECON.ERRAND.FIRST[0], ECON.ERRAND.FIRST[1]); return; }
   if ((ERR.left -= dt) <= 0) ERR.due = true;
 }
 function errandDone () {
   ERR.due = false;
-  ERR.left = ECON.ERRAND.EVERY + rand(-ECON.ERRAND.JITTER, ECON.ERRAND.JITTER);
+  // что нравится игроку (likes.js): отказывал от всех — таймер до ×LIKES.SLOW (просьба не реже ~раза в 7—10 мин), всё нравится — чаще
+  ERR.k = LIKES.slow('err');
+  ERR.left = (ECON.ERRAND.EVERY + rand(-ECON.ERRAND.JITTER, ECON.ERRAND.JITTER)) * ERR.k;
   ERR.log.push(Math.round(ERR.clock));
 }
 function sideOpts (ped, only) {
@@ -989,22 +1082,30 @@ function sideOpts (ped, only) {
   // face — поручение знакомого лица (Глеб, faces.js): только когда просят именно его (only)
   return SIDE_ORDERS.filter(s => (!s.adult || A.ADULT) && (!s.kids || !A.ADULT) && (!s.sex || f === null || (s.sex === 'f') === f) && (!s.face || s.id === only))
     // giver — забрать у человека у подъезда (errands.js giverSpot), иначе — магазин рядом
-    .map(s => ({ s, shop: s.giver ? (A.errandGiver ? A.errandGiver(s, ped) : null) : A.errandShop({ kinds: s.shop.kinds || [], prefer: s.shop.prefer || /$^/, anyKind: !!s.shop.anyKind }, ped) }))
+    .map(s => ({ s, shop: s.giver ? (A.errandGiver ? A.errandGiver(s, ped) : null) : A.errandShop({ kinds: s.shop.kinds || [], prefer: s.shop.prefer || /$^/, anyKind: !!s.shop.anyKind, loose: s.shop.loose, not: s.shop.not, show: s.shop.show }, ped) }))
     .filter(o => o.shop);
 }
 function offerSide (ped, person, only) {
   const opts = sideOpts(ped, only).filter(o => !only || o.s.id === only);
   if (!opts.length) return false;
-  const { s, shop } = pick(opts);
-  S.handT = 1e9;                                          // пока думаешь — дальше не едем
+  // не подряд одно и то же (автор 16.10.2026): прошлое поручение — только если другого рядом нет
+  const fresh = opts.length > 1 ? opts.filter(o => o.s.id !== ERR.lastId) : opts;
+  // что нравится игроку (likes.js): вид, от которого отказывался, — реже (вес 0,2…1,5)
+  const { s, shop } = LIKES.pick('err', fresh.length ? fresh : opts, o => o.s.id);
+  ERR.lastId = s.id;
+  S.handT = 1e9;                                         // пока думаешь — дальше не едем
   ped.freeT = 1e9;
   const pay = rint(s.pay || ORDERS.SIDE_PAY);
   const what = t(s.what);
   DLG.say({
-    person, name: person.first || person.name.split(/\s+/)[0], text: t(s.ask) + ' (+' + A.money(pay) + ')',
+    // сумма — отдельной строкой под портретом (автор 12.10.2026); таймера на ответ нет — пока думаешь, мир идёт (16.10.2026)
+    person, name: person.first || person.name.split(/\s+/)[0], text: t(s.ask), head: t('поручение'),
+    pay: '+' + A.money(pay), payLabel: t('заплатит'),
     accept: t(s.accept), decline: t(s.decline), mood: s.mood || 'calm', color: typeColor('side'),
-    timer: s.timer || 8, timeoutText: t(s.timeout || N_('ну лан ((')),
   }).then(r => {
+    // ответ игрока — в вес вида (likes.js): «да» — чаще, «нет» — реже; закрыли без ответа (смена кончилась) — не в счёт
+    if (!s.face) { if (r === true) LIKES.yes('err', s.id); else if (r === false) LIKES.no('err', s.id); }
+    TEL.ev('errand', { id: s.id, r: r === true ? 1 : r === false ? 0 : -1 });
     if (r === true && S.state === 'handover' && !ped.dead) A.startSide(ped, person, shop, { id: s.id, ask: what, what, gotIt: s.giver ? t('забрал: {what}', { what }) : t('купил: {what}', { what }), pay, bag: s.bag, side: true, spec: s });
     else A.declineSide(ped);
   });
@@ -1064,6 +1165,8 @@ export function bagMesh (bag = {}) {
    маршрут назад (зелёный); вернулся — game.js (handover без заказа) → career.atBase → staffHere() — диалог.
    Не вернулся за STAFF_WAIT с — ушли пешком (false), смена кончается. */
 const STAFF = { p: null, res: null, crew: null, board: null, drops: [], pay: 0, wait: false, waitT: 0 };
+/* на часах полночь и пиццерия закрывается (не круглосуточная) — можно сказать «полночь» */
+const staffMidnight = () => { try { return !!(CAR && CAR.midnightNow && CAR.midnightNow()); } catch (e) { return false; } };
 const STAFF_WAIT = 150;
 export function staffRide () {
   if (!A) return Promise.resolve(false);
@@ -1079,7 +1182,9 @@ export function staffRide () {
     if (S.side) { if (!S.side.ped.dead) S.side.ped.freeT = 3; S.side = null; }
     A.hidePhone(); A.clearGate();
     if (A.backToBase) A.backToBase();
-    A.toast(t('полночь — заедь в пиццерию: смену надо развезти'));
+    // «полночь» — только если на часах полночь: в круглосуточной смена кончается в любой час (daytime.js)
+    A.toast(t(DAYT.fresh('staffCall', staffMidnight() ? [N_('полночь — заедь в пиццерию: смену надо развезти'), N_('полночь — ребята ждут в пиццерии, их надо развезти по домам')]
+      : [N_('смена всё — заедь в пиццерию: ребят надо развезти по домам'), N_('конец смены — в пиццерии ждут, их надо развезти по домам')])));
   }
   return STAFF.p;
 }
@@ -1088,7 +1193,8 @@ function staffAsk () {
   STAFF.wait = false;
   S.handT = 1e9;                                          // пока спрашивают — следующий заказ не берём
   DLG.say({
-    person: crew[0], name: crew[0].first + ' · ' + t('пиццерия'), text: t(STAFF_RIDE.ask),
+    person: crew[0], name: crew[0].first + ' · ' + t('пиццерия'), head: t('развоз смены'),
+    text: t(DAYT.fresh('staffAsk', (STAFF_RIDE.asks || [STAFF_RIDE.ask]).concat(staffMidnight() ? STAFF_RIDE.asksMidnight || [] : CAR && CAR.allDay && CAR.allDay() ? STAFF_RIDE.asksDay || [] : []))),
     accept: t(STAFF_RIDE.accept), decline: t(STAFF_RIDE.decline), mood: 'shy', color: typeColor('staff'),
   }).then(r => { if (r === true && STAFF.crew === crew) beginStaff(crew); else staffDone(false); });
 }
@@ -1101,11 +1207,17 @@ export function staffHere () {
   return true;
 }
 /* смена оборвалась (снялся, новая смена): развоз снимаем, обещание — false */
-function staffAbort () {
+function staffAbort (r = false) {
   if (!STAFF.p) return;
   if (STAFF.board) for (const p of STAFF.board.peds) { A.clearGuest(p); if (!p.dead) { A.rehuman(p); A.walkSpawn(p, 150, 400); } }
   if (S.order && S.order.ord && S.order.ord.type === 'staff') { S.order = null; S.target = null; }
-  staffDone(false);
+  staffDone(r);
+}
+/* развоз взяли — он последнее дело смены (автор 12.10.2026: «после развоза поехал за заказом — непонятно»):
+   кончился как угодно (всех развёз или не успел) — смена закрывается, новых заказов нет. В полночь это делает
+   career.js сам (ждёт обещание staffRide); посреди смены (песочница) — CAR.staffOver */
+function staffOver (r) {
+  try { if (CAR && typeof CAR.staffOver === 'function') CAR.staffOver(r); } catch (e) { console.warn('[orders] staffOver', e); }
 }
 function staffDone (r) {
   const res = STAFF.res;
@@ -1184,7 +1296,7 @@ function staffArrive (o, st) {
     p.x = V.x + Math.cos(V.h) * 1.9; p.z = V.z - Math.sin(V.h) * 1.9;
     A.pushOut(p, 0.5);
     A.makeGuest(p, { x: st.at.x, z: st.at.z });
-    const b = A.sayBubble(p.grp, line, '#8a6a00', 2.7);
+    const b = A.sayBubble(p.grp, line, '#8a6a00', 2.7, 1);
     STAFF.drops.push({ p, b, t: 7 });
   }
   A.toast(line + ' · +' + A.money(pay));
@@ -1199,10 +1311,13 @@ function staffArrive (o, st) {
   A.popBonus(t('развёз смену!'), t('+{money} · +{n} ★', { money: A.money(STAFF.pay), n: stars }));
   const n = o.stops.filter(s => !s.pickup).length, total = STAFF.pay;
   S.order = null; S.target = null;
-  // в полночь career.js сразу закрывает смену; если развоз позвали посреди смены (песочница) — следующий заказ
-  S.state = 'handover'; S.handT = 0.8;
+  // развоз — последнее в смене: следующего заказа не будет, смену закрывает career.js (в полночь — сам, посреди смены — staffOver)
+  const car = !!(CAR && typeof CAR.shiftOn === 'function' && CAR.shiftOn());
+  S.state = 'handover'; S.handT = car ? 1e9 : 0.8;
   A.rebuildRoutePath();
-  staffDone({ ok: true, people: n, pay: total, stars });
+  const r = { ok: true, people: n, pay: total, stars };
+  staffDone(r);
+  if (car) staffOver(r);
 }
 
 /* ─────────────── каждый кадр ─────────────── */
@@ -1210,6 +1325,7 @@ let urgOn = null;
 export function step (dt) {
   if (!A) return;
   if (window.__dlv && !window.__dlv.ORD) window.__dlv.ORD = DEBUG;
+  if (window.__dlv && !window.__dlv.SKILL) window.__dlv.SKILL = SKILL.DEBUG;   // умение курьера (skill.js)
   errandStep(dt);
   // посадка работников: дошёл до машины — пропал (в машине)
   const B = STAFF.board;
@@ -1247,7 +1363,10 @@ export function step (dt) {
   // развоз не успел: работники выходят и идут пешком — обещание false, career.js закрывает смену
   if (STAFF.p && S.order && S.order.ord && S.order.ord.type === 'staff' && S.time < 0 && ['drive', 'loading'].includes(S.state)) {
     A.toast(t('не успел развезти — дальше они пешком'));
-    staffAbort();
+    // и смена всё: взял развоз — новых заказов нет (раньше после этого машина оставалась «в пути» без заказа и смена висела)
+    const r = { ok: false, pay: STAFF.pay };
+    staffAbort(r);
+    staffOver(r);
   }
   // смена оборвалась посреди развоза
   if (STAFF.p && STAFF.crew && (S.state === 'over' || S.state === 'title' || S.state === 'dying') && !(S.order && S.order.ord && S.order.ord.type === 'staff')) staffDone(false);
@@ -1330,7 +1449,7 @@ export function activeStops () {
   for (let i = o.idx; i < o.stops.length; i++) {
     const st = o.stops[i], p = stopAt(st);
     if (!p || st.pickup) continue;
-    out.push({ x: p.x, z: p.z, color: col, current: i === o.idx, name: st.persons && st.persons[0] ? st.persons[0].name : '', addr: st.addr || '' });
+    out.push({ x: p.x, z: p.z, color: col, current: i === o.idx, name: st.persons && st.persons[0] ? NICK.label(st.persons[0]) : '', addr: st.addr || '' });
   }
   return out;
 }
@@ -1449,7 +1568,7 @@ export function forceSide (id) {
    каждый «доставлен» (адрес — в dlv-used-addr). life — номер первого заказа за всё время
    (по умолчанию — настоящий), told — сколько пицц директор уже объявил (по умолчанию —
    из сохранения); сохранение счётчиков не трогает. Возвращает журнал. */
-function simShift (n = 10, h0 = 9, h1 = 23.5, life = null, told = null, arc = false) {
+function simShift (n = 10, h0 = 9, h1 = 23.5, life = null, told = null, arc = false, each = null) {   // each(row) → умение для следующего заказа (skill.js, прогон «идеальный / плохой игрок»)
   SIM_ARC = arc ? { n, peak: false } : null;                // arc — с дугой ритма смены (роль заказа по номеру)
   LIFE_OVERRIDE = life !== null ? life : lifeN();
   SIM_TOLD = told !== null ? told : +A.Store.get('dlv-boss', 0) || 0;
@@ -1463,23 +1582,34 @@ function simShift (n = 10, h0 = 9, h1 = 23.5, life = null, told = null, arc = fa
     for (const st of sp.stops) markUsed(st.key);
     SH.done++;
     const lvl = { urgent: !!sp.urgent, edge: !!sp.edge, level: A.level() };
-    out.push({ n: sp.n, life: LIFE_OVERRIDE, h: +HOUR_OVERRIDE.toFixed(1), type: sp.type, kind: sp.kind, vk: visKind(sp), beach: !!sp.beach, easy: !!sp.easy, zone: sp.zone, stops: sp.stops.length, edge: !!sp.edge, urgent: !!sp.urgent, side: !!sp.side, forced: sp.forced, m: sp.m, keys: sp.stops.map(s => s.key),
+    out.push({ n: sp.n, life: LIFE_OVERRIDE, h: +HOUR_OVERRIDE.toFixed(1), type: sp.type, kind: sp.kind, vk: visKind(sp), beach: !!sp.beach, easy: !!sp.easy, zone: sp.zone, stops: sp.stops.length, edge: !!sp.edge, urgent: !!sp.urgent, side: !!sp.side, forced: sp.forced, m: sp.m, keys: sp.stops.map(s => s.key), short: sp.short || 0,
       boss: sp.bundle ? sp.bundle.boss : null, fee: sp.stops.reduce((a, st, k) => a + ECON.orderPay(sp.m[k] || 0, st.zone, lvl), 0),
       far: DIST.has() && DIST.city() ? sp.m.map(ECON.cityFar) : null,
-      ...(SIM_ARC ? { role: sp.role, rimPick: !!sp.rimPick, away: Math.round(DIST.away(sp.stops[0].x, sp.stops[0].z)), rim: +DIST.rim(sp.stops[0].x, sp.stops[0].z).toFixed(2) } : {}) });
+      ...(SIM_ARC ? { role: sp.role, rimPick: !!sp.rimPick, away: Math.round(DIST.away(sp.stops[0].x, sp.stops[0].z)), rim: +DIST.rim(sp.stops[0].x, sp.stops[0].z).toFixed(2) } : {}),
+      ...simTime(sp, i) });
+    if (each) { const u = each(out[out.length - 1]); if (Number.isFinite(u)) SKILL.DEBUG.sim(u); }
     if (sp.bundle && sp.bundle.boss) SIM_TOLD = Math.max(SIM_TOLD, Math.abs(sp.bundle.boss));
     LIFE_OVERRIDE += sp.bundle ? sp.stops.length : 1;
   }
   LIFE_OVERRIDE = null; HOUR_OVERRIDE = null; SIM = false; SIM_ARC = null;
+  if (each) SKILL.DEBUG.sim(null);
   dropQueue();
   SH.last = 0;
   return out;
+}
+/* прогон: умение, напряжение с потолком умения, срок (как в setup, без волны) и запас «срок / (путь / 19 м/с)» */
+function simTime (sp, i) {
+  const L = sp.m.reduce((a, b) => a + b, 0), n = sp.stops.length;
+  const t0 = sp.urgent ? (DIST.has() ? Math.max(ECON.URGENT.MIN_T, (sp.m[0] || 0) / ECON.URGENT.V + ECON.URGENT.ADD) : A.orderTime(L, 1, 1) * PAY.URGENT_TIME)
+    : sp.bundle ? bundleTime(L, n, sp.bundle.time || 1) : A.orderTime(L, 1, i + 1);
+  const tm = SKILL.time(t0, L, n, !!sp.urgent);
+  return { u: SKILL.cur(), tk: sp.tk === undefined ? -1 : +sp.tk.toFixed(2), tm: Math.round(tm), slack: L > 0 ? +(tm / (L / RUN_V)).toFixed(2) : 0 };
 }
 /** «весь город»: премия за дальние, заработанная за эту смену (итоги смены, career.js) */
 export const farEarned = () => SH.far || 0;
 export const DEBUG = {
   farEarned, Q, SH, get POOL () { return POOL; }, get USED () { return USED; }, STAFF, ARRIVE, simShift, resetShift, genSpec, pickSpot, staffRide, bagMesh,
   get CAR () { return CAR; }, get STORY () { return STORY; }, hourNow, offerSide, sideOpts, force, forceSide, nextPlan, card, onArrive,
-  lifeN, bundleSpec, activeStops, pickStop, reachStop, ERR,
+  lifeN, bundleSpec, activeStops, pickStop, reachStop, ERR, MIX: MIX.DEBUG,
   clearUsed () { USED = []; reindex(); A.Store.set(USED_KEY, USED); },
 };

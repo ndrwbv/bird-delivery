@@ -36,7 +36,8 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { snowAmt, seasonValue, heatAmt } from './seasons.js';
 import * as GFX from './gfx.js';
-import { onPave, walkHalf } from './pave.js';
+import { onPave, walkHalf, roadGap } from './pave.js';
+const LAWN_EXTRA = s => (s.c > 5 ? 0.8 : 1.0);
 import { wet } from './streams.js';             // речки и пруды — не газон (streams.js)
 import * as FADEJS from './fade.js';
 import * as EDL from './editlayer.js';          // редактор города: убранная мелочь (edits.json, вид lawn; ключ — место вещи)
@@ -168,10 +169,32 @@ function inPolys (G, x, z) {
   for (const b of near(G, LAWN.CELL, x, z) || []) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1 && inP(x, z, b.p)) return true;
   return false;
 }
-let CLAIMS = null;
+/* занятые места (стройки, костры, точки конкурентов) — по сетке CLG м (18.10.2026: раньше каждая проба места шла по всему
+   списку с Math.hypot — сборка клетки газона на телефоне давала рывки до 10—17 мс и ~75 МБ мусора за 2 мин езды) */
+let CLAIMS = null, CL_GRID = null;
+const CLG = 32, CL_M = 8;                          // CL_M — запас под отступ m (в spot до 5 м)
 function claimed (x, z, m) {
-  if (!CLAIMS) CLAIMS = A.claims() || [];
-  for (const c of CLAIMS) if (Math.hypot(c.x - x, c.z - z) < c.r + m) return true;
+  if (!CLAIMS) {
+    CLAIMS = A.claims() || [];
+    CL_GRID = new Map();
+    for (const c of CLAIMS) {
+      const r = c.r + CL_M;
+      for (let i = Math.floor((c.x - r) / CLG); i <= Math.floor((c.x + r) / CLG); i++)
+        for (let j = Math.floor((c.z - r) / CLG); j <= Math.floor((c.z + r) / CLG); j++) {
+          const k = key(i, j);
+          let a = CL_GRID.get(k);
+          if (!a) CL_GRID.set(k, a = []);
+          a.push(c);
+        }
+    }
+  }
+  const a = CL_GRID.get(key(Math.floor(x / CLG), Math.floor(z / CLG)));
+  if (!a) return false;
+  for (let q = 0; q < a.length; q++) {
+    const c = a[q], dx = c.x - x, dz = c.z - z, rr = c.r + m;
+    if (m <= CL_M ? dx * dx + dz * dz < rr * rr : Math.sqrt(dx * dx + dz * dz) < rr) return true;
+  }
+  if (m > CL_M) for (const c of CLAIMS) if (Math.sqrt((c.x - x) ** 2 + (c.z - z) ** 2) < c.r + m) return true;   // большой отступ — по всему списку, как было
   return false;
 }
 
@@ -181,9 +204,10 @@ function spot (x, z, m = 0) {
   const y = A.groundH(x, z);
   if (y < 0.3) return null;
   if (A.inHouse(x, z, 1.2 + m)) return null;
+  // до края каждой дороги рядом, не до ближайшей осевой (pave.js roadGap, как construction.js): у пешеходки запас 0,8 м, у остальных — 1 м
+  if (roadGap(x, z, LAWN_EXTRA) < m) return null;
   const nr = A.nearestRoad(x, z, 9, 1);
-  let edge = 99;
-  if (nr) { edge = nr.d - nr.seg.w / 2; if (edge < (nr.seg.c > 5 ? 0.8 : 1.0) + m) return null; }
+  const edge = Math.min(nr ? nr.d - nr.seg.w / 2 : 99, roadGap(x, z));
   if (onPath(x, z, 1.1 + m) || A.onAlley(x, z, 0.8 + m) || A.yardBlocks(x, z, 0.8 + m) || A.pzBlocks(x, z, 1 + m)) return null;
   if (inPolys(POLYS, x, z) || claimed(x, z, 4 + m)) return null;
   if (onPave(x, z, 0.3 + m)) return null;              // тротуары, пешеходки, дорожки, аллеи (pave.js)
@@ -479,8 +503,8 @@ function * buildCell (i, j) {
       }
       if (late()) yield;
     }
-  // 2) оградки вдоль улиц, со стороны газона
-  rails(cell, inCell);
+  // 2) оградки вдоль улиц, со стороны газона (18.10.2026: кусками — целиком это 4—10 мс за раз на телефоне)
+  yield * rails(cell, inCell);
   if (late()) yield;
   // 3) мусор у баков
   for (const c of A.cans || []) {
@@ -605,7 +629,7 @@ const free = (taken, x, z, r) => taken.every(t => Math.hypot(t[0] - x, t[1] - z)
 function gridHot (x, z) { gridPut(HOT, 20, x, z, x, z, [x, z]); }
 
 /* оградки: у улиц (и редких дворовых проездов) с одной стороны, кусками по 2,44 м */
-function rails (cell, inCell) {
+function * rails (cell, inCell) {
   const seen = new Set(), C = A.CITY.roads;
   for (const [ri, si] of ROADS.get(key(cell.i, cell.j)) || []) {
     const id = ri * 4096 + si;
@@ -620,6 +644,7 @@ function rails (cell, inCell) {
       const ux = (bx - ax) / len, uz = (bz - az) / len, nx = -uz * sd, nz = ux * sd, off = walkHalf({ w: A.roadWidth(rd), c: rd.c, g: rd.g }) + 0.5;   // за тротуаром, по краю газона
       const ry = Math.atan2(-uz, ux);
       for (let d = 7; d + 2.44 < len - 7; d += 2.44) {
+        if (late()) yield;
         // у края газона, сразу за тротуаром (или чуть дальше, если там занято)
         let x = 0, z = 0, sp = null;
         for (const o of [off, off + 1.2, off + 2.4]) {
@@ -843,8 +868,9 @@ function knock (c, it, nx, nz, force, quiet) {
   if (!quiet && A.Snd) A.Snd.fx('smash', s => s.noise(0.15, it.kind === 'sand' || it.kind === 'trash' ? 0.12 : 0.2), null, it.kind === 'sand' || it.kind === 'trash' ? 0.6 : 1);
 }
 
-/* машина: сносит мелочь быстрее 9 км/ч (game.js — рядом с дворовой мелочью). → во сколько скорость */
-export function car (noseX, noseZ, tailX, tailZ, rc, vf, vx, vz) {
+/* машина: сносит мелочь быстрее 9 км/ч (game.js — рядом с дворовой мелочью). → во сколько скорость.
+   bump(kind) — game.js: столбы (выбивалка, бельевой) тормозят и уводят сами (carbump.js), тогда true */
+export function car (noseX, noseZ, tailX, tailZ, rc, vf, vx, vz, bump) {
   if (!A || Math.abs(vf) <= LAWN.SLOW) return 1;
   let k = 1;
   const l = Math.hypot(vx, vz) || 1;
@@ -855,7 +881,7 @@ export function car (noseX, noseZ, tailX, tailZ, rc, vf, vx, vz) {
       for (const [px, pz, pr] of it.pts) {
         if (Math.hypot(px - noseX, pz - noseZ) < pr + rc || Math.hypot(px - tailX, pz - tailZ) < pr + rc) {
           knock(c, it, vx / l, vz / l, Math.abs(vf));
-          k *= it.slow || 0.96;
+          if (!(bump && bump(it.kind))) k *= it.slow || 0.96;
           break;
         }
       }
@@ -897,6 +923,29 @@ export function withSolids (list, x, z) {
       }
     }
   return S_LIST.length ? list.concat(S_LIST) : list;
+}
+
+/* ── жизнь во дворах (yardlife.js) ── */
+/* стоит ли крупная вещь газона (ракушка, бельё, выбивалка, песок, покрышки, оградка, мусор у баков) ближе r к точке */
+export function busy (x, z, r) {
+  if (!A) return false;
+  const C = LAWN.CELL, R = r + 4;
+  for (let i = Math.floor((x - R) / C); i <= Math.floor((x + R) / C); i++)
+    for (let j = Math.floor((z - R) / C); j <= Math.floor((z + R) / C); j++) {
+      const c = CELLS.get(key(i, j));
+      if (!c) continue;
+      for (const it of c.items) {
+        if (it.down || it.ed) continue;
+        const ex = it.kind === 'garage' ? 3.2 : (it.pts[0][2] || 0) + 1.5;      // ракушка 5,4 м длиной — от середины
+        for (const q of it.pts) if (Math.abs(q[0] - x) < R + ex && Math.abs(q[1] - z) < R + ex && Math.hypot(q[0] - x, q[1] - z) < r + ex) return true;
+      }
+    }
+  return false;
+}
+/* вещи вида kind ближе R к точке (стоят, не сбиты): fn(it) — у it есть x, z */
+export function itemsNear (kind, x, z, R, fn) {
+  if (!A) return;
+  cellsNear(x, z, R, c => { for (const it of c.items) if (it.kind === kind && !it.down && !it.ed && Math.hypot(it.x - x, it.z - z) < R) fn(it); });
 }
 
 /* ── редактор города (editlayer.js): что стоит у точки; список «убрать» поменялся — пометить заново ── */

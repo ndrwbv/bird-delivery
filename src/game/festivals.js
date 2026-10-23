@@ -17,11 +17,11 @@
      часть заказов — «вместо бургера», оплата × FEST.BURGER_K.
 
      FEST.init(api)          — один раз после города (game.js)
-     FEST.shiftStart(o)      — начало смены: решить, будет ли фестиваль; o: { ride, quick }
+     FEST.shiftStart(o)      — начало смены: решить, будет ли фестиваль; o: { ride, quick, holiday } (в праздник — нет)
      FEST.step(dt)           — каждый кадр
    для orders.js:
      FEST.near()             — { x, z, r } — заказы рядом с фестивалем (кальянщики) или null
-     FEST.passSpec(n)        — n-й заказ смены: на сам фестиваль? → { x, z, addr, why } или null
+     FEST.passSpec(n)        — n-й заказ смены: на сам фестиваль (кальянщики, митинг бургеров)? → { x, z, addr, why, burger? } или null
      FEST.burgerRoll()       — этот заказ «вместо бургера»? → множитель оплаты или 0
    api: THREE, scene, V, S, CITY, ADULT, Store, obb, SOLIDS, indexSolids, NODES, TRAFFIC,
         put, mergeGeos, groundH, inHouse, inPoly, nearestRoad, solidAt, makeHuman, makePerson,
@@ -47,6 +47,7 @@ export const FEST = {
   PASS_SHARE: 0.35,      // кальянщики: доля заказов (после первого) ровно на фестиваль
   BURGER_SHARE: 0.4,     // День угнетения бургеров: доля заказов «вместо бургера»
   BURGER_K: 1.5,         // их оплата ×
+  BURGER_PASS: 0.25,     // День угнетения бургеров: доля заказов (после первого) прямо на митинг, к проходу
   MASCOT_PAY: 100,       // премия за маскота (× MONEY_K в карьере — 800 ₽)
   MASCOT_MAX: 3,         // премий за смену не больше
   MASCOT_BACK: 25,       // новый маскот через, с (взрослая)
@@ -223,6 +224,7 @@ export function shiftStart (o = {}) {
   ST.forced = null;
   if (o.ride || o.quick) { stop(); return; }
   if (want) { start(want.kind, want.site); return; }
+  if (o.holiday) { stop(); return; }              // праздничная смена (holidays.js) — без фестиваля
   if (!DIRECTOR.can('fest')) { stop(); return; }   // режиссёр: не в первую смену сессии и не вместе с ураганом
   const shifts = +A.Store.get('dlv-shifts', 0) || 0, sv = load(), choices = siteChoices();
   const kind = decide(shifts, sv, choices.length);
@@ -912,8 +914,8 @@ export function announce () {
       : [t('сегодня у ТЦ «{mall}» фестиваль самоваров, Стёпа на сцене. все заказы — туда и рядом, отдаёшь у прохода', { mall: m })],
     pumpkin: [t('у ТЦ «{mall}» фестиваль тыквы — тыквы размером с твою машину. проезд по дорожке вдоль блоков', { mall: m })],
     burger: A.ADULT
-      ? [t('сегодня День угнетения бургеров! у ТЦ «{mall}» митинг против «Королевы Бургеров». кто берёт пиццу вместо бургера — платит больше. увидишь ихнего маскота — сам знаешь, что делать)', { mall: m })]
-      : [t('сегодня День угнетения бургеров! у ТЦ «{mall}» митинг против «Королевы Бургеров». кто берёт пиццу вместо бургера — платит больше. увидишь маскота — толкни его, он мягкий)', { mall: m })],
+      ? [t('сегодня День угнетения бургеров! у ТЦ «{mall}» митинг против «Королевы Бургеров». первый заказ — прямо туда, отдаёшь у прохода. кто берёт пиццу вместо бургера — платит больше. увидишь ихнего маскота — сам знаешь, что делать)', { mall: m })]
+      : [t('сегодня День угнетения бургеров! у ТЦ «{mall}» митинг против «Королевы Бургеров». первый заказ — прямо туда, отдаёшь у прохода. кто берёт пиццу вместо бургера — платит больше. увидишь маскота — толкни его, он мягкий)', { mall: m })],
   };
   const id = F;
   setTimeout(() => { if (F === id && A.chat) A.chat(lines[k][0]); }, 2500);
@@ -926,18 +928,23 @@ export function near () {
   const c = F.L.w(0, F.L.D / 2);
   return { x: c.x, z: c.z, r: FEST.NEAR_R };
 }
-/* n — сколько заказов смены уже собрано (0 — первый). Первый — всегда на фестиваль */
+/* n — сколько заказов смены уже собрано (0 — первый). Первый — всегда на фестиваль.
+   День угнетения бургеров (автор 12.10.2026: «менеджер говорит — там митинг, а заказ не туда ведёт, и я его не увидел»):
+   первый заказ — тоже на митинг, к проходу, и он «вместо бургера»; дальше — доля FEST.BURGER_PASS */
 export function passSpec (n) {
-  if (!F || F.kind !== 'hookah') return null;
-  if (n > 0 && Math.random() >= FEST.PASS_SHARE) return null;
+  if (!F || (F.kind !== 'hookah' && F.kind !== 'burger')) return null;
+  const burger = F.kind === 'burger';
+  if (n > 0 && Math.random() >= (burger ? FEST.BURGER_PASS : FEST.PASS_SHARE)) return null;
   if (F.lastPass === n - 1 && F.passRow >= 2) { F.passRow = 0; return null; }   // не больше двух подряд
   F.passRow = F.lastPass === n - 1 ? (F.passRow || 1) + 1 : 1;
   F.lastPass = n;
   const p = F.L.w(F.L.aPass, 0.35);
   return {
     x: p.x, z: p.z,
-    addr: t('{fest} · парковка ТЦ «{mall}», проход', { fest: nameOf('hookah'), mall: F.site.mall }),
-    why: t('{fest}: отдать у прохода, внутрь не проехать', { fest: nameOf('hookah') }),
+    addr: t('{fest} · парковка ТЦ «{mall}», проход', { fest: nameOf(F.kind), mall: F.site.mall }),
+    why: burger ? t('митинг против бургеров: отдать у прохода, внутрь не проехать')
+      : t('{fest}: отдать у прохода, внутрь не проехать', { fest: nameOf('hookah') }),
+    ...(burger ? { burger: FEST.BURGER_K } : {}),     // заказ на митинг — «вместо бургера», оплата ×BURGER_K
   };
 }
 export function burgerRoll () {

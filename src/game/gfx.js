@@ -18,6 +18,11 @@
      aa      нет               сглаживание    сглаживание   (MSAA ×4 на маленьком кадре —
              края и огни вдали не рябят; меняется после перезапуска игры)
 
+   Отдельно от пресета — «тяжёлый кадр» (dynres.js): видеокарта не успевает — на миг
+   меньшее разрешение, «мыло вместо рывка». По умолчанию выкл везде (автор 18.10.2026: «что за блюр?»).
+   Вместо него — «тяжёлое место» (tune.js, вкл везде, без пункта): кадр не успевает — ненадолго и плавно ближе
+   туман, люди и машины вдали, комнаты за окнами, мелочь газона (viewR, detail, lag ниже), потом обратно.
+
    Правило: графика не меняет игру. Пресет трогает только то, что видно и что
    далеко: сколько машин и людей, где они рождаются, кто клиент, физика —
    одинаково. «Вдали» — дальше LAG_R от машины игрока: там прохожие и так не
@@ -39,6 +44,7 @@ import Platform from '../platform/index.js';
 import * as CULL from './cull.js';
 import * as WINS from './windows.js';
 import { ON as MOBILE } from './mobile.js';
+import * as TUNE from './tune.js';
 
 export const KEY = 'dlv-gfx';
 const BASE_FAR = 490;
@@ -128,13 +134,47 @@ export const winQ = () => (val('win') ? { interior: 1, lod: 70 } : { interior: 0
    (lawnprops.js) — радиус клеток R, трава / одуванчики / мусор — до small, доля травы,
    зарослей и мусора — thin; краска газона (lawn.js) — полная (1) или облегчённая (0:
    без тени-рельефа и мелких октав шума — на Деке это ~треть времени видеокарты на землю) */
+/* small — до края, где трава уже исчезла; полоса роста из земли — 14 м и ещё 6 м запаса (lawnprops.js FADE_S, FADE_LAG):
+   видно примерно до small − 13 м. 17.10.2026: средняя 50 → 64 (трава видна до ~51 м, как до 04.10, а не до ~37),
+   высокая 60 → 72 (~59 м) — чтобы высокая не была ближе средней; на «Деке» кадр тот же (травы в кадре сотни штук) */
 export const DETAIL = [
   { R: 80, small: 40, thin: 0.5, lawn: 0 },     // низкая
-  { R: 100, small: 50, thin: 0.7, lawn: 0 },    // средняя (Steam Deck)
-  { R: 120, small: 60, thin: 1, lawn: 1 },      // высокая
+  { R: 100, small: 64, thin: 0.7, lawn: 0 },    // средняя (Steam Deck)
+  { R: 120, small: 72, thin: 1, lawn: 1 },      // высокая
 ];
-export const detail = () => DETAIL[O.range] || DETAIL[2];
+/* 18.10.2026: мелочь газона ближе, пока кадр тяжёлый (tune.js «облегчение»: small × M.small; у края она и так растёт из земли) */
+const DET_T = { R: 0, small: 0, thin: 0, lawn: 0 };
+export const detail = () => {
+  const D = DETAIL[O.range] || DETAIL[2], m = TUNE.M.small;
+  if (m >= 1) return D;
+  DET_T.R = D.R; DET_T.small = D.small * m; DET_T.thin = D.thin; DET_T.lawn = D.lawn;
+  return DET_T;
+};
 export const hideR = () => (O.far === 0 ? { people: 100, cars: 200, lod: 32 } : { people: 130, cars: 220, lod: 45 });
+/* что видно сейчас (game.js cullFar, humanLod, стоящие машины): hideR, а пока кадр тяжёлый — ближе (tune.js);
+   плотность и рождение (yardlife.js и др.) — по hideR, чтобы облегчение не меняло, сколько жизни вокруг */
+const VIEW_R = { people: 0, cars: 0, lod: 0 };
+export const viewR = () => {
+  const R = hideR(), M = TUNE.M;
+  VIEW_R.people = R.people * M.people; VIEW_R.cars = R.cars * M.cars; VIEW_R.lod = R.lod * M.lod;
+  return VIEW_R;
+};
+
+/* ── «тяжёлый кадр»: мыло вместо рывка (dynres.js) ──
+   Вкл / выкл — отдельно от пресета (в «свою» не превращает), по виду устройства, в том же ключе dlv-gfx
+   (поле dyn). ?dyn=0 / ?dyn=1 — на этот запуск, не сохраняется.
+   18.10.2026 (автор: «что за блюр появляется? зачем?») — по умолчанию выкл на всех устройствах; кто включил сам
+   (значение dyn сохранено игроком в настройках) — у того остаётся (до 18.10 было вкл на Деке, телефоне и iOS) */
+export const DYN_DEF = { ios: 0, phone: 0, deck: 0, pc: 0 };
+const DYN_Q = Q.get('dyn');
+let DYN = (() => { const v = readAll().dyn; return v && (v[DEV] === 0 || v[DEV] === 1) ? v[DEV] : DYN_DEF[DEV]; })();
+if (DYN_Q === '0' || DYN_Q === '1') DYN = +DYN_Q;
+export const dynOn = () => DYN;
+export function setDyn (v) {
+  DYN = v ? 1 : 0;
+  if (DYN_Q === '0' || DYN_Q === '1') return;
+  const all = readAll(); all.dyn = { ...(all.dyn || {}), [DEV]: DYN }; writeAll(all);
+}
 
 /* ── применить: что меняется без перезагрузки ── */
 let H = null;                       // хуки game.js: { resize }
@@ -208,7 +248,7 @@ export function work (ms) { const w = STATS.work; w.push(ms); if (w.length > 600
    по своему номеру, чтобы не все в один кадр. */
 let SEQ = 0;
 export function lag (o, dt, px, pz) {
-  const n = val('far');
+  const n = val('far') + TUNE.M.extraLag;        // тяжёлый кадр — вдали ещё реже (tune.js)
   const near = (o.x - px) ** 2 + (o.z - pz) ** 2 < LAG_R * LAG_R;
   if (n <= 1 || near) { if (o._lag) { dt += o._lag; o._lag = 0; } return Math.min(dt, 0.2); }
   if (o._lk === undefined) o._lk = SEQ++;
@@ -295,7 +335,8 @@ export function panel (body, focus, card) {
   const row = (label, id, txt, main) => '<div class="set-row"><span>' + label + '</span>' + btn(id, txt, main) + '</div>';
   body.innerHTML = (card ? '' : '<div class="pn-t">' + t('графика') + '</div>') +
     row('<b>' + t('качество') + '</b>', 'gfx-p', presetName(), true) +
-    '<div class="set-rows">' + ITEMS.map(it => row(t(it.label), 'gfx-' + it.id, itemText(it, O[it.id]))).join('') + '</div>' +
+    '<div class="set-rows">' + ITEMS.map(it => row(t(it.label), 'gfx-' + it.id, itemText(it, O[it.id]))).join('') +
+    row(t('тяжёлый кадр'), 'gfx-dyn', DYN ? t('мыло вместо рывка') : t('рывок вместо мыла')) + '</div>' +
     '<div class="pn-n">' + t('графика не меняет игру: машины и люди рядом, клиенты и физика — одинаковые на любой') + '</div>';
   const again = id => panel(body, id, card);
   body.querySelector('#gfx-p').onclick = () => {
@@ -304,12 +345,13 @@ export function panel (body, focus, card) {
     again('gfx-p');
   };
   for (const it of ITEMS) body.querySelector('#gfx-' + it.id).onclick = () => { set(it.id, (O[it.id] + 1) % it.vals.length); again('gfx-' + it.id); };
+  body.querySelector('#gfx-dyn').onclick = () => { setDyn(!DYN); again('gfx-dyn'); };
 }
 
 /* отладка: __dlv.GFX */
 export const DEBUG = {
   get dev () { return DEV; }, get preset () { return PRESET; }, get opts () { return { ...O }; },
-  set, setPreset, STATS, ITEMS, PRESETS, DETAIL, poke,
+  set, setPreset, STATS, ITEMS, PRESETS, DETAIL, poke, get dyn () { return DYN; }, setDyn,
   offer: () => { offerEl = null; offer(); return true; },   // показать плашку «кадр не успевает» сразу (проверка вида)
   /* время кадра CPU за последние n кадров: p50 / p95, мс */
   work (n = 300) { const s = STATS.work.slice(-n).sort((a, b) => a - b), q = p => (s.length ? +s[Math.min(s.length - 1, Math.floor(p * s.length))].toFixed(2) : 0); return { n: s.length, p50: q(0.5), p95: q(0.95) }; },

@@ -2,15 +2,16 @@
    стиль — src/styles/paper.css, движение — paperfx.js). С 09.10.2026 вместо копилки-свиньи с купюрами.
    Тот же чек годится для любого итога (быстрый заезд — quickrun.js может звать play со своими строками).
 
-     END.play({ host, tap, head, no, why, rows, total, hints, seal, party, sticker, stamp, money, Snd }, done)
+     END.play({ host, tap, head, no, why, rows, total, hints, seal, party, sticker, stamp, ribbon, money, Snd }, done)
          host  — куда рисовать (#cr-stage); tap — где тап = «допечатать сразу» (#over);
          head  — шапка чека («чек смены · Юг»), no — номер (7 → «№ 0007»), why — строка мелко под шапкой;
          rows  — [[подпись, значение, 'pp-plus' | 'pp-minus' | '']] — строки «подпись ··· значение»;
          total — { k: 'за смену', n: 5261, fmt: n => '+5 261 ₽', cls: 'pp-plus' } — итог крупно, щёлкает счётчиком;
-         hints — [{ text, mark, wal } | { bar }] — мелкие строки под итогом (mark — жёлтым маркером; wal — «в копилке теперь»,
+         hints — [{ text, mark, wal } | { bar } | { cal }] — мелкие строки под итогом (mark — жёлтым маркером; wal — «в копилке теперь»,
                  сумму потом меняет END.wallet; bar — полоска «до следующего района», barHTML); seal — { text, color: 'green' | 'red' | 'rust' | 'pink' };
          party — 'coins' | 'confetti' | 'both' | '' — что вылетит из итога; sticker — { line, face } сообщение Толика (пузырь iMessage);
          stamp — кнопка-штамп (career.js переносит сюда #ov-again), встаёт внизу чека.
+         ribbon — { title, sub } праздничная лента под шапкой (holidays.js ribbon; стиль — holidays.css).
          0 с — чек влетает, 0,25 с — сбоку Толик «печатает…», 0,95 с — его сообщение пузырём со звуком, аватарка говорит ртом (talkface.js); с 0,3 с строки допечатываются по одной (0,09 с);
          потом итог щёлкает вверх (0,8 с), печать хлопает, на хорошей смене — монетки; штамп шлёпает → done(quick).
          Всё — ~2 с. quick — нажали «допечатать сразу»: всё на месте мгновенно.
@@ -35,22 +36,24 @@ const GUARD = 350;                       // мс: после «сразу» на
 const T = { ROWS0: 300, ROW: 90, COUNT: 800, SEAL: 120, SLAM: 260, MSG: 950 };   // мс; MSG — когда приходит текст Толика
 
 /** разметка чека (без движения) — для play и для других итогов */
-export function receiptHTML ({ head = '', no = 0, why = '', rows = [], total = null, hints = [], seal = null, money = n => String(Math.round(n)) } = {}) {
+export function receiptHTML ({ head = '', no = 0, why = '', rows = [], total = null, hints = [], seal = null, ribbon = null, money = n => String(Math.round(n)) } = {}) {
   const num = no ? '№ ' + String(Math.max(0, Math.round(no))).padStart(4, '0') : '';
   const row = ([k, v, cls]) => '<p class="pp-row"><span>' + esc(k) + '</span><i></i><b class="' + (cls || '') + '">' + esc(v) + '</b></p>';
   return '<section class="pp-receipt cr-rc">' +
     '<header class="pp-head"><span>' + esc(head) + '</span>' + (num ? '<b>' + esc(num) + '</b>' : '') + '</header>' +
     (why ? '<p class="pp-hint cr-rc-why">' + esc(why) + '</p>' : '') +
+    (ribbon ? '<div class="cr-rc-ribbon">' + esc(ribbon.title) + (ribbon.sub ? '<small>' + esc(ribbon.sub) + '</small>' : '') + '</div>' : '') +   // праздничная смена (holidays.js, стиль — holidays.css)
     '<div class="cr-rc-body">' +
       (rows.length ? '<div class="cr-rc-rows">' + rows.map(row).join('') + '</div>' : '') +
       '<div class="cr-rc-end">' +
         (total ? '<p class="pp-row pp-total"><span>' + esc(total.k) + '</span><i></i><b class="cr-rc-sum ' + (total.cls || '') + '">' +
           esc((total.fmt || money)(total.n)) + '</b></p>' : '') +
         '<div class="cr-rc-mid"><div class="cr-rc-hints">' +
-        hints.filter(h => !h.bar).map(h => '<p class="pp-hint' + (h.wal ? ' cr-rc-wal' : '') + '">' + (h.mark ? '<span class="pp-mark">' + esc(h.text) + '</span>' : esc(h.text)) +
+        hints.filter(h => !h.bar && !h.cal).map(h => '<p class="pp-hint' + (h.wal ? ' cr-rc-wal' : '') + '">' + (h.mark ? '<span class="pp-mark">' + esc(h.text) + '</span>' : esc(h.text)) +
           (h.wal ? ' <b>' + esc(money(h.n || 0)) + '</b>' : '') + '</p>').join('') + '</div>' +
         (seal ? '<div class="pp-seal pp-seal-' + (seal.color || 'red') + ' cr-rc-seal">' + esc(seal.text) + '</div>' : '') + '</div>' +
         hints.filter(h => h.bar).map(h => barHTML(h.bar)).join('') +          // полоска района — на всю ширину, под строками и печатью
+        hints.filter(h => h.cal).map(h => calHTML(h.cal)).join('') +          // календарик сезонов (seasoncycle.js receipt)
         '<div class="cr-rc-stamp"></div>' +
       '</div>' +
     '</div></section>';
@@ -66,12 +69,23 @@ function barHTML (b) {
     (b.done ? ' <span class="pp-mark">' + esc(b.done) + '</span>' : '') + '</span><span class="cr-dbar">' + cells + '</span></p>';
 }
 
+/* календарик сезонов (seasoncycle.js receipt): { text: «до весны — 2 смены», sub: что придёт, hol: { text } | null,
+   cells: [{ sea, to — переход в сезон, hol, next, name }] } — клетки следующих смен цветом сезона, звезда — праздник
+   (стиль — seasoncycle.css) */
+const SEA_ICON = { winter: '\u2744\uFE0E', spring: '\u273F', summer: '\u2600\uFE0E', autumn: '\u2766' };
+function calHTML (c) {
+  const cells = (c.cells || []).map(q => '<i class="sc-c sc-' + esc(q.sea) + (q.to ? ' sc-to-' + esc(q.to) : '') + (q.next ? ' sc-next' : '') + (q.hol ? ' sc-hol' : '') +
+    '" title="' + esc(q.name) + '">' + (q.hol ? '\u2605' : SEA_ICON[q.to || q.sea] || '') + '</i>').join('');
+  return '<div class="cr-rc-cal"><p class="sc-t"><span class="pp-mark">' + esc(c.text) + '</span>' + (c.hol ? ' · <b>' + esc(c.hol.text) + '</b>' : '') + '</p>' +
+    '<p class="sc-s">' + esc(c.sub) + '</p><p class="sc-row">' + cells + '</p></div>';
+}
+
 export function play ({ host, tap = null, head = '', no = 0, why = '', rows = [], total = null, hints = [], seal = null, party = '', sticker = null,
-  stamp = null, money = n => String(Math.round(n)), Snd = null } = {}, done = () => {}) {
+  stamp = null, ribbon = null, money = n => String(Math.round(n)), Snd = null } = {}, done = () => {}) {
   if (RUN) RUN.end();
   if (!host) { done(); return; }
   const face = sticker ? (sticker.face != null ? sticker.face : CHAT.avatar(96)) : '';
-  host.innerHTML = receiptHTML({ head, no, why, rows, total, hints, seal, money }) +
+  host.innerHTML = receiptHTML({ head, no, why, rows, total, hints, seal, ribbon, money }) +
     (sticker && sticker.line ? '<aside class="en-tolik cr-tolik">' + (face ? '<img alt="" src="' + esc(face) + '">' : '<i></i>') +
       '<div class="en-tb"><b>' + esc(t('Толик управляющий')) + '</b><div class="en-st"><p class="typing en-dots"><span></span><span></span><span></span></p>' +
       '<p class="en-msg">' + esc(sticker.line) + '</p></div></div></aside>' : '');   // сообщение как в iMessage (chat.css): «печатает…», потом текст
@@ -84,7 +98,7 @@ export function play ({ host, tap = null, head = '', no = 0, why = '', rows = []
   const walEl = host.querySelector('.cr-rc-wal b');
   WAL = walEl ? { el: walEl, fmt: money } : null;
   const fmt = total ? (total.fmt || money) : money;
-  const lines = [...host.querySelectorAll('.cr-rc-why, .cr-rc-rows .pp-row, .cr-rc-end > .pp-row, .cr-rc-hints > .pp-hint, .cr-rc-end > .cr-rc-bar')];
+  const lines = [...host.querySelectorAll('.cr-rc-why, .cr-rc-rows .pp-row, .cr-rc-end > .pp-row, .cr-rc-hints > .pp-hint, .cr-rc-end > .cr-rc-bar, .cr-rc-end > .cr-rc-cal')];
 
   let finished = false, ended = false;
   const timers = [];

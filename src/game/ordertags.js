@@ -24,6 +24,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import { t } from '../i18n/index.js';
 import './ordertags.css';
+import * as NICK from './nicks.js';
 
 export const OTAG = {
   EVERY: 0.25,      // метры и лица — раз в столько секунд
@@ -46,9 +47,19 @@ export function init (api) {
   el.setAttribute('aria-hidden', 'true');
   ((document.getElementById('game')) || document.body).appendChild(el);
   T.el = el;
+  /* высота стопки — от ResizeObserver (после раскладки, сам браузер), а не чтением offsetHeight раз в секунду: чтение
+     посреди кадра заставляло пересчитать раскладку всей страницы — на «Деке» 4—9 мс в одном кадре (18.10.2026) */
+  try { new ResizeObserver(es => { const b = es[0] && es[0].borderBoxSize && es[0].borderBoxSize[0]; RO_H = Math.round(b ? b.blockSize : el.offsetHeight); applyH(); }).observe(el); RO = true; } catch (e) { RO = false; }
+}
+let RO = false, RO_H = 0;
+function applyH () {
+  const h = T.el.classList.contains('on') ? RO_H : 0;
+  if (h === T.h) return;
+  T.h = h;
+  document.documentElement.style.setProperty('--otags-h', h ? h + 8 + 'px' : '0px');   // радио-плашка — над стопкой (ordertags.css)
 }
 
-const firstName = p => (p && (p.first || (p.name || '').split(/\s+/)[0])) || t('клиент');
+const firstName = p => NICK.short(p, t('клиент'));   // клиент заказа — ник из приложения целиком, иначе только имя (nicks.js)
 const delivered = (o, st, i) => st.done || (i < o.idx && st.done !== false);
 const colorOf = o => { const sp = o.ord || o.look; return (sp && sp.color) || '#ff8a2b'; };
 const storyOf = o => { const sp = o.ord || o.look; return !!(sp && sp.type === 'story'); };
@@ -72,7 +83,7 @@ function build (o) {
     T.el.appendChild(el);
     const it = { st, i, el, img, nm, m, p: ps[0] || null, mood: null, txt: '', cur: null, done: false, goneT: 0 };
     setMood(it, '');
-    if (it.p && A.faceDataURL.soon) A.faceDataURL.soon(it.p, OTAG.FACE, ['ok', 'angry', 'happy'], [0]);   // другие лица карточки — заранее, в спокойные кадры (people.js)
+    if (it.p && NICK.isFace(it.p) && A.faceDataURL.soon) A.faceDataURL.soon(it.p, OTAG.FACE, ['ok', 'angry', 'happy'], [0]);   // другие лица карточки — заранее, в спокойные кадры (people.js)
     T.items.push(it);
   });
   T.stats.built++;
@@ -84,7 +95,8 @@ function setMood (it, mood) {
   if (it.mood === mood) return;
   const first = it.mood === null;
   it.mood = mood;
-  if (it.p) { const src = A.faceDataURL(it.p, OTAG.FACE, mood); if (src && it.img.src !== src) it.img.src = src; }
+  if (it.p) { const src = NICK.avatar(it.p, OTAG.FACE, mood);   // аватарка из приложения: лицо или мазня с наклейкой настроения (nicks.js)
+    if (src && it.img.src !== src) it.img.src = src; }
   if (!first) { T.stats.moods++; it.el.classList.remove('jolt'); void it.el.offsetWidth; it.el.classList.add('jolt'); }
 }
 
@@ -146,6 +158,7 @@ function update () {
    (T.h < 0: собрали, убрали бирку, сменилась текущая, показали/спрятали) и на всякий случай раз в секунду */
 function syncHeight () {
   T.hT = 0; T.stats.measured++;
+  if (RO) { applyH(); return; }                     // высоту знаем от ResizeObserver — не читаем раскладку
   const h = T.el.classList.contains('on') ? Math.round(T.el.offsetHeight) : 0;
   if (h === T.h) return;
   T.h = h;

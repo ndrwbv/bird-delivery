@@ -191,16 +191,17 @@ export default function hudScreens (ctx) {
   /* ── воскрешение: копия game.js askRevive + showChoice, за ним — надпись #wasted ── */
   const revive = {
     id: 'revive', group: 'Окна поверх езды', name: 'окно воскрешения',
-    note: 'Копия game.js askRevive: машина взорвалась — воскреснуть за деньги из кошелька (скидка раз в несколько смен, econ.js REVIVE). Не хватает денег — одна кнопка «ну что ж».',
+    note: 'Копия game.js askRevive: машина взорвалась — воскреснуть за деньги из кошелька (каждое следующее за смену ×2, скидка — на первое, раз в несколько смен, econ.js REVIVE). Не хватает денег — одна кнопка «ну что ж».',
     knobs: [
       { k: 'wallet', label: 'в кошельке, ₽', type: 'num', def: 12000, min: 0, max: 500000, step: 500 },
+      { k: 'n', label: 'уже воскресал за смену', type: 'sel', def: 0, opts: [[0, 'ни разу'], [1, '1 раз'], [2, '2 раза'], [3, '3 раза']] },
       { k: 'sale', label: 'скидка', type: 'sel', def: 0, opts: [[0, 'есть сейчас'], [1, 'через 1 смену'], [2, 'через 2 смены'], [3, 'через 3 смены']] },
       { k: 'why', label: 'как погиб (надпись сзади)', type: 'sel', def: 'машина всё', opts: [['машина всё', 'машина разбита'], ['утонул', 'утонул']] },
       { k: 'timer', label: 'таймер на ответ идёт', type: 'bool', def: true },
     ],
     async show (o, tok) {
       const shiftN = 10, wait = +o.sale || 0;
-      const R = ECON.revivePrice(shiftN, wait ? shiftN - ECON.REVIVE.SALE_EVERY + wait : null);
+      const R = ECON.revivePrice(shiftN, wait ? shiftN - ECON.REVIVE.SALE_EVERY + wait : null, +o.n || 0);
       const price = R.price, have = +o.wallet || 0;
       // надпись смерти (game.js deathFx)
       const word = $('w-word');
@@ -214,7 +215,8 @@ export default function hudScreens (ctx) {
         ? { title: t('воскреснуть — {money}', { money: money(price) }), sub: t('в копилке {money} — не хватает', { money: money(have) }),
           opts: [{ label: t('ну что ж'), r: 'нет денег' }], timeout: 4 }
         : { title: R.sale ? t('воскреснуть со скидкой?') : t('воскреснуть?'),
-          sub: t('новая машина спустится с неба · из копилки {money} (там {have})', { money: money(price), have: money(have) }),
+          sub: t('новая машина спустится с неба · из копилки {money} (там {have})', { money: money(price), have: money(have) }) +
+            '<br>' + t('следующее воскрешение за смену — {money}', { money: money(R.next) }),
           opts: [{ label: t('воскреснуть · {money}', { money: money(price) }), r: 'воскрес' },
             { label: t('нет, закончить смену'), r: 'нет, всё' }], timeout: 9 };
       // game.js showChoice({ …, full: true })

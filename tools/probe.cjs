@@ -19,6 +19,7 @@
                             игра на телефоне только боком, orient.js) / 844×390 боком / 667×375 iPhone SE боком /
                             932×430 большой боком / 1280×800
    поворот из скрипта: console.log('__proberesize:844x390') — окно сменит размер (повернуть телефон туда-обратно)
+   кадр посреди скрипта: console.log('__probeshot:/путь/a.png') + wait(500) — снимок окна (несколько экранов за один запуск)
    --turn                   --size=phone без ?portrait: как настоящий телефон стоя — заставка «поверни телефон» и пауза
    --sa=L,B                 вырез и полоска «домой» боком, px (iPhone 15 — 59,21): отступы --sa-* хада вместо env()
    --js="код" | --eval=file.js     тело async-функции в странице. Есть: d (= __dlv), wait(ms),
@@ -155,6 +156,16 @@ app.whenReady().then(async () => {
     if (MEM && typeof msg === 'string' && msg.startsWith('__probemem:')) { memMark(msg.slice(11)); return; }
     // повернуть «телефон» из скрипта: console.log('__proberesize:844x390') — окно меняет размер (orient.js, поворот туда-обратно)
     if (typeof msg === 'string' && msg.startsWith('__proberesize:')) { const [w, h] = msg.slice(14).split('x').map(Number); if (w > 0 && h > 0) win.setContentSize(w, h); return; }
+    // кадр посреди скрипта: console.log('__probeshot:/путь/кадр.png') — снимок окна (--scale тот же); подождать ~0,5 с
+    if (typeof msg === 'string' && msg.startsWith('__probeshot:')) {
+      const f = path.resolve(msg.slice(12));
+      win.webContents.capturePage().then(img => {
+        const tw = Math.round(W * (+arg('scale', 1) || 1));
+        if (img.getSize().width !== tw) img = img.resize({ width: tw, quality: 'good' });
+        fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, img.toPNG());
+      }).catch(e => err('probe: кадр не снят:', e.message));
+      return;
+    }
     if (has('console') || (level >= 3 && has('errors'))) err('[page]', msg.slice(0, 500));
     if (level >= 3) {
       const un = /^Uncaught/.test(msg);

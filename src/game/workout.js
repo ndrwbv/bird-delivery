@@ -30,7 +30,7 @@ import * as HITS from './hits.js';
 export const WO = {
   SHARE: 0.55,             // у какой доли коробок есть качалка
   BAR_H: 2.3, DIP_H: 1.25,
-  NEAR: 110, DROP: 150, ACTIVE: 2,
+  NEAR: 130, DROP: 160, ACTIVE: 3,      // 12.10.2026 (жизнь во дворах): было 110 / 150 / 2
   ARM: 0.6, SHOULDER: 1.3,  // длина руки и высота плеча человека (people.js), м
   ME_R: 7, ME_WAIT: 1.5, ME_HEAL: 0.5,
 };
@@ -174,7 +174,7 @@ function meStart (s) {
 }
 function bubble (p, txt) {
   if (ME.bubble) { p.grp.remove(ME.bubble); ME.bubble.material.dispose(); }
-  ME.bubble = A.sayBubble(p.grp, txt, '#ff6a13', 2.5);
+  ME.bubble = A.sayBubble(p.grp, txt, '#ff6a13', 2.5, 1);
 }
 function meDone (full) {
   const p = ME.p;
@@ -227,7 +227,7 @@ export function step (dt) {
       if (sp > 3 && A.CAR_L) {
         const dx = p.x - V.x, dz = p.z - V.z;
         if (Math.abs(dx * fx + dz * fz) < A.CAR_L + 0.9 && Math.abs(dx * fz - dz * fx) < A.CAR_W + 0.35) {
-          if (HITS.isFall(kmh)) { HITS.fall(p, V.vx, V.vz); ST.falls++; continue; }
+          if ((HITS.isFall(kmh) || HITS.survive(p, kmh))) { HITS.fall(p, V.vx, V.vz); ST.falls++; continue; }
           s.people.splice(i, 1); ST.people--; ST.hit++;
           A.dropMesh(p.grp);
           A.gibHuman(p, V.vx, V.vz, kmh);

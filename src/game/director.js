@@ -28,10 +28,11 @@
      relaunch(минут назад) — как будто игру перезапустили через столько минут, setN(n), reset().
    ────────────────────────────────────────────────────────────────────────── */
 import { DIRECTOR as C } from './econ.js';
+import * as TEL from './telemetry.js';          // анонимная статистика: какое событие началось (telemetry.js)
 import * as RHY from './rhythm.js';          // ритм смены: дуга, окна «покататься», бюджет событий (rhythm.js)
 
 export const KINDS = {
-  gig: 'light', crew: 'light', thugs: 'light', flirt: 'light', moose: 'light',
+  gig: 'light', crew: 'light', thugs: 'light', flirt: 'light', moose: 'light', odd: 'light',   // odd — сценка у двери (oddfolk.js)
   story: 'story', errand: 'story',
   gang: 'medium', march: 'medium', mafia: 'medium',
   raid: 'major', riot: 'major', fest: 'major', hurricane: 'major',
@@ -130,6 +131,8 @@ export function can (kind) {
 
 export function start (kind, ttl = 0) {
   const tier = KINDS[kind];
+  TEL.ev('event', { k: kind });
+  TEL.count('ev.' + kind);
   if (!tier || tier === 'story') return;
   ACT.push({ kind, tier, age: 0, ttl: ttl || (PLANNED.includes(kind) ? 0 : C.AGE) });
   ST.last[kind] = undefined;

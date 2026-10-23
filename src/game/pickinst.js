@@ -12,16 +12,18 @@
    Повтор (replay.js) возвращает на сцену и подобранное, что было в записи: такие группы живут
    в «кладбище» (последние GRAVE штук) — step() видит и их, если они снова на сцене.
 
-     create(THREE, scene, { geos: {kind: [[geo, mat], …]}, ringGeo, ringHex: {kind: '#hex'} })
-       → { add(g, kind, body, ring), drop(g), step(), STATS }
-   У вида — один или несколько инстансов (щит: прозрачный шар и звезда). Вид, которого нет в geos
-   (деньги, сердце), рисуется как раньше — своими мешами; его кольцо всё равно здесь. */
+     create(THREE, scene, { geos: {kind: [[geo, mat], …]}, ringGeo, ringHex: {kind: '#hex'}, caps: {kind: n} })
+       → { add(g, kind, body, ring), drop(g), step(), kind(k, [[geo, mat], …], cap, '#hex'), STATS }
+   kind() — добавить вид позже (находки: их список — после создания, game.js buildCollect); второй раз — ничего.
+   У вида — один или несколько инстансов (щит: прозрачный шар и звезда). Вид, которого нет в geos,
+   рисуется своими мешами; его кольцо всё равно здесь. caps — сколько мест в буфере у вида (по умолчанию CAP;
+   у находок — по одной, 18.10.2026: деньги, сердце и находки теперь тоже объёмные инстансы, pickups3d.js). */
 
 const CAP = 256, GRAVE = 64;
 
-export function create (THREE, scene, { geos, ringGeo, ringHex }) {
-  const inst = (geo, m) => {
-    const im = new THREE.InstancedMesh(geo, m, CAP);
+export function create (THREE, scene, { geos, ringGeo, ringHex, caps = {} }) {
+  const inst = (geo, m, cap = CAP) => {
+    const im = new THREE.InstancedMesh(geo, m, cap);
     im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     im.count = 0;
     im.frustumCulled = false;                    // что вне кадра — game.js и так прячет группу (CULL.inView)
@@ -31,8 +33,8 @@ export function create (THREE, scene, { geos, ringGeo, ringHex }) {
     scene.add(im);
     return im;
   };
-  const BODY = {};
-  for (const k in geos) BODY[k] = geos[k].map(([geo, mat]) => inst(geo, mat));
+  const BODY = {}, CAPK = {};
+  for (const k in geos) { CAPK[k] = caps[k] || CAP; BODY[k] = geos[k].map(([geo, mat]) => inst(geo, mat, CAPK[k])); }
   const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false });
   const RING = inst(ringGeo, ringMat);
   RING.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 3), 3);
@@ -46,6 +48,12 @@ export function create (THREE, scene, { geos, ringGeo, ringHex }) {
   const STATS = { live: 0, drawn: 0, rings: 0 };
   const N = {};
 
+  function kind (k, list, cap, hex) {
+    if (BODY[k]) return;
+    CAPK[k] = cap || CAP;
+    BODY[k] = list.map(([geo, mat]) => inst(geo, mat, CAPK[k]));
+    if (hex) COL[k] = new THREE.Color(hex);
+  }
   function add (g, kind, body, ring) { LIVE.set(g, { kind, body, ring, inst: !!BODY[kind] }); }
   function drop (g) {
     const e = LIVE.get(g);
@@ -59,7 +67,7 @@ export function create (THREE, scene, { geos, ringGeo, ringHex }) {
     g.updateMatrix();
     if (e.inst) {
       const L = BODY[e.kind], i = N[e.kind]++;
-      if (i < CAP) {
+      if (i < CAPK[e.kind]) {
         e.body.updateMatrix();
         B.multiplyMatrices(g.matrix, e.body.matrix);
         for (let k = 0; k < L.length; k++) L[k].setMatrixAt(i, B);
@@ -83,7 +91,7 @@ export function create (THREE, scene, { geos, ringGeo, ringHex }) {
     for (let i = 0; i < GR.length; i++) { const g = GR[i][0]; if (g.parent === scene) one(g, GR[i][1]); }   // в повторе — снова на сцене
     let drawn = 0;
     for (const k in BODY) {
-      const n = Math.min(CAP, N[k]);
+      const n = Math.min(CAPK[k], N[k]);
       drawn += n;
       for (const im of BODY[k]) { im.count = n; im.visible = n > 0; if (n) dirty(im.instanceMatrix, n * 16); }
     }
@@ -91,5 +99,5 @@ export function create (THREE, scene, { geos, ringGeo, ringHex }) {
     if (RING.count) { dirty(RING.instanceMatrix, RING.count * 16); dirty(RING.instanceColor, RING.count * 3); }
     STATS.live = LIVE.size; STATS.drawn = drawn; STATS.rings = RING.count;
   }
-  return { add, drop, step, STATS };
+  return { add, drop, step, kind, STATS };
 }

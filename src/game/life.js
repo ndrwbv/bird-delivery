@@ -13,6 +13,7 @@ import { t } from '../i18n/index.js';
 import { makePerson, holdFixed } from './people.js';
 import { MAP } from './map.js';
 import * as SEAS from './seasons.js';
+import * as PETW from './petwear.js';          // зимой собачка в свитере или попонке (petwear.js)
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[(Math.random() * a.length) | 0];
@@ -314,7 +315,7 @@ function spawnRich () {
 /* собачка: туловище одним мешем, передние и задние ноги — парами */
 const LEASH_MAT = { m: null };
 function makeDog () {
-  const col = pick(['#f4f1ea', '#e0c8a0', '#2b2a30', '#b07a4a', '#d9d2c2']), dk = shadeHex(col, 0.7);
+  const col = pick(['#f4f1ea', '#e0c8a0', '#2b2a30', '#b07a4a', '#d9d2c2']), dk = shadeHex(col, 0.7), coat = PETW.coatFor(1, ['sweater', 'vest']);
   const g = new THREE.Group();
   g.add(bits(b => {
     b(0.22, 0.2, 0.44, col, 0, 0.3, 0);
@@ -324,6 +325,7 @@ function makeDog () {
     b(0.04, 0.04, 0.04, '#1b1410', -0.05, 0.49, 0.38); b(0.04, 0.04, 0.04, '#1b1410', 0.05, 0.49, 0.38);
     b(0.05, 0.05, 0.22, col, 0, 0.42, -0.28, -0.7);
     b(0.23, 0.05, 0.05, '#c23a3a', 0, 0.42, 0.17);
+    PETW.wear(b, { w: 0.22, h: 0.2, d: 0.44, y: 0.3, z: 0 }, coat);   // зимой — свитер или попонка (petwear.js)
   }));
   const legs = [];
   for (const zz of [0.15, -0.15]) {
@@ -1100,7 +1102,7 @@ export function richTip (peds, share) {
   const ok = RICH.some(r => !r.m.dead && near(r.m.x, r.m.z, 70)) || LUX.some(l => near(l.x, l.z, 90)) || POSH.some(q => near(q[0], q[1], 40));
   if (!ok || !chance(1 / 8)) return 0;
   if (p.grp) {
-    const b = A.sayBubble(p.grp, t('Сдачи не надо!'), '#8a6a1a', 2.7);
+    const b = A.sayBubble(p.grp, t('Сдачи не надо!'), '#8a6a1a', 2.7, 1);
     setTimeout(() => { if (b.parent) b.parent.remove(b); b.material.dispose(); }, 2600);
   }
   return Math.max(300, Math.round(share * rand(1.5, 3) / 50) * 50);
@@ -1160,10 +1162,16 @@ function scan () {
 }
 
 const OFF = new URLSearchParams(location.search).has('nolife');     // ?nolife — без жизни улиц: сравнить кадр
+/* первый шаг — заготовки (стены для граффити, парки…): кусок поздней сборки game.js 'first', а не первый кадр после неё */
+export function init (api) {
+  if (OFF || A) return;
+  const t0 = performance.now();
+  A = api; setup(); STATE.stats.setupMs = Math.round(performance.now() - t0);
+}
 export function step (dt, api) {
   if (OFF) return;
   const t0 = performance.now();
-  if (!A) { A = api; setup(); STATE.stats.setupMs = Math.round(performance.now() - t0); }
+  if (!A) init(api);
   if ((scanT -= dt) <= 0) { scanT = 1; scan(); }
   else if (LATER.length) LATER.shift()();
   WIND += Math.sin(performance.now() / 23000) * 0.02 * dt;

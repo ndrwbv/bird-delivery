@@ -167,9 +167,9 @@ function setupBox () {
   });
   return box;
 }
-function rowHTML (f, i) {
+function rowHTML (f) {
   const o = optOf(f);
-  return '<div class="qr-f" data-pad tabindex="-1" data-f="' + f.key + '"' + (i === 0 ? ' data-pad-main' : '') + '>' +
+  return '<div class="qr-f" data-pad tabindex="-1" data-f="' + f.key + '">' +
     '<span class="qr-fl">' + esc(f.label) + '</span>' +
     '<button type="button" class="qr-ar" data-pad-skip data-d="-1" aria-label="◀">◀</button>' +
     '<span class="qr-fv"><b>' + esc(o.name) + '</b><small>' + esc(o.sub || '') + '</small></span>' +
@@ -181,8 +181,10 @@ function render () {
     '<section class="pp-sheet pp-in qr-sheet">' +
       '<header class="pp-head"><span>' + esc(t('путевой лист')) + '</span><b>' + num(runs + 1) + '</b></header>' +
       '<div class="qr-fields">' + fields().map(rowHTML).join('') + '</div>' +
+      // как менять строки (геймпад и клавиатура; пальцем — ◀ ▶ видно и так): курсор стоит на «поехали», строки — выше
+      '<p class="pp-hint qr-how"><kbd class="pp-key">▲ ▼</kbd>' + esc(t('строка')) + '<i>·</i><kbd class="pp-key">◀ ▶</kbd>' + esc(t('поменять')) + '</p>' +
       '<p class="qr-warn">' + esc(t('в копилку не идёт, сюжета нет')) + '</p>' +
-      '<button type="button" class="pp-stamp qr-go">' + keyHTML('ok') + esc(t('поехали')) + '</button>' +
+      '<button type="button" class="pp-stamp qr-go" data-pad-main>' + keyHTML('ok') + esc(t('поехали')) + '</button>' +
     '</section>' +
     '<nav class="pp-margin"><button type="button" class="pp-note qr-back">' + keyHTML('back') + esc(Q.setupFrom === 'end' ? t('в меню') : t('назад')) + '</button></nav>';
   refreshKeys(box);
@@ -233,6 +235,7 @@ export function back () {
 
 /* геймпад (game.js padStep, до padMenu и career padPre): на путевом листе ←→ и LB/RB меняют значение
    строки под курсором, A из любой строки — «поехали» (на пометке «назад» — её); на чеке X — поменять условия.
+   Курсор при открытии — на «поехали» (data-pad-main; до 17.10.2026 — на «сезоне»), ↑ — к строкам.
    Курсора нет (играли мышью) — первое ←→ только зажигает его (padmenu.js), A — сразу главное */
 export function pad (p) {
   const r = root();

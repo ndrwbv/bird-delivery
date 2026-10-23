@@ -9,8 +9,8 @@
    пристроен тамбур с открытой дверью — за ней кусок квартиры героя (бардак и бутылки, фольга и
    аквариумы, портрет и флаги — а на кровати бонг); у подъезда — свой антураж (мусор, крысы, мигающая
    лампа — или цветы и коврик). Реплика портретом (рот говорит), два коротких ответа столбиком
-   (story.js ['ask'] → dialog.js stack: курсор ▶, ↑ ↓ / крестовина, Enter / A), реакция (реплики без ответа листаются
-   сами — autoSay), курьер уходит. 8—12 секунд, B / Esc — пропустить.
+   (story.js ['ask'] → dialog.js stack: курсор ▶, ↑ ↓ / крестовина, Enter / A), реакция (реплики без ответа
+   ждут нажатия «дальше» — сами не листаются, автор 16.10.2026), курьер уходит. B / Esc — пропустить.
 
    Тексты: свои (у каждого героя одна «фирменная» встреча, под его квартиру) + встречи агента
    «диалог у двери» из minigames/smalltalk-lines.js (SITS с полем who, файл не правим — берём что есть).
@@ -52,6 +52,7 @@ import * as DOOR from './doorstep.js';
 import * as RHY from './rhythm.js';             // ритм смены ставит встречи (rhythm.js)
 import * as FACES from './faces.js';            // знакомые лица района: Глеб и его история (faces.js)
 import { FACE_HEROES, FACE_DECOR, FACE_PAL, FACE_DECOR_NAME } from './faces.js';
+import * as LOCALS from './locals.js';          // жители Юга: их катсцены у подъезда (locals.js LOCAL_HEROES)
 
 export const EN = {
   NEAR: 320,          // подъезд для встречи — ближе стольких метров к машине
@@ -82,10 +83,10 @@ const HEROES = [
     kidsLook: { bottle: '#f4f1ea' },                              // в детской — кефир
     char: { walk: { speed: 0.7, step: 5.5, leg: 0.45, arm: 0.9, sway: 0.16, drag: 0.5, stoop: 0.1 }, talk: 'spread', idle: 'sway' },
     own: { id: 'alkash-fall', emo: 'sad',
-      say: N_('Ик… Пицца? Я, бля, не заказывал… Или заказывал? Давай.'),
+      say: N_('Пицца? Я, бля, не заказывал… Или заказывал? Не помню. Давай.'),
       a: { me: N_('Держи, дядь'), re: N_('Левой возьму. Правую на бургерной войне оставил.'), mood: 'sad', out: '0' },   // расписываться за пиццу не надо (автор, 11.10)
       b: { me: N_('Проспитесь, дядь'), re: N_('Я с девяносто восьмого не сплю. Пиздуй, малой.'), mood: 'angry', out: '0', slam: true },
-      kids: { say: N_('Ик… Пицца? Я не заказывал… Или заказывал? Давай.'),
+      kids: { say: N_('Пицца? Я не заказывал… Или заказывал? Не помню. Давай.'),
         b: { me: N_('Проспитесь, дядь'), re: N_('Я с девяносто восьмого не сплю. Иди, малой.'), mood: 'angry', out: '0', slam: true } } } },
 
   { id: 'granny', who: 'angry_granny', name: N_('баба Галя'), seed: 0x6a1a, fem: true, decor: 'granny',
@@ -156,6 +157,8 @@ const HEROES = [
 
   // знакомые лица района (faces.js): Глеб и его жена — только в своей истории, в случайные встречи не попадают
   ...FACE_HEROES,
+  // жители Юга (locals.js): Людмила Петровна, Серёга, Петя, Костя, Олеся и новый жилец — только в своих историях
+  ...LOCALS.LOCAL_HEROES,
 ];
 
 /* ─────────────── состояние ─────────────── */
@@ -317,7 +320,7 @@ function register () {
       model: () => modelOf(h),
       place: () => M.spot,
       shot: meetShot,                 // свои планы камеры (story.js shotPose): герой с квартирой за спиной
-      autoSay: true,                  // реплики без ответов листаются сами (пауза 1,2—2,5 с по длине; Enter — сразу)
+      autoSay: true,                  // было: реплики листаются сами; с 16.10.2026 не работает — ждут нажатия (story.js say)
       cps: EN.CPS,
       ready: () => false,             // в очередь глав не ходит: встречу зовут ENC.play (песочница; в игре — потом)
       onDone: () => { const q = STORY.progOf(SID(h)); q.ch = 0; STORY.persist(); },
@@ -330,11 +333,21 @@ function register () {
    Куда смотрит (POV_LOOK: z — м от стены, y — высота над землёй):
      'establish' — на дверь подъезда (подход);
      'cat'       — мимо героя в квартиру за ним (кота во встречах нет — имя плана свободно);
-     'zina'      — герой в проёме: макушка — на top доле высоты кадра сверху (0,2 — сразу под чёрной полосой), тогда
+     'zina'      — герой в проёме: макушка — на pad доли высоты кадра ниже верхней полосы кино (её высоту меряем), тогда
                    он виден от пояса до макушки над окном реплики (герои разного роста: 1,6—2,2 м с головой-коробкой);
      'two'       — реакция: чуть ниже — видно, как он берёт коробку;
      'car'       — уходим: разворот к машине. */
-export const POV_LOOK = { establish: { z: 0.4, y: 1.3 }, cat: { z: -1.6, y: 1.0, side: 0.45 }, zina: { z: 0.9, top: 0.2 }, two: { z: 0.9, top: 0.24 } };
+export const POV_LOOK = { establish: { z: 0.4, y: 1.3 }, cat: { z: -1.6, y: 1.0, side: 0.45 }, zina: { z: 0.9, pad: 0.07 }, two: { z: 0.9, pad: 0.1 } };
+/* доля высоты экрана под верхней полосой кино (story.css: 13vh, на низком экране — 22 px); меряем раз в 0,5 с */
+const BAR = { t: -1, v: 0.13 };
+function barFrac () {
+  const now = typeof performance !== 'undefined' ? performance.now() : 0;
+  if (now - BAR.t < 500 || typeof document === 'undefined') return BAR.v;
+  BAR.t = now;
+  const el = document.querySelector('#story-cut .sc-top'), H = window.innerHeight || 1;
+  if (el) BAR.v = Math.max(0, Math.min(0.25, el.offsetHeight / H));
+  return BAR.v;
+}
 function meetShot (name, h, side, gy) {
   const c = STORY.DEBUG.CUT && STORY.DEBUG.CUT.actors && STORY.DEBUG.CUT.actors.courier;
   if (!c) return null;
@@ -350,9 +363,10 @@ function meetShot (name, h, side, gy) {
   const cs = -side, lat = (L.side || 0) * cs;
   const lx = h.ex - h.sx * lat + h.nx * L.z, lz = h.ez - h.sz * lat + h.nz * L.z;
   let ly = gy + (L.y || 1.1);
-  if (L.top !== undefined) {         // по макушке героя: она на L.top кадра сверху
+  if (L.pad !== undefined) {         // по макушке героя: она на L.pad кадра ниже верхней полосы кино (полоса на телефоне боком тоньше)
     const D = Math.hypot(lx - eye[0], lz - eye[2]) || 1, fov = (STORY.DEBUG.cam && STORY.DEBUG.cam.fov) || 52;
-    const up = Math.atan(((gy + (M.headTop || 1.85)) - eye[1]) / D), off = Math.atan((1 - 2 * L.top) * Math.tan(fov * Math.PI / 360));
+    const top = Math.min(0.3, barFrac() + L.pad);
+    const up = Math.atan(((gy + (M.headTop || 1.85)) - eye[1]) / D), off = Math.atan((1 - 2 * top) * Math.tan(fov * Math.PI / 360));
     ly = eye[1] + D * Math.tan(up - off);
   }
   return [eye, [lx, ly, lz], [0, 0, 0]];
@@ -990,7 +1004,7 @@ export function play (id, i = 0, o = {}) {
     else if (res) m = sample(res);
     // знакомое лицо (faces.js): появление сыграно на заказе — история дальше (ответ в 1-м запоминается), адрес и подъезд — его
     const ord = o.order && o.order.ord;
-    if (h.face && st && ord) FACES.met(h.id, CUT.ans || null, ord.stops && ord.stops[0], sp);
+    if (h.face && st && ord) { if (h.local) LOCALS.met(h.local, CUT.ans || null, ord.stops && ord.stops[0]); else FACES.met(h.id, CUT.ans || null, ord.stops && ord.stops[0], sp); }
     M.stats.last = { id, meet: s.id, ans: CUT.ans || null, skip: !!CUT.skip, ms: Math.round(performance.now() - t0),
       out: res ? res.out : null, seal: res ? t(res.seal) : '', row: res && res.row ? t(res.row) : '', mood: res ? res.mood : '',
       order: !!st, sample: !st && m ? { fee: EN.SAMPLE.FEE, tip: EN.SAMPLE.TIP, add: m.add, cut: m.cut } : null };
@@ -1000,7 +1014,8 @@ export function play (id, i = 0, o = {}) {
     povClear();
     clearDecor();
     // жена Глеба: в накладной был он, дверь открыла она — к двери за пиццей выходит она (faces.js)
-    if (h.face && h.fem && st && A.rehuman && st.peds && st.peds[0] && !st.peds[0].dead) { try { A.rehuman(st.peds[0], personOf(h)); } catch (e) { console.warn('[enc] rehuman', e); } }
+    // жители Юга (locals.js): swap — дверь открыл другой (новый жилец), к двери выходит он
+    if (h.face && (h.local ? h.swap : h.fem) && st && A.rehuman && st.peds && st.peds[0] && !st.peds[0].dead) { try { A.rehuman(st.peds[0], personOf(h)); } catch (e) { console.warn('[enc] rehuman', e); } }
     guestBack(st);                                 // герой вышел к двери — вручение как обычно
     if (st) RHY.meetOff(M.stats.last ? id + ' — ' + (M.stats.last.skip ? 'пропустил' : M.stats.last.seal || 'без ответа') : id);
     M.on = false; M.hero = null;

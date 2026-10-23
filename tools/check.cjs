@@ -70,6 +70,11 @@ const CHECKS = [
     if (r.code !== 0 || errs) return { status: 'fail', info: `ошибок ${errs}: ` + lines.filter(l => /^\s{3}/.test(l)).slice(0, 2).map(s => s.trim()).join(' | ') };
     return { status: miss ? 'warn' : 'ok', info: miss ? `без перевода ${miss} строк (на все языки)` : 'всё переведено' };
   } },
+  // политика конфиденциальности: public/privacy.html = src/game/privacytext.js (текст листа «что собираем» в игре)
+  { id: 'privacy', name: 'privacy.html совпадает с текстом в игре', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'privacy-html.mjs'), '--check'], { timeout: 20 });
+    return r.code === 0 ? { status: 'ok', info: 'страница = privacytext.js' } : { status: 'fail', info: (r.err || r.out).trim().split('\n').slice(0, 2).join(' | ') };
+  } },
   { id: 'video', name: 'ролик повтора: сохранение в Стиме, длительность webm', group: 1, run: async () => {
     const r = await sh(process.execPath, [path.join(__dirname, 'video-save-test.cjs')], { timeout: 30 });
     let j = null; try { j = JSON.parse(r.out.trim().split('\n').pop()); } catch (e) { /* — */ }
@@ -133,6 +138,15 @@ const CHECKS = [
     return { status: r.ok ? 'ok' : 'fail', info: `к клиенту ${r.n}: режут дом ${r.after} (по-старому ${r.before}); со двора ${r.yard}: ${r.afterYard} (по-старому ${r.beforeYard}); без дорог рядом ${r.noRoad}, улица дальше 230 м ${r.far}; ` +
       `поиск по клеткам к клиенту p95 ${r.tail.p95} мс, со двора ${r.head.p95} мс` + (r.ok ? '' : ': ' + JSON.stringify(r.sample.slice(0, 2))) };
   } },
+  { id: 'yardmaze', name: 'дворы сложнее: клиенты достижимы, навигатор не сквозь заборы и лесочки', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/yard-maze.js')]);
+    const e = errLine(j), r = j.result;
+    if (e || !r) return { status: 'fail', info: e || 'нет результата' };
+    const m = r.maze || {};
+    return { status: r.ok ? 'ok' : 'fail', info: `адресов ${r.n}: доехать ${r.strict + r.soft} (мягко ${r.soft}), заперты ${r.none}, далеко ${r.far}; маршрут сквозь лабиринт ${r.thru} из ${r.thruN}; ` +
+      `прямая через двор перекрыта у ${r.lineCut} из ${r.pairs}; заборы ${m.solidM} м твёрдых / ${m.smashM} м сбиваемых, клумб ${m.beds}, кустов ${m.hedges}, лесочков ${m.groves}` +
+      (r.ok ? '' : ': ' + JSON.stringify({ none: r.none_at, thru: r.thru_at })) };
+  } },
   { id: 'ghosts', name: 'машины не призраки и твёрдые, лось не сквозь', group: 2, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/ghost-cars.js')]);
     const e = errLine(j), r = j.result;
@@ -143,6 +157,21 @@ const CHECKS = [
       (r.orphans ? ' · ' + JSON.stringify(r.orphanSample) : '') + (r.merged ? ' · ' + JSON.stringify(r.mergedSample) : '') + (r.noBody ? ' · ' + JSON.stringify(r.noBodySample) : '') + (r.unexplained ? ' · ' + JSON.stringify(r.standSample) : '') +
       r.solid.filter(s => s.pass).map(s => ' · ' + s.k + ': ' + JSON.stringify(s)).join('');
     return { status: !r.ok ? 'fail' : r.unexplained ? 'warn' : 'ok', info };
+  } },
+  /* одно уведомление за раз (18.10.2026, notifyq.js, docs/CAREER.md «Одно уведомление за раз»): 60 с средней смены на автопилоте,
+     через 6 с езды машину переносит к адресу (вручений втрое больше — теснее, чем у игрока); раз в 50 мс по самой странице —
+     сколько всплывающего видно сразу (чек оплаты, реплика, новое сообщение чата, тост, грамота, задание, подсказка, таблица).
+     Двух сразу — 0; было до очереди: 4—9 раз за 3 мин (до трёх сразу) */
+  // группа 3 (с дымовыми), не 2: рядом с «призраками» под нагрузкой лось не успевал боднуть машину
+  { id: 'notify-one', name: 'одно уведомление за раз', group: 3, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/notify-one.js'), '--q=nsecs=60&nshift=6&ntp=6'], 150);
+    const e = errLine(j), r = j.result;
+    if (e || !r) return { status: 'fail', info: e || 'нет результата' };
+    const kinds = Object.entries(r.shown).map(([k, n]) => k + ' ' + n).join(', ');
+    const info = `${r.liveSec} с езды, вручений ${r.delivered}: показано ${kinds}; два и больше сразу — ${r.overlaps} раз (${r.overSec} с)` +
+      (r.nq ? `, выброшено устаревших ${r.nq.stale}, перебито ${r.nq.cut}, дольше всех ждало ${r.nq.maxWait} с` : '') +
+      (r.overlaps ? ' · ' + r.examples.slice(0, 3).map(x => x.t + ' с: ' + x.kinds + ' («' + x.texts + '»)').join('; ') : '');
+    return { status: r.overlaps ? 'fail' : r.delivered < 3 ? 'warn' : 'ok', info: info + (r.delivered < 3 ? ' (мало вручений — проверка слабая)' : '') };
   } },
   /* память на телефоне (11.10.2026, docs/AGENTS.md «Память на телефоне»): мобильный режим, меню → город достроен → 20 с смены.
      Порог — с запасом ~20 % над замером; было до правок: куча 706 / 822 МБ, след страницы пик 1477 МБ — вкладка Safari на iPhone умирала */

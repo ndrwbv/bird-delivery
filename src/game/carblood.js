@@ -46,7 +46,7 @@ export function resetPlayer () {
 }
 
 /* машина потока: копия материалов кузова, кровь в её осях (uBInv — обратная матрица машины, step) */
-function own (mesh) {
+function own (mesh, track = true) {
   if (mesh.userData.blood) return mesh.userData.blood;
   const S = newState();
   S.mesh = mesh;
@@ -68,12 +68,17 @@ function own (mesh) {
     o.material = done.get(o.material);
   });
   mesh.userData.blood = S;
-  CARS.push(S);
+  if (track) CARS.push(S);
   STATS.cars = CARS.length;
   return S;
 }
 
 /* сбил человека: car — группа машины, wx, wz — где был человек (мир), kmh — скорость удара, player — своя машина */
+/* прогрев шейдеров (warmup.js, 18.10.2026): кузов «в крови» — своя программа на каждый материал кузова; собиралась в момент,
+   когда лихач впервые сбил человека (в Электроне с медленным процессором — ожидание 70—80 мс). Образец — машина с теми же
+   материалами: копии с кровью, без слежения (game.js WARM.init extra; потом освобождается) */
+export function sample (mesh) { own(mesh, false); return mesh; }
+
 export function hit (car, wx, wz, kmh = 40, player = false) {
   if (!car) return;
   const S = player ? PLAYER : own(car);

@@ -37,10 +37,15 @@ import * as DEP from './dep.js';                // «депнуть»: одно�
 import * as HQ from './heroquests.js';           // герои, этап 2: совет Лёхи на ставке, «наоборот» Игорька, Жека про машину
 import * as RAID from './raid.js';               // «потратить» → ёлка-турель у точки (raid.js)
 import * as QR from './quickrun.js';             // быстрый заезд: своя длина смены, с 9:00, свои итоги (quickrun.js)
+import * as TRANS from './transfer.js';         // перевод в новую пиццерию: Толик говорит в начале первой смены там (transfer.js)
 import { makePadMenu } from '../input/padmenu.js';
 import { keyHTML, matchKey, inputKind, onInput } from '../input/glyphs.js';   // значки кнопок: полоска «как управлять» внизу чека смены, «гараж и траты»
 import * as PFX from './paperfx.js';
+import * as DAYT from './daytime.js';            // время суток словами: обед / ужин, «полночь» — по часам мира (daytime.js)
+import * as HOL from './holidays.js';            // праздничная смена: лента в чеке (holidays.js)
+import * as CYCLE from './seasoncycle.js';      // календарик сезонов в чеке: «до весны — 2 смены» (seasoncycle.js)
 import { t, tn, lang } from '../i18n/index.js';
+import * as TEL from './telemetry.js';          // анонимная статистика: открытие района, донаты (telemetry.js)
 
 /* соседние модули карьеры — если уже есть: заказы (развоз смены) и машины (гараж) */
 const ORD = import.meta.glob('./orders.js', { eager: true })['./orders.js'] || null;
@@ -97,6 +102,8 @@ export const isEvening = () => { const d = hour() % 24; return d >= ECON.SHIFT.E
 /* круглосуточная пиццерия: со второго района (ECON.SHIFT.ALLDAY_FROM) */
 export const allDay = (i = DIST.cur()) => DIST.has() && i >= (ECON.SHIFT.ALLDAY_FROM ?? 99);
 export const shiftOn = () => SH.on;
+/** на часах мира около полуночи, а пиццерия не круглосуточная: можно сказать «полночь» (orders.js, развоз смены) */
+export const midnightNow = () => !(SH.on ? SH.allDay : allDay()) && DAYT.nearMidnight(hour());
 export const phase = () => SH.phase;
 export function onShiftStart (cb) { if (typeof cb === 'function') startCbs.push(cb); }
 export function onShiftEnd (cb) { if (typeof cb === 'function') endCbs.push(cb); }
@@ -114,6 +121,7 @@ export function init (api) {
   document.body.classList.add('career');
   GARAGE.init({ cars: carsApi, A, stars, onChange: () => { refreshWallet(); refreshTabs(); } });
   api.crew = crewBoard; api.garage = openGarage;       // getter-ы api (DAY_LEN) не трогаем: они живые
+  DAYT.setClock(hour);                             // часы мира — для реплик про время суток в других модулях (daytime.js)
   api.kbClear = () => KB.clear();                  // меню-карусель: после листания подсветка — на карточку в центре
   MENU.init(api);
   DEP.init({ A, SH, kbClear: () => KB.clear(), refreshWallet, refreshTabs, refreshEnd, closeSpend });
@@ -155,6 +163,11 @@ export function startShift () {
   const pace = P === 'tight' ? [t('час пик'), t('заказы дальше, кофе меньше — зато платят ×{k}', { k: fmtK(pm.pay) })] : null;
   if (pace) setTimeout(() => { if (SH.on && SH.len === L) A.popBonus(pace[0], pace[1]); }, 5600);
   if (day) setTimeout(() => { if (SH.on && SH.len === L) A.toast(t('пиццерия круглосуточная — смена с {time}', { time: ECON.clock(SH.t0h) })); }, 2600);
+  // перевели в новую пиццерию (открылся район) — Толик говорит один раз, в начале первой смены там (transfer.js)
+  if (!QR.on() && DIST.has()) {
+    TRANS.atStart({ Store: A.Store, cur: SH.district, city: SH.city, name: i => t(DIST.list()[i].name), addr: A.pizzaAddr,
+      person: CHAT.person && CHAT.person(), still: () => SH.on && SH.len === L });
+  }
 }
 /** волна этой смены: 'generous' | 'normal' | 'tight' */
 export const pace = () => SH.pace || 'normal';
@@ -230,11 +243,21 @@ function watchMoney (S) {
 /* ── вернулся в пиццерию (game.js: «отдал заказ и доехал назад», handover без заказа) ──
    После полуночи — развоз смены, если ждут (orders.js staffHere). С 14:00 — обед, раз за смену: Толик
    управляющий диалогом «на, похавай», потом выбор. true — ход забрали: next() (следующий заказ) — потом */
-const LUNCH_SAY = /*i18n*/ [
-  'о, вернулся. на, похавай — что будешь?',
-  'стоять! обед. на, похавай, потом поедешь',
-  'два часа уже. на, похавай — за счёт заведения',
-];
+/* что говорит Толик — по часам мира (daytime.js), не по расписанию смены: в круглосуточной пиццерии перерыв бывает
+   и утром, и ночью (автор 12.10.2026: «говорит "время обеда", а там ночь»). В каждой поре — по 4 фразы, подряд не повторяются */
+const LUNCH_SAY = {
+  morning: /*i18n*/ ['о, вернулся. завтракать будешь? на, похавай', 'стоять! сначала завтрак. на, похавай, потом поедешь',
+    'утро, а ты уже на колёсах. на, позавтракай — за счёт заведения', '{time}, а ты не завтракал. на, похавай'],
+  day: /*i18n*/ ['о, вернулся. на, похавай — что будешь?', 'стоять! обед. на, похавай, потом поедешь',
+    '{time} уже. обед — на, похавай, за счёт заведения', 'день в разгаре, а ты не ел. на, пообедай'],
+  evening: /*i18n*/ ['о, вернулся. поужинай — что будешь?', 'стоять! ужин. на, похавай, потом поедешь',
+    'вечер уже, а ты не ел. на, за счёт заведения', '{time}, время ужина. на, похавай'],
+  night: /*i18n*/ ['ночь на дворе, а ты голодный. на, похавай', 'стоять! ночной перекус. на, потом поедешь',
+    '{time}, кухня почти спит. на, похавай — за счёт заведения', 'ночью без еды не ездят. на, перекуси'],
+};
+function lunchLine (h = hour()) { const pt = DAYT.part(h); return t(DAYT.fresh('lunch:' + pt, LUNCH_SAY[pt]), { time: ECON.clock(h) }); }
+/* как зовётся перерыв на карточке — тоже по часам мира */
+const MEAL_NAME = { morning: () => t('завтрак'), day: () => t('обед'), evening: () => t('ужин'), night: () => t('ночной перекус') };
 export function atBase (next) {
   if (!A || !SH.on || A.S.ride) return false;
   if (SH.phase === 'late') {
@@ -248,12 +271,26 @@ export function atBase (next) {
   if (h < ECON.SHIFT.LUNCH_H || h >= 24) return false;
   SH.lunch = true;
   A.S.handT = 1e9;                                  // пока обедаешь — следующий заказ не берём
-  const go = () => { if (SH.on && A.S.state === 'handover' && !A.S.order) showLunch(next); };
+  const go = () => { LUNCH_TALK.on = false; if (lunchFits()) showLunch(next); };
   const p = CHAT.person && CHAT.person();
   if (!p) { go(); return true; }
-  DLG.say({ person: p, name: t('Толик управляющий'), text: t(LUNCH_SAY[Math.floor(Math.random() * LUNCH_SAY.length)]),
-    accept: t('давай'), mood: 'calm', color: '#3fae5a' }).then(go, go);
+  // реплика может постоять в очереди за другим разговором — к своей очереди смена уже могла кончиться (полночь,
+  // сняли, «в меню»): тогда Толик молчит, а открытую реплику конец смены закрывает сам (lunchOff)
+  DLG.say({ person: p, name: t('Толик управляющий'), head: t('пиццерия'), text: lunchLine(),
+    accept: t('давай'), mood: 'calm', color: '#3fae5a',
+    skip: () => !(LUNCH_TALK.on = lunchFits()) }).then(go, go);
   return true;
+}
+/* обед ещё к месту: смена идёт, до полуночи, стоишь в пиццерии без заказа.
+   Гонка (IDEAS «Баги» 5): обед открылся поверх чека, когда смену оборвали, пока Толик говорил «на, похавай» */
+const LUNCH_TALK = { on: false };                   // реплика Толика про обед сейчас на экране
+function lunchFits () {
+  const S = A && A.S;
+  return !!S && SH.on && SH.phase === '' && S.state === 'handover' && !S.order && !S.ride;
+}
+/* конец смены (полночь, чек, быстрый заезд): реплика про обед на экране — закрыть; карточку обеда снимает endShift */
+function lunchOff () {
+  if (LUNCH_TALK.on) { LUNCH_TALK.on = false; DLG.dismiss(); }
 }
 
 /* ── обед (с 14:00, в пиццерии): одно из трёх до конца смены; next — после выбора.
@@ -271,7 +308,7 @@ function showLunch (next) {
       fn () { S.hpMax += L.hp.hearts; S.hp += L.hp.hearts; A.hudHearts(); } },
   ];
   A.showChoice({
-    title: t('обед'), sub: t('{time} — перерыв. на кухне остыли пиццы, которые сделали по ошибке. какую берёшь?', { time: ECON.clock(hour()) }),
+    title: MEAL_NAME[DAYT.part(hour())](), sub: t('{time} — перерыв. на кухне остыли пиццы, которые сделали по ошибке. какую берёшь?', { time: ECON.clock(hour()) }),
     pause: true, row: true, okLabel: t('взять'),
     opts: opts.map(o => ({ label: o.label, sub: o.sub, fn: () => {
       S.lunch = o.id;
@@ -288,6 +325,7 @@ const fmtK = k => Number(k).toLocaleString(lang() === 'zh' ? 'zh-CN' : lang());
 /* ── полночь: сначала, может быть, развоз смены, потом итоги ── */
 async function midnight () {
   SH.phase = 'late'; SH.lateT = 0;
+  lunchOff();
   const S = A.S;
   let ride = false;
   // развоз — только если едешь: в полночь на карточке заказа или на погрузке смена просто кончается
@@ -300,18 +338,40 @@ async function midnight () {
   // полночь застала в дороге (без развоза): смена не обрывается посреди улицы — довози, что везёшь, и
   // возвращайся; кончится, когда доедешь до пиццерии (atBase). Новых заказов нет. Сколько бы ни ехал — смена ждёт
   // (автор 10.10.2026: «всегда надо дать игроку доехать обратно и только потом показывать конец смены»); бросить — «сняться» в паузе
+  // ride — объект, если развоз взяли (и всех развёз, и не успел): тогда смена кончается сразу, где бы ни был
   if (!ride && homeward(S)) {
     SH.home = true;
     A.toast(S.state === 'back' ? t('заказов больше нет — возвращайся в пиццерию') : t('это последний заказ — довези и возвращайся в пиццерию'));
     return;
   }
-  endLate(ride);
+  endLate(!!(ride && ride.ok), !!(ride && !ride.ok));
+}
+/** развоз смены кончился посреди смены (песочница: «развоз смены» до полуночи) — он последнее дело смены, смена всё.
+    В полночь — no-op: там смену закрывает midnight(), дождавшись развоза */
+export function staffOver (r) {
+  if (!A || !SH.on || SH.phase !== '') return;
+  SH.phase = 'late';
+  endLate(!!(r && r.ok), !!(r && !r.ok));
 }
 /* в дороге после полуночи: везёшь заказ, поручение, отдаёшь у двери или едешь назад */
 const homeward = S => ['back', 'drive', 'side'].includes(S.state) || (S.state === 'handover' && !!(S.order || S.side));
-function endLate (ride) {
-  A.toast(SH.allDay ? (ride ? t('всех развёз — смена всё') : t('смена всё — {time}', { time: ECON.clock(hour()) }))
-    : ride ? t('полночь — всех развёз, смена всё') : t('полночь — смена всё'));
+/* последний тост смены: «полночь» — только если на часах и правда около полуночи (daytime.js nearMidnight);
+   в круглосуточной смена кончается в любой час, после развоза или долгой дороги назад — тоже не в полночь.
+   Слова — разные каждый раз (подряд одна и та же не выпадает) */
+const END_SAY = {
+  midnight: /*i18n*/ ['полночь — смена всё', 'полночь — пиццерия закрылась', 'двенадцать на часах — смена всё'],
+  midnightRide: /*i18n*/ ['полночь — всех развёз, смена всё', 'полночь, все дома — смена закрыта'],
+  closed: /*i18n*/ ['пиццерия закрыта — смена всё', 'кухня закрылась — на сегодня всё', 'всё, отработал — пиццерия закрыта'],
+  allDay: /*i18n*/ ['смена всё — {time}', '{time} — на сегодня хватит, смена всё', 'конец смены — {time}, сменщик уже тут'],
+  ride: /*i18n*/ ['всех развёз — смена всё', 'все дома — смена закрыта', 'развёз своих — на сегодня всё'],
+};
+export function endWords (ride, h = hour()) {
+  const k = DAYT.nearMidnight(h) && !SH.allDay ? (ride ? 'midnightRide' : 'midnight') : ride ? 'ride' : SH.allDay ? 'allDay' : 'closed';
+  return t(DAYT.fresh('end:' + k, END_SAY[k]), { time: ECON.clock(h) });
+}
+/* quiet — без своего тоста: развоз не успел, на экране уже «не успел развезти — дальше они пешком» */
+function endLate (ride, quiet) {
+  if (!quiet) A.toast(endWords(ride));
   A.endShift('время');
 }
 
@@ -395,6 +455,8 @@ function sealOf (why, full, mood) {
 export function showEnd (why, whyText, held) {
   if (!A) return;
   const S = A.S;
+  lunchOff();
+  if ($('choice') && $('choice').classList.contains('cr-lunch')) A.hideChoice();   // карточка обеда поверх чека — никогда
   if (QR.on()) { quickEnd(why, whyText); return; }
   if (!held && SH.on && CHAT.busy()) { CHAT.idle(() => { if (A.S.state === 'over') showEnd(why, whyText, true); }); return; }
   CHAT.clear();
@@ -413,6 +475,8 @@ export function showEnd (why, whyText, held) {
     // район: смена засчитана (отвёз хотя бы DISTRICT.COUNT_MIN), открылся следующий — сразу туда
     const r = DIST.countShift(S.delivered || 0);
     SH.counted = r.counted; SH.opened = r.opened;
+    if (r.opened >= 0) TRANS.mark(A.Store, r.opened, SH.district);
+    if (r.opened >= 0) { TEL.ev('district', { opened: r.opened, shifts: SH.n + 1 }); TEL.first('district' + (r.opened + 1)); }   // следующая смена — там: в её начале Толик скажет про перевод
     // бонус за смену — только досидел до конца (econ.js SHIFT_BONUS), сразу в кошелёк
     SH.bonus = full ? ECON.shiftBonus(S.delivered || 0, DIST.has() ? (SH.city ? ECON.CITY.PAY : DIST.pay(SH.district >= 0 ? SH.district : DIST.cur())) : 1) : 0;
     if (SH.bonus) A.addWallet(SH.bonus);
@@ -464,6 +528,7 @@ export function showEnd (why, whyText, held) {
     total: wasOn ? { k: t('за смену'), n: total, fmt: n => (n > 0 ? '+' : '') + A.money(n), cls: total > 0 ? 'pp-plus' : '' } : null,
     hints: endHints(wasOn, rankWas, placeWas),
     seal, party: seal && total > 0 ? seal.party : '',
+    ribbon: wasOn ? HOL.ribbon() : null,          // праздничная смена — лента «С Новым годом!» (holidays.js)
     sticker: wasOn ? { line: END.tolikLine({ mood: SH.mood || 'ok', opened, killed: knocked(), adult: !!A.ADULT }) } : null,
   }, quick => {
     noteIn();
@@ -481,7 +546,29 @@ export function showEnd (why, whyText, held) {
     if (note && col && note.parentNode !== col) { note.className = 'ov-note pp-hint'; col.appendChild(note); }
   }
   noteIn();
+  placeCal();
   fitEnd();
+}
+
+/* календарик сезонов (seasoncycle.js receipt): на широком экране (career.css, ≥ 980 px и выше 540) — отдельным листком
+   справа от чека, под сообщением Толика: так длинный чек влезает на Деке без уменьшения. На телефоне боком (ниже 541 и
+   шире 599, 17.10.2026, Р13) — тоже справа, мелким листком между Толиком и пометками: в чеке он с праздничной лентой
+   выталкивал шапку за экран и всё уменьшалось до ×0,76 (подписи ~7 px). На узком стоя — в чеке, как был */
+const WIDE_END = '(min-width: 980px) and (min-height: 541px), (max-height: 540px) and (min-width: 600px)';
+function placeCal () {
+  const stage = $('cr-stage');
+  if (!stage) return;
+  let side = stage.querySelector('.cr-side-cal');
+  const cal = stage.querySelector('.cr-rc-cal');
+  if (!cal) { if (side) side.remove(); return; }
+  if (matchMedia(WIDE_END).matches) {
+    if (!side) { side = document.createElement('aside'); side.className = 'cr-side-cal'; stage.appendChild(side); }
+    if (cal.parentNode !== side) side.appendChild(cal);
+  } else if (side && cal.parentNode === side) {
+    const slot = stage.querySelector('.cr-rc-end > .cr-rc-stamp');
+    if (slot) slot.before(cal);
+    side.remove();
+  }
 }
 
 /* обучение на чеке (shifttour.js): «чек — сколько заработал» → «гараж и траты» → «депнуть» → «на новую смену» */
@@ -529,7 +616,8 @@ function endHints (wasOn, rankWas, placeWas) {
   for (const [k, v, where] of GROW.rows()) if (where === 'new') news.push({ text: k + (v ? ' · ' + v : ''), mark: true });   // «пиццерия «Юг» выросла · ★★★☆☆»
   const place = crewPlace();
   if (placeWas > 0 && place > 0 && place < placeWas) news.push({ text: t('ты #{n} среди курьеров', { n: place }) });
-  return out.concat(news.slice(0, 3));
+  const cal = CYCLE.receipt();                       // что будет дальше: сезоны и праздник (seasoncycle.js)
+  return out.concat(news.slice(0, 3), cal ? [{ cal }] : []);
 }
 
 /* полоска «до следующего района» под итогом (автор 10.10.2026: вместо строки «для района «Кольцо» не в зачёт:
@@ -562,6 +650,7 @@ function districtLine () {
 const QTITLE = { 'смена окончена': () => t('ты сам закончил заезд'), 'время': () => t('заезд окончен'), 'сбил клиента': () => t('сняли с заезда') };
 function quickEnd (why, whyText) {
   const S = A.S;
+  lunchOff();
   CHAT.clear();
   if (SH.on) SH.endH = hour();
   SH.on = false; SH.phase = 'done'; SH.bonus = 0;
@@ -572,7 +661,7 @@ function quickEnd (why, whyText) {
     title: QTITLE[why] ? QTITLE[why]() : t('заезд сорвался'),
     // причина конца признаком, а не текстом: 'time' — по времени, 'quit' — сам, 'pulled' — сняли, 'dead' — машина / утонул
     kind: why === 'время' ? 'time' : why === 'смена окончена' ? 'quit' : why === 'сбил клиента' ? 'pulled' : 'dead',
-    why: why === 'время' ? t('полночь — пиццерия закрылась') : why === 'смена окончена' ? '' : whyText || '',
+    why: why === 'время' ? (DAYT.nearMidnight(SH.endH) ? t('полночь — пиццерия закрылась') : t('время вышло — пиццерия закрылась')) : why === 'смена окончена' ? '' : whyText || '',
     money: S.money || 0, delivered: S.delivered || 0, tips: typeof S.tips === 'number' ? S.tips : 0,
     hits: SH.hits, fine: SH.fine, back: SH.back, people: S.people || 0, t0h: SH.t0h, endH: SH.endH,
   });
@@ -632,6 +721,7 @@ function fitBox (box) {
 }
 addEventListener('resize', () => {
   if (!A) return;
+  placeCal();
   fitEnd();
   const md = $('cr-spend');
   if (md && !md.hidden && !TAB) fitBox(md.querySelector('.cr-sp-box'));
@@ -822,25 +912,37 @@ export function crewSeed (i) {
   const c = crewLoad();
   return c.crew[i] ? c.crew[i].seed : undefined;
 }
+/* с 17.10.2026 у каждой пиццерии свой состав (crewcast.js, A.crewRoster): заработок каждого — c.by[id];
+   кто не ездил эту смену — около твоего среднего, как раньше. Старый список c.crew — только без состава. */
+const rosterStart = k => Math.round(CREW_START[k % CREW_START.length] * (k < CREW_START.length ? 1 : 0.7) / 10) * 10;
 function crewRecord (earned, full) {
   const c = crewLoad();
   earned = Math.max(0, Math.round(earned || 0));
   c.me = (c.me || 0) + earned;
   c.n = (c.n || 0) + 1;
   const avg = Math.max(CREW_FLOOR, c.me / c.n);
-  const real = new Map(((A.rivals && A.rivals()) || []).map(r => [r.i, Math.round(r.money || 0)]));
-  c.crew.forEach((m, i) => {
-    const got = real.get(i) || 0;
-    // смену сняли раньше полуночи — курьеры доработали до конца: добавляем недостающее по среднему
-    const sim = Math.round(avg * (0.6 + Math.random() * 0.7) / 10) * 10;
-    m.total = (m.total || 0) + (got > 0 ? (full ? got : Math.max(got, sim)) : sim);
-  });
+  const riders = (A.rivals && A.rivals()) || [];
+  const real = new Map(riders.map(r => [r.i, Math.round(r.money || 0)]));
+  const byId = new Map(riders.map(r => [r.id, Math.round(r.money || 0)]));
+  // смену сняли раньше полуночи — курьеры доработали до конца: добавляем недостающее по среднему
+  const sim = () => Math.round(avg * (0.6 + Math.random() * 0.7) / 10) * 10;
+  const add = (was, got) => (was || 0) + (got > 0 ? (full ? got : Math.max(got, sim())) : sim());
+  const ros = (A.crewRoster && A.crewRoster()) || [];
+  if (ros.length) {
+    c.by = c.by || {};
+    ros.forEach((m, k) => { c.by[m.id] = add(c.by[m.id] ?? rosterStart(k), byId.get(m.id) || 0); });
+  } else c.crew.forEach((m, i) => { m.total = add(m.total, real.get(i) || 0); });
   A.Store.set(CREW_KEY, c);
 }
 export function crewBoard () {
   if (!A) return [];
   const c = crewLoad(), spec = (A.rivalSpec && A.rivalSpec()) || [];
-  const rows = c.crew.map((m, i) => {
+  const ros = (A.crewRoster && A.crewRoster()) || [];
+  const rows = ros.length ? ros.map((m, k) => {
+    let face = '';
+    if (A.face) { try { face = A.face(m.person, 44); } catch (e) { face = ''; } }
+    return { name: m.person.first, gen: m.person.firstGen || m.person.first, total: (c.by && c.by[m.id]) ?? rosterStart(k), hex: m.hex, face };
+  }) : c.crew.map((m, i) => {
     const p = crewPerson(i, c);
     let face = '';
     if (p && A.face) { try { face = A.face(p, 44); } catch (e) { face = ''; } }
@@ -1024,6 +1126,7 @@ function paneDonate (p, k) {
     const v = Math.min(+r.value || 0, Math.floor(Math.min(A.wallet(), Math.max(0, D.goal - (+A.Store.get(key, 0) || 0))) / D.step) * D.step);
     if (v <= 0) return;
     A.addWallet(-v);
+    TEL.ev('donate', { k: String(key).replace(/^dlv-/, ''), v: Math.round(v) });
     A.Store.set(key, (+A.Store.get(key, 0) || 0) + v);
     A.Store.flush();
     A.Snd.coin();
@@ -1037,7 +1140,7 @@ export function reprofile () { DEP.reprofile(); }
 
 /* отладка: __dlv.CAREERM.skipTo(13.9) — к обеду, skipTo(23.95) — к полуночи */
 const DEBUG = {
-  get SH () { return SH; }, shiftSlow, pace, DIST: DIST.DEBUG, stars, addStars, hour, isEvening, clockText, shiftOn, phase, onShiftStart, onShiftEnd, startShift, showEnd, clientKilled,
+  get SH () { return SH; }, TRANS: { pending: () => TRANS.pending(A && A.Store), last: TRANS.last, text: TRANS.text }, shiftSlow, pace, DIST: DIST.DEBUG, stars, addStars, hour, isEvening, clockText, shiftOn, phase, onShiftStart, onShiftEnd, startShift, showEnd, clientKilled,
   hasOrders: () => !!(ORD && ORD.staffRide), hasCars: () => !!carsApi(),
   // перемотка за обед — обед считается прошедшим (иначе он всплывает в любом пресете песочницы)
   // h — по расписанию смены (9…24): в круглосуточной смене с ночи «23,9» — это тоже «почти конец смены»
@@ -1045,5 +1148,6 @@ const DEBUG = {
   skipTo (h) { if (A) { A.env().t = SH.on ? (SH.tStart + ECON.tOfHour(h) - ECON.SHIFT.T0) % 1 : ECON.tOfHour(h); if (h > ECON.SHIFT.LUNCH_H + 0.05) SH.lunch = true; else if (h < ECON.SHIFT.LUNCH_H) SH.lunch = false; } },
   useCars (api) { CARS_MOCK = api || null; },
   showLunch,                                        // обед сразу — проверить карточку (стрелки, Enter)
+  lunchLine, endWords, midnightNow, staffOver, mealName: (h = hour()) => MEAL_NAME[DAYT.part(h)](),   // слова про время по часам мира (daytime.js)
   STOUR: STOUR.DEBUG, crewBoard, crewLoad: () => (A ? crewLoad() : null), openDep: DEP.open, closeDep: DEP.close, openGarage, closeGarage: GARAGE.close, garageFlip: GARAGE.flip, openSpend, menu, askName, back,
 };

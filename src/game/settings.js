@@ -2,9 +2,9 @@
    из главного меню и из паузы (game.js renderSettings → SET.render). Правила словами —
    docs/CAREER.md «Главное меню, пауза и настройки».
 
-   Табы: игра (имя, профиль, мини-игры у клиента вкл / выкл, путь на дороге вкл / выкл (routeask.js), сбросить прогресс, тестовые районы, версия и обновление, update.js) ·
+   Табы: игра (имя, профиль, камера — три вида по кругу (camview.js), мини-игры у клиента вкл / выкл, путь на дороге вкл / выкл (routeask.js), анонимная статистика вкл / выкл (telemetry.js, только взрослая) и под ней «что собираем ▸» — лист с текстом политики (privacy.js), сбросить прогресс, тестовые районы, версия и обновление, update.js) ·
    графика (качество и 7 пунктов, gfx.js) · звук (вкл / выкл и три ползунка: музыка, звуки, мотор — docs/SOUNDS.md;
-   радио в машине вкл / выкл и станция — radio.js) · управление (какие кнопки за что — геймпад,
+   музыка в игре вкл / выкл и «трек ▶» — music.js; радио в машине вкл / выкл и станция — radio.js) · управление (какие кнопки за что — геймпад,
    клавиатура или палец) · язык (сетка языков). Внутри таба — обычный вертикальный список; не влез
    (телефон боком) — листается внутри таба, окно целиком не прокручивается.
    Переключить таб: LB/RB и LT/RT геймпада, ←→ (крестовина, стик, клавиши), когда подсветка на строке
@@ -24,6 +24,8 @@ import './settings.css';
 import { t } from '../i18n/index.js';
 import * as UPD from './update.js';
 import { keyHTML } from '../input/glyphs.js';
+import * as TEL from './telemetry.js';          // «анонимная статистика: вкл / выкл» — только взрослая версия (telemetry.js, docs/ANALYTICS.md)
+import * as PV from './privacy.js';             // «что собираем ▸» — лист с текстом политики (privacytext.js), офлайн
 
 let A = null, TAB = 'game', TABS = [];
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';');
@@ -31,6 +33,19 @@ const TAB_NAMES = { game: 'игра', gfx: 'графика', snd: 'звук', ct
 
 export function init (api) {
   A = api;
+  // смена настройки — в анонимную статистику (telemetry.js): какая (id кнопки) и что стало (надпись кнопки / ползунок).
+  // Камеру пишет camview.js, саму статистику — telemetry.js set; табы и открытие окон — не настройки
+  const pb = A.body && A.body();
+  if (pb && !pb.dataset.tel) {
+    pb.dataset.tel = '1';
+    pb.addEventListener('click', e => {
+      const el = e.target && e.target.closest ? e.target.closest('button[id^="set-"], button[id^="gfx-"]') : null;
+      if (!el || !on() || /^set-(tab-|cam$|tel$|prof$|name$|l-)/.test(el.id)) return;
+      const id = el.id;
+      setTimeout(() => { const n = document.getElementById(id); TEL.ev('setting', { id: id.replace(/^set-/, ''), v: n ? n.textContent.trim().slice(0, 30) : '' }); }, 40);
+    });
+    pb.addEventListener('change', e => { const el = e.target; if (el && el.dataset && el.dataset.vol && on()) TEL.ev('setting', { id: 'vol-' + el.dataset.vol, v: +el.value }); });
+  }
   UPD.onChange(() => { if (on() && TAB === 'game') render(focusId()); });
   // Q / E и PageUp / PageDown — соседний таб (клавиатура)
   addEventListener('keydown', e => {
@@ -44,7 +59,7 @@ export function init (api) {
 export const on = () => !!(A && A.kind() === 'settings' && !A.panel().hidden && A.body().querySelector('.set-tabs'));
 const focusId = () => { const e = A.selected && A.selected(); return (e && e.id) || undefined; };
 /* какая кнопка в каком табе */
-const tabOf = id => !id ? null : id === 'set-snd' || id.startsWith('set-vol-') || id.startsWith('set-radio') ? 'snd' : id.startsWith('gfx-') ? 'gfx' : id.startsWith('set-l-') ? 'lang' : id.startsWith('set-tab-') ? id.slice(8) : 'game';
+const tabOf = id => !id ? null : id === 'set-snd' || id.startsWith('set-vol-') || id.startsWith('set-radio') || id.startsWith('set-mus') ? 'snd' : id.startsWith('gfx-') ? 'gfx' : id.startsWith('set-l-') ? 'lang' : id.startsWith('set-tab-') ? id.slice(8) : 'game';
 
 /** соседний таб; force — LB/RB, LT/RT, Q/E (всегда), без него — ←→ (только со строки табов) */
 export function flip (d, force) {
@@ -81,6 +96,7 @@ const still = html => '<div class="set-still" data-pad tabindex="-1">' + html + 
 export function render (focus, tab) {
   if (!A) return;
   const P = A.panel(), body = A.body();
+  if (!focus && P.dataset.kind === PV.KIND) { focus = 'set-privacy'; tab = 'game'; }   // B / Esc с листа «что собираем» — обратно на его кнопку
   P.dataset.kind = 'settings'; P.dataset.back = ''; P.dataset.sub = '';
   const menu = A.inMenu();                          // из главного меню (не посреди смены)
   const onlyMenu = t('меняется в главном меню');
@@ -109,6 +125,11 @@ export function render (focus, tab) {
       slider('sfx', t('звуки'), vol.sfx, focus) +
       slider('eng', t('мотор'), vol.eng, focus) +
       note(t('M на клавиатуре, R3 на геймпаде — звук вкл / выкл прямо в игре')) +
+      // своя музыка (music.js, chiptunes.js): вкл / выкл и «трек ▶» — следующий
+      (A.music ? row(t('музыка в игре'), A.music.on() ? t('вкл') : t('выкл'), 'set-mus', focus) +
+        (A.music.on() ? row(t('трек'), esc(A.music.name() || '—') + ' ▶', 'set-mus-next', focus) : '') +
+        note(A.music.radioKey ? t('B на клавиатуре, L3 на геймпаде — музыка вкл / выкл; F или ↓ на крестовине — следующий трек')
+          : t('B на клавиатуре, L3 на геймпаде — музыка вкл / выкл')) : '') +
       // радио в машине (radio.js): вкл — в смене играет станция, выкл — музыка игры; «станция» — для телефона, где нет клавиш
       (A.radio ? row(t('радио в машине'), A.radio.on() ? t('вкл') : t('выкл'), 'set-radio', focus) +
         (A.radio.on() ? row(t('станция'), esc(A.radio.name()), 'set-radio-st', focus) : '') +
@@ -136,6 +157,11 @@ export function render (focus, tab) {
         note(t('у каждого профиля свой прогресс: копилка, машины, районы'));
       else h += row(t('имя'), esc(name || '—'), 'set-name', focus);
     }
+    // камера (camview.js): сзади, высоко → сзади, близко → из-за руля; меняется и из паузы — сразу
+    if (A.cam) {
+      h += row(t('камера'), esc(A.cam.label()), 'set-cam', focus) +
+        note(t('V на клавиатуре, View на геймпаде, значок камеры на телефоне — прямо в езде'));
+    }
     // мини-игры у клиента (doorstep.js): домофон у подъезда и разговор у двери; выкл — только езда. Меняется и из паузы — со следующего адреса
     if (A.door) {
       h += row(t('мини-игры у клиента'), A.door.on() ? t('вкл') : t('выкл'), 'set-door', focus) +
@@ -146,6 +172,12 @@ export function render (focus, tab) {
       h += row(t('путь на дороге'), A.route.on() ? t('вкл') : t('выкл'), 'set-route', focus) +
         note(t('полоса на асфальте до клиента и обратно в пиццерию; в первой смене горит всегда') +
           (A.route.first() ? ' · ' + t('сейчас первая смена — горит') : ''));
+    }
+    // анонимная статистика (telemetry.js): только взрослая версия; в детской строки нет. Меняется и из паузы — сразу
+    if (TEL.available()) {
+      h += row(t('анонимная статистика'), TEL.on() ? t('вкл') : t('выкл'), 'set-tel', focus) +
+        note(t('сколько играешь, что включается в смене, ошибки и плавность — без имени и адресов; помогает чинить игру')) +
+        row(t('конфиденциальность'), t('что собираем ▸'), 'set-privacy', focus);   // полный текст политики — лист privacy.js, офлайн
     }
     // версия и обновление
     {
@@ -160,6 +192,9 @@ export function render (focus, tab) {
     }
     // ТЕСТ: «открыть все районы» — в релизе (BUILD_VERSION, __RELEASE__) нет, с ?debug — есть
     if (menu && A.unlock.on()) h += row(t('районы') + ' <small class="set-msg">' + t('для тестов') + '</small>', A.unlock.all() ? t('все открыты') : t('открыть все районы'), 'set-unlock', focus);
+    // ТЕСТ: «накинуть денег» — копилка до TEST_MONEY.TO (econ.js); перед Стимом выключить
+    if (A.cash && A.cash.on()) h += row(t('копилка') + ' <small class="set-msg">' + t('для тестов') + '</small>',
+      A.cash.wallet() >= A.cash.to ? esc(A.cash.money(A.cash.wallet())) : t('накинуть до {sum}', { sum: esc(A.cash.money(A.cash.to)) }), 'set-cash', focus);
     if (menu && A.canReset()) h += '<button type="button" id="set-reset" class="set-danger"' + ('set-reset' === focus ? ' autofocus' : '') + '>' + t('сбросить прогресс') + '</button>';
     if (!menu) h += note(t('сбросить прогресс — в главном меню'));
     list.innerHTML = h;
@@ -204,11 +239,17 @@ function wire (body) {
   body.querySelectorAll('[data-l]').forEach(b => b.addEventListener('click', () => A.setLang(b.dataset.l)));
   if ($('set-name')) $('set-name').onclick = () => A.askName(() => render('set-name'));
   if ($('set-prof')) $('set-prof').onclick = () => A.openProfiles();
+  if ($('set-cam')) $('set-cam').onclick = () => { A.cam.next(); render('set-cam'); };
   if ($('set-route')) $('set-route').onclick = () => { A.route.set(!A.route.on()); render('set-route'); };
+  if ($('set-tel')) $('set-tel').onclick = () => { TEL.set(!TEL.on()); render('set-tel'); };
+  if ($('set-privacy')) $('set-privacy').onclick = () => { PV.open(A.panel(), A.body(), () => { render('set-privacy'); A.navReset(); }); A.navReset(); };
   if ($('set-door')) $('set-door').onclick = () => { A.door.set(!A.door.on()); render('set-door'); };
+  if ($('set-mus')) $('set-mus').onclick = () => { A.music.set(); render('set-mus'); };
+  if ($('set-mus-next')) $('set-mus-next').onclick = () => { A.music.next(); setTimeout(() => { if (on() && TAB === 'snd') render('set-mus-next'); }, 60); };
   if ($('set-radio')) $('set-radio').onclick = () => { A.radio.set(!A.radio.on()); render('set-radio'); };
   if ($('set-radio-st')) $('set-radio-st').onclick = () => { A.radio.next(); render('set-radio-st'); };
   if ($('set-unlock')) $('set-unlock').onclick = () => A.unlock.run();
+  if ($('set-cash')) $('set-cash').onclick = () => { A.cash.run(); TEL.ev('test_money', { to: A.cash.to }); render('set-cash'); };   // тестовая кнопка денег — пометка в статистике
   if ($('set-reset')) $('set-reset').onclick = () => A.reset();
   if ($('set-upd')) $('set-upd').onclick = () => { UPD.check(true); render('set-upd'); };
   if ($('set-upd-go')) $('set-upd-go').onclick = () => { UPD.apply(); render(); };

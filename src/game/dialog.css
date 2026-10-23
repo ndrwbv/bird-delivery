@@ -1,90 +1,159 @@
-/* диалог: голова слева, облачко изо рта справа (на телефоне стоя — голова сверху) */
-#dlg { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center;
-       background: rgba(12, 18, 40, .45); opacity: 0; transition: opacity .18s; padding: 16px; box-sizing: border-box; }
+/* Окно разговора — лист накладной внизу экрана, как разговор у двери (minigames/smalltalk.css; автор 16.10.2026: «в одном
+   стиле»): сверху видно город, хад и часы срока. Шапка капсом (что это · срок заказа), слева полароид с именем и суммой
+   предложения, справа белое облачко с хвостиком к фото, ответы — бумажные кнопки. Палитра — --pp-* (paper.css). */
+#dlg { position: absolute; inset: 0; z-index: 40; display: flex; align-items: flex-end; justify-content: center; box-sizing: border-box;
+       padding: 12px 12px clamp(10px, 3vh, 34px); overflow: auto; opacity: 0; transition: opacity .18s;
+       font-family: "Press Start 2P", ui-monospace, monospace; color: var(--pp-ink); user-select: none; -webkit-user-select: none;
+       background: linear-gradient(to top, rgba(40, 14, 24, .55), rgba(40, 14, 24, .12) 55%, transparent 80%); }
 #dlg[hidden] { display: none; }
 #dlg.on { opacity: 1; }
-.dlg-box { width: min(720px, 100%); background: #1d2440; border: 3px solid #33210c; border-radius: 12px;
-           box-shadow: 0 8px 0 #141a33; overflow: hidden; transform: translateY(12px) scale(.97); transition: transform .18s; }
+.dlg-box { width: min(820px, 100%); padding-top: 2px; transform: translateY(16px) scale(.98); transition: transform .22s var(--pp-spring, ease-out); }
 #dlg.on .dlg-box { transform: none; }
-.dlg-bar { height: 10px; background: #ff8a2b; }
-.dlg-row { display: flex; align-items: flex-end; gap: 18px; padding: 20px 22px 8px; }
-.dlg-head { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.dlg-head img { width: 168px; height: 168px; image-rendering: pixelated; border-radius: 14px; border: 4px solid #33210c; background: #f3c9a0;
-                animation: dlg-talk .5s ease-in-out infinite alternate; }
-.dlg-head b { font-weight: normal; font-size: 11px; color: #ffd85e; text-align: center; max-width: 180px; }
-@keyframes dlg-talk { from { transform: translateY(0); } to { transform: translateY(-3px) rotate(-1deg); } }
+.dlg-bar { display: none; }                      /* цвет активности — полоской над шапкой (--pp-accent) */
+.dlg-top { margin-bottom: .4em; }
+.dlg-what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* срок заказа — как часы хада: горит — оранжевым, вот-вот / опоздал — красным и мигает */
+.dlg-clock { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dlg-clock:empty { display: none; }
+.dlg-clock.dlg-warn { color: var(--pp-orange); }
+.dlg-clock.dlg-low, .dlg-clock.dlg-late { color: var(--pp-red); animation: dlg-blink .6s steps(2) infinite; }
+@keyframes dlg-blink { 50% { opacity: .35; } }
+.dlg-row { display: flex; align-items: flex-start; gap: clamp(10px, 2vw, 22px); }
+.dlg-head { flex: none; margin: 0; display: flex; flex-direction: column; align-items: center; gap: .5em; max-width: 10em; rotate: var(--pp-tilt, 0deg); }
+.dlg-head img.pp-polaroid { width: clamp(64px, 9vw, 116px); height: clamp(64px, 9vw, 116px); image-rendering: pixelated; background: #f3c9a0; }
+.dlg-head img[hidden] { display: none; }
+#dlg.dlg-talking .dlg-head img { animation: dlg-talk .32s ease-in-out infinite alternate; }   /* говорит — голова чуть качается */
+@keyframes dlg-talk { from { rotate: -4deg; translate: 0 0; } to { rotate: -1deg; translate: 0 -3px; } }
+.dlg-name { font-weight: normal; font-size: var(--pp-fs-s); line-height: 1.4; color: var(--pp-label); text-align: center; overflow-wrap: anywhere; }
+.dlg-name:empty { display: none; }
+/* сумма предложения — отдельной строкой под портретом: подпись мелко, сумма крупно (зелёная — заплатят, красная — отдать) */
+.dlg-pay { display: flex; flex-direction: column; align-items: center; gap: .3em; margin: .1em 0 0; padding: .45em .6em .4em; rotate: 2deg;
+           background: #fff; border: 2px solid var(--pp-ink); border-radius: 4px; box-shadow: 0 3px 0 var(--pp-ink); }
+.dlg-pay[hidden] { display: none; }
+.dlg-pay span { font-size: var(--pp-fs-s); line-height: 1.3; color: var(--pp-label); text-align: center; }
+.dlg-pay span:empty { display: none; }
+.dlg-pay b { font-weight: normal; font-size: clamp(13px, 1.5vw, 20px); line-height: 1.1; white-space: nowrap; }
+.dlg-pay.pp-plus b { color: var(--pp-money); }
+.dlg-pay.pp-minus b { color: var(--pp-red); }
 .dlg-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.dlg-bubble { position: relative; flex: 1; min-height: 120px; background: #fff3d6; color: #2a1d10; border: 3px solid #33210c;
-              border-radius: 14px; padding: 16px 18px 26px; margin-bottom: 40px; cursor: pointer; }
-.dlg-bubble::before { content: ''; position: absolute; left: -20px; bottom: 26px; border: 10px solid transparent; border-right: 12px solid #33210c; }
-.dlg-bubble::after { content: ''; position: absolute; left: -13px; bottom: 28px; border: 8px solid transparent; border-right: 10px solid #fff3d6; }
-.dlg-text { margin: 0; font-size: 13px; line-height: 1.9; white-space: pre-wrap; }
-.dlg-skip { position: absolute; right: 12px; bottom: 6px; font-size: 8px; color: #8a7556; }
-.dlg-timer { height: 8px; margin: 0 22px; background: #2a3766; border-radius: 4px; overflow: hidden; visibility: hidden; }
-.dlg-timer.on { visibility: visible; }
-.dlg-timer i { display: block; height: 100%; background: #ffd85e; transform-origin: left center; }
-.dlg-timer.low i { background: #ff5a4a; }
-.dlg-btns { display: flex; justify-content: flex-end; gap: 12px; padding: 12px 22px 18px; visibility: hidden; }
+/* фраза — белое облачко с хвостиком к фото; клик / тап — допечатать (одна кнопка — дальше) */
+.dlg-bubble { position: relative; margin: 0; min-height: 3.4em; padding: .8em 1em 1.5em; font-size: var(--pp-fs-m); line-height: 1.7; cursor: pointer;
+              background: #fff; color: var(--pp-ink); border: 3px solid var(--pp-ink); border-radius: 10px; box-shadow: 0 4px 0 var(--pp-ink); }
+.dlg-bubble::before { content: ''; position: absolute; left: -13px; top: 1.1em; width: 0; height: 0;
+                      border: 8px solid transparent; border-right: 12px solid var(--pp-ink); border-left: 0; }
+.dlg-text { margin: 0; font-size: inherit; line-height: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dlg-skip { position: absolute; right: .9em; bottom: .45em; font-size: var(--pp-fs-s); color: var(--pp-label); }
+/* ответы — бумажные кнопки справа внизу листа; «принять» — жёлтая, «отказаться» — бумага */
+.dlg-btns { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin: .9em 0 0; visibility: hidden; }
 .dlg-btns.on { visibility: visible; }
-.dlg-btns button { font: inherit; font-size: 12px; padding: 12px 20px; border-radius: 8px; border: 3px solid #33210c; cursor: pointer; box-shadow: 0 4px 0 #33210c; }
-.dlg-yes { background: #ffd85e; color: #2a1d10; }
-.dlg-no { background: #3a4570; color: #fff3d6; }
-.dlg-btns.plain .dlg-yes { background: #3a4570; color: #fff3d6; }   /* приглашение клиентки: оба ответа — отказы, вид один */
-.dlg-btns button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.dlg-btns button { display: inline-flex; align-items: center; justify-content: center; gap: .7em; font: inherit; font-size: var(--pp-fs-m); line-height: 1.4;
+                   padding: .7em 1.1em; color: var(--pp-ink); cursor: pointer; touch-action: manipulation; text-align: left;
+                   background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 8px; box-shadow: 0 4px 0 var(--pp-ink);
+                   transition: translate .12s var(--pp-spring, ease-out), box-shadow .12s, background .12s; }
+/* через .dlg-btns: правило кнопок выше (.dlg-btns button — бумага) сильнее одиночного класса, и «принять» было бумажным (ревью 17.10) */
+.dlg-btns .dlg-yes { background: color-mix(in srgb, var(--pp-yellow) 60%, var(--pp-paper)); }
+.dlg-btns .dlg-no { background: var(--pp-paper); }
+.dlg-btns.plain .dlg-yes { background: var(--pp-paper); }   /* приглашение клиентки: оба ответа — отказы, вид один */
 .dlg-btns button[hidden] { display: none; }   /* одна кнопка «дальше»: пустой «Esc» рядом не рисуем (display выше перебивал hidden) */
 /* значок кнопки — общий .pp-key (paper.css, glyphs.js): [A] / [B] геймпада кружком, Enter / Esc клавиатуры клавишей */
 .dlg-btns .pp-key { margin-right: 0; font-size: 10px; }
-.dlg-btns button:active { transform: translateY(2px); box-shadow: 0 2px 0 #33210c; }
+.dlg-btns button:active { translate: 0 3px; box-shadow: 0 1px 0 var(--pp-ink); }
+@media (hover: hover) { .dlg-btns button:hover { translate: 0 -2px; } }
+.dlg-pop { animation: dlg-pop .2s var(--pp-spring, ease-out); }
+@keyframes dlg-pop { 0% { scale: .96; } 100% { scale: 1; } }
+@media (prefers-reduced-motion: reduce) { .dlg-pop, #dlg.dlg-talking .dlg-head img, .dlg-clock { animation: none !important; } }
+body.calm-fx .dlg-pop, body.calm-fx #dlg.dlg-talking .dlg-head img { animation: none; }
+/* узко (телефон стоя): голова сверху, облачко под ней */
 @media (max-width: 560px) {
-  .dlg-row { flex-direction: column; align-items: center; padding: 16px 14px 6px; }
-  .dlg-head img { width: 120px; height: 120px; }
-  .dlg-bubble { margin-bottom: 8px; width: 100%; box-sizing: border-box; }
-  .dlg-bubble::before { left: 50%; top: -20px; bottom: auto; border: 10px solid transparent; border-bottom: 12px solid #33210c; transform: translateX(-50%); }
-  .dlg-bubble::after { left: 50%; top: -13px; bottom: auto; border: 8px solid transparent; border-bottom: 10px solid #fff3d6; transform: translateX(-50%); }
-  .dlg-text { font-size: 11px; }
+  .dlg-row { flex-direction: column; align-items: center; }
+  .dlg-head { max-width: none; }
+  .dlg-head img.pp-polaroid { width: 72px; height: 72px; }
+  .dlg-col { width: 100%; }
+  .dlg-bubble::before { left: 50%; top: -15px; border: 8px solid transparent; border-bottom: 12px solid var(--pp-ink); border-top: 0; transform: translateX(-50%); }
   .dlg-btns { justify-content: stretch; } .dlg-btns button { flex: 1; }
 }
+/* низко (телефон боком, 844×390 / 667×375): плотнее — портрет 48 px, облачко по тексту, кнопки ниже */
+@media (max-height: 500px) {
+  #dlg { padding: 6px 10px 6px; }
+  .dlg-box.pp-sheet { padding: 4px 12px 10px; }
+  .dlg-top { padding: .45em 0 .35em; margin-bottom: .3em; }
+  .dlg-row { gap: 10px; }
+  .dlg-head { gap: .3em; max-width: 8em; }
+  .dlg-head img.pp-polaroid { width: 48px; height: 48px; }
+  .dlg-pay { padding: .3em .45em; }
+  .dlg-pay b { font-size: 12px; }
+  .dlg-pay span { font-size: 10px; }   /* «заплатит», «мзда» — не мельче 10 px на телефоне (было 7) */
+  .dlg-bubble { min-height: 0; padding: .5em .8em 1.2em; line-height: 1.5; }
+  .dlg-btns { margin-top: .5em; gap: 8px; }
+  .dlg-btns button { padding: .45em .9em; }
+  body.dlg-open #chat:not(.ph) { opacity: 0; transition: opacity .2s; }   /* чат Толика справа сверху лёг бы на облачко — пока окно открыто, не видно;
+                                                                            на телефоне (#chat.ph) он колонкой над педалями — выше листа, виден */
+}
+
+/* телефон боком (ревью 17.10, Р16): лист — низкой полосой внизу (~30 % экрана, было ~60 %), чтобы над ним были видны своя
+   машина и «место N из M» на хаде. Шапка в одну мелкую строку (срок справа — как был); портрет 40 px, справа от него имя и
+   сумма; облачко — текст 11 px (до 720 px шириной — 10) в 2—3 строки, без «пропустить ▸»; ответы — справа от облачка друг над другом. Катсцена (story-cut) и два ответа
+   столбиком (.stack) — как были */
+@media (max-height: 500px) {
+  body:not(.story-cut) #dlg { padding: 0 8px 4px; background: linear-gradient(to top, rgba(40, 14, 24, .45), transparent 42%); }
+  body:not(.story-cut) #dlg .dlg-box:not(.stack) { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; align-items: end;
+                                                   width: min(880px, 100%); padding: 0 10px 8px; }
+  body:not(.story-cut) #dlg .dlg-box:not(.stack) > .dlg-top { grid-column: 1 / -1; }
+  body:not(.story-cut) #dlg .dlg-box:not(.stack) > .dlg-row { grid-column: 1; grid-row: 2; }
+  body:not(.story-cut) #dlg .dlg-box:not(.stack) > .dlg-btns { grid-column: 2; grid-row: 2; flex-direction: column; flex-wrap: nowrap; align-items: stretch;
+                                                               gap: 6px; margin: 0; max-width: 12em; }
+  body:not(.story-cut) #dlg .dlg-top { padding: .35em 0 .25em; margin-bottom: .35em; font-size: 10px; }
+  body:not(.story-cut) #dlg .dlg-row { gap: 8px; align-items: center; }
+  body:not(.story-cut) #dlg .dlg-head { display: grid; grid-template-columns: auto auto; column-gap: 6px; row-gap: 3px; align-items: center;
+                                        max-width: 17em; rotate: none; }
+  body:not(.story-cut) #dlg .dlg-head img.pp-polaroid { grid-row: 1 / 3; width: 40px; height: 40px; rotate: -3deg; }
+  body:not(.story-cut) #dlg .dlg-name { grid-column: 2; align-self: end; max-width: 11em; text-align: left; font-size: 10px; line-height: 1.3; }
+  body:not(.story-cut) #dlg .dlg-pay { grid-column: 2; align-self: start; justify-self: start; margin: 0; padding: .25em .4em; gap: .2em; box-shadow: 0 2px 0 var(--pp-ink); }
+  body:not(.story-cut) #dlg .dlg-head:has(.dlg-pay[hidden]) .dlg-name { grid-row: 1 / 3; align-self: center; }
+  body:not(.story-cut) #dlg .dlg-bubble { min-height: 0; padding: .45em .7em; font-size: 11px; line-height: 1.45; border-width: 2px; box-shadow: 0 3px 0 var(--pp-ink); }
+  body:not(.story-cut) #dlg .dlg-bubble::before { top: .8em; }
+  body:not(.story-cut) #dlg .dlg-skip { display: none; }   /* «пропустить ▸» — строка лишней высоты; тап по облачку и так допечатывает */
+  body:not(.story-cut) #dlg .dlg-btns button { font-size: 10px; padding: .55em .8em; border-width: 2px; box-shadow: 0 3px 0 var(--pp-ink); }
+  body:not(.story-cut) #dlg .dlg-meters { margin-top: 6px; gap: 4px 6px; }
+}
+/* маленький телефон боком (667×375): облачко уже — текст 10 px, чтобы фраза гопника влезала в 3 строки, а не в 4 */
+@media (max-height: 500px) and (max-width: 720px) { body:not(.story-cut) #dlg .dlg-bubble { font-size: 10px; } }
 
 /* два ответа столбиком (say { stack }: вопрос в катсцене, story.js ['ask']) — как разговор у двери (smalltalk.css):
    друг под другом, верхний — первый, у выбранного курсор ▶; значков клавиш на кнопках нет — подсказка одной строкой внизу */
-.dlg-btns.stack { flex-direction: column; align-items: stretch; gap: 8px; width: min(30em, 100%); margin: 0 0 0 auto; box-sizing: border-box; padding: 0 0 4px; }
+.dlg-btns.stack { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 8px; width: min(30em, 100%); margin: .8em 0 0 auto; box-sizing: border-box; }
 .dlg-btns.stack .dlg-yes { order: -1; }
-.dlg-box.stack .dlg-bubble { margin-bottom: 10px; }
-.dlg-btns.stack button { justify-content: flex-start; text-align: left; padding: 10px 16px 10px 30px; position: relative;
-                         background: #3a4570; color: #fff3d6; box-shadow: 0 3px 0 #33210c; transition: translate .12s, background .12s; }
+.dlg-btns.stack button { justify-content: flex-start; text-align: left; padding: .7em 1em .7em 2.4em; position: relative; background: var(--pp-paper); }
 .dlg-btns.stack .pp-key { display: none; }
-.dlg-btns.stack button::before { content: '▶'; position: absolute; left: 11px; top: 50%; translate: 0 -50%; font-size: 10px; color: #33210c; opacity: 0; }
-.dlg-btns.stack button.dlg-cur { background: #ffd85e; color: #2a1d10; translate: -4px 0; }
+.dlg-btns.stack button::before { content: '▶'; position: absolute; left: .8em; top: 50%; translate: 0 -50%; font-size: .8em; color: var(--pp-rust); opacity: 0; }
+.dlg-btns.stack button.dlg-cur { background: color-mix(in srgb, var(--pp-yellow) 55%, var(--pp-paper)); translate: -4px 0; }
 .dlg-btns.stack button.dlg-cur::before { opacity: 1; animation: dlg-nudge .6s ease-in-out infinite alternate; }
-#dlg[data-input="touch"] .dlg-btns.stack button.dlg-cur { background: #3a4570; color: #fff3d6; translate: none; }
+#dlg[data-input="touch"] .dlg-btns.stack button { padding-left: 1em; }
+#dlg[data-input="touch"] .dlg-btns.stack button.dlg-cur { background: var(--pp-paper); translate: none; }
 #dlg[data-input="touch"] .dlg-btns.stack button::before { opacity: 0; animation: none; }
 @keyframes dlg-nudge { from { translate: 0 -50%; } to { translate: 3px -50%; } }
-.dlg-hint { margin: 0; padding: 6px 0 12px; font-size: 9px; line-height: 1.5; text-align: right; color: #9aa6d6; }
+.dlg-hint { margin: .7em 0 0; font-size: var(--pp-fs-s); line-height: 1.5; text-align: right; color: var(--pp-label); }
 .dlg-hint[hidden] { display: none; }
-@media (max-width: 560px) { .dlg-col { width: 100%; } .dlg-btns.stack button { flex: none; } .dlg-hint { padding: 4px 0 10px; } }
+@media (max-width: 560px) { .dlg-btns.stack button { flex: none; } }
 @media (prefers-reduced-motion: reduce) { .dlg-btns.stack button.dlg-cur::before { animation: none; } }
-/* авто-продолжение (say { auto }): тонкая полоска тает — сколько реплика ещё повисит; не краснеет */
-.dlg-timer.auto { height: 4px; background: transparent; }
-.dlg-timer.auto i { background: #8a96c8; }
 /* в катсцене (body.story-cut) окно — внизу, над чёрной полосой: лица героев в верхней половине кадра видны;
-   затемнение слабее */
+   затемнение слабее; компактнее: портрет меньше, облачко по тексту — над окном героя видно по пояс */
 body.story-cut #dlg { align-items: flex-end; padding-bottom: 3vh; background: rgba(12, 18, 40, .14); }
-/* и компактнее: портрет меньше, облачко по тексту — над окном героя видно по пояс */
-body.story-cut .dlg-row { padding: 12px 18px 4px; gap: 14px; }
-body.story-cut .dlg-head img { width: 104px; height: 104px; border-width: 3px; }
-body.story-cut .dlg-bubble { min-height: 0; padding: 12px 16px 20px; margin-bottom: 22px; }
-body.story-cut .dlg-bubble::before { bottom: 18px; }
-body.story-cut .dlg-bubble::after { bottom: 20px; }
-body.story-cut .dlg-text { line-height: 1.75; }
-body.story-cut .dlg-btns { padding: 6px 18px 12px; }
-body.story-cut .dlg-btns.stack { gap: 6px; }
-body.story-cut .dlg-btns.stack button { padding: 8px 14px 8px 28px; }
-body.story-cut .dlg-hint { padding: 4px 0 8px; }
+body.story-cut #dlg .dlg-box { width: min(760px, 100%); }
+body.story-cut #dlg .dlg-top { display: none; }   /* в катсцене шапки нет — у главы своя плашка, кадр важнее */
+body.story-cut #dlg .dlg-row { gap: 14px; padding: 0; }   /* story.css: прежние отступы старого окна — не нужны */
+body.story-cut #dlg .dlg-head img { width: 88px; height: 88px; }
+body.story-cut #dlg .dlg-bubble { min-height: 0; padding: .7em 1em 1.3em; margin-bottom: 0; }
+body.story-cut #dlg .dlg-btns { margin-top: .6em; padding: 0; }
+body.story-cut #dlg .dlg-btns.stack { gap: 6px; }
+body.story-cut #dlg .dlg-btns.stack button { padding: .55em .9em .55em 2.2em; }
+body.story-cut #dlg .dlg-hint { margin-top: .4em; }
 
 /* полоски под текстом (meters): «мотор 82 %», «ресурс 94 %» у Дяди Жени */
-.dlg-meters { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+/* полоски — одной сеткой на все строки: подписи «мотор» / «ресурс» любой длины (и en), полоски начинаются ровно */
+.dlg-meters { display: grid; grid-template-columns: max-content 1fr max-content; align-items: center; gap: 6px 8px; margin-top: 10px; font-size: var(--pp-fs-s); }
 .dlg-meters[hidden] { display: none; }
-.dlg-m { display: grid; grid-template-columns: 72px 1fr 48px; align-items: center; gap: 8px; font-size: 10px; }
+.dlg-m { display: contents; }
 .dlg-m > i { display: block; height: 10px; background: #e8d9b8; border: 2px solid #33210c; border-radius: 5px; overflow: hidden; }
 .dlg-m > i > i { display: block; height: 100%; }
 .dlg-m b { font-weight: normal; text-align: right; }
@@ -120,3 +189,28 @@ body.story-cut .dlg-hint { padding: 4px 0 8px; }
 @media (max-width: 560px) { #dlg-live .dll-row img { width: 36px; height: 36px; } #dlg-live .dll-b p { font-size: 10px; padding: 7px 11px; } #dlg-live .dll-b b { font-size: 9px; } }
 
 @media (prefers-reduced-motion: reduce) { .dll-row img { animation: none; } }
+
+/* низкий экран (высота ≤ 500 px — телефон боком, 844×390 / 667×375): окно реплики в катсцене — компактное, не выше
+   трети экрана: портрет 44 px, текст мельче в 1—2 строки, ответы столбиком мелко, без подсказки и «пропустить ▸»
+   в облачке (жмут пальцем по ответу); полосы кино тоньше — story.css */
+@media (max-height: 500px) {
+  body.story-cut #dlg { padding: 0 8px 4px; }
+  body.story-cut #dlg .dlg-box { width: min(720px, 100%); border-width: 2px; border-radius: 10px; box-shadow: 0 3px 0 #141a33; }
+  body.story-cut #dlg .dlg-bar { height: 4px; }
+  body.story-cut #dlg .dlg-row { padding: 6px 10px 2px; gap: 10px; align-items: flex-start; }
+  body.story-cut #dlg .dlg-head { gap: 2px; }
+  body.story-cut #dlg .dlg-head img { width: 44px; height: 44px; border-width: 2px; border-radius: 8px; }
+  body.story-cut #dlg .dlg-head b { font-size: 7px; max-width: 72px; }
+  body.story-cut #dlg .dlg-bubble { min-height: 0; padding: 6px 10px; margin-bottom: 4px; border-width: 2px; border-radius: 10px; }
+  body.story-cut #dlg .dlg-bubble::before { bottom: auto; top: 10px; border-width: 7px; border-right-width: 9px; left: -16px; }
+  body.story-cut #dlg .dlg-bubble::after { bottom: auto; top: 12px; border-width: 5px; border-right-width: 7px; left: -10px; }
+  body.story-cut #dlg .dlg-text { font-size: 10px; line-height: 1.5; }
+  body.story-cut #dlg .dlg-skip, body.story-cut #dlg .dlg-hint { display: none; }
+  body.story-cut #dlg .dlg-timer { margin: 0 10px; }
+  body.story-cut #dlg .dlg-btns { padding: 2px 10px 6px; gap: 8px; }
+  body.story-cut #dlg .dlg-btns button { font-size: 9px; padding: 5px 10px; border-width: 2px; box-shadow: 0 2px 0 #33210c; }
+  body.story-cut #dlg .dlg-btns.stack { gap: 4px; padding: 0 0 4px; }
+  body.story-cut #dlg .dlg-btns.stack button { padding: 4px 10px 4px 22px; }
+  body.story-cut #dlg .dlg-btns.stack button::before { left: 8px; font-size: 8px; }
+  body.story-cut #dlg .dlg-btns .pp-key { font-size: 7px; padding: 1px 4px; }
+}

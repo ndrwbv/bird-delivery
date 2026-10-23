@@ -423,7 +423,7 @@ function potStep (s, dt, near) {
   if (w.fall) { if (HITS.fallStep(w, dt)) return; }
   if (sp > 3 && carHits(w.x, w.z, 0.35)) {
     const kmh = sp * 3.6;
-    if (HITS.isFall(kmh)) { if (!w.fall) HITS.fall(w, V.vx, V.vz); return; }
+    if ((HITS.isFall(kmh) || HITS.survive(w, kmh))) { if (!w.fall) HITS.fall(w, V.vx, V.vz); return; }
     w.dead = 1;
     if (s.bubble && s.bubble.parent === g) dropBubble(s);
     A.dropMesh(g);
@@ -526,15 +526,17 @@ function ghostStep (dt) {
 }
 
 /* ═════════════ сборка и шаг ═════════════ */
-export function build (api) {
+/* шагами (function*, latebuild.js): два поиска участков (CONSTR.freeLotsSteps) — на Деке ~0,1—0,12 с одним куском */
+export function* build (api) {
   A = api;
   const t0 = performance.now();
-  const camps = CONSTR.freeLots({ W: CAMP.W, D: CAMP.D, max: CAMP.MAX, gap: CAMP.GAP, salt: 21 });
+  const camps = yield* CONSTR.freeLotsSteps({ W: CAMP.W, D: CAMP.D, max: CAMP.MAX, gap: CAMP.GAP, salt: 21 });
   camps.forEach((s, i) => { s.i = i; s.n = CAMP.N[0] + Math.floor(hash(s.x, s.z, 3) * (CAMP.N[1] - CAMP.N[0] + 1)); s.live = false; s.gen = 0; s.sav = []; CAMPS.push(s); });
-  const pots = CONSTR.freeLots({ W: POT.W, D: POT.D, max: POT.MAX, gap: POT.GAP, salt: 41, avoid: CAMPS.map(c => ({ x: c.x, z: c.z, r: Math.hypot(c.W, c.D) / 2 + 100 })) });
+  yield 'camps';
+  const pots = yield* CONSTR.freeLotsSteps({ W: POT.W, D: POT.D, max: POT.MAX, gap: POT.GAP, salt: 41, avoid: CAMPS.map(c => ({ x: c.x, z: c.z, r: Math.hypot(c.W, c.D) / 2 + 100 })) });
   pots.forEach((s, i) => { s.i = i; s.live = false; s.gen = 0; POTS.push(s); });
   STATS.camps = CAMPS.length; STATS.pots = POTS.length;
-  STATS.ms = Math.round(performance.now() - t0);
+  STATS.ms = Math.round(performance.now() - t0);   // с паузами между шагами
 }
 
 function scan (force) {

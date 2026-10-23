@@ -1,4 +1,4 @@
-/* Карьера (Стим): четырнадцать машин, мотор и ресурс, «заглохла» с мини-игрой, ямы на
+/* Карьера (Стим): пятнадцать машин, мотор и ресурс, «заглохла» с мини-игрой, ямы на
    дорогах и гараж Дяди Жени. Числа — econ.js (CAR_LIST, UPGRADE, BREAK),
    правила — docs/CAREER.md. Работает только когда в game.js CAREER.
 
@@ -15,7 +15,7 @@
      list()               — все машины: цена, звёзды, сердца, мотор/ресурс, куплена ли, прокачка
      buy(id[, api])       — { ok, why: 'owned' | 'stars' | 'money' | 'unknown' }
      select(id)           — выбрать купленную
-     upgrade(id, kind)    — kind: 'armor' (+1 сердце) | 'engine' (+4 % скорости)
+     upgrade(id, kind)    — kind: 'armor' (+1 сердце) | 'engine' (+4 % скорости) | 'wings' (полёт, flycar.js) | 'gun' (гранатомёт, turret.js)
      paint(id, hex)       — покрасить свою за деньги (PAINTS — палитра, econ.js PAINT — цена)
      sell(id)             — продать свою (не текущую и не «Семёрку»): { ok, price } (econ.js SELL)
      current()            — выбранная машина с учётом прокачки (hp, vmax, acc, L…)
@@ -26,12 +26,12 @@
      previewCanvas(id, { w, h, spin }) — картинка машины для карточки магазина
 
    Сохранения: dlv-car-owned (массив id), dlv-car-cur (id), dlv-car-up
-   ({ id: { armor, engine } }), dlv-car-eng ({ id: { c, r, km, n } } — мотор, ресурс, пробег км,
+   ({ id: { armor, engine, wings, gun } }), dlv-car-eng ({ id: { c, r, km, n } } — мотор, ресурс, пробег км,
    ремонтов), dlv-car-paint ({ id: '#hex' }). Звёзды — dlv-stars. Старое dlv-car-L ({ id: L },
    до 03.10.2026) читается один раз, когда у машины ещё нет dlv-car-eng (econ.js BREAK.OLD_L). */
 import * as RESPECT from './respect.js';
 import * as DENT from './cardent.js';
-import { CAR_LIST, UPGRADE, BREAK, upgradePrice, paintPrice, sellPrice, wearK, stallChance, repairQuote } from './econ.js';
+import { CAR_LIST, UPGRADE, ADDON, BREAK, upgradePrice, paintPrice, sellPrice, wearK, stallChance, repairQuote } from './econ.js';
 import { cnCar } from './roadlife.js';
 import { lampDepth } from './carrear.js';
 import { t } from '../i18n/index.js';
@@ -42,6 +42,9 @@ import { KEY as TOUR_KEY } from './garagetour.js';
 import { ZHENYA_KEY } from './doorstep.js';
 import { pad as PAD } from '../input/gamepad.js';
 import './cars.css';
+import * as TEL from './telemetry.js';
+import { wingsLook } from './flycar.js';        // крылышки на борту (улучшение «крылья»)
+import * as GUNM from './turret.js';             // гранатомёт на крыше: подставка и поворотная голова (turret.js)          // анонимная статистика: покупки, улучшения, продажа, ремонт (telemetry.js)
 
 const N_ = s => s;
 let A = null;
@@ -114,6 +117,12 @@ const LOOK = {
     name: N_('Патриот'), note: N_('большой внедорожник: запаска на двери, ямы не замечает'), hex: '#3a4c3c', chrome: '#2a2a2e', model: 'hatch', wheel: 'steel', flare: '#26252a', lift: 0.2, spare: { y: 0.18, z: 0.3, r: 0.19 },
     spec: { L: 4.78, W: 1.9, h: 0.66, hood: 1.35, trunk: 0, cab: 3.05, cz: -0.72, ch: 0.82, r: 0.5, fz: 1.42, bz: -1.35 },
   },
+  // летающий электро-кабриолет (17.10.2026): пародия без бренда — своя молния на носу и корме, открытый верх,
+  // за рулём курьер, рядом манекен в скафандре (flycar.js openCabin); open — makeCar рисует салон без крыши и стёкол
+  roadster: {
+    name: N_('Тесло Родстер'), note: N_('электро-кабриолет: молния на носу, подлетает на время'), hex: '#d8262e', model: 'sedan', wheel: 'alloy', two: true, low: true, open: true, molding: null,
+    spec: { L: 4.0, W: 1.8, h: 0.42, hood: 1.45, trunk: 0.85, cab: 1.6, cz: -0.3, ch: 0.46, r: 0.36, fz: 1.3, bz: -1.25 },
+  },
 };
 const BY_ID = new Map(CAR_LIST.map(c => [c.id, c]));
 const START = CAR_LIST[0].id;
@@ -126,7 +135,10 @@ const flush = () => { const p = A && A.Platform; if (p && p.store && p.store.flu
 const obj = k => { const v = sget(k, {}); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; };
 const ownedIds = () => { const v = sget(K_OWN, [START]); const a = Array.isArray(v) ? v.filter(id => BY_ID.has(id)) : []; if (!a.includes(START)) a.unshift(START); return a; };
 const curId = () => { const id = sget(K_CUR, START); return BY_ID.has(id) && ownedIds().includes(id) ? id : START; };
-const ups = id => { const u = obj(K_UP)[id] || {}; return { armor: Math.min(UPGRADE.STEPS, +u.armor || 0), engine: Math.min(UPGRADE.STEPS, +u.engine || 0) }; };
+const ups = id => { const u = obj(K_UP)[id] || {}; return { armor: Math.min(UPGRADE.STEPS, +u.armor || 0), engine: Math.min(UPGRADE.STEPS, +u.engine || 0),
+  wings: u.wings && !(BY_ID.get(id) || {}).fly ? 1 : 0, gun: u.gun ? 1 : 0 }; };   // крылья и гранатомёт — один раз (econ.js ADDON); у родстера крыльев нет — летает и так
+/* докупить можно: крылья — не родстеру; что уже стоит — null */
+const addonPrice = (id, u, k) => (u[k] || (k === 'wings' && (BY_ID.get(id) || {}).fly) ? null : ADDON[k]);
 /* палитра покраски: 10 цветов; «заводской» — свой у каждой машины (LOOK.hex) */
 export const PAINTS = [
   { hex: '#d8262e', name: N_('красный') }, { hex: '#f0522a', name: N_('оранжевый') }, { hex: '#f2c21b', name: N_('жёлтый') },
@@ -181,7 +193,9 @@ function spec (id) {
     vmaxBase: c.vmax, vmax: Math.round(c.vmax * (1 + u.engine * UPGRADE.VMAX) * 10) / 10, acc: c.acc,
     Lbase: c.L, wearK: wearK(c), offroad: !!c.offroad, up: u, handling: c.handling ?? 5,
     cond: Math.round(e.c), ceil: Math.round(e.r), km: Math.round(e.km), repairs: e.n, stallP: stallP(id, e), L: (100 - e.c) / 10,
-    upPrice: { armor: u.armor < UPGRADE.STEPS ? upgradePrice(c, u.armor) : null, engine: u.engine < UPGRADE.STEPS ? upgradePrice(c, u.engine) : null },
+    upPrice: { armor: u.armor < UPGRADE.STEPS ? upgradePrice(c, u.armor) : null, engine: u.engine < UPGRADE.STEPS ? upgradePrice(c, u.engine) : null,
+      wings: addonPrice(id, u, 'wings'), gun: addonPrice(id, u, 'gun') },
+    fly: !!c.fly,                                   // родстер летает с завода — крыльев не предлагаем
     paintPrice: paintPrice(c), sellPrice: sellPrice(c, u, e.r),
   };
 }
@@ -204,6 +218,7 @@ export function buy (id, api = A) {
   newEng(id);                                       // новая: мотор 100 %, ресурс 100 %, обкатка
   select(id);
   flush();                                          // покупка — сохранить сразу
+  TEL.ev('buy', { what: 'car', id, price: c.price }); TEL.first('buy1', { what: 'car', id });
   return { ok: true };
 }
 export function select (id) {
@@ -227,18 +242,21 @@ export function labPaint (id, hex) {
 }
 export function upgrade (id, kind, api = A) {
   const c = BY_ID.get(id);
-  if (!c || (kind !== 'armor' && kind !== 'engine')) return { ok: false, why: 'unknown' };
+  const add = kind === 'wings' || kind === 'gun';  // крылья и гранатомёт — один раз, цена одна (econ.js ADDON)
+  if (!c || (kind !== 'armor' && kind !== 'engine' && !add)) return { ok: false, why: 'unknown' };
   if (!ownedIds().includes(id)) return { ok: false, why: 'owned' };
   const u = ups(id);
-  if (u[kind] >= UPGRADE.STEPS) return { ok: false, why: 'max' };
-  const price = upgradePrice(c, u[kind]);
+  if (add && kind === 'wings' && c.fly) return { ok: false, why: 'unknown' };
+  if (add ? u[kind] : u[kind] >= UPGRADE.STEPS) return { ok: false, why: 'max' };
+  const price = add ? ADDON[kind] : upgradePrice(c, u[kind]);
   if (wallet(api) < price || !pay(api, price)) return { ok: false, why: 'money', need: price };
   const all = obj(K_UP);
   all[id] = { ...u, [kind]: u[kind] + 1 };
   sset(K_UP, all);
   flush();
   PREV.delete(id);
-  if (id === curId() && A && A.resetCar) A.resetCar();   // кенгурятник виден сразу
+  if (id === curId() && A && A.resetCar) A.resetCar();   // кенгурятник, крылья, гранатомёт видны сразу
+  TEL.ev('buy', { what: kind, id, price, lv: u[kind] + 1 }); TEL.first('buy1', { what: kind, id });
   return { ok: true, price };
 }
 /* покраска: hex — из PAINTS или заводской; тот же цвет второй раз не продаём */
@@ -256,6 +274,7 @@ export function paint (id, hex, api = A) {
   flush();
   PREV.delete(id);
   if (id === curId() && A && A.resetCar) A.resetCar();
+  TEL.ev('buy', { what: 'paint', id, price }); TEL.first('buy1', { what: 'paint', id });
   return { ok: true, price };
 }
 /* продажа: половина цены × ресурс (econ.js SELL) + половина вложенного в броню и мотор; прокачка, цвет и мотор — сброс */
@@ -272,6 +291,7 @@ export function sell (id, api = A) {
   api.addWallet(price);
   flush();
   PREV.delete(id);
+  TEL.ev('buy', { what: 'sell', id, price });
   return { ok: true, price };
 }
 /* сделать хуже / лучше (бандиты, сюжет): worsen(n) — мотор −BREAK.GANG_WEAR × n %;
@@ -281,6 +301,7 @@ export function repair (pct = 10, id = curId()) { const e = eng(id); return setE
 /* ремонт у Дяди Жени: мотор до ресурса, ресурс −quote.drop, без денег (деньги — в offer) */
 export function fix (id = curId()) {
   const e = eng(id), q = repairQuote(e.c, e.r);
+  TEL.ev('buy', { what: 'repair', id, price: q.price, pct: q.pct });
   return setEng(id, { ...e, c: e.r, r: e.r - q.drop, n: e.n + 1 });
 }
 export const names = () => Object.fromEntries(CAR_LIST.map(c => [c.id, t(LOOK[c.id].name)]));
@@ -294,6 +315,7 @@ export function makeModel (id, o = {}) {
   const hex = o.hex || hexOf(id);
   const g = A.makeCar(hex, !!o.sign, c.model, false, {
     spec: c.spec, lift: c.lift || 0, low: c.low, tint: c.tint, chrome: c.chrome || hex, roofHex: c.roof, see: !!o.see,   // see — салон со стёклами и курьером (carglass.js)
+    open: !!c.open,                                 // кабриолет: без крыши и стёкол, курьер и манекен видны всегда (flycar.js openCabin)
     armor: u.armor,                                 // броня — вмятины мельче, кенгурятник держит передний бампер (cardent.js)
     dual: u.engine >= 2, spare: c.spare || false,   // зад своей машины (carrear.js): двойной выхлоп, запаска на двери (логотип — на её колпаке)
     dress: (g, add, k) => dress(id, g, add, k, u),
@@ -304,11 +326,24 @@ export function makeModel (id, o = {}) {
   g.userData.ws = WS.run ? { run: WS.run, rise: WS.rise } : null;   // наклонное лобовое: дворники ложатся на него (wipers.js)
   g.userData.wsB = WS.brun ? { run: WS.brun, rise: WS.brise } : null;   // наклонное заднее — задний дворник на нём
   g.userData.hatch = !c.spec.trunk;               // без багажника (хэтчбек, джип, фургон) — есть задний дворник
+  g.userData.wings = !!u.wings;                    // крылья: полёт, как у родстера, но слабее (flycar.js WINGS)
+  // гранатомёт: голова — отдельной группой над подставкой (крутится, turret.js); точка — из dress
+  if (u.gun && GUNAT.y !== null) {
+    const h = GUNM.head(A.put, A.mergeGeos, gunAdult());
+    h.position.set(GUNAT.x, GUNAT.y + 0.1 + GUNAT.dy, GUNAT.z);
+    g.add(h);
+    g.userData.gun = h;
+  } else g.userData.gun = null;
+  GUNAT.y = null;
   WS.run = WS.brun = 0;
   return g;
 }
 
 const WS = { run: 0, rise: 0, brun: 0, brise: 0 };                    // наклон лобового последней собранной машины (dress → makeModel)
+const GUNAT = { x: 0, y: null, z: 0, dy: 0 };                         // где подставка гранатомёта (dress → makeModel)
+/* взрослая — гранатомёт, детская (?kids, Яндекс) — водомёт; A.adult даёт game.js */
+const gunAdult = () => !!(A && A.adult);
+export const adult = gunAdult;                   // гараж: «гранатомёт» или «водомёт»
 /* морда, корма и мелочи — всё, кроме фар, в общий склеенный меш кузова;
    фары и фонари — один меш без света, чтобы горели ночью */
 function dress (id, g, add, k, u) {
@@ -549,6 +584,28 @@ function dress (id, g, add, k, u) {
       break;
     }
   }
+  if (id === 'roadster') {
+    // гладкий нос без решётки, узкие раскосые фары, щель воздухозаборника внизу; на носу и корме — своя молния
+    B(W * 0.64, 0.24, 0.06, bodyHex, 0, top - 0.08, hl + 0.005);              // закрыть общую решётку цветом кузова
+    B(W * 0.56, 0.07, 0.05, DARK, 0, y0 - 0.12, fr + 0.02);
+    both(s => {
+      rect(0.42, 0.07, '#eaf4ff', s * (W / 2 - 0.3), top - 0.06, fr + 0.01, s * 0.28);
+      rect(0.5, 0.06, TAIL, s * (W / 2 - 0.32), top - 0.05, bk);
+    });
+    rect(W * 0.34, 0.035, TAIL, 0, top - 0.05, bk);                            // фонари — почти полосой во всю корму
+    B(W - 0.36, 0.04, 0.12, bodyHex, 0, top + 0.19, -hl + 0.12);               // губа спойлера на крышке
+    // молния: три наклонных штриха зигзагом, белым по красному — на носу (над щелью) и на крышке багажника
+    const bolt = (y, z, sc, face) => {
+      B(0.05 * sc, 0.13 * sc, 0.02, '#fff3d6', 0.025 * sc, y + 0.05 * sc, z, 0, 0, -0.45);
+      B(0.09 * sc, 0.035 * sc, 0.02, '#fff3d6', 0, y, z);
+      B(0.05 * sc, 0.13 * sc, 0.02, '#fff3d6', -0.025 * sc, y - 0.05 * sc, z, 0, 0, -0.45);
+      if (face) B(0.15 * sc, 0.3 * sc, 0.012, '#f2c21b', 0, y, z - 0.008);   // жёлтая подложка-ромбик
+    };
+    bolt(top - 0.1, fr + 0.04, 1.3, true);
+    B(0.24, 0.02, 0.32, '#fff3d6', 0, top + 0.145, hl - 0.4, 0, Math.PI / 4);  // молния-ромб на капоте (сверху видно)
+    B(0.18, 0.025, 0.24, '#f2c21b', 0, top + 0.15, hl - 0.4, 0, Math.PI / 4);
+    bolt(top - 0.12, bk - 0.03, 1, false);
+  }
   // броня: кенгурятник, на третьей ступени — ещё и люстра на крыше
   if (u.armor >= 1) {
     const zb = hl + 0.22, yb = y0 + 0.02;
@@ -561,6 +618,14 @@ function dress (id, g, add, k, u) {
     B(W * 0.7, 0.06, 0.12, '#2b2c31', 0, roof + 0.12, cf - 0.2);
     for (let i = -1; i <= 1; i++) round(0.07, HEAD, i * 0.3, roof + 0.2, cf - 0.14);
   }
+  // крылья (flycar.js WINGS): крылышки по бортам и антикрыло на корме
+  if (u.wings) wingsLook(add, { S, W, top, hl });
+  // гранатомёт (turret.js): подставка на крыше, у кабриолета — на палубе за сиденьями; голова — в makeModel
+  if (u.gun) {
+    const at = LOOK[id].open ? { x: 0, y: top + 0.08, z: cb - 0.3 } : { x: 0, y: roof, z: S.cz - 0.05 };
+    GUNM.mount(add, at, gunAdult());
+    GUNAT.x = at.x; GUNAT.y = at.y; GUNAT.z = at.z; GUNAT.dy = dy || 0;
+  }
   // мотор: на второй ступени — двойной выхлоп
   if (u.engine >= 2) both(s => add(new THREE.CylinderGeometry(0.05, 0.05, 0.3, 8).rotateX(Math.PI / 2), '#9aa0a8', s * 0.25, y0 - 0.2, -hl - 0.05));
   // своя машина: задние фонари в нише с рифлёным стеклом и белым стеклом заднего хода (carrear.js)
@@ -568,6 +633,7 @@ function dress (id, g, add, k, u) {
   if (k.see) lampDepth(add, lamp, backs, { minY: y0 + 0.05, frameHex: LOOK[id].chrome && new THREE.Color(CHR).getHSL({}).l > 0.5 ? CHR : '#' + new THREE.Color(bodyHex).multiplyScalar(0.55).getHexString() });
   if (lamps.length) {
     const m = new THREE.Mesh(A.mergeGeos(lamps), new THREE.MeshBasicMaterial({ vertexColors: true }));
+    if (k.see) m.material.userData.glow = 1;      // своя машина: фары и фонари ночью не темнеют вместе с городом (FLAT_MATS) — горят (carlights.js)
     m.position.y = -dy;                           // склейку сдвинет вместе с кузовом, put уже поднял
     g.add(m);
   }
@@ -754,6 +820,7 @@ function patch (M, x, z, ang, R, lift) {
    только ближайший, дальние (> 250 м) спрятаны. */
 let GARS = [], GAR = null, ZHENYA = null;
 const GW = 5.8, GD = 8.4, GH = 3.3, DOOR = 3.4;
+const GATE_OUT = 6, GATE_SIDE = 3.6;          // зона «подъехал»: до 6 м перед воротами, ±3,6 м вбок (дальше — край улицы)
 const garagePoints = () => { const C = A.MAP.career; return C ? C.garages || (C.garage ? [C.garage] : []) : []; };
 const garOpen = g => !DIST.has() || DIST.at(g.ox, g.oz) < DIST.opened();
 
@@ -789,6 +856,7 @@ function garageSpot (G) {
           if (blocked(g.ox + g.rx * u + g.fx * v, g.oz + g.rz * u + g.fz * v)) ok = false;
       if (!ok) continue;
       g.road = { x: road.x, z: road.z, w };
+      g.roadV = (road.x - g.ox) * fx + (road.z - g.oz) * fz - w / 2;   // от ворот до края улицы, м
       return g;
     }
   }
@@ -821,10 +889,11 @@ function signMat () {
   return new THREE.MeshBasicMaterial({ map: tex });
 }
 
-function buildGarage (G) {
+function* buildGarage (G) {                         // шагами (buildSteps): место, бокс, Дядя Женя
   const g = garageSpot(G);
   if (!g) return;
   GAR = g; GARS.push(g);
+  yield 'spot';
   const { THREE, LIT, FLAT, box, put, obb } = A;
   const { fx, fz, rx, rz, ry, gy } = g;
   const at = (u, v) => [g.ox + rx * u + fx * v, g.oz + rz * u + fz * v];   // u — вбок, v — наружу (внутри гаража v < 0)
@@ -902,6 +971,7 @@ function buildGarage (G) {
   A.scene.add(new THREE.Mesh(sg, signMat()));
   B(5.0, 1.0, 0.1, '#6b4f3a', 0, GH + 0.62, -0.05);
   for (const s of [-1, 1]) B(0.08, 0.5, 0.08, '#2b2a30', s * 2.2, GH + 0.1, -0.05);
+  yield 'box';
   buildZhenya();
   g.zh = ZHENYA;
 }
@@ -938,16 +1008,23 @@ function buildZhenya () {
   ZHENYA = { fig, person, t: 0 };
 }
 
-export function build () {
+/* шагами (function*, latebuild.js): на Деке ~0,2 с одним куском — районы, гаражи, ямы, ямы разбитого асфальта */
+export function* buildSteps () {
   if (!A) return;
-  const t0 = performance.now();
+  let t0 = performance.now(), ms = 0;
+  const pause = () => { ms += performance.now() - t0; };
   if (A.ZN && A.ZN.init) A.ZN.init({ CITY: A.CITY, MAP: A.MAP, donated: A.donated || (() => 0) });   // районы нужны ямам уже сейчас
-  for (const G of garagePoints()) buildGarage(G);
+  pause(); yield 'zones'; t0 = performance.now();
+  for (const G of garagePoints()) { const it = buildGarage(G); for (let r = it.next(); !r.done; r = it.next()) { pause(); yield 'garage'; t0 = performance.now(); } pause(); yield 'garage'; t0 = performance.now(); }
   GAR = GARS[0] || null; ZHENYA = GAR ? GAR.zh : null;
+  pause(); yield 'garage'; t0 = performance.now();
   buildPotholes();
-  const broken = RW.drawPots(A.LITM);              // ямы разбитого асфальта (roadwear.js) — тоже в статику, там же, где трясёт
-  return { ms: Math.round(performance.now() - t0), potholes: POT.length, brokenPots: broken, garage: !!GAR, garages: GARS.length };
+  pause(); yield 'pots'; t0 = performance.now();
+  const broken = yield* RW.drawPotsSteps(A.LITM);              // ямы разбитого асфальта (roadwear.js) — тоже в статику, там же, где трясёт
+  pause();
+  return { ms: Math.round(ms), potholes: POT.length, brokenPots: broken, garage: !!GAR, garages: GARS.length };
 }
+export function build () { const it = buildSteps(); let r; do r = it.next(); while (!r.done); return r.value; }
 export const potholes = () => POT;
 export const garage = () => GAR;
 export const garages = () => GARS;
@@ -1010,7 +1087,7 @@ function stall (why) {
   const Snd = A.Snd;
   if (Snd) Snd.fx('engine-stall', s => { s.blip(70, 0.35, 'sawtooth', 0.2); setTimeout(() => s.blip(52, 0.4, 'square', 0.14), 160); s.noise(0.3, 0.2); }, { eng: 1 });
   if (A.rumble) A.rumble(0.5, 300);
-  A.toast(why === 'pothole' ? t('ой… в яме заглохла') : t('заглохла!'));
+  A.toast(why === 'pothole' ? t('ой… в яме заглохла') : t('заглохла!'), { urgent: true });   // срочное — перебивает уведомление на экране (notifyq.js)
 }
 function showGame () {
   ui();
@@ -1203,7 +1280,10 @@ function garageStep (dt, vf) {
     if (ud.armL) ud.armL.rotation.x = Math.sin(ZHENYA.t * 1.3 + 1) * 0.05;
     if (ud.head) ud.head.rotation.y = near ? Math.max(-0.7, Math.min(0.7, Math.atan2(V.x - ZHENYA.fig.position.x, V.z - ZHENYA.fig.position.z) - ZHENYA.fig.rotation.y)) : Math.sin(ZHENYA.t * 0.4) * 0.3;
   }
-  const inside = Math.abs(u) < GW / 2 - 0.4 && v < -1.2 && v > -GD + 0.6;
+  /* подъехал и встал (автор 12.10.2026: «как только подъехал и остановился, а не вглубь») — внутри бокса
+     или на площадке перед воротами: до GATE_OUT м от ворот, ±GATE_SIDE м вбок; с улицы (её край — g.roadV) не ловит */
+  const outV = Math.max(2.5, Math.min(GATE_OUT, (GAR.roadV ?? 99) - 1.2));
+  const inside = v > -GD + 0.6 && (v < 0 ? Math.abs(u) < GW / 2 - 0.4 : v < outV && Math.abs(u) < GATE_SIDE);
   const ok = inside && Math.abs(vf) < 0.8 && !ST.on && !GS.offered && !GS.busy && (DRIVING.has(S.state) || S.ride);
   GS.stillT = ok ? GS.stillT + dt : 0;
   if (GS.stillT > 0.6) { GS.offered = true; GS.stillT = 0; offer(); }
@@ -1228,35 +1308,36 @@ async function offer () {
   // скидка от клиента (разговор у двери, doorstep.js ZHENYA_KEY: «скажи, что от меня») — на один ремонт, вместе со скидкой звания
   const talkOff = Math.min(0.5, Math.max(0, +(A.Store ? A.Store.get(ZHENYA_KEY, 0) : 0) || 0));
   const price = Math.round(q.price * (1 - (RESPECT.perk('garageOff') || 0) - talkOff) / 10) * 10;   // звание по респекту — скидка (econ.js RESPECT.LEVELS)
-  const face = ZHENYA ? ZHENYA.person : null, name = t('Дядя Женя'), color = '#6f8a3a';
+  const face = ZHENYA ? ZHENYA.person : null, name = t('Дядя Женя'), color = '#6f8a3a', head = t('гараж');
   const pc = n => String(Math.round(n));
   GS.busy = true;
   try {
     // первый раз в гараже на районе (а экран гаража ещё не открывали) — знакомится и зовёт в гараж меню
     if (!GS.met && A.Store && !A.Store.get(TOUR_KEY, 0)) {
       GS.met = true;
-      await DLG.say({ person: face, name, color, text: t('о, новенький! я Дядя Женя. тут я чиню: заехал, встал — подшаманю. а тачки купить и прокачать — это в гараже в меню, там всё покажу'), accept: t('понял') });
+      await DLG.say({ person: face, name, color, head, text: t('о, новенький! я Дядя Женя. тут я чиню: подъехал к воротам, встал — подшаманю. а тачки купить и прокачать — это в гараже в меню, там всё покажу'), accept: t('понял') });
     }
     if (q.pct < BREAK.REPAIR_MIN_PCT) {
       if (bodyHurt()) {                              // мотор цел, а кузов мятый — выправит даром (cardent.js)
-        await DLG.say({ person: face, name, color, mood: 'calm', meters: meters(e),
+        await DLG.say({ person: face, name, color, head, mood: 'calm', meters: meters(e),
           text: t('мотор в порядке, крутить нечего. а кузов выправлю: вмятины, бампер, зеркала, стёкла — даром, по-соседски'), accept: t('спасибо!') });
         bodyFix();
         A.toast(t('кузов как новый'));
         return;
       }
-      await DLG.say({ person: face, name, color, meters: meters(e),
+      await DLG.say({ person: face, name, color, head, meters: meters(e),
         text: e.r >= 80 ? t('о, здорово. машина как часы — нечего тут крутить. езжай давай')
           : t('мотор {c} % — больше из него не выжму, ресурс {r} %.', { c: pc(e.c), r: pc(e.r) }) + ceilWord(e.r),
         accept: t('ну ок') });
       return;
     }
     if (wallet(A) < price) {
-      await DLG.say({ person: face, name, color, meters: meters(e), text: t('ну чё, опять стучит? мотор {c} %, подтяну до {r} % за {money}, но у тебя столько нет. заезжай, как заработаешь', { c: pc(e.c), r: pc(e.r), money: A.money(price) }), accept: t('ладно') });
+      await DLG.say({ person: face, name, color, head, meters: meters(e), text: t('ну чё, опять стучит? мотор {c} %, подтяну до {r} % за {money}, но у тебя столько нет. заезжай, как заработаешь', { c: pc(e.c), r: pc(e.r), money: A.money(price) }), accept: t('ладно') });
       return;
     }
-    const yes = await DLG.say({ person: face, name, color, mood: 'calm', meters: meters(e),
+    const yes = await DLG.say({ person: face, name, color, head, mood: 'calm', meters: meters(e),
       text: t('ну чё, опять стучит? мотор {c} %, подтяну до {r} % за {money}.', { c: pc(e.c), r: pc(e.r), money: A.money(price) }) + ceilWord(e.r),
+      pay: '−' + A.money(price), payLabel: t('ремонт'),                     // цена — под портретом (автор 12.10.2026)
       accept: t('давай, Дядь Жень'), decline: t('не, потом') });
     if (!yes) return;
     if (!pay(A, price)) return;
@@ -1264,7 +1345,7 @@ async function offer () {
     const now = fix(id);
     bodyFix();                                       // заодно выправил кузов: вмятины, детали, стёкла (cardent.js)
     if (A.Snd) A.Snd.fx('repair', s => [0, 140, 300, 420].forEach((d, i) => setTimeout(() => s.blip(900 + i * 140, 0.06, 'square', 0.08), d)));
-    await DLG.say({ person: face, name, color, meters: meters(now),
+    await DLG.say({ person: face, name, color, head, meters: meters(now),
       text: (now.r >= 90 ? t('во, другое дело. мотор {c} %, езжай аккуратней', { c: pc(now.c) })
         : t('ну вот, мотор {c} %. а ресурс теперь {r} % — как новая уже не будет', { c: pc(now.c), r: pc(now.r) })) + (now.r < 60 ? ceilWord(now.r) : ''),
       accept: t('спасибо!') });

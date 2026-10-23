@@ -32,6 +32,7 @@ import { t } from '../i18n/index.js';
 import { hourOf } from './econ.js';
 import * as DIST from './districts.js';
 import * as HITS from './hits.js';
+import * as WARM from './warmup.js';           // прогрев шейдера «сеточки» при загрузке (18.10.2026: собиралась в первую ночь — рывок на телефоне)
 
 export const WORK = {
   FROM: 22, TO: 5,              // часы мира
@@ -103,6 +104,7 @@ function netMat () {
   NET.userData.keep = true;
   return NET;
 }
+WARM.samplesFrom((T, geo) => [['сеточка чулок (nightlife.js netMat)', new T.Mesh(geo, netMat())]]);
 
 const FURS = ['#f2ece4', '#f2a6c8', '#c89a5a', '#26222a', '#c8642a', '#b8b2c8'];
 const MINIS = ['#e0287a', '#141216', '#c81e3a', '#7a2ac8', '#c8c8d8', '#d9a520'];
@@ -274,7 +276,7 @@ function workStep (dt) {
       if (sp > 3) {
         const dx = p.x - V.x, dz = p.z - V.z;
         if (Math.abs(dx * fx + dz * fz) < A.CAR_L + 0.5 && Math.abs(dx * fz - dz * fx) < A.CAR_W + 0.35) {
-          if (HITS.isFall(kmh)) { if (!p.fall) HITS.fall(p, V.vx, V.vz); continue; }
+          if ((HITS.isFall(kmh) || HITS.survive(p, kmh))) { if (!p.fall) HITS.fall(p, V.vx, V.vz); continue; }
           p.dead = 1;
           if (s.bubble && s.bubble.parent === g) dropBubble(s);
           A.dropMesh(g);

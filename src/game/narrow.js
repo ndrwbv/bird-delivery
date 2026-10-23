@@ -28,8 +28,9 @@ export const NARROW = {
 };
 
 // two — одностороння в тупик: для потока двусторонний тупик с разворотом (deadends.js), полосы — как у двусторонней
-export const narrow = e => !!e && (!e.oneway || !!e.two) && e.w < NARROW.ONE_LANE;
-const tiny = e => narrow(e) && !e.oneway && e.w < NARROW.ONE_WAY;
+// ширина — прежняя, до «полос шире» (e.w0, roadwiden.js): какие улицы узкие, не поменялось
+export const narrow = e => !!e && (!e.oneway || !!e.two) && (e.w0 || e.w) < NARROW.ONE_LANE;
+const tiny = e => narrow(e) && !e.oneway && (e.w0 || e.w) < NARROW.ONE_WAY;
 /* насколько можно прижаться вправо от оси */
 export const pullMax = e => Math.max(0, Math.min(e.w / 4, e.w / 2 - NARROW.HALF_W - NARROW.MARGIN));
 

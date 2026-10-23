@@ -1,6 +1,6 @@
 /* Пауза (04.10.2026): сверху — чек смены (до конца смены, доставлено, заработано, респект…) и
    накладная (текущий заказ, адрес, сколько до точки), внизу — полоса кнопок-карточек, как в главном
-   меню (carousel.js): продолжить · карта района · повтор последних 10 с (replay.js) · настройки (те же, что в главном меню, settings.js)
+   меню (carousel.js): продолжить · карта района · повтор последних 10 с (replay.js) · музыка: трек (music.js) · настройки (те же, что в главном меню, settings.js)
    · управление (настройки сразу на табе «управление») · закончить смену. Без прокрутки на любом
    экране; листок, который не влез, листается внутри себя. Правила — docs/CAREER.md «Пауза».
    Кнопки и листки — те же элементы из index.html (#pm-go, #pm-stats, #pm-order, #pm-map, #pm-menu):
@@ -9,7 +9,7 @@
    красный штамп; «пауза» — жёлтый стикер. Значка кнопки [A] / [Enter] на ярлычках нет (автор, 10.10.2026):
    как выбрать — одной строкой внизу, как в главном меню («листай ◀ ▶ · выбрать [Enter]», по вводу — glyphs.js).
 
-     PZ.init(elPause, { settings(tab), navReset }) — из game.js один раз
+     PZ.init(elPause, { settings(tab), navReset, replay, music(), musicLabel() }) — из game.js один раз
      PZ.reset()      — при открытии паузы: в центр «продолжить»
      PZ.flip(±1), PZ.on() — листать (game.js padStep, career.js onKey) */
 import './pausecz.css';
@@ -50,6 +50,10 @@ export function init (el, api) {
   rp.type = 'button'; rp.id = 'pm-replay';
   rp.addEventListener('click', () => { if (A.replay) A.replay(); });
   if ($('pm-sfx')) $('pm-sfx').hidden = true;
+  // «музыка: трек» (music.js): нажал — следующий трек, после последнего — «выкл», ещё раз — снова играет (телефон: без клавиш)
+  const mu = document.createElement('button');
+  mu.type = 'button'; mu.id = 'pm-music';
+  mu.addEventListener('click', () => { if (A.music) A.music(); });
   const btnCard = (key, btn) => {
     const c = document.createElement('div');
     c.className = 'pz-card pz-btn';
@@ -62,6 +66,7 @@ export function init (el, api) {
     btnCard('go', $('pm-go')),
     btnCard('map', $('pm-map')),
     btnCard('replay', rp),
+    btnCard('music', mu),
     btnCard('set', set),
     btnCard('keys', ctrl),
     btnCard('end', $('pm-menu')),
@@ -77,7 +82,8 @@ export function label () {
   const b = $('pm-set'); if (b) b.textContent = t('настройки');
   const c = $('pm-ctrl'); if (c) c.textContent = t('управление');
   const r = $('pm-replay'); if (r) r.textContent = t('повтор последних 10 с');
-  for (const id of ['pm-go', 'pm-map', 'pm-replay', 'pm-set', 'pm-ctrl', 'pm-menu']) {
+  const m = $('pm-music'); if (m) m.textContent = (A && A.musicLabel ? A.musicLabel() : t('музыка')) + ' ▶';
+  for (const id of ['pm-go', 'pm-map', 'pm-replay', 'pm-music', 'pm-set', 'pm-ctrl', 'pm-menu']) {
     const n = $(id);
     if (n) for (const k of n.querySelectorAll('.pp-key')) k.remove();
   }

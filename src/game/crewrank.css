@@ -1,0 +1,96 @@
+/* ── рейтинг смены на хаде (crewrank.js): место сменилось — строка «место N из M» на миг вспыхивает
+   (вверх — зелёным, вниз — красным) и рядом штампом шлёпается стрелка ↑ / ↓ на бумажке, наклон −8°;
+   всё вместе 1,4 с, потом стрелка тает — в покое ничего не движется (UI-REVIEW: в езде не отвлекать).
+   Меньше движения — без увеличения и тряски, только цвет. docs/CAREER.md «Рейтинг смены». ── */
+#rivals li.cr-up, #rivals li.cr-down { --cr: #3fd16b; position: relative; border-radius: 3px; animation: cr-flash 1.4s ease-out both; }
+#rivals li.cr-down { --cr: #ff4d5e; }
+#rivals li.cr-up b, #rivals li.cr-down b { animation: cr-pop 1s ease-out both; }   /* текст на миг белый — плашка не растёт, стрелку не задевает */
+/* стрелка — справа от плашки, поверх города: строка не раздвигается и не прыгает */
+#rivals li em.cr-arr { position: absolute; left: calc(100% + 20px); top: 50%; width: 18px; height: 18px; margin-top: -11px; display: flex; align-items: center; justify-content: center;
+                       color: var(--cr); background: #fff3d6; border: 2px solid var(--cr); border-radius: 3px; box-shadow: 1px 2px 0 #33210c;
+                       animation: cr-stamp 1.4s cubic-bezier(.2, .9, .3, 1.2) both; }
+#rivals li em.cr-arr svg { width: 13px; height: 13px; fill: currentColor; }
+#rivals li.cr-down em.cr-arr svg { transform: rotate(180deg); }
+@keyframes cr-flash {
+  0%, 35% { background: color-mix(in srgb, var(--cr) 75%, transparent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--cr) 75%, transparent); }
+  100% { background: transparent; box-shadow: 0 0 0 4px transparent; }
+}
+@keyframes cr-pop { 0%, 30% { color: #fff; } }
+@keyframes cr-stamp {
+  0% { transform: scale(2.4) rotate(-20deg); opacity: 0; }
+  14% { transform: scale(.9) rotate(-8deg); opacity: 1; }
+  24% { transform: scale(1.05) rotate(-8deg); }
+  32%, 78% { transform: rotate(-8deg); opacity: 1; }
+  100% { transform: rotate(-8deg); opacity: 0; }
+}
+@keyframes cr-fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+@media (max-width: 560px), (max-height: 430px) { #rivals li em.cr-arr { width: 15px; height: 15px; margin-top: -9px; } #rivals li em.cr-arr svg { width: 11px; height: 11px; } }
+@media (prefers-reduced-motion: reduce) {
+  #rivals li.cr-up b, #rivals li.cr-down b { animation: none; }
+  #rivals li em.cr-arr { animation: cr-fade 1.4s both; transform: rotate(-8deg); }
+}
+body.calm-fx #rivals li.cr-up b, body.calm-fx #rivals li.cr-down b { animation: none; }
+body.calm-fx #rivals li em.cr-arr { animation: cr-fade 1.4s both; transform: rotate(-8deg); }
+
+/* ── таблица после вручения (crewrank.js sheetOpen): строка «место N из M» разворачивается листком накладной —
+   бумага, чернила, бурый пунктир между строками, деньги зелёные, ты — жёлтым маркером. Лист лежит ровно поверх
+   строки и растёт из неё (масштаб --sx/--sy — её размер к листу), через SHEET.HOLD с схлопывается в неё же.
+   Строки уже в новом порядке; кто сменил место — стартует со старого (--dy строк) и проезжает (--mv), номера мест
+   слева стоят; потом штамп стрелки. Тень от .hud снята — на бумаге текст чистый. Меньше движения — без анимаций. ── */
+#rank-sheet { position: absolute; z-index: 6; width: max-content; box-sizing: border-box; padding: .45em .6em .5em; font-size: 11px; line-height: 1;
+  color: #33210c; background: #fff3d6; border: 2px solid #33210c; border-radius: 3px; box-shadow: 0 4px 0 #33210c; text-shadow: none;
+  transform-origin: 0 0; --rh: 1.95em; }
+#rank-sheet[hidden] { display: none; }
+#rank-sheet .rk-head { display: flex; align-items: center; gap: .5em; padding: .15em 0 .45em; border-bottom: 2px solid #33210c; }
+#rank-sheet .rk-head b { font-weight: normal; color: #33210c; }
+#rank-sheet .rk-head span { margin-left: auto; padding-left: 1.2em; font-size: .82em; letter-spacing: .08em; text-transform: uppercase; color: #8a3b22; }
+#rank-sheet i.rk-you { flex: none; display: inline-block; width: .95em; height: .95em; background: #f0522a; border: 1px solid #33210c; border-radius: 2px; }
+#rank-sheet .rk-body { display: flex; }
+#rank-sheet .rk-nums { flex: none; display: flex; flex-direction: column; margin-right: .3em; }
+#rank-sheet .rk-nums i { display: flex; align-items: center; justify-content: flex-end; height: var(--rh); min-width: 1.1em; font-style: normal; color: #75573b;
+  border-bottom: 2px dotted transparent; box-sizing: border-box; }
+#rank-sheet .rk-rows { flex: 1; display: flex; flex-direction: column; }
+#rank-sheet .rk-row { position: relative; display: flex; align-items: center; gap: .5em; height: var(--rh); box-sizing: border-box; padding: 0 1.95em 0 .3em;
+  border-bottom: 2px dotted #8a6b4e; background: #fff3d6; transform: translateY(calc(var(--dy, 0) * var(--rh))); }
+#rank-sheet .rk-row:last-child { border-bottom-color: transparent; }
+#rank-sheet .rk-row.me { z-index: 2; background: #ffd85e; border-radius: 2px; }
+#rank-sheet .rk-row.rk-new { opacity: 0; }
+#rank-sheet .rk-face { flex: none; width: 1.45em; height: 1.45em; border: 1px solid #b39678; border-radius: 3px; image-rendering: pixelated; background: #fff3d6; }
+#rank-sheet .rk-row i.rk-you { width: 1.45em; height: 1.45em; box-sizing: border-box; }
+#rank-sheet .rk-row b { font-weight: normal; width: 7.2em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#rank-sheet .rk-row.me b { color: #33210c; }
+#rank-sheet .rk-row.out { opacity: .6; }
+#rank-sheet .rk-row.out s { text-decoration-thickness: 2px; text-decoration-color: #d9342c; }
+#rank-sheet .rk-d { display: inline-flex; align-items: center; gap: .3em; min-width: 2.6em; color: #75573b; }
+#rank-sheet .rk-row.me .rk-d { color: #33210c; }
+#rank-sheet .rk-box { width: 1em; height: 1em; flex: none; }
+#rank-sheet .rk-m { min-width: 6.6em; margin-left: auto; text-align: right; color: #1f7a2e; }
+/* стрелка — штампом на правом поле строки (место под неё есть всегда — лист не меняет ширину) */
+#rank-sheet .rk-arr { position: absolute; right: .25em; top: 50%; width: 1.3em; height: 1.3em; margin-top: -.65em; display: flex; align-items: center; justify-content: center;
+  --cr: #1f9a3e; color: var(--cr); background: #fff3d6; border: 2px solid var(--cr); border-radius: 3px; box-shadow: 1px 2px 0 #33210c; opacity: 0; transform: rotate(-8deg); }
+#rank-sheet .rk-down .rk-arr { --cr: #d9342c; }
+#rank-sheet .rk-arr svg { width: .85em; height: .85em; fill: currentColor; }
+#rank-sheet .rk-down .rk-arr svg { transform: rotate(180deg); }
+/* движение: разворот из строки → строки едут → штамп стрелок → схлопывание в строку */
+#rank-sheet.rk-open { animation: rk-open .3s cubic-bezier(.2, .8, .3, 1.05) both; }
+#rank-sheet.rk-close { animation: rk-close .35s cubic-bezier(.5, 0, .8, .4) both; }
+#rank-sheet.rk-go .rk-row { transform: none; transition: transform var(--mv, .75s) cubic-bezier(.55, 0, .25, 1), opacity .4s ease-out; }
+#rank-sheet.rk-go .rk-row.rk-new { opacity: 1; }
+#rank-sheet.rk-go .rk-row.me.rk-up, #rank-sheet.rk-go .rk-row.me.rk-down { animation: rk-lift var(--mv, .75s) ease-in-out; }
+#rank-sheet.rk-go .rk-arr { animation: rk-stamp .45s cubic-bezier(.2, .9, .3, 1.2) var(--mv, .75s) both; }
+@keyframes rk-open { 0% { transform: scale(var(--sx, .4), var(--sy, .2)); opacity: .5; } 100% { transform: none; opacity: 1; } }
+@keyframes rk-close { 0% { transform: none; opacity: 1; } 100% { transform: scale(var(--sx, .4), var(--sy, .2)); opacity: 0; } }
+@keyframes rk-lift { 0%, 100% { box-shadow: none; } 30%, 70% { box-shadow: 0 3px 0 #33210c, 0 0 0 2px #33210c; } }
+@keyframes rk-stamp { 0% { transform: scale(2.2) rotate(-20deg); opacity: 0; } 55% { transform: scale(.92) rotate(-8deg); opacity: 1; } 100% { transform: rotate(-8deg); opacity: 1; } }
+/* телефон: мельче (не мельче 10 px), уже колонки — лист короче и не лезет к педалям */
+@media (max-width: 560px), (max-height: 430px) {
+  #rank-sheet { font-size: 10px; --rh: 1.75em; padding: .35em .5em .4em; }
+  #rank-sheet .rk-row b { width: 6.4em; }
+  #rank-sheet .rk-m { min-width: 6em; }
+  #rank-sheet .rk-head span { display: none; }
+}
+#rank-sheet.rk-tall { transform-origin: 0 100%; }   /* телефон: растёт из строки вверх — руль внизу слева не задевает */
+/* меньше движения: показалась — стоит — пропала; строки сразу на местах, стрелки просто видны */
+#rank-sheet.rk-calm, #rank-sheet.rk-calm .rk-row, #rank-sheet.rk-calm .rk-arr { animation: none !important; transition: none !important; }
+#rank-sheet.rk-calm .rk-row { transform: none; }
+#rank-sheet.rk-calm .rk-row.rk-new, #rank-sheet.rk-calm .rk-arr { opacity: 1; }

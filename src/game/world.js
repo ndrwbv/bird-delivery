@@ -20,7 +20,8 @@
    • бандитские районы (ZN.gangZones): размытые красные пятна на радаре и карте;
      адрес в районе — 3–4 гопника в спортивках (днём 6 из 10, вечером всегда) ждут у пина
      или выходят из-за угла; пицца отдаётся сразу, но машину тут же окружают и держат,
-     пока не заплатишь или не помнут (gang*, HOLD). В детской версии без бит: «покачают» машину;
+     пока не ответишь: заплатил 10 000 ₽ — отпускают; отказал — короткая стычка (до 1 сердца), дал газу —
+     бегут следом и отстают (gang*, HOLD, GANG в econ.js). В детской версии без бит: «покачают» машину;
    • особняки (prepCity): дома в круге MAP.career.rich — коттеджи в 2–3
      этажа со скатной крышей, светлыми стенами, газоном, высоким забором
      (roadlife.js), воротами и дорогой машиной у дома;
@@ -116,7 +117,7 @@ function paveKind (key, x, z, salt) {
 }
 /* тротуар улицы — по имени улицы и району: вся улица в районе одинаковая */
 export function paveRoad (r) {
-  const p = r.p[(r.p.length / 2) | 0] || r.p[0];
+  const p = r.m0 || r.p[(r.p.length / 2) | 0] || r.p[0];   // m0 — середина улицы до разрезки (roadwiden.js)
   return PAVE[paveKind(r.n || '', p[0], p[1], 0)];
 }
 export function pavePath (q) {
@@ -134,7 +135,7 @@ const PAVE_GLSL = `
   vec3 pvc = vColor.rgb;
   vec3 pdB = abs(pvc - uPvB), pdS = abs(pvc - uPvS);
   float isB = step(max(pdB.r, max(pdB.g, pdB.b)), 0.0022), isS = step(max(pdS.r, max(pdS.g, pdS.b)), 0.0022);
-  if (isB + isS > 0.5) {
+  if (S_LAND && isB + isS > 0.5) {          // S_LAND — не реквизит (seasons.js: признак в цвете вершины склейки LITM)
     vec2 q = vSW.xz;
     if (isB > 0.5) {
       // брусчатка: ровный тёплый тон и лёгкие полоски рядов через 0,8 м — без
@@ -271,12 +272,14 @@ function roadClear (x, z, m) {
   if (r.seg.c >= 7) return r.d > r.seg.w / 2 + 0.3;          // дорожку аллея может пересечь, но не лечь на неё
   return r.d > r.seg.w / 2 + m + (r.seg.c <= 5 ? 2.8 : 0.6);
 }
-function planAlleys () {
+function* planAlleys () {                          // шагами (build): через каждые 12 больших парков
   const C = A.CITY;
+  let np = 0;
   for (const g of C.green) {
     if (g.k !== 'park' || ALLEYS.length > 160) continue;
     const P = g.p, area = areaOf(P);
     if (area < 2500) continue;                                  // в Москве парки — скверы по полгектара
+    if (++np % 12 === 0) yield 'alleys';
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const q of P) { if (q[0] < x0) x0 = q[0]; if (q[0] > x1) x1 = q[0]; if (q[1] < z0) z0 = q[1]; if (q[1] > z1) z1 = q[1]; }
     if (!A.inBounds((x0 + x1) / 2, (z0 + z1) / 2, 30)) continue;
@@ -326,11 +329,12 @@ function benchGeo (x, z, ry) {
   for (const s of [-1, 1]) { [px, pz] = at(s * 1.05, -0.05); A.box(parts, 0.14, 0.85, 0.66, '#3b3f46', px, gy + 0.2, pz, ry); }
   return parts;
 }
-function drawAlleys () {
+function* drawAlleys () {                          // шагами (build): через каждые 12 аллей
   const LITM = A.LITM;
-  let benches = 0, lamps = 0;
+  let benches = 0, lamps = 0, na = 0;
   const benchAt = [];
   for (const al of ALLEYS) {
+    if (++na % 12 === 0) yield 'draw';
     const pts = al.pts, W = al.w, r = rng(al.seed * 7 + 3);
     if (!al.own) {
       const k = r(), ph = k < 0.55 ? PAVE.brick : k < 0.8 ? PAVE.speck : PAVE.path, ay = 0.075 + paveStep(ph) * 0.0008;   // разная плитка внахлёст — не на одной высоте (О3)
@@ -385,10 +389,11 @@ function drawAlleys () {
 const LUX_SPOTS = [];
 function richLawns () {
   const C = A.CITY;
+  const RICH = C.buildings.filter(b => b.rich);     // особняки — один раз, а не перебор всех домов на каждую пробу (тот же ответ)
   for (const v of VILLAS) {
     const R = minRect(v.p);
     if (!R) continue;
-    const bad = (x, z) => !roadClear(x, z, 0.4) || C.buildings.some(b => b !== v && b.rich && inPolyP(x, z, b.p)) || A.inHouse(x, z, 0) && !inPolyP(x, z, v.p);
+    const bad = (x, z) => !roadClear(x, z, 0.4) || RICH.some(b => b !== v && inPolyP(x, z, b.p)) || A.inHouse(x, z, 0) && !inPolyP(x, z, v.p);
     // отступ каждой стороны: самый широкий, при котором край газона ничего не задевает
     const m = [0, 0, 0, 0];
     for (let sd = 0; sd < 4; sd++) {
@@ -626,7 +631,8 @@ function heapGeos (hp, s, out) {
     }
   }
 }
-function trashBuild (k) {
+function trashBuild (k) { const it = trashSteps(k); while (!it.next().done); }
+function* trashSteps (k) {                          // шагами (build): кучи — через каждые 60, склейка — по клетке
   if (!TRASH.grp) {
     TRASH.grp = new THREE.Group();
     TRASH.grp.matrixAutoUpdate = false;          // cull.js эту группу не трогает: мы пересобираем её сами
@@ -640,13 +646,16 @@ function trashBuild (k) {
   const s = 1 - k;
   if (s <= 0.004 || !HEAPS.length) return;
   const by = new Map();
+  let nh = 0;
   for (const hp of HEAPS) {
+    if (++nh % 60 === 0) yield 'heaps';
     const key = Math.floor(hp.x / 400) + ',' + Math.floor(hp.z / 400);
     if (!by.has(key)) by.set(key, []);
     heapGeos(hp, s, by.get(key));
   }
   for (const list of by.values()) {
     if (!list.length) continue;
+    yield 'merge';
     const g = A.mergeGeos(list);
     g.computeBoundingSphere();
     const m = new THREE.Mesh(g, TRASH.mat);
@@ -874,7 +883,8 @@ const GE = { st: '', men: [], t: 0, cd: 0, cx: 0, cz: 0, bribe: 0, hearts: 0, hu
    держат: потолок скорости падает на BRAKE м/с за секунду до V, дальше машина только качается —
    не дальше LEASH м и TURN рад от места, где встала; гопники подбегают (RUN м/с) и встают у
    водительской двери, перед капотом, за багажником (и у пассажирской). Держат, пока живы и не ушли:
-   разговор → заплатил — уходят; отказал — мнут машину и уходят. Сбить — по общим правилам
+   разговор → заплатил — уходят; отказал — отпускают и мнут машину (до GANG.SMASH_HEARTS сердца), уехал —
+   бегут следом и отстают («оторвался»), не уехал — через GANG.SMASH_T уходят. Сбить — по общим правилам
    (hits.js TIER.FALL, 20 км/ч): быстрее — сбит, медленнее — твёрдый, отталкивается от кузова. */
 export const HOLD = {
   PRE_R: 60, AT: [4.5, 7], NEAR: [3.5, 6.5], RUN: 5.5,
@@ -1054,7 +1064,7 @@ function gangStart (reuse) {
   }
   GE.men = men; GE.lead = men[0];
   if (!GE.dir) { GE.dir = 1; DIRECTOR.start('gang'); }
-  GE.st = 'come'; GE.t = 0; GE.t0 = performance.now(); GE.cx = V.x; GE.cz = V.z; GE.hearts = 0; GE.hurtT = 1.2; GE.stop = null;
+  GE.st = 'come'; GE.t = 0; GE.t0 = performance.now(); GE.cx = V.x; GE.cz = V.z; GE.hearts = 0; GE.hurtT = 1.2; GE.stop = null; GE.res = '';
   GE.capV = Math.hypot(V.vx, V.vz); GE.ax = V.x; GE.az = V.z; GE.ah = V.h; GE.gasT = 0; GE.push = 0;
   GE.bribe = Math.round((GANG.BRIBE_BASE + GANG.BRIBE_SHARE * Math.max(0, (A.S && A.S.money) || 0)) / 10) * 10;
   const front = men.find(m => m.slot === 1) || men[0];
@@ -1105,7 +1115,7 @@ function gangLeave (line, col, cd = 45) {
 function gsay (m, text, col) {
   if (!A.sayBubble || m.dead) return;
   if (m.bubble) { m.grp.remove(m.bubble); m.bubble.material.dispose(); }
-  m.bubble = A.sayBubble(m.grp, text, col || '#3a3a42', 2.7);
+  m.bubble = A.sayBubble(m.grp, text, col || '#3a3a42', 2.7, 1);
   m.bubT = 2.8;
 }
 function gangTalk () {
@@ -1116,15 +1126,17 @@ function gangTalk () {
   const text = A.ADULT
     ? t('Слышь, курьер. Это наш район. Хочешь тут ездить — плати. {money}, и катайся спокойно.', { money: sum })
     : t('Эй, курьер! Это наш двор. Проезд платный — {money}. Заплатишь — катайся.', { money: sum });
+  // таймера на ответ нет (автор 16.10.2026): стоят, пока не ответишь; мзда — под портретом
   DLG.say({
     person: L.person, name: A.ADULT ? t('Гопник') : t('Пацан со двора'), text, mood: 'calm', color: '#d9342c',
-    accept: t('заплатить {money}', { money: sum }), decline: t('не буду'), timer: 9,
-    timeoutText: A.ADULT ? t('Молчишь? Ну, сам виноват') : t('Молчишь? Ну держись!'),
+    head: A.ADULT ? t('наезд') : t('двор'), pay: '−' + sum, payLabel: t('мзда'),
+    accept: t('заплатить {money}', { money: sum }), decline: t('не буду'),
   }).then(ok => {
     if (GE.st !== 'talk') return;
     if (ok) {
       const paid = A.pay ? A.pay(GE.bribe) : 0;
       if (A.toast) A.toast(paid < GE.bribe ? t('отдал всё, что было: {money}', { money: A.money(paid) }) : t('мзда: −{money}', { money: A.money(paid) }));
+      GE.res = 'paid';
       gangLeave(A.ADULT ? t('Другое дело. Катайся.') : t('Во, нормально. Езжай.'));
     } else {
       GE.st = 'smash'; GE.t = 0; GE.hurtT = 0.9;
@@ -1153,7 +1165,7 @@ function gangStep (dt) {
       if (!GE.st) return;
     } else if (GE.men.every(m => m.dead)) { gangClear(); GE.preOk = false; GE.cd = 45; return; }   // всех сбил по дороге — некому трясти
   }
-  if (GE.st === 'come' || GE.st === 'talk' || GE.st === 'smash') hold(dt);
+  if (GE.st === 'come' || GE.st === 'talk') hold(dt);   // стычка (smash) — уже не держат: дал газу — уехал
   const sp = Math.hypot(V.vx, V.vz);
   const dCar = Math.hypot(V.x - GE.cx, V.z - GE.cz);
   // уехал до разговора — ну и вали
@@ -1168,26 +1180,38 @@ function gangStep (dt) {
       }
     }
   }
+  /* отказал — короткая стычка (автор 12.10, сделано 17.10.2026): держать перестают, бьют машину — но не
+     больше GANG.SMASH_HEARTS сердца за всю стычку, дальше удары только мнут кузов. Дал газу и отъехал от
+     ближнего дальше 6 м — бегут следом (GANG.CHASE_V) не дольше GANG.CHASE_T и отстают: «оторвался».
+     Не уехал — через GANG.SMASH_T сами уходят. */
+  const nearest = () => GE.men.reduce((b, m) => m.dead ? b : Math.min(b, Math.hypot(m.x - V.x, m.z - V.z)), 1e9);
   if (GE.st === 'smash') {
-    // уехал — ругаются вслед
-    if (dCar > 9 && sp > 4) { gangLeave(A.ADULT ? t('Ещё встретимся!') : t('Ещё увидимся!'), '#d9342c'); }
-    else {
-      GE.cx = damp(GE.cx, V.x, 2, dt); GE.cz = damp(GE.cz, V.z, 2, dt);
+    if (sp > 3 && nearest() > 6) {
+      GE.st = 'chase'; GE.t = 0;
+      const m = GE.men.find(q => !q.dead && q.slot === 1) || GE.men.find(q => !q.dead);
+      if (m) gsay(m, A.ADULT ? t('Держи его!') : t('Стой, куда!'), '#d9342c');
+    } else {
       const near = GE.men.some(m => !m.dead && Math.hypot(m.x - V.x, m.z - V.z) < 3.4);
-      if (near && (GE.hurtT -= dt) <= 0) {
+      if (near && GE.hearts < GANG.SMASH_HEARTS && (GE.hurtT -= dt) <= 0) {
         GE.hurtT = 1.7;
         if (A.hurt) A.hurt(1);
-        GE.hearts++;
+        GE.hearts += 0.5;                    // удар битой — ½ сердца (game.js hitHearts, с 17.10.2026; было 1): лимит — 2 удара
         if (GE.hearts >= GANG.SMASH_HEARTS) {
           const worse = chance(GANG.SMASH_BREAK);
           if (worse) carWorse();
           if (A.toast) A.toast(worse ? (A.ADULT ? t('машину помяли — теперь хуже заводится') : t('машину раскачали — теперь хуже заводится'))
             : (A.ADULT ? t('машину помяли') : t('машину раскачали')));
-          gangLeave(A.ADULT ? t('Будешь знать!') : t('В следующий раз плати!'), '#d9342c');
         }
       }
-      if (GE.t > 14) gangLeave(t('Ладно, пошли, пацаны'));
+      if (GE.t > GANG.SMASH_T) { GE.res = 'beat'; gangLeave(A.ADULT ? t('Будешь знать!') : t('В следующий раз плати!'), '#d9342c'); }
     }
+  } else if (GE.st === 'chase') {
+    const d = nearest();
+    if (d > GANG.CHASE_LOST) {
+      GE.res = 'lost';
+      if (A.toast) A.toast(t('оторвался!'));
+      gangLeave(A.ADULT ? t('Ещё встретимся!') : t('Ещё увидимся!'), '#d9342c');
+    } else if (GE.t > GANG.CHASE_T) { GE.res = 'gaveup'; gangLeave(t('Ладно, пошли, пацаны')); }
   }
   for (const m of GE.men) {
     if (m.dead) continue;
@@ -1196,6 +1220,7 @@ function gangStep (dt) {
     let tx, tz, speed = HOLD.RUN;                  // подбегают
     if (GE.st === 'leave') { tx = m.tx; tz = m.tz; speed = 1.9; }
     else if (GE.st === 'wait') { tx = m.wx; tz = m.wz; speed = 1.2; }
+    else if (GE.st === 'chase') { tx = V.x - fx * 2; tz = V.z - fz * 2; speed = GANG.CHASE_V * (0.85 + 0.15 * Math.sin(m.ph * 0.13 + m.slot)); }   // бегут следом
     else { [tx, tz] = around(m, ...slotPos(m.slot)); if (GE.st === 'smash') speed = 3.2; }
     const dx = tx - m.x, dz = tz - m.z, d = Math.hypot(dx, dz);
     let walk = false;
@@ -1336,31 +1361,38 @@ export function* build (api) {
   const tm = (k, f) => { const t0 = performance.now(); f(); STATS.buildMs[k] = Math.round(performance.now() - t0); };
   tm('grid', pathGrid);
   yield 'grid';
-  tm('alleys', () => { planAlleys(); drawAlleys(); });
+  const ts = function* (k, it) { let ms = 0; for (;;) { const t0 = performance.now(), r = it.next(); ms += performance.now() - t0; STATS.buildMs[k] = Math.round(ms); if (r.done) return; yield k; } };
+  yield* ts('alleys', planAlleys());
+  yield* ts('alleysDraw', drawAlleys());
   if (!CAREER) return;
   yield 'alleys';
   tm('rich', richLawns);
   yield 'rich';
   tm('trash', planTrash);
   yield 'trash';
-  tm('trashb', () => trashBuild(Math.round(A.donated('trash') * 240) / 240));
+  yield* ts('trashb', trashSteps(Math.round(A.donated('trash') * 240) / 240));
   yield 'trashb';
   tm('garages', planGarages);
 }
 
 let late = false;
+/* первый шаг мира: богачи по особнякам, заказы узнают о приезде — раньше в первом кадре после сборки города (на Деке
+   ~15 мс в и так долгом кадре); теперь — отдельным куском поздней сборки (game.js 'first'), шаг — уже без него */
+export function lateInit (api) {
+  if (api) A = api;
+  if (!A || !CAREER || late) return;
+  late = true;
+  richLate();
+  const ORD = MOD('orders');
+  if (ORD && ORD.onArrive) ORD.onArrive(arrive);
+}
 export function step (dt, api) {
   if (!A) return;
   if (api) A = api;
   if (typeof window !== 'undefined' && window.__dlv && !window.__dlv.WORLD) window.__dlv.WORLD = DEBUG;
   if (!CAREER) return;
   const t0 = performance.now();
-  if (!late) {
-    late = true;
-    richLate();
-    const ORD = MOD('orders');
-    if (ORD && ORD.onArrive) ORD.onArrive(arrive);
-  }
+  if (!late) lateInit();
   trashStep(dt);
   gangStep(dt);
   grillStep(dt);

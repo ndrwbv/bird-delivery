@@ -38,6 +38,15 @@
 .qr-warn { margin: .8em 0 0; text-align: center; font-size: max(12px, var(--pp-fs-s)); line-height: 1.6; color: var(--pp-rust); }
 .qr-warn::before, .qr-warn::after { content: '✱'; margin: 0 .5em; color: var(--pp-orange); }
 .qr-sheet .pp-stamp, .qr-check .pp-stamp { margin-top: .8em; }
+/* «▲▼ строка · ◀▶ поменять» — как ходить по листу с геймпада и клавиатуры; пальцем не нужна (◀ ▶ — кнопки) */
+.qr-how { margin: .7em 0 0; text-align: center; font-size: max(12px, var(--pp-fs-s)); color: var(--pp-label); }
+.qr-how .pp-key { margin: 0 .35em 0 .1em; padding: 0 .35em; width: auto; letter-spacing: .1em; }
+.qr-how i { font-style: normal; margin: 0 .6em; opacity: .5; }
+body.touch .qr-how, body[data-input="touch"] .qr-how { display: none; }
+/* лист — бумага на затемнённом городе: меню (логотип, карточки, профиль) под ним не видно — не путает, где курсор (17.10.2026) */
+body:has(#qr-setup:not([hidden])) #big { visibility: hidden; }
+/* чек заезда — хад (сердца, деньги, радар, пауза) не светит из-под него, как у чека смены (delivery.css #over) */
+body:has(#qr-end:not([hidden])) .hud, body:has(#qr-end:not([hidden])) #ctrls, body:has(#qr-end:not([hidden])) #daily-note { visibility: hidden; }
 
 /* ── чек заезда ── */
 .qr-check { --pp-accent: var(--pp-pink); width: min(520px, 100%); }

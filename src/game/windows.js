@@ -326,9 +326,13 @@ function material () {
 
 /* слабое железо: телефон — комната только вблизи (или совсем без неё) */
 export function quality ({ interior = 1, lod = 70 } = {}) {
-  STATS.interior = interior ? 1 : 0; STATS.lod = lod; U.uLod.value = lod;
+  STATS.interior = interior ? 1 : 0; STATS.lod = lod; U.uLod.value = lod * LOD_K;
   if (MAT) { MAT.defines = interior ? { INTERIOR: 1 } : {}; MAT.needsUpdate = true; }
 }
+/* тяжёлый кадр (tune.js): комнаты за окнами — только ближе (×0,6 при самом лёгком); к краю комната и так плавно уходит
+   в ровный цвет окна (smoothstep выше), граница едет — не щёлкает; дальше неё видеокарта комнату не считает */
+let LOD_K = 1;
+export function lodScale (k) { if (k === LOD_K) return; LOD_K = k; U.uLod.value = STATS.lod * k; }
 
 function dropArr () { this.array = null; }
 

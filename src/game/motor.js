@@ -74,6 +74,7 @@ export const CLASS = {
   semerka: 'vaz', kopeyka: 'vaz', priora: 'vaz', niva: 'vaz', volga: 'vaz',
   buhanka: 'uaz', patriot: 'uaz',
   matiz: 'foreign', cheri: 'foreign', belgik: 'foreign', cruze: 'foreign', vesta: 'foreign', havalka: 'foreign', jilya: 'foreign',
+  roadster: 'foreign',                             // электро-родстер: своего звука мотора нет — тихий «иномарочный»
 };
 export const classOf = id => CLASS[id] || 'vaz';
 const LAYERS = ['idle', 'low', 'mid', 'high'];

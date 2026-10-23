@@ -67,6 +67,15 @@
 
 .tk-out { min-height: 2.6em; box-sizing: border-box; margin: .9em 0 0; padding: .6em 40% .5em 0; font-size: var(--pp-fs-m); line-height: 1.6; text-align: left; border-top: 2px dashed var(--pp-brown); }
 .tk-replied .tk-me { order: -1; }
+/* печать стоит — «понятно»: закрывает игрок (таймера нет, автор 16.10.2026); тап по листу — то же */
+.tk-end { display: flex; justify-content: flex-end; margin: .7em 0 0; }
+.tk-end[hidden] { display: none; }
+.tk-ok { display: inline-flex; align-items: center; gap: .7em; padding: .7em 1.2em; font: inherit; font-size: var(--pp-fs-m); line-height: 1.4; color: var(--pp-ink);
+         cursor: pointer; touch-action: manipulation; background: color-mix(in srgb, var(--pp-yellow) 60%, var(--pp-paper));
+         border: 3px solid var(--pp-ink); border-radius: 8px; box-shadow: 0 4px 0 var(--pp-ink); animation: tk-pop .2s var(--pp-spring); }
+.tk-ok .pp-key { margin-right: 0; font-size: 10px; }
+.tk-ok:active { translate: 0 3px; box-shadow: 0 1px 0 var(--pp-ink); }
+.tk-ended .tk-seal { bottom: 64px; }               /* печать — над строкой итога, не на кнопке «понятно» */
 .tk-seal { top: auto; bottom: .5em; right: 5%; --pp-seal-rot: -8deg; }
 
 .tk-pop { animation: tk-pop .18s var(--pp-spring); }
@@ -89,4 +98,7 @@ body.calm-fx .tk-pop, body.calm-fx .tk-talking .pp-polaroid, body.calm-fx .tk-o.
   .tk-o { padding-top: .45em; padding-bottom: .45em; }
   .tk-opts { margin-top: .5em; gap: 6px; }
   .tk-hint { margin-top: .4em; }
+  .tk-end { margin-top: .4em; }
+  .tk-ok { padding: .45em .9em; }
+  .tk-ended .tk-seal { bottom: 52px; }
 }

@@ -24,6 +24,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import * as SEAS from './seasons.js';
 import * as CONSTR from './construction.js';
+import { roadGap } from './pave.js';
 import * as TWIST from './twister.js';          // смерч к дому и косой ливень (twister.js)
 
 export const HUR = {
@@ -188,8 +189,8 @@ function check (b, i) {
   for (let s = 0; s < per; s += st) {
     let a, c, A = I.hx + M + 1, B = I.hz + M + 1, q = s;
     if (q < 2 * A) { a = -A + q; c = -B; } else if ((q -= 2 * A) < 2 * B) { a = A; c = -B + q; } else if ((q -= 2 * B) < 2 * A) { a = A - q; c = B; } else { q -= 2 * A; a = -A; c = B - q; }
-    const [x, z] = toW(I, a, c), r = C.nearestRoad(x, z, 12, 1);
-    if (r && r.d < r.seg.w / 2 + 0.6) return why('road');
+    const [x, z] = toW(I, a, c);
+    if (roadGap(x, z) < 0.6) return why('road');      // до края каждой дороги рядом, не до ближайшей осевой (pave.js)
   }
   // чужие дома в коробку не залезают
   const ax0 = Math.min(I.cx, I.ox) - I.hx - I.hz - M - 2, ax1 = Math.max(I.cx, I.ox) + I.hx + I.hz + M + 2;

@@ -495,7 +495,7 @@ function makeBeachHuman (person) {
   const u = grp.userData;
   if (person.look.f || u.fem) {                    // руки купальщицы — без рукавов
     const c = new THREE.Color(person.look.skin);
-    if (u.skin && u.skin.geometry) {                // человек одним мешем с костями (people.js): руки — вершины костей 3 и 4
+    if (u.skin && u.skin.geometry && !u.q) {        // человек одним мешем с костями (people.js): руки — вершины костей 3 и 4 (не у модели Quaternius — qpeople.js)
       const g = u.skin.geometry, ca = g.attributes.color, si = g.attributes.skinIndex;
       if (ca && si) {
         for (let i = 0; i < ca.count; i++) { const b = si.getX(i); if (b === 3 || b === 4) ca.setXYZ(i, c.r, c.g, c.b); }
@@ -596,7 +596,7 @@ function mobStep (o, dt, sp) {
     const kmh = sp * 3.6;
     poseStand(o.grp);
     o.grp.position.set(o.x, A.groundH(o.x, o.z), o.z);
-    if (HITS.isFall(kmh)) { if (!o.fall) HITS.fall(o, V.vx, V.vz); o.t = 'stand'; o.h = Math.atan2(V.x - o.x, V.z - o.z); return; }   // упал и встал — стоит, грозит
+    if ((HITS.isFall(kmh) || HITS.survive(o, kmh))) { if (!o.fall) HITS.fall(o, V.vx, V.vz); o.t = 'stand'; o.h = Math.atan2(V.x - o.x, V.z - o.z); return; }   // упал и встал — стоит, грозит
     o.dead = 1;
     A.dropMesh(o.grp);
     A.gibHuman(o, V.vx, V.vz, kmh);

@@ -57,10 +57,10 @@ export function feed (el, o = {}) {
     }
     const b = document.createElement('div');
     b.className = 'mk-b';
-    b.innerHTML = (m.name ? '<b>' + esc(m.name) + '</b>' : '') + '<p>' + esc(m.text) + '</p>';
+    b.innerHTML = (m.name ? '<b>' + esc(m.name) + '</b>' : '') + '<p>' + (m.html || esc(m.text)) + '</p>';   // html — подсказка с кнопками (learn)
     box.appendChild(b);
     el.appendChild(box);
-    if (img) TF.talk(img, TF.talkTime(m.text));
+    if (img) TF.talk(img, TF.talkTime(m.text || b.textContent));
     // старые — уходят сверху, лента не растёт
     const all = [...el.children].filter(c => !c.classList.contains('mk-gone'));
     for (let i = 0; i < all.length - max; i++) {
@@ -73,6 +73,48 @@ export function feed (el, o = {}) {
     return box;
   }
   return { say, clear: () => { for (const im of imgs) TF.stop(im); imgs.clear(); el.replaceChildren(); } };
+}
+
+/* ── первый раз (doorstep.js learnFirst, ECON.DOORGAME.LEARN): до 18.10.2026 Толик писал подсказку пузырём в ленте поверх
+   игры — на телефоне она накладывалась на подъезд; теперь — пошаговое обучение до старта, doorcoach.js. Здесь — значок
+   клавиши и строка с кнопками для его записок */
+export const key = (s, kb) => '<kbd class="pp-key' + (kb ? ' pp-key-kb' : '') + '">' + esc(s) + '</kbd>';
+/* строка с кнопками целиком одним ключом перевода: t(s, vars) с {имя} кнопок из keys (HTML <kbd>), остальное экранировано */
+export function keysLine (t, s, keys = {}, vars = {}) {
+  const ks = Object.keys(keys), tok = {};
+  ks.forEach((k, i) => { tok[k] = '\u0001' + i + '\u0001'; });
+  let out = esc(t(s, Object.assign({}, vars, tok)));
+  ks.forEach((k, i) => { out = out.split('\u0001' + i + '\u0001').join(keys[k]); });
+  return out;
+}
+/* «+N с к сроку — на первый раз» — строка в конце подсказки */
+export const learnAdd = (ln, t) => (ln && ln.add > 0 ? ' ' + esc(t('На первый раз к сроку +{n} с.', { n: ln.add })) : '');
+
+/* ── «пусть сам спустится» (17.10.2026; числа — econ.js DOORGAME.SELF): отказ от домофона и подъезда своей кнопкой —
+   пометка на полях под заданием (справа), основному управлению не мешает: клавиатура Q, геймпад RB / R1, палец — тап по ней.
+   Нажали — та же пометка становится строкой «клиент спускается… N с» (selfOn); ждать — selfWait(o) с (o.selfWait: [от, до]) ── */
+export const selfHTML = t => '<button type="button" tabindex="-1" data-a="self" class="mk-self"><kbd class="pp-key"></kbd><span>' + esc(t('пусть сам спустится')) + '</span></button>';
+export const selfKey = (k, fam) => (k === 'pad' ? (fam === 'ps' ? 'R1' : 'RB') : k === 'kb' ? 'Q' : '');
+export function selfGlyph (el, k, fam) {
+  const kb = el && el.querySelector('kbd');
+  if (!kb) return;
+  const s = selfKey(k, fam);
+  kb.hidden = !s || el.classList.contains('on');
+  kb.textContent = s;
+  kb.classList.toggle('pp-key-kb', k === 'kb');
+}
+export const selfPad = p => !!(p && p.pageR);                       // геймпад: RB / R1 (pageR — фронт нажатия)
+export const selfCode = c => c === 'KeyQ';                          // клавиатура: Q
+export function selfWait (o) {
+  const w = o && Array.isArray(o.selfWait) ? o.selfWait : [6, 10];
+  return w[0] + Math.random() * Math.max(0, w[1] - w[0]);
+}
+export function selfOn (el, t, left) {
+  if (!el) return;
+  el.classList.add('on');
+  const kb = el.querySelector('kbd'); if (kb) kb.hidden = true;
+  const s = el.querySelector('span'), n = Math.max(0, Math.ceil(left));
+  if (s && el.__n !== n) { el.__n = n; s.textContent = t('клиент спускается… {n} с', { n }); }
 }
 
 /* ── часы заказа: «сейчас» и «доставить до …», как на приборке ── */

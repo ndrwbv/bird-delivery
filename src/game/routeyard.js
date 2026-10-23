@@ -19,7 +19,7 @@
 
    Переменных игры модуль не видит — всё приходит объектом api (game.js):
      init({ HOUSE_GRID, inHouse, segHouse, solidAt, ARCHES, SOLID_GRID, SCELL, SMASH_GRID, SM_CELL,
-            yardsEach, paveEach, groundH, festBlocks })   — inHouse: в доме, но не в арке; segHouse(ax, az, bx, bz) — отрезок заходит в дом (точно); solidAt — твёрдое
+            yardsEach, paveEach, groundH, festBlocks, carsEach })   — carsEach — стоящие во дворах (yardcars.js), как забор; inHouse: в доме, но не в арке; segHouse(ax, az, bx, bz) — отрезок заходит в дом (точно); solidAt — твёрдое
      const J = job(slot, x, z, R, extra, goals)     — то же шагами: J.step(мс) → true, когда готово; J.result — F
      const F = field(slot, x, z, R, extra, goals)   — поле расстояний от (x, z) сразу:
        R — полуширина окна, м; goals — точки [x, z, ...] (улицы), extra — после
@@ -179,6 +179,8 @@ function* raster (S, x, z, R, soft) {
     if ((q & 63) === 63) yield 'заборы';
   }
   yield 'заборы';
+  // стоящие машины во дворах (yardcars.js) — как забор: линия идёт по проезду, а не сквозь карман
+  if (A.carsEach) { A.carsEach(x0, z0, x1, z1, (cx, cz, cs, sn, hw, hd) => markBox(S, cx, cz, cs, sn, hw, hd, fence)); yield 'машины'; }
   // твёрдое: будки, гаражи, деревья (перила моста — не на земле)
   const wall = k => { K[k] = 0; };
   const SC = A.SCELL, seen = new Set();
@@ -187,7 +189,10 @@ function* raster (S, x, z, R, soft) {
       for (const s of A.SOLID_GRID.get(i + ',' + j) || []) {
         if (s.deckY !== undefined || seen.has(s)) continue;
         seen.add(s);
-        markBox(S, s.cx, s.cz, s.cs, s.sn, s.hw + (soft ? 0.4 : RY.SOLID_M), s.hd + (soft ? 0.4 : RY.SOLID_M), wall);
+        // вытянутое и тонкое (забор у тротуара, yardmaze.js): полоса не уже 1,44 клетки — иначе наискосок между серединами клеток
+        // остаётся щель, и линия проходит сквозь забор
+        const mg = soft ? 0.4 : RY.SOLID_M, thin = Math.max(s.hw, s.hd) > 0.9 && Math.min(s.hw, s.hd) < 0.4 ? 0.72 * C : 0;
+        markBox(S, s.cx, s.cz, s.cs, s.sn, Math.max(s.hw + mg, thin), Math.max(s.hd + mg, thin), wall);
       }
   yield 'твёрдое';
   // дома: углы клеток внутри контура → клетка — стена

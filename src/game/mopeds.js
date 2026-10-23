@@ -14,7 +14,9 @@
      быстрее машин, в пробке иногда просачиваются между рядами (ghost +
      сдвиг на межполосье). Ударили — седок слетает: сильно — как сбитый
      пешеход (кровь только во взрослой версии, это решает gibHuman), слабо —
-     падает, встаёт, садится и едет дальше.
+     падает, встаёт, садится и едет дальше. Мопед от удара не взрывается
+     (автор 18.10.2026; game.js wreckCar): ложится на бок, скользит с искрами
+     и лежит, пока седок не поднимет; горит — только от чужого взрыва рядом.
    • Часть стоит у кафе, магазинов и подъездов: мопед на тротуаре, курьер
      рядом с короба за спиной смотрит в телефон. У твоего ждущего клиента
      (ближе MP.clientR) не встают, а вставшие раньше уходят.
@@ -175,6 +177,7 @@ function inSolid (A, x, z, r) {
 }
 
 /* ── места стоянки: у дверей заведений и у подъездов, на тротуаре ── */
+export const warm = A => { if (A) spots(A); };   // места у ТЦ — заранее (game.js 'first'), не в первом кадре после сборки
 function spots (A) {
   if (MP.spots) return MP.spots;
   const out = [];
@@ -234,6 +237,7 @@ const FLY = [];
 function fall (A, c) {
   const m = c.mp, u = c.mesh.userData;
   m.fell = 1;
+  if (c.parked && m.man) { MP.n.falls++; return; }      // стоял у двери без седока (курьер рядом) — мопед просто падает на бок
   if (m.br.rival && MP.onRival) MP.onRival(c);          // курьер конкурента (rivals.js): сбил ты — респект
   u.rider.visible = false;
   c.angry = 0;                                          // это не водитель машины — разбираться не выйдет
@@ -270,8 +274,9 @@ function stepFly (dt, A) {
     } else {
       // встал, отряхнулся — к мопеду; мопеда нет — уходит пешком и пропадает
       // мопед ещё кувыркается — стоит и ждёт (раньше шагал на месте)
-      const wait = c && !c.gone && !c.wreck && c.knock;
-      const ok = c && !c.gone && !c.wreck && !c.knock;
+      // мопед лежит на боку и уже не скользит (game.js: mpRest) — идёт поднимать
+      const wait = c && !c.gone && !c.wreck && c.knock && !c.mpRest;
+      const ok = c && !c.gone && !c.wreck && (!c.knock || c.mpRest);
       // мопеда нет (разбит, убран) — уходит прочь от машины игрока, а не шагает на месте
       if (!ok && !wait && f.ax === undefined) { const a = Math.atan2(f.x - V.x, f.z - V.z) + rand(-0.6, 0.6); f.ax = Math.sin(a); f.az = Math.cos(a); }
       const tx = ok ? c.x + Math.cos(c.h) * 0.7 : f.x + (f.ax || 0), tz = ok ? c.z - Math.sin(c.h) * 0.7 : f.z + (f.az || 0);
@@ -279,7 +284,7 @@ function stepFly (dt, A) {
       f.T += dt;
       if ((ok && d < 0.4) || f.T > 12) {
         A.dropMesh(g);
-        if (ok) { c.mp.fell = 0; c.mesh.userData.rider.visible = true; c.speed = 0; }
+        if (ok) { c.mp.fell = 0; c.mesh.userData.rider.visible = true; c.speed = 0; c.roll = 0; c.rollV = 0; c.kvx = c.kvz = 0; c.mpRest = 0; }   // поднял мопед и сел
         FLY.splice(i, 1);
         continue;
       }

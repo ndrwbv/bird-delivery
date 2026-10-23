@@ -375,6 +375,24 @@ function crashWrite(line) {
 const crashMain = (kind, msg) => crashWrite(JSON.stringify({ kind, where: 'electron', msg, n: 1, first: new Date().toISOString(), last: new Date().toISOString(), snap: { build: buildTag() || app.getVersion(), platform: process.platform } }));
 ipcMain.on('log:write', (e, line) => crashWrite(line));
 ipcMain.handle('log:dir', () => LOG_DIR());
+/* записи оболочки (падение и «не отвечает» страницы, падение видеокарты) новее since (ISO) — игре при следующем запуске:
+   анонимная статистика шлёт их событием crash_prev (src/game/telemetry.js, docs/ANALYTICS.md). Не больше 20 */
+ipcMain.handle('log:shell', (e, since) => {
+  const out = [];
+  try {
+    const dir = LOG_DIR(), from = String(since || '');
+    const files = fs.readdirSync(dir).filter(f => /^crash-\d{4}-\d\d-\d\d\.log$/.test(f)).sort();
+    for (const f of files) {
+      if (from && f.slice(6, 16) < from.slice(0, 10)) continue;
+      for (const line of fs.readFileSync(path.join(dir, f), 'utf8').split('\n')) {
+        if (!line.includes('"where":"electron"')) continue;
+        try { const r = JSON.parse(line); if (r.where === 'electron' && r.kind !== 'info' && (!from || String(r.last) > from)) out.push({ kind: r.kind, msg: String(r.msg || '').slice(0, 160), at: r.last, build: r.snap && r.snap.build }); } catch (err) { /* — */ }
+      }
+    }
+  } catch (err) { /* папки ещё нет */ }
+  return out.slice(-20);
+});
+app.on('child-process-gone', (e, d) => { if (d && d.type === 'GPU' && d.reason !== 'clean-exit') crashMain('crash', 'gpu process gone: ' + d.reason + ' ' + (d.exitCode ?? '')); });
 ipcMain.handle('log:open', async () => { try { fs.mkdirSync(LOG_DIR(), { recursive: true }); return !(await shell.openPath(LOG_DIR())); } catch (e) { return false; } });
 
 /* ─── ролики повтора (src/game/replay.js, docs/CAREER.md «Повтор») ───

@@ -157,10 +157,28 @@ export function edHide (it, on) {
   }
 }
 
-/* вершины куска склейки — под землю (как знаки в roadlife.js) */
+/* вершины куска склейки — под землю (как знаки в roadlife.js). Плафоны в клетках FLATM (game.js, 17.10.2026) позиций в памяти
+   не держат (отпущены после загрузки в видеокарту): тогда массив — временный, только до конца этого куска (плафоны лежат в
+   начале клетки — он короткий), с прежним byteLength (three.js сверяет), кусок — в одну точку (треугольники пропадают), в
+   видеокарту — только диапазоном (addUpdateRange); после заливки массив снова отпускается (onUpload склейки) */
 function hide ([m, v0, nv]) {
-  const pos = m.geometry.attributes.position, a = pos.array;
-  for (let v = v0; v < v0 + nv; v++) a[v * 3 + 1] = -60;
+  const pos = m.geometry.attributes.position;
+  let a = pos.array;
+  if (a && !a.part && a.length === pos.count * 3) {
+    for (let v = v0; v < v0 + nv; v++) a[v * 3 + 1] = -60;
+    pos.needsUpdate = true;
+    return;
+  }
+  const len = (v0 + nv) * 3;
+  if (!a || a.length < len) {
+    const b = new Float32Array(len);
+    if (a) b.set(a);
+    Object.defineProperty(b, 'byteLength', { value: pos.count * 3 * 4 });
+    b.part = 1;                                   // временный: остальное в нём — нули, целиком не заливать
+    a = pos.array = b;
+  }
+  for (let v = v0; v < v0 + nv; v++) { a[v * 3] = 0; a[v * 3 + 1] = -60; a[v * 3 + 2] = 0; }
+  pos.addUpdateRange(v0 * 3, nv * 3);
   pos.needsUpdate = true;
 }
 
@@ -249,15 +267,23 @@ function poorCells (CITY) {
 
 const hash = i => { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 
-/* A: CITY, roadWidth, nearestRoad, inHouse, introClear, ZEBRAS + то, что нужно lamp() */
-export function streets (A) {
+/* A: CITY, roadWidth, nearestRoad, inHouse, introClear, ZEBRAS + то, что нужно lamp().
+   Шагами (function*, latebuild.js): на Деке ~0,28 с одним куском — шаг через каждые STEP_W проверенных мест столба
+   (по счёту, не по времени: город с ?nolate и без одинаковый) */
+const STEP_W = 500;
+export function* streets (A) {
   const cells = poorCells(A.CITY), sector = A.MAP && A.MAP.privSector;
   const poor = sector ? (x, z) => sector(x, z) || cells(x, z) : cells;   // район частного сектора из карты + клетки с частными домами
   const zebra = (px, pz) => A.ZEBRAS.some(q => Math.abs(q.x - px) < 6 && Math.abs(q.z - pz) < 6);
-  A.CITY.roads.forEach((r, ri) => {
-    if (r.b || r.x) return;                        // на мосту свои перила, фонарям там не место
+  yield 'poor';
+  let work = 0;
+  const roads = A.CITY.roads;
+  for (let ri = 0; ri < roads.length; ri++) {
+    if (work >= STEP_W) { work = 0; yield 'lamps'; }
+    const r = roads[ri];
+    if (r.b || r.x) continue;                      // на мосту свои перила, фонарям там не место
     const big = r.c <= 3, small = r.c === 4;
-    if (!big && !small) return;
+    if (!big && !small) continue;
     // Столб — на внешнем краю тротуара, консоль — над дорогой. У разделённого
     // проспекта тротуар одной половины — это асфальт другой, поэтому столб,
     // попавший на чужое полотно или в дом, не ставим.
@@ -279,6 +305,7 @@ export function streets (A) {
         const nx = -uz * side, nz = ux * side;     // от осевой к тротуару
         const cx = x1 + ux * d, cz = z1 + uz * d;
         if (small && !poor(cx, cz)) continue;      // улочки 4 класса — только в частном секторе
+        work++;
         const px = cx + nx * w, pz = cz + nz * w;
         const near = A.nearestRoad(px, pz, 7, 1);
         if (near && near.d < near.seg.w / 2 + (big ? 1.2 : 0.9)) { if (small) STATS.skip.road++; continue; }
@@ -294,7 +321,7 @@ export function streets (A) {
         } else STATS.priv++;
       }
     }
-  });
+  }
 }
 
 export const DEBUG = { LAMPS, FALL, STATS, LAMP };

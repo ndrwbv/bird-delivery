@@ -53,6 +53,8 @@ let frames = 0;
 
 /* ── предохранитель ── */
 const FUSES = new Map();        // name → { fails, streak, off }
+/* новая запись журнала — HOOK.fn(запись): анонимная статистика (game/telemetry.js) шлёт её коротко; без неё — null */
+export const HOOK = { fn: null };
 /* замер шагов (tools/perf.cjs --play): PROF.fn(name, мс) после каждого шага; без замера — null */
 export const PROF = { fn: null };
 export function step (name, fn, a, b, c, d) {
@@ -133,6 +135,7 @@ export function report (where, e, kind = 'error', extra = null) {
     event('ошибка ' + where + ': ' + msg.slice(0, 60));
     try { console.error('[crashlog]', kind, where, msg); } catch (x) { /* — */ }
     writeFile(r);
+    if (HOOK.fn !== null) { try { HOOK.fn(r); } catch (x) { /* — */ } }
     dirty = true; schedule(true);
     if (kind === 'frame' || kind === 'error' || kind === 'freeze') toast();
     refreshButton();
@@ -264,6 +267,9 @@ export function init () {
   });
   addEventListener('unhandledrejection', e => { report('promise', (e && e.reason) || '?', 'rejection'); });
   addEventListener('pagehide', save);
+  // видеокарта отобрала контекст WebGL (драйвер упал, мало видеопамяти) — картинка встанет: в журнал (и в статистику)
+  document.addEventListener('webglcontextlost', () => report('webgl', { message: 'webgl context lost', stack: '' }, 'gl'), true);
+  document.addEventListener('webglcontextrestored', () => event('webgl context restored'), true);
   const hook = () => {
     const b = document.getElementById('pm-crash');
     if (b && !b.dataset.on) { b.dataset.on = '1'; b.addEventListener('click', ev => { ev.stopPropagation(); openPanel(); }); }
@@ -274,4 +280,4 @@ export function init () {
 export function setSnapshot (fn) { snapFn = fn; }
 export function setToast (fn) { toastFn = fn; }
 
-export default { PROF, init, report, step, beat, want, done, track, event, at, entries, count, session, clear, text, disabled, openDir, logDir, setSnapshot, setToast, refreshButton };
+export default { PROF, HOOK, init, report, step, beat, want, done, track, event, at, entries, count, session, clear, text, disabled, openDir, logDir, setSnapshot, setToast, refreshButton };

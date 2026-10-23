@@ -1,0 +1,25 @@
+/* летающий родстер (flycar.js): полоска «полёт» на хаде под скоростью и кнопка на телефоне.
+   В стиле полоски «кофе»: подпись мелко, полоска в тёмной рамке; цвет — красный кузова, полная — светится */
+#flyhud { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 6px; font-size: 11px; color: #ff8f7a; }   /* подпись ≥ 11 px (было 7 — «[Z] полёт» не читался) */
+#flyhud[hidden] { display: none; }
+/* телефон: заряд показывает кольцо на красной кнопке «полёт», а полоску справа сверху закрывала мини-карточка заказа — не рисуем */
+body.touch #flyhud { display: none; }
+#flyhud b { display: block; width: 84px; height: 8px; background: #33210c; border: 2px solid #33210c; border-radius: 2px; overflow: hidden; }
+#flyhud i { display: block; height: 100%; width: 100%; background: #9a3a30;
+            background-image: repeating-linear-gradient(90deg, transparent 0 9px, rgba(51, 33, 12, .55) 9px 10px); }
+#flyhud.ready { color: #fff3d6; }
+#flyhud.ready i { background-color: #ff5a45; box-shadow: 0 0 8px #ff8f7a; }
+#flyhud.fly { color: #ffe08a; }
+#flyhud.fly i { background-color: #ffd85e; box-shadow: 0 0 8px #ffd85e; }
+
+/* телефон: слева от педалей, у нижнего края; кольцо по краю — заряд (--fly ставит flycar.js) */
+.tp-right { position: relative; }
+#touchpad .tp-fly { position: absolute; right: calc(100% + 14px); bottom: 6px; width: 70px; height: 70px; font-size: 8px; color: #fff; border: 0; z-index: 0;
+                    background: conic-gradient(#ffb3a8 calc(var(--fly, 1) * 360deg), rgba(20, 16, 30, .6) 0); }
+#touchpad .tp-fly[hidden] { display: none; }
+#touchpad .tp-fly::before { content: ''; position: absolute; inset: 5px; z-index: -1; border-radius: 50%; background: #7a2a24; }
+#touchpad .tp-fly.ready::before { background: #d8262e; }
+#touchpad .tp-fly.ready { box-shadow: 0 0 12px #ff8f7a, 0 4px 0 rgba(0, 0, 0, .35); }
+#touchpad .tp-fly.fly::before { background: #e0a020; }
+@media (max-height: 460px) { #touchpad .tp-fly { width: 58px; height: 58px; font-size: 7px; } }
+@media (max-width: 440px) { #touchpad .tp-fly { width: 52px; height: 52px; font-size: 6px; right: calc(100% + 8px); } }

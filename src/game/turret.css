@@ -1,0 +1,24 @@
+/* гранатомёт на крыше (turret.js): счётчик «гранаты 9» справа сверху под полоской «полёт», в том же стиле;
+   на телефоне — круглый значок над кнопкой «полёт» слева от педалей */
+#gunhud { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 6px; font-size: 11px; color: #d9e3b8; }
+#gunhud[hidden] { display: none; }
+body.touch #gunhud { display: none; }
+#gunhud i { display: block; width: 10px; height: 13px; border-radius: 45% 45% 40% 40%; background: #5d6b3e; border: 2px solid #33210c; position: relative; }
+#gunhud i::before { content: ''; position: absolute; left: 1px; top: -5px; width: 4px; height: 3px; background: #33210c; }   /* чека */
+#gunhud b { min-width: 22px; padding: 1px 4px; text-align: center; background: #33210c; color: #fff3d6; border-radius: 2px; font-weight: normal; }
+#gunhud.wait { color: #a7ad8c; }
+#gunhud.wait b { color: #c9c3a8; }
+#gunhud.empty { color: #8a7f70; }
+#gunhud.empty b { color: #ff8f7a; }
+#gunhud.kid { color: #bfe6ff; }
+#gunhud.kid i { background: #3f9ae0; border-radius: 50%; }
+
+#touchpad .tp-gun { position: absolute; right: calc(100% + 26px); bottom: 86px; width: 40px; height: 40px; border-radius: 50%;
+                    display: flex; align-items: center; justify-content: center; font-size: 10px; color: #fff3d6; pointer-events: none;
+                    background: #4a5636; border: 2px solid #33210c; box-shadow: 0 3px 0 rgba(0, 0, 0, .3); }
+#touchpad .tp-gun[hidden] { display: none; }
+#touchpad .tp-gun.wait { background: #3a3f30; color: #c9c3a8; }
+#touchpad .tp-gun.empty { background: #3a3030; color: #ff8f7a; }
+#touchpad .tp-gun.kid { background: #2d6fb5; }
+@media (max-height: 460px) { #touchpad .tp-gun { bottom: 72px; width: 34px; height: 34px; font-size: 9px; right: calc(100% + 26px); } }
+@media (max-width: 440px) { #touchpad .tp-gun { right: calc(100% + 14px); bottom: 62px; } }

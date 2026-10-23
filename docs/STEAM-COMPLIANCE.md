@@ -19,10 +19,32 @@
 | 7 | Не шок-контент намеренно | кровь мультяшная, пиксельная | ✅, отметить в опросе |
 | 8 | Ничего про эксплуатацию несовершеннолетних | нет | ✅ |
 | 9 | Не менять систему пользователя | Electron; автообновление с GitHub **выключено** под `--steam` (Steam обновляет сам) | ✅ проверить, что `--steam` стоит в Launch Options |
-| 10 | Не собирать чужие данные | ничего не собираем; таблица рекордов локальная | ✅ если появится онлайн — политика конфиденциальности |
+| 10 | Не собирать чужие данные | с 18.10.2026 — **анонимная статистика** ([ANALYTICS.md](ANALYTICS.md)): случайный номер установки, без имени, почты, Steam ID и IP; выключатель «анонимная статистика» в настройках → игра; в детской (Яндекс) нет совсем. Таблица рекордов — Стима | 📝 текст ниже — в описание на странице магазина и в политику конфиденциальности (поле Privacy Policy в Steamworks) |
 | 11 | Видео — только про игру | трейлер из игры | ✅ |
 | 12—13 | VR, блокчейн, NFT | нет | ✅ |
 | 14 | Не бизнес-модель на рекламе | реклама только в сборке для Яндекса, в Стим-сборке `features.ads = false` | ✅ |
+
+## Анонимная статистика — текст для страницы и политики конфиденциальности
+
+**Страница политики готова (18.10.2026):** `public/privacy.html` → после релиза лежит на
+**https://ndrwbv.github.io/bird-delivery/privacy.html** (ru + en, полный список собираемого). Этот адрес — в Steamworks →
+Store Page → **Privacy Policy**; короткий текст ниже — внизу описания игры на странице Стима.
+**Тот же текст — и в самой игре (18.10.2026):** настройки → игра → «что собираем ▸» под «анонимная статистика»,
+работает офлайн; там же выключатель. Страница и лист — из одного файла `src/game/privacytext.js`
+(`node tools/privacy-html.mjs`), расходиться не могут — [ANALYTICS.md](ANALYTICS.md) «Текст политики».
+
+> **Анонимная статистика.** Игра отправляет разработчику анонимную статистику: сколько длятся заходы и смены, какие
+> события в игре случаются и чем кончаются, прогресс и покупки в игре, ошибки и плавность (время кадра, память,
+> качество графики, тип устройства: компьютер / Steam Deck, модель видеокарты). Подробно —
+> ndrwbv.github.io/bird-delivery/privacy.html. Игрок обозначен случайным номером установки — без имени, почты, Steam ID и IP-адреса;
+> адреса доставки, ники и тексты не отправляются. Данные хранятся в Яндекс Облаке (Россия) не дольше года и нужны
+> только для того, чтобы чинить ошибки и делать игру лучше. Выключить: Настройки → Игра → «анонимная статистика: выкл».
+
+> **Anonymous statistics.** The game sends the developer anonymous statistics: session and shift length, which in-game
+> events happen and how they end, in-game progress and purchases, errors and performance (frame time, memory,
+> graphics quality, device type: PC / Steam Deck, GPU model). Details: ndrwbv.github.io/bird-delivery/privacy.html. Players are identified only by a random install number — no name, email, Steam ID or IP address; no
+> delivery addresses, nicknames or texts are sent. Data is stored in Yandex Cloud (Russia) for at most one year and is
+> used only to fix bugs and improve the game. To turn it off: Settings → Game → “anonymous statistics: off”.
 
 ## Valve NDA
 
@@ -42,4 +64,5 @@
       в сборке.
 - [x] Бандитские районы — без реальных названий.
 - [ ] Проверить, что в «детском режиме» нет алкоголя, табака, крови и слот-машины.
+- [ ] Текст «Анонимная статистика» (выше) — внизу описания на странице; в поле Privacy Policy в Steamworks — адрес https://ndrwbv.github.io/bird-delivery/privacy.html (страница готова 18.10).
 - [ ] Mature Content Survey на странице магазина (см. п. 3): с 02.10.2026 ещё и «sexual themes / suggestive content (no nudity)» — девушки у обочины и стрип-клуб.

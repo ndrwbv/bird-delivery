@@ -49,8 +49,9 @@ import * as RESPECT from './respect.js';
 import * as MOPEDS from './mopeds.js';
 import * as CONSTR from './construction.js';
 import * as DAILY from './daily.js';             // задание на день «сбей N бургеров» — маскоты в зачёт (daily.js)
-import { onPave, walkHalf } from './pave.js';
+import { onPave, walkHalf, roadGap } from './pave.js';
 import { addTrail, YARD } from './yards.js';
+import * as GFX from './gfx.js';                // дальность — гостей за столиками дальше тумана не рисуем
 
 export const RIV = {
   PER_DIST: 2, MAX: 26, NODIST: 6,     // точек сети в районе; всего; без районов на карте
@@ -132,31 +133,41 @@ function signCanvas (ch) {
   x.fillText(txt, (SIGN_W + 190) / 2, SIGN_H / 2 + 4);
   return c;
 }
-/* все вывески сети — одним мешем с одной текстурой */
+/* все вывески сетей — одним мешем с одной текстурой (17.10.2026: обе сети — один холст в две строки, было по мешу и текстуре на
+   сеть — лишний вызов отрисовки в каждом кадре, docs/AGENTS.md «Слои статики») */
 const SIGNQ = { sushi: [], burger: [] };   // [x, y, z, ux, uz, w, h] — плоскость лицом в (−uz, ux)… задаётся нормалью
 function signQuad (key, cx, cy, cz, ax, az, w, h) { SIGNQ[key].push([cx, cy, cz, ax, az, w, h]); }
+const SIGN_GAP = 16;                        // зазор между строками холста: края строк не текут друг в друга на мелких мипах
 function buildSigns () {
-  for (const key of ['sushi', 'burger']) {
-    const Q = SIGNQ[key];
-    if (!Q.length) continue;
-    const P = [], U = [], I = [];
-    for (const [cx, cy, cz, ax, az, w, h] of Q) {
+  const keys = ['sushi', 'burger'].filter(k => SIGNQ[k].length);
+  if (!keys.length) return;
+  const CH_H = keys.length * SIGN_H + (keys.length - 1) * SIGN_GAP;
+  const c = document.createElement('canvas');
+  c.width = SIGN_W; c.height = CH_H;
+  const x = c.getContext('2d');
+  const P = [], U = [], I = [];
+  keys.forEach((key, row) => {
+    const y0 = row * (SIGN_H + SIGN_GAP);
+    x.drawImage(signCanvas(CH[key]), 0, y0);
+    // холст в текстуре — снизу вверх (flipY): строка row — v от 1 − (y0 + H) / CH_H до 1 − y0 / CH_H
+    const v0 = 1 - (y0 + SIGN_H) / CH_H, v1 = 1 - y0 / CH_H;
+    for (const [cx, cy, cz, ax, az, w, h] of SIGNQ[key]) {
       const o = P.length / 3, hx = ax * w / 2, hz = az * w / 2;
       P.push(cx - hx, cy - h / 2, cz - hz, cx + hx, cy - h / 2, cz + hz, cx + hx, cy + h / 2, cz + hz, cx - hx, cy + h / 2, cz - hz);
-      U.push(0, 0, 1, 0, 1, 1, 0, 1);
+      U.push(0, v0, 1, v0, 1, v1, 0, v1);
       I.push(o, o + 1, o + 2, o, o + 2, o + 3);
     }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
-    g.setIndex(I);
-    g.computeBoundingSphere();
-    const tex = new THREE.CanvasTexture(signCanvas(CH[key]));
-    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: tex }));
-    m.matrixAutoUpdate = false; m.name = 'rival-signs-' + key;
-    A.scene.add(m);
-  }
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+  g.setIndex(I);
+  g.computeBoundingSphere();
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: tex }));
+  m.matrixAutoUpdate = false; m.name = 'rival-signs';
+  A.scene.add(m);
 }
 
 /* ═════════════ поиск места ═════════════ */
@@ -250,8 +261,7 @@ function finder () {
       if (inPolys(px, pz)) return no('poly');
       if (nearLine(px, pz, 2.2)) return no('path');
       if (inSolid(px, pz, 1)) return no('solid');
-      const r = A.nearestRoad(px, pz, 7, 1);
-      if (r && r.d < r.seg.w / 2 + 1.2) return no('road');
+      if (roadGap(px, pz) < 1.2) return no('road');     // до края каждой дороги рядом, не до ближайшей осевой (pave.js)
     }
     // улица у террасы — та самая и прямая
     for (const a of [-W / 2, 0, W / 2]) {
@@ -371,52 +381,79 @@ function* findSites () {                         // шагами (yield): пои
   return sites;
 }
 
-/* районы без пустыря — по 1 точке у ТЦ, прежним отбором (у улицы, без домов на участке) */
+/* в районе нет точки какой-то сети (пустыря не нашлось или он один) — недостающая сеть встаёт у ТЦ (в MALL_R), прежним
+   отбором (у улицы, без домов на участке); в районе без ТЦ — у любой улицы 2—4 класса этого района (жребий по месту),
+   не ближе GAP_SAME к точке той же сети. До 17.10.2026 — только районы совсем без пустыря и по 1 точке у ТЦ: в районе
+   с одним пустырём была одна сеть (в районах 2 и 3 не было суши) */
 function mallSites (sites) {
   const F = finder(), malls = mallCenters();
-  if (!malls.length) return;
-  const have = new Set(sites.map(s => s.dist));
-  const cands = [];
-  for (const r of A.CITY.roads) {
-    if (r.c < 2 || r.c > 4 || r.b || r.x) continue;
-    const w = A.roadWidth(r);
-    let acc = RIV.STEP / 2;
-    for (let i = 1; i < r.p.length; i++) {
-      const [x1, z1] = r.p[i - 1], [x2, z2] = r.p[i];
-      const L = Math.hypot(x2 - x1, z2 - z1);
-      if (L < 1) continue;
-      const ux = (x2 - x1) / L, uz = (z2 - z1) / L;
-      for (; acc < L; acc += RIV.STEP) {
-        const px = x1 + ux * acc, pz = z1 + uz * acc;
-        for (const sd of [1, -1]) {
-          const vx = ux * sd, vz = uz * sd, nx = -vz, nz = vx, off = walkHalf({ w, c: r.c, g: r.g || 0 }) + RIV.LAWN;
-          const fx = px + nx * off, fz = pz + nz * off;
-          let dm = Infinity;
-          for (const m of malls) dm = Math.min(dm, Math.hypot(m[0] - fx, m[1] - fz));
-          if (dm > RIV.MALL_R) continue;
-          const pr = dm / RIV.MALL_R + hash(px, pz, sd > 0 ? 11 : 13) * 0.3;
-          cands.push({ fx, fz, ux: vx, uz: vz, nx, nz, pr, h: hash(px, pz, 17) });
+  const have = new Map();                          // район → какие сети в нём уже есть
+  for (const s of sites) { if (!have.has(s.dist)) have.set(s.dist, new Set()); have.get(s.dist).add(s.chain); }
+  const lacks = di => { const h = have.get(di); return !h ? ['sushi', 'burger'] : ['sushi', 'burger'].filter(k => !h.has(k)); };
+  /* места у улиц 2—4 класса: pr(fx, fz, px, pz, sd) — порядок (меньше — раньше), null — не годится */
+  const roadCands = pr => {
+    const cands = [];
+    for (const r of A.CITY.roads) {
+      if (r.c < 2 || r.c > 4 || r.b || r.x) continue;
+      const w = A.roadWidth(r);
+      let acc = RIV.STEP / 2;
+      for (let i = 1; i < r.p.length; i++) {
+        const [x1, z1] = r.p[i - 1], [x2, z2] = r.p[i];
+        const L = Math.hypot(x2 - x1, z2 - z1);
+        if (L < 1) continue;
+        const ux = (x2 - x1) / L, uz = (z2 - z1) / L;
+        for (; acc < L; acc += RIV.STEP) {
+          const px = x1 + ux * acc, pz = z1 + uz * acc;
+          for (const sd of [1, -1]) {
+            const vx = ux * sd, vz = uz * sd, nx = -vz, nz = vx, off = walkHalf({ w, c: r.c, g: r.g || 0 }) + RIV.LAWN;
+            const fx = px + nx * off, fz = pz + nz * off, q = pr(fx, fz, px, pz, sd);
+            if (q != null) cands.push({ fx, fz, ux: vx, uz: vz, nx, nz, pr: q, h: hash(px, pz, 17) });
+          }
         }
+        acc -= L;
       }
-      acc -= L;
     }
-  }
-  ST.tried = cands.length;
-  cands.sort((a, b) => a.pr - b.pr);
+    return cands.sort((a, b) => a.pr - b.pr);
+  };
   const D = !!A.distAt, cap = D ? RIV.MAX : RIV.NODIST, n0 = sites.length;
   const far = c => sites.every(s => Math.hypot(s.cx - c.cx, s.cz - c.cz) > RIV.GAP_ANY);
   const busy = CONSTR.claimed(), R = Math.hypot(WT(), DT()) / 2;
-  for (const c of cands) {
-    if (sites.length >= cap) break;
-    c.cx = c.fx + c.nx * DT() / 2; c.cz = c.fz + c.nz * DT() / 2;
-    const di = D ? A.distAt(c.cx, c.cz) : 0;
-    if (have.has(di) || !far(c) || !busy.every(a => Math.hypot(a.x - c.cx, a.z - c.cz) > R + a.r + 15)) continue;
-    ST.tested++;
-    if (!F.test(c)) continue;
-    c.dist = di; c.chain = c.h < 0.5 ? 'sushi' : 'burger'; c.mall = 1;
-    have.add(di);
-    sites.push(c);
-    CONSTR.claim(c.cx, c.cz, R);
+  const fill = (cands, sameGap) => {
+    for (const c of cands) {
+      if (sites.length >= cap) break;
+      c.cx = c.fx + c.nx * DT() / 2; c.cz = c.fz + c.nz * DT() / 2;
+      const di = D ? A.distAt(c.cx, c.cz) : 0;
+      let need = lacks(di);
+      if (sameGap) need = need.filter(k => sites.every(s => s.chain !== k || Math.hypot(s.cx - c.cx, s.cz - c.cz) > sameGap));
+      if (!need.length || !far(c) || !busy.every(a => Math.hypot(a.x - c.cx, a.z - c.cz) > R + a.r + 15)) continue;
+      ST.tested++;
+      if (!F.test(c)) continue;
+      c.dist = di; c.chain = need.length > 1 ? (c.h < 0.5 ? 'sushi' : 'burger') : need[0]; c.mall = 1;
+      if (!have.has(di)) have.set(di, new Set());
+      have.get(di).add(c.chain);
+      sites.push(c);
+      CONSTR.claim(c.cx, c.cz, R);
+    }
+  };
+  // у ТЦ — ближе к ТЦ раньше
+  if (malls.length) {
+    const cands = roadCands((fx, fz, px, pz, sd) => {
+      let dm = Infinity;
+      for (const m of malls) dm = Math.min(dm, Math.hypot(m[0] - fx, m[1] - fz));
+      return dm > RIV.MALL_R ? null : dm / RIV.MALL_R + hash(px, pz, sd > 0 ? 11 : 13) * 0.3;
+    });
+    ST.tried = cands.length;
+    fill(cands, 0);
+  }
+  // районы, где сети всё ещё нет (без ТЦ), — у любой улицы этого района
+  if (D) {
+    const miss = new Set();
+    for (const s of sites) if (lacks(s.dist).length) miss.add(s.dist);
+    if (miss.size) {
+      const cands = roadCands((fx, fz, px, pz, sd) => (miss.has(A.distAt(fx, fz)) ? hash(px, pz, sd > 0 ? 23 : 29) : null));
+      ST.tried += cands.length;
+      fill(cands, RIV.GAP_SAME);
+    }
   }
   ST.mall = sites.length - n0;
 }
@@ -453,6 +490,7 @@ function build1 (s, idx) {
       LITM.color(YARD.COLOR);                                    // цвет дворовых дорожек: зимой протоптана (seasons.js)
       LITM.ribbon(bx, bz, cx, cz, RIV.BRANCH_W, 0.13);
       shop.branch = [[bx, bz], [cx, cz]];
+      shop.branch.hw = RIV.BRANCH_W / 2; shop.branch.lift = 0.13;   // бордюрам по краям (curbs.js)
       A.CITY.paths.push(shop.branch);
       addTrail(shop.branch, RIV.BRANCH_W / 2);
       ST.branches++;
@@ -721,25 +759,38 @@ function buildGuests () {
   G_HEAD = new THREE.InstancedMesh(hg, mat, SEAT.length);
   G_BODY.frustumCulled = G_HEAD.frustumCulled = false;
   G_BODY.name = 'rival-guests';
-  const c = new THREE.Color();
   for (const q of SEAT) {
-    G_BODY.setColorAt(q.k, c.set(SHIRTS[(hash(q.x, q.z, 1) * SHIRTS.length) | 0]));
-    G_HEAD.setColorAt(q.k, c.set(SKINS[(hash(q.x, q.z, 2) * SKINS.length) | 0]));
+    q.cb = new THREE.Color(SHIRTS[(hash(q.x, q.z, 1) * SHIRTS.length) | 0]);
+    q.ch = new THREE.Color(SKINS[(hash(q.x, q.z, 2) * SKINS.length) | 0]);
   }
+  G_BODY.setColorAt(0, SEAT[0].cb); G_HEAD.setColorAt(0, SEAT[0].ch);   // цвет инстансов — сразу (иначе программа шейдера сменится на ходу)
   ST.guests = SEAT.length;
   A.scene.add(G_BODY, G_HEAD);
   poseGuests();
 }
-const GM = new THREE.Matrix4(), GR = new THREE.Matrix4(), ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
+/* 18.10.2026: рисуем только гостей ближе дальности (туман) — их ~сотни по городу, и раньше все шли в каждый кадр
+   (спрятанные — нулевым размером, видеокарта всё равно считала вершины: ~50 тыс. треугольников в кадре на телефоне).
+   Ближние — подряд в начале инстансов (count), пересобираем, когда машина отъехала на G_MOVE м или кто-то сбежал */
+const GM = new THREE.Matrix4(), GR = new THREE.Matrix4(), ZERO = new THREE.Matrix4().makeScale(0, 0, 0);   // ZERO — спрятанные маскоты
+const G_MOVE = 30;
+let G_AT = { x: 1e9, z: 1e9 };
 function poseGuests () {
   if (!G_BODY) return;
+  const V = A.V, R = GFX.rangeK() * 490 + 40;
+  let n = 0;
   for (const q of SEAT) {
-    if (!q.on) { G_BODY.setMatrixAt(q.k, ZERO); G_HEAD.setMatrixAt(q.k, ZERO); continue; }
+    if (!q.on || Math.abs(q.x - V.x) > R || Math.abs(q.z - V.z) > R) continue;
     GR.makeRotationY(q.ry + (q.nod || 0) * 0.15);
     GM.copy(GR).setPosition(q.x, q.y, q.z);
-    G_BODY.setMatrixAt(q.k, GM); G_HEAD.setMatrixAt(q.k, GM);
+    G_BODY.setMatrixAt(n, GM); G_HEAD.setMatrixAt(n, GM);
+    G_BODY.setColorAt(n, q.cb); G_HEAD.setColorAt(n, q.ch);
+    n++;
   }
+  G_BODY.count = G_HEAD.count = n;
+  G_BODY.visible = G_HEAD.visible = n > 0;
   G_BODY.instanceMatrix.needsUpdate = true; G_HEAD.instanceMatrix.needsUpdate = true;
+  if (G_BODY.instanceColor) { G_BODY.instanceColor.needsUpdate = true; G_HEAD.instanceColor.needsUpdate = true; }
+  G_AT = { x: V.x, z: V.z };
   GUESTS_DIRTY = 0;
 }
 
@@ -1221,7 +1272,7 @@ export function step (dt) {
   }
   if (dirty && MI) for (const k of ['leg', 'arm', 'chop', 'scep']) MI[k].instanceMatrix.needsUpdate = true;
   if (dirty && MI) for (const k in MI.body) MI.body[k].instanceMatrix.needsUpdate = true;
-  if (GUESTS_DIRTY) poseGuests();
+  if (GUESTS_DIRTY || Math.abs(V.x - G_AT.x) > G_MOVE || Math.abs(V.z - G_AT.z) > G_MOVE) poseGuests();
   // курьеры конкурентов
   stepBcars();
   stepSushi(dt);

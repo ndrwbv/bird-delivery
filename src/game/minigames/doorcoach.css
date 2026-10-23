@@ -1,0 +1,104 @@
+/* Обучение первого раза в мини-играх у двери (doorcoach.js, автор 18.10.2026): затемнение поверх мини-игры, вырез с
+   пульсирующей жёлтой рамкой вокруг того, что жать, палец (телефон) или крупный значок клавиши (клавиатура, геймпад) у
+   цели и записка Толика — бумага, как накладная: «пропустить» на полях, «дальше» / штамп «поехали!». */
+.dc { position: absolute; inset: 0; z-index: 40; pointer-events: auto; touch-action: none; overflow: hidden;
+      font-family: "Press Start 2P", ui-monospace, monospace; color: var(--pp-ink); animation: dc-in .25s ease-out both; }
+.dc.dc-dimmed { background: rgba(14, 9, 5, .66); }
+.dc.dc-out { pointer-events: none; animation: dc-fade .22s ease-in both; }
+@keyframes dc-in { from { opacity: 0; } }
+@keyframes dc-fade { to { opacity: 0; } }
+
+/* вырез: тень на весь экран вокруг цели — затемнение; рамка жёлтая, пульсирует; переезжает к следующей цели */
+.dc-hole { position: absolute; box-sizing: border-box; border: 4px solid var(--pp-yellow); border-radius: 14px; pointer-events: none;
+           box-shadow: 0 0 0 3px var(--pp-ink), 0 0 0 200vmax rgba(14, 9, 5, .66);
+           transition: left .38s cubic-bezier(.3, 1.25, .5, 1), top .38s cubic-bezier(.3, 1.25, .5, 1), width .38s cubic-bezier(.3, 1.25, .5, 1), height .38s cubic-bezier(.3, 1.25, .5, 1), border-color .15s;
+           animation: dc-hole-in .45s cubic-bezier(.3, 1.3, .5, 1) .08s both; }
+.dc-hole[hidden] { display: none; }
+.dc-hole::after { content: ''; position: absolute; inset: -6px; border: 4px solid var(--pp-yellow); border-radius: 18px; animation: dc-pulse 1.1s ease-out .5s infinite; }
+.dc-hole.dc-ok { border-color: var(--pp-lime); box-shadow: 0 0 0 3px var(--pp-ink), 0 0 26px 6px rgba(79, 214, 90, .7), 0 0 0 200vmax rgba(14, 9, 5, .66); }
+.dc-hole.dc-ok::after { border-color: var(--pp-lime); }
+.dc-hole.dc-nudge { animation: dc-nudge .32s ease-out; }
+@keyframes dc-hole-in { from { opacity: 0; scale: 1.9; } }
+@keyframes dc-pulse { 0% { opacity: .95; scale: 1; } 100% { opacity: 0; scale: 1.14; } }
+@keyframes dc-nudge { 25% { translate: -5px 0; } 60% { translate: 5px 0; } }
+
+/* у цели: палец тапает (телефон) или крупный значок клавиши жмётся (клавиатура, геймпад) */
+.dc-hint { position: absolute; display: flex; align-items: center; gap: 8px; translate: -50% -100%; pointer-events: none; opacity: 0; }
+.dc-hint[hidden] { display: none; }
+.dc-hint.dc-below { translate: -50% 0; }
+.dc-hint.dc-show { animation: dc-show .3s ease-out .42s both; }
+@keyframes dc-show { from { opacity: 0; translate: -50% calc(-100% + 10px); } to { opacity: 1; } }
+.dc-hint.dc-below.dc-show { animation-name: dc-show-b; }
+@keyframes dc-show-b { from { opacity: 0; translate: -50% -10px; } to { opacity: 1; } }
+.dc-hand { display: none; font-size: 38px; line-height: 1; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .55)); animation: dc-tap 1s ease-in-out .8s infinite; }
+.dc[data-input="touch"] .dc-hand { display: block; }
+.dc[data-input="touch"] .dc-keys { display: none; }
+.dc[data-input="touch"] .dc-hint { translate: -35% 0; }
+.dc[data-input="touch"] .dc-hint.dc-show { animation-name: dc-show-t; }
+@keyframes dc-show-t { from { opacity: 0; translate: -35% 12px; } to { opacity: 1; translate: -35% 0; } }
+@keyframes dc-tap { 0%, 100% { transform: translateY(12px); } 45% { transform: translateY(0) scale(.88); } 60% { transform: translateY(0) scale(.88); } }
+.dc-keys { display: flex; gap: 8px; }
+.dc-keys .pp-key { margin: 0; min-width: 2.3em; height: 2.3em; font-size: clamp(14px, 1.7vw, 26px); color: var(--pp-ink); background: var(--pp-yellow);
+                   border: 3px solid var(--pp-ink); box-shadow: 0 5px 0 var(--pp-ink); animation: dc-key 1s ease-in-out .8s infinite; }
+.dc-keys .pp-key.pp-key-kb { box-shadow: inset 0 -4px 0 rgba(51, 33, 12, .25), 0 5px 0 var(--pp-ink); }
+@keyframes dc-key { 0%, 55%, 100% { translate: 0 0; } 30% { translate: 0 4px; box-shadow: 0 1px 0 var(--pp-ink); } }
+
+/* записка Толика: бумага, как накладная; в половине экрана, где цели нет */
+.dc-card { position: absolute; left: 50%; translate: -50% 0; box-sizing: border-box; width: min(540px, calc(100% - 24px)); padding: .9em 1.1em 1em;
+           background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 6px; box-shadow: 0 6px 0 var(--pp-ink), 0 18px 40px rgba(0, 0, 0, .5); rotate: -.6deg; }
+.dc-card.dc-top { top: max(12px, var(--sa-t, env(safe-area-inset-top))); }
+.dc-card.dc-bot { bottom: max(14px, var(--sa-b, env(safe-area-inset-bottom))); }
+.dc-card.dc-mid { top: 50%; translate: -50% -50%; }
+.dc-card.dc-pop { animation: dc-pop .34s cubic-bezier(.2, 1.4, .45, 1) .12s both; }
+@keyframes dc-pop { from { opacity: 0; scale: .92; } }
+.dc-head { display: flex; align-items: center; gap: .6em; margin: 0 0 .6em; font-size: var(--pp-fs-s); }
+.dc-av { flex: none; display: grid; place-items: center; width: 34px; height: 34px; overflow: hidden; border-radius: 50%; border: 2px solid var(--pp-ink);
+         background: #8a6b4e; color: var(--pp-paper); font-size: 14px; }
+.dc-av img { width: 100%; height: 100%; image-rendering: pixelated; object-fit: cover; }
+.dc-head b { font-weight: normal; color: var(--pp-rust); text-transform: uppercase; letter-spacing: .06em; }
+.dc-head em { font-style: normal; padding: .25em .5em; color: var(--pp-ink); background: var(--pp-yellow); border-radius: 3px; font-size: .85em; }
+.dc-n { margin-left: auto; color: var(--pp-label); }
+.dc-txt { margin: 0; font-size: var(--pp-fs-m); line-height: 1.75; }
+.dc-txt .pp-key { margin: 0 .3em; font-size: .85em; }
+.dc-txt b { font-weight: normal; padding: 0 .2em; background: linear-gradient(transparent 12%, var(--pp-yellow) 12% 88%, transparent 88%); }
+.dc-btns { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: .9em; }
+.dc-btns button { display: inline-flex; align-items: center; gap: .5em; font-family: inherit; line-height: 1.2; color: var(--pp-ink); cursor: pointer; touch-action: manipulation; }
+.dc-btns button[hidden] { display: none; }
+.dc-btns .pp-key { margin: 0; }
+.dc-btns .pp-key[hidden] { display: none; }
+.dc-skip { padding: .55em .8em; font-size: var(--pp-fs-s); background: transparent; border: 2px dashed var(--pp-brown); border-radius: 3px; }
+.dc-next { padding: .7em 1.1em; font-size: var(--pp-fs-m); background: var(--pp-yellow); border: 3px solid var(--pp-ink); border-radius: 6px; box-shadow: 0 4px 0 var(--pp-ink); }
+.dc-next:active { translate: 0 3px; box-shadow: 0 1px 0 var(--pp-ink); }
+.dc-btns .dc-go { width: auto; margin: 0; padding: .65em 1.2em; font-size: var(--pp-fs-l); text-shadow: 2px 2px 0 var(--pp-ink); }
+.dc-go .pp-key { color: var(--pp-red); background: var(--pp-paper); font-size: var(--pp-fs-s); }
+.dc-last .dc-card { width: min(600px, calc(100% - 24px)); }
+
+/* цель нажали — она вдавливается и отпружинивает (кнопка мини-игры под вырезом) */
+.dc-press { animation: dc-press .3s cubic-bezier(.2, 1.4, .45, 1); }
+@keyframes dc-press { 0% { scale: .88; } 100% { scale: 1; } }
+
+/* телефон боком (низко): записка уже и мельче, чтобы цель внизу или вверху оставалась на виду */
+@media (max-height: 460px) {
+  .dc-card { width: min(470px, calc(100% - 140px)); padding: .6em .8em .7em; }
+  .dc-last .dc-card { width: min(520px, calc(100% - 60px)); }
+  .dc-card.dc-top { top: max(8px, var(--sa-t, env(safe-area-inset-top))); }
+  .dc-card.dc-bot { bottom: max(8px, var(--sa-b, env(safe-area-inset-bottom))); }
+  .dc-head { margin-bottom: .4em; }
+  .dc-av { width: 26px; height: 26px; }
+  .dc-txt { font-size: 10px; line-height: 1.6; }
+  .dc-btns { margin-top: .55em; }
+  .dc-next { padding: .55em .9em; font-size: 10px; }
+  .dc-skip { font-size: 9px; min-height: 32px; }
+  .dc-btns .dc-go { padding: .5em 1em; font-size: 15px; }
+  .dc-hand { font-size: 32px; }
+}
+@media (max-width: 760px) and (min-height: 461px) {
+  .dc-txt { font-size: 11px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-hole, .dc-hole::after, .dc-hand, .dc-keys .pp-key, .dc-card.dc-pop, .dc-hint.dc-show, .dc-press { animation: none; }
+  .dc-hint { opacity: 1; }
+  .dc-hole { transition: none; }
+}
+body.calm-fx .dc-hole::after, body.calm-fx .dc-hand, body.calm-fx .dc-keys .pp-key { animation: none; }

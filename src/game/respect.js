@@ -21,6 +21,7 @@
 import './respect.css';
 import { t, N_ } from '../i18n/index.js';
 import { RESPECT as R } from './econ.js';
+import * as TEL from './telemetry.js';          // анонимная статистика: новое звание (telemetry.js)
 
 const KEY = 'dlv-respect';
 let A = {};
@@ -96,6 +97,7 @@ export function add (n, why, quiet) {
   const lv = level();
   if (!quiet && d) pop(d, why);
   else paint(d);
+  if (lv.i !== before) TEL.ev('rank', { i: lv.i, up: lv.i > before ? 1 : 0, why: why || '' });
   if (lv.i !== before && A.toast) A.toast(lv.i > before ? t('новое звание: {name}', { name: lv.name }) : t('звание упало: {name}', { name: lv.name }));
   for (const fn of subs) { try { fn(val, d, why, lv); } catch (e) { /* подписчик не ломает остальных */ } }
   return val;

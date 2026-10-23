@@ -27,7 +27,7 @@ const CULL_EVERY = 12;
 const MAX_R = 400;              // больше — это юбка земли и река: они всегда на сцене
 
 let LIST = [], SCENE = null, CAM = null, PROPS = [], tick = 0;
-export const STATS = { frozen: 0, culled: 0, groups: 0, props: 0, propsOff: 0, cells: 0, cellsOut: 0, outMeshes: 0 };
+export const STATS = { frozen: 0, culled: 0, groups: 0, props: 0, propsOff: 0, cells: 0, cellsOut: 0, outMeshes: 0, big: 0, boxOut: 0, mwSkip: 0, farMs: 0 };
 
 /* ── что в кадре: клетки статики (09.10.2026, хвост кадров на Деке) ──
    three.js в каждом кадре проверяет КАЖДЫЙ видимый меш сцены на попадание в кадр (projectObject →
@@ -37,8 +37,14 @@ export const STATS = { frozen: 0, culled: 0, groups: 0, props: 0, propsOff: 0, c
    раз в кадр — проверка коробки клетки (сотни проверок вместо тысяч), и у кусков клетки вне кадра
    выключен слой (layers.mask = 0) — three.js проходит их, не считая. Видимость (visible) не
    трогаем: её переключают сезоны. Слои в игре больше никто не использует.
-   Камера та же для всех отрисовок (главная, катсцены, меню) — inView() годится и для машин и людей. */
+   Камера та же для всех отрисовок (главная, катсцены, меню) — inView() годится и для машин и людей.
+   Большие куски (клетки статики 200 м: земля, разметка, склейки реквизита, деревья — радиус от BIG_R м; таких ~6 тыс. на город) в клетке, что в кадре,
+   проверяются ещё и своей коробкой (17.10.2026): шар клетки 200 м — радиус ~140 м, он задевает кадр куда чаще, чем сама
+   клетка (сзади и сбоку камеры, над и под ней) — ~5 лишних вызовов отрисовки в кадре на «Деке» (docs/AGENTS.md «Слои статики»). Коробку кладёт тот, кто
+   собрал геометрию (game.js boundSphere, seasons.js Pile), или она считается здесь, пока вершины ещё в памяти. */
 const VIEW_CELL = 128;
+const BIG_R = 80;
+const BOX_ON = typeof location === 'undefined' || !/[?&]nobox(&|$)/.test(location.search);   // ?nobox — без коробок, для замера
 /* VIEW.on = false (или ?noview) — без отсечения по кадру: для сравнения замеров (tools/perf.cjs, probe) */
 export const VIEW = { on: typeof location === 'undefined' || !/[?&]noview(&|$)/.test(location.search) };
 let CELLS = [], masked = false;
@@ -63,8 +69,9 @@ function buildCells () {
   for (const e of LIST) {
     const k = Math.floor(e.x / VIEW_CELL) + ',' + Math.floor(e.z / VIEW_CELL);
     let c = M.get(k);
-    if (!c) M.set(k, c = { box: new THREE.Box3(), list: [], vis: true, cx: 0, cz: 0, rad: 0 });
+    if (!c) M.set(k, c = { box: new THREE.Box3(), list: [], big: [], vis: true, cx: 0, cz: 0, rad: 0 });
     c.list.push(e);
+    if (e.box) c.big.push(e);
     c.box.expandByPoint(BOX.min.set(e.x - e.r, e.y - e.r, e.z - e.r));
     c.box.expandByPoint(BOX.max.set(e.x + e.r, e.y + e.r, e.z + e.r));
   }
@@ -83,18 +90,27 @@ function nearCells () {
   nearX = px; nearZ = pz;
 }
 function cellCull () {
-  let out = 0, om = 0;
+  let out = 0, om = 0, bo = 0;
   masked = true;
   for (let i = 0; i < NEAR.length; i++) {
     const c = NEAR[i], v = FR.intersectsBox(c.box);
     if (v !== c.vis) {
       c.vis = v;
       const L = c.list, mask = v ? 1 : 0;
-      for (let j = 0; j < L.length; j++) if (!L[j].gone) L[j].m.layers.mask = mask;
+      for (let j = 0; j < L.length; j++) if (!L[j].gone) { L[j].m.layers.mask = mask; L[j].bw = mask; }
     }
-    if (!v) { out++; om += c.list.length; }
+    if (!v) { out++; om += c.list.length; continue; }
+    // клетка в кадре — большие куски ещё и своей коробкой
+    const B = c.big;
+    for (let j = 0; j < B.length; j++) {
+      const e = B[j];
+      if (e.gone || !e.on) continue;
+      const w = FR.intersectsBox(e.box) ? 1 : 0;
+      if (w !== e.bw) { e.bw = w; e.m.layers.mask = w; }
+      if (!w) bo++;
+    }
   }
-  STATS.cellsOut = out; STATS.outMeshes = om;
+  STATS.cellsOut = out; STATS.outMeshes = om; STATS.boxOut = bo;
 }
 
 const still = o => o.position.x === 0 && o.position.y === 0 && o.position.z === 0 &&
@@ -113,12 +129,18 @@ function take (m, parent) {
   const s = g.boundingSphere;
   if (!s || !(s.radius < MAX_R)) return;
   if (parent === SCENE) m.matrixWorldAutoUpdate = false;   // step() не зовёт ему updateMatrixWorld каждый кадр (их тысячи); сдвинут — cullFar вернёт
-  LIST.push({ m, parent, x: s.center.x, y: s.center.y, z: s.center.z, r: s.radius, on: true });
+  let box = null;
+  if (BOX_ON && s.radius >= BIG_R) {
+    if (!g.boundingBox && g.attributes.position && g.attributes.position.array) g.computeBoundingBox();
+    // запас 3 м: ветер урагана клонит кроны, разбитый сугроб чуть шире — коробка геометрии их не знает
+    if (g.boundingBox && !g.boundingBox.isEmpty()) { box = g.boundingBox.clone().expandByScalar(3); STATS.big++; }
+  }
+  LIST.push({ m, parent, x: s.center.x, y: s.center.y, z: s.center.z, r: s.radius, on: true, box, bw: 1 });
 }
 
 export function freeze (scene, cam, props) {
   for (const c of CELLS) for (const e of c.list) if (!e.gone) e.m.layers.mask = 1;   // второй раз — с чистого листа
-  CELLS = []; NEAR = []; OFF = 0;
+  CELLS = []; NEAR = []; OFF = 0; STATS.big = 0; SCH = null;
   SCENE = scene; CAM = cam; LIST = []; PROPS = props || [];
   POFF = PROPS.filter(p => p._fz && p._on === false).length;
   for (const c of scene.children.slice()) {
@@ -167,7 +189,7 @@ function propThaw (p) {
 }
 
 /** камера прыгнула далеко (смена профиля в меню, game.js reprofile): дальние — сразу, не через CULL_EVERY кадров */
-export function refresh () { if (SCENE) cullFar(); }
+export function refresh () { if (SCENE) { if (FAR_OLD) cullFar(); else farAll(); } }
 export function step () {
   if (!SCENE) return;
   let np = 0;
@@ -182,25 +204,124 @@ export function step () {
      (смерть, новая смена, телепорт) — сразу всё */
   tick++;
   const jump = Math.abs(CAM.position.x - nearX) + Math.abs(CAM.position.z - nearZ) > 60;
-  if (jump) cullFar(); else cullFar(tick % CULL_EVERY, CULL_EVERY);
+  const tf = performance.now();
+  if (FAR_OLD) { if (jump) cullFar(); else cullFar(tick % CULL_EVERY, CULL_EVERY); }
+  else if (jump || !SCH) farAll();
+  else farStep(tick % CULL_EVERY, CULL_EVERY);
+  STATS.farMs += (performance.now() - tf - STATS.farMs) * 0.02;   // дальнее, мс на кадр (сглажено) — для замеров
   if (jump || tick % CULL_EVERY === 0) nearCells();
   if (VIEW.on) { viewFrustum(); cellCull(); }
-  else if (masked) { masked = false; frOk = false; for (const c of CELLS) { c.vis = true; for (const e of c.list) if (!e.gone) e.m.layers.mask = 1; } STATS.cellsOut = STATS.outMeshes = 0; }
+  else if (masked) { masked = false; frOk = false; for (const c of CELLS) { c.vis = true; for (const e of c.list) if (!e.gone) { e.m.layers.mask = 1; e.bw = 1; } } STATS.cellsOut = STATS.outMeshes = STATS.boxOut = 0; }
   // матрицы — только у видимого и живого (см. freeze): спрятанные группы,
   // замороженный реквизит, склейки города и стоящие лёгкие машины пропускаем
   let g = 0, still2 = 0;
+  SKIP = 0;
   for (const c of SCENE.children) {
     if (c.isGroup && c.matrixAutoUpdate) {
       let on = c.visible;
       if (on && c.userData.lite && !moved(c)) { on = false; still2++; }
       c.matrixWorldAutoUpdate = on; g++;
     }
-    if (c.visible && c.matrixWorldAutoUpdate) c.updateMatrixWorld();
+    if (c.visible && c.matrixWorldAutoUpdate) { if (MW_SKIP) upd(c, false); else c.updateMatrixWorld(); }
   }
-  STATS.groups = g; STATS.stillCars = still2;
+  STATS.groups = g; STATS.stillCars = still2; STATS.mwSkip = SKIP;
 }
 
-/* part, of — каждый of-й элемент, начиная с part (по кусочку в кадр); без них — весь список */
+/* updateMatrixWorld three.js, только спрятанное внутри видимого (visible = false) не обходим (17.10.2026): у дальнего
+   человека (humanLod) спрятаны кости, тело и всё, что у него в руках, — ~340 узлов из ~960 в кадре на «Деке» считались
+   зря. Спрятанному ставим matrixWorldNeedsUpdate: покажут — пересчитается в том же кадре, до отрисовки, вместе с детьми.
+   Кто читает matrixWorld спрятанного сам (localToWorld у кости дальнего) — сначала updateWorldMatrix(true, false).
+   У кого свой updateMatrixWorld (колёса лёгких машин курьеров, SkinnedMesh) — зовём его, как раньше.
+   ?mwall — как раньше (обходить всё), для замеров */
+const UMW = THREE.Object3D.prototype.updateMatrixWorld;
+const MW_SKIP = typeof location === 'undefined' || !/[?&]mwall(&|$)/.test(location.search);
+let SKIP = 0;
+function upd (o, force) {
+  if (o.updateMatrixWorld !== UMW) { o.updateMatrixWorld(force); return; }
+  if (o.matrixAutoUpdate) o.updateMatrix();
+  if (o.matrixWorldNeedsUpdate || force) {
+    if (o.matrixWorldAutoUpdate) { const p = o.parent; if (p === null) o.matrixWorld.copy(o.matrix); else o.matrixWorld.multiplyMatrices(p.matrixWorld, o.matrix); }
+    o.matrixWorldNeedsUpdate = false;
+    force = true;
+  }
+  const ch = o.children;
+  for (let i = 0, n = ch.length; i < n; i++) {
+    const k = ch[i];
+    if (k.visible) upd(k, force);
+    else { k.matrixWorldNeedsUpdate = true; SKIP++; }
+  }
+}
+
+/* Дальнее по расписанию (17.10.2026, docs/AGENTS.md «Слои статики»): было — каждый кадр 1/12 списка (~620 кусков из ~7,4 тыс.:
+   сдвинут ли и дальше ли дальности), ~0,2 мс кадра на «Деке». Кусок не может перейти границу дальности, пока камера не
+   проехала (плюс сколько сдвинулась сама дальность — страховка govern) столько, сколько от него до границы: после проверки
+   он ложится в корзину «путь камеры» = сейчас + этот зазор (корзины по FSTEP м), и до неё его не трогают. В кадр — только
+   корзины, до которых доехали (обычно пусто или десяток-другой кусков у края дальности). «Сдвинут ли» — отдельно, по
+   кусочку: весь список за ~STILL_PASS кадров (кто-то сдвинул замороженное — больше не наш, как было). Камера прыгнула —
+   всё разом и расписание заново. ?farold — по-старому, для замера */
+const FAR_OLD = typeof location !== 'undefined' && /[?&]farold(&|$)/.test(location.search);
+const FSTEP = 4, STILL_PASS = 48;
+let SCH = null, ODO = 0, odoK = 0, oX = NaN, oZ = NaN, oF = NaN, stillI = 0;
+function farOne (e, px, pz, far) {
+  const m = e.m, dx = e.x - px, dz = e.z - pz, lim = far + e.r, d2 = dx * dx + dz * dz;
+  const want = d2 < lim * lim;
+  if (want !== e.on) {
+    e.on = want;
+    if (want) { e.parent.add(m); OFF--; } else { e.parent.remove(m); OFF++; }
+  }
+  const gap = Math.abs(Math.sqrt(d2) - lim);
+  const k = Math.max(odoK + 1, Math.floor((ODO + Math.max(gap, FSTEP)) / FSTEP));
+  const L = SCH.get(k);
+  if (L) L.push(e); else SCH.set(k, [e]);
+}
+function unfreeze (e, i) {                          // кто-то сдвинул — больше не наш
+  const m = e.m;
+  m.matrixAutoUpdate = true; m.matrixWorldAutoUpdate = true;
+  e.gone = true; m.layers.mask = 1;                 // и не в клетках «что в кадре», и не в расписании
+  if (!e.on) { e.parent.add(m); OFF--; }
+  LIST.splice(i, 1);
+}
+function farAll () {
+  const px = CAM.position.x, pz = CAM.position.z, far = CAM.far + 20;
+  SCH = new Map(); oX = px; oZ = pz; oF = far; odoK = Math.floor(ODO / FSTEP);
+  for (let i = LIST.length - 1; i >= 0; i--) { const e = LIST[i]; if (!still(e.m)) { unfreeze(e, i); continue; } farOne(e, px, pz, far); }
+  STATS.culled = OFF;
+  propsFar(0, 1, px, pz, far);
+}
+function farStep (part, of) {
+  const px = CAM.position.x, pz = CAM.position.z, far = CAM.far + 20;
+  ODO += Math.sqrt((px - oX) * (px - oX) + (pz - oZ) * (pz - oZ)) + Math.abs(far - oF);
+  oX = px; oZ = pz; oF = far;
+  const kNow = Math.floor(ODO / FSTEP);
+  let n = 0;
+  while (odoK < kNow) {
+    odoK++;
+    const L = SCH.get(odoK);
+    if (!L) continue;
+    SCH.delete(odoK);
+    for (let j = 0; j < L.length; j++) { const e = L[j]; if (!e.gone) { farOne(e, px, pz, far); n++; } }
+  }
+  // сдвинут ли — по кусочку
+  const per = Math.ceil(LIST.length / STILL_PASS);
+  for (let c = 0; c < per && LIST.length; c++) {
+    if (stillI >= LIST.length) stillI = 0;
+    const e = LIST[stillI];
+    if (!still(e.m)) unfreeze(e, stillI); else stillI++;
+  }
+  STATS.culled = OFF; STATS.farN = n;
+  propsFar(part, of, px, pz, far);
+}
+function propsFar (part, of, px, pz, far) {
+  for (let i = part; i < PROPS.length; i += of) {
+    const p = PROPS[i];
+    if (!p._fz) continue;
+    const dx = p.x - px, dz = p.z - pz, want = dx * dx + dz * dz < far * far;
+    if (want !== p._on) { p._on = want; if (want) { SCENE.add(p.pivot); POFF--; } else { SCENE.remove(p.pivot); POFF++; } }
+  }
+  STATS.propsOff = POFF;
+}
+
+/* part, of — каждый of-й элемент, начиная с part (по кусочку в кадр); без них — весь список (по-старому: ?farold) */
 let OFF = 0, POFF = 0;
 function cullFar (part = 0, of = 1) {
   const px = CAM.position.x, pz = CAM.position.z, far = CAM.far + 20;
@@ -249,7 +370,7 @@ const LEVELS = [1, 0.85, 0.72];
 /* base — полная дальность по настройке графики (gfx.js: 250 / 370 / 490 м), fps — на сколько
    кадров в секунду рассчитан кадр (ограничение 30 к/с — пороги вдвое длиннее, иначе 30 к/с
    сами по себе выглядели бы «не успевает») */
-export const Q = { lvl: 0, k: 1, base: 490, fps: 60 };
+export const Q = { lvl: 0, k: 1, base: 490, fps: 60, t: 1 };   // t — облегчение тяжёлого кадра (tune.js M.far, ставит game.js каждый кадр)
 let ema = 1 / 60, busy = 1 / 120, slowT = 0, fastT = 0, coolT = 0, clock = 0, upAt = -1e9, downAt = -1e9, upWait = 12, farF = 490;
 /* сколько занял сам кадр игры (секунды) — зовётся после рендера */
 export function work (sec) { if (sec > 0 && sec < 0.2) busy += (sec - busy) * 0.05; }
@@ -259,7 +380,7 @@ export function govern (raw, active) {
     const d = want - Q.k, st = Math.min(0.1, raw > 0 ? raw : 0) * 0.1;
     Q.k = Math.abs(d) <= st ? want : Q.k + Math.sign(d) * st;
   }
-  if (CAM && Q.base * Q.k !== farF) { farF = Q.base * Q.k; CAM.far = farF; CAM.updateProjectionMatrix(); }
+  if (CAM && Q.base * Q.k * Q.t !== farF) { farF = Q.base * Q.k * Q.t; CAM.far = farF; CAM.updateProjectionMatrix(); }
   if (!active || !(raw > 0) || raw > 0.1) return;
   clock += raw;
   ema += (raw - ema) * 0.05;

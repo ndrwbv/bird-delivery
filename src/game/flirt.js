@@ -23,6 +23,7 @@ import { t, N_ } from '../i18n/index.js';
 import * as DIRECTOR from './director.js';
 import * as TALK from './talk.js';             // облачка реплик (talk.js)
 import * as DLG from './dialog.js';            // окно диалога, как в сюжете
+import { nowPart } from './daytime.js';         // «хорошего вечера» — только вечером и ночью по часам мира
 
 export const FLIRT = { P: 0.08, SAY: 0.4, HOLD: 3.2, REPLY: 1.6, REPLY_HOLD: 2.6, STILL: 6 };   // STILL — м/с: медленнее — диалог (как «приехал» в game.js), быстрее — облачка
 
@@ -44,13 +45,15 @@ const COURIER = /*i18n*/ [
   N_('я только до двери. хорошего вечера!'),
 ];
 
+const EVENING_BYE = COURIER[5];                   // «я только до двери. хорошего вечера!» — утром и днём не говорим
+const courierNow = () => { const pt = nowPart(); return pt === 'morning' || pt === 'day' ? COURIER.filter(s => s !== EVENING_BYE) : COURIER; };
 const ST = { hands: 0, fem: 0, rolled: 0, shown: 0, dialogs: 0, bubbles: 0, last: '', reply: '' };
 const LAST = { c: -1, r: -1 };
 function bubble (grp, text, col, y, hold) {
   const b = new THREE.Sprite(new THREE.SpriteMaterial({ map: TALK.tex(text, col), transparent: true, depthWrite: false }));
   b.position.set(0, y, 0);
   grp.add(b);
-  TALK.track(b);                                   // читаемая плашка, размер по расстоянию (talk.js)
+  TALK.track(b, 1);                                // читаемая плашка, размер по расстоянию; важное — без очереди (talk.js)
   setTimeout(() => { if (b.parent) b.parent.remove(b); b.material.dispose(); }, hold * 1000);
   return b;
 }
@@ -93,12 +96,13 @@ export function onHand (st, onTime, api) {
 /* окно диалога: она — фраза, курьер — один из двух отказов */
 function dialog (p, person, api) {
   ST.dialogs++;
-  const a = pickNew(COURIER, 'r');
-  const b = pickNew(COURIER, 'r');                  // pickNew не повторяет прошлую — b ≠ a
+  const CR = courierNow();
+  const a = pickNew(CR, 'r');
+  const b = pickNew(CR, 'r');                       // pickNew не повторяет прошлую — b ≠ a
   if (api && api.hold) api.hold(true);
   const name = person.first || String(person.name || '').split(/\s+/)[0];
   const end = r => { ST.reply = r === false ? b : a; if (api && api.hold) api.hold(false); };
-  DLG.say({ person, name, text: ST.last, accept: a, decline: b, mood: 'shy', color: '#d6457a', plain: true }).then(end, end);
+  DLG.say({ person, name, head: t('у двери'), text: ST.last, accept: a, decline: b, mood: 'shy', color: '#d6457a', plain: true }).then(end, end);
 }
 
 /* по-старому, облачками над головами: машина уже едет — игру не останавливаем */
@@ -108,7 +112,7 @@ function bubbles (p, api) {
   setTimeout(() => {
     const car = api && api.car && api.car();
     if (!car || !car.parent) return;
-    ST.reply = pickNew(COURIER, 'r');
+    ST.reply = pickNew(courierNow(), 'r');
     bubble(car, ST.reply, '#3a6fb0', 2.7, FLIRT.REPLY_HOLD);
   }, FLIRT.REPLY * 1000);
 }

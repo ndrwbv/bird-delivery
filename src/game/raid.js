@@ -193,7 +193,7 @@ function unshare (g) {
 function say (m, text, col) {
   if (!A.sayBubble || m.st === 'gone') return;
   if (m.bubble) { m.grp.remove(m.bubble); m.bubble.material.dispose(); }
-  m.bubble = A.sayBubble(m.grp, text, col || BRANDS[R.brand].bubble, 2.8);
+  m.bubble = A.sayBubble(m.grp, text, col || BRANDS[R.brand].bubble, 2.8, 1);
   m.bubT = 2.4;
 }
 const standing = () => R.men.filter(m => m.st === 'in' || m.st === 'smash' || m.st === 'charge').length;
@@ -479,6 +479,7 @@ function turretStep (dt) {
 }
 function muzzle () {
   const p = new THREE.Vector3(0, 0, 1.7);
+  TUR.head.updateWorldMatrix(true, false);          // спрятанное cull.js не пересчитывает
   TUR.head.localToWorld(p);
   return p;
 }

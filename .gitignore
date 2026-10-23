@@ -20,5 +20,12 @@ STEAM-ACCOUNT.local.md
 # ключи (ElevenLabs для npm run sfx и т. п.) — не коммитить
 .env.local
 .env.*.local
+# ключи сервисных аккаунтов Яндекс Облака (статистика, tools/telemetry) и прочие локальные секреты
+*.local.json
+*.local.key
+*.local.pem
+# копия выгрузки статистики (npm run stats)
+tools/telemetry/.cache/
 # старые звуки после npm run sfx -- --force
 .sfx-old/
+promo/

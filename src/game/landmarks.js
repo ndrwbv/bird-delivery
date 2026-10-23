@@ -5,6 +5,7 @@
    видит — всё приходит в api (landApi в game.js). */
 import { t } from '../i18n/index.js';
 import * as SL from './streetlamps.js';
+import { snowy } from './seasons.js';            // каток — только когда лежит снег
 
 /* ── заправки ──
    Название и цвета — те же, что на вывеске точки (brands.js переписал
@@ -214,20 +215,30 @@ export function buildRink (A, green, spot) {
     const [lx, lz] = pt(u * 0.9, n * 0.9);
     SL.lamp(A, { x, z, y, style: 'mast', dx: lx - x, dz: lz - z, spot: pt(u * 0.6, n * 0.6) });   // мачта сбивается (streetlamps.js)
   }
-  // катающиеся: по эллипсу, с наклоном в поворот
+  // катающиеся: по эллипсу, с наклоном в поворот. Люди — не при сборке города, а когда лежит снег и курьер ближе 260 м,
+  // по одному за кадр (из запаса людей); снег сошёл — уходят (17.10.2026: память и запуск; до того — всегда, и летом)
   const skaters = [];
   const k = Math.max(4, Math.min(10, Math.round(hu * hn / 40)));
   for (let i = 0; i < k; i++) {
-    const g = A.makeHuman(A.makePerson());
-    A.scene.add(g);
-    skaters.push({ g, a: i / k * Math.PI * 2 + Math.random() * 0.4, ru: hu * (0.55 + Math.random() * 0.25), rn: hn * (0.45 + Math.random() * 0.25), w: (0.25 + Math.random() * 0.15) * (i % 4 === 3 ? -1 : 1), ph: Math.random() * 6 });
+    skaters.push({ g: null, a: i / k * Math.PI * 2 + Math.random() * 0.4, ru: hu * (0.55 + Math.random() * 0.25), rn: hn * (0.45 + Math.random() * 0.25), w: (0.25 + Math.random() * 0.15) * (i % 4 === 3 ? -1 : 1), ph: Math.random() * 6 });
   }
-  return { cx, cz, ux, uz, nx, nz, gy, skaters };
+  return { cx, cz, ux, uz, nx, nz, gy, skaters, A, on: 0 };
 }
 
 export function stepRink (R, dt, px, pz) {
-  if (!R || (R.cx - px) ** 2 + (R.cz - pz) ** 2 > 260 * 260) return;
+  if (!R) return;
+  if (!snowy()) {                                    // без снега — никто не катается
+    if (R.on) { for (const s of R.skaters) if (s.g) { R.A.dropMesh(s.g); s.g = null; } R.on = 0; }
+    return;
+  }
+  if ((R.cx - px) ** 2 + (R.cz - pz) ** 2 > 260 * 260) return;
+  if (R.on < R.skaters.length) {                     // родить следующего — один за кадр
+    const s = R.skaters[R.on++], A = R.A;
+    s.g = A.freshHuman ? A.freshHuman() : A.makeHuman(A.makePerson());
+    A.scene.add(s.g);
+  }
   for (const s of R.skaters) {
+    if (!s.g) continue;
     s.a += s.w * dt; s.ph += dt * 3;
     const cu = Math.cos(s.a) * s.ru, cn = Math.sin(s.a) * s.rn;
     const x = R.cx + R.ux * cu + R.nx * cn, z = R.cz + R.uz * cu + R.nz * cn;

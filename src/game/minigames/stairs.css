@@ -20,7 +20,7 @@
 .sx-b-up { flex: 2.2 1 0; background: var(--pp-lime); }
 .sx-b-ring { background: var(--pp-yellow); }
 .sx-b-pay { flex: 2.4 1 0; background: color-mix(in srgb, var(--pp-orange) 45%, var(--pp-paper)); }
-.sx-ok .sx-bar, .sx-late .sx-bar { opacity: .35; pointer-events: none; }
+.sx-ok .sx-bar, .sx-late .sx-bar, .sx-self .sx-bar { opacity: .35; pointer-events: none; }
 
 .sx-pop { animation: sx-pop .16s var(--pp-spring); }
 @keyframes sx-pop { 0% { scale: .92; } 100% { scale: 1; } }
@@ -34,4 +34,10 @@ body.calm-fx .sx-pop { animation: none; }
   .sx .mk-mini { bottom: 128px; }
   .sx-bar { bottom: 48px; }
   .sx-b { min-height: 58px; }
+}
+/* телефон боком: кнопки ▲ ▼ ◀ ▶ стоят выше низа (52 px + ~46 px), а реплики (doorkit.css: снизу 60 px) уходили под них —
+   подсказка Толика первого раза обрезалась (ревью 17.10). Реплики — над кнопками, шире и мельче, чтобы не лезть на задание */
+@media (max-height: 460px) {
+  .sx .mk-say { bottom: 108px; width: 48%; }
+  .sx .mk-say .mk-b p { font-size: 10px; line-height: 1.45; }
 }

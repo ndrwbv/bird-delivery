@@ -14,6 +14,22 @@
    Сколько всего одновременно — CAP: лишнее самое старое тает. */
 
 export const TIER = { FALL: 20, HIGH: 55, BURST: 85 };          // км/ч; BURST — только детская (лежит дольше)
+/* жизни прохожего (автор 21.10.2026, ветка test/people: «больше жизней, чтобы пережили чуть больше ударов»): удар слабее
+   MAX км/ч отнимает жизнь — пока она не последняя, человек падает и встаёт (как медленнее FALL); последняя — сбит.
+   Быстрее MAX — сбит сразу, как раньше. Лежащий — так же: удар отнимает жизнь, падает заново; первые GRACE с после
+   удара (машина ещё на нём) — не считается. Жизни кончились — труп (hit не «поднимет» его второй раз) */
+export const LIVES = { N: 3, MAX: 55, GRACE: 1.5 };   // GRACE — с после удара, пока лежащего не добивает
+export function survive (p, kmh) {
+  const u = p && p.grp && p.grp.userData;
+  if (!A.adult || !u) return false;
+  if (kmh >= LIVES.MAX) { u.hp = 0; return false; }
+  const now = performance.now();
+  if (u.graceT && now < u.graceT && (u.hp ?? LIVES.N) > 0) return true;   // только что сбила — машина ещё на нём: не добивает
+  u.hp = (u.hp ?? LIVES.N) - 1;
+  if (u.hp > 0) { u.graceT = now + LIVES.GRACE * 1000; if (p.fall) p.fall = null; return true; }   // стоит или лежит — падает заново
+  u.hp = 0;
+  return false;
+}
 export const LIMB = { MID: 0.15, HIGH: 0.4 };                   // шанс оторвать руку/ногу на нитро 20–55 км/ч (HIGH); MID не используется
 export const TIME = {
   FALL_LIE: 1.8,        // упал и встал: сколько лежит
@@ -30,10 +46,12 @@ const PUDDLE_HEX = 0x5a0e16;
 const FALL_LIFT = 0.17;   // упал и встал: спина над верхом слоя (толщина модели прохожего)
 const UP = { x: 0, y: 1, z: 0 };
 
+import { corpseQ, qLimb, qPose, QP } from './qpeople.js';
+
 let A;
 /* api: THREE, scene, box, mergeGeos, HUMAN_VC, groundH, surfaceAt, curbAt, nearestRoad, driftTop, pavedLift, groundNormal,
    emote, puff, pushOut, burst (кусками — старый gibHuman), scare, callAmbulance, Snd, adult */
-export function init (api) { A = api; }
+export function init (api) { A = api; QP.topAt = (x, z) => topAt(x, z); }   // люди-модели: подошва — на видимый слой (qpeople.js)
 
 /* ── по чему лежать: верх того, что нарисовано в точке ──
    Рельеф (groundH) — только подложка: поверх него лежат полотно, тротуар, бордюр, плитка, а
@@ -248,6 +266,27 @@ export function fallStep (p, dt) {
   const F = p.fall, g = p.grp, u = g.userData;
   const t = (F.t += dt);
   const T1 = 0.35, T2 = T1 + TIME.FALL_LIE, T3 = T2 + 0.6, T4 = T3 + 1.1;
+  if (u.q) {                                         // модель Quaternius (qpeople.js): падает навзничь клипом художника,
+    if (t < T1 + 0.3) { const k = 1 - t / (T1 + 0.3); p.x += F.vx * k * dt; p.z += F.vz * k * dt; A.pushOut(p, 0.45); }   // лежит, встаёт (тот же клип назад), грозит кулаком
+    g.rotation.order = 'YXZ'; g.rotation.set(0, F.yaw, 0);
+    for (const b of [u.legL, u.legR, u.armL, u.armR]) b.rotation.set(0, 0, 0);
+    u.qAnim = t < T2 ? { c: 'death', f: t / (T1 + 0.55) } : t < T3 ? { c: 'death', f: 1 - (t - T2) / (T3 - T2) } : { c: 'punch', f: ((t - T3) * 1.4) % 1 };
+    // лёг — самая низкая точка позы на 1 см над видимым слоем (как у коробочных лежачих fallLift); меряем раз, когда лёг
+    if (t < T1 + 0.3 || F.top === undefined) F.top = topAt(p.x, p.z);
+    const lie = t < T1 + 0.55 ? t / (T1 + 0.55) : t < T2 ? 1 : t < T3 ? 1 - (t - T2) / (T3 - T2) : 0;
+    if (F.qLift === undefined && t >= T1 + 0.55 && u.skin) {
+      if (!BX) { BX = new A.THREE.Box3(); V3 = new A.THREE.Vector3(); }
+      g.position.set(p.x, F.top, p.z); g.updateMatrixWorld(true); qPose(u.skin);
+      BX.makeEmpty(); BX.expandByObject(u.skin, true);
+      F.qLift = BX.isEmpty() ? 0 : Math.max(-0.3, Math.min(0.3, F.top + 0.01 - BX.min.y));
+    }
+    g.position.set(p.x, F.top + (F.qLift || 0) * lie, p.z);
+    if (t >= T3 && !F.mad) { F.mad = 1; A.emote(p.x, 2.1, p.z, 'angry', 3); }
+    if (t < T4) return true;
+    u.qAnim = null; g.rotation.order = 'XYZ';
+    p.fall = null;
+    return false;
+  }
   if (t < T1 + 0.3) {                              // по инерции проезжает по асфальту
     const k = 1 - t / (T1 + 0.3);
     p.x += F.vx * k * dt; p.z += F.vz * k * dt;
@@ -289,6 +328,9 @@ export function hit (p, vx, vz, kmh, o = {}) {
     if (A.Snd.impact) A.Snd.impact(Math.max(kmh / 3.6, 8), 'person', { x: p.x, z: p.z });
     else A.Snd.fx('hit-person', s => { s.blip(62, 0.2, 'sine', 0.34); s.noise(0.08, 0.16); }, { x: p.x, z: p.z });
   }
+  // жизни (LIVES): во взрослой удар слабее MAX, пока жизнь не последняя, — отлетает, полежит и встанет, как в детской.
+  // Сюда приходят все смерти от машины (game.js gibHuman): и очереди, и протесты, и шашлыки — у них своей проверки нет
+  if (!o.up && !o.over && survive(p, kmh)) o = { ...o, up: true };
   if (o.over) {
     const B = throwOver(p, vx, vz, kmh, o);
     if (!o.up) { A.scare(p.x, p.z); if (!B.shatter) A.callAmbulance(p.x, p.z); }   // разбился — скорая к кускам
@@ -362,7 +404,8 @@ export const THROW = { FWD: 1.15, SIDE0: 1.5, SIDE_K: 0.06, UP0: 3, UP_K: 11, UP
   FULL: 70, FWD0: 0.85, UP_LO: 1.8, SIDE_LO: 0.3 };
 function throwBody (p, vx, vz, kmh, up, lie, y0) {
   const c = (p.grp && p.grp.userData.colors) || { skin: '#e0b48c', shirt: '#4a6fa5', pants: '#333' };
-  const { root, parts } = buildBody(c);
+  // проба (ветка test/people): человек — модель Quaternius → и тело та же модель (qpeople.js corpseQ)
+  const { root, parts, qskin } = p.grp && p.grp.userData.q ? corpseQ(p.grp.userData, A.HUMAN_VC) : buildBody(c);
   const s = (p.grp && p.grp.scale.x) || 1;
   root.scale.setScalar(s);
   const fl = A.groundH(p.x, p.z) + A.curbAt(p.x, p.z);
@@ -376,7 +419,7 @@ function throwBody (p, vx, vz, kmh, up, lie, y0) {
   const fwd = THROW.FWD0 + (THROW.FWD - THROW.FWD0) * q, upFull = clamp(THROW.UP0 + kmh / THROW.UP_K, 3, THROW.UP_MAX);
   root.position.x += vx / l * THROW.AHEAD; root.position.z += vz / l * THROW.AHEAD;   // чуть впереди морды — не в капоте
   const B = {
-    root, parts, s, t: 0, mode: 'fly', up, lie, life: lie, shadow: shadowFor(), floor: fl, settle: 0,
+    root, parts, qskin, s, t: 0, mode: 'fly', up, lie, life: lie, shadow: shadowFor(), floor: fl, settle: 0,
     // вперёд — быстрее машины (×THROW.FWD): иначе машина догоняет тело и проезжает сквозь; вбок — разброс, растёт со скоростью
     vx: vx * fwd + side * -vz / l, vy: THROW.UP_LO + (upFull - THROW.UP_LO) * q, vz: vz * fwd + side * vx / l,
     spin: rand(5, 9) * k * (Math.random() < 0.5 ? -1 : 1), roll: rand(-3, 3) * k, landed: 0, puddle: null, starT: 0, wx: 0, wz: 0,
@@ -422,6 +465,7 @@ export function rehit (cx, cz, fx, fz, L, W, vx, vz) {
 function skeleton (B) {
   B.skel = 1;
   if (!BONE) BONE = new A.THREE.MeshLambertMaterial({ color: REHIT.BONE });
+  if (B.qskin) B.qskin.material = BONE;             // тело-модель (qpeople.js) — целиком цвета кости
   for (const k in B.parts) {
     const m = B.parts[k];
     if (!m) continue;
@@ -437,6 +481,7 @@ function tearLimb (B) {
   const keys = ['armL', 'armR', 'legL', 'legR'];
   const k = keys[Math.floor(Math.random() * 4)];
   const m = B.parts[k];
+  if (B.qskin) { const lm = qLimb(B.qskin, k); if (lm) m.add(lm); }   // тело-модель: рука/нога модели летит с куском
   B.root.updateMatrixWorld(true);
   A.scene.attach(m);
   B.parts[k] = null;
@@ -611,7 +656,7 @@ function dispose (o) {
   o.traverse(m => {
     if (!m.isMesh) return;
     if (m.geometry !== PUD_GEO) m.geometry.dispose();
-    if (m.material !== A.HUMAN_VC) m.material.dispose();
+    if (m.material !== A.HUMAN_VC && m.material !== BONE) m.material.dispose();
   });
 }
 
@@ -637,6 +682,7 @@ function poseLimbs (B, dt, k) {
 /* поставить тело на верх слоя: самая низкая вершина — на 1 см над ним */
 function rest (B, again) {
   const r = B.root;
+  if (B.qskin) { r.updateMatrixWorld(true); qPose(B.qskin); }   // тело-модель: поза — нынешняя, не с прошлого кадра в кадре (иначе висит в воздухе)
   r.updateMatrixWorld(true);
   const lo = lowest(r);
   if (!again) B.floor = floorUnder(r, B.s);         // где лёг — считаем раз, дальше только поза

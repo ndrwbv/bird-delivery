@@ -1,0 +1,8 @@
+{
+  "name": "bird-ingest",
+  "private": true,
+  "main": "index.js",
+  "dependencies": {
+    "ydb-sdk": "5.11.1"
+  }
+}

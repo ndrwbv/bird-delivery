@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('birdSteam', {
   // журнал ошибок (src/platform/crashlog.js, docs/CRASHES.md): строка JSON → userData/logs/crash-ГГГГ-ММ-ДД.log
   log: line => ipcRenderer.send('log:write', String(line)),
   logDir: () => call('log:dir'),
+  shellLog: since => call('log:shell', since || ''),   // падения и «не отвечает» из прошлых запусков (telemetry.js crash_prev)
   openLogs: () => call('log:open'),
   isFullscreen: () => call('win:isFullscreen'),
   // ролик повтора (src/game/replay.js): байты webm → «Видео/<папка>/<имя>», ответ — путь или null; показать в папке

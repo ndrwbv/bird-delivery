@@ -5,7 +5,7 @@
    собирает `renderer.compile` (game.js, кусок поздней сборки 'shaders'). Тут — три добавки:
 
    1. **Образцы** (sample): то, чего на сцене при загрузке ещё нет, — материалы заводятся на ходу
-      (молния, воздушные змеи и их нитки, поводок собаки, пиксельное подбираемое и искра, огни автобуса,
+      (молния, воздушные змеи и их нитки, поводок собаки, спрайты, огни автобуса,
       таблички протеста, осколки витрины, дворники) и машина игрока с грязью (cardirt.js — в первом кадре смены). Образец — крошечный объект с материалом тех же настроек: программа зависит
       только от настроек (карта, цвета вершин, две стороны, прозрачность, туман, инстансы, линия или меш),
       не от цвета и текстуры. Собираем их при загрузке вместе со светом и туманом сцены.
@@ -30,6 +30,12 @@ export const STATS = { samples: 0, pinned: 0, ready: 0, ms: 0, readyMs: 0 };
 
 export function init (ctx) { C = ctx; }
 
+/* образцы из других модулей (18.10.2026: праздники — украшения Нового года и Хэллоуина собирали 5 программ в момент
+   начала праздника; на телефоне программы на ходу не держатся, а сборка в Сафари — десятки мс за программу).
+   fn(THREE, geo) → [[что, объект], …]; geo — крошечная коробка с цветом в вершинах. Объекты не освобождаются. */
+const MORE = [];
+export function samplesFrom (fn) { MORE.push(fn); }
+
 /* образцы: [что, объект]; материалы — тех же настроек, что заводятся на ходу (ищи по подписи) */
 function samples () {
   const T = C.THREE, D = T.DoubleSide;
@@ -48,7 +54,10 @@ function samples () {
     s.add(b); s.bindMode = T.DetachedBindMode; s.bind(new T.Skeleton([b], [new T.Matrix4()]), new T.Matrix4());
     return s;
   };
+  const more = [];
+  for (const f of MORE) { try { more.push(...f(T, geo)); } catch (e) { console.error('[warmup] образцы модуля', e); } }
   return [
+    ...more,
     ['нитка змея, поводок, хвосты (life.js kiteMats, LEASH_MAT)', new T.Line(lg, new T.LineBasicMaterial())],
     // была у дождя (game.js rainMat) до 11.10.2026 — дождь теперь свой шейдер, а программа нужна этим
     ['нитки змеев на пляже, трассеры (kites.js line, mafia.js, raid.js)', new T.Line(lg, new T.LineBasicMaterial({ transparent: true, opacity: 0.7 }))],
@@ -57,13 +66,15 @@ function samples () {
     ['змей на пляже полупрозрачный (kites.js mat, op)', mesh(new T.MeshLambertMaterial({ flatShading: true, side: D, transparent: true, opacity: 0.5 }))],
     ['змей на пляже полупрозрачный (kites.js mat, op)', mesh(new T.MeshLambertMaterial({ flatShading: true, transparent: true, opacity: 0.5 }))],
     ['молния (weather.js boltMesh)', mesh(new T.MeshBasicMaterial({ transparent: true, opacity: 0, fog: false, depthWrite: false, side: D }))],
-    ['пиксельное подбираемое (game.js pxMat)', mesh(new T.MeshBasicMaterial({ map, transparent: true, alphaTest: 0.5, side: D }))],
-    ['искра (game.js pxMat spark)', new T.Sprite(new T.SpriteMaterial({ map, transparent: true, depthWrite: false }))],
+    // пиксельного подбираемого (game.js pxMat) с 18.10.2026 нет — деньги и сердце объёмные (pickups3d.js), их программа — у кофе
+    ['спрайты: эмоции, облачка, бывшая искра денег (game.js emote, talk)', new T.Sprite(new T.SpriteMaterial({ map, transparent: true, depthWrite: false }))],
     ['огни автобуса (buses.js GLOW_MAT)', mesh(new T.MeshBasicMaterial({ vertexColors: true, map }))],
     ['таблички протеста (protests.js MAT)', inst(new T.MeshLambertMaterial({ map, alphaTest: 0.45, side: D }))],
     ['осколки стекла (raid.js SHARD_MAT)', inst(new T.MeshLambertMaterial({ transparent: true, opacity: 0.8 }))],
     ['дворники (wipers.js mat)', mesh(new T.MeshBasicMaterial({ side: D }))],
     ['таблички и мигалки ремонта (roadlife.js signMesh)', mesh(new T.MeshBasicMaterial({ map, side: D, vertexColors: true }))],
+    // 18.10.2026: на «Деке» ночью собиралась посреди езды (decktail.js: прозрачный MeshBasic с цветами вершин, меш прямо на сцене)
+    ['призраки тёмной ночи, стекло встреч (darknight.js ghostMat, encounters.js glassM)', mesh(new T.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.5, depthWrite: false }))],
     ['тело человека со скиннингом (people.js HSkin, HUMAN_VC)', skinned(new T.MeshLambertMaterial({ vertexColors: true, flatShading: true }))],
   ];
 }
@@ -101,9 +112,11 @@ export function keep (play = false) {
   if (!C || !C.renderer) return;
   // мобильный режим: держим только собранные при загрузке (без них compileAsync меню ждёт выгруженные — ошибки GL);
   // новые на ходу — выгружаются, как раньше (память видеокарты и страницы)
-  if (play && MOB.on && !MOB.pinPrograms) return;
+  // 18.10.2026: и на телефоне новые на ходу держим, пока программ не больше MOB.programs — иначе материал, который
+  // заводится и освобождается снова и снова (люди в толпе, украшения, обломки), каждый раз собирал программу заново
+  // (в Сафари — десятки мс). Память: программа — десятки КБ, потолок — страховка от «уникальных» ключей
   const P = C.renderer.info.programs;
-  if (!P || P.length > LIMIT) return;
+  if (!P || P.length > (play && MOB.on && !MOB.pinPrograms ? MOB.programs : LIMIT)) return;
   for (const p of P) if (!PINNED.has(p)) { PINNED.add(p); p.usedTimes++; STATS.pinned++; }
 }
 

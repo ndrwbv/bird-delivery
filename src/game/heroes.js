@@ -460,7 +460,7 @@ function say (H, text, ttl = HERO.SAY_T) {
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: TALK.tex(String(text), H.def.color, t(H.def.name)), transparent: true, depthWrite: false }));
   sp.position.set(0, 2.85 + (H.lift || 0), 0);
   H.grp.add(sp);
-  TALK.track(sp);                                  // читаемая плашка с именем, размер по расстоянию (talk.js)
+  TALK.track(sp, 1);                               // читаемая плашка с именем, размер по расстоянию; важное — без очереди (talk.js)
   H.bubble = sp; H.bubT = Math.max(ttl, readTime(text)); H.talk = Math.min(ttl, 2.5);
   H.log.push(text);
   if (H.log.length > 40) H.log.shift();

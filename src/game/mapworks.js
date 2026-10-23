@@ -550,7 +550,7 @@ function watch (dt, api) {
   if (V) {
     R.samples++;
     const g = groundH(V.x, V.z), top = surfaceAt(V.x, V.z, V.y);
-    if (inHouse(V.x, V.z)) flag('player', V.x, V.z, 'car-in-house', 0);
+    if (inHouse(V.x, V.z) && !V.roof) flag('player', V.x, V.z, 'car-in-house', 0);   // на крыше низкого дома — можно (roofs.js)
     if (V.y < top - 0.35 && !V.air) flag('player', V.x, V.z, 'car-sunk', V.y - top);
     if (top - g < 0.5) { const ld = lowDeck(V.x, V.z, V.y, 1.5); if (ld !== null) flag('player', V.x, V.z, 'car-in-deck', ld); }
   }

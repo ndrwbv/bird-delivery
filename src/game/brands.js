@@ -104,17 +104,19 @@ const KIND_COLORS = {
 const hash = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; };
 
 /* Переписать вывески на месте. После этого у точки: n — что написано на
-   вывеске (уже на языке игры), n0 — настоящее имя из карты, c — цвета */
+   вывеске (уже на языке игры), nk — то же по-русски, до перевода (поручения сверяют, что видит игрок:
+   водку — не в «Овощи-фрукты», зарядку — не в «Ткани»), n0 — настоящее имя из карты, c — цвета */
 export function sanitizePois (pois) {
   for (const p of pois) {
     if (p.n0 !== undefined) continue;
     p.n0 = p.n || '';
     const src = [p.b || '', p.n0];
     const hit = CHAINS.find(([re]) => src.some(s => re.test(s)));
-    if (hit) { p.n = t(hit[1]); p.c = [hit[2], hit[3]]; }
+    if (hit) { p.nk = hit[1]; p.n = t(hit[1]); p.c = [hit[2], hit[3]]; }
     else {
       const pool = POOL[p.k] || POOL.shop;
-      p.n = t(pool[hash(p.n0 + ':' + p.p[0].toFixed(0) + ':' + p.p[1].toFixed(0)) % pool.length]);
+      p.nk = pool[hash(p.n0 + ':' + p.p[0].toFixed(0) + ':' + p.p[1].toFixed(0)) % pool.length];
+      p.n = t(p.nk);
       p.c = KIND_COLORS[p.k] || KIND_COLORS.shop;
     }
     delete p.b;

@@ -448,11 +448,17 @@ function woodDecid (g) {
 /* ── подключение ── */
 /* api (game.js): CITY, roadWidth, LITM, CURB_H, groundH, inHouse, tree(x, z, strip, kind, own), raise(x, z),
    onPave(x, z, m), onAlley(x, z, m) */
-export function build (api) {
-  const t0 = performance.now();
+/* шагами (function*, latebuild.js): на Деке ~0,12 с одним куском */
+export function* build (api) {
+  let t0 = performance.now(), ms = 0;
+  const pause = () => { ms += performance.now() - t0; }, resume = () => { t0 = performance.now(); };
   A = api;
   LIST.length = 0; OWN.clear();
-  for (const r of find(A.CITY, A.roadWidth)) {
+  const found = find(A.CITY, A.roadWidth);
+  pause(); yield 'find'; resume();
+  let k = 0;
+  for (const r of found) {
+    if (++k % 3 === 0) { pause(); yield 'island'; resume(); }
     const isl = island(r, A.CITY, A.roadWidth);
     if (!isl) { ST.why.open = (ST.why.open || 0) + 1; continue; }
     const g = { ...r, ...isl, c: r.c };
@@ -469,14 +475,17 @@ export function build (api) {
     g.names = [...new Set(g.ids.map(j => A.CITY.roads[j].n).filter(Boolean))];
     LIST.push(g);
   }
+  pause(); yield 'island'; resume();
   for (const g of LIST) {
+    pause(); yield 'plant'; resume();
     const t = ST.trees + ST.bushes;
     if (g.kind === 'wood') woodDecid(g);
     else { paint(g); if (g.kind === 'grove') grove(g); else small(g); }
     g.planted = ST.trees + ST.bushes - t;
   }
   ST.rings = LIST.length;
-  ST.ms = Math.round(performance.now() - t0);
+  pause();
+  ST.ms = Math.round(ms);
   if (typeof window !== 'undefined') window.setTimeout(() => { if (window.__dlv) window.__dlv.ROUND = DEBUG; }, 0);
 }
 

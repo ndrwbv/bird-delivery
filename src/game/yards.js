@@ -23,7 +23,7 @@
        сбиваются на ходу, как дворовые заборчики (машину чуть тормозит, не держит);
      • лавочка у BENCH.SHARE (80 %) подъездов: сбоку от тропинки, вдоль неё, спинкой к заборчику,
        лицом к тропинке; сторона — жребий по месту подъезда (каждый запуск там же); на выход и
-       чужую дорожку не встаёт.
+       чужую дорожку не встаёт — тогда встаёт по другую сторону тропинки.
    Зимой: все эти дорожки — цвета-метки YARD.COLOR, сезонный шейдер оставляет их протоптанными
    (snow на них — пятнами, серее), сугробы сезона и снежной зимы на них не ложатся (onYard).
    Заборчик не встаёт на тротуар, пешеходку и чужую дорожку (pave.js) — там кусок пропускаем.
@@ -41,7 +41,7 @@ export const YARD = {
   STEP: 6,                                       // домов за шаг поздней сборки (latebuild.js): на Деке шаг ~30—60 мс
   PATH: { W: 1.6, FROM: 2.3, MIN: 3 },
   WALK: { OFF: 7.5, W: 1.8, EXT: 4, STEP: 3, ROAD_MAX: 40 },
-  FENCE: { U: 2.9, H: 0.55, SEG: 2.5, FROM: 2.9, FLOWERS: 0.35, COLORS: ['#3f7a4a', '#4f6fa8', '#d8d2c8', '#8a3b3b', '#c9803a'] },
+  FENCE: { U: 2.9, H: 0.55, SEG: 2.5, FROM: 2.9, FLOWERS: 0.35, COLORS: ['#5aa860', '#6a9ad8', '#ece6da', '#c45a48', '#e0943e'] },   // светлые: сбиваемое (твёрдое — серое, yardmaze.js)
   BENCH: { SHARE: 0.8, U: 1.9, N: 3.9 },
   // выход общей дорожки в сеть: ширина, не длиннее MAX м, луч шагами STEP, внахлёст на OVER м,
   // DIRS направлений веером, старты — концы и каждые EVERY м (штраф PEN_MID м), веер — штраф PEN_FAN м
@@ -294,6 +294,7 @@ export function* steps (A) {
   }
   const segsNear = (segs, x, z, r) => { for (const q of segs) if (segD(x, z, q[0], q[1], q[2], q[3]) < r) return true; return false; };
   const addPath = (pts, half) => {
+    pts.hw = half;                                 // полуширина — бордюрам по краям (curbs.js)
     A.YARD_PATHS.push(pts); CITY.paths.push(pts);
     for (let i = 1; i < pts.length; i++) netAdd(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], half);
   };
@@ -559,17 +560,24 @@ export function* steps (A) {
         }
         // лавочка сбоку от тропинки, вдоль неё, лицом к ней — в конце, когда все дорожки проложены
         if (hash(e.x, e.z, 24) < B.SHARE && nEnd >= B.N + 1.3) {
-          const benchSide = hash(e.x, e.z, 21) < 0.5 ? 1 : -1;
-          const [bx, bz] = at(e.u + benchSide * B.U, B.N), [b0x, b0z] = at(e.u + benchSide * B.U, B.N - 1.2), [b1x, b1z] = at(e.u + benchSide * B.U, B.N + 1.2);
-          BENCHQ.push({ bx, bz, b0x, b0z, b1x, b1z, ry: Math.atan2(-ux * benchSide, -uz * benchSide) });
+          // сторона — жребий; занята (выход к тротуару, чужая дорожка) — другая сторона той же тропинки (17.10.2026:
+          // раньше лавочка просто пропадала — у подъездов их стало ~1 150 вместо ~1 330)
+          const side0 = hash(e.x, e.z, 21) < 0.5 ? 1 : -1;
+          BENCHQ.push([side0, -side0].map(sd => {
+            const [bx, bz] = at(e.u + sd * B.U, B.N), [b0x, b0z] = at(e.u + sd * B.U, B.N - 1.2), [b1x, b1z] = at(e.u + sd * B.U, B.N + 1.2);
+            return { bx, bz, b0x, b0z, b1x, b1z, ry: Math.atan2(-ux * sd, -uz * sd) };
+          }));
         }
       }
     }
   }
   yield 'nets';
   yield* farLinks(WALKS);
-  for (const q of BENCHQ) {
-    if (!A.benchOk(q.bx, q.bz) || nearPath(q.bx, q.bz, 1.1) || onPave(q.bx, q.bz, 0.55)) continue;   // на чужую дорожку и выход к тротуару — нет
+  const benchFree = q => A.benchOk(q.bx, q.bz) && !nearPath(q.bx, q.bz, 1.1) && !onPave(q.bx, q.bz, 0.55);   // на чужую дорожку и выход к тротуару — нет
+  for (const two of BENCHQ) {
+    const q = two.find(benchFree);
+    if (!q) continue;
+    if (q !== two[0]) STATS.benchFlip = (STATS.benchFlip || 0) + 1;
     const it = A.smashAdd('bench', q.bx, q.bz, 1.2, benchGeo(A, q.bx, q.bz, q.ry), '#8a6b4e');
     A.BENCHES.push({ x: q.bx, z: q.bz, y: A.groundH(q.bx, q.bz), ry: q.ry, prop: it });
     it.ax = q.b0x; it.az = q.b0z; it.bx = q.b1x; it.bz = q.b1z; it.th = 0.35;

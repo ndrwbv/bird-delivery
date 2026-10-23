@@ -20,9 +20,9 @@
      back   — первый раз опоздал обратно в пиццерию (карьера, game.js backLate): «вернуться до» — тоже срок.
    «respect», «bump» и «back» видят и ветераны — это правила, о которых раньше не говорили.
 
-   Очередь вручения (ridequeue.js, UI-REVIEW № 41): пока на экране чек оплаты, деньги летят в пачку
-   или только что написал Толик (RQ.busy) — подсказка спрятана, её время стоит, новая не открывается.
-   Пока подсказка на экране — RQ.mark('hint'): достижение ждёт её.
+   Общая очередь уведомлений (notifyq.js, автор 18.10.2026: «одно уведомление за раз»): подсказка держит экран
+   (NQ.claim('hint', soft)), пока видна; что-то важнее (чек оплаты, Толик, рейтинг, достижение) — перебивает: подсказка
+   прячется, её время стоит, после — покажется заново целиком; новая не открывается, пока экран занят.
 
    Подсказка висит не меньше, чем её прочитать (readTime, dialog.js), следующая ждёт, пока
    уйдёт текущая (+0,6 с). «hp» и кофе — срочные: сменяют текущую, та встаёт в очередь.
@@ -42,8 +42,9 @@
 import './hints.css';
 import { t } from '../i18n/index.js';
 import { readTime } from './dialog.js';
-import * as RQ from './ridequeue.js';
+import * as NQ from './notifyq.js';
 import { CLIENT_HIT } from './econ.js';
+import * as TEL from './telemetry.js';          // анонимная статистика: подсказки новичку — воронка (telemetry.js)
 
 const KEY = 'dlv-hints';
 const PLAY = ['drive', 'back', 'side', 'loading', 'handover'];
@@ -95,10 +96,10 @@ function make (id, extra) {
     case 'brake': return { text: t('у гостя притормози — пицца отдастся сама') };
     case 'nitro': {
       const key = pad ? k('A') : touch ? k(t('кофе')) : k('Shift');
-      return { hi: touch ? '#touchpad .tp-nos' : '#radar', text: extra === 'coffee' ? t('кофе в баке! нажми {key} и полетишь на кофейной тяге', { key })
-        : t('прямая! нажми {key} и полетишь на кофейной тяге', { key }) };
+      return { hi: touch ? '#touchpad .tp-nos' : '#radar', text: extra === 'coffee' ? t('кофе в баке! нажми {key} и помчишь на кофейной тяге', { key })
+        : t('прямая! нажми {key} и помчишь на кофейной тяге', { key }) };
     }
-    case 'hp': return { hi: '#hearts', text: t('сердца — жизни тачки: врезался — минус сердце, легонько — половинка') };
+    case 'hp': return { hi: '#hearts', text: t('сердца — жизни тачки: врезался — минус половинка, со всей дури — целое') };
     case 'cash': return { hi: '#shiftcash', text: t('зелёная пачка — заработано за смену') };
     case 'wallet': return { hi: '#money', text: t('копилка — все твои деньги: в конце смены пачка ссыпается в неё') };
     case 'respect': return { hi: '#respect', text: t('звезда — респект района: за конкурентов, похитителя и помощь своим. копишь — растёт звание') };
@@ -128,8 +129,8 @@ function highlight (sel) {
 }
 function open (h) {
   ui();
-  RQ.mark('hint', true);
   H.cur = h; H.t = 0; H.shown = 0;
+  TEL.first('hint.' + h.id);
   TXT.innerHTML = h.text;
   seen(h.id);
   highlight(h.hi);
@@ -139,7 +140,6 @@ function close () {
   if (!H.cur) return;
   const id = H.cur.id;
   H.cur = null; H.gap = GAP;
-  RQ.mark('hint', false);
   highlight(null);
   if (EL) EL.classList.remove('on');
   if (id === 'drive' && need('map')) { const h = make('map'); H.queue.unshift(Object.assign({ id: 'map', min: Math.max(3, readTime(h.text.replace(/<[^>]+>/g, ''))) }, h)); }   // радар — сразу следом
@@ -157,7 +157,7 @@ function push (id, extra, urgent) {
     open(h);
     return true;
   }
-  if (!H.cur && H.gap <= 0 && !RQ.busy()) open(h); else H.queue.push(h);
+  if (!H.cur && H.gap <= 0 && NQ.claim('hint', true)) open(h); else H.queue.push(h);
   return true;
 }
 
@@ -193,9 +193,12 @@ export function step (dt) {
   if (!A) return;
   const S = A.S, V = A.V;
   const live = !S.paused && PLAY.includes(S.state) && !S.ride;
-  const wait = RQ.busy();                          // чек оплаты, деньги в пачку, Толик — подсказка ждёт (ridequeue.js)
+  // экран — из общей очереди (notifyq.js): есть что показать — держим; занято или перебили — ждём
+  const want = live && !!(H.cur || (H.queue.length && H.gap <= 0));
+  let own = false;
+  if (want) own = NQ.claim('hint', true); else NQ.release('hint');
+  const wait = want && !own;
   if (EL) EL.classList.toggle('on', !!(H.cur && live && !wait));
-  RQ.mark('hint', !!(H.cur && live && !wait));      // достижение ждёт, пока подсказка на экране; следующая — после него (RQ.hold)
   if (!live) {
     if (H.hiEl) H.hiEl.classList.remove('hn-hi');
     if (S.state === 'title' || S.state === 'over') { H.driveAt = null; H.lastHp = null; H.lastMoney = null; }
@@ -221,14 +224,14 @@ export function step (dt) {
   // первый удар: сердце убыло
   if (H.lastHp !== null && S.hp < H.lastHp && S.hp > 0) push('hp', null, true);
   H.lastHp = S.hp;
-  // первые деньги за смену — в очередь: откроется, когда чек и деньги в пачку уйдут (RQ.busy)
+  // первые деньги за смену — в очередь: откроется, когда чек и Толик уйдут (notifyq.js)
   if (A.CAREER) {
     if (H.lastMoney !== null && S.money > H.lastMoney) push('cash');
     H.lastMoney = S.money;
   }
 
   // ── показ ──
-  if (wait) {                                      // занято (чек, деньги, Толик): текущая — обратно в очередь, покажется заново целиком
+  if (wait) {                                      // занято (чек, Толик, рейтинг…): текущая — обратно в очередь, покажется заново целиком
     if (H.cur) { const was = H.cur; highlight(null); H.cur = null; H.gap = GAP; if (was.id !== 'brake') H.queue.unshift(was); }
     return;
   }
@@ -250,7 +253,7 @@ export function stepan (ped) {
   const live = () => !ped.dead && ped.grp.parent && PLAY.includes(S.state);
   setTimeout(() => {
     if (!live()) return;
-    const b = A.sayBubble(ped.grp, t('Брат, вложишься в мой бизнес?'), '#7a4cc2');
+    const b = A.sayBubble(ped.grp, t('Брат, вложишься в мой бизнес?'), '#7a4cc2', 2.7, 1);
     setTimeout(() => { ped.grp.remove(b); if (b.material) b.material.dispose(); }, 3600);
   }, 1100);
   // облако — прямо на машину

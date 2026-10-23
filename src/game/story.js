@@ -58,7 +58,7 @@
      onDone(idx, cond, order)    — после награды (мелкий бонус)
      kids: { items }, глава kids: { name, note, why } — для детской версии
      catFur                      — номер окраса кота из cats.js FURS для ['cat', …]
-     autoSay                     — реплики без ответов листаются сами (dialog.js auto; встречи у двери)
+     autoSay                     — (не работает с 16.10.2026: реплики ждут нажатия, сами не листаются)
      cps                         — букв в секунду в репликах (по умолчанию 42) */
 import './story.css';
 import { t, N_ } from '../i18n/index.js';
@@ -773,7 +773,7 @@ async function cat (what) {
     if (!k) return;
     k.sit = true; k.orbit = false;
     if (CUT.skip) return;
-    const b = API.sayBubble(k.grp, t('мяу!'), '#e0873f', 1.05);
+    const b = API.sayBubble(k.grp, t('мяу!'), '#e0873f', 1.05, 1);
     b.scale.set(1.3, 0.65, 1);
     API.Snd && API.Snd.fx && API.Snd.fx('meow', s => { s.blip(900, 0.12, 'triangle', 0.08); setTimeout(() => s.blip(700, 0.18, 'triangle', 0.07), 120); });
     await wait(1.1);
@@ -824,8 +824,8 @@ async function say (who, text, o = {}) {
   if (a) LIFE.say(a, true, emo);
   // вопрос с двумя ответами (['ask']): столбиком, курсор ▶ — ↑ ↓ / крестовина, Enter / A — выбранный, X — нижний;
   // B / Esc остаются «пропустить сцену» (alt, stack — dialog.js)
-  // реплика без ответов у истории с autoSay (встречи у двери, encounters.js) — дальше сама: допечаталась, пауза 1,2—2,5 с
-  const two = o.yes && o.no ? { accept: t(o.yes), decline: t(o.no), alt: true, stack: true } : (CUT.story && CUT.story.autoSay ? { auto: true } : {});
+  // реплика без ответов — ждёт нажатия «дальше» (и у встреч у двери: autoSay больше не листает сам — автор 16.10.2026)
+  const two = o.yes && o.no ? { accept: t(o.yes), decline: t(o.no), alt: true, stack: true } : {};
   const r = await DLG.say({ person, name: person.name, text: t(text, typeof o.vars === 'function' ? o.vars() : o.vars), color: COLOR, fillers: false, mood: o.mood || 'calm', cps: (CUT.story && CUT.story.cps) || 42,
     emo, onTyped: () => { if (a) LIFE.hush(a); }, ...two });     // портрет говорит ртом с тем же выражением (talkface.js); допечаталось — и 3D-рот закрыт
   if (a) { a.talk = false; LIFE.say(a, false); }

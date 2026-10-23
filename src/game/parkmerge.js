@@ -20,6 +20,8 @@
      • повтор (replay.js): кто проснулся в окне повтора, до своего толчка снова виден в склейке (replay).
    ────────────────────────────────────────────────────────────────────────── */
 
+import * as CSNOW from './carsnow.js';    // зимой — снег на крыше и капоте, у каждой машины свой (байт aSnw)
+
 const CELL = 160;
 let THREE = null, SCENE = null, SRC = null, MAT = null;
 const U = { uPl: { value: null }, uR: { value: 220 }, uBand: { value: 35 }, uBasic: { value: null }, uLed: { value: null } };
@@ -35,11 +37,12 @@ function material (base) {
   { float pmD = distance(aC.xz, uPl), pmK = clamp((uR - pmD) / uBand, 0.0, 1.0);
     transformed = aC + (transformed - aC) * (pmD > uR ? 0.0 : max(0.02, pmK * pmK * (3.0 - 2.0 * pmK))); }
   vF = aF;`);
+    CSNOW.inject(sh, 'merged');
     sh.fragmentShader = 'uniform vec3 uBasic, uLed;\nvarying float vF;\n' +
       sh.fragmentShader.replace('#include <opaque_fragment>', `if (vF > 0.5) outgoingLight = vColor * (vF > 1.5 ? uLed : uBasic);   // фары — без света, как LITE_BASIC / LED
 #include <opaque_fragment>`);
   };
-  m.customProgramCacheKey = () => 'parkcells';
+  m.customProgramCacheKey = () => 'parkcells:snow';
   m.userData.shared = true;
   return m;
 }
@@ -53,17 +56,21 @@ export function init (api) {
 }
 
 /** все стоящие разом (LATE 'cars'): cars — лёгкие машины на сцене (дети — кузов и, если есть, фары); ставит t.pk */
-export function build (cars) {
+/* шагами (function*, latebuild.js): склейка клетки — шаг; клетки подряд, пока набралось меньше 40 машин */
+export function* build (cars) {
   const per = new Map(), v = new THREE.Vector3();
+  let nc = 0;
   for (const t of cars) {
     const k = Math.floor(t.x / CELL) + ',' + Math.floor(t.z / CELL);
     if (!per.has(k)) per.set(k, []);
     per.get(k).push(t);
   }
   for (const L of per.values()) {
+    if (nc >= 40) { nc = 0; yield 'parkmerge'; }
+    nc += L.length;
     let vn = 0, iN = 0;
     for (const t of L) for (const m of t.mesh.children) { vn += m.geometry.attributes.position.count; iN += m.geometry.index.count; }
-    const pos = new Float32Array(vn * 3), nor = new Float32Array(vn * 3), col = new Float32Array(vn * 3), aC = new Float32Array(vn * 3), aF = new Float32Array(vn);
+    const pos = new Float32Array(vn * 3), nor = new Float32Array(vn * 3), col = new Float32Array(vn * 3), aC = new Float32Array(vn * 3), aF = new Float32Array(vn), aS = new Uint8Array(vn);
     const idx = new Uint32Array(iN);
     const C = { mesh: null, pos: null, cars: [], cx: 0, cz: 0, rad: 0, n: 0 };
     let vo = 0, io = 0, minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
@@ -72,7 +79,7 @@ export function build (cars) {
       g.updateMatrix();
       const v0 = vo, ox = g.position.x, oy = g.position.y, oz = g.position.z;
       for (const m of g.children) {
-        const G = m.geometry, P = G.attributes.position, N = G.attributes.normal, K = G.attributes.color, I = G.index.array, n = P.count;
+        const G = m.geometry, P = G.attributes.position, N = G.attributes.normal, K = G.attributes.color, I = G.index.array, n = P.count, SN = G.attributes.aSnw;
         const f = m.material === SRC.LITE_BASIC ? 1 : m.material === SRC.LED_MAT ? 2 : 0;
         for (let i = 0; i < n; i++) {
           const j = (vo + i) * 3;
@@ -83,6 +90,7 @@ export function build (cars) {
           col[j] = K.getX(i); col[j + 1] = K.getY(i); col[j + 2] = K.getZ(i);
           aC[j] = ox; aC[j + 1] = oy; aC[j + 2] = oz;
           aF[vo + i] = f;
+          aS[vo + i] = SN ? SN.array[i] : 0;
         }
         for (let i = 0; i < I.length; i++) idx[io + i] = I[i] + vo;
         vo += n; io += I.length;
@@ -98,6 +106,7 @@ export function build (cars) {
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     geo.setAttribute('aC', new THREE.BufferAttribute(aC, 3));
     geo.setAttribute('aF', new THREE.BufferAttribute(aF, 1));
+    geo.setAttribute('aSnw', new THREE.BufferAttribute(aS, 1, true));
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
     geo.computeBoundingSphere();
     const mesh = new THREE.Mesh(geo, MAT);

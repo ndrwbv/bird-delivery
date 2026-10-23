@@ -16,11 +16,14 @@
      — после события — окно «просто покататься» QUIET с: ни событий (и лёгких сценок), ни лишнего чата Толика;
      — встреча — только если на прошлом заказе события не было (её ставит сам ритм, заранее);
      — не больше BUDGET за смену, каждого вида — не больше MAX; сценки — с напряжения SCENE_K.
+     — «малые» (мини-игра, поручение — SMALL, 17.10.2026): бюджет не тратят, окно «покататься» ждут не дольше SMALL_GAP с.
    Таймеры мини-игр и поручений идут как шли: подошёл срок — ждут, пока ритм пустит.
    Встречи у двери ставит ритм: только в районе MEET.DIST (первом), с MEET.FROM законченных смен, не в быстром
    заезде; разные герои, без героев прошлой смены (сохранение MEET.KEY).
    Знакомое лицо (faces.js, Глеб): там же и тогда же, что встречи, — первым на первом заказе подъёма, где можно встречу;
    одно появление за смену: встреча у двери (как встреча) или заказ ему с поручением (в счёт поручения).
+   Жители Юга (locals.js, 17.10.2026): там же и так же, но с 1-й смены игрока — после Глеба, раньше случайной встречи;
+   окно разговора у двери — как встреча (faceOn / faceOff), поручение — в счёт поручений, катсцена — встреча.
 
    Из director.js: init(api), begin(ride), why(kind), started(kind), ended(kind), step(dt, live), quiet().
    Из orders.js: slot(n, left) → { n, role, k, meet } | null (null — ритма нет: «покататься», не карьера),
@@ -32,13 +35,14 @@
 import { RHYTHM as C } from './econ.js';
 import * as DIST from './districts.js';
 import * as FACES from './faces.js';            // знакомые лица района: Глеб — по одному появлению за смену (faces.js)
+import * as LOCALS from './locals.js';          // жители Юга: пятеро с историями на 4 появления (locals.js)
 
 let A = null;          // { Store, S, career, quick(), doorOn(), errAsked() } — из game.js через director.init
 const PROV = { heroes: [], person: null, door: null };
 const R = {
   on: false, t: 0, len: 0, n: 0, role: '', k: 0, f: 0, peak: false,
-  last: -9, quietTo: 0, act: [], pend: '', beats: {}, total: 0, budget: 0,
-  meetMax: 0, used: [], prev: [], shift: 0, door: false, side: false, err: 0, face: false,
+  last: -9, quietTo: 0, calmAt: -999, act: [], pend: '', beats: {}, total: 0, budget: 0,
+  meetMax: 0, used: [], prev: [], shift: 0, door: false, side: false, err: 0, face: false, lcHere: false,
   log: [], plan: [],
 };
 
@@ -51,6 +55,8 @@ function note (s) {
   R.log.push(mmss(R.t) + ' ' + s);
   if (R.log.length > C.LOG) R.log.splice(0, R.log.length - C.LOG);
 }
+/* «малые» события (мини-игра, поручение — RHYTHM.SMALL): бюджет смены не тратят, окно «покататься» ждут не дольше SMALL_GAP с */
+const small = kind => (C.SMALL || []).includes(kind);
 const errN = () => { try { return A && A.errAsked ? +A.errAsked() || 0 : 0; } catch (e) { return 0; } };
 
 export function init (api) { A = api; }
@@ -72,13 +78,14 @@ function loadMeets () {
 export function begin (ride) {
   const quick = !!(A && A.quick && A.quick());
   Object.assign(R, { on: !!(A && A.career) && !ride, t: 0, len: 0, n: 0, role: '', k: 0, f: 0, peak: false,
-    last: -9, quietTo: 0, act: [], pend: '', beats: {}, total: 0, budget: C.BUDGET[0], used: [], log: [], plan: [],
+    last: -9, quietTo: 0, calmAt: -999, act: [], pend: '', beats: {}, total: 0, budget: C.BUDGET[0], used: [], log: [], plan: [],
     door: false, side: !!(A && A.S && A.S.side), err: errN() });
   if (!R.on) return;
   R.shift = (+get('dlv-shifts', 0) || 0) + 1;
   const m = loadMeets();
   R.prev = m.shift === R.shift ? (m.prev || []) : (m.cur || []);     // та же смена заново (перезапуск) — её «прошлая» остаётся
   R.meetMax = meetsHere(quick) ? C.MAX.meet : 0;
+  R.lcHere = !quick && DIST.has() && !DIST.city() && DIST.cur() === C.MEET.DIST;   // жители Юга (locals.js) — с 1-й смены
   note('смена ' + R.shift + (R.meetMax ? ' · встречи у двери: до ' + R.meetMax + (R.prev.length ? ', не ' + R.prev.join(', ') : '') : ''));
 }
 
@@ -100,14 +107,20 @@ export function slot (n, left) {
   R.role = role; R.k = k; R.f = f;
   let meet = null;
   R.face = false;
-  if (role === 'rise' && R.meetMax && !why('meet')) {
-    const fc = faceSlot();                          // знакомое лицо (Глеб) — первым
+  if (role === 'rise' && (R.meetMax || R.lcHere) && !why('meet')) {
+    const fc = R.meetMax ? faceSlot() : null;       // знакомое лицо (Глеб) — первым
     if (fc) {
       register(fc.kind === 'errand' ? 'errand' : 'meet'); R.pend = fc.kind === 'errand' ? 'face' : 'meet'; R.face = true;
       FACES.planned(R.shift);
       return { n: R.n, role, k, f, meet: fc };
     }
-    meet = pickHero();
+    const lc = R.lcHere ? localSlot() : null;       // жители Юга (locals.js) — раньше случайной встречи
+    if (lc) {
+      register(lc.kind === 'errand' ? 'errand' : 'meet'); R.pend = lc.kind === 'errand' ? 'face' : 'meet'; R.face = true;
+      LOCALS.planned(lc.local);
+      return { n: R.n, role, k, f, meet: lc };
+    }
+    if (R.meetMax) meet = pickHero();
   }
   if (meet) { register('meet'); R.pend = 'meet'; R.used.push(meet.id); saveMeets(); }
   return { n: R.n, role, k, f, meet };
@@ -121,6 +134,18 @@ function faceSlot () {
   if (w.kind === 'errand' && (R.beats.errand || 0) >= (C.MAX.errand || 1)) return null;
   let person = null;
   try { person = PROV.person ? PROV.person(w.face) : null; } catch (e) { person = null; }
+  return { ...w, person };
+}
+
+/* появление жителя Юга (locals.js want): окно у двери, поручение или катсцена; в накладной — он */
+function localSlot () {
+  let w = null;
+  try { w = LOCALS.want(R.shift); } catch (e) { console.warn('[rhythm] locals', e); w = null; }
+  if (!w) return null;
+  if (w.kind === 'errand' && (R.beats.errand || 0) >= (C.MAX.errand || 1)) return null;
+  let person = null;
+  try { person = PROV.person ? PROV.person(w.face) : null; } catch (e) { person = null; }
+  LOCALS.own(person, w.name);                       // в накладной и окнах — его имя, не ник из приложения
   return { ...w, person };
 }
 
@@ -151,9 +176,9 @@ export function meetFailed () {
   if (R.pend !== 'meet' && R.pend !== 'face') return;
   const kind = R.pend === 'face' ? 'errand' : 'meet';
   R.pend = '';
-  R.beats[kind] = Math.max(0, (R.beats[kind] || 0) - 1); R.total = Math.max(0, R.total - 1);
+  R.beats[kind] = Math.max(0, (R.beats[kind] || 0) - 1); if (!small(kind)) R.total = Math.max(0, R.total - 1);
   R.last = R.lastWas;
-  if (R.face) { R.face = false; FACES.unplan(); note('знакомое лицо не поставили: его адрес занят или нет подъезда'); return; }
+  if (R.face) { R.face = false; FACES.unplan(); LOCALS.unplan(); note('знакомое лицо не поставили: его адрес занят или нет подъезда'); return; }
   R.used.pop(); saveMeets();
   note('встречу не поставили: нет подъезда');
 }
@@ -181,7 +206,7 @@ function register (kind) {
   R.lastWas = R.last;
   R.last = R.n;
   R.beats[kind] = (R.beats[kind] || 0) + 1;
-  R.total++;
+  if (!small(kind)) R.total++;                    // мини-игра и поручение бюджет смены не тратят
 }
 /* событие идёт (машина встала, сценка на улице, едешь по поручению) */
 function begin2 (kind, name) {
@@ -198,6 +223,7 @@ function end2 (kind) {
   if (R.act.length) return;
   const w = rand(C.QUIET[0], C.QUIET[1]);
   R.quietTo = Math.max(R.quietTo, R.t + w);
+  R.calmAt = R.t;
   note('окно «покататься» ' + Math.round(w) + ' с (до ' + mmss(R.quietTo) + ')');
 }
 
@@ -205,13 +231,15 @@ function end2 (kind) {
 export function why (kind) {
   if (!R.on) return '';
   if (R.role === '' || R.role === 'open') return 'ритм: первый заказ — без событий';
-  if (R.t < R.quietTo - (kind === 'meet' || kind === 'mini' ? C.AHEAD : 0)) return 'ритм: окно «покататься» ещё ' + Math.ceil(R.quietTo - R.t) + ' с';
+  // малые (мини-игра, поручение) ждут окно не дольше SMALL_GAP с после конца события
+  const calm = small(kind) ? Math.min(R.quietTo, R.calmAt + (C.SMALL_GAP || 0)) : R.quietTo;
+  if (R.t < calm - (kind === 'meet' || kind === 'mini' ? C.AHEAD : 0)) return 'ритм: окно «покататься» ещё ' + Math.ceil(calm - R.t) + ' с';
   if (kind === 'light') return '';
   if (R.role === 'last') return 'ритм: последний заказ — лёгкий';
   if (R.act.length) return 'ритм: идёт ' + R.act.join(', ');
   if (R.last === R.n) return 'ритм: на этом заказе событие уже было';
   if (kind === 'meet' && R.n - R.last < 2) return 'ритм: событие было на прошлом заказе';
-  if (R.total >= R.budget) return 'ритм: события смены кончились (' + R.budget + ')';
+  if (!small(kind) && R.total >= R.budget) return 'ритм: события смены кончились (' + R.budget + ')';
   if ((R.beats[kind] || 0) >= (C.MAX[kind] || 1)) return 'ритм: ' + kind + ' за смену уже ' + R.beats[kind];
   if (kind === 'scene' && R.k < C.SCENE_K) return 'ритм: рано для сценки (' + R.k.toFixed(2) + ')';
   return '';
@@ -233,6 +261,9 @@ export function meetOn (id) {
   begin2('meet', 'встреча у двери: ' + id);
 }
 export function meetOff (res) { if (R.on) { if (res) note('встреча: ' + res); end2('meet'); } }
+/** locals.js: окно разговора жителя у двери открылось / закрылось (как встреча: после — окно «покататься») */
+export function faceOn (name) { if (R.on) begin2('meet', 'житель у двери: ' + name); }
+export function faceOff (res) { if (R.on) { if (res) note('житель: ' + res); end2('meet'); } }
 
 /* каждый кадр (director.step): часы смены (только пока смена идёт), мини-игры и поручения — по переменам */
 export function step (dt, live) {

@@ -18,7 +18,7 @@
    не раздаёт, их ставят руками поверх look (Object.assign(p.look, {...}), как
    у героев сюжета) — поэтому все прежние люди остались такими же:
      scar: 'cheek' | 'eye' | 'brow'   — шрам на щеке / через глаз / через бровь
-     sleeve: 'L' | 'R'                — пустой рукав (руки нет), подколот
+     sleeve: 'L' | 'R' | 'LR'         — пустой рукав (руки нет), подколот; 'LR' — оба (regulars.js, Света)
      broad: true                      — широкие плечи (туловище и руки шире)
      nose: 'huge', noseC: '#…'        — огромный нос; цвет носа (красный — пьющий)
      eyes: 'bulge' | 'alien'          — выпученные (торчат из лица) / огромные чёрные
@@ -28,6 +28,7 @@
      cig: true                        — сигарета во рту
      bottle: '#…'                     — бутылка в руке (цвет стекла; белая — кефир)
      cup: '#…'                        — стакан кофе с крышкой в руке
+     gun: true                        — пистолет в руке, стволом вперёд (regulars.js, Саня: «не смотри на ствол»)
      earring: true                    — серьга в ухе
      antenna: '#…'                    — антенны на голове (цвет шариков)
      sweater: '#…'                    — вязаный свитер: высокое горло и полоса узора на груди (цвет узора;
@@ -37,6 +38,7 @@
 
 import { t, lang } from '../i18n/index.js';
 import { MOB } from './mobile.js';
+import { pickQ, buildQ, qPortrait } from './qpeople.js';
 
 /* ─────────────── случайность от зерна ─────────────── */
 function rng (seed) {
@@ -271,7 +273,7 @@ const BG = ['#8fb8de', '#f2c57c', '#a8d5a2', '#e8a0a8', '#c3a6e0', '#9fd3cf', '#
 function makeLook (seed, o = {}) {
   const r = rng(seed), C = p => r() < p;
   const f = o.fem !== undefined ? !!o.fem : C(0.5);
-  const age = W(r, { young: 35, adult: 50, old: 15 });
+  const age0 = W(r, { young: 35, adult: 50, old: 15 }), age = o.age || age0;   // o.age — бабки на лавочке (yardlife.js): возраст задан, остальное — от зерна
   const si = +W(r, o.skinW || SKIN_W), skin = SKINS[si];
   let hairC = age === 'old' && C(0.7) ? P(r, ['#b8b2aa', '#d4d0ca', '#9a948c']) : W(r, si >= 5 ? HAIR_DARK : HAIR_LIGHT);
   if (age !== 'old' && C(0.05)) hairC = P(r, HAIR_DYE);
@@ -343,7 +345,7 @@ export function redressHumans (cx, cz, fx, fz, max = 3, dFar = 60) {
    (переодеть, как redressHumans, — не то же: голову с капюшоном и шапкой тот не пересобирает) */
 export function humanStale (g) {
   const u = g.userData;
-  return !!u.look && Math.abs((u.warm || 0) - WARM) >= 0.005;
+  return !!u.look && !u.q && Math.abs((u.warm || 0) - WARM) >= 0.005;
 }
 const COATS = ['#2b2a30', '#3b4a5a', '#1f2328', '#5a3a2e', '#6b2e2e', '#2e4a6b', '#3f5a3a', '#8a2a3a', '#d9d2c2', '#4a4550', '#c9476b', '#e0b13f', '#3fa8a0'];
 const SCARVES = ['#d95d5d', '#e0b13f', '#f4f1ea', '#4f7fd6', '#59b06a', '#c9476b', '#8e6fd0', '#2b2a30'];
@@ -356,11 +358,17 @@ function wearOf (Lk, o) {
   const coat = o.shirt || P(r, COATS), scarf = r() < 0.7 ? P(r, SCARVES) : null, fur = P(r, FURS);
   const hx = r();
   let head = null;
-  if (!o.cap) {
-    if (lvl === 3) head = hx < (Lk.age === 'young' ? 0.12 : 0.34) ? 'ushanka' : hx < 0.8 ? 'beanie' : hx < 0.9 ? 'hood' : Lk.head === 'hat' ? 'hat' : 'beanie';
-    else if (lvl === 2 && Lk.head === 'none' && hx < 0.28) head = 'beanie';
-    else if (lvl === 0 && Lk.head === 'beanie') head = 'cap';               // летом без шапки
+  /* зимой голых голов нет (автор 18.10.2026: «люди не должны ходить без шапок на улице»): в пуховике — ушанка, шапка,
+     капюшон или шляпа; в куртке (первый снег, оттепель, поздняя осень) — у большинства шапка; ирокез и афро — под
+     капюшоном; форменная кепка (курьеры, дорожники, гопники) — шапкой того же цвета */
+  const odd = Lk.hair === 'mohawk' || Lk.hair === 'afro';
+  if (o.cap) { if (lvl >= 2) head = hx < (lvl === 3 ? 0.28 : 0.1) ? 'ushanka' : 'beanie'; }
+  else if (lvl === 3) head = odd ? 'hood' : hx < (Lk.age === 'young' ? 0.12 : 0.34) ? 'ushanka' : hx < 0.8 ? 'beanie' : hx < 0.9 ? 'hood' : Lk.head === 'hat' ? 'hat' : 'beanie';
+  else if (lvl === 2) {
+    if (Lk.head === 'hat' || Lk.head === 'hood' || Lk.head === 'beanie') head = Lk.head;
+    else if (hx < (WARM > 0.6 ? 0.78 : 0.35)) head = odd || hx < 0.1 ? 'hood' : 'beanie';
   }
+  else if (lvl === 0 && Lk.head === 'beanie') head = 'cap';               // летом без шапки
   return { lvl, coat, scarf, fur, head, mitt: P(r, ['#2b2a30', '#6b2e2e', '#3b4a5a', '#e0b13f', '#f4f1ea']) };
 }
 
@@ -381,7 +389,7 @@ function mix (a, b, k) {
 const U = 0.035, HY = 1.58, T = 0.28;
 const HEAD_W = { thin: 14, normal: 16, chubby: 18 };            // ширина головы в пикселях лица
 const HEAD_D = { thin: 0.28, normal: 0.3, chubby: 0.33 };
-/* o: { fem, fat, h, skin, shirt, pants, cap } — как у старого makeHuman */
+/* o: { fem, fat, h, skin, shirt, pants, cap, hat } — как у старого makeHuman (hat — убор силой, как в зиму не переодевать) */
 function buildSpec (Lk, o = {}) {
   const r = rng(Lk.seed ^ 0x51AB5EED);
   const fat = o.fat !== undefined ? !!o.fat : Lk.fat;
@@ -445,7 +453,7 @@ function buildSpec (Lk, o = {}) {
   // руки: короткий рукав и голое предплечье или длинный рукав и кисть
   const sleeve = coat ? Wr.coat : top === 'jacket' ? Lk.jacket : topC;
   for (const p of [3, 4]) {
-    if (Lk.sleeve && p === (Lk.sleeve === 'R' ? 4 : 3)) {                       // пустой рукав: руки нет, рукав сплющен и подколот к боку
+    if (Lk.sleeve && (Lk.sleeve === 'LR' || p === (Lk.sleeve === 'R' ? 4 : 3))) {   // пустой рукав: руки нет, рукав сплющен и подколот к боку ('LR' — оба)
       const sc = coat ? Wr.coat : sleeve, pin = mix(sc, '#000000', 0.25);
       if (!coat && (top === 'tee' || top === 'dress')) bx(p, 0.14, 0.15, 0.1, 0, -0.08, 0, sc);
       else { bx(p, 0.12, 0.3, 0.06, 0, -0.16, 0, sc); bx(p, 0.1, 0.14, 0.05, 0, -0.27, 0.035, pin); bx(p, 0.03, 0.03, 0.02, 0, -0.22, 0.065, '#c8ccd2'); }
@@ -463,18 +471,21 @@ function buildSpec (Lk, o = {}) {
     if (Lk.cup && !Lk.bottle && p === (Lk.sleeve === 'R' ? 3 : 4)) {            // стакан кофе с крышкой
       bx(p, 0.09, 0.15, 0.09, 0, -0.55, 0.08, Lk.cup); bx(p, 0.1, 0.025, 0.1, 0, -0.465, 0.08, '#2b2a30'); bx(p, 0.092, 0.05, 0.092, 0, -0.56, 0.08, '#8a5a3a');
     }
+    if (Lk.gun && !Lk.bottle && !Lk.cup && p === (Lk.sleeve === 'R' ? 3 : 4)) {   // пистолет: рукоять в кулаке, ствол вперёд
+      bx(p, 0.045, 0.11, 0.07, 0, -0.58, 0.05, '#2b2a30'); bx(p, 0.045, 0.06, 0.2, 0, -0.52, 0.13, '#3a3a40');
+    }
     if (Lk.leaflets && !Lk.bottle && !Lk.cup && p === (Lk.sleeve === 'R' ? 3 : 4)) {   // пачка листовок: бумага, сверху — красный заголовок
       bx(p, 0.05, 0.2, 0.15, 0.02, -0.56, 0.06, Lk.leaflets); bx(p, 0.052, 0.05, 0.12, 0.02, -0.5, 0.06, '#d9342c');
     }
   }
   // голова: волосы, убор, борода, нос, уши
-  const hw = o.cap ? 'cap' : Wr.head || Lk.head, hc = o.cap || Lk.headC;
+  const hw = o.hat || Wr.head || (o.cap ? 'cap' : Lk.head), hc = o.cap || Lk.headC;   // форменная кепка зимой — шапка (wearOf)   // o.hat — убор силой (костюм Деда Мороза: шапка с помпоном, holidays.js)
   const H = [];
   hairBoxes(Lk, Wd, D, r, H);
   const covers = hw === 'cap' || hw === 'beanie' || hw === 'bandana' || hw === 'hood' || hw === 'ushanka';
   for (const b of H) {
     const k = b[0];
-    if ((covers || hw === 'hat') && k === 'top') continue;
+    if ((covers || hw === 'hat' || hw === 'witch') && k === 'top') continue;
     if (covers && hw !== 'hood' && k === 'fringe') continue;
     if (hw === 'hood' && (k === 'back' || k === 'side' || k === 'tail')) continue;
     bx(5, ...b.slice(1));
@@ -490,6 +501,11 @@ function buildSpec (Lk, o = {}) {
     const fd = mix(Wr.fur, '#000000', 0.25);
     bx(5, Wd + 0.1, 0.2, D + 0.1, 0, T + 0.07, 0, Wr.fur); bx(5, Wd + 0.14, 0.11, 0.06, 0, T + 0.02, F + 0.06, fd);
     for (const s of [-1, 1]) bx(5, 0.07, 0.3, D * 0.62, s * (Wd / 2 + 0.05), T - 0.16, -0.01, Wr.fur);
+  }
+  if (hw === 'witch') {                          // остроконечная шляпа ведьмы (Хэллоуин, holidays.js): широкие поля, конус ступеньками набок, лента
+    bx(5, Wd + 0.36, 0.03, D + 0.36, 0, T, 0, hc); bx(5, Wd - 0.02, 0.16, D - 0.02, 0, T + 0.09, 0, hc);
+    bx(5, Wd * 0.62, 0.16, D * 0.62, 0, T + 0.25, -0.02, hc); bx(5, Wd * 0.34, 0.15, D * 0.34, 0, T + 0.4, -0.05, hc);
+    bx(5, 0.06, 0.12, 0.06, 0, T + 0.52, -0.1, hc); bx(5, Wd, 0.04, D, 0, T + 0.035, 0, Lk.tieC || '#7a3fb0');
   }
   if (hw === 'headband') bx(5, Wd + 0.03, 0.05, D + 0.03, 0, T - 0.07, 0, hc);
   if (hw === 'bandana') { bx(5, Wd + 0.04, 0.12, D + 0.04, 0, T + 0.02, 0, hc); bx(5, 0.08, 0.14, 0.06, 0, T - 0.08, -F - 0.04, hc); }
@@ -529,7 +545,7 @@ function buildSpec (Lk, o = {}) {
   if (Lk.shape === 'chubby') bx(6, Wd - 0.12, 0.06, D - 0.08, 0, -T - 0.02, 0.01, skin);   // второй подбородок
   const piv = [[-lx, 0.7, 0], [lx, 0.7, 0], [0, 0, 0], [-ax, 1.3, 0], [ax, 1.3, 0], [0, HY, 0], [0, HY, 0]];
   const pace = fat ? Lk.pace0 : hs < 0.92 ? 0.82 : 1;
-  return { parts, piv, Wp, W: Wd, D, skin, shirt: coat ? Wr.coat : shirt, pants, hs, fat, pace, fem: Lk.f, face: faceKey(Lk, skin, Wp) };
+  return { parts, piv, Wp, W: Wd, D, skin, shirt: coat ? Wr.coat : shirt, pants, hs, fat, pace, fem: Lk.f, face: faceKey(Lk, skin, Wp), hw, lvl: Wr.lvl };
 }
 
 /* Причёски — коробки в осях головы: [вид, w, h, d, x, y, z, цвет].
@@ -896,13 +912,14 @@ export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
   HSET = HUMANS;
   /* та же фигура и лицо, одежда — по нынешнему сезону; цвет головы — какой был (перекрашенная так и остаётся) */
   REDRESS = g => {
+    if (g.userData.q) { g.userData.warm = WARM; return; }     // модель Quaternius (проба) — по сезону не переодеваем
     const u = g.userData, S = buildSpec(u.look, u.o || {}), hc = u.head.material.color;
     const body = skinGeo(S, [hc.r, hc.g, hc.b]);
     setSkinGeo(u.skin, u.held ? withHeld(body, u.held) : body);         // предметы в руках — те же, в новое тело
     u.head.geometry.dispose(); u.head.geometry = headBox(S);
     if (u.held) for (const c of u.held) if (c.k === 5) growHeadBox(u.head.geometry, c);
     u.lod.geometry.dispose(); u.lod.geometry = geo(S.parts.map((l, i) => [l, ...S.piv[i]]));
-    u.colors.shirt = S.shirt; u.colors.pants = S.pants; u.warm = WARM;
+    u.colors.shirt = S.shirt; u.colors.pants = S.pants; u.warm = WARM; u.hw = S.hw;
   };
   /* ── предмет в руке — в меш тела (holdFixed, 11.10.2026) ──
      Вершины предмета (меш или группа мешей в осях кости — как для bone.add) кладутся в меш тела с номером кости:
@@ -1015,30 +1032,34 @@ export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
     const legL = bone(0), legR = bone(1), bodyB = bone(2), armL = bone(3), armR = bone(4), head = bone(6);
     const bones = [legL, legR, bodyB, armL, armR, head];
     yield;
-    const skin = new HSkin(undefined, HUMAN_VC);
-    setSkinGeo(skin, skinGeo(S, col(S.skin)));
-    skin.bindMode = THREE.DetachedBindMode;
-    skin.bind(new HSkel(bones, [S.piv[0], S.piv[1], S.piv[2], S.piv[3], S.piv[4], S.piv[6]]), IDENT);
-    skin.boundingSphere = SPHERE;
-    g.add(skin);
+    // проба (ветка test/people): каждый третий — модель Quaternius на тех же костях (qpeople.js)
+    const qn = pickQ(Lk), qm = qn ? buildQ(g, qn, S, Lk, HUMAN_VC) : null;
+    const skin = qm ? qm.skin : new HSkin(undefined, HUMAN_VC);
+    if (!qm) {
+      setSkinGeo(skin, skinGeo(S, col(S.skin)));
+      skin.bindMode = THREE.DetachedBindMode;
+      skin.bind(new HSkel(bones, [S.piv[0], S.piv[1], S.piv[2], S.piv[3], S.piv[4], S.piv[6]]), IDENT);
+      skin.boundingSphere = SPHERE;
+      g.add(skin);
+    }
     // голова: «свой материал цвета кожи» — игра красит его (злой водитель, вор в маске)
     head.material = headPaint(skin, S.skin);
     head.geometry = headBox(S);
     yield;
     let faceM = null;
-    if (o.face !== false) {
+    if (o.face !== false && !qm) {
       faceM = new THREE.Mesh(new THREE.PlaneGeometry(S.W, 0.56), faceMat(Lk, S));
       faceM.position.z = S.D / 2 + 0.002;
       head.add(faceM);
       yield;
     }
     // дальний вариант: весь человек одним мешем
-    const lod = new THREE.Mesh(geo(S.parts.map((l, i) => [l, ...S.piv[i]])), HUMAN_VC);
+    const lod = qm ? qm.lod : new THREE.Mesh(geo(S.parts.map((l, i) => [l, ...S.piv[i]])), HUMAN_VC);
     lod.visible = false;
-    g.add(lod);
-    g.scale.setScalar(S.hs);
+    if (!qm) g.add(lod);
+    g.scale.setScalar(qm ? Math.max(S.hs, 0.97) : S.hs);   // модель Quaternius: не ниже 97 % — никто не похож на ребёнка
     g.userData = { legL, legR, armL, armR, head, faceM, faceS: { skin: S.skin, Wp: S.Wp }, colors: { skin: S.skin, shirt: S.shirt, pants: S.pants }, person, fem: S.fem, fat: S.fat, pace: S.pace,
-      lod, parts: [legL, legR, bodyB, armL, armR, head, skin], far: false, look: Lk, o, hair: null, warm: w0, skin };
+      lod, parts: [legL, legR, bodyB, armL, armR, head, skin], far: false, look: Lk, o, hair: null, warm: w0, skin, hw: S.hw, q: qn };
     HUMANS.add(g);
     return g;
   }
@@ -1091,6 +1112,9 @@ const portraitKey = (person, Lk, size, mood, talk) => (person.id || Lk.seed) + '
 /* talk — кадр речи (talkface.js): 0 — рот как у выражения, 1 — приоткрыт, 2 — открыт */
 export function faceDataURL (person, size = 128, mood = '', talk = 0) {
   if (!person) return '';
+  // проба (ветка test/people): человек-модель Quaternius — снимок её головы (qpeople.js qPortrait)
+  const qp = person.look && qPortrait(person.look, () => buildSpec(person.look, {}), size, person.id || person.look.seed);
+  if (qp) return qp;
   FACE_STATS.n++;
   const Lk = faceLook(person, mood), key = portraitKey(person, Lk, size, mood, talk);
   const hit = PORTRAITS.get(key);
@@ -1184,6 +1208,9 @@ function soonStep (dl) {
 /* готов ли кадр (без рисования) — talkface.js: не готов — пока показывает закрытый рот */
 export function faceReady (person, size = 128, mood = '', talk = 0) {
   if (!person) return '';
+  // проба (ветка test/people): у человека-модели кадры разговора — тот же снимок головы, не старое лицо (talkface.js)
+  const qp = person.look && qPortrait(person.look, () => buildSpec(person.look, {}), size, person.id || person.look.seed);
+  if (qp) return qp;
   const Lk = faceLook(person, mood), key = portraitKey(person, Lk, size, mood, talk), u = PORTRAITS.get(key);
   if (u) { PORTRAITS.delete(key); PORTRAITS.set(key, u); }
   return u || '';
