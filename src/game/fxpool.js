@@ -50,7 +50,7 @@ const M4 = new THREE.Matrix4(), POS = new THREE.Vector3(), SCL = new THREE.Vecto
 /* частица — все поля с рождения и дробные (скрытая форма V8 одна) */
 function mk () {
   return { x: 0.5, y: 0.5, z: 0.5, vx: 0.5, vy: 0.5, vz: 0.5, life: 0.5, max: 0.5, grow: 0.5, spin: 0.5, gravity: 0.5,
-    floor: 0.5, s: 0.5, rx: 0.5, ry: 0.5, rz: 0.5, r: 0.5, g: 0.5, b: 0.5, a: 0.5, d: 0.5 };
+    floor: 0.5, s: 0.5, rx: 0.5, ry: 0.5, rz: 0.5, r: 0.5, g: 0.5, b: 0.5, a: 0.5, d: 0.5, rest: 0.5 };
 }
 
 function material (k) {
@@ -159,8 +159,9 @@ function flush (P) {
 }
 
 /* частица. kind — вид (KINDS), x/y/z — где (y — уже с полом), hex — цвет, s — размер (масштаб), a — прозрачность
-   в первом кадре (прозрачные виды; дальше — по жизни), o — { vx, vy, vz, life, max, grow, spin, gravity, ry, floor, keep },
-   floor — пол для отскока (у кого тяжесть; o.floor важнее). keep — не прореживать на «эффекты: меньше» */
+   в первом кадре (прозрачные виды; дальше — по жизни), o — { vx, vy, vz, life, max, grow, spin, gravity, ry, floor, keep, rest },
+   floor — пол для отскока (у кого тяжесть; o.floor важнее). keep — не прореживать на «эффекты: меньше»;
+   rest — ложится на пол и лежит: полувысота над полом, м (не крутится, последние 0,6 с уходит в землю) */
 export function part (kind, x, y, z, hex, s, a, o, floor) {
   const P = POOLS[kind];
   if (!P) return;
@@ -181,6 +182,7 @@ export function part (kind, x, y, z, hex, s, a, o, floor) {
   p.grow = o.grow || 0; p.spin = o.spin || 0; p.gravity = o.gravity || 0;
   p.floor = o.floor !== undefined ? o.floor : (floor || 0);
   p.s = s; p.rx = 0; p.ry = o.ry || 0; p.rz = 0;
+  p.rest = o.rest || 0;
   COL.setHex(hex);
   p.r = COL.r; p.g = COL.g; p.b = COL.b;
   p.a = a;
@@ -204,7 +206,10 @@ export function step (dt) {
       p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
       if (p.spin) { p.rx += p.spin * dt; p.rz += p.spin * 0.7 * dt; }
       if (p.grow) p.s *= 1 + p.grow * dt;
-      if (p.gravity && p.y < p.floor + 0.12) { p.y = p.floor + 0.12; p.vy *= -0.3; p.vx *= 0.5; p.vz *= 0.5; }
+      if (p.rest) {                               // ложится на пол и лежит (крошки удара, crashfx.js): не крутится, к концу жизни уходит в землю
+        if (p.gravity && p.y < p.floor + p.rest) { p.y = p.floor + p.rest; p.vy = p.vy < -1.5 ? p.vy * -0.3 : 0; p.vx *= 0.5; p.vz *= 0.5; p.spin *= 0.3; }
+        if (p.life < 0.6) p.s *= Math.exp(-dt * 6);
+      } else if (p.gravity && p.y < p.floor + 0.12) { p.y = p.floor + 0.12; p.vy *= -0.3; p.vx *= 0.5; p.vz *= 0.5; }
       p.life -= dt;
       if (p.life <= 0) { FREE[NFREE++] = p; continue; }
       if (P.tr) { const k = p.life / p.max; p.a = (k < 0 ? 0 : k > 1 ? 1 : k) * 0.85; }

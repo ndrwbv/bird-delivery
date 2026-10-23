@@ -222,7 +222,7 @@ export default {
     const mini = KIT.miniBind(q('.mk-mini')), elInv = mini.body;
     const elSelf = q('.mk-self'), elGoal = q('.mk-goal');
     const elBreath = q('.sx-breath'), elBreathBar = q('.sx-breath b'), barGo = q('.sx-bar-go'), barGop = q('.sx-bar-gop');
-    const cv = q('.sx-cv'), g = cv.getContext('2d');
+    const cv = KIT.sceneCanvas(box), g = cv.getContext('2d');   // холст сцены — один на все заходы (doorkit.js, 0п48)
     const msgs = KIT.feed(q('.sx-feed'), { max: 3 });
     const say = m => msgs.say(m);
 
@@ -981,6 +981,7 @@ export default {
       if (raf) cancelAnimationFrame(raf);
       if (api.setStep) api.setStep(null);
       if (api.setPad) api.setPad(null);
+      KIT.sceneCanvasOff(cv);
       box.remove();
     };
   },

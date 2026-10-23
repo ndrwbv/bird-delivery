@@ -43,6 +43,7 @@ import * as PIX from './pixfx.js';
 import { glass as glassSnd } from './impact.js';
 import { qHas } from './qpeople.js';
 import { GLSL as BLOOD_GLSL } from './carblood.js';
+import * as WRECK from './carwreck.js';
 
 export const FW = {
   ON: !(typeof location !== 'undefined' && /[?&]nofw\b/.test(location.search || '')),   // ?nofw — как было до 12ар (для сравнения)
@@ -204,6 +205,7 @@ export function pre (t, v) {
     // стёкла облегчённой были одной сеткой: разбиты — нет ни одного, в трещинах — все
     const lg = R1.glass[0];
     if (lg && !lg.visible) for (const k in R2.panes) { R2.panes[k].st = 2; R2.panes[k].m.visible = false; }
+    WRECK.restore(t.mesh);                          // перекошенное, болтающееся, отлетевшее — как было на прошлой копии (carwreck.js)
     r.kind = 'real'; ST.real++;
     if (!t.parked) seatReal(t, r);
   } else {
@@ -300,8 +302,10 @@ export function post (t, wx, wz, v, nx = 0, nz = 0) {
       if (best) { u.wheels.splice(u.wheels.indexOf(best), 1); DENTM.fling(g, best, 'wheel', ox, oz, v); ST.wheels++; }
     }
   }
+  // детали по ступеням (0п34, carwreck.js): капот, крышка, двери, бамперы, фары — перекос, болтаются, отлетают от тебя
+  if (R && WRECK.WR.on) WRECK.hit(g, lx, lz, v, { ox, oz });
   // бампер «Семёрки» (коробочные — cardent.js сам)
-  if (R && v >= FW.BUMPER && Math.abs(lz) / hl >= Math.abs(lx) / W2) {
+  else if (R && v >= FW.BUMPER && Math.abs(lz) / hl >= Math.abs(lx) / W2) {
     const m = REALCAR.bumper(g, lz > 0 ? 'f' : 'r');
     if (m) { m.userData.keepMat = 1; DENTM.fling(g, m, 'bumper', 0, lz > 0 ? 1 : -1, v); ST.bumpers++; }
   } else if (!R && u.lost) {                       // коробочная: бампер сносит cardent.js — только считаем
@@ -525,8 +529,8 @@ function crackBig (t, r, end, nx, nz, lx, lz, v) {
   const [ax, az] = n[0] ? [0, 1] : [1, 0], ex = ext[0], ey = ext[1];
   const P = [[-ex, -ey], [ex, -ey], [ex, ey], [-ex, ey]];
   P.forEach(([a, b], j) => pa.setXYZ(q * 4 + j, c[0] + ax * a, c[1] + b, c[2] + az * a));
-  const sh = (q % 3) * 0.04;
-  ua.setXY(q * 4, 0.5 + sh, 0); ua.setXY(q * 4 + 1, 1, 0); ua.setXY(q * 4 + 2, 1, 1); ua.setXY(q * 4 + 3, 0.5 + sh, 1);
+  const sh = (q % 3) * 0.013, u0 = CG.CELL, u1 = 2 * CG.CELL;   // клетка «трещины» картинки стёкол (carglass.js)
+  ua.setXY(q * 4, u0 + sh, 0); ua.setXY(q * 4 + 1, u1, 0); ua.setXY(q * 4 + 2, u1, 1); ua.setXY(q * 4 + 3, u0 + sh, 1);
   pa.needsUpdate = true; ua.needsUpdate = true;
   r.ncr++;
   ST.bigCrack++;

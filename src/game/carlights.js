@@ -318,11 +318,12 @@ export function step (car, dt, vf, steer, brake, gas, night = 0) {
 
 /* фары и задние фонари своей машины: night — ENV.night (0…1), wx — дождь или снегопад (0…1).
    Каждый кадр из updateEnv (game.js), в любом состоянии игры: огни собираются здесь же, если ещё нет */
-export function lights (car, dt, night = 0, wx = 0) {
+export function lights (car, dt, night = 0, wx = 0, dead = false) {
   if (!car) return;
   const L = car.userData.lights === undefined ? rig(car) : car.userData.lights;
   HEAD.night = night; HEAD.wx = wx;
   HEAD.on = HEAD.on ? night >= HEAD.OFF || wx >= HEAD.WX_OFF : night >= HEAD.ON || wx >= HEAD.WX;
+  if (dead) { HEAD.on = false; HEAD.k = 0; }               // «машина всё» (0п46, 24.10.2026): разбита — ни фар, ни фонарей
   HEAD.k += ((HEAD.on ? 1 : 0) - HEAD.k) * Math.min(1, HEAD.FADE * dt);
   if (!HEAD.on && HEAD.k < 0.01) HEAD.k = 0;
   if (!L || !L.head) return;

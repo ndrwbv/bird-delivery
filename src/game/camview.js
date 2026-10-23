@@ -22,6 +22,8 @@
      CV.near(dt, vf, sh)   — поставить камеру «сзади, близко»
      CV.cab(dt, vf, sh)    — поставить камеру «из-за руля» и салон
      CV.overlay(renderer)  — нарисовать салон поверх (после renderer.render города); сам знает, нужен ли
+     CV.kick(v, dx, dz)    — удар своей машины (game.js hitFx): камера «клюёт» по ходу в удар (CAMV.JOLT, 11би)
+     CV.jolt(dt, вид)      — каждый кадр после камеры: сдвиг вперёд и кивок этого кадра
    ────────────────────────────────────────────────────────────────────────── */
 import './camview.css';
 import { t } from '../i18n/index.js';
@@ -53,6 +55,15 @@ export const CAMV = {
     shakeK: 0.12,                   // тряска от ударов — 12 % от тряски камеры сзади
     wheelK: 5,                      // руль крутится в 5 раз сильнее колёс (полный — ~120°)
     kmhMax: 200,                    // спидометр до 200 км/ч
+  },
+  /* «клюёт» на ударе (11би, 24.10.2026; автор: «при ударе нет ощущения удара — камеру дёргать немного вперёд, будто резкая
+     остановка, не сильно»): камера по инерции подаётся вперёд по ходу (в удар) и чуть кивает вниз, потом мягко назад —
+     без тряски в стороны. Пик через TAU с, к 0,2 с — пятая часть, к LIFE — ничего */
+  JOLT: {
+    V0: 6, V1: 26,                  // м/с удара: слабее V0 — нет, к V1 — в полную силу (удар о стену на 90 км/ч ≈ 22—25 м/с)
+    HIGH: 0.7, NEAR: 0.45, CAB: 0.09,   // м вперёд в полную силу: сзади высоко, сзади близко, из-за руля (голова)
+    PITCH: 0.03, CAB_PITCH: 0.014,  // рад кивка вниз в полную силу (1,7° и 0,8°)
+    TAU: 0.055, LIFE: 0.45,         // с: пик и сколько длится
   },
 };
 
@@ -97,6 +108,35 @@ function sync () {
   const l = t('камера: {v}', { v: label() });
   b.title = l; b.setAttribute('aria-label', l);
 }
+
+/* ── «клюёт» на ударе (CAMV.JOLT) ── */
+const JO = { t: 9, a: 0, x: 0, z: 0, n: 0, d: 0, last: null };   // d — на сколько подвинута в этом кадре, м
+/** удар своей машины силой v м/с; (dx, dz) — куда по инерции (единичный, по ходу машины в удар) */
+export function kick (v, dx, dz) {
+  const J = CAMV.JOLT, a = Math.pow(clamp((v - J.V0) / (J.V1 - J.V0), 0, 1), 0.8);
+  if (!(a > 0)) return 0;
+  const left = JO.t < J.LIFE ? JO.a * joltF(JO.t) : 0;   // идёт прежний — новый, только если сильнее
+  if (a <= left) return 0;
+  JO.t = 0; JO.a = a; JO.x = dx; JO.z = dz; JO.n++;
+  JO.last = { v: +v.toFixed(1), a: +a.toFixed(2) };
+  return a;
+}
+const joltF = t => { const u = t / CAMV.JOLT.TAU; return u * Math.exp(1 - u); };   // 0 → 1 (в TAU) → 0, без отскока
+/** каждый кадр после того, как камера встала: подвинуть вперёд и кивнуть; m — вид ('high' | 'near' | 'cab') */
+export function jolt (dt, m = MODE) {
+  const J = CAMV.JOLT;
+  if (JO.t >= J.LIFE) return 0;
+  JO.t += dt;
+  const k = JO.t >= J.LIFE ? 0 : JO.a * joltF(JO.t);
+  JO.d = 0;
+  if (!k || !A) return 0;
+  const cam = A.cam, d = k * (m === 'cab' ? J.CAB : m === 'near' ? J.NEAR : J.HIGH);
+  cam.position.x += JO.x * d; cam.position.z += JO.z * d;
+  cam.rotateX(-k * (m === 'cab' ? J.CAB_PITCH : J.PITCH));
+  JO.d = d;
+  return d;
+}
+export const JOLT_ST = JO;
 
 /** угол кадра вида без нитро и бист-мода; sp — доля максималки */
 export function fov (sp) {

@@ -52,6 +52,10 @@
                             видеопамять по обёрткам WebGL (tools/probe-glmem.cjs: буферы, текстуры, кадр), renderer.info,
                             память процессов Электрона (страница, видеокарта); memLate() — по кускам поздней сборки (с --early)
    --heapsnap=папка         снимок кучи по heapSnap('метка') в скрипте → папка/метка.heapsnapshot; разбор — node tools/heapsum.cjs a [b]
+                            watch('метка') … unwatch('метка') в скрипте (с --mem) — пик следа страницы между ними: probe опрашивает
+                            footprint без передышки (~10—60 мс на опрос), пока окно открыто → { foot0, peak, exact, peakT, foot1, life0 / life1 — пик с запуска до / после, page, gpu, n, ms };
+                            пик с запуска вырос за окно — peak = он (точно, exact), нет — по опросам
+                            (переходы: экран загрузки, мини-игры — docs/AGENTS.md «Память на телефоне» → «Пики на переходах»)
    --timeout=120            секунд на всё
    Код выхода: 1 — необработанная ошибка в странице, исключение в скрипте, игра не загрузилась.
    Каждый запуск — с чистым сохранением (своя сессия в памяти и своя папка userData). */
@@ -157,6 +161,7 @@ app.whenReady().then(async () => {
   let uncaught = 0;
   win.webContents.on('console-message', (e, level, msg, line, src) => {
     if (MEM && typeof msg === 'string' && msg.startsWith('__probemem:')) { memMark(msg.slice(11)); return; }
+    if (MEM && typeof msg === 'string' && msg.startsWith('__probewatch:')) { watchMark(msg.slice(13)); return; }
     // повернуть «телефон» из скрипта: console.log('__proberesize:844x390') — окно меняет размер (orient.js, поворот туда-обратно)
     if (typeof msg === 'string' && msg.startsWith('__proberesize:')) { const [w, h] = msg.slice(14).split('x').map(Number); if (w > 0 && h > 0) win.setContentSize(w, h); return; }
     // кадр посреди скрипта: await shot('/путь/кадр.png') (PRELUDE) или console.log('__probeshot:/путь/кадр.png') + wait(800)
@@ -209,6 +214,52 @@ app.whenReady().then(async () => {
     MEMLOG.push({ label, ...r });
     if (heap) js('window.__lateHold = false').catch(() => {});   // ?latesnap — поздняя сборка стояла, пока снимали кучу
     js(`(window.__probeMemR || (window.__probeMemR = {}))[${JSON.stringify(raw)}] = ${JSON.stringify(r)}`).catch(() => {});
+  }
+
+  /* --mem: окно «пик между метками» (watch / unwatch в скрипте): след страницы опрашивается подряд, пока открыто хоть одно окно.
+     phys_footprint_peak — пик с запуска процесса (его не сбросить), поэтому — свои опросы текущего следа */
+  const WATCH = new Map();                            // метка → { foot0, peak, page, gpu, n, t0 }
+  let watchLoop = null;
+  const footNow = full => new Promise(res => {
+    if (process.platform !== 'darwin') return res(full ? {} : null);
+    let rpid; try { rpid = win.webContents.getOSProcessId(); } catch (e) { return res(full ? {} : null); }
+    require('child_process').execFile('footprint', ['-p', String(rpid), '--noCategories'], { encoding: 'utf8', timeout: 20000 }, (e, o) => {
+      const mb = re => { const x = !e && o && o.match(re); return x ? Math.round(+x[1] * (/GB/.test(x[2]) ? 1024 : /KB/.test(x[2]) ? 1 / 1024 : 1)) : null; };
+      res(full ? { foot: mb(/phys_footprint:\s*([\d.]+)\s*(GB|MB|KB)/), peak: mb(/phys_footprint_peak:\s*([\d.]+)\s*(GB|MB|KB)/) } : mb(/phys_footprint:\s*([\d.]+)\s*(GB|MB|KB)/));
+    });
+  });
+  const procNow = () => { const r = {}; try { const rpid = win.webContents.getOSProcessId(); for (const m of app.getAppMetrics()) { if (m.pid === rpid) r.page = Math.round(m.memory.workingSetSize / 1024); else if (m.type === 'GPU') r.gpu = Math.round(m.memory.workingSetSize / 1024); } } catch (e) { /* — */ } return r; };
+  async function watchRun () {
+    while (WATCH.size) {
+      const f = await footNow(), p = procNow();
+      for (const w of WATCH.values()) {
+        w.n++;
+        if (f != null) { if (w.foot0 == null) w.foot0 = f; if (f > w.peak) { w.peak = f; w.peakT = Date.now() - w.t0; } }
+        if (p.page > w.page) w.page = p.page;
+        if (p.gpu > w.gpu) w.gpu = p.gpu;
+      }
+    }
+    watchLoop = null;
+  }
+  async function watchMark (raw) {
+    const i = raw.indexOf(':'), op = raw.slice(0, i), label = raw.slice(i + 1);
+    if (op === 'start') {
+      const F = await footNow(true), f = F.foot, p = procNow();
+      WATCH.set(label, { foot0: f, peak: f || 0, life0: F.peak, page: p.page || 0, gpu: p.gpu || 0, n: 0, t0: Date.now() });
+      if (!watchLoop) watchLoop = watchRun();
+      js(`(window.__probeWatchR || (window.__probeWatchR = {}))[${JSON.stringify('start:' + label)}] = true`).catch(() => {});
+      return;
+    }
+    const w = WATCH.get(label);
+    WATCH.delete(label);
+    const F = await footNow(true), f = F.foot;
+    // пик с запуска (phys_footprint_peak) вырос за окно — новый пик был в окне, он и есть пик окна (точно, между опросами тоже);
+    // не вырос — пик окна не выше прежнего, берём опросы (exact: false — между опросами мог быть короткий всплеск, но ниже life0)
+    const rose = w && F.peak != null && w.life0 != null && F.peak > w.life0;
+    const r = w ? { foot0: w.foot0, peak: rose ? Math.max(F.peak, w.peak) : Math.max(w.peak, f || 0), exact: !!rose, sampled: w.peak, peakT: w.peakT || 0, foot1: f,
+      life0: w.life0, life1: F.peak, page: w.page, gpu: w.gpu, n: w.n, ms: Date.now() - w.t0 } : { err: 'нет окна ' + label };
+    MEMLOG.push({ label: 'watch:' + label, foot: r.foot1, footPeak: r.peak, page: r.page, gpu: r.gpu, win: true });
+    js(`(window.__probeWatchR || (window.__probeWatchR = {}))[${JSON.stringify('stop:' + label)}] = ${JSON.stringify(r)}`).catch(() => {});
   }
 
   /* снимок как видит игрок (автор 23.10: «скрины жёстко заблюренные»). Игра рисует маленький кадр (~1152×720, dynres)

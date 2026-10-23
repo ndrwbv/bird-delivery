@@ -1,8 +1,8 @@
 /* Плавные улицы (11ч, roadsmooth.js): сводка города — сравнить «было / стало».
-   npm run probe -- --eval=tools/probe-checks/smooth-summary.js --max=0            — как сейчас
-   npm run probe -- --eval=tools/probe-checks/smooth-summary.js --max=0 --q=smooth — со скруглением
+   npm run probe -- --eval=tools/probe-checks/smooth-summary.js --max=0              — как сейчас (с 24.10.2026 — со скруглением)
+   npm run probe -- --eval=tools/probe-checks/smooth-summary.js --max=0 --q=oldroads — старые улицы углом (в npm run check — id smooth)
    Числа и отпечатки (хеш координат): узлы, рёбра, зебры, группы светофоров, дома с адресом, подъезды, остановки,
-   фонари, деревья; BUILD_T — время кусков стройки. Без ?smooth отпечатки должны совпасть с замером «до» бит в бит. */
+   фонари, деревья; BUILD_T — время кусков стройки. С ?oldroads отпечатки должны совпасть с замером «до» бит в бит. */
 await until(() => d.SPOTS && d.SPOTS.length > 50 && (!d.LATE || !d.LATE.busy()), 60000);
 const fnv = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(16); };
 const r2 = v => Math.round(v * 100) / 100;

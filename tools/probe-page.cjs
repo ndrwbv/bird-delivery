@@ -36,6 +36,12 @@ const mem = async (label = 'mem') => {
 };
 const heapSnap = async label => { if (window.gc) gc(); return memProc(label, true); };
 const memLate = () => window.__glmem ? window.__glmem.late() : null;
+/* probe --mem: пик следа страницы между watch('метка') и unwatch('метка') (probe опрашивает footprint подряд, пока окно открыто;
+   без --mem — null). watch ждёт первый опрос; unwatch → { foot0, peak, foot1, page, gpu, n, ms } */
+const watch = async label => { if (!window.__glmem) return null; const k = 'start:' + label; console.debug('__probewatch:' + k);
+  for (let i = 0; i < 400; i++) { if (window.__probeWatchR && window.__probeWatchR[k]) return true; await wait(25); } return null; };
+const unwatch = async label => { if (!window.__glmem) return null; const k = 'stop:' + label; console.debug('__probewatch:' + k);
+  for (let i = 0; i < 600; i++) { const r = window.__probeWatchR && window.__probeWatchR[k]; if (r) return r; await wait(50); } return null; };
 /* что автопилот закрыл за прогон: { closed: {окно: сколько раз}, maxStall: самая долгая стойка мира, с } */
 const apStats = () => ({ closed: { ...P.ap.closed }, maxStall: +P.ap.maxStall.toFixed(1) });
 /* smoke(secs): смена на автопилоте и проверка, что игра жива. → { ok, fail: [что не так], m, frames, clock, ft }

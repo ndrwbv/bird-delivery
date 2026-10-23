@@ -15,7 +15,8 @@
    выполняет сразу. Долгий кусок может вернуть итератор (function* … yield): тогда он идёт шагами —
    между шагами браузер рисует кадр и ловит ввод (подъезды, сугробы: на Деке по 0,6—1,3 с одним куском).
    Шаги — в тех же местах при ?nolate и без: зерно --seed — перед каждым шагом (имя#номер). start() — начать разбор очереди (после первого кадра меню), flush() —
-   достроить всё сейчас, busy() — ещё строится, onDone(fn) — когда всё. */
+   достроить всё сейчас, flushAsync(cb) — достроить под экраном загрузки тиками с передышкой (память телефона, 0п48),
+   busy() — ещё строится, onDone(fn) — когда всё. */
 import * as CL from '../platform/crashlog.js';
 import { MOB } from './mobile.js';
 
@@ -80,8 +81,8 @@ if (MC) MC.port1.onmessage = () => tick();
 function tick () {
   if (DONE) return;
   if (MEMHOOK && window.__lateHold) { setTimeout(tick, 50); return; }   // probe --mem ?latesnap: стоим, пока снимается куча
-  const t0 = performance.now();
-  do one(); while (Q.length && performance.now() - t0 < BUDGET && !(MEMHOOK && window.__lateHold));
+  const t0 = performance.now(), bud = RUSH ? RUSH_BUDGET : BUDGET;
+  do one(); while (Q.length && performance.now() - t0 < bud && !(MEMHOOK && window.__lateHold));
   if (!DONE) setTimeout(next, IDLE);       // через таймер: сначала кадр (rAF), потом следующий кусок
 }
 
@@ -92,11 +93,29 @@ export function start () {
   if (!Q.length) { finish(); return; }
   next();
 }
+/* достроить остаток под экраном загрузки — тиками, не разом (0п48, автор 24.10.2026: «переход в загрузку заставляет
+   перезагружаться вебвью»). Разом (flush) — один длинный кусок без передышки: отходы поздней сборки не успевают убраться,
+   след страницы на телефоне боком 930 → 1300 МБ, а следом ещё начало смены — и iOS выгружает вкладку. Тиками по RUSH_BUDGET мс
+   с той же паузой IDLE (мобильный режим — 30 мс: сборщик мусора успевает), в конце — ещё SETTLE мс тишины, потом cb
+   (game.js: повторить нажатие карточки меню). На компьютере пауз нет — то же время, что разом */
+let RUSH = false;
+const RUSH_Q = typeof location !== 'undefined' ? (location.search.match(/[?&]rushms=(\d+)/) || [])[1] : undefined;
+const RUSH_BUDGET = RUSH_Q !== undefined ? +RUSH_Q : 48;   // ?rushms=N — свой кусок (проверки)
+const SETTLE = MOB.on ? 250 : 0;
+export function flushAsync (cb) {
+  if (DONE) { cb(); return; }
+  RUSH = true;
+  CL.trans('достройка города');
+  onDone(() => { RUSH = false; CL.transEnd('достройка города'); if (SETTLE) setTimeout(cb, SETTLE); else cb(); });
+  if (!STARTED) start();
+}
 export function flush () {
   if (DONE) return;
+  CL.trans('достройка города разом');
   if (!STARTED) { STARTED = true; T0 = performance.now(); if (MEMHOOK) window.__lateMem('(меню)'); }
   const t0 = performance.now();
   while (Q.length) one();
   finish();
   T.flush = Math.round(performance.now() - t0);
+  CL.transEnd('достройка города разом');
 }

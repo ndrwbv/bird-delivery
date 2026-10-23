@@ -35,6 +35,25 @@ export function stranger (kind) {
   return p;
 }
 
+/* ── холст сцены: один на домофон и подъезд (0п48, автор 24.10.2026: «заход в мини-игру заставляет перезагружаться вебвью»).
+   Раньше каждый заход — новый холст во весь экран (домофон — ×2 плотности, ~1 900×860 точек, 6—7 МБ), старый отпускался, только
+   когда сборщик мусора доберётся до вынутого элемента — в Safari холсты копились. Теперь холст один: заход — в разметку
+   мини-игры на место пустышки (.mk-cv), выход — вынут, размер и память те же (тот же размер экрана — без нового буфера).
+   Уже стоит в другой мини-игре (песочница показывает две разом) — свой холст, как раньше. */
+let SCV = null;
+export function sceneCanvas (box) {
+  const slot = box.querySelector('canvas.mk-cv');
+  if (!slot) return null;
+  if (!SCV) SCV = document.createElement('canvas');
+  if (SCV.isConnected) return slot;
+  SCV.className = slot.className;
+  slot.replaceWith(SCV);
+  if (SCV.width > 300) { const g = SCV.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, SCV.width, SCV.height); }   // прошлая сцена — не мелькнуть
+  return SCV;
+}
+/* выход из мини-игры: общий холст — из разметки вон (box.remove() его бы тоже унёс, но ссылка на него — здесь, он не копится) */
+export function sceneCanvasOff (cv) { if (cv && cv === SCV && cv.parentNode) cv.remove(); }
+
 /* ── лента сообщений ── */
 export function feed (el, o = {}) {
   const max = o.max || 3;

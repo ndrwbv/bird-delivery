@@ -25,6 +25,7 @@
      tick(dt)                — раз в кадр: двери, что закрываются
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
+import * as WRECK from './carwreck.js';   // 0п34: дверь — тот же кусок, что перекашивает и срывает удар (carwreck.js)
 
 export const CX = {
   on: !(typeof location !== 'undefined' && /[?&]oldexit\b/.test(location.search || '')),
@@ -105,19 +106,32 @@ function realDoor (t) {
   R.dent.push(geo);                                 // мнётся с кузовом (realcar.js dentR), выбросят с копией (undetail)
   return { kind: 'real', car: g, pivot, R, ang: 0, want: 0 };
 }
+/* дверь водителя куском carwreck.js: та же, что перекосило или сорвало ударом (у «Семёрки» — передняя левая dfl, у коробочной — doorR) */
+function wreckDoor (t) {
+  const g = t.mesh, u = g && g.userData;
+  if (!u) return null;
+  const key = u.real ? 'dfl' : 'dl';
+  if (u.real && !u.real.detail) return null;
+  const P = WRECK.piece(g, key);
+  if (!P) return null;
+  if (!u.real && P.m && P.m.userData.lost) return null;
+  return { kind: 'wr', car: g, P, R: u.real || null, ang: 0, want: 0 };
+}
 function doorOf (t, make) {
   let r = DOORS.get(t);
-  if (r && (r.car !== t.mesh || (r.kind === 'real' && (!r.pivot.parent || t.mesh.userData.real !== r.R)) || (r.kind === 'box' && r.mesh.parent !== t.mesh))) { MOVING.delete(r); DOORS.delete(t); r = null; }   // машину подменили (копия ушла, перекрасил взрыв)
+  if (r && r.kind === 'wr' && (r.car !== t.mesh || r.P.gone || (t.mesh.userData.real || null) !== r.R)) { MOVING.delete(r); DOORS.delete(t); r = null; }   // сорвало, копию убрали
+  if (r && r.kind !== 'wr' && (r.car !== t.mesh || (r.kind === 'real' && (!r.pivot.parent || t.mesh.userData.real !== r.R)) || (r.kind === 'box' && r.mesh.parent !== t.mesh))) { MOVING.delete(r); DOORS.delete(t); r = null; }   // машину подменили (копия ушла, перекрасил взрыв)
   if (r || !make) return r;
   if (A.detail) A.detail(t);                        // «Семёрка» — в подробную копию: у облегчённой двери нет
   const u = t.mesh && t.mesh.userData;
-  r = u && (u.real ? realDoor(t) : boxDoor(t));
-  if (r) { DOORS.set(t, r); ST[r.kind === 'real' ? 'doorsReal' : 'doorsBox']++; } else ST.noDoor++;
+  r = u && (WRECK.WR.on ? wreckDoor(t) : u.real ? realDoor(t) : boxDoor(t));
+  if (r) { DOORS.set(t, r); ST[r.kind === 'real' || (r.kind === 'wr' && r.R) ? 'doorsReal' : 'doorsBox']++; } else ST.noDoor++;
   return r;
 }
 function setDoor (r, a) {
   if (r.ang !== a && r.car.userData) r.car.userData._pose = undefined;   // стоящая машина матрицы не пересчитывает (cull.js moved) — пересчитать
   r.ang = a;
+  if (r.kind === 'wr') { WRECK.open(r.P, a); return; }
   if (r.kind === 'real') { r.pivot.rotation.y = -a; return; }
   const m = r.mesh, hx = r.p0.x, hz = r.p0.z + r.L;   // петля у передней кромки
   m.rotation.y = r.r0 - a;

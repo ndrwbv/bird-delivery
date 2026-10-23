@@ -35,6 +35,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { snowAmt } from './seasons.js';
 import * as FADEJS from './fade.js';
+import { SEE_U, SEE_FN } from './seethru.js';    // ёлки между камерой и машиной тают (seethru.js, 0п47)
 import { wet } from './streams.js';             // речки и пруды — без ёлок (streams.js)
 import * as EDL from './editlayer.js';          // редактор города: убранные ели, сосны и кусты (edits.json, вид forest)
 
@@ -156,14 +157,15 @@ function material (kind) {
   m.onBeforeCompile = sh => {
     sh.uniforms.uSnow = U.uSnow;
     sh.uniforms.uFade = bush ? FADE_BUSH : FADE_LOD;
+    if (kind !== 'far') sh.uniforms.uSeeP = SEE_U;
     sh.vertexShader = 'attribute float aSnow;\nvarying float vSnow;\nvarying vec3 vFW;\nvarying float vFadeK;\nuniform vec2 uFade;\n' + FADEJS.FADE_FN + '\n' +
       sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>' + FADEJS.BASE_DIST + (bush ? FADEJS.GROW_BEGIN : '') + '\n  vFadeK = fadeK(fadeD, uFade);')
         .replace('#include <project_vertex>', `#include <project_vertex>
       vSnow = aSnow;
       vFW = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;`);
     const cut = kind === 'near' ? 'if (vFadeK <= bayer4(gl_FragCoord.xy)) discard;' : kind === 'far' ? 'if (vFadeK > bayer4(gl_FragCoord.xy)) discard;' : '';
-    sh.fragmentShader = 'uniform float uSnow;\nvarying float vSnow;\nvarying vec3 vFW;\nvarying float vFadeK;\n' + FADEJS.BAYER_FN + '\n' +
-      sh.fragmentShader.replace('void main() {', 'void main() {\n  ' + cut).replace('#include <color_fragment>', `#include <color_fragment>
+    sh.fragmentShader = 'uniform float uSnow;\nvarying float vSnow;\nvarying vec3 vFW;\nvarying float vFadeK;\n' + FADEJS.BAYER_FN + '\n' + (kind !== 'far' ? SEE_FN + '\n' : '') +
+      sh.fragmentShader.replace('void main() {', 'void main() {\n  ' + cut + (kind !== 'far' ? '\n  seeCut(vFW);' : '')).replace('#include <color_fragment>', `#include <color_fragment>
       float fn = fract(sin(dot(floor(vFW.xz * 1.7 + vFW.y * 0.9), vec2(12.9898, 78.233))) * 43758.5453);
       float cov = smoothstep(0.98 - uSnow * 0.62, 1.1 - uSnow * 0.62, vSnow + (fn - 0.5) * 0.22) * step(0.02, uSnow);
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.93, 0.98), cov * 0.95);`);

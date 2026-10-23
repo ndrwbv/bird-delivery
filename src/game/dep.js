@@ -30,6 +30,7 @@ import * as PFX from './paperfx.js';
 import { keyHTML, inputKind } from '../input/glyphs.js';
 import { t, N_ } from '../i18n/index.js';
 import * as TEL from './telemetry.js';          // анонимная статистика: ставки в «депнуть» (telemetry.js)
+import * as CL from '../platform/crashlog.js';   // метка перехода «деп» (0п48)
 
 let A = null, SH = { slot: false, n: 0 }, H = {};
 const $ = id => document.getElementById(id);
@@ -185,6 +186,7 @@ function stageHTML (g) {
 }
 
 export function open () {
+  CL.transFor('деп', 2500);                        // метка перехода (crashlog.js, 0п48)
   const md = box();
   GAME = game();
   MATCH = GAME === 'tennis' ? HQ.match() : [];

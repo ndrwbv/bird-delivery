@@ -30,7 +30,12 @@ import { kill as killLights } from './carlights.js';
 
 export const GLASS = { CRACK: 9, BREAK: 15, SHARDS: 14 };
 /* фары: BREAK / BOTH — м/с удара; END — удар в передней / задней такой доле половины длины; SHARDS — осколков на фару */
-export const LAMP = { BREAK: 8, BOTH: 16, END: 0.45, SHARDS: 10 };
+export const LAMP = { BREAK: 8, BOTH: 16, END: 0.45, SHARDS: 10, staged: null };   // staged(car) — фары этой машины бьёт carwreck.js по ступеням (0п34)
+/* стёкла по ступеням (0п34, 24.10.2026; автор: «стёкла трескаются, потом бьются постепенно»): удар у стекла с STEP[0] / [1] / [2]
+   м/с добавляет 1 / 2 / 3 ступени: 1 — трещины, 2 — ещё трещины (вторая паутина, мутнее), 3 — разбито. ?oldwreck — как было */
+GLASS.STEP = [9, 15, 22];
+GLASS.staged = !(typeof location !== 'undefined' && /[?&]oldwreck\b/.test(location.search || ''));
+export const CELL = 1 / 3;                        // картинка стёкол — три клетки: целое, трещины, ещё трещины
 export const STATS = { cracked: 0, broken: 0, lamps: 0, lampCr: 0 };   // lampCr — задних фонарей в трещинах (cardent.js «следы сзади»)
 
 /* текстура: слева — целое стекло, справа — то же в трещинах. Целое — ровного цвета с одним мягким широким бликом
@@ -39,16 +44,16 @@ const TEX = new Map();
 function tex (tint) {
   const k = tint ? 't' : 'c';
   if (TEX.has(k)) return TEX.get(k);
-  const c = document.createElement('canvas'); c.width = 128; c.height = 64;
+  const c = document.createElement('canvas'); c.width = 192; c.height = 64;
   const x = c.getContext('2d');
-  for (let cell = 0; cell < 2; cell++) {
+  for (let cell = 0; cell < 3; cell++) {
     const o = cell * 64;
     x.fillStyle = tint ? 'rgba(18, 20, 26, 0.82)' : 'rgba(120, 160, 200, 0.38)'; x.fillRect(o, 0, 64, 64);
     // блик: одна широкая мягкая полоса наискось, без лесенки
     x.save(); x.beginPath(); x.rect(o, 0, 64, 64); x.clip();
     x.fillStyle = tint ? 'rgba(90, 100, 120, 0.16)' : 'rgba(230, 245, 255, 0.16)';
     x.beginPath(); x.moveTo(o + 20, 64); x.lineTo(o + 34, 64); x.lineTo(o + 58, 0); x.lineTo(o + 44, 0); x.closePath(); x.fill();
-    if (cell) {
+    if (cell >= 1) {
       // трещины: из точки удара лучи и кольцо
       x.strokeStyle = 'rgba(245, 250, 255, 0.95)'; x.lineWidth = 1.6; x.lineCap = 'round';
       const cx = o + 26, cy = 28;
@@ -59,6 +64,19 @@ function tex (tint) {
       x.stroke();
       x.beginPath(); x.arc(cx, cy, 10, 0, 7); x.stroke();
       x.fillStyle = 'rgba(255, 255, 255, 0.6)'; x.beginPath(); x.arc(cx, cy, 3, 0, 7); x.fill();
+    }
+    if (cell === 2) {
+      // ещё трещины: вторая паутина ниже, лучи через всё стекло, помутнело
+      const cx = o + 44, cy = 46;
+      x.beginPath();
+      for (const [dx, dy] of [[1, 0.2], [0.5, 0.9], [-0.4, 1], [-1, 0.1], [-0.8, -0.7], [0, -1], [0.7, -0.7]]) {
+        x.moveTo(cx, cy); x.lineTo(cx + dx * 16 - dy * 4, cy + dy * 16 + dx * 4); x.lineTo(cx + dx * 40, cy + dy * 40);
+      }
+      x.moveTo(o + 4, 10); x.lineTo(o + 30, 34); x.lineTo(o + 60, 58);
+      x.stroke();
+      x.beginPath(); x.arc(cx, cy, 8, 0, 7); x.stroke();
+      x.beginPath(); x.arc(o + 26, 28, 20, 0, 7); x.stroke();
+      x.fillStyle = 'rgba(235, 242, 250, 0.22)'; x.fillRect(o, 0, 64, 64);
     }
     x.restore();                                  // трещины не вылезают на соседнюю клетку
   }
@@ -131,7 +149,7 @@ export function cabin (g, add, k) {
     // наклон: tz — верх заднего стекла вперёд (низ — назад), tb — верхний задний угол бокового вперёд
     const lo = -(p.tz || 0) / 2, hi = (p.tz || 0) / 2, tb = p.tb || 0;
     pos.push(cx - ax, cy2 - hh, cz - az + lo, cx + ax, cy2 - hh, cz + az + lo, cx + ax, cy2 + hh, cz + az + hi, cx - ax, cy2 + hh, cz - az + hi + tb);
-    uv.push(0, 0, 0.5, 0, 0.5, 1, 0, 1);
+    uv.push(0, 0, CELL, 0, CELL, 1, 0, 1);
     idx.push(v, v + 1, v + 2, v, v + 2, v + 3);
     p.st = 0;
   }
@@ -148,22 +166,29 @@ export function cabin (g, add, k) {
 
 /* удар по машине: lx, lz — точка удара в осях машины (как в dentCar), force — м/с удара */
 export function hit (cg, lx, lz, force, car) {
-  if (car && force >= LAMP.BREAK) lampHit(car, lx, lz, force);
+  if (car && force >= LAMP.BREAK && !(LAMP.staged && LAMP.staged(car))) lampHit(car, lx, lz, force);
   if (!cg || !(force >= GLASS.CRACK)) return;
   const S = cg.S, cf = S.cz + S.cab / 2, cb = S.cz - S.cab / 2;
   const k = lz > cf ? 'f' : lz < cb ? 'b' : lx > 0 ? 'l' : 'r';
   const p = cg.panes.find(q => q.k === k);
   if (!p || p.st === 2) return;
+  if (GLASS.staged) {                             // по ступеням: трещины → ещё трещины → разбито
+    const was = p.st === 1 ? p.lv || 1 : 0, add = force >= GLASS.STEP[2] ? 3 : force >= GLASS.STEP[1] ? 2 : 1;
+    if (was + add >= 3) breakPane(cg, p, car);
+    else crack(cg, p, was + add);
+    return;
+  }
   if (force >= GLASS.BREAK || p.st === 1) breakPane(cg, p, car);
   else crack(cg, p);
 }
 
-function crack (cg, p) {
-  p.st = 1; STATS.cracked++;
+function crack (cg, p, lv = 1) {
+  if (p.st !== 1) STATS.cracked++;
+  p.st = 1; p.lv = lv;
   const uv = cg.mesh.geometry.attributes.uv, a = uv.array, o = p.v0 * 2;
-  // своя точка трещины на каждом стекле: клетка справа, чуть сдвинутая
-  const sh = (p.v0 % 3) * 0.04;
-  a.set([0.5 + sh, 0, 1, 0, 1, 1, 0.5 + sh, 1], o);
+  // своя точка трещины на каждом стекле: клетка трещин (lv 2 — следующая), чуть сдвинутая
+  const sh = (p.v0 % 3) * 0.013, u0 = CELL * lv;
+  a.set([u0 + sh, 0, u0 + CELL, 0, u0 + CELL, 1, u0 + sh, 1], o);
   uv.needsUpdate = true;
 }
 

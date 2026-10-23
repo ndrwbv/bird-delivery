@@ -309,31 +309,45 @@ function cluster (D) {
 }
 
 /* ─── стёкла: светлые и прозрачные; трещины — общий холст «паутина» ─── */
-const GLASS = { CLEAR: 0.14, CRACK: 0.6, HEX: 0xdcecf7, TINT: 0x1c2630, TINT_A: 0.88 };   // TINT — стёкла машин потока
-let CRACK = null;
-function crackTex () {
-  if (CRACK) return CRACK;
+const GLASS = { CLEAR: 0.14, CRACK: 0.6, CRACK2: 0.78, HEX: 0xdcecf7, TINT: 0x1c2630, TINT_A: 0.88 };   // TINT — стёкла машин потока
+let CRACK = null, CRACK2 = null;
+/* lv 1 — паутина от одной точки; 2 — «ещё трещины» (0п34, 24.10.2026): вторая паутина и лучи через всё стекло */
+function crackTex (lv = 1) {
+  if (lv < 2 && CRACK) return CRACK;
+  if (lv >= 2 && CRACK2) return CRACK2;
   const c = document.createElement('canvas');
   c.width = c.height = 128;
   const x = c.getContext('2d');
-  x.strokeStyle = 'rgba(255,255,255,0.95)'; x.lineWidth = 1.5;
-  const cx = 78, cy = 56;
-  for (let i = 0; i < 11; i++) {
-    let a = i / 11 * Math.PI * 2 + Math.random() * 0.4, px = cx, py = cy;
-    x.beginPath(); x.moveTo(px, py);
-    for (let s = 0; s < 6; s++) { a += (Math.random() - 0.5) * 0.5; px += Math.cos(a) * 14; py += Math.sin(a) * 14; x.lineTo(px, py); }
-    x.stroke();
+  const web = (cx, cy, n, len, rings) => {
+    x.strokeStyle = 'rgba(255,255,255,0.95)'; x.lineWidth = 1.5;
+    for (let i = 0; i < n; i++) {
+      let a = i / n * Math.PI * 2 + Math.random() * 0.4, px = cx, py = cy;
+      x.beginPath(); x.moveTo(px, py);
+      for (let s = 0; s < len; s++) { a += (Math.random() - 0.5) * 0.5; px += Math.cos(a) * 14; py += Math.sin(a) * 14; x.lineTo(px, py); }
+      x.stroke();
+    }
+    x.lineWidth = 1;
+    for (const r of rings) {
+      x.beginPath();
+      for (let i = 0; i <= 22; i++) { const a = i / 22 * Math.PI * 2, rr = r * (0.8 + Math.random() * 0.4); x[i ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); }
+      x.stroke();
+    }
+  };
+  web(78, 56, 11, 6, [9, 20, 34]);
+  if (lv >= 2) {
+    web(34, 84, 9, 7, [7, 16, 27, 40]);
+    x.fillStyle = 'rgba(255,255,255,0.18)'; x.fillRect(0, 0, 128, 128);   // стекло помутнело
   }
-  x.lineWidth = 1;
-  for (const r of [9, 20, 34]) {
-    x.beginPath();
-    for (let i = 0; i <= 22; i++) { const a = i / 22 * Math.PI * 2, rr = r * (0.8 + Math.random() * 0.4); x[i ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); }
-    x.stroke();
-  }
-  CRACK = new THREE.CanvasTexture(c);
-  CRACK.magFilter = THREE.NearestFilter;
-  return CRACK;
+  const t = new THREE.CanvasTexture(c);
+  t.magFilter = THREE.NearestFilter;
+  if (lv >= 2) CRACK2 = t; else CRACK = t;
+  return t;
 }
+/* стёкла по ступеням (0п34): удар с GLASS_HIT.CRACK / BREAK / FULL добавляет 1 / 2 / 3 ступени; 1 — трещины, 2 — ещё трещины,
+   3 — разбито. RCW.staged — включает carwreck.js (?oldwreck — как было: трещины, второй удар или BREAK — разбито) */
+export const RCW = { staged: false };
+const glassAdd = f => (f >= 22 ? 3 : f >= 15 ? 2 : f >= 9 ? 1 : 0);
+export const p0Of = o => P0.get(o) || null;         // несмятые вершины сетки модели (carwreck.js режет детали по ним)
 
 /* ─── краска и кровь на кузове (своя программа поверх «Ламберта») ───
    uPaint — цвет машины (маска краски — прозрачность картинки кузова); uBlood[i] — пятно: xyz — центр
@@ -883,13 +897,23 @@ function paneOf (R, x, z) {
   const HL = R.C.box.HL;
   return z > HL * PANE_Z.F ? 'f' : z < HL * PANE_Z.B ? 'b' : x > 0 ? 'l' : 'r';
 }
-function crackPane (q) {
+function crackPane (q, lv = 1) {
   const mt = q.m.material;
-  q.st = 1; TST.cracked++;
-  mt.map = crackTex(); mt.opacity = GLASS.CRACK; mt.color.setHex(0xffffff); mt.needsUpdate = true;
+  if (q.st !== 1) TST.cracked++;
+  q.st = 1; q.lv = lv;
+  mt.map = crackTex(lv); mt.opacity = lv >= 2 ? GLASS.CRACK2 : GLASS.CRACK; mt.color.setHex(0xffffff); mt.needsUpdate = true;
 }
 function paneGlass (R, x, z, force) {
   const k = paneOf(R, x, z), q = R.panes[k];
+  if (RCW.staged) {                                  // по ступеням: трещины → ещё трещины → разбито
+    if (q && q.st < 2) {
+      const lv = (q.st === 1 ? q.lv || 1 : 0) + glassAdd(force);
+      if (lv >= 3) { q.st = 2; q.m.visible = false; R.broke.push(q.m); TST.broken++; }
+      else if (lv > (q.st === 1 ? q.lv || 1 : 0)) crackPane(q, lv);
+    }
+    if (force >= GLASS_HIT.BOTH) for (const n in R.panes) { const o = R.panes[n]; if (o !== q && o.st === 0) crackPane(o); }
+    return;
+  }
   if (q && q.st < 2 && force >= GLASS_HIT.CRACK) {
     if (force >= GLASS_HIT.BREAK || q.st === 1) { q.st = 2; q.m.visible = false; R.broke.push(q.m); TST.broken++; }
     else crackPane(q);
@@ -983,7 +1007,7 @@ export function dent (car, lx, lz, force, rear) {
 function dentR (R, lx, lz, force, rear) {
   const K = R.C.k, { W2, HL } = R.C.box, x = lx / K, z = lz / K, k = Math.min(1, (force - DENT.MIN) / (DENT.FULL - DENT.MIN));
   // поток: удар у угла — фара (фонарь) той стороны гаснет, сильный — обе на этом конце (своя — carglass.js, как у старого кузова)
-  if (R.traffic && R.lamp && !rear && force >= LAMP.HIT && Math.abs(z) > HL * 0.5) {
+  if (R.traffic && R.lamp && !rear && force >= LAMP.HIT && Math.abs(z) > HL * 0.5 && !(RCW.staged && (R.detail || R.det))) {   // подробная копия (и спрятанная под ней облегчённая — огни общие) — по ступеням (carwreck.js)
     const e = z > 0 ? 'f' : 'r', both = force >= LAMP.BOTH || Math.abs(x) < 0.12;
     for (const s of both ? ['l', 'r'] : [x > 0 ? 'l' : 'r']) R.lamp.dead[LAMP_KEY[e + s]] = 1;
   }
@@ -1034,10 +1058,10 @@ export function step (car, spin, steerY, steer, vf, dt = 1 / 60) {
   const cg = car.userData.cg;
   if (cg) for (const p of cg.panes) {
     const q = R.panes[p.k];
-    if (!q || q.st === p.st) continue;
-    q.st = p.st;
+    if (!q || (q.st === p.st && (q.lv || 1) === (p.lv || 1))) continue;
+    q.st = p.st; q.lv = p.lv || 1;
     const mt = q.m.material;
-    if (p.st === 1) { mt.map = crackTex(); mt.opacity = GLASS.CRACK; mt.color.setHex(0xffffff); mt.needsUpdate = true; }
+    if (p.st === 1) { mt.map = crackTex(q.lv); mt.opacity = q.lv >= 2 ? GLASS.CRACK2 : GLASS.CRACK; mt.color.setHex(0xffffff); mt.needsUpdate = true; }
     if (p.st === 2) { q.m.visible = false; if (p.k === 'f' && R.blood) R.blood.m.visible = false; }
   }
   // заднее стекло — от износа зада (cardent.js REARD: 2 — трещины, 3 — разбито), как фонари у старого кузова

@@ -1534,6 +1534,7 @@ export function walkGuard (p) {
 
 /* ═════════════════ фары потока ночью ═════════════════ */
 const GLOW = { mesh: null, mat: null, max: 32 };
+const GC = new THREE.Color();
 const GM = new THREE.Matrix4(), GQ = new THREE.Quaternion(), GP = new THREE.Vector3(), GS = new THREE.Vector3(1, 1, 1), GY = new THREE.Vector3(0, 1, 0);
 function stepGlow (dt, A) {
   const night = A.ENV ? A.ENV.night : 0;
@@ -1547,6 +1548,7 @@ function stepGlow (dt, A) {
     GLOW.mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0, polygonOffset: true, polygonOffsetFactor: -4 });
     GLOW.mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(4, 8.5).rotateX(-Math.PI / 2).translate(0, 0, 6.2), GLOW.mat, GLOW.max);
     GLOW.mesh.frustumCulled = false; GLOW.mesh.renderOrder = 3; GLOW.mesh.count = 0;
+    for (let i = 0; i < GLOW.max; i++) GLOW.mesh.setColorAt(i, GC.setRGB(1, 1, 1));   // цвет у каждого пятна — с рождения (одна программа)
     A.scene.add(GLOW.mesh);
   }
   GLOW.mat.opacity = clamp((night - 0.2) * 0.8, 0, 0.5);
@@ -1558,15 +1560,21 @@ function stepGlow (dt, A) {
     if (n >= GLOW.max) break;
     if (c.parked || c.wreck || c.knock || c.gone || !c.mesh.visible) continue;
     if (Math.abs(c.x - cx) > 110 || Math.abs(c.z - cz) > 110) continue;
-    GP.set(c.x, (c.gy || 0) + 0.22, c.z);
+    // фары по целым (0п46, 24.10.2026, carwreck.js headOf): обе разбиты — пятна нет, одна — уже, слабее и с её стороны
+    const H = A.headOf ? A.headOf(c) : null;
+    if (H && !(H.k > 0)) continue;
+    const ox = H ? H.x : 0;
+    GP.set(c.x + Math.cos(c.h) * ox, (c.gy || 0) + 0.22, c.z - Math.sin(c.h) * ox);
     GQ.setFromAxisAngle(GY, c.h);
     const gk = c.model === 'cn' ? 1.12 : c.model === 'moped' ? 0.45 : 1;
-    GS.set(gk, 1, gk);
+    GS.set(gk * (H ? H.w : 1), 1, gk);
     GM.compose(GP, GQ, GS);
+    GLOW.mesh.setColorAt(n, GC.setScalar(H ? H.k : 1));
     GLOW.mesh.setMatrixAt(n++, GM);
   }
   GLOW.mesh.count = n;
   GLOW.mesh.instanceMatrix.needsUpdate = true;
+  if (GLOW.mesh.instanceColor) GLOW.mesh.instanceColor.needsUpdate = true;
 }
 
 /* ═════════════════ шаг и рисование на радаре/карте ═════════════════ */

@@ -55,6 +55,7 @@ import * as DIST from './districts.js';
 import * as ZN from './zones.js';
 import * as LIKES from './likes.js';           // что нравится игроку: вес вида мини-игры — выбор и часы (likes.js, econ.js LIKES)
 import * as CHAT from './chat.js';             // Толик: его лицо — у подсказки первого раза (learn)
+import * as CL from '../platform/crashlog.js';   // метка перехода «мини-игра»: оборвётся (iOS выгрузит вкладку) — следующий запуск запишет (0п48)
 
 const D = ECON.DOOR;
 const TK = ECON.TALK;
@@ -302,9 +303,12 @@ function playStairs (st, order, opt) {
     const h = host();
     const person = st.persons && st.persons[0];
     const cur = G.cur = { type: 'stairs', st, order, mode: 'stairs', resolve, off: null, done: false };
+    const trN = 'мини-игра: подъезд';
+    CL.transFor(trN, 3000);                         // вход: метка на 3 с (0п48; на всю мини-игру — могла бы залежаться)
     const end = res => {
       if (cur.done) return;
       cur.done = true;
+      CL.transFor('выход из мини-игры: подъезд', 2000);
       st.stairs = Object.assign({ mode: 'stairs' }, selfTip(res) || { ok: false, aborted: true });
       SG.last = st.stairs;
       if (typeof cur.off === 'function') cur.off();
@@ -380,9 +384,12 @@ function playTalk (st, order, person, fem, sit, ln) {
   return new Promise(resolve => {
     const h = host();
     const cur = G.cur = { type: 'talk', st, order, mode: 'talk', resolve, off: null, done: false };
+    const trN = 'мини-игра: разговор у двери';
+    CL.transFor(trN, 3000);                         // вход: метка на 3 с (0п48; на всю мини-игру — могла бы залежаться)
     const end = res => {
       if (cur.done) return;
       cur.done = true;
+      CL.transFor('выход из мини-игры: разговор у двери', 2000);
       st.talk = res || { aborted: true };
       TG.last = st.talk;
       // поддержал разговор (или кивал молча) — респект; в «покататься» — нет
@@ -483,9 +490,12 @@ function play (st, mode, lv, order, ln) {
     const hh = host();
     const person = st.persons && st.persons[0];
     const cur = G.cur = { type: 'door', st, order, mode, resolve, off: null, done: false };
+    const trN = 'мини-игра: домофон';
+    CL.transFor(trN, 3000);                         // вход: метка на 3 с (0п48; на всю мини-игру — могла бы залежаться)
     const end = res => {
       if (cur.done) return;
       cur.done = true;
+      CL.transFor('выход из мини-игры: домофон', 2000);
       st.door = Object.assign({ mode }, selfTip(res) || { ok: false, aborted: true });
       G.last = st.door;
       if (aw && res && res.away) moveAway(st, aw);

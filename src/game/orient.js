@@ -102,6 +102,10 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     document.addEventListener('fullscreenchange', lock);
     // body.touch ставит игра позже (game.js) — пересмотреть, когда она загрузится
     setTimeout(update, 0);
+    // 0п36: и при запуске PWA, и при возврате в неё iOS сперва отдаёт размеры окна со строкой статуса — то же, что после поворота
+    rotated();
+    addEventListener('pageshow', rotated);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') rotated(); });
   };
   if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
   window.__orient = { blocked, update, get shown () { return shown; } };

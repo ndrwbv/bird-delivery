@@ -26,6 +26,7 @@
 import * as FXP from './fxpool.js';
 import { shatter } from './impact.js';
 import { pop as lidPop, lidTick } from './cardent.js';
+import { WR as WRK, lid as wreckLid } from './carwreck.js';   // 0п34: от удара крышки не открываются, крышка «Семёрки» — куском carwreck.js
 
 export const CFX = {
   GAP: 0.3,                                        // с — один удар (нос и корма, место удара и hurtCar)
@@ -72,9 +73,68 @@ export function hit (v, wx, wz, broken = 0) {
   if (n) out.shards = shards(car, u, lx, lz, n);
   // крышки
   const L = CFX.LID;
-  if (v >= L.V && !again && Math.random() < L.P0 + (L.P1 - L.P0) * lerp01(v, L.V, L.V1)) out.lid = popLid(u, lx, lz);
+  if (!WRK.on && v >= L.V && !again && Math.random() < L.P0 + (L.P1 - L.P0) * lerp01(v, L.V, L.V1)) out.lid = popLid(u, lx, lz);
   ST.last = out;
   return out;
+}
+
+/* ─── крошки на асфальт (11би, 24.10.2026; автор: «чтобы крошки какие-то рассыпались на пол») ───
+   Из места удара сыплются кусочки того, во что въехал (штукатурка и кирпич, краска и пластик чужой машины, щепки дерева,
+   металл и краска столба и ограждения), и немного своей краски и чёрного пластика бампера; ложатся на асфальт, лежат
+   LIE с и уходят в землю. Частицы общего запаса (fxpool.js 'debris' — со светом, ночью не светятся), лежащих — не
+   больше MAX (лишние не родятся). */
+export const CRUMB = {
+  V: 5, V1: 26, N0: 6, N1: 30,                      // м/с удара: с V — 6 крошек, к V1 — 30
+  MAX: 140,                                          // лежит одновременно, не больше
+  OWN: 0.3,                                          // доля своей краски и пластика
+  S: [0.24, 0.6],                                    // размер: кубик 0,22 м × это (5—13 см)
+  LIE: [7, 13],                                      // с лежит на асфальте
+  OUT: [0.5, 2.5], SIDE: [1.5, 4.5], UP: [1.5, 4],   // разлёт, м/с: от того, во что въехал, назад; вбок (в обе стороны — из-под машины видно); вверх
+};
+const CRUMB_HEX = {
+  wall:  [0xb9b2a6, 0x9c958a, 0xd8d0c2, 0x8a7f72, 0xb4603f, 0x7d7368],   // штукатурка, бетон, кирпич
+  car:   [0x1d1d20, 0x2a2a2e, 0xc9dde6, 0x8d9296],                         // пластик, стекло, металл (+ краска той машины)
+  pole:  [0x8d9296, 0x6d7276, 0x5c7a5a, 0xb5b0a5],                         // металл, зелёная краска, бетон
+  tree:  [0x6b4a2e, 0x8a6440, 0xc9a877, 0x4a3a2c, 0xd9bf8c],               // кора и щепки
+  fence: [0x3f6b45, 0x7a4b2e, 0xc9a877, 0x8d9296],                         // краска, доска, металл
+  rail:  [0x8d9296, 0x6d7276, 0xb8bcbf, 0xc8a03a],                         // трубы, жёлтая краска
+  bin:   [0x3d6b44, 0x5c6166, 0x8d9296, 0x2f4f8a],                         // пластик бака, металл
+};
+const CR = { alive: [], n: 0, spawned: 0, capped: 0, last: null, t: -9, v: 0 };
+const hexOf = h => (typeof h === 'number' ? h : typeof h === 'string' && /^#?[0-9a-f]{6}$/i.test(h) ? parseInt(h.replace('#', ''), 16) : 0x9a9aa0);
+/** крошки от удара своей машины силой v м/с о материал mat (impact.js: wall / car / pole / tree / fence / rail / bin) в
+    точке (wx, wz); hex2 — краска того, во что въехал (чужая машина) */
+export function crumbs (v, mat, wx, wz, hex2) {
+  const C = CRUMB, car = CAR;
+  if (!(v >= C.V) || !CRUMB_HEX[mat]) return 0;
+  const now = T;
+  if (now - CR.t < CFX.GAP && v <= CR.v + 0.5) return 0;   // тот же удар (нос и корма в одном кадре) — не сильнее: второй раз не сыплем
+  CR.t = now; CR.v = v;
+  let k = 0;
+  for (let i = 0; i < CR.alive.length; i++) if (CR.alive[i] > now) CR.alive[k++] = CR.alive[i];
+  CR.alive.length = k;
+  let n = Math.round(C.N0 + (C.N1 - C.N0) * lerp01(v, C.V, C.V1));
+  const room = C.MAX - CR.alive.length;
+  if (n > room) { CR.capped += n - Math.max(0, room); n = Math.max(0, room); }
+  if (!n) return 0;
+  const pal = CRUMB_HEX[mat], own = car && car.userData ? hexOf(car.userData.bodyHex) : 0x9a9aa0, other = hex2 !== undefined && hex2 !== null ? hexOf(hex2) : -1;
+  // от места удара — чуть назад (в стену не летят) и вбок в обе стороны
+  let ox = car ? car.position.x - wx : 0, oz = car ? car.position.z - wz : 1;
+  const ol = Math.hypot(ox, oz) || 1; ox /= ol; oz /= ol;
+  const gy = A && A.groundH ? A.groundH(wx, wz) : car ? car.position.y : 0;
+  for (let i = 0; i < n; i++) {
+    const r = Math.random();
+    const hex = r < C.OWN * 0.6 ? own : r < C.OWN ? 0x222226 : other >= 0 && r < C.OWN + 0.3 ? other : pal[(Math.random() * pal.length) | 0];
+    const sp = rnd(C.OUT[0], C.OUT[1]), sd = rnd(C.SIDE[0], C.SIDE[1]) * (i % 2 ? 1 : -1), s = rnd(C.S[0], C.S[1]);
+    const life = rnd(C.LIE[0], C.LIE[1]);
+    FXP.part('debris', wx + ox * 0.3 + rnd(-0.3, 0.3), gy + rnd(0.3, 0.9), wz + oz * 0.3 + rnd(-0.3, 0.3), hex, s, 1,
+      { vx: ox * sp - oz * sd, vy: rnd(C.UP[0], C.UP[1]), vz: oz * sp + ox * sd, life, max: life, gravity: 15,
+        spin: rnd(-18, 18), ry: Math.random() * 6.28, rest: 0.11 * s, keep: i % 2 === 0 }, gy);
+    CR.alive.push(now + life);
+  }
+  CR.n = CR.alive.length; CR.spawned += n;
+  CR.last = { v: +v.toFixed(1), mat, n };
+  return n;
 }
 
 /* осколки из окон: ближнее к удару — больше половины */
@@ -251,6 +311,7 @@ function realLids (car) {
 }
 /* угол крышек «Семёрки» — как у спрятанных крышек старого кузова */
 function realStep (car) {
+  if (WRK.on) { const t = car.userData.trunk; wreckLid(car, t && !t.lost ? t.a || 0 : 0); return; }   // пицца: ровно на петле (carwreck.js)
   const u = car.userData, RL = realLids(car);
   if (!RL) return;
   const tr = u.trunk && !u.trunk.lost ? u.trunk.a || 0 : u.rdoor ? u.rdoor.a || 0 : 0;
@@ -282,7 +343,7 @@ export function step (dt, car) {
 const RD = { a: 0 };
 
 export const DEBUG = {
-  CFX, ST, RLID, hit,
+  CFX, ST, RLID, hit, CRUMB, CR, crumbs,
   state () {
     const car = CAR, u = car && car.userData;
     if (!u) return null;

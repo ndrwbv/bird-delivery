@@ -41,6 +41,8 @@ import { qHas } from './qpeople.js';               // снежки: бросок
 import { mat as fakeShadowMat } from './fakeshadows.js';   // тени домов на сугробах, листьях и кронах (fakeshadows.js)
 import { ON as MOBILE } from './mobile.js';       // снег на телефоне — крупнее и реже (SNOW_PH, 0п43)
 import * as DYN from './dynres.js';              // «мыло»: снежинка того же размера на экране, когда кадр меньше
+import { SEE_U, SEE_FN } from './seethru.js';    // деревья, кусты и столбы между камерой и машиной тают (seethru.js, 0п47)
+import { BAYER_FN } from './fade.js';
 
 const CELL = 200;                           // клетка склейки, как у статики (CHUNK в game.js; было 100 — деревья и сугробы давали ~37 вызовов отрисовки в кадре, 10.10.2026)
 
@@ -279,7 +281,9 @@ function smashMat (m) {
     sh.vertexShader = 'attribute vec4 aux;\nvarying vec3 vSW;\nvarying float vK, vP, vSeed;\n' +
       sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvK = floor(aux.x * 255.0 + 0.5); vSeed = aux.y; vP = floor(aux.z * 255.0 + 0.5);')
         .replace('#include <project_vertex>', '#include <project_vertex>\n' + WPOS);
-    sh.fragmentShader = 'uniform float uYellow, uLeaf;\nvarying float vK, vP, vSeed;\n' + TINT + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+    sh.uniforms.uSeeP = SEE_U;
+    sh.fragmentShader = 'uniform float uYellow, uLeaf;\nvarying float vK, vP, vSeed;\n' + TINT + BAYER_FN + SEE_FN + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+      seeCut(vSW);                                    // между камерой и машиной — тает (seethru.js)
       if (vK == 1.0) {
         vec3 c0 = diffuseColor.rgb;
         float leafy = smoothstep(0.03, 0.12, c0.g - max(c0.r, c0.b));
@@ -308,7 +312,9 @@ function pileMat () {
         if (vSeed >= lim) transformed = vec3(0.0, -3000.0, 0.0);
         if (vK == 7.0 && uLeaf > vSeed) transformed = vec3(0.0, -3000.0, 0.0);   // вид 7 — ветки и прутья голой кроны (trees.js, зимние модели): видны, когда облетела листва`)
         .replace('#include <project_vertex>', '#include <project_vertex>\n' + WPOS);
-    sh.fragmentShader = 'uniform float uYellow;\nvarying float vK, vP, vSeed;\n' + TINT + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+    sh.uniforms.uSeeP = SEE_U;
+    sh.fragmentShader = 'uniform float uYellow;\nvarying float vK, vP, vSeed;\n' + TINT + BAYER_FN + SEE_FN + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+      if (vK != 2.0 && vK != 3.0) seeCut(vSW);       // между камерой и машиной — тает (seethru.js); листья и сугробы на земле — нет
       if (vK == 1.0) {
         vec3 pal = autPal(vP, vSeed);                 // яркая сухая осень — сочнее (uGold внутри)
         diffuseColor.rgb = mix(diffuseColor.rgb, pal, clamp(uYellow * 1.7 - vSeed * 0.7, 0.0, 1.0));

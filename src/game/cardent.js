@@ -56,6 +56,7 @@ export const ST = { dents: 0, lost: [], ground: 0, flown: 0, verts: 0, car: null
 
 import { crackLamp, smashLamp } from './carglass.js';
 import { bumper as realBumper } from './realcar.js';
+import * as WRECK from './carwreck.js';   // 0п34: детали по ступеням — перекос, болтаются, отлетают; от удара ничего не открывается
 
 let API = null;
 /* api: scene, groundH(x, z), put, mergeGeos; onLand(x, z, v, key, again) — деталь ударилась об асфальт (звук, impact.js) */
@@ -129,13 +130,16 @@ export function hit (g, lx, lz, force) {
   const L = u.lost || (u.lost = {}), zone = end ? (nz > 0 ? 'f' : 'r') : (nx > 0 ? 'sl' : 'sr');
   const sum = u.dentSum || (u.dentSum = { f: 0, r: 0, sl: 0, sr: 0 });
   sum[zone] += k;
+  if (WRECK.WR.on) WRECK.hit(g, lx, lz, force);   // бамперы, капот, крышка, двери, фары (carwreck.js)
   if (end) {
+    if (!WRECK.WR.on) {
     const front = nz > 0, key = front ? 'bumperF' : 'bumperR';
     const need = PART.BUMPER + (front ? PART.ARMOR_F * (u.armor || 0) : 0);
     if (!L[key] && (force >= need || sum[front ? 'f' : 'r'] >= PART.SUM)) dropPanel(g, key, nx, nz, force);   // у «Семёрки» — бампер модели (realOff)
     if (!front && !L.trunk && u.trunk && (force >= PART.TRUNK || (L.bumperR && force >= PART.TRUNK_BARE))) {
       if (u.real) { const R = u.rear || (u.rear = { w: 0, st: 0 }); R.w = Math.max(R.w, REARD.S3); }   // «Семёрка»: крышка не отлетает — замок вдребезги, распахивает (crashfx.js открывает крышку модели)
       else dropPanel(g, 'trunk', 0, -1, force);
+    }
     }
   } else {
     for (const m of u.real ? [] : u.mirrors || []) {   // «Семёрка» (realcar.js): коробочные зеркала спрятаны под моделью — не отрывать (0п30)
@@ -166,6 +170,11 @@ function rearWear (g, w, k, sd, force) {
   if (k >= REARD.ONE3) st = 3; else if (k >= REARD.ONE2) st = Math.max(st, 2);
   const near = 'r' + (sd > 0 ? 'l' : 'r'), far = 'r' + (sd > 0 ? 'r' : 'l');
   const st0 = R.st;
+  if (WRECK.WR.on) {                               // 0п34: фонари, задний бампер, крышка — по ступеням (carwreck.js), не открывается
+    if (st > R.st) { R.st = st; WRECK.rear(g, st, near, far, force); }
+    ST.rear = R.st;
+    return;
+  }
   while (R.st < st) {
     R.st++;
     if (R.st === 1) { crackLamp(g, near); skew(g, sd, REARD.SKEW1, REARD.DROP1); }
@@ -331,6 +340,8 @@ function end (d) {
 }
 /* деталь чужой машины слетает так же (foewreck.js: колесо, бампер настоящей модели) */
 export const fling = (g, m, key, nx, nz, force) => fly(g, m, key, nx, nz, force);
+/* панель коробочного кузова отлетает (carwreck.js: третья ступень) */
+export const dropPart = (g, key, nx, nz, force) => { const u = g && g.userData; if (!u || !u.panels) return; if (!u.lost) u.lost = {}; dropPanel(g, key, nx, nz, force); };
 
 /* каждый кадр: скорость машины (от неё летят детали) и детали на дороге */
 export function step (dt, car) {
@@ -381,7 +392,7 @@ export function hurt (car) {
   const u = car && car.userData;
   if (!u) return false;
   const lamps = u.lamps ? Object.values(u.lamps).some(l => l.st || l.cr) : false;
-  return !!(u.dents || (u.rear && u.rear.st) || (u.lost && Object.keys(u.lost).length) || (u.cg && u.cg.panes.some(p => p.st)) || lamps);
+  return !!(u.dents || (u.rear && u.rear.st) || WRECK.hurt(car) || (u.lost && Object.keys(u.lost).length) || (u.cg && u.cg.panes.some(p => p.st)) || lamps);
 }
 
 /* насколько разбит зад — для «пицца остыла» (econ.js coldCut): trunk 0 — цел, 1 — замок разбит, крышка хлопает

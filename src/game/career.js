@@ -20,6 +20,7 @@ import * as RESPECT from './respect.js';
 import './career.css';
 import * as ECON from './econ.js';
 import * as GARAGE from './garage.js';
+import * as CL from '../platform/crashlog.js';   // метки переходов: гараж (0п48)
 import { PIGGY } from './shiftcash.js';           // копилка — та же свинья, что на хаде и в гараже
 import * as MENU from './menu.js';
 import * as HONOR from './honor.js';            // доска почёта (honor.js): геймпад и «доставлено всего» профиля
@@ -831,7 +832,7 @@ function endKeys () {
 onInput(() => endKeys());
 
 /* гараж — отдельно: с экрана конца смены и из меню, на весь экран (garage.js) */
-function openGarage (onClose) { GARAGE.open(onClose); }
+function openGarage (onClose) { CL.transFor('гараж', 3000); GARAGE.open(onClose); }   // метка перехода (crashlog.js, 0п48)
 
 let TAB = '';
 const SPEND_MORE = false;   // «гараж и траты»: донаты городу и ёлка-турель — пока скрыты (автор, 09.10.2026)

@@ -19,6 +19,7 @@ import { t } from '../i18n/index.js';
 import { pad as PAD } from '../input/gamepad.js';
 import { keyHTML, refreshKeys, inputKind } from '../input/glyphs.js';
 import * as DLG from './dialog.js';
+import * as CL from '../platform/crashlog.js';
 
 export const RING = { LEAD: 0.75, FROM: 1, AT: 0.42, WIN: 0.075, SPEED: 0.5, SHOW: 1.1 };
 
@@ -52,6 +53,7 @@ export const state = () => cur ? { st: cur.st, r: +cur.r.toFixed(3), res: cur.re
 
 export function play (o = {}) {
   if (cur) return Promise.resolve(false);
+  CL.transFor('кольцо гопников', 2000);           // метка перехода (crashlog.js, 0п48)
   if (!root) build();
   const adult = !!o.adult, $ = s => root.querySelector(s);
   const sfx = n => { try { if (o.sfx) o.sfx(n); } catch (e) { /* — */ } };
@@ -121,3 +123,6 @@ export function play (o = {}) {
     raf = requestAnimationFrame(tick);
   });
 }
+
+/* отладка: __dlv.RF (probe memtrans.js — память окна кольца) */
+if (typeof window !== 'undefined') setTimeout(() => { if (window.__dlv) window.__dlv.RF = { RING, state, play }; }, 0);

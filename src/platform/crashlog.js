@@ -8,6 +8,8 @@
      выключается до конца сессии, игра идёт без него, внизу плашка «что-то споткнулось»;
    • сторож: смена идёт, не пауза, не карта/диалог/катсцена, кадры зовутся, а мир 3 с не
      продвигается (want без done) — запись «freeze»;
+   • переходы: trans(имя) / transEnd(имя) — метка в localStorage; прошлый запуск оборвался посреди перехода (iOS выгрузила
+     вкладку по памяти) — при запуске запись kind 'reload' «перезагрузка после перехода: <какой>»;
    • хранение: localStorage (последние записи, коротко) и в Электроне — файл
      userData/logs/crash-ГГГГ-ММ-ДД.log (JSON-строки) через window.birdSteam.log.
 
@@ -143,6 +145,49 @@ export function report (where, e, kind = 'error', extra = null) {
   } catch (x) { return null; }
 }
 
+/* ── переходы (0п48, автор 24.10.2026: «переход в загрузку и иногда заход в мини-игру заставляет перезагружаться вебвью») ──
+   iOS выгружает вкладку по памяти молча: ни ошибки, ни pagehide — страница просто грузится заново. Поэтому переход
+   (экран загрузки, мини-игра, начало / конец смены, деп, гараж…) ставит метку в localStorage до начала (trans) и снимает
+   после (transEnd). Следующий запуск видит неснятую метку — запись kind 'reload', «перезагрузка после перехода: <какой>»
+   (и в анонимную статистику — событием error, как любая запись). Ушёл сам (pagehide: закрыл, перезагрузил) — метки снимаются;
+   вкладку прятали (фон) — в записи hidden: true (iOS выгружает и фоновые вкладки — не обязательно наш пик). */
+const TKEY = 'dlv-trans';
+const TRS = {};                                    // открытые переходы: имя → когда начат (мс)
+let trHid = false;
+function saveTrans () {
+  try {
+    if (Object.keys(TRS).length) localStorage.setItem(TKEY, JSON.stringify({ s: SESSION, b: BUILD, t: TRS, ...(trHid ? { h: 1 } : {}) }));
+    else localStorage.removeItem(TKEY);
+  } catch (e) { /* — */ }
+}
+export function trans (name) {
+  name = String(name).slice(0, 60);
+  if (TRS[name]) return;
+  TRS[name] = Date.now(); trHid = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+  event('переход начат: ' + name);
+  saveTrans();
+}
+export function transEnd (name) {
+  name = String(name).slice(0, 60);
+  if (!TRS[name]) return;
+  delete TRS[name];
+  event('переход кончен: ' + name);
+  saveTrans();
+}
+/* переход на ms мс: начат сейчас, кончен через ms (вход в мини-игру, первые кадры смены) */
+export function transFor (name, ms) { trans(name); setTimeout(() => transEnd(name), ms); }
+export const transOpen = () => Object.keys(TRS);
+export function prevTrans () {   // init; отладка: прочитать метку ещё раз (проверка — probe)
+  let j = null;
+  try { j = JSON.parse(localStorage.getItem(TKEY) || 'null'); } catch (e) { j = null; }
+  try { localStorage.removeItem(TKEY); } catch (e) { /* — */ }
+  if (!j || !j.t || typeof j.t !== 'object' || j.s === SESSION) return;
+  const names = Object.keys(j.t).sort((a, b) => j.t[b] - j.t[a]);
+  if (!names.length) return;
+  report('reload', { message: 'перезагрузка после перехода: ' + names.join(', '), stack: '' }, 'reload',
+    { trans: names, prevSession: String(j.s || ''), prevBuild: String(j.b || ''), ago: Math.round((Date.now() - (+j.t[names[0]] || Date.now())) / 1000), hidden: !!j.h });
+}
+
 /* ── хранение ── */
 let past = [];                                     // записи прошлых запусков (localStorage)
 function load () {
@@ -211,7 +256,7 @@ export function refreshButton (closeBox) {
   if (box) box.hidden = true;
 }
 function fmt (r) {
-  const w = r.kind === 'freeze' ? $t('зависание') : r.kind === 'fuse' ? $t('выключено') : $t('ошибка');
+  const w = r.kind === 'freeze' ? $t('зависание') : r.kind === 'fuse' ? $t('выключено') : r.kind === 'reload' ? $t('перезагрузка') : $t('ошибка');
   const d = new Date(r.last), p2 = v => String(v).padStart(2, '0');
   const when = isNaN(d) ? '' : d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes()) + ':' + p2(d.getSeconds());
   return when + ' · ' + w + ' · ' + r.where + (r.n > 1 ? ' ×' + r.n : '') + '\n  ' + r.msg;
@@ -267,6 +312,10 @@ export function init () {
   });
   addEventListener('unhandledrejection', e => { report('promise', (e && e.reason) || '?', 'rejection'); });
   addEventListener('pagehide', save);
+  // ушёл сам (закрыл, перезагрузил, сменил язык) — это не выгрузка по памяти: метки переходов снять
+  addEventListener('pagehide', () => { for (const k in TRS) delete TRS[k]; saveTrans(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && Object.keys(TRS).length) { trHid = true; saveTrans(); } });
+  prevTrans();                                     // прошлый запуск оборвался посреди перехода — запись «перезагрузка после перехода»
   // видеокарта отобрала контекст WebGL (драйвер упал, мало видеопамяти) — картинка встанет: в журнал (и в статистику)
   document.addEventListener('webglcontextlost', () => report('webgl', { message: 'webgl context lost', stack: '' }, 'gl'), true);
   document.addEventListener('webglcontextrestored', () => event('webgl context restored'), true);
@@ -280,4 +329,4 @@ export function init () {
 export function setSnapshot (fn) { snapFn = fn; }
 export function setToast (fn) { toastFn = fn; }
 
-export default { PROF, HOOK, init, report, step, beat, want, done, track, event, at, entries, count, session, clear, text, disabled, openDir, logDir, setSnapshot, setToast, refreshButton };
+export default { PROF, HOOK, init, report, trans, transEnd, transFor, transOpen, prevTrans, step, beat, want, done, track, event, at, entries, count, session, clear, text, disabled, openDir, logDir, setSnapshot, setToast, refreshButton };

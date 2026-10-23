@@ -288,7 +288,7 @@ const SPD = { car: null, x: 0, z: 0, v: 0 };
 export function step (dt, car, n) {
   const u = car && car.userData, m = u && u.cargo, tr = u && u.trunk, d = u && u.rdoor;
   if (d && !d.p) d.p = d.m.position.clone();        // закрытая — где стоит (уже с занижением)
-  if (d && d.ajar) {
+  if (d && d.ajar && !d.lost) {
     // задняя дверь хэтчбека: петля снизу, над бампером — верх отваливается назад (камера сверху видит проём и коробки)
     if (SPD.car !== car) { SPD.car = car; SPD.x = car.position.x; SPD.z = car.position.z; }
     if (dt > 0) { SPD.v = Math.min(60, Math.hypot(car.position.x - SPD.x, car.position.z - SPD.z) / dt); SPD.x = car.position.x; SPD.z = car.position.z; }
@@ -299,7 +299,7 @@ export function step (dt, car, n) {
     d.m.position.z = d.p.z - Math.sin(d.a) * d.h / 2;
   }
   if (!m) return;
-  const open = !!(tr && (tr.a > 0.03 || tr.lost) || d && d.a > 0.03);   // крышку сорвало (cardent.js) — коробки видно всегда
+  const open = !!(tr && (tr.a > 0.03 || tr.lost) || d && (d.a > 0.03 || d.lost));   // крышку / дверь сорвало (cardent.js, carwreck.js) — коробки видно всегда
   const k = open ? Math.max(0, Math.min(m.userData.max || REAR.PIZZAS, n | 0)) : 0;
   m.visible = k > 0;
   if (m.visible) m.geometry.setDrawRange(0, k * m.userData.per);

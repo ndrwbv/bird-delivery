@@ -155,6 +155,23 @@ const CHECKS = [
     return { status: r.ok ? 'ok' : r.bad || r.pieces > 20 ? 'fail' : 'warn', info: `пустых кусков ${r.pieces} (${r.m2} м²); поставлено ${r.things}: ${pl}; деревьев ${r.trees}, кустов ${r.bushes}, сборка ${r.buildMs} мс; на мощёном и в доме ${r.bad}` +
       (r.pieces ? ': ' + JSON.stringify(r.list.slice(0, 4)) : '') + (r.bad ? ' ' + JSON.stringify(r.by) + ' ' + JSON.stringify(r.sample) : '') };
   } },
+  /* плавные улицы по умолчанию (11ч этап 5, 24.10.2026, roadsmooth.js; docs/CAREER.md «Дороги плавные»): сводка города
+     (smooth-summary.js) по умолчанию и с ?oldroads — скругление включено и сделано (≥ 1 500 дуг, срез ≤ 3 м), с ?oldroads — выключено
+     и точек не добавлено; остановки и дома с адресом — те же числом, зебры и подъезды — в пределах 0,5 % */
+  { id: 'smooth', name: 'плавные улицы: по умолчанию дугой, ?oldroads — углом', group: 2, run: async () => {
+    const S = path.join(__dirname, 'probe-checks/smooth-summary.js');
+    const a = await probe(['--eval=' + S]), b = await probe(['--eval=' + S, '--q=oldroads']);
+    const e = errLine(a) || errLine(b), A = a.result, B = b.result;
+    if (e || !A || !B || !A.smooth || !B.smooth) return { status: 'fail', info: e || 'нет результата' };
+    const st = A.smooth.STATS, near = (x, y) => Math.abs(x - y) <= Math.max(2, y * 0.005);
+    const bad = [!st.on && 'по умолчанию выключено', st.done < 1500 && `скруглено ${st.done} < 1500`, st.maxCut > 3 && `срез ${st.maxCut} > 3 м`,
+      B.smooth.STATS.on && 'с ?oldroads включено', B.smooth.STATS.pts && `с ?oldroads +${B.smooth.STATS.pts} точек`,
+      A.n.stops !== B.n.stops && `остановок ${B.n.stops} → ${A.n.stops}`, A.n.housesAddr !== B.n.housesAddr && `домов с адресом ${B.n.housesAddr} → ${A.n.housesAddr}`,
+      !near(A.n.zebras, B.n.zebras) && `зебр ${B.n.zebras} → ${A.n.zebras}`, !near(A.n.entr, B.n.entr) && `подъездов ${B.n.entr} → ${A.n.entr}`].filter(Boolean);
+    const by = Object.entries(st.byClass).map(([k, v]) => k + ':' + v).join(' ');
+    return { status: bad.length ? 'fail' : 'ok', info: (bad.length ? bad.join('; ') + ' · ' : '') + `дуг ${st.done} из ${st.found} (по классам ${by}), +${st.pts} точек, срез ≤ ${st.maxCut} м, ${st.ms} мс; ` +
+      `?oldroads → по умолчанию: узлов ${B.n.nodes} → ${A.n.nodes}, зебр ${B.n.zebras} → ${A.n.zebras}, остановок ${B.n.stops} → ${A.n.stops}, подъездов ${B.n.entr} → ${A.n.entr}, треугольников ${B.T.tris} → ${A.T.tris}` };
+  } },
   /* край газона у дороги без бордюра (11ц, 24.10.2026, curbs.js; docs/CAREER.md «Бордюр у дорог и проездов»): по краям улиц, проездов
      и пешеходок шагом 1 м — газон за краем, а бордюра (поднятого тротуара или камня) нет; перекрёстки, зебры, узкие полоски — не в счёт.
      Было (?oldcurbs): проезды 82,8 км из 212, улицы 6,5 из 236 */
@@ -243,17 +260,30 @@ const CHECKS = [
   } },
   /* память на телефоне (11.10.2026, docs/AGENTS.md «Память на телефоне»): мобильный режим, меню → город достроен → 20 с смены.
      Порог — с запасом ~20 % над замером; было до правок: куча 706 / 822 МБ, след страницы пик 1477 МБ — вкладка Safari на iPhone умирала */
-  { id: 'memory-phone', w: 50, name: 'память на телефоне: куча JS, видео, след страницы', group: 2, run: async () => {
-    const LIM = { menu: 520, shift: 620, gl: 360, foot: 1450 };
+  { id: 'memory-phone', w: 90, name: 'память на телефоне: куча JS, видео, след страницы, пики на переходах', group: 2, run: async () => {
+    const LIM = { menu: 520, shift: 620, gl: 360, foot: 1450, trans: 1450 };
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/memory.js'), '--mem', '--early', '--size=phone-land', '--q=msecs=20'], 220);
     const e = errLine(j), r = j.result;
     if (e || !r || !r.shift) return { status: 'fail', info: e || 'нет результата' };
     const foot = Math.max(0, ...((j.mem || []).map(m => m.footPeak || 0)));
+    /* пики на переходах (0п48, автор 24.10.2026: «переход в загрузку и иногда заход в мини-игру заставляют перезагружаться вебвью»):
+       «на смену», пока город достраивается (экран загрузки, остаток разом), мини-игры у двери (вход и выход), загрузка пиццы
+       в пиццерии (накладная, коробка в багажник), кольцо гопников,
+       чек смены, деп, перевод в другую пиццерию — пик следа страницы за каждый (tools/probe-checks/memtrans.js) */
+    const jt = await probe(['--eval=' + path.join(__dirname, 'probe-checks/memtrans.js'), '--mem', '--early', '--size=phone-land',
+      '--q=mtonly=load,домофон,подъезд,pizza,ring,shiftend,dep,transfer'], 300);
+    const et = errLine(jt), rt = jt.result;
+    const T = rt && rt.T ? Object.entries(rt.T).filter(([k]) => !k.startsWith('·')) : [];
+    const tp = T.length ? Math.max(...T.map(([, x]) => x.peak || 0)) : 0;
+    const worst = T.slice().sort((a, b) => (b[1].peak || 0) - (a[1].peak || 0))[0];
+    const miss = rt && rt.miss ? rt.miss.map(x => (typeof x === 'string' ? x : x.name)) : [];
     const bad = [r.menu.heap > LIM.menu && `куча в меню ${r.menu.heap} > ${LIM.menu}`, r.shift.heap > LIM.shift && `куча в смене ${r.shift.heap} > ${LIM.shift}`,
-      r.shift.gl.total > LIM.gl && `видео ${r.shift.gl.total} > ${LIM.gl}`, foot > LIM.foot && `след страницы, пик ${foot} > ${LIM.foot}`].filter(Boolean);
+      r.shift.gl.total > LIM.gl && `видео ${r.shift.gl.total} > ${LIM.gl}`, foot > LIM.foot && `след страницы, пик ${foot} > ${LIM.foot}`,
+      tp > LIM.trans && `пик на переходе «${worst[0]}» ${tp} > ${LIM.trans}`, (et || !rt) && 'переходы: ' + (et || 'нет результата')].filter(Boolean);
     const info = `куча JS, МБ: меню ${r.menu.heap}, достроен ${r.built.heap}, смена ${r.shift.heap} (пик ${r.shift.gl.heapPeak}); видео ${r.shift.gl.total} МБ` +
-      (foot ? `; след страницы, пик ${foot} МБ` : '') + ` · пороги ${LIM.menu} / ${LIM.shift} / ${LIM.gl}` + (foot ? ` / ${LIM.foot}` : '') + (r.shift.mobile ? '' : ' · НЕ мобильный режим');
-    return { status: bad.length ? 'fail' : r.shift.mobile ? 'ok' : 'warn', info: (bad.length ? bad.join('; ') + ' · ' : '') + info };
+      (foot ? `; след страницы, пик ${foot} МБ` : '') + ` · пороги ${LIM.menu} / ${LIM.shift} / ${LIM.gl}` + (foot ? ` / ${LIM.foot}` : '') + (r.shift.mobile ? '' : ' · НЕ мобильный режим') +
+      (tp ? ` · переходы (${T.length}): пик ${tp} МБ — «${worst[0]}» (+${worst[1].d}), порог ${LIM.trans}` : '') + (miss.length ? ` · не случились: ${miss.join(', ')}` : '');
+    return { status: bad.length ? 'fail' : r.shift.mobile && !miss.length ? 'ok' : 'warn', info: (bad.length ? bad.join('; ') + ' · ' : '') + info };
   } },
   /* экранная клавиатура Стима (23.10.2026, 0ав: на Деке одна буква — 10 раз): автоповтор с флагом и парой «отпустил — нажал»,
      зажатая клавиша, вставка без нажатий — одна буква; «Анна» пальцем — как есть (docs/CAREER.md «Экранная клавиатура Стима») */

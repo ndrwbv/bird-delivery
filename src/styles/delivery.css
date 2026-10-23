@@ -17,7 +17,11 @@ html, body {
   font-family: "Press Start 2P", ui-monospace, monospace;
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
 }
+/* 0п36: страница не прокручивается вовсе — body прибит к окну, у html нечего листать. В PWA на iPhone документ
+   сдвигался на высоту строки статуса (при запуске, повороте, фокусе), и сверху оставалась полоса */
+body { position: fixed; inset: 0; }
 
 /* игра — во весь экран окна, а не «100 % от body»: в PWA на iPhone после поворота высота body
    залипала на старой, и сверху (или снизу) оставалась чёрная полоса (orient.js, docs/IOS.md) */

@@ -1,7 +1,7 @@
-/* Плавные улицы (11ч, этап 4): адреса и подъезды списком — сравнить без и с ?smooth (tools/smooth-addr-diff.cjs).
+/* Плавные улицы (11ч, этап 4): адреса и подъезды списком — сравнить без и с ?smooth (node tools/smooth-addr-diff.cjs a.json b.json).
    npm run probe -- --eval=tools/probe-checks/smooth-addr.js --max=0 > a.json; … --q=smooth > b.json
-   houses — дом с адресом: адрес, точка у фасада (x, z), куда смотрит фасад (ox, oz — наружу из «лицевой» стены bestEdge),
-   улица фасада (класс, номер куска); entr — двери подъездов [x, z, ox, oz]; spots — адреса заказов [x, z]. */
+   houses — дом с адресом: адрес, точка у фасада (x, z), куда смотрит фасад (ox, oz — наружу из «лицевой» стены bestEdge);
+   entr — двери подъездов [x, z, ox, oz]; spots — адреса заказов [x, z]. */
 await until(() => d.SPOTS && d.SPOTS.length > 50 && (!d.LATE || !d.LATE.busy()), 60000);
 const r2 = v => Math.round(v * 100) / 100;
 return {

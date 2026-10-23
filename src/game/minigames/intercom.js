@@ -151,7 +151,7 @@ export default {
     const keyEls = [...box.querySelectorAll('.dg-k')];
     const elSelf = q('.mk-self'), elGoal = q('.mk-goal');
     const msgs = KIT.feed(q('.dg-feed'), { max: 3 });
-    const cv = q('.mk-cv'), g = cv.getContext('2d');
+    const cv = KIT.sceneCanvas(box), g = cv.getContext('2d');   // холст сцены — один на все заходы (doorkit.js, 0п48)
     let flick = 1;
     /* сцена: перерисовать (размер поменялся, лампа мигнула) и поставить панель домофона на дверь */
     function draw () {
@@ -504,6 +504,7 @@ export default {
       if (raf) cancelAnimationFrame(raf);
       if (api.setStep) api.setStep(null);
       if (api.setPad) api.setPad(null);
+      KIT.sceneCanvasOff(cv);
       box.remove();
     };
   },
