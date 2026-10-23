@@ -55,7 +55,9 @@ export const MODELS = {
     driver: { x: 0.4, seat: 0.56, z: 0.22 },
   },
 };
-export const REAL = { on: true, k: 1.2, eye: new THREE.Vector3(0.36, 1.19, 0.24) };   // текущая (для game.js camStep и отладки)
+/* on — настоящие модели вместо коробочных (?oldcar — прежние, коробочные: их код остаётся, автор 23.10 «может потом вернём»);
+   ownCab — свой салон модели из-за руля (торпедо, щиток, руль модели); выключен (автор 23.10): из-за руля — салон игры, как у всех машин (camview.js) */
+export const REAL = { on: !(typeof location !== 'undefined' && /[?&]oldcar\b/.test(location.search || '')), ownCab: false, k: 1.2, eye: new THREE.Vector3(0.36, 1.19, 0.24) };   // текущая (для game.js camStep и отладки)
 const CACHE = {};
 let SEQ = 0;                                       // номер машины — свой ключ программы кузова (bodyShader)
 

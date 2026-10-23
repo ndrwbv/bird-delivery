@@ -11604,7 +11604,8 @@ function camStep (dt, vf) {
   /* Вид из кабины (проба, автор 13.10.2026): V — переключить. Машину прячем на кадр,
      глаза водителя — над сиденьем, взгляд вперёд по ходу. Остальные камеры (смерть, повтор)
      возвращают машину сами: FPV.hid сбрасывается в начале кадра. */
-  const near = FPV.on && car.userData.real ? 0.05 : 0.4;   // в салоне руль в полуметре — ближняя граница кадра ближе
+  const own = car.userData.real && REALCAR.REAL.ownCab;   // свой салон настоящей модели — выключен: из-за руля салон игры (camview.js)
+  const near = FPV.on && own ? 0.05 : 0.4;   // в салоне руль в полуметре — ближняя граница кадра ближе
   if (cam.near !== near) { cam.near = near; cam.updateProjectionMatrix(); }
   if (CARLAB.orbit !== null && !FPV.on) {          // песочница машин: облёт
     V.hero = 0;
@@ -11614,8 +11615,8 @@ function camStep (dt, vf) {
     V.camX = cam.position.x; V.camZ = cam.position.z; V.camY = cam.position.y + 2; V.camH = V.h; V.camPull = 0;
     return;
   }
-  if (car.userData.real) REALCAR.fp(car, FPV.on);   // из-за руля курьера не видно
-  if (FPV.on && car.userData.real) {                // настоящая «Семёрка» (realcar.js): глаза водителя, видно торпедо и руль
+  if (own) REALCAR.fp(car, FPV.on);   // из-за руля курьера не видно
+  if (FPV.on && own) {                // настоящая «Семёрка» (realcar.js): глаза водителя, видно торпедо и руль
     V.hero = 0;
     car.updateMatrixWorld();
     const E = REALCAR.REAL.eye, sh = S.shake * 0.03;  // автор 13.10: «внутри не должно трясти так сильно» — тряска почти вся гасится
