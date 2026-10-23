@@ -1,0 +1,208 @@
+/* Конец смены — экраны по очереди (shiftsteps.js; правила — docs/CAREER.md «Конец смены — экраны по очереди»):
+   деньги → «давай депнем?» → рейтинг → машина → чек смены. Стиль — накладная (src/styles/paper.css): лист на тёплом
+   затемнённом городе, сверху закладки «1 деньги · 2 деп · …», внизу листа красный штамп «дальше ▸», под листом —
+   пометка «пропустить всё». Лист улетает влево, следующий влетает справа. Без прокрутки на 1280×720, Деке 1280×800,
+   телефоне боком 844×390 и стоя 390×844 (не влезло — shiftsteps.js fit чуть уменьшает лист, не меньше 0,6). */
+
+/* пока идут экраны — чек и его полоска под ними не видны (чек печатается после, career.js showEnd) */
+#over.ss-on .ov-box, #over.ss-on > .cr-keys { visibility: hidden; }
+#over.ss-on { overflow: hidden; }
+
+.ss.pp-desk { z-index: 6; flex-direction: column; flex-wrap: nowrap; align-items: stretch; justify-content: center; gap: clamp(6px, 1.4vh, 14px);
+              overflow: hidden; background: none;
+              padding: max(10px, 2vh, var(--sa-t, env(safe-area-inset-top))) max(16px, var(--sa-r, env(safe-area-inset-right))) max(56px, 2.4vh + 44px) max(16px, var(--sa-l, env(safe-area-inset-left))); }
+body.touch .ss.pp-desk, .ss.pp-desk:has(.ss-keys[hidden]) { padding-bottom: max(10px, 2vh, var(--sa-b, env(safe-area-inset-bottom))); }
+
+/* закладки: какой лист из скольких */
+.ss-tabs { flex: none; display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; }
+.ss-tabs > i { display: inline-flex; align-items: center; gap: .5em; padding: .4em .7em .3em; font-style: normal; font-size: var(--pp-fs-s); line-height: 1.2;
+               color: var(--pp-label); background: color-mix(in srgb, var(--pp-paper) 70%, transparent); border: 2px solid rgba(51, 33, 12, .55); border-radius: 3px 3px 0 0;
+               transition: background .2s, color .2s, translate .25s var(--pp-spring); }
+.ss-tabs > i b { font-weight: normal; color: var(--pp-ink); }
+.ss-tabs > i.was { opacity: .65; }
+.ss-tabs > i.was::after { content: '✓'; color: var(--pp-money); }
+.ss-tabs > i.on { color: var(--pp-ink); background: var(--pp-yellow); border-color: var(--pp-ink); translate: 0 -3px; box-shadow: 0 3px 0 var(--pp-ink); }
+
+/* стол: листы в одной клетке — старый улетает поверх нового */
+.ss-deck { position: relative; flex: 0 1 auto; min-height: 0; display: grid; place-items: center; }
+.ss-deck > .ss-sheet { grid-area: 1 / 1; }
+.ss-sheet { width: min(720px, 100%); padding-top: clamp(6px, 1vh, 12px); }
+.ss-sheet .pp-head { margin-bottom: .4em; }
+.ss-sheet .pp-row { padding: .3em 0; }
+.ss-sheet .pp-stamp { margin-top: .8em; padding: clamp(9px, 1.6vh, 16px) 10px; }
+.ss-first { animation: ss-up .5s cubic-bezier(.2, .75, .25, 1) both; }
+.ss-in { animation: ss-in .55s var(--pp-spring) both; }
+.ss-out { animation: ss-out .36s cubic-bezier(.5, 0, .9, .5) both; pointer-events: none; z-index: 2; }
+@keyframes ss-up { 0% { opacity: 0; transform: translateY(45vh) rotate(4deg); } 30% { opacity: 1; } 100% { transform: none; } }
+@keyframes ss-in { 0% { opacity: 0; transform: translateX(75vw) rotate(8deg); } 40% { opacity: 1; } 100% { transform: none; } }
+@keyframes ss-out { 0% { transform: none; } 100% { opacity: 0; transform: translateX(-85vw) translateY(4vh) rotate(-12deg); } }
+.ss-go.ss-wait { visibility: hidden; }
+
+/* под листом — «пропустить всё»; полоска «как управлять» — внизу экрана, как у чека */
+.ss-foot { flex: none; display: flex; justify-content: center; }
+.ss-foot .pp-note { padding: .5em .9em; font-size: var(--pp-fs-s); }
+.ss-keys { position: absolute; left: 50%; bottom: max(14px, var(--sa-b, env(safe-area-inset-bottom))); translate: -50% 0; max-width: calc(100% - 32px);
+           box-sizing: border-box; padding: .35em .9em .25em; text-align: center; white-space: nowrap; font-size: var(--pp-fs-s); line-height: 2; color: var(--pp-ink);
+           background: var(--pp-paper); border: 2px solid var(--pp-ink); border-radius: 2px; box-shadow: 0 3px 0 rgba(51, 33, 12, .7); pointer-events: none; }
+.ss-keys[hidden] { display: none; }
+.ss-keys .pp-key { margin: 0 .25em 0 .1em; }
+.ss-keys i { font-style: normal; margin: 0 .6em; opacity: .5; }
+
+/* монета летит в копилку: снаружи — по x, внутри — дугой по y */
+.ss-coin { position: fixed; z-index: 80; width: 0; height: 0; pointer-events: none; animation: ss-cx .62s linear var(--d, 0s) both; }
+.ss-coin > b { position: absolute; left: -10px; top: -10px; width: 20px; height: 20px; display: grid; place-items: center; box-sizing: border-box;
+               font: 9px/1 "Press Start 2P", monospace; color: #7a4a0c; border: 2px solid var(--pp-ink); border-radius: 50%;
+               background: radial-gradient(circle at 35% 35%, #fff6b8, var(--pp-yellow) 45%, #d99a1e); animation: ss-cy .62s var(--d, 0s) both; }
+.ss-coin.bad > b { color: #fff; background: radial-gradient(circle at 35% 35%, #ffb3a8, var(--pp-red) 55%, #8a1e18); }
+@keyframes ss-cx { 0% { opacity: 0; transform: none; } 8% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0; transform: translateX(var(--dx)); } }
+@keyframes ss-cy { 0% { transform: translateY(0) scale(.7); animation-timing-function: cubic-bezier(.2, .6, .4, 1); }
+                   35% { transform: translateY(calc(min(var(--dy), 0px) - 50px)) scale(1); animation-timing-function: cubic-bezier(.6, 0, .9, .5); }
+                   100% { transform: translateY(var(--dy)) scale(.55); } }
+
+/* ── 1. деньги: слева сумма и строки, справа копилка ── */
+.ss-cash-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, 34%); gap: clamp(12px, 2.4vw, 32px); align-items: center; }
+.ss-cap { margin: .2em 0 0; color: var(--pp-ink); font-size: var(--pp-fs-m); text-transform: uppercase; letter-spacing: .08em; }
+.ss-sum { margin: .15em 0 .35em; font-size: calc(var(--pp-fs-l) * 1.55); line-height: 1.15; white-space: nowrap; text-shadow: 3px 3px 0 rgba(51, 33, 12, .18); }
+.ss-rows { border-top: 3px double var(--pp-brown); }
+.ss-rows .pp-row > b.cr-rc-no { color: var(--pp-label); font-size: var(--pp-fs-s); }
+.ss-cash-r { display: flex; flex-direction: column; align-items: center; gap: .4em; }
+.ss-pig { display: block; width: 100%; max-width: 230px; height: auto; image-rendering: pixelated; overflow: visible; filter: drop-shadow(0 5px 0 rgba(51, 33, 12, .55)); }
+.ss-pig-fill { --f: 0; transform: translateY(calc((1 - var(--f)) * 16px)); transition: transform 1s cubic-bezier(.3, 1.3, .5, 1); }
+.ss-pig-fill.ss-now { transition: none; }
+.ss-pig.ss-bump { animation: ss-bump .45s var(--pp-spring); }
+@keyframes ss-bump { 30% { transform: scale(1.08, .92); } 60% { transform: scale(.96, 1.05); } }
+.ss-pig-drop { opacity: 0; }
+.ss-wal { margin: 0; display: flex; flex-direction: column; align-items: center; gap: .3em; text-align: center; }
+.ss-wal span { color: var(--pp-label); font-size: var(--pp-fs-s); }
+.ss-wal b { font-weight: normal; font-size: var(--pp-fs-l); color: #b0285a; }
+
+/* ── 2. «давай депнем?»: билет игры, ставка, ДЕП и «не сейчас» ── */
+.ss-dep { width: min(620px, 100%); --pp-accent: var(--pp-pink); }
+.ss-say { margin: .3em 0 .7em; font-size: var(--pp-fs-m); line-height: 1.6; }
+.ss-ticket { display: flex; align-items: center; gap: 1em; margin: 0 0 .6em; padding: .7em .9em; background: #2a1530; color: #fff3d6;
+             border: 3px solid var(--pp-ink); border-radius: 6px; box-shadow: 0 4px 0 var(--pp-ink), inset 0 0 0 2px rgba(255, 95, 162, .55); rotate: -.6deg; }
+.ss-tk-t { display: flex; flex-direction: column; gap: .5em; min-width: 0; }
+.ss-tk-t b { font-weight: normal; font-size: var(--pp-fs-m); line-height: 1.4; color: var(--pp-yellow); text-shadow: 2px 2px 0 #000; }
+.ss-tk-t span { font-size: var(--pp-fs-s); color: #ff9ccc; }
+.ss-dg { flex: none; display: flex; align-items: center; justify-content: center; gap: 3px; width: clamp(64px, 8vw, 96px); height: clamp(48px, 6vw, 70px); font-style: normal; }
+.ss-dg-slot { background: #d9342c; border: 3px solid #000; border-radius: 8px; box-shadow: inset 0 -5px 0 rgba(0, 0, 0, .25); }
+.ss-dg-slot b { display: grid; place-items: center; width: 28%; height: 66%; font: clamp(12px, 1.6vw, 20px)/1 "Press Start 2P", monospace; color: #ff3b6b; background: #fff3d6; border: 2px solid #000; }
+.ss-dg-roul { border-radius: 50%; width: clamp(56px, 7vw, 80px); height: clamp(56px, 7vw, 80px); border: 4px solid #8a5a2b;
+              background: conic-gradient(#1f9e4f 0 10deg, #d9342c 10deg 30deg, #1d1a22 30deg 50deg, #d9342c 50deg 70deg, #1d1a22 70deg 90deg, #d9342c 90deg 110deg, #1d1a22 110deg 130deg,
+                #d9342c 130deg 150deg, #1d1a22 150deg 170deg, #d9342c 170deg 190deg, #1d1a22 190deg 210deg, #d9342c 210deg 230deg, #1d1a22 230deg 250deg, #d9342c 250deg 270deg,
+                #1d1a22 270deg 290deg, #d9342c 290deg 310deg, #1d1a22 310deg 330deg, #d9342c 330deg 350deg, #1d1a22 350deg 360deg); }
+.ss-dg-roul i { width: 30%; height: 30%; border-radius: 50%; background: #ffd85e; border: 2px solid #000; }
+.ss-dg-ten { position: relative; background: #e2763a; border: 3px solid #fff; outline: 3px solid #000; }
+.ss-dg-ten i { position: absolute; left: 50%; top: 0; bottom: 0; width: 3px; translate: -50% 0; background: #fff; box-shadow: 0 0 0 1px #000; }
+.ss-dg-ten b { position: absolute; left: 30%; top: 30%; width: 12px; height: 12px; border-radius: 50%; background: #d8f04a; border: 2px solid #000; }
+.ss-dep-go { display: flex; align-items: center; gap: 14px; margin-top: .6em; }
+.ss-dep-go .pp-stamp { flex: 1; margin: 0; white-space: nowrap; }
+.ss-dep-go .pp-note { flex: none; }
+
+/* ── 3. рейтинг смены ── */
+.ss-sheet.ss-rank { width: min(600px, 100%); }
+.ss-sheet.ss-rank { --pp-accent: var(--pp-lime); }
+.ss-rkbox { position: relative; }
+.ss-rk-list { overflow: hidden; padding: 2px 0; }
+.ss-rk { display: grid; grid-template-columns: 2.2em 28px minmax(0, 1fr) auto minmax(6.5em, auto); align-items: center; gap: .7em; padding: .32em .5em; font-size: var(--pp-fs-m);
+         border-bottom: 1px dashed rgba(138, 107, 78, .55); }
+.ss-rk > em { font-style: normal; color: var(--pp-label); text-align: right; }
+.ss-rk.first > em { color: var(--pp-money); }
+.ss-rk > img, .ss-rk > .ss-you { width: 28px; height: 28px; border: 2px solid var(--pp-ink); border-radius: 3px; image-rendering: pixelated; box-sizing: border-box; background: #f0a24a; }
+.ss-rk > .ss-you { display: block; background: var(--pp-orange); }
+.ss-rk > b { font-weight: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ss-rk.out > b { color: var(--pp-label); }
+.ss-d { display: inline-flex; align-items: center; gap: .4em; white-space: nowrap; }
+.ss-box { width: 14px; height: 12px; image-rendering: pixelated; }
+.ss-m { text-align: right; color: var(--pp-money); white-space: nowrap; }
+.ss-rk.me { padding-right: .8em; position: relative; z-index: 1; background: color-mix(in srgb, var(--pp-yellow) 45%, var(--pp-paper)); border: 2px solid var(--pp-ink); border-radius: 3px;
+            box-shadow: 0 3px 0 var(--pp-ink); margin: 2px 0; }
+.ss-rk.ss-park { transform: translateX(115%); }
+.ss-rk.ss-drive { animation: ss-drive .62s cubic-bezier(.2, 1.25, .4, 1) both; }
+@keyframes ss-drive { 0% { transform: translateX(115%) rotate(2deg); } 70% { transform: translateX(-2.5%) rotate(-.6deg); } 100% { transform: none; } }
+.ss-rkbox .ss-seal { --pp-seal-top: -10px; --pp-seal-right: 2%; --pp-seal-rot: -9deg; }
+.ss-prize { margin-top: .5em; }
+.ss-gap { margin: .2em 0 0; }
+
+/* ── 4. машина: акт осмотра ── */
+.ss-sheet.ss-car { width: min(760px, 100%); --pp-accent: var(--pp-yellow); }
+.ss-car-grid { display: grid; grid-template-columns: minmax(110px, 28%) minmax(0, 1fr); gap: clamp(12px, 2.4vw, 30px); align-items: start; }
+.ss-car-l { display: flex; flex-direction: column; align-items: center; gap: .4em; }
+.ss-carsvg { display: block; width: 100%; max-width: 160px; max-height: 42vh; height: auto; overflow: visible; }
+.ss-carsvg .ss-body { fill: #e9dcc0; stroke: var(--pp-ink); stroke-width: 3; }
+.ss-carsvg .ss-roof { fill: #d8c7a4; stroke: var(--pp-ink); stroke-width: 2; }
+.ss-carsvg .ss-wheel { fill: var(--pp-ink); }
+.ss-carsvg .ss-part { fill: var(--pp-paper); stroke: var(--pp-ink); stroke-width: 2; }
+.ss-carsvg .ss-part.skew { fill: var(--pp-yellow); }
+.ss-carsvg .ss-part.hang { fill: var(--pp-orange); }
+.ss-carsvg .ss-part.off { fill: rgba(217, 52, 44, .12); stroke: var(--pp-red); stroke-dasharray: 5 4; stroke-width: 2.5; }
+.ss-carsvg .ss-x { fill: none; stroke: var(--pp-red); stroke-width: 3.5; stroke-linecap: round; }
+.ss-carsvg .ss-glass { stroke: var(--pp-ink); stroke-width: 1.5; }
+.ss-carsvg .ss-glass.g0 { fill: #bfe3f2; }
+.ss-carsvg .ss-glass.g1 { fill: #9ccbe0; }
+.ss-carsvg .ss-glass.g2 { fill: #3a3446; }
+.ss-carsvg .ss-crack { fill: none; stroke: #fff; stroke-width: 1.6; }
+.ss-carsvg .ss-lamp { fill: #fff6b8; stroke: var(--pp-ink); stroke-width: 1.5; }
+.ss-carsvg .ss-lamp.rear { fill: #e0283a; }
+.ss-carsvg .ss-lamp.l1 { stroke: var(--pp-orange); stroke-width: 3; }
+.ss-carsvg .ss-lamp.l2, .ss-carsvg .ss-lamp.l3 { fill: #33210c; stroke: var(--pp-red); stroke-width: 3; }
+.ss-carsvg .ss-hide { opacity: 0; }
+.ss-carsvg .ss-pop { transform-box: fill-box; transform-origin: center; animation: ss-pop .4s var(--pp-spring) both; }
+@keyframes ss-pop { 0% { opacity: 0; transform: scale(1.9); } 60% { opacity: 1; transform: scale(.9); } 100% { transform: none; } }
+.ss-legend { margin: 0; display: flex; flex-direction: column; align-items: flex-start; gap: .1em; font-size: var(--pp-fs-s); color: var(--pp-label); line-height: 1.5; }
+.ss-legend i { display: inline-block; width: 1em; height: 1em; margin-right: .3em; vertical-align: -.15em; border: 2px solid var(--pp-ink); box-sizing: border-box; }
+.ss-legend i.skew { background: var(--pp-yellow); }
+.ss-legend i.hang { background: var(--pp-orange); }
+.ss-legend i.off { border: 2px dashed var(--pp-red); }
+.ss-car-r { position: relative; min-width: 0; }
+.ss-car-rows .pp-row > b { white-space: normal; text-align: right; }
+.ss-hp { color: var(--pp-red); letter-spacing: .1em; }
+.ss-hp i { font-style: normal; color: rgba(51, 33, 12, .25); }
+.ss-warn { color: #c25a12 !important; }
+.ss-fix { margin-top: .5em; }
+.ss-car-r > .pp-hint { margin-top: .4em; }
+.ss-legend span { white-space: nowrap; }
+.ss-car-l .ss-seal { margin: .5em auto 0; font-size: var(--pp-fs-m); --pp-seal-rot: -8deg; }
+
+/* меньше движения: сразу на месте */
+@media (prefers-reduced-motion: reduce) {
+  .ss *, .ss, .ss-coin, .ss-coin * { animation: none !important; transition: none !important; }
+}
+body.calm-fx .ss *, body.calm-fx .ss { animation: none !important; transition: none !important; }
+
+/* телефон боком и низкие окна: мельче, плотнее; закладки — только номера (подпись — у текущей) */
+@media (max-height: 540px) and (min-width: 600px) {
+  .ss.pp-desk { gap: 4px; padding-top: max(6px, var(--sa-t, env(safe-area-inset-top))); padding-bottom: max(6px, var(--sa-b, env(safe-area-inset-bottom))); }
+  .ss-keys { display: none; }
+  .ss-tabs > i { padding: .25em .5em .2em; }
+  .ss-tabs > i:not(.on) span { display: none; }
+  .ss-sheet { padding: 4px 14px 10px; }
+  .ss-sheet .pp-head { padding: .5em 0 .35em; margin-bottom: .2em; }
+  .ss-sheet .pp-row { padding: .12em 0; line-height: 1.35; }
+  .ss-sheet .pp-stamp { margin-top: .45em; padding: 6px; }
+  .ss-sum { margin: .05em 0 .2em; font-size: calc(var(--pp-fs-l) * 1.35); }
+  .ss-pig { max-width: 150px; }
+  .ss-cash-grid { grid-template-columns: minmax(0, 1fr) minmax(120px, 30%); }
+  .ss-carsvg { max-height: 30vh; max-width: 100px; }
+  .ss-car-l .ss-seal { margin-top: .3em; }
+  .ss-legend { gap: 0; line-height: 1.35; }
+  .ss-car-grid { grid-template-columns: minmax(90px, 22%) minmax(0, 1fr); }
+  .ss-rk { padding: .12em .4em; grid-template-columns: 2em 22px minmax(0, 1fr) auto minmax(6em, auto); }
+  .ss-rk.me { padding-right: .6em; }
+  .ss-rk > img, .ss-rk > .ss-you { width: 22px; height: 22px; }
+  .ss-ticket { padding: .4em .7em; margin-bottom: .35em; }
+  .ss-say { margin: .15em 0 .4em; }
+  .ss-foot .pp-note { padding: .35em .7em; }
+}
+/* узкий экран стоя: колонки — друг под другом */
+@media (max-width: 599px) {
+  .ss-cash-grid { grid-template-columns: 1fr; }
+  .ss-cash-r { order: -1; flex-direction: row; justify-content: center; gap: 1em; }
+  .ss-pig { max-width: 120px; }
+  .ss-car-grid { grid-template-columns: 1fr; }
+  .ss-carsvg { max-width: 96px; max-height: 26vh; }
+  .ss-tabs > i:not(.on) span { display: none; }
+  .ss-rk { grid-template-columns: 1.8em 22px minmax(0, 1fr) auto minmax(5.5em, auto); gap: .5em; }
+  .ss-rk > img, .ss-rk > .ss-you { width: 22px; height: 22px; }
+  .ss-dep-go { flex-direction: column; align-items: stretch; }
+}

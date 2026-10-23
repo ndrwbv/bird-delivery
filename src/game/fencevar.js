@@ -13,6 +13,12 @@
    город строится на зерне (docs/AGENTS.md «Город строится на зерне»), и одно место — всегда одна и та же вещь.
    ────────────────────────────────────────────────────────────────────────── */
 import { at as distAt, has as distHas } from './districts.js';
+import { CLEAN } from './mobile.js';
+
+/* телефон (mobile.js CLEAN.fencePlain, 11бз): оградки газона — только дуги и рамка (колечки внахлёст и зигзаг на маленьком
+   экране — рябь), без ржавчины, облупленной краски и завала набок; твёрдые заборы — «обычные» (без сколов, подтёков, пик).
+   На компьютере — как выше (город бит в бит) */
+const PLAIN = !!(CLEAN && CLEAN.fencePlain);
 
 /* ?nofvar — как до 24.10.2026: одна форма оградки газона (краска как была), твёрдые заборы прежними долями и без износа,
    высокие заборы — только чёрные пики (сравнить кадры, вызовы и память) */
@@ -79,7 +85,7 @@ const TALL_LIST = [];
    (район): { shape, hex, zone } */
 export function rail (kx, kz, x, z, oldHex) {
   if (OFF) return { shape: 0, hex: oldHex, zone: 'mid', fade: false, off: 1 };
-  const R = FV.RAIL, zn = zone(x, z), shape = byW(hsh(kx, kz, 71), R.SHAPE[zn]);
+  const R = FV.RAIL, zn = zone(x, z), shape0 = byW(hsh(kx, kz, 71), R.SHAPE[zn]), shape = PLAIN ? [0, 0, 2, 2][shape0] : shape0;
   const pal = R.PAINT[zn];
   let hex = pal[Math.floor(hsh(kx, kz, 72) * pal.length)];
   const fade = hsh(kx, kz, 73) < R.FADE[zn];
@@ -88,7 +94,7 @@ export function rail (kx, kz, x, z, oldHex) {
 }
 /* износ секции оградки: { hex — краска секции, wear — рыжие пятна, lean — наклон набок, рад } */
 export function railSec (x, z, side) {
-  if (side.off) { ST.rail[0]++; return { hex: side.hex, wear: 0, lean: 0 }; }
+  if (side.off || PLAIN) { ST.rail[side.shape || 0]++; return { hex: side.hex, wear: 0, lean: 0 }; }
   const R = FV.RAIL, zn = side.zone, h = hsh(x, z, 74);
   let hex = side.hex, wear = 0, lean = 0;
   if (h < R.RUST[zn]) { hex = mix(R.RUST_HEX, side.hex, 0.15); wear = 1; ST.railWear.rust++; }
@@ -104,7 +110,7 @@ export function solidSty (x, z, w) {
   return byW(w, FV.SOLID.STY[OFF ? 'mid' : zone(x, z)]);
 }
 export function solidWear (x, z, sty) {
-  const zn = zone(x, z), wear = OFF ? 1 : byW(hsh(x, z, 77), FV.SOLID.WEAR[zn]);
+  const zn = zone(x, z), wear = OFF || PLAIN ? 1 : byW(hsh(x, z, 77), FV.SOLID.WEAR[zn]);
   ST.solid[sty][wear]++; ST.zone[zn]++;
   return wear;
 }
@@ -119,4 +125,4 @@ export function tall (b, cx, cz, kids) {
   return { tile, tint, debris: T.DEBRIS[tile] || tint };
 }
 
-export const DEBUG = { FV, ST, TALL: TALL_LIST, zone, OFF };
+export const DEBUG = { FV, ST, TALL: TALL_LIST, zone, OFF, PLAIN };

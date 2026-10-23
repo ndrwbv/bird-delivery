@@ -316,7 +316,7 @@ function* rings () {
   const done = new Map();
   let n = 0;
   for (const s of A.SOLIDS) {
-    if (!s.tree || s.edGone) continue;
+    if (!s.tree || s.edGone || s.noRing) continue;   // noRing — живая изгородь (trees.js)
     const x = s.cx, z = s.cz;
     if (!inZone(x, z) || grove.has(Math.round(x * 2) + ',' + Math.round(z * 2))) continue;
     if (++n % 300 === 0) yield 'круги';

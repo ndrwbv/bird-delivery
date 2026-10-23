@@ -32,6 +32,10 @@
    ────────────────────────────────────────────────────────────────────────── */
 
 import * as GFX from './gfx.js';
+import { CLEAN } from './mobile.js';
+/* телефон (mobile.js CLEAN.lawnCalm, 11бз): проплешин меньше (порог выше), светлые / тёмные и жёлтые пятна мягче —
+   на маленьком экране они рябили вместе с мелочью; на компьютере — как было */
+const CALM = !!(CLEAN && CLEAN.lawnCalm);
 
 /* чёткость: на «Низкой» (~430 точек по короткой стороне) — без ряби */
 const uLawnLo = { get value () { try { return GFX.pixelShort() < 480 ? 1 : 0; } catch (e) { return 0; } } };
@@ -58,9 +62,9 @@ const LAWN_GLSL = `
       gold = mix(gold, vec3(0.86, 0.66, 0.08), uGold * 0.35 * big);
       c = mix(c, gold * lum0, uDry * 0.85);
     }
-    c *= 0.8 + uDry * 0.08 + (0.38 - uDry * 0.12) * big;               // осенью пятна светлее, без тёмных провалов
+    ${CALM ? 'c *= 0.9 + uDry * 0.04 + (0.19 - uDry * 0.06) * big;               // телефон: пятна вдвое мягче' : 'c *= 0.8 + uDry * 0.08 + (0.38 - uDry * 0.12) * big;               // осенью пятна светлее, без тёмных провалов'}
     float yel = smoothstep(0.52, 0.82, hue - uDry * 0.25);
-    c = mix(c, c * vec3(1.22, 1.03, 0.62), yel * 0.75);
+    c = mix(c, c * vec3(1.22, 1.03, 0.62), yel * ${CALM ? '0.4' : '0.75'});
     c = mix(c, c * vec3(0.82, 0.98, 0.86), smoothstep(0.45, 0.12, hue) * 0.6 * (1.0 - uDry * 0.7));
     // тень-рельеф: бугры ~25 м, наклон к солнцу (с юго-запада) светлее; градиент — конечной разностью
     if (uLawnQ > 0.5) {
@@ -86,7 +90,7 @@ const LAWN_GLSL = `
     vec2 bq = mat2(0.857, 0.515, -0.515, 0.857) * q;
     float clump = sNoise(q * 0.021 + 19.0);    // где проплешин больше (~50 м)
     float bn = sNoise(bq * 0.14 + 5.0) * 0.82 + (uLawnQ > 0.5 ? sNoise(mat2(0.643, -0.766, 0.766, 0.643) * q * 0.5 + 9.0) : 0.5) * 0.18;
-    float bTh = 0.84 - clump * 0.1 - uHeat * 0.08 - uDry * 0.02 - uMud * 0.03;
+    float bTh = 0.84 - clump * 0.1 - uHeat * 0.08 - uDry * 0.02 - uMud * 0.03${CALM ? ' + 0.07' : ''};
     float bald = smoothstep(bTh - 0.012, bTh + 0.05, bn);
     float bt = bn > bTh - 0.05 ? sNoise(q * 0.9 + 2.0) : 0.5;
     vec3 dirt = vec3(0.30, 0.22, 0.13) * (0.86 + 0.24 * bt);

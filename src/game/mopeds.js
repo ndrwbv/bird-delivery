@@ -72,6 +72,8 @@ function mopedGeo (A, hex) {
   GEO.set(k, g);
   return g;
 }
+/* кузов мопеда без седока — общая склейка (копию берёт тот, кто ставит: хвост бандитов, gangland.js) */
+export const bodyGeo = (A, hex) => mopedGeo(A, hex);
 /* седок: сидит, руки на руле, шлем и короб — цвета службы, по коробу полоса и «логотип» */
 function riderGeo (A, br, look) {
   const k = 'r' + br.i + look;

@@ -27,11 +27,12 @@
    от места (hsh). Прежние броски коробки (chance + uuid геометрии) game.js тянет как раньше — город не сдвигается.
 
    setup(api) — game.js до стройки (LITM, WINS — без вещей three.js); wall(w, o) — из facade (F0, когда известны
-   подъезды); init(api) — после стройки; step(dt) — каждый кадр (CL.step: набор и люди). ?nobalc — по-старому (коробки,
+   подъезды; та же стена второй раз — перестройка дома: прежние места стены убираются, не задваиваются); forget(x0, z0, x1, z1) —
+   убрать открытые балконы в рамке; init(api) — после стройки; step(dt) — каждый кадр (CL.step: набор и люди). ?nobalc — по-старому (коробки,
    сравнить); ?balcbare — без мелочи (как на телефоне); ?nobkit — без набора. Отладка: __dlv.BALC (ST, near(r), force()).
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
-import { MOB } from './mobile.js';
+import { MOB, CLEAN } from './mobile.js';
 import { inView } from './cull.js';
 import { holdFixed } from './people.js';
 import * as FXP from './fxpool.js';
@@ -55,12 +56,13 @@ export const BALC = {
      ~1 человек); у балкона «жилец выходит» — доля OCC; курит SMOKE (детская — никто), остальные смотрят; машут — машина ближе WAVE м */
   NEAR: 50, MIN: 10, DROP: 70, MAX: 2, MAX_MOB: 1, COOL: [10, 25], OCC: 0.22, SMOKE: 0.5, WAVE: 26, SCAN: 0.6, STAY: [12, 30],
 };
+if (CLEAN) BALC.KIT_R = CLEAN.balcKitR;           // телефон: прутья и рёбра — только ближе 40 м (дальше — рябь; mobile.js CLEAN, 11бз)
 const SIDING = ['#e9e6dc', '#d8d2c2', '#9fb6c9', '#c9b08a', '#7d6a5a', '#b9c7b0', '#d9c8a8', '#a8afb8'];   // обшивка остеклённых
 const RAILC = ['#7f93a8', '#a8574c', '#7f9a6e', '#c9bfa0', '#8a8f96', '#5f7f9a'];                        // плиты и профлист
 const GRATEC = ['#2a2a2e', '#3b4a3a', '#5a3a2e', '#e2e2dc', '#2f3f5a'];                                  // решётки
 
 export const ST = { walls: 0, balc: 0, glazed: 0, open: 0, panel: 0, ribs: 0, grate: 0, items: 0, tris: 0, doors: 0, skipped: 0,
-  kit: 0, kitBuilds: 0, kitMs: 0, people: 0, spawned: 0, waves: 0, puffs: 0, scanMs: 0 };
+  kit: 0, kitBuilds: 0, kitMs: 0, people: 0, spawned: 0, waves: 0, puffs: 0, scanMs: 0, redo: 0, gone: 0 };
 const hsh = (x, z, k) => { const s = Math.sin(x * 12.9898 + z * 78.233 + k * 37.719) * 43758.5453; return s - Math.floor(s); };
 const pk = (a, h) => a[Math.min(a.length - 1, (h * a.length) | 0)];
 const hexN = hex => (typeof hex === 'string' ? parseInt(hex.slice(1), 16) : hex | 0);
@@ -87,6 +89,13 @@ const K = { GRATE: 1, RIBS: 2, FLOW: 4, LAUN: 8, SKIS: 16, BOX: 32, BIKE: 64 };
    inArch(m, half, y), shopHit(w, from, to, y0, y1), gaps } */
 export function wall (w, o) {
   ST.walls++;
+  const wk = wallKey(w), was = WALLS.get(wk);
+  if (was !== undefined) { forgetRange(Math.floor(was / 65536), was % 65536); ST.redo++; }   // стену строят второй раз (перестройка дома): прежние места — долой
+  const from = ON;
+  wallIn(w, o);
+  if (ON > from || was !== undefined) WALLS.set(wk, from * 65536 + (ON - from));
+}
+function wallIn (w, o) {
   const B = BALC;
   const P0 = o.seed % 2;                            // колонки с балконами — через одну (у дома свой сдвиг)
   const hr = hsh(o.seed, 7, 2), hg = hsh(o.seed, 0, 3);
@@ -113,6 +122,32 @@ export function wall (w, o) {
       one(w, o, { c, s0, s1, side, Y, f, above: !!fl[f + 1], rail, railHex, glazed: h < glaze, tAlong, h, cx0, cz0 });
     }
   }
+}
+
+/* Перестройка дома (0п37, 24.10.2026): если стену того же дома строят ещё раз (редактор: этажи, цвет, мурал), её открытые
+   балконы не дописываются вторым набором — прежние места стены убираются (из сетки, набора и у людей), потом пишутся новые
+   (другое число этажей — без лишних мест сверху). Стена — по началу и направлению (дм, тысячные радиана). WALLS: ключ →
+   первое место × 65536 + сколько. forget(x0, z0, x1, z1) — убрать открытые балконы в рамке (дом убрали совсем) */
+const WALLS = new Map();
+const wallKey = w => ((Math.round(w.a[0] * 10) + 65536) * 131072 + Math.round(w.a[1] * 10) + 65536) * 8192 + Math.round(Math.atan2(w.uz, w.ux) * 1000) + 4096;
+function unGrid (k) {
+  const b = k * PER, ck = Math.floor(OB[b] / CELL) * 100003 + Math.floor(OB[b + 2] / CELL), arr = GRID.get(ck);
+  if (arr) { const i = arr.indexOf(k); if (i >= 0) arr.splice(i, 1); if (!arr.length) GRID.delete(ck); }
+  OB[b + 6] = 0;                                   // и в наборе пусто
+}
+function forgetRange (from, n) {
+  if (!n) return;
+  for (let k = from; k < from + n; k++) unGrid(k);
+  for (let i = MEN.length - 1; i >= 0; i--) { const m = MEN[i]; if (m.sp.k >= from && m.sp.k < from + n) { drop(m); MEN.splice(i, 1); } }
+  ST.open -= n; ST.gone += n;
+  kitX = 1e9;                                       // набор — пересобрать
+}
+export function forget (x0, z0, x1, z1) {
+  const ks = [];
+  for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL); i++) for (let j = Math.floor(z0 / CELL); j <= Math.floor(z1 / CELL); j++)
+    for (const k of GRID.get(i * 100003 + j) || []) { const b = k * PER; if (OB[b] >= x0 && OB[b] <= x1 && OB[b + 2] >= z0 && OB[b + 2] <= z1) ks.push(k); }
+  for (const k of ks) forgetRange(k, 1);
+  return ks.length;
 }
 
 /* локальные оси стены: s — вдоль, q — наружу */
@@ -455,4 +490,6 @@ const DEBUG = {
   /* выключить набор и людей на ходу (сравнить кадр в одном запуске) */
   get off () { return OFFR; }, set off (v) { OFFR = !!v; if (KIT) KIT.visible = !OFFR; if (OFFR) { for (const m of MEN) drop(m); MEN.length = 0; } },
   rebuild () { kitX = 1e9; },
+  /* проверка перестройки (0п37): wall / forget / места стены; api — склейка и окна, что сейчас у стройки (подменить заглушкой) */
+  wall, forget, setup, get api () { return { LITM, WINS }; }, get grid () { let n = 0; for (const a of GRID.values()) n += a.length; return n; },
 };

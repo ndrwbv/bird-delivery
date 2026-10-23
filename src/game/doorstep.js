@@ -22,7 +22,8 @@
                           respect(why), hintFind() → { name, where, m } | null — ближайшая ненайденная находка (и отметить на карте),
                           guestIn(st) → bool — клиент дома (за дверью подъезда), guestOut(st) — вышел к двери,
                           guestMove(st, x, z) — клиент ждёт в другом месте (пин, адрес, маршрут), SPOTS — точки адресов,
-                          nearestRoad(x, z, r, k), routeLen(x0, z0, x1, z1) }
+                          nearestRoad(x, z, r, k), routeLen(x0, z0, x1, z1),
+                          handScene(st, onTime) → Promise | null — сцена крупным планом перед разговором (handcam.js, 11бд) }
      DOOR.plan(order)   — game.js showOrderCard: часы подошли — пометить адрес и вид мини-игры заранее (st.mgPlan)
      DOOR.on()          — мини-игра на экране (game.js: руль стоит, кнопки геймпада — её)
      DOOR.step(dt)      — каждый кадр мира (пауза и карта её стоят): часы мини-игр и сама мини-игра
@@ -370,7 +371,7 @@ function talk (ev, forced) {
   o.mg = 'talk';
   const ln = learnFirst('talk');                                 // первый разговор — подсказка, к сроку запас
   const fem = person.fem !== undefined ? !!person.fem : ped && ped.grp && ped.grp.userData ? !!ped.grp.userData.fem : null;
-  return playTalk(st, o, person, fem, typeof sit === 'string' ? sit : '', ln);
+  return playTalk(st, o, person, fem, typeof sit === 'string' ? sit : '', ln, ev.onTime);
 }
 
 function host () {
@@ -380,7 +381,7 @@ function host () {
   return h;
 }
 
-function playTalk (st, order, person, fem, sit, ln) {
+function playTalk (st, order, person, fem, sit, ln, onTime) {
   return new Promise(resolve => {
     const h = host();
     const cur = G.cur = { type: 'talk', st, order, mode: 'talk', resolve, off: null, done: false };
@@ -421,6 +422,15 @@ function playTalk (st, order, person, fem, sit, ln) {
       pct: { rush: pct(1 - TK.RUSH_K), keep: pct(TK.KEEP_TIP), fun: pct(TK.FUN_TIP), zhenya: pct(TK.ZHENYA_OFF) },
       clock: () => (A.S && !A.S.free && Number.isFinite(A.S.time) && A.S.timeMax > 0 ? { s: A.S.time, k: A.S.time / A.S.timeMax } : null),
     }, api);
+    // сначала — сцена крупным планом (handcam.js, 11бд): курьер отдаёт коробку, клиент (уже «под роль» — cast в mount)
+    // говорит облачком; окно разговора ждёт под ней спрятанным и не идёт (step / pad / клавиши — не ему)
+    const sc = A.handScene && !cur.done ? A.handScene(st, onTime) : null;
+    if (sc && typeof sc.then === 'function') {
+      cur.scene = true;
+      h.style.visibility = 'hidden';
+      const back = () => { cur.scene = false; h.style.visibility = ''; };
+      sc.then(back, back);
+    }
   });
 }
 
@@ -598,9 +608,10 @@ export function step (dt) {
   // обучение первого раза (doorcoach.js, автор 18.10.2026): мини-игра стоит — и срок заказа тоже (game.js в этом же кадре
   // снимет с него dt — возвращаем); сколько так простояли — G.heldT (проверки)
   if (c.hold && !S.free && Number.isFinite(S.time)) { S.time += dt; G.heldT = (G.heldT || 0) + dt; }
+  if (c.scene) return;                             // идёт сцена вручения (handcam.js): разговор ждёт под ней
   if (G.step) G.step(dt);
 }
-export function pad (p) { if (G.cur && G.pad) G.pad(p); }
+export function pad (p) { if (G.cur && G.pad && !G.cur.scene) G.pad(p); }
 
 /* деньги: быстро и с первого раза — +FAST_BONUS от цены адреса; не успел — «за скорость» и чаевые × SLOW_K;
    «пусть сам спустится» — без бонуса, чаевые остались с шансом SELF.TIP_KEEP (не остались — минус чаевые, «спускался сам») */

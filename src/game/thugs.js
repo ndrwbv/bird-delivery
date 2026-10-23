@@ -72,7 +72,7 @@ const pick = a => a[(Math.random() * a.length) | 0];
 const chance = p => Math.random() < p;
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
-const inGang = (x, z) => ZN.gangZones().some(g => (x - g.x) ** 2 + (z - g.z) ** 2 < g.r * g.r);
+const inGang = (x, z) => ZN.inGang(x, z);      // кварталы района (zones.js), не круг
 
 let A = null;
 export const SC = {

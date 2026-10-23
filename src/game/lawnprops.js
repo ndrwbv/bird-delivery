@@ -43,6 +43,7 @@ import * as FADEJS from './fade.js';
 import { WTREES } from './wintertrees.data.js';  // зимние деревья дворов — те же модели, что у деревьев города (trees.js)
 import { TREE as TREEC } from './trees.js';
 import * as EDL from './editlayer.js';
+import { CLEAN } from './mobile.js';         // телефон: мелочь реже, у пина чище (mobile.js CLEAN, 11бз)
 import * as FVAR from './fencevar.js';          // варианты оградок газона: вид, краска, износ по району (fencevar.js, М5)          // редактор города: убранная мелочь (edits.json, вид lawn; ключ — место вещи)
 
 export const LAWN = {
@@ -62,6 +63,8 @@ export const LAWN = {
   CAPS: { grass: 7000, dand: 3000, weed: 2500, burdock: 1500, tall: 5000, reed: 5000, hog: 2500,
     rail: 1500, tire: 1200, flower: 1200, shell: 300, sand: 200, cube: 7000, lit: 4000, bottle: 2000, ytrunk: 1600, ycrown: 2600, ywin: 1200, ywinb: 700 },
 };
+/* телефон (mobile.js CLEAN, 11бз): у пина и клиента чище, оградок вдоль улиц вдвое меньше */
+if (CLEAN) { LAWN.PIN_HIDE = CLEAN.pinHide; LAWN.PIN_HIDE_BIG = CLEAN.pinHideBig; LAWN.RAIL *= CLEAN.rail; LAWN.RAIL_YARD *= CLEAN.rail; }
 const SMALL = { grass: 1, dand: 1, lit: 1, bottle: 1 };                          // ближе R_SMALL
 const BEND = { grass: 1, dand: 1, weed: 1, burdock: 1, tall: 1, reed: 1, hog: 1, flower: 1 };
 const WINTER_OFF = { grass: 1, dand: 1, burdock: 1, flower: 1, lit: 1, bottle: 1, weed: 1, ycrown: 1, ytrunk: 1 };
@@ -75,6 +78,7 @@ const WINTER_TOP = { KEEP: 0.15, SINK: 1.35, KINDS: { tall: 1, reed: 1, hog: 1 }
 const topKeep = (x, z) => { const v = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453; return v - Math.floor(v) < WINTER_TOP.KEEP; };
 const DRY = { weed: 1, tall: 1, reed: 1, hog: 1 };                               // зимой — бурые
 const THIN = { grass: 1, dand: 1, lit: 1, bottle: 1, tall: 1, reed: 1, hog: 1, weed: 1 };   // на «низкой» — вдвое реже
+const KEEP = CLEAN ? CLEAN.lawn : null;   // телефон: своя доля по виду (трава, одуванчики, мусор, бурьян, заросли) — поверх «низкой»
 
 let A = null;
 const CELLS = new Map();
@@ -601,7 +605,7 @@ function * buildCell (i, j) {
   if (late()) yield;
   // 3) мусор у баков
   for (const c of A.cans || []) {
-    if (!inCell(c.x0, c.z0) || hsh(c.x0, c.z0, 41) > 0.5) continue;
+    if (!inCell(c.x0, c.z0) || hsh(c.x0, c.z0, 41) > (CLEAN ? 0.5 * CLEAN.binTrash : 0.5)) continue;
     const r = rng(c.x0, c.z0, 42), a = r() * 6.3, d = 1.6 + r() * 0.8;
     const px = c.x0 + Math.cos(a) * d, pz = c.z0 + Math.sin(a) * d;
     const nr = A.nearestRoad(px, pz, 9, 1);
@@ -950,7 +954,8 @@ function refresh (cam) {
   for (const c of CELLS.values()) {
     // спрятать у пина: вещи клетки (и в тех, что не в кадре, — для столкновений)
     let pinNear = false;
-    if (PINS) for (let k = 0; k < PINS.length; k += 2) if (PINS[k] > c.x0 - 10 && PINS[k] < c.x0 + F.CELL + 10 && PINS[k + 1] > c.z0 - 10 && PINS[k + 1] < c.z0 + F.CELL + 10) pinNear = true;
+    const pm = Math.max(10, F.PIN_HIDE_BIG);
+    if (PINS) for (let k = 0; k < PINS.length; k += 2) if (PINS[k] > c.x0 - pm && PINS[k] < c.x0 + F.CELL + pm && PINS[k + 1] > c.z0 - pm && PINS[k + 1] < c.z0 + F.CELL + pm) pinNear = true;
     if (pinNear || c.pinNear) for (const it of c.items) it.hid = pinNear && hideNear(it.x, it.z, it.kind === 'garage' || it.kind === 'line') ? 1 : 0;
     c.pinNear = pinNear;
     const d = Math.hypot(c.cx - x, c.cz - z);
@@ -970,7 +975,8 @@ function refresh (cam) {
       if (k === 'dand' && !SEA.dand) continue;
       if (SMALL[k] && d > RS + F.CELL * 0.71) continue;
       const src = c.L[k], M = MESH[k], cap = M.instanceMatrix.count;
-      const want = thin < 1 && THIN[k] ? Math.ceil(src.n * thin) : src.n;
+      let want = thin < 1 && THIN[k] ? Math.ceil(src.n * thin) : src.n;
+      if (KEEP && KEEP[k] !== undefined) { want = Math.floor(want * KEEP[k]); if (!want) continue; }
       const ma = M.instanceMatrix.array, ca = M.instanceColor.array;
       const dry = SEA.winter && WINTER_TOP.KINDS[k];   // зима: заросли под снегом, торчат редкие верхушки
       if (!c.down && !c.pinNear && !dry) {

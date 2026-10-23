@@ -31,7 +31,7 @@ import { TIER } from './hits.js';
 import { hourOf } from './econ.js';
 import * as RESPECT from './respect.js';
 import * as FEST from './festivals.js';
-import { freeAfterUpload } from './mobile.js';   // телефон: холст атласа после загрузки — 1×1 (атлас рисуется заново на новый холст)
+import { freeAfterUpload, CLEAN } from './mobile.js';   // телефон: холст атласа после загрузки — 1×1 (атлас рисуется заново на новый холст)
 import * as DIRECTOR from './director.js';   // режиссёр событий: концерт — лёгкое, марш — среднее, восстание — крупное
 
 const SRCH = typeof location !== 'undefined' ? location.search || '' : '';   // ?boxcrowd — толпы коробками, как до 23.10.2026 (сравнить)
@@ -58,6 +58,7 @@ export const GIG = {
   MAX: 1, MAX_EVE: 2,
   R: [45, 170], LIFE: [100, 160], FAR: 260, CROWD: [10, 20], SPACING: 70,
 };
+if (CLEAN) GIG.CROWD = [5, 9];                    // телефон: слушателей 5—9 (mobile.js CLEAN, 11бз)
 
 /* ── проблемы горожан ── */
 const PROBLEMS = [
@@ -378,7 +379,7 @@ function buildChunk (ci, cj) {
           q.add(px + ux * 0.85, gh + 4.1, pz + uz * 0.85, -sx, -sz, 1.6, 0.8, cellUV(7));
         } else {
           pole(q, px, pz, gh, 2.6);
-          const n = 3 + ((r1 * 4) | 0);
+          const n = CLEAN ? CLEAN.leaflets : 3 + ((r1 * 4) | 0);   // телефон — одна листовка (mobile.js CLEAN, 11бз); жребии те же
           for (let k = 0; k < n; k++) {
             const f = (k + ((r2 * 4) | 0)) % 4, nx = [1, 0, -1, 0][f], nz = [0, 1, 0, -1][f];
             const rr = (r3 * 1000 + k * 7.31) % 1;

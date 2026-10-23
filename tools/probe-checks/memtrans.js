@@ -68,6 +68,7 @@ async function doorGame (name, force, solveArg) {
 // ── меню → экран загрузки (город ещё строится: остаток разом) → смена ──
 try { d.Store.set('dlv-name', 'Проба'); } catch (e) { /* — */ }
 await wait(WAIT * 1000);
+{ const n = document.getElementById('crm-name'); if (n) n.hidden = true; }   // окно имени первого запуска (probe — с чистым сохранением)
 out.base = (await mem('menu')).proc;
 if (want('load')) {
   await tr('меню → загрузка → смена', async () => {
@@ -75,12 +76,14 @@ if (want('load')) {
     out.lateBusy = !(window.__boot && window.__boot.full);
     await watch('· достроить город');
     if (b) b.click();
-    // нажатие ждёт город (экран загрузки), потом повторяется; не начало смену (окно имени и т. п. поверх меню) — как «на смену»
+    // нажатие ждёт город (экран загрузки), потом повторяется само (game.js hold) — смена начинается; не началась — как «на смену»
     await until(() => window.__boot && window.__boot.full, 90000);
-    out.flushMs = window.__boot && window.__boot.late ? window.__boot.late.flush : null;
+    out.loadMs = window.__boot && window.__boot.late ? window.__boot.late.total : null;
     out.T['· достроить город'] = fin(await unwatch('· достроить город'));   // пик за переход — в составном окне ниже
     await watch('· начало смены');
-    if (!['brief', 'drive'].includes(d.S.state)) d.startRun(false);
+    await until(() => ['brief', 'drive'].includes(d.S.state), 3000);
+    out.replayed = ['brief', 'drive'].includes(d.S.state);
+    if (!out.replayed) d.startRun(false);
     await until(() => ['brief', 'drive'].includes(d.S.state), 20000); await wait(1500);
     out.T['· начало смены'] = fin(await unwatch('· начало смены'));
   }, () => ['brief', 'drive'].includes(d.S.state), 30000, 2500);

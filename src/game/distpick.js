@@ -81,7 +81,7 @@ function card (key, cls, num, name, where, rows, extra, foot, btn, locked, photo
 }
 
 /* бандиты в районе i — есть ли круг (с учётом доната) */
-const gangIn = i => { try { return ZN.gangZones().some(g => DIST.at(g.x, g.z) === i); } catch (e) { return false; } };
+const gangIn = i => { try { return ZN.gangZones().length > 0 && ZN.gangDistricts(DIST.at).has(i); } catch (e) { return false; } };   // кварталы бандитов в этом районе (zones.js), не только середина
 
 /* две главные строки — далеко ли заказы и на сколько больше платят (одинаковые для открытых и закрытых) */
 function distRows (i) {

@@ -67,6 +67,7 @@ function one () {
   if (q[2]) (STEPS[n] || (STEPS[n] = [])).push(lab ? lab + ':' + Math.round(ms) : Math.round(ms));   // yield 'имя' — подпись шага
   if (end) { Q.shift(); T[n] = Math.round(T[n]); if (MEMHOOK) window.__lateMem(n); }   // probe --mem: память по кускам
   if (!Q.length) finish();
+  return end ? T[n] : 0;                   // кусок кончился — сколько мс он шёл всего (передышка после тяжёлых, RUSH)
 }
 function finish () {
   if (DONE) return;
@@ -82,8 +83,12 @@ function tick () {
   if (DONE) return;
   if (MEMHOOK && window.__lateHold) { setTimeout(tick, 50); return; }   // probe --mem ?latesnap: стоим, пока снимается куча
   const t0 = performance.now(), bud = RUSH ? RUSH_BUDGET : BUDGET;
-  do one(); while (Q.length && performance.now() - t0 < bud && !(MEMHOOK && window.__lateHold));
-  if (!DONE) setTimeout(next, IDLE);       // через таймер: сначала кадр (rAF), потом следующий кусок
+  let rest = 0;
+  do {
+    const e = one();
+    if (RUSH && REST_K > 0 && e > REST_FROM) { rest = Math.min(REST_MAX, e * REST_K); break; }   // тяжёлый кусок кончился — его отходы убрать до следующего
+  } while (Q.length && performance.now() - t0 < bud && !(MEMHOOK && window.__lateHold));
+  if (!DONE) setTimeout(next, Math.max(IDLE, rest));   // через таймер: сначала кадр (rAF), потом следующий кусок
 }
 
 export function start () {
@@ -96,12 +101,19 @@ export function start () {
 /* достроить остаток под экраном загрузки — тиками, не разом (0п48, автор 24.10.2026: «переход в загрузку заставляет
    перезагружаться вебвью»). Разом (flush) — один длинный кусок без передышки: отходы поздней сборки не успевают убраться,
    след страницы на телефоне боком 930 → 1300 МБ, а следом ещё начало смены — и iOS выгружает вкладку. Тиками по RUSH_BUDGET мс
-   с той же паузой IDLE (мобильный режим — 30 мс: сборщик мусора успевает), в конце — ещё SETTLE мс тишины, потом cb
+   с той же паузой IDLE (мобильный режим — 30 мс: сборщик мусора успевает) и передышкой после тяжёлых кусков, в конце — ещё SETTLE мс тишины, потом cb
    (game.js: повторить нажатие карточки меню). На компьютере пауз нет — то же время, что разом */
 let RUSH = false;
 const RUSH_Q = typeof location !== 'undefined' ? (location.search.match(/[?&]rushms=(\d+)/) || [])[1] : undefined;
-const RUSH_BUDGET = RUSH_Q !== undefined ? +RUSH_Q : 48;   // ?rushms=N — свой кусок (проверки)
+/* кусок подряд под экраном загрузки: мобильный режим — как за меню (16 мс): пик следа на телефоне боком 1 330 → 1 290 МБ
+   (по 2 прогона), экран загрузки на ~4 с дольше (11 → 15 с с запуска); компьютер — 48 (пауз там нет, мельче — только дольше).
+   ?rushms=N — свой */
+const RUSH_BUDGET = RUSH_Q !== undefined ? +RUSH_Q : MOB.on ? BUDGET : 48;
 const SETTLE = MOB.on ? 250 : 0;
+/* мобильный режим: после тяжёлого куска (шёл дольше REST_FROM мс) — передышка REST_K × его время, не дольше REST_MAX мс:
+   сборщик мусора убирает его отходы до следующего (дворы, лабиринт, сугробы — по 100—500 мс на куске). ?rushrest=K,MAX — свои */
+const REST_Q = typeof location !== 'undefined' ? (location.search.match(/[?&]rushrest=([\d.]+),(\d+)/) || []) : [];
+const REST_K = REST_Q[1] !== undefined ? +REST_Q[1] : MOB.on ? 0.5 : 0, REST_MAX = REST_Q[2] !== undefined ? +REST_Q[2] : 200, REST_FROM = 40;
 export function flushAsync (cb) {
   if (DONE) { cb(); return; }
   RUSH = true;

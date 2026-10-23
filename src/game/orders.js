@@ -88,6 +88,7 @@ export const ZONE_LABEL = {
 /* ─────────────── init ─────────────── */
 export function init (api) {
   A = api; S = api.S; V = api.V;
+  DIRECTOR.errandWants(errWant);                         // поручение хочет это вручение — мини-игру и сценку у двери не ставим
   for (const [k, f] of Object.entries(OPT)) f().then(m => { if (k.includes('career')) hookCareer(m); else STORY = m; }).catch(e => console.warn('[orders]', k, e));
   loadUsed();
   MIX.init(api);
@@ -978,6 +979,7 @@ export function payStop (o, st, onTime, tier) {
   TEL.first('delivery1', { late: onTime ? 0 : 1 });       // воронка новичка: первая доставка
   if (!onTime) {
     const gop = DOOR.stairsAdjust(st, fee, 0, 0).gop;     // откупился от гопников в подъезде, а всё равно опоздал — «чаевые» им уже отданы
+    if (sp.type !== 'staff' && !o.tut) SKILL.rated(false, 'опоздал', !!sp.bundle);   // ужатие срока: «рейтинг» упал (press.js)
     st.pay = { fee, bonus: 0, tip: 0, late: true, story: !!sp.story, stairsGop: gop };
     return Math.round(fee * PAY.LATE) - gop;
   }
@@ -1004,6 +1006,11 @@ export function payStop (o, st, onTime, tier) {
   const cw = !o.tut && A.wear ? ECON.coldCut(A.wear()) : { k: 0, why: '' };
   const coldLeft = Math.max(0, bonus + tip - door.cut - talk.cut - stairs.cut);
   const cold = cw.k > 0 ? Math.min(coldLeft, Math.round((bonus + tip) * cw.k / 10) * 10) : 0;
+  // ужатие срока (press.js): вовремя, пицца не холодная, клиента не задел — хорошо; иначе «рейтинг» упал — срок отпускает
+  if (sp.type !== 'staff' && !o.tut) {
+    const bad = st.bumped ? 'задел клиента' : cw.k >= ECON.PRESS.COLD_BAD ? 'пицца холодная' : '';
+    SKILL.rated(!bad, bad, !!sp.bundle);
+  }
   // из чего сложилась оплата — game.js покажет кучкой денег и чеком (popPay); сюжет — катсцена сама покажет награду
   st.pay = { fee, bonus, tip, rich: rich && tip > 0, late: false, story: !!sp.story, doorAdd: door.add, doorCut: door.cut, doorMode: st.door ? st.door.mode : '',
     talkAdd: talk.add, talkCut: talk.cut, talkKind: talk.kind, stairsAdd: stairs.add, stairsCut: stairs.cut, stairsGop: stairs.gop,
@@ -1046,43 +1053,63 @@ export function delivered (o, st, onTime) {
     ERR.miss.push(sp.face.local ? sp.face.name + ': нет магазина или человека рядом' : 'Глеб: нет товарища рядом'); if (ERR.miss.length > 30) ERR.miss.shift();
     if (sp.face.local) LOCALS.missed(sp.face);            // житель Юга: не вышло дважды — история дальше без поручения
   }
+  errandCount(sp);                                        // заказ отдан — счёт заказов до поручения (раз в 2—3 заказа)
   if (ERR.due) {
-    const no = sp.story ? 'сюжет' : sp.fest ? 'фестиваль' : S.ride ? 'покататься' : st.talk ? 'разговор у двери' : st.odd && st.odd !== 'shout' ? 'сценка у двери'
-      : !(st.persons[0] && st.peds[0] && !st.peds[0].dead) ? 'нет клиента' : !DIRECTOR.can('errand') ? 'режиссёр' : !offerSide(st.peds[0], st.persons[0]) ? 'нет магазина' : '';
+    const no = sp.story ? 'сюжет' : sp.fest ? 'фестиваль' : S.ride ? 'покататься' : st.talk ? 'разговор у двери' : st.odd && st.odd !== 'shout' ? 'сценка у двери: ' + st.odd
+      : !(st.persons[0] && st.peds[0] && !st.peds[0].dead) ? 'нет клиента' : !DIRECTOR.can('errand') ? 'режиссёр: ' + DIRECTOR.DEBUG.why('errand') : !offerSide(st.peds[0], st.persons[0]) ? 'нет магазина' : '';
     if (no) { ERR.miss.push(no); if (ERR.miss.length > 30) ERR.miss.shift(); } else errandDone();
   }
 }
 
 /* ─────────────── поручения ───────────────
-   Когда: таймер настоящего времени (econ.js ERRAND) с FROM_SHIFT-й смены сессии (DIRECTOR.sessionShifts; с 17.10.2026 — с 1-й,
-   но не в первой смене новичка, FROM_DONE):
-   первое — через FIRST с, дальше — каждые EVERY ± JITTER с. Секунды идут только в кадре смены
-   (game.js не зовёт ORD.step на паузе и в катсцене; окно разговора мир не стоит — тут ждём, пока закроют), остаток переходит в следующую смену. */
-const ERR = { left: null, due: false, clock: 0, log: [], miss: [] };   // log — когда просили (с), miss — почему не попросили (отладка)
+   Когда (24.10.2026, автор: «ездить за чем-то в магазины надо чаще делать»): по счёту заказов, не по часам — раз в
+   EVERY_N (2 или 3) отданных заказа смены (× «что нравится игроку», likes.js; не меньше 2 — не два заказа подряд), с
+   FROM_SHIFT-й смены сессии, не в первой смене новичка (FROM_DONE). Подошёл счёт — просит клиент этого вручения; нельзя
+   (ритм, разговор у двери, нет магазина) — следующий. Счёт переходит в следующую смену.
+   До 24.10.2026 — таймер 3 мин ± 40 с настоящего времени: просьба раз в ~5—7 мин, ~1 на 8—13 заказов. */
+const ERR = { since: 0, gap: 0, due: false, clock: 0, log: [], at: [], miss: [], shops: [] };   // log — когда просили (с), at — на каком отданном заказе, miss — почему не попросили
 const LIVE_ST = ['drive', 'back', 'handover', 'brief', 'loading', 'side'];
+const errGap = () => {
+  const N = ECON.ERRAND.EVERY_N, k = LIKES.slow('err');
+  ERR.k = k;
+  return Math.max(2, Math.round((N[0] + Math.floor(Math.random() * (N[1] - N[0] + 1))) * k));
+};
 function errandStep (dt) {
-  if (DLG.isOpen()) return;                               // идёт разговор — часы просьб стоят (просьба поверх просьбы не нужна)
+  if (DLG.isOpen()) return;                               // идёт разговор — часы журнала стоят
   ERR.clock += dt;
-  if (ERR.due || S.ride || S.state === 'side' || !LIVE_ST.includes(S.state)) return;
-  if (!CAR || typeof CAR.shiftOn !== 'function' || !CAR.shiftOn()) return;
-  if (!(DIRECTOR.sessionShifts && DIRECTOR.sessionShifts() >= ECON.ERRAND.FROM_SHIFT)) return;
-  if ((+A.Store.get('dlv-shifts', 0) || 0) < (ECON.ERRAND.FROM_DONE || 0)) return;   // первая смена новичка — без поручений
-  if (ERR.left === null) { ERR.left = rand(ECON.ERRAND.FIRST[0], ECON.ERRAND.FIRST[1]); return; }
-  if ((ERR.left -= dt) <= 0) ERR.due = true;
+}
+/* отдан заказ целиком: +1 к счёту; дошёл до ERR.gap — просьба на этом вручении (или на следующем, если тут нельзя) */
+const errOn = () => !!A && !S.ride && !!CAR && typeof CAR.shiftOn === 'function' && CAR.shiftOn()
+  && !!(DIRECTOR.sessionShifts && DIRECTOR.sessionShifts() >= ECON.ERRAND.FROM_SHIFT)
+  && (+A.Store.get('dlv-shifts', 0) || 0) >= (ECON.ERRAND.FROM_DONE || 0);                  // первая смена новичка — без поручений
+function errandCount (sp) {
+  if (ERR.due || sp.story || sp.type === 'staff' || !errOn()) return;
+  if (!ERR.gap) ERR.gap = errGap();
+  if (++ERR.since >= ERR.gap) ERR.due = true;
+}
+/* это вручение — под поручение (director.js errandWants): счёт дойдёт на нём или уже дошёл; у сборного — только последний адрес.
+   Мини-игру у клиента и сценку у двери на нём не ставим */
+function errWant () {
+  const o = S && S.order, sp = o && o.ord;
+  if (!sp || sp.story || sp.type === 'staff' || sp.fest || (o.stops && o.idx < o.stops.length - 1)) return false;
+  return (ERR.due || (ERR.gap > 0 && ERR.since + 1 >= ERR.gap)) && errOn();
 }
 function errandDone () {
   ERR.due = false;
-  // что нравится игроку (likes.js): отказывал от всех — таймер до ×LIKES.SLOW (просьба не реже ~раза в 7—10 мин), всё нравится — чаще
-  ERR.k = LIKES.slow('err');
-  ERR.left = (ECON.ERRAND.EVERY + rand(-ECON.ERRAND.JITTER, ECON.ERRAND.JITTER)) * ERR.k;
+  ERR.since = 0;
+  // что нравится игроку (likes.js): отказывал от всех — счёт до ×LIKES.SLOW (просьба не реже ~раза в 5—7 заказов), всё нравится — чаще
+  ERR.gap = errGap();
   ERR.log.push(Math.round(ERR.clock));
+  ERR.at.push(SH.done);
 }
+/** ключ магазина для «недавних» (game.js errandShop: it.avoid) */
+export const shopKey = q => Math.round(q.x) + ',' + Math.round(q.z);
 function sideOpts (ped, only) {
   const f = ped && ped.person ? !!ped.person.f : null;      // sex — текст просьбы в мужском / женском роде
   // face — поручение знакомого лица (Глеб, faces.js): только когда просят именно его (only)
   return SIDE_ORDERS.filter(s => (!s.adult || A.ADULT) && (!s.kids || !A.ADULT) && (!s.sex || f === null || (s.sex === 'f') === f) && (!s.face || s.id === only))
     // giver — забрать у человека у подъезда (errands.js giverSpot), иначе — магазин рядом
-    .map(s => ({ s, shop: s.giver ? (A.errandGiver ? A.errandGiver(s, ped) : null) : A.errandShop({ kinds: s.shop.kinds || [], prefer: s.shop.prefer || /$^/, anyKind: !!s.shop.anyKind, loose: s.shop.loose, not: s.shop.not, show: s.shop.show }, ped) }))
+    .map(s => ({ s, shop: s.giver ? (A.errandGiver ? A.errandGiver(s, ped) : null) : A.errandShop({ kinds: s.shop.kinds || [], prefer: s.shop.prefer || /$^/, anyKind: !!s.shop.anyKind, loose: s.shop.loose, not: s.shop.not, show: s.shop.show, avoid: ERR.shops }, ped) }))
     .filter(o => o.shop);
 }
 function offerSide (ped, person, only) {
@@ -1093,6 +1120,8 @@ function offerSide (ped, person, only) {
   // что нравится игроку (likes.js): вид, от которого отказывался, — реже (вес 0,2…1,5)
   const { s, shop } = LIKES.pick('err', fresh.length ? fresh : opts, o => o.s.id);
   ERR.lastId = s.id;
+  // разные магазины (24.10.2026): этот магазин — в «недавние», следующие поручения ведут в другие (game.js errandShop avoid)
+  if (!s.giver && shop && Number.isFinite(shop.x)) { ERR.shops.push(shopKey(shop)); if (ERR.shops.length > ECON.ERRAND.SHOP_MEM) ERR.shops.shift(); }
   S.handT = 1e9;                                         // пока думаешь — дальше не едем
   ped.freeT = 1e9;
   const pay = rint(s.pay || ORDERS.SIDE_PAY);
@@ -1328,6 +1357,7 @@ export function step (dt) {
   if (!A) return;
   if (window.__dlv && !window.__dlv.ORD) window.__dlv.ORD = DEBUG;
   if (window.__dlv && !window.__dlv.SKILL) window.__dlv.SKILL = SKILL.DEBUG;   // умение курьера (skill.js)
+  if (window.__dlv && !window.__dlv.PRESS) window.__dlv.PRESS = SKILL.DEBUG.PRESS;   // ужатие срока (press.js)
   errandStep(dt);
   // посадка работников: дошёл до машины — пропал (в машине)
   const B = STAFF.board;
@@ -1605,7 +1635,7 @@ function simTime (sp, i) {
   const t0 = sp.urgent ? (DIST.has() ? Math.max(ECON.URGENT.MIN_T, (sp.m[0] || 0) / ECON.URGENT.V + ECON.URGENT.ADD) : A.orderTime(L, 1, 1) * PAY.URGENT_TIME)
     : sp.bundle ? bundleTime(L, n, sp.bundle.time || 1) : A.orderTime(L, 1, i + 1);
   const tm = SKILL.time(t0, L, n, !!sp.urgent);
-  return { u: SKILL.cur(), tk: sp.tk === undefined ? -1 : +sp.tk.toFixed(2), tm: Math.round(tm), slack: L > 0 ? +(tm / (L / RUN_V)).toFixed(2) : 0 };
+  return { u: SKILL.cur(), pk: SKILL.pressK(), tk: sp.tk === undefined ? -1 : +sp.tk.toFixed(2), tm: Math.round(tm), slack: L > 0 ? +(tm / (L / RUN_V)).toFixed(2) : 0 };
 }
 /** «весь город»: премия за дальние, заработанная за эту смену (итоги смены, career.js) */
 export const farEarned = () => SH.far || 0;

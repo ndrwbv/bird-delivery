@@ -28,7 +28,9 @@
    smashBuild, car — каждый шаг машины, step — каждый кадр, reset — новая смена.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
+import * as ZN from './zones.js';           // бандитский район — мусора у подъездов больше
 import * as DEBRIS from './debris.js';          // разлёт кучи мусора — куски из запаса (debris.js)
+import { CLEAN } from './mobile.js';             // телефон: мусора у подъездов втрое меньше, у контейнеров — без мешков рядом (11бз)
 
 /* числа — здесь; в docs/CAREER.md — они же словами */
 export const STOP = {
@@ -37,7 +39,7 @@ export const STOP = {
   DMG_K: 0.6,             // удар — как о стену на той же скорости × 0,6
   DMG_MIN: 0.4,           // но не меньше половинки сердца
 };
-export const LITTER = { P: 0.34, CAP: 1400 };                      // доля подъездов с мусором, потолок
+export const LITTER = { P: 0.34, CAP: 1400, GANG: 0.8 };            // доля подъездов с мусором, потолок; в бандитском районе (zones.js inMask) — 8 из 10
 export const CANS = {
   PAD_P: 0.1, PAD_CAP: 260, PAD_GAP: 34,  // площадки: доля подъездов, потолок, не ближе друг к другу
   R: 0.85,                                // радиус контейнера для удара
@@ -470,7 +472,7 @@ function padAt (x, z, ux, uz, n, seed) {
     can(cx, cz, ry + (r() - 0.5) * 0.12, (r() * CAN_HEX.length) | 0);
   }
   // рядом — что не влезло в контейнеры
-  for (let i = 0; i < 1 + ((r() * 2) | 0); i++) {
+  if (!CLEAN || CLEAN.padLitter) for (let i = 0; i < 1 + ((r() * 2) | 0); i++) {   // телефон — без мешков рядом
     const a = (r() - 0.5) * L, b = (r() < 0.5 ? -1 : 1) * (D / 2 + 0.9);
     litterAt(x + ux * a + nx * b, z + uz * a + nz * b, seed + i * 7 + 1);
   }
@@ -483,13 +485,14 @@ function padAt (x, z, ux, uz, n, seed) {
 export function* yard () {
   let t0 = performance.now(), ms = 0, n = 0;
   const clean = A.CAREER ? A.donated('trash') : 0;        // карьера: город вычищен донатом — мусора меньше
-  const pLit = LITTER.P * (1 - clean), pPad = CANS.PAD_P;
+  const pLit = LITTER.P * (1 - clean) * (CLEAN ? CLEAN.litter : 1), pPad = CANS.PAD_P;
   const pads = [];
   for (const [x, z, nx, nz] of A.CITY.entrances) {
     if (++n % 250 === 0) { ms += performance.now() - t0; yield 'junk'; t0 = performance.now(); }
     if (!A.inBounds(x, z, -40)) continue;
     const tx = nz, tz = -nx, h = hash(x, z, 5), seed = Math.round(x * 31 + z * 17);
-    if (h < pLit && STATS.litter < LITTER.CAP) {
+    const pl = A.CAREER && ZN.inMask(x, z) ? Math.max(pLit, LITTER.GANG * (1 - clean) * (CLEAN ? CLEAN.litter : 1)) : pLit;   // бандитский район — грязнее (24.10.2026); телефон — так же реже
+    if (h < pl && STATS.litter < LITTER.CAP) {
       const s = hash(x, z, 6) < 0.5 ? 1 : -1, a = 3.4 + hash(x, z, 7) * 1.2, b = 1.8 + hash(x, z, 8) * 1.4;
       litterAt(x + nx * b + tx * a * s, z + nz * b + tz * a * s, seed);
     }

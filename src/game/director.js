@@ -105,7 +105,14 @@ export const quiet = () => RHY.quiet();
 
 const count = tier => ACT.reduce((a, e) => a + (e.tier === tier ? 1 : 0), 0);
 
+/* поручение хочет это вручение (orders.js: счёт заказов дошёл, econ.js ERRAND.EVERY_N) — мини-игру и сценку у двери на нём
+   не ставим, они — на следующем (24.10.2026: раньше просьбу почти каждый раз съедала сценка или мини-игра у той же двери) */
+let ERRW = null;
+export function errandWants (f) { ERRW = typeof f === 'function' ? f : null; }
+const errWants = () => { try { return !!(ERRW && ERRW()); } catch (e) { return false; } };
+
 function why (kind) {
+  if ((kind === 'mini' || kind === 'odd') && errWants()) return 'вручение — под поручение';
   if (kind === 'mini') return RHY.why('mini');     // мини-игра у клиента: часы doorstep.js подошли — ждёт, пока ритм пустит
   const tier = KINDS[kind];
   if (!tier) return '';                            // незнакомое — не сдерживаем

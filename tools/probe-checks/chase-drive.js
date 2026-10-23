@@ -9,7 +9,8 @@
    cshots — снимки полным размером: в погоне, он встал у тебя, вышел / уезжает. */
 const Q = new URLSearchParams(location.search), SHOTS = Q.get('cshots') || '';
 const V = d.V, IN = d.IN, CS = d.CHS.STATS;
-const out = { old: !!d.CHS.CH.old, chases: 0, ends: [], phases: [], stats: null, shots: [] };
+const out = { old: !!d.CHS.CH.old, miss: [], chases: 0, ends: [], phases: [], stats: null, shots: [] };
+let T = 0;
 const stalled = () => !!(d.DLG && d.DLG.isOpen && d.DLG.isOpen()) || (d.S.paused && d.S.state !== 'over');
 await onShift();
 autopilot(true); await run(6, 2);
@@ -20,14 +21,22 @@ function begin () {
   const L = TR.filter(t => !t.gone && !t.knock && !t.wreck && !t.driver && !t.parked && !t.svc && !t.bus && !t.mp && t.model !== 'moped' && !t.stalled)
     .map(t => [t, Math.hypot(t.x - V.x, t.z - V.z)]).filter(p => p[1] > 25 && p[1] < 70).sort((a, b) => a[1] - b[1]);
   for (const [t] of L) if (d.chaseStart(t)) { t.chase.T = 999; car = t; out.chases++; return true; }
+  // рядом никого — ближнюю машину потока переносим на улицу в ~45 м за тобой (как будто ехала следом)
+  const far = TR.filter(t => !t.gone && !t.knock && !t.wreck && !t.driver && !t.parked && !t.svc && !t.bus && !t.mp && t.model !== 'moped' && !t.stalled && !t.chase && t.mesh)
+    .sort((a, b) => Math.hypot(a.x - V.x, a.z - V.z) - Math.hypot(b.x - V.x, b.z - V.z))[0];
+  const r = far && d.nearestRoad(V.x - Math.sin(V.h) * 45, V.z - Math.cos(V.h) * 45, 8, 4);
+  if (r && Math.hypot(r.x - V.x, r.z - V.z) > 20) {
+    Object.assign(far, { x: r.x, z: r.z, h: V.h, speed: 6, e: null, turn: null, cb: null });
+    if (d.chaseStart(far)) { far.chase.T = 999; car = far; out.chases++; out.moved = (out.moved || 0) + 1; return true; }
+  }
+  if (out.miss.length < 6) out.miss.push([d.S.state, L.length, +T.toFixed(0)]);
   return false;
 }
 for (const k in CS) { if (typeof CS[k] === 'number') CS[k] = 0; }
-CS.stops.length = 0; CS.jerkAt.length = 0; CS.modes = {};
+CS.stops.length = 0; CS.jerkAt.length = 0; CS.modes = {}; CS.lim = {}; CS.touchBy = {};
 begin();
 let ended = null;
 const wrapEnd = () => { if (car && !car.chase && !ended) ended = { why: car.driver ? 'вышел' : car.stalled ? 'встал' : 'уехал', t: +T.toFixed(1) }; };
-let T = 0;
 async function phase (name, secs, move) {
   const P = { name, secs, minD: 1e9, stopAt: null, stopD: null, exitAt: null, leaveAt: null, modes: {}, maxV: 0 };
   const halt = () => { IN.gas = 0; IN.joy = 0; IN.brake = V.vx * Math.sin(V.h) + V.vz * Math.cos(V.h) > 0.3 ? 1 : 0; };   // тормоз стоя — это задний ход
@@ -65,5 +74,5 @@ if (!car || !car.chase) begin();
 await phase('едет-2', 10, true);
 await phase('стоит-2', 20, false);
 autopilot(false);
-out.stats = { ...CS, modes: Object.fromEntries(Object.entries(CS.modes).map(([k, v]) => [k, +v.toFixed(1)])), secs: +CS.secs.toFixed(1) };
+out.stats = { ...CS, lim: Object.fromEntries(Object.entries(CS.lim).map(([k, v]) => [k, +v.toFixed(1)])), modes: Object.fromEntries(Object.entries(CS.modes).map(([k, v]) => [k, +v.toFixed(1)])), secs: +CS.secs.toFixed(1) };
 return out;

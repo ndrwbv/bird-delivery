@@ -67,6 +67,7 @@ export const game = () => { const G = ECON.SLOT.GAMES; return G[((SH.n || 0) % G
 export const mul = g => (ECON.SLOT[g] && ECON.SLOT[g].mul) || ECON.SLOT.MUL;
 /** «однорукий бандит · ×2» — подсказка у пометки «депнуть» на чеке смены */
 export const label = (g = game()) => t(NAME[g]) + ' · ×' + mul(g);
+export const nameOf = (g = game()) => t(NAME[g]);    // название игры — «давай депнем?» в конце смены (shiftsteps.js)
 /** картинка плитки «депнуть» в «гараже и тратах» (career.js): пачки купюр и монеты — стиль в dep.css (.cr-t-dep) */
 export const tileArt = () => '<i class="dep-loot" aria-hidden="true">' +
   '<i class="dep-stack s1"></i><i class="dep-stack s2"></i><i class="dep-stack s3"></i>' +
@@ -128,7 +129,7 @@ function keysHint (after) {
   const k = n => keyHTML(n);
   const pick = GAME !== 'slot' ? k('x') + k('y') + esc(t('выбор')) : '';
   h.innerHTML = after
-    ? [k('ok') + esc(t('на работу')), k('x') + esc(t('крутить ещё')), k('back') + esc(t('назад'))].join('<i>·</i>')
+    ? [k('ok') + esc(FLOW ? t('дальше') : t('на работу')), k('x') + esc(t('крутить ещё')), k('back') + esc(t('назад'))].join('<i>·</i>')
     : [k('lb') + k('rb') + esc(t('ставка')), pick, k('ok') + esc(t('деп')), k('back') + esc(t('назад'))].filter(Boolean).join('<i>·</i>');
 }
 /* шаг кнопок −/+: ~1/20 кошелька, круглым числом */
@@ -185,14 +186,19 @@ function stageHTML (g) {
       '<i class="dep-ball"></i></div>' + picks + '</div>';
 }
 
-export function open () {
+/* o (экраны конца смены, shiftsteps.js «давай депнем?»): stake — ставка (¼ заработанного за смену), spin — сразу крутить
+   (игрок уже нажал «Деп» на листе), next — после итога главная кнопка «дальше» и «назад» ведут к следующему экрану,
+   а не на новую смену. Без o — как было: ставка — заработанное за смену, «пора на работу» */
+let FLOW = null;
+export function open (o = {}) {
   CL.transFor('деп', 2500);                        // метка перехода (crashlog.js, 0п48)
+  FLOW = typeof o.next === 'function' ? o.next : null;
   const md = box();
   GAME = game();
   MATCH = GAME === 'tennis' ? HQ.match() : [];
   if (MATCH.some(p => HQ.ANON.includes(p))) reseat();
   const max = stepDown(A.wallet());
-  STAKE = Math.min(max, stepDown(A.S.money || 0) || stepDown(max / 4) || max);
+  STAKE = o.stake > 0 ? Math.min(max, stepDown(o.stake)) : Math.min(max, stepDown(A.S.money || 0) || stepDown(max / 4) || max);
   md.dataset.game = GAME;
   md.querySelector('.dep-t').textContent = t(NAME[GAME]);
   md.querySelector('.dep-g').textContent = t('депнуть') + ' · ' + t('выигрыш ×{k}', { k: mul(GAME) });
@@ -212,6 +218,7 @@ export function open () {
   newRound(md);
   md.hidden = false;
   requestAnimationFrame(() => md.classList.add('on'));
+  if (o.spin) spin();
 }
 /* раунд с чистого листа: та же сцена, ставка и выбор остаются */
 function newRound (md) {
@@ -273,6 +280,7 @@ function again () {
 }
 function toWork () {
   if (SPINNING) return;
+  if (FLOW) { close(); return; }                   // экраны конца смены: «дальше» — к следующему экрану (close зовёт FLOW)
   close(); if (H.closeSpend) H.closeSpend();
   const b = $('ov-again'); if (b) b.click();
 }
@@ -283,6 +291,8 @@ export function close () {
   if (H.refreshWallet) H.refreshWallet();
   if (H.refreshTabs) H.refreshTabs();
   if (H.refreshEnd) H.refreshEnd();
+  const f = FLOW; FLOW = null;
+  if (f) try { f(); } catch (e) { console.error('[dep]', e); }
   return true;
 }
 /** B / Esc: посреди прокрутки не закрывает — дождись итога */
@@ -374,7 +384,7 @@ function spin () {
     md.querySelector('.dep-sum span').textContent = t('в копилке {money}', { money: A.money(A.wallet()) });
     SPINNING = false;
     const go = md.querySelector('.dep-go');
-    go.innerHTML = '<span>' + esc(t('пора на работу')) + '</span>'; go.disabled = false;
+    go.innerHTML = '<span>' + esc(FLOW ? t('дальше') : t('пора на работу')) + '</span>'; go.disabled = false;
     md.querySelector('.dep-close').disabled = false;
     const ag = md.querySelector('.dep-again');
     ag.textContent = t('крутить ещё'); keysHint(true); ag.hidden = stepDown(A.wallet()) <= 0;   // [X] — нарочно мелко (dep.css)

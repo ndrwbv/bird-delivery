@@ -239,6 +239,9 @@ export function cab (dt, vf, sh) {
   V.camX = K.e.x; V.camZ = K.e.z; V.camY = K.e.y + 4; V.camH = V.h; V.camPull = 0;
 }
 
+/** этот кадр салон не рисовать (сцена вручения из-за руля — камера снаружи, handcam.js) */
+export function undraw () { if (CAB) CAB.drawn = false; }
+
 /** салон поверх кадра города: зовёт game.js сразу после renderer.render(scene, cam) */
 export function overlay (renderer) {
   if (!CAB || !CAB.drawn) return;

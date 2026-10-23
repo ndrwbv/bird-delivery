@@ -213,7 +213,11 @@ function inPolyH (x, z, p) {
 const SEEDED = new Set(['nightlife', 'world', 'construction', 'rivals', 'darknight', 'wastelands', 'beach', 'life', 'entr', 'vents', 'signs', 'gates', 'trees', 'metro', 'lots', 'lights', 'ramps', 'landmarks', 'roadlife', 'billboards', 'cars', 'yard', 'yardbits', 'yardtrees', 'edits', 'seasonyard', 'smash', 'seasons', 'trails',
   // куски дворов раундов 4—5 (24.10.2026): без зерна город выходил каждый раз чуть другим — деревья «дворов без пустых мест»,
   // кусты и заборы лабиринта, корты, трамплины, карманы парковки; «убрать» в редакторе их не находило
-  'rings', 'pots', 'yardcars', 'yardmaze', 'yardcurbs', 'yarddecor', 'courts', 'jumps', 'yardfill', 'yardcars2']);
+  'rings', 'pots', 'yardcars', 'yardmaze', 'yardcurbs', 'yarddecor', 'courts', 'jumps', 'yardfill', 'yardcars2',
+  // 0п37 (24.10.2026): места ночных компаний (у баров и у каждого четвёртого подъезда — жребием) были от запуска к запуску разные
+  // (906 / 868 / 865). Остальные куски без зерна жребий на город не тратят (только uuid вещей three.js) — кроме нарочно случайного:
+  // погода (сезон каждой смены), бонусы и кофе (раскладываются заново в начале смены), люди и машины
+  'pubs']);
 const ORIG = Math.random;
 let back = false;
 const mulberry = s => { let a = s >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };

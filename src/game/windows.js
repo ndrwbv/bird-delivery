@@ -98,9 +98,10 @@ export function add (w, from, to, y0, y1, out, sty) {
   b.x0 = Math.min(b.x0, px, qx); b.x1 = Math.max(b.x1, px, qx); b.z0 = Math.min(b.z0, pz, qz); b.z1 = Math.max(b.z1, pz, qz);
   b.y0 = Math.min(b.y0, y0); b.y1 = Math.max(b.y1, y1);
   STATS.windows++;
-  if (sty >= 128) { STATS.balc++; return; }      // стекло остеклённого балкона (balconies.js) — не «окно дома»
-  if (sty >= 64) { STATS.shops++; return; }        // витрины и двери магазинов — не «окна дома» (проверка shop-arch считает окна на вывеске)
+  if (sty >= 128) { STATS.balc++; return seed; }  // стекло остеклённого балкона (balconies.js) — не «окно дома»
+  if (sty >= 64) { STATS.shops++; return seed; }    // витрины и двери магазинов — не «окна дома» (проверка shop-arch считает окна на вывеске)
   if (LOG) LOG.push([+cx.toFixed(2), +cy.toFixed(2), +cz.toFixed(2), w.ox, w.oz, +ww.toFixed(2), +hh.toFixed(2)]);
+  return seed;                                     // зерно окна — свет на земле у фасада горит тем же зерном (nightlight.js)
 }
 
 /* ── атлас: мебель задней стены, фигуры в глубине, подоконник ──

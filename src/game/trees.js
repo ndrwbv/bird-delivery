@@ -27,11 +27,37 @@
 import { wet } from './streams.js';             // речки и пруды — без деревьев (streams.js)
 import { WTREES } from './wintertrees.data.js'; // зимние модели: голые ветки со снегом сверху (tools/trees/wintertrees.py, Blender)
 import { MOB } from './mobile.js';
+import { at as distAt, has as distHas } from './districts.js';   // район: частный сектор, старый центр (порода по месту)
 
 export const TREE = {
   // доли пород там, где дерево сажает карта и улицы (без своей породы)
-  W_SVK: { birch: 30, pine: 13, spruce: 17, poplar: 10, maple: 8, lime: 6, rowan: 8, bush: 8 },
-  W_MSK: { lime: 30, maple: 15, birch: 14, poplar: 11, rowan: 6, spruce: 10, pine: 4, bush: 10 },
+  // (М6, 24.10.2026: + вяз, каштан, лиственница, черёмуха, яблоня, старое дерево, жёлтая акация, боярышник, бузина)
+  W_SVK: { birch: 27, pine: 12, spruce: 15, poplar: 9, maple: 7, lime: 6, rowan: 7, bush: 5, elm: 3, chestnut: 2, larch: 3,
+    cherry: 3, apple: 1, oldtree: 2, caragana: 2, hawthorn: 2, elder: 1 },
+  // телефон (мобильный режим): прежние доли ели и сосны (их крона дешевле всех — память), новые породы — понемногу вместо берёзы
+  W_SVK_MOB: { birch: 25, pine: 13, spruce: 17, poplar: 10, maple: 8, lime: 6, rowan: 8, bush: 8, elm: 2, chestnut: 1, cherry: 2 },
+  W_MSK: { lime: 27, maple: 14, birch: 13, poplar: 10, rowan: 6, spruce: 9, pine: 4, bush: 7, elm: 3, chestnut: 4, larch: 1,
+    cherry: 2, oldtree: 1, caragana: 2, hawthorn: 2 },
+  // ?oldtrees — как до М6 (сравнить кадры, память и вызовы одной сборкой): прежние доли, без новых пород и посадок
+  OLD: { W_SVK: { birch: 30, pine: 13, spruce: 17, poplar: 10, maple: 8, lime: 6, rowan: 8, bush: 8 },
+    W_MSK: { lime: 30, maple: 15, birch: 14, poplar: 11, rowan: 6, spruce: 10, pine: 4, bush: 10 },
+    YARD: { birch: 40, poplar: 14, maple: 16, lime: 10, rowan: 12, pine: 8 }, WIN: { lilac: 60, rosehip: 40 } },
+  // порода по месту (М6): где сажает карта, парки и улицы — доли меняются по тому, что рядом (pickKind)
+  PLACE: {
+    WATER: 9,                   // ближе стольких метров к речке или пруду — «у воды»
+    W_WATER: { willow: 52, birch: 16, poplar: 12, oldtree: 8, elder: 6, cherry: 6 },
+    W_PARK: { chestnut: 8, elm: 6, larch: 6, oldtree: 4, hawthorn: 4, caragana: 3, juniper: 2 },   // + к обычным долям в парке
+    W_OLD: { chestnut: 6, elm: 5, lime: 6 },                                                        // + в Центре и Старом городе
+    W_PRIV_MOB: { apple: 10, cherry: 8, birch: 22, poplar: 10, maple: 6, rowan: 8, spruce: 17, pine: 10, bush: 6, willow: 3 },   // телефон: ели и сосны — как везде
+    W_PRIV: { apple: 18, cherry: 14, birch: 16, poplar: 8, maple: 5, rowan: 8, elder: 6, oldtree: 8, hawthorn: 4, caragana: 5, spruce: 6, willow: 2 },   // частный сектор
+  },
+  // новые посадки (М6, plantYardsSteps): сады частного сектора, стриженое у администраций, ивы по берегам
+  GARDEN: { SHARE: 0.85, MOB: 0, BACK: [3, 8], N: [1, 3], STEP: 3.2, MIX: { apple: 55, cherry: 28, rowan: 9, oldtree: 8 }, CURRANT: 0.6, HEDGE: 0.3 },   // MOB — доля на телефоне (0 — садов нет: память)
+  ADMIN: { SHARE: 0.8, WALL: [2.6, 4.2, 5.6], STEP: 2.7, HEDGE: 0.45, MAX: 8, FROM: 2.5 },   // от стены, м (по очереди); доля зданий с изгородью вместо шаров
+  SHORE: { STEP: 15, OFF: [4.5, 7.5], MAX: 300, MAX_MOB: 60 },                    // ивы: шаг по берегу, от воды, м; не больше
+  // телефон (мобильный режим, «меньше видов»): этих пород нет — вместо них старые (память и «каша» на маленьком экране)
+  MOB_SWAP: { oldtree: 'poplar', caragana: 'bush', elder: 'bush', hawthorn: 'rowan', hedge: null, larch: 'spruce' },
+  MOB_DOTS: 0.4,               // телефон: цветов и ягод у новых пород — 0,4 от компьютера (по 8 треугольников каждый)
   // группы во дворах
   YARD: {
     SHARE: 0.5,                 // у такой доли подъездов — группа перед домом
@@ -43,7 +69,8 @@ export const TREE = {
     DOOR: 8,                    // от любой двери не ближе, м
     ROAD: 3.5,                  // от края проезда не ближе, м
     PATH: 2.2,                  // от оси тропинки не ближе, м
-    MIX: { birch: 40, poplar: 14, maple: 16, lime: 10, rowan: 12, pine: 8 },   // порода группы
+    MIX: { birch: 34, poplar: 11, maple: 13, lime: 9, rowan: 10, pine: 6, cherry: 6, apple: 4, chestnut: 3, elm: 2, larch: 1, oldtree: 1 },   // порода группы
+    MIX_MOB: { birch: 37, poplar: 14, maple: 16, lime: 10, rowan: 12, pine: 8, cherry: 3 },                                                  // телефон
   },
   // кусты под окнами
   WIN: {
@@ -52,7 +79,8 @@ export const TREE = {
     FROM: 4.4,                  // от оси двери вдоль стены не ближе, м (дальше заборчиков тропинки)
     N: [1, 3],                  // кустов подряд
     STEP: 2.0,                  // между кустами, м
-    LILAC: 0.6,                 // сирень, остальное — шиповник
+    MIX: { lilac: 40, rosehip: 24, caragana: 12, hedge: 12, hawthorn: 6, elder: 6 },   // (до М6: сирень 60 %, шиповник 40 %)
+    HEDGE_STEP: 1.7,            // живая изгородь — кусками вплотную, ×2 кусков
   },
   // аллея-арка: ряды пышных деревьев с обеих сторон, кроны смыкаются над дорогой (plantAlley)
   ALLEY: {
@@ -71,6 +99,12 @@ export const TREE = {
       birch: ['#ece8de', '#d8d2c6', '#8a7c72', '#5e463c'], maple: ['#6e5440', '#6a4c32', '#5e4632', '#54402e'],
       lime: ['#7a5a3c', '#6a4c32', '#5e4632', '#54402e'], poplar: ['#6a5a48', '#5a4a3a', '#544436', '#4c3e32'],
       rowan: ['#6a5a4c', '#6a5a4c', '#5e5044', '#54463a'],
+      apple: ['#6a5644', '#665040', '#5e4a3a', '#544234'], cherry: ['#4e4440', '#4a403c', '#463c38', '#403632'],
+      willow: ['#6a5e4c', '#6e6248', '#8a7a40', '#a8903a'],          // у ивы прутья зимой жёлто-оливковые
+      chestnut: ['#5a4a40', '#56463a', '#4e4036', '#463a30'], elm: ['#5e5248', '#5a4c40', '#544638', '#4c4032'],
+      larch: ['#7a5240', '#6a4a36', '#5e4430', '#56402e'], oldtree: ['#5a5046', '#5e544a', '#544a40', '#4a4038'],
+      caragana: ['#6a6a48', '#62603e', '#5c5a3a', '#545234'], elder: ['#8a8070', '#7a7060', '#6e6454', '#625848'],
+      hawthorn: ['#5e4c40', '#5a4838', '#524232', '#4a3c2e'], currant: ['#6a5040', '#5e4838', '#564232', '#4e3c2e'],
     },
     TWIG: [0.32, 0.55],          // зерно прутьев: видны, когда листвы осталось меньше (ветки — на 0,12 раньше)
     MOB_PARTS: 2,                // мобильный режим: только части ниже этой (2 — ствол и суки со снегом, без веток и прутьев:
@@ -78,8 +112,11 @@ export const TREE = {
   },
 };
 let LEAN = null;                // для 'alley': куда клонится крона — к оси улицы { ux, uz, reach }
+let ORIENT = null;              // для изгороди и рядов: поворот куска вдоль стены (рад), null — по жребию
+let FORM = null;                // форма силой (изгородь: 'cut' / 'wild'; стриженое: 0 шар, 1 на штамбе, 2 конус)
+export const SHRUBS = new Set(['lilac', 'rosehip', 'caragana', 'elder', 'hawthorn', 'currant', 'hedge', 'juniper', 'topiary']);
 
-export const STATS = { kinds: {}, where: {}, groups: 0, yard: 0, shrubs: 0, tried: 0 };
+export const STATS = { kinds: {}, where: {}, groups: 0, yard: 0, shrubs: 0, tried: 0, places: {}, pts: {}, tris: {}, admin: { b: 0, edge: 0, try: 0, ok: 0 } };
 
 /* цвет темнее/светлее, кэш по строке: склейка разбирает цвет один раз на строку */
 const TONE = new Map();
@@ -124,15 +161,46 @@ const twig = r => TREE.WINTER.TWIG[0] + r() * (TREE.WINTER.TWIG[1] - TREE.WINTER
 const QS = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
 const NOWT = QS.has('nowt');                                       // ?nowt — зимой палки, как до моделей (сравнить)
 const WTPARTS = QS.has('wtparts') ? +QS.get('wtparts') : null;     // ?wtparts=2 — только ствол и суки (как в мобильном режиме), 9 — всё
+const OLDT = QS.has('oldtrees');                                   // ?oldtrees — породы и посадки как до М6 (TREE.OLD)
 const YEL = ['#e8b830', '#f0c848', '#d8a028'], ORA = ['#e8902a', '#d86a22', '#f0a838'], RED = ['#c84a24', '#d86a22', '#b83a22'];
-const DECIDUOUS = new Set(['birch', 'maple', 'lime', 'poplar', 'rowan', 'bush', 'lilac', 'rosehip', 'alley']);
+const DECIDUOUS = new Set(['birch', 'maple', 'lime', 'poplar', 'rowan', 'bush', 'lilac', 'rosehip', 'alley',
+  'apple', 'cherry', 'willow', 'chestnut', 'elm', 'larch', 'oldtree', 'caragana', 'elder', 'hawthorn', 'currant', 'hedge']);
+const WMOK = !NOWT && !(MOB.on && !TREE.WINTER.MOB_PARTS && WTPARTS === null);   // зимние модели вообще (MOB_PARTS 0 — на телефоне палки)
+/* порода по месту: у воды — ивы, в частном секторе — сады, в парке и в старом центре — каштаны и вязы (TREE.PLACE) */
+let PARKS = null;
+function pickKind (o, r) {
+  const { x, z } = o, PL = TREE.PLACE;
+  if (OLDT) return weighted(r, o.seversk ? TREE.OLD.W_SVK : TREE.OLD.W_MSK);
+  let W = o.seversk ? (MOB.on ? TREE.W_SVK_MOB : TREE.W_SVK) : TREE.W_MSK;
+  if (wet(x, z, PL.WATER)) W = PL.W_WATER;
+  else {
+    const d = distHas() ? distAt(x, z) : -1;
+    if (o.seversk && d === 7) W = MOB.on ? PL.W_PRIV_MOB : PL.W_PRIV;
+    else {
+      if (!PARKS && o.CITY) PARKS = (o.CITY.green || []).filter(g => g.k === 'park').map(g => {
+        let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+        for (const q of g.p) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); z0 = Math.min(z0, q[1]); z1 = Math.max(z1, q[1]); }
+        return { p: g.p, x0, z0, x1, z1 };
+      });
+      const park = PARKS && o.inPoly && PARKS.some(g => x > g.x0 && x < g.x1 && z > g.z0 && z < g.z1 && o.inPoly(x, z, g.p));
+      const old = o.seversk && (d === 3 || d === 4);
+      if (park || old) { W = { ...W }; for (const [k, v] of Object.entries(park ? PL.W_PARK : PL.W_OLD)) W[k] = (W[k] || 0) + v; }
+    }
+  }
+  return weighted(r, W);
+}
 
 /* o: P (склейка), T (шаблоны), r (жребий от точки), x, z, y, kind, seversk, DECID, SPRUCES, ground(x, z) */
+let TRIS = 0;                                     // треугольников у этого дерева (STATS.tris — по породам, для проверки)
 export function growTree (o) {
-  const { P, T, r, x, z, y } = o;
-  const kind = o.kind || weighted(r, o.seversk ? TREE.W_SVK : TREE.W_MSK);
+  const { T, r, x, z, y } = o, P0 = o.P;
+  const P = { add (tpl, ...a) { TRIS += tpl.length / 9; return P0.add(tpl, ...a); } };
+  let kind = o.kind || pickKind(o, r);
+  if (MOB.on && kind in TREE.MOB_SWAP) { kind = TREE.MOB_SWAP[kind]; if (!kind) return false; }   // телефон: меньше видов
   STATS.kinds[kind] = (STATS.kinds[kind] || 0) + 1;
+  TRIS = 0;
   if (STATS.kinds[kind] === 40 || STATS.kinds[kind] === 400) STATS.where[kind] = [Math.round(x), Math.round(z)];   // для проверки глазами (?debug)
+  if (STATS.kinds[kind] % 7 === 1) { const a = STATS.pts[kind] || (STATS.pts[kind] = []); if (a.length < 40) a.push([Math.round(x), Math.round(z)]); }
   const s = 0.82 + r() * 0.4, yaw = r() * 6.283;
   // зимняя модель вместо палок-веток: старые trunk/branch молчат, но жребий r() тянется как прежде — летняя крона та же
   const WM = (kind === 'alley' ? !!LEAN : kind in TREE.WINTER.COL) && !NOWT && !(MOB.on && !TREE.WINTER.MOB_PARTS && WTPARTS === null);   // MOB_PARTS 0 — на телефоне палки, как было
@@ -289,13 +357,183 @@ export function growTree (o) {
     for (let i = 0; i < 4; i++) branch(0, 1.3, 0.4 + r() * 0.2, i * 1.57 + r(), 0.07, '#7a4a3a');
     for (let i = 0; i < 4; i++) { const a = i * 1.57 + r() * 0.6; clump(Math.sin(a) * 0.55, 0.8 + r() * 0.3, Math.cos(a) * 0.55, 0.65 + r() * 0.12, 0.9, '#4f8a3c', 2, i / 3); }
     dots(6, 0, 0.9, 0, 0.95, 0.2, ['#c8281c', '#d8401c'], 6, false);
+  } else if (NEW_KINDS.has(kind)) {
+    growNew(kind, { P, T, r, x, y, z, s, yaw, H, WM, trunk, branch, clump, leaves, dots });
   } else {                                                 // куст в парке
     for (let i = 0; i < 3; i++) branch(0, 2.2, 0.28, i * 2.1 + r(), 0.16, '#6a4c32');
     const pal = r() < 0.5 ? 2 : 1;
     for (let i = 0; i < 4; i++) { const a = i * 1.6 + r(); clump(Math.sin(a) * 0.8, 1.7 + r() * 0.7, Math.cos(a) * 0.8, 0.9 + r() * 0.3, 0.9, pickR(r, ['#5aa04a', '#6fb05a', '#4f9443']), pal, i / 3); }
     leaves(pal === 2 ? RED : ORA, 3, 2.0);
   }
+  STATS.tris[kind] = (STATS.tris[kind] || 0) + TRIS;
   if (DECIDUOUS.has(kind)) o.DECID.push([x, z]);
+}
+
+/* ─────────────── новые породы и кусты (М6, автор 24.10.2026: «больше вариаций кустов и деревьев») ───────────────
+   У каждой — 2—3 размера и формы (s, H, своя форма по жребию), цвета по сезонам (осенняя палитра комков 0 — золотая,
+   1 — рыжая, 2 — алая, 3 — лимонная), зимой — голые ветки моделью из Blender (wintertrees.data.js), хвойные и
+   стриженые — зелёные, снег сверху. Цветы — вид 5 (весной), ягоды и яблоки — вид 6 (с конца лета до середины зимы). */
+const NEW_KINDS = new Set(['apple', 'cherry', 'willow', 'chestnut', 'elm', 'larch', 'oldtree', 'topiary', 'hedge', 'juniper',
+  'caragana', 'elder', 'hawthorn', 'currant']);
+const COLW = TREE.WINTER.COL;
+function growNew (kind, c) {
+  const { P, T, r, x, y, z, s, yaw, H, WM, trunk, branch, clump, leaves } = c;
+  const dots = (n, ...a) => c.dots(MOB.on ? Math.max(2, Math.round(n * TREE.MOB_DOTS)) : n, ...a);   // телефон — реже
+  // смещение в осях дерева (как у модели: поворот yaw вокруг вертикали) → мир
+  const rot = (lx, lz) => [lx * Math.cos(yaw) + lz * Math.sin(yaw), -lx * Math.sin(yaw) + lz * Math.cos(yaw)];
+  const wt = (name, sx, sy, sz, ry = yaw) => { if (WM) winterTree(P, name, x, y, z, sx, sy, sz, ry, COLW[kind], twig(r)); };
+  if (kind === 'apple') {
+    // яблоня-дичка: низкая, кривой ствол, крона широкая и приплюснутая; весной — бело-розовый цвет, осенью — яблочки
+    const W = 0.85 + r() * 0.35;
+    trunk(0.36, 1.7 * H, '#6a5644');
+    for (let i = 0; i < 4; i++) branch(1.5 * H, 1.8 + r() * 0.5, 0.8 + r() * 0.3, i * 1.57 + r() * 0.5, 0.12, '#665040');
+    const g = pickR(r, ['#5a9a48', '#62a04c', '#5f9446']);
+    for (let i = 0; i < 5; i++) { const a = i * 1.257 + r() * 0.4; clump(Math.sin(a) * 1.55 * W, (2.9 + r() * 0.4) * H, Math.cos(a) * 1.55 * W, 1.1 + r() * 0.25, 0.72, g, 0, 0.3); }
+    clump(0, 3.7 * H, 0, 1.3 * W, 0.7, g, 0, 1);
+    dots(9, 0, 3.2 * H, 0, 2.15 * W, 0.26, ['#fbeef2', '#f4d6de', '#ffffff'], 5, false);
+    dots(6, 0, 3.0 * H, 0, 2.1 * W, 0.18, r() < 0.55 ? ['#d8401c', '#c83020', '#e85a28'] : ['#e8c040', '#d8b030', '#c8d040'], 6, false);
+    leaves(YEL, 4, 2.8);
+    wt('apple', s * W, s * H, s * W);
+  } else if (kind === 'cherry') {
+    // черёмуха: три ствола из земли, крона высоким овалом; весной вся в белых кистях, летом — чёрные ягоды
+    for (let i = 0; i < 3; i++) branch(0, 4.6 * H, 0.2 + r() * 0.1, i * 2.1 + r() * 0.4, 0.13, '#4e4440');
+    const g = pickR(r, ['#4f8a3c', '#558f40']), W = 0.85 + r() * 0.3;
+    for (let i = 0; i < 5; i++) { const t = i / 4, a = i * 2.4 + r(); clump(Math.sin(a) * 1.15 * W * (1 - t * 0.4), (3.5 + t * 2.4) * H, Math.cos(a) * 1.15 * W * (1 - t * 0.4), 1.2 - t * 0.25, 1.15, g, 1, t); }
+    dots(13, 0, 4.5 * H, 0, 2.2 * W, 0.32, ['#ffffff', '#f6f4ee', '#eef0e6'], 5, true);
+    dots(5, 0, 4.0 * H, 0, 2.1 * W, 0.15, ['#2a1e28', '#3a2a34'], 6, false);
+    leaves(ORA, 3, 2.4);
+    wt('cherry', s * W, s * H, s * W);
+  } else if (kind === 'willow') {
+    // ива у воды: плакучая (крона свисает почти до земли) или ракита (короткий толстый ствол, круглая шапка)
+    const weep = FORM !== null ? FORM === 0 : r() < 0.65, g = pickR(r, ['#8aa860', '#93ad66', '#7f9f58']);
+    if (weep) {
+      trunk(0.6, 3.0 * H, '#6a5e4c');
+      for (let i = 0; i < 4; i++) branch(2.6 * H, 2.4, 0.85 + r() * 0.3, i * 1.57 + r() * 0.5, 0.18, '#6e6248');
+      // «занавес»: узкие длинные пряди по кругу свисают от макушки почти до земли, сверху — приплюснутая шапка
+      for (let i = 0; i < 8; i++) { const a = i * 0.785 + r() * 0.3, d = 2.4 + r() * 0.5; clump(Math.sin(a) * d, (3.5 + r() * 0.4) * H, Math.cos(a) * d, 0.8 + r() * 0.15, 2.5, g, 3, 0.1 + r() * 0.3); }
+      clump(0, 5.5 * H, 0, 2.3, 0.62, g, 3, 1);
+      wt('willowA', s, s * H, s);
+    } else {
+      trunk(0.72, 2.3 * H, '#6a5e4c');
+      for (let i = 0; i < 4; i++) branch(2.0 * H, 2.0, 0.45 + r() * 0.3, i * 1.57 + r() * 0.5, 0.14, '#6e6248');
+      for (let i = 0; i < 4; i++) { const a = i * 1.57 + r() * 0.5; clump(Math.sin(a) * 1.5, (4.0 + r() * 0.4) * H, Math.cos(a) * 1.5, 1.35 + r() * 0.2, 0.95, g, 3, 0.25); }
+      clump(0, 5.4 * H, 0, 1.6, 0.9, g, 3, 1);
+      wt('willowB', s, s * H, s);
+    }
+    leaves(['#c8b840', '#e0c040'], 4, 3.2);
+  } else if (kind === 'chestnut') {
+    // каштан: толстый ствол, тёмный плотный купол (или высокий овал); весной — белые «свечи», осенью рыжий
+    const tall = r() < 0.4, g = pickR(r, ['#3f7f3a', '#447f3c', '#3a7536']), W = tall ? 0.8 : 1;
+    trunk(0.62, 3.4 * H, '#5a4a40');
+    for (let i = 0; i < 3; i++) branch(3.0 * H, 2.6, 0.6 + r() * 0.3, i * 2.1 + r() * 0.5, 0.18, '#56463a');
+    // плотный купол: нижнее кольцо из 4 комков внахлёст, над ним 3, макушка — без просветов (не «клевер»)
+    for (let i = 0; i < 4; i++) { const a = i * 1.57 + r() * 0.4; clump(Math.sin(a) * 1.5 * W, (4.9 + r() * 0.3) * H, Math.cos(a) * 1.5 * W, 1.75 + r() * 0.15, tall ? 1.15 : 0.9, g, 1, 0.2); }
+    for (let i = 0; i < 3; i++) { const a = i * 2.1 + 0.8 + r() * 0.4; clump(Math.sin(a) * 0.95 * W, (6.3 + r() * 0.3) * H * (tall ? 1.08 : 1), Math.cos(a) * 0.95 * W, 1.5, tall ? 1.15 : 0.9, g, 1, 0.6); }
+    clump(0, (tall ? 7.9 : 7.2) * H, 0, 1.35 * W, tall ? 1.2 : 0.85, g, 1, 1);
+    dots(12, 0, 6.0 * H, 0, 3.1 * W, 0.24, ['#f8f4e8', '#f6e4e0', '#fff8f0'], 5, true);
+    leaves(ORA, 6, 3.4);
+    wt('chestnut', s * W, s * H * (tall ? 1.1 : 1), s * W);
+  } else if (kind === 'elm') {
+    // вяз — «ваза»: ствол до 3,3 м, три лидера вразлёт вверх, крона широким зонтом; осенью золотой
+    const g = pickR(r, ['#4f8f3f', '#57954a', '#4a8a3c']), W = 0.85 + r() * 0.3;
+    trunk(0.5, 3.4 * H, '#5e5248');
+    for (let i = 0; i < 3; i++) branch(3.0 * H, 4.8, 0.42 + r() * 0.12, i * 2.1 + r() * 0.3, 0.2, '#5a4c40');
+    for (let i = 0; i < 5; i++) { const a = i * 1.257 + r() * 0.4; clump(Math.sin(a) * 2.7 * W, (7.5 + r() * 0.5) * H, Math.cos(a) * 2.7 * W, 1.45 + r() * 0.2, 0.7, g, 0, 0.35); }
+    clump(0, 8.6 * H, 0, 1.9 * W, 0.6, g, 0, 1);
+    leaves(YEL, 6, 3.6);
+    wt('elm', s * W, s * H, s * W);
+  } else if (kind === 'larch') {
+    // лиственница: конус из ярусов светлой мягкой хвои — осенью золотая и облетает (вид 1), зимой — голые ветки мутовками
+    const g = pickR(r, ['#8cc060', '#94c468', '#86b85a']);
+    trunk(0.34, 12 * H, '#7a5240');
+    const L = [[2.4, 1.9], [1.95, 3.9], [1.5, 5.8], [1.05, 7.7], [0.6, 9.5]];
+    L.forEach(([rr, b], i) => P.add(T.cone, x, y + (b + 1.15) * s * H, z, rr * s, 2.3 * s * H, rr * s, 0, yaw + i * 0.5, 0, tone(g, Math.round((0.84 + 0.06 * i) * 20) / 20), 1, r(), 0, 0.38));
+    leaves(['#e8b830', '#f0c848', '#d8a028'], 3, 2.2);
+    wt('larch', s, s * H, s);
+  } else if (kind === 'oldtree') {
+    // старое корявое: толстый наклонный ствол с дуплом, один сук обломан, другой сухой торчит; крона редкая, набок
+    const g = pickR(r, ['#5a9446', '#62984a', '#548c42']), pal = r() < 0.5 ? 0 : 1;
+    trunk(0.85, 5.0 * H, '#5a5046');
+    branch(3.0 * H, 1.8, 1.3, 2.9, 0.3, '#5e544a');
+    const [hx, hz] = rot(0.02, -0.15);                            // дупло — на стволе (модель: ствол на 2,2 м — x 0,31, z −0,15)
+    P.add(T.box, x + hx * s, y + 2.2 * s * H, z + hz * s, 0.3 * s, 0.5 * s, 0.3 * s, 0, yaw, 0, '#1e1812');
+    for (const [lx, ly, lz, rr] of [[2.5, 6.0, 0.2, 1.5], [-0.8, 6.6, -1.2, 1.35], [1.0, 7.7, 0.7, 1.2], [3.2, 5.2, -1.4, 1.1]]) {
+      const [ox, oz] = rot(lx, lz);
+      clump(ox, ly * H, oz, rr * (0.9 + r() * 0.2), 0.8, g, pal, (ly - 5) / 3);
+    }
+    leaves(pal ? ORA : YEL, 5, 3.4);
+    wt('oldtree', s, s * H, s);
+  } else if (kind === 'topiary') {
+    // стриженое у администраций: шар на земле, шар на штамбе или конус туи — вечнозелёное (вид 0), зимой снег сверху
+    const f = FORM !== null ? FORM : (r() * 3) | 0, g = pickR(r, ['#3f7a3f', '#467f44', '#3a7040']), k = 0.85 + r() * 0.3;
+    if (f === 0) P.add(T.ico, x, y + 0.55 * k, z, 0.75 * k, 0.68 * k, 0.75 * k, 0, yaw, 0, g, 0, 0, 0, 0.38);
+    else if (f === 1) {
+      P.add(T.stick, x, y + 0.6 * k, z, 0.12, 1.3 * k, 0.12, 0, yaw, 0, '#6a5040');
+      P.add(T.ico, x, y + 1.65 * k, z, 0.62 * k, 0.6 * k, 0.62 * k, 0, yaw, 0, g, 0, 0, 0, 0.38);
+    } else {
+      P.add(T.cone, x, y + 1.2 * k, z, 0.6 * k, 2.4 * k, 0.6 * k, 0, yaw, 0, tone(g, 0.92), 0, 0, 0, 0.3);
+      P.add(T.ico, x, y + 0.35 * k, z, 0.58 * k, 0.42 * k, 0.58 * k, 0, yaw, 0, tone(g, 0.85), 0);
+    }
+  } else if (kind === 'hedge') {
+    // живая изгородь, кусок ~1,7 м вдоль стены: стриженая — ровный брусок (осенью желтеет, зимой — голые ветки со снегом
+    // сверху), запущенная — комки разной высоты, зимой — прутья
+    const ry = ORIENT !== null ? ORIENT : yaw, wild = FORM !== null ? FORM === 'wild' : r() < 0.4;
+    const g = pickR(r, ['#4f8a3c', '#558f40', '#4a8538']), sd = twig(r);
+    if (!wild) {
+      const h = 0.95 + r() * 0.2;
+      P.add(T.box, x, y + h / 2, z, 1.78, h, 0.85, 0, ry, 0, g, 1, 0.05 + r() * 0.85, 0, 0.38);
+      P.add(T.box, x, y + h / 2 - 0.05, z, 1.62, h - 0.12, 0.7, 0, ry, 0, '#4a3e30', 7, sd);
+      P.add(T.box, x, y + h - 0.08, z, 1.68, 0.1, 0.76, 0, ry, 0, '#4a3e30', 7, sd, 1);
+    } else {
+      const ux = Math.cos(ry), uz = -Math.sin(ry);
+      for (let i = -1; i <= 1; i++) { const d = i * 0.62 + (r() - 0.5) * 0.2; clump(ux * d, 0.8 + r() * 0.5, uz * d, 0.62 + r() * 0.2, 1.05, g, 0, 0.3 + i * 0.2); }
+      if (WMOK) winterTree(P, 'currant', x, y, z, 1.7, 1.5 + r() * 0.4, 1.0, ry, COLW.currant, sd);
+      else for (let i = 0; i < 3; i++) branch(0, 1.4, 0.3 + r() * 0.3, i * 2.1 + r(), 0.06, '#5e4838');
+    }
+  } else if (kind === 'juniper') {
+    // можжевельник: колонна или стелющийся — сизо-зелёный, вечнозелёный, зимой снег сверху
+    const g = pickR(r, ['#3a6a58', '#41705c', '#365f50']);
+    if (r() < 0.55) {
+      P.add(T.cone, x, y + 1.3 * s * H, z, 0.55 * s, 2.6 * s * H, 0.55 * s, 0, yaw, 0, g, 0, 0, 0, 0.3);
+      clump(0, 0.7 * H, 0, 0.6, 1.3, g, 0, 0.2, 0);
+    } else for (let i = 0; i < 3; i++) { const a = i * 2.1 + r(); clump(Math.sin(a) * 0.7, 0.42, Math.cos(a) * 0.7, 0.8, 0.45, g, 0, i / 2, 0); }
+  } else if (kind === 'caragana') {
+    // жёлтая акация: прямой узкий куст ~2,6 м, мелкая светлая листва, в конце весны — жёлтые цветки
+    const g = pickR(r, ['#7ab052', '#80b458', '#74a84c']);
+    for (let i = 0; i < 4; i++) branch(0, 2.3 * H, 0.15 + r() * 0.12, i * 1.57 + r(), 0.06, '#62603e');
+    for (let i = 0; i < 4; i++) { const a = i * 1.57 + r() * 0.5; clump(Math.sin(a) * 0.45, (1.2 + r() * 0.6) * H, Math.cos(a) * 0.45, 0.62 + r() * 0.12, 1.35, g, 0, i / 3); }
+    clump(0, 2.25 * H, 0, 0.55, 1.2, g, 0, 1);
+    dots(9, 0, 1.7 * H, 0, 0.95, 0.2, ['#f0d030', '#f8e048', '#e8c020'], 5, false);
+    leaves(YEL, 2, 1.6);
+    wt('caragana', s, s * H, s);
+  } else if (kind === 'elder') {
+    // бузина: широкий раскидистый куст ~3 м, крупная тёмная листва; весной — белые зонтики, с конца лета — красные ягоды
+    const g = pickR(r, ['#4f8a3c', '#4a8238']);
+    for (let i = 0; i < 4; i++) branch(0, 2.4 * H, 0.45 + r() * 0.2, i * 1.57 + r(), 0.08, '#7a7060');
+    for (let i = 0; i < 5; i++) { const a = i * 1.257 + r() * 0.5; clump(Math.sin(a) * 1.1, (1.6 + r() * 0.6) * H, Math.cos(a) * 1.1, 0.9 + r() * 0.15, 0.85, g, 2, i / 4); }
+    dots(8, 0, 1.9 * H, 0, 1.75, 0.3, ['#f4f0dc', '#ece6cc'], 5, false);
+    dots(7, 0, 1.8 * H, 0, 1.7, 0.18, ['#d82018', '#e83020', '#c01818'], 6, false);
+    leaves(RED, 2, 1.8);
+    wt('elder', s, s * H, s);
+  } else if (kind === 'hawthorn') {
+    // боярышник: деревце-куст ~3,5 м, круглая плотная крона; весной белые цветы, осенью алый и тёмно-красные ягоды
+    const g = pickR(r, ['#4f9443', '#56984a']);
+    trunk(0.2, 1.3 * H, '#5e4c40');
+    for (let i = 0; i < 3; i++) branch(1.0 * H, 1.4, 0.7 + r() * 0.3, i * 2.1 + r(), 0.07, '#5a4838');
+    for (let i = 0; i < 4; i++) { const a = i * 1.57 + r() * 0.5; clump(Math.sin(a) * 0.85, (2.3 + r() * 0.3) * H, Math.cos(a) * 0.85, 0.9 + r() * 0.15, 0.9, g, 2, 0.3); }
+    clump(0, 3.0 * H, 0, 0.95, 0.85, g, 2, 1);
+    dots(9, 0, 2.5 * H, 0, 1.6, 0.2, ['#ffffff', '#f6f0ea'], 5, false);
+    dots(8, 0, 2.4 * H, 0, 1.6, 0.16, ['#a8181c', '#c02020', '#901418'], 6, false);
+    leaves(RED, 3, 2.0);
+    wt('hawthorn', s, s * H, s);
+  } else if (kind === 'currant') {
+    // смородина у частных домов: низкий круглый куст ~1,2 м, чёрные или красные ягоды
+    const g = pickR(r, ['#5a9a48', '#62a04e']), red = r() < 0.35;
+    for (let i = 0; i < 3; i++) branch(0, 1.1, 0.4 + r() * 0.2, i * 2.1 + r(), 0.05, '#6a5040');
+    for (let i = 0; i < 3; i++) { const a = i * 2.1 + r() * 0.5; clump(Math.sin(a) * 0.45, 0.6 + r() * 0.2, Math.cos(a) * 0.45, 0.55 + r() * 0.1, 0.85, g, red ? 2 : 1, i / 2); }
+    dots(6, 0, 0.65, 0, 0.8, 0.12, red ? ['#d01828', '#e02838'] : ['#20141e', '#2e1e2a'], 6, false);
+    wt('currant', s, s, s);
+  }
 }
 
 /* ─────────────── дворы: группы деревьев и кусты под окнами ───────────────
@@ -331,17 +569,19 @@ export function* plantYardsSteps (A) {
   const segD = (x, z, s) => { const dx = s[2] - s[0], dz = s[3] - s[1], l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - s[0]) * dx + (z - s[1]) * dz) / l2)); return Math.hypot(x - s[0] - dx * t, z - s[1] - dz * t); };
 
   // свободно ли место: m — сколько от дома, road — от проезда, door — от двери, path — от тропинки
+  const WHY = STATS.why = {};
+  const no = k => { WHY[k] = (WHY[k] || 0) + 1; return false; };
   const free = (x, z, m, road, door, path, sm) => {
     STATS.tried++;
-    if (!A.inBounds(x, z, -30) || A.groundH(x, z) < 0.3 || A.inHouse(x, z, m) || wet(x, z, 1)) return false;
+    if (!A.inBounds(x, z, -30) || A.groundH(x, z) < 0.3 || A.inHouse(x, z, m) || wet(x, z, 1)) return no('house');
     const n = A.nearestRoad(x, z, 14, 1);
-    if (n && n.d < n.seg.w / 2 + road) return false;
-    if (DOORS.near(x, z, e => Math.hypot(e[0] - x, e[1] - z) < door)) return false;
-    if (PATHS.near(x, z, s => segD(x, z, s) < path)) return false;
-    if (SM.near(x, z, it => Math.hypot(it.x - x, it.z - z) < (it.r || 1) + sm)) return false;
-    if (A.solidAt(x, z, 1.0)) return false;
-    if (PITCHES_NEAR(x, z)) return false;
-    return !inArea(x, z);
+    if (n && n.d < n.seg.w / 2 + road) return no('road');
+    if (DOORS.near(x, z, e => Math.hypot(e[0] - x, e[1] - z) < door)) return no('door');
+    if (PATHS.near(x, z, s => segD(x, z, s) < path)) return no('path');
+    if (SM.near(x, z, it => Math.hypot(it.x - x, it.z - z) < (it.r || 1) + sm)) return no('smash');
+    if (A.solidAt(x, z, 1.0)) return no('solid');
+    if (PITCHES_NEAR(x, z)) return no('pitch');
+    return !inArea(x, z) || no('area');
   };
   const PITCHES_NEAR = (x, z) => (A.PITCHES || []).some(p => Math.hypot(p.cx - x, p.cz - z) < Math.max(p.L || 0, p.W || 0) / 2 + 4);
   const hash = (x, z, k) => { const v = Math.sin(x * 12.9898 + z * 78.233 + k * 37.719) * 43758.5453; return v - Math.floor(v); };
@@ -359,7 +599,7 @@ export function* plantYardsSteps (A) {
         if (MINE.near(cx, cz, q => q.g && Math.hypot(q.x - cx, q.z - cz) < Y.GAP)) continue;
         if (!free(cx, cz, 4, Y.ROAD + 1, Y.DOOR + 2, Y.PATH + 1, 2.5)) continue;
         const n = Y.N[0] + Math.floor(hash(cx, cz, 3) * (Y.N[1] - Y.N[0] + 1));
-        const main = weighted(() => hash(cx, cz, 4), Y.MIX);
+        const main = weighted(() => hash(cx, cz, 4), OLDT ? TREE.OLD.YARD : MOB.on ? Y.MIX_MOB : Y.MIX);
         const pts = [];
         for (let k = 0; k < n * 3 && pts.length < n; k++) {
           const a = k * 2.4 + hash(cx, cz, 30 + k) * 0.8, rr = k ? 2.2 + Math.sqrt(k) * 1.5 + hash(cx, cz, 40 + k) : 0;
@@ -367,7 +607,7 @@ export function* plantYardsSteps (A) {
           if (pts.some(p => Math.hypot(p[0] - x, p[1] - z) < Y.STEP)) continue;
           if (MINE.near(x, z, q => Math.hypot(q.x - x, q.z - z) < Y.STEP)) continue;
           if (k && !free(x, z, 3, Y.ROAD, Y.DOOR, Y.PATH, 1.8)) continue;
-          const kind = hash(x, z, 5) < 0.75 ? main : pickR(() => hash(x, z, 6), ['birch', 'rowan', 'maple', 'lime']);
+          const kind = hash(x, z, 5) < 0.75 ? main : pickR(() => hash(x, z, 6), ['birch', 'rowan', 'maple', 'lime']);   // примесь — прежняя
           if (!A.tree(x, z, 0, kind)) continue;
           pts.push([x, z]);
           MINE.add(x, z, { x, z, g: !k });
@@ -379,10 +619,11 @@ export function* plantYardsSteps (A) {
     // кусты под окнами — по обе стороны от двери
     for (const sd of [-1, 1]) {
       if (hash(ex, ez, sd > 0 ? 7 : 8) >= WN.SHARE) continue;
-      const kind = hash(ex, ez, sd > 0 ? 11 : 12) < WN.LILAC ? 'lilac' : 'rosehip';
-      const cnt = WN.N[0] + Math.floor(hash(ex, ez, sd > 0 ? 13 : 14) * (WN.N[1] - WN.N[0] + 1));
+      const kind = weighted(() => hash(ex, ez, sd > 0 ? 11 : 12), OLDT ? TREE.OLD.WIN : WN.MIX), hedge = kind === 'hedge';
+      const cnt = (WN.N[0] + Math.floor(hash(ex, ez, sd > 0 ? 13 : 14) * (WN.N[1] - WN.N[0] + 1))) * (hedge ? 2 : 1);
       let off = WN.FROM + hash(ex, ez, sd > 0 ? 15 : 16) * 2;
-      for (let k = 0; k < cnt; k++, off += WN.STEP + hash(ex, ez, 17 + k) * 0.8) {
+      if (hedge) { ORIENT = Math.atan2(-tz, tx); FORM = 'cut'; }               // изгородь под окнами — стриженая, вдоль стены
+      for (let k = 0; k < cnt; k++, off += hedge ? WN.HEDGE_STEP : WN.STEP + hash(ex, ez, 17 + k) * 0.8) {
         const x = ex + nx * WN.WALL + tx * off * sd, z = ez + nz * WN.WALL + tz * off * sd;
         if (MINE.near(x, z, q => Math.hypot(q.x - x, q.z - z) < 1.6)) continue;
         if (!free(x, z, 0.9, 1.5, 3.6, 1.3, 1.0)) continue;
@@ -390,9 +631,129 @@ export function* plantYardsSteps (A) {
         MINE.add(x, z, { x, z });
         STATS.shrubs++;
       }
+      ORIENT = FORM = null;
     }
   }
+  yield 'yards';
+  if (!QS.has('nonewtrees') && !OLDT) {                     // ?nonewtrees — без садов, стриженого у администраций и ив по берегам (сравнить)
+    const put = (x, z, kind, m, road, door, path, sm, step = 2.4) => {
+      if (MINE.near(x, z, q => Math.hypot(q.x - x, q.z - z) < step)) return false;
+      if (!free(x, z, m, road, door, path, sm) || !A.tree(x, z, 0, kind)) return false;
+      MINE.add(x, z, { x, z });
+      STATS.places[kind] = (STATS.places[kind] || 0) + 1;
+      return true;
+    };
+    plantGardens(A, put, hash);
+    yield 'gardens';
+    plantAdmins(A, put, hash);
+    yield 'admins';
+    plantShores(A, put, hash);
+  }
   return STATS;
+}
+
+/* сады частного сектора (М6): за домом, с той стороны, что дальше от улицы, — 1—3 яблони, черёмухи, рябины, ряд смородины,
+   у части — запущенная изгородь по задней границе */
+const centerOf = p => { let cx = 0, cz = 0; for (const q of p) { cx += q[0] / p.length; cz += q[1] / p.length; } return [cx, cz]; };
+function plantGardens (A, put, hash) {
+  const G = TREE.GARDEN;
+  for (const b of A.CITY.buildings) {
+    if (!(b.k === 'priv' || b.st === 'priv') || !b.p || b.p.length < 3) continue;
+    const [cx, cz] = centerOf(b.p);
+    if (hash(cx, cz, 50) >= G.SHARE * (MOB.on ? G.MOB : 1)) continue;
+    const rd = A.nearestRoad(cx, cz, 80, 1);
+    let ax = 1, az = 0;
+    if (rd) { const l = Math.hypot(cx - rd.x, cz - rd.z) || 1; ax = (cx - rd.x) / l; az = (cz - rd.z) / l; }
+    const bx = -az, bz = ax;
+    let back = 0, side = 0;                         // дом: до задней стены и в стороны от середины, м
+    for (const q of b.p) { back = Math.max(back, (q[0] - cx) * ax + (q[1] - cz) * az); side = Math.max(side, Math.abs((q[0] - cx) * bx + (q[1] - cz) * bz)); }
+    const d0 = back + G.BACK[0] + hash(cx, cz, 51) * (G.BACK[1] - G.BACK[0]);
+    const n = G.N[0] + Math.floor(hash(cx, cz, 52) * (G.N[1] - G.N[0] + 1));
+    for (let i = 0; i < n; i++) {
+      const lat = (i - (n - 1) / 2) * G.STEP + (hash(cx, cz, 53 + i) - 0.5) * 1.2, dd = d0 + (hash(cx, cz, 56 + i) - 0.5) * 1.6;
+      const x = cx + ax * dd + bx * lat, z = cz + az * dd + bz * lat;
+      put(x, z, weighted(() => hash(x, z, 57), G.MIX), 1.5, 3, 5, 1.6, 1.2, 2.8);
+    }
+    if (hash(cx, cz, 60) < G.CURRANT) {             // смородина — рядком сбоку от дома
+      const sd = hash(cx, cz, 61) < 0.5 ? -1 : 1, nb = 2 + Math.floor(hash(cx, cz, 62) * 3);
+      for (let i = 0; i < nb; i++) {
+        const lat = sd * (side + 2.0), dd = back * 0.4 - i * 1.5;
+        put(cx + ax * dd + bx * lat, cz + az * dd + bz * lat, 'currant', 1.0, 2.5, 3.6, 1.3, 0.8, 1.2);
+      }
+    }
+    if (hash(cx, cz, 63) < G.HEDGE) {               // запущенная изгородь по задней границе
+      ORIENT = Math.atan2(-bz, bx); FORM = 'wild';
+      const dd = d0 + 3.2;
+      for (let i = -2; i <= 2; i++) { const lat = i * 1.7; put(cx + ax * dd + bx * lat, cz + az * dd + bz * lat, 'hedge', 1.2, 2.5, 4, 1.3, 0.8, 1.5); }
+      ORIENT = FORM = null;
+    }
+  }
+}
+
+/* у администраций, школ, больниц и контор (pub, off — М6): вдоль стены к улице, в 2,6 м от неё — ряд стриженых шаров
+   (у каждого здания своя форма: шар, шар на штамбе, конус туи — или через один) или стриженая изгородь */
+function plantAdmins (A, put, hash) {
+  const D = TREE.ADMIN;
+  for (const b of A.CITY.buildings) {
+    if (!(b.k === 'pub' || b.k === 'off') || !b.p || b.p.length < 3) continue;
+    const [cx, cz] = centerOf(b.p);
+    if (hash(cx, cz, 70) >= D.SHARE) continue;
+    // сторона к улице: середина стены + наружу 3 м — ближе всех к дороге
+    let best = null;
+    for (let i = 0; i < b.p.length; i++) {
+      const [x1, z1] = b.p[i], [x2, z2] = b.p[(i + 1) % b.p.length], L = Math.hypot(x2 - x1, z2 - z1);
+      if (L < 8) continue;
+      const ux = (x2 - x1) / L, uz = (z2 - z1) / L, mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
+      let nx = uz, nz = -ux;
+      if (A.inPoly(mx + nx, mz + nz, b.p)) { nx = -nx; nz = -nz; }
+      const rd = A.nearestRoad(mx + nx * 3, mz + nz * 3, 50, 1);
+      if (!rd) continue;
+      if (!best || rd.d < best.d) best = { d: rd.d, x1, z1, ux, uz, L, nx, nz };
+    }
+    STATS.admin.b++;
+    if (!best) continue;
+    STATS.admin.edge++;
+    const hedge = hash(cx, cz, 71) < D.HEDGE, f1 = (hash(cx, cz, 72) * 3) | 0, f2 = hash(cx, cz, 73) < 0.5 ? f1 : (f1 + 1) % 3;
+    const step = hedge ? TREE.WIN.HEDGE_STEP : D.STEP, max = hedge ? D.MAX * 2 : D.MAX;
+    if (hedge) { ORIENT = Math.atan2(-best.uz, best.ux); FORM = 'cut'; }
+    let n = 0;
+    for (let t = D.FROM + (best.L - 2 * D.FROM) % step / 2; t <= best.L - D.FROM && n < max; t += step) {
+      if (!hedge) FORM = n % 2 ? f2 : f1;
+      for (const w of D.WALL) {                     // у стены часто дорожка-отмостка — тогда чуть дальше
+        const x = best.x1 + best.ux * t + best.nx * w, z = best.z1 + best.uz * t + best.nz * w;
+        STATS.admin.try++;
+        if (put(x, z, hedge ? 'hedge' : 'topiary', 0.9, 1.5, 3.6, 1.0, 0.8, hedge ? 1.5 : 2.0)) { n++; break; }
+      }
+    }
+    STATS.admin.ok += n;
+    ORIENT = FORM = null;
+  }
+}
+
+/* ивы по берегам речек и прудов (М6): места через SHORE.STEP м по обе стороны, в 4,5—7,5 м от воды; из мест — доля по
+   жребию так, чтобы ив было не больше SHORE.MAX (телефон — MAX_MOB) */
+function plantShores (A, put, hash) {
+  const S = TREE.SHORE, C = [];
+  const edge = (p, closed, w) => {
+    for (let i = 1; i < p.length + (closed ? 1 : 0); i++) {
+      const [x1, z1] = p[i - 1], [x2, z2] = p[i % p.length], L = Math.hypot(x2 - x1, z2 - z1) || 1, ux = (x2 - x1) / L, uz = (z2 - z1) / L;
+      for (let t = S.STEP / 2; t < L; t += S.STEP) for (const sd of [-1, 1]) {
+        const off = w / 2 + S.OFF[0] + hash(x1 + t, z1, 80 + sd) * (S.OFF[1] - S.OFF[0]);
+        const x = x1 + ux * t - uz * off * sd, z = z1 + uz * t + ux * off * sd;
+        if (A.inBounds(x, z, -30) && !wet(x, z, 1.5) && wet(x, z, TREE.PLACE.WATER)) C.push([x, z]);
+      }
+    }
+  };
+  for (const st of A.CITY.streams || []) edge(st.p, false, st.w || 6);
+  for (const g of A.CITY.green) if (g.k === 'water') edge(g.p, true, 0);
+  const max = MOB.on ? S.MAX_MOB : S.MAX, k = Math.min(1, max / Math.max(1, C.length));
+  STATS.shore = C.length;
+  for (const [x, z] of C) {
+    if (hash(x, z, 85) >= k) continue;
+    FORM = hash(x, z, 86) < 0.65 ? 0 : 1;           // плакучая / ракита
+    put(x, z, 'willow', 2, 3, 6, 2, 1.5, 6);
+    FORM = null;
+  }
 }
 
 /* ─────────────── аллея-арка (улица Ленина в Солнечном) ───────────────

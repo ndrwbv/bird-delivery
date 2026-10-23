@@ -440,7 +440,7 @@ html[data-map="moscow"] #radar { cursor: zoom-in; pointer-events: auto; }
 /* маршрут: к клиенту — оранжевый, в пиццерию — зелёный */
 .fm-leg i.lg-route { width: 14px; height: 4px; vertical-align: 1px; background: linear-gradient(90deg, #ff8a2b 50%, #3fd15e 50%); border-color: #5a2a00; }
 .fm-leg i.lg-jam { width: 14px; height: 3px; vertical-align: 2px; background: #e8323c; border: 0; }
-.fm-leg i.lg-gang { width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle, rgba(214, 36, 44, 0.75) 0, rgba(214, 36, 44, 0.35) 45%, rgba(214, 36, 44, 0) 72%); }   /* размытое пятно, как на карте (world.js drawBlob) */
+.fm-leg i.lg-gang { width: 10px; height: 10px; border-radius: 1px; background: rgba(214, 36, 44, 0.3); border: 2px solid #c41e24; }   /* кварталы района с краем, как на карте (world.js drawGang) */
 .fm-leg i.lg-mine { background: transparent; border: 2px solid #ffd85e; box-sizing: border-box; }
 .fm-leg i.lg-lock { background: repeating-linear-gradient(-45deg, #1e1828 0 3px, #8a3a38 3px 4px); }
 .fm-leg i.lg-gar { background: #6f8a3a; border-radius: 2px; } .fm-leg i.lg-kpp { background: #1f4f9a; }

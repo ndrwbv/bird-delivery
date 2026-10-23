@@ -32,6 +32,7 @@ import * as GROW from './growth.js';             // пиццерия растё�
 import { farEarned } from './orders.js';
 import * as END from './shiftend.js';
 import * as STOUR from './shifttour.js';        // первый чек смены: Толик облачками показывает, что тут где (shifttour.js)
+import * as SSTEPS from './shiftsteps.js';      // конец смены экранами по очереди: деньги → «давай депнем?» → рейтинг → машина → чек (shiftsteps.js)
 import * as DAILY from './daily.js';             // задания на день: строка «задания: 2 из 3» в чеке смены (daily.js)
 import * as IDLEB from './idleboss.js';          // простой за смену: строка «простой · 3:20» в чеке (idleboss.js)
 import * as CHAT from './chat.js';
@@ -149,13 +150,14 @@ export function startShift () {
   SH.tStart = A.env().t; SH.allDay = day;
   S.lunch = null;
   SH.on = true; SH.phase = ''; SH.home = false; SH.lunch = false; SH.hits = 0; SH.lastHurt = S.hurt || 0; SH.fine = 0; SH.back = 0; SH.stars = 0;
-  SH.slot = false; SH.forceMood = ''; SH.lost = 0; SH.m = S.money || 0; S.tips = 0; SH.t0h = ECON.hourOf(A.env().t); SH.endH = SH.t0h; SH.n = +A.Store.get('dlv-shifts', 0) || 0;
+  SH.slot = false; SH.forceMood = ''; SH.forceCar = null; SH.forceDep = ''; SH.lost = 0; SH.m = S.money || 0; S.tips = 0; SH.t0h = ECON.hourOf(A.env().t); SH.endH = SH.t0h; SH.n = +A.Store.get('dlv-shifts', 0) || 0;
   SH.len = QR.on() ? QR.len() : ECON.shiftLen(SH.n);   // быстрый заезд — длина, что выбрал игрок
   // волна щедрости: 1-я смена сессии — щедрая (econ.js PACE); быстрый заезд — обычная и волну не двигает
   SH.pace = QR.on() ? (DIST.setPace('normal'), 'normal') : DIST.beginShift();
   SH.district = DIST.cur();
   SH.city = DIST.city();                          // «весь город» (cityopen.js): итоги — без района, с премией за дальние
   SH.opened = -1;
+  SH.car0 = carNow();                             // мотор и пробег в начале смены — «мотор 87 % (−3 %)», «проехал 9 км» (shiftsteps.js, экран машины)
   lunchClass(false);
   fire(startCbs, { n: SH.n + 1 });
   const L = SH.len, P = SH.pace;
@@ -534,36 +536,113 @@ export function showEnd (why, whyText, held) {
   // строка «лучшая смена» прошлого чека — вынуть из него, пока play не стёр старый чек вместе с ней (вернётся в новый — noteIn)
   const note0 = $('st-note2');
   if (note0 && stage.contains(note0)) stage.after(note0);
-  END.play({
-    host: stage, tap: ov, money: A.money, Snd: A.Snd, stamp: again,
-    head: wasOn ? t('чек смены') + ' · ' + (SH.city ? t('весь город') : DIST.has() ? t(DIST.list()[SH.district >= 0 ? SH.district : DIST.cur()].name) : t('Солнечный'))
-      : t('покатался'),
-    no: wasOn ? SH.n + 1 : 0,
-    why: wasOn ? (WHY[why] ? WHY[why]() : whyText || '') : '',
-    rows: wasOn ? endRows(full) : [],
-    total: wasOn ? { k: t('за смену'), n: total, fmt: n => (n > 0 ? '+' : '') + A.money(n), cls: total > 0 ? 'pp-plus' : '' } : null,
-    hints: endHints(wasOn, rankWas, placeWas),
-    seal, party: seal && total > 0 ? seal.party : '',
-    ribbon: wasOn ? HOL.ribbon() : null,          // праздничная смена — лента «С Новым годом!» (holidays.js)
-    sticker: wasOn ? { line: END.tolikLine({ mood: SH.mood || 'ok', opened, killed: knocked(), adult: !!A.ADULT }) } : null,
-  }, quick => {
+  // 11бе (автор 24.10.2026): сначала экраны по очереди — деньги, «давай депнем?», рейтинг, машина (shiftsteps.js), потом этот чек
+  const screens = wasOn && !SSTEPS.OFF ? endScreens(full, total) : [];
+  if (screens.length) {
+    SSTEPS.play({ host: ov, screens, Snd: A.Snd, padClear: () => { KB.clear(); if (A.padClear) A.padClear(); },
+      onDep: (stake, next) => { if (A.Snd.boot) A.Snd.boot(); DEP.open({ stake, spin: true, next }); } }, printCheck);
+  } else printCheck();
+  function printCheck () {
+    if (screens.length && (ov.hidden || A.S.state !== 'over')) return;   // чек убрали, пока шли экраны (новая смена из отладки, меню)
+    refreshEnd();
+    END.play({
+      host: stage, tap: ov, money: A.money, Snd: A.Snd, stamp: again,
+      head: wasOn ? t('чек смены') + ' · ' + (SH.city ? t('весь город') : DIST.has() ? t(DIST.list()[SH.district >= 0 ? SH.district : DIST.cur()].name) : t('Солнечный'))
+        : t('покатался'),
+      no: wasOn ? SH.n + 1 : 0,
+      why: wasOn ? (WHY[why] ? WHY[why]() : whyText || '') : '',
+      rows: wasOn ? endRows(full) : [],
+      total: wasOn ? { k: t('за смену'), n: total, fmt: n => (n > 0 ? '+' : '') + A.money(n), cls: total > 0 ? 'pp-plus' : '' } : null,
+      hints: endHints(wasOn, rankWas, placeWas),
+      seal, party: seal && total > 0 ? seal.party : '',
+      ribbon: wasOn ? HOL.ribbon() : null,          // праздничная смена — лента «С Новым годом!» (holidays.js)
+      sticker: wasOn ? { line: END.tolikLine({ mood: SH.mood || 'ok', opened, killed: knocked(), adult: !!A.ADULT }) } : null,
+    }, quick => {
+      noteIn();
+      fitEnd();
+      setTimeout(() => {
+        ov.classList.remove('wait'); KB.clear(); fitEnd();
+        // первый чек профиля — обучение Толика поверх чека (вопрос «оставить путь?» routeask.js ждёт, пока оно не кончится)
+        if (wasOn && STOUR.need(A.Store) && !ov.hidden && A.S.state === 'over') tourEnd(ov);
+      }, quick ? 350 : 0);
+    });
     noteIn();
+    placeCal();
     fitEnd();
-    setTimeout(() => {
-      ov.classList.remove('wait'); KB.clear(); fitEnd();
-      // первый чек профиля — обучение Толика поверх чека (вопрос «оставить путь?» routeask.js ждёт, пока оно не кончится)
-      if (wasOn && STOUR.need(A.Store) && !ov.hidden && A.S.state === 'over') tourEnd(ov);
-    }, quick ? 350 : 0);
-  });
+  }
   // «лучшая смена! ты #N в мире» (board.js) — строкой в чеке; переносим сразу, а не в конце печати: пока строка лежала
   // под чеком, высота экрана была другой, и размер под экран (fitEnd) менялся в конце — лист прыгал
   function noteIn () {
     const note = $('st-note2'), col = stage.querySelector('.cr-rc-hints');
     if (note && col && note.parentNode !== col) { note.className = 'ov-note pp-hint'; col.appendChild(note); }
   }
-  noteIn();
-  placeCal();
-  fitEnd();
+}
+
+/* ── экраны конца смены по очереди (shiftsteps.js, docs/CAREER.md «Конец смены — экраны по очереди») ── */
+const DEP_OFFER = 'dlv-dep-offer';                 // какой по счёту смене последний раз предлагали «давай депнем?»
+const signed = n => (n > 0 ? '+' : n < 0 ? '−' : '') + A.money(Math.abs(n));
+function endScreens (full, total) {
+  const head = t('смена № {n}', { n: SH.n + 1 }) + ' · ' + (SH.city ? t('весь город') : DIST.has() ? t(DIST.list()[SH.district >= 0 ? SH.district : DIST.cur()].name) : t('Солнечный'));
+  const out = [cashScreen(full, total, head)];
+  out.push(depScreen(total), rankScreen(), carScreen());
+  return out.filter(Boolean);
+}
+/* 1. деньги: строки — то же, что в чеке (сходится с итогом «за смену»), только деньги; копилка — до и после */
+function cashScreen (full, total, head) {
+  const S = A.S, tips = Math.max(0, Math.round(S.tips || 0)), lost = Math.max(0, Math.round(SH.lost || 0));
+  const daily = Math.max(0, Math.round(DAILY.earned() || 0)), d = S.delivered || 0;
+  const got = Math.max(0, (S.money || 0) - tips - daily + lost);
+  const rows = [{ k: d ? tn(d, '{n} заказ доставлен|{n} заказа доставлено|{n} заказов доставлено') : t('заказов не доставлено'), n: got }];
+  if (tips) rows.push({ k: t('чаевые и за скорость'), n: tips });
+  if (daily) rows.push({ k: t('задания на день'), n: daily });
+  if (lost) rows.push({ k: t('штрафы и вычеты'), n: -lost });
+  rows.push(full ? { k: t('бонус за смену'), n: SH.bonus || 0 } : { k: t('бонус за смену'), n: 0, v: t('только до конца') });
+  if (SH.win) rows.push({ k: t('премия первому'), n: SH.win });
+  const after = A.wallet();
+  return { id: 'cash', head, rows, total, fmt: signed, money: A.money, before: Math.max(0, after - total), after };
+}
+/* 2. «давай депнем?» — только взрослая; первый раз — обязательно (как только есть ¼ смены на ставку), дальше — иногда */
+function depScreen (total) {
+  if (!A.ADULT) return null;
+  const C = SSTEPS.CFG, step = ECON.SLOT.STEP;
+  const stake = Math.floor(Math.max(0, total) * C.DEP_SHARE / step) * step;
+  if (stake < step || A.wallet() < stake) return null;
+  const last = A.Store.get(DEP_OFFER, null), first = last == null || last === '';
+  if (SH.forceDep === 'no') return null;
+  if (!first && SH.forceDep !== 'yes' && (SH.n - (+last || 0) < 2 || Math.random() >= C.DEP_CHANCE)) return null;
+  A.Store.set(DEP_OFFER, SH.n);
+  const g = DEP.game();
+  return { id: 'dep', game: g, name: DEP.nameOf(g), mul: DEP.mul(g), stake, wallet: A.wallet(), money: A.money,
+    say: first ? t('первая получка — давай депнем! четверть смены на кон, вдруг удвоится?') : t('четверть смены на кон — вдруг удвоится?') };
+}
+/* 3. рейтинг смены: курьеры смены (game.js shiftBoard — по доставкам), премия первому */
+function rankScreen () {
+  const b = (A.shiftBoard && A.shiftBoard()) || [];
+  if (b.length < 2 || b.findIndex(r => r.me) < 0) return null;
+  const face = p => { if (!p || !A.face) return ''; try { return A.face(p, 44); } catch (e) { return ''; } };
+  const rows = b.map(r => ({ n: r.me ? (r.n || t('ты')) : r.n, m: r.m, d: r.d || 0, me: r.me, out: r.out, hex: r.hex, face: r.me ? '' : face(r.person) }));
+  const top = b[0], me = b.find(r => r.me);
+  return { id: 'rank', rows, money: A.money, phone: CHAT.phone(), delivered: A.S.delivered || 0,
+    prize: { win: SH.win || 0, sum: ECON.crewWin(b.length - 1), top: top.n, topGen: top.person && top.person.firstGen, gap: Math.max(0, (top.d || 0) - (me.d || 0)) } };
+}
+/* 4. машина: акт осмотра — детали, стёкла, фары (shiftsteps.js carState), сердца, мотор и ресурс, ремонт у Дяди Жени */
+function carNow () {
+  try { const C = carsApi(), c = C && C.current ? C.current() : null; return c ? { id: c.id, name: c.name, cond: c.cond, ceil: c.ceil, km: c.km } : null; } catch (e) { return null; }
+}
+function carScreen () {
+  const S = A.S;
+  if (SH.forceCar) return { id: 'car', car: SH.forceCar, money: A.money };   // песочница интерфейса (src/uilab) — машина руками
+  const g = A.car;
+  if (!g) return null;
+  const st = SSTEPS.carState(g), c = carNow(), c0 = SH.car0 && c && SH.car0.id === c.id ? SH.car0 : null;
+  let repair = 0;
+  if (c && c.cond != null) {
+    const q = ECON.repairQuote(c.cond, c.ceil);
+    if (q.pct >= ECON.BREAK.REPAIR_MIN_PCT) repair = Math.round(q.price * (1 - (RESPECT.perk('garageOff') || 0)) / 10) * 10;
+  }
+  const km = c0 ? Math.max(0, c.km - c0.km) : 0;
+  return { id: 'car', money: A.money, car: { ...st, name: c ? c.name : '', hp: S.hp, hpMax: S.hpMax, cond: c ? c.cond : null, ceil: c ? c.ceil : null,
+    cond0: c0 ? c0.cond : null, km, kmText: String(km), hits: SH.hits || 0, repair } };
 }
 
 /* календарик сезонов (seasoncycle.js receipt): на широком экране (career.css, ≥ 980 px и выше 540) — отдельным листком
@@ -997,10 +1076,17 @@ const spendOpen = () => { const m = $('cr-spend'); return m && !m.hidden ? m : n
 /** непрозрачный экран поверх города (гараж, «потратить») — кадр мира можно не рисовать */
 export const covered = () => GARAGE.isOpen() || !!spendOpen() || !!DEP.root();
 /** что сейчас листает геймпад: окно имени, гараж, «депнуть», «потратить» — или null */
-export function padRoot () { return STOUR.root() || QR.root() || END.root() || CITY.root() || MENU.modal() || GARAGE.root() || DEP.root() || spendOpen(); }
+export function padRoot () { return STOUR.root() || QR.root() || END.root() || CITY.root() || MENU.modal() || GARAGE.root() || DEP.root() || spendOpen() || SSTEPS.root(); }
 /** до makePadMenu: в гараже ←→ и LB/RB листают машины, B — закрыть то, что сверху */
 export function padPre (p) {
   if (!A) return;
+  if (SSTEPS.active() && !DEP.root() && !MENU.modal()) {   // экраны конца смены: A — дальше (курсор на другой кнопке — её), X — «не сейчас», B — пропустить всё
+    if (p.menuOk || p.accept) { const sel = SSTEPS.root().querySelector('.padsel'); if (sel && !sel.classList.contains('ss-go')) { PFX.press(sel); sel.click(); } else SSTEPS.ok(); }
+    else if (p.btnX) SSTEPS.alt();
+    else if (p.menuBack) SSTEPS.skip();
+    p.menuOk = p.menuBack = p.accept = p.btnX = p.btnY = false;
+    return;
+  }
   if (END.active()) {                               // конец смены (деньги, Толик): любая кнопка — показать сразу / «продолжить»
     if (p.any || p.menuOk || p.menuBack || p.accept) END.skip();
     p.menuOk = p.menuBack = p.menuUp = p.menuDown = p.menuLeft = p.menuRight = false;
@@ -1053,6 +1139,7 @@ export function back () {
   if (MENU.modal()) return MENU.back();
   if (GARAGE.isOpen()) return GARAGE.back();       // палитра / «точно продать?» — закрыть их, иначе выйти
   if (DEP.root()) return DEP.back();               // посреди прокрутки B не закрывает — дождись итога
+  if (SSTEPS.active()) { SSTEPS.skip(); return true; }   // экраны конца смены: пропустить всё — сразу чек
   if (spendOpen()) { closeSpend(); return true; }
   return false;
 }
@@ -1074,6 +1161,17 @@ const KEYS = { ArrowUp: 'menuUp', KeyW: 'menuUp', ArrowDown: 'menuDown', KeyS: '
   ArrowRight: 'menuRight', KeyD: 'menuRight', Enter: 'menuOk', NumpadEnter: 'menuOk', Space: 'menuOk', Escape: 'menuBack', Backspace: 'menuBack' };
 function onKey (e) {
   if (!A) return;
+  if (SSTEPS.active() && !DEP.root() && !MENU.modal()) {   // экраны конца смены: Enter / пробел — дальше, X — «не сейчас», Esc — пропустить всё; стрелки — курсор
+    const c = e.code, enter = c === 'Enter' || c === 'NumpadEnter' || c === 'Space';
+    if (enter || matchKey('x', e) || c === 'Escape' || c === 'Backspace') {
+      e.preventDefault(); e.stopPropagation();
+      if (e.repeat) return;
+      if (enter) { const sel = KB.selected(); if (sel && sel.isConnected && SSTEPS.root().contains(sel) && sel.classList.contains('padsel') && !sel.classList.contains('ss-go')) sel.click(); else SSTEPS.ok(); }
+      else if (matchKey('x', e)) SSTEPS.alt();
+      else SSTEPS.skip();
+      return;
+    }
+  }
   if (END.active()) { if (!e.repeat) END.skip(); e.preventDefault(); e.stopPropagation(); return; }   // конец смены — любая клавиша: показать сразу / «продолжить»
   if (endOn()) {                                    // чек смены: Y — гараж и траты, X — депнуть, Esc — в меню (как [Y] [X] [B] геймпада)
     const hit = matchKey('y', e) ? $('ov-spend') : matchKey('x', e) ? $('ov-dep') : matchKey('back', e) ? $('ov-menu') : null;
@@ -1178,5 +1276,5 @@ const DEBUG = {
   useCars (api) { CARS_MOCK = api || null; },
   showLunch,                                        // обед сразу — проверить карточку (стрелки, Enter)
   lunchLine, endWords, midnightNow, staffOver, mealName: (h = hour()) => MEAL_NAME[DAYT.part(h)](),   // слова про время по часам мира (daytime.js)
-  STOUR: STOUR.DEBUG, crewBoard, crewLoad: () => (A ? crewLoad() : null), openDep: DEP.open, closeDep: DEP.close, openGarage, closeGarage: GARAGE.close, garageFlip: GARAGE.flip, openSpend, menu, askName, back,
+  STOUR: STOUR.DEBUG, SSTEPS: SSTEPS.DEBUG, crewBoard, crewLoad: () => (A ? crewLoad() : null), openDep: DEP.open, closeDep: DEP.close, openGarage, closeGarage: GARAGE.close, garageFlip: GARAGE.flip, openSpend, menu, askName, back,
 };

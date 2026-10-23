@@ -43,7 +43,7 @@ const rand = (a, b) => a + Math.random() * (b - a);
 const chance = p => Math.random() < p;
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
-const inGang = (x, z) => ZN.gangZones().some(g => (x - g.x) ** 2 + (z - g.z) ** 2 < g.r * g.r);
+const inGang = (x, z) => ZN.inGang(x, z);      // кварталы района (zones.js), не круг
 
 let A = null;
 const M = { man: null, stop: null, session: -1, shown: 0, stops: 0, force: false, fx: [], stats: { spawned: 0, shots: 0, hits: 0, ko: 0 } };

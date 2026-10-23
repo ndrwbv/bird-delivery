@@ -146,8 +146,12 @@ const appName = o => {
 
 /* o.skip() — спросить, когда подошла очередь: реплика ещё к месту? true — не показывать, say вернёт null
    (обед Толика стоял в очереди за другим разговором, а смена тем временем кончилась — career.js) */
+/* перед окном (handcam.js, 11бд): gate(o) → Promise — сначала сцена вручения (курьер отдаёт коробку клиенту), потом окно */
+let GATE = null;
+export function gate (fn) { GATE = typeof fn === 'function' ? fn : null; }
 export function say (o) {
-  const run = () => (o.skip && o.skip() ? null : new Promise(res => show(o, res)));
+  const go = () => (o.skip && o.skip() ? null : new Promise(res => show(o, res)));
+  const run = () => { const g = GATE ? GATE(o) : null; return g && typeof g.then === 'function' ? g.then(go, go) : go(); };
   const p = queue.then(run);
   queue = p.catch(() => {});
   // два ответа (поручение, приглашение, гопники, Толик…) — в статистику: шапка и ответ (1 принял, 0 отказался, -1 закрыли)

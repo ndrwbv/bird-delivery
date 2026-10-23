@@ -42,6 +42,8 @@ export const AMB = {
   DOG: [14, 40], DOG_R: [45, 130], DOG_FAR: 170,               // собака: раз в 14—40 с ночью, в 45—130 м
   TRAIN: [90, 200], TRAIN_R: 280, TRAIN_FAR: 320,             // поезд: раз в 90—200 с, рельсы ближе 280 м
   TITLE: 0.5,           // в главном меню фон вдвое тише (без звуков «в мире»)
+  GANG_DOG: [5, 13],    // с — в бандитском районе собака лает так часто, днём тоже
+  GANG: { birds: 0.85, crickets: 0.6, city: 0.4, wind: 0.24 },   // в глубине района: птиц −85 %, сверчков −60 %, города −40 %, ветра +0,24
 };
 
 /* петли: prio — кто главнее при отборе, spatial — звук из точки мира, file — множитель файла */
@@ -75,6 +77,10 @@ export function init (api) {
   if (typeof setInterval === 'function') setInterval(watch, 300);
 }
 
+/* бандитский район (gangland.js, 24.10.2026): k 0…1 — насколько глубоко въехал. Птицы и сверчки смолкают,
+   город тише, ветер воет сильнее, собаки лают и днём и чаще (AMB.GANG_DOG) — без новых файлов */
+let GANGK = 0;
+export function mood (k) { GANGK = clamp(+k || 0, 0, 1); }
 /* внешняя петля (ураган): держится, пока шлют каждый кадр */
 export function want (name, v, p) {
   if (!DEF[name]) return;
@@ -139,6 +145,11 @@ function targets () {
   const t = now();
   for (const n in EXT) { const e = EXT[n]; if (t - e.t < 500) { w[n] = Math.max(w[n] || 0, e.v); if (CH[n].src && CH[n].src.set) CH[n].src.set(e.p); } }
   for (const n in FORCE) w[n] = FORCE[n];
+  if (GANGK > 0) {                                 // бандитский район: глуше и тревожнее (mood)
+    const G = AMB.GANG;
+    w['amb-birds'] *= 1 - G.birds * GANGK; w['amb-crickets'] *= 1 - G.crickets * GANGK; w['amb-city'] *= 1 - G.city * GANGK;
+    w['amb-wind'] += G.wind * GANGK;
+  }
   w['amb-wind'] *= 1 - clamp(w['amb-storm-wind'] * 1.5, 0, 1);   // воет ураган — простой ветер не нужен
   return w;
 }
@@ -296,9 +307,10 @@ function oneShots (dt) {
   const E = A.ENV, Snd = A.Snd, V = A.V;
   const rain = SEAS.snowy() ? 0 : E.rain || 0;
   if ((T.dog -= dt) <= 0) {
-    T.dog = rnd(...AMB.DOG);
+    const gang = GANGK > 0.5;
+    T.dog = gang ? rnd(...AMB.GANG_DOG) : rnd(...AMB.DOG);
     STATS.dogTry = (STATS.dogTry || 0) + 1;
-    if ((E.night || 0) > 0.6 && rain < 0.5) {
+    if (((E.night || 0) > 0.6 || gang) && rain < 0.5) {
       const a = rnd(0, Math.PI * 2), d = rnd(...AMB.DOG_R);
       if (Snd.fx(['amb-dog', 'bark'], synDog, { x: V.x + Math.sin(a) * d, z: V.z + Math.cos(a) * d, far: AMB.DOG_FAR, near: 20 })) STATS.oneshot.dog = (STATS.oneshot.dog || 0) + 1;
     }
@@ -541,6 +553,7 @@ export const DEBUG = {
     return o;
   },
   get mode () { return MODE; },
+  get gang () { return GANGK; },
   ctx: () => ({ green: +CTX.green.toFixed(2), traffic: +CTX.traffic.toFixed(2), wide: +CTX.wide.toFixed(2), cons: CTX.cons && { x: Math.round(CTX.cons.x), z: Math.round(CTX.cons.z) }, crowd: CTX.crowd && { kind: CTX.crowd.kind, x: Math.round(CTX.crowd.x), z: Math.round(CTX.crowd.z) }, railD: Math.round(CTX.railD), greenDone: GREEN.done, greenCells: GREEN.cells }),
   /* поставить петлю вручную (v 0…1; null — снять) */
   force (n, v) { if (v == null) delete FORCE[n]; else FORCE[n] = v; return true; },

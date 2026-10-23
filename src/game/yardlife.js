@@ -44,7 +44,7 @@ import * as COURTS from './courts.js';          // корты: сцены вну
 import * as LAWNP from './lawnprops.js';
 import { onPave } from './pave.js';
 import { inView } from './cull.js';
-import { MOB } from './mobile.js';
+import { MOB, CLEAN } from './mobile.js';
 
 export const YL = {
   WANT: 150, MIN_IN: 70, MIN_OUT: 30, DROP: 215, SCAN: 1,
@@ -922,7 +922,7 @@ function dogStep (p, dt) {
 /* ─────────────── кадр ─────────────── */
 let scanT = 0, WALK_DUE = 0;
 function caps (M) {
-  const k = LOW ? 0.6 : A.hideR().people < 130 ? 0.75 : 1;
+  const k = LOW ? (CLEAN ? CLEAN.yardLife : 0.6) : A.hideR().people < 130 ? 0.75 : 1;   // телефон: 0,4 (mobile.js CLEAN, 11бз; ?mobclean=0 — 0,6)
   return { scenes: Math.max(1, Math.round(YL.SCENES[M.key] * k)), walk: Math.max(1, Math.round(YL.WALK[M.key] * k)) };
 }
 function farFrom (x, z, gap, kind) {

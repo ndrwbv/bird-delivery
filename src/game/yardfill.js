@@ -26,6 +26,7 @@
    ?filldt — сверка быстрых расстояний (markCircleDT, edt) с прежним edt после каждой вещи: ST.dtBad / ST.dhBad — расхождений (0).
    ────────────────────────────────────────────────────────────────────────── */
 import { wet } from './streams.js';
+import { CLEAN } from './mobile.js';
 
 export const FILL = {
   R: 4.5,                      // пустой кусок — круг такого радиуса (Ø 9 м, ~64 м²)
@@ -45,6 +46,8 @@ export const FILL = {
   SHRUB: { WALL: 6, NEAR_WALL: 0.55, OPEN: 0.25 },          // доля кустов (остальное — деревья): у стены / на открытом
   LAWN_CELL: 40,               // клетка мелочи газона (lawnprops.js LAWN.CELL)
 };
+/* телефон (mobile.js CLEAN, 11бз): дворы проще — заполняем только большие пустые куски (Ø 13 м) и не больше 14 вещей на клетку */
+if (CLEAN) { FILL.R = CLEAN.fillR; FILL.CAP = CLEAN.fillCap; }
 export const ST = { ms: 0, tiles: 0, before: 0, placed: {}, trees: 0, bushes: 0, fail: 0, capped: 0, near: 0 };
 
 let A = null, OFF = new Set();

@@ -677,7 +677,7 @@ export function seasonTree (x, z, y, kind) {
   // редактор города: где чьи куски склейки — чтобы «убрать» прятало дерево сразу (editlayer.js hideNow)
   const rec = EDL.ED.on ? [] : null;
   const P = rec ? { add (...a) { const q = PILE.add(...a); rec.push(q); return q; } } : PILE;
-  const out = growTree({ P, T: tpls(), r: rngAt(x, z, 7), x, z, y, kind, seversk: C.MAP.id === 'seversk', DECID, SPRUCES, ground: (lx, lz) => C.groundH(lx, lz) + C.curbAt(lx, lz) });
+  const out = growTree({ P, T: tpls(), r: rngAt(x, z, 7), x, z, y, kind, seversk: C.MAP.id === 'seversk', CITY: C.CITY, inPoly: C.inPoly, DECID, SPRUCES, ground: (lx, lz) => C.groundH(lx, lz) + C.curbAt(lx, lz) });
   if (rec) EDL.edTree(x, z, rec);
   return out;
 }

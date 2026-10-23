@@ -44,6 +44,8 @@ import * as SEAS from './seasons.js';
 import * as SL from './streetlamps.js';
 import { makePerson, holdFixed } from './people.js';
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
+import { ON as MOBILE } from './mobile.js';   // телефон: в бандитском районе куч меньше (память)
+import * as GLAND from './gangland.js';     // бандитский район изнутри: граффити, сгоревшие машины, стаи, хвост, темнее (12бе)
 
 /* соседние модули карьеры — если уже есть: вечер (career.js), «подъехал к
    клиенту» (orders.js), «машина хуже заводится» (cars.js) */
@@ -522,6 +524,9 @@ function nearPath (x, z, r) {
   for (const [x1, z1, x2, z2] of PG.get(Math.floor(x / PGC) + ',' + Math.floor(z / PGC)) || []) if (segD(x, z, x1, z1, x2, z2) < r) return true;
   return false;
 }
+/* бандитский район (zones.js inMask) — куча у каждого второго жилого дома (вне района — у каждого третьего), сверх общего
+   потолка 96 — ещё MORE (24.10.2026, 12бе: «картинка грязнее») */
+const TRASH_GANG = { P: 0.62, MORE: MOBILE ? 24 : 70 };   // телефон — меньше (память)
 function planTrash () {
   const C = A.CITY;
   pathGrid();
@@ -537,13 +542,14 @@ function planTrash () {
   for (const b of C.buildings) {
     if (b.rich || (b.k !== 'res' && b.k !== 'priv')) continue;
     const [cx, cz] = centroid(b.p);
-    const h = hash(cx, cz, 21);
-    if (h > 0.34) continue;
-    cands.push({ b, cx, cz, h });
+    const h = hash(cx, cz, 21), gang = ZN.inMask(cx, cz);
+    if (h > (gang ? TRASH_GANG.P : 0.34)) continue;
+    cands.push({ b, cx, cz, h, gang });
   }
   cands.sort((p, q) => p.h - q.h);
+  let nGang = 0;
   for (const c of cands) {
-    if (HEAPS.length >= 96) break;
+    if (c.gang ? nGang >= TRASH_GANG.MORE : HEAPS.length - nGang >= 96) continue;   // свой потолок у района и у города
     const { b, cx, cz } = c, r = rng(Math.round(cx * 13 + cz * 29));
     const R = 1.3 + r() * 1.3;
     const spots = [];
@@ -571,10 +577,11 @@ function planTrash () {
     for (const [x, z] of spots) {
       if (!trashSpotOk(x, z, R, lots)) continue;
       HEAPS.push(makeHeap(x, z, R, r));
+      if (c.gang) nGang++;
       break;
     }
   }
-  STATS.heaps = HEAPS.length;
+  STATS.heaps = HEAPS.length; STATS.heapsGang = nGang;
 }
 /* куча: мешки горкой, сверху и по краям — хлам. У каждой вещи ранг: при
    донате остаются только те, у кого он меньше доли «сколько ещё грязно» */
@@ -917,7 +924,7 @@ function evening () {
   if (C && C.isEvening && C.shiftOn && C.shiftOn()) return C.isEvening();
   return hourOf(A.ENV.t) >= SHIFT.EVENING_H;
 }
-const inGang = (x, z) => ZN.gangZones().some(g => (x - g.x) ** 2 + (z - g.z) ** 2 < g.r * g.r);
+const inGang = (x, z) => ZN.inGang(x, z);      // кварталы района (zones.js), не круг
 const gangChance = () => (evening() ? GANG.CHANCE_EVENING : GANG.CHANCE) * (1 - 0.5 * A.donated('gang'));
 /* жребий на новый адрес (каждый кадр, пока банды нет): адрес — пин или клиент — в круге */
 function preRoll () {
@@ -1327,61 +1334,83 @@ function gangClear () {
   gangEnd();
 }
 
-/* районы на радаре и полной карте — размытые красные пятна неровной формы, без края (08.10.2026,
-   было — круги с обводкой). Пятно — GANG_BLOB мягких кружков: один в середине и вокруг по кругу со
-   случайным (по месту района — всегда тем же) сдвигом и размером. Кружки — одна заготовка-градиент
-   64 px (рисуется один раз), на кадр — drawImage на кружок: радар не тяжелеет. Сами правила района —
-   прежний круг ZN.gangZones (r): пятно гаснет как раз около него. */
-const GANG_BLOB = { N: 8, A_RADAR: 0.16, A_MAP: 0.2 };
-let BLOB_IMG = null;
-const blobCache = new Map();
-function blobImg () {
-  if (BLOB_IMG) return BLOB_IMG;
-  const c = document.createElement('canvas'); c.width = c.height = 64;
-  const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
-  g.addColorStop(0, 'rgba(214, 36, 44, 1)'); g.addColorStop(0.45, 'rgba(214, 36, 44, 0.6)'); g.addColorStop(1, 'rgba(214, 36, 44, 0)');
-  x.fillStyle = g; x.fillRect(0, 0, 64, 64);
-  return (BLOB_IMG = c);
-}
-/* кружки пятна в долях радиуса: [dx, dz, r] — от места района, всегда одинаковые */
-function blobDots (g) {
-  const k = Math.round(g.x) + ',' + Math.round(g.z);
-  let d = blobCache.get(k);
-  if (d) return d;
-  let sd = (Math.abs(Math.round(g.x * 13 + g.z * 7)) % 233280) + 1;
-  const rnd = () => (sd = (sd * 9301 + 49297) % 233280) / 233280;
-  d = [[0, 0, 0.72]];
-  const a0 = rnd() * 6.283;
-  for (let i = 0; i < GANG_BLOB.N; i++) {
-    const a = a0 + i * 6.283 / GANG_BLOB.N + (rnd() - 0.5) * 0.6, q = 0.3 + rnd() * 0.34;
-    d.push([Math.cos(a) * q, Math.sin(a) * q, 0.3 + rnd() * 0.26]);
+/* районы на радаре и полной карте (24.10.2026, было — размытые пятна вокруг круга): кварталы района (zones.js
+   gangMask) — красная заливка по клеткам и край сплошной тёмно-красной линией по границе кварталов, как
+   правила (гопники, мзда, заказы). Заготовка на район — картинка клеток (1 пиксель — клетка GMAP.CELL) и путь
+   края (Path2D в клетках), заново — только когда донат сдвинул границу. На кадр — drawImage и stroke на район
+   под матрицей «клетка → экран»: радар не тяжелеет. */
+const GANG_DRAW = { FILL_RADAR: 0.2, FILL_MAP: 0.22, EDGE_RADAR: 0.85, EDGE_MAP: 0.9, W_RADAR: 1.8, W_MAP: 2.2, HEX: '#c41e24' };
+const GART = new Map();
+function gangArt (m, cut) {
+  let c = GART.get(m);
+  if (c && c.cut === cut) return c;
+  const { nx, nz, v } = m, inC = (i, j) => i >= 0 && j >= 0 && i < nx && j < nz && v[i * nz + j] > 0 && v[i * nz + j] < cut;
+  const cv = document.createElement('canvas'); cv.width = nx; cv.height = nz;
+  const x = cv.getContext('2d'), im = x.createImageData(nx, nz), d = im.data;
+  const path = new Path2D();
+  let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9, n = 0;
+  for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
+    if (!inC(i, j)) continue;
+    const k = (j * nx + i) * 4;
+    d[k] = 214; d[k + 1] = 36; d[k + 2] = 44; d[k + 3] = 255; n++;
+    if (i < x0) x0 = i; if (i > x1) x1 = i; if (j < z0) z0 = j; if (j > z1) z1 = j;
   }
-  blobCache.set(k, d);
-  return d;
-}
-function drawBlob (ctx, g, at, sc, alpha) {
-  const img = blobImg(), a0 = ctx.globalAlpha;
-  ctx.globalAlpha = alpha;
-  for (const [dx, dz, rr] of blobDots(g)) {
-    const [a, b] = at(g.x + dx * g.r, g.z + dz * g.r), r = rr * g.r * sc;
-    ctx.drawImage(img, a - r, b - r, r * 2, r * 2);
+  x.putImageData(im, 0, 0);
+  // край: стороны клеток района, за которыми не район, — отрезками, подряд идущие сливаем
+  for (let j = 0; j <= nz; j++) {            // горизонтальные (между рядами j-1 и j)
+    let run = -1;
+    for (let i = 0; i <= nx; i++) {
+      const e = i < nx && inC(i, j) !== inC(i, j - 1);
+      if (e && run < 0) run = i;
+      if (!e && run >= 0) { path.moveTo(run, j); path.lineTo(i, j); run = -1; }
+    }
   }
-  ctx.globalAlpha = a0;
+  for (let i = 0; i <= nx; i++) {            // вертикальные
+    let run = -1;
+    for (let j = 0; j <= nz; j++) {
+      const e = j < nz && inC(i, j) !== inC(i - 1, j);
+      if (e && run < 0) run = j;
+      if (!e && run >= 0) { path.moveTo(i, run); path.lineTo(i, j); run = -1; }
+    }
+  }
+  c = { cut, img: cv, path, n, bx0: m.x0 + x0 * m.C, bz0: m.z0 + z0 * m.C, bx1: m.x0 + (x1 + 1) * m.C, bz1: m.z0 + (z1 + 1) * m.C };
+  GART.set(m, c);
+  return c;
 }
-export function drawRadar (ctx, tr, s) {
+/* tr — мир → экран (линейное: радар поворачивает, карта масштабирует); матрица клетки маски — из трёх точек */
+function drawGang (ctx, tr, fill, edge, lw, near) {
+  const cut = ZN.gangCut();
+  if (cut <= 1) return;
+  for (const m of ZN.gangMask()) {
+    const art = gangArt(m, cut);
+    if (!art.n) continue;
+    if (near && !near(art)) continue;
+    const [e, f] = tr(m.x0, m.z0), [ax, ay] = tr(m.x0 + m.C, m.z0), [cx, cy] = tr(m.x0, m.z0 + m.C);
+    const a = ax - e, b = ay - f, c = cx - e, d = cy - f, sc = Math.sqrt(Math.abs(a * d - b * c)) || 1;
+    const a0 = ctx.globalAlpha;
+    ctx.save();
+    ctx.transform(a, b, c, d, e, f);
+    ctx.imageSmoothingEnabled = true;
+    ctx.globalAlpha = fill;
+    ctx.drawImage(art.img, 0, 0);
+    ctx.globalAlpha = edge;
+    ctx.strokeStyle = GANG_DRAW.HEX; ctx.lineWidth = lw / sc; ctx.lineCap = 'square';
+    ctx.stroke(art.path);
+    ctx.restore();
+    ctx.globalAlpha = a0;
+  }
+}
+export function drawRadar (ctx, tr) {
   if (!CAREER || !A) return;
-  for (const g of ZN.gangZones()) {
-    const [a, b] = tr(g.x, g.z), r = g.r * s;
-    if (Math.hypot(a, b) > r * 1.2 + 200) continue;
-    drawBlob(ctx, g, tr, s, GANG_BLOB.A_RADAR);
-  }
+  const V = A.V;                                   // радар — ~135 м вокруг машины: дальние районы не трогаем
+  drawGang(ctx, tr, GANG_DRAW.FILL_RADAR, GANG_DRAW.EDGE_RADAR, GANG_DRAW.W_RADAR,
+    art => V.x > art.bx0 - 200 && V.x < art.bx1 + 200 && V.z > art.bz0 - 200 && V.z < art.bz1 + 200);
 }
-export function drawMap (x, fmX, fmZ, s) {
+export function drawMap (x, fmX, fmZ) {
   if (!CAREER || !A) return;
-  for (const g of ZN.gangZones()) {
-    const k = Math.abs(fmX(g.x + 1) - fmX(g.x));
-    drawBlob(x, g, (wx, wz) => [fmX(wx), fmZ(wz)], k, GANG_BLOB.A_MAP);
-  }
+  // край — GANG_DRAW.W_MAP пикселей экрана на любом зуме (холст карты уже под матрицей зума)
+  const K = Math.abs(x.getTransform().a) || 1, dpr = (typeof devicePixelRatio !== 'undefined' && devicePixelRatio) || 1;
+  drawGang(x, (wx, wz) => [fmX(wx), fmZ(wz)], GANG_DRAW.FILL_MAP, GANG_DRAW.EDGE_MAP, GANG_DRAW.W_MAP * Math.min(dpr, 2) / K, null);
 }
 
 /* ═════════════════ сборка и шаг ═════════════════ */
@@ -1405,6 +1434,8 @@ export function* build (api) {
   yield* ts('trashb', trashSteps(Math.round(A.donated('trash') * 240) / 240));
   yield 'trashb';
   tm('garages', planGarages);
+  yield 'garages';
+  yield* ts('gangland', GLAND.build(A));         // бандитский район: граффити и сгоревшие машины — жребий по месту (gangland.js)
 }
 
 let late = false;
@@ -1427,6 +1458,7 @@ export function step (dt, api) {
   if (!late) lateInit();
   trashStep(dt);
   gangStep(dt);
+  GLAND.step(dt, A, GE.st);                      // бандитский район изнутри (gangland.js)
   grillStep(dt);
   STATS.ms = STATS.ms * 0.98 + (performance.now() - t0) * 0.02;
 }

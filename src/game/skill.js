@@ -8,7 +8,8 @@
    сохранение без умения — с START_OLD (как было до 17.10.2026). Быстрый заезд — QUICK, не меняется; «покататься» — не считается.
    От умения — только заказы (физика, урон, цены — те же): точки SKILL.STEPS, между ними — по прямой:
      cap  — потолок напряжения ритма смены (rhythm.js k): дальность подъёма, сборные (с 0,2, пицц до 2 + 5k), срочные «по шансу» (с 0,5);
-     time — срок × (с полом «доехать реально»);
+     time — срок × (с полом «доехать реально»); с 24.10.2026 только «новичку больше» (1,2 → 1 к умению 5), срок мастеру
+            ужимает press.js (серия чистых — короче, до −30 %; ошибка — отпускает);
      hard — доля сложных: вес сборных, шанс срочного и окраины, вес бандитских адресов, срочный в кульминации;
      far  — «хочется» по дорогам × (orders.js arcTarget);
      size — самое большее пицц в сборном.
@@ -25,6 +26,7 @@ import { SKILL as C } from './econ.js';
 import { t, N_ } from '../i18n/index.js';
 import * as CHAT from './chat.js';
 import * as DIRECTOR from './director.js';
+import * as PRESS from './press.js';          // ужатие срока: серия чистых — срок короче, ошибка — отпускает (press.js, 24.10.2026)
 
 let A = null;
 const K = { lost: 0, n: 0, gap: 3, saidAt: 0, told: null, log: [], sim: null };
@@ -41,6 +43,7 @@ function note (s) {
 
 export function init (api) {
   A = api;
+  PRESS.init(api);
   if (typeof window !== 'undefined' && window.__dlv) window.__dlv.SKILL = DEBUG;
 }
 
@@ -92,7 +95,7 @@ export const size = () => now().size;
 export const far = () => now().far;
 /** срок: tm — как посчитан, L — путь по дорогам (сборный — весь развоз), n — адресов. Срочному строже не делаем */
 export function time (tm, L, n = 1, urgent = false) {
-  let m = now().time;
+  let m = now().time * PRESS.k();                            // ужатие срока (press.js): от × 1 до × 0,7
   if (urgent && m < 1) m = 1;
   if (m === 1) return tm;
   const out = tm * m;
@@ -104,6 +107,7 @@ export function time (tm, L, n = 1, urgent = false) {
 /** новая смена (orders.js resetShift): умение × CARRY, один раз за смену */
 export function beginShift () {
   K.lost = 0; K.n = 0; K.gap = Math.round(rnd(C.SAY_GAP[0], C.SAY_GAP[1])); K.saidAt = 0; K.told = null;
+  PRESS.beginShift();
   if (off() || quick()) return;
   const v = load(), no = shiftNo();
   if (v.shift !== no) {
@@ -128,6 +132,7 @@ function add (d, why) {
 /** заказ выдан (orders.js setup): считаем сердца с нуля; Толик — если умение заметно сдвинулось */
 export function begin () {
   K.lost = 0;
+  PRESS.begin();
   if (off() || quick()) return;
   K.n++;
   say();
@@ -146,9 +151,13 @@ export function stop (onTime, bumped, bundle) {
   add(+(d * m).toFixed(2), why + (bundle ? ' (сборный)' : ''));
 }
 /** машина взорвалась / провалилась под лёд (game.js gameOver) */
-export function wreck () { K.lost = 0; add(C.GAIN.WRECK, 'машина всё'); }
+export function wreck () { K.lost = 0; add(C.GAIN.WRECK, 'машина всё'); PRESS.rate(false, 'машина всё'); }
 /** срочный сорван (game.js urgentFail) */
-export function urgent () { add(C.GAIN.URGENT, 'срочный сорван'); }
+export function urgent () { add(C.GAIN.URGENT, 'срочный сорван'); PRESS.rate(false, 'срочный сорван'); }
+/** «рейтинг клиентов» вручения (orders.js payStop): вовремя, не холодная, клиента не задел — хорошо (press.js) */
+export const rated = (good, why, bundle) => PRESS.rate(good, why, bundle);
+/** множитель ужатия срока сейчас (прогон simShift) */
+export const pressK = () => PRESS.k();
 /** опоздал обратно (game.js) */
 export function back () { add(C.GAIN.BACK, 'опоздал обратно'); }
 
@@ -172,7 +181,7 @@ function say () {
 }
 
 export const DEBUG = {
-  C,
+  C, PRESS: PRESS.DEBUG,
   get state () { const v = load(); return { u: cur(), saved: v, at: now(), lost: K.lost, n: K.n, told: K.told, gap: K.gap, saidAt: K.saidAt }; },
   get log () { return K.log; },
   at,

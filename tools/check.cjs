@@ -172,17 +172,19 @@ const CHECKS = [
     return { status: bad.length ? 'fail' : 'ok', info: (bad.length ? bad.join('; ') + ' · ' : '') + `дуг ${st.done} из ${st.found} (по классам ${by}), +${st.pts} точек, срез ≤ ${st.maxCut} м, ${st.ms} мс; ` +
       `?oldroads → по умолчанию: узлов ${B.n.nodes} → ${A.n.nodes}, зебр ${B.n.zebras} → ${A.n.zebras}, остановок ${B.n.stops} → ${A.n.stops}, подъездов ${B.n.entr} → ${A.n.entr}, треугольников ${B.T.tris} → ${A.T.tris}` };
   } },
-  /* край газона у дороги без бордюра (11ц, 24.10.2026, curbs.js; docs/CAREER.md «Бордюр у дорог и проездов»): по краям улиц, проездов
-     и пешеходок шагом 1 м — газон за краем, а бордюра (поднятого тротуара или камня) нет; перекрёстки, зебры, узкие полоски — не в счёт.
-     Было (?oldcurbs): проезды 82,8 км из 212, улицы 6,5 из 236 */
+  /* край газона у мощёного без бордюра (11ц, 24.10.2026, curbs.js; все виды мощения — 0п35; docs/CAREER.md «Бордюр у дорог и проездов»,
+     «Бордюр на всех стыках газона и мощёного»): по краям улиц, проездов, пешеходок, дорожек, стоянок, площадок и карманов шагом 1 м — газон
+     за краем, а бордюра (поднятого тротуара или камня) нет; перекрёстки, зебры, швы до 0,35 м, пандусы у дверей — не в счёт.
+     Было (?oldcurbs): проезды 82,8 км из 212, улицы 6,5 из 236; до 0п35: дорожки 55 км из 183, стоянки, площадки, карманы — почти весь край */
   { id: 'curbgap', name: 'край газона у дороги — с бордюром', group: 2, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/curb-gaps.js')]);
     const e = errLine(j), r = j.result;
     if (e || !r) return { status: 'fail', info: e || 'нет результата' };
     if (r.err) return { status: 'fail', info: r.err };
     const km = m => (m / 1000).toFixed(1);
-    return { status: r.ok ? 'ok' : 'fail', info: `край газона: улицы ${km(r.lawn.street)} км, проезды ${km(r.lawn.drive)} км; без бордюра — улицы ${r.bare.street} м, проезды ${r.bare.drive} м (пешеходки ${r.bare.foot} м; ` +
-      `не в счёт: перекрёстки ${km(r.skip.junction)} км, зебры ${km(r.skip.zebra)} км, полоски ${km(r.skip.strip)} км); камня ${km(r.curbs.m)} км, сборка ${r.curbs.ms} мс` + (r.ok ? '' : ': ' + JSON.stringify(r.sample.slice(0, 4))) };
+    const o = ['path', 'lot', 'play', 'pocket'].map(k => `${{ path: 'дорожки', lot: 'стоянки', play: 'площадки', pocket: 'карманы' }[k]} ${r.bare[k] || 0} м из ${km(r.lawn[k] || 0)} км`).join(', ');
+    return { status: r.ok ? 'ok' : 'fail', info: `край газона: улицы ${km(r.lawn.street)} км, проезды ${km(r.lawn.drive)} км; без бордюра — улицы ${r.bare.street} м, проезды ${r.bare.drive} м, ${o} (пешеходки ${r.bare.foot} м; ` +
+      `не в счёт: перекрёстки ${km(r.skip.junction)} км, зебры ${km(r.skip.zebra)} км, швы ${km(r.skip.strip)} км, пандусы ${r.skip.door || 0} м); камня ${km(r.curbs.m)} км, сборка ${r.curbs.ms} мс` + (r.ok ? '' : ': ' + JSON.stringify(r.sample.slice(0, 4))) };
   } },
   { id: 'routehouse', name: 'маршрут навигатора не сквозь дома', group: 2, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/route-house.js')]);

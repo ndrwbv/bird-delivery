@@ -28,6 +28,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { blocks as ringIsland, circles as ringCircles } from './rings.js';   // остров малого круга: там ни фонарей, ни знаков (rings.js)
 import * as MOBM from './mobile.js';
+import { spotOf } from './nightlight.js';           // пятно света по виду: свой круг у каждого (nightlight.js POOL, 11бж)
 
 /* числа — здесь; в docs/CAREER.md — они же словами */
 export const LAMP = {
@@ -575,10 +576,11 @@ export function lamp (A, o) {
     it.slow = LAMP.SLOW;
     it.onDown = (_, nx, nz, force) => knock(rec, nx, nz, force);
     if (!o.noSpot) {
-      const hs = o.spot ? [null] : T.head;
+      const hs = o.spot ? [null] : T.head, PK = spotOf(style, dec(style, v).kind);
       for (const h of hs) {
         const sp = o.spot ? [o.spot[0], o.spot[1]] : [x + dx * h, z + dz * h];
         sp.track = (m, v0, nv) => rec.pools.push([m, v0, nv]);
+        Object.assign(sp, PK);
         A.LAMP_SPOTS.push(sp);
         rec.spots.push(sp);
       }
@@ -607,6 +609,7 @@ function oldLamp (A, o, rec) {
   if (!o.noSpot) {
     const s = o.spot ? [o.spot[0], o.spot[1]] : [x + rec.dx * head[0], z + rec.dz * head[0]];
     s.track = (m, v0, nv) => rec.pools.push([m, v0, nv]);
+    Object.assign(s, spotOf(rec.style, 0));
     A.LAMP_SPOTS.push(s);
     rec.spot = s; rec.spots.push(s);
   }

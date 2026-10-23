@@ -123,7 +123,7 @@ def kmeans(P, k, ref, it=12):
     return [[P[i] for i in g] for g in G if g]
 
 
-def grow(T, stems, nL, nB, rL, rB, rT, fL=0.55, fB=0.8, base=lambda c: c.z * 0.5, zmin=-0.35, n=24, xmin=-9.0, sag=0.0):
+def grow(T, stems, nL, nB, rL, rB, rT, fL=0.55, fB=0.8, base=lambda c: c.z * 0.5, zmin=-0.35, n=24, xmin=-9.0, sag=0.0, hang=0.0):
     """stems — ломаные стволов (к ним крепятся суки); каждой кучке целей — сук от ствола, подкучкам — ветки, целям — прутья"""
     P = tips(T, n, zmin, xmin=xmin)
     lo = [s for s in stems]
@@ -145,7 +145,11 @@ def grow(T, stems, nL, nB, rL, rB, rT, fL=0.55, fB=0.8, base=lambda c: c.z * 0.5
             br = T.chain([q0, be + (be - q0).normalized() * 0.25], rB, 2)
             for tp in sg:
                 w0, _ = T.along(br, T.rng.uniform(0.7, 0.97))
-                if sag:                                     # берёза: прут свисает — середина ниже
+                if hang:                                    # плакучая ива: прут дугой через «яйцо» и вниз, почти до земли
+                    o = Vector((tp.x - T.c.x, tp.y - T.c.y, 0)).normalized()
+                    L = hang * T.rng.uniform(0.75, 1.1) * (0.6 + 0.4 * max(0.0, (tp.z - T.c.z) / T.r.z + 0.5))
+                    T.chain([w0, tp, tp + o * 0.35 - UP * L], rT, 3, taper=0.6)
+                elif sag:                                   # берёза: прут свисает — середина ниже
                     T.chain([w0, w0.lerp(tp, 0.5) - UP * sag, tp], rT, 3)
                 else:
                     T.chain([w0, tp], rT, 3)
@@ -195,8 +199,144 @@ def alley(seed):
     return T
 
 
+# ─────────── новые породы (М6, 24.10.2026): яблоня, черёмуха, ива (две), каштан, вяз, лиственница, старое дерево; кусты ───────────
+def apple(seed):
+    """яблоня-дичка: низкий кривой ствол 1,5 м, развилка на 3—4 толстых сука, крона широкая и приплюснутая"""
+    T = Tree(((0, 0, 3.2), (2.7, 2.7, 1.55)), random.Random(seed))
+    trunk = T.chain([Vector((0, 0, -0.2)), Vector((0.18, 0.06, 0.9)), Vector((0.05, 0.16, 1.7))], 0.2, 0, taper=0.45)
+    grow(T, [trunk], 5, 2, 0.11, 0.06, 0.045, fL=0.55, fB=0.75, base=lambda c: 1.2, zmin=-0.45, n=22)
+    return T
+
+
+def cherry(seed):
+    """черёмуха: три ствола из земли вразлёт, крона — высокий овал"""
+    T = Tree(((0, 0, 4.7), (2.3, 2.3, 2.4)), random.Random(seed))
+    st = []
+    for i in range(3):
+        a = i * 2.1 + T.rng.uniform(-0.3, 0.3)
+        o = Vector((math.cos(a), math.sin(a), 0))
+        st.append(T.chain([Vector((0, 0, -0.2)) + o * 0.12, o * 0.45 + Vector((0, 0, 2.0)), o * 0.9 + Vector((0, 0, 4.6))], 0.1, 0, taper=0.6))
+    grow(T, st, 5, 2, 0.065, 0.045, 0.035, fL=0.5, fB=0.7, base=lambda c: c.z - 1.6, zmin=-0.45, n=22)
+    return T
+
+
+def willow(seed, weep=True):
+    """ива у воды: weep — плакучая (толстый ствол 2,4 м, прутья свисают почти до земли), иначе — ракита (короткий ствол,
+    суки торчком из «головы», круглая шапка)"""
+    if weep:
+        T = Tree(((0, 0, 4.9), (3.6, 3.6, 3.1)), random.Random(seed))
+        trunk = T.chain([Vector((0, 0, -0.2)), Vector((0.2, 0, 1.4)), Vector((0.35, 0.05, 3.2))], 0.3, 0, taper=0.5)
+        grow(T, [trunk], 5, 2, 0.13, 0.07, 0.035, fL=0.5, fB=0.65, base=lambda c: 2.8, zmin=0.0, n=18, hang=3.2)
+    else:
+        T = Tree(((0, 0, 4.6), (2.6, 2.6, 2.2)), random.Random(seed))
+        trunk = T.chain([Vector((0, 0, -0.2)), Vector((0.1, 0, 1.1)), Vector((0.12, 0.04, 2.2))], 0.32, 0, taper=0.3)
+        grow(T, [trunk], 7, 2, 0.08, 0.05, 0.035, fL=0.6, fB=0.75, base=lambda c: 2.0, zmin=-0.35, n=26)
+    return T
+
+
+def chestnut(seed):
+    """каштан: толстый ствол 3 м, плотный купол"""
+    T = Tree(((0, 0, 6.0), (3.2, 3.2, 3.0)), random.Random(seed))
+    trunk = T.chain([Vector((0, 0, -0.2)), Vector((0.04, 0.02, 2.0)), Vector((0.0, 0.05, 5.2))], 0.3, 0, taper=0.55)
+    grow(T, [trunk], 6, 2, 0.14, 0.07, 0.05, fL=0.5, fB=0.72, base=lambda c: c.z - 2.6, zmin=-0.35, n=28)
+    return T
+
+
+def elm(seed):
+    """вяз — «ваза»: ствол до 3,2 м, там три лидера вразлёт вверх, крона широким зонтом наверху"""
+    T = Tree(((0, 0, 7.9), (3.9, 3.9, 2.5)), random.Random(seed))
+    trunk = T.chain([Vector((0, 0, -0.2)), Vector((0.05, 0, 1.6)), Vector((0.0, 0.04, 3.3))], 0.27, 0, taper=0.3)
+    st = [trunk]
+    for i in range(3):
+        a = i * 2.1 + T.rng.uniform(-0.25, 0.25)
+        o = Vector((math.cos(a), math.sin(a), 0))
+        st.append(T.chain([Vector((0, 0.04, 3.2)), o * 0.9 + Vector((0, 0, 5.4)), o * 1.8 + Vector((0, 0, 8.2))], 0.15, 1, sec='sq', taper=0.6))
+    grow(T, st[1:], 6, 2, 0.08, 0.05, 0.04, fL=0.5, fB=0.75, base=lambda c: c.z - 1.6, zmin=-0.25, n=28)
+    return T
+
+
+def larch(seed):
+    """лиственница: прямой ствол до 12 м, ветки мутовками почти горизонтально, концы чуть вверх; конус — внизу шире"""
+    rng = random.Random(seed)
+    T = Tree(((0, 0, 6.5), (2.6, 2.6, 6.0)), rng)
+    lead = T.chain([Vector((0, 0, -0.2)), Vector((0, 0, 4.0)), Vector((0.03, -0.02, 12.2))], 0.22, 0, taper=0.8)
+    k = 0
+    for i in range(6):                              # мутовки: 2,4 м … 10,5 м, по 2—3 ветки
+        z = 2.4 + i * 1.6 + rng.uniform(-0.2, 0.2)
+        L = 2.7 * (1 - (z - 2.0) / 11.0) + 0.35      # длина ветки — конус
+        for j in range(3 if i < 4 else 2):
+            a = k * GA + rng.uniform(-0.2, 0.2); k += 1
+            p0 = Vector((0, 0, z))
+            d = az(a, rng.uniform(-0.12, 0.05))
+            e = p0 + d * L + UP * (0.25 + 0.1 * L)
+            br = T.chain([p0, p0 + d * L * 0.55 - UP * 0.1 * L, e], 0.06 + 0.012 * L, 1 if L > 1.4 else 2, taper=0.6)
+            for t in (0.5, 0.92):                    # веточки в стороны от ветки
+                q, dd = T.along(br, t)
+                sd = dd.cross(UP).normalized() * (1 if (j + int(t * 10)) % 2 else -1)
+                T.chain([q, q + (sd * 0.8 + dd * 0.5 - UP * 0.1).normalized() * (0.35 + 0.3 * L * (1 - t))], 0.03, 3)
+    return T
+
+
+def oldtree(seed):
+    """старое корявое дерево: толстый ствол с наклоном, кривые суки, один обломан (короткий тупой), крона редкая, набок"""
+    T = Tree(((0.7, 0.2, 6.4), (3.7, 3.0, 2.8)), random.Random(seed))
+    trunk = T.chain([Vector((0, 0, -0.2)), Vector((0.35, 0.1, 1.8)), Vector((0.2, 0.3, 3.4)), Vector((0.75, 0.25, 5.0))], 0.42, 0, taper=0.55)
+    T.chain([Vector((0.25, 0.25, 3.0)), Vector((-0.9, 0.4, 3.8)), Vector((-1.5, 0.5, 4.0))], 0.16, 1, taper=0.35)   # обломанный сук
+    T.chain([Vector((0.6, 0.25, 4.6)), Vector((0.2, -0.8, 6.2)), Vector((0.1, -1.0, 7.6))], 0.09, 1, taper=0.7)      # сухой сук торчит вверх
+    grow(T, [trunk], 4, 2, 0.13, 0.07, 0.045, fL=0.6, fB=0.75, base=lambda c: c.z - 2.4, zmin=-0.3, n=18, xmin=-1.0)
+    return T
+
+
+def shrub(T, stems, nB, rS, rB, rT, fS=0.7, fB=0.8, zmin=-0.2, n=18, sag=0.0):
+    """куст: stems стеблей из земли (часть 1 — видны всегда, на телефоне — только они), к кучкам концов — ветки (2), прутья (3)"""
+    P = tips(T, n, zmin)
+    root = Vector((T.c.x, T.c.y, -0.1))
+    for g in kmeans(P, stems, Vector((T.c.x, T.c.y, T.c.z - T.r.z))):
+        cen = sum(g, Vector()) / len(g)
+        a = T.rng.uniform(0, 6.283)
+        p0 = root + Vector((math.cos(a), math.sin(a), 0)) * 0.12
+        e = p0.lerp(cen, fS)
+        m = p0.lerp(e, 0.5) + (Vector((e.x - p0.x, e.y - p0.y, 0)) * 0.12)
+        st = T.chain([p0, m, e], rS, 1, sec='dia', taper=0.6)
+        for sg in kmeans(g, nB, e):
+            sc = sum(sg, Vector()) / len(sg)
+            q0, _ = T.along(st, T.rng.uniform(0.6, 0.92))
+            be = q0.lerp(sc, fB)
+            br = T.chain([q0, be], rB, 2)
+            for tp in sg:
+                w0, _ = T.along(br, T.rng.uniform(0.6, 0.95))
+                T.chain([w0, w0.lerp(tp, 0.5) - UP * sag, tp] if sag else [w0, tp], rT, 3)
+    return T
+
+
+def caragana(seed):
+    """жёлтая акация: прямой узкий куст ~2,6 м, стебли почти стоймя"""
+    return shrub(Tree(((0, 0, 1.6), (0.95, 0.95, 1.15)), random.Random(seed)), 6, 2, 0.045, 0.03, 0.022, fS=0.75, zmin=-0.1, n=15)
+
+
+def elder(seed):
+    """бузина: широкий раскидистый куст ~3 м, стебли дугой наружу"""
+    return shrub(Tree(((0, 0, 1.8), (1.7, 1.7, 1.3)), random.Random(seed)), 5, 2, 0.06, 0.04, 0.028, fS=0.65, zmin=-0.3, n=16)
+
+
+def hawthorn(seed):
+    """боярышник: деревце-куст ~3,5 м — короткий ствол, развилка, круглая крона"""
+    T = Tree(((0, 0, 2.5), (1.55, 1.55, 1.2)), random.Random(seed))
+    trunk = T.chain([Vector((0, 0, -0.2)), Vector((0.06, 0.03, 0.6)), Vector((0.02, 0.06, 1.3))], 0.1, 0, taper=0.4)
+    grow(T, [trunk], 4, 2, 0.06, 0.04, 0.025, fL=0.55, fB=0.75, base=lambda c: 1.0, zmin=-0.35, n=15)
+    return T
+
+
+def currant(seed):
+    """смородина: низкий круглый куст ~1,2 м из тонких стеблей"""
+    return shrub(Tree(((0, 0, 0.7), (0.8, 0.8, 0.6)), random.Random(seed)), 5, 2, 0.03, 0.022, 0.016, fS=0.7, zmin=-0.25, n=12)
+
+
 MODELS = [('birchA', lambda: birch(11)), ('birchB', lambda: birch(29)), ('poplar', lambda: poplar(5)), ('maple', lambda: maple(7)),
-          ('lime', lambda: maple(13, lime=True)), ('rowan', lambda: rowan(3)), ('alley', lambda: alley(17))]
+          ('lime', lambda: maple(13, lime=True)), ('rowan', lambda: rowan(3)), ('alley', lambda: alley(17)),
+          ('apple', lambda: apple(23)), ('cherry', lambda: cherry(31)), ('willowA', lambda: willow(41)), ('willowB', lambda: willow(43, False)),
+          ('chestnut', lambda: chestnut(47)), ('elm', lambda: elm(53)), ('larch', lambda: larch(59)), ('oldtree', lambda: oldtree(61)),
+          ('caragana', lambda: caragana(67)), ('elder', lambda: elder(71)), ('hawthorn', lambda: hawthorn(73)), ('currant', lambda: currant(79))]
 SEC = {'sq': [45, 135, 225, 315], 'dia': [0, 90, 180, 270], 'tri': [90, 210, 330]}
 
 
@@ -306,9 +446,11 @@ if PNG:   # проверка глазами: каждая модель — сб�
     for ob in objs:
         for o2 in objs: o2.hide_render = o2 is not ob
         al = ob.name == 'alley'
-        tgt = Vector((4.5, 0, 6.5)) if al else Vector((0, 0, 4.8))
+        hz = max(v.co.z for v in ob.data.vertices)         # кусты — ближе и ниже (камера по высоте модели)
+        k = 1.5 if al else max(0.35, hz / 9.0)
+        tgt = Vector((4.5, 0, 6.5)) if al else Vector((0, 0, hz * 0.55))
         for i, loc in enumerate(((0, -15, 1.6), (8, -9, 7.0))):
-            cam.location = tgt + Vector(loc) * (1.5 if al else 1.0) - Vector((0, 0, 4.8 if not al else 6.5)) + Vector((0, 0, 0 if i else 0))
-            cam.location.z = loc[2]
+            cam.location = tgt + Vector(loc) * k - Vector((0, 0, tgt.z))
+            cam.location.z = loc[2] * (1 if al or k >= 1 else max(0.4, k))
             cam.rotation_euler = (tgt - cam.location).to_track_quat('-Z', 'Y').to_euler()
             sc.render.filepath = os.path.join(PNG, '%s_%d.png' % (ob.name, i)); bpy.ops.render.render(write_still=True)
