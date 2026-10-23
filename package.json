@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite --port 5190 --strictPort",
     "sandbox": "vite --port 5193 --mode web --open /sandbox.html",
+    "carlab": "vite --port 5197 --mode web --open /carlab.html",
     "ui": "vite --port 5194 --mode web --open /ui.html",
     "editor": "vite --port 5195 --mode web --open /editor.html",
     "dev:yandex": "vite --port 5191 --strictPort --mode yandex",
@@ -82,8 +83,13 @@
     ]
   },
   "devDependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
     "electron": "^33.4.11",
     "electron-builder": "^25.1.8",
+    "meshoptimizer": "^1.3.0",
+    "sharp": "^0.35.5",
     "vite": "^6.4.3"
   },
   "allowScripts": {

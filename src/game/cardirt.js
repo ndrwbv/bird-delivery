@@ -61,15 +61,17 @@ vec3 carDirt (vec3 c) {
   return c;
 }
 `;
+/* грязь и снег — в чужую программу (realcar.js: краска и кровь поверх, тот же материал) */
+export function inject (sh) {
+  Object.assign(sh.uniforms, U);
+  sh.vertexShader = 'uniform mat4 uCarInv;\nvarying vec3 vCL;\n' +
+    sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvCL = (uCarInv * modelMatrix * vec4(transformed, 1.0)).xyz;');
+  sh.fragmentShader = FRAG + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = carDirt(diffuseColor.rgb);');
+}
 function patch (m) {
   if (m.userData.dirt) return;
   m.userData.dirt = 1;
-  m.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, U);
-    sh.vertexShader = 'uniform mat4 uCarInv;\nvarying vec3 vCL;\n' +
-      sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvCL = (uCarInv * modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = FRAG + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = carBlood(carDirt(diffuseColor.rgb), vCL);');
-  };
+  m.onBeforeCompile = inject;
   m.customProgramCacheKey = () => 'carDirt';
   m.needsUpdate = true;
   ST.mats++;
