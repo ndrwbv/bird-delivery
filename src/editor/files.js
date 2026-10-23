@@ -1,4 +1,4 @@
-/* Файлы редактора в репозитории: src/maps/<карта>/notes.json (пометки) и edits.json (правки предметов).
+/* Файлы редактора в репозитории: src/maps/<карта>/notes.json (пометки) и edits.json (правки предметов и домов).
    Читает и пишет dev-сервер Vite (vite.config.js, editorFiles: GET/POST /__editor/file). Без него
    (сборка для probe) — только чтение: то, что было в файлах при сборке. */
 const NOTES = import.meta.glob('../maps/*/notes.json', { eager: true, import: 'default' });
@@ -26,4 +26,9 @@ export async function save (map, f, obj) {
     const j = await r.json().catch(() => ({}));
     return r.ok ? { ok: true, path: j.path || path(map, f) } : { ok: false, error: j.error || ('код ' + r.status) };
   } catch (e) { return { ok: false, error: 'dev-сервер не отвечает: ' + e.message }; }
+}
+/** сразу, без ответа (страница уходит: F5, закрыли вкладку) — navigator.sendBeacon */
+export function saveNow (map, f, obj) {
+  if (!DEV || !navigator.sendBeacon) return false;
+  return navigator.sendBeacon(`/__editor/file?map=${encodeURIComponent(map)}&f=${f}`, new Blob([JSON.stringify(obj)], { type: 'text/plain' }));
 }

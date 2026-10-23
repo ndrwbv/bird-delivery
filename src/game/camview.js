@@ -27,7 +27,9 @@ import './camview.css';
 import { t } from '../i18n/index.js';
 import * as TEL from './telemetry.js';          // анонимная статистика: смена вида камеры (telemetry.js)
 import { carMats as shadeMats } from './fakeshadows.js';   // в тени дома салон и капот темнее, как асфальт за стеклом (fakeshadows.js carMat)
-import { LK, LOOK } from './camlook.js';        // осмотреться: голова из-за руля, камера вокруг машины сзади (camlook.js)
+import { LK, LOOK } from './camlook.js';
+import * as GLASSB from './glassblood.js';       // кровь на лобовом и дворники салона (glassblood.js)
+import { RF, ROOF } from './camroof.js';             // под аркой и мостом — ниже свода и ближе за машиной (camroof.js, 0п40)        // осмотреться: голова из-за руля, камера вокруг машины сзади (camlook.js)
 
 export const MODES = ['high', 'near', 'cab'];
 const KEY = 'dlv-cam';
@@ -108,21 +110,24 @@ export function fov (sp) {
    не залезает в дом, а подходит ближе и чуть поднимается. */
 export function near (dt, vf, sh) {
   const { V, cam } = A, N = CAMV.NEAR, sp = clamp(Math.abs(vf) / (A.vmax() || 48), 0, 1);
-  V.camH = damp(V.camH, V.h, N.yawK, dt);
-  const full = N.dist + sp * N.distFast;
+  const rk = RF.begin(dt, V, V.camX, V.camZ);      // под сводом арки, под мостом (camroof.js): ниже свода, ближе, поворот догоняет быстрее
+  V.camH = damp(V.camH, V.h, N.yawK + rk * ROOF.YAW, dt);
+  const full = RF.dist(N.dist + sp * N.distFast, 'near'), hUp = RF.h(N.h, 'near');
   const yaw = LK.yaw;                              // осмотреться (camlook.js): камера обходит машину, отпустил — за спину
   const sx = Math.sin(V.camH + yaw), sz = Math.cos(V.camH + yaw);
   let back = full;
   for (let d = 1.6; d <= full; d += 0.5) if (!A.camClear(V.x - sx * d, V.z - sz * d)) { back = Math.max(N.minBack, d - 1.2); break; }
   const pull = full - back;
   V.camPull = damp(V.camPull || 0, pull, pull > (V.camPull || 0) ? 18 : 2.5, dt);
-  const eff = full - V.camPull;
+  const rb = RF.back(V, sx, sz, back, hUp + V.camPull * N.pullRaise * (1 - rk)), rp = rb < Infinity ? Math.max(0, back - Math.max(N.minBack, rb - 1.2)) : 0;
+  V.camRP = damp(V.camRP || 0, rp, rp > (V.camRP || 0) ? 18 : 2.5, dt);   // свод сзади — как стена, но камера у него не поднимается
+  const eff = Math.max(N.minBack, full - V.camPull - V.camRP);
   const tx = V.x - sx * eff, tz = V.z - sz * eff;
   V.camX = damp(V.camX, tx, N.posK, dt);
   V.camZ = damp(V.camZ, tz, N.posK, dt);
   if (!A.camClear(V.camX, V.camZ)) { V.camX = tx; V.camZ = tz; }   // отстающая камера оказалась в стене — сразу на место
-  const want = Math.max(V.y + N.h + V.camPull * N.pullRaise - LK.pitch * 6, A.groundH(V.camX, V.camZ) + 1.6);   // смотрит вверх — камера ниже
-  V.camY = damp(V.camY, want, 8, dt);
+  const want = Math.max(V.y + hUp + V.camPull * N.pullRaise * (1 - rk) - LK.pitch * 6, A.groundH(V.camX, V.camZ) + 1.6);   // смотрит вверх — камера ниже
+  V.camY = RF.clampY(V.camX, V.camZ, damp(V.camY, want, 8 + rk * 3, dt), V.y);   // под сводом — не выше него
   sh = sh || 0;
   cam.position.set(V.camX + (sh ? (Math.random() * 2 - 1) * sh * 0.7 : 0), V.camY + (sh ? (Math.random() * 2 - 1) * sh * 0.7 : 0), V.camZ);
   const ax = V.x + Math.sin(V.h + yaw) * N.ahead, az = V.z + Math.cos(V.h + yaw) * N.ahead;
@@ -188,6 +193,7 @@ export function cab (dt, vf, sh) {
     K.hood.position.copy(hm.position); K.hood.quaternion.copy(hm.quaternion); K.hood.scale.copy(hm.scale);
     if (hm.material && hm.material.color) K.hood.material.color.copy(hm.material.color);
   }
+  GLASSB.cabStep(K.glass, car);                    // дворники и кровь на лобовом (glassblood.js)
   K.drawn = true;
   // для звука, отсечения и возврата в вид сзади — без рывка из-за спины
   V.camX = K.e.x; V.camZ = K.e.z; V.camY = K.e.y + 4; V.camH = V.h; V.camPull = 0;
@@ -404,8 +410,8 @@ function build (car) {
     }
     box(W - 0.2, 0.06, 0.1, TRIM, 0, gt + 0.04, rw + 0.25);                   // верх рамы заднего стекла
   } else box(W - 0.24, 0.04, 0.05, TRIM, 0, gb + 0.12, rw + 0.04, 0.6, 0, 0);   // кабриолет: низкая рамка сзади
-  // дворники лежат у низа лобового
-  for (const x of [0.32, -0.18]) box(0.5, 0.012, 0.014, '#141317', x, gb + 0.015, cf + 0.03, 0, 0.12, 0);
+  // стекло лобового с кровью (взрослая) и дворники на нём — машут с настоящими (glassblood.js, 0п41)
+  const glass = GLASSB.cab(root, { W, gb, gt, cf });
   // рама лобового, крыша изнутри, козырьки, зеркало (у кабриолета — только низкая рамка стекла)
   if (!open) {
     for (const s of [1, -1]) bar(0.085, 0.11, TRIM, [s * (W / 2 - 0.1), gb - 0.02, cf + 0.02], [s * (W / 2 - 0.13), gt + 0.02, cf - 0.26]);
@@ -425,7 +431,7 @@ function build (car) {
     M: new THREE.Matrix4(), e: new THREE.Vector3(), eye: new THREE.Vector3(), sv: new THREE.Vector3(1, 1, 1), s: 1,
   };
   if (!old) scene.add(K.hemi, K.amb, K.sun);
-  Object.assign(K, { car, root, spin, speedo, tacho, hood, lampHp, lampNos, fy: null, p: 0, tt: 0, kmh: 0, rpm: 0, drawn: false });
+  Object.assign(K, { car, root, spin, speedo, tacho, hood, lampHp, lampNos, glass, fy: null, p: 0, tt: 0, kmh: 0, rpm: 0, drawn: false });
   K.eye.set(dx, ey, ez);
   shadeMats(root);
   K.s = clamp(CAMV.CAB.eyeH / Math.max(0.5, ey), 1, CAMV.CAB.eyeMax);   // низкий глаз (седан — 1,19 м) — салон крупнее; высокий (джип, «Буханка») — как есть

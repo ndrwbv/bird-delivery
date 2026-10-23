@@ -39,6 +39,8 @@ import { inView } from './cull.js';             // снежки: бой не з�
 import * as PEDC from './pedcollide.js';         // снежки: бегут не сквозь твёрдое, прячутся за предметы (pedcollide.js steer, coverNear)
 import { qHas } from './qpeople.js';               // снежки: бросок — клип «Punch» людей-моделей
 import { mat as fakeShadowMat } from './fakeshadows.js';   // тени домов на сугробах, листьях и кронах (fakeshadows.js)
+import { ON as MOBILE } from './mobile.js';       // снег на телефоне — крупнее и реже (SNOW_PH, 0п43)
+import * as DYN from './dynres.js';              // «мыло»: снежинка того же размера на экране, когда кадр меньше
 
 const CELL = 200;                           // клетка склейки, как у статики (CHUNK в game.js; было 100 — деревья и сугробы давали ~37 вызовов отрисовки в кадре, 10.10.2026)
 
@@ -98,6 +100,10 @@ export const snowFall = () => (SKY ? SKY.amt : 0);
    было), wind 0…1 — метель (снег летит вбок до 9,5 м/с, сбитые сугробы отрастают до 4 раз быстрее), wet — асфальт мокрее
    (ливень; null — как у сезона и варианта). Ставит weather.js каждый кадр смены */
 const WX = { snow: null, wind: 0, wet: null };
+/* лужи на асфальте в дождь (12ам): v — сколько сейчас (0…1, в шейдере земли — порог шума: 0,3 — редкие пятна, 0,85 —
+   дождь, 1 — ливень); FROM — с какой силы дождя копятся (морось — нет); GROW / DRY — с от 0 до 1 / от 1 до 0 */
+export const RAINPUD = { v: 0, FROM: 0.5, GROW: 70, DRY: 150 };
+export const puddles = () => RAINPUD.v;
 export function setWx (snow = null, wind = 0, wet = null) { WX.snow = snow; WX.wind = wind || 0; WX.wet = wet; }
 export const blizzard = () => WX.wind;
 /* жара (вариант погоды weather.js): 0 … 1 — трава выжжена (lawnprops.js красит пучки в солому) */
@@ -108,6 +114,7 @@ export const iced = () => (A.snow || 0) > 0.25;
 /* ─── юниформы: общие для всех сезонных материалов ─── */
 const U = {
   uSnow: { value: 0 }, uDry: { value: 0 }, uMud: { value: 0 }, uFresh: { value: 0 }, uWet: { value: 0 },
+  uPud: { value: 0 }, uPudR: { value: 0 },        // лужи на асфальте: сколько (0…1) и сила дождя сейчас — кольца (RAINPUD)
   uLeaf: { value: 1 }, uYellow: { value: 0 }, uFallen: { value: 0 }, uDrift: { value: 0 }, uNY: { value: 0 }, uIce: { value: 0 },
   uTime: { value: 0 }, uNight: { value: 0 },
   uHeat: { value: 0 }, uGold: { value: 0 },     // варианты сезона (weather.js): жара, яркая сухая осень
@@ -128,7 +135,7 @@ const TINT = `
 #else
 #define S_LAND true
 #endif
-uniform float uSnow, uDry, uMud, uFresh, uWet, uHeat, uGold, uTime;
+uniform float uSnow, uDry, uMud, uFresh, uWet, uHeat, uGold, uTime, uPud, uPudR;
 uniform vec3 uYardP;
 varying vec3 vSW;
 float sHash (vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -178,6 +185,21 @@ vec3 seasonTint (vec3 c, float dryK, float snowK) {
   c = mix(c, vec3(0.2, 0.15, 0.07), uMud * g * smoothstep(0.35, 0.65, n) * 0.85);
   c = mix(c, vec3(0.16, 0.52, 0.08), uFresh * g * 0.55);
   c *= 1.0 - uWet * (0.3 * road + 0.12 * g + 0.06) * up * (0.6 + 0.4 * n);
+  if (uPud > 0.0) {                            // лужи на асфальте (12ам): копятся в дождь, растут в ливень, сохнут после (RAINPUD)
+    float pn = sNoise(mat2(0.8, -0.6, 0.6, 0.8) * vSW.xz * 0.14 + 61.0) * 0.75 + n2 * 0.25;
+    float pm = smoothstep(0.0, 0.035, pn - (0.93 - 0.26 * uPud)) * road * up;
+    if (pm > 0.0) {
+      // кольца от капель: в клетке 0,7 м — одно, расходится и гаснет; дальше 28 м не видно (не рябит)
+      vec2 cq = vSW.xz * 1.4, cell = floor(cq), f = fract(cq) - 0.5 - (vec2(lHash(cell + 3.0), lHash(cell + 5.0)) - 0.5) * 0.4;
+      float ph = fract(uTime * 1.1 + lHash(cell));
+      float rip = (1.0 - smoothstep(0.0, 0.05, abs(length(f) - ph * 0.42))) * (1.0 - ph) * uPudR
+        * (1.0 - smoothstep(12.0, 28.0, length(vSW.xz - cameraPosition.xz)));
+      // вода отражает пасмурное небо: на тёмном асфальте — светлее, серо-голубая, по краю — тёмный мокрый ободок
+      float rim = smoothstep(0.0, 0.035, pn - (0.93 - 0.26 * uPud) + 0.02) - pm;
+      c = mix(c, vec3(0.4, 0.45, 0.53), pm * 0.7) * (1.0 - 0.35 * clamp(rim * road * up, 0.0, 1.0));
+      c += vec3(0.22, 0.24, 0.26) * rip * pm;
+    }
+  }
   if (uGold > 0.0) {                           // яркая сухая осень: листья на асфальте — вразброс, кучками (то густо, то пусто)
     float clump = smoothstep(0.3, 0.8, sNoise(vSW.xz * 0.07 + 3.7)) * 0.75 + n * 0.25;
     float pk, pk2;
@@ -283,7 +305,8 @@ function pileMat () {
         vK = floor(aux.x * 255.0 + 0.5); vSeed = aux.y; vP = floor(aux.z * 255.0 + 0.5);
         if (uGale > 0.0 && vK == 1.0) transformed.xz += uGaleD * uGale * (0.72 + 0.28 * sin(uTime * 3.1 + vSeed * 41.0 + transformed.x * 0.07));   // ураган: крону клонит по ветру
         float lim = vK == 1.0 ? uLeaf : vK == 2.0 ? uFallen : vK == 3.0 ? uDrift : vK == 4.0 ? uNY : vK == 5.0 ? uBloom : vK == 6.0 ? uBerry : 2.0;
-        if (vSeed >= lim) transformed = vec3(0.0, -3000.0, 0.0);`)
+        if (vSeed >= lim) transformed = vec3(0.0, -3000.0, 0.0);
+        if (vK == 7.0 && uLeaf > vSeed) transformed = vec3(0.0, -3000.0, 0.0);   // вид 7 — ветки и прутья голой кроны (trees.js, зимние модели): видны, когда облетела листва`)
         .replace('#include <project_vertex>', '#include <project_vertex>\n' + WPOS);
     sh.fragmentShader = 'uniform float uYellow;\nvarying float vK, vP, vSeed;\n' + TINT + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       if (vK == 1.0) {
@@ -291,7 +314,8 @@ function pileMat () {
         diffuseColor.rgb = mix(diffuseColor.rgb, pal, clamp(uYellow * 1.7 - vSeed * 0.7, 0.0, 1.0));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.72, 0.16), uFresh * 0.55);   // весна: молодая листва светлее
       }
-      diffuseColor.rgb = seasonTint(diffuseColor.rgb, 0.0, vK == 0.0 || vK == 4.0 ? 0.62 : 1.0);`);
+      if ((vK == 0.0 || vK == 7.0) && vP > 0.5) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.88, 0.91, 0.97), uSnow);   // снег на верхней стороне веток (палитра 1 у ствола и веток — trees.js)
+      diffuseColor.rgb = seasonTint(diffuseColor.rgb, 0.0, vK == 0.0 || vK == 4.0 || vK == 7.0 ? 0.62 : 1.0);`);
   };
   m.customProgramCacheKey = () => 'seasonPile';
   return fakeShadowMat(m);
@@ -1101,6 +1125,14 @@ function bigFir (x, z, k) {
 /* ─────────────── живое: снег с неба, снежки, сугробы под колёсами ─────────────── */
 let SNOWF = null, SPLASH = null, SKY = null;
 const SF_N = 3200, SP_N = 420, SF_R = 38, SF_IN = 1400, SF_RI = 15;   // первые SF_IN — ближняя коробка: крупные хлопья у камеры
+/* размер хлопьев в точках кадра: от MIN до MAX, всегда целое (дробный — то 2, то 3 точки по месту: мерцание), «мыло» не раздувает */
+const SNOW_PC = { MIN: 2, MAX: 6, S: 1 };
+/* Телефон (0п43, автор 24.10.2026: «снег на мобиле мерцает, вообще ничего не видно»): кадр там ~931×430 и сам экран маленький —
+   хлопья в 2 точки и метель вбок 9,5 м/с при 30 к/с прыгали по 30—50 точек за кадр и рябили. Тут: N — доля хлопьев (реже),
+   ближних из них — каждый NEAR-й (а не первые 1 400); MIN / MAX / S — размер крупнее; FADE — ближе этого (м) хлопок гаснет
+   (самые быстрые по экрану); WIND — доля сноса вбок в метель (0,5 → ~5 м/с вместо 9,5) */
+const SNOW_PH = { N: 0.5, NEAR: 3, MIN: 3, MAX: 8, S: 1.3, FADE: [1.5, 4], WIND: 0.5 };
+const SNOW_K = MOBILE ? SNOW_PH : SNOW_PC;
 function initSky () {
   const g = new THREE.BufferGeometry();
   // хлопья — в мировых координатах, в коробке вокруг камеры (чуть впереди);
@@ -1111,7 +1143,7 @@ function initSky () {
   const p = new Float32Array(SF_N * 3), sa = new Float32Array(SF_N * 3);
   for (let i = 0; i < SF_N; i++) {
     p[i * 3] = rnd(-SF_R, SF_R); p[i * 3 + 1] = rnd(-10, 30); p[i * 3 + 2] = rnd(-SF_R, SF_R);
-    sa[i * 3] = 0.7 + (i % 5) * 0.12; sa[i * 3 + 1] = i < SF_IN ? 1 : 0; sa[i * 3 + 2] = i % 6.283185307;
+    sa[i * 3] = 0.7 + (i % 5) * 0.12; sa[i * 3 + 1] = (MOBILE ? i % SNOW_PH.NEAR === 0 : i < SF_IN) ? 1 : 0; sa[i * 3 + 2] = i % 6.283185307;
   }
   g.setAttribute('position', new THREE.BufferAttribute(p, 3));
   g.setAttribute('aS', new THREE.BufferAttribute(sa, 3));
@@ -1119,8 +1151,8 @@ function initSky () {
      белом поле и бледном небе не видно; дальние — по пикселю. */
   const m = new THREE.ShaderMaterial({
     uniforms: { uOp: { value: 0 }, uNight: U.uNight, uS: { value: 64 }, uFall: { value: 0 }, uDx: { value: 0 }, uW: { value: 0 },
-      uO: { value: new THREE.Vector3() }, uOi: { value: new THREE.Vector3() } },
-    vertexShader: `uniform float uS, uFall, uDx, uW; uniform vec3 uO, uOi; attribute vec3 aS; varying float vD;
+      uO: { value: new THREE.Vector3() }, uOi: { value: new THREE.Vector3() }, uK: { value: 1 } },
+    vertexShader: `uniform float uS, uFall, uDx, uW, uK; uniform vec3 uO, uOi; attribute vec3 aS; varying float vD;
       void main () {
         bool nr = aS.y > 0.5;
         vec3 o = nr ? uOi : uO;
@@ -1129,14 +1161,18 @@ function initSky () {
         q.x = o.x - R + mod(q.x - o.x + R, 2.0 * R);
         q.z = o.z - R + mod(q.z - o.z + R, 2.0 * R);
         q.y = lo + mod(q.y - lo, span);
-        vec4 mv = modelViewMatrix * vec4(q, 1.0); gl_Position = projectionMatrix * mv; vD = -mv.z; gl_PointSize = clamp(uS / max(vD, 0.5), 2.0, 6.0); }`,
+        vec4 mv = modelViewMatrix * vec4(q, 1.0); gl_Position = projectionMatrix * mv; vD = -mv.z; gl_PointSize = floor(max(clamp(uS / max(vD, 0.5), ${SNOW_K.MIN.toFixed(1)}, ${SNOW_K.MAX.toFixed(1)}) * uK, ${SNOW_K.MIN.toFixed(1)}) + 0.5); }`,
     fragmentShader: `uniform float uOp, uNight; varying float vD;
       void main () { vec2 q = abs(gl_PointCoord * 2.0 - 1.0); float r = max(q.x, q.y);
         vec3 c = r > 0.52 && vD < 16.0 ? vec3(0.58, 0.66, 0.78) : vec3(1.0);
         c *= mix(1.0, 0.5, uNight);
-        gl_FragColor = vec4(c, uOp * clamp(1.25 - vD / 60.0, 0.35, 1.0)); }`,
+        gl_FragColor = vec4(c, uOp * clamp(1.25 - vD / 60.0, 0.35, 1.0)${MOBILE ? ` * smoothstep(${SNOW_PH.FADE[0].toFixed(1)}, ${SNOW_PH.FADE[1].toFixed(1)}, vD)` : ''}); }`,
     transparent: true, depthWrite: false,
   });
+  // «мягкие края» (fxaa.js) хлопья не трогают: трафарет 1, как у облачков с текстом (talk.js) — снежинка в 2—3 точки
+  // после сглаживания то бледнела, то нет
+  m.stencilWrite = true; m.stencilRef = 1; m.stencilFunc = THREE.AlwaysStencilFunc;
+  m.stencilZPass = THREE.ReplaceStencilOp; m.stencilFail = m.stencilZFail = THREE.KeepStencilOp;
   CAM_DIR = new THREE.Vector3();
   SNOWF = new THREE.Points(g, m);
   SNOWF.frustumCulled = false; SNOWF.visible = false;
@@ -1186,6 +1222,12 @@ function stepSky (dt) {
   } else SKY.want = 0;
   const want = sn > 0.45 ? (WX.snow != null ? WX.snow : Math.max(SKY.want, ENV.rain || 0, (VAR && VAR.snowfall) || 0)) : 0;
   U.uWet.value = WX.wet != null ? Math.max(A.wet || 0, WX.wet) : A.wet || 0;   // ливень — асфальт мокрее (weather.js)
+  // лужи на асфальте (12ам, 23.10.2026): в дождь (сила > FROM) копятся к силе дождя за ~GROW с (ливень — до 1, крупнее и
+  // больше), стихло — сохнут за ~DRY с; снег — нет. Кольца от капель — пока идёт (uPudR)
+  const pr = sn > 0.45 ? 0 : (ENV.rain || 0), pw = pr > RAINPUD.FROM ? pr : 0;
+  RAINPUD.v = RAINPUD.v < pw ? Math.min(pw, RAINPUD.v + dt / RAINPUD.GROW) : Math.max(pw, RAINPUD.v - dt / RAINPUD.DRY);
+  if (sn > 0.45) RAINPUD.v = 0;                  // зима — лужи под снегом сразу
+  U.uPud.value = RAINPUD.v; U.uPudR.value = Math.min(1, pr * 1.2);
   SKY.amt += (want - SKY.amt) * (1 - Math.exp(-0.5 * dt));
   // небо: зимой бледнее, осенью чуть серее, свет от снега снизу
   const day = 1 - night;
@@ -1205,11 +1247,12 @@ function stepSky (dt) {
   u.uO.value.set(cp.x + fx * 14, cp.y, cp.z + fz * 14);
   u.uOi.value.set(cp.x + fx * 6, cp.y, cp.z + fz * 6);
   SKY.fall = (SKY.fall + (2.0 + SKY.amt * 1.6 + WX.wind * 1.4) * dt) % 46200;     // 46 200 м × любая скорость 0,7…1,18 — целое число высот коробок 22 и 42 м
-  SKY.dx = (SKY.dx + (0.5 + WX.wind * 9) * dt) % 1140;            // снос ветром 0,5 м/с (в метель — до 9,5); 1 140 — кратно ширине коробок 30 и 76 м
+  SKY.dx = (SKY.dx + (0.5 + WX.wind * 9 * (MOBILE ? SNOW_PH.WIND : 1)) * dt) % 1140;   // снос ветром 0,5 м/с (в метель — до 9,5, на телефоне ~5); 1 140 — кратно ширине коробок 30 и 76 м
   u.uFall.value = SKY.fall; u.uDx.value = SKY.dx;
-  u.uS.value = 64 * (1 + 0.45 * WX.wind);                          // в метель хлопья крупнее (ближе к глазам)
+  u.uS.value = 64 * SNOW_K.S * (1 + 0.45 * WX.wind);              // в метель хлопья крупнее (ближе к глазам)
+  u.uK.value = DYN.k();                                           // «мыло»: кадр меньше и растянут — хлопок во столько же меньше
   u.uW.value = U.uTime.value % (6.283185307 / 0.9);                 // покачивание ±0,44 м с периодом 7 с
-  SNOWF.geometry.setDrawRange(0, Math.floor(SF_N * Math.min(1, 0.35 + SKY.amt)));
+  SNOWF.geometry.setDrawRange(0, Math.floor(SF_N * (MOBILE ? SNOW_PH.N : 1) * Math.min(1, 0.35 + SKY.amt)));
 }
 
 /* Сугробы. Врезался на скорости — сугроб взрывается: белые комья,

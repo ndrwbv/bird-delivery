@@ -55,6 +55,7 @@ export const REARD = { REAR_K: 1.5, S1: 0.4, S2: 1.0, S3: 1.6, ONE2: 0.67, ONE3:
 export const ST = { dents: 0, lost: [], ground: 0, flown: 0, verts: 0, car: null, rear: 0, pops: 0, shut: 0 };
 
 import { crackLamp, smashLamp } from './carglass.js';
+import { bumper as realBumper } from './realcar.js';
 
 let API = null;
 /* api: scene, groundH(x, z), put, mergeGeos; onLand(x, z, v, key, again) — деталь ударилась об асфальт (звук, impact.js) */
@@ -131,20 +132,20 @@ export function hit (g, lx, lz, force) {
   if (end) {
     const front = nz > 0, key = front ? 'bumperF' : 'bumperR';
     const need = PART.BUMPER + (front ? PART.ARMOR_F * (u.armor || 0) : 0);
-    if (!L[key] && (force >= need || sum[front ? 'f' : 'r'] >= PART.SUM)) dropPanel(g, key, nx, nz, force);
+    if (!L[key] && (force >= need || sum[front ? 'f' : 'r'] >= PART.SUM)) dropPanel(g, key, nx, nz, force);   // у «Семёрки» — бампер модели (realOff)
     if (!front && !L.trunk && u.trunk && (force >= PART.TRUNK || (L.bumperR && force >= PART.TRUNK_BARE))) {
       if (u.real) { const R = u.rear || (u.rear = { w: 0, st: 0 }); R.w = Math.max(R.w, REARD.S3); }   // «Семёрка»: крышка не отлетает — замок вдребезги, распахивает (crashfx.js открывает крышку модели)
       else dropPanel(g, 'trunk', 0, -1, force);
     }
   } else {
-    for (const m of u.mirrors || []) {
+    for (const m of u.real ? [] : u.mirrors || []) {   // «Семёрка» (realcar.js): коробочные зеркала спрятаны под моделью — не отрывать (0п30)
       const key = m.userData.mirror;
       if (L[key] || Math.sign(m.position.x) !== nx) continue;
       if (force >= PART.MIRROR_ANY || (force >= PART.MIRROR && Math.abs(m.position.z - lz) < PART.MIRROR_NEAR)) { L[key] = 1; fly(g, m, key, nx, 0, force); }
     }
   }
   rearWear(g, end && nz < 0 ? REARD.REAR_K : 1, k, end ? (Math.sign(lx) || 1) : nx, force);
-  if (force >= PART.HUB) {
+  if (force >= PART.HUB && !u.real) {              // колпаки — у коробочных колёс (у «Семёрки» они спрятаны под моделью)
     let best = null, bd = PART.HUB_R;
     for (const w of u.wheels || []) {
       const p = w.parent && w.parent.position;
@@ -257,11 +258,23 @@ const VEL = { x: 0, z: 0, px: 0, pz: 0, ok: false };
 function dropPanel (g, key, nx, nz, force) {
   const u = g.userData, i = u.panels.findIndex(p => p.m.name === key);
   u.lost[key] = 1;
+  if (u.real) { realOff(g, key, nz, force); return; }   // коробочный кузов спрятан под моделью — его деталь не трогаем
   if (i < 0) return;
   const m = u.panels[i].m;
   u.panels.splice(i, 1);                           // dentCar её больше не трогает
   if (key === 'trunk' && u.trunk) { u.trunk.lost = true; u.trunk.m = new THREE.Object3D(); }   // крышки нет: открывать нечего, коробки видно (carrear.js)
   fly(g, m, key, nx, nz, force);
+}
+
+/* своя «Семёрка» (0п30, 23.10.2026; автор: «теряет серые бампер и зеркала коробочного кузова»): бампер вырезается из
+   кузова модели своей сеткой (realcar.js bumper — как у подробной копии потока, foewreck.js) и улетает; задний на 3-й
+   ступени следов сзади — падает под машину (force маленькая). Крышки багажника у модели не отлетают (crashfx.js) */
+function realOff (g, key, nz, force) {
+  if (key !== 'bumperF' && key !== 'bumperR') return;
+  const m = realBumper(g, key === 'bumperF' ? 'f' : 'r');
+  if (!m) return;
+  m.userData.keepMat = 1;                          // материал — общий с кузовом машины
+  fly(g, m, key, 0, nz || (key === 'bumperF' ? 1 : -1), force);
 }
 
 /* деталь m слетает с машины g: в мир, со скоростью машины, наружу (nx, nz — в осях машины) и вверх */

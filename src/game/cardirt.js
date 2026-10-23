@@ -73,8 +73,13 @@ export function inject (sh) {
 function patch (m) {
   if (m.userData.dirt) return;
   m.userData.dirt = 1;
-  m.onBeforeCompile = inject;
-  m.customProgramCacheKey = () => 'carDirt';
+  // коробочная своя машина (?oldcar и машины гаража без настоящей модели) — и кровь поверх грязи (carblood.js, взрослая)
+  const gore = CBLOOD.CFG.on;
+  m.onBeforeCompile = gore ? sh => {
+    inject(sh);
+    sh.fragmentShader = sh.fragmentShader.replace('diffuseColor.rgb = carDirt(diffuseColor.rgb);', 'diffuseColor.rgb = carBlood(carDirt(diffuseColor.rgb), vCL);');
+  } : inject;
+  m.customProgramCacheKey = () => gore ? 'carDirt|blood' : 'carDirt';
   m.needsUpdate = true;
   ST.mats++;
 }

@@ -52,6 +52,7 @@ import { onYard } from './yards.js';              // дворовые дорож
 import * as HUR from './hurricane.js';
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 import * as CYCLE from './seasoncycle.js';   // сезоны по кругу с зимы: шаг смены, переходы, сюрпризы (seasoncycle.js, 17.10.2026)
+import { ON as MOBILE } from './mobile.js';   // метель на телефоне — видно не ближе FOG_PH (0п43)
 
 /* какой сезон выпадет на смену карьеры (в сумме 100; 11.10.2026): лето чаще — «чаще ярко-солнечно» (09.10.2026) */
 /* 13.10.2026 (автор: «по базе делай погоду зиму»): всегда зима — жребий только на погоду в ней. Было: лето 38, осень 22, зима 18, весна 22 */
@@ -235,6 +236,7 @@ export function* init (ctx) {
 export function shiftStart (ride) {
   if (!C) return;
   SEAS.setVariant(null);
+  if (SEAS.RAINPUD) SEAS.RAINPUD.v = 0;           // лужи на асфальте прошлой смены (12ам) — новая смена сухая, копятся заново
   const done = +C.Store.get('dlv-shifts', 0) || 0, n = done + (ride ? 5003 : 0);
   const career = !ride && !SEAS.seasonForced() && !FORCE;   // не «покататься», не быстрый заезд, не ?season= / ?weather=
   NEW = !ride && done < NEWBIE;                    // первая смена карьеры: лето, ясно и сухо
@@ -328,6 +330,8 @@ function colors () {
     stormSky: c('#3b424f'), stormFog: c('#4a525f'), hurSky: c('#525a52'), hurFog: c('#646b62'), flash: c('#e4e9ff'), flashFog: c('#bfc8e6') };
   return COL;
 }
+/* метель на телефоне (0п43, 24.10.2026): туман кончается не ближе far м и начинается не ближе near м */
+const FOG_PH = { far: 160, near: 55 };
 function sky (dt) {
   const ENV = C.ENV, scene = C.scene, sun = C.sun, hemi = C.hemi, amb = C.amb, K = colors();
   const day = 1 - (ENV.night || 0), fog = scene.fog;
@@ -344,7 +348,13 @@ function sky (dt) {
     // туман — от того, сколько снега падает: в перерыв ×0,82, снегопад ×0,72 (как было всю смену), метель ×0,28 и с 15 % ближнего
     const s = SEAS.snowFall(), B = SEAS.blizzard();
     scene.background.lerp(K.snowSky, (0.35 + 0.45 * B) * day);
-    if (fog) { fog.color.lerp(K.snowFog, (0.4 + 0.5 * B) * day); fog.far *= 0.82 - 0.12 * Math.min(1, s) - 0.42 * B; fog.near *= 1 - 0.85 * B; }
+    if (fog) {
+      const f0 = fog.far, n0 = fog.near;
+      fog.color.lerp(K.snowFog, (0.4 + 0.5 * B) * day); fog.far *= 0.82 - 0.12 * Math.min(1, s) - 0.42 * B; fog.near *= 1 - 0.85 * B;
+      // телефон (0п43): дальность там и так 250 м (а со страховкой слабого железа — меньше), ×0,28 давало 50—70 м и туман
+      // от 20 м — «вообще ничего не видно». Не ближе FOG_PH (если сама дальность не короче)
+      if (MOBILE) { fog.far = Math.max(fog.far, Math.min(f0, FOG_PH.far)); fog.near = Math.max(fog.near, Math.min(n0, FOG_PH.near)); }
+    }
     if (sun) sun.intensity *= 1 - 0.3 * B;
   } else if (ID === 'rain') {
     // ливень: темнее, туман ближе, струи гуще (до 23.10 вариант «дождь» неба не трогал)
@@ -755,6 +765,7 @@ export function update (dt) {
 const DEBUG = {
   get id () { return ID; }, get forced () { return FORCE; }, get temp () { return TEMP; }, get label () { return label(); },
   CHANCES, IDS, bucket, pickFor, force, strike, shiftStart, hur: HUR.DEBUG,
+  pud: SEAS.RAINPUD,                               // лужи на асфальте (seasons.js RAINPUD): v — сколько сейчас
   /* поставить вариант сейчас (и сезон, если не к месту); 'blizzard' / 'downpour' — снежная зима / дождь и всё время метель / ливень */
   set (v) {
     PIN = ALIAS[v] ? ALIAS[v][1] : null; if (ALIAS[v]) v = ALIAS[v][0];

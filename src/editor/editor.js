@@ -6,14 +6,18 @@
      поставить — выбрать предмет в палитре, клик — поставить (R — повернуть на 15°); файл edits.json;
      выбрать   — клик по предмету: свой (поставленный) — повернуть или убрать, городской — убрать;
      кисть     — круг радиуса R: «посадить рощу» (N деревьев выбранных пород вперемешку, не на асфальт)
-                 или «убрать всё в круге» (что отмечено галочками).
+                 или «убрать всё в круге» (что отмечено галочками);
+     дом       — клик по дому: этажность, цвет стен (палитра citypaint.js), мурал на торце, убрать / вернуть.
+                 Правка — edits.json → houses (по номеру дома из карты), в городе — после «пересобрать город»,
+                 до того — заготовкой: прозрачный дом новой высоты и цвета.
    Убранное пропадает сразу (editlayer.js hideNow: город в редакторе собран целиком, убранное спрятано на
    месте); поставленное — заготовкой, в городе — после «пересобрать город» (страница перезагружается,
    камера остаётся). Отмена — Ctrl+Z (Cmd+Z) или кнопка, до UNDO_MAX шагов.
 
    Для probe и агентов — window.__editor: st, goTo, top, side, addNote, place, removeCity, grove, clearCircle,
-   undo, pickAt, check, cityNear. */
+   undo, pickAt, check, cityNear, houseAt, house, setHouse. */
 import { KINDS } from '../game/editlayer.js';
+import { PALETTE } from '../game/citypaint.js';
 import * as FILES from './files.js';
 import { makeCam } from './cam.js';
 import { makeMinimap } from './minimap.js';
@@ -47,7 +51,7 @@ const addName = a => { const k = kindOf(a); return k ? k.name : a.kind; };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 let d, THREE, CAM, MAPID, MM, ROOT3, built = false;
-const st = { clouds: false, tool: 'look', notes: [], edits: { add: [], remove: [] }, notesAbout: '', editsAbout: '', place: KINDS[0], ry: 0, sel: null, selNote: null, far: 'normal', status: '',
+const st = { clouds: false, tool: 'look', notes: [], edits: { add: [], remove: [], houses: [] }, notesAbout: '', editsAbout: '', editsMore: {}, place: KINDS[0], ry: 0, sel: null, selNote: null, far: 'normal', status: '',
   brush: { mode: 'grove', R: 12, N: 10, kinds: new Set(['birch', 'pine', 'rowan']), clear: new Set(CLEAR.filter(c => c.on).map(c => c.id)) }, undo: [] };
 
 /* ── ожидание игры ── */
@@ -64,7 +68,9 @@ export async function boot () {
   setFar(st.far);
   const [N, E] = await Promise.all([FILES.load(MAPID, 'notes'), FILES.load(MAPID, 'edits')]);
   st.notes = Array.isArray(N.notes) ? N.notes : []; st.notesAbout = N.about || '';
-  st.edits = { add: Array.isArray(E.add) ? E.add : [], remove: Array.isArray(E.remove) ? E.remove : [] }; st.editsAbout = E.about || '';
+  st.edits = { add: Array.isArray(E.add) ? E.add : [], remove: Array.isArray(E.remove) ? E.remove : [], houses: Array.isArray(E.houses) ? E.houses : [] }; st.editsAbout = E.about || '';
+  st.editsMore = {};                                                  // чужие поля файла — сохранить как были
+  for (const k in E) if (!['about', 'add', 'remove', 'houses'].includes(k)) st.editsMore[k] = E[k];
   renderLists();
   await until(() => window.__boot && window.__boot.full, 180000);     // город достроился (latebuild.js)
   $('ed-wait').remove();
@@ -284,12 +290,21 @@ function rebuildMarks () {
   }
   // убранное спрятано сразу; крест — только где «убрать» ничего не нашло (ельник и газон — у собранной клетки)
   for (const r of st.edits.remove) if (!(d.EDL.hits(r) > 0)) MK.rem.add(cross(r.x, r.z));
+  houseMarks(MK.adds);
   showSel();
 }
 function showSel () {
   clearGroup(MK.sel); MK.sel = null;
   const s = st.sel;
   if (!s || !built) return;
+  if (s.type === 'house') {
+    MK.sel = new THREE.Group();
+    const b = s.b, e = hEdit(s.id);
+    MK.sel.add(houseLine(b, (e && e.lv && !hApplied(e, s.id) ? houseTop(b, e.lv) : b._top || houseTop(b, b.lv || 2)) + 0.6, '#ffcc00'));
+    MK.sel.add(houseLine(b, null, '#ffcc00'));
+    ROOT3.add(MK.sel);
+    return;
+  }
   const x = s.type === 'add' ? s.a.x : s.type === 'note' ? s.n.x : s.x, z = s.type === 'add' ? s.a.z : s.type === 'note' ? s.n.z : s.z;
   MK.sel = new THREE.Group();
   MK.sel.add(ring(x, z, 2.2, '#ffcc00', 0.4));
@@ -298,14 +313,18 @@ function showSel () {
 
 /* ── сохранение (с задержкой: несколько кликов — одна запись) ── */
 const T = {};
+const fileObj = f => f === 'notes' ? { about: st.notesAbout, notes: st.notes }
+  : { about: st.editsAbout, add: st.edits.add, remove: st.edits.remove, ...(st.edits.houses.length ? { houses: st.edits.houses } : {}), ...st.editsMore };
 function saveLater (f) {
   clearTimeout(T[f]);
   T[f] = setTimeout(async () => {
-    const obj = f === 'notes' ? { about: st.notesAbout, notes: st.notes } : { about: st.editsAbout, add: st.edits.add, remove: st.edits.remove };
-    const r = await FILES.save(MAPID, f, obj);
+    T[f] = null;
+    const r = await FILES.save(MAPID, f, fileObj(f));
     if (r.ok) status('сохранено → ' + r.path, 'ok'); else status('не сохранено: ' + r.error, 'bad');
   }, 250);
 }
+/* F5 или закрыли вкладку раньше, чем прошли 250 мс, — дописать сразу (sendBeacon доходит и при уходе со страницы) */
+addEventListener('pagehide', () => { for (const f of ['notes', 'edits']) if (T[f]) { clearTimeout(T[f]); T[f] = null; FILES.saveNow(MAPID, f, fileObj(f)); } });
 function status (s, cls = '') { const el = $('ed-status'); if (!el) return; el.textContent = s; el.className = cls; st.status = s; }
 
 /* ── действия (каждое — шаг отмены: do / undo) ── */
@@ -410,6 +429,139 @@ function clearCircle (x, z, R = st.brush.R, groups = [...st.brush.clear]) {
   return list;
 }
 
+
+/* ── дома: этажность, цвет стен, мурал, убрать (edits.json → houses, по номеру дома из карты) ──
+   Правка — одна строка на дом: { id, lv?, col?, mural? (1 есть / 0 нет), drop? (1 — дома нет), date }. Поля нет — как в карте.
+   Игра кладёт её на данные карты до сборки (editlayer.js houses): в городе — после «пересобрать город» */
+const HOUSE_KIND = { res: 'жилой', pub: 'общественный', off: 'офисы', shop: 'магазин', ind: 'цех', gar: 'гаражи', church: 'храм', school: 'школа' };
+const HOUSE_ST = { panel: 'панелька', brick: 'кирпич', stalin: 'сталинка', villa: 'особняк', priv: 'частный дом', pub: 'общественный', khrush: 'хрущёвка' };
+const HFIELDS = ['lv', 'col', 'mural', 'drop'];
+const houseById = () => houseById.m || (houseById.m = new Map(d.MAP.data.buildings.concat(d.EDL.HOUSES.dropped).map(b => [String(b.id), b])));
+const hEdit = id => st.edits.houses.find(h => String(h.id) === String(id)) || null;
+const houseName = b => b ? (b.a ? b.a.join(', ') : b.n || 'дом без адреса') : 'дом';
+/** правка дома как в городе (её взяла игра при сборке) — или нет: «ещё не в городе» */
+function hApplied (e, id) {
+  const g = (d.EDL.HOUSES.list || []).find(h => String(h.id) === String(id)) || null;
+  const pick = h => h ? HFIELDS.map(k => h[k] === undefined ? '' : String(h[k])).join('|') : '|||';
+  return pick(g) === pick(e);
+}
+/* верх стен как у игры (game.js osmBuildings): от самого высокого угла 3,15 м на этаж + 1,1 */
+function houseTop (b, lv) {
+  let hi = -Infinity;
+  for (const q of b.p) hi = Math.max(hi, gH(q[0], q[1]));
+  return b.k === 'gar' ? hi + 2.7 : hi + 3.15 * lv + 1.1;
+}
+/** дом под точкой экрана: { type: 'house', id, b } или null. Луч — до земли: первая точка внутри контура ниже верха стен;
+    убранный дом (его в городе нет) — по контуру на земле */
+function houseAt (cx, cy) {
+  const R = ray(cx, cy), o = R.origin, v = R.direction, G = groundAt(cx, cy), tMax = G ? G.t + 0.5 : 2500, by = houseById();
+  for (let t = 0; t < tMax; t += 0.4 + t * 0.002) {
+    const x = o.x + v.x * t, y = o.y + v.y * t, z = o.z + v.z * t;
+    for (const b of d.HOUSE_GRID.get(Math.floor(x / 40) + ',' + Math.floor(z / 40)) || []) {
+      if (b.id === undefined || !by.has(String(b.id)) || y > (b._top || houseTop(b, b.lv || 2)) + 0.3 || !inPoly(x, z, b.p)) continue;
+      return { type: 'house', id: b.id, b };
+    }
+  }
+  if (G) for (const b of d.EDL.HOUSES.dropped) if (inPoly(G.x, G.z, b.p)) return { type: 'house', id: b.id, b };
+  return null;
+}
+/** что про дом знает редактор: адрес, вид, этажи (в карте / сейчас), цвет, мурал, правка */
+function houseInfo (id) {
+  const b = houseById().get(String(id)), e = hEdit(id);
+  if (!b) return null;
+  const lv0 = b._lv0 !== undefined ? b._lv0 : b.lv;
+  return { id: b.id, name: houseName(b), title: b.n || '', kind: HOUSE_KIND[b.k] || b.k || '', style: HOUSE_ST[b.st] || b.st || '', lv0, lv: e && e.lv ? e.lv : lv0,
+    hex: b._hex || b.col || '', mural: b._mural || '', muralNo: b._muralNo || '', dropped: d.EDL.HOUSES.dropped.includes(b), edit: e ? { ...e } : null, applied: hApplied(e, id) };
+}
+/** поменять дом: patch — { lv, col, mural, drop }, null у поля — «как в карте». Пустая правка убирается из файла. Один шаг отмены */
+function setHouse (id, patch, name) {
+  const b = houseById().get(String(id));
+  if (!b) { status('нет дома № ' + id + ' в карте', 'bad'); return null; }
+  const was = hEdit(id), before = was ? { ...was } : null;
+  const next = { ...(was || { id: b.id }) };
+  for (const k in patch) { if (patch[k] === null || patch[k] === undefined) delete next[k]; else next[k] = patch[k]; }
+  const lv0 = b._lv0 !== undefined ? b._lv0 : b.lv;
+  if (next.lv !== undefined) next.lv = Math.max(d.EDL.HOUSE_LV[0], Math.min(d.EDL.HOUSE_LV[1], Math.round(+next.lv) || lv0));
+  if (next.lv === lv0) delete next.lv;                                                     // как в карте — поля нет
+  if (!next.drop) delete next.drop;
+  next.date = today();
+  const empty = !HFIELDS.some(k => next[k] !== undefined);
+  const put = v => {
+    const L = st.edits.houses, i = L.findIndex(h => String(h.id) === String(id));
+    if (!v) { if (i >= 0) L.splice(i, 1); } else if (i >= 0) L[i] = v; else L.push(v);
+    saveLater('edits'); refresh();
+  };
+  act(name || 'дом ' + houseName(b), () => put(empty ? null : next), () => put(before));
+  return empty ? null : next;
+}
+/* заготовка дома: прозрачная коробка по контуру — новой высоты и цвета; убранный — красный контур на земле */
+function housePrism (b, lv, hex, op) {
+  const p = b.p, n = p.length, top = houseTop(b, lv);
+  let lo = Infinity;
+  for (const q of p) lo = Math.min(lo, gH(q[0], q[1]));
+  const pos = [];
+  for (let i = 0; i < n; i++) {
+    const a = p[i], c = p[(i + 1) % n];
+    pos.push(a[0], lo, a[1], c[0], lo, c[1], c[0], top, c[1], a[0], lo, a[1], c[0], top, c[1], a[0], top, a[1]);
+  }
+  const wg = new THREE.BufferGeometry();
+  wg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const m = new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false, fog: false });
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(wg, m));
+  const sh = new THREE.Shape(p.map(q => new THREE.Vector2(q[0], -q[1])));
+  const rg = new THREE.ShapeGeometry(sh).rotateX(-Math.PI / 2);
+  rg.translate(0, top, 0);
+  g.add(new THREE.Mesh(rg, m));
+  return g;
+}
+function houseLine (b, y, hex) {
+  const pts = b.p.map(q => new THREE.Vector3(q[0], y === null ? gH(q[0], q[1]) + 0.4 : y, q[1]));
+  const l = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: hex, fog: false, depthTest: false }));
+  l.renderOrder = 11;
+  return l;
+}
+function houseMarks (grp) {
+  const by = houseById();
+  for (const e of st.edits.houses) {
+    const b = by.get(String(e.id));
+    if (!b) continue;
+    const applied = hApplied(e, e.id), top = b._top || houseTop(b, b.lv || 2);
+    if (e.drop) { grp.add(houseLine(b, null, '#e0281b')); if (!applied) grp.add(housePrism(b, b.lv || 2, '#e0281b', 0.25)); continue; }
+    if (!applied) grp.add(housePrism(b, e.lv || (b._lv0 !== undefined ? b._lv0 : b.lv), e.col || b._hex || '#cccccc', 0.55));
+    grp.add(houseLine(b, applied ? top + 0.3 : houseTop(b, e.lv || b.lv) + 0.3, '#2f6fd0'));
+  }
+}
+function houseSelHtml (I) {
+  const e = I.edit || {}, sw = (hex, on) => `<button class="sw${on ? ' on' : ''}" data-col="${hex}" title="${hex}" style="background:${hex}"></button>`;
+  const muralNow = e.mural === 1 ? 'есть' : e.mural === 0 ? 'нет' : 'как было' + (I.applied || !I.edit ? (I.mural ? ' (есть)' : ' (нет)') : '');
+  const note = I.dropped ? 'убран — в городе его нет' : I.applied ? (I.edit ? 'правка в городе' : 'как в карте') : 'правка ещё не в городе — «пересобрать город»';
+  const muralBad = e.mural === 1 && I.applied && !I.mural ? `<div class="hint bad">мурал не встал: ${esc(I.muralNo || 'у такого дома муралов не бывает (цех, гараж, особняк)')}</div>` : '';
+  return `<b>дом: ${esc(I.name)}</b>${I.title && I.title !== I.name ? '<br>' + esc(I.title) : ''}<br>
+    <span class="hint">№ ${esc(I.id)} в карте · ${esc([I.kind, I.style].filter(Boolean).join(', '))} · в карте ${I.lv0} эт. · ${esc(note)}</span>
+    ${I.dropped || e.drop ? '' : `<div class="row">этажей: <button class="mini" data-h="lv-">−</button> <b>${I.lv}</b> <button class="mini" data-h="lv+">+</button>
+      ${e.lv ? '<button class="mini" data-h="lv0">как в карте</button>' : ''}</div>
+    <div class="row">стены: ${e.col ? `<span class="sw on" style="background:${e.col}"></span>` : `<span class="sw" style="background:${I.hex}"></span>`}
+      ${e.col ? '<button class="mini" data-h="col0">как было</button>' : '<span class="hint">как было</span>'}</div>
+    <div class="ed-sw">${PALETTE.calm.map(h => sw(h, e.col === h)).join('')}<br>${PALETTE.bold.map(h => sw(h, e.col === h)).join('')}<br>${PALETTE.brick.map(h => sw(h, e.col === h)).join('')}</div>
+    <div class="row">мурал на торце: <b>${esc(muralNow)}</b> <button class="mini" data-h="m1">есть</button><button class="mini" data-h="m0">нет</button>${e.mural !== undefined ? '<button class="mini" data-h="m">как было</button>' : ''}</div>${muralBad}`}
+    <div class="row">${e.drop ? '<button class="mini" data-h="back">вернуть дом</button>' : '<button class="mini warn" data-h="drop">убрать дом</button>'}${I.edit ? ' <button class="mini" data-h="undo">всё как в карте</button>' : ''}</div>`;
+}
+function houseSelAct (id, a, v) {
+  const I = houseInfo(id);
+  if (!I) return;
+  if (a === 'lv-' || a === 'lv+') setHouse(id, { lv: I.lv + (a === 'lv+' ? 1 : -1) }, 'этажи: ' + I.name);
+  else if (a === 'lv0') setHouse(id, { lv: null }, 'этажи как в карте: ' + I.name);
+  else if (a === 'col') setHouse(id, { col: v }, 'цвет: ' + I.name);
+  else if (a === 'col0') setHouse(id, { col: null }, 'цвет как был: ' + I.name);
+  else if (a === 'm1' || a === 'm0') setHouse(id, { mural: a === 'm1' ? 1 : 0 }, 'мурал: ' + I.name);
+  else if (a === 'm') setHouse(id, { mural: null }, 'мурал как был: ' + I.name);
+  else if (a === 'drop') setHouse(id, { drop: 1 }, 'убрать дом ' + I.name);
+  else if (a === 'back') setHouse(id, { drop: null }, 'вернуть дом ' + I.name);
+  else if (a === 'undo') setHouse(id, { lv: null, col: null, mural: null, drop: null }, 'дом как в карте: ' + I.name);
+  status((a === 'drop' ? 'дом убран' : a === 'back' ? 'дом вернётся' : 'дом изменён') + ' — в городе после «пересобрать город»', 'ok');
+}
+
 /* ── клики по городу ── */
 function onClick (cx, cy) {
   closePop();
@@ -428,6 +580,10 @@ function onClick (cx, cy) {
     const G = groundAt(cx, cy);
     if (!G) return;
     if (st.brush.mode === 'grove') grove(G.x, G.z); else clearCircle(G.x, G.z);
+  } else if (st.tool === 'house') {
+    st.sel = houseAt(cx, cy);
+    if (!st.sel) status('тут нет дома из карты (пиццерия, точки конкурентов, стройки — не правятся)', 'bad');
+    showSel(); renderSel();
   } else if (st.tool === 'pick') {
     st.sel = pickAt(cx, cy);
     if (st.sel && st.sel.type === 'note') st.selNote = st.sel.n.id;
@@ -475,7 +631,7 @@ function buildDom () {
       <h2>Что делаем</h2>
       <div class="row tools">
         <button data-tool="look">смотреть</button><button data-tool="note">пометка</button>
-        <button data-tool="place">поставить</button><button data-tool="pick">выбрать / убрать</button><button data-tool="brush">кисть</button>
+        <button data-tool="place">поставить</button><button data-tool="pick">выбрать / убрать</button><button data-tool="brush">кисть</button><button data-tool="house">дом</button>
       </div>
       <div class="row"><button id="ed-undo" disabled>↶ отменить</button> <span class="hint">Ctrl+Z</span></div>
       <div class="hint" id="ed-toolhint"></div>
@@ -505,12 +661,12 @@ function buildDom () {
       <h2>Пометки <span class="hint" id="ed-ncount"></span></h2>
       <div class="row"><label><input type="checkbox" id="ed-hidedone"> прятать сделанные</label></div>
       <ul class="ed-list" id="ed-notes"></ul>
-      <h2>Правки предметов <span class="hint" id="ed-ecount"></span></h2>
+      <h2>Правки предметов и домов <span class="hint" id="ed-ecount"></span></h2>
       <div class="row"><button class="big" id="ed-rebuild">пересобрать город (показать правки)</button></div>
       <ul class="ed-list" id="ed-edits"></ul>
       <h2>Кнопки</h2>
       <div id="ed-keys"><kbd>W A S D</kbd> / стрелки — лететь, <kbd>Q</kbd> <kbd>E</kbd> — ниже / выше, <kbd>Shift</kbd> — быстрее,
-        колесо — высота, тянуть мышью — повернуть голову. <kbd>1</kbd>–<kbd>5</kbd> — инструменты, <kbd>R</kbd> — повернуть предмет,
+        колесо — высота, тянуть мышью — повернуть голову. <kbd>1</kbd>–<kbd>6</kbd> — инструменты, <kbd>R</kbd> — повернуть предмет,
         <kbd>[</kbd> <kbd>]</kbd> — радиус кисти, <kbd>Del</kbd> — убрать выбранное, <kbd>Ctrl</kbd>+<kbd>Z</kbd> — отменить, <kbd>Esc</kbd> — снять выбор.
         Геймпад: стики, курки — высота, A — действие в центре.</div>
     </div>`;
@@ -576,11 +732,13 @@ function setTool (t) {
     note: 'Клик по городу — булавка с текстом. Сохраняется сразу в ' + FILES.path(MAPID || 'seversk', 'notes') + '.',
     place: 'Выбери предмет и кликни, куда поставить. В городе появится после «пересобрать город».',
     pick: 'Клик по предмету: свой — повернуть или убрать, городской — убрать: дерево, куст, ель и сосна ельника, лавочка, фонарь, урна, заборчик, песочница, горка, мелочь газона (покрышки, выбивалка, бельё, ракушка…), знак, забор стройки, рекламный щит. Пропадает сразу.',
+    house: 'Клик по дому — этажность, цвет стен, мурал на торце, убрать / вернуть. В городе — после «пересобрать город», до того — прозрачной заготовкой (синяя рамка — дом с правкой, красная — убран). Сохраняется сразу в edits.json.',
     brush: 'Круг под мышью. «Посадить рощу» — деревья выбранных пород вперемешку (не на асфальт, не в дом и воду; в городе — после «пересобрать город»). «Убрать всё в круге» — что отмечено галочками, пропадает сразу. [ ] — радиус.',
   }[t];
   if (t !== 'place') { clearGroup(GH.ghost); GH.ghost = null; }
   if (t !== 'brush') { clearGroup(GH.ring); GH.ring = null; }
-  if (t !== 'pick') { st.sel = null; showSel(); renderSel(); }
+  if (t !== 'pick' && t !== 'house') { st.sel = null; showSel(); renderSel(); }
+  else if (st.sel && (st.sel.type === 'house') !== (t === 'house')) { st.sel = null; showSel(); renderSel(); }
 }
 function setKind (k) {
   st.place = k;
@@ -611,7 +769,7 @@ function onKey (e) {
   window.__edKeys.down.add(e.code);
   const k = e.code;
   if ((e.ctrlKey || e.metaKey) && k === 'KeyZ') { e.preventDefault(); undo(); return; }
-  if (k === 'Digit1') setTool('look'); else if (k === 'Digit2') setTool('note'); else if (k === 'Digit3') setTool('place'); else if (k === 'Digit4') setTool('pick'); else if (k === 'Digit5') setTool('brush');
+  if (k === 'Digit1') setTool('look'); else if (k === 'Digit2') setTool('note'); else if (k === 'Digit3') setTool('place'); else if (k === 'Digit4') setTool('pick'); else if (k === 'Digit5') setTool('brush'); else if (k === 'Digit6') setTool('house');
   else if (k === 'BracketLeft' || k === 'BracketRight') { if (st.tool === 'brush') setBrush({ R: st.brush.R + (k === 'BracketLeft' ? -2 : 2) }); }
   else if (k === 'KeyR') { if (st.tool === 'place') setRy(st.ry - Math.PI / 12); else if (st.sel && st.sel.type === 'add') rotateAdd(st.sel.a, -Math.PI / 12); }
   else if (k === 'Escape') { closePop(); if (st.sel) { st.sel = null; showSel(); renderSel(); } }
@@ -624,6 +782,7 @@ function delSel () {
   if (s.type === 'add') unAdd(s.a);
   else if (s.type === 'city') removeCity(s.kind, s.x, s.z, s.sub);
   else if (s.type === 'note') delNote(s.n);
+  else if (s.type === 'house') { const e = hEdit(s.id); houseSelAct(s.id, e && e.drop ? 'back' : 'drop'); }
 }
 
 function renderSel () {
@@ -637,6 +796,13 @@ function renderSel () {
   } else if (s.type === 'city') {
     el.innerHTML = `<b>${esc(itemName(s))}</b> — из города<br><span class="hint">x ${r2(s.x)}, z ${r2(s.z)}</span>
       <div class="row"><button class="mini warn" data-a="del">убрать из города</button></div>`;
+  } else if (s.type === 'house') {
+    const I = houseInfo(s.id);
+    if (!I) { el.hidden = true; return; }
+    el.innerHTML = houseSelHtml(I);
+    for (const b of el.querySelectorAll('[data-h]')) b.onclick = () => houseSelAct(s.id, b.dataset.h);
+    for (const b of el.querySelectorAll('[data-col]')) b.onclick = () => houseSelAct(s.id, 'col', b.dataset.col);
+    return;
   } else {
     el.innerHTML = `<b>пометка</b>: ${esc(s.n.text)}<div class="row"><button class="mini warn" data-a="del">удалить пометку</button></div>`;
   }
@@ -682,7 +848,15 @@ function renderLists () {
     li.querySelector('.tx').onclick = bs[0].onclick = go; bs[1].onclick = undo;
     ue.appendChild(li);
   };
-  // сначала поставленное, потом убранное; новые — сверху
+  // сначала дома, потом поставленное и убранное; новые — сверху
+  for (const e of st.edits.houses.slice().reverse()) {
+    const b = houseById().get(String(e.id)), I = b && houseInfo(e.id);
+    const what = !b ? 'нет такого дома в карте' : e.drop ? 'убран' : [e.lv ? e.lv + ' эт. (было ' + I.lv0 + ')' : '', e.col ? 'цвет' : '', e.mural === 1 ? 'мурал есть' : e.mural === 0 ? 'мурала нет' : ''].filter(Boolean).join(', ');
+    const bad = !b || (e.mural === 1 && I.applied && !I.mural);
+    const note = !b ? '' : !I.applied ? ' · ещё не в городе — «пересобрать город»' : bad ? ' · мурал не встал' : ' · в городе';
+    const go = () => { if (!b) return; let x = 0, z = 0; for (const q of b.p) { x += q[0] / b.p.length; z += q[1] / b.p.length; } CAM.goTo(x, z, 60); setTool('house'); st.sel = { type: 'house', id: b.id, b }; showSel(); renderSel(); };
+    row(bad ? 'bad' : '', `⌂ ${esc(houseName(b))}<small>${esc(what + note)}</small>`, go, () => setHouse(e.id, { lv: null, col: null, mural: null, drop: null }, 'дом как в карте: ' + houseName(b)), 'отменить');
+  }
   for (const a of st.edits.add.slice().reverse()) {
     const W = check(a), pend = !applied.has(a.id), bad = !pend && refused.has(a.id);
     const note = pend ? 'ещё не в городе — «пересобрать город»' : bad ? 'игра не поставила: ' + (W.join('; ') || 'место занято') : W.length ? W.join('; ') : 'в городе';
@@ -694,11 +868,11 @@ function renderLists () {
     row(n > 0 ? '' : 'bad', `− ${esc(itemName(r))}<small>x ${Math.round(r.x)}, z ${Math.round(r.z)} · ${esc(note)}</small>`, () => CAM.goTo(r.x, r.z, 30), () => unRemove(r), 'вернуть');
   }
   if (rows > MAXROWS) { const li = document.createElement('li'); li.className = 'hint'; li.textContent = '… и ещё ' + (rows - MAXROWS) + ' (старые)'; ue.appendChild(li); }
-  $('ed-ecount').textContent = `+${st.edits.add.length} · −${st.edits.remove.length}`;
+  $('ed-ecount').textContent = `+${st.edits.add.length} · −${st.edits.remove.length}` + (st.edits.houses.length ? ` · домов ${st.edits.houses.length}` : '');
 }
 async function rebuild () {
   saveCam();
-  for (const f of ['notes', 'edits']) if (T[f]) { clearTimeout(T[f]); T[f] = null; const obj = f === 'notes' ? { about: st.notesAbout, notes: st.notes } : { about: st.editsAbout, add: st.edits.add, remove: st.edits.remove }; await FILES.save(MAPID, f, obj); }
+  for (const f of ['notes', 'edits']) if (T[f]) { clearTimeout(T[f]); T[f] = null; await FILES.save(MAPID, f, fileObj(f)); }
   location.reload();
 }
 
@@ -775,7 +949,7 @@ function loop (now) {
     if (now - ghT > 50) { ghT = now; updateGhost(false); }
     if (now - mmT > 250) {
       mmT = now;
-      const s = st.sel, sel = s ? (s.type === 'add' ? s.a : s.type === 'note' ? s.n : s) : null;
+      const s = st.sel, sel = s ? (s.type === 'add' ? s.a : s.type === 'note' ? s.n : s.type === 'house' ? { x: s.b.p[0][0], z: s.b.p[0][1] } : s) : null;
       MM.draw({ cam: { x: CAM.P.x, z: CAM.P.z, yaw: CAM.P.yaw }, notes: $('ed-hidedone').checked ? st.notes.filter(n => !n.done) : st.notes, adds: st.edits.add, removes: st.edits.remove, sel });
       $('ed-pos').textContent = `камера: x ${Math.round(CAM.P.x)}, z ${Math.round(CAM.P.z)}, высота ${Math.round(CAM.P.y - gH(CAM.P.x, CAM.P.z))} м`;
       if (now - camSaved > 1000) { camSaved = now; saveCam(); }
@@ -801,5 +975,7 @@ window.__editor = {
   addNote, place, removeCity, unAdd, unRemove, rotateAdd, check, pickAt, groundAt, pen, inHouse, grove, clearCircle, undo, setBrush,
   cityNear: (x, z, r = 3) => cityAround(x, z, r).map(c => ({ ...c, d: r2(Math.hypot(c.x - x, c.z - z)) })).sort((a, b) => a.d - b.d),
   click: (cx, cy) => onClick(cx, cy),
+  houseAt, house: houseInfo, setHouse, houseSel: (id, a, v) => houseSelAct(id, a, v), get houses () { return st.edits.houses; },
+  houseNear: (x, z) => { const b = (d.HOUSE_GRID.get(Math.floor(x / 40) + ',' + Math.floor(z / 40)) || []).find(q => q.id !== undefined && inPoly(x, z, q.p)); return b ? houseInfo(b.id) : null; },
   get ghost () { return GH.ghost; }, hover: (cx, cy) => { MOUSE.x = cx; MOUSE.y = cy; MOUSE.in = true; updateGhost(true); },
 };

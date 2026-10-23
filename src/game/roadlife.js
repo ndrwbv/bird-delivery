@@ -9,8 +9,9 @@
      «въезд запрещён» и «одностороннее» у односторонних улиц, остановки,
      «дети» у школ и садов. Столбы — в склейке сбиваемого (smashAdd),
      таблички — один меш с одной текстурой; сбили столб — табличку прячем.
-   • Высокие чёрные заборы (buildFences) вокруг части частных домов, школ
-     и новостроек: двор с калиткой-въездом со стороны улицы, через дороги,
+   • Высокие заборы (buildFences) вокруг части частных домов, школ
+     и новостроек — кованые пики, ржавые пики, профлист, старый профлист, доски,
+     рабица (вид по району и дому, fencevar.js): двор с калиткой-въездом со стороны улицы, через дороги,
      дорожки и чужие дома не идут; каждая секция (2,5 м) сбивается, как
      дворовый заборчик (smashMesh из game.js): на ходу сносишь — летят прутья.
    • Пробки за авариями (jams): поток стоит за аварией во всех перекрытых
@@ -36,7 +37,8 @@ import { holdFixed } from './people.js';
 import * as MOPEDS from './mopeds.js';
 import { onPave } from './pave.js';
 import { blocks as ringIsland } from './rings.js';   // остров малого круга: знаков там нет (rings.js)
-import { TALK } from './talk.js';             // доля вышедших водителей, что говорят (talk.js SHOUT)
+import { TALK } from './talk.js';
+import * as FVAR from './fencevar.js';          // высокие заборы домов: вид по району и дому (fencevar.js, М5)             // доля вышедших водителей, что говорят (talk.js SHOUT)
 
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -336,20 +338,70 @@ function stepSigns (dt, A) {
   SG.mat.color.setScalar(lerp(1, 0.55, n));
 }
 
-/* ═════════════════ высокие чёрные заборы ═════════════════ */
+/* ═════════════════ высокие заборы ═════════════════ */
+/* Атлас секции (М5, fencevar.js): плитки по 80 × 64 в ряд — 0 кованые пики (как было), 1 ржавые пики, 2 профлист,
+   3 старый профлист (подтёки, вмятина), 4 доски (щели, одной доски нет), 5 рабица на трубах. Профлист, доски и рабица
+   нарисованы светлыми — цвет даёт оттенок вершин секции (крашеный профлист, серые доски, зелёная рабица). Рисунок —
+   без жребия (одинаков всегда); один меш и одна текстура на все заборы, как было */
+const FT = { W: 80, H: 64, N: 6 };
 function fenceTex () {
   const c = document.createElement('canvas');
-  c.width = 80; c.height = 64;
+  c.width = FT.W * FT.N; c.height = FT.H;
   const x = c.getContext('2d');
-  x.fillStyle = '#17181c';
-  x.fillRect(0, 0, 4, 64); x.fillRect(76, 0, 4, 64);                 // столбы по краям секции
-  x.fillRect(0, 9, 80, 3); x.fillRect(0, 54, 80, 3);                  // две перекладины
-  for (let i = 0; i < 8; i++) {
-    const bx = 7 + i * 9.4;
-    x.fillRect(bx, 4, 2.4, 60);
-    x.beginPath(); x.moveTo(bx - 1, 5); x.lineTo(bx + 1.2, 0); x.lineTo(bx + 3.4, 5); x.closePath(); x.fill();   // пика
-  }
-  x.fillStyle = '#3a3c44'; for (let i = 0; i < 8; i++) x.fillRect(7.6 + i * 9.4, 12, 0.8, 42);                  // блик на прутке
+  const pikes = (o, bar, hi, spot) => {
+    x.fillStyle = bar;
+    x.fillRect(o, 0, 4, 64); x.fillRect(o + 76, 0, 4, 64);                 // столбы по краям секции
+    x.fillRect(o, 9, 80, 3); x.fillRect(o, 54, 80, 3);                      // две перекладины
+    for (let i = 0; i < 8; i++) {
+      const bx = o + 7 + i * 9.4;
+      x.fillRect(bx, 4, 2.4, 60);
+      x.beginPath(); x.moveTo(bx - 1, 5); x.lineTo(bx + 1.2, 0); x.lineTo(bx + 3.4, 5); x.closePath(); x.fill();   // пика
+    }
+    x.fillStyle = hi; for (let i = 0; i < 8; i++) x.fillRect(o + 7.6 + i * 9.4, 12, 0.8, 42);                    // блик на прутке
+    if (spot) { x.fillStyle = spot; for (let i = 0; i < 14; i++) x.fillRect(o + 6 + (i * 37) % 70, 8 + (i * 23) % 50, 2 + i % 2, 2 + (i * 3) % 4); }   // рыжие пятна
+  };
+  const prof = (o, rust) => {
+    x.fillStyle = '#d6d6d4'; x.fillRect(o, 2, 80, 62);
+    for (let k = 0; k < 10; k++) {                                          // рёбра через 8 px: тень, блик
+      x.fillStyle = '#a9a9a7'; x.fillRect(o + k * 8 + 5, 2, 3, 62);
+      x.fillStyle = '#f2f2f0'; x.fillRect(o + k * 8 + 4, 2, 1, 62);
+    }
+    x.fillStyle = '#8f8f8d'; x.fillRect(o, 2, 80, 2);                       // кромка
+    if (rust) {
+      x.fillStyle = '#8a5434';
+      for (let i = 0; i < 9; i++) { const rx = o + 3 + (i * 29) % 74, rl = 8 + (i * 13) % 26; x.fillRect(rx, 4, 2, rl); x.fillRect(rx + 1, 4 + rl, 1, 4); }   // подтёки от саморезов
+      x.fillStyle = '#7d7d7a'; x.fillRect(o + 46, 34, 14, 10); x.fillStyle = '#b9b9b6'; x.fillRect(o + 47, 35, 6, 3);   // вмятина
+      x.fillStyle = '#9a6040'; x.fillRect(o, 58, 80, 6);                    // низ проржавел
+    }
+  };
+  const boards = o => {
+    for (let k = 0; k < 8; k++) {
+      if (k === 5) continue;                                                // одной доски нет
+      const bx = o + k * 10, top = (k * 7) % 3 + ((k * 5) % 4 === 0 ? 2 : 0);
+      x.fillStyle = k % 3 ? '#c49a68' : '#b88c5c'; x.fillRect(bx, top + 2, 9, 62 - top);
+      x.beginPath(); x.moveTo(bx, top + 2); x.lineTo(bx + 4.5, top); x.lineTo(bx + 9, top + 2); x.closePath(); x.fill();   // скос
+      x.fillStyle = '#9c7448'; x.fillRect(bx + 2 + k % 3, top + 8, 1, 40); x.fillRect(bx + 6, top + 20, 1, 30);           // волокна
+      x.fillStyle = '#5a4430'; x.fillRect(bx + 4, 14, 1, 1); x.fillRect(bx + 4, 52, 1, 1);                                // гвозди
+    }
+    x.fillStyle = '#8a6440'; x.fillRect(o + 51, 13, 8, 3); x.fillRect(o + 51, 50, 8, 3);                  // поперечины видны в щели
+  };
+  const net = o => {
+    x.strokeStyle = '#c4c8ca'; x.lineWidth = 1;
+    for (let k = -64; k < 80; k += 6) {                                     // ромбы сетки
+      x.beginPath(); x.moveTo(o + k + 0.5, 64); x.lineTo(o + k + 64.5, 0); x.stroke();
+      x.beginPath(); x.moveTo(o + k + 0.5, 0); x.lineTo(o + k + 64.5, 64); x.stroke();
+    }
+    x.clearRect(o, 0, 80, 3);
+    x.fillStyle = '#8a9096'; x.fillRect(o, 0, 4, 64); x.fillRect(o + 76, 0, 4, 64); x.fillRect(o, 3, 80, 3);   // столбы-трубы, верхняя труба
+    x.fillStyle = '#b8bec4'; x.fillRect(o + 1, 0, 1, 64); x.fillRect(o + 77, 0, 1, 64);
+  };
+  pikes(0, '#17181c', '#3a3c44');
+  pikes(FT.W, '#4a2a1c', '#7a4a30', '#9a5a32');
+  prof(FT.W * 2, false);
+  prof(FT.W * 3, true);
+  // доски и рабица: сетка вылезает за плитку — рисуем в своей полосе
+  x.save(); x.beginPath(); x.rect(FT.W * 4, 0, FT.W, FT.H); x.clip(); boards(FT.W * 4); x.restore();
+  x.save(); x.beginPath(); x.rect(FT.W * 5, 0, FT.W, FT.H); x.clip(); net(FT.W * 5); x.restore();
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.generateMipmaps = false;
@@ -421,7 +473,7 @@ function* buildFences (A) {
     return nearPath(x, z, 1.3) || near(A.PARKED, x, z, 3) || near(ENTR, x, z, 1.2) || !!onPave(x, z, 0.1) || inHouse(x, z, 0);
   };
   const KIDS = /школ|детск|сад\b|сад |гимназ|лице|school|kinder/i;
-  const P = [], N = [], U = [], I = [];
+  const P = [], N = [], U = [], I = [], C = [];
   const PANELS = [];                                // секции: середина и первая вершина — их сбивают (smashMesh)
   let houses = 0, nb = 0;
   yield 'paths';
@@ -486,8 +538,8 @@ function* buildFences (A) {
       const sd = i === 0 ? 2 : i === 1 ? 1 : i === 2 ? 3 : 0;         // вдоль фасада въезда нет — ворота на соседней стороне
       if (r && len > 7 && !tight[sd] && r.d < gd) { gd = r.d; gate = i; }
     });
-    let panels = 0;
-    const runs = [], mine = [], sidePanels = [0, 0, 0, 0];
+    let panels = 0, fv = null, u0 = 0, u1 = 1;
+    const runs = [], mine = [], sidePanels = [0, 0, 0, 0], tc = new THREE.Color();
     sides.forEach(([a0, b0, a1, b1], si) => {
       const len = Math.hypot(a1 - a0, b1 - b0), n = Math.max(1, Math.round(len / 2.5));
       let run = null;
@@ -504,9 +556,15 @@ function* buildFences (A) {
         const dx = x2 - x1, dz = z2 - z1, dl = Math.hypot(dx, dz) || 1, nx = -dz / dl, nz = dx / dl;
         P.push(x1, y1, z1, x2, y2, z2, x2, y2 + 2.05, z2, x1, y1 + 2.05, z1);
         for (let v = 0; v < 4; v++) N.push(nx, 0, nz);
-        U.push(0, 0, 1, 0, 1, 1, 0, 1);
+        if (!fv) {                                 // вид забора дома: плитка атласа и оттенок (fencevar.js, М5) — один на дом
+          fv = FVAR.tall(b, cx, cz, kids);
+          u0 = (fv.tile * FT.W + 0.5) / (FT.W * FT.N); u1 = ((fv.tile + 1) * FT.W - 0.5) / (FT.W * FT.N);
+          tc.set(fv.tint);
+        }
+        U.push(u0, 0, u1, 0, u1, 1, u0, 1);
+        for (let v = 0; v < 4; v++) C.push(tc.r, tc.g, tc.b);
         I.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
-        PANELS.push([mx, mz, vi, dl]);
+        PANELS.push([mx, mz, vi, dl, fv.debris]);
         mine.push(tk(mx, mz), tk(x1, z1), tk(x2, z2));
         panels++; sidePanels[si]++;
       }
@@ -529,12 +587,13 @@ function* buildFences (A) {
   g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
   g.setIndex(I);
+  g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));   // оттенок вида (профлист, доски, рабица)
   g.computeBoundingSphere();
-  const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: fenceTex(), alphaTest: 0.5, side: THREE.DoubleSide }));
+  const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: fenceTex(), vertexColors: true, alphaTest: 0.5, side: THREE.DoubleSide }));
   A.scene.add(mesh);
   // каждая секция (2,5 м) — сбиваемая, как дворовый заборчик: на ходу сносится, летят чёрные обломки
   if (A.smashMesh) {
-    for (const [x, z, vi, l] of PANELS) A.smashMesh('bigfence', x, z, l / 2 * 0.8, mesh, vi, 4, '#17181c');
+    for (const [x, z, vi, l, hex] of PANELS) A.smashMesh('bigfence', x, z, l / 2 * 0.8, mesh, vi, 4, hex);   // обломки — цвета забора
   }
 }
 

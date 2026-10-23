@@ -1,5 +1,6 @@
 /* Люди не сквозь твёрдое, машины толкают людей (0п1, pedcollide.js; для npm run check; можно и так:
-   npm run probe -- --eval=tools/probe-checks/ped-solid.js; дольше — --q=psecs=120; по-старому — --q=oldped).
+   npm run probe -- --eval=tools/probe-checks/ped-solid.js; дольше — --q=psecs=120; по-старому — --q=oldped;
+   кадры «удар в толпу» полным размером — --q=pshots=/папка).
    1. Смена на автопилоте (psecs игровых секунд, по умолчанию 45, ускорение ×3), каждые 0,1 с (0,3 игровых) — все люди ближе 250 м (и вне кадра)
       (прохожие, дворовые, гости и клиенты — PEOPLE; бургеры — PEDS; самокатчики — SCOOTS), кроме лежащих, сидящих, идущих к лавочке (садятся на неё) и входящих в подъезд:
       центр человека внутри дома (не арка), внутри твёрдого (стена, гараж, забор, будка, ракушка, заборчик двора — глубже
@@ -11,9 +12,12 @@
       упал или сбит (не прошёл сквозь).
    4. Стоящая машина поперёк тротуара в 3,5 м перед идущим — 8 с: ни разу не внутри кузова (обходит).
    5. Твёрдая коробка 6 × 3 м (как гараж) поперёк тротуара в 3,5 м перед идущим — 8 с: ни разу не внутри и не по ту сторону
-      (раньше проскакивал сквозь: стены выталкивают к ближней стороне, на середине — к дальней). */
-const V = d.V, PC = d.PEDC, Q = new URLSearchParams(location.search), PSECS = +(Q.get('psecs') || 45), K = 3, R = 250;
-const out = { on: PC.PC.on, gameSecs: 0, samples: 0, inside: 0, entries: 0, byKind: {}, byState: {}, sample: [], stuck: [], panic: null, roll: null };
+      (раньше проскакивал сквозь: стены выталкивают к ближней стороне, на середине — к дальней).
+   6. Ударил машину в толпу (0п31, 24.10.2026): курьер на 70 км/ч в корму стоящей машины потока, шесть прохожих в 1—7 м перед ней — 4 с:
+      ни разу человек не внутри её кузова (до 24.10 упавший лежал, и машина проезжала сквозь него: 60—70 кадров), сбит или
+      упал хоть один. */
+const V = d.V, PC = d.PEDC, Q = new URLSearchParams(location.search), PSHOTS = Q.get('pshots') || '', PSECS = +(Q.get('psecs') || 45), K = 3, R = 250;
+const out = { on: PC.PC.on, gameSecs: 0, samples: 0, inside: 0, entries: 0, byKind: {}, byState: {}, sample: [], stuck: [], panic: null, roll: null, crowd: null };
 const stateOf = (p, L) => L === 'peds' ? (p.hang ? 'burger-hang' : 'burger') : L === 'scoots' ? 'scoot' :
   p.guest ? 'guest' : p.after ? 'after' : p.idle ? 'bench' : p.panic ? 'panic' : p.errand ? 'errand' : p.goTo ? 'goTo' : p.cross ? 'cross' : p.path ? 'yard' : 'walk';
 const was = new Map(), long = new Map(), YB = (x, z) => d.YARDS && d.YARDS.blocks ? d.YARDS.blocks(x, z, 0.05) : false;
@@ -159,5 +163,47 @@ async function across1 (tag, far, put, undo, skip) {
   }, s => { for (const a of s.cells) { const i = a.indexOf(s); if (i >= 0) a.splice(i, 1); } for (const k of s.fresh) G.delete(k); });
 }
 
-out.ok = !out.entries && (!out.panic || out.panic.ok) && (!out.roll || out.roll.ok) && (!out.parked || out.parked.ok) && (!out.box || out.box.ok);
+/* ── 6. ударил машину в толпу (0п31): курьер на 70 км/ч — в корму стоящей машины потока и сразу в сторону; в момент удара
+   шесть прохожих — в 1—7 м перед ней, по ходу. 4 с каждый кадр: сколько раз центр человека (стоит, упал, лежит) внутри её кузова (глубже 0,1 м) —
+   должно быть 0; сколько сбито или упало ── */
+{
+  const IN = d.IN, frame = () => new Promise(r => requestAnimationFrame(r));
+  const t = d.TRAFFIC.filter(t => !t.gone && !t.knock && !t.wreck && !t.driver && !t.parked && !t.svc && !t.bus && !t.mp && !t.rival && t.model !== 'moped' && t.model !== 'dump' && !t.chase && t.e && !t.turn && !t.cb &&
+    Math.hypot(t.x - V.x, t.z - V.z) < 300 && !d.TRAFFIC.some(o => o !== t && !o.gone && Math.hypot(o.x - t.x, o.z - t.z) < 12))
+    .sort((a, b) => Math.hypot(a.x - V.x, a.z - V.z) - Math.hypot(b.x - V.x, b.z - V.z))[0];
+  const P = d.PEOPLE.filter(p => !p.dead && !p.fall && !p.guest && !p.after && !p.idle && !p.sitting && !p.panic && !p.errand && p.grp && p.grp.parent)
+    .sort((a, b) => Math.hypot(a.x - V.x, a.z - V.z) - Math.hypot(b.x - V.x, b.z - V.z)).slice(0, 6);
+  if (t && P.length >= 3) {
+    const st = { ...PC.ST }, hl = t.hl || 2.2, fx = Math.sin(t.h), fz = Math.cos(t.h), v = 70 / 3.6;
+    t.speed = 0;
+    const put = () => P.forEach((p, i) => { const kv = Math.hypot(t.kvx, t.kvz) || 1, hx = t.knock ? t.kvx / kv : Math.sin(t.h), hz = t.knock ? t.kvz / kv : Math.cos(t.h), a = hl + 1 + i * 1.1, sd = (i % 3 - 1) * 0.6; p.x = t.x + hx * a + hz * sd; p.z = t.z + hz * a - hx * sd; p.grp.position.x = p.x; p.grp.position.z = p.z; });
+    const put0 = () => P.forEach((p, i) => { const a = hl + 4 + i * 1.6, sd = (i % 3 - 1) * 0.7; p.x = t.x + fx * a + fz * sd; p.z = t.z + fz * a - fx * sd; p.grp.position.x = p.x; p.grp.position.z = p.z; });
+    V.x = t.x - fx * (hl + 5); V.z = t.z - fz * (hl + 5); V.h = t.h; V.y = d.surfaceAt(V.x, V.z); V.air = 0;
+    V.camX = V.x - fx * 11; V.camZ = V.z - fz * 11; V.camH = V.h; V.camY = V.y + 6;
+    const hp0 = d.S.hp;
+    let hit = false;
+    for (let i = 0; i < 60 && !hit; i++) { t.speed = 0; put0(); IN.gas = 1; V.vx = fx * v; V.vz = fz * v; d.S.hp = Math.max(d.S.hp, 6); await frame(); hit = !!(t.knock || t.hitT > 0); }
+    IN.gas = 0; V.vx = V.vz = 0;
+    put();                                         // толпа — прямо по ходу отлетевшей (от курьера увернулись бы: peddodge.js)
+    V.x -= fz * 7; V.z += fx * 7;                  // курьера — в сторону
+    const inBody = p => { const hx = Math.sin(t.h), hz = Math.cos(t.h), dx = p.x - t.x, dz = p.z - t.z; return Math.abs(dx * hx + dz * hz) < hl - 0.1 && Math.abs(dx * hz - dz * hx) < 1.0 - 0.1; };   // полширины кузова — game.js CAR_W
+    let inside = 0, frames = 0, slid = 0;
+    const down = new Set(), x0 = t.x, z0 = t.z, T0 = performance.now();
+    while (performance.now() - T0 < 4000) {
+      await frame();
+      d.S.hp = Math.max(d.S.hp, 6);
+      frames++;
+      if (PSHOTS && (frames === 14 || frames === 45 || frames === 150)) await shot(PSHOTS + '/crowd-' + frames + '.png');
+      for (const p of P) {
+        if (p.dead || p.fall) down.add(p);
+        if (!p.dead && inBody(p)) inside++;
+      }
+    }
+    slid = Math.hypot(t.x - x0, t.z - z0);
+    d.S.hp = hp0;
+    out.crowd = { ok: hit && !inside && down.size > 0, hit, people: P.length, down: down.size, inside, frames, slid: +slid.toFixed(1), aside: PC.ST.aside - (st.aside || 0), fell: PC.ST.fell - st.fell, killed: PC.ST.killed - st.killed };
+  }
+}
+
+out.ok = !out.entries && (!out.panic || out.panic.ok) && (!out.roll || out.roll.ok) && (!out.parked || out.parked.ok) && (!out.box || out.box.ok) && (!out.crowd || out.crowd.ok);
 return out;

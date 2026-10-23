@@ -32,6 +32,7 @@
      personOf(t), out(t), variant() — водитель: кто он, выйдет ли, что будет делать
      aim(d), attack(d, dt), drive(d, dt) — водитель у твоей машины (game.js updateDrivers)
      forget(t)                    — машину переставили / убрали (respawnTraffic, placeTraffic, svcGone)
+     bloodTo(mesh, S, root, own)  — кровь со сбитых (carblood.js) — на новую модель: подробная копия, обратно, полная (game.js fullCar)
      step(dt)                     — каждый кадр
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
@@ -41,6 +42,7 @@ import * as DENTM from './cardent.js';
 import * as PIX from './pixfx.js';
 import { glass as glassSnd } from './impact.js';
 import { qHas } from './qpeople.js';
+import { GLSL as BLOOD_GLSL } from './carblood.js';
 
 export const FW = {
   ON: !(typeof location !== 'undefined' && /[?&]nofw\b/.test(location.search || '')),   // ?nofw — как было до 12ар (для сравнения)
@@ -69,7 +71,7 @@ export const FW = {
   },
 };
 export const ST = { buildMs: 0, buildMax: 0, det: 0, real: 0, boxy: 0, back: 0, evict: 0, wheels: 0, bumpers: 0, panes: 0, shards: 0, seated: 0,
-  out: 0, stay: 0, kick: 0, glass: 0, hood: 0, kicks: 0, glassHits: 0, ownCrack: 0, ownBreak: 0, jumps: 0, falls: 0,
+  blood: 0, out: 0, stay: 0, kick: 0, glass: 0, hood: 0, kicks: 0, glassHits: 0, ownCrack: 0, ownBreak: 0, jumps: 0, falls: 0,
   big: 0, bigDent: 0, bigCrack: 0, bigLamp: 0, sway: 0, swayMax: 0 };
 
 let A = null;
@@ -113,7 +115,7 @@ export function variant () {
   for (const k of ['kick', 'glass', 'hood']) { if ((x -= FW.VAR[k]) < 0) { ST[k]++; return k; } }
   ST.kick++; return 'kick';
 }
-const drvLook = p => { const L = p && p.look; return L ? { shirt: (L.top === 'jacket' ? L.jacket : L.shirt) || '#5a6a7a', skin: L.skin || '#e2b48c', hair: L.hairC || '#3a2a20' } : null; };
+const drvLook = p => { const L = (p && p.look) || {}; return { shirt: (L.top === 'jacket' ? L.jacket : L.shirt) || '#5a6a7a', skin: L.skin || '#e2b48c', hair: L.hairC || '#3a2a20' }; };   // без look — в серой рубашке (null — пустой салон, carglass.js)
 
 /* посадить человека Quaternius за руль подробной «Семёрки» */
 function seatReal (t, r) {
@@ -143,6 +145,40 @@ function unseat (t, r) {
   if (g.parent) { g.parent.remove(g); if (A.dropMesh) A.dropMesh(g); }
 }
 
+/* ─── кровь на кузове (carblood.js own: копия материалов с пятнами, S — пятна машины) ───
+   Подробная копия (и обратно) — новые материалы: без переноса кровь со сбитых пропадала, как только машину ударили.
+   Переносим те же пятна (S) на материалы новой модели — та же программа, что у carblood.js (ключ «|carblood»).
+   root — что перекрасить (у «Семёрки» — только подробная модель: облегчённая уже в крови), own — куда сложить копии
+   материалов (realcar.js undetail их освободит) */
+export function bloodTo (mesh, S, root = mesh, own = null) {
+  if (!S || !mesh) return 0;
+  S.mesh = mesh; mesh.userData.blood = S;
+  const done = new Map();
+  let n = 0;
+  root.traverse(o => {
+    if (!o.isMesh || !o.material || Array.isArray(o.material) || !o.material.isMeshLambertMaterial || o.material.transparent) return;
+    if (o.material.userData.cbS) return;            // уже в крови (своими пятнами)
+    if (!done.has(o.material)) {
+      const m = o.material.clone(), prev = o.material.onBeforeCompile;
+      m.onBeforeCompile = (sh, r) => {
+        if (prev) prev(sh, r);
+        sh.uniforms.uBlood = S.U.uBlood; sh.uniforms.uBInv = S.U.uBInv;
+        sh.vertexShader = 'varying vec3 vCBW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvCBW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+        sh.fragmentShader = 'uniform mat4 uBInv;\nvarying vec3 vCBW;\n' + BLOOD_GLSL + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = carBlood(diffuseColor.rgb, (uBInv * vec4(vCBW, 1.0)).xyz);');
+      };
+      const key = o.material.customProgramCacheKey ? o.material.customProgramCacheKey() : '';
+      m.customProgramCacheKey = () => key + '|carblood';
+      m.userData.cbS = 1;
+      done.set(o.material, m);
+      if (own) own.push(m);
+      n++;
+    }
+    o.material = done.get(o.material);
+  });
+  ST.blood += n;
+  return n;
+}
+
 /* ─── подробная копия ─── */
 const dist2 = t => (t.x - A.V.x) ** 2 + (t.z - A.V.z) ** 2;
 function slot (t) {
@@ -157,9 +193,10 @@ export function pre (t, v) {
   if (!A || !FW.ON || !(v >= FW.MIN) || !okCar(t)) return;
   const r = rec(t);
   if (r.det || !slot(t)) return;
-  const u = t.mesh.userData, t0 = performance.now();
+  const u = t.mesh.userData, t0 = performance.now(), S0 = u.blood;
   if (u.realLite) {
     if (!REALCAR.detail(t.mesh)) return;
+    if (S0) { const R2 = t.mesh.userData.real; bloodTo(t.mesh, S0, R2.m, R2.own); }   // сбивал людей — кровь и на подробной
     const R2 = t.mesh.userData.real, R1 = R2.lite;
     R2.lite = null;                                 // прежние удары — только на копии (облегчённая их уже помнит)
     for (const h of r.hits) REALCAR.dent(t.mesh, h[0], h[1], h[2]);
@@ -171,6 +208,7 @@ export function pre (t, v) {
     if (!t.parked) seatReal(t, r);
   } else {
     if (!A.swap(t, true, r.hits, t.parked ? null : drvLook(personOf(t)))) return;
+    if (S0) bloodTo(t.mesh, S0);                   // кровь — на новую модель (carblood.js)
     r.kind = 'boxy'; ST.boxy++;
     r.seat = t.mesh.userData.seat || null;
     rearLamps(t.mesh);
@@ -210,7 +248,7 @@ function evict (t, keep = true) {
   if (!r || !r.det) return;
   r.det = false;
   if (r.kind === 'real') { unseat(t, r); if (t.mesh) REALCAR.undetail(t.mesh); }
-  else { r.seat = null; if (keep && !t.gone && t.mesh && t.mesh.userData.dent) A.swap(t, false, r.hits, null); }
+  else { r.seat = null; const S0 = t.mesh && t.mesh.userData.blood; if (keep && !t.gone && t.mesh && t.mesh.userData.dent && A.swap(t, false, r.hits, null) && S0) bloodTo(t.mesh, S0); }   // кровь — обратно на обычную полную
   if (keep) ST.evict++;
   ST.back++;
 }
@@ -571,4 +609,4 @@ export function step (dt) {
   }
 }
 
-export const DEBUG = { FW, ST, DETS, rec: t => REC.get(t) || null, big: t => BIGR.get(t) || null, evict, isBig, pre, post, hitBig: big };
+export const DEBUG = { FW, ST, DETS, bloodTo, rec: t => REC.get(t) || null, big: t => BIGR.get(t) || null, evict, isBig, pre, post, hitBig: big };

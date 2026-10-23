@@ -82,6 +82,7 @@ const sm = q => q <= 0 ? 0 : q >= 1 ? 1 : q * q * (3 - 2 * q);
 export function init (api) {
   A = api;
   if (FLOW.on) markRings();
+  if (FLOW.on && api.smooth) markSoft();            // плавные улицы (?smooth): мягкие узлы — после колец (на кольце — как было)
   // первая подрезка — жребий в первом кадре (frameStep), не здесь: init идёт посреди сборки города с зерном (editlayer.js
   // buildStart), лишний Math.random сдвигал весь город — подъезды, заборы дворов, адреса (23.10.2026, yard-maze.js)
   CUT.t = NaN;
@@ -114,6 +115,77 @@ function markRings () {
     if (k) ST.rings++;
     ST.ringEdges += k;
   }
+}
+
+/* ── 6. плавные улицы (?smooth, roadsmooth.js; план docs/plan/smooth-roads.md, этап 3) ──
+   С ?smooth излом улицы — дуга из коротких рёбер (излом ≤ 10° на точку). Мягкий узел — где сходятся ровно две
+   улицы-ветки одной ширины, направленности и числа полос с изломом меньше SOFT.DEG (у такого узла нет дуги поворота:
+   tA = tB = 0, game.js), не на кольце (кольца — как были). Его машина проезжает не поворотом, а по точкам: та же
+   полоса, смена полосы и выбранный заранее поворот (nx) не обрываются (game.js startTurn); полоса — по средней
+   нормали двух рёбер (без ступеньки на изломе, mA / mB), курс — плавно от средней касательной в начале ребра к средней
+   в конце (hA / hB, game.js lanePoint, poseTraffic). Цепочка — рёбра подряд через мягкие узлы до перекрёстка, светофора
+   или смены полос (не дальше SOFT.CAP м): запас на смену полосы, выбор ряда, уступи, сброс перед поворотом, подрезка,
+   расстановка (placeTraffic), конец тупика, остановка такси — по её длине. Без ?smooth — ничего этого нет. */
+export const SOFT = { on: false, DEG: 16, CAP: 160, nodes: 0, edges: 0 };
+const STRAIGHT = 0.96;                              // −(u1·u2) не меньше — узел без дуги поворота (game.js: обрезка у узла), ≈ излом < 16°
+function markSoft () {
+  const { NODES, edgeOf } = A;
+  SOFT.on = true;
+  const mid = (ax, az, bx, bz) => { const k = 1 / (1 + ax * bx + az * bz); return [(ax + bx) * k, (az + bz) * k]; };   // средняя нормаль: |m| = 1 / cos(излом / 2)
+  const end = e => { if (!e.mA) { e.mA = [e.rx, e.rz]; e.mB = [e.rx, e.rz]; e.hA = e.hB = Math.atan2(e.ux, e.uz); SOFT.edges++; } };
+  for (let n = 0; n < NODES.length; n++) {
+    const N = NODES[n];
+    if (N.nb.length !== 2 || N.ring) continue;
+    const e1 = edgeOf(n, N.nb[0]), e2 = edgeOf(n, N.nb[1]);
+    if (!e1 || !e2 || e1.tA || e2.tA || -(e1.ux * e2.ux + e1.uz * e2.uz) < STRAIGHT) continue;
+    if (e1.w !== e2.w || e1.oneway !== e2.oneway || e1.lanes !== e2.lanes || A.laneCount(e1) !== A.laneCount(e2)) continue;
+    N.sft = 1; SOFT.nodes++;
+    // через N в обе стороны: in — ребро в N, out — из N
+    for (const [c1, c2] of [[N.nb[0], N.nb[1]], [N.nb[1], N.nb[0]]]) {
+      const ein = edgeOf(c1, n), eout = edgeOf(n, c2);
+      end(ein); end(eout);
+      const m = mid(ein.rx, ein.rz, eout.rx, eout.rz), h = Math.atan2(ein.ux + eout.ux, ein.uz + eout.uz);
+      ein.mB = m; eout.mA = m; ein.hB = h; eout.hA = h;
+    }
+  }
+}
+/* следующее ребро цепочки (через мягкий узел) или null */
+function softNext (k) {
+  const N = A.NODES[k.b];
+  if (!N.sft || k.sig) return null;
+  const n = A.edgeOf(k.b, N.nb[0] === k.a ? N.nb[1] : N.nb[0]);
+  return n && n.ok && A.laneCount(n) === A.laneCount(k) ? n : null;
+}
+function chainOf (e) {
+  let sum = 0, k = e;
+  for (let i = 0, n; i < 400 && sum < SOFT.CAP && (n = softNext(k)) && n !== e; i++) { sum += A.edgeRun(n); k = n; }
+  e._ch = sum; e._cl = k;
+}
+/* последнее ребро цепочки (до перекрёстка); без ?smooth — само ребро */
+export const endOf = e => (SOFT.on && e ? (e._cl || (chainOf(e), e._cl)) : e);
+/* сколько ехать по цепочке после конца ребра, м; без ?smooth — 0 */
+export const ahead = e => (SOFT.on ? (e._cl ? e._ch : (chainOf(e), e._ch)) : 0);
+/* мягкий узел между e и n: проезд по точкам, а не поворот (game.js startTurn) */
+export const soft = (e, n) => SOFT.on && n.a === e.b && n.b !== e.a && !!A.NODES[e.b].sft && A.laneCount(n) === A.laneCount(e);
+/* на дуге (?smooth) — не быстрее √(A_LAT × радиус), к дуге впереди по цепочке (до ARC_LOOK м) сбрасывает заранее (BRAKE) */
+const ARC_LOOK = 30;
+const arcV = e => {
+  if (e._vm === undefined) { const k = Math.abs(wrap(e.hB - e.hA)) / A.edgeRun(e); e._vm = k > 1e-4 ? Math.max(FLOW.V_TURN, Math.sqrt(FLOW.A_LAT / k)) : 99; }
+  return e._vm;
+};
+function arcSlow (t) {
+  const e = t.e;
+  let v = arcV(e), d = A.edgeRun(e) - t.s;
+  for (let i = 0, k = e, n; i < 12 && d < ARC_LOOK && (n = softNext(k)); i++) {
+    if (n.mA) v = Math.min(v, Math.sqrt(arcV(n) ** 2 + 2 * FLOW.BRAKE * Math.max(0, d)));
+    d += A.edgeRun(n); k = n;
+  }
+  return v >= t.cruise ? 1 : v / Math.max(1, t.cruise);
+}
+/* s м по цепочке от начала ребра e → [ребро, s на нём] (game.js placeTraffic) */
+export function walk (e, s) {
+  for (let i = 0, n; i < 400 && s > A.edgeRun(e) && (n = SOFT.on ? softNext(e) : null); i++) { s -= A.edgeRun(e); e = n; }
+  return [e, s];
 }
 
 /* ── 1. плавность ── */
@@ -243,18 +315,19 @@ function straight (e) {
   return best;
 }
 function decide (t) {
-  const e = t.e, n = A.laneCount(e), rem = A.edgeRun(e) - t.s, sp = t.speed || 0;
+  // E — конец цепочки (с ?smooth — до перекрёстка через мягкие узлы, иначе само ребро), rem — сколько до него
+  const e = t.e, n = A.laneCount(e), E = endOf(e), rem = A.edgeRun(e) - t.s + ahead(e), sp = t.speed || 0;
   const room = rem > sp * FLOW.LC_DUR[1] + 10;
-  const sigNear = e.sig && e.len - e.stopAt - e.tA - t.s < 45;
+  const sigNear = E === e ? e.sig && e.len - e.stopAt - e.tA - t.s < 45 : E.sig && rem - A.edgeRun(E) + E.len - E.stopAt - E.tA < 45;
   // полоса кончается (на следующем ребре полос меньше) — заранее вправо; поворот — заранее в свой ряд
-  if (t.nx && t.nxE === e) {
+  if (t.nx && t.nxE === E) {
     let want = A.laneCount(t.nx) <= t.lane ? A.laneCount(t.nx) - 1 : -1;
-    const L = laneFor(e, t.nx, n);
+    const L = laneFor(E, t.nx, n);
     if (L >= 0 && L !== t.lane) want = L;
     if (want >= 0 && want !== t.lane) {
       const to = want > t.lane ? t.lane + 1 : t.lane - 1;
       if (rem > sp * 1.4 + 3 && laneFree(t, to)) startLc(t, to, rand(...FLOW.LC_DUR), FLOW.SIGNAL * 0.6);
-      else if (rem < sp * 1.4 + 3 && L >= 0 && L !== t.lane) { t.nx = straight(e) || t.nx; }   // не успел в свой ряд — прямо
+      else if (rem < sp * 1.4 + 3 && L >= 0 && L !== t.lane) { t.nx = straight(E) || t.nx; }   // не успел в свой ряд — прямо
       return;
     }
   }
@@ -298,14 +371,14 @@ function pick (t, e, nl) {
 
 const prio = (t, e, Lt) => (e.ring ? 4 : 0) + (t.lane === Lt ? 2 : 0);
 function yieldSlow (t, dt) {
-  const e = t.e, rem = A.edgeRun(e) - t.s;
+  const e = t.e, E = endOf(e), rem = A.edgeRun(e) - t.s + ahead(e);   // E, rem — до конца цепочки (?smooth), иначе ребра
   const nl = A.laneCount(e);
   if (rem > (nl >= 2 ? FLOW.PICK_LOOK : FLOW.YIELD_LOOK)) { t.yT = 0; return 1; }
-  if (!t.nx || t.nxE !== e) pick(t, e, nl);
+  if (!t.nx || t.nxE !== E) pick(t, E, nl);
   if (rem > FLOW.YIELD_LOOK) { t.yT = 0; return 1; }
-  const nx = t.nx, N = A.NODES[e.b], hl = t.hl || 2.2, sp = t.speed || 0;
-  const Lt = nx ? laneOnto(t, e, nx, clamp(t.lane, 0, A.laneCount(nx) - 1)) : t.lane;
-  const enterRing = N.ring && !e.ring;
+  const nx = t.nx, N = A.NODES[E.b], hl = t.hl || 2.2, sp = t.speed || 0;
+  const Lt = nx ? laneOnto(t, E, nx, clamp(t.lane, 0, A.laneCount(nx) - 1)) : t.lane;
+  const enterRing = N.ring && !E.ring;
   const late = rem - 0.8 < sp * sp / 12;            // уже не затормозить — проезжаем
   const soft = !(t.yGo > 0);                        // ждал дольше YIELD_MAX — «вежливые» правила не держат
   if (t.yGo > 0) t.yGo -= dt;
@@ -318,22 +391,22 @@ function yieldSlow (t, dt) {
       // место занято: на следующем ребре в моей полосе, ближе двух корпусов
       // (на изломе улицы и прямо — это просто «кто впереди», его держит updateTraffic)
       if (o.e === nx && !o.turn && o.s < hl + (o.hl || 2.2) + 2.5 && (o.lane === Lt || A.laneCount(nx) === 1) &&
-          (N.nb.length >= 3 || e.ux * nx.ux + e.uz * nx.uz < 0.9) && Math.sin(o.h) * e.ux + Math.cos(o.h) * e.uz < 0.9) { hard = true; break; }
+          (N.nb.length >= 3 || E.ux * nx.ux + E.uz * nx.uz < 0.9) && Math.sin(o.h) * E.ux + Math.cos(o.h) * E.uz < 0.9) { hard = true; break; }
       // кто-то уже на дуге в то же место (не мой же впереди из моей полосы)
-      if (o.turn && o.turn.next === nx && o.turn.lane === Lt && !(o.e === e && o.lane === t.lane)) { wait = true; continue; }
+      if (o.turn && o.turn.next === nx && o.turn.lane === Lt && !(endOf(o.e) === E && o.lane === t.lane)) { wait = true; continue; }
     }
     if (!soft || late) continue;
     // двое к одному месту: пропускает младший по приоритету
-    if (nx && !o.turn && o.nx === nx && o.nxE === o.e && o.e.b === e.b && !(o.e === e && o.lane === t.lane)) {
-      const oL = laneOnto(o, o.e, nx, clamp(o.lane, 0, A.laneCount(nx) - 1));
+    if (nx && !o.turn && o.nx === nx && o.nxE === endOf(o.e) && o.nxE.b === E.b && !(o.nxE === E && o.lane === t.lane)) {
+      const oL = laneOnto(o, o.nxE, nx, clamp(o.lane, 0, A.laneCount(nx) - 1));
       if (oL === Lt) {
-        const pa = prio(t, e, Lt), pb = prio(o, o.e, oL);
-        const oT = (A.edgeRun(o.e) - o.s) / Math.max(1, o.speed || 0);
+        const pa = prio(t, E, Lt), pb = prio(o, o.nxE, oL);
+        const oT = (A.edgeRun(o.e) - o.s + ahead(o.e)) / Math.max(1, o.speed || 0);
         if (pb > pa || (pb === pa && (oT < myT - 0.05 || (Math.abs(oT - myT) <= 0.05 && (o._fid || 0) < (t._fid || 0))))) { wait = true; continue; }
       }
     }
     // въезд на кольцо: на кольце кто-то едет к точке въезда
-    if (enterRing && o.e && o.e.ring && !(o.e === e)) {
+    if (enterRing && o.e && o.e.ring && !(endOf(o.e) === E)) {
       const dx = N.x - o.x, dz = N.z - o.z, dd = Math.hypot(dx, dz);
       if ((dx * Math.sin(o.h) + dz * Math.cos(o.h)) > 0.3 * dd && dd < (o.speed || 0) * FLOW.RING_T + (o.hl || 2.2) + hl + 2) wait = true;
     }
@@ -359,7 +432,7 @@ function cutIn (why) {
     if (Math.sin(o.h) * fx + Math.cos(o.h) * fz < 0.93 || e.ux * fx + e.uz * fz < 0.9) { no('dir'); continue; }
     const dx = o.x - V.x, dz = o.z - V.z, fw = dx * fx + dz * fz, gap = fw - (o.hl || 2.2) - A.CAR_L;
     if (gap < FLOW.CUT_GAP[0] || gap > FLOW.CUT_GAP[1]) { no('gap ' + gap.toFixed(1)); continue; }
-    if ((o.speed || 0) < vp * 0.75 || A.edgeRun(e) - o.s < (o.speed || 0) * 2 + 12) { no('speed/room'); continue; }
+    if ((o.speed || 0) < vp * 0.75 || A.edgeRun(e) - o.s + ahead(e) < (o.speed || 0) * 2 + 12) { no('speed/room'); continue; }
     // полоса курьера на ребре машины
     frame(e, o, V.x, V.z);
     const la = FR.la;
@@ -471,8 +544,10 @@ export function step (t, dt) {
   let k = predC(t, dt);
   k = Math.min(k, yieldC(t, dt));
   // к повороту — сбросить заранее (следующее ребро выбрано: nx)
-  if (t.nx && t.nxE === t.e) {
-    const vm = curveV(t.e, t.nx), rem = A.edgeRun(t.e) - t.s;
+  if (SOFT.on && t.e.mA) k = Math.min(k, arcSlow(t));   // плавные улицы: по дуге — по её радиусу
+  const E = endOf(t.e);
+  if (t.nx && t.nxE === E) {
+    const vm = curveV(E, t.nx), rem = A.edgeRun(t.e) - t.s + ahead(t.e);
     if (vm < t.cruise) k = Math.min(k, Math.sqrt(vm * vm + 2 * FLOW.BRAKE * Math.max(0, rem - 1)) / t.cruise);
   }
   return k;
@@ -493,6 +568,7 @@ export function laneOnto (t, e, n, lane0) {
 
 /* выбранное заранее следующее ребро (startTurn в game.js), если ещё можно туда */
 export function takeNext (t, e) {
+  if (SOFT.on && t.nxE !== e && A.NODES[e.b].sft) return null;   // мягкий узел посреди цепочки: выбранный поворот — на её конце, не сбрасываем
   const n = t.nx;
   t.nx = null;
   return FLOW.on && n && t.nxE === e && n.a === e.b && A.okNext(n) ? n : null;
@@ -516,4 +592,4 @@ function blink (t, side, bt = 0) {
   b.m[0].visible = b.m[1].visible = on;
 }
 
-export const DEBUG = { FLOW, ST, CUT, cut: why => { CUT.t = 0; return cutIn(why); }, laneFree, leaderOf, lanes: e => A.laneCount(e), off: (e, k) => A.laneOff(e, k) };
+export const DEBUG = { FLOW, ST, SOFT, endOf, ahead, CUT, cut: why => { CUT.t = 0; return cutIn(why); }, laneFree, leaderOf, lanes: e => A.laneCount(e), off: (e, k) => A.laneOff(e, k) };

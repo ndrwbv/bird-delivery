@@ -191,7 +191,8 @@ export function roundOff (CITY) {
   CIRCLES.length = 0;
   const C = RING.CIRCLE, R = CITY.roads || [];
   const r2 = v => Math.round(v * 100) / 100;
-  for (const g of find(CITY, r => r.w || 9)) {
+  FOUND = find(CITY, r => r.w || 9);
+  for (const g of FOUND) {
     if (g.mean > C.R || g.round < C.ROUND) continue;
     const [cx, cz] = g.c, Rm = g.mean;
     const moved = new Map();
@@ -221,6 +222,10 @@ export function roundOff (CITY) {
   ST.roundMs = Math.round(performance.now() - t0);
   return CIRCLES;
 }
+/* все круги карты (find): { c, ids, mean, w, round, … } — с последнего roundOff, иначе (?norings) считаем сейчас.
+   Плавные улицы (roadsmooth.js) улицы кругов не трогают */
+let FOUND = null;
+export function found (CITY) { if (!FOUND) FOUND = find(CITY, r => r.w || 9); return FOUND; }
 /* ровный малый круг, к оси которого точка ближе m (или null) */
 export function circleAt (x, z, m = 0) {
   for (const o of CIRCLES) if (Math.abs(Math.hypot(x - o.c[0], z - o.c[1]) - o.R) <= m) return o;

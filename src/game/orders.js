@@ -354,7 +354,7 @@ function genSpec () {
   if (R) { R.k0 = R.k; R.k = SKILL.k(R.k); RHY_K = R.k; }   // умение курьера: потолок напряжения (skill.js) — дальность, сборные, срочные «по шансу»
   const tgt = R ? arcTarget(R, D) : 0;                    // сколько метров по дорогам «хочется» этому заказу
   if (R) { D = rampRing(D, R.k); RHY_ROLE = R.role; D.max = Math.max(D.min + 150, Math.min(D.max, Math.round(tgt))); }   // по прямой — не дальше «хочется» по дорогам
-  // фестиваль кальянщиков и митинг Дня угнетения бургеров: первый заказ смены и часть остальных — на сам фестиваль, к проходу (festivals.js)
+  // фестиваль кальянщиков и митинг в поддержку ожирения: первый заказ смены и часть остальных — на сам фестиваль, к проходу (festivals.js)
   const fp = SIM ? null : FEST.passSpec(SH.gen);
   if (fp && R && R.meet) RHY.meetFailed();
   if (fp) return finishSpec({ type: 'pizza', kind: 'solo', fest: fp, stops: [{ x: fp.x, z: fp.z, key: keyOf(fp.x, fp.z), zone: ZN.zoneAt(fp.x, fp.z), n: 1, addr: fp.addr }] }, null, hourNow());
@@ -689,8 +689,8 @@ function finishSpec (spec, forced, hAt) {
   if (RHY_ROLE) { spec.role = RHY_ROLE; spec.tk = RHY_K; }                             // ритм: следующий заказ — не сильно дальше этого (arcTarget)
   spec.color = spec.color || typeColor(spec.type);
   spec.forced = forced;
-  // День угнетения бургеров (festivals.js): часть заказов — «вместо бургера», оплата ×FEST.BURGER_K
-  if (!spec.story && !SIM) { const bk = (spec.fest && spec.fest.burger) || FEST.burgerRoll(); if (bk) spec.burger = bk; }   // заказ на сам митинг — всегда «вместо бургера»
+  // митинг в поддержку ожирения (festivals.js): часть заказов — «едят за двоих», оплата ×FEST.BURGER_K
+  if (!spec.story && !SIM) { const bk = (spec.fest && spec.fest.burger) || FEST.burgerRoll(); if (bk) spec.burger = bk; }   // заказ на сам митинг — всегда «едят за двоих»
   // праздник (holidays.js): обычная пицца — иногда праздничная (оливье-пицца), оплата ×k
   if (!spec.story && !SIM && !spec.hol && !spec.fest && !spec.beach && !spec.bundle && !spec.urgent && spec.type === 'pizza') { const h = HOL.olivier() || CYCLE.perk(); if (h) spec.hol = h; }   // не праздник — может быть сезонная (seasoncycle.js)
   spec.n = ++SH.gen;
@@ -823,7 +823,7 @@ export function setup (plan) {
   // «весь город» (econ.js CITY): премия за дальний — за путь по дорогам сверх FAR_FROM, в цене остановки
   sp.far = o.stops.map((st, i) => (city && !sp.story ? ECON.cityFar(sp.m[i] || 0) : 0));
   sp.fees = sp.fees.map((f, i) => f + sp.far[i]);
-  // «вместо бургера» (День угнетения бургеров): надбавка — в цене остановки
+  // «едят за двоих» (митинг в поддержку ожирения): надбавка — в цене остановки
   sp.burgerAdd = sp.burger ? sp.fees.map(f => Math.round(f * (sp.burger - 1) / 10) * 10) : null;
   if (sp.burgerAdd) sp.fees = sp.fees.map((f, i) => f + sp.burgerAdd[i]);
   // праздничный заказ (holidays.js): надбавка — в цене остановки; в накладной — праздничная пицца
@@ -936,7 +936,7 @@ export function cardRows (order) {
     // оплата — крупно, это главное число накладной; «срочно» тут не пишем — есть печать и шапка
     [t('оплата'), '<b class="oc-pay">' + A.money(S.fee) + '</b>'],
     ...(far > 0 ? [[t('за дальний'), '<b class="oc-far">+' + A.money(far) + '</b>' + ' · ' + esc(t('премия, уже в оплате'))]] : []),
-    ...(brg > 0 ? [[t('вместо бургера'), '<b class="oc-far">+' + A.money(brg) + '</b>' + ' · ' + esc(t('День угнетения бургеров, уже в оплате'))]] : []),
+    ...(brg > 0 ? [[t('едят за двоих'), '<b class="oc-far">+' + A.money(brg) + '</b>' + ' · ' + esc(t('митинг в поддержку ожирения, уже в оплате'))]] : []),
     ...(hol > 0 ? [[sp.hol && sp.hol.label ? t(sp.hol.label) : t('к празднику'), '<b class="oc-far">+' + A.money(hol) + '</b>' + ' · ' + esc(t('{name}, уже в оплате', { name: (sp.hol && sp.hol.name ? t(sp.hol.name) : HOL.name()) || t('праздник') }))]] : []),
   ];
 }
@@ -1200,6 +1200,8 @@ function staffAsk () {
 }
 /** развоз ждёт, пока вернёшься в пиццерию (career.js lateGuard не закрывает смену) */
 export const staffWaiting = () => !!(STAFF.p && STAFF.wait);
+/** развоз смены идёт: позвали, едешь за ними, спрашивают, везёшь (game.js envTick — ночь держится, daytime.js NIGHT_HOLD) */
+export const staffOn = () => !!STAFF.p;
 /** вернулся в пиццерию (career.atBase): ждали — спрашиваем; true — ход забрали */
 export function staffHere () {
   if (!STAFF.p || !STAFF.wait) return false;

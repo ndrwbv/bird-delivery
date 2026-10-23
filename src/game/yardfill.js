@@ -23,6 +23,7 @@
      YFILL.scan(api?)         — пустые куски сейчас: { pieces, area, sample } (npm run check, yard-empty.js)
      YFILL.cellFills(i, j)    — что ставит мелочь газона в клетке LAWN.CELL (lawnprops.js)
    ?nofill — без заполнения (сравнить, «было»); ?filloff=trees,shrubs,play,dryer,booth — без этих видов.
+   ?filldt — сверка быстрых расстояний (markCircleDT, edt) с прежним edt после каждой вещи: ST.dtBad / ST.dhBad — расхождений (0).
    ────────────────────────────────────────────────────────────────────────── */
 import { wet } from './streams.js';
 
@@ -170,10 +171,32 @@ function markRect (M, rx, rz, ux, uz, hl, hw) {      // середина, ось
     if (Math.abs(u) <= hl && Math.abs(v) <= hw) M[j * NC + i] = 1;
   }
 }
+/* многоугольник — строками (23.10.2026, было: inPoly на каждую клетку рамки — лес и парк в сотни вершин, ~1/4 всего куска):
+   в строке — где рёбра пересекают её (та же формула, что в inPoly, до бита), клетка внутри, если правее неё нечётно пересечений */
+let XS = new Float64Array(256);
 function markPoly (M, b) {
   const g = FILL.GRID, i0 = Math.max(0, Math.floor((b.x0 - T.ox) / g)), i1 = Math.min(NC - 1, Math.floor((b.x1 - T.ox) / g));
   const j0 = Math.max(0, Math.floor((b.z0 - T.oz) / g)), j1 = Math.min(NC - 1, Math.floor((b.z1 - T.oz) / g));
-  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (!M[j * NC + i] && inPoly(cx(i), cz(j), b.p)) M[j * NC + i] = 1;
+  if (i0 > i1 || j0 > j1) return;
+  const p = b.p, n = p.length;
+  if (XS.length < n) XS = new Float64Array(n * 2);
+  for (let j = j0; j <= j1; j++) {
+    const z = cz(j);
+    let m = 0;
+    for (let q = 0, w = n - 1; q < n; w = q++) {
+      const a = p[q], c = p[w];
+      if ((a[1] > z) !== (c[1] > z)) XS[m++] = (c[0] - a[0]) * (z - a[1]) / (c[1] - a[1]) + a[0];
+    }
+    if (!m) continue;
+    const xs = XS.subarray(0, m);
+    xs.sort();
+    let t = 0;                                      // сколько пересечений не правее клетки
+    for (let i = i0, k = j * NC + i0; i <= i1; i++, k++) {
+      const x = cx(i);
+      while (t < m && xs[t] <= x) t++;
+      if ((m - t) & 1) M[k] = 1;
+    }
+  }
 }
 /* расстояние до ближайшего занятого, в клетках² (Felzenszwalb: точно, за два прохода) */
 const F1 = new Float64Array(NC), D1 = new Float64Array(NC), V1 = new Int32Array(NC), Z1 = new Float64Array(NC + 1);
@@ -189,10 +212,21 @@ function dt1 (n) {
 }
 function edt (M, out) {
   const BIG = 1e9;
+  // столбцы: занятое 0/1 — до ближайшего занятого в столбце двумя проходами (то же, что dt1 с 0 / BIG, до бита: BIG, если в
+  // столбце пусто), строки — dt1
   for (let i = 0; i < NC; i++) {
-    for (let j = 0; j < NC; j++) F1[j] = M[j * NC + i] ? 0 : BIG;
-    dt1(NC);
-    for (let j = 0; j < NC; j++) out[j * NC + i] = D1[j];
+    let last = -1;
+    for (let j = 0, k = i; j < NC; j++, k += NC) {
+      if (M[k]) last = j;
+      out[k] = last < 0 ? -1 : j - last;
+    }
+    if (last < 0) { for (let k = i; k < NC * NC; k += NC) out[k] = BIG; continue; }
+    last = -1;
+    for (let j = NC - 1, k = i + (NC - 1) * NC; j >= 0; j--, k -= NC) {
+      if (M[k]) last = j;
+      const a = out[k], b = last < 0 ? -1 : last - j, d = a < 0 ? b : b < 0 ? a : a < b ? a : b;
+      out[k] = d * d;
+    }
   }
   for (let j = 0; j < NC; j++) {
     for (let i = 0; i < NC; i++) F1[i] = out[j * NC + i];
@@ -200,6 +234,41 @@ function edt (M, out) {
     for (let i = 0; i < NC; i++) out[j * NC + i] = D1[i];
   }
 }
+/* занят ещё круг (markCircle с теми же x, z, r) — расстояния без пересчёта всей клетки (23.10.2026; было: edt заново после
+   каждой вещи, ~1/3 куска). Новое расстояние — меньшее из старого и до ближайшей клетки круга; круг — строками [j, от i, до i].
+   Числа те же до бита (целые клетки²), что и у edt заново */
+const CIRW = new Int32Array(NC * 3);
+let DBG_DT = false; const DBG_A = new Float64Array(NC * NC);   // ?filldt — сверка с edt заново после каждой вещи (ST.dtBad — расхождений)
+function markCircleDT (x, z, r) {
+  markCircle(BLK, x, z, r);
+  const g = FILL.GRID, i0 = Math.max(0, Math.floor((x - r - T.ox) / g)), i1 = Math.min(NC - 1, Math.floor((x + r - T.ox) / g));
+  const j0 = Math.max(0, Math.floor((z - r - T.oz) / g)), j1 = Math.min(NC - 1, Math.floor((z + r - T.oz) / g)), r2 = r * r;
+  let nr = 0, iA = NC, iB = -1, jA = NC, jB = -1;
+  for (let j = j0; j <= j1; j++) {
+    const dz = cz(j) - z;
+    let lo = -1, hi = -1;
+    for (let i = i0; i <= i1; i++) { const dx = cx(i) - x; if (dx * dx + dz * dz <= r2) { if (lo < 0) lo = i; hi = i; } }
+    if (lo < 0) continue;
+    CIRW[nr * 3] = j; CIRW[nr * 3 + 1] = lo; CIRW[nr * 3 + 2] = hi; nr++;
+    if (lo < iA) iA = lo; if (hi > iB) iB = hi; if (j < jA) jA = j; if (j > jB) jB = j;
+  }
+  if (!nr) return;
+  for (let j = 0; j < NC; j++) {
+    const dJ = j < jA ? jA - j : j > jB ? j - jB : 0, dJ2 = dJ * dJ;
+    for (let i = 0, k = j * NC; i < NC; i++, k++) {
+      const dI = i < iA ? iA - i : i > iB ? i - iB : 0;
+      if (dI * dI + dJ2 >= D2[k]) continue;        // до рамки круга не ближе, чем уже есть
+      let best = D2[k];
+      for (let q = 0; q < nr * 3; q += 3) {
+        const dj = j - CIRW[q], di = i < CIRW[q + 1] ? CIRW[q + 1] - i : i > CIRW[q + 2] ? i - CIRW[q + 2] : 0, d = di * di + dj * dj;
+        if (d < best) best = d;
+      }
+      D2[k] = best;
+    }
+  }
+}
+/* прежний edt (Felzenszwalb по столбцам и строкам) — только для сверки ?filldt */
+function edtOld (M, out) { const BIG = 1e9; for (let i = 0; i < NC; i++) { for (let j = 0; j < NC; j++) F1[j] = M[j * NC + i] ? 0 : BIG; dt1(NC); for (let j = 0; j < NC; j++) out[j * NC + i] = D1[j]; } for (let j = 0; j < NC; j++) { for (let i = 0; i < NC; i++) F1[i] = out[j * NC + i]; dt1(NC); for (let i = 0; i < NC; i++) out[j * NC + i] = D1[i]; } }
 /* свободный газон до края, м (у края сетки — до занятого внутри неё) */
 const clear = (k, A2 = D2) => Math.sqrt(A2[k]) * FILL.GRID - FILL.GRID / 2;
 
@@ -430,6 +499,7 @@ export function* build (api) {
   A = api;
   if (QS && QS.has('nofill')) return ST;
   OFF = new Set(((QS && QS.get('filloff')) || '').split(','));
+  DBG_DT = !!(QS && QS.has('filldt'));
   const t0 = performance.now();
   index();
   // площадки из карты — тоже площадки: новую не ставим ближе PLAY.FAR
@@ -443,9 +513,11 @@ export function* build (api) {
     if (!raster(tx, tz)) continue;
     ST.tiles++;
     edt(HOUSE, DH);
+    if (DBG_DT) { DBG_A.set(DH); edtOld(HOUSE, DH); for (let k = 0; k < DH.length; k++) if (DBG_A[k] !== DH[k]) { ST.dhBad = (ST.dhBad || 0) + 1; break; } }
     let placed = 0;
+    edt(BLK, D2);                                   // дальше — без пересчёта: markCircleDT
     for (;;) {
-      edt(BLK, D2);
+      if (DBG_DT) { DBG_A.set(D2); edtOld(BLK, D2); for (let k = 0; k < D2.length; k++) if (DBG_A[k] !== D2[k]) { ST.dtBad = (ST.dtBad || 0) + 1; break; } ST.dtChk = (ST.dtChk || 0) + 1; }
       empties(E);
       if (!E.length) break;
       if (placed >= FILL.CAP) { ST.capped++; break; }
@@ -457,8 +529,8 @@ export function* build (api) {
       const nr = A.nearestRoad(x, z, 7, 1), wall = clear(k, DH), road = nr ? Math.max(0, nr.d - nr.seg.w / 2) : 99;
       const kind = choose(x, z, D, wall, road), r = rng(x, z, 17);
       const R = kind ? place(kind, x, z, D, r) : 0;
-      if (R) { markCircle(BLK, x, z, R); placed++; }
-      else { markCircle(BLK, x, z, FILL.R); ST.fail++; }
+      if (R) { markCircleDT(x, z, R); placed++; }
+      else { markCircleDT(x, z, FILL.R); ST.fail++; }
     }
   }
   for (const [k, a] of NEAR) NEAR.set(k, Float32Array.from(a));

@@ -34,8 +34,13 @@ const BOLD_P = 0.16, MURAL_P = 0.22;
 
 const paintable = b => (b.k === 'res' || b.k === 'pub') && !b.rich && b.st !== 'villa' && b.st !== 'priv';
 
-/* цвет стен дома или null — тогда как было (цвет из карты / по типу) */
+/* палитра для редактора города (правка дома «цвет стен»): те же цвета, что у города */
+export const PALETTE = { calm: CALM, bold: BOLD, brick: BRICK };
+
+/* цвет стен дома или null — тогда как было (цвет из карты / по типу). Правка из редактора (b._edCol,
+   editlayer.js houses) — сильнее всего */
 export function wallHex (b) {
+  if (b._edCol) return b._edCol;
   if (!paintable(b)) return null;
   const key = keyOf(b), h = strHash(key, 1), h2 = strHash(key, 7);
   if (b.st === 'brick') { DEBUG.brick++; return BRICK[(h2 * BRICK.length) | 0]; }
@@ -173,27 +178,29 @@ function quad (w, from, to, y0, y1, out, u0, v0, u1, v1, hex) {
 /* Выбрать торец под мурал и положить его. walls — стены из facade (a, len, ux/uz,
    ox/oz наружу). Вернёт стену (на ней facade не рисует окна) или null. */
 export function mural (b, walls, base, h, lv, arch, api) {
-  if (b.k !== 'res' || !paintable(b) || lv < 4 || walls.length < 4) return null;
+  const force = b._edMural === 1;                           // правка из редактора: 1 — мурал есть, 0 — нет (editlayer.js houses)
+  if (b._edMural === 0) return null;
+  if (!force && (b.k !== 'res' || !paintable(b) || lv < 4 || walls.length < 4)) return null;
   const key = keyOf(b);
-  if (strHash(key, 3) >= MURAL_P) return null;
+  if (!force && strHash(key, 3) >= MURAL_P) return null;
   DEBUG.muralTried++;
   let maxLen = 0;
   for (const w of walls) if (w.len > maxLen) maxLen = w.len;
   let best = null, bd = Infinity;
   for (const w of walls) {
-    if (w.len < 8 || w.len > 20 || w.len > maxLen * 0.6) continue;
+    if (force ? w.len < 5 || w.len > 40 : w.len < 8 || w.len > 20 || w.len > maxLen * 0.6) continue;   // своя правка — любая глухая стена 5—40 м
     if (arch && arch.cut.get(w.a) !== undefined) continue;
     const mx = w.a[0] + w.ux * w.len / 2 + w.ox * 12, mz = w.a[1] + w.uz * w.len / 2 + w.oz * 12;
     if (api.inHouse(mx, mz, 1)) continue;                    // торец в торец с соседом — не видно
     const r = api.nearestRoad(mx, mz, 7, 2);
-    const d = r ? r.d : 200;
+    const d = (r ? r.d : 200) + (force && w.len > maxLen * 0.6 ? 150 : 0);   // своя правка: торец лучше длинной стены
     if (d < bd) { bd = d; best = w; }
   }
-  if (!best) return null;
+  if (!best) { if (force) b._muralNo = 'нет подходящей стены'; return null; }
   const y0 = base + 0.3, y1 = h - 0.5, W = best.len - 0.8, Hh = y1 - y0;
   // рисунок 1:2 — по высоте стены, но не шире торца
   let dh = Math.min(Hh - 1.2, (W - 1.0) * 2), dw = dh / 2;
-  if (dh < 6) return null;
+  if (dh < 6) { if (force) b._muralNo = 'дом слишком низкий (рисунок от 6 м)'; return null; }
   const i = (strHash(key, 5) * DESIGNS.length) | 0, D = DESIGNS[i];
   const m0 = 0.4, mid = m0 + W / 2, dy0 = y0 + (Hh - dh) * 0.55, dy1 = dy0 + dh;
   const OUT = 0.11, wv = (WHITE_H / 2) / AH;                // белая точка атласа: фон берёт цвет вершин
@@ -208,6 +215,7 @@ export function mural (b, walls, base, h, lv, arch, api) {
   const cv1 = 1 - ((i / COLS) | 0) * CH / AH, cv0 = cv1 - CH / AH;
   quad(best, fx0, fx1, dy0, dy1, OUT, cu0, cv0, cu1, cv1, '#ffffff');
   DEBUG.murals++;
+  b._mural = D.k;                                           // редактор города: у дома мурал (какой)
   DEBUG.at.push([Math.round(best.a[0] + best.ux * best.len / 2), Math.round(best.a[1] + best.uz * best.len / 2), +best.ox.toFixed(2), +best.oz.toFixed(2)]);
   DEBUG.designs[D.k] = (DEBUG.designs[D.k] || 0) + 1;
   return best;

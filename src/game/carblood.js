@@ -8,13 +8,23 @@
      новая машина (смена, «ещё раз», воскрешение) — чистая.
    • Машина потока, что сбила человека, — при первом наезде своя копия материалов с теми же
      пятнами (у потока материал общий на всех — иначе кровь была бы на всех машинах сразу).
-   Кадр: пятна — числа в программе (без картинок и новых отрисовок); step — рост и потёки.
+   • Держится, пока не помыли (0п42, автор 24.10.2026: «кровь постепенно стирается с машины»): сама по времени не
+     сходит. Пятен на машину — BLOOD.N; места не хватает — два ближних пятна сливаются в одно побольше (раньше
+     новое затирало самое старое — после 4—5 сбитых первая кровь пропадала). Сильный дождь и ливень (с WASH.FROM)
+     смывают медленно и не до конца (до WASH.MIN от размера); ремонт у Дяди Жени и новая машина — целиком.
+     Настоящая «Семёрка» (realcar.js: свои 40 пятен на кузове) — те же правила: roomReal перед ударом, step — дождь.
+   Кадр: пятна — числа в программе (без картинок и новых отрисовок); step — рост, потёки, дождь.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 
 /* N — пятен на машину, GROW — с растёт, DRIP — м/с ползёт потёк, DRIP_MIN — ниже не стекает (м), K — размер */
 export const BLOOD = { N: 24, GROW: 0.9, DRIP: 0.07, DRIP_MIN: 0.3, K: 1.3 };
-export const STATS = { cars: 0, splats: 0 };
+/* слить: ROOM — сколько мест держать свободными перед ударом (на удар — до 11 пятен), MAX — радиус слитого не больше, м;
+   дождь: FROM — с какой силы смывает (дождь 0,85, ливень 1), RATE — доля размера за с в ливень, MIN — меньше не смоет */
+export const MERGE = { ROOM: 12, MAX: 0.85 };
+export const WASH = { FROM: 0.8, RATE: 1 / 160, MIN: 0.35 };
+export const STATS = { cars: 0, splats: 0, merged: 0 };
+export const CFG = { on: false };                   // взрослая версия: кровь в программе коробочной своей машины (cardirt.js patch; game.js)
 
 /* пятно: xyz — центр в осях машины (x — влево, y — вверх, z — вперёд), w — радиус (0 — нет); ниже центра — вытянуто вниз */
 export const GLSL = `
@@ -88,6 +98,7 @@ export function hit (car, wx, wz, kmh = 40, player = false) {
   const end = Math.abs(L.z) / HL >= Math.abs(L.x) / W2;
   const nz = end ? Math.sign(L.z) || 1 : 0, nx = end ? 0 : Math.sign(L.x) || 1;
   const x = end ? Math.max(-W2, Math.min(W2, L.x)) : nx * W2, z = end ? nz * HL : Math.max(-HL, Math.min(HL, L.z));
+  room(S.U.uBlood.value, S.splats, MERGE.ROOM, i => { S.i = i; });
   const add = (px, py, pz, r, drip) => {
     const v = S.U.uBlood.value[S.i++ % BLOOD.N];
     v.set(px, py, pz, 0.01);
@@ -105,6 +116,43 @@ export function hit (car, wx, wz, kmh = 40, player = false) {
   if (n > 1) { add((Math.random() - 0.5) * 1.0, 1.0, -HL + 0.55, 0.22, 1); add((Math.random() - 0.5) * 1.2, 0.75, -HL, 0.2, 1); }
 }
 
+/* Места под новые пятна (0п42): живые пятна — подряд с начала массива, следующий удар пишет за ними. Свободных меньше
+   need — два ближних (по краям) сливаются: середина — по площади, радиус — накрывает оба (не больше MERGE.MAX),
+   дорос и не стекает. vs — массив Vector4 (w — радиус, 0 — нет), splats — { v, R, t, drip }; setI(i) — куда писать */
+function room (vs, splats, need, setI) {
+  const N = vs.length;
+  const live = splats.filter(q => q.v.w > 0);
+  while (live.length > N - need && live.length > 1) {
+    let bi = 0, bj = 1, bd = Infinity;
+    for (let i = 0; i < live.length; i++) for (let j = i + 1; j < live.length; j++) {
+      const a = live[i].v, b = live[j].v, dd = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) - (live[i].R + live[j].R) * 0.5;
+      if (dd < bd) { bd = dd; bi = i; bj = j; }
+    }
+    const A = live[bi], B = live[bj], a = A.v, b = B.v, wa = A.R * A.R, wb = B.R * B.R, k = wb / (wa + wb);
+    const d = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+    a.set(a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k, a.z + (b.z - a.z) * k, 0);
+    A.R = Math.min(MERGE.MAX, Math.max(A.R, B.R, (d + A.R + B.R) * 0.5));
+    a.w = A.R * (A.wk || 1); A.t = 5; A.drip = 0;                   // A.wk — сколько от размера оставил дождь
+    b.set(0, 0, 0, 0);
+    live.splice(bj, 1);
+    STATS.merged++;
+  }
+  // подряд с начала: живые пятна — в первые места массива, запись следующего удара — за последним
+  live.sort((p, q) => vs.indexOf(p.v) - vs.indexOf(q.v));
+  const vals = live.map(q => q.v.clone());
+  for (let i = 0; i < N; i++) vs[i].set(0, 0, 0, 0);
+  for (let i = 0; i < live.length; i++) { vs[i].copy(vals[i]); live[i].v = vs[i]; }
+  splats.length = 0;
+  for (const q of live) splats.push(q);
+  setI(live.length);
+}
+/* настоящая «Семёрка» (realcar.js blood: R.bloodU — 40 пятен, R.splats, R.bloodI — куда писать) — перед ударом */
+export function roomReal (car) {
+  const R = car && car.userData && car.userData.real;
+  if (!R || !R.bloodU || !R.splats) return;
+  room(R.bloodU.value, R.splats, MERGE.ROOM, i => { R.bloodI = i; });
+}
+
 function grow (S, dt) {
   for (const s of S.splats) {
     if (s.t > 4) continue;
@@ -113,13 +161,34 @@ function grow (S, dt) {
     if (s.drip && s.v.y > BLOOD.DRIP_MIN) s.v.y -= BLOOD.DRIP * dt;
   }
 }
-/* каждый кадр: пятна растут и стекают; у машин потока — их положение (обратная матрица). Убранные машины — из списка */
-export function step (dt) {
+/* сильный дождь смывает: доросшие пятна (t > 4: растёт пятно realcar.js / grow — до 4 с) медленно меньше, до WASH.MIN */
+function wash (splats, rain, dt) {
+  if (!(rain > WASH.FROM)) return;
+  const k = (rain - WASH.FROM) / (1 - WASH.FROM) * WASH.RATE * dt;
+  for (const s of splats) {
+    if (!(s.t > 4) || !(s.v.w > 0)) continue;
+    s.wk = Math.max(WASH.MIN, (s.wk || 1) - k);
+    s.v.w = s.R * s.wk;
+  }
+}
+/* машина в крови (Дядя Женя: «кровищу отмою»): кузов — своя «Семёрка» или коробочная, лобовое — glassblood.js */
+export function bloody (car) {
+  const R = car && car.userData && car.userData.real;
+  if (R && R.splats) return R.splats.some(s => s.v.w > 0.02);
+  return PLAYER.splats.some(s => s.v.w > 0.02);
+}
+/* каждый кадр: пятна растут и стекают, дождь смывает; у машин потока — их положение (обратная матрица). Убранные
+   машины — из списка. car — своя (настоящая «Семёрка»: её пятна растут в realcar.js step, дождь — тут) */
+export function step (dt, rain = 0, car = null) {
   grow(PLAYER, dt);
+  wash(PLAYER.splats, rain, dt);
+  const R = car && car.userData && car.userData.real;
+  if (R && R.splats) wash(R.splats, rain, dt);
   for (let i = CARS.length - 1; i >= 0; i--) {
     const S = CARS[i];
     if (!S.mesh.parent) { CARS.splice(i, 1); continue; }
     grow(S, dt);
+    wash(S.splats, rain, dt);
     S.mesh.updateMatrixWorld();
     S.U.uBInv.value.copy(S.mesh.matrixWorld).invert();
   }

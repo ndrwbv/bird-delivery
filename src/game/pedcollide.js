@@ -20,7 +20,8 @@
       (hits.js: медленнее 20 км/ч — падает и встаёт, во взрослой жизни LIVES — падает и встаёт, последняя — сбит, кровь;
       в детской — падает и встаёт). Гость, который ждёт пиццу, клиент с коробкой, сидящий — только падает и встаёт.
       Сбитый машиной потока — не на тебе: счёт «сбил прохожих», штраф и сорванный заказ не трогает. Только ближе NEAR м
-      к курьеру (дальше людей не видно). Летящая выше FLY м — над головами.
+      к курьеру (дальше людей не видно). Летящая выше FLY м — над головами. Упавший и лежащий — не под машиной: вбок с её
+      пути (aside, 0п31, 24.10.2026: до того отлетевшая машина ехала сквозь упавшего).
 
    Сетки, без перебора всех со всеми: стены — клетки 30 м (game.js solidsNear), машины и люди — клетки 20 м
    (trafficgrid.js near / walkersNear).
@@ -45,6 +46,8 @@ export const PC = {
   NEAR: 160,      // м от курьера: тут едущие машины толкают людей
   FLY: 1.3,       // м: машина выше — летит над головами
   PAD: 0.3,       // м: к кузову — человек задет (как у твоей: underCar)
+  LIE: 0.15,      // м: лежащий ближе к кузову — сталкивает с пути (aside)
+  ASIDE: 0.15,    // м: сбитого — за край кузова (+ PAD) поперёк хода машины
   UNSTICK: 3,     // м/с: стоящий отходит от вставшей на него машины
   RECHK: 0.25,    // м: идущий по линии проверяет твёрдое раз на столько пути (Дека: не каждый кадр) …
   AHEAD: 0.35,    // м: … на столько вперёд
@@ -53,12 +56,12 @@ export const PC = {
   PING_T: 60, PING_R: 90,
   t: 0,           // с: часы (carsStep)
 };
-export const ST = { carBack: 0, blocked: 0, turned: 0, waits: 0, steer: 0, stuck: 0, moved: 0, pushed: 0, fell: 0, killed: 0, cars: 0, ms: 0 };
+export const ST = { aside: 0, carBack: 0, blocked: 0, turned: 0, waits: 0, steer: 0, stuck: 0, moved: 0, pushed: 0, fell: 0, killed: 0, cars: 0, ms: 0 };
 const ANG = [0, 0.55, -0.55, 1.1, -1.1, 1.7, -1.7, 2.4, -2.4];
 
 let A = null;
 /** api: V, TRAFFIC, CAR_L, CAR_W, solidsNear, inHouse(x, z) — дом не арка, walkLeg, walkSpawn, releaseIdle, gibHuman,
-    gibBurger, runOverScoot, ERRS, CBLOOD, GORE, Snd, PEOPLE, PEDS, SCOOTS, rand */
+    gibBurger, burgerHit, runOverScoot, ERRS, CBLOOD, GORE, Snd, PEOPLE, PEDS, SCOOTS, rand */
 export function init (api) { A = api; }
 
 /* ── что твёрдое ── */
@@ -303,15 +306,18 @@ export function carsStep (dt) {
     const hl = t.hl || A.CAR_L, fx = Math.sin(t.h), fz = Math.cos(t.h);
     for (let i = 0, n = TGRID.walkersNear(t.x, t.z, hl + 2, NW); i < n; i++) {
       const p = NW[i];
-      if (p.dead || p.fall) continue;
+      if (p.dead) continue;
       const dx = p.x - t.x, dz = p.z - t.z;
       if (Math.abs(dx) > hl + 2 || Math.abs(dz) > hl + 2) continue;
       const al = dx * fx + dz * fz, ac = dx * fz - dz * fx;
       if (Math.abs(al) >= hl + PC.PAD || Math.abs(ac) >= A.CAR_W + PC.PAD) continue;
       const k = kindOf(p);
       if (!k || (k === 3 && !p.grp.visible)) continue;
+      // лежит (сбили, упал): машина не едет сквозь — сталкивает в сторону, с её пути (0п31)
+      if (p.fall) { if (k === 1 && Math.abs(al) < hl + PC.LIE && Math.abs(ac) < A.CAR_W + PC.LIE) aside(p, t, vx, vz, sp, fx, fz, hl, 0); continue; }
       if (sp < PC.SOFT) { shove(p, t, al, ac, fx, fz, hl); continue; }
       hitOne(p, k, t, vx, vz, sp);
+      if (k === 1 && p.fall && !p.dead) aside(p, t, vx, vz, sp, fx, fz, hl, 1);   // упал — отброшен в сторону, а не под машину
     }
   }
   ST.cars = cars;
@@ -331,6 +337,27 @@ export function unstick (p, dt) {
   if (p.grp) { p.grp.position.x = p.x; p.grp.position.z = p.z; }
   return true;
 }
+/* сбитый или лежащий — с пути машины (0п31; автор 24.10: «ударяю машину, она отлетает в человека — человек сквозь машину
+   проходит»): до 24.10 упавший оставался, где стоял, и катящаяся машина проезжала сквозь него. Теперь — вбок от того, куда
+   она едет (vx, vz), за край кузова на PAD + ASIDE м (с той стороны, где он был; там стена — с другой); hit — только что
+   сбит: ещё и отлетает (скольжение «упал» — вбок и по ходу машины) */
+function aside (p, t, vx, vz, sp, fx, fz, hl, hit) {
+  if (sp < 0.05) return;
+  const ux = vx / sp, uz = vz / sp, nx = uz, nz = -ux;        // n — поперёк хода машины
+  const rx = p.x - t.x, rz = p.z - t.z, ru = rx * ux + rz * uz, rn = rx * nx + rz * nz;
+  const en = Math.abs(nx * fx + nz * fz) * hl + Math.abs(nx * fz - nz * fx) * A.CAR_W + PC.PAD + PC.ASIDE;   // полкузова поперёк хода
+  if (Math.abs(rn) >= en - PC.ASIDE * 0.5 && !hit) return;   // уже не на пути
+  let sd = rn >= 0 ? 1 : -1;
+  for (let k = 0; k < 2; k++, sd = -sd) {
+    const x = t.x + ux * ru + nx * sd * Math.max(en, Math.abs(rn)), z = t.z + uz * ru + nz * sd * Math.max(en, Math.abs(rn));
+    if (solidAt(x, z, 0.15) || A.inHouse(x, z)) continue;
+    p.x = x; p.z = z;
+    if (p.grp) { p.grp.position.x = x; p.grp.position.z = z; }
+    if (hit && p.fall) { const f = p.fall, fw = Math.min(sp * 0.25, 3); f.vx = nx * sd * 2.2 + ux * fw; f.vz = nz * sd * 2.2 + uz * fw; }
+    ST.aside++;
+    return;
+  }
+}
 /* медленно — к ближнему борту, не насквозь */
 function shove (p, t, al, ac, fx, fz, hl) {
   const HL = hl + PC.PAD, HW = A.CAR_W + PC.PAD;
@@ -342,9 +369,8 @@ function shove (p, t, al, ac, fx, fz, hl) {
 }
 function hitOne (p, k, t, vx, vz, sp) {
   const kmh = sp * 3.6;
-  if (k === 2) {                                   // бургер — разлетается
-    p.dead = 1; p.deadT = A.rand(6, 14); p.grp.visible = false;
-    A.gibBurger(p.x, p.z);
+  if (k === 2) {                                   // человек в костюме-бургере — отлетает (game.js burgerHit, burgersuit.js)
+    A.burgerHit(p, vx, vz);
     ST.killed++;
     return;
   }

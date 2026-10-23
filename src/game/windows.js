@@ -23,6 +23,18 @@
    • дальше LOD-метров (70 м; на телефоне — 45) комната не считается: окно
      одного усреднённого цвета, рама — тоже усреднённая (не рябит). С 70 % LOD
      комната плавно переходит в этот цвет — граница не щёлкает.
+   • 11ю (24.10.2026): у окон первого этажа части домов — решётка (прутья сеткой
+     или ромбом), у магазинов — витрина и стеклянная дверь с «залом» внутри:
+     стеллажи с товаром по задней и боковым стенам, плитка на полу, лампы-полосы
+     на потолке, прилавок и продавец за ним (силуэтом); товар и стены — по виду
+     магазина (продукты, еда, кафе, аптека, одежда, банк, пункт выдачи, заправка).
+     Магазин горит вечером и ночью (днём лампы — слабее солнца), закрытые — тёмные.
+     Вид окна — в стиле: 0—31 окно, +32 — с решёткой, 64 + вид магазина (+8 — закрыт) —
+     витрина, 96 + … — дверь магазина (shop() ниже).
+   • М1 (24.10.2026, balconies.js): стекло остеклённого балкона — вид 128 + рама (0 — белая, 1 — дерево, 2 — серая)
+     + 4 × «дверь квартиры у большего u». Рама со створками и фрамугой, иногда створка открыта (там стекла нет); за
+     стеклом — неглубокая коробка балкона (~1 м): вагонка, краска или стена, на задней стене — окно и дверь квартиры
+     (ночью у части горят и светят на балкон), бельё на верёвке, лыжи, коробки, сушилка или фикус, цветы на подоконнике.
    Всё детерминированно: зерно окна — от его середины, стиль — от дома.
    Окна склеены по клеткам города (как статика): один вызов отрисовки на
    клетку, один материал и один маленький атлас на весь город.
@@ -31,7 +43,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 
-export const STATS = { windows: 0, meshes: 0, verts: 0, ms: 0, interior: 1, lod: 70 };
+export const STATS = { windows: 0, shops: 0, balc: 0, meshes: 0, verts: 0, ms: 0, interior: 1, lod: 70 };
 /* ?winlog — для проверок (tools/probe-checks/shop-arch.js): каждое окно — середина, нормаль, ширина, высота; иначе не копим */
 const LOG = typeof location !== 'undefined' && /[?&]winlog(&|$)/.test(location.search) ? [] : null;
 if (LOG) STATS.log = LOG;
@@ -51,6 +63,11 @@ export function style (seed, st) {
   const fc = h2 < (old ? 0.4 : 0.22) ? 1 : h2 < (old ? 0.5 : 0.34) ? 2 : 0;
   return ft + fc * 8;
 }
+
+/* 11ю: решётка на окне первого этажа — стиль окна + BARS; витрина и дверь магазина — shop(вид, дверь, закрыт) */
+export const BARS = 32;
+export const SHOP_KIND = { grocery: 0, food: 1, cafe: 2, pharm: 3, shop: 4, bank: 5, pickup: 6, fuel: 7 };
+export function shop (kind, door, closed) { return (door ? 96 : 64) + ((kind | 0) & 7) + (closed ? 8 : 0); }
 
 /* окно — один экземпляр общего четырёхугольника: угол (u = 0, v = 0), нормаль, размер, зерно, стиль.
    9 чисел на окно вместо 4 вершин — в Северске ~300 тысяч окон, это ~11 МБ, а не ~55 */
@@ -81,6 +98,8 @@ export function add (w, from, to, y0, y1, out, sty) {
   b.x0 = Math.min(b.x0, px, qx); b.x1 = Math.max(b.x1, px, qx); b.z0 = Math.min(b.z0, pz, qz); b.z1 = Math.max(b.z1, pz, qz);
   b.y0 = Math.min(b.y0, y0); b.y1 = Math.max(b.y1, y1);
   STATS.windows++;
+  if (sty >= 128) { STATS.balc++; return; }      // стекло остеклённого балкона (balconies.js) — не «окно дома»
+  if (sty >= 64) { STATS.shops++; return; }        // витрины и двери магазинов — не «окна дома» (проверка shop-arch считает окна на вывеске)
   if (LOG) LOG.push([+cx.toFixed(2), +cy.toFixed(2), +cz.toFixed(2), w.ox, w.oz, +ww.toFixed(2), +hh.toFixed(2)]);
 }
 
@@ -195,22 +214,251 @@ varying vec4 vN;
 varying vec3 vView;
 vec4 wh4 (float s) { vec4 p = fract(vec4(s) * vec4(443.897, 441.423, 437.195, 444.129) + vec4(0.13, 0.71, 0.37, 0.53)); p += dot(p, p.wzxy + 19.19); return fract((p.xxyz + p.yzzw) * p.zywx); }
 vec3 wpick (float k, vec3 a, vec3 b, vec3 c, vec3 d, vec3 e, vec3 f) { k *= 6.0; return k < 1.0 ? a : k < 2.0 ? b : k < 3.0 ? c : k < 4.0 ? d : k < 5.0 ? e : f; }
+float shk (vec2 c) { return fract(sin(dot(c, vec2(12.9898, 78.233))) * 43758.5453); }
+bool isv (float v, float k) { return abs(v - k) < 0.5; }
+/* товар на полке: цвета по виду магазина (sRGB — квадрат ниже) */
+vec3 goods (float vr, float h) {
+  vec3 g;
+  if (isv(vr, 3.0)) g = wpick(h, vec3(0.95), vec3(0.85, 0.92, 0.98), vec3(0.3, 0.65, 0.45), vec3(0.9, 0.3, 0.3), vec3(0.4, 0.55, 0.85), vec3(0.98, 0.95, 0.85));   // аптека
+  else if (isv(vr, 4.0)) g = wpick(h, vec3(0.2, 0.25, 0.4), vec3(0.8, 0.72, 0.6), vec3(0.45), vec3(0.65, 0.2, 0.2), vec3(0.12), vec3(0.85, 0.85, 0.9));   // одежда
+  else if (isv(vr, 6.0)) g = wpick(h, vec3(0.62, 0.45, 0.28), vec3(0.7, 0.52, 0.32), vec3(0.55, 0.4, 0.25), vec3(0.75, 0.6, 0.4), vec3(0.3, 0.45, 0.8), vec3(0.66, 0.5, 0.3));   // коробки
+  else if (isv(vr, 2.0)) g = wpick(h, vec3(0.95, 0.93, 0.88), vec3(0.45, 0.28, 0.16), vec3(0.75, 0.55, 0.3), vec3(0.9, 0.85, 0.7), vec3(0.3, 0.2, 0.12), vec3(0.8, 0.3, 0.25));   // кафе: чашки, банки, выпечка
+  else g = wpick(h, vec3(0.9, 0.2, 0.15), vec3(0.98, 0.8, 0.2), vec3(0.25, 0.65, 0.3), vec3(0.95, 0.55, 0.15), vec3(0.95, 0.95, 0.92), vec3(0.2, 0.4, 0.8));   // продукты, еда, заправка
+  return g * g;
+}
+/* витрина (door = 0) или стеклянная дверь (door = 1) магазина: зал за стеклом. sb — стиль без вида окна: вид магазина + 8 × закрыт */
+vec3 shopShade (vec2 S, vec2 lp, float seed, float sb, float door) {
+  vec4 A = wh4(seed), B = wh4(seed + 0.371), C = wh4(seed + 0.719);
+  float vr = mod(sb, 8.0), closed = step(0.5, floor(sb / 8.0 + 0.01));
+  float ew = max(max(fwidth(lp.x), fwidth(lp.y)), 1e-4);
+  // рама — тёмный алюминий: у витрины импосты через ~1,6 м и фрамуга сверху, у двери рама шире и перекладина-ручка
+  float d = min(min(lp.x, S.x - lp.x), min(lp.y, S.y - lp.y)) - (door > 0.5 ? 0.09 : 0.06);
+  if (door > 0.5) { d = min(d, abs(lp.y - 1.0) - 0.035); if (abs(lp.y - 1.0) < 0.25) d = min(d, abs(lp.x - (S.x - 0.2)) - 0.02); }
+  else {
+    float nm = max(1.0, floor(S.x / 1.6 + 0.5)), cw = S.x / nm, mx = mod(lp.x, cw);
+    d = min(d, min(mx, cw - mx) - 0.03);
+    if (S.y > 1.6) d = min(d, abs(lp.y - (S.y - 0.42)) - 0.03);
+  }
+  float cov = clamp(0.5 - d / ew, 0.0, 1.0);
+  cov = mix(cov, 0.24, smoothstep(0.03, 0.12, ew));
+  vec3 fcol = isv(vr, 3.0) ? vec3(0.7, 0.72, 0.72) : vec3(0.06, 0.065, 0.07);
+  vec3 L = isv(vr, 2.0) || isv(vr, 1.0) ? vec3(1.0, 0.8, 0.55) : vec3(0.88, 0.95, 1.0);
+  float lit = (1.0 - closed) * mix(0.3, 1.0, smoothstep(0.15, 0.7, uNight));   // днём лампы горят, но слабее солнца
+  vec3 wall = isv(vr, 0.0) ? vec3(0.86, 0.9, 0.8) : isv(vr, 1.0) ? vec3(0.95, 0.8, 0.58) : isv(vr, 2.0) ? vec3(0.62, 0.46, 0.34)
+    : isv(vr, 3.0) ? vec3(0.93, 0.97, 0.95) : isv(vr, 4.0) ? vec3(0.84, 0.8, 0.86) : isv(vr, 5.0) ? vec3(0.74, 0.8, 0.9) : vec3(0.9, 0.88, 0.82);
+  wall *= wall;
+  vec3 colF = mix(wall * 0.3 * uDark, L * (0.55 + 0.5 * wall), lit);
+  vec3 col = colF;
+  float wd = length(vView);
+#ifdef INTERIOR
+  if (wd < uLod && cov < 0.99) {
+    vec3 r = vView; r.z = min(r.z, -1e-3);
+    float sill = door > 0.5 ? 0.0 : 0.3, RH = 3.0, D = 4.0 + A.z * 3.0, sx = 0.5;
+    vec3 o = vec3(lp, 0.0), inv = 1.0 / r;
+    vec3 tf = max((vec3(-sx, -sill, -D) - o) * inv, (vec3(S.x + sx, RH - sill, 0.0) - o) * inv);
+    float t = min(min(tf.x, tf.y), tf.z);
+    vec3 p = o + r * t;
+    vec3 alb = wall;
+    float glow = 0.0;
+    if (t != tf.y) {
+      // стена: стеллажи 0,12—2,1 м, полки через 0,44 м, на полках — товар коробками и банками (у банка — без полок)
+      float py = p.y + sill, u = t == tf.z ? p.x : p.z;
+      if (!isv(vr, 5.0) && py > 0.12 && py < 2.1 && (t == tf.z || -p.z > 0.5)) {
+        float sy = (py - 0.12) / 0.44, fy = fract(sy), row = floor(sy);
+        if (fy < 0.09) alb = vec3(0.3, 0.29, 0.27);
+        else {
+          float cwid = isv(vr, 6.0) ? 0.42 : 0.15 + 0.07 * A.w, cx = floor(u / cwid), fx = fract(u / cwid);
+          float h1 = shk(vec2(cx, row + seed * 31.0)), h2 = shk(vec2(cx * 1.7 + 3.1, row + seed * 17.0));
+          alb = (fx > 0.08 && fx < 0.92 && fy < 0.12 + (0.4 + 0.45 * h1) * 0.88 && h2 > 0.1) ? goods(vr, h2) : wall * 0.4;
+        }
+      } else if (isv(vr, 5.0) && py > 0.9 && py < 2.0 && abs(u - S.x * 0.5) < 0.8) alb = vec3(0.12, 0.2, 0.4);   // банк: плакат на стене
+    } else if (r.y < 0.0) {
+      float ch = mod(floor(p.x * 1.6) + floor(-p.z * 1.6), 2.0);
+      alb = mix(vec3(0.42, 0.42, 0.4), vec3(0.62, 0.6, 0.56), ch);                       // плитка
+    } else {
+      alb = vec3(0.8);
+      if (fract(-p.z * 0.55 + 0.2) < 0.14 && abs(p.x - S.x * 0.5) < max(0.6, S.x * 0.35)) glow = 1.0;   // лампы-полосы
+    }
+    // за прилавком — продавец (силуэт из атласа), прилавок поперёк зала
+    float zc = 1.1 + C.x * 1.3, c0 = S.x * (0.1 + 0.35 * C.y), c1 = min(S.x + 0.3, c0 + 1.4 + C.z * 1.6);
+    if (B.w < 0.7) {
+      float ts = -(zc + 0.6) / r.z;
+      if (ts < t) {
+        vec3 sp = o + r * ts;
+        float pk = floor(C.w * 8.0), ci = pk < 1.0 ? 0.0 : pk < 2.0 ? 1.0 : pk < 3.0 ? 2.0 : pk < 4.0 ? 8.0 : pk < 5.0 ? 9.0 : pk < 6.0 ? 10.0 : pk < 7.0 ? 13.0 : 15.0;
+        vec2 q = vec2((sp.x - (c0 + c1) * 0.5 - (B.z - 0.5) * 0.8) / 1.2 + 0.5, (sp.y + sill) / 2.4);
+        if (q.x > 0.0 && q.x < 1.0 && q.y > 0.0 && q.y < 1.0) {
+          vec4 tx = texture2D(uAtlas, vec2((ci + 0.03 + q.x * 0.94) * 0.0625, 0.5 + (0.01 + q.y * 0.98) * 0.25));
+          if (tx.a > 0.5) { alb = tx.rgb; p = sp; t = ts; glow = 0.0; }
+        }
+      }
+    }
+    float tc = -zc / r.z;
+    if (tc < t) {
+      vec3 cp = o + r * tc;
+      float cy = cp.y + sill;
+      if (cp.x > c0 && cp.x < c1 && cy < 1.0) { alb = cy > 0.93 ? vec3(0.75, 0.73, 0.7) : isv(vr, 2.0) ? vec3(0.4, 0.25, 0.15) : vec3(0.55, 0.58, 0.62); p = cp; glow = 0.0; }
+    }
+    vec3 dl = p - vec3(S.x * 0.5, RH - sill - 0.3, -D * 0.45);
+    float bri = 0.55 + 1.0 / (1.0 + 0.25 * dot(dl, dl));
+    col = mix(alb * (0.42 - 0.16 * clamp(-p.z / D, 0.0, 1.0)) * uDark, alb * L * bri * 1.35, lit);
+    if (glow > 0.5) col = mix(vec3(0.75) * uDark, L * 1.6, lit);
+    col = mix(col, colF, smoothstep(uLod * 0.7, uLod, wd));
+  }
+#endif
+  vec3 nv = normalize(vView);
+  float fres = 0.08 + 0.12 * smoothstep(0.02, 0.06, ew) + 0.5 * pow(1.0 - abs(nv.z), 4.0);
+  col = mix(col, uSky * (0.8 + 0.25 * vW.y), fres * (1.0 - 0.75 * lit));
+  return mix(col, fcol * uDark * (1.0 - 0.75 * uNight), cov);
+}
+
+/* М1: остеклённый балкон (вид 128+, balconies.js). sb — рама (0—2) + 4 × дверь квартиры у большего x */
+vec3 balcShade (vec2 S, vec2 lp, float seed, float sb) {
+  vec4 A = wh4(seed), B = wh4(seed + 0.371), C = wh4(seed + 0.719), E = wh4(seed + 0.113);
+  float fc = mod(sb, 4.0), dhi = step(0.5, floor(sb / 4.0 + 0.01));
+  float ew = max(max(fwidth(lp.x), fwidth(lp.y)), 1e-4);
+  // рама: створки по ~0,65 м, фрамуга сверху; у части — одна створка открыта (там стекла нет, видна её кромка)
+  float n = max(3.0, floor(S.x / 0.65 + 0.5)), cw = S.x / n, ty = S.y * 0.7, k = floor(lp.x / cw), mx = lp.x - k * cw;
+  float Fw = fc > 0.5 && fc < 1.5 ? 0.075 : 0.055;
+  float d = min(min(lp.x, S.x - lp.x), min(lp.y, S.y - lp.y)) - Fw;
+  d = min(d, min(mx, cw - mx) - 0.03);
+  d = min(d, abs(lp.y - ty) - 0.03);
+  float open = step(C.y, 0.38) * step(abs(k - floor(C.z * n)), 0.5) * step(lp.y, ty);
+  if (open > 0.5) d = min(d, abs(mx - 0.13) - 0.025);                                  // кромка открытой створки
+  float cov = clamp(0.5 - d / ew, 0.0, 1.0);
+  cov = mix(cov, 0.3, smoothstep(0.03, 0.12, ew));
+  vec3 fcol = fc < 0.5 ? vec3(0.80, 0.80, 0.76) : fc < 1.5 ? vec3(0.2, 0.1, 0.045) : vec3(0.36, 0.38, 0.4);
+  // отделка внутри: вагонка, краска или стена
+  vec3 fin = A.x < 0.42 ? vec3(0.62, 0.42, 0.22) : A.x < 0.75 ? wpick(A.y, vec3(0.7, 0.82, 0.85), vec3(0.78, 0.86, 0.7), vec3(0.92, 0.9, 0.84), vec3(0.86, 0.76, 0.6), vec3(0.62, 0.72, 0.82), vec3(0.9, 0.8, 0.8)) : vec3(0.78, 0.76, 0.72);
+  fin *= fin;
+  // свет квартиры за балконом: ~40 % ночью; иногда лампочка на самом балконе
+  float on = step(C.x, 0.42), lamp = step(0.88, C.x);
+  float lit = max(on, lamp) * smoothstep(0.15, 0.7, uNight);
+  vec3 L = mix(vec3(1.0, 0.62, 0.3), vec3(1.0, 0.8, 0.5), B.y);
+  vec3 colF = mix(fin * 0.32 * uDark, L * (0.35 + 0.4 * fin), lit * 0.8);
+  vec3 col = colF;
+  float wd = length(vView);
+#ifdef INTERIOR
+  if (wd < uLod && cov < 0.99) {
+    vec3 r = vView; r.z = min(r.z, -1e-3);
+    const float sill = 1.04, D = 0.97, TOP = 0.13;
+    vec3 o = vec3(lp, 0.0), inv = 1.0 / r;
+    vec3 tf = max((vec3(0.0, -sill, -D) - o) * inv, (vec3(S.x, S.y + TOP, 0.0) - o) * inv);
+    float t = min(min(tf.x, tf.y), tf.z);
+    vec3 p = o + r * t;
+    vec3 alb = fin;
+    float glow = 0.0;
+    if (t == tf.z) {
+      // задняя стена — дом: окно и дверь квартиры (как на фасаде: окно 0,9—2,5 м над полом, дверь рядом)
+      float xc = S.x * 0.5, wc = xc - (dhi > 0.5 ? 0.425 : -0.425), dc = xc + (dhi > 0.5 ? 0.6 : -0.6);
+      float y = p.y + sill;
+      if (A.x < 0.42) alb *= 0.9 + 0.1 * step(0.12, fract(p.x / 0.095));                  // вагонка — доски
+      bool win = abs(p.x - wc) < 0.65 && y > 0.9 && y < 2.5, door = abs(p.x - dc) < 0.36 && y < 2.5;
+      if (win || door) {
+        float fx = win ? 0.65 - abs(p.x - wc) : 0.36 - abs(p.x - dc), fy = min(abs(y - 2.5), win ? abs(y - 0.9) : abs(y - 0.9));
+        bool fr = fx < 0.06 || fy < 0.06 || (door && y < 0.9);
+        alb = fr ? vec3(0.75, 0.74, 0.7) : vec3(0.05, 0.06, 0.08);
+        if (!fr) glow = on;
+      }
+    } else if (t == tf.y) alb = r.y < 0.0 ? vec3(0.22, 0.2, 0.18) : vec3(0.6, 0.6, 0.58);    // пол, потолок
+    else if (A.x < 0.42) alb *= 0.9 + 0.1 * step(0.12, fract(-p.z / 0.095));
+    // сушилка, фикус, кот или жилец — фигура из атласа у задней стены
+    if (B.w < 0.55) {
+      float zc = D * 0.62, tc = -zc / r.z;
+      if (tc < t) {
+        vec3 cp = o + r * tc;
+        float pkc = floor(fract(B.w * 5.7) * 8.0);
+        float ci = pkc < 2.0 ? 11.0 : pkc < 3.0 ? 6.0 : pkc < 4.0 ? 7.0 : pkc < 5.0 ? 0.0 : pkc < 6.0 ? 8.0 : pkc < 7.0 ? 12.0 : 5.0;
+        vec2 q = vec2((cp.x - S.x * (dhi > 0.5 ? 0.28 : 0.72)) / 1.2 + 0.5, (cp.y + sill) / 2.4);
+        if (q.x > 0.0 && q.x < 1.0 && q.y > 0.0 && q.y < 1.0) {
+          vec4 tx = texture2D(uAtlas, vec2((ci + 0.03 + q.x * 0.94) * 0.0625, 0.5 + (0.01 + q.y * 0.98) * 0.25));
+          if (tx.a > 0.5) { alb = tx.rgb; p = cp; t = tc; glow = 0.0; }
+        }
+      }
+    }
+    // коробки стопкой в углу у окна; лыжи в углу у двери
+    if (E.x < 0.4) {
+      float zb = D * 0.45, tb = -zb / r.z;
+      if (tb < t) {
+        vec3 bp = o + r * tb;
+        float bxp = dhi > 0.5 ? bp.x : S.x - bp.x, y = bp.y + sill;
+        float hb = 1.15 + 0.3 * E.z;
+        if (bxp > 0.04 && bxp < 0.62 && y < hb) {
+          float row = floor(y / 0.38);
+          alb = mix(vec3(0.55, 0.4, 0.24), vec3(0.62, 0.48, 0.3), shk(vec2(row, seed * 9.0)));
+          if (fract(y / 0.38) < 0.05) alb *= 0.6;
+          alb *= alb; p = bp; t = tb; glow = 0.0;
+        }
+      }
+    }
+    if (B.z < 0.25) {
+      float zs = 0.22, ts = -zs / r.z;
+      if (ts < t) {
+        vec3 sp2 = o + r * ts;
+        float sx2 = dhi > 0.5 ? S.x - sp2.x : sp2.x, y = sp2.y + sill;
+        if (y < 1.8 && ((sx2 > 0.08 && sx2 < 0.16) || (sx2 > 0.19 && sx2 < 0.27))) { alb = sx2 < 0.17 ? vec3(0.6, 0.06, 0.05) : vec3(0.06, 0.15, 0.5); p = sp2; t = ts; glow = 0.0; }
+      }
+    }
+    // бельё на верёвке под потолком
+    if (B.x < 0.45) {
+      float zl = D * 0.5, tl = -zl / r.z;
+      if (tl < t) {
+        vec3 lpp = o + r * tl;
+        float yl = S.y - 0.06, sl = floor(lpp.x / 0.36), h1 = shk(vec2(sl, seed * 13.0)), h2 = shk(vec2(sl + 7.1, seed * 5.0));
+        float fx = fract(lpp.x / 0.36);
+        if (abs(lpp.y - yl) < 0.01) { alb = vec3(0.7); p = lpp; t = tl; glow = 0.0; }
+        else if (h1 > 0.3 && fx > 0.1 && fx < 0.9 && lpp.y < yl && lpp.y > yl - 0.28 - 0.45 * h2) {
+          alb = wpick(h2, vec3(0.9, 0.25, 0.2), vec3(0.95), vec3(0.25, 0.5, 0.85), vec3(0.95, 0.8, 0.2), vec3(0.3, 0.75, 0.4), vec3(0.95, 0.75, 0.8));
+          alb *= alb; p = lpp; t = tl; glow = 0.0;
+        }
+      }
+    }
+    vec3 dl = p - vec3(S.x * 0.5, 0.0, -D);
+    float bri = 0.5 + 0.8 / (1.0 + 0.8 * dot(dl, dl));
+    col = mix(alb * 0.55 * uDark, alb * L * bri * 1.3, lit);
+    if (glow > 0.5) col = mix(alb * uDark, L * 1.2, lit);
+    // цветы на подоконнике (ряд подоконников атласа), у стекла
+    if (E.y < 0.45) {
+      float ts = -0.14 / r.z;
+      vec3 sp = o + r * ts;
+      float hx = S.x * 0.5, hf = step(hx, sp.x);
+      vec2 q = vec2(fract(sp.x / hx), sp.y / 0.5);
+      if (q.y > 0.0 && q.y < 1.0 && sp.x > 0.0 && sp.x < S.x) {
+        float ci = floor(fract(E.z + hf * 0.37) * 16.0), row = floor(ci / 8.0);
+        vec4 tx = texture2D(uAtlas, vec2((mod(ci, 8.0) + 0.02 + q.x * 0.96) * 0.125, 0.4375 - row * 0.0625 + (0.03 + q.y * 0.94) * 0.0625));
+        if (tx.a > 0.5) col = tx.rgb * mix(0.65 * uDark * (1.0 - 0.6 * uNight), L * 0.4, lit);
+      }
+    }
+    col = mix(col, colF, smoothstep(uLod * 0.7, uLod, wd));
+  }
+#endif
+  vec3 nv = normalize(vView);
+  float fres = (0.1 + 0.15 * smoothstep(0.02, 0.06, ew) + 0.55 * pow(1.0 - abs(nv.z), 4.0)) * (1.0 - open);
+  col = mix(col, uSky * (0.8 + 0.25 * vW.y), fres * (1.0 - 0.7 * lit));
+  return mix(col, fcol * uDark * (1.0 - 0.75 * uNight), cov);
+}
 `;
 
 /* цвета в шейдере — линейные (квадрат от sRGB, приблизительно) */
 const FRAG_BODY = `
   vec2 S = vN.zw;
   vec2 lp = vW.xy * S;
-  float seed = vW.z, sty = vW.w;
+  float seed = vW.z, sty0 = vW.w;
+  float kind = floor(sty0 / 32.0 + 0.01), sty = sty0 - kind * 32.0;   // 0 — окно, 1 — с решёткой, 2 — витрина, 3 — дверь магазина (11ю), 4 — стекло балкона (М1)
+  vec3 col;
+  if (kind > 3.5) col = balcShade(S, lp, seed, sty);
+  else if (kind > 1.5) col = shopShade(S, lp, seed, sty, kind - 2.0);
+  else {
   vec4 A = wh4(seed), B = wh4(seed + 0.371), C = wh4(seed + 0.719), E = wh4(seed + 0.113);
   // рама и переплёт
   float ft = mod(sty, 8.0), fc = floor(sty / 8.0 + 0.01);
-  if (C.z < 0.14) { ft = 2.0; fc = 0.0; }                  // жильцы поставили свой стеклопакет
+  if (C.z < 0.14 && ft < 4.5) { ft = 2.0; fc = 0.0; }      // жильцы поставили свой стеклопакет
   float ew = max(max(fwidth(lp.x), fwidth(lp.y)), 1e-4);
   const float F = 0.085, Bw = 0.035;
   float d = min(min(lp.x, S.x - lp.x), min(lp.y, S.y - lp.y)) - F;
   float ty = S.y * 0.68;
-  if (ft < 0.5) { d = min(d, abs(lp.x - S.x * 0.5) - Bw); d = min(d, abs(lp.y - ty) - Bw); }
+  if (ft > 4.5) { d = min(d, abs(lp.y - S.y * 0.8) - Bw); if (lp.y < 0.85) d = -1.0; }   // М1: дверь на балкон — фрамуга, внизу филёнка (до 0,85 м)
+  else if (ft < 0.5) { d = min(d, abs(lp.x - S.x * 0.5) - Bw); d = min(d, abs(lp.y - ty) - Bw); }
   else if (ft < 1.5) { d = min(d, abs(lp.y - ty) - Bw); if (lp.y < ty) d = min(d, abs(lp.x - S.x * 0.5) - Bw); }
   else if (ft < 2.5) { d = min(d, abs(lp.x - S.x * 0.5) - Bw); }
   else if (ft < 3.5) { d = min(d, abs(lp.x - S.x / 3.0) - Bw); d = min(d, abs(lp.x - S.x * 2.0 / 3.0) - Bw); d = min(d, abs(lp.y - S.y * 0.74) - Bw); }
@@ -240,7 +488,6 @@ const FRAG_BODY = `
   float far = smoothstep(0.02, 0.06, ew);                // вдали: складки штор не рисуем (рябили бы), стекло больше отражает
   float fres = 0.07 + 0.18 * far + 0.55 * pow(1.0 - abs(nv.z), 4.0);
   vec3 refl = uSky * (0.8 + 0.25 * vW.y);
-  vec3 col;
   // без комнаты (вдали и на «окнах без комнат»): ровный цвет
   vec3 colF = mix(wc * 0.7 * 0.36 * uDark, L * (0.6 + 0.5 * wc), lit);
   float wd = length(vView);
@@ -248,7 +495,7 @@ const FRAG_BODY = `
   if (wd < uLod && cov < 0.99) {
     vec3 r = vView; r.z = min(r.z, -1e-3);
     float sx = 0.45 + A.y * 0.9, RH = 2.75, D = 2.6 + A.z * 2.4;
-    const float sill = 0.85;
+    float sill = ft > 4.5 ? 0.0 : 0.85;                  // у двери на балкон пол комнаты — у низа двери
     vec3 o = vec3(lp, 0.0);
     vec3 inv = 1.0 / r;
     vec3 tf = max((vec3(-sx, -sill, -D) - o) * inv, (vec3(S.x + sx, RH - sill, 0.0) - o) * inv);
@@ -310,7 +557,18 @@ const FRAG_BODY = `
     if (lp.y > S.y * (0.7 - 0.5 * fract(ct * 13.0))) col = vec3(0.56, 0.5, 0.38) * cl * mix(0.92 + 0.08 * step(0.5, fract(lp.y * 10.0)), 0.96, far);
   }
   col = mix(col, refl, fres * (1.0 - 0.8 * lit));
+  if (kind > 0.5) {                                      // 11ю: решётка на окне первого этажа — прутья сеткой или ромбом, крашеные
+    float bs = 0.15 + 0.05 * C.y;
+    vec2 g = E.x < 0.4 ? vec2(lp.x + lp.y, lp.x - lp.y) * 0.7071 : lp;
+    vec2 fq = fract(g / vec2(bs, E.x < 0.4 ? bs : 0.55)), dq = min(fq, 1.0 - fq) * vec2(bs, E.x < 0.4 ? bs : 0.55);
+    float bd = min(dq.x, dq.y) - 0.014;
+    float bcov = clamp(0.5 - bd / ew, 0.0, 1.0);
+    bcov = mix(bcov, 0.18, smoothstep(0.012, 0.05, ew));
+    vec3 bc = C.w < 0.5 ? vec3(0.03) : C.w < 0.75 ? vec3(0.05, 0.12, 0.06) : vec3(0.7);
+    col = mix(col, bc * uDark * (1.0 - 0.75 * uNight), bcov);
+  }
   col = mix(col, fcol * uDark * (1.0 - 0.75 * uNight), cov);
+  }
   vec4 diffuseColor = vec4(col, opacity);`;
 
 let MAT = null;

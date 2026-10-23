@@ -20,8 +20,9 @@
    • бандитские районы (ZN.gangZones): размытые красные пятна на радаре и карте;
      адрес в районе — 3–4 гопника в спортивках (днём 6 из 10, вечером всегда) ждут у пина
      или выходят из-за угла; пицца отдаётся сразу, но машину тут же окружают и держат,
-     пока не ответишь: заплатил 10 000 ₽ — отпускают; отказал — короткая стычка (до 1 сердца), дал газу —
-     бегут следом и отстают (gang*, HOLD, GANG в econ.js). В детской версии без бит: «покачают» машину;
+     пока не ответишь: заплатил 10 000 ₽ — отпускают; «отбиться» — сжимающееся кольцо (ringfight.js): попал —
+     уходят без денег, промах — платишь (gang*, HOLD, GANG в econ.js). Старая стычка (smash: до 1 сердца, дал газу —
+     бегут следом и отстают) в коде осталась, но из разговора больше не зовётся; в детской без бит;
    • особняки (prepCity): дома в круге MAP.career.rich — коттеджи в 2–3
      этажа со скатной крышей, светлыми стенами, газоном, высоким забором
      (roadlife.js), воротами и дорогой машиной у дома;
@@ -38,6 +39,7 @@ import { GANG, SHIFT, hourOf } from './econ.js';
 import { TIER } from './hits.js';
 import * as ZN from './zones.js';
 import * as DLG from './dialog.js';
+import * as RF from './ringfight.js';    // «отбиться» — сжимающееся кольцо (12ао)
 import * as SEAS from './seasons.js';
 import * as SL from './streetlamps.js';
 import { makePerson, holdFixed } from './people.js';
@@ -1110,7 +1112,7 @@ function hold (dt) {
   if (sp > GE.capV + 0.4) {
     GE.push += dt;
     if (A.S) A.S.shake = Math.max(A.S.shake || 0, 0.12);
-    if (GE.gasT <= 0 && GE.st !== 'talk') {
+    if (GE.gasT <= 0 && GE.st !== 'talk' && GE.st !== 'ring') {
       GE.gasT = 3.5;
       const m = GE.men.find(q => !q.dead && q.slot === 1) || GE.men.find(q => !q.dead);
       if (m) gsay(m, A.ADULT ? t('Куда собрался? Стоять!') : t('Куда? Стой!'), '#d9342c');
@@ -1145,19 +1147,34 @@ function gangTalk () {
   DLG.say({
     person: L.person, name: A.ADULT ? t('Гопник') : t('Пацан со двора'), text, mood: 'calm', color: '#d9342c',
     head: A.ADULT ? t('наезд') : t('двор'), pay: '−' + sum, payLabel: t('мзда'),
-    accept: t('заплатить {money}', { money: sum }), decline: t('не буду'),
+    accept: t('заплатить {money}', { money: sum }), decline: t('отбиться'),
   }).then(ok => {
     if (GE.st !== 'talk') return;
-    if (ok) {
-      const paid = A.pay ? A.pay(GE.bribe) : 0;
-      if (A.toast) A.toast(paid < GE.bribe ? t('отдал всё, что было: {money}', { money: A.money(paid) }) : t('мзда: −{money}', { money: A.money(paid) }));
-      GE.res = 'paid';
-      gangLeave(A.ADULT ? t('Другое дело. Катайся.') : t('Во, нормально. Езжай.'));
-    } else {
-      GE.st = 'smash'; GE.t = 0; GE.hurtT = 0.9;
-      gsay(L, A.ADULT ? t('Сам напросился!') : t('Ща покачаем!'), '#d9342c');
-    }
+    if (ok) { gangPay(); return; }
+    /* «отбиться» (12ао, автор 18.10.2026): сжимающееся кольцо (ringfight.js) — попал вовремя: отбился, не платишь и
+       машину не мнут; промах — платишь, как «заплатить». Пока кольцо на экране — держат, как в разговоре. Было до 23.10:
+       «не буду» — стычка (smash ниже: бьют машину до GANG.SMASH_HEARTS сердца, можно оторваться) — код оставлен */
+    GE.st = 'ring';
+    gsay(L, A.ADULT ? t('Чё, борзый?') : t('Ты чё, смелый?'), '#d9342c');
+    RF.play({ adult: A.ADULT, sum, sfx: n => {
+      if (!A.Snd) return;
+      if (n === 'hit') A.Snd.fx('bat', s => { s.noise(0.09, 0.22); s.blip(120 + Math.random() * 40, 0.08, 'square', 0.1); });
+    } }).then(hit => {
+      if (GE.st !== 'ring') return;
+      if (!hit) { gangPay(); return; }
+      GE.res = 'fought'; STATS.fought = (STATS.fought || 0) + 1;
+      if (A.S) A.S.shake = Math.max(A.S.shake || 0, 0.3);
+      if (A.toast) A.toast(t('отбился — без мзды'));
+      gangLeave(A.ADULT ? t('Ай, бля! Всё-всё, уходим!') : t('Ай! Ладно-ладно, уходим!'), '#d9342c');
+    });
   });
+}
+/* заплатил мзду (или промахнулся в кольце): денег меньше — отдаёшь всё, что есть */
+function gangPay () {
+  const paid = A.pay ? A.pay(GE.bribe) : 0;
+  if (A.toast) A.toast(paid < GE.bribe ? t('отдал всё, что было: {money}', { money: A.money(paid) }) : t('мзда: −{money}', { money: A.money(paid) }));
+  GE.res = 'paid';
+  gangLeave(A.ADULT ? t('Другое дело. Катайся.') : t('Во, нормально. Езжай.'));
 }
 /* машина хуже заводится: мотор −10 % (cars.js worsen, econ.js BREAK.GANG_WEAR) */
 function carWorse () {
@@ -1180,7 +1197,7 @@ function gangStep (dt) {
       if (!GE.st) return;
     } else if (GE.men.every(m => m.dead)) { gangClear(); GE.preOk = false; GE.cd = 45; return; }   // всех сбил по дороге — некому трясти
   }
-  if (GE.st === 'come' || GE.st === 'talk') hold(dt);   // стычка (smash) — уже не держат: дал газу — уехал
+  if (GE.st === 'come' || GE.st === 'talk' || GE.st === 'ring') hold(dt);   // стычка (smash) — уже не держат: дал газу — уехал
   const sp = Math.hypot(V.vx, V.vz);
   const dCar = Math.hypot(V.x - GE.cx, V.z - GE.cz);
   // уехал до разговора — ну и вали
@@ -1239,7 +1256,7 @@ function gangStep (dt) {
     else { [tx, tz] = around(m, ...slotPos(m.slot)); if (GE.st === 'smash') speed = 3.2; }
     const dx = tx - m.x, dz = tz - m.z, d = Math.hypot(dx, dz);
     let walk = false;
-    if (d > 0.3 && GE.st !== 'talk') {
+    if (d > 0.3 && GE.st !== 'talk' && GE.st !== 'ring') {
       const k = Math.min(1, speed * dt / d);
       m.x += dx * k; m.z += dz * k; walk = true;
       m.h = damp(m.h, m.h + wrap(Math.atan2(dx, dz) - m.h), 8, dt);
@@ -1417,5 +1434,6 @@ export function step (dt, api) {
 /* для отладки: __dlv.WORLD */
 export const DEBUG = {
   STATS, HEAPS, ALLEYS, VILLAS, GRILLS, GRILL_SPOTS, GE, LUX_SPOTS, TRASH, paveRoad, pavePath, PAVE,
+  RF: { RING: RF.RING, state: RF.state, play: o => RF.play(o) },   // кольцо «отбиться» (ringfight.js)
   HOLD, gang: () => A && (!GE.st || GE.st === 'wait') && gangStart(GE.st === 'wait'), thugsNext, trash: k => A && trashBuild(k), grill: () => { const V = A.V; const s = GRILL_SPOTS.filter(q => !q.busy).sort((a, b) => Math.hypot(a.x - V.x, a.z - V.z) - Math.hypot(b.x - V.x, b.z - V.z))[0]; if (s) spawnGrill(s); return s; },
 };

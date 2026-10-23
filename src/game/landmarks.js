@@ -49,6 +49,7 @@ function padFree (A, F, u0, u1, n0, n1) {
 }
 
 export const FUEL_LOG = [];                        // для отладки: какие АЗС встали и где
+export const FUEL_ROOFS = [];                      // навесы АЗС: { x, z, ux, uz, nx, nz, hu, hn, y — низ } — камера сзади под ними ниже (camroof.js)
 export const FUEL_PADS = [];                       // бетонные площадки АЗС: на них не остаётся следов колёс (tracks.js)
 function fuelStation (A, poi) {
   const [px, pz] = poi.p;
@@ -95,6 +96,7 @@ function fuelStation (A, poi) {
   }
   const [cx, cz] = at(F, 0, cn);
   box(A.LIT, 16, 0.8, 10, '#f5f5f2', cx, gy + 5.6, cz, ry);
+  FUEL_ROOFS.push({ x: cx, z: cz, ux, uz, nx, nz, hu: 8.1, hn: 5.1, y: gy + 5.17 });
   box(A.LIT, 16.2, 0.38, 10.2, bg, cx, gy + 5.45, cz, ry);
   for (const dn of [-2.2, 2.2]) {
     const [lx, lz] = at(F, 0, cn + dn);

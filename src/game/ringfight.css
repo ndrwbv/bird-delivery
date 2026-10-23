@@ -1,0 +1,37 @@
+/* Отбиться от гопников — сжимающееся кольцо (ringfight.js). Лист накладной посреди экрана: круг-цель пунктиром,
+   кольцо красными чернилами; легло на круг — кольцо зеленеет; итог — печать «отбился!» / «промах». */
+#ringfight { position: absolute; inset: 0; z-index: 46; display: flex; align-items: center; justify-content: center;
+             padding: 12px 16px; box-sizing: border-box; background: radial-gradient(ellipse at 50% 50%, rgba(40, 14, 24, .18), rgba(40, 14, 24, .5) 75%);
+             font-family: "Press Start 2P", ui-monospace, monospace; color: var(--pp-ink); opacity: 0; transition: opacity .15s;
+             touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; }
+#ringfight[hidden] { display: none; }
+#ringfight.on { opacity: 1; }
+#ringfight .rf-box { --pp-accent: var(--pp-red); width: min(400px, 100%); text-align: center; translate: 0 12px; transition: translate .25s var(--pp-spring); }
+#ringfight.on .rf-box { translate: 0 0; }
+#ringfight .pp-head { font-size: var(--pp-fs-s); }
+#ringfight .rf-sum { color: var(--pp-red); }
+#ringfight .rf-stage { position: relative; width: min(260px, 44vh, 70vw); aspect-ratio: 1; margin: 0 auto; }
+#ringfight svg { display: block; width: 100%; height: 100%; overflow: visible; }
+#ringfight svg * { vector-effect: non-scaling-stroke; fill: none; stroke-linecap: round; }
+#ringfight .rf-target { stroke: var(--pp-ink); stroke-width: 5; stroke-dasharray: 9 7; opacity: .75; }
+#ringfight .rf-o { stroke: var(--pp-red); stroke-width: 9; }
+#ringfight .rf-cr { display: none; }
+#ringfight.rf-adult .rf-cr { display: inline; }
+#ringfight .rf-cr path { stroke: var(--pp-red); stroke-width: 4; opacity: .8; }
+#ringfight.rf-hot .rf-o, #ringfight.rf-hit .rf-o, #ringfight.rf-hot .rf-cr path, #ringfight.rf-hit .rf-cr path { stroke: var(--pp-money); }
+#ringfight.rf-hot .rf-target, #ringfight.rf-hit .rf-target { stroke: var(--pp-money); opacity: 1; }
+#ringfight.rf-miss .rf-ring, #ringfight.rf-hit .rf-ring { opacity: .3; }
+#ringfight .rf-seal { position: absolute; left: 50%; top: 50%; right: auto; translate: -50% -50%; margin: 0; background: var(--pp-paper); mix-blend-mode: normal; opacity: 1; z-index: 2; white-space: nowrap; font-size: var(--pp-fs-l);
+                      animation: rf-slam .28s var(--pp-spring); }
+@keyframes rf-slam { from { scale: 1.8; opacity: 0; } to { scale: 1; opacity: 1; } }
+#ringfight .rf-title { margin: .5em 0 0; font-size: var(--pp-fs-l); line-height: 1.25; color: var(--pp-red); text-transform: uppercase; letter-spacing: .06em; }
+#ringfight .rf-hint { display: flex; align-items: center; justify-content: center; margin: .5em 0 0; }
+/* телефон боком: низкий экран — лист пониже */
+@media (max-height: 460px) {
+  #ringfight .rf-box { padding-top: 6px; padding-bottom: 10px; }
+  #ringfight .pp-head { margin-bottom: .2em; padding: .5em 0 .4em; }
+  #ringfight .rf-stage { width: min(200px, 48vh); }
+  #ringfight .rf-title { font-size: var(--pp-fs-m); margin-top: .3em; }
+  #ringfight .rf-hint { margin-top: .2em; }
+}
+@media (prefers-reduced-motion: reduce) { #ringfight .rf-seal { animation: none; } }

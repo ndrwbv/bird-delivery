@@ -93,6 +93,14 @@ let root = null, queue = Promise.resolve(), open = 0;
 
 export function init (api) { API = { ...API, ...api }; }
 export const isOpen = () => open > 0;
+/* своё окно поверх игры, которое для игры — как разговор (руль из рук, isOpen(), чат Толика не мешает):
+   кольцо «отбиться» у гопников (ringfight.js). hold(true) — открыли, hold(false) — закрыли */
+export function hold (on) {
+  if (on) { open++; API.pause(true); document.body.classList.add('dlg-open'); return; }
+  if (open <= 0) return;
+  open--;
+  if (!open) { API.pause(false); document.body.classList.remove('dlg-open'); if (root && !root.classList.contains('on')) root.hidden = true; }   // лист разговора под ним уже ушёл — не держать пустой слой поверх хада
+}
 /* закрыть текущую реплику сразу (катсцена пропущена: story.js) — say вернёт null */
 let CUR = null;
 export function dismiss () { if (CUR) CUR(); }

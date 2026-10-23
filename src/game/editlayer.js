@@ -12,6 +12,12 @@
               с плафоном и пятном света), лавочка-реквизит — со сцены, из списков «где посидеть».
               Дерево (game.js tree) не растёт сразу, но его ствол стоит до куска 'edits' — для
               соседей город тот же. Виды — REMOVABLE.
+     houses — [{ id, lv, col, mural, drop }]: правки домов по номеру дома из карты (OSM id, b.id):
+              этажность, цвет стен, мурал на торце (1 — есть, 0 — нет), drop — дома нет. Ложатся
+              на данные карты до всего (houses(CITY) — сразу после MAP.data в game.js), как правка
+              overrides.json, только без python3. Каждый дом строится своим жребием по номеру
+              (houseRnd в osmBuildings) — этажи, мурал или пропажа одного дома не сдвигают окна,
+              арки и подъезды у соседей.
      add    — [{ id, kind, sub, x, z, ry, w, d, h, col }]: ставится куском поздней сборки
               'edits' (после деревьев дворов, до склейки), теми же функциями, что и город:
               дерево — game.js tree (порода sub), лавочка — bench, фонарь — streetlamps.js
@@ -144,8 +150,70 @@ export function setLive (list) {
 const PROV = {};
 export function provide (kind, p) { PROV[kind] = p; }
 
+/* ── дома: этажность, цвет стен, мурал, убрать (edits.json → houses) ──
+   Ложится на данные карты до сборки (game.js зовёт houses(CITY) сразу после const CITY = MAP.data):
+   убранный дом вынут из CITY.buildings (его пятно — газон), у остальных — lv, цвет стен (b._edCol, citypaint.js
+   wallHex) и мурал (b._edMural, citypaint.js mural). ?edh=… — правки домов из адреса (для probe, без файла):
+   «id-l9-m1-ce08a62_id-x» — этажей 9, мурал есть, цвет #e08a62; x — убрать */
+export const HOUSE_LV = [1, 30];
+export const HOUSES = { list: [], dropped: [], edited: [], missing: [] };
+function qHouses () {
+  if (typeof location === 'undefined') return null;
+  const q = new URLSearchParams(location.search).get('edh');
+  if (!q) return null;
+  return q.split('_').filter(Boolean).map(t => {
+    const [id, ...f] = t.split('-'), h = { id: +id || id };
+    for (const v of f) {
+      if (v === 'x') h.drop = 1;
+      else if (v[0] === 'l') h.lv = +v.slice(1);
+      else if (v[0] === 'm') h.mural = +v.slice(1) ? 1 : 0;
+      else if (v[0] === 'c') h.col = '#' + v.slice(1);
+    }
+    return h;
+  });
+}
+export function houses (city) {
+  const L = qHouses() || EDITS().houses || [];
+  HOUSES.list = L;
+  if (!L.length || !city || !city.buildings) return;
+  const by = new Map();
+  for (const h of L) if (h && h.id !== undefined && h.id !== null) by.set(String(h.id), h);
+  const seen = new Set(), keepB = [];
+  for (const b of city.buildings) {
+    const e = b.id !== undefined ? by.get(String(b.id)) : null;
+    if (!e) { keepB.push(b); continue; }
+    seen.add(String(b.id));
+    if (e.drop) { HOUSES.dropped.push(b); continue; }
+    b._lv0 = b.lv;                                  // как в карте — редактору («в карте 3 этажа»)
+    if (isFinite(e.lv) && +e.lv > 0) b.lv = Math.max(HOUSE_LV[0], Math.min(HOUSE_LV[1], Math.round(+e.lv)));
+    if (typeof e.col === 'string' && /^#[0-9a-f]{6}$/i.test(e.col)) b._edCol = e.col.toLowerCase();
+    if (e.mural === 0 || e.mural === 1) b._edMural = e.mural;
+    b._ed = e;
+    HOUSES.edited.push(b);
+    keepB.push(b);
+  }
+  if (keepB.length !== city.buildings.length) { city.buildings.length = 0; for (const b of keepB) city.buildings.push(b); }
+  for (const k of by.keys()) if (!seen.has(k)) HOUSES.missing.push(k);
+  if (!HOUSES.dropped.length) return;
+  // у убранного дома нет и его подъездов из карты, вывесок и ТЦ
+  const inside = (x, z) => HOUSES.dropped.some(b => inPolyH(x, z, b.p));
+  const ids = new Set(HOUSES.dropped.map(b => b.id));
+  const cut = (arr, f) => { if (!Array.isArray(arr)) return; let j = 0; for (let i = 0; i < arr.length; i++) if (!f(arr[i])) arr[j++] = arr[i]; arr.length = j; };
+  cut(city.entrances, e => inside(e[0] - e[2] * 0.6, e[1] - e[3] * 0.6));
+  cut(city.pois, q => q.p && inside(q.p[0], q.p[1]));
+  cut(city.malls, m => ids.has(m.id));
+}
+function inPolyH (x, z, p) {
+  let c = false;
+  for (let i = 0, j = p.length - 1; i < p.length; j = i++) { const a = p[i], b = p[j]; if ((a[1] > z) !== (b[1] > z) && x < (b[0] - a[0]) * (z - a[1]) / (b[1] - a[1]) + a[0]) c = !c; }
+  return c;
+}
+
 /* ── зерно сборки ── */
-const SEEDED = new Set(['nightlife', 'world', 'construction', 'rivals', 'darknight', 'wastelands', 'beach', 'life', 'entr', 'vents', 'signs', 'gates', 'trees', 'metro', 'lots', 'lights', 'ramps', 'landmarks', 'roadlife', 'billboards', 'cars', 'yard', 'yardbits', 'yardtrees', 'edits', 'seasonyard', 'smash', 'seasons', 'trails']);
+const SEEDED = new Set(['nightlife', 'world', 'construction', 'rivals', 'darknight', 'wastelands', 'beach', 'life', 'entr', 'vents', 'signs', 'gates', 'trees', 'metro', 'lots', 'lights', 'ramps', 'landmarks', 'roadlife', 'billboards', 'cars', 'yard', 'yardbits', 'yardtrees', 'edits', 'seasonyard', 'smash', 'seasons', 'trails',
+  // куски дворов раундов 4—5 (24.10.2026): без зерна город выходил каждый раз чуть другим — деревья «дворов без пустых мест»,
+  // кусты и заборы лабиринта, корты, трамплины, карманы парковки; «убрать» в редакторе их не находило
+  'rings', 'pots', 'yardcars', 'yardmaze', 'yardcurbs', 'yarddecor', 'courts', 'jumps', 'yardfill', 'yardcars2']);
 const ORIG = Math.random;
 let back = false;
 const mulberry = s => { let a = s >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
@@ -161,6 +229,26 @@ if (OURS) {
     if (SEEDED.has(name.split('#')[0])) seedOn(name); else Math.random = ORIG;
   };
 }
+/** game.js osmBuildings: каждый дом — своим жребием по номеру (b.id), houseRnd(null) после всех домов — снова жребий города.
+    Так у дома окна, арка, подъезды зависят только от него самого: правка этажей или мурала, убранный дом
+    не сдвигают соседей (раньше дома тянули один общий жребий по порядку) */
+let CITY_RND = null;
+export function houseRnd (b) {
+  if (!OURS) return;
+  if (b) {
+    if (!CITY_RND) CITY_RND = Math.random;
+    Math.random = mulberry(hashName('house:' + (b.id !== undefined ? b.id : b.p[0][0] + ',' + b.p[0][1])));
+  } else if (CITY_RND) { Math.random = CITY_RND; CITY_RND = null; }
+}
+/** то же для мелочи у подъездов (game.js: лавочка у двери, кусты и урна у подъезда): жребий по месту двери, seedBack() —
+    после цикла снова жребий куска. Убранный дом (его подъездов нет) не сдвигает кусты и урны у остальных */
+let AT_RND = null;
+export function seedAt (tag, x, z) {
+  if (!OURS) return;
+  if (!AT_RND) AT_RND = Math.random;
+  Math.random = mulberry(hashName(tag + ':' + Math.round(x * 10) + ',' + Math.round(z * 10)));
+}
+export function seedBack () { if (AT_RND) { Math.random = AT_RND; AT_RND = null; } }
 /** game.js buildCity: сразу видимая часть города (дома, дороги…) — тоже с зерном; buildEnd() — после неё */
 export function buildStart () { if (OURS) seedOn('city'); }
 export function buildEnd () { if (OURS) Math.random = ORIG; }
@@ -376,4 +464,4 @@ export function itemsNear (x, z, r) {
   return out;
 }
 
-export const DEBUG = { ED, STATS, BOXES, KINDS, REMOVABLE, LAZY, R_MATCH, get edits () { return EDITS(); }, match, hits, setLive, hideNow, showNow, hideMany, showMany, itemsNear, PROV, TREES };
+export const DEBUG = { ED, STATS, BOXES, KINDS, REMOVABLE, LAZY, R_MATCH, HOUSES, HOUSE_LV, get edits () { return EDITS(); }, match, hits, setLive, hideNow, showNow, hideMany, showMany, itemsNear, PROV, TREES };

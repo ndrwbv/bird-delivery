@@ -86,12 +86,12 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 
 /* заборы и лавочки для пина: отрезок каждой вещи в сетке по 10 м */
-const CELL = 10, GRID = new Map();
+const CELL = 10, GRID = new Map(), gk = (i, j) => (i + 32768) * 65536 + j + 32768;   // ключ клетки — число (23.10.2026: было строкой)
 function gridAdd (it) {
   const x0 = Math.floor((Math.min(it.ax, it.bx) - 1) / CELL), x1 = Math.floor((Math.max(it.ax, it.bx) + 1) / CELL);
   const z0 = Math.floor((Math.min(it.az, it.bz) - 1) / CELL), z1 = Math.floor((Math.max(it.az, it.bz) + 1) / CELL);
   for (let i = x0; i <= x1; i++) for (let j = z0; j <= z1; j++) {
-    const k = i + ',' + j;
+    const k = gk(i, j);
     let a = GRID.get(k);
     if (!a) GRID.set(k, a = []);
     a.push(it);
@@ -105,7 +105,7 @@ const segD = (x, z, ax, az, bx, bz) => {
 
 /* стоит ли целый заборчик или лавочка ближе r к точке — для пина (game.js pinRay / pinFree) */
 export function blocks (x, z, r) {
-  const a = GRID.get(Math.floor(x / CELL) + ',' + Math.floor(z / CELL));
+  const a = GRID.get(gk(Math.floor(x / CELL), Math.floor(z / CELL)));
   if (!a) return false;
   for (let i = 0; i < a.length; i++) {
     const it = a[i];
@@ -120,7 +120,7 @@ export function each (x0, z0, x1, z1, fn) {
   const seen = new Set();
   for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL); i++)
     for (let j = Math.floor(z0 / CELL); j <= Math.floor(z1 / CELL); j++) {
-      const a = GRID.get(i + ',' + j);
+      const a = GRID.get(gk(i, j));
       if (a) for (const it of a) if (!it.down && !seen.has(it)) { seen.add(it); fn(it); }
     }
 }
@@ -229,22 +229,26 @@ export function* steps (A) {
      улице с концов, потом — веером из концов и каждых LINK.EVERY м; берём самый короткий. */
   const L = YARD.LINK;
   // чужие заборы (как fenceNear в game.js, только своей сеткой — луч спрашивает сотни тысяч раз)
-  const FG = new Map();
+  // (23.10.2026) забор — во все клетки, которые задевает его круг с запасом FR (вопрос — с r ≤ FR): вопрос — одна клетка,
+  // ключ — число (было: 9 клеток со строковым ключом; ответ тот же — забор дальше r + его радиус не считается и так)
+  const FG = new Map(), FR = 0.9, fk = (i, j) => (i + 32768) * 65536 + j + 32768;
   for (const it of A.SMASH || []) {
     if ((it.kind !== 'fence' && it.kind !== 'bigfence') || it.rshop || it.down) continue;
     const x = it.x ?? it.x0, z = it.z ?? it.z0;
     if (!Number.isFinite(x) || !Number.isFinite(z)) continue;
-    const k = Math.floor(x / CELL) + ',' + Math.floor(z / CELL);
-    let q = FG.get(k);
-    if (!q) FG.set(k, q = []);
-    q.push(x, z, Math.min(it.r || 1, 1.3));
+    const fr = Math.min(it.r || 1, 1.3), e = fr + FR;
+    for (let i = Math.floor((x - e) / CELL); i <= Math.floor((x + e) / CELL); i++)
+      for (let j = Math.floor((z - e) / CELL); j <= Math.floor((z + e) / CELL); j++) {
+        const k = fk(i, j);
+        let q = FG.get(k);
+        if (!q) FG.set(k, q = []);
+        q.push(x, z, fr);
+      }
   }
   const fencedFast = A.SMASH ? (x, z, r) => {
-    const ci = Math.floor(x / CELL), cj = Math.floor(z / CELL);
-    for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
-      const q = FG.get(i + ',' + j);
-      if (q) for (let k = 0; k < q.length; k += 3) { const dx = q[k] - x, dz = q[k + 1] - z, rr = r + q[k + 2]; if (dx * dx + dz * dz < rr * rr) return true; }
-    }
+    if (r > FR) return fenced(x, z, r);
+    const q = FG.get(fk(Math.floor(x / CELL), Math.floor(z / CELL)));
+    if (q) for (let k = 0; k < q.length; k += 3) { const dx = q[k] - x, dz = q[k + 1] - z, rr = r + q[k + 2]; if (dx * dx + dz * dz < rr * rr) return true; }
     return false;
   } : fenced;
   const blocked = (x, z) => A.groundH(x, z) < 0.3 || A.inHouse(x, z, 0.6) || fencedFast(x, z, 0.9) ||

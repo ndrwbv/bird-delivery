@@ -100,6 +100,10 @@ export function cabin (g, add, k) {
   const q = Math.min(1, gh / 0.42), dx = W * 0.22, by = gb - 0.1;   // сидит пониже: сверху-сбоку голову не прячет верх рамы
   const Dv = k.drv, DB = Dv && k.drvAdd ? (w, h, d, hex, x, y, z) => k.drvAdd(new THREE.BoxGeometry(w, h, d), hex, x, y, z) : B;
   const JK = Dv ? Dv.shirt : '#f0522a', SK = Dv ? Dv.skin : '#e2b48c';
+  // чужая без водителя (стоящая у бордюра, во дворе, на стоянке — пустая; 0п39, 24.10.2026): до 24.10 тут садился курьер
+  // в оранжевой куртке — ударил стоящую, а в ней человек
+  const nobody = !Dv && !!k.drvAdd;
+  if (!nobody) {
   DB(0.42 * q, 0.2 * q, 0.26 * q, JK, dx, by + 0.1 * q, dz);                             // плечи
   DB(0.2 * q, 0.19 * q, 0.2 * q, SK, dx, by + 0.29 * q, dz + 0.01);                      // голова
   if (Dv) DB(0.21 * q, 0.05 * q, 0.21 * q, Dv.hair, dx, by + 0.4 * q, dz - 0.01);        // волосы
@@ -108,6 +112,7 @@ export function cabin (g, add, k) {
     B(0.2 * q, 0.025 * q, 0.11 * q, '#c93f1f', dx, by + 0.39 * q, dz + 0.15 * q);        // козырёк
   }
   for (const s of [-1, 1]) DB(0.07 * q, 0.07 * q, 0.3 * q, JK, dx + s * 0.15 * q, by + 0.14 * q, dz + 0.17 * q);   // руки
+  }
   B(0.26 * q, 0.26 * q, 0.03, '#1b1a1f', dx, by + 0.17 * q, dz + 0.36 * q);              // руль
 
   // стёкла: четыре квадрата одним мешем (вершины и UV на стекло — 4 подряд)

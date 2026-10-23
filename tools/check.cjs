@@ -1,11 +1,14 @@
-/* npm run check — общие проверки перед сдачей, 1—2 минуты. Таблица в конце, код выхода 1 при провале.
+/* npm run check — общие проверки перед сдачей, ~3 минуты (3 проверки в игре разом). Таблица в конце, код выхода 1 при провале.
    npm run check -- --rebuild   собрать заново, даже если сборки свежие
    npm run check -- --only=orders,smoke   только эти проверки (по началу id)
-   npm run check -- --serial    дымовые прогоны по очереди (по умолчанию — разом: быстрее,
-                                но время кадра чуть хуже, чем у одного)
+   npm run check -- --serial    проверки в игре — по одной (по умолчанию — по JOBS разом)
+   npm run check -- --jobs=N    сколько проверок в игре разом (по умолчанию: ядер / 3, от 1 до 3)
 
    Новая проверка — элемент CHECKS: { id, name, group, run: async () => ({ status, info }) },
-   status — 'ok' | 'warn' | 'fail'. Проверки одной group идут параллельно, группы — по очереди.
+   status — 'ok' | 'warn' | 'fail'. Группы — по очереди; проверки группы 1 (сборки, тексты) — разом, в игре (группа 2 и
+   дальше) — не больше JOBS разом (23.10.2026: по ~10 Электронов сразу на загруженной машине «время вышло» у ghosts,
+   ped-solid, osk-repeat — по одной они зелёные). Время и тайм-аут проверки — от её собственного старта, не от группы;
+   долгие (поле w, с) — первыми.
    Скрипт в игре — через probe(args) (tools/probe.cjs, отчёт JSON). */
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -126,7 +129,9 @@ const CHECKS = [
     if (e || !r) return { status: 'fail', info: e || 'нет результата' };
     const info = `поставить ${r.add}, убрать ${r.remove}` + (r.missing.length ? '; нет в городе: ' + JSON.stringify(r.missing) : '') + (r.still.length ? '; не убрано: ' + JSON.stringify(r.still) : '')
       + (r.refused.length ? '; игра не поставила (место): ' + JSON.stringify(r.refused) : '') + (r.stale.length ? '; «убрать» ничего не нашло (город поменялся?): ' + JSON.stringify(r.stale) : '');
-    return { status: !r.ok ? 'fail' : (r.refused.length || r.stale.length) ? 'warn' : 'ok', info };
+    const H = r.houses || { n: 0, bad: [], noMural: [], unknown: [] };
+    const hinfo = H.n ? `; домов ${H.n}` + (H.bad.length ? ', не так: ' + JSON.stringify(H.bad) : '') + (H.noMural.length ? ', мурал не встал: ' + JSON.stringify(H.noMural) : '') + (H.unknown.length ? ', нет в карте: ' + JSON.stringify(H.unknown) : '') : '';
+    return { status: !r.ok ? 'fail' : (r.refused.length || r.stale.length || H.noMural.length || H.unknown.length) ? 'warn' : 'ok', info: info + hinfo };
   } },
   { id: 'pave', name: 'заборчики и конструкции не на тротуарах', group: 2, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/pave-props.js')]);
@@ -150,6 +155,18 @@ const CHECKS = [
     return { status: r.ok ? 'ok' : r.bad || r.pieces > 20 ? 'fail' : 'warn', info: `пустых кусков ${r.pieces} (${r.m2} м²); поставлено ${r.things}: ${pl}; деревьев ${r.trees}, кустов ${r.bushes}, сборка ${r.buildMs} мс; на мощёном и в доме ${r.bad}` +
       (r.pieces ? ': ' + JSON.stringify(r.list.slice(0, 4)) : '') + (r.bad ? ' ' + JSON.stringify(r.by) + ' ' + JSON.stringify(r.sample) : '') };
   } },
+  /* край газона у дороги без бордюра (11ц, 24.10.2026, curbs.js; docs/CAREER.md «Бордюр у дорог и проездов»): по краям улиц, проездов
+     и пешеходок шагом 1 м — газон за краем, а бордюра (поднятого тротуара или камня) нет; перекрёстки, зебры, узкие полоски — не в счёт.
+     Было (?oldcurbs): проезды 82,8 км из 212, улицы 6,5 из 236 */
+  { id: 'curbgap', name: 'край газона у дороги — с бордюром', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/curb-gaps.js')]);
+    const e = errLine(j), r = j.result;
+    if (e || !r) return { status: 'fail', info: e || 'нет результата' };
+    if (r.err) return { status: 'fail', info: r.err };
+    const km = m => (m / 1000).toFixed(1);
+    return { status: r.ok ? 'ok' : 'fail', info: `край газона: улицы ${km(r.lawn.street)} км, проезды ${km(r.lawn.drive)} км; без бордюра — улицы ${r.bare.street} м, проезды ${r.bare.drive} м (пешеходки ${r.bare.foot} м; ` +
+      `не в счёт: перекрёстки ${km(r.skip.junction)} км, зебры ${km(r.skip.zebra)} км, полоски ${km(r.skip.strip)} км); камня ${km(r.curbs.m)} км, сборка ${r.curbs.ms} мс` + (r.ok ? '' : ': ' + JSON.stringify(r.sample.slice(0, 4))) };
+  } },
   { id: 'routehouse', name: 'маршрут навигатора не сквозь дома', group: 2, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/route-house.js')]);
     const e = errLine(j), r = j.result;
@@ -166,7 +183,7 @@ const CHECKS = [
       `прямая через двор перекрыта у ${r.lineCut} из ${r.pairs}; заборы ${m.solidM} м твёрдых / ${m.smashM} м сбиваемых, клумб ${m.beds}, кустов ${m.hedges}, лесочков ${m.groves}` +
       (r.ok ? '' : ': ' + JSON.stringify({ none: r.none_at, thru: r.thru_at })) };
   } },
-  { id: 'ghosts', name: 'машины не призраки и твёрдые, лось не сквозь', group: 2, run: async () => {
+  { id: 'ghosts', w: 60, name: 'машины не призраки и твёрдые, лось не сквозь', group: 2, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/ghost-cars.js')]);
     const e = errLine(j), r = j.result;
     if (e || !r) return { status: 'fail', info: e || 'нет результата' };
@@ -177,10 +194,23 @@ const CHECKS = [
       r.solid.filter(s => s.pass).map(s => ' · ' + s.k + ': ' + JSON.stringify(s)).join('');
     return { status: !r.ok ? 'fail' : r.unexplained ? 'warn' : 'ok', info };
   } },
+  /* машина о машину (0п38, 24.10.2026, carhit.js, docs/CAREER.md «Машина о машину»): отброшенная ударом (у бордюра, во дворе,
+     поток) и толкнутая курьером стоящая — не заходит в кузов другой глубже 5 см; та, в которую попали, сдвинута или помята.
+     Было (CHIT.CH.on = false): 1,5—2,8 м внутри соседней, ~175 кадров из 180 */
+  { id: 'carhit', w: 45, name: 'машина о машину: не сквозь, мнутся обе', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/car-hit.js'), '--seed=7']);   // город с зерном: ряды стоящих у бордюра — одни и те же
+    const e = errLine(j), r = j.result;
+    if (e || !r || !r.runs) return { status: 'fail', info: e || 'нет результата' };
+    const f = q => q.none ? 'нет пары' : `${q.maxPen} м (${q.badFrames} кадров)` + (q.bMoved !== undefined ? `, соседнюю сдвинуло ${q.bMoved} м, помята ${q.bDmg}` : '');
+    const ks = [...new Set(r.runs.map(q => q.k))];
+    const info = ks.map(k => { const o = r.runs.find(q => q.k === k && !q.on), n = r.runs.find(q => q.k === k && q.on); return `${k}: было ${o ? f(o) : '—'} → стало ${n ? f(n) : '—'}`; }).join('; ');
+    return { status: r.ok ? 'ok' : 'fail', info };
+  } },
   /* люди не сквозь твёрдое (0п1, 23.10.2026, pedcollide.js, docs/CAREER.md «Люди и твёрдое»): 45 с смены на автопилоте — сколько
      раз человек оказался внутри дома, твёрдого или кузова (было: 4—6 за 45—150 с, 0,2—0,5 % замеров внутри; бургер в доме, в машине,
-     гость под твоей машиной); паника у стены, катящаяся машина, стоящая машина и коробка-«гараж» поперёк тротуара */
-  { id: 'ped-solid', name: 'люди не сквозь стены и машины, машина толкает людей', group: 2, run: async () => {
+     гость под твоей машиной); паника у стены, катящаяся машина, стоящая машина и коробка-«гараж» поперёк тротуара; ударил машину
+     в толпу (0п31, 24.10.2026) — ни разу не внутри её кузова (было 60—70 кадров: упавший лежал, машина ехала сквозь) */
+  { id: 'ped-solid', w: 60, name: 'люди не сквозь стены и машины, машина толкает людей', group: 2, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/ped-solid.js')]);
     const e = errLine(j), r = j.result;
     if (e || !r) return { status: 'fail', info: e || 'нет результата' };
@@ -188,7 +218,8 @@ const CHECKS = [
     const t = (o, ok, bad) => !o ? 'не нашлось' : o.ok ? ok : bad;
     const info = `${r.gameSecs} с смены, ${r.samples} замеров: вошли внутрь ${r.entries} раз (${kinds}), внутри ${r.insidePct} % замеров; ` +
       `паника у стены: ${t(r.panic, 'отбежал на ' + (r.panic && r.panic.moved) + ' м', 'В СТЕНУ')}; катящаяся машина: ${t(r.roll, r.roll && r.roll.hit, 'СКВОЗЬ')}; ` +
-      `стоящая поперёк тротуара: ${t(r.parked, 'обошёл', 'СКВОЗЬ')}; коробка поперёк: ${t(r.box, 'развернулся', 'СКВОЗЬ')}` +
+      `стоящая поперёк тротуара: ${t(r.parked, 'обошёл', 'СКВОЗЬ')}; коробка поперёк: ${t(r.box, 'развернулся', 'СКВОЗЬ')}; ` +
+      `удар машиной в толпу: ${t(r.crowd, 'сбито ' + (r.crowd && r.crowd.down) + ' из ' + (r.crowd && r.crowd.people) + ', внутри 0', 'внутри кузова ' + (r.crowd && r.crowd.inside) + ' раз, сбито ' + (r.crowd && r.crowd.down))}` +
       (r.entries ? ' · ' + JSON.stringify(r.sample) : '') + (r.stuck && r.stuck.length ? ' · застряли: ' + JSON.stringify(r.stuck) : '');
     return { status: r.ok ? 'ok' : 'fail', info };
   } },
@@ -197,7 +228,7 @@ const CHECKS = [
      сколько всплывающего видно сразу (чек оплаты, реплика, новое сообщение чата, тост, грамота, задание, подсказка, таблица).
      Двух сразу — 0; было до очереди: 4—9 раз за 3 мин (до трёх сразу) */
   // группа 3 (с дымовыми), не 2: рядом с «призраками» под нагрузкой лось не успевал боднуть машину
-  { id: 'notify-one', name: 'одно уведомление за раз', group: 3, run: async () => {
+  { id: 'notify-one', w: 75, name: 'одно уведомление за раз', group: 3, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/notify-one.js'), '--q=nsecs=60&nshift=6&ntp=6'], 150);
     const e = errLine(j), r = j.result;
     if (e || !r) return { status: 'fail', info: e || 'нет результата' };
@@ -212,7 +243,7 @@ const CHECKS = [
   } },
   /* память на телефоне (11.10.2026, docs/AGENTS.md «Память на телефоне»): мобильный режим, меню → город достроен → 20 с смены.
      Порог — с запасом ~20 % над замером; было до правок: куча 706 / 822 МБ, след страницы пик 1477 МБ — вкладка Safari на iPhone умирала */
-  { id: 'memory-phone', name: 'память на телефоне: куча JS, видео, след страницы', group: 2, run: async () => {
+  { id: 'memory-phone', w: 50, name: 'память на телефоне: куча JS, видео, след страницы', group: 2, run: async () => {
     const LIM = { menu: 520, shift: 620, gl: 360, foot: 1450 };
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/memory.js'), '--mem', '--early', '--size=phone-land', '--q=msecs=20'], 220);
     const e = errLine(j), r = j.result;
@@ -226,14 +257,34 @@ const CHECKS = [
   } },
   /* экранная клавиатура Стима (23.10.2026, 0ав: на Деке одна буква — 10 раз): автоповтор с флагом и парой «отпустил — нажал»,
      зажатая клавиша, вставка без нажатий — одна буква; «Анна» пальцем — как есть (docs/CAREER.md «Экранная клавиатура Стима») */
-  { id: 'osk-repeat', name: 'экранная клавиатура Стима: одно нажатие — одна буква', group: 2, run: async () => {
+  { id: 'osk-repeat', w: 40, name: 'экранная клавиатура Стима: одно нажатие — одна буква', group: 2, run: async () => {
     const j = await probe(['--mode=steam', '--q=mock-steam=deck', '--eval=' + path.join(__dirname, 'probe-checks/osk-repeat.js')], 120);
     const e = errLine(j), r = j.result;
     if (e || !r) return { status: 'fail', info: e || 'нет результата' };
     return { status: r.bad.length ? 'fail' : 'ok', info: r.bad.length ? r.bad.join('; ') : '7 сценариев × наша клавиатура и клавиатура Стима — ок' };
   } },
-  { id: 'smoke-adult', name: '30 с автопилота: взрослая (web)', group: 3, run: smoke(['--mode=web'], 'взрослая') },
-  { id: 'smoke-phone', name: '30 с автопилота: телефон боком (web)', group: 3, run: smoke(['--size=phone-land'], 'телефон') },
+  /* руль на телефоне не залипает (0п44, автор 24.10.2026: «перестал крутиться руль на мобиле»): держишь руль → окно разговора,
+     пауза, уведомления, вкладка в фоне, фокус, поворот экрана, три пальца → отпустил (обычно / потерялось / отменено) → руль
+     снова слушается; поверх руля и педалей ничего; палец у руля — руль, не «осмотреться» (docs/CAREER.md «Управление на телефоне») */
+  { id: 'touchwheel', w: 40, name: 'руль на телефоне не залипает', group: 2, run: async () => {
+    const j = await probe(['--size=phone-land', '--sa=59,21', '--eval=' + path.join(__dirname, 'probe-checks/touchwheel.js')], 200);
+    const e = errLine(j), r = j.result;
+    if (e || !r) return { status: 'fail', info: e || 'нет результата' };
+    const n = Object.keys(r.rows || {}).length;
+    return { status: r.bad.length ? 'fail' : 'ok', info: r.bad.length ? r.bad.slice(0, 6).join('; ') + (r.bad.length > 6 ? ` … и ещё ${r.bad.length - 6}` : '') : `${n} сценариев (7 помех × 4 отпускания), три пальца, палец у руля — ок` };
+  } },
+  /* Новый год: полночь — событие, смена кончается только в пиццерии (0п45, автор 24.10.2026: «Новый год посреди возвращения
+     закончил смену»): полночь застаёт с заказом, на обратном пути, с накладной и на погрузке вдали от пиццерии — смена идёт,
+     пока не вернёшься; в полночь — залп салюта и «с Новым годом» в чате (docs/CAREER.md «Полночь», «Праздники») */
+  { id: 'nymidnight', w: 60, name: 'Новый год: смена кончается в пиццерии, не посреди дороги', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/nymidnight.js')], 420);
+    const e = errLine(j), r = j.result;
+    if (e || !r) return { status: 'fail', info: e || 'нет результата' };
+    const rows = Object.entries(r.rows || {}).map(([k, v]) => `${k} ${v.at} → конец в ${v.endD == null ? '—' : v.endD + ' м'}`).join('; ');
+    return { status: r.bad.length ? 'fail' : r.warn.length ? 'warn' : 'ok', info: [...r.bad, ...r.warn].join('; ') || rows };
+  } },
+  { id: 'smoke-adult', w: 40, name: '30 с автопилота: взрослая (web)', group: 3, run: smoke(['--mode=web'], 'взрослая') },
+  { id: 'smoke-phone', w: 40, name: '30 с автопилота: телефон боком (web)', group: 3, run: smoke(['--size=phone-land'], 'телефон') },
   { id: 'smoke-crashlog', name: 'журнал ошибок пуст после дымовых', group: 4, run: async () => (
     CRASHES.length ? { status: 'fail', info: CRASHES.length + ' записей:\n' + CRASHES.map(l => '    ' + l).join('\n') } : { status: 'ok', info: 'пуст' }) },
   // детская версия и сборка Яндекса — только по явной просьбе автора (Яндекс собираем по нужде)
@@ -254,11 +305,18 @@ const CHECKS = [
     return row;
   };
   const groups = [...new Set(list.map(c => c.group))].sort((a, b) => a - b);
+  const JOBS = has('serial') ? 1 : Math.max(1, +arg('jobs', 0) || Math.min(3, Math.floor(os.cpus().length / 3)));
+  // не больше n разом: следующая — когда освободилось место; долгие — первыми (меньше ждать хвоста группы)
+  const pool = async (cs, n) => {
+    const q = cs.slice().sort((a, b) => (b.w || 0) - (a.w || 0));
+    await Promise.all(Array.from({ length: Math.min(n, q.length) }, async () => { while (q.length) await runOne(q.shift()); }));
+  };
+  process.stderr.write(`  проверок в игре разом: ${JOBS}\n`);
   for (const g of groups) {
     const cs = list.filter(c => c.group === g);
     // сборки упали — в игре проверять нечего
     if (g > 1 && rows.some(r => r.id.startsWith('build') && r.status === 'fail')) { for (const c of cs) rows.push({ ...c, status: 'fail', info: 'не запускалась: сборка упала', ms: 0 }); continue; }
-    if (has('serial') && g === 3) { for (const c of cs) await runOne(c); } else await Promise.all(cs.map(runOne));
+    await pool(cs, g === 1 ? cs.length : JOBS);
   }
   rows.sort((a, b) => list.indexOf(list.find(c => c.id === a.id)) - list.indexOf(list.find(c => c.id === b.id)));
   const W = Math.max(...rows.map(r => r.name.length));

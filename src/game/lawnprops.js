@@ -40,7 +40,10 @@ import { onPave, walkHalf, roadGap } from './pave.js';
 const LAWN_EXTRA = s => (s.c > 5 ? 0.8 : 1.0);
 import { wet } from './streams.js';             // речки и пруды — не газон (streams.js)
 import * as FADEJS from './fade.js';
-import * as EDL from './editlayer.js';          // редактор города: убранная мелочь (edits.json, вид lawn; ключ — место вещи)
+import { WTREES } from './wintertrees.data.js';  // зимние деревья дворов — те же модели, что у деревьев города (trees.js)
+import { TREE as TREEC } from './trees.js';
+import * as EDL from './editlayer.js';
+import * as FVAR from './fencevar.js';          // варианты оградок газона: вид, краска, износ по району (fencevar.js, М5)          // редактор города: убранная мелочь (edits.json, вид lawn; ключ — место вещи)
 
 export const LAWN = {
   CELL: 40, STEP: 4, DROP: 120,
@@ -57,11 +60,15 @@ export const LAWN = {
   SLOW: 2.5, SNOW: 0.35,
   FADE: 22, FADE_S: 14, FADE_LAG: 6,         // рост из земли у края дальности: полоса крупного / мелкого, запас, м (fade.js)
   CAPS: { grass: 7000, dand: 3000, weed: 2500, burdock: 1500, tall: 5000, reed: 5000, hog: 2500,
-    rail: 1500, tire: 1200, flower: 1200, shell: 300, sand: 200, cube: 7000, lit: 4000, bottle: 2000, ytrunk: 1600, ycrown: 2600 },
+    rail: 1500, tire: 1200, flower: 1200, shell: 300, sand: 200, cube: 7000, lit: 4000, bottle: 2000, ytrunk: 1600, ycrown: 2600, ywin: 1200, ywinb: 700 },
 };
 const SMALL = { grass: 1, dand: 1, lit: 1, bottle: 1 };                          // ближе R_SMALL
 const BEND = { grass: 1, dand: 1, weed: 1, burdock: 1, tall: 1, reed: 1, hog: 1, flower: 1 };
-const WINTER_OFF = { grass: 1, dand: 1, burdock: 1, flower: 1, lit: 1, bottle: 1, weed: 1, ycrown: 1 };   // + кроны и кусты дворов (yardfill.js): зимой голые   // зимой под снегом (бурьян у стен ~1,2 м — тоже, 0п12)
+const WINTER_OFF = { grass: 1, dand: 1, burdock: 1, flower: 1, lit: 1, bottle: 1, weed: 1, ycrown: 1, ytrunk: 1 };
+/* деревья дворов зимой (24.10.2026): вместо ствола с тремя палками — голая крона из Blender (wintertrees.data.js) со снегом
+   на ветках: ywinb — берёза, ywin — остальные (клён). Летом их нет (два меша, только когда рядом деревья дворов и снег) */
+const SUMMER_OFF = { ywin: 1, ywinb: 1 };
+if (typeof location !== 'undefined' && /[?&]nowt(&|$)/.test(location.search)) { delete WINTER_OFF.ytrunk; WINTER_OFF.ywin = WINTER_OFF.ywinb = 1; }   // ?nowt — по-старому (сравнить)   // + кроны и кусты дворов (yardfill.js): зимой голые   // зимой под снегом (бурьян у стен ~1,2 м — тоже, 0п12)
 /* заросли пустыря зимой (автор 23.10.2026, 0п12: «зимой высокая трава и камыши не растут»): под снегом, торчат только
    сухие верхушки у WINTER_TOP.KEEP самых высоких кустов (жребий по месту) — утоплены в снег на SINK м */
 const WINTER_TOP = { KEEP: 0.15, SINK: 1.35, KINDS: { tall: 1, reed: 1, hog: 1 } };
@@ -252,6 +259,52 @@ const Bx = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 const blade = (r, h, x, z, tx, tz, hex, seg = 3) => paint(new THREE.ConeGeometry(r, h, seg, 1, true).translate(0, h / 2, 0).rotateX(tx).rotateZ(tz).translate(x, 0, z), hex);
 const stalk = (w, h, x, z, tx, tz, hex) => paint(Bx(w, h, w).translate(0, h / 2, 0).rotateX(tx).rotateZ(tz).translate(x, 0, z), hex);
 const blob = (sx, sy, sz, x, y, z, hex, ry = 0, rx = 0) => paint(new THREE.IcosahedronGeometry(1, 0).scale(sx, sy, sz).rotateX(rx).rotateY(ry).translate(x, y, z), hex);
+/* оградка газона (секция 2,44 м вдоль x) — все виды в одной модели (fencevar.js, М5): у каждого куска — aPart
+   (x — вид; y — 1: рыжее пятно износа, свой цвет). Вид и износ экземпляра — в целой части его цвета
+   (r + 2·вид, g + 2·износ); лишние куски шейдер сжимает в точку (railMaterial) — один вызов на все виды, как было */
+function railGeo () {
+  const P = [];
+  // труба — коробка без торцов (торцы стыков не видно): 24 вершины вместо 36
+  const tube = (ax, ay, bx, by, w = 0.045) => {
+    const L = Math.hypot(bx - ax, by - ay), b = Bx(L + w * 0.6, w, w).toNonIndexed(), q = b.attributes.position.array.slice(36), g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(q, 3));
+    return g.rotateZ(Math.atan2(by - ay, bx - ax)).translate((ax + bx) / 2, (ay + by) / 2, 0);
+  };
+  const add = (g, shape, wear = 0, hex = '#ffffff') => { const p = paint(g, hex), n = p.attributes.position.count, a = new Float32Array(n * 2); for (let i = 0; i < n; i++) { a[i * 2] = shape; a[i * 2 + 1] = wear; } p.setAttribute('aPart', new THREE.BufferAttribute(a, 2)); P.push(p); };
+  const arcs = (shape, cs, R, H, seg) => {
+    for (const cx of cs) {
+      let px = cx + R, py = -0.1;
+      for (let k = 1; k <= seg; k++) {
+        const t = k / seg * Math.PI, nx = cx + Math.cos(t) * R, ny = k === seg ? -0.1 : Math.sin(t) * H + 0.05;
+        add(tube(px, py, nx, ny), shape);
+        px = nx; py = ny;
+      }
+    }
+  };
+  const spot = (shape, x, y, a, l = 0.16) => add(Bx(l, 0.056, 0.056).rotateZ(a).translate(x, y, 0), shape, 1, '#6e3a20');   // рыжее пятно поверх трубы
+  // 0 · дуги (как было): три дуги по 0,84 м
+  arcs(0, [-0.8, 0, 0.8], 0.42, 0.5, 7);
+  spot(0, -0.8, 0.55, 0); spot(0, 0.56, 0.36, 1.0); spot(0, 0.37, 0.2, -1.3, 0.12);
+  // 1 · колечки внахлёст: четыре дуги через 0,5 м — заходят друг на друга
+  arcs(1, [-0.75, -0.25, 0.25, 0.75], 0.42, 0.44, 4);
+  spot(1, -0.25, 0.49, 0); spot(1, 0.92, 0.3, -1.1, 0.12); spot(1, 0.4, 0.42, 0.5);
+  // 2 · рамка: стойки по краям и посередине, две трубы
+  for (const x of [-1.17, 0, 1.17]) add(tube(x, -0.15, x, 0.66, 0.05), 2);
+  for (const y of [0.62, 0.24]) add(tube(-1.16, y, 1.16, y), 2);
+  spot(2, -0.5, 0.62, 0, 0.22); spot(2, 0.7, 0.24, 0, 0.18); spot(2, 1.17, 0.45, 1.57, 0.14);
+  // 3 · зигзаг: две трубы, стойки по краям, между ними ломаная
+  for (const x of [-1.17, 1.17]) add(tube(x, -0.15, x, 0.6, 0.05), 3);
+  for (const y of [0.56, 0.1]) add(tube(-1.16, y, 1.16, y), 3);
+  for (let k = 0; k < 4; k++) { const x0 = -1.17 + k * 0.585, x1 = x0 + 0.585; add(tube(x0, k % 2 ? 0.56 : 0.1, x1, k % 2 ? 0.1 : 0.56, 0.035), 3); }
+  spot(3, 0.2, 0.56, 0, 0.2); spot(3, -0.9, 0.33, 0.66, 0.14); spot(3, 0.85, 0.1, 0, 0.16);
+  const g = merge(P);
+  let n = 0;
+  const a = new Float32Array(g.attributes.position.count * 2);
+  for (const p of P) { a.set(p.attributes.aPart.array, n * 2); n += p.attributes.position.count; }
+  g.setAttribute('aPart', new THREE.BufferAttribute(a, 2));
+  return g;
+}
+
 function geos () {
   const r = rng(1, 2, 9), G = {};
   // пучок травы ~0,7 м
@@ -294,18 +347,7 @@ function geos () {
     P.push(paint(new THREE.CylinderGeometry(0.5, 0.12, 0.14, 8).translate(0, 2.35, 0), '#efecd6'));
     for (const [x, z, h] of [[0.4, 0.1, 1.95], [-0.3, -0.3, 1.8]]) { P.push(stalk(0.025, h, x * 0.5, z * 0.5, z * 0.4, -x * 0.4, '#7a9a50')); P.push(paint(new THREE.CylinderGeometry(0.26, 0.07, 0.1, 7).translate(x, h + 0.02, z), '#f2efdc')); }
     G.hog = merge(P); }
-  // оградка из гнутых труб: 2,44 м вдоль x, три дуги
-  { const P = [];
-    for (const cx of [-0.8, 0, 0.8]) {
-      let px = cx + 0.42, py = -0.1;
-      for (let k = 1; k <= 7; k++) {
-        const t = k / 7 * Math.PI, nx = cx + Math.cos(t) * 0.42, ny = k === 7 ? -0.1 : Math.sin(t) * 0.5 + 0.05;
-        const L = Math.hypot(nx - px, ny - py);
-        P.push(paint(Bx(L + 0.03, 0.045, 0.045).rotateZ(Math.atan2(ny - py, nx - px)).translate((px + nx) / 2, (py + ny) / 2, 0), '#ffffff'));
-        px = nx; py = ny;
-      }
-    }
-    G.rail = merge(P); }
+  G.rail = railGeo();
   G.tire = merge([paint(new THREE.TorusGeometry(0.34, 0.12, 5, 12).rotateX(Math.PI / 2).translate(0, 0.07, 0), '#f2f2ec')]);
   { const P = [paint(new THREE.CylinderGeometry(0.24, 0.24, 0.1, 8).translate(0, 0.1, 0), '#5a4030')];
     ['#e04848', '#f2c230', '#b05ad0', '#f08a30', '#ffffff', '#e04848', '#f2c230'].forEach((hex, i) => {
@@ -334,6 +376,19 @@ function geos () {
       g.setAttribute('color', new THREE.BufferAttribute(c, 3)); g.deleteAttribute('uv'); P.push(g);
     }
     G.ycrown = merge(P); }
+  // зимой: модель голой кроны (части 0—3 и снег — цветом вершин), ужата до размера ycrown (верх ~5,7 м, ±2,4 м)
+  const wt = (name, sx, sy, col) => {
+    const D = WTREES[name], v = D.v, P = [];
+    for (const [part, snow, ix] of D.g) {
+      const a = new Float32Array(ix.length * 3);
+      for (let i = 0; i < ix.length; i++) { const q = ix[i] * 3; a[i * 3] = v[q] / 100 * sx; a[i * 3 + 1] = v[q + 1] / 100 * sy; a[i * 3 + 2] = v[q + 2] / 100 * sx; }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(a, 3));
+      P.push(paint(g, snow ? '#f0f4fa' : col[part]));
+    }
+    return merge(P);
+  };
+  G.ywin = wt('maple', 0.8, 0.84, TREEC.WINTER.COL.maple);
+  G.ywinb = wt('birchA', 0.95, 0.66, TREEC.WINTER.COL.birch);
   G.cube = merge([paint(Bx(1, 1, 1), '#ffffff')]);
   G.lit = G.cube;
   G.bottle = merge([paint(new THREE.CylinderGeometry(0.035, 0.035, 0.2, 6).translate(0, 0.1, 0), '#ffffff'),
@@ -371,6 +426,24 @@ function material (bend, small) {
   m.customProgramCacheKey = () => (bend ? 'lawnBendF' : 'lawnSolidF');
   return m;
 }
+/* оградки газона: вид и износ — в целой части цвета экземпляра (railGeo); куски чужого вида и пятна у неизношенной —
+   в точку (треугольники нулевой площади: вызов тот же, вершин втрое больше прежнего — ~1 600 на секцию) */
+function railMaterial () {
+  const m = material(false, false), base = m.onBeforeCompile;
+  m.onBeforeCompile = sh => {
+    base(sh);
+    sh.vertexShader = 'attribute vec2 aPart;\n' + sh.vertexShader
+      .replace('#include <color_vertex>', `#include <color_vertex>
+      vec2 fvSW = floor(instanceColor.rg * 0.5);
+      vColor.xyz = color.xyz * (instanceColor.xyz - vec3(fvSW * 2.0, 0.0));
+      if (aPart.y > 0.5) vColor.xyz = color.xyz;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+      { vec2 sw = floor(instanceColor.rg * 0.5);
+        if (abs(aPart.x - sw.x) > 0.5 || (aPart.y > 0.5 && sw.y < 0.5)) transformed = vec3(0.0); }`);
+  };
+  m.customProgramCacheKey = () => 'lawnRailF';
+  return m;
+}
 /* полоса роста: кончается FADE_LAG м до края (камера уходит до 5 м между пересборками) */
 function setFade (R, RS) {
   const e = LAWN.FADE_LAG;
@@ -380,7 +453,7 @@ function setFade (R, RS) {
 function makeMeshes () {
   const G = geos(), mats = { sb: material(true, true), bb: material(true, false), ss: material(false, true), bs: material(false, false) };
   for (const k in LAWN.CAPS) {
-    const cap = LAWN.CAPS[k], M = new THREE.InstancedMesh(G[k], mats[(SMALL[k] ? 's' : 'b') + (BEND[k] ? 'b' : 's')], cap);
+    const cap = LAWN.CAPS[k], M = new THREE.InstancedMesh(G[k], k === 'rail' ? railMaterial() : mats[(SMALL[k] ? 's' : 'b') + (BEND[k] ? 'b' : 's')], cap);
     M.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     M.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3).fill(1), 3);
     M.instanceColor.setUsage(THREE.DynamicDrawUsage);
@@ -657,6 +730,7 @@ function fillThing (cell, f) {
     const c = YT[f.t] || YT.birch, s = f.s, tall = f.t === 'poplar' ? 1.35 : f.t === 'birch' ? 1.12 : 1, wide = f.t === 'poplar' ? 0.7 : f.t === 'maple' ? 1.12 : 1;
     inst(cell, 'ytrunk', x, y0 - 0.05, z, f.a, s, s * tall, s, c[1], -1, r());
     inst(cell, 'ycrown', x, y0 - 0.05, z, f.a, s * wide, s * tall, s * wide, c[0], -1, r());
+    inst(cell, f.t === 'birch' ? 'ywinb' : 'ywin', x, y0 - 0.05, z, f.a, s * wide, s * tall, s * wide, '#ffffff', -1, 0);   // зимой — голая крона
     return;
   }
   if (f.k === 'shrub') {
@@ -771,8 +845,8 @@ function * rails (cell, inCell) {
     const rd = C[ri];
     for (const sd of [-1, 1]) {
       if (hsh(ri, sd, 51) > (rd.c === 4 ? LAWN.RAIL_YARD : LAWN.RAIL)) continue;
-      const hex = ['#3f7a4a', '#4f6fa8', '#e8e4d8', '#c9803a', '#a8463a'][Math.floor(hsh(ri, sd, 52) * 5)];
       const [ax, az] = rd.p[si - 1], [bx, bz] = rd.p[si], len = Math.hypot(bx - ax, bz - az);
+      const side = FVAR.rail(rd.p[0][0] + sd * 3.7, rd.p[0][1] - sd * 1.3, (ax + bx) / 2, (az + bz) / 2, ['#3f7a4a', '#4f6fa8', '#e8e4d8', '#c9803a', '#a8463a'][Math.floor(hsh(ri, sd, 52) * 5)]);   // вид и краска стороны — по району (fencevar.js)
       if (len < 14) continue;
       const ux = (bx - ax) / len, uz = (bz - az) / len, nx = -uz * sd, nz = ux * sd, off = walkHalf({ w: A.roadWidth(rd), c: rd.c, g: rd.g }) + 0.5;   // за тротуаром, по краю газона
       const ry = Math.atan2(-uz, ux);
@@ -787,8 +861,11 @@ function * rails (cell, inCell) {
           sp = null;
         }
         if (!sp || !inCell(x, z) || nearEnt(x, z, 5)) continue;
-        const own = item(cell, 'rail', [[x - ux * 0.8, z - uz * 0.8, 0.5], [x + ux * 0.8, z + uz * 0.8, 0.5]], hex);
-        inst(cell, 'rail', x, sp.y, z, ry, 1, 1, 1, hex, own, hsh(x, z, 53));
+        const sec = FVAR.railSec(x, z, side);          // износ секции: ржавая, облупленная, погнутая
+        const own = item(cell, 'rail', [[x - ux * 0.8, z - uz * 0.8, 0.5], [x + ux * 0.8, z + uz * 0.8, 0.5]], sec.hex, { v: side.shape * 10 + sec.wear + (sec.lean ? 2 : 0) });
+        inst(cell, 'rail', x, sp.y, z, ry, 1, 1, 1, sec.hex, own, hsh(x, z, 53), sec.lean);
+        const t = cell.L.rail[cell.L.rail.length - 1];
+        t[7] += 2 * side.shape; t[8] += 2 * sec.wear;   // вид и износ — в целой части цвета (railMaterial)
       }
     }
   }
@@ -889,6 +966,7 @@ function refresh (cam) {
   for (const [d, c] of vis) {
     for (const k in c.L) {
       if (SEA.winter && WINTER_OFF[k]) continue;
+      if (!SEA.winter && SUMMER_OFF[k]) continue;
       if (k === 'dand' && !SEA.dand) continue;
       if (SMALL[k] && d > RS + F.CELL * 0.71) continue;
       const src = c.L[k], M = MESH[k], cap = M.instanceMatrix.count;

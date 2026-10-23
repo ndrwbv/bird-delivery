@@ -16,12 +16,16 @@
    Переменных игры модуль не видит — всё приходит в init.
    ────────────────────────────────────────────────────────────────────────── */
 
+import { unwind } from './routechain.js';
+
 let A = null;
-export const CFG = { off: false };              // отладка: true — по-старому (замер до/после)
+export const CFG = { off: false, norc: false };  // отладка: off — по-старому (замер до/после); norc — без цепочек (сравнить пути)
 export const STATS = { calls: 0, ok: 0, same: 0, fail: 0, ms: 0, max: 0, cut: 0, edges: 0, pops: 0, wall: 0, jump: 0, warmed: 0, at: [] };   // wall — кадров «упёрся в стену», jump — перенос на улицу (game.js svcWall)
 let G = null, PR = null, SG = null, HK = [], HV = [], gen = 0;
 
-/* api: { NODES, edgeOf(a, b), segCut(ax, az, bx, bz) — режет дом?, DRIVE_MAX } */
+/* api: { NODES, edgeOf(a, b), segCut(ax, az, bx, bz) — режет дом?, DRIVE_MAX, RC — цепочки узлов (routechain.js, только с ?smooth;
+   нет — поиск по узлам, как был) } */
+let PO = null;
 export function init (api) { A = api; }
 
 function push (k, v) {
@@ -120,10 +124,20 @@ export function route (r0, r1) {
     SG[k] = gen; G[k] = g; PR[k] = p;
     push(g + h(k), k);
   };
-  relax(s0.na, Math.hypot(N[s0.na].x - r0.x, N[s0.na].z - r0.z), -1);
-  relax(s0.nb, Math.hypot(N[s0.nb].x - r0.x, N[s0.nb].z - r0.z), -1);
+  const RC = CFG.norc ? null : A.RC;
+  if (RC && (!PO || PO.length !== n)) PO = new Array(n).fill(null);
+  const relaxC = (k, g, p, o) => {
+    if (SG[k] === gen && G[k] <= g) return;
+    SG[k] = gen; G[k] = g; PR[k] = p; PO[k] = o;
+    push(g + h(k), k);
+  };
+  if (RC) { relaxC(s0.na, Math.hypot(N[s0.na].x - r0.x, N[s0.na].z - r0.z), -1, null); relaxC(s0.nb, Math.hypot(N[s0.nb].x - r0.x, N[s0.nb].z - r0.z), -1, null); }
+  else {
+    relax(s0.na, Math.hypot(N[s0.na].x - r0.x, N[s0.na].z - r0.z), -1);
+    relax(s0.nb, Math.hypot(N[s0.nb].x - r0.x, N[s0.nb].z - r0.z), -1);
+  }
   const ta = s1.na, tb = s1.nb;
-  let best = Infinity, bn = -1, pops = 0;
+  let best = Infinity, bn = -1, pops = 0, via = null;
   while (HK.length) {
     const u = pop(), g = G[u];
     if (TOP > g + h(u) + 1e-6) continue;           // устаревшая запись
@@ -131,9 +145,37 @@ export function route (r0, r1) {
     pops++;
     if (u === ta || u === tb) {
       const c = g + Math.hypot(N[u].x - ex, N[u].z - ez);
-      if (c < best) { best = c; bn = u; }
+      if (c < best) { best = c; bn = u; via = null; }
     }
     const U = N[u];
+    if (RC) {
+      // плавные улицы: по цепочкам узлов с двумя соседями разом (routechain.js), проверки — на каждом куске, как ниже
+      for (const o of RC.OUT[u]) {
+        if (o.c < 0) {
+          const v = o.to, W = N[v], e = o.e;
+          if ((W.out || W.lock) && v !== ta && v !== tb) continue;
+          if (!e || e.closed || e.c > MAXC || cuts(e, u, v)) continue;
+          relaxC(v, g + e.len, u, null);
+          continue;
+        }
+        const S = RC.SEQ[o.c], E = o.dir > 0 ? RC.EF[o.c] : RC.EB[o.c];
+        let pv = u, gg = g, ok = true;
+        for (let k = o.p0 + o.dir; ; k += o.dir) {
+          const v = S[k], W = N[v], e = E[o.dir > 0 ? k - 1 : k];
+          if ((W.out || W.lock) && v !== ta && v !== tb) { ok = false; break; }
+          if (!e || e.closed || e.c > MAXC || cuts(e, pv, v)) { ok = false; break; }
+          gg += e.len;
+          if (k === o.end) break;
+          if (v === ta || v === tb) {                               // конец куска цели — внутри цепочки
+            const c = gg + Math.hypot(W.x - ex, W.z - ez);
+            if (c < best) { best = c; bn = v; via = { u, o, q: k }; }
+          }
+          pv = v;
+        }
+        if (ok) relaxC(o.to, gg, u, o);
+      }
+      continue;
+    }
     for (const v of U.nb) {
       const W = N[v];
       if ((W.out || W.lock) && v !== ta && v !== tb) continue;   // за линию закрытого города и в закрытый район не ведём
@@ -146,10 +188,11 @@ export function route (r0, r1) {
   const ms = performance.now() - t0;
   STATS.ms += ms; STATS.max = Math.max(STATS.max, ms); STATS.pops = Math.max(STATS.pops, pops);
   if (bn < 0) { STATS.fail++; return null; }
+  STATS.ok++;
+  if (RC) return unwind(RC, PR, PO, bn, via).map(k => N[k]);
   const out = [];
   for (let k = bn; k !== -1; k = PR[k]) out.push(N[k]);
   out.reverse();
-  STATS.ok++;
   return out;
 }
 

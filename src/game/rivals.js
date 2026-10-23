@@ -883,7 +883,7 @@ function mascotGeos () {
   P(o, bx(0.7, 0.45, 0.6), '#1d3b2c', 0, 0.82, 0.0);
   for (const s of [-1, 1]) { P(o, new THREE.SphereGeometry(0.11, 8, 6), '#ffffff', 0.2 * s, 1.3, 0.28); P(o, new THREE.SphereGeometry(0.055, 6, 5), '#1b1410', 0.2 * s, 1.3, 0.37); }
   P(o, new THREE.SphereGeometry(0.06, 6, 4), '#ff9aa8', -0.34, 1.16, 0.26); P(o, new THREE.SphereGeometry(0.06, 6, 4), '#ff9aa8', 0.34, 1.16, 0.26);
-  // бургер в короне (как маскот Дня угнетения бургеров, festivals.js — поменьше)
+  // бургер в короне (как маскот митинга в поддержку ожирения, festivals.js — поменьше)
   const b = [], k = 0.82;
   for (const [rr, h, c, y] of [[0.95, 0.42, '#e8b563', 0.9], [1.0, 0.3, '#7a4526', 1.27], [1.0, 0.1, '#ffd34d', 1.47], [1.02, 0.14, '#5fbf4a', 1.59], [0.9, 0.14, '#e04836', 1.73]])
     P(b, new THREE.CylinderGeometry(rr * k, rr * k * 1.03, h * k, 14), c, 0, 0.1 + y * k, 0);

@@ -65,3 +65,10 @@ body.editor > :not(#game):not(#boot):not(#ed-root):not(vite-error-overlay):not(s
 #ed-pop .msg.bad { color: #8a1d0b; }
 
 #ed-wait { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); padding: 14px 22px; border-radius: 8px; background: #fbf6e6; border: 2px solid #3a3226; font-size: 16px; pointer-events: none; }
+/* дом: палитра стен (citypaint.js) */
+.ed-sw { margin: 4px 0; line-height: 0; }
+#ed-panel .ed-sw button.sw, #ed-panel span.sw { display: inline-block; width: 20px; height: 20px; padding: 0; margin: 0 3px 3px 0; border: 2px solid #3a3226; border-radius: 3px; box-shadow: none; vertical-align: middle; }
+#ed-panel .ed-sw button.sw.on { outline: 3px solid #ffcc00; }
+#ed-panel span.sw { margin: 0 4px; }
+#ed-view.t-house { cursor: pointer; }
+#ed-sel .bad { color: #c0281b; }

@@ -76,6 +76,9 @@ export const HOLIDAYS = [
       adult: N_('сегодня 31-е! заказов — вагон. пьяных Дедов Морозов не сбивай'),
       kids: N_('сегодня 31-е! заказов — вагон. Дедов Морозов объезжай'),
     },
+    // в 00:00 по часам мира — событие, не конец смены (0п45, автор 24.10.2026): залп салюта и поздравление Толика в чате;
+    // смена кончается как всегда — когда довёз и вернулся в пиццерию (career.js midnight)
+    midnight: { say: [N_('с Новым годом! куранты пробили — глянь, какой салют'), N_('с Новым годом, курьер! двенадцать пробило — салют в твою честь')], salvo: 8 },
     orders: {
       olivier: { share: 0.35, k: 1.2, items: [N_('оливье-пицца'), N_('пицца «Мандариновая»'), N_('пицца «Селёдка под шубой»')],
         why: N_('к праздничному столу · оплата ×{k}') },
@@ -176,7 +179,7 @@ export function shiftStart (o = {}) {
   if (h) begin(h);
 }
 function begin (h) {
-  CUR = { h, n: 0, corp: 0, chimes: false, got: 0, seen: new WeakSet() };
+  CUR = { h, n: 0, corp: 0, chimes: false, got: 0, seen: new WeakSet(), tm: -1, rang: false };
   ST.lastRibbon = null;
   CYCLE.held(h.id, +A.Store.get('dlv-shifts', 0) || 0);   // круг сезонов: такой же праздник по плану скоро — не встанет и не обещается
   // Новый год: сезон — где новогодние ёлки и гирлянды стоят (seasons.js K.ny)
@@ -226,6 +229,7 @@ function stepIn (dt) {
   fwStep(dt, !!(CUR && CUR.h.decor.fireworks));
   bubStep(dt);
   if (!CUR) return;
+  chimesStep();
   lampStep(dt);
   folkStep(dt);
   ghostStep();
@@ -415,9 +419,9 @@ const DECOR_BUILD = {
     for (const r of L) {
       if (++n % 120 === 0) yield;
       if (bulbs >= LAMP_CAP) break;
-      const top = TOP[r.style];
+      const top = r.top || TOP[r.style];                    // новые виды фонарей знают свою высоту сами (streetlamps.js)
       if (!top || hsh(r.x, r.z, 311) > D.lamps || !A.inBounds(r.x, r.z, 0)) continue;
-      const N = Math.round(top * 2.6), rad = RAD[r.style], a0 = hsh(r.x, r.z, 312) * 6.28, multi = hsh(r.x, r.z, 313) < 0.7;
+      const N = Math.round(top * 2.6), rad = r.rad || RAD[r.style], a0 = hsh(r.x, r.z, 312) * 6.28, multi = hsh(r.x, r.z, 313) < 0.7;
       let first = null;
       for (let i = 0; i < N; i++) {
         const f = i / (N - 1), a = a0 + f * 5.5 * 6.283;
@@ -882,6 +886,20 @@ function onArrive (ev) {
   if (pool.length && p && p.grp && !p.dead) setTimeout(() => { if (p.grp && !p.dead) say(p.grp, t(pick(pool)), '#c0392b', 3.4, 1); }, 350);
 }
 
+/* ─────────────── полночь праздника: событие ───────────────
+   До 00:00 по часам мира осталось меньше 2 с, а в этот кадр — снова почти сутки: часы пробили. Раз за смену — залп
+   (salvo ракет разом) и поздравление в чате. Смену это не кончает (0п45): конец смены в полночь — career.js, как всегда */
+function chimesStep () {
+  const m = CUR.h.midnight;
+  if (!m || CUR.rang || !(A.playing && A.playing())) { if (CUR) CUR.tm = -1; return; }
+  const tm = toMidnight(), was = CUR.tm;
+  CUR.tm = tm;
+  if (was < 0 || !(was < 2 && tm > was + 30)) return;
+  CUR.rang = true;
+  if (CUR.h.decor.fireworks) { if (!FW.pts) fwInit(); for (let i = 0; i < (m.salvo || 6); i++) launch(); petard(); }
+  if (A.chat && m.say && m.say.length) A.chat(t(pick(m.say)));
+}
+
 /* ═════════════════════ заказы (orders.js) ═════════════════════ */
 /** сколько настоящих секунд до 00:00 по часам мира */
 export function toMidnight () {
@@ -1074,7 +1092,7 @@ export const DEBUG = {
   info: () => {
     const R = CUR ? DECOR.get(CUR.h.id) : null;
     return {
-      id: CUR ? CUR.h.id : '', orders: CUR ? CUR.n : 0, corp: CUR ? CUR.corp : 0, chimes: CUR ? CUR.chimes : false, got: CUR ? CUR.got : 0,
+      id: CUR ? CUR.h.id : '', orders: CUR ? CUR.n : 0, corp: CUR ? CUR.corp : 0, chimes: CUR ? CUR.chimes : false, got: CUR ? CUR.got : 0, rang: CUR ? CUR.rang : false,
       toMidnight: A ? Math.round(toMidnight()) : 0, building: !!BUILD.gen, save: A ? load() : null,
       decor: R ? { ...R.out, points: R.n, cellsPts: R.pts.length, cellsTin: R.tin.length, ms: R.ms, visible: R.pts.filter(m => m.visible).length } : null,
       fireworks: { alive: FW.alive, rockets: FW.rockets.length, bursts: FW.bursts || 0, petards: FW.petards || 0 },

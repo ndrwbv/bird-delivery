@@ -36,6 +36,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import { wet } from './streams.js';
 import { MOB } from './mobile.js';                 // телефон: лесочки меньше (MOB.groveR)
+import * as FVAR from './fencevar.js';            // вид твёрдого забора по району и износ куска (fencevar.js, М5)
 
 export const MAZE = {
   FEN: {
@@ -53,7 +54,8 @@ export const MAZE = {
     FRONT: 3.2,                // дом ближе — это фасад, забора нет
     ENT: 7, STOP: 8, PARK: 10, PIZZA: 45, FUEL: 7,
     TH: 0.16,                  // полутолщина твёрдого для удара, м (на вид — 0,3—0,48 м)
-    // твёрдое — тяжёлое и серое: доли видов (парапет, столбы с трубой, кирпич с решёткой) и цвета
+    // твёрдое — тяжёлое и серое: доли видов (парапет, столбы с трубой, кирпич с решёткой) и цвета.
+    // С 24.10.2026 доли — по району (fencevar.js FV.SOLID.STY; «вперемешку» — эти же), STY — для справки
     STY: [0.35, 0.4, 0.25],
     CONCRETE: ['#8f8c84', '#827f78', '#9a968b'],
     PIPE: ['#34373c', '#2e4a3a', '#4a3a30'],   // толстая труба: графит, тёмно-зелёная, тёмно-коричневая
@@ -300,7 +302,7 @@ function* fences () {
             left = F.RUN[0] + rr() * (F.RUN[1] - F.RUN[0]);
             // твёрдое: вид и цвет; сбиваемое (и секции в проездах твёрдого): трубы или штакетник, светлое
             const w = rr();
-            sty = w < F.STY[0] ? 0 : w < F.STY[0] + F.STY[1] ? 1 : 2;
+            sty = FVAR.solidSty(cx, cz, w);           // доли видов — по району, из того же жребия (fencevar.js)
             const pal = sty === 2 ? F.BRICK : sty === 1 ? F.PIPE : F.CONCRETE;
             hex = pal[Math.floor(rr() * pal.length)];
             const pk = rr() < F.PICKET, sp = pk ? F.PICKET_HEX : F.SMASH_HEX;
@@ -372,47 +374,82 @@ function solidRun (run, len, sty, hex) {
   const F = MAZE.FEN, { ax, az, ux, uz } = run, bx = ax + ux * len, bz = az + uz * len;
   const ay = A.groundH(ax, az), by = A.groundH(bx, bz), cx = (ax + bx) / 2, cz = (az + bz) / 2;
   const n = Math.max(1, Math.round(len / F.SEC)), sl = len / n, ry = Math.atan2(-uz, ux);
+  /* износ куска (fencevar.js, М5): 0 — аккуратный (Старый город, центр), 1 — обычный (как было), 2 — старый (окраины).
+     Мелочь износа (сколы, подтёки, пики, обрывки краски) — вне жребия куска: three.js берёт uuid каждой новой геометрии
+     из Math.random, и лишнее вытягивание в шаге с зерном сдвинуло бы всё, что дальше в этом шаге (дворы за заборами) */
+  const wear = FVAR.solidWear(cx, cz, sty), wh = FVAR.wearH;
+  const extra = fn => { const R = Math.random; Math.random = () => 0.5; try { fn(); } finally { Math.random = R; } };
+  const at = t => { const x = ax + ux * t, z = az + uz * t; return [x, z, A.groundH(x, z)]; };
   const cap = (gy, t, s, top) => {                 // красно-белая шапка тумбы: видно издали и ночью в фарах
     const x = ax + ux * t, z = az + uz * t;
     A.box(LIT, s + 0.02, 0.14, s + 0.02, '#c8352e', x, gy + top - 0.21, z, ry);
     A.box(LIT, s + 0.03, 0.14, s + 0.03, '#f1ede4', x, gy + top - 0.07, z, ry);
   };
   if (sty === 0) {
-    // бетонный парапет 0,7 м, 0,32 толщиной, с плитой-крышкой; секции через одну чуть другого серого — стыки
-    const alt = hex === F.CONCRETE[1] ? F.CONCRETE[0] : F.CONCRETE[1];
+    // бетонный парапет 0,7 м, 0,32 толщиной, с плитой-крышкой; секции через одну чуть другого серого — стыки.
+    // аккуратный — ровный серый, белая крышка; старый — темнее, грязная крышка, сколы на крышке, зелёные подтёки внизу
+    const alt = wear === 2 ? '#77746c' : wear === 0 ? hex : hex === F.CONCRETE[1] ? F.CONCRETE[0] : F.CONCRETE[1];
+    const lid = wear === 0 ? '#e6e2d8' : wear === 2 ? '#b2aea3' : '#c9c5bb';
     for (let k = 0; k < n; k++) {
       wall(run, k * sl, (k + 1) * sl, 0.62, 0.32, k % 2 ? alt : hex);
-      wall(run, k * sl + 0.02, (k + 1) * sl - 0.02, 0.7, 0.4, '#c9c5bb');     // крышка: выше на 8 см, шире
+      wall(run, k * sl + 0.02, (k + 1) * sl - 0.02, 0.7, 0.4, lid);     // крышка: выше на 8 см, шире
     }
+    if (wear === 2) extra(() => {
+      for (let k = 0; k < n; k++) {
+        const h1 = wh(ax + k, az, 81), h2 = wh(ax + k, az, 82);
+        if (h1 < 0.5) { const [x, z, gy] = at((k + 0.5) * sl); A.box(LIT, sl - 0.12, 0.16, 0.34, '#5f6b4c', x, gy + 0.03, z, ry); }   // подтёк, мох
+        if (h2 < 0.45) { const [x, z, gy] = at((k + 0.15 + h2 * 1.5) * sl); A.box(LIT, 0.22, 0.07, 0.42, '#6c6960', x, gy + 0.69, z, ry); }   // скол крышки
+      }
+    });
     for (const t of [0, len]) cap(pillar(run, t, 0.46, 1.05, hex, ry), t, 0.46, 1.05);
   } else if (sty === 1) {
-    // бетонные столбы 0,34 через 2,5 м, бетонный поребрик внизу, толстая труба (0,2) поверху
-    const conc = F.CONCRETE[0];
-    for (let k = 0; k < n; k++) wall(run, k * sl, (k + 1) * sl, 0.3, 0.3, '#a9a59a');
-    for (let k = 1; k < n; k++) pillar(run, k * sl, 0.34, 1.0, conc, ry);
+    // бетонные столбы 0,34 через 2,5 м, бетонный поребрик внизу, толстая труба (0,2) поверху.
+    // аккуратный — столбы и поребрик белёные; старый — серые столбы, труба ржавая с обрывками краски, кое-где провисла
+    const conc = F.CONCRETE[0], post = wear === 0 ? '#d9d5cc' : wear === 2 ? '#77746c' : conc;
+    for (let k = 0; k < n; k++) wall(run, k * sl, (k + 1) * sl, 0.3, 0.3, wear === 0 ? '#c9c5bb' : '#a9a59a');
+    for (let k = 1; k < n; k++) pillar(run, k * sl, 0.34, 1.0, post, ry);
     for (const t of [0, len]) cap(pillar(run, t, 0.44, 1.15, conc, ry), t, 0.44, 1.15);
-    A.put(LIT, railGeo(ax, ay + 0.8, az, bx, by + 0.8, bz, 0.2, 0.2), hex, cx, (ay + by) / 2 + 0.8, cz);
+    const pipe = wear === 2 ? '#6e3b22' : hex;
+    const sag = wear === 2 && n >= 4 && wh(ax, az, 83) < 0.5;
+    if (!sag) A.put(LIT, railGeo(ax, ay + 0.8, az, bx, by + 0.8, bz, 0.2, 0.2), pipe, cx, (ay + by) / 2 + 0.8, cz);
+    else {                                         // провисла: две половины к точке на 0,16 м ниже
+      const tm = Math.round(n / 2) * sl, [mx, mz, my] = at(tm), ym = my + 0.8 - 0.16;
+      A.put(LIT, railGeo(ax, ay + 0.8, az, mx, ym, mz, 0.2, 0.2), pipe, (ax + mx) / 2, (ay + 0.8 + ym) / 2, (az + mz) / 2);
+      extra(() => A.put(LIT, railGeo(mx, ym, mz, bx, by + 0.8, bz, 0.2, 0.2), pipe, (mx + bx) / 2, (ym + by + 0.8) / 2, (mz + bz) / 2));
+    }
+    if (wear === 2) extra(() => {                  // обрывки старой краски на ржавой трубе
+      for (let k = 0; k < n; k++) {
+        const h = wh(ax + k, az, 84);
+        if (h > 0.6 || (sag && Math.abs((k + 0.5) * sl - Math.round(n / 2) * sl) < sl)) continue;
+        const [x, z] = at((k + 0.2 + h) * sl), t0 = (k + 0.2 + h) * sl, gyA = ay + (by - ay) * t0 / len;
+        A.box(LIT, 0.55, 0.215, 0.215, hex, x, gyA + 0.8, z, ry);
+      }
+    });
   } else {
     // кирпичные столбы с бетонной шапкой через 5 м, высокий кирпичный цоколь 0,55, кованая решётка: верхний брус и прутья
-    // (цоколь и столбы — чтобы не путать с высокими чёрными сбиваемыми заборами частных домов)
-    const top = 1.06, base = 0.55;
+    // (цоколь и столбы — чтобы не путать с высокими чёрными сбиваемыми заборами частных домов).
+    // аккуратный — пики на прутьях, белые шапки; старый — ржавая решётка, кое-где прута нет, шапки серые
+    const top = 1.06, base = 0.55, bar = wear === 2 ? '#5a3020' : '#1d1f22', lid = wear === 0 ? '#e6e2d8' : wear === 2 ? '#a9a497' : '#cbc6ba';
+    const tip = wh(ax, az, 85) < 0.4 ? '#b8962e' : '#1d1f22';
     for (let k = 0; k < n; k++) {
       wall(run, k * sl, (k + 1) * sl, base, 0.36, hex);
       for (let b = 1; b <= 3; b++) {
         const t = (k + b / 4) * sl, x = ax + ux * t, z = az + uz * t, gy = A.groundH(x, z);
-        A.box(LIT, 0.045, top - base + 0.02, 0.045, '#1d1f22', x, gy + (top + base) / 2, z, ry);
+        A.box(LIT, 0.045, top - base + 0.02, 0.045, bar, x, gy + (top + base) / 2, z, ry);
+        if (wear === 2 && wh(ax + k * 3 + b, az, 86) < 0.12) LIT.pop();   // прута нет (запись — та же: жребий шага не сдвигается)
+        else if (wear === 0) extra(() => A.box(LIT, 0.085, 0.1, 0.085, tip, x, gy + top + 0.08, z, ry + 0.785));   // пика
       }
     }
-    A.put(LIT, railGeo(ax, ay + top, az, bx, by + top, bz, 0.07, 0.07), '#1d1f22', cx, (ay + by) / 2 + top, cz);
+    A.put(LIT, railGeo(ax, ay + top, az, bx, by + top, bz, 0.07, 0.07), bar, cx, (ay + by) / 2 + top, cz);
     for (let k = 0; k <= n; k++) {
       if (k % 2 && k !== n) continue;
       const gy = pillar(run, k * sl, 0.5, 1.22, hex, ry), x = ax + ux * k * sl, z = az + uz * k * sl;
-      A.box(LIT, 0.6, 0.09, 0.6, '#cbc6ba', x, gy + 1.26, z, ry);
+      A.box(LIT, 0.6, 0.09, 0.6, lid, x, gy + 1.26, z, ry);
     }
   }
   const s = A.obb(cx, cz, len / 2, F.TH, Math.atan2(uz, ux));
   s.rail = 1; s.maze = 1;                          // удар — как о забор (impact.js), лабиринт — для отладки
-  const o = { seg: 1, ax, az, bx, bz, th: F.TH, solid: 1, kind: 'fence', sty, rx: run.rx, rz: run.rz };   // rx, rz — к дороге (отладка)
+  const o = { seg: 1, ax, az, bx, bz, th: F.TH, solid: 1, kind: 'fence', sty, wear, rx: run.rx, rz: run.rz };   // rx, rz — к дороге (отладка)
   FEN.push(o);
   gput(Math.min(ax, bx) - 1, Math.min(az, bz) - 1, Math.max(ax, bx) + 1, Math.max(az, bz) + 1, o);
   ST.fen.solidM += len; ST.fen.solidRuns++; ST.fen.sty[sty]++;

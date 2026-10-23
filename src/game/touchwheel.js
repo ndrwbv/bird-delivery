@@ -8,6 +8,9 @@
    вбок). Вверх-вниз — ничего. Отпустил — руль сам возвращается в центр.
    Это аналог стика геймпада: игра читает IN.joy / IN.jx (как gamepad.js applyToIN), поэтому
    поворот плавный, а не «до упора». Свой палец (pointer capture) — руль и газ жмутся разом.
+   Не залипает (0п44, 24.10.2026): новый палец на руле забирает руль у старого (старый мог «застрять» — не пришло
+   «отпустил»); «повёл» и «отпустил» слушаются на окне; нет пальцев на экране — руль отпущен; палец на картинке в
+   NEAR px от руля — тоже руль (game.js), а не «осмотреться» (camlook.js). Пауза, окна, фон, фокус, поворот — game.js touchReset.
    ────────────────────────────────────────────────────────────────────────── */
 import './touchwheel.css';
 
@@ -16,6 +19,7 @@ export const WHEEL = {
   DEAD: 0.08,     // мёртвая зона у центра (доля полного)
   DEG: 120,       // на сколько градусов поворачивается картинка руля при полном повороте
   K: 1.35,        // физика крутит на −jx·1.35 (game.js), делим — край руля ровно полный замок
+  NEAR: 40,       // палец лёг на картинку не дальше 40 px от руля — это руль (не «осмотреться»); от педалей — ничего
 };
 
 const W = { id: null, ox: 0, s: 0, el: null, rim: null, IN: null, onDown: null, wrote: false };
@@ -61,24 +65,46 @@ export function init (el, IN, onDown) {
   W.el = el; W.IN = IN; W.onDown = onDown || null;
   el.innerHTML = '<div class="tw-wheel">' + SVG + '</div>';
   W.rim = el.querySelector('.tw-wheel');
-  el.addEventListener('pointerdown', e => {
-    e.preventDefault();
-    if (W.id !== null) return;                     // второй палец на руле — не перехватывает
-    if (W.onDown) W.onDown();
-    try { el.setPointerCapture(e.pointerId); } catch (_) { /* — */ }
-    W.id = e.pointerId; W.ox = e.clientX;
-    el.classList.add('on');
-    setS(0);
-    apply();
-  });
-  el.addEventListener('pointermove', e => {
+  el.addEventListener('pointerdown', e => { e.preventDefault(); grab(e); });
+  // ведёт и отпускает — слушаем окно, а не руль: захват пальца (pointer capture) на телефоне иногда теряется
+  // (окно поверх, системный жест, уведомление), и тогда «отпустил» приходит не рулю — руль оставался зажатым навсегда
+  addEventListener('pointermove', e => {
     if (e.pointerId !== W.id) return;
     setS(steerOf(e.clientX - W.ox));
     apply();
-  });
-  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture'])
-    el.addEventListener(ev, e => { if (e.pointerId === W.id) release(); });
+  }, true);
+  for (const ev of ['pointerup', 'pointercancel'])
+    addEventListener(ev, e => { if (e.pointerId === W.id) release(); }, true);
+  el.addEventListener('lostpointercapture', e => { if (e.pointerId === W.id) release(); });
+  // страховка: на экране не осталось ни одного пальца — руль отпущен, что бы ни потерялось по дороге
+  for (const ev of ['touchend', 'touchcancel'])
+    addEventListener(ev, e => { if (W.id !== null && e.touches && e.touches.length === 0) release(); }, true);
   el.addEventListener('contextmenu', e => e.preventDefault());
+}
+
+/** палец на руль (или рядом с ним — game.js передаёт касание картинки у руля, см. nearPad).
+    Руль уже держат, а лёг новый палец — руль переходит к новому (0п44, 24.10.2026): прежний палец мог «застрять»
+    (не пришло «отпустил»), и раньше руль больше не слушался вовсе */
+export function grab (e) {
+  if (!W.el) return;
+  if (W.id !== null && W.id === e.pointerId) return;
+  if (W.onDown) W.onDown();
+  try { W.el.setPointerCapture(e.pointerId); } catch (_) { /* — */ }
+  W.id = e.pointerId; W.ox = e.clientX;
+  W.el.classList.add('on');
+  setS(0);
+  apply();
+}
+
+/** точка (x, y) у руля или у педалей — в пределах m px от их края (палец промахнулся мимо руля — это не «осмотреться»,
+    camlook.js; руль спрятан — false) */
+export function nearPad (x, y, m = WHEEL.NEAR) {
+  const pad = W.el && W.el.parentElement;
+  if (!pad || pad.hidden) return '';
+  const hit = el => { const r = el.getBoundingClientRect(); return r.width > 0 && x >= r.left - m && x <= r.right + m && y >= r.top - m && y <= r.bottom + m; };
+  if (hit(W.el)) return 'wheel';
+  for (const b of pad.querySelectorAll('button')) if (!b.hidden && hit(b)) return 'pedal';
+  return '';
 }
 
 /** держишь руль — подтверждаем ввод каждый кадр (пауза и диалоги обнуляют IN); не держишь — ничего */
@@ -94,4 +120,4 @@ export function apply () {
 export function reset () { release(); }
 export const held = () => W.id !== null;
 export const value = () => W.s;
-if (typeof window !== 'undefined') window.__wheel = { W, WHEEL, steerOf };
+if (typeof window !== 'undefined') window.__wheel = { W, WHEEL, steerOf, nearPad };

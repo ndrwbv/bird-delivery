@@ -31,6 +31,8 @@
    до 03.10.2026) читается один раз, когда у машины ещё нет dlv-car-eng (econ.js BREAK.OLD_L). */
 import * as RESPECT from './respect.js';
 import * as DENT from './cardent.js';
+import * as CBLOOD from './carblood.js';          // кровь на кузове — Дядя Женя отмывает (carblood.js bloody)
+import * as GLASSB from './glassblood.js';        // и с лобового (glassblood.js)
 import { CAR_LIST, UPGRADE, ADDON, BREAK, upgradePrice, paintPrice, sellPrice, wearK, stallChance, repairQuote } from './econ.js';
 import { cnCar } from './roadlife.js';
 import { lampDepth } from './carrear.js';
@@ -61,7 +63,7 @@ export function init (api) {
    spare — запаска на задней двери: y — середина колпака над крыльями, z — его лицо за кормой, r — радиус логотипа на нём (м). */
 const LOOK = {
   semerka: {
-    name: N_('Семёрка'), note: N_('ВАЗ-2107 в цветах пиццерии: хром, квадратные фары'), hex: '#f0522a', roof: '#fff3e2', chrome: '#d4d8dc', model: 'sedan', wheel: 'cap', molding: null, handle: '#c9ccd1', rake: { f: 0, b: 0.3 },
+    name: N_('Семёрка'), note: N_('ВАЗ-2107 «белая ночь»: хром, квадратные фары'), hex: '#ebe6d8', roof: '#fff3e2',   // 11бг (автор 24.10.2026): белая «белая ночь», чуть тёплая — на ней видно вмятины и кровь (была оранжевая #f0522a) chrome: '#d4d8dc', model: 'sedan', wheel: 'cap', molding: null, handle: '#c9ccd1', rake: { f: 0, b: 0.3 },
     spec: { L: 4.13, W: 1.62, h: 0.44, hood: 1.35, trunk: 1.0, cab: 1.85, cz: -0.2, ch: 0.6, r: 0.37, fz: 1.3, bz: -1.12 },
   },
   matiz: {
@@ -145,7 +147,16 @@ export const PAINTS = [
   { hex: '#7a3fb0', name: N_('фиолетовый') }, { hex: '#f27aa8', name: N_('розовый') }, { hex: '#ecebe6', name: N_('белый') },
   { hex: '#1b1c21', name: N_('чёрный') },
 ];
-const hexOf = id => { const v = obj(K_PAINT)[id]; return typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : LOOK[id].hex; };
+/* старый заводской цвет (до 24.10.2026: «Семёрка» — оранжевая) в сохранении — это не «покрасил сам», а заводской: теперь белая.
+   Своя покраска после этого (paint / labPaint) пишет в сохранение _v: 2 — дальше оранжевый у «Семёрки» — уже свой */
+const OLD_HEX = { semerka: '#f0522a' };
+const hexOf = id => {
+  const m = obj(K_PAINT), v = m[id];
+  if (typeof v !== 'string' || !/^#[0-9a-f]{6}$/i.test(v) || (!m._v && OLD_HEX[id] === v.toLowerCase())) return LOOK[id].hex;
+  return v;
+};
+/* сохранение цветов перед записью: старый заводской — убрать, пометить новую версию */
+const paintMap = () => { const m = obj(K_PAINT); if (!m._v) { for (const id in OLD_HEX) if (typeof m[id] === 'string' && m[id].toLowerCase() === OLD_HEX[id]) delete m[id]; m._v = 2; } return m; };
 export const paintOf = id => (LOOK[id] ? hexOf(id) : null);   // цвет машины — для настоящих моделей (realcar.js)
 /* мотор: { c — состояние %, r — ресурс (потолок ремонта) %, km — пробег с покупки, n — ремонтов } */
 const r2 = v => Math.round(v * 100) / 100;
@@ -257,7 +268,7 @@ export function labUse (id) {
 }
 export function labPaint (id, hex) {
   if (!LOOK[id] || !/^#[0-9a-f]{6}$/i.test(hex)) return false;
-  const m = obj(K_PAINT); m[id] = hex.toLowerCase(); sset(K_PAINT, m);
+  const m = paintMap(); m[id] = hex.toLowerCase(); sset(K_PAINT, m);
   PREV.delete(id);
   return true;
 }
@@ -289,7 +300,7 @@ export function paint (id, hex, api = A) {
   if (hexOf(id).toLowerCase() === hex) return { ok: false, why: 'same' };
   const price = paintPrice(c);
   if (wallet(api) < price || !pay(api, price)) return { ok: false, why: 'money', need: price };
-  const m = obj(K_PAINT);
+  const m = paintMap();
   if (hex === LOOK[id].hex.toLowerCase()) delete m[id]; else m[id] = hex;
   sset(K_PAINT, m);
   flush();
@@ -1321,7 +1332,9 @@ const meters = e => [
   { name: t('ресурс'), v: Math.round(e.r) + ' %', p: e.r / 100, color: '#6fd3ff' },
 ];
 /* кузов битый — вмятины, отлетевшие детали, стёкла, фары (cardent.js hurt); чинит — машина собирается заново (resetCar) */
-const bodyHurt = () => DENT.hurt(A.car);
+/* в крови (взрослая: сбивал людей) — кузов или лобовое; отмывает заодно с ремонтом или даром (0п42) */
+const bloody = () => CBLOOD.bloody(A.car) || GLASSB.DEBUG.ST.any;
+const bodyHurt = () => DENT.hurt(A.car) || bloody();
 function bodyFix () { if (bodyHurt() && A.resetCar) A.resetCar(); }
 async function offer () {
   const DLG = A.DLG, id = curId(), e = eng(id), q = repairQuote(e.c, e.r);
@@ -1338,11 +1351,13 @@ async function offer () {
       await DLG.say({ person: face, name, color, head, text: t('о, новенький! я Дядя Женя. тут я чиню: подъехал к воротам, встал — подшаманю. а тачки купить и прокачать — это в гараже в меню, там всё покажу'), accept: t('понял') });
     }
     if (q.pct < BREAK.REPAIR_MIN_PCT) {
-      if (bodyHurt()) {                              // мотор цел, а кузов мятый — выправит даром (cardent.js)
+      if (bodyHurt()) {                              // мотор цел, а кузов мятый — выправит даром (cardent.js); в крови — отмоет
+        const wash = !DENT.hurt(A.car);
         await DLG.say({ person: face, name, color, head, mood: 'calm', meters: meters(e),
-          text: t('мотор в порядке, крутить нечего. а кузов выправлю: вмятины, бампер, зеркала, стёкла — даром, по-соседски'), accept: t('спасибо!') });
+          text: wash ? t('мотор в порядке, крутить нечего. а кровищу с машины отмою — даром. и не спрашиваю, откуда она')
+            : t('мотор в порядке, крутить нечего. а кузов выправлю: вмятины, бампер, зеркала, стёкла — даром, по-соседски'), accept: t('спасибо!') });
         bodyFix();
-        A.toast(t('кузов как новый'));
+        A.toast(wash ? t('машина чистая') : t('кузов как новый'));
         return;
       }
       await DLG.say({ person: face, name, color, head, meters: meters(e),

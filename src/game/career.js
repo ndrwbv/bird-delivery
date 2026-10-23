@@ -329,20 +329,25 @@ async function midnight () {
   lunchOff();
   const S = A.S;
   let ride = false;
-  // развоз — только если едешь: в полночь на карточке заказа или на погрузке смена просто кончается
-  const moving = ['drive', 'back', 'handover'].includes(S.state);
+  // развоз — только если едешь: в полночь на карточке заказа или на погрузке у пиццерии смена просто кончается.
+  // Накладная и погрузка — не «в пиццерии», если уже отъехал (руль на накладной не блокируется, погрузка после налёта
+  // дольше): тогда это последний заказ, как в дороге (0п45, автор 24.10.2026: «Новый год посреди возвращения закончил смену»)
+  const away = !atPizza();
+  const moving = ['drive', 'back', 'handover'].includes(S.state) || (['brief', 'loading'].includes(S.state) && away);
   if (moving && ORD && typeof ORD.staffRide === 'function' && Math.random() < ECON.ORDERS.STAFF_CHANCE) {
     A.hideChoice();
     try { ride = await ORD.staffRide(); } catch (e) { console.error('[career] staffRide', e); }
   }
-  if (!SH.on || S.state === 'over' || S.state === 'title' || S.state === 'dying') return;   // смена уже кончилась иначе
+  if (!SH.on || S.state === 'over' || S.state === 'title') return;   // смена уже кончилась иначе
+  // взорвался, пока решалось (развоз ждал ответа): воскреснешь — довози и возвращайся; не воскрес — смену и так закроют
+  if (S.state === 'dying') { if (!ride) SH.home = true; return; }
   // полночь застала в дороге (без развоза): смена не обрывается посреди улицы — довози, что везёшь, и
   // возвращайся; кончится, когда доедешь до пиццерии (atBase). Новых заказов нет. Сколько бы ни ехал — смена ждёт
   // (автор 10.10.2026: «всегда надо дать игроку доехать обратно и только потом показывать конец смены»); бросить — «сняться» в паузе
   // ride — объект, если развоз взяли (и всех развёз, и не успел): тогда смена кончается сразу, где бы ни был
-  if (!ride && homeward(S)) {
+  if (!ride && (homeward(S) || (away && S.state !== 'handover'))) {
     SH.home = true;
-    A.toast(S.state === 'back' ? t('заказов больше нет — возвращайся в пиццерию') : t('это последний заказ — довези и возвращайся в пиццерию'));
+    A.toast(S.state === 'back' || !S.order ? t('заказов больше нет — возвращайся в пиццерию') : t('это последний заказ — довези и возвращайся в пиццерию'));
     return;
   }
   endLate(!!(ride && ride.ok), !!(ride && !ride.ok));
@@ -354,6 +359,9 @@ export function staffOver (r) {
   SH.phase = 'late';
   endLate(!!(r && r.ok), !!(r && !r.ok));
 }
+/* у своей пиццерии (game.js atPizza: ближе AT_BASE_R м) — «стоишь в пиццерии» в полночь */
+const AT_BASE_R = 30;
+const atPizza = () => !A || !A.atPizza || A.atPizza(AT_BASE_R);
 /* в дороге после полуночи: везёшь заказ, поручение, отдаёшь у двери или едешь назад */
 const homeward = S => ['back', 'drive', 'side'].includes(S.state) || (S.state === 'handover' && !!(S.order || S.side));
 /* последний тост смены: «полночь» — только если на часах и правда около полуночи (daytime.js nearMidnight);
@@ -381,8 +389,10 @@ function endLate (ride, quiet) {
 function lateGuard (dt) {
   const S = A.S, riding = S.order && S.order.ord && S.order.ord.type === 'staff';
   if (riding || DLG.isOpen() || A.choiceOpen() || (ORD && ORD.staffWaiting && ORD.staffWaiting())) { SH.lateT = 0; return; }   // едет за ними в пиццерию — ждём
-  // последний рейс после полуночи: ждём, пока доедешь до пиццерии (handover у пиццерии → atBase закрывает смену)
-  if (SH.home && (homeward(S) || S.state === 'handover')) { SH.lateT = 0; return; }
+  // последний рейс после полуночи: ждём, пока доедешь до пиццерии (handover у пиццерии → atBase закрывает смену).
+  // Что бы ни было по дороге (накладная, погрузка, воскрес после взрыва, «весь город» — другая пиццерия) — не дальше
+  // пиццерии смена сама не кончается (0п45); у пиццерии, без заказа и поручения, — через 6 с, если atBase почему-то не закрыл
+  if (SH.home && (homeward(S) || S.state === 'handover' || S.order || S.side || !atPizza())) { SH.lateT = 0; return; }
   if ((SH.lateT = (SH.lateT || 0) + dt) < 6) return;
   SH.lateT = -1e9;
   endLate();
@@ -463,7 +473,7 @@ export function showEnd (why, whyText, held) {
   CHAT.clear();
   const wasOn = SH.on;
   if (wasOn) { SH.endH = hour(); watchMoney(S); }
-  SH.bonus = 0;
+  SH.bonus = 0; SH.win = 0; SH.rank = null;
   SH.on = false; SH.phase = 'done';
   lunchClass(false);
   $('cr-clock') && ($('cr-clock').hidden = true);
@@ -481,6 +491,10 @@ export function showEnd (why, whyText, held) {
     // бонус за смену — только досидел до конца (econ.js SHIFT_BONUS), сразу в кошелёк
     SH.bonus = full ? ECON.shiftBonus(S.delivered || 0, DIST.has() ? (SH.city ? ECON.CITY.PAY : DIST.pay(SH.district >= 0 ? SH.district : DIST.cur())) : 1) : 0;
     if (SH.bonus) A.addWallet(SH.bonus);
+    // 12ан: премия первому в рейтинге смены (по доставкам) — ты первый, досидел до конца, отвёз хоть один (econ.js CREW.WIN)
+    const top = A.shiftTop ? A.shiftTop() : null;
+    SH.rank = top; SH.win = full && top && top.place === 1 && (S.delivered || 0) > 0 ? ECON.crewWin(top.n) : 0;
+    if (SH.win) A.addWallet(SH.win);
     // сбито прохожих за всю карьеру — Толик шутит про них при переводе в новый район
     A.Store.set(KNOCKED, knocked() + (S.people || 0));
     HONOR.shiftEnd(A.Store, S.delivered || 0);      // доставлено за всю карьеру профиля — рекорд на доске почёта
@@ -514,7 +528,7 @@ export function showEnd (why, whyText, held) {
   ov.hidden = false;
   const opened = DIST.has() && SH.opened >= 0 ? t(DIST.list()[SH.opened].name) : '';
   const seal = wasOn ? sealOf(why, full, SH.mood) : null;
-  const total = (S.money || 0) + (SH.bonus || 0);
+  const total = (S.money || 0) + (SH.bonus || 0) + (SH.win || 0);
   const stage = endStage();
   // строка «лучшая смена» прошлого чека — вынуть из него, пока play не стёр старый чек вместе с ней (вернётся в новый — noteIn)
   const note0 = $('st-note2');
@@ -581,7 +595,7 @@ function tourEnd (ov) {
   });
 }
 
-/* строки чека: [подпись, значение, класс]. Сходится: доставлено + чаевые + задания − штрафы + бонус = итог «за смену».
+/* строки чека: [подпись, значение, класс]. Сходится: доставлено + чаевые + задания − штрафы + бонус + премия за 1-е место = итог «за смену».
    «доставлено» — всё, что пришло за смену, кроме чаевых (заказы, премия за развоз, поручения); штрафы —
    все вычеты за смену (career.js watchMoney): за клиента и «опоздал обратно» — своими строками, остальное — «опоздания и штрафы» */
 function endRows (full) {
@@ -603,6 +617,13 @@ function endRows (full) {
   const ir = IDLEB.endRow();                                              // управляющий заметил простой (idleboss.js)
   if (ir) rows.push(ir);
   rows.push(full ? [t('бонус за смену'), '+' + m(SH.bonus || 0), 'pp-plus'] : [t('бонус за смену'), t('только до конца'), 'cr-rc-no']);
+  // 12ан: рейтинг смены — первый получает премию (econ.js CREW.WIN); не первый — где ты и кто первый
+  const R = SH.rank;
+  if (R && R.place) {
+    if (SH.win) rows.push([t('1-е место из {n} — премия', { n: R.n + 1 }), '+' + m(SH.win), 'pp-plus']);
+    else if (R.place === 1) rows.push([t('1-е место из {n} — премия', { n: R.n + 1 }), d ? t('только до конца') : t('без заказов — нет'), 'cr-rc-no']);
+    else rows.push([t('место в смене · премия у: {who}', { who: R.top }), t('{p} из {n}', { p: R.place, n: R.n + 1 }), '']);
+  }
   return rows;
 }
 

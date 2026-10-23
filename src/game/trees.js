@@ -9,7 +9,15 @@
    мешей, отрисовок на кадр не прибавляется. Вид куска (aux.x) в склейке:
    0 — ствол и ветки, 1 — листва (осенью желтеет и опадает по комку),
    2 — листья на земле, 5 — цветы сирени (весной), 6 — ягоды рябины и
-   шиповника (осень — зима).
+   шиповника (осень — зима), 7 — ветки и прутья голой кроны (видны, когда
+   облетела листва).
+
+   Зимние модели (24.10.2026, автор 23.10: «не просто палки — ветки образуют
+   округлую форму, и они все в снегу»): у берёзы, тополя, клёна, липы, рябины и
+   дерева аллеи ствол и ветки — модель из Blender (wintertrees.data.js): ствол и
+   суки (вид 0) видны всегда — летом внутри кроны, ветки и прутья (вид 7) — когда
+   облетела листва; концы прутьев — по поверхности летней кроны. Грани, что
+   смотрят вверх, — палитра 1: зимой белые (снег, seasons.js pileMat).
 
    plantYardsSteps — дворы: группы по 3—7 деревьев перед подъездами и кусты под
    окнами (сирень, шиповник). Не на проезде, не у двери, не на тропинке,
@@ -17,6 +25,8 @@
    Твёрдость — как у всех деревьев: ствол — препятствие 1,1 × 1,1 м (game.js tree).
    ────────────────────────────────────────────────────────────────────────── */
 import { wet } from './streams.js';             // речки и пруды — без деревьев (streams.js)
+import { WTREES } from './wintertrees.data.js'; // зимние модели: голые ветки со снегом сверху (tools/trees/wintertrees.py, Blender)
+import { MOB } from './mobile.js';
 
 export const TREE = {
   // доли пород там, где дерево сажает карта и улицы (без своей породы)
@@ -55,6 +65,17 @@ export const TREE = {
     TOP: 11.6,                  // верх арки над осью улицы, м; низ кроны там ~8 м (камера — 6,2 м над машиной, автобус ~3,5)
     MIX: { lime: 55, maple: 30, poplar: 15 },   // осенью: липа — золотая, клён — рыжий и красный, тополь — лимонный
   },
+  // зимние модели (wintertrees.data.js): цвета частей [ствол, сук, ветка, прут]; когда появляются ветки и прутья
+  WINTER: {
+    COL: {
+      birch: ['#ece8de', '#d8d2c6', '#8a7c72', '#5e463c'], maple: ['#6e5440', '#6a4c32', '#5e4632', '#54402e'],
+      lime: ['#7a5a3c', '#6a4c32', '#5e4632', '#54402e'], poplar: ['#6a5a48', '#5a4a3a', '#544436', '#4c3e32'],
+      rowan: ['#6a5a4c', '#6a5a4c', '#5e5044', '#54463a'],
+    },
+    TWIG: [0.32, 0.55],          // зерно прутьев: видны, когда листвы осталось меньше (ветки — на 0,12 раньше)
+    MOB_PARTS: 2,                // мобильный режим: только части ниже этой (2 — ствол и суки со снегом, без веток и прутьев:
+                                 // память телефона — у каждого дерева ~70 треугольников вместо ~200; 0 — палки, как до моделей)
+  },
 };
 let LEAN = null;                // для 'alley': куда клонится крона — к оси улицы { ux, uz, reach }
 
@@ -78,6 +99,31 @@ function weighted (r, o) {
   return Object.keys(o)[0];
 }
 
+/* зимняя модель: группы [часть, снег] → вершины шаблона без индексов (м), раз на модель — при первом дереве */
+const WT = {};
+function wtModel (name) {
+  let m = WT[name];
+  if (m) return m;
+  const D = WTREES[name], v = D.v, top = WTPARTS ?? (MOB.on ? TREE.WINTER.MOB_PARTS : 9);
+  m = WT[name] = D.g.filter(g => g[0] < top).map(([part, snow, ix]) => {
+    const t = new Float32Array(ix.length * 3);
+    for (let i = 0; i < ix.length; i++) { const q = ix[i] * 3; t[i * 3] = v[q] / 100; t[i * 3 + 1] = v[q + 1] / 100; t[i * 3 + 2] = v[q + 2] / 100; }
+    return { part, snow, tpl: t };
+  });
+  return m;
+}
+/* дерево по модели: ствол и суки — вид 0, ветки и прутья — вид 7 (зерно seed: видны, когда листвы меньше); снег — палитра 1 */
+function winterTree (P, name, x, y, z, sx, sy, sz, yaw, col, seed) {
+  for (const g of wtModel(name)) {
+    const k = g.part < 2 ? 0 : 7;
+    P.add(g.tpl, x, y, z, sx, sy, sz, 0, yaw, 0, col[g.part], k, k ? Math.min(0.95, seed + (g.part === 2 ? 0.12 : 0)) : 0, g.snow);
+  }
+}
+
+const twig = r => TREE.WINTER.TWIG[0] + r() * (TREE.WINTER.TWIG[1] - TREE.WINTER.TWIG[0]);
+const QS = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
+const NOWT = QS.has('nowt');                                       // ?nowt — зимой палки, как до моделей (сравнить)
+const WTPARTS = QS.has('wtparts') ? +QS.get('wtparts') : null;     // ?wtparts=2 — только ствол и суки (как в мобильном режиме), 9 — всё
 const YEL = ['#e8b830', '#f0c848', '#d8a028'], ORA = ['#e8902a', '#d86a22', '#f0a838'], RED = ['#c84a24', '#d86a22', '#b83a22'];
 const DECIDUOUS = new Set(['birch', 'maple', 'lime', 'poplar', 'rowan', 'bush', 'lilac', 'rosehip', 'alley']);
 
@@ -88,9 +134,12 @@ export function growTree (o) {
   STATS.kinds[kind] = (STATS.kinds[kind] || 0) + 1;
   if (STATS.kinds[kind] === 40 || STATS.kinds[kind] === 400) STATS.where[kind] = [Math.round(x), Math.round(z)];   // для проверки глазами (?debug)
   const s = 0.82 + r() * 0.4, yaw = r() * 6.283;
-  const trunk = (w, h, hex) => P.add(T.stick, x, y + h / 2 * s - 0.2, z, w * s, h * s + 0.2, w * s, 0, yaw, 0, hex);
+  // зимняя модель вместо палок-веток: старые trunk/branch молчат, но жребий r() тянется как прежде — летняя крона та же
+  const WM = (kind === 'alley' ? !!LEAN : kind in TREE.WINTER.COL) && !NOWT && !(MOB.on && !TREE.WINTER.MOB_PARTS && WTPARTS === null);   // MOB_PARTS 0 — на телефоне палки, как было
+  const trunk = (w, h, hex) => WM || P.add(T.stick, x, y + h / 2 * s - 0.2, z, w * s, h * s + 0.2, w * s, 0, yaw, 0, hex);
   const branch = (y0, len, tilt, a, w, hex) => {
     // ветка от ствола: наклон tilt, по кругу a; центр — на середине длины
+    if (WM) return;
     const dx = -Math.sin(tilt) * Math.cos(a + yaw), dy = Math.cos(tilt), dz = Math.sin(tilt) * Math.sin(a + yaw);
     P.add(T.stick, x + dx * len / 2 * s, y + (y0 + dy * len / 2) * s, z + dz * len / 2 * s, w * s, len * s, w * s, 0, a + yaw, tilt, hex);
   };
@@ -123,7 +172,10 @@ export function growTree (o) {
     for (let i = 0; i < 4; i++) {
       const hy = 1.2 + i * 1.45 * H + r() * 0.4;
       const a = yaw + i * 2.3 + r();                      // пятно с одной стороны ствола, не кольцо
-      P.add(T.stick, x + Math.cos(a) * 0.06 * s, y + hy * s, z - Math.sin(a) * 0.06 * s, 0.26 * s, (0.07 + r() * 0.08) * s, 0.26 * s, 0, a, 0, '#26252a');
+      // у модели ствол тоньше кверху (радиус угла: 0,2 у земли → 0,13 на 3,6 м → 0,06 на макушке) — пятно по нему
+      const hm = hy / H, rr = WM ? (hm < 3.6 ? 0.2 - 0.07 * hm / 3.6 : Math.max(0.06, 0.13 - 0.07 * (hm - 3.6) / 5)) : 0;
+      const w = WM ? rr * 1.5 : 0.26, off = WM ? rr * 0.25 : 0.06;
+      P.add(T.stick, x + Math.cos(a) * off * s, y + hy * s, z - Math.sin(a) * off * s, w * s, (0.07 + r() * 0.08) * s, w * s, 0, a, 0, '#26252a');
     }
     for (let i = 0; i < 3; i++) branch((3.4 + i * 0.9) * H, 1.5 + r() * 0.7, 0.5 + r() * 0.35, i * 2.1 + r(), 0.09, '#d8d2c6');
     for (let i = 0; i < 2; i++) branch(6.2 * H, 1.3 + r() * 0.5, 0.25 + r() * 0.35, i * 2.1 + r(), 0.06, '#6a5248');   // тонкие тёмные прутья наверху — зимой видно
@@ -133,6 +185,7 @@ export function growTree (o) {
       clump(Math.sin(a) * 0.75 * (1 - t * 0.6), (3.9 + t * 3.7) * H, Math.cos(a) * 0.75 * (1 - t * 0.6), 1.25 - t * 0.35, 1.3, g, 0, t);
     }
     leaves(YEL, 4, 2.6);
+    if (WM) winterTree(P, r() < 0.5 ? 'birchA' : 'birchB', x, y, z, s, s * H, s, yaw, TREE.WINTER.COL.birch, twig(r));
   } else if (kind === 'maple' || kind === 'lime') {
     // клён — широкий круглый, осенью красный и рыжий; липа — повыше, осенью жёлтая
     const maple = kind === 'maple';
@@ -148,6 +201,7 @@ export function growTree (o) {
     clump(0, top * H, 0, maple ? 1.65 : 1.45, maple ? 0.85 : 1.15, g, pal, 1);
     for (let i = 0; i < 2; i++) branch((top - 1.4) * H, 1.5, 0.3 + r() * 0.3, i * 3.1 + r(), 0.08, '#5e4632');   // макушка: зимой видно, что это дерево, а не рогатка
     leaves(pal === 0 ? YEL : pal === 1 ? ORA : RED, 6, 3.4);
+    if (WM) winterTree(P, kind, x, y, z, s, s * H, s, yaw, TREE.WINTER.COL[kind], twig(r));
   } else if (kind === 'alley' && LEAN) {
     // дерево аллеи: толстый ствол, сучья и крона тянутся над дорогой к её оси — с той стороны навстречу
     // такое же, кроны смыкаются аркой. Зимой видно голые сучья через всю дорогу
@@ -159,6 +213,7 @@ export function growTree (o) {
     const TR = AL.TRUNK * (0.94 + r() * 0.12), hTop = AL.TOP * (0.97 + r() * 0.06);
     const at = (f, h, sd = 0) => [x + ux * f + vx * sd, y + h, z + uz * f + vz * sd];
     const limb = (a, b, w, hex) => {
+      if (WM) return;
       const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], l = Math.hypot(dx, dy, dz) || 1;
       P.add(T.stick, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, w, l, w, 0, Math.atan2(dz / l, -dx / l), Math.acos(Math.max(-1, Math.min(1, dy / l))), hex);
     };
@@ -180,6 +235,8 @@ export function growTree (o) {
       P.add(T.ico, p[0], p[1], p[2], k, k * 0.74, k, 0, r() * 6.283, 0, tone(g, Math.round((0.84 + 0.3 * (i === 8 ? 1 : t * 0.6)) * 20) / 20), 1, r(), pal, 0.38);
     });
     leaves(pal === 0 ? YEL : pal === 1 ? ORA : pal === 2 ? RED : ['#e0c840', '#f0d048'], 6, 3.0);
+    // модель аллеи: +x — к оси улицы (сучья до 10,4 м) — тянем до reach; высота — по верху арки
+    if (WM) winterTree(P, 'alley', x, y, z, R / 10.2, hTop / 11.6, 1, Math.atan2(-uz, ux), sp === 'maple' ? TREE.WINTER.COL.maple : sp === 'poplar' ? [bark, bark, '#544436', '#4c3e32'] : [bark, bark, '#5e4632', '#54402e'], twig(r));
   } else if (kind === 'poplar') {
     // тополь колонной: высокий, узкий, крона от низа почти до макушки; зимой — метла из прямых веток
     trunk(0.5, 2.4 * H, '#6a5a48');
@@ -190,9 +247,10 @@ export function growTree (o) {
       clump((r() - 0.5) * 0.5, (3.4 + i * 1.75) * H, (r() - 0.5) * 0.5, 1.5 - t * 0.5, 1.3, g, i < 2 ? 3 : 0, t);
     }
     leaves(['#c8b840', '#e0c040'], 3, 2.2);
+    if (WM) winterTree(P, 'poplar', x, y, z, s, s * H, s, yaw, TREE.WINTER.COL.poplar, twig(r));
   } else if (kind === 'rowan') {
     // рябина: невысокая, ствол раздвоен; осенью красная, гроздья ягод — с осени до конца зимы
-    for (const sd of [-1, 1]) P.add(T.stick, x + sd * 0.25 * s, y + 1.2 * H * s, z, 0.2 * s, 2.6 * H * s, 0.2 * s, 0, yaw, sd * 0.16, '#6a5a4c');
+    if (!WM) for (const sd of [-1, 1]) P.add(T.stick, x + sd * 0.25 * s, y + 1.2 * H * s, z, 0.2 * s, 2.6 * H * s, 0.2 * s, 0, yaw, sd * 0.16, '#6a5a4c');
     for (let i = 0; i < 3; i++) branch(2.0 * H, 1.4 + r() * 0.4, 0.55 + r() * 0.3, i * 2.1 + r(), 0.08, '#6a5a4c');
     const g = '#5aa04a', pal = r() < 0.6 ? 2 : 1;
     for (let i = 0; i < 4; i++) {
@@ -201,6 +259,7 @@ export function growTree (o) {
     }
     dots(8, 0, 3.0 * H, 0, 1.45, 0.3, ['#d8301c', '#e8481c', '#c8281c'], 6, false);
     leaves(pal === 2 ? RED : ORA, 3, 2.0);
+    if (WM) winterTree(P, 'rowan', x, y, z, s, s * H, s, yaw, TREE.WINTER.COL.rowan, twig(r));
   } else if (kind === 'pine') {
     // сосна: рыжий ствол, крона — неровные тёмные ярусы на верхней половине, снизу сухие сучки
     trunk(0.42, 9.2 * H, '#a0603a');

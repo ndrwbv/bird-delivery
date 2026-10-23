@@ -11,10 +11,10 @@
      (самоваром), дым над толпой; в эту смену заказы — рядом с фестивалем (FEST.NEAR_R),
      первый и часть остальных (FEST.PASS_SHARE) — на сам фестиваль, вручение у прохода;
    • тыква — только осенью: тыквы-гиганты на поддонах, конкурс, победительница на весах;
-   • День угнетения бургеров — митинг против «Королевы Бургеров»: плакаты, перечёркнутый
-     бургер на сцене, маскот-бургер в короне ходит по дорожке. Сбил маскота — +2 респекта и
-     премия (во взрослой он лопается на ингредиенты, в детской — укатывается колесом и встаёт);
-     часть заказов — «вместо бургера», оплата × FEST.BURGER_K.
+   • митинг в поддержку ожирения (до 23.10.2026 — «День угнетения бургеров», митинг против «Королевы Бургеров»; автор 18.10,
+     12ап): толстяки за блоками, плакаты «жир — это красиво», «руки прочь от бургеров!», «оземпик — не пройдёт!», бургер-идол
+     на сцене, маскот-бургер «Королевы» в короне ходит по дорожке. Сбил маскота — +2 респекта и премия (во взрослой он лопается
+     на ингредиенты, в детской — укатывается колесом и встаёт); часть заказов — «едят за двоих», оплата × FEST.BURGER_K.
 
      FEST.init(api)          — один раз после города (game.js)
      FEST.shiftStart(o)      — начало смены: решить, будет ли фестиваль; o: { ride, quick, holiday } (в праздник — нет)
@@ -45,9 +45,9 @@ export const FEST = {
   GAP: 1.3,              // проход для курьера в блоках, м (машина ~2 м — не пролезает)
   NEAR_R: 380,           // кальянщики: адреса не дальше от фестиваля, м
   PASS_SHARE: 0.35,      // кальянщики: доля заказов (после первого) ровно на фестиваль
-  BURGER_SHARE: 0.4,     // День угнетения бургеров: доля заказов «вместо бургера»
+  BURGER_SHARE: 0.4,     // митинг в поддержку ожирения: доля заказов «едят за двоих»
   BURGER_K: 1.5,         // их оплата ×
-  BURGER_PASS: 0.25,     // День угнетения бургеров: доля заказов (после первого) прямо на митинг, к проходу
+  BURGER_PASS: 0.25,     // митинг в поддержку ожирения: доля заказов (после первого) прямо на митинг, к проходу
   MASCOT_PAY: 100,       // премия за маскота (× MONEY_K в карьере — 800 ₽)
   MASCOT_MAX: 3,         // премий за смену не больше
   MASCOT_BACK: 25,       // новый маскот через, с (взрослая)
@@ -58,7 +58,7 @@ export const FEST = {
 const KINDS = ['hookah', 'pumpkin', 'burger'];
 const NAME = {
   hookah: N_('фестиваль кальянщиков'), hookahKids: N_('фестиваль самоваров'),
-  pumpkin: N_('фестиваль тыквы'), burger: N_('День угнетения бургеров'),
+  pumpkin: N_('фестиваль тыквы'), burger: N_('митинг в поддержку ожирения'),
 };
 const KEY = 'dlv-fest';
 
@@ -413,7 +413,7 @@ function start (kind, site) {
   {
     const p = w(0, D - 1.3);
     const sub = kind === 'hookah' ? (A.ADULT ? t('гость фестиваля — Стёпа Тугарев') : t('Стёпа Тугарев и самовар-гигант'))
-      : kind === 'pumpkin' ? t('конкурс тыкв-гигантов') : t('пицца круглая — совесть чистая');
+      : kind === 'pumpkin' ? t('конкурс тыкв-гигантов') : t('при поддержке «Королевы Бургеров»');
     plane(banner([title, sub], pal[0], '#ffffff', 1024, 320, pic), sw - 1.2, 3.6, p.x, gh(p.x, p.z) + 3.4, p.z, faceTo(nx, nz));
   }
   F.stage = { a: 0, b: sb, sw, sd };
@@ -579,22 +579,20 @@ function buildPumpkins (G, at, W, D, sd, free) {
 }
 
 function buildBurger (G, at, sw, sb, sd, pal, free) {
-  // перечёркнутый бургер на сцене, три метра
+  // бургер-идол на сцене, три метра (до 23.10.2026 — перечёркнутый: митинг был против бургеров)
   const L = [[1.6, 1.7, 0.6, '#e8b563'], [1.7, 1.7, 0.45, '#7a4526'], [1.75, 1.75, 0.2, '#ffd34d'], [1.72, 1.7, 0.25, '#5fbf4a'], [1.55, 1.55, 0.25, '#e04836']];
   let y = 1.3;
   const b0 = sb + 0.5;
   for (const [r0, r1, h, c] of L) { at(G, new THREE.CylinderGeometry(r0, r1, h, 16), c, 0, y + h / 2, b0); y += h; }
   at(G, new THREE.SphereGeometry(1.65, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), '#e8a84f', 0, y, b0);
-  const ry = alongX(F.L.ax, F.L.az);
-  for (const s of [-1, 1]) {
-    const p = F.L.w(0, b0 - 1.9);
-    A.put(G, new THREE.BoxGeometry(5, 0.5, 0.3), '#d9342c', p.x, A.groundH(p.x, p.z) + 3, p.z, 0, ry, s * 0.75);
-  }
+  // корона над бургером — митинг «Королевы»
+  for (let i = 0; i < 5; i++) at(G, new THREE.ConeGeometry(0.34, 1.0, 4), '#f2c230', Math.cos(i * 1.257) * 0.95, y + 2.05, b0 + Math.sin(i * 1.257) * 0.95);
+  at(G, new THREE.CylinderGeometry(1.1, 1.1, 0.55, 12, 1, true), '#f2c230', 0, y + 1.38, b0);
   // плакаты на блоках снаружи — перед и бока
   const texs = [
-    banner([t('бургер — не еда')], '#f4f1ea', '#d9342c', 512, 256, (g, x, yy, r) => drawBurger(g, x, yy, r, true)),
-    banner([t('долой булки без повода')], '#1d3f8f', '#ffd84a', 512, 256, (g, x, yy, r) => drawBurger(g, x, yy, r, true)),
-    banner([t('Королеву — в отставку!')], '#f2c230', '#1d3f8f', 512, 256, (g, x, yy, r) => drawBurger(g, x, yy, r, true)),
+    banner([t('жир — это красиво')], '#f4f1ea', '#d9342c', 512, 256, (g, x, yy, r) => drawBurger(g, x, yy, r, false)),
+    banner([t('руки прочь от бургеров!')], '#1d3f8f', '#ffd84a', 512, 256, (g, x, yy, r) => drawBurger(g, x, yy, r, false)),
+    banner([A.ADULT ? t('оземпик — не пройдёт!') : t('пилюли для худения — не пройдут!')], '#f2c230', '#1d3f8f', 512, 256, (g, x, yy, r) => drawBurger(g, x, yy, r, false)),
   ];
   F.texs = texs;
   const { W, D, aPass, nx, nz } = F.L;
@@ -698,7 +696,7 @@ function pose (dt, all) {
       q.vx *= 0.9; q.vz *= 0.9;
     }
     if (q.grp && !q.want) { A.dropMesh(q.grp); q.grp = null; FQ.live--; }
-    else if (!q.grp && q.want && budget > 0) { budget--; q.grp = A.makeHuman(null, { shirt: q.shirt }); A.scene.add(q.grp); FQ.live++; FQ.built++; }
+    else if (!q.grp && q.want && budget > 0) { budget--; q.grp = A.makeHuman(null, F && F.kind === 'burger' ? { shirt: q.shirt, fat: true } : { shirt: q.shirt }); A.scene.add(q.grp); FQ.live++; FQ.built++; }   // на митинге в поддержку ожирения — толстяки
     const bob = Math.max(0, Math.sin(beat + q.ph)) * q.amp, jump = q.hop > 0 ? Math.sin(q.hop / 0.6 * Math.PI) * 0.9 : 0;
     const ry = q.ry + (all ? 0 : Math.sin(beat * 0.25 + q.ph) * 0.15);
     if (q.grp) {
@@ -805,7 +803,7 @@ function mascotStep (dt, dC) {
   g.rotation.z = Math.sin(m.ph * 5) * 0.06;
   const [l0, l1] = g.userData.legs;
   l0.rotation.x = Math.sin(m.ph * 10) * 0.6; l1.rotation.x = -l0.rotation.x;
-  if (dC < 60 && Math.random() < dt * 0.15) say(g, pick([t('бургеры тоже люди!'), t('не угнетай!'), t('съешь бургер, курьер!'), t('Королева всё видит')]), 3.3);
+  if (dC < 60 && Math.random() < dt * 0.15) say(g, pick([t('бургеры тоже люди!'), t('жир — это красиво!'), t('съешь бургер, курьер!'), t('Королева всё видит')]), 3.3);
   // наезд
   const sp = Math.hypot(V.vx, V.vz);
   if (sp < 3) return;
@@ -824,10 +822,10 @@ function hitMascot (m, sp) {
     if (!S.freeRun) RESPECT.add(2, 'rivalMascot', true);   // в общую шкалу респекта (respect.js), всплывашка — своя ниже
     S.money += cash;
     if (!S.freeRun) A.addWallet(cash);
-    A.toast(t('маскот угнетён!') + ' ' + t('+2 респекта · премия +{money}', { money: A.money(cash) }));
-  } else A.toast(t('маскот угнетён — премии на сегодня кончились'));
+    A.toast(t('маскот митинга сбит!') + ' ' + t('+2 респекта · премия +{money}', { money: A.money(cash) }));
+  } else A.toast(t('маскот митинга сбит — премии на сегодня кончились'));
   try { A.Snd.fx('mascot', s => { A.Snd.squish(); s.blip(140, 0.25, 'square', 0.08); }); } catch (e) { /* звук не обязателен */ }
-  if (F.host && Math.hypot(F.host.position.x - V.x, F.host.position.z - V.z) < 160) say(F.host, pick([t('УРА! Минус булка!'), t('Вот это угнетение!'), t('Пицца победила!')]), 3.4);
+  if (F.host && Math.hypot(F.host.position.x - V.x, F.host.position.z - V.z) < 160) say(F.host, pick([t('Это провокация!'), t('Нашего маскота сбили!'), t('Пиццерия, позор!')]), 3.4);
   if (A.ADULT) {
     // лопается на ингредиенты — большие куски
     for (let i = 0; i < 3; i++) A.gibBurger(m.x + rand(-0.6, 0.6), m.z + rand(-0.6, 0.6));
@@ -858,7 +856,8 @@ const LINES = {
   hookah: [N_('Бизнес — это дым, брат!'), N_('Новый табак: «Пепперони». Будущее!'), N_('Кто последний на чашу?'), N_('Дуем кольцами, Солнечный!'), N_('Болгарка тоже продаётся. По-братски.')],
   hookahKids: [N_('Самовар — это бизнес, брат!'), N_('Новый чай: «Пепперони». Будущее!'), N_('Кто последний за бубликом?'), N_('Пар — это тоже облако!'), N_('Болгарка тоже продаётся. По-братски.')],
   pumpkin: [N_('Тыква номер три — 412 кило!'), N_('Новый рекорд Солнечного!'), N_('Пирог из тыквы — у шатров!'), N_('Кто вырастил больше — тот и молодец!'), N_('Не трогайте тыкву руками, это экспонат!')],
-  burger: [N_('Пицца круглая — совесть чистая!'), N_('Долой булки без повода!'), N_('Королеву — в отставку!'), N_('Бургер — это не еда, это бутерброд!'), N_('Сбей маскота — получи респект!')],
+  burger: [N_('Жир — это красиво!'), N_('Руки прочь от наших булок!'), N_('Оземпик — не пройдёт!'), N_('Худеть — не выход!'), N_('Королева нас не бросит!')],
+  burgerKids: [N_('Жир — это красиво!'), N_('Руки прочь от наших булок!'), N_('Пилюли для худения — не пройдут!'), N_('Худеть — не выход!'), N_('Королева нас не бросит!')],   // детская — без «химии» (docs/LORE.md)
 };
 
 /* ─────────────── каждый кадр ─────────────── */
@@ -877,7 +876,7 @@ export function step (dt) {
   if (dC < 140 && (F.sayT -= dt) <= 0) {
     F.sayT = rand(5, 9);
     const who = F.kind === 'hookah' ? F.stepa : F.kind === 'burger' ? F.host : null;
-    const pool = LINES[F.kind === 'hookah' && !A.ADULT ? 'hookahKids' : F.kind];
+    const pool = LINES[!A.ADULT && (F.kind === 'hookah' || F.kind === 'burger') ? F.kind + 'Kids' : F.kind];
     if (who) say(who, t(pick(pool)), 2.9);
     else if (F.kind === 'pumpkin' && F.crowd && F.crowd.P.length) {
       // объявляют со сцены — пузырь над сценой
@@ -949,7 +948,7 @@ export function announce () {
       ? [t('у ТЦ «{mall}» фестиваль кальянщиков — заказы туда', { mall: m })]
       : [t('у ТЦ «{mall}» фестиваль самоваров — заказы туда', { mall: m })],
     pumpkin: [t('у ТЦ «{mall}» фестиваль тыквы — объезжай блоки', { mall: m })],
-    burger: [t('у ТЦ «{mall}» митинг против бургеров — заказ туда', { mall: m })],
+    burger: [t('у ТЦ «{mall}» митинг в поддержку ожирения — заказ туда', { mall: m })],
   };
   const id = F;
   setTimeout(() => { if (F === id && A.chat) A.chat(lines[k][0]); }, 2500);
@@ -963,8 +962,8 @@ export function near () {
   return { x: c.x, z: c.z, r: FEST.NEAR_R };
 }
 /* n — сколько заказов смены уже собрано (0 — первый). Первый — всегда на фестиваль.
-   День угнетения бургеров (автор 12.10.2026: «менеджер говорит — там митинг, а заказ не туда ведёт, и я его не увидел»):
-   первый заказ — тоже на митинг, к проходу, и он «вместо бургера»; дальше — доля FEST.BURGER_PASS */
+   Митинг в поддержку ожирения (автор 12.10.2026: «менеджер говорит — там митинг, а заказ не туда ведёт, и я его не увидел»):
+   первый заказ — тоже на митинг, к проходу, и он «едят за двоих»; дальше — доля FEST.BURGER_PASS */
 export function passSpec (n) {
   if (!F || (F.kind !== 'hookah' && F.kind !== 'burger')) return null;
   const burger = F.kind === 'burger';
@@ -976,9 +975,9 @@ export function passSpec (n) {
   return {
     x: p.x, z: p.z,
     addr: t('{fest} · парковка ТЦ «{mall}», проход', { fest: nameOf(F.kind), mall: F.site.mall }),
-    why: burger ? t('митинг против бургеров: отдать у прохода, внутрь не проехать')
+    why: burger ? t('митинг: отдать у прохода, внутрь не проехать')
       : t('{fest}: отдать у прохода, внутрь не проехать', { fest: nameOf('hookah') }),
-    ...(burger ? { burger: FEST.BURGER_K } : {}),     // заказ на митинг — «вместо бургера», оплата ×BURGER_K
+    ...(burger ? { burger: FEST.BURGER_K } : {}),     // заказ на митинг — «едят за двоих», оплата ×BURGER_K
   };
 }
 export function burgerRoll () {

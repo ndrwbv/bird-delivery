@@ -29,3 +29,4 @@ tools/telemetry/.cache/
 # старые звуки после npm run sfx -- --force
 .sfx-old/
 promo/
+ref.local/

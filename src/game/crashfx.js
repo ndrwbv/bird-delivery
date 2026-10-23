@@ -218,12 +218,14 @@ function realLids (car) {
     lids[key] = { pv, tri: tri.length, a: 0, sign: Q.hinge === 'front' ? 1 : -1 };
   }
   if (!Object.keys(lids).length) return null;
-  // кузов без открытых крышек: индекс на каждое сочетание — один раз (пока закрыты — прежний, целиком)
-  const full = g.index, cache = { '': full };
+  // кузов без открытых крышек: индекс на каждое сочетание — один раз (пока закрыты и бамперы на месте — прежний, целиком).
+  // cut — треугольники, вырезанные навсегда (бампер улетел: realcar.js bumper → trim, 0п30) — их нет ни в одном сочетании
+  const full = g.index, cut = new Uint8Array(n);
+  let cache = { '': full };
   const without = keys => {
     const k = keys.join('+');
     if (cache[k]) return cache[k];
-    const drop = new Uint8Array(n);
+    const drop = cut.slice();
     for (const key of keys) for (let t = 0; t < n; t++) if (lidOf[t] === key) drop[t] = 1;
     let m = 0;
     for (let t = 0; t < n; t++) if (!drop[t]) m++;
@@ -232,7 +234,18 @@ function realLids (car) {
     for (let t = 0; t < n; t++) if (!drop[t]) { out[j++] = I[t * 3]; out[j++] = I[t * 3 + 1]; out[j++] = I[t * 3 + 2]; }
     return (cache[k] = new full.constructor(out, 1));
   };
-  R.lids = { body, lids, without, shown: '' };
+  /* вырезать навсегда треугольники, где test(a, b, c) (номера вершин) — кроме крышек; вернуть их вершины подряд */
+  const trim = test => {
+    const out = [];
+    for (let t = 0; t < n; t++) {
+      if (cut[t] || lidOf[t]) continue;
+      const a = I[t * 3], b = I[t * 3 + 1], c = I[t * 3 + 2];
+      if (test(a, b, c)) { cut[t] = 1; out.push(a, b, c); }
+    }
+    if (out.length) { cache = {}; g.setIndex(without(R.lids.shown ? R.lids.shown.split('+') : [])); }
+    return out;
+  };
+  R.lids = { body, lids, without, trim, shown: '' };
   ST.real++;
   return R.lids;
 }

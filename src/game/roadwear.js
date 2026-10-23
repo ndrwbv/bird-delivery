@@ -200,7 +200,7 @@ export function decorate (M, r, w, y, junc) {
   const kind = kindOf(r), dens = WEAR.PATCHES[kind];
   if (!dens) return;
   const t0 = performance.now();
-  const p = r.p, m = p[(p.length / 2) | 0];
+  const p = r.p, m = r.mid0 ? r.mid0[1] : p[(p.length / 2) | 0];   // mid0 — середина до дуг (roadsmooth.js): заплатки те же
   const R = rng(Math.round(m[0] * 13.1 + m[1] * 7.7) ^ 0x5bd1);
   // расстояния вдоль улицы: концы и перекрёстки — запретные
   const cum = [0];

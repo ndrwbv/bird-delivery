@@ -711,7 +711,8 @@ export function trafficCar (hex, taxi) {
      detail(car)    — поставить (false — полной модели ещё нет: грузится, preloadFull)
      undetail(car)  — вернуть облегчённую
      wheel(car, k)  — группа колеса 'LF' / 'RF' / 'LB' / 'RB' (отлетает — foewreck.js)
-     bumper(car, e) — 'f' / 'r': бампер вырезается из кузова и деталей модели своей сеткой (BUMPER — где он) */
+     bumper(car, e) — 'f' / 'r': бампер вырезается из кузова и деталей модели своей сеткой (BUMPER — где он); так же — у своей
+                      «Семёрки» (cardent.js hit, 0п30) */
 const FULL = {};
 const DET = { GLASS: 0x2c3946, A: 0.5 };
 export const TST = { details: 0, back: 0, cracked: 0, broken: 0, bumpers: 0 };
@@ -746,7 +747,7 @@ export function detail (car) {
     }
     o.material = own.get(src);
     if (SHARE_GEO.test(o.name)) o.geometry.userData.shared = true;
-    else { o.geometry = o.geometry.clone(); R2.dent.push(o.geometry); }
+    else { P0.set(o, o.geometry.attributes.position); o.geometry = o.geometry.clone(); R2.dent.push(o.geometry); }   // p0 — несмятая (bumper)
     const pk = /^real:win([FBLR])$/.exec(o.name);
     if (pk) R2.panes[pk[1].toLowerCase()] = { m: o, st: 0 };
   });
@@ -776,40 +777,51 @@ export function undetail (car) {
   return true;
 }
 export const wheel = (car, k) => { const R = car && car.userData.real; return R && R.detail ? R.wheelG[k] || null : null; };
-/* бампер в осях модели: z дальше этого (морда) / ближе (корма), высота от—до; |x| до — весь по ширине */
-const BUMPER = { f: { z: 1.93, y: [0.3, 0.57] }, r: { z: -1.9, y: [0.27, 0.56] }, X: 0.95 };
+/* бампер в осях модели: все три вершины треугольника дальше z (морда) / ближе (корма) и на высоте от—до; |x| до — весь по
+   ширине. Бампер «Семёрки» — от 2,08 у середины до 1,76 по углам (огибает их): до 23.10.2026 (0п30) было 1,93 / −1,9 — длинные
+   треугольники лица бампера от угла к середине оставались на машине, улетала только хромовая полоса и номер */
+const P0 = new WeakMap();                          // сетка → её несмятые вершины (общие с моделью; не в userData — clone копирует его в JSON)
+const BUMPER = { f: { z: 1.75, y: [0.3, 0.57] }, r: { z: -1.75, y: [0.27, 0.56] }, X: 0.95 };
 export function bumper (car, e) {
   const R = car && car.userData.real;
-  if (!R || !R.detail || R.cut[e] !== undefined) return null;
-  R.cut[e] = null;
-  const Q = BUMPER[e], P = [], N = [], UV = [];
-  let mat = null;
+  if (!R || (R.traffic && !R.detail) || R.C !== MODELS.semerka) return null;   // своя (0п30, 23.10.2026) и подробная копия потока; облегчённая — нет (одна сетка); BUMPER — места «Семёрки»
+  const cut = R.cut || (R.cut = {});
+  if (cut[e] !== undefined) return null;
+  cut[e] = null;
+  const Q = BUMPER[e], P = [], UV = [], parts = [];   // parts — кусок кузова и кусок деталей: у каждого своя картинка (группа сетки)
   R.m.traverse(o => {
     if (!o.isMesh || !/^real:Car_(CarBody|Details)_0$/.test(o.name) || !o.geometry.index) return;
-    const g = o.geometry, pa = g.attributes.position, ua = g.attributes.uv, I = g.index.array, keep = [];
-    let took = 0;
-    for (let t = 0; t < I.length; t += 3) {
-      let ok = true;
-      for (let j = 0; j < 3 && ok; j++) {
-        const i = I[t + j], z = pa.getZ(i), y = pa.getY(i);
-        ok = (e === 'f' ? z > Q.z : z < Q.z) && y >= Q.y[0] && y <= Q.y[1] && Math.abs(pa.getX(i)) <= BUMPER.X;
+    const g = o.geometry, pa = g.attributes.position, ua = g.attributes.uv;
+    const q0 = P0.get(o), p0 = q0 && q0.count === pa.count ? q0 : pa;   // где бампер — по несмятой сетке: вмятина от этого же удара уже сдвинула его за Q.z
+    const inZone = i => { const z = p0.getZ(i), y = p0.getY(i); return (e === 'f' ? z > Q.z : z < Q.z) && y >= Q.y[0] && y <= Q.y[1] && Math.abs(p0.getX(i)) <= BUMPER.X; };
+    const test = (a, b, c) => inZone(a) && inZone(b) && inZone(c);
+    let tris;
+    const L = R.lids && R.lids.body === o && R.lids.trim ? R.lids : null;
+    if (L) tris = L.trim(test);                      // своя: у кузова крышки — свой индекс на каждое сочетание открытых (crashfx.js realLids), резать там
+    else {
+      const I = g.index.array, keep = [];
+      tris = [];
+      for (let t = 0; t < I.length; t += 3) {
+        if (test(I[t], I[t + 1], I[t + 2])) tris.push(I[t], I[t + 1], I[t + 2]);
+        else keep.push(I[t], I[t + 1], I[t + 2]);
       }
-      if (!ok) { keep.push(I[t], I[t + 1], I[t + 2]); continue; }
-      if (!mat || /Details/.test(o.name)) mat = o.material;   // деталь (хром, резина) — её картинка; иначе кузов
-      for (let j = 0; j < 3; j++) { const i = I[t + j]; P.push(pa.getX(i), pa.getY(i), pa.getZ(i)); UV.push(ua.getX(i), ua.getY(i)); }
-      took++;
+      if (tris.length) g.setIndex(keep);
     }
-    if (took) g.setIndex(keep);
+    if (!tris.length) return;
+    parts.push({ start: P.length / 3, count: tris.length, mat: o.material });
+    for (const i of tris) { P.push(pa.getX(i), pa.getY(i), pa.getZ(i)); UV.push(ua.getX(i), ua.getY(i)); }
   });
   if (P.length < 9 * 6) return null;
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(UV, 2));
   geo.computeVertexNormals();
+  let mat = parts[0].mat;
+  if (parts.length > 1) { mat = parts.map(q => q.mat); parts.forEach((q, k) => geo.addGroup(q.start, q.count, k)); }
   const m = new THREE.Mesh(geo, mat);
   m.name = 'real:bumper-' + e;
   R.m.add(m);
-  R.cut[e] = m;
+  cut[e] = m;
   TST.bumpers++;
   return m;
 }
@@ -912,7 +924,7 @@ export function dress (car, id = 'semerka', hex) {
           own.set(o.material, mt);
         }
         o.material = own.get(o.material);
-        if (/^real:(?!wheel)/.test(o.name)) { o.geometry = o.geometry.clone(); R.dent.push(o.geometry); }   // мнётся — своя сетка
+        if (/^real:(?!wheel)/.test(o.name)) { P0.set(o, o.geometry.attributes.position); o.geometry = o.geometry.clone(); R.dent.push(o.geometry); }   // мнётся — своя сетка; p0 — несмятая (bumper: где бампер)
         const pk = /^real:win([FBLR])$/.exec(o.name);
         if (pk) R.panes[pk[1].toLowerCase()] = { m: o, st: 0 };
       }

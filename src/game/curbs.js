@@ -6,8 +6,11 @@
    Где: по обоим краям
      • дорожек во дворах и парках (CITY.paths: тропинки к подъездам, общие дорожки, выходы в сеть, дорожки
        вдоль стен, дорожки из карты) — у каждой своя полуширина (pts.hw; нет — 1 м, как плитка 2 м);
-     • дворовых проездов и пешеходок (класс 7 и 6) — по внешнему краю их плитки (метр за асфальтом).
-   Только во дворах: середина края ближе ZONE м к подъезду (парки и промзоны — без бордюров, память).
+     • дворовых проездов и пешеходок (класс 7 и 6) — по внешнему краю их плитки (метр за асфальтом), по всему городу
+       (11ц, 24.10.2026: «надо подталкивать, чтобы ездил именно по дороге»); тупик проезда — поперёк конца плитки;
+     • улиц (класс ≤ 5) — по внешнему краю тротуара там, где он не поднят (у перекрёстков, зебр, стыков, обрывков подъёма).
+   Дорожки — только во дворах: середина края ближе ZONE м к подъезду (парки — без бордюров, память). Площадки, промзоны,
+   гаражи (CITY.lots не 'park') — не газон: у проездов и улиц туда камень не ведём.
    Бордюрный камень: ширина W (0,12 м), верх на H (0,12 м) выше плитки — над газоном 0,2 м; секции по SEC м
    (на компьютере — через одну чуть другого серого, видны стыки; местами просевшие и со сколом).
    Нет бордюра там, где край ложится на другое мощёное: чужую дорожку (перекрёсток дорожек), тротуар,
@@ -18,22 +21,27 @@
    из карты и проездов на изломе — веер теми же шагами, а не 6—9-угольник): камень идёт точно по краю
    плитки; изнутри излома камни сходятся в угол (обрезаны по пересечению), а не заходят друг за друга.
 
-   Машина: бордюр — не стена. Колесо переехало камень — толчок вверх (BUMP м, гаснет за ~0,2 с) и тряска
-   камеры; скорость не теряется (step). Люди и машины потока — как раньше.
+   Машина: бордюр — не стена. Колесо переехало камень — толчок вверх (BUMP / BUMP_ON м, гаснет за ~0,2 с) и тряска
+   камеры; передними на газон — теряешь скорость и уводит вбок (took() → carbump.js 'curb'), с газона — слабее, задними — чуть.
+   Люди и машины потока — как раньше.
 
    Всё — треугольниками в клетки земли и дорог (LITM): новых вызовов отрисовки нет. Телефон (MOB): секции
    длиннее (SEC_MOB), одного цвета — вершины соседних секций общие; камень клином (грань к дорожке и скат к
-   газону, без отдельного верха) — вдвое меньше треугольников; только у дорожек, у проездов — нет (память).
+   газону, без отдельного верха) — вдвое меньше треугольников; только у дорожек, у проездов и улиц — нет (память).
+   Проверка «край газона у дороги без бордюра» — tools/probe-checks/curb-gaps.js (npm run check, id curbgap).
 
      CURBS.build(api)            — LATE-шаг (game.js, после лабиринта дворов, до smashBuild); шагами
      CURBS.bump(V, dt)           — каждый кадр езды: толчок от бордюра под колёсами, м (прибавка к высоте кузова)
+     CURBS.took()                — какой удар был ('curb' | 'curbOff' | 'curbRear' | ''): game.js бьёт им машину (carbump.js)
      CURBS.near(x, z, r)         — бордюр ближе r (yarddecor.js: не ставить на него)
-   ?nocurbs — без бордюров (сравнить).
+   ?nocurbs — без бордюров, ?oldcurbs — как до 24.10.2026 (проезды только во дворах, без улиц и тупиков; сравнить).
    ────────────────────────────────────────────────────────────────────────── */
+
+import { isArc, STATS as SMST } from './roadsmooth.js';   // плавные улицы: точки дуги — края «в ус», без дуги камня на каждой
 
 export const CURB = {
   W: 0.12,            // ширина камня, м
-  H: 0.12,            // верх над плиткой дорожки, м (над газоном — плитка 0,085 + H ≈ 0,2)
+  H: 0.15,            // верх над плиткой, м (над газоном — плитка 0,085 + H ≈ 0,23; до 24.10.2026 — 0,12, 11ц: «высокий бордюр»)
   IN: 0.02,           // камень заходит на плитку, м (без щели между ними)
   SEC: 2.0,           // секция, м (телефон — SEC_MOB, одним цветом)
   SEC_MOB: 6.0,
@@ -45,7 +53,9 @@ export const CURB = {
   SUNK: 0.07,         // доля просевших секций (верх ниже на 3—6 см, наклон)
   CHIPS: 0.05,        // доля секций со сколом
   DRIVE: 1.0,         // проезд (класс 7) и пешеходка (6): плитка за асфальтом, м (pave.js PAVE.SIDE)
-  BUMP: 0.07,         // толчок кузова, м (на скорости от 6 м/с; медленнее — меньше)
+  BUMP: 0.07,         // толчок кузова, м (на скорости от 6 м/с; медленнее — меньше) — съезд с газона на мощёное и задние колёса
+  BUMP_ON: 0.1,       // толчок передних колёс при заезде через камень на газон, м (11ц, 24.10.2026)
+  LIFT_MAX: 0.15,     // выше кузов от камня не подкидывает, м
   ARC: 0.2,           // дуга на изломе: шаг, рад (тот же — у веера плитки, bendFan; до 23.10.2026 — 0,45 и 6—9-угольник плитки)
   STRIP: 0.9,         // за камнем газон уже этого, а дальше вдоль края мощёное — бордюра нет, м
 };
@@ -69,7 +79,7 @@ export function bendFan (M, bx, bz, ux, uz, vx, vz, r, lift) {
   }
   return n;
 }
-export const ST = { ms: 0, runs: 0, m: 0, secs: 0, pathM: 0, driveM: 0, arcs: 0, cut: 0, strip: 0, miter: 0, bumps: 0, mob: 0 };
+export const ST = { ms: 0, runs: 0, m: 0, secs: 0, pathM: 0, driveM: 0, streetM: 0, capM: 0, arcs: 0, cut: 0, strip: 0, miter: 0, raised: 0, bumps: 0, onLawn: 0, offLawn: 0, mob: 0 };
 
 let A = null, ON = false;
 const segD = (x, z, ax, az, bx, bz) => {
@@ -87,7 +97,7 @@ function hsh (x, z, k) {
 /* ── дорожки по клеткам: [ax, az, bx, bz, hw] (свои — для «край лёг на чужую дорожку») ── */
 const PC = 16;
 const ck = (i, j) => (i + 8192) * 16384 + j + 8192;
-let PG = null, LOTS = null;
+let PG = null, LOTS = null, LOTX = null;
 function pgAdd (s) {
   const m = s[4] + 0.5;
   for (let i = Math.floor((Math.min(s[0], s[2]) - m) / PC); i <= Math.floor((Math.max(s[0], s[2]) + m) / PC); i++)
@@ -111,22 +121,31 @@ function onPath (x, z, self) {
   }
   return false;
 }
-function inLot (x, z) {
-  const a = LOTS.get(ck(Math.floor(x / 40), Math.floor(z / 40)));
+function inLot (x, z, M = LOTS) {
+  const a = M.get(ck(Math.floor(x / 40), Math.floor(z / 40)));
   if (a) for (const b of a) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1 && A.inPoly(x, z, b.p)) return true;
   return false;
 }
-/* стоянка, чья рамка задевает прямоугольник */
-function lotIn (x0, z0, x1, z1) {
+/* стоянка (или площадка — M = LOTX), чья рамка задевает прямоугольник */
+function lotIn (x0, z0, x1, z1, M = LOTS) {
   for (let i = Math.floor(x0 / 40); i <= Math.floor(x1 / 40); i++) for (let j = Math.floor(z0 / 40); j <= Math.floor(z1 / 40); j++) {
-    const a = LOTS.get(ck(i, j));
+    const a = M.get(ck(i, j));
     if (a) for (const b of a) if (b.x1 >= x0 && b.x0 <= x1 && b.z1 >= z0 && b.z0 <= z1) return true;
   }
   return false;
 }
 /* по краю (edge): есть ли вообще рядом дом / стоянка / карман парковки. Нет — их пробы в точках края заведомо «нет», и их
    не зовём (ответ тот же; на Деке бордюры строились ~5 с, это треть). Вне края (дуги) — всё как есть */
-let EH = true, EL = true, EY = true;
+let EH = true, EL = true, EY = true, EX = true;
+/* ALL — край проездов, пешеходок и улиц (11ц, 24.10.2026): по всему городу, не только во дворах; площадки, промзоны и гаражи
+   (CITY.lots не 'park') — не газон, туда камень не ведём. RSW — край тротуара улицы (от края камня внутрь до полотна, м):
+   там, где тротуар поднят (бордюр 0,28 м, game.js osmCurbs), камня нет — у поднятого тротуара грань к газону своя */
+let ALL = false, RSW = 0;
+/* ?oldcurbs — как до 24.10.2026 целиком (сравнить «было»): и камень, и езда (через камень — только толчок, скорость не теряется) */
+export const RULES = { on: true };
+/* поперёк тупика проезда: pave.js считает конец плитки кругом (полуширина от последней точки), а плитка обрезана прямо —
+   полотно и тротуар проверяем дальше по ходу на CX, CZ (за кругом своего конца): там чужое мощёное — камня нет */
+let CX = 0, CZ = 0;
 /* край камня (середина) в точке — на другом мощёном или в доме: тут бордюра нет */
 /* onPave по частям (pave.js roadWalk / pathAt): дорожка из карты сама по себе бордюру не мешает, проверять её
    (до 20 кусков в клетке) не нужно — то же, что «onPave ∈ полотно, тротуар, аллея» и «дорожка + аллея» */
@@ -140,14 +159,20 @@ function rwaPaved (x, z) {                           // paved: полотно, �
   return !!RW(x, z) || (!!A.onAlley && A.onAlley(x, z, 0) && !A.pathAt(x, z, 0));
 }
 function covered (x, z, self) {
-  if (!inZone(x, z)) return true;
+  if (!ALL && !inZone(x, z)) return true;
   if (onPath(x, z, self)) return true;
-  if (rwa(x, z)) return true;
+  if (rwa(x + CX, z + CZ)) return true;
   if (EH && A.inHouse(x, z, 0.05)) return true;
   if (A.groundH(x, z) < 0.3) return true;
   if (EL && inLot(x, z)) return true;
   if (EY && A.ycBlocks && A.ycBlocks(x, z, 0.2)) return true;
   if (A.extra && A.extra(x, z)) return true;
+  if (ALL && EX && inLot(x, z, LOTX)) return true;
+  return false;
+}
+/* тротуар улицы поднят поперёк в этой точке края (середина камня x, z; n — к газону) */
+function raised (x, z, nx, nz) {
+  for (let q = 0.45; q < RSW - 0.2; q += 0.45) if (A.curbAt(x - nx * q, z - nz * q) > 0) return true;
   return false;
 }
 
@@ -162,7 +187,7 @@ function paved (x, z) {
    снова мощёное: стык газона и тротуара — тут бордюра нет. Вдоль — три пробы (±1 м): поперечное мощёное
    (дорожка подходит к нашей под углом) — не в счёт */
 function strip (x, z, ux, uz, nx, nz) {
-  const g = CURB.W / 2 + CURB.STRIP, px = x + nx * g, pz = z + nz * g;
+  const g = CURB.W / 2 + CURB.STRIP, px = x + nx * g + CX, pz = z + nz * g + CZ;   // CX, CZ — тупик: за кругом своего конца
   return paved(px, pz) && paved(px + ux, pz + uz) && paved(px - ux, pz - uz);
 }
 
@@ -175,7 +200,8 @@ const inZone = (x, z) => ZN.has(ck(Math.floor(x / ZC), Math.floor(z / ZC)));
    потом — один Float32Array, по ключу клетки — где начинается и сколько (BI: начало × 1024 + сколько) ── */
 const BC = 32;
 let BG = new Map(), BI = new Map(), BF = null;
-function bgAdd (ax, az, bx, bz) {
+function bgAdd (ax, az, bx, bz, nx, nz) {
+  if ((bx - ax) * nz - (bz - az) * nx < 0) { let t = ax; ax = bx; bx = t; t = az; az = bz; bz = t; }   // газон — слева от a→b (толчок знает, куда заехал)
   for (let i = Math.floor((Math.min(ax, bx) - 0.2) / BC); i <= Math.floor((Math.max(ax, bx) + 0.2) / BC); i++)
     for (let j = Math.floor((Math.min(az, bz) - 0.2) / BC); j <= Math.floor((Math.max(az, bz) + 0.2) / BC); j++) {
       const k = ck(i, j);
@@ -229,12 +255,13 @@ function run (P, ux, uz, nx, nz, t0, t1, lift) {
     const a = k ? t0 + k * sl : t0, b = k + 1 < n ? t0 + (k + 1) * sl : t1;   // концы соседних секций — одно и то же число (общие вершины)
     section(P[0] + ux * a, P[1] + uz * a, P[0] + ux * b, P[1] + uz * b, nx, nz, lift, k0 + k);
   }
-  bgAdd(P[0] + ux * t0, P[1] + uz * t0, P[0] + ux * t1, P[1] + uz * t1);
+  bgAdd(P[0] + ux * t0, P[1] + uz * t0, P[0] + ux * t1, P[1] + uz * t1, nx, nz);
   ST.runs++; ST.m += L;
 }
 /* край отрезка: P — начало средней линии камня, вдоль u на L м; где не накрыто — куски */
 function edge (P, ux, uz, nx, nz, L, lift, self, t0 = 0) {
-  const st = CURB.STEP, at = t => covered(P[0] + ux * t, P[1] + uz * t, self) || (strip(P[0] + ux * t, P[1] + uz * t, ux, uz, nx, nz) && ++ST.strip > 0);
+  const st = CURB.STEP, at = t => (RSW > 0 && raised(P[0] + ux * t, P[1] + uz * t, nx, nz) && ++ST.raised > 0) ||
+    covered(P[0] + ux * t, P[1] + uz * t, self) || (strip(P[0] + ux * t, P[1] + uz * t, ux, uz, nx, nz) && ++ST.strip > 0);
   const fine = (a, b, wantFree) => {              // граница между a (как wantFree) и b — делением пополам
     for (let i = 0; i < 4; i++) { const m = (a + b) / 2; if (!at(m) === wantFree) a = m; else b = m; }
     return a;
@@ -246,6 +273,7 @@ function edge (P, ux, uz, nx, nz, L, lift, self, t0 = 0) {
     EH = !A.houseIn || A.houseIn(x0 - 0.06, z0 - 0.06, x1 + 0.06, z1 + 0.06);
     EL = lotIn(x0 - M, z0 - M, x1 + M, z1 + M);
     EY = !!A.ycBlocks && A.ycBlocks((ax + bx) / 2, (az + bz) / 2, 0.2 + (L - t0) / 2 + 2.5);
+    EX = ALL && lotIn(x0 - M, z0 - M, x1 + M, z1 + M, LOTX);
     // дорожки рядом: из клеток PG, чья рамка (+ полуширина) задевает край с полоской (± M); куски дорог — у pave.js
     const st = ++PST; EPL.length = 0;
     for (let i = Math.floor((x0 - M) / PC); i <= Math.floor((x1 + M) / PC); i++)
@@ -254,7 +282,7 @@ function edge (P, ux, uz, nx, nz, L, lift, self, t0 = 0) {
         if (c) for (let k = 0; k < c.length; k++) { const q = c[k]; if (q[9] !== st && q[7] >= x0 - M && q[5] <= x1 + M && q[8] >= z0 - M && q[6] <= z1 + M) { q[9] = st; EPL.push(q); } }
       }
     if (A.roadsIn) A.roadsIn(x0 - M, z0 - M, x1 + M, z1 + M, ERL);
-    EP = !!A.roadsIn;
+    EP = !!A.roadsIn && !CX && !CZ;          // тупик (CX, CZ): полотно — по всему городу, не по списку у края
   }
   let s0 = null, prevT = t0, prevFree = false;
   for (let t = t0; ; t += st) {
@@ -264,7 +292,7 @@ function edge (P, ux, uz, nx, nz, L, lift, self, t0 = 0) {
     prevT = tt; prevFree = free;
     if (tt >= L) break;
   }
-  EH = EL = EY = true; EP = false;
+  EH = EL = EY = EX = true; EP = false;
   if (s0 !== null) run(P, ux, uz, nx, nz, s0, L, lift);
 }
 /* дуга снаружи излома: вокруг точки (cx, cz) радиусом r от угла a0 на da */
@@ -276,7 +304,7 @@ function arc (cx, cz, r, a0, da, lift, self) {
     if (covered(mx, mz, self)) continue;
     const x0 = cx + Math.cos(a) * r, z0 = cz + Math.sin(a) * r, x1 = cx + Math.cos(b) * r, z1 = cz + Math.sin(b) * r;
     section(x0, z0, x1, z1, Math.cos(m), Math.sin(m), lift, k);
-    bgAdd(x0, z0, x1, z1);
+    bgAdd(x0, z0, x1, z1, Math.cos(m), Math.sin(m));
     ST.arcs++; ST.m += Math.hypot(x1 - x0, z1 - z0);
   }
 }
@@ -289,24 +317,31 @@ const turn = (ax, az, bx, bz, cx, cz) => {            // излом в b: { cr, 
   const cr = ux * vz - uz * vx, dot = ux * vx + uz * vz;
   return { cr, tan: Math.abs(cr) / Math.max(0.05, 1 + dot) };
 };
-function line (pts, hw, lift, segs) {
+/* плавные улицы (roadsmooth.js): у точки дуги (излом ≤ ~25°) снаружи край не обрывается и не ведёт дугу камня — оба края
+   продлены до биссектрисы излома («в ус», как плитка и тротуар в game.js), изнутри — как обычно, обрезаны. pre / post — точка
+   соседнего куска за концом (стык двух кусков одной улицы на дуге) */
+const ARCT = () => Math.tan(CURB.ARC) + 1e-6;       // tg половины излома, не больше: круче двух шагов дуги камня (~23°) — снаружи дугой (круглее), как у плитки
+function line (pts, hw, lift, segs, pre = null, post = null) {
   const off = hw - CURB.IN + CURB.W / 2;            // середина камня от оси
+  const SM = SMST.done > 0, MT = ARCT();
   for (let i = 1; i < pts.length; i++) {
     const [ax, az] = pts[i - 1], [bx, bz] = pts[i], L = Math.hypot(bx - ax, bz - az);
     if (L < 0.3) continue;
     const ux = (bx - ax) / L, uz = (bz - az) / L, self = segs ? segs[i - 1] : null;
-    const tA = i > 1 ? turn(pts[i - 2][0], pts[i - 2][1], ax, az, bx, bz) : null;
-    const tB = i < pts.length - 1 ? turn(ax, az, bx, bz, pts[i + 1][0], pts[i + 1][1]) : null;
+    const pA = i > 1 ? pts[i - 2] : pre, pB = i < pts.length - 1 ? pts[i + 1] : post;
+    const tA = pA ? turn(pA[0], pA[1], ax, az, bx, bz) : null;
+    const tB = pB ? turn(ax, az, bx, bz, pB[0], pB[1]) : null;
+    const mA = SM && tA && tA.tan < MT && isArc(ax, az), mB = SM && tB && tB.tan < MT && isArc(bx, bz);
     for (const sd of [-1, 1]) {
       const nx = -uz * sd, nz = ux * sd;
-      // изнутри излома (нормаль этой стороны смотрит в поворот) — край короче на off·tg(угла/2)
-      const cutA = tA && tA.cr * sd > 0 ? Math.min(L / 2, off * tA.tan) : 0;
-      const cutB = tB && tB.cr * sd > 0 ? Math.min(L / 2, off * tB.tan) : 0;
+      // изнутри излома (нормаль этой стороны смотрит в поворот) — край короче на off·tg(угла/2); снаружи у точки дуги — длиннее
+      const cutA = tA && tA.cr * sd > 0 ? Math.min(L / 2, off * tA.tan) : mA ? -off * tA.tan : 0;
+      const cutB = tB && tB.cr * sd > 0 ? Math.min(L / 2, off * tB.tan) : mB ? -off * tB.tan : 0;
       if (cutA || cutB) ST.miter++;
       if (L - cutA - cutB < CURB.MIN) continue;
       edge([ax + nx * off, az + nz * off], ux, uz, nx, nz, L - cutB, lift, self, cutA);
     }
-    if (i < pts.length - 1) {                       // излом: снаружи — дугой от нормали этого отрезка до нормали следующего
+    if (i < pts.length - 1 && !RSW && !mB) {        // излом: снаружи — дугой от нормали этого отрезка до нормали следующего (у улиц — нет: угол тротуара — пятно, не дуга)
       const [cx, cz] = pts[i + 1], L2 = Math.hypot(cx - bx, cz - bz);
       if (L2 < 0.3) continue;
       const vx = (cx - bx) / L2, vz = (cz - bz) / L2, cr = ux * vz - uz * vx;
@@ -324,18 +359,21 @@ function line (pts, hw, lift, segs) {
 export function* build (api) {
   const QS = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
   if (QS && QS.has('nocurbs')) return ST;
+  const OLD = !!(QS && QS.has('oldcurbs'));         // ?oldcurbs — как до 24.10.2026: проезды только во дворах, без тупиков и улиц, камень 0,12 м, без потери скорости (сравнить)
+  if (OLD) { RULES.on = false; CURB.H = 0.12; }
   const t0 = performance.now();
   A = api; LITM = api.LITM; MOB = !!(api.mobile && api.mobile()); SEC = MOB ? CURB.SEC_MOB : CURB.SEC; ST.mob = MOB ? 1 : 0;
   const C = A.CITY;
   // стоянки (CITY.lots: k = 'park') — асфальт: туда бордюр не ведём
-  LOTS = new Map();
+  LOTS = new Map(); LOTX = new Map();
   for (const l of C.lots || []) {
-    if (l.k !== 'park' || !l.p || l.p.length < 3) continue;
+    if (!l.p || l.p.length < 3) continue;
+    const LM = l.k === 'park' ? LOTS : LOTX;        // площадки, промзоны, гаражи — не газон: только для края проездов и улиц (ALL)
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const q of l.p) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); z0 = Math.min(z0, q[1]); z1 = Math.max(z1, q[1]); }
     const b = { p: l.p, x0, x1, z0, z1 };
     for (let i = Math.floor(x0 / 40); i <= Math.floor(x1 / 40); i++) for (let j = Math.floor(z0 / 40); j <= Math.floor(z1 / 40); j++) {
-      const k = ck(i, j); let a = LOTS.get(k); if (!a) LOTS.set(k, a = []); a.push(b);
+      const k = ck(i, j); let a = LM.get(k); if (!a) LM.set(k, a = []); a.push(b);
     }
   }
   ZN = new Set();
@@ -363,16 +401,58 @@ export function* build (api) {
     if (++n % 40 === 0) yield 'бордюры: дорожки';   // шаг ≤ ~50 мс на Деке (случайных чисел здесь нет — шаги можно двигать)
   }
   ST.pathM = Math.round(ST.m); m0 = ST.m;
-  // дворовые проезды и пешеходки: по внешнему краю их плитки (телефон — нет: пик памяти поздней сборки у порога)
+  // дворовые проезды и пешеходки: по внешнему краю их плитки — по всему городу, не только во дворах (11ц, 24.10.2026: «надо
+  // подталкивать, чтобы ездил именно по дороге»); тупик проезда — поперёк, у конца плитки (телефон — нет: пик памяти поздней сборки у порога)
+  const inB = r => !A.inBounds || (OLD ? A.inBounds(r.p[0][0], r.p[0][1], -20) : r.p.some(q => A.inBounds(q[0], q[1], -20)));   // хоть одна точка в черте (до 24.10.2026 — первая: проезды, что начинались за краем, оставались без камня)
+  ALL = !OLD;
+  const deg = new Map(), pk = q => q[0] * 65536 + q[1];
+  if (!MOB) for (const r of C.roads) for (let i = 0; i < r.p.length; i++) { const k = pk(r.p[i]); deg.set(k, (deg.get(k) || 0) + (i === 0 || i === r.p.length - 1 ? 1 : 2)); }
+  // плавные улицы: стык двух кусков одной улицы на дуге (в точке концы ровно двух) — точка соседа за концом (line: pre / post)
+  const ENDS = new Map();
+  if (!MOB && SMST.done) for (const r of C.roads) if (r.p.length >= 2) for (const [e, f] of [[r.p[0], r.p[1]], [r.p[r.p.length - 1], r.p[r.p.length - 2]]]) {
+    if (!isArc(e[0], e[1])) continue;
+    const k = pk(e); let a = ENDS.get(k); if (!a) ENDS.set(k, a = []); a.push([r, f]);
+  }
+  const nbAt = (r, e) => {
+    if (!ENDS.size || deg.get(pk(e)) !== 2) return null;
+    const a = ENDS.get(pk(e));
+    const o = a && a.length === 2 ? a.find(q => q[0] !== r) : null;
+    return o ? o[1] : null;
+  };
+  const joint = r => [nbAt(r, r.p[0]), nbAt(r, r.p[r.p.length - 1])];
   for (const r of MOB ? [] : C.roads) {
     if (r.b || (r.c !== 6 && r.c !== 7) || r.p.length < 2) continue;
-    if (A.inBounds && !A.inBounds(r.p[0][0], r.p[0][1], -20)) continue;
-    line(r.p, A.roadWidth(r) / 2 + CURB.DRIVE, 0.09, null);
+    if (!inB(r)) continue;
+    const hw = A.roadWidth(r) / 2 + CURB.DRIVE;
+    line(r.p, hw, 0.09, null, ...joint(r));
+    if (r.c === 7 && !OLD) for (const [e, f] of [[r.p[0], r.p[1]], [r.p[r.p.length - 1], r.p[r.p.length - 2]]]) {
+      if (deg.get(pk(e)) !== 1) continue;
+      const L = Math.hypot(e[0] - f[0], e[1] - f[1]);
+      if (L < 1) continue;
+      const ux = (e[0] - f[0]) / L, uz = (e[1] - f[1]) / L, vx = -uz, vz = ux, off = hw - CURB.IN + CURB.W / 2, c = CURB.W / 2 - CURB.IN, m1 = ST.m;
+      CX = ux * (hw + 0.15); CZ = uz * (hw + 0.15);
+      edge([e[0] + ux * c - vx * off, e[1] + uz * c - vz * off], vx, vz, ux, uz, off * 2, 0.09, null);   // поперёк конца: газон — дальше по ходу
+      CX = CZ = 0;
+      ST.capM += ST.m - m1;
+    }
     if (++n % 15 === 0) yield 'бордюры: проезды';  // проезды длиннее дорожек: на Деке по 70 было до 95 мс на шаг
   }
-  ST.driveM = Math.round(ST.m - m0);
+  ST.driveM = Math.round(ST.m - m0); m0 = ST.m;
+  // улицы (класс ≤ 5): по внешнему краю тротуара — только там, где он не поднят (у перекрёстков, зебр, стыков и обрывков
+  // поднятого тротуара — плита вровень с газоном): камень тот же, что у проездов
+  for (const r of MOB || OLD || !A.curbAt ? [] : C.roads) {
+    if (r.b || r.c > 5 || r.x || r.p.length < 2) continue;
+    if (!inB(r)) continue;
+    const w = A.roadWidth(r);
+    RSW = 2.75 + (r.g || 0) + CURB.W / 2;
+    line(r.p, w / 2 + 2.75 + (r.g || 0), 0.1 + (7 - r.c) * 0.004, null, ...joint(r));
+    RSW = 0;
+    if (++n % 15 === 0) yield 'бордюры: улицы';
+  }
+  ALL = false;
+  ST.streetM = Math.round(ST.m - m0); ST.capM = Math.round(ST.capM);
   bgPack();                                         // толчок: один типизированный массив (меньше памяти, чем массивы чисел)
-  PG = null; LOTS = null; ZN = null;
+  PG = null; LOTS = null; LOTX = null; ZN = null;
   ON = true;
   ST.m = Math.round(ST.m);
   ST.ms = Math.round(performance.now() - t0);
@@ -388,27 +468,29 @@ export function near (x, z, r = 0.3) {
   for (let i = i0; i < i1; i += 4) if (segD(x, z, a[i], a[i + 1], a[i + 2], a[i + 3]) < r) return true;
   return false;
 }
-/* отрезок p—q пересекает камень? */
+/* отрезок p—q пересекает камень? 1 — заехал на газон (q слева от камня), −1 — съехал с газона, 0 — нет */
 function crosses (px, pz, qx, qz) {
   const kq = ck(Math.floor(qx / BC), Math.floor(qz / BC)), kp = ck(Math.floor(px / BC), Math.floor(pz / BC));
-  return crossIn(kq, px, pz, qx, qz) || (kp !== kq && crossIn(kp, px, pz, qx, qz));
+  return crossIn(kq, px, pz, qx, qz) || (kp !== kq ? crossIn(kp, px, pz, qx, qz) : 0);
 }
 function crossIn (key, px, pz, qx, qz) {
   const v = BI.get(key);
-  if (v === undefined) return false;
+  if (v === undefined) return 0;
   const a = BF, i0 = Math.floor(v / 1024) * 4, i1 = i0 + (v % 1024) * 4;
   const dx = qx - px, dz = qz - pz;
   for (let i = i0; i < i1; i += 4) {
     const ax = a[i], az = a[i + 1], ex = a[i + 2] - ax, ez = a[i + 3] - az, den = dx * ez - dz * ex;
     if (Math.abs(den) < 1e-9) continue;
     const t = ((ax - px) * ez - (az - pz) * ex) / den, u = ((ax - px) * dz - (az - pz) * dx) / den;
-    if (t >= 0 && t <= 1 && u >= -0.02 && u <= 1.02) return true;
+    if (t >= 0 && t <= 1 && u >= -0.02 && u <= 1.02) return ex * (qz - az) - ez * (qx - ax) > 0 ? 1 : -1;
   }
-  return false;
+  return 0;
 }
 /* Толчок: переднее или заднее колесо (по оси машины, ±1,4 м) за кадр пересекло камень — кузов подкидывает.
-   Вернёт прибавку к высоте кузова, м. V — машина игрока (x, z, h, vx, vz, air) */
-const BS = { lift: 0, vy: 0, fx: NaN, fz: NaN, rx: NaN, rz: NaN, shake: 0 };
+   Вернёт прибавку к высоте кузова, м. V — машина игрока (x, z, h, vx, vz, air).
+   Какой удар (11ц, 24.10.2026) — took(): передние колёса через камень на газон — 'curb' (теряешь скорость, уводит вбок,
+   carbump.js), с газона на мощёное — 'curbOff' (слабее), задние — 'curbRear' (чуть) */
+const BS = { lift: 0, vy: 0, fx: NaN, fz: NaN, rx: NaN, rz: NaN, shake: 0, hit: '' };
 export function bump (V, dt) {
   if (!ON) return 0;
   const sx = Math.sin(V.h), sz = Math.cos(V.h);
@@ -416,11 +498,14 @@ export function bump (V, dt) {
   const sp = Math.hypot(V.vx || 0, V.vz || 0);
   if (!V.air && BS.fx === BS.fx && sp > 0.8) {
     const step = Math.hypot(fx - BS.fx, fz - BS.fz);
-    if (step < 3 && (crosses(BS.fx, BS.fz, fx, fz) || crosses(BS.rx, BS.rz, rx, rz))) {
+    const f = step < 3 ? crosses(BS.fx, BS.fz, fx, fz) : 0, r = step < 3 && !f ? crosses(BS.rx, BS.rz, rx, rz) : 0;
+    if (f || r) {
       const k = Math.min(1, 0.35 + sp / 9);
-      BS.vy = Math.max(BS.vy, CURB.BUMP * k * 18);    // вверх, гаснет пружиной
-      BS.shake = 0.06 * k;
+      BS.vy = Math.max(BS.vy, (f > 0 ? CURB.BUMP_ON : CURB.BUMP) * k * 18);    // вверх, гаснет пружиной
+      BS.shake = (f > 0 ? 0.09 : 0.06) * k;
+      BS.hit = f > 0 ? 'curb' : f < 0 ? 'curbOff' : 'curbRear';
       ST.bumps++;
+      if (f > 0) ST.onLawn++; else if (f < 0) ST.offLawn++;
     }
   }
   BS.fx = fx; BS.fz = fz; BS.rx = rx; BS.rz = rz;
@@ -428,10 +513,12 @@ export function bump (V, dt) {
   BS.lift += BS.vy * dt;
   BS.vy -= (BS.lift * 380 + BS.vy * 18) * dt;
   if (BS.lift < 0) { BS.lift = 0; if (BS.vy < 0) BS.vy = 0; }
-  if (BS.lift > 0.12) BS.lift = 0.12;
+  if (BS.lift > CURB.LIFT_MAX) BS.lift = CURB.LIFT_MAX;
   return BS.lift;
 }
 /* тряска камеры от последнего толчка (game.js берёт и обнуляет) */
 export function shake () { const s = BS.shake; BS.shake = 0; return s; }
+/* какой удар был за кадр ('curb' | 'curbOff' | 'curbRear' | ''): game.js берёт, обнуляет и бьёт машину (carbump.js hit) */
+export function took () { const h = BS.hit; BS.hit = ''; return RULES.on ? h : ''; }
 
-export const DEBUG = { CURB, ST, near, get cells () { return BI.size; }, get floats () { return BF ? BF.length : 0; }, get segs () { return BF; }, BS };
+export const DEBUG = { CURB, ST, near, get api () { return A; }, get cells () { return BI.size; }, get floats () { return BF ? BF.length : 0; }, get segs () { return BF; }, BS };
