@@ -7,6 +7,9 @@
    (женщины — из qJ2gsTUBHL.glb → winterF.glb). PNG — проверочная картинка.
 2. Всё в игру: `python3 glb2q2.py ../../src/game/qpeople.data.js "M:Walk,Run:worker=…,…,winter=winterM.glb" "F:…" "A:Female_Walk,Female_Run:…"`
    — кости, ходьба и бег, части (голова, тело, ноги, ступни, шапки); одежда из Blender перекладывается в позу покоя семейства.
+2а. Легче (обязательно после п. 2, 23.10.2026): `node slim.mjs ../../src/game/qpeople.data.js` — сварка одинаковых вершин и
+   упрощение meshoptimizer (ошибка 4 мм, шапки 2,5 мм; края частей и краски не двигаются). Один раз на свежий выход glb2q2.py —
+   второй раз скрипт откажется (пометка «slim» в шапке файла); `--dry` — только числа. Зачем — docs/AGENTS.md «Память на телефоне».
 3. Проверка: `npm run probe -- --eval=tools/probe-checks/qlook.js --max=0 --q=season=2.4` — лист 16 человек.
 4. Добавочные клипы (наклон «Interact» — поднять с земли, carried.js), без пересборки qpeople.data.js:
    `python3 clipadd.py ../../src/game/qpeople.clips.js "M:Interact:worker.glb" "F:Interact:qJ2gsTUBHL.glb"` — модель та же,

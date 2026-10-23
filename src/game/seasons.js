@@ -92,6 +92,12 @@ export const mudAmt = () => A.mud || 0;
 export const wetAmt = () => A.wet || 0;
 /* сколько снега падает сейчас (снегопад 0…1) — дворникам (wipers.js) */
 export const snowFall = () => (SKY ? SKY.amt : 0);
+/* погода волнами (weather.js, 12ах 23.10.2026): snow — снегопад этой силы вместо своего жребия и VAR.snowfall (null — как
+   было), wind 0…1 — метель (снег летит вбок до 9,5 м/с, сбитые сугробы отрастают до 4 раз быстрее), wet — асфальт мокрее
+   (ливень; null — как у сезона и варианта). Ставит weather.js каждый кадр смены */
+const WX = { snow: null, wind: 0, wet: null };
+export function setWx (snow = null, wind = 0, wet = null) { WX.snow = snow; WX.wind = wind || 0; WX.wet = wet; }
+export const blizzard = () => WX.wind;
 /* жара (вариант погоды weather.js): 0 … 1 — трава выжжена (lawnprops.js красит пучки в солому) */
 export const heatAmt = () => U.uHeat.value || 0;
 /* река во льду (сёрферу там не место) */
@@ -1143,7 +1149,8 @@ function stepSky (dt) {
     if ((SKY.t -= dt) <= 0) { SKY.want = SKY.want ? 0 : Math.random() < 0.55 ? rnd(0.3, 0.7) : 0; SKY.t = SKY.want ? rnd(40, 90) : rnd(30, 80); }
     if (rain) rain.visible = false;                      // дождь зимой — это снег
   } else SKY.want = 0;
-  const want = sn > 0.45 ? Math.max(SKY.want, ENV.rain || 0, (VAR && VAR.snowfall) || 0) : 0;
+  const want = sn > 0.45 ? (WX.snow != null ? WX.snow : Math.max(SKY.want, ENV.rain || 0, (VAR && VAR.snowfall) || 0)) : 0;
+  U.uWet.value = WX.wet != null ? Math.max(A.wet || 0, WX.wet) : A.wet || 0;   // ливень — асфальт мокрее (weather.js)
   SKY.amt += (want - SKY.amt) * (1 - Math.exp(-0.5 * dt));
   // небо: зимой бледнее, осенью чуть серее, свет от снега снизу
   const day = 1 - night;
@@ -1162,9 +1169,10 @@ function stepSky (dt) {
   // и пройденный путь; путь — по модулю, кратному всем коробкам и скоростям, чтобы число не росло и не было скачка
   u.uO.value.set(cp.x + fx * 14, cp.y, cp.z + fz * 14);
   u.uOi.value.set(cp.x + fx * 6, cp.y, cp.z + fz * 6);
-  SKY.fall = (SKY.fall + (2.0 + SKY.amt * 1.6) * dt) % 46200;     // 46 200 м × любая скорость 0,7…1,18 — целое число высот коробок 22 и 42 м
-  SKY.dx = (SKY.dx + 0.5 * dt) % 1140;                             // снос ветром 0,5 м/с; 1 140 — кратно ширине коробок 30 и 76 м
+  SKY.fall = (SKY.fall + (2.0 + SKY.amt * 1.6 + WX.wind * 1.4) * dt) % 46200;     // 46 200 м × любая скорость 0,7…1,18 — целое число высот коробок 22 и 42 м
+  SKY.dx = (SKY.dx + (0.5 + WX.wind * 9) * dt) % 1140;            // снос ветром 0,5 м/с (в метель — до 9,5); 1 140 — кратно ширине коробок 30 и 76 м
   u.uFall.value = SKY.fall; u.uDx.value = SKY.dx;
+  u.uS.value = 64 * (1 + 0.45 * WX.wind);                          // в метель хлопья крупнее (ближе к глазам)
   u.uW.value = U.uTime.value % (6.283185307 / 0.9);                 // покачивание ±0,44 м с периодом 7 с
   SNOWF.geometry.setDrawRange(0, Math.floor(SF_N * Math.min(1, 0.35 + SKY.amt)));
 }
@@ -1208,8 +1216,8 @@ function stepCar (dt) {
     growT = 0.25;
     for (let i = GROW.length - 1; i >= 0; i--) {
       const d = GROW[i];
-      if ((d.t -= 0.25) > 0) continue;
-      const s = Math.min(1, d.s + 0.06);
+      if ((d.t -= 0.25 * (1 + 3 * WX.wind)) > 0) continue;   // в метель отрастают быстрее (weather.js)
+      const s = Math.min(1, d.s + 0.06 * (1 + 3 * WX.wind));
       driftShape(d, s);
       if (s >= 1) GROW.splice(i, 1);
     }

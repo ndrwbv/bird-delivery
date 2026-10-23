@@ -544,6 +544,7 @@ export function decorate (car) {
 }
 
 /* ─────────────── камера ─────────────── */
+const CAM = { EYE: 1.65, FACE: 1.45, SIT_EYE: 1.35, SIT_FACE: 0.78 };   // м над землёй у двери: камера (глаза) и куда смотрит (лица); сидит — камера SIT_EYE, лицо на SIT_FACE над сиденьем
 const V3 = () => new API.THREE.Vector3();
 let CP = null, CL = null, CPW = null, CLW = null;
 function shotPose (name) {
@@ -556,12 +557,17 @@ function shotPose (name) {
   const cx = c ? c.x : h.ex + h.nx * 2.4, cz = c ? c.z : h.ez + h.nz * 2.4;
   const sd = CUT.side, sx = h.sx * sd, sz = h.sz * sd, nx = h.nx, nz = h.nz;
   const mx = (zx + cx) / 2, mz = (zz + cz) / 2;
+  // камера — на уровне глаз (CAM.EYE над землёй), смотрит на лица (CAM.FACE); автор 18.10.2026 (0аи): «камера задирается
+  // вверх, ничего не понятно — камера на уровне глаз на героя». До 23.10.2026 общий план был с 5,5 м и за 16 м от двери,
+  // крупные — с 1,9—2,05 м сверху вниз на пояс
+  const E = gy + CAM.EYE, F = gy + CAM.FACE;
+  const zs = z && z.sit ? z.sit : 0, FZ = zs ? gy + zs + CAM.SIT_FACE : F, EZ = zs ? gy + CAM.SIT_EYE : E;   // герой сидит (Стёпа на лавочке) — лицо ниже
   switch (name) {
-    case 'establish': return [[h.ex + nx * 15 + sx * 6, gy + 5.5, h.ez + nz * 15 + sz * 6], [h.ex + nx * 2, gy + 2.2, h.ez + nz * 2], [-sx * 0.25, 0, -sz * 0.25]];
-    // лица — в верхней половине кадра: низ закрывает диалог
-    case 'two': return [[mx + sx * 5.2 + nx * 2.2, gy + 1.95, mz + sz * 5.2 + nz * 2.2], [mx, gy + 1.05, mz], [nx * 0.08, 0.02, nz * 0.08]];
-    case 'zina': return [[cx + nx * 2.3 + sx * 2.1, gy + 2.05, cz + nz * 2.3 + sz * 2.1], [zx, gy + 1.2, zz], [sx * 0.05, 0, sz * 0.05]];
-    case 'courier': return [[zx + nx * 0.35 + sx * 3.3, gy + 1.9, zz + nz * 0.35 + sz * 3.3], [cx, gy + 1.15, cz], [-sx * 0.05, 0, -sz * 0.05]];
+    case 'establish': return [[h.ex + nx * 6.5 + sx * 3.4, E, h.ez + nz * 6.5 + sz * 3.4], [h.ex + nx * 1.8, F, h.ez + nz * 1.8], [-sx * 0.1, 0, -sz * 0.1]];
+    // лица — чуть выше середины кадра: низ закрывает диалог
+    case 'two': return [[mx + sx * 5.2 + nx * 2.2, E, mz + sz * 5.2 + nz * 2.2], [mx, (F + FZ) / 2 - 0.15, mz], [nx * 0.08, 0, nz * 0.08]];
+    case 'zina': return [[cx + nx * 2.3 + sx * 2.1, EZ, cz + nz * 2.3 + sz * 2.1], [zx, FZ, zz], [sx * 0.05, 0, sz * 0.05]];
+    case 'courier': return [[zx + nx * 0.35 + sx * 3.3, E, zz + nz * 0.35 + sz * 3.3], [cx, F, cz], [-sx * 0.05, 0, -sz * 0.05]];
     case 'cat': {
       const k = CUT.cat ? CUT.cat : { x: zx + sx * 0.7, z: zz + sz * 0.7 };
       return [[k.x + nx * 1.9 + sx * 0.9, gy + 0.75, k.z + nz * 1.9 + sz * 0.9], [k.x, gy + 0.35, k.z], [sx * 0.08, 0.01, sz * 0.08]];

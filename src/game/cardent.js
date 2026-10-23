@@ -46,10 +46,13 @@ export const PART = { BUMPER: 17, ARMOR_F: 3, SUM: 1.6, TRUNK: 24, TRUNK_BARE: 1
      2 — тот фонарь разбит, второй в трещинах; бампер висит одним краем (SKEW2, DROP2); крышка багажника
          (у хэтчбеков и джипов — задняя дверь) приоткрылась на AJAR / DOOR_AJAR рад и болтается на ходу;
      3 — оба фонаря разбиты, задний бампер отвалился (падает на дорогу), крышка / дверь распахнута (OPEN / DOOR_OPEN) —
-         видны коробки с пиццей */
+         видны коробки с пиццей.
+   С 23.10.2026 (0п15, автор: «багажник не остаётся открытым навсегда») крышка / дверь открывается от удара и через
+   HOLD + до HOLD_R с захлопывается сама (pop / lidTick, тикает crashfx.js). Замок со 2-й ступени разбит: каждый следующий
+   удар (с DENT.MIN) снова распахивает её на AJAR / OPEN — пицца стынет по ступени (wear), а не по тому, открыта ли сейчас */
 export const REARD = { REAR_K: 1.5, S1: 0.4, S2: 1.0, S3: 1.6, ONE2: 0.67, ONE3: 0.99,
-  SKEW1: 0.1, DROP1: 0.04, SKEW2: 0.2, DROP2: 0.08, AJAR: 0.24, OPEN: 1.15, DOOR_AJAR: 1.0, DOOR_OPEN: 1.5 };
-export const ST = { dents: 0, lost: [], ground: 0, flown: 0, verts: 0, car: null, rear: 0 };
+  SKEW1: 0.1, DROP1: 0.04, SKEW2: 0.2, DROP2: 0.08, AJAR: 0.24, OPEN: 1.15, DOOR_AJAR: 1.0, DOOR_OPEN: 1.5, HOLD: 1.4, HOLD_R: 1.2 };
+export const ST = { dents: 0, lost: [], ground: 0, flown: 0, verts: 0, car: null, rear: 0, pops: 0, shut: 0 };
 
 import { crackLamp, smashLamp } from './carglass.js';
 
@@ -129,7 +132,10 @@ export function hit (g, lx, lz, force) {
     const front = nz > 0, key = front ? 'bumperF' : 'bumperR';
     const need = PART.BUMPER + (front ? PART.ARMOR_F * (u.armor || 0) : 0);
     if (!L[key] && (force >= need || sum[front ? 'f' : 'r'] >= PART.SUM)) dropPanel(g, key, nx, nz, force);
-    if (!front && !L.trunk && u.trunk && (force >= PART.TRUNK || (L.bumperR && force >= PART.TRUNK_BARE))) dropPanel(g, 'trunk', 0, -1, force);
+    if (!front && !L.trunk && u.trunk && (force >= PART.TRUNK || (L.bumperR && force >= PART.TRUNK_BARE))) {
+      if (u.real) { const R = u.rear || (u.rear = { w: 0, st: 0 }); R.w = Math.max(R.w, REARD.S3); }   // «Семёрка»: крышка не отлетает — замок вдребезги, распахивает (crashfx.js открывает крышку модели)
+      else dropPanel(g, 'trunk', 0, -1, force);
+    }
   } else {
     for (const m of u.mirrors || []) {
       const key = m.userData.mirror;
@@ -158,6 +164,7 @@ function rearWear (g, w, k, sd, force) {
   let st = R.w >= REARD.S3 ? 3 : R.w >= REARD.S2 ? 2 : R.w >= REARD.S1 ? 1 : 0;
   if (k >= REARD.ONE3) st = 3; else if (k >= REARD.ONE2) st = Math.max(st, 2);
   const near = 'r' + (sd > 0 ? 'l' : 'r'), far = 'r' + (sd > 0 ? 'r' : 'l');
+  const st0 = R.st;
   while (R.st < st) {
     R.st++;
     if (R.st === 1) { crackLamp(g, near); skew(g, sd, REARD.SKEW1, REARD.DROP1); }
@@ -170,6 +177,7 @@ function rearWear (g, w, k, sd, force) {
       ajar(u, REARD.OPEN, REARD.DOOR_OPEN);
     }
   }
+  if (R.st === st0 && R.st >= 2) ajar(u, R.st >= 3 ? REARD.OPEN : REARD.AJAR, R.st >= 3 ? REARD.DOOR_OPEN : REARD.DOOR_AJAR);   // замок разбит — снова распахнуло
   ST.rear = R.st;
 }
 /* задний бампер перекосило: одним краем (со стороны удара) ниже */
@@ -182,8 +190,26 @@ function skew (g, sd, a, dy) {
   m.position.y -= dy;
 }
 function ajar (u, lid, door) {
-  if (u.trunk && !u.trunk.lost) u.trunk.ajar = Math.max(u.trunk.ajar || 0, lid);
-  if (u.rdoor) u.rdoor.ajar = Math.max(u.rdoor.ajar || 0, door);
+  const hold = REARD.HOLD + Math.random() * REARD.HOLD_R;
+  if (u.trunk && !u.trunk.lost) pop(u.trunk, lid, hold);
+  if (u.rdoor) pop(u.rdoor, door, hold);
+}
+/* крышка / дверь (u.trunk, u.rdoor) открылась от удара на angle рад и через hold с захлопнется — не остаётся открытой */
+export function pop (o, angle, hold) {
+  if (!o || !(angle > 0) || o.lost) return false;
+  o.ajar = Math.max(o.ajT > 0 ? o.ajar || 0 : 0, angle);
+  o.ajT = Math.max(o.ajT || 0, hold);
+  ST.pops++;
+  return true;
+}
+/* каждый кадр (crashfx.js): время вышло — отпускаем (ajar 0), крышку тянет закрыться (game.js updateTrunk, carrear.js step);
+   true — в тот кадр, когда отпустило */
+export function lidTick (o, dt) {
+  if (!o || !(o.ajT > 0)) return false;
+  o.ajT -= dt;
+  if (o.ajT > 0) return false;
+  o.ajT = 0; o.ajar = 0; ST.shut++;
+  return true;
 }
 
 /* вершины у точки (cx, cy, cz) — внутрь по −n на глубину depth, в радиусе r; не глубже плоскости lim от середины */
@@ -343,15 +369,16 @@ export function hurt (car) {
   return !!(u.dents || (u.rear && u.rear.st) || (u.lost && Object.keys(u.lost).length) || (u.cg && u.cg.panes.some(p => p.st)) || lamps);
 }
 
-/* насколько разбит зад — для «пицца остыла» (econ.js coldCut): trunk 0 — закрыт, 1 — приоткрыт (2-я ступень),
-   2 — нараспашку или крышки нет (3-я); bumper — заднего бампера нет */
+/* насколько разбит зад — для «пицца остыла» (econ.js coldCut): trunk 0 — цел, 1 — замок разбит, крышка хлопает
+   (2-я ступень), 2 — распахивается настежь (3-я) или крышки нет; bumper — заднего бампера нет.
+   С 23.10.2026 — по ступени износа: крышка сама захлопывается (pop), а пицца стынет, пока замок разбит */
 export function wear (car) {
   const u = car && car.userData;
   if (!u) return { trunk: 0, bumper: false };
-  const L = u.lost || {};
-  const lid = u.trunk && !u.trunk.lost ? u.trunk.ajar || 0 : 0, door = u.rdoor ? u.rdoor.ajar || 0 : 0;
-  const trunk = L.trunk || lid >= REARD.OPEN || door >= REARD.DOOR_OPEN ? 2 : lid > 0 || door > 0 ? 1 : 0;
+  const L = u.lost || {}, st = (u.rear && u.rear.st) || 0;
+  const lid = !!(u.trunk || u.rdoor);
+  const trunk = L.trunk || (lid && st >= 3) ? 2 : lid && st >= 2 ? 1 : 0;
   return { trunk, bumper: !!L.bumperR };
 }
 
-export const DEBUG = { ST, DENT, PART, REARD, DEB, wear, rear: car => (car && car.userData.rear) || null, lost: car => Object.keys((car && car.userData.lost) || {}).sort().join(' ') };
+export const DEBUG = { ST, DENT, PART, REARD, DEB, wear, pop, lidTick, rear: car => (car && car.userData.rear) || null, lost: car => Object.keys((car && car.userData.lost) || {}).sort().join(' ') };

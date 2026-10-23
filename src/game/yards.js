@@ -215,6 +215,7 @@ export function* steps (A) {
       A.box(g, l, 0.06, 0.05, hex, cx, gy + F.H * 0.45, cz, ry);
       for (const o of [-l / 2 + 0.04, l / 2 - 0.04]) A.box(g, 0.07, F.H, 0.07, hex, cx + ex * o, gy + F.H / 2, cz + ez * o);
       it = A.smashAdd('fence', cx, cz, Math.min(1.3, l / 2), g, hex);
+      it.mat = 'rail';                             // трубы — удар металлом (impact.js)
       STATS.fences++;
     }
     it.ax = ax; it.az = az; it.bx = bx; it.bz = bz; it.th = 0.05;

@@ -177,6 +177,19 @@ function torpedo (T, D) {
   return g;
 }
 
+/* пол салона (0ад, 23.10.2026: «в машине нет пола — видно при ускорении»): у модели днище — только тоннель и
+   балки, между сиденьями и под ногами видно асфальт. Коврик от задних сидений до ног под торпедо (T.floor — его
+   высота, там же низ торпедо) и пороги по бокам — одна склейка, одна отрисовка */
+const FLOOR = { Z0: -1.0, W: 0.8, SILL: 0.12, HEX: 0x2e2b2c, SILL_HEX: 0x3a3634 };
+function cabFloor (T) {
+  const parts = [], z1 = T.lip - 0.25, zc = (FLOOR.Z0 + z1) / 2, L = z1 - FLOOR.Z0;
+  parts.push({ geo: new THREE.BoxGeometry(FLOOR.W * 2, 0.04, L), m: M4(0, T.floor - 0.02, zc), hex: FLOOR.HEX });
+  for (const s of [-1, 1]) parts.push({ geo: new THREE.BoxGeometry(0.08, FLOOR.SILL, L), m: M4(s * (FLOOR.W - 0.02), T.floor + FLOOR.SILL / 2, zc), hex: FLOOR.SILL_HEX });
+  const m = new THREE.Mesh(merge(parts), new THREE.MeshLambertMaterial({ vertexColors: true }));   // как у торпедо: та же программа шейдера
+  m.name = 'floor';
+  return m;
+}
+
 /* курьер за рулём (как люди в игре — из коробок): оранжевая куртка, кепка, руки к рулю. Из-за руля (V) не виден */
 const DRV = { jacket: 0xf0522a, dark: 0xc93f1f, skin: 0xe2b48c, pants: 0x2f3440 };
 function driver (D, SW) {
@@ -495,6 +508,7 @@ function load (C, lite) {
       }
       if (lite) { g.userData.liteOf = C; return g; }   // поток: без салона, руля и курьера
       if (C.torpedo) g.add(torpedo(C.torpedo, C.dash));
+      if (C.torpedo) g.add(cabFloor(C.torpedo));     // пол салона: у модели днище с дырами — сквозь стёкла была видна дорога (0ад)
       if (C.driver) g.add(driver(C.driver, C.sw));
       if (C.sw) g.add(steeringWheel(C.sw));
       if (C.dash) g.add(cluster(C.dash));

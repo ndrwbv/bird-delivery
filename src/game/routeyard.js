@@ -15,11 +15,11 @@
    От клиента — кратчайший путь по клеткам (Дейкстра) до точек улиц рядом;
    ломаная по клеткам потом выпрямляется (прямая, если по клеткам не задевает
    стену и забор), каждый выпрямленный кусок ещё раз проверяется по контурам
-   домов через 1 м.
+   домов и по твёрдому лабиринта дворов (заборы, клумбы, грядки, лесочки) точно.
 
    Переменных игры модуль не видит — всё приходит объектом api (game.js):
      init({ HOUSE_GRID, inHouse, segHouse, solidAt, ARCHES, SOLID_GRID, SCELL, SMASH_GRID, SM_CELL,
-            yardsEach, paveEach, groundH, festBlocks, carsEach })   — carsEach — стоящие во дворах (yardcars.js), как забор; inHouse: в доме, но не в арке; segHouse(ax, az, bx, bz) — отрезок заходит в дом (точно); solidAt — твёрдое
+            yardsEach, paveEach, groundH, festBlocks, carsEach, segMaze })   — segMaze(ax, az, bx, bz) — отрезок задевает твёрдое лабиринта (yardmaze.js); carsEach — стоящие во дворах (yardcars.js), как забор; inHouse: в доме, но не в арке; segHouse(ax, az, bx, bz) — отрезок заходит в дом (точно); solidAt — твёрдое
      const J = job(slot, x, z, R, extra, goals)     — то же шагами: J.step(мс) → true, когда готово; J.result — F
      const F = field(slot, x, z, R, extra, goals)   — поле расстояний от (x, z) сразу:
        R — полуширина окна, м; goals — точки [x, z, ...] (улицы), extra — после
@@ -392,7 +392,10 @@ function losFree (S, ax, az, bx, bz, maxW) {
   }
   return true;
 }
-const exactFree = (ax, az, bx, bz) => !A.segHouse(ax, az, bx, bz);   // по контурам домов точно (game.js segHouse)
+// по контурам домов точно (game.js segHouse) и по твёрдому лабиринта (заборы, клумбы, грядки, лесочки — yardmaze.js segHits):
+// клетка 2 м свободна, если свободна её середина, а прямая между серединами может срезать край грядки у самой клетки
+// (23.10.2026: к 2715,690 прямая шла по бортику грядки в 0,55 м от её оси)
+const exactFree = (ax, az, bx, bz) => !A.segHouse(ax, az, bx, bz) && !(A.segMaze && A.segMaze(ax, az, bx, bz));
 function pathFrom (S, px, pz) {
   const t0 = performance.now(), r = pathRaw(S, px, pz);
   STATS.pathMax = Math.max(STATS.pathMax, performance.now() - t0);

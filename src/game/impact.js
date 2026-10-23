@@ -1,7 +1,8 @@
 /* Удары слоями (М4, 09.10.2026). Правила словами и имена файлов — docs/SOUNDS.md «Удары слоями».
 
    Удар машины собирается из слоёв, каждый — свой файл public/sfx (или синтез, если файла нет):
-     тело     hit-<материал>-<сила>   «бум» того, во что въехал: стена, машина, столб, забор, человек, бак, дерево
+     тело     hit-<материал>-<сила>   «бум» того, во что въехал: стена (дом), машина, столб, забор, ограждение (металл),
+                                       бордюр, человек, бак, дерево
      металл   hit-metal-mid / -heavy   хруст и скрежет своего кузова (средний удар и авария)
      бум      hit-boom                 низкий глухой удар — только авария
      стекло   hit-glass / hit-glass-crack / hit-lamp   разбилось / треснуло стекло, разбилась фара (carglass.js)
@@ -10,16 +11,20 @@
    sfx-names: hit-wall-light, hit-wall-mid, hit-wall-heavy, hit-car-light, hit-car-mid, hit-car-heavy, hit-pole-light, hit-pole-mid, hit-pole-heavy
    sfx-names: hit-fence-light, hit-fence-mid, hit-fence-heavy, hit-person-light, hit-person-mid, hit-person-heavy, hit-bin-light, hit-bin-mid, hit-bin-heavy
    sfx-names: hit-tree-light, hit-tree-mid, hit-tree-heavy, hit-metal-mid, hit-metal-heavy, hit-boom, hit-glass, hit-glass-crack, hit-lamp, hit-debris
+   sfx-names: hit-rail-light, hit-rail-mid, hit-rail-heavy, hit-curb-light, hit-curb-mid, hit-curb-heavy
    sfx-names: scrape-wall, scrape-car, scrape, crash-heavy, crash-light, crash, clank
 
    Сила — скорость удара по нормали, м/с (IMP.TIER): лёгкий тычок, средний, авария. Сильнее — больше
    слоёв и громче. Голосов (слоёв) звучит не больше IMP.VOICES: новый важнее — тихо гасит самый
    неважный, нет — не звучит. Один и тот же удар (нос и корма, место столкновения + hurtCar) в IMP.GAP с
-   рядом — один раз, если не сильнее прежнего. Вариант файла / синтеза подряд не повторяется.
+   рядом — один раз, если не сильнее прежнего. Вариант файла / синтеза подряд не повторяется: у синтеза каждого
+   материала IMP.VARS варианта (свой строй, не только высота), вперемешку. Тело всегда начинается с жёсткого
+   щелчка удара (snap) — мягкого «пуф» нет ни у одного материала, кроме человека (0п15, 23.10.2026).
 
      init({ Snd, tap })     — из game.js; tap(вид, ...аргументы) — повтор (replay.js) пишет hit / glass / debris
      hit(v, mat, at, o)     — удар силы v (м/с) о материал mat в точке at { x, z } (без at — «в машине»)
      glass(broken, cracked, lamps, at) — сколько стёкол разбилось / треснуло и фар разбилось за удар
+     shatter(v, at)         — звон бьющегося стекла «иногда» (crashfx.js), даже если своё стекло цело
      debris(at, v, key, again) — деталь упала на асфальт со скоростью v м/с (again — повторный отскок)
      rub(k, mat)            — трёшься бортом этот кадр: k 0…1 (от скорости вдоль), mat 'wall' | 'car'
      step()                 — каждый кадр: петля скрежета
@@ -34,6 +39,8 @@ export const IMP = {
   RUB_MIN: 3,            // м/с вдоль борта — скрежет с этой скорости, в полную силу — к RUB_FULL
   RUB_FULL: 18,
   RUB_HOLD: 0.12,        // с — петля держится после последнего касания (контакт мигает по кадрам)
+  VARS: 4,               // вариантов синтеза у каждого слоя (вперемешку, подряд не повторяется)
+  VOL: [[0.62, 0.2], [0.82, 0.13], [0.95, 0.08]],   // громкость тела по силе: тычок 62—82 %, средний 82—95 %, авария 95—103 % (было 45—70 / 70—90 / 90—100)
 };
 const T_NAME = ['light', 'mid', 'heavy'];
 const OLD = t => (t === 2 ? ['crash-heavy', 'crash'] : ['crash-light', 'crash']);   // старые имена (до М4) — запасные
@@ -46,12 +53,14 @@ const MAT = {
   person: { metal: 0.3,  boom: 0.5,  old: () => ['hit-person'] },
   bin:    { metal: 0.6,  boom: 0.6,  old: () => ['clank'] },
   tree:   { metal: 0.6,  boom: 0.8,  old: OLD },
+  rail:   { metal: 0.9,  boom: 0.75, old: OLD },   // ограждение: трубы вдоль тротуаров, перила мостов, профлист строек — металл
+  curb:   { metal: 0.35, boom: 0.55, old: OLD },   // бордюр: камень под колесом — удар подвески, без хруста кузова на тычке
 };
 /* приоритет слоя при нехватке голосов */
 const PRIO = { body: 3, boom: 2, metal: 2, glass: 2, debris: 1 };
 
 let A = null;
-export const ST = { hits: 0, gated: 0, layers: {}, file: 0, synth: 0, stolen: 0, dropped: 0, tiers: [0, 0, 0], mats: {}, rub: 0, rubMax: 0 };
+export const ST = { hits: 0, gated: 0, layers: {}, file: 0, synth: 0, stolen: 0, dropped: 0, tiers: [0, 0, 0], mats: {}, rub: 0, rubMax: 0, shatter: 0 };
 const LAST = { t: -9, tier: -1, x: 0, z: 0, at: false, info: null };
 export function init (api) { A = api; }
 
@@ -63,7 +72,7 @@ export const matOf = m => (MAT[m] ? m : 'wall');
 export function solidMat (s) {
   if (s.mat) return s.mat;
   if (s.tree) return 'tree';
-  if (s.rail) return 'fence';
+  if (s.rail) return s.rail === true ? 'rail' : 'fence';   // перила моста (true) — металл; заборы дворов (1) — забор
   const a = Math.min(s.hw, s.hd), b = Math.max(s.hw, s.hd);
   if (b <= 0.8) return 'pole';                    // столбы, колонны, тумбы, стелы
   if (a <= 0.35) return 'fence';                  // заборы, оградки, перила
@@ -75,9 +84,13 @@ const SMASH_MAT = {
   fence: ['fence', 0.55], bigfence: ['fence', 0.75], table: ['fence', 0.45], bench: ['fence', 0.5], slide: ['fence', 0.5], goal: ['fence', 0.45],
   sign: ['pole', 0.7], lamp: ['pole', 0.75], bush: ['tree', 0.35], bin: ['bin', 0.45], can: ['bin', 0.35], litter: ['bin', 0.3], cone: ['bin', 0.25],
   bricks: ['wall', 0.5], ice: ['wall', 0.3], snowman: ['person', 0.35], sand: ['person', 0.3], pile: ['person', 0.4], glass: ['fence', 0.3],
+  bigfence: ['rail', 0.8],
 };
+/* it.mat — свой материал вещи (game.js / yards.js: трубы ограждения — 'rail') */
+const SMASH_K = { rail: 0.75 };
 export function smashMat (it) {
   if (it.post) return ['pole', 0.75];
+  if (it.mat) return [it.mat, (SMASH_MAT[it.kind] && SMASH_MAT[it.kind][0] === it.mat ? SMASH_MAT[it.kind][1] : SMASH_K[it.mat]) || 0.6];
   return SMASH_MAT[it.kind] || ['fence', 0.4];
 }
 
@@ -159,9 +172,9 @@ export function hit (v, mat, at) {
   // сила внутри ступени 0…1 и громкость слоя тела: тычок 0,45—0,7, средний 0,7—0,9, авария 0,9—1
   const lo = [T.LIGHT, T.MID, T.HEAVY][tier], hi = [T.MID, T.HEAVY, 30][tier];
   const kin = clamp((v - lo) / (hi - lo), 0, 1);
-  const vol = [0.45, 0.7, 0.9][tier] + kin * [0.25, 0.2, 0.1][tier];
+  const vol = IMP.VOL[tier][0] + kin * IMP.VOL[tier][1];
   const k = clamp((v - T.LIGHT) / 25, 0, 1);          // общая сила 0…1 — для синтеза
-  const vi = variant(mat + tier, 3);
+  const vi = variant(mat + tier, IMP.VARS);
   const body = 'hit-' + mat + '-' + T_NAME[tier];
   const played = [];
   const bn = layer(c, out, 'body', [body, ...M.old(tier)], vol, (cc, o, t, vv) => SYN[mat](cc, o, t, vv, k, tier, vi), k);
@@ -169,16 +182,16 @@ export function hit (v, mat, at) {
   const legacy = bn && bn !== body && OLD(tier).includes(bn);   // старый «crash» — металл и бум в нём уже есть
   if (tier >= 1 && !legacy) {
     const mv = M.metal * (tier === 2 ? 0.85 : 0.5) * (0.85 + kin * 0.15);
-    const mi = variant('metal' + tier, 3);
+    const mi = variant('metal' + tier, IMP.VARS);
     const n = layer(c, out, 'metal', ['hit-metal-' + T_NAME[tier], 'scrape'], mv, (cc, o, t, vv) => synMetal(cc, o, t, vv, k, tier, mi), k);
     if (n) played.push(n);
   }
   if (tier === 2 && !legacy) {
-    const bi = variant('boom', 3);
+    const bi = variant('boom', IMP.VARS);
     const n = layer(c, out, 'boom', ['hit-boom'], M.boom * (0.75 + kin * 0.25), (cc, o, t, vv) => synBoom(cc, o, t, vv, k, bi), k);
     if (n) played.push(n);
   }
-  const info = { v: +v.toFixed(1), mat, tier: T_NAME[tier], layers: played };
+  const info = { v: +v.toFixed(1), mat, tier: T_NAME[tier], layers: played, vi };   // vi — вариант синтеза тела (0…IMP.VARS−1)
   LAST.info = info;
   return info;
 }
@@ -190,11 +203,28 @@ export function glass (broken, cracked, lamps, at) {
   const c = A && A.Snd && A.Snd.ctx, out = c && outFor(at);
   if (!out) return null;
   const got = [];
-  const go = (name, v, syn) => { const vi = variant(name, 3); const n = layer(c, out, 'glass', [name, 'glass'], v, (cc, o, t, vv) => syn(cc, o, t, vv, vi)); if (n) got.push(n); };
+  if (broken > 0) GL.t = c.currentTime;
+  const go = (name, v, syn) => { const vi = variant(name, IMP.VARS); const n = layer(c, out, 'glass', [name, 'glass'], v, (cc, o, t, vv) => syn(cc, o, t, vv, vi)); if (n) got.push(n); };
   if (broken > 0) go('hit-glass', Math.min(1, 0.8 + broken * 0.15), synGlass);
   else if (cracked > 0) go('hit-glass-crack', 0.7, synCrack);
   if (lamps > 0) go('hit-lamp', Math.min(1, 0.6 + lamps * 0.15), synLamp);
   return got;
+}
+
+/** звон бьющегося стекла «иногда» (crashfx.js, 0п15): на заметном ударе — даже если стекло своей машины уцелело.
+    v — сила удара, м/с (громче на сильном); тот же слой, что у разбитого стекла (hit-glass). Только что звенело
+    настоящее (glass) — не повторяет */
+const GL = { t: -9 };
+export function shatter (v, at) {
+  const c = A && A.Snd && A.Snd.ctx;
+  if (c && c.currentTime - GL.t < 0.3) return null;
+  ST.shatter++;
+  if (A && A.tap) A.tap('glass', 1, 0, 0, at);
+  const out = c && outFor(at);
+  if (!out) return null;
+  GL.t = c.currentTime;
+  const vi = variant('hit-glass', IMP.VARS);
+  return layer(c, out, 'glass', ['hit-glass', 'glass'], clamp(0.6 + (v - 8) / 30, 0.6, 1), (cc, o, t, vv) => synGlass(cc, o, t, vv, vi));
 }
 
 /** деталь (бампер, крышка, зеркало, колпак) ударилась об асфальт: v — скорость падения, м/с */
@@ -205,7 +235,7 @@ export function debris (at, v, key, again) {
   if (!out) return null;
   const vol = clamp((v - 1) / 7, 0.15, 1) * (DEB_K[key] || 0.7) * (again ? 0.6 : 1);
   if (vol < 0.12) return null;
-  const vi = variant('debris', 3), small = key === 'hub' || /^mirror/.test(key || '');
+  const vi = variant('debris', IMP.VARS), small = key === 'hub' || /^mirror/.test(key || '');
   return layer(c, out, 'debris', ['hit-debris'], vol, (cc, o, t, vv) => synDebris(cc, o, t, vv, vi, small));
 }
 
@@ -332,10 +362,17 @@ function rattle (c, out, t, n, dt, v, f0, f1, q = 2.5) {
 }
 
 /* ─── тело: «бум» по материалу. v — громкость 0…1, k — сила 0…1, tier 0…2, vi — вариант 0…2 ─── */
-const VR = [0.92, 1, 1.1];                         // высота варианта
+const VR = [0.9, 0.97, 1.05, 1.13];               // высота варианта (IMP.VARS)
+/* щелчок удара: 2—4 мс шума сверху — у каждого тела, кроме человека; без него удар звучит «ватно» */
+function snap (c, o, t, v, f) {
+  nz(c, o, t, 0.012, 0.55 * v, 'highpass', f, 0.8, null, 0.001);
+  return 0.03;
+}
 const SYN = {
   wall (c, o, t, v, k, tier, vi) {                 // бетон, кирпич: низкий глухой удар, короткий хвост
     const r = VR[vi] * rnd(0.97, 1.03);
+    snap(c, o, t, v, 1600 * r);
+    if (vi === 3) nz(c, o, t + 0.015, 0.05, 0.3 * v, 'bandpass', 380 * r, 1.4);   // вариант: эхо в пустом подъезде
     let d = tone(c, o, t, 'sine', 105 * r, 38, 0.16 + 0.22 * k, 0.5 * v);
     d = Math.max(d, nz(c, o, t, 0.1 + 0.2 * k, 0.4 * v, 'lowpass', 900 * r, 0.7, 260));
     if (tier >= 1) d = Math.max(d, nz(c, o, t + 0.01, 0.06, 0.25 * v, 'bandpass', 1800 * r, 1.2));   // крошка
@@ -344,6 +381,8 @@ const SYN = {
   },
   car (c, o, t, v, k, tier, vi) {                  // жесть о жесть: «бонг» панели и хлопок
     const r = VR[vi] * rnd(0.97, 1.03);
+    snap(c, o, t, v, 2600 * r);
+    if (vi % 2) rattle(c, o, t + 0.02, 2 + tier, 0.025, 0.35 * v, 1200, 2600, 2);   // вариант: дребезг чужой решётки
     let d = tone(c, o, t, 'triangle', 150 * r, 62, 0.14 + 0.2 * k, 0.4 * v);
     d = Math.max(d, nz(c, o, t, 0.09 + 0.18 * k, 0.4 * v, 'bandpass', 1400 * r, 1.4, 700));
     d = Math.max(d, ring(c, o, t, [310 * r, 523 * r * (1 + vi * 0.03), 788 * r], 0.25 + 0.3 * k, (0.08 + 0.08 * k) * v));
@@ -351,13 +390,17 @@ const SYN = {
   },
   pole (c, o, t, v, k, tier, vi) {                 // столб, фонарь: звонкий «донг» с долгим хвостом
     const r = VR[vi] * rnd(0.97, 1.03);
+    snap(c, o, t, v, 3200 * r);
+    if (vi === 2) tone(c, o, t + 0.04, 'sine', 660 * r, 655 * r, 0.6 + 0.4 * k, 0.05 * v);   // вариант: гудит пустая труба
     let d = ring(c, o, t, [440 * r, 1185 * r, 2350 * r, 3120 * r], 0.35 + 0.55 * k + tier * 0.1, (0.13 + 0.07 * k) * v);
     d = Math.max(d, tone(c, o, t, 'sine', 190 * r, 90, 0.1, 0.35 * v));
     d = Math.max(d, nz(c, o, t, 0.04, 0.25 * v, 'highpass', 2600, 0.8));
     return d + 0.05;
   },
-  fence (c, o, t, v, k, tier, vi) {                // доски, сетка, перила: стук и дребезг
+  fence (c, o, t, v, k, tier, vi) {                // доски, штакетник, сетка: стук и дребезг
     const r = VR[vi] * rnd(0.95, 1.05);
+    snap(c, o, t, v, 2200 * r);
+    if (tier >= 1 && vi >= 2) nz(c, o, t + 0.01, 0.08, 0.5 * v, 'bandpass', 1300 * r, 2.5);   // вариант: доска ломается с треском
     let d = tone(c, o, t, 'triangle', 230 * r, 140, 0.08, 0.3 * v);
     d = Math.max(d, rattle(c, o, t, 3 + tier * 3 + vi, 0.03 + 0.01 * vi, 0.75 * v, 800 * r, 2200 * r, 1.8));
     if (tier >= 1) d = Math.max(d, nz(c, o, t, 0.15, 0.45 * v, 'bandpass', 600 * r, 1.2));        // треск доски
@@ -372,6 +415,7 @@ const SYN = {
   },
   bin (c, o, t, v, k, tier, vi) {                  // мусорка, бак, контейнер, ракушка: гулкое пустое железо
     const r = VR[vi] * rnd(0.97, 1.03);
+    snap(c, o, t, v, 2400 * r);
     let d = ring(c, o, t, [172 * r, 415 * r, 760 * r, 1290 * r], 0.3 + 0.35 * k, (0.12 + 0.06 * k) * v);
     d = Math.max(d, tone(c, o, t, 'triangle', 115 * r, 68, 0.12, 0.3 * v));
     d = Math.max(d, nz(c, o, t, 0.07, 0.3 * v, 'bandpass', 1800 * r, 1.2));
@@ -380,10 +424,31 @@ const SYN = {
   },
   tree (c, o, t, v, k, tier, vi) {                 // ствол, куст: деревянный стук и шорох листвы
     const r = VR[vi] * rnd(0.95, 1.05);
+    snap(c, o, t, v, 1500 * r);
+    if (tier >= 1 && vi !== 1) nz(c, o, t + 0.03, 0.12, 0.35 * v, 'bandpass', 900 * r, 3);   // вариант: хрустнула ветка
     let d = tone(c, o, t, 'triangle', 210 * r, 118, 0.1 + 0.05 * k, 0.4 * v);
     d = Math.max(d, nz(c, o, t, 0.08, 0.6 * v, 'bandpass', 520 * r, 2));
     d = Math.max(d, nz(c, o, t + 0.02, 0.3 + 0.4 * k, (0.06 + 0.08 * k) * v, 'highpass', 3000 * r, 0.7, null, 0.06));   // листва
     if (tier === 2) d = Math.max(d, nz(c, o, t, 0.25, 0.25 * v, 'lowpass', 300, 0.7));
+    return d + 0.05;
+  },
+  rail (c, o, t, v, k, tier, vi) {                 // ограждение из труб, перила, профлист: звонкий пустой металл и дребезг стоек
+    const r = VR[vi] * rnd(0.97, 1.03);
+    snap(c, o, t, v, 2800 * r);
+    let d = ring(c, o, t, [380 * r, 990 * r, 1730 * r * (1 + vi * 0.02), 2650 * r], 0.3 + 0.45 * k + tier * 0.12, (0.12 + 0.08 * k) * v);
+    d = Math.max(d, tone(c, o, t, 'triangle', 165 * r, 82, 0.12 + 0.1 * k, 0.4 * v));            // гнётся труба
+    d = Math.max(d, nz(c, o, t, 0.08 + 0.1 * k, 0.4 * v, 'bandpass', 1500 * r, 1.3, 800));        // скрежет
+    d = Math.max(d, 0.04 + rattle(c, o, t + 0.04, 3 + tier * 2 + (vi & 1), 0.045, 0.3 * v, 900 * r, 2400 * r, 2.5));   // дребезг стоек
+    if (tier === 2) d = Math.max(d, nz(c, o, t, 0.35, 0.3 * v, 'lowpass', 260, 0.7));
+    return d + 0.05;
+  },
+  curb (c, o, t, v, k, tier, vi) {                 // бордюр: камень под колесом — глухой удар шины, лязг подвески
+    const r = VR[vi] * rnd(0.96, 1.04);
+    snap(c, o, t, v, 1300 * r);
+    let d = tone(c, o, t, 'sine', 95 * r, 46, 0.12 + 0.08 * k, 0.55 * v);                          // шина и рычаг
+    d = Math.max(d, nz(c, o, t, 0.05, 0.45 * v, 'bandpass', 1150 * r, 1.3));                       // камень
+    d = Math.max(d, 0.03 + tone(c, o, t + 0.03 + vi * 0.006, 'triangle', 230 * r, 150, 0.05, 0.3 * v));   // лязг подвески
+    if (tier >= 1) d = Math.max(d, 0.07 + tone(c, o, t + 0.07, 'sine', 80 * r, 45, 0.1, 0.35 * v));   // второе колесо
     return d + 0.05;
   },
 };

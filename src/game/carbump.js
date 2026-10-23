@@ -17,6 +17,7 @@ export const BUMP = {
   person: { LOSS: 0.08, PER: 0.7, MAX: 0.3, YAW: [4, 9] },
   post: { LOSS: 0.14, PER: 1.0, MAX: 0.3, YAW: [5, 11] },
   bush: { LOSS: 0.05, PER: 0.3, MAX: 0.12, YAW: [0, 1.5] },
+  rail: { LOSS: 0.07, PER: 0.6, MAX: 0.2, YAW: [2, 6] },   // снёс ограждение из труб (0п15, game.js smashRail): 80 км/ч — −10 %, 40 — −12 %
 };
 export const YAW = { TAU: 0.11, FOLLOW: 0.6 };
 
@@ -25,7 +26,7 @@ export const YAW = { TAU: 0.11, FOLLOW: 0.6 };
 const POST_KINDS = { lamp: 1, sign: 1, beater: 1, line: 1 };
 export const kindOf = k => (POST_KINDS[k] ? 'post' : k === 'bush' ? 'bush' : null);
 
-export const STATS = { n: { person: 0, post: 0, bush: 0 }, last: null };
+export const STATS = { n: { person: 0, post: 0, bush: 0, rail: 0 }, last: null };
 
 /* удар: V — машина (vx, vz, kickW), kind — 'person' | 'post' | 'bush'. Скорость теряет сразу, увод копится в V.kickW */
 export function hit (V, kind) {

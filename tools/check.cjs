@@ -158,6 +158,21 @@ const CHECKS = [
       r.solid.filter(s => s.pass).map(s => ' · ' + s.k + ': ' + JSON.stringify(s)).join('');
     return { status: !r.ok ? 'fail' : r.unexplained ? 'warn' : 'ok', info };
   } },
+  /* люди не сквозь твёрдое (0п1, 23.10.2026, pedcollide.js, docs/CAREER.md «Люди и твёрдое»): 45 с смены на автопилоте — сколько
+     раз человек оказался внутри дома, твёрдого или кузова (было: 4—6 за 45—150 с, 0,2—0,5 % замеров внутри; бургер в доме, в машине,
+     гость под твоей машиной); паника у стены, катящаяся машина, стоящая машина и коробка-«гараж» поперёк тротуара */
+  { id: 'ped-solid', name: 'люди не сквозь стены и машины, машина толкает людей', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/ped-solid.js')]);
+    const e = errLine(j), r = j.result;
+    if (e || !r) return { status: 'fail', info: e || 'нет результата' };
+    const kinds = Object.entries(r.byKind).map(([k, n]) => k + ' ' + n).join(', ') || '—';
+    const t = (o, ok, bad) => !o ? 'не нашлось' : o.ok ? ok : bad;
+    const info = `${r.gameSecs} с смены, ${r.samples} замеров: вошли внутрь ${r.entries} раз (${kinds}), внутри ${r.insidePct} % замеров; ` +
+      `паника у стены: ${t(r.panic, 'отбежал на ' + (r.panic && r.panic.moved) + ' м', 'В СТЕНУ')}; катящаяся машина: ${t(r.roll, r.roll && r.roll.hit, 'СКВОЗЬ')}; ` +
+      `стоящая поперёк тротуара: ${t(r.parked, 'обошёл', 'СКВОЗЬ')}; коробка поперёк: ${t(r.box, 'развернулся', 'СКВОЗЬ')}` +
+      (r.entries ? ' · ' + JSON.stringify(r.sample) : '') + (r.stuck && r.stuck.length ? ' · застряли: ' + JSON.stringify(r.stuck) : '');
+    return { status: r.ok ? 'ok' : 'fail', info };
+  } },
   /* одно уведомление за раз (18.10.2026, notifyq.js, docs/CAREER.md «Одно уведомление за раз»): 60 с средней смены на автопилоте,
      через 6 с езды машину переносит к адресу (вручений втрое больше — теснее, чем у игрока); раз в 50 мс по самой странице —
      сколько всплывающего видно сразу (чек оплаты, реплика, новое сообщение чата, тост, грамота, задание, подсказка, таблица).
@@ -189,6 +204,14 @@ const CHECKS = [
     const info = `куча JS, МБ: меню ${r.menu.heap}, достроен ${r.built.heap}, смена ${r.shift.heap} (пик ${r.shift.gl.heapPeak}); видео ${r.shift.gl.total} МБ` +
       (foot ? `; след страницы, пик ${foot} МБ` : '') + ` · пороги ${LIM.menu} / ${LIM.shift} / ${LIM.gl}` + (foot ? ` / ${LIM.foot}` : '') + (r.shift.mobile ? '' : ' · НЕ мобильный режим');
     return { status: bad.length ? 'fail' : r.shift.mobile ? 'ok' : 'warn', info: (bad.length ? bad.join('; ') + ' · ' : '') + info };
+  } },
+  /* экранная клавиатура Стима (23.10.2026, 0ав: на Деке одна буква — 10 раз): автоповтор с флагом и парой «отпустил — нажал»,
+     зажатая клавиша, вставка без нажатий — одна буква; «Анна» пальцем — как есть (docs/CAREER.md «Экранная клавиатура Стима») */
+  { id: 'osk-repeat', name: 'экранная клавиатура Стима: одно нажатие — одна буква', group: 2, run: async () => {
+    const j = await probe(['--mode=steam', '--q=mock-steam=deck', '--eval=' + path.join(__dirname, 'probe-checks/osk-repeat.js')], 120);
+    const e = errLine(j), r = j.result;
+    if (e || !r) return { status: 'fail', info: e || 'нет результата' };
+    return { status: r.bad.length ? 'fail' : 'ok', info: r.bad.length ? r.bad.join('; ') : '7 сценариев × наша клавиатура и клавиатура Стима — ок' };
   } },
   { id: 'smoke-adult', name: '30 с автопилота: взрослая (web)', group: 3, run: smoke(['--mode=web'], 'взрослая') },
   { id: 'smoke-phone', name: '30 с автопилота: телефон боком (web)', group: 3, run: smoke(['--size=phone-land'], 'телефон') },

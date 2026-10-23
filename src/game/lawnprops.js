@@ -916,7 +916,13 @@ export function reset () {
 const S_LIST = [];
 export function withSolids (list, x, z) {
   if (!A) return list;
+  solidsOnly(x, z);
+  return S_LIST.length ? list.concat(S_LIST) : list;
+}
+/* только ракушки у точки (±6 м) — общий список, без нового массива (люди: pedcollide.js, каждый кадр) */
+export function solidsOnly (x, z) {
   S_LIST.length = 0;
+  if (!A) return S_LIST;
   // как cellsNear(x, z, 4, …), но без замыкания на каждый вызов (шаг езды — дважды за шаг)
   const C = LAWN.CELL;
   for (let i = Math.floor((x - 4) / C); i <= Math.floor((x + 4) / C); i++)
@@ -929,7 +935,7 @@ export function withSolids (list, x, z) {
         S_LIST.push(s);
       }
     }
-  return S_LIST.length ? list.concat(S_LIST) : list;
+  return S_LIST;
 }
 
 /* ── жизнь во дворах (yardlife.js) ── */

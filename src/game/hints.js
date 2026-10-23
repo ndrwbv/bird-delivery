@@ -17,7 +17,11 @@
      wallet — сразу за «cash»: копилка — все твои деньги, пачка ссыпается в неё в конце смены;
      respect — первый респект (карьера): что такое звезда; звезда подсвечена;
      bump   — первый раз задел своего клиента (карьера): без чаевых, а быстрее 43 км/ч — заказ сорван;
-     back   — первый раз опоздал обратно в пиццерию (карьера, game.js backLate): «вернуться за» — тоже срок.
+     back   — первый раз опоздал обратно в пиццерию (карьера, game.js backLate): «вернуться за» — тоже срок;
+     cam    — вид камеры (11р, 23.10.2026): V / View / значок камеры — по кругу высоко, близко, из-за руля.
+              В спокойный момент: «map» уже была, 40 с езды с первого заказа, до цели дальше 60 м, других
+              подсказок нет и не ждут. Сам уже переключал вид (есть сохранённый 'dlv-cam') — не показываем.
+              Уходит, как только переключил вид (не раньше 1,5 с), или как обычная.
    «respect», «bump» и «back» видят и ветераны — это правила, о которых раньше не говорили.
 
    Общая очередь уведомлений (notifyq.js, автор 18.10.2026: «одно уведомление за раз»): подсказка держит экран
@@ -49,12 +53,13 @@ import * as TEL from './telemetry.js';          // анонимная стати
 const KEY = 'dlv-hints';
 const PLAY = ['drive', 'back', 'side', 'loading', 'handover'];
 const GAP = 0.6;
-const ALL = ['drive', 'map', 'brake', 'nitro', 'hp', 'cash', 'wallet'];
+const ALL = ['drive', 'map', 'brake', 'nitro', 'hp', 'cash', 'wallet', 'cam'];
+const CAM_KEY = 'dlv-cam', CAM_AFTER = 40, CAM_FAR = 60;   // вид камеры (camview.js): спустя сколько с езды и дальше скольких м от цели
 
 let A = null, EL = null, TXT = null;
 const H = {
   seen: new Set(), cur: null, t: 0, shown: 0, gap: 0, queue: [], hiEl: null,
-  driveAt: null, mapT: -1, away: 0, lastD: 0, straight: 0, lastH: 0, lastHp: null, lastMoney: null, cashT: -1, burn: 0,
+  driveAt: null, mapT: -1, away: 0, lastD: 0, straight: 0, lastH: 0, lastHp: null, lastMoney: null, cashT: -1, burn: 0, drv: 0, cam0: '',
 };
 
 const isPad = () => document.body.classList.contains('pad');
@@ -77,7 +82,7 @@ export function reload () {
   if (!A) return;
   if (H.hiEl) H.hiEl.classList.remove('hn-hi');
   if (EL) EL.classList.remove('on');
-  Object.assign(H, { cur: null, t: 0, shown: 0, gap: 0, queue: [], hiEl: null, driveAt: null, mapT: -1, away: 0, lastD: 0, straight: 0, lastH: 0, lastHp: null, lastMoney: null, cashT: -1, burn: 0 });
+  Object.assign(H, { cur: null, t: 0, shown: 0, gap: 0, queue: [], hiEl: null, driveAt: null, mapT: -1, away: 0, lastD: 0, straight: 0, lastH: 0, lastHp: null, lastMoney: null, cashT: -1, burn: 0, drv: 0, cam0: '' });
   H.seen.clear();
   readSeen();
 }
@@ -105,6 +110,8 @@ function make (id, extra) {
     case 'respect': return { hi: '#respect', text: t('звезда — респект района: за конкурентов, похитителя и помощь своим. копишь — растёт звание') };
     case 'back': return { hi: '#timewrap', text: t('«вернуться за» — тоже срок: опоздал обратно в пиццерию — штраф {sum}', { sum: extra || '' }) };
     case 'bump': return { text: t('задел клиента — без чаевых; быстрее {kmh} км/ч — заказ сорван', { kmh: Math.round(CLIENT_HIT.HARD * 3.6) }) };
+    case 'cam': return touch ? { hi: '#cambtn', text: t('значок камеры — вид по кругу: высоко, близко, из-за руля') }
+      : { text: t('{key} — вид камеры по кругу: высоко, близко, из-за руля', { key: k(pad ? 'View' : 'V') }) };
   }
   return null;
 }
@@ -132,6 +139,7 @@ function open (h) {
   H.cur = h; H.t = 0; H.shown = 0;
   TEL.first('hint.' + h.id);
   TXT.innerHTML = h.text;
+  if (h.id === 'cam') H.cam0 = String(A.Store.get(CAM_KEY, '') || '');
   seen(h.id);
   highlight(h.hi);
   EL.classList.remove('on'); void EL.offsetWidth;
@@ -186,6 +194,7 @@ function done (h, dt) {
     return H.t > h.min + 4;
   }
   if (h.id === 'brake') return S.state !== 'drive' ? H.t > 1.5 : H.t > h.min + 3;
+  if (h.id === 'cam' && H.t > 1.5 && String(A.Store.get(CAM_KEY, '') || '') !== H.cam0) return true;   // переключил — понял
   return H.t > h.min + 1;
 }
 
@@ -214,6 +223,12 @@ export function step (dt) {
     H.lastD = d;
     if (H.away > 3 && H.driveAt && need('map')) push('map');
     if (S.state === 'drive' && d < 40 && v > 7) push('brake');
+    // вид камеры — в спокойный момент: едешь давно, до цели далеко, на экране и в очереди пусто
+    if (H.driveAt) H.drv += dt;
+    if (H.drv > CAM_AFTER && d > CAM_FAR && need('cam') && H.seen.has('map') && !H.cur && !H.queue.length && H.gap <= 0) {
+      if (A.Store.get(CAM_KEY, '')) seen('cam');   // уже переключал вид сам — знает
+      else push('cam');
+    }
   }
   // прямая: быстро и руль почти не крутишь
   let dh = V.h - H.lastH; H.lastH = V.h;

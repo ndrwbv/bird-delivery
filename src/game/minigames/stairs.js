@@ -26,6 +26,7 @@
    на первый этаж и ждёт o.selfWait с (срок заказа идёт), итог { ok: false, self: true }. */
 import './stairs.css';
 import { inputKind, onInput } from '../../input/glyphs.js';
+import { tn } from '../../i18n/index.js';
 import { STAIRS as K0 } from '../econ.js';
 import { faceDataURL } from '../people.js';
 import * as NICK from '../nicks.js';            // накладная: аватарка и ник клиента из приложения (nicks.js)
@@ -137,7 +138,7 @@ export function plan (o = {}, K = K0) {
 
 export default {
   id: 'stairs', name: 'подъезд: подняться на этаж',
-  note: 'Задание крупно: «поднимись на N-й этаж и отдай заказ», рядом та же накладная. Лифт сломан: вверх — A / ↑ / пробел / ▲ часто (держать — дыхалка тает), вниз — B / ↓. На площадке ← → к двери, A / Enter / тап — позвонить. Гопники: ← → в такт или Y / Enter — откупиться. Своего таймера нет — идёт срок заказа.',
+  note: 'Задание крупно: «поднимись на N-й этаж», кв. и сколько осталось (дыхалка — только когда тает), рядом та же накладная. Лифт сломан: вверх — A / ↑ / пробел / ▲ часто (держать — дыхалка тает), вниз — B / ↓. На площадке ← → к двери, A / Enter / тап — позвонить. Гопники: ← → в такт или Y / Enter — откупиться. Своего таймера нет — идёт срок заказа.',
   knobs: [
     { k: 'lv', label: 'этажей в доме', type: 'num', def: 9, min: 5, max: 16, step: 1 },
     { k: 'floor', label: 'нужный этаж (0 — случайно)', type: 'num', def: 0, min: 0, max: 16, step: 1 },
@@ -173,7 +174,7 @@ export default {
     const st = {
       t: 0, phase: 'play', y: 0, v: 0, breath: 1, puff: 0, door: -1, walk: 0, lock: 0, arm: 0.35, tries: 0, lastTap: -9,
       upHold: 0, stride: 0, leg: 0, bounce: 0, side: 0, sideT: 0, endT: 0, res: null, cam: -0.12, pad: false, armA: false,
-      last: {}, fl: -1,
+      last: {}, fl: -1, here: false,
     };
     const gop = P.gopAt ? { at: P.gopAt, done: false, how: '', state: '', i: 0, dirs: [], w: 0, tt: 0, arm: 0, flash: 0 } : null;
     const doors = new Map();                                    // квартира → { kind: 'wrong' | 'right', t, open }
@@ -193,9 +194,11 @@ export default {
     box.innerHTML =
       '<canvas class="mk-cv sx-cv"></canvas>' +
       '<div class="mk-top">' + KIT.dashHTML() + '<div class="mk-fuse" aria-hidden="true"><i></i></div>' +
-        '<div class="mk-task sx-task"><b class="mk-goal">' + esc(t('Поднимись на {n}-й этаж и отдай заказ', { n: floor })) + '</b>' +
-          '<span class="mk-sub"><i>' + esc(t('кв. {n}', { n: flat })) + '</i>' + (P.entr > 1 ? '<i>' + esc(t('подъезд {n}', { n: P.entr })) + '</i>' : '') +
-          '<em class="sx-now"></em><span class="sx-breath"><span>' + esc(t('дыхалка')) + '</span><i><b></b></i></span></span>' +
+        // 11аа (автор 23.10.2026: «интерфейс перегружен»): задание — этаж и квартира, под ним — сколько осталось;
+        // подъезда нет (ты уже в нём), дыхалка — только когда тает
+        '<div class="mk-task sx-task"><b class="mk-goal">' + esc(t('Поднимись на {n}-й этаж', { n: floor })) + '</b>' +
+          '<span class="mk-sub"><i>' + esc(t('кв. {n}', { n: flat })) + '</i>' +
+          '<em class="sx-now"></em><span class="sx-breath" hidden><span>' + esc(t('дыхалка')) + '</span><i><b></b></i></span></span>' +
         '</div>' +
         KIT.selfHTML(t) +
       '</div>' +
@@ -223,14 +226,17 @@ export default {
     const msgs = KIT.feed(q('.sx-feed'), { max: 3 });
     const say = m => msgs.say(m);
 
-    /* где ты сейчас: «ты на 3-м этаже» → «твой этаж! кв. 47» */
+    /* сколько осталось: «ещё 4 этажа» → «твой этаж — ищи дверь» (выше — «проскочил — вниз на 1»); на своём этаже
+       строка внизу — про дверь и звонок, на лестнице — про вверх и вниз */
     const where = () => {
       const f = Math.round(st.y);
       if (f === st.fl) return;
       st.fl = f;
       const here = f === tgt;
       elTask.classList.toggle('mk-here', here);
-      elNow.textContent = here ? t('твой этаж! ищи кв. {n}', { n: flat }) : f > tgt ? t('ты на {n}-м — проскочил, ниже!', { n: f + 1 }) : t('ты на {n}-м этаже', { n: f + 1 });
+      elNow.textContent = here ? t('твой этаж — ищи дверь') : f > tgt ? t('проскочил — вниз на {n}', { n: f - tgt })
+        : tn(tgt - f, 'ещё {n} этаж|ещё {n} этажа|ещё {n} этажей');
+      if (here !== st.here) { st.here = here; glyphs(); }
     };
 
     /* подсказка по вводу — одной строкой внизу; на кнопках значков нет */
@@ -245,10 +251,14 @@ export default {
         elHelp.innerHTML = k === 'pad' ? kbd('◀ ▶') + esc(t('в такт — обойти')) + ' · ' + kbd(Y) + esc(t('откупиться'))
           : k === 'kb' ? kbd('← →', 1) + esc(t('в такт — обойти')) + ' · ' + kbd('Enter', 1) + esc(t('откупиться'))
             : esc(t('жми ◀ ▶ в такт — или откупись'));
-      } else {
-        elHelp.innerHTML = k === 'pad' ? kbd(A) + esc(t('вверх — жми часто')) + ' · ' + kbd(B) + esc(t('вниз')) + ' · ' + kbd('◀ ▶') + esc(t('к двери')) + ' · ' + kbd(A) + esc(t('у двери — звонок')) + ' · ' + kbd(ps ? '□' : 'X') + esc(t('накладная'))
-          : k === 'kb' ? kbd('↑', 1) + esc(t('вверх — жми часто')) + ' · ' + kbd('↓', 1) + esc(t('вниз')) + ' · ' + kbd('← →', 1) + esc(t('к двери')) + ' · ' + kbd('Enter', 1) + esc(t('звонок')) + ' · ' + kbd('X', 1) + esc(t('накладная'))
-            : esc(t('жми ▲ часто · дверь — тап'));
+      } else if (st.here) {                          // свой этаж: к двери и звонок (накладная — своя клавиша на ней самой)
+        elHelp.innerHTML = k === 'pad' ? kbd('◀ ▶') + esc(t('к двери')) + ' · ' + kbd(A) + esc(t('звонок'))
+          : k === 'kb' ? kbd('← →', 1) + esc(t('к двери')) + ' · ' + kbd('Enter', 1) + esc(t('звонок'))
+            : esc(t('◀ ▶ к двери · 🔔 звонок'));
+      } else {                                       // на лестнице: вверх и вниз
+        elHelp.innerHTML = k === 'pad' ? kbd(A) + esc(t('вверх — жми часто')) + ' · ' + kbd(B) + esc(t('вниз'))
+          : k === 'kb' ? kbd('↑', 1) + esc(t('вверх — жми часто')) + ' · ' + kbd('↓', 1) + esc(t('вниз'))
+            : esc(t('жми ▲ часто'));
       }
     };
     const pop = el => { if (!el) return; el.classList.remove('sx-pop'); void el.offsetWidth; el.classList.add('sx-pop'); };
@@ -493,6 +503,8 @@ export default {
       if (c && c.s <= 0) { finish(false, true); anim(dt); draw(); return; }   // срок заказа кончился — клиент спускается сам
       if (st.phase === 'gop') gopStep(dt); else climb(dt);
       elBreathBar.style.transform = 'scaleX(' + st.breath.toFixed(3) + ')';
+      // дыхалка видна, только пока тает (меньше 75 %) или курьер отдувается; отдышался до 95 % — снова спрятана
+      if (elBreath.hidden ? st.breath < 0.75 || st.puff > 0 : st.breath > 0.95 && st.puff <= 0) elBreath.hidden = !elBreath.hidden;
       elBreath.classList.toggle('sx-low', st.breath < 0.3 || st.puff > 0);
       elBreath.classList.toggle('sx-puff', st.puff > 0);
       where();

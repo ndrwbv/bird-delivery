@@ -19,10 +19,10 @@
               все в шортах, дождя нет
      golden — яркая сухая осень: кроны насыщенно жёлто-красные и ещё держатся, на асфальте листья,
               сухо, небо чистое
-     snowy  — снежная зима: снегопад всю смену, вдоль домов сугробы до второго этажа, вдоль улиц —
+     snowy  — снежная зима: снег идёт волнами (WAVE, ниже), вдоль домов сугробы до второго этажа, вдоль улиц —
               валы за тротуаром; дороги, подъезды и адреса заказов расчищены; въехал в сугроб —
               машину мягко тормозит; с сугробов катаются люди на ледянках
-     rain   — дождь почти всю смену (льёт 60—120 с, перерывы 15—35 с), асфальт мокрый
+     rain   — дождь волнами (WAVE: морось → дождь → иногда ливень → стихает), асфальт мокрый
      storm  — гроза: ливень всю смену, небо тёмное, молнии (вспышка света на миг) и гром с
               задержкой «сколько до молнии / 343 м/с»
      hurricane — ураган (редко, не в первые смены — hurricane.js HUR.FROM): гроза (молнии чаще),
@@ -38,7 +38,13 @@
      update(dt)           — каждый кадр после seasons: небо, молнии, сугробы и ледянки
      label()              — всегда '' (погоду игроку не пишем; было — «жара +34°» для накладной)
      force(id)            — быстрый заезд: свой вариант на следующую смену (null — снова жребий)
-   ?weather=storm — вариант сразу (проверка), __dlv.weather — ручки.
+   ?weather=storm — вариант сразу (проверка), ?weather=blizzard / downpour — снежная зима / дождь, и всё время метель /
+   ливень; __dlv.weather — ручки (wave('blizzard') — метель сейчас, wave() — что идёт, waveSim() — как ходят волны).
+
+   Погода меняется за смену (12ах, автор 23.10.2026: «иногда идёт снег, потом заканчивается, иногда превращается в метель
+   и потом заканчивается, иногда быстрее, иногда дольше; с дождём так же»). В снежную зиму и в дождь осадки идут волнами:
+   начинаются, усиливаются, держатся и стихают, между волнами — перерыв. Ступени: 0 — сухо, 1 — лёгкий снег / морось,
+   2 — снегопад / дождь, 3 — метель / ливень. Переход между ступенями — 15—30 с. Гроза и ураган — ливень всю смену, как было.
    ────────────────────────────────────────────────────────────────────────── */
 import { t } from '../i18n/index.js';
 import * as SEAS from './seasons.js';
@@ -77,8 +83,19 @@ export const IDS = ['clear', 'heat', 'golden', 'snowy', 'rain', 'storm', 'hurric
 export const SPECIAL = ['thaw', 'firstsnow', 'maysnow'];
 /* где вариант к месту: быстрый заезд с «жарой» зимой ставит сезон отсюда */
 const HOME = { heat: 0.45, golden: 1.45, snowy: 2.5, rain: 3.5, storm: 0.6, hurricane: 1.3, thaw: 3.02, firstsnow: 2.04, maysnow: 3.65 };
+/* волны осадков (12ах, 23.10.2026): снежная зима и дождь. До 23.10 — снег всю смену, дождь «льёт 60—120 с / перерыв 15—35 с».
+   LEN — длина волны от первой снежинки до последней, GAP — перерыв, с (короткие чаще: доля^SKEW); PEAK — до какой ступени
+   дойдёт волна (веса); метель / ливень — только в волне не короче MIN3 с; RAMP — переход ступени, с; AMT — сила снегопада
+   (SKY.amt seasons.js) / дождя (ENV.rain) на ступенях 0…3. Первая волна смены — уже на ступени 2 (снег / дождь идут сразу). */
+export const WAVE = {
+  snowy: { LEN: [60, 360], GAP: [25, 150], PEAK: { 1: 30, 2: 50, 3: 20 } },
+  rain: { LEN: [60, 360], GAP: [15, 120], PEAK: { 1: 25, 2: 50, 3: 25 } },
+  RAMP: [15, 30], SKEW: 1.4, MIN3: 150,
+  AMT: [0, 0.3, 0.85, 1],
+  // метель: снег летит вбок до 9,5 м/с (обычно 0,5), хлопья крупнее, видно до ~28 % обычного, сбитые сугробы отрастают
+  // вчетверо быстрее (seasons.js setWx), с горок уходят; ливень: асфальт мокрее (0,65 → 0,95), струи гуще, туман на 20 % ближе, небо темнее
+};
 const W = {
-  RAIN_ON: [60, 120], RAIN_OFF: [15, 35],      // дождь: сколько льёт и сколько перерыв, с
   BOLT_EVERY: [6, 16], BOLT_DIST: [320, 1100], // молния: раз в 6—16 с, в 320—1 100 м
   BOLT_HUR: [4, 10],                            // в ураган — раз в 4—10 с
   SOUND: 343,                                   // м/с: гром через 1—3,2 с после вспышки
@@ -101,7 +118,7 @@ const OVER = {
 };
 
 let C = null, THREE = null;
-let ID = 'clear', FORCE = null, TEMP = 0, RT = 0, N = 0, NEW = false;
+let ID = 'clear', FORCE = null, TEMP = 0, N = 0, NEW = false;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
@@ -109,6 +126,62 @@ function h01 (n, k = 0) {
   let h = Math.imul((n | 0) ^ 0x5bd1e995, 0x9E3779B1) ^ Math.imul(k + 0x27d4eb2d, 0x85ebca6b);
   h ^= h >>> 15; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 13; h = Math.imul(h, 0x27d4eb2f); h ^= h >>> 16;
   return (h >>> 0) / 4294967296;
+}
+
+/* ─────────────── волны осадков (12ах) ─────────────── */
+const WV = { k: null, t: 0, len: 0, peak: 0, gap: 0, L: 0, n: 0 };   // k — ступени волны [[с, ступень]], L — ступень сейчас (0…3)
+let PIN = null;                                    // ?weather=blizzard / downpour, __dlv.weather.pin(3): ступень держится всё время
+const ALIAS = { blizzard: ['snowy', 3], downpour: ['rain', 3] };
+const waved = (id = ID) => id === 'snowy' || id === 'rain';
+const skew = ([a, b], r = Math.random()) => a + (b - a) * Math.pow(r, WAVE.SKEW);
+/* волна: вверх по ступеням до вершины, держится, вниз до сухо; на нижних ступенях задерживается по пути */
+function wavePlan (kind, minPeak = 0) {
+  const w = WAVE[kind] || WAVE.rain, ramp = () => rnd(...WAVE.RAMP);
+  const len = skew(w.LEN);
+  let P = Math.max(minPeak, +pickW(w.PEAK));
+  if (P === 3 && len < WAVE.MIN3) P = 2;
+  const up = [], dn = [];
+  for (let i = 0; i < P; i++) { up.push(ramp()); dn.push(ramp()); }
+  const hold = Math.max(10, len - up.reduce((a, b) => a + b, 0) - dn.reduce((a, b) => a + b, 0));
+  const hp = P === 1 ? hold : hold * rnd(0.5, 0.8), lo = P === 1 ? 0 : (hold - hp) / (2 * (P - 1));
+  const k = [[0, 0]];
+  let t = 0;
+  for (let i = 1; i <= P; i++) { t += up[i - 1]; k.push([t, i]); t += i < P ? lo : hp; k.push([t, i]); }
+  for (let i = P - 1; i >= 0; i--) { t += dn[i]; k.push([t, i]); if (i > 0) { t += lo; k.push([t, i]); } }
+  return { k, len: t, peak: P };
+}
+function levelAt (k, t) {
+  for (let i = 1; i < k.length; i++) {
+    if (t > k[i][0]) continue;
+    const [t0, a] = k[i - 1], [t1, b] = k[i], u = t1 > t0 ? clamp((t - t0) / (t1 - t0), 0, 1) : 1;
+    return a + (b - a) * u * u * (3 - 2 * u);     // плавно: без рывка в начале и в конце перехода
+  }
+  return 0;
+}
+function waveStart (kind, first) {
+  const p = wavePlan(kind, first ? 2 : 0);
+  WV.k = p.k; WV.len = p.len; WV.peak = p.peak; WV.gap = 0; WV.t = 0; WV.n++;
+  if (first) WV.t = (p.k.find(q => q[1] >= 2) || [0])[0];   // смена начинается, когда снег / дождь уже идёт
+  WV.L = PIN != null ? PIN : levelAt(WV.k, WV.t);
+}
+function stepWave (dt) {
+  if (PIN != null) { WV.L = PIN; return; }
+  if (WV.k) {
+    WV.t += dt;
+    if (WV.t >= WV.len) { WV.k = null; WV.gap = skew((WAVE[ID] || WAVE.rain).GAP); WV.L = 0; } else WV.L = levelAt(WV.k, WV.t);
+  } else { WV.L = 0; if ((WV.gap -= dt) <= 0) waveStart(ID, false); }
+}
+/* ступень → сила снегопада / дождя (AMT), и насколько метель / ливень (0…1) */
+function waveAmt (L = WV.L) {
+  const a = WAVE.AMT, x = clamp(L, 0, 3), i = Math.min(2, Math.floor(x));
+  return a[i] + (a[i + 1] - a[i]) * (x - i);
+}
+const waveTop = () => (waved() ? clamp(WV.L - 2, 0, 1) : 0);
+/* каждый кадр смены (из rainControl): снег — seasons.js (setWx), дождь — ENV.rainWant (ENV.rain догоняет сам) */
+function applyWave (ENV) {
+  const a = waveAmt(), top = waveTop();
+  if (ID === 'snowy') { ENV.rainWant = 0; SEAS.setWx(a, top, null); }
+  else { ENV.rainWant = a; SEAS.setWx(null, 0, 0.65 + 0.3 * top); }
 }
 
 /* сезон календаря → набор шансов. Зима — пока лежит снег (seasons snowAmt > 0,45) */
@@ -143,7 +216,7 @@ const fits = (id, b) => id === 'clear' || (CHANCES[b] && CHANCES[b][id] !== unde
 
 /* ctx: THREE, scene, cam, Store, MAP, CITY, V, S, SPOTS, ZEBRAS, Snd, toast, groundH, curbAt, nearestRoad, roadWidth, drivable,
    inHouse, inPoly, inBounds, makeHuman, dropMesh, gibHuman, CAR_L, CAR_W, isPlaying, intro;
-   геттеры: ENV, sun, hemi, amb, PIZZERIAS */
+   геттеры: ENV, sun, hemi, amb, PIZZERIAS, rainLines (струи дождя: ливень гуще) */
 /* шагами (function*, latebuild.js): сугробы снежной зимы на Деке ~0,27 с одним куском */
 export function* init (ctx) {
   C = ctx; THREE = ctx.THREE;
@@ -151,7 +224,8 @@ export function* init (ctx) {
   yield 'deep';
   if (!ctx.intro) { try { HUR.init(ctx); } catch (e) { console.error('[weather] ураган', e); } }
   SEAS.addDriftTop(deepTop);
-  const q = new URLSearchParams(location.search).get('weather');
+  let q = new URLSearchParams(location.search).get('weather');
+  if (ALIAS[q]) { PIN = ALIAS[q][1]; q = ALIAS[q][0]; }   // ?weather=blizzard — снежная зима и всё время метель
   if (q && (IDS.includes(q) || SPECIAL.includes(q))) { FORCE = q; setTimeout(() => set(q), 0); }   // ENV игры заводится позже
   if (window.__dlv) window.__dlv.weather = DEBUG;
   else setTimeout(() => { if (window.__dlv) window.__dlv.weather = DEBUG; }, 0);
@@ -206,9 +280,14 @@ function set (id, n = N) {
   TEMP = W.HEAT_T[0] + Math.floor(h01(n, 5) * (W.HEAT_T[1] - W.HEAT_T[0] + 1));
   for (const m of DEEP_MESH) m.visible = id === 'snowy';
   const ENV = C.ENV;
+  WV.k = null; WV.L = 0; WV.n = 0;
+  SEAS.setWx(null);
+  if (waved(id)) waveStart(id, true);                // волны осадков: смена — уже на снегопаде / дожде
   if (ENV) {
-    if (id === 'rain' || id === 'storm' || id === 'hurricane') { ENV.rainWant = 1; ENV.rain = Math.max(ENV.rain, 0.85); RT = rnd(...W.RAIN_ON); }
+    if (id === 'storm' || id === 'hurricane') { ENV.rainWant = 1; ENV.rain = Math.max(ENV.rain, 0.85); }
+    else if (id === 'rain') { applyWave(ENV); ENV.rain = Math.max(ENV.rain, ENV.rainWant); }
     else if (id !== 'clear') { ENV.rainWant = 0; ENV.rain = 0; }
+    if (id === 'snowy') applyWave(ENV);
   }
   if (id !== 'snowy') dropSleds();
   BOLT.t = id === 'storm' || id === 'hurricane' ? rnd(2, 5) : 0;
@@ -234,12 +313,8 @@ export const drizzle = () => (NEW && !FORCE ? 0 : DRIZZLE[bucket()] ?? 0.22);
 export function rainControl (ENV, dt) {
   if (ID === 'clear' || ID === 'thaw' || ID === 'firstsnow') return false;   // оттепель и первый снег — как обычная: изредка дождь / снег
   if (ID === 'storm' || ID === 'hurricane') ENV.rainWant = 1;
-  else if (ID === 'rain') {
-    if ((RT -= dt) <= 0) {
-      ENV.rainWant = ENV.rainWant ? 0 : 1;
-      RT = rnd(...(ENV.rainWant ? W.RAIN_ON : W.RAIN_OFF));        // без подписи: погоду игроку не называем (04.10.2026)
-    }
-  } else ENV.rainWant = 0;
+  else if (waved()) { stepWave(dt); applyWave(ENV); }   // снежная зима и дождь — волнами (без подписи: погоду игроку не называем)
+  else ENV.rainWant = 0;
   return true;
 }
 
@@ -266,8 +341,22 @@ function sky (dt) {
     scene.background.lerp(K.goldSky, 0.3 * day);
     if (sun) sun.color.lerp(K.goldSun, 0.35 * day);
   } else if (ID === 'snowy') {
-    scene.background.lerp(K.snowSky, 0.35 * day);
-    if (fog) { fog.color.lerp(K.snowFog, 0.4 * day); fog.far *= 0.72; }
+    // туман — от того, сколько снега падает: в перерыв ×0,82, снегопад ×0,72 (как было всю смену), метель ×0,28 и с 15 % ближнего
+    const s = SEAS.snowFall(), B = SEAS.blizzard();
+    scene.background.lerp(K.snowSky, (0.35 + 0.45 * B) * day);
+    if (fog) { fog.color.lerp(K.snowFog, (0.4 + 0.5 * B) * day); fog.far *= 0.82 - 0.12 * Math.min(1, s) - 0.42 * B; fog.near *= 1 - 0.85 * B; }
+    if (sun) sun.intensity *= 1 - 0.3 * B;
+  } else if (ID === 'rain') {
+    // ливень: темнее, туман ближе, струи гуще (до 23.10 вариант «дождь» неба не трогал)
+    const P = waveTop();
+    if (P > 0.001) {
+      scene.background.lerp(K.stormSky, 0.4 * P);
+      if (fog) { fog.color.lerp(K.stormFog, 0.4 * P); fog.far *= 1 - 0.2 * P; fog.near *= 1 - 0.4 * P; }
+      if (sun) sun.intensity *= 1 - 0.3 * P;
+      if (hemi) hemi.intensity *= 1 - 0.12 * P;
+      const RL = C.rainLines;
+      if (RL && RL.material.uniforms && RL.material.uniforms.uA) RL.material.uniforms.uA.value = Math.min(1, (ENV.rain || 0) * (0.85 + 0.15 * P));
+    }
   } else if (ID === 'storm' || ID === 'hurricane') {
     // ураган — видно как в обычный дождь (04.10.2026: был сплошной туман): туман не ближе, чуть темнее
     const R = ENV.rain || 0, hu = ID === 'hurricane';
@@ -605,7 +694,7 @@ function placeSled (q, dt) {
   }
 }
 function stepSleds (dt) {
-  const V = C.V, on = ID === 'snowy' && (C.ENV.night || 0) < 0.7 && C.S.state !== 'title';
+  const V = C.V, on = ID === 'snowy' && (C.ENV.night || 0) < 0.7 && C.S.state !== 'title' && SEAS.blizzard() < 0.5;   // в метель с горок уходят
   if (!on) { if (SLEDS.length) dropSleds(); return; }
   if ((sledScan -= dt) <= 0) {
     sledScan = 1.5;
@@ -666,8 +755,47 @@ export function update (dt) {
 const DEBUG = {
   get id () { return ID; }, get forced () { return FORCE; }, get temp () { return TEMP; }, get label () { return label(); },
   CHANCES, IDS, bucket, pickFor, force, strike, shiftStart, hur: HUR.DEBUG,
-  /* поставить вариант сейчас (и сезон, если не к месту) */
-  set (v) { SEAS.setVariant(null); if (v !== 'clear' && !fits(v, bucket())) SEAS.setSeason(HOME[v], true); set(v); HUR.shiftStart(ID, false, N); return ID; },
+  /* поставить вариант сейчас (и сезон, если не к месту); 'blizzard' / 'downpour' — снежная зима / дождь и всё время метель / ливень */
+  set (v) {
+    PIN = ALIAS[v] ? ALIAS[v][1] : null; if (ALIAS[v]) v = ALIAS[v][0];
+    SEAS.setVariant(null); if (v !== 'clear' && !fits(v, bucket())) SEAS.setSeason(HOME[v], true); set(v); HUR.shiftStart(ID, false, N); return ID;
+  },
+  /* волны осадков (12ах). wave() — что идёт сейчас; wave('blizzard', 120) — метель сейчас (и снежная зима, если не она):
+     держится 120 с, потом стихает по ступеням. Имена: light, snow, blizzard (снег), drizzle, rain, downpour (дождь) или ступень 0…3 */
+  wave (v, secs = 180) {
+    if (v !== undefined) {
+      const M = { light: ['snowy', 1], snow: ['snowy', 2], blizzard: ['snowy', 3], drizzle: ['rain', 1], rain: ['rain', 2], downpour: ['rain', 3] };
+      const [id, L] = typeof v === 'number' ? [waved() ? ID : 'snowy', clamp(v, 0, 3)] : M[v] || [];
+      if (!id) return null;
+      if (ID !== id) DEBUG.set(id);
+      PIN = null;
+      const k = [[0, L], [secs, L]];
+      let t = secs;
+      for (let i = Math.ceil(L) - 1; i >= 0; i--) { t += 20; k.push([t, i]); }
+      WV.k = k; WV.len = t; WV.peak = L; WV.t = 0; WV.gap = 0; WV.L = L; WV.n++;
+      if (C && C.ENV) { applyWave(C.ENV); if (id === 'rain') C.ENV.rain = C.ENV.rainWant; }
+    }
+    const a = waveAmt();
+    return { id: ID, on: waved(), L: +WV.L.toFixed(2), amt: +a.toFixed(2), top: +waveTop().toFixed(2), peak: WV.peak, n: WV.n, pin: PIN,
+      t: Math.round(WV.t), len: Math.round(WV.len), gap: WV.k ? 0 : Math.round(WV.gap), rain: C && C.ENV ? +(C.ENV.rain || 0).toFixed(2) : null,
+      snowFall: +SEAS.snowFall().toFixed(2), blizzard: +SEAS.blizzard().toFixed(2) };
+  },
+  /* ступень держится всё время (null — снова волнами) */
+  pin (L = 3) { PIN = L == null ? null : clamp(L, 0, 3); return PIN; },
+  /* как ходят волны: n волн подряд жребием → средние длины, сколько доходит до метели / ливня, доля времени с осадками */
+  waveSim (n = 10000, kind = 'snowy') {
+    let len = 0, gap = 0, wet = 0, topT = 0, lmin = 1e9, lmax = 0;
+    const peaks = { 1: 0, 2: 0, 3: 0 };
+    for (let i = 0; i < n; i++) {
+      const p = wavePlan(kind), g = skew(WAVE[kind].GAP);
+      len += p.len; gap += g; peaks[p.peak]++; lmin = Math.min(lmin, p.len); lmax = Math.max(lmax, p.len);
+      for (let t = 0; t < p.len; t += 1) { const L = levelAt(p.k, t); if (L > 0.5) wet++; if (L > 2.5) topT++; }
+    }
+    const all = len + gap;
+    return { kind, waveAvg: Math.round(len / n), waveMin: Math.round(lmin), waveMax: Math.round(lmax), gapAvg: Math.round(gap / n),
+      peaks: { light: +(peaks[1] / n * 100).toFixed(1), heavy: +(peaks[2] / n * 100).toFixed(1), top: +(peaks[3] / n * 100).toFixed(1) },
+      wetShare: +(wet / all * 100).toFixed(1), topShare: +(topT / all * 100).toFixed(1), perShift15: +(900 / (all / n)).toFixed(1) };
+  },
   /* как разойдутся смены 0…n-1 по вариантам в этом сезоне */
   spread (n = 1000, b = bucket()) { const o = {}; for (let i = 0; i < n; i++) { const k = pickFor(b); o[k] = (o[k] || 0) + 1; } return o; },
   /* n смен карьеры подряд (как в игре: без повтора пары, ураган с HUR.FROM) → { seasons, weather, pairs, repeats, list } */

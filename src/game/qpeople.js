@@ -21,7 +21,9 @@
    Чего нет в пробе: зимней одежды и шапок (верх зимой — цвета пуховика), живых лиц катсцен (у моделей свои лица).
    Дальний вариант (дальше 45 м) — та же модель одним мешем, стоит.
    23.10.2026: коробку с пиццей держит двумя руками на кистях (CARRY); сбитый — та же модель с цветами живого и тем, что
-   надето поверх (corpseQ); на куски — та же модель (qPieces); наклон «Interact» — qpeople.clips.js. */
+   надето поверх (corpseQ); на куски — та же модель (qPieces); наклон «Interact» — qpeople.clips.js.
+   23.10.2026 (память телефона, docs/AGENTS.md): части сварены и упрощены (tools/quaternius/slim.mjs), кости — лёгкие (QBone,
+   не в сцене), очки — только у кого есть во внешности. */
 import * as THREE from '../vendor/three.module.min.js';
 import { QDATA } from './qpeople.data.js';
 import { QCLIPS } from './qpeople.clips.js';      // добавочные клипы (наклон «Interact» — поднять с земли), tools/quaternius/clipadd.py
@@ -281,18 +283,52 @@ const col = hex => {
   return c;
 };
 
+/* ── кость модели без Object3D (23.10.2026, 0п4): у человека ~60 костей (пальцы — по 19 на руку), людей в городе ~180 —
+   было 11 тыс. THREE.Bone (~1,9 КБ каждая, ~22 МБ кучи), и сцена каждый кадр пересчитывала их матрицы, даже у тех, кого
+   не видно (на «Деке» 2,7 мс из 3,9 мс всего обхода сцены). Теперь кость — место, поворот, масштаб и матрица в мире
+   (~0,35 КБ); считает их только poseHook — когда модель в кадре (qBones). Обратные матрицы покоя — общие на семейство.
+   Очки и шапка — на «гнезде» головы (sock, дочка меша: спрятан меш — спрятаны и они), его место ставит qBones ── */
+const YAX = new THREE.Vector3(0, 1, 0), RQY = new THREE.Quaternion(), BM = new THREE.Matrix4();
+class QBone {
+  constructor (parent) { this.parent = parent; this.position = new THREE.Vector3(); this.quaternion = new THREE.Quaternion(); this.scale = new THREE.Vector3(1, 1, 1); this.matrixWorld = new THREE.Matrix4(); }
+  getWorldPosition (v) { return v.setFromMatrixPosition(this.matrixWorld); }
+  rotateY (a) { this.quaternion.multiply(RQY.setFromAxisAngle(YAX, a)); return this; }
+}
+/* матрицы костей в мире — от корня модели (его матрица — уже в этом кадре) */
+function qBones (st) {
+  st.root.updateMatrixWorld(true);
+  const F = st.F, B = st.bones, RW = st.root.matrixWorld;
+  for (const j of F.order) {
+    const b = B[j];
+    b.matrixWorld.multiplyMatrices(b.parent ? b.parent.matrixWorld : RW, BM.compose(b.position, b.quaternion, b.scale));
+  }
+  if (st.sock && F.J.head >= 0) {                   // гнездо головы: место головы в осях корня (меш — в начале корня)
+    st.sock.matrix.copy(IM.copy(RW).invert()).multiply(B[F.J.head].matrixWorld);
+    st.sock.updateMatrixWorld(true);
+  }
+}
+/* обратные матрицы покоя (кости в осях модели, корень без масштаба) — одни на семейство */
+function restInv (F) {
+  if (!F.inv) {
+    const W = [];
+    for (const j of F.order) { const m = new THREE.Matrix4().compose(F.LP[j], F.LQ[j], ONE3); W[j] = F.parent[j] < 0 ? m : m.premultiply(W[F.parent[j]]); }
+    F.headM = F.J.head >= 0 ? W[F.J.head].clone() : null;
+    F.inv = W.map(m => m.clone().invert());
+  }
+  return F.inv;
+}
+
 /* надеть модель: в группу человека g (кости игры уже в ней) — корень модели со скелетом, меш и дальний меш */
 export function buildQ (g, q, S, Lk, mat, dressed = false) {
   if (!dressed) q = dress(q, S, Lk);
   const F = family(q.fam), C = combo(F, q);
-  const bones = [];
-  for (let j = 0; j < F.nJ; j++) {
-    const b = new THREE.Bone();
+  const bones = new Array(F.nJ);
+  for (const j of F.order) {                       // родитель — раньше ребёнка
+    const b = new QBone(F.parent[j] < 0 ? null : bones[F.parent[j]]);
     b.position.copy(F.LP[j]); b.quaternion.copy(F.LQ[j]);
-    bones.push(b);
+    bones[j] = b;
   }
   const root = new THREE.Group();
-  for (let j = 0; j < F.nJ; j++) (F.parent[j] < 0 ? root : bones[F.parent[j]]).add(bones[j]);
   // цвета человека игры
   const want = { skin: S.skin, shirt: S.shirt, pants: S.pants, hair: Lk.hairC, hat: HATS[(Lk.seed >>> 5) % HATS.length] };
   const pc = C.pal.map(p => p.role && want[p.role] ? col(want[p.role]) : p.rgb);
@@ -313,15 +349,21 @@ export function buildQ (g, q, S, Lk, mat, dressed = false) {
   geo.setIndex(C.idx);
   const skin = new THREE.SkinnedMesh(geo, mat);
   root.add(skin);
-  root.updateMatrixWorld(true);                     // корень пока без масштаба и вне группы: кости в покое — в осях модели, как вершины
-  const skel = new THREE.Skeleton(bones);
-  skel.calculateInverses();
+  const skel = new THREE.Skeleton(bones, restInv(F));   // обратные покоя — общие на семейство (кости в покое — в осях модели, как вершины)
   skin.bind(skel, new THREE.Matrix4());
   skin.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, F.h * 0.5 + F.y0, 0), F.h * 0.8);
-  // очки (если они есть во внешности человека игры) — на кость головы
-  if (Lk.glasses && C.eye && F.J.head >= 0 && C.eye.lengthSq() > 0) bones[F.J.head].add(glasses(F, C.eye, Lk));
-  // шапка зимой (ушанка / вязаная), если на голове не каска и не корона
-  if (lvl >= 3 && !q.hat && C.skull && !C.helmet && F.J.head >= 0 && /ushanka|beanie|hood|hat/.test(S.hw || '')) bones[F.J.head].add(hat(F, C.skull, S, Lk));   // нет шапки из Blender — простая
+  // очки (если они есть во внешности человека игры) и шапка зимой (ушанка / вязаная, если на голове не каска и не корона) —
+  // на гнездо головы (qBones); нет шапки из Blender — простая
+  const wantHat = lvl >= 3 && !q.hat && C.skull && !C.helmet && F.J.head >= 0 && /ushanka|beanie|hood|hat/.test(S.hw || '');
+  const wantGl = Lk.glasses && Lk.glasses !== 'none' && C.eye && F.J.head >= 0 && C.eye.lengthSq() > 0;   // 'none' — без очков (было: очки у всех)
+  let sock = null;
+  if (wantHat || wantGl) {
+    sock = new THREE.Group();
+    sock.matrixAutoUpdate = false; sock.matrix.copy(F.headM);   // до первой позы — голова в покое
+    skin.add(sock);
+    if (wantGl) sock.add(glasses(F, C.eye, Lk));
+    if (wantHat) sock.add(hat(F, C.skull, S, Lk));
+  }
   // дальний вариант (humanLod, дальше 45 м): та же модель одним мешем — стоит, руки опущены
   const lg = new THREE.BufferGeometry();
   lg.setAttribute('position', C.lod); lg.setAttribute('color', ca); lg.setIndex(C.idx);
@@ -329,13 +371,15 @@ export function buildQ (g, q, S, Lk, mat, dressed = false) {
   lod.visible = false;
   root.add(lod);
   // места, кости и индексы — общие на всех с этим набором частей: человек ушёл — их из видеокарты не выгружать
-  // (иначе у остальных пропадёт меш); цвета — свои, в пробе остаются (~150 КБ на человека)
-  geo.dispose = lg.dispose = KEEP;
+  // (иначе у остальных пропадёт меш). Освобождаются только свои цвета: dispose сначала снимает с геометрии общее
+  // (было KEEP — ничего: three.js держал геометрию и цвета каждого ушедшего человека в своём кэше, до конца игры)
+  lg.dispose = ownDispose;
+  geo.dispose = function () { skel.dispose(); ownDispose.call(this); };   // и текстуру костей (её заводит three.js при первом показе)
   const k = (Lk.f ? 1.72 : 1.8) / F.h;              // рост — как у человека игры (дальше × его рост, g.scale)
   root.scale.setScalar(k);
   root.position.y = -F.y0 * k;
   g.add(root);
-  const st = { F, C, bones, root, skel, g, k, qd: q, S: { skin: S.skin, shirt: S.shirt, pants: S.pants, lvl: S.lvl, hw: S.hw }, y0: root.position.y, lift: 0, liftT: 0, WQ: F.RQ.map(x => x.clone()), WP: F.RP.map(x => x.clone()), dq: new Array(F.nJ).fill(null), ang: {},
+  const st = { F, C, bones, root, skel, sock, g, k, qd: q, S: { skin: S.skin, shirt: S.shirt, pants: S.pants, lvl: S.lvl, hw: S.hw }, y0: root.position.y, lift: 0, liftT: 0, dq: new Array(F.nJ).fill(null), ang: {},
     frame: -1, nb: 0, nh: 0, nl: 0, lastT: 0, lx: 0, lz: 0, v: 0, swing: 0, w: 0, t: Math.random() * 10, run: 0 };
   skin.userData.q = st;
   skin.onBeforeRender = poseHook;
@@ -343,7 +387,12 @@ export function buildQ (g, q, S, Lk, mat, dressed = false) {
   return { skin, lod };
 }
 
-function KEEP () {}
+const SHARED = ['position', 'skinIndex', 'skinWeight'];
+function ownDispose () {
+  for (const n of SHARED) if (this.attributes[n]) this.deleteAttribute(n);
+  this.setIndex(null);
+  THREE.BufferGeometry.prototype.dispose.call(this);
+}
 
 /* шапка по черепу (кожа головы в покое): вязаная с помпоном или ушанка с ушами; в осях кости головы */
 const HATS = ['#c9476b', '#2e4a6b', '#e0b13f', '#3f5a3a', '#8a2a3a', '#d9d2c2', '#4f7fd6', '#2b2a30'], FURS = ['#5a4a3a', '#3a3036', '#6b5a48', '#8a7a68'];
@@ -534,7 +583,8 @@ function poseHook () {
   a.elbL = elb(u.armL.rotation.x); a.elbR = elb(u.armR.rotation.x);
   const box = !u.qAnim && !st.noWalk ? carriedBox(st) : null;   // несёт коробку: руки вперёд, коробка — на кистях (CARRY)
   if (box) { if (J.armL >= 0) dq[J.armL] = CQL; if (J.armR >= 0) dq[J.armR] = CQR; a.elbL = a.elbR = CARRY.ELB; }
-  solve(F, dq, a, st.WQ, st.WP, st.bones);
+  if (!F.WQ) { F.WQ = F.RQ.map(x => x.clone()); F.WP = F.RP.map(x => x.clone()); }   // повороты и места в мире — черновик на семейство (нужны только внутри solve)
+  solve(F, dq, a, F.WQ, F.WP, st.bones);
   // анимация художника, которую задаёт игра (hits.js fallStep: падает навзничь, лежит, встаёт, грозит кулаком;
   // carried.js: наклон «Interact» — поднять с земли то, что выронил)
   const an = u.qAnim, ac = an && F.clips[an.c];
@@ -550,10 +600,10 @@ function poseHook () {
       b.quaternion.premultiply(CQ2.setFromAxisAngle(V, an.bend));
     }
     // ступни у Quaternius — цели ног, в этих клипах не следуют за ногой: пристегнуть к голени, как в покое
-    st.root.updateMatrixWorld(true);
+    qBones(st);
     for (const Ft of F.FOOT) {
       const fb = st.bones[Ft.f], kb = st.bones[Ft.k];
-      FM.compose(Ft.p, Ft.q, ONE3).premultiply(kb.matrixWorld).premultiply(IM.copy(fb.parent.matrixWorld).invert());
+      FM.compose(Ft.p, Ft.q, ONE3).premultiply(kb.matrixWorld).premultiply(IM.copy(fb.parent ? fb.parent.matrixWorld : st.root.matrixWorld).invert());
       FM.decompose(fb.position, fb.quaternion, SC3);
     }
   }
@@ -578,7 +628,7 @@ function poseHook () {
   const sit = Math.max(0, Math.min(1, (-Math.max(u.legL.rotation.x, u.legR.rotation.x) - 0.8) / 0.5));
   if (st.hip === undefined) st.hip = J.legL >= 0 ? (F.RP[J.legL].y - F.y0) * st.k - 0.7 : 0;
   st.root.position.y = st.y0 + (st.noWalk ? 0 : st.lift / (st.g.scale.y || 1)) - sit * st.hip;
-  st.root.updateMatrixWorld(true);                  // поза — в этот же кадр, без запаздывания
+  qBones(st);                                       // поза — в этот же кадр, без запаздывания
   st.skel.update();
   // вещи в руках (бутылка, лопата, портфель) висят на наших руках-костях: кисть коробочного человека — в 0,58 под
   // плечом, у модели кисть ниже и дальше. Сдвигаем нашу «руку» так, чтобы её кисть была в кисти модели
@@ -759,6 +809,7 @@ export function qPortrait (Lk, spec, size, id) {
   PR.r.setClearColor(PASTEL[(Lk.seed >>> 3) % PASTEL.length], 1);
   PR.r.render(PR.sc, PR.cam);
   PR.sc.remove(g);
+  g.traverse(o => { if (o.geometry) o.geometry.dispose(); });   // свои цвета, кости, очки — вон (общее у людей остаётся)
   const c = document.createElement('canvas'); c.width = c.height = size;
   const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
   x.drawImage(PR.r.domElement, 0, 0, size, size);

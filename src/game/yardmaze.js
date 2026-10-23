@@ -429,7 +429,8 @@ function smashSec (cx, cz, ux, uz, sk) {
     A.box(g, F.SEC, 0.045, 0.045, hex, cx, gy + 0.4, cz, ry);
     for (const o of [-1.2, 1.2]) A.box(g, 0.05, F.H, 0.05, hex, cx + ux * o, gy + F.H / 2, cz + uz * o);
   }
-  A.smashAdd('fence', cx, cz, 1.3, g, hex);
+  const it = A.smashAdd('fence', cx, cz, 1.3, g, hex);
+  if (!sk.pk && it) it.mat = 'rail';               // тонкие трубы — удар металлом, штакетник — забор (impact.js)
   const o = { seg: 1, ax: cx - ux * 1.25, az: cz - uz * 1.25, bx: cx + ux * 1.25, bz: cz + uz * 1.25, th: 0.1, solid: 0, kind: 'sfence' };
   gput(cx - 2, cz - 2, cx + 2, cz + 2, o);
   ST.fen.smashM += F.SEC; ST.fen.smashSec++; if (sk.pk) ST.fen.pickets++;

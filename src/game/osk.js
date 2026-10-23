@@ -10,12 +10,15 @@
    A на поле поднимает клавиатуру всегда, даже если мы думаем, что она уже висит (её могли закрыть
    самим Стимом — игра этого не видит).
 
+   Автоповтор гасим (буквы — в любом поле Стим-сборки на Деке, с геймпадом или касанием, даже если
+   клавиатуру поднял сам Стим, Steam + X; Backspace и стрелки — только при нашей): клавиша с повтором
+   (e.repeat), снова до своего отпускания (keyup, в течение 1 с), та же буква чаще 60 мс или парой
+   «отпустил — нажал» ближе 8 мс (так приходит автоповтор под gamescope: флага repeat нет) — в поле не
+   попадает; та же буква вставкой (beforeinput) чаще 60 мс — тоже. Первое нажатие клавиши проходит
+   всегда. Клавиатура Стима под gamescope отпускает клавишу с опозданием, и Chromium дописывал букву
+   автоповтором («одно нажатие — много букв», Дека, v0.8.0; снова «одну букву 10 раз» — 23.10.2026,
+   фильтр был только при нашей клавиатуре и пропускал повтор парой).
    Пока плавающая клавиатура открыта нами (OSK.open — поле, над которым она висит):
-   • автоповтор гасим: клавиша с повтором (e.repeat) или снова до своего отпускания (keyup, в
-     течение 1 с) в поле не попадает; та же буква вставкой (beforeinput) чаще раза за 35 мс без
-     отпускания между ними — тоже. Первое нажатие клавиши проходит всегда. Клавиатура Стима под
-     gamescope отпускает клавишу с опозданием, и Chromium дописывал букву автоповтором («одно
-     нажатие — много букв», Дека, v0.8.0);
    • по возврату фокуса в окно второй раз не поднимаем;
    • геймпад игре не отдаём (padGate) — но только пока клавиатура заведомо на экране: ждём ответа
      большой (≤ 1,5 с), 1,5 с после того, как подняли плавающую, и 1,5 с после каждой буквы с неё.
@@ -30,7 +33,8 @@ import Platform from '../platform/index.js';
 import { t as $t } from '../i18n/index.js';
 import { pad as PAD } from '../input/gamepad.js';
 
-const REPEAT_MS = 35;            // та же буква вставкой чаще — повтор
+const FAST_MS = 60;              // та же буква чаще — повтор (автоповтор 20—30 раз в секунду, пальцем так не нажать)
+const PAIR_MS = 8;               // «отпустил» и снова «нажал» ближе — автоповтор парой событий, не палец
 const HELD_MS = 1000;            // нажатие без отпускания: столько ещё считаем её зажатой (если keyup не пришёл вовсе)
 const BIG_MS = 1500;             // большая клавиатура молчит столько — считаем, что не поднялась
 const GATE_MS = 1500;            // геймпад — клавиатуре: столько после её подъёма и после каждой буквы
@@ -110,32 +114,41 @@ export function padGate (p) {
 }
 
 function drop (e) { e.preventDefault(); e.stopImmediatePropagation(); OSK.dropped++; }
+/* фильтр повторов — над полем, где печатают экранной клавиатурой: нашей (OSK.open) или любой на Деке / с геймпадом /
+   касанием (Стим-сборка) — её могли поднять и самим Стимом (Steam + X), игра этого не видит */
+const guarded = el => !!el && (openOn() === el || (wanted() && isTextField(el) && document.activeElement === el));
+const isChar = e => !!e.key && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
 function onKeyDown (e) {
-  const el = openOn();
-  if (!el || e.target !== el) return;
+  const el = e.target;
+  if (!guarded(el)) return;
   if (e.isComposing || e.key === 'Process') return;
-  const id = e.code + '|' + e.key, now = performance.now(), h = OSK.held.get(id);
-  OSK.key = now;                                                     // по клавиатуре печатают — геймпад её
-  // повтор — только то, что пришло после первого нажатия этой клавиши без отпускания: первое
-  // (даже с флагом repeat — Стим мог поднять клавиатуру посреди нажатия) проходит всегда
-  if (h && (e.repeat || now - h.t < HELD_MS)) { h.t = now; drop(e); return; }
-  OSK.held.set(id, { t: now });
-  if (e.key === 'Enter' || e.key === 'Escape' || e.key === 'Tab') close();
+  const id = e.code + '|' + e.key, now = performance.now(), h = OSK.held.get(id), ours = OSK.open === el;
+  if (ours) OSK.key = now;                                           // по клавиатуре печатают — геймпад её
+  // повтор — только то, что пришло после первого нажатия этой клавиши: первое (даже с флагом repeat — Стим мог
+  // поднять клавиатуру посреди нажатия) проходит всегда. Буква — ещё и повтор парой «отпустил-нажал» (меньше
+  // PAIR_MS между ними: так автоповтор приходит под gamescope — флага repeat нет, keyup есть) и та же буква
+  // чаще FAST_MS; прочие клавиши (Backspace, стрелки) — как раньше, только при нашей клавиатуре
+  const rep = h && now - h.t < HELD_MS && (e.repeat || h.held || (isChar(e) && (now - h.t < FAST_MS || now - h.up < PAIR_MS)));
+  if (rep && (ours || isChar(e))) { h.t = now; h.held = true; drop(e); return; }
+  OSK.held.set(id, { t: now, up: -1e9, held: true });
+  if (ours && (e.key === 'Enter' || e.key === 'Escape' || e.key === 'Tab')) close();
 }
 function onKeyUp (e) {
-  if (!OSK.open) return;
+  if (!OSK.held.size) return;
   // отпустили клавишу — её нажатия больше не «зажаты» (по коду: Shift мог смениться между down и up)
-  for (const id of OSK.held.keys()) {
+  const now = performance.now();
+  for (const [id, h] of OSK.held) {
     const [c, k] = id.split('|');
-    if (e.code ? c === e.code : k === e.key) OSK.held.delete(id);
+    if (e.code ? c === e.code : k === e.key) { h.held = false; h.up = now; }
   }
   OSK.ups++;
 }
 function onBeforeInput (e) {
-  const el = openOn();
-  if (!el || e.target !== el || e.inputType !== 'insertText' || !e.data) return;
+  const el = e.target;
+  if (e.inputType !== 'insertText' || !e.data || !guarded(el)) return;
+  // та же буква вставкой чаще FAST_MS — повтор (и без нажатий клавиш: вставкой текста)
   const now = performance.now(), I = OSK.ins;
-  if (I.data === e.data && I.ups === OSK.ups && now - I.t < REPEAT_MS) { I.t = now; drop(e); return; }
+  if (I.data === e.data && now - I.t < FAST_MS) { I.t = now; drop(e); return; }
   I.data = e.data; I.t = now; I.ups = OSK.ups;
 }
 
