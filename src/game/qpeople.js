@@ -320,7 +320,7 @@ export function buildQ (g, q, S, Lk, mat, dressed = false) {
   root.position.y = -F.y0 * k;
   g.add(root);
   const st = { F, C, bones, root, skel, g, k, qd: q, S: { skin: S.skin, shirt: S.shirt, pants: S.pants, lvl: S.lvl, hw: S.hw }, y0: root.position.y, lift: 0, liftT: 0, WQ: F.RQ.map(x => x.clone()), WP: F.RP.map(x => x.clone()), dq: new Array(F.nJ).fill(null), ang: {},
-    frame: -1, nb: 0, nh: 0, lastT: 0, lx: 0, lz: 0, v: 0, swing: 0, w: 0, t: Math.random() * 10, run: 0 };
+    frame: -1, nb: 0, nh: 0, nl: 0, lastT: 0, lx: 0, lz: 0, v: 0, swing: 0, w: 0, t: Math.random() * 10, run: 0 };
   skin.userData.q = st;
   skin.onBeforeRender = poseHook;
   QP.built++;
@@ -448,6 +448,9 @@ function poseHook () {
   const bd = u.parts && u.parts[2], hd = u.head;
   if (bd && bd.children.length !== st.nb) { for (const c of bd.children) if (!c.isSprite) c.visible = false; st.nb = bd.children.length; }
   if (hd && hd.children.length !== st.nh) { for (const c of hd.children) if (!c.isSprite) c.visible = false; st.nh = hd.children.length; }
+  // и на ногах (юбки, шорты-коробки у ночной жизни и костюмов — на модели висели «раздутыми квадратами» у бёдер)
+  const nl = u.legL.children.length + u.legR.children.length;
+  if (nl !== st.nl) { for (const c of [...u.legL.children, ...u.legR.children]) if (!c.isSprite) c.visible = false; st.nl = nl; }
   const dt = st.lastT ? Math.min(0.1, (now - st.lastT) / 1000) : 0;
   st.lastT = now;
   // скорость: где группа человека в мире сейчас и кадр назад
