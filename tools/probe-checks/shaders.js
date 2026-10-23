@@ -131,7 +131,7 @@ await phase('налёт', () => d.RAID.start());
 await phase('шар', () => { d.RAID.lose(); const D = d.PZD.DOMES[0]; if (!D) return false; tp(D.x + 18, D.z + 18); });
 await phase('шар-ночь', () => { d.ENV.t = NIGHT; });
 await phase('катсцена', async () => { d.ENV.t = DAY; const L = d.STORY.list(); const s = L && L[0]; if (!s) return false; await d.STORY.play(s.id || s, 0, { teleport: true }); }, 8);
-await phase('повтор', () => { const ok = d.REPLAY.open(); setTimeout(() => d.REPLAY.close(), 4000); return ok; });
+if (d.REPLAY.enabled) await phase('повтор', () => { const ok = d.REPLAY.open(); setTimeout(() => d.REPLAY.close(), 4000); return ok; });   // повтор выкл с 23.10.2026 (replay.js RP.ON) — этапа нет
 await phase('край-1', () => { tp(-1500, -1500); });
 await phase('край-2', () => { tp(1500, 1500); });
 await phase('край-3', () => { tp(-1500, 1500); });

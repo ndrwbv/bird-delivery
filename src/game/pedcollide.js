@@ -233,6 +233,50 @@ export function dodgeSide (p, rx, rz, cx, cz, fx, fz, al, ac, HL, HW) {
   return sd;
 }
 
+/* ── укрытие (снежки, seasons.js; автор 23.10.2026, 0п13: «прятаться за предметы рядом — машины, горки, деревья, будки») ──
+   Ближайший твёрдый предмет не дальше r м от (x, z): дерево, будка, гараж, контейнер, ракушка (коробки не длиннее
+   COVER.BIG м — стены домов не годятся), стоящая машина (поток, у бордюра, во дворе) или что дал вызывающий (extra:
+   [{ x, z, r }] — горки, снеговики). Точка укрытия — за ним, если смотреть от «противника» (fx, fz), на COVER.GAP м
+   от края; свободная (не в твёрдом, не у кузова, не в доме). Вернёт { x, z, d } (d — путь до неё) или null */
+export const COVER = { BIG: 4.5, GAP: 0.55 };
+const CV = { x: 0, z: 0, d: 0 }, CVN = [], CVS = new Set();
+let CVX = 0, CVZ = 0, CVFX = 0, CVFZ = 0, CVR = 0, CVBEST = 0;
+/* предмет — коробка (центр, полуразмеры hw × hd, поворот: cs, sn — как у SOLIDS) */
+function cvBox (cx, cz, hw, hd, cs, sn) {
+  if (Math.abs(cx - CVX) > CVR + hw + hd || Math.abs(cz - CVZ) > CVR + hw + hd) return;
+  let ux = cx - CVFX, uz = cz - CVFZ;
+  const L = Math.hypot(ux, uz);
+  if (L < 1) return;
+  ux /= L; uz /= L;
+  // полуразмер коробки вдоль (ux, uz): оси коробки в мире — (cs, sn) и (−sn, cs) (inBox: lx = dx·cs + dz·sn)
+  const ext = Math.abs(ux * cs + uz * sn) * hw + Math.abs(-ux * sn + uz * cs) * hd;
+  const hx = cx + ux * (ext + COVER.GAP), hz = cz + uz * (ext + COVER.GAP), d = Math.hypot(hx - CVX, hz - CVZ);
+  if (d > CVR || d >= CVBEST || !free(hx, hz) || A.inHouse(hx, hz)) return;
+  CVBEST = d; CV.x = hx; CV.z = hz; CV.d = d;
+}
+function cvCar (t) { const h = t.h || 0; cvBox(t.x, t.z, A.CAR_W, t.hl || A.CAR_L, Math.cos(h), -Math.sin(h)); }
+export function coverNear (x, z, fx, fz, r, extra) {
+  if (!A) return null;
+  CVX = x; CVZ = z; CVFX = fx; CVFZ = fz; CVR = r; CVBEST = Infinity;
+  CVS.clear();
+  for (const [ox, oz] of [[0, 0], [-r, -r], [r, -r], [-r, r], [r, r]]) {   // клетки стен (30 м) вокруг
+    const L = A.solidsNear(x + ox, z + oz);
+    if (CVS.has(L)) continue;
+    CVS.add(L);
+    for (let i = 0; i < L.length; i++) {
+      const s = L[i];
+      if (s.deckY !== undefined || s.edGone || s.hw > COVER.BIG || s.hd > COVER.BIG) continue;
+      cvBox(s.cx, s.cz, s.hw, s.hd, s.cs, s.sn);
+    }
+  }
+  const G = LAWNP.solidsOnly(x, z);
+  for (let i = 0; i < G.length; i++) { const s = G[i]; if (s.hw <= COVER.BIG && s.hd <= COVER.BIG) cvBox(s.cx, s.cz, s.hw, s.hd, s.cs, s.sn); }
+  for (let i = 0, n = TGRID.near(x, z, r + 3, CVN), T = TGRID.TG.R; i < n; i++) { const t = T[i]; if (!t.gone && !t.knock && Math.abs(t.speed || 0) < 0.3) cvCar(t); }
+  YCARS.eachNear(x, z, r + 3, cvCar);
+  if (extra) for (const e of extra) if (!e.down) cvBox(e.x, e.z, e.r, e.r, 1, 0);
+  return CVBEST < Infinity ? { x: CV.x, z: CV.z, d: CV.d } : null;
+}
+
 /* ── 3. едущая машина толкает людей ── */
 const NW = [];
 function kindOf (p) {
@@ -323,4 +367,4 @@ function hitOne (p, k, t, vx, vz, sp) {
   ST.killed++;
 }
 
-export const DEBUG = { PC, ST, inside, solidAt, carAt };
+export const DEBUG = { PC, ST, inside, solidAt, carAt, coverNear };

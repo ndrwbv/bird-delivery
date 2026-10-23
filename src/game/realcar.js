@@ -24,6 +24,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 import { inject as dirtInject } from './cardirt.js';
+import { carMats as shadeMats, shadeInject } from './fakeshadows.js';   // тень домов на кузове (fakeshadows.js carMat)
 
 const ROOT = (import.meta.env.BASE_URL || './') + 'models/';
 /* всё — в осях модели до увеличения k (метры настоящей машины): x — влево по ходу, y — вверх, z — вперёд, 0 — середина длины.
@@ -326,6 +327,7 @@ function bodyShader (mat, U, paint, traffic) {
   mat.userData.dirt = 1;                            // cardirt.js свою программу не ставит — грязь и снег вставляем сами
   mat.onBeforeCompile = sh => {
     if (!traffic) dirtInject(sh);                   // грязь и снег — своей машине (считаются от неё); у потока — износ uWear
+    else shadeInject(sh);                           // тень домов (своей — в грязи, cardirt.js)
     sh.uniforms.uWear = U.wear || { value: 0 };
     sh.uniforms.uGrit = { value: { x: 0.35, y: 0 } };   // глубина города (grit.js) на машине — втрое слабее: не сереет
     sh.uniforms.uPaint = U.paint;
@@ -576,6 +578,7 @@ export function trafficCar (hex, taxi) {
     if (o.material.transparent && !o.material.map) R.glass.push(o); else R.dent.push(o.geometry);
   });
   if (taxi) { m.add(taxiDecor(C.taxi)); U.wear.value *= 0.4; }   // такси — ухоженнее
+  shadeMats(m);                                      // в тени дома — темнее, как асфальт (до первой отрисовки: одна программа, без перекомпиляции)
   g.userData.real = R;
   return { g, hl: C.box.HL * C.k, id };
 }
@@ -672,6 +675,7 @@ export function dress (car, id = 'semerka', hex) {
       ud.realGlass = R.glassF;                       // дворники — по новому лобовому (wipers.js)
       ud.wipers = undefined;                         // уже собранные (по старому стеклу) ушли в old-body — собрать заново
     }
+    shadeMats(m);                                    // тень домов: хром, резина, стёкла — до первой отрисовки (кузов — в грязи)
     REAL.k = C.k; REAL.eye.set(...C.eye);
     ud.real = R;
   });

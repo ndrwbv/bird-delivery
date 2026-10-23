@@ -1,6 +1,10 @@
 /* ──────────────────────────────────────────────────────────────────────────
    Повтор для клипов (№ 10 IDEAS, 09.10.2026). Правила словами — docs/CAREER.md «Повтор».
 
+   ВЫКЛЮЧЕН (23.10.2026, IDEAS 11ф: «повтор последних 10 с — убрать»): RP.ON = false — нет ни кнопки R / LB,
+   ни пункта в паузе, ни строки в управлении, запись не идёт (кадр дешевле). Система цела: вернуть — RP.ON = true;
+   на один запуск — ?replay (проверки). Удар своей машины (тряска, crash) работает и без повтора.
+
    ЗАПИСЬ — всё время, пока идёт смена (и пока машина «умирает»): 20 раз в секунду игрового
    времени снимок поз всего, что ездит, ходит и летает рядом со своей машиной (RP.R м): верхние
    объекты сцены (машины потока, прохожие, свои и чужие обломки, сбитые столбы и лавочки, дым и
@@ -60,6 +64,7 @@ export const RP = {
   SPEEDS: [0.25, 0.5, 1],
   SCRUB: 2.5,         // перемотка зажатой стрелкой — во столько раз быстрее реального времени
   STEP: 1,            // с: шаг крестовины / кнопки ◀ ▶
+  ON: false,          // весь повтор (кнопка, пауза, запись, ролик) — выкл, автор 23.10.2026 (11ф); ?replay — вкл на запуск
   SLOW: { ON: false, V: 15, K: 0.3, SECS: 0.4, EASE: 0.12, GAP: 2.5, SHAKE: 0.9 },   // ON — замедление выключено (автор 10.10.2026: «неприятная пауза, когда врезаешься» — убрать); тряска осталась
   REC_FPS: 30, REC_BPS: 8e6,
   SND: true,          // звуки в повторе (и в ролике): удары, гудки, мотор по записи
@@ -100,7 +105,10 @@ const ALW = new Set();
 export const STATS = { samples: 0, entries: 0, maxPer: 0, objs: 0, clears: 0, opens: 0, slow: 0, saved: 0, recMs: 0, lastPath: '', events: 0, played: 0, audio: false, lastDurMs: 0 };
 
 /* ?noreplay — без записи (сравнить цену кадра: tools/probe-checks/frametail.js) */
-const OFF = typeof location !== 'undefined' && /[?&]noreplay(&|$)/.test(location.search);
+const QS = typeof location !== 'undefined' ? location.search : '';
+/** повтор есть в игре: RP.ON или ?replay на этот запуск (game.js: пункт паузы, строка в управлении) */
+export const ENABLED = RP.ON || /[?&]replay(&|=|$)/.test(QS);
+const OFF = !ENABLED || /[?&]noreplay(&|$)/.test(QS);
 let A = null;
 export function init (api) {
   A = api;
@@ -266,7 +274,7 @@ export const length = () => (FN - F0 > 1 ? FD[((FN - 1) % F_CAP) * FDL] - FD[(F0
 export const can = () => !!(A && !OPEN && A.canOpen() && length() >= RP.MIN);
 
 export function open (from) {
-  if (!A || OPEN) return false;
+  if (!A || OPEN || !ENABLED) return false;
   if (!A.canOpen(from === 'pause')) return false;
   if (length() < RP.MIN) { if (A.toast) A.toast(t('повтор: пока нечего показывать')); return false; }
   FROM = from || 'key';
@@ -546,7 +554,7 @@ function step (d) { PT = Math.max(0, Math.min(DUR, PT + d * RP.STEP)); }
 function typing (e) { const el = e.target; return !!(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)); }
 function onKey (e) {
   if (!OPEN) {
-    if (e.code === 'KeyR' && !e.repeat && !typing(e) && A && A.canOpen(false)) {
+    if (ENABLED && e.code === 'KeyR' && !e.repeat && !typing(e) && A && A.canOpen(false)) {
       if (open('key')) { e.preventDefault(); e.stopImmediatePropagation(); }
     }
     return;
@@ -574,7 +582,7 @@ function onKeyUp (e) {
 export function pad (p) {
   if (!A) return false;
   if (!OPEN) {
-    if (p.pageL && A.canOpen(false)) { p.pageL = false; return open('pad'); }
+    if (ENABLED && p.pageL && A.canOpen(false)) { p.pageL = false; return open('pad'); }
     return false;
   }
   if (p.menuBack || p.pause || p.pageL) { close(); return true; }
@@ -782,7 +790,7 @@ export function slowK (raw) {
 }
 
 export const DEBUG = {
-  RP, STATS, EV, open, close, can, length, slowK, crash, sink: null,
+  RP, STATS, EV, open, close, can, length, slowK, crash, sink: null, enabled: ENABLED,
   forceAudio: false,      // проверки: звук в ролик и при ?mute (динамики молчат — общий регулятор игры на нуле)
   get on () { return OPEN; }, get pt () { return PT; }, get dur () { return DUR; }, get cam () { return CAMS[CAM].id; }, get speed () { return RP.SPEEDS[SPD]; },
   get play () { return PLAY; }, get rec () { return !!REC; }, get frames () { return FN - F0; }, get slow () { return SLOW_T; },

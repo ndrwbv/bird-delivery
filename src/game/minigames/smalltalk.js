@@ -2,7 +2,8 @@
    Правила словами — docs/ORDERS.md «Разговор с клиентом». Когда выпадает и что даёт деньгами — doorstep.js (числа — ECON.TALK);
    кто что говорит — smalltalk-lines.js; здесь — только экран.
 
-   Как идёт (5—10 с): портрет человека (говорит ртом — talkface.js), его реплика, под ней ДВА коротких ответа столбиком.
+   Как идёт (5—10 с): портрет человека крупно (говорит ртом — talkface.js; 11х: «как будто он говорит прямо тебе»), его
+   реплика, под ней, рядом с лицом, ДВА коротких ответа столбиком.
    Курсор — стрелки / W S / крестовина (стик), выбрать — Enter / пробел / A, палец — тап; 1 / 2 — сразу ответ.
    Ответил — одна короткая реакция (или молча закрыл дверь), печать итога и кнопка «понятно» — закрывает игрок
    (автор 16.10.2026: «не надо по таймеру убирать»). Своего таймера нет и сам ответ не выбирается: идёт срок заказа
@@ -114,11 +115,12 @@ export default {
           '<figure class="tk-who pp-tilt-l"><img class="pp-polaroid tk-face" alt=""><figcaption>' + esc(who) + '</figcaption></figure>' +
           '<div class="tk-talk">' +
             '<p class="tk-say"><span class="tk-txt"></span><i class="tk-caret"></i></p>' +
+            // ответы курьера — рядом с крупным лицом, под его фразой (11х, 23.10.2026)
+            '<div class="tk-opts">' + ans.map((x, i) => '<button type="button" tabindex="-1" data-i="' + i + '" class="tk-o' + (i === 0 ? ' tk-cur' : '') + '" disabled><b>' + esc(t(x.me)) + '</b></button>').join('') + '</div>' +
             '<p class="tk-me" hidden></p>' +
             '<p class="tk-note" hidden></p>' +
           '</div>' +
         '</div>' +
-        '<div class="tk-opts">' + ans.map((x, i) => '<button type="button" tabindex="-1" data-i="' + i + '" class="tk-o' + (i === 0 ? ' tk-cur' : '') + '" disabled><b>' + esc(t(x.me)) + '</b></button>').join('') + '</div>' +
         '<p class="tk-out" hidden></p>' +
         '<div class="tk-end" hidden><button type="button" tabindex="-1" class="tk-ok">' + keyHTML('ok') + '<span>' + esc(t('понятно')) + '</span></button></div>' +
         '<p class="tk-hint"></p>' +

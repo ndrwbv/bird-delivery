@@ -10,6 +10,12 @@ import numpy as np
 HERE = sys.argv[0].rsplit('/', 1)[0] if '/' in sys.argv[0] else '.'
 sys.path.insert(0, HERE)
 src = open(HERE + '/glb2q2.py').read().split('REPOSE = None')[0].replace("sys.path.insert(0, sys.argv[0].rsplit('/', 1)[0])", '')
+# бег вбок (Run_Left / Run_Right, 23.10.2026): ступня на земле едет вбок, а не назад — шаг меряем по земле (x и z);
+# у ходьбы и бега вбок не уходит — то же, что было. И печатаем, куда едет ступня на земле (тело — в другую сторону)
+src = src.replace("dz = np.abs(np.diff(np.r_[z, z[0]])) * nF / T",
+                  "x = fpos[:, i, 0]; dz = np.hypot(np.diff(np.r_[z, z[0]]), np.diff(np.r_[x, x[0]])) * nF / T; "
+                  "SIDE.append(float(np.mean(np.diff(np.r_[x, x[0]])[low])) * nF / T)")
+SIDE = []
 exec(src)
 
 data_js = open(HERE + '/../../src/game/qpeople.data.js').read()
@@ -32,8 +38,8 @@ for spec in sys.argv[2:]:
     b = bytearray(struct.pack('<2I', len(R), len(names.split(','))))
     for cn in names.split(','):
         nF, fps, sp, d = clip(m, R, cn)
-        print(fam, 'clip', cn, 'frames', nF, 'fps', round(fps, 1))
+        print(fam, 'clip', cn, 'frames', nF, 'fps', round(fps, 1), 'speed', round(sp, 3), 'foot x', [round(v, 3) for v in SIDE]); SIDE.clear()
         b += S(cn) + struct.pack('<I2f', nF, fps, sp) + d.astype('<f4').tobytes()
     fams.append((fam, base64.b64encode(bytes(b)).decode()))
-open(out, 'w').write('/* Добавочные клипы людей Quaternius (CC0) для qpeople.js: наклон «Interact» (поднять с земли). Собрано tools/quaternius/clipadd.py */\nexport const QCLIPS = {\n' + '\n'.join("  %s: '%s'," % f for f in fams) + '\n};\n')
+open(out, 'w').write('/* Добавочные клипы людей Quaternius (CC0) для qpeople.js: наклон «Interact» (поднять с земли), бег вбок «Run_Left» / «Run_Right» и кувырок «Roll» (уворот от машины, peddodge.js). Собрано tools/quaternius/clipadd.py */\nexport const QCLIPS = {\n' + '\n'.join("  %s: '%s'," % f for f in fams) + '\n};\n')
 print('bytes', [(f, len(s)) for f, s in fams])

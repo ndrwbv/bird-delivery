@@ -36,6 +36,8 @@ import { growTree } from './trees.js';
 import * as EDL from './editlayer.js';         // редактор города: прятать убранные деревья на месте
 import { YARD, onYard } from './yards.js';
 import { inView } from './cull.js';             // снежки: бой не заводится на глазах (cull.js)   // дворовые дорожки: зимой протоптаны, сугробы мимо (yards.js)
+import * as PEDC from './pedcollide.js';         // снежки: бегут не сквозь твёрдое, прячутся за предметы (pedcollide.js steer, coverNear)
+import { qHas } from './qpeople.js';               // снежки: бросок — клип «Punch» людей-моделей
 import { mat as fakeShadowMat } from './fakeshadows.js';   // тени домов на сугробах, листьях и кронах (fakeshadows.js)
 
 const CELL = 200;                           // клетка склейки, как у статики (CHUNK в game.js; было 100 — деревья и сугробы давали ~37 вызовов отрисовки в кадре, 10.10.2026)
@@ -1399,11 +1401,13 @@ function spawnFight (sp) {
       const grp = makeHuman(null, { fat: Math.random() < 0.15 });      // детей в игре нет — играют взрослые
       grp.position.set(x, groundH(x, z) + curbAt(x, z), z);
       scene.add(grp);
-      ppl.push({ grp, x, z, team, st: 'idle', t: rnd(0.2, 2.2), hit: 0, dead: 0, person: null, tgt: null, sc: grp.scale.x });
+      ppl.push({ grp, x, z, hx: x, hz: z, team, st: 'idle', t: rnd(0.2, 2.2), hit: 0, dead: 0, person: null, tgt: null, sc: grp.scale.x, ph: 0, sq: 0, gx: 0, gz: 0, hide: 0, nHide: 0, thrown: 0, T: 1, pcS: 1 });
     }
   }
   if (ppl.length < 3) { for (const q of ppl) C.dropMesh(q.grp); return; }
-  FIGHTS.push({ sp, ppl, say: null, sayT: 0 });
+  // укрытия своего двора: горки и снеговики рядом (остальное — деревья, будки, машины — ищет pedcollide.js coverNear)
+  const extra = SEA_ITEMS.filter(it => (it.kind === 'ice' || it.kind === 'snowman') && Math.abs(it.x - sp.x) < 18 && Math.abs(it.z - sp.z) < 18);
+  FIGHTS.push({ sp, ppl, say: null, sayT: 0, extra });
   sp.on = 1;
 }
 function dropFight (f) {
@@ -1435,7 +1439,7 @@ function stepBalls (dt) {
     if (!done && b.f) for (const q of b.f.ppl) {
       if (q.dead || q.team === b.team) continue;
       const dy = b.y - q.grp.position.y;
-      if (dy > 0.2 && dy < 1.9 * q.sc && Math.hypot(b.x - q.x, b.z - q.z) < 0.45) { q.hit = 0.7; q.st = 'idle'; q.t = rnd(0.6, 1.4); done = true; break; }
+      if (dy > 0.2 && dy < (q.sq > 0.5 ? 1.1 : 1.9) * q.sc && Math.hypot(b.x - q.x, b.z - q.z) < 0.45) { q.hit = 0.7; q.st = 'idle'; q.t = rnd(0.6, 1.4); q.grp.userData.qAnim = null; done = true; FIGHT.hits++; break; }   // присел — ниже
     }
     // попали в курьера
     if (!done && Math.abs(b.x - V.x) < 1.2 && Math.abs(b.z - V.z) < 1.2 && b.y < V.y + 1.8) {
@@ -1443,6 +1447,8 @@ function stepBalls (dt) {
       C.Snd.fx('snowball-hit', s => s.blip(420, 0.05, 'triangle', 0.05));
     }
     if (!done && b.y < gy) done = true;
+    if (!done && b.y < gy + FIGHT.COVER_H && PEDC.solidAt(b.x, b.z, 0)) done = true;   // в укрытие (дерево, будка, машина ниже) — разбился о него
+    if (!done && b.y < gy + 1.3 && PEDC.carAt(b.x, b.z, 0, 0, false, false)) done = true;
     if (done) {
       b.on = 0; b.m.visible = false;
       splash(b.x, Math.max(b.y, gy + 0.1), b.z, 7, 0.6);
@@ -1488,43 +1494,108 @@ function stepFights (dt) {
         }
       }
       if (!g.visible) continue;
-      // цель: кто-то из другой команды, а если курьер рядом и медленно — он
-      const foes = f.ppl.filter(o => !o.dead && o.team !== q.team);
-      const atCar = dC < 26 && vsp < 7 && Math.hypot(q.x - V.x, q.z - V.z) < 22;
-      if (!q.tgt || q.tgt.dead || Math.random() < dt * 0.2) q.tgt = foes.length ? foes[(Math.random() * foes.length) | 0] : null;
-      const tx = atCar ? V.x : q.tgt ? q.tgt.x : f.sp.x, tz = atCar ? V.z : q.tgt ? q.tgt.z : f.sp.z;
-      g.rotation.y = damp(g.rotation.y, Math.atan2(tx - q.x, tz - q.z), 6, dt);
-      if (q.hit > 0) {
-        q.hit -= dt;
-        g.rotation.z = Math.sin(q.hit * 22) * 0.12;
-        u.armL.rotation.x = damp(u.armL.rotation.x, -2.4, 12, dt);
-        if (q.hit <= 0) { g.rotation.z = 0; if (!f.say && Math.random() < 0.35 && dC < 60) { f.say = C.sayBubble(g, Math.random() < 0.5 ? t('ай!') : t('ха-ха!'), '#4f7fd6', 2.4 * q.sc + 0.3); f.sayT = 1.3; } }
-        continue;
+      fighter(q, f, u, g, dt, dC, vsp);
+    }
+  }
+}
+/* один игрок в снежки (автор 23.10.2026, 0п13: «поворачиваются на прямых ногах» — должны приседать, бросать, убегать и
+   прятаться). Цикл: стоит → приседает и лепит снежок (SCOOP с) → бросает (клип «Punch» у людей-моделей, у остальных —
+   замах рукой) → дальше: стоит / отбегает вбок (P_DODGE) / бежит в укрытие (P_COVER: ближайшее твёрдое со стороны от
+   «противника» — дерево, будка, гараж, машина, горка, снеговик; pedcollide.js coverNear, не дальше COVER_R м) / назад
+   на своё место (дальше HOME м). В укрытии сидит на корточках HIDE с, лепит там же и встаёт бросить; так NHIDE раз,
+   потом выбегает. Бежит через pedcollide.js steer — не сквозь твёрдое. Снежок о твёрдое ниже COVER_H м — разбивается */
+export const FIGHT = { SCOOP: [0.9, 1.4], THROW: 0.55, REL: 0.42, RUN: 4.2, COVER_R: 9, HIDE: [0.9, 2.2], NHIDE: [1, 3],
+  P_COVER: 0.35, P_DODGE: 0.2, HOME: 2.5, ROAM: 7, COVER_H: 1.6, LEG: -1.35, DROP: 0.32, BODY: 0.5, hits: 0, covers: 0, dodges: 0, throws: 0, squats: 0 };
+function fighter (q, f, u, g, dt, dC, vsp) {
+  const V = C.V;
+  // цель: кто-то из другой команды, а если курьер рядом и медленно — он
+  const foes = f.ppl.filter(o => !o.dead && o.team !== q.team);
+  const atCar = dC < 26 && vsp < 7 && Math.hypot(q.x - V.x, q.z - V.z) < 22;
+  if (!q.tgt || q.tgt.dead || Math.random() < dt * 0.2) q.tgt = foes.length ? foes[(Math.random() * foes.length) | 0] : null;
+  const tx = atCar ? V.x : q.tgt ? q.tgt.x : f.sp.x, tz = atCar ? V.z : q.tgt ? q.tgt.z : f.sp.z;
+  const body = u.parts && u.parts[2];
+  g.rotation.x = 0; g.rotation.z = 0;
+  let want = 0, run = false;                       // want — насколько присел (0 — стоит, 1 — на корточках)
+  if (q.hit > 0) {
+    // попали: дёрнулся корпусом, рука к лицу
+    q.hit -= dt;
+    if (body) body.rotation.z = Math.sin(q.hit * 22) * 0.15;
+    u.armL.rotation.x = damp(u.armL.rotation.x, -2.4, 12, dt);
+    if (q.hit <= 0) { if (body) body.rotation.z = 0; if (!f.say && Math.random() < 0.35 && dC < 60) { f.say = C.sayBubble(g, Math.random() < 0.5 ? t('ай!') : t('ха-ха!'), '#4f7fd6', 2.4 * q.sc + 0.3); f.sayT = 1.3; } }
+  } else {
+    q.t -= dt;
+    if (q.st !== 'run') u.armL.rotation.x = damp(u.armL.rotation.x, -0.3, 6, dt);
+    if (q.st === 'idle') {
+      u.armR.rotation.x = damp(u.armR.rotation.x, 0, 6, dt);
+      if (q.t <= 0) { q.st = 'scoop'; q.T = q.t = rnd(FIGHT.SCOOP[0], FIGHT.SCOOP[1]); FIGHT.squats++; }
+    } else if (q.st === 'scoop' || q.st === 'hide') {
+      // на корточках: лепит снежок — ладони у земли, похлопывают
+      want = 1;
+      const pat = q.st === 'scoop' ? Math.sin(q.t * 18) * 0.22 : 0;
+      u.armR.rotation.x = damp(u.armR.rotation.x, -0.75 + pat, 10, dt);
+      u.armL.rotation.x = damp(u.armL.rotation.x, -0.75 - pat, 10, dt);
+      if (q.t <= 0) {
+        if (q.st === 'hide') { q.st = 'scoop'; q.T = q.t = rnd(FIGHT.SCOOP[0], FIGHT.SCOOP[1]) * 0.7; }
+        else { q.st = 'throw'; q.T = q.t = FIGHT.THROW; q.thrown = 0; }
       }
-      u.armL.rotation.x = damp(u.armL.rotation.x, -0.3, 6, dt);
-      q.t -= dt;
-      if (q.st === 'idle') {
-        g.rotation.x = damp(g.rotation.x, 0, 8, dt);
-        u.armR.rotation.x = damp(u.armR.rotation.x, 0, 6, dt);
-        if (q.t <= 0) { q.st = 'scoop'; q.t = rnd(0.5, 0.9); }
-      } else if (q.st === 'scoop') {                  // нагнулся, лепит
-        g.rotation.x = damp(g.rotation.x, 0.5, 8, dt);
-        u.armR.rotation.x = damp(u.armR.rotation.x, -0.9, 8, dt);
-        u.armL.rotation.x = damp(u.armL.rotation.x, -0.9, 8, dt);
-        if (q.t <= 0) { q.st = 'aim'; q.t = rnd(0.3, 0.5); }
-      } else if (q.st === 'aim') {                    // замах
-        g.rotation.x = damp(g.rotation.x, -0.08, 8, dt);
-        u.armR.rotation.x = damp(u.armR.rotation.x, -3.0, 12, dt);
-        if (q.t <= 0) {
-          q.st = 'idle'; q.t = rnd(0.9, 2.6);
-          u.armR.rotation.x = -0.7;
-          const ty = atCar ? V.y + 1.0 : q.tgt ? q.tgt.grp.position.y + 1.1 * q.tgt.sc : C.groundH(tx, tz);
-          throwBall(q, tx + rnd(-0.5, 0.5), ty, tz + rnd(-0.5, 0.5), f);
-          if (dC < 40) C.Snd.fx('throw', s => s.blip(rnd(500, 700), 0.04, 'triangle', 0.03), { x: tx, z: tz, far: 40 });
-        }
+    } else if (q.st === 'throw') {
+      const k = 1 - Math.max(0, q.t) / q.T;
+      if (qHas(g, 'punch')) u.qAnim = { c: 'punch', f: Math.min(1, k * 1.15) };   // бросок: клип художника
+      else u.armR.rotation.x = k < FIGHT.REL ? damp(u.armR.rotation.x, -3.0, 14, dt) : damp(u.armR.rotation.x, -0.7, 14, dt);   // замах и бросок рукой
+      if (!q.thrown && k >= FIGHT.REL) {
+        q.thrown = 1; FIGHT.throws++;
+        const tg = q.tgt, ty = atCar ? V.y + 1.0 : tg ? tg.grp.position.y + (tg.sq > 0.5 ? 0.7 : 1.1) * tg.sc : C.groundH(tx, tz);
+        throwBall(q, tx + rnd(-0.5, 0.5), ty, tz + rnd(-0.5, 0.5), f);
+        if (dC < 40) C.Snd.fx('throw', s => s.blip(rnd(500, 700), 0.04, 'triangle', 0.03), { x: tx, z: tz, far: 40 });
+      }
+      if (q.t <= 0) { u.qAnim = null; u.armR.rotation.x = -0.4; nextMove(q, f, tx, tz); }
+    } else if (q.st === 'run') {
+      const dx = q.gx - q.x, dz = q.gz - q.z, d = Math.hypot(dx, dz);
+      if (d < 0.35 || q.t <= 0) {
+        if (q.hide && d < 1) { q.st = 'hide'; q.T = q.t = rnd(FIGHT.HIDE[0], FIGHT.HIDE[1]); }
+        else { q.st = 'idle'; q.t = rnd(0.3, 1.0); q.hide = 0; q.nHide = 0; }
+      } else {
+        const a = PEDC.steer(q, dx / d, dz / d, Math.min(d, FIGHT.RUN * dt));
+        if (Number.isNaN(a)) q.t = 0;
+        else { g.rotation.y = damp(g.rotation.y, a, 12, dt); run = true; }
+        q.ph += dt * 15;
+        const sw = Math.sin(q.ph) * 1.1;
+        u.legL.rotation.x = sw; u.legR.rotation.x = -sw;
+        u.armL.rotation.x = -sw * 0.8; u.armR.rotation.x = sw * 0.8;
       }
     }
   }
+  if (!run) {
+    // лицом к цели (в укрытии — тоже: выглядывает)
+    g.rotation.y = damp(g.rotation.y, Math.atan2(tx - q.x, tz - q.z), 6, dt);
+    if (q.st !== 'throw' || !u.qAnim) { u.legL.rotation.x = damp(u.legL.rotation.x, FIGHT.LEG * q.sq, 14, dt); u.legR.rotation.x = damp(u.legR.rotation.x, FIGHT.LEG * q.sq, 14, dt); }
+  }
+  // приседает: бёдра вперёд, голень вниз (колени гнёт модель — как на лавочке), корпус вперёд, ниже к земле
+  q.sq = damp(q.sq, want, 9, dt);
+  if (body) body.rotation.x = FIGHT.BODY * q.sq;
+  u.head.rotation.x = -0.3 * q.sq;
+  g.position.set(q.x, C.groundH(q.x, q.z) + C.curbAt(q.x, q.z) - FIGHT.DROP * q.sq * q.sc, q.z);
+}
+/* после броска: куда дальше */
+function nextMove (q, f, tx, tz) {
+  const r = Math.random();
+  q.st = 'idle'; q.t = rnd(0.5, 1.6);
+  if (q.hide && q.nHide > 0) { q.nHide--; q.st = 'hide'; q.T = q.t = rnd(FIGHT.HIDE[0], FIGHT.HIDE[1]); return; }   // ещё раз из того же укрытия
+  q.hide = 0;
+  if (r < FIGHT.P_COVER) {
+    const c = PEDC.coverNear(q.x, q.z, tx, tz, FIGHT.COVER_R, f.extra);
+    if (c && Math.hypot(c.x - f.sp.x, c.z - f.sp.z) < FIGHT.COVER_R + 6) {
+      q.gx = c.x; q.gz = c.z; q.st = 'run'; q.t = 4; q.hide = 1; q.nHide = (rnd(FIGHT.NHIDE[0], FIGHT.NHIDE[1] + 1) | 0) - 1; FIGHT.covers++;
+      return;
+    }
+  }
+  if (r < FIGHT.P_COVER + FIGHT.P_DODGE) {
+    // отбежать вбок от линии броска, не дальше ROAM м от своего места
+    const ux = tx - q.x, uz = tz - q.z, l = Math.hypot(ux, uz) || 1, s = Math.random() < 0.5 ? 1 : -1, dd = rnd(1.5, 3);
+    const gx = q.x + uz / l * s * dd, gz = q.z - ux / l * s * dd;
+    if (Math.hypot(gx - q.hx, gz - q.hz) < FIGHT.ROAM && !PEDC.solidAt(gx, gz, 0.3) && !C.inHouse(gx, gz, 0.3)) { q.gx = gx; q.gz = gz; q.st = 'run'; q.t = 2; FIGHT.dodges++; return; }
+  }
+  if (Math.hypot(q.x - q.hx, q.z - q.hz) > FIGHT.HOME && Math.random() < 0.6) { q.gx = q.hx; q.gz = q.hz; q.st = 'run'; q.t = 4; }
 }
 
 /* каждый кадр — после updateEnv */
@@ -1552,5 +1623,5 @@ export const kit = () => ({ Pile, tpls, hsh, rngAt, splash: (x, y, z, n, k) => s
 const DEBUG = {
   get value () { return SEA; }, get name () { return seasonName(); }, get amounts () { return { ...A }; }, BUILT, set: setSeason, shift: shiftSeason,
   snowNow (a = 0.8) { SKY.want = a; SKY.amt = a; SKY.t = 9999; }, DRIFTS, GROW, burstDrift,
-  FIGHTS, FIRS, SEA_ITEMS, DECID, SPRUCES, get meshes () { return [...MESH_PILE, ...MESH_GARL, ...DRIFT_MESH]; }, get drifts () { return BUILT.drifts; }, get ENV () { return C.ENV; },
+  FIGHTS, FIGHT, FIRS, SEA_ITEMS, DECID, SPRUCES, get meshes () { return [...MESH_PILE, ...MESH_GARL, ...DRIFT_MESH]; }, get drifts () { return BUILT.drifts; }, get ENV () { return C.ENV; },
 };

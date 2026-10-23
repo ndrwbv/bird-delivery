@@ -26,6 +26,7 @@
 import './camview.css';
 import { t } from '../i18n/index.js';
 import * as TEL from './telemetry.js';          // анонимная статистика: смена вида камеры (telemetry.js)
+import { carMats as shadeMats } from './fakeshadows.js';   // в тени дома салон и капот темнее, как асфальт за стеклом (fakeshadows.js carMat)
 
 export const MODES = ['high', 'near', 'cab'];
 const KEY = 'dlv-cam';
@@ -41,7 +42,9 @@ export const CAMV = {
   },
   CAB: {
     fov: 66, fovFast: 6,            // 66° стоя, 72° на максималке
-    pitch: -0.06,                   // взгляд чуть вниз (рад) — торпедо и капот в кадре
+    pitch: -0.02,                   // взгляд чуть вниз (рад) — торпедо и капот в кадре (до 23.10.2026 — −0,06: в 4 м середина кадра — у человека на тазе)
+    eyeH: 1.3, eyeMax: 1.12,        // глаз водителя — не ниже 1,3 м над дорогой (0п26, 23.10.2026: было 1,2 — смотрел человеку 1,8 м в живот): салон
+                                    // целиком растёт от земли (до ×1,12) — с места водителя торпедо, руль и стойки те же, мир — ниже
     bob: 0.35, bobMax: 0.06,        // голову отбрасывает, когда машина резко идёт вниз / вверх: доля, предел, м
     sway: 0.05,                     // в повороте голову ведёт наружу, м (на полной скорости и полном руле)
     shakeK: 0.12,                   // тряска от ударов — 12 % от тряски камеры сзади
@@ -131,7 +134,8 @@ export function cab (dt, vf, sh) {
   if (!CAB || CAB.car !== car) build(car);
   const K = CAB, u = car.userData;
   const sp = clamp(Math.abs(vf) / (A.vmax() || 48), 0, 1);
-  K.M.compose(car.position, car.quaternion, car.scale);
+  K.sv.copy(car.scale).multiplyScalar(K.s);         // салон и глаз — крупнее машины (CAB.eyeH): с места водителя тот же вид, мир ниже
+  K.M.compose(car.position, car.quaternion, K.sv);
   // голова: отстаёт от резких движений кузова вверх-вниз, в повороте её ведёт наружу, на скорости мелко дрожит
   const cy = car.position.y;
   K.fy = K.fy === null ? cy : damp(K.fy, cy, 16, dt);
@@ -380,16 +384,18 @@ function build (car) {
   const K = old || {
     scene, cam: new THREE.PerspectiveCamera(64, 1, 0.03, 30), zero: new THREE.Vector3(),
     hemi: new THREE.HemisphereLight(0xffffff, 0xffffff, 1), amb: new THREE.AmbientLight(0xffffff, 0.5), sun: new THREE.DirectionalLight(0xffffff, 1),
-    M: new THREE.Matrix4(), e: new THREE.Vector3(), eye: new THREE.Vector3(),
+    M: new THREE.Matrix4(), e: new THREE.Vector3(), eye: new THREE.Vector3(), sv: new THREE.Vector3(1, 1, 1), s: 1,
   };
   if (!old) scene.add(K.hemi, K.amb, K.sun);
   Object.assign(K, { car, root, spin, speedo, tacho, hood, lampHp, lampNos, fy: null, p: 0, tt: 0, kmh: 0, rpm: 0, drawn: false });
   K.eye.set(dx, ey, ez);
+  shadeMats(root);
+  K.s = clamp(CAMV.CAB.eyeH / Math.max(0.5, ey), 1, CAMV.CAB.eyeMax);   // низкий глаз (седан — 1,19 м) — салон крупнее; высокий (джип, «Буханка») — как есть
   CAB = K;
   if (A.renderer) try { A.renderer().compile(scene, K.cam); } catch (e) { /* — */ }   // программы шейдеров — сразу, а не рывком в первом кадре
 }
 
 export const DEBUG = {
   get mode () { return MODE; }, CAMV,
-  get cab () { return CAB ? { built: true, eye: CAB.eye.toArray().map(v => +v.toFixed(3)), wheel: +CAB.spin.rotation.z.toFixed(3), speedo: +CAB.speedo.rotation.z.toFixed(3), kmh: Math.round(CAB.kmh), meshes: CAB.root.children.length } : null; },
+  get cab () { return CAB ? { built: true, eye: CAB.eye.toArray().map(v => +v.toFixed(3)), s: +CAB.s.toFixed(3), wheel: +CAB.spin.rotation.z.toFixed(3), speedo: +CAB.speedo.rotation.z.toFixed(3), kmh: Math.round(CAB.kmh), meshes: CAB.root.children.length } : null; },
 };

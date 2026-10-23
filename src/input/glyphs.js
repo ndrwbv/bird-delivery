@@ -8,7 +8,7 @@
      matchKey('x', e)       → true, если keydown e — клавиатурная пара действия (KeyX и т. п.)
 
    Действия: ok (главное, штамп) · back (назад) · x · y (пометки на полях) · lb · rb (страницы) ·
-   pause · replay (повтор: LB / R) · radio (радио в машине: крестовина ↓ / F, radio.js) · fly (полёт родстера: X / Z, flycar.js) · music (музыка вкл / выкл: L3 / B, music.js). Ввод: 'pad' (Xbox / Steam Deck — A B X Y LB RB; PlayStation — ✕ ○ □ △ L1 R1),
+   pause · replay (повтор: LB / R — выкл с 23.10.2026, replay.js RP.ON) · radio (радио в машине: крестовина ↓ / F, radio.js) · fly (полёт родстера: X / Z, flycar.js) · music (музыка вкл / выкл: L3 / B, music.js). Ввод: 'pad' (Xbox / Steam Deck — A B X Y LB RB; PlayStation — ✕ ○ □ △ L1 R1),
    'kb' (клавиатура и мышь), 'touch' (палец — значков нет, жмут сам штамп).
 
    Как понимаем, чем играют: первое же нажатие геймпада (game.js padStep → setInput('pad'), по

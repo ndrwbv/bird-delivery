@@ -6,7 +6,7 @@
       padding: 12px 12px clamp(10px, 3vh, 34px); overflow: auto; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none;
       font-family: "Press Start 2P", ui-monospace, monospace; color: var(--pp-ink);
       background: linear-gradient(to top, rgba(40, 14, 24, .55), rgba(40, 14, 24, .12) 55%, transparent 80%); }
-.tk-sheet { position: relative; width: min(820px, 100%); padding-top: 2px; }
+.tk-sheet { --tk-face: clamp(132px, min(25vh, 17vw), 236px); position: relative; width: min(960px, 100%); padding-top: 2px; }
 .tk-sheet .pp-head { --pp-accent: var(--pp-pink); margin-bottom: .3em; }
 .tk-clock { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tk-clock.tk-warn { color: var(--pp-orange); }
@@ -14,20 +14,21 @@
 @keyframes tk-blink { 50% { opacity: .35; } }
 
 
-.tk-body { display: flex; gap: clamp(10px, 2vw, 22px); align-items: flex-start; }
-.tk-who { flex: none; margin: 0; display: flex; flex-direction: column; align-items: center; gap: .5em; rotate: var(--pp-tilt, 0deg); }
-.tk-who .pp-polaroid { width: clamp(64px, 9vw, 116px); height: clamp(64px, 9vw, 116px); }
+/* лицо — крупно (11х, 23.10.2026: «как будто он говорит прямо тебе»), ответы — рядом, под его фразой */
+.tk-body { display: flex; gap: clamp(14px, 2.4vw, 30px); align-items: flex-start; }
+.tk-who { flex: none; margin: 0; display: flex; flex-direction: column; align-items: center; gap: .5em; width: calc(var(--tk-face) + 14px); rotate: var(--pp-tilt, 0deg); }
+.tk-who .pp-polaroid { width: var(--tk-face); height: var(--tk-face); border-width: 7px; border-bottom-width: 22px; rotate: -2deg; }
 .tk-who .tk-noface { visibility: hidden; }
-.tk-who figcaption { max-width: 9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--pp-fs-s); color: var(--pp-label); }
+.tk-who figcaption { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--pp-fs-m); color: var(--pp-ink); }
 /* говорит — голова чуть качается */
 .tk-talking .pp-polaroid { animation: tk-talk .32s ease-in-out infinite alternate; }
 @keyframes tk-talk { from { rotate: -4deg; translate: 0 0; } to { rotate: -1deg; translate: 0 -3px; } }
 
 .tk-talk { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .6em; }
 /* фраза клиента — облачко с хвостиком к фото */
-.tk-say { position: relative; margin: 0; min-height: 3.2em; padding: .8em 1em; font-size: var(--pp-fs-m); line-height: 1.7;
+.tk-say { position: relative; margin: 0; min-height: 3.2em; padding: .8em 1em; font-size: clamp(12px, 1.3vw, 19px); line-height: 1.7;
           background: #fff; border: 3px solid var(--pp-ink); border-radius: 10px; box-shadow: 0 4px 0 var(--pp-ink); }
-.tk-say::before { content: ''; position: absolute; left: -13px; top: 1.1em; width: 0; height: 0;
+.tk-say::before { content: ''; position: absolute; left: -13px; top: 1.6em; width: 0; height: 0;
                   border: 8px solid transparent; border-right: 12px solid var(--pp-ink); border-left: 0; }
 .tk-caret { display: inline-block; width: .5em; height: 1em; margin-left: .15em; vertical-align: -.15em; background: var(--pp-ink); opacity: .6; animation: tk-caret .8s steps(2) infinite; }
 .tk-who:not(.tk-talking) ~ .tk-talk .tk-caret { display: none; }
@@ -43,8 +44,8 @@
 .tk-note::before { content: '★ '; color: var(--pp-rust); }
 
 /* два ответа — столбиком, коротко; курсор ▶ у выбранного (стрелки / крестовина) */
-.tk-opts { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: min(30em, 100%); margin: .9em 0 0 auto; }
-.tk-o { position: relative; display: block; padding: .75em 1em .75em 2.4em; font: inherit; font-size: var(--pp-fs-m); line-height: 1.4;
+.tk-opts { display: flex; flex-direction: column; align-items: stretch; gap: 10px; width: min(32em, 100%); margin: .4em 0 0 auto; }
+.tk-o { position: relative; display: block; padding: .85em 1.1em .85em 2.5em; font: inherit; font-size: clamp(12px, 1.3vw, 19px); line-height: 1.4;
         text-align: left; color: var(--pp-ink); cursor: pointer; touch-action: manipulation;
         background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 8px; box-shadow: 0 4px 0 var(--pp-ink);
         transition: translate .12s var(--pp-spring), box-shadow .12s, background .12s; }
@@ -85,16 +86,22 @@ body.calm-fx .tk-pop, body.calm-fx .tk-talking .pp-polaroid, body.calm-fx .tk-o.
 
 /* телефон стоя и узкие окна */
 @media (max-width: 620px) {
+  .tk-sheet { --tk-face: 84px; }
   .tk-opts { width: 100%; }
   .tk-o { font-size: var(--pp-fs-s); }
-  .tk-who .pp-polaroid { width: 60px; height: 60px; }
 }
 /* низкие (телефон боком): плотнее */
+/* телефон боком: лицо ~100 px выглядывает над листом слева (шапка — правее него), лист остаётся низким */
 @media (max-height: 460px) {
   .tk { padding-bottom: 6px; }
-  .tk-sheet .pp-head { padding: .4em 0 .3em; }
-  .tk-say { min-height: 0; padding: .5em .8em; line-height: 1.5; }
-  .tk-who .pp-polaroid { width: 52px; height: 52px; }
+  .tk-sheet { --tk-face: clamp(84px, 26vh, 104px); margin-top: 60px; }
+  .tk-sheet .pp-head { padding: .4em 0 .3em calc(var(--tk-face) + 22px); }
+  .tk-body { gap: 10px; }
+  .tk-who { gap: 2px; margin-top: calc(-1 * var(--tk-face) * .62); width: calc(var(--tk-face) + 10px); }
+  .tk-who .pp-polaroid { border-width: 4px; border-bottom-width: 12px; rotate: -3deg; }
+  .tk-who figcaption { font-size: 10px; }
+  .tk-say { min-height: 0; padding: .5em .8em; font-size: 11px; line-height: 1.5; }
+  .tk-o { font-size: 11px; }
   .tk-o { padding-top: .45em; padding-bottom: .45em; }
   .tk-opts { margin-top: .5em; gap: 6px; }
   .tk-hint { margin-top: .4em; }

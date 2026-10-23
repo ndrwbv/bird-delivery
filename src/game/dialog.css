@@ -7,7 +7,7 @@
        background: linear-gradient(to top, rgba(40, 14, 24, .55), rgba(40, 14, 24, .12) 55%, transparent 80%); }
 #dlg[hidden] { display: none; }
 #dlg.on { opacity: 1; }
-.dlg-box { width: min(820px, 100%); padding-top: 2px; transform: translateY(16px) scale(.98); transition: transform .22s var(--pp-spring, ease-out); }
+.dlg-box { --dlg-face: clamp(132px, min(25vh, 17vw), 236px); width: min(960px, 100%); padding-top: 2px; transform: translateY(16px) scale(.98); transition: transform .22s var(--pp-spring, ease-out); }
 #dlg.on .dlg-box { transform: none; }
 .dlg-bar { display: none; }                      /* цвет активности — полоской над шапкой (--pp-accent) */
 .dlg-top { margin-bottom: .4em; }
@@ -18,16 +18,20 @@
 .dlg-clock.dlg-warn { color: var(--pp-orange); }
 .dlg-clock.dlg-low, .dlg-clock.dlg-late { color: var(--pp-red); animation: dlg-blink .6s steps(2) infinite; }
 @keyframes dlg-blink { 50% { opacity: .35; } }
-.dlg-row { display: flex; align-items: flex-start; gap: clamp(10px, 2vw, 22px); }
-.dlg-head { flex: none; margin: 0; display: flex; flex-direction: column; align-items: center; gap: .5em; max-width: 10em; rotate: var(--pp-tilt, 0deg); }
-.dlg-head img.pp-polaroid { width: clamp(64px, 9vw, 116px); height: clamp(64px, 9vw, 116px); image-rendering: pixelated; background: #f3c9a0; }
+.dlg-row { display: flex; align-items: stretch; gap: clamp(14px, 2.4vw, 30px); }
+/* лицо говорящего — крупно (11х, 23.10.2026: «как будто он говорит прямо тебе»): большой полароид, сумма — стикером на его углу */
+.dlg-head { position: relative; flex: none; margin: 0; display: flex; flex-direction: column; align-items: center; gap: .5em;
+            width: calc(var(--dlg-face) + 14px); rotate: var(--pp-tilt, 0deg); }
+.dlg-head img.pp-polaroid { width: var(--dlg-face); height: var(--dlg-face); border-width: 7px; border-bottom-width: 22px; rotate: -2deg;
+                            image-rendering: pixelated; background: #f3c9a0; }
 .dlg-head img[hidden] { display: none; }
 #dlg.dlg-talking .dlg-head img { animation: dlg-talk .32s ease-in-out infinite alternate; }   /* говорит — голова чуть качается */
 @keyframes dlg-talk { from { rotate: -4deg; translate: 0 0; } to { rotate: -1deg; translate: 0 -3px; } }
-.dlg-name { font-weight: normal; font-size: var(--pp-fs-s); line-height: 1.4; color: var(--pp-label); text-align: center; overflow-wrap: anywhere; }
+.dlg-name { font-weight: normal; font-size: var(--pp-fs-m); line-height: 1.4; color: var(--pp-ink); text-align: center; overflow-wrap: anywhere; }
 .dlg-name:empty { display: none; }
 /* сумма предложения — отдельной строкой под портретом: подпись мелко, сумма крупно (зелёная — заплатят, красная — отдать) */
-.dlg-pay { display: flex; flex-direction: column; align-items: center; gap: .3em; margin: .1em 0 0; padding: .45em .6em .4em; rotate: 2deg;
+.dlg-pay { position: absolute; right: -16px; top: calc(var(--dlg-face) * .8); z-index: 1;
+           display: flex; flex-direction: column; align-items: center; gap: .3em; margin: 0; padding: .45em .6em .4em; rotate: 4deg;
            background: #fff; border: 2px solid var(--pp-ink); border-radius: 4px; box-shadow: 0 3px 0 var(--pp-ink); }
 .dlg-pay[hidden] { display: none; }
 .dlg-pay span { font-size: var(--pp-fs-s); line-height: 1.3; color: var(--pp-label); text-align: center; }
@@ -35,19 +39,19 @@
 .dlg-pay b { font-weight: normal; font-size: clamp(13px, 1.5vw, 20px); line-height: 1.1; white-space: nowrap; }
 .dlg-pay.pp-plus b { color: var(--pp-money); }
 .dlg-pay.pp-minus b { color: var(--pp-red); }
-.dlg-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.dlg-col { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; }
 /* фраза — белое облачко с хвостиком к фото; клик / тап — допечатать (одна кнопка — дальше) */
-.dlg-bubble { position: relative; margin: 0; min-height: 3.4em; padding: .8em 1em 1.5em; font-size: var(--pp-fs-m); line-height: 1.7; cursor: pointer;
+.dlg-bubble { position: relative; margin: 0; min-height: 3.4em; padding: .8em 1em 1.5em; font-size: clamp(12px, 1.3vw, 19px); line-height: 1.7; cursor: pointer;
               background: #fff; color: var(--pp-ink); border: 3px solid var(--pp-ink); border-radius: 10px; box-shadow: 0 4px 0 var(--pp-ink); }
-.dlg-bubble::before { content: ''; position: absolute; left: -13px; top: 1.1em; width: 0; height: 0;
+.dlg-bubble::before { content: ''; position: absolute; left: -13px; top: 1.6em; width: 0; height: 0;
                       border: 8px solid transparent; border-right: 12px solid var(--pp-ink); border-left: 0; }
 .dlg-text { margin: 0; font-size: inherit; line-height: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
 .dlg-skip { position: absolute; right: .9em; bottom: .45em; font-size: var(--pp-fs-s); color: var(--pp-label); }
-/* ответы — бумажные кнопки справа внизу листа; «принять» — жёлтая, «отказаться» — бумага */
-.dlg-btns { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin: .9em 0 0; visibility: hidden; }
+/* ответы курьера — крупные бумажные кнопки рядом с лицом, под облачком справа; «принять» — жёлтая, «отказаться» — бумага */
+.dlg-btns { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; margin: 1em 0 0; visibility: hidden; }
 .dlg-btns.on { visibility: visible; }
-.dlg-btns button { display: inline-flex; align-items: center; justify-content: center; gap: .7em; font: inherit; font-size: var(--pp-fs-m); line-height: 1.4;
-                   padding: .7em 1.1em; color: var(--pp-ink); cursor: pointer; touch-action: manipulation; text-align: left;
+.dlg-btns button { display: inline-flex; align-items: center; justify-content: center; gap: .7em; font: inherit; font-size: clamp(12px, 1.3vw, 19px); line-height: 1.4;
+                   padding: .85em 1.3em; color: var(--pp-ink); cursor: pointer; touch-action: manipulation; text-align: left;
                    background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 8px; box-shadow: 0 4px 0 var(--pp-ink);
                    transition: translate .12s var(--pp-spring, ease-out), box-shadow .12s, background .12s; }
 /* через .dlg-btns: правило кнопок выше (.dlg-btns button — бумага) сильнее одиночного класса, и «принять» было бумажным (ревью 17.10) */
@@ -65,9 +69,9 @@
 body.calm-fx .dlg-pop, body.calm-fx #dlg.dlg-talking .dlg-head img { animation: none; }
 /* узко (телефон стоя): голова сверху, облачко под ней */
 @media (max-width: 560px) {
+  .dlg-box { --dlg-face: 104px; }
   .dlg-row { flex-direction: column; align-items: center; }
-  .dlg-head { max-width: none; }
-  .dlg-head img.pp-polaroid { width: 72px; height: 72px; }
+  .dlg-head { width: auto; max-width: none; }
   .dlg-col { width: 100%; }
   .dlg-bubble::before { left: 50%; top: -15px; border: 8px solid transparent; border-bottom: 12px solid var(--pp-ink); border-top: 0; transform: translateX(-50%); }
   .dlg-btns { justify-content: stretch; } .dlg-btns button { flex: 1; }
@@ -78,8 +82,7 @@ body.calm-fx .dlg-pop, body.calm-fx #dlg.dlg-talking .dlg-head img { animation: 
   .dlg-box.pp-sheet { padding: 4px 12px 10px; }
   .dlg-top { padding: .45em 0 .35em; margin-bottom: .3em; }
   .dlg-row { gap: 10px; }
-  .dlg-head { gap: .3em; max-width: 8em; }
-  .dlg-head img.pp-polaroid { width: 48px; height: 48px; }
+  .dlg-head { gap: .3em; }
   .dlg-pay { padding: .3em .45em; }
   .dlg-pay b { font-size: 12px; }
   .dlg-pay span { font-size: 10px; }   /* «заплатит», «мзда» — не мельче 10 px на телефоне (было 7) */
@@ -90,31 +93,30 @@ body.calm-fx .dlg-pop, body.calm-fx #dlg.dlg-talking .dlg-head img { animation: 
                                                                             на телефоне (#chat.ph) он колонкой над педалями — выше листа, виден */
 }
 
-/* телефон боком (ревью 17.10, Р16): лист — низкой полосой внизу (~30 % экрана, было ~60 %), чтобы над ним были видны своя
-   машина и «место N из M» на хаде. Шапка в одну мелкую строку (срок справа — как был); портрет 40 px, справа от него имя и
-   сумма; облачко — текст 11 px (до 720 px шириной — 10) в 2—3 строки, без «пропустить ▸»; ответы — справа от облачка друг над другом. Катсцена (story-cut) и два ответа
-   столбиком (.stack) — как были */
+/* телефон боком (ревью 17.10, Р16): лист — низкой полосой внизу, чтобы над ним были видны своя машина и «место N из M» на хаде.
+   Лицо крупно и тут (11х, 23.10.2026): полароид ~100 px выглядывает над листом слева (шапка начинается правее него), имя под
+   ним, сумма — стикером на углу; облачко — текст 11 px (до 720 px шириной — 10) в 2—3 строки, без «пропустить ▸»; ответы —
+   справа от облачка друг над другом, кнопками 11 px. Катсцена (story-cut) — как была */
 @media (max-height: 500px) {
   body:not(.story-cut) #dlg { padding: 0 8px 4px; background: linear-gradient(to top, rgba(40, 14, 24, .45), transparent 42%); }
-  body:not(.story-cut) #dlg .dlg-box:not(.stack) { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; align-items: end;
-                                                   width: min(880px, 100%); padding: 0 10px 8px; }
-  body:not(.story-cut) #dlg .dlg-box:not(.stack) > .dlg-top { grid-column: 1 / -1; }
-  body:not(.story-cut) #dlg .dlg-box:not(.stack) > .dlg-row { grid-column: 1; grid-row: 2; }
-  body:not(.story-cut) #dlg .dlg-box:not(.stack) > .dlg-btns { grid-column: 2; grid-row: 2; flex-direction: column; flex-wrap: nowrap; align-items: stretch;
-                                                               gap: 6px; margin: 0; max-width: 12em; }
-  body:not(.story-cut) #dlg .dlg-top { padding: .35em 0 .25em; margin-bottom: .35em; font-size: 10px; }
-  body:not(.story-cut) #dlg .dlg-row { gap: 8px; align-items: center; }
-  body:not(.story-cut) #dlg .dlg-head { display: grid; grid-template-columns: auto auto; column-gap: 6px; row-gap: 3px; align-items: center;
-                                        max-width: 17em; rotate: none; }
-  body:not(.story-cut) #dlg .dlg-head img.pp-polaroid { grid-row: 1 / 3; width: 40px; height: 40px; rotate: -3deg; }
-  body:not(.story-cut) #dlg .dlg-name { grid-column: 2; align-self: end; max-width: 11em; text-align: left; font-size: 10px; line-height: 1.3; }
-  body:not(.story-cut) #dlg .dlg-pay { grid-column: 2; align-self: start; justify-self: start; margin: 0; padding: .25em .4em; gap: .2em; box-shadow: 0 2px 0 var(--pp-ink); }
-  body:not(.story-cut) #dlg .dlg-head:has(.dlg-pay[hidden]) .dlg-name { grid-row: 1 / 3; align-self: center; }
-  body:not(.story-cut) #dlg .dlg-bubble { min-height: 0; padding: .45em .7em; font-size: 11px; line-height: 1.45; border-width: 2px; box-shadow: 0 3px 0 var(--pp-ink); }
+  body:not(.story-cut) #dlg .dlg-box { --dlg-face: clamp(84px, 26vh, 104px); width: min(900px, 100%); padding: 0 10px 8px; margin-top: 60px; }
+  body:not(.story-cut) #dlg .dlg-top { padding: .35em 0 .25em calc(var(--dlg-face) + 22px); margin-bottom: .35em; font-size: 10px; }
+  body:not(.story-cut) #dlg .dlg-row { gap: 10px; align-items: flex-end; }
+  body:not(.story-cut) #dlg .dlg-head { gap: 2px; margin-top: calc(-1 * var(--dlg-face) * .62); width: calc(var(--dlg-face) + 10px); rotate: none; }
+  body:not(.story-cut) #dlg .dlg-head img.pp-polaroid { border-width: 4px; border-bottom-width: 12px; rotate: -3deg; }
+  body:not(.story-cut) #dlg .dlg-name { max-width: 100%; font-size: 10px; line-height: 1.3; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+  body:not(.story-cut) #dlg .dlg-pay { right: -14px; top: calc(var(--dlg-face) * .74); padding: .25em .4em; gap: .2em; box-shadow: 0 2px 0 var(--pp-ink); }
+  body:not(.story-cut) #dlg .dlg-col { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; align-items: end; }
+  body:not(.story-cut) #dlg .dlg-bubble { grid-column: 1; min-height: 0; padding: .45em .7em; font-size: 11px; line-height: 1.45; border-width: 2px; box-shadow: 0 3px 0 var(--pp-ink); }
   body:not(.story-cut) #dlg .dlg-bubble::before { top: .8em; }
   body:not(.story-cut) #dlg .dlg-skip { display: none; }   /* «пропустить ▸» — строка лишней высоты; тап по облачку и так допечатывает */
-  body:not(.story-cut) #dlg .dlg-btns button { font-size: 10px; padding: .55em .8em; border-width: 2px; box-shadow: 0 3px 0 var(--pp-ink); }
+  body:not(.story-cut) #dlg .dlg-btns { grid-column: 2; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 6px; margin: 0; max-width: 13em; }
+  body:not(.story-cut) #dlg .dlg-btns button { font-size: 11px; padding: .6em .85em; border-width: 2px; box-shadow: 0 3px 0 var(--pp-ink); }
   body:not(.story-cut) #dlg .dlg-meters { margin-top: 6px; gap: 4px 6px; }
+  /* два ответа столбиком (вопрос) — под облачком во всю ширину, подсказка строкой */
+  body:not(.story-cut) #dlg .dlg-box.stack .dlg-col { display: flex; }
+  body:not(.story-cut) #dlg .dlg-box.stack .dlg-btns { max-width: none; margin-top: .5em; }
+  body:not(.story-cut) #dlg .dlg-hint { grid-column: 1 / -1; margin-top: .35em; }
 }
 /* маленький телефон боком (667×375): облачко уже — текст 10 px, чтобы фраза гопника влезала в 3 строки, а не в 4 */
 @media (max-height: 500px) and (max-width: 720px) { body:not(.story-cut) #dlg .dlg-bubble { font-size: 10px; } }
@@ -142,7 +144,9 @@ body.story-cut #dlg { align-items: flex-end; padding-bottom: 3vh; background: rg
 body.story-cut #dlg .dlg-box { width: min(760px, 100%); }
 body.story-cut #dlg .dlg-top { display: none; }   /* в катсцене шапки нет — у главы своя плашка, кадр важнее */
 body.story-cut #dlg .dlg-row { gap: 14px; padding: 0; }   /* story.css: прежние отступы старого окна — не нужны */
+body.story-cut #dlg .dlg-box { --dlg-face: 88px; }   /* в катсцене лицо героя — в кадре 3D, портрет в окне скромнее */
 body.story-cut #dlg .dlg-head img { width: 88px; height: 88px; }
+body.story-cut #dlg .dlg-head img.pp-polaroid { border-width: 5px; border-bottom-width: 14px; }
 body.story-cut #dlg .dlg-bubble { min-height: 0; padding: .7em 1em 1.3em; margin-bottom: 0; }
 body.story-cut #dlg .dlg-btns { margin-top: .6em; padding: 0; }
 body.story-cut #dlg .dlg-btns.stack { gap: 6px; }
@@ -199,7 +203,8 @@ body.story-cut #dlg .dlg-hint { margin-top: .4em; }
   body.story-cut #dlg .dlg-bar { height: 4px; }
   body.story-cut #dlg .dlg-row { padding: 6px 10px 2px; gap: 10px; align-items: flex-start; }
   body.story-cut #dlg .dlg-head { gap: 2px; }
-  body.story-cut #dlg .dlg-head img { width: 44px; height: 44px; border-width: 2px; border-radius: 8px; }
+  body.story-cut #dlg .dlg-box { --dlg-face: 44px; }
+  body.story-cut #dlg .dlg-head img, body.story-cut #dlg .dlg-head img.pp-polaroid { width: 44px; height: 44px; border-width: 2px; border-radius: 8px; }
   body.story-cut #dlg .dlg-head b { font-size: 7px; max-width: 72px; }
   body.story-cut #dlg .dlg-bubble { min-height: 0; padding: 6px 10px; margin-bottom: 4px; border-width: 2px; border-radius: 10px; }
   body.story-cut #dlg .dlg-bubble::before { bottom: auto; top: 10px; border-width: 7px; border-right-width: 9px; left: -16px; }

@@ -22,6 +22,7 @@
    Дальний вариант (дальше 45 м) — та же модель одним мешем, стоит.
    23.10.2026: коробку с пиццей держит двумя руками на кистях (CARRY); сбитый — та же модель с цветами живого и тем, что
    надето поверх (corpseQ); на куски — та же модель (qPieces); наклон «Interact» — qpeople.clips.js.
+   23.10.2026 (12аф): там же бег вбок «Run_Left / Run_Right» (u.qSide — peddodge.js) и кувырок «Roll» (u.qAnim c: 'roll').
    23.10.2026 (память телефона, docs/AGENTS.md): части сварены и упрощены (tools/quaternius/slim.mjs), кости — лёгкие (QBone,
    не в сцене), очки — только у кого есть во внешности. */
 import * as THREE from '../vendor/three.module.min.js';
@@ -65,7 +66,8 @@ function family (fam) {
     RP.push(new THREE.Vector3(f32(), f32(), f32())); RQ.push(new THREE.Quaternion(f32(), f32(), f32(), f32()));
   }
   const clips = {};
-  const clipKey = name => /run/i.test(name) ? 'run' : /death/i.test(name) ? 'death' : /punch/i.test(name) ? 'punch' : /interact|pick/i.test(name) ? 'interact' : /walk/i.test(name) ? 'walk' : name.toLowerCase();
+  // Run_Left / Run_Right — бег вбок, Roll — кувырок (уворот от машины, peddodge.js): до «run», иначе перепишут бег
+  const clipKey = name => /run_?left/i.test(name) ? 'runl' : /run_?right/i.test(name) ? 'runr' : /roll/i.test(name) ? 'roll' : /run/i.test(name) ? 'run' : /death/i.test(name) ? 'death' : /punch/i.test(name) ? 'punch' : /interact|pick/i.test(name) ? 'interact' : /walk/i.test(name) ? 'walk' : name.toLowerCase();
   for (let c = 0; c < nC; c++) {
     const name = str(), nF = u32(), fps = f32(), speed = f32();
     const data = new Float32Array(bin.buffer.slice(o, o + nF * nJ * 7 * 4)); o += nF * nJ * 7 * 4;
@@ -611,7 +613,9 @@ function poseHook () {
   else if (st.w > 0.01 && F.clips.walk) {
     const sc = st.k * (st.g.scale.x || 1);                 // единицы модели → метры мира
     st.run += ((st.v > 2.4 && F.clips.run ? 1 : 0) - st.run) * Math.min(1, dt * 5);
-    const c = st.run > 0.5 ? F.clips.run : F.clips.walk;
+    // бег вбок лицом к машине (peddodge.js: u.qSide 1 — влево, −1 — вправо), если у семейства есть клип; нет — обычный бег
+    const sd = u.qSide && st.v > 1 ? (u.qSide > 0 ? F.clips.runl : F.clips.runr) : null;
+    const c = sd || (st.run > 0.5 ? F.clips.run : F.clips.walk);
     st.t += dt * st.v / (c.speed * sc);
     clipPose(st, c, ((st.t / c.T) % 1) * c.nF, true, st.w, box || u.qArms ? armMask(F) : null);   // qArms — руки заняты (митингующий держит плакат, protests.js): ходьба им не машет
     // голова — куда смотрит игра (на машину, на собеседника)
@@ -646,6 +650,12 @@ function poseHook () {
     QP.carry++;
   }
   QP.posed++;
+}
+
+/* есть ли у модели человека клип художника (peddodge.js: 'roll', 'runl'; carried.js: 'interact') */
+export function qHas (grp, c) {
+  const u = grp && grp.userData, st = u && u.skin && u.skin.userData.q;
+  return !!(st && st.F.clips[c]);
 }
 
 /* ── тело сбитого (hits.js throwBody): вместо шести коробок — та же модель, что у человека; куски тела hits.js

@@ -197,12 +197,13 @@ import * as TALK from './talk.js';
 import * as PKINST from './pickinst.js';          // подбираемое инстансами: кофе, аптечки, быки, кольца — 4 вызова на все (pickinst.js)
 import * as P3D from './pickups3d.js';            // деньги, золотое сердце и находки — объёмные модельки, как стаканчик кофе (pickups3d.js)
 import * as CV from './camview.js';             // три вида камеры: сзади высоко, сзади близко, из-за руля (camview.js, docs/CAREER.md «Камера: три вида»)
-import * as REPLAY from './replay.js';         // повтор последних 10 с, замедление на аварии, ролик в «Видео» (replay.js, docs/CAREER.md «Повтор»)             // реплики над головами: читаемая плашка, крупнее вблизи, не больше нескольких (talk.js)
+import * as REPLAY from './replay.js';         // повтор последних 10 с, ролик в «Видео» — выкл с 23.10.2026 (RP.ON, ?replay); тряска на аварии (replay.js, docs/CAREER.md «Повтор»)             // реплики над головами: читаемая плашка, крупнее вблизи, не больше нескольких (talk.js)
 import * as OS from './ordersheet.js';         // лист накладной: одна сборка для накладной, домофона и подъезда (ordersheet.js)
 import * as OTAGS from './ordertags.js';       // мини-карточки заказа над радаром: аватарка, имя, сколько метров; доставил — вычеркнуто (ordertags.js)
 import * as NICK from './nicks.js';             // ники и аватарки клиентов «как в приложении» (nicks.js, docs/ORDERS.md)
 import * as TEL from './telemetry.js';          // анонимная статистика: сессии, смены, механики, ошибки, кадр (telemetry.js, docs/ANALYTICS.md)
 import * as PEDC from './pedcollide.js';        // люди не сквозь стены и машины, едущая машина толкает и сбивает людей (pedcollide.js, CAREER.md «Люди и твёрдое»)
+import * as PDODGE from './peddodge.js';       // люди уворачиваются от твоей машины: отходят, отбегают вбок, отпрыгивают, кувырок (peddodge.js, CAREER.md «Уворот от машины»)
 EDL.buildStart();                                 // город (всё до конца buildCity) — с зерном: одинаковый каждый запуск, правки редактора находят свои предметы (editlayer.js)
 
 /* Прозрачное двустороннее three рисует в два прохода и перед каждым меняет material.side с needsUpdate —
@@ -4124,6 +4125,7 @@ function osmGates () {
 const LITE = {};
 const LITE_MAT = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
 CSNOW.patch(LITE_MAT, 'lite');                  // снег на крыше и капоте зимой (carsnow.js)
+FSH.carMat(LITE_MAT);                           // в тени домов — темнее, как асфальт (fakeshadows.js; новых вещей three.js нет)
 // программы лёгких машин потока и колёс курьеров — при загрузке (18.10.2026: в меню лёгких машин на сцене нет — собирались в начале смены)
 WARM.samplesFrom((T, geo) => [['лёгкие машины потока (LITE_MAT, снег carsnow.js)', new T.Mesh(geo, LITE_MAT)], ['колёса курьеров (LITE_MAT, инстансы)', new T.InstancedMesh(geo, LITE_MAT, 1)]]);
 const LITE_BASIC = new THREE.MeshBasicMaterial({ vertexColors: true });
@@ -7079,11 +7081,13 @@ function updatePeople (dt) {
       }
       continue;
     }
+    if (p.dg && PDODGE.step(p, dt)) continue;   // уворачивается от машины (peddodge.js)
     if (p.fall && HITS.fallStep(p, dt)) continue;   // упал от лёгкого удара — лежит и встаёт
     if (p.guest) { guestStep(p, dt); if (p.shock > 0) shockStep(p, dt); continue; }
     if (p.after) { afterStep(p, dt); continue; }
     if (p.panic) { panicStep(p, dt); continue; }
     if (p.idle) { idleSitStep(p, dt); continue; }
+    if (PDODGE.watch(p, dt)) continue;           // машина едет на него — уворачивается (peddodge.js)
 
     // вдали — раз в N кадров (графика, gfx.js); клиенты, сидящие, напуганные — выше, всегда
     const dl = GFX.lag(p, dt, V.x, V.z);
@@ -7661,7 +7665,8 @@ FSH.init(scene);
 let FSH_E = null;                                  // ENV объявлен ниже — собираем при первом кадре
 function fakeShadows () {
   if (!FSH_E) FSH_E = { V, sun, ENV, weather: () => WTH.id(), traffic: TRAFFIC, humans: HUMANS, scene,
-    yard: (x, z, r, fn) => YCARS.eachNear(x, z, r, fn), animals: [FAUNA.DEBUG.LIST, CATS.DEBUG.LIST] };
+    yard: (x, z, r, fn) => YCARS.eachNear(x, z, r, fn), animals: [FAUNA.DEBUG.LIST, CATS.DEBUG.LIST],
+    car: () => car };                               // тень домов и на кузове своей машины (fakeshadows.js carMat)
   FSH.step(FSH_E);
 }
 function carShadow () {
@@ -15275,7 +15280,7 @@ function keysInfo () {
     [k('RT'), $t('газ')], [k('LT'), $t('тормоз, назад')], [k($t('левый стик')), $t('руль')],
     [k('B'), $t('ручник')], [k('A', 'RB'), $t('кофе — зажал и полетел')],
     [k('Y'), $t('карта района')], [k('←', '↑', '→'), $t('ответ клиенту')], [k('R3'), $t('звук')], [k('☰'), $t('пауза')],
-    [k('LB'), $t('повтор последних 10 с')], [k('↓'), RADIO.RAD.HIDDEN ? $t('музыка: следующий трек') : $t('радио: следующая станция')], [k('View'), $t('вид камеры')],
+    ...(REPLAY.ENABLED ? [[k('LB'), $t('повтор последних 10 с')]] : []), [k('↓'), RADIO.RAD.HIDDEN ? $t('музыка: следующий трек') : $t('радио: следующая станция')], [k('View'), $t('вид камеры')],
     [k('L3'), $t('музыка вкл / выкл')],
   ] : touch ? [
     [k($t('руль')), $t('слева: палец на руль и вбок — поворот')], [k($t('газ')), $t('газ')], [k($t('тормоз')), $t('тормоз, назад')],
@@ -15284,7 +15289,7 @@ function keysInfo () {
     [k('W', '↑'), $t('газ')], [k('S', '↓'), $t('тормоз, назад')], [k('A', 'D'), $t('руль')],
     [k($t('пробел')), $t('ручник')], [k('Shift', 'N'), $t('кофе')], [k('Tab'), $t('карта района')],
     [k('1', '2', '3'), $t('ответ клиенту')], [k('M'), $t('звук')], [k('Esc', 'P'), $t('пауза')],
-    [k('R'), $t('повтор последних 10 с')], [k('F'), RADIO.RAD.HIDDEN ? $t('музыка: следующий трек') : $t('радио: следующая станция')], [k('V'), $t('вид камеры')],
+    ...(REPLAY.ENABLED ? [[k('R'), $t('повтор последних 10 с')]] : []), [k('F'), RADIO.RAD.HIDDEN ? $t('музыка: следующий трек') : $t('радио: следующая станция')], [k('V'), $t('вид камеры')],
     [k('B'), $t('музыка вкл / выкл')],
   ];
   return '<div class="pm-keys-t">' + (pad ? $t('геймпад') : touch ? $t('управление') : $t('клавиатура')) + '</div>' +
@@ -15348,7 +15353,7 @@ if (elPause) {
   $('pm-sfx').addEventListener('click', () => { Snd.set(!Snd.on); renderPause(); });
   $('pm-menu').addEventListener('click', endShift);
   // пауза — карусель (pausecz.js); «настройки» — те же, что в главном меню, поверх паузы
-  PAUSE.init(elPause, { music: () => { MUS.cycle(); PAUSE.label(); }, musicLabel: () => MUS.label(), replay: () => REPLAY.open('pause'), settings: tab => { elPanel.hidden = false; SET.render(undefined, tab); }, navReset: () => { padMenu.clear(); if (CAREER) CAREERM.kbClear(); } });
+  PAUSE.init(elPause, { music: () => { MUS.cycle(); PAUSE.label(); }, musicLabel: () => MUS.label(), replay: REPLAY.ENABLED ? () => REPLAY.open('pause') : null, settings: tab => { elPanel.hidden = false; SET.render(undefined, tab); }, navReset: () => { padMenu.clear(); if (CAREER) CAREERM.kbClear(); } });
 }
 
 /* нитро кнопкой — пока держишь палец */
@@ -17062,7 +17067,7 @@ LATE.add('shaders', function* () {
 // прогрев на ходу-материалов, программы не выгружаются, первое использование — сейчас (warmup.js, docs/AGENTS.md «Шейдеры на ходу»)
 WARM.init({ THREE, renderer, scene, cam, drop: dropMesh,
   extra: () => {
-    const c = makeCourier(); DIRT.dress(c);
+    const c = makeCourier(); DIRT.dress(c); FSH.carMats(c);   // и тень домов на стёклах, фарах-корпусах (fakeshadows.js)
     const out = [['машина игрока в смене (грязь cardirt.js)', c]];   // первая смена: машина с грязью — 3 новые программы
     if (GORE_ON) {                                  // кровь на кузове лёгкой машины потока (carblood.js): кузов, колёса-инстансы, шашка такси
       const bx = new THREE.BoxGeometry(0.2, 0.2, 0.2), g = new THREE.Group();     // свои коробки: общие геометрии шаблонов dropMesh не трогаем
@@ -17231,6 +17236,8 @@ if (window.__dlv) window.__dlv.RELIEF = { STATS: RELIEF.STATS, at: RELIEF.relief
 PEDC.init({ V, TRAFFIC, CAR_L, CAR_W, solidsNear, inHouse: houseNotArch, walkLeg, walkSpawn, releaseIdle, gibHuman, gibBurger, runOverScoot,
   ERRS, CBLOOD, GORE: GORE_ON, Snd, PEOPLE, PEDS, SCOOTS, rand });   // люди и твёрдое (pedcollide.js)
 if (window.__dlv) window.__dlv.PEDC = { ...PEDC.DEBUG, scare, walkSpawn };   // проверка ped-solid.js: паника у стены
+PDODGE.init({ V, CAR_L, CAR_W, walkBack, groundH, curbAt, pushOut, emote, rand, chance, inHouse: houseNotArch, intro: () => INTRO });   // уворот от машины (peddodge.js)
+if (window.__dlv) window.__dlv.PDODGE = PDODGE.DEBUG;
 if (window.__dlv) Object.assign(window.__dlv, { CROWDS, PUB_SPOTS, spawnCrowd, ACCIDENTS, PITCHES });   // компании у подъездов, драки на авариях, футбол — проверка наезда в probe
 if (window.__dlv) window.__dlv.RW = RW.DEBUG;   // вид асфальта улиц (roadwear.js)
 if (window.__dlv) window.__dlv.LATE = LATE;

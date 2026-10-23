@@ -28,7 +28,7 @@
       ровно под ним и бледнее. Старые круги под машинами (полная модель, машины курьеров) спрятаны.
 
    Флаги для замера одной сборкой: ?nofs — без всего, ?nofsh — без теней домов,
-   ?nofsb — без пятен. __dlv.FSH — числа и ручки.
+   ?nofsb — без пятен, ?nofsc — без тени домов на машинах (carMat). __dlv.FSH — числа и ручки.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 
@@ -66,6 +66,7 @@ const U = {
   uFsMap: { value: null },
   uFsWin: { value: new THREE.Vector3(0, 0, 1 / 600) },
   uFsK: { value: 0 },
+  uFsCar: { value: Q.has('nofsc') ? 0 : 1 },   // доля силы тени на машинах (carMat; ?nofsc — без неё, для сравнения)
 };
 const VERT = `
 #include <project_vertex>
@@ -88,6 +89,7 @@ float fsShade () {
 /* материал склейки земли / разметки — берёт маску теней домов: поверх всех его прежних правок шейдера */
 export function mat (m) {
   if (!FS.HOUSES) return m;
+  m.userData.fsGround = 1;
   const prev = m.onBeforeCompile, key = m.customProgramCacheKey;
   m.onBeforeCompile = function (sh, r) {
     if (prev) prev.call(this, sh, r);
@@ -99,6 +101,71 @@ export function mat (m) {
   m.customProgramCacheKey = function () { return (key ? key.call(this) : '') + '|fs'; };
   m.needsUpdate = true;
   return m;
+}
+
+/* Машины в тени домов (0п5, 23.10.2026: «въехал в тень — асфальт затенён, а машина светлая»): та же маска в точке
+   каждого пикселя кузова — краска, стёкла, колёса темнее на ту же долю, что асфальт под ними (без проверки «смотрит
+   вверх»: в тени весь кузов). Тень по машине ползёт, как по земле: въехал наполовину — темнее половина. Светящееся
+   (MeshBasic: фары, фонари, приборы) и свои программы (ShaderMaterial) — как есть. Своя машина — каждый её
+   материал (ownCar, раз в FS_CAR.EVERY кадров ищет новые: модель, дворники, фары приходят позже); кузов в грязи —
+   в программе грязи (cardirt.js inject → shadeInject); поток — общий материал лёгких машин (game.js LITE_MAT, одна
+   программа на все) и «Семёрки» потока (realcar.js trafficCar, bodyShader); салон вида из-за руля (camview.js).
+   Новых вызовов нет; программы — в прогреве (game.js WARM extra: машина игрока в грязи + carMats). */
+const FS_CAR = { EVERY: 60 };   // доля силы тени асфальта на машине — U.uFsCar (1 — как асфальт)
+const FRAG_CAR = `
+uniform sampler2D uFsMap; uniform vec3 uFsWin; uniform float uFsK; uniform float uFsCar;
+varying vec3 vFsW;
+float fsShadeCar () {
+  vec2 uv = (vFsW.xz - uFsWin.xy) * uFsWin.z + 0.5;
+  vec2 e = abs(uv - 0.5);
+  return 1.0 - uFsK * uFsCar * texture2D(uFsMap, uv).r * (1.0 - smoothstep(0.4, 0.48, max(e.x, e.y)));
+}
+`;
+/* в чужую программу (cardirt.js inject — своя машина в грязи; realcar.js bodyShader — кузов «Семёрки» потока) */
+export function shadeInject (sh) {
+  if (!FS.HOUSES || sh.fragmentShader.indexOf('fsShadeCar') >= 0) return;
+  Object.assign(sh.uniforms, U);
+  sh.vertexShader = 'varying vec3 vFsW;\n' + sh.vertexShader.replace('#include <project_vertex>', VERT);
+  sh.fragmentShader = FRAG_CAR + sh.fragmentShader.replace('#include <colorspace_fragment>', '#include <colorspace_fragment>\nif (uFsK * uFsCar > 0.0) gl_FragColor.rgb *= fsShadeCar();');
+}
+/* материал со своей программой грязи (userData.dirt: cardirt.js, realcar.js) тень берёт там же — не трогаем; свой обёрнутый,
+   который потом переписали без нас (onBeforeCompile = …), — оборачиваем заново */
+export function carMat (m) {
+  if (!FS.HOUSES || !m || !m.isMaterial || m.userData.dirt || m.userData.fsGround || m.isMeshBasicMaterial || m.isShaderMaterial || m.isRawShaderMaterial) return m;
+  if (!(m.isMeshLambertMaterial || m.isMeshPhongMaterial || m.isMeshStandardMaterial || m.isMeshToonMaterial)) return m;
+  if (m.userData.fsCar && m.onBeforeCompile === FSC_FN.get(m)) return m;
+  m.userData.fsCar = 1;
+  // ключ программы: свой у материала — его + «|fsc»; нет своего (у three.js по умолчанию — текст onBeforeCompile) — текст прежней
+  // правки + «|fsc»: иначе у всех обёрнутых один ключ (текст обёртки) и программа с чужой правкой досталась бы не тому
+  const prev = m.onBeforeCompile, key = Object.prototype.hasOwnProperty.call(m, 'customProgramCacheKey') ? m.customProgramCacheKey : null, pk = prev ? String(prev) : '';
+  const fn = function (sh, r) {
+    if (prev) prev.call(this, sh, r);
+    shadeInject(sh);
+  };
+  m.onBeforeCompile = fn; FSC_FN.set(m, fn);
+  m.customProgramCacheKey = function () { return (key ? key.call(this) : pk) + '|fsc'; };
+  m.needsUpdate = true;
+  return m;
+}
+const FSC_FN = new WeakMap();
+/* все материалы машины (кроме курьера за рулём — у людей общие материалы) */
+export function carMats (g) {
+  if (!FS.HOUSES || !g) return;
+  const walk = o => {
+    if (o.name === 'driver') return;
+    if (o.isMesh && o.material) for (const m of [].concat(o.material)) carMat(m);
+    for (const c of o.children) walk(c);
+  };
+  walk(g);
+}
+let OWN = null, OWN_R = null, OWN_N = 0;
+function ownCar (E) {
+  const c = E.car ? E.car() : null;
+  if (!c) return;
+  const r = c.userData && c.userData.real;
+  if (c === OWN && r === OWN_R && ++OWN_N < FS_CAR.EVERY) return;
+  OWN = c; OWN_R = r; OWN_N = 0;
+  carMats(c);
 }
 
 /* ── маска теней домов ── */
@@ -407,6 +474,7 @@ export function step (E) {
   const len = FS.LEN[0] + (FS.LEN[1] - FS.LEN[0]) * dt;
   if (FS.HOUSES && RT) {
     U.uFsK.value = k;
+    ownCar(E);
     if (k > 0.005 && pollPoles()) cx = NaN;        // сбили фонарь или знак — маску заново
     if (k > 0.005) {
       const turn = Math.acos(Math.max(-1, Math.min(1, -sx * dX + -sz * dZ))) * 180 / Math.PI;

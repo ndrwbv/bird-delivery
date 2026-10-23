@@ -19,6 +19,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 import * as CBLOOD from './carblood.js';
+import { shadeInject } from './fakeshadows.js';   // тень домов на кузове в грязи (fakeshadows.js)
 
 /* KM — км по сухому до полной грязи; WET / MUD / WINTER — во сколько раз быстрее в ливень, распутицу, зимой;
    MAX — какая «полная» грязь на кузове (доля от прежней густой: автор 12.10 — «слегка, чтобы была»);
@@ -63,6 +64,7 @@ vec3 carDirt (vec3 c) {
 `;
 /* грязь и снег — в чужую программу (realcar.js: краска и кровь поверх, тот же материал) */
 export function inject (sh) {
+  shadeInject(sh);                                  // тень домов на кузове (fakeshadows.js)
   Object.assign(sh.uniforms, U);
   sh.vertexShader = 'uniform mat4 uCarInv;\nvarying vec3 vCL;\n' +
     sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvCL = (uCarInv * modelMatrix * vec4(transformed, 1.0)).xyz;');

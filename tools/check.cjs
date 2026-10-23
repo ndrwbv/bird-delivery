@@ -76,6 +76,8 @@ const CHECKS = [
     return r.code === 0 ? { status: 'ok', info: 'страница = privacytext.js' } : { status: 'fail', info: (r.err || r.out).trim().split('\n').slice(0, 2).join(' | ') };
   } },
   { id: 'video', name: 'ролик повтора: сохранение в Стиме, длительность webm', group: 1, run: async () => {
+    // повтор выключен в игре (23.10.2026, 11ф: replay.js RP.ON: false) — ролика нет, проверку пропускаем; включат — снова проверяется
+    if (/^\s*ON:\s*false\b/m.test(fs.readFileSync(path.join(__dirname, '..', 'src/game/replay.js'), 'utf8'))) return { status: 'ok', info: 'пропущена: повтор выключен в игре (replay.js RP.ON)' };
     const r = await sh(process.execPath, [path.join(__dirname, 'video-save-test.cjs')], { timeout: 30 });
     let j = null; try { j = JSON.parse(r.out.trim().split('\n').pop()); } catch (e) { /* — */ }
     if (!j) return { status: 'fail', info: 'без ответа: ' + (r.err || r.out).trim().slice(0, 160) };
