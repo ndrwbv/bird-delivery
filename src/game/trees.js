@@ -19,9 +19,15 @@
    облетела листва; концы прутьев — по поверхности летней кроны. Грани, что
    смотрят вверх, — палитра 1: зимой белые (снег, seasons.js pileMat).
 
+   Новые породы и кусты (М6, 24.10.2026, автор: «больше вариаций кустов и деревьев») — growNew: яблоня, черёмуха,
+   ива (плакучая, ракита), каштан, вяз, лиственница, старое дерево, стриженое, живая изгородь (стриженая, запущенная),
+   можжевельник, жёлтая акация, бузина, боярышник, смородина. Порода по месту — pickKind: у воды — ивы, в частном
+   секторе — сады, в парке и старом центре — каштаны и вязы (TREE.PLACE). Телефон — меньше видов (TREE.MOB_SWAP).
+
    plantYardsSteps — дворы: группы по 3—7 деревьев перед подъездами и кусты под
-   окнами (сирень, шиповник). Не на проезде, не у двери, не на тропинке,
-   не на площадке и не в дворовой мелочи — места для пина остаются.
+   окнами (сирень, шиповник, акация, изгородь…). Не на проезде, не у двери, не на тропинке,
+   не на площадке и не в дворовой мелочи — места для пина остаются. Потом — новые посадки: сады частного
+   сектора (plantGardens), стриженое у администраций (plantAdmins), ивы по берегам (plantShores).
    Твёрдость — как у всех деревьев: ствол — препятствие 1,1 × 1,1 м (game.js tree).
    ────────────────────────────────────────────────────────────────────────── */
 import { wet } from './streams.js';             // речки и пруды — без деревьев (streams.js)
@@ -116,7 +122,7 @@ let ORIENT = null;              // для изгороди и рядов: пов
 let FORM = null;                // форма силой (изгородь: 'cut' / 'wild'; стриженое: 0 шар, 1 на штамбе, 2 конус)
 export const SHRUBS = new Set(['lilac', 'rosehip', 'caragana', 'elder', 'hawthorn', 'currant', 'hedge', 'juniper', 'topiary']);
 
-export const STATS = { kinds: {}, where: {}, groups: 0, yard: 0, shrubs: 0, tried: 0, places: {}, pts: {}, tris: {}, admin: { b: 0, edge: 0, try: 0, ok: 0 } };
+export const STATS = { kinds: {}, where: {}, groups: 0, yard: 0, shrubs: 0, tried: 0, places: {}, pts: {}, tris: {}, gardens: [], ygroups: [], admin: { b: 0, edge: 0, try: 0, ok: 0 } };
 
 /* цвет темнее/светлее, кэш по строке: склейка разбирает цвет один раз на строку */
 const TONE = new Map();
@@ -390,7 +396,7 @@ function growNew (kind, c) {
     const g = pickR(r, ['#5a9a48', '#62a04c', '#5f9446']);
     for (let i = 0; i < 5; i++) { const a = i * 1.257 + r() * 0.4; clump(Math.sin(a) * 1.55 * W, (2.9 + r() * 0.4) * H, Math.cos(a) * 1.55 * W, 1.1 + r() * 0.25, 0.72, g, 0, 0.3); }
     clump(0, 3.7 * H, 0, 1.3 * W, 0.7, g, 0, 1);
-    dots(9, 0, 3.2 * H, 0, 2.15 * W, 0.26, ['#fbeef2', '#f4d6de', '#ffffff'], 5, false);
+    dots(9, 0, 3.2 * H, 0, 2.15 * W, 0.32, ['#fbeef2', '#f4d6de', '#ffffff'], 5, false);
     dots(6, 0, 3.0 * H, 0, 2.1 * W, 0.18, r() < 0.55 ? ['#d8401c', '#c83020', '#e85a28'] : ['#e8c040', '#d8b030', '#c8d040'], 6, false);
     leaves(YEL, 4, 2.8);
     wt('apple', s * W, s * H, s * W);
@@ -569,19 +575,17 @@ export function* plantYardsSteps (A) {
   const segD = (x, z, s) => { const dx = s[2] - s[0], dz = s[3] - s[1], l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - s[0]) * dx + (z - s[1]) * dz) / l2)); return Math.hypot(x - s[0] - dx * t, z - s[1] - dz * t); };
 
   // свободно ли место: m — сколько от дома, road — от проезда, door — от двери, path — от тропинки
-  const WHY = STATS.why = {};
-  const no = k => { WHY[k] = (WHY[k] || 0) + 1; return false; };
   const free = (x, z, m, road, door, path, sm) => {
     STATS.tried++;
-    if (!A.inBounds(x, z, -30) || A.groundH(x, z) < 0.3 || A.inHouse(x, z, m) || wet(x, z, 1)) return no('house');
+    if (!A.inBounds(x, z, -30) || A.groundH(x, z) < 0.3 || A.inHouse(x, z, m) || wet(x, z, 1)) return false;
     const n = A.nearestRoad(x, z, 14, 1);
-    if (n && n.d < n.seg.w / 2 + road) return no('road');
-    if (DOORS.near(x, z, e => Math.hypot(e[0] - x, e[1] - z) < door)) return no('door');
-    if (PATHS.near(x, z, s => segD(x, z, s) < path)) return no('path');
-    if (SM.near(x, z, it => Math.hypot(it.x - x, it.z - z) < (it.r || 1) + sm)) return no('smash');
-    if (A.solidAt(x, z, 1.0)) return no('solid');
-    if (PITCHES_NEAR(x, z)) return no('pitch');
-    return !inArea(x, z) || no('area');
+    if (n && n.d < n.seg.w / 2 + road) return false;
+    if (DOORS.near(x, z, e => Math.hypot(e[0] - x, e[1] - z) < door)) return false;
+    if (PATHS.near(x, z, s => segD(x, z, s) < path)) return false;
+    if (SM.near(x, z, it => Math.hypot(it.x - x, it.z - z) < (it.r || 1) + sm)) return false;
+    if (A.solidAt(x, z, 1.0)) return false;
+    if (PITCHES_NEAR(x, z)) return false;
+    return !inArea(x, z);
   };
   const PITCHES_NEAR = (x, z) => (A.PITCHES || []).some(p => Math.hypot(p.cx - x, p.cz - z) < Math.max(p.L || 0, p.W || 0) / 2 + 4);
   const hash = (x, z, k) => { const v = Math.sin(x * 12.9898 + z * 78.233 + k * 37.719) * 43758.5453; return v - Math.floor(v); };
@@ -612,7 +616,7 @@ export function* plantYardsSteps (A) {
           pts.push([x, z]);
           MINE.add(x, z, { x, z, g: !k });
         }
-        if (pts.length) { STATS.groups++; STATS.yard += pts.length; }
+        if (pts.length) { STATS.groups++; STATS.yard += pts.length; if (pts.length > 2 && STATS.ygroups.length < 60 && NEW_KINDS.has(main)) STATS.ygroups.push([Math.round(cx), Math.round(cz), Math.round(ex), Math.round(ez), main]); }
         break;
       }
     }
@@ -667,6 +671,7 @@ function plantGardens (A, put, hash) {
     const bx = -az, bz = ax;
     let back = 0, side = 0;                         // дом: до задней стены и в стороны от середины, м
     for (const q of b.p) { back = Math.max(back, (q[0] - cx) * ax + (q[1] - cz) * az); side = Math.max(side, Math.abs((q[0] - cx) * bx + (q[1] - cz) * bz)); }
+    if (STATS.gardens.length < 40) STATS.gardens.push([Math.round(cx), Math.round(cz), Math.round(ax * 100) / 100, Math.round(az * 100) / 100]);   // для проверки глазами
     const d0 = back + G.BACK[0] + hash(cx, cz, 51) * (G.BACK[1] - G.BACK[0]);
     const n = G.N[0] + Math.floor(hash(cx, cz, 52) * (G.N[1] - G.N[0] + 1));
     for (let i = 0; i < n; i++) {

@@ -3,8 +3,9 @@
    Кадры:  ... --q="tvshots=/папка" — по месту × сезону (лето 0,5, осень 1,5, зима 2,5, весна 3,45) кадр полным размером;
            tvat=имя,X,Z,ГЛАЗ_X,ГЛАЗ_Z,ВЫСОТА;… — свои места (глаз смотрит на X, Z; имя,X,Z[,D,В] — глаз с ближней дороги в D м); tvseas=0.5,2.5 — свои сезоны; tvh — час (13);
            tvcar=1 — ещё кадр из-за машины (камера игры) на каждом месте.
-   Ответ: kinds — деревьев каждой породы, places — посажено садами, у администраций и по берегам, pts — где (до 40 на породу),
-   pile — треугольников в склейке деревьев, calls — вызовов в кадре по кадрам. */
+   Ответ: kinds — деревьев каждой породы, places — посажено садами, у администраций и по берегам, pts — где (до 40 на породу), tris — треугольников на дерево, gardens / ygroups — сады и рощицы новых пород,
+   pile — треугольников в склейке деревьев, calls — вызовов в кадре по кадрам. Глаз свой (EYE), но машина ставится носом к месту:
+   статику отсекает камера игры (cull.js), иначе то, что у неё за спиной, в кадре пропадает. --q=oldsee — деревья не тают. */
 const Q = new URLSearchParams(location.search), DIR = Q.get('tvshots') || '', H = +(Q.get('tvh') || 13);
 await onShift(); autopilot(false);
 await until(() => !d.LATE || !d.LATE.busy(), 120000);
@@ -13,8 +14,10 @@ const S = d.TREES.STATS, R = d.renderer;
 const out = { pile: d.season.BUILT.pile, trees: d.season.BUILT.trees, kinds: S.kinds, places: S.places, shore: S.shore, pts: {}, calls: [] };
 const dist = (x, z) => (d.DIST && d.DIST.at ? d.DIST.at(x, z) : -1);
 for (const k in S.pts) out.pts[k] = S.pts[k].map(p => [...p, dist(p[0], p[1])]);
+out.tris = {}; for (const k in S.kinds) out.tris[k] = Math.round((S.tris[k] || 0) / S.kinds[k]);   // треугольников на дерево
+out.gardens = S.gardens; out.ygroups = S.ygroups; out.admin = S.admin;
 if (DIR) {
-  const st = document.createElement('style'); st.textContent = ':has(> .oc-go) { display: none !important; }'; document.head.appendChild(st);   // накладная заказа не заслоняет кадр
+  const st = document.createElement('style'); st.textContent = '#phone, :has(> .oc-go) { visibility: hidden !important; }'; document.head.appendChild(st);   // накладная заказа не заслоняет кадр
   let EYE = null, calls = 0;
   const r0 = R.render.bind(R);
   R.render = (s, c) => { if (EYE && c === d.cam) { c.position.set(EYE[0], EYE[1], EYE[2]); c.lookAt(EYE[3], EYE[4], EYE[5]); c.updateMatrixWorld(); } r0(s, c); calls = R.info.render.calls; };
