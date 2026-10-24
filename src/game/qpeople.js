@@ -49,6 +49,21 @@ export function pickQ (Lk) {
   return fam === 'A' ? { fam, all: k(), seed: Lk.seed } : { fam, head: k(), body: k(), legs: k(), feet: k(), seed: Lk.seed };
 }
 
+/* части модели силой, по именам моделей семейства M (people.js makeHuman o.q; minigames/stairs3d.js — мужик в трусах:
+   { head: ['business', 'casual', 'beach'], body: 'punk', legs: 'beach', feet: 'beach' }; список — одна из них по зерну).
+   Только мужчины (Lk.f — как было); q — что выбрал pickQ (или null — соберём сами) */
+export function qForce (q, Lk, parts) {
+  if (!QP.on || !Lk || Lk.f || !parts) return q;
+  const F = family('M'), r = rng((Lk.seed >>> 0) ^ 0xF0CE), ok = F.models.map((m, i) => i).filter(i => F.models[i].name !== 'winter');
+  const k = () => ok[(r() * ok.length) | 0];
+  const out = q && q.fam === 'M' ? { ...q } : { fam: 'M', head: k(), body: k(), legs: k(), feet: k(), seed: Lk.seed };
+  for (const key of ['head', 'body', 'legs', 'feet']) {
+    const want = [].concat(parts[key] || []).map(n => F.models.findIndex(m => m.name === n)).filter(i => i >= 0);
+    if (want.length) out[key] = want[(r() * want.length) | 0];
+  }
+  return out;
+}
+
 /* ── семейство из qpeople.data.js: разбор один раз ── */
 const FAMS = new Map();
 function family (fam) {
@@ -567,6 +582,7 @@ function poseHook () {
   const e = st.g.matrixWorld.elements, x = e[12], z = e[14];
   if (dt > 0) st.v += (Math.min(Math.hypot(x - st.lx, z - st.lz) / dt, 20) - st.v) * Math.min(1, dt * 8);
   st.lx = x; st.lz = z;
+  if (u.qV != null) st.v = u.qV;                   // скорость задана игрой (подъезд, minigames/stairs3d.js: бег по пролёту быстрее 7 м/с по ровному)
   // игра машет ему ногами (идёт), а не стоит / сидит / лежит / едет в машине
   st.swing = Math.max(st.swing * Math.exp(-dt * 3), Math.abs(u.legL.rotation.x), Math.abs(u.legR.rotation.x));
   const sitting = u.legL.rotation.x < -0.8 && u.legR.rotation.x < -0.8;

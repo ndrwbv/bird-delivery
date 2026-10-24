@@ -208,7 +208,7 @@ const CHECKS = [
     if (e || !r) return { status: 'fail', info: e || 'нет результата' };
     const solid = r.solid.map(s => s.k + (s.pass ? ' НАСКВОЗЬ' : ' ок')).join(', '), m = r.moose;
     const info = `${r.gameSecs} с смены: призраков ${r.orphans}` + (r.merged !== undefined ? `, склейка стоящих: лишних ${r.merged}, без кузова ${r.noBody}` : '') + `, стоят > 30 с ${r.stand} (без причины ${r.unexplained}); твёрдые: ${solid}; лось: ` +
-      ['parked', 'bus'].filter(k => m[k]).map(k => k + ' ' + (m[k].pen < 0 ? 'не сквозь' : 'СКВОЗЬ ' + m[k].pen)).join(', ') + (m.butt ? `, боднул — машину на ${m.butt.moved} м` : '') +
+      ['parked', 'bus'].filter(k => m[k]).map(k => k + ' ' + (m[k].pen < 0 ? 'не сквозь' : 'СКВОЗЬ ' + m[k].pen)).join(', ') + (m.butt ? `, боднул — машину на ${m.butt.moved} м` + (m.butt.tries > 1 ? ` (с ${m.butt.tries}-й)` : '') + (m.butt.hit ? '' : ' (не добежал)') : '') +
       (r.orphans ? ' · ' + JSON.stringify(r.orphanSample) : '') + (r.merged ? ' · ' + JSON.stringify(r.mergedSample) : '') + (r.noBody ? ' · ' + JSON.stringify(r.noBodySample) : '') + (r.unexplained ? ' · ' + JSON.stringify(r.standSample) : '') +
       r.solid.filter(s => s.pass).map(s => ' · ' + s.k + ': ' + JSON.stringify(s)).join('');
     return { status: !r.ok ? 'fail' : r.unexplained ? 'warn' : 'ok', info };
@@ -220,7 +220,7 @@ const CHECKS = [
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/car-hit.js'), '--seed=7']);   // город с зерном: ряды стоящих у бордюра — одни и те же
     const e = errLine(j), r = j.result;
     if (e || !r || !r.runs) return { status: 'fail', info: e || 'нет результата' };
-    const f = q => q.none ? 'нет пары' : `${q.maxPen} м (${q.badFrames} кадров)` + (q.bMoved !== undefined ? `, соседнюю сдвинуло ${q.bMoved} м, помята ${q.bDmg}` : '');
+    const f = q => q.none ? 'нет пары' : `${q.maxPen} м (${q.badFrames} кадров)` + (q.bMoved !== undefined ? `, соседнюю сдвинуло ${q.bMoved} м, помята ${q.bDmg}` : '') + (q.hits !== undefined ? `, ударов ${q.hits}` : '');
     const ks = [...new Set(r.runs.map(q => q.k))];
     const info = ks.map(k => { const o = r.runs.find(q => q.k === k && !q.on), n = r.runs.find(q => q.k === k && q.on); return `${k}: было ${o ? f(o) : '—'} → стало ${n ? f(n) : '—'}`; }).join('; ');
     return { status: r.ok ? 'ok' : 'fail', info };

@@ -22,6 +22,9 @@
    ?nodecor — без всего этого (сравнить).
    ────────────────────────────────────────────────────────────────────────── */
 
+import * as FVAR from './fencevar.js';        // вид заборчика палисадника по району (fencevar.js, М5 этап 2)
+import * as PV from './propvar.js';          // его форма — одной геометрией (propvar.js)
+
 export const DECOR = {
   ZONE: 60,                    // дворы: подъезд ближе, м (как бордюры)
   STRIP: [2.2, 7.4, 2.2, 3.6], // полоса у стены: ищем газон от стены от — до, м (дорожка вдоль стены — до 2,35, общая — от 6,6); ширина от — до
@@ -196,7 +199,8 @@ function palisade (at, len, r, e) {
   const D = DECOR, N0 = at.N0, N1 = at.N1, u0 = D.U0, u1 = D.U0 + len;
   const hex = D.FENCE_HEX[Math.floor(hsh(e[0], e[1], 43) * D.FENCE_HEX.length)];   // у подъезда — свой цвет
   const corners = [at(u0, N0), at(u1, N0), at(u1, N1), at(u0, N1)];
-  for (let k = 0; k < 4; k++) fenceSide(corners[k], corners[(k + 1) % 4], hex);
+  const sv = FVAR.item('low', e[0], e[1], hex);   // вид — на подъезд, как у заборчиков его тропинки (fencevar.js); null — как было
+  for (let k = 0; k < 4; k++) fenceSide(corners[k], corners[(k + 1) % 4], hex, sv);
   // земля
   const m = 0.18, q = [at(u0 + m, N0 + m), at(u1 - m, N0 + m), at(u1 - m, N1 - m), at(u0 + m, N1 - m)];
   A.LITM.color(r() < 0.5 ? SOIL : SOIL2);
@@ -222,12 +226,21 @@ function palisade (at, len, r, e) {
 /* сторона заборчика: секции по SEC м — каждая сбивается сама (круг r, как у дворовых заборчиков); секция — одна геометрия
    из трёх коробок по 8 вершин (две перекладины и столбик в начале; у последней — и в конце): сбиваемое держит вершины
    в памяти до конца игры — у четырёх коробок BoxGeometry было 96 вершин и 4 объекта на секцию */
-function fenceSide (a, b, hex) {
+function fenceSide (a, b, hex, sv) {
   const D = DECOR, L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.round(L / D.SEC)), sl = L / n;
   const ex = (b[0] - a[0]) / L, ez = (b[1] - a[1]) / L, c = new A.THREE.Color(hex);
   for (let k = 0; k < n; k++) {
     const x0 = a[0] + ex * k * sl, z0 = a[1] + ez * k * sl, x1 = x0 + ex * sl, z1 = z0 + ez * sl, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
     const g0 = A.groundH(x0, z0), g1 = A.groundH(x1, z1), nb = k === n - 1 ? 4 : 3;
+    if (sv) {                                       // вариант (fencevar.js): одна геометрия, как и была; столб в начале, у последней — и в конце
+      PV.burn(1);
+      const g = PV.fenceGeo(sv, FVAR.wear2(cx, cz, sv), sl, D.FENCE_H, cx, (g0 + g1) / 2, cz, Math.atan2(-ez, ex), (g1 - g0) / sl, true, k === n - 1);
+      const it = A.smashAdd('fence', cx, cz, Math.min(1.3, sl / 2), [g], sv.hex);
+      if (sv.metal && it) it.mat = 'rail';
+      if (it) { it.fvk = 'pal'; it.fvf = sv.form; it.fvr = Math.atan2(-ez, ex); }
+      ST.palFence++;
+      continue;
+    }
     const P = new Float32Array(nb * 24), I = new Uint16Array(nb * 36);
     let v = 0;
     const bx = (ax, ay, az, bx2, by, bz2, w, h) => {      // коробка вдоль a→b, ширина w, высота h (низ — ay/by)
@@ -250,7 +263,8 @@ function fenceSide (a, b, hex) {
     g.setAttribute('position', new A.THREE.BufferAttribute(P, 3));
     g.setAttribute('color', new A.THREE.BufferAttribute(C, 3));
     g.setIndex(new A.THREE.BufferAttribute(I, 1));
-    A.smashAdd('fence', cx, cz, Math.min(1.3, sl / 2), [g], hex);
+    const it = A.smashAdd('fence', cx, cz, Math.min(1.3, sl / 2), [g], hex);
+    if (it) { it.fvk = 'pal'; it.fvf = '-'; it.fvr = Math.atan2(-ez, ex); }
     ST.palFence++;
   }
 }

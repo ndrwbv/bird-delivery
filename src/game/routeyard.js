@@ -19,7 +19,7 @@
 
    Переменных игры модуль не видит — всё приходит объектом api (game.js):
      init({ HOUSE_GRID, inHouse, segHouse, solidAt, ARCHES, SOLID_GRID, SCELL, SMASH_GRID, SM_CELL,
-            yardsEach, paveEach, groundH, festBlocks, carsEach, segMaze })   — segMaze(ax, az, bx, bz) — отрезок задевает твёрдое лабиринта (yardmaze.js); carsEach — стоящие во дворах (yardcars.js), как забор; inHouse: в доме, но не в арке; segHouse(ax, az, bx, bz) — отрезок заходит в дом (точно); solidAt — твёрдое
+            yardsEach, paveEach, groundH, festBlocks, carsEach, garagesEach, segMaze })   — segMaze(ax, az, bx, bz) — отрезок задевает твёрдое лабиринта (yardmaze.js) или ракушку (yardfill.js); garagesEach — ракушки газона (yardfill.js), стена; carsEach — стоящие во дворах (yardcars.js), как забор; inHouse: в доме, но не в арке; segHouse(ax, az, bx, bz) — отрезок заходит в дом (точно); solidAt — твёрдое
      const J = job(slot, x, z, R, extra, goals)     — то же шагами: J.step(мс) → true, когда готово; J.result — F
      const F = field(slot, x, z, R, extra, goals)   — поле расстояний от (x, z) сразу:
        R — полуширина окна, м; goals — точки [x, z, ...] (улицы), extra — после
@@ -181,6 +181,8 @@ function* raster (S, x, z, R, soft) {
   yield 'заборы';
   // стоящие машины во дворах (yardcars.js) — как забор: линия идёт по проезду, а не сквозь карман
   if (A.carsEach) { A.carsEach(x0, z0, x1, z1, (cx, cz, cs, sn, hw, hd) => markBox(S, cx, cz, cs, sn, hw, hd, fence)); yield 'машины'; }
+  // ракушки газона (yardfill.js garagesEach; твёрдые у камеры — lawnprops.js, в SOLID_GRID их нет) — стена, как будка (0п50)
+  if (A.garagesEach) { const mg = soft ? 0.4 : RY.SOLID_M; A.garagesEach(x0, z0, x1, z1, (cx, cz, cs, sn, hw, hd) => markBox(S, cx, cz, cs, sn, hw + mg, hd + mg, k => { K[k] = 0; })); yield 'ракушки'; }
   // твёрдое: будки, гаражи, деревья (перила моста — не на земле)
   const wall = k => { K[k] = 0; };
   const SC = A.SCELL, seen = new Set();

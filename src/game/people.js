@@ -38,7 +38,7 @@
 
 import { t, lang } from '../i18n/index.js';
 import { MOB } from './mobile.js';
-import { pickQ, buildQ, qPortrait } from './qpeople.js';
+import { pickQ, buildQ, qPortrait, qForce } from './qpeople.js';
 
 /* ─────────────── случайность от зерна ─────────────── */
 function rng (seed) {
@@ -1033,7 +1033,8 @@ export function createHumanFactory ({ THREE, HUMAN_VC, HUMANS }) {
     const bones = [legL, legR, bodyB, armL, armR, head];
     yield;
     // проба (ветка test/people): каждый третий — модель Quaternius на тех же костях (qpeople.js)
-    const qn = pickQ(Lk), qm = qn ? buildQ(g, qn, S, Lk, HUMAN_VC) : null;
+    // o.q — части модели силой, по именам (minigames/stairs3d.js: мужик в трусах — майка, шорты, шлёпанцы); сезон тогда не переодевает
+    const qn = o.q ? qForce(pickQ(Lk), Lk, o.q) : pickQ(Lk), qm = qn ? buildQ(g, qn, S, Lk, HUMAN_VC, !!o.q) : null;
     const skin = qm ? qm.skin : new HSkin(undefined, HUMAN_VC);
     if (!qm) {
       setSkinGeo(skin, skinGeo(S, col(S.skin)));

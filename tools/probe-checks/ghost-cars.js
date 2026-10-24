@@ -154,21 +154,48 @@ if (F) {
   if (lone[0]) await cross(lone[0], 'parked', false);
   const bus = pickCar(t => !!t.bus);
   if (bus) await cross(bus, 'bus', false);
-  const t = lone[1] || lone[0];
-  if (t && F.butt) {
+  // боднуть: до 3 машин подряд (лось мог упереться в столб, дерево или боднуть по дороге другую — 0п52, 24.10.2026: в общем
+  // прогоне изредка «машину на 0 м»). Сторона разбега — где между лосём и машиной и за машиной на 6 м нет твёрдого (столбы,
+  // деревья, заборы, дома): машину, отброшенную в забор или столб, он на метр не сдвинет
+  const YC = d.YCARS;
+  const solidOn = (x0, z0, x1, z1, w) => {
+    const L = Math.hypot(x1 - x0, z1 - z0), ux = (x1 - x0) / L, uz = (z1 - z0) / L;
+    for (const q of d.SOLIDS || []) {
+      if (Math.abs(q.cx - x0) > L + 10 || Math.abs(q.cz - z0) > L + 10) continue;
+      const vx = q.cx - x0, vz = q.cz - z0, al = vx * ux + vz * uz, lat = Math.abs(-vx * uz + vz * ux), r = Math.max(q.hw, q.hd);
+      if (al > -r && al < L + r && lat < w + r) return true;
+    }
+    for (let k = 0; k <= L; k += 1) if (d.inWall && d.inWall(x0 + ux * k, z0 + uz * k, 0.8)) return true;
+    return false;
+  };
+  const sideOk = (t, s, strict) => {
+    const px = t.x + Math.sin(t.h + 1.57 * s) * 12, pz = t.z + Math.cos(t.h + 1.57 * s) * 12, Y = d.YMAZE;
+    const bx = t.x - (px - t.x) * 0.5, bz = t.z - (pz - t.z) * 0.5;
+    if (Y && (Y.segHits(px, pz, t.x, t.z, 0.5) || Y.segHits(t.x, t.z, bx, bz, 0.5))) return false;
+    return !strict || !solidOn(px, pz, t.x, t.z, 1.2) && !solidOn(t.x, t.z, bx, bz, 1.4);
+  };
+  // сначала — где с обеих сторон пусто от твёрдого, потом — как было (только заборы лабиринта)
+  const cand = [];
+  for (const strict of [true, false]) for (const t of [...lone.slice(1), lone[0]].filter(Boolean)) {
+    const sd = sideOk(t, 1, strict) ? 1 : sideOk(t, -1, strict) ? -1 : 0;
+    if (sd && !cand.some(q => q[0] === t)) cand.push([t, sd]);
+  }
+  const tried = [];
+  for (const [t, sd] of cand) {
+    if (!F.butt || tried.length >= 3) break;
     await tick(0); noMoose(); tp(t.x + 45, t.z + 45);
-    // сторона разбега — та, где между лосём и машиной нет твёрдого забора у тротуара (yardmaze.js): из-за забора лось не добежит,
-    // а машину, отброшенную в забор, он не сдвинет на метр
-    const sideOk = s => { const px = t.x + Math.sin(t.h + 1.57 * s) * 12, pz = t.z + Math.cos(t.h + 1.57 * s) * 12, Y = d.YMAZE; return !Y || !Y.segHits(px, pz, t.x, t.z, 0.5) && !Y.segHits(t.x, t.z, t.x - (px - t.x) * 0.5, t.z - (pz - t.z) * 0.5, 0.5); };
-    const sd = sideOk(1) ? 1 : sideOk(-1) ? -1 : 1;
     const a = F.at(t.x + Math.sin(t.h + 1.57 * sd) * 12, t.z + Math.cos(t.h + 1.57 * sd) * 12, 0);
-    const pos = new Map(TR.map(o => [o, [o.x, o.z]])), b0 = F.stats.buttCars;
+    const pos = new Map([...TR, ...(YC ? YC.CARS : [])].map(o => [o, [o.x, o.z]])), b0 = F.stats.buttCars;
     F.butt(a, { car: t });
     for (let i = 0; i < 100 && F.stats.buttCars === b0; i++) await tick(50);
-    await tick(900);
-    const c = F.last && F.last.t, p0 = c && pos.get(c);   // боднул по дороге другую — тоже годится
-    out.moose.butt = { hit: F.stats.buttCars - b0, target: c === t, moved: p0 ? +Math.hypot(c.x - p0[0], c.z - p0[1]).toFixed(1) : 0 };
+    const hit = F.stats.buttCars - b0;
+    if (hit) await tick(900);
+    const c = hit && F.last && F.last.t, p0 = c && pos.get(c);   // боднул по дороге другую — тоже годится
+    const r = { hit, target: c === t, moved: p0 ? +Math.hypot(c.x - p0[0], c.z - p0[1]).toFixed(1) : 0 };
+    tried.push(r);
+    if (r.moved > 1) break;
   }
+  if (tried.length) out.moose.butt = { ...tried[tried.length - 1], tries: tried.length };
   noMoose();
 }
 out.ok = !out.orphans && !out.merged && !out.noBody && out.solid.every(s => !s.pass) && Object.values(out.moose).every(m => m.pen === undefined || m.pen < 0)

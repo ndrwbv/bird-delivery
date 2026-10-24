@@ -779,6 +779,7 @@ export function undetail (car) {
   const u = car && car.userData, R2 = u && u.real;
   if (!R2 || !R2.detail) return false;
   const R1 = R2.lite;
+  liteFromDetail(R1, R2);                            // облегчённая возвращается битой: стёкла по окнам, отлетевшие колёса (0п51)
   if (R2.m.parent) R2.m.parent.remove(R2.m);
   for (const g of R2.dent) g.dispose();
   for (const mt of R2.own) { if (mt.map === CRACK) mt.map = null; mt.dispose(); }
@@ -789,6 +790,84 @@ export function undetail (car) {
   car.updateMatrixWorld(true);
   TST.back++;
   return true;
+}
+/* ─── облегчённая после подробной (0п51, 24.10.2026; автор: «подробная копия, убранная дальше 90 м, возвращается облегчённой
+   и целой»). Облегчённая мнётся вместе с копией (dent), но стёкла у неё — одна сетка (трещины / разбито — все сразу), а
+   колёса и детали — в той же сетке кузова. Возвращаем: у стёкол облегчённой снимаем треугольники разбитых окон (какое
+   окно — paneOf по середине треугольника), треснувшие — картинка трещин; отлетевшие колёса — треугольники у их ступицы;
+   отлетевшие детали — carwreck.js liteLost (foewreck.js evict). Снова ударили — подробная копия берёт окна из paneSt
+   (liteBack). */
+const _li = new THREE.Matrix4(), _lm = new THREE.Matrix4(), _lv = new THREE.Vector3(), _lw = new THREE.Vector3(), _lx = new THREE.Vector3();
+/** снять у облегчённой треугольники, для которых test(x, y, z, |ny|, стекло) — да (середина в осях модели); сколько сняли */
+export function liteCut (R, test) {
+  if (!R || !R.m) return 0;
+  R.m.updateWorldMatrix(true, true);
+  _li.copy(R.m.matrixWorld).invert();
+  let n = 0;
+  R.m.traverse(o => {
+    if (!o.isMesh || !o.geometry || o.geometry.userData.shared) return;
+    const geo = o.geometry, pa = geo.attributes.position;
+    if (!pa) return;
+    _lm.multiplyMatrices(_li, o.matrixWorld);
+    const glass = R.glass.includes(o), I = geo.index ? geo.index.array : null, nt = I ? I.length / 3 : pa.count / 3;
+    const keep = [];
+    let drop = 0;
+    for (let t = 0; t < nt; t++) {
+      const a = I ? I[t * 3] : t * 3, b = I ? I[t * 3 + 1] : t * 3 + 1, c = I ? I[t * 3 + 2] : t * 3 + 2;
+      _lv.fromBufferAttribute(pa, a).applyMatrix4(_lm); _lw.fromBufferAttribute(pa, b).applyMatrix4(_lm); _lx.fromBufferAttribute(pa, c).applyMatrix4(_lm);
+      const x = (_lv.x + _lw.x + _lx.x) / 3, y = (_lv.y + _lw.y + _lx.y) / 3, z = (_lv.z + _lw.z + _lx.z) / 3;
+      _lw.sub(_lv); _lx.sub(_lv); _lw.cross(_lx);
+      const l = _lw.length() || 1;
+      if (test(x, y, z, Math.abs(_lw.y / l), glass)) drop++; else keep.push(a, b, c);
+    }
+    if (drop) { geo.setIndex(keep); n += drop; }
+  });
+  return n;
+}
+function liteFromDetail (R1, R2) {
+  if (!R1 || !R2) return;
+  const ps = R1.paneSt || (R1.paneSt = {}), cut = R1.glassCut || (R1.glassCut = {});
+  let cracked = false;
+  for (const k in R2.panes) {
+    const q = R2.panes[k], o = ps[k];
+    if (q.st && (!o || q.st > o.st || q.st === o.st && (q.lv || 1) > o.lv)) ps[k] = { st: q.st, lv: q.lv || 1 };
+    if (ps[k] && ps[k].st === 1) cracked = true;
+  }
+  const broken = Object.keys(ps).filter(k => ps[k].st >= 2 && !cut[k]);
+  const wl = [];
+  R2.m.updateWorldMatrix(true, true);
+  for (const k in R2.wheelG) {
+    const w = R2.wheelG[k];
+    if (!w.userData.lost || R1.wheelCut && R1.wheelCut[k]) continue;
+    const p = R2.m.worldToLocal(w.getWorldPosition(new THREE.Vector3()));   // в осях модели (группа колеса может сидеть глубже)
+    wl.push([k, p.x, p.y, p.z]);
+  }
+  if (broken.length || wl.length) {
+    for (const k of broken) cut[k] = 1;
+    const wc = R1.wheelCut || (R1.wheelCut = {});
+    for (const w of wl) wc[w[0]] = [+w[1].toFixed(2), +w[2].toFixed(2), +w[3].toFixed(2)];   // где была ступица (для отладки)
+    liteCut(R1, (x, y, z, ny, glass) => {
+      if (glass) return broken.includes(paneOf(R1, x, z));
+      for (const w of wl) if (Math.sign(x) === Math.sign(w[1]) && Math.abs(x) > Math.abs(w[1]) - 0.3 && Math.hypot(y - w[2], z - w[3]) < LITE_WHEEL_R) return true;
+      return false;
+    });
+  }
+  // стёкла облегчённой: видны (разбитые окна сняты выше); пока была спрятана, сильный удар гасил их все разом (trafficGlass)
+  for (const o of R1.glass) {
+    o.visible = true;
+    if (cracked && !o.material.map) { o.material.map = crackTex(); o.material.opacity = GLASS.CRACK; o.material.color.setHex(0xffffff); o.material.needsUpdate = true; }
+  }
+}
+const LITE_WHEEL_R = 0.34;                           // ступица → край шины, в осях модели (колесо ~0,3)
+/** подробная копия снова собрана (foewreck.js pre, после повтора ударов): окна — не целее, чем были у прошлой копии */
+export function liteBack (car) {
+  const R2 = car && car.userData.real, R1 = R2 && R2.detail ? R2.lite : null, ps = R1 && R1.paneSt;
+  if (!ps) return;
+  for (const k in ps) {
+    const q = R2.panes[k], o = ps[k];
+    if (!q || q.st >= o.st && (q.st === 2 || (q.lv || 1) >= o.lv)) continue;
+    if (o.st >= 2) { q.st = 2; q.m.visible = false; } else crackPane(q, o.lv);
+  }
 }
 export const wheel = (car, k) => { const R = car && car.userData.real; return R && R.detail ? R.wheelG[k] || null : null; };
 /* бампер в осях модели: все три вершины треугольника дальше z (морда) / ближе (корма) и на высоте от—до; |x| до — весь по
@@ -1001,7 +1080,9 @@ export function dent (car, lx, lz, force, rear) {
   if (!R || !(force > DENT.MIN)) return;
   if (R.traffic && !rear) { if (R.detail) paneGlass(R, lx / R.C.k, lz / R.C.k, force); else trafficGlass(R, force); }
   if (!rear) rearDent(car, lx, lz, force);
-  dentR(R, lx, lz, force, rear);
+  // своя «Семёрка»: коробочный кузов спрятан — cardent.js dent его не мнёт и вмятин не считает; считаем свои (акт осмотра
+  // в конце смены, shiftsteps.js carState: «удары · вмятины», 0п53)
+  if (dentR(R, lx, lz, force, rear) && !rear && !R.traffic) car.userData.dents = (car.userData.dents || 0) + 1;
   if (R.lite) { dentR(R.lite, lx, lz, force, rear); if (!rear) { trafficGlass(R.lite, force); R.lite.broke.length = 0; } }   // подробная копия: облегчённая (спрятана) мнётся тоже — вернётся битой
 }
 function dentR (R, lx, lz, force, rear) {
@@ -1015,6 +1096,7 @@ function dentR (R, lx, lz, force, rear) {
   const nx = end ? 0 : Math.sign(x) || 1, nz = end ? Math.sign(z) || 1 : 0;
   const cx = end ? Math.max(-W2, Math.min(W2, x)) : nx * W2, cz = end ? nz * HL : Math.max(-HL, Math.min(HL, z)), cy = 0.6;
   const depth = DENT.DEPTH * k / K, rad = (DENT.R0 + DENT.R1 * k) / K;
+  let any = false;
   for (const g of R.dent) {
     const a = g.attributes.position;
     let hit = false;
@@ -1027,8 +1109,9 @@ function dentR (R, lx, lz, force, rear) {
       a.setXYZ(i, px - nx * f, py - f * 0.15, pz - nz * f);
       hit = true;
     }
-    if (hit) { a.needsUpdate = true; g.computeBoundingSphere(); }
+    if (hit) { a.needsUpdate = true; g.computeBoundingSphere(); any = true; }
   }
+  return any;
 }
 /* «Следы сзади» (как cardent.js REARD; автор 13.10: «ломаться чаще сзади» — камера сзади): любой удар не в корму
    мнёт и корму — REAR.K силы, в случайном месте по ширине, на высоте бампера */

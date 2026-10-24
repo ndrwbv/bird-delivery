@@ -43,6 +43,8 @@ import { freeAfterUpload } from './mobile.js';
 import { reliefAt, RELIEF } from './relief.js';
 import { t, N_ } from '../i18n/index.js';
 import { onPave } from './pave.js';
+import * as FVAR from './fencevar.js';         // вид забора стройки по району: шифер или бетонные плиты (fencevar.js, М5 этап 2)
+import * as PV from './propvar.js';           // плита — одной геометрией (propvar.js)
 
 export const CONS = {
   MAX: 13, GAP: 380, PER_DIST: 2,   // строек — не больше; не ближе друг к другу, м; в одном районе
@@ -502,6 +504,14 @@ function slatePanelGeo () {
   PANEL_GEO = A.mergeGeos(g);
   return PANEL_GEO;
 }
+/* падающая бетонная плита (вариант забора, fencevar.js): шаблон на форму, краску и износ */
+const PLATE_GEO = new Map();
+function platePanelGeo (sv) {
+  const k = sv.form + sv.hex + (sv.aged ? 1 : 0);
+  let g = PLATE_GEO.get(k);
+  if (!g) { g = PV.plateGeo({ ...sv, seed: 0.3 }, CONS.SEC - 0.02, CONS.FENCE_H + 0.05, 0, 0, 0, 0); g.computeVertexNormals(); PLATE_GEO.set(k, g); }
+  return g;
+}
 /* секция шифера в своих осях: x вдоль забора, низ на y; v — вариант оттенка */
 function slateParts (g, x, y, z, ry, v) {
   const c = ['#9aa0a2', '#8d9496', '#a5a8a6'][v % 3], dk = '#7d8486';
@@ -537,12 +547,17 @@ function build1 (s, idx) {
     A.LITM.dtri(ex, ez, gx, gz, hx, hz, 0.08);
   }
   // ── забор: секции по периметру, ворота к улице ──
+  const fsv0 = FVAR.item('cons', x, z), fsv = fsv0 && fsv0.form !== 'slate' ? fsv0 : null;   // плиты — на всю стройку; null — шифер, как было
   const sec = (a, b, r, v) => {
     const [px, pz] = P(a, b), g = [];
     if (onPave(px, pz, 0.2)) return;                  // на тротуар и дорожку секцию не ставим (pave.js)
-    slateParts(g, px, A.groundH(px, pz), pz, ry + r, v);
-    const it = A.smashAdd('bigfence', px, pz, 1.3, g, '#9aa0a2');
-    it.cons = 'fence'; it.ry = ry + r; it.v = v;
+    if (fsv) {                                        // жребий — как от семи прежних коробок шифера (город на зерне)
+      PV.burn(7);
+      g.push(PV.plateGeo({ ...fsv, seed: hash(px, pz, 5) }, CONS.SEC - 0.02, CONS.FENCE_H + 0.05, px, A.groundH(px, pz), pz, ry + r));
+    } else slateParts(g, px, A.groundH(px, pz), pz, ry + r, v);
+    const it = A.smashAdd('bigfence', px, pz, 1.3, g, fsv ? fsv.hex : '#9aa0a2');
+    it.cons = 'fence'; it.ry = ry + r; it.v = v; if (fsv) it.pv = fsv;
+    it.fvk = 'cons'; it.fvf = fsv ? fsv.form : fsv0 ? 'slate' : '-'; it.fvr = ry + r;
     it.onDown = onFenceDown; it.edOk = 1;          // edOk — редактор города может убрать секцию (editlayer.js)
     ITEMS.push(it);
     ST.sections++;
@@ -737,7 +752,7 @@ function onFenceDown (it, nx, nz, force) {
   saveOrig(it);
   ST.fell++;
   mats();
-  const m = new THREE.Mesh(slatePanelGeo(), MAT);
+  const m = new THREE.Mesh(it.pv ? platePanelGeo(it.pv) : slatePanelGeo(), MAT);
   const gy = A.groundH(it.x, it.z);
   m.rotation.order = 'YXZ';
   m.position.set(it.x, gy, it.z);

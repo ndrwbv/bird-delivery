@@ -35,6 +35,8 @@
    ────────────────────────────────────────────────────────────────────────── */
 
 import { onPave } from './pave.js';
+import * as FVAR from './fencevar.js';         // вид заборчика и лавочки по району (fencevar.js, М5 этап 2)
+import * as PV from './propvar.js';           // их формы — одной геометрией (propvar.js)
 
 export const YARD = {
   MIN_LV: 3,
@@ -194,7 +196,7 @@ export function* steps (A) {
   // заборчики ставим в самом конце, когда все тропинки, общие дорожки и выходы к тротуару уже
   // проложены: кусок, на который потом легла чужая дорожка, пропускаем (onPave ниже)
   const FENCES = [], fenceSeg = (...a) => FENCES.push(a);
-  const fenceNow = (ax, az, bx, bz, hex, flowers) => {
+  const fenceNow = (ax, az, bx, bz, hex, flowers, doorX, doorZ) => {
     const cx = (ax + bx) / 2, cz = (az + bz) / 2, l = Math.hypot(bx - ax, bz - az);
     if (l < 0.6 || bad(cx, cz, 0.9) || bad(ax, az, 0.6) || bad(bx, bz, 0.6) || nearPath(cx, cz, 1.3)) return;
     if (onPave(cx, cz, 0.3) || onPave(ax, az, 0.15) || onPave(bx, bz, 0.15)) return;     // не на тротуар и чужую дорожку (pave.js)
@@ -211,11 +213,22 @@ export function* steps (A) {
       it = A.smashAdd('bush', cx, cz, Math.min(1.3, l / 2), g, '#4f8f3f');
       STATS.flowers++;
     } else {
-      A.box(g, l, 0.06, 0.05, hex, cx, gy + F.H - 0.05, cz, ry);
-      A.box(g, l, 0.06, 0.05, hex, cx, gy + F.H * 0.45, cz, ry);
-      for (const o of [-l / 2 + 0.04, l / 2 - 0.04]) A.box(g, 0.07, F.H, 0.07, hex, cx + ex * o, gy + F.H / 2, cz + ez * o);
-      it = A.smashAdd('fence', cx, cz, Math.min(1.3, l / 2), g, hex);
-      it.mat = 'rail';                             // трубы — удар металлом (impact.js)
+      const sv = FVAR.item('low', doorX, doorZ, hex);   // вид — на подъезд, как у его палисадника (fencevar.js); null — ?nofvar, как было
+      if (sv) {
+        PV.burn(4);                                // жребий куска — как от четырёх прежних коробок (город на зерне)
+        const ga = A.groundH(ax, az), gb = A.groundH(bx, bz);
+        g.push(PV.fenceGeo(sv, FVAR.wear2(cx, cz, sv), l, F.H, cx, (ga + gb) / 2, cz, ry, (gb - ga) / l));
+        it = A.smashAdd('fence', cx, cz, Math.min(1.3, l / 2), g, sv.hex);
+        if (sv.metal) it.mat = 'rail';
+        it.fvk = 'low'; it.fvf = sv.form; it.fvr = ry;
+      } else {
+        A.box(g, l, 0.06, 0.05, hex, cx, gy + F.H - 0.05, cz, ry);
+        A.box(g, l, 0.06, 0.05, hex, cx, gy + F.H * 0.45, cz, ry);
+        for (const o of [-l / 2 + 0.04, l / 2 - 0.04]) A.box(g, 0.07, F.H, 0.07, hex, cx + ex * o, gy + F.H / 2, cz + ez * o);
+        it = A.smashAdd('fence', cx, cz, Math.min(1.3, l / 2), g, hex);
+        it.mat = 'rail';                           // трубы — удар металлом (impact.js)
+        it.fvk = 'low'; it.fvf = '-'; it.fvr = ry;
+      }
       STATS.fences++;
     }
     it.ax = ax; it.az = az; it.bx = bx; it.bz = bz; it.th = 0.05;
@@ -560,7 +573,7 @@ export function* steps (A) {
           const k = Math.max(1, Math.round(Lf / F.SEG));
           for (let j = 0; j < k; j++) {
             const [ax, az] = at(u, F.FROM + Lf * j / k), [bx, bz] = at(u, F.FROM + Lf * (j + 1) / k);
-            fenceSeg(ax, az, bx, bz, hex, flowers);
+            fenceSeg(ax, az, bx, bz, hex, flowers, e.x, e.z);
           }
         }
         // лавочка сбоку от тропинки, вдоль неё, лицом к ней — в конце, когда все дорожки проложены
@@ -583,7 +596,10 @@ export function* steps (A) {
     const q = two.find(benchFree);
     if (!q) continue;
     if (q !== two[0]) STATS.benchFlip = (STATS.benchFlip || 0) + 1;
-    const it = A.smashAdd('bench', q.bx, q.bz, 1.2, benchGeo(A, q.bx, q.bz, q.ry), '#8a6b4e');
+    const sv = FVAR.item('bench', q.bx, q.bz, '#8a6b4e');   // вид лавочки по району (fencevar.js); null — как было
+    if (sv) PV.burn(4);                            // жребий — как от четырёх прежних коробок
+    const it = A.smashAdd('bench', q.bx, q.bz, 1.2, sv ? [PV.benchGeo(sv, q.bx, A.groundH(q.bx, q.bz), q.bz, q.ry)] : benchGeo(A, q.bx, q.bz, q.ry), sv ? sv.hex : '#8a6b4e');
+    it.fvk = 'bench'; it.fvf = sv ? sv.form : '-'; it.fvr = q.ry;
     A.BENCHES.push({ x: q.bx, z: q.bz, y: A.groundH(q.bx, q.bz), ry: q.ry, prop: it });
     it.ax = q.b0x; it.az = q.b0z; it.bx = q.b1x; it.bz = q.b1z; it.th = 0.35;
     gridAdd(it);

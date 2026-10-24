@@ -78,7 +78,74 @@ export const FV = {
     DEBRIS: ['#17181c', '#5a3322', null, null, '#8a6b4e', '#9aa3a8'],   // цвет обломков (null — оттенок плитки)
   },
 };
-export const ST = { rail: [0, 0, 0, 0], railWear: { rust: 0, peel: 0, lean: 0, fade: 0 }, solid: [[0, 0, 0], [0, 0, 0], [0, 0, 0]], tall: [0, 0, 0, 0, 0, 0], zone: { old: 0, mid: 0, rim: 0 } };
+/* ── этап 2: мелочь дворов и улиц (формы — propvar.js). На вещь (или на подъезд, сторону улицы, коробку) — форма и краска
+   по району; на секцию — износ. F — формы, W — доли форм по району, PLAIN — какая форма на телефоне (CLEAN.fencePlain:
+   без мелких узоров), PAINT — краска формы по району ([короб, крышка] у контейнеров), K — номер жребия ── */
+const MET = { old: ['#2f5a3a', '#e8e4d8', '#3f7a4a', '#4f6fa8'], mid: ['#5aa860', '#6a9ad8', '#ece6da', '#c45a48', '#e0943e'],
+  rim: ['#5aa860', '#6a9ad8', '#c45a48', '#e0943e', '#8a9096'] };
+const WOOD = { old: ['#f4f1e8', '#a8dc90', '#e3c48e', '#f2eee4'], mid: ['#e3c48e', '#f4f1e8', '#a8dc90', '#a8d0ee'], rim: ['#b8ad98', '#a8a294', '#e3c48e', '#a8dc90'] };
+const IRON = { old: ['#232528', '#2f4a36', '#2a2d30'], mid: ['#232528', '#2f4a36'], rim: ['#3a3530'] };
+const IRON_L = { old: ['#f2eee4', '#cfe8c8', '#e8e4d8'], mid: ['#f2eee4', '#cfe8c8'], rim: ['#d8d4c8'] };   // у тротуаров — светлая «ковка»: сбиваемое светлое
+const XF = { old: ['#6a9ad8', '#5aa860'], mid: ['#5aa860', '#6a9ad8', '#8a9096', '#e0943e'], rim: ['#7a6a52', '#8a9096', '#5f8a5a', '#9a5a36'] };
+const BOARD = { old: ['#f2eee4', '#cfe3ee'], mid: ['#f2eee4', '#a8d0ee', '#a8dc90', '#f0c63c'], rim: ['#c9c2b0', '#a8d0ee', '#d8c48e'] };
+const OLDW = { old: ['#b8ad98'], mid: ['#b8ad98', '#a89c86', '#c4b8a0'], rim: ['#a8a294', '#9a9284', '#b8ad98', '#8e8878'] };
+const ofZone = t => ({ old: t, mid: t, rim: t });
+FV.ITEM = {
+  // палисадники у подъездов (yarddecor.js) и заборчики по бокам тропинок (yards.js): на подъезд
+  low: { K: 101, F: ['pipes', 'picket', 'hoops', 'forged', 'xframe'],
+    W: { old: [0.25, 0.25, 0.1, 0.4, 0], mid: [0.35, 0.3, 0.2, 0.05, 0.1], rim: [0.3, 0.2, 0.1, 0, 0.4] },
+    PLAIN: ['pipes', 'pipes', 'pipes', 'pipes', 'pipes'], PAINT: { pipes: MET, picket: WOOD, hoops: MET, forged: IRON, xframe: XF } },
+  // дворовые заборчики вдоль жилых улиц (game.js): на сторону улицы
+  street: { K: 111, F: ['pipes', 'picket', 'hoops', 'forged', 'xframe', 'planks'],
+    W: { old: [0.25, 0.25, 0.1, 0.4, 0, 0], mid: [0.3, 0.3, 0.15, 0.05, 0.1, 0.1], rim: [0.25, 0.15, 0.05, 0, 0.3, 0.25] },
+    PLAIN: ['pipes', 'pipes', 'pipes', 'pipes', 'pipes', 'pipes'], PAINT: { pipes: MET, picket: WOOD, hoops: MET, forged: IRON, xframe: XF, planks: OLDW } },
+  // сбиваемые заборы у тротуаров (yardmaze.js), трубы: на кусок стороны
+  softp: { K: 121, F: ['pipes', 'hoops', 'forged', 'xframe'],
+    W: { old: [0.35, 0.2, 0.45, 0], mid: [0.5, 0.2, 0.1, 0.2], rim: [0.45, 0, 0, 0.55] },
+    PLAIN: ['pipes', 'pipes', 'pipes', 'pipes'], PAINT: { forged: IRON_L, xframe: XF } },      // трубы и дуги — краска куска (как было)
+  // они же, штакетник
+  softk: { K: 131, F: ['planks4', 'picket', 'planks'],
+    W: { old: [0.3, 0.7, 0], mid: [0.5, 0.35, 0.15], rim: [0.35, 0.15, 0.5] },
+    PLAIN: ['planks4', 'planks4', 'planks4'], PAINT: { planks: OLDW } },
+  // бортики футбольных коробок (game.js pitchAt): на коробку
+  pitch: { K: 141, F: ['pipes', 'board', 'bars'],
+    W: { old: [0.35, 0.35, 0.3], mid: [0.4, 0.35, 0.25], rim: [0.5, 0.25, 0.25] },
+    PLAIN: ['pipes', 'board', 'pipes'], PAINT: { pipes: { old: ['#3f6fa8', '#2f5a3a', '#e8e4d8'], mid: ['#3f6fa8', '#5aa860', '#c45a48', '#f0c63c'], rim: ['#3f6fa8', '#5aa860', '#8a9096'] },
+      board: BOARD, bars: { old: ['#2f5a3a', '#3f6fa8'], mid: ['#3f6fa8', '#5aa860', '#8a9096'], rim: ['#8a9096', '#5f8a5a'] } } },
+  // лавочки (yards.js, world.js, game.js bench): на лавочку
+  bench: { K: 151, F: ['classic', 'slats', 'plain', 'park', 'broken'],
+    W: { old: [0.25, 0.2, 0, 0.55, 0], mid: [0.35, 0.3, 0.15, 0.15, 0.05], rim: [0.2, 0.25, 0.25, 0, 0.3] },
+    PLAIN: ['classic', 'classic', 'plain', 'classic', 'plain'],
+    PAINT: { classic: { old: ['#7a5236', '#3f6a40', '#8a6b4e'], mid: ['#8a6b4e', '#3f7a4a', '#4f6fa8', '#a8463a', '#c9803a'], rim: ['#8a6b4e', '#7a6a58'] },
+      slats: { old: ['#8a6b4e', '#3f6a40'], mid: ['#8a6b4e', '#3f7a4a', '#4f6fa8', '#c9803a', '#a8463a'], rim: ['#8a6b4e', '#9a8a70'] },
+      plain: { old: ['#8a6b4e'], mid: ['#8a6b4e', '#3f7a4a', '#c9803a'], rim: ['#8e8a80', '#8a6b4e', '#7a6a58'] },
+      park: { old: ['#7a5236', '#3f6a40', '#6a4a30'], mid: ['#7a5236', '#3f6a40'], rim: ['#7a5236'] },
+      broken: ofZone(['#8e8a80', '#9a9284', '#7a7468']) } },
+  // урны (game.js у подъездов, editlayer.js): на урну
+  urn: { K: 161, F: ['cup', 'vase', 'tilt', 'iron', 'rusty'],
+    W: { old: [0.3, 0.2, 0, 0.5, 0], mid: [0.4, 0.3, 0.2, 0.05, 0.05], rim: [0.25, 0.25, 0.2, 0, 0.3] },
+    PLAIN: ['cup', 'vase', 'cup', 'cup', 'cup'],
+    PAINT: { cup: { old: ['#2f5a3a', '#2a2d30'], mid: ['#4e5a4a', '#3f6fa8', '#4e5a4a', '#5a6a50'], rim: ['#4e5a4a', '#6c7378'] },
+      vase: { old: ['#e8e4d8', '#c8c4ba'], mid: ['#b8b4aa', '#e8e4d8', '#a9a69e'], rim: ['#9a968b', '#a9a69e'] },
+      tilt: ofZone(['#3f7a4a', '#4f6fa8', '#c9803a', '#6c7378']), iron: ofZone(['#1e2022']), rusty: ofZone(['#8a4a2a', '#7a5236']) } },
+  // мусорные контейнеры (junk.js): на контейнер, краска [короб, крышка]
+  can: { K: 171, F: ['metal', 'euro', 'open', 'cage'],
+    W: { old: [0.3, 0.5, 0, 0.2], mid: [0.45, 0.35, 0.1, 0.1], rim: [0.45, 0.15, 0.4, 0] },
+    PLAIN: ['metal', 'euro', 'metal', 'euro'],
+    PAINT: { metal: ofZone([['#3f7a4a', '#2f5a38'], ['#2f5f9a', '#244a78'], ['#6c7378', '#4e5559'], ['#3f7a4a', '#2f5a38']]),
+      euro: { old: [['#3f7a4a', '#2f5a38'], ['#4e5559', '#3a3f42'], ['#2f5f9a', '#244a78']], mid: [['#3f7a4a', '#2f5a38'], ['#4e5559', '#3a3f42'], ['#2f5f9a', '#244a78'], ['#4e5559', '#e0b028'], ['#c0622e', '#8a4422']], rim: [['#4e5559', '#3a3f42'], ['#3f7a4a', '#2f5a38']] },
+      open: ofZone([['#8a4a2a', '#6a3a22'], ['#6c5a48', '#5a3322']]), cage: { old: [['#2f5f9a'], ['#3f7a4a']], mid: [['#e0b028'], ['#2f5f9a'], ['#3f7a4a']], rim: [['#e0b028']] } } },
+  // заборы строек (construction.js): на стройку — шифер (как было) или бетонные плиты ПО-2 с ромбами
+  cons: { K: 181, F: ['slate', 'plate'], W: { old: [0.8, 0.2], mid: [0.6, 0.4], rim: [0.35, 0.65] }, PLAIN: ['slate', 'plate0'],
+    PAINT: { plate: ofZone(['#a8a49a', '#9c988e', '#b0ab9f']), plate0: ofZone(['#a8a49a', '#9c988e', '#b0ab9f']) } },
+};
+/* износ секции (заборчики) и вещи: доля ржавых, облупленных, с выпавшими планками / прутьями; выцветшая краска — на сторону */
+/* OLD — доля старых вещей (на подъезд, сторону, коробку — целиком): у старой секции ржавая RUST, облупленная PEEL, планки и
+   прутья выпали MISS; у новой — только редкие рыжие пятна NEW_PEEL */
+FV.WEAR2 = { OLD: { old: 0.03, mid: 0.22, rim: 0.6 }, RUST: 0.3, PEEL: 0.55, MISS: 0.3, NEW_PEEL: 0.05, FADE: { old: 0.1, mid: 0.3, rim: 0.55 },
+  GOLD: 0.5 };                                          // кованые пики Старого города — золочёные у половины
+export const ST = { rail: [0, 0, 0, 0], railWear: { rust: 0, peel: 0, lean: 0, fade: 0 }, solid: [[0, 0, 0], [0, 0, 0], [0, 0, 0]], tall: [0, 0, 0, 0, 0, 0], zone: { old: 0, mid: 0, rim: 0 },
+  items: {}, wear2: { rust: 0, peel: 0, miss: 0 } };
 const TALL_LIST = [];
 
 /* оградка газона на сторону улицы: kx, kz — точка-ключ стороны (начало улицы, сдвиг по стороне), x, z — где кусок
@@ -125,4 +192,40 @@ export function tall (b, cx, cz, kids) {
   return { tile, tint, debris: T.DEBRIS[tile] || tint };
 }
 
-export const DEBUG = { FV, ST, TALL: TALL_LIST, zone, OFF, PLAIN };
+/* этап 2 — вид вещи: kind — ключ FV.ITEM, (x, z) — место (жребий и район), hex0 — краска, что была (форме без своей
+   палитры). → { kind, form, hex, hex2, hex3, tips, zone, seed } или null (?nofvar — строить как было) */
+const METAL_F = { pipes: 1, hoops: 1, forged: 1, xframe: 1, bars: 1 };
+export function item (kind, x, z, hex0) {
+  if (OFF) return null;
+  const T = FV.ITEM[kind], zn = zone(x, z), k = T.K, fi = byW(hsh(x, z, k), T.W[zn]);
+  const form = PLAIN ? T.PLAIN[fi] : T.F[fi], pal = T.PAINT[form] && T.PAINT[form][zn];
+  let hex = pal ? pal[Math.floor(hsh(x, z, k + 1) * pal.length)] : hex0, hex2 = null, hex3 = null, tips = false;
+  if (Array.isArray(hex)) { hex2 = hex[1] || null; hex = hex[0]; }
+  const a = hsh(x, z, k + 3);
+  if (form === 'forged') { if (zn === 'old' && a < FV.WEAR2.GOLD) hex2 = '#c9a23a'; tips = zn === 'old'; }
+  else if (!PLAIN && kind !== 'can' && kind !== 'urn' && hsh(x, z, k + 2) < FV.WEAR2.FADE[zn] && hex) hex = mix(hex, '#c9c6bd', 0.4);   // выцвела
+  if (form === 'picket') { tips = zn !== 'rim' && a < 0.7; if (tips) hex2 = hex; }
+  if (form === 'board') hex2 = ['#c8352e', '#3f6fa8', '#f2eee4', '#2f5a3a'][Math.floor(a * 4)];
+  if (form === 'vase') hex2 = ['#3f6fa8', '#c45a48', hex, hex][Math.floor(a * 4)];
+  if (kind === 'bench') {
+    hex2 = form === 'park' ? '#1e2022' : form === 'slats' || form === 'broken' ? (zn === 'old' ? '#c9c5bb' : '#9a968b') : a < 0.5 ? '#3b3f46' : '#5c5560';
+    if (form === 'park' && zn === 'old' && a < 0.5) hex3 = '#c9a23a';
+  }
+  if (kind === 'can' && form === 'metal' && !PLAIN && hsh(x, z, k + 2) < FV.WEAR2.RUST[zn] * 1.5) hex = mix(hex, '#8a4a2a', 0.55);   // ржавый
+  const S = ST.items[kind] || (ST.items[kind] = {});
+  S[form] = (S[form] || 0) + 1;
+  const aged = !PLAIN && hsh(x, z, k + 5) < FV.WEAR2.OLD[zn];
+  return { kind, form, hex, hex2, hex3, tips, zone: zn, seed: hsh(x, z, k + 4), metal: !!METAL_F[form], aged };
+}
+/* износ секции заборчика: { rust, peel, miss, seed } — на телефоне нет */
+export function wear2 (x, z, sv) {
+  const W = FV.WEAR2, zn = sv.zone, h = hsh(x, z, 191), seed = hsh(x, z, 192);
+  if (PLAIN) return { seed };
+  const metal = sv.metal, wood = sv.form === 'picket' || sv.form === 'planks4' || sv.form === 'planks' || sv.form === 'bars' || sv.form === 'forged';
+  const aged = sv.aged, rust = aged && metal && h < W.RUST, peel = !rust && (metal || sv.form === 'board') && h < (aged ? W.RUST + W.PEEL : W.NEW_PEEL);
+  const miss = aged && wood && hsh(x, z, 193) < W.MISS ? 0.12 + hsh(x, z, 194) * 0.2 : 0;
+  if (rust) ST.wear2.rust++; if (peel) ST.wear2.peel++; if (miss) ST.wear2.miss++;
+  return { rust, peel, miss, seed };
+}
+
+export const DEBUG = { FV, ST, TALL: TALL_LIST, zone, OFF, PLAIN, item, wear2 };

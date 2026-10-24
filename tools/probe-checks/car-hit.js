@@ -6,7 +6,8 @@
    любой другой машины рядом (поток, стоящие у бордюра и во дворах, автобус) — после шага игры.
    1. «отбросило в стоящую» — стоящую у бордюра отбрасывает ударом (knockCar, 14 м/с) вдоль ряда в соседнюю (в 4,5—9 м);
    2. «толкнул в стоящую» — курьер медленно (газ, ~3 м/с) толкает стоящую у бордюра в соседнюю;
-   3. «поток в стоящую» — машину потока отбрасывает ударом (knockCar, 16 м/с — как от курьера на ~60 км/ч) в стоящую в 4,5—12 м (у бордюра, во дворе, автобус);
+   3. «поток в стоящую» — машину потока ставим в 7 м за стоящей у бордюра по линии ряда (пусто: ни машин, ни твёрдого) и
+      отбрасываем ударом (knockCar, 16 м/с — как от курьера на ~60 км/ч) прямо в неё; удар должен случиться (CHIT.ST.hits);
    4. «во дворе» — стоящую во дворе отбрасывает (14 м/с) в соседнюю по карману.
    ok — во всех «стало»: глубже 5 см ни разу (pen ≤ 0,05); отброшенная — та, в которую попали, сдвинута или помята. */
 const V = d.V, IN = d.IN, TR = d.TRAFFIC, CHIT = d.CHIT, YC = d.YCARS;
@@ -108,27 +109,57 @@ async function pushRow (k) {
   V.vx = V.vz = 0;
   out.runs.push(R);
 }
-async function flowIntoParked (k) {
-  const parked = all().filter(t => !t.knock && !t.mp && !used.has(t) && (t.parked || t.bus || t.stalled));
-  const R0 = { flow: 0, parked: parked.length };
-  let pick = null;
-  for (const t of TR) {
-    if (t.gone || t.parked || t.svc || t.bus || t.mp || t.knock || t.driver || t.rival || t.model === 'moped' || t.model === 'dump' || used.has(t) || !t.e) continue;
-    if (Math.hypot(t.x - V.x, t.z - V.z) > 1500) continue;
-    R0.flow++;
-    const p = parked.find(o => { const dd = Math.hypot(o.x - t.x, o.z - t.z); return o !== t && dd > 4.5 && dd < 12; });
-    if (p) { pick = [t, p]; break; }
+/* стоящая у бордюра с краю ряда — ровно на пути отлёта: машину потока ставим в 7 м за ней по линии ряда (там пусто: ни машин,
+   ни твёрдого, ни дома) и бьём вдоль ряда в неё. До 24.10 искали машину потока, у которой «где-то в 4,5—12 м» стоит
+   кто-то, и чаще всего попадался автобус: он не сдвигается и не мнётся счётчиком dmg, или уезжал сам — проверка то
+   зелёная, то красная (0п52) */
+function clearLine (x0, z0, x1, z1, skip) {
+  const L = Math.hypot(x1 - x0, z1 - z0), ux = (x1 - x0) / L, uz = (z1 - z0) / L;
+  for (const s of d.SOLIDS) {
+    if (Math.abs(s.cx - x0) > 14 || Math.abs(s.cz - z0) > 14) continue;
+    const vx = s.cx - x0, vz = s.cz - z0, al = vx * ux + vz * uz, lat = Math.abs(-vx * uz + vz * ux), r = Math.max(s.hw, s.hd);
+    if (al > -2.5 - r && al < L + r && lat < 1.4 + r) return false;
   }
+  for (let q = -2.5; q <= L; q += 1) if (d.inWall(x0 + ux * q, z0 + uz * q, 1.2)) return false;
+  for (const o of all()) {
+    if (skip.includes(o) || Math.abs(o.x - x0) > 16 || Math.abs(o.z - z0) > 16) continue;
+    const vx = o.x - x0, vz = o.z - z0, al = vx * ux + vz * uz, lat = Math.abs(-vx * uz + vz * ux);
+    if (al > -5 && al < L + 1 && lat < 2.6) return false;
+  }
+  return true;
+}
+async function flowIntoParked (k) {
   const R = { k, on: CHIT.CH.on };
-  if (!pick) { R.none = 1; Object.assign(R, R0); out.runs.push(R); return; }
-  const [t, p] = pick; used.add(t); used.add(p);
+  const flow = TR.filter(t => !t.gone && !t.parked && !t.svc && !t.bus && !t.mp && !t.knock && !t.cb && !t.driver && !t.rival && !t.chase && !t.stalled && !t.wreck && !t.still &&
+    t.model !== 'moped' && t.model !== 'dump' && !used.has(t) && t.e && t.mesh && Math.hypot(t.x - V.x, t.z - V.z) < 400)
+    .sort((a, b) => Math.hypot(a.x - V.x, a.z - V.z) - Math.hypot(b.x - V.x, b.z - V.z));
+  const parked = TR.filter(o => !o.gone && o.parked && !yardOf(o) && !o.lux && !o.knock && !o.mp && o.model !== 'moped' && !o.accident && !used.has(o) && Math.hypot(o.x - V.x, o.z - V.z) < 1500)
+    .sort((a, b) => Math.hypot(a.x - V.x, a.z - V.z) - Math.hypot(b.x - V.x, b.z - V.z));
+  let pick = null;
+  for (const t of flow.slice(0, 6)) {
+    for (const p of parked) {
+      const [fx, fz] = fwd(p);
+      for (const sg of [1, -1]) {
+        const sx = p.x - fx * sg * 7, sz = p.z - fz * sg * 7;
+        if (!clearLine(sx, sz, p.x - fx * sg * 2.4, p.z - fz * sg * 2.4, [t, p])) continue;
+        pick = [t, p, sx, sz, fx * sg, fz * sg]; break;
+      }
+      if (pick) break;
+    }
+    if (pick) break;
+  }
+  if (!pick) { R.none = 1; R.flow = flow.length; R.parked = parked.length; out.runs.push(R); return; }
+  const [t, p, sx, sz, ux, uz] = pick; used.add(t); used.add(p);
   await unstall();
-  const dd = Math.hypot(p.x - t.x, p.z - t.z), ux = (p.x - t.x) / dd, uz = (p.z - t.z) / dd;
-  V.x = t.x - uz * 12; V.z = t.z + ux * 12; V.vx = V.vz = 0; V.y = d.surfaceAt(V.x, V.z);   // курьер — в стороне
-  cam(t.x, t.z, ux, uz);
-  await frame();
+  if (t.gone || t.knock || p.gone) { R.none = 1; R.lost = 1; out.runs.push(R); return; }
+  V.x = sx - uz * 12; V.z = sz + ux * 12; V.vx = V.vz = 0; V.y = d.surfaceAt(V.x, V.z);   // курьер — в стороне
+  t.x = sx; t.z = sz; t.h = Math.atan2(ux, uz); t.speed = 0; t.kvx = t.kvz = 0;
+  t.mesh.position.set(sx, d.surfaceAt(sx, sz), sz); t.mesh.rotation.set(0, t.h, 0);
+  cam(sx, sz, ux, uz);
+  const h0 = CHIT.ST.hits;
   d.knockCar(t, ux, uz, 16);                         // как от удара курьера на ~60 км/ч (knockCar — та же функция)
   await watch(R, t, p, 3);
+  R.hits = CHIT.ST.hits - h0;                        // удар случился (в «было» — 0: летит сквозь)
   out.runs.push(R);
 }
 for (const on of [false, true]) {
@@ -142,5 +173,5 @@ CHIT.CH.on = true;
 if (FWC) FWC.OUT = OUT0;
 out.st = { ...CHIT.ST };
 const neu = out.runs.filter(r => r.on && !r.none);
-out.ok = neu.length >= 3 && neu.every(r => r.maxPen <= 0.05 && (/толкнул/.test(r.k) || r.bMoved > 0.05 || r.bDmg > 0));
+out.ok = neu.length >= 3 && neu.every(r => r.maxPen <= 0.05 && (/толкнул/.test(r.k) || r.bMoved > 0.05 || r.bDmg > 0) && (!/поток/.test(r.k) || r.hits > 0));
 return out;

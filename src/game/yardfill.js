@@ -566,4 +566,39 @@ function zoneCells () {
         if (Math.hypot((i + 0.5) * ZC - E[q], (j + 0.5) * ZC - E[q + 1]) < R) ZSET.add(gk(i, j));
 }
 
-export const DEBUG = { FILL, ST, NEAR, PLAYS, BOOTHS, scan: opts => scan(null, opts) };
+/* ── ракушки для навигатора (0п50, 24.10.2026) ──
+   Ракушки рисует и делает твёрдыми lawnprops.js — только у камеры, их нет в SOLID_GRID, а в лабиринте они мягкие (solid: 0).
+   Навигатор (routeyard.js) вёл линию прямо сквозь ряд ракушек (Ленинградская, 2957,2377): машина упиралась в гараж.
+   Здесь — те же коробки, что у lawnprops.js (по 3,3 м в ряд, 1,5 × 2,7 от середины), по всему городу. */
+const G_HW = 1.5, G_HD = 2.7, G_STEP = 3.3;
+/** ракушки в прямоугольнике: fn(cx, cz, cs, sn, hw, hd) — как obb (cs, sn — ось ширины) */
+export function garagesEach (x0, z0, x1, z1, fn) {
+  const C = FILL.LAWN_CELL, g = KI.garage;
+  for (let i = Math.floor((x0 - 10) / C); i <= Math.floor((x1 + 10) / C); i++)
+    for (let j = Math.floor((z0 - 10) / C); j <= Math.floor((z1 + 10) / C); j++) {
+      const a = NEAR.get(gk(i, j));
+      if (!a) continue;
+      for (let q = 0; q < a.length; q += 6) {
+        if (a[q] !== g) continue;
+        const x = a[q + 1], z = a[q + 2], ang = a[q + 3], n = a[q + 4], tx = Math.sin(ang), tz = -Math.cos(ang);
+        if (x < x0 - 10 || x > x1 + 10 || z < z0 - 10 || z > z1 + 10) continue;
+        for (let k = 0; k < n; k++) { const o = (k - (n - 1) / 2) * G_STEP; fn(x + tx * o, z + tz * o, tx, tz, G_HW, G_HD); }
+      }
+    }
+}
+/** отрезок задевает ракушку (запас m; концы по 1 м не в счёт — как yardmaze.js segHits) */
+export function segGarage (ax, az, bx, bz, m = 0.3) {
+  const L = Math.hypot(bx - ax, bz - az);
+  if (L < 2.5) return false;
+  let hit = false;
+  garagesEach(Math.min(ax, bx), Math.min(az, bz), Math.max(ax, bx), Math.max(az, bz), (cx, cz, cs, sn, hw, hd) => {
+    if (hit) return;
+    for (let f = 1; f <= L - 1; f += 0.5) {
+      const x = ax + (bx - ax) * f / L, z = az + (bz - az) * f / L, dx = x - cx, dz = z - cz;
+      if (Math.abs(dx * cs + dz * sn) < hw + m && Math.abs(-dx * sn + dz * cs) < hd + m) { hit = true; return; }
+    }
+  });
+  return hit;
+}
+
+export const DEBUG = { FILL, ST, NEAR, PLAYS, BOOTHS, scan: opts => scan(null, opts), garagesEach, segGarage };

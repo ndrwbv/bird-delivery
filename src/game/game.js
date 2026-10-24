@@ -186,6 +186,7 @@ import * as YCARS from './yardcars.js';       // машины во дворах:
 import * as COURTS from './courts.js';         // теннисные корты (облезлые) и падел у особняков: сетка, разметка, играют (courts.js)
 import * as YMAZE from './yardmaze.js';       // дворы сложнее: заборы вдоль тротуаров (твёрдые и сбиваемые), большие клумбы, кусты, лесочки (yardmaze.js)
 import * as DECOR from './yarddecor.js';       // двор не плоский: палисадники, грядки и покрышки у подъездов, приствольные круги, холмики (yarddecor.js)
+import * as PV from './propvar.js';            // формы вариантов мелочи: заборчики, лавочки, урны — одной геометрией (propvar.js, М5 этап 2)
 import * as FVAR from './fencevar.js';          // варианты заборов и препятствий: вид, краска, износ по району (fencevar.js, М5)
 import * as YFILL from './yardfill.js';        // дворы без пустых мест: деревья, кусты, площадки, сушилки, будки на пустом газоне (yardfill.js)
 import * as REANIM from './reanim.js';           // перезапуск CSS-анимации без принудительной раскладки (reanim.js)
@@ -215,6 +216,7 @@ import * as P3D from './pickups3d.js';            // деньги, золото�
 import * as CROOF from './camroof.js';         // камера сзади под аркой и мостом — ниже свода и ближе (camroof.js, 0п40)
 import * as CLOOK from './camlook.js';          // осмотреться: правая кнопка мыши / правый стик / палец по экрану (camlook.js, CAREER.md «Камера: три вида»)
 import * as HCAM from './handcam.js';           // вручение в кадре: камера на клиента, сцена крупным планом перед разговором (handcam.js, 11бд)
+import * as ST3 from './minigames/stairs3d.js';  // подъезд в 3D (12ас): пока он открыт, этот же рендерер рисует его вместо города (stairs3d.js)
 import * as CV from './camview.js';             // три вида камеры: сзади высоко, сзади близко, из-за руля (camview.js, docs/CAREER.md «Камера: три вида»)
 import * as REPLAY from './replay.js';         // повтор последних 10 с, ролик в «Видео» — выкл с 23.10.2026 (RP.ON, ?replay); тряска на аварии (replay.js, docs/CAREER.md «Повтор»)             // реплики над головами: читаемая плашка, крупнее вблизи, не больше нескольких (talk.js)
 import * as OS from './ordersheet.js';         // лист накладной: одна сборка для накладной, домофона и подъезда (ordersheet.js)
@@ -2674,8 +2676,16 @@ function bench (x, z, ry) {
   const y = groundH(x, z);
   if (y < 0.3 || !benchSpotOk(x, z)) return null;
   if (ry === undefined) { const wf = wallFace(x, z, 5); ry = wf !== null ? wf : faceRoad(x, z); }
+  const sv = FVAR.item('bench', x, z, '#8a6b4e');      // вид лавочки по району (fencevar.js); null — как было
   const p = addProp(x, z, ry, 'bench', g => {
     // одним мешем: лавочек под три сотни, по четыре меша было бы тысяча вызовов
+    if (sv) {                                         // вариант: жребий — как от четырёх прежних коробок (город на зерне)
+      PV.burn(4);
+      const bg = PV.benchGeo(sv, 0, 0, 0, 0, 1.08);
+      bg.computeVertexNormals();
+      g.add(new THREE.Mesh(mergeGeos([bg]), SMASH_MAT));
+      return;
+    }
     const parts = [];
     box(parts, 2.6, 0.18, 0.7, '#8a6b4e', 0, 0.62, 0);
     box(parts, 2.6, 0.7, 0.16, '#8a6b4e', 0, 1.05, -0.28);
@@ -2879,6 +2889,7 @@ function* osmYardBits () {
     const w = PAVE.walkHalf({ w: roadWidth(r), c: r.c, g: r.g }) + 0.35, hex = pick(FENCE);
     for (const sd of [-1, 1]) {
       if (!chance(0.45)) continue;
+      const sv = FVAR.item('street', r.p[0][0] + sd * 2.3, r.p[0][1] - sd * 1.7, hex);   // вид — на сторону улицы, по району (fencevar.js); null — как было
       for (let i = 1; i < r.p.length; i++) {
         const [x1, z1] = r.p[i - 1], [x2, z2] = r.p[i];
         const len = Math.hypot(x2 - x1, z2 - z1);
@@ -2894,10 +2905,22 @@ function* osmYardBits () {
           if (nearEntr(cx, cz)) continue;
           if (PAVE.onPave(cx, cz, 0.2) || PAVE.onPave(cx - ux * 1.25, cz - uz * 1.25, 0.1) || PAVE.onPave(cx + ux * 1.25, cz + uz * 1.25, 0.1)) continue;   // чужой тротуар, дорожка — проход
           const gy = groundH(cx, cz), g = [];
+          if (sv) {                                  // вариант: жребий — как от четырёх прежних коробок (город на зерне)
+            PV.burn(4);
+            const ga = groundH(cx - ux * 1.25, cz - uz * 1.25), gb = groundH(cx + ux * 1.25, cz + uz * 1.25);
+            g.push(PV.fenceGeo(sv, FVAR.wear2(cx, cz, sv), 2.5, 0.85, cx, (ga + gb) / 2, cz, ry, (gb - ga) / 2.5));
+            const it = smashAdd('fence', cx, cz, 1.3, g, sv.hex);
+            if (sv.metal) it.mat = 'rail';
+            it.fvk = 'street'; it.fvf = sv.form; it.fvr = ry;
+            if (++segs > 900) break;
+            continue;
+          }
           put(g, new THREE.BoxGeometry(2.5, 0.07, 0.06), hex, cx, gy + 0.75, cz, 0, ry, 0);
           put(g, new THREE.BoxGeometry(2.5, 0.07, 0.06), hex, cx, gy + 0.35, cz, 0, ry, 0);
           for (const o of [-1.2, 1.2]) put(g, new THREE.BoxGeometry(0.08, 0.85, 0.08), hex, cx + ux * o, gy + 0.42, cz + uz * o);
-          smashAdd('fence', cx, cz, 1.3, g, hex).mat = 'rail';   // ограждение из труб: удар — металл (impact.js)
+          const it = smashAdd('fence', cx, cz, 1.3, g, hex);
+          it.mat = 'rail';                         // ограждение из труб: удар — металл (impact.js)
+          it.fvk = 'street'; it.fvf = '-'; it.fvr = ry;
           if (++segs > 900) break;
         }
       }
@@ -2954,10 +2977,14 @@ function* osmYardBits () {
     if (chance(0.55)) {
       const bx = x + nx * 1.6 - tx * 1.6, bz = z + nz * 1.6 - tz * 1.6;
       if (!inHouse(bx, bz, 0.4)) {
-        const gy = groundH(bx, bz), g = [];
-        put(g, new THREE.CylinderGeometry(0.28, 0.24, 0.8, 8), '#4e5a4a', bx, gy + 0.4, bz);
-        put(g, new THREE.CylinderGeometry(0.3, 0.3, 0.06, 8), '#3a4238', bx, gy + 0.82, bz);
-        smashAdd('bin', bx, bz, 0.5, g, '#4e5a4a');
+        const gy = groundH(bx, bz), g = [], sv = FVAR.item('urn', bx, bz, '#4e5a4a');   // вид урны по району (fencevar.js); null — как было
+        if (sv) { PV.burn(2); g.push(PV.urnGeo(sv, bx, gy, bz, Math.atan2(nx, nz))); }
+        else {
+          put(g, new THREE.CylinderGeometry(0.28, 0.24, 0.8, 8), '#4e5a4a', bx, gy + 0.4, bz);
+          put(g, new THREE.CylinderGeometry(0.3, 0.3, 0.06, 8), '#3a4238', bx, gy + 0.82, bz);
+        }
+        const it = smashAdd('bin', bx, bz, 0.5, g, sv ? sv.hex : '#4e5a4a');
+        it.fvk = 'urn'; it.fvf = sv ? sv.form : '-'; it.fvr = Math.atan2(nx, nz);
       }
     }
   }
@@ -3036,16 +3063,28 @@ function pitchAt (cx, cz, ang, L, W, own, rink) {
     smashAdd('goal', gx, gz, 1.8, g, '#f4f4ee');
   }
   // низкий заборчик по периметру, с проходами посередине длинных сторон
+  const fsv = FVAR.item('pitch', cx, cz, '#3f6fa8');   // вид бортика — на коробку, по району (fencevar.js); null — как было
   const fence = (a0, b0, a1, b1) => {
     const [x0, z0] = P(a0, b0), [x1, z1] = P(a1, b1), l = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.round(l / 2.6));
     const ex = (x1 - x0) / l, ez = (z1 - z0) / l, fr = Math.atan2(-ez, ex);
     for (let i = 0; i < n; i++) {
       const cx2 = x0 + ex * (i + 0.5) * l / n, cz2 = z0 + ez * (i + 0.5) * l / n, fy = groundH(cx2, cz2), g = [];
       if (PAVE.onPave(cx2, cz2, 0.1)) continue;          // не поперёк тротуара, дорожки и аллеи (pave.js)
+      if (fsv) {                                         // вариант: жребий — как от трёх прежних коробок (город на зерне)
+        PV.burn(3);
+        const sl = l / n, ga = groundH(cx2 - ex * sl / 2, cz2 - ez * sl / 2), gb = groundH(cx2 + ex * sl / 2, cz2 + ez * sl / 2);
+        g.push(PV.fenceGeo(fsv, FVAR.wear2(cx2, cz2, fsv), sl, 1.0, cx2, (ga + gb) / 2, cz2, fr, (gb - ga) / sl, true, false));
+        const it = smashAdd('fence', cx2, cz2, 1.3, g, fsv.hex);
+        if (fsv.metal) it.mat = 'rail';
+        it.fvk = 'pitch'; it.fvf = fsv.form; it.fvr = fr;
+        continue;
+      }
       put(g, new THREE.BoxGeometry(l / n, 0.06, 0.05), '#3f6fa8', cx2, fy + 0.95, cz2, 0, fr, 0);
       put(g, new THREE.BoxGeometry(l / n, 0.06, 0.05), '#3f6fa8', cx2, fy + 0.45, cz2, 0, fr, 0);
       put(g, new THREE.BoxGeometry(0.07, 1.0, 0.07), '#3f6fa8', cx2 - ex * l / n / 2, fy + 0.5, cz2 - ez * l / n / 2);
-      smashAdd('fence', cx2, cz2, 1.3, g, '#3f6fa8').mat = 'rail';   // трубы — металл (impact.js)
+      const it = smashAdd('fence', cx2, cz2, 1.3, g, '#3f6fa8');
+      it.mat = 'rail';                                   // трубы — металл (impact.js)
+      it.fvk = 'pitch'; it.fvf = '-'; it.fvr = fr;
     }
   };
   const fa = L / 2 + 1.5, fb = W / 2 + 1.5;
@@ -11416,7 +11455,8 @@ function throughHouse (x0, z0, x1, z1) {
    заборы — дорого; дорожки и асфальт дешевле газона. Точки улиц — через 4 м по каждому куску рядом */
 RYARD.init({ HOUSE_GRID, inHouse: houseNotArch, segHouse: (ax, az, bx, bz) => segHouse(ax, az, bx, bz), solidAt: (x, z) => solidAt(x, z, 0.3), ARCHES, SOLID_GRID, SCELL, SMASH_GRID, SM_CELL, groundH,
   yardsEach: YARDS.each, paveEach: PAVE.each, festBlocks: (x, z, m) => FEST.blocks(x, z, m), carsEach: YCARS.carsEach,   // стоящие во дворах — как забор (yardcars.js)
-  segMaze: (ax, az, bx, bz) => YMAZE.segHits(ax, az, bx, bz, 0) });   // выпрямленный кусок — и не сквозь твёрдое лабиринта точно (yardmaze.js)
+  garagesEach: YFILL.garagesEach,                 // ракушки газона — стена (yardfill.js, 0п50)
+  segMaze: (ax, az, bx, bz) => YMAZE.segHits(ax, az, bx, bz, 0) || YFILL.segGarage(ax, az, bx, bz, 0) });   // выпрямленный кусок — и не сквозь твёрдое лабиринта и ракушки точно (yardmaze.js, yardfill.js)
 const RG_TAIL = { PAD: 80, R0: 60, EXTRA: 60, STEP: 4, HEAD_PAD: 50, HEAD_EXTRA: 30 };
 /* плавные улицы (RC): точка, где уже был кандидат или образец (общий узел соседних кусков; на дуге куски по 1,5—3,5 м —
    каждая точка дуги дважды), второй раз не берём: цена та же, а проверок сквозь дом и целей поиска по клеткам меньше */
@@ -11447,7 +11487,7 @@ function routeTail (x, z) {
     edgesNear(x, z, r, (a, b, px, pz, d) => {
       if (NODES[a].fx && NODES[a].fx.has(b)) return;   // проезд сквозь фестиваль закрыт блоками (festivals.js)
       if (seen) { const key = ptKey(px, pz); if (seen.has(key)) return; seen.add(key); }   // плавные улицы: та же точка с соседнего куска (ptKey)
-      const cut = d > 4 && (throughHouse(px, pz, x, z) || YMAZE.segHits(px, pz, x, z));   // и сквозь твёрдый забор, клумбу, лесок (yardmaze.js)
+      const cut = d > 4 && (throughHouse(px, pz, x, z) || YMAZE.segHits(px, pz, x, z) || YFILL.segGarage(px, pz, x, z));   // и сквозь твёрдый забор, клумбу, лесок (yardmaze.js), ракушки (yardfill.js)
       RT.cand.push({ a, b, x: px, z: pz, d, cut, c: d * 2 + (cut ? 400 : 0) });
     });
     if (RT.cand.length) break;
@@ -11566,7 +11606,7 @@ function roadPath (x0, z0, x1, z1, h, deck) {
   // машина во дворе и прямая к улице режет дом — выезд по клеткам (routeyard.js) к лучшей точке улицы.
   // Выезд помним 3 с: едешь по нему (не дальше 4 м от линии) — берём его же, от ближайшей точки
   let head = null;
-  if (sa >= 0 && sd > 5 && !RYARD.RY.OFF && (throughHouse(x0, z0, spx, spz) || YMAZE.segHits(x0, z0, spx, spz))) {
+  if (sa >= 0 && sd > 5 && !RYARD.RY.OFF && (throughHouse(x0, z0, spx, spz) || YMAZE.segHits(x0, z0, spx, spz) || YFILL.segGarage(x0, z0, spx, spz))) {
     const H = RT.head, now = performance.now();
     let k = -1;
     if (H && now - H.t < 3000) {
@@ -12879,6 +12919,9 @@ HCAM.init({ THREE, cam, scene, V, S, IN, pad: PAD, car: () => car, mode: () => C
   driver: on => { const g = DRIVER.DEBUG.of(car); if (g) g.visible = !!on; },
   cabOut: () => { car.visible = true; FPV.hid = 0; CV.undraw(); } });
 DLG.gate(HCAM.gate);                              // окно разговора с клиентом сразу после вручения — сначала сцена
+/* подъезд в 3D (minigames/stairs3d.js, 12ас): люди — как в городе, но не в «дальних» (humanLod считает от камеры города) */
+ST3.init({ THREE, renderer, human: (p, o) => { const g = makeHuman(p, o); HUMANS.delete(g); return g; }, drop: dropMesh,
+  courier: () => STORY.PERSON.courier(), box: () => pizzaBox() });
 
 const CAMFO = { k: 0, x: 0, y: 0, z: 0, has: false };   // взгляд на того, кто говорит у двери (doorcast.js focus): k — насколько
 function camStep (dt, vf) {
@@ -18226,8 +18269,10 @@ function frameStep (now) {
   CL.at.ph = 'render';
   CL.step('cullstep', CULL.step);              // отсечение клеток статики и матрицы подвижного (cull.js) — виден в frametail.js
   DYN.begin();                                    // таймер видеокарты вокруг отрисовки (dynres.js)
-  renderer.render(scene, cam);
-  CV.overlay(renderer);                           // из-за руля: салон вторым проходом поверх города (camview.js; рисует, только если camStep его ставил)
+  if (!ST3.render(renderer)) {                    // подъезд в 3D (stairs3d.js) — вместо города
+    renderer.render(scene, cam);
+    CV.overlay(renderer);                         // из-за руля: салон вторым проходом поверх города (camview.js; рисует, только если camStep его ставил)
+  }
   DYN.end();
   const wk = performance.now() - tWork;
   CULL.work(wk / 1000);

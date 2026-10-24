@@ -45,6 +45,8 @@ import * as SL from './streetlamps.js';
 import { makePerson, holdFixed } from './people.js';
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 import { ON as MOBILE } from './mobile.js';   // телефон: в бандитском районе куч меньше (память)
+import * as FVAR from './fencevar.js';        // вид лавочки по району (fencevar.js, М5 этап 2)
+import * as PV from './propvar.js';          // её форма — одной геометрией (propvar.js)
 import * as GLAND from './gangland.js';     // бандитский район изнутри: граффити, сгоревшие машины, стаи, хвост, темнее (12бе)
 
 /* соседние модули карьеры — если уже есть: вечер (career.js), «подъехал к
@@ -373,8 +375,11 @@ function* drawAlleys () {                          // шагами (build): че
             if (onAlley(bx2, bz2, 0.35) || nearPath(bx2, bz2, 1.45)) continue;          // не на соседней дорожке
             if (benchAt.some(q => Math.abs(q[0] - bx2) < 2.5 && Math.abs(q[1] - bz2) < 2.5)) continue;
             const ry = Math.atan2(-nx * s, -nz * s);                 // лицом к аллее, то есть друг к другу
-            A.smashAdd('bench', bx2, bz2, 1.5, benchGeo(bx2, bz2, ry), '#8a6b4e');
+            const sv = FVAR.item('bench', bx2, bz2, '#8a6b4e');   // null — ?nofvar, как было
+            if (sv) PV.burn(4);                                    // жребий — как от четырёх прежних коробок (город на зерне)
+            A.smashAdd('bench', bx2, bz2, 1.5, sv ? [PV.benchGeo(sv, bx2, A.groundH(bx2, bz2), bz2, ry)] : benchGeo(bx2, bz2, ry), sv ? sv.hex : '#8a6b4e');
             const it = A.SMASH[A.SMASH.length - 1];
+            it.fvk = 'bench'; it.fvf = sv ? sv.form : '-'; it.fvr = ry;
             if (A.BENCHES) A.BENCHES.push({ x: bx2, z: bz2, y: A.groundH(bx2, bz2), ry, prop: it });
             benchAt.push([bx2, bz2]);
             benches++;

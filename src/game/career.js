@@ -158,6 +158,7 @@ export function startShift () {
   SH.city = DIST.city();                          // «весь город» (cityopen.js): итоги — без района, с премией за дальние
   SH.opened = -1;
   SH.car0 = carNow();                             // мотор и пробег в начале смены — «мотор 87 % (−3 %)», «проехал 9 км» (shiftsteps.js, экран машины)
+  if (A.car && A.car.userData) A.car.userData.bumps0 = A.car.userData.bumps || 0;   // удары по кузову до смены (cardent.js hit) — в акте осмотра только за смену (новый кузов — с нуля)
   lunchClass(false);
   fire(startCbs, { n: SH.n + 1 });
   const L = SH.len, P = SH.pace;
@@ -641,8 +642,11 @@ function carScreen () {
     if (q.pct >= ECON.BREAK.REPAIR_MIN_PCT) repair = Math.round(q.price * (1 - (RESPECT.perk('garageOff') || 0)) / 10) * 10;
   }
   const km = c0 ? Math.max(0, c.km - c0.km) : 0;
+  // удары: сердца теряются не от каждого (о стену медленнее 15 м/с — без урона), а стёкла бьются и детали отлетают — считаем и
+  // удары по кузову (cardent.js hit, своя машина — и «Семёрка», и коробочная; 0п53: у «Семёрки» было «удары 0» при битых стёклах)
+  const bumps = Math.max(0, (st.bumps || 0) - (g.userData.bumps0 || 0));
   return { id: 'car', money: A.money, car: { ...st, name: c ? c.name : '', hp: S.hp, hpMax: S.hpMax, cond: c ? c.cond : null, ceil: c ? c.ceil : null,
-    cond0: c0 ? c0.cond : null, km, kmText: String(km), hits: SH.hits || 0, repair } };
+    cond0: c0 ? c0.cond : null, km, kmText: String(km), hits: Math.max(SH.hits || 0, bumps), repair } };
 }
 
 /* календарик сезонов (seasoncycle.js receipt): на широком экране (career.css, ≥ 980 px и выше 540) — отдельным листком

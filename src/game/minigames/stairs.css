@@ -50,3 +50,45 @@ body.calm-fx .sx-pop { animation: none; }
   .sx .mk-mini { bottom: 106px; }   /* свёрнутая накладная лежала под рядом кнопок (🔔 и край листа между ними) — над ним (ревью 23.10, Р23-4) */
   .sx .mk-say .mk-b p { font-size: 10px; line-height: 1.45; }
 }
+
+/* ── подъезд в 3D (stairs3d.js, 12ас): сцену рисует холст игры (#view) — он над хадом и под мини-игрой, как раньше
+   непрозрачный лист мини-игры; в песочнице — свой холст .sx3-cv. Поверх — номера дверей площадки, облачко мужика у
+   своей двери, стрелки гопников (места — из 3D, каждый кадр) ── */
+body.sx3-on #view { position: relative; z-index: 25; }
+.mk-full.sx3 { background: transparent; }
+.sx3-cv { image-rendering: pixelated; }
+.sx3-hit { position: absolute; inset: 0; cursor: pointer; }
+.mk-full.sx3::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: radial-gradient(ellipse at 50% 55%, rgba(10, 6, 4, 0) 45%, rgba(10, 6, 4, .55) 100%); }
+.sx3-ui { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+.sx3-ui > * { position: absolute; left: 0; top: 0; }
+.sx3-ui [hidden] { display: none; }
+.sx3-tag { padding: .28em .45em; font-weight: normal; font-size: var(--pp-fs-s); line-height: 1; color: #33210c; background: #d9b25a;
+  border: 2px solid #33210c; border-radius: 3px; box-shadow: 0 2px 0 rgba(0, 0, 0, .5); white-space: nowrap; }
+.sx3-tag.on { background: #ffd85e; font-size: var(--pp-fs-m); box-shadow: 0 0 0 3px rgba(255, 216, 94, .45), 0 2px 0 rgba(0, 0, 0, .5); }
+.sx3-bub { box-sizing: border-box; max-width: min(42vw, 420px); width: max-content; padding: .7em .9em; font-size: var(--pp-fs-m); line-height: 1.5;
+  color: var(--pp-ink); background: var(--pp-paper); border: 3px solid var(--pp-ink); border-radius: 10px; box-shadow: 0 5px 0 rgba(18, 12, 8, .6); margin-top: -14px; }
+.sx3-bub::after { content: ''; position: absolute; left: 50%; bottom: -13px; width: 16px; height: 16px; translate: -50% 0; rotate: 45deg;
+  background: var(--pp-paper); border-right: 3px solid var(--pp-ink); border-bottom: 3px solid var(--pp-ink); }
+.sx3-pop { animation: sx3-pop .22s var(--pp-spring); }
+@keyframes sx3-pop { 0% { opacity: 0; scale: .7; } 100% { opacity: 1; scale: 1; } }
+.sx3-arrow { width: 58px; height: 58px; --k: 1; }
+.sx3-arrow > b { position: absolute; inset: 0; display: grid; place-items: center; font-weight: normal; font-size: 24px; color: #33210c;
+  background: #fff3d6; border: 3px solid #33210c; border-radius: 50%; }
+.sx3-arrow.miss > b { background: #d9342c; color: #fff3d6; }
+.sx3-ring { position: absolute; inset: -6px; border: 4px solid #ff8a2b; border-radius: 50%; scale: calc(1 + var(--k) * 1.1); opacity: 0; }
+.sx3-arrow.beat .sx3-ring { opacity: 1; }
+.sx3-arrow > span { position: absolute; left: 50%; top: calc(100% + 8px); translate: -50% 0; display: flex; gap: 5px; }
+.sx3-arrow > span i { width: 10px; height: 10px; background: rgba(255, 243, 214, .7); border: 2px solid #33210c; }
+.sx3-arrow > span i.ok { background: #4fd65a; }
+/* у своей двери печать — вниз влево, не на мужика */
+.mk-full.sx3.sx-ok .mk-seal { top: 76%; left: 28%; font-size: clamp(16px, 2.4vw, 32px); }
+@media (prefers-reduced-motion: reduce) { .sx3-pop { animation: none; } }
+body.calm-fx .sx3-pop { animation: none; }
+.mk-full.sx3 .mk-top, .mk-full.sx3 .mk-say { transition: opacity .25s; }
+.mk-full.sx3.sx-scene .mk-top, .mk-full.sx3.sx-scene .mk-say { opacity: 0; }
+/* телефон боком: реплики ложатся на площадку (между заданием и кнопками) — в 3D гаснут через 4,5 с */
+@media (max-height: 460px) {
+  .mk-full.sx3 .mk-say .mk-m { animation: sx3-fade .4s 4.5s forwards; }
+}
+@keyframes sx3-fade { to { opacity: 0; visibility: hidden; } }

@@ -10,7 +10,8 @@
      стёклами (opts.dent: мнётся вершинами, бампер и колпаки отлетают — cardent.js, стёкла по одному — carglass.js),
      «Семёрка» — полная модель (realcar.js detail: стёкла по одному, четыре колеса, бампер вырезается).
      Удары по ней — как по своей. Дальше FW.FAR м — копию возвращаем: «Семёрка» — облегчённая (она мялась вместе
-     с копией), коробочная — обычная полная модель, на которой повторены прежние удары (битая так и остаётся).
+     с копией; разбитые окна, отлетевшие колёса и детали с неё снимаем — realcar.js liteFromDetail, carwreck.js
+     liteLost, 0п51), коробочная — обычная полная модель, на которой повторены прежние удары (битая так и остаётся).
    • Сильный удар у колеса (FW.WHEEL м/с, ближе FW.WHEEL_R) — колесо отлетает; в морду или корму (FW.BUMPER) —
      бампер (у «Семёрки» — вырезан из кузова). Разбилось стекло — осколки (pixfx.js) и звон (impact.js).
    • Водитель. Внутри машины потока сидит конкретный человек (personOf — тот же, что выйдет): у «Семёрки» —
@@ -71,7 +72,7 @@ export const FW = {
     LAMP: 8, BOTH: 16,           // фара / фонарь гаснет с LAMP м/с у угла, обе на этом конце — с BOTH
   },
 };
-export const ST = { buildMs: 0, buildMax: 0, det: 0, real: 0, boxy: 0, back: 0, evict: 0, wheels: 0, bumpers: 0, panes: 0, shards: 0, seated: 0,
+export const ST = { buildMs: 0, buildMax: 0, det: 0, real: 0, boxy: 0, back: 0, evict: 0, liteCut: 0, wheels: 0, bumpers: 0, panes: 0, shards: 0, seated: 0,
   blood: 0, out: 0, stay: 0, kick: 0, glass: 0, hood: 0, kicks: 0, glassHits: 0, ownCrack: 0, ownBreak: 0, jumps: 0, falls: 0,
   big: 0, bigDent: 0, bigCrack: 0, bigLamp: 0, sway: 0, swayMax: 0 };
 
@@ -205,6 +206,7 @@ export function pre (t, v) {
     // стёкла облегчённой были одной сеткой: разбиты — нет ни одного, в трещинах — все
     const lg = R1.glass[0];
     if (lg && !lg.visible) for (const k in R2.panes) { R2.panes[k].st = 2; R2.panes[k].m.visible = false; }
+    REALCAR.liteBack(t.mesh);                       // окна — не целее, чем у прошлой копии (realcar.js, 0п51)
     WRECK.restore(t.mesh);                          // перекошенное, болтающееся, отлетевшее — как было на прошлой копии (carwreck.js)
     r.kind = 'real'; ST.real++;
     if (!t.parked) seatReal(t, r);
@@ -249,7 +251,11 @@ function evict (t, keep = true) {
   if (i >= 0) DETS.splice(i, 1);
   if (!r || !r.det) return;
   r.det = false;
-  if (r.kind === 'real') { unseat(t, r); if (t.mesh) REALCAR.undetail(t.mesh); }
+  if (r.kind === 'real') {
+    unseat(t, r);
+    const R1 = t.mesh && t.mesh.userData.real && t.mesh.userData.real.lite;
+    if (t.mesh && REALCAR.undetail(t.mesh) && keep && !t.gone) ST.liteCut += WRECK.liteLost(t.mesh, R1);   // облегчённая — без отлетевшего (0п51)
+  }
   else { r.seat = null; const S0 = t.mesh && t.mesh.userData.blood; if (keep && !t.gone && t.mesh && t.mesh.userData.dent && A.swap(t, false, r.hits, null) && S0) bloodTo(t.mesh, S0); }   // кровь — обратно на обычную полную
   if (keep) ST.evict++;
   ST.back++;

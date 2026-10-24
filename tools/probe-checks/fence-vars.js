@@ -27,6 +27,53 @@ const out = { FV: FV ? FV.ST : null, solid: {}, tall: {}, rails: {}, calls: [], 
 out.print = [d.SOLIDS.length, d.SMASH.length, d.YMAZE.FEN.length, +d.YMAZE.FEN.reduce((p, f) => p + f.ax * 0.3 + f.az * 0.7, 0).toFixed(2), d.RL.RL.n.panels];
 for (const f of d.YMAZE.FEN) { const k = f.sty + (f.wear !== undefined ? '/' + f.wear : ''); out.solid[k] = (out.solid[k] || 0) + 1; }
 if (FV && FV.TALL) for (const v of FV.TALL) out.tall[v] = (out.tall[v] || 0) + 1;
+// этап 2 (fvitems): мелочь — сколько каких форм, вершин, и кадр вблизи на каждую форму. it.fvk — что (low — заборчики
+// тропинок, pal — палисадники, street — вдоль жилых улиц, softp / softk — сбиваемые у тротуаров, pitch — бортики коробок,
+// bench, urn, can), it.fvf — форма ('-' — как было, ?nofvar). fvia=x,z,r,ключ;… — те же вещи, что в прошлом прогоне (до/после)
+if (Q.has('fvitems')) {
+  const kinds = (Q.get('fvitems') || 'low,pal,street,softp,softk,pitch,bench,urn,can,cons').split(',');
+  const vtx = {}, cnt = {};
+  for (const it of d.SMASH) if (it.fvk) { const k = it.fvk + '/' + it.fvf; vtx[it.fvk] = (vtx[it.fvk] || 0) + it.nv; cnt[k] = (cnt[k] || 0) + 1; }
+  out.vtx = vtx; out.cnt = cnt; out.items = FV ? FV.ST.items : null; out.wear2 = FV ? FV.ST.wear2 : null;
+  let pick = [];
+  const eyeOf = (x, z, r, dd) => {                 // глаз спереди (лавочка — лицом) или с той стороны, где не дом
+    for (const s of [1, -1]) {
+      const nx = Math.sin(r) * s, nz = Math.cos(r) * s, ax = Math.cos(r), az = -Math.sin(r);
+      const ex = x + nx * dd + ax * 1.2, ez = z + nz * dd + az * 1.2;
+      if (!d.inHouse(ex, ez, 0.8) && !d.inHouse(x + nx * dd * 0.5, z + nz * dd * 0.5, 0.3)) return [ex, ez];
+    }
+    return null;
+  };
+  if (Q.get('fvia')) pick = Q.get('fvia').split(';').map(q => { const a = q.split(','); return [+a[0], +a[1], +a[2], a[3]]; });
+  else {
+    const seen = {}, want = +(Q.get('fvper') || 1), skip = {};   // fvskip=ключ,ключ — у этих взять следующую вещь (кадр не вышел)
+    for (const k of (Q.get('fvskip') || '').split(',')) if (k) skip[k] = (skip[k] || 0) + 1;
+    for (const it of d.SMASH) {
+      if (!it.fvk || !kinds.includes(it.fvk)) continue;
+      const key = it.fvk + '/' + it.fvf;
+      if ((seen[key] || 0) >= want || !eyeOf(it.x, it.z, it.fvr || 0, 3.2)) continue;
+      if (pick.some(p => Math.hypot(p[0] - it.x, p[1] - it.z) < 40)) continue;   // разные места
+      if (skip[key]) { skip[key]--; continue; }
+      seen[key] = (seen[key] || 0) + 1;
+      pick.push([+it.x.toFixed(2), +it.z.toFixed(2), +(it.fvr || 0).toFixed(3), key]);
+    }
+    pick.sort((a, b) => (a[3] < b[3] ? -1 : 1));
+  }
+  out.fvia = pick.map(p => p.join(',')).join(';');
+  out.picked = pick.map(p => p[3] + '@' + dist(p[0], p[1]));
+  if (DIR) await run(4);                           // накладная первого заказа — уйти с экрана
+  if (DIR) for (const [i, [x, z, r, key]] of pick.entries()) {
+    const dd = /can|pitch/.test(key) ? 4.2 : /urn/.test(key) ? 2.3 : 3.2, e = eyeOf(x, z, r, dd) || [x + 3, z + 3];
+    // машина — за глазом, на газоне (tp к дороге бывает далеко: клетки у вещи не показаны)
+    const bx = e[0] + (e[0] - x) / dd * 3, bz = e[1] + (e[1] - z) / dd * 3, bh = Math.atan2(x - bx, z - bz);
+    for (let k = 0; k < 30; k++) { hold(); put(bx, bz, bh); cam0(bx, bz, bh); await wait(50); }
+    EYE = [e[0], d.groundH(e[0], e[1]) + 1.55, e[1], x, d.groundH(x, z) + 0.45, z];
+    await wait(400);
+    await shot(DIR + '/it' + String(i).padStart(2, '0') + '-' + key.replace('/', '-') + '.png');
+    EYE = null;
+  }
+  return out;
+}
 // места
 const places = [];
 const at = Q.get('fvat');

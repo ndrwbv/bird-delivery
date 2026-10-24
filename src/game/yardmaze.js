@@ -36,6 +36,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import { wet } from './streams.js';
 import { MOB } from './mobile.js';                 // телефон: лесочки меньше (MOB.groveR)
+import * as PV from './propvar.js';              // формы вариантов сбиваемых секций — одной геометрией (propvar.js, М5 этап 2)
 import * as FVAR from './fencevar.js';            // вид твёрдого забора по району и износ куска (fencevar.js, М5)
 
 export const MAZE = {
@@ -307,6 +308,7 @@ function* fences () {
             hex = pal[Math.floor(rr() * pal.length)];
             const pk = rr() < F.PICKET, sp = pk ? F.PICKET_HEX : F.SMASH_HEX;
             sk = { pk, hex: sp[Math.floor(rr() * sp.length)] };
+            sk.sv = FVAR.item(pk ? 'softk' : 'softp', cx, cz, sk.hex);   // вид сбиваемого куска по району (fencevar.js), без жребия куска
             piece = 0; pieceAt = F.PIECE[0] + rr() * (F.PIECE[1] - F.PIECE[0]);
             ped = 0; pedAt = F.PED[0] + rr() * (F.PED[1] - F.PED[0]);
           }
@@ -456,8 +458,12 @@ function solidRun (run, len, sty, hex) {
 }
 /* сбиваемое: хлипкое и светлое — тонкие крашеные трубы (2 трубы, 2 стойки) или штакетник (2 жердины, 4 планки) */
 function smashSec (cx, cz, ux, uz, sk) {
-  const F = MAZE.FEN, gy = A.groundH(cx, cz), g = [], ry = Math.atan2(-uz, ux), hex = sk.hex;
-  if (sk.pk) {
+  const F = MAZE.FEN, gy = A.groundH(cx, cz), g = [], ry = Math.atan2(-uz, ux), hex = sk.hex, sv = sk.sv;
+  if (sv) {                                         // вариант (fencevar.js): жребий — как от прежних коробок (2 + 4 или 2 + 2)
+    PV.burn(sk.pk ? 6 : 4);
+    const ga = A.groundH(cx - ux * F.SEC / 2, cz - uz * F.SEC / 2), gb = A.groundH(cx + ux * F.SEC / 2, cz + uz * F.SEC / 2);
+    g.push(PV.fenceGeo(sv, FVAR.wear2(cx, cz, sv), F.SEC, sk.pk ? 0.92 : F.H, cx, (ga + gb) / 2, cz, ry, (gb - ga) / F.SEC));
+  } else if (sk.pk) {
     A.box(g, F.SEC, 0.06, 0.03, hex, cx, gy + 0.72, cz, ry);
     A.box(g, F.SEC, 0.06, 0.03, hex, cx, gy + 0.28, cz, ry);
     for (const o of [-0.94, -0.31, 0.31, 0.94]) A.box(g, 0.1, 0.92, 0.025, hex, cx + ux * o, gy + 0.46, cz + uz * o, ry);
@@ -466,8 +472,9 @@ function smashSec (cx, cz, ux, uz, sk) {
     A.box(g, F.SEC, 0.045, 0.045, hex, cx, gy + 0.4, cz, ry);
     for (const o of [-1.2, 1.2]) A.box(g, 0.05, F.H, 0.05, hex, cx + ux * o, gy + F.H / 2, cz + uz * o);
   }
-  const it = A.smashAdd('fence', cx, cz, 1.3, g, hex);
-  if (!sk.pk && it) it.mat = 'rail';               // тонкие трубы — удар металлом, штакетник — забор (impact.js)
+  const it = A.smashAdd('fence', cx, cz, 1.3, g, sv ? sv.hex : hex);
+  if ((sv ? sv.metal : !sk.pk) && it) it.mat = 'rail';   // тонкие трубы — удар металлом, штакетник — забор (impact.js)
+  if (it) { it.fvk = sk.pk ? 'softk' : 'softp'; it.fvf = sv ? sv.form : '-'; it.fvr = ry; }
   const o = { seg: 1, ax: cx - ux * 1.25, az: cz - uz * 1.25, bx: cx + ux * 1.25, bz: cz + uz * 1.25, th: 0.1, solid: 0, kind: 'sfence' };
   gput(cx - 2, cz - 2, cx + 2, cz + 2, o);
   ST.fen.smashM += F.SEC; ST.fen.smashSec++; if (sk.pk) ST.fen.pickets++;

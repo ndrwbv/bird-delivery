@@ -196,8 +196,11 @@ const INSTALL = `(() => { if (window.__probe) return; const P = window.__probe =
   const lastMile = (D, tx, tz) => {
     const r0 = D.nearestRoad(tx, tz); if (r0 && r0.d < 12) return null;
     const C = 2, RR = 1.2, MAXN = 30000;
+    // ракушки газона (yardfill.js; твёрдые у камеры — lawnprops.js, в SOLID_GRID их нет) — 0п50
+    const GAR = []; if (D.YFILL && D.YFILL.garagesEach) D.YFILL.garagesEach(tx - 260, tz - 260, tx + 260, tz + 260, (cx, cz, cs, sn, hw, hd) => GAR.push([cx, cz, cs, sn, hw, hd]));
     const free = (x, z) => {
       if (D.groundH(x, z) < 0.3) return false;
+      for (const g of GAR) { const dx = x - g[0], dz = z - g[1]; if (Math.abs(dx) < 9 && Math.abs(dz) < 9 && Math.abs(dx * g[2] + dz * g[3]) < g[4] + RR && Math.abs(-dx * g[3] + dz * g[2]) < g[5] + RR) return false; }
       const cell = D.SOLID_GRID.get(Math.floor(x / 30) + ',' + Math.floor(z / 30));
       if (cell) for (const q of cell) {
         if (q.deckY !== undefined) continue;
@@ -222,6 +225,46 @@ const INSTALL = `(() => { if (window.__probe) return; const P = window.__probe =
       }
     }
     return null;
+  };
+  /* маршрут игры сам доводит до пина во дворе (навигатор знает дома, заборы, клумбы — yardmaze.js): хвост от последней
+     точки на дороге до пина не задевает твёрдого (запас RR) — свой путь по клеткам (lastMile) не нужен. До 0п50 (24.10.2026)
+     автопилот всегда искал свой: кратчайший по клеткам вёл в щель у конца забора между гаражами (Ленинградская, 2966,2382),
+     а маршрут игры — в широкий въезд у угла дома; машина крутилась у щели, время выходило */
+  /* отрезок (x0, z0) → (x1, z1) задевает твёрдое (SOLID_GRID, с запасом rr), ракушку или дом — шагом 0,7 м */
+  const segHitsSolid = (D, x0, z0, x1, z1, rr) => {
+    const L = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.ceil(L / 0.7));
+    if (D.YFILL && D.YFILL.segGarage && D.YFILL.segGarage(x0, z0, x1, z1, rr * 0.6)) return true;   // ракушки газона (yardfill.js)
+    for (let k = 1; k <= n; k++) {
+      const x = x0 + (x1 - x0) * k / n, z = z0 + (z1 - z0) * k / n;
+      if (D.inWall(x, z, rr * 0.6)) return true;      // угол дома (дома — не в SOLID_GRID)
+      const cell = D.SOLID_GRID.get(Math.floor(x / 30) + ',' + Math.floor(z / 30));
+      if (cell) for (const q of cell) {
+        if (q.deckY !== undefined || q.ramp !== undefined) continue;
+        const dx = x - q.cx, dz = z - q.cz, lx = dx * q.cs + dz * q.sn, lz = -dx * q.sn + dz * q.cs;
+        if (Math.abs(lx) < q.hw + rr && Math.abs(lz) < q.hd + rr) return true;
+      }
+    }
+    return false;
+  };
+  const navOk = (D, R, tx, tz) => {
+    const n = R.length, RR = 0.25;                     // у пина (5 м) — не в счёт: пин и так на свободном месте (game.js pinFront)
+    if (n < 2 || Math.hypot(R[n - 1][0] - tx, R[n - 1][1] - tz) > 6) return false;
+    let i = n - 1;
+    for (; i > 0; i--) { const r = D.nearestRoad(R[i][0], R[i][1]); if (r && r.d < r.seg.w / 2 + 1) break; }
+    for (let k = Math.max(1, i); k < n; k++) {
+      const ax = R[k - 1][0], az = R[k - 1][1], L = Math.hypot(R[k][0] - ax, R[k][1] - az);
+      for (let f = 0; f <= L; f += 1) {
+        const x = ax + (R[k][0] - ax) * (L ? f / L : 0), z = az + (R[k][1] - az) * (L ? f / L : 0);
+        if (Math.hypot(x - tx, z - tz) < 5) continue;
+        const cell = D.SOLID_GRID.get(Math.floor(x / 30) + ',' + Math.floor(z / 30));
+        if (cell) for (const q of cell) {
+          if (q.deckY !== undefined || q.ramp !== undefined) continue;
+          const dx = x - q.cx, dz = z - q.cz, lx = dx * q.cs + dz * q.sn, lz = -dx * q.sn + dz * q.cs;
+          if (Math.abs(lx) < q.hw + RR && Math.abs(lz) < q.hd + RR) return false;
+        }
+      }
+    }
+    return true;
   };
   const step = () => { raf0(step);
     const D = window.__dlv, A = P.ap; if (!A.on || !D) return; const IN = D.IN, V = D.V, S = D.S;
@@ -269,9 +312,13 @@ const INSTALL = `(() => { if (window.__probe) return; const P = window.__probe =
       if (onRoad || !A.trail) A.trail = [[V.x, V.z]];
       else { const l = A.trail[A.trail.length - 1]; if (Math.hypot(V.x - l[0], V.z - l[1]) > 2) { A.trail.push([V.x, V.z]); if (A.trail.length > 150) A.trail.shift(); } }
       const tkey = S.target ? Math.round(S.target.x) + ',' + Math.round(S.target.z) : '';
-      if (tkey !== A.tkey) { A.tkey = tkey; A.own = null; A.detT = 0; A.lm = S.target ? lastMile(D, S.target.x, S.target.z) : null; A.lmOn = false;
+      if (tkey !== A.tkey) { A.tkey = tkey; A.own = null; A.detT = 0; A.lm = S.target ? lastMile(D, S.target.x, S.target.z) : null; A.lmOn = false; A.lmNav = 0;
         if (!onRoad && A.trail.length > 2) A.own = { kind: 'trail', pts: [[V.x, V.z], ...A.trail.slice().reverse()] }; }
       if (A.own && A.own.kind === 'trail' && (onRoad || Math.hypot(V.x - A.own.pts[A.own.pts.length - 1][0], V.z - A.own.pts[A.own.pts.length - 1][1]) < 3)) A.own = null;
+      if (A.lm && !A.lmOn && !A.lmNav && S.target && GR.length > 1 && Math.hypot(GR[GR.length - 1][0] - S.target.x, GR[GR.length - 1][1] - S.target.z) < 6) {
+        A.lmNav = 1;                                    // маршрут игры уже к этому пину — решаем раз
+        if (navOk(D, GR, S.target.x, S.target.z)) { A.lm = null; if (A.own && A.own.kind === 'detour') A.own = null; A.detT = 0; }
+      }
       // доехали до въезда к пину вдали от улиц — дальше по клеткам, маршрут больше не пересчитываем
       if (A.lm && !A.lmOn && !(A.own && A.own.kind === 'trail') && Math.hypot(V.x - A.lm.entry[0], V.z - A.lm.entry[1]) < 8) {
         A.lmOn = true; A.own = { kind: 'last', pts: [[V.x, V.z], ...A.lm.pts] };
@@ -291,6 +338,10 @@ const INSTALL = `(() => { if (window.__probe) return; const P = window.__probe =
       const sp = Math.hypot(V.vx, V.vz), left = S.target ? Math.hypot(S.target.x - V.x, S.target.z - V.z) : 99;
       const pr = proj(R, V.x, V.z), L = 9 + sp * 0.35;
       let [tx, tz, ux, uz] = along(R, pr.i, pr.k, L);
+      /* не срезать угол сквозь твёрдое: прямая до точки цели задевает забор, столб, гараж, угол дома (запас — полкорпуса) — точку ближе
+         по маршруту. До 0п50 (24.10.2026) на шпильке у конца забора (Ленинградская, 2963,2382) точка в 9 м была уже за
+         забором: машина рулила прямо в него и стояла */
+      for (let Lk = L * 0.6; Lk > 2.4 && segHitsSolid(D, V.x, V.z, tx, tz, 0.9); Lk *= 0.6) [tx, tz, ux, uz] = along(R, pr.i, pr.k, Lk);
       // полоса: правая (как поток), на обгоне — встречная; у пина — прямо на него
       let lane = 0;
       if (left > 25 && !(A.own && A.own.kind !== 'detour')) {
@@ -333,7 +384,10 @@ const INSTALL = `(() => { if (window.__probe) return; const P = window.__probe =
       else if (A.pass > 0) block = false;
       A.wait = block && sp < 1 ? (A.wait || 0) + dts : 0;
       if (A.wait > 2.5 && !oncoming) { A.wait = 0; A.pass = 3; }
-      let want = block ? 0 : left < 14 ? 3.5 : Math.abs(diff) > 1.5 ? 4 : left < 30 ? 7 : Math.abs(diff) > 0.45 ? 6 : turn > 0.7 ? 8 : A.pass > 0 ? 8 : A.vmax;
+      /* поворот с улицы во двор (дальняя точка пути — не на дороге): сбросить до 5 м/с. До 0п50 (24.10.2026) влетал на 8 м/с,
+         проскакивал узкий въезд (у Ленинградской 2959,2294: 3,7 м между углом дома и забором вдоль тротуара) и крутился на улице */
+      const rdT = turn > 0.9 ? D.nearestRoad(fx2, fz2, 7, 1) : null, offRoadTurn = turn > 0.9 && !(rdT && rdT.d < rdT.seg.w / 2 + 1);
+      let want = block ? 0 : left < 14 ? 3.5 : Math.abs(diff) > 1.5 ? 4 : left < 30 ? 7 : Math.abs(diff) > 0.45 ? 6 : offRoadTurn ? 5 : turn > 0.7 ? 8 : A.pass > 0 ? 8 : A.vmax;
       if (wall) want = Math.min(want, 10);
       if (A.own && A.own.kind !== 'detour') want = Math.min(want, 7);   // по двору и по своему следу — не спеша
       /* таран конкурента (game.js svcDrive, ECON.FOES): несётся на тебя ~30 м/с, удар — 2 сердца. Сзади —

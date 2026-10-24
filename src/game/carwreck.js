@@ -33,7 +33,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 import * as PIX from './pixfx.js';
-import { p0Of, RCW, LAMP_KEY } from './realcar.js';
+import { p0Of, RCW, LAMP_KEY, liteCut } from './realcar.js';
 import { crackLamp, smashLamp, lampState, LAMP as CGLAMP } from './carglass.js';
 import { fling, dropPart } from './cardent.js';
 
@@ -499,10 +499,24 @@ function off (g, W, pc, o, v) {
   fling(g, m, 'part-' + pc.key, ox, oz, o.soft ? Math.min(v, 6) : v);
   ST.off++; ST.offKeys.push(pc.key);
 }
-/* крышки багажника «Семёрки» нет — коробки с пиццей видно (коробки старого кузова — carrear.js cargo) */
+/* крышки багажника «Семёрки» нет — коробки с пиццей видно (коробки старого кузова — carrear.js cargo).
+   Коробки собраны под ванну коробочного седана (низко, у заднего стекла, слева): у «Семёрки» ванны нет — кузов под крышкой
+   сплошной, и из выреза торчал только оранжевый край верхней коробки (0п51). Ставим стопку на срез проёма (низ — на
+   высоте среза крышки), по середине проёма вдоль и поперёк, в CARGO.K крупнее */
+export const CARGO = { K: 1.3, UP: 0.01 };
 function cargoReal (g) {
-  const u = g.userData, c = u.cargo;
-  if (c && c.parent && c.parent !== g) { g.add(c); }
+  const u = g.userData, c = u.cargo, R = u.real;
+  if (!c) return;
+  if (c.parent && c.parent !== g) g.add(c);
+  if (!R || c.userData.realFit) return;
+  c.userData.realFit = 1;
+  const S = REAL_PARTS.trunk.box, k = R.C.k, HL = R.C.box.HL;
+  c.geometry.computeBoundingBox();
+  const bb = c.geometry.boundingBox, cx = (bb.min.x + bb.max.x) / 2, cz = (bb.min.z + bb.max.z) / 2;
+  const z0 = Math.max(S.z[0], -HL), z1 = S.z[1];                 // проём крышки вдоль: от кормы до петли у стекла
+  const K = CARGO.K;
+  c.scale.setScalar(K);
+  c.position.set(-cx * K, S.y[0] * k + CARGO.UP - bb.min.y * K, (z0 + z1) / 2 * k * 0.98 - cz * K);
 }
 
 /** крышка багажника «Семёрки» на угол a (crashfx.js: кладут пиццу; tr — u.trunk) */
@@ -512,6 +526,7 @@ export function lid (g, a) {
   let pc = W.P.trunk;
   if (pc && pc.gone) return;
   if (!pc) { if (!(a > 0.01)) return; pc = piece(g, 'trunk'); if (!pc) return; }
+  if (a > 0.01) cargoReal(g);                        // приоткрыта — коробки на срезе проёма (не утоплены в кузов)
   if (pc.lidA === a) return;
   pc.lidA = a;
   if (!(a > 0.01) && !(P && P.st)) { unpiece(W, pc); return; }   // закрылась, цела — снова кузовом
@@ -522,6 +537,30 @@ export function open (pc, a) {
   if (!pc || pc.gone) return;
   if (pc.box) { pc.open = a; pose(pc); return; }
   pc.open = a; pose(pc);
+}
+/** подробную копию «Семёрки» потока убрали (foewreck.js evict, дальше FW.FAR): отлетевшее (ступень 3) снимаем и с облегчённой
+    R1 — треугольники, чья середина в коробке детали (по плоскостям, ny — грань вверх, top — по высоте; дверь — и со своим
+    окном). Облегчённая — одна сетка без разрезов: край неровный, но с 90 м не видно; до 0п51 возвращалась целой */
+export function liteLost (g, R1) {
+  if (!WR.on || !g || !R1) return 0;
+  const W = WS.get(g);
+  if (!W) return 0;
+  const done = R1.wrCut || (R1.wrCut = {});
+  const keys = Object.keys(W.parts).filter(k => W.parts[k].st >= 3 && REAL_PARTS[k] && !done[k]);
+  if (!keys.length) return 0;
+  for (const k of keys) done[k] = 1;
+  return liteCut(R1, (x, y, z, ny, glass) => {
+    for (const k of keys) {
+      const S = REAL_PARTS[k], B = S.box;
+      if (glass && S.kind !== 'door') continue;
+      if (x < B.x[0] || x > B.x[1] || y < B.y[0] || y > B.y[1] || z < B.z[0] || z > B.z[1]) continue;
+      if (!glass && S.top && y > S.top.body) continue;
+      if (S.planes && S.planes.some(pl => pl[0] * x + pl[1] * y + pl[2] * z + pl[3] < 0)) continue;
+      if (S.ny && !glass && ny < S.ny) continue;
+      return true;
+    }
+    return false;
+  });
 }
 /** подробная копия «Семёрки» собрана заново (foewreck.js pre): прежние ступени — на новых кусках */
 export function restore (g) {

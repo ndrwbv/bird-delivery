@@ -38,6 +38,8 @@
    вместо камеры меню (game.js зовёт её в кадре меню).
    ────────────────────────────────────────────────────────────────────────── */
 import { MAP } from './map.js';
+import * as FVAR from './fencevar.js';           // вид урны по району (fencevar.js, М5 этап 2)
+import * as PV from './propvar.js';             // её форма — одной геометрией (propvar.js)
 
 export const ED = { on: typeof window !== 'undefined' && !!window.__EDITOR, cam: null };
 
@@ -275,10 +277,13 @@ export function apply (A) {
       else if (a.kind === 'bench') ok = !!A.bench(x, z, ry);
       else if (a.kind === 'lamp') A.lamp({ x, z, style: a.sub || 'ball', dx: Math.cos(ry), dz: -Math.sin(ry) });
       else if (a.kind === 'bin') {
-        const g = [];
-        A.put(g, new THREE.CylinderGeometry(0.28, 0.24, 0.8, 8), '#4e5a4a', x, gy + 0.4, z);
-        A.put(g, new THREE.CylinderGeometry(0.3, 0.3, 0.06, 8), '#3a4238', x, gy + 0.82, z);
-        A.smashAdd('bin', x, z, 0.5, g, '#4e5a4a');
+        const g = [], sv = FVAR.item('urn', x, z, '#4e5a4a');   // null — ?nofvar, как было
+        if (sv) { PV.burn(2); g.push(PV.urnGeo(sv, x, gy, z, ry)); }
+        else {
+          A.put(g, new THREE.CylinderGeometry(0.28, 0.24, 0.8, 8), '#4e5a4a', x, gy + 0.4, z);
+          A.put(g, new THREE.CylinderGeometry(0.3, 0.3, 0.06, 8), '#3a4238', x, gy + 0.82, z);
+        }
+        A.smashAdd('bin', x, z, 0.5, g, sv ? sv.hex : '#4e5a4a');
       } else if (a.kind === 'tyres') {                // три белёные покрышки кольцом, земля и цветы внутри
         const g = [], cs = Math.cos(ry), sn = Math.sin(ry);
         for (let k = 0; k < 3; k++) {

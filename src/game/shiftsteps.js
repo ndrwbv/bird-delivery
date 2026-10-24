@@ -396,9 +396,9 @@ const PART_NAME = {
   dfl: N_('дверь'), drl: N_('дверь'), dfr: N_('дверь'), drr: N_('дверь'), fl: N_('фара'), fr: N_('фара'), rl: N_('фонарь'), rr: N_('фонарь'),
   mirror: N_('зеркало'), hub: N_('колпак'),
 };
-/* что с машиной сейчас: { parts: { key: 0…3 }, glass: { f, b, l, r: 0…2 }, dents, lost: [key] } — своя «Семёрка» и коробочные */
+/* что с машиной сейчас: { parts: { key: 0…3 }, glass: { f, b, l, r: 0…2 }, dents, bumps, lost: [key] } — своя «Семёрка» и коробочные */
 export function carState (g) {
-  const out = { parts: {}, glass: {}, dents: 0, lost: [] };
+  const out = { parts: {}, glass: {}, dents: 0, bumps: 0, lost: [] };
   const u = g && g.userData;
   if (!u) return out;
   const P = out.parts, up = (k, v) => { if (v > (P[k] || 0)) P[k] = v; };
@@ -417,6 +417,7 @@ export function carState (g) {
   if (u.lamps) for (const k of ['fl', 'fr', 'rl', 'rr']) { const c = u.lamps[k]; if (c) up(k, c.st ? 2 : c.cr ? 1 : 0); }
   if (u.cg && u.cg.panes) for (const p of u.cg.panes) out.glass[p.k] = Math.max(out.glass[p.k] || 0, Math.min(2, p.st || 0));
   out.dents = Math.max(0, u.dents || 0);
+  out.bumps = Math.max(0, u.bumps || 0);            // удары по кузову (cardent.js hit) — у «Семёрки» вмятин коробочный кузов не считает
   out.lost = [...lost];
   return out;
 }

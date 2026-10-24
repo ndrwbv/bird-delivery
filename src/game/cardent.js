@@ -118,6 +118,7 @@ const _v = new THREE.Vector3(), _d = new THREE.Vector3(), _c = new THREE.Vector3
 export function hit (g, lx, lz, force) {
   const u = g && g.userData;
   if (!u || !(u.see || u.dent) || !(force > DENT.MIN)) return;   // dent — подробная копия чужой машины (foewreck.js, 12ар)
+  if (u.see) u.bumps = (u.bumps || 0) + 1;         // своя: удар по кузову — в акт осмотра (shiftsteps.js carState, «удары»)
   const W = u.W || 1.8, hl = u.hl || 2.1;
   // сторона удара: морда / корма или бок — по тому, к какому краю точка ближе в долях габарита
   const end = Math.abs(lz) / hl >= Math.abs(lx) / (W / 2);

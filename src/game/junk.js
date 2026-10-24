@@ -30,6 +30,8 @@
 import * as THREE from '../vendor/three.module.min.js';
 import * as ZN from './zones.js';           // бандитский район — мусора у подъездов больше
 import * as DEBRIS from './debris.js';          // разлёт кучи мусора — куски из запаса (debris.js)
+import * as FVAR from './fencevar.js';          // вид контейнера по району (fencevar.js, М5 этап 2)
+import * as PV from './propvar.js';            // его форма — одной геометрией (propvar.js)
 import { CLEAN } from './mobile.js';             // телефон: мусора у подъездов втрое меньше, у контейнеров — без мешков рядом (11бз)
 
 /* числа — здесь; в docs/CAREER.md — они же словами */
@@ -290,7 +292,14 @@ function canParts (g, c, x, y, z, ry) {
   P(A.boxGeo(1.5, 0.08, 0.1), lid, 0, 1.0, 0.52);                     // ручка-обод
   for (const [a, b] of [[-0.55, -0.38], [0.55, -0.38], [-0.55, 0.38], [0.55, 0.38]]) P(A.boxGeo(0.14, 0.14, 0.14), '#1b1a1f', a, 0.07, b);
 }
-function canTpl (c) {
+function canTpl (c, sv) {
+  if (sv) {                                       // вариант (fencevar.js): шаблон на вид и краску
+    const k = sv.form + sv.hex + (sv.hex2 || '') + Math.round(sv.seed * 8);
+    if (CAN_TPL[k]) return CAN_TPL[k];
+    const g = PV.canGeo({ ...sv, seed: Math.round(sv.seed * 8) / 8 }, 0, 0, 0, 0);
+    g.computeVertexNormals();
+    return (CAN_TPL[k] = A.mergeGeos([g]));
+  }
   if (CAN_TPL[c]) return CAN_TPL[c];
   const g = [];
   canParts(g, c, 0, 0, 0, 0);
@@ -302,10 +311,17 @@ const cgKey = (x, z) => Math.floor(x / CG) + ',' + Math.floor(z / CG);
 /* поставить контейнер: в склейку мелочи (стоит — ничего не стоит) */
 export function can (x, z, ry, c) {
   const gy = A.groundH(x, z) + A.curbAt(x, z), g = [];
-  canParts(g, c, x, gy, z, ry);
-  A.smashAdd('can', x, z, CANS.R, g, CAN_HEX[c][0]);
+  let sv = FVAR.item('can', x, z, CAN_HEX[c][0]);      // вид по району (fencevar.js); null — ?nofvar, как было
+  if (sv && sv.form === 'metal' && !sv.hex2) sv = { ...sv, hex2: CAN_HEX[c][1] };
+  if (sv) {                                            // жребий — как от семи прежних коробок (город на зерне)
+    PV.burn(7);
+    sv.seed = Math.round(sv.seed * 8) / 8;             // мелочь вида (что в мусоре сверху) — 8 вариантов: шаблон сдвинутого — тот же
+    g.push(PV.canGeo(sv, x, gy, z, ry));
+  } else canParts(g, c, x, gy, z, ry);
+  A.smashAdd('can', x, z, CANS.R, g, sv ? sv.hex : CAN_HEX[c][0]);
   const it = lastSmash();
-  const o = { it, x, z, ry, c, x0: x, z0: z, ry0: ry, vx: 0, vz: 0, w: 0, tip: 0, tipV: 0, ax: 1, az: 0, dyn: null, fell: 0 };
+  it.fvk = 'can'; it.fvf = sv ? sv.form : '-'; it.fvr = ry;
+  const o = { it, x, z, ry, c, sv, x0: x, z0: z, ry0: ry, vx: 0, vz: 0, w: 0, tip: 0, tipV: 0, ax: 1, az: 0, dyn: null, fell: 0 };
   it.heavy = 1;
   it.junk = (q, nx, nz, force) => { detach(o); push(o, nx * force * 0.8, nz * force * 0.8, force); };   // взрыв рядом
   CANS_ALL.push(o);
@@ -321,7 +337,7 @@ export function can (x, z, ry, c) {
 function detach (o) {
   if (o.dyn) return;
   hide(o.it);
-  const m = new THREE.Mesh(canTpl(o.c), mat('vc'));
+  const m = new THREE.Mesh(canTpl(o.c, o.sv), mat('vc'));
   A.scene.add(m);
   o.dyn = m;
   o.rest = 0;
