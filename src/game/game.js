@@ -222,6 +222,7 @@ import * as P3D from './pickups3d.js';            // деньги, золото�
 import * as CROOF from './camroof.js';         // камера сзади под аркой и мостом — ниже свода и ближе (camroof.js, 0п40)
 import * as CLOOK from './camlook.js';          // осмотреться: правая кнопка мыши / правый стик / палец по экрану (camlook.js, CAREER.md «Камера: три вида»)
 import * as HCAM from './handcam.js';           // вручение в кадре: камера на клиента, сцена крупным планом перед разговором (handcam.js, 11бд)
+import * as FPD from './fpdeliver.js';          // доставка от первого лица, проба ?fpdeliver: из машины → багажник → к двери подъезда (fpdeliver.js, Д2)
 import * as ST3 from './minigames/stairs3d.js';  // подъезд в 3D (12ас): пока он открыт, этот же рендерер рисует его вместо города (stairs3d.js)
 import * as CV from './camview.js';             // три вида камеры: сзади высоко, сзади близко, из-за руля (camview.js, docs/CAREER.md «Камера: три вида»)
 import * as REPLAY from './replay.js';         // повтор последних 10 с, ролик в «Видео» — выкл с 23.10.2026 (RP.ON, ?replay); тряска на аварии (replay.js, docs/CAREER.md «Повтор»)             // реплики над головами: читаемая плашка, крупнее вблизи, не больше нескольких (talk.js)
@@ -13170,6 +13171,11 @@ HCAM.init({ THREE, cam, scene, V, S, IN, pad: PAD, car: () => car, mode: () => C
   cabOut: () => { car.visible = true; FPV.hid = 0; CV.undraw(); } });
 DLG.gate(HCAM.gate);                              // окно разговора с клиентом сразу после вручения — сначала сцена
 /* подъезд в 3D (minigames/stairs3d.js, 12ас): люди — как в городе, но не в «дальних» (humanLod считает от камеры города) */
+/* доставка от первого лица (fpdeliver.js, Д2, проба ?fpdeliver): перед подъездом — глазами курьера от машины до двери */
+FPD.init({ THREE, cam, scene, V, S, pad: PAD, car: () => car, groundH, courier: () => STORY.PERSON.courier(), box: n => pizzaBox(n),
+  door: (x, z) => nearEntrance(x, z, ECON.DOOR.DOOR_R), setTrunk, trunk: () => trunkPoint(), seatOf: t => CEX.DEBUG.seatOf(t),
+  driver: on => { const g = DRIVER.DEBUG.of(car); if (g) g.visible = !!on; }, mode: () => CV.mode(),
+  cabOut: () => { car.visible = true; FPV.hid = 0; CV.undraw(); } });
 ST3.init({ THREE, renderer, human: (p, o) => { const g = makeHuman(p, o); HUMANS.delete(g); return g; }, drop: dropMesh,
   courier: () => STORY.PERSON.courier(), box: n => pizzaBox(n) });
 
@@ -13186,7 +13192,7 @@ function camStep (dt, vf) {
      глаза водителя — над сиденьем, взгляд вперёд по ходу. Остальные камеры (смерть, повтор)
      возвращают машину сами: FPV.hid сбрасывается в начале кадра. */
   const own = car.userData.real && REALCAR.REAL.ownCab;   // свой салон настоящей модели — выключен: из-за руля салон игры (camview.js)
-  const near = FPV.on && own ? 0.05 : 0.4;   // в салоне руль в полуметре — ближняя граница кадра ближе
+  const near = (FPV.on && own) || FPD.busy() ? 0.05 : 0.4;   // в салоне руль в полуметре — ближняя граница кадра ближе
   if (cam.near !== near) { cam.near = near; cam.updateProjectionMatrix(); }
   if (CARLAB.orbit !== null && !FPV.on) {          // песочница машин: облёт
     V.hero = 0;
@@ -17150,6 +17156,7 @@ if (CAREER) DOOR.init({ ORD, S, Store, ADULT, Snd, money, root: () => $('game') 
   entranceLv, shiftsDone: () => +Store.get('dlv-shifts', 0) || 0, onShiftStart: CAREERM.onShiftStart,
   respect: why => RESPECT.gain(why), hintFind,
   guestIn, guestOut, guestMove, SPOTS, nearestRoad, routeLen, realAddress,
+  fpWalk: st => FPD.run(st),                       // от первого лица до двери подъезда (fpdeliver.js, ?fpdeliver)
   handScene: (st, onTime) => { const ped = st && st.peds && st.peds[0]; return ped ? HCAM.scene(ped, { onTime, give: () => preBox(ped) }) : null; },   // сцена перед разговором (handcam.js)
   rehuman: (p, person) => { dropMesh(p.grp); p.grp = makeHuman(person); p.person = p.grp.userData.person; p.speed = p.base * p.grp.userData.pace; scene.add(p.grp); } });   // разговор у двери: клиент в мире — как портрет «под роль» (doorstep.js)   // клиент дома / не дома (doorstep.js plan, «клиент не дома»)
 if (CAREER) WRONG.init({ S, V, ADULT, CHAT, NICK, DIST, ZN, SPOTS, routeLen, realAddress, guestMove, nearestRoad,
@@ -18382,11 +18389,12 @@ function frameStep (now) {
     car.rotation.y = V.h;
   } else {
     briefStep(dt);                                 // пицца уже в багажнике, а накладная ещё висит — досчитать её время
-    if (DOOR.on() || dlgHold || HCAM.busy()) holdCar(dt);   // домофон (doorstep.js), окно разговора (dialog.js), сцена вручения (handcam.js): руль из рук, машина стоит
+    if (DOOR.on() || dlgHold || HCAM.busy() || FPD.busy()) holdCar(dt);   // от первого лица к подъезду (fpdeliver.js); домофон (doorstep.js), окно разговора (dialog.js), сцена вручения (handcam.js): руль из рук, машина стоит
     vf = driveSub(dt);
     camStep(dt, vf);
     CV.jolt(dt, FPV.on ? 'cab' : CV.mode());       // удар — камера «клюёт» вперёд (camview.js, 11би)
     HCAM.step(dt);                                 // вручение в кадре: поворот на клиента / сцена (handcam.js)
+    FPD.step(dt);                                  // от первого лица: из машины → багажник → к двери подъезда (fpdeliver.js, ?fpdeliver)
   }
   SEE.step(dt, V.x, V.y, V.z, !FPV.on && S.state !== 'title' && S.state !== 'over');   // между камерой и машиной — тает (seethru.js)
 
@@ -18439,7 +18447,7 @@ function frameStep (now) {
   CL.step('crashfx', CRASH.step, dt, car);
   CL.step('carwreck', WRECK.step, dt);                                   // болтающиеся детали — качаются на ходу (carwreck.js)
   CL.step('foewreck', FW.step, dt);                                      // чужие машины: качка автобусов, водитель за рулём, дальние копии — назад (foewreck.js)                               // крышки от удара: открылись — захлопнулись (crashfx.js)
-  CL.step('carrear', REARM.step, dt, car, pizzasInCar());               // коробки в открытом багажнике (carrear.js)
+  CL.step('carrear', REARM.step, dt, car, Math.max(0, pizzasInCar() - FPD.taken()));   // коробки в открытом багажнике (carrear.js); взятые в руки (fpdeliver.js) — уже не там
   CL.step('routeline', updateRouteLine, dt);                            // оранжевый маршрут на асфальте
   CL.step('tracks', TRK.step, dt);                                   // следы колёс на газоне и снегу (tracks.js)
   CL.step('hints', HINTS.step, dt);                                 // подсказки первой смены строкой внизу (hints.js)
@@ -18781,6 +18789,7 @@ if (window.__dlv) window.__dlv.CSH = CSH.DEBUG;
 if (window.__dlv) window.__dlv.sayBubble = sayBubble;   // облачко над кем угодно (проверка «мягких краёв»: буквы не мылятся, fxaa.js)
 if (window.__dlv) window.__dlv.LIKES = LIKES.DEBUG;   // что нравится игроку: all, w(g, id), no / yes, slow(g), reset() (likes.js)
 if (window.__dlv) window.__dlv.FSH = FSH.DEBUG;   // поддельные тени: FS — числа, ST — замеры, off(), redraw() (fakeshadows.js)
+if (window.__dlv) window.__dlv.FPD = FPD.DEBUG;     // от первого лица к подъезду (fpdeliver.js)
 if (window.__dlv) window.__dlv.HCAM = HCAM.DEBUG;   // вручение в кадре (handcam.js)
 if (window.__dlv) window.__dlv.DOOR = DOOR.DEBUG;   // домофон у подъезда: force(mode), solve(), last (doorstep.js)   // тень под машиной (carshadow.js)
 if (window.__dlv) window.__dlv.STREAMS = STREAMS.DEBUG;   // речки и пруды: где вода, глубина, сколько чего (streams.js)

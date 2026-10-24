@@ -5,7 +5,8 @@
 import './styles/delivery.css';
 import './input/padmenu.css';
 import './styles/paper.css';            // стиль «как накладная»: бумага, чек, штамп, печать, стикер (П0)
-import './input/glyphs.js';             // значки кнопок по текущему вводу (A / Enter / тап)
+import './game/hudpaper.css';       // хад-ценники и записка подсказки как накладная (clarity c8)
+import './input/glyphs.js';            // значки кнопок по текущему вводу (A / Enter / тап)
 import './game/orient.js';              // телефон — только боком: стоя — заставка «поверни телефон» (сразу, ещё на экране загрузки)
 import Platform from './platform/index.js';
 import * as CRASH from './platform/crashlog.js';

@@ -64,6 +64,8 @@ const SR = ECON.STAIRS;
 const MG = ECON.DOORGAME;
 export const ZHENYA_KEY = 'dlv-zhenya-off';
 const KEY = 'dlv-doorgames';
+/* проба «доставка от первого лица» (Д2, fpdeliver.js): с ?fpdeliver подъезд — на каждом подходящем адресе, перед ним — шаги от машины */
+const FPDELIVER = typeof location !== 'undefined' && /[?&]fpdeliver\b/.test(location.search || '');
 let A = null;
 const G = { cur: null, step: null, pad: null, force: null, n: 0, last: null, host: null };
 const TG = { force: null, n: 0, last: null };   // разговор: сколько за смену
@@ -154,6 +156,14 @@ export function plan (o) {
     if (st && A.guestIn && A.guestIn(st)) st.mgIn = true;
     return null;
   }
+  if (FPDELIVER && !o.mg && planOk(o)) for (const st of o.stops) {      // проба ?fpdeliver: подъезд везде, где можно, без часов
+    if (st.done || !stopOk(o, st) || st.peds.length !== 1) continue;
+    const at = st.at || st.peds[0];
+    if (A.entranceLv(at.x, at.z) < SR.LV) continue;
+    st.mgPlan = 'stairs'; st.fpPlan = true;
+    if (A.guestIn && A.guestIn(st)) st.mgIn = true;
+    return 'stairs';
+  }
   if (!due() || o.mg || A.shiftsDone() < MG.FROM_SHIFT || !planOk(o)) return null;
   for (const st of o.stops) {
     if (st.done || !stopOk(o, st)) continue;
@@ -191,9 +201,12 @@ function arrive (ev) {
   else if (st.mgPlan) {
     const k = st.mgPlan;
     st.mgPlan = null;
-    const late = !ev.onTime || (A.S && !A.S.free && A.S.time < MG.MIN_LEFT);
-    if (late || !enabled() || ev.order.mg) TM.t = Math.max(TM.t, TM.next);   // не сыграли — часы снова подошли
-    else r = k === 'door' ? door(ev) : k === 'stairs' ? stairs(ev) : talk(ev);
+    if (st.fpPlan) { st.fpPlan = false; r = stairs(ev, true); }   // проба ?fpdeliver: и опоздав, и в первую смену
+    else {
+      const late = !ev.onTime || (A.S && !A.S.free && A.S.time < MG.MIN_LEFT);
+      if (late || !enabled() || ev.order.mg) TM.t = Math.max(TM.t, TM.next);   // не сыграли — часы снова подошли
+      else r = k === 'door' ? door(ev) : k === 'stairs' ? stairs(ev) : talk(ev);
+    }
   }
   if (!r) { out(st); return; }
   // домофон и подъезд — клиент за дверью; после мини-игры (не «не дома») — выходит к двери за пиццей
@@ -296,6 +309,9 @@ function stairs (ev, forced) {
   if (!h || fo.floor || fo.lv || fo.per || fo.entr) { st.home = Object.assign(STAIRS_PLAN(Object.assign({ lv: lvH }, fo, { gop: false })), { lv: fo.lv || lvH }); st.home.flat = String(st.home.flat); h = st.home; }
   const opt = Object.assign({}, fo, { lv: h.lv, floor: h.floor, per: h.per, entr: h.entr, door: h.door, gop });
   if (ln) { opt.learn = ln; opt.time = STAIRS_PLAN(Object.assign({}, opt, { time: fo.time })).time * ln.k; }
+  // проба ?fpdeliver (fpdeliver.js): сначала глазами курьера — из машины, пицца из багажника, к двери подъезда
+  const fp = A.fpWalk && A.fpWalk(st);
+  if (fp) return fp.then(() => (A.S && A.S.state === 'drive' && A.S.order === o ? playStairs(st, o, opt) : undefined));
   return playStairs(st, o, opt);
 }
 
