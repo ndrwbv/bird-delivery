@@ -40,6 +40,7 @@ import * as DLG from './dialog.js';
 import * as ZN from './zones.js';
 import * as DIST from './districts.js';
 import * as FEST from './festivals.js';
+import * as PZ from './pzevents.js';              // событие пиццерии района: часть заказов — «заказ события» с надбавкой (pzevents.js)
 import * as HOL from './holidays.js';            // праздничная смена: оливье-пицца, «к бою курантов», корпоратив, чаевые щедрее (holidays.js)
 import * as CYCLE from './seasoncycle.js';      // первая смена сезона: сезонные пиццы, оплата ×k (seasoncycle.js perk)
 import * as HURR from './hurricane.js';          // дома, унесённые ураганом: их адреса не выдаём (hurricane.js blocked)
@@ -697,6 +698,8 @@ function finishSpec (spec, forced, hAt) {
   if (!spec.story && !SIM) { const bk = (spec.fest && spec.fest.burger) || FEST.burgerRoll(); if (bk) spec.burger = bk; }   // заказ на сам митинг — всегда «едят за двоих»
   // праздник (holidays.js): обычная пицца — иногда праздничная (оливье-пицца), оплата ×k
   if (!spec.story && !SIM && !spec.hol && !spec.fest && !spec.beach && !spec.bundle && !spec.urgent && spec.type === 'pizza') { const h = HOL.olivier() || CYCLE.perk(); if (h) spec.hol = h; }   // не праздник — может быть сезонная (seasoncycle.js)
+  // событие пиццерии (pzevents.js): в окне события часть обычных пицц — «заказ события», оплата ×k
+  if (!spec.story && !SIM && !spec.hol && !spec.fest && !spec.beach && !spec.bundle && !spec.urgent && spec.type === 'pizza') { const pz = PZ.tag(); if (pz) spec.pz = pz; }
   spec.n = ++SH.gen;
   // ритм размеров (sizeRoll): сколько было после разминки, сколько пицц в прошлом; серия одного вида (kindRoll)
   const size = spec.bundle ? spec.stops.length : 1;
@@ -795,6 +798,7 @@ function whyOf (sp) {
   if (sp.story) return sp.story.why || t('особый заказ');
   if (sp.fest) return sp.fest.why;
   if (sp.beach) return t('пляж: клиент загорает на полотенце · на песке машина вязнет');
+  if (sp.pz) return sp.pz.why;                      // событие пиццерии (pzevents.js)
   if (sp.hol) return HOL.why(sp.hol, { n: sp.stops.length, k: fmtK((sp.urgent ? PAY.URGENT : 1) * sp.hol.k) });   // праздник (holidays.js)
   const z = t(ZONE_LABEL[sp.zone] || ZONE_LABEL.normal);
   if (sp.urgent) return t('срочно: времени в обрез · оплата ×{k} · не успеешь — штраф', { k: fmtK(PAY.URGENT) });
@@ -833,6 +837,9 @@ export function setup (plan) {
   // праздничный заказ (holidays.js): надбавка — в цене остановки; в накладной — праздничная пицца
   sp.holAdd = sp.hol && sp.hol.k > 1 ? sp.fees.map(f => Math.round(f * (sp.hol.k - 1) / 10) * 10) : null;
   if (sp.holAdd) sp.fees = sp.fees.map((f, i) => f + sp.holAdd[i]);
+  // заказ события пиццерии (pzevents.js): надбавка — в цене остановки, отдельной строкой в накладной
+  sp.pzAdd = sp.pz && sp.pz.k > 1 ? sp.fees.map(f => Math.round(f * (sp.pz.k - 1) / 10) * 10) : null;
+  if (sp.pzAdd) sp.fees = sp.fees.map((f, i) => f + sp.pzAdd[i]);
   if (sp.hol && sp.hol.item) o.items = o.stops.reduce((n, st) => n + (st.boxes > 1 ? st.boxes : Math.max(1, st.peds.length)), 0) + ' × ' + sp.hol.item;
   S.fee = sp.fees.reduce((a, b) => a + b, 0);
   // оплата и район — на самой остановке: в сборном игрок развозит в своём порядке, o.stops переставляются
@@ -936,11 +943,13 @@ export function cardRows (order) {
   const far = (sp.far || []).reduce((a, b) => a + b, 0);
   const brg = (sp.burgerAdd || []).reduce((a, b) => a + b, 0);
   const hol = (sp.holAdd || []).reduce((a, b) => a + b, 0);
+  const pzv = (sp.pzAdd || []).reduce((a, b) => a + b, 0);
   return [
     // оплата — крупно, это главное число накладной; «срочно» тут не пишем — есть печать и шапка
     [t('оплата'), '<b class="oc-pay">' + A.money(S.fee) + '</b>'],
     ...(far > 0 ? [[t('за дальний'), '<b class="oc-far">+' + A.money(far) + '</b>' + ' · ' + esc(t('премия, уже в оплате'))]] : []),
     ...(brg > 0 ? [[t('едят за двоих'), '<b class="oc-far">+' + A.money(brg) + '</b>' + ' · ' + esc(t('митинг в поддержку ожирения, уже в оплате'))]] : []),
+    ...(pzv > 0 ? [[sp.pz.label, '<b class="oc-far">+' + A.money(pzv) + '</b>' + ' · ' + esc(t('{name}, уже в оплате', { name: sp.pz.name }))]] : []),
     ...(hol > 0 ? [[sp.hol && sp.hol.label ? t(sp.hol.label) : t('к празднику'), '<b class="oc-far">+' + A.money(hol) + '</b>' + ' · ' + esc(t('{name}, уже в оплате', { name: (sp.hol && sp.hol.name ? t(sp.hol.name) : HOL.name()) || t('праздник') }))]] : []),
   ];
 }

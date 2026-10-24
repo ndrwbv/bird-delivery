@@ -104,6 +104,7 @@ import * as WORK from './workout.js';         // площадки-качалки
 import * as KITES from './kites.js';          // воздушные змеи и дроны в парках и на Ленина (kites.js)
 import * as AUTO from './cars.js';               // карьера: 14 машин, мотор и ресурс, заглохла, ямы, гараж Дяди Жени
 import * as SUIT from './burgersuit.js';         // бургеры на улицах — люди в ростовых костюмах (12ап, burgersuit.js)
+import * as PZE from './pzevents.js';              // событие пиццерии района на смену: свадьба, марафон, дорожники… (pzevents.js)
 import * as FEST from './festivals.js';          // фестивали на парковках ТЦ: кальянщики, тыква, митинг в поддержку ожирения (festivals.js)
 import * as HOL from './holidays.js';            // праздничная смена: Новый год — гирлянды, Деды Морозы, салют, праздничные заказы (holidays.js)
 import * as CYCLE from './seasoncycle.js';      // сезоны по кругу с зимы: переходы, сюрпризы, прогноз Толика, календарик в чеке (seasoncycle.js)
@@ -13174,7 +13175,7 @@ DLG.gate(HCAM.gate);                              // окно разговора
 /* доставка от первого лица (fpdeliver.js, Д2, проба ?fpdeliver): перед подъездом — глазами курьера от машины до двери */
 FPD.init({ THREE, cam, scene, V, S, pad: PAD, car: () => car, groundH, courier: () => STORY.PERSON.courier(), box: n => pizzaBox(n),
   door: (x, z) => nearEntrance(x, z, ECON.DOOR.DOOR_R), setTrunk, trunk: () => trunkPoint(), seatOf: t => CEX.DEBUG.seatOf(t),
-  driver: on => { const g = DRIVER.DEBUG.of(car); if (g) g.visible = !!on; }, mode: () => CV.mode(),
+  driver: on => { const g = DRIVER.DEBUG.of(car); if (g) g.visible = !!on; }, mode: () => CV.mode(), Snd,   // Snd — пики домофона (Д3)
   cabOut: () => { car.visible = true; FPV.hid = 0; CV.undraw(); } });
 ST3.init({ THREE, renderer, human: (p, o) => { const g = makeHuman(p, o); HUMANS.delete(g); return g; }, drop: dropMesh,
   courier: () => STORY.PERSON.courier(), box: n => pizzaBox(n) });
@@ -16668,6 +16669,7 @@ function startRun (ride) {
   S.lvl0 = levelOf(getXP());
   if (CAREER) RAID.shiftStart({ ride: S.ride, quick: QR.on() });   // налёт на точку в эту смену? (raid.js)
   if (CAREER) { FEST.shiftStart({ ride: S.ride, quick: QR.on(), holiday: !!HOL.active() }); if (!S.ride) FEST.announce(); }   // фестиваль в эту смену? в праздник — нет (festivals.js)
+  if (CAREER && !INTRO) PZE.shiftStart({ ride: S.ride, quick: QR.on(), busy: !!HOL.active() || !!FEST.active(), dist: DIST.cur(), shifts: +Store.get('dlv-shifts', 0) || 0 });   // событие пиццерии: у каждой — своё (pzevents.js)
   if (CAREER && !S.ride) HOL.announce();         // праздник: Толик объявляет в чате (holidays.js)
   if (CAREER && !S.ride && !INTRO) CYCLE.announce();   // новый сезон, переход, сюрприз — Толик в чате; накануне стыка — прогноз (seasoncycle.js)
   if (CAREER && !S.ride) CAREERM.startShift();   // часы — на 9:00, обед, звёзды за смену; волна щедрости (districts.js)
@@ -17404,6 +17406,7 @@ if (!INTRO) LATE.add('hookah', () => HK.init({ THREE, scene, BENCHES, V, S, ADUL
 if (!INTRO && CAREER) FEST.init({ THREE, scene, V, S, CITY, ADULT, Store, obb, SOLIDS, indexSolids, NODES, TRAFFIC, parkOut: t => { if (t.still) { t.still = 0; PARKI.out(t, true); } }, put, mergeGeos, groundH, inHouse, inPoly, nearestRoad, solidAt,
   makeHuman, makePerson, dropMesh, sayBubble, fxAdd, puffGeo, steam, gibBurger, popBonus, toast, chat: s => CHAT.say(s), addWallet, money, CASH, Snd, CAR_L, CAR_W, HEROES, DIST,
   season: () => SEAS.seasonValue() });   // фестивали на парковках ТЦ (festivals.js)
+if (!INTRO && CAREER) PZE.init({ Store, S, ADULT, hour: () => CAREERM.hour(), chat: s => CHAT.say(s), sayBubble, onArrive: cb => ORD.onArrive(cb) });   // события пиццерий (pzevents.js)
 if (!INTRO && CAREER) CYCLE.init({ Store, ADULT, chat: s => CHAT.say(s), playing: isPlaying });   // круг сезонов (seasoncycle.js)
 if (!INTRO && CAREER) HOL.init({ THREE, scene, cam, renderer, Store, CITY, ADULT, V, S, groundH, inBounds, inHouse, inPoly, sayBubble, get PIZZA () { return PIZZA; },
   night: () => ENV.night || 0, hour: () => CAREERM.hour(), env: () => ENV, playing: isPlaying, chat: s => CHAT.say(s), onArrive: cb => ORD.onArrive(cb),
@@ -18439,6 +18442,7 @@ function frameStep (now) {
   CL.at.ph = 'world';
   CL.step('smokers', updateSmokers, dt);
   CL.step('hookah', HK.step, dt);                                    // кальянщики на лавочках
+  if (CAREER && !INTRO) CL.step('pzevents', PZE.step, dt);               // событие пиццерии: начало окна — строка в чат (pzevents.js)
   if (CAREER) CL.step('festivals', FEST.step, dt);                    // фестиваль на парковке ТЦ (festivals.js)
   if (CAREER && !INTRO) CL.step('holidays', HOL.step, dt);            // праздник: украшения строятся, салют, костюмы (holidays.js)
   CL.step('parties', updateParties, dt);
