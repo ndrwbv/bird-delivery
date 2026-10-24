@@ -1,0 +1,221 @@
+{
+ "box": {
+  "min": [
+   -0.9498471617698669,
+   -1.5693200826644897,
+   -2.1514835357666016
+  ],
+  "max": [
+   0.9498487114906311,
+   -0.000581933360081166,
+   2.528379440307617
+  ]
+ },
+ "parts": [
+  {
+   "name": "kopeika_kopeika_0",
+   "file": "kopeika_kopeika.png",
+   "pivot": null,
+   "role": "body",
+   "blend": false,
+   "alpha": 1,
+   "pos": [
+    0,
+    8100
+   ],
+   "uv": [
+    32400,
+    5400
+   ],
+   "idx": [
+    54000,
+    8067,
+    2
+   ]
+  },
+  {
+   "name": "winF",
+   "file": null,
+   "pivot": null,
+   "role": null,
+   "blend": true,
+   "alpha": 0.14,
+   "pos": [
+    70136,
+    60
+   ],
+   "uv": [
+    70376,
+    40
+   ],
+   "idx": [
+    70536,
+    48,
+    2
+   ]
+  },
+  {
+   "name": "winB",
+   "file": null,
+   "pivot": null,
+   "role": null,
+   "blend": true,
+   "alpha": 0.14,
+   "pos": [
+    70632,
+    45
+   ],
+   "uv": [
+    70812,
+    30
+   ],
+   "idx": [
+    70932,
+    36,
+    2
+   ]
+  },
+  {
+   "name": "winL",
+   "file": null,
+   "pivot": null,
+   "role": null,
+   "blend": true,
+   "alpha": 0.14,
+   "pos": [
+    71004,
+    69
+   ],
+   "uv": [
+    71280,
+    46
+   ],
+   "idx": [
+    71464,
+    45,
+    2
+   ]
+  },
+  {
+   "name": "winR",
+   "file": null,
+   "pivot": null,
+   "role": null,
+   "blend": true,
+   "alpha": 0.14,
+   "pos": [
+    71556,
+    69
+   ],
+   "uv": [
+    71832,
+    46
+   ],
+   "idx": [
+    72016,
+    45,
+    2
+   ]
+  },
+  {
+   "name": "wheelLF",
+   "file": "kopeika_kopeika.png",
+   "pivot": [
+    0.7762489914894104,
+    -1.242433249950409,
+    1.828493893146515
+   ],
+   "role": "wheel",
+   "blend": false,
+   "alpha": 1,
+   "pos": [
+    72108,
+    324
+   ],
+   "uv": [
+    73404,
+    216
+   ],
+   "idx": [
+    74268,
+    432,
+    2
+   ]
+  },
+  {
+   "name": "wheelRF",
+   "file": "kopeika_kopeika.png",
+   "pivot": [
+    -0.786247581243515,
+    -1.242433249950409,
+    1.8284910321235657
+   ],
+   "role": "wheel",
+   "blend": false,
+   "alpha": 1,
+   "pos": [
+    75132,
+    324
+   ],
+   "uv": [
+    76428,
+    216
+   ],
+   "idx": [
+    77292,
+    432,
+    2
+   ]
+  },
+  {
+   "name": "wheelLB",
+   "file": "kopeika_kopeika.png",
+   "pivot": [
+    0.7762492895126343,
+    -1.2331750690937042,
+    -0.9814910292625427
+   ],
+   "role": "wheel",
+   "blend": false,
+   "alpha": 1,
+   "pos": [
+    78156,
+    324
+   ],
+   "uv": [
+    79452,
+    216
+   ],
+   "idx": [
+    80316,
+    432,
+    2
+   ]
+  },
+  {
+   "name": "wheelRB",
+   "file": "kopeika_kopeika.png",
+   "pivot": [
+    -0.7862472534179688,
+    -1.2331750690937042,
+    -0.9814939498901367
+   ],
+   "role": "wheel",
+   "blend": false,
+   "alpha": 1,
+   "pos": [
+    81180,
+    324
+   ],
+   "uv": [
+    82476,
+    216
+   ],
+   "idx": [
+    83340,
+    432,
+    2
+   ]
+  }
+ ]
+}
