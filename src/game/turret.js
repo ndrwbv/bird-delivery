@@ -171,7 +171,6 @@ function fire (h, c) {
   STATS.lastTgt = c.rival ? 'foe' : c.bcar ? 'bcar' : 'car';
   if (ST.ammo <= 0 && !ST.emptyHint && A.toast) {
     ST.emptyHint = true;
-    A.toast(adult ? t('гранаты кончились — новый ящик в следующую смену') : t('вода в водомёте кончилась — нальют в следующую смену'));
   }
 }
 function dropFly (f) {

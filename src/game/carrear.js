@@ -38,6 +38,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 import { BODY } from './carbody.js';
+import * as TFILL from './trunkfill.js';      // 11бт: багажник «Семёрки» изнутри — тёмная обивка и мелочи
 
 const CORNER = BODY.CORNER;
 
@@ -298,8 +299,9 @@ export function step (dt, car, n) {
     d.m.position.y = hy + Math.cos(d.a) * d.h / 2;
     d.m.position.z = d.p.z - Math.sin(d.a) * d.h / 2;
   }
-  if (!m) return;
   const open = !!(tr && (tr.a > 0.03 || tr.lost) || d && (d.a > 0.03 || d.lost));   // крышку / дверь сорвало (cardent.js, carwreck.js) — коробки видно всегда
+  if (u && u.real) TFILL.step(car, open);           // 11бт: тёмная обивка и мелочи под крышкой «Семёрки» (trunkfill.js)
+  if (!m) return;
   const k = open ? Math.max(0, Math.min(m.userData.max || REAR.PIZZAS, n | 0)) : 0;
   m.visible = k > 0;
   if (m.visible) m.geometry.setDrawRange(0, k * m.userData.per);

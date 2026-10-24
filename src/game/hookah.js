@@ -17,6 +17,7 @@
         fxAdd, puffGeo, steam, toast, Snd, CAR_L, CAR_W, nearestRoad, t */
 
 import { part as fxPart } from './fxpool.js';    // частицы из общего запаса (fxpool.js)
+import { benchSeat } from './propvar.js';        // высота сиденья лавочки — сидящие на ней (0п75)
 import * as HITS from './hits.js';               // лавочку снесли — сидевшие падают с неё и встают (hits.js fall)
 
 const SPAWN_R = 230, DROP_R = 320;
@@ -106,7 +107,7 @@ function seatOne (s, i) {
     // сидящие — лицом вперёд, как лавочка; стоящий — к кальяну
     const h = frontOf(b, 1.05);
     grp.rotation.y = sit ? b.ry : Math.atan2(h.x - x, h.z - z);
-    if (sit) { grp.userData.legL.rotation.x = -1.45; grp.userData.legR.rotation.x = -1.45; }
+    if (sit) { grp.userData.legL.rotation.x = -1.45; grp.userData.legR.rotation.x = -1.45; grp.userData.qSeat = benchSeat(b); }   // таз — на доске (0п75)
     A.scene.add(grp);
     s.people.push(p);
   }

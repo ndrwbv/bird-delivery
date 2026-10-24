@@ -28,6 +28,8 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { QDATA } from './qpeople.data.js';
 import { QCLIPS } from './qpeople.clips.js';      // добавочные клипы (наклон «Interact» — поднять с земли), tools/quaternius/clipadd.py
+import { BOX as PBOX_DIM } from './pizzabox.js';   // размер коробки в руках (0п54)
+const BOX_H = PBOX_DIM.H;
 
 const SRCH = typeof location !== 'undefined' ? location.search || '' : '';
 export const QP = { on: !/[?&]qp=0\b/.test(SRCH), all: !/[?&]qpmix\b/.test(SRCH), rate: 0.34, built: 0, posed: 0, walk: 0, combos: 0, carry: 0 };
@@ -545,7 +547,10 @@ function clipPose (st, c, fi, loop, w, skip) {
    плечи вперёд на ARM, локти согнуты на ELB (предплечья почти горизонтально), чуть внутрь (IN); коробка лежит на кистях
    модели (Y — м над запястьями), не ближе ZMIN м перед осью тела (задний край — перед животом). Ходьба художника рукам
    не машет. Так держат все: клиент у двери, на лавочке, по дороге домой, в катсценах */
-export const CARRY = { ARM: -0.5, ELB: -1.0, IN: 0.1, Y: 0.035, ZMIN: 0.47 };
+/* сидит на лавочке (0п75): таз над доской сиденья, м; насколько сдвинут назад к спинке от середины лавочки, м */
+export const SIT = { PAD: 0.07, BACK: 0.17 };
+const SQ = new THREE.Quaternion();
+export const CARRY = { ARM: -0.5, ELB: -1.0, IN: 0.1, Y: 0.035, ZMIN: 0.36 };
 const CQL = new THREE.Quaternion().setFromEuler(new THREE.Euler(CARRY.ARM, 0, CARRY.IN)), CQR = new THREE.Quaternion().setFromEuler(new THREE.Euler(CARRY.ARM, 0, -CARRY.IN));
 function carriedBox (st) {
   const g = st.g;
@@ -586,7 +591,7 @@ function poseHook () {
   // игра машет ему ногами (идёт), а не стоит / сидит / лежит / едет в машине
   st.swing = Math.max(st.swing * Math.exp(-dt * 3), Math.abs(u.legL.rotation.x), Math.abs(u.legR.rotation.x));
   const sitting = u.legL.rotation.x < -0.8 && u.legR.rotation.x < -0.8;
-  const walking = !st.noWalk && st.v > 0.25 && st.v < 7 && st.swing > 0.08 && !sitting && Math.abs(st.g.rotation.x) < 0.3 && Math.abs(st.g.rotation.z) < 0.3;
+  const walking = !st.noWalk && !u.qRide && st.v > 0.25 && st.v < 7 && st.swing > 0.08 && !sitting && Math.abs(st.g.rotation.x) < 0.3 && Math.abs(st.g.rotation.z) < 0.3;
   st.w += ((walking ? 1 : 0) - st.w) * Math.min(1, dt * 6);
   // наши кости → кости модели
   const dq = st.dq;
@@ -601,6 +606,19 @@ function poseHook () {
   a.elbL = elb(u.armL.rotation.x); a.elbR = elb(u.armR.rotation.x);
   const box = !u.qAnim && !st.noWalk ? carriedBox(st) : null;   // несёт коробку: руки вперёд, коробка — на кистях (CARRY)
   if (box) { if (J.armL >= 0) dq[J.armL] = CQL; if (J.armR >= 0) dq[J.armR] = CQR; a.elbL = a.elbR = CARRY.ELB; }
+  // сидит на лавочке (u.qSeat — высота сиденья над землёй, м; группу игра, как всем сидящим, ставит на 0,42 над землёй):
+  // таз — на доске (SIT.PAD над ней), бёдра вниз к коленям ровно настолько, чтобы голень встала отвесно, а ступня — на
+  // землю; сдвинут к спинке на SIT.BACK (0п75, автор 24.10: «буквально левитируют на лавочке»). Водители, мопедисты — без qSeat, как было
+  let seatH = 0;
+  if (sitting && u.qSeat && J.legL >= 0 && J.kneeL >= 0 && J.footL >= 0 && !u.qAnim) {
+    const L = F.LEG || (F.LEG = { a: F.RP[J.kneeL].distanceTo(F.RP[J.legL]), b: F.RP[J.footL].distanceTo(F.RP[J.kneeL]), c: F.RP[J.footL].y - F.y0 });
+    const sc = st.k * (st.g.scale.y || 1);
+    seatH = u.qSeat + SIT.PAD;
+    const th = Math.acos(Math.max(-1, Math.min(1, (seatH - (L.b + L.c) * sc) / (L.a * sc))));
+    SQ.setFromAxisAngle(AX, -th);
+    dq[J.legL] = SQ; if (J.legR >= 0) dq[J.legR] = SQ;
+    a.kneeL = a.kneeR = th;
+  }
   if (!F.WQ) { F.WQ = F.RQ.map(x => x.clone()); F.WP = F.RP.map(x => x.clone()); }   // повороты и места в мире — черновик на семейство (нужны только внутри solve)
   solve(F, dq, a, F.WQ, F.WP, st.bones);
   // анимация художника, которую задаёт игра (hits.js fallStep: падает навзничь, лежит, встаёт, грозит кулаком;
@@ -647,7 +665,14 @@ function poseHook () {
   // сидит (обе ноги вперёд): игра сажает по тазу коробочного человека (0,7 над подошвой), у модели таз выше — опустить
   const sit = Math.max(0, Math.min(1, (-Math.max(u.legL.rotation.x, u.legR.rotation.x) - 0.8) / 0.5));
   if (st.hip === undefined) st.hip = J.legL >= 0 ? (F.RP[J.legL].y - F.y0) * st.k - 0.7 : 0;
-  st.root.position.y = st.y0 + (st.noWalk ? 0 : st.lift / (st.g.scale.y || 1)) - sit * st.hip;
+  if (seatH) {                                      // на лавочке: тазобедренный сустав — на seatH над землёй (группа — на 0,42)
+    const gs = st.g.scale.y || 1;
+    st.root.position.y = st.y0 + (seatH - 0.42) / gs - (F.RP[J.legL].y - F.y0) * st.k;
+    st.root.position.z = -SIT.BACK / gs;
+  } else {
+    st.root.position.y = st.y0 + (st.noWalk ? 0 : st.lift / (st.g.scale.y || 1)) - sit * st.hip;
+    if (st.root.position.z) st.root.position.z = 0;
+  }
   qBones(st);                                       // поза — в этот же кадр, без запаздывания
   st.skel.update();
   // вещи в руках (бутылка, лопата, портфель) висят на наших руках-костях: кисть коробочного человека — в 0,58 под
@@ -661,7 +686,7 @@ function poseHook () {
   if (box && J.handL >= 0 && J.handR >= 0) {
     st.bones[J.handL].getWorldPosition(V); st.g.worldToLocal(V);
     st.bones[J.handR].getWorldPosition(V2); st.g.worldToLocal(V2);
-    box.position.set((V.x + V2.x) / 2, (V.y + V2.y) / 2 + 0.11 * box.scale.y + CARRY.Y, Math.max((V.z + V2.z) / 2 + 0.03, CARRY.ZMIN));
+    box.position.set((V.x + V2.x) / 2, (V.y + V2.y) / 2 + BOX_H / 2 * box.scale.y + CARRY.Y, Math.max((V.z + V2.z) / 2 + 0.03, CARRY.ZMIN));
     box.rotation.set(0, 0, 0);
     QP.carry++;
   }

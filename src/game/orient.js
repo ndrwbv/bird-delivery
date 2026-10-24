@@ -16,6 +16,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import './orient.css';
 import { ON as MOBILE } from './mobile.js';
+import { touchOn } from '../input/touchmode.js';
 
 const QS = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams('');
 let STEAM = false;
@@ -24,11 +25,8 @@ const ALLOW = QS.has('portrait') || STEAM;
 const MQ = typeof matchMedia === 'function' ? matchMedia('(orientation: portrait)') : null;
 
 let EL = null;
-/* как game.js решает «касания» (body.touch) — но сразу, до загрузки игры: заставка нужна и на экране загрузки */
-const mm = q => { try { return matchMedia(q).matches; } catch (e) { return false; } };
-const TOUCHY = typeof navigator !== 'undefined' && typeof window !== 'undefined' &&
-  (mm('(pointer: coarse)') || (navigator.maxTouchPoints > 0 && 'ontouchstart' in window));
-const phoneLike = () => MOBILE || TOUCHY || (!!document.body && document.body.classList.contains('touch'));
+// ноутбук с тачскрином — не телефон, пока не тронули экран (touchmode.js, 0п67)
+const phoneLike = () => MOBILE || touchOn() || (!!document.body && document.body.classList.contains('touch'));
 /** стоит ли сейчас телефон «стоя» и закрыт ли экран заставкой */
 export function blocked () {
   return !ALLOW && !!MQ && MQ.matches && phoneLike();

@@ -43,6 +43,7 @@ import * as YMAZE from './yardmaze.js';          // клумбы, кусты, л
 import * as COURTS from './courts.js';          // корты: сцены внутрь не встают (courts.js)
 import * as LAWNP from './lawnprops.js';
 import { onPave } from './pave.js';
+import { DOGS_ON } from './dogsflag.js';      // собаки выключены (?dogs — вернуть)
 import { inView } from './cull.js';
 import { MOB, CLEAN } from './mobile.js';
 
@@ -323,6 +324,7 @@ function dropPerson (p) {
 }
 function sitPose (u) {
   u.legL.rotation.x = u.legR.rotation.x = -1.45;
+  u.qSeat = 0.68;                                 // таз — на доске (лавочка, скамья у доминошного стола — 0,65—0,71 м; qpeople.js SIT, 0п75)
   u.armL.rotation.x = u.armR.rotation.x = -0.45;
 }
 function standPose (u, dt, k = 6) {
@@ -821,7 +823,7 @@ function spawnWalker (M) {
     const d = dist(w.x, w.z);
     if (d < 90 && inView(w.x, 1, w.z, 2)) continue;
     if (d < YL.MIN_IN && still()) continue;                  // стоишь — не рядом за спиной (0п0)
-    const ski = M.sea === 'win' && !M.night && chance(YL.WALKER.SKI), dog = !ski && chance(YL.WALKER.DOG);
+    const ski = M.sea === 'win' && !M.night && chance(YL.WALKER.SKI), dog = DOGS_ON && !ski && chance(YL.WALKER.DOG);
     const grp = chance(0.4) ? A.freshHuman({}, {}) : A.makeHuman(null, { fat: chance(0.2) });
     if (ski) { skis(grp); hold(grp, 'pole'); }
     A.scene.add(grp);

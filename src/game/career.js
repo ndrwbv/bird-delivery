@@ -19,6 +19,7 @@
 import * as RESPECT from './respect.js';
 import './career.css';
 import * as ECON from './econ.js';
+import { NITRO_ICON, HEART_ICON, MONEY_ICON } from './lunchicons.js';   // иконки пунктов обеда (11бр)
 import * as GARAGE from './garage.js';
 import * as CL from '../platform/crashlog.js';   // метки переходов: гараж (0п48)
 import { PIGGY } from './shiftcash.js';           // копилка — та же свинья, что на хаде и в гараже
@@ -165,9 +166,8 @@ export function startShift () {
   // попапа «на смене · до конца смены ~N мин» нет: сколько осталось — в паузе
   // час пик — говорим прямо (платят больше); щедрую смену не объявляем — плашка ложилась на накладную
   const pm = ECON.PACE.MODES[P];
-  const pace = P === 'tight' ? [t('час пик'), t('заказы дальше, кофе меньше — зато платят ×{k}', { k: fmtK(pm.pay) })] : null;
+  const pace = P === 'tight' ? [t('час пик'), t('заказы дальше, нитро меньше — зато платят ×{k}', { k: fmtK(pm.pay) })] : null;
   if (pace) setTimeout(() => { if (SH.on && SH.len === L) A.popBonus(pace[0], pace[1]); }, 5600);
-  if (day) setTimeout(() => { if (SH.on && SH.len === L) A.toast(t('пиццерия круглосуточная — смена с {time}', { time: ECON.clock(SH.t0h) })); }, 2600);
   // перевели в новую пиццерию (открылся район) — Толик говорит один раз, в начале первой смены там (transfer.js)
   if (!QR.on() && DIST.has()) {
     TRANS.atStart({ Store: A.Store, cur: SH.district, city: SH.city, name: i => t(DIST.list()[i].name), addr: A.pizzaAddr,
@@ -304,18 +304,19 @@ function lunchClass (on) { const c = $('choice'); if (c) c.classList.toggle('cr-
 function showLunch (next) {
   SH.lunch = true;
   const S = A.S, L = ECON.LUNCH, T = ECON.TIPS;
+  /* пункты обеда (11бр): иконка вещи из игры, одно слово и число; шутка про пиццу — в подсказке при наведении (tip) */
   const opts = [
-    { id: 'nitro', label: t('пицца с кофейным кремом — повар перепутал начинку'), sub: t('кофе: бак ×{k} и сразу полный', { k: fmtK(L.nitro.tank) }),
+    { id: 'nitro', icon: NITRO_ICON, label: t('Нитро'), sub: t('бак ×{k}, сразу полный', { k: fmtK(L.nitro.tank) }), tip: t('пицца с кофейным кремом — повар перепутал начинку'),
       fn () { S.nosEff = (S.nosEff || 1) / L.nitro.tank; A.NOS.tank = 1; } },
-    { id: 'tips', label: t('«Директорская» — Палыч заказал и не пришёл'), sub: t('чаевые: шанс +{p} %, сумма ×{k}', { p: Math.round(T.LUNCH_CHANCE * 100), k: fmtK(T.LUNCH_MUL) }),
+    { id: 'tips', icon: MONEY_ICON, label: t('Деньги'), sub: t('чаевые: +{p} %, ×{k}', { p: Math.round(T.LUNCH_CHANCE * 100), k: fmtK(T.LUNCH_MUL) }), tip: t('«Директорская» — Палыч заказал и не пришёл'),
       fn () { /* orders.js читает S.lunch === 'tips' */ } },
-    { id: 'hp', label: t('холодная пепперони — клиент не забрал'), sub: tn(L.hp.hearts, '+{n} сердце|+{n} сердца|+{n} сердец'),
+    { id: 'hp', icon: HEART_ICON, label: t('Сердце'), sub: tn(L.hp.hearts, '+{n} сердце|+{n} сердца|+{n} сердец'), tip: t('холодная пепперони — клиент не забрал'),
       fn () { S.hpMax += L.hp.hearts; S.hp += L.hp.hearts; A.hudHearts(); } },
   ];
   A.showChoice({
-    title: MEAL_NAME[DAYT.part(hour())](), sub: t('{time} — перерыв. на кухне остыли пиццы, которые сделали по ошибке. какую берёшь?', { time: ECON.clock(hour()) }),
+    title: MEAL_NAME[DAYT.part(hour())](), sub: t('{time} — перерыв. что берёшь?', { time: ECON.clock(hour()) }),
     pause: true, row: true, okLabel: t('взять'),
-    opts: opts.map(o => ({ label: o.label, sub: o.sub, fn: () => {
+    opts: opts.map(o => ({ label: o.label, sub: o.sub, icon: o.icon, tip: o.tip, fn: () => {
       S.lunch = o.id;
       lunchClass(false);
       o.fn();
@@ -541,7 +542,7 @@ export function showEnd (why, whyText, held) {
   const screens = wasOn && !SSTEPS.OFF ? endScreens(full, total) : [];
   if (screens.length) {
     SSTEPS.play({ host: ov, screens, Snd: A.Snd, padClear: () => { KB.clear(); if (A.padClear) A.padClear(); },
-      onDep: (stake, next) => { if (A.Snd.boot) A.Snd.boot(); DEP.open({ stake, spin: true, next }); } }, printCheck);
+      onDep: (stake, next, spin) => { if (A.Snd.boot) A.Snd.boot(); DEP.open({ stake, spin: spin !== false, next }); } }, printCheck);
   } else printCheck();
   function printCheck () {
     if (screens.length && (ov.hidden || A.S.state !== 'over')) return;   // чек убрали, пока шли экраны (новая смена из отладки, меню)

@@ -2,8 +2,8 @@
    Реплики над головами (облачка прохожих, водителей, героев, клиентов) — правила в docs/CAREER.md
    «Реплики людей на улице».
 
-   Все облачка рисует tex(): тёмная плашка с цветной обводкой (цвет — кто говорит: красный — злой,
-   синий — обычный…), белый жирный шрифт, хвостик вниз к голове; до 3 строк, длинное — по словам.
+   Все облачка рисует tex(): светлая бумажная плашка с тёмной обводкой и мягкой тенью (цвет говорящего — лёгкий
+   оттенок заливки и имя), тёмный жирный шрифт, хвостик вниз к голове; до 3 строк, длинное — по словам.
    track(sprite) — облачко под присмотром: каждый кадр step() решает, кого показать:
      • видно не дальше FAR м от машины (с FADE м — гаснет); дальше — скрыто;
      • одновременно — не больше MAX облачков, ближние к машине важнее;
@@ -43,10 +43,11 @@ export const TALK = {
 
 /* ═════════════ текстура ═════════════ */
 const FONT = '"Arial Black", "Helvetica Neue", Arial, "Noto Sans", system-ui, sans-serif';
-const FS = 52, LH = 62, PADX = 30, PADY = 20, TAIL = 22, MAXW = 600, BORDER = 7;
+const FS = 52, LH = 62, PADX = 30, PADY = 20, TAIL = 22, MAXW = 600, BORDER = 6, SM = 8;   // SM — поле под тень
+const INK = '#33210c', INK_TEXT = '#241810', PAPER = '#fff8e6';
 const CACHE = new Map(), CACHE_MAX = 240;
 
-/* плашка: цвет обводки col, имя (необязательно) — строкой сверху в цвет обводки */
+/* плашка: col — цвет говорящего (оттенок заливки), имя (необязательно) — строкой сверху */
 export function tex (text, col = '#5a4a9a', name = '') {
   const key = col + '|' + name + '|' + text;
   const hit = CACHE.get(key);
@@ -70,18 +71,22 @@ export function tex (text, col = '#5a4a9a', name = '') {
   let tw = Math.max(...L.map(q => x.measureText(q).width), 60);
   if (name) { x.font = font(30); tw = Math.max(tw, x.measureText(name).width); }
   const W = Math.ceil(tw + PADX * 2 + BORDER * 2), H = Math.ceil(nameH + L.length * lh + PADY * 2 + BORDER * 2);
-  c.width = W; c.height = H + TAIL;
+  c.width = W + SM * 2; c.height = H + TAIL + SM;
+  x.translate(SM, SM);
   const b = BORDER / 2;
-  x.fillStyle = 'rgba(20, 20, 28, 0.9)'; x.strokeStyle = col; x.lineWidth = BORDER; x.lineJoin = 'round';
-  x.beginPath(); x.roundRect(b, b, W - BORDER, H - BORDER, 22); x.fill(); x.stroke();
-  // хвостик к голове
-  x.beginPath(); x.moveTo(W / 2 - 16, H - BORDER); x.lineTo(W / 2, H + TAIL - 3); x.lineTo(W / 2 + 16, H - BORDER); x.closePath();
-  x.fillStyle = col; x.fill();
+  // светлая бумажная плашка с тёмной обводкой (Д7, автор 24.10.2026): цвет говорящего — лёгкий оттенок заливки и имя
+  const fill = paper(col), tx = Math.floor(W / 2);
+  x.fillStyle = fill; x.strokeStyle = INK; x.lineWidth = BORDER; x.lineJoin = 'round'; x.lineCap = 'round';
+  x.shadowColor = 'rgba(20, 14, 8, 0.38)'; x.shadowOffsetY = 4; x.shadowBlur = 5;           // мягкая тень — читается на снегу и ночью
+  x.beginPath(); x.roundRect(b, b, W - BORDER, H - BORDER, 24); x.fill(); x.stroke();
+  x.shadowColor = 'transparent'; x.shadowBlur = 0; x.shadowOffsetY = 0;
+  // хвостик к голове: две тёмные линии от низа плашки, внутри — та же заливка (стык обводки закрыт)
+  x.beginPath(); x.moveTo(tx - 16, H - b); x.lineTo(tx, H + TAIL - 3); x.lineTo(tx + 16, H - b); x.stroke();
+  x.fillStyle = fill; x.beginPath(); x.moveTo(tx - 13, H - BORDER - 0.5); x.lineTo(tx, H + TAIL - 9); x.lineTo(tx + 13, H - BORDER - 0.5); x.closePath(); x.fill();
   x.textAlign = 'center'; x.textBaseline = 'middle';
   let y = BORDER + PADY;
-  if (name) { x.font = font(30); x.fillStyle = light(col); x.fillText(name, W / 2, y + 16); y += nameH; }
-  x.font = font(fs); x.fillStyle = '#ffffff';
-  x.shadowColor = 'rgba(0,0,0,0.6)'; x.shadowOffsetY = 3;
+  if (name) { x.font = font(30); x.fillStyle = dark(col); x.fillText(name, W / 2, y + 16); y += nameH; }
+  x.font = font(fs); x.fillStyle = INK_TEXT;
   L.forEach((q, i) => x.fillText(q, W / 2, y + lh * (i + 0.5) + 2));
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -93,11 +98,16 @@ export function tex (text, col = '#5a4a9a', name = '') {
   if (CACHE.size > CACHE_MAX) { const k = CACHE.keys().next().value; CACHE.get(k).dispose(); CACHE.delete(k); }
   return t;
 }
-/* цвет говорящего на тёмной плашке: тёмные (синий, фиолетовый) — светлее, чтобы имя читалось */
-function light (col) {
+/* заливка плашки: бумага с лёгким оттенком цвета говорящего (злой — розоватая, ночь — сиреневая…) */
+function paper (col) {
+  const c = new THREE.Color(PAPER).lerp(new THREE.Color(col), 0.16);
+  return '#' + c.getHexString();
+}
+/* имя героя на светлой плашке: цвет говорящего, потемнее, чтобы читалось */
+function dark (col) {
   const c = new THREE.Color(col), hsl = {};
   c.getHSL(hsl);
-  return '#' + c.setHSL(hsl.h, Math.min(1, hsl.s + 0.1), Math.max(hsl.l, 0.68)).getHexString();
+  return '#' + c.setHSL(hsl.h, Math.min(1, hsl.s), Math.min(hsl.l, 0.34)).getHexString();
 }
 
 /* ═════════════ кого показать и каким размером ═════════════ */

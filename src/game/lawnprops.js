@@ -58,7 +58,7 @@ export const LAWN = {
   YARD_R: 40,                                // заросли, бельё, ракушки, выбивалки — дальше от большой улицы или за домом, м
   BIG: { beater: 0.16, line: 0.18, garage: 0.12, sand: 0.1 },
   RAIL: 0.3, RAIL_YARD: 0.1,
-  SLOW: 2.5, SNOW: 0.35,
+  SLOW: 0.4, SNOW: 0.35,                     // SLOW — машина сносит мелочь с этой скорости, м/с (0п89, 24.10.2026: было 2,5 — медленно проезжала насквозь)
   FADE: 22, FADE_S: 14, FADE_LAG: 6,         // рост из земли у края дальности: полоса крупного / мелкого, запас, м (fade.js)
   CAPS: { grass: 7000, dand: 3000, weed: 2500, burdock: 1500, tall: 5000, reed: 5000, hog: 2500,
     rail: 1500, tire: 1200, flower: 1200, shell: 300, sand: 200, cube: 7000, lit: 4000, bottle: 2000, ytrunk: 1600, ycrown: 2600, ywin: 1200, ywinb: 700 },
@@ -1088,8 +1088,19 @@ function knock (c, it, nx, nz, force, quiet) {
   if (!quiet && A.Snd) A.Snd.fx('smash', s => s.noise(0.15, it.kind === 'sand' || it.kind === 'trash' ? 0.12 : 0.2), null, it.kind === 'sand' || it.kind === 'trash' ? 0.6 : 1);
 }
 
-/* машина: сносит мелочь быстрее 9 км/ч (game.js — рядом с дворовой мелочью). → во сколько скорость.
+/* машина: сносит мелочь с LAWN.SLOW (~1,5 км/ч; до 0п89, 24.10.2026 — с 9 км/ч, медленно проезжала насквозь). → во сколько скорость.
+   Бельевая верёвка и перекладина выбивалки — не только столбы: кузов (ось нос—корма ± rc) задел отрезок между ними — сорвал
+   (0п89: «медленно катится сквозь бельевую верёвку, и только потом она ломается»).
    bump(kind) — game.js: столбы (выбивалка, бельевой) тормозят и уводят сами (carbump.js), тогда true */
+const segSeg = (ax, az, bx, bz, cx, cz, dx, dz) => {   // расстояние между отрезками a—b и c—d (плоскость)
+  const ux = bx - ax, uz = bz - az, vx = dx - cx, vz = dz - cz, d0 = ux * vz - uz * vx;
+  if (Math.abs(d0) > 1e-9) {
+    const t = ((cx - ax) * vz - (cz - az) * vx) / d0, u = ((cx - ax) * uz - (cz - az) * ux) / d0;
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) return 0;
+  }
+  const pd = (px, pz, qx, qz, wx, wz) => { const l2 = wx * wx + wz * wz || 1, t = Math.max(0, Math.min(1, ((px - qx) * wx + (pz - qz) * wz) / l2)); return Math.hypot(qx + wx * t - px, qz + wz * t - pz); };
+  return Math.min(pd(cx, cz, ax, az, ux, uz), pd(dx, dz, ax, az, ux, uz), pd(ax, az, cx, cz, vx, vz), pd(bx, bz, cx, cz, vx, vz));
+};
 export function car (noseX, noseZ, tailX, tailZ, rc, vf, vx, vz, bump) {
   if (!A || Math.abs(vf) <= LAWN.SLOW) return 1;
   let k = 1;
@@ -1098,12 +1109,14 @@ export function car (noseX, noseZ, tailX, tailZ, rc, vf, vx, vz, bump) {
     for (const it of c.items) {
       if (it.down || it.hid || it.solid) continue;
       if (Math.abs(it.x - noseX) > 10 || Math.abs(it.z - noseZ) > 10) continue;
-      for (const [px, pz, pr] of it.pts) {
-        if (Math.hypot(px - noseX, pz - noseZ) < pr + rc || Math.hypot(px - tailX, pz - tailZ) < pr + rc) {
-          knock(c, it, vx / l, vz / l, Math.abs(vf));
-          if (!(bump && bump(it.kind))) k *= it.slow || 0.96;
-          break;
-        }
+      const rope = (it.kind === 'line' || it.kind === 'beater') && it.pts.length === 2 &&
+        segSeg(it.pts[0][0], it.pts[0][1], it.pts[1][0], it.pts[1][1], noseX, noseZ, tailX, tailZ) < rc * 0.8;   // верёвка / перекладина поперёк кузова (нос и корма — в 1,2 м от середины, + 0,8 — кузов до бампера)
+      let pole = false;
+      for (const [px, pz, pr] of it.pts) if (Math.hypot(px - noseX, pz - noseZ) < pr + rc || Math.hypot(px - tailX, pz - tailZ) < pr + rc) { pole = true; break; }
+      if (pole || rope) {
+        knock(c, it, vx / l, vz / l, Math.abs(vf));
+        if (!pole) k *= 0.97;                          // только верёвку сорвал — чуть тормозит, без увода (столб — ниже)
+        else if (!(bump && bump(it.kind))) k *= it.slow || 0.96;
       }
     }
   });

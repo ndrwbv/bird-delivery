@@ -54,7 +54,7 @@ const MAT = {
   bin:    { metal: 0.6,  boom: 0.6,  old: () => ['clank'] },
   tree:   { metal: 0.6,  boom: 0.8,  old: OLD },
   rail:   { metal: 0.9,  boom: 0.75, old: OLD },   // ограждение: трубы вдоль тротуаров, перила мостов, профлист строек — металл
-  curb:   { metal: 0.35, boom: 0.55, old: OLD },   // бордюр: камень под колесом — удар подвески, без хруста кузова на тычке
+  curb:   { metal: 0, boom: 0, vol: 0.42, old: () => [] },   // бордюр: глухой «тук» шины, тихо (0п68, 24.10.2026: «звук мерзкий»): без хруста кузова, без «бума» и без старого «crash»
 };
 /* приоритет слоя при нехватке голосов */
 const PRIO = { body: 3, boom: 2, metal: 2, glass: 2, debris: 1 };
@@ -172,7 +172,7 @@ export function hit (v, mat, at) {
   // сила внутри ступени 0…1 и громкость слоя тела: тычок 0,45—0,7, средний 0,7—0,9, авария 0,9—1
   const lo = [T.LIGHT, T.MID, T.HEAVY][tier], hi = [T.MID, T.HEAVY, 30][tier];
   const kin = clamp((v - lo) / (hi - lo), 0, 1);
-  const vol = IMP.VOL[tier][0] + kin * IMP.VOL[tier][1];
+  const vol = (IMP.VOL[tier][0] + kin * IMP.VOL[tier][1]) * (M.vol || 1);   // бордюр — тише (MAT.curb.vol)
   const k = clamp((v - T.LIGHT) / 25, 0, 1);          // общая сила 0…1 — для синтеза
   const vi = variant(mat + tier, IMP.VARS);
   const body = 'hit-' + mat + '-' + T_NAME[tier];
@@ -180,13 +180,13 @@ export function hit (v, mat, at) {
   const bn = layer(c, out, 'body', [body, ...M.old(tier)], vol, (cc, o, t, vv) => SYN[mat](cc, o, t, vv, k, tier, vi), k);
   if (bn) played.push(bn);
   const legacy = bn && bn !== body && OLD(tier).includes(bn);   // старый «crash» — металл и бум в нём уже есть
-  if (tier >= 1 && !legacy) {
+  if (tier >= 1 && !legacy && M.metal > 0) {
     const mv = M.metal * (tier === 2 ? 0.85 : 0.5) * (0.85 + kin * 0.15);
     const mi = variant('metal' + tier, IMP.VARS);
     const n = layer(c, out, 'metal', ['hit-metal-' + T_NAME[tier], 'scrape'], mv, (cc, o, t, vv) => synMetal(cc, o, t, vv, k, tier, mi), k);
     if (n) played.push(n);
   }
-  if (tier === 2 && !legacy) {
+  if (tier === 2 && !legacy && M.boom > 0) {
     const bi = variant('boom', IMP.VARS);
     const n = layer(c, out, 'boom', ['hit-boom'], M.boom * (0.75 + kin * 0.25), (cc, o, t, vv) => synBoom(cc, o, t, vv, k, bi), k);
     if (n) played.push(n);
@@ -442,13 +442,11 @@ const SYN = {
     if (tier === 2) d = Math.max(d, nz(c, o, t, 0.35, 0.3 * v, 'lowpass', 260, 0.7));
     return d + 0.05;
   },
-  curb (c, o, t, v, k, tier, vi) {                 // бордюр: камень под колесом — глухой удар шины, лязг подвески
-    const r = VR[vi] * rnd(0.96, 1.04);
-    snap(c, o, t, v, 1300 * r);
-    let d = tone(c, o, t, 'sine', 95 * r, 46, 0.12 + 0.08 * k, 0.55 * v);                          // шина и рычаг
-    d = Math.max(d, nz(c, o, t, 0.05, 0.45 * v, 'bandpass', 1150 * r, 1.3));                       // камень
-    d = Math.max(d, 0.03 + tone(c, o, t + 0.03 + vi * 0.006, 'triangle', 230 * r, 150, 0.05, 0.3 * v));   // лязг подвески
-    if (tier >= 1) d = Math.max(d, 0.07 + tone(c, o, t + 0.07, 'sine', 80 * r, 45, 0.1, 0.35 * v));   // второе колесо
+  curb (c, o, t, v, k, tier, vi) {                 // бордюр: глухой «тук» шины о камень (0п68, 24.10.2026) — без щелчка, звона камня и лязга
+    const r = VR[vi] * rnd(0.95, 1.05);
+    let d = tone(c, o, t, 'sine', 120 * r, 55, 0.09 + 0.05 * k, 0.7 * v);                         // шина
+    d = Math.max(d, nz(c, o, t, 0.06 + 0.03 * k, 0.35 * v, 'lowpass', 420 * r, 0.7));               // резина о камень, глухо
+    if (tier >= 1) d = Math.max(d, 0.06 + tone(c, o, t + 0.06, 'sine', 90 * r, 50, 0.08, 0.3 * v));   // подвеска села
     return d + 0.05;
   },
 };

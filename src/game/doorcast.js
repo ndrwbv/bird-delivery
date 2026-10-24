@@ -25,6 +25,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 import { t } from '../i18n/index.js';
+import { DOGS_ON } from './dogsflag.js';      // собаки выключены (?dogs — вернуть): dog() отдаёт null
 import * as LIFE from './actorlife.js';
 import * as PETW from './petwear.js';          // зимой собака клиента в свитере или попонке (petwear.js)
 import * as TALK from './talk.js';
@@ -290,7 +291,7 @@ const synBark = s => { s.blip(560, 0.07, 'square', 0.05); setTimeout(() => s.bli
 /** собака у ног клиента (сбоку, ближе к машине), мордой к машине. o: { sec — сколько стоит (0 — пока не go), barks — сколько раз
     гавкнуть сразу, sit — сидит и виляет хвостом, word — «Гав!» } → { bark(n), go(), m } */
 export function dog (ped, o = {}) {
-  if (!A || !A.scene || !ped || !ped.grp) return null;
+  if (!DOGS_ON || !A || !A.scene || !ped || !ped.grp) return null;
   const X = axes(ped);
   const [x, z] = petSpot(X, 0.8);
   const m = dogMesh();

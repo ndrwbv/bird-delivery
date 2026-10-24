@@ -52,6 +52,7 @@ import * as DAILY from './daily.js';             // задание на день
 import { onPave, walkHalf, roadGap } from './pave.js';
 import { addTrail, YARD } from './yards.js';
 import * as GFX from './gfx.js';                // дальность — гостей за столиками дальше тумана не рисуем
+import * as QGUEST from './qguests.js';          // гости за столиками — люди-модели: ближние настоящие, дальние — сидячим мешем (0п62)
 
 export const RIV = {
   PER_DIST: 2, MAX: 26, NODIST: 6,     // точек сети в районе; всего; без районов на карте
@@ -752,8 +753,12 @@ function guestGeo () {
   A.put(h, A.boxGeo(0.28, 0.08, 0.28), '#3a2a20', 0, 1.48, 0);
   return [A.mergeGeos(b), A.mergeGeos(h)];
 }
+let G_Q = null, G_CAND = [];                     // гости-модели (qguests.js); кто ближе — кандидаты в настоящие люди
 function buildGuests () {
   if (!SEAT.length) return;
+  ST.guests = SEAT.length;
+  G_Q = QGUEST.build(A, SEAT.length);
+  if (G_Q) { poseGuests(); return; }               // ?boxguests или людей собрать не вышло — коробочные, как было
   const [bg, hg] = guestGeo(), mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   G_BODY = new THREE.InstancedMesh(bg, mat, SEAT.length);
   G_HEAD = new THREE.InstancedMesh(hg, mat, SEAT.length);
@@ -775,6 +780,7 @@ const GM = new THREE.Matrix4(), GR = new THREE.Matrix4(), ZERO = new THREE.Matri
 const G_MOVE = 30;
 let G_AT = { x: 1e9, z: 1e9 };
 function poseGuests () {
+  if (G_Q) { poseGuestsQ(); return; }
   if (!G_BODY) return;
   const V = A.V, R = GFX.rangeK() * 490 + 40;
   let n = 0;
@@ -790,6 +796,26 @@ function poseGuests () {
   G_BODY.visible = G_HEAD.visible = n > 0;
   G_BODY.instanceMatrix.needsUpdate = true; G_HEAD.instanceMatrix.needsUpdate = true;
   if (G_BODY.instanceColor) { G_BODY.instanceColor.needsUpdate = true; G_HEAD.instanceColor.needsUpdate = true; }
+  G_AT = { x: V.x, z: V.z };
+  GUESTS_DIRTY = 0;
+}
+
+/* гости-модели: дальние — сидячим мешем ближе QGUEST.farR(), кто сейчас настоящий человек — не рисуем;
+   кандидаты в настоящие — ближе NEAR + G_MOVE (их каждый кадр смотрит QGUEST.stepNear) */
+function poseGuestsQ () {
+  const V = A.V, R = Math.min(GFX.rangeK() * 490 + 40, QGUEST.farR()), RC = QGUEST.QG.FAR + G_MOVE + 5;
+  QGUEST.begin(G_Q);
+  G_CAND = [];
+  for (const q of SEAT) {
+    if (!q.on) continue;
+    const dx = Math.abs(q.x - V.x), dz = Math.abs(q.z - V.z);
+    if (dx < RC && dz < RC) G_CAND.push(q);
+    if (q.grp || dx > R || dz > R) continue;
+    GR.makeRotationY(q.ry);
+    GM.copy(GR).setPosition(q.x, q.y, q.z);
+    QGUEST.put(G_Q, q, GM);
+  }
+  QGUEST.end(G_Q);
   G_AT = { x: V.x, z: V.z };
   GUESTS_DIRTY = 0;
 }
@@ -1241,6 +1267,14 @@ export function blocks (x, z, m = 0) {
   return false;
 }
 
+/* места у входа бургерных — для зазывал в костюмах (game.js, burgersuit.js; 0п70): на газоне между тротуаром и
+   террасой, справа и слева от дорожки ко входу; face — лицом к улице, i — номер точки (жребий, сколько зазывал) */
+export function burgerDoors () {
+  const L = [];
+  for (const s of SHOPS) if (s.chain === 'burger') L.push({ i: s.i, x: s.fx - s.nx * 1.9, z: s.fz - s.nz * 1.9, ux: s.ux, uz: s.uz, face: s.ry });
+  return L;
+}
+
 /* ═════════════ сборка, кадр, новая смена ═════════════ */
 /* шагами (yield) — поздняя сборка (latebuild.js; при ?nolate — разом): на Деке весь кусок ~0,45 с */
 export function* build (api) {
@@ -1290,6 +1324,7 @@ export function step (dt) {
   }
   if (dirty && MI) for (const k of ['leg', 'arm', 'chop', 'scep']) MI[k].instanceMatrix.needsUpdate = true;
   if (dirty && MI) for (const k in MI.body) MI.body[k].instanceMatrix.needsUpdate = true;
+  if (G_Q && QGUEST.stepNear(A, G_CAND)) GUESTS_DIRTY = 1;   // ближние гости — настоящие люди (qguests.js)
   if (GUESTS_DIRTY || Math.abs(V.x - G_AT.x) > G_MOVE || Math.abs(V.z - G_AT.z) > G_MOVE) poseGuests();
   // курьеры конкурентов
   stepBcars();
@@ -1305,6 +1340,7 @@ export function reset () {
     s.hits = 0; s.paid = 0;
     for (const m of s.mascots) if (m.st === 'gone' || m.st === 'tumble') { const [x, z] = pick(s.roam); Object.assign(m, { x, z, tx: x, tz: z, st: 'idle', T: 1, gone: 0, cool: 0 }); if (m.root) m.root.userData.body.rotation.z = 0; }
   }
+  if (G_Q) QGUEST.dropAll(A);
   for (const q of SEAT) { q.on = 1; q.fled = 0; }
   GUESTS_DIRTY = 1;
   applySeason(true);
@@ -1312,7 +1348,7 @@ export function reset () {
 
 /* для probe: d.RIV.list — точки; force = 2 — две следующие машины потока у бургерной станут машинами-бургерами */
 export const DEBUG = {
-  RIV, ST, SHOPS, MASC, SEAT, force: 0, list: [],
+  RIV, ST, SHOPS, MASC, SEAT, QG: QGUEST.QG, force: 0, list: [],
   get stats () {
     const by = {};
     for (const s of SHOPS) { const k = s.dist + ''; by[k] = by[k] || { sushi: 0, burger: 0 }; by[k][s.chain]++; }

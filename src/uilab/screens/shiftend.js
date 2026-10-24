@@ -119,7 +119,7 @@ export default function shiftEndScreens (ctx) {
         if (at >= want) break;
         await sleep(360);
         if (SS.state.anim) { SS.ok(); await sleep(360); }
-        if (SS.state.id === 'dep') SS.alt(); else SS.ok();
+        if (SS.state.id === 'dep') { if (!CM.closeDep()) SS.alt(); } else SS.ok();   // «давай депнем?» — сразу окно депа (0п60): «не сейчас» = закрыть его
       }
       log('смена ' + (SH.n + 1) + ' (' + (SH.len && SH.len.id) + ') · настроение ' + SH.mood + ' · бонус ' + ctx.money(SH.bonus || 0) +
         (SH.opened >= 0 ? ' · открыт район «' + t(DIST.list()[SH.opened].name) + '»' : '') + (SH.counted ? '' : ' · смена не засчитана'));

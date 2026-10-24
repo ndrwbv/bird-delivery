@@ -251,7 +251,38 @@ export function cabin (add, k) {
     E.quad([-w0, y0 + ny * o, z0 + nz * o], [w0, y0 + ny * o, z0 + nz * o], [w1, y1 + ny * o, z1 + nz * o], [-w1, y1 + ny * o, z1 + nz * o], 0, ny, nz);
     return E.geo();
   };
+  if (k.sil) silhouette(add, k, { S, yb, yt, H, half, zF, zB, rf, rb, g0, g1, off });
   return { roofZ: (zF(yt) + zB(yt)) / 2, roofLen: zF(yt) - zB(yt), roofW: 2 * ht, front: pane(true), back: pane(false), cf, rf };
+}
+
+/* ─── водитель за тонированным стеклом машины потока (0п69, 24.10.2026; автор: «машины ездят пустые») ───
+   У коробочных машин потока стёкла непрозрачные — человека внутри не видно. Поэтому водитель нарисован прямо на стёклах:
+   тёмный силуэт «голова и плечи» (SIL) на лобовом, заднем и обоих боковых — на месте водителя (слева по ходу, +X).
+   В склейке кузова — ни одного лишнего меша. У стоящих (game.js makeCarLite) силуэт перекрашен в цвет стекла: стоящие
+   пустые (0п39, автор: «врезаешься в стоящую — а там человек, не должно такое»); PARKED — доля стоящих с человеком. */
+export const SIL = { HEX: '#1f2731', XD: 0.45, PARKED: 0 };
+function silhouette (add, k, c) {
+  const { S, yb, H, half, zF, zB, rf, rb, g0, g1, off } = c;
+  const T = Tris(), xd = (half(yb) - 0.07) * SIL.XD;
+  // лобовое и заднее — на плоскости стекла, на 6 мм снаружи него
+  for (const front of [true, false]) {
+    const r = front ? rf : rb, len = Math.hypot(r, H), nz = (front ? H : -H) / len, ny = r / len, o = 0.014;
+    const u0 = front ? 0.16 : 0.12;
+    const P = (x, u) => { const y = yb + H * u, z = front ? zF(y) : zB(y); return [x, y + ny * o, z + nz * o]; };
+    const rect = (x0, x1, ua, ub) => T.quad(P(x0, ua), P(x1, ua), P(x1, ub), P(x0, ub), 0, ny, nz);
+    rect(xd - 0.24, xd + 0.24, u0, u0 + 0.2);            // плечи
+    rect(xd - 0.05, xd + 0.05, u0 + 0.2, u0 + 0.27);     // шея
+    rect(xd - 0.11, xd + 0.11, u0 + 0.27, u0 + 0.58);    // голова
+  }
+  // боковые — профиль: голова чуть впереди средней стойки
+  const gh = g1 - g0, zh = S.cz + S.cab * 0.14;
+  for (const s of [-1, 1]) {
+    const Q = (y, z) => [s * (half(y) + off * 1.6), y, z];
+    const rect = (za, zb, ya, yb2) => T.quad(Q(ya, za), Q(ya, zb), Q(yb2, zb), Q(yb2, za), s, 0, 0);
+    rect(zh - 0.24, zh + 0.1, g0, g0 + gh * 0.3);        // плечи
+    rect(zh - 0.1, zh + 0.11, g0 + gh * 0.3, Math.min(g1 - 0.02, g0 + gh * 0.88));   // голова
+  }
+  add(T.geo(), k.sil, 0, 0, 0);
 }
 
 /* ─── мелочь потока в склейку кузова: зеркала, лючок бензобака, рёбра решётки ───

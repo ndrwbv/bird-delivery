@@ -31,6 +31,7 @@
    ?nofsb — без пятен, ?nofsc — без тени домов на машинах (carMat). __dlv.FSH — числа и ручки.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
+import { pullDepth } from './carshadow.js';   // 0п87: пятна не прячутся под соседнюю поверхность
 
 const Q = typeof location === 'undefined' ? new URLSearchParams() : new URLSearchParams(location.search);
 const OFF = Q.has('nofs');
@@ -408,6 +409,7 @@ function blobMat (tex, key) {
   const m = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   m.alphaMap = tex;
   m.onBeforeCompile = sh => {
+    pullDepth(sh, 0.35);           // 0п87: не прячется под соседнюю поверхность выше (carshadow.js); меньше, чем у своей — не темнит обувь людей
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <alphamap_fragment>', '#ifdef USE_ALPHAMAP\n  diffuseColor.a *= texture2D( alphaMap, vAlphaMapUv ).a;\n#endif')
       .replace('#include <color_fragment>', '#ifdef USE_COLOR\n  diffuseColor.a *= vColor.r;\n#endif\n  diffuseColor.rgb = vec3(0.0);');

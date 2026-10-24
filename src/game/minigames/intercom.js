@@ -28,6 +28,7 @@ import { inputKind, onInput } from '../../input/glyphs.js';
 import * as OS from '../ordersheet.js';
 import * as KIT from './doorkit.js';
 import { DOOR } from '../econ.js';
+import { DOGS_ON } from '../dogsflag.js';
 import * as SC from './doorscene.js';
 import * as COACH from './doorcoach.js';     // обучение первого раза: пауза, подсветка кнопок, «поехали!»
 import { faceDataURL } from '../people.js';
@@ -44,12 +45,12 @@ const WRONG = [
   { who: N_('соседка'), say: N_('Опять не туда! Петровы этажом выше, сколько можно!') },
   { who: N_('мужик'), say: N_('Ты на часы смотрел, мудила? Я с ночной!'), adult: true },
 ];
+if (!DOGS_ON) for (let i = WRONG.length - 1; i >= 0; i--) if (WRONG[i].who === 'собака') WRONG.splice(i, 1);   // «ГАВ!» за дверью — только с ?dogs
 /* «клиент не дома» (11.10.2026): набрал верно — отвечает сам клиент, он не дома и зовёт на другой адрес ({addr}).
    adult — только во взрослой. Без глаголов в роде — подходит и ему, и ей */
 export const AWAY = [
   { say: N_('Ой, я не дома! Я у тёщи, {addr}. Подъезжай туда!') },
   { say: N_('А я не дома… Я у кума в гараже, {addr}. Вези сюда!') },
-  { say: N_('Ой, а я с собакой гуляю! {addr}. Догоняй!') },
   { say: N_('Я в бане! {addr}. Выйду в полотенце — не пугайся.') },
   { say: N_('Я у мамы, {addr}! Она тоже пиццу хочет. Давай туда.') },
   { say: N_('Я в очереди в поликлинику, {addr}. Вези, тут все голодные.') },

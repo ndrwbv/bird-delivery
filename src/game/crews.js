@@ -24,6 +24,7 @@ import * as RESPECT from './respect.js';
 import { TIER } from './hits.js';
 import { part as fxPart } from './fxpool.js';    // частицы из общего запаса (fxpool.js)
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
+import * as BW from './brawl.js';           // драки по-настоящему: на расстоянии руки, удар, отшатнулся, упал (brawl.js, 0п91)
 
 const C = R.CREW;
 /* цвет формы сетей-конкурентов — один на всю игру (автор 23.10.2026: «насыщенный»): синий «Вселенной суши» и жёлтый
@@ -165,7 +166,7 @@ function spawn (kind, o = {}) {
     else { att = pick(RIVAL_IDS); vic = att === 'sushi' ? 'burger' : 'sushi'; }
     crew.att = att; crew.vic = vic; crew.own = vic === 'pizza';
     const nv = n >= 5 ? 2 : 1, na = n - nv;
-    crew.t = C.FIGHT_T;
+    crew.t = rand(C.FIGHT_T[0], C.FIGHT_T[1]);   // драка не вечная: через 15—40 с один из избиваемых падает (finish 'time')
     for (let i = 0; i < nv; i++) member(crew, vic, 'vic', at.x + rand(-0.8, 0.8), at.z + rand(-0.8, 0.8));
     for (let i = 0; i < na; i++) {
       const a = i / na * Math.PI * 2 + rand(-0.3, 0.3);
@@ -175,11 +176,7 @@ function spawn (kind, o = {}) {
     crew.dir = 1; DIRECTOR.start('crew');
     if (crew.own) {
       ST.stats.own++;
-      if (A.toast && Math.hypot(at.x - A.V.x, at.z - A.V.z) < 320) {
-        const kb = typeof document !== 'undefined' && !document.body.classList.contains('touch') && !document.body.classList.contains('pad');
-        A.toast(kb ? t('наших бьют! «{brand}» напали на курьеров — сбей их или посигналь (H)', { brand: t(BRANDS[att].name) })
-          : t('наших бьют! «{brand}» напали на курьеров — сбей их или встань рядом: машина посигналит', { brand: t(BRANDS[att].name) }));
-      }
+      // 11бм: надпись «наших бьют! … напали на курьеров» убрана — драку видно
     }
   }
   CREWS.push(crew);
@@ -231,9 +228,18 @@ function finish (crew, how) {
       RESPECT.gain('passCrew');
     } else ST.stats.lost++;
   }
-  // нападавшие уходят, избиваемые встают
+  // 0п91: никто не вмешался — один из избиваемых остаётся лежать (взрослая — мёртвый, кровь; детская — сел, держится за голову)
+  if (how === 'time') {
+    const v = pick(crew.people.filter(m => m.role === 'vic' && !m.dead && !BW.lying(m)));
+    if (v) {
+      BW.stop(v); BW.die(v, A.ADULT ? 'dead' : 'sit');
+      if (A.ADULT) { if (A.blood) A.blood(v.x, 0.6, v.z, 6); BW.pool(v); }
+      crew.lay = 1;
+    }
+  }
+  // нападавшие уходят, остальные избиваемые встают
   for (const m of crew.people) {
-    if (m.dead) continue;
+    if (m.dead || BW.lying(m)) continue;
     if (m.role === 'att') m.flee = 1;
     m.down = 0; m.grp.rotation.x = 0;
   }
@@ -268,6 +274,7 @@ function hangStep (crew, m, dt, near) {
 function fightStep (crew, m, dt, near) {
   const u = m.u;
   if (m.flee) {                                     // уходит прочь от машины и тает за 50 м
+    if (m.bw && (m.bw.f >= 0 || m.bw.st > 0 || m.bw.walk)) BW.stop(m);
     if (m.faT > 0) m.faT -= dt;
     const an = Math.atan2(m.x - A.V.x, m.z - A.V.z) + (m.faT > 0 ? m.fa : 0), x0 = m.x, z0 = m.z;
     m.x += Math.sin(an) * 4.2 * dt; m.z += Math.cos(an) * 4.2 * dt;
@@ -287,48 +294,76 @@ function fightStep (crew, m, dt, near) {
     if (m.down <= 0) m.grp.rotation.x = 0;
     return;
   }
+  if (BW.lying(m)) { BW.animate(m, dt); return; }   // упал в драке (0п91) — лежит, пока сцену не уберут
+  const live = e => !e.dead && !e.flee && !BW.lying(e);
   if (m.role === 'vic') {
-    // закрывается руками, ёжится; после драки — машет «спасибо»
     m.ph += dt;
+    const a = nearest(crew, m, e => e.role === 'att' && live(e));
+    if (crew.over) {                                 // после драки — машет «спасибо»
+      if (m.bw) BW.stop(m);
+      standPose(u);
+      const k = 0.9 + Math.sin(m.ph * 8) * 0.25;
+      u.armL.rotation.x = damp(u.armL.rotation.x, -2.6 * k, 12, dt);
+      u.armR.rotation.x = damp(u.armR.rotation.x, -2.6 * k, 12, dt);
+      m.h = damp(m.h, Math.atan2(A.V.x - m.x, A.V.z - m.z), 4, dt);
+      place(m);
+      return;
+    }
     standPose(u);
-    const k = crew.over ? 0.9 + Math.sin(m.ph * 8) * 0.25 : 1;
-    u.armL.rotation.x = damp(u.armL.rotation.x, -2.6 * k, 12, dt);
-    u.armR.rotation.x = damp(u.armR.rotation.x, -2.6 * k, 12, dt);
-    if (!crew.over) {
-      const a = crew.people.find(x => x.role === 'att' && !x.dead && !x.flee);
-      if (a) m.h = damp(m.h, Math.atan2(a.x - m.x, a.z - m.z), 6, dt);
-    } else m.h = damp(m.h, Math.atan2(A.V.x - m.x, A.V.z - m.z), 4, dt);
+    // огрызается: бьёт ближайшего нападавшего, если тот на расстоянии руки (0п91)
+    if (a) {
+      m.h = BW.face(m.h, m.x, m.z, a.x, a.z, dt, 8);
+      if (BW.ready(m, a, dt) && Math.random() < dt * 1.6) BW.start(m);
+    }
+    const r = BW.animate(m, dt);
+    if (A.pushOut && m.bw && m.bw.st > 0) A.pushOut(m, 0.45);
     place(m);
+    if (r === 'hit' && a) landed(crew, m, a, near);
     return;
   }
-  // нападающий: к ближнему стоящему избиваемому, замах, удар
-  let foe = null, bd = Infinity;
-  for (const e of crew.people) if (e.role === 'vic' && !e.dead) { const d = Math.hypot(e.x - m.x, e.z - m.z); if (d < bd) { bd = d; foe = e; } }
-  if (!foe || crew.over) { m.flee = 1; return; }
-  const dx = foe.x - m.x, dz = foe.z - m.z;
-  if (bd > 1.25) {
-    m.x += dx / bd * 3.4 * dt; m.z += dz / bd * 3.4 * dt;
-    if (A.pushOut) A.pushOut(m, 0.45);
+  // нападающий: к ближнему стоящему избиваемому, на расстояние руки, удар (0п91: кулак доходит до соперника)
+  const foe = nearest(crew, m, e => e.role === 'vic' && live(e) && e.down <= 0), bd = foe ? Math.hypot(foe.x - m.x, foe.z - m.z) : 0;
+  if (!foe || crew.over) { m.flee = 1; if (m.bw) BW.stop(m); return; }
+  const b = BW.bw(m);
+  if (bd > BW.BRAWL.COME && b.f < 0 && b.st <= 0) {
+    const stp = Math.min(3.4 * dt, bd - BW.BRAWL.REACH);
+    m.x += (foe.x - m.x) / bd * stp; m.z += (foe.z - m.z) / bd * stp;
     m.ph += dt * 12; walkPose(u, m.ph); u.armR.rotation.x = -2.6;
+    b.walk = 1;
   } else {
+    if (b.walk) { b.walk = 0; u.legL.rotation.x = u.legR.rotation.x = 0; }
     standPose(u);
-    m.swingCd -= dt;
-    if (m.swingCd <= 0) {
-      m.swingCd = rand(0.6, 1.1); m.swing = 0.25;
-      if (foe.down <= 0 && chance(0.45)) {
-        foe.down = rand(1.4, 2.2);
-        if (near < 70) {
-          A.Snd.fx('fight', s => s.blip(rand(150, 220), 0.06, 'square', 0.07), { x: foe.x, z: foe.z, far: 70 });
-          if (A.ADULT && A.blood) A.blood(foe.x, 1.2, foe.z, 4);   // детская — без крови, только звёздочки
-          else if (A.emote) A.emote(foe.x, 2, foe.z, 'angry', 1);
-        }
-      }
-    }
-    if (m.swing > 0) { m.swing -= dt; u.armR.rotation.x = -2.8 + (0.25 - m.swing) * 9; }
-    else u.armR.rotation.x = damp(u.armR.rotation.x, -2.7, 8, dt);
+    if (BW.ready(m, foe, dt)) BW.start(m);
   }
-  m.h = damp(m.h, Math.atan2(dx, dz), 10, dt);
+  // не слипаться с такими же нападавшими: расходятся на расстояние плеча
+  for (const e of crew.people) {
+    if (e === m || e.dead || BW.lying(e)) continue;
+    const ex = m.x - e.x, ez = m.z - e.z, ed = Math.hypot(ex, ez);
+    if (ed < 0.55 && ed > 0.001) { const k = (0.55 - ed) * 0.5 / ed; m.x += ex * k; m.z += ez * k; }
+  }
+  if (A.pushOut) A.pushOut(m, 0.45);
+  m.h = BW.face(m.h, m.x, m.z, foe.x, foe.z, dt, 10);
+  const r = BW.animate(m, dt);
   place(m);
+  if (r === 'hit') landed(crew, m, foe, near);
+}
+
+/* ближайший живой подходящий (pred) к m */
+function nearest (crew, m, pred) {
+  let best = null, bd = Infinity;
+  for (const e of crew.people) if (e !== m && pred(e)) { const d = Math.hypot(e.x - m.x, e.z - m.z); if (d < bd) { bd = d; best = e; } }
+  return best;
+}
+/* кулак долетел: тот, кому попало, отшатывается; звук и (взрослая) кровь — не на каждый удар */
+function landed (crew, m, foe, near) {
+  BW.hurt(foe, m.x, m.z, m.role === 'att' ? 1 : 0.6);
+  if (near < 70) {
+    A.Snd.fx('fight', s => s.blip(rand(150, 220), 0.06, 'square', 0.07), { x: foe.x, z: foe.z, far: 70 });
+    if (chance(0.45)) {
+      if (A.ADULT && A.blood) A.blood(foe.x, 1.2, foe.z, 4);   // детская — без крови, только звёздочки
+      else if (A.emote) A.emote(foe.x, 2, foe.z, 'angry', 1);
+    }
+  }
 }
 
 /* наезд — как у мафиози: прямоугольник кузова; быстрее TIER.FALL — сбит (hits.js решает, как) */

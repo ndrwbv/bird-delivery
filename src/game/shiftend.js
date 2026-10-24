@@ -77,7 +77,7 @@ function calHTML (c) {
   const cells = (c.cells || []).map(q => '<i class="sc-c sc-' + esc(q.sea) + (q.to ? ' sc-to-' + esc(q.to) : '') + (q.next ? ' sc-next' : '') + (q.hol ? ' sc-hol' : '') +
     '" title="' + esc(q.name) + '">' + (q.hol ? '\u2605' : SEA_ICON[q.to || q.sea] || '') + '</i>').join('');
   return '<div class="cr-rc-cal"><p class="sc-t"><span class="pp-mark">' + esc(c.text) + '</span>' + (c.hol ? ' · <b>' + esc(c.hol.text) + '</b>' : '') + '</p>' +
-    '<p class="sc-s">' + esc(c.sub) + '</p><p class="sc-row">' + cells + '</p></div>';
+    (c.sub ? '<p class="sc-s">' + esc(c.sub) + '</p>' : '') + '<p class="sc-row">' + cells + '</p></div>';
 }
 
 export function play ({ host, tap = null, head = '', no = 0, why = '', rows = [], total = null, hints = [], seal = null, party = '', sticker = null,

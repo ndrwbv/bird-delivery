@@ -29,6 +29,8 @@
    Машина: бордюр — не стена. Колесо переехало камень — толчок вверх (BUMP / BUMP_ON м, гаснет за ~0,2 с) и тряска
    камеры; передними на газон — теряешь скорость и уводит вбок (took() → carbump.js 'curb'), с газона — слабее, задними — чуть.
    Люди и машины потока — как раньше.
+   Земля за камнем поднята (0п68, 24.10.2026): от верха камня к газону — скат травы BERM м (узкий газон — BERM_N); машина встаёт
+   на него колёсами (liftAt → game.js), толчок пружины вдвое мягче. ?noberm — без ската.
 
    Всё — треугольниками в клетки земли и дорог (LITM): новых вызовов отрисовки нет. Телефон (MOB): секции
    длиннее (SEC_MOB), одного цвета — вершины соседних секций общие; камень клином (грань к дорожке и скат к
@@ -39,6 +41,7 @@
      CURBS.bump(V, dt)           — каждый кадр езды: толчок от бордюра под колёсами, м (прибавка к высоте кузова)
      CURBS.took()                — какой удар был ('curb' | 'curbOff' | 'curbRear' | ''): game.js бьёт им машину (carbump.js)
      CURBS.near(x, z, r)         — бордюр ближе r (yarddecor.js: не ставить на него)
+     CURBS.liftAt(x, z)          — высота камня / ската над рельефом в точке, м (0 — нет): машина игрока на скате (game.js)
    ?nocurbs — без бордюров, ?oldcurbs — как до 24.10.2026 (проезды только во дворах, без улиц и тупиков; сравнить).
    ────────────────────────────────────────────────────────────────────────── */
 
@@ -66,6 +69,10 @@ export const CURB = {
   STRIP: 0.25,        // за камнем газон уже этого, а дальше вдоль края мощёное — это шов, не газон: бордюра нет, м (0п35, 24.10.2026:
                       // «есть газон — есть бордюр»; до того — 0,9: полоски до 0,9 м были без камня; телефон и ?oldcurbs — как было)
   STRIP_OLD: 0.9,
+  BERM: 0.9,          // за камнем земля поднята (0п68, 24.10.2026: «нужно просто землю поднять относительно дороги»): скат газона от верха
+                      // камня вниз до газона, м; ?noberm — без ската (как было: камень торчит над газоном на 0,2 м)
+  BERM_N: 0.35,       // газон за камнем узкий (в 0,45 м снова мощёное) — скат короче, м
+  BERM_HEX: '#a2cf86',  // цвет ската — газона двора (game.js GREEN_HEX.green; сезоны красят его как газон: зелёное и смотрит вверх)
 };
 /* шагов дуги на изломе на угол da (рад) — один и тот же у плитки (bendFan) и у камня (arc) */
 export const arcN = da => Math.max(1, Math.ceil(Math.abs(da) / CURB.ARC - 1e-6));
@@ -210,67 +217,99 @@ const inZone = (x, z) => ZN.has(ck(Math.floor(x / ZC), Math.floor(z / ZC)));
 /* ── толчок: куски бордюра по клеткам BC м (середина камня, отрезок). На время сборки — массивы чисел по клеткам,
    потом — один Float32Array, по ключу клетки — где начинается и сколько (BI: начало × 1024 + сколько) ── */
 const BC = 32;
-let BG = new Map(), BI = new Map(), BF = null;
-function bgAdd (ax, az, bx, bz, nx, nz) {
+let BG = new Map(), BI = new Map(), BF = null, BWF = null;   // BWF — по куску: ширина ската и верх камня (0п68)
+function bgAdd (ax, az, bx, bz, nx, nz, top = 0) {
   if ((bx - ax) * nz - (bz - az) * nx < 0) { let t = ax; ax = bx; bx = t; t = az; az = bz; bz = t; }   // газон — слева от a→b (толчок знает, куда заехал)
-  for (let i = Math.floor((Math.min(ax, bx) - 0.2) / BC); i <= Math.floor((Math.max(ax, bx) + 0.2) / BC); i++)
-    for (let j = Math.floor((Math.min(az, bz) - 0.2) / BC); j <= Math.floor((Math.max(az, bz) + 0.2) / BC); j++) {
+  const mg = 0.2 + (BERM ? BW : 0);                 // скат — тоже в клетках, где он лежит (liftAt)
+  for (let i = Math.floor((Math.min(ax, bx) - mg) / BC); i <= Math.floor((Math.max(ax, bx) + mg) / BC); i++)
+    for (let j = Math.floor((Math.min(az, bz) - mg) / BC); j <= Math.floor((Math.max(az, bz) + mg) / BC); j++) {
       const k = ck(i, j);
       let a = BG.get(k);
       if (!a) BG.set(k, a = []);
-      a.push(ax, az, bx, bz);
+      a.push(ax, az, bx, bz, BERM ? BW : 0, top);  // + скат: ширина и верх камня над рельефом (liftAt)
     }
 }
 function bgPack () {
   let n = 0;
-  for (const a of BG.values()) n += Math.min(a.length, 4 * 1023);
-  BF = new Float32Array(n);
+  for (const a of BG.values()) n += Math.min(a.length / 6, 1023) * 4;
+  BF = new Float32Array(n); BWF = new Float32Array(n / 2);
   let o = 0;
   for (const [k, a] of BG) {
-    const m = Math.min(a.length, 4 * 1023);
-    for (let i = 0; i < m; i++) BF[o + i] = a[i];
-    BI.set(k, (o / 4) * 1024 + m / 4);
-    o += m;
+    const m = Math.min(a.length / 6, 1023);
+    for (let i = 0; i < m; i++) { for (let j = 0; j < 4; j++) BF[o + i * 4 + j] = a[i * 6 + j]; BWF[(o / 2) + i * 2] = a[i * 6 + 4]; BWF[(o / 2) + i * 2 + 1] = a[i * 6 + 5]; }
+    BI.set(k, (o / 4) * 1024 + m);
+    o += m * 4;
   }
   BG = null;
 }
 
 /* ── геометрия: секция камня от (x0, z0) до (x1, z1) по средней линии; nx, nz — от дорожки к газону ── */
 let LITM = null, SEC = 1, MOB = false;
+let BERM = false, BW = 0;                           // скат газона за камнем (0п68): включён, ширина у текущего куска, м
+/* ?nomiter — торцы камня на изломе поперёк, дуги по хорде, просадка где попало (как до 0п72; сравнить стыки — curb-joins.js) */
+const NOMITER = typeof location !== 'undefined' && /[?&]nomiter(&|$)/.test(location.search);
+const TRACE = typeof location !== 'undefined' && /[?&]curbtrace(&|$)/.test(location.search) ? [] : null;   // по 18 чисел на секцию: углы торцов (низ — вверх) и средняя линия
 const hexOf = (x, z, k) => (MOB ? CURB.HEX[0] : hsh(x, z, 5) < CURB.CHIPS ? CURB.CHIP : CURB.HEX[k & 1]);
-function section (x0, z0, x1, z1, nx, nz, lift, k) {
+/* ta, tb — «в ус» (0п72, 24.10.2026): торец секции на изломе лежит не поперёк камня, а по биссектрисе излома — как у соседнего
+   отрезка, и два камня сходятся без щели и нахлёста. Вершина торца на расстоянии s поперёк (к газону — плюс) от средней
+   линии сдвинута вдоль камня на +s·ta в начале и на −s·tb в конце; ta, tb = tg(половины угла излома), плюс — если газон
+   со стороны, куда поворачивает дорожка, минус — снаружи поворота. en — свои нормали торцов [n0x, n0z, n1x, n1z] (дуга: по лучу
+   из центра, как у веера плитки и соседнего отрезка); flat — без просадки (концы стыкуются с соседом по высоте) */
+function section (x0, z0, x1, z1, nx, nz, lift, k, ta = 0, tb = 0, en = null, flat = false) {
   const hw = CURB.W / 2 + CURB.IN / 2, ow = CURB.W / 2 - CURB.IN / 2;
-  const ix0 = x0 - nx * hw, iz0 = z0 - nz * hw, ix1 = x1 - nx * hw, iz1 = z1 - nz * hw;   // к дорожке
-  const ox0 = x0 + nx * ow, oz0 = z0 + nz * ow, ox1 = x1 + nx * ow, oz1 = z1 + nz * ow;   // к газону
+  const n0x = en ? en[0] : nx, n0z = en ? en[1] : nz, n1x = en ? en[2] : nx, n1z = en ? en[3] : nz;
+  let ux = 0, uz = 0;
+  if (ta || tb) { const l = Math.hypot(x1 - x0, z1 - z0) || 1; ux = (x1 - x0) / l; uz = (z1 - z0) / l; }
+  const ix0 = x0 - n0x * hw - ux * hw * ta, iz0 = z0 - n0z * hw - uz * hw * ta, ix1 = x1 - n1x * hw + ux * hw * tb, iz1 = z1 - n1z * hw + uz * hw * tb;   // к дорожке
+  const ox0 = x0 + n0x * ow + ux * ow * ta, oz0 = z0 + n0z * ow + uz * ow * ta, ox1 = x1 + n1x * ow - ux * ow * tb, oz1 = z1 + n1z * ow - uz * ow * tb;   // к газону
   const gi0 = A.groundH(ix0, iz0), gi1 = A.groundH(ix1, iz1), go0 = A.groundH(ox0, oz0), go1 = A.groundH(ox1, oz1);
   let t0 = Math.max(gi0, go0) + lift + CURB.H, t1 = Math.max(gi1, go1) + lift + CURB.H;
-  if (!MOB && hsh(x0, z0, 3) < CURB.SUNK) { const s = 0.03 + hsh(x0, z0, 4) * 0.03; if (hsh(x1, z1, 6) < 0.5) { t0 -= s; t1 -= s * 0.4; } else { t1 -= s; t0 -= s * 0.4; } }
+  if (!MOB && !flat && hsh(x0, z0, 3) < CURB.SUNK) { const s = 0.03 + hsh(x0, z0, 4) * 0.03; if (hsh(x1, z1, 6) < 0.5) { t0 -= s; t1 -= s * 0.4; } else { t1 -= s; t0 -= s * 0.4; } }
   LITM.color(hexOf(x0, z0, k));
   const b0 = gi0 + lift - 0.035, b1 = gi1 + lift - 0.035;
   LITM.quad(ix0, b0, iz0, ix1, b1, iz1, ix1, t1, iz1, ix0, t0, iz0);           // к дорожке
-  if (MOB) {                                         // клин: от верха грани к дорожке — скатом к газону
+  if (BERM && BW > 0) {                              // 0п68: за камнем земля поднята — скат газона от верха камня до газона (BW м)
+    const fw = (MOB ? -hw : ow) + BW, lim = 1.2 / fw;  // «в ус» и у ската: торец по биссектрисе (на остром изломе — не дальше 1,2 м вдоль)
+    const fa = Math.max(-lim, Math.min(lim, ta)), fb = Math.max(-lim, Math.min(lim, tb));
+    const fx0 = x0 + n0x * fw + ux * fw * fa, fz0 = z0 + n0z * fw + uz * fw * fa, fx1 = x1 + n1x * fw - ux * fw * fb, fz1 = z1 + n1z * fw - uz * fw * fb;
+    const gf0 = A.groundH(fx0, fz0) - 0.01, gf1 = A.groundH(fx1, fz1) - 0.01;   // конец ската — чуть ниже газона (0,04): уходит под него
+    if (MOB) {                                       // телефон: грань к дорожке камнем, сверху сразу скат (без верха камня — те же 4 треугольника)
+      LITM.color(CURB.BERM_HEX);
+      LITM.quad(ix0, t0, iz0, ix1, t1, iz1, fx1, gf1, fz1, fx0, gf0, fz0);
+    } else {
+      LITM.quad(ix0, t0, iz0, ix1, t1, iz1, ox1, t1, oz1, ox0, t0, oz0);       // верх камня
+      LITM.color(CURB.BERM_HEX);
+      LITM.quad(ox0, t0, oz0, ox1, t1, oz1, fx1, gf1, fz1, fx0, gf0, fz0);     // скат газона (вместо грани камня к газону)
+    }
+  } else if (MOB) {                                  // клин: от верха грани к дорожке — скатом к газону
     LITM.quad(ix0, t0, iz0, ix1, t1, iz1, ox1, go1 - 0.03, oz1, ox0, go0 - 0.03, oz0);
   } else {
     LITM.quad(ix0, t0, iz0, ix1, t1, iz1, ox1, t1, oz1, ox0, t0, oz0);         // верх
     LITM.quad(ox0, t0, oz0, ox1, t1, oz1, ox1, go1 - 0.03, oz1, ox0, go0 - 0.03, oz0);   // к газону
   }
+  if (TRACE) TRACE.push(ix0, iz0, t0, ox0, oz0, t0, ix1, iz1, t1, ox1, oz1, t1, (x0 + x1) / 2, (z0 + z1) / 2, x0, z0, x1, z1);   // ?curbtrace: углы секции для проверки стыков (curb-joins.js)
   ST.secs++;
 }
 /* кусок [t0, t1] края: секции и толчок */
-function run (P, ux, uz, nx, nz, t0, t1, lift) {
+function run (P, ux, uz, nx, nz, t0, t1, lift, ta = 0, tb = 0, fa = false, fb = false) {
   const L = t1 - t0;
   if (L < CURB.MIN) return;
   const n = Math.max(1, Math.round(L / SEC)), sl = L / n;
   const k0 = Math.round(t0 / SEC);
+  if (BERM) {                                        // скат за камнем: в 0,45 м за ним снова мощёное (начало, середина, конец куска) — короче
+    const g = CURB.W / 2 + 0.45;
+    BW = CURB.BERM;
+    for (const t of [t0 + 0.2, (t0 + t1) / 2, t1 - 0.2]) if (paved(P[0] + ux * t + nx * g, P[1] + uz * t + nz * g)) { BW = CURB.BERM_N; break; }
+  }
   for (let k = 0; k < n; k++) {
     const a = k ? t0 + k * sl : t0, b = k + 1 < n ? t0 + (k + 1) * sl : t1;   // концы соседних секций — одно и то же число (общие вершины)
-    section(P[0] + ux * a, P[1] + uz * a, P[0] + ux * b, P[1] + uz * b, nx, nz, lift, k0 + k);
+    section(P[0] + ux * a, P[1] + uz * a, P[0] + ux * b, P[1] + uz * b, nx, nz, lift, k0 + k, k ? 0 : ta, k + 1 < n ? 0 : tb, null, (!k && fa) || (k + 1 === n && fb));
   }
-  bgAdd(P[0] + ux * t0, P[1] + uz * t0, P[0] + ux * t1, P[1] + uz * t1, nx, nz);
+  bgAdd(P[0] + ux * t0, P[1] + uz * t0, P[0] + ux * t1, P[1] + uz * t1, nx, nz, lift + CURB.H);
   ST.runs++; ST.m += L;
 }
 /* край отрезка: P — начало средней линии камня, вдоль u на L м; где не накрыто — куски */
-function edge (P, ux, uz, nx, nz, L, lift, self, t0 = 0) {
+function edge (P, ux, uz, nx, nz, L, lift, self, t0 = 0, J = null) {
   const st = CURB.STEP, at = t => (RSW > 0 && raised(P[0] + ux * t, P[1] + uz * t, nx, nz) && ++ST.raised > 0) ||
     covered(P[0] + ux * t, P[1] + uz * t, self) || (strip(P[0] + ux * t, P[1] + uz * t, ux, uz, nx, nz) && ++ST.strip > 0);
   const fine = (a, b, wantFree) => {              // граница между a (как wantFree) и b — делением пополам
@@ -299,23 +338,24 @@ function edge (P, ux, uz, nx, nz, L, lift, self, t0 = 0) {
   for (let t = t0; ; t += st) {
     const tt = Math.min(t, L), free = !at(tt);
     if (free && s0 === null) s0 = tt > t0 && !prevFree ? fine(tt, prevT, true) : tt;
-    if (!free && s0 !== null) { run(P, ux, uz, nx, nz, s0, fine(prevT, tt, true), lift); s0 = null; ST.cut++; }
+    if (!free && s0 !== null) { run(P, ux, uz, nx, nz, s0, fine(prevT, tt, true), lift, J && s0 === t0 ? J.ma : 0, 0, !!J && s0 === t0 && J.fa, false); s0 = null; ST.cut++; }
     prevT = tt; prevFree = free;
     if (tt >= L) break;
   }
   EH = EL = EY = EX = true; EP = false;
-  if (s0 !== null) run(P, ux, uz, nx, nz, s0, L, lift);
+  if (s0 !== null) run(P, ux, uz, nx, nz, s0, L, lift, J && s0 === t0 ? J.ma : 0, J ? J.mb : 0, !!J && s0 === t0 && J.fa, !!J && J.fb);
 }
 /* дуга снаружи излома: вокруг точки (cx, cz) радиусом r от угла a0 на da */
 function arc (cx, cz, r, a0, da, lift, self) {
   const n = arcN(da);
+  BW = CURB.BERM;                                    // скат снаружи излома — полный (0п68)
   for (let k = 0; k < n; k++) {
     const a = a0 + da * k / n, b = a0 + da * (k + 1) / n, m = (a + b) / 2;
     const mx = cx + Math.cos(m) * r, mz = cz + Math.sin(m) * r;
     if (covered(mx, mz, self)) continue;
     const x0 = cx + Math.cos(a) * r, z0 = cz + Math.sin(a) * r, x1 = cx + Math.cos(b) * r, z1 = cz + Math.sin(b) * r;
-    section(x0, z0, x1, z1, Math.cos(m), Math.sin(m), lift, k);
-    bgAdd(x0, z0, x1, z1, Math.cos(m), Math.sin(m));
+    section(x0, z0, x1, z1, Math.cos(m), Math.sin(m), lift, k, 0, 0, NOMITER ? null : [Math.cos(a), Math.sin(a), Math.cos(b), Math.sin(b)], !NOMITER);   // торцы — по лучам, как соседние секции и отрезки
+    bgAdd(x0, z0, x1, z1, Math.cos(m), Math.sin(m), lift + CURB.H);
     ST.arcs++; ST.m += Math.hypot(x1 - x0, z1 - z0);
   }
 }
@@ -350,7 +390,12 @@ function line (pts, hw, lift, segs, pre = null, post = null) {
       const cutB = tB && tB.cr * sd > 0 ? Math.min(L / 2, off * tB.tan) : mB ? -off * tB.tan : 0;
       if (cutA || cutB) ST.miter++;
       if (L - cutA - cutB < CURB.MIN) continue;
-      edge([ax + nx * off, az + nz * off], ux, uz, nx, nz, L - cutB, lift, self, cutA);
+      // торцы по биссектрисе (0п72): изнутри излома — если обрезали ровно по ней (не зажали половиной отрезка), снаружи у точки дуги — продлили до неё;
+      // снаружи с дугой — торец по лучу, высота как у дуги (без просадки)
+      const inA = tA && tA.cr * sd > 0, inB = tB && tB.cr * sd > 0;
+      const ma = inA ? (cutA >= off * tA.tan - 1e-6 ? tA.tan : 0) : mA ? -tA.tan : 0, mb = inB ? (cutB >= off * tB.tan - 1e-6 ? tB.tan : 0) : mB ? -tB.tan : 0;
+      const arcA = !inA && !mA && !!tA && !RSW, arcB = !inB && !mB && !!tB && !RSW;
+      edge([ax + nx * off, az + nz * off], ux, uz, nx, nz, L - cutB, lift, self, cutA, NOMITER ? null : { ma, mb, fa: !!ma || arcA, fb: !!mb || arcB });
     }
     if (i < pts.length - 1 && !RSW && !mB) {        // излом: снаружи — дугой от нормали этого отрезка до нормали следующего (у улиц — нет: угол тротуара — пятно, не дуга)
       const [cx, cz] = pts[i + 1], L2 = Math.hypot(cx - bx, cz - bz);
@@ -392,7 +437,10 @@ function ring (p, lift) {
     const eA = ext(U[pi], u), eB = ext(u, U[ni]);
     if (u[2] + eA + eB < CURB.MIN) continue;
     if (eA || eB) ST.miter++;
-    edge([a[0] + nx * off, a[1] + nz * off], u[0], u[1], nx, nz, u[2] + eB, lift, null, -eA);
+    // торцы по биссектрисе (0п72): продлили (выпуклый угол — снаружи поворота, ta < 0) или обрезали (вогнутый, ta > 0) ровно до неё — не зажатый 0,3 м
+    const tn = (u0, v0) => { const cr = u0[0] * v0[1] - u0[1] * v0[0], dot = u0[0] * v0[0] + u0[1] * v0[1]; return Math.abs(cr) / Math.max(0.05, 1 + dot); };
+    const ma = eA && Math.abs(eA) >= off * tn(U[pi], u) - 1e-9 ? tn(U[pi], u) * (eA > 0 ? -1 : 1) : 0, mb = eB && Math.abs(eB) >= off * tn(u, U[ni]) - 1e-9 ? tn(u, U[ni]) * (eB > 0 ? -1 : 1) : 0;
+    edge([a[0] + nx * off, a[1] + nz * off], u[0], u[1], nx, nz, u[2] + eB, lift, null, -eA, NOMITER ? null : { ma, mb, fa: !!ma, fb: !!mb });
   }
 }
 
@@ -401,6 +449,7 @@ export function* build (api) {
   if (QS && QS.has('nocurbs')) return ST;
   const OLD = !!(QS && QS.has('oldcurbs'));         // ?oldcurbs — как до 24.10.2026: проезды только во дворах, без тупиков и улиц, камень 0,12 м, без потери скорости (сравнить)
   if (OLD) { RULES.on = false; CURB.H = 0.12; }
+  BERM = !OLD && !(QS && QS.has('noberm'));        // 0п68: за камнем — скат газона (земля поднята); ?noberm, ?oldcurbs — без
   const t0 = performance.now();
   A = api; LITM = api.LITM; MOB = !!(api.mobile && api.mobile()); SEC = MOB ? CURB.SEC_MOB : CURB.SEC; ST.mob = MOB ? 1 : 0;
   const EVERY = !MOB && !OLD;                       // 0п35 (24.10.2026, «бордюры везде, где есть стыки между землёй и дорожками»): дорожки — по всему
@@ -571,8 +620,8 @@ export function bump (V, dt) {
     const f = step < 3 ? crosses(BS.fx, BS.fz, fx, fz) : 0, r = step < 3 && !f ? crosses(BS.rx, BS.rz, rx, rz) : 0;
     if (f || r) {
       const k = Math.min(1, 0.35 + sp / 9);
-      BS.vy = Math.max(BS.vy, (f > 0 ? CURB.BUMP_ON : CURB.BUMP) * k * 18);    // вверх, гаснет пружиной
-      BS.shake = (f > 0 ? 0.09 : 0.06) * k;
+      BS.vy = Math.max(BS.vy, (f > 0 ? CURB.BUMP_ON : CURB.BUMP) * k * (BERM ? 9 : 18));    // вверх, гаснет пружиной; со скатом (0п68) — вдвое мягче: кузов и так встаёт на поднятую землю
+      BS.shake = (f > 0 ? 0.09 : 0.06) * k * (BERM ? 0.45 : 1);
       BS.hit = f > 0 ? 'curb' : f < 0 ? 'curbOff' : 'curbRear';
       ST.bumps++;
       if (f > 0) ST.onLawn++; else if (f < 0) ST.offLawn++;
@@ -581,14 +630,36 @@ export function bump (V, dt) {
   BS.fx = fx; BS.fz = fz; BS.rx = rx; BS.rz = rz;
   // пружина: подкинуло и опустилось (~0,2 с)
   BS.lift += BS.vy * dt;
-  BS.vy -= (BS.lift * 380 + BS.vy * 18) * dt;
+  BS.vy -= (BERM ? BS.lift * 160 + BS.vy * 14 : BS.lift * 380 + BS.vy * 18) * dt;   // со скатом — пружина мягче и дольше (~0,3 с): «мягкий толчок подвески»
   if (BS.lift < 0) { BS.lift = 0; if (BS.vy < 0) BS.vy = 0; }
   if (BS.lift > CURB.LIFT_MAX) BS.lift = CURB.LIFT_MAX;
   return BS.lift;
+}
+/* Высота земли за камнем в точке (0п68): над камнем — его верх, на скате — от верха вниз до газона; нет ската — 0. В метрах над
+   рельефом (как paveLift и curbAt в game.js): машина игрока встаёт на скат передними и задними колёсами (game.js, кузов и наклон) */
+export function liftAt (x, z) {
+  if (!ON || !BERM) return 0;
+  const v = BI.get(ck(Math.floor(x / BC), Math.floor(z / BC)));
+  if (v === undefined) return 0;
+  const a = BF, i0 = Math.floor(v / 1024) * 4, i1 = i0 + (v % 1024) * 4, hw = CURB.W / 2;
+  let h = 0;
+  for (let i = i0; i < i1; i += 4) {
+    const w = BWF[i / 2];
+    if (!w) continue;
+    const ax = a[i], az = a[i + 1], ex = a[i + 2] - ax, ez = a[i + 3] - az, l2 = ex * ex + ez * ez;
+    if (l2 < 1e-6) continue;
+    const t = ((x - ax) * ex + (z - az) * ez) / l2;
+    if (t < -0.02 || t > 1.02) continue;
+    const s = (ex * (z - az) - ez * (x - ax)) / Math.sqrt(l2);   // к газону — плюс (bgAdd: газон слева)
+    if (s < -hw || s > hw + w) continue;
+    const top = BWF[i / 2 + 1], y = s <= hw ? top : top * (1 - (s - hw) / w);
+    if (y > h) h = y;
+  }
+  return h;
 }
 /* тряска камеры от последнего толчка (game.js берёт и обнуляет) */
 export function shake () { const s = BS.shake; BS.shake = 0; return s; }
 /* какой удар был за кадр ('curb' | 'curbOff' | 'curbRear' | ''): game.js берёт, обнуляет и бьёт машину (carbump.js hit) */
 export function took () { const h = BS.hit; BS.hit = ''; return RULES.on ? h : ''; }
 
-export const DEBUG = { CURB, ST, near, get api () { return A; }, get cells () { return BI.size; }, get floats () { return BF ? BF.length : 0; }, get segs () { return BF; }, BS };
+export const DEBUG = { CURB, ST, near, liftAt, get berm () { return BERM; }, get trace () { return TRACE; }, get api () { return A; }, get cells () { return BI.size; }, get floats () { return BF ? BF.length : 0; }, get segs () { return BF; }, BS };

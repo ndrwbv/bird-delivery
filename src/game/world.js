@@ -484,7 +484,7 @@ function richLate () {
     const old = base.mesh;
     old.traverse(o => { if (o.isMesh && o.geometry) o.geometry.dispose(); });
     const model = pick(['suv', 'suv', 'sedan']);
-    const mesh = A.makeCarLite(pick(HEX), model);
+    const mesh = A.makeCarLite(pick(HEX), model, false, 'park');   // стоит — пустая (без водителя за стеклом, 0п69)
     const car = Object.assign(base, { mesh, model, hl: mesh.userData.hl, x, z, h: ry, lux: 1 });
     A.poseOnSlope(car);
     A.scene.add(mesh);
@@ -1344,7 +1344,9 @@ function gangClear () {
    правила (гопники, мзда, заказы). Заготовка на район — картинка клеток (1 пиксель — клетка GMAP.CELL) и путь
    края (Path2D в клетках), заново — только когда донат сдвинул границу. На кадр — drawImage и stroke на район
    под матрицей «клетка → экран»: радар не тяжелеет. */
-const GANG_DRAW = { FILL_RADAR: 0.2, FILL_MAP: 0.22, EDGE_RADAR: 0.85, EDGE_MAP: 0.9, W_RADAR: 1.8, W_MAP: 2.2, HEX: '#c41e24' };
+/* без жёсткой обводки (автор 24.10.2026, 0п56: «очень жёсткая красная граница непонятно чего») — только мягкая красноватая
+   заливка; край её размыт сам (картинка клеток растягивается со сглаживанием). EDGE_* > 0 вернёт тонкую линию */
+const GANG_DRAW = { FILL_RADAR: 0.24, FILL_MAP: 0.26, EDGE_RADAR: 0, EDGE_MAP: 0, W_RADAR: 1.8, W_MAP: 2.2, HEX: '#c41e24' };
 const GART = new Map();
 function gangArt (m, cut) {
   let c = GART.get(m);
@@ -1398,9 +1400,11 @@ function drawGang (ctx, tr, fill, edge, lw, near) {
     ctx.imageSmoothingEnabled = true;
     ctx.globalAlpha = fill;
     ctx.drawImage(art.img, 0, 0);
-    ctx.globalAlpha = edge;
-    ctx.strokeStyle = GANG_DRAW.HEX; ctx.lineWidth = lw / sc; ctx.lineCap = 'square';
-    ctx.stroke(art.path);
+    if (edge > 0) {
+      ctx.globalAlpha = edge;
+      ctx.strokeStyle = GANG_DRAW.HEX; ctx.lineWidth = lw / sc; ctx.lineCap = 'square';
+      ctx.stroke(art.path);
+    }
     ctx.restore();
     ctx.globalAlpha = a0;
   }

@@ -130,7 +130,7 @@ function keysHint (after) {
   const pick = GAME !== 'slot' ? k('x') + k('y') + esc(t('выбор')) : '';
   h.innerHTML = after
     ? [k('ok') + esc(FLOW ? t('дальше') : t('на работу')), k('x') + esc(t('крутить ещё')), k('back') + esc(t('назад'))].join('<i>·</i>')
-    : [k('lb') + k('rb') + esc(t('ставка')), pick, k('ok') + esc(t('деп')), k('back') + esc(t('назад'))].filter(Boolean).join('<i>·</i>');
+    : [k('lb') + k('rb') + esc(t('ставка')), pick, k('ok') + esc(t('деп')), k('back') + esc(FLOW ? t('не сейчас') : t('назад'))].filter(Boolean).join('<i>·</i>');
 }
 /* шаг кнопок −/+: ~1/20 кошелька, круглым числом */
 function stakeStep () {
@@ -190,9 +190,11 @@ function stageHTML (g) {
    (игрок уже нажал «Деп» на листе), next — после итога главная кнопка «дальше» и «назад» ведут к следующему экрану,
    а не на новую смену. Без o — как было: ставка — заработанное за смену, «пора на работу» */
 let FLOW = null;
+let ARM_AT = 0;                                    // конец смены, окно открылось само (0п60): первые 0,6 с «ДЕП» не жмётся — кто долбил «дальше», не поставит нечаянно
 export function open (o = {}) {
   CL.transFor('деп', 2500);                        // метка перехода (crashlog.js, 0п48)
   FLOW = typeof o.next === 'function' ? o.next : null;
+  ARM_AT = FLOW && !o.spin ? performance.now() + 600 : 0;
   const md = box();
   GAME = game();
   MATCH = GAME === 'tennis' ? HQ.match() : [];
@@ -203,7 +205,7 @@ export function open (o = {}) {
   md.querySelector('.dep-t').textContent = t(NAME[GAME]);
   md.querySelector('.dep-g').textContent = t('депнуть') + ' · ' + t('выигрыш ×{k}', { k: mul(GAME) });
   md.querySelector('.dep-quick [data-k="1"]').textContent = t('всё');
-  md.querySelector('.dep-close').textContent = t('назад');
+  md.querySelector('.dep-close').textContent = FLOW ? t('не сейчас') : t('назад');   // конец смены (0п60): сразу сюда — «не сейчас» дальше
   keysHint();
   md.querySelector('.dep-stage').innerHTML = stageHTML(GAME);
   md.querySelectorAll('.dep-pick').forEach(b => b.addEventListener('click', () => choose(b.dataset.p)));
@@ -340,7 +342,7 @@ function pile (n, quiet) {
 function spin () {
   const md = box();
   const st = Math.min(STAKE, stepDown(A.wallet()));
-  if (SH.slot || SPINNING || st <= 0 || (GAME !== 'slot' && !PICK)) return;
+  if (SH.slot || SPINNING || st <= 0 || (GAME !== 'slot' && !PICK) || performance.now() < ARM_AT) return;
   SH.slot = true; SPINNING = true;
   DEP_SESSION++;
   const cfg = ECON.SLOT[GAME] || {};
@@ -386,6 +388,7 @@ function spin () {
     const go = md.querySelector('.dep-go');
     go.innerHTML = '<span>' + esc(FLOW ? t('дальше') : t('пора на работу')) + '</span>'; go.disabled = false;
     md.querySelector('.dep-close').disabled = false;
+    md.querySelector('.dep-close').textContent = t('назад');
     const ag = md.querySelector('.dep-again');
     ag.textContent = t('крутить ещё'); keysHint(true); ag.hidden = stepDown(A.wallet()) <= 0;   // [X] — нарочно мелко (dep.css)
     if (H.refreshWallet) H.refreshWallet();

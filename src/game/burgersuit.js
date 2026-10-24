@@ -8,15 +8,22 @@
    (SUIT.OFF) костюм слетает и кувыркается отдельно, а человек летит без него.
 
      SUIT.dress(A, grp)       — надеть костюм на группу человека (один меш, общая геометрия и материал на всех)
-     SUIT.hit(A, p, vx, vz)   — сбит (машиной, взрывом, конкурентом): человек отлетает (A.gibHuman), костюм — на нём или слетает
+     SUIT.hit(A, p, vx, vz, o) — сбит (машиной, взрывом, конкурентом): человек отлетает (A.gibHuman), костюм — на нём или слетает;
+                                o — как у hits.js hit: { up, one, back } (game.js burgerHit)
+     SUIT.sign(A, grp)        — табличка зазывалы у бургерной (0п70)
      SUIT.step(dt)            — каждый кадр: слетевшие костюмы падают, лежат и тают
      SUIT.STATS               — сколько надето, сбито, слетело костюмов
    A — { THREE, scene, put, mergeGeos, gibHuman, groundH }. Геометрия — при первом костюме (поздняя сборка, после buildCity:
    вещи three.js до стройки города сдвигают «зерно», docs/AGENTS.md). */
 
+/* 0п70 (автор 24.10.2026: «людей в костюмах бургеров слишком много; их должно быть меньше, и они обитают около бургерных
+   в основном»): по тротуарам — один на всю округу (прохожих вокруг машины ~44: примерно 1 на 45), на сходке у ТЦ — 4,
+   а у точек «Королевы Бургеров» (rivals.js) — зазывалы с табличкой на палке: у каждой ближней точки 1—3 (PER, жребий —
+   по месту), всего BARK на город; уехал — зазывалы переходят к точкам рядом с тобой (за кадром, дальше BARK_FAR м) */
 export const SUIT = {
-  N: 28,            // ходят по тротуарам (было 40 бургеров)
-  HANG: 12,         // на сходке у ТЦ (было 16)
+  N: 1,             // ходят по тротуарам (было 28; до 23.10 — 40 бургеров)
+  HANG: 4,          // на сходке у ТЦ (было 12)
+  BARK: 6, PER: [1, 3], BARK_FAR: 200,   // зазывал у бургерных всего; у одной точки; переводить к другой — когда дальше BARK_FAR м от машины
   OFF: 0.45,        // доля сбитых, у кого костюм слетает
   LIE: 14,          // с — слетевший костюм лежит, потом тает (последняя секунда)
 };
@@ -52,9 +59,30 @@ function build (A) {
     P(L, new T.SphereGeometry(0.035, 6, 5), '#1b1410', 0.14 * s, 1.95, 0.51);
   }
   GEO = A.mergeGeos(L);
+  GEO.userData.shared = true;                      // одна на все костюмы: тело сбитого (hits.js dispose) её не освобождает
   // изнутри прорези видна внутренность костюма — две стороны; общий материал не выбрасывать (dropMesh, куски — userData.keep)
   MAT = new T.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: T.DoubleSide });
   MAT.userData.keep = true;
+}
+
+/* табличка зазывалы на палке (у правого плеча, над костюмом): жёлтая с синим кантом, на ней — бургер полосками */
+let SGEO = null;
+export function sign (A, grp) {
+  if (!GEO) build(A);
+  if (!SGEO) {
+    const P = A.put, L = [];
+    P(L, new A.THREE.BoxGeometry(0.05, 1.7, 0.05), '#8a6b4e', 0.62, 1.6, 0.1);               // палка
+    P(L, new A.THREE.BoxGeometry(0.78, 0.5, 0.05), '#1d3f8f', 0.62, 2.5, 0.12);              // кант
+    P(L, new A.THREE.BoxGeometry(0.7, 0.42, 0.06), '#f4c430', 0.62, 2.5, 0.12);              // табличка
+    for (const [y, h, c] of [[2.6, 0.08, '#e8a84f'], [2.53, 0.04, '#5fbf4a'], [2.48, 0.06, '#7a4526'], [2.42, 0.06, '#e8a84f']])
+      P(L, new A.THREE.BoxGeometry(0.3, h, 0.07), c, 0.62, y, 0.12);                         // бургер полосками
+    SGEO = A.mergeGeos(L);
+    SGEO.userData.shared = true;
+  }
+  const m = new A.THREE.Mesh(SGEO, MAT);
+  m.name = 'burger-sign';
+  grp.add(m);
+  return m;
 }
 
 export function dress (A, grp) {
@@ -69,12 +97,12 @@ export function dress (A, grp) {
 
 /* сбит: костюм на нём — тело hits.js копирует то, что надето на группу (qpeople.js corpseQ); слетает — тело без него,
    костюм — своим куском: вверх и вперёд по удару, кувырком */
-export function hit (A, p, vx, vz) {
+export function hit (A, p, vx, vz, o = {}) {
   STATS.hit++;
   const s = p.grp && p.grp.userData.suit;
-  const off = s && Math.random() < SUIT.OFF;
+  const off = s && !o.up && Math.random() < SUIT.OFF;   // упал и встал (o.up) — костюм на нём
   if (off) s.userData.noDecor = true;
-  A.gibHuman(p, vx, vz);
+  A.gibHuman(p, vx, vz, o);
   if (!off) return;
   s.userData.noDecor = false;
   STATS.off++;

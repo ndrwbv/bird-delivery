@@ -19,6 +19,8 @@
    только через 8 с простоя).
    Песочница (без game.js) переключает руками: setInput('pad' | 'kb' | 'touch', 'xbox' | 'ps'). */
 
+import { touchOn, onTouchMode } from './touchmode.js';
+
 const PAD = {
   xbox: { ok: 'A', back: 'B', x: 'X', y: 'Y', lb: 'LB', rb: 'RB', pause: '☰', replay: 'LB', radio: '↓', fly: 'X', music: 'L3' },
   ps: { ok: '✕', back: '○', x: '□', y: '△', lb: 'L1', rb: 'R1', pause: '☰', replay: 'L1', radio: '↓', fly: '□', music: 'L3' },
@@ -38,7 +40,7 @@ const KB = {
   music: ['B', ['KeyB']],       // музыка вкл / выкл (music.js); геймпад — L3. Следующий трек — кнопка радио F / ↓, пока радио скрыто
 };
 
-let kind = matchMedia('(pointer: coarse)').matches ? 'touch' : 'kb';
+let kind = touchOn() ? 'touch' : 'kb';   // ноутбук с тачскрином — с клавиш, пока не тронули экран (touchmode.js, 0п67)
 let family = 'xbox';
 const subs = new Set();
 
@@ -102,11 +104,12 @@ if (typeof window !== 'undefined') {
   };
   if (document.body) boot(); else addEventListener('DOMContentLoaded', boot, { once: true });
   addEventListener('keydown', () => setInput('kb'), true);
+  onTouchMode(v => { if (kind !== 'pad') setInput(v ? 'touch' : 'kb'); });   // мышь сдвинули — подсказки снова клавишами
   addEventListener('pointerdown', e => setInput(e.pointerType === 'touch' || e.pointerType === 'pen' ? 'touch' : 'kb'), true);
   addEventListener('gamepadconnected', () => { if (kind === 'pad') setInput('pad', padFamily()); });
   addEventListener('gamepaddisconnected', () => {
     let any = false;
     try { any = [...(navigator.getGamepads ? navigator.getGamepads() : [])].some(Boolean); } catch (e) { /* — */ }
-    if (kind === 'pad' && !any) setInput(matchMedia('(pointer: coarse)').matches ? 'touch' : 'kb');
+    if (kind === 'pad' && !any) setInput(touchOn() ? 'touch' : 'kb');
   });
 }

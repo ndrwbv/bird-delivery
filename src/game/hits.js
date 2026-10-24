@@ -229,6 +229,10 @@ function lowest (o) {
   for (let i = 0; i < LOWLIST.length; i++) {
     const m = LOWLIST[i];
     m.updateWorldMatrix(false, false);
+    // кости модели (qpeople.js) — не в графе сцены: их место в мире считает поза перед отрисовкой. Новое тело ещё ни разу
+    // не рисовалось (кости — в нуле мира), улетевшее за кадр — там, где его рисовали: самая низкая точка выходила на
+    // десятки метров ниже, и тело «вставало» на землю, подлетая в небо (0п77, 24.10.2026). Позу — сейчас
+    if (m.isSkinnedMesh && m.userData.q) qPose(m);
     const g = m.geometry, pa = g && g.attributes && g.attributes.position;
     if (!pa) continue;
     any = true;
@@ -445,7 +449,8 @@ export function hit (p, vx, vz, kmh, o = {}) {
   }
   // жизни (LIVES): во взрослой удар слабее MAX, пока жизнь не последняя, — отлетает, полежит и встанет, как в детской.
   // Сюда приходят все смерти от машины (game.js gibHuman): и очереди, и протесты, и шашлыки — у них своей проверки нет
-  if (!o.up && !o.over && survive(p, kmh)) o = { ...o, up: true };
+  // o.one — без жизней: человек в костюме-бургере сбит с первого удара (game.js burgerHit)
+  if (!o.up && !o.over && !o.one && survive(p, kmh)) o = { ...o, up: true };
   if (o.over) {
     const B = throwOver(p, vx, vz, kmh, o);
     if (!o.up) { A.scare(p.x, p.z); if (!B.shatter) A.callAmbulance(p.x, p.z); }   // разбился — скорая к кускам
@@ -457,6 +462,7 @@ export function hit (p, vx, vz, kmh, o = {}) {
   const up = o.up || !A.adult;
   const lie = o.up ? TIME.FALL_LIE : !A.adult ? (kmh >= TIER.BURST ? TIME.KID_LIE_HIGH : TIME.KID_LIE) : TIME.BODY;
   const B = throwBody(p, vx, vz, kmh, up, lie, o.y0 || 0);
+  if (up && o.back) B.back = o.back;               // встал — снова живой там, где поднялся (бургер, game.js burgerHit), а не уходит и тает
   if (nitro && kmh >= TIER.FALL && Math.random() < LIMB.HIGH) tearLimb(B);
   if (!o.up) { A.scare(p.x, p.z); A.callAmbulance(p.x, p.z); }
   return !o.up;
@@ -800,8 +806,8 @@ function dispose (o) {
   A.scene.remove(o);
   o.traverse(m => {
     if (!m.isMesh) return;
-    if (m.geometry !== PUD_GEO) m.geometry.dispose();
-    if (m.material !== A.HUMAN_VC && m.material !== BONE) m.material.dispose();
+    if (m.geometry !== PUD_GEO && !m.geometry.userData.shared) m.geometry.dispose();   // shared — общая (костюм-бургер, burgersuit.js)
+    if (m.material !== A.HUMAN_VC && m.material !== BONE && !m.material.userData.keep) m.material.dispose();
   });
 }
 
@@ -941,6 +947,7 @@ function stepBody (B, dt) {
     if (B.t >= 0.7) {
       B.mode = 'walk'; B.t = 0;
       if (B.shadow) B.shadow.visible = false;
+      if (B.back) { B.back(r.position.x, r.position.z, r.rotation.y); B.mode = 'gone'; return; }   // встал — дальше живой человек
       const a = r.rotation.y + rand(-1.2, 1.2);    // уходит примерно туда, куда отлетел
       B.wx = Math.sin(a); B.wz = Math.cos(a);
       r.rotation.y = a;

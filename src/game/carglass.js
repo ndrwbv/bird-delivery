@@ -34,6 +34,7 @@ export const LAMP = { BREAK: 8, BOTH: 16, END: 0.45, SHARDS: 10, staged: null };
 /* стёкла по ступеням (0п34, 24.10.2026; автор: «стёкла трескаются, потом бьются постепенно»): удар у стекла с STEP[0] / [1] / [2]
    м/с добавляет 1 / 2 / 3 ступени: 1 — трещины, 2 — ещё трещины (вторая паутина, мутнее), 3 — разбито. ?oldwreck — как было */
 GLASS.STEP = [9, 15, 22];
+GLASS.cap = null;                                 // cap(car) — до какой ступени можно (3 — разбить); carwreck.js — по сердцам своей (0п58)
 GLASS.staged = !(typeof location !== 'undefined' && /[?&]oldwreck\b/.test(location.search || ''));
 export const CELL = 1 / 3;                        // картинка стёкол — три клетки: целое, трещины, ещё трещины
 export const STATS = { cracked: 0, broken: 0, lamps: 0, lampCr: 0 };   // lampCr — задних фонарей в трещинах (cardent.js «следы сзади»)
@@ -174,8 +175,9 @@ export function hit (cg, lx, lz, force, car) {
   if (!p || p.st === 2) return;
   if (GLASS.staged) {                             // по ступеням: трещины → ещё трещины → разбито
     const was = p.st === 1 ? p.lv || 1 : 0, add = force >= GLASS.STEP[2] ? 3 : force >= GLASS.STEP[1] ? 2 : 1;
-    if (was + add >= 3) breakPane(cg, p, car);
-    else crack(cg, p, was + add);
+    const top = GLASS.cap ? GLASS.cap(car) : 3;   // своя: сердец потеряно мало — только трещины (0п58, carwreck.js)
+    if (was + add >= 3 && top >= 3) breakPane(cg, p, car);
+    else if (Math.min(2, was + add) > was) crack(cg, p, Math.min(2, was + add));
     return;
   }
   if (force >= GLASS.BREAK || p.st === 1) breakPane(cg, p, car);

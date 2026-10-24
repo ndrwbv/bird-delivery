@@ -5,11 +5,16 @@
    „дальше“». И: «первый раз игроку одна из частей — „давай депнем“: сразу уже стоит игра и можно нажать
    „Деп“; сумма — четверть зп»). Правила словами — docs/CAREER.md «Конец смены — экраны по очереди».
 
-   Листы-накладные по очереди на тёплом затемнённом городе (стиль — paper.css, свой — shiftsteps.css):
+   11бн (автор 24.10.2026: «не на белом фоне с рамкой и табличным интерфейсом — на чёрном, яркие и праздничные, если хорошо;
+   а если плохо — это отображали»): листы — без бумаги и рамки, на чёрном; настроение листа (toneOf: good / meh / bad)
+   красит фон и сыплет своё — золото, конфетти и салют, или дождь, трещины и тусклые цвета.
+
+   Листы по очереди на чёрном (шрифт и палитра — paper.css, свой — shiftsteps.css):
      cash — «заработано за смену»: строки (заказы, чаевые, задания, бонус, премия, штрафы) допечатываются,
             сумма растёт с каждой, монеты летят в копилку-свинью, свинья наполняется, «в копилке» щёлкает;
-     dep  — «давай депнем?» (только взрослая): игра этой смены уже стоит, ставка — ¼ заработанного,
-            «ДЕП · N ₽» (сразу крутит в окне «депнуть», dep.js) и «не сейчас»;
+     dep  — «давай депнем?» (только взрослая): сразу окно «депнуть» (dep.js) — игра этой смены (рулетка, бандит…),
+            ставка ¼ заработанного уже стоит, «ДЕП» крутит, «не сейчас» — дальше (0п60; CFG.DEP_DIRECT = false — билет
+            «ДЕП · N ₽» и «не сейчас», как было);
      rank — рейтинг смены: строки коллег, твоя «въезжает» справа на своё место, премия первому;
      car  — «акт осмотра»: машина сверху, битое закрашено (перекос / болтается / отлетело, стёкла, фары),
             сердца, мотор и ресурс, что отлетело, «ремонт мотора у Дяди Жени — N ₽».
@@ -33,6 +38,7 @@ import { state as wreckState } from './carwreck.js';
 
 export const CFG = {
   DEP_SHARE: 0.25,     // «давай депнем?»: ставка — четверть заработанного за смену
+  DEP_DIRECT: true,    // «давай депнем?» — сразу окно игры (dep.js), не билет с кнопкой (0п60); false — билет, как было
   DEP_CHANCE: 0.3,     // после первого раза — с таким шансом, когда есть деньги, и не две смены подряд
   PIG_K: 60000,        // копилка: уровень = в копилке / (в копилке + PIG_K) — 15 000 ₽ ≈ ⅕, 60 000 ≈ ½, 240 000 ≈ ⅘
   ARM: 320,            // мс: новый лист первые столько не жмётся (кто долбил A, не пролистает не глядя)
@@ -51,6 +57,62 @@ const alive = () => { if (R && (!R.host.isConnected || R.host.hidden)) end(true)
 export const active = () => alive();
 export const root = () => (alive() ? R.el : null);
 
+/* ── настроение листа (11бн): good — праздник, meh — спокойно, bad — мрачно ── */
+function carVerdict (c) {
+  const off = (c.lost || []).filter(k => !['fl', 'fr', 'rl', 'rr'].includes(k));
+  const G = c.glass || {}, gc = Object.values(G).filter(v => v === 1).length, gb = Object.values(G).filter(v => v >= 2).length;
+  const body = c.dents || gc || gb || Object.values(c.parts || {}).some(v => v > 0);
+  return c.hp <= 0 || off.length >= 3 ? ['red', t('в хлам')] : body || c.hits ? ['rust', t('помята')] : ['green', t('целая')];
+}
+export function toneOf (s) {
+  if (!s) return 'meh';
+  if (s.id === 'cash') return s.total > 0 && s.rows && s.rows.some(r => r.n > 0) ? 'good' : 'bad';
+  if (s.id === 'rank') {
+    const place = (s.rows || []).findIndex(r => r.me) + 1, n = (s.rows || []).length;
+    return place === 1 && s.delivered > 0 ? 'good' : place === n && n > 2 ? 'bad' : 'meh';
+  }
+  if (s.id === 'car') { const v = carVerdict(s.car)[0]; return v === 'green' ? 'good' : v === 'red' ? 'bad' : 'meh'; }
+  return 'meh';
+}
+/* фон листа: хорошо — сверху сыплются золото и конфетти; плохо — дождь и трещины по углам (calm — без движения, но трещины и цвет остаются) */
+const CRACK_P = '<path d="M0 0L38 30L52 22L74 62L66 70L98 118M38 30L20 54L26 90M74 62L120 54"/>';
+const CRACK = '<svg class="ss-crack ss-crack-a" viewBox="0 0 120 120" aria-hidden="true">' + CRACK_P + '</svg>' +
+  '<svg class="ss-crack ss-crack-b" viewBox="0 0 120 120" aria-hidden="true">' + CRACK_P + '</svg>';
+function fxFor (tone) {
+  if (!R) return;
+  const box = R.el.querySelector('.ss-fx');
+  if (!box) return;
+  R.el.dataset.tone = tone;
+  box.innerHTML = '';
+  if (tone === 'meh') return;
+  let h = '';
+  if (tone === 'bad') h += CRACK;
+  if (!calm()) {
+    const n = tone === 'good' ? 26 : 46, cols = ['#ffd85e', '#ff5fa2', '#4fd65a', '#ff8a2b', '#fff6b8'];
+    for (let i = 0; i < n; i++) {
+      const d = (Math.random() * 6).toFixed(2), x = Math.round(Math.random() * 100), dur = tone === 'good' ? (3.4 + Math.random() * 3).toFixed(2) : (0.7 + Math.random() * 0.6).toFixed(2);
+      h += tone === 'good'
+        ? '<i class="ss-fall" style="left:' + x + '%;--d:' + d + 's;--t:' + dur + 's;--c:' + cols[i % cols.length] + ';--w:' + (6 + (i % 3) * 3) + 'px;--r:' + Math.round(Math.random() * 360) + 'deg' + (i % 4 === 0 ? ';border-radius:50%' : '') + '"></i>'
+        : '<i class="ss-drop" style="left:' + x + '%;--d:' + d + 's;--t:' + dur + 's;--h:' + (14 + (i % 4) * 8) + 'px"></i>';
+    }
+  }
+  box.innerHTML = h;
+}
+/* коротко: фанфара или мрачный спуск */
+const sting = tone => {
+  if (tone === 'good') [523, 659, 784, 1046].forEach((f, i) => later(i * 90, () => blip('ss-good', f, 0.16, 'triangle', 0.07)));
+  else if (tone === 'bad') [196, 156, 117].forEach((f, i) => later(i * 190, () => blip('ss-bad', f, 0.34, 'sawtooth', 0.05)));
+};
+/* салют: несколько залпов конфетти из разных мест листа */
+function salute (sh) {
+  if (calm()) return;
+  const r = sh.getBoundingClientRect();
+  [[0.2, 0.3], [0.8, 0.25], [0.5, 0.15], [0.3, 0.6], [0.7, 0.55]].forEach(([x, y], i) => later(i * 260, () => {
+    PFX.burst({ x: r.left + r.width * x, y: r.top + r.height * y }, { kind: 'confetti', n: 30, spread: 1.6 });
+    blip('whoosh', 700 + i * 90, 0.08, 'sine', 0.03);
+  }));
+}
+
 /* ── показ ── */
 export function play (o, done) {
   if (R) end(true);
@@ -60,7 +122,7 @@ export function play (o, done) {
   el.id = 'cr-steps';
   el.className = 'ss pp-desk';
   const tabs = screens.map(s => s.id).concat('end');
-  el.innerHTML = '<nav class="ss-tabs">' + tabs.map((k, i) => '<i data-k="' + k + '"><b>' + (i + 1) + '</b><span>' + esc(t(TAB[k])) + '</span></i>').join('') + '</nav>' +
+  el.innerHTML = '<div class="ss-fx" aria-hidden="true"></div><nav class="ss-tabs">' + tabs.map((k, i) => '<i data-k="' + k + '"><b>' + (i + 1) + '</b><span>' + esc(t(TAB[k])) + '</span></i>').join('') + '</nav>' +
     '<div class="ss-deck"></div>' +
     '<nav class="ss-foot"><button type="button" class="pp-note ss-skip">' + esc(t('пропустить всё')) + '</button></nav>' +
     '<div class="ss-keys"></div>';
@@ -126,10 +188,14 @@ function next () {
   }
   const s = R.screens[R.i];
   const sh = document.createElement('section');
-  sh.className = 'pp-sheet ss-sheet ss-' + s.id + (old ? ' ss-in' : ' ss-first');
+  sh.className = 'ss-sheet ss-' + s.id + (old ? ' ss-in' : ' ss-first');
   sh.innerHTML = BUILD[s.id](s);
   deck.appendChild(sh);
   R.sheet = sh;
+  const tone = toneOf(s);
+  sh.dataset.tone = tone;
+  fxFor(tone);
+  sting(tone);
   R.armAt = performance.now() + CFG.ARM;
   tabsOn(s.id);
   const go = sh.querySelector('.ss-go');
@@ -143,6 +209,9 @@ function next () {
   keys();
   fit();
   ANIM[s.id](sh, s);
+  // «давай депнем?» — сразу сама игра (0п60, автор 24.10.2026: «экран депа — это буквально то, что показывается, когда
+  // заходишь в деп»): окно «депнуть» (dep.js) с рулеткой или бандитом, ставка ¼ смены уже стоит — крути или «не сейчас»
+  if (s.id === 'dep' && CFG.DEP_DIRECT && R.o.onDep) depGo(false);
 }
 
 function tabsOn (k) {
@@ -290,7 +359,7 @@ function animCash (sh, s) {
     stopTween(sum, s.total, s.fmt);
     tween(wal, s.before, s.after, 800, m);
     setF(f1);
-    if (s.total > 0) { PFX.replay(pig, 'ss-bump'); PFX.burst(pig, { kind: 'coins', n: 10, spread: 0.8 }); }
+    if (s.total > 0) { PFX.replay(pig, 'ss-bump'); PFX.burst(pig, { kind: 'coins', n: 14, spread: 1 }); PFX.burst(sum, { kind: 'confetti', n: 34, spread: 1.5 }); }
   });
   later(tWal + 900, () => { R.anim = null; go.classList.remove('ss-wait'); PFX.slam(go); blip('stamp', 90, 0.09, 'square', 0.1); });
 }
@@ -316,16 +385,16 @@ function animDep (sh) {
   const tk = sh.querySelector('.ss-ticket');
   if (tk) { tk.style.setProperty('--pp-delay', '.25s'); PFX.replay(tk, 'pp-print'); }
 }
-function depGo () {
+function depGo (spin = true) {
   if (!R) return;
   const s = R.screens[R.i];
   if (!s || s.id !== 'dep' || !R.o.onDep) { next(); return; }
   const go = R.sheet && R.sheet.querySelector('.ss-go');
-  if (go) PFX.press(go);
+  if (go && spin) PFX.press(go);
   R.busy = true;                                    // пока открыто окно «депнуть» — листы не листаются
   const r = R;
   try {
-    R.o.onDep(s.stake, () => { if (R === r) { R.busy = false; R.armAt = performance.now() + CFG.ARM; next(); } });
+    R.o.onDep(s.stake, () => { if (R === r) { R.busy = false; R.armAt = performance.now() + CFG.ARM; next(); } }, spin);
   } catch (e) { console.error('[shiftsteps]', e); R.busy = false; next(); }
 }
 
@@ -378,6 +447,7 @@ function animRank (sh) {
   later(tMe + 700, () => {
     prize.forEach(p => { p.style.visibility = ''; PFX.replay(p, 'pp-print'); });
     if (seal) { seal.style.visibility = ''; PFX.replay(seal, 'pp-seal'); blip('seal', 150, 0.12, 'square', 0.12); }
+    if (sh.dataset.tone === 'good') salute(sh);
     if (sh.querySelector('.ss-prize b.pp-plus')) { PFX.burst(sh.querySelector('.ss-prize b'), { kind: 'coins', n: 12 }); later(150, coin); }
   });
   later(tMe + 1100, () => { R.anim = null; go.classList.remove('ss-wait'); PFX.slam(go); blip('stamp', 90, 0.09, 'square', 0.1); });
@@ -474,7 +544,7 @@ function buildCar (s) {
     ? '<p class="pp-row pp-total ss-fix"><span>' + esc(t('ремонт мотора у Дяди Жени')) + '</span><i></i><b class="pp-minus">' + esc(m(c.repair)) + '</b></p>'
     : '<p class="pp-row pp-total ss-fix"><span>' + esc(t('мотор')) + '</span><i></i><b class="pp-plus">' + esc(t('чинить нечего')) + '</b></p>';
   const body = c.dents || gc || gb || Object.values(c.parts).some(v => v > 0);
-  const seal = c.hp <= 0 || off.length >= 3 ? ['red', t('в хлам')] : body || c.hits ? ['rust', t('помята')] : ['green', t('целая')];
+  const seal = carVerdict(c);
   return '<header class="pp-head"><span>' + esc(t('акт осмотра')) + '</span><b>' + esc(c.name || '') + '</b></header>' +
     '<div class="ss-car-grid"><div class="ss-car-l">' + carSVG(c) +
       '<p class="ss-legend"><span><i class="skew"></i>' + esc(t('перекос')) + '</span><span><i class="hang"></i>' + esc(t('болтается')) + '</span><span><i class="off"></i>' + esc(t('отлетело')) + '</span></p>' +

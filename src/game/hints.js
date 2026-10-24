@@ -101,9 +101,9 @@ function make (id, extra) {
         : t('куда везти — точка на радаре · {key} — карта района', { key: k('Tab') }) };
     case 'brake': return { text: t('у гостя притормози — пицца отдастся сама') };
     case 'nitro': {
-      const key = pad ? k('A') : touch ? k(t('кофе')) : k('Shift');
-      return { hi: touch ? '#touchpad .tp-nos' : '#radar', text: extra === 'coffee' ? t('кофе в баке! нажми {key} и помчишь на кофейной тяге', { key })
-        : t('прямая! нажми {key} и помчишь на кофейной тяге', { key }) };
+      const key = pad ? k('A') : touch ? k(t('нитро')) : k('Shift');
+      return { hi: touch ? '#touchpad .tp-nos' : '#radar', text: extra === 'coffee' ? t('нитро в баке! жми {key} и помчишь', { key })
+        : t('прямая! жми {key} и помчишь на нитро', { key }) };
     }
     case 'hp': return { hi: '#hearts', text: t('сердца — жизни тачки: врезался — минус половинка, со всей дури — целое') };
     case 'cash': return { hi: '#shiftcash', text: t('зелёная пачка — заработано за смену') };

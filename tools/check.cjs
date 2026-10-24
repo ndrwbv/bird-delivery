@@ -140,6 +140,26 @@ const CHECKS = [
     const n = Object.entries(r.n).map(([k, v]) => k + ' ' + v).join(', ');
     return { status: r.ok ? 'ok' : 'fail', info: `${n}, стеблей зарослей ${r.thick} (${r.perK} на клетку); на тротуаре и дорожке ${r.bad}` + (r.bad ? ': ' + JSON.stringify(r.by) + ' ' + JSON.stringify(r.sample) : '') };
   } },
+  /* заборы не накладываются и не липнут к стенам (0п88, 24.10.2026, roadlife.js buildFences; docs/CAREER.md «Заборы домов»): секции
+     сбиваемых заборов — наложения (почти на одной линии), пересечения (режутся) и высокие заборы ближе 0,4 м к стене = 0.
+     Было: чёрных секций ближе 0,4 м к стене 1820 из 8129 (в основном 8 см — «вплотную к фасаду») */
+  { id: 'fenceover', name: 'заборы не накладываются и не вплотную к стене', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/fence-overlap.js')]);
+    const e = errLine(j), r = j.result;
+    if (e || !r) return { status: 'fail', info: e || 'нет результата' };
+    return { status: r.ok ? 'ok' : 'fail', info: `секций ${r.segs}; наложений ${r.dup}, пересечений ${r.cross}, ближе 0,4 м к стене ${r.wall}` + (r.ok ? '' : ': ' + JSON.stringify([...r.sample, ...r.csample, ...r.wsample].slice(0, 3))) };
+  } },
+  /* бордюры на поворотах стыкуются (0п72, 24.10.2026, curbs.js; docs/CAREER.md «Бордюр на изломах»): торцы камня на изломе — по биссектрисе
+     (изнутри и «в ус» у плавных улиц), дуги — по лучам из центра, секции у стыка без просадки. Считаем стыки по углам секций
+     (?curbtrace): щель — край торца не сходится с соседним больше чем на 3 см в плане, ступенька — верх выше 3 см. Было (?nomiter):
+     щелей на изломах 477, ступенек 728 из 255 тыс. стыков (до 8,8 см — «квадрат» вырезан в углу камня) */
+  { id: 'curbjoin', name: 'бордюры на поворотах стыкуются', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/curb-joins.js'), '--q=curbtrace']);
+    const e = errLine(j), r = j.result;
+    if (e || !r) return { status: 'fail', info: e || 'нет результата' };
+    if (r.err) return { status: 'fail', info: r.err };
+    return { status: r.ok ? 'ok' : 'fail', info: `секций ${r.sections}, стыков ${r.joins}; на изломах щелей ${r.gapTurn}, ступенек ${r.stepTurn} (самый большой разрыв ${r.worst} м)` + (r.ok ? '' : ': ' + JSON.stringify(r.sample.slice(0, 3))) };
+  } },
   { id: 'yardnet', name: 'дорожки дворов в сети, точки конкурентов за тротуаром', group: 2, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/yard-paths.js')]);
     const e = errLine(j), r = j.result;
@@ -156,7 +176,7 @@ const CHECKS = [
       (r.pieces ? ': ' + JSON.stringify(r.list.slice(0, 4)) : '') + (r.bad ? ' ' + JSON.stringify(r.by) + ' ' + JSON.stringify(r.sample) : '') };
   } },
   /* плавные улицы по умолчанию (11ч этап 5, 24.10.2026, roadsmooth.js; docs/CAREER.md «Дороги плавные»): сводка города
-     (smooth-summary.js) по умолчанию и с ?oldroads — скругление включено и сделано (≥ 1 500 дуг, срез ≤ 3 м), с ?oldroads — выключено
+     (smooth-summary.js) по умолчанию и с ?oldroads — скругление включено и сделано (≥ 1 500 дуг, срез улиц ≤ 3 м; у проездов — maxCut7, до 5,5 м, 0п71), с ?oldroads — выключено
      и точек не добавлено; остановки и дома с адресом — те же числом, зебры и подъезды — в пределах 0,5 % */
   { id: 'smooth', name: 'плавные улицы: по умолчанию дугой, ?oldroads — углом', group: 2, run: async () => {
     const S = path.join(__dirname, 'probe-checks/smooth-summary.js');

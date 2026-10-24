@@ -25,6 +25,8 @@
      • не трогаем: узлы перекрёстков, концы, мосты (и стыки с мостом), улицы кругов (rings.js — замкнутые
        цепочки односторонних) и изломы ближе CIRCLE_ZONE м к краю малого круга, стыки разных по виду кусков
        (класс, ширина, полосы, бульвар, направление).
+   Дорожки во дворах и парках (CITY.paths) — тоже дугой, своим проходом (smoothPaths, SM.PATH; 0п71). У проездов дуга
+   не уводит плитку от дорожки, что в неё упиралась (pathCut).
    Новых улиц и узлов перекрёстков не появляется; граф (game.js NODES) получает точки дуги — узлы с двумя
    рёбрами. Случайности здесь нет, порядок обхода фиксированный (улицы по номеру, точки по порядку): город
    одинаков от запуска к запуску.
@@ -43,8 +45,13 @@ export const SM = {
   // по классу улицы (0—1 трасса и главная … 5 тихая, 6 пешеходка, 7 проезд во двор): R — радиус оси, м; CUT — предельный срез угла, м
   CLS: {
     0: { R: 40, CUT: 3 }, 1: { R: 40, CUT: 3 }, 2: { R: 40, CUT: 3 }, 3: { R: 30, CUT: 3 },
-    4: { R: 20, CUT: 2.5 }, 5: { R: 20, CUT: 2.5 }, 6: { R: 6, CUT: 1 }, 7: { R: 8, CUT: 1.5 },
+    4: { R: 20, CUT: 2.5 }, 5: { R: 20, CUT: 2.5 }, 6: { R: 6, CUT: 2.5 }, 7: { R: 13, CUT: 5.5 },
   },
+  // 0п71 (24.10.2026): проезды во дворах — радиус по месту до 13 м, срез угла до 5,5 м (было 8 м и 1,5 м: излом 90° с таким
+  // срезом давал радиус 3,6 м < наименьшего 5,25 — 90-градусные повороты проездов не скруглялись вовсе, 45° — едва заметно).
+  // Данные выгрузки у проездов (КПП, ворота, закрытые) — запретными зонами, как и было.
+  // Дорожки во дворах и парках (CITY.paths, плитка 2 м) — тоже дугой: радиус оси по месту PATH.R … PATH.RMIN м
+  PATH: { R: 6, RMIN: 2.2, CUT: 3, MIN_DEG: 12, MAX_DEG: 140, HALF: 1, M: 0.15, ROAD: 0.6, FOREIGN: 1.6, END: 1 },
   STEP_DEG: 10,     // шаг дуги, градусов на точку, не больше
   MIN_DEG: 6,       // излом меньше — прямая
   MAX_DEG: 120,     // излом круче — не трогаем
@@ -72,12 +79,17 @@ export const SM = {
   CELL: 40,
 };
 
-const ZERO = () => ({ junction: 0, zone: 0, house: 0, neighbor: 0, room: 0, cut: 0, circle: 0, bridge: 0, joint: 0, dup: 0 });
+const ZERO = () => ({ junction: 0, zone: 0, house: 0, neighbor: 0, room: 0, cut: 0, circle: 0, bridge: 0, joint: 0, dup: 0, path: 0 });
+const PZERO = () => ({ found: 0, done: 0, pts: 0, maxCut: 0, minR: 0, why: { sharp: 0, room: 0, cut: 0, house: 0, road: 0, joint: 0, dup: 0 } });
 /* why — пропущено по причинам: junction — у перекрёстка, zone — запретная зона (остановка, переход, светофор,
    переезд, КПП, ворота), house — дом, neighbor — полотно соседней улицы, room — мало места на кусках,
    cut — круто для предельного среза (радиус вышел бы меньше полуширины), circle — круг, bridge — мост,
-   joint — стык разных кусков, dup — точка дуги совпала бы с чужой точкой */
-export const STATS = { on: false, found: 0, done: 0, sharp: 0, byClass: {}, foundByClass: {}, why: ZERO(), pts: 0, ptsBefore: 0, ptsAfter: 0, shrunk: 0, maxCut: 0, minR: 0, ms: 0 };
+   joint — стык разных кусков, dup — точка дуги совпала бы с чужой точкой, path — у проезда: дорожка (CITY.paths), что касалась
+   его плитки, после дуги от неё отошла бы.
+   maxCut — наибольший срез у улиц (классы 0—5), maxCut7 — у проездов и пешеходок; paths — дорожки (CITY.paths): найдено,
+   скруглено, точек добавлено, пропущено по причинам (sharp — круче MAX_DEG, road — дуга на чужом полотне, joint — рядом
+   чужая точка дорожки: развилка, примыкание) */
+export const STATS = { on: false, found: 0, done: 0, sharp: 0, byClass: {}, foundByClass: {}, why: ZERO(), pts: 0, ptsBefore: 0, ptsAfter: 0, shrunk: 0, maxCut: 0, maxCut7: 0, minR: 0, ms: 0, paths: PZERO() };
 export const ARCS = [];
 const ARC_KEYS = new Map();                    // точка дуги → номер дуги в ARCS
 const akey = (x, z) => Math.round(x * 100) + ',' + Math.round(z * 100);
@@ -108,7 +120,7 @@ const widthOf = r => r.w || DEF_W[r.c] || 9;
 
 export function smooth (CITY, opt = {}) {
   const t0 = performance.now();
-  Object.assign(STATS, { on: !!opt.on, found: 0, done: 0, sharp: 0, byClass: {}, foundByClass: {}, why: ZERO(), pts: 0, ptsBefore: 0, ptsAfter: 0, shrunk: 0, maxCut: 0, minR: 0, ms: 0 });
+  Object.assign(STATS, { on: !!opt.on, found: 0, done: 0, sharp: 0, byClass: {}, foundByClass: {}, why: ZERO(), pts: 0, ptsBefore: 0, ptsAfter: 0, shrunk: 0, maxCut: 0, maxCut7: 0, minR: 0, ms: 0, paths: PZERO() });
   ARCS.length = 0; ARC_KEYS.clear();
   if (!opt.on) return STATS;
   const W = SM, C = W.CELL, roads = CITY.roads || [];
@@ -193,6 +205,23 @@ export function smooth (CITY, opt = {}) {
     if (a) for (const o of a) if (x >= o.x0 && x <= o.x1 && z >= o.z0 && z <= o.z1 && inPoly(x, z, o.p)) return true;
     return false;
   };
+  // угол дома (вершина контура) ближе half к новой оси, а к прежней — не был: дуга срезала бы угол дома между точками проверки
+  // по краю (0п71: проезд R 12,8 м у «Новый проезд, 4 к2» зашёл на угол дома — fixMap убрал дом, адрес пропал)
+  const houseCorner = (pts, half, oldD) => {
+    let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+    for (const q of pts) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); z0 = Math.min(z0, q[1]); z1 = Math.max(z1, q[1]); }
+    x0 -= half; z0 -= half; x1 += half; z1 += half;
+    for (let i = Math.floor(x0 / C); i <= Math.floor(x1 / C); i++) for (let j = Math.floor(z0 / C); j <= Math.floor(z1 / C); j++)
+      for (const o of HG.get(i + ',' + j) || []) {
+        if (o.x1 < x0 || o.x0 > x1 || o.z1 < z0 || o.z0 > z1) continue;
+        for (const v of o.p) {
+          let dn = Infinity;
+          for (let k = 1; k < pts.length; k++) dn = Math.min(dn, segDist(v[0], v[1], pts[k - 1][0], pts[k - 1][1], pts[k][0], pts[k][1]));
+          if (dn < half && oldD(v[0], v[1]) >= half) return true;
+        }
+      }
+    return false;
+  };
   // куски улиц по клеткам — полотна соседей
   const SG = new Map();
   roads.forEach((r, ri) => {
@@ -228,7 +257,7 @@ export function smooth (CITY, opt = {}) {
   };
 
   // дуга: V — вершина, A — точка до, B — после (по ходу улицы in); R — радиус оси; n чётное — для стыка
-  const arc = (A, V, B, R, even) => {
+  const arc = (A, V, B, R, even, chord = W.CHORD) => {
     let ux = V[0] - A[0], uz = V[1] - A[1], wx = B[0] - V[0], wz = B[1] - V[1];
     const l1 = Math.hypot(ux, uz), l2 = Math.hypot(wx, wz);
     ux /= l1; uz /= l1; wx /= l2; wz /= l2;
@@ -239,7 +268,7 @@ export function smooth (CITY, opt = {}) {
     const nx = -uz * sg, nz = ux * sg;                             // от касания к центру
     const cx = T1[0] + nx * R, cz = T1[1] + nz * R;
     const a0 = Math.atan2(T1[1] - cz, T1[0] - cx);
-    let n = Math.max(1, Math.min(Math.ceil(phi / (W.STEP_DEG * Math.PI / 180) - 1e-9), Math.floor(R * phi / W.CHORD)));
+    let n = Math.max(1, Math.min(Math.ceil(phi / (W.STEP_DEG * Math.PI / 180) - 1e-9), Math.floor(R * phi / chord)));
     if (even && n % 2) n++;
     const pts = [];
     for (let k = 0; k <= n; k++) {
@@ -258,6 +287,7 @@ export function smooth (CITY, opt = {}) {
       if (near(JG, x, z, o => Math.hypot(o.x - x, o.z - z) < (lowCls ? o.low : o.big))) return 'junction';
       if (near(ZG, x, z, o => Math.hypot(o.x - x, o.z - z) < o.R)) return 'zone';
     }
+    if (houseCorner(pts, hw + walk - W.M_WALK, oldD)) return 'house';
     const shCache = new Map();
     for (let i = 1; i < pts.length; i++) {
       const [x1, z1] = pts[i - 1], [x2, z2] = pts[i], L = Math.hypot(x2 - x1, z2 - z1);
@@ -292,6 +322,17 @@ export function smooth (CITY, opt = {}) {
     }
     return '';
   };
+
+  // точки дорожек (CITY.paths) по клеткам: у проезда дуга не уводит плитку от дорожки, что в неё упиралась (0п71)
+  const paths = CITY.paths || [], PG = new Map(), PCNT = new Map();
+  paths.forEach((q, qi) => { if (q) q.forEach((v, i) => { const k = pk(v); PCNT.set(k, (PCNT.get(k) || 0) + 1); put(PG, cell(v[0], v[1]), { x: v[0], z: v[1], qi, i }); }); });
+  const polyD = (x, z, pts) => { let m = Infinity; for (let i = 1; i < pts.length; i++) m = Math.min(m, segDist(x, z, pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1])); return m; };
+  // дорожка касалась плитки проезда (до края + 0,5 м) — после дуги касается и дальше (до края + 0,3 м)
+  const pathCut = (pts, half, A, V, B, t) => near(PG, V[0], V[1], o => {
+    if (Math.hypot(o.x - V[0], o.z - V[1]) > t + half + 2) return false;
+    const dOld = Math.min(segDist(o.x, o.z, A[0], A[1], V[0], V[1]), segDist(o.x, o.z, V[0], V[1], B[0], B[1]));
+    return dOld <= half + 0.5 && polyD(o.x, o.z, pts) > half + 0.3;
+  }) ? 'path' : '';
 
   // обход: улицы по номеру, точки по порядку; дуги считаем по исходной форме, применяем в конце
   const REP = new Map();                       // улица → Map(номер точки → точки взамен, по ходу улицы)
@@ -352,6 +393,7 @@ export function smooth (CITY, opt = {}) {
       for (; R >= Rmin; R *= W.HOUSE_K, tries++) {
         a = arc(A, V, B, R, partner !== null);
         res = check(a.pts, hw, walk, A, V, B, lowCls, skip);
+        if (!res && lowCls) res = pathCut(a.pts, hw + walk, A, V, B, a.t);
         if (!res) break;
       }
       if (res || !a) { why(res || 'room'); continue; }
@@ -367,7 +409,8 @@ export function smooth (CITY, opt = {}) {
         rep(partner, pi, pi === 0 ? h2 : h2.slice().reverse());
       }
       STATS.done++; STATS.byClass[c] = (STATS.byClass[c] || 0) + 1;
-      STATS.maxCut = Math.max(STATS.maxCut, Math.round(a.cut * 100) / 100);
+      if (lowCls) STATS.maxCut7 = Math.max(STATS.maxCut7, Math.round(a.cut * 100) / 100);
+      else STATS.maxCut = Math.max(STATS.maxCut, Math.round(a.cut * 100) / 100);
       STATS.minR = STATS.minR ? Math.min(STATS.minR, Math.round(R * 10) / 10) : Math.round(R * 10) / 10;
       for (const q of a.pts) ARC_KEYS.set(akey(q[0], q[1]), ARCS.length);
       // corner — прежний угол: касание, вершина, касание (game.js nearestRoad0 — «лицевая» стена дома как до дуг)
@@ -388,8 +431,82 @@ export function smooth (CITY, opt = {}) {
     }
     r.p = out;
   }
+  smoothPaths(paths, PCNT, PG, POS, NEWK, { arc, inH, near, polyD, SG, houseCorner });
   for (const r of roads) STATS.ptsAfter += r.p ? r.p.length : 0;
   STATS.pts = STATS.ptsAfter - STATS.ptsBefore;
   STATS.ms = Math.round(performance.now() - t0);
   return STATS;
+}
+
+/* ── дорожки во дворах и парках (CITY.paths, плитка 2 м; 0п71, 24.10.2026) ──
+   Излом внутри дорожки (точка только этой дорожки, не на улице, излом PATH.MIN_DEG…MAX_DEG) — дугой радиусом оси до PATH.R м
+   (по месту: касание — не дальше половины куска, если на другом его конце тоже излом, иначе до конца куска без PATH.END м;
+   срез угла — не больше PATH.CUT м), не меньше PATH.RMIN. Не скругляем: развилки (точка общая с другой дорожкой), рядом чужая
+   точка дорожки (ближе FOREIGN м к срезаемому углу — примыкание), край плитки зашёл бы в дом, ось — на чужое полотно (ближе
+   полуширины + ROAD м), если угол там не лежал. Дорожка меняется на месте (тот же массив): вид плитки — по первой точке. */
+function smoothPaths (paths, PCNT, PG, POS, NEWK, F) {
+  const W = SM, P = W.PATH, PS = STATS.paths, D = Math.PI / 180;
+  const ang = (A, V, B) => {
+    const ux = V[0] - A[0], uz = V[1] - A[1], wx = B[0] - V[0], wz = B[1] - V[1], l1 = Math.hypot(ux, uz), l2 = Math.hypot(wx, wz);
+    if (l1 < 1e-6 || l2 < 1e-6) return -1;
+    return Math.acos(Math.max(-1, Math.min(1, (ux * wx + uz * wz) / (l1 * l2)))) / D;
+  };
+  const check = (a, A, V, B, qi, i) => {
+    const pts = a.pts, h = P.HALF - P.M;
+    if (F.houseCorner(pts, P.HALF, (x, z) => F.polyD(x, z, [A, V, B]))) return 'house';
+    // чужие точки дорожек у срезаемого угла (касание — вершина — касание)
+    const T1 = pts[0], T2 = pts[pts.length - 1];
+    if (F.near(PG, V[0], V[1], o => (o.qi !== qi || Math.abs(o.i - i) > 1) &&
+      Math.min(segDist(o.x, o.z, T1[0], T1[1], V[0], V[1]), segDist(o.x, o.z, V[0], V[1], T2[0], T2[1]), F.polyD(o.x, o.z, pts)) < P.FOREIGN)) return 'joint';
+    for (let k = 1; k < pts.length; k++) {
+      const [x1, z1] = pts[k - 1], [x2, z2] = pts[k], L = Math.hypot(x2 - x1, z2 - z1);
+      if (L < 1e-6) continue;
+      const nx = -(z2 - z1) / L, nz = (x2 - x1) / L, m = Math.max(1, Math.ceil(L / W.SAMPLE));
+      for (let s = 0; s <= m; s++) {
+        const cx = x1 + (x2 - x1) * s / m, cz = z1 + (z2 - z1) * s / m;
+        for (const sd of [1, -1]) {
+          const ex = cx + nx * h * sd, ez = cz + nz * h * sd;
+          if (F.inH(ex, ez) && F.polyD(ex, ez, [A, V, B]) > h) return 'house';
+        }
+        if (F.near(F.SG, cx, cz, o => segDist(cx, cz, o.x1, o.z1, o.x2, o.z2) < o.hw + P.ROAD && segDist(V[0], V[1], o.x1, o.z1, o.x2, o.z2) >= o.hw + P.ROAD)) return 'road';
+      }
+    }
+    return '';
+  };
+  paths.forEach((q, qi) => {
+    if (!q || q.length < 3) return;
+    const last = q.length - 1, ins = new Map();
+    const free = j => j > 0 && j < last && PCNT.get(pk(q[j])) === 1 && !POS.has(pk(q[j]));
+    const bendOk = j => { if (!free(j)) return false; const b = ang(q[j - 1], q[j], q[j + 1]); return b >= P.MIN_DEG && b <= P.MAX_DEG; };
+    for (let i = 1; i < last; i++) {
+      if (!free(i)) continue;
+      const A = q[i - 1], V = q[i], B = q[i + 1], ph = ang(A, V, B);
+      if (ph < P.MIN_DEG) continue;
+      PS.found++;
+      if (ph > P.MAX_DEG) { PS.why.sharp++; continue; }
+      const L1 = Math.hypot(V[0] - A[0], V[1] - A[1]), L2 = Math.hypot(B[0] - V[0], B[1] - V[1]);
+      const roomL = (L, j) => bendOk(j) ? L / 2 - W.MIN_SEG / 2 : L - P.END;
+      const tanH = Math.tan(ph * D / 2), Rspace = Math.min(roomL(L1, i - 1), roomL(L2, i + 1)) / tanH;
+      const Rcut = P.CUT / (1 / Math.cos(ph * D / 2) - 1);
+      let R = Math.min(P.R, Rcut, Rspace);
+      if (R < P.RMIN) { PS.why[Rcut < Rspace ? 'cut' : 'room']++; continue; }
+      let a = null, res = '';
+      for (; R >= P.RMIN; R *= W.HOUSE_K) { a = F.arc(A, V, B, R, false, 0.8); res = check(a, A, V, B, qi, i); if (!res) break; }
+      if (res || !a) { PS.why[res || 'room']++; continue; }
+      if (a.pts.some(v => PCNT.has(pk(v)) || POS.has(pk(v)) || NEWK.has(pk(v)))) { PS.why.dup++; continue; }
+      for (const v of a.pts) NEWK.add(pk(v));
+      ins.set(i, a.pts);
+      PS.done++; PS.pts += a.pts.length - 1;
+      PS.maxCut = Math.max(PS.maxCut, Math.round(a.cut * 100) / 100);
+      PS.minR = PS.minR ? Math.min(PS.minR, Math.round(R * 10) / 10) : Math.round(R * 10) / 10;
+    }
+    if (!ins.size) return;
+    const out = [];
+    for (let i = 0; i < q.length; i++) for (const v of ins.has(i) ? ins.get(i) : [q[i]]) {
+      const l = out[out.length - 1];
+      if (!l || l[0] !== v[0] || l[1] !== v[1]) out.push(v);
+    }
+    q.length = 0;
+    for (const v of out) q.push(v);
+  });
 }

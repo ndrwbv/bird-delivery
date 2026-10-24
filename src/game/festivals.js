@@ -28,6 +28,7 @@
         dropMesh, sayBubble, fxAdd, puffGeo, steam, gibBurger, popBonus, toast, chat(text),
         addWallet, money, CASH, Snd, CAR_L, CAR_W, HEROES, DIST, season() */
 import * as RESPECT from './respect.js';
+import * as QC from './qcrowd.js';             // толпа вдали — люди-модели (qcrowd.js, 0п62)
 import * as DAILY from './daily.js';             // задание на день «сбей N бургеров» — маскот фестиваля в зачёт (daily.js)
 import { part as fxPart } from './fxpool.js';    // частицы из общего запаса (fxpool.js)
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
@@ -647,7 +648,8 @@ function crowd (free) {
     if (P.some(q => (q.a - a) ** 2 + (q.b - b) ** 2 < 0.55)) continue;
     P.push({ a, b });
   }
-  const body = new THREE.InstancedMesh(BODY, mats().crowd, P.length), head = new THREE.InstancedMesh(HEAD, mats().crowd, P.length);
+  const qb = QC.body(A, P.length);   // вдали — люди-модели, не коробки (qcrowd.js, 0п62); ?boxcrowd — коробки
+  const body = qb || new THREE.InstancedMesh(BODY, mats().crowd, P.length), head = qb ? QC.head(mats().crowd, P.length) : new THREE.InstancedMesh(HEAD, mats().crowd, P.length);
   body.frustumCulled = head.frustumCulled = false;
   const c = new THREE.Color(), st = F.stage, toS = F.L.w(st.a, st.b);
   for (let i = 0; i < P.length; i++) {

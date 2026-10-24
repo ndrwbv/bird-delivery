@@ -302,6 +302,10 @@ export function plate (K, L, H, o) {
 export function fenceGeo (sv, w, L, H, X, Y, Z, RY, slope = 0, p0 = true, p1 = true) {
   return quiet(() => geo(fence(kit(), L, H, { form: sv.form, hex: sv.hex, hex2: sv.hex2, tips: sv.tips, rust: w.rust, peel: w.peel, miss: w.miss, seed: w.seed, aged: sv.aged, p0, p1 }), X, Y, Z, RY, slope));
 }
+/* высота верха сиденья над землёй, м — по виду лавочки (bench выше); '-' / нет — прежняя коробочная (доска 0,62 ± 0,09).
+   b — запись BENCHES (seatF — вид у лавочек game.js, prop.fvf — у склейки world.js / yards.js). Люди садятся на эту высоту (0п75) */
+const SEAT_H = { classic: 0.68, slats: 0.665, broken: 0.665, plain: 0.65, park: 0.65 };
+export const benchSeat = b => SEAT_H[(b && (b.seatF || (b.prop && b.prop.fvf))) || ''] || 0.71;
 export const benchGeo = (sv, X, Y, Z, RY, k = 1) => quiet(() => geo(bench(kit(), { ...sv, k }), X, Y, Z, RY));
 export const urnGeo = (sv, X, Y, Z, RY) => quiet(() => geo(urn(kit(), sv), X, Y, Z, RY));
 export const canGeo = (sv, X, Y, Z, RY) => quiet(() => geo(can(kit(), sv), X, Y, Z, RY));

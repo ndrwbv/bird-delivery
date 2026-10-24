@@ -1357,7 +1357,7 @@ async function offer () {
           text: wash ? t('мотор в порядке, крутить нечего. а кровищу с машины отмою — даром. и не спрашиваю, откуда она')
             : t('мотор в порядке, крутить нечего. а кузов выправлю: вмятины, бампер, зеркала, стёкла — даром, по-соседски'), accept: t('спасибо!') });
         bodyFix();
-        A.toast(wash ? t('машина чистая') : t('кузов как новый'));
+        // 11бп: тост «машина чистая / кузов как новый» убран
         return;
       }
       await DLG.say({ person: face, name, color, head, meters: meters(e),
@@ -1384,7 +1384,6 @@ async function offer () {
       text: (now.r >= 90 ? t('во, другое дело. мотор {c} %, езжай аккуратней', { c: pc(now.c) })
         : t('ну вот, мотор {c} %. а ресурс теперь {r} % — как новая уже не будет', { c: pc(now.c), r: pc(now.r) })) + (now.r < 60 ? ceilWord(now.r) : ''),
       accept: t('спасибо!') });
-    A.toast(t('мотор {c} % · ресурс {r} %', { c: pc(now.c), r: pc(now.r) }));
     if (A.hudMoney) A.hudMoney();
   } finally { GS.busy = false; }
 }

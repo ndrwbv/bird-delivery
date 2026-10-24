@@ -31,6 +31,7 @@ import * as TEL from './telemetry.js';          // анонимная стати
 import { carMats as shadeMats } from './fakeshadows.js';   // в тени дома салон и капот темнее, как асфальт за стеклом (fakeshadows.js carMat)
 import { LK, LOOK } from './camlook.js';
 import * as GLASSB from './glassblood.js';       // кровь на лобовом и дворники салона (glassblood.js)
+import * as GLARE from './cabglare.js';          // 11бу: лёгкий блик на лобовом и боковых изнутри (cabglare.js)
 import { RF, ROOF } from './camroof.js';             // под аркой и мостом — ниже свода и ближе за машиной (camroof.js, 0п40)        // осмотреться: голова из-за руля, камера вокруг машины сзади (camlook.js)
 
 export const MODES = ['high', 'near', 'cab'];
@@ -67,15 +68,16 @@ export const CAMV = {
   },
 };
 
-let A = null, MODE = 'high', CAB = null;
+const DEFAULT = 'near';   // 11бф (24.10.2026): новая игра — «сзади, близко» (средний вид), а не «высоко издалека»; у кого выбран свой вид — он остаётся
+let A = null, MODE = DEFAULT, CAB = null;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 const lerp = (a, b, k) => a + (b - a) * k;
 
 export function init (api) {
   A = api;
-  const v = A.Store ? A.Store.get(KEY, 'high') : 'high';
-  MODE = MODES.includes(v) ? v : 'high';
+  const v = A.Store ? A.Store.get(KEY, DEFAULT) : DEFAULT;
+  MODE = MODES.includes(v) ? v : DEFAULT;
   const b = typeof document !== 'undefined' && document.getElementById('cambtn');
   if (b) {
     b.addEventListener('click', e => { e.currentTarget.blur(); if (A.can && !A.can()) return; cycle(true); });
@@ -98,7 +100,7 @@ export function set (m, save = true) {
 export function cycle (say) {
   set(MODES[(MODES.indexOf(MODE) + 1) % MODES.length]);
   TEL.ev('setting', { id: 'cam', v: MODE, how: say ? 'key' : 'menu' });
-  if (say && A && A.toast) A.toast(t('камера: {v}', { v: label() }));
+  // 11бп (24.10.2026): всплывашка «камера: …» убрана — вид и так виден; подпись осталась в настройках и на значке телефона
   return MODE;
 }
 function sync () {
@@ -258,6 +260,7 @@ export function overlay (renderer) {
     if (L.sun) {
       K.sun.color.copy(L.sun.color); K.sun.intensity = L.sun.intensity * 0.8;   // в салоне солнце чуть слабее: крыша и стойки
       K.sun.position.copy(L.sun.position).sub(L.sun.target ? L.sun.target.position : K.zero).normalize().multiplyScalar(10);
+      GLARE.step(K.glare, c, K.sun.position, L.sun.intensity);   // блик на стёклах: против солнца сильнее, ночью — от фонарей (cabglare.js)
     }
   }
   const ac = renderer.autoClear, ar = renderer.info.autoReset;
@@ -455,6 +458,7 @@ function build (car) {
   } else box(W - 0.24, 0.04, 0.05, TRIM, 0, gb + 0.12, rw + 0.04, 0.6, 0, 0);   // кабриолет: низкая рамка сзади
   // стекло лобового с кровью (взрослая) и дворники на нём — машут с настоящими (glassblood.js, 0п41)
   const glass = GLASSB.cab(root, { W, gb, gt, cf });
+  const glare = GLARE.build(root, THREE, { W, gb, gt, cf, rw, open });   // блик на стёклах (cabglare.js, 11бу)
   // рама лобового, крыша изнутри, козырьки, зеркало (у кабриолета — только низкая рамка стекла)
   if (!open) {
     for (const s of [1, -1]) bar(0.085, 0.11, TRIM, [s * (W / 2 - 0.1), gb - 0.02, cf + 0.02], [s * (W / 2 - 0.13), gt + 0.02, cf - 0.26]);
@@ -474,7 +478,7 @@ function build (car) {
     M: new THREE.Matrix4(), e: new THREE.Vector3(), eye: new THREE.Vector3(), sv: new THREE.Vector3(1, 1, 1), s: 1,
   };
   if (!old) scene.add(K.hemi, K.amb, K.sun);
-  Object.assign(K, { car, root, spin, speedo, tacho, hood, lampHp, lampNos, glass, fy: null, p: 0, tt: 0, kmh: 0, rpm: 0, drawn: false });
+  Object.assign(K, { car, root, spin, speedo, tacho, hood, lampHp, lampNos, glass, glare, fy: null, p: 0, tt: 0, kmh: 0, rpm: 0, drawn: false });
   K.eye.set(dx, ey, ez);
   shadeMats(root);
   K.s = clamp(CAMV.CAB.eyeH / Math.max(0.5, ey), 1, CAMV.CAB.eyeMax);   // низкий глаз (седан — 1,19 м) — салон крупнее; высокий (джип, «Буханка») — как есть

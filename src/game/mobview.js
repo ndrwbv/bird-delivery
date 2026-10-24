@@ -2,7 +2,7 @@
    Своя машина на телефоне — с обводкой (11бз, автор 24.10.2026: «на телефоне много деталей, которые в кашу
    превращаются»; набор телефона — mobile.js CLEAN, правила словами — docs/CAREER.md «Мобильный режим» → «Чистая картинка»).
 
-   Кузов своей машины обведён тёмной линией CLEAN.outline м: «вывернутая оболочка» — тот же кузов (та же геометрия,
+   Кузов своей машины обведён тонкой мягкой линией CLEAN.outline м (тёмная полупрозрачная, цвета тени; была чёрная 7 см, стала 3,5 см — автор 24.10.2026): «вывернутая оболочка» — тот же кузов (та же геометрия,
    без копии вершин: вмятины и оторванные куски видны и на обводке), раздутый по нормалям и нарисованный изнутри
    тёмным. Один вызов отрисовки. Из кабины и вплотную (камера ближе NEAR м к машине) обводки нет — она закрыла бы вид.
    Кузов сменился (гараж, ремонт, другая машина) — обводка переезжает на новый сама (проверка раз в CHECK с).
@@ -11,13 +11,13 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { CLEAN } from './mobile.js';
 
-const MV = { NEAR: 3.2, CHECK: 0.5, HEX: 0x1a1410, BODY: /^real:Car_CarBody/ };
+const MV = { NEAR: 3.2, CHECK: 0.5, HEX: 0x2a2230, OPACITY: 0.55, BODY: /^real:Car_CarBody/ };
 export const ST = { on: 0, body: '', moves: 0 };
 let A = null, MAT = null, HULL = null, BODY = null, t = 0;
 const WS = new THREE.Vector3(), WP = new THREE.Vector3();
 
 function mat () {
-  const m = new THREE.MeshBasicMaterial({ color: MV.HEX, side: THREE.BackSide });
+  const m = new THREE.MeshBasicMaterial({ color: MV.HEX, side: THREE.BackSide, transparent: true, opacity: MV.OPACITY, depthWrite: false });
   const U = { uOut: { value: CLEAN.outline } };
   m.onBeforeCompile = sh => {
     sh.uniforms.uOut = U.uOut;

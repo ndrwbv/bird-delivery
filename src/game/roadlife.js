@@ -470,9 +470,61 @@ function* buildFences (A) {
     if (TAKEN.has(tk(x, z)) || !A.inBounds(x, z, 10) || groundH(x, z) < 0.3) return true;
     const r = nearestRoad(x, z, 7, 1);
     if (r && r.d < r.seg.w / 2 + (r.seg.c <= 5 ? 2.2 : 0.9)) return true;
-    return nearPath(x, z, 1.3) || near(A.PARKED, x, z, 3) || near(ENTR, x, z, 1.2) || !!onPave(x, z, 0.1) || inHouse(x, z, 0);
+    return nearPath(x, z, 1.3) || near(A.PARKED, x, z, 3) || near(ENTR, x, z, 1.2) || !!onPave(x, z, 0.1) || inHouse(x, z, WALL_GAP);   // 0п88: не ближе WALL_GAP к стене
   };
   const KIDS = /школ|детск|сад\b|сад |гимназ|лице|school|kinder/i;
+  // стены домов — отрезками по клеткам в 8 м: точное расстояние до стены (inHouse смотрит только вдоль осей — косую стену пропускает)
+  const WG = new Map();
+  for (const hb of CITY.buildings) {
+    const hp = hb.p;
+    for (let i = 0; i < hp.length; i++) {
+      const a = hp[i], c = hp[(i + 1) % hp.length];
+      for (let u = Math.floor(Math.min(a[0], c[0]) / 8); u <= Math.floor(Math.max(a[0], c[0]) / 8); u++)
+        for (let v = Math.floor(Math.min(a[1], c[1]) / 8); v <= Math.floor(Math.max(a[1], c[1]) / 8); v++) {
+          const k = u * 100003 + v; let g = WG.get(k); if (!g) WG.set(k, g = []); g.push(a[0], a[1], c[0], c[1]);
+        }
+    }
+  }
+  const wallNear = (x, z, r) => {
+    for (let u = Math.floor((x - r) / 8); u <= Math.floor((x + r) / 8); u++)
+      for (let v = Math.floor((z - r) / 8); v <= Math.floor((z + r) / 8); v++) {
+        const g = WG.get(u * 100003 + v);
+        if (!g) continue;
+        for (let i = 0; i < g.length; i += 4) {
+          const dx = g[i + 2] - g[i], dz = g[i + 3] - g[i + 1], l2 = dx * dx + dz * dz || 1, q = clamp(((x - g[i]) * dx + (z - g[i + 1]) * dz) / l2, 0, 1);
+          if (Math.hypot(x - g[i] - dx * q, z - g[i + 1] - dz * q) < r) return true;
+        }
+      }
+    return false;
+  };
+  // принятые секции — по клеткам в 8 м: чужой забор не режет и не дублирует этот (0п88: «два забора в одном месте»)
+  const SG = new Map();
+  const segClash = (x1, z1, x2, z2, hi) => {
+    const dx = x2 - x1, dz = z2 - z1, l = Math.hypot(dx, dz) || 1, ux = dx / l, uz = dz / l;
+    for (let u = Math.floor((Math.min(x1, x2) - 0.4) / 8); u <= Math.floor((Math.max(x1, x2) + 0.4) / 8); u++)
+      for (let v = Math.floor((Math.min(z1, z2) - 0.4) / 8); v <= Math.floor((Math.max(z1, z2) + 0.4) / 8); v++)
+        for (const o of SG.get(u * 100003 + v) || []) {
+          if (o.hi === hi) continue;
+          const cr = ux * o.uz - uz * o.ux, ex = o.x1 - x1, ez = o.z1 - z1;
+          if (Math.abs(cr) < 0.2) {                // почти параллельные: на одной линии (< 0,35 м поперёк) и общий кусок длиннее 0,3 м
+            if (Math.abs(-ex * uz + ez * ux) > 0.35) continue;
+            const t0 = ex * ux + ez * uz, t1 = (o.x2 - x1) * ux + (o.z2 - z1) * uz;
+            if (Math.min(l, Math.max(t0, t1)) - Math.max(0, Math.min(t0, t1)) > 0.3) return true;
+          } else {                                 // режутся не у самых концов (0,3 м)
+            const ts = (ex * o.uz - ez * o.ux) / cr, to = (ex * uz - ez * ux) / cr;
+            if (ts > 0.3 && ts < l - 0.3 && to > 0.3 && to < o.l - 0.3) return true;
+          }
+        }
+    return false;
+  };
+  const segAdd = (x1, z1, x2, z2, hi) => {
+    const dx = x2 - x1, dz = z2 - z1, l = Math.hypot(dx, dz) || 1, o = { x1, z1, x2, z2, ux: dx / l, uz: dz / l, l, hi };
+    for (let u = Math.floor(Math.min(x1, x2) / 8); u <= Math.floor(Math.max(x1, x2) / 8); u++)
+      for (let v = Math.floor(Math.min(z1, z2) / 8); v <= Math.floor(Math.max(z1, z2) / 8); v++) {
+        const k = u * 100003 + v; let g = SG.get(k); if (!g) SG.set(k, g = []); g.push(o);
+      }
+  };
+  const WALL_GAP = 0.4;                           // 0п88 (24.10.2026): забор не ближе 0,4 м к стене — у самой стены текстура фасада и забора «дёргается»; ближе — секцию не ставим
   const P = [], N = [], U = [], I = [], C = [];
   const PANELS = [];                                // секции: середина и первая вершина — их сбивают (smashMesh)
   let houses = 0, nb = 0;
@@ -516,18 +568,18 @@ function* buildFences (A) {
     // Дом у самого тротуара (частный сектор) — забор по краю тротуара, хоть в
     // тридцати сантиметрах от фасада: иначе сторона к улице выпадала целиком.
     const m = [0, 0, 0, 0], tight = [0, 0, 0, 0];   // u0, u1, v0, v1
-    const cand = [M, M * 0.75, M * 0.55, 2.4, 1.8, 1.3, 0.9, 0.6, 0.35];
+    const cand = [M, M * 0.75, M * 0.55, 2.4, 1.8, 1.3, 0.9, 0.6, 0.45];
     for (let sd = 0; sd < 4; sd++) {
       let best = 1.8, bn = Infinity;
       for (const mm of cand) {
-        const hm = Math.min(0.5, mm * 0.6);
+        const hm = Math.min(0.5, Math.max(WALL_GAP, mm * 0.6));
         const nb = sd < 2 ? sideBad(true, sd ? R.u1 + mm : R.u0 - mm, R.v0 - M, R.v1 + M, hm) : sideBad(false, sd === 3 ? R.v1 + mm : R.v0 - mm, R.u0 - M, R.u1 + M, hm);
         if (nb < bn) { bn = nb; best = mm; }
         if (!nb) break;
       }
       m[sd] = best;
       // и так задевает — фасад стоит на краю тротуара: забор в линию фасада, от углов дома к боковым
-      if (bn > 0) { m[sd] = 0.08; tight[sd] = 1; }
+      if (bn > 0) { m[sd] = WALL_GAP + 0.05; tight[sd] = 1; }
     }
     const U0 = R.u0 - m[0], U1 = R.u1 + m[1], V0 = R.v0 - m[2], V1 = R.v1 + m[3];
     const sides = [[U0, V0, U1, V0], [U1, V0, U1, V1], [U1, V1, U0, V1], [U0, V1, U0, V0]];
@@ -547,9 +599,10 @@ function* buildFences (A) {
         const q0 = k / n, q1 = (k + 1) / n, qm = (q0 + q1) / 2;
         const [x1, z1] = X(lerp(a0, a1, q0), lerp(b0, b1, q0)), [x2, z2] = X(lerp(a0, a1, q1), lerp(b0, b1, q1));
         const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
-        const sd = si === 0 ? 2 : si === 1 ? 1 : si === 2 ? 3 : 0, hm = Math.min(0.5, m[sd] * 0.6);    // side 0 — v0, 1 — u1, 2 — v1, 3 — u0
+        const sd = si === 0 ? 2 : si === 1 ? 1 : si === 2 ? 3 : 0, hm = Math.min(0.5, Math.max(WALL_GAP, m[sd] * 0.6));    // side 0 — v0, 1 — u1, 2 — v1, 3 — u0
         const B = tight[sd] ? badTight : (x, z) => bad(x, z, hm);
-        const skip = (si === gate && Math.abs(qm - 0.5) * len < 2.7) || B(mx, mz) || B(lerp(x1, x2, 0.1), lerp(z1, z2, 0.1)) || B(lerp(x1, x2, 0.9), lerp(z1, z2, 0.9));
+        const skip = (si === gate && Math.abs(qm - 0.5) * len < 2.7) || B(mx, mz) || B(lerp(x1, x2, 0.1), lerp(z1, z2, 0.1)) || B(lerp(x1, x2, 0.9), lerp(z1, z2, 0.9))
+          || [0, 0.25, 0.5, 0.75, 1].some(q => wallNear(lerp(x1, x2, q), lerp(z1, z2, q), WALL_GAP)) || segClash(x1, z1, x2, z2, nb);
         if (skip) { if (run) { runs.push(run); run = null; } continue; }
         if (!run) run = { x1, z1, x2, z2 }; else { run.x2 = x2; run.z2 = z2; }
         const y1 = groundH(x1, z1) - 0.06, y2 = groundH(x2, z2) - 0.06, vi = P.length / 3;
@@ -566,6 +619,7 @@ function* buildFences (A) {
         I.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
         PANELS.push([mx, mz, vi, dl, fv.debris]);
         mine.push(tk(mx, mz), tk(x1, z1), tk(x2, z2));
+        segAdd(x1, z1, x2, z2, nb);
         panels++; sidePanels[si]++;
       }
       if (run) runs.push(run);
@@ -1410,8 +1464,9 @@ function stepWorks (dt, A) {
     }
     // конусы разлетаются от удара
     for (const c of W8.cones) {
-      if (!c.fly && sp > 2.5 && Math.hypot(c.x - V.x, c.z - V.z) < 1.5) {
-        c.fly = 1; c.vx = V.vx * 0.8 + rand(-1.5, 1.5); c.vz = V.vz * 0.8 + rand(-1.5, 1.5); c.vy = rand(3, 5.5); c.spin = rand(-9, 9);
+      if (!c.fly && sp > 0.4 && Math.hypot(c.x - V.x, c.z - V.z) < 1.5) {   // 0п89: с ~1,5 км/ч (было 2,5 м/с — медленно проезжала сквозь); медленно — просто валится
+        const soft = Math.min(1, 0.25 + sp / 6);
+        c.fly = 1; c.vx = V.vx * 0.8 + rand(-1.5, 1.5) * soft; c.vz = V.vz * 0.8 + rand(-1.5, 1.5) * soft; c.vy = rand(3, 5.5) * soft; c.spin = rand(-9, 9) * soft;
         coneOut(W8, c);                                // из склейки — своим мешем
         if (A.Snd) A.Snd.fx('cone', s => s.noise(0.08, 0.1));
       }

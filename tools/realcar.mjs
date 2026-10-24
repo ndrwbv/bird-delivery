@@ -27,7 +27,7 @@ const MODELS = {
   vaz2107: {
     K: 0.01,                                      // модель в сантиметрах
     PART: {
-      Car_CarBody_0: { keep: 0.5, err: 0.006, tex: 64, colors: 6, median: 9, paint: { hue: [330, 45], sat: 0.3 } },
+      Car_CarBody_0: { keep: 0.5, err: 0.006, tex: 64, colors: 6, median: 9, paint: { hue: [330, 45], sat: 0.3, rest: 0.5 } },
       Car_Details_0: { keep: 0.4, err: 0.01, tex: 256, colors: 12, sat: 1.35, bri: 1.3 },   // номера и фары — мельче не читаются; светлее (хром, фары)
       Car_Details_Transparent_0: { keep: 1, tex: 128, sat: 1.2, bri: 1.1, alpha: 0.5 },
       Car_Bottom_0: { keep: 0.15, err: 0.03, tex: 64, colors: 8, sat: 1.1, bri: 1.2 },
@@ -111,6 +111,7 @@ async function texture (name, mat, P) {
     for (let i = 0; i < data.length; i += 4) {
       const c = hsv(i);
       if (isPaint(c)) { const g = Math.round(255 * Math.min(1, PAINT_SHADE + (1 - PAINT_SHADE) * c[2] / vref)); data[i] = data[i + 1] = data[i + 2] = g; data[i + 3] = 255; }
+      else if (P.paint.rest) { data[i] = data[i + 1] = data[i + 2] = Math.round(255 * P.paint.rest); data[i + 3] = 255; }   // rest — остальное тоже краска, темнее (0п85: были пятна старого цвета)
       else data[i + 3] = 0;
     }
     img = sharp(data, { raw: info });

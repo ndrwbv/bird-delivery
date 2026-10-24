@@ -369,9 +369,8 @@ function shove (p, t, al, ac, fx, fz, hl) {
 }
 function hitOne (p, k, t, vx, vz, sp) {
   const kmh = sp * 3.6;
-  if (k === 2) {                                   // человек в костюме-бургере — отлетает (game.js burgerHit, burgersuit.js)
-    A.burgerHit(p, vx, vz);
-    ST.killed++;
+  if (k === 2) {                                   // человек в костюме-бургере — медленно падает и встаёт, быстрее отлетает (game.js burgerHit, burgersuit.js)
+    if (A.burgerHit(p, vx, vz)) ST.killed++; else ST.fell++;
     return;
   }
   if (k === 3) { A.runOverScoot(p, vx, vz, 'traffic'); ST.killed++; return; }

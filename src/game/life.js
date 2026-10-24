@@ -12,6 +12,7 @@
 import { t } from '../i18n/index.js';
 import { makePerson, holdFixed } from './people.js';
 import { MAP } from './map.js';
+import { DOGS_ON } from './dogsflag.js';      // собаки выключены (?dogs — вернуть)
 import * as SEAS from './seasons.js';
 import * as PETW from './petwear.js';          // зимой собачка в свитере или попонке (petwear.js)
 
@@ -287,7 +288,7 @@ function spawnRich () {
   }
   const fat = chance(fem ? 0.08 : 0.35);
   const m = member(person, { fat });
-  const u = m.u, z = fat ? 0.25 : 0.145, dog = chance(0.4);
+  const u = m.u, z = fat ? 0.25 : 0.145, dog = DOGS_ON && chance(0.4);
   const tie = !fem && chance(0.7), chain = fem || chance(0.5);
   m.grp.add(bits(b => {
     if (chain) {

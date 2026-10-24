@@ -26,6 +26,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { t, N_ } from '../i18n/index.js';
 import { holdFixed } from './people.js';
+import * as QC from './qcrowd.js';             // толпа вдали — люди-модели, не коробки (qcrowd.js, 0п62)
 import * as DIST from './districts.js';
 import { TIER } from './hits.js';
 import { hourOf } from './econ.js';
@@ -33,6 +34,7 @@ import * as RESPECT from './respect.js';
 import * as FEST from './festivals.js';
 import { freeAfterUpload, CLEAN } from './mobile.js';   // телефон: холст атласа после загрузки — 1×1 (атлас рисуется заново на новый холст)
 import * as DIRECTOR from './director.js';   // режиссёр событий: концерт — лёгкое, марш — среднее, восстание — крупное
+import * as BW from './brawl.js';          // драки на расстоянии руки: удар, отшатнулся (brawl.js, 0п91)
 
 const SRCH = typeof location !== 'undefined' ? location.search || '' : '';   // ?boxcrowd — толпы коробками, как до 23.10.2026 (сравнить)
 export const PROT = {
@@ -548,6 +550,9 @@ function crowdGeo () {
   });
 }
 const M4 = new THREE.Matrix4(), R4 = new THREE.Matrix4(), COL = new THREE.Color();
+/* тело толпы: люди-модели вдали (qcrowd.js, 0п62), ?boxcrowd — коробки; голова — тогда пустая (она в модели) */
+function crowdBody (geo, n) { const q = QC.body(A, n); if (!q) return inst(geo, CMAT, n); A.scene.add(q); return q; }
+function crowdHead (n, body) { if (!(body instanceof THREE.Group)) return inst(HEAD, CMAT, n); const m = QC.head(CMAT, n); A.scene.add(m); return m; }
 function inst (geo, mat, n) { const m = new THREE.InstancedMesh(geo, mat, Math.max(1, n)); m.count = n; m.frustumCulled = false; A.scene.add(m); return m; }
 function setInst (meshes, i, x, y, z, ry, s) {
   R4.makeRotationY(ry); M4.makeScale(s, s, s).premultiply(R4); M4.setPosition(x, y, z);
@@ -690,7 +695,7 @@ function buildMarch (P) {
     const v = i % 4;
     M.push({ row: (i / cols) | 0, lat: ((i % cols) - (cols - 1) / 2) * 1.05 + rand(-0.15, 0.15), ox: 0, oz: 0, dead: 0, ph: rand(0, 6), v, j: pl[v]++, shirt: pick(SHIRTS), x: 0, z: 0, ry: 0 });
   }
-  const body = inst(MBODY, CMAT, n), head = inst(HEAD, CMAT, n), pole = inst(POLE, CMAT, n), plac = PLAC.map((g, v) => inst(g, MAT, pl[v]));
+  const body = crowdBody(MBODY, n), head = crowdHead(n, body), pole = inst(POLE, CMAT, n), plac = PLAC.map((g, v) => inst(g, MAT, pl[v]));
   M.forEach((m, i) => { body.setColorAt(i, COL.set(m.shirt)); head.setColorAt(i, COL.set(pick(SKINS))); });
   // ведущий с мегафоном — настоящий человек: кричит речёвки
   const lg = A.makeHuman(null, { shirt: prob().col[0] });
@@ -836,7 +841,7 @@ function spawnRiot (force) {
   for (let i = 0; i < n; i++) {
     const side = i % 2, grp = A.makeHuman(null, { shirt: side ? P.col[0] : pick(['#5a6070', '#2b2a30', '#8a6a4a']) });
     A.scene.add(grp);
-    const a = i / n * Math.PI * 2 + rand(-0.3, 0.3), r = rand(0.5, 0.8);
+    const a = i / n * Math.PI * 2 + rand(-0.3, 0.3), r = BW.BRAWL.REACH / (2 * Math.sin(Math.PI / n));   // на расстоянии руки друг от друга (0п91)
     men.push({ grp, u: grp.userData, x: s.x + Math.sin(a) * r, z: s.z + Math.cos(a) * r, bx: s.x + Math.sin(a) * r, bz: s.z + Math.cos(a) * r, h: 0, ph: rand(0, 6), dead: 0, bubble: null, bubT: 0, punch: 0, pT: rand(0.3, 1.2), jx: 0, jz: 0 });
   }
   RIOTS.push({ x: s.x, z: s.z, men, t: 0, life: rand(PROT.RIOT.LIFE[0], PROT.RIOT.LIFE[1]), sayT: 0.5, smokeT: 1 });
@@ -864,14 +869,22 @@ function riotStep (dt) {
       if (m.bubble && (m.bubT -= dt) <= 0) unsay(m);
       const foe = alive.length > 1 ? alive[(alive.indexOf(m) + 1) % alive.length] : null;
       if (foe) m.h = damp(m.h, m.h + wrap(Math.atan2(foe.x - m.x, foe.z - m.z) - m.h), 6, dt);
-      m.punch = Math.max(0, m.punch - dt * 4);
-      if ((m.pT -= dt) <= 0) { m.pT = rand(0.5, 1.3); m.punch = 1; if (foe) { foe.jx += Math.sin(m.h) * 0.25; foe.jz += Math.cos(m.h) * 0.25; } }
+      // драка на расстоянии руки (0п91): отлетел от удара — подходит; кулак долетел — тому отшатываться
+      const bwm = BW.bw(m);
+      if (foe) {
+        const dd = Math.hypot(foe.bx - m.bx, foe.bz - m.bz);
+        if (dd > BW.BRAWL.COME && bwm.f < 0 && bwm.st <= 0) {
+          const stp = Math.min(2.4 * dt, dd - BW.BRAWL.REACH);
+          m.bx += (foe.bx - m.bx) / dd * stp; m.bz += (foe.bz - m.bz) / dd * stp;
+        } else if (BW.ready(m, foe, dt)) BW.start(m);
+      }
+      if (bwm.st > BW.BRAWL.STAG_T * 0.5) { m.bx += bwm.vx * dt; m.bz += bwm.vz * dt; }
       m.jx = damp(m.jx, 0, 3, dt); m.jz = damp(m.jz, 0, 3, dt);
       m.x = m.bx + m.jx; m.z = m.bz + m.jz;
       m.ph += dt * 6;
-      if (u.armR) u.armR.rotation.x = -0.6 - 1.2 * m.punch;
-      if (u.armL) u.armL.rotation.x = -0.9 + Math.sin(m.ph) * 0.2;
-      if (u.legL) { u.legL.rotation.x = Math.sin(m.ph) * 0.25; u.legR.rotation.x = -Math.sin(m.ph) * 0.25; }
+      if (u.legL) { u.legL.rotation.x = Math.sin(m.ph) * 0.12; u.legR.rotation.x = -Math.sin(m.ph) * 0.12; }
+      const hitR = BW.animate(m, dt, false);
+      if (hitR && foe) BW.hurt(foe, m.x, m.z);
       const c = dC < 30 && inCar(m.x, m.z);
       if (c) {
         if (hit) { knockHuman(m); STATS.riotKo++; continue; }
@@ -971,7 +984,7 @@ function spawnGig (force, kind) {
     if (rd && rd.d < (rd.seg.w || 6) / 2 + 0.6) continue;
     L.push({ x: lx, z: lz, y: A.groundH(lx, lz), ry: Math.atan2(x - lx, z - lz) + rand(-0.4, 0.4), s: rand(0.88, 1.08), ph: rand(0, 6.28), amp: Math.random() < 0.6 ? rand(0.06, 0.22) : 0.02, hop: 0, vx: 0, vz: 0, dead: 0, shirt: pick(SHIRTS) });
   }
-  const body = inst(BODY, CMAT, L.length), head = inst(HEAD, CMAT, L.length);
+  const body = crowdBody(BODY, L.length), head = crowdHead(L.length, body);
   L.forEach((q, i) => { body.setColorAt(i, COL.set(q.shirt)); head.setColorAt(i, COL.set(pick(SKINS))); });
   const band = t(pick(BANDS));
   DIRECTOR.start('gig');

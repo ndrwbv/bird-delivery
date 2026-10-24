@@ -987,7 +987,7 @@ export async function play (storyId, chapter, o = {}) {
   const ca = actor(cg, cx, cz, Math.atan2(h.ex - cx, h.ez - cz));
   ca.speed = 2.0;
   const box = API.pizzaBox();
-  box.scale.setScalar(0.75); box.position.set(0, 1.12, 0.34);
+  box.position.set(0, 1.12, 0.34);
   cg.add(box); ca.hold = box;
   CUT.actors = { zina: za, courier: ca };
   // характер: id истории = id героя (Стёпа на лавочке — 'stepa-bench', баба Зина — 'zina')

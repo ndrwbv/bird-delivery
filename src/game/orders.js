@@ -1206,7 +1206,15 @@ export function staffRide () {
   STAFF.crew = crew; STAFF.pay = 0;
   const P = A.PIZZA, here = !S.order && !S.side && S.state === 'handover' && P && Math.hypot(V.x - P.x, V.z - P.z) < 25;
   if (here) staffAsk();
-  else {
+  else if (staffCarrying()) {
+    // в машине ещё пицца — сначала довези (0п63, автор 24.10.2026: «ехал на заказ, видимо последний, и потом мне резко
+    // говорят — всё, возвращайся в пиццерию»): заказ не снимаем, деньги за него — как обычно; ребята ждут в пиццерии,
+    // их срок (STAFF_WAIT) идёт только после последнего вручения
+    STAFF.wait = true; STAFF.waitT = 0;
+    if (S.side) { if (!S.side.ped.dead) S.side.ped.freeT = 3; S.side = null; }
+    A.toast(t(DAYT.fresh('staffCallCarry', [N_('это последний заказ — довези, потом заедь в пиццерию: смену надо развезти'),
+      N_('довези заказ — и в пиццерию: ребят надо развезти по домам')])));
+  } else {
     STAFF.wait = true; STAFF.waitT = 0;
     if (S.side) { if (!S.side.ped.dead) S.side.ped.freeT = 3; S.side = null; }
     A.hidePhone(); A.clearGate();
@@ -1217,6 +1225,9 @@ export function staffRide () {
   }
   return STAFF.p;
 }
+/* везёшь заказ (не развоз) и в нём кто-то ещё без пиццы — пицца в машине */
+const staffCarrying = () => !!(S.order && !(S.order.ord && S.order.ord.type === 'staff')
+  && S.order.stops.some(st => st.peds.some(p => !p.served)));
 function staffAsk () {
   const crew = STAFF.crew;
   STAFF.wait = false;
@@ -1304,7 +1315,9 @@ function boardCrew () {
     A.rehuman(p, person);
     p.x = (P.wx !== undefined ? P.wx : P.x) + rand(-1.2, 1.2); p.z = (P.wz !== undefined ? P.wz : P.z) + rand(-1.2, 1.2);
     A.pushOut(p, 0.5);
-    A.makeGuest(p, { x: V.x + rand(-1, 1), z: V.z + rand(-1, 1) });
+    // к ближней двери (сбоку), а не в середину машины — и вокруг кузова, не сквозь (game.js guestStep, 0п73)
+    const cs = Math.cos(V.h), sn = Math.sin(V.h), sd = (p.x - V.x) * cs - (p.z - V.z) * sn >= 0 ? 1 : -1, f = rand(-0.6, 0.6);
+    A.makeGuest(p, { x: V.x + sd * cs * 1.45 + Math.sin(V.h) * f, z: V.z - sd * sn * 1.45 + Math.cos(V.h) * f });
     peds.push(p);
   });
   STAFF.board = { peds, t: 0 };
@@ -1388,7 +1401,7 @@ export function step (dt) {
     STAFF.drops.splice(i, 1);
   }
   // ждут в пиццерии, а ты не едешь — ушли пешком
-  if (STAFF.p && STAFF.wait && (STAFF.waitT += dt) > STAFF_WAIT) {
+  if (STAFF.p && STAFF.wait && !staffCarrying() && (STAFF.waitT += dt) > STAFF_WAIT) {   // довозишь заказ — ждут (0п63)
     A.toast(t('не дождались — ушли пешком'));
     staffDone(false);
   }

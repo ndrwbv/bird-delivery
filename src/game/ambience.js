@@ -30,6 +30,7 @@ import * as FEST from './festivals.js';
 import * as PROT from './protests.js';
 import * as CONSTR from './construction.js';
 import { isForest } from './forest.js';
+import { DOGS_ON } from './dogsflag.js';      // собаки выключены (?dogs — вернуть): лая вдали нет
 
 export const AMB = {
   MAX: 4,               // петель звучит одновременно, не больше
@@ -306,7 +307,7 @@ function railPts () {
 function oneShots (dt) {
   const E = A.ENV, Snd = A.Snd, V = A.V;
   const rain = SEAS.snowy() ? 0 : E.rain || 0;
-  if ((T.dog -= dt) <= 0) {
+  if (DOGS_ON && (T.dog -= dt) <= 0) {
     const gang = GANGK > 0.5;
     T.dog = gang ? rnd(...AMB.GANG_DOG) : rnd(...AMB.DOG);
     STATS.dogTry = (STATS.dogTry || 0) + 1;

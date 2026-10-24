@@ -36,6 +36,7 @@ import * as REGS from './regulars.js';         // клиенты автора у
 import * as LOCALS from './locals.js';         // жители Юга: заказ к его двери — окно разговора (locals.js)
 import * as DCAST from './doorcast.js';        // кто говорит — виден в 3D: незнакомец подходит, второй из-за спины, собака, рот (doorcast.js)
 import { makePerson } from './people.js';
+import { DOGS_ON } from './dogsflag.js';      // собаки выключены (?dogs — вернуть)
 
 export const SHOUT = { P: 0.15, SAY: 0.9, HOLD: 3.0, SORRY: 2.6, SORRY_HOLD: 2.8, COL: '#c0392b', SORRY_COL: '#3a6fb0' };
 export const SCENE = { P: 0.15, FROM_SHIFT: 1, SAY: 0.6, HABAR: 5000, COL: '#7a4a2a' };
@@ -130,11 +131,11 @@ const pickNew = (pool, key) => {
 /* ── 1. крик в квартиру ── */
 function shoutPool (fem) {
   const L = A && A.ADULT ? ADULT_SHOUT : KIDS_SHOUT;
-  return L.filter(q => !q.sex || (q.sex === 'f') === !!fem);
+  return L.filter(q => (!q.sex || (q.sex === 'f') === !!fem) && (DOGS_ON || !q.dog));
 }
 /* текст крика и извинения (без показа) */
 function shoutLines (fem, dog) {
-  const pool = dog ? shoutPool(fem).filter(q => q.dog) : shoutPool(fem);
+  const pool = dog && DOGS_ON ? shoutPool(fem).filter(q => q.dog) : shoutPool(fem);
   const q = pool[(() => { let k = Math.floor(Math.random() * pool.length); if (pool.length > 1 && pool[k].s === ST.lastShout) k = (k + 1) % pool.length; return k; })()];
   ST.lastShout = q.s;
   const sorry = pickNew(A && A.ADULT ? ADULT_SORRY : KIDS_SORRY, 'r');

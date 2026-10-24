@@ -33,8 +33,9 @@
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
 import * as PIX from './pixfx.js';
-import { p0Of, RCW, LAMP_KEY, liteCut } from './realcar.js';
-import { crackLamp, smashLamp, lampState, LAMP as CGLAMP } from './carglass.js';
+import { p0Of, RCW, LAMP_KEY, liteCut, soot as sootAt } from './realcar.js';
+import { ST as DIRT_ST } from './cardirt.js';   // 0п82: отлетела деталь — своя машина грязнее
+import { crackLamp, smashLamp, lampState, LAMP as CGLAMP, GLASS as CGGLASS } from './carglass.js';
 import { fling, dropPart } from './cardent.js';
 
 export const WR = {
@@ -58,9 +59,21 @@ export const WR = {
   },
   SPRING: { K: 55, C: 3.5, ACC: 0.05, BUMP: 0.04, YAW: 0.25 },   // качание: жёсткость, затухание; от разгона (рад на м/с²), тряски, поворота
   GLASS: [9, 15, 22],        // м/с: удар у стекла добавляет 1 / 2 / 3 ступени: 1 — трещины, 2 — ещё трещины, 3 — разбито
+  /* своя машина — вид по потерянным сердцам (0п58, автор 24.10: «разбитость машины привязана к сердцам»). Доля потерянных:
+     меньше SKEW — только перекос и трещины (ступень 1); меньше HALF — болтается (2), стёкла и фары бьются; с HALF — отлетает
+     OFFS[0] деталь, с MOST и на последнем сердце — OFFS[1]. Счёт ударов копится как раньше: потерял сердце — машина
+     догоняет (sync) по месту прежних ударов. hearts(g) — { hp, max } своей (game.js), у чужих — null (как раньше) */
+  HEARTS: { SKEW: 1 / 3, HALF: 0.5, MOST: 0.75, OFFS: [1, 2] },
+  hearts: null,
+  /* фары и фонари не отлетают и не висят (0п61, автор 24.10: «фонари не должны пропадать — могут мерцать или быть
+     разбитыми»): 1 — трещины, горит тусклее и мерцает (ON — горит столько с, OFF — гаснет на столько, DIM — насколько), 2 — разбита */
+  FLICK: { ON: [0.35, 2.6], OFF: [0.04, 0.16], DIM: 0.92 },
+  /* отлетел бампер «Семёрки» — за ним панель кузова, тёмная, с креплениями (0п80; до того было видно багажник изнутри) */
+  BACK: { HEX: 0x2b2a2c, BRACKET: 0x55565a, IN: 0.025 },
 };
 RCW.staged = WR.on;          // realcar.js: подробная копия — фары и стёкла по ступеням отсюда
 CGLAMP.staged = WR.on ? (car) => !!(car && car.userData && (car.userData.see || car.userData.dent)) : null;   // carglass.js: фары своей и копии — по ступеням отсюда
+CGGLASS.cap = car => { const c = WR.on && capOf(car); return c && c.st < 2 ? 2 : 3; };   // стёкла своей: сердец потеряно меньше трети — только трещины (0п58)
 
 export const ST = { hits: 0, cuts: 0, cutTris: 0, clipped: 0, off: 0, offKeys: [], hang: 0, skew: 0, quiet: 0 };
 
@@ -97,6 +110,7 @@ const hideMat = () => HIDE || (HIDE = new THREE.MeshBasicMaterial({ visible: fal
 /* ─── состояние машины ─── */
 const WS = new WeakMap();                          // машина (группа) → { parts: { key: { d, st } }, P: { key: piece }, R }
 const LIVE = new Set();                            // машины с болтающимися деталями
+const FLK = new Set();                             // машины с фарами в трещинах — мерцают (0п61)
 function stOf (g) {
   let W = WS.get(g);
   if (!W) WS.set(g, W = { g, parts: {}, P: {}, R: null, src: null, mv: null });
@@ -105,8 +119,35 @@ function stOf (g) {
   return W;
 }
 const realOK = R => !!(R && R.m && (!R.traffic || R.detail) && R.C && R.C.dir === 'vaz2107');
-const partOf = (W, key) => W.parts[key] || (W.parts[key] = { d: 0, st: 0 });
+const partOf = (W, key) => W.parts[key] || (W.parts[key] = { d: 0, st: 0, want: 0 });
 const stageOf = d => (d >= WR.S[2] ? 3 : d >= WR.S[1] ? 2 : d >= WR.S[0] ? 1 : 0);
+/* потолок по сердцам (0п58): { st — выше какой ступени нельзя, off — сколько деталей может отлететь }; null — без потолка */
+function capOf (g) {
+  const h = WR.hearts && WR.hearts(g);
+  if (!h || !(h.max > 0) || !(h.hp > 0)) return null;
+  const f = (h.max - h.hp) / h.max, H = WR.HEARTS, last = h.hp <= 1;
+  return { st: last || f >= H.HALF ? 3 : f >= H.SKEW ? 2 : 1, off: last || f >= H.MOST ? H.OFFS[1] : f >= H.HALF ? H.OFFS[0] : 0 };
+}
+const offs = W => { let n = 0; for (const k in W.parts) if (W.parts[k].st >= 3) n++; return n; };
+/* деталь key — к ступени, какую набрала (want), но не выше потолка; 0 — не сдвинулась */
+function raise (g, W, key, o, v, lx, cap) {
+  const P = partOf(W, key);
+  let st = P.want || 0;
+  if (cap) { st = Math.min(st, cap.st); if (st >= 3 && offs(W) >= cap.off) st = 2; }
+  if (!(st > P.st)) return 0;
+  setStage(g, W, key, st, P.st, o, v, lx);
+  return st;
+}
+/** сердца своей машины поменялись (game.js hurtCar): догнать вид по набранному счёту — сильнее набравшие первыми */
+export function sync (g) {
+  if (!WR.on || !g) return null;
+  const W = WS.get(g);
+  if (!W || !partsList(g)) return null;
+  const cap = capOf(g), L = W.last || { o: { soft: true }, v: 8, lx: 0 }, out = [];
+  const keys = Object.keys(W.parts).filter(k => W.parts[k].want > W.parts[k].st).sort((a, b) => W.parts[b].d - W.parts[a].d);
+  for (const k of keys) { const s = raise(g, W, k, L.o, L.v, L.lx, cap); if (s) out.push(k + s); }
+  return out;
+}
 
 /* какие детали у машины и где они (в осях машины, метры игры) */
 function partsList (g) {
@@ -142,11 +183,14 @@ export function hit (g, lx, lz, v, o = {}) {
   const k = lerp01(v, WR.MIN, WR.FULL) * Math.max(0.2, 1 - WR.ARMOR * (u.armor || 0));
   const end = Math.abs(lz) / hl >= Math.abs(lx) / hw, rearHit = end && lz < 0;
   ST.hits++;
-  const out = [];
-  for (const p of list) {
+  const out = [], cap = capOf(g);
+  W.last = { o: { ox: o.ox, oz: o.oz, soft: o.soft }, v, lx };
+  // ближние к удару — первыми (отлетает то, во что попали, пока сердца позволяют)
+  const order = list.map(p => [p, Math.hypot(p.ax - lx, p.az - lz)]).sort((a, b) => a[1] - b[1]);
+  for (const [p, dist] of order) {
     const P = partOf(W, p.key);
     if (P.st >= 3) continue;
-    const dist = Math.hypot(p.ax - lx, p.az - lz), w = 1 - lerp01(dist, WR.NEAR[0], WR.NEAR[1]);
+    const w = 1 - lerp01(dist, WR.NEAR[0], WR.NEAR[1]);
     let add = k * w * (p.rear && rearHit ? WR.REAR_K : 1);
     if (p.rear && !rearHit) add = Math.max(add, k * WR.REAR);
     if (!(add > 0)) continue;
@@ -157,8 +201,13 @@ export function hit (g, lx, lz, v, o = {}) {
       const front = p.az > 0, need = WR.BUMPER + (front ? WR.ARMOR_F * (u.armor || 0) : 0);
       if (v >= need + (WR.BUMPER_OFF - WR.BUMPER)) st = 3; else if (v >= need) st = Math.max(st, 2);
     }
-    if (p.kind === 'lamp' && w >= 0.7) { if (v >= WR.LAMP[1]) st = Math.max(st, 2); else if (v >= WR.LAMP[0]) st = Math.max(st, 1); }
-    if (st > P.st) { setStage(g, W, p.key, st, P.st, o, v, lx); out.push(p.key + st); }
+    if (p.kind === 'lamp') {                         // фара не отлетает (0п61): трещины → разбита
+      if (w >= 0.7) { if (v >= WR.LAMP[1]) st = Math.max(st, 2); else if (v >= WR.LAMP[0]) st = Math.max(st, 1); }
+      st = Math.min(st, 2);
+    }
+    P.want = Math.max(P.want || 0, st);
+    const s = raise(g, W, p.key, o, v, lx, cap);
+    if (s) out.push(p.key + s);
   }
   return out;
 }
@@ -167,8 +216,8 @@ export function rear (g, st, near, far, v = 6) {
   if (!WR.on || !g) return;
   const W = stOf(g), list = partsList(g);
   if (!list) return;
-  const has = k => list.some(p => p.key === k);
-  const at = (key, s) => { if (!has(key)) return; const P = partOf(W, key); if (s > P.st) { P.d = Math.max(P.d, WR.S[s - 1]); setStage(g, W, key, s, P.st, { soft: true }, v, 0); } };
+  const has = k => list.some(p => p.key === k), cap = capOf(g);
+  const at = (key, s) => { if (!has(key)) return; const P = partOf(W, key); if (s > (P.want || 0)) { P.d = Math.max(P.d, WR.S[s - 1]); P.want = s; } raise(g, W, key, { soft: true }, v, 0, cap); };
   if (st >= 1) { at(near, 1); at('br', 1); at('trunk', 1); at('rdoor', 1); }
   if (st >= 2) { at(near, 2); at(far, 1); at('br', 2); }
   if (st >= 3) { at(near, 2); at(far, 2); at('br', 3); at('trunk', 2); at('rdoor', 2); }
@@ -181,7 +230,7 @@ function setStage (g, W, key, st, from, o, v, lx) {
   const u = g.userData, R = u.real;
   if (LAMPS.includes(key)) lampStage(g, W, key, st, from, o, v);
   if (R) {
-    if (key in REAL_PARTS && REAL_PARTS[key].kind !== 'lamp' || st >= 2 && key in REAL_PARTS) {
+    if (key in REAL_PARTS && REAL_PARTS[key].kind !== 'lamp') {   // фара — на месте (0п61): бьётся стекло (carglass.js, realcar.js lampInject)
       const pc = piece(g, key);
       if (pc) {
         if (pc.kind === 'bumper' && !pc.sd) pc.sd = Math.sign(lx) || (Math.random() < 0.5 ? 1 : -1);
@@ -203,7 +252,7 @@ function lampStage (g, W, key, st, from, o, v) {
   const dead = R && R.lamp && R.lamp.dead;
   if (dead) {
     const c = LAMP_KEY[key];
-    if (st === 1) dead[c] = Math.max(dead[c], 0.45);   // в трещинах — горит тусклее
+    if (st === 1) { dead[c] = Math.max(dead[c], 0.45); FLK.add(W); }   // в трещинах — горит тусклее и мерцает (step)
     if (st >= 2) {
       if (dead[c] < 1 && !u.cg) shards(g, key);         // копия потока: осколки (своей — carglass.js smashLamp)
       dead[c] = 1;
@@ -477,16 +526,34 @@ function pose (pc) {
   if (pc.wins && Array.isArray(m.material)) pc.wins.forEach((o, i) => { if (o) m.material[i] = o.visible ? pc.mats[i] : hideMat(); });
 }
 
+/* копоть и грязь на месте отлетевшего (0п82, автор 24.10: «разбитая в хлам — белое пятно без всего»): вокруг дыры — сажа
+   рваными краями (realcar.js soot, радиус SOOT_R по виду детали, м модели); своя машина — грязнее на GRIME (cardirt.js),
+   машина потока — тусклее и ржавее на WEAR (износ uWear) */
+export const SCAR = { R: { hood: 0.75, trunk: 0.75, door: 0.6, bumper: 0.55, lamp: 0.28 }, GRIME: 0.22, WEAR: 0.25 };
+function scar (g, key, again) {
+  const S = REAL_PARTS[key], R = g.userData.real;
+  if (!S || !R) return;
+  const r = SCAR.R[S.kind] || 0.4;
+  // бампер — копоть на кузове над ним (сам бампер ниже кузова), остальное — посередине детали на высоте крепления
+  const y = S.kind === 'bumper' ? S.box.y[1] + 0.08 : S.hinge[1];
+  sootAt(g, S.at[0], y, S.at[1], r);
+  if (again) return;                                 // подробная копия собрана заново (restore) — грязь уже набрана
+  if (R.traffic) { if (R.U && R.U.wear) R.U.wear.value = Math.min(1, R.U.wear.value + SCAR.WEAR); }
+  else DIRT_ST.dirt = Math.min(1, DIRT_ST.dirt + SCAR.GRIME);
+}
+
 /* отлетела: кусок — в мир (cardent.js fling), летит от удара */
 function off (g, W, pc, o, v) {
   const u = g.userData;
   pc.gone = true; LIVE.delete(W);
+  scar(g, pc.key);                                   // 0п82: копоть вокруг дыры, грязь
   if (pc.key === 'trunk' && u.trunk) { u.trunk.lost = true; cargoReal(g); }
   (u.lost || (u.lost = {}))[pc.key] = 1;
   if (pc.kind === 'lamp' && u.real && u.real.lamp) u.real.lamp.dead[LAMP_KEY[pc.key]] = 1;
   const m = pc.m;
   const di = W.R.dent.indexOf(m.geometry);
   if (di >= 0) W.R.dent.splice(di, 1);
+  if (pc.kind === 'bumper') backPlate(W, m.geometry, pc.H.z > 0 ? 1 : -1);
   if (WR.QUIET || o.quiet) { m.parent && m.parent.remove(m); m.geometry.dispose(); ST.quiet++; return; }
   // середина куска — в начало его осей, масштаб модели — в сетку: кувыркается вокруг себя, ложится на асфальт как есть
   const geo = m.geometry, k = W.R.C.k;
@@ -498,6 +565,30 @@ function off (g, W, pc, o, v) {
   const f = faceOf(pc.key, g), ox = (o.ox || 0) * 0.5 + f[0], oz = (o.oz || 0) * 0.5 + f[1];
   fling(g, m, 'part-' + pc.key, ox, oz, o.soft ? Math.min(v, 6) : v);
   ST.off++; ST.offKeys.push(pc.key);
+}
+/* бампер отлетел — на его месте панель кузова: тёмная пластина поперёк проёма (у внутреннего края бампера) и два
+   кронштейна, торчат туда, где он был (0п80: сквозь дыру было видно багажник / моторный отсек изнутри). В осях модели */
+let BACKM = null;
+function backPlate (W, geo, s) {
+  if (!W.R || !W.R.m) return;
+  geo.computeBoundingBox();
+  const b = geo.boundingBox, B = WR.BACK;
+  if (!BACKM) BACKM = [new THREE.MeshLambertMaterial({ color: B.HEX }), new THREE.MeshLambertMaterial({ color: B.BRACKET })];
+  const w = (b.max.x - b.min.x) * 0.9, h = (b.max.y - b.min.y) * 0.85, cy = (b.max.y + b.min.y) / 2;
+  const zin = s > 0 ? b.min.z + B.IN : b.max.z - B.IN, depth = Math.max(0.05, (b.max.z - b.min.z) * 0.55);
+  const grp = new THREE.Group();
+  grp.name = 'real:bumper-back';
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.03), BACKM[0]);
+  plate.position.set((b.max.x + b.min.x) / 2, cy, zin);
+  grp.add(plate);
+  for (const sx of [-1, 1]) {
+    const br = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, depth), BACKM[1]);
+    br.position.set((b.max.x + b.min.x) / 2 + sx * w * 0.32, cy, zin + s * depth / 2);
+    grp.add(br);
+  }
+  for (const c of grp.children) c.userData.keepMat = 1;
+  W.R.m.add(grp);
+  if (W.g.userData) W.g.userData._pose = undefined;
 }
 /* крышки багажника «Семёрки» нет — коробки с пиццей видно (коробки старого кузова — carrear.js cargo).
    Коробки собраны под ванну коробочного седана (низко, у заднего стекла, слева): у «Семёрки» ванны нет — кузов под крышкой
@@ -571,16 +662,38 @@ export function restore (g) {
   for (const key in W.parts) {
     const P = W.parts[key];
     if (!P.st || !REAL_PARTS[key]) continue;
-    if (REAL_PARTS[key].kind === 'lamp' && P.st < 2) continue;
+    if (REAL_PARTS[key].kind === 'lamp') { if (P.st === 1) FLK.add(W); continue; }   // фара — на месте, стекло — по uLampDead (0п61)
     const pc = piece(g, key);
     if (!pc) continue;
-    if (P.st >= 3) { pc.gone = true; pc.m.parent && pc.m.parent.remove(pc.m); const i = W.R.dent.indexOf(pc.m.geometry); if (i >= 0) W.R.dent.splice(i, 1); pc.m.geometry.dispose(); }
+    if (P.st >= 3) { pc.gone = true; scar(g, pc.key, true); if (pc.kind === 'bumper') backPlate(W, pc.m.geometry, pc.H.z > 0 ? 1 : -1); pc.m.parent && pc.m.parent.remove(pc.m); const i = W.R.dent.indexOf(pc.m.geometry); if (i >= 0) W.R.dent.splice(i, 1); pc.m.geometry.dispose(); }
     else { pose(pc); if (P.st === 2) LIVE.add(W); }
+  }
+}
+
+/* ─── фара в трещинах мерцает: горит тусклее, изредка гаснет на миг (0п61) ─── */
+function flicker (dt) {
+  const F = WR.FLICK;
+  for (const W of FLK) {
+    const g = W.g, R = g.userData && g.userData.real, dead = R && R.lamp && R.lamp.dead;
+    if (!g.parent || !dead) { FLK.delete(W); continue; }
+    const fl = W.fl || (W.fl = {});
+    let any = false;
+    for (const key of LAMPS) {
+      const P = W.parts[key], c = LAMP_KEY[key];
+      if (!P || P.st !== 1 || dead[c] >= 1) continue;
+      any = true;
+      const s = fl[key] || (fl[key] = { t: rnd(F.ON[0], F.ON[1]), off: 0 });
+      s.t -= dt;
+      if (s.t <= 0) { s.off = s.off ? 0 : 1; s.t = s.off ? rnd(F.OFF[0], F.OFF[1]) : (Math.random() < 0.35 ? rnd(F.OFF[0], F.OFF[1] * 1.5) : rnd(F.ON[0], F.ON[1])); }   // иногда — очередью
+      dead[c] = s.off ? F.DIM : 0.45;
+    }
+    if (!any) FLK.delete(W);
   }
 }
 
 /* ─── каждый кадр: болтается на ходу ─── */
 export function step (dt) {
+  if (FLK.size && dt > 0) flicker(dt);
   if (!LIVE.size || !(dt > 0)) return;
   const SP = WR.SPRING, t = performance.now() / 1000;
   for (const W of LIVE) {
@@ -656,5 +769,5 @@ export function state (g) {
   for (const k in W.parts) { const P = W.parts[k]; if (P.d > 0) o[k] = P.st + '/' + P.d.toFixed(2); }
   return o;
 }
-export const DEBUG = { WR, ST, REAL_PARTS, state, piece, hurt, beam: g => ({ ...beam(g) }), live: () => LIVE.size,
+export const DEBUG = { WR, ST, REAL_PARTS, SCAR, state, piece, hurt, hit, sync, cap: g => capOf(g), flk: () => FLK.size, beam: g => ({ ...beam(g) }), live: () => LIVE.size,
   pieces: g => { const W = g && WS.get(g); return W ? Object.fromEntries(Object.entries(W.P).map(([k, p]) => [k, p.gone ? 'off' : (p.box ? 'box' : p.tris + ' тр.')])) : {}; } };

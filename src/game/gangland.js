@@ -671,7 +671,7 @@ function stepIn (dt, api, ge) {
   AMBI.mood(F.k);
   const on = live();
   if (inside && !F.wasIn && on) {
-    if (performance.now() - F.toastT > GL.TOAST_CD * 1000 && A.toast) { F.toastT = performance.now(); A.toast(t('бандитский район: тут трясут мзду')); }
+    if (performance.now() - F.toastT > GL.TOAST_CD * 1000 && A.toast) { F.toastT = performance.now(); }   /* 11бм: надпись «бандитский район: тут трясут мзду» убрана */
     if (!F.tail && F.tailCd <= 0 && chance(GL.TAIL_P)) F.tailT = rand(GL.TAIL_AFTER[0], GL.TAIL_AFTER[1]);
   }
   F.wasIn = inside;

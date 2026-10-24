@@ -17,6 +17,7 @@
      шара), 'wood' — деревянный столб частного сектора с фонарём на кронштейне (колпак, малая консоль или шар),
      'conc' — бетонный столб с траверсами и изоляторами, 'mast' — прожекторная мачта (каток, стоянки), 'yard' —
      фонарь над парковкой пиццерии. 'woodball' — старое имя деревянного с шаром.
+   • Дворовые фонари (11бо, yardLamps) — бетонный с консолью или шар у дворовых проездов и детских площадок, редко.
    • Провода — тонкими трёхгранными лентами в той же склейке: между соседними столбами одной стороны улицы
      (провисают дугой), у деревянных и бетонных — ещё к домам. В мобильном режиме проводов нет (память).
    • ?oldlamps — прежние коробки (сравнить «до/после»), ?nowires — без проводов.
@@ -48,6 +49,13 @@ export const LAMP = {
   MED_MAX: 14,       //   шире — тоже нет (там бульвар: обычные столбы)
   MED_GAP: 22,       // м — двойные консоли на разделительной не чаще
   LOT_AREA: 800,     // м² — стоянка больше — прожекторная мачта у её края
+  // 11бо (24.10.2026, автор: «во дворы так же надо добавить освещение»): дворовые фонари — редко, по месту
+  YARD_STEP: 70,     // м между местами вдоль дворового проезда (класс 7)
+  YARD_P: 0.4,       //   из мест фонарь — у 40 % (жребий по месту)
+  YARD_GAP: 30,      // м — ближе другой фонарь — дворовый не ставим
+  YARD_OFF: 1.4,     // м от края проезда до столба
+  PLAY_P: 0.7,       // у детской площадки из карты — фонарь с такой долей
+  YARD_BLINK: 0.1,   // доля дворовых, у которых свет мигает
 };
 
 const Q = typeof location !== 'undefined' ? location.search : '';
@@ -525,6 +533,7 @@ const hp = (x, z, s) => { const v = Math.sin(x * 12.9898 + z * 78.233 + s * 37.7
    провода от этого столба (мировые точки; other — фонарь на том конце), par — сколько коробок тянули прежде } */
 export function lamp (A, o) {
   if (!SCENE) SCENE = A.scene;
+  if (!GH && A.groundH) GH = A.groundH;
   const { x, z, style = 'cobra' } = o;
   const l = Math.hypot(o.dx || 0, o.dz || 0);
   const dx = l ? o.dx / l : 1, dz = l ? o.dz / l : 0;
@@ -634,11 +643,15 @@ function wireSet (rec, w, pts) {
   else wireWrite(W.a, o, pts);
   W.pa.needsUpdate = true;
 }
-/* свисший провод: от точки, что держится, до земли у сбитого столба (лежит на земле последние метры) */
+/* оборванный провод (0п90, автор 24.10: «кабеля должны быть натянуты, а не лежать на асфальте»): висит с того столба
+   (или дома), что держится, — короткий хвост чуть в сторону сбитого (HANG.OUT м) и вниз, конец — в HANG.LOW м над
+   землёй. Раньше тянулся до земли у сбитого и лежал на асфальте весь пролёт */
+const HANG = { OUT: 1.4, LOW: 0.7, SAG: 0.25 };
+let GH = null;                                      // groundH (из A при первом фонаре)
 function hang (from, gx, gz, gy) {
-  const L = Math.hypot(from[0] - gx, from[2] - gz);
-  const tx = gx + (from[0] - gx) * Math.min(0.5, 1.2 / (L || 1)), tz = gz + (from[2] - gz) * Math.min(0.5, 1.2 / (L || 1));
-  return wirePts(from, [tx, gy + 0.04, tz], Math.max(0.3, (from[1] - gy) * 0.3), gy + 0.04);   // дугой вниз, последние метры — на земле
+  const dx = gx - from[0], dz = gz - from[2], L = Math.hypot(dx, dz) || 1, o = Math.min(HANG.OUT, L * 0.4);
+  const tx = from[0] + dx / L * o, tz = from[2] + dz / L * o, g = GH ? GH(tx, tz) : gy;
+  return wirePts(from, [tx, Math.min(from[1] - 0.5, g + HANG.LOW), tz], HANG.SAG);
 }
 /* сбит фонарь rec: его провода свисают от дальнего конца, чужие провода к нему — от своего столба; если сбит и тот
    конец — провод пропадает */
@@ -983,6 +996,72 @@ export function* streets (A) {
     }
   }
   if (!OLD) lotMasts(A);
+  if (!OLD) yield* yardLamps(A);
+}
+
+/* дворовые фонари (11бо): вдоль дворовых проездов — через YARD_STEP м, у половины мест, по одной стороне; у детских
+   площадок из карты — столб у края, ближнего к проезду. Бетонный столб с консолью или шар. Жребий — по месту (hp). */
+function* yardLamps (A) {
+  const G = new Map(), gk = (x, z) => Math.floor(x / 30) + ',' + Math.floor(z / 30);
+  const addG = (x, z) => { const k = gk(x, z); let a = G.get(k); if (!a) G.set(k, a = []); a.push([x, z]); };
+  for (const l of LAMPS) addG(l.x, l.z);
+  const near = (x, z, r) => { for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const a = G.get((Math.floor(x / 30) + i) + ',' + (Math.floor(z / 30) + j)); if (a) for (const q of a) if (Math.hypot(q[0] - x, q[1] - z) < r) return true; } return false; };
+  const zebra = (px, pz) => A.ZEBRAS.some(q => Math.abs(q.x - px) < 6 && Math.abs(q.z - pz) < 6);
+  const ok = (px, pz) => {
+    const nr = A.nearestRoad(px, pz, 7, 1);
+    if (nr && nr.d < nr.seg.w / 2 + 1.0) return false;
+    if (A.inHouse(px, pz, 1.5) || A.introClear(px, pz, 9) || (A.startClear && A.startClear(px, pz))) return false;
+    if (zebra(px, pz) || ringIsland(px, pz, 1) || near(px, pz, LAMP.YARD_GAP)) return false;
+    return true;
+  };
+  const put = (px, pz, dx, dz) => {
+    const st = hp(px, pz, 21) < 0.6 ? 'conc' : 'ball';
+    const rec = lamp(A, { x: px, z: pz, y: A.groundH(px, pz), style: st, dx, dz, par: 0 });
+    const P = spotOf('ydrive', 0), bl = hp(px, pz, 22) < LAMP.YARD_BLINK ? 0.05 + hp(px, pz, 23) * 0.95 : 0;
+    for (const sp of rec.spots) { sp.r = P.r; sp.s = P.s; sp.k = P.k; if (bl) sp.bl = bl; }   // цвет — свой у вида
+    addG(px, pz);
+    STATS.yard = (STATS.yard || 0) + 1;
+  };
+  let work = 0;
+  const roads = A.CITY.roads;
+  for (let ri = 0; ri < roads.length; ri++) {
+    const r = roads[ri];
+    if (r.c !== 7 || r.b || r.x) continue;
+    if (++work % 400 === 0) yield 'yardlamps';
+    const hw = A.roadWidth(r) / 2, p = r.p;
+    let acc = LAMP.YARD_STEP * (0.3 + 0.6 * hash(ri + 3131)), side = hash(ri + 4141) < 0.5 ? 1 : -1;
+    for (let i = 1; i < p.length; i++) {
+      const x1 = p[i - 1][0], z1 = p[i - 1][1], x2 = p[i][0], z2 = p[i][1];
+      const len = Math.hypot(x2 - x1, z2 - z1) || 1, ux = (x2 - x1) / len, uz = (z2 - z1) / len;
+      for (let d = 0; d < len; d += 1) {
+        if (++acc < LAMP.YARD_STEP) continue;
+        acc = 0;
+        const cx = x1 + ux * d, cz = z1 + uz * d;
+        if (hp(cx, cz, 20) > LAMP.YARD_P) continue;
+        let done = false;
+        for (const sd of [side, -side]) {          // своя сторона занята (дом, дорога) — другая
+          const nx = -uz * sd, nz = ux * sd, px = cx + nx * (hw + LAMP.YARD_OFF), pz = cz + nz * (hw + LAMP.YARD_OFF);
+          if (ok(px, pz)) { put(px, pz, -nx, -nz); done = true; break; }
+        }
+        if (!done) STATS.yardSkip = (STATS.yardSkip || 0) + 1;
+      }
+    }
+  }
+  // у детских площадок из карты
+  for (const g of A.CITY.green || []) {
+    if (g.k !== 'play' || !g.p || g.p.length < 3) continue;
+    let cx = 0, cz = 0;
+    for (const q of g.p) { cx += q[0] / g.p.length; cz += q[1] / g.p.length; }
+    if (hp(cx, cz, 24) > LAMP.PLAY_P || near(cx, cz, LAMP.YARD_GAP)) continue;
+    const nr = A.nearestRoad(cx, cz, 40, 1);
+    if (!nr) continue;
+    // ближняя к проезду вершина контура, на 1 м наружу от середины площадки
+    let best = null, bd = Infinity;
+    for (const q of g.p) { const dd = Math.hypot(q[0] - nr.x, q[1] - nr.z); if (dd < bd) { bd = dd; best = q; } }
+    let ox = best[0] - cx, oz = best[1] - cz; const ol = Math.hypot(ox, oz) || 1; ox /= ol; oz /= ol;
+    const px = best[0] + ox, pz = best[1] + oz;
+    if (ok(px, pz)) { put(px, pz, -ox, -oz); STATS.play = (STATS.play || 0) + 1; }
+  }
 }
 
 /* прожекторные мачты у больших стоянок: у середины длинного края, на 1,5 м наружу, светят на стоянку */
@@ -1011,4 +1090,4 @@ function lotMasts (A) {
   STATS.lotMasts = n;
 }
 
-export const DEBUG = { LAMPS, FALL, STATS, LAMP, TPL, OLD, WIRES };
+export const DEBUG = { LAMPS, FALL, STATS, LAMP, TPL, OLD, WIRES, HANG, hang };

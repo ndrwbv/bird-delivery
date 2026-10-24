@@ -381,7 +381,6 @@ function ramHit (a, hx, hz) {
   a.tgt = null;
   if (a.resume && a.ex !== undefined) { a.mode = 'cross'; a.mid = 2; } else { a.mode = 'home'; a.mt = R.HOME; }
   ST.rams = (ST.rams || 0) + 1;
-  if (ST.hitToast <= 0) { ST.hitToast = 8; A.toast(t('лось боднул машину!')); }
 }
 
 /* ── любовь (только взрослая): один лось пристраивается к другому ── */
@@ -494,7 +493,6 @@ function bump (a) {
     a.mode = 'stagger'; a.mt = H.STAGGER; a.h = Math.atan2(nx, nz) + rand(-0.5, 0.5);
     if (A.emote) A.emote(a.x, 2.6, a.z, 'star', 5);
     if (A.Snd && A.Snd.crash && A.S.hurt <= 0) A.Snd.crash(vn, { x: hx, z: hz }, 'person');   // лось — мягкое тело (impact.js)
-    if (ST.hitToast <= 0) { ST.hitToast = 8; A.toast(t('врезался в лося — он тяжёлый, как машина')); }
   } else {
     V.vx -= nx * vn; V.vz -= nz * vn;          // упёрся: дальше не едешь
   }

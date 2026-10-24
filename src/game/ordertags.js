@@ -80,9 +80,10 @@ function build (o) {
     const nm = document.createElement('span'); nm.className = 'ot-nm';
     nm.textContent = firstName(ps[0]) + (ps.length > 1 ? ' +' + (ps.length - 1) : '');
     const m = document.createElement('span'); m.className = 'ot-m';
-    el.append(img, nm, m);
+    const du = document.createElement('span'); du.className = 'ot-t'; du.hidden = true;   // срок заказа — печатью справа (11бх)
+    el.append(img, nm, m, du);
     T.el.appendChild(el);
-    const it = { st, i, el, img, nm, m, p: ps[0] || null, mood: null, txt: '', cur: null, done: false, goneT: 0 };
+    const it = { st, i, el, img, nm, m, du, due: '', lvl: '', p: ps[0] || null, mood: null, txt: '', cur: null, done: false, goneT: 0 };
     setMood(it, '');
     if (it.p && NICK.isFace(it.p) && A.faceDataURL.soon) A.faceDataURL.soon(it.p, OTAG.FACE, ['ok', 'angry', 'happy'], [0]);   // другие лица карточки — заранее, в спокойные кадры (people.js)
     T.items.push(it);
@@ -114,6 +115,7 @@ function markDone (it, late) {
   T.stats.done++;
   setMood(it, late ? 'angry' : 'happy');
   it.m.textContent = '✓'; it.txt = '✓';
+  it.du.hidden = true; it.due = '';
   it.el.classList.remove('late', 'jolt');
   it.el.classList.add('done');
   T.h = -2;
@@ -136,8 +138,20 @@ function metersText (d) {
   return t('{n} м', { n });
 }
 
+/* срок заказа на бирке (11бх, 24.10.2026: «срок заказа надо рисовать рядом с заказом»): «часики + м:сс» печатью справа;
+   срок один на весь заказ (S.time; в развозе — общий), поэтому на всех ещё не отданных бирках одно число.
+   Оранжевый — осталось ≤ 40 %, красный — ≤ 18 % или меньше 10 с, «опоздал» — красным (те же ступени, что у часов заказа) */
+function dueOf () {
+  const S = A.S;
+  if (S.free || !(S.timeMax > 0) || !Number.isFinite(S.time) || S.state === 'loading') return null;
+  if (S.time <= 0) return { txt: t('опоздал'), lvl: 'low' };
+  const k = S.time / S.timeMax, n = Math.ceil(S.time);
+  return { txt: Math.floor(n / 60) + ':' + String(n % 60).padStart(2, '0'), lvl: (k <= OTAG.LOW || S.time < OTAG.LOW_S) ? 'low' : k <= OTAG.WARN ? 'warn' : '' };
+}
+
 function update () {
   const S = A.S, V = A.V, o = T.order;
+  const due = dueOf();
   const lateNow = !S.free && S.timeMax > 0 && S.time <= 0 && S.state !== 'loading';
   for (const it of T.items) {
     if (it.done) continue;
@@ -152,6 +166,9 @@ function update () {
     if (txt !== it.txt) { it.txt = txt; it.m.textContent = txt; }
     setMood(it, moodNow(st));
     it.el.classList.toggle('late', lateNow);
+    const dtx = due ? due.txt : '', dlv = due ? due.lvl : '';
+    if (dtx !== it.due) { it.due = dtx; it.du.textContent = dtx; it.du.hidden = !dtx; }
+    if (dlv !== it.lvl) { it.lvl = dlv; it.du.classList.toggle('warn', dlv === 'warn'); it.du.classList.toggle('low', dlv === 'low'); }
   }
 }
 

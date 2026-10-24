@@ -26,8 +26,8 @@ import { WIPE } from './wipers.js';
    SMEAR — какую долю снятого тащит перед собой (размазывает); CHECK — с между проверками «чисто»; LEFT — меньше стольких точек в секторах — чисто;
    R0…R1 — где щётка по длине дворника (доли; R1 > 1 — с концом щётки и брызгами, чтобы верх стекла не оставался);
    RAIN — с дождя сила смывает (доля за с при ливне 1) */
-export const GB = { W: 128, H: 64, WET: 0.6, SMEAR: 0.6, WIPE: 0.3, R0: 0.2, R1: 1.15, CHECK: 0.5, LEFT: 6, RAIN: 0.05, RAIN_FROM: 0.3 };
-export const STATS = { hits: 0, wipe: false, any: false, left: 0, cleaned: 0 };
+export const GB = { W: 128, H: 64, WET: 0.6, SMEAR: 0.6, WIPE: 0.3, R0: 0.2, R1: 1.15, CHECK: 0.5, LEFT: 6, RAIN: 0.05, RAIN_FROM: 0.3, SIDE: 1.4 };   // SIDE — насколько в бок от морды ещё летит на стекло (1 — строго мордой; передним углом тоже брызжет)
+export const STATS = { hits: 0, wipe: false, any: false, left: 0, cleaned: 0, calls: 0, why: '' };
 
 let ON = false;
 export function setOn (v) { ON = !!v; }
@@ -73,7 +73,8 @@ const FALLBACK = [{ px: 0.36, len: 0.378 }, { px: 0.036, len: 0.378 }];   // в 
 
 /* сбил человека: точка в осях машины — мордой ли (как realcar.js blood: доля длины против доли ширины) */
 export function hit (car, wx, wz) {
-  if (!ON || !car || !car.userData || typeof document === 'undefined') return;
+  STATS.calls++;
+  if (!ON || !car || !car.userData || typeof document === 'undefined') { STATS.why = 'off'; return; }
   own(car);
   const u = car.userData, cg = u.cg;
   if (cg && cg.panes && cg.panes.some(p => p.k === 'f' && p.st === 2)) return;   // лобового нет — не на что
@@ -83,7 +84,8 @@ export function hit (car, wx, wz) {
   const lx = (dx * e[0] + dz * e[2]) / Math.max(1e-6, e[0] * e[0] + e[2] * e[2]);
   const lz = (dx * e[8] + dz * e[10]) / Math.max(1e-6, e[8] * e[8] + e[10] * e[10]);
   const HL = (u.hl || 2.2) * 0.98, W2 = 0.95;
-  if (!(lz > 0 && Math.abs(lz) / HL >= Math.abs(lx) / W2)) return;               // не мордой — на стекло не летит
+  STATS.why = 'lx ' + lx.toFixed(2) + ' lz ' + lz.toFixed(2) + ' HL ' + HL.toFixed(2);
+  if (!(lz > 0 && Math.abs(lz) / HL >= Math.abs(lx) / (W2 * GB.SIDE))) return;    // не мордой (и не передним углом) — на стекло не летит
   if (!ensure()) return;
   splash(Math.sign(lx) || 0);
   STATS.hits++;

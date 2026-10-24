@@ -17,7 +17,20 @@ export const SHADOW = {
   SUN: 0.25,                      // сдвиг от солнца, м: днём пятно чуть выглядывает из-под машины (18.10.2026: было 0,45 — отрывалось от колёс)
   UP: 0.035,                      // над тем, на чём стоят колёса, м
   AIR: 3,                         // высота прыжка, на которой пятно почти пропадает, м
+  PULL: 0.6,                      // 0п87: на сколько пятно «ближе к камере» по глубине, м — не прячется под бордюр, полотно, газон рядом
 };
+
+/* 0п87 (автор 24.10: «тень обрезается об текстуры, и следы тоже»). Пятно — плоская плоскость на высоте колёс;
+   полотно (0,14—0,17 м), тротуар, газон (0,04), бордюр лежат на разной высоте, и соседняя поверхность выше
+   прятала кусок пятна. Теперь в шейдере точка пятна сдвигается к камере по лучу взгляда на PULL метров: на экране
+   она там же, а по глубине — поверх соседних поверхностей в пределах ступеньки. Тем же — следы колёс (tracks.js)
+   и пятна под чужими машинами и людьми (fakeshadows.js). */
+const NOPULL = typeof location !== 'undefined' && /[?&]nopull\b/.test(location.search || '');   // ?nopull — как было (сравнить)
+export function pullDepth (sh, m = SHADOW.PULL) {
+  if (NOPULL) return;
+  sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>',
+    `#include <project_vertex>\n{ float pl = length(mvPosition.xyz); gl_Position = projectionMatrix * vec4(mvPosition.xyz * max(0.05, 1.0 - ${m.toFixed(2)} / max(pl, 0.001)), 1.0); }`);
+}
 
 let M = null;
 function tex () {
@@ -41,6 +54,7 @@ export function init (scene) {
   const t = tex();
   mat.alphaMap = t;                // чёрный цвет, прозрачность — из размытого пятна (холст: альфа в каналах)
   mat.onBeforeCompile = sh => {    // alphaMap берёт зелёный канал; у нас пятно в альфе холста
+    pullDepth(sh);
     sh.fragmentShader = sh.fragmentShader.replace('#include <alphamap_fragment>', '#ifdef USE_ALPHAMAP\n  diffuseColor.a *= texture2D( alphaMap, vAlphaMapUv ).a;\n#endif');
   };
   mat.customProgramCacheKey = () => 'carShadow';

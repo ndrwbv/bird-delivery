@@ -3,7 +3,9 @@
 
    Съехал с асфальта на траву — за задними колёсами остаются две тёмные
    полосы, зимой по снегу — серо-синие колеи (по снегу на дороге — тоже,
-   когда снега много, только бледнее). В заносе и на ручнике след темнее и
+   когда снега много, только бледнее). 0п65 (автор 24.10): трава и снег на
+   асфальте — след только при торможении, заносе и ручнике; при обычной езде
+   по дороге и траве — ничего; колея на целом снегу и на льду — как была. В заносе и на ручнике след темнее и
    шире, и к нему добавляются полосы от передних колёс: машину боком видно
    по земле. След лежит на земле и тает: трава — за ~28 с, снег — за ~40 с.
 
@@ -25,6 +27,7 @@
 import * as SEAS from './seasons.js';
 import { onAlley } from './world.js';
 import { FUEL_PADS } from './landmarks.js';
+import { pullDepth } from './carshadow.js';
 
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 
@@ -70,6 +73,7 @@ export function init (api) {
     side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   mat.onBeforeCompile = sh => {
     sh.uniforms.uNow = uNow;
+    pullDepth(sh);                                    // 0п87: кусок на стыке газон/полотно/бордюр не прячется под соседний (carshadow.js)
     sh.vertexShader = 'attribute vec2 aT;\nuniform float uNow;\nvarying float vFade;\n' + sh.vertexShader.replace('#include <begin_vertex>',
       '#include <begin_vertex>\nvFade = 1.0 - smoothstep(aT.y * 0.55, aT.y, uNow - aT.x);');
     sh.fragmentShader = 'varying float vFade;\n' + sh.fragmentShader.replace('#include <color_fragment>',
@@ -167,6 +171,8 @@ function ground (x, z) {
   }
   return 1;
 }
+/* для заноса (drift.js): 0 — асфальт, плитка, площадка; 1 — земля и трава; -1 — вода */
+export const groundAt = (x, z) => A ? ground(x, z) : 0;
 /* сколько снега: 0 — нет, 1 — зима в разгаре (seasons.js: slip = снег × 0,32) */
 const snowK = () => SEAS.slip() / 0.32;
 /* вид следа в точке: 0 — нет следа, 1 — трава, 2 — снег, 3 — снег на асфальте */
@@ -242,6 +248,8 @@ export function step (dt) {
   const slide = clamp((vl - 1.2) / 5, 0, 1), hand = A.IN.hand && speed > 3 ? 1 : 0;
   const sn = snowK();
   const st = clamp(0.5 + speed * 0.02, 0.5, 1.2);       // кусок длиннее на скорости
+  const braking = A.IN.brake && V.vx * fx + V.vz * fz > 1;   // жмёшь тормоз, пока едешь вперёд
+  const mark = braking || slide >= 0.25 || hand;             // оставляет след: тормоз, занос, ручник; езда по траве и по асфальту со снегом — нет (колея на целом снегу и льду — как была)
   const hw = (W_TIRE + slide * 0.12) / 2;
   const str = Math.min(1, 0.72 + slide * 0.4 + hand * 0.2);
   let kindSeen = 0;
@@ -253,7 +261,7 @@ export function step (dt) {
     if (w.on && d < st) continue;
     const kind = surf(px, pz, sn);
     if (kind) kindSeen = kind;
-    if (!kind) { w.on = false; w.cx = px; w.cz = pz; continue; }
+    if (!kind || (!mark && (kind === 1 || kind === 3))) { w.on = false; w.cx = px; w.cz = pz; continue; }   // траву и снег на асфальте — только торможением и заносом (0п65)
     // края следа — поперёк пути колеса (в заносе он идёт не по оси машины)
     let nx = sx, nz = sz;
     if (w.on && d < JUMP && d > 0.01) { nx = dz / d; nz = -dx / d; }

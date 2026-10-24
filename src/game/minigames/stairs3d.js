@@ -571,7 +571,7 @@ export function create (box, o) {
   const cp = env.courier();
   const cour = human(cp, { shirt: cp.look && cp.look.shirt, pants: cp.look && cp.look.pants });
   let cbox = env.box();
-  cbox.scale.setScalar(0.75); cbox.position.set(0, 1.12, 0.48);
+  cbox.position.set(0, 1.12, 0.48);
   cour.add(cbox);
   let man = null, manP = null;
   function makeMan () {

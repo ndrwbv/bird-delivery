@@ -48,6 +48,7 @@ import * as HITS from './hits.js';
 import * as SEAS from './seasons.js';
 import * as WTH from './weather.js';
 import { onPave } from './pave.js';
+import { DOGS_ON } from './dogsflag.js';      // собаки выключены (?dogs — вернуть, dogsflag.js)
 
 export const WASTE = {
   BIG: { W: 36, D: 26, MAX: 46, GAP: 140, PER: 3, CAP: 9, SALT: 51 },     // большой участок, м; сколько; не ближе друг к другу
@@ -487,8 +488,8 @@ function kiosks (c) {
 
 /* ═════════════ назначение ═════════════ */
 const GEN = { garden, wrecks, slabs, football, dogs, kiosks };
-const BIG_KINDS = ['garden', 'wrecks', 'slabs', 'football', 'dogs'];
-const SMALL_KINDS = ['garden', 'dogs', 'kiosks', 'slabs'];
+const BIG_KINDS = DOGS_ON ? ['garden', 'wrecks', 'slabs', 'football', 'dogs'] : ['garden', 'wrecks', 'slabs', 'football'];
+const SMALL_KINDS = DOGS_ON ? ['garden', 'dogs', 'kiosks', 'slabs'] : ['garden', 'kiosks', 'slabs'];
 let ENTG = null;
 function entGrid () {
   ENTG = new Map();
@@ -788,6 +789,7 @@ function spawnLot (s) {
   const V = A.V;
   for (const n of s.npc) {
     if (n.t === 'dog') {
+      if (!DOGS_ON) continue;
       const geos = dogGeo(), m = new THREE.Mesh(geos[(Math.random() * geos.length) | 0], DOG_MAT);
       const [ia0, ib0, ia1, ib1] = s.inner;
       const a = rand(ia0, ia1), b = rand(ib0, ib1), [x, z] = c.P(a, b);

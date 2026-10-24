@@ -33,6 +33,11 @@ body.career #money b { color: #ffe6ee; text-shadow: 2px 2px 0 #3a1020; }
 #choice.big.cr-lunch #ch-opts button:nth-child(3) { background: #ff9a9a; }
 #choice.big.cr-lunch #ch-opts button b { font-size: clamp(14px, 1.7vw, 24px); line-height: 1.4; }
 #choice.big.cr-lunch #ch-opts button span { font-size: clamp(10px, 1.1vw, 15px); line-height: 1.7; opacity: 1; }
+/* иконки пунктов обеда (11бр, lunchicons.js): вещь из игры крупно, под ней одно слово и число */
+#ch-opts button .ch-ico { display: block; width: clamp(52px, 11vh, 110px); height: clamp(52px, 11vh, 110px); }
+#ch-opts button .ch-ico svg { display: block; width: 100%; height: 100%; filter: drop-shadow(2px 3px 0 rgba(51, 33, 12, .35)); }
+#choice.big.cr-lunch #ch-opts button b { font-size: clamp(18px, 2.3vw, 32px); }
+#choice.big.cr-lunch #ch-opts button span { font-size: clamp(12px, 1.4vw, 20px); }
 @media (max-width: 560px) { #choice.big.cr-lunch #ch-opts { flex-direction: column; } #choice.big.cr-lunch #ch-opts button { min-height: 0; } }
 
 /* ── экран конца смены — «чек смены» (career.js showEnd, shiftend.js; стиль — src/styles/paper.css, UI-REVIEW.md П1):

@@ -313,16 +313,16 @@ export function receipt (done = doneNow()) {
   // сюрприз (не первая смена сезона, не переход) — дальше как обычная смена своего сезона: «до лета — 1 смена»
   if (p0.trans) {
     text = t('следующая смена — {name}!', { name: t(STEP[p0.key].name) });
-    sub = t(STEP[p0.key].hint) + ' · ' + t('потом {season}: {what}', { season: t(SEA[p0.trans].name), what: t(SEA[p0.trans].what) });
+    sub = t('потом {season}', { season: t(SEA[p0.trans].name) });   // 11бп: перечень «что придёт» убран — остаётся имя сезона
   } else if (p0.first) {
     text = t('следующая смена — {name}!', { name: t(SEA[p0.sea].name) });
-    sub = t('{season}: {what}', { season: t(SEA[p0.sea].name), what: t(SEA[p0.sea].what) });
+    sub = '';   // 11бп: «весна: ручьи и лужи…» убрано — имя сезона уже в строке выше
   } else {
     let j = 1;
     while (j < P.length && P[j].sea === p0.sea && !P[j].trans) j++;
     const nx = P[j] || null, to = nx ? nx.trans || nx.sea : ORDER[(ORDER.indexOf(p0.sea) + 1) % 4];
     text = tn(j, SEA[to].until, { n: j });
-    sub = t('{season}: {what}', { season: t(SEA[to].name), what: t(SEA[to].what) });
+    sub = '';   // 11бп: без перечня
   }
   let hol = null;
   for (let k = 0; k < Math.min(P.length, CYC.HOL_SOON); k++) {
