@@ -227,7 +227,7 @@ export default {
     // 3D: сцена — тем же рендерером, что город (в песочнице — свой холст); строится при входе, освобождается при выходе.
     // Не вышло (нет WebGL в песочнице, ошибка) — прежний 2D
     let V3 = null;
-    if (D3) { try { V3 = S3.create(box, { plan: P, look, seed, ADULT: !!api.ADULT, t, gopAt: P.gopAt, person }); } catch (e) { console.warn('[stairs] 3D не вышло — 2D', e); V3 = null; } }
+    if (D3) { try { V3 = S3.create(box, { plan: P, look, seed, ADULT: !!api.ADULT, t, gopAt: P.gopAt, person, boxes: o.boxes }); } catch (e) { console.warn('[stairs] 3D не вышло — 2D', e); V3 = null; } }
     if (V3) q('canvas.sx-cv').remove(); else { box.classList.remove('sx3'); const h = q('.sx3-hit'); if (h) h.remove(); }
     const hit = V3 ? q('.sx3-hit') : null;
     const cv = V3 ? null : KIT.sceneCanvas(box), g = cv ? cv.getContext('2d') : null;   // холст сцены — один на все заходы (doorkit.js, 0п48)

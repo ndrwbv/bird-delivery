@@ -331,6 +331,7 @@ function playStairs (st, order, opt) {
     };
     const fee = feeOf(order, st);
     cur.off = STAIRS.mount(h, Object.assign({
+      boxes: st.boxes || 0,                                      // много пицц одному — курьер несёт стопку (12бл)
       addr: st.addr || '', who: person ? (person.app ? NICK.label(person) : person.first || person.name) : '', person, sheet: sheetOf(order), clock,
       bonus: '+' + money(r10(fee * SR.FAST_BONUS)), gopPay: '−' + money(r10(fee * SR.GOP_PAY)), selfWait: MG.SELF.WAIT,
     }, sceneOf(order, st), opt), api);

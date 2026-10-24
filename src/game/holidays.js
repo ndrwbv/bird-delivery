@@ -887,14 +887,14 @@ function onArrive (ev) {
 }
 
 /* ─────────────── полночь праздника: событие ───────────────
-   До 00:00 по часам мира осталось меньше 2 с, а в этот кадр — снова почти сутки: часы пробили. Раз за смену — залп
+   До 00:00 по часам мира осталось меньше 5 с, а в этот кадр — снова почти сутки: часы пробили. Раз за смену — залп
    (salvo ракет разом) и поздравление в чате. Смену это не кончает (0п45): конец смены в полночь — career.js, как всегда */
 function chimesStep () {
   const m = CUR.h.midnight;
   if (!m || CUR.rang || !(A.playing && A.playing())) { if (CUR) CUR.tm = -1; return; }
   const tm = toMidnight(), was = CUR.tm;
   CUR.tm = tm;
-  if (was < 0 || !(was < 2 && tm > was + 30)) return;
+  if (was < 0 || !(was < 5 && tm > was + 30)) return;   // окно 5 с (было 2): ночь в смене ×2 (12бм) — последние секунды короче, длинный кадр не должен их пропускать
   CUR.rang = true;
   if (CUR.h.decor.fireworks) { if (!FW.pts) fwInit(); for (let i = 0; i < (m.salvo || 6); i++) launch(); petard(); }
   if (A.chat && m.say && m.say.length) A.chat(t(pick(m.say)));
@@ -907,7 +907,7 @@ export function toMidnight () {
   if (!E) return 0;
   let d = ECON.tOfHour(24) - E.t;
   if (d < -1e-6) d += 1;
-  return d / (A.dayRate() || 1 / 480);
+  return A.secsToT ? A.secsToT(ECON.tOfHour(24)) : d / (A.dayRate() || 1 / 480);   // в смене сумерки и ночь быстрее — по кускам (career.js secsToT)
 }
 /** пора «к бою курантов»? → секунд до полуночи (окно orders.chimes.win) или 0 */
 export function chimesDue () {

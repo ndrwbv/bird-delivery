@@ -93,14 +93,42 @@ export function hour () {
 }
 /* сколько суток (ENV.t) прошло со старта смены: смена — SPAN, как 9:00—24:00 */
 const SPAN = ECON.SHIFT.T_END - ECON.SHIFT.T0;
+const span = () => (SH.on && SH.span) || SPAN;       // сколько суток длится эта смена: обычная — SPAN, дневная короче (12бм)
 function elapsed () {
   if (!A || !SH.on) return 0;
   const e = A.env().t - SH.tStart;
   return e < -1e-9 ? e + 1 : e;
 }
+/** смена дошла до конца: 24:00 (по расписанию), у дневной — закат */
+const shiftOver = () => SH.on && elapsed() >= span() - 1e-6;
+/** во сколько раз сутки идут медленнее обычных: длина смены × подгонка под час начала (сумерки и ночь быстрее, секунд — те же) */
+const slowNow = () => (SH.on && SH.len ? SH.len.slow * (SH.k || 1) : ECON.SHIFT.SLOW);
+/** шаг ENV.t за dt секунд в смене (game.js envTick): сумерки и ночь быстрее; после конца смены (дорога назад) — как есть */
+export function dayStep (dt, dayLen) {
+  if (!SH.on) return dt / dayLen;
+  if (SH.phase !== '' || shiftOver()) {
+    const d = dt / (dayLen * (SH.len ? SH.len.slow : 1));
+    // дневная смена: пока едешь назад после конца — закат не наступает (держим ~17:30)
+    return SH.kind === 'day' ? (A.env().t >= 0.615 ? 0 : d * 0.15) : d;
+  }
+  return dt / (dayLen * slowNow()) * ECON.tempo(A.env().t);
+}
+/** сколько настоящих секунд до ENV.t = t1 (в пределах этой смены; дальше конца — по обычному ходу) — часы мира, куранты (holidays.js) */
+export function secsToT (t1) {
+  if (!A) return 0;
+  const E = A.env(), DL = A.DAY_LEN || 480;
+  let d = t1 - E.t; if (d < -1e-6) d += 1;
+  if (!SH.on) return d * DL;
+  return ECON.tempoSpan(E.t, d) * DL * slowNow();
+}
+/** часов смены в секунду (orders.js rate): от 9:00 до конца смены, за все секунды смены */
+export function shiftHps () {
+  const endH = SH.on && SH.kind === 'day' ? ECON.hourOf(ECON.SHIFT.DAY.T_END) : 24;
+  return (endH - ECON.SHIFT.KEYS[0][1]) / (span() * (A.DAY_LEN || 480) * (SH.len ? SH.len.slow : ECON.SHIFT.SLOW));
+}
 /* «часы по расписанию» 9…24: где смена, как если бы она шла 9:00—24:00. На них — обед, полночь
    (конец смены), обязательные заказы и срочные (orders.js). В Юге совпадают с часами мира */
-export function schedHour () { return SH.on ? ECON.hourOf(ECON.SHIFT.T0 + Math.min(elapsed(), SPAN + 0.1)) : hour(); }
+export function schedHour () { return SH.on ? ECON.hourOf(ECON.SHIFT.T0 + Math.min(elapsed(), span() + 0.1)) : hour(); }
 /* вечер для бандитов: с 18:00 до 6 утра по часам мира */
 export const isEvening = () => { const d = hour() % 24; return d >= ECON.SHIFT.EVENING_H || d < 6; };
 /* круглосуточная пиццерия: со второго района (ECON.SHIFT.ALLDAY_FROM) */
@@ -146,13 +174,19 @@ export function startShift () {
   // в Юге — всегда с 9:00
   // быстрый заезд (quickrun.js) — всегда с 9:00
   const cv = A.Store.get('dlv-clock', null), day = allDay() && !QR.on(), c0 = cv == null || cv === '' ? 9 : +cv;
-  const h0 = day && Number.isFinite(c0) ? ((c0 % 24) + 24) % 24 : ECON.SHIFT.KEYS[0][1];
+  // 12бм: дневная смена (со 2-й каждая 3-я, не быстрый заезд) — с 9:00 до заката; обычная круглосуточная — с того часа,
+  // где кончилась прошлая, но только если это до 12:00 (иначе с утра, 9:00)
+  const nShift = (+A.Store.get('dlv-shifts', 0) || 0) + 1, dayKind = !QR.on() && ECON.isDayShift(nShift) && !HOL.active();   // праздничная смена (Новый год — куранты в полночь) — не дневная
+  const h0 = day && !dayKind && Number.isFinite(c0) ? ECON.nextStartH(c0) : ECON.SHIFT.KEYS[0][1];
   A.env().t = ECON.tOfHour(h0 < ECON.SHIFT.KEYS[0][1] ? h0 + 24 : h0);
   SH.tStart = A.env().t; SH.allDay = day;
+  SH.kind = dayKind ? 'day' : '';
+  SH.span = dayKind ? ECON.SHIFT.DAY.T_END - ECON.SHIFT.T0 : SPAN;
+  SH.k = dayKind ? 1 : SH.span / ECON.tempoSpan(SH.tStart, SH.span);   // подгонка slow: секунд в смене — как была длина
   S.lunch = null;
   SH.on = true; SH.phase = ''; SH.home = false; SH.lunch = false; SH.hits = 0; SH.lastHurt = S.hurt || 0; SH.fine = 0; SH.back = 0; SH.stars = 0;
   SH.slot = false; SH.forceMood = ''; SH.forceCar = null; SH.forceDep = ''; SH.lost = 0; SH.m = S.money || 0; S.tips = 0; SH.t0h = ECON.hourOf(A.env().t); SH.endH = SH.t0h; SH.n = +A.Store.get('dlv-shifts', 0) || 0;
-  SH.len = QR.on() ? QR.len() : ECON.shiftLen(SH.n);   // быстрый заезд — длина, что выбрал игрок
+  SH.len = QR.on() ? QR.len() : dayKind ? ECON.SHIFT.DAY : ECON.shiftLen(SH.n);   // быстрый заезд — длина, что выбрал игрок
   // волна щедрости: 1-я смена сессии — щедрая (econ.js PACE); быстрый заезд — обычная и волну не двигает
   SH.pace = QR.on() ? (DIST.setPace('normal'), 'normal') : DIST.beginShift();
   SH.district = DIST.cur();
@@ -178,7 +212,9 @@ export function startShift () {
 export const pace = () => SH.pace || 'normal';
 /* длина смены: короткая / средняя / длинная (ECON.SHIFT.LENGTHS) */
 /** во сколько раз медленнее идут сутки, пока идёт смена (game.js, orders.js) */
-export const shiftSlow = () => (SH.on && SH.len ? SH.len.slow : ECON.SHIFT.SLOW);
+export const shiftSlow = () => slowNow();
+/** дневная смена (12бм): 9:00 → закат, без развоза */
+export const dayShift = () => SH.on && SH.kind === 'day';
 
 export function clockText () { return ECON.clock(hour()); }
 
@@ -190,8 +226,11 @@ const mmss = sec => { sec = Math.max(0, Math.ceil(sec)); return Math.floor(sec /
 export function shiftLeft () {
   // по доле суток, а не по часам: ночью часы бегут вдвое быстрее дня, и прежний расчёт по часам
   // показывал «осталось 1:13», когда до конца было 0:38
-  const perSec = 1 / ((A.DAY_LEN || 480) * shiftSlow()) + (FAST > 1 ? (FAST - 1) / (A.DAY_LEN || 480) : 0);   // долей суток в секунду
-  return Math.max(0, (SPAN - elapsed()) / perSec);
+  // 12бм: сумерки и ночь идут быстрее (ECON.tempo) — считаем по кускам (ECON.tempoSpan), а не одной скоростью
+  const DL = A.DAY_LEN || 480, left = span() - elapsed();
+  if (left <= 0) return 0;
+  const secs = ECON.tempoSpan(A.env().t, left) * DL * slowNow();
+  return FAST > 1 ? secs / (1 + (FAST - 1) * slowNow()) : secs;
 }
 let clockPrev = '';
 function clockStep () {
@@ -226,14 +265,13 @@ export function step (dt) {
   if (!SH.on || S.ride || !A.isPlaying()) { clockStep(); return; }
   if (SH.phase === 'late') lateGuard(dt);
   // висит карточка заказа или грузится пицца — часы идут, и в полночь смена кончается и тут
-  if (S.state === 'loading' || S.state === 'brief') { if (SH.phase === '' && schedHour() >= 24) midnight(); clockStep(); return; }
+  if (S.state === 'loading' || S.state === 'brief') { if (SH.phase === '' && shiftOver()) midnight(); clockStep(); return; }
   if (FAST > 1 && SH.phase === '') { const E = A.env(); E.t = (E.t + dt * (FAST - 1) / A.DAY_LEN) % 1; }
   // удар — S.hurt подскакивает до 0,9 в hurtCar; считаем такие скачки
   const hu = S.hurt || 0;
   if (hu > SH.lastHurt + 0.05) SH.hits++;
   SH.lastHurt = hu;
-  const h = schedHour();                          // по расписанию 9…24 (в круглосуточной смена может идти с ночи)
-  if (SH.phase === '' && h >= 24) midnight();
+  if (SH.phase === '' && shiftOver()) midnight();   // по расписанию 9…24 (в круглосуточной смена может идти с ночи); дневная — до заката
   clockStep();
 }
 
@@ -273,7 +311,7 @@ export function atBase (next) {
   }
   if (SH.lunch || SH.phase !== '') return false;
   const h = schedHour();
-  if (h < ECON.SHIFT.LUNCH_H || h >= 24) return false;
+  if (h < ECON.SHIFT.LUNCH_H || shiftOver()) return false;
   SH.lunch = true;
   A.S.handT = 1e9;                                  // пока обедаешь — следующий заказ не берём
   const go = () => { LUNCH_TALK.on = false; if (lunchFits()) showLunch(next); };
@@ -339,7 +377,7 @@ async function midnight () {
   // дольше): тогда это последний заказ, как в дороге (0п45, автор 24.10.2026: «Новый год посреди возвращения закончил смену»)
   const away = !atPizza();
   const moving = ['drive', 'back', 'handover'].includes(S.state) || (['brief', 'loading'].includes(S.state) && away);
-  if (moving && ORD && typeof ORD.staffRide === 'function' && Math.random() < ECON.ORDERS.STAFF_CHANCE) {
+  if (moving && SH.kind !== 'day' && ORD && typeof ORD.staffRide === 'function' && Math.random() < ECON.ORDERS.STAFF_CHANCE) {   // дневная смена — без развоза (12бм)
     A.hideChoice();
     try { ride = await ORD.staffRide(); } catch (e) { console.error('[career] staffRide', e); }
   }
@@ -376,11 +414,12 @@ const END_SAY = {
   midnight: /*i18n*/ ['полночь — смена всё', 'полночь — пиццерия закрылась', 'двенадцать на часах — смена всё'],
   midnightRide: /*i18n*/ ['полночь — всех развёз, смена всё', 'полночь, все дома — смена закрыта'],
   closed: /*i18n*/ ['пиццерия закрыта — смена всё', 'кухня закрылась — на сегодня всё', 'всё, отработал — пиццерия закрыта'],
+  day: /*i18n*/ ['дневная смена всё — до заката управились', 'день отработан — смена всё', 'солнце ещё высоко, а смена всё'],
   allDay: /*i18n*/ ['смена всё — {time}', '{time} — на сегодня хватит, смена всё', 'конец смены — {time}, сменщик уже тут'],
   ride: /*i18n*/ ['всех развёз — смена всё', 'все дома — смена закрыта', 'развёз своих — на сегодня всё'],
 };
 export function endWords (ride, h = hour()) {
-  const k = DAYT.nearMidnight(h) && !SH.allDay ? (ride ? 'midnightRide' : 'midnight') : ride ? 'ride' : SH.allDay ? 'allDay' : 'closed';
+  const k = SH.kind === 'day' && !ride ? 'day' : DAYT.nearMidnight(h) && !SH.allDay ? (ride ? 'midnightRide' : 'midnight') : ride ? 'ride' : SH.allDay ? 'allDay' : 'closed';
   return t(DAYT.fresh('end:' + k, END_SAY[k]), { time: ECON.clock(h) });
 }
 /* quiet — без своего тоста: развоз не успел, на экране уже «не успел развезти — дальше они пешком» */
@@ -434,7 +473,7 @@ const TITLE = {
 /* строка мелко под шапкой чека — почему кончилась смена (полночь в Юге — без строки: печать и так скажет) */
 const WHY = {
   'смена окончена': () => '',
-  'время': () => (SH.allDay ? t('пиццерия круглосуточная — следующая смена с {time}', { time: ECON.clock(SH.endH) }) : ''),
+  'время': () => (SH.allDay ? t('пиццерия круглосуточная — следующая смена с {time}', { time: ECON.clock(ECON.nextStartH(SH.endH)) }) : ''),
   'сбил клиента': () => t('тебя сняли со смены: сбил своего клиента'),
 };
 

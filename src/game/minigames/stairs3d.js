@@ -78,7 +78,7 @@ function sandboxEnv () {
       Object.assign(cp.look, { head: 'cap', headC: '#ff6a13', shirt: '#ff6a13', pants: '#2f3540', glasses: 'none', top: 'tee', bottom: 'pants' });
       return cp;
     },
-    box: () => PBOX.makeBox(THREE),
+    box: n => (n > 1 ? PBOX.makeStack(THREE, n) : PBOX.makeBox(THREE)),
   };
   return SBX;
 }
@@ -570,7 +570,7 @@ export function create (box, o) {
   const human = (p, opt) => { const g = env.human(p, opt); scene.add(g); humans.push(g); return g; };
   const cp = env.courier();
   const cour = human(cp, { shirt: cp.look && cp.look.shirt, pants: cp.look && cp.look.pants });
-  let cbox = env.box();
+  let cbox = env.box(o.boxes);                       // много пицц одному — стопкой (12бл)
   cbox.position.set(0, 1.12, 0.48);
   cour.add(cbox);
   let man = null, manP = null;

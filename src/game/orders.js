@@ -56,6 +56,8 @@ import * as DAYT from './daytime.js';            // время суток сло
 import * as MIX from './routemix.js';
 import * as LIKES from './likes.js';             // что нравится игроку: вес вида поручения — выбор и таймер (likes.js, econ.js LIKES)
 import * as SKILL from './skill.js';             // умение курьера: потолок напряжения, срок, доля сложных по тому, как возишь (skill.js, econ.js SKILL)              // разные маршруты: другая сторона от пиццерии и другая улица, чем недавние (routemix.js)
+import { STACK as PSTACK } from './pizzabox.js';   // много пицц одному: доплата за коробку (12бл)
+import * as CRIDE from './crewride.js';         // развоз смены: садятся через двери, едут в машине, выходят у дома (crewride.js, 12бн)
 import { ORDER_TYPES, SHIFT_PLAN, SIDE_ORDERS, STAFF_RIDE, BOSS } from './orders.config.js';
 
 const N_ = s => s;
@@ -216,7 +218,8 @@ export function resetShift () {
 function rate () {
   const h = hourNow() - SH.h0;
   const slow = CAR && typeof CAR.shiftSlow === 'function' ? CAR.shiftSlow() : ECON.SHIFT.SLOW;
-  const hps = (24 - ECON.SHIFT.KEYS[0][1]) / ((ECON.SHIFT.T_END - ECON.SHIFT.T0) * (A.DAY_LEN || 480) * slow);   // часов смены в секунду
+  const hps = CAR && typeof CAR.shiftHps === 'function' ? CAR.shiftHps()   // часов смены в секунду (дневная смена короче, 12бм)
+    : (24 - ECON.SHIFT.KEYS[0][1]) / ((ECON.SHIFT.T_END - ECON.SHIFT.T0) * (A.DAY_LEN || 480) * slow);
   const prior = 1 / ((2 * 1100 / 19 + 18) * hps);
   const est = h > 1 && SH.done > 0 ? (SH.done + prior) / (h + 1) : prior;
   return Math.min(1.5, Math.max(0.1, est));
@@ -815,11 +818,11 @@ export function setup (plan) {
   // район платит больше (DISTRICT.PAY), час пик — тоже (PACE pay)
   const mul = (DIST.has() ? DIST.pay() : 1) * (DIST.pace().pay || 1), city = DIST.has() && DIST.city();
   sp.fees = o.stops.map((st, i) => {
-    const m = sp.m[i] || 0, zone = sp.stops[i] ? sp.stops[i].zone : sp.zone, n = Math.max(1, st.peds.length);
+    const m = sp.m[i] || 0, zone = sp.stops[i] ? sp.stops[i].zone : sp.zone, n = st.boxes > 1 ? st.boxes : Math.max(1, st.peds.length), xk = st.boxes > 1 ? PSTACK.PAY : 1;   // стопка одному (12бл): за каждую следующую коробку — доля базы
     if (sp.story && Number.isFinite(sp.story.pay)) return Math.round(sp.story.pay / o.stops.length);
     // групповой: за каждого следующего — ещё одна база
     const g = sp.stops[i] ? GROW.payK(sp.stops[i].x, sp.stops[i].z) : GROW.payK();   // ступень пиццерии района (econ.js GROWTH.PAY)
-    return Math.round((ECON.orderPay(m, zone, opts) + (n - 1) * ECON.orderPay(0, zone, opts)) * mul * g / 10) * 10;
+    return Math.round((ECON.orderPay(m, zone, opts) + (n - 1) * xk * ECON.orderPay(0, zone, opts)) * mul * g / 10) * 10;
   });
   // «весь город» (econ.js CITY): премия за дальний — за путь по дорогам сверх FAR_FROM, в цене остановки
   sp.far = o.stops.map((st, i) => (city && !sp.story ? ECON.cityFar(sp.m[i] || 0) : 0));
@@ -830,7 +833,7 @@ export function setup (plan) {
   // праздничный заказ (holidays.js): надбавка — в цене остановки; в накладной — праздничная пицца
   sp.holAdd = sp.hol && sp.hol.k > 1 ? sp.fees.map(f => Math.round(f * (sp.hol.k - 1) / 10) * 10) : null;
   if (sp.holAdd) sp.fees = sp.fees.map((f, i) => f + sp.holAdd[i]);
-  if (sp.hol && sp.hol.item) o.items = o.stops.reduce((n, st) => n + Math.max(1, st.peds.length), 0) + ' × ' + sp.hol.item;
+  if (sp.hol && sp.hol.item) o.items = o.stops.reduce((n, st) => n + (st.boxes > 1 ? st.boxes : Math.max(1, st.peds.length)), 0) + ' × ' + sp.hol.item;
   S.fee = sp.fees.reduce((a, b) => a + b, 0);
   // оплата и район — на самой остановке: в сборном игрок развозит в своём порядке, o.stops переставляются
   o.stops.forEach((st, i) => { st.fee = sp.fees[i]; st.far = sp.far[i]; if (!st.zone && sp.stops[i]) st.zone = sp.stops[i].zone; st.done = false; });
@@ -1252,6 +1255,7 @@ export function staffHere () {
 function staffAbort (r = false) {
   if (!STAFF.p) return;
   if (STAFF.board) for (const p of STAFF.board.peds) { A.clearGuest(p); if (!p.dead) { A.rehuman(p); A.walkSpawn(p, 150, 400); } }
+  CRIDE.clear();                                          // кто сидел в машине — пропал (дальше «пешком»)
   if (S.order && S.order.ord && S.order.ord.type === 'staff') { S.order = null; S.target = null; }
   staffDone(r);
 }
@@ -1315,9 +1319,12 @@ function boardCrew () {
     A.rehuman(p, person);
     p.x = (P.wx !== undefined ? P.wx : P.x) + rand(-1.2, 1.2); p.z = (P.wz !== undefined ? P.wz : P.z) + rand(-1.2, 1.2);
     A.pushOut(p, 0.5);
-    // к ближней двери (сбоку), а не в середину машины — и вокруг кузова, не сквозь (game.js guestStep, 0п73)
+    // к своей двери (12бн, crewride.js: первый — вперёд справа, дальше — назад), а не в середину машины — и вокруг кузова,
+    // не сквозь (game.js guestStep, 0п73); ?oldcrew — к ближней двери сбоку, дошёл — пропал
+    const seat = CRIDE.CR.on && i < CRIDE.seats(crew.length) ? i : -1, dr = seat >= 0 ? CRIDE.doorAt(seat) : null;
     const cs = Math.cos(V.h), sn = Math.sin(V.h), sd = (p.x - V.x) * cs - (p.z - V.z) * sn >= 0 ? 1 : -1, f = rand(-0.6, 0.6);
-    A.makeGuest(p, { x: V.x + sd * cs * 1.45 + Math.sin(V.h) * f, z: V.z - sd * sn * 1.45 + Math.cos(V.h) * f });
+    A.makeGuest(p, dr || { x: V.x + sd * cs * 1.45 + Math.sin(V.h) * f, z: V.z - sd * sn * 1.45 + Math.cos(V.h) * f });
+    p.crew = { person, seat, dr };
     peds.push(p);
   });
   STAFF.board = { peds, t: 0 };
@@ -1331,18 +1338,21 @@ function staffArrive (o, st) {
   markUsed(st.key);
   // выходит у своего подъезда
   const P = st.persons[0];
-  const p = A.alive().filter(q => !q.guest && !q.dead).sort((a, b) => ((a.x - V.x) ** 2 + (a.z - V.z) ** 2) - ((b.x - V.x) ** 2 + (b.z - V.z) ** 2))[0];
   const line = t(pick(STAFF_RIDE.lines));
-  if (p) {
+  // ехал в машине (crewride.js) — сначала вылезает через свою дверь, встал снаружи — дальше прохожим к подъезду
+  const out = (x, z) => {
+    const p = A.alive().filter(q => !q.guest && !q.dead).sort((a, b) => ((a.x - x) ** 2 + (a.z - z) ** 2) - ((b.x - x) ** 2 + (b.z - z) ** 2))[0];
+    if (!p) return;
     if (p.idle) A.releaseIdle(p);
     p.path = null; p.w = null;
     A.rehuman(p, P);
-    p.x = V.x + Math.cos(V.h) * 1.9; p.z = V.z - Math.sin(V.h) * 1.9;
+    p.x = x; p.z = z;
     A.pushOut(p, 0.5);
     A.makeGuest(p, { x: st.at.x, z: st.at.z });
     const b = A.sayBubble(p.grp, line, '#8a6a00', 2.7, 1);
     STAFF.drops.push({ p, b, t: 7 });
-  }
+  };
+  if (!CRIDE.alight(P, out)) out(V.x + Math.cos(V.h) * 1.9, V.z - Math.sin(V.h) * 1.9);
   A.toast(line + ' · +' + A.money(pay));
   A.Snd.coin();
   o.idx++;
@@ -1372,19 +1382,24 @@ export function step (dt) {
   if (window.__dlv && !window.__dlv.SKILL) window.__dlv.SKILL = SKILL.DEBUG;   // умение курьера (skill.js)
   if (window.__dlv && !window.__dlv.PRESS) window.__dlv.PRESS = SKILL.DEBUG.PRESS;   // ужатие срока (press.js)
   errandStep(dt);
+  CRIDE.step(dt, !!STAFF.p);                              // коллеги в машине: садятся, едут, вылезают (crewride.js)
   // посадка работников: дошёл до машины — пропал (в машине)
   const B = STAFF.board;
   if (B) {
     B.t += dt;
     for (let i = B.peds.length - 1; i >= 0; i--) {
-      const p = B.peds[i];
-      if (p.dead || Math.hypot(p.x - V.x, p.z - V.z) < 1.8 || B.t > 6) {
+      const p = B.peds[i], c = p.crew;
+      // дошёл до своей двери (или долго идёт) — садится (crewride.js): модель на его месте, сам — обратно в толпу
+      const at = c && c.dr ? Math.hypot(p.x - c.dr.x, p.z - c.dr.z) < CRIDE.CR.NEAR + 0.2 : Math.hypot(p.x - V.x, p.z - V.z) < 1.8;
+      if (p.dead || at || B.t > (c && c.dr ? 12 : 6)) {
+        if (c && c.seat >= 0 && !p.dead) CRIDE.board(c.person, c.seat);
+        p.crew = null;
         A.clearGuest(p);
         if (!p.dead) { A.rehuman(p); A.walkSpawn(p, 150, 400); }
         B.peds.splice(i, 1);
       }
     }
-    if (!B.peds.length) {
+    if (!B.peds.length && !CRIDE.busy()) {         // все сели и двери закрыты — едем
       STAFF.board = null;
       S.state = 'drive';
       A.syncTarget(); A.rebuildRoutePath();

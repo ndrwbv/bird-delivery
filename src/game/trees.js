@@ -155,11 +155,81 @@ function wtModel (name) {
   });
   return m;
 }
+/* ── М9 (24.10.2026): у каждого дерева своя форма. Варианты ветвления — те же вершины шаблона, перекрученные, согнутые, расширенные,
+   у части — с обломанным сучком; считаются раз на породу при первом дереве (в памяти — по ~5 КБ на вариант). Какой вариант,
+   наклон ствола и ширина — хешем места (не жребием r: порядок случайных чисел при стройке не меняется) */
+const hz = (x, z, k = 0) => {
+  let h = Math.imul(Math.round(x * 16) ^ 0x27d4eb2d, 0x9E3779B1) ^ Math.imul(Math.round(z * 16) + k * 1013904223, 0x85ebca6b);
+  h ^= h >>> 15; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 13; h = Math.imul(h, 0x27d4eb2f); h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+};
+const NOVAR = typeof location !== 'undefined' && new URLSearchParams(location.search).has('novar');   // ?novar — все деревья одной породы одинаковые, как до М9 (сравнить)
+const NVAR = () => MOB.on ? 4 : 6;                 // вариантов ветвления на породу (0 — как в файле)
+let VAR = null;                                    // у текущего дерева: { k вариант, wx, wz наклон (м на метр высоты, в мире), ax, az ширина }
+function varOf (kind, x, z) {
+  if (NOVAR || kind === 'hedge' || kind === 'topiary') return null;
+  const shrub = SHRUBS.has(kind) || kind === 'bush', m = shrub ? 0 : 0.025 + hz(x, z, 52) * 0.07, a = hz(x, z, 53) * 6.283;
+  return { k: Math.floor(hz(x, z, 51) * NVAR()), wx: m * Math.cos(a), wz: m * Math.sin(a),
+    ax: 1 + (hz(x, z, 54) - 0.5) * 0.3, az: 1 + (hz(x, z, 55) - 0.5) * 0.3 };
+}
+const WTV = {}, WTX = {};
+function wtVariant (name, k) {
+  if (!k) return wtModel(name);
+  const key = name + '#' + k;
+  let m = WTV[key];
+  if (m) return m;
+  const base = wtModel(name);
+  let ex = WTX[name];
+  if (!ex) {                                       // размер модели: высота и самый дальний сук
+    ex = WTX[name] = { h: 1, r: 1 };
+    for (const g of base) for (let i = 0; i < g.tpl.length; i += 3) { ex.h = Math.max(ex.h, g.tpl[i + 1]); ex.r = Math.max(ex.r, Math.hypot(g.tpl[i], g.tpl[i + 2])); }
+  }
+  let a = (Math.imul(k * 7919 + 13, 0x9E3779B1) ^ Math.imul(name.length * 131 + name.charCodeAt(0) * 17 + name.charCodeAt(name.length - 1), 0x85ebca6b)) >>> 0;
+  const rnd = () => { a = (a + 0x6D2B79F5) >>> 0; let q = a; q = Math.imul(q ^ (q >>> 15), q | 1); q ^= q + Math.imul(q ^ (q >>> 7), q | 61); return ((q ^ (q >>> 14)) >>> 0) / 4294967296; };
+  const al = name === 'alley', sg = () => rnd() < 0.5 ? -1 : 1;
+  const tw = sg() * (0.1 + rnd() * (al ? 0.12 : 0.22)), bx = sg() * (0.01 + rnd() * 0.045), bz = sg() * (0.01 + rnd() * 0.05),
+    wx = (rnd() - 0.5) * (al ? 0.16 : 0.34), wz = (rnd() - 0.5) * 0.4, mir = k % 2 === 1,
+    cut = k % 3 === 2, ca = rnd() * 6.283, cw = 0.5 + rnd() * 0.4;
+  m = WTV[key] = base.map(g => {
+    const t = g.tpl, n = t.length / 9, o = new Float32Array(t.length);
+    let w = 0;
+    for (let f = 0; f < n; f++) {
+      if (cut && g.part >= 1) {                    // обломан сучок: сектор в стороне и выше середины — без ветвей и прутьев
+        const cx = (t[f * 9] + t[f * 9 + 3] + t[f * 9 + 6]) / 3, cy = (t[f * 9 + 1] + t[f * 9 + 4] + t[f * 9 + 7]) / 3, cz = (t[f * 9 + 2] + t[f * 9 + 5] + t[f * 9 + 8]) / 3;
+        let d = Math.atan2(cz, cx) - ca; d = Math.abs(Math.atan2(Math.sin(d), Math.cos(d)));
+        if (cy > ex.h * 0.4 && Math.hypot(cx, cz) > ex.r * 0.4 && d < cw) continue;
+      }
+      for (let q = 0; q < 9; q += 3) {
+        let vx = t[f * 9 + q], vy = t[f * 9 + q + 1], vz = t[f * 9 + q + 2];
+        const u = Math.min(1.2, vy / ex.h), sm = Math.min(1, Math.max(0, (u - 0.3) / 0.5));
+        const ang = tw * Math.max(0, u), c1 = Math.cos(ang), s1 = Math.sin(ang);   // перекрут растёт с высотой
+        const rx = vx * c1 - vz * s1, rz = vx * s1 + vz * c1;
+        vx = rx * (1 + wx * sm) + bx * u * u * ex.h; vz = rz * (1 + wz * sm) + bz * u * u * ex.h;
+        if (mir) vz = -vz;
+        o.set([vx, vy, vz], w * 9 + q);
+      }
+      if (mir) { for (let q = 0; q < 3; q++) { const tmp = o[w * 9 + 3 + q]; o[w * 9 + 3 + q] = o[w * 9 + 6 + q]; o[w * 9 + 6 + q] = tmp; } }   // зеркало — грани наизнанку: меняем порядок вершин
+      w++;
+    }
+    return { part: g.part, snow: g.snow, tpl: o.slice(0, w * 9) };
+  });
+  return m;
+}
 /* дерево по модели: ствол и суки — вид 0, ветки и прутья — вид 7 (зерно seed: видны, когда листвы меньше); снег — палитра 1 */
 function winterTree (P, name, x, y, z, sx, sy, sz, yaw, col, seed) {
-  for (const g of wtModel(name)) {
+  const V = VAR;
+  let rx = 0, rz = 0, mod = null;
+  if (V) {
+    mod = wtVariant(name, V.k);
+    sx *= V.ax; sz *= V.az;
+    if (V.wx || V.wz) {                            // наклон ствола: смещение в мире (wx, wz на метр высоты) → оси модели (поворот yaw последний)
+      const c = Math.cos(yaw), sn = Math.sin(yaw);
+      rz = Math.atan2(-(V.wx * c - V.wz * sn), 1); rx = Math.atan2(V.wx * sn + V.wz * c, 1);
+    }
+  }
+  for (const g of mod || wtModel(name)) {
     const k = g.part < 2 ? 0 : 7;
-    P.add(g.tpl, x, y, z, sx, sy, sz, 0, yaw, 0, col[g.part], k, k ? Math.min(0.95, seed + (g.part === 2 ? 0.12 : 0)) : 0, g.snow);
+    P.add(g.tpl, x, y, z, sx, sy, sz, rx, yaw, rz, col[g.part], k, k ? Math.min(0.95, seed + (g.part === 2 ? 0.12 : 0)) : 0, g.snow);
   }
 }
 
@@ -205,6 +275,7 @@ export function growTree (o) {
   if (MOB.on && kind in TREE.MOB_SWAP) { kind = TREE.MOB_SWAP[kind]; if (!kind) return false; }   // телефон: меньше видов
   STATS.kinds[kind] = (STATS.kinds[kind] || 0) + 1;
   TRIS = 0;
+  VAR = varOf(kind, x, z);                       // М9: свой вариант ветвления, наклон и ширина у каждого дерева (хеш места)
   if (STATS.kinds[kind] === 40 || STATS.kinds[kind] === 400) STATS.where[kind] = [Math.round(x), Math.round(z)];   // для проверки глазами (?debug)
   if (STATS.kinds[kind] % 7 === 1) { const a = STATS.pts[kind] || (STATS.pts[kind] = []); if (a.length < 40) a.push([Math.round(x), Math.round(z)]); }
   const s = 0.82 + r() * 0.4, yaw = r() * 6.283;
@@ -219,7 +290,7 @@ export function growTree (o) {
   };
   // комок кроны: lvl 0 — нижний (темнее), 1 — верхний (светлее)
   const clump = (ox, oy, oz, rr, sy, hex, pal, lvl, kind = 1) =>
-    P.add(T.ico, x + ox * s, y + oy * s, z + oz * s, rr * s, rr * s * sy, rr * s, 0, r() * 6.283, 0, tone(hex, Math.round((0.82 + 0.32 * lvl) * 20) / 20), kind, r(), pal, 0.38);
+    P.add(T.ico, x + ox * s + (VAR ? VAR.wx * oy * s : 0), y + oy * s, z + oz * s + (VAR ? VAR.wz * oy * s : 0), rr * s, rr * s * sy, rr * s, 0, r() * 6.283, 0, tone(hex, Math.round((0.82 + 0.32 * lvl) * 20) / 20), kind, r(), pal, 0.38);
   const leaves = (hexes, n, rad) => {
     for (let i = 0; i < n; i++) {
       const a = r() * 6.283, d = 0.4 + r() * rad, lx = x + Math.cos(a) * d, lz = z + Math.sin(a) * d;
@@ -234,7 +305,7 @@ export function growTree (o) {
   const dots = (n, cx, cy, cz, rad, size, hexes, k, ico) => {
     for (let i = 0; i < n; i++) {
       const a = r() * 6.283, h = -0.5 + r() * 0.9, d = rad * Math.sqrt(1 - h * h) * 0.95;
-      P.add(T.oct, x + (cx + Math.cos(a) * d) * s, y + (cy + h * rad) * s, z + (cz + Math.sin(a) * d) * s,
+      P.add(T.oct, x + (cx + Math.cos(a) * d) * s + (VAR ? VAR.wx * (cy + h * rad) * s : 0), y + (cy + h * rad) * s, z + (cz + Math.sin(a) * d) * s + (VAR ? VAR.wz * (cy + h * rad) * s : 0),
         size * s, size * s * (ico ? 1.6 : 1), size * s, 0, r() * 6.283, 0, pickR(r, hexes), k, 0.02 + r() * 0.9);
     }
   };
@@ -284,8 +355,10 @@ export function growTree (o) {
     const pal = sp === 'maple' ? (r() < 0.55 ? 2 : 1) : sp === 'poplar' ? 3 : r() < 0.8 ? 0 : 1;
     const g = pickR(r, sp === 'maple' ? ['#4f9443', '#5aa04a'] : ['#5aa04a', '#62a84f', '#548f44']);
     const bark = sp === 'poplar' ? '#6a5a48' : '#6e5440';
-    const TR = AL.TRUNK * (0.94 + r() * 0.12), hTop = AL.TOP * (0.97 + r() * 0.06);
-    const at = (f, h, sd = 0) => [x + ux * f + vx * sd, y + h, z + uz * f + vz * sd];
+    // М9: у каждого дерева аллеи своя форма — вариант ветвления модели, наклон ствола, ширина и высота, у кроны свои комки (хеш места, не r)
+    const q = k => hz(x, z, 60 + k), hr = r();
+    const TR = AL.TRUNK * (0.94 + r() * 0.12), hTop = AL.TOP * (VAR ? 0.95 + q(0) * 0.15 : 0.97 + hr * 0.06), wk = VAR ? VAR.az : 1;
+    const at = (f, h, sd = 0) => [x + ux * f + vx * sd + (VAR ? VAR.wx * h : 0), y + h, z + uz * f + vz * sd + (VAR ? VAR.wz * h : 0)];
     const limb = (a, b, w, hex) => {
       if (WM) return;
       const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], l = Math.hypot(dx, dy, dz) || 1;
@@ -301,9 +374,15 @@ export function growTree (o) {
     limb(F, at(0.6, TR + 4.4), 0.2, '#5e4632');                         // макушка
     // крона по дуге от ствола к оси улицы: у ствола ~9 м, над осью ~10 м до центра комка
     const hc = t => TR + 3.1 + (hTop - 1.7 - TR - 3.1) * Math.sin(Math.min(1, Math.max(0, t)) * Math.PI / 2);
-    const C = [[-0.18, 0, 2.3], [0.12, 0, 2.7], [0.42, 0, 2.7], [0.72, 0, 2.6], [1.0, 0, 2.5],
+    let C = [[-0.18, 0, 2.3], [0.12, 0, 2.7], [0.42, 0, 2.7], [0.72, 0, 2.6], [1.0, 0, 2.5],
       [0.3, 2.5, 2.2], [0.3, -2.5, 2.2], [0.78, 2.1 * sd, 2.1], [0.2, 0.6 * sd, 1.9]];
-    C.forEach(([t, side, rr], i) => {
+    if (VAR) {                                                          // крона несимметричная: комки сдвинуты, часть боковых нет, где-то лишний
+      C = C.map(([t, side, rr], i) => (i >= 5 && i <= 7 && q(10 + i) < 0.22) ? null : [t + (q(20 + i) - 0.5) * 0.16, side * wk + (q(30 + i) - 0.5) * 1.4, rr * (0.82 + q(40 + i) * 0.42)]);
+      if (q(5) < 0.5) C.push([0.25 + q(6) * 0.6, (q(7) - 0.5) * 5, 1.7 + q(8) * 0.6]);
+    }
+    C.forEach((c, i) => {
+      if (!c) return;
+      const [t, side, rr] = c;
       const p = at(t * R, hc(t) + (i === 8 ? 2.1 : 0) + (r() - 0.5) * 0.5, side + (r() - 0.5) * 0.8);
       const k = rr * (0.92 + r() * 0.16);
       P.add(T.ico, p[0], p[1], p[2], k, k * 0.74, k, 0, r() * 6.283, 0, tone(g, Math.round((0.84 + 0.3 * (i === 8 ? 1 : t * 0.6)) * 20) / 20), 1, r(), pal, 0.38);

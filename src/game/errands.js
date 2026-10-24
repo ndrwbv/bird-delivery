@@ -256,13 +256,20 @@ export function unboardLive (Sd) {
    → { tip, k } — k: доля оплаты поручения (1 — целиком); tip — чаевые, ₽ (как видит игрок).
    Привёз, что просил: thanks + фраза чаевых (SIDE_TIPS). Не то или ни с чем: реплика back (злится, смеётся,
    даёт за попытку) и pay из неё. Без реплик (Яндекс, старый путь) — { tip: 0, k: 1 } */
+/* клиент говорит у двери облачком над головой (Д6, автор 24.10.2026: у дома — без окна разговора); деньги и чаевые — как раньше, чеком */
+function cloudSay (Sd, o) {
+  const a = Sd.ped && !Sd.ped.dead ? DCAST.client(Sd.ped) : null;
+  const r = DCAST.say(a, { name: firstOf(Sd.person), color: ORDER_TYPES.side.color, ...o });
+  r.then(() => DCAST.leave(a), () => {});
+  return r;
+}
 export function thanks (Sd) {
   const s = Sd.it && Sd.it.spec;
   if (!s || !s.thanks) return { tip: 0, k: 1 };
   const oc = Sd.outcome || { k: 'give' }, b = s.back || {};
   if (oc.k !== 'give') {
     const q = oc.k === 'wrong' ? (b.wrong || { say: s.thanks, pay: 1 }) : wpick([].concat(b.none || { say: s.thanks, pay: 0, emo: 'angry' }));
-    DLG.say({ person: Sd.person, name: firstOf(Sd.person), head: t('поручение'), text: t(q.say), accept: t('понятно'), emo: q.emo || undefined, fillers: false, color: ORDER_TYPES.side.color });
+    cloudSay(Sd, { text: t(q.say), emo: q.emo || undefined });
     paidLog(Sd, oc.k, q.pay || 0, 0);
     return { tip: 0, k: q.pay || 0 };
   }
@@ -273,8 +280,7 @@ export function thanks (Sd) {
   // pet — к кому это (кот): выходит к ногам клиента, «Мяу» (doorcast.js) — «Барсик, жри» говорят тому, кого видно
   const pet = s.pet === 'cat' && Sd.ped && !Sd.ped.dead ? DCAST.cat(Sd.ped) : null;
   if (pet) setTimeout(() => pet.go(), 7000);
-  DLG.say({ person: Sd.person, name: firstOf(Sd.person), head: t('поручение'), text, accept: t('понятно'), emo: 'happy', fillers: false, color: ORDER_TYPES.side.color,
-    ...(tip > 0 ? { pay: '+' + A.money(tip), payLabel: t('чаевые') } : {}) });
+  cloudSay(Sd, { text, emo: 'happy' });
   paidLog(Sd, 'give', 1, tip);
   return { tip, k: 1 };
 }

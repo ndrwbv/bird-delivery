@@ -20,8 +20,8 @@
    • бандитские районы (ZN.gangZones): размытые красные пятна на радаре и карте;
      адрес в районе — 3–4 гопника в спортивках (днём 6 из 10, вечером всегда) ждут у пина
      или выходят из-за угла; пицца отдаётся сразу, но машину тут же окружают и держат,
-     пока не ответишь: заплатил 10 000 ₽ — отпускают; «отбиться» — сжимающееся кольцо (ringfight.js): попал —
-     уходят без денег, промах — платишь (gang*, HOLD, GANG в econ.js). Старая стычка (smash: до 1 сердца, дал газу —
+     пока не рассчитаешься: главный говорит требование облачком (окна разговора нет, 24.10.2026, Д6), через 4 с — сжимающееся
+     кольцо «отбиться» (ringfight.js): попал — уходят без денег, промах — платишь мзду (10 000 ₽) (gang*, HOLD, GANG в econ.js). Старая стычка (smash: до 1 сердца, дал газу —
      бегут следом и отстают) в коде осталась, но из разговора больше не зовётся; в детской без бит;
    • особняки (prepCity): дома в круге MAP.career.rich — коттеджи в 2–3
      этажа со скатной крышей, светлыми стенами, газоном, высоким забором
@@ -38,7 +38,6 @@ import { t } from '../i18n/index.js';
 import { GANG, SHIFT, hourOf } from './econ.js';
 import { TIER } from './hits.js';
 import * as ZN from './zones.js';
-import * as DLG from './dialog.js';
 import * as RF from './ringfight.js';    // «отбиться» — сжимающееся кольцо (12ао)
 import * as SEAS from './seasons.js';
 import * as SL from './streetlamps.js';
@@ -1155,30 +1154,29 @@ function gangTalk () {
   const text = A.ADULT
     ? t('Слышь, курьер. Это наш район. Хочешь тут ездить — плати. {money}, и катайся спокойно.', { money: sum })
     : t('Эй, курьер! Это наш двор. Проезд платный — {money}. Заплатишь — катайся.', { money: sum });
-  // таймера на ответ нет (автор 16.10.2026): стоят, пока не ответишь; мзда — под портретом
-  DLG.say({
-    person: L.person, name: A.ADULT ? t('Гопник') : t('Пацан со двора'), text, mood: 'calm', color: '#d9342c',
-    head: A.ADULT ? t('наезд') : t('двор'), pay: '−' + sum, payLabel: t('мзда'),
-    accept: t('заплатить {money}', { money: sum }), decline: t('отбиться'),
-  }).then(ok => {
-    if (GE.st !== 'talk') return;
-    if (ok) { gangPay(); return; }
-    /* «отбиться» (12ао, автор 18.10.2026): сжимающееся кольцо (ringfight.js) — попал вовремя: отбился, не платишь и
-       машину не мнут; промах — платишь, как «заплатить». Пока кольцо на экране — держат, как в разговоре. Было до 23.10:
-       «не буду» — стычка (smash ниже: бьют машину до GANG.SMASH_HEARTS сердца, можно оторваться) — код оставлен */
-    GE.st = 'ring';
-    gsay(L, A.ADULT ? t('Чё, борзый?') : t('Ты чё, смелый?'), '#d9342c');
-    RF.play({ adult: A.ADULT, sum, sfx: n => {
-      if (!A.Snd) return;
-      if (n === 'hit') A.Snd.fx('bat', s => { s.noise(0.09, 0.22); s.blip(120 + Math.random() * 40, 0.08, 'square', 0.1); });
-    } }).then(hit => {
-      if (GE.st !== 'ring') return;
-      if (!hit) { gangPay(); return; }
-      GE.res = 'fought'; STATS.fought = (STATS.fought || 0) + 1;
-      if (A.S) A.S.shake = Math.max(A.S.shake || 0, 0.3);
-      if (A.toast) A.toast(t('отбился — без мзды'));
-      gangLeave(A.ADULT ? t('Ай, бля! Всё-всё, уходим!') : t('Ай! Ладно-ладно, уходим!'), '#d9342c');
-    });
+  // Д6 (автор 24.10.2026): у дома — без окна разговора. Главный говорит требование облачком над головой, потом сразу
+  // кольцо «отбиться» — оно и есть ответ: попал вовремя — не платишь, промах — платишь, как «заплатить» (раньше — две кнопки)
+  gsay(L, text, '#d9342c');
+  L.bubT = GANG_SAY;
+  GE.sayT = setTimeout(() => { GE.sayT = 0; if (GE.st === 'talk') gangRing(L, sum); }, GANG_SAY * 1000);
+}
+const GANG_SAY = 4;   // с: требование висит над головой, потом кольцо
+function gangRing (L, sum) {
+  /* «отбиться» (12ао, автор 18.10.2026): сжимающееся кольцо (ringfight.js) — попал вовремя: отбился, не платишь и
+     машину не мнут; промах — платишь. Пока кольцо на экране — держат, как в разговоре. Было до 23.10:
+     «не буду» — стычка (smash ниже: бьют машину до GANG.SMASH_HEARTS сердца, можно оторваться) — код оставлен */
+  GE.st = 'ring';
+  gsay(L, A.ADULT ? t('Чё, борзый?') : t('Ты чё, смелый?'), '#d9342c');
+  RF.play({ adult: A.ADULT, sum, sfx: n => {
+    if (!A.Snd) return;
+    if (n === 'hit') A.Snd.fx('bat', s => { s.noise(0.09, 0.22); s.blip(120 + Math.random() * 40, 0.08, 'square', 0.1); });
+  } }).then(hit => {
+    if (GE.st !== 'ring') return;
+    if (!hit) { gangPay(); return; }
+    GE.res = 'fought'; STATS.fought = (STATS.fought || 0) + 1;
+    if (A.S) A.S.shake = Math.max(A.S.shake || 0, 0.3);
+    if (A.toast) A.toast(t('отбился — без мзды'));
+    gangLeave(A.ADULT ? t('Ай, бля! Всё-всё, уходим!') : t('Ай! Ладно-ладно, уходим!'), '#d9342c');
   });
 }
 /* заплатил мзду (или промахнулся в кольце): денег меньше — отдаёшь всё, что есть */
@@ -1335,6 +1333,7 @@ function gangClear () {
     if (!m.dead) { m.dead = 1; A.dropMesh(m.grp); }
   }
   GE.men = []; GE.st = ''; GE.lead = null; GE.stop = null;
+  if (GE.sayT) { clearTimeout(GE.sayT); GE.sayT = 0; }
   if (GE.dir) { GE.dir = 0; DIRECTOR.end('gang'); }
   gangEnd();
 }

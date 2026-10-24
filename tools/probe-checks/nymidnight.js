@@ -12,6 +12,7 @@ const out = { rows: {}, bad: [], warn: [] };
 const chatNY = () => { const el = document.getElementById('chat'); return !!el && /с Новым годом/i.test(el.textContent); };
 async function freshShift () {
   if (!['title', 'over'].includes(d.S.state)) { d.endShift(); await run(0.5); }
+  d.Store.set('dlv-shifts', 0);                          // не дневная смена (12бм: каждая 3-я со 2-й кончается на закате, без курантов)
   d.startRun(false); await wait(400);
   if (d.S.state === 'brief') { d.acceptOrder(); await until(x => x.S.state === 'drive', 4000); }
   d.HOL.start('newyear');
@@ -24,7 +25,7 @@ async function untilState (st, far, secs) {
 for (const sc of ONLY) {
   await freshShift();
   let ok = true, said = false;
-  if (sc === 'drive') { ok = await untilState('drive', 60, 60); d.CAREERM.skipTo(23.97); }
+  if (sc === 'drive') { ok = await untilState('drive', 60, 60); d.CAREERM.skipTo(23.8); }
   else {
     // назад / новый заказ вдали: машину — на дорогу в 150—400 м от пиццерии (без автопилота: он не всегда успевает отъехать)
     autopilot(false);
@@ -41,7 +42,7 @@ for (const sc of ONLY) {
         d.newOrder();                                  // новый заказ пришёл, когда ты уже не у пиццерии (накладная на экране)
         if (sc === 'loading') d.acceptOrder();          // приняли сразу: коробка летит в багажник (погрузка), а ты уже далеко
         d.CAREERM.skipTo(23.995);
-      } else d.CAREERM.skipTo(23.97);
+      } else d.CAREERM.skipTo(23.8);
       ok = d.S.state === (sc === 'back' ? 'back' : sc);
       autopilot(true);
     }

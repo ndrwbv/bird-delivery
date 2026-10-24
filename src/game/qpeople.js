@@ -556,7 +556,7 @@ function carriedBox (st) {
   const g = st.g;
   if (g.children.length !== st.nc || (st.box && st.box.parent !== g)) { st.nc = g.children.length; st.box = null; for (const c of g.children) if (c.userData && c.userData.pbox) { st.box = c; break; } }
   const b = st.box;
-  return b && b.parent === g && b.visible && b.children.length <= 2 ? b : null;
+  return b && b.parent === g && b.visible && b.children.length <= (b.userData.stack > 1 ? 3 : 2) ? b : null;   // стопка (pizzabox.js makeStack) — тоже в руках
 }
 function armMask (F) {
   if (!F.armMask) { const cls = classes(F); F.armMask = new Uint8Array(F.nJ); for (let j = 0; j < F.nJ; j++) if (cls[j] === 1 || cls[j] === 3) F.armMask[j] = 1; }

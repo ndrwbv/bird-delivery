@@ -252,7 +252,7 @@ export function scene (ped, o = {}) {
     cour.rotation.set(0, ry + Math.PI, 0);
     cour.visible = true;
     if (!cour.parent) A.scene.add(cour);
-    const b = A.box();
+    const b = A.box(ped.boxes);                     // много пицц одному — стопка (12бл, pizzabox.js)
     b.position.set(0, 1.12, 0.48);
     cour.add(b);
     SC.box = b;

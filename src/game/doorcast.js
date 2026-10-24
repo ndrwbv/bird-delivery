@@ -79,6 +79,7 @@ export function client (ped, o = {}) {
   const a = actor(ped.grp, false);
   a.nofocus = !!o.nofocus;
   a.ped = ped;
+  LASTPED = ped;
   return a;
 }
 
@@ -172,6 +173,7 @@ export function stranger (person, ped, o = {}) {
 export function leave (a) {
   if (!a) return;
   talk(a, false);
+  if (LASTPED && a.ped === LASTPED) LASTPED = null;
   a.leaving = true;
   if (!a.own) { release(a); return; }
   if (!alive(a)) { release(a); return; }
@@ -218,9 +220,48 @@ export function focus () {
   return FO;
 }
 
-/** окно разговора: пока реплика печатается — у актёра a говорит рот (a — null: говорящего в мире нет) */
+/* ── реплика облачком (Д6, автор 24.10.2026: «встречи возле дома не отображаются диалогами — просто сверху чела пишется,
+   что он говорит»): окна разговора у дома нет — человек говорит облачком над головой (talk.js, светлая бумажная плашка),
+   рот открыт, пока оно висит; игра не стоит, руль у игрока. Выбор ответа у дома убран (он будет на этаже, Д5): реплика
+   с ответами (o.decline) отвечает за курьера случай: say вернёт true или false наугад (CLOUD.PICK: 1 — всегда true, 0 — всегда false,
+   для проверок), чтобы обе ветки историй жителей и клиентов автора жили до этажа. ──
+   CLOUD.ON = false — по-старому, окном разговора (dialog.js) */
+export const CLOUD = { ON: true, PICK: null, MIN: 2.6, MAX: 7, BASE: 1.3, PER_CHAR: 0.055, GAP: 0.3, Y: 2.75 };
+const PEND = new Set();                                   // облачка сейчас: { b, grp, end(res) }
+let LASTPED = null;                                       // клиент у двери — к нему идёт «голос из квартиры» (актёра нет)
+const cloudTime = text => Math.min(CLOUD.MAX, Math.max(CLOUD.MIN, CLOUD.BASE + CLOUD.PER_CHAR * String(text == null ? '' : text).length));
+const pickAns = o => (o.decline === undefined || o.decline === null ? true : CLOUD.PICK === 1 ? true : CLOUD.PICK === 0 ? false : Math.random() < 0.5);
+function cloudSay (a, o) {
+  const text = String(o.text == null ? '' : o.text), hold = cloudTime(text), name = o.name || '';
+  const col = o.color || '#5a4a9a';
+  let g = a && alive(a) ? a.grp : null, off = null;
+  const ped = (a && a.ped) || LASTPED;
+  if (!g && ped && ped.grp && ped.grp.parent && !ped.dead) off = offstage(ped, text, { hold, col, name: name || undefined });   // из квартиры: за спиной клиента
+  if (!g && !off) return new Promise(res => { const P = { end: r => { clearTimeout(P.tm); PEND.delete(P); res(r); } }; P.tm = setTimeout(() => P.end(pickAns(o)), hold * 1000); PEND.add(P); });   // человека в мире нет (песочница) — пауза без облачка
+  if (g) { hushAll(); if (a) talk(a, true, o.emo); }
+  const b = g ? bubble(g, text, col, CLOUD.Y, hold, name) : null;
+  if (o.onShow) { try { o.onShow(); } catch (e) { /* — */ } }
+  return new Promise(res => {
+    const P = {
+      end: r => {
+        clearTimeout(P.tm); PEND.delete(P);
+        if (a) talk(a, false);
+        if (b && b.parent) b.parent.remove(b);
+        if (off && off.parent) off.parent.remove(off);
+        if (o.onTyped) { try { o.onTyped(); } catch (e) { /* — */ } }
+        setTimeout(() => res(r), r === null ? 0 : CLOUD.GAP * 1000);
+      } };
+    P.tm = setTimeout(() => P.end(pickAns(o)), hold * 1000);
+    PEND.add(P);
+  });
+}
+/** сбросить висящие облачка (смена кончилась) — say вернёт null, сценка дальше не идёт */
+function cloudClear () { for (const P of [...PEND]) P.end(null); }
+
+/** реплика человека у дома (у актёра a говорит рот; a — null: голос из квартиры / говорящего в мире нет) → Promise: true (дослушали) / true | false наугад, если у реплики два ответа, null (смена кончилась). Окна больше нет — облачко (см. выше) */
 export function say (a, o) {
   ST.says++;
+  if (CLOUD.ON) return cloudSay(a, o);
   return DLG.say(Object.assign({}, o, {
     onShow: () => { hushAll(); if (a) talk(a, true, o.emo); if (o.onShow) o.onShow(); },
     onTyped: () => { if (a) talk(a, false); if (o.onTyped) o.onTyped(); },
@@ -556,6 +597,7 @@ export function frame (dt) {
 
 /** убрать всех своих сразу (смена кончилась, профиль сменили) */
 export function clear () {
+  cloudClear();
   for (const a of [...ACT]) { if (a.own) drop(a); else release(a); }
   for (const D of [...DOGS]) dogDrop(D);
   for (const C of [...CATS]) catDrop(C);
@@ -563,7 +605,7 @@ export function clear () {
 
 /* для probe: __dlv.DCAST */
 export const DEBUG = {
-  DC, ST,
+  DC, ST, CLOUD, get pending () { return PEND.size; }, cloudClear,
   get actors () { return [...ACT].map(a => ({ own: a.own, x: +(a.grp ? a.grp.position.x : a.x).toFixed(1), z: +(a.grp ? a.grp.position.z : a.z).toFixed(1), kid: a.grp ? +a.grp.scale.y.toFixed(2) : 1, walking: !!a.to, talk: a.talk, mouth: a.L ? a.L.mouth : null, face: !!a.L, seen: a.seen })); },
   get dogs () { return [...DOGS].map(D => ({ x: +D.x.toFixed(1), z: +D.z.toFixed(1), sit: D.sit, going: !!D.to, board: !!D.board, barksLeft: D.barkQ })); },
   get cats () { return [...CATS].map(C => ({ x: +C.x.toFixed(1), z: +C.z.toFixed(1), going: !!C.to, board: !!C.board })); },

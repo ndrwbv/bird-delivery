@@ -234,6 +234,7 @@ import * as CHIT from './carhit.js';         // машина о машину: о
 import * as CHS from './chase.js';          // погоня обиженного водителя водит как человек: руль и педали плавно, ты стоишь — подъезжает и решает (chase.js, 0п49)
 import * as CROUND from './carround.js';       // пешком — вокруг машины, а не сквозь кузов (carround.js, 0п73)
 import * as CEX from './carexit.js';         // водитель выходит и садится через дверь: дверь открывается, вылезает сбоку (carexit.js, 0п39)
+import * as CRIDE from './crewride.js';      // развоз смены: коллеги садятся через двери и едут в машине (crewride.js, 12бн)
 import * as PEDC from './pedcollide.js';        // люди не сквозь стены и машины, едущая машина толкает и сбивает людей (pedcollide.js, CAREER.md «Люди и твёрдое»)
 import * as PDODGE from './peddodge.js';       // люди уворачиваются от твоей машины: отходят, отбегают вбок, отпрыгивают, кувырок (peddodge.js, CAREER.md «Уворот от машины»)
 EDL.buildStart();                                 // город (всё до конца buildCity) — с зерном: одинаковый каждый запуск, правки редактора находят свои предметы (editlayer.js)
@@ -6537,7 +6538,7 @@ function steam (x, y, z) {
 }
 
 /* коробка с пиццей — и летящая, и та, что уже в руках */
-function pizzaBox () { return PBOX.makeBox(THREE); }   // логотип птицы на крышке, общие материалы (pizzabox.js)
+function pizzaBox (n) { return n > 1 ? PBOX.makeStack(THREE, n) : PBOX.makeBox(THREE); }   // n > 1 — стопка (много пицц одному, 12бл)   // логотип птицы на крышке, общие материалы (pizzabox.js)
 
 /* ─────────────── машины ───────────────
    Четыре кузова. Седан — советский: длинный капот, коробка салона,
@@ -8043,15 +8044,15 @@ function crumbs (x, y, z) {
 }
 /* открытая коробка: крышка откинута, внутри пицца (дети box — p.hold) */
 function openBox (box) {
-  const lab = box.children[1];
+  const top = PBOX.topOf(box), lab = top.logo;   // стопка — открывает верхнюю (pizzabox.js)
   if (lab) lab.visible = false;
   const lidG = new THREE.Group();
-  lidG.position.set(0, PBOX.BOX.H / 2, -PBOX.BOX.W / 2);
+  lidG.position.set(0, top.y + PBOX.BOX.H / 2, -PBOX.BOX.W / 2);
   const lid = new THREE.Mesh(new THREE.BoxGeometry(PBOX.BOX.W, 0.015, PBOX.BOX.W), new THREE.MeshLambertMaterial({ color: '#f0522a', flatShading: true }));
   lid.position.z = PBOX.BOX.W / 2;
   lidG.add(lid);
   const pie = new THREE.Mesh(new THREE.CylinderGeometry(PBOX.BOX.W * 0.42, PBOX.BOX.W * 0.42, 0.015, 10), new THREE.MeshLambertMaterial({ color: '#f2c14e', flatShading: true }));
-  pie.position.y = PBOX.BOX.H / 2 + 0.005;
+  pie.position.y = top.y + PBOX.BOX.H / 2 + 0.005;
   box.add(lidG, pie);
   return lidG;
 }
@@ -13163,14 +13164,14 @@ CLOOK.init({ canvas, pad: PAD, touch: () => TOUCH,
   padCan: () => !briefShown() });   // висит накладная — правый стик листает её (padmenu.js)
 /* вручение в кадре (handcam.js, 11бд): поворот на клиента, сцена «курьер отдаёт коробку» перед окном разговора */
 HCAM.init({ THREE, cam, scene, V, S, IN, pad: PAD, car: () => car, mode: () => CV.mode(), groundH, camClear, makeHuman,
-  courier: () => STORY.PERSON.courier(), box: () => pizzaBox(), say: (g, text, col, y, vip) => sayBubble(g, text, col, y, vip),
+  courier: () => STORY.PERSON.courier(), box: n => pizzaBox(n), say: (g, text, col, y, vip) => sayBubble(g, text, col, y, vip),
   emote: (x, y, z, k, n) => emote(x, y, z, k, n), DCAST, LK: CLOOK.LK, LOOK: CLOOK.LOOK, ADULT, focus: () => DCAST.focus(),
   driver: on => { const g = DRIVER.DEBUG.of(car); if (g) g.visible = !!on; },
   cabOut: () => { car.visible = true; FPV.hid = 0; CV.undraw(); } });
 DLG.gate(HCAM.gate);                              // окно разговора с клиентом сразу после вручения — сначала сцена
 /* подъезд в 3D (minigames/stairs3d.js, 12ас): люди — как в городе, но не в «дальних» (humanLod считает от камеры города) */
 ST3.init({ THREE, renderer, human: (p, o) => { const g = makeHuman(p, o); HUMANS.delete(g); return g; }, drop: dropMesh,
-  courier: () => STORY.PERSON.courier(), box: () => pizzaBox() });
+  courier: () => STORY.PERSON.courier(), box: n => pizzaBox(n) });
 
 const CAMFO = { k: 0, x: 0, y: 0, z: 0, has: false };   // взгляд на того, кто говорит у двери (doorcast.js focus): k — насколько
 function camStep (dt, vf) {
@@ -14853,7 +14854,8 @@ function updateFly (dt) {
       lerp(f.from.y, to.y, t) + Math.sin(t * Math.PI) * 1.9,
       lerp(f.from.z, to.z, t),
     );
-    f.g.rotation.x += dt * 7; f.g.rotation.y += dt * 4;
+    if (f.g.userData.stack > 1) f.g.rotation.y += dt * 3;   // стопка летит ровно, крутится вокруг себя (12бл)
+    else { f.g.rotation.x += dt * 7; f.g.rotation.y += dt * 4; }
     if (t >= 1) {
       scene.remove(f.g);
       FLY.splice(i, 1);
@@ -15506,6 +15508,7 @@ function routeLen (x0, z0, x1, z1) {
    так, как в начале. Даже самый срочный оставляет запас — доехать
    реально, если не плутать. */
 const RUN_V = 19;
+let FORCE_STACK = 0;                              // отладка: __dlv.stackNext(n) — следующий заказ одному стопкой из n
 function slackFor (n) {
   const c = Math.floor((n - 1) / 3), k = (n - 1) % 3;
   const calm = Math.max(1.3, 2.0 - 0.18 * c), tight = Math.max(1.12, 1.32 - 0.05 * c);
@@ -15545,7 +15548,14 @@ function newOrder () {
   }
 
   for (const st of plan.stops) rememberSpot(st.peds[0].x, st.peds[0].z);
-  const total = plan.stops.reduce((n, st) => n + st.peds.length, 0);
+  // много пицц одному (12бл): изредка один клиент берёт стопку (pizzabox.js STACK); не в учебном, не сёрферу, не на пляж и фестиваль
+  for (const st of plan.stops) {
+    const one = st.peds.length === 1 && !plan.tut && !st.surf && !st.beach && !st.fest;
+    st.boxes = one && (FORCE_STACK || (S.orders >= PBOX.STACK.FROM && chance(PBOX.STACK.P))) ? FORCE_STACK || PBOX.stackN() : 0;
+    for (const p of st.peds) p.boxes = st.boxes;
+  }
+  FORCE_STACK = 0;
+  const total = plan.stops.reduce((n, st) => n + (st.boxes || st.peds.length), 0);
   S.order = {
     kind: plan.kind,
     tut: !!plan.tut,
@@ -15627,7 +15637,7 @@ function pizzasInCar () {
   let n = 0;
   for (let i = o.idx || 0; i < o.stops.length; i++) {
     const st = o.stops[i], peds = st.peds || [];
-    n += peds.length ? peds.filter(p => !p.served).length : 1;
+    n += peds.length ? (st.boxes > 1 ? (peds[0].served ? 0 : st.boxes) : peds.filter(p => !p.served).length) : 1;   // стопка — все её коробки (12бл)
   }
   return n;
 }
@@ -15670,6 +15680,7 @@ function loadPizza () {
     return;
   }
   loadPizza.waited = false;
+  const nb = S.order && S.order.stops && !(S.order.ord && S.order.ord.type === 'staff') ? S.order.stops.reduce((n, st) => n + (st.boxes || st.peds.length || 1), 0) : 1;
   flyBox(
     { x: PIZZA.wx, y: PIZZA.wy, z: PIZZA.wz },
     trunkPoint,
@@ -15690,6 +15701,7 @@ function loadPizza () {
       Platform.gameplayStart();
       Snd.fx('go', s => s.blip(760, 0.1, 'square', 0.13));
     },
+    nb > 1 ? pizzaBox(Math.min(PBOX.STACK.MAX, nb)) : undefined,   // весь заказ — стопкой в багажник (12бл)
   );
 }
 
@@ -15749,7 +15761,8 @@ function handOver (st, onTime, story) {
       if (ped.dead || S.state === 'over' || S.state === 'dying') return;
       // в руки перед ним, а не в середину (автор 23.10.2026, 0п9: «коробка проходит сквозь него»)
       const ry = ped.grp ? ped.grp.rotation.y : 0;
-      flyBox(trunkPoint(), { x: ped.x + Math.sin(ry) * 0.5, y: (ped.surf ? 0.2 : groundH(ped.x, ped.z)) + 1.15, z: ped.z + Math.cos(ry) * 0.5 }, ped.surf ? 1.1 : 0.6, () => takeBox(ped, st, onTime));
+      flyBox(trunkPoint(), { x: ped.x + Math.sin(ry) * 0.5, y: (ped.surf ? 0.2 : groundH(ped.x, ped.z)) + 1.15, z: ped.z + Math.cos(ry) * 0.5 }, ped.surf ? 1.1 : 0.6, () => takeBox(ped, st, onTime, true),
+        st.boxes > 1 ? pizzaBox(st.boxes) : undefined);   // много пицц одному — летит стопка (12бл)
     }, 380 + i * 220);
     return q;
   });
@@ -15759,19 +15772,20 @@ function handOver (st, onTime, story) {
    (оплата и takeBox — после разговора, handOver: коробка та же, не летит) */
 function preBox (ped) {
   if (!ped || ped.dead || !ped.grp || ped.preBox) return;
-  const box = pizzaBox();
+  const box = pizzaBox(ped.boxes);
   box.position.set(0, ped.sitting ? 1.0 : 1.12, 0.48);
   ped.grp.add(box);
   ped.preBox = box;
 }
 /* коробка — клиенту в руки (долетела из багажника; учебный Стёпа — сразу после катсцены, коробку ему отдал курьер) */
-function takeBox (ped, st, onTime) {
+function takeBox (ped, st, onTime, thrown) {
   if (ped.preBox) { const b = ped.preBox; ped.preBox = null; if (b.parent) b.parent.remove(b); b.traverse(o => { if (o.isMesh) o.geometry.dispose(); }); }   // коробка из сцены (preBox) — та же, теперь вручена
   if (ped.dead) return;
-  const box = pizzaBox();
+  const box = pizzaBox(st.boxes);
   box.position.set(0, ped.sitting ? 1.0 : 1.12, 0.48);   // перед животом; люди-модели держат её на кистях (qpeople.js CARRY)
   ped.grp.add(box);
   ped.hold = box;
+  if (thrown && st.boxes >= PBOX.STACK.SPILL_N && !ped.surf && (FORCE_SPILL || chance(PBOX.STACK.SPILL))) spillStack(ped, box);   // бросил стопку — верх слетел (12бл)
   ped.served = 1;
   ped.freeT = 16;
   // что делать с пиццей дальше (afterStart); сюжетного клиента ведёт story.js — его не трогаем
@@ -15782,6 +15796,24 @@ function takeBox (ped, st, onTime) {
   if (onTime) { ped.holdT = 7; emote(ped.x, 2.1, ped.z, 'heart', 5); }
   else emote(ped.x, 2.1, ped.z, 'angry', 3);
 }
+
+/* стопка рассыпалась (12бл): верхние коробки слетают с рук и лежат на земле (carried.js), в руках — остальное */
+let FORCE_SPILL = 0;
+function spillStack (ped, box) {
+  FORCE_SPILL = 0;
+  const n = box.userData.stack || 1, k = 1 + ((Math.random() * (n - 2)) | 0);
+  const mats = PBOX.unstack(box, k);
+  if (!mats.length) return;
+  const tmp = new THREE.Group();
+  scene.add(tmp);
+  for (const M of mats) { const b = pizzaBox(); M.decompose(b.position, b.quaternion, b.scale); tmp.add(b); }
+  const dx = ped.x - V.x, dz = ped.z - V.z, l = Math.hypot(dx, dz) || 1;   // летят дальше — от машины
+  HITS.CARRY.drop({ grp: tmp, x: ped.x, z: ped.z }, dx / l * 2.2, dz / l * 2.2, false);
+  scene.remove(tmp);
+  emote(ped.x, 2.1, ped.z, 'angry', 2);
+  STACK_ST.spills++;
+}
+const STACK_ST = { spills: 0 };
 
 function checkArrival (dt) {
   if (!S.target) return;
@@ -17368,7 +17400,7 @@ if (!INTRO && CAREER) FEST.init({ THREE, scene, V, S, CITY, ADULT, Store, obb, S
 if (!INTRO && CAREER) CYCLE.init({ Store, ADULT, chat: s => CHAT.say(s), playing: isPlaying });   // круг сезонов (seasoncycle.js)
 if (!INTRO && CAREER) HOL.init({ THREE, scene, cam, renderer, Store, CITY, ADULT, V, S, groundH, inBounds, inHouse, inPoly, sayBubble, get PIZZA () { return PIZZA; },
   night: () => ENV.night || 0, hour: () => CAREERM.hour(), env: () => ENV, playing: isPlaying, chat: s => CHAT.say(s), onArrive: cb => ORD.onArrive(cb),
-  dayRate: () => 1 / (DAY_LEN * (CAREERM.shiftOn() ? CAREERM.shiftSlow() : 1)), people: () => PEOPLE,
+  dayRate: () => 1 / (DAY_LEN * (CAREERM.shiftOn() ? CAREERM.shiftSlow() : 1)), secsToT: t1 => CAREERM.secsToT(t1), people: () => PEOPLE,
   dress: (p, person, o) => { dropMesh(p.grp); p.grp = person ? makeHuman(person, o) : freshHuman(); p.person = p.grp.userData.person; p.speed = p.base * p.grp.userData.pace; scene.add(p.grp); } });   // праздники (holidays.js): костюмы — переодетые прохожие
 /* налёт на точку и ёлка-турель (raid.js) */
 // сессия: новая или продолжение (director.js); ритм смены (rhythm.js) — быстрый заезд, мини-игра идёт, поручения
@@ -17723,7 +17755,7 @@ const envClock = () => { const h = (6 + ENV.t * 24) % 24; return String(Math.flo
 function envTick (dt) {
   if (INTRO) return;
   // в карьере смена идёт медленнее (короткая / средняя / длинная — ECON.SHIFT.LENGTHS): небо и фазы те же
-  const d = dt / (DAY_LEN * (CAREER && CAREERM.shiftOn() ? CAREERM.shiftSlow() : 1));
+  const d = CAREER && CAREERM.shiftOn() ? CAREERM.dayStep(dt, DAY_LEN) : dt / DAY_LEN;   // в смене сумерки и ночь быстрее (econ.js SHIFT.TEMPO, 12бм)
   // развоз смены ночью — ночь держится: часы вшестеро медленнее и не дальше ~3:50 (daytime.js NIGHT_HOLD, 0п33)
   if (CAREER && ORD.staffOn() && DAYT.holdsNight(ENV.t)) { ENV.t = Math.min(DAYT.NIGHT_HOLD.CAP, ENV.t + d / DAYT.NIGHT_HOLD.SLOW); return; }
   ENV.t = (ENV.t + d) % 1;
@@ -18809,6 +18841,9 @@ CHIT.init({ near: (x, z, r, out) => TGRID.near(x, z, r, out), nearList: () => TG
 if (window.__dlv) window.__dlv.CHIT = CHIT.DEBUG;
 CEX.init({ groundH: (x, z) => groundH(x, z), detail: t => FW.pre(t, FW.FW.MIN) });   // дверь водителя (carexit.js)
 if (window.__dlv) window.__dlv.CEX = CEX.DEBUG;
+CRIDE.init({ makeHuman: (p, o) => makeHuman(p, o), drop: g => dropMesh(g), car: () => car, groundH: (x, z) => groundH(x, z), seatOf: t => CEX.DEBUG.seatOf(t), Snd });   // коллеги в машине (crewride.js)
+if (window.__dlv) window.__dlv.CRIDE = CRIDE.DEBUG;
+if (window.__dlv) Object.assign(window.__dlv, { stackNext: (n, spill) => { FORCE_STACK = n || 4; FORCE_SPILL = spill ? 1 : 0; }, STACK: { ...PBOX.STACK, ST: STACK_ST } });   // много пицц одному (12бл)
 WRECK.WR.hearts = g => (g === car && !SBX.god && S.hpMax > 0 ? { hp: S.hp, max: S.hpMax } : null);   // своя — вид по потерянным сердцам (0п58)
 if (window.__dlv) window.__dlv.WRECK = WRECK.DEBUG;   // детали по ступеням: state(машина), pieces(машина), ST (carwreck.js)
 PEDC.init({ V, TRAFFIC, CAR_L, CAR_W, solidsNear, inHouse: houseNotArch, walkLeg, walkSpawn, releaseIdle, gibHuman, gibBurger, burgerHit, runOverScoot,

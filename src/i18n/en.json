@@ -1040,6 +1040,9 @@
  "пиццерия круглосуточная — смена с {time}": "the pizzeria is open 24/7 — shift starts at {time}",
  "всех развёз — смена всё": "everyone's home — shift over",
  "смена всё — {time}": "shift over — {time}",
+ "дневная смена всё — до заката управились": "day shift done — made it before sunset",
+ "день отработан — смена всё": "day worked — shift over",
+ "солнце ещё высоко, а смена всё": "sun is still up, and the shift is over",
  "в районе «{name}»": "in “{name}”",
  "новый район": "next district",
  "«{name}» через {n} смену|«{name}» через {n} смены|«{name}» через {n} смен": {
