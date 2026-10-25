@@ -63,6 +63,15 @@ const smoke = (args, label) => async () => {
 };
 
 const CHECKS = [
+  { id: 'pile-live', name: 'сугробы после индексации: разрушение и смена сезона', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/pile-index.js'), '--seed=7']);
+    const e = errLine(j), r = j.result;
+    return { status: !e && r?.ok && !j.errors.length && !r.crash ? 'ok' : 'fail', info: e || (r ? `${r.cells} клеток, буферы ${r.mbBefore} → ${r.mbAfter} МБ; проверено сугробов ${r.checks.length}, ошибок ${j.errors.length}` : 'нет результата') };
+  } },
+  { id: 'pile-index', name: 'общие вершины статики: геометрия, сезоны, живой префикс', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'pile-index-test.mjs')]);
+    return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };
+  } },
   { id: 'build-web', name: 'сборка web', group: 1, run: build('web') },
   { id: 'build-steam', name: 'сборка steam', group: 1, run: build('steam') },
   { id: 'i18n', name: 'i18n:check', group: 1, run: async () => {
@@ -91,6 +100,19 @@ const CHECKS = [
     let j = null; try { j = JSON.parse(r.out.trim().split('\n').pop()); } catch (e) { /* — */ }
     if (!j) return { status: 'fail', info: 'без ответа: ' + (r.err || r.out).trim().slice(0, 160) };
     return j.ok ? { status: 'ok', info: `${j.cases} случаев: из 0.9.1 / 0.10.6 / 0.11.0 — сразу последняя` } : { status: 'fail', info: j.fail.join(' | ').slice(0, 200) };
+  } },
+  { id: 'car-blood-shader', name: 'кровь и грязь машины: программа WebGL компилируется', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/car-blood-shader.js')]);
+    const e = errLine(j), r = j.result;
+    const shaderError = (j.errors || []).find(x => /Shader Error|shader is not compiled/.test(x));
+    return e || shaderError || !r?.ok ? { status: 'fail', info: e || shaderError || 'нет результата' }
+      : { status: 'ok', info: r.scenarios.join('; ') + ': ' + r.programs + ' программ' };
+  } },
+  { id: 'car-dirt-isolation', name: 'грязь машины не переходит на прохожих', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/car-dirt-isolation.js')]);
+    const e = errLine(j), r = j.result;
+    return e || !r?.ok ? { status: 'fail', info: e || 'нет результата' }
+      : { status: 'ok', info: r.rows.length + ' запуска машины; чужие материалы чисты, повторных копий нет' };
   } },
   { id: 'orders', name: 'заказы в открытых районах, город поделён', group: 2, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/orders-open.js')]);
