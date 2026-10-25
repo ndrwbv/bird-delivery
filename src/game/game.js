@@ -18,6 +18,7 @@
 
 import * as THREE from '../vendor/three.module.min.js';
 import * as SOFTCITY from './softcity.js';
+import * as SOFTSURF from './softsurfaces.js';
 import { MAP } from './map.js';
 import { MAP_IDS, MAP_META } from '../maps/index.js';
 import Platform from '../platform/index.js';
@@ -741,6 +742,14 @@ function boxGeo (w, h, d) {
 }
 const box = (list, w, h, d, hex, x, y, z, ry = 0) =>
   put(list, boxGeo(w, h, d), hex, x, y, z, 0, ry, 0);
+const softBox = (list, w, h, d, hex, x, y, z, ry = 0) => {
+  const positions = SOFTCITY.boxPositions(w, h, d);
+  if (!positions) return box(list, w, h, d, hex, x, y, z, ry);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3)); geo.computeVertexNormals();
+  geo.parameters = { width: w, height: h, depth: d };
+  return put(list, geo, hex, x, y, z, 0, ry, 0);
+};
 const quad = (list, w, h, hex, x, y, z, rx = -Math.PI / 2, ry = 0) =>
   put(list, new THREE.PlaneGeometry(w, h), hex, x, y, z, rx, ry, 0);
 
@@ -888,6 +897,9 @@ STREAMS.carve(CITY, TH, TER, {
   spots: MAP.career ? [...((MAP.career.districts && MAP.career.districts.list) || []).filter(q => q.pizza).map(q => [q.pizza[0], q.pizza[1], 60]),
     ...(MAP.career.garages || []).map(q => [q.x, q.z, 45])] : [],
 });
+
+// Round visible paving only after terrain shaping: cosmetic corners must not move the ground.
+SOFTSURF.prepare(CITY, SMOOTH.isArc);
 
 function groundH (x, z) {
   const u = (x - TX0) / TG, v = (z - TZ0) / TG;
@@ -1939,7 +1951,7 @@ function osmGround () {
     const gh = FOREST.isForest(g) ? FOREST.FOREST.FLOOR : GREEN_HEX[g.k] || '#95c579';
     LITM.color(gh);   // в ельнике земля темнее (forest.js)
     // разные зелёные куски (парк поверх двора, ельник поверх газона) — не на одной высоте: мерцали на стыке (О3)
-    LITM.poly(g.p, g.k === 'water' ? 0.03 : 0.04 + flatRank(GREEN_RANK, gh, 5) * 0.0007);
+    LITM.poly(g.softP || g.p, g.k === 'water' ? 0.03 : 0.04 + flatRank(GREEN_RANK, gh, 5) * 0.0007);
   }
 }
 
@@ -2065,11 +2077,15 @@ function osmRoads () {
       LITM.color(pass ? RW.roadHex(r, ROAD_HEX[r.c]) : pv);   // полотно — по виду асфальта (roadwear.js); тротуар: гладкий, брусчатка или в крапинку (world.js)
       // стык с другим видом асфальта — плавно: конец полотна перекрашен по месту (roadwear.js)
       const jp = pass ? RW.jointPts(r) : null;
-      if (jp) LITM.grad(RW.jointGrad(r));
+      const baseGrad = jp ? RW.jointGrad(r) : null;
+      if (jp) LITM.grad(baseGrad);
       const p = ENDS.trim(r, pass, jp || r.p);      // у стыка с узкими конец короче — дальше воронка (ниже)
       const MI = arcMiters(p, w / 2);                 // плавные улицы: на точках дуги — «в ус», без пятна (null — нет дуг)
       for (let i = 1; i < p.length; i++) {
-        if (MI && (MI[i - 1] || MI[i])) miterRibbon(LITM, p[i - 1], p[i], MI[i - 1], MI[i], w / 2, y);
+        const startCap = !pass && i === 1 && r.softEnds?.[0], endCap = !pass && i === p.length - 1 && r.softEnds?.[1];
+        if (pass && r.c !== 6 && SOFTSURF.roadSeam(LITM, p[i - 1], p[i], MI?.[i - 1], MI?.[i], w / 2, y, RW.roadHex(r, ROAD_HEX[r.c]), WORLD.paveRoad(r), baseGrad)) { /* same footprint, softer colour at the seam */ }
+        else if ((startCap || endCap) && SOFTSURF.endRibbon(LITM, p[i - 1], p[i], w / 2, y, startCap, endCap)) { /* shared with curb */ }
+        else if (MI && (MI[i - 1] || MI[i])) miterRibbon(LITM, p[i - 1], p[i], MI[i - 1], MI[i], w / 2, y);
         else LITM.ribbon(p[i - 1][0], p[i - 1][1], p[i][0], p[i][1], w, y);
         if (jp && !p[i][2]) continue;                // добавленная точка перехода — на прямой, пятно не нужно
         if (MI && MI[i]) continue;                   // точка дуги «в ус» — пятно не нужно
@@ -3678,7 +3694,7 @@ function shopRow (w, kind, on, base, hLo) {
   }
 }
 
-function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch, doors, softRoof) {
+function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch, doors, softRoof, softCorners) {
   const n = p.length, seed = Math.abs(Math.round(cx * 7 + cz * 13));
   const walls = [];
   for (let i = 0; i < n; i++) {
@@ -3686,7 +3702,7 @@ function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch, doors, softRoof
     const dx = c[0] - a[0], dz = c[1] - a[1], len = Math.hypot(dx, dz);
     if (len < 0.4) continue;
     const ox = (ccw ? dz : -dz) / len, oz = (ccw ? -dx : dx) / len;
-    walls.push({ a, c, dx, dz, len, ox, oz, ux: dx / len, uz: dz / len, gaps: null });
+    walls.push({ ci: i, a, c, dx, dz, len, ox, oz, ux: dx / len, uz: dz / len, gaps: null });
   }
   doorGaps(walls, doors);                          // подъезды из карты — для стекла ТЦ и офисов (свои подъезды — позже, F0)
   shopWalls(walls, p);                             // магазины на стенах (w.shop): там окон нет — витрина, над ней вывеска (0п17)
@@ -3700,6 +3716,16 @@ function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch, doors, softRoof
   };
   // полоса на стене: from..to вдоль стены (метры), y0..y1, чуть снаружи; on — свет уже решён (не тянуть случайное ещё раз)
   const band = (w, from, to, y0, y1, out = 0.08, lit = 0, on) => {
+    if (softCorners && !lit && on === undefined && y1 - y0 <= 0.65) {
+      const c0 = softCorners[w.ci], c1 = softCorners[(w.ci + 1) % n];
+      if (from <= 0.001 && c0) {
+        const prev = p[(w.ci + n - 1) % n], dx = w.a[0] - prev[0], dz = w.a[1] - prev[1], len = Math.hypot(dx, dz) || 1;
+        SOFTCITY.bandCorner(FLATM, c0, [ccw ? dz / len : -dz / len, ccw ? -dx / len : dx / len], [w.ox, w.oz], out, y0, y1);
+      }
+      if (c0) from = Math.max(from, Math.hypot(c0.end[0] - w.a[0], c0.end[1] - w.a[1]));
+      if (c1) to = Math.min(to, w.len - Math.hypot(c1.start[0] - w.c[0], c1.start[1] - w.c[1]));
+      if (to <= from) return;
+    }
     const ax = w.a[0] + w.ux * from + w.ox * out, az = w.a[1] + w.uz * from + w.oz * out;
     const bx = w.a[0] + w.ux * to + w.ox * out, bz = w.a[1] + w.uz * to + w.oz * out;
     FLATM.quad(ax, y0, az, bx, y0, bz, bx, y1, bz, ax, y1, az, w.ox, 0, w.oz);
@@ -4394,7 +4420,7 @@ function osmBuildings (skip) {
     }
     // окна первого этажа за дверью и козырьком не рисуем (автор 18.10.2026): фасад копит первый этаж, F0 рисует его мимо подъездов
     const doors = osmDoorsNear(p);
-    facade(b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch, doors.slice(), softRoof);
+    facade(b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch, doors.slice(), softRoof, softCorners);
     genEntrances(b, p, ccw, lv, area, arch, bestEdge, doors);
     F0(doors); F0 = null;
 
@@ -5345,18 +5371,19 @@ function osmParkingLots (near) {
   const spots = [];
   for (const lot of CITY.lots) {
     if (lot.k !== 'park') continue;
-    const p = lot.p, n = p.length;
+    const p = lot.softP || lot.p, n = p.length;
     LITM.color('#a6abb3');
     LITM.poly(p, 0.11);
     // ряды — вдоль самой длинной стороны площадки
+    const layout = p.original || p;
     let best = 0, ux = 1, uz = 0;
-    for (let i = 0; i < n; i++) {
-      const a = p[i], c = p[(i + 1) % n], l = Math.hypot(c[0] - a[0], c[1] - a[1]);
+    for (let i = 0; i < layout.length; i++) {
+      const a = layout[i], c = layout[(i + 1) % layout.length], l = Math.hypot(c[0] - a[0], c[1] - a[1]);
       if (l > best) { best = l; ux = (c[0] - a[0]) / l; uz = (c[1] - a[1]) / l; }
     }
     const rx = -uz, rz = ux;
     let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
-    for (const q of p) {
+    for (const q of layout) {
       const u = q[0] * ux + q[1] * uz, v = q[0] * rx + q[1] * rz;
       u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v);
     }
@@ -5634,7 +5661,7 @@ const ENV_API = { get ENV () { return ENV; } };    // пиццерия-шар: �
 /* что нужно citybits.js (забор, КПП, рельсы, крыши, купола, вывески ТЦ) */
 /* что нужно pizzeria.js: ламповый фасад и парковка курьеров */
 const pizzaApi = () => ({
-  THREE, scene, LIT, FLAT, LITM, FLATM, LAMPH, LAMP_SPOTS, box, put, smashAdd, groundH, inHouse,
+  THREE, scene, LIT, FLAT, LITM, FLATM, LAMPH, LAMP_SPOTS, box: softBox, put, smashAdd, groundH, inHouse,
   CITY, SOLIDS, obb, inBounds, nearestRoad, addFoot: houseFoot,
   distAt: DISTRICTS ? (x, z) => DIST.at(x, z) : null,
   onRoad: (x, z, m) => { const r = nearestRoad(x, z, 7, 1); return !!r && r.d < r.seg.w / 2 + m; },
@@ -5642,7 +5669,7 @@ const pizzaApi = () => ({
 });
 /* места на парковке курьеров: [0] — твоё, дальше — соперников */
 let COURIER_SLOTS = null;
-const cityApi = () => ({ THREE, scene, LIT, FLAT, LITM, FLATM, LAMPH, LAMP_SPOTS, box, put, obb, groundH, nearestRoad, makeHuman });
+const cityApi = () => ({ THREE, scene, LIT, FLAT, LITM, FLATM, LAMPH, LAMP_SPOTS, box: softBox, put, obb, groundH, nearestRoad, makeHuman });
 /* что нужно world.js (плитка, аллеи, мусор, бандиты, особняки, шашлыки) */
 const worldApi = () => ({
   THREE, scene, cam, V, S, CITY, MAP, CAREER, ADULT, LITM, LIT, LAMPH, LAMP_SPOTS, BENCHES, TRAFFIC, HUMAN_VC, SMASH, GEN_ENTR,
@@ -18798,7 +18825,7 @@ if (LATE.busy()) {
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
 /* песочница (sandbox.html): бесконечное здоровье, нитро, «не глохнет» (noStall читает cars.js) */
 const SBX = { god: false, nitro: false, noStall: false };
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { SOFTCITY, inWall, FLY: FLYC, WRONG: WRONG.DEBUG, GUN, inTallHouse, WIDEN: { ...WIDEN.WIDEN, STATS: WIDEN.STATS }, SMOOTH: { SM: SMOOTH.SM, STATS: SMOOTH.STATS, ARCS: SMOOTH.ARCS, isArc: SMOOTH.isArc }, FACE: FACE_DEBUG, RADAR, HUDC, RYARD: RYARD.DEBUG, RT, RASK: RASK.DEBUG, OTAGS: OTAGS.DEBUG, NICK, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, PG: PG.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, chaseEnd, CHS, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, TACT, TG: TGRID.TG, PARKI: { ...PARKI.DEBUG, orphans: () => PARKI.orphans(TRAFFIC) }, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, addPickup, PKI: PKI.STATS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get routeOn () { return ROUTE_LINE.slots.some(q => q.m.visible); }, ROUTE_LINE, RP, rebuildRoutePath, updateRouteLine, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, CULLREFRESH: CULL.refresh, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, DYNRES: DYN.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { SOFTCITY, SOFTSURF, inWall, FLY: FLYC, WRONG: WRONG.DEBUG, GUN, inTallHouse, WIDEN: { ...WIDEN.WIDEN, STATS: WIDEN.STATS }, SMOOTH: { SM: SMOOTH.SM, STATS: SMOOTH.STATS, ARCS: SMOOTH.ARCS, isArc: SMOOTH.isArc }, FACE: FACE_DEBUG, RADAR, HUDC, RYARD: RYARD.DEBUG, RT, RASK: RASK.DEBUG, OTAGS: OTAGS.DEBUG, NICK, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, PG: PG.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, chaseEnd, CHS, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, TACT, TG: TGRID.TG, PARKI: { ...PARKI.DEBUG, orphans: () => PARKI.orphans(TRAFFIC) }, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, addPickup, PKI: PKI.STATS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get routeOn () { return ROUTE_LINE.slots.some(q => q.m.visible); }, ROUTE_LINE, RP, rebuildRoutePath, updateRouteLine, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, CULLREFRESH: CULL.refresh, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, DYNRES: DYN.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта

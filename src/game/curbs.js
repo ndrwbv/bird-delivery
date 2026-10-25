@@ -1,4 +1,5 @@
 import * as SOFTCITY from './softcity.js';
+import * as SOFTSURF from './softsurfaces.js';
 /* ──────────────────────────────────────────────────────────────────────────
    Бордюры во дворах (автор 18.10.2026: «между газоном и дорожкой резкий стык, некрасивый. Дорожка обычно
    с двух сторон огорожена бордюром… во дворах всё ещё очень гладко… чтобы дорога отделялась от газонов
@@ -297,9 +298,10 @@ function section (x0, z0, x1, z1, nx, nz, lift, k, ta = 0, tb = 0, en = null, fl
   ST.secs++;
 }
 /* кусок [t0, t1] края: секции и толчок */
+let MIN_RUN = CURB.MIN;
 function run (P, ux, uz, nx, nz, t0, t1, lift, ta = 0, tb = 0, fa = false, fb = false) {
   const L = t1 - t0;
-  if (L < CURB.MIN) return;
+  if (L < MIN_RUN) return;
   const n = Math.max(1, Math.round(L / SEC)), sl = L / n;
   const k0 = Math.round(t0 / SEC);
   if (BERM) {                                        // скат за камнем: в 0,45 м за ним снова мощёное (начало, середина, конец куска) — короче
@@ -420,12 +422,17 @@ function line (pts, hw, lift, segs, pre = null, post = null) {
 
 /* контур p мощёного (стоянка, площадка): камень снаружи по каждой стороне, вплотную к краю. На выпуклом углу края продлены
    до биссектрисы («в ус»), на вогнутом — обрезаны (камни сходятся в угол); у острого угла (круче ~100°) — не дальше 0,3 м */
-function ring (p, lift) {
+function ring (p, lift, options = {}) {
+  const prev = MIN_RUN; MIN_RUN = p.soft ? 0.035 : CURB.MIN;
+  try { ringCore(p, lift, options); } finally { MIN_RUN = prev; }
+}
+function ringCore (p, lift, options) {
   const n = p.length;
   if (n < 3) return;
   let s2 = 0;
   for (let i = 0; i < n; i++) { const a = p[i], b = p[(i + 1) % n]; s2 += a[0] * b[1] - b[0] * a[1]; }
   const sg = s2 > 0 ? 1 : -1, off = CURB.W / 2 - CURB.IN;
+  const short = p.soft ? 0.03 : 0.3;
   const U = [];
   for (let i = 0; i < n; i++) { const a = p[i], b = p[(i + 1) % n], L = Math.hypot(b[0] - a[0], b[1] - a[1]); U.push(L > 1e-6 ? [(b[0] - a[0]) / L, (b[1] - a[1]) / L, L] : null); }
   const ext = (u, v) => {                           // на сколько продлить край у угла (u — до угла, v — после); < 0 — обрезать
@@ -434,14 +441,16 @@ function ring (p, lift) {
     return Math.min(0.3, off * tn) * (cr * sg > 0 ? 1 : -1);   // против часовой (sg > 0): поворот влево — угол выпуклый
   };
   for (let i = 0; i < n; i++) {
+    if ((options.open && i === n - 1) || (options.skipFirst && i === 0)) continue;
     const u = U[i];
-    if (!u || u[2] < 0.3) continue;
+    if (!u || u[2] < short) continue;
     let pi = (i - 1 + n) % n, ni = (i + 1) % n;
-    while (pi !== i && (!U[pi] || U[pi][2] < 0.3)) pi = (pi - 1 + n) % n;
-    while (ni !== i && (!U[ni] || U[ni][2] < 0.3)) ni = (ni + 1) % n;
+    while (pi !== i && (!U[pi] || U[pi][2] < short)) pi = (pi - 1 + n) % n;
+    while (ni !== i && (!U[ni] || U[ni][2] < short)) ni = (ni + 1) % n;
     const nx = u[1] * sg, nz = -u[0] * sg, a = p[i];
-    const eA = ext(U[pi], u), eB = ext(u, U[ni]);
-    if (u[2] + eA + eB < CURB.MIN) continue;
+    const eA = options.open && i === 0 ? 0 : ext(U[pi], u), eB = options.open && i === n - 2 ? 0 : ext(u, U[ni]);
+    if (YN) { YN[0] = nx * 0.22; YN[1] = nz * 0.22; }
+    if (u[2] + eA + eB < MIN_RUN) continue;
     if (eA || eB) ST.miter++;
     // торцы по биссектрисе (0п72): продлили (выпуклый угол — снаружи поворота, ta < 0) или обрезали (вогнутый, ta > 0) ровно до неё — не зажатый 0,3 м
     const tn = (u0, v0) => { const cr = u0[0] * v0[1] - u0[1] * v0[0], dot = u0[0] * v0[0] + u0[1] * v0[1]; return Math.abs(cr) / Math.max(0.05, 1 + dot); };
@@ -524,14 +533,25 @@ export function* build (api) {
     if (r.b || (r.c !== 6 && r.c !== 7) || r.p.length < 2) continue;
     if (!inB(r)) continue;
     const hw = A.roadWidth(r) / 2 + CURB.DRIVE;
-    line(r.p, hw, 0.09, null, ...joint(r));
+    let curbPath = r.p;
+    if (!OLD && r.softEnds?.some(Boolean)) {
+      curbPath = r.p.map(p => p.slice());
+      for (const [end, idx, nb] of [[0, 0, 1], [1, r.p.length - 1, r.p.length - 2]]) if (r.softEnds[end]) {
+        const e = r.p[idx], f = r.p[nb], l = Math.hypot(f[0] - e[0], f[1] - e[1]);
+        const trim = Math.min(SOFTSURF.CAP * 3, l * 0.45);
+        curbPath[idx] = [e[0] + (f[0] - e[0]) * trim / l, e[1] + (f[1] - e[1]) * trim / l];
+      }
+    }
+    line(curbPath, hw, 0.09, null, ...joint(r));
     if (r.c === 7 && !OLD) for (const [e, f] of [[r.p[0], r.p[1]], [r.p[r.p.length - 1], r.p[r.p.length - 2]]]) {
       if (deg.get(pk(e)) !== 1) continue;
       const L = Math.hypot(e[0] - f[0], e[1] - f[1]);
       if (L < 1) continue;
       const ux = (e[0] - f[0]) / L, uz = (e[1] - f[1]) / L, vx = -uz, vz = ux, off = hw - CURB.IN + CURB.W / 2, c = CURB.W / 2 - CURB.IN, m1 = ST.m;
       CX = ux * (hw + 0.15); CZ = uz * (hw + 0.15);
-      edge([e[0] + ux * c - vx * off, e[1] + uz * c - vz * off], vx, vz, ux, uz, off * 2, 0.09, null);   // поперёк конца: газон — дальше по ходу
+      const softEnd = r.softEnds?.[e === r.p[0] ? 0 : 1];
+      if (softEnd) ring(SOFTSURF.endOutline(e, f, hw, Math.min(SOFTSURF.CAP * 3, L * 0.45)), 0.09, { open: true });
+      else edge([e[0] + ux * c - vx * off, e[1] + uz * c - vz * off], vx, vz, ux, uz, off * 2, 0.09, null);   // поперёк конца: газон — дальше по ходу
       CX = CZ = 0;
       ST.capM += ST.m - m1;
     }
@@ -554,13 +574,14 @@ export function* build (api) {
   // камень по краю, где за ним газон; въезд с проезда, дорожка, тротуар, соседняя площадка — понижение (covered)
   const inP = pp => !A.inBounds || pp.some(q => A.inBounds(q[0], q[1], -20));
   if (EVERY) {
-    for (const l of C.lots || []) if (l.k === 'park' && l.p && l.p.length > 2 && inP(l.p)) { ring(l.p, 0.11); if (++n % 15 === 0) yield 'бордюры: стоянки'; }
+    for (const l of C.lots || []) if (l.k === 'park' && l.p && l.p.length > 2 && inP(l.p)) { ring(l.softP || l.p, 0.11); if (++n % 15 === 0) yield 'бордюры: стоянки'; }
     ST.lotM = Math.round(ST.m - m0); m0 = ST.m;
-    for (const g of C.green || []) if ((g.k === 'play' || g.k === 'pitch') && g.p && g.p.length > 2 && inP(g.p)) { ring(g.p, 0.045); if (++n % 15 === 0) yield 'бордюры: площадки'; }
+    for (const g of C.green || []) if ((g.k === 'play' || g.k === 'pitch') && g.p && g.p.length > 2 && inP(g.p)) { ring(g.softP || g.p, 0.045); if (++n % 15 === 0) yield 'бордюры: площадки'; }
     ST.playM = Math.round(ST.m - m0); m0 = ST.m;
     const off = CURB.W / 2 - CURB.IN, YQ = [0, 0];
     YN = YQ;
     for (const P of YCD.POCKETS) {
+      if (P.outline?.soft) { ring(P.outline, 0.1, { skipFirst: true }); if (++n % 60 === 0) yield 'бордюры: карманы'; continue; }
       const { cx, cz, ux, uz, nx, nz, hl, hd } = P, fx = cx + nx * hd, fz = cz + nz * hd;
       YQ[0] = nx * 0.22; YQ[1] = nz * 0.22;
       edge([fx + nx * off - ux * hl, fz + nz * off - uz * hl], ux, uz, nx, nz, hl * 2, 0.1, null);   // дальний край (ближний — у проезда)

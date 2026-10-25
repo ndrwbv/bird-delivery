@@ -38,3 +38,31 @@ console.log(`OK: ${roofs} roof outlines, both windings, narrow fallback, guarded
 let mapRoofs=0, fallback=0;
 for(const b of CITY.buildings){const p=b.p, positive=area(p)>0, r=roofRim(p,corners(p,positive),positive);if(!r){fallback++;continue;}mapRoofs++;for(const q of [...r.inner,...r.outer]) assert(inside(p,q),`Roof outside building ${b.id}`);}
 console.log(`Map: ${mapRoofs} valid outlines, ${fallback} safe fallbacks, no roof outside original footprint`);
+
+const { outline, prepare, endOutline, endRibbon, contains, roadSeam } = await import('../src/game/softsurfaces.js');
+const { boxPositions } = await import('../src/game/softcity.js');
+const rectangle = [[0,0],[10,0],[10,8],[0,8]], rounded=outline(rectangle);
+assert(rounded.soft);assert.equal(rounded.original,rectangle);
+assert(rounded.every(p=>inside(rectangle,p)));assert(!contains(rounded,0,0));assert(contains(rounded,0,0,.3));
+assert(contains(rounded,5,4));
+const city={lots:[{k:'park',p:rectangle}],green:[{k:'play',p:rectangle}],roads:[]};
+prepare(city,()=>false);
+for(const item of [...city.lots,...city.green]) {assert.equal(item.p,rectangle,'Layout outline must remain unchanged');assert(item.softP.soft,'Paving and curbs need a shared rounded outline');}
+let roadOutline; endRibbon({poly(p){roadOutline=p;}},[0,0],[10,0],4,.1,false,true);
+const cap=endOutline([10,0],[0,0],4);
+for(const p of cap.filter(p=>p[0]>9)) assert(roadOutline.some(q=>Math.hypot(p[0]-q[0],p[1]-q[1])<1e-8),'Cap and pavement disagree');
+const pin=outline(rectangle,.65,new Set([0,1]));assert.deepEqual(pin.slice(0,2),rectangle.slice(0,2),'Entrance must stay open and square');
+for(const dims of [[1,2,3],[.12,5,1],[8,.2,4]]) {
+  const pos=boxPositions(...dims),edges=new Map();assert.equal(pos.length,44*9);
+  for(let k=0;k<pos.length;k+=9){const p=Array.from(pos.slice(k,k+9));for(let i=0;i<9;i++)assert(Math.abs(p[i])<=dims[i%3]/2+1e-6);
+    const u=p.slice(3,6).map((v,i)=>v-p[i]),v=p.slice(6,9).map((v,i)=>v-p[i]);const n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
+    assert(n.reduce((s,x,i)=>s+x*p[i],0)>0,'Box face points inward');
+    for(let i=0;i<3;i++){const a=p.slice(i*3,i*3+3).map(v=>v.toFixed(6)).join(','),b=p.slice((i+1)%3*3,(i+1)%3*3+3).map(v=>v.toFixed(6)).join(',');const key=[a,b].sort().join('|');edges.set(key,(edges.get(key)||0)+1);}}
+  assert([...edges.values()].every(n=>n===2),'Box must be closed');
+}
+assert.equal(boxPositions(.04,1,2),null,'Thin details stay intact');
+let grad=null;let roadArea=0;let seenTint=false;
+const seamMesher={grad(fn){grad=fn;},dtri(ax,az,bx,bz,cx,cz,y){roadArea+=Math.abs((bx-ax)*(cz-az)-(bz-az)*(cx-ax))/2;assert.equal(y,.15);if(grad){const col=[];grad(15,3,col,0);assert(col.every(Number.isFinite));seenTint ||= col[0]>40;}}};
+roadSeam(seamMesher,[0,0],[30,0],null,null,3,.15,'#606060','#cccccc',null);
+assert(Math.abs(roadArea-180)<1e-7,'Seam leaves a hole or adds overlapping area');assert.equal(grad,null);assert(seenTint);
+console.log('OK: shared cap outline, parking entrance, rounded-box bounds/winding/manifold, road seam coverage and reset');

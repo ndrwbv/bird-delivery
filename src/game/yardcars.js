@@ -1,3 +1,4 @@
+import * as SOFTSURF from './softsurfaces.js';
 /* ──────────────────────────────────────────────────────────────────────────
    Машины во дворах (16.10.2026, автор: «Никто не ездит по дворам — надо добавить машины»,
    «во дворах надо добавить машины и парковки»; правила словами — docs/CAREER.md «Машины во дворах»).
@@ -104,9 +105,12 @@ const gput = (G, C, x, z, v) => { const k = gk(Math.floor(x / C), Math.floor(z /
 const ekey = (a, b) => (a < b ? a * 1e6 + b : b * 1e6 + a);
 
 /* ── места ── */
-function inRect (P, x, z, r) {
+function inRectBroad (P, x, z, r) {
   const dx = x - P.cx, dz = z - P.cz;
   return Math.abs(dx * P.ux + dz * P.uz) < P.hl + r && Math.abs(dx * P.nx + dz * P.nz) < P.hd + r;
+}
+function inRect (P, x, z, r) {
+  return inRectBroad(P, x, z, r) && (!P.outline?.soft || SOFTSURF.contains(P.outline, x, z, Math.max(0, r)));
 }
 /* карманы ещё и по клеткам с запасом PG1_M: вопрос с r ≤ PG1_R — одна клетка точки (было 2×2 клетки на каждый вопрос;
    blocks зовут сотни тысяч раз при сборке — бордюры, дворы без пустых мест). Ответ тот же: карман, что задевает точку
@@ -356,13 +360,16 @@ function pocket (p, S, U, sA, sB, side, e0, G, list, perp) {
     const q0 = samp[j - 1], q1 = samp[j];
     if (q1[0] - q0[0] < 0.02) continue;
     const a = ptOf(q0, e0 - 0.05), b = ptOf(q1, e0 - 0.05), c = ptOf(q1, e0 + G.D), d = ptOf(q0, e0 + G.D);
-    A.LITM.dtri(a[0], a[1], b[0], b[1], c[0], c[1], YC.Y);
-    A.LITM.dtri(a[0], a[1], c[0], c[1], d[0], d[1], YC.Y);
+    const blocked = new Set([0, 1]);
+    if (j !== 1) blocked.add(3); if (j !== samp.length - 1) blocked.add(2);
+    const outline = SOFTSURF.outline([a, b, c, d], 0.65, blocked);
+    if (outline.soft) { A.LITM.poly(outline, YC.Y); SOFTSURF.ST.pockets++; }
+    else { A.LITM.dtri(a[0], a[1], b[0], b[1], c[0], c[1], YC.Y); A.LITM.dtri(a[0], a[1], c[0], c[1], d[0], d[1], YC.Y); }
     // место для blocks(): прямоугольник куска (по отрезку)
     const si = q0[1];                               // кусок лежит на отрезке, с которого начинается
     const ux = U[si][0], uz = U[si][1], nx = -uz * side, nz = ux * side;
     const cx = (a[0] + b[0] + c[0] + d[0]) / 4, cz = (a[1] + b[1] + c[1] + d[1]) / 4;
-    putPocket({ cx, cz, ux, uz, nx, nz, hl: (q1[0] - q0[0]) / 2 + 0.05, hd: G.D / 2 + 0.03, perp, n: list.length });
+    putPocket({ cx, cz, ux, uz, nx, nz, hl: (q1[0] - q0[0]) / 2 + 0.05, hd: G.D / 2 + 0.03, perp, n: list.length, outline });
   }
   if (!perp) return;
   A.FLATM.color(YC.LINE);

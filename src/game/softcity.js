@@ -20,24 +20,24 @@ export function light (sun, hemi, amb, night, rain) {
 }
 
 // Clip only convex, roomy corners; keep original points for mapping and collisions.
-export function corners (p, ccw, blocked = null) {
+export function corners (p, ccw, blocked = null, radius = STYLE.corner, count = true) {
   if (!STYLE.geometry) return null;
   return p.map((v, i) => {
     if (blocked?.has(i)) return null;
     const a = p[(i + p.length - 1) % p.length], b = p[(i + 1) % p.length];
     const la = Math.hypot(v[0] - a[0], v[1] - a[1]), lb = Math.hypot(b[0] - v[0], b[1] - v[1]);
-    if (la < 2 || lb < 2) return null;
+    if (la < (count ? 2 : 0.1) || lb < (count ? 2 : 0.1)) return null;
     const ux = (v[0] - a[0]) / la, uz = (v[1] - a[1]) / la, vx = (b[0] - v[0]) / lb, vz = (b[1] - v[1]) / lb;
     const cross = (ux * vz - uz * vx) * (ccw ? 1 : -1), dot = ux * vx + uz * vz;
     if (cross < 0.3 || dot < -0.5) return null;
-    const r = Math.min(STYLE.corner, la * 0.08, lb * 0.08);
+    const r = Math.min(radius, la * (count ? 0.08 : 0.45), lb * (count ? 0.08 : 0.45));
     const start = [v[0] - ux * r, v[1] - uz * r], end = [v[0] + vx * r, v[1] + vz * r];
     const arc = [start];
     for (let j = 1; j < 3; j++) {
       const t = j / 3, s = 1 - t;
       arc.push([s * s * start[0] + 2 * s * t * v[0] + t * t * end[0], s * s * start[1] + 2 * s * t * v[1] + t * t * end[1]]);
     }
-    arc.push(end); STATS.corners++;
+    arc.push(end); if (count) STATS.corners++;
     return { start, end, arc };
   });
 }
@@ -165,4 +165,36 @@ export function lawnEdge (M, a, b, c, d, top0, top1, low0, low1) {
   try { M.quad(a[0], top0, a[1], b[0], top1, b[1], d[0], low1, d[1], c[0], low0, c[1]); }
   finally { M.grad(null); }
   STATS.lawnEdges++;
+}
+
+// A chamfered box with exactly the original bounds: six faces, twelve bevels, eight corners.
+export function boxPositions (w, h, d) {
+  if (!STYLE.geometry || ![w, h, d].every(v => Number.isFinite(v) && v >= 0.12)) return null;
+  const half = [w / 2, h / 2, d / 2], r = Math.min(0.08, Math.min(w, h, d) * 0.18), inner = half.map(v => v - r), out = [];
+  const face = pts => {
+    const a = pts[0], b = pts[1], c = pts[2], u = b.map((v, i) => v - a[i]), v = c.map((v, i) => v - a[i]);
+    const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    if (n.reduce((s, x, i) => s + x * a[i], 0) < 0) pts.reverse();
+    for (let i = 1; i < pts.length - 1; i++) out.push(...pts[0], ...pts[i], ...pts[i + 1]);
+  };
+  for (let axis = 0; axis < 3; axis++) {
+    const u = (axis + 1) % 3, v = (axis + 2) % 3;
+    for (const sign of [-1, 1]) face([[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([su, sv]) => { const p = [0, 0, 0]; p[axis] = sign * half[axis]; p[u] = su * inner[u]; p[v] = sv * inner[v]; return p; }));
+    for (const su of [-1, 1]) for (const sv of [-1, 1]) face([[-1, 0], [1, 0], [1, 1], [-1, 1]].map(([s, t]) => { const p = [0, 0, 0]; p[axis] = s * inner[axis]; p[u] = su * (t ? inner[u] : half[u]); p[v] = sv * (t ? half[v] : inner[v]); return p; }));
+  }
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+    const s = [sx, sy, sz]; face([0, 1, 2].map(axis => s.map((sign, i) => sign * (i === axis ? half[i] : inner[i]))));
+  }
+  STATS.boxes = (STATS.boxes || 0) + 1;
+  return new Float32Array(out);
+}
+
+export function bandCorner (M, corner, previous, next, out, low, high) {
+  if (!corner) return;
+  const points = corner.arc.map((p, i) => {
+    const t = i / (corner.arc.length - 1), nx = previous[0] * (1 - t) + next[0] * t, nz = previous[1] * (1 - t) + next[1] * t, l = Math.hypot(nx, nz) || 1;
+    return [p[0] + nx * out / l, p[1] + nz * out / l];
+  });
+  for (let i = 1; i < points.length; i++) M.wall(...points[i - 1], ...points[i], low, high);
+  STATS.bands = (STATS.bands || 0) + 1;
 }
