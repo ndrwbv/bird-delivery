@@ -58,6 +58,15 @@ export const BALC = {
 };
 if (CLEAN) BALC.KIT_R = CLEAN.balcKitR;           // телефон: прутья и рёбра — только ближе 40 м (дальше — рябь; mobile.js CLEAN, 11бз)
 const SIDING = ['#e9e6dc', '#d8d2c2', '#9fb6c9', '#c9b08a', '#7d6a5a', '#b9c7b0', '#d9c8a8', '#a8afb8'];   // обшивка остеклённых
+/* балконы разного цвета (2г3, 25.10.2026; автор по референсам: «балконы разного цвета»): у каждого балкона своя обшивка и
+   ограждение из «советской» палитры — бледно-жёлтый, розоватый, дерево, голубовато-серый, белый, ржаво-оранжевый, зелёный
+   профлист; часть — старые бетонные без отделки; вид ограждения — у 45 % балконов свой, не как у дома. Жребий — от места.
+   ?oldbalc (и общий ?oldlook) — как было: ограждение одно на дом */
+const OLDCOL = /[?&](oldbalc|oldlook)(&|$)/.test(QS);
+const SOVIET = ['#ddd09e', '#e6ddbb', '#d4b0a2', '#c9a293', '#86634a', '#6e5240', '#977a5c', '#93a3b0', '#a9b8c4', '#e3e1d9', '#d4d2ca',
+  '#ad7652', '#a36a4c', '#6f8868', '#87997a', '#647e6c', '#a2bccc'];
+const CONCRETE = ['#a8a49b', '#9c988f', '#b4b0a6'];
+export const BALC_COL = { OWN_RAIL: 0.45, BARE: 0.22, SOVIET, CONCRETE };
 const RAILC = ['#7f93a8', '#a8574c', '#7f9a6e', '#c9bfa0', '#8a8f96', '#5f7f9a'];                        // плиты и профлист
 const GRATEC = ['#2a2a2e', '#3b4a3a', '#5a3a2e', '#e2e2dc', '#2f3f5a'];                                  // решётки
 
@@ -70,6 +79,11 @@ function shadeHex (hex, k) {
   const v = hexN(hex);
   const r = Math.min(255, Math.round(((v >> 16) & 255) * k)), g = Math.min(255, Math.round(((v >> 8) & 255) * k)), b = Math.min(255, Math.round((v & 255) * k));
   return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
+}
+
+function mixHex (a, b, t) {
+  const x = hexN(a), y = hexN(b), m = (s) => Math.round(((x >> s) & 255) * (1 - t) + ((y >> s) & 255) * t);
+  return '#' + ((m(16) << 16) | (m(8) << 8) | m(0)).toString(16).padStart(6, '0');
 }
 
 /* ── стройка (в facade, внутри buildCity): только числа в склейку и окна, без three.js и Math.random ── */
@@ -119,7 +133,15 @@ function wallIn (w, o) {
     for (let f = f0; f < o.floors; f++) {
       if (!fl[f]) { ST.skipped++; continue; }
       const Y = o.base + f * o.FH, h = hsh(cx0 + f * 3.1, cz0 - f * 1.7, 10);
-      one(w, o, { c, s0, s1, side, Y, f, above: !!fl[f + 1], rail, railHex, glazed: h < glaze, tAlong, h, cx0, cz0 });
+      let rl = rail, rh = railHex, sid = null;
+      if (!OLDCOL) {                                // свой цвет у каждого балкона (2г3)
+        const x = cx0 + f * 2.3, z = cz0 + f * 1.1;
+        if (hsh(x, z, 12) < BALC_COL.OWN_RAIL) { const q = hsh(x, z, 13); rl = q < 0.45 ? 'panel' : q < 0.75 ? 'ribs' : 'grate'; }
+        const bare = hsh(x, z, 14) < BALC_COL.BARE;
+        rh = rl === 'grate' ? pk(GRATEC, hsh(x, z, 15)) : bare ? pk(CONCRETE, hsh(x, z, 16)) : pk(SOVIET, hsh(x, z, 17));
+        sid = bare ? pk(CONCRETE, hsh(x, z, 18)) : pk(SOVIET, hsh(x, z, 19));
+      }
+      one(w, o, { c, s0, s1, side, Y, f, above: !!fl[f + 1], rail: rl, railHex: rh, sid, glazed: h < glaze, tAlong, h, cx0, cz0 });
     }
   }
 }
@@ -166,7 +188,7 @@ function one (w, o, b) {
   ST.balc++;
   if (ALL) ALL.push(PX(sc, 0.5), Y + 1, PZ(sc, 0.5));
   // плита пола: верх (с двух сторон — виден и снизу) и торец
-  LITM.color(shadeHex(o.wallHex, 0.82));
+  LITM.color(OLDCOL ? shadeHex(o.wallHex, 0.82) : mixHex(shadeHex(o.wallHex, 0.86), '#9d9a94', 0.5));   // плита — бетон
   hq(s0 - 0.05, s1 + 0.05, 0, D + 0.05, Y + 0.02);
   if (!SIMPLE) vq(s0 - 0.05, D + 0.05, s1 + 0.05, D + 0.05, Y - B.SLAB, Y + 0.02);
   if (b.glazed) { glazedBalc(w, o, b, R); return; }
@@ -213,7 +235,7 @@ function one (w, o, b) {
 function glazedBalc (w, o, b, R) {
   const D = BALC.D, { s0, s1, Y } = b, top = Y + o.FH - BALC.SLAB - 0.01, h2 = hsh(b.cx0 + b.f, b.cz0, 11);
   ST.glazed++;
-  const sid = pk(SIDING, h2);
+  const sid = b.sid || pk(SIDING, h2);
   LITM.color(sid);
   vq(s0, D, s1, D, Y + 0.02, R); vq(s0, 0, s0, D, Y + 0.02, top); vq(s1, 0, s1, D, Y + 0.02, top);
   const g1 = top - 0.14;

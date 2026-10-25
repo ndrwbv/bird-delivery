@@ -29,10 +29,15 @@
 
    Травой считаем то же, что seasons.js: зелёный цвет вершины и грань,
    смотрящая вверх. Асфальт, плитку, стены и воду не трогаем.
+
+   25.10.2026 (2г8—2г9, «Стиль глубинки»): поверх — «бархат» после сезона (VELVET), край газона на асфальте и
+   плитке, плиты дворовых дорожек со швами и тропинки (EDGE_GLSL; рядом с камерой — по маске земли meadow.js).
+   ?oldgrass / ?oldlook — без них.
    ────────────────────────────────────────────────────────────────────────── */
 
 import * as GFX from './gfx.js';
 import { CLEAN } from './mobile.js';
+import * as MD from './meadow.js';         // некошеная трава: маска земли рядом с камерой, цвета-метки тропинок и дорожек (2г8—2г9)
 /* телефон (mobile.js CLEAN.lawnCalm, 11бз): проплешин меньше (порог выше), светлые / тёмные и жёлтые пятна мягче —
    на маленьком экране они рябили вместе с мелочью; на компьютере — как было */
 const CALM = !!(CLEAN && CLEAN.lawnCalm);
@@ -42,6 +47,41 @@ const uLawnLo = { get value () { try { return GFX.pixelShort() < 480 ? 1 : 0; } 
 /* полная краска (gfx.js DETAIL.lawn): на «Средней» и «Низкой» — без тени-рельефа (рельеф теперь
    настоящий, relief.js) и без вторых октав шума: 4 шума на точку вместо 10 */
 const uLawnQ = { get value () { try { return GFX.detail().lawn ? 1 : 0; } catch (e) { return 1; } } };
+
+/* «Бархат» (2г8, 25.10.2026, автор: «трава нежная», рефы — тёплые жёлто-зелёные и тёмные холодные пятна): ПОСЛЕ сезона
+   (seasons.js seasonTint красит газон свежей зеленью — «салатовая скатерть»), только где газон и сейчас зелёный (осень,
+   жара и снег — как были). Пятна ~30—70 м: тёплые — жёлто-зелёные, холодные — темнее; синевы меньше (салат → олива);
+   под скользящим взглядом (вдаль) — светлее и теплее, как кончики некошеной травы на солнце. ?oldgrass / ?oldlook — как было */
+const VELVET = `
+{
+  vec3 pc = diffuseColor.rgb;
+  vec3 pN = normalize(cross(dFdx(vSW), dFdy(vSW)));
+  float pg = smoothstep(0.03, 0.14, pc.g - max(pc.r, pc.b)) * smoothstep(0.42, 0.8, pN.y);
+  if (!(S_LAND)) pg *= smoothstep(0.95, 0.99, pN.y);   // реквизит: только ровный верх (газон палисадника, клумбы), не кусты
+  if (pg > 0.0) {
+    vec2 q = vSW.xz;
+    float pw = mdNoise(q * 0.028 + 57.0) * 0.6 + mdNoise(q * 0.09 + 13.0) * 0.4;
+    // цвет — по яркости, а не множителем: салатовый от сезона (свежая зелень) тоже уходит в оливу (второй круг 25.10.2026)
+    float lum = clamp(dot(pc, vec3(0.3, 0.59, 0.11)) / 0.43, 0.55, 1.05);   // 0,43 — яркость газона #95c579; свежая зелень сезона не светлее
+    vec3 cool = vec3(0.07, 0.13, 0.025), mid = vec3(0.17, 0.245, 0.045), warm = vec3(0.33, 0.34, 0.07);   // олива: тёмная холодная → тёплая жёлто-зелёная
+    vec3 tgt = mix(mix(cool, mid, smoothstep(0.12, 0.5, pw)), warm, smoothstep(0.5, 0.86, pw)) * lum;
+    vec3 c = mix(pc, tgt, 0.88);
+    float fine = mdNoise(q * 0.9 + 3.0) * 0.6 + mdNoise(q * 2.7) * 0.4;
+    c *= 0.88 + 0.22 * fine * (1.0 - smoothstep(0.3, 0.9, fwidth(q.x * 2.7)));
+    // под травинками (meadow.js) земля темнее и глубже — трава её затеняет; гаснет вместе с травой вдали
+    if (uMdOn > 0.5) {
+      vec2 cuv = (q - uMdWin.xy) * uMdWin.z + 0.5;
+      vec2 ce = abs(cuv - 0.5);
+      float cov = texture2D(uMdMap, cuv).r * (1.0 - smoothstep(0.42, 0.48, max(ce.x, ce.y)))
+        * (1.0 - smoothstep(uMdCover.x, uMdCover.y, length(q - cameraPosition.xz)));
+      c = mix(c, c * vec3(0.52, 0.6, 0.5), cov * uMdCover.z);
+    }
+    vec3 vv = normalize(cameraPosition - vSW);
+    float gz = 1.0 - clamp(vv.y, 0.0, 1.0); gz *= gz;
+    c = mix(c, c * vec3(1.2, 1.12, 0.75), gz * 0.3);
+    diffuseColor.rgb = mix(pc, c, pg);
+  }
+}`;
 
 const LAWN_GLSL = `
 {
@@ -135,6 +175,89 @@ const LAWN_GLSL = `
   }
 }`;
 
+/* Край газона, плиты и тропинки (2г8—2г9, 25.10.2026) — не газон, а то, что рядом. Кладётся перед сезоном (seasons.js
+   seasonTint): нарисованная трава осенью желтеет, зимой под снегом, как настоящий газон.
+   • тропинки (wastelands.js, цвета-метки): середина — рыжая утоптанная земля, посередине светлее; край — трава с
+     проплешинами земли (неровно) — везде, без маски;
+   • рядом с камерой (маска meadow.js, ±50 м): трава заходит на край асфальта, плитки, бордюра и тропинки на 10—50 см —
+     неровным краем (шум по месту): ровные полосы дорожек кажутся кривыми, у края — темнее (земля);
+   • дворовые дорожки и отмостка (цвета-метки yards.js YARD.COLOR, game.js отмостка, world.js PAVE.path): плиты по
+     1,15 м поперёк дорожки (направление — из маски), швы, часть плит темнее (просели, сырые) или светлее (новые),
+     в части швов — трава. Вдали швы гаснут (не рябят). */
+const EDGE_GLSL = `
+{
+  if (S_LAND) {
+    vec3 mc0 = vColor.rgb;
+    vec3 mN = normalize(cross(dFdx(vSW), dFdy(vSW)));
+    float mup = smoothstep(0.42, 0.8, mN.y);
+    float mgr = smoothstep(0.05, 0.18, mc0.g - max(mc0.r, mc0.b));
+    if (mup > 0.0 && mgr < 0.5) {
+      vec2 q = vSW.xz;
+      vec3 c = diffuseColor.rgb;
+      float wn = mdNoise(q * 1.7) * 0.55 + mdNoise(q * 4.9 + 3.0) * 0.3 + mdNoise(q * 12.0 + 7.0) * 0.15;
+      vec3 grass = vec3(0.30, 0.56, 0.19) * (0.7 + 0.25 * mdNoise(q * 0.7 + 2.0) + 0.2 * wn);   // как газон (#95c579): «бархат» после сезона красит его так же
+      vec3 earth = vec3(0.30, 0.16, 0.075) * (0.8 + 0.4 * mdNoise(q * 2.3 + 1.0));
+      float isTr = mdTag(mc0, uMdTr0) + mdTag(mc0, uMdTr1) + mdTag(mc0, uMdTr2);
+      float isTe = mdTag(mc0, uMdTe);
+      float isPath = mdTag(mc0, uMdPy) + mdTag(mc0, uMdPw) + mdTag(mc0, uMdPp);
+      if (isTr > 0.5) {
+        float mid = mdNoise(q * 0.6 + 11.0);
+        c = mix(earth, earth * vec3(1.35, 1.25, 1.1), smoothstep(0.45, 0.8, mid) * 0.7);   // вытоптано до светлого
+        float pb = step(0.93, mdHash(floor(q * 9.0)));                                         // камешки
+        c = mix(c, vec3(0.42, 0.38, 0.33), pb * (1.0 - smoothstep(0.1, 0.3, fwidth(q.x * 9.0))) * 0.7);
+      }
+      if (isTe > 0.5) c = mix(grass, earth * 1.08, smoothstep(0.52, 0.64, mdNoise(q * 1.4 + 5.0) * 0.7 + wn * 0.3));
+      vec2 muv = (q - uMdWin.xy) * uMdWin.z + 0.5;
+      vec2 me = abs(muv - 0.5);
+      float mwin = uMdOn * (1.0 - smoothstep(0.40, 0.47, max(me.x, me.y)));
+      if (mwin > 0.0) {
+        float r = 0.3 * uMdWin.z;
+        float l0 = texture2D(uMdMap, muv).r;
+        float ln = max(max(texture2D(uMdMap, muv + vec2(r, 0.0)).r, texture2D(uMdMap, muv - vec2(r, 0.0)).r),
+                       max(texture2D(uMdMap, muv + vec2(0.0, r)).r, texture2D(uMdMap, muv - vec2(0.0, r)).r));
+        ln = max(ln * 0.8, l0);
+        if (isPath > 0.5) {
+          float aE = texelFetch(uMdMap, min(ivec2(clamp(muv, 0.0, 1.0) * uMdN), ivec2(int(uMdN) - 1)), 0).a;
+          if (aE > 0.05) {
+            float ang = (aE - 0.1) / 0.85 * 3.14159265;
+            vec2 dir = vec2(cos(ang), sin(ang));
+            float u = dot(q, dir) / 1.15;
+            float k = floor(u), fw = fwidth(u), ks = floor(u + 0.5);                      // плита и ближайший шов
+            float vis = (1.0 - smoothstep(0.06, 0.2, fw)) * mwin * (1.0 - smoothstep(0.1, 0.4, uSnow));   // зимой — под снегом
+            float an = floor(aE * 300.0);
+            float h1 = mdHash(vec2(k, an)), h2 = mdHash(vec2(ks + 17.0, an));          // h2 — шов (тот же жребий у травы meadow.js)
+            float tone = h1 < 0.18 ? 0.78 : h1 > 0.82 ? 1.07 : 0.93 + 0.1 * h1;
+            c *= mix(1.0, tone, vis);
+            c = mix(c, c * vec3(0.86, 0.95, 0.76), (h1 < 0.18 ? 0.55 : 0.0) * vis);                    // просела — сыро, мох
+            float e = abs(u - ks) * 1.15;
+            float sw = h2 < 0.3 ? 0.055 : 0.018;
+            float seam = (1.0 - smoothstep(sw, sw + max(fw * 1.15, 0.012), e)) * vis;
+            c *= 1.0 - 0.12 * (1.0 - smoothstep(0.0, 0.1, e)) * vis;                                   // фаска у шва
+            c = mix(c, h2 < 0.3 ? grass * (0.7 + 0.5 * mdNoise(q * 8.0)) : c * 0.68, seam * (h2 < 0.3 ? smoothstep(0.3, 0.6, mdNoise(q * 3.0 + ks)) : 1.0));
+          }
+        }
+        float amp = isPath > 0.5 ? 1.15 : isTr + isTe > 0.5 ? 1.25 : 0.85;
+        float cr = ln * (0.62 + amp * (wn - 0.5));
+        float gk = smoothstep(0.36, 0.44, cr) * mwin;
+        float sk = smoothstep(0.24, 0.36, cr) * (1.0 - gk) * mwin;
+        c = mix(c, c * vec3(0.72, 0.66, 0.55), sk * 0.6);
+        c = mix(c, grass, gk);
+      }
+      diffuseColor.rgb = c;
+    }
+  }
+}
+`;
+const EDGE_HEAD = `uniform sampler2D uMdMap; uniform vec3 uMdWin, uMdCover; uniform float uMdOn, uMdN;
+uniform vec3 uMdTr0, uMdTr1, uMdTr2, uMdTe, uMdPy, uMdPw, uMdPp;
+float mdHash (vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float mdNoise (vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mdHash(i), mdHash(i + vec2(1.0, 0.0)), f.x), mix(mdHash(i + vec2(0.0, 1.0)), mdHash(i + vec2(1.0, 1.0)), f.x), f.y); }
+float mdTag (vec3 c, vec3 t) { vec3 d = abs(c - t); return step(max(d.r, max(d.g, d.b)), 0.0022); }
+`;
+const MDT = { uMdTr0: { value: MD.tagLin(MD.TAGS.trail[0]) }, uMdTr1: { value: MD.tagLin(MD.TAGS.trail[1]) }, uMdTr2: { value: MD.tagLin(MD.TAGS.trail[2]) },
+  uMdTe: { value: MD.tagLin(MD.TAGS.trailEdge) }, uMdPy: { value: MD.tagLin(MD.TAGS.yard) }, uMdPw: { value: MD.tagLin(MD.TAGS.walk) }, uMdPp: { value: MD.tagLin(MD.TAGS.path) } };
+
 /* материал земли (LITM): поверх сезонного (seasons.js — vSW, sHash, sNoise,
    uDry, uMud, uHeat уже объявлены) — пятна газона; кладутся до снега и луж */
 export function lawnMat (m) {
@@ -144,8 +267,17 @@ export function lawnMat (m) {
     if (prev) prev.call(m, sh, r);
     if (!/sNoise/.test(sh.fragmentShader) || !/vSW/.test(sh.fragmentShader) || !/uHeat/.test(sh.fragmentShader) || !/leafAt/.test(sh.fragmentShader)) return;   // без сезонного шейдера — как было
     sh.uniforms.uLawnLo = uLawnLo; sh.uniforms.uLawnQ = uLawnQ;
-    sh.fragmentShader = 'uniform float uLawnLo;\nuniform float uLawnQ;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' + LAWN_GLSL);
+    let f = sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' + LAWN_GLSL);
+    // край газона, плиты, тропинки (2г8—2г9) — перед сезоном; без сезонного вызова или с ?oldgrass — нет
+    const at = MD.OLD ? -1 : f.indexOf('diffuseColor.rgb = seasonTint(');
+    if (at >= 0) {
+      f = f.slice(0, at) + EDGE_GLSL + f.slice(at);
+      const end = f.indexOf(';', f.indexOf('diffuseColor.rgb = seasonTint(')) + 1;   // «бархат» — сразу после сезона
+      f = f.slice(0, end) + '\n' + VELVET + f.slice(end);
+    }
+    if (!MD.OLD) Object.assign(sh.uniforms, MD.MU, MDT);
+    sh.fragmentShader = 'uniform float uLawnLo;\nuniform float uLawnQ;\n' + (MD.OLD ? '' : EDGE_HEAD) + f;
   };
-  m.customProgramCacheKey = () => key + 'lawn';
+  m.customProgramCacheKey = () => key + 'lawn' + (MD.OLD ? '' : 'md');
   return m;
 }

@@ -18,6 +18,8 @@
 
 import * as THREE from '../vendor/three.module.min.js';
 import * as SOFTCITY from './softcity.js';
+import * as SKYM from './sky.js';               // небо-купол, свет и палитра (2г1)
+import * as MATS from './materials.js';         // блики и отклик по классу поверхности (2г11)
 import * as SOFTSURF from './softsurfaces.js';
 import { MAP } from './map.js';
 import { MAP_IDS, MAP_META } from '../maps/index.js';
@@ -47,6 +49,8 @@ import * as CONSTR from './construction.js';     // стройки на пуст
 import * as RIVS from './rivals.js';             // точки «Вселенной суши» и «Королевы Бургеров», маскоты, их курьеры (rivals.js)
 import * as CSH from './carshadow.js';           // пятно-тень под машиной игрока (carshadow.js)
 import * as FSH from './fakeshadows.js';         // поддельные тени: дома — маска в шейдере земли, машины, люди, звери — пятна (fakeshadows.js)
+import * as SUNP from './sunpath.js';           // путь солнца: днём ~35°, утром и вечером низко, длинные тени (sunpath.js, 2г2; ?oldsun — прежний)
+import * as SUNSH from './sunshadow.js';         // настоящие тени от солнца на «Высокой»: карта теней рядом с камерой (sunshadow.js, 2г2)
 import * as CARL from './carlights.js';         // огни машины игрока: стоп-сигналы, поворотники, задний ход (carlights.js)         // фонари: все сбиваются, шары и консоли, частный сектор (streetlamps.js)
 import * as DEBRIS from './debris.js';          // обломки из запаса: забор кусками вразнобой, куча мусора разлетается (debris.js)
 import * as JUNK from './junk.js';              // остановки ломаются, мусор у подъездов, контейнеры (junk.js)             // плитка, аллеи; в карьере — мусор, бандиты, особняки, шашлыки
@@ -121,6 +125,9 @@ import * as FXP from './fxpool.js';             // частицы эффекто
 import * as CG from './carglass.js';            // стёкла своей машины: курьер внутри, трещины и осколки (carglass.js)
 import * as REALCAR from './realcar.js';         // проба: настоящая «Семёрка» (ветка test/real-car)
 import * as GRITM from './grit.js';               // проба: глубина города — пятна, зерно, потёки на всём «Ламберте» (G)
+import * as PANELS from './panels.js';            // фасады панелек: стыки этажей, тон плит, подтёки, цоколь, парапет (2г3; ?oldfacade)
+import * as RBITS from './roofbits.js';           // крыши многоэтажек: антенны, кирпичные вентшахты, будки выхода, провода (2г4; ?noroofbits)
+import * as PORCHM from './porch.js';             // подъезд: козырёк с мягкой кромкой на опорах, доска объявлений (2г5; ?oldporch)
 import * as CBLOOD from './carblood.js';          // кровь на машинах, что сбили человека (carblood.js)
 import * as GLASSB from './glassblood.js';        // кровь на лобовом своей машины, снаружи и из-за руля (glassblood.js)
 import * as SFX from './sfx.js';                // звуки из файлов public/sfx вместо синтеза, звук в пространстве (sfx.js, docs/SOUNDS.md)
@@ -185,6 +192,8 @@ import * as RELIEF from './relief.js';          // неровный газон: 
 import * as OSKM from './osk.js';                // экранная клавиатура Стима в полях ввода: поднять, гасить автоповтор, геймпад — не игре (osk.js)
 import * as RW from './roadwear.js';            // асфальт разный: свежий, ровный, в заплатках, старый, разбитый (roadwear.js)
 import * as LAWN from './lawn.js';              // пятна на газоне — в краске земли (lawn.js)
+import * as SHORT from './shortcuts.js';        // тропинки-срезки через газоны дворов (shortcuts.js, 2г9)
+import * as MEADOW from './meadow.js';         // некошеная трава рядом с камерой, маска земли для края газона, плит и тропинок (meadow.js, 2г8—2г9)
 import * as DEADENDS from './deadends.js';       // тупики потока: разворот вместо исчезновения (deadends.js)
 import * as BACKB from './backblock.js';         // перекрытие на обратном пути: не возвращаться той же дорогой (backblock.js)
 import * as TGRID from './trafficgrid.js';     // машины: «кто рядом» по сетке, стоящие — вон из покадровых циклов (trafficgrid.js)
@@ -474,6 +483,7 @@ const sun = new THREE.DirectionalLight(0xfff6e4, 1.45);
 sun.position.set(120, 180, 90);
 scene.add(sun);
 scene.add(new THREE.AmbientLight(0xdfeaff, 0.5));
+SKYM.init({ scene, renderer });                 // небо-градиент с облаками и цветокоррекция кадра (sky.js, grade.js; ?oldsky — как было)
 
 function resize () {
   const w = canvas.clientWidth || 640, h = canvas.clientHeight || 360;
@@ -599,6 +609,7 @@ const NO_LITJ = /[?&]nolitj(&|$)/.test(location.search);
    цвета: 254 — просто мелочь (сухость травы 0,6), 128…253 — куст (палитра осени и зерно — для листвы, как aux у smashMat).
    ?nosmj — по-старому, для замера */
 const NO_SMJ = /[?&]nosmj(&|$)/.test(location.search);
+const PANELS_ON = PANELS.ON && (!NO_LITJ || !NO_SMJ);   // стены панелек — кусками с четвёртым байтом цвета (у LITM он есть, если склейка не по-старому)
 /* Плафоны фонарей и прочее, что светится (LAMPH), — тоже в клетки FLATM (17.10.2026): признак «светится» — четвёртый байт
    цвета 255, шейдер FLATM у таких вершин не берёт ночное затемнение материала (как было у своего материала с glow). Сбиваемые
    плафоны — в начале клетки, их позиции остаются в памяти: сбитый фонарь прячет плафон под землю (streetlamps.js hide).
@@ -1850,6 +1861,7 @@ function dropArr () { this.array = null; }
 // клетка статики, метров: по ним отсекается то, что не в кадре. Большому
 // городу — крупнее: сорок тысяч мелких кусков дороже обходить, чем дорисовать лишнее
 const CHUNK = MAP.border ? 200 : 100;
+PANELS.PANEL.CHUNK = CHUNK;                       // стены панелек — кусками по тем же клеткам (panels.js)
 WINS.init(CHUNK);
 // окна с комнатами — настройка графики (gfx.js): на Низкой комнаты за стеклом нет — рама, шторы и свет остаются (windows.js)
 WINS.quality(GFX.winQ());
@@ -3696,6 +3708,7 @@ function shopRow (w, kind, on, base, hLo) {
 
 function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch, doors, softRoof, softCorners) {
   const n = p.length, seed = Math.abs(Math.round(cx * 7 + cz * 13));
+  let PRIM = null;                                 // контур для цоколя и парапета (panels.js), если они у дома есть
   const walls = [];
   for (let i = 0; i < n; i++) {
     const a = p[i], c = p[(i + 1) % n];
@@ -3872,7 +3885,7 @@ function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch, doors, softRoof
           if (shopHit(w, m - winW / 2, m + winW / 2, base + wy0 + f * FH, base + wy1 + f * FH)) continue;   // на вывеске окон нет (0п17)
           WINS.add(w, m - winW / 2, m + winW / 2, base + wy0 + f * FH, base + wy1 + f * FH, 0.08, wsty);
         }
-      if (st === 'panel' && w.len > 8) {
+      if (st === 'panel' && w.len > 8 && !b._pan) {   // панелька в новом виде — стыки и плиты рисует шейдер (panels.js)
         // панельный дом: швы между плитами — по этажам и через три метра
         FLATM.color(shade(hexOf(b), 0.86));
         for (let f = 1; f < floors; f++) bandA(w, 0, w.len, base + f * FH - 0.05, base + f * FH + 0.05, 0.06);
@@ -3909,6 +3922,11 @@ function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch, doors, softRoof
         if (!BALCS.OLD) f0balc.push([w, { cols, pad, step, inArch, wsty, wy0: st === 'stalin' ? 0.7 : 0.9, wy1: st === 'stalin' ? 2.7 : st === 'priv' ? 2.2 : 2.5 }]);
       }
     }
+    // цоколь (2г3, panels.js): тёмная полоса снизу у жилых от двух этажей, мимо проёма арки; ?oldfacade — без него
+    if (PANELS_ON && (k === 'res' || k === 'pub') && lv >= 2 && st !== 'priv' && st !== 'villa') {
+      PRIM = PANELS.rim(p, ccw, softCorners, i => { const cu = arch ? arch.cut.get(p[i]) : undefined; return cu === undefined ? null : [cu - ARCH_W / 2 - 0.05, cu + ARCH_W / 2 + 0.05]; });
+      PANELS.plinth(LITM, PRIM, groundH, base + (st === 'stalin' ? 0.7 : 0.9) - PANELS.PANEL.PLINTH_SILL, PANELS.plinthHex(cx, cz));   // по земле у стены, не выше подоконников 1-го этажа
+    }
   }
 
   // крыша: двускатная / вальмовая, если так в карте (частный сектор, сталинки)
@@ -3932,17 +3950,24 @@ function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch, doors, softRoof
       LITM.tri(a[0], h, a[1], c[0], h, c[1], cx, top, cz, w.ox, 0.8, w.oz);
     }
   } else {
-    LITM.color(k === 'off' ? '#a9b0b8' : ROOFS[(n + lv) % ROOFS.length]);
+    LITM.color(k === 'off' ? '#a9b0b8' : RBITS.ON && k === 'res' && lv >= 4 && st !== 'stalin' && !b._lowRoof ? RBITS.roofHex(cx, cz) : ROOFS[(n + lv) % ROOFS.length]);   // многоэтажка — рубероид (roofbits.js)
     if (softRoof) SOFTCITY.flatRoof(LITM, softRoof, h); else LITM.poly(p, h, true);
+    // парапет: край плоской крыши чуть выступает, снизу тень (2г3, panels.js)
+    if (PRIM && lv >= 3 && st !== 'stalin') { const P = PANELS.PANEL, wt = h - (softRoof ? softRoof.drop : 0); PANELS.parapet(LITM, PANELS.rim(p, ccw, softCorners), wt - P.PARAPET, wt + P.PARAPET_UP, shade(hexOf(b), 0.94)); }
     // парапет и надстройки: выход на крышу, вентиляция, у офиса — кондиционеры
+    // жилой от 4 этажей (2г4, roofbits.js): будка выхода — своей коробкой в склейку, вентшахты, антенны, провода; ?noroofbits — как было
+    const rbits = RBITS.ON && k === 'res' && lv >= 4 && st !== 'stalin' && !b._lowRoof;
+    let exit = null;
     if (area > 150) {
       for (let i = 0; i < (k === 'off' || k === 'ind' ? 3 : 1); i++) {
         const tx = cx + rand(-1, 1) * Math.sqrt(area) * 0.18, tz = cz + rand(-1, 1) * Math.sqrt(area) * 0.18;
         if (!inPoly(tx, tz, p)) continue;
-        box(LIT, k === 'off' ? 2.6 : 2.2, k === 'off' ? 1.4 : 2.2, k === 'off' ? 1.6 : 2.2, k === 'off' ? '#c4c9cf' : '#9c8f96', tx, h + 0.7, tz);
+        if (rbits) exit = [tx, tz];                  // будка (roofbits.js) — вокруг прежней коробки: та остаётся как есть (склейка LIT и зерно сборки те же)
+        box(LIT, k === 'off' ? 2.6 : 2.2, k === 'off' ? 1.4 : 2.2, k === 'off' ? 1.6 : 2.2, k === 'off' ? '#c4c9cf' : rbits ? RBITS.RB.BOOTH : '#9c8f96', tx, h + 0.7, tz);
         if (b._lowRoof) obb(tx, tz, k === 'off' ? 1.3 : 1.1, k === 'off' ? 0.8 : 1.1, 0).topY = h + (k === 'off' ? 1.4 : 1.8);   // на низкой крыше — твёрдая (roofs.js)
       }
     }
+    if (rbits) RBITS.roof(LITM, { p, h, inPoly, exit, ccw });
   }
 }
 
@@ -4244,8 +4269,9 @@ function entranceAt (x, z, nx, nz, grand) {
   }
   put(FLAT, new THREE.PlaneGeometry(1.5, 2.25), '#5a4636', x + nx * 0.09, gy + 1.12, z + nz * 0.09, 0, ry, 0);
   put(FLAT, new THREE.PlaneGeometry(0.5, 0.18), '#fff3c4', x + nx * 0.1, gy + 2.45, z + nz * 0.1, 0, ry, 0);
-  box(LIT, 2.5, 0.18, 1.35, '#8f8a93', x + nx * 0.7, gy + 2.7, z + nz * 0.7, ry);
+  box(LIT, 2.5, 0.18, 1.35, PORCHM.ON ? PORCHM.PORCH.SLAB : '#8f8a93', x + nx * 0.7, gy + 2.7, z + nz * 0.7, ry);
   box(LIT, 2.1, 0.22, 0.9, '#c9c2b6', x + nx * 0.45, gy + 0.08, z + nz * 0.45, ry);
+  if (PORCHM.ON) PORCHM.porch({ LITM, FLATM }, x, z, nx, nz, gy);   // кромка козырька, опоры, доска объявлений (2г5, porch.js; ?oldporch)
 }
 
 /* Дому без подъездов в карте — свои: по одному на каждые шестнадцать
@@ -4361,6 +4387,10 @@ function osmBuildings (skip) {
     const softRoof = flatRoof ? SOFTCITY.roofRim(p, softCorners, ccw) : null;
     const wallTop = h - (softRoof ? softRoof.drop : 0);
     LITM.color(hex);
+    // панелька (2г3, panels.js): стены — кусками со стыками этажей и плитами в вершинах; ?oldfacade — ровной стеной
+    const pan = PANELS_ON && b.st === 'panel' && b.k === 'res' && lv >= 2;
+    b._pan = pan;
+    const panTop = hHi + 3.15 * lv;
     let bestEdge = null, bestD = Infinity;
     for (let i = 0; i < n; i++) {
       const a = p[i], c = p[(i + 1) % n];
@@ -4369,17 +4399,24 @@ function osmBuildings (skip) {
       if (len < 0.4) continue;
       const cu = arch ? arch.cut.get(a) : undefined;
       const sa = softCorners?.[i]?.end || a, sb = softCorners?.[(i + 1) % n]?.start || c;
+      const cols = Math.max(1, Math.floor((len - 1) / 3)), s0 = Math.hypot(sa[0] - a[0], sa[1] - a[1]), s1 = len - Math.hypot(c[0] - sb[0], c[1] - sb[1]);
+      const pw = (f, t, y0, low) => PANELS.wall(LITM, { a, ux: dx / len, uz: dz / len, len, s0: f, s1: t, y0, y1: wallTop, top: panTop, hex, low,
+        grid: len >= 4.5 ? { pad: (len - cols * 3) / 2, step: 3, cols } : null });   // окна — как в facade (шаг 3 м)
       if (cu !== undefined) {
         // стена с проёмом: слева, справа и перемычка над аркой
         const ux = dx / len, uz = dz / len, g0 = cu - ARCH_W / 2, g1 = cu + ARCH_W / 2, ry = Math.atan2(dz, dx);
+        if (pan) { pw(s0, g0, hLo - 0.6); pw(g1, s1, hLo - 0.6); pw(g0, g1, arch.top, true); LITM.color(hex); }
+        else {
         LITM.wall(sa[0], sa[1], a[0] + ux * g0, a[1] + uz * g0, hLo - 0.6, wallTop);
         LITM.wall(a[0] + ux * g1, a[1] + uz * g1, sb[0], sb[1], hLo - 0.6, wallTop);
         LITM.wall(a[0] + ux * g0, a[1] + uz * g0, a[0] + ux * g1, a[1] + uz * g1, arch.top, wallTop);
+        }
         if (arch.round) archSpandrel(a, ux, uz, cu, arch);           // круглая: углы над сводом — стеной
         obb(a[0] + ux * g0 / 2, a[1] + uz * g0 / 2, g0 / 2, 0.5, ry);
         obb(a[0] + ux * (g1 + len) / 2, a[1] + uz * (g1 + len) / 2, (len - g1) / 2, 0.5, ry);
       } else {
-        LITM.wall(sa[0], sa[1], sb[0], sb[1], hLo - 0.6, wallTop);
+        if (pan) { pw(s0, s1, hLo - 0.6); LITM.color(hex); }
+        else LITM.wall(sa[0], sa[1], sb[0], sb[1], hLo - 0.6, wallTop);
         const ws = obb((a[0] + c[0]) / 2, (a[1] + c[1]) / 2, len / 2, 0.5, Math.atan2(dz, dx));
         if (topY !== undefined) ws.topY = topY;   // выше — стоишь на крыше (roofs.js)
       }
@@ -4397,7 +4434,8 @@ function osmBuildings (skip) {
       }
     }
 
-    SOFTCITY.cornerWalls(LITM, softCorners, hLo - 0.6, wallTop);
+    if (pan) { PANELS.corners(LITM, softCorners, { y0: hLo - 0.6, y1: wallTop, top: panTop, hex }); LITM.color(hex); }
+    else SOFTCITY.cornerWalls(LITM, softCorners, hLo - 0.6, wallTop);
 
     if (arch) {
       // тоннель: стены по бокам проезда и потолок
@@ -5957,11 +5995,14 @@ function buildCity () {
   tm('smash', smashBuild);
   tm('seasons', SEAS.seasonSteps);                // сугробы, ёлки, гирлянды — шагами (latebuild.js)
   if (!INTRO) tm('trails', WASTE.trails);         // тропинки наискосок, вытоптанное у лавочек, лужи — после дворов и лавочек (wastelands.js)
+  if (!INTRO) tm('shortcuts', () => SHORT.build({ LITM, CITY, SOLIDS, groundH, inHouse, inBounds, nearestRoad, fills: YFILL.cellFills,
+    blocks: (x, z, r) => YARDS.blocks(x, z, r) || YCARS.blocks(x, z, r) || YMAZE.blocks(x, z, r) || COURTS.blocks(x, z, r) }));   // тропинки-срезки через газоны дворов — только краска (shortcuts.js, 2г9); ?noshortcut — без них
 
   /* склейка статики: сначала то, что уже собрано (земля, дороги, дома — их видно в меню), потом —
      после поздних кусков — их полотно, плитка и ямы отдельными мешами по тем же клеткам и с тем же материалом */
   const tq = performance.now();
   const litMat = HUR.holeMat(LAWN.lawnMat(RW.wearMat(WORLD.paveMat(SEAS.seasonMat(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }), 1, 0.4, !NO_SMJ && !EDL.ED.on)))));   // + узор плитки (world.js), + вид асфальта (roadwear.js), + пятна газона (lawn.js), + ураган (hurricane.js); у реквизита (признак в цвете) сухость травы 0,4 и без плитки, износа и газона
+  MEADOW.groundMat(litMat);                       // маска земли рисует те же куски склейки (meadow.js)
   const flatMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
   // светится (признак в цвете — плафоны LAMPH): ночное затемнение материала (FLAT_MATS) не берём, цвет — как есть
   flatMat.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n#ifdef USE_COLOR_ALPHA\nif (vColor.a > 0.5) diffuseColor.rgb = vColor.rgb;\n#endif'); };
@@ -8525,6 +8566,7 @@ const LAMP = [0, 1].map(() => ({
 }));
 const LIGHT_OFF = new THREE.MeshBasicMaterial({ color: 0x2e2b33 });
 const LIGHT_BODY = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });   // столб и головы — как propMat, цвет в вершинах (без сезонного шейдера SMASH_MAT)
+MATS.metal(LIGHT_BODY);                          // столбы — металл, острый блик (materials.js)
 /* лампы светофора — один меш на столб (10.10.2026): у каждой лампы в вершинах «чья она» — красный канал у
    красной, зелёный у жёлтой, синий у зелёной; цвет берётся из LAMP[фаза] (updateLights красит их, как раньше) */
 const BULB = [0, 1].map(ph => {
@@ -8824,6 +8866,12 @@ function fakeShadows () {
     yard: (x, z, r, fn) => YCARS.eachNear(x, z, r, fn), animals: [FAUNA.DEBUG.LIST, CATS.DEBUG.LIST],
     car: () => car };                               // тень домов и на кузове своей машины (fakeshadows.js carMat)
   FSH.step(FSH_E);
+}
+let SUNSH_E = null;
+function sunShadow () {
+  if (!SUNSH_E) SUNSH_E = { V, cam, sun, ENV, weather: () => WTH.id(), groundY: 0 };
+  SUNSH_E.groundY = V.y || 0;
+  SUNSH.step(SUNSH_E);
 }
 function carShadow () {
   FSH.noCircle(car);                               // старый круг полной модели — прятать: под машиной одно пятно (fakeshadows.js)
@@ -17403,6 +17451,7 @@ if (!INTRO) LATE.add('ringwood', RINGM.wood);    // лес на Кольце: е
 /* лес из карты, которого нет в OSM (MAP.woods — контуры, автор попросил «засеять лесом»): тот же ельник; дорожки свободны */
 if (!INTRO && MAP.woods) LATE.add('mapwoods', () => { for (const p of MAP.woods) FOREST.addArea(p, (x, z, r) => !!PAVE.onPave(x, z, FOREST.FOREST.PATH + r)); });
 /* мелочь на газоне (lawnprops.js): тоже клетками вокруг камеры */
+LATE.add('meadow', () => MEADOW.init({ renderer, scene, cam, CITY, groundH, car: V }));   // некошеная трава (meadow.js); ?oldgrass — по-старому
 LATE.add('lawnp', () => LAWNP.init({ THREE, scene, cam, CITY, ADULT, forests: () => [...LWOOD.polys(), ...RINGM.polys(), ...(MAP.woods || [])], groundH, inHouse, inBounds, nearestRoad, roadWidth, car: V, Snd,
   onAlley: (x, z, m) => WORLD.onAlley(x, z, m), yardBlocks: (x, z, r) => YARDS.blocks(x, z, r) || YCARS.blocks(x, z, r) || YMAZE.blocks(x, z, r) || COURTS.blocks(x, z, r) || JUMPS.blocks(x, z, r), pzBlocks: PZD.blocks, isForest: FOREST.isForest,
   claims: () => [...CONSTR.claimed(), ...CONSTR.DEBUG.SITES.map(s => ({ x: s.x, z: s.z, r: Math.hypot(s.W, s.D) / 2 + 2 }))],
@@ -17703,6 +17752,7 @@ function initClouds () {
       put(parts, g, '#ffffff', rand(-14, 14), rand(0, 3), rand(-8, 8));
     }
     const m = new THREE.Mesh(mergeGeos(parts), CLOUD_MAT);
+    m.visible = SKYM.oldClouds();                 // облака рисует небо-купол (sky.js); ?oldsky — эти
     m.position.set(V.x + rand(-320, 320), rand(95, 130), V.z + rand(-320, 320));
     scene.add(m);
     CLOUDS.push(m);
@@ -17861,10 +17911,14 @@ function updateEnv (dt) {
   if (amb) amb.intensity = lerp(A[8], B[8], k);
   ENV.night = lerp(A[9], B[9], k);
   SOFTCITY.light(sun, hemi, amb, ENV.night, R);
-  // солнце ходит по небу: днём высоко, вечером низко
-  const sa = ENV.t * Math.PI * 2;
-  sun.position.set(V.x + Math.cos(sa) * 160, 60 + Math.max(0, Math.sin(sa * 0.5 + 0.3)) * 140, V.z + 90);
-  sun.target.position.set(V.x, 0, V.z); sun.target.updateMatrixWorld();   // цель — под машиной, иначе вдали от центра карты свет почти горизонтальный
+  // солнце ходит по небу: днём ~35°, утром и вечером низко, ночью — как было (sunpath.js; ?oldsun — прежний путь ниже)
+  if (!SUNP.place(sun, ENV.t, ENV.night, V.x, 0, V.z)) {
+    const sa = ENV.t * Math.PI * 2;
+    sun.position.set(V.x + Math.cos(sa) * 160, 60 + Math.max(0, Math.sin(sa * 0.5 + 0.3)) * 140, V.z + 90);
+    sun.target.position.set(V.x, 0, V.z); sun.target.updateMatrixWorld();   // цель — под машиной, иначе вдали от центра карты свет почти горизонтальный
+  }
+  SKYM.env({ t: ENV.t, night: ENV.night, rain: R, over: SEAS.snowFall(), snow: SEAS.snowAmt(), scene, sun, hemi, amb, dt });   // небо, туман, тёплое солнце и прохладная тень (sky.js)
+  MATS.env({ night: ENV.night, rain: R, snow: SEAS.snowAmt(), scene, sun, dt });   // блики, мокрый асфальт, отсвет в тени, стекло (materials.js)
   // склейки без света: темнеют вместе с вечером
   const dk = lerp(1, NLIT.OLD ? 0.34 : 0.38, ENV.night) * (1 - R * 0.18);
   for (let i = 0; i < FLAT_MATS.length; i++) FLAT_MATS[i].color.setRGB(dk, dk, dk * (1 + ENV.night * 0.12));   // по номеру, не for…of: тут сотни, а updateEnv часто идёт неоптимизированным — итератор сорит
@@ -18488,6 +18542,7 @@ function frameStep (now) {
   CL.step('forest', FOREST.step, dt, FOREST_API);
   CL.step('lwood', LWOOD.step, dt);                // тропы леса у Ленина зимой светлее (leninwood.js)
   CL.step('lawn', LAWNP.step, dt);                 // мелочь на газоне: какие клетки рядом и в кадре (lawnprops.js)  // ельник: какие ели рядом и в кадре (forest.js)
+  CL.step('meadow', MEADOW.step, dt);             // некошеная трава и маска земли рядом с камерой (meadow.js)
   CL.step('rivals', updateRivals, dt);
   CL.step('verandas', updateVerandas, dt);
   CL.at.ph = 'orders';
@@ -18655,6 +18710,7 @@ function frameStep (now) {
   if (S.state !== 'title' && S.state !== 'over') CL.step('replay', REPLAY.rec, dt); else REPLAY.idle();   // запись последних 10 с для повтора (replay.js)
   CL.at.ph = 'render';
   CL.step('cullstep', CULL.step);              // отсечение клеток статики и матрицы подвижного (cull.js) — виден в frametail.js
+  CL.step('sunshadow', sunShadow);               // настоящие тени: карта теней — когда отъехал или солнце сдвинулось (sunshadow.js)
   DYN.begin();                                    // таймер видеокарты вокруг отрисовки (dynres.js)
   if (!ST3.render(renderer)) {                    // подъезд в 3D (stairs3d.js) — вместо города
     renderer.render(scene, cam);
@@ -18678,6 +18734,7 @@ function frameStep (now) {
    мир — богачи по особнякам, мелочь газона — клетки вокруг камеры; на Деке ~0,3 с замершего меню. Теперь — кусками
    здесь, до прогрева шейдеров (их новые материалы прогреваются там же). dt = 0: время не идёт, в меню они дальше не идут */
 LATE.add('fsh', function* () { yield* FSH.buildSteps({ renderer, buildings: CITY.buildings, groundH, solids: SOLIDS, smash: SMASH, props: PROPS }); });   // маска теней домов, столбов и стволов (fakeshadows.js)
+LATE.add('sunsh', function* () { yield* SUNSH.initSteps({ scene, renderer, gfxOn: GFX.realShadows }); });   // настоящие тени от солнца — после сборки города, до прогрева шейдеров (sunshadow.js)
 LATE.add('first', function* () {
   try { WORLD.lateInit(WORLD_API || (WORLD_API = worldApi())); } catch (e) { console.error('[first] world', e); }
   yield 'world';
@@ -18836,7 +18893,7 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) wi
   EDGES, SIG_GROUPS, ZEBRAS, SCOOTS, TL, IN, DRIFT: DRIFTM, touches, lightOf, edgeOf, NAR: NAR.DEBUG, TALK: TALK.DEBUG,
   // песочница: сюжет, карта, сохранения, старт смены, кошелёк, читы
   STORY, STORY_DBG: STORY.DEBUG, MAP, Store, SBX, CARSM: AUTO, startRun, goRun, endShift, wallet, addWallet, hudHearts, marker, updateEnv, humanLod, get SPOTS_N () { return SPOTS.length; },
-  DRIVERS, SMOKERS, NITRO_CANS, NOS, RESPECT: RESPECT.DEBUG, RESPECT_API: RESPECT, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, PIGEONS, FLOCKS, AMB, INCIDENTS, scare, RIVALS, FOES, RIVSTAT: RIVAL_STATS, rivalBoard: () => rivalBoard(), THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, roadPath, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT, LOOT, XLIFE, askRevive, addWallet, RQ: RQ.DEBUG, HINTS_API: HINTS };
+  DRIVERS, SMOKERS, NITRO_CANS, NOS, RESPECT: RESPECT.DEBUG, RESPECT_API: RESPECT, SURF, surfPlan, PITCHES, ACCIDENTS, spawnAccident, CROWDS, PUB_SPOTS, RECENT, sectorOf, SMASH, VERANDAS, ARCHES, GEN_ENTR, ENV, CLOUDS, SKY: SKYM.SKY, SKY_LIGHT: SKYM.LIGHT, MATS: MATS.MAT, PIGEONS, FLOCKS, AMB, INCIDENTS, scare, RIVALS, FOES, RIVSTAT: RIVAL_STATS, rivalBoard: () => rivalBoard(), THIEF, spawnThief, showMeal, offerSide, CH, pickChoice, slackFor, routeLen, roadPath, FXS, SIGNS, stallCar, Snd, RAMPS, BUILD_MS, BUILD_T, SPOTS, PARTIES, COL_ON_MAP, COLLECT, LOOT, XLIFE, askRevive, addWallet, RQ: RQ.DEBUG, HINTS_API: HINTS };
 if (window.__dlv) Object.assign(window.__dlv, { FXP: { S: FXP.STATS, count: FXP.count, part: fxPart, FX, puff, fire, nosFlame, steam, splash, crumbs, emote }, FXQ: FXP.FXP });   // частицы из запаса (fxpool.js): S — родилось / живо / пик / рост / ?oldfx
 if (window.__dlv) Object.assign(window.__dlv, { IXS, MESHM: () => ({ lit: LITM.memStat(), flat: FLATM.memStat() }), LITN: () => { let b = 0; for (const L of [LIT, FLAT, LAMPH]) for (const g of L) b += g.p ? g.p.byteLength : g.attributes.position.array.byteLength * 2; return { lit: LIT.length, flat: FLAT.length, lamph: LAMPH.length, mb: +(b / 1048576).toFixed(1), smash: SMASH.length }; }, HPOOL: HPOOL.DEBUG, HSK: HSTATS, holdFixed, FAHEAD: FAHEAD.STATS, makeHuman, freshHuman, makePerson, setSeason: SEAS.setSeason, SEASMEM: SEAS.pileMem, CSNOW: CSNOW.DEBUG, PETW: PETW.DEBUG });   // запас готовых людей: собрано на ходу / из запаса, ключи (humanpool.js)
 if (window.__dlv) window.__dlv.FLOWL = FL.DEBUG;   // поток: перестроения, уступи, кольца, подрезка (flowlane.js): ST, cut()
@@ -18849,7 +18906,8 @@ if (window.__dlv) Object.assign(window.__dlv, { showTitle, CAREERM, ORDM: ORD, r
 if (window.__dlv) window.__dlv.CSH = CSH.DEBUG;
 if (window.__dlv) window.__dlv.sayBubble = sayBubble;   // облачко над кем угодно (проверка «мягких краёв»: буквы не мылятся, fxaa.js)
 if (window.__dlv) window.__dlv.LIKES = LIKES.DEBUG;   // что нравится игроку: all, w(g, id), no / yes, slow(g), reset() (likes.js)
-if (window.__dlv) window.__dlv.FSH = FSH.DEBUG;   // поддельные тени: FS — числа, ST — замеры, off(), redraw() (fakeshadows.js)
+if (window.__dlv) window.__dlv.FSH = FSH.DEBUG;
+if (window.__dlv) window.__dlv.SUNSH = SUNSH.DEBUG;   // настоящие тени: SS — числа, ST — замеры, redraw() (sunshadow.js)   // поддельные тени: FS — числа, ST — замеры, off(), redraw() (fakeshadows.js)
 if (window.__dlv) window.__dlv.FPD = FPD.DEBUG;     // от первого лица к подъезду (fpdeliver.js)
 if (window.__dlv) window.__dlv.HCAM = HCAM.DEBUG;   // вручение в кадре (handcam.js)
 if (window.__dlv) window.__dlv.DOOR = DOOR.DEBUG;   // домофон у подъезда: force(mode), solve(), last (doorstep.js)   // тень под машиной (carshadow.js)
@@ -18894,7 +18952,7 @@ if (window.__dlv) Object.assign(window.__dlv, { GRIT: GRITM.GRIT, REALCAR, bounc
 if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG, CONS: CONSTR.DEBUG, DARK: DARKN.DEBUG, WASTE: WASTE.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)
 if (window.__dlv) Object.defineProperties(window.__dlv, { reprofile: { value: reprofile }, REPROFILE_MS: { get: () => REPROFILE_MS } });   // смена профиля без перезагрузки
 if (window.__dlv) Object.assign(window.__dlv, { ODD: ODD.DEBUG, DCAST: DCAST.DEBUG, DIRECTOR: DIRECTOR.DEBUG, HB: HB.DEBUG, FLIRT: ADULT ? FLIRT.DEBUG : null, popBonus, CHAT_PERSON: () => CHAT.person(), CHAT, HAVOC: HAV.DEBUG });   // коневозки, заигрывание (только взрослая); CHAT — чат Толика (say, react)
-if (window.__dlv) { window.__dlv.WARM = WARM.DEBUG; window.__dlv.FOREST = FOREST.DEBUG; window.__dlv.LAWN = LAWNP.DEBUG; window.__dlv.PAVE = PAVE.DEBUG; window.__dlv.PZD = PZD.DEBUG; window.__dlv.cam = cam; window.__dlv.RIV = RIVS.DEBUG; window.__dlv.SOFTEDGE = SOFTEDGE.DEBUG; }   // ельник и пиццерия-шар (forest.js, pizzadome.js); край города (softedge.js)
+if (window.__dlv) { window.__dlv.WARM = WARM.DEBUG; window.__dlv.FOREST = FOREST.DEBUG; window.__dlv.LAWN = LAWNP.DEBUG; window.__dlv.MEADOW = MEADOW.DEBUG; window.__dlv.SHORT = SHORT.DEBUG; window.__dlv.PAVE = PAVE.DEBUG; window.__dlv.PZD = PZD.DEBUG; window.__dlv.cam = cam; window.__dlv.RIV = RIVS.DEBUG; window.__dlv.SOFTEDGE = SOFTEDGE.DEBUG; }   // ельник и пиццерия-шар (forest.js, pizzadome.js); край города (softedge.js)
 if (window.__dlv) window.__dlv.RELIEF = { STATS: RELIEF.STATS, at: RELIEF.reliefAt };   // неровный газон (relief.js)
 CBK.init({ V, NODES, edgeRun, pushOut, shown: flowShown, respawn: t => respawnTraffic(t, 'back'),   // на полосу после удара (carback.js)
   lane: (e, s) => { const [x, z] = lanePoint(e, 0, s); return [x, z, e.mA ? e.hA + Math.atan2(Math.sin(e.hB - e.hA), Math.cos(e.hB - e.hA)) * clamp(s / edgeRun(e), 0, 1) : Math.atan2(e.ux, e.uz)]; },

@@ -34,6 +34,7 @@ import { wet } from './streams.js';             // речки и пруды — 
 import { WTREES } from './wintertrees.data.js'; // зимние модели: голые ветки со снегом сверху (tools/trees/wintertrees.py, Blender)
 import { MOB } from './mobile.js';
 import { at as distAt, has as distHas } from './districts.js';   // район: частный сектор, старый центр (порода по месту)
+import { grow2, WOOD_ON } from './treeform.js';   // формы «как в глубинке» (2г6): выше, крона из многих комков в два тона; ?oldwood — по-старому
 
 export const TREE = {
   // доли пород там, где дерево сажает карта и улицы (без своей породы)
@@ -215,6 +216,35 @@ function wtVariant (name, k) {
   });
   return m;
 }
+/* снег обволакивает ветки (2г10, автор 25.10: «снег не просто лежит на ветках, он прям обволакивает их»): у граней в снегу
+   вершины, которых нет у граней без снега той же части (верх ромба сука, вершина треугольника прута), зимой поднимаются на
+   LIFT м (по части: ствол, сук, ветка, прут) — сверху на ветке толстый белый гребень, щелей нет. Считается раз на модель */
+const LIFT = [0.09, 0.11, 0.09, 0.07];
+function liftOf (groups) {
+  if (groups.lifted || !WOOD_ON) return;
+  groups.lifted = 1;
+  const key = (t, i) => Math.round(t[i] * 500) + ',' + Math.round(t[i + 1] * 500) + ',' + Math.round(t[i + 2] * 500);
+  const bare = new Map();
+  for (const g of groups) if (!g.snow) { let b = bare.get(g.part); if (!b) bare.set(g.part, b = new Set()); for (let i = 0; i < g.tpl.length; i += 3) b.add(key(g.tpl, i)); }
+  // гребень не выше ~толщины ветки у этой вершины (0,7 × ближайшее ребро её грани): тонкий прут — тонкий гребень, не «нож»
+  const lim = new Map();
+  for (const g of groups) if (g.snow) {
+    const T = g.tpl, b = bare.get(g.part);
+    for (let f = 0; f < T.length; f += 9) for (let q = 0; q < 3; q++) {
+      const i = f + q * 3, k = key(T, i);
+      if (b && b.has(k)) continue;
+      let m = Infinity;
+      for (let w = 0; w < 3; w++) if (w !== q) { const j = f + w * 3; m = Math.min(m, Math.hypot(T[i] - T[j], T[i + 1] - T[j + 1], T[i + 2] - T[j + 2])); }
+      const v = Math.min(LIFT[g.part] || 0.07, 0.7 * m), o = lim.get(k);
+      lim.set(k, o === undefined ? v : Math.min(o, v));
+    }
+  }
+  for (const g of groups) if (g.snow) {
+    const L = new Float32Array(g.tpl.length / 3);
+    for (let i = 0; i < L.length; i++) L[i] = lim.get(key(g.tpl, i * 3)) || 0;
+    g.lift = L;
+  }
+}
 /* дерево по модели: ствол и суки — вид 0, ветки и прутья — вид 7 (зерно seed: видны, когда листвы меньше); снег — палитра 1 */
 function winterTree (P, name, x, y, z, sx, sy, sz, yaw, col, seed) {
   const V = VAR;
@@ -227,9 +257,11 @@ function winterTree (P, name, x, y, z, sx, sy, sz, yaw, col, seed) {
       rz = Math.atan2(-(V.wx * c - V.wz * sn), 1); rx = Math.atan2(V.wx * sn + V.wz * c, 1);
     }
   }
-  for (const g of mod || wtModel(name)) {
+  const G = mod || wtModel(name), lk = Math.min(1.5, Math.sqrt(Math.max(0.5, sy)));
+  liftOf(G);
+  for (const g of G) {
     const k = g.part < 2 ? 0 : 7;
-    P.add(g.tpl, x, y, z, sx, sy, sz, rx, yaw, rz, col[g.part], k, k ? Math.min(0.95, seed + (g.part === 2 ? 0.12 : 0)) : 0, g.snow);
+    P.add(g.tpl, x, y, z, sx, sy, sz, rx, yaw, rz, col[g.part], k, k ? Math.min(0.95, seed + (g.part === 2 ? 0.12 : 0)) : 0, g.snow, 0, g.lift || null, lk);
   }
 }
 
@@ -238,6 +270,8 @@ const QS = typeof location !== 'undefined' ? new URLSearchParams(location.search
 const NOWT = QS.has('nowt');                                       // ?nowt — зимой палки, как до моделей (сравнить)
 const WTPARTS = QS.has('wtparts') ? +QS.get('wtparts') : null;     // ?wtparts=2 — только ствол и суки (как в мобильном режиме), 9 — всё
 const OLDT = QS.has('oldtrees');                                   // ?oldtrees — породы и посадки как до М6 (TREE.OLD)
+const NEWF = WOOD_ON && !MOB.on;                                   // формы treeform.js (2г6): не на телефоне (память) и не с ?oldwood / ?oldlook
+const FORM2 = new Set(['birch', 'maple', 'lime', 'poplar', 'pine', 'spruce']);
 const YEL = ['#e8b830', '#f0c848', '#d8a028'], ORA = ['#e8902a', '#d86a22', '#f0a838'], RED = ['#c84a24', '#d86a22', '#b83a22'];
 const DECIDUOUS = new Set(['birch', 'maple', 'lime', 'poplar', 'rowan', 'bush', 'lilac', 'rosehip', 'alley',
   'apple', 'cherry', 'willow', 'chestnut', 'elm', 'larch', 'oldtree', 'caragana', 'elder', 'hawthorn', 'currant', 'hedge']);
@@ -310,6 +344,21 @@ export function growTree (o) {
     }
   };
   const H = 0.88 + r() * 0.3;                              // своя высота у каждого
+  if (NEWF && FORM2.has(kind)) {
+    // 2г6 (25.10.2026): формы «как в глубинке» — treeform.js (выше, крона из многих комков в два тона, сосна — зонтиком)
+    const lx = VAR ? VAR.wx : 0, lz = VAR ? VAR.wz : 0;
+    const out = grow2(kind, { P, T, r, x, y, z, yaw, lx, lz, WM, hz: k => hz(x, z, k), leaves,
+      wt: (name, sx, sy, sz) => winterTree(P, name, x, y, z, sx, sy, sz, yaw, TREE.WINTER.COL[kind] || TREE.WINTER.COL.birch, twig(r)),
+      stick: (x0, y0, z0, x1, y1, z1, w, hex) => {
+        const ax = x + x0 + lx * y0, az = z + z0 + lz * y0, bx = x + x1 + lx * y1, bz = z + z1 + lz * y1;
+        const dx = bx - ax, dy = y1 - y0, dz = bz - az, l = Math.hypot(dx, dy, dz) || 1;
+        P.add(T.stick, (ax + bx) / 2, y + (y0 + y1) / 2, (az + bz) / 2, w, l, w, 0, Math.atan2(dz / l, -dx / l), Math.acos(Math.max(-1, Math.min(1, dy / l))), hex);
+      } });
+    if (kind === 'spruce') { const k = out.rx * 0.9 / 2.5; o.SPRUCES.push({ x, z, y, s: k, hs: out.h * 0.8 / (4.6 * k) }); }   // гирлянда спиралью (seasons.js)
+    STATS.tris[kind] = (STATS.tris[kind] || 0) + TRIS;
+    if (DECIDUOUS.has(kind)) o.DECID.push([x, z]);
+    return;
+  }
   if (kind === 'birch') {
     // белый ствол с чёрными чёрточками, тёмный комель; крона лёгкая, вытянутая, светлая
     trunk(0.3, 7.4 * H, '#ece8de');

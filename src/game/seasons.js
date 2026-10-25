@@ -44,6 +44,7 @@ import * as DYN from './dynres.js';              // «мыло»: снежинк
 import { SEE_U, SEE_FN } from './seethru.js';    // деревья, кусты и столбы между камерой и машиной тают (seethru.js, 0п47)
 import { BAYER_FN } from './fade.js';
 import { indexPile } from './pileindex.js';
+import { WOOD_ON, WOOD } from './treeform.js';      // деревья «как в глубинке» (2г6, 2г10): два тона кроны, снег на ветках толще, шапки на соснах; ?oldwood — по-старому
 
 const CELL = 200;                           // клетка склейки, как у статики (CHUNK в game.js; было 100 — деревья и сугробы давали ~37 вызовов отрисовки в кадре, 10.10.2026)
 
@@ -94,6 +95,9 @@ export const slip = () => (A.snow || 0) * 0.32;
 export const snowy = () => (A.snow || 0) > 0.45;
 /* сколько снега на ветках и земле, 0 … 1 (ельник: forest.js) */
 export const snowAmt = () => A.snow || 0;
+/* листва на деревьях 1 … 0 (облетела) и желтизна 0 … 1 — берёзы ельника (forest.js) */
+export const leafAmt = () => A.leaf ?? 1;
+export const yellowAmt = () => A.yellow || 0;
 /* распутица (весна) и мокрая земля, 0 … 1 — грязь на машине (cardirt.js) */
 export const mudAmt = () => A.mud || 0;
 export const wetAmt = () => A.wet || 0;
@@ -303,28 +307,58 @@ function smashMat (m) {
 /* деревья, листья, сугробы, ёлки: aux = вид, зерно, палитра осени */
 function pileMat () {
   const m = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  m.defines = { MAT_LEAF: '' };                   // 2г11: зелень склейки (листва) — на просвет против солнца (materials.js)
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, U);
-    sh.vertexShader = 'attribute vec4 aux;\nuniform float uLeaf, uFallen, uDrift, uNY, uGale, uTime, uBloom, uBerry;\nuniform vec2 uGaleD;\nvarying vec3 vSW;\nvarying float vK, vP, vSeed;\n' +
+    sh.vertexShader = 'attribute vec4 aux;\nuniform float uLeaf, uFallen, uDrift, uNY, uGale, uTime, uBloom, uBerry, uSnow;\nuniform vec2 uGaleD;\nvarying vec3 vSW;\nvarying float vK, vP, vSeed;\n' + (WOOD_ON ? 'varying vec3 vFolN;\n' : '') +
       sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
-        vK = floor(aux.x * 255.0 + 0.5); vSeed = aux.y; vP = floor(aux.z * 255.0 + 0.5);
+        vK = floor(aux.x * 255.0 + 0.5); vSeed = aux.y; vP = floor(aux.z * 255.0 + 0.5);${WOOD_ON ? `
+        vFolN = vec3(0.0, 1.0, 0.0);
+        float fPp = mod(vP, 4.0);
+        if (vK == 1.0 || (vK == 0.0 && abs(fPp - 2.0) < 0.5)) {   // листва и хвоя: нормаль вершины — октаэдром в aux (seasons.js octN), палитра — 2 младших бита
+          float fU = floor(vP / 4.0) / 31.5 - 1.0, fV = aux.w * 2.0 - 1.0;
+          vec3 fN = vec3(fU, 1.0 - abs(fU) - abs(fV), fV);
+          if (fN.y < 0.0) fN.xz = (1.0 - abs(fN.zx)) * vec2(fN.x >= 0.0 ? 1.0 : -1.0, fN.z >= 0.0 ? 1.0 : -1.0);
+          vFolN = normalize(fN); vP = fPp;
+        } else transformed.y += aux.w * 1.275 * uSnow;   // снег обволакивает ветки (2г10, treeform.js): верх сечения ветки поднят на столько м зимой` : ''}
         if (uGale > 0.0 && vK == 1.0) transformed.xz += uGaleD * uGale * (0.72 + 0.28 * sin(uTime * 3.1 + vSeed * 41.0 + transformed.x * 0.07));   // ураган: крону клонит по ветру
-        float lim = vK == 1.0 ? uLeaf : vK == 2.0 ? uFallen : vK == 3.0 ? uDrift : vK == 4.0 ? uNY : vK == 5.0 ? uBloom : vK == 6.0 ? uBerry : 2.0;
+        float lim = vK == 1.0 ? uLeaf : vK == 2.0 ? uFallen : vK == 3.0 ? uDrift : vK == 4.0 ? uNY : vK == 5.0 ? uBloom : vK == 6.0 ? uBerry : vK == 8.0 ? uSnow : 2.0;   // вид 8 — снежные шапки на лапах сосен (treeform.js)
         if (vSeed >= lim) transformed = vec3(0.0, -3000.0, 0.0);
         if (vK == 7.0 && uLeaf > vSeed) transformed = vec3(0.0, -3000.0, 0.0);   // вид 7 — ветки и прутья голой кроны (trees.js, зимние модели): видны, когда облетела листва`)
         .replace('#include <project_vertex>', '#include <project_vertex>\n' + WPOS);
     sh.uniforms.uSeeP = SEE_U;
-    sh.fragmentShader = 'uniform float uYellow;\nvarying float vK, vP, vSeed;\n' + TINT + BAYER_FN + SEE_FN + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+    sh.fragmentShader = 'uniform float uYellow;\nvarying float vK, vP, vSeed;\n' + (WOOD_ON ? 'varying vec3 vFolN;\n' : '') + TINT + BAYER_FN + SEE_FN + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       if (vK != 2.0 && vK != 3.0) seeCut(vSW);       // между камерой и машиной — тает (seethru.js); листья и сугробы на земле — нет
       if (vK == 1.0) {
         vec3 pal = autPal(vP, vSeed);                 // яркая сухая осень — сочнее (uGold внутри)
         diffuseColor.rgb = mix(diffuseColor.rgb, pal, clamp(uYellow * 1.7 - vSeed * 0.7, 0.0, 1.0));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.72, 0.16), uFresh * 0.55);   // весна: молодая листва светлее
       }
-      if ((vK == 0.0 || vK == 7.0) && vP > 0.5) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.88, 0.91, 0.97), uSnow);   // снег на верхней стороне веток (палитра 1 у ствола и веток — trees.js)
-      diffuseColor.rgb = seasonTint(diffuseColor.rgb, 0.0, vK == 0.0 || vK == 4.0 || vK == 7.0 ? 0.62 : 1.0);`);
+      if ((vK == 0.0 || vK == 7.0) && vP > 0.5 && vP < 1.5) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.88, 0.91, 0.97), uSnow);   // снег на верхней стороне веток (палитра 1 у ствола и веток — trees.js)
+      float wEver = vK == 0.0 && vP > 1.5 && vP < 2.5 ? 1.0 : 0.0;   // хвоя новых сосен и елей (палитра 2, treeform.js): снег гуще
+      float wFol = vK == 1.0 ? 1.0 : wEver;
+      diffuseColor.rgb = seasonTint(diffuseColor.rgb, 0.0, wEver > 0.5 ? ${WOOD_ON ? '1.45' : '0.62'} : vK == 0.0 || vK == 4.0 || vK == 7.0 ? 0.62 : 1.0);`);
+    if (WOOD_ON) sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      if (wFol > 0.5) {
+        // мягкая крона (2г6): нормаль — плавная, от середины комка и кроны, свет без граней
+        normal = normalize((viewMatrix * vec4(vFolN, 0.0)).xyz);
+        // рваный край: у края силуэта (нормаль вбок к взгляду) листва — гроздьями, между ними просвет (шум в мире, ~0,4 м)
+        float fFr = 1.0 - abs(dot(normal, normalize(vViewPosition)));
+        float fD = length(vSW - cameraPosition);
+        vec3 fQ = fract(floor(vSW * 2.6) * 0.1031); fQ += dot(fQ, fQ.yzx + 33.33);
+        vec3 fQ2 = fract(floor(vSW * 5.2 + 0.5) * 0.1031); fQ2 += dot(fQ2, fQ2.yzx + 33.33);
+        float fH = fract((fQ.x + fQ.y) * fQ.z) * 0.65 + fract((fQ2.x + fQ2.y) * fQ2.z) * 0.35;
+        if (fH < smoothstep(${WOOD.EDGE[0].toFixed(2)}, ${WOOD.EDGE[1].toFixed(2)}, fFr) * ${WOOD.EDGE[2].toFixed(2)} * (1.0 - smoothstep(${WOOD.EDGE[3]}.0, ${WOOD.EDGE[4]}.0, fD))) discard;
+      }`).replace('#include <lights_lambert_fragment>', `
+      #if NUM_DIR_LIGHTS > 0
+      if (wFol > 0.5) {                              // два тона кроны (2г6): грань к солнцу — теплее и светлее, в тени — холодная и тёмная
+        float wNdl = dot(normal, directionalLights[ 0 ].direction);
+        diffuseColor.rgb *= mix(vec3(0.56, 0.66, 0.82), vec3(1.12, 1.06, 0.8), smoothstep(-0.25, 0.6, wNdl));
+      }
+      #endif
+      #include <lights_lambert_fragment>`);
   };
-  m.customProgramCacheKey = () => 'seasonPile';
+  m.customProgramCacheKey = () => 'seasonPile' + (WOOD_ON ? 'w' : '');
   return fakeShadowMat(m);
 }
 
@@ -343,6 +377,25 @@ function garlandMat () {
   };
   m.customProgramCacheKey = () => 'seasonGarland';
   return m;
+}
+
+/* нормаль листвы октаэдром (ось — вверх): u — 6 бит в aux.z над палитрой (2 бита), v — 8 бит в aux.w (pileMat разбирает) */
+function octN (c, v0, nv, x, y, z, pal, nrm) {
+  const w = nrm ? nrm.w : 0;
+  for (let i = v0; i < v0 + nv; i++) {
+    const px = c.p[i * 3], py = c.p[i * 3 + 1], pz = c.p[i * 3 + 2];
+    let ax = px - x, ay = py - y, az = pz - z, l = Math.hypot(ax, ay, az) || 1;
+    ax /= l; ay /= l; az /= l;
+    if (w) {
+      let bx = px - nrm.cx, by = py - nrm.cy, bz = pz - nrm.cz, m = Math.hypot(bx, by, bz) || 1;
+      ax = ax * (1 - w) + bx / m * w; ay = ay * (1 - w) + by / m * w; az = az * (1 - w) + bz / m * w;
+    }
+    const s = Math.abs(ax) + Math.abs(ay) + Math.abs(az) || 1;
+    let u = ax / s, v = az / s;
+    if (ay < 0) { const u2 = (1 - Math.abs(v)) * (u >= 0 ? 1 : -1), v2 = (1 - Math.abs(u)) * (v >= 0 ? 1 : -1); u = u2; v = v2; }
+    c.a[i * 4 + 2] = pal + (Math.round((u * 0.5 + 0.5) * 63) << 2);
+    c.a[i * 4 + 3] = Math.round((v * 0.5 + 0.5) * 255);
+  }
 }
 
 /* ─── своя склейка: клетки по сто метров, позиция + цвет + aux ─── */
@@ -384,7 +437,11 @@ function Pile (CH = CELL) {                      // CH — клетка скле
     /* tpl — неиндексированные вершины шаблона; поворот: X, потом Z, потом Y */
     /* возвращает, где лежат вершины: клетка и первая вершина */
     /* shade — низ куска темнее, верх светлее (кроны, trees.js): 0 — ровный цвет */
-    add (tpl, x, y, z, sx, sy, sz, rx, ry, rz, hex, kind = 0, seed = 0, pal = 0, shade = 0) {
+    /* lift — на сколько м поднять вершину зимой (по вершине шаблона, снег на ветках толще: treeform.js), liftK — множитель */
+    /* nrm — мягкая листва (2г6, treeform.js): { cx, cy, cz, w } — центр кроны и доля «от центра кроны» в нормали (остальное —
+       от середины комка x, y, z); у листвы (вид 1; вид 0 с палитрой 2 — хвоя) нормаль вершины пишется в aux.z (старшие 6 бит)
+       и aux.w (8 бит) октаэдром — без лишней памяти; шейдер рисует крону плавно, без граней */
+    add (tpl, x, y, z, sx, sy, sz, rx, ry, rz, hex, kind = 0, seed = 0, pal = 0, shade = 0, lift = null, liftK = 1, nrm = null) {
       const c = cell(x, z), nv = tpl.length / 3, v0 = c.n;
       room(c, nv);
       write(tpl, c.p, v0 * 3, x, y, z, sx, sy, sz, rx, ry, rz);
@@ -402,8 +459,9 @@ function Pile (CH = CELL) {                      // CH — клетка скле
           const f = 1 + shade * (0.6 * tpl[(i - v0) * 3 + 1] - 0.12);
           c.c[o] = Math.min(255, r * f); c.c[o + 1] = Math.min(255, g * f); c.c[o + 2] = Math.min(255, b * f);
         } else { c.c[o] = r; c.c[o + 1] = g; c.c[o + 2] = b; }
-        c.a[q] = kind; c.a[q + 1] = sd; c.a[q + 2] = pal; c.a[q + 3] = 0;
+        c.a[q] = kind; c.a[q + 1] = sd; c.a[q + 2] = pal; c.a[q + 3] = lift ? Math.min(255, Math.round(lift[i - v0] * liftK * 200)) : 0;
       }
+      if (WOOD_ON && (kind === 1 || (kind === 0 && pal === 2))) octN(c, v0, nv, x, y, z, pal, nrm);
       c.n += nv;
       tris += nv / 3;
       return { key: c.k, v0, nv };

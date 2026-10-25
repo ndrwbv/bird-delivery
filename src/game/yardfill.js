@@ -27,6 +27,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import { wet } from './streams.js';
 import { CLEAN } from './mobile.js';
+import { WOOD_ON } from './treeform.js';      // рощицы вокруг полянок (2г6); ?oldwood — по-старому
 
 export const FILL = {
   R: 4.5,                      // пустой кусок — круг такого радиуса (Ø 9 м, ~64 м²)
@@ -36,7 +37,8 @@ export const FILL = {
   DOOR: 7,                     // у двери подъезда — место пина и машины
   CAP: 40,                     // вещей на клетку, не больше
   GAP: 1.2,                    // вещь — не ближе к занятому, м (между вещами проедет машина)
-  TREE: { CROWN: 2.6, SHRUB: 1.3, STEP: 3.6, GROUP: 7.5, N: 6, S: [1.15, 1.6], MIX: { birch: 34, maple: 18, lime: 14, poplar: 14, rowan: 20 } },   // крона до CROWN м от ствола
+  TREE: { CROWN: 2.6, SHRUB: 1.3, STEP: 3.6, GROUP: 7.5, N: 6, S: [1.15, 1.6], MIX: { birch: 34, maple: 18, lime: 14, poplar: 14, rowan: 20 },   // крона до CROWN м от ствола
+    RING_N: 4, RING_R: 4.5, SEMI: 0.45, RING_MAX: 10, RING_STEP: 5.2, RING_NMAX: 10 },   // радиус кольца до RING_MAX м, деревья через ~RING_STEP м, не больше RING_NMAX   // 2г6: от RING_N деревьев и места от RING_R м — кольцом вокруг полянки (доля SEMI — полукольцом)
   PLAY: { D: 6.7, R: 5.5, WALL: 8, FAR: 70, SHARE: 0.45 },   // песочница, горка, качели: свободно от середины D м, занимает R м
   DRYER: { D: 5.0, R: 3.8, WALL: [5, 32], SHARE: 0.18 },     // сушилка 6—7 м: у дома (WALL м от стены)
   BOOTH: { R: 1.9, HW: 1.05, HD: 1.45, ROAD: 14, FAR: 230, SHARE: 0.3 },   // будка 2,1 × 2,9 м у проезда, не ближе FAR м к другой
@@ -412,6 +414,20 @@ function plantTrees (x, z, D, r) {
   // группа: чем больше места, тем больше деревьев (рощица до T0.N), между стволами — T0.STEP
   const Rg = Math.min(room, T0.GROUP), want = Rg < T0.STEP ? 1 : Math.max(2, Math.min(T0.N, Math.round(Math.PI * Rg * Rg / (T0.STEP * T0.STEP * 1.6))));
   const kind = weighted(r, T0.MIX), pts = [];
+  // 2г6 (25.10.2026): рощица вокруг полянки — 4 и больше деревьев встают кольцом или полукольцом, середина пустая
+  // (свой круг занят целиком — own ниже, проверка «дворы без пустых мест» его не считает пустым)
+  if (WOOD_ON && want >= T0.RING_N && room >= T0.RING_R) {
+    const Rr = Math.min(room, T0.RING_MAX), semi = hsh(x, z, 17) < T0.SEMI, span = semi ? Math.PI * 1.15 : Math.PI * 2, a0 = hsh(x, z, 18) * 6.283;
+    const full = Math.min(T0.RING_NMAX, Math.max(T0.RING_N, Math.round(2 * Math.PI * Rr / T0.RING_STEP))), n = semi ? Math.max(3, Math.round(full * 0.6)) : full;
+    for (let i = 0; i < n * 3 && pts.length < n; i++) {
+      const k = i % n, a = a0 + span * (semi ? k / Math.max(1, n - 1) : k / n) + (r() - 0.5) * 0.35, d = Rr * (0.82 + r() * 0.18);
+      const px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d;
+      if (pts.some(p => Math.hypot(p[0] - px, p[1] - pz) < T0.STEP)) continue;
+      if (A.onPave(px, pz, 1.0) || A.ycBlocks(px, pz, 1)) continue;
+      pts.push([px, pz]);
+    }
+    if (pts.length >= 3) ST.rings = (ST.rings || 0) + 1; else pts.length = 0;
+  }
   for (let q = 0; q < want * 6 && pts.length < want; q++) {
     const a = r() * 6.283, d = q ? Math.sqrt(r()) * Rg : 0, px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d;
     if (pts.some(p => Math.hypot(p[0] - px, p[1] - pz) < T0.STEP)) continue;

@@ -20,6 +20,8 @@
      edge    мягкие края       нет            мягкие края   (FXAA одним проходом по готовому кадру,
              fxaa.js: лесенка внутри краски — разметка, окна, листва; сразу, без перезапуска; на низкой MSAA нет —
              тут они заметнее всего; на средней — Дека: по прикидке дороже 0,5 мс видеокарты, а MSAA и так есть)
+     shadow  поддельные        поддельные     настоящие     (2г2, sunshadow.js: карта теней от солнца ±64 м
+             вокруг камеры — дома, балконы, деревья, фонари на землю и стены; поддельные — маска домов на земле, fakeshadows.js)
 
    Отдельно от пресета — «тяжёлый кадр» (dynres.js): видеокарта не успевает — на миг
    меньшее разрешение, «мыло вместо рывка». По умолчанию вкл везде (автор 18.10.2026: «по дефолту ставить блюр
@@ -64,11 +66,12 @@ export const ITEMS = [
   { id: 'far', label: N_('машины и люди вдали'), vals: [3, 2, 1] },
   { id: 'aa', label: N_('сглаживание'), vals: [0, 1] },
   { id: 'edge', label: N_('мягкие края'), vals: [0, 1] },   // FXAA по готовому кадру (fxaa.js), сразу, без перезапуска
+  { id: 'shadow', label: N_('тени'), vals: [0, 1] },        // 0 — поддельные (маска домов на земле, fakeshadows.js), 1 — настоящие от солнца (sunshadow.js)
 ];
 export const PRESETS = {
-  low: { fps: 0, range: 0, menu: 0, px: 0, win: 0, fx: 0, far: 0, aa: 0, edge: 1 },   // edge: у низкой нет MSAA — мягкие края заметнее всего (телефон: +0,06 мс процессора, видеокарта ~+0,3 мс на M4)
-  mid: { fps: 3, range: 1, menu: 1, px: 1, win: 1, fx: 1, far: 1, aa: 1, edge: 0 },   // edge: Дека — проход ~0,25 мс на M4, на Деке по прикидке ×3 ≈ 0,6—0,9 мс > 0,5 — выкл (MSAA и так есть)
-  high: { fps: 3, range: 2, menu: 2, px: 2, win: 1, fx: 1, far: 1, aa: 1, edge: 1 },   // far: вдали раз в 2 кадра, как на средней (10.10.2026: на «Деке» поток −0,15 мс, люди и прохожие −0,1…0,2 мс; на средней так и было)
+  low: { fps: 0, range: 0, menu: 0, px: 0, win: 0, fx: 0, far: 0, aa: 0, edge: 1, shadow: 0 },   // edge: у низкой нет MSAA — мягкие края заметнее всего (телефон: +0,06 мс процессора, видеокарта ~+0,3 мс на M4)
+  mid: { fps: 3, range: 1, menu: 1, px: 1, win: 1, fx: 1, far: 1, aa: 1, edge: 0, shadow: 0 },   // edge: Дека — проход ~0,25 мс на M4, на Деке по прикидке ×3 ≈ 0,6—0,9 мс > 0,5 — выкл (MSAA и так есть)
+  high: { fps: 3, range: 2, menu: 2, px: 2, win: 1, fx: 1, far: 1, aa: 1, edge: 1, shadow: 1 },   // far: вдали раз в 2 кадра, как на средней (10.10.2026: на «Деке» поток −0,15 мс, люди и прохожие −0,1…0,2 мс; на средней так и было)
 };
 const ORDER = ['low', 'mid', 'high'];
 const NAMES = { low: N_('низкая'), mid: N_('средняя'), high: N_('высокая'), custom: N_('своя') };
@@ -105,6 +108,7 @@ function load () {
     const o = { ...mine.o };
     if (!(mine.fv >= 2) && Number.isInteger(o.fps)) o.fps = [0, 2, 3][o.fps] ?? o.fps;   // сохранено до 09.10.2026: к/с были 30 / 60 / как у экрана
     for (const it of ITEMS) { const v = clampItem(it, o[it.id]); if (v !== null) O[it.id] = v; }
+    if (o.shadow === undefined) O.shadow = (PRESETS[DEFAULTS[DEV]] || PRESETS.high).shadow;   // «своя» сохранена до пункта «тени» (25.10.2026) — как у пресета устройства
   }
   PRESET = whichPreset();
 }
@@ -136,6 +140,8 @@ const AA0 = aa();
 /* мягкие края (FXAA одним проходом, fxaa.js / dynres.js) — меняется сразу; ?fxaa=0 / ?fxaa=1 — на этот запуск (замеры) */
 const FXAA_Q = Q.get('fxaa');
 export const edge = () => (FXAA_Q === '0' ? false : FXAA_Q === '1' ? true : !!val('edge'));
+/* тени: настоящие от солнца (sunshadow.js, 2г2) — только где пункт «тени: настоящие» (по умолчанию — «Высокая»); сразу, без перезапуска */
+export const realShadows = () => !!val('shadow');
 export const winQ = () => (val('win') ? { interior: 1, lod: 70 } : { interior: 0, lod: 0 });
 /* прятать дальше (м): прохожих, машин; ближний/дальний вариант человечка */
 /* мелочь мира — по пункту «дальность» (свой пункт в окне не заводим): мелочь на газоне
@@ -145,17 +151,19 @@ export const winQ = () => (val('win') ? { interior: 1, lod: 70 } : { interior: 0
 /* small — до края, где трава уже исчезла; полоса роста из земли — 14 м и ещё 6 м запаса (lawnprops.js FADE_S, FADE_LAG):
    видно примерно до small − 13 м. 17.10.2026: средняя 50 → 64 (трава видна до ~51 м, как до 04.10, а не до ~37),
    высокая 60 → 72 (~59 м) — чтобы высокая не была ближе средней; на «Деке» кадр тот же (травы в кадре сотни штук) */
+/* meadow — некошеная трава рядом с камерой (meadow.js, 2г8): 1 — только ближняя и редкая, 2 — ближняя и дальняя пореже,
+   3 — полная (25.10.2026) */
 export const DETAIL = [
-  { R: 80, small: 40, thin: 0.5, lawn: 0 },     // низкая
-  { R: 100, small: 64, thin: 0.7, lawn: 0 },    // средняя (Steam Deck)
-  { R: 120, small: 72, thin: 1, lawn: 1 },      // высокая
+  { R: 80, small: 40, thin: 0.5, lawn: 0, meadow: 1 },     // низкая
+  { R: 100, small: 64, thin: 0.7, lawn: 0, meadow: 2 },    // средняя (Steam Deck)
+  { R: 120, small: 72, thin: 1, lawn: 1, meadow: 3 },      // высокая
 ];
 /* 18.10.2026: мелочь газона ближе, пока кадр тяжёлый (tune.js «облегчение»: small × M.small; у края она и так растёт из земли) */
-const DET_T = { R: 0, small: 0, thin: 0, lawn: 0 };
+const DET_T = { R: 0, small: 0, thin: 0, lawn: 0, meadow: 0, meadowK: 1 };
 export const detail = () => {
   const D = DETAIL[O.range] || DETAIL[2], m = TUNE.M.small;
   if (m >= 1) return D;
-  DET_T.R = D.R; DET_T.small = D.small * m; DET_T.thin = D.thin; DET_T.lawn = D.lawn;
+  DET_T.R = D.R; DET_T.small = D.small * m; DET_T.thin = D.thin; DET_T.lawn = D.lawn; DET_T.meadow = D.meadow; DET_T.meadowK = m;   // трава (meadow.js): реже на ту же долю, без пересборки
   return DET_T;
 };
 export const hideR = () => (O.far === 0 ? { people: 100, cars: 200, lod: 32 } : { people: 130, cars: 220, lod: 45 });
@@ -335,6 +343,7 @@ function itemText (it, v) {
     case 'far': return v === 2 ? t('каждый кадр') : t('раз в {n} кадра', { n: it.vals[v] });
     case 'aa': return (v ? t('вкл') : t('выкл')) + (!!v !== AA0 ? ' · ' + t('после перезапуска') : '');
     case 'edge': return v ? t('вкл') : t('выкл');
+    case 'shadow': return v ? t('настоящие') : t('поддельные');
   }
   return String(v);
 }
