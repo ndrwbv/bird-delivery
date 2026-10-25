@@ -159,6 +159,8 @@ export function createLandCover(cell=32) {
     packed={n,data,meta};all.length=0;cache.clear();
   }
   return {triangle,height,covered:(x,z)=>height(x,z)>-Infinity,sideHeights,cut,breaks,compact,stats,
+    inBox(bounds){const out=[];each(bounds,t=>out.push(t));return out;},
+    *cells(){for(const k of grid.keys()){const [i,j]=k.split(',').map(Number);yield [i*cell,j*cell,(i+1)*cell,(j+1)*cell];}},
     get count(){return count();},get rawCount(){return all.length;},get triangles(){
       if(!packed)return all;
       return {[Symbol.iterator]:function*(){for(let i=0;i<packed.n;i++)yield read(i);yield* all;}};

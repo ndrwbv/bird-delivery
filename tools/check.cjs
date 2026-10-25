@@ -63,6 +63,14 @@ const smoke = (args, label) => async () => {
 };
 
 const CHECKS = [
+  { id: 'land-clean', name: 'газоны: минимальная ширина и цельные формы', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'landclean-geometry.mjs')]);
+    return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };
+  } },
+  { id: 'land-drive', name: 'поднятая земля: плавная опора четырёх колёс', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'landdrive-geometry.mjs')]);
+    return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };
+  } },
   { id: 'land-boundary', name: 'границы покрытий: перекрытия, острова и узкие проходы', group: 1, run: async () => {
     const r = await sh(process.execPath, [path.join(__dirname, 'landboundary-geometry.mjs')]);
     return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };

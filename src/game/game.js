@@ -20,6 +20,7 @@ import * as THREE from '../vendor/three.module.min.js';
 import * as SOFTCITY from './softcity.js';
 import * as SOFTSURF from './softsurfaces.js';
 import * as RLAND from './raisedland.js';
+import { landCarSupport } from './landdrive.js';
 import { MAP } from './map.js';
 import { MAP_IDS, MAP_META } from '../maps/index.js';
 import Platform from '../platform/index.js';
@@ -5993,6 +5994,10 @@ function buildCity () {
   if (RLAND.ON) LATE.add('raisedland', function* () {
     CURB_M.discard();
     RLAND.prepare(CITY.buildings, p => THREE.ShapeUtils.triangulateShape(p.map(q => new THREE.Vector2(q[0], q[1])), []));
+    yield* RLAND.cleanContours({M:LITM,skip:DMASK?farOut:null,triangulate:(outer,holes)=>({
+      points:[...outer,...holes.flat()],
+      triangles:THREE.ShapeUtils.triangulateShape(outer.map(p=>new THREE.Vector2(...p)),holes.map(h=>h.map(p=>new THREE.Vector2(...p))))
+    })});
     if (!INTRO) yield* buildCurbs({ LITM, rebuild: true, boundaryAt: RLAND.boundaryAt, boundaryRanges: RLAND.boundaryRanges,
       landTopAt: (x,z) => RLAND.topOffset(x,z,terrainH(x,z)) });
     RLAND.ST.baseDisposed = GROUND_M.discard();
@@ -8884,6 +8889,11 @@ function carShadow () {
    на 15—18 см. Теперь кузов — на верх того, что под ним. Поднятый бордюр (0,28) — отдельно:
    у игрока V.kerb, чужие на тротуар не заезжают. На мосту — настил (surfaceAt), без добавки */
 function paveLift (x, z) {
+  if(RLAND.ST.built){
+    const paved=RLAND.cover.height(x,z),grass=RLAND.green.height(x,z);
+    if(RLAND.onLand(x,z))return Math.max(.03,grass>paved?grass:0);
+    if(Number.isFinite(paved)&&paved<.49)return Math.max(.03,paved);
+  }
   const r = nearestRoad(x, z, 7, 1);
   let y = 0.03;
   if (r) {
@@ -12654,6 +12664,7 @@ function driveSub (dt) {
 }
 /* по чему едет колесо, с замёрзшей Томью: лёд на уровне воды (ice.js floor) */
 const iceSurf = (x, z, y) => Math.max(surfaceAt(x, z, y), ICEM.floor());
+const landDriveOffset = (x,z) => RLAND.offset(x,z,terrainH(x,z));
 /* Высота опоры под машиной (17.10.2026, roofs.js): земля / мост / лёд — или крыша низкого дома, если кузов уже
    примерно на её высоте (y не ниже ROOFM.ROOF.STEP от крыши): сверху садишься, сбоку держит стена. Что победило —
    SUP_ROOF (крыша). Летающий родстер садится той же функцией */
@@ -13087,6 +13098,9 @@ function driveStep (dt) {
   if (lift > 0) V.ramp = RAMP_ON;
   const gnd = supportAt(V.x, V.z, V.y - (V.rlift || 0)) + lift;
   const onRoof = SUP_ROOF && !lift;
+  const landSupport = RLAND.ST.built && !V.air && !flyOn && !onRoof && !lift && Math.abs(gnd-groundH(V.x,V.z))<.05
+    ? landCarSupport(V,landDriveOffset,dt) : null;
+  if(!landSupport)V.landPose=null;
   const rp = V.ramp || RAMP_SMALL;
   if (flyOn) {
     // летающий родстер (flycar.js): взлёт, держит высоту, снижается и садится на опору (земля, мост, твёрдая крыша) без удара
@@ -13115,7 +13129,7 @@ function driveStep (dt) {
   } else if ((V.roof || (V.rlift || 0) > 0) && V.y - gnd > ROOFM.ROOF.DROP && V.sink === undefined) {
     // опора ушла из-под колёс — съехал с края крыши или с верха трамплина шагом: падает, без урона
     V.air = true; V.vy = 0; V.rampSafe = 1.5;
-  } else V.y = gnd;
+  } else V.y = gnd + (landSupport?.delta || 0);
   V.roof = !V.air && !FLYC.on() && onRoof;
   if (V.sink !== undefined) {
     // тонет: сначала качается на воде, потом нос вниз и ко дну
@@ -13132,6 +13146,12 @@ function driveStep (dt) {
   let f2 = supportAt(V.x + fx * 1.4, V.z + fz * 1.4, V.y) + rampLift(V.x + fx * 1.4, V.z + fz * 1.4) + DECOR.lift(V.x + fx * 1.4, V.z + fz * 1.4) + Math.max(0, cbF - 0.09);   // + холмик двора (yarddecor.js), + скат за бордюром — кузов кивает
   let t2 = supportAt(V.x - fx * 1.45, V.z - fz * 1.45, V.y) + rampLift(V.x - fx * 1.45, V.z - fz * 1.45) + DECOR.lift(V.x - fx * 1.45, V.z - fz * 1.45) + Math.max(0, cbR - 0.09);
   let l2 = supportAt(V.x + sx * 0.9, V.z + sz * 0.9, V.y) + DECOR.lift(V.x + sx * 0.9, V.z + sz * 0.9), r2 = supportAt(V.x - sx * 0.9, V.z - sz * 0.9, V.y) + DECOR.lift(V.x - sx * 0.9, V.z - sz * 0.9);
+  if(landSupport){
+    f2+=landSupport.front-landDriveOffset(V.x+fx*1.4,V.z+fz*1.4);
+    t2+=landSupport.back-landDriveOffset(V.x-fx*1.45,V.z-fz*1.45);
+    l2+=landSupport.left-landDriveOffset(V.x+sx*.9,V.z+sz*.9);
+    r2+=landSupport.right-landDriveOffset(V.x-sx*.9,V.z-sz*.9);
+  }
   // в полёте нос идёт за траекторией, на земле — за уклоном
   if (V.sink !== undefined) { f2 = t2 + clamp(V.sink - 0.5, 0, 1) * -1.3; l2 = r2 = 0; }
   const flyNow = FLYC.on();                        // в полёте родстера кузов ровный: нос чуть вверх на взлёте (flycar.js pitch)
@@ -13141,11 +13161,11 @@ function driveStep (dt) {
   V.kerb = damp(V.kerb || 0, V.air || flyNow || lift > 0 || V.roof ? 0 : (pl => Math.max(curbAt(V.x, V.z), pl, DECOR.lift(V.x, V.z), cbF || cbR ? (Math.max(cbF, pl) + Math.max(cbR, pl)) / 2 : 0))(paveLift(V.x, V.z)) - STREAMS.sinkBy(V.wade || 0), 22, dt);   // + скат за бордюром (0п68): среднее под осями   // + верх асфальта и плитки (paveLift): колёса не в асфальте
   V.cbump = V.air || flyNow || V.roof ? 0 : CURBS.bump(V, dt);   // бордюр двора под колесом — толчок (curbs.js)
   if (V.cbump) { const cs = CURBS.shake(); if (cs) { S.shake = Math.max(S.shake, cs); Snd.impact(Math.hypot(V.vx, V.vz) * CURB_HIT, 'curb', { x: V.x, z: V.z }); } }   // бордюр под колесом — толчок и удар камня (impact.js 'curb')
-  { const ch = CURBS.took(); if (ch) CBUMP.hit(V, ch); }   // через камень на газон — теряешь скорость и уводит (11ц, carbump.js 'curb')
+  { const ch = CURBS.took(); if (ch && !RLAND.ST.built) CBUMP.hit(V, ch); }   // поднятый грунт уже поднимает колёса: второго тормозящего удара нет
   if (CURB_LAWN_T > 0) CURB_LAWN_T -= dt;
   { const ck = V.air || flyNow ? CURB_PREV : curbAt(V.x, V.z);   // бордюр тротуара: заехал или съехал — тоже удар камня (вниз — тише)
     if (ck !== CURB_PREV) { Snd.impact(Math.hypot(V.vx, V.vz) * CURB_HIT * (ck > CURB_PREV ? 1 : 0.7), 'curb', { x: V.x, z: V.z });
-      if (ck < CURB_PREV && CURB_LAWN_T <= 0 && CURBS.RULES.on && !PAVE.onPave(V.x, V.z, 0)) { CURB_LAWN_T = 0.6; CBUMP.hit(V, 'curb'); }   // с поднятого тротуара на газон — как через камень (11ц; не чаще раза в 0,6 с: вдоль края клетки мигают)
+      if (!RLAND.ST.built && ck < CURB_PREV && CURB_LAWN_T <= 0 && CURBS.RULES.on && !PAVE.onPave(V.x, V.z, 0)) { CURB_LAWN_T = 0.6; CBUMP.hit(V, 'curb'); }   // с поднятого тротуара на газон — как через камень (11ц; не чаще раза в 0,6 с: вдоль края клетки мигают)
       CURB_PREV = ck; } }
   car.position.set(V.x, V.y + V.kerb + V.cbump, V.z);
   car.rotation.y = V.h;
