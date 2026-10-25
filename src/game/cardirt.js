@@ -87,7 +87,22 @@ function patch (m) {
 export function dress (car) {
   ST.mats = 0;
   CBLOOD.resetPlayer();                             // новая машина — чистая
-  car.traverse(o => { if (o.isMesh && o.material && o.material.isMeshLambertMaterial) patch(o.material); });
+  // Водитель использует общие материалы людей: грязь машины не должна менять прохожих.
+  // Уже подготовленные материалы (в том числе настоящего кузова) оставляем как есть.
+  const own = new Map();
+  car.traverse(o => {
+    const source = o.material;
+    if (!o.isMesh || !source?.isMeshLambertMaterial || source.userData.dirt) return;
+    let m = own.get(source);
+    if (!m) {
+      m = source.clone();
+      delete m.userData.keep;
+      delete m.userData.shared;
+      patch(m);
+      own.set(source, m);
+    }
+    o.material = m;
+  });
 }
 
 /* новая смена: машина чистая, снег — если зима (простояла ночь во дворе) */

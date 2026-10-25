@@ -201,7 +201,7 @@ async function across1 (tag, far, put, undo, skip) {
     const inBody = p => { const hx = Math.sin(t.h), hz = Math.cos(t.h), dx = p.x - t.x, dz = p.z - t.z; return Math.abs(dx * hx + dz * hz) < hl - 0.1 && Math.abs(dx * hz - dz * hx) < 1.0 - 0.1; };   // полширины кузова — game.js CAR_W
     let inside = 0, frames = 0, slid = 0, insideStanding = 0, insideFallen = 0;
     const overlaps = [], overlapSeen = new Set();
-    const down = new Set(), x0 = t.x, z0 = t.z, T0 = performance.now();
+    const down = new Set(), x0 = t.x, z0 = t.z, h0 = t.h, T0 = performance.now();
     try {
       while (performance.now() - T0 < 4000) {
         await frame();
@@ -233,7 +233,7 @@ async function across1 (tag, far, put, undo, skip) {
     }
     slid = Math.hypot(t.x - x0, t.z - z0);
     d.S.hp = hp0;
-    out.crowd = { ok: hit && !inside && down.size > 0, hit, people: P.length, down: down.size, inside, insideStanding, insideFallen, overlaps, frames, slid: +slid.toFixed(1), aside: PC.ST.aside - (st.aside || 0), fell: PC.ST.fell - st.fell, killed: PC.ST.killed - st.killed };
+    out.crowd = { ok: hit && !inside && down.size > 0, model: t.model, at: [+x0.toFixed(2), +z0.toFixed(2)], heading: +h0.toFixed(3), hit, people: P.length, down: down.size, inside, insideStanding, insideFallen, overlaps, frames, slid: +slid.toFixed(1), aside: PC.ST.aside - (st.aside || 0), fell: PC.ST.fell - st.fell, killed: PC.ST.killed - st.killed };
   }
 }
 

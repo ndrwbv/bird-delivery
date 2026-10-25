@@ -99,6 +99,12 @@ const CHECKS = [
     return e || shaderError || !r?.ok ? { status: 'fail', info: e || shaderError || 'нет результата' }
       : { status: 'ok', info: r.scenarios.join('; ') + ': ' + r.programs + ' программ' };
   } },
+  { id: 'car-dirt-isolation', name: 'грязь машины не переходит на прохожих', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/car-dirt-isolation.js')]);
+    const e = errLine(j), r = j.result;
+    return e || !r?.ok ? { status: 'fail', info: e || 'нет результата' }
+      : { status: 'ok', info: r.rows.length + ' запуска машины; чужие материалы чисты, повторных копий нет' };
+  } },
   { id: 'orders', name: 'заказы в открытых районах, город поделён', group: 2, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/orders-open.js')]);
     const e = errLine(j), r = j.result;
