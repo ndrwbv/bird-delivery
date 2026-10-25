@@ -1,3 +1,4 @@
+import * as SOFTCITY from './softcity.js';
 /* ──────────────────────────────────────────────────────────────────────────
    Бордюры во дворах (автор 18.10.2026: «между газоном и дорожкой резкий стык, некрасивый. Дорожка обычно
    с двух сторон огорожена бордюром… во дворах всё ещё очень гладко… чтобы дорога отделялась от газонов
@@ -57,7 +58,7 @@ export const CURB = {
   ZONE: 60,           // только во дворах: подъезд ближе, м
   STEP: 0.25,         // шаг проверки края, м (концы — точнее, делением пополам)
   MIN: 0.45,          // кусок короче — не кладём, м
-  HEX: ['#aeaba3', '#a3a098'],   // серый бетон, темнее плитки (видно издали); через одну — видны стыки
+  HEX: SOFTCITY.STYLE.geometry ? ['#b2afa6', '#aca9a0'] : ['#aeaba3', '#a3a098'],   // серый бетон, темнее плитки (видно издали); через одну — видны стыки
   CHIP: '#8f8c85',    // со сколом (темнее)
   SUNK: 0.07,         // доля просевших секций (верх ниже на 3—6 см, наклон)
   CHIPS: 0.05,        // доля секций со сколом
@@ -267,7 +268,11 @@ function section (x0, z0, x1, z1, nx, nz, lift, k, ta = 0, tb = 0, en = null, fl
   if (!MOB && !flat && hsh(x0, z0, 3) < CURB.SUNK) { const s = 0.03 + hsh(x0, z0, 4) * 0.03; if (hsh(x1, z1, 6) < 0.5) { t0 -= s; t1 -= s * 0.4; } else { t1 -= s; t0 -= s * 0.4; } }
   LITM.color(hexOf(x0, z0, k));
   const b0 = gi0 + lift - 0.035, b1 = gi1 + lift - 0.035;
-  LITM.quad(ix0, b0, iz0, ix1, b1, iz1, ix1, t1, iz1, ix0, t0, iz0);           // к дорожке
+  let tx0 = ix0, tz0 = iz0, tx1 = ix1, tz1 = iz1;
+  if (SOFTCITY.STYLE.geometry && !MOB) {
+    const [a, b] = SOFTCITY.curbEdge(LITM, [ix0, iz0], [ix1, iz1], [ox0, oz0], [ox1, oz1], b0, b1, t0, t1);
+    tx0 = a[0]; tz0 = a[1]; tx1 = b[0]; tz1 = b[1];
+  } else LITM.quad(ix0, b0, iz0, ix1, b1, iz1, ix1, t1, iz1, ix0, t0, iz0);           // к дорожке
   if (BERM && BW > 0) {                              // 0п68: за камнем земля поднята — скат газона от верха камня до газона (BW м)
     const fw = (MOB ? -hw : ow) + BW, lim = 1.2 / fw;  // «в ус» и у ската: торец по биссектрисе (на остром изломе — не дальше 1,2 м вдоль)
     const fa = Math.max(-lim, Math.min(lim, ta)), fb = Math.max(-lim, Math.min(lim, tb));
@@ -277,14 +282,14 @@ function section (x0, z0, x1, z1, nx, nz, lift, k, ta = 0, tb = 0, en = null, fl
       LITM.color(CURB.BERM_HEX);
       LITM.quad(ix0, t0, iz0, ix1, t1, iz1, fx1, gf1, fz1, fx0, gf0, fz0);
     } else {
-      LITM.quad(ix0, t0, iz0, ix1, t1, iz1, ox1, t1, oz1, ox0, t0, oz0);       // верх камня
+      LITM.quad(tx0, t0, tz0, tx1, t1, tz1, ox1, t1, oz1, ox0, t0, oz0);       // верх камня
       LITM.color(CURB.BERM_HEX);
       LITM.quad(ox0, t0, oz0, ox1, t1, oz1, fx1, gf1, fz1, fx0, gf0, fz0);     // скат газона (вместо грани камня к газону)
     }
   } else if (MOB) {                                  // клин: от верха грани к дорожке — скатом к газону
     LITM.quad(ix0, t0, iz0, ix1, t1, iz1, ox1, go1 - 0.03, oz1, ox0, go0 - 0.03, oz0);
   } else {
-    LITM.quad(ix0, t0, iz0, ix1, t1, iz1, ox1, t1, oz1, ox0, t0, oz0);         // верх
+    LITM.quad(tx0, t0, tz0, tx1, t1, tz1, ox1, t1, oz1, ox0, t0, oz0);         // верх
     LITM.quad(ox0, t0, oz0, ox1, t1, oz1, ox1, go1 - 0.03, oz1, ox0, go0 - 0.03, oz0);   // к газону
   }
   if (TRACE) TRACE.push(ix0, iz0, t0, ox0, oz0, t0, ix1, iz1, t1, ox1, oz1, t1, (x0 + x1) / 2, (z0 + z1) / 2, x0, z0, x1, z1);   // ?curbtrace: углы секции для проверки стыков (curb-joins.js)

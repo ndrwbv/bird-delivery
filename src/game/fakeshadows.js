@@ -31,6 +31,7 @@
    ?nofsb — без пятен, ?nofsc — без тени домов на машинах (carMat). __dlv.FSH — числа и ручки.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
+import { STYLE } from './softcity.js';
 import { pullDepth } from './carshadow.js';   // 0п87: пятна не прячутся под соседнюю поверхность
 
 const Q = typeof location === 'undefined' ? new URLSearchParams() : new URLSearchParams(location.search);
@@ -44,7 +45,7 @@ export const FS = {
   HALF: 300,          // маска — квадрат ±HALF м вокруг машины (0,29 м на точку: тонкие тени столбов не рвутся, край мягкий сам)
   MOVE: 50,           // машина отъехала на столько м от середины маски — нарисовать заново
   TURN: 1.2,          // солнце повернулось на столько градусов — заново
-  DAY: 0.35,          // насколько темнее земля в тени днём, в ясную погоду (у стены; к концу тени — FS.TIP от неё), в цвете экрана
+  DAY: STYLE.on ? STYLE.shadow : 0.35,          // насколько темнее земля в тени днём, в ясную погоду (у стены; к концу тени — FS.TIP от неё), в цвете экрана
   TIP: 0.6,           // конец тени — такая доля от густоты у стены
   LEN: [0.4, 0.65],   // длина тени — доля высоты дома: в полдень — меньшее, к утру и вечеру — большее
   WET: 0.3,           // в сильный дождь сила × (1 − WET) — и так слабее: солнце в дождь тусклее (weather.js)
@@ -82,7 +83,12 @@ varying vec3 vFsW;
 float fsShade () {
   vec2 uv = (vFsW.xz - uFsWin.xy) * uFsWin.z + 0.5;
   vec2 e = abs(uv - 0.5);
-  float s = texture2D(uFsMap, uv).r * (1.0 - smoothstep(0.4, 0.48, max(e.x, e.y)));
+  float s = texture2D(uFsMap, uv).r;
+  ${STYLE.on ? `// Feather the shadow mask only; geometry and HUD remain sharp.
+  vec2 tap = vec2(${(1.5 / 2048).toFixed(10)}, 0.0);
+  s = s * 0.4 + 0.15 * (texture2D(uFsMap, uv + tap).r + texture2D(uFsMap, uv - tap).r
+    + texture2D(uFsMap, uv + tap.yx).r + texture2D(uFsMap, uv - tap.yx).r);` : ''}
+  s *= 1.0 - smoothstep(0.4, 0.48, max(e.x, e.y));
   vec3 N = normalize(cross(dFdx(vFsW), dFdy(vFsW)));
   return 1.0 - uFsK * s * smoothstep(0.45, 0.8, abs(N.y));
 }

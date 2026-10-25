@@ -17,6 +17,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 
 import * as THREE from '../vendor/three.module.min.js';
+import * as SOFTCITY from './softcity.js';
 import { MAP } from './map.js';
 import { MAP_IDS, MAP_META } from '../maps/index.js';
 import Platform from '../platform/index.js';
@@ -2198,11 +2199,14 @@ function osmCurbs () {
               LITM.up(ax1, y1, az1, bx2, y2, bz2, bx1, y1, bz1);
               return [y1, y2];
             };
-            const [y1, y2] = band(o1, o2, CURB_H + 0.02, r.g ? null : WORLD.paveRoad(r));
-            band(sd * (w / 2), sd * (w / 2 + 0.24), CURB_H + 0.03, '#f1ede6');
-            LITM.color('#b9b4ab');
+            const [y1, y2] = band(o1 + (SOFTCITY.STYLE.geometry ? sd * 0.04 : 0), o2, CURB_H + 0.02, r.g ? null : WORLD.paveRoad(r));
             const [ax, az] = q(o1, 0), [bx, bz] = q(o1, 1), ga = groundH(ax, az), gb = groundH(bx, bz);
-            LITM.quad(ax, ga + 0.12, az, bx, gb + 0.12, bz, bx, gb + CURB_H + 0.03, bz, ax, ga + CURB_H + 0.03, az, e.rx * -sd, 0, e.rz * -sd);
+            if (SOFTCITY.STYLE.geometry) SOFTCITY.curbStone(LITM, [ax, az], [bx, bz], q(o1 + sd * 0.24, 0), q(o1 + sd * 0.24, 1), ga + 0.12, gb + 0.12, ga + CURB_H + 0.03, gb + CURB_H + 0.03);
+            else {
+              band(sd * (w / 2), sd * (w / 2 + 0.24), CURB_H + 0.03, '#f1ede6');
+              LITM.color('#b9b4ab');
+              LITM.quad(ax, ga + 0.12, az, bx, gb + 0.12, bz, bx, gb + CURB_H + 0.03, bz, ax, ga + CURB_H + 0.03, az, e.rx * -sd, 0, e.rz * -sd);
+            }
             if (!r.g) { const [cx1, cz1] = q(o2, 0), [cx2, cz2] = q(o2, 1), gc = groundH(cx1, cz1), gd = groundH(cx2, cz2);
               LITM.quad(cx1, Math.min(gc, y1 - 0.3) - 0.03, cz1, cx2, Math.min(gd, y2 - 0.3) - 0.03, cz2, cx2, y2, cz2, cx1, y1, cz1); }
             for (let o = w / 2 + 0.5; o < w / 2 + SW; o += 0.9) {
@@ -2215,14 +2219,20 @@ function osmCurbs () {
           const mid = (o1 + o2) / 2;
           const [sx1, sz1] = p(d, mid), [sx2, sz2] = p(dd, mid);
           LITM.color(r.g ? groundHex(groundH(sx1, sz1)) : WORLD.paveRoad(r));
-          flat(sx1, sz1, sx2, sz2, SW, CURB_H + 0.02);
+          if (SOFTCITY.STYLE.geometry) {
+            const [sa, za] = p(d, mid + sd * 0.02), [sb, zb] = p(dd, mid + sd * 0.02);
+            flat(sa, za, sb, zb, SW - 0.04, CURB_H + 0.02);
+          } else flat(sx1, sz1, sx2, sz2, SW, CURB_H + 0.02);
           // бордюрный камень: светлая кромка сверху и грань к дороге
           const [kx1, kz1] = p(d, sd * (w / 2 + 0.12)), [kx2, kz2] = p(dd, sd * (w / 2 + 0.12));
-          LITM.color('#f1ede6');
-          flat(kx1, kz1, kx2, kz2, 0.24, CURB_H + 0.03);
-          LITM.color('#b9b4ab');
           const ga = groundH(ax, az), gb = groundH(bx, bz);
-          LITM.quad(ax, ga + 0.12, az, bx, gb + 0.12, bz, bx, gb + CURB_H + 0.03, bz, ax, ga + CURB_H + 0.03, az, e.rx * -sd, 0, e.rz * -sd);
+          if (SOFTCITY.STYLE.geometry) SOFTCITY.curbStone(LITM, [ax, az], [bx, bz], p(d, o1 + sd * 0.24), p(dd, o1 + sd * 0.24), ga + 0.12, gb + 0.12, ga + CURB_H + 0.03, gb + CURB_H + 0.03);
+          else {
+            LITM.color('#f1ede6');
+            flat(kx1, kz1, kx2, kz2, 0.24, CURB_H + 0.03);
+            LITM.color('#b9b4ab');
+            LITM.quad(ax, ga + 0.12, az, bx, gb + 0.12, bz, bx, gb + CURB_H + 0.03, bz, ax, ga + CURB_H + 0.03, az, e.rx * -sd, 0, e.rz * -sd);
+          }
           // со стороны газона — тоже грань (18.10.2026): плита тротуара не висит над травой, видно 30 см бордюра
           if (!r.g) { const [cx1, cz1] = p(d, o2), [cx2, cz2] = p(dd, o2), gc = groundH(cx1, cz1), gd = groundH(cx2, cz2);
             const y1 = groundH(sx1, sz1) + CURB_H + 0.02, y2 = groundH(sx2, sz2) + CURB_H + 0.02;   // верх — как у плиты (flat: по высоте середины)
@@ -2258,13 +2268,16 @@ function arcCurb (o, x1, z1, x2, z2, w, SW, hex) {
   };
   const [mx, mz] = P(a1 + da / 2, rIn + SW / 2);
   LITM.color(hex || groundHex(groundH(mx, mz)));
-  band(rIn, rIn + SW, CURB_H + 0.02);
-  LITM.color('#f1ede6');
-  band(rIn - 0.01, rIn + 0.24, CURB_H + 0.03);
-  LITM.color('#b9b4ab');
+  band(rIn + (SOFTCITY.STYLE.geometry ? 0.04 : 0), rIn + SW, CURB_H + 0.02);
   const [ax, az] = P(a1, rIn - 0.01), [bx, bz] = P(a2, rIn - 0.01), ga = groundH(ax, az), gb = groundH(bx, bz);
   const nm = a1 + da / 2;
-  LITM.quad(ax, ga + 0.12, az, bx, gb + 0.12, bz, bx, gb + CURB_H + 0.03, bz, ax, ga + CURB_H + 0.03, az, -Math.cos(nm), 0, -Math.sin(nm));
+  if (SOFTCITY.STYLE.geometry) SOFTCITY.curbStone(LITM, [ax, az], [bx, bz], P(a1, rIn + 0.24), P(a2, rIn + 0.24), ga + 0.12, gb + 0.12, ga + CURB_H + 0.03, gb + CURB_H + 0.03);
+  else {
+    LITM.color('#f1ede6');
+    band(rIn - 0.01, rIn + 0.24, CURB_H + 0.03);
+    LITM.color('#b9b4ab');
+    LITM.quad(ax, ga + 0.12, az, bx, gb + 0.12, bz, bx, gb + CURB_H + 0.03, bz, ax, ga + CURB_H + 0.03, az, -Math.cos(nm), 0, -Math.sin(nm));
+  }
   const n = Math.max(1, Math.ceil(Math.abs(da) * (rIn + SW)));
   for (let k = 0; k <= n; k++)
     for (let r = rIn + 0.5; r < rIn + SW; r += 0.9) { const [x, z] = P(a1 + da * k / n, r); RAISED.add(rkey(x, z)); }
@@ -4308,6 +4321,7 @@ function osmBuildings (skip) {
 
     // стены и препятствия
     const arch = archFor(b, p, ccw, lv, area);
+    const softCorners = !arch && b.k !== 'church' ? SOFTCITY.corners(p, ccw) : null;
     LITM.color(hex);
     let bestEdge = null, bestD = Infinity;
     for (let i = 0; i < n; i++) {
@@ -4326,7 +4340,8 @@ function osmBuildings (skip) {
         obb(a[0] + ux * g0 / 2, a[1] + uz * g0 / 2, g0 / 2, 0.5, ry);
         obb(a[0] + ux * (g1 + len) / 2, a[1] + uz * (g1 + len) / 2, (len - g1) / 2, 0.5, ry);
       } else {
-        LITM.wall(a[0], a[1], c[0], c[1], hLo - 0.6, h);
+        const sa = softCorners?.[i]?.end || a, sb = softCorners?.[(i + 1) % n]?.start || c;
+        LITM.wall(sa[0], sa[1], sb[0], sb[1], hLo - 0.6, h);
         const ws = obb((a[0] + c[0]) / 2, (a[1] + c[1]) / 2, len / 2, 0.5, Math.atan2(dz, dx));
         if (topY !== undefined) ws.topY = topY;   // выше — стоишь на крыше (roofs.js)
       }
@@ -4343,6 +4358,8 @@ function osmBuildings (skip) {
         }
       }
     }
+
+    SOFTCITY.cornerWalls(LITM, softCorners, hLo - 0.6, h);
 
     if (arch) {
       // тоннель: стены по бокам проезда и потолок
@@ -17804,6 +17821,7 @@ function updateEnv (dt) {
   if (hemi) { hemi.color.copy(mix(A[5], B[5])); hemi.groundColor.copy(mix(A[6], B[6])); hemi.intensity = lerp(A[7], B[7], k) * (1 - R * 0.25); }
   if (amb) amb.intensity = lerp(A[8], B[8], k);
   ENV.night = lerp(A[9], B[9], k);
+  SOFTCITY.light(sun, hemi, amb, ENV.night, R);
   // солнце ходит по небу: днём высоко, вечером низко
   const sa = ENV.t * Math.PI * 2;
   sun.position.set(V.x + Math.cos(sa) * 160, 60 + Math.max(0, Math.sin(sa * 0.5 + 0.3)) * 140, V.z + 90);
@@ -18768,7 +18786,7 @@ if (LATE.busy()) {
 /* отладочная ручка — только в dev и с ?debug: в релизе через неё можно было бы накрутить таблицу */
 /* песочница (sandbox.html): бесконечное здоровье, нитро, «не глохнет» (noStall читает cars.js) */
 const SBX = { god: false, nitro: false, noStall: false };
-if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { inWall, FLY: FLYC, WRONG: WRONG.DEBUG, GUN, inTallHouse, WIDEN: { ...WIDEN.WIDEN, STATS: WIDEN.STATS }, SMOOTH: { SM: SMOOTH.SM, STATS: SMOOTH.STATS, ARCS: SMOOTH.ARCS, isArc: SMOOTH.isArc }, FACE: FACE_DEBUG, RADAR, HUDC, RYARD: RYARD.DEBUG, RT, RASK: RASK.DEBUG, OTAGS: OTAGS.DEBUG, NICK, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, PG: PG.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, chaseEnd, CHS, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, TACT, TG: TGRID.TG, PARKI: { ...PARKI.DEBUG, orphans: () => PARKI.orphans(TRAFFIC) }, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, addPickup, PKI: PKI.STATS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get routeOn () { return ROUTE_LINE.slots.some(q => q.m.visible); }, ROUTE_LINE, RP, rebuildRoutePath, updateRouteLine, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, CULLREFRESH: CULL.refresh, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, DYNRES: DYN.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { SOFTCITY, inWall, FLY: FLYC, WRONG: WRONG.DEBUG, GUN, inTallHouse, WIDEN: { ...WIDEN.WIDEN, STATS: WIDEN.STATS }, SMOOTH: { SM: SMOOTH.SM, STATS: SMOOTH.STATS, ARCS: SMOOTH.ARCS, isArc: SMOOTH.isArc }, FACE: FACE_DEBUG, RADAR, HUDC, RYARD: RYARD.DEBUG, RT, RASK: RASK.DEBUG, OTAGS: OTAGS.DEBUG, NICK, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, PG: PG.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, chaseEnd, CHS, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, TACT, TG: TGRID.TG, PARKI: { ...PARKI.DEBUG, orphans: () => PARKI.orphans(TRAFFIC) }, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, addPickup, PKI: PKI.STATS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get routeOn () { return ROUTE_LINE.slots.some(q => q.m.visible); }, ROUTE_LINE, RP, rebuildRoutePath, updateRouteLine, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, CULLREFRESH: CULL.refresh, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, DYNRES: DYN.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта
