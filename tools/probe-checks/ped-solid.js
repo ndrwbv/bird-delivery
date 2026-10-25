@@ -185,23 +185,55 @@ async function across1 (tag, far, put, undo, skip) {
     for (let i = 0; i < 60 && !hit; i++) { t.speed = 0; put0(); IN.gas = 1; V.vx = fx * v; V.vz = fz * v; d.S.hp = Math.max(d.S.hp, 6); await frame(); hit = !!(t.knock || t.hitT > 0); }
     IN.gas = 0; V.vx = V.vz = 0;
     put();                                         // толпа — прямо по ходу отлетевшей (от курьера увернулись бы: peddodge.js)
+    // Одна перестановка x/z не переносит маршрут: уже следующий walkerStep возвращал
+    // человека на прежний тротуар, прежде чем машина проедет оставшийся метр.
+    // Ставим стоящую толпу на собственные короткие дорожки. Координаты больше не
+    // закрепляем: падение, отбрасывание и выталкивание проверяются настоящей физикой.
+    const routeKeys = ['w', 'path', 'cross', 'goTo', 'dg', 'panic', 'resnap', 'speed', 'restT', 'crossT'];
+    const routes = P.map(p => routeKeys.map(k => [k, Object.hasOwn(p, k), p[k]]));
+    for (const p of P) {
+      p.w = null;
+      p.path = { q: [[p.x, p.z], [p.x + fx, p.z + fz]], i: 0, d: 0, dir: 1 };
+      p.cross = p.goTo = p.dg = p.panic = null;
+      p.resnap = false; p.speed = 0; p.restT = p.crossT = 60;
+    }
     V.x -= fz * 7; V.z += fx * 7;                  // курьера — в сторону
     const inBody = p => { const hx = Math.sin(t.h), hz = Math.cos(t.h), dx = p.x - t.x, dz = p.z - t.z; return Math.abs(dx * hx + dz * hz) < hl - 0.1 && Math.abs(dx * hz - dz * hx) < 1.0 - 0.1; };   // полширины кузова — game.js CAR_W
-    let inside = 0, frames = 0, slid = 0;
+    let inside = 0, frames = 0, slid = 0, insideStanding = 0, insideFallen = 0;
+    const overlaps = [], overlapSeen = new Set();
     const down = new Set(), x0 = t.x, z0 = t.z, T0 = performance.now();
-    while (performance.now() - T0 < 4000) {
-      await frame();
-      d.S.hp = Math.max(d.S.hp, 6);
-      frames++;
-      if (PSHOTS && (frames === 14 || frames === 45 || frames === 150)) await shot(PSHOTS + '/crowd-' + frames + '.png');
-      for (const p of P) {
-        if (p.dead || p.fall) down.add(p);
-        if (!p.dead && inBody(p)) inside++;
+    try {
+      while (performance.now() - T0 < 4000) {
+        await frame();
+        d.S.hp = Math.max(d.S.hp, 6);
+        frames++;
+        if (PSHOTS && (frames === 14 || frames === 45 || frames === 150)) await shot(PSHOTS + '/crowd-' + frames + '.png');
+        for (const p of P) {
+          if (p.dead || p.fall) down.add(p);
+          if (!p.dead && inBody(p)) {
+            inside++;
+            if (p.fall) insideFallen++; else insideStanding++;
+            const key = P.indexOf(p) + ':' + (p.fall ? 'fall' : 'stand');
+            if (!overlapSeen.has(key)) {
+              overlapSeen.add(key);
+              const start = p.path?.q?.[0];
+              overlaps.push({ person: P.indexOf(p), frame: frames, secs: +((performance.now() - T0) / 1000).toFixed(2),
+                fall: p.fall ? +p.fall.t.toFixed(2) : null, knock: !!t.knock,
+                speed: +(t.knock ? Math.hypot(t.kvx, t.kvz) : Math.abs(t.speed || 0)).toFixed(2),
+                height: +(t.y || 0).toFixed(2), fromStart: start ? +Math.hypot(p.x - start[0], p.z - start[1]).toFixed(2) : null,
+                solid: PC.solidAt(p.x, p.z, 0.15) ? true : false, house: !!d.inWall(p.x, p.z) });
+            }
+          }
+        }
+      }
+    } finally {
+      for (let i = 0; i < P.length; i++) for (const [k, had, value] of routes[i]) {
+        if (had) P[i][k] = value; else delete P[i][k];
       }
     }
     slid = Math.hypot(t.x - x0, t.z - z0);
     d.S.hp = hp0;
-    out.crowd = { ok: hit && !inside && down.size > 0, hit, people: P.length, down: down.size, inside, frames, slid: +slid.toFixed(1), aside: PC.ST.aside - (st.aside || 0), fell: PC.ST.fell - st.fell, killed: PC.ST.killed - st.killed };
+    out.crowd = { ok: hit && !inside && down.size > 0, hit, people: P.length, down: down.size, inside, insideStanding, insideFallen, overlaps, frames, slid: +slid.toFixed(1), aside: PC.ST.aside - (st.aside || 0), fell: PC.ST.fell - st.fell, killed: PC.ST.killed - st.killed };
   }
 }
 

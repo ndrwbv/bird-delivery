@@ -56,3 +56,13 @@ html body #hud-right #fxs:not(:empty) { font-size: 10px; color: #8a3b22; border-
   html body #hud-right #speed, html body #hud-right #dist { font-size: 10px; padding: 2px 6px; }
   html body #hud-right #nitro { padding: 2px 6px; }
 }
+
+/* Кофе на телефоне — бумажная кнопка, кольцо показывает оставшийся запас. */
+html body #touchpad .tp-nos { color: #33210c; border: 2px solid #33210c;
+  background: conic-gradient(#3a9fd6 calc(var(--nos, .5) * 360deg), #d8c9a8 0);
+  box-shadow: 2px 3px 0 rgba(51, 33, 12, .85); }
+html body #touchpad .tp-nos::before { background: #fff3d6; }
+html body #touchpad .tp-nos.burn, html body #touchpad .tp-nos.on {
+  background: conic-gradient(#6fd3ff calc(var(--nos, .5) * 360deg), #d8c9a8 0);
+  box-shadow: 1px 1px 0 rgba(51, 33, 12, .85); }
+html body #touchpad .tp-nos.burn::before, html body #touchpad .tp-nos.on::before { background: #ffe9a8; }
