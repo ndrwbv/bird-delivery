@@ -63,6 +63,10 @@ const smoke = (args, label) => async () => {
 };
 
 const CHECKS = [
+  { id: 'land-cover', name: 'контур земли: вырезы покрытий и целостность стыков', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'landcover-geometry.mjs')]);
+    return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };
+  } },
   { id: 'pile-live', name: 'сугробы после индексации: разрушение и смена сезона', group: 2, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/pile-index.js'), '--seed=7']);
     const e = errLine(j), r = j.result;

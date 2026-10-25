@@ -19,6 +19,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import * as SOFTCITY from './softcity.js';
 import * as SOFTSURF from './softsurfaces.js';
+import * as RLAND from './raisedland.js';
 import { MAP } from './map.js';
 import { MAP_IDS, MAP_META } from '../maps/index.js';
 import Platform from '../platform/index.js';
@@ -536,6 +537,7 @@ function put (list, g, hex, x, y, z, rx = 0, ry = 0, rz = 0) {
       xform(g, XM.makeTranslation(x, y, z));
     }
     const c = hexRGB(hex), lite = { p: g.attributes.position.array, i: g.index.array, r: c.r, g: c.g, b: c.b, userData: g.userData };
+    if (RLAND.ON) lite.landAnchor = [x, z];
     list.push(lite);
     return lite;
   }
@@ -902,6 +904,10 @@ STREAMS.carve(CITY, TH, TER, {
 SOFTSURF.prepare(CITY, SMOOTH.isArc);
 
 function groundH (x, z) {
+  const h = terrainH(x, z);
+  return h + RLAND.offset(x, z, h);
+}
+function terrainH (x, z) {
   const u = (x - TX0) / TG, v = (z - TZ0) / TG;
   let i = Math.floor(u), j = Math.floor(v);
   if (i < 0) i = 0; else if (i > TNX - 2) i = TNX - 2;
@@ -1284,6 +1290,7 @@ function Mesher (opt) {
      hide): спереди он короткий. api.track(fn) — fn(меш, первая вершина, вершин) позовут, когда меш клетки будет готов
      (кусок по клетке — отдельно) */
   let FRONT = false, TRK = null;
+  let LAND_HOLD = false;
   function slot (ax, az, bx, bz, cx, cz) {
     const b = bucket(ax, az, bx, bz, cx, cz);
     if (!FRONT) return b;
@@ -1383,6 +1390,14 @@ function Mesher (opt) {
 
   const V2 = [];
   const api = {
+    coverQuad: RLAND.ON ? (p, lift) => {
+      if (opt && opt.keepFront && opt.alpha && ca === 0 && !LAND_HOLD) {
+        RLAND.record(...p[0], ...p[1], ...p[2], lift, cr, cg, cb);
+        RLAND.record(...p[0], ...p[2], ...p[3], lift, cr, cg, cb);
+      }
+      const prev = LAND_HOLD; LAND_HOLD = true;
+      return () => { LAND_HOLD = prev; };
+    } : null,
     color (hex) {
       let k = BYTE_RGB.get(hex);
       if (k === undefined) {
@@ -1473,6 +1488,7 @@ function Mesher (opt) {
        Режем его по клеткам сетки и по их диагоналям: каждый кусок лежит
        в одной плоскости с землёй под ним, поэтому ни щелей, ни провалов. */
     dtri (ax, az, bx, bz, cx, cz, lift) {
+      if (RLAND.ON && !LAND_HOLD && opt && opt.keepFront && opt.alpha && ca === 0) RLAND.record(ax, az, bx, bz, cx, cz, lift, cr, cg, cb);
       if (ZFLOG) {
         const k0 = (cr << 16) | (cg << 8) | cb, q = [k0, k0, k0];
         if (GRAD) { const t3 = [0, 0, 0]; [[ax, az], [bx, bz], [cx, cz]].forEach(([x, z], i) => { GRAD(x, z, t3, 0); q[i] = (t3[0] << 16) | (t3[1] << 8) | t3[2]; }); }
@@ -2142,7 +2158,7 @@ class CellSet {
 }
 const RAISED = new CellSet(8000 * 8000);
 const rkey = (x, z) => (Math.round(x) + 4000) * 8000 + (Math.round(z) + 4000);
-const curbAt = (x, z) => (RAISED.has(rkey(x, z)) ? CURB_H : 0);
+const curbAt = (x, z) => (!RLAND.onLand(x, z) && RAISED.has(rkey(x, z)) ? CURB_H : 0);
 
 /* кусок бордюра [d, dd] без заездов на стоянки курьеров (pizzeria.js DRIVEWAYS): куски, что остались
    (не короче 0,5 м). at(t) — точка середины плиты тротуара на расстоянии t вдоль ребра */
@@ -5955,6 +5971,12 @@ function buildCity () {
   if (!INTRO) tm('pitchnet', () => PNET.finish({ scene }));   // полотно сетки футбольных коробок — одним мешем, после дворов, до smashBuild (pitchnet.js); ?nopnet — без неё
   if (!INTRO) tm('bollards', () => BOLL.build({ CITY, ZEBRAS, nearestRoad, roadWidth, inHouse, inBounds, groundH, curbAt, smashAdd, onPave: PAVE.onPave, introClear, startClear }));   // полусферы и столбики у зебр, магазинов и въездов — до smashBuild (bollards.js); ?nobollard — без них
   tm('smash', smashBuild);
+  if (RLAND.ON) LATE.add('raisedland', function* () {
+    yield* RLAND.build({ M: LITM, terrain: TER, heights: TH, groundH: terrainH, groundHex, skip: DMASK ? farOut : null, buildings: CITY.buildings,
+      triangulate: p => THREE.ShapeUtils.triangulateShape(p.map(q => new THREE.Vector2(q[0], q[1])), []) });
+    const delta = RLAND.alignObjects({ lists: [LIT, FLAT, LAMPH], items: SMASH, props: PROPS, benches: BENCHES, baseH: terrainH });
+    SEAS.raiseLand(delta);
+  });
   tm('seasons', SEAS.seasonSteps);                // сугробы, ёлки, гирлянды — шагами (latebuild.js)
   if (!INTRO) tm('trails', WASTE.trails);         // тропинки наискосок, вытоптанное у лавочек, лужи — после дворов и лавочек (wastelands.js)
 
@@ -13081,7 +13103,7 @@ function driveStep (dt) {
   }
   V.rlift = lift;
   if (!V.air && V.rampSafe > 0) V.rampSafe -= dt;
-  const cbF = CURBS.liftAt(V.x + fx * 1.4, V.z + fz * 1.4), cbR = CURBS.liftAt(V.x - fx * 1.45, V.z - fz * 1.45);   // земля за бордюром поднята (0п68, curbs.js): передние и задние колёса
+  const cbF = RLAND.ST.built ? 0 : CURBS.liftAt(V.x + fx * 1.4, V.z + fz * 1.4), cbR = RLAND.ST.built ? 0 : CURBS.liftAt(V.x - fx * 1.45, V.z - fz * 1.45);   // земля за бордюром поднята (0п68, curbs.js): передние и задние колёса
   let f2 = supportAt(V.x + fx * 1.4, V.z + fz * 1.4, V.y) + rampLift(V.x + fx * 1.4, V.z + fz * 1.4) + DECOR.lift(V.x + fx * 1.4, V.z + fz * 1.4) + Math.max(0, cbF - 0.09);   // + холмик двора (yarddecor.js), + скат за бордюром — кузов кивает
   let t2 = supportAt(V.x - fx * 1.45, V.z - fz * 1.45, V.y) + rampLift(V.x - fx * 1.45, V.z - fz * 1.45) + DECOR.lift(V.x - fx * 1.45, V.z - fz * 1.45) + Math.max(0, cbR - 0.09);
   let l2 = supportAt(V.x + sx * 0.9, V.z + sz * 0.9, V.y) + DECOR.lift(V.x + sx * 0.9, V.z + sz * 0.9), r2 = supportAt(V.x - sx * 0.9, V.z - sz * 0.9, V.y) + DECOR.lift(V.x - sx * 0.9, V.z - sz * 0.9);
@@ -18931,7 +18953,7 @@ if (window.__dlv) window.__dlv.BUS = BUSES.DEBUG;   // автобусы: routes(
 if (window.__dlv) window.__dlv.ENDS = ENDS.DEBUG;   // стыки широкой с узкой (roadends.js)
 if (window.__dlv) window.__dlv.EDL = EDL.DEBUG;
 if (window.__dlv) window.__dlv.FENCEVAR = FVAR.DEBUG;   // варианты заборов: сколько каких (fencevar.js)
-if (window.__dlv) { window.__dlv.CURBS = CURBS.DEBUG; window.__dlv.DECOR = DECOR.DEBUG; window.__dlv.nearestRoad = nearestRoad; window.__dlv.inHouse = inHouse; }   // бордюры дворов: сколько, толчок (curbs.js)   // правки из редактора и его камера (editlayer.js)
+if (window.__dlv) { window.__dlv.RLAND = RLAND; window.__dlv.RLAND_BASE = terrainH; window.__dlv.CURBS = CURBS.DEBUG; window.__dlv.DECOR = DECOR.DEBUG; window.__dlv.nearestRoad = nearestRoad; window.__dlv.inHouse = inHouse; }   // бордюры дворов: сколько, толчок (curbs.js)   // правки из редактора и его камера (editlayer.js)
 if (window.__dlv) window.__dlv.BACKB = BACKB.DEBUG;
 if (window.__dlv) { window.__dlv.SUIT = SUIT.DEBUG; window.__dlv.burgerHit = burgerHit; }   // люди в костюмах-бургерах (burgersuit.js)   // перекрытие на обратном пути (backblock.js)
 if (window.__dlv) { window.__dlv.UNSTUCK = UNSTUCK.STATS; window.__dlv.SL = SL.DEBUG; window.__dlv.NLIT = NLIT.DEBUG; window.__dlv.LAMP_SPOTS = LAMP_SPOTS; window.__dlv.smashHit = smashHit; window.__dlv.CARL = CARL.DEBUG; }   // фонари и огни машины

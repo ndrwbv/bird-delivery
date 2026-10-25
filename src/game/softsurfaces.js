@@ -69,6 +69,8 @@ export function roadSeam (M, a, b, ma, mb, hw, y, hex, paving, baseGrad) {
   const plain = baseGrad || ((x, z, col, i) => { col[i] = base[0]; col[i + 1] = base[1]; col[i + 2] = base[2]; });
   const at = (t, o) => [a[0] + (b[0] - a[0]) * t + (na[0] + (nb[0] - na[0]) * t) * o, a[1] + (b[1] - a[1]) * t + (na[1] + (nb[1] - na[1]) * t) * o];
   const band = (lo, hi, s, t) => { const p = at(s, lo), q = at(t, lo), r = at(t, hi), v = at(s, hi); M.dtri(...p, ...q, ...r, y); M.dtri(...p, ...r, ...v, y); };
+  const release = M.coverQuad?.([at(0, -hw), at(1, -hw), at(1, hw), at(0, hw)], y);
+  try {
   M.grad(baseGrad); band(-hw + width, hw - width, 0, 1);
   for (const side of [-1, 1]) {
     const p = at(0, hw * side), q = at(1, hw * side), ex = q[0] - p[0], ez = q[1] - p[1], el = Math.hypot(ex, ez) || 1;
@@ -85,4 +87,5 @@ export function roadSeam (M, a, b, ma, mb, hw, y, hex, paving, baseGrad) {
     for (let i = 1; i < cuts.length; i++) band(side < 0 ? -hw : hw - width, side < 0 ? -hw + width : hw, cuts[i - 1], cuts[i]);
   }
   M.grad(baseGrad); ST.seams++; return true;
+  } finally { release?.(); }
 }

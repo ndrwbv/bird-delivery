@@ -44,6 +44,7 @@ import * as DYN from './dynres.js';              // «мыло»: снежинк
 import { SEE_U, SEE_FN } from './seethru.js';    // деревья, кусты и столбы между камерой и машиной тают (seethru.js, 0п47)
 import { BAYER_FN } from './fade.js';
 import { indexPile } from './pileindex.js';
+import * as RLAND from './raisedland.js';
 
 const CELL = 200;                           // клетка склейки, как у статики (CHUNK в game.js; было 100 — деревья и сугробы давали ~37 вызовов отрисовки в кадре, 10.10.2026)
 
@@ -348,6 +349,8 @@ function garlandMat () {
 /* ─── своя склейка: клетки по сто метров, позиция + цвет + aux ─── */
 function Pile (CH = CELL) {                      // CH — клетка склейки, м
   const cells = new Map();
+  const landParts = RLAND.ON ? [] : null;
+  let landRoot = null;
   const col = new THREE.Color(), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), P = new THREE.Vector3(), Sc = new THREE.Vector3();
   let tris = 0;
   const byNum = new Map(), RGB = new Map();         // клетка по числу (строка-ключ на каждую вещь стоила), цвет по строке — разобранный
@@ -406,7 +409,16 @@ function Pile (CH = CELL) {                      // CH — клетка скле
       }
       c.n += nv;
       tris += nv / 3;
+      if (landParts && !RLAND.ST.built) landParts.push({ c, v0, nv, x: landRoot ? landRoot[0] : x, z: landRoot ? landRoot[1] : z });
       return { key: c.k, v0, nv };
+    },
+    landAnchor (x, z) { landRoot = x === undefined ? null : [x, z]; },
+    raiseLand (delta) {
+      for (const q of landParts || []) {
+        const h = delta(q.x, q.z), a = q.c.p;
+        if (h && a) for (let v = q.v0; v < q.v0 + q.nv; v++) a[v * 3 + 1] += h;
+      }
+      if (landParts) landParts.length = 0;
     },
     write,
     tris: () => tris,
@@ -689,7 +701,10 @@ export function seasonTree (x, z, y, kind) {
   // редактор города: где чьи куски склейки — чтобы «убрать» прятало дерево сразу (editlayer.js hideNow)
   const rec = EDL.ED.on ? [] : null;
   const P = rec ? { add (...a) { const q = PILE.add(...a); rec.push(q); return q; } } : PILE;
-  const out = growTree({ P, T: tpls(), r: rngAt(x, z, 7), x, z, y, kind, seversk: C.MAP.id === 'seversk', CITY: C.CITY, inPoly: C.inPoly, DECID, SPRUCES, ground: (lx, lz) => C.groundH(lx, lz) + C.curbAt(lx, lz) });
+  if (RLAND.ON) PILE.landAnchor(x, z);
+  let out;
+  try { out = growTree({ P, T: tpls(), r: rngAt(x, z, 7), x, z, y, kind, seversk: C.MAP.id === 'seversk', CITY: C.CITY, inPoly: C.inPoly, DECID, SPRUCES, ground: (lx, lz) => C.groundH(lx, lz) + C.curbAt(lx, lz) }); }
+  finally { if (RLAND.ON) PILE.landAnchor(); }
   if (rec) EDL.edTree(x, z, rec);
   return out;
 }
@@ -1712,6 +1727,16 @@ export function updateSeasons (dt) {
 /* для weather.js: склейка, шаблоны, шум и снежные брызги — сугробы снежной зимы строятся тем же */
 export const kit = () => ({ Pile, tpls, hsh, rngAt, splash: (x, y, z, n, k) => splash(x, y, z, n, k), chunks: (x, y, z, n, vx, vz) => chunks(x, y, z, n, vx, vz),
   mat: () => (MESH_PILE[0] ? MESH_PILE[0].material : pileMat()) });
+
+/* Сборка земли закончена: ещё не загруженные деревья и кучи следуют за своим основанием. */
+export function raiseLand(delta) {
+  for (const p of [PILE, DRIFTP, LEAFP, GARL]) if (p) p.raiseLand(delta);
+  const seen = new Set();
+  for (const list of [DECID, SPRUCES, FIRS, ...DRIFTS.values(), ...LEAVES.values()]) for (const q of list) {
+    if (seen.has(q) || ![q.x, q.y, q.z].every(Number.isFinite)) continue;
+    seen.add(q); q.y += delta(q.x, q.z);
+  }
+}
 
 /* для ?debug: __dlv.season */
 const DEBUG = {
