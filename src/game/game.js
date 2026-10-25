@@ -18734,7 +18734,7 @@ function frameStep (now) {
    мир — богачи по особнякам, мелочь газона — клетки вокруг камеры; на Деке ~0,3 с замершего меню. Теперь — кусками
    здесь, до прогрева шейдеров (их новые материалы прогреваются там же). dt = 0: время не идёт, в меню они дальше не идут */
 LATE.add('fsh', function* () { yield* FSH.buildSteps({ renderer, buildings: CITY.buildings, groundH, solids: SOLIDS, smash: SMASH, props: PROPS }); });   // маска теней домов, столбов и стволов (fakeshadows.js)
-LATE.add('sunsh', function* () { yield* SUNSH.initSteps({ scene, renderer, gfxOn: GFX.realShadows }); });   // настоящие тени от солнца — после сборки города, до прогрева шейдеров (sunshadow.js)
+LATE.add('sunsh', function* () { yield* SUNSH.initSteps({ scene, renderer, gfxOn: GFX.realShadows, forest: FOREST.shadowCells }); });   // настоящие тени от солнца — после сборки города, до прогрева шейдеров (sunshadow.js)
 LATE.add('first', function* () {
   try { WORLD.lateInit(WORLD_API || (WORLD_API = worldApi())); } catch (e) { console.error('[first] world', e); }
   yield 'world';
@@ -18753,6 +18753,7 @@ LATE.add('first', function* () {
    Пачка — пустышка с чужими детьми (родитель у них прежний). По одному объекту — нельзя: каждый вызов обходит всю сцену ради
    света (вышло 6 с вместо 0,1) */
 LATE.add('shaders', function* () {
+  SUNSH.prep();                                   // настоящие тени: что добавилось после 'sunsh' — тоже с тенью, собрать сейчас (sunshadow.js)
   const kids = scene.children.slice(), w = kids.map(o => { let n = 0; o.traverse(() => { n++; }); return n; });
   const tot = w.reduce((a, b) => a + b, 0), per = tot / 5;
   const holder = new THREE.Object3D();
@@ -18767,7 +18768,7 @@ LATE.add('shaders', function* () {
   if (b.length) go();
 });
 // прогрев на ходу-материалов, программы не выгружаются, первое использование — сейчас (warmup.js, docs/AGENTS.md «Шейдеры на ходу»)
-WARM.init({ THREE, renderer, scene, cam, drop: dropMesh,
+WARM.init({ THREE, renderer, scene, cam, drop: dropMesh, variants: objs => SUNSH.warm(objs, cam),   // образцы — и с настоящей тенью (sunshadow.js)
   extra: () => {
     const c = makeCourier(); DIRT.dress(c); FSH.carMats(c);   // и тень домов на стёклах, фарах-корпусах (fakeshadows.js)
     const out = [['машина игрока в смене (грязь cardirt.js)', c]];   // первая смена: машина с грязью — 3 новые программы

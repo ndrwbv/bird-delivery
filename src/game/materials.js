@@ -161,7 +161,8 @@ export function env ({ night, rain, snow, scene, sun, dt }) {
   WINS.sky(MAT.on, zen, hor, V3, CS.copy(sun.color).multiplyScalar(sun.intensity));
   if (!MAT.on) return;
   const P = MU.uMatP.value;
-  P.x = MAT.BOUNCE * day; P.y = day * (1 - Math.min(1, rain) * 0.85);   // ясно: в дождь блики солнца почти гаснут P.z = Math.min(1, MAT.wet); P.w = Math.min(1, snow);
+  P.x = MAT.BOUNCE * day; P.y = day * (1 - Math.min(1, rain) * 0.85);   // ясно: в дождь блики солнца почти гаснут
+  P.z = Math.min(1, MAT.wet); P.w = Math.min(1, snow);   // мокрый асфальт, снег (26.10: строка была в комментарии — не работали)
   if (MAT.dbg) Object.assign(P, MAT.dbg);           // probe: __dlv.MATS.dbg = { z: 0 } — выключить одно
   const Z = MU.uMatZ.value, H = MU.uMatH.value, B = MU.uMatB.value;
   Z.r = zen.r; Z.g = zen.g; Z.b = zen.b; H.r = hor.r; H.g = hor.g; H.b = hor.b;

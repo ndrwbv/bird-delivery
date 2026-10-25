@@ -301,12 +301,13 @@ function material (kind) {
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.93, 0.98), cov * 0.95);`);
   };
   if (WOOD_ON && kind !== 'far') {
-    // рваный край ближней хвои и листвы (как у крон города, seasons.js pileMat): у края силуэта — гроздьями, между ними просвет
+    // рваный край ближней листвы берёз (как у крон города, seasons.js pileMat): у края силуэта — гроздьями, между ними просвет;
+    // хвоя ели и сосны — плотная, без просветов (2г15, автор: «ёлки полупустые»); листва берёзы — aSnow −1
     const prev = m.onBeforeCompile, E = WOOD.EDGE;
     m.onBeforeCompile = (sh, r) => {
       prev(sh, r);
       sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-      if (vFol > 0.5) {
+      if (vFol > 0.5 && vSnow < -0.5) {
         float fFr = 1.0 - abs(dot(normal, normalize(vViewPosition)));
         float fD = length(vFW - cameraPosition);
         vec3 fQ = fract(floor(vFW * 2.6) * 0.1031); fQ += dot(fQ, fQ.yzx + 33.33);
@@ -681,6 +682,19 @@ const EDP = {
     return n;
   },
 };
+
+/* карта теней (sunshadow.js, 2г16): весь собранный ельник, а не только тот, что в кадре (иначе тени ельника появляются и
+   пропадают при развороте камеры) — fn(подробный меш вида, клетка { cx, cz, gy }, пачка { n, m }); kinds — только меши видов (прогрев) */
+export function shadowCells (fn, kinds) {
+  if (!A || !FORESTS || !FORESTS.length || !MESH.sp0) return;
+  if (kinds) { for (const k of ['sp0', 'pi0', 'bi0']) if (MESH[k]) fn(MESH[k], null, null); return; }
+  for (const c of CELLS.values()) {
+    if (c.empty) continue;
+    if (c.sp) fn(MESH.sp0, c, c.sp);
+    if (c.pi) fn(MESH.pi0, c, c.pi);
+    if (c.bi && MESH.bi0) fn(MESH.bi0, c, c.bi);
+  }
+}
 
 /* стволы рядом с точкой — машина в них упирается (game.js: столкновения кузова) */
 const T_LIST = [], T_POOL = [];   // стволы у точки (withTrees) — живут до следующего вызова: езда перебирает их сразу

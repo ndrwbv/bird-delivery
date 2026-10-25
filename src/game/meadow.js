@@ -326,6 +326,7 @@ const GU = {
   uTime: { value: 0 }, uCar: { value: new THREE.Vector4(0, 0, 0, 0) }, uWind: { value: new THREE.Vector2(0.8, 0.6) },
   uSea: { value: new THREE.Vector4(0, 0, 0, 0) },    // осень, жара, весна (грязь), снег
   uH: { value: new THREE.Vector2(MEADOW.H[0], MEADOW.H[1]) }, uEdgeK: { value: MEADOW.EDGE }, uCreep: { value: MEADOW.CREEP },
+  uMdFast: { value: 1 },     // 1 — невидимые пучки сразу в точку (perf 14); 0 — по-старому (замер: __dlv.MEADOW.GU.uMdFast)
 };
 function grassMat (L) {
   const m = new THREE.MeshLambertMaterial({ color: 0xffffff });
@@ -336,7 +337,7 @@ function grassMat (L) {
     Object.assign(sh.uniforms, GU, U, MU);
     sh.vertexShader = `
 uniform float uTime; uniform vec4 uCar; uniform vec2 uWind; uniform vec4 uSea; uniform vec2 uH; uniform float uEdgeK, uCreep;
-uniform vec3 uTile; uniform vec2 uFadeAB; uniform float uDens, uLayH;
+uniform vec3 uTile; uniform vec2 uFadeAB; uniform float uDens, uLayH, uMdFast;
 uniform sampler2D uMdMap; uniform vec3 uMdWin; uniform float uMdOn, uMdRef, uMdN;
 attribute vec4 aBl; attribute vec4 aI;
 varying vec3 vMdC;
@@ -353,11 +354,19 @@ float mdLawn (vec2 p) { vec2 uv = (p - uMdWin.xy) * uMdWin.z + 0.5; vec2 e = abs
   vec2 rel = p - cameraPosition.xz;
   float behind = dot(rel, normalize(fwd.xz + vec2(1e-5))) < -4.0 ? 0.0 : 1.0;
   vec2 uv = (p - uMdWin.xy) * uMdWin.z + 0.5;
-  vec4 mk = texture2D(uMdMap, uv);
   vec2 ue = abs(uv - 0.5);
   float win = 1.0 - smoothstep(0.42, 0.48, max(ue.x, ue.y));
-  float lawn = mk.r * win * uMdOn;
   float fade = 1.0 - smoothstep(uFadeAB.x, uFadeAB.y, dist);
+  // скорость (perf 14, 26.10.2026): пучок за спиной, дальше угасания, реже густоты или вбок за краем кадра — сразу в точку,
+  // без маски и шума (их считала каждая из 15—35 вершин пучка; видимых пучков — около трети плитки)
+  vec3 transformed = vec3(p.x, uMdRef - 60.0, p.y);
+  vMdC = vec3(0.0);
+  vec3 mdQ = (viewMatrix * vec4(p.x, uMdRef + 0.5, p.y, 1.0)).xyz;   // ось x вида горизонтальна (камера без крена) — высота не важна
+  float mdP0 = projectionMatrix[0][0];
+  bool mdCut = uMdFast > 0.5 && (behind < 0.5 || fade < 0.001 || aI.z > uDens
+    || abs(mdQ.x) * mdP0 - 2.2 * sqrt(mdP0 * mdP0 + 1.0) > -mdQ.z + 1.0);
+  if (!mdCut) {
+  float lawn = texture2D(uMdMap, uv).r * win * uMdOn;
   // шов плит дворовой дорожки с травой (как в lawn.js): пучок — на шов, короткий
   float seamG = 0.0;
   if (lawn < uCreep && win > 0.0) {
@@ -407,7 +416,7 @@ float mdLawn (vec2 p) { vec2 uv = (p - uMdWin.xy) * uMdWin.z + 0.5; vec2 e = abs
   vec2 dd = p - uCar.xy; float dl = max(length(dd), 0.001);
   float push = (1.0 - smoothstep(0.6, 2.6, dl)) * uCar.z;
   vec2 bend = (lean + wind) * t * t + dd / dl * push * t * 0.9;
-  vec3 transformed = vec3(p.x + b0.x + side.x * aBl.x * wdt + bend.x * h, uMdRef + n0.g - 0.03 + t * h * (1.0 - push * 0.5), p.y + b0.y + side.y * aBl.x * wdt + bend.y * h);
+  transformed = vec3(p.x + b0.x + side.x * aBl.x * wdt + bend.x * h, uMdRef + n0.g - 0.03 + t * h * (1.0 - push * 0.5), p.y + b0.y + side.y * aBl.x * wdt + bend.y * h);
   if (h < 0.004) transformed = vec3(p.x, uMdRef + n0.g - 0.5, p.y);
   // цвет: тёмный у корня → сочный → светлый тёплый кончик (на солнце — золотистый)
   // тёплые и холодные пятна — те же, что у краски газона (lawn.js «бархат»)
@@ -421,7 +430,8 @@ float mdLawn (vec2 p) { vec2 uv = (p - uMdWin.xy) * uMdWin.z + 0.5; vec2 e = abs
   tip = mix(tip, vec3(0.26, 0.55, 0.08), uSea.z * 0.6);
   vMdC = mix(root, mid, smoothstep(0.0, 0.45, t));
   vMdC = mix(vMdC, tip, smoothstep(0.35, 1.0, t));
-  vMdC *= 0.9 + 0.2 * aI.z;`);
+  vMdC *= 0.9 + 0.2 * aI.z;
+  }`);
     sh.fragmentShader = 'varying vec3 vMdC;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= vMdC;');
     try { FSH.shadeInject(sh); } catch (e) { /* без теней домов */ }
   };
@@ -471,6 +481,14 @@ export function init (api) {
   MU.uMdMap.value = RT.texture; MU.uMdN.value = N;
   MCAM = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 2000);
   MMAT = maskMat(); PMAT = pathMat(); KMAT = killMat();
+  // дорожки рисуются в маску только через ~1,5 с езды — их программу собрать сейчас, под загрузкой (2г17: новая программа на ходу)
+  try {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(9, 3)); g.setAttribute('aAng', new THREE.Float32BufferAttribute(3, 1));
+    const R = api.renderer, prev = R.getRenderTarget();
+    R.setRenderTarget(RT); R.compile(new THREE.Mesh(g, PMAT), MCAM); R.setRenderTarget(prev);
+    g.dispose();
+  } catch (e) { /* — */ }
 }
 export function groundMat (m) { GROUND = m; }
 /* середина маски и плиток травы — впереди камеры */
@@ -519,7 +537,7 @@ export const active = () => LAYERS.length > 0 && MU.uMdOn.value > 0;
 export const DEBUG = {
   pose: null,
   stats: () => ({ ...ST, on: MU.uMdOn.value, win: [Math.round(MU.uMdWin.value.x), Math.round(MU.uMdWin.value.y)] }),
-  get MEADOW () { return MEADOW; }, MU, redraw: () => { LAST.t = -1e9; }, setLevel: k => setLevel(k), get layers () { return LAYERS; },
+  get MEADOW () { return MEADOW; }, MU, GU, redraw: () => { LAST.t = -1e9; }, setLevel: k => setLevel(k), get layers () { return LAYERS; },
   /* вся маска картинкой (для проверок глазами): зелёный — газон, серый — высота, синий — дорожка */
   dbg (k) { MMAT.uniforms.uDbg.value = k; LAST.t = -1e9; },
   image (raw) {

@@ -1,7 +1,7 @@
 /* ──────────────────────────────────────────────────────────────────────────
    Небо, свет и палитра (2г1, 25.10.2026; автор: «игра выглядит плоско», рефы 6, 9, 10 — рисованная глубинка).
 
-   Небо — купол вокруг камеры (один вызов отрисовки, рисуется первым, без тумана и глубины):
+   Небо — купол вокруг камеры (один вызов отрисовки, последним из непрозрачного — только где не закрыто, без тумана):
      • градиент: зенит насыщенно-синий, к горизонту светлее и теплее; низ неба = цвет тумана, поэтому
        дальний город растворяется в небе, а не в серо-голубой стене;
      • свечение вокруг солнца (направление — от настоящего солнца игры) и тёплая полоса у горизонта
@@ -144,10 +144,12 @@ export function init ({ scene, renderer }) {
   R = renderer;
   GRADE.init(renderer);
   if (!SKY.on) return;
+  /* рисуется последним из непрозрачного, с проверкой глубины (perf 14, 26.10.2026): облака и свечение считаются только там,
+     где правда видно небо, а не на всём кадре под домами и землёй (купол на дальней плоскости — z = w); прозрачное — поверх */
   const mat = new THREE.ShaderMaterial({ uniforms: U, vertexShader: VS, fragmentShader: FS, side: THREE.BackSide,
-    depthTest: false, depthWrite: false, fog: false, toneMapped: false });
+    depthTest: true, depthWrite: false, fog: false, toneMapped: false });
   const m = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), mat);
-  m.frustumCulled = false; m.renderOrder = -1e9; m.matrixAutoUpdate = false;
+  m.frustumCulled = false; m.renderOrder = 1e9; m.matrixAutoUpdate = false;
   m.name = 'sky';
   /* в момент отрисовки — после погоды и сезонов: зенит и горизонт — какие они в этом кадре */
   m.onBeforeRender = (rr, sc, cam) => {

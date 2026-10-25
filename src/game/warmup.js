@@ -70,6 +70,10 @@ function samples () {
     ['спрайты: эмоции, облачка, бывшая искра денег (game.js emote, talk)', new T.Sprite(new T.SpriteMaterial({ map, transparent: true, depthWrite: false }))],
     ['огни автобуса (buses.js GLOW_MAT)', mesh(new T.MeshBasicMaterial({ vertexColors: true, map }))],
     ['таблички протеста (protests.js MAT)', inst(new T.MeshLambertMaterial({ map, alphaTest: 0.45, side: D }))],
+    // 26.10.2026 (2г17): без тени их программа общая с чем-то на сцене, а с настоящей тенью (sunshadow.js) — своя, собиралась посреди езды
+    ['таблички протеста одним мешем (protests.js MAT)', mesh(new T.MeshLambertMaterial({ map, alphaTest: 0.45, side: D }))],
+    ['панели кузова makeCar: капот, крыша (game.js makeCar mat)', mesh(new T.MeshLambertMaterial({ flatShading: true }))],
+    ['логотип на коробке пиццы (pizzabox.js logo)', mesh(new T.MeshLambertMaterial({ map, flatShading: true }))],
     ['осколки стекла (raid.js SHARD_MAT)', inst(new T.MeshLambertMaterial({ transparent: true, opacity: 0.8 }))],
     ['дворники (wipers.js mat)', mesh(new T.MeshBasicMaterial({ side: D }))],
     ['таблички и мигалки ремонта (roadlife.js signMesh)', mesh(new T.MeshBasicMaterial({ map, side: D, vertexColors: true }))],
@@ -88,7 +92,8 @@ export function* compile () {
     SAMPLES = samples();
     for (const [, o] of SAMPLES) { o.frustumCulled = false; g.add(o); }
     C.renderer.compile(g, C.cam, C.scene);
-    KEEP = g;                                  // не освобождаем: материалы образцов держат свои программы
+    if (C.variants) C.variants(SAMPLES.map(s => s[1]));   // и их же с настоящей тенью (sunshadow.js warm) — когда появятся на сцене
+    KEEP = g;                                // не освобождаем: материалы образцов держат свои программы
   } catch (e) { console.error('[warmup] образцы', e); }
   keep();
   STATS.ms = performance.now() - t0;
@@ -99,7 +104,8 @@ export function* compile () {
     const g2 = new C.THREE.Group();
     for (const [, o] of big) g2.add(o);
     C.renderer.compile(g2, C.cam, C.scene);
-    keep();                                    // до освобождения: программы остаются
+    if (C.variants) C.variants(big.map(b => b[1]));
+    keep();                                   // до освобождения: программы остаются
     for (const [k, o] of big) { g2.remove(o); if (C.drop) C.drop(o); SAMPLES.push([k, null]); }
   } catch (e) { console.error('[warmup] машина', e); }
   keep();

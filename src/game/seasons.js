@@ -342,13 +342,16 @@ function pileMat () {
       if (wFol > 0.5) {
         // мягкая крона (2г6): нормаль — плавная, от середины комка и кроны, свет без граней
         normal = normalize((viewMatrix * vec4(vFolN, 0.0)).xyz);
-        // рваный край: у края силуэта (нормаль вбок к взгляду) листва — гроздьями, между ними просвет (шум в мире, ~0,4 м)
+        // рваный край: у края силуэта (нормаль вбок к взгляду) листва — гроздьями, между ними просвет (шум в мире, ~0,4 м);
+        // только у лиственных (вид 1): хвоя сосен и елей — плотная, без просветов (2г15, автор: «ёлки полупустые»)
+        if (vK == 1.0) {
         float fFr = 1.0 - abs(dot(normal, normalize(vViewPosition)));
         float fD = length(vSW - cameraPosition);
         vec3 fQ = fract(floor(vSW * 2.6) * 0.1031); fQ += dot(fQ, fQ.yzx + 33.33);
         vec3 fQ2 = fract(floor(vSW * 5.2 + 0.5) * 0.1031); fQ2 += dot(fQ2, fQ2.yzx + 33.33);
         float fH = fract((fQ.x + fQ.y) * fQ.z) * 0.65 + fract((fQ2.x + fQ2.y) * fQ2.z) * 0.35;
         if (fH < smoothstep(${WOOD.EDGE[0].toFixed(2)}, ${WOOD.EDGE[1].toFixed(2)}, fFr) * ${WOOD.EDGE[2].toFixed(2)} * (1.0 - smoothstep(${WOOD.EDGE[3]}.0, ${WOOD.EDGE[4]}.0, fD))) discard;
+        }
       }`).replace('#include <lights_lambert_fragment>', `
       #if NUM_DIR_LIGHTS > 0
       if (wFol > 0.5) {                              // два тона кроны (2г6): грань к солнцу — теплее и светлее, в тени — холодная и тёмная
