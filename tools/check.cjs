@@ -92,6 +92,13 @@ const CHECKS = [
     if (!j) return { status: 'fail', info: 'без ответа: ' + (r.err || r.out).trim().slice(0, 160) };
     return j.ok ? { status: 'ok', info: `${j.cases} случаев: из 0.9.1 / 0.10.6 / 0.11.0 — сразу последняя` } : { status: 'fail', info: j.fail.join(' | ').slice(0, 200) };
   } },
+  { id: 'car-blood-shader', name: 'кровь и грязь машины: программа WebGL компилируется', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/car-blood-shader.js')]);
+    const e = errLine(j), r = j.result;
+    const shaderError = (j.errors || []).find(x => /Shader Error|shader is not compiled/.test(x));
+    return e || shaderError || !r?.ok ? { status: 'fail', info: e || shaderError || 'нет результата' }
+      : { status: 'ok', info: r.scenarios.join('; ') + ': ' + r.programs + ' программ' };
+  } },
   { id: 'orders', name: 'заказы в открытых районах, город поделён', group: 2, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/orders-open.js')]);
     const e = errLine(j), r = j.result;

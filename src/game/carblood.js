@@ -31,7 +31,11 @@ export const STATS = { cars: 0, splats: 0, merged: 0 };
 export const CFG = { on: false };                   // взрослая версия: кровь в программе коробочной своей машины (cardirt.js patch; game.js)
 
 /* пятно: xyz — центр в осях машины (x — влево, y — вверх, z — вперёд), w — радиус (0 — нет); ниже центра — вытянуто вниз */
+// Грязь и кровь потока могут оказаться на одном материале после замены модели.
+// Объявления общие; оба слоя используют один uniform без повторной компиляции функций.
 export const GLSL = `
+#ifndef BIRD_CAR_BLOOD_GLSL
+#define BIRD_CAR_BLOOD_GLSL
 uniform vec4 uBlood[${BLOOD.N}];
 float cbH (vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 vec3 carBlood (vec3 c, vec3 p) {
@@ -47,6 +51,8 @@ vec3 carBlood (vec3 c, vec3 p) {
   }
   return mix(c, vec3(0.32, 0.015, 0.02), bl * 0.92);
 }
+
+#endif
 `;
 
 const newState = () => ({ U: { uBlood: { value: Array.from({ length: BLOOD.N }, () => new THREE.Vector4(0, 0, 0, 0)) }, uBInv: { value: new THREE.Matrix4() } }, i: 0, splats: [], mesh: null });
