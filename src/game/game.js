@@ -3678,7 +3678,7 @@ function shopRow (w, kind, on, base, hLo) {
   }
 }
 
-function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch, doors) {
+function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch, doors, softRoof) {
   const n = p.length, seed = Math.abs(Math.round(cx * 7 + cz * 13));
   const walls = [];
   for (let i = 0; i < n; i++) {
@@ -3894,7 +3894,7 @@ function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch, doors) {
   const pitched = b.roof && b.roof !== 'f' && area < 420 && n <= 10 && lv <= 4;
   if (k === 'gar') {
     LITM.color('#57524d');                                          // рубероид
-    LITM.poly(p, h, true);
+    if (softRoof) SOFTCITY.flatRoof(LITM, softRoof, h); else LITM.poly(p, h, true);
     return;
   }
   if (pitched) {
@@ -3907,7 +3907,7 @@ function facade (b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch, doors) {
     }
   } else {
     LITM.color(k === 'off' ? '#a9b0b8' : ROOFS[(n + lv) % ROOFS.length]);
-    LITM.poly(p, h, true);
+    if (softRoof) SOFTCITY.flatRoof(LITM, softRoof, h); else LITM.poly(p, h, true);
     // парапет и надстройки: выход на крышу, вентиляция, у офиса — кондиционеры
     if (area > 150) {
       for (let i = 0; i < (k === 'off' || k === 'ind' ? 3 : 1); i++) {
@@ -4321,7 +4321,19 @@ function osmBuildings (skip) {
 
     // стены и препятствия
     const arch = archFor(b, p, ccw, lv, area);
-    const softCorners = !arch && b.k !== 'church' ? SOFTCITY.corners(p, ccw) : null;
+    const cornerBlock = new Set();
+    if (arch) for (let i = 0; i < n; i++) {
+      const cu = arch.cut.get(p[i]);
+      if (cu === undefined) continue;
+      const len = Math.hypot(p[(i + 1) % n][0] - p[i][0], p[(i + 1) % n][1] - p[i][1]);
+      if (cu - ARCH_W / 2 < 0.5) cornerBlock.add(i);
+      if (len - cu - ARCH_W / 2 < 0.5) cornerBlock.add((i + 1) % n);
+    }
+    const softCorners = SOFTCITY.corners(p, ccw, cornerBlock);
+    // Unknown pitched-roof variants stay intact; flat roofs share the rounded wall outline.
+    const flatRoof = b.k === 'gar' || !b.roof || b.roof === 'f';
+    const softRoof = flatRoof ? SOFTCITY.roofRim(p, softCorners, ccw) : null;
+    const wallTop = h - (softRoof ? softRoof.drop : 0);
     LITM.color(hex);
     let bestEdge = null, bestD = Infinity;
     for (let i = 0; i < n; i++) {
@@ -4330,18 +4342,18 @@ function osmBuildings (skip) {
       const len = Math.hypot(dx, dz);
       if (len < 0.4) continue;
       const cu = arch ? arch.cut.get(a) : undefined;
+      const sa = softCorners?.[i]?.end || a, sb = softCorners?.[(i + 1) % n]?.start || c;
       if (cu !== undefined) {
         // стена с проёмом: слева, справа и перемычка над аркой
         const ux = dx / len, uz = dz / len, g0 = cu - ARCH_W / 2, g1 = cu + ARCH_W / 2, ry = Math.atan2(dz, dx);
-        LITM.wall(a[0], a[1], a[0] + ux * g0, a[1] + uz * g0, hLo - 0.6, h);
-        LITM.wall(a[0] + ux * g1, a[1] + uz * g1, c[0], c[1], hLo - 0.6, h);
-        LITM.wall(a[0] + ux * g0, a[1] + uz * g0, a[0] + ux * g1, a[1] + uz * g1, arch.top, h);
+        LITM.wall(sa[0], sa[1], a[0] + ux * g0, a[1] + uz * g0, hLo - 0.6, wallTop);
+        LITM.wall(a[0] + ux * g1, a[1] + uz * g1, sb[0], sb[1], hLo - 0.6, wallTop);
+        LITM.wall(a[0] + ux * g0, a[1] + uz * g0, a[0] + ux * g1, a[1] + uz * g1, arch.top, wallTop);
         if (arch.round) archSpandrel(a, ux, uz, cu, arch);           // круглая: углы над сводом — стеной
         obb(a[0] + ux * g0 / 2, a[1] + uz * g0 / 2, g0 / 2, 0.5, ry);
         obb(a[0] + ux * (g1 + len) / 2, a[1] + uz * (g1 + len) / 2, (len - g1) / 2, 0.5, ry);
       } else {
-        const sa = softCorners?.[i]?.end || a, sb = softCorners?.[(i + 1) % n]?.start || c;
-        LITM.wall(sa[0], sa[1], sb[0], sb[1], hLo - 0.6, h);
+        LITM.wall(sa[0], sa[1], sb[0], sb[1], hLo - 0.6, wallTop);
         const ws = obb((a[0] + c[0]) / 2, (a[1] + c[1]) / 2, len / 2, 0.5, Math.atan2(dz, dx));
         if (topY !== undefined) ws.topY = topY;   // выше — стоишь на крыше (roofs.js)
       }
@@ -4359,7 +4371,7 @@ function osmBuildings (skip) {
       }
     }
 
-    SOFTCITY.cornerWalls(LITM, softCorners, hLo - 0.6, h);
+    SOFTCITY.cornerWalls(LITM, softCorners, hLo - 0.6, wallTop);
 
     if (arch) {
       // тоннель: стены по бокам проезда и потолок
@@ -4382,7 +4394,7 @@ function osmBuildings (skip) {
     }
     // окна первого этажа за дверью и козырьком не рисуем (автор 18.10.2026): фасад копит первый этаж, F0 рисует его мимо подъездов
     const doors = osmDoorsNear(p);
-    facade(b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch, doors.slice());
+    facade(b, p, ccw, lv, area, hLo, hHi, h, cx, cz, arch, doors.slice(), softRoof);
     genEntrances(b, p, ccw, lv, area, arch, bestEdge, doors);
     F0(doors); F0 = null;
 

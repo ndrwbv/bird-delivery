@@ -1,3 +1,4 @@
+import * as SOFTCITY from './softcity.js';
 /* Городские объекты, которых нет в Москве, а в Северске есть: забор по
    периметру закрытого города и КПП на выездах, железная дорога с
    переездами, скатные крыши частного сектора, купола церкви, вывески ТЦ.
@@ -189,6 +190,7 @@ export function gableRoof (A, p, h, wallHex, roofHex, hipped) {
   const [p00x, p00z] = P(a0, b0), [p10x, p10z] = P(a1, b0), [p11x, p11z] = P(a1, b1), [p01x, p01z] = P(a0, b1);
   const [r0x, r0z] = P(a0 + hip, bm), [r1x, r1z] = P(a1 - hip, bm);
   const y0 = h - 0.15, yt = h + rise;
+  if (SOFTCITY.pitchedRoof(A.LITM, [[p00x, p00z], [p10x, p10z], [p11x, p11z], [p01x, p01z]], [[r0x, r0z], [r1x, r1z]], [nx, nz], y0, yt, W / 2, roofHex, wallHex, hipped)) return true;
   A.LITM.color(roofHex);
   A.LITM.quad(p00x, y0, p00z, p10x, y0, p10z, r1x, yt, r1z, r0x, yt, r0z, -nx, 0.9, -nz);
   A.LITM.quad(p11x, y0, p11z, p01x, y0, p01z, r0x, yt, r0z, r1x, yt, r1z, nx, 0.9, nz);

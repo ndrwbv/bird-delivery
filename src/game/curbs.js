@@ -284,7 +284,8 @@ function section (x0, z0, x1, z1, nx, nz, lift, k, ta = 0, tb = 0, en = null, fl
     } else {
       LITM.quad(tx0, t0, tz0, tx1, t1, tz1, ox1, t1, oz1, ox0, t0, oz0);       // верх камня
       LITM.color(CURB.BERM_HEX);
-      LITM.quad(ox0, t0, oz0, ox1, t1, oz1, fx1, gf1, fz1, fx0, gf0, fz0);     // скат газона (вместо грани камня к газону)
+      if (SOFTCITY.STYLE.geometry) SOFTCITY.lawnEdge(LITM, [ox0, oz0], [ox1, oz1], [fx0, fz0], [fx1, fz1], t0, t1, gf0, gf1);
+      else LITM.quad(ox0, t0, oz0, ox1, t1, oz1, fx1, gf1, fz1, fx0, gf0, fz0);     // скат газона (вместо грани камня к газону)
     }
   } else if (MOB) {                                  // клин: от верха грани к дорожке — скатом к газону
     LITM.quad(ix0, t0, iz0, ix1, t1, iz1, ox1, go1 - 0.03, oz1, ox0, go0 - 0.03, oz0);
