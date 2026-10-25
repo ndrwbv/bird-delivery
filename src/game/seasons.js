@@ -43,6 +43,7 @@ import { ON as MOBILE } from './mobile.js';       // снег на телефо�
 import * as DYN from './dynres.js';              // «мыло»: снежинка того же размера на экране, когда кадр меньше
 import { SEE_U, SEE_FN } from './seethru.js';    // деревья, кусты и столбы между камерой и машиной тают (seethru.js, 0п47)
 import { BAYER_FN } from './fade.js';
+import { indexPile } from './pileindex.js';
 
 const CELL = 200;                           // клетка склейки, как у статики (CHUNK в game.js; было 100 — деревья и сугробы давали ~37 вызовов отрисовки в кадре, 10.10.2026)
 
@@ -485,7 +486,7 @@ function* jointSteps (piles, mat, nKeep) {
     let n = 0, nk = 0;
     const parts = piles.map((P, pi) => { const c = P.cells().get(k), cn = c ? c.n : 0; n += cn; if (pi < nKeep) nk += cn; return c; });
     if (!n) continue;
-    const pp = new Float32Array(n * 3), cc = new Uint8Array(n * 3), aa = new Uint8Array(n * 4);
+    let pp = new Float32Array(n * 3), cc = new Uint8Array(n * 3), aa = new Uint8Array(n * 4);
     let o = 0;
     for (let pi = 0; pi < parts.length; pi++) {
       const c = parts[pi];
@@ -496,6 +497,16 @@ function* jointSteps (piles, mat, nKeep) {
     }
     for (const P of piles) P.drop(k);
     const g = new THREE.BufferGeometry();
+    // ?nopileix — контрольная сборка без общих вершин, для замера памяти и вида.
+    const t0 = performance.now();
+    const indexed = /[?&]nopileix(&|$)/.test(location.search) ? null : indexPile(pp, cc, aa, nk);
+    if (indexed) {
+      pp = indexed.p; cc = indexed.c; aa = indexed.a;
+      const ia = new THREE.BufferAttribute(indexed.index, 1);
+      ia.onUpload(dropArr); g.setIndex(ia);
+    }
+    g.userData.pileIndex = { before: n, after: pp.length / 3, keep: nk, ms: performance.now() - t0,
+      bytesBefore: n * 19, bytesAfter: pp.byteLength + cc.byteLength + aa.byteLength + (indexed ? indexed.index.byteLength : 0) };
     const pa = new THREE.BufferAttribute(pp, 3), ca = new THREE.BufferAttribute(cc, 3, true), xa = new THREE.BufferAttribute(aa, 4, true);
     g.setAttribute('position', pa); g.setAttribute('color', ca); g.setAttribute('aux', xa);
     bounds(g);
@@ -594,7 +605,8 @@ const BUILT = { trees: 0, pile: 0, garl: 0, drifts: 0, bulbs: 0, items: 0 };
    inHouse, inPoly, inBounds, put, smashAdd, SMASH, SMASH_MAT, LAMP_SPOTS, ZEBRAS, NODE_IDX, nodeDeg,
    makeHuman, dropMesh, gibHuman, toast, Snd, CAR_L, CAR_W, isPlaying, sayBubble; геттеры: PIZZA, ENV, rainLines, hemi */
 /* память склеек до их сборки (отладка, __dlv.SEASMEM) */
-export const pileMem = () => ({ pile: PILE && PILE.mem(), drift: DRIFTP && DRIFTP.mem(), leaf: LEAFP && LEAFP.mem(), garl: GARL && GARL.mem() });
+export const pileMem = () => ({ pile: PILE && PILE.mem(), drift: DRIFTP && DRIFTP.mem(), leaf: LEAFP && LEAFP.mem(), garl: GARL && GARL.mem(),
+  index: MESH_PILE.map(m => m.geometry.userData.pileIndex).filter(Boolean) });
 export function initSeasons (ctx) {
   C = ctx; THREE = ctx.THREE;
   const q = new URLSearchParams(location.search).get('season');

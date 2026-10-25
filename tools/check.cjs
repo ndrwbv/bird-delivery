@@ -63,6 +63,15 @@ const smoke = (args, label) => async () => {
 };
 
 const CHECKS = [
+  { id: 'pile-live', name: 'сугробы после индексации: разрушение и смена сезона', group: 2, run: async () => {
+    const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/pile-index.js'), '--seed=7']);
+    const e = errLine(j), r = j.result;
+    return { status: !e && r?.ok && !j.errors.length && !r.crash ? 'ok' : 'fail', info: e || (r ? `${r.cells} клеток, буферы ${r.mbBefore} → ${r.mbAfter} МБ; проверено сугробов ${r.checks.length}, ошибок ${j.errors.length}` : 'нет результата') };
+  } },
+  { id: 'pile-index', name: 'общие вершины статики: геометрия, сезоны, живой префикс', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'pile-index-test.mjs')]);
+    return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };
+  } },
   { id: 'build-web', name: 'сборка web', group: 1, run: build('web') },
   { id: 'build-steam', name: 'сборка steam', group: 1, run: build('steam') },
   { id: 'i18n', name: 'i18n:check', group: 1, run: async () => {
