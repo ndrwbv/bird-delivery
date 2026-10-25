@@ -2,6 +2,8 @@
 const q=new URLSearchParams(location.search), prefix=q.get('softshots');
 if(!prefix||!q.has('noview'))throw Error('Use noview and softshots');
 await ride();await until(()=>!d.LATE.busy(),60000);
+// При повторном запуске после проверки смены накладная может ещё падать к радару.
+d.acceptOrder();await wait(800);
 d.ENV.t=.3;d.ENV.rain=d.ENV.rainWant=0;await wait(400);d.S.paused=true;
 const home=[d.V.x,d.V.z],dist=p=>Math.hypot(p[0]-home[0],p[1]-home[1]);
 const views=[];

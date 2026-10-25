@@ -1391,9 +1391,9 @@ function Mesher (opt) {
   const V2 = [];
   const api = {
     coverQuad: RLAND.ON ? (p, lift) => {
-      if (opt && opt.keepFront && opt.alpha && ca === 0 && !LAND_HOLD) {
-        RLAND.record(...p[0], ...p[1], ...p[2], lift, cr, cg, cb);
-        RLAND.record(...p[0], ...p[2], ...p[3], lift, cr, cg, cb);
+      if (opt && opt.keepFront && opt.alpha && !opt.noLandRecord && ca === 0 && !LAND_HOLD) {
+        RLAND.record(...p[0], ...p[1], ...p[2], lift, cr, cg, cb, !!opt.groundOnly);
+        RLAND.record(...p[0], ...p[2], ...p[3], lift, cr, cg, cb, !!opt.groundOnly);
       }
       const prev = LAND_HOLD; LAND_HOLD = true;
       return () => { LAND_HOLD = prev; };
@@ -1488,7 +1488,7 @@ function Mesher (opt) {
        Режем его по клеткам сетки и по их диагоналям: каждый кусок лежит
        в одной плоскости с землёй под ним, поэтому ни щелей, ни провалов. */
     dtri (ax, az, bx, bz, cx, cz, lift) {
-      if (RLAND.ON && !LAND_HOLD && opt && opt.keepFront && opt.alpha && ca === 0) RLAND.record(ax, az, bx, bz, cx, cz, lift, cr, cg, cb);
+      if (RLAND.ON && !LAND_HOLD && opt && opt.keepFront && opt.alpha && !opt.noLandRecord && ca === 0) RLAND.record(ax, az, bx, bz, cx, cz, lift, cr, cg, cb, !!opt.groundOnly);
       if (ZFLOG) {
         const k0 = (cr << 16) | (cg << 8) | cb, q = [k0, k0, k0];
         if (GRAD) { const t3 = [0, 0, 0]; [[ax, az], [bx, bz], [cx, cz]].forEach(([x, z], i) => { GRAD(x, z, t3, 0); q[i] = (t3[0] << 16) | (t3[1] << 8) | t3[2]; }); }
@@ -1606,6 +1606,7 @@ function Mesher (opt) {
         // статика не двигается: матрицы не пересчитываем каждый кадр —
         // в Северске таких кусков десятки тысяч, обход съедал десятую часть кадра
         const me = new THREE.Mesh(geoOf(B, IX, keep), mat);
+        if (opt && opt.groundOnly) me.userData.landPreview = true;
         me.matrixAutoUpdate = false;
         grp.add(me);
         tracks(B, me);
@@ -1620,6 +1621,13 @@ function Mesher (opt) {
       n = 0; ids = new Map(); BK = []; lastK = NaN; lastB = null;
       ixFree();
       return grp;
+    },
+    /* Временная земля меню заменяется окончательным контуром, со сцены — сразу. */
+    discard () {
+      const removed = n;
+      for (const B of BK) if (B.me) { B.me.removeFromParent(); B.me.geometry.dispose(); }
+      n = 0; ids.clear(); BK = []; lastK = NaN; lastB = null;
+      return removed;
     },
     /* последняя склейка шагами (поздняя сборка, latebuild.js): клетка за клеткой — общие вершины (ixCell), меш (клетке меню —
        новая геометрия, новой — новый меш в grp), в видеокарту — пачкой через up(меши) (~150 тыс. вершин на шаг), и свои массивы
@@ -1871,6 +1879,8 @@ WINS.init(CHUNK);
 WINS.quality(GFX.winQ());
 const LITM = Mesher({ alpha: !NO_LITJ || !NO_SMJ, index: true, keepFront: true, mainRGB: true });   // всё материальное: земля, дороги, дома; с 17.10.2026 и склейки реквизита (LIT) — признак «реквизит» в четвёртом байте цвета
 const FLATM = Mesher({ alpha: true, index: true, mainRGB: true });   // разметка, окна, вывески — света не ловят; с 17.10.2026 и плафоны (LAMPH) — признак «светится» в четвёртом байте цвета
+const GROUND_M = RLAND.ON ? Mesher({ alpha: true, index: true, keepFront: true, mainRGB: true, groundOnly: true }) : LITM;
+const CURB_M = RLAND.ON ? Mesher({ alpha: true, index: true, keepFront: true, noLandRecord: true }) : LITM;
 BALCS.setup({ LITM, FLATM, WINS });               // балконы пишут прямо в склейки и окна (balconies.js; вещей three.js не создаёт)
 
 /* ── земля, зелёнка, вода ── */
@@ -1893,42 +1903,16 @@ function groundHex (h) {
   return c;
 }
 
-function osmGround () {
-  // сама сетка рельефа: по два треугольника на клетку, диагональ та же,
-  // что в groundH
+function groundSkirt (M) {
   const hAt = (i, j) => TH[j * TNX + i];
-  const cell = (i, j) => {
-    const x0 = TX0 + i * TG, x1 = x0 + TG, z0 = TZ0 + j * TG, z1 = z0 + TG;
-    const h00 = hAt(i, j), h10 = hAt(i + 1, j), h01 = hAt(i, j + 1), h11 = hAt(i + 1, j + 1);
-    LITM.color(groundHex((h00 + h10 + h01) / 3));
-    LITM.up(x0, h00, z0, x1, h10, z0, x0, h01, z1);
-    LITM.color(groundHex((h11 + h10 + h01) / 3));
-    LITM.up(x1, h11, z1, x0, h01, z1, x1, h10, z0);
-  };
-  /* Далеко за забором (карта с границей) земля — крупными кусками по
-     четыре клетки: туда не проехать, а мелкая сетка на полгорода за
-     оградой весила миллион треугольников. */
-  const K = 4;
-  for (let bj = 0; bj < TNZ - 1; bj += K)
-    for (let bi = 0; bi < TNX - 1; bi += K) {
-      const ei = Math.min(bi + K, TNX - 1), ej = Math.min(bj + K, TNZ - 1);
-      const x0 = TX0 + bi * TG, z0 = TZ0 + bj * TG, x1 = TX0 + ei * TG, z1 = TZ0 + ej * TG;
-      if (DMASK && farOut(x0, z0) && farOut(x1, z0) && farOut(x0, z1) && farOut(x1, z1) && farOut((x0 + x1) / 2, (z0 + z1) / 2)) {
-        const h00 = hAt(bi, bj) - 0.3, h10 = hAt(ei, bj) - 0.3, h01 = hAt(bi, ej) - 0.3, h11 = hAt(ei, ej) - 0.3;
-        LITM.color(groundHex((h00 + h10 + h01) / 3)); LITM.up(x0, h00, z0, x1, h10, z0, x0, h01, z1);
-        LITM.color(groundHex((h11 + h10 + h01) / 3)); LITM.up(x1, h11, z1, x0, h01, z1, x1, h10, z0);
-        continue;
-      }
-      for (let j = bj; j < ej; j++) for (let i = bi; i < ei; i++) cell(i, j);
-    }
   // Юбка до горизонта: край сетки тянем наружу на той же высоте,
   // иначе за городом земля обрывается ступенькой в пустоту.
   const far = 1400;
   const gx1 = TX0 + (TNX - 1) * TG, gz1 = TZ0 + (TNZ - 1) * TG;
   const skirt = (ax, az, ha, bx, bz, hb, ox, oz) => {
-    LITM.color(groundHex((ha + hb) / 2));
-    LITM.up(ax, ha, az, bx, hb, bz, bx + ox, hb, bz + oz);
-    LITM.up(ax, ha, az, bx + ox, hb, bz + oz, ax + ox, ha, az + oz);
+    M.color(groundHex((ha + hb) / 2));
+    M.up(ax, ha, az, bx, hb, bz, bx + ox, hb, bz + oz);
+    M.up(ax, ha, az, bx + ox, hb, bz + oz, ax + ox, ha, az + oz);
   };
   for (let i = 0; i < TNX - 1; i++) {
     const xa = TX0 + i * TG, xb = xa + TG;
@@ -1943,10 +1927,43 @@ function osmGround () {
   for (const [cx, cz, i, j, sx, sz] of [[TX0, TZ0, 0, 0, -1, -1], [gx1, TZ0, TNX - 1, 0, 1, -1],
                                         [TX0, gz1, 0, TNZ - 1, -1, 1], [gx1, gz1, TNX - 1, TNZ - 1, 1, 1]]) {
     const h = hAt(i, j);
-    LITM.color(groundHex(h));
-    LITM.up(cx, h, cz, cx + sx * far, h, cz, cx + sx * far, h, cz + sz * far);
-    LITM.up(cx, h, cz, cx + sx * far, h, cz + sz * far, cx, h, cz + sz * far);
+    M.color(groundHex(h));
+    M.up(cx, h, cz, cx + sx * far, h, cz, cx + sx * far, h, cz + sz * far);
+    M.up(cx, h, cz, cx + sx * far, h, cz + sz * far, cx, h, cz + sz * far);
   }
+
+}
+
+function osmGround () {
+  // сама сетка рельефа: по два треугольника на клетку, диагональ та же,
+  // что в groundH
+  const hAt = (i, j) => TH[j * TNX + i];
+  const cell = (i, j) => {
+    const x0 = TX0 + i * TG, x1 = x0 + TG, z0 = TZ0 + j * TG, z1 = z0 + TG;
+    const h00 = hAt(i, j), h10 = hAt(i + 1, j), h01 = hAt(i, j + 1), h11 = hAt(i + 1, j + 1);
+    GROUND_M.color(groundHex((h00 + h10 + h01) / 3));
+    GROUND_M.up(x0, h00, z0, x1, h10, z0, x0, h01, z1);
+    GROUND_M.color(groundHex((h11 + h10 + h01) / 3));
+    GROUND_M.up(x1, h11, z1, x0, h01, z1, x1, h10, z0);
+  };
+  /* Далеко за забором (карта с границей) земля — крупными кусками по
+     четыре клетки: туда не проехать, а мелкая сетка на полгорода за
+     оградой весила миллион треугольников. */
+  const K = 4;
+  for (let bj = 0; bj < TNZ - 1; bj += K)
+    for (let bi = 0; bi < TNX - 1; bi += K) {
+      const ei = Math.min(bi + K, TNX - 1), ej = Math.min(bj + K, TNZ - 1);
+      const x0 = TX0 + bi * TG, z0 = TZ0 + bj * TG, x1 = TX0 + ei * TG, z1 = TZ0 + ej * TG;
+      if (DMASK && farOut(x0, z0) && farOut(x1, z0) && farOut(x0, z1) && farOut(x1, z1) && farOut((x0 + x1) / 2, (z0 + z1) / 2)) {
+        const h00 = hAt(bi, bj) - 0.3, h10 = hAt(ei, bj) - 0.3, h01 = hAt(bi, ej) - 0.3, h11 = hAt(ei, ej) - 0.3;
+        GROUND_M.color(groundHex((h00 + h10 + h01) / 3)); GROUND_M.up(x0, h00, z0, x1, h10, z0, x0, h01, z1);
+        GROUND_M.color(groundHex((h11 + h10 + h01) / 3)); GROUND_M.up(x1, h11, z1, x0, h01, z1, x1, h10, z0);
+        continue;
+      }
+      for (let j = bj; j < ej; j++) for (let i = bi; i < ei; i++) cell(i, j);
+    }
+  groundSkirt(GROUND_M);
+  const far = 1400, gx1 = TX0 + (TNX - 1) * TG, gz1 = TZ0 + (TNZ - 1) * TG;
 
   // Томь — одна ровная гладь на нуле: дно под ней на три метра ниже,
   // берег выше, и кромка воды получается сама там, где земля уходит вниз
@@ -1965,9 +1982,9 @@ function osmGround () {
     if (DMASK && g.p.every(q => farOut(q[0], q[1]))) continue;      // за забором далеко — не рисуем
     if (g.k === 'water') continue;                                   // пруды — в воде (water.js)
     const gh = FOREST.isForest(g) ? FOREST.FOREST.FLOOR : GREEN_HEX[g.k] || '#95c579';
-    LITM.color(gh);   // в ельнике земля темнее (forest.js)
+    GROUND_M.color(gh);   // в ельнике земля темнее (forest.js)
     // разные зелёные куски (парк поверх двора, ельник поверх газона) — не на одной высоте: мерцали на стыке (О3)
-    LITM.poly(g.softP || g.p, g.k === 'water' ? 0.03 : 0.04 + flatRank(GREEN_RANK, gh, 5) * 0.0007);
+    GROUND_M.poly(g.softP || g.p, g.k === 'water' ? 0.03 : 0.04 + flatRank(GREEN_RANK, gh, 5) * 0.0007);
   }
 }
 
@@ -5909,6 +5926,7 @@ function buildCity () {
   tm0('ground', osmGround);
   RW.init({ CITY, MAP, nearestRoad, get ENV () { return ENV; } });   // вид асфальта улиц — до полотна (roadwear.js); ENV — позже, на дождь
   tm0('roads', osmRoads);
+  if (RLAND.ON) RLAND.compact();
   tm0('marks', osmMarkings);
   tm0('bridges', osmBridges);
   tm0('edge', osmEdgeBlocks);
@@ -5960,8 +5978,9 @@ function buildCity () {
     BENCHES, PROPS, SOLIDS, SMASH, SMASH_GRID, SM_CHUNKS, SM_CELL, LAMPH, LAMP_SPOTS }));   // правки из редактора: поставить добавленное (editlayer.js)
   if (!INTRO && !new URLSearchParams(location.search).has('noyc')) tm('yardcars', () => YCARS.build(ycApi()));   // карманы парковки у дворовых проездов — после деревьев дворов, до сугробов (yardcars.js); ?noyc — без них
   if (!INTRO) tm('yardmaze', () => YMAZE.build(ymApi()));   // дворы сложнее: заборы у тротуаров, клумбы, кусты, лесочки — после карманов парковки, до сугробов и smashBuild (yardmaze.js); ?nomaze — без них
-  if (!INTRO) tm('yardcurbs', () => CURBS.build({ CITY, LITM, groundH, inHouse, houseIn, inBounds, inPoly, roadWidth, onPave: PAVE.onPave, roadWalk: PAVE.roadWalk, roadWalkL: PAVE.roadWalkL, roadsIn: PAVE.roadsIn, pathAt: PAVE.pathAt, onAlley: (x, z, m) => WORLD.onAlley(x, z, m), curbAt,
-    ycBlocks: (x, z, r) => YCARS.blocks(x, z, r), mobile: () => TOUCH || MOBM.ON }));   // бордюры у дорожек и проездов дворов — после карманов парковки и лабиринта (curbs.js); ?nocurbs — без них
+  const buildCurbs = extra => CURBS.build({ CITY, LITM: CURB_M, groundH, inHouse, houseIn, inBounds, inPoly, roadWidth, onPave: PAVE.onPave, roadWalk: PAVE.roadWalk, roadWalkL: PAVE.roadWalkL, roadsIn: PAVE.roadsIn, pathAt: PAVE.pathAt, onAlley: (x, z, m) => WORLD.onAlley(x, z, m), curbAt,
+    ycBlocks: (x, z, r) => YCARS.blocks(x, z, r), mobile: () => TOUCH || MOBM.ON, ...extra });
+  if (!INTRO) tm('yardcurbs', () => buildCurbs());   // бордюры у дорожек и проездов дворов — после карманов парковки и лабиринта (curbs.js); ?nocurbs — без них
   if (!INTRO) tm('yarddecor', () => DECOR.build({ ...ymApi(), LITM, groundHex, mazeBlocks: (x, z, r) => YMAZE.blocks(x, z, r), mazeAdd: YMAZE.addObj, groves: () => YMAZE.DEBUG.OBJ.filter(o => o.kind === 'grove'),
     curbNear: CURBS.near, greenHex: g => GREEN_HEX[g.k] || '#95c579', greenY: g => 0.04 + flatRank(GREEN_RANK, GREEN_HEX[g.k] || '#95c579', 5) * 0.0007 }));   // палисадники, грядки, круги у деревьев, холмики — после бордюров, до сугробов и smashBuild (yarddecor.js); ?nodecor — без них
   tm('seasonyard', SEAS.seasonYard);
@@ -5972,8 +5991,14 @@ function buildCity () {
   if (!INTRO) tm('bollards', () => BOLL.build({ CITY, ZEBRAS, nearestRoad, roadWidth, inHouse, inBounds, groundH, curbAt, smashAdd, onPave: PAVE.onPave, introClear, startClear }));   // полусферы и столбики у зебр, магазинов и въездов — до smashBuild (bollards.js); ?nobollard — без них
   tm('smash', smashBuild);
   if (RLAND.ON) LATE.add('raisedland', function* () {
+    CURB_M.discard();
+    RLAND.prepare(CITY.buildings, p => THREE.ShapeUtils.triangulateShape(p.map(q => new THREE.Vector2(q[0], q[1])), []));
+    if (!INTRO) yield* buildCurbs({ LITM, rebuild: true, boundaryAt: RLAND.boundaryAt, boundaryRanges: RLAND.boundaryRanges,
+      landTopAt: (x,z) => RLAND.topOffset(x,z,terrainH(x,z)) });
+    RLAND.ST.baseDisposed = GROUND_M.discard();
     yield* RLAND.build({ M: LITM, terrain: TER, heights: TH, groundH: terrainH, groundHex, skip: DMASK ? farOut : null, buildings: CITY.buildings,
       triangulate: p => THREE.ShapeUtils.triangulateShape(p.map(q => new THREE.Vector2(q[0], q[1])), []) });
+    groundSkirt(LITM);
     const delta = RLAND.alignObjects({ lists: [LIT, FLAT, LAMPH], items: SMASH, props: PROPS, benches: BENCHES, baseH: terrainH });
     SEAS.raiseLand(delta);
   });
@@ -5992,7 +6017,7 @@ function buildCity () {
   FSH.mat(litMat); FSH.mat(flatMat);            // тени домов: маска в шейдере земли и разметки (fakeshadows.js)
   const groups = [];
   let warm4 = null;                               // прогрев шейдера склейки с признаком (см. ниже)
-  const meshNow = keep => { for (const g of [LITM.mesh(litMat, keep), FLATM.mesh(flatMat, keep)]) { if (g.children.length) { groups.push(g); scene.add(g); } } };
+  const meshNow = keep => { for (const g of [...(RLAND.ON ? [GROUND_M.mesh(litMat, keep)] : []), LITM.mesh(litMat, keep), FLATM.mesh(flatMat, keep)]) { if (g.children.length) { groups.push(g); scene.add(g); } } };
   if (LATE.busy()) {                              // поздняя сборка: видимое — в сцену сразу, в видеокарту — при первом кадре
     meshNow(true);
     /* клетки меню — цвет тремя байтами (как лежит), последняя склейка — четырьмя (признак: реквизит, мелочь, плафоны) — это

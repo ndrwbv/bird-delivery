@@ -1,6 +1,8 @@
 /* №0п68, ?raisedland: общий контур земли и поверхности движения. */
 await onShift();await wait(500);
 const L=d.RLAND;if(!L?.ST.built)throw new Error('Поднятая земля не собрана');
+let previews=0;d.scene.traverse(o=>{if(o.userData.landPreview)previews++;});
+if(previews||!L.ST.baseDisposed)throw new Error('Старая земля осталась на сцене');
 d.CITYOPEN.unlockAll();d.districtLocks();
 const home=[d.V.x,d.V.z],rows=[],edges=[],base=d.RLAND_BASE;
 for(const t of L.cover.triangles){
@@ -32,4 +34,4 @@ for(const e of edges){
   if(!Number.isFinite(gap)||gap<-.08||gap>.65)throw new Error('Машина под газоном или над ним: '+gap);
   poses.push({x:+d.V.x.toFixed(2),z:+d.V.z.toFixed(2),gap:+gap.toFixed(3)});
 }
-return {ok:true,stats:L.ST,edges:rows.slice(0,12),poses,crash:d.crashlog.count()};
+return {ok:true,stats:L.ST,previews,edges:rows.slice(0,12),poses,crash:d.crashlog.count()};

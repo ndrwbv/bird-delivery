@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {createLandCover} from '../src/game/landcover.js';
+import {createLandCover,intersectTriangle} from '../src/game/landcover.js';
 const area=p=>Math.abs(p.reduce((s,a,i)=>{const b=p[(i+1)%p.length];return s+a[0]*b[1]-a[1]*b[0];},0))/2;
 const sum=ps=>ps.reduce((s,p)=>s+area(p),0);
 const rect=(C,x,z,w,h,lift=0)=>{C.triangle(x,z,x+w,z,x+w,z+h,lift);C.triangle(x,z,x+w,z+h,x,z+h,lift);};
@@ -55,3 +55,44 @@ for(const origin of [[0,0],[4123,-5071]])for(let trial=0;trial<12;trial++){
   }
 }
 console.log('landcover: случайные пересечения и координаты карты — 2400 независимых точек');
+for(let i=0;i<80;i++){
+  const t=Array.from({length:3},()=>[rand()*14-2,rand()*14-2]),C=createLandCover();
+  C.triangle(...t.flat());
+  const cut=C.cut(square),intersection=intersectTriangle(square,i%2?t.slice().reverse():t);
+  assert.ok(Math.abs(sum(cut)+area(intersection)-100)<1e-7,'Части исходной сетки и их вырезы покрывают её полностью');
+}
+console.log('landcover: пересечение с исходной сеткой — без потерянной площади');
+{
+  const C=createLandCover(4);rect(C,2,2,2,6);rect(C,4.02,2,3.98,6);
+  const points=C.breaks(0,5,10,5).sort((a,b)=>a-b);
+  assert.ok(points.every(Number.isFinite));
+  const gap=points.some((a,i)=>i&&Math.abs(points[i-1]-.4)<1e-9&&Math.abs(a-.402)<1e-9);
+  assert.ok(gap,'Двухсантиметровый разрыв найден точно, без шагового пропуска');
+  for(let i=1;i<points.length;i++)if(points[i]-points[i-1]>1e-9){
+    const x=(points[i]+points[i-1])*5;
+    assert.equal(C.covered(x,5),(x>=2&&x<=4)||(x>=4.02&&x<=8));
+  }
+}
+console.log('landcover: точные интервалы для бордюров, включая узкие разрывы');
+{
+  const C=createLandCover(4);rect(C,2,2,6,6,.2);
+  C.triangles[0].rgb=[17,81,139];C.triangles[0].initial=true;
+  const points=Array.from({length:400},()=>[rand()*12-1,rand()*12-1]);
+  const snapshot=points.map(p=>C.height(...p)),before=sum(C.cut(square)),breaks=C.breaks(0,5,10,5).sort((a,b)=>a-b);
+  C.compact();
+  assert.deepEqual(points.map(p=>C.height(...p)),snapshot,'Сжатый контур сохраняет все запросы высоты');
+  assert.equal(sum(C.cut(square)),before);assert.deepEqual(C.breaks(0,5,10,5).sort((a,b)=>a-b),breaks);
+  assert.deepEqual([...C.triangles][0].rgb,[17,81,139]);assert.equal([...C.triangles][0].initial,true);
+  rect(C,0,0,1,1,.3);assert.equal(C.height(.5,.5),.3);assert.equal(C.count,4);
+  C.compact();assert.equal(C.height(.5,.5),.3);assert.equal(C.height(5,5),.2);
+  assert.ok(Math.abs(sum(C.cut(square))-63)<1e-8);
+  C.clear();rect(C,-1,-1,2,2,.4);C.compact();assert.equal(C.count,2);assert.equal(C.height(0,0),.4);
+}
+console.log('landcover: компактное хранение сохраняет геометрию, высоты, цвет и последующие добавления');
+{
+  const C=createLandCover();C.triangle(8,8,12,8,8,12);
+  const p=[[0,0],[10,0],[0,10]];
+  assert.deepEqual(C.cut(p),[p],'Чужое покрытие не дробит землю из-за пересечения одних только рамок');
+  C.compact();assert.deepEqual(C.cut(p),[p]);
+}
+console.log('landcover: непересекающиеся покрытия оставляют землю цельной');

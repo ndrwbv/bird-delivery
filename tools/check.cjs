@@ -63,6 +63,14 @@ const smoke = (args, label) => async () => {
 };
 
 const CHECKS = [
+  { id: 'land-boundary', name: 'границы покрытий: перекрытия, острова и узкие проходы', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'landboundary-geometry.mjs')]);
+    return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };
+  } },
+  { id: 'land-shore', name: 'берег: геометрия совпадает с высотой движения', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'landheight-geometry.mjs')]);
+    return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };
+  } },
   { id: 'land-cover', name: 'контур земли: вырезы покрытий и целостность стыков', group: 1, run: async () => {
     const r = await sh(process.execPath, [path.join(__dirname, 'landcover-geometry.mjs')]);
     return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };

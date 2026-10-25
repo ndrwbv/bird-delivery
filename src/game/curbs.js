@@ -267,6 +267,10 @@ function section (x0, z0, x1, z1, nx, nz, lift, k, ta = 0, tb = 0, en = null, fl
   const gi0 = A.groundH(ix0, iz0), gi1 = A.groundH(ix1, iz1), go0 = A.groundH(ox0, oz0), go1 = A.groundH(ox1, oz1);
   let t0 = Math.max(gi0, go0) + lift + CURB.H, t1 = Math.max(gi1, go1) + lift + CURB.H;
   if (!MOB && !flat && hsh(x0, z0, 3) < CURB.SUNK) { const s = 0.03 + hsh(x0, z0, 4) * 0.03; if (hsh(x1, z1, 6) < 0.5) { t0 -= s; t1 -= s * 0.4; } else { t1 -= s; t0 -= s * 0.4; } }
+  if (A.landTopAt) {
+    t0 = Math.max(t0, go0 + A.landTopAt(ox0 + n0x * .12, oz0 + n0z * .12));
+    t1 = Math.max(t1, go1 + A.landTopAt(ox1 + n1x * .12, oz1 + n1z * .12));
+  }
   LITM.color(hexOf(x0, z0, k));
   const b0 = gi0 + lift - 0.035, b1 = gi1 + lift - 0.035;
   let tx0 = ix0, tz0 = iz0, tx1 = ix1, tz1 = iz1;
@@ -274,7 +278,12 @@ function section (x0, z0, x1, z1, nx, nz, lift, k, ta = 0, tb = 0, en = null, fl
     const [a, b] = SOFTCITY.curbEdge(LITM, [ix0, iz0], [ix1, iz1], [ox0, oz0], [ox1, oz1], b0, b1, t0, t1);
     tx0 = a[0]; tz0 = a[1]; tx1 = b[0]; tz1 = b[1];
   } else LITM.quad(ix0, b0, iz0, ix1, b1, iz1, ix1, t1, iz1, ix0, t0, iz0);           // к дорожке
-  if (BERM && BW > 0) {                              // 0п68: за камнем земля поднята — скат газона от верха камня до газона (BW м)
+  if (A.landTopAt) {
+    // Полный грунт уже поднят: камень заканчивается у его верхней грани,
+    // вместо отдельного спуска обратно к старому уровню газона.
+    LITM.quad(tx0, t0, tz0, tx1, t1, tz1, ox1, t1, oz1, ox0, t0, oz0);
+    LITM.quad(ox0, t0, oz0, ox1, t1, oz1, ox1, go1, oz1, ox0, go0, oz0);
+  } else if (BERM && BW > 0) {                              // 0п68: за камнем земля поднята — скат газона от верха камня до газона (BW м)
     const fw = (MOB ? -hw : ow) + BW, lim = 1.2 / fw;  // «в ус» и у ската: торец по биссектрисе (на остром изломе — не дальше 1,2 м вдоль)
     const fa = Math.max(-lim, Math.min(lim, ta)), fb = Math.max(-lim, Math.min(lim, tb));
     const fx0 = x0 + n0x * fw + ux * fw * fa, fz0 = z0 + n0z * fw + uz * fw * fa, fx1 = x1 + n1x * fw - ux * fw * fb, fz1 = z1 + n1z * fw - uz * fw * fb;
@@ -318,7 +327,17 @@ function run (P, ux, uz, nx, nz, t0, t1, lift, ta = 0, tb = 0, fa = false, fb = 
 }
 /* край отрезка: P — начало средней линии камня, вдоль u на L м; где не накрыто — куски */
 function edge (P, ux, uz, nx, nz, L, lift, self, t0 = 0, J = null) {
-  const st = CURB.STEP, at = t => (RSW > 0 && raised(P[0] + ux * t, P[1] + uz * t, nx, nz) && ++ST.raised > 0) ||
+  if(A.boundaryRanges){
+    for(const [a,b] of A.boundaryRanges(P,ux,uz,nx,nz,t0,L)){
+      const first=Math.abs(a-t0)<1e-6,last=Math.abs(b-L)<1e-6;
+      run(P,ux,uz,nx,nz,a,b,lift,first&&J?J.ma:0,last&&J?J.mb:0,!!(first&&J?.fa),!!(last&&J?.fb));
+    }
+    return;
+  }
+  const st = CURB.STEP, at = A.boundaryAt ? t => {
+    const x=P[0]+ux*t,z=P[1]+uz*t;
+    return !A.boundaryAt(x,z,nx,nz)||A.inHouse(x,z,.05)||A.groundH(x,z)<.3;
+  } : t => (RSW > 0 && raised(P[0] + ux * t, P[1] + uz * t, nx, nz) && ++ST.raised > 0) ||
     covered(P[0] + ux * t, P[1] + uz * t, self) || (strip(P[0] + ux * t, P[1] + uz * t, ux, uz, nx, nz) && ++ST.strip > 0);
   const fine = (a, b, wantFree) => {              // граница между a (как wantFree) и b — делением пополам
     for (let i = 0; i < 4; i++) { const m = (a + b) / 2; if (!at(m) === wantFree) a = m; else b = m; }
@@ -360,8 +379,18 @@ function arc (cx, cz, r, a0, da, lift, self) {
   for (let k = 0; k < n; k++) {
     const a = a0 + da * k / n, b = a0 + da * (k + 1) / n, m = (a + b) / 2;
     const mx = cx + Math.cos(m) * r, mz = cz + Math.sin(m) * r;
-    if (covered(mx, mz, self)) continue;
     const x0 = cx + Math.cos(a) * r, z0 = cz + Math.sin(a) * r, x1 = cx + Math.cos(b) * r, z1 = cz + Math.sin(b) * r;
+    if(A.boundaryRanges){
+      const len=Math.hypot(x1-x0,z1-z0),ux=(x1-x0)/len,uz=(z1-z0)/len;
+      for(const [lo,hi] of A.boundaryRanges([x0,z0],ux,uz,Math.cos(m),Math.sin(m),0,len)){
+        if(hi-lo<.035)continue;
+        const p=[x0+ux*lo,z0+uz*lo],q=[x0+ux*hi,z0+uz*hi],aa=a+(b-a)*lo/len,bb=a+(b-a)*hi/len;
+        section(...p,...q,Math.cos(m),Math.sin(m),lift,k,0,0,[Math.cos(aa),Math.sin(aa),Math.cos(bb),Math.sin(bb)],true);
+        bgAdd(...p,...q,Math.cos(m),Math.sin(m),lift+CURB.H);ST.arcs++;ST.m+=hi-lo;
+      }
+      continue;
+    }
+    if (covered(mx, mz, self)) continue;
     section(x0, z0, x1, z1, Math.cos(m), Math.sin(m), lift, k, 0, 0, NOMITER ? null : [Math.cos(a), Math.sin(a), Math.cos(b), Math.sin(b)], !NOMITER);   // торцы — по лучам, как соседние секции и отрезки
     bgAdd(x0, z0, x1, z1, Math.cos(m), Math.sin(m), lift + CURB.H);
     ST.arcs++; ST.m += Math.hypot(x1 - x0, z1 - z0);
@@ -462,6 +491,11 @@ function ringCore (p, lift, options) {
 export function* build (api) {
   const QS = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
   if (QS && QS.has('nocurbs')) return ST;
+  if (api.rebuild) {
+    BG=new Map();BI.clear();BF=BWF=null;ON=false;
+    if(TRACE)TRACE.length=0;
+    for(const k of Object.keys(ST))ST[k]=0;
+  }
   const OLD = !!(QS && QS.has('oldcurbs'));         // ?oldcurbs — как до 24.10.2026: проезды только во дворах, без тупиков и улиц, камень 0,12 м, без потери скорости (сравнить)
   if (OLD) { RULES.on = false; CURB.H = 0.12; }
   BERM = !OLD && !(QS && QS.has('noberm'));        // 0п68: за камнем — скат газона (земля поднята); ?noberm, ?oldcurbs — без
