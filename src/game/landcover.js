@@ -29,9 +29,12 @@ function subtract(p,tri) {
 }
 
 export function intersectTriangle(p,triangle){
-  const tri=area2(triangle)<0?triangle.slice().reverse():triangle;
+  return intersectConvex(p,triangle);
+}
+export function intersectConvex(p,polygon){
+  const tri=area2(polygon)<0?polygon.slice().reverse():polygon;
   let rest=p;
-  for(let i=0;i<3&&rest.length>=3;i++)rest=half(rest,tri[i],tri[(i+1)%3],true);
+  for(let i=0;i<tri.length&&rest.length>=3;i++)rest=half(rest,tri[i],tri[(i+1)%tri.length],true);
   return rest.length>=3&&Math.abs(area2(rest))>EPS?rest:[];
 }
 
@@ -107,6 +110,23 @@ export function createLandCover(cell=32) {
     stats.queries++;if(hits.length)stats.cut++;stats.parts+=parts.length;
     return parts;
   }
+  function inside(p){
+    const hits=[];each(box(p),t=>hits.push(t));
+    const original=area2(p)<0?p.slice().reverse():p;
+    let rest=[original];const result=[];
+    for(const t of hits){
+      const next=[];
+      for(const part of rest){
+        const hit=intersectTriangle(part,t.p);
+        if(!hit.length){next.push(part);continue;}
+        result.push(hit);next.push(...subtract(part,t.p));
+      }
+      // Полностью закрытый участок остаётся исходным многоугольником:
+      // внутренние диагонали маски не должны становиться швами земли.
+      rest=next;if(!rest.length)return [original];
+    }
+    return result;
+  }
   // Высота непосредственно по обе стороны линии в точке (x,z).
   // Проба с отступом перескакивала через тонкую полоску другого покрытия:
   // здесь сторону определяют полуплоскости треугольника, без шага в метрах.
@@ -158,7 +178,7 @@ export function createLandCover(cell=32) {
     for(const [k,list] of grid)grid.set(k,Uint32Array.from(list,t=>typeof t==='number'?t:t.id));
     packed={n,data,meta};all.length=0;cache.clear();
   }
-  return {triangle,height,covered:(x,z)=>height(x,z)>-Infinity,sideHeights,cut,breaks,compact,stats,
+  return {triangle,height,covered:(x,z)=>height(x,z)>-Infinity,sideHeights,cut,inside,breaks,compact,stats,
     inBox(bounds){const out=[];each(bounds,t=>out.push(t));return out;},
     *cells(){for(const k of grid.keys()){const [i,j]=k.split(',').map(Number);yield [i*cell,j*cell,(i+1)*cell,(j+1)*cell];}},
     get count(){return count();},get rawCount(){return all.length;},get triangles(){

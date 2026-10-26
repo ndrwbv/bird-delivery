@@ -3,18 +3,21 @@
 import {createLandCover,intersectTriangle} from './landcover.js';
 import {LAND_LIFT,landLift,shoreParts} from './landheight.js';
 import {landBoundary} from './landboundary.js';
-import {landCleanTile,landWidth,LAND_MIN_WIDTH} from './landclean.js';
+import {landCleanTileRegion,landCleanTile,landWidth,contourWidth,LAND_MIN_WIDTH} from './landclean.js';
+import {createLandMask} from './landmask.js';
 export const ON = typeof location!=='undefined'&&new URLSearchParams(location.search).has('raisedland');
 export const LIFT=LAND_LIFT;
 export const cover=ON?createLandCover():null,green=ON?createLandCover():null;
+const rawLand=(x,z)=>green.height(x,z)>cover.height(x,z)||!cover.covered(x,z);
+export const finalMask=ON?createLandMask(rawLand,(...args)=>[...cover.breaks(...args),...green.breaks(...args)]):null;
 export const ST={paving:0,green:0,top:0,walls:0,built:false};
 export function compact(){if(ON){cover.compact();green.compact();}}
-export function boundaries(options){return landBoundary(cover,green,options);}
+export function boundaries(options){return finalMask?.ready?finalMask.boundaries({floorAt:(x,z)=>{const p=cover.height(x,z);return Number.isFinite(p)?p:.085;},...options,accept:(x,z)=>!outside?.(x,z)&&(!options?.accept||options.accept(x,z))}):landBoundary(cover,green,options);}
 // Проверка ширины не добавляет технологический заход мощения на шов.
 export function widthPatches(core){return landCleanTile(cover,green,core,LAND_MIN_WIDTH,0);}
-export function widthAt(edge,t){return landWidth(cover,green,edge,t);}
+export function widthAt(edge,t){return finalMask?.ready?contourWidth(finalMask,edge,t):landWidth(cover,green,edge,t);}
 let building=false, outside=null;
-function classifiedLand(x,z){return green.height(x,z)>cover.height(x,z)||!cover.covered(x,z);}
+function classifiedLand(x,z){return finalMask?.ready?finalMask.contains(x,z):rawLand(x,z);}
 export function boundaryAt(x,z,nx,nz){
   return [.12,.25,.5].some(r=>classifiedLand(x+nx*r,z+nz*r)&&!classifiedLand(x-nx*r,z-nz*r));
 }
@@ -23,7 +26,7 @@ export function boundaryRanges(P,ux,uz,nx,nz,start,end){
   if(length<=0)return [];
   for(const r of [.12,.25,.5])for(const side of [-1,1]){
     const ax=P[0]+ux*start+nx*r*side,az=P[1]+uz*start+nz*r*side,bx=P[0]+ux*end+nx*r*side,bz=P[1]+uz*end+nz*r*side;
-    for(const C of [cover,green])for(const t of C.breaks(ax,az,bx,bz))cuts.push(start+t*length);
+    for(const C of finalMask?.ready?[finalMask]:[cover,green])for(const t of C.breaks(ax,az,bx,bz))cuts.push(start+t*length);
   }
   cuts.sort((a,b)=>a-b);
   const out=[];
@@ -36,7 +39,7 @@ export function boundaryRanges(P,ux,uz,nx,nz,start,end){
 }
 export function topOffset(x,z,h){
   const g=green.height(x,z),p=cover.height(x,z);
-  return landLift(h)+(g>p?Math.max(0,g):0);
+  return landLift(h)+(finalMask?.ready?Math.max(0,g):g>p?Math.max(0,g):0);
 }
 export function onLand(x,z){
   if(!ST.built||outside?.(x,z))return false;
@@ -94,9 +97,12 @@ export function* cleanContours({M,triangulate,skip}){
   building=true;
   try{
     for(const core of cover.cells()){
+      finalMask.reserve(core);
       const [x0,z0,x1,z1]=core;
       if(skip&&[[x0,z0],[x1,z0],[x1,z1],[x0,z1],[(x0+x1)/2,(z0+z1)/2]].every(p=>skip(...p)))continue;
-      for(const patch of landCleanTile(cover,green,core)){
+      const cleaned=landCleanTileRegion(cover,green,core);
+      finalMask.add(core,cleaned.kept,triangulate);
+      for(const patch of cleaned.removed){
         const {points,triangles}=triangulate(patch.outer,patch.holes);
         for(const ids of triangles){
           const p=ids.map(i=>points[i]),x=(p[0][0]+p[1][0]+p[2][0])/3,z=(p[0][1]+p[1][1]+p[2][1])/3;
@@ -130,7 +136,7 @@ export function* cleanContours({M,triangulate,skip}){
       const q=cover.triangle(...t.p[0],...t.p[1],...t.p[2],t.lift);if(q)q.rgb=t.rgb;
       if(cover.rawCount>=16384)cover.compact();
     }
-    cover.compact();ST.cleanedArea=Math.round(ST.cleanedArea*100)/100;
+    cover.compact();yield* finalMask.finishSteps();ST.maskTriangles=finalMask.count;ST.maskEdges=finalMask.segments.length/4;ST.cleanedArea=Math.round(ST.cleanedArea*100)/100;
   }finally{fills.clear();building=false;M.grad(null);}
 }
 function* terrainParts(p,{g,nx,nz,x0,z0}){
@@ -151,7 +157,6 @@ export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,trian
     // Под зданием сохраняем исходный пол, без поднятого газона в дверях.
     prepare(buildings,triangulate);
     const {g,nx,nz,x0,z0}=terrain;
-    const visibleLand=(x,z)=>!skip?.(x,z)&&(green.height(x,z)>cover.height(x,z)||!cover.covered(x,z));
     const draw=(p,extra=0,raise=true)=>{
       const points=p.map(q=>[q[0],q[1],groundH(...q)]);
       for(const part of raise?shoreParts(points):[points])for(let i=1;i<part.length-1;i++){
@@ -159,19 +164,6 @@ export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,trian
         if(Math.abs((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]))<1e-8)continue;
         const y=q=>q[2]+(raise?landLift(q[2]):0)+extra;
         M.up(a[0],y(a),a[1],b[0],y(b),b[1],c[0],y(c),c[1]);ST.top++;
-      }
-    };
-    const walls=(p,extra=0)=>{
-      for(let i=0;i<p.length;i++){
-        const a=p[i],b=p[(i+1)%p.length],dx=b[0]-a[0],dz=b[1]-a[1],len=Math.hypot(dx,dz);
-        if(len<1e-5)continue;
-        const x=(a[0]+b[0])/2,z=(a[1]+b[1])/2,ox=-dz/len*.0001,oz=dx/len*.0001;
-        if(visibleLand(x+ox,z+oz)===visibleLand(x-ox,z-oz))continue;
-        const floor=cover.height(x,z);
-        if(!Number.isFinite(floor)||floor>=landLift(groundH(x,z))+extra)continue;
-        M.color('#829867');
-        const ha=groundH(...a),hb=groundH(...b);
-        M.quad(a[0],ha+floor,a[1],b[0],hb+floor,b[1],b[0],hb+landLift(hb)+extra,b[1],a[0],ha+landLift(ha)+extra,a[1]);ST.walls++;
       }
     };
     let work=0;
@@ -188,10 +180,10 @@ export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,trian
         const x=x0+i*g,z=z0+j*g;
         for(const tri of [[[x,z],[x+g,z],[x,z+g]],[[x+g,z+g],[x,z+g],[x+g,z]]]){
           const raised=!tri.every(q=>skip?.(...q));
-          const parts=raised?cover.cut(tri):[tri];
+          const parts=raised?(finalMask.ready?finalMask.parts(tri,q=>cover.cut(q)):cover.cut(tri)):[tri];
           for(const p of parts){
             M.color(groundHex(groundH((tri[0][0]+tri[1][0]+tri[2][0])/3,(tri[0][1]+tri[1][1]+tri[2][1])/3)));
-            draw(p,0,raised);if(raised)walls(p);
+            draw(p,0,raised);
           }
         }
         if(++work%128===0)yield 'земля';
@@ -200,11 +192,22 @@ export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,trian
     // Цветные вставки используют ту же береговую сетку и тот же закон высоты.
     for(const t of green.triangles){
       const rgb=t.rgb;
-      for(const p of cover.cut(t.p,t.lift))for(const part of terrainParts(p,terrain)){
+      for(const local of terrainParts(t.p,terrain))for(const part of finalMask.ready?finalMask.parts(local,q=>cover.cut(q,t.lift)):cover.cut(local,t.lift)){
         M.grad((x,z,c,o)=>{c[o]=rgb[0];c[o+1]=rgb[1];c[o+2]=rgb[2];});
-        draw(part,t.lift);M.grad(null);walls(part,t.lift);
+        draw(part,t.lift);M.grad(null);
       }
       if(++work%128===0)yield 'газоны';
+    }
+    // Вертикальный торец есть только на настоящей границе газона.
+    // Внутренние диагонали и наложенные зелёные слои стенок не создают.
+    for(const edge of boundaries({includeWalls:true})){
+      if(!edge){yield 'торцы земли';continue;}
+      const {a,b,lift}=edge,x=(a[0]+b[0])/2,z=(a[1]+b[1])/2;
+      const extra=Math.max(0,green.height(x,z));
+      if(lift>=landLift(groundH(x,z))+extra)continue;
+      const ha=groundH(...a),hb=groundH(...b);
+      M.color('#829867');
+      M.quad(a[0],ha+lift,a[1],b[0],hb+lift,b[1],b[0],hb+topOffset(...b,hb),b[1],a[0],ha+topOffset(...a,ha),a[1]);ST.walls++;
     }
     // Песок площадок и другие незелёные участки исходной земли — тоже пол,
     // поэтому они остаются в своих вырезах на прежней высоте.

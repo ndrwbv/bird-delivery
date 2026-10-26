@@ -20,17 +20,24 @@ for(const t of L.cover.triangles){
     const rise=d.groundH(...land)-base(...land),flat=d.groundH(...paved)-base(...paved);
     if(Math.abs(rise-L.LIFT)>1e-5||Math.abs(flat)>1e-5)throw new Error('Геометрия и поверхность движения не совпадают');
     rows.push({land,paved,rise:+rise.toFixed(3),flat:+flat.toFixed(3)});
-    if(edges.every(e=>Math.hypot(e.land[0]-land[0],e.land[1]-land[1])>30))edges.push({land,paved});
+    const sign=land===p?1:-1,pose=[x+nx*sign*4,z+nz*sign*4];
+    if([-2,0,2].some(f=>[-1,1].some(s=>!L.onLand(pose[0]+nx*sign*f+nz*s,pose[1]+nz*sign*f-nx*s))))continue;
+    if(d.inHouse(...pose,3))continue;
+    if(edges.every(e=>Math.hypot(e.land[0]-land[0],e.land[1]-land[1])>30))edges.push({land,paved,pose,h:Math.atan2(nx*sign,nz*sign)});
   }
 }
 if(edges.length<3)throw new Error('Недостаточно независимых границ для проверки');
 const poses=[];
 for(const e of edges){
-  const p=e.land;tp(...p);
+  // Все четыре колеса стоят на земле; частичная опора у самого края
+  // закономерно держит середину кузова ниже высоты центральной точки.
+  const p=e.pose;tp(...p,e.h);
   d.V.x=p[0];d.V.z=p[1];d.V.vx=d.V.vz=0;
   await wait(500);
   if(Math.hypot(d.V.x-p[0],d.V.z-p[1])>3||!L.onLand(d.V.x,d.V.z))throw new Error('Место проверки занято препятствием');
   const gap=d.car.position.y-d.groundH(d.V.x,d.V.z);
+  const V=d.V,fx=Math.sin(V.h),fz=Math.cos(V.h);
+  if([1.4,-1.45].some(f=>[-.9,.9].some(s=>!L.onLand(V.x+fx*f+fz*s,V.z+fz*f-fx*s))))throw Error('Не все колёса стоят на грунте');
   if(!Number.isFinite(gap)||gap<-.08||gap>.65)throw new Error('Машина под газоном или над ним: '+gap);
   poses.push({x:+d.V.x.toFixed(2),z:+d.V.z.toFixed(2),gap:+gap.toFixed(3)});
 }

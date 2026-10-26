@@ -1,16 +1,17 @@
-/* 0п68: повторное раскрытие фактической земли ищет оставшиеся тонкие
-   области. Диагностика формы, не закрытие всей задачи о бордюрах. */
+/* 0п68: независимые поперечные лучи по окончательной области газона.
+   Проверяем также границы у стен; готовность всех бордюров — отдельно. */
 await until(()=>d.RLAND?.ST.built&&!d.LATE.busy(),180000);
-const L=d.RLAND,area=p=>Math.abs(p.reduce((sum,a,i)=>{const b=p[(i+1)%p.length];return sum+a[0]*b[1]-a[1]*b[0];},0))/2;
-if(!L?.ST.built)throw Error('Поднятая земля не собралась');
-let cells=0,residualArea=0,large=0,worst=0;const sample=[];
-for(const core of L.cover.cells()){
-  if(d.CURBS.api.inBounds&&![[core[0],core[1]],[core[2],core[3]],[(core[0]+core[2])/2,(core[1]+core[3])/2]].some(p=>d.CURBS.api.inBounds(...p,-40)))continue;
-  for(const p of L.widthPatches(core)){
-    const a=area(p.outer)-p.holes.reduce((s,h)=>s+area(h),0);if(a<1e-6)continue;
-    residualArea+=a;worst=Math.max(worst,a);
-    if(a>.02){large++;sample.push({core,area:+a.toFixed(4),outer:p.outer});sample.sort((a,b)=>b.area-a.area);if(sample.length>12)sample.pop();}
+const L=d.RLAND;if(!L?.finalMask?.ready)throw Error('Окончательная область газона не собрана');
+const stats={},sample=[];let edges=0,points=0,narrow=0,min=2;
+for(const edge of L.boundaries({includeWalls:true,stats,accept:(x,z)=>d.RLAND_BASE(x,z)>.8})){
+  if(!edge){await wait(0);continue;}
+  for(const t of [.17,.5,.83]){
+    const width=L.widthAt(edge,t);points++;min=Math.min(min,width);
+    if(width+.001<L.ST.minWidth){
+      narrow++;sample.push({a:edge.a,b:edge.b,t,width:+width.toFixed(5)});
+      sample.sort((a,b)=>a.width-b.width);if(sample.length>12)sample.pop();
+    }
   }
-  cells++;if(cells%10===0)await wait(0);
+  if(++edges%1000===0)await wait(0);
 }
-return {complete:false,stats:L.ST,cells,large,residualArea:+residualArea.toFixed(3),worst:+worst.toFixed(4),sample,crash:d.crashlog.count()};
+return {complete:false,ok:edges>0&&!narrow&&!d.crashlog.count(),stats:L.ST,boundary:stats,edges,points,narrow,min:+min.toFixed(5),sample,crash:d.crashlog.count()};

@@ -511,6 +511,7 @@ function paint (g, hex) {
   g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
   return g;
 }
+let LAND_OBJECT = true;
 function put (list, g, hex, x, y, z, rx = 0, ry = 0, rz = 0) {
   // икосаэдры приходят без индекса — склейке он нужен всем одинаково
   if (!g.index) {
@@ -538,7 +539,7 @@ function put (list, g, hex, x, y, z, rx = 0, ry = 0, rz = 0) {
       xform(g, XM.makeTranslation(x, y, z));
     }
     const c = hexRGB(hex), lite = { p: g.attributes.position.array, i: g.index.array, r: c.r, g: c.g, b: c.b, userData: g.userData };
-    if (RLAND.ON) lite.landAnchor = [x, z];
+    if (RLAND.ON && LAND_OBJECT) lite.landAnchor = [x, z];
     list.push(lite);
     return lite;
   }
@@ -5933,10 +5934,17 @@ function buildCity () {
   tm0('edge', osmEdgeBlocks);
   if (CITY.rails) tm0('rails', () => { BUILD_T.railKm = Math.round(CBITS.buildRails(cityApi(), CITY.rails, CITY.levelx)); });
   if (MAPFIX) { BUILD_T.mapfix = Math.round(MAPFIX.ms); BUILD_T.mapfixT = MAPFIX.T; tm0('mapworks', () => MAPW.buildWorks(MAPFIX, mapApi())); }   // тупики: блоки и ремонт
-  { const t0 = performance.now(); osmBuildings(spot); BUILD_T.houses = Math.round(performance.now() - t0); }
-  if (house) { PIZZA = dodoFacade(house); COURIER_SLOTS = PIZZA.slots; SMOKE_SPOT = PIZZA.smoke; }
-  else buildPizzeria(spot.x, spot.z, spot.ry);
-  if (DISTRICTS && house) { buildDistrictPizzerias(); usePizzeria(DIST.cur()); }
+  { const t0 = performance.now();
+    LAND_OBJECT=false;
+    try { osmBuildings(spot); } finally { LAND_OBJECT=true; }
+    BUILD_T.houses = Math.round(performance.now() - t0);
+  }
+  LAND_OBJECT=false;
+  try {
+    if (house) { PIZZA = dodoFacade(house); COURIER_SLOTS = PIZZA.slots; SMOKE_SPOT = PIZZA.smoke; }
+    else buildPizzeria(spot.x, spot.z, spot.ry);
+    if (DISTRICTS && house) { buildDistrictPizzerias(); usePizzeria(DIST.cur()); }
+  } finally { LAND_OBJECT=true; }
   // бордюры — после пиццерий: перед стоянкой курьеров бордюр опущен (заезд, pizzeria.js DRIVEWAYS); растр асфальта нужен только им (mapworks.js) — сразу отпускаем
   tm0('curbs', () => { osmCurbs(); MAPW.freeAsphalt(); });
   // во вступлении место под кружок знаем заранее — его держим пустым
@@ -5998,7 +6006,7 @@ function buildCity () {
       points:[...outer,...holes.flat()],
       triangles:THREE.ShapeUtils.triangulateShape(outer.map(p=>new THREE.Vector2(...p)),holes.map(h=>h.map(p=>new THREE.Vector2(...p))))
     })});
-    if (!INTRO) yield* buildCurbs({ LITM, rebuild: true, boundaryAt: RLAND.boundaryAt, boundaryRanges: RLAND.boundaryRanges,
+    if (!INTRO) yield* buildCurbs({ LITM, rebuild: true, contours:()=>RLAND.boundaries({accept:(x,z)=>!DMASK||!farOut(x,z)}),
       landTopAt: (x,z) => RLAND.topOffset(x,z,terrainH(x,z)) });
     RLAND.ST.baseDisposed = GROUND_M.discard();
     yield* RLAND.build({ M: LITM, terrain: TER, heights: TH, groundH: terrainH, groundHex, skip: DMASK ? farOut : null, buildings: CITY.buildings,
@@ -8891,7 +8899,7 @@ function carShadow () {
 function paveLift (x, z) {
   if(RLAND.ST.built){
     const paved=RLAND.cover.height(x,z),grass=RLAND.green.height(x,z);
-    if(RLAND.onLand(x,z))return Math.max(.03,grass>paved?grass:0);
+    if(RLAND.onLand(x,z))return Math.max(.03,RLAND.finalMask?.ready?grass:grass>paved?grass:0);
     if(Number.isFinite(paved)&&paved<.49)return Math.max(.03,paved);
   }
   const r = nearestRoad(x, z, 7, 1);

@@ -1,5 +1,6 @@
 import * as SOFTCITY from './softcity.js';
 import * as SOFTSURF from './softsurfaces.js';
+import {joinLandCurbs} from './landcurb.js';
 /* ──────────────────────────────────────────────────────────────────────────
    Бордюры во дворах (автор 18.10.2026: «между газоном и дорожкой резкий стык, некрасивый. Дорожка обычно
    с двух сторон огорожена бордюром… во дворах всё ещё очень гладко… чтобы дорога отделялась от газонов
@@ -501,6 +502,39 @@ export function* build (api) {
   BERM = !OLD && !(QS && QS.has('noberm'));        // 0п68: за камнем — скат газона (земля поднята); ?noberm, ?oldcurbs — без
   const t0 = performance.now();
   A = api; LITM = api.LITM; MOB = !!(api.mobile && api.mobile()); SEC = MOB ? CURB.SEC_MOB : CURB.SEC; ST.mob = MOB ? 1 : 0;
+  if(api.contours){
+    BERM=false;
+    const edges=[];
+    for(const e of api.contours()){if(e)edges.push(e);else yield 'бордюры: общий контур';}
+    const mesh=joinLandCurbs(edges,CURB.W);edges.length=0;
+    ST.contourOpen=mesh.open;ST.contourJoins=mesh.joins.length;
+    const mix=(a,b,t)=>t===0?a:t===1?b:[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
+    const top=p=>A.groundH(...p)+A.landTopAt(...p);
+    const draw=(a,b,oa,ob,lift,k)=>{
+      const ha=top(a),hb=top(b),fa=A.groundH(...oa)+lift-.035,fb=A.groundH(...ob)+lift-.035;
+      if(ha<=fa||hb<=fb)return;
+      const ca=mix(oa,a,.16),cb=mix(ob,b,.16),bevel=.02;
+      LITM.color(CURB.HEX[k&1]);
+      LITM.quad(oa[0],fa,oa[1],ob[0],fb,ob[1],ob[0],hb-bevel,ob[1],oa[0],ha-bevel,oa[1]);
+      LITM.quad(oa[0],ha-bevel,oa[1],ob[0],hb-bevel,ob[1],cb[0],hb,cb[1],ca[0],ha,ca[1]);
+      LITM.quad(ca[0],ha,ca[1],cb[0],hb,cb[1],b[0],hb,b[1],a[0],ha,a[1]);
+      if(TRACE)TRACE.push(oa[0],oa[1],ha,a[0],a[1],ha,ob[0],ob[1],hb,b[0],b[1],hb,(a[0]+b[0])/2,(a[1]+b[1])/2,...a,...b);
+      ST.secs++;
+    };
+    let count=0;
+    for(const s of mesh.sections){
+      const dx=s.b[0]-s.a[0],dz=s.b[1]-s.a[1],length=Math.hypot(dx,dz),n=Math.ceil(length/SEC);
+      for(let i=0;i<n;i++)draw(mix(s.a,s.b,i/n),mix(s.a,s.b,(i+1)/n),mix(s.outA,s.outB,i/n),mix(s.outA,s.outB,(i+1)/n),s.lift,i);
+      bgAdd(...s.a,...s.b,-dz/length,dx/length);ST.m+=length;ST.runs++;
+      if(++count%128===0)yield 'бордюры: стыки';
+    }
+    for(const j of mesh.joins){
+      const h=top(j.p),fa=A.groundH(...j.a)+j.lift-.035,fb=A.groundH(...j.b)+j.lift-.035;
+      LITM.color(CURB.HEX[0]);LITM.up(j.p[0],h,j.p[1],j.a[0],h,j.a[1],j.b[0],h,j.b[1]);
+      LITM.quad(j.a[0],fa,j.a[1],j.b[0],fb,j.b[1],j.b[0],h,j.b[1],j.a[0],h,j.a[1]);
+    }
+    bgPack();ON=true;ST.m=Math.round(ST.m);ST.ms=Math.round(performance.now()-t0);return ST;
+  }
   const EVERY = !MOB && !OLD;                       // 0п35 (24.10.2026, «бордюры везде, где есть стыки между землёй и дорожками»): дорожки — по всему
   STRIPV = EVERY ? CURB.STRIP : CURB.STRIP_OLD;     // городу, стоянки, площадки, карманы, шов 0,25 м. Телефон и ?oldcurbs — как было (память)
   const C = A.CITY;

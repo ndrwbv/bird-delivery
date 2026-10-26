@@ -63,6 +63,14 @@ const smoke = (args, label) => async () => {
 };
 
 const CHECKS = [
+  { id: 'land-curb', name: 'бордюры: общий торец и закрытые углы', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'landcurb-geometry.mjs')]);
+    return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };
+  } },
+  { id: 'land-mask', name: 'газоны: общая область рисунка, опоры и бордюра', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'landmask-geometry.mjs')]);
+    return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };
+  } },
   { id: 'land-clean', name: 'газоны: минимальная ширина и цельные формы', group: 1, run: async () => {
     const r = await sh(process.execPath, [path.join(__dirname, 'landclean-geometry.mjs')]);
     return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };

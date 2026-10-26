@@ -2,7 +2,7 @@
    Геометрическая диагностика; она ещё не доказывает готовность бордюров. */
 await until(() => d.RLAND?.ST.built && !d.LATE.busy(), 120000);
 const L = d.RLAND, stats = {}, degree = new Map(), sample = [];
-const land = (x, z) => L.green.height(x, z) > L.cover.height(x, z) || !L.cover.covered(x, z);
+const land = (x, z) => L.onLand(x, z);
 const key = p => p.map(x => Math.round(x * 1e4)).join(',');
 let checked = 0, bad = 0, thin = 0;
 for (const edge of L.boundaries({ stats, accept: (x, z) => d.RLAND_BASE(x, z) > .8 })) {
@@ -18,7 +18,7 @@ for (const edge of L.boundaries({ stats, accept: (x, z) => d.RLAND_BASE(x, z) > 
       // Выбираем пробу внутри ближайшего пересечения по нормали, чтобы
       // проверять именно эту границу, а не перескочить на другую фигуру.
       const span = .01;
-      for (const C of [L.cover, L.green]) for (const u of C.breaks(x - nx * span, z - nz * span, x + nx * span, z + nz * span)) {
+      for (const C of L.finalMask?.ready ? [L.finalMask] : [L.cover, L.green]) for (const u of C.breaks(x - nx * span, z - nz * span, x + nx * span, z + nz * span)) {
         const distance = Math.abs(u - .5) * span * 2;
         if (distance > 1e-9) r = Math.min(r, distance / 4);
       }
