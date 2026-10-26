@@ -1204,7 +1204,7 @@ function kbRoot () {
 const KEYS = { ArrowUp: 'menuUp', KeyW: 'menuUp', ArrowDown: 'menuDown', KeyS: 'menuDown', ArrowLeft: 'menuLeft', KeyA: 'menuLeft',
   ArrowRight: 'menuRight', KeyD: 'menuRight', Enter: 'menuOk', NumpadEnter: 'menuOk', Space: 'menuOk', Escape: 'menuBack', Backspace: 'menuBack' };
 function onKey (e) {
-  if (!A) return;
+  if (!A || e.target?.tagName === 'SELECT') return; // нативный список сам обрабатывает стрелки и Enter
   if (SSTEPS.active() && !DEP.root() && !MENU.modal()) {   // экраны конца смены: Enter / пробел — дальше, X — «не сейчас», Esc — пропустить всё; стрелки — курсор
     const c = e.code, enter = c === 'Enter' || c === 'NumpadEnter' || c === 'Space';
     if (enter || matchKey('x', e) || c === 'Escape' || c === 'Backspace') {
@@ -1273,7 +1273,7 @@ function onKey (e) {
 function onKeyUp (e) {
   if (!A || !kbRoot()) return;
   const tg = e.target;
-  if (tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA')) return;
+  if (tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA' || tg.tagName === 'SELECT')) return;
   if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); e.stopPropagation(); }
 }
 

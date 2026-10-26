@@ -11,7 +11,7 @@
              09.10.2026, IDEAS К2: по умолчанию — без ограничения, и на Деке; было 30 / 60 / как у экрана)
      range   туман ~250 м      ~370 м         ~490 м
      menu    застывший кадр    30 к/с         живой    (листаешь меню — полные к/с)
-     px      ~430 точек        ~540           ~720 (по короткой стороне)
+     px      PC: 1280×720      1600×900       1920×1080; Deck: 960×540 / 1280×720 / 1280×800
      win     комнат нет        есть           есть
      fx      меньше и короче   как есть       как есть
      far     вдали раз в 3 к.  раз в 2        каждый кадр
@@ -51,6 +51,7 @@ import * as CULL from './cull.js';
 import * as WINS from './windows.js';
 import { ON as MOBILE } from './mobile.js';
 import * as TUNE from './tune.js';
+import {RESOLUTIONS,RESOLUTION_PRESETS,migrateResolution,resolutionSize} from './renderresolution.js';
 
 export const KEY = 'dlv-gfx';
 const BASE_FAR = 490;
@@ -96,6 +97,10 @@ export function device () {
 }
 
 const DEV = device();
+if (RESOLUTION_PRESETS[DEV]) {
+  ITEMS.find(it => it.id === 'px').vals = RESOLUTIONS;
+  ORDER.forEach((p,i) => { PRESETS[p].px = RESOLUTION_PRESETS[DEV][i]; });
+}
 const O = {};                      // текущие пункты: { fps: 0…2, … }
 let PRESET = 'high', VER = 0;
 const clampItem = (it, v) => (Number.isInteger(v) && v >= 0 && v < it.vals.length ? v : null);
@@ -106,6 +111,7 @@ function load () {
   Object.assign(O, PRESETS[p] || PRESETS.high);
   if (p === 'custom' && mine && mine.o) {
     const o = { ...mine.o };
+    if (!(mine.rv >= 2) && RESOLUTION_PRESETS[DEV]) o.px = migrateResolution(o.px, DEV) ?? PRESETS[DEFAULTS[DEV]].px;
     if (!(mine.fv >= 2) && Number.isInteger(o.fps)) o.fps = [0, 2, 3][o.fps] ?? o.fps;   // сохранено до 09.10.2026: к/с были 30 / 60 / как у экрана
     for (const it of ITEMS) { const v = clampItem(it, o[it.id]); if (v !== null) O[it.id] = v; }
     if (o.shadow === undefined) O.shadow = (PRESETS[DEFAULTS[DEV]] || PRESETS.high).shadow;   // «своя» сохранена до пункта «тени» (25.10.2026) — как у пресета устройства
@@ -119,7 +125,7 @@ function whichPreset () {
 function save () {
   if (PRESETS[Q.get('gfx')]) return;             // отладочный пресет из адреса — не сохраняем
   const all = readAll();
-  all[DEV] = PRESET === 'custom' ? { p: 'custom', o: { ...O }, fv: 2 } : { p: PRESET };   // fv — номера пункта к/с: 30 / 40 / 60 / без ограничения
+  all[DEV] = PRESET === 'custom' ? { p: 'custom', o: { ...O }, fv: 2, rv: 2 } : { p: PRESET, rv: 2 };   // fv — номера пункта к/с: 30 / 40 / 60 / без ограничения
   writeAll(all);
 }
 load();
@@ -131,12 +137,8 @@ export const presetName = () => t(NAMES[PRESET]);
 export const opts = () => ({ ...O });
 export const fpsCap = () => val('fps');                        // 0 — как у экрана
 export const rangeK = () => val('range') / BASE_FAR;           // доля полной дальности
-export const pixelShort = () => val('px') || Infinity; // 0 — физическое разрешение экрана
-// Общий расчёт для холста и подписи настройки: пропорции экрана сохранены.
-export function renderSize(w, h, dpr = 1, short = pixelShort()) {
-  const px = Math.max(1, Math.min(w, h) * dpr / (short || Infinity));
-  return [Math.max(200, Math.round(w * dpr / px)), Math.max(112, Math.round(h * dpr / px))];
-}
+export const pixelShort = () => { const v=val('px');return Array.isArray(v)?Math.min(...v):v||Infinity; };
+export function renderSize(w,h,dpr=1,choice=val('px')) { return resolutionSize(choice,w,h,dpr); }
 export const every = () => val('far');                         // вдали — раз в столько кадров
 export const fxLow = () => !val('fx');
 /* сглаживание: контекст WebGL создаётся один раз — значение на момент запуска (game.js), смена — после перезапуска */
@@ -360,10 +362,14 @@ function itemText (it, v) {
    у «качества» data-main (на неё встаёт геймпад) */
 export function panel (body, focus, card) {
   const btn = (id, txt, main) => '<button type="button" id="' + id + '"' + (id === focus ? ' autofocus' : '') + (main && card ? ' data-main' : '') + '>' + txt + '</button>';
+  const resolution = ITEMS.find(it => it.id === 'px');
+  const resolutionRow = '<div class="set-row"><label for="gfx-px">' + t(resolution.label) + '</label><select id="gfx-px"' +
+    (focus === 'gfx-px' ? ' autofocus' : '') + '>' + resolution.vals.map((v,i) => '<option value="' + i + '"' +
+    (i === O.px ? ' selected' : '') + '>' + itemText(resolution,i) + '</option>').join('') + '</select></div>';
   const row = (label, id, txt, main) => '<div class="set-row"><span>' + label + '</span>' + btn(id, txt, main) + '</div>';
   body.innerHTML = (card ? '' : '<div class="pn-t">' + t('графика') + '</div>') +
     row('<b>' + t('качество') + '</b>', 'gfx-p', presetName(), true) +
-    '<div class="set-rows">' + ITEMS.map(it => row(t(it.label), 'gfx-' + it.id, itemText(it, O[it.id]))).join('') +
+    '<div class="set-rows">' + ITEMS.map(it => it.id === 'px' ? resolutionRow : row(t(it.label), 'gfx-' + it.id, itemText(it, O[it.id]))).join('') +
     row(t('тяжёлый кадр'), 'gfx-dyn', DYN ? t('мыло вместо рывка') : t('рывок вместо мыла')) +
     '<div class="pn-n">' + t('меньше разрешение — выше скорость; интерфейс остаётся чётким. «Тяжёлый кадр» может временно снижать разрешение ещё сильнее') + '</div>' +
     // «сглаживание» и «мягкие края» рядом — непонятно, чем отличаются (ревью 23.10, Р23-7)
@@ -375,14 +381,19 @@ export function panel (body, focus, card) {
     setPreset(ORDER[(i + 1) % ORDER.length]);      // «своя» → низкая
     again('gfx-p');
   };
-  for (const it of ITEMS) body.querySelector('#gfx-' + it.id).onclick = () => { set(it.id, (O[it.id] + 1) % it.vals.length); again('gfx-' + it.id); };
+  for (const it of ITEMS.filter(it => it.id !== 'px')) body.querySelector('#gfx-' + it.id).onclick = () => { set(it.id, (O[it.id] + 1) % it.vals.length); again('gfx-' + it.id); };
+  const select=body.querySelector('#gfx-px');
+  select.onchange=()=>{set('px',Number(select.value));body.querySelector('#gfx-p').textContent=presetName();};
+  // Стрелки/Enter/поиск по буквам обрабатывает сам список, не навигация игры.
+  select.onkeydown=e=>{if(e.code!=='Escape')e.stopPropagation();};
+  select.onkeyup=e=>e.stopPropagation();
   body.querySelector('#gfx-dyn').onclick = () => { setDyn(!DYN); again('gfx-dyn'); };
 }
 
 // Размер окна может поменяться, пока открыты настройки.
 addEventListener('resize', () => {
-  const button = document.getElementById('gfx-px');
-  if (button) button.textContent = itemText(ITEMS.find(it => it.id === 'px'), O.px);
+  const select = document.getElementById('gfx-px'), item=ITEMS.find(it => it.id === 'px');
+  if (select) for(const option of select.options)option.textContent=itemText(item,Number(option.value));
 });
 
 /* отладка: __dlv.GFX */
