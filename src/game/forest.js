@@ -33,7 +33,8 @@
    и чем дальше, тем реже (до THIN на краю тумана). Кусты — ближе BUSH_R.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
-import { snowAmt } from './seasons.js';
+import { snowAmt, leafAmt, yellowAmt } from './seasons.js';
+import { WOOD_ON, WOOD } from './treeform.js';      // лес «как в глубинке» (2г7): выше, сосны с голыми стволами, березняк, опушка светлее; ?oldwood — по-старому
 import * as FADEJS from './fade.js';
 import { SEE_U, SEE_FN } from './seethru.js';    // ёлки между камерой и машиной тают (seethru.js, 0п47)
 import { wet } from './streams.js';             // речки и пруды — без ёлок (streams.js)
@@ -47,7 +48,16 @@ export const FOREST = {
   CAP: 16000, BUSH_CAP: 9000,
   SOLID_H: 6, TRUNK: 0.45,
   BUDGET: 2.5, WARM: 160,
-  FLOOR: '#86ab6a',
+  FLOOR: WOOD_ON ? '#6c9055' : '#86ab6a',     // земля леса темнее (2г7)
+};
+/* 2г7 (25.10.2026, автор: «хвойный лес — тёмная глубина, стволы-колонны, светлая опушка»): высоты, березняк, свет по глубине */
+export const WOOD2 = {
+  PINE: [19, 9], SPRUCE: [13, 9], BIRCH: [13, 7],   // высота в глубине: от, + до (м); у опушки — ниже (grow)
+  PINE_P: [0.42, 0.2],                              // доля сосен: в глубине / ближе к краю
+  BIRCH_EDGE: 0.42, BIRCH_PATCH: [0.64, 0.55],      // березы у опушки (доля у самого края); пятна березняка: порог шума и доля в пятне
+  PATCH_S: 46,                                      // размер пятен березняка, м
+  UNDER: 0.18,                                      // + доля подлеска (кусты, молодые ёлки 2—5,5 м) в глубине
+  LIGHT: [1.14, 0.74],                              // яркость дерева у края / в глубине (в глубине — темнее)
 };
 
 let A = null;
@@ -55,8 +65,8 @@ let FORESTS = null;                     // [{ p, x0, x1, z0, z1, segs }]
 let LOTS = null;
 const CELLS = new Map();                // клетка → { i, j, cx, cz, gy, sp, pi, bu, sol }
 const MESH = {};                         // sp0, sp1, pi0, pi1, bu
-const U = { uSnow: { value: 0 } };
-const ST = { built: 0, dropped: 0, ms: 0, msMax: 0, trees: 0, sp: 0, pi: 0, bu: 0, sol: 0, shown: {}, refresh: 0 };
+const U = { uSnow: { value: 0 }, uLeaf: { value: 1 }, uYellow: { value: 0 } };
+const ST = { built: 0, dropped: 0, ms: 0, msMax: 0, trees: 0, sp: 0, pi: 0, bu: 0, bi: 0, sol: 0, shown: {}, refresh: 0 };
 const AREA = new WeakMap();
 let LAST = { x: 1e9, z: 1e9, yaw: 0, n: 0, dirty: true, frame: 0, sweep: 0 };
 
@@ -118,7 +128,19 @@ function merge (parts) {
   g.setAttribute('position', new THREE.BufferAttribute(P, 3));
   g.setAttribute('color', new THREE.BufferAttribute(C, 3));
   g.setAttribute('aSnow', new THREE.BufferAttribute(S, 1));
-  g.computeVertexNormals();
+  if (!WOOD_ON) { g.computeVertexNormals(); return g; }
+  // 2г6: у листвы и хвои — свои плавные нормали (part2 fol), у стволов — грани (как было)
+  const N = new Float32Array(n * 3), F = new Float32Array(n);
+  o = 0;
+  for (const q of parts) {
+    const k = q.attributes.position.count;
+    if (!q.attributes.normal || !q.attributes.aFol) { q.deleteAttribute('normal'); q.computeVertexNormals(); }
+    N.set(q.attributes.normal.array, o * 3);
+    if (q.attributes.aFol) F.set(q.attributes.aFol.array, o);
+    o += k;
+  }
+  g.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+  g.setAttribute('aFol', new THREE.BufferAttribute(F, 1));
   return g;
 }
 const cone = (r, h, seg, y0, rot) => new THREE.ConeGeometry(r, h, seg, 1, true).rotateY(rot || 0).translate(0, y0 + h / 2, 0);
@@ -143,7 +165,110 @@ function pineFar () {
   ]);
 }
 function bushGeo () {
+  // низ куста — тёмный и зимой в сугробе (было: яркое лаймовое кольцо по земле под снежной шапкой)
+  if (WOOD_ON) return merge([part2(new THREE.IcosahedronGeometry(1, 0).scale(1, 0.62, 1).translate(0, 0.38, 0), y => (y > 0.45 ? '#3f7434' : '#22401e'),
+    y => (y > 0.5 ? 0.4 + (y - 0.5) * 2 : y < 0.2 ? 0.9 : 0.1), { c: [0, 0.2, 0], w: 0.5 })]);
   return merge([part(new THREE.IcosahedronGeometry(1, 0).scale(1, 0.62, 1).translate(0, 0.38, 0), '#4f8a40', y => (y > 0.5 ? 0.4 + (y - 0.5) * 2 : 0.05))]);
+}
+
+/* ── модели 2г7: ель ярусами «полка + бахрома», сосна — голый рыжий ствол и лапы зонтиком, берёза ──
+   цвет вершины — функцией высоты; aSnow: 1 — верх (зимой белый), −1 — листва берёзы (облетает, желтеет) */
+function part2 (geo, colFn, snow, fol) {
+  const g = geo.index ? geo.toNonIndexed() : geo;
+  const n = g.attributes.position.count, pos = g.attributes.position, col = new THREE.Color();
+  const c = new Float32Array(n * 3), s = new Float32Array(n);
+  for (let i = 0; i < n; i++) { col.set(colFn(pos.getY(i), Math.floor(i / 3), pos.getX(i), pos.getZ(i))); c[i * 3] = col.r; c[i * 3 + 1] = col.g; c[i * 3 + 2] = col.b; s[i] = snow(pos.getY(i), Math.floor(i / 3)); }
+  g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+  g.setAttribute('aSnow', new THREE.BufferAttribute(s, 1));
+  if (g.attributes.uv) g.deleteAttribute('uv');
+  if (g.attributes.normal) g.deleteAttribute('normal');
+  // мягкая хвоя и листва (второй круг 2г6): нормаль — от середины лапы / яруса (lc) и от центра кроны (c, доля w), признак aFol
+  if (fol) {
+    let lc = fol.lc;
+    if (!lc) { lc = [0, 0, 0]; for (let i = 0; i < n; i++) { lc[0] += pos.getX(i) / n; lc[1] += pos.getY(i) / n; lc[2] += pos.getZ(i) / n; } }
+    const N = new Float32Array(n * 3), w = fol.w;
+    for (let i = 0; i < n; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      let ax = x - lc[0], ay = y - lc[1], az = z - lc[2], l = Math.hypot(ax, ay, az) || 1;
+      let bx = x - fol.c[0], by = y - fol.c[1], bz = z - fol.c[2], m = Math.hypot(bx, by, bz) || 1;
+      ax = ax / l * (1 - w) + bx / m * w; ay = ay / l * (1 - w) + by / m * w; az = az / l * (1 - w) + bz / m * w;
+      l = Math.hypot(ax, ay, az) || 1; N[i * 3] = ax / l; N[i * 3 + 1] = ay / l; N[i * 3 + 2] = az / l;
+    }
+    g.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+    g.setAttribute('aFol', new THREE.BufferAttribute(new Float32Array(n).fill(1), 1));
+  }
+  return g;
+}
+/* ярус ели: полка (пологая, на ней снег) и бахрома (крутая, рваная, зелёная и зимой); радиус r, высота h, низ — y0 */
+function skirtGeo (r, h, y0, rot, n = 6) {
+  const P = [], top = [0, 1, 0], mid = [], bot = [];
+  for (let i = 0; i < n; i++) {
+    const a = i / n * Math.PI * 2 + rot, b = a + Math.PI / n, rr = i % 2 ? 0.84 : 0.97;
+    mid.push([Math.cos(a) * 0.8, 0.5, Math.sin(a) * 0.8]); bot.push([Math.cos(b) * rr, i % 2 ? 0.12 : 0, Math.sin(b) * rr]);
+  }
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    P.push(...top, ...mid[j], ...mid[i], ...mid[i], ...mid[j], ...bot[i], ...mid[j], ...bot[j], ...bot[i]);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(P), 3));
+  return g.scale(r, h, r).translate(0, y0, 0);
+}
+const lerpHex = (a, b, t) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), Math.max(0, Math.min(1, t))).getHexString();
+function spruceGeo2 () {
+  const P = [part2(new THREE.CylinderGeometry(0.014, 0.026, 0.2, 5, 1, true).translate(0, 0.1, 0), () => '#4a3628', () => 0)];
+  const T = [[0.06, 0.3, 0.24], [0.27, 0.27, 0.19], [0.47, 0.25, 0.14], [0.66, 0.22, 0.095], [0.82, 0.18, 0.05]];
+  T.forEach(([y0, h, r], i) => {
+    const hex = lerpHex('#0e2418', '#2e5a38', 0.15 + i * 0.18);
+    // снег: полка (верх яруса, выше 0,42 его высоты) — 1, бахрома — 0,12
+    P.push(part2(skirtGeo(r, h, y0, i * 0.7), y => (y > y0 + h * 0.45 ? hex : lerpHex(hex, '#08180e', 0.35)), y => (y > y0 + h * 0.45 ? 0.5 + 0.5 * (y - y0) / h : 0.12),
+      { lc: [0, y0, 0], c: [0, 0.45, 0], w: 0.25 }));
+  });
+  return merge(P);
+}
+function spruceFar2 () {
+  return merge([part(cone(0.22, 0.55, 6, 0.06), '#16321f', tier(0.06, 0.55)), part(cone(0.14, 0.45, 6, 0.5, 0.5), '#24482c', tier(0.5, 0.45))]);
+}
+function pineGeo2 () {
+  // ствол — голый до 0,62 высоты, комель тёмный, выше рыжий; лапы — плоские комки ярусами, со смещением в стороны
+  const P = [part2(new THREE.CylinderGeometry(0.011, 0.022, 0.96, 5, 1, true).translate(0, 0.48, 0), y => lerpHex('#5e3a2a', '#c87a44', y * 1.4), () => 0)];
+  for (const [y, a] of [[0.34, 0.6], [0.46, 3.4]]) P.push(part2(new THREE.CylinderGeometry(0.003, 0.005, 0.07, 3, 1, true).rotateZ(1.25).rotateY(a).translate(Math.cos(a) * 0.03, y, -Math.sin(a) * 0.03), () => '#4e3a2c', () => 0));
+  // лапы: разного размера, вразнобой по сторонам, верхняя — крупная (крона «зонтиком», не стопка тарелок)
+  const pads = [[0.68, 0.0, 0.09, 0.08, 0.62, 0.25], [0.76, 2.3, 0.08, 0.1, 0.55, -0.2], [0.83, 4.4, 0.06, 0.105, 0.6, 0.15], [0.9, 1.2, 0.045, 0.09, 0.65, -0.1], [0.96, 3.4, 0.015, 0.06, 0.85, 0]];
+  pads.forEach(([y, a, d, R, fl, tilt], i) => {
+    const x = Math.cos(a) * d, z = Math.sin(a) * d, hex = lerpHex('#11281a', '#46703a', 0.2 + i * 0.16 + 0.15 * Math.sin(a));
+    P.push(part2(new THREE.IcosahedronGeometry(1, 0).scale(R, R * fl, R * 0.8).rotateZ(tilt).rotateY(a).translate(x, y, z), yy => (yy > y ? hex : lerpHex(hex, '#08160c', 0.4)),
+      yy => (yy > y ? 0.4 + 0.6 * (yy - y) / (R * fl) : 0.05), { c: [0, 0.82, 0], w: 0.35 }));
+  });
+  return merge(P);
+}
+function pineFar2 () {
+  return merge([
+    part(new THREE.CylinderGeometry(0.014, 0.022, 0.9, 3, 1, true).translate(0, 0.45, 0), '#a8603a', () => 0),
+    part(new THREE.OctahedronGeometry(1, 0).scale(0.13, 0.06, 0.13).translate(0.03, 0.78, 0), '#1c3a24', y => (y > 0.78 ? 1 : 0.1)),
+    part(new THREE.OctahedronGeometry(1, 0).scale(0.09, 0.05, 0.09).translate(-0.02, 0.9, 0.02), '#2c5030', y => (y > 0.9 ? 1 : 0.1)),
+  ]);
+}
+function birchGeo () {
+  // белый ствол с чёрными чёрточками (грани через жребий), два тонких сука, крона — светлые комки (aSnow −1: листва)
+  let seed = 7;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const marks = new Map();
+  const P = [part2(new THREE.CylinderGeometry(0.009, 0.016, 0.9, 5, 5, true).translate(0, 0.45, 0),
+    (y, f) => { if (!marks.has(f >> 1)) marks.set(f >> 1, rnd() < 0.24); return y < 0.03 ? '#3a3632' : marks.get(f >> 1) ? '#2a2a2e' : '#e8e4da'; }, () => 0)];
+  for (const [y, a] of [[0.5, 0.4], [0.58, 2.6], [0.66, 4.6]]) P.push(part2(new THREE.CylinderGeometry(0.003, 0.005, 0.16, 3, 1, true).translate(0, 0.08, 0).rotateZ(0.7).rotateY(a).translate(0, y, 0), () => '#d8d2c6', yy => (yy > y + 0.05 ? 1 : 0)));
+  const L = [[0, 0.8, 0, 0.11, 1.5], [0.07, 0.68, 0.03, 0.08, 1.6], [-0.06, 0.7, -0.04, 0.08, 1.7], [0.02, 0.6, -0.07, 0.07, 1.9], [-0.03, 0.92, 0.02, 0.07, 1.4]];
+  L.forEach(([x, y, z, R, sy], i) => {
+    const hex = lerpHex('#2e5a2a', '#a8c456', 0.25 + 0.6 * (y - 0.6) / 0.32 + 0.2 * z / 0.07);
+    P.push(part2(new THREE.IcosahedronGeometry(1, 0).scale(R, R * sy, R).translate(x, y, z), yy => (yy > y ? hex : lerpHex(hex, '#1a3a1c', 0.35)), () => -1, { c: [0, 0.76, 0], w: 0.55 }));
+  });
+  return merge(P);
+}
+function birchFar () {
+  return merge([
+    part(new THREE.CylinderGeometry(0.012, 0.016, 0.8, 3, 1, true).translate(0, 0.4, 0), '#e0dcd2', () => 0),
+    part2(new THREE.OctahedronGeometry(1, 0).scale(0.12, 0.2, 0.12).translate(0, 0.76, 0), y => (y > 0.76 ? '#94b450' : '#3e6a30'), () => -1),
+  ]);
 }
 
 /* kind: 'near' — подробные ели и сосны, 'far' — простые, 'bush' — кусты.
@@ -152,25 +277,47 @@ function bushGeo () {
    дополняющий — ни дыр, ни двойных). Кусты у края BUSH_R растут из земли */
 const FADE_LOD = { value: null }, FADE_BUSH = { value: null };
 function material (kind) {
-  const m = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  const m = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: !WOOD_ON || kind === 'far' });   // 2г6: ближняя хвоя и листва — плавные нормали
+  m.defines = { MAT_LEAF: '' };                   // 2г11: листва и хвоя на просвет (materials.js; тёмная хвоя — почти нет)
   const bush = kind === 'bush';
   m.onBeforeCompile = sh => {
-    sh.uniforms.uSnow = U.uSnow;
+    sh.uniforms.uSnow = U.uSnow; sh.uniforms.uLeaf = U.uLeaf; sh.uniforms.uYellow = U.uYellow;
     sh.uniforms.uFade = bush ? FADE_BUSH : FADE_LOD;
     if (kind !== 'far') sh.uniforms.uSeeP = SEE_U;
-    sh.vertexShader = 'attribute float aSnow;\nvarying float vSnow;\nvarying vec3 vFW;\nvarying float vFadeK;\nuniform vec2 uFade;\n' + FADEJS.FADE_FN + '\n' +
-      sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>' + FADEJS.BASE_DIST + (bush ? FADEJS.GROW_BEGIN : '') + '\n  vFadeK = fadeK(fadeD, uFade);')
+    sh.vertexShader = (WOOD_ON ? 'attribute float aFol;\nvarying float vFol;\n' : '') + 'attribute float aSnow;\nvarying float vSnow;\nvarying vec3 vFW;\nvarying float vFadeK;\nvarying float vLeafH;\nuniform vec2 uFade;\nuniform float uLeaf;\n' + FADEJS.FADE_FN + '\n' +
+      sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>' + FADEJS.BASE_DIST + (bush ? FADEJS.GROW_BEGIN : '') + '\n  vFadeK = fadeK(fadeD, uFade);' +
+        // листва берёзы (aSnow −1): облетает по зерну дерева (место экземпляра) — как кроны города (seasons.js uLeaf)
+        '\n  vLeafH = fract(sin(dot(instanceMatrix[3].xz, vec2(12.9898, 78.233))) * 43758.5453);\n  if (aSnow < -0.5 && vLeafH >= uLeaf) transformed = vec3(0.0, -3000.0, 0.0);' +
+        (WOOD_ON ? '\n  vFol = aFol;' : ''))
         .replace('#include <project_vertex>', `#include <project_vertex>
       vSnow = aSnow;
       vFW = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;`);
     const cut = kind === 'near' ? 'if (vFadeK <= bayer4(gl_FragCoord.xy)) discard;' : kind === 'far' ? 'if (vFadeK > bayer4(gl_FragCoord.xy)) discard;' : '';
-    sh.fragmentShader = 'uniform float uSnow;\nvarying float vSnow;\nvarying vec3 vFW;\nvarying float vFadeK;\n' + FADEJS.BAYER_FN + '\n' + (kind !== 'far' ? SEE_FN + '\n' : '') +
+    sh.fragmentShader = (WOOD_ON ? 'varying float vFol;\n' : '') + 'uniform float uSnow, uYellow;\nvarying float vSnow;\nvarying vec3 vFW;\nvarying float vFadeK;\nvarying float vLeafH;\n' + FADEJS.BAYER_FN + '\n' + (kind !== 'far' ? SEE_FN + '\n' : '') +
       sh.fragmentShader.replace('void main() {', 'void main() {\n  ' + cut + (kind !== 'far' ? '\n  seeCut(vFW);' : '')).replace('#include <color_fragment>', `#include <color_fragment>
       float fn = fract(sin(dot(floor(vFW.xz * 1.7 + vFW.y * 0.9), vec2(12.9898, 78.233))) * 43758.5453);
-      float cov = smoothstep(0.98 - uSnow * 0.62, 1.1 - uSnow * 0.62, vSnow + (fn - 0.5) * 0.22) * step(0.02, uSnow);
+      float cov = smoothstep(${WOOD_ON ? '0.92 - uSnow * 0.74, 1.02 - uSnow * 0.74' : '0.98 - uSnow * 0.62, 1.1 - uSnow * 0.62'}, vSnow + (fn - 0.5) * 0.22) * step(0.02, uSnow);
+      if (vSnow < -0.5) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.58, 0.06) * (0.85 + 0.3 * fract(vLeafH * 13.7)), clamp(uYellow * 1.7 - vLeafH * 0.7, 0.0, 1.0));   // берёза осенью — золотая
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.93, 0.98), cov * 0.95);`);
   };
-  m.customProgramCacheKey = () => 'forestSnow' + kind;
+  if (WOOD_ON && kind !== 'far') {
+    // рваный край ближней листвы берёз (как у крон города, seasons.js pileMat): у края силуэта — гроздьями, между ними просвет;
+    // хвоя ели и сосны — плотная, без просветов (2г15, автор: «ёлки полупустые»); листва берёзы — aSnow −1
+    const prev = m.onBeforeCompile, E = WOOD.EDGE;
+    m.onBeforeCompile = (sh, r) => {
+      prev(sh, r);
+      sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      if (vFol > 0.5 && vSnow < -0.5) {
+        float fFr = 1.0 - abs(dot(normal, normalize(vViewPosition)));
+        float fD = length(vFW - cameraPosition);
+        vec3 fQ = fract(floor(vFW * 2.6) * 0.1031); fQ += dot(fQ, fQ.yzx + 33.33);
+        vec3 fQ2 = fract(floor(vFW * 5.2 + 0.5) * 0.1031); fQ2 += dot(fQ2, fQ2.yzx + 33.33);
+        float fH = fract((fQ.x + fQ.y) * fQ.z) * 0.65 + fract((fQ2.x + fQ2.y) * fQ2.z) * 0.35;
+        if (fH < smoothstep(${E[0].toFixed(2)}, ${E[1].toFixed(2)}, fFr) * ${E[2].toFixed(2)} * (1.0 - smoothstep(${E[3]}.0, ${E[4]}.0, fD))) discard;
+      }`);
+    };
+  }
+  m.customProgramCacheKey = () => 'forestSnow' + kind + (WOOD_ON ? 'w' : '');
   return m;
 }
 
@@ -187,8 +334,9 @@ function makeMeshes () {
     A.scene.add(m);
     return m;
   };
-  MESH.sp0 = mk(spruceGeo(), FOREST.CAP, 'near'); MESH.sp1 = mk(spruceFar(), FOREST.CAP, 'far');
-  MESH.pi0 = mk(pineGeo(), FOREST.CAP >> 1, 'near'); MESH.pi1 = mk(pineFar(), FOREST.CAP >> 1, 'far');
+  MESH.sp0 = mk(WOOD_ON ? spruceGeo2() : spruceGeo(), FOREST.CAP, 'near'); MESH.sp1 = mk(WOOD_ON ? spruceFar2() : spruceFar(), FOREST.CAP, 'far');
+  MESH.pi0 = mk(WOOD_ON ? pineGeo2() : pineGeo(), FOREST.CAP >> 1, 'near'); MESH.pi1 = mk(WOOD_ON ? pineFar2() : pineFar(), FOREST.CAP >> 1, 'far');
+  if (WOOD_ON) { MESH.bi0 = mk(birchGeo(), FOREST.CAP >> 2, 'near'); MESH.bi1 = mk(birchFar(), FOREST.CAP >> 2, 'far'); }   // березняк (2г7)
   MESH.bu = mk(bushGeo(), FOREST.BUSH_CAP, 'bush');
 }
 
@@ -197,6 +345,13 @@ function hsh (x, z, k) {
   let h = Math.imul(Math.round(x * 8) ^ 0x27d4eb2d, 0x9E3779B1) ^ Math.imul(Math.round(z * 8) + k * 1013904223, 0x85ebca6b);
   h ^= h >>> 15; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 13; h = Math.imul(h, 0x27d4eb2f); h ^= h >>> 16;
   return (h >>> 0) / 4294967296;
+}
+/* гладкий шум 0…1 с шагом sc м — пятна березняка (как в lawnprops.js) */
+function vnoise (x, z, sc, k) {
+  const fx = x / sc, fz = z / sc, i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j;
+  const a = hsh(i, j, k), b = hsh(i + 1, j, k), c = hsh(i, j + 1, k), d = hsh(i + 1, j + 1, k);
+  const su = u * u * (3 - 2 * u), sv = v * v * (3 - 2 * v);
+  return a + (b - a) * su + (c - a) * sv + (a - b - c + d) * su * sv;
 }
 function rng (x, z) {
   let a = (hsh(x, z, 3) * 4294967296) >>> 0;
@@ -232,7 +387,7 @@ function buildCell (i, j) {
     }
   }
   const lots = LOTS.filter(l => l.x1 > x0 && l.x0 < x1 && l.z1 > z0 && l.z0 < z1);
-  const sp = [], pi = [], bu = [];
+  const sp = [], pi = [], bu = [], bi = [];
   // в клетку — если автор не убрал (редактор: ещё и список «что стоит» — для выбора и «убрать в круге»)
   const keepT = (list, sub, t) => {
     if (EDL.gone('forest', t[0], t[2])) return false;
@@ -279,8 +434,22 @@ function buildCell (i, j) {
       // опушка: реже, ниже, больше кустов и молодых ёлок
       // убранное в редакторе (EDL.gone, вид forest) — жребий тянем тот же, а в клетку не кладём: соседи те же
       if (r() < 0.38 * (1 - k)) { if (r() < 0.6) keepT(bu, 'bush', [x, y, z, r() * 6.3, 0.9 + r() * 1.1, 0.6 + r() * 0.7, 0.8 + r() * 0.4, rank]); continue; }
-      const grow = 0.34 + 0.66 * k;
-      if (r() < (k > 0.7 ? 0.3 : 0.12)) {
+      const grow = 0.34 + 0.66 * k, W2 = WOOD2;
+      if (WOOD_ON) {
+        // 2г7: сосны выше домов, ели ярусами, у опушки и пятнами — березняк; в глубине темнее, у края светлее
+        const lit = W2.LIGHT[0] + (W2.LIGHT[1] - W2.LIGHT[0]) * k, patch = vnoise(x, z, W2.PATCH_S, 23) > W2.BIRCH_PATCH[0];
+        const pB = Math.min(0.85, W2.BIRCH_EDGE * (1 - k) + (patch ? W2.BIRCH_PATCH[1] : 0)), pick = hsh(x, z, 21);
+        if (pick < pB) {
+          const H = (W2.BIRCH[0] + r() * W2.BIRCH[1]) * (0.5 + 0.5 * k);
+          if (keepT(bi, 'birch', [x, y, z, r() * 6.3, H, H, (0.9 + r() * 0.25) * Math.min(1.1, lit + 0.12), rank]) && H > F.SOLID_H) cell.sol.push(x, z);
+        } else if (r() < (k > 0.7 ? W2.PINE_P[0] : W2.PINE_P[1])) {
+          const H = (W2.PINE[0] + r() * W2.PINE[1]) * grow;
+          if (keepT(pi, 'pine', [x, y, z, r() * 6.3, H, H, (0.85 + r() * 0.3) * lit, rank]) && H > F.SOLID_H) cell.sol.push(x, z);
+        } else {
+          const H = (W2.SPRUCE[0] + r() * W2.SPRUCE[1]) * grow, w = H * (0.8 + r() * 0.3);
+          if (keepT(sp, 'spruce', [x, y, z, r() * 6.3, w, H, (0.82 + r() * 0.36) * lit, rank]) && H > F.SOLID_H) cell.sol.push(x, z);
+        }
+      } else if (r() < (k > 0.7 ? 0.3 : 0.12)) {
         const H = (14 + r() * 6) * grow;
         if (keepT(pi, 'pine', [x, y, z, r() * 6.3, H, H, 0.85 + r() * 0.3, rank]) && H > F.SOLID_H) cell.sol.push(x, z);
       } else {
@@ -288,12 +457,12 @@ function buildCell (i, j) {
         if (keepT(sp, 'spruce', [x, y, z, r() * 6.3, w, H, 0.82 + r() * 0.36, rank]) && H > F.SOLID_H) cell.sol.push(x, z);
       }
       // подлесок: куст или молодая ёлка рядом
-      if (r() < 0.12 + 0.5 * (1 - k)) {
+      if (r() < 0.12 + 0.5 * (1 - k) + (WOOD_ON ? WOOD2.UNDER * k : 0)) {   // 2г7: в глубине подлесок гуще — темнее между стволами
         const a = r() * 6.3, d = 1.6 + r() * 1.2, bx = x + Math.cos(a) * d, bz = z + Math.sin(a) * d;
         if (okAt(bx, bz, 0.6) >= 0 && !(f.hole && f.hole(bx, bz, 0.8))) {
           const by = A.groundH(bx, bz);
-          if (r() < 0.55) keepT(bu, 'bush', [bx, by, bz, r() * 6.3, 0.8 + r() * 1.0, 0.5 + r() * 0.7, 0.75 + r() * 0.45, r()]);
-          else { const H = 1.5 + r() * 2; keepT(sp, 'spruce', [bx, by, bz, r() * 6.3, H, H, 0.95 + r() * 0.3, r()]); }
+          if (r() < 0.55) keepT(bu, 'bush', [bx, by, bz, r() * 6.3, 0.8 + r() * 1.0, 0.5 + r() * 0.7, (0.75 + r() * 0.45) * (WOOD_ON ? WOOD2.LIGHT[0] + (WOOD2.LIGHT[1] - WOOD2.LIGHT[0]) * k : 1), r()]);
+          else { const H = WOOD_ON ? 2 + r() * 3.5 : 1.5 + r() * 2; keepT(sp, 'spruce', [bx, by, bz, r() * 6.3, H, H, (0.95 + r() * 0.3) * (WOOD_ON ? WOOD2.LIGHT[0] + (WOOD2.LIGHT[1] - 0.12 - WOOD2.LIGHT[0]) * k : 1), r()]); }
         }
       }
     }
@@ -309,8 +478,8 @@ function buildCell (i, j) {
     });
     return { m, c, n: list.length };
   };
-  cell.sp = pack(sp); cell.pi = pack(pi); cell.bu = pack(bu);
-  ST.sp += sp.length; ST.pi += pi.length; ST.bu += bu.length; ST.trees += sp.length + pi.length; ST.sol += cell.sol.length / 2;
+  cell.sp = pack(sp); cell.pi = pack(pi); cell.bu = pack(bu); cell.bi = pack(bi);
+  ST.sp += sp.length; ST.pi += pi.length; ST.bu += bu.length; ST.bi += bi.length; ST.trees += sp.length + pi.length + bi.length; ST.sol += cell.sol.length / 2;
   ST.built++;
   const dt = performance.now() - t0;
   ST.ms += dt; ST.msMax = Math.max(ST.msMax, dt);
@@ -318,8 +487,8 @@ function buildCell (i, j) {
 }
 function dropCell (k, c) {
   if (!c.empty) {
-    ST.sp -= c.sp ? c.sp.n : 0; ST.pi -= c.pi ? c.pi.n : 0; ST.bu -= c.bu ? c.bu.n : 0;
-    ST.trees -= (c.sp ? c.sp.n : 0) + (c.pi ? c.pi.n : 0); ST.sol -= c.sol.length / 2;
+    ST.sp -= c.sp ? c.sp.n : 0; ST.pi -= c.pi ? c.pi.n : 0; ST.bu -= c.bu ? c.bu.n : 0; ST.bi -= c.bi ? c.bi.n : 0;
+    ST.trees -= (c.sp ? c.sp.n : 0) + (c.pi ? c.pi.n : 0) + (c.bi ? c.bi.n : 0); ST.sol -= c.sol.length / 2;
   }
   CELLS.delete(k); ST.dropped++; ENS.gone++;
 }
@@ -387,7 +556,7 @@ function refresh (cam) {
     vis.push([d, c]);
   }
   vis.sort((a, b) => a[0] - b[0]);
-  const n = { sp0: 0, sp1: 0, pi0: 0, pi1: 0, bu: 0 };
+  const n = { sp0: 0, sp1: 0, pi0: 0, pi1: 0, bu: 0, bi0: 0, bi1: 0 };
   const put = (mk, src, cnt) => {
     const M = MESH[mk], cap = M.instanceMatrix.count;
     const k = Math.min(cnt, cap - n[mk]);
@@ -402,8 +571,8 @@ function refresh (cam) {
   FADE_BUSH.value.set(F.BUSH_R - F.LAG - F.BUSH_FADE, F.BUSH_R - F.LAG);
   for (const [d, c] of vis) {
     const keep = d < NEAR ? 1 : 1 - (1 - F.THIN) * Math.min(1, (d - NEAR) / Math.max(1, FAR - NEAR));
-    if (d < NEAR + half) { if (c.sp) put('sp0', c.sp, c.sp.n); if (c.pi) put('pi0', c.pi, c.pi.n); }
-    if (d > n0 - half) { if (c.sp) put('sp1', c.sp, Math.ceil(c.sp.n * keep)); if (c.pi) put('pi1', c.pi, Math.ceil(c.pi.n * keep)); }
+    if (d < NEAR + half) { if (c.sp) put('sp0', c.sp, c.sp.n); if (c.pi) put('pi0', c.pi, c.pi.n); if (c.bi) put('bi0', c.bi, c.bi.n); }
+    if (d > n0 - half) { if (c.sp) put('sp1', c.sp, Math.ceil(c.sp.n * keep)); if (c.pi) put('pi1', c.pi, Math.ceil(c.pi.n * keep)); if (c.bi) put('bi1', c.bi, Math.ceil(c.bi.n * keep)); }
     if (c.bu && d < F.BUSH_R + half) put('bu', c.bu, c.bu.n);
   }
   for (const k in MESH) {
@@ -451,7 +620,7 @@ export function addArea (p, hole) {
 
 export function step (dt, api) {
   if (!A || !FORESTS || !FORESTS.length) return;
-  U.uSnow.value = snowAmt();
+  U.uSnow.value = snowAmt(); U.uLeaf.value = leafAmt(); U.uYellow.value = yellowAmt();
   const cam = A.cam, x = cam.position.x, z = cam.position.z, F = FOREST;
   LAST.frame++;
   const jump = Math.hypot(x - LAST.x, z - LAST.z);
@@ -508,11 +677,24 @@ const EDP = {
     let n = 0;
     cellsAround(x, z, r, (i, j, c) => {
       if (!c || c.empty) return;
-      for (const P of [c.sp, c.pi, c.bu]) if (P) for (let q = 0; q < P.n; q++) if (Math.hypot(P.m[q * 16 + 12] - x, P.m[q * 16 + 14] - z) <= r) n++;
+      for (const P of [c.sp, c.pi, c.bu, c.bi]) if (P) for (let q = 0; q < P.n; q++) if (Math.hypot(P.m[q * 16 + 12] - x, P.m[q * 16 + 14] - z) <= r) n++;
     });
     return n;
   },
 };
+
+/* карта теней (sunshadow.js, 2г16): весь собранный ельник, а не только тот, что в кадре (иначе тени ельника появляются и
+   пропадают при развороте камеры) — fn(подробный меш вида, клетка { cx, cz, gy }, пачка { n, m }); kinds — только меши видов (прогрев) */
+export function shadowCells (fn, kinds) {
+  if (!A || !FORESTS || !FORESTS.length || !MESH.sp0) return;
+  if (kinds) { for (const k of ['sp0', 'pi0', 'bi0']) if (MESH[k]) fn(MESH[k], null, null); return; }
+  for (const c of CELLS.values()) {
+    if (c.empty) continue;
+    if (c.sp) fn(MESH.sp0, c, c.sp);
+    if (c.pi) fn(MESH.pi0, c, c.pi);
+    if (c.bi && MESH.bi0) fn(MESH.bi0, c, c.bi);
+  }
+}
 
 /* стволы рядом с точкой — машина в них упирается (game.js: столкновения кузова) */
 const T_LIST = [], T_POOL = [];   // стволы у точки (withTrees) — живут до следующего вызова: езда перебирает их сразу
@@ -561,7 +743,7 @@ export const DEBUG = {
   FOREST, CELLS, MESH, edgeAt, ENS,
   get stats () {
     return { forests: FORESTS ? FORESTS.length : 0, cells: [...CELLS.values()].filter(c => !c.empty).length, built: ST.built, dropped: ST.dropped,
-      spruce: ST.sp, pine: ST.pi, bush: ST.bu, trees: ST.trees, solid: ST.sol, shown: ST.shown, refresh: ST.refresh,
+      spruce: ST.sp, pine: ST.pi, bush: ST.bu, birch: ST.bi, trees: ST.trees, solid: ST.sol, shown: ST.shown, refresh: ST.refresh,
       msTotal: Math.round(ST.ms), msMax: Math.round(ST.msMax * 10) / 10, snow: U.uSnow.value };
   },
   warm: (x, z, R = 470) => { while (ensure(x, z, R, 1000)); return CELLS.size; },

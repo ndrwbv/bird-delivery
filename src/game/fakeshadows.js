@@ -33,6 +33,9 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { STYLE } from './softcity.js';
 import { pullDepth } from './carshadow.js';   // 0п87: пятна не прячутся под соседнюю поверхность
+import { UNIFORMS as SSU, GLSL_COVER, withSS } from './sunshadow.js';
+import { ON as SUNP_ON } from './sunpath.js';   // путь солнца ниже (2г2): длина тени — по высоте солнца   // 2г2: где настоящие тени от солнца — маски домов нет (sunshadow.js)
+import { car as matCar } from './materials.js';   // 2г11: лак кузова — метка MAT_CAR у всех материалов машин (materials.js)
 
 const Q = typeof location === 'undefined' ? new URLSearchParams() : new URLSearchParams(location.search);
 const OFF = Q.has('nofs');
@@ -47,7 +50,9 @@ export const FS = {
   TURN: 1.2,          // солнце повернулось на столько градусов — заново
   DAY: STYLE.on ? STYLE.shadow : 0.35,          // насколько темнее земля в тени днём, в ясную погоду (у стены; к концу тени — FS.TIP от неё), в цвете экрана
   TIP: 0.6,           // конец тени — такая доля от густоты у стены
-  LEN: [0.4, 0.65],   // длина тени — доля высоты дома: в полдень — меньшее, к утру и вечеру — большее
+  LEN: [0.4, 0.65],   // длина тени — доля высоты дома: в полдень — меньшее, к утру и вечеру — большее (?oldsun; с путём солнца sunpath.js — по его высоте)
+  LEN_MAX: 3.5,       // с путём солнца sunpath.js: не длиннее стольких высот дома (солнце у горизонта)
+  LEN_MAN: 1.0,       // тень-пятно человека: длина как у дома, но не больше этой доли
   WET: 0.3,           // в сильный дождь сила × (1 − WET) — и так слабее: солнце в дождь тусклее (weather.js)
   SNOWY: 0.6,         // в снежную погоду сила × SNOWY
   // пятна под машинами, людьми и зверями
@@ -77,7 +82,7 @@ const VERT = `
   fsP = instanceMatrix * fsP;
 #endif
   vFsW = (modelMatrix * fsP).xyz; }`;
-const FRAG_HEAD = `
+const FRAG_HEAD = GLSL_COVER + `
 uniform sampler2D uFsMap; uniform vec3 uFsWin; uniform float uFsK;
 varying vec3 vFsW;
 float fsShade () {
@@ -89,6 +94,7 @@ float fsShade () {
   s = s * 0.4 + 0.15 * (texture2D(uFsMap, uv + tap).r + texture2D(uFsMap, uv - tap).r
     + texture2D(uFsMap, uv + tap.yx).r + texture2D(uFsMap, uv - tap.yx).r);` : ''}
   s *= 1.0 - smoothstep(0.4, 0.48, max(e.x, e.y));
+  s *= 1.0 - ssCover(vFsW);                       // 2г2: тут настоящие тени от солнца (sunshadow.js)
   vec3 N = normalize(cross(dFdx(vFsW), dFdy(vFsW)));
   return 1.0 - uFsK * s * smoothstep(0.45, 0.8, abs(N.y));
 }
@@ -100,7 +106,7 @@ export function mat (m) {
   const prev = m.onBeforeCompile, key = m.customProgramCacheKey;
   m.onBeforeCompile = function (sh, r) {
     if (prev) prev.call(this, sh, r);
-    Object.assign(sh.uniforms, U);
+    Object.assign(sh.uniforms, U, SSU);
     sh.vertexShader = 'varying vec3 vFsW;\n' + sh.vertexShader.replace('#include <project_vertex>', VERT);
     // после перевода в цвет экрана (sRGB), до тумана: густота FS.DAY — как у пятна под машиной (смешивание тоже в цвете экрана)
     sh.fragmentShader = FRAG_HEAD + sh.fragmentShader.replace('#include <colorspace_fragment>', '#include <colorspace_fragment>\nif (uFsK > 0.0) gl_FragColor.rgb *= fsShade();');
@@ -125,19 +131,26 @@ varying vec3 vFsW;
 float fsShadeCar () {
   vec2 uv = (vFsW.xz - uFsWin.xy) * uFsWin.z + 0.5;
   vec2 e = abs(uv - 0.5);
-  return 1.0 - uFsK * uFsCar * texture2D(uFsMap, uv).r * (1.0 - smoothstep(0.4, 0.48, max(e.x, e.y)));
+  float k = 1.0 - uFsK * uFsCar * texture2D(uFsMap, uv).r * (1.0 - smoothstep(0.4, 0.48, max(e.x, e.y))) * (1.0 - ssCover(vFsW));
+  if (uSsP.z > 0.0 && uFsCar > 0.0) {             // 2г2: настоящая тень от солнца на кузове (sunshadow.js)
+    vec3 N = normalize(cross(dFdx(vFsW), dFdy(vFsW)));
+    float lit = dot(N, uSsDir) > 0.0 ? ssLit(vFsW, N) : 1.0;
+    return k * mix(1.0, dot(uSsFlat, vec3(0.3333)), uSsP.z * uFsCar * (1.0 - lit));
+  }
+  return k;
 }
 `;
 /* в чужую программу (cardirt.js inject — своя машина в грязи; realcar.js bodyShader — кузов «Семёрки» потока) */
 export function shadeInject (sh) {
   if (!FS.HOUSES || sh.fragmentShader.indexOf('fsShadeCar') >= 0) return;
-  Object.assign(sh.uniforms, U);
+  Object.assign(sh.uniforms, U, SSU);
   sh.vertexShader = 'varying vec3 vFsW;\n' + sh.vertexShader.replace('#include <project_vertex>', VERT);
-  sh.fragmentShader = FRAG_CAR + sh.fragmentShader.replace('#include <colorspace_fragment>', '#include <colorspace_fragment>\nif (uFsK * uFsCar > 0.0) gl_FragColor.rgb *= fsShadeCar();');
+  sh.fragmentShader = withSS(FRAG_CAR + sh.fragmentShader, true).replace('#include <colorspace_fragment>', '#include <colorspace_fragment>\nif ((uFsK + uSsP.z) * uFsCar > 0.0) gl_FragColor.rgb *= fsShadeCar();');
 }
 /* материал со своей программой грязи (userData.dirt: cardirt.js, realcar.js) тень берёт там же — не трогаем; свой обёрнутый,
    который потом переписали без нас (onBeforeCompile = …), — оборачиваем заново */
 export function carMat (m) {
+  matCar(m);
   if (!FS.HOUSES || !m || !m.isMaterial || m.userData.dirt || m.userData.fsGround || m.isMeshBasicMaterial || m.isShaderMaterial || m.isRawShaderMaterial) return m;
   if (!(m.isMeshLambertMaterial || m.isMeshPhongMaterial || m.isMeshStandardMaterial || m.isMeshToonMaterial)) return m;
   if (m.userData.fsCar && m.onBeforeCompile === FSC_FN.get(m)) return m;
@@ -479,7 +492,9 @@ export function step (E) {
   if (wid === 'snowy' || wid === 'storm') k *= FS.SNOWY;
   ST.k = +k.toFixed(3);
   const dt = Math.min(1, Math.abs(((ENV.t || 0) - 0.3)) / 0.35);
-  const len = FS.LEN[0] + (FS.LEN[1] - FS.LEN[0]) * dt;
+  // длина тени: при новом пути солнца (sunpath.js, 2г2) — по его высоте, как у настоящей (днём ~1,4 высоты дома, вечером до FS.LEN_MAX)
+  const sv = sun.position.y - sun.target.position.y;
+  const len = SUNP_ON ? Math.min(FS.LEN_MAX, Math.max(FS.LEN[0], sl / Math.max(1e-3, sv))) : FS.LEN[0] + (FS.LEN[1] - FS.LEN[0]) * dt;
   if (FS.HOUSES && RT) {
     U.uFsK.value = k;
     ownCar(E);
@@ -487,7 +502,7 @@ export function step (E) {
     if (k > 0.005) {
       const turn = Math.acos(Math.max(-1, Math.min(1, -sx * dX + -sz * dZ))) * 180 / Math.PI;
       const far = !(Math.abs(V.x - cx) < FS.MOVE && Math.abs(V.z - cz) < FS.MOVE);
-      if (far || turn > FS.TURN || Math.abs(len - dLen) > 0.02) {
+      if (far || turn > FS.TURN || Math.abs(len - dLen) > 0.02 * Math.max(1, len)) {
         dX = -sx; dZ = -sz; dLen = len;
         ST.len = +len.toFixed(3); ST.dir = [+dX.toFixed(3), +dZ.toFixed(3)];
         drawMask(V.x, V.z);
@@ -528,7 +543,7 @@ function blobs (E, dx, dz, night, len) {
   if (E.yard) E.yard(px, pz, Rr, t => { const ex = t.x - px, ez = t.z - pz, d2 = ex * ex + ez * ez; if (d2 < R2) car(t, d2); });
   const nY = NC;
   // люди: стоят на земле сами по себе (в машине, на руках, в сценке внутри группы — без пятна)
-  const H = E.humans, sc = E.scene, ha = Math.atan2(dx, dz), hl = 1.7 * len * day;   // тень человека вытянута от солнца
+  const H = E.humans, sc = E.scene, ha = Math.atan2(dx, dz), hl = 1.7 * Math.min(len, FS.LEN_MAN) * day;   // тень человека вытянута от солнца
   for (const g of H) {
     if (g.parent !== sc || !g.visible) continue;
     const p = g.position, ex = p.x - px, ez = p.z - pz, d2 = ex * ex + ez * ez;

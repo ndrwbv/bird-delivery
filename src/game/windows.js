@@ -195,6 +195,9 @@ const U = {
   uT: { value: 0 }, uNight: { value: 0 }, uLod: { value: 70 },
   uDark: { value: new THREE.Color(1, 1, 1) }, uSky: { value: new THREE.Color(0.6, 0.8, 0.95) },
   uAtlas: { value: null },
+  // 2г11 (materials.js): стекло отражает небо тем же градиентом, что купол (sky.js), и блестит солнцем; uMatOn 0 — как было (?oldmat)
+  uSkyZ: { value: new THREE.Color(0.05, 0.2, 0.6) }, uSkyH: { value: new THREE.Color(0.6, 0.75, 0.8) },
+  uSunD: { value: new THREE.Vector3(0, 1, 0) }, uSunC: { value: new THREE.Color(1, 1, 1) }, uMatOn: { value: 0 },
 };
 
 const VERT_HEAD = 'attribute vec3 iP;\nattribute vec4 iD;\nattribute vec2 iS;\nvarying vec4 vW;\nvarying vec4 vN;\nvarying vec3 vView;\n';
@@ -213,6 +216,18 @@ uniform sampler2D uAtlas;
 varying vec4 vW;
 varying vec4 vN;
 varying vec3 vView;
+uniform vec3 uSkyZ, uSkyH, uSunD, uSunC;
+uniform float uMatOn;
+/* отражение в стекле: nv — луч из глаза в осях окна (x — вдоль, y — вверх, z — по нормали), vy — высота точки в окне */
+vec3 wRefl (vec3 nv, float vy) {
+  vec3 old = uSky * (0.8 + 0.25 * vy);
+  if (uMatOn < 0.5) return old;
+  vec3 Tt = vec3(vN.y, 0.0, -vN.x), Nn = vec3(vN.x, 0.0, vN.y);
+  vec3 r = normalize(Tt * nv.x + vec3(0.0, nv.y, 0.0) - Nn * nv.z);
+  vec3 sky = r.y > 0.0 ? mix(uSkyH, uSkyZ, 1.0 - pow(1.0 - r.y, 3.0)) : uSkyH * mix(0.8, 0.5, min(-r.y * 3.0, 1.0));   // ниже горизонта — земля и дома напротив
+  float sd = max(dot(r, uSunD), 0.0);
+  return sky * (0.85 + 0.2 * vy) + uSunC * (pow(sd, 300.0) * 1.2 + pow(sd, 18.0) * 0.1);
+}
 vec4 wh4 (float s) { vec4 p = fract(vec4(s) * vec4(443.897, 441.423, 437.195, 444.129) + vec4(0.13, 0.71, 0.37, 0.53)); p += dot(p, p.wzxy + 19.19); return fract((p.xxyz + p.yzzw) * p.zywx); }
 vec3 wpick (float k, vec3 a, vec3 b, vec3 c, vec3 d, vec3 e, vec3 f) { k *= 6.0; return k < 1.0 ? a : k < 2.0 ? b : k < 3.0 ? c : k < 4.0 ? d : k < 5.0 ? e : f; }
 float shk (vec2 c) { return fract(sin(dot(c, vec2(12.9898, 78.233))) * 43758.5453); }
@@ -309,7 +324,7 @@ vec3 shopShade (vec2 S, vec2 lp, float seed, float sb, float door) {
 #endif
   vec3 nv = normalize(vView);
   float fres = 0.08 + 0.12 * smoothstep(0.02, 0.06, ew) + 0.5 * pow(1.0 - abs(nv.z), 4.0);
-  col = mix(col, uSky * (0.8 + 0.25 * vW.y), fres * (1.0 - 0.75 * lit));
+  col = mix(col, wRefl(nv, vW.y), fres * (1.0 - 0.75 * lit));
   return mix(col, fcol * uDark * (1.0 - 0.75 * uNight), cov);
 }
 
@@ -435,7 +450,7 @@ vec3 balcShade (vec2 S, vec2 lp, float seed, float sb) {
 #endif
   vec3 nv = normalize(vView);
   float fres = (0.1 + 0.15 * smoothstep(0.02, 0.06, ew) + 0.55 * pow(1.0 - abs(nv.z), 4.0)) * (1.0 - open);
-  col = mix(col, uSky * (0.8 + 0.25 * vW.y), fres * (1.0 - 0.7 * lit));
+  col = mix(col, wRefl(nv, vW.y), fres * (1.0 - 0.7 * lit));
   return mix(col, fcol * uDark * (1.0 - 0.75 * uNight), cov);
 }
 `;
@@ -488,7 +503,7 @@ const FRAG_BODY = `
   vec3 nv = normalize(vView);
   float far = smoothstep(0.02, 0.06, ew);                // вдали: складки штор не рисуем (рябили бы), стекло больше отражает
   float fres = 0.07 + 0.18 * far + 0.55 * pow(1.0 - abs(nv.z), 4.0);
-  vec3 refl = uSky * (0.8 + 0.25 * vW.y);
+  vec3 refl = wRefl(nv, vW.y);
   // без комнаты (вдали и на «окнах без комнат»): ровный цвет
   vec3 colF = mix(wc * 0.7 * 0.36 * uDark, L * (0.6 + 0.5 * wc), lit);
   float wd = length(vView);
@@ -629,6 +644,11 @@ export function build (scene) {
 }
 
 /* каждый кадр из updateEnv: ночь (0—1), затемнение стен (как у склеек без света), небо, время */
+/* 2г11: небо и солнце для отражения в стекле (materials.js env, раз в кадр) */
+export function sky (on, zen, hor, sunDir, sunCol) {
+  U.uMatOn.value = on ? 1 : 0;
+  U.uSkyZ.value.copy(zen); U.uSkyH.value.copy(hor); U.uSunD.value.copy(sunDir); U.uSunC.value.copy(sunCol);
+}
 export function update (night, dark, darkB, sky, t) {
   U.uNight.value = night;
   U.uDark.value.setRGB(dark, dark, darkB);
