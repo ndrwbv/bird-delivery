@@ -65,6 +65,15 @@ const smoke = (args, label) => async () => {
 };
 
 const CHECKS = [
+  { id: 'daily-race-unit', name: 'задания: отмена старых кадров и затухания', group: 1, run: async () => {
+    const r=await sh(process.execPath,[path.join(__dirname,'daily-race-test.cjs')]);
+    return {status:r.code===0?'ok':'fail',info:(r.code===0?r.out:r.err).trim()};
+  } },
+  { id: 'daily-race', name: 'задания: прерванная плашка не возвращается поверх оплаты', group: 2, run: async () => {
+    const j=await probe(['--mode=steam','--size=deck','--eval='+path.join(__dirname,'probe-checks/daily-race.js')]);
+    const e=errLine(j),r=j.result;
+    return {status:!e&&r?.ok&&!j.errors.length?'ok':'fail',info:e||(r?r.rows.map(x=>(x.ok?'ок: ':'ПРОВАЛ: ')+x.name).join('; '):'нет результата')};
+  } },
   { id: 'land-ready', name: 'земля: готовая опора до окончательной склейки', group: 1, run: async () => {
     const r = await sh(process.execPath, [path.join(__dirname, 'landready-geometry.mjs')]);
     return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };

@@ -237,35 +237,46 @@ export function endRow () {
 export const earned = () => D.earned;
 
 /* ── записка в начале смены (сверху, не окно: сама уходит) ── */
-let NOTE = null, noteT = 0;
+let NOTE = null, noteT = 0, noteRaf = 0, noteGen = 0;
 function showNote () {
   D.noted = true;
   if (typeof document === 'undefined') return;
+  hideNote();
   if (!NOTE) { NOTE = document.createElement('div'); NOTE.id = 'daily-note'; NOTE.className = 'pp-ride'; document.body.appendChild(NOTE); }
   NOTE.innerHTML = '<div class="dl-pz-t">' + esc(t('задания на день')) + '</div>' + D.list.map(q =>
     '<div class="dl-row"><i class="dl-box"></i><span>' + esc(label(q)) + '</span><b>+' + esc(A.money(q.pay)) + '</b></div>').join('');
   NOTE.hidden = false;
-  requestAnimationFrame(() => NOTE && NOTE.classList.add('on'));
+  const gen = ++noteGen;
+  noteRaf = requestAnimationFrame(() => { noteRaf = 0; if (gen === noteGen && NOTE) NOTE.classList.add('on'); });
   clearTimeout(noteT);
   noteT = setTimeout(hideNote, 7000);
 }
 function hideNote () {
-  clearTimeout(noteT);
+  const gen = ++noteGen;
+  clearTimeout(noteT); noteT = 0;
+  if (noteRaf) { cancelAnimationFrame(noteRaf); noteRaf = 0; }
   if (!NOTE) return;
   NOTE.classList.remove('on');
-  setTimeout(() => { if (NOTE && !NOTE.classList.contains('on')) NOTE.hidden = true; }, 300);
+  setTimeout(() => { if (gen === noteGen && NOTE && !NOTE.classList.contains('on')) NOTE.hidden = true; }, 300);
 }
 
 /* ── выполнил: галочка, звук, «+N ₽» ── */
-let POPEL = null, popT = 0;
-function hidePop () { clearTimeout(popT); if (POPEL) POPEL.classList.remove('on'); }
+let POPEL = null, popT = 0, popRaf = 0, popGen = 0;
+function hidePop () {
+  popGen++;
+  clearTimeout(popT); popT = 0;
+  if (popRaf) { cancelAnimationFrame(popRaf); popRaf = 0; }
+  if (POPEL) POPEL.classList.remove('on');
+}
 function showPop (q) {
-  if (NOTE && NOTE.classList.contains('on')) hideNote();
+  hidePop();
+  if (NOTE) hideNote();
   if (!POPEL) { POPEL = document.createElement('div'); POPEL.id = 'daily-pop'; POPEL.className = 'pp-ride'; document.body.appendChild(POPEL); }
   POPEL.innerHTML = '<i class="dl-box"></i><div><small>' + esc(t('задание выполнено')) + '</small><span>' + esc(label(q)) + '</span></div><b>+' + esc(A.money(q.pay)) + '</b>';
   POPEL.hidden = false;
   POPEL.classList.remove('on');
-  requestAnimationFrame(() => POPEL && POPEL.classList.add('on'));
+  const gen = popGen;
+  popRaf = requestAnimationFrame(() => { popRaf = 0; if (gen === popGen && POPEL) POPEL.classList.add('on'); });
   // sfx-names: task-done
   try { A.Snd.fx('task-done', s => [784, 1046, 1568].forEach((f, i) => setTimeout(() => s.blip(f, i === 2 ? 0.22 : 0.09, 'triangle', 0.12), i * 80))); } catch (e) { /* — */ }
   clearTimeout(popT);
@@ -278,5 +289,5 @@ const DEBUG = {
   start: n => { shiftStart({ n }); return D.list.map(q => q.id + ' ' + q.n + ' ' + q.pay); },
   pick, avail, snap, tick, tally, deliver,
   done: id => { const q = D.list.find(x => x.id === id); if (q && !q.done) complete(q); return q; },
-  note: showNote, pause: pauseHTML, row: endRow,
+  note: showNote, hideNote, pause: pauseHTML, row: endRow,
 };
