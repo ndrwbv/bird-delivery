@@ -119,30 +119,56 @@ V.vx = V.vz = 0;
 
 /* ── 4—5. поперёк тротуара прямо перед идущим: стоящая машина (обходит) и твёрдая коробка 3 × 6 м, как гараж (разворачивается) ── */
 /* до трёх прохожих: прервался рано (свернул к лавочке, испугался, перешёл к зебре) — следующий */
-async function across (tag, far, put, undo) {
+const pedSnapshot = p => {
+  const round = n => Number.isFinite(n) ? +n.toFixed(3) : null, w = p.w;
+  return { x: round(p.x), z: round(p.z), speed: round(p.speed), resnap: !!p.resnap,
+    dg: p.dg ? { ph: p.dg.ph, mode: p.dg.mode, t: round(p.dg.t) } : null,
+    cross: p.cross ? { t: round(p.cross.t), back: !!p.cross.back, wait: !!p.cross.wait } : null,
+    path: p.path ? { i: p.path.i, d: round(p.path.d), dir: p.path.dir, points: p.path.q?.length } : null,
+    idle: p.idle ? { phase: p.idle.phase } : null,
+    walk: w ? { a: w.a, b: w.b, c: w.c, side: w.side, d: round(w.d), L: round(w.L),
+      from: [round(w.sx), round(w.sz)], to: [round(w.ex), round(w.ez)], R: round(w.R), R0: round(w.R0) } : null,
+    pc: { ok: p.pcOk, in: p.pcIn, x: round(p.pcX), z: round(p.pcZ) } };
+};
+async function across (tag, far, put, undo, inspectFixture = null) {
   let r = null;
-  for (let k = 0; k < 3; k++) { r = await across1(tag, far, put, undo, k); if (!r || r.n >= 40) break; }
+  for (let k = 0; k < 3; k++) { r = await across1(tag, far, put, undo, k, inspectFixture); if (!r || r.n >= 40) break; }
   return r;
 }
-async function across1 (tag, far, put, undo, skip) {
+async function across1 (tag, far, put, undo, skip, inspectFixture) {
   const p = walker(skip);
   if (!p) return null;
   const W = p.w, ux = (W.ex - W.sx) / W.L, uz = (W.ez - W.sz) / W.L, x0 = p.x, z0 = p.z;
   const o = put(p.x + ux * 3.5, p.z + uz * 3.5, ux, uz);
+  // PC.inside учитывает весь мир: «внутри» ещё не доказывает проход
+  // через поставленную коробку. Только запись причин, критерий прежний.
+  const diagnostic = { attempt: skip, person: d.PEOPLE.indexOf(p), initial: pedSnapshot(p), samples: [] };
+  const note = (sample, why, kind, forward) => {
+    if (diagnostic.samples.length >= 8) return;
+    let fixture = inspectFixture ? inspectFixture(p, o) : null;
+    if (tag === 'solid') {
+      const dx = p.x - o.cx, dz = p.z - o.cz, lx = dx * o.cs + dz * o.sn, lz = -dx * o.sn + dz * o.cs;
+      fixture = { overlap: Math.abs(lx) < o.hw - 0.1 && Math.abs(lz) < o.hd - 0.1,
+        local: [+lx.toFixed(3), +lz.toFixed(3)], half: [o.hw, o.hd] };
+    }
+    diagnostic.samples.push({ sample, why, kind, forward: +forward.toFixed(3), fixture, ...pedSnapshot(p) });
+  };
   let inside = 0, n = 0, back = 0, maxF = -9, px = p.x, pz = p.z, jump = 0;
   for (let i = 0; i < 160; i++) {
     await wait(50);
     if (p.dead || p.fall || p.goTo || p.panic) break;
-    if (Math.hypot(p.x - px, p.z - pz) > 2.5) { jump = 1; break; }   // скачок: проскочил сквозь (стена выталкивает к дальней стороне) или перенесли
+    if (Math.hypot(p.x - px, p.z - pz) > 2.5) { jump = 1; note(i, 'jump', PC.inside(p.x, p.z, 0.1), (p.x - x0) * ux + (p.z - z0) * uz); break; }   // скачок: проскочил сквозь (стена выталкивает к дальней стороне) или перенесли
     px = p.x; pz = p.z;
     n++;
-    if (PC.inside(p.x, p.z, 0.1)) inside++;
+    const kind = PC.inside(p.x, p.z, 0.1);
+    if (kind) inside++;
     const f = (p.x - x0) * ux + (p.z - z0) * uz; maxF = Math.max(maxF, f);
+    if (kind || (tag !== 'car' && f > 3.5 + far + 0.3)) note(i, kind ? 'inside' : 'passed', kind, f);
     if (f < maxF - 1) back = 1;
   }
   undo(o);
   const passed = maxF > 3.5 + far + 0.3 ? 1 : 0;
-  return { ok: !inside && (tag === 'car' || (!passed && !jump)), inside, n, passed, jump, back, maxF: +maxF.toFixed(1) };
+  return { ok: !inside && (tag === 'car' || (!passed && !jump)), inside, n, passed, jump, back, maxF: +maxF.toFixed(1), diagnostic };
 }
 {
   const t = d.TRAFFIC.filter(t => t.parked && !t.gone && !t.bus && !t.lux && t.model !== 'moped' && Math.hypot(t.x - V.x, t.z - V.z) < 250)
@@ -152,7 +178,11 @@ async function across1 (tag, far, put, undo, skip) {
     t.x = x; t.z = z; t.h = h; t.speed = 0; t.moved = 1;
     if (t.mesh) { t.mesh.position.set(x, t.mesh.position.y, z); t.mesh.rotation.y = h; }
     return k;
-  }, k => { t.x = k.x; t.z = k.z; t.h = k.h; t.moved = 1; if (t.mesh) { t.mesh.position.set(t.x, t.mesh.position.y, t.z); t.mesh.rotation.y = t.h; } });
+  }, k => { t.x = k.x; t.z = k.z; t.h = k.h; t.moved = 1; if (t.mesh) { t.mesh.position.set(t.x, t.mesh.position.y, t.z); t.mesh.rotation.y = t.h; } }, p => {
+    const dx = p.x - t.x, dz = p.z - t.z, fx = Math.sin(t.h), fz = Math.cos(t.h), al = dx * fx + dz * fz, ac = dx * fz - dz * fx, hl = t.hl || 2.2;
+    return { overlap: Math.abs(al) < hl - 0.1 && Math.abs(ac) < 1.0 - 0.1,
+      local: [+al.toFixed(3), +ac.toFixed(3)], half: [hl, 1.0], model: t.model };
+  });
   const G = d.SOLID_GRID, C = 30;
   out.box = await across('solid', 1.5, (x, z, ux, uz) => {
     const h = Math.atan2(-ux, uz), hw = 3, hd = 1.5, cs = Math.cos(h), sn = Math.sin(h);

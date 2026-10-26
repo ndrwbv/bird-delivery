@@ -26,7 +26,7 @@ import * as THREE from '../vendor/three.module.min.js';
 const CULL_EVERY = 12;
 const MAX_R = 400;              // больше — это юбка земли и река: они всегда на сцене
 
-let LIST = [], SCENE = null, CAM = null, PROPS = [], tick = 0;
+let LIST = [], SCENE = null, CAM = null, PROPS = [], tick = 0, TAKEN = new WeakSet();
 export const STATS = { frozen: 0, culled: 0, groups: 0, props: 0, propsOff: 0, cells: 0, cellsOut: 0, outMeshes: 0, big: 0, boxOut: 0, mwSkip: 0, farMs: 0 };
 
 /* ── что в кадре: клетки статики (09.10.2026, хвост кадров на Деке) ──
@@ -47,7 +47,7 @@ const BIG_R = 80;
 const BOX_ON = typeof location === 'undefined' || !/[?&]nobox(&|$)/.test(location.search);   // ?nobox — без коробок, для замера
 /* VIEW.on = false (или ?noview) — без отсечения по кадру: для сравнения замеров (tools/perf.cjs, probe) */
 export const VIEW = { on: typeof location === 'undefined' || !/[?&]noview(&|$)/.test(location.search) };
-let CELLS = [], masked = false;
+let CELLS = [], CELL_MAP = new Map(), masked = false;
 const FR = new THREE.Frustum(), PS = new THREE.Matrix4(), BOX = new THREE.Box3(), SPH = new THREE.Sphere();
 let frOk = false;
 function viewFrustum () {
@@ -64,19 +64,25 @@ export function inView (x, y, z, r) {
   SPH.center.set(x, y, z); SPH.radius = r;
   return FR.intersectsSphere(SPH);
 }
+function addCell (e) {
+  const k = Math.floor(e.x / VIEW_CELL) + ',' + Math.floor(e.z / VIEW_CELL);
+  let c = CELL_MAP.get(k);
+  if (!c) { c = { box: new THREE.Box3(), list: [], big: [], vis: true, cx: 0, cz: 0, rad: 0 }; CELL_MAP.set(k, c); CELLS.push(c); }
+  c.list.push(e);
+  if (e.box) c.big.push(e);
+  c.box.expandByPoint(BOX.min.set(e.x - e.r, e.y - e.r, e.z - e.r));
+  c.box.expandByPoint(BOX.max.set(e.x + e.r, e.y + e.r, e.z + e.r));
+  const b = c.box;
+  c.cx = (b.min.x + b.max.x) / 2; c.cz = (b.min.z + b.max.z) / 2;
+  c.rad = Math.hypot(b.max.x - b.min.x, b.max.z - b.min.z) / 2;
+  // Если клетка уже вне кадра, её новый меш должен получить тот же
+  // слой: cellCull меняет слои только при смене видимости клетки.
+  e.m.layers.mask = e.bw = c.vis ? 1 : 0;
+  return c;
+}
 function buildCells () {
-  const M = new Map();
-  for (const e of LIST) {
-    const k = Math.floor(e.x / VIEW_CELL) + ',' + Math.floor(e.z / VIEW_CELL);
-    let c = M.get(k);
-    if (!c) M.set(k, c = { box: new THREE.Box3(), list: [], big: [], vis: true, cx: 0, cz: 0, rad: 0 });
-    c.list.push(e);
-    if (e.box) c.big.push(e);
-    c.box.expandByPoint(BOX.min.set(e.x - e.r, e.y - e.r, e.z - e.r));
-    c.box.expandByPoint(BOX.max.set(e.x + e.r, e.y + e.r, e.z + e.r));
-  }
-  CELLS = [...M.values()];
-  for (const c of CELLS) { const b = c.box; c.cx = (b.min.x + b.max.x) / 2; c.cz = (b.min.z + b.max.z) / 2; c.rad = Math.hypot(b.max.x - b.min.x, b.max.z - b.min.z) / 2; }
+  CELLS = []; CELL_MAP.clear();
+  for (const e of LIST) addCell(e);
   STATS.cells = CELLS.length;
   nearCells();
 }
@@ -118,6 +124,8 @@ const still = o => o.position.x === 0 && o.position.y === 0 && o.position.z === 
   o.scale.x === 1 && o.scale.y === 1 && o.scale.z === 1;
 
 function take (m, parent) {
+  if (TAKEN.has(m)) return;
+  TAKEN.add(m);
   m.matrixAutoUpdate = false;
   m.updateMatrix();
   m.matrixWorld.copy(m.matrix);
@@ -135,13 +143,15 @@ function take (m, parent) {
     // запас 3 м: ветер урагана клонит кроны, разбитый сугроб чуть шире — коробка геометрии их не знает
     if (g.boundingBox && !g.boundingBox.isEmpty()) { box = g.boundingBox.clone().expandByScalar(3); STATS.big++; }
   }
-  LIST.push({ m, parent, x: s.center.x, y: s.center.y, z: s.center.z, r: s.radius, on: true, box, bw: 1 });
+  const e = { m, parent, x: s.center.x, y: s.center.y, z: s.center.z, r: s.radius, on: true, box, bw: 1 };
+  LIST.push(e);
+  return e;
 }
 
 export function freeze (scene, cam, props) {
   for (const c of CELLS) for (const e of c.list) if (!e.gone) e.m.layers.mask = 1;   // второй раз — с чистого листа
   CELLS = []; NEAR = []; OFF = 0; STATS.big = 0; SCH = null;
-  SCENE = scene; CAM = cam; LIST = []; PROPS = props || [];
+  SCENE = scene; CAM = cam; LIST = []; TAKEN = new WeakSet(); PROPS = props || [];
   POFF = PROPS.filter(p => p._fz && p._on === false).length;
   for (const c of scene.children.slice()) {
     if (c.isMesh && still(c)) take(c, scene);
@@ -161,6 +171,29 @@ export function freeze (scene, cam, props) {
   // дальнее и ближние клетки — сразу, а не в первом кадре мира после сборки (на Деке он и так самый долгий: ~10 мс отсюда)
   if (CAM) { farAll(); nearCells(); }
   return STATS;
+}
+
+/** Готовый участок земли после freeze. Группа — прямо в сцене, вершины
+ * в мировых координатах; повторный вызов берёт только новые меши.
+ * До freeze ничего не делает: первоначальный обход сам заберёт участок. */
+export function register (group) {
+  if (!SCENE || !CAM || !group?.isGroup || group.parent !== SCENE || !still(group)) return 0;
+  group.matrixAutoUpdate = false; group.matrixWorldAutoUpdate = false;
+  group.updateMatrix(); group.matrixWorld.multiplyMatrices(SCENE.matrixWorld, group.matrix);
+  const touched = new Set(), added = [];
+  for (const m of group.children.slice()) {
+    if (!m.isMesh || !still(m)) continue;
+    const e = take(m, group);
+    if (e) { added.push(e); touched.add(addCell(e)); }
+  }
+  const px = CAM.position.x, pz = CAM.position.z, far = CAM.far + 20;
+  for (const e of added) farOne(e, px, pz, far);
+  for (const c of touched) {
+    const dx = c.cx - px, dz = c.cz - pz, r = far + c.rad;
+    if (dx * dx + dz * dz < r * r && !NEAR.includes(c)) NEAR.push(c);
+  }
+  STATS.cells = CELLS.length; STATS.culled = OFF;
+  return added.length;
 }
 
 /* Лёгкая машина (одна склейка кузова и фары — makeCarLite) внутри не

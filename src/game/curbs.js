@@ -490,31 +490,21 @@ function ringCore (p, lift, options) {
   }
 }
 
-export function* build (api) {
-  const QS = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
-  if (QS && QS.has('nocurbs')) return ST;
-  if (api.rebuild) {
-    BG=new Map();BI.clear();BF=BWF=null;ON=false;
-    if(TRACE)TRACE.length=0;
-    if(TRACE_TOPOLOGY){TRACE_TOPOLOGY.active=false;TRACE_TOPOLOGY.links.length=TRACE_TOPOLOGY.bridges.length=TRACE_TOPOLOGY.open.length=0;}
-    for(const k of Object.keys(ST))ST[k]=0;
-  }
-  const OLD = !!(QS && QS.has('oldcurbs'));         // ?oldcurbs — как до 24.10.2026: проезды только во дворах, без тупиков и улиц, камень 0,12 м, без потери скорости (сравнить)
-  if (OLD) { RULES.on = false; CURB.H = 0.12; }
-  BERM = !OLD && !(QS && QS.has('noberm'));        // 0п68: за камнем — скат газона (земля поднята); ?noberm, ?oldcurbs — без
-  const t0 = performance.now();
-  A = api; LITM = api.LITM; MOB = !!(api.mobile && api.mobile()); SEC = MOB ? CURB.SEC_MOB : CURB.SEC; ST.mob = MOB ? 1 : 0;
-  if(api.contours){
-    BERM=false;
-    if(TRACE_TOPOLOGY)TRACE_TOPOLOGY.active=true;
+// Потоковая плитка меняет только рисунок камня. Общая опора, толчки,
+// отладочный граф всего города и API основной сборки остаются прежними.
+function* buildContours(api,visualOnly=false,t0=performance.now()){
+  const A=api,LITM=api.LITM,MOB=!!(api.mobile&&api.mobile()),SEC=MOB?CURB.SEC_MOB:CURB.SEC;
+  const trace=visualOnly?null:TRACE,topology=visualOnly?null:TRACE_TOPOLOGY;
+    if(topology)topology.active=true;
     const edges=[];
     for(const e of api.contours()){if(e)edges.push(e);else yield 'бордюры: общий контур';}
     const mesh=joinLandCurbs(edges,CURB.W);edges.length=0;
-    ST.contourOpen=mesh.open;ST.contourJoins=mesh.joins.length;
+    ST.contourOpen=(visualOnly?(ST.contourOpen||0):0)+mesh.open;ST.contourJoins=(visualOnly?(ST.contourJoins||0):0)+mesh.joins.length;
     const mix=(a,b,t)=>t===0?a:t===1?b:[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
     const top=p=>A.groundH(...p)+A.landTopAt(...p);
-    const draw=(a,b,oa,ob,lift,k)=>{
-      const ha=top(a),hb=top(b),fa=A.groundH(...oa)+lift-.035,fb=A.groundH(...ob)+lift-.035;
+    const endpoint=(a,oa,lift)=>({a,oa,ha:top(a),fa:A.groundH(...oa)+lift-.035});
+    const draw=(from,to,k)=>{
+      const {a,oa,ha,fa}=from,{a:b,oa:ob,ha:hb,fa:fb}=to;
       if(ha<=fa||hb<=fb)return null;
       LITM.color(CURB.HEX[MOB?0:k&1]);
       if(MOB){
@@ -528,8 +518,8 @@ export function* build (api) {
         LITM.quad(oa[0],ha-bevel,oa[1],ob[0],hb-bevel,ob[1],cb[0],hb,cb[1],ca[0],ha,ca[1]);
         LITM.quad(ca[0],ha,ca[1],cb[0],hb,cb[1],b[0],hb,b[1],a[0],ha,a[1]);
       }
-      const id=TRACE?TRACE.length/18:null;
-      if(TRACE)TRACE.push(oa[0],oa[1],ha,a[0],a[1],ha,ob[0],ob[1],hb,b[0],b[1],hb,(a[0]+b[0])/2,(a[1]+b[1])/2,...a,...b);
+      const id=trace?trace.length/18:null;
+      if(trace)trace.push(oa[0],oa[1],ha,a[0],a[1],ha,ob[0],ob[1],hb,b[0],b[1],hb,(a[0]+b[0])/2,(a[1]+b[1])/2,...a,...b);
       ST.secs++;
       return id;
     };
@@ -537,32 +527,37 @@ export function* build (api) {
     for(const s of mesh.sections){
       const dx=s.b[0]-s.a[0],dz=s.b[1]-s.a[1],length=Math.hypot(dx,dz),n=Math.ceil(length/SEC);
       let previous=null;s.traceFirst=s.traceLast=null;
+      let from=endpoint(s.a,s.outA,s.lift);
       for(let i=0;i<n;i++){
-        const id=draw(mix(s.a,s.b,i/n),mix(s.a,s.b,(i+1)/n),mix(s.outA,s.outB,i/n),mix(s.outA,s.outB,(i+1)/n),s.lift,i);
-        if(TRACE_TOPOLOGY){
+        // Конец предыдущего камня — ровно начало следующего (тот же
+        // i/n). Координаты и обе высоты сохраняем без округления.
+        const to=endpoint(mix(s.a,s.b,(i+1)/n),mix(s.outA,s.outB,(i+1)/n),s.lift);
+        const id=draw(from,to,i);from=to;
+        if(topology){
           if(i===0)s.traceFirst=id;if(i===n-1)s.traceLast=id;
           if(id!==null){
-            if(previous!==null)TRACE_TOPOLOGY.links.push(previous,id);
-            else if(i>0)TRACE_TOPOLOGY.open.push(id,0);
-          }else if(previous!==null)TRACE_TOPOLOGY.open.push(previous,1);
+            if(previous!==null)topology.links.push(previous,id);
+            else if(i>0)topology.open.push(id,0);
+          }else if(previous!==null)topology.open.push(previous,1);
         }
         previous=id;
+        if(visualOnly&&i%8===7)yield 'бордюры: камни';
       }
-      bgAdd(...s.a,...s.b,-dz/length,dx/length);ST.m+=length;ST.runs++;
-      if(++count%128===0)yield 'бордюры: стыки';
+      if(!visualOnly)bgAdd(...s.a,...s.b,-dz/length,dx/length);ST.m+=length;ST.runs++;
+      if(++count%(visualOnly?8:128)===0)yield 'бордюры: стыки';
     }
-    if(TRACE_TOPOLOGY)for(const s of mesh.sections){
-      if(s.traceFirst!==null&&(!s.prev||s.prev.traceLast===null))TRACE_TOPOLOGY.open.push(s.traceFirst,0);
-      if(s.traceLast!==null&&(!s.next||s.next.traceFirst===null))TRACE_TOPOLOGY.open.push(s.traceLast,1);
-      if(s.traceLast!==null&&s.next?.traceFirst!==null&&s.next?.traceFirst!==undefined&&s.outB===s.next.outA)TRACE_TOPOLOGY.links.push(s.traceLast,s.next.traceFirst);
+    if(topology)for(const s of mesh.sections){
+      if(s.traceFirst!==null&&(!s.prev||s.prev.traceLast===null))topology.open.push(s.traceFirst,0);
+      if(s.traceLast!==null&&(!s.next||s.next.traceFirst===null))topology.open.push(s.traceLast,1);
+      if(s.traceLast!==null&&s.next?.traceFirst!==null&&s.next?.traceFirst!==undefined&&s.outB===s.next.outA)topology.links.push(s.traceLast,s.next.traceFirst);
     }
     for(const j of mesh.joins){
       const h=top(j.p),fa=A.groundH(...j.a)+j.lift-.035,fb=A.groundH(...j.b)+j.lift-.035;
       LITM.color(CURB.HEX[0]);LITM.up(j.p[0],h,j.p[1],j.a[0],h,j.a[1],j.b[0],h,j.b[1]);
       LITM.quad(j.a[0],fa,j.a[1],j.b[0],fb,j.b[1],j.b[0],h,j.b[1],j.a[0],h,j.a[1]);
-      if(TRACE_TOPOLOGY){
+      if(topology){
         const prev=mesh.sections.find(s=>s.b===j.p&&s.outB===j.a),next=prev?.next;
-        if(prev?.traceLast!==null&&prev?.traceLast!==undefined&&next?.traceFirst!==null&&next?.traceFirst!==undefined)TRACE_TOPOLOGY.bridges.push(prev.traceLast,next.traceFirst,...j.p,...j.a,...j.b,h);
+        if(prev?.traceLast!==null&&prev?.traceLast!==undefined&&next?.traceFirst!==null&&next?.traceFirst!==undefined)topology.bridges.push(prev.traceLast,next.traceFirst,...j.p,...j.a,...j.b,h);
       }
     }
     // После записи камня и сведений о стыках связанный граф больше
@@ -570,8 +565,28 @@ export function* build (api) {
     for(const s of mesh.sections)s.next=s.prev=null;
     mesh.sections.length=0;mesh.joins.length=0;
     yield 'бордюры: готовые стыки';
-    bgPack();ON=true;ST.m=Math.round(ST.m);ST.ms=Math.round(performance.now()-t0);return ST;
+    if(!visualOnly){bgPack();ON=true;}ST.m=Math.round(ST.m);ST.ms=(visualOnly?ST.ms:0)+Math.round(performance.now()-t0);return ST;
+}
+
+export function* build (api) {
+  const QS = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
+  if (QS && QS.has('nocurbs')) return ST;
+  if(api.visualOnly){
+    if(!api.contours)throw Error('Потоковый камень требует готовый контур');
+    return yield* buildContours(api,true);
   }
+  if (api.rebuild) {
+    BG=new Map();BI.clear();BF=BWF=null;ON=false;
+    if(TRACE)TRACE.length=0;
+    if(TRACE_TOPOLOGY){TRACE_TOPOLOGY.active=false;TRACE_TOPOLOGY.links.length=TRACE_TOPOLOGY.bridges.length=TRACE_TOPOLOGY.open.length=0;}
+    for(const k of Object.keys(ST))ST[k]=0;
+  }
+  const OLD = !!(QS && QS.has('oldcurbs'));         // ?oldcurbs — как до 24.10.2026: проезды только во дворах, без тупиков и улиц, камень 0,12 м, без потери скорости (сравнить)
+  if (OLD) { RULES.on = false; CURB.H = 0.12; }
+  BERM = !OLD && !(QS && QS.has('noberm'));        // 0п68: за камнем — скат газона (земля поднята); ?noberm, ?oldcurbs — без
+  const t0 = performance.now();
+  A = api; LITM = api.LITM; MOB = !!(api.mobile && api.mobile()); SEC = MOB ? CURB.SEC_MOB : CURB.SEC; ST.mob = MOB ? 1 : 0;
+  if(api.contours){BERM=false;return yield* buildContours(api,false,t0);}
   const EVERY = !MOB && !OLD;                       // 0п35 (24.10.2026, «бордюры везде, где есть стыки между землёй и дорожками»): дорожки — по всему
   STRIPV = EVERY ? CURB.STRIP : CURB.STRIP_OLD;     // городу, стоянки, площадки, карманы, шов 0,25 м. Телефон и ?oldcurbs — как было (память)
   const C = A.CITY;

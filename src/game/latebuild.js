@@ -40,26 +40,53 @@ export const left = () => Q.length;
 // probe --seed: перед каждым куском — своё зерно Math.random, чтобы сравнить город с ?nolate и без один в один
 const seed = n => { if (typeof window !== 'undefined' && window.__lateSeed) window.__lateSeed(n); };
 const isIt = r => !!r && typeof r.next === 'function';
+const isWait = r => !!r && typeof r.wait?.then==='function' && typeof r.sync==='function';
 export function add (name, fn) {
   if (DONE) {
     seed(name);
     const it = fn();
-    if (isIt(it)) for (let k = 0; !it.next().done;) seed(name + '#' + ++k);   // по шагам — с тем же зерном, что и в очереди
+    if (isIt(it)) {
+      let input;
+      for(let k=0;;){
+        const r=it.next(input);if(r.done)break;
+        if(isWait(r.value)){Promise.resolve(r.value.wait).catch(()=>{});input=r.value.sync();}else input=undefined;
+        seed(name+'#'+ ++k);
+      }
+    }   // ?nolate: ожидающий поток заменяется тем же синхронным расчётом
     return;
   }
   Q.push([name, fn, null, 0]);
 }
 export function onDone (fn) { if (DONE) fn(); else WAIT.push(fn); }
 
+// Генератор может yield {wait:Promise,sync:()=>result,label}. Очередь
+// возобновится с результатом Promise; flush/?nolate вызывают sync.
 // один шаг: кусок целиком или следующий шаг итератора (первый шаг — вызов fn и его первый next)
-function one () {
+function one (sync=false) {
   const q = Q[0], n = q[0];
+  if(q.waiting&&!q.waiting.ready&&!sync)return 0;
   seed(q[3] ? n + '#' + q[3] : n);
   const t0 = performance.now();
   let end = true, lab;
   try {
+    if(q.waiting){
+      const w=q.waiting;q.waiting=null;
+      q.input=w.ready&&!w.failed?w.result:w.job.sync();
+    }
     if (!q[2]) { const r = q[1](); if (isIt(r)) q[2] = r; }
-    if (q[2]) { const r = q[2].next(); end = r.done; lab = r.value; q[3]++; }
+    if (q[2]) {
+      const r = q[2].next(q.input);q.input=undefined;end=r.done;lab=r.value;q[3]++;
+      if(!end&&isWait(lab)){
+        const job=lab,w={job,ready:false,failed:false,result:undefined};q.waiting=w;lab=job.label||'ожидание';
+        const settled=(result,failed)=>{
+          // flush мог уже исполнить запасной путь. Запоздалый ответ
+          // не возобновляет генератор второй раз и не меняет новую задачу.
+          if(q.waiting!==w||Q[0]!==q||DONE)return;
+          w.ready=true;w.failed=failed;w.result=result;next();
+        };
+        job.wait.then(value=>settled(value,false),error=>settled(error,true));
+      }
+    }
   } catch (e) { end = true; console.error('[latebuild]', n, e); try { CL.report('late:' + n, e, 'error'); } catch (e2) { /* — */ } }
   const ms = performance.now() - t0;
   T[n] = (T[n] || 0) + ms;
@@ -81,14 +108,17 @@ const next = () => { if (MC) MC.port2.postMessage(0); else setTimeout(tick, 0); 
 if (MC) MC.port1.onmessage = () => tick();
 function tick () {
   if (DONE) return;
+  if(Q[0]?.waiting&&!Q[0].waiting.ready)return;
   if (MEMHOOK && window.__lateHold) { setTimeout(tick, 50); return; }   // probe --mem ?latesnap: стоим, пока снимается куча
   const t0 = performance.now(), bud = RUSH ? RUSH_BUDGET : BUDGET;
   let rest = 0;
   do {
     const e = one();
     if (RUSH && REST_K > 0 && e > REST_FROM) { rest = Math.min(REST_MAX, e * REST_K); break; }   // тяжёлый кусок кончился — его отходы убрать до следующего
-  } while (Q.length && performance.now() - t0 < bud && !(MEMHOOK && window.__lateHold));
-  if (!DONE) setTimeout(next, Math.max(IDLE, rest));   // через таймер: сначала кадр (rAF), потом следующий кусок
+  } while (Q.length && !Q[0].waiting && performance.now() - t0 < bud && !(MEMHOOK && window.__lateHold));
+  // Во время расчёта в другом потоке нет ни опроса, ни вращения пустой
+  // очереди: следующий тик назначит завершение Promise.
+  if (!DONE&&!Q[0]?.waiting) setTimeout(next, Math.max(IDLE, rest));   // через таймер: сначала кадр (rAF), потом следующий кусок
 }
 
 export function start () {
@@ -126,7 +156,7 @@ export function flush () {
   CL.trans('достройка города разом');
   if (!STARTED) { STARTED = true; T0 = performance.now(); if (MEMHOOK) window.__lateMem('(меню)'); }
   const t0 = performance.now();
-  while (Q.length) one();
+  while (Q.length) one(true);
   finish();
   T.flush = Math.round(performance.now() - t0);
   CL.transEnd('достройка города разом');
