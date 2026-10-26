@@ -22,6 +22,9 @@ import * as SKYM from './sky.js';               // небо-купол, свет
 import * as MATS from './materials.js';         // блики и отклик по классу поверхности (2г11)
 import * as SOFTSURF from './softsurfaces.js';
 import * as RLAND from './raisedland.js';
+import {createLandStream,streamedGroundMaterial} from './landstream.js';
+import {clippedMesher} from './landclip.js';
+let LAND_STREAM = null, LAND_ENTERING = false;
 import { landCarSupport } from './landdrive.js';
 import { createLandMeshPages } from './landmeshpages.js';
 import { createLandPositionCodec, landPositionMaterial } from './landpositions.js';
@@ -1931,7 +1934,9 @@ WINS.quality(GFX.winQ());
 const LITM = Mesher({ alpha: !NO_LITJ || !NO_SMJ, index: true, keepFront: true, mainRGB: true });   // всё материальное: земля, дороги, дома; с 17.10.2026 и склейки реквизита (LIT) — признак «реквизит» в четвёртом байте цвета
 const FLATM = Mesher({ alpha: true, index: true, mainRGB: true });   // разметка, окна, вывески — света не ловят; с 17.10.2026 и плафоны (LAMPH) — признак «светится» в четвёртом байте цвета
 const GROUND_M = RLAND.ON ? Mesher({ alpha: true, index: true, keepFront: true, mainRGB: true, groundOnly: true }) : LITM;
-const CURB_M = RLAND.ON ? Mesher({ alpha: true, index: true, keepFront: true, noLandRecord: true }) : LITM;
+// Старый проход нужен декору для индекса бордюров. Его невидимые
+// вершины всё равно выбрасывались перед окончательным контуром земли.
+const CURB_M = RLAND.ON ? {color(){},grad(){},quad(){},up(){},tri(){},dtri(){},discard(){return 0;}} : LITM;
 BALCS.setup({ LITM, FLATM, WINS });               // балконы пишут прямо в склейки и окна (balconies.js; вещей three.js не создаёт)
 
 /* ── земля, зелёнка, вода ── */
@@ -6081,7 +6086,7 @@ function buildCity () {
     LITM.landPages(LATE.busy());
     try {
       RLAND.prepare(CITY.buildings, p => THREE.ShapeUtils.triangulateShape(p.map(q => new THREE.Vector2(q[0], q[1])), []));
-      yield* RLAND.cleanContours({M:LITM,terrain:TER,groundH:terrainH,skip:DMASK?farOut:null,triangulate:(outer,holes)=>({
+      yield* RLAND.cleanContours({M:LITM,terrain:TER,groundH:terrainH,deferDraw:!!LAND_STREAM,skip:DMASK?farOut:null,triangulate:(outer,holes)=>({
         points:[...outer,...holes.flat()],
         triangles:THREE.ShapeUtils.triangulateShape(outer.map(p=>new THREE.Vector2(...p)),holes.map(h=>h.map(p=>new THREE.Vector2(...p))))
       })});
@@ -6096,9 +6101,14 @@ function buildCity () {
     // новый граф камня и новые вершины не держатся вместе с её копиями.
     LITM.landPages(LATE.busy());
     try {
-      if (!INTRO) yield* buildCurbs({ LITM, groundH:terrainH, rebuild: true, contours:()=>RLAND.boundaries({accept:(x,z)=>!DMASK||!farOut(x,z)}),
+      if (!INTRO && !LAND_STREAM) yield* buildCurbs({ LITM, groundH:terrainH, rebuild: true, contours:()=>RLAND.boundaries({accept:(x,z)=>!DMASK||!farOut(x,z)}),
         landTopAt: (x,z) => RLAND.topOffset(x,z,terrainH(x,z)) });
       yield* flushLandStage();
+      if (LAND_STREAM) {
+        yield* LAND_STREAM.prepare(PIZZA.bx, PIZZA.bz);
+        RLAND.clearReadCaches();
+        return;
+      }
       RLAND.ST.baseDisposed = GROUND_M.discard();
       let landRow = -Infinity;
       const flushThrough = function* (z) {
@@ -6136,12 +6146,35 @@ function buildCity () {
   FSH.mat(litMat); FSH.mat(flatMat);            // тени домов: маска в шейдере земли и разметки (fakeshadows.js)
   const groups = [];
   let landPackedMat=null,landPaletteMat=null,landPaletteTex=null,landPaletteRevision=-1;
+  let groundMat=litMat,groundStreamMask=null;
+  if (RLAND.ON && LATE.busy() && !new URLSearchParams(location.search).has('fullterrain')) {
+    LAND_STREAM=createLandStream({terrain:TER,build:function* (bounds) {
+      const M=Mesher({alpha:true,index:true,keepFront:true,mainRGB:true,noLandRecord:true});
+      if (!INTRO) {
+        const halo=[bounds[0]-8,bounds[1]-8,bounds[2]+8,bounds[3]+8];
+        yield* buildCurbs({LITM:clippedMesher(M,bounds,{includeMaxX:bounds[2]===TX0+(TNX-1)*TG,includeMaxZ:bounds[3]===TZ0+(TNZ-1)*TG}),
+          groundH:terrainH,visualOnly:true,contours:()=>RLAND.boundaries({bounds:halo}),
+          landTopAt:(x,z)=>RLAND.topOffset(x,z,terrainH(x,z))});
+      }
+      yield* RLAND.build({M,terrain:TER,heights:TH,groundH:terrainH,groundHex,skip:DMASK?farOut:null,
+        buildings:CITY.buildings,curbed:!INTRO&&!new URLSearchParams(location.search).has('nocurbs'),bounds,
+        triangulate:(p,holes=[])=>THREE.ShapeUtils.triangulateShape(p.map(q=>new THREE.Vector2(...q)),holes.map(h=>h.map(q=>new THREE.Vector2(...q))))});
+      const g=new THREE.Group();g.matrixAutoUpdate=false;g.matrixWorldAutoUpdate=false;
+      yield* M.prep(litMat,g,()=>{});
+      const tail=M.mesh(litMat);for(const m of tail.children.slice())g.add(m);
+      return g;
+    },publish(id,g) {
+      groups.push(g);scene.add(g);CULL.register(g);groundStreamMask.update();
+    }});
+    groundStreamMask=streamedGroundMaterial(THREE,litMat,LAND_STREAM);
+    groundMat=groundStreamMask.material;
+  }
   // Новая земля не держит свои массивы одновременно со всей прежней
   // статикой. Готовая стадия проходит ту же склейку и загрузку клеток.
   function* flushLandStage (M = LITM, accept = null) {
     // При ?nolate очередь исполняется ещё до создания материалов.
     if (!LATE.busy()) return;
-    const mat=M===FLATM?flatMat:litMat;
+    const mat=M===FLATM?flatMat:M===GROUND_M?groundMat:litMat;
     const tmp = new THREE.Scene(), target = new THREE.WebGLRenderTarget(4, 4);
     const g = new THREE.Group(); g.matrixAutoUpdate = false; g.matrixWorldAutoUpdate = false; scene.add(g);
     const upload = list => {
@@ -6162,7 +6195,7 @@ function buildCity () {
     if (g.children.length) groups.push(g); else scene.remove(g);
   }
   let warm4 = null;                               // прогрев шейдера склейки с признаком (см. ниже)
-  const meshNow = keep => { for (const g of [...(RLAND.ON&&keep ? [GROUND_M.mesh(litMat, keep)] : []), LITM.mesh(litMat, keep), FLATM.mesh(flatMat, keep)]) { if (g.children.length) { groups.push(g); scene.add(g); } } };
+  const meshNow = keep => { for (const g of [...(RLAND.ON&&keep ? [GROUND_M.mesh(groundMat, keep)] : []), LITM.mesh(litMat, keep), FLATM.mesh(flatMat, keep)]) { if (g.children.length) { groups.push(g); scene.add(g); } } };
   if (LATE.busy()) {                              // поздняя сборка: видимое — в сцену сразу, в видеокарту — при первом кадре
     meshNow(true);
     /* клетки меню — цвет тремя байтами (как лежит), последняя склейка — четырьмя (признак: реквизит, мелочь, плафоны) — это
@@ -13246,7 +13279,7 @@ function driveStep (dt) {
   if (lift > 0) V.ramp = RAMP_ON;
   const gnd = supportAt(V.x, V.z, V.y - (V.rlift || 0)) + lift;
   const onRoof = SUP_ROOF && !lift;
-  const landSupport = RLAND.ST.built && !V.air && !flyOn && !onRoof && !lift && Math.abs(gnd-groundH(V.x,V.z))<.05
+  const landSupport = (RLAND.ST.supportReady||RLAND.ST.built) && !V.air && !flyOn && !onRoof && !lift && Math.abs(gnd-groundH(V.x,V.z))<.05
     ? landCarSupport(V,landDriveOffset,dt) : null;
   if(!landSupport)V.landPose=null;
   const rp = V.ramp || RAMP_SMALL;
@@ -13290,7 +13323,7 @@ function driveStep (dt) {
   }
   V.rlift = lift;
   if (!V.air && V.rampSafe > 0) V.rampSafe -= dt;
-  const cbF = RLAND.ST.built ? 0 : CURBS.liftAt(V.x + fx * 1.4, V.z + fz * 1.4), cbR = RLAND.ST.built ? 0 : CURBS.liftAt(V.x - fx * 1.45, V.z - fz * 1.45);   // земля за бордюром поднята (0п68, curbs.js): передние и задние колёса
+  const cbF = (RLAND.ST.supportReady||RLAND.ST.built) ? 0 : CURBS.liftAt(V.x + fx * 1.4, V.z + fz * 1.4), cbR = (RLAND.ST.supportReady||RLAND.ST.built) ? 0 : CURBS.liftAt(V.x - fx * 1.45, V.z - fz * 1.45);   // земля за бордюром поднята (0п68, curbs.js): передние и задние колёса
   let f2 = supportAt(V.x + fx * 1.4, V.z + fz * 1.4, V.y) + rampLift(V.x + fx * 1.4, V.z + fz * 1.4) + DECOR.lift(V.x + fx * 1.4, V.z + fz * 1.4) + Math.max(0, cbF - 0.09);   // + холмик двора (yarddecor.js), + скат за бордюром — кузов кивает
   let t2 = supportAt(V.x - fx * 1.45, V.z - fz * 1.45, V.y) + rampLift(V.x - fx * 1.45, V.z - fz * 1.45) + DECOR.lift(V.x - fx * 1.45, V.z - fz * 1.45) + Math.max(0, cbR - 0.09);
   let l2 = supportAt(V.x + sx * 0.9, V.z + sz * 0.9, V.y) + DECOR.lift(V.x + sx * 0.9, V.z + sz * 0.9), r2 = supportAt(V.x - sx * 0.9, V.z - sz * 0.9, V.y) + DECOR.lift(V.x - sx * 0.9, V.z - sz * 0.9);
@@ -13307,13 +13340,13 @@ function driveStep (dt) {
   V.roll = damp(V.roll, V.air || flyNow ? 0 : Math.atan((l2 - r2) / 1.8), 12, dt);
   // бордюр: тротуар выше дороги — заехал, и кузов стоит на нём
   V.kerb = damp(V.kerb || 0, V.air || flyNow || lift > 0 || V.roof ? 0 : (pl => Math.max(curbAt(V.x, V.z), pl, DECOR.lift(V.x, V.z), cbF || cbR ? (Math.max(cbF, pl) + Math.max(cbR, pl)) / 2 : 0))(paveLift(V.x, V.z)) - STREAMS.sinkBy(V.wade || 0), 22, dt);   // + скат за бордюром (0п68): среднее под осями   // + верх асфальта и плитки (paveLift): колёса не в асфальте
-  V.cbump = RLAND.ST.built || V.air || flyNow || V.roof ? 0 : CURBS.bump(V, dt);   // новая земля уже поднимает четыре колеса, без второго толчка старого камня
+  V.cbump = RLAND.ST.supportReady || RLAND.ST.built || V.air || flyNow || V.roof ? 0 : CURBS.bump(V, dt);   // новая земля уже поднимает четыре колеса, без второго толчка старого камня
   if (V.cbump) { const cs = CURBS.shake(); if (cs) { S.shake = Math.max(S.shake, cs); Snd.impact(Math.hypot(V.vx, V.vz) * CURB_HIT, 'curb', { x: V.x, z: V.z }); } }   // бордюр под колесом — толчок и удар камня (impact.js 'curb')
-  { const ch = CURBS.took(); if (ch && !RLAND.ST.built) CBUMP.hit(V, ch); }   // поднятый грунт уже поднимает колёса: второго тормозящего удара нет
+  { const ch = CURBS.took(); if (ch && !(RLAND.ST.supportReady||RLAND.ST.built)) CBUMP.hit(V, ch); }   // поднятый грунт уже поднимает колёса: второго тормозящего удара нет
   if (CURB_LAWN_T > 0) CURB_LAWN_T -= dt;
   { const ck = V.air || flyNow ? CURB_PREV : curbAt(V.x, V.z);   // бордюр тротуара: заехал или съехал — тоже удар камня (вниз — тише)
     if (ck !== CURB_PREV) { Snd.impact(Math.hypot(V.vx, V.vz) * CURB_HIT * (ck > CURB_PREV ? 1 : 0.7), 'curb', { x: V.x, z: V.z });
-      if (!RLAND.ST.built && ck < CURB_PREV && CURB_LAWN_T <= 0 && CURBS.RULES.on && !PAVE.onPave(V.x, V.z, 0)) { CURB_LAWN_T = 0.6; CBUMP.hit(V, 'curb'); }   // с поднятого тротуара на газон — как через камень (11ц; не чаще раза в 0,6 с: вдоль края клетки мигают)
+      if (!(RLAND.ST.supportReady||RLAND.ST.built) && ck < CURB_PREV && CURB_LAWN_T <= 0 && CURBS.RULES.on && !PAVE.onPave(V.x, V.z, 0)) { CURB_LAWN_T = 0.6; CBUMP.hit(V, 'curb'); }   // с поднятого тротуара на газон — как через камень (11ц; не чаще раза в 0,6 с: вдоль края клетки мигают)
       CURB_PREV = ck; } }
   car.position.set(V.x, V.y + V.kerb + V.cbump, V.z);
   car.rotation.y = V.h;
@@ -16907,6 +16940,22 @@ function reviveTick (dt) {
 }
 
 function startRun (ride) {
+  const place=PIZZERIAS[DIST.cur()]||PIZZA;
+  if (LAND_STREAM && !LATE.busy() && !LAND_STREAM.readyAt(place.bx,place.bz,640)) {
+    if (LAND_ENTERING) return;
+    LAND_ENTERING=true;
+    const boot=document.createElement('div');boot.id='boot';boot.className='late-wait';
+    boot.innerHTML='<img src="./brand/logo-px.png" alt=""><div class="boot-bar"><i></i></div>';document.body.appendChild(boot);
+    const task=LAND_STREAM.prepare(place.bx,place.bz);
+    const advance=()=>{
+      try {
+        const until=performance.now()+12;
+        while(performance.now()<until)if(task.next().done){boot.remove();LAND_ENTERING=false;startRun(ride);return;}
+        setTimeout(advance,0);
+      } catch(e) {boot.remove();LAND_ENTERING=false;CL.report('земля перед сменой',e,'error');}
+    };
+    requestAnimationFrame(()=>setTimeout(advance,0));return;
+  }
   CL.transFor('начало смены', 3000);             // метка перехода (crashlog.js, 0п48): оборвётся — следующий запуск запишет
   LATE.flush();                                   // город ещё достраивался за меню — сначала достроить (latebuild.js)
   S.ride = !!ride;
@@ -18609,6 +18658,10 @@ function frame (now) {
 function frameStep (now) {
   CL.at.ph = 'pre';
   if (LATE.busy() && lateFrame(now)) return;      // город ещё достраивается за меню (latebuild.js)
+  if (LAND_STREAM && !LAND_ENTERING) CL.step('земля рядом', () => {
+    const menu=S.state==='title'||S.state==='over';
+    LAND_STREAM.step(menu?PIZZA.bx:cam.position.x,menu?PIZZA.bz:cam.position.z);
+  }, 0);
   // настройки графики (gfx.js): 30 / 60 к/с, город за меню застывший или 30 к/с — лишний кадр пропускаем
   // целиком, время копится (last не трогаем): следующий кадр шагнёт мир на всё прошедшее
   const menu = (S.state === 'title' || S.state === 'over') && !EDL.ED.on;   // редактор города: кадр как в езде, не «город за меню»
@@ -19149,7 +19202,7 @@ PDODGE.init({ V, CAR_L, CAR_W, walkBack, groundH, curbAt, pushOut, emote, rand, 
 if (window.__dlv) window.__dlv.PDODGE = PDODGE.DEBUG;
 if (window.__dlv) Object.assign(window.__dlv, { CROWDS, PUB_SPOTS, spawnCrowd, ACCIDENTS, PITCHES });   // компании у подъездов, драки на авариях, футбол — проверка наезда в probe
 if (window.__dlv) window.__dlv.RW = RW.DEBUG;   // вид асфальта улиц (roadwear.js)
-if (window.__dlv) window.__dlv.LATE = LATE;
+if (window.__dlv) { window.__dlv.LATE = LATE; window.__dlv.LAND_STREAM = LAND_STREAM; }
 if (window.__dlv) window.__dlv.CREWC = Object.assign(CREWC.DEBUG, { roster: CREWC.roster, pick: CREWC.pick, person: CREWC.person });   // составы пиццерий (crewcast.js)
 if (window.__dlv) window.__dlv.CREWRANK = CREWR.DEBUG;   // рейтинг смены: log — что писали, moves — смены места (crewrank.js)
 if (window.__dlv) { window.__dlv.YMAZE = YMAZE.DEBUG; window.__dlv.YFILL = { ...YFILL.DEBUG, scan: o => YFILL.scan(yfApi(), o) }; window.__dlv.COURTS = COURTS.DEBUG; window.__dlv.PNET = PNET.DEBUG; window.__dlv.BOLL = BOLL.DEBUG; window.__dlv.YCARS = YCARS.DEBUG; window.__dlv.SVCP = SVCP.DEBUG; window.__dlv.GROW = GROW.DEBUG; }   // путь курьеров и скорой: STATS — сколько искали, мс, кусков сквозь дом (svcpath.js)

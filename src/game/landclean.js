@@ -3,6 +3,7 @@
    считают форму с запасом, поэтому их общая граница не становится швом. */
 import Clipper from 'clipper-lib';
 import {simplifyRing} from './landsimplify.js';
+import {intersectTriangle} from './landcover.js';
 export const LAND_MIN_WIDTH=.8;
 const SCALE=10000;
 const path=p=>p.map(v=>({X:Math.round(v[0]*SCALE),Y:Math.round(v[1]*SCALE)}));
@@ -58,8 +59,17 @@ export function cleanLandRegion(polygons,core,width=LAND_MIN_WIDTH,overlap=.005)
 export const cleanLandPolygons=(polygons,core,width=LAND_MIN_WIDTH,overlap=.005)=>cleanLandRegion(polygons,core,width,overlap).removed;
 export function landCleanTileRegion(cover,green,core,width=LAND_MIN_WIDTH,overlap=.005){
   const pad=width*2,bounds=[core[0]-pad,core[1]-pad,core[2]+pad,core[3]+pad];
-  const frame=[path(rectangle(bounds))];
+  const framePoints=rectangle(bounds),frame=[path(framePoints)];
   const paving=cover.inBox(bounds),groups=new Map();
+  // В индекс попадает вся рамка исходного треугольника, включая пустые
+  // клетки вдоль длинной диагонали. Без мощения даже в запасе вокруг
+  // клетки газон занимает её целиком: объединение и два offset ничего
+  // не меняют. Запас шире раскрытия и округления Clipper; зелёные
+  // вставки внутри уже полного газона также не меняют его область.
+  if(width>=LAND_MIN_WIDTH&&!paving.some(t=>intersectTriangle(framePoints,t.p).length)){
+    const [x0,z0,x1,z1]=core.map(v=>Math.round(v*SCALE)/SCALE);
+    return {removed:[],kept:x1>x0&&z1>z0?[{outer:[[x1,z1],[x0,z1],[x0,z0],[x1,z0]],holes:[]}]:[]};
+  }
   const paved=clip(paving.map(t=>path(t.p)),frame,Clipper.ClipType.ctIntersection);
   const pieces=clip(frame,paved,Clipper.ClipType.ctDifference);
   // Сначала ограничиваем все фигуры клеткой. Островки зелени видны

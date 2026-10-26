@@ -65,6 +65,28 @@ const smoke = (args, label) => async () => {
 };
 
 const CHECKS = [
+  {id:'shift-loading',name:'ранний вход в смену и догрузка другого района',group:2,w:65,run:async()=>{
+    const j=await probe(['--mode=steam','--early','--seed=7','--size=deck','--q=gfx=high&gfxdev=deck','--eval='+path.join(__dirname,'probe-checks/shift-loading.js')],130);
+    const e=errLine(j),r=j.result;
+    return {status:!e&&r?.ok&&!j.errors.length?'ok':'fail',info:e||(r?'вход '+(r.first.clickMs/1000).toFixed(1)+' с; '+r.first.tiles+'/'+r.first.total+' участков; проезд '+r.moved+' м; новый район '+(r.newAreaMs/1000).toFixed(1)+' с':'нет результата')};
+  }},
+  ...[
+    ['land-stream','загрузка земли рядом и безопасная замена','landstream-test.mjs'],
+    ['land-tiles','стыки участков земли и совпадение высот','landtiles-geometry.mjs'],
+    ['land-fill','отложенные заполнения не меняют опору и цвет','landfill-deferred-geometry.mjs'],
+    ['land-clip','участки бордюров без дыр на швах','landclip-geometry.mjs'],
+    ['land-loading','высоты бордюров без повторных расчётов','land-loading-geometry.mjs'],
+    ['land-merge-speed','точное быстрое объединение геометрии','landpieces-speed-test.mjs'],
+    ['land-empty','пустые клетки без дорогой очистки','landclean-empty-test.mjs'],
+    ['land-index','мелкий поисковый индекс не меняет землю','landmask-index-test.mjs'],
+    ['land-bounds','границы участков совпадают с общим контуром','landmask-bounds-test.mjs'],
+    ['land-workers','рабочие потоки и запасной расчёт земли','landclean-workers-test.mjs'],
+    ['late-wait','ожидание рабочих потоков без зависания очереди','latebuild-wait-test.mjs'],
+    ['cull-stream','отсечение новых участков после запуска','cull-stream-test.mjs'],
+  ].map(([id,name,file])=>({id,name,group:1,run:async()=>{
+    const r=await sh(process.execPath,[path.join(__dirname,file)]);
+    return {status:r.code===0?'ok':'fail',info:(r.code===0?r.out:r.err).trim()};
+  }})),
   { id: 'daily-race-unit', name: 'задания: отмена старых кадров и затухания', group: 1, run: async () => {
     const r=await sh(process.execPath,[path.join(__dirname,'daily-race-test.cjs')]);
     return {status:r.code===0?'ok':'fail',info:(r.code===0?r.out:r.err).trim()};
@@ -469,7 +491,7 @@ const CHECKS = [
     const cs = list.filter(c => c.group === g);
     // сборки упали — в игре проверять нечего
     if (g > 1 && rows.some(r => r.id.startsWith('build') && r.status === 'fail')) { for (const c of cs) rows.push({ ...c, status: 'fail', info: 'не запускалась: сборка упала', ms: 0 }); continue; }
-    await pool(cs, g === 1 ? cs.length : JOBS);
+    await pool(cs, has('serial') ? 1 : g === 1 ? cs.length : JOBS);
   }
   rows.sort((a, b) => list.indexOf(list.find(c => c.id === a.id)) - list.indexOf(list.find(c => c.id === b.id)));
   const W = Math.max(...rows.map(r => r.name.length));

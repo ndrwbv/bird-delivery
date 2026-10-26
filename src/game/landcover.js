@@ -52,11 +52,11 @@ export function intersectConvex(p,polygon){
   return rest.length>=3&&Math.abs(area2(rest))>EPS?rest:[];
 }
 
-export function createLandCover(cell=32) {
-  const grid=new Map(),all=[],cache=new Map();
+export function createLandCover(cell=32,snapshot=null) {
+  const grid=snapshot?.grid||new Map(),all=[],cache=new Map(),dirtyCells=new Set();
   // n — число фигур; end — следующий id. Перенос готовых страниц
   // сохраняет неполный блок, поэтому после него id могут иметь пропуски.
-  let packed=null;
+  let packed=snapshot?.packed||null;
   // Клетки города — пара знаковых 16-битных индексов. Вне этого
   // диапазона сохраняем строковый ключ, без наложения далёких областей.
   const key=(i,j)=>i>=-32768&&i<=32767&&j>=-32768&&j<=32767?(i<<16)|(j&65535):i+','+j;
@@ -70,18 +70,19 @@ export function createLandCover(cell=32) {
     if(meta&0x2000000)t.rgb=[(meta>>16)&255,(meta>>8)&255,meta&255];
     if(cache.size>=2048)cache.delete(cache.keys().next().value);cache.set(id,t);return t;
   }
-  function each(bounds,fn){
+  function each(bounds,fn,minLift=-Infinity){
     const seen=new Set();
     for(let i=Math.floor((bounds[0]-EPS)/cell);i<=Math.floor((bounds[2]+EPS)/cell);i++)
       for(let j=Math.floor((bounds[1]-EPS)/cell);j<=Math.floor((bounds[3]+EPS)/cell);j++)
         for(const item of grid.get(key(i,j))||[]){
           const id=typeof item==='number'?item:item.id;if(seen.has(id))continue;seen.add(id);
           if(typeof item==='number'){
-            const b=packed.blocks[Math.floor(id/PAGE)],i=id%PAGE*3,a=b.xy,v=b.indices;
+            const b=packed.blocks[Math.floor(id/PAGE)],j=id%PAGE,i=j*3,a=b.xy,v=b.indices;
+            if(b.heights[b.heightIndex[j]]<minLift)continue;
             const ax=a[v[i]*2],az=a[v[i]*2+1],bx=a[v[i+1]*2],bz=a[v[i+1]*2+1],cx=a[v[i+2]*2],cz=a[v[i+2]*2+1];
             if(bounds[0]>Math.max(ax,bx,cx)+EPS||bounds[2]<Math.min(ax,bx,cx)-EPS||bounds[1]>Math.max(az,bz,cz)+EPS||bounds[3]<Math.min(az,bz,cz)-EPS)continue;
             fn(read(id));
-          }else if(overlaps(bounds,item.box))fn(item);
+          }else if(item.lift>=minLift&&overlaps(bounds,item.box))fn(item);
         }
   }
   function triangle(ax,az,bx,bz,cx,cz,lift=0){
@@ -93,7 +94,7 @@ export function createLandCover(cell=32) {
     for(let i=Math.floor(bounds[0]/cell);i<=Math.floor(bounds[2]/cell);i++)
       for(let j=Math.floor(bounds[1]/cell);j<=Math.floor(bounds[3]/cell);j++){
         const k=key(i,j);let list=grid.get(k);
-        if(!list)grid.set(k,list=[]);else if(!Array.isArray(list))grid.set(k,list=Array.from(list));list.push(t);
+        if(!list)grid.set(k,list=[]);else if(!Array.isArray(list))grid.set(k,list=Array.from(list));list.push(t);dirtyCells.add(k);
       }
     stats.triangles++;
     return t;
@@ -103,19 +104,20 @@ export function createLandCover(cell=32) {
     for(const item of grid.get(key(Math.floor(x/cell),Math.floor(z/cell)))||[]){
       if(typeof item==='number'){
         const b=packed.blocks[Math.floor(item/PAGE)],j=item%PAGE,i=j*3,a=b.xy,v=b.indices;
+        if(b.heights[b.heightIndex[j]]<=h)continue;
         const ax=a[v[i]*2],az=a[v[i]*2+1],bx=a[v[i+1]*2],bz=a[v[i+1]*2+1],cx=a[v[i+2]*2],cz=a[v[i+2]*2+1];
         if(x<Math.min(ax,bx,cx)-EPS||x>Math.max(ax,bx,cx)+EPS||z<Math.min(az,bz,cz)-EPS||z>Math.max(az,bz,cz)+EPS)continue;
         if((bx-ax)*(z-az)-(bz-az)*(x-ax)>=-EPS&&(cx-bx)*(z-bz)-(cz-bz)*(x-bx)>=-EPS&&(ax-cx)*(z-cz)-(az-cz)*(x-cx)>=-EPS)h=Math.max(h,b.heights[b.heightIndex[j]]);
         continue;
       }
-      const t=item;
+      const t=item;if(t.lift<=h)continue;
       if(x<t.box[0]-EPS||x>t.box[2]+EPS||z<t.box[1]-EPS||z>t.box[3]+EPS)continue;
       const p=[x,z];if(t.p.every((a,i)=>cross(a,t.p[(i+1)%3],p)>=-EPS))h=Math.max(h,t.lift);
     }
     return h;
   }
   function cut(p,minLift=-Infinity,accept=null){
-    const bounds=box(p),hits=[];each(bounds,t=>{if(t.lift>=minLift&&(!accept||accept(t)))hits.push(t);});
+    const bounds=box(p),hits=[];each(bounds,t=>{if(!accept||accept(t))hits.push(t);},minLift);
     let parts=[area2(p)<0?p.slice().reverse():p];
     for(const t of hits){
       const next=[];
@@ -137,6 +139,7 @@ export function createLandCover(cell=32) {
     for(const t of hits){
       const next=[];
       for(const part of rest){
+        if(!overlaps(box(part),t.box)||outsideTriangle(part,t.p)){next.push(part);continue;}
         const hit=intersectTriangle(part,t.p);
         if(!hit.length){next.push(part);continue;}
         result.push(hit);next.push(...subtract(part,t.p));
@@ -172,7 +175,6 @@ export function createLandCover(cell=32) {
   function breaks(ax,az,bx,bz,minLift=-Infinity){
     const out=[0,1],dx=bx-ax,dz=bz-az;
     each([Math.min(ax,bx),Math.min(az,bz),Math.max(ax,bx),Math.max(az,bz)],t=>{
-      if(t.lift<minLift)return;
       let lo=0,hi=1;
       for(let i=0;i<3;i++){
         const a=t.p[i],b=t.p[(i+1)%3],f=cross(a,b,[ax,az]),d=(b[0]-a[0])*dz-(b[1]-a[1])*dx;
@@ -185,7 +187,7 @@ export function createLandCover(cell=32) {
         if(lo>hi)return;
       }
       if(hi>=0&&lo<=1){out.push(Math.max(0,lo),Math.min(1,hi));}
-    });
+    },minLift);
     return out;
   }
   function compact(){
@@ -214,10 +216,15 @@ export function createLandCover(cell=32) {
       // сами координаты и высоты по-прежнему хранятся в Float64.
       packed.blocks[page]={n:size,xy:Float64Array.from(xy),heights:Float64Array.from(heights),indices,heightIndex:heights.length<=256?Uint8Array.from(heightIndex):heightIndex,meta:metaValues.length<=256?Uint8Array.from(meta):meta,metaValues:Uint32Array.from(metaValues)};start=end;
     }
-    for(const [k,list] of grid)if(Array.isArray(list))grid.set(k,Uint32Array.from(list,t=>typeof t==='number'?t:t.id));
+    // Упакованные клетки не менялись: не обходим весь город при каждой странице.
+    for(const k of dirtyCells)grid.set(k,Uint32Array.from(grid.get(k),t=>typeof t==='number'?t:t.id));
+    dirtyCells.clear();
     packed.n=n;packed.end=all.at(-1).id+1;all.length=0;cache.clear();
   }
   const api={triangle,height,covered:(x,z)=>height(x,z)>-Infinity,sideHeights,cut,inside,breaks,compact,stats,
+    // postMessage копирует готовые числовые страницы и индекс за один
+    // проход; миллионы промежуточных объектов треугольников не нужны.
+    snapshot(){compact();return {version:1,cell,packed,grid};},
     absorb(other){
       const inspect=COVER_DATA.get(other);if(!inspect||other===api)throw Error('Неверное поле для переноса');
       if(inspect().cell!==cell)throw Error('Разные клетки полей');
@@ -247,6 +254,6 @@ export function createLandCover(cell=32) {
     get count(){return count();},get rawCount(){return all.length;},get triangles(){
       if(!packed)return all;
       return {[Symbol.iterator]:function*(){for(let page=0;page<packed.blocks.length;page++)for(let i=0;i<packed.blocks[page].n;i++)yield read(page*PAGE+i);yield* all;}};
-    },clear(){grid.clear();all.length=0;packed=null;cache.clear();}};
+    },clear(){grid.clear();dirtyCells.clear();all.length=0;packed=null;cache.clear();}};
   COVER_DATA.set(api,()=>({packed,grid,cell}));return api;
 }

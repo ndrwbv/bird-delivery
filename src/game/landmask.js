@@ -5,9 +5,11 @@ import {createLandCover,intersectConvex} from './landcover.js';
 import {unionLandRegions,subtractLandRegions} from './landclean.js';
 import {pruneLandIslands} from './landislands.js';
 const CELL=32;
-export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[]){
-  const kept=createLandCover(CELL),domain=new Map(),pending=[],removedRegions=[];let segments=[];
-  let ready=false,domainCells=0;
+export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[],indexCell=8){
+  // Размер очищаемой области остаётся 32 м. Более мелкая поисковая
+  // сетка не меняет контуры: опора и бордюры обходят меньше чужих граней.
+  const kept=createLandCover(indexCell),domain=new Map(),pending=[],removedRegions=[];let segments=[];
+  let ready=false,domainCells=0,segmentGrid=null;
   const stateIndex=(i,j)=>domain.get(i)?.get(j);
   const stateAt=(x,z)=>stateIndex(Math.floor(x/CELL),Math.floor(z/CELL));
   function setState(x,z,state){
@@ -118,11 +120,29 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[]){
       return state===true?heights[i]>-Infinity:state===undefined?true:fallback(x+nx*sign*1e-7,z+nz*sign*1e-7);
     });
   }
-  function* boundaries({accept=()=>true,stats={},floorAt=()=>.085,floorBreaks=()=>[],includeWalls=false,coalesce=true}={}){
+  function* segmentIds(bounds){
+    if(!bounds){for(let i=0;i<segments.length;i+=4)yield i;return;}
+    const size=256;
+    if(!segmentGrid){
+      segmentGrid=new Map();
+      for(let n=0;n<segments.length;n+=4){
+        const ax=segments[n],az=segments[n+1],bx=segments[n+2],bz=segments[n+3];
+        for(let i=Math.floor(Math.min(ax,bx)/size);i<=Math.floor(Math.max(ax,bx)/size);i++)
+          for(let j=Math.floor(Math.min(az,bz)/size);j<=Math.floor(Math.max(az,bz)/size);j++){
+            const k=i+','+j;let ids=segmentGrid.get(k);if(!ids)segmentGrid.set(k,ids=[]);ids.push(n);
+          }
+      }
+    }
+    const found=new Set();
+    for(let i=Math.floor(bounds[0]/size);i<=Math.floor(bounds[2]/size);i++)for(let j=Math.floor(bounds[1]/size);j<=Math.floor(bounds[3]/size);j++)
+      for(const n of segmentGrid.get(i+','+j)||[])found.add(n);
+    for(const n of [...found].sort((a,b)=>a-b))if(Math.max(segments[n],segments[n+2])>=bounds[0]&&Math.min(segments[n],segments[n+2])<=bounds[2]&&Math.max(segments[n+1],segments[n+3])>=bounds[1]&&Math.min(segments[n+1],segments[n+3])<=bounds[3])yield n;
+  }
+  function* boundaries({accept=()=>true,stats={},floorAt=()=>.085,floorBreaks=()=>[],includeWalls=false,coalesce=true,bounds=null}={}){
     const seen=new Set(),emitted=coalesce?null:new Set(),point=(x,z)=>Math.round(x*1e6)+','+Math.round(z*1e6);
     const edgeKey=(ax,az,bx,bz)=>{const a=point(ax,az),b=point(bx,bz);return a<b?a+':'+b:b+':'+a;};
     stats.edges=stats.segments=stats.length=stats.duplicates=0;
-    for(let i=0;i<segments.length;i+=4){
+    for(const i of segmentIds(bounds)){
       const ax=segments[i],az=segments[i+1],bx=segments[i+2],bz=segments[i+3],id=edgeKey(ax,az,bx,bz);
       if(seen.has(id))continue;seen.add(id);stats.edges++;
       const dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz);if(len<1e-6)continue;
