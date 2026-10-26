@@ -65,6 +65,11 @@ const smoke = (args, label) => async () => {
 };
 
 const CHECKS = [
+  {id:'render-resolution',name:'разрешение отрисовки: выбор, буфер, сохранение и автоматика',group:2,run:async()=>{
+    const j=await probe(['--mode=steam','--size=deck','--q=gfxdev=deck&resolutionShot','--eval='+path.join(__dirname,'probe-checks/render-resolution.js')]);
+    const e=errLine(j),r=j.result;
+    return {status:!e&&r?.ok&&!j.errors.length?'ok':'fail',info:e||(r?.ok?'4 размера, сохранение и динамическое разрешение — ок':'нет результата')};
+  }},
   {id:'shift-loading',name:'ранний вход в смену и догрузка другого района',group:2,w:65,run:async()=>{
     const j=await probe(['--mode=steam','--early','--seed=7','--size=deck','--q=gfx=high&gfxdev=deck','--eval='+path.join(__dirname,'probe-checks/shift-loading.js')],130);
     const e=errLine(j),r=j.result;
