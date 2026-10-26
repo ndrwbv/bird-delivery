@@ -1,4 +1,7 @@
 {
+ "разрешение отрисовки": "render resolution",
+ "полное": "native",
+ "меньше разрешение — выше скорость; интерфейс остаётся чётким. «Тяжёлый кадр» может временно снижать разрешение ещё сильнее": "lower resolution improves performance; the interface stays sharp. Heavy frame mode may temporarily lower resolution further",
  "нет такой": "no such flat",
  "не очкуй": "don't chicken out",
  "не трусь": "don't be scared",

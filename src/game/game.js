@@ -477,7 +477,8 @@ const renderer = new THREE.WebGLRenderer({ canvas, stencil: true, antialias: AA_
    два: на телефоне это 195 точек в ширину — каша. Теперь по короткой
    стороне в физических пикселях: примерно 540 точек, как на ноутбуке с
    1080 по высоте, — пиксель одного размера и на телефоне, и на десктопе.
-   Сколько точек — настройка графики «чёткость» (gfx.js): ~430 / 540 / 720. */
+   Размер — настройка «разрешение отрисовки» (gfx.js): 430 / 540 / 720
+   по короткой стороне или полное разрешение экрана. */
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x86c6f2);
@@ -495,9 +496,9 @@ SKYM.init({ scene, renderer });                 // небо-градиент с 
 function resize () {
   const w = canvas.clientWidth || 640, h = canvas.clientHeight || 360;
   const dpr = window.devicePixelRatio || 1;
-  const px = Math.max(1, Math.min(w, h) * dpr / GFX.pixelShort());
+  const [rw, rh] = GFX.renderSize(w, h, dpr);
   renderer.setPixelRatio(1);
-  renderer.setSize(Math.max(200, Math.round(w * dpr / px)), Math.max(112, Math.round(h * dpr / px)), false);
+  renderer.setSize(rw, rh, false);
   cam.aspect = w / h;
   cam.updateProjectionMatrix();
   sizeRadar();

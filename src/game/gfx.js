@@ -60,7 +60,7 @@ export const ITEMS = [
   { id: 'fps', label: N_('кадров в секунду'), vals: [30, 40, 60, 0] },   // 0 — без ограничения (как у экрана)
   { id: 'range', label: N_('дальность'), vals: [250, 370, 490] },
   { id: 'menu', label: N_('город за меню'), vals: [0, 30, -1] },
-  { id: 'px', label: N_('чёткость'), vals: [430, 540, 720] },
+  { id: 'px', label: N_('разрешение отрисовки'), vals: [430, 540, 720, 0] },
   { id: 'win', label: N_('окна с комнатами'), vals: [0, 1] },
   { id: 'fx', label: N_('эффекты'), vals: [0, 1] },
   { id: 'far', label: N_('машины и люди вдали'), vals: [3, 2, 1] },
@@ -131,7 +131,12 @@ export const presetName = () => t(NAMES[PRESET]);
 export const opts = () => ({ ...O });
 export const fpsCap = () => val('fps');                        // 0 — как у экрана
 export const rangeK = () => val('range') / BASE_FAR;           // доля полной дальности
-export const pixelShort = () => val('px');
+export const pixelShort = () => val('px') || Infinity; // 0 — физическое разрешение экрана
+// Общий расчёт для холста и подписи настройки: пропорции экрана сохранены.
+export function renderSize(w, h, dpr = 1, short = pixelShort()) {
+  const px = Math.max(1, Math.min(w, h) * dpr / (short || Infinity));
+  return [Math.max(200, Math.round(w * dpr / px)), Math.max(112, Math.round(h * dpr / px))];
+}
 export const every = () => val('far');                         // вдали — раз в столько кадров
 export const fxLow = () => !val('fx');
 /* сглаживание: контекст WebGL создаётся один раз — значение на момент запуска (game.js), смена — после перезапуска */
@@ -337,7 +342,11 @@ function itemText (it, v) {
     case 'fps': return it.vals[v] ? String(it.vals[v]) : t('без ограничения');
     case 'range': return [t('близко'), t('средне'), t('далеко')][v] + ' · ' + t('{m} м', { m: it.vals[v] });
     case 'menu': return v === 0 ? t('застывший кадр') : v === 1 ? t('{n} к/с', { n: 30 }) : t('живой');
-    case 'px': return [t('крупный пиксель'), t('средний пиксель'), t('мелкий пиксель')][v];
+    case 'px': {
+      const canvas = document.getElementById('view');
+      const [w, h] = renderSize(canvas?.clientWidth || innerWidth, canvas?.clientHeight || innerHeight, window.devicePixelRatio || 1, it.vals[v]);
+      return w + ' × ' + h + (it.vals[v] === 0 ? ' · ' + t('полное') : '');
+    }
     case 'win': return v ? t('вкл') : t('выкл');
     case 'fx': return v ? t('все') : t('меньше');
     case 'far': return v === 2 ? t('каждый кадр') : t('раз в {n} кадра', { n: it.vals[v] });
@@ -356,6 +365,7 @@ export function panel (body, focus, card) {
     row('<b>' + t('качество') + '</b>', 'gfx-p', presetName(), true) +
     '<div class="set-rows">' + ITEMS.map(it => row(t(it.label), 'gfx-' + it.id, itemText(it, O[it.id]))).join('') +
     row(t('тяжёлый кадр'), 'gfx-dyn', DYN ? t('мыло вместо рывка') : t('рывок вместо мыла')) +
+    '<div class="pn-n">' + t('меньше разрешение — выше скорость; интерфейс остаётся чётким. «Тяжёлый кадр» может временно снижать разрешение ещё сильнее') + '</div>' +
     // «сглаживание» и «мягкие края» рядом — непонятно, чем отличаются (ревью 23.10, Р23-7)
     '<div class="pn-n set-aa-n">' + t('сглаживание — ровные края домов и машин, грузит видеокарту; мягкие края — лёгкое сглаживание всего кадра, почти даром') + '</div></div>' +
     '<div class="pn-n">' + t('графика не меняет игру: машины и люди рядом, клиенты и физика — одинаковые на любой') + '</div>';
@@ -368,6 +378,12 @@ export function panel (body, focus, card) {
   for (const it of ITEMS) body.querySelector('#gfx-' + it.id).onclick = () => { set(it.id, (O[it.id] + 1) % it.vals.length); again('gfx-' + it.id); };
   body.querySelector('#gfx-dyn').onclick = () => { setDyn(!DYN); again('gfx-dyn'); };
 }
+
+// Размер окна может поменяться, пока открыты настройки.
+addEventListener('resize', () => {
+  const button = document.getElementById('gfx-px');
+  if (button) button.textContent = itemText(ITEMS.find(it => it.id === 'px'), O.px);
+});
 
 /* отладка: __dlv.GFX */
 export const DEBUG = {
