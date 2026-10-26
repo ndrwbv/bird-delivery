@@ -240,6 +240,10 @@ function ground () {
 const ORIG = { mat: null, mask: 0 }, SPH = new THREE.Sphere();
 function drawMask (cx, cz) {
   const R = A.renderer, H = MEADOW.MASK.HALF, t0 = performance.now();
+  // середина — по сетке точек маски (2г17, автор 26.10: «трава перемещается раз в несколько секунд»): иначе при каждой
+  // перерисовке сетка сдвигалась на долю точки, и у края газона травинки пропадали и меняли высоту
+  const tx = 2 * H / MEADOW.MASK.N;
+  cx = Math.round(cx / tx) * tx; cz = Math.round(cz / tx) * tx;
   MU.uMdRef.value = A.groundH(cx, cz);
   MMAT.uniforms.uC.value.set(cx, cz, 1 / (2 * H));
   PMAT.uniforms.uC.value.set(cx, cz, 1 / (2 * H));
@@ -391,7 +395,7 @@ float mdLawn (vec2 p) { vec2 uv = (p - uMdWin.xy) * uMdWin.z + 0.5; vec2 e = abs
     nb = texelFetch(uMdMap, ti - ivec2(0, 1), 0); if (nb.r > 0.5) best = min(best, abs(nb.g - n0.g));
     okH = step(best, 0.35);
   }
-  float keep = step(aI.z, uDens) * behind * max(step(uCreep, lawn), seamG) * step(0.001, fade) * okH * step(n0.b, 0.75);   // на середине тропинки — нет
+  float keep = (1.0 - smoothstep(uDens - 0.12, uDens, aI.z)) * behind * max(step(uCreep, lawn), seamG) * step(0.001, fade) * okH * step(n0.b, 0.75);   // на середине тропинки — нет
   float snow = 1.0 - smoothstep(0.25, 0.45, uSea.w);
   // некошеная: пятнами выше и ниже; у края газона (стена, забор, дорожка) — выше
   float patchH = mdNoise(p * 0.11 + 4.0) * 0.6 + mdNoise(p * 0.37 + 9.0) * 0.4;
@@ -528,7 +532,7 @@ export function step (dt) {
   for (const L of LAYERS) {
     const [tx, tz] = ahead(cam, L.T * 0.3);
     L.U.uTile.value.set(tx, tz, L.T);
-    L.U.uDens.value = dk;                            // кадр тяжёлый (tune.js «облегчение») — реже, без пересборки
+    L.U.uDens.value += (dk - L.U.uDens.value) * Math.min(1, dt * 0.8);   // кадр тяжёлый (tune.js «облегчение») — реже, без пересборки; плавно за ~2 с (2г17)
     L.mesh.visible = snow < 0.45;
   }
 }
