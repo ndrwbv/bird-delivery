@@ -516,11 +516,18 @@ export function* build (api) {
     const draw=(a,b,oa,ob,lift,k)=>{
       const ha=top(a),hb=top(b),fa=A.groundH(...oa)+lift-.035,fb=A.groundH(...ob)+lift-.035;
       if(ha<=fa||hb<=fb)return null;
-      const ca=mix(oa,a,.16),cb=mix(ob,b,.16),bevel=.02;
-      LITM.color(CURB.HEX[k&1]);
-      LITM.quad(oa[0],fa,oa[1],ob[0],fb,ob[1],ob[0],hb-bevel,ob[1],oa[0],ha-bevel,oa[1]);
-      LITM.quad(oa[0],ha-bevel,oa[1],ob[0],hb-bevel,ob[1],cb[0],hb,cb[1],ca[0],ha,ca[1]);
-      LITM.quad(ca[0],ha,ca[1],cb[0],hb,cb[1],b[0],hb,b[1],a[0],ha,a[1]);
+      LITM.color(CURB.HEX[MOB?0:k&1]);
+      if(MOB){
+        // Как у прежнего мобильного камня, без отдельной фаски.
+        // Высота, ширина и общие торцы остаются теми же.
+        LITM.quad(oa[0],fa,oa[1],ob[0],fb,ob[1],ob[0],hb,ob[1],oa[0],ha,oa[1]);
+        LITM.quad(oa[0],ha,oa[1],ob[0],hb,ob[1],b[0],hb,b[1],a[0],ha,a[1]);
+      }else{
+        const ca=mix(oa,a,.16),cb=mix(ob,b,.16),bevel=.02;
+        LITM.quad(oa[0],fa,oa[1],ob[0],fb,ob[1],ob[0],hb-bevel,ob[1],oa[0],ha-bevel,oa[1]);
+        LITM.quad(oa[0],ha-bevel,oa[1],ob[0],hb-bevel,ob[1],cb[0],hb,cb[1],ca[0],ha,ca[1]);
+        LITM.quad(ca[0],ha,ca[1],cb[0],hb,cb[1],b[0],hb,b[1],a[0],ha,a[1]);
+      }
       const id=TRACE?TRACE.length/18:null;
       if(TRACE)TRACE.push(oa[0],oa[1],ha,a[0],a[1],ha,ob[0],ob[1],hb,b[0],b[1],hb,(a[0]+b[0])/2,(a[1]+b[1])/2,...a,...b);
       ST.secs++;

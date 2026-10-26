@@ -5,6 +5,7 @@ import {LAND_LIFT,landLift,shoreParts} from './landheight.js';
 import {landBoundary} from './landboundary.js';
 import {landCleanTileRegion,landCleanTile,landWidth,contourWidth,LAND_MIN_WIDTH} from './landclean.js';
 import {createLandMask} from './landmask.js';
+import {landPaintEdges,shoreLine} from './landlayers.js';
 export const ON = typeof location!=='undefined'&&new URLSearchParams(location.search).has('raisedland');
 export const LIFT=LAND_LIFT;
 export const cover=ON?createLandCover():null,green=ON?createLandCover():null;
@@ -75,6 +76,7 @@ export function record(ax,az,bx,bz,cx,cz,lift,r,g,b,initial=false){
     t.rgb=[r,g,b];t.initial=initial;if(lawn)ST.green++;else ST.paving++;
     // Не держим промежуточные объекты всего города до конца загрузки.
     if(C.rawCount>=16384)C.compact();
+    return lawn;
   }
 }
 let prepared=false;
@@ -154,7 +156,7 @@ function* terrainParts(p,{g,nx,nz,x0,z0}){
     }
   }
 }
-export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,triangulate}){
+export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,triangulate,curbed=false}){
   if(!ON)return;
   building=true;outside=skip;M.grad(null);
   try {
@@ -170,7 +172,7 @@ export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,trian
         M.up(a[0],y(a),a[1],b[0],y(b),b[1],c[0],y(c),c[1]);ST.top++;
       }
     };
-    let work=0;
+    let work=0;ST.paintWalls=0;
     // За оградой сохраняем прежнюю крупную сетку и её высоту; под водой — дно.
     for(let bj=0;bj<nz-1;bj+=4)for(let bi=0;bi<nx-1;bi+=4){
       const ei=Math.min(bi+4,nx-1),ej=Math.min(bj+4,nz-1),ax=x0+bi*g,az=z0+bj*g,bx=x0+ei*g,bz=z0+ej*g;
@@ -186,17 +188,32 @@ export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,trian
           const raised=!tri.every(q=>skip?.(...q));
           const parts=raised?(finalMask.ready?finalMask.parts(tri,q=>cover.cut(q)):cover.cut(tri)):[tri];
           for(const p of parts){
-            M.color(groundHex(groundH((tri[0][0]+tri[1][0]+tri[2][0])/3,(tri[0][1]+tri[1][1]+tri[2][1])/3)));
-            draw(p,0,raised);
+            const hex=groundHex(groundH((tri[0][0]+tri[1][0]+tri[2][0])/3,(tri[0][1]+tri[1][1]+tri[2][1])/3));
+            // Под цветным слоем нет второй скрытой поверхности земли.
+            for(const bare of raised?green.cut(p):[p]){
+              M.color(hex);draw(bare,0,raised);
+              if(!raised)continue;
+              for(const edge of landPaintEdges(bare,green,finalMask.ready?finalMask:null)){
+                const a=[...edge.a,groundH(...edge.a)],b=[...edge.b,groundH(...edge.b)];M.color('#829867');
+                for(const [u,v] of shoreLine(a,b)){
+                  const yu=u[2]+landLift(u[2]),yv=v[2]+landLift(v[2]);
+                  M.quad(u[0],yu,u[1],v[0],yv,v[1],v[0],yv+edge.height,v[1],u[0],yu+edge.height,u[1]);ST.paintWalls++;
+                }
+              }
+            }
           }
         }
         if(++work%128===0)yield 'земля';
       }
     }
+    ST.baseTop=ST.top;
     // Цветные вставки используют ту же береговую сетку и тот же закон высоты.
     for(const t of green.triangles){
       const rgb=t.rgb;
-      for(const local of terrainParts(t.p,terrain))for(const part of finalMask.ready?finalMask.parts(local,q=>cover.cut(q,t.lift)):cover.cut(local,t.lift)){
+      // У наложенных газонов остаётся только верхняя поверхность;
+      // равные по высоте используют последний записанный цвет.
+      const visible=green.cut(t.p,t.lift,u=>u.lift>t.lift||u.id>t.id);
+      for(const piece of visible)for(const local of terrainParts(piece,terrain))for(const part of finalMask.ready?finalMask.parts(local,q=>cover.cut(q,t.lift)):cover.cut(local,t.lift)){
         M.grad((x,z,c,o)=>{c[o]=rgb[0];c[o+1]=rgb[1];c[o+2]=rgb[2];});
         draw(part,t.lift);M.grad(null);
       }
@@ -204,7 +221,7 @@ export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,trian
     }
     // Вертикальный торец есть только на настоящей границе газона.
     // Внутренние диагонали и наложенные зелёные слои стенок не создают.
-    for(const edge of boundaries({includeWalls:true})){
+    for(const edge of curbed?[]:boundaries({includeWalls:true})){
       if(!edge){yield 'торцы земли';continue;}
       const {a,b,lift}=edge,x=(a[0]+b[0])/2,z=(a[1]+b[1])/2;
       const extra=Math.max(0,green.height(x,z));

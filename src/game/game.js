@@ -1292,7 +1292,7 @@ function Mesher (opt) {
      hide): спереди он короткий. api.track(fn) — fn(меш, первая вершина, вершин) позовут, когда меш клетки будет готов
      (кусок по клетке — отдельно) */
   let FRONT = false, TRK = null;
-  let LAND_HOLD = false;
+  let LAND_HOLD = false, LAND_HIDE = false;
   function slot (ax, az, bx, bz, cx, cz) {
     const b = bucket(ax, az, bx, bz, cx, cz);
     if (!FRONT) return b;
@@ -1393,12 +1393,13 @@ function Mesher (opt) {
   const V2 = [];
   const api = {
     coverQuad: RLAND.ON ? (p, lift) => {
+      let hide = LAND_HIDE;
       if (opt && opt.keepFront && opt.alpha && !opt.noLandRecord && ca === 0 && !LAND_HOLD) {
-        RLAND.record(...p[0], ...p[1], ...p[2], lift, cr, cg, cb, !!opt.groundOnly);
+        hide = RLAND.record(...p[0], ...p[1], ...p[2], lift, cr, cg, cb, !!opt.groundOnly) === true;
         RLAND.record(...p[0], ...p[2], ...p[3], lift, cr, cg, cb, !!opt.groundOnly);
       }
-      const prev = LAND_HOLD; LAND_HOLD = true;
-      return () => { LAND_HOLD = prev; };
+      const prev = LAND_HOLD, prevHide = LAND_HIDE; LAND_HOLD = true; LAND_HIDE = hide;
+      return () => { LAND_HOLD = prev; LAND_HIDE = prevHide; };
     } : null,
     color (hex) {
       let k = BYTE_RGB.get(hex);
@@ -1410,6 +1411,7 @@ function Mesher (opt) {
       return api;
     },
     tri (ax, ay, az, bx, by, bz, cx, cy, cz) {
+      if (LAND_HIDE) return;
       const b = slot(ax, az, bx, bz, cx, cz);
       room(b, 3);
       const W = b.cs, p = b.pos, c = b.col, i = b.n * 3, j = b.n * W;
@@ -1490,7 +1492,11 @@ function Mesher (opt) {
        Режем его по клеткам сетки и по их диагоналям: каждый кусок лежит
        в одной плоскости с землёй под ним, поэтому ни щелей, ни провалов. */
     dtri (ax, az, bx, bz, cx, cz, lift) {
-      if (RLAND.ON && !LAND_HOLD && opt && opt.keepFront && opt.alpha && !opt.noLandRecord && ca === 0) RLAND.record(ax, az, bx, bz, cx, cz, lift, cr, cg, cb, !!opt.groundOnly);
+      // Цветной газон целиком заменяет RLAND: прежняя скрытая плоскость
+      // не должна оставаться под ним после сборки поднятой земли.
+      if (LAND_HIDE) return;
+      if (RLAND.ON && !LAND_HOLD && opt && opt.keepFront && opt.alpha && !opt.noLandRecord && ca === 0 &&
+          RLAND.record(ax, az, bx, bz, cx, cz, lift, cr, cg, cb, !!opt.groundOnly) === true) return;
       if (ZFLOG) {
         const k0 = (cr << 16) | (cg << 8) | cb, q = [k0, k0, k0];
         if (GRAD) { const t3 = [0, 0, 0]; [[ax, az], [bx, bz], [cx, cz]].forEach(([x, z], i) => { GRAD(x, z, t3, 0); q[i] = (t3[0] << 16) | (t3[1] << 8) | t3[2]; }); }
@@ -6009,7 +6015,7 @@ function buildCity () {
     if (!INTRO) yield* buildCurbs({ LITM, rebuild: true, contours:()=>RLAND.boundaries({accept:(x,z)=>!DMASK||!farOut(x,z)}),
       landTopAt: (x,z) => RLAND.topOffset(x,z,terrainH(x,z)) });
     RLAND.ST.baseDisposed = GROUND_M.discard();
-    yield* RLAND.build({ M: LITM, terrain: TER, heights: TH, groundH: terrainH, groundHex, skip: DMASK ? farOut : null, buildings: CITY.buildings,
+    yield* RLAND.build({ M: LITM, terrain: TER, heights: TH, groundH: terrainH, groundHex, skip: DMASK ? farOut : null, buildings: CITY.buildings, curbed: !INTRO && CURBS.ST.secs>0,
       triangulate: p => THREE.ShapeUtils.triangulateShape(p.map(q => new THREE.Vector2(q[0], q[1])), []) });
     groundSkirt(LITM);
     const delta = RLAND.alignObjects({ lists: [LIT, FLAT, LAMPH], items: SMASH, props: PROPS, benches: BENCHES, baseH: terrainH });

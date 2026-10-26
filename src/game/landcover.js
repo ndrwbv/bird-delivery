@@ -4,6 +4,7 @@
    Вычитание выпуклого треугольника оставляет выпуклые части, без мостиков
    через отверстия и без отдельной триангуляции многоугольников с дырками. */
 const EPS = 1e-8;
+const PAGE=16384;
 const cross = (a, b, p) => (b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]);
 const area2 = p => p.reduce((s,a,i)=>{const b=p[(i+1)%p.length];return s+a[0]*b[1]-a[1]*b[0];},0);
 const box = p => [Math.min(...p.map(v=>v[0])),Math.min(...p.map(v=>v[1])),Math.max(...p.map(v=>v[0])),Math.max(...p.map(v=>v[1]))];
@@ -46,8 +47,9 @@ export function createLandCover(cell=32) {
   const count=()=>all.length+(packed?.n||0);
   function read(id){
     let t=cache.get(id);if(t)return t;
-    const a=packed.data,o=id*11,meta=packed.meta[id];
-    t={id,p:[[a[o],a[o+1]],[a[o+2],a[o+3]],[a[o+4],a[o+5]]],lift:a[o+6],box:[a[o+7],a[o+8],a[o+9],a[o+10]],initial:!!(meta&0x1000000)};
+    const b=packed.blocks[Math.floor(id/PAGE)],j=id%PAGE,i=j*3,a=b.xy,v=b.indices,meta=b.meta[j];
+    const ax=a[v[i]*2],az=a[v[i]*2+1],bx=a[v[i+1]*2],bz=a[v[i+1]*2+1],cx=a[v[i+2]*2],cz=a[v[i+2]*2+1];
+    t={id,p:[[ax,az],[bx,bz],[cx,cz]],lift:b.heights[b.heightIndex[j]],box:[Math.min(ax,bx,cx),Math.min(az,bz,cz),Math.max(ax,bx,cx),Math.max(az,bz,cz)],initial:!!(meta&0x1000000)};
     if(meta&0x2000000)t.rgb=[(meta>>16)&255,(meta>>8)&255,meta&255];
     if(cache.size>=2048)cache.delete(cache.keys().next().value);cache.set(id,t);return t;
   }
@@ -58,8 +60,9 @@ export function createLandCover(cell=32) {
         for(const item of grid.get(key(i,j))||[]){
           const id=typeof item==='number'?item:item.id;if(seen.has(id))continue;seen.add(id);
           if(typeof item==='number'){
-            const a=packed.data,o=id*11;
-            if(bounds[0]>a[o+9]+EPS||bounds[2]<a[o+7]-EPS||bounds[1]>a[o+10]+EPS||bounds[3]<a[o+8]-EPS)continue;
+            const b=packed.blocks[Math.floor(id/PAGE)],i=id%PAGE*3,a=b.xy,v=b.indices;
+            const ax=a[v[i]*2],az=a[v[i]*2+1],bx=a[v[i+1]*2],bz=a[v[i+1]*2+1],cx=a[v[i+2]*2],cz=a[v[i+2]*2+1];
+            if(bounds[0]>Math.max(ax,bx,cx)+EPS||bounds[2]<Math.min(ax,bx,cx)-EPS||bounds[1]>Math.max(az,bz,cz)+EPS||bounds[3]<Math.min(az,bz,cz)-EPS)continue;
             fn(read(id));
           }else if(overlaps(bounds,item.box))fn(item);
         }
@@ -82,10 +85,10 @@ export function createLandCover(cell=32) {
     let h=-Infinity;
     for(const item of grid.get(key(Math.floor(x/cell),Math.floor(z/cell)))||[]){
       if(typeof item==='number'){
-        const a=packed.data,o=item*11;
-        if(x<a[o+7]-EPS||x>a[o+9]+EPS||z<a[o+8]-EPS||z>a[o+10]+EPS)continue;
-        const ax=a[o],az=a[o+1],bx=a[o+2],bz=a[o+3],cx=a[o+4],cz=a[o+5];
-        if((bx-ax)*(z-az)-(bz-az)*(x-ax)>=-EPS&&(cx-bx)*(z-bz)-(cz-bz)*(x-bx)>=-EPS&&(ax-cx)*(z-cz)-(az-cz)*(x-cx)>=-EPS)h=Math.max(h,a[o+6]);
+        const b=packed.blocks[Math.floor(item/PAGE)],j=item%PAGE,i=j*3,a=b.xy,v=b.indices;
+        const ax=a[v[i]*2],az=a[v[i]*2+1],bx=a[v[i+1]*2],bz=a[v[i+1]*2+1],cx=a[v[i+2]*2],cz=a[v[i+2]*2+1];
+        if(x<Math.min(ax,bx,cx)-EPS||x>Math.max(ax,bx,cx)+EPS||z<Math.min(az,bz,cz)-EPS||z>Math.max(az,bz,cz)+EPS)continue;
+        if((bx-ax)*(z-az)-(bz-az)*(x-ax)>=-EPS&&(cx-bx)*(z-bz)-(cz-bz)*(x-bx)>=-EPS&&(ax-cx)*(z-cz)-(az-cz)*(x-cx)>=-EPS)h=Math.max(h,b.heights[b.heightIndex[j]]);
         continue;
       }
       const t=item;
@@ -94,8 +97,8 @@ export function createLandCover(cell=32) {
     }
     return h;
   }
-  function cut(p,minLift=-Infinity){
-    const bounds=box(p),hits=[];each(bounds,t=>{if(t.lift>=minLift)hits.push(t);});
+  function cut(p,minLift=-Infinity,accept=null){
+    const bounds=box(p),hits=[];each(bounds,t=>{if(t.lift>=minLift&&(!accept||accept(t)))hits.push(t);});
     let parts=[area2(p)<0?p.slice().reverse():p];
     for(const t of hits){
       const next=[];
@@ -170,18 +173,35 @@ export function createLandCover(cell=32) {
   }
   function compact(){
     if(!all.length)return;
-    const n=count(),data=new Float64Array(n*11),meta=new Uint32Array(n);
-    if(packed){data.set(packed.data);meta.set(packed.meta);}
-    for(const t of all){
-      data.set([...t.p[0],...t.p[1],...t.p[2],t.lift,...t.box],t.id*11);
-      meta[t.id]=(t.initial?0x1000000:0)|(t.rgb?0x2000000|(t.rgb[0]<<16)|(t.rgb[1]<<8)|t.rgb[2]:0);
+    const n=count(),numberKey=v=>Object.is(v,-0)?'-0':String(v);
+    if(!packed)packed={n:0,blocks:[]};
+    for(let start=0;start<all.length;){
+      const page=Math.floor(all[start].id/PAGE),old=packed.blocks[page],end=Math.min(all.length,start+PAGE-all[start].id%PAGE),size=(old?.n||0)+end-start;
+      const xy=old?Array.from(old.xy):[],heights=old?Array.from(old.heights):[],vertices=new Map(),levels=new Map();
+      for(let i=0;i<xy.length;i+=2)vertices.set(numberKey(xy[i])+','+numberKey(xy[i+1]),i/2);
+      for(let i=0;i<heights.length;i++)levels.set(numberKey(heights[i]),i);
+      const indices=new Uint16Array(size*3),heightIndex=new Uint16Array(size),meta=new Uint32Array(size);
+      if(old){indices.set(old.indices);heightIndex.set(old.heightIndex);meta.set(old.meta);}
+      for(let i=start;i<end;i++){
+        const t=all[i],id=t.id%PAGE;
+        for(let v=0;v<3;v++){
+          const p=t.p[v],k=numberKey(p[0])+','+numberKey(p[1]);let index=vertices.get(k);
+          if(index===undefined){index=xy.length/2;vertices.set(k,index);xy.push(...p);}indices[id*3+v]=index;
+        }
+        const k=numberKey(t.lift);let index=levels.get(k);if(index===undefined){index=heights.length;levels.set(k,index);heights.push(t.lift);}heightIndex[id]=index;
+        meta[id]=(t.initial?0x1000000:0)|(t.rgb?0x2000000|(t.rgb[0]<<16)|(t.rgb[1]<<8)|t.rgb[2]:0);
+      }
+      // Общие вершины и палитра высот экономят память без округления:
+      // сами координаты и высоты по-прежнему хранятся в Float64.
+      packed.blocks[page]={n:size,xy:Float64Array.from(xy),heights:Float64Array.from(heights),indices,heightIndex,meta};start=end;
     }
-    for(const [k,list] of grid)grid.set(k,Uint32Array.from(list,t=>typeof t==='number'?t:t.id));
-    packed={n,data,meta};all.length=0;cache.clear();
+    for(const [k,list] of grid)if(Array.isArray(list))grid.set(k,Uint32Array.from(list,t=>typeof t==='number'?t:t.id));
+    packed.n=n;all.length=0;cache.clear();
   }
   return {triangle,height,covered:(x,z)=>height(x,z)>-Infinity,sideHeights,cut,inside,breaks,compact,stats,
     inBox(bounds){const out=[];each(bounds,t=>out.push(t));return out;},
     *cells(){for(const k of grid.keys()){const [i,j]=k.split(',').map(Number);yield [i*cell,j*cell,(i+1)*cell,(j+1)*cell];}},
+    get storageBytes(){return packed?packed.blocks.reduce((s,b)=>s+b.xy.byteLength+b.heights.byteLength+b.indices.byteLength+b.heightIndex.byteLength+b.meta.byteLength,0):0;},
     get count(){return count();},get rawCount(){return all.length;},get triangles(){
       if(!packed)return all;
       return {[Symbol.iterator]:function*(){for(let i=0;i<packed.n;i++)yield read(i);yield* all;}};

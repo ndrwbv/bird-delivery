@@ -96,3 +96,23 @@ console.log('landcover: компактное хранение сохраняет
   C.compact();assert.deepEqual(C.cut(p),[p]);
 }
 console.log('landcover: непересекающиеся покрытия оставляют землю цельной');
+{
+  const C=createLandCover(),n=33001;
+  for(let i=0;i<n;i++){
+    const x=i%256*2,z=Math.floor(i/256)*2,t=C.triangle(x,z,x+1,z,x,z+1,i/100000);
+    t.rgb=[i%256,81,139];t.initial=i%3===0;if(i%4000===3999)C.compact();
+  }
+  C.compact();assert.equal(C.count,n);assert.ok(C.storageBytes<n*92*.8,'Упаковка действительно сокращает объём новых контуров');
+  const ids=[0,3999,4000,16383,16384,32767,32768,33000],found=new Map();
+  for(const t of C.triangles)if(ids.includes(t.id))found.set(t.id,t);
+  for(const id of ids){
+    const x=id%256*2,z=Math.floor(id/256)*2,t=found.get(id);
+    assert.equal(C.height(x+.2,z+.2),id/100000,'Высота точна после дополнения частичного блока');
+    assert.deepEqual(t.p,[[x,z],[x+1,z],[x,z+1]]);assert.deepEqual(t.rgb,[id%256,81,139]);assert.equal(t.initial,id%3===0);
+    assert.ok(C.inBox([x+.1,z+.1,x+.3,z+.3]).some(t=>t.id===id),'Индекс клетки сохраняет границы блоков');
+  }
+  C.clear();C.triangle(-0,-0,1,0,0,1,-0);C.triangle(3,0,4,0,3,1,0);C.compact();
+  assert.ok(Object.is(C.height(.1,.1),-0)&&Object.is(C.height(3.1,.1),0),'Палитра не округляет высоты и различает знаковый ноль');
+  assert.ok(Object.is([...C.triangles][0].p[0][0],-0));assert.equal(C.count,2);
+}
+console.log('landcover: индексы общих вершин, точная палитра высот и несколько дополняемых блоков — проверены');
