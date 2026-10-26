@@ -39,7 +39,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import {landPositionMaskMaterial} from './landpositions.js';
 import * as GFX from './gfx.js';
-import { snowAmt, seasonValue, heatAmt, mudAmt } from './seasons.js';
+import { snowAmt, dryAmt, heatAmt, mudAmt, patchNoiseGLSL } from './seasons.js';
 import { ON as MOBILE } from './mobile.js';
 import * as FSH from './fakeshadows.js';
 
@@ -329,7 +329,7 @@ function instAttr (g, n, seed) {
 }
 const GU = {
   uTime: { value: 0 }, uCar: { value: new THREE.Vector4(0, 0, 0, 0) }, uWind: { value: new THREE.Vector2(0.8, 0.6) },
-  uSea: { value: new THREE.Vector4(0, 0, 0, 0) },    // осень, жара, весна (грязь), снег
+  uSea: { value: new THREE.Vector4(0, 0, 0, 0) },    // сухость, жара, весна (грязь), снег
   uH: { value: new THREE.Vector2(MEADOW.H[0], MEADOW.H[1]) }, uEdgeK: { value: MEADOW.EDGE }, uCreep: { value: MEADOW.CREEP },
   uMdFast: { value: 1 },     // 1 — невидимые пучки сразу в точку (perf 14); 0 — по-старому (замер: __dlv.MEADOW.GU.uMdFast)
 };
@@ -347,6 +347,7 @@ uniform sampler2D uMdMap; uniform vec3 uMdWin; uniform float uMdOn, uMdRef, uMdN
 attribute vec4 aBl; attribute vec4 aI;
 varying vec3 vMdC;
 ${NOISE}
+${patchNoiseGLSL('mdNoise')}
 float mdLawn (vec2 p) { vec2 uv = (p - uMdWin.xy) * uMdWin.z + 0.5; vec2 e = abs(uv - 0.5); return max(e.x, e.y) > 0.49 ? 0.0 : texture2D(uMdMap, uv).r; }
 ` + sh.vertexShader
       .replace('#include <beginnormal_vertex>', 'vec3 objectNormal = vec3(0.0, 1.0, 0.0);')
@@ -398,6 +399,13 @@ float mdLawn (vec2 p) { vec2 uv = (p - uMdWin.xy) * uMdWin.z + 0.5; vec2 e = abs
   }
   float keep = (1.0 - smoothstep(uDens - 0.12, uDens, aI.z)) * behind * max(step(uCreep, lawn), seamG) * step(0.001, fade) * okH * step(n0.b, 0.75);   // на середине тропинки — нет
   float snow = 1.0 - smoothstep(0.25, 0.45, uSea.w);
+  if (uSea.w > 0.0) {
+    // Под белым пятном газона травинок нет; остаются только в проталинах.
+    // Летом дополнительный шум не считается (Steam Deck, 2г18).
+    float lim = uSea.w * 1.35 - 0.22;
+    float cover = 1.0 - smoothstep(lim - 0.1, lim + 0.1, seasonPatch(p).x);
+    snow *= 1.0 - smoothstep(0.05, 0.4, cover);
+  }
   // некошеная: пятнами выше и ниже; у края газона (стена, забор, дорожка) — выше
   float patchH = mdNoise(p * 0.11 + 4.0) * 0.6 + mdNoise(p * 0.37 + 9.0) * 0.4;
   float edge = 1.0 - min(min(mdLawn(p + vec2(1.1, 0.0)), mdLawn(p - vec2(1.1, 0.0))), min(mdLawn(p + vec2(0.0, 1.1)), mdLawn(p - vec2(0.0, 1.1))));
@@ -522,11 +530,10 @@ export function step (dt) {
   GU.uTime.value = T;
   const V = A.car;
   if (V) GU.uCar.value.set(V.x, V.z, 1, 0);
-  // сезон — как у мелочи газона (lawnprops.js season)
-  const s = ((seasonValue() % 4) + 4) % 4, snow = snowAmt();
-  const autumn = s < 0.9 ? 0 : s < 1.4 ? (s - 0.9) / 0.5 : s < 2.2 ? 1 : 0;
+  // Сухая трава — по той же кривой, что газон: после зимы не зеленеет раньше земли (2г18).
+  const snow = snowAmt();
   const spring = Math.min(1, mudAmt() * 1.5);
-  GU.uSea.value.set(autumn, heatAmt(), spring, snow);
+  GU.uSea.value.set(dryAmt(), heatAmt(), spring, snow);
   { const L = LAYERS[LAYERS.length - 1]; MU.uMdCover.value.set(L.fade[0], L.fade[1], snow < 0.45 ? 1 : 0); }
   let dk = 1;
   try { dk = Math.max(0.35, Math.min(1, GFX.detail().meadowK ?? 1)); } catch (e) { /* — */ }

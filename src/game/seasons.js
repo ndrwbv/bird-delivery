@@ -101,6 +101,7 @@ export const leafAmt = () => A.leaf ?? 1;
 export const yellowAmt = () => A.yellow || 0;
 /* распутица (весна) и мокрая земля, 0 … 1 — грязь на машине (cardirt.js) */
 export const mudAmt = () => A.mud || 0;
+export const dryAmt = () => A.dry || 0;
 export const wetAmt = () => A.wet || 0;
 /* сколько снега падает сейчас (снегопад 0…1) — дворникам (wipers.js) */
 export const snowFall = () => (SKY ? SKY.amt : 0);
@@ -137,6 +138,15 @@ export function setGale (amp, dx = 1, dz = 0) { U.uGale.value = amp; U.uGaleD.va
    она всегда смотрит на камеру, поэтому у земли и крыш y > 0, у стен ~0.
    Классы по цвету вершины (цвета линейные): зелёное — трава, серое и
    тёмное — асфальт, синее — вода. */
+/* Один рисунок снежных пятен для земли и травинок: x — пятно, y — мелкая октава.
+   Имя шума своё у каждого шейдера, координаты и расчёт — общие (2г18). */
+export const patchNoiseGLSL = noise => `
+vec2 seasonPatch (vec2 p) {
+  float n2 = ${noise}(mat2(0.6, -0.8, 0.8, 0.6) * p * 0.5 + 17.0);
+  float n = ${noise}(mat2(0.8, 0.6, -0.6, 0.8) * p * 0.23 + (n2 - 0.5) * 0.9) * 0.68 + n2 * 0.32;
+  return vec2(n, n2);
+}`;
+
 const TINT = `
 #ifdef USE_COLOR_ALPHA
 #define S_LAND (vColor.a < 0.5)
@@ -149,6 +159,7 @@ varying vec3 vSW;
 float sHash (vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float sNoise (vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(sHash(i), sHash(i + vec2(1.0, 0.0)), f.x), mix(sHash(i + vec2(0.0, 1.0)), sHash(i + vec2(1.0, 1.0)), f.x), f.y); }
+${patchNoiseGLSL('sNoise')}
 /* хэш без синуса: на координатах в тысячи метров sin теряет точность и рисует ряды (листья лежали строем) */
 float lHash (vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
 /* опавший лист: в клетке s м — не больше одного, со случайным сдвигом, поворотом и размером (ряды не видны);
@@ -184,8 +195,8 @@ vec3 seasonTint (vec3 c, float dryK, float snowK) {
   // Ровная сетка по осям мира рисовала пятна углами и клетками — снег лежал «квадратами» (О6, 09.10.2026)
   // крупная октава ещё и сдвинута мелкой (без лишних вызовов шума): край пятна извилистый, а не ромбом
   // (мелкая — ~2 м, а не ~1 м: метровые клетки шума по краю пятна читались ступеньками)
-  float n2 = sNoise(mat2(0.6, -0.8, 0.8, 0.6) * vSW.xz * 0.5 + 17.0);
-  float n = sNoise(mat2(0.8, 0.6, -0.6, 0.8) * vSW.xz * 0.23 + (n2 - 0.5) * 0.9) * 0.68 + n2 * 0.32;
+  vec2 pattern = seasonPatch(vSW.xz);
+  float n = pattern.x, n2 = pattern.y;
   float g = green * up;
   // сухая трава осенью — золотисто-зелёная и жёлтая, чистая (не бурая): пятнами по шуму
   vec3 dryC = mix(vec3(0.38, 0.45, 0.05), vec3(0.80, 0.52, 0.04), smoothstep(0.3, 0.75, n)) * (0.88 + 0.26 * n);
