@@ -3,16 +3,21 @@
 const key=p=>Math.round(p[0]*1e5)+','+Math.round(p[1]*1e5);
 export function joinLandCurbs(edges,width=.12){
   const nodes=new Map(),sections=[],joins=[];
-  const node=p=>{const k=key(p);let n=nodes.get(k);if(!n)nodes.set(k,n={p,in:[],out:[]});return n;};
+  const node=p=>{const k=key(p);let n=nodes.get(k);if(!n)nodes.set(k,n={p,in:null,out:null});return n;};
+  const add=(n,k,s)=>{if(!n[k])n[k]=s;else if(Array.isArray(n[k]))n[k].push(s);else n[k]=[n[k],s];};
   for(const e of edges){
     const a=node(e.a),b=node(e.b),length=Math.hypot(b.p[0]-a.p[0],b.p[1]-a.p[1]);if(length<1e-5||a===b)continue;
-    const s={a:a.p,b:b.p,lift:e.lift,an:a,bn:b};a.out.push(s);b.in.push(s);sections.push(s);
+    const s={a:a.p,b:b.p,lift:e.lift};add(a,'out',s);add(b,'in',s);sections.push(s);
   }
   const unit=s=>{const dx=s.b[0]-s.a[0],dz=s.b[1]-s.a[1],l=Math.hypot(dx,dz);return [dx/l,dz/l];};
   let open=0;
   for(const n of nodes.values()){
-    const free=new Set(n.out);
-    for(const prev of n.in){
+    if(!Array.isArray(n.in)&&!Array.isArray(n.out)){
+      if(n.in&&n.out){n.in.next=n.out;n.out.prev=n.in;}else if(n.in||n.out)open++;
+      continue;
+    }
+    const free=new Set(Array.isArray(n.out)?n.out:n.out?[n.out]:[]);
+    for(const prev of Array.isArray(n.in)?n.in:n.in?[n.in]:[]){
       const u=unit(prev);let next=null,best=-Infinity;
       for(const s of free){const v=unit(s),turn=Math.atan2(u[0]*v[1]-u[1]*v[0],u[0]*v[0]+u[1]*v[1]);if(turn>best){best=turn;next=s;}}
       if(next){prev.next=next;next.prev=prev;free.delete(next);}else open++;
@@ -26,7 +31,7 @@ export function joinLandCurbs(edges,width=.12){
     while(s.next&&s.next!==s&&!s.next.removed){
       const t=s.next,u=unit(s),v=unit(t);
       if(Math.abs(u[0]*v[1]-u[1]*v[0])>1e-7||u[0]*v[0]+u[1]*v[1]<.9999999||Math.abs(s.lift-t.lift)>.002)break;
-      s.b=t.b;s.bn=t.bn;s.next=t.next;if(t.next)t.next.prev=s;t.removed=true;
+      s.b=t.b;s.next=t.next;if(t.next)t.next.prev=s;t.removed=true;
     }
   }
   const active=sections.filter(s=>!s.removed);

@@ -9,7 +9,13 @@ const N=T.length/18,vert=(s,e)=>{
   return T.slice(s*18+e*6,s*18+e*6+6);
 };
 const ends=new Uint8Array(N*2),mark=(s,e)=>{vert(s,e);ends[s*2+e]++;};
-const out={ok:false,sections:N,joins:0,bridges:0,gap:0,step:0,open:0,pairedOpen:0,wall:0,shore:0,outside:0,unmatched:0,untracked:0,duplicates:0,worst:0,sample:[]};
+const out={ok:false,sections:N,joins:0,bridges:0,gap:0,step:0,open:0,pairedOpen:0,wall:0,shore:0,outside:0,unmatched:0,untracked:0,duplicates:0,geometryDuplicates:0,worst:0,sample:[]};
+const geometry=new Set(),vertexKey=p=>p.map(x=>Math.round(x*1e6)).join(','),endKey=v=>[vertexKey(v.slice(0,3)),vertexKey(v.slice(3,6))].sort().join(':');
+for(let i=0;i<N;i++){
+  const k=[endKey(vert(i,0)),endKey(vert(i,1))].sort().join('|');
+  if(geometry.has(k))out.geometryDuplicates++;else geometry.add(k);
+  if(i%8192===0)await wait(0);
+}
 const check=(a,b,where)=>{
   const gap=Math.max(Math.hypot(a[0]-b[0],a[1]-b[1]),Math.hypot(a[3]-b[3],a[4]-b[4])),step=Math.max(Math.abs(a[2]-b[2]),Math.abs(a[5]-b[5]));
   out.worst=Math.max(out.worst,gap);if(gap>.03)out.gap++;if(step>.03)out.step++;
@@ -55,4 +61,4 @@ for(let id=0;id<open.length;id++){
   if(found)out.pairedOpen++;else{out.unmatched++;if(out.sample.length<12)out.sample.push({where:'открытый торец',section:a.s,end:a.end,v});}
 }
 for(const count of ends){if(!count)out.untracked++;else if(count>1)out.duplicates++;}
-out.worst=+out.worst.toFixed(6);out.ok=N>0&&(out.joins>0||out.bridges>0)&&!out.gap&&!out.step&&!out.unmatched&&!out.untracked&&!out.duplicates&&!d.crashlog.count();return out;
+out.worst=+out.worst.toFixed(6);out.ok=N>0&&(out.joins>0||out.bridges>0)&&!out.gap&&!out.step&&!out.unmatched&&!out.untracked&&!out.duplicates&&!out.geometryDuplicates&&!d.crashlog.count();return out;

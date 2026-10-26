@@ -71,4 +71,14 @@ g.triangle(15.99,15.99,16.02,15.99,16,16.02,.2);
 assert.equal(raw(16,16),true,'В промежуточной геометрии появился зелёный обрывок');
 assert.equal(clean.contains(16,16),false,'Обрывок не возвращается в физическую землю');
 assert.equal([...clean.parts(rect(15.99,15.99,16.01,16.01))].length,0,'Обрывок не возвращается в нарисованную землю');
+for(const offset of[-5120,5120]){
+  const m=createLandMask(),core=[offset,offset,offset+32,offset+32];
+  m.reserve(core);assert.equal(m.cellState(offset+1,offset+1),false);
+  m.add(core,[{outer:rect(offset+4,offset+4,offset+20,offset+20),holes:[]}],triangulate);
+  assert.equal(m.cells,1,'Запись очищенной области не добавляет повторную клетку');m.finish();
+  assert.equal(m.contains(offset+10,offset+10),true);assert.equal(m.contains(offset+1,offset+1),false);
+  assert.equal(m.cellState(offset+40,offset+1),undefined);
+  const original=[...m.boundaries({coalesce:false})].filter(Boolean),merged=[...m.boundaries()].filter(Boolean);
+  for(const e of original)covers(e,merged);for(const e of merged)covers(e,original);
+}
 console.log('landmask: общая область опоры и рисунка, отверстия, стыки клеток и защита от зелёных обрывков — OK');

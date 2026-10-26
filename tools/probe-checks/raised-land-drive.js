@@ -29,18 +29,19 @@ for(const edge of candidates)for(const direction of [1,-1]){
   tp(sx,sz,Math.atan2(fx,fz));V.x=sx;V.z=sz;V.y=d.surfaceAt(sx,sz);V.vx=fx;V.vz=fz;V.air=false;V.roof=false;V.pitch=V.roll=V.steer=V.kickW=0;
   await wait(100);d.S.paused=false;
   const start=performance.now(),bumps=d.CURBS.ST.bumps,hp=d.S.hp,trace=[];
-  let previous=d.car.position.y,maxStep=0;
+  let previous=d.car.position.y,maxStep=0,maxCbump=0;
   while(performance.now()-start<6000){
     const speed=V.vx*fx+V.vz*fz;
     IN.gas=speed<2.5?1:0;
     await wait(16);
     const y=d.car.position.y;maxStep=Math.max(maxStep,Math.abs(y-previous));previous=y;
+    maxCbump=Math.max(maxCbump,Math.abs(V.cbump||0));
     trace.push({s:(V.x-sx)*fx+(V.z-sz)*fz,v:speed,y,pitch:V.pitch,roll:V.roll});
     if(trace.at(-1).s>8)break;
   }
   IN.gas=0;
   const distance=(V.x-sx)*fx+(V.z-sz)*fz,lateral=Math.abs((V.x-sx)*fz-(V.z-sz)*fx);
-  rows.push({edge,direction,distance:+distance.toFixed(2),lateral:+lateral.toFixed(2),bumps:d.CURBS.ST.bumps-bumps,maxStep:+maxStep.toFixed(3),crossing:trace.filter(p=>p.s>1.5&&p.s<6).filter((p,i)=>i%6===0).map(p=>({s:+p.s.toFixed(2),v:+p.v.toFixed(2),y:+p.y.toFixed(3),pitch:+p.pitch.toFixed(3),roll:+p.roll.toFixed(3)})),hpBefore:hp,hpAfter:d.S.hp});
+  rows.push({edge,direction,distance:+distance.toFixed(2),lateral:+lateral.toFixed(2),bumps:d.CURBS.ST.bumps-bumps,maxCbump,maxStep:+maxStep.toFixed(3),crossing:trace.filter(p=>p.s>1.5&&p.s<6).filter((p,i)=>i%6===0).map(p=>({s:+p.s.toFixed(2),v:+p.v.toFixed(2),y:+p.y.toFixed(3),pitch:+p.pitch.toFixed(3),roll:+p.roll.toFixed(3)})),hpBefore:hp,hpAfter:d.S.hp});
 }
 IN.gas=0;
-return {complete:false,ok:rows.every(r=>r.distance>=8&&r.lateral<.75&&r.maxStep<.12&&r.hpAfter===r.hpBefore)&&!d.crashlog.count(),rows,crash:d.crashlog.count()};
+return {complete:false,ok:rows.every(r=>r.distance>=8&&r.lateral<.75&&r.maxStep<.12&&r.hpAfter===r.hpBefore&&r.bumps===0&&r.maxCbump===0)&&!d.crashlog.count(),rows,crash:d.crashlog.count()};

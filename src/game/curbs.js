@@ -235,11 +235,11 @@ function bgAdd (ax, az, bx, bz, nx, nz, top = 0) {
 function bgPack () {
   let n = 0;
   for (const a of BG.values()) n += Math.min(a.length / 6, 1023) * 4;
-  BF = new Float32Array(n); BWF = new Float32Array(n / 2);
+  BF = new Float32Array(n); BWF = A.contours ? null : new Float32Array(n / 2);
   let o = 0;
   for (const [k, a] of BG) {
     const m = Math.min(a.length / 6, 1023);
-    for (let i = 0; i < m; i++) { for (let j = 0; j < 4; j++) BF[o + i * 4 + j] = a[i * 6 + j]; BWF[(o / 2) + i * 2] = a[i * 6 + 4]; BWF[(o / 2) + i * 2 + 1] = a[i * 6 + 5]; }
+    for (let i = 0; i < m; i++) { for (let j = 0; j < 4; j++) BF[o + i * 4 + j] = a[i * 6 + j]; if(BWF){BWF[(o / 2) + i * 2] = a[i * 6 + 4]; BWF[(o / 2) + i * 2 + 1] = a[i * 6 + 5];} }
     BI.set(k, (o / 4) * 1024 + m);
     o += m * 4;
   }
@@ -565,6 +565,11 @@ export function* build (api) {
         if(prev?.traceLast!==null&&prev?.traceLast!==undefined&&next?.traceFirst!==null&&next?.traceFirst!==undefined)TRACE_TOPOLOGY.bridges.push(prev.traceLast,next.traceFirst,...j.p,...j.a,...j.b,h);
       }
     }
+    // После записи камня и сведений о стыках связанный граф больше
+    // не нужен. Отпускаем его перед упаковкой опоры и загрузкой мешей.
+    for(const s of mesh.sections)s.next=s.prev=null;
+    mesh.sections.length=0;mesh.joins.length=0;
+    yield 'бордюры: готовые стыки';
     bgPack();ON=true;ST.m=Math.round(ST.m);ST.ms=Math.round(performance.now()-t0);return ST;
   }
   const EVERY = !MOB && !OLD;                       // 0п35 (24.10.2026, «бордюры везде, где есть стыки между землёй и дорожками»): дорожки — по всему

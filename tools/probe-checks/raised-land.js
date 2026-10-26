@@ -41,4 +41,17 @@ for(const e of edges){
   if(!Number.isFinite(gap)||gap<-.08||gap>.65)throw new Error('Машина под газоном или над ним: '+gap);
   poses.push({x:+d.V.x.toFixed(2),z:+d.V.z.toFixed(2),gap:+gap.toFixed(3)});
 }
-return {ok:true,stats:L.ST,previews,edges:rows.slice(0,12),poses,crash:d.crashlog.count()};
+const pavedPoses=[];
+for(const e of edges){
+  const dx=e.paved[0]-e.land[0],dz=e.paved[1]-e.land[1],length=Math.hypot(dx,dz),ux=dx/length,uz=dz/length;
+  const p=[(e.paved[0]+e.land[0])/2+ux*4,(e.paved[1]+e.land[1])/2+uz*4],floor=L.cover.height(...p);
+  if(!Number.isFinite(floor)||floor>=.49||base(...p)<=1||d.inHouse(...p,3)||Math.abs(d.surfaceAt(...p)-d.groundH(...p))>.05)continue;
+  if([1.4,-1.45].some(f=>[-.9,.9].some(s=>L.onLand(p[0]+ux*f+uz*s,p[1]+uz*f-ux*s))))continue;
+  tp(...p,Math.atan2(ux,uz));d.V.x=p[0];d.V.z=p[1];d.V.vx=d.V.vz=0;await wait(500);
+  const x=d.V.x,z=d.V.z,at=L.cover.height(x,z);if(!Number.isFinite(at)||at>=.49||L.onLand(x,z))continue;
+  const actual=d.car.position.y-base(x,z),expected=Math.max(.03,at,d.DECOR.lift(x,z));
+  if(Math.abs(actual-expected)>.03||d.V.cbump)throw Error('На мощении осталась прежняя ступенька или лишний подброс: '+actual+' вместо '+expected);
+  pavedPoses.push({x:+x.toFixed(2),z:+z.toFixed(2),actual:+actual.toFixed(3),expected:+expected.toFixed(3)});
+}
+if(pavedPoses.length<2)throw Error('Недостаточно независимых мест для проверки стоянки на мощении');
+return {ok:true,stats:L.ST,previews,edges:rows.slice(0,12),poses,pavedPoses,crash:d.crashlog.count()};

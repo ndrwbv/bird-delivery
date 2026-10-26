@@ -116,3 +116,38 @@ console.log('landcover: непересекающиеся покрытия ост
   assert.ok(Object.is([...C.triangles][0].p[0][0],-0));assert.equal(C.count,2);
 }
 console.log('landcover: индексы общих вершин, точная палитра высот и несколько дополняемых блоков — проверены');
+{
+  const C=createLandCover(),wanted=[];
+  for(let i=0;i<321;i++){
+    const t=C.triangle(i*2,0,i*2+1,0,i*2,1,i/10000);t.rgb=[i&255,i>>8,17];t.initial=i%5===0;
+    if(t.initial)wanted.push(i);
+    if(i%64===63)C.compact();
+  }
+  for(const compact of[false,true]){
+    if(compact)C.compact();C.clearReadCache();
+    assert.deepEqual([...C.initialTriangles].map(t=>t.id),wanted,'Выбор исходных площадок сохраняет порядок в упакованной и сырой части');
+    for(const t of C.triangles){assert.equal(t.lift,t.id/10000);assert.deepEqual(t.rgb,[t.id&255,t.id>>8,17]);assert.equal(t.initial,t.id%5===0);}
+  }
+  C.clear();assert.deepEqual([...C.initialTriangles],[]);
+}
+console.log('landcover: переход палитр через 256 значений, очистка временного чтения и прямой обход площадок — проверены');
+{
+  const target=createLandCover(),source=createLandCover(),reference=createLandCover();
+  const add=(C,i,base=false)=>{const x=base?i*2:i%128*2,z=base?0:Math.floor(i/128)*2,t=C.triangle(x,z,x+1,z,x,z+1,base ? .1 : .2+(i%7)/100);t.rgb=[i&255,71,141];t.initial=i%10===0;};
+  for(let i=0;i<17;i++){add(target,i,true);add(reference,i,true);}
+  for(let i=0;i<35000;i++){add(source,i);add(reference,i);if(i%4000===3999)source.compact();}
+  target.absorb(source);assert.equal(source.count,0);assert.equal(target.count,35017);
+  for(const C of[target,reference])C.triangle(800,0,801,0,800,1,.31);
+  target.compact();source.triangle(900,0,901,0,900,1,-0);reference.triangle(900,0,901,0,900,1,-0);target.absorb(source);reference.compact();
+  assert.equal(target.count,35019);assert.equal(source.count,0);
+  const expected=reference.triangles[Symbol.iterator]();
+  for(const t of target.triangles){const r=expected.next().value;assert.deepEqual(t.p,r.p);assert.ok(Object.is(t.lift,r.lift));assert.deepEqual(t.rgb,r.rgb);assert.equal(t.initial,r.initial);}
+  assert.equal(expected.next().done,true);
+  assert.deepEqual([...target.initialTriangles].map(t=>t.p),[...reference.initialTriangles].map(t=>t.p));
+  for(let i=0;i<100;i++){const x=i%128*2+.2,z=Math.floor(i/128)*2+.2;assert.equal(target.height(x,z),reference.height(x,z));}
+  assert.deepEqual(target.cut([[0,0],[8,0],[8,8],[0,8]]),reference.cut([[0,0],[8,0],[8,8],[0,8]]));
+  assert.deepEqual(target.breaks(-1,.3,20,.3),reference.breaks(-1,.3,20,.3));
+  assert.throws(()=>target.absorb(target));assert.throws(()=>target.absorb(createLandCover(4)));
+  target.clear();assert.equal(target.triangle(0,0,1,0,0,1).id,0);
+}
+console.log('landcover: перенос готовых страниц, неполные блоки, индекс клеток, повторное дополнение и исходные площадки — проверены');

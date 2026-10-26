@@ -11,6 +11,8 @@ const gap=trace.slice();gap[18]+=.04;assert.equal((await run(gap,links)).gap,1,'
 const step=trace.slice();step[20]+=.04;assert.equal((await run(step,links)).step,1,'Ступенька 4 см между настоящими соседями выявляется');
 assert.equal((await run(trace,links,x=>x!==3)).unmatched,1,'Открытый торец внутри города не пропускается');
 assert.ok((await run(trace,{...links,open:[]})).untracked>0,'Секция без сведений о её конце не пропускается');
+const duplicate=await run([...trace,...section(0,0,1,0)],{...links,open:[...links.open,3,0,3,1]},()=>true);
+assert.equal(duplicate.geometryDuplicates,1);assert.equal(duplicate.ok,false,'Повторный камень не считается корректным только потому, что его торцы учтены');
 const feet=[[0,0],[2,0],[1.01,.01],[3,.01]].map(([x,z])=>({p:[[x-.05,z-.05],[x+.05,z-.05],[x,z+.05]],lift:.5}));
 assert.equal((await run(trace,links,()=>false,feet)).ok,true,'Торец у точной грани здания распознаётся при пропуске пространственной сетки');
 assert.ok((await run(trace,links,()=>false,feet.map(t=>({...t,rgb:[120,120,120]})))).unmatched>0,'Обычное высокое покрытие не выдаётся за стену');

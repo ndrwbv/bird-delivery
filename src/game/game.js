@@ -21,6 +21,7 @@ import * as SOFTCITY from './softcity.js';
 import * as SOFTSURF from './softsurfaces.js';
 import * as RLAND from './raisedland.js';
 import { landCarSupport } from './landdrive.js';
+import { createLandMeshPages } from './landmeshpages.js';
 import { MAP } from './map.js';
 import { MAP_IDS, MAP_META } from '../maps/index.js';
 import Platform from '../platform/index.js';
@@ -1274,7 +1275,7 @@ function Mesher (opt) {
   /* Треугольник сразу ложится в свою клетку (см. mesh): общий массив на весь
      город с последующей раскладкой по клеткам весил в Северске сотни мегабайт
      и стоил лишнего копирования. Клетки — в порядке первого треугольника */
-  let ids = new Map(), BK = [], lastK = NaN, lastB = null;
+  let ids = new Map(), BK = [], lastK = NaN, lastB = null, LAND_PAGES = false;
   function bucket (ax, az, bx, bz, cx, cz) {
     // координаты — как они лягут во Float32Array: клетка та же, что и у склейки по готовому массиву
     const x0 = Math.fround(ax), z0 = Math.fround(az), x1 = Math.fround(bx), z1 = Math.fround(bz), x2 = Math.fround(cx), z2 = Math.fround(cz);
@@ -1283,7 +1284,7 @@ function Mesher (opt) {
     if (k === lastK && !lastB.done) return lastB;
     let b = ids.get(k);
     // done — клетка уже склеена заранее (prep), её массивы отпущены: дописанное — в новую клетку с тем же ключом
-    if (b === undefined || b.done) { b = { cap: 1 << 10, n: 0, pos: new Float32Array(3 << 10), col: new Uint8Array(CSI << 10), cs: CSI }; ids.set(k, b); BK.push(b); }
+    if (b === undefined || b.done) { b = LAND_PAGES ? {cap:0,n:0,pos:null,col:null,cs:CSI,pages:createLandMeshPages(CSI),landRow:k===-1?Infinity:Math.floor((z0+z1+z2)/3/CHUNK)} : { cap: 1 << 10, n: 0, pos: new Float32Array(3 << 10), col: new Uint8Array(CSI << 10), cs: CSI }; ids.set(k, b); BK.push(b); }
     lastK = k; lastB = b;
     return b;
   }
@@ -1392,6 +1393,7 @@ function Mesher (opt) {
 
   const V2 = [];
   const api = {
+    landPages(on){LAND_PAGES=!!on;},
     coverQuad: RLAND.ON ? (p, lift) => {
       let hide = LAND_HIDE;
       if (opt && opt.keepFront && opt.alpha && !opt.noLandRecord && ca === 0 && !LAND_HOLD) {
@@ -1413,8 +1415,9 @@ function Mesher (opt) {
     tri (ax, ay, az, bx, by, bz, cx, cy, cz) {
       if (LAND_HIDE) return;
       const b = slot(ax, az, bx, bz, cx, cz);
-      room(b, 3);
-      const W = b.cs, p = b.pos, c = b.col, i = b.n * 3, j = b.n * W;
+      let target=b,at=b.n;
+      if(b.pages){target=b.pages.reserve(3);at=target.offset;}else room(b,3);
+      const W = b.cs, p = target.pos, c = target.col, i = at * 3, j = at * W;
       p[i] = ax; p[i + 1] = ay; p[i + 2] = az; p[i + 3] = bx; p[i + 4] = by; p[i + 5] = bz; p[i + 6] = cx; p[i + 7] = cy; p[i + 8] = cz;
       if (GRAD) { GRAD(ax, az, c, j); GRAD(bx, bz, c, j + W); GRAD(cx, cz, c, j + W * 2); }
       else { c[j] = c[j + W] = c[j + W * 2] = cr; c[j + 1] = c[j + W + 1] = c[j + W * 2 + 1] = cg; c[j + 2] = c[j + W + 2] = c[j + W * 2 + 2] = cb; }
@@ -1642,13 +1645,13 @@ function Mesher (opt) {
        клетки сразу отпускаем. Так копии клеток не копятся до конца склейки (пик памяти поздней сборки на телефоне), а старые
        склейки мелочи уходят по мере готовности клеток (track). Дописать в такую клетку (done) — новая клетка с тем же ключом,
        её склеит mesh() */
-    *prep (mat, grp, up) {
+    *prep (mat, grp, up, landRGB = false, accept = null) {
       if (!(opt && opt.index) || NO_LIX) return;
       let w = 0, batch = [];
       for (const B of BK) {
-        if (B.done) continue;
+        if (B.done || accept && !accept(B)) continue;
         const nv = B.n + (B.f ? B.f.n : 0) + (B.mbi || 0);
-        const g = geoOf(B, true);
+        const g = geoOf(B, true, false, landRGB);
         let me = B.me;
         if (me) { const old = me.geometry; me.geometry = g; old.dispose(); }
         else { me = new THREE.Mesh(g, mat); me.matrixAutoUpdate = false; grp.add(me); B.me = me; }
@@ -1667,6 +1670,7 @@ function Mesher (opt) {
       const M = 1048576, r = { cells: BK.length, done: 0, pos: 0, used: 0, front: 0, me: 0, meOwn: 0, meShared: 0, meUp: 0 };
       for (const B of BK) {
         if (B.done) r.done++;
+        if (B.pages) { r.pos += B.pages.bytes; r.used += B.n * (12 + B.cs); }
         if (B.pos) { r.pos += B.pos.byteLength + B.col.byteLength; r.used += B.n * (12 + B.cs); }
         if (B.f && B.f.pos) r.front += B.f.pos.byteLength + B.f.col.byteLength;
         if (!B.me || B.done) continue;
@@ -1681,12 +1685,16 @@ function Mesher (opt) {
     },
   };
   /* геометрия клетки: IX — общие вершины (ixCell); кусок со своим индексом (block) — индекс всегда */
-  function geoOf (B, IX, keep) {
+  function geoOf (B, IX, keep, landRGB = false) {
+    if(B.pages){const data=B.pages.materialize();B.pages=null;B.pos=data.pos;B.col=data.col;B.cap=B.n;if(!B.n){B.cap=16;B.pos=new Float32Array(48);B.col=new Uint8Array(16*B.cs);}}
     const nf = B.f && B.f.n ? B.f.n : 0;
     const ix = IX || !!(nf && (B.f.ix || (B.f.blocks && B.f.blocks.length)));
-    let X = null, P = null, Cc = null, cs = CS;
-    if (ix) X = ixCell(nf ? B.f : null, B.pos.subarray(0, B.n * 3), B.col.subarray(0, B.n * B.cs), B.n, CS, !IX, B.mb, B.cs);
-    if (!X) ({ P, Cc, cs } = cellArr(B, keep));     // выгоды нет — без индекса (куски ссылками — треугольниками)
+    // Стадии новой земли не содержат реквизита: там исходные RGB уже
+    // полны. Четвёртый байт оставляем клеткам с флагами и мелочью.
+    const outCS = landRGB && B.cs === 3 && !nf && !B.mb ? 3 : CS;
+    let X = null, P = null, Cc = null, cs = outCS;
+    if (ix) X = ixCell(nf ? B.f : null, B.pos.subarray(0, B.n * 3), B.col.subarray(0, B.n * B.cs), B.n, outCS, !IX, B.mb, B.cs);
+    if (!X) ({ P, Cc, cs } = cellArr(B, keep || landRGB && outCS === 3));     // выгоды нет — без индекса (куски ссылками — треугольниками)
     const g = new THREE.BufferGeometry();
     B.ix = IX; B.mb = null; B.mbi = 0;
     if (X) { P = X.p; Cc = X.c; const ia = new THREE.BufferAttribute(X.i, 1); g.setIndex(ia); ia.onUpload(dropArr); }
@@ -2183,7 +2191,7 @@ class CellSet {
 }
 const RAISED = new CellSet(8000 * 8000);
 const rkey = (x, z) => (Math.round(x) + 4000) * 8000 + (Math.round(z) + 4000);
-const curbAt = (x, z) => (!RLAND.onLand(x, z) && RAISED.has(rkey(x, z)) ? CURB_H : 0);
+const curbAt = (x, z) => (!RLAND.ST.built && RAISED.has(rkey(x, z)) ? CURB_H : 0);
 
 /* кусок бордюра [d, dd] без заездов на стоянки курьеров (pizzeria.js DRIVEWAYS): куски, что остались
    (не короче 0,5 м). at(t) — точка середины плиты тротуара на расстоянии t вдоль ребра */
@@ -6007,19 +6015,38 @@ function buildCity () {
   tm('smash', smashBuild);
   if (RLAND.ON) LATE.add('raisedland', function* () {
     CURB_M.discard();
-    RLAND.prepare(CITY.buildings, p => THREE.ShapeUtils.triangulateShape(p.map(q => new THREE.Vector2(q[0], q[1])), []));
-    yield* RLAND.cleanContours({M:LITM,terrain:TER,groundH:terrainH,skip:DMASK?farOut:null,triangulate:(outer,holes)=>({
-      points:[...outer,...holes.flat()],
-      triangles:THREE.ShapeUtils.triangulateShape(outer.map(p=>new THREE.Vector2(...p)),holes.map(h=>h.map(p=>new THREE.Vector2(...p))))
-    })});
-    if (!INTRO) yield* buildCurbs({ LITM, rebuild: true, contours:()=>RLAND.boundaries({accept:(x,z)=>!DMASK||!farOut(x,z)}),
-      landTopAt: (x,z) => RLAND.topOffset(x,z,terrainH(x,z)) });
-    RLAND.ST.baseDisposed = GROUND_M.discard();
-    yield* RLAND.build({ M: LITM, terrain: TER, heights: TH, groundH: terrainH, groundHex, skip: DMASK ? farOut : null, buildings: CITY.buildings, curbed: !INTRO && CURBS.ST.secs>0,
-      triangulate: p => THREE.ShapeUtils.triangulateShape(p.map(q => new THREE.Vector2(q[0], q[1])), []) });
-    groundSkirt(LITM);
-    const delta = RLAND.alignObjects({ lists: [LIT, FLAT, LAMPH], items: SMASH, props: PROPS, benches: BENCHES, baseH: terrainH });
-    SEAS.raiseLand(delta);
+    yield* flushLandStage();
+    yield* flushLandStage(GROUND_M);
+    LITM.landPages(LATE.busy());
+    try {
+      RLAND.prepare(CITY.buildings, p => THREE.ShapeUtils.triangulateShape(p.map(q => new THREE.Vector2(q[0], q[1])), []));
+      yield* RLAND.cleanContours({M:LITM,terrain:TER,groundH:terrainH,skip:DMASK?farOut:null,triangulate:(outer,holes)=>({
+        points:[...outer,...holes.flat()],
+        triangles:THREE.ShapeUtils.triangulateShape(outer.map(p=>new THREE.Vector2(...p)),holes.map(h=>h.map(p=>new THREE.Vector2(...p))))
+      })});
+      yield* flushLandStage();
+      if (!INTRO) yield* buildCurbs({ LITM, rebuild: true, contours:()=>RLAND.boundaries({accept:(x,z)=>!DMASK||!farOut(x,z)}),
+        landTopAt: (x,z) => RLAND.topOffset(x,z,terrainH(x,z)) });
+      yield* flushLandStage();
+      RLAND.ST.baseDisposed = GROUND_M.discard();
+      let landRow = -Infinity;
+      const flushThrough = function* (z) {
+        const row = Math.floor(Math.fround(z) / CHUNK);
+        if (row === landRow) return;
+        landRow = row;
+        // Дальше строятся только ряды с большим z: готовую клетку
+        // можно загрузить и отпустить, сохранив все её общие вершины.
+        yield* flushLandStage(LITM, B => B.landRow < row);
+      };
+      yield* RLAND.build({ M: LITM, terrain: TER, heights: TH, groundH: terrainH, groundHex, skip: DMASK ? farOut : null, buildings: CITY.buildings, curbed: !INTRO && CURBS.ST.secs>0,
+        flushThrough,
+        triangulate: p => THREE.ShapeUtils.triangulateShape(p.map(q => new THREE.Vector2(q[0], q[1])), []) });
+      groundSkirt(LITM);
+      const delta = RLAND.alignObjects({ lists: [LIT, FLAT, LAMPH], items: SMASH, props: PROPS, benches: BENCHES, baseH: terrainH });
+      SEAS.raiseLand(delta);
+      RLAND.clearReadCaches();
+      yield* flushLandStage();
+    } finally { LITM.landPages(false); }
   });
   tm('seasons', SEAS.seasonSteps);                // сугробы, ёлки, гирлянды — шагами (latebuild.js)
   if (!INTRO) tm('trails', WASTE.trails);         // тропинки наискосок, вытоптанное у лавочек, лужи — после дворов и лавочек (wastelands.js)
@@ -6035,6 +6062,23 @@ function buildCity () {
   HUR.holeMat(flatMat);
   FSH.mat(litMat); FSH.mat(flatMat);            // тени домов: маска в шейдере земли и разметки (fakeshadows.js)
   const groups = [];
+  // Новая земля не держит свои массивы одновременно со всей прежней
+  // статикой. Готовая стадия проходит ту же склейку и загрузку клеток.
+  function* flushLandStage (M = LITM, accept = null) {
+    // При ?nolate очередь исполняется ещё до создания материалов.
+    if (!LATE.busy()) return;
+    const tmp = new THREE.Scene(), target = new THREE.WebGLRenderTarget(4, 4);
+    const g = new THREE.Group(); g.matrixAutoUpdate = false; g.matrixWorldAutoUpdate = false; scene.add(g);
+    const upload = list => {
+      const parents = list.map(m => m.parent);
+      for (const m of list) { m.frustumCulled = false; tmp.add(m); }
+      renderer.setRenderTarget(target); renderer.render(tmp, cam); renderer.setRenderTarget(null);
+      list.forEach((m, i) => { m.frustumCulled = true; parents[i].add(m); });
+    };
+    try { yield* M.prep(litMat, g, upload, true, accept); }
+    finally { target.dispose(); }
+    if (g.children.length) groups.push(g); else scene.remove(g);
+  }
   let warm4 = null;                               // прогрев шейдера склейки с признаком (см. ниже)
   const meshNow = keep => { for (const g of [...(RLAND.ON ? [GROUND_M.mesh(litMat, keep)] : []), LITM.mesh(litMat, keep), FLATM.mesh(flatMat, keep)]) { if (g.children.length) { groups.push(g); scene.add(g); } } };
   if (LATE.busy()) {                              // поздняя сборка: видимое — в сцену сразу, в видеокарту — при первом кадре
@@ -13173,7 +13217,7 @@ function driveStep (dt) {
   V.roll = damp(V.roll, V.air || flyNow ? 0 : Math.atan((l2 - r2) / 1.8), 12, dt);
   // бордюр: тротуар выше дороги — заехал, и кузов стоит на нём
   V.kerb = damp(V.kerb || 0, V.air || flyNow || lift > 0 || V.roof ? 0 : (pl => Math.max(curbAt(V.x, V.z), pl, DECOR.lift(V.x, V.z), cbF || cbR ? (Math.max(cbF, pl) + Math.max(cbR, pl)) / 2 : 0))(paveLift(V.x, V.z)) - STREAMS.sinkBy(V.wade || 0), 22, dt);   // + скат за бордюром (0п68): среднее под осями   // + верх асфальта и плитки (paveLift): колёса не в асфальте
-  V.cbump = V.air || flyNow || V.roof ? 0 : CURBS.bump(V, dt);   // бордюр двора под колесом — толчок (curbs.js)
+  V.cbump = RLAND.ST.built || V.air || flyNow || V.roof ? 0 : CURBS.bump(V, dt);   // новая земля уже поднимает четыре колеса, без второго толчка старого камня
   if (V.cbump) { const cs = CURBS.shake(); if (cs) { S.shake = Math.max(S.shake, cs); Snd.impact(Math.hypot(V.vx, V.vz) * CURB_HIT, 'curb', { x: V.x, z: V.z }); } }   // бордюр под колесом — толчок и удар камня (impact.js 'curb')
   { const ch = CURBS.took(); if (ch && !RLAND.ST.built) CBUMP.hit(V, ch); }   // поднятый грунт уже поднимает колёса: второго тормозящего удара нет
   if (CURB_LAWN_T > 0) CURB_LAWN_T -= dt;

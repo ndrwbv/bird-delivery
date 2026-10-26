@@ -5,9 +5,22 @@
    через отверстия и без отдельной триангуляции многоугольников с дырками. */
 const EPS = 1e-8;
 const PAGE=16384;
+const COVER_DATA=new WeakMap();
 const cross = (a, b, p) => (b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]);
 const area2 = p => p.reduce((s,a,i)=>{const b=p[(i+1)%p.length];return s+a[0]*b[1]-a[1]*b[0];},0);
-const box = p => [Math.min(...p.map(v=>v[0])),Math.min(...p.map(v=>v[1])),Math.max(...p.map(v=>v[0])),Math.max(...p.map(v=>v[1]))];
+const box = p => {
+  let ax=Infinity,az=Infinity,bx=-Infinity,bz=-Infinity;
+  for(const v of p){ax=Math.min(ax,v[0]);az=Math.min(az,v[1]);bx=Math.max(bx,v[0]);bz=Math.max(bz,v[1]);}
+  return [ax,az,bx,bz];
+};
+const outsideTriangle=(p,t)=>{
+  for(let i=0;i<3;i++){
+    const a=t[i],b=t[(i+1)%3];let outside=true;
+    for(const v of p)if(cross(a,b,v)>0){outside=false;break;}
+    if(outside)return true;
+  }
+  return false;
+};
 const overlaps = (a,b) => a[0]<=b[2]+EPS&&a[2]>=b[0]-EPS&&a[1]<=b[3]+EPS&&a[3]>=b[1]-EPS;
 function half(p,a,b,inside) {
   const out=[];
@@ -41,13 +54,15 @@ export function intersectConvex(p,polygon){
 
 export function createLandCover(cell=32) {
   const grid=new Map(),all=[],cache=new Map();
+  // n — число фигур; end — следующий id. Перенос готовых страниц
+  // сохраняет неполный блок, поэтому после него id могут иметь пропуски.
   let packed=null;
   const key=(i,j)=>i+','+j;
   const stats={triangles:0,queries:0,cut:0,parts:0};
   const count=()=>all.length+(packed?.n||0);
   function read(id){
     let t=cache.get(id);if(t)return t;
-    const b=packed.blocks[Math.floor(id/PAGE)],j=id%PAGE,i=j*3,a=b.xy,v=b.indices,meta=b.meta[j];
+    const b=packed.blocks[Math.floor(id/PAGE)],j=id%PAGE,i=j*3,a=b.xy,v=b.indices,meta=b.metaValues[b.meta[j]];
     const ax=a[v[i]*2],az=a[v[i]*2+1],bx=a[v[i+1]*2],bz=a[v[i+1]*2+1],cx=a[v[i+2]*2],cz=a[v[i+2]*2+1];
     t={id,p:[[ax,az],[bx,bz],[cx,cz]],lift:b.heights[b.heightIndex[j]],box:[Math.min(ax,bx,cx),Math.min(az,bz,cz),Math.max(ax,bx,cx),Math.max(az,bz,cz)],initial:!!(meta&0x1000000)};
     if(meta&0x2000000)t.rgb=[(meta>>16)&255,(meta>>8)&255,meta&255];
@@ -72,7 +87,7 @@ export function createLandCover(cell=32) {
     let p=[[ax,az],[bx,bz],[cx,cz]];
     const signed=area2(p);if(Math.abs(signed)<EPS)return;
     if(signed<0)p=[p[0],p[2],p[1]];
-    const bounds=box(p),t={id:count(),p,box:bounds,lift};all.push(t);
+    const bounds=box(p),t={id:(packed?.end||0)+all.length,p,box:bounds,lift};all.push(t);
     for(let i=Math.floor(bounds[0]/cell);i<=Math.floor(bounds[2]/cell);i++)
       for(let j=Math.floor(bounds[1]/cell);j<=Math.floor(bounds[3]/cell);j++){
         const k=key(i,j);let list=grid.get(k);
@@ -105,7 +120,7 @@ export function createLandCover(cell=32) {
       for(const part of parts){
         // Пересечение рамок ещё не означает пересечения фигур. Иначе даже
         // чужая дорожка дробит нетронутую землю на лишние внутренние части.
-        if(!overlaps(box(part),t.box)||!intersectTriangle(part,t.p).length){next.push(part);continue;}
+        if(!overlaps(box(part),t.box)||outsideTriangle(part,t.p)||!intersectTriangle(part,t.p).length){next.push(part);continue;}
         next.push(...subtract(part,t.p));
       }
       parts=next;if(!parts.length)break;
@@ -174,13 +189,14 @@ export function createLandCover(cell=32) {
   function compact(){
     if(!all.length)return;
     const n=count(),numberKey=v=>Object.is(v,-0)?'-0':String(v);
-    if(!packed)packed={n:0,blocks:[]};
+    if(!packed)packed={n:0,end:0,blocks:[]};
     for(let start=0;start<all.length;){
       const page=Math.floor(all[start].id/PAGE),old=packed.blocks[page],end=Math.min(all.length,start+PAGE-all[start].id%PAGE),size=(old?.n||0)+end-start;
-      const xy=old?Array.from(old.xy):[],heights=old?Array.from(old.heights):[],vertices=new Map(),levels=new Map();
+      const xy=old?Array.from(old.xy):[],heights=old?Array.from(old.heights):[],metaValues=old?Array.from(old.metaValues):[],vertices=new Map(),levels=new Map(),attributes=new Map();
       for(let i=0;i<xy.length;i+=2)vertices.set(numberKey(xy[i])+','+numberKey(xy[i+1]),i/2);
       for(let i=0;i<heights.length;i++)levels.set(numberKey(heights[i]),i);
-      const indices=new Uint16Array(size*3),heightIndex=new Uint16Array(size),meta=new Uint32Array(size);
+      for(let i=0;i<metaValues.length;i++)attributes.set(metaValues[i],i);
+      const indices=new Uint16Array(size*3),heightIndex=new Uint16Array(size),meta=new Uint16Array(size);
       if(old){indices.set(old.indices);heightIndex.set(old.heightIndex);meta.set(old.meta);}
       for(let i=start;i<end;i++){
         const t=all[i],id=t.id%PAGE;
@@ -189,21 +205,46 @@ export function createLandCover(cell=32) {
           if(index===undefined){index=xy.length/2;vertices.set(k,index);xy.push(...p);}indices[id*3+v]=index;
         }
         const k=numberKey(t.lift);let index=levels.get(k);if(index===undefined){index=heights.length;levels.set(k,index);heights.push(t.lift);}heightIndex[id]=index;
-        meta[id]=(t.initial?0x1000000:0)|(t.rgb?0x2000000|(t.rgb[0]<<16)|(t.rgb[1]<<8)|t.rgb[2]:0);
+        const value=(t.initial?0x1000000:0)|(t.rgb?0x2000000|(t.rgb[0]<<16)|(t.rgb[1]<<8)|t.rgb[2]:0);
+        let attribute=attributes.get(value);if(attribute===undefined){attribute=metaValues.length;attributes.set(value,attribute);metaValues.push(value);}meta[id]=attribute;
       }
       // Общие вершины и палитра высот экономят память без округления:
       // сами координаты и высоты по-прежнему хранятся в Float64.
-      packed.blocks[page]={n:size,xy:Float64Array.from(xy),heights:Float64Array.from(heights),indices,heightIndex,meta};start=end;
+      packed.blocks[page]={n:size,xy:Float64Array.from(xy),heights:Float64Array.from(heights),indices,heightIndex:heights.length<=256?Uint8Array.from(heightIndex):heightIndex,meta:metaValues.length<=256?Uint8Array.from(meta):meta,metaValues:Uint32Array.from(metaValues)};start=end;
     }
     for(const [k,list] of grid)if(Array.isArray(list))grid.set(k,Uint32Array.from(list,t=>typeof t==='number'?t:t.id));
-    packed.n=n;all.length=0;cache.clear();
+    packed.n=n;packed.end=all.at(-1).id+1;all.length=0;cache.clear();
   }
-  return {triangle,height,covered:(x,z)=>height(x,z)>-Infinity,sideHeights,cut,inside,breaks,compact,stats,
+  const api={triangle,height,covered:(x,z)=>height(x,z)>-Infinity,sideHeights,cut,inside,breaks,compact,stats,
+    absorb(other){
+      const inspect=COVER_DATA.get(other);if(!inspect||other===api)throw Error('Неверное поле для переноса');
+      if(inspect().cell!==cell)throw Error('Разные клетки полей');
+      compact();other.compact();const incoming=inspect();if(!incoming.packed?.n)return;
+      if(!packed)packed={n:0,end:0,blocks:[]};
+      // Источник опустошается; координаты и палитры переезжают без
+      // распаковки. Меняются только id в пространственном индексе.
+      const offset=packed.blocks.length*PAGE;
+      packed.blocks.push(...incoming.packed.blocks);
+      for(const[k,list]of incoming.grid){
+        const previous=grid.get(k),n=previous?.length||0,joined=new Uint32Array(n+list.length);
+        if(previous)joined.set(previous);
+        for(let i=0;i<list.length;i++)joined[n+i]=list[i]+offset;
+        grid.set(k,joined);
+      }
+      packed.n+=incoming.packed.n;packed.end=offset+incoming.packed.end;stats.triangles+=incoming.packed.n;
+      other.clear();cache.clear();
+    },
+    clearReadCache(){cache.clear();},
     inBox(bounds){const out=[];each(bounds,t=>out.push(t));return out;},
     *cells(){for(const k of grid.keys()){const [i,j]=k.split(',').map(Number);yield [i*cell,j*cell,(i+1)*cell,(j+1)*cell];}},
-    get storageBytes(){return packed?packed.blocks.reduce((s,b)=>s+b.xy.byteLength+b.heights.byteLength+b.indices.byteLength+b.heightIndex.byteLength+b.meta.byteLength,0):0;},
+    get storageBytes(){return packed?packed.blocks.reduce((s,b)=>s+b.xy.byteLength+b.heights.byteLength+b.indices.byteLength+b.heightIndex.byteLength+b.meta.byteLength+b.metaValues.byteLength,0):0;},
+    get initialTriangles(){return {[Symbol.iterator]:function*(){
+      if(packed)for(let page=0;page<packed.blocks.length;page++){const b=packed.blocks[page];for(let i=0;i<b.n;i++)if(b.metaValues[b.meta[i]]&0x1000000)yield read(page*PAGE+i);}
+      for(const t of all)if(t.initial)yield t;
+    }};},
     get count(){return count();},get rawCount(){return all.length;},get triangles(){
       if(!packed)return all;
-      return {[Symbol.iterator]:function*(){for(let i=0;i<packed.n;i++)yield read(i);yield* all;}};
+      return {[Symbol.iterator]:function*(){for(let page=0;page<packed.blocks.length;page++)for(let i=0;i<packed.blocks[page].n;i++)yield read(page*PAGE+i);yield* all;}};
     },clear(){grid.clear();all.length=0;packed=null;cache.clear();}};
+  COVER_DATA.set(api,()=>({packed,grid,cell}));return api;
 }

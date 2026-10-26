@@ -4,13 +4,19 @@
 import {createLandCover,intersectConvex} from './landcover.js';
 import {unionLandRegions,subtractLandRegions} from './landclean.js';
 import {pruneLandIslands} from './landislands.js';
-const CELL=32,key=(x,z)=>Math.floor(x/CELL)+','+Math.floor(z/CELL);
+const CELL=32;
 export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[]){
   const kept=createLandCover(CELL),domain=new Map(),pending=[],removedRegions=[];let segments=[];
-  let ready=false;
-  function reserve(core){domain.set(key(core[0],core[1]),false);}
+  let ready=false,domainCells=0;
+  const stateIndex=(i,j)=>domain.get(i)?.get(j);
+  const stateAt=(x,z)=>stateIndex(Math.floor(x/CELL),Math.floor(z/CELL));
+  function setState(x,z,state){
+    const i=Math.floor(x/CELL),j=Math.floor(z/CELL);let row=domain.get(i);
+    if(!row)domain.set(i,row=new Map());if(!row.has(j))domainCells++;row.set(j,state);
+  }
+  function reserve(core){setState(core[0],core[1],false);}
   function add(core,regions,triangulate){
-    domain.set(key(core[0],core[1]),true);
+    setState(core[0],core[1],true);
     pending.push({core,regions,triangulate});
   }
   function weld(){
@@ -62,7 +68,7 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[]){
     for(const group of pending){
       const cleaned=unionLandRegions(group.regions,group.core);removedRegions.push(...subtractLandRegions(group.regions,cleaned));group.regions=cleaned;
     }
-    pruneLandIslands(pending,{onRemove:p=>removedRegions.push(p),open:(x,z)=>{const state=domain.get(key(x,z));return state===undefined||state===false&&fallback(x,z);}});n=0;
+    pruneLandIslands(pending,{onRemove:p=>removedRegions.push(p),open:(x,z)=>{const state=stateAt(x,z);return state===undefined||state===false&&fallback(x,z);}});n=0;
     for(const {regions,triangulate}of pending){
       for(const p of regions){
         const outer=cleanRing(p.outer),holes=p.holes.map(cleanRing).filter(h=>h.length>=3);if(outer.length<3)continue;
@@ -76,13 +82,13 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[]){
     pending.length=0;kept.compact();segments=Float64Array.from(segments);ready=true;
   }
   function contains(x,z){
-    const state=domain.get(key(x,z));
+    const state=stateAt(x,z);
     return state===true?kept.covered(x,z):state===undefined?true:fallback(x,z);
   }
   function* parts(p,raw=q=>[q]){
     const bounds=[Math.min(...p.map(q=>q[0])),Math.min(...p.map(q=>q[1])),Math.max(...p.map(q=>q[0])),Math.max(...p.map(q=>q[1]))];
     for(let i=Math.floor(bounds[0]/CELL);i<=Math.floor(bounds[2]/CELL);i++)for(let j=Math.floor(bounds[1]/CELL);j<=Math.floor(bounds[3]/CELL);j++){
-      const state=domain.get(i+','+j),x=i*CELL,z=j*CELL;
+      const state=stateIndex(i,j),x=i*CELL,z=j*CELL;
       const q=intersectConvex(p,[[x,z],[x+CELL,z],[x+CELL,z+CELL],[x,z+CELL]]);if(!q.length)continue;
       if(state===true)yield* kept.inside(q);else if(state===false)yield* raw(q);else yield q;
     }
@@ -91,7 +97,7 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[]){
     const out=[...kept.breaks(ax,az,bx,bz)];
     // Исходные рёбра нужны только в пропущенной области. В очищенном
     // газоне они уже не границы и не должны резать новый камень.
-    if(domain.get(key(ax,az))===false||domain.get(key(bx,bz))===false)out.push(...fallbackBreaks(ax,az,bx,bz));
+    if(stateAt(ax,az)===false||stateAt(bx,bz)===false)out.push(...fallbackBreaks(ax,az,bx,bz));
     for(const [a,b] of [[ax,bx],[az,bz]])if(Math.abs(b-a)>1e-9){
       for(let n=Math.ceil(Math.min(a,b)/CELL);n<=Math.floor(Math.max(a,b)/CELL);n++){
         const t=(n*CELL-a)/(b-a);if(t>0&&t<1)out.push(t);
@@ -103,14 +109,14 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[]){
     const heights=kept.sideHeights(x,z,nx,nz);
     const cell=(v,d)=>Math.abs(v/CELL-Math.round(v/CELL))<1e-9?Math.round(v/CELL)+(d<0?-1:0):Math.floor(v/CELL);
     return [1,-1].map((sign,i)=>{
-      const state=domain.get(cell(x,nx*sign)+','+cell(z,nz*sign));
+      const state=stateIndex(cell(x,nx*sign),cell(z,nz*sign));
       return state===true?heights[i]>-Infinity:state===undefined?true:fallback(x+nx*sign*1e-7,z+nz*sign*1e-7);
     });
   }
   function* boundaries({accept=()=>true,stats={},floorAt=()=>.085,floorBreaks=()=>[],includeWalls=false,coalesce=true}={}){
-    const seen=new Set(),emitted=new Set(),point=(x,z)=>Math.round(x*1e6)+','+Math.round(z*1e6);
+    const seen=new Set(),emitted=coalesce?null:new Set(),point=(x,z)=>Math.round(x*1e6)+','+Math.round(z*1e6);
     const edgeKey=(ax,az,bx,bz)=>{const a=point(ax,az),b=point(bx,bz);return a<b?a+':'+b:b+':'+a;};
-    stats.edges=stats.segments=stats.length=0;
+    stats.edges=stats.segments=stats.length=stats.duplicates=0;
     for(let i=0;i<segments.length;i+=4){
       const ax=segments[i],az=segments[i+1],bx=segments[i+2],bz=segments[i+3],id=edgeKey(ax,az,bx,bz);
       if(seen.has(id))continue;seen.add(id);stats.edges++;
@@ -136,9 +142,11 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[]){
         const [left,right]=sides(x,z,nx,nz);
         if(left===right||!accept(x,z)){if(run)yield flush();continue;}
         const lift=floorAt(x+(left?-nx:nx)*.01,z+(left?-nz:nz)*.01);if(lift>=.49&&!includeWalls){if(run)yield flush();continue;}
-        let p=[ax+dx*a,az+dz*a],q=[ax+dx*b,az+dz*b];if(!left)[p,q]=[q,p];
-        const k=edgeKey(...p,...q);if(emitted.has(k)){if(run)yield flush();continue;}emitted.add(k);
-        if(!coalesce){stats.segments++;stats.length+=(b-a)*len;yield {a:p,b:q,lift};continue;}
+        if(emitted){
+          let p=[ax+dx*a,az+dz*a],q=[ax+dx*b,az+dz*b];if(!left)[p,q]=[q,p];
+          const k=edgeKey(...p,...q);if(emitted.has(k)){stats.duplicates++;continue;}emitted.add(k);
+          stats.segments++;stats.length+=(b-a)*len;yield {a:p,b:q,lift};continue;
+        }
         // Внутренние диагонали поисковых треугольников не являются
         // новыми узлами бордюра. Высота, сторона и все пробелы сохранены.
         if(run&&run.b===a&&run.left===left&&run.lift===lift)run.b=b;
@@ -149,7 +157,7 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[]){
     }
   }
   return {reserve,add,contains,parts,breaks,sides,kept,removedRegions,
-    cellState:(x,z)=>domain.get(key(x,z)),
+    cellState:(x,z)=>stateAt(x,z),
     boundaries,finishSteps,finish(){for(const step of finishSteps()){}},get ready(){return ready;},get count(){return kept.count;},
-    get segments(){return segments;},get cells(){return domain.size;}};
+    get segments(){return segments;},get cells(){return domainCells;}};
 }

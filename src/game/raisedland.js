@@ -1,4 +1,4 @@
-/* №0п68: земля над мощёным. До завершения физики — только ?raisedland.
+/* №0п68: земля над мощёным. До завершения приёмки — только ?raisedland.
    Контур берём из тех же треугольников, которыми нарисовано покрытие. */
 import {createLandCover,intersectTriangle} from './landcover.js';
 import {LAND_LIFT,landLift,shoreParts} from './landheight.js';
@@ -14,6 +14,7 @@ const rawLand=(x,z)=>green.height(x,z)>cover.height(x,z)||!cover.covered(x,z);
 export const finalMask=ON?createLandMask(rawLand,(...args)=>[...cover.breaks(...args),...green.breaks(...args)]):null;
 export const ST={paving:0,green:0,top:0,walls:0,built:false};
 export function compact(){if(ON){cover.compact();green.compact();}}
+export function clearReadCaches(){if(ON){cover.clearReadCache();green.clearReadCache();finalMask.kept.clearReadCache();}}
 export function boundaries(options){return finalMask?.ready?finalMask.boundaries({floorAt:(x,z)=>{const p=cover.height(x,z);return Number.isFinite(p)?p:.085;},floorBreaks:(...args)=>cover.breaks(...args,.49),...options,accept:(x,z)=>!outside?.(x,z)&&(!options?.accept||options.accept(x,z))}):landBoundary(cover,green,options);}
 // Проверка ширины не добавляет технологический заход мощения на шов.
 export function widthPatches(core){return landCleanTile(cover,green,core,LAND_MIN_WIDTH,0);}
@@ -151,10 +152,9 @@ export function* cleanContours({M,triangulate,skip,terrain,groundH}){
     for(const patch of finalMask.removedRegions)fillPatch(patch);
     finalMask.removedRegions.length=0;
     fills.compact();
-    for(const t of fills.triangles){
-      const q=cover.triangle(...t.p[0],...t.p[1],...t.p[2],t.lift);if(q)q.rgb=t.rgb;
-      if(cover.rawCount>=16384)cover.compact();
-    }
+    // Заполнение уже упаковано: переносим готовые страницы, не создавая
+    // снова полмиллиона треугольников и временных массивов их точек.
+    cover.absorb(fills);
     cover.compact();ST.maskTriangles=finalMask.count;ST.maskEdges=finalMask.segments.length/4;ST.cleanedArea=Math.round(ST.cleanedArea*100)/100;
   }finally{fills.clear();building=false;M.grad(null);}
 }
@@ -169,7 +169,7 @@ function* terrainParts(p,{g,nx,nz,x0,z0}){
     }
   }
 }
-export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,triangulate,curbed=false}){
+export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,triangulate,curbed=false,flushThrough}){
   if(!ON)return;
   building=true;outside=skip;M.grad(null);
   try {
@@ -186,8 +186,29 @@ export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,trian
       }
     };
     let work=0;ST.paintWalls=0;
+    // Окрашенные участки и голая земля не перекрываются. Записываем
+    // цветные части первыми: готовый ряд затем отдаётся целиком,
+    // без второй склейки той же клетки и без копий всей голой земли.
+    // Цветные вставки используют ту же береговую сетку и тот же закон высоты.
+    let paintWork=0;
+    for(const t of green.triangles){
+      const rgb=t.rgb;
+      // У наложенных газонов остаётся только верхняя поверхность;
+      // равные по высоте используют последний записанный цвет.
+      const visible=green.cut(t.p,t.lift,u=>u.lift>t.lift||u.id>t.id);
+      for(const piece of visible)for(const local of terrainParts(piece,terrain)){
+        for(const part of mergeLandPieces([...(finalMask.ready?finalMask.parts(local,q=>cover.cut(q,t.lift)):cover.cut(local,t.lift))])){
+          M.grad((x,z,c,o)=>{c[o]=rgb[0];c[o+1]=rgb[1];c[o+2]=rgb[2];});
+          draw(part,t.lift);M.grad(null);
+        }
+        if(++paintWork%128===0)yield 'газоны';
+      }
+      if(++work%128===0)yield 'газоны';
+    }
+    const paintTop=ST.top;
     // За оградой сохраняем прежнюю крупную сетку и её высоту; под водой — дно.
     for(let bj=0;bj<nz-1;bj+=4)for(let bi=0;bi<nx-1;bi+=4){
+      if(bi===0&&flushThrough)yield* flushThrough(z0+bj*g);
       const ei=Math.min(bi+4,nx-1),ej=Math.min(bj+4,nz-1),ax=x0+bi*g,az=z0+bj*g,bx=x0+ei*g,bz=z0+ej*g;
       if(skip?.(ax,az)&&skip(bx,az)&&skip(ax,bz)&&skip(bx,bz)&&skip((ax+bx)/2,(az+bz)/2)){
         const h=(i,j)=>heights[j*nx+i]-.3;
@@ -218,19 +239,8 @@ export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,trian
         if(++work%128===0)yield 'земля';
       }
     }
-    ST.baseTop=ST.top;
-    // Цветные вставки используют ту же береговую сетку и тот же закон высоты.
-    for(const t of green.triangles){
-      const rgb=t.rgb;
-      // У наложенных газонов остаётся только верхняя поверхность;
-      // равные по высоте используют последний записанный цвет.
-      const visible=green.cut(t.p,t.lift,u=>u.lift>t.lift||u.id>t.id);
-      for(const piece of visible)for(const local of terrainParts(piece,terrain))for(const part of mergeLandPieces([...(finalMask.ready?finalMask.parts(local,q=>cover.cut(q,t.lift)):cover.cut(local,t.lift))])){
-        M.grad((x,z,c,o)=>{c[o]=rgb[0];c[o+1]=rgb[1];c[o+2]=rgb[2];});
-        draw(part,t.lift);M.grad(null);
-      }
-      if(++work%128===0)yield 'газоны';
-    }
+    if(flushThrough)yield* flushThrough(Infinity);
+    ST.baseTop=ST.top-paintTop;
     // Вертикальный торец есть только на настоящей границе газона.
     // Внутренние диагонали и наложенные зелёные слои стенок не создают.
     for(const edge of curbed?[]:boundaries({includeWalls:true})){
@@ -244,7 +254,7 @@ export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,trian
     }
     // Песок площадок и другие незелёные участки исходной земли — тоже пол,
     // поэтому они остаются в своих вырезах на прежней высоте.
-    for(const t of cover.triangles)if(t.initial){
+    for(const t of cover.initialTriangles){
       const rgb=t.rgb;
       M.grad((x,z,c,o)=>{c[o]=rgb[0];c[o+1]=rgb[1];c[o+2]=rgb[2];});
       for(const p of terrainParts(t.p,terrain))draw(p,t.lift,false);
