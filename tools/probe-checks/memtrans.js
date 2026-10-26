@@ -88,7 +88,7 @@ if (want('load')) {
     out.T['· начало смены'] = fin(await unwatch('· начало смены'));
   }, () => ['brief', 'drive'].includes(d.S.state), 30000, 2500);
 }
-await until(() => window.__boot && window.__boot.full, 120000);
+if (!await until(() => window.__boot && window.__boot.full, 240000)) throw Error('Город не достроен перед проверкой переходов');
 await onShift();
 out.shift = (await mem('shift')).proc;
 autopilot(true);

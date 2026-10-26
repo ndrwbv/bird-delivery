@@ -1,4 +1,4 @@
-/* №0п68: земля над мощёным. До завершения приёмки — только ?raisedland.
+/* №0п68: земля над мощёным. ?oldland — прежний вариант для сравнения.
    Контур берём из тех же треугольников, которыми нарисовано покрытие. */
 import {createLandCover,intersectTriangle} from './landcover.js';
 import {LAND_LIFT,landLift,shoreParts} from './landheight.js';
@@ -8,7 +8,7 @@ import {createLandMask} from './landmask.js';
 import {landPaintEdges,shoreLine} from './landlayers.js';
 import {mergeLandPieces} from './landpieces.js';
 import {landSurfacePieces,SURFACE_STATS} from './landpatches.js';
-export const ON = typeof location!=='undefined'&&new URLSearchParams(location.search).has('raisedland');
+export const ON = typeof location!=='undefined'&&!new URLSearchParams(location.search).has('oldland');
 export const LIFT=LAND_LIFT;
 export const cover=ON?createLandCover():null,green=ON?createLandCover():null;
 const rawLand=(x,z)=>green.height(x,z)>cover.height(x,z)||!cover.covered(x,z);

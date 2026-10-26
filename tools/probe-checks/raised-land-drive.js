@@ -1,4 +1,4 @@
-/* 0п68: медленный заезд и съезд по настоящей границе газона, ?raisedland. */
+/* 0п68: медленный заезд и съезд по настоящей границе газона. */
 await ride(); await until(() => !d.LATE.busy(), 90000);
 d.acceptOrder(); await wait(800);
 d.CITYOPEN.unlockAll(); d.districtLocks();
@@ -16,6 +16,14 @@ for (const t of L.cover.triangles) {
       if(![.15,1,3].every(r=>L.onLand(x+ux*r,z+uz*r)&&!L.onLand(x-ux*r,z-uz*r)))continue;
       if([-4,-2,0,2,4].some(r=>d.inHouse(x+ux*r,z+uz*r,3)))continue;
       if(candidates.some(q=>Math.hypot(q.x-x,q.z-z)<35))continue;
+      // Проезд проверяет край покрытия: вдоль всей полосы не должно быть
+      // фонаря, ствола, ограды или иного твёрдого из обновлённого main.
+      const blocked=[-5,-4,-3,-2,-1,0,1,2,3,4,5].some(r=>{
+        const px=x+ux*r,pz=z+uz*r,i=Math.floor(px/30),j=Math.floor(pz/30);
+        const solids=new Set();for(let a=i-1;a<=i+1;a++)for(let b=j-1;b<=j+1;b++)for(const solid of d.SOLID_GRID.get(a+','+b)||[])solids.add(solid);
+        return [...solids].some(s=>{if(s.edGone||s.down)return false;const dx=px-s.cx,dz=pz-s.cz;return Math.abs(dx*s.cs-dz*s.sn)<s.hw+1.4&&Math.abs(dx*s.sn+dz*s.cs)<s.hd+1.4;});
+      });
+      if(blocked)continue;
       candidates.push({x,z,ux,uz});break;
     }
   }

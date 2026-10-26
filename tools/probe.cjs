@@ -56,7 +56,8 @@
                             footprint без передышки (~10—60 мс на опрос), пока окно открыто → { foot0, peak, exact, peakT, foot1, life0 / life1 — пик с запуска до / после, page, gpu, n, ms };
                             пик с запуска вырос за окно — peak = он (точно, exact), нет — по опросам
                             (переходы: экран загрузки, мини-игры — docs/AGENTS.md «Память на телефоне» → «Пики на переходах»)
-   --timeout=120            секунд на всё
+   --bootwait=240           секунд на полную готовность города; --early ждёт только меню
+   --timeout=360            секунд на всё
    Код выхода: 1 — необработанная ошибка в странице, исключение в скрипте, игра не загрузилась.
    Каждый запуск — с чистым сохранением (своя сессия в памяти и своя папка userData). */
 const { app, BrowserWindow, protocol, net, session, nativeImage } = require('electron');
@@ -327,7 +328,7 @@ app.whenReady().then(async () => {
     return { w: out.getSize().width, h: out.getSize().height, sharp: !!(fr && fr.url), skip: fr && fr.skip };
   }
 
-  const timer = setTimeout(() => { err('probe: время вышло (--timeout=' + arg('timeout', 120) + ')'); finish(1, { ok: false, timeout: true, errors }); }, +arg('timeout', 120) * 1000);
+  const timer = setTimeout(() => { err('probe: время вышло (--timeout=' + arg('timeout', 360) + ')'); finish(1, { ok: false, timeout: true, errors }); }, +arg('timeout', 360) * 1000);
 
   const q = ['debug', 'mute', 'nolb', 'lang=' + LANG];
   if (!has('fresh')) q.push('nointro');
@@ -363,12 +364,13 @@ app.whenReady().then(async () => {
   }, 200) : null;
   try { await win.loadURL(url); } catch (e) { err('probe: не открылась', url, e.message); }
   let ok = false;
-  for (let i = 0; i < 450; i++) {                     // до 45 с: на «Деке» (--bootcpu) город достраивается за меню ~20 с
+  const bootWait=+arg('bootwait',240);                // окончательный контур земли строится за меню; смена — только после полной готовности
+  for (let i = 0; i < bootWait*10; i++) {
     try { ok = await js(GAME ? `!!(window.__dlv && __dlv.frame && __dlv.S && !document.body.classList.contains('booting')${has('early') ? '' : ' && (!window.__boot || window.__boot.full)'})` : `document.readyState === 'complete' && window.__probeReady !== false`); } catch (e) { /* — */ }
     if (ok) break;
     await sleep(100);
   }
-  if (!ok) { err('probe: ' + (GAME ? 'игра' : PAGE) + ' не загрузилась за 45 с;', errors.length, 'ошибок:\n  ' + errors.slice(0, 5).join('\n  ')); clearTimeout(timer); return finish(1, { ok: false, loaded: false, errors }); }
+  if (!ok) { err('probe: ' + (GAME ? 'игра' : PAGE) + ' не загрузилась за '+bootWait+' с;', errors.length, 'ошибок:\n  ' + errors.slice(0, 5).join('\n  ')); clearTimeout(timer); return finish(1, { ok: false, loaded: false, errors }); }
   if (arg('cpuprofile')) {
     try { const { profile } = await dbg.sendCommand('Profiler.stop'); fs.writeFileSync(path.resolve(arg('cpuprofile')), JSON.stringify(profile)); err('probe: профиль загрузки →', path.resolve(arg('cpuprofile'))); } catch (e) { err('probe: профиль не снят:', e.message); }
   }

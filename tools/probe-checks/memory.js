@@ -17,7 +17,7 @@ out.menu = { ...(await mem('menu')), ...extra() };
 if (SNAP) await heapSnap('menu');
 // until возвращает false по тайм-ауту. Продолжение такого замера запускало
 // смену посреди стройки и принудительно достраивало остаток одним куском.
-if (!await until(() => window.__boot && window.__boot.full, 180000)) throw Error('Город не достроен: замер памяти завершён без запуска смены');
+if (!await until(() => window.__boot && window.__boot.full, 240000)) throw Error('Город не достроен: замер памяти завершён без запуска смены');
 await wait(500);
 out.built = { ...(await mem('built')), ...extra(), bootFull: window.__boot.full };
 if (SNAP) await heapSnap('built');

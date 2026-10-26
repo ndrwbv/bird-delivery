@@ -59,9 +59,24 @@ export function createLandPositionCodec(x0,z0,y0,stepY=1/1024){
   }
   return {pack,decode,packColors,dedup,attributes,release(){scratch=null;},palette,get revision(){return revision;},stats,origin:[x0,y0,z0],step:[1/1024,stepY,1/1024]};
 }
+const MASKS=new WeakMap();
+const number=x=>Number.isInteger(x)?x+'.0':String(x),vec=v=>'vec3('+v.map(number).join(',')+')';
+const decoded=(codec,tile)=>`${vec(codec.origin)} + vec3(floor(${tile} / 256.0) * 64.0, 0.0, mod(${tile}, 256.0) * 64.0) + position * ${vec(codec.step)}`;
+export function landPositionMaskMaterial(mask,land){
+  const info=MASKS.get(land);if(!info)return mask;
+  let m=info.masks.get(mask);if(m)return m;
+  const {codec,palette}=info;m=mask.clone();m.uniforms=mask.uniforms;
+  m.onBeforeCompile=sh=>{
+    const tile=palette?'(color.r + color.g * 256.0)':'landTile';
+    sh.vertexShader=(palette?'uniform sampler2D landPalette;\n':'attribute float landTile;\n')+sh.vertexShader
+      .replace('vec4(position, 1.0)',`vec4(${decoded(codec,tile)}, 1.0)`);
+    if(palette){sh.uniforms.landPalette={value:palette};sh.vertexShader=sh.vertexShader.replace('vC = vec4(color, 0.0);','vC = vec4(texture2D(landPalette, vec2((color.b + 0.5) / 256.0, 0.5)).rgb, 0.0);');}
+  };
+  m.customProgramCacheKey=()=>land.customProgramCacheKey()+'|meadow-mask';info.masks.set(mask,m);return m;
+}
 export function landPositionMaterial(source,codec,palette=null){
   const m=source.clone(),prev=source.onBeforeCompile,cache=source.customProgramCacheKey;
-  const number=x=>Number.isInteger(x)?x+'.0':String(x),vec=v=>'vec3('+v.map(number).join(',')+')';
+  m.userData.landPositions=true;MASKS.set(m,{codec,palette,masks:new WeakMap()});
   m.onBeforeCompile=function(sh,r){
     if(prev)prev.call(this,sh,r);
     const tile=palette?'(color.r + color.g * 256.0)':'landTile';

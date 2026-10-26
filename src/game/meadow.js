@@ -37,6 +37,7 @@
    (краска остаётся). __dlv.MEADOW — числа и ручки.
    ────────────────────────────────────────────────────────────────────────── */
 import * as THREE from '../vendor/three.module.min.js';
+import {landPositionMaskMaterial} from './landpositions.js';
 import * as GFX from './gfx.js';
 import { snowAmt, seasonValue, heatAmt, mudAmt } from './seasons.js';
 import { ON as MOBILE } from './mobile.js';
@@ -227,7 +228,7 @@ function ground () {
   const PR = [];
   A.scene.traverse(o => {
     if (!o.isMesh || !o.geometry) return;
-    if (o.material === GROUND) { L.push(o); return; }
+    if (o.material === GROUND || o.material?.userData?.landPositions) { L.push(o); return; }
     if (o.isInstancedMesh && !Array.isArray(o.material) && o.material.customProgramCacheKey) {
       let k = ''; try { k = String(o.material.customProgramCacheKey()); } catch (e) { return; }
       if (/^lawn(Solid|Rail)/.test(k)) PR.push(o);       // мелочь газона: покрышки, песок, ракушки, оградки, мусор (кроны — выше PROP_H)
@@ -262,7 +263,7 @@ function drawMask (cx, cz) {
       SPH.copy(m.geometry.boundingSphere).applyMatrix4(m.matrixWorld);
       if (Math.abs(SPH.center.x - cx) > H + SPH.radius || Math.abs(SPH.center.z - cz) > H + SPH.radius) continue;
       ORIG.mat = m.material; ORIG.mask = m.layers.mask;
-      m.material = MMAT; m.layers.mask = 1;
+      m.material = landPositionMaskMaterial(MMAT,ORIG.mat); m.layers.mask = 1;
       try { R.render(m, MCAM); } finally { m.material = ORIG.mat; m.layers.mask = ORIG.mask; }
       n++;
     }

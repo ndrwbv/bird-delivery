@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import * as THREE from '../src/vendor/three.module.min.js';
-import {createLandPositionCodec,landPositionMaterial} from '../src/game/landpositions.js';
+import {createLandPositionCodec,landPositionMaterial,landPositionMaskMaterial} from '../src/game/landpositions.js';
 let seed=177;const rand=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
 for(const step of[1/1024,1/512]){
   const codec=createLandPositionCodec(-8192,-8192,-16,step),n=30000,p=new Float32Array(n*3);
@@ -69,3 +69,19 @@ console.log('landpositions: одинаковые декодированные в
   }
 }
 console.log('landpositions: обычные position/color вместо дополнительных объектов атрибутов, без изменения позиции и цвета — OK');
+
+{
+  const codec=createLandPositionCodec(-8192,-8192,-16),tex=new THREE.DataTexture(codec.palette,256,1,THREE.RGBAFormat);
+  const mask=new THREE.ShaderMaterial({uniforms:{uC:{value:new THREE.Vector3()}}});
+  for(const palette of[null,tex]){
+    const land=landPositionMaterial(source,codec,palette),m=landPositionMaskMaterial(mask,land);
+    assert.notEqual(m,mask);assert.equal(m.uniforms,mask.uniforms,'Маска использует текущий центр и высоту камеры');
+    assert.equal(landPositionMaskMaterial(mask,land),m,'Материал маски повторно используется');
+    const sh={vertexShader:'vW = (modelMatrix * vec4(position, 1.0)).xyz; vC = vec4(color, 0.0);',uniforms:{}};
+    m.onBeforeCompile(sh);assert.ok(!sh.vertexShader.includes('vec4(position, 1.0)'),'Маска восстанавливает мировые координаты');
+    if(palette){assert.equal(sh.uniforms.landPalette.value,tex);assert.ok(sh.vertexShader.includes('texture2D(landPalette'),'Цвет маски — исходная зелень, а не номер плитки');}
+    else assert.ok(sh.vertexShader.includes('attribute float landTile'));
+  }
+  assert.equal(landPositionMaskMaterial(mask,source),mask,'Обычные покрытия используют прежнюю маску');
+}
+console.log('landpositions: маска новой травы использует те же координаты, точный цвет и текущую камеру — OK');

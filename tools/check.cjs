@@ -2,6 +2,8 @@
    npm run check -- --rebuild   собрать заново, даже если сборки свежие
    npm run check -- --only=orders,smoke   только эти проверки (по началу id)
    npm run check -- --serial    проверки в игре — по одной (по умолчанию — по JOBS разом)
+   npm run check -- --mobile    добавить телефонные проверки; только для отдельно порученного мобильного трека
+   npm run check -- --list      показать выбранные проверки без запуска
    npm run check -- --jobs=N    сколько проверок в игре разом (по умолчанию: ядер / 3, от 1 до 3)
 
    Новая проверка — элемент CHECKS: { id, name, group, run: async () => ({ status, info }) },
@@ -34,7 +36,7 @@ function sh (cmd, args, opts = {}) {
 let nProbe = 0;
 async function probe (args, timeout = 150) {
   const rep = path.join(TMP, 'r' + (nProbe++) + '.json');
-  const r = await sh(ELECTRON, [path.join(__dirname, 'probe.cjs'), '--no-build', '--report=' + rep, '--timeout=' + (timeout - 10), ...args], { timeout });
+  const r = await sh(ELECTRON, [path.join(__dirname, 'probe.cjs'), '--no-build', '--report=' + rep, '--timeout=' + (timeout + 230), ...args], { timeout:timeout+240 });
   let j = null;
   try { j = JSON.parse(fs.readFileSync(rep, 'utf8')); } catch (e) { /* — */ }
   return j || { ok: false, errors: [], evalErr: 'probe без отчёта (код ' + r.code + '): ' + (r.err || r.out).trim().split('\n').slice(-3).join(' | ') };
@@ -422,6 +424,7 @@ const CHECKS = [
     return { status: r.bad.length ? 'fail' : r.warn.length ? 'warn' : 'ok', info: [...r.bad, ...r.warn].join('; ') || rows };
   } },
   { id: 'smoke-adult', w: 40, name: '30 с автопилота: взрослая (web)', group: 3, run: smoke(['--mode=web'], 'взрослая') },
+  { id: 'smoke-deck', w: 40, name: '30 с автопилота: Steam Deck, высокая графика, CPU ×3', group: 3, run: smoke(['--mode=steam','--size=deck','--cpu=3','--q=gfx=high&gfxdev=deck'], 'Steam Deck высокая') },
   { id: 'smoke-phone', w: 40, name: '30 с автопилота: телефон боком (web)', group: 3, run: smoke(['--size=phone-land'], 'телефон') },
   { id: 'smoke-crashlog', name: 'журнал ошибок пуст после дымовых', group: 4, run: async () => (
     CRASHES.length ? { status: 'fail', info: CRASHES.length + ' записей:\n' + CRASHES.map(l => '    ' + l).join('\n') } : { status: 'ok', info: 'пуст' }) },
@@ -431,7 +434,10 @@ const CHECKS = [
 (async () => {
   const T0 = Date.now();
   const only = arg('only', '').split(',').filter(Boolean);
-  const list = CHECKS.filter(c => !only.length || only.some(o => c.id.startsWith(o)));
+  const mobile=new Set(['memory-phone','touchwheel','smoke-phone']);
+  const list = CHECKS.filter(c => (has('mobile')||!mobile.has(c.id))&&(!only.length || only.some(o => c.id.startsWith(o))));
+  if(has('list')){for(const c of list)console.log(c.id+' · '+c.name);return;}
+  if(!list.length){console.error('Проверки не выбраны. Телефонные пункты доступны только с --mobile для отдельного мобильного трека.');process.exit(2);}
   const rows = [];
   const runOne = async c => {
     const t = Date.now();
