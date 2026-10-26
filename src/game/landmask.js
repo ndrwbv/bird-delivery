@@ -53,17 +53,17 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[]){
     }
     pending.length=0;
     for(const group of groups.values()){
-      group.regions=unionLandRegions(group.regions);pending.push(group);
+      group.regions=unionLandRegions(group.regions,group.core);pending.push(group);
       if(++n%64===0)yield 'цельные контуры';
     }
     groups.clear();weld();
     // Подгонка общей точки может оставить обратный шип из нескольких
     // вершин. Убираем его после подгонки, до опоры, рисунка и камня.
     for(const group of pending){
-      const cleaned=unionLandRegions(group.regions);removedRegions.push(...subtractLandRegions(group.regions,cleaned));group.regions=cleaned;
+      const cleaned=unionLandRegions(group.regions,group.core);removedRegions.push(...subtractLandRegions(group.regions,cleaned));group.regions=cleaned;
     }
     pruneLandIslands(pending,{onRemove:p=>removedRegions.push(p),open:(x,z)=>{const state=domain.get(key(x,z));return state===undefined||state===false&&fallback(x,z);}});n=0;
-    for(const {core,regions,triangulate}of pending){
+    for(const {regions,triangulate}of pending){
       for(const p of regions){
         const outer=cleanRing(p.outer),holes=p.holes.map(cleanRing).filter(h=>h.length>=3);if(outer.length<3)continue;
         const {points,triangles}=triangulate(outer,holes);
@@ -99,7 +99,15 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[]){
     }
     return out;
   }
-  function* boundaries({accept=()=>true,stats={},floorAt=()=>.085,includeWalls=false}={}){
+  function sides(x,z,nx,nz){
+    const heights=kept.sideHeights(x,z,nx,nz);
+    const cell=(v,d)=>Math.abs(v/CELL-Math.round(v/CELL))<1e-9?Math.round(v/CELL)+(d<0?-1:0):Math.floor(v/CELL);
+    return [1,-1].map((sign,i)=>{
+      const state=domain.get(cell(x,nx*sign)+','+cell(z,nz*sign));
+      return state===true?heights[i]>-Infinity:state===undefined?true:fallback(x+nx*sign*1e-7,z+nz*sign*1e-7);
+    });
+  }
+  function* boundaries({accept=()=>true,stats={},floorAt=()=>.085,floorBreaks=()=>[],includeWalls=false}={}){
     const seen=new Set(),emitted=new Set(),point=(x,z)=>Math.round(x*1e6)+','+Math.round(z*1e6);
     const edgeKey=(ax,az,bx,bz)=>{const a=point(ax,az),b=point(bx,bz);return a<b?a+':'+b:b+':'+a;};
     stats.edges=stats.segments=stats.length=0;
@@ -107,11 +115,18 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[]){
       const ax=segments[i],az=segments[i+1],bx=segments[i+2],bz=segments[i+3],id=edgeKey(ax,az,bx,bz);
       if(seen.has(id))continue;seen.add(id);stats.edges++;
       const dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz);if(len<1e-6)continue;
-      const nx=-dz/len,nz=dx/len,cuts=breaks(ax,az,bx,bz).sort((a,b)=>a-b);
+      const nx=-dz/len,nz=dx/len,cuts=breaks(ax,az,bx,bz);
+      // Пол стены может занимать лишь середину длинного края. Камень
+      // заканчивается у самой стены, а не у конца целого отрезка.
+      for(const side of [-1,1])cuts.push(...floorBreaks(ax+nx*.01*side,az+nz*.01*side,bx+nx*.01*side,bz+nz*.01*side));
+      cuts.sort((a,b)=>a-b);
       for(let j=1;j<cuts.length;j++){
         const a=cuts[j-1],b=cuts[j];if((b-a)*len<1e-5)continue;
         const x=ax+dx*(a+b)/2,z=az+dz*(a+b)/2;
-        const left=contains(x+nx*.0001,z+nz*.0001),right=contains(x-nx*.0001,z-nz*.0001);
+        // Стороны определяются полуплоскостями треугольников. Проба с
+        // отступом перескакивала через соседний край у перекрытия и
+        // ошибочно превращала внутреннюю линию в отдельный бордюр.
+        const [left,right]=sides(x,z,nx,nz);
         if(left===right||!accept(x,z))continue;
         const lift=floorAt(x+(left?-nx:nx)*.01,z+(left?-nz:nz)*.01);if(lift>=.49&&!includeWalls)continue;
         let p=[ax+dx*a,az+dz*a],q=[ax+dx*b,az+dz*b];if(!left)[p,q]=[q,p];
@@ -121,7 +136,8 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[]){
       if(i%512===0)yield null;
     }
   }
-  return {reserve,add,contains,parts,breaks,kept,removedRegions,
+  return {reserve,add,contains,parts,breaks,sides,kept,removedRegions,
+    cellState:(x,z)=>domain.get(key(x,z)),
     boundaries,finishSteps,finish(){for(const step of finishSteps()){}},get ready(){return ready;},get count(){return kept.count;},
     get segments(){return segments;},get cells(){return domain.size;}};
 }

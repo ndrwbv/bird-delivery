@@ -252,6 +252,7 @@ let BERM = false, BW = 0;                           // скат газона з�
 /* ?nomiter — торцы камня на изломе поперёк, дуги по хорде, просадка где попало (как до 0п72; сравнить стыки — curb-joins.js) */
 const NOMITER = typeof location !== 'undefined' && /[?&]nomiter(&|$)/.test(location.search);
 const TRACE = typeof location !== 'undefined' && /[?&]curbtrace(&|$)/.test(location.search) ? [] : null;   // по 18 чисел на секцию: углы торцов (низ — вверх) и средняя линия
+const TRACE_TOPOLOGY=TRACE?{active:false,links:[],bridges:[],open:[]}:null;
 const hexOf = (x, z, k) => (MOB ? CURB.HEX[0] : hsh(x, z, 5) < CURB.CHIPS ? CURB.CHIP : CURB.HEX[k & 1]);
 /* ta, tb — «в ус» (0п72, 24.10.2026): торец секции на изломе лежит не поперёк камня, а по биссектрисе излома — как у соседнего
    отрезка, и два камня сходятся без щели и нахлёста. Вершина торца на расстоянии s поперёк (к газону — плюс) от средней
@@ -495,6 +496,7 @@ export function* build (api) {
   if (api.rebuild) {
     BG=new Map();BI.clear();BF=BWF=null;ON=false;
     if(TRACE)TRACE.length=0;
+    if(TRACE_TOPOLOGY){TRACE_TOPOLOGY.active=false;TRACE_TOPOLOGY.links.length=TRACE_TOPOLOGY.bridges.length=TRACE_TOPOLOGY.open.length=0;}
     for(const k of Object.keys(ST))ST[k]=0;
   }
   const OLD = !!(QS && QS.has('oldcurbs'));         // ?oldcurbs — как до 24.10.2026: проезды только во дворах, без тупиков и улиц, камень 0,12 м, без потери скорости (сравнить)
@@ -504,6 +506,7 @@ export function* build (api) {
   A = api; LITM = api.LITM; MOB = !!(api.mobile && api.mobile()); SEC = MOB ? CURB.SEC_MOB : CURB.SEC; ST.mob = MOB ? 1 : 0;
   if(api.contours){
     BERM=false;
+    if(TRACE_TOPOLOGY)TRACE_TOPOLOGY.active=true;
     const edges=[];
     for(const e of api.contours()){if(e)edges.push(e);else yield 'бордюры: общий контур';}
     const mesh=joinLandCurbs(edges,CURB.W);edges.length=0;
@@ -512,26 +515,48 @@ export function* build (api) {
     const top=p=>A.groundH(...p)+A.landTopAt(...p);
     const draw=(a,b,oa,ob,lift,k)=>{
       const ha=top(a),hb=top(b),fa=A.groundH(...oa)+lift-.035,fb=A.groundH(...ob)+lift-.035;
-      if(ha<=fa||hb<=fb)return;
+      if(ha<=fa||hb<=fb)return null;
       const ca=mix(oa,a,.16),cb=mix(ob,b,.16),bevel=.02;
       LITM.color(CURB.HEX[k&1]);
       LITM.quad(oa[0],fa,oa[1],ob[0],fb,ob[1],ob[0],hb-bevel,ob[1],oa[0],ha-bevel,oa[1]);
       LITM.quad(oa[0],ha-bevel,oa[1],ob[0],hb-bevel,ob[1],cb[0],hb,cb[1],ca[0],ha,ca[1]);
       LITM.quad(ca[0],ha,ca[1],cb[0],hb,cb[1],b[0],hb,b[1],a[0],ha,a[1]);
+      const id=TRACE?TRACE.length/18:null;
       if(TRACE)TRACE.push(oa[0],oa[1],ha,a[0],a[1],ha,ob[0],ob[1],hb,b[0],b[1],hb,(a[0]+b[0])/2,(a[1]+b[1])/2,...a,...b);
       ST.secs++;
+      return id;
     };
     let count=0;
     for(const s of mesh.sections){
       const dx=s.b[0]-s.a[0],dz=s.b[1]-s.a[1],length=Math.hypot(dx,dz),n=Math.ceil(length/SEC);
-      for(let i=0;i<n;i++)draw(mix(s.a,s.b,i/n),mix(s.a,s.b,(i+1)/n),mix(s.outA,s.outB,i/n),mix(s.outA,s.outB,(i+1)/n),s.lift,i);
+      let previous=null;s.traceFirst=s.traceLast=null;
+      for(let i=0;i<n;i++){
+        const id=draw(mix(s.a,s.b,i/n),mix(s.a,s.b,(i+1)/n),mix(s.outA,s.outB,i/n),mix(s.outA,s.outB,(i+1)/n),s.lift,i);
+        if(TRACE_TOPOLOGY){
+          if(i===0)s.traceFirst=id;if(i===n-1)s.traceLast=id;
+          if(id!==null){
+            if(previous!==null)TRACE_TOPOLOGY.links.push(previous,id);
+            else if(i>0)TRACE_TOPOLOGY.open.push(id,0);
+          }else if(previous!==null)TRACE_TOPOLOGY.open.push(previous,1);
+        }
+        previous=id;
+      }
       bgAdd(...s.a,...s.b,-dz/length,dx/length);ST.m+=length;ST.runs++;
       if(++count%128===0)yield 'бордюры: стыки';
+    }
+    if(TRACE_TOPOLOGY)for(const s of mesh.sections){
+      if(s.traceFirst!==null&&(!s.prev||s.prev.traceLast===null))TRACE_TOPOLOGY.open.push(s.traceFirst,0);
+      if(s.traceLast!==null&&(!s.next||s.next.traceFirst===null))TRACE_TOPOLOGY.open.push(s.traceLast,1);
+      if(s.traceLast!==null&&s.next?.traceFirst!==null&&s.next?.traceFirst!==undefined&&s.outB===s.next.outA)TRACE_TOPOLOGY.links.push(s.traceLast,s.next.traceFirst);
     }
     for(const j of mesh.joins){
       const h=top(j.p),fa=A.groundH(...j.a)+j.lift-.035,fb=A.groundH(...j.b)+j.lift-.035;
       LITM.color(CURB.HEX[0]);LITM.up(j.p[0],h,j.p[1],j.a[0],h,j.a[1],j.b[0],h,j.b[1]);
       LITM.quad(j.a[0],fa,j.a[1],j.b[0],fb,j.b[1],j.b[0],h,j.b[1],j.a[0],h,j.a[1]);
+      if(TRACE_TOPOLOGY){
+        const prev=mesh.sections.find(s=>s.b===j.p&&s.outB===j.a),next=prev?.next;
+        if(prev?.traceLast!==null&&prev?.traceLast!==undefined&&next?.traceFirst!==null&&next?.traceFirst!==undefined)TRACE_TOPOLOGY.bridges.push(prev.traceLast,next.traceFirst,...j.p,...j.a,...j.b,h);
+      }
     }
     bgPack();ON=true;ST.m=Math.round(ST.m);ST.ms=Math.round(performance.now()-t0);return ST;
   }
@@ -757,4 +782,4 @@ export function shake () { const s = BS.shake; BS.shake = 0; return s; }
 /* какой удар был за кадр ('curb' | 'curbOff' | 'curbRear' | ''): game.js берёт, обнуляет и бьёт машину (carbump.js hit) */
 export function took () { const h = BS.hit; BS.hit = ''; return RULES.on ? h : ''; }
 
-export const DEBUG = { CURB, ST, near, liftAt, get berm () { return BERM; }, get trace () { return TRACE; }, get api () { return A; }, get cells () { return BI.size; }, get floats () { return BF ? BF.length : 0; }, get segs () { return BF; }, BS };
+export const DEBUG = { CURB, ST, near, liftAt, get berm () { return BERM; }, get trace () { return TRACE; }, get traceTopology () { return TRACE_TOPOLOGY?.active?TRACE_TOPOLOGY:null; }, get api () { return A; }, get cells () { return BI.size; }, get floats () { return BF ? BF.length : 0; }, get segs () { return BF; }, BS };

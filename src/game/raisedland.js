@@ -12,7 +12,7 @@ const rawLand=(x,z)=>green.height(x,z)>cover.height(x,z)||!cover.covered(x,z);
 export const finalMask=ON?createLandMask(rawLand,(...args)=>[...cover.breaks(...args),...green.breaks(...args)]):null;
 export const ST={paving:0,green:0,top:0,walls:0,built:false};
 export function compact(){if(ON){cover.compact();green.compact();}}
-export function boundaries(options){return finalMask?.ready?finalMask.boundaries({floorAt:(x,z)=>{const p=cover.height(x,z);return Number.isFinite(p)?p:.085;},...options,accept:(x,z)=>!outside?.(x,z)&&(!options?.accept||options.accept(x,z))}):landBoundary(cover,green,options);}
+export function boundaries(options){return finalMask?.ready?finalMask.boundaries({floorAt:(x,z)=>{const p=cover.height(x,z);return Number.isFinite(p)?p:.085;},floorBreaks:(...args)=>cover.breaks(...args,.49),...options,accept:(x,z)=>!outside?.(x,z)&&(!options?.accept||options.accept(x,z))}):landBoundary(cover,green,options);}
 // Проверка ширины не добавляет технологический заход мощения на шов.
 export function widthPatches(core){return landCleanTile(cover,green,core,LAND_MIN_WIDTH,0);}
 export function widthAt(edge,t){return finalMask?.ready?contourWidth(finalMask,edge,t):landWidth(cover,green,edge,t);}

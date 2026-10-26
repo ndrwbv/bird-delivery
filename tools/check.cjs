@@ -63,6 +63,14 @@ const smoke = (args, label) => async () => {
 };
 
 const CHECKS = [
+  { id: 'land-simplify', name: 'газоны: общие опорные точки при очистке', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'landsimplify-geometry.mjs')]);
+    return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };
+  } },
+  { id: 'land-curb-trace', name: 'бордюры: проверка фактических соседних торцов', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'landcurb-trace.mjs')]);
+    return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };
+  } },
   { id: 'land-islands', name: 'газоны: обрывки и связь через общий край', group: 1, run: async () => {
     const r = await sh(process.execPath, [path.join(__dirname, 'landislands-geometry.mjs')]);
     return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };

@@ -149,9 +149,10 @@ export function createLandCover(cell=32) {
     });
     return [left,right];
   }
-  function breaks(ax,az,bx,bz){
+  function breaks(ax,az,bx,bz,minLift=-Infinity){
     const out=[0,1],dx=bx-ax,dz=bz-az;
     each([Math.min(ax,bx),Math.min(az,bz),Math.max(ax,bx),Math.max(az,bz)],t=>{
+      if(t.lift<minLift)return;
       let lo=0,hi=1;
       for(let i=0;i<3;i++){
         const a=t.p[i],b=t.p[(i+1)%3],f=cross(a,b,[ax,az]),d=(b[0]-a[0])*dz-(b[1]-a[1])*dx;

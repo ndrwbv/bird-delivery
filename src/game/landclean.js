@@ -2,6 +2,7 @@
    полоски, иглы и островки, сохраняя широкую землю. Соседние клетки
    считают форму с запасом, поэтому их общая граница не становится швом. */
 import Clipper from 'clipper-lib';
+import {simplifyRing} from './landsimplify.js';
 export const LAND_MIN_WIDTH=.8;
 const SCALE=10000;
 const path=p=>p.map(v=>({X:Math.round(v[0]*SCALE),Y:Math.round(v[1]*SCALE)}));
@@ -24,10 +25,13 @@ function offset(paths,amount){
 // Исходные фигуры — внешние контуры против часовой стрелки, отверстия —
 // наоборот. Результат Clipper сохраняет эту пару направлений.
 const regions=tree=>Clipper.JS.PolyTreeToExPolygons(tree).map(p=>({outer:polygon(p.outer),holes:p.holes.map(polygon)}));
-export function unionLandRegions(input){
+export function unionLandRegions(input,core){
   const paths=input.flatMap(p=>[path(p.outer),...p.holes.map(path)]);
   const joined=clip(paths,[],Clipper.ClipType.ctUnion);
-  return regions(clip(Clipper.Clipper.CleanPolygons(joined,.005*SCALE),[],Clipper.ClipType.ctUnion,true));
+  if(!core)return regions(clip(Clipper.Clipper.CleanPolygons(joined,.005*SCALE),[],Clipper.ClipType.ctUnion,true));
+  const grouped=regions(clip(joined,[],Clipper.ClipType.ctUnion,true));
+  const simplified=grouped.map(p=>({outer:simplifyRing(p.outer,core),holes:p.holes.map(h=>simplifyRing(h,core)).filter(h=>h.length>=3)})).filter(p=>p.outer.length>=3);
+  return regions(clip(simplified.flatMap(p=>[path(p.outer),...p.holes.map(path)]),[],Clipper.ClipType.ctUnion,true));
 }
 export function subtractLandRegions(subject,other){
   const paths=items=>items.flatMap(p=>[path(p.outer),...p.holes.map(path)]);
