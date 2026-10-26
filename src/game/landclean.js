@@ -29,6 +29,10 @@ export function unionLandRegions(input){
   const joined=clip(paths,[],Clipper.ClipType.ctUnion);
   return regions(clip(Clipper.Clipper.CleanPolygons(joined,.005*SCALE),[],Clipper.ClipType.ctUnion,true));
 }
+export function subtractLandRegions(subject,other){
+  const paths=items=>items.flatMap(p=>[path(p.outer),...p.holes.map(path)]);
+  return regions(clip(paths(subject),paths(other),Clipper.ClipType.ctDifference,true));
+}
 export function cleanLandRegion(polygons,core,width=LAND_MIN_WIDTH,overlap=.005){
   const original=clip(polygons.map(path),[],Clipper.ClipType.ctUnion);
   // Небольшой запас сохраняет минимум 80 см и после подгонки кромки

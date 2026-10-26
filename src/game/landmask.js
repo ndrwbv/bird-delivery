@@ -2,10 +2,11 @@
    больше не может вернуть в него случайную зелёную щель между гранями.
    Та же область отвечает на запросы опоры и обрезает видимую землю. */
 import {createLandCover,intersectConvex} from './landcover.js';
-import {unionLandRegions} from './landclean.js';
+import {unionLandRegions,subtractLandRegions} from './landclean.js';
+import {pruneLandIslands} from './landislands.js';
 const CELL=32,key=(x,z)=>Math.floor(x/CELL)+','+Math.floor(z/CELL);
 export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[]){
-  const kept=createLandCover(CELL),domain=new Map(),pending=[];let segments=[];
+  const kept=createLandCover(CELL),domain=new Map(),pending=[],removedRegions=[];let segments=[];
   let ready=false;
   function reserve(core){domain.set(key(core[0],core[1]),false);}
   function add(core,regions,triangulate){
@@ -55,7 +56,13 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[]){
       group.regions=unionLandRegions(group.regions);pending.push(group);
       if(++n%64===0)yield 'цельные контуры';
     }
-    groups.clear();weld();n=0;
+    groups.clear();weld();
+    // Подгонка общей точки может оставить обратный шип из нескольких
+    // вершин. Убираем его после подгонки, до опоры, рисунка и камня.
+    for(const group of pending){
+      const cleaned=unionLandRegions(group.regions);removedRegions.push(...subtractLandRegions(group.regions,cleaned));group.regions=cleaned;
+    }
+    pruneLandIslands(pending,{onRemove:p=>removedRegions.push(p),open:(x,z)=>{const state=domain.get(key(x,z));return state===undefined||state===false&&fallback(x,z);}});n=0;
     for(const {core,regions,triangulate}of pending){
       for(const p of regions){
         const outer=cleanRing(p.outer),holes=p.holes.map(cleanRing).filter(h=>h.length>=3);if(outer.length<3)continue;
@@ -114,7 +121,7 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[]){
       if(i%512===0)yield null;
     }
   }
-  return {reserve,add,contains,parts,breaks,kept,
+  return {reserve,add,contains,parts,breaks,kept,removedRegions,
     boundaries,finishSteps,finish(){for(const step of finishSteps()){}},get ready(){return ready;},get count(){return kept.count;},
     get segments(){return segments;},get cells(){return domain.size;}};
 }

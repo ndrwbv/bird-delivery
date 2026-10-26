@@ -94,6 +94,30 @@ export function* cleanContours({M,triangulate,skip}){
     const dx=b[0]-a[0],dz=b[1]-a[1],k=Math.max(0,Math.min(1,((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz||1)));
     return Math.hypot(x-a[0]-dx*k,z-a[1]-dz*k);
   };
+  const fillPatch=patch=>{
+    const {points,triangles}=triangulate(patch.outer,patch.holes);
+    for(const ids of triangles){
+      const p=ids.map(i=>points[i]),x=(p[0][0]+p[1][0]+p[2][0])/3,z=(p[0][1]+p[1][1]+p[2][1])/3;
+      const area=Math.abs((p[1][0]-p[0][0])*(p[2][1]-p[0][1])-(p[1][1]-p[0][1])*(p[2][0]-p[0][0]))/2;
+      if(area<1e-6)continue;
+      let closest=null,best=Infinity;
+      for(const t of cover.inBox([x-2,z-2,x+2,z+2])){
+        if(t.lift>=.49||!t.rgb)continue;
+        const d=Math.min(...t.p.map((a,i)=>distance(x,z,a,t.p[(i+1)%3])));
+        if(d<best){best=d;closest=t;}
+      }
+      const box=[Math.min(...p.map(q=>q[0])),Math.min(...p.map(q=>q[1])),Math.max(...p.map(q=>q[0])),Math.max(...p.map(q=>q[1]))];
+      let floor=(closest?.lift||.085)+.001;
+      for(const t of green.inBox(box))floor=Math.max(floor,t.lift+.001);
+      const rgb=closest?.rgb||[177,173,159];
+      const t=fills.triangle(...p[0],...p[1],...p[2],floor);if(!t)continue;
+      t.rgb=rgb;
+      M.grad((x,z,c,o)=>{c[o]=rgb[0];c[o+1]=rgb[1];c[o+2]=rgb[2];});
+      M.dtri(...p[0],...p[1],...p[2],floor);M.grad(null);
+      ST.cleanedArea+=area;ST.fillTriangles++;
+      if(fills.rawCount>=16384)fills.compact();
+    }
+  };
   building=true;
   try{
     for(const core of cover.cells()){
@@ -102,41 +126,21 @@ export function* cleanContours({M,triangulate,skip}){
       if(skip&&[[x0,z0],[x1,z0],[x1,z1],[x0,z1],[(x0+x1)/2,(z0+z1)/2]].every(p=>skip(...p)))continue;
       const cleaned=landCleanTileRegion(cover,green,core);
       finalMask.add(core,cleaned.kept,triangulate);
-      for(const patch of cleaned.removed){
-        const {points,triangles}=triangulate(patch.outer,patch.holes);
-        for(const ids of triangles){
-          const p=ids.map(i=>points[i]),x=(p[0][0]+p[1][0]+p[2][0])/3,z=(p[0][1]+p[1][1]+p[2][1])/3;
-          const area=Math.abs((p[1][0]-p[0][0])*(p[2][1]-p[0][1])-(p[1][1]-p[0][1])*(p[2][0]-p[0][0]))/2;
-          if(area<1e-6)continue;
-          let closest=null,best=Infinity;
-          for(const t of cover.inBox([x-2,z-2,x+2,z+2])){
-            if(t.lift>=.49||!t.rgb)continue;
-            const d=Math.min(...t.p.map((a,i)=>distance(x,z,a,t.p[(i+1)%3])));
-            if(d<best){best=d;closest=t;}
-          }
-          const box=[Math.min(...p.map(q=>q[0])),Math.min(...p.map(q=>q[1])),Math.max(...p.map(q=>q[0])),Math.max(...p.map(q=>q[1]))];
-          let floor=(closest?.lift||.085)+.001;
-          for(const t of green.inBox(box))floor=Math.max(floor,t.lift+.001);
-          const rgb=closest?.rgb||[177,173,159];
-          const t=fills.triangle(...p[0],...p[1],...p[2],floor);if(!t)continue;
-          t.rgb=rgb;
-          M.grad((x,z,c,o)=>{c[o]=rgb[0];c[o+1]=rgb[1];c[o+2]=rgb[2];});
-          M.dtri(...p[0],...p[1],...p[2],floor);M.grad(null);
-          ST.cleanedArea+=area;ST.fillTriangles++;
-          if(fills.rawCount>=16384)fills.compact();
-        }
-      }
+      for(const patch of cleaned.removed)fillPatch(patch);
       ST.cleanTiles++;
       yield 'цельные газоны';
     }
     // Все клетки считают исходный город: добавляем исправления в общий
     // контур только после обхода, чтобы порядок клеток не влиял на форму.
+    yield* finalMask.finishSteps();
+    for(const patch of finalMask.removedRegions)fillPatch(patch);
+    finalMask.removedRegions.length=0;
     fills.compact();
     for(const t of fills.triangles){
       const q=cover.triangle(...t.p[0],...t.p[1],...t.p[2],t.lift);if(q)q.rgb=t.rgb;
       if(cover.rawCount>=16384)cover.compact();
     }
-    cover.compact();yield* finalMask.finishSteps();ST.maskTriangles=finalMask.count;ST.maskEdges=finalMask.segments.length/4;ST.cleanedArea=Math.round(ST.cleanedArea*100)/100;
+    cover.compact();ST.maskTriangles=finalMask.count;ST.maskEdges=finalMask.segments.length/4;ST.cleanedArea=Math.round(ST.cleanedArea*100)/100;
   }finally{fills.clear();building=false;M.grad(null);}
 }
 function* terrainParts(p,{g,nx,nz,x0,z0}){

@@ -63,6 +63,10 @@ const smoke = (args, label) => async () => {
 };
 
 const CHECKS = [
+  { id: 'land-islands', name: 'газоны: обрывки и связь через общий край', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'landislands-geometry.mjs')]);
+    return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };
+  } },
   { id: 'land-curb', name: 'бордюры: общий торец и закрытые углы', group: 1, run: async () => {
     const r = await sh(process.execPath, [path.join(__dirname, 'landcurb-geometry.mjs')]);
     return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };
