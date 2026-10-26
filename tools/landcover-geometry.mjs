@@ -151,3 +151,10 @@ console.log('landcover: переход палитр через 256 значен�
   target.clear();assert.equal(target.triangle(0,0,1,0,0,1).id,0);
 }
 console.log('landcover: перенос готовых страниц, неполные блоки, индекс клеток, повторное дополнение и исходные площадки — проверены');
+{
+  const C=createLandCover(4),positions=[[-32768,-32768],[32767,32767],[-1,0],[0,-1],[0,0],[-32769,32768],[32768,-32769]];
+  for(const[i,j]of positions)C.triangle(i*4+.5,j*4+.5,i*4+1.5,j*4+.5,i*4+.5,j*4+1.5,i+j+.25);
+  assert.deepEqual([...C.cells()],positions.map(([i,j])=>[i*4,j*4,(i+1)*4,(j+1)*4]),'Порядок клеток и знаковые координаты сохранены');
+  C.compact();for(const[i,j]of positions)assert.equal(C.height(i*4+.7,j*4+.7),i+j+.25,'Далёкие клетки не накладываются на числовые ключи');
+}
+console.log('landcover: числовые клетки, отрицательные индексы и отдельный путь за пределами ±32768 — проверены');

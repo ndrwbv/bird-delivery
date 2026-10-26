@@ -22,6 +22,7 @@ import * as SOFTSURF from './softsurfaces.js';
 import * as RLAND from './raisedland.js';
 import { landCarSupport } from './landdrive.js';
 import { createLandMeshPages } from './landmeshpages.js';
+import { createLandPositionCodec, landPositionMaterial } from './landpositions.js';
 import { MAP } from './map.js';
 import { MAP_IDS, MAP_META } from '../maps/index.js';
 import Platform from '../platform/index.js';
@@ -903,6 +904,13 @@ STREAMS.carve(CITY, TH, TER, {
     ...(MAP.career.garages || []).map(q => [q.x, q.z, 45])] : [],
 });
 
+const LAND_POS = RLAND.ON ? (() => {
+  let low=Infinity,high=-Infinity;for(const y of TH){low=Math.min(low,y);high=Math.max(high,y);}
+  const step=high-low+4<64?1/1024:1/512;
+  const codec=createLandPositionCodec(Math.floor((TX0-1400)/64)*64,Math.floor((TZ0-1400)/64)*64,Math.floor((low-2)/step)*step,step);
+  RLAND.ST.positions=codec.stats;return codec;
+})() : null;
+
 // Round visible paving only after terrain shaping: cosmetic corners must not move the ground.
 SOFTSURF.prepare(CITY, SMOOTH.isArc);
 
@@ -1698,14 +1706,29 @@ function Mesher (opt) {
     const g = new THREE.BufferGeometry();
     B.ix = IX; B.mb = null; B.mbi = 0;
     if (X) { P = X.p; Cc = X.c; const ia = new THREE.BufferAttribute(X.i, 1); g.setIndex(ia); ia.onUpload(dropArr); }
-    const pa = new THREE.BufferAttribute(P, 3), cA = new THREE.BufferAttribute(Cc, cs, true);
+    const pa = new THREE.BufferAttribute(P, 3);let cA = new THREE.BufferAttribute(Cc, cs, true);
     g.setAttribute('position', pa);
     g.setAttribute('color', cA);
     boundSphere(g);
     // после загрузки в видеокарту копия в памяти JS не нужна (сбитый плафон спереди прячет streetlamps.js hide — коротким
     // массивом до своего куска и правкой диапазоном); opt.keepFront — позиции куска спереди остаются (мелочь дворов: сбил —
     // её вершины в точку прямо в массиве, keepHead)
-    pa.onUpload(opt && opt.keepFront && nf ? keepHead(nf * 3) : dropArr); cA.onUpload(dropArr);
+    // Только клетки новой земли без живого префикса и признаков вещей.
+    let packed=LAND_POS&&landRGB&&B.landRow!==undefined&&cs===3&&!nf?LAND_POS.pack(P):null;
+    if(packed){
+      let colors=LAND_POS.packColors(Cc);
+      if(colors){const data=LAND_POS.dedup(packed,colors,g.index?.array);packed=data.data;colors=data.colors;if(data.index&&data.index!==g.index?.array){const ia=new THREE.BufferAttribute(data.index,1);g.setIndex(ia);ia.onUpload(dropArr);}}
+      if(colors){
+        const data=LAND_POS.attributes(packed,colors),pA=new THREE.BufferAttribute(data.positions,3);pA.onUpload(dropArr);
+        g.setAttribute('position',pA);cA=new THREE.BufferAttribute(data.colors,3);g.setAttribute('color',cA);g.userData.landPalette=true;
+      }else{
+        const data=new THREE.InterleavedBuffer(packed,4);data.onUpload(dropArr);
+        g.setAttribute('position',new THREE.InterleavedBufferAttribute(data,3,0));g.setAttribute('landTile',new THREE.InterleavedBufferAttribute(data,1,3));
+      }
+      g.userData.landPacked=true;
+      g.boundingBox.expandByScalar(.002);g.boundingSphere.radius+=.002;
+    }else pa.onUpload(opt && opt.keepFront && nf ? keepHead(nf * 3) : dropArr);
+    cA.onUpload(dropArr);
     return g;
   }
   function tracks (B, me) { if (B.f) { for (const [f, v0, nv] of B.f.trk) f(me, v0, nv); B.f.trk.length = 0; } }
@@ -2191,7 +2214,7 @@ class CellSet {
 }
 const RAISED = new CellSet(8000 * 8000);
 const rkey = (x, z) => (Math.round(x) + 4000) * 8000 + (Math.round(z) + 4000);
-const curbAt = (x, z) => (!RLAND.ST.built && RAISED.has(rkey(x, z)) ? CURB_H : 0);
+const curbAt = (x, z) => (!(RLAND.ST.supportReady||RLAND.ST.built) && RAISED.has(rkey(x, z)) ? CURB_H : 0);
 
 /* кусок бордюра [d, dd] без заездов на стоянки курьеров (pizzeria.js DRIVEWAYS): куски, что остались
    (не короче 0,5 м). at(t) — точка середины плиты тротуара на расстоянии t вдоль ребра */
@@ -6025,7 +6048,17 @@ function buildCity () {
         triangles:THREE.ShapeUtils.triangulateShape(outer.map(p=>new THREE.Vector2(...p)),holes.map(h=>h.map(p=>new THREE.Vector2(...p))))
       })});
       yield* flushLandStage();
-      if (!INTRO) yield* buildCurbs({ LITM, rebuild: true, contours:()=>RLAND.boundaries({accept:(x,z)=>!DMASK||!farOut(x,z)}),
+      RLAND.activate(DMASK?farOut:null);
+      const delta=RLAND.alignObjects({lists:[LIT,FLAT,LAMPH],items:SMASH,props:PROPS,benches:BENCHES,baseH:terrainH});
+      SEAS.raiseLand(delta);
+    } finally { LITM.landPages(false);LAND_POS.release(); }
+  });
+  function* buildRaisedLandSurface(){
+    // Сначала освобождается исходная статика города. Самый большой
+    // новый граф камня и новые вершины не держатся вместе с её копиями.
+    LITM.landPages(LATE.busy());
+    try {
+      if (!INTRO) yield* buildCurbs({ LITM, groundH:terrainH, rebuild: true, contours:()=>RLAND.boundaries({accept:(x,z)=>!DMASK||!farOut(x,z)}),
         landTopAt: (x,z) => RLAND.topOffset(x,z,terrainH(x,z)) });
       yield* flushLandStage();
       RLAND.ST.baseDisposed = GROUND_M.discard();
@@ -6040,14 +6073,13 @@ function buildCity () {
       };
       yield* RLAND.build({ M: LITM, terrain: TER, heights: TH, groundH: terrainH, groundHex, skip: DMASK ? farOut : null, buildings: CITY.buildings, curbed: !INTRO && CURBS.ST.secs>0,
         flushThrough,
-        triangulate: p => THREE.ShapeUtils.triangulateShape(p.map(q => new THREE.Vector2(q[0], q[1])), []) });
+        triangulate: (p,holes=[]) => THREE.ShapeUtils.triangulateShape(p.map(q => new THREE.Vector2(q[0], q[1])), holes.map(h=>h.map(q=>new THREE.Vector2(...q)))) });
       groundSkirt(LITM);
-      const delta = RLAND.alignObjects({ lists: [LIT, FLAT, LAMPH], items: SMASH, props: PROPS, benches: BENCHES, baseH: terrainH });
-      SEAS.raiseLand(delta);
       RLAND.clearReadCaches();
       yield* flushLandStage();
-    } finally { LITM.landPages(false); }
-  });
+      const g=LITM.mesh(litMat);if(g.children.length){groups.push(g);scene.add(g);}
+    } finally { LITM.landPages(false);LAND_POS.release(); }
+  }
   tm('seasons', SEAS.seasonSteps);                // сугробы, ёлки, гирлянды — шагами (latebuild.js)
   if (!INTRO) tm('trails', WASTE.trails);         // тропинки наискосок, вытоптанное у лавочек, лужи — после дворов и лавочек (wastelands.js)
 
@@ -6062,25 +6094,34 @@ function buildCity () {
   HUR.holeMat(flatMat);
   FSH.mat(litMat); FSH.mat(flatMat);            // тени домов: маска в шейдере земли и разметки (fakeshadows.js)
   const groups = [];
+  let landPackedMat=null,landPaletteMat=null,landPaletteTex=null,landPaletteRevision=-1;
   // Новая земля не держит свои массивы одновременно со всей прежней
   // статикой. Готовая стадия проходит ту же склейку и загрузку клеток.
   function* flushLandStage (M = LITM, accept = null) {
     // При ?nolate очередь исполняется ещё до создания материалов.
     if (!LATE.busy()) return;
+    const mat=M===FLATM?flatMat:litMat;
     const tmp = new THREE.Scene(), target = new THREE.WebGLRenderTarget(4, 4);
     const g = new THREE.Group(); g.matrixAutoUpdate = false; g.matrixWorldAutoUpdate = false; scene.add(g);
     const upload = list => {
       const parents = list.map(m => m.parent);
-      for (const m of list) { m.frustumCulled = false; tmp.add(m); }
+      for (const m of list) {
+        if(m.geometry.userData.landPalette){
+          if(!landPaletteTex){landPaletteTex=new THREE.DataTexture(LAND_POS.palette,256,1,THREE.RGBAFormat);landPaletteTex.minFilter=landPaletteTex.magFilter=THREE.NearestFilter;landPaletteTex.generateMipmaps=false;}
+          if(landPaletteRevision!==LAND_POS.revision){landPaletteTex.needsUpdate=true;landPaletteRevision=LAND_POS.revision;}
+          m.material=landPaletteMat||(landPaletteMat=landPositionMaterial(litMat,LAND_POS,landPaletteTex));
+        }else if(m.geometry.userData.landPacked)m.material=landPackedMat||(landPackedMat=landPositionMaterial(litMat,LAND_POS));
+        m.frustumCulled = false; tmp.add(m);
+      }
       renderer.setRenderTarget(target); renderer.render(tmp, cam); renderer.setRenderTarget(null);
       list.forEach((m, i) => { m.frustumCulled = true; parents[i].add(m); });
     };
-    try { yield* M.prep(litMat, g, upload, true, accept); }
+    try { yield* M.prep(mat, g, upload, true, accept); }
     finally { target.dispose(); }
     if (g.children.length) groups.push(g); else scene.remove(g);
   }
   let warm4 = null;                               // прогрев шейдера склейки с признаком (см. ниже)
-  const meshNow = keep => { for (const g of [...(RLAND.ON ? [GROUND_M.mesh(litMat, keep)] : []), LITM.mesh(litMat, keep), FLATM.mesh(flatMat, keep)]) { if (g.children.length) { groups.push(g); scene.add(g); } } };
+  const meshNow = keep => { for (const g of [...(RLAND.ON&&keep ? [GROUND_M.mesh(litMat, keep)] : []), LITM.mesh(litMat, keep), FLATM.mesh(flatMat, keep)]) { if (g.children.length) { groups.push(g); scene.add(g); } } };
   if (LATE.busy()) {                              // поздняя сборка: видимое — в сцену сразу, в видеокарту — при первом кадре
     meshNow(true);
     /* клетки меню — цвет тремя байтами (как лежит), последняя склейка — четырьмя (признак: реквизит, мелочь, плафоны) — это
@@ -6133,6 +6174,7 @@ function buildCity () {
     if (warm4) { for (const w of warm4) scene.remove(w); warm4[0].geometry.dispose(); warm4 = null; }
     BUILD_T.meshLate = Math.round(ms + performance.now() - t0);
   });
+  if(RLAND.ON)LATE.add('raisedlandSurface',buildRaisedLandSurface);
   WINS.build(scene);                              // окна — по клеткам, один материал (windows.js)
   PAINT.build(scene);                             // муралы — один меш (citypaint.js)
   /* Всю статику — сразу в видеокарту, одним кадром в крохотную цель:
@@ -8947,7 +8989,7 @@ function carShadow () {
    на 15—18 см. Теперь кузов — на верх того, что под ним. Поднятый бордюр (0,28) — отдельно:
    у игрока V.kerb, чужие на тротуар не заезжают. На мосту — настил (surfaceAt), без добавки */
 function paveLift (x, z) {
-  if(RLAND.ST.built){
+  if(RLAND.ST.supportReady||RLAND.ST.built){
     const paved=RLAND.cover.height(x,z),grass=RLAND.green.height(x,z);
     if(RLAND.onLand(x,z))return Math.max(.03,RLAND.finalMask?.ready?grass:grass>paved?grass:0);
     if(Number.isFinite(paved)&&paved<.49)return Math.max(.03,paved);

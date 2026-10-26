@@ -65,8 +65,10 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[]){
     groups.clear();weld();
     // Подгонка общей точки может оставить обратный шип из нескольких
     // вершин. Убираем его после подгонки, до опоры, рисунка и камня.
+    n=0;
     for(const group of pending){
       const cleaned=unionLandRegions(group.regions,group.core);removedRegions.push(...subtractLandRegions(group.regions,cleaned));group.regions=cleaned;
+      if(++n%16===0)yield 'чистые стыки газонов';
     }
     pruneLandIslands(pending,{onRemove:p=>removedRegions.push(p),open:(x,z)=>{const state=stateAt(x,z);return state===undefined||state===false&&fallback(x,z);}});n=0;
     for(const {regions,triangulate}of pending){
@@ -77,6 +79,9 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[]){
         for(const ring of [outer,...holes])for(let i=0;i<ring.length;i++)segments.push(...ring[i],...ring[(i+1)%ring.length]);
         if(kept.rawCount>=16384)kept.compact();
       }
+      // Вершины уже записаны в поле и контур численно. Следующие
+      // группы не используют исходные кольца этой группы.
+      regions.length=0;
       if(++n%128===0)yield 'единый газон';
     }
     pending.length=0;kept.compact();segments=Float64Array.from(segments);ready=true;

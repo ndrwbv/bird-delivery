@@ -63,6 +63,18 @@ const smoke = (args, label) => async () => {
 };
 
 const CHECKS = [
+  { id: 'land-ready', name: 'земля: готовая опора до окончательной склейки', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'landready-geometry.mjs')]);
+    return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };
+  } },
+  { id: 'land-positions', name: 'новая земля: компактные позиции и закрытые общие торцы', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'landpositions-geometry.mjs')]);
+    return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };
+  } },
+  { id: 'land-surface', name: 'земля: единая поверхность без внутренних разрезов', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'landpatches-geometry.mjs')]);
+    return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };
+  } },
   { id: 'land-pages', name: 'земля: временные страницы вершин без копий', group: 1, run: async () => {
     const r = await sh(process.execPath, [path.join(__dirname, 'landmeshpages-geometry.mjs')]);
     return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };

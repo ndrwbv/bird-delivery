@@ -7,12 +7,13 @@ import {landCleanTileRegion,landCleanTile,landWidth,contourWidth,LAND_MIN_WIDTH}
 import {createLandMask} from './landmask.js';
 import {landPaintEdges,shoreLine} from './landlayers.js';
 import {mergeLandPieces} from './landpieces.js';
+import {landSurfacePieces,SURFACE_STATS} from './landpatches.js';
 export const ON = typeof location!=='undefined'&&new URLSearchParams(location.search).has('raisedland');
 export const LIFT=LAND_LIFT;
 export const cover=ON?createLandCover():null,green=ON?createLandCover():null;
 const rawLand=(x,z)=>green.height(x,z)>cover.height(x,z)||!cover.covered(x,z);
 export const finalMask=ON?createLandMask(rawLand,(...args)=>[...cover.breaks(...args),...green.breaks(...args)]):null;
-export const ST={paving:0,green:0,top:0,walls:0,built:false};
+export const ST={paving:0,green:0,top:0,walls:0,built:false,supportReady:false,surface:SURFACE_STATS};
 export function compact(){if(ON){cover.compact();green.compact();}}
 export function clearReadCaches(){if(ON){cover.clearReadCache();green.clearReadCache();finalMask.kept.clearReadCache();}}
 export function boundaries(options){return finalMask?.ready?finalMask.boundaries({floorAt:(x,z)=>{const p=cover.height(x,z);return Number.isFinite(p)?p:.085;},floorBreaks:(...args)=>cover.breaks(...args,.49),...options,accept:(x,z)=>!outside?.(x,z)&&(!options?.accept||options.accept(x,z))}):landBoundary(cover,green,options);}
@@ -20,6 +21,11 @@ export function boundaries(options){return finalMask?.ready?finalMask.boundaries
 export function widthPatches(core){return landCleanTile(cover,green,core,LAND_MIN_WIDTH,0);}
 export function widthAt(edge,t){return finalMask?.ready?contourWidth(finalMask,edge,t):landWidth(cover,green,edge,t);}
 let building=false, outside=null;
+export function activate(skip=null){
+  if(!ON)return;
+  if(!finalMask.ready)throw Error('Область земли ещё не готова');
+  outside=skip;ST.supportReady=true;
+}
 function classifiedLand(x,z){return finalMask?.ready?finalMask.contains(x,z):rawLand(x,z);}
 export function boundaryAt(x,z,nx,nz){
   return [.12,.25,.5].some(r=>classifiedLand(x+nx*r,z+nz*r)&&!classifiedLand(x-nx*r,z-nz*r));
@@ -45,7 +51,7 @@ export function topOffset(x,z,h){
   return landLift(h)+(finalMask?.ready?Math.max(0,g):g>p?Math.max(0,g):0);
 }
 export function onLand(x,z){
-  if(!ST.built||outside?.(x,z))return false;
+  if(!(ST.supportReady||ST.built)||outside?.(x,z))return false;
   return classifiedLand(x,z);
 }
 export function offset(x,z,h){return onLand(x,z)?landLift(h):0;}
@@ -70,7 +76,7 @@ export function alignObjects({lists,items,props,benches,baseH}){
   return delta;
 }
 export function record(ax,az,bx,bz,cx,cz,lift,r,g,b,initial=false){
-  if(!ON||building||ST.built||lift<.015||lift>.5)return;
+  if(!ON||building||ST.supportReady||ST.built||lift<.015||lift>.5)return;
   // Существующие зелёные вставки поверх плитки сохраняются как островки земли.
   const lawn=g>r*1.14&&g>b*1.14;
   const C=lawn?green:cover,t=C.triangle(ax,az,bx,bz,cx,cz,lift);
@@ -149,7 +155,10 @@ export function* cleanContours({M,triangulate,skip,terrain,groundH}){
     // Все клетки считают исходный город: добавляем исправления в общий
     // контур только после обхода, чтобы порядок клеток не влиял на форму.
     yield* finalMask.finishSteps();
-    for(const patch of finalMask.removedRegions)fillPatch(patch);
+    for(let i=0;i<finalMask.removedRegions.length;i++){
+      fillPatch(finalMask.removedRegions[i]);finalMask.removedRegions[i]=null;
+      if(i%64===63)yield 'завершённые покрытия';
+    }
     finalMask.removedRegions.length=0;
     fills.compact();
     // Заполнение уже упаковано: переносим готовые страницы, не создавая
@@ -176,6 +185,11 @@ export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,trian
     // Под зданием сохраняем исходный пол, без поднятого газона в дверях.
     prepare(buildings,triangulate);
     const {g,nx,nz,x0,z0}=terrain;
+    const tessellate=(outer,holes)=>({points:[...outer,...holes.flat()],triangles:triangulate(outer,holes)});
+    const surfaceParts=(parts,extra=0)=>landSurfacePieces(mergeLandPieces(parts),tessellate,(a,b)=>{
+      const y=p=>{const h=groundH(...p);return Math.fround(h+landLift(h)+extra);};
+      return Math.fround(a[0])===Math.fround(b[0])&&Math.fround(a[1])===Math.fround(b[1])&&y(a)===y(b);
+    });
     const draw=(p,extra=0,raise=true)=>{
       const points=p.map(q=>[q[0],q[1],groundH(...q)]);
       for(const part of raise?shoreParts(points):[points])for(let i=1;i<part.length-1;i++){
@@ -197,7 +211,7 @@ export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,trian
       // равные по высоте используют последний записанный цвет.
       const visible=green.cut(t.p,t.lift,u=>u.lift>t.lift||u.id>t.id);
       for(const piece of visible)for(const local of terrainParts(piece,terrain)){
-        for(const part of mergeLandPieces([...(finalMask.ready?finalMask.parts(local,q=>cover.cut(q,t.lift)):cover.cut(local,t.lift))])){
+        for(const part of surfaceParts([...(finalMask.ready?finalMask.parts(local,q=>cover.cut(q,t.lift)):cover.cut(local,t.lift))],t.lift)){
           M.grad((x,z,c,o)=>{c[o]=rgb[0];c[o+1]=rgb[1];c[o+2]=rgb[2];});
           draw(part,t.lift);M.grad(null);
         }
@@ -221,7 +235,7 @@ export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,trian
         for(const tri of [[[x,z],[x+g,z],[x,z+g]],[[x+g,z+g],[x,z+g],[x+g,z]]]){
           const raised=!tri.every(q=>skip?.(...q));
           const parts=raised?(finalMask.ready?finalMask.parts(tri,q=>cover.cut(q)):cover.cut(tri)):[tri];
-          const bareParts=mergeLandPieces([...parts].flatMap(p=>raised?green.cut(p):[p]));
+          const bareParts=surfaceParts([...parts].flatMap(p=>raised?green.cut(p):[p]));
           const hex=groundHex(groundH((tri[0][0]+tri[1][0]+tri[2][0])/3,(tri[0][1]+tri[1][1]+tri[2][1])/3));
           // Под цветным слоем нет второй скрытой поверхности земли.
           for(const bare of bareParts){

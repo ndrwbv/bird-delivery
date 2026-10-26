@@ -57,7 +57,9 @@ export function createLandCover(cell=32) {
   // n — число фигур; end — следующий id. Перенос готовых страниц
   // сохраняет неполный блок, поэтому после него id могут иметь пропуски.
   let packed=null;
-  const key=(i,j)=>i+','+j;
+  // Клетки города — пара знаковых 16-битных индексов. Вне этого
+  // диапазона сохраняем строковый ключ, без наложения далёких областей.
+  const key=(i,j)=>i>=-32768&&i<=32767&&j>=-32768&&j<=32767?(i<<16)|(j&65535):i+','+j;
   const stats={triangles:0,queries:0,cut:0,parts:0};
   const count=()=>all.length+(packed?.n||0);
   function read(id){
@@ -236,7 +238,7 @@ export function createLandCover(cell=32) {
     },
     clearReadCache(){cache.clear();},
     inBox(bounds){const out=[];each(bounds,t=>out.push(t));return out;},
-    *cells(){for(const k of grid.keys()){const [i,j]=k.split(',').map(Number);yield [i*cell,j*cell,(i+1)*cell,(j+1)*cell];}},
+    *cells(){for(const k of grid.keys()){const [i,j]=typeof k==='number'?[k>>16,k<<16>>16]:k.split(',').map(Number);yield [i*cell,j*cell,(i+1)*cell,(j+1)*cell];}},
     get storageBytes(){return packed?packed.blocks.reduce((s,b)=>s+b.xy.byteLength+b.heights.byteLength+b.indices.byteLength+b.heightIndex.byteLength+b.meta.byteLength+b.metaValues.byteLength,0):0;},
     get initialTriangles(){return {[Symbol.iterator]:function*(){
       if(packed)for(let page=0;page<packed.blocks.length;page++){const b=packed.blocks[page];for(let i=0;i<b.n;i++)if(b.metaValues[b.meta[i]]&0x1000000)yield read(page*PAGE+i);}
