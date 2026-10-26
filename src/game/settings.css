@@ -48,7 +48,7 @@
   color: var(--pp-ink); border-bottom: 2px dashed rgba(138, 107, 78, .45); }
 #panel[data-kind="settings"] .set-list .set-row > span b { font-weight: normal; color: var(--pp-ink); }
 /* кнопка строки — поле анкеты: жёлтое, чернильная рамка, вдавливается */
-#panel[data-kind="settings"] .set-list .set-row button { min-height: 40px; min-width: min(100%, calc(var(--u) * 11)); padding: calc(var(--u) * .5) calc(var(--u) * .8); font-size: calc(var(--u) * .95);
+#panel[data-kind="settings"] .set-list .set-row :is(button, select) { min-height: 40px; min-width: min(100%, calc(var(--u) * 11)); padding: calc(var(--u) * .5) calc(var(--u) * .8); font-size: calc(var(--u) * .95);
   color: var(--pp-ink); background: var(--pp-yellow); border: 3px solid var(--pp-ink); border-radius: 6px; box-shadow: 0 4px 0 var(--pp-ink);
   transition: translate .18s var(--pp-spring), box-shadow .18s var(--pp-spring); }
 #panel[data-kind="settings"] .set-list .set-row button:hover { background: var(--pp-orange); }
@@ -109,7 +109,7 @@
 /* 1280×720 (компьютер, Дека в окне): графика (10 строк) и управление вылезали на 25—50 px и листались — строки плотнее */
 @media (max-height: 760px) and (min-height: 561px) {
   #panel[data-kind="settings"] .set-list .set-row { padding: calc(var(--u) * .2) 0; }
-  #panel[data-kind="settings"] .set-list .set-row button { min-height: 36px; padding-block: calc(var(--u) * .35); }
+  #panel[data-kind="settings"] .set-list .set-row :is(button, select) { min-height: 36px; padding-block: calc(var(--u) * .35); }
   .set-keys { padding-block: calc(var(--u) * .6); }
   .set-keys .pm-keys-g { row-gap: calc(var(--u) * .25); }
 }
@@ -123,7 +123,7 @@
   .set-list { max-width: none; }
   .set-list .set-rows { display: grid; grid-template-columns: 1fr 1fr; column-gap: calc(var(--u) * 1.2); }
   .set-list .lang-grid { grid-template-columns: repeat(4, 1fr); }
-  #panel[data-kind="settings"] .set-list .set-row button { min-height: 30px; }
+  #panel[data-kind="settings"] .set-list .set-row :is(button, select) { min-height: 30px; }
   .set-list .lang-grid button { min-height: 28px; }
   .set-keys .pm-keys-g { grid-template-columns: auto 1fr auto 1fr; }
   .set-foot .set-close { min-height: 30px; padding: .3em .7em; }
@@ -139,3 +139,7 @@
   .set-foot { flex-direction: column; align-items: stretch; gap: 6px; }
   #panel[data-kind="settings"] .set-foot .set-cred { text-align: center; }
 }
+
+#panel[data-kind="settings"] .set-list .set-row select { margin-left: auto; box-sizing: border-box; font-family: inherit; font-weight: inherit; cursor: pointer; max-width: 100%; }
+
+#panel[data-kind="settings"] .set-list .set-row > label { flex: 1 1 0; min-width: min(100%, 9em); }
