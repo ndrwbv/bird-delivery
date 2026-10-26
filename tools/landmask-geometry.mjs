@@ -22,6 +22,23 @@ const wallEdges=[...mask.boundaries({floorAt:(x,z)=>Number.isFinite(wall.height(
 const bottom=wallEdges.filter(e=>Math.abs(e.a[1]-2)<1e-8&&Math.abs(e.b[1]-2)<1e-8);
 assert.ok(Math.abs(bottom.reduce((s,e)=>s+Math.hypot(e.b[0]-e.a[0],e.b[1]-e.a[1]),0)-7)<1e-7,'Стена скрывает только свой метр края, а не весь длинный отрезок');
 assert.ok(bottom.some(e=>Math.abs(e.b[0]-5)<1e-7)&&bottom.some(e=>Math.abs(e.a[0]-6)<1e-7),'Оба торца заканчиваются у точных краёв стены');
+const covers=(edge,others)=>{
+  const dx=edge.b[0]-edge.a[0],dz=edge.b[1]-edge.a[1],l2=dx*dx+dz*dz,intervals=[];
+  for(const e of others){
+    if(e.lift!==edge.lift||[e.a,e.b].some(p=>Math.abs(dx*(p[1]-edge.a[1])-dz*(p[0]-edge.a[0]))>1e-8*Math.sqrt(l2)))continue;
+    const t=[e.a,e.b].map(p=>((p[0]-edge.a[0])*dx+(p[1]-edge.a[1])*dz)/l2).sort((a,b)=>a-b);
+    if(t[1]>0&&t[0]<1)intervals.push([Math.max(0,t[0]),Math.min(1,t[1])]);
+  }
+  intervals.sort((a,b)=>a[0]-b[0]);let end=0;
+  for(const[a,b]of intervals){assert.ok(a<=end+1e-8,'Не перекрываем отсутствующий камень или пол другой высоты');end=Math.max(end,b);}
+  assert.ok(end>=1-1e-8,'Вся исходная граница сохранена');
+};
+for(const includeWalls of[false,true]){
+  const options={includeWalls,floorAt:(x,z)=>Number.isFinite(wall.height(x,z))?.5:x<8?.085:.11,floorBreaks:(ax,az,bx,bz)=>[...wall.breaks(ax,az,bx,bz,.49),...(bx!==ax&&8>Math.min(ax,bx)&&8<Math.max(ax,bx)?[(8-ax)/(bx-ax)]:[])]};
+  const original=[...mask.boundaries({...options,coalesce:false})].filter(Boolean),merged=[...mask.boundaries(options)].filter(Boolean);
+  assert.ok(merged.length<=original.length);
+  for(const e of original)covers(e,merged);for(const e of merged)covers(e,original);
+}
 assert.ok(Math.abs([...mask.parts(rect(28,12,36,16))].reduce((s,p)=>s+area(p),0)-16)<1e-6,'Вне очищенной области открытая земля сохраняется');
 const joined=createLandMask();
 joined.add([0,0,32,32],[{outer:rect(20,4,32.005,12),holes:[]}],triangulate);

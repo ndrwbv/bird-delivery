@@ -107,7 +107,7 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[]){
       return state===true?heights[i]>-Infinity:state===undefined?true:fallback(x+nx*sign*1e-7,z+nz*sign*1e-7);
     });
   }
-  function* boundaries({accept=()=>true,stats={},floorAt=()=>.085,floorBreaks=()=>[],includeWalls=false}={}){
+  function* boundaries({accept=()=>true,stats={},floorAt=()=>.085,floorBreaks=()=>[],includeWalls=false,coalesce=true}={}){
     const seen=new Set(),emitted=new Set(),point=(x,z)=>Math.round(x*1e6)+','+Math.round(z*1e6);
     const edgeKey=(ax,az,bx,bz)=>{const a=point(ax,az),b=point(bx,bz);return a<b?a+':'+b:b+':'+a;};
     stats.edges=stats.segments=stats.length=0;
@@ -120,19 +120,31 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[]){
       // заканчивается у самой стены, а не у конца целого отрезка.
       for(const side of [-1,1])cuts.push(...floorBreaks(ax+nx*.01*side,az+nz*.01*side,bx+nx*.01*side,bz+nz*.01*side));
       cuts.sort((a,b)=>a-b);
+      let run=null;
+      const flush=()=>{
+        if(!run)return null;
+        const {a,b,left,lift}=run;run=null;
+        let p=[ax+dx*a,az+dz*a],q=[ax+dx*b,az+dz*b];if(!left)[p,q]=[q,p];
+        stats.segments++;stats.length+=(b-a)*len;return {a:p,b:q,lift};
+      };
       for(let j=1;j<cuts.length;j++){
-        const a=cuts[j-1],b=cuts[j];if((b-a)*len<1e-5)continue;
+        const a=cuts[j-1],b=cuts[j];if((b-a)*len<1e-5){if(b>a&&run)yield flush();continue;}
         const x=ax+dx*(a+b)/2,z=az+dz*(a+b)/2;
         // Стороны определяются полуплоскостями треугольников. Проба с
         // отступом перескакивала через соседний край у перекрытия и
         // ошибочно превращала внутреннюю линию в отдельный бордюр.
         const [left,right]=sides(x,z,nx,nz);
-        if(left===right||!accept(x,z))continue;
-        const lift=floorAt(x+(left?-nx:nx)*.01,z+(left?-nz:nz)*.01);if(lift>=.49&&!includeWalls)continue;
+        if(left===right||!accept(x,z)){if(run)yield flush();continue;}
+        const lift=floorAt(x+(left?-nx:nx)*.01,z+(left?-nz:nz)*.01);if(lift>=.49&&!includeWalls){if(run)yield flush();continue;}
         let p=[ax+dx*a,az+dz*a],q=[ax+dx*b,az+dz*b];if(!left)[p,q]=[q,p];
-        const k=edgeKey(...p,...q);if(emitted.has(k))continue;emitted.add(k);
-        stats.segments++;stats.length+=(b-a)*len;yield {a:p,b:q,lift};
+        const k=edgeKey(...p,...q);if(emitted.has(k)){if(run)yield flush();continue;}emitted.add(k);
+        if(!coalesce){stats.segments++;stats.length+=(b-a)*len;yield {a:p,b:q,lift};continue;}
+        // Внутренние диагонали поисковых треугольников не являются
+        // новыми узлами бордюра. Высота, сторона и все пробелы сохранены.
+        if(run&&run.b===a&&run.left===left&&run.lift===lift)run.b=b;
+        else{if(run)yield flush();run={a,b,left,lift};}
       }
+      if(run)yield flush();
       if(i%512===0)yield null;
     }
   }

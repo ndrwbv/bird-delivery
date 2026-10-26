@@ -63,6 +63,10 @@ const smoke = (args, label) => async () => {
 };
 
 const CHECKS = [
+  { id: 'land-pieces', name: 'земля: точное объединение соседних граней', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'landpieces-geometry.mjs')]);
+    return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };
+  } },
   { id: 'land-layers', name: 'земля: один видимый слой и закрытые торцы', group: 1, run: async () => {
     const r = await sh(process.execPath, [path.join(__dirname, 'landlayers-geometry.mjs')]);
     return { status: r.code === 0 ? 'ok' : 'fail', info: (r.code === 0 ? r.out : r.err).trim() };

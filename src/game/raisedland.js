@@ -6,6 +6,7 @@ import {landBoundary} from './landboundary.js';
 import {landCleanTileRegion,landCleanTile,landWidth,contourWidth,LAND_MIN_WIDTH} from './landclean.js';
 import {createLandMask} from './landmask.js';
 import {landPaintEdges,shoreLine} from './landlayers.js';
+import {mergeLandPieces} from './landpieces.js';
 export const ON = typeof location!=='undefined'&&new URLSearchParams(location.search).has('raisedland');
 export const LIFT=LAND_LIFT;
 export const cover=ON?createLandCover():null,green=ON?createLandCover():null;
@@ -89,15 +90,16 @@ export function prepare(buildings,triangulate){
   prepared=true;
   compact();
 }
-export function* cleanContours({M,triangulate,skip}){
+export function* cleanContours({M,triangulate,skip,terrain,groundH}){
   const fills=createLandCover();
-  ST.minWidth=LAND_MIN_WIDTH;ST.cleanedArea=0;ST.fillTriangles=0;ST.cleanTiles=0;
+  ST.minWidth=LAND_MIN_WIDTH;ST.cleanedArea=0;ST.fillTriangles=0;ST.fillDraw=0;ST.cleanTiles=0;
   const distance=(x,z,a,b)=>{
     const dx=b[0]-a[0],dz=b[1]-a[1],k=Math.max(0,Math.min(1,((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz||1)));
     return Math.hypot(x-a[0]-dx*k,z-a[1]-dz*k);
   };
   const fillPatch=patch=>{
     const {points,triangles}=triangulate(patch.outer,patch.holes);
+    const layers=new Map();
     for(const ids of triangles){
       const p=ids.map(i=>points[i]),x=(p[0][0]+p[1][0]+p[2][0])/3,z=(p[0][1]+p[1][1]+p[2][1])/3;
       const area=Math.abs((p[1][0]-p[0][0])*(p[2][1]-p[0][1])-(p[1][1]-p[0][1])*(p[2][0]-p[0][0]))/2;
@@ -114,10 +116,21 @@ export function* cleanContours({M,triangulate,skip}){
       const rgb=closest?.rgb||[177,173,159];
       const t=fills.triangle(...p[0],...p[1],...p[2],floor);if(!t)continue;
       t.rgb=rgb;
-      M.grad((x,z,c,o)=>{c[o]=rgb[0];c[o+1]=rgb[1];c[o+2]=rgb[2];});
-      M.dtri(...p[0],...p[1],...p[2],floor);M.grad(null);
+      const key=floor+'|'+rgb.join(',');let layer=layers.get(key);
+      if(!layer)layers.set(key,layer={floor,rgb,parts:[]});layer.parts.push(t.p);
       ST.cleanedArea+=area;ST.fillTriangles++;
       if(fills.rawCount>=16384)fills.compact();
+    }
+    // Одноцветное заполнение тоже не должно хранить внутренние
+    // диагонали исходной триангуляции под видом отдельных поверхностей.
+    for(const {floor,rgb,parts}of layers.values()){
+      M.grad((x,z,c,o)=>{c[o]=rgb[0];c[o+1]=rgb[1];c[o+2]=rgb[2];});
+      for(const p of mergeLandPieces(parts))for(const q of terrainParts(p,terrain))for(let i=1;i<q.length-1;i++){
+        const a=q[0],b=q[i],c=q[i+1];
+        if(Math.abs((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]))<1e-8)continue;
+        M.up(a[0],groundH(...a)+floor,a[1],b[0],groundH(...b)+floor,b[1],c[0],groundH(...c)+floor,c[1]);ST.fillDraw++;
+      }
+      M.grad(null);
     }
   };
   building=true;
@@ -187,18 +200,17 @@ export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,trian
         for(const tri of [[[x,z],[x+g,z],[x,z+g]],[[x+g,z+g],[x,z+g],[x+g,z]]]){
           const raised=!tri.every(q=>skip?.(...q));
           const parts=raised?(finalMask.ready?finalMask.parts(tri,q=>cover.cut(q)):cover.cut(tri)):[tri];
-          for(const p of parts){
-            const hex=groundHex(groundH((tri[0][0]+tri[1][0]+tri[2][0])/3,(tri[0][1]+tri[1][1]+tri[2][1])/3));
-            // Под цветным слоем нет второй скрытой поверхности земли.
-            for(const bare of raised?green.cut(p):[p]){
-              M.color(hex);draw(bare,0,raised);
-              if(!raised)continue;
-              for(const edge of landPaintEdges(bare,green,finalMask.ready?finalMask:null)){
-                const a=[...edge.a,groundH(...edge.a)],b=[...edge.b,groundH(...edge.b)];M.color('#829867');
-                for(const [u,v] of shoreLine(a,b)){
-                  const yu=u[2]+landLift(u[2]),yv=v[2]+landLift(v[2]);
-                  M.quad(u[0],yu,u[1],v[0],yv,v[1],v[0],yv+edge.height,v[1],u[0],yu+edge.height,u[1]);ST.paintWalls++;
-                }
+          const bareParts=mergeLandPieces([...parts].flatMap(p=>raised?green.cut(p):[p]));
+          const hex=groundHex(groundH((tri[0][0]+tri[1][0]+tri[2][0])/3,(tri[0][1]+tri[1][1]+tri[2][1])/3));
+          // Под цветным слоем нет второй скрытой поверхности земли.
+          for(const bare of bareParts){
+            M.color(hex);draw(bare,0,raised);
+            if(!raised)continue;
+            for(const edge of landPaintEdges(bare,green,finalMask.ready?finalMask:null)){
+              const a=[...edge.a,groundH(...edge.a)],b=[...edge.b,groundH(...edge.b)];M.color('#829867');
+              for(const [u,v] of shoreLine(a,b)){
+                const yu=u[2]+landLift(u[2]),yv=v[2]+landLift(v[2]);
+                M.quad(u[0],yu,u[1],v[0],yv,v[1],v[0],yv+edge.height,v[1],u[0],yu+edge.height,u[1]);ST.paintWalls++;
               }
             }
           }
@@ -213,7 +225,7 @@ export function* build({M,terrain,heights,groundH,groundHex,skip,buildings,trian
       // У наложенных газонов остаётся только верхняя поверхность;
       // равные по высоте используют последний записанный цвет.
       const visible=green.cut(t.p,t.lift,u=>u.lift>t.lift||u.id>t.id);
-      for(const piece of visible)for(const local of terrainParts(piece,terrain))for(const part of finalMask.ready?finalMask.parts(local,q=>cover.cut(q,t.lift)):cover.cut(local,t.lift)){
+      for(const piece of visible)for(const local of terrainParts(piece,terrain))for(const part of mergeLandPieces([...(finalMask.ready?finalMask.parts(local,q=>cover.cut(q,t.lift)):cover.cut(local,t.lift))])){
         M.grad((x,z,c,o)=>{c[o]=rgb[0];c[o+1]=rgb[1];c[o+2]=rgb[2];});
         draw(part,t.lift);M.grad(null);
       }

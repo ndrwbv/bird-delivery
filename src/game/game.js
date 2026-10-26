@@ -6008,7 +6008,7 @@ function buildCity () {
   if (RLAND.ON) LATE.add('raisedland', function* () {
     CURB_M.discard();
     RLAND.prepare(CITY.buildings, p => THREE.ShapeUtils.triangulateShape(p.map(q => new THREE.Vector2(q[0], q[1])), []));
-    yield* RLAND.cleanContours({M:LITM,skip:DMASK?farOut:null,triangulate:(outer,holes)=>({
+    yield* RLAND.cleanContours({M:LITM,terrain:TER,groundH:terrainH,skip:DMASK?farOut:null,triangulate:(outer,holes)=>({
       points:[...outer,...holes.flat()],
       triangles:THREE.ShapeUtils.triangulateShape(outer.map(p=>new THREE.Vector2(...p)),holes.map(h=>h.map(p=>new THREE.Vector2(...p))))
     })});

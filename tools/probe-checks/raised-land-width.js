@@ -3,7 +3,7 @@
 await until(()=>d.RLAND?.ST.built&&!d.LATE.busy(),180000);
 const L=d.RLAND;if(!L?.finalMask?.ready)throw Error('Окончательная область газона не собрана');
 const stats={},sample=[];let edges=0,points=0,narrow=0,min=2;
-for(const edge of L.boundaries({includeWalls:true,stats,accept:(x,z)=>d.RLAND_BASE(x,z)>.8})){
+for(const edge of L.boundaries({includeWalls:true,stats,coalesce:false,accept:(x,z)=>d.RLAND_BASE(x,z)>.8})){
   if(!edge){await wait(0);continue;}
   for(const t of [.17,.5,.83]){
     const width=L.widthAt(edge,t);points++;min=Math.min(min,width);
