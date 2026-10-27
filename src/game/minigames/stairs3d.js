@@ -555,7 +555,7 @@ export function create (box, o) {
     const cl = o.person;
     manP = cl || makePerson({ seed: (seed ^ 0x7a11) >>> 0, fem: false });
     // Сюжетный клиент берёт внешность из данных персонажа; обычным заказам остаётся прежний временный облик.
-    man = human(manP, cl && cl.story ? { summer: true } : CLIENT_LOOK);
+    man = human(manP, cl && cl.story ? { summer: true, q: cl.look && cl.look.q } : CLIENT_LOOK);
     const dx = doorX(P.door);
     man.position.set(dx + 0.08, tgt * FH, ZB - 0.42);
     man.rotation.y = 0;

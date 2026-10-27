@@ -1114,7 +1114,7 @@ const portraitKey = (person, Lk, size, mood, talk) => (person.id || Lk.seed) + '
 export function faceDataURL (person, size = 128, mood = '', talk = 0) {
   if (!person) return '';
   // проба (ветка test/people): человек-модель Quaternius — снимок её головы (qpeople.js qPortrait)
-  const qp = person.look && qPortrait(person.look, () => buildSpec(person.look, {}), size, person.id || person.look.seed);
+  const qp = person.look && qPortrait(person.look, () => buildSpec(person.look, { summer: !!person.story }), size, person.id || person.look.seed);
   if (qp) return qp;
   FACE_STATS.n++;
   const Lk = faceLook(person, mood), key = portraitKey(person, Lk, size, mood, talk);
@@ -1203,7 +1203,7 @@ function soonStep (dl) {
        (таблица мест после вручения, чат коллеги), это был рывок шага до 9 мс */
     if (person.look && pickQ(person.look)) {
       const t0 = performance.now();
-      if (qPortrait(person.look, () => buildSpec(person.look, {}), size, person.id || person.look.seed)) { FACE_STATS.soonQ = (FACE_STATS.soonQ || 0) + 1; n++; FACE_STATS.soonMs += performance.now() - t0; continue; }
+      if (qPortrait(person.look, () => buildSpec(person.look, { summer: !!person.story }), size, person.id || person.look.seed)) { FACE_STATS.soonQ = (FACE_STATS.soonQ || 0) + 1; n++; FACE_STATS.soonMs += performance.now() - t0; continue; }
     }
     const Lk = faceLook(person, mood), key = portraitKey(person, Lk, size, mood, talk);
     if (PORTRAITS.has(key)) continue;
@@ -1218,7 +1218,7 @@ function soonStep (dl) {
 export function faceReady (person, size = 128, mood = '', talk = 0) {
   if (!person) return '';
   // проба (ветка test/people): у человека-модели кадры разговора — тот же снимок головы, не старое лицо (talkface.js)
-  const qp = person.look && qPortrait(person.look, () => buildSpec(person.look, {}), size, person.id || person.look.seed);
+  const qp = person.look && qPortrait(person.look, () => buildSpec(person.look, { summer: !!person.story }), size, person.id || person.look.seed);
   if (qp) return qp;
   const Lk = faceLook(person, mood), key = portraitKey(person, Lk, size, mood, talk), u = PORTRAITS.get(key);
   if (u) { PORTRAITS.delete(key); PORTRAITS.set(key, u); }

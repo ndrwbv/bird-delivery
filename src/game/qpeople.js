@@ -48,7 +48,8 @@ export function pickQ (Lk) {
   if (!QP.all && r() >= QP.rate) return null;
   const fam = Lk.f ? (r() < 0.65 ? 'F' : 'A') : 'M';
   const F = family(fam), ok = F.models.map((m, i) => i).filter(i => F.models[i].name !== 'winter'), k = () => ok[(r() * ok.length) | 0];
-  return fam === 'A' ? { fam, all: k(), seed: Lk.seed } : { fam, head: k(), body: k(), legs: k(), feet: k(), seed: Lk.seed };
+  const q = fam === 'A' ? { fam, all: k(), seed: Lk.seed } : { fam, head: k(), body: k(), legs: k(), feet: k(), seed: Lk.seed };
+  return Lk.q && typeof Lk.q === 'object' ? qForce(q, Lk, Lk.q) : q;
 }
 
 /* части модели силой, по именам моделей семейства M (people.js makeHuman o.q; minigames/stairs3d.js — мужик в трусах:
