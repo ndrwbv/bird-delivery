@@ -168,7 +168,8 @@ function show (o, done) {
   const two = !!o.decline;
   const stack = two && !!o.stack;                // столбиком: верхний — accept, нижний — decline, курсор ▶
   const btns = $('.dlg-btns'), hintEl = $('.dlg-hint'), box = $('.dlg-box');
-  root.classList.toggle('compact', o.compact !== false);
+  root.classList.toggle('compact', o.compact !== false && !o.door2d);
+  root.classList.toggle('door2d', !!o.door2d);
   const col = o.color || '#ff8a2b';
   $('.dlg-bar').style.background = col;
   box.style.setProperty('--pp-accent', col);
@@ -270,10 +271,11 @@ function show (o, done) {
     done(v);
   };
   // ответить: допечатывается — сначала допечатать; допечаталась только что — ждём ARM
-  const answer = v => { if (!typed) finish(); else if (armed()) close(v); };
+  const answer = v => { if (o.paused && o.paused()) return; if (!typed) finish(); else if (armed()) close(v); };
   const tick = now => {
     raf = requestAnimationFrame(tick);
     const dt = Math.min(0.1, (now - last) / 1000);
+    if (o.paused && o.paused()) { last = now; return; }
     if (!typed) {
       acc += dt * CPS;
       while (acc >= 1 && i < full.length) {
@@ -320,6 +322,7 @@ function show (o, done) {
   const dismissMe = () => close(null);
   CUR = dismissMe;
   const key = e => {
+    if (o.paused && o.paused()) return;
     if (stack) {                                 // столбиком: стрелки / W S — курсор, Enter / пробел — ответить, 1 / 2 — сразу
       const c = e.code, eat = () => { e.preventDefault(); e.stopPropagation(); };
       if (c === 'Space' || c === 'Enter' || c === 'NumpadEnter' || c === 'KeyE') { eat(); if (!e.repeat) answer(pick !== no); }
@@ -336,9 +339,9 @@ function show (o, done) {
   };
   addEventListener('keydown', key, true);
   // клик / тап по облачку: допечатать; одна кнопка — дальше (две — отвечают кнопкой)
-  $('.dlg-bubble').onclick = () => { if (!typed) finish(); else if (!two && armed()) close(true); };
-  yes.onclick = () => { if (armed()) close(true); };
-  no.onclick = () => { if (armed()) close(false); };
+  $('.dlg-bubble').onclick = () => { if (o.paused && o.paused()) return; if (!typed) finish(); else if (!two && armed()) close(true); };
+  yes.onclick = () => { if (o.paused && o.paused()) return; if (armed()) close(true); };
+  no.onclick = () => { if (o.paused && o.paused()) return; if (armed()) close(false); };
 }
 
 /* ── реплика на ходу (line) ── */

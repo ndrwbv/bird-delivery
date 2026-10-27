@@ -20,11 +20,13 @@ if (d.DOOR.mode !== 'stairs') throw new Error('Домофон не открыл 
 d.DOOR.solve();
 await run(2);
 const stairs = d.DOOR.stairsState();
-if (!stairs?.d3 || stairs.flat !== +flat || stairs.scene?.stage !== 'dialog') throw new Error('Нет сцены у нужной квартиры');
-for (const seconds of [7, 4, 4]) {
+const oldDoor = new URLSearchParams(location.search).has('door3d');
+if (!stairs?.d3 || stairs.flat !== +flat || stairs.scene?.stage !== (oldDoor ? 'dialog' : 'door_dialogue')) throw new Error('Нет сцены у нужной квартиры');
+for (const seconds of oldDoor ? [7, 4, 4] : [7, 4]) {
   await run(seconds);
   const next = document.querySelector('#dlg .dlg-yes');
   if (!d.DLG.isOpen() || !next) throw new Error('Реплика не открылась');
+  if (!oldDoor && !document.querySelector('#door2d img')) throw new Error('Нет 2D-персонажа в диалоге');
   next.click();
   await run(0.35);
 }
@@ -34,4 +36,4 @@ const afterSms = document.querySelector('#chat')?.textContent?.includes('Мол�
 return { story: order.ord.story.storyId, flat, intercomFlat, stairsFlat: stairs.flat,
   carried: stop.carry, scenarioDone: order.ord.story.interiorDone,
   savedProgress: d.STORY.progress().gennady?.ch, delivered: d.S.delivered,
-  state: d.S.state, dialogOpen: d.DLG.isOpen(), doorOpen: d.DOOR.on(), beforeSms, afterSms };
+  state: d.S.state, dialogOpen: d.DLG.isOpen(), doorOpen: d.DOOR.on(), oldDoor, beforeSms, afterSms };

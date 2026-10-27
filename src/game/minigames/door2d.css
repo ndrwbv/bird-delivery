@@ -1,0 +1,60 @@
+/* 2D-портрет поверх живого вида подъезда; весь текст и кнопки рисует общий #dlg. */
+#door2d { position: absolute; inset: 0; z-index: 39; pointer-events: none; overflow: hidden; opacity: 0; transition: opacity .24s ease; }
+#door2d.on { opacity: 1; }
+#door2d .door2d-shade { position: absolute; inset: 0; background: linear-gradient(90deg,
+  rgba(5, 10, 16, .05) 0%, rgba(5, 10, 16, .08) 48%, rgba(17, 14, 16, .46) 60%, rgba(17, 14, 16, .72) 100%); }
+#door2d .door2d-frame { position: absolute; bottom: 0; left: clamp(34px, 9vw, 210px);
+  height: 83vh; aspect-ratio: 500 / 555; transform-origin: bottom center; }
+#door2d img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: bottom center; transform-origin: bottom center; }
+body.door-dialogue #hud-left, body.door-dialogue #hud-right, body.door-dialogue #radar,
+body.door-dialogue #timewrap, body.door-dialogue #bonus, body.door-dialogue .sx .mk-top,
+body.door-dialogue .sx .mk-mini, body.door-dialogue .sx .mk-feed,
+body.door-dialogue .sx .mk-help, body.door-dialogue .sx .sx-bar { visibility: hidden !important; }
+
+/* Смена оформления у того же обработчика реплик: кадр слева, текст и ответы справа. */
+#dlg.door2d { align-items: stretch; justify-content: stretch; overflow: hidden; padding: 0; background: none; pointer-events: none;
+  font-family: system-ui, sans-serif; color: #14151a; }
+#dlg.door2d .dlg-box { position: relative; width: 100%; max-width: none; margin: 0; padding: 0; box-shadow: none;
+  background: none; border: 0; transform: none; pointer-events: none; }
+#dlg.door2d .dlg-top, #dlg.door2d .dlg-bar, #dlg.door2d .dlg-head img, #dlg.door2d .dlg-pay { display: none; }
+#dlg.door2d .dlg-row { position: absolute; left: 59%; top: 12%; width: 38%; max-width: 720px; display: block; padding: 0; }
+#dlg.door2d .dlg-head { position: relative; z-index: 1; display: block; width: fit-content; margin: 0 0 -4px 20px; rotate: none; }
+#dlg.door2d .dlg-name { display: block; padding: 10px 20px 12px; background: #d93748; color: white; border-radius: 10px 10px 5px 5px;
+  box-shadow: 0 4px 0 #83272e; font: 700 clamp(19px, 2.2vw, 34px)/1.15 system-ui, sans-serif; text-shadow: none; }
+#dlg.door2d .dlg-col { display: block; width: 100%; }
+#dlg.door2d .dlg-bubble { box-sizing: border-box; min-height: 0; padding: clamp(19px, 2.5vw, 36px); background: #fbf9f4;
+  border: 0; border-radius: 9px; box-shadow: 0 8px 25px rgba(0,0,0,.27); color: #19191d;
+  font: 500 clamp(19px, 2.15vw, 31px)/1.35 system-ui, sans-serif; pointer-events: auto;
+  clip-path: polygon(0 8%, 3% 0, 97% 0, 100% 8%, 100% 92%, 97% 100%, 3% 100%, 0 92%); }
+#dlg.door2d .dlg-bubble::before, #dlg.door2d .dlg-bubble::after, #dlg.door2d .dlg-skip { display: none; }
+#dlg.door2d .dlg-text { min-height: 4.1em; }
+#dlg.door2d .dlg-btns { display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 8px;
+  width: 100%; margin: 20px 0 0; pointer-events: auto; }
+#dlg.door2d .dlg-btns button { position: relative; justify-content: flex-start; min-height: 58px; padding: 12px 18px 12px 48px;
+  border: 0; border-radius: 3px; box-shadow: 0 5px 0 rgba(0,0,0,.3); background: #22272c; color: #fff;
+  font: 500 clamp(17px, 1.9vw, 28px)/1.3 system-ui, sans-serif;
+  clip-path: polygon(0 13%, 2% 0, 98% 0, 100% 13%, 100% 87%, 98% 100%, 2% 100%, 0 87%); }
+#dlg.door2d .dlg-btns .dlg-yes, #dlg.door2d .dlg-btns button.dlg-cur { background: #ffedaa; color: #181818; }
+#dlg.door2d .dlg-btns .dlg-no { background: #22272c; color: #fff; }
+#dlg.door2d .dlg-btns .dlg-no.dlg-cur { background: #ffedaa; color: #181818; }
+#dlg.door2d .dlg-btns button::before { content: '▶'; position: absolute; left: 17px; top: 50%; translate: 0 -50%;
+  color: inherit; opacity: 0; font-size: .75em; }
+#dlg.door2d .dlg-btns .dlg-yes::before, #dlg.door2d .dlg-btns button.dlg-cur::before { opacity: 1; }
+#dlg.door2d .dlg-btns .dlg-no:not(.dlg-cur)::before { opacity: 0; }
+#dlg.door2d .dlg-btns .pp-key { display: none; }
+#dlg.door2d .dlg-hint { color: #fff5d7; text-shadow: 0 1px 3px #000; }
+@media (max-width: 900px) {
+  #door2d .door2d-frame { left: 1vw; height: min(77vh, 555px); }
+  #dlg.door2d .dlg-row { left: 55%; top: 9%; width: 43%; }
+  #dlg.door2d .dlg-bubble { font-size: clamp(16px, 2.4vw, 23px); }
+  #dlg.door2d .dlg-btns button { font-size: clamp(15px, 2vw, 21px); }
+}
+@media (max-height: 620px) {
+  #door2d .door2d-frame { height: 90vh; }
+  #dlg.door2d .dlg-row { top: 5%; }
+  #dlg.door2d .dlg-bubble { padding: 14px 19px; font-size: clamp(15px, 2vw, 21px); }
+  #dlg.door2d .dlg-text { min-height: 3em; }
+  #dlg.door2d .dlg-btns { margin-top: 9px; }
+  #dlg.door2d .dlg-btns button { min-height: 43px; padding-top: 7px; padding-bottom: 7px; }
+}
+@media (prefers-reduced-motion: reduce) { #door2d, #door2d img { transition: none; } }

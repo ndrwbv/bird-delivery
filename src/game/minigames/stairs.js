@@ -36,6 +36,7 @@ import * as SC from './doorscene.js';
 import * as COACH from './doorcoach.js';     // обучение первого раза: пауза, подсветка кнопок, «поехали!»
 import * as S3 from './stairs3d.js';         // подъезд в 3D (12ас): лестница, двери, курьер-модель, клиент у своей двери; ?old2dstairs — 2D
 import * as DLG from '../dialog.js';
+import * as DOOR2D from './door2d.js';
 import { ordinaryDoor } from '../story.js';
 
 const N_ = s => s;
@@ -230,6 +231,7 @@ export default {
     // Не вышло (нет WebGL в песочнице, ошибка) — прежний 2D
     let V3 = null;
     if (D3) { try { V3 = S3.create(box, { plan: P, look, seed, ADULT: !!api.ADULT, t, gopAt: P.gopAt, person, boxes: o.boxes }); } catch (e) { console.warn('[stairs] 3D не вышло — 2D', e); V3 = null; } }
+    if (DOOR2D.enabled(o.scenario, V3)) DOOR2D.prepare(o.scenario.portrait.manifest).catch(e => console.warn('[door2d] preload', e));
     if (V3) q('canvas.sx-cv').remove(); else { box.classList.remove('sx3'); const h = q('.sx3-hit'); if (h) h.remove(); }
     const hit = V3 ? q('.sx3-hit') : null;
     const cv = V3 ? null : KIT.sceneCanvas(box), g = cv ? cv.getContext('2d') : null;   // холст сцены — один на все заходы (doorkit.js, 0п48)
@@ -408,10 +410,11 @@ export default {
     /* Сцена у двери использует один диалоговый обработчик для сюжетного и обычного заказа. */
     function sceneStart () {
       const dialogue = o.scenario || ordinaryDoor(client(), person);
-      st.scene = { t: 0, stage: 'open', opened: false, running: false, out: 0, dialogue };
+      const portrait = DOOR2D.enabled(dialogue, V3);
+      st.scene = { t: 0, stage: 'open', opened: false, running: false, out: 0, dialogue, portrait, actor: null };
       if (api.hold) api.hold(true);
       box.classList.add('sx-scene');
-      V3.scene.start();
+      V3.scene.start({ portrait });
     }
     function sceneStep (dt) {
       const S = st.scene;
@@ -423,6 +426,7 @@ export default {
       }
       if (S.stage === 'wait' && V3.scene.given()) { S.stage = 'out'; S.out = S.t + 0.6; }
       if (S.stage === 'out' && S.t >= S.out) {
+        if (S.actor) S.actor.close();
         st.scene = null; st.phase = 'done';
         if (api.hold) api.hold(false);
         api.done && api.done(st.res);
@@ -430,21 +434,33 @@ export default {
     }
     async function runScenario (S) {
       if (S.running) return;
-      S.running = true; S.stage = 'dialog';
+      S.running = true; S.stage = S.portrait ? 'door_dialogue' : 'dialog';
       try {
+        if (S.portrait) {
+          try { S.actor = await DOOR2D.open(S.dialogue.portrait.manifest, () => !!(api.paused && api.paused())); }
+          catch (e) { console.warn('[door2d] fallback to 3D', e); S.portrait = false; S.stage = 'dialog'; V3.scene.portrait(false); }
+        }
+        if (st.scene !== S) { if (S.actor) S.actor.close(); return; }
         for (const line of S.dialogue.lines) {
           if (st.scene !== S) return;
+          if (S.portrait && line.omit2d) continue;
           const host = line.speaker !== t('Евгений');
-          V3.scene.talk(host);
-          const answer = await DLG.say({ compact: true, canonicalName: true, fillers: false, head: t('у квартиры'),
+          const choices = S.portrait ? line.choices2d || line.choices : line.choices;
+          if (S.actor) S.actor.line(line.emotion);
+          V3.scene.talk(host && !S.portrait);
+          const answer = await DLG.say({ compact: true, door2d: S.portrait, canonicalName: true, fillers: false, head: t('у квартиры'),
             name: line.speaker, person: host ? S.dialogue.person : S.dialogue.courier,
-            text: line.text, accept: line.choices ? t(line.choices[0].text) : t('дальше'),
-            decline: line.choices && line.choices[1] ? t(line.choices[1].text) : undefined,
-            stack: !!line.choices });
+            text: line.text, accept: choices ? t(choices[0].text) : t('дальше'),
+            decline: choices && choices[1] ? t(choices[1].text) : undefined,
+            stack: !!choices, paused: () => !!(api.paused && api.paused()),
+            onShow: () => { if (S.actor) S.actor.talk(host); },
+            onTyped: () => { if (S.actor) S.actor.talk(false); } });
+          if (S.actor) S.actor.talk(false);
           V3.scene.talk(false);
           if (st.scene !== S) return;
-          if (line.choices) {
-            const choice = answer === false ? line.choices[1] : line.choices[0];
+          if (answer === null) return;
+          if (choices) {
+            const choice = answer === false ? choices[1] : choices[0];
             if (choice && choice.flag && o.storySpec) (o.storySpec.flags || (o.storySpec.flags = {}))[choice.flag] = true;
           }
         }
@@ -1073,6 +1089,7 @@ export default {
       if (api.setStep) api.setStep(null);
       if (api.setPad) api.setPad(null);
       if (cv) KIT.sceneCanvasOff(cv);
+      if (st.scene && st.scene.actor) st.scene.actor.close();
       if (st.scene && api.hold) api.hold(false);
       if (V3) { V3.dispose(); document.body.classList.remove('sx3-on'); }
       if (DLG.isOpen()) DLG.dismiss();

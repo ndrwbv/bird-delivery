@@ -1,0 +1,85 @@
+{
+  "id": "gennady",
+  "name": "Геннадий",
+  "version": "dialogue_prototype_1",
+  "format": "portrait_sprite",
+  "spriteSize": [
+    500,
+    555
+  ],
+  "sprites": {
+    "idle": "character/gennady/idle.png",
+    "talk": "character/gennady/talk.png",
+    "blink": "character/gennady/blink.png",
+    "smile": "character/gennady/smile.png",
+    "angry": "character/gennady/angry.png"
+  },
+  "presentation": {
+    "spriteAnchor": "bottom-center",
+    "horizontalLayout": "character_left_dialogue_right",
+    "uiReference": "reference/approved_ui_reference.png",
+    "backgroundOptional": "optional/hallway_background_draft.png"
+  },
+  "animation": {
+    "idleBreath": {
+      "periodSeconds": 3.5,
+      "scaleX": [
+        0.998,
+        1.002
+      ],
+      "scaleY": [
+        0.998,
+        1.004
+      ]
+    },
+    "blink": {
+      "intervalSeconds": [
+        3.5,
+        7.0
+      ],
+      "durationSeconds": 0.12
+    },
+    "talk": {
+      "stateSwitchSeconds": [
+        0.15,
+        0.3
+      ],
+      "onlyWhenNpcSpeaking": true
+    },
+    "expression": {
+      "smile": "on_positive_reaction",
+      "angry": "on_negative_reaction"
+    }
+  },
+  "encounter": {
+    "id": "gennady_doctors_sausage",
+    "type": "one_shot",
+    "retryIfShiftEnds": true,
+    "dialogue": [
+      {
+        "speaker": "gennady",
+        "text": "О, пицца! А я как раз докторской купил наразвес. Хочу вашу пиццу посыпать. Мне так больше нравится.",
+        "emotion": "talk",
+        "choices": [
+          {
+            "text": "А зачем тогда пиццу заказывали?",
+            "next": "reply"
+          }
+        ]
+      },
+      {
+        "nodeId": "reply",
+        "speaker": "gennady",
+        "text": "Ну не буду же я одну колбасу есть.",
+        "emotion": "idle",
+        "end": true
+      }
+    ]
+  },
+  "notes": [
+    "These are half-body dialogue portraits, not full-body sprites.",
+    "Sprite poses are generated variants and are NOT pixel-perfect; avoid crossfading full silhouettes.",
+    "reference PNG includes UI for visual reference only; do not use it as a runtime UI texture.",
+    "No new image assets were generated for this package."
+  ]
+}

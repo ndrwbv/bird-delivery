@@ -789,7 +789,8 @@ export function create (box, o) {
     }
   }
   const sceneApi = {
-    start () { VW.scene = { on: true, t: 0, text: '', talking: false, pass: -1, given: false, from: null }; makeMan(); },
+    start (o = {}) { VW.scene = { on: true, t: 0, text: '', talking: false, pass: -1, given: false, from: null }; cour.visible = !o.portrait; makeMan().visible = !o.portrait; },
+    portrait (on) { if (VW.scene) { cour.visible = !on; makeMan().visible = !on; } },
     say (text) { if (!VW.scene) return; VW.scene.text = text; bub.textContent = text; bub.classList.remove('sx3-pop'); void bub.offsetWidth; bub.classList.add('sx3-pop'); },
     talk (on) { if (VW.scene) VW.scene.talking = !!on; },
     hush () { if (VW.scene) VW.scene.text = ''; },

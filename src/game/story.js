@@ -14,6 +14,7 @@ const COURIER_LOOK = { f: false, age: 'young', hair: 'short', hairC: '#4a3020', 
    choices: [{text, flag}, {text, flag}] — второй вариант можно не давать. */
 export const STORIES = [{
   id: 'gennady', name: N_('Геннадий'), intro: true,
+  portrait: { manifest: './assets/dialogue/ZATO_Gennady_dialogue_assets/manifest.json' },
   who: { seed: 0x6e6e6164, fem: false, look: { f: false, age: 'middle', hair: 'bald', hairC: '#574438', beard: 'none',
     head: 'none', glasses: 'none', pack: null,
     q: { head: 'business', body: 'punk', legs: 'casual', feet: 'beach' },
@@ -22,9 +23,10 @@ export const STORIES = [{
   chapters: [{ id: 'gennady-sausage', name: N_('Докторская к пицце'),
     note: N_('Панельный дом. Квартира и код — в накладной.'), why: N_('Геннадий ждёт пиццу дома'),
     dialogue: [
-      { speaker: 'gennady', text: N_('О, пицца! А я как раз докторской купил наразвес. Хочу вашу пиццу посыпать. Мне так больше нравится') },
-      { speaker: 'courier', text: N_('А зачем тогда пиццу заказывали?') },
-      { speaker: 'gennady', text: N_('Ну не буду же я одну колбасу есть') },
+      { speaker: 'gennady', text: N_('О, пицца! А я как раз докторской купил наразвес. Хочу вашу пиццу посыпать. Мне так больше нравится'),
+        choices2d: [{ text: N_('А зачем тогда пиццу заказывали?') }] },
+      { speaker: 'courier', text: N_('А зачем тогда пиццу заказывали?'), omit2d: true },
+      { speaker: 'gennady', text: N_('Ну не буду же я одну колбасу есть'), emotion: 'smile' },
     ] },
   ],
 }];
@@ -163,9 +165,11 @@ export function onCancel () { /* глава остаётся доступной 
 export function interiorFor (order) {
   const sp = specOf(order), s = sp && STORIES.find(q => q.id === sp.storyId), c = s && s.chapters[sp.chapter];
   if (!c) return null;
-  return { id: c.id || s.id + '-' + sp.chapter, name: t(s.name), person: storyPerson(s), courier: courierPerson(),
+  return { id: c.id || s.id + '-' + sp.chapter, name: t(s.name), person: storyPerson(s), courier: courierPerson(), portrait: s.portrait || null,
     lines: c.dialogue.map(q => ({ speaker: q.speaker === 'courier' ? t('Евгений') : t(s.name), text: t(q.text),
-      choices: q.choices ? q.choices.map(x => ({ text: t(x.text), flag: x.flag })) : null })) };
+      emotion: q.emotion || 'idle', omit2d: !!q.omit2d,
+      choices: q.choices ? q.choices.map(x => ({ text: t(x.text), flag: x.flag })) : null,
+      choices2d: q.choices2d ? q.choices2d.map(x => ({ text: t(x.text), flag: x.flag })) : null })) };
 }
 export function onDeliver (order) {
   const sp = specOf(order), s = sp && STORIES.find(q => q.id === sp.storyId);

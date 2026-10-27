@@ -19,7 +19,12 @@ if (d.DOOR.mode !== 'stairs') throw new Error('Домофон не открыл 
 d.DOOR.solve();
 await run(2);
 const stairs = d.DOOR.stairsState();
-if (!stairs?.d3 || stairs.flat !== +flat || stairs.scene?.stage !== 'dialog') throw new Error('Нет сцены у нужной квартиры');
+const oldDoor = new URLSearchParams(location.search).has('door3d');
+if (!stairs?.d3 || stairs.flat !== +flat || stairs.scene?.stage !== (oldDoor ? 'dialog' : 'door_dialogue')) throw new Error('Нет сцены у нужной квартиры');
 await run(7);
 const vis = s => [...document.querySelectorAll(s)].map(el => ({ cls: el.className, visibility: getComputedStyle(el).visibility, display: getComputedStyle(el).display }));
-return { story: order.ord.story.storyId, pizzeria: d.PIZZA && d.PIZZA.name, dialogOpen: d.DLG.isOpen(), compact: document.querySelector('#dlg')?.classList.contains('compact'), on: document.querySelector('#dlg')?.classList.contains('on'), speaker: document.querySelector('.dlg-name')?.textContent, text: document.querySelector('.dlg-text')?.textContent, stairs3d: !!stairs.d3, hud: { top: vis('.sx .mk-top'), mini: vis('.sx .mk-mini'), feed: vis('.sx .mk-feed'), timer: vis('#timewrap') } };
+return { story: order.ord.story.storyId, pizzeria: d.PIZZA && d.PIZZA.name, dialogOpen: d.DLG.isOpen(), oldDoor,
+  compact: document.querySelector('#dlg')?.classList.contains('compact'), portrait: !!document.querySelector('#door2d img'),
+  on: document.querySelector('#dlg')?.classList.contains('on'), speaker: document.querySelector('.dlg-name')?.textContent,
+  text: document.querySelector('.dlg-text')?.textContent, stairs3d: !!stairs.d3,
+  hud: { top: vis('.sx .mk-top'), mini: vis('.sx .mk-mini'), feed: vis('.sx .mk-feed'), timer: vis('#timewrap') } };
