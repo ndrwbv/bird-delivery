@@ -27,6 +27,9 @@ export const STORIES = [{
   ],
 }];
 
+export const ordinaryDoor = (name, person) => ({ person, courier: null,
+  lines: [{ speaker: name, text: N_('Спасибо за доставку.') }] });
+
 const KEY = 'dlv-story';
 let API = null, DATA = null;
 const issued = Object.create(null);

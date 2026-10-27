@@ -34,8 +34,9 @@ import * as OS from '../ordersheet.js';
 import * as KIT from './doorkit.js';
 import * as SC from './doorscene.js';
 import * as COACH from './doorcoach.js';     // обучение первого раза: пауза, подсветка кнопок, «поехали!»
-import * as S3 from './stairs3d.js';         // подъезд в 3D (12ас): лестница, двери, курьер-модель, мужик в трусах у своей двери; ?old2dstairs — 2D
+import * as S3 from './stairs3d.js';         // подъезд в 3D (12ас): лестница, двери, курьер-модель, клиент у своей двери; ?old2dstairs — 2D
 import * as DLG from '../dialog.js';
+import { ordinaryDoor } from '../story.js';
 
 const N_ = s => s;
 const DT_MAX = 0.1;
@@ -98,12 +99,12 @@ const TOP = [
   '..YYYYY.....',
   '..BBBBB.....',
 ];
-const MAN = {
+const COURIER = {
   stand: TOP.concat(['..BB..BB....', '..BB..BB....', '..BB..BB....', '..bb..bb....', '..kk..kkk...']),
   w1: TOP.concat(['.BBB...BB...', '.BB.....BB..', 'BB.......BB.', 'bb.......bb.', 'kk.......kkk']),
   w2: TOP.concat(['..BBBBBB....', '..BB..BB....', '..BB...BB...', '..bb...bb...', '..kkk..kkk..']),
 };
-MAN.puff = ['............'].concat(TOP.slice(0, TOP.length - 1).map((r, i) => (i === 4 ? '.W' + r.slice(2) : r)), MAN.stand.slice(TOP.length));
+COURIER.puff = ['............'].concat(TOP.slice(0, TOP.length - 1).map((r, i) => (i === 4 ? '.W' + r.slice(2) : r)), COURIER.stand.slice(TOP.length));
 /* гопник сидит на ступеньке */
 const GOPNIK = [
   '...kkkkk....',
@@ -398,64 +399,28 @@ export default {
       elGoal.textContent = ok ? t('У квартиры') : t('Клиент спустится сам');
       if (fast && bonus) { OS.pen(elInv, 'pay', bonus + ' · ' + t('взбежал быстро'), 'os-plus'); mini.peek(); }
       api.log && api.log((ok ? 'дошёл' : 'срок вышел') + ' за ' + st.res.t + ' с (быстро — до ' + (limit * K.FAST).toFixed(1) + '), этаж ' + floor + ', ошибок ' + st.tries + (fast ? ', быстро' : '') + (gop ? ', гопники: ' + (gop.how || '—') : ''));
-      if (ok && V3) { sceneStart(fast); return; }               // 3D: дверь открывает мужик в трусах — затирает историю, берёт коробку
-      if (ok) say({ person, name: client(), text: t('О, пицца! Даже не запыхался?'), mood: 'happy', cls: 'mk-good' });
+      if (ok && V3) { sceneStart(); return; }               // 3D: дверь и единый диалог, затем передача коробки
+      if (ok) say({ person, name: client(), text: t(ordinaryDoor(client(), person).lines[0].text), mood: 'happy', cls: 'mk-good' });
       else say({ person, name: client(), text: t('Да стой ты там, сам спущусь…'), mood: 'angry', cls: 'mk-bad' });
       sfx(ok ? 'open' : 'fail');
     }
 
-    /* ── 3D: своя дверь (автор 24.10.2026: «тебе открывают квартиру, а там чел в трусах … затирающий историю»): дверь
-       открывается через 0,7 с, мужик в проёме говорит 2—3 облачка (взрослая — с матом), на последнем тянется за коробкой —
-       берёт двумя руками, через 0,6 с — оплата, как раньше. Срок заказа на это время стоит (api.hold). Любая клавиша, кнопка,
-       тап — следующее облачко ── */
-    function sceneStart (fast) {
-      if (o.scenario && V3) {
-        st.scene = { t: 0, stage: 'open', opened: false, running: false, given: false, out: 0 };
-        if (api.hold) api.hold(true);
-        box.classList.add('sx-scene');
-        V3.scene.start();
-        return;
-      }
-      const ad = !!api.ADULT, pool = S3.MAN.STORIES.filter(x => (ad ? x.a : x.k));
-      const s = pick(pool), lines = (ad ? s.a : s.k).slice();
-      if (fast) lines[0] = S3.MAN.FAST;
-      st.scene = { t: 0, lines, i: -1, next: 1.15, stage: 'open', gap: 0, opened: false, giveAt: 0, out: 0 };
+    /* Сцена у двери использует один диалоговый обработчик для сюжетного и обычного заказа. */
+    function sceneStart () {
+      const dialogue = o.scenario || ordinaryDoor(client(), person);
+      st.scene = { t: 0, stage: 'open', opened: false, running: false, out: 0, dialogue };
       if (api.hold) api.hold(true);
-      box.classList.add('sx-scene');                            // задание и лента — убрать, место облачкам (stairs.css)
+      box.classList.add('sx-scene');
       V3.scene.start();
-      glyphs();
-      api.log && api.log('у двери: ' + lines.length + ' облачка');
-    }
-    function sceneLine () {
-      const S = st.scene;
-      S.i++;
-      if (S.i < S.lines.length) {
-        const tx = t(S.lines[S.i]);
-        V3.scene.say(tx);
-        S.stage = 'talk'; S.next = S.t + clamp(0.9 + tx.length * 0.045, 1.6, 3.4);
-        if (S.i === S.lines.length - 1) S.giveAt = S.t + 0.55;   // «давай сюда» — тянется за коробкой
-      } else { V3.scene.hush(); S.stage = 'wait'; }
     }
     function sceneStep (dt) {
       const S = st.scene;
-      S.t += dt; S.gap -= dt;
-      if (o.scenario) {
-        if (!S.opened && S.t >= 0.7) {
-          S.opened = true; sfx('open');
-          const d = doors.get(flat); if (d) d.delay = 0;
-          runScenario(S);
-        }
-        if (S.stage === 'wait' && V3.scene.given()) { S.stage = 'out'; S.out = S.t + 0.6; }
-        if (S.stage === 'out' && S.t >= S.out) {
-          st.scene = null; st.phase = 'done';
-          if (api.hold) api.hold(false);
-          api.done && api.done(st.res);
-        }
-        return;
+      S.t += dt;
+      if (!S.opened && S.t >= 0.7) {
+        S.opened = true; sfx('open');
+        const d = doors.get(flat); if (d) d.delay = 0;
+        runScenario(S);
       }
-      if (!S.opened && S.t >= 0.7) { S.opened = true; sfx('open'); const d = doors.get(flat); if (d) d.delay = 0; }
-      if ((S.stage === 'open' || S.stage === 'talk') && S.t >= S.next) sceneLine();
-      if (S.giveAt && S.t >= S.giveAt) { S.giveAt = 0; V3.scene.give(); }
       if (S.stage === 'wait' && V3.scene.given()) { S.stage = 'out'; S.out = S.t + 0.6; }
       if (S.stage === 'out' && S.t >= S.out) {
         st.scene = null; st.phase = 'done';
@@ -467,12 +432,12 @@ export default {
       if (S.running) return;
       S.running = true; S.stage = 'dialog';
       try {
-        for (const line of o.scenario.lines) {
+        for (const line of S.dialogue.lines) {
           if (st.scene !== S) return;
           const host = line.speaker !== t('Евгений');
           V3.scene.talk(host);
           const answer = await DLG.say({ compact: true, canonicalName: true, fillers: false, head: t('у квартиры'),
-            name: line.speaker, person: host ? o.scenario.person : o.scenario.courier,
+            name: line.speaker, person: host ? S.dialogue.person : S.dialogue.courier,
             text: line.text, accept: line.choices ? t(line.choices[0].text) : t('дальше'),
             decline: line.choices && line.choices[1] ? t(line.choices[1].text) : undefined,
             stack: !!line.choices });
@@ -483,20 +448,15 @@ export default {
             if (choice && choice.flag && o.storySpec) (o.storySpec.flags || (o.storySpec.flags = {}))[choice.flag] = true;
           }
         }
-        st.res.scenarioDone = true;
+        if (o.scenario) st.res.scenarioDone = true;
         V3.scene.give();
         S.stage = 'wait';
       } catch (e) { console.warn('[stairs] scenario', e); S.stage = 'wait'; V3.scene.give(); }
     }
     function sceneSkip () {
-      if (o.scenario) return;               // реплики сценария листает dialog.js
       const S = st.scene;
-      if (!S || S.gap > 0) return;
-      S.gap = 0.28;
-      if (!S.opened) S.t = Math.max(S.t, 0.7);
-      if (S.stage === 'open' || S.stage === 'talk') S.next = S.t;
-      if (S.i >= S.lines.length - 1 && S.giveAt) S.giveAt = S.t;
-      if (S.stage === 'out') S.out = S.t;
+      if (S && !S.opened) S.t = Math.max(S.t, 0.7);
+      if (S && S.stage === 'out') S.out = S.t;
     }
 
     /* «пусть сам спустится» (econ.js DOORGAME.SELF): отказ своей кнопкой (и посреди гопников) — курьер спускается на первый
@@ -848,7 +808,7 @@ export default {
       let px = SX(manX());
       if (st.sideT > 0) px += st.side * U * 5 * Math.sin((1 - st.sideT / 0.28) * Math.PI);
       const moving = Math.abs(st.v) > 0.08 || Math.abs(st.walk - (st.door >= 0 ? standX(st.door) - XA : 0)) > 0.002;
-      const frame = st.puff > 0 ? MAN.puff : moving ? ((st.leg * 14) | 0) % 2 ? MAN.w1 : MAN.w2 : MAN.stand;
+      const frame = st.puff > 0 ? COURIER.puff : moving ? ((st.leg * 14) | 0) % 2 ? COURIER.w1 : COURIER.w2 : COURIER.stand;
       // тень под ногами
       g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(Math.round(px - U * 5), Math.round(SY(y) - U * 0.5), U * 10, U);
       SC.spr(g, frame, px, SY(y) - st.bounce * U * 1.5, U, flip, PAL);
@@ -966,7 +926,7 @@ export default {
     /* ── ввод ── */
     const SKIP = new Set(['Enter', 'NumpadEnter', 'Space', 'KeyE', 'ArrowUp', 'KeyW', 'ArrowRight', 'KeyD']);
     const onKey = e => {
-      if (o.scenario && DLG.isOpen()) return;
+      if (DLG.isOpen()) return;
       if (st.scene && st.phase === 'end' && !(api.paused && api.paused())) {   // у своей двери: любая — следующее облачко
         if (e.code === 'KeyX') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) mini.toggle(); return; }
         if (SKIP.has(e.code) || e.code === 'Tab') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat && e.code !== 'Tab') sceneSkip(); }
@@ -1084,7 +1044,7 @@ export default {
     // 'wrong' — сначала позвонить в чужую дверь; 'late' — не успеть (срок вышел)
     box.__solve = arg => {
       if (coach && coach.on()) coach.skip();                    // обучение первого раза — пропустить, как кнопкой
-      if (st.scene && st.phase === 'end') { if (!o.scenario || !DLG.isOpen()) sceneSkip(); return; }   // у своей двери — следующее облачко, как клавишей
+      if (st.scene && st.phase === 'end') { if (!DLG.isOpen()) sceneSkip(); return; }   // у своей двери — следующее облачко, как клавишей
       if (st.phase !== 'play' && st.phase !== 'gop') return;
       if (arg === 'self') { selfDown(); return; }               // «пусть сам спустится»
       st.arm = 0; st.lock = 0;
@@ -1098,7 +1058,7 @@ export default {
     box.__coach = () => (coach && coach.on() ? coach.state() : null);
     box.__v3 = V3;
     box.__st = () => ({ phase: st.phase, y: +st.y.toFixed(3), v: +st.v.toFixed(3), breath: +st.breath.toFixed(3), puff: st.puff > 0, door: st.door,
-      t: +st.t.toFixed(2), limit, floor, flat, per, lv, entr: P.entr, want: P.door, gopAt: P.gopAt, selfT: st.phase === 'self' ? +st.selfT.toFixed(2) : null, d3: !!V3, scene: st.scene ? { stage: st.scene.stage, i: st.scene.i || 0, n: st.scene.lines ? st.scene.lines.length : o.scenario ? o.scenario.lines.length : 0, given: V3.scene.given() } : null, v3: V3 ? V3.stats() : null, gop: gop ? { state: gop.state, i: gop.i, dir: gop.dirs[gop.i], done: gop.done, how: gop.how } : null, res: st.res });
+      t: +st.t.toFixed(2), limit, floor, flat, per, lv, entr: P.entr, want: P.door, gopAt: P.gopAt, selfT: st.phase === 'self' ? +st.selfT.toFixed(2) : null, d3: !!V3, scene: st.scene ? { stage: st.scene.stage, i: st.scene.i || 0, n: st.scene.dialogue ? st.scene.dialogue.lines.length : 0, given: V3.scene.given() } : null, v3: V3 ? V3.stats() : null, gop: gop ? { state: gop.state, i: gop.i, dir: gop.dirs[gop.i], done: gop.done, how: gop.how } : null, res: st.res });
     return () => {
       removeEventListener('keydown', onKey, true);
       removeEventListener('keyup', onKeyUp, true);
@@ -1115,7 +1075,7 @@ export default {
       if (cv) KIT.sceneCanvasOff(cv);
       if (st.scene && api.hold) api.hold(false);
       if (V3) { V3.dispose(); document.body.classList.remove('sx3-on'); }
-      if (o.scenario && DLG.isOpen()) DLG.dismiss();
+      if (DLG.isOpen()) DLG.dismiss();
       box.remove();
     };
   },
