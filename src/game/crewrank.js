@@ -168,10 +168,10 @@ function speak (cands, rows) {
     loser: c.loser ? c.loser.name : '', who: R ? R.name : '', gen: R ? (R.person && R.person.firstGen) || R.name : '', gap: c.gap ? gapText(c.gap) : '',
   });
   // «Серёга · курьер» (chat.js); rank — фраза про рейтинг: в очереди уведомлений самая неважная (notifyq.js)
-  CHAT.say(text, null, false, by ? { name: by.name, person: by.person, role: t('курьер'), rank: true } : { rank: true });
+  // В этой версии SMS пишет только Ирина Сергеевна; рейтинг и его расчёт сохраняются.
   ST.last = ST.clock; ST.next = ST.clock + rnd(RANK.EVERY[0], RANK.EVERY[1]);
   ST.recent.push(l.k); while (ST.recent.length > RANK.MEM) ST.recent.shift();
-  DEBUG.log.push({ t: Math.round(ST.clock), k: l.k, by: by ? by.name : t('Толик управляющий'), text });
+  DEBUG.log.push({ t: Math.round(ST.clock), k: l.k, by: by ? by.name : t('Ирина Сергеевна'), text });
   if (DEBUG.log.length > 200) DEBUG.log.shift();
   return true;
 }
@@ -182,7 +182,7 @@ function own (rows) {
   for (const r of rows) if (r.R && !r.out && r.R.lines) r.R.lines.forEach((m, i) => { const k = 'own:' + r.R.name + i; if (!ST.recent.includes(k)) cs.push({ R: r.R, m, k }); });
   if (!cs.length) return false;
   const c = pick(cs);
-  CHAT.say(c.m, null, false, { name: c.R.name, person: c.R.person, role: t('курьер'), rank: true });
+  // Реплики прежних коллег не попадают в SMS.
   ST.last = ST.clock; ST.next = ST.clock + rnd(RANK.EVERY[0], RANK.EVERY[1]);
   ST.recent.push(c.k); while (ST.recent.length > RANK.MEM) ST.recent.shift();
   DEBUG.log.push({ t: Math.round(ST.clock), k: c.k, by: c.R.name, text: c.m });

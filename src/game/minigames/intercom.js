@@ -89,7 +89,7 @@ export default {
     { k: 'knocks', label: 'стуков (сломан)', type: 'num', def: 12, min: 3, max: 30, step: 1 },
     { k: 'look', label: 'подъезд', type: 'sel', def: 'shabby', opts: [['shabby', 'обшарпанный'], ['clean', 'чистый с цветами'], ['auto', 'по адресу']] },
     { k: 'entr', label: 'номер подъезда', type: 'num', def: 2, min: 1, max: 6, step: 1 },
-    { k: 'learnOn', label: 'первый раз (подсказка Толика)', type: 'bool', def: false },
+    { k: 'learnOn', label: 'первый раз (подсказка)', type: 'bool', def: false },
   ],
   mount (root, o, api) {
     const t = api.t;
@@ -234,10 +234,7 @@ export default {
       st.endT = 1.3;
       if (mode === 'away') { away(); return; }
       box.classList.add(ok ? 'dg-ok' : 'dg-late');
-      const seal = document.createElement('div');
-      seal.className = 'pp-seal ' + (ok ? 'pp-seal-green' : 'pp-seal-rust') + ' mk-seal';
-      seal.textContent = ok ? (fast ? t('с первого раза!') : t('открыто')) : t('сам спустится');
-      elSheet.appendChild(seal);
+      elGoal.textContent = ok ? t('Дверь открыта') : t('Клиент спустится сам');
       if (ok) msgs.say({ person, name: client(), text: mode === 'broken' ? t('Иду, иду! Дверь не ломай!') : t('Открываю, поднимайтесь!'), mood: 'happy', cls: 'mk-good' });
       else msgs.say({ person, name: client(), text: t('Да стой ты там, сам спущусь…'), mood: 'angry', cls: 'mk-bad' });
       if (fast && bonus) { OS.pen(elInv, 'pay', bonus + ' · ' + t('с первого раза'), 'os-plus'); mini.peek(); }
@@ -252,10 +249,7 @@ export default {
       st.res.ok = true; st.res.fast = false; st.res.away = true; st.res.addr = awayAddr;
       st.endT = 3.6;                                   // успеть прочитать, куда ехать
       box.classList.add('dg-ok', 'dg-away');
-      const seal = document.createElement('div');
-      seal.className = 'pp-seal pp-seal-rust mk-seal';
-      seal.textContent = t('не дома');
-      elSheet.appendChild(seal);
+      elGoal.textContent = t('Клиент не дома');
       msgs.say({ person, name: client(), text: t(awaySay, { addr: awayAddr }), mood: 'surprised' });
       setTimeout(() => { if (st.phase === 'end') msgs.say({ out: true, text: t('Понял, еду…') }); }, 1700);
       OS.move(elInv, 0, awayAddr);
@@ -279,10 +273,6 @@ export default {
       box.classList.add('dg-self');
       elGoal.textContent = t('клиент спускается сам — жди у подъезда');
       KIT.selfOn(elSelf, t, st.selfT);
-      const seal = document.createElement('div');
-      seal.className = 'pp-seal pp-seal-rust mk-seal';
-      seal.textContent = t('сам спустится');
-      elSheet.appendChild(seal);
       cursor();
       api.log && api.log('пусть сам спустится: ждать ' + st.selfT.toFixed(1) + ' с');
     }
@@ -428,7 +418,7 @@ export default {
     tick();
     /* первый раз (doorstep.js learnFirst, ECON.DOORGAME.LEARN; doorcoach.js, автор 18.10.2026): домофон стоит, срок заказа
        тоже (api.hold) — по шагам подсвечено, что жать: номер в накладной, цифры, вызов (сломан — дверь); «поехали!» — игра */
-    const ln = o.learn || (o.learnOn ? { name: t('Толик'), add: 15, k: 2 } : null);
+    const ln = o.learn || (o.learnOn ? { name: t('Ирина Сергеевна'), add: 15, k: 2 } : null);
     let coach = null;
     if (ln) {
       const KB = COACH.kbd, L = (s, keys, v) => KIT.keysLine(t, s, keys || {}, v || {});

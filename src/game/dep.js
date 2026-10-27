@@ -24,7 +24,6 @@
 import './dep.css';
 import * as ECON from './econ.js';
 import * as ACH from './achievements.js';          // «Всё на красное» (achievements.js)
-import * as HEROES from './heroes.js';             // теннисисты — герои города: те же лица
 import * as HQ from './heroquests.js';             // совет Лёхи, «наоборот» Игорька, кто играет матч
 import * as PFX from './paperfx.js';
 import { keyHTML, inputKind } from '../input/glyphs.js';
@@ -38,10 +37,7 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&am
 
 const NAME = { slot: N_('однорукий бандит'), roulette: N_('красное или чёрное'), tennis: N_('теннис: кто выиграет матч') };
 const PLAYER = {
-  andr: { name: N_('Андрюша'), seed: 41027, fem: false },
-  igor: { name: N_('Игорёк'), seed: 77311, fem: false },
-  nast: { name: N_('Настюша'), seed: 50923, fem: true },
-  // сюжет героев в архиве (heroquests.js ANON): двое безымянных; лица — новые на каждый матч (reseat)
+  // Двое безымянных; лица — новые на каждый матч.
   pl: { name: N_('левый'), seed: 1, fem: false },
   pr: { name: N_('правый'), seed: 2, fem: false },
 };
@@ -144,7 +140,7 @@ export function stake (d) { if (root() && !SH.slot && !SPINNING && d) setStake(S
 const cell = s => '<i style="--c:' + SYM_C[s] + '">' + SYM[s] + '</i>';
 const keyFor = () => '';                           // значков X / Y на выборе нет — они в строке внизу
 function face (id) {
-  try { if (A.person && A.face) return A.face(HEROES.person(id) || A.person({ seed: PLAYER[id].seed, fem: PLAYER[id].fem }), 64); } catch (e) { /* — */ }
+  try { if (A.person && A.face) return A.face(A.person({ seed: PLAYER[id].seed, fem: PLAYER[id].fem }), 64); } catch (e) { /* — */ }
   return '';
 }
 function stageHTML (g) {

@@ -176,7 +176,7 @@ function say () {
   if (DIRECTOR.quiet() || CHAT.busy()) return;                // окно «покататься» или Толик уже пишет — на следующем заказе
   const line = up ? pick(UP) : pick(A && A.adult ? DOWN.concat(DOWN_ADULT) : DOWN);
   K.told = u; K.saidAt = K.n; K.gap = Math.round(rnd(C.SAY_GAP[0], C.SAY_GAP[1]));
-  note('Толик: ' + line);
+  note('Ирина Сергеевна: ' + line);
   CHAT.later(3500, () => { if (!CHAT.busy()) CHAT.say(t(line)); });   // после накладной
 }
 

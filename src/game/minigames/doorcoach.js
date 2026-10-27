@@ -41,7 +41,7 @@ export function coach (box, o) {
     '<div class="dc-hole" hidden></div>' +
     '<div class="dc-hint" hidden><span class="dc-hand" aria-hidden="true">👆</span><span class="dc-keys"></span></div>' +
     '<div class="dc-card">' +
-      '<header class="dc-head"><span class="dc-av"></span><b>' + esc(ln.name || t('Толик')) + '</b><em>' + esc(t('первый раз')) + '</em><span class="dc-n"></span></header>' +
+      '<header class="dc-head"><span class="dc-av"></span><b>' + esc(ln.name || t('Ирина Сергеевна')) + '</b><em>' + esc(t('первый раз')) + '</em><span class="dc-n"></span></header>' +
       '<p class="dc-txt"></p>' +
       '<div class="dc-btns">' +
         '<button type="button" tabindex="-1" class="dc-skip"><kbd class="pp-key"></kbd><span>' + esc(t('пропустить')) + '</span></button>' +
@@ -58,7 +58,7 @@ export function coach (box, o) {
     av = document.createElement('img'); av.alt = '';
     try { if (!TF.bind(av, ln.person, 96, 'happy')) av = null; } catch (e) { av = null; }
   }
-  if (av) q('.dc-av').appendChild(av); else q('.dc-av').textContent = String(ln.name || t('Толик')).slice(0, 1);
+  if (av) q('.dc-av').appendChild(av); else q('.dc-av').textContent = String(ln.name || t('Ирина Сергеевна')).slice(0, 1);
   box.appendChild(el);
 
   const cur = () => steps[i] || { go: true };

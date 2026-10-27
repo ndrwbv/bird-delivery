@@ -1,0 +1,30 @@
+await onShift();
+await run(3);
+const order = d.S.order;
+const stop = order && order.stops[0];
+if (order?.ord?.story?.storyId !== 'gennady') throw new Error('Первым заказом не стал Геннадий');
+if (stop.peds.length) throw new Error('Геннадий появился перед домом вместо квартиры');
+if (!stop.home?.flat) throw new Error('Номер квартиры не появился в накладной');
+const flat = stop.home.flat;
+d.V.x = d.S.target.x; d.V.z = d.S.target.z;
+d.V.vx = 0; d.V.vz = 0;
+d.car.position.x = d.V.x; d.car.position.z = d.V.z;
+await run(10);
+if (!stop.carry || d.DOOR.mode !== 'dial' || document.querySelector('#fp-take-hint')) throw new Error('Автоматический путь от машины до домофона не завершился');
+const intercomFlat = d.DOOR.doorState()?.flat;
+if (intercomFlat !== flat) throw new Error('Код не совпадает с накладной');
+d.DOOR.solve();
+await run(2);
+if (d.DOOR.mode !== 'stairs') throw new Error('Домофон не открыл подъезд');
+d.DOOR.solve();
+await run(2);
+const stairs = d.DOOR.stairsState();
+const oldDoor = new URLSearchParams(location.search).has('door3d');
+if (!stairs?.d3 || stairs.flat !== +flat || stairs.scene?.stage !== (oldDoor ? 'dialog' : 'door_dialogue')) throw new Error('Нет сцены у нужной квартиры');
+await run(7);
+const vis = s => [...document.querySelectorAll(s)].map(el => ({ cls: el.className, visibility: getComputedStyle(el).visibility, display: getComputedStyle(el).display }));
+return { story: order.ord.story.storyId, pizzeria: d.PIZZA && d.PIZZA.name, dialogOpen: d.DLG.isOpen(), oldDoor,
+  compact: document.querySelector('#dlg')?.classList.contains('compact'), portrait: !!document.querySelector('#door2d img'),
+  on: document.querySelector('#dlg')?.classList.contains('on'), speaker: document.querySelector('.dlg-name')?.textContent,
+  text: document.querySelector('.dlg-text')?.textContent, stairs3d: !!stairs.d3,
+  hud: { top: vis('.sx .mk-top'), mini: vis('.sx .mk-mini'), feed: vis('.sx .mk-feed'), timer: vis('#timewrap') } };

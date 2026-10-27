@@ -1,0 +1,71 @@
+/* Геннадий стоит на плоскости в 3D-коридоре; слой нужен для виньетки и диалога. */
+#door2d { position: absolute; inset: 0; z-index: 39; pointer-events: none; overflow: hidden; opacity: 0;
+  transition: opacity .24s ease; }
+#door2d.on { opacity: 1; }
+#door2d .door2d-shade { position: absolute; inset: 0; background: linear-gradient(90deg,
+  rgba(16, 17, 17, .08), transparent 44%, rgba(20, 18, 17, .08)); }
+#door2d .door2d-frame { position: absolute; bottom: -12vh; left: 0; z-index: 1;
+  height: 105vh; aspect-ratio: 1260 / 1730; transform-origin: 50% 66%; }
+#door2d img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: bottom center; transform-origin: bottom center; }
+#door2d::after { content: ''; position: absolute; inset: 0; z-index: 2;
+  background: radial-gradient(ellipse 85% 78% at 51% 45%, transparent 42%, rgba(15, 16, 17, .16) 71%, rgba(13, 14, 15, .53) 100%); }
+body.door-dialogue #hud-left, body.door-dialogue #hud-right, body.door-dialogue #radar,
+body.door-dialogue #timewrap, body.door-dialogue #bonus, body.door-dialogue .sx .mk-top,
+body.door-dialogue .sx .mk-mini, body.door-dialogue .sx .mk-feed,
+body.door-dialogue .sx .mk-help, body.door-dialogue .sx .sx-bar { visibility: hidden !important; }
+
+/* Милитари-материалы под броню Геннадия: тёмная ткань, состаренная медь, без портрета в шапке. */
+#dlg.door2d { align-items: stretch; justify-content: stretch; overflow: hidden; padding: 0; background: none;
+  pointer-events: none; font-family: system-ui, sans-serif; }
+#dlg.door2d .dlg-box { position: relative; width: 100%; max-width: none; margin: 0; padding: 0; box-shadow: none;
+  background: none; border: 0; transform: none; pointer-events: none; }
+#dlg.door2d .dlg-top, #dlg.door2d .dlg-bar, #dlg.door2d .dlg-head img, #dlg.door2d .dlg-pay { display: none; }
+#dlg.door2d .dlg-row { position: absolute; left: 63%; top: 28%; width: 33%; max-width: 490px; display: block; padding: 0;
+  transform: perspective(1000px) rotateY(-7deg) rotateZ(-1deg); transform-origin: right center;
+  filter: drop-shadow(7px 12px 12px rgba(10, 10, 10, .3)); }
+#dlg.door2d .dlg-head { display: flex; flex-direction: row; align-items: center; gap: 6px; position: relative; z-index: 1; width: fit-content; margin: 0 0 -3px 16px; rotate: none; }
+#dlg.door2d .dlg-head img.pp-polaroid { display: none; }
+#dlg.door2d .dlg-name { display: block; padding: 6px 16px; background: #393b2d; color: #e8dbba;
+  border-radius: 0; box-shadow: none; font: 700 clamp(13px, 1vw, 17px)/1.2 system-ui, sans-serif;
+  letter-spacing: .08em; text-transform: uppercase; text-shadow: none; }
+#dlg.door2d .dlg-col { display: block; box-sizing: border-box; width: 100%; padding: 14px 14px 18px;
+  background-color: #2b2e25;
+  background-image: linear-gradient(135deg, rgba(150, 111, 64, .14), transparent 38%),
+    repeating-linear-gradient(135deg, rgba(220, 205, 160, .025) 0 2px, transparent 2px 8px);
+  clip-path: polygon(0 14px, 14px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%);
+  pointer-events: auto; }
+#dlg.door2d .dlg-bubble { box-sizing: border-box; min-height: clamp(138px, 21vh, 210px); padding: clamp(16px, 2vw, 27px);
+  display: flex; align-items: center; justify-content: center; background: #34382d; border: 1px solid #786c4c; border-radius: 0;
+  box-shadow: inset 0 0 0 3px rgba(20, 23, 18, .4); color: #f1ead4; font: 600 clamp(19px, 1.75vw, 27px)/1.42 system-ui, sans-serif;
+  text-align: center; pointer-events: auto;
+  clip-path: polygon(0 0, calc(100% - 17px) 0, 100% 17px, 100% 100%, 12px 100%, 0 calc(100% - 12px)); }
+#dlg.door2d .dlg-bubble::before, #dlg.door2d .dlg-bubble::after, #dlg.door2d .dlg-skip,
+#dlg.door2d .dlg-meters { display: none; }
+#dlg.door2d .dlg-text { min-height: 0; margin: 0; width: 100%; text-align: center; }
+#dlg.door2d .dlg-btns { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px;
+  width: 100%; margin: 13px 0 0; pointer-events: auto; }
+#dlg.door2d .dlg-btns.one { display: flex; justify-content: center; }
+#dlg.door2d .dlg-btns button { position: relative; justify-content: center; min-height: 46px; padding: 7px 10px;
+  border: 1px solid #8c7851; border-radius: 0; box-shadow: none; background: #484b36; color: #f1ead4;
+  font: 600 clamp(16px, 1.3vw, 21px)/1.25 system-ui, sans-serif; text-align: center;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
+#dlg.door2d .dlg-btns.one button { width: min(50%, 200px); }
+#dlg.door2d .dlg-btns .dlg-no { background: #303229; color: #f1ead4; border-color: #8c7851; }
+#dlg.door2d .dlg-btns button.dlg-cur, #dlg.door2d .dlg-btns button:hover { background: #b69b69; color: #202219; border-color: #dec493; }
+#dlg.door2d .dlg-btns button::before, #dlg.door2d .dlg-btns .pp-key, #dlg.door2d .dlg-hint { display: none; }
+#dlg.door2d.door2d-courier .dlg-row { left: 28%; top: auto; bottom: 5%; width: 44%; max-width: 580px;
+  transform: perspective(1000px) rotateY(0) rotateZ(-.5deg); transform-origin: center bottom; }
+#dlg.door2d.door2d-courier .dlg-head { display: none; }
+#dlg.door2d.door2d-courier .dlg-bubble { min-height: 72px; }
+@media (max-width: 900px) {
+  #door2d .door2d-frame { left: -3vw; height: 92vh; bottom: 0; }
+  #dlg.door2d .dlg-row { left: 56%; top: 26%; width: 40%; }
+  #dlg.door2d.door2d-courier .dlg-row { left: 19%; top: auto; bottom: 4%; width: 62%; }
+  #dlg.door2d .dlg-bubble { min-height: 23vh; }
+}
+@media (max-height: 620px) {
+  #dlg.door2d .dlg-row { top: 18%; }
+  #dlg.door2d .dlg-bubble { min-height: 30vh; font-size: clamp(18px, 1.8vw, 25px); }
+  #dlg.door2d .dlg-btns button { min-height: 42px; }
+}
+@media (prefers-reduced-motion: reduce) { #door2d, #door2d img { transition: none; } }

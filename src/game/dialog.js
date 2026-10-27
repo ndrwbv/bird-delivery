@@ -1,4 +1,4 @@
-/* Окно разговора — лист накладной внизу экрана, как разговор у двери (minigames/smalltalk.js, автор 16.10.2026:
+/* Единый обработчик разговоров. У квартиры по умолчанию компактная панель под 3D-сценой.
    «диалоги в одном стиле и с одной озвучкой, как те, где штамп ставится»): шапка капсом (что это — поручение,
    гараж…, справа — срок заказа, как на часах хада), слева полароид того, кто говорит (говорит ртом), под ним имя
    и сумма предложения отдельной строкой (pay); справа — облачко, текст печатается по буквам с «ну», «э-э» и
@@ -140,6 +140,7 @@ export function speechify (text, mood = 'calm', rnd = Math.random) {
 /* подпись под портретом: клиент заказа подписан в приложении ником (nicks.js person.app) — лицо живое, а подпись —
    ник («Анальная трещина» — милая бабушка). Подменяем, только если звали по имени (имя или имя-фамилия) */
 const appName = o => {
+  if (o.canonicalName) return o.name || '';
   const p = o.person, ap = p && p.app, n = o.name || '';
   return ap && ap.nick && n && (n === p.name || n === p.first) ? ap.nick : n;
 };
@@ -167,6 +168,9 @@ function show (o, done) {
   const two = !!o.decline;
   const stack = two && !!o.stack;                // столбиком: верхний — accept, нижний — decline, курсор ▶
   const btns = $('.dlg-btns'), hintEl = $('.dlg-hint'), box = $('.dlg-box');
+  root.classList.toggle('compact', o.compact !== false && !o.door2d);
+  root.classList.toggle('door2d', !!o.door2d);
+  root.classList.toggle('door2d-courier', !!o.door2d && !!o.courierLine);
   const col = o.color || '#ff8a2b';
   $('.dlg-bar').style.background = col;
   box.style.setProperty('--pp-accent', col);
@@ -268,10 +272,11 @@ function show (o, done) {
     done(v);
   };
   // ответить: допечатывается — сначала допечатать; допечаталась только что — ждём ARM
-  const answer = v => { if (!typed) finish(); else if (armed()) close(v); };
+  const answer = v => { if (o.paused && o.paused()) return; if (!typed) finish(); else if (armed()) close(v); };
   const tick = now => {
     raf = requestAnimationFrame(tick);
     const dt = Math.min(0.1, (now - last) / 1000);
+    if (o.paused && o.paused()) { last = now; return; }
     if (!typed) {
       acc += dt * CPS;
       while (acc >= 1 && i < full.length) {
@@ -300,8 +305,8 @@ function show (o, done) {
     } else if (PAD.connected) {
       const a = PAD.a, b = PAD.b;
       const on = padLit(PAD) && typed;
-      if (on && lit && two && (PAD.menuLeft || PAD.menuUp)) pick = no;      // «отказаться» — слева
-      if (on && lit && two && (PAD.menuRight || PAD.menuDown)) pick = yes;
+      if (on && two && (PAD.menuLeft || PAD.menuUp)) pick = o.door2d ? yes : no;
+      if (on && two && (PAD.menuRight || PAD.menuDown)) pick = o.door2d ? no : yes;
       lit = on;
       mark(on);
       if (a && !padPrev.a) answer(pick !== no);
@@ -318,6 +323,7 @@ function show (o, done) {
   const dismissMe = () => close(null);
   CUR = dismissMe;
   const key = e => {
+    if (o.paused && o.paused()) return;
     if (stack) {                                 // столбиком: стрелки / W S — курсор, Enter / пробел — ответить, 1 / 2 — сразу
       const c = e.code, eat = () => { e.preventDefault(); e.stopPropagation(); };
       if (c === 'Space' || c === 'Enter' || c === 'NumpadEnter' || c === 'KeyE') { eat(); if (!e.repeat) answer(pick !== no); }
@@ -327,16 +333,17 @@ function show (o, done) {
       return;                                    // Esc / Backspace — «пропустить сцену» (story.js)
     }
     const eat = () => { e.preventDefault(); e.stopPropagation(); };
-    if (e.code === 'Space' || e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'KeyE') { eat(); if (e.repeat) return; if (!typed) finish(); else if (!two || e.code !== 'Space') answer(true); }
+    if (two && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) { eat(); if (typed) { pick = e.code === 'ArrowLeft' ? (o.door2d ? yes : no) : (o.door2d ? no : yes); mark(true); } }
+    else if (e.code === 'Space' || e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'KeyE') { eat(); if (e.repeat) return; if (!typed) finish(); else if (!two || e.code !== 'Space') answer(pick !== no); }
     else if (o.alt && two && e.code === 'KeyX') { eat(); if (!e.repeat) answer(false); }
     else if (o.alt && (e.code === 'Escape' || e.code === 'Backspace')) return;   // alt: Esc — пропустить сцену (story.js), не ответ
     else if (e.code === 'Escape' || e.code === 'Backspace') { eat(); if (!e.repeat) answer(two ? false : true); }
   };
   addEventListener('keydown', key, true);
   // клик / тап по облачку: допечатать; одна кнопка — дальше (две — отвечают кнопкой)
-  $('.dlg-bubble').onclick = () => { if (!typed) finish(); else if (!two && armed()) close(true); };
-  yes.onclick = () => { if (armed()) close(true); };
-  no.onclick = () => { if (armed()) close(false); };
+  $('.dlg-bubble').onclick = () => { if (o.paused && o.paused()) return; if (!typed) finish(); else if (!two && armed()) close(true); };
+  yes.onclick = () => { if (o.paused && o.paused()) return; if (armed()) close(true); };
+  no.onclick = () => { if (o.paused && o.paused()) return; if (armed()) close(false); };
 }
 
 /* ── реплика на ходу (line) ── */

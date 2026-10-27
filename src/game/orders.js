@@ -37,17 +37,15 @@ import * as TEL from './telemetry.js';          // анонимная стати
 import { t, tn } from '../i18n/index.js';
 import * as ECON from './econ.js';
 import * as DLG from './dialog.js';
+import * as CHAT from './chat.js';
 import * as ZN from './zones.js';
 import * as DIST from './districts.js';
-import * as FEST from './festivals.js';
 import * as PZ from './pzevents.js';              // событие пиццерии района: часть заказов — «заказ события» с надбавкой (pzevents.js)
 import * as HOL from './holidays.js';            // праздничная смена: оливье-пицца, «к бою курантов», корпоратив, чаевые щедрее (holidays.js)
 import * as CYCLE from './seasoncycle.js';      // первая смена сезона: сезонные пиццы, оплата ×k (seasoncycle.js perk)
 import * as HURR from './hurricane.js';          // дома, унесённые ураганом: их адреса не выдаём (hurricane.js blocked)
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 import * as RHY from './rhythm.js';             // ритм смены: роль заказа на дуге, напряжение, встреча у двери (rhythm.js)
-import * as FACES from './faces.js';            // знакомые лица района: Глеб — его адрес, его поручение (faces.js)
-import * as LOCALS from './locals.js';          // жители Юга: их адреса и поручения (locals.js)
 import * as GROW from './growth.js';            // пиццерия растёт: оплата, чаевые, размер сборных по ступени (econ.js GROWTH)
 import * as BEACH from './beach.js';            // пляж летом: заказ на полотенце (beach.js ORDER)
 import * as DOOR from './doorstep.js';          // домофон у подъезда: бонус «с первого раза» / «спускался сам» (econ.js DOOR)
@@ -231,7 +229,7 @@ function rate () {
 function pickSpot (o = {}) {
   if ((o.grow || 0) > 6) return null;
   // фестиваль кальянщиков (festivals.js): все адреса смены — рядом с ним
-  const fn = !o.near && !SIM ? FEST.near() : null;
+  const fn = null;
   if (fn) o = { ...o, near: fn, r: fn.r, dmin: undefined, dmax: undefined, zone: null };
   const c = o.from || A.PIZZA;
   const fit = s => (!o.zone || s.zone === o.zone) && !SH.reserved.has(s.key) && !HURR.blocked(s.x, s.z) &&   // у унесённого ураганом дома — не возим
@@ -359,11 +357,15 @@ function genSpec () {
   if (R) { R.k0 = R.k; R.k = SKILL.k(R.k); RHY_K = R.k; }   // умение курьера: потолок напряжения (skill.js) — дальность, сборные, срочные «по шансу»
   const tgt = R ? arcTarget(R, D) : 0;                    // сколько метров по дорогам «хочется» этому заказу
   if (R) { D = rampRing(D, R.k); RHY_ROLE = R.role; D.max = Math.max(D.min + 150, Math.min(D.max, Math.round(tgt))); }   // по прямой — не дальше «хочется» по дорогам
-  // фестиваль кальянщиков и митинг в поддержку ожирения: первый заказ смены и часть остальных — на сам фестиваль, к проходу (festivals.js)
-  const fp = SIM ? null : FEST.passSpec(SH.gen);
-  if (fp && R && R.meet) RHY.meetFailed();
-  if (fp) return finishSpec({ type: 'pizza', kind: 'solo', fest: fp, stops: [{ x: fp.x, z: fp.z, key: keyOf(fp.x, fp.z), zone: ZN.zoneAt(fp.x, fp.z), n: 1, addr: fp.addr }] }, null, hourNow());
-  if (R && R.meet) { const ms = R.meet.face ? faceSpec(R, D, tgt) : meetSpec(R, D, tgt); if (ms) return finishSpec(ms, null, hourNow()); RHY.meetFailed(); }
+  // Первая встреча проходит через обычную очередь заказов, до случайных событий смены.
+  if (!SIM && STORY && typeof STORY.nextOrder === 'function') {
+    const first = STORY.nextOrder(storyCtx());
+    if (first && first.storyId === 'gennady') {
+      const spec = storySpec(first);
+      if (spec && storyNear(first)) return finishSpec(spec, null, hourNow());
+      storyCancel(first);
+    }
+  }
   const easy = easySpec(R);
   if (easy) return finishSpec(easy, null, hourNow());
   // праздник (holidays.js): «к бою курантов» — срочный, срок до 00:00 по часам мира; адрес — чтобы успеть
@@ -694,8 +696,6 @@ function finishSpec (spec, forced, hAt) {
   if (RHY_ROLE) { spec.role = RHY_ROLE; spec.tk = RHY_K; }                             // ритм: следующий заказ — не сильно дальше этого (arcTarget)
   spec.color = spec.color || typeColor(spec.type);
   spec.forced = forced;
-  // митинг в поддержку ожирения (festivals.js): часть заказов — «едят за двоих», оплата ×FEST.BURGER_K
-  if (!spec.story && !SIM) { const bk = (spec.fest && spec.fest.burger) || FEST.burgerRoll(); if (bk) spec.burger = bk; }   // заказ на сам митинг — всегда «едят за двоих»
   // праздник (holidays.js): обычная пицца — иногда праздничная (оливье-пицца), оплата ×k
   if (!spec.story && !SIM && !spec.hol && !spec.fest && !spec.beach && !spec.bundle && !spec.urgent && spec.type === 'pizza') { const h = HOL.olivier() || CYCLE.perk(); if (h) spec.hol = h; }   // не праздник — может быть сезонная (seasoncycle.js)
   // событие пиццерии (pzevents.js): в окне события часть обычных пицц — «заказ события», оплата ×k
@@ -868,14 +868,13 @@ function bundleTime (L, n, k) {
 
 /* директор пиццерии: «ты растёшь — бери два сразу» (BOSS в orders.config.js). Диалог
    поверх накладной; запоминаем, сколько пицц уже объявлено (dlv-boss) */
-let BOSS_P = null, SIM_TOLD = 0;
+let SIM_TOLD = 0;
 const toldGet = () => (SIM ? SIM_TOLD : +A.Store.get('dlv-boss', 0) || 0);
 function bossSays (k) {
   A.Store.set('dlv-boss', Math.max(toldGet(), Math.abs(k)));
   const line = k > 0 && BOSS.lines[k];
   if (!line) return;
-  if (!BOSS_P) BOSS_P = makePerson({ seed: BOSS.seed, first: t(BOSS.first), last: t(BOSS.last), fem: !!BOSS.fem });
-  DLG.say({ person: BOSS_P, name: BOSS_P.name + ' · ' + t(BOSS.role), head: t('пиццерия'), text: t(line), accept: t(BOSS.ok), mood: 'calm', fillers: false, color: typeColor('pizza') });
+  CHAT.say(t(line));
 }
 
 /* сюжетный заказ без прохожего: у двери его человек (story.js), game.js зовёт вместо сборки S.order */
@@ -884,7 +883,7 @@ export function startStory (plan) {
   const sp = plan.ord, s = sp.story, stp = sp.stops[0];
   // пин — перед дверью на свободном месте (game.js pinFront), человек сюжета — у самой двери
   const at = A.pinFront ? A.pinFront(stp.x, stp.z) : { x: stp.x, z: stp.z };
-  const st = { peds: [], persons: s.person ? [s.person] : [], at, key: stp.key, zone: stp.zone,
+  const st = { peds: [], persons: s.person ? [s.person] : [], at, entry: s.door, key: stp.key, zone: stp.zone,
     addr: stp.addr, note: s.note || '', reach: s.reach || 6 };
   S.order = { kind: 'solo', tut: false, surf: false, stops: [st], idx: 0, why: plan.why, items: s.items || '1 × ' + t('пицца'), ord: sp };
   S.state = 'brief';
@@ -970,11 +969,14 @@ export function arrive (o, st, onTime) {
       try { const r = cb(ev); if (r && typeof r.then === 'function') wait.push(r); } catch (e) { console.warn('[orders] onArrive', e); }
     }
     if (wait.length) {
-      st.hold = Promise.allSettled(wait).then(() => { st.hold = null; });
+      st.hold = Promise.allSettled(wait).then(() => {
+        st.hold = null;
+        if (o.ord && o.ord.story && STORY.interiorFor(o.ord.story) && !o.ord.story.interiorDone) st.arrived = false;
+      });
       return true;
     }
   }
-  return false;
+  return !!(o.ord && o.ord.story && STORY.interiorFor(o.ord.story) && !o.ord.story.interiorDone);
 }
 
 /* оплата остановки: ECON.orderPay (посчитана в setup), скорость, чаевые */
@@ -1049,22 +1051,11 @@ export function delivered (o, st, onTime) {
     if (A.marker) A.marker.visible = false;               // в катсцене столб маркера не нужен
     sp.story.late = !onTime;                              // условие «успеть» у глав героев (herostories.js)
     try { STORY.onDeliver(sp.story); } catch (e) { console.warn('[orders] STORY.onDeliver', e); }
+    if (sp.story.storyId === 'gennady' && sp.story.interiorDone) CHAT.say(t('Молодец, Женя. Клиент доволен. Вот так и работай'), null, false,
+      null, { key: 'gennady-after' });
   }
   // поручение по таймеру (errandStep): подошёл срок — просит этот клиент (и когда опоздал); после разговора у двери
   // (doorstep.js), у сюжетного, на фестивале и без магазина рядом — не просит, попросит следующий
-  // знакомое лицо (faces.js): на этом заказе Глеб просит своё поручение — листовки у товарища (не по таймеру, ритм его уже
-  // посчитал); не вышло (нет товарища в районе рядом) — история ждёт следующей смены
-  if (sp.face && sp.face.kind === 'errand' && !sp.faceAsked) {
-    const ped = st.peds[0], per = st.persons[0];
-    if (!S.ride && per && ped && !ped.dead && offerSide(ped, per, sp.face.side)) {
-      sp.faceAsked = true;
-      errandDone();                                       // в счёт поручений (таймер — заново, ритм видит просьбу)
-      if (sp.face.local) LOCALS.asked(sp.face, sp.stops && sp.stops[0]); else FACES.asked(sp.stops && sp.stops[0]);
-      return;
-    }
-    ERR.miss.push(sp.face.local ? sp.face.name + ': нет магазина или человека рядом' : 'Глеб: нет товарища рядом'); if (ERR.miss.length > 30) ERR.miss.shift();
-    if (sp.face.local) LOCALS.missed(sp.face);            // житель Юга: не вышло дважды — история дальше без поручения
-  }
   errandCount(sp);                                        // заказ отдан — счёт заказов до поручения (раз в 2—3 заказа)
   if (ERR.due) {
     const no = sp.story ? 'сюжет' : sp.fest ? 'фестиваль' : S.ride ? 'покататься' : st.talk ? 'разговор у двери' : st.odd && st.odd !== 'shout' ? 'сценка у двери: ' + st.odd
@@ -1091,7 +1082,7 @@ function errandStep (dt) {
   ERR.clock += dt;
 }
 /* отдан заказ целиком: +1 к счёту; дошёл до ERR.gap — просьба на этом вручении (или на следующем, если тут нельзя) */
-const errOn = () => !!A && !S.ride && !!CAR && typeof CAR.shiftOn === 'function' && CAR.shiftOn()
+const errOn = () => SIDE_ORDERS.length > 0 && !!A && !S.ride && !!CAR && typeof CAR.shiftOn === 'function' && CAR.shiftOn()
   && !!(DIRECTOR.sessionShifts && DIRECTOR.sessionShifts() >= ECON.ERRAND.FROM_SHIFT)
   && (+A.Store.get('dlv-shifts', 0) || 0) >= (ECON.ERRAND.FROM_DONE || 0);                  // первая смена новичка — без поручений
 function errandCount (sp) {

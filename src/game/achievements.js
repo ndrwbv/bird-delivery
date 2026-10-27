@@ -27,7 +27,6 @@ import * as DIST from './districts.js';
 import * as AUTO from './cars.js';
 import * as SL from './streetlamps.js';
 import * as STORY from './story.js';
-import { HERO } from './heroes.js';                // HERO.STORY — сюжет героев в архиве (10.10.2026)
 import * as NQ from './notifyq.js';                 // плашка достижения — в общей очереди уведомлений: после чека, Толика и рейтинга (notifyq.js)
 
 export const KEY = 'dlv-ach';
@@ -70,10 +69,7 @@ export const LIST = [
   { id: 'BUHANKA_20', group: 'fun', stat: 'buhanka', need: 20, name: N_('Хлебовоз'), desc: N_('Доставить 20 заказов на «Буханке»') },
   { id: 'ALL_IN', group: 'fun', stat: 'allin', need: 1, hidden: true, name: N_('Всё на красное'), desc: N_('Депнуть всю копилку и проиграть') },
   { id: 'ROOFTOP', group: 'fun', stat: 'roof', need: 1, name: N_('Карлсон'), desc: N_('Запрыгнуть на машине на крышу дома') },
-  { id: 'TOLIK_MDAA', group: 'fun', stat: 'mdaa', need: 1, name: N_('Мдаа'), desc: N_('Услышать от Толика «мдаа» в конце смены') },
-  // в архиве, автор 10.10.2026: сюжет героев убран (heroes.js HERO.STORY) — глав бабы Зины нет, достижение спрятано
-  // (story: true — только при HERO.STORY; уже полученное остаётся в сохранении и в Стиме, на доске почёта — видно)
-  { id: 'ZINA', group: 'fun', stat: 'zina', need: 1, story: true, name: N_('Для внука'), desc: N_('Пройти историю бабы Зины до конца') },
+  { id: 'TOLIK_MDAA', group: 'fun', stat: 'mdaa', need: 1, name: N_('Мдаа'), desc: N_('Получить замечание от управляющей в конце смены') },
 ];
 const BY_ID = new Map(LIST.map(a => [a.id, a]));
 
@@ -307,7 +303,7 @@ export function stats () { return { ...load().n }; }
 export function got () { return Object.keys(load().got); }
 export function list () {
   const d = load();
-  return LIST.filter(a => !a.story || HERO.STORY || d.got[a.id]).map(a => ({ id: a.id, name: t(a.name), got: !!d.got[a.id], at: d.got[a.id] || 0, have: Math.min(d.n[a.stat] || 0, a.need), need: a.need, adult: !!a.adult, hidden: !!a.hidden }));
+  return LIST.filter(a => !a.story || d.got[a.id]).map(a => ({ id: a.id, name: t(a.name), got: !!d.got[a.id], at: d.got[a.id] || 0, have: Math.min(d.n[a.stat] || 0, a.need), need: a.need, adult: !!a.adult, hidden: !!a.hidden }));
 }
 /* доска почёта (honor.js): какие полученные игрок ещё не видел на доске — они «прилетают» при открытии.
    Отметка — в том же сохранении (dlv-ach, общее на устройство, сброс прогресса не стирает) */

@@ -87,7 +87,7 @@ export function play ({ host, tap = null, head = '', no = 0, why = '', rows = []
   const face = sticker ? (sticker.face != null ? sticker.face : CHAT.avatar(96)) : '';
   host.innerHTML = receiptHTML({ head, no, why, rows, total, hints, seal, ribbon, money }) +
     (sticker && sticker.line ? '<aside class="en-tolik cr-tolik">' + (face ? '<img alt="" src="' + esc(face) + '">' : '<i></i>') +
-      '<div class="en-tb"><b>' + esc(t('Толик управляющий')) + '</b><div class="en-st"><p class="typing en-dots"><span></span><span></span><span></span></p>' +
+      '<div class="en-tb"><b>' + esc(t('Ирина Сергеевна')) + '</b><div class="en-st"><p class="typing en-dots"><span></span><span></span><span></span></p>' +
       '<p class="en-msg">' + esc(sticker.line) + '</p></div></div></aside>' : '');   // сообщение как в iMessage (chat.css): «печатает…», потом текст
   const rc = host.querySelector('.cr-rc'), tol = host.querySelector('.cr-tolik');
   const ava = tol && sticker.face == null ? tol.querySelector('img') : null;      // своё лицо (sticker.face) — без рта

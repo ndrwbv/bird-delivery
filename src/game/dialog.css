@@ -1,4 +1,4 @@
-/* Окно разговора — лист накладной внизу экрана, как разговор у двери (minigames/smalltalk.css; автор 16.10.2026: «в одном
+/* Панель разговора. Компактный режим оставляет камеру и человека видимыми (прежний стиль листа сохранён ниже для служебных окон).
    стиле»): сверху видно город, хад и часы срока. Шапка капсом (что это · срок заказа), слева полароид с именем и суммой
    предложения, справа белое облачко с хвостиком к фото, ответы — бумажные кнопки. Палитра — --pp-* (paper.css). */
 #dlg { position: absolute; inset: 0; z-index: 40; display: flex; align-items: flex-end; justify-content: center; box-sizing: border-box;
@@ -7,6 +7,39 @@
        background: linear-gradient(to top, rgba(40, 14, 24, .55), rgba(40, 14, 24, .12) 55%, transparent 80%); }
 #dlg[hidden] { display: none; }
 #dlg.on { opacity: 1; }
+/* Сцена в дверях: один и тот же обработчик реплик, короткая полоса под 3D-персонажем. */
+#dlg.compact { background: none; overflow: visible; pointer-events: none; padding-bottom: 2.5vh; }
+#dlg.compact .dlg-box { position: relative; width: min(700px, calc(100% - 32px)); padding: 18px 22px 20px;
+  box-sizing: border-box; background: rgba(19, 23, 32, .9); border: 1px solid rgba(255,255,255,.32);
+  border-radius: 15px; box-shadow: 0 12px 35px rgba(0,0,0,.45); pointer-events: auto; color: #fff; }
+#dlg.compact .dlg-top, #dlg.compact .dlg-head img, #dlg.compact .dlg-pay, #dlg.compact .dlg-bar { display: none; }
+#dlg.compact .dlg-row { display: block; padding: 0; }
+#dlg.compact .dlg-head { width: auto; max-width: none; margin: 0 0 8px; rotate: none; }
+#dlg.compact .dlg-name { max-width: none; color: #ffc668; font-size: 13px; line-height: 1.4; text-shadow: none; }
+#dlg.compact .dlg-col { display: block; width: 100%; }
+#dlg.compact .dlg-bubble { min-height: 0; padding: 0; background: none; color: #fff; border: 0; border-radius: 0;
+  box-shadow: none; font: 16px/1.55 system-ui, sans-serif; }
+#dlg.compact .dlg-bubble::before, #dlg.compact .dlg-bubble::after { display: none; }
+#dlg.compact .dlg-skip { bottom: 0; right: 0; color: rgba(255,255,255,.55); font-size: 10px; }
+#dlg.compact .dlg-btns { justify-content: flex-start; margin-top: 15px; gap: 8px; }
+#dlg.compact .dlg-btns button { font: 14px/1.3 system-ui,sans-serif; padding: 8px 13px; border: 1px solid rgba(255,255,255,.55);
+  border-radius: 8px; box-shadow: none; background: rgba(255,255,255,.12); color: #fff; }
+#dlg.compact .dlg-btns .dlg-yes, #dlg.compact .dlg-btns .dlg-no { background: rgba(255,255,255,.12); }
+#dlg.compact .dlg-btns button:hover, #dlg.compact .dlg-btns button.dlg-cur { background: rgba(255,198,104,.25); }
+/* В разговоре у квартиры остаётся чистый кадр с человеком и короткой полосой реплики. */
+body:has(#dlg.compact.on) #hud-left,
+body:has(#dlg.compact.on) #hud-right,
+body:has(#dlg.compact.on) #radar,
+body:has(#dlg.compact.on) #timewrap,
+body:has(#dlg.compact.on) #bonus,
+body:has(#dlg.compact.on) .sx .mk-top,
+body:has(#dlg.compact.on) .sx .mk-mini,
+body:has(#dlg.compact.on) .sx .mk-feed,
+body:has(#dlg.compact.on) .sx .mk-help,
+body:has(#dlg.compact.on) .sx .sx-bar { visibility: hidden; }
+body.dlg-open #timewrap,
+body.dlg-open #otags,
+body.dlg-open .sx .mk-mini { visibility: hidden !important; }
 .dlg-box { --dlg-face: clamp(132px, min(25vh, 17vw), 236px); width: min(960px, 100%); padding-top: 2px; transform: translateY(16px) scale(.98); transition: transform .22s var(--pp-spring, ease-out); }
 #dlg.on .dlg-box { transform: none; }
 .dlg-bar { display: none; }                      /* цвет активности — полоской над шапкой (--pp-accent) */

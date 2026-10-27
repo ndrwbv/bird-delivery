@@ -34,7 +34,10 @@ import * as OS from '../ordersheet.js';
 import * as KIT from './doorkit.js';
 import * as SC from './doorscene.js';
 import * as COACH from './doorcoach.js';     // обучение первого раза: пауза, подсветка кнопок, «поехали!»
-import * as S3 from './stairs3d.js';         // подъезд в 3D (12ас): лестница, двери, курьер-модель, мужик в трусах у своей двери; ?old2dstairs — 2D
+import * as S3 from './stairs3d.js';         // подъезд в 3D (12ас): лестница, двери, курьер-модель, клиент у своей двери; ?old2dstairs — 2D
+import * as DLG from '../dialog.js';
+import * as DOOR2D from './door2d.js';
+import { ordinaryDoor } from '../story.js';
 
 const N_ = s => s;
 const DT_MAX = 0.1;
@@ -97,12 +100,12 @@ const TOP = [
   '..YYYYY.....',
   '..BBBBB.....',
 ];
-const MAN = {
+const COURIER = {
   stand: TOP.concat(['..BB..BB....', '..BB..BB....', '..BB..BB....', '..bb..bb....', '..kk..kkk...']),
   w1: TOP.concat(['.BBB...BB...', '.BB.....BB..', 'BB.......BB.', 'bb.......bb.', 'kk.......kkk']),
   w2: TOP.concat(['..BBBBBB....', '..BB..BB....', '..BB...BB...', '..bb...bb...', '..kkk..kkk..']),
 };
-MAN.puff = ['............'].concat(TOP.slice(0, TOP.length - 1).map((r, i) => (i === 4 ? '.W' + r.slice(2) : r)), MAN.stand.slice(TOP.length));
+COURIER.puff = ['............'].concat(TOP.slice(0, TOP.length - 1).map((r, i) => (i === 4 ? '.W' + r.slice(2) : r)), COURIER.stand.slice(TOP.length));
 /* гопник сидит на ступеньке */
 const GOPNIK = [
   '...kkkkk....',
@@ -149,7 +152,7 @@ export default {
     { k: 'clockS', label: 'срок заказа, с', type: 'num', def: 45, min: 3, max: 120, step: 1 },
     { k: 'look', label: 'подъезд', type: 'sel', def: 'shabby', opts: [['shabby', 'обшарпанный'], ['clean', 'чистый с цветами'], ['auto', 'по адресу']] },
     { k: 'time', label: 'эталон «быстро», с (0 — по формуле)', type: 'num', def: 0, min: 0, max: 30, step: 0.5 },
-    { k: 'learnOn', label: 'первый раз (подсказка Толика)', type: 'bool', def: false },
+    { k: 'learnOn', label: 'первый раз (подсказка)', type: 'bool', def: false },
     { k: 'learnGop', label: 'первые гопники (обучение)', type: 'bool', def: false },
   ],
   mount (root, o, api) {
@@ -175,13 +178,13 @@ export default {
     const st = {
       t: 0, phase: 'play', y: 0, v: 0, breath: 1, puff: 0, door: -1, walk: 0, lock: 0, arm: 0.35, tries: 0, lastTap: -9,
       upHold: 0, stride: 0, leg: 0, bounce: 0, side: 0, sideT: 0, endT: 0, res: null, cam: -0.12, pad: false, armA: false,
-      last: {}, fl: -1, here: false,
+      last: {}, fl: -1, here: false, fpX: -0.32, fpZ: -0.05, fpY: 0, fpStairs: false,
     };
     const gop = P.gopAt ? { at: P.gopAt, done: false, how: '', state: '', i: 0, dirs: [], w: 0, tt: 0, arm: 0, flash: 0 } : null;
     const doors = new Map();                                    // квартира → { kind: 'wrong' | 'right', t, open }
-    const keys = { up: false, down: false, act: false };
+    const keys = { up: false, down: false, left: false, right: false, act: false, sprint: false };
     const touch = { up: false, down: false };
-    const padH = { up: false, down: false, a: false };
+    const padH = { up: false, down: false, a: false, lx: 0, ly: 0, sprint: false };
     const client = () => o.who || (person && person.first) || t('клиент');
 
     // подъезд по виду: обшарпанный или чистый — по дому (doorscene.js), стиль — общий с домофоном
@@ -194,7 +197,7 @@ export default {
     const box = document.createElement('div');
     box.className = 'mk-full sx sx-' + look + (D3 ? ' sx3' : '');
     box.innerHTML =
-      '<canvas class="mk-cv sx-cv"></canvas>' + (D3 ? '<div class="sx3-hit"></div>' : '') +
+      '<canvas class="mk-cv sx-cv"></canvas>' + (D3 ? '<div class="sx3-hit"></div>' : '') + '<div class="sx-black"></div><div class="sx-entry-line" hidden></div>' +
       '<div class="mk-top">' + KIT.dashHTML() + '<div class="mk-fuse" aria-hidden="true"><i></i></div>' +
         // 11аа (автор 23.10.2026: «интерфейс перегружен»): задание — этаж и квартира, под ним — сколько осталось;
         // подъезда нет (ты уже в нём), дыхалка — только когда тает
@@ -227,7 +230,15 @@ export default {
     // 3D: сцена — тем же рендерером, что город (в песочнице — свой холст); строится при входе, освобождается при выходе.
     // Не вышло (нет WebGL в песочнице, ошибка) — прежний 2D
     let V3 = null;
-    if (D3) { try { V3 = S3.create(box, { plan: P, look, seed, ADULT: !!api.ADULT, t, gopAt: P.gopAt, person, boxes: o.boxes }); } catch (e) { console.warn('[stairs] 3D не вышло — 2D', e); V3 = null; } }
+    if (D3) { try { V3 = S3.create(box, { forceOwn: !!o.forceOwn, plan: P, look, seed, ADULT: !!api.ADULT, t, gopAt: P.gopAt, person, boxes: o.boxes, firstPerson: !!o.scenario?.portrait }); } catch (e) { console.warn('[stairs] 3D не вышло — 2D', e); V3 = null; } }
+    const FPS = !!(V3 && o.scenario?.portrait);
+    if (FPS && !new URLSearchParams(location.search).has('doorpreview')) {
+      st.entryTextT = 3.2;
+      q('.sx-entry-line').textContent = t('пахнет ссаниной');
+      q('.sx-entry-line').hidden = false;
+    }
+    box.classList.toggle('sx-fps', FPS);
+    if (DOOR2D.enabled(o.scenario, V3)) DOOR2D.prepare(o.scenario.portrait.manifest).catch(e => console.warn('[door2d] preload', e));
     if (V3) q('canvas.sx-cv').remove(); else { box.classList.remove('sx3'); const h = q('.sx3-hit'); if (h) h.remove(); }
     const hit = V3 ? q('.sx3-hit') : null;
     const cv = V3 ? null : KIT.sceneCanvas(box), g = cv ? cv.getContext('2d') : null;   // холст сцены — один на все заходы (doorkit.js, 0п48)
@@ -238,7 +249,7 @@ export default {
     /* сколько осталось: «ещё 4 этажа» → «твой этаж — ищи дверь» (выше — «проскочил — вниз на 1»); на своём этаже
        строка внизу — про дверь и звонок, на лестнице — про вверх и вниз */
     const where = () => {
-      const f = Math.round(st.y);
+      const f = FPS ? Math.floor((st.fpY + 0.08) / 2.8) : Math.round(st.y);
       if (f === st.fl) return;
       st.fl = f;
       const here = f === tgt;
@@ -263,10 +274,16 @@ export default {
         elHelp.innerHTML = k === 'pad' ? kbd('◀ ▶') + esc(t('в такт — обойти')) + ' · ' + kbd(Y) + esc(t('откупиться'))
           : k === 'kb' ? kbd('← →', 1) + esc(t('в такт — обойти')) + ' · ' + kbd('Enter', 1) + esc(t('откупиться'))
             : esc(t('жми ◀ ▶ в такт — или откупись'));
+      } else if (FPS && st.here) {
+        elHelp.textContent = k === 'pad' ? t('Левый стик — идти · RT — бег · правый — смотреть · A — звонок')
+          : t('WASD — идти · Shift — бег · мышь — смотреть · E — звонок');
       } else if (st.here) {                          // свой этаж: к двери и звонок (накладная — своя клавиша на ней самой)
         elHelp.innerHTML = k === 'pad' ? kbd('◀ ▶') + esc(t('к двери')) + ' · ' + kbd(A) + esc(t('звонок'))
           : k === 'kb' ? kbd('← →', 1) + esc(t('к двери')) + ' · ' + kbd('Enter', 1) + esc(t('звонок'))
             : esc(t('◀ ▶ к двери · 🔔 звонок'));
+      } else if (FPS) {
+        elHelp.textContent = k === 'pad' ? t('Левый стик — по ступеням · RT — бег · правый — смотреть · A — звонок')
+          : t('WASD — идти · Shift — бег · клик — осмотр мышью');
       } else {                                       // на лестнице: вверх и вниз
         elHelp.innerHTML = k === 'pad' ? kbd(A) + esc(t('вверх — жми часто')) + ' · ' + kbd(B) + esc(t('вниз'))
           : k === 'kb' ? kbd('↑', 1) + esc(t('вверх — жми часто')) + ' · ' + kbd('↓', 1) + esc(t('вниз'))
@@ -305,13 +322,14 @@ export default {
     }
     function action () {
       if (st.phase !== 'play') return;
-      if (st.door >= 0) ring(); else tapUp();
+      if (st.door >= 0) ring(); else if (!FPS) tapUp();
     }
     function ring () {
       if (st.phase !== 'play' || st.arm > 0 || st.lock > 0 || st.door < 0) return;
+      if (FPS && (Math.abs(st.fpX - V3.doorAt(st.door)) > 0.78 || st.fpZ > -0.45)) return;
       const f = Math.round(st.y), n = flatAt(f, st.door);
       sfx('ring');
-      if (n === flat) { doors.set(n, { kind: 'right', t: 99, open: 0, delay: V3 ? 0.7 : 0 }); finish(true, false); return; }   // 3D: откроют не сразу — идут к двери
+      if (n === flat) { doors.set(n, { kind: 'right', t: 99, open: 0, delay: V3 && !FPS ? 0.7 : 0, cinematic: FPS }); finish(true, false); return; }   // 3D: откроют не сразу — идут к двери
       st.tries++;
       st.lock = K.WRONG_T;
       const rel = f === tgt ? 'same' : f < tgt ? 'up' : 'down';
@@ -320,7 +338,12 @@ export default {
       if (pool.length > 1 && w === st.last.wrong) w = pool.find(x => x !== w);
       st.last.wrong = w;
       doors.set(n, { kind: 'wrong', t: K.WRONG_T + 0.5, open: 0, who: w.who });
-      say({ person: KIT.stranger(w.who), kind: w.who, name: t('кв. {n}', { n }) + ' · ' + t(w.who), text: t(w.say), mood: 'angry', cls: 'mk-bad' });
+      if (FPS) {
+        const occupant = st.tries % 2 === 0;
+        DLG.say({ compact: true, door2d: true, courierLine: !occupant, canonicalName: true, fillers: false,
+          name: '', person: null, text: occupant ? t(api.ADULT ? 'кто там? иди нахуй' : 'кто там?') : t('походу не сюда'),
+          accept: t('дальше'), paused: () => !!(api.paused && api.paused()) });
+      } else say({ person: KIT.stranger(w.who), kind: w.who, name: t('кв. {n}', { n }) + ' · ' + t(w.who), text: t(w.say), mood: 'angry', cls: 'mk-bad' });
       const pens = elInv.querySelectorAll('.os-pen.os-x');
       if (pens.length >= 3) pens[0].remove();
       OS.pen(elInv, 'flat', String(n), 'os-x');                 // чужая дверь — ручкой на листе, зачёркнутой
@@ -394,64 +417,119 @@ export default {
       where();
       setBars();
       box.classList.add(ok ? 'sx-ok' : 'sx-late');
-      const seal = document.createElement('div');
-      seal.className = 'pp-seal ' + (ok ? 'pp-seal-green' : 'pp-seal-rust') + ' mk-seal';
-      seal.textContent = ok ? (fast ? t('с ветерком!') : t('дошёл')) : t('сам спустится');
-      elSheet.appendChild(seal);
+      elGoal.textContent = ok ? t('У квартиры') : t('Клиент спустится сам');
       if (fast && bonus) { OS.pen(elInv, 'pay', bonus + ' · ' + t('взбежал быстро'), 'os-plus'); mini.peek(); }
       api.log && api.log((ok ? 'дошёл' : 'срок вышел') + ' за ' + st.res.t + ' с (быстро — до ' + (limit * K.FAST).toFixed(1) + '), этаж ' + floor + ', ошибок ' + st.tries + (fast ? ', быстро' : '') + (gop ? ', гопники: ' + (gop.how || '—') : ''));
-      if (ok && V3) { sceneStart(fast); return; }               // 3D: дверь открывает мужик в трусах — затирает историю, берёт коробку
-      if (ok) say({ person, name: client(), text: t('О, пицца! Даже не запыхался?'), mood: 'happy', cls: 'mk-good' });
+      if (ok && V3) { sceneStart(); return; }               // 3D: дверь и единый диалог, затем передача коробки
+      if (ok) say({ person, name: client(), text: t(ordinaryDoor(client(), person).lines[0].text), mood: 'happy', cls: 'mk-good' });
       else say({ person, name: client(), text: t('Да стой ты там, сам спущусь…'), mood: 'angry', cls: 'mk-bad' });
       sfx(ok ? 'open' : 'fail');
     }
 
-    /* ── 3D: своя дверь (автор 24.10.2026: «тебе открывают квартиру, а там чел в трусах … затирающий историю»): дверь
-       открывается через 0,7 с, мужик в проёме говорит 2—3 облачка (взрослая — с матом), на последнем тянется за коробкой —
-       берёт двумя руками, через 0,6 с — оплата, как раньше. Срок заказа на это время стоит (api.hold). Любая клавиша, кнопка,
-       тап — следующее облачко ── */
-    function sceneStart (fast) {
-      const ad = !!api.ADULT, pool = S3.MAN.STORIES.filter(x => (ad ? x.a : x.k));
-      const s = pick(pool), lines = (ad ? s.a : s.k).slice();
-      if (fast) lines[0] = S3.MAN.FAST;
-      st.scene = { t: 0, lines, i: -1, next: 1.15, stage: 'open', gap: 0, opened: false, giveAt: 0, out: 0 };
+    /* Сцена у двери использует один диалоговый обработчик для сюжетного и обычного заказа. */
+    function sceneStart () {
+      const dialogue = o.scenario || ordinaryDoor(client(), person);
+      const arrival = clock();
+      if (o.scenario && arrival && arrival.s <= 0) dialogue.lines = [
+        { speaker: dialogue.name, text: t('драсте.. че так долго то, а?'), emotion: 'angry' },
+        { speaker: t('Евгений'), text: t('извините задержался') }, ...dialogue.lines.slice(1)];
+      const portrait = DOOR2D.enabled(dialogue, V3);
+      st.scene = { t: 0, stage: 'open', opened: false, creak: false, running: false, out: 0, dialogue, portrait, actor: null, actorReady: !portrait };
       if (api.hold) api.hold(true);
-      box.classList.add('sx-scene');                            // задание и лента — убрать, место облачкам (stairs.css)
-      V3.scene.start();
-      glyphs();
-      api.log && api.log('у двери: ' + lines.length + ' облачка');
-    }
-    function sceneLine () {
-      const S = st.scene;
-      S.i++;
-      if (S.i < S.lines.length) {
-        const tx = t(S.lines[S.i]);
-        V3.scene.say(tx);
-        S.stage = 'talk'; S.next = S.t + clamp(0.9 + tx.length * 0.045, 1.6, 3.4);
-        if (S.i === S.lines.length - 1) S.giveAt = S.t + 0.55;   // «давай сюда» — тянется за коробкой
-      } else { V3.scene.hush(); S.stage = 'wait'; }
+      box.classList.add('sx-scene');
+      V3.scene.start({ portrait });
+      if (portrait) {
+        const S = st.scene;
+        S.actorPromise = DOOR2D.open(dialogue.portrait.manifest, () => !!(api.paused && api.paused()), V3.scene)
+          .then(actor => { if (st.scene !== S) actor.close(); else S.actorReady = true; return { actor }; },
+            error => { S.actorReady = true; return { error }; });
+      }
     }
     function sceneStep (dt) {
       const S = st.scene;
-      S.t += dt; S.gap -= dt;
-      if (!S.opened && S.t >= 0.7) { S.opened = true; sfx('open'); const d = doors.get(flat); if (d) d.delay = 0; }
-      if ((S.stage === 'open' || S.stage === 'talk') && S.t >= S.next) sceneLine();
-      if (S.giveAt && S.t >= S.giveAt) { S.giveAt = 0; V3.scene.give(); }
-      if (S.stage === 'wait' && V3.scene.given()) { S.stage = 'out'; S.out = S.t + 0.6; }
+      if (!S.actorReady) return;
+      S.t += dt;
+      if (!S.creak && S.t >= 0.75) { S.creak = true; sfx('open'); }
+      if (S.portrait) {
+        const d = doors.get(flat); if (d) d.open = S3.cinematicDoor(S.t);
+        V3.scene.light(S3.cinematicLight(S.t));
+      }
+      if (!S.opened && S.t >= (S.portrait ? 5.0 : 0.7)) { S.opened = true; runScenario(S); }
+      if (S.stage === 'wait' && V3.scene.given()) { S.stage = 'out'; S.out = S.t + 0.9; }
+      if (S.stage === 'out' && S.portrait) {
+        const k = clamp((S.t - (S.out - 0.9)) / 0.75, 0, 1), d = doors.get(flat);
+        if (d) d.open = 1 - k * k * k;
+        q('.sx-black').style.opacity = String(clamp((k - 0.78) / 0.22, 0, 1));
+        if (!S.slam && k >= 1) { S.slam = true; sfx('slam'); }
+      }
       if (S.stage === 'out' && S.t >= S.out) {
+        if (S.actor) S.actor.close();
         st.scene = null; st.phase = 'done';
         if (api.hold) api.hold(false);
         api.done && api.done(st.res);
       }
     }
+    async function runScenario (S) {
+      if (S.running) return;
+      S.running = true; S.stage = S.portrait ? 'door_dialogue' : 'dialog';
+      try {
+        if (S.portrait) {
+          try { const ready = await S.actorPromise; if (ready.error) throw ready.error; S.actor = ready.actor; }
+          catch (e) { console.warn('[door2d] fallback to 3D', e); S.portrait = false; S.stage = 'dialog'; V3.scene.portrait(false); }
+        }
+        if (st.scene !== S) { if (S.actor) S.actor.close(); return; }
+        for (const [lineIndex, line] of S.dialogue.lines.entries()) {
+          if (st.scene !== S) return;
+          if (S.portrait && line.omit2d) continue;
+          let retry;
+          do {
+            retry = false;
+            const host = line.speaker !== t('Евгений');
+            const choices = S.portrait ? line.choices2d || line.choices : line.choices;
+            if (S.actor) S.actor.line(line.emotion);
+            V3.scene.talk(host && !S.portrait);
+            const answer = await DLG.say({ compact: true, door2d: S.portrait, canonicalName: true, fillers: false, head: t('у квартиры'),
+              name: S.portrait ? host ? S.dialogue.name : '' : line.speaker,
+              courierLine: S.portrait && !host,
+              person: S.portrait ? null : host ? S.dialogue.person : S.dialogue.courier,
+              text: line.amountLine ? line.text.replace('{amount}', o.payment || t('сдача')) : line.text,
+              accept: choices ? t(choices[0].text) : S.portrait && lineIndex === 0
+                ? line.text === t('драсте') ? t('драсте') : t('извините задержался') : t('дальше'),
+              decline: choices && choices[1] ? t(choices[1].text) : undefined,
+              stack: !!choices && !S.portrait, paused: () => !!(api.paused && api.paused()),
+              onShow: () => { if (S.actor) S.actor.talk(host); },
+              onTyped: () => { if (S.actor) S.actor.talk(false); } });
+            if (S.actor) S.actor.talk(false);
+            V3.scene.talk(false);
+            if (st.scene !== S || answer === null) return;
+            if (choices) {
+              const choice = answer === false ? choices[1] : choices[0];
+              if (choice && choice.flag && o.storySpec) (o.storySpec.flags || (o.storySpec.flags = {}))[choice.flag] = true;
+            }
+            if (line.retryOnFirst && answer === true && line.wrongReply) {
+              if (S.actor) S.actor.line('angry');
+              V3.scene.talk(!S.portrait);
+              const correction = await DLG.say({ compact: true, door2d: S.portrait, canonicalName: true, fillers: false,
+                name: S.dialogue.name, person: S.portrait ? null : S.dialogue.person, text: line.wrongReply, accept: t('дальше'),
+                paused: () => !!(api.paused && api.paused()),
+                onShow: () => { if (S.actor) S.actor.talk(true); },
+                onTyped: () => { if (S.actor) S.actor.talk(false); } });
+              if (S.actor) S.actor.talk(false);
+              V3.scene.talk(false);
+              if (st.scene !== S || correction === null) return;
+              retry = true;
+            }
+          } while (retry);
+        }
+        if (o.scenario) st.res.scenarioDone = true;
+        V3.scene.give();
+        S.stage = 'wait';
+      } catch (e) { console.warn('[stairs] scenario', e); S.stage = 'wait'; V3.scene.give(); }
+    }
     function sceneSkip () {
       const S = st.scene;
-      if (!S || S.gap > 0) return;
-      S.gap = 0.28;
-      if (!S.opened) S.t = Math.max(S.t, 0.7);
-      if (S.stage === 'open' || S.stage === 'talk') S.next = S.t;
-      if (S.i >= S.lines.length - 1 && S.giveAt) S.giveAt = S.t;
-      if (S.stage === 'out') S.out = S.t;
+      if (S && !S.opened) { S.t = Math.max(S.t, S.portrait ? 5.0 : 0.7); const d = doors.get(flat); if (d) { d.delay = 0; d.open = 1; } V3.scene.light(1); }
+      if (S && S.stage === 'out') S.out = S.t;
     }
 
     /* «пусть сам спустится» (econ.js DOORGAME.SELF): отказ своей кнопкой (и посреди гопников) — курьер спускается на первый
@@ -467,10 +545,6 @@ export default {
       say({ out: true, text: t('Спуститесь сами, пожалуйста! Я внизу подожду.') });
       elGoal.textContent = t('клиент спускается сам — жди внизу');
       KIT.selfOn(elSelf, t, st.selfT);
-      const seal = document.createElement('div');
-      seal.className = 'pp-seal pp-seal-rust mk-seal';
-      seal.textContent = t('сам спустится');
-      elSheet.appendChild(seal);
       api.log && api.log('пусть сам спустится: ждать ' + st.selfT.toFixed(1) + ' с, с ' + (Math.round(st.y) + 1) + '-го этажа');
     }
     /* ждёт: сначала вниз по лестнице на первый этаж (камера едет за ним), там стоит */
@@ -499,6 +573,41 @@ export default {
       const lock = st.lock > 0;
       if (lock) st.lock -= dt;
       const up = !lock && st.arm <= 0 && held('up'), down = !lock && st.arm <= 0 && held('down');
+      if (FPS) {
+        const forward = (keys.up ? 1 : 0) - (keys.down ? 1 : 0) + padH.ly + (touch.up ? 1 : 0) - (touch.down ? 1 : 0);
+        const strafe = (keys.right ? 1 : 0) - (keys.left ? 1 : 0) + padH.lx;
+        const mag = Math.hypot(forward, strafe), scale = mag > 1 ? 1 / mag : 1;
+        const yaw = V3.heading();
+        const vx = (Math.sin(yaw) * forward - Math.cos(yaw) * strafe) * scale;
+        const vz = (Math.cos(yaw) * forward + Math.sin(yaw) * strafe) * scale;
+        if (st.exhausted && st.breath >= 0.25) st.exhausted = false;
+        const sprint = mag > 0.05 && (keys.sprint || padH.sprint) && !st.exhausted && st.breath > 0;
+        const speed = sprint ? 3.6 : 2.2, dx = vx * speed * dt, dz = vz * speed * dt;
+        const before = st.y, x0 = st.fpX, z0 = st.fpZ;
+        const moveTo = (x, z) => {
+          const surface = V3.walkSurface(x, z, st.fpY);
+          if (surface == null) return false;
+          st.fpX = x; st.fpZ = z; st.fpY = surface;
+          return true;
+        };
+        if (mag > 0.05 && !moveTo(x0 + dx, z0 + dz)) {
+          if (!moveTo(x0 + dx, z0)) moveTo(x0, z0 + dz);
+        }
+        st.y = st.fpY / 2.8;
+        st.fpStairs = Math.abs(st.y - Math.round(st.y)) > 0.025;
+        const walked = Math.hypot(st.fpX - x0, st.fpZ - z0);
+        st.breath = clamp(st.breath + (sprint && walked > 0.01 ? -0.24 : 0.14) * dt, 0, 1);
+        if (st.breath <= 0) st.exhausted = true;
+        st.v = dt > 0 ? walked / dt : 0;
+        st.door = -1;
+        if (!st.fpStairs && st.fpZ < -0.45) for (let i = 0; i < per; i++) {
+          if (Math.abs(st.fpX - V3.doorAt(i)) < 0.78) { st.door = i; break; }
+        }
+        if (gop && !gop.done && before < gop.at && st.y >= gop.at) { startGop(); return; }
+        st.stride += walked;
+        if (st.stride > 0.55) { st.stride -= 0.55; sfx('step'); }
+        return;
+      }
       st.upHold = up ? st.upHold + dt : 0;
       const puffing = st.puff > 0;
       if (puffing) { st.puff -= dt; st.breath += K.BREATH.rest * dt; }
@@ -539,6 +648,7 @@ export default {
     function step (dt) {
       dt = clamp(dt, 0, DT_MAX);
       if (st.phase === 'done') return;
+      if (st.entryTextT > 0 && (st.entryTextT -= dt) <= 0) q('.sx-entry-line').hidden = true;
       if (st.phase === 'learn') {                               // обучение первого раза: всё стоит, сцена рисуется, рамка — за целью
         KIT.dashSet(box, clock(), elFuse);
         anim(dt); draw(dt);
@@ -550,7 +660,7 @@ export default {
       for (const [n, d] of doors) {
         if (d.delay > 0) { d.delay -= dt; continue; }
         d.t -= dt;
-        d.open += ((d.t > 0 ? (d.kind === 'right' ? 1 : 0.62) : 0) - d.open) * Math.min(1, dt * 9);
+        if (!d.cinematic) d.open += ((d.t > 0 ? (d.kind === 'right' ? 1 : 0.62) : 0) - d.open) * Math.min(1, dt * 9);
         if (d.t <= 0 && d.open < 0.02) doors.delete(n);
       }
       if (st.phase === 'end' && st.scene) { sceneStep(dt); anim(dt); draw(dt); return; }   // 3D: мужик у своей двери
@@ -563,11 +673,12 @@ export default {
       if (st.phase === 'self') { selfStep(dt); anim(dt); draw(dt); return; }   // «пусть сам спустится»: ждёт внизу, часы заказа идут
       st.t += dt; st.arm -= dt;
       const c = clock();
-      if (c && c.s <= 0) { finish(false, true); anim(dt); draw(dt); return; }   // срок заказа кончился — клиент спускается сам
+      if (c && c.s <= 0 && !FPS) { finish(false, true); anim(dt); draw(dt); return; }   // сюжетное опоздание меняет приветствие
       if (st.phase === 'gop') gopStep(dt); else climb(dt);
       elBreathBar.style.transform = 'scaleX(' + st.breath.toFixed(3) + ')';
       // дыхалка видна, только пока тает (меньше 75 %) или курьер отдувается; отдышался до 95 % — снова спрятана
-      if (elBreath.hidden ? st.breath < 0.75 || st.puff > 0 : st.breath > 0.95 && st.puff <= 0) elBreath.hidden = !elBreath.hidden;
+      if (FPS) elBreath.hidden = !(keys.sprint || padH.sprint || st.breath < 0.99);
+      else if (elBreath.hidden ? st.breath < 0.75 || st.puff > 0 : st.breath > 0.95 && st.puff <= 0) elBreath.hidden = !elBreath.hidden;
       elBreath.classList.toggle('sx-low', st.breath < 0.3 || st.puff > 0);
       elBreath.classList.toggle('sx-puff', st.puff > 0);
       where();
@@ -588,10 +699,12 @@ export default {
       return fr < 0.5 ? lerp(XA, XB, fr / 0.5) : lerp(XB, XA, (fr - 0.5) / 0.5);
     }
     function anim (dt) {
-      const want = st.door >= 0 ? (V3 ? V3.standOff(st.door) : standX(st.door) - XA) : 0;
-      const d = want - st.walk, sp = (V3 ? V3.WALK : 1.9) * dt;
-      st.walk = Math.abs(d) <= sp ? want : st.walk + Math.sign(d) * sp;
-      if (Math.abs(d) > 0.001) st.leg += sp * 0.8;
+      if (!FPS) {
+        const want = st.door >= 0 ? (V3 ? V3.standOff(st.door) : standX(st.door) - XA) : 0;
+        const d = want - st.walk, sp = (V3 ? V3.WALK : 1.9) * dt;
+        st.walk = Math.abs(d) <= sp ? want : st.walk + Math.sign(d) * sp;
+        if (Math.abs(d) > 0.001) st.leg += sp * 0.8;
+      }
       if (st.bounce > 0) st.bounce = Math.max(0, st.bounce - dt * 7);
       if (st.sideT > 0) st.sideT -= dt;
       st.cam += (clamp(st.y, 0, lv - 1) - st.cam) * Math.min(1, dt * 6);
@@ -807,7 +920,7 @@ export default {
       let px = SX(manX());
       if (st.sideT > 0) px += st.side * U * 5 * Math.sin((1 - st.sideT / 0.28) * Math.PI);
       const moving = Math.abs(st.v) > 0.08 || Math.abs(st.walk - (st.door >= 0 ? standX(st.door) - XA : 0)) > 0.002;
-      const frame = st.puff > 0 ? MAN.puff : moving ? ((st.leg * 14) | 0) % 2 ? MAN.w1 : MAN.w2 : MAN.stand;
+      const frame = st.puff > 0 ? COURIER.puff : moving ? ((st.leg * 14) | 0) % 2 ? COURIER.w1 : COURIER.w2 : COURIER.stand;
       // тень под ногами
       g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(Math.round(px - U * 5), Math.round(SY(y) - U * 0.5), U * 10, U);
       SC.spr(g, frame, px, SY(y) - st.bounce * U * 1.5, U, flip, PAL);
@@ -845,7 +958,7 @@ export default {
     /* ── обучение первого раза (doorcoach.js; автор 18.10.2026: «сначала обучение с постепенной анимацией, подсвечивающей,
        куда нажимать, и потом уже даёшь подняться»): подъезд стоит (фаза 'learn'), срок заказа тоже (api.hold), шаги —
        ▲ вверх, ◀ ▶ к двери, звонок; «поехали!» — и только тогда бежать. Первые гопники за всё время — так же: в такт, откуп ── */
-    const ln = o.learn || (o.learnOn ? { name: t('Толик'), add: 20, k: 2 } : null);
+    const ln = o.learn || (o.learnOn ? { name: t('Ирина Сергеевна'), add: 20, k: 2 } : null);
     let coach = null;
     const ps = () => inputKind().family === 'ps';
     const padA = () => (ps() ? '✕' : 'A');
@@ -907,7 +1020,7 @@ export default {
       keys.up = keys.down = keys.act = false; touch.up = touch.down = false; st.v = 0;
       if (api.hold) api.hold(true);
       let who = ln && ln.person ? ln : null;
-      if (!who) { let p = null; try { p = api.tolik ? api.tolik() : null; } catch (e) { p = null; } who = { person: p, name: t('Толик') }; }
+      if (!who) { let p = null; try { p = api.tolik ? api.tolik() : null; } catch (e) { p = null; } who = { person: p, name: t('Ирина Сергеевна') }; }
       coach = COACH.coach(box, {
         t, ln: who, steps, paused: () => !!(api.paused && api.paused()),
         onEnd: skipped => {
@@ -925,6 +1038,7 @@ export default {
     /* ── ввод ── */
     const SKIP = new Set(['Enter', 'NumpadEnter', 'Space', 'KeyE', 'ArrowUp', 'KeyW', 'ArrowRight', 'KeyD']);
     const onKey = e => {
+      if (DLG.isOpen()) return;
       if (st.scene && st.phase === 'end' && !(api.paused && api.paused())) {   // у своей двери: любая — следующее облачко
         if (e.code === 'KeyX') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) mini.toggle(); return; }
         if (SKIP.has(e.code) || e.code === 'Tab') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat && e.code !== 'Tab') sceneSkip(); }
@@ -938,6 +1052,7 @@ export default {
       else if (c === 'ArrowLeft' || c === 'KeyA') k = 'left';
       else if (c === 'ArrowRight' || c === 'KeyD') k = 'right';
       else if (c === 'Space') k = 'act';
+      else if (FPS && (c === 'ShiftLeft' || c === 'ShiftRight')) k = 'sprint';
       else if (c === 'Enter' || c === 'NumpadEnter' || c === 'KeyE') k = 'ring';
       else if (c === 'KeyY') k = 'pay';
       else if (c === 'KeyX') k = 'inv';
@@ -948,10 +1063,11 @@ export default {
       if (e.repeat) return;
       if (k === 'inv') { mini.toggle(); return; }
       if (k === 'self') { selfDown(); return; }
-      if (k === 'up') { keys.up = true; tapUp(); }
-      else if (k === 'down') { keys.down = true; tapDown(); }
-      else if (k === 'left') side(-1);
-      else if (k === 'right') side(1);
+      if (k === 'sprint') { keys.sprint = true; return; }
+      if (k === 'up') { keys.up = true; if (!FPS) tapUp(); }
+      else if (k === 'down') { keys.down = true; if (!FPS) tapDown(); }
+      else if (k === 'left') { if (FPS) keys.left = true; else side(-1); }
+      else if (k === 'right') { if (FPS) keys.right = true; else side(1); }
       else if (k === 'act') { keys.act = true; if (st.phase === 'play') action(); }
       else if (k === 'ring') { if (st.phase === 'gop') pay(); else action(); }
       else if (k === 'pay') pay();
@@ -960,9 +1076,12 @@ export default {
       const c = e.code;
       if (c === 'ArrowUp' || c === 'KeyW') keys.up = false;
       else if (c === 'ArrowDown' || c === 'KeyS') keys.down = false;
+      else if (c === 'ArrowLeft' || c === 'KeyA') keys.left = false;
+      else if (c === 'ArrowRight' || c === 'KeyD') keys.right = false;
       else if (c === 'Space') keys.act = false;
+      else if (c === 'ShiftLeft' || c === 'ShiftRight') keys.sprint = false;
     };
-    const onBlur = () => { keys.up = keys.down = keys.act = false; touch.up = touch.down = false; };
+    const onBlur = () => { keys.up = keys.down = keys.left = keys.right = keys.act = keys.sprint = false; touch.up = touch.down = false; padH.lx = padH.ly = 0; padH.sprint = false; };
     addEventListener('keydown', onKey, true);
     addEventListener('keyup', onKeyUp, true);
     addEventListener('blur', onBlur);
@@ -971,8 +1090,9 @@ export default {
       if (st.phase === 'learn') { if (coach) coach.pad(p); return; }
       if (st.scene && st.phase === 'end') { if (p.btnX) mini.toggle(); if (p.menuOk || p.menuUp || p.menuRight || p.btnY) sceneSkip(); return; }
       if (st.phase !== 'play' && st.phase !== 'gop') return;
+      if (FPS && (Math.abs(p.rx || 0) > 0.02 || Math.abs(p.ry || 0) > 0.02)) V3.look((p.rx || 0) * 12, (p.ry || 0) * 12);
       if (!p.a) st.armA = true;                                 // A держали ещё в машине (нитро) — не считаем, пока не отпустят
-      padH.a = !!p.a; padH.up = !!p.up; padH.down = !!(p.b || p.down);
+      padH.a = !!p.a; padH.up = !!p.up; padH.down = !!(p.b || p.down); padH.sprint = FPS && p.gas > 0.5;
       if (p.menuOk || p.menuBack || p.btnY || p.menuUp || p.menuDown || p.menuLeft || p.menuRight) st.pad = true;
       if (p.btnX) mini.toggle();                                // X — накладная
       if (KIT.selfPad(p)) { st.pad = true; selfDown(); return; }   // RB / R1 — «пусть сам спустится»
@@ -982,23 +1102,41 @@ export default {
         if (p.btnY) pay();
         return;
       }
+      if (FPS) {
+        padH.lx = p.steer || 0;
+        padH.ly = -(p.ly || 0);
+        if (p.menuOk && st.armA) action();
+        return;
+      }
       if (p.menuOk && st.armA) action();
-      else if (p.menuUp) tapUp();
-      if (p.menuDown || p.menuBack) tapDown();
+      else if (p.menuUp && !FPS) tapUp();
+      if ((p.menuDown || p.menuBack) && !FPS) tapDown();
       if (p.menuLeft) side(-1);
       if (p.menuRight) side(1);
     }
 
     /* палец и мышь: кнопки внизу (▲ ▼ держать можно), тап по двери своей площадки — подойти и позвонить, тап по лестнице — вверх */
-    const BTN = { up: () => { touch.up = true; tapUp(); }, down: () => { touch.down = true; tapDown(); }, left: () => side(-1), right: () => side(1),
+    const BTN = { up: () => { touch.up = true; if (!FPS) tapUp(); }, down: () => { touch.down = true; if (!FPS) tapDown(); }, left: () => side(-1), right: () => side(1),
       ring: () => (st.door >= 0 ? ring() : side(-1)), pay: () => pay(), self: () => selfDown() };
     const release = () => { touch.up = false; touch.down = false; };
+    let lookAt = null;
+    const onMouseLook = e => {
+      if (!FPS || document.pointerLockElement !== hit) return;
+      V3.look(e.movementX || 0, e.movementY || 0);
+    };
+    addEventListener('mousemove', onMouseLook, true);
     box.addEventListener('pointerdown', e => {
       if (api.paused && api.paused()) return;
       const b = e.target.closest('button');
       if (b && BTN[b.dataset.a]) { e.preventDefault(); BTN[b.dataset.a](); pop(b); return; }
       if (st.scene && st.phase === 'end') { if (!e.target.closest('.mk-mini')) { e.preventDefault(); sceneSkip(); } return; }
       if (e.target !== (V3 ? hit : cv) || st.phase !== 'play') return;
+      if (FPS && e.pointerType === 'mouse') {
+        e.preventDefault();
+        if (e.button === 2) { lookAt = { x: e.clientX, y: e.clientY }; return; }
+        if (e.button === 0 && hit.requestPointerLock) hit.requestPointerLock();
+        return;
+      }
       e.preventDefault();
       const r = (V3 ? box : cv).getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
       const f = Math.round(st.y);
@@ -1018,6 +1156,15 @@ export default {
       }
       touch.up = true; tapUp();
     });
+    const onLook = e => {
+      if (!lookAt || !FPS) return;
+      V3.look(e.clientX - lookAt.x, e.clientY - lookAt.y);
+      lookAt = { x: e.clientX, y: e.clientY };
+    };
+    const endLook = () => { lookAt = null; };
+    box.addEventListener('contextmenu', e => { if (FPS) e.preventDefault(); });
+    addEventListener('pointermove', onLook, true);
+    addEventListener('pointerup', endLook, true);
     addEventListener('pointerup', release, true);
     addEventListener('pointercancel', release, true);
 
@@ -1042,26 +1189,31 @@ export default {
     // 'wrong' — сначала позвонить в чужую дверь; 'late' — не успеть (срок вышел)
     box.__solve = arg => {
       if (coach && coach.on()) coach.skip();                    // обучение первого раза — пропустить, как кнопкой
-      if (st.scene && st.phase === 'end') { sceneSkip(); return; }   // у своей двери — следующее облачко, как клавишей
+      if (st.scene && st.phase === 'end') { if (!DLG.isOpen()) sceneSkip(); return; }   // у своей двери — следующее облачко, как клавишей
       if (st.phase !== 'play' && st.phase !== 'gop') return;
       if (arg === 'self') { selfDown(); return; }               // «пусть сам спустится»
       st.arm = 0; st.lock = 0;
       if (gop && !gop.done) { if (st.phase !== 'gop') { st.y = gop.at; startGop(); if (coach && coach.on()) coach.skip(); } gop.arm = 0; if (arg === 'pay') pay(); else gopPass('dodge'); }
       if (arg === 'late') { finish(false, true); return; }
       st.y = tgt; st.v = 0;
-      if (arg === 'wrong' && per > 1) { st.door = (P.door + 1) % per; ring(); st.lock = 0; }
+      if (arg === 'wrong' && per > 1) { st.door = (P.door + 1) % per; if (FPS) { st.fpStairs = false; st.fpY = tgt * 2.8; st.y = tgt; st.fpX = V3.doorAt(st.door); st.fpZ = -0.8; } ring(); st.lock = 0; }
       st.door = P.door;
+      if (FPS) { st.fpStairs = false; st.fpY = tgt * 2.8; st.y = tgt; st.fpX = V3.doorAt(st.door); st.fpZ = -0.8; }
       ring();
     };
     box.__coach = () => (coach && coach.on() ? coach.state() : null);
     box.__v3 = V3;
     box.__st = () => ({ phase: st.phase, y: +st.y.toFixed(3), v: +st.v.toFixed(3), breath: +st.breath.toFixed(3), puff: st.puff > 0, door: st.door,
-      t: +st.t.toFixed(2), limit, floor, flat, per, lv, entr: P.entr, want: P.door, gopAt: P.gopAt, selfT: st.phase === 'self' ? +st.selfT.toFixed(2) : null, d3: !!V3, scene: st.scene ? { stage: st.scene.stage, i: st.scene.i, n: st.scene.lines.length, given: V3.scene.given() } : null, v3: V3 ? V3.stats() : null, gop: gop ? { state: gop.state, i: gop.i, dir: gop.dirs[gop.i], done: gop.done, how: gop.how } : null, res: st.res });
+      fp: FPS ? { x: +st.fpX.toFixed(2), z: +st.fpZ.toFixed(2), height: +st.fpY.toFixed(2), stairs: st.fpStairs, heading: +V3.heading().toFixed(3) } : null,
+      t: +st.t.toFixed(2), limit, floor, flat, per, lv, entr: P.entr, want: P.door, gopAt: P.gopAt, selfT: st.phase === 'self' ? +st.selfT.toFixed(2) : null, d3: !!V3, scene: st.scene ? { stage: st.scene.stage, i: st.scene.i || 0, n: st.scene.dialogue ? st.scene.dialogue.lines.length : 0, given: V3.scene.given() } : null, v3: V3 ? V3.stats() : null, gop: gop ? { state: gop.state, i: gop.i, dir: gop.dirs[gop.i], done: gop.done, how: gop.how } : null, res: st.res });
     return () => {
       removeEventListener('keydown', onKey, true);
       removeEventListener('keyup', onKeyUp, true);
       removeEventListener('blur', onBlur);
       removeEventListener('pointerup', release, true);
+      removeEventListener('pointermove', onLook, true);
+      removeEventListener('mousemove', onMouseLook, true);
+      removeEventListener('pointerup', endLook, true);
       removeEventListener('pointercancel', release, true);
       offInput();
       if (coach) coach.off();
@@ -1071,8 +1223,12 @@ export default {
       if (api.setStep) api.setStep(null);
       if (api.setPad) api.setPad(null);
       if (cv) KIT.sceneCanvasOff(cv);
+      if (st.scene && st.scene.actor) st.scene.actor.close();
+      if (st.scene && st.scene.actorPromise) st.scene.actorPromise.then(ready => { if (ready.actor) ready.actor.close(); });
       if (st.scene && api.hold) api.hold(false);
       if (V3) { V3.dispose(); document.body.classList.remove('sx3-on'); }
+      if (document.pointerLockElement === hit) document.exitPointerLock();
+      if (DLG.isOpen()) DLG.dismiss();
       box.remove();
     };
   },

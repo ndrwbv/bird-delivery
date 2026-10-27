@@ -1,5 +1,4 @@
-/* Мини-игры у клиента (IDEAS блок 13, 09.10.2026): домофон (minigames/intercom.js), подъезд — подняться на этаж
-   (minigames/stairs.js) и разговор у двери (minigames/smalltalk.js, реплики — minigames/smalltalk-lines.js).
+/* Доставка к квартире: рабочий домофон и лестница, затем единый компактный диалог из dialog.js.
    Правила словами — docs/ORDERS.md «Домофон у подъезда», «Подъезд: подняться на этаж» и «Разговор с клиентом»,
    числа — ECON.DOOR, ECON.STAIRS и ECON.TALK (econ.js).
 
@@ -32,7 +31,6 @@
      DOOR.enabled() / DOOR.setEnabled(on) — настройка «мини-игры у клиента» (settings.js, ключ dlv-doorgames)
      DOOR.payAdjust(st, fee, bonus, tip) → { bonus, tip, add, cut } — orders.js payStop (домофон)
      DOOR.talkAdjust(st, fee, tip) → { add, cut, kind, win } — orders.js payStop (разговор)
-     DOOR.meetDone(st, res) — итог встречи-катсцены (encounters.js) при вручении: в st.talk, как у разговора (тепло — респект)
      DOOR.stairsAdjust(st, fee, bonus, tip) → { add, cut, gop } — orders.js payStop (подъезд)
      DOOR.ZHENYA_KEY    — ключ сохранения: скидка на следующий ремонт у Дяди Жени (доля; cars.js offer)
      DOOR.talkSfx(name) — звук разговора: 'blab' (бормочет по буквам), 'pick', 'coin', 'sad' — и для окна разговора (dialog.js)
@@ -42,20 +40,18 @@ import { t } from '../i18n/index.js';
 import * as TEL from './telemetry.js';          // анонимная статистика: исход мини-игры у клиента (telemetry.js)
 import * as ECON from './econ.js';
 import INTERCOM from './minigames/intercom.js';
-import SMALLTALK from './minigames/smalltalk.js';
-import * as DCAST from './doorcast.js';        // разговор у двери: клиент в мире — с лицом из окна, говорит ртом; собака у ног (doorcast.js)
+import * as DLG from './dialog.js';
 import STAIRS, { plan as STAIRS_PLAN } from './minigames/stairs.js';
 import { swapDigits } from './minigames/intercom.js';
 import * as OS from './ordersheet.js';
 import * as SC from './minigames/doorscene.js';
-import { BONUS } from './minigames/smalltalk-lines.js';
-import { faceDataURL } from './people.js';
 import * as NICK from './nicks.js';             // подпись у двери — ник клиента из приложения (лицо — живое)
 import { awayLine } from './minigames/intercom.js';
 import * as DIST from './districts.js';
 import * as ZN from './zones.js';
 import * as LIKES from './likes.js';           // что нравится игроку: вес вида мини-игры — выбор и часы (likes.js, econ.js LIKES)
 import * as CHAT from './chat.js';             // Толик: его лицо — у подсказки первого раза (learn)
+import * as STORY from './story.js';
 import * as CL from '../platform/crashlog.js';   // метка перехода «мини-игра»: оборвётся (iOS выгрузит вкладку) — следующий запуск запишет (0п48)
 
 const D = ECON.DOOR;
@@ -103,7 +99,7 @@ function learnFirst (kind) {
   try { person = CHAT.person ? CHAT.person() : null; } catch (e) { person = null; }
   G.learnN = (G.learnN || 0) + 1;
   G.learnLast = { kind, add };
-  return { person, name: t('Толик'), add, k: LN.K || 1 };
+  return { person, name: t('Ирина Сергеевна'), add, k: LN.K || 1 };
 }
 /* первая встреча с тем, что бывает внутри мини-игры (гопники в подъезде): true — один раз за всё время, без добавки к сроку */
 function learnOnce (kind) {
@@ -178,10 +174,9 @@ export function plan (o) {
   return null;
 }
 /* заказ, на котором бывают мини-игры (без force; «вовремя» — уже на месте, arrive) */
-function planOk (o) {
-  const sp = o.ord;
-  if (!sp || !enabled() || o.tut) return false;
-  return sp.type === 'pizza' && !sp.urgent && !sp.beach && !sp.fest && !sp.story;
+function planOk () {
+  // Старые случайные диалоги у дома выключены; подъезд и домофон живут в едином сценарном маршруте.
+  return false;
 }
 const stopOk = (o, st) => !!(st.peds && st.peds.length && !st.beach && !st.fest && !st.pickup && !st.surf && (st.zone || o.ord.zone) !== 'gang');
 /* клиент дома — вышел к двери за пиццей (после мини-игры, или она не случилась) */
@@ -193,6 +188,7 @@ function out (st) { if (st && st.mgIn) { st.mgIn = false; if (A.guestOut) A.gues
 function arrive (ev) {
   if (!A || G.cur) return;
   const st = ev.stop;
+  if (ev.order && ev.order.ord && ev.order.ord.story && STORY.interiorFor(ev.order.ord.story)) return storyDelivery(ev);
   const forced = !!(G.force || SG.force || TG.force);
   let r = null;
   if (G.force) r = door(ev, true) || talk(ev, true);
@@ -213,6 +209,33 @@ function arrive (ev) {
   if (G.cur && G.cur.type !== 'talk' && !st.mgIn && A.guestIn && A.guestIn(st)) st.mgIn = true;
   const kind = G.cur ? G.cur.type : '';
   return r.then(() => { like(kind, kind ? st[kind] : null, forced); if (!(st.door && st.door.away)) out(st); });
+}
+
+async function storyDelivery (ev) {
+  const o = ev.order, st = ev.stop, sp = o.ord.story;
+  const scene = STORY.interiorFor(sp);
+  if (!scene || !A.S || A.S.state !== 'drive') return;
+  const walk = A.fpWalk && A.fpWalk(st);
+  if (!walk) return;                              // без подъезда не открываем оплату на улице
+  await walk;
+  if (!st.carry || A.S.order !== o || A.S.state !== 'drive') return;
+  const lv = Math.max(SR.LV, A.entranceLv(ev.x, ev.z));
+  if (!st.home || !Number.isFinite(st.home.floor)) {
+    st.home = STAIRS_PLAN({ lv, gop: false }); st.home.flat = String(st.home.flat);
+  }
+  const h = st.home;
+  if (!h) return;
+  // В сюжетной встрече домофон временно скрыт: после подхода сразу лестница.
+  // Для обычных доставок мини-игра остаётся доступной.
+  st.door = { mode: 'hidden', ok: true, fast: false };
+  if (A.S.order !== o || A.S.state !== 'drive') return;
+  const opt = { lv: h.lv, floor: h.floor, per: h.per, entr: h.entr, door: h.door, gop: false,
+    scenario: scene, storySpec: sp };
+  do {
+    st.stairs = null;
+    await playStairs(st, o, opt);
+  } while (A.S.order === o && A.S.state === 'drive' && st.stairs && !st.stairs.ok);
+  if (st.stairs && st.stairs.ok && st.stairs.scenarioDone) sp.interiorDone = true;
 }
 /* какая — по месту: у подъезда дома от DOOR.LV этажей — домофон, от STAIRS.LV — и подъезд; клиент у двери — разговор */
 function pickKind (ev) {
@@ -330,7 +353,8 @@ function playStairs (st, order, opt) {
       SG.last = st.stairs;
       if (typeof cur.off === 'function') cur.off();
       if (G.cur === cur) { G.cur = null; G.step = null; G.pad = null; }
-      resolve();
+      const leave = res && res.scenarioDone && A.fpReturn ? A.fpReturn(st) : null;
+      if (leave && typeof leave.then === 'function') leave.then(resolve, resolve); else resolve();
     };
     cur.end = end;
     const api = {
@@ -349,6 +373,7 @@ function playStairs (st, order, opt) {
     cur.off = STAIRS.mount(h, Object.assign({
       boxes: st.boxes || 0,                                      // много пицц одному — курьер несёт стопку (12бл)
       addr: st.addr || '', who: person ? (person.app ? NICK.label(person) : person.first || person.name) : '', person, sheet: sheetOf(order), clock,
+      payment: money(fee),
       bonus: '+' + money(r10(fee * SR.FAST_BONUS)), gopPay: '−' + money(r10(fee * SR.GOP_PAY)), selfWait: MG.SELF.WAIT,
     }, sceneOf(order, st), opt), api);
   });
@@ -362,6 +387,7 @@ function stairsSound (name) {
     step: s => s.blip(150 + Math.random() * 50, 0.035, 'square', 0.025),
     puff: s => (s.noise ? s.noise(0.3, 0.05) : s.blip(200, 0.2, 'triangle', 0.04)),
     ring: s => { s.blip(1320, 0.1, 'square', 0.05); setTimeout(() => s.blip(990, 0.16, 'square', 0.05), 110); },
+    slam: s => (s.noise ? s.noise(0.18, 0.13) : s.blip(80, 0.14, 'square', 0.12)),
     wrong: s => { s.blip(260, 0.1, 'square', 0.06); setTimeout(() => s.blip(200, 0.16, 'square', 0.06), 110); },
     open: s => [523, 659, 784].forEach((f, i) => setTimeout(() => s.blip(f, 0.1, 'square', 0.06), i * 80)),
     gop: s => s.blip(110, 0.28, 'sawtooth', 0.06),
@@ -398,81 +424,23 @@ function host () {
   return h;
 }
 
-function playTalk (st, order, person, fem, sit, ln, onTime) {
+/* Обычная короткая реплика использует тот же компактный обработчик, что сюжет у квартиры. */
+function playTalk (st, order, person) {
   return new Promise(resolve => {
-    const h = host();
-    const cur = G.cur = { type: 'talk', st, order, mode: 'talk', resolve, off: null, done: false };
-    const trN = 'мини-игра: разговор у двери';
-    CL.transFor(trN, 3000);                         // вход: метка на 3 с (0п48; на всю мини-игру — могла бы залежаться)
-    const end = res => {
+    const cur = G.cur = { type: 'talk', st, order, mode: 'talk', done: false };
+    cur.end = res => {
       if (cur.done) return;
       cur.done = true;
-      CL.transFor('выход из мини-игры: разговор у двери', 2000);
       st.talk = res || { aborted: true };
       TG.last = st.talk;
-      // поддержал разговор (или кивал молча) — респект; в «покататься» — нет
-      if (res && res.kind === 'keep' && A.respect && !(A.S && A.S.freeRun)) A.respect('chat');
-      if (typeof cur.off === 'function') cur.off();
-      if (cur.cast) { cur.cast.done(); cur.cast = null; }
       if (G.cur === cur) { G.cur = null; G.step = null; G.pad = null; }
+      if (DLG.isOpen()) DLG.dismiss();
       resolve();
     };
-    cur.end = end;
-    const pct = k => Math.round(k * 100);
-    const api = {
-      t, ADULT: !!A.ADULT, faceDataURL,
-      log: () => {},
-      done: res => end(res),
-      setStep: fn => { G.step = fn; },
-      setPad: fn => { G.pad = fn; },
-      paused: () => !!(A.paused && A.paused()),
-      sfx: name => talkSound(name),
-      hold: on => { cur.hold = !!on; },                           // обучение первого раза (doorcoach.js): срок заказа стоит
-      bonus,
-      cast: (dressed, s) => { cur.cast = talkCast(st, dressed, s); },   // клиент в мире — тот, чьё лицо в окне (doorcast.js)
-      speak: (on, mood) => { if (cur.cast && cur.cast.a) DCAST.talk(cur.cast.a, on, mood); },
-      uncast: () => { if (cur.cast) { cur.cast.done(); cur.cast = null; } },
-    };
-    cur.off = SMALLTALK.mount(h, {
-      sit, person, fem, who: (person.app ? NICK.label(person) : person.first) || '', learn: ln || null,
-      T: TK.T, p: { rushNone: TK.RUSH_NONE, funWin: TK.FUN_P, bonusP: TK.BONUS_P },
-      pct: { rush: pct(1 - TK.RUSH_K), keep: pct(TK.KEEP_TIP), fun: pct(TK.FUN_TIP), zhenya: pct(TK.ZHENYA_OFF) },
-      clock: () => (A.S && !A.S.free && Number.isFinite(A.S.time) && A.S.timeMax > 0 ? { s: A.S.time, k: A.S.time / A.S.timeMax } : null),
-    }, api);
-    // сначала — сцена крупным планом (handcam.js, 11бд): курьер отдаёт коробку, клиент (уже «под роль» — cast в mount)
-    // говорит облачком; окно разговора ждёт под ней спрятанным и не идёт (step / pad / клавиши — не ему)
-    const sc = A.handScene && !cur.done ? A.handScene(st, onTime) : null;
-    if (sc && typeof sc.then === 'function') {
-      cur.scene = true;
-      h.style.visibility = 'hidden';
-      const back = () => { cur.scene = false; h.style.visibility = ''; };
-      sc.then(back, back);
-    }
+    DLG.say({ compact: true, canonicalName: true, fillers: false, person,
+      name: person.first || person.name || t('Клиент'), text: t('Спасибо за пиццу.'),
+      accept: t('Приятного аппетита') }).then(() => cur.end({ kind: 'keep', out: '0' }), () => cur.end({ aborted: true }));
   });
-}
-
-/* разговор у двери в мире (doorcast.js): клиент переодет под роль (портрет и тело — одно лицо), говорит ртом, камера на нём;
-   «угадаешь, как зовут собаку» (sit.dog) — собака сидит у ног, гавкает и виляет хвостом, после разговора убегает домой */
-function talkCast (st, dressed, sit) {
-  const ped = st && st.peds && st.peds[0];
-  if (!ped || ped.dead || ped.surf || !ped.grp || !ped.grp.parent) return null;
-  if (dressed && A.rehuman && ped.person !== dressed && !(ped.person && ped.person.id === dressed.id)) {
-    try { A.rehuman(ped, dressed); if (st.persons) st.persons[0] = ped.person || dressed; } catch (e) { console.warn('[door] rehuman', e); }
-  }
-  const a = DCAST.client(ped);
-  const dog = sit && sit.dog ? DCAST.dog(ped, { sit: true, barks: 2 }) : null;
-  return { a, dog, done: () => { DCAST.leave(a); if (dog) { dog.bark(1); dog.go(); } } };
-}
-
-/* бонус «поддержать»: подсказка, где находка (game.js hintFind отмечает её на карте), нет находок — скидка у Дяди Жени */
-function bonus (kind) {
-  if (kind === 'find' && A.hintFind) {
-    const f = A.hintFind();
-    if (f) return { kind: 'find', line: t(BONUS.find, { what: f.name, where: f.where, m: Math.max(50, Math.round(f.m / 50) * 50) }), note: t('находка — на карте') };
-  }
-  const n = Math.round(TK.ZHENYA_OFF * 100);
-  try { if (A.Store) A.Store.set(ZHENYA_KEY, TK.ZHENYA_OFF); } catch (e) { /* — */ }
-  return { kind: 'zhenya', line: t(BONUS.zhenya, { n }), note: t('у Дяди Жени −{n} %', { n }) };
 }
 
 /* звуки разговора: бормотание по буквам, выбор, монетка / вздох (файлы public/sfx, без них — синтез);
@@ -544,7 +512,7 @@ function play (st, mode, lv, order, ln) {
     cur.off = INTERCOM.mount(hh, Object.assign({
       mode, flat, print: shown, time, knocks: D.KNOCKS, fast: D.FAST, fastPad: D.FAST_PAD, wipeAfter: D.WIPE_AFTER,
       addr: st.addr || '', who: person ? (person.app ? NICK.label(person) : person.first || person.name) : '', person,
-      sheet: sheetOf(order), bonus: '+' + money(r10(fee * D.FAST_BONUS)), clock,
+      sheet: sheetOf(order), bonus: '+' + money(r10(fee * D.FAST_BONUS)), clock: order.ord && order.ord.story ? () => null : clock,
       away: aw ? { addr: aw.addr, say: awayLine(!!A.ADULT) } : null, learn: ln || null, selfWait: MG.SELF.WAIT,
     }, sceneOf(order, st)), api);
     sound('ring');
@@ -657,16 +625,6 @@ export function talkAdjust (st, fee, tip) {
   if (r.kind === 'rush') return { add: 0, cut: tip > 0 ? (r.none ? tip : r10(tip * (1 - TK.RUSH_K))) : 0, kind: 'rush', win: false };
   if (r.kind === 'fun') return r.win ? { add: r10(fee * TK.FUN_TIP), cut: 0, kind: 'fun', win: true } : { add: 0, cut: tip, kind: 'fun', win: false };
   return { add: r10(fee * TK.KEEP_TIP), cut: 0, kind: 'keep', win: false };
-}
-
-/* встреча-катсцена у двери (encounters.js) прошла как вручение заказа: итог — туда же, где итог разговора (st.talk),
-   и дальше всё как у разговора: talkAdjust → payStop, строка в чеке (row), лицо на карточке оплаты (mood; person — герой).
-   res — { kind, win, out, row, mood, person, … } или null (пропустили до ответа — денег не меняет) */
-export function meetDone (st, res) {
-  if (!st) return;
-  st.talk = res || { aborted: true, enc: true };
-  TG.last = st.talk;
-  if (res && res.kind === 'keep' && A && A.respect && !(A.S && A.S.freeRun)) A.respect('chat');   // тепло — респект +1
 }
 
 /* деньги подъезда: дошёл с первого раза и быстро — +FAST_BONUS цены адреса; не успел — «за скорость» и чаевые × SLOW_K;

@@ -1114,13 +1114,13 @@ const portraitKey = (person, Lk, size, mood, talk) => (person.id || Lk.seed) + '
 export function faceDataURL (person, size = 128, mood = '', talk = 0) {
   if (!person) return '';
   // проба (ветка test/people): человек-модель Quaternius — снимок её головы (qpeople.js qPortrait)
-  const qp = person.look && qPortrait(person.look, () => buildSpec(person.look, {}), size, person.id || person.look.seed);
+  const qp = person.look && qPortrait(person.look, () => buildSpec(person.look, { summer: !!person.story }), size, person.id || person.look.seed);
   if (qp) return qp;
   FACE_STATS.n++;
   const Lk = faceLook(person, mood), key = portraitKey(person, Lk, size, mood, talk);
   const hit = PORTRAITS.get(key);
   if (hit) { FACE_STATS.hit++; PORTRAITS.delete(key); PORTRAITS.set(key, hit); return hit; }      // свежие — в конец очереди
-  const t0 = performance.now(), url = drawPortrait(Lk, size, talk), e = performance.now() - t0;
+  const t0 = performance.now(), url = drawPortrait(Lk, size, talk, !!person.story), e = performance.now() - t0;
   FACE_STATS.miss++; FACE_STATS.ms += e; if (e > FACE_STATS.max) FACE_STATS.max = e;
   keepPortrait(key, url);
   return url;
@@ -1129,8 +1129,8 @@ function keepPortrait (key, url) {
   PORTRAITS.set(key, url);
   if (PORTRAITS.size > FACE_CAP_P) { PORTRAITS.delete(PORTRAITS.keys().next().value); FACE_STATS.evict++; }
 }
-function drawPortrait (Lk, size, talk) {
-  const S = buildSpec(Lk);
+function drawPortrait (Lk, size, talk, indoors = false) {
+  const S = buildSpec(Lk, indoors ? { summer: true } : {});
   const G = 32, PY = 14;
   const { c, x, out, o } = portraitCanvas();
   c.width = G;                                    // чистый холст и настройки по умолчанию — как у нового
@@ -1203,11 +1203,11 @@ function soonStep (dl) {
        (таблица мест после вручения, чат коллеги), это был рывок шага до 9 мс */
     if (person.look && pickQ(person.look)) {
       const t0 = performance.now();
-      if (qPortrait(person.look, () => buildSpec(person.look, {}), size, person.id || person.look.seed)) { FACE_STATS.soonQ = (FACE_STATS.soonQ || 0) + 1; n++; FACE_STATS.soonMs += performance.now() - t0; continue; }
+      if (qPortrait(person.look, () => buildSpec(person.look, { summer: !!person.story }), size, person.id || person.look.seed)) { FACE_STATS.soonQ = (FACE_STATS.soonQ || 0) + 1; n++; FACE_STATS.soonMs += performance.now() - t0; continue; }
     }
     const Lk = faceLook(person, mood), key = portraitKey(person, Lk, size, mood, talk);
     if (PORTRAITS.has(key)) continue;
-    const t0 = performance.now(), url = drawPortrait(Lk, size, talk), e = performance.now() - t0;
+    const t0 = performance.now(), url = drawPortrait(Lk, size, talk, !!person.story), e = performance.now() - t0;
     FACE_STATS.soon++; FACE_STATS.soonMs += e; if (e > FACE_STATS.soonMax) FACE_STATS.soonMax = e;
     keepPortrait(key, url);
     n++;
@@ -1218,7 +1218,7 @@ function soonStep (dl) {
 export function faceReady (person, size = 128, mood = '', talk = 0) {
   if (!person) return '';
   // проба (ветка test/people): у человека-модели кадры разговора — тот же снимок головы, не старое лицо (talkface.js)
-  const qp = person.look && qPortrait(person.look, () => buildSpec(person.look, {}), size, person.id || person.look.seed);
+  const qp = person.look && qPortrait(person.look, () => buildSpec(person.look, { summer: !!person.story }), size, person.id || person.look.seed);
   if (qp) return qp;
   const Lk = faceLook(person, mood), key = portraitKey(person, Lk, size, mood, talk), u = PORTRAITS.get(key);
   if (u) { PORTRAITS.delete(key); PORTRAITS.set(key, u); }

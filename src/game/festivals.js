@@ -413,7 +413,7 @@ function start (kind, site) {
   for (let k = 0; k < 6; k++) at(GL, new THREE.BoxGeometry(0.35, 0.3, 0.35), pal[k % pal.length], -sw / 2 + 1 + k * (sw - 2) / 5, 5.95, sb - sd / 2 + 0.3);
   {
     const p = w(0, D - 1.3);
-    const sub = kind === 'hookah' ? (A.ADULT ? t('гость фестиваля — Стёпа Тугарев') : t('Стёпа Тугарев и самовар-гигант'))
+    const sub = kind === 'hookah' ? t('городской фестиваль')
       : kind === 'pumpkin' ? t('конкурс тыкв-гигантов') : t('при поддержке «Королевы Бургеров»');
     plane(banner([title, sub], pal[0], '#ffffff', 1024, 320, pic), sw - 1.2, 3.6, p.x, gh(p.x, p.z) + 3.4, p.z, faceTo(nx, nz));
   }
@@ -508,18 +508,6 @@ function buildHookah (G, at, sw, sb, sd, free) {
   };
   big(1.6, sb - 0.5, 2.6);
   F.hookahs.push({ a: 1.6, b: sb - 0.5, y: 1.25 + (kids ? 0.75 : 0.95) * 2.6, big: 1 });
-  // Стёпа на сцене (heroes.js) — на улице его в эту смену нет
-  try {
-    const g = A.HEROES && A.HEROES.model('stepa');
-    if (g) {
-      const p = F.L.w(-0.6, sb - 0.6);
-      g.position.set(p.x, A.groundH(p.x, p.z) + 1.25, p.z);
-      g.rotation.y = faceTo(F.L.nx, F.L.nz);
-      A.scene.add(g);
-      F.stepa = g; F.objs.push(g);
-      A.HEROES.hold('stepa', true);
-    }
-  } catch (e) { console.warn('[fest] stepa', e); }
   // кальяны (самовары) в толпе — на столиках
   const n = clamp(Math.round(F.L.W * F.L.D / 160), 4, 14);
   for (let i = 0; i < n; i++) {
@@ -877,7 +865,7 @@ export function step (dt) {
   if (F.sayLeft > 0 && (F.sayLeft -= dt) <= 0 && F.say) { if (F.say.parent) F.say.parent.remove(F.say); F.say.material.dispose(); F.say = null; }
   if (dC < 140 && (F.sayT -= dt) <= 0) {
     F.sayT = rand(5, 9);
-    const who = F.kind === 'hookah' ? F.stepa : F.kind === 'burger' ? F.host : null;
+    const who = F.kind === 'burger' ? F.host : null;
     const pool = LINES[!A.ADULT && (F.kind === 'hookah' || F.kind === 'burger') ? F.kind + 'Kids' : F.kind];
     if (who) say(who, t(pick(pool)), 2.9);
     else if (F.kind === 'pumpkin' && F.crowd && F.crowd.P.length) {
@@ -886,10 +874,6 @@ export function step (dt) {
       if (!F.mic) { F.mic = new THREE.Group(); F.mic.position.set(p.x, A.groundH(p.x, p.z) + 1.3, p.z); A.scene.add(F.mic); F.objs.push(F.mic); }
       say(F.mic, t(pick(pool)), 3.2);
     }
-  }
-  if (F.stepa) {
-    const u = F.stepa.userData;
-    if (u && u.armL) u.armL.rotation.x = -0.4 + Math.sin(F.t * 1.6) * 0.5;
   }
   // дым кальянов / пар самоваров
   if (F.kind === 'hookah' && dC < 260 && (F.puffT -= dt) <= 0) {
@@ -917,7 +901,6 @@ export function stop () {
   if (F.crowd) qDropAll(F.crowd);
   for (const o of F.objs) {
     if (o.parent) o.parent.remove(o);
-    if (o === F.stepa) continue;
     o.traverse(q => {
       if (q.isSprite) { q.material.dispose(); return; }
       if (!q.isMesh && !q.isInstancedMesh) return;
@@ -925,7 +908,6 @@ export function stop () {
       for (const m of [].concat(q.material)) { if (m.map) m.map.dispose(); if (!m.userData.keep) m.dispose(); }
     });
   }
-  if (F.stepa) { A.dropMesh(F.stepa); if (A.HEROES) A.HEROES.hold('stepa', false); }
   if (F.host) A.dropMesh(F.host);
   for (const tx of F.texs || []) tx.dispose();
   dropMascot();

@@ -66,7 +66,7 @@ export function start (host, api) {
   try { who = A.person ? A.person() : null; } catch (e) { who = null; }
   if (!TF.bind(img, who, 160)) try { img.src = (A.face && A.face()) || ''; } catch (e) { img.src = ''; }
   img.hidden = !img.src;
-  box.querySelector('.gt-head b').textContent = t('Толик');
+  box.querySelector('.gt-head b').textContent = t('Ирина Сергеевна');
   box.querySelector('.gt-skip').textContent = t('пропустить');
   box.querySelector('.gt-skip').addEventListener('click', e => { e.stopPropagation(); skip(); });
   box.querySelector('.gt-next').addEventListener('click', e => { e.stopPropagation(); next(); });

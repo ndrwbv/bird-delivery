@@ -87,17 +87,7 @@ export function open (onClose) {
   refreshKeys(el);
   render();
   requestAnimationFrame(() => el.classList.add('on'));
-  if (TOUR.need(D.A.Store)) TOUR.start(el, { Store: D.A.Store, Snd: D.A.Snd, face: zhenyaFace, person: zhenya });
-}
-/* Дядя Женя — тот же, что стоит в гаражах (cars.js); гаражей нет — такой же по сиду */
-function zhenya () {
-  const C = D.cars(), g = C && C.garage ? C.garage() : null;
-  return (g && g.zh && g.zh.person) || (D.A.person ? D.A.person({ seed: 0x2E1A, fem: false, fat: true }) : null);
-}
-function zhenyaFace () {
-  if (!D.A.face) return '';
-  const p = zhenya();
-  return p ? D.A.face(p, 160) : '';
+  if (TOUR.need(D.A.Store)) TOUR.start(el, { Store: D.A.Store, Snd: D.A.Snd, face: () => '', person: () => null });
 }
 /** B / Esc: палитра или «точно продать?» — закрыть их (курсор — на ту же кнопку), иначе выйти из гаража */
 export function back () {
