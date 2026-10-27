@@ -37,7 +37,6 @@ import { CAR_LIST, UPGRADE, ADDON, BREAK, upgradePrice, paintPrice, sellPrice, w
 import { cnCar } from './roadlife.js';
 import { lampDepth } from './carrear.js';
 import { t } from '../i18n/index.js';
-import { holdFixed } from './people.js';
 import * as DIST from './districts.js';
 import * as RW from './roadwear.js';
 import { KEY as TOUR_KEY } from './garagetour.js';
@@ -849,7 +848,7 @@ function patch (M, x, z, ang, R, lift) {
    все одинаковые, работает ближайший к курьеру из открытых районов (GAR), на радаре
    и на карте — только гаражи открытых районов. Дядя Женя в каждом свой, двигается
    только ближайший, дальние (> 250 м) спрятаны. */
-let GARS = [], GAR = null, ZHENYA = null;
+let GARS = [], GAR = null;
 const GW = 5.8, GD = 8.4, GH = 3.3, DOOR = 3.4;
 const GATE_OUT = 6, GATE_SIDE = 3.6;          // зона «подъехал»: до 6 м перед воротами, ±3,6 м вбок (дальше — край улицы)
 const garagePoints = () => { const C = A.MAP.career; return C ? C.garages || (C.garage ? [C.garage] : []) : []; };
@@ -1003,40 +1002,6 @@ function* buildGarage (G) {                         // шагами (buildSteps)
   B(5.0, 1.0, 0.1, '#6b4f3a', 0, GH + 0.62, -0.05);
   for (const s of [-1, 1]) B(0.08, 0.5, 0.08, '#2b2a30', s * 2.2, GH + 0.1, -0.05);
   yield 'box';
-  buildZhenya();
-  g.zh = ZHENYA;
-}
-
-/* Дядя Женя: большой, с животом, в замасленном синем комбинезоне и кепке */
-function buildZhenya () {
-  const { THREE, makePerson, makeHuman } = A;
-  const person = makePerson({ seed: 0x2E1A, fem: false, fat: true });
-  Object.assign(person.look, { age: 'adult', beard: 'mustache', hair: 'receding', head: 'cap', headC: '#3b4a5a', capBack: false,
-    glasses: 'none', shape: 'chubby', hairC: '#5a3c26', browC: '#4a3020', mouth: 'smile', bg: '#c6d8a0', pack: null, top: 'tee',
-    skin: '#eab993', stubble: true, nose: 'big', brows: 'thick', shirt: '#34507a', pants: '#2f4870', blush: true, freckles: false, mole: -1 });
-  person.name = t('Дядя Женя');
-  const fig = makeHuman(person, { fat: true, shirt: '#34507a', pants: '#2f4870' });
-  // пятна мазута, тряпка в кармане, ключ в руке
-  const blot = [];
-  A.put(blot, new THREE.BoxGeometry(0.56, 0.38, 0.2), '#34507a', 0, 0.86, 0.26);            // живот
-  A.put(blot, new THREE.BoxGeometry(0.46, 0.2, 0.12), '#34507a', 0, 0.72, 0.3);
-  for (const [x, y, w, h] of [[0.12, 0.96, 0.14, 0.1], [-0.14, 0.8, 0.1, 0.13], [0.06, 0.66, 0.16, 0.07]]) A.put(blot, new THREE.BoxGeometry(w, h, 0.02), '#1c2230', x, y, 0.365);
-  for (const s of [-1, 1]) A.put(blot, new THREE.BoxGeometry(0.06, 0.4, 0.02), '#2a4066', s * 0.14, 1.12, 0.22);   // лямки комбинезона
-  A.put(blot, new THREE.BoxGeometry(0.1, 0.18, 0.04), '#c9453a', -0.26, 0.6, 0.2);           // тряпка в кармане
-  fig.add(new THREE.Mesh(A.mergeGeos(blot), A.HUMAN_VC || new THREE.MeshLambertMaterial({ vertexColors: true })));
-  const u = fig.userData;
-  if (u.armR) {
-    const w = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.36, 0.05), new THREE.MeshLambertMaterial({ color: 0x9aa0a8 }));
-    w.position.set(0, -0.62, 0.08);
-    holdFixed(u.armR, w);                           // ключ в руке — в меш тела (people.js)
-  }
-  const [x, z] = [GAR.ox + GAR.rx * -1.7 + GAR.fx * -2.4, GAR.oz + GAR.rz * -1.7 + GAR.fz * -2.4];
-  fig.position.set(x, GAR.gy + 0.08, z);
-  fig.scale.x *= 1.12; fig.scale.z *= 1.15;       // большой дядька
-  // смотрит на ворота, чуть к середине
-  fig.rotation.y = Math.atan2(GAR.fx + GAR.rx * 0.5, GAR.fz + GAR.rz * 0.5);
-  A.scene.add(fig);
-  ZHENYA = { fig, person, t: 0 };
 }
 
 /* шагами (function*, latebuild.js): на Деке ~0,2 с одним куском — районы, гаражи, ямы, ямы разбитого асфальта */
@@ -1047,7 +1012,7 @@ export function* buildSteps () {
   if (A.ZN && A.ZN.init) A.ZN.init({ CITY: A.CITY, MAP: A.MAP, donated: A.donated || (() => 0) });   // районы нужны ямам уже сейчас
   pause(); yield 'zones'; t0 = performance.now();
   for (const G of garagePoints()) { const it = buildGarage(G); for (let r = it.next(); !r.done; r = it.next()) { pause(); yield 'garage'; t0 = performance.now(); } pause(); yield 'garage'; t0 = performance.now(); }
-  GAR = GARS[0] || null; ZHENYA = GAR ? GAR.zh : null;
+  GAR = GARS[0] || null;
   pause(); yield 'garage'; t0 = performance.now();
   buildPotholes();
   pause(); yield 'pots'; t0 = performance.now();
@@ -1293,24 +1258,15 @@ function garageStep (dt, vf) {
     let best = null, bd = 1e18;
     for (const g of GARS) {
       const d = (V.x - g.ox) ** 2 + (V.z - g.oz) ** 2;
-      if (g.zh) g.zh.fig.visible = d < 250 * 250;
       if (d < bd && garOpen(g)) { bd = d; best = g; }
     }
-    if (best && best !== GAR) { GAR = best; ZHENYA = best.zh; GS.offered = false; GS.stillT = 0; }
+    if (best && best !== GAR) { GAR = best; GS.offered = false; GS.stillT = 0; }
   }
   if (!GAR) return;
   const dx = V.x - GAR.ox, dz = V.z - GAR.oz;
   const u = dx * GAR.rx + dz * GAR.rz, v = dx * GAR.fx + dz * GAR.fz;
   const near = dx * dx + dz * dz < 18 * 18;
   if (!near) { GS.offered = false; GS.stillT = 0; }
-  // Дядя Женя: дышит, а когда подъезжаешь — машет ключом
-  if (ZHENYA) {
-    ZHENYA.t += dt;
-    const ud = ZHENYA.fig.userData, wave = near && !GS.offered;
-    if (ud.armR) ud.armR.rotation.x = wave ? -2.4 + Math.sin(ZHENYA.t * 7) * 0.35 : -0.25 + Math.sin(ZHENYA.t * 1.3) * 0.05;
-    if (ud.armL) ud.armL.rotation.x = Math.sin(ZHENYA.t * 1.3 + 1) * 0.05;
-    if (ud.head) ud.head.rotation.y = near ? Math.max(-0.7, Math.min(0.7, Math.atan2(V.x - ZHENYA.fig.position.x, V.z - ZHENYA.fig.position.z) - ZHENYA.fig.rotation.y)) : Math.sin(ZHENYA.t * 0.4) * 0.3;
-  }
   /* подъехал и встал (автор 12.10.2026: «как только подъехал и остановился, а не вглубь») — внутри бокса
      или на площадке перед воротами: до GATE_OUT м от ворот, ±GATE_SIDE м вбок; с улицы (её край — g.roadV) не ловит */
   const outV = Math.max(2.5, Math.min(GATE_OUT, (GAR.roadV ?? 99) - 1.2));
@@ -1322,9 +1278,9 @@ function garageStep (dt, vf) {
 /* что Дядя Женя говорит про ресурс: чем меньше, тем мрачнее */
 function ceilWord (r) {
   if (r >= 80) return '';
-  if (r >= 60) return ' ' + t('ресурс уже подсел — с каждым ремонтом держит хуже.');
-  if (r >= 40) return ' ' + t('ресурс уже не тот, сынок, скоро на металлолом.');
-  return ' ' + t('я её чиню, а она сыпется. продавай, пока берут, и бери другую.');
+  if (r >= 60) return ' ' + t('Ресурс снизился: каждый ремонт уменьшает его запас.');
+  if (r >= 40) return ' ' + t('Ресурс машины низкий.');
+  return ' ' + t('Ресурс почти исчерпан. Можно продать машину и выбрать другую.');
 }
 /* полоски в облачке: мотор и ресурс */
 const meters = e => [
@@ -1341,39 +1297,39 @@ async function offer () {
   // скидка от клиента (разговор у двери, doorstep.js ZHENYA_KEY: «скажи, что от меня») — на один ремонт, вместе со скидкой звания
   const talkOff = Math.min(0.5, Math.max(0, +(A.Store ? A.Store.get(ZHENYA_KEY, 0) : 0) || 0));
   const price = Math.round(q.price * (1 - (RESPECT.perk('garageOff') || 0) - talkOff) / 10) * 10;   // звание по респекту — скидка (econ.js RESPECT.LEVELS)
-  const face = ZHENYA ? ZHENYA.person : null, name = t('Дядя Женя'), color = '#6f8a3a', head = t('гараж');
+  const face = null, name = t('Мастерская'), color = '#6f8a3a', head = t('гараж');
   const pc = n => String(Math.round(n));
   GS.busy = true;
   try {
     // первый раз в гараже на районе (а экран гаража ещё не открывали) — знакомится и зовёт в гараж меню
     if (!GS.met && A.Store && !A.Store.get(TOUR_KEY, 0)) {
       GS.met = true;
-      await DLG.say({ person: face, name, color, head, text: t('о, новенький! я Дядя Женя. тут я чиню: подъехал к воротам, встал — подшаманю. а тачки купить и прокачать — это в гараже в меню, там всё покажу'), accept: t('понял') });
+      await DLG.say({ person: face, name, color, head, text: t('Подъезжай к воротам и останавливайся для ремонта. Машины и улучшения — в гараже в меню.'), accept: t('понял') });
     }
     if (q.pct < BREAK.REPAIR_MIN_PCT) {
       if (bodyHurt()) {                              // мотор цел, а кузов мятый — выправит даром (cardent.js); в крови — отмоет
         const wash = !DENT.hurt(A.car);
         await DLG.say({ person: face, name, color, head, mood: 'calm', meters: meters(e),
-          text: wash ? t('мотор в порядке, крутить нечего. а кровищу с машины отмою — даром. и не спрашиваю, откуда она')
-            : t('мотор в порядке, крутить нечего. а кузов выправлю: вмятины, бампер, зеркала, стёкла — даром, по-соседски'), accept: t('спасибо!') });
+          text: wash ? t('Мотор в порядке. Кузов можно отмыть бесплатно.')
+            : t('Мотор в порядке. Кузов можно выправить бесплатно.'), accept: t('спасибо!') });
         bodyFix();
         // 11бп: тост «машина чистая / кузов как новый» убран
         return;
       }
       await DLG.say({ person: face, name, color, head, meters: meters(e),
-        text: e.r >= 80 ? t('о, здорово. машина как часы — нечего тут крутить. езжай давай')
-          : t('мотор {c} % — больше из него не выжму, ресурс {r} %.', { c: pc(e.c), r: pc(e.r) }) + ceilWord(e.r),
+        text: e.r >= 80 ? t('Мотор в порядке. Ремонт не требуется.')
+          : t('Мотор {c} %, ресурс {r} %. Дальше починить нельзя.', { c: pc(e.c), r: pc(e.r) }) + ceilWord(e.r),
         accept: t('ну ок') });
       return;
     }
     if (wallet(A) < price) {
-      await DLG.say({ person: face, name, color, head, meters: meters(e), text: t('ну чё, опять стучит? мотор {c} %, подтяну до {r} % за {money}, но у тебя столько нет. заезжай, как заработаешь', { c: pc(e.c), r: pc(e.r), money: A.money(price) }), accept: t('ладно') });
+      await DLG.say({ person: face, name, color, head, meters: meters(e), text: t('Мотор {c} %. Ремонт до {r} % стоит {money}; денег пока не хватает.', { c: pc(e.c), r: pc(e.r), money: A.money(price) }), accept: t('ладно') });
       return;
     }
     const yes = await DLG.say({ person: face, name, color, head, mood: 'calm', meters: meters(e),
-      text: t('ну чё, опять стучит? мотор {c} %, подтяну до {r} % за {money}.', { c: pc(e.c), r: pc(e.r), money: A.money(price) }) + ceilWord(e.r),
+      text: t('Мотор {c} %. Ремонт до {r} % стоит {money}.', { c: pc(e.c), r: pc(e.r), money: A.money(price) }) + ceilWord(e.r),
       pay: '−' + A.money(price), payLabel: t('ремонт'),                     // цена — под портретом (автор 12.10.2026)
-      accept: t('давай, Дядь Жень'), decline: t('не, потом') });
+      accept: t('починить'), decline: t('не, потом') });
     if (!yes) return;
     if (!pay(A, price)) return;
     if (talkOff && A.Store) { A.Store.set(ZHENYA_KEY, 0); A.toast(t('скидка «от знакомого» −{n} %', { n: Math.round(talkOff * 100) })); }
@@ -1381,8 +1337,8 @@ async function offer () {
     bodyFix();                                       // заодно выправил кузов: вмятины, детали, стёкла (cardent.js)
     if (A.Snd) A.Snd.fx('repair', s => [0, 140, 300, 420].forEach((d, i) => setTimeout(() => s.blip(900 + i * 140, 0.06, 'square', 0.08), d)));
     await DLG.say({ person: face, name, color, head, meters: meters(now),
-      text: (now.r >= 90 ? t('во, другое дело. мотор {c} %, езжай аккуратней', { c: pc(now.c) })
-        : t('ну вот, мотор {c} %. а ресурс теперь {r} % — как новая уже не будет', { c: pc(now.c), r: pc(now.r) })) + (now.r < 60 ? ceilWord(now.r) : ''),
+      text: (now.r >= 90 ? t('Мотор восстановлен до {c} %.', { c: pc(now.c) })
+        : t('Мотор {c} %, ресурс после ремонта {r} %.', { c: pc(now.c), r: pc(now.r) })) + (now.r < 60 ? ceilWord(now.r) : ''),
       accept: t('спасибо!') });
     if (A.hudMoney) A.hudMoney();
   } finally { GS.busy = false; }

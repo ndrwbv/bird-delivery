@@ -735,9 +735,7 @@ function renderStory () {
       const a = el('button', 'btn sm story', 'как заказ'); a.type = 'button';
       a.disabled = !has('forceOrder'); a.title = a.disabled ? 'нужен orders.force(spec) — docs/SANDBOX.md' : '';
       a.addEventListener('click', () => runPreset({ name: s.name + ', глава ' + (c.i + 1), run: () => G.story(s.id, c.i) }));
-      const p = el('button', 'btn sm', 'катсцена'); p.type = 'button';
-      p.addEventListener('click', async () => { await ready(); await G.riding(); W().focus(); const r = await d.STORY.play(s.id, c.i, { teleport: true }); log('глава ' + (c.i + 1) + ': +' + r.stars + ' ★, +' + r.money + ' ₽'); renderStory(); });
-      bb.appendChild(a); bb.appendChild(p);
+      bb.appendChild(a);
       card.appendChild(bb);
       grid.appendChild(card);
     }

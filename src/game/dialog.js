@@ -1,4 +1,4 @@
-/* Окно разговора — лист накладной внизу экрана, как разговор у двери (minigames/smalltalk.js, автор 16.10.2026:
+/* Единый обработчик разговоров. У квартиры по умолчанию компактная панель под 3D-сценой.
    «диалоги в одном стиле и с одной озвучкой, как те, где штамп ставится»): шапка капсом (что это — поручение,
    гараж…, справа — срок заказа, как на часах хада), слева полароид того, кто говорит (говорит ртом), под ним имя
    и сумма предложения отдельной строкой (pay); справа — облачко, текст печатается по буквам с «ну», «э-э» и
@@ -140,6 +140,7 @@ export function speechify (text, mood = 'calm', rnd = Math.random) {
 /* подпись под портретом: клиент заказа подписан в приложении ником (nicks.js person.app) — лицо живое, а подпись —
    ник («Анальная трещина» — милая бабушка). Подменяем, только если звали по имени (имя или имя-фамилия) */
 const appName = o => {
+  if (o.canonicalName) return o.name || '';
   const p = o.person, ap = p && p.app, n = o.name || '';
   return ap && ap.nick && n && (n === p.name || n === p.first) ? ap.nick : n;
 };
@@ -167,6 +168,7 @@ function show (o, done) {
   const two = !!o.decline;
   const stack = two && !!o.stack;                // столбиком: верхний — accept, нижний — decline, курсор ▶
   const btns = $('.dlg-btns'), hintEl = $('.dlg-hint'), box = $('.dlg-box');
+  root.classList.toggle('compact', o.compact !== false);
   const col = o.color || '#ff8a2b';
   $('.dlg-bar').style.background = col;
   box.style.setProperty('--pp-accent', col);

@@ -14,7 +14,7 @@
                                   молча снимаем (в меню пропуск района и так всё показал)
      TR.pending(Store)          — { to, from } или null (отладка) */
 import { t } from '../i18n/index.js';
-import * as DLG from './dialog.js';
+import * as CHAT from './chat.js';
 
 const KEY = 'dlv-transfer';
 const SAY_DELAY = 900;                 // мс после старта смены: машина встала у пиццерии, мотор схватил
@@ -52,8 +52,7 @@ export function atStart (o) {
   LAST = words;
   setTimeout(() => {
     if (o.still && !o.still()) return;          // смену уже закончили / вышли в меню
-    DLG.say({ person: o.person || undefined, name: t('Толик управляющий'), head: t('перевод'), text: words,
-      accept: t('понял'), mood: 'calm', fillers: false, color: '#3fae5a' });
+    CHAT.say(words);
   }, SAY_DELAY);
   return true;
 }

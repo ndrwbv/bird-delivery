@@ -1,41 +1,10 @@
-/* ──────────────────────────────────────────────────────────────────────────
-   Доставка от первого лица — первый кусок (Д2, docs/plan/doors.md; автор 24.10.2026: «ты подъехал к точке, камера от
-   первого лица становится, курьер выходит из машины, подходит к багажнику, берёт пиццу, подходит к двери»).
-   Пока проба: только с ?fpdeliver. Правило словами — docs/ORDERS.md «Доставка от первого лица (проба)».
-
-   Подъезд на адресе (doorstep.js stairs) — перед ним сцена глазами курьера, всё само, ~7 с:
-     1) ВЫХОД (FP.EXIT с): камера плавно уходит в глаза курьера у водительской двери; дверь открывается и закрывается
-        (куски carwreck.js, как у коллег — crewride.js), за рулём пусто;
-     2) К БАГАЖНИКУ (FP.TO_TRUNK с): шаги вдоль борта за корму, взгляд — на крышку;
-     3) БАГАЖНИК: крышка поднимается (FP.OPEN с), руки берут коробку — много пицц одному — стопку (pizzabox.js STACK) —
-        из багажника в руки (FP.TAKE с), крышка закрывается (FP.CLOSE с);
-     4) К ДВЕРИ ПОДЪЕЗДА: шаги в обход машины (carround.js) до двери (FP.WALK м/с, но не дольше FP.WALK_MAX с), стоит
-        перед дверью FP.HOLD с;
-     5) ДОМОФОН (Д3; автор 24.10: «камера наезжает на домофон и бесшовно открывается интерфейс ввода кода на домофоне»):
-        камера за FP.ZOOM с наезжает на панель домофона на двери (3D, справа от середины полотна), панель и есть ввод —
-        без окна поверх: экранчик с набранным, кнопки 1—9, ⌫, 0, 🔔, лампочка. Номер квартиры — с накладной (st.home.flat,
-        та же, что в листе заказа), бумажка в левой руке. Цифры / Backspace / Enter или касание кнопок на панели; верно —
-        лампочка зелёная, пищит, FP.OPENED с — и подъезд, как сейчас (minigames/stairs.js, stairs3d.js); неверно — красная,
-        «нет такой» на экранчике, стереть и заново. Логика — как у мини-игры домофона (minigames/intercom.js), вид — свой.
-   Руки курьера (кисти и предплечья, футболка — руки голые) видны в кадре всё время, с коробкой — с шага 3.
-   Пропуск шагов 1—4 — любая клавиша, кнопка геймпада, касание: сразу к домофону (коробка — в руках). У домофона Esc или
-   кнопка геймпада — без набора, сразу подъезд. Машина стоит (game.js holdCar), срок идёт.
-
-     init(api)     — game.js: { THREE, cam, scene, V, S, car(), groundH(x, z), courier() — человек курьера, box(n) — коробка /
-                     стопка, door(x, z) → [x, z, nx, nz] | null — дверь подъезда и наружу от неё, setTrunk(open),
-                     trunk() → { x, y, z } — середина багажника, seatOf(t) — водительское место (carexit.js),
-                     driver(on), mode(), cabOut(), pad, Snd — звуки (intercom-key / ring / open / wrong, как у домофона) }
-     run(st, o)    — doorstep.js stairs: Promise — сцена кончилась (или пропущена); null — без сцены (нет флага, двери)
-     step(dt)      — game.js после camStep и HCAM.step: камера глазами курьера поверх обычной
-     busy()        — идёт (game.js: машина стоит, ближняя граница кадра — 5 см)
-     taken()       — сколько коробок уже в руках (game.js: в багажнике их больше не рисовать)
-   Отладка: __dlv.FPD
-   ────────────────────────────────────────────────────────────────────────── */
+/* Этап доставки от машины до подъезда. Камера плавно переходит к глазам курьера,
+   у багажника игрок отдельным действием берёт пиццу. После подхода к двери
+   управление передаётся существующему домофону doorstep.js.
+   Автомобильное управление и сам домофон здесь не дублируются. */
 import * as WRECK from './carwreck.js';
 import * as CROUND from './carround.js';
-import { t } from '../i18n/index.js';
-
-export const ON = typeof location !== 'undefined' && /[?&]fpdeliver\b/.test(location.search || '');
+export const ON = true;
 
 export const FP = {
   EYE: 1.62,          // м: глаза над землёй
@@ -60,22 +29,13 @@ export const FP = {
   HW: 0.9,            // м: полуширина
   STACK_DN: 0.07, STACK_MAX: 0.25,   // м: стопку руки держат ниже — на столько за каждую коробку сверх одной (не выше)
   SKIN: '#e2ae86',
-  // домофон (Д3)
-  ZOOM: 0.9,          // с: камера наезжает на панель
-  PANEL_X: 0.45,      // м: панель — правее середины двери
-  PANEL_Y: 1.32,      // м: середина панели над землёй
-  PANEL_D: 0.42,      // м: глаза от панели при наборе
-  PANEL_EYE: 0.1,     // м: глаза выше середины панели
-  WRONG: 0.9,         // с: красная лампочка и «нет такой» — потом набор чистый
-  OPENED: 0.7,        // с: зелёная лампочка, пищит — потом подъезд
-  MAXLEN: 4,          // цифр на экранчике
 };
 export const ST = { runs: 0, skips: 0, last: null, noDoor: 0 };
 
 let A = null;
 const R = { on: false, t: 0, ph: '', st: null, n: 1, done: null, path: null, len: 0, dur: 0, door: null, pc: null, doorA: 0,
   p0: null, look: null, hands: null, box: null, from: null, taken: 0, walkT: 0, bob: 0,
-  pan: null, flat: '', typed: '', tries: 0, led: '', ledT: 0, keyT: 0, keyI: -1, dialT: 0, handK: 0, note: null };
+  handK: 0, hint: null };
 let V3 = null;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, k) => a + (b - a) * k;
@@ -90,16 +50,8 @@ export function init (api) {
     if (e.cancelable) e.preventDefault();
     e.stopImmediatePropagation();                   // ни руль, ни пауза под сценой (как сцена вручения, handcam.js)
     if (e.repeat) return;
-    if (R.ph === 'zoom' || R.ph === 'dial') {        // домофон: цифры, ⌫, вызов; касание — по кнопке панели
-      if (e.type === 'pointerdown') { const i = keyAt(e); if (i >= 0) press(KEYS[i]); return; }
-      const k = e.key;
-      if (/^[0-9]$/.test(k)) press(k);
-      else if (k === 'Backspace' || k === 'Delete') press('del');
-      else if (k === 'Enter' || k === ' ') press('call');
-      else if (k === 'Escape') finish(true);
-      return;
-    }
-    if (R.ph !== 'opened') toDial();               // пропуск шагов — сразу к домофону
+    if (R.ph === 'take-ready') { beginTake(); return; }
+    if (R.ph === 'exit' || R.ph === 'trunk') toTrunk();
   };
   addEventListener('keydown', hit, true);
   addEventListener('pointerdown', hit, true);
@@ -153,7 +105,8 @@ export function run (st, o = {}) {
   if (!ON || !A || R.on || !st) return null;
   const car = carNow();
   const at = st.at || (st.peds && st.peds[0]);
-  const e = car && at && A.door && A.door(at.x, at.z);
+  const e = car && at && A.door && A.door(at.x, at.z) ||
+    (car && st.entry && [st.entry.x, st.entry.z, st.entry.nx, st.entry.nz]);
   if (!e) { ST.noDoor++; return null; }
   ST.runs++;
   const n = Math.max(1, st.boxes || 1);
@@ -193,8 +146,7 @@ function finish (skip) {
   if (A.setTrunk) A.setTrunk(false);
   dropBox();
   if (R.hands) { R.hands.visible = false; if (R.hands.parent) R.hands.parent.remove(R.hands); }
-  if (R.pan && R.pan.g.parent) R.pan.g.parent.remove(R.pan.g);
-  if (R.note) R.note.visible = false;
+  if (R.hint) R.hint.hidden = true;
   R.handK = 0;
   if (A.driver) A.driver(true);
   R.taken = 0;
@@ -234,7 +186,7 @@ export function step (dt) {
   const S = A.S, car = carNow();
   const pad = !!(A.pad && A.pad.any);
   if (!car || S.state !== 'drive') { finish(false); return; }
-  if (pad) { if (R.ph === 'zoom' || R.ph === 'dial') { finish(true); return; } if (R.ph !== 'opened') { toDial(); return; } }
+  if (pad) { if (R.ph === 'take-ready') { beginTake(); return; } if (R.ph === 'exit' || R.ph === 'trunk') { toTrunk(); return; } }
   R.t += dt;
   const cam = A.cam, hw = R.seat.hw;
   const side = world(car, Math.max(hw, FP.HW) + FP.OUT, R.seat.dz); // у водительской двери снаружи — от борта, не от сиденья
@@ -264,7 +216,7 @@ export function step (dt) {
   } else if (ph === 'open' || ph === 'take' || ph === 'close') {
     [x, z] = back;
     lx = tp.x; ly = tp.y - (ph === 'close' ? 0 : 0.3); lz = tp.z;
-    if (ph === 'open' && R.t >= FP.OPEN) { R.ph = 'take'; R.t = 0; takeBox(tp); }
+    if (ph === 'open' && R.t >= FP.OPEN) { R.ph = 'take-ready'; R.t = 0; showTakeHint(); }
     else if (ph === 'take' && R.t >= FP.TAKE) { R.ph = 'close'; R.t = 0; holdBox(); if (A.setTrunk) A.setTrunk(false); }
     else if (ph === 'close' && R.t >= FP.CLOSE) {
       R.ph = 'walk'; R.t = 0;
@@ -273,6 +225,8 @@ export function step (dt) {
       R.dur = clamp(R.path.len / FP.WALK, FP.WALK_MIN, FP.WALK_MAX);
       if (ST.last) ST.last.walk = +R.path.len.toFixed(1);
     }
+  } else if (ph === 'take-ready') {
+    [x, z] = back; lx = tp.x; ly = tp.y - 0.3; lz = tp.z;
   } else if (ph === 'walk') {
     const k = R.t / R.dur;
     [x, z] = along(R.path, ease(k) * 0.15 + clamp(k, 0, 1) * 0.85);  // с места — плавно, дальше ровным шагом
@@ -283,8 +237,8 @@ export function step (dt) {
     const d = R.door;
     x = d.x + d.nx * FP.AT_DOOR; z = d.z + d.nz * FP.AT_DOOR;
     lx = d.x; ly = A.groundH(d.x, d.z) + 1.35; lz = d.z;
-    if (R.t >= FP.HOLD) { startDial(); return; }
-  } else if (ph === 'zoom' || ph === 'dial' || ph === 'opened') { dialStep(dt); return; }
+    if (R.t >= FP.HOLD) { if (R.st) R.st.carry = true; finish(false); return; }
+  }
   if (walking) R.bob += dt * FP.BOB_HZ * Math.PI * 2;
   const y = eyeY(x, z) + (walking ? Math.abs(Math.sin(R.bob)) * FP.BOB - FP.BOB * 0.5 : 0);
   if (R.ph === 'take') moveBox(ease(R.t / FP.TAKE));   // R.ph: в этом кадре могла уже лечь в руки (holdBox)
@@ -339,194 +293,33 @@ function holdBox () {
   b.rotation.set(0, 0, 0);
 }
 
-/* ── домофон (Д3): панель на двери, камера наезжает, набор — прямо на ней ── */
-const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'call'];
-const CW = 256, CH = 448;                           // холст лицевой стороны: 0,18 × 0,315 м
-const PW = 0.18, PH = 0.315;
-const KEY_R = i => { const c = i % 3, r = (i / 3) | 0; return { x: 22 + c * 74, y: 182 + r * 64, w: 64, h: 54 }; };
-
-/* звуки — те же имена, что у мини-игры домофона (doorstep.js sound; файлы public/sfx intercom-*), без файлов — синтез */
-const SY = {
-  key: s => s.blip(1250, 0.05, 'square', 0.06),
-  ring: s => { s.blip(660, 0.18, 'square', 0.05); setTimeout(() => s.blip(520, 0.22, 'square', 0.05), 200); },
-  open: s => { s.blip(180, 0.5, 'sawtooth', 0.06); },
-  wrong: s => { s.blip(300, 0.1, 'square', 0.07); setTimeout(() => s.blip(220, 0.16, 'square', 0.07), 110); },
-};
-function sfx (n) { const S = A && A.Snd; if (!S || !S.fx || !SY[n]) return; try { S.fx('intercom-' + n, SY[n]); } catch (e) { /* — */ } }
-
-function panel () {
-  if (R.pan) return R.pan;
-  const T = A.THREE, g = new T.Group();
-  g.name = 'fp-intercom';
-  const body = new T.Mesh(new T.BoxGeometry(PW + 0.02, PH + 0.02, 0.035), new T.MeshLambertMaterial({ color: '#3b3f46' }));
-  body.position.z = -0.012;
-  const cv = document.createElement('canvas');
-  cv.width = CW; cv.height = CH;
-  const tex = new T.CanvasTexture(cv);
-  if (T.SRGBColorSpace) tex.colorSpace = T.SRGBColorSpace;
-  tex.anisotropy = 4;
-  const face = new T.Mesh(new T.PlaneGeometry(PW, PH), new T.MeshBasicMaterial({ map: tex }));   // подсвечена — видно и ночью
-  face.position.z = 0.0065;
-  g.add(body, face);
-  R.pan = { g, face, cv, tex, ctx: cv.getContext('2d'), key: '' };
-  return R.pan;
-}
-
-/* лицевая сторона: решётка динамика, лампочка, экранчик, кнопки; перерисовать — только когда поменялось */
-function drawPanel () {
-  const P = R.pan;
-  if (!P) return;
-  const press = R.keyT > 0 ? R.keyI : -1;
-  const key = R.typed + '|' + R.led + '|' + press;
-  if (key === P.key) return;
-  P.key = key;
-  const c = P.ctx;
-  const gr = c.createLinearGradient(0, 0, CW, CH);
-  gr.addColorStop(0, '#b9bec6'); gr.addColorStop(1, '#7c828b');
-  c.fillStyle = gr; c.fillRect(0, 0, CW, CH);
-  c.strokeStyle = '#4a4f57'; c.lineWidth = 6; c.strokeRect(3, 3, CW - 6, CH - 6);
-  c.fillStyle = '#2d3036';                            // решётка
-  for (let y = 0; y < 4; y++) for (let x = 0; x < 9; x++) { c.beginPath(); c.arc(56 + x * 14, 26 + y * 12, 3.2, 0, 7); c.fill(); }
-  const led = R.led === 'ok' ? '#3dff6a' : R.led === 'bad' ? '#ff3b30' : '#6b4a1a';
-  c.fillStyle = led; c.beginPath(); c.arc(214, 44, 11, 0, 7); c.fill();
-  if (R.led) { c.fillStyle = 'rgba(255,255,255,0.6)'; c.beginPath(); c.arc(210, 40, 4, 0, 7); c.fill(); }
-  c.fillStyle = '#16231b'; c.fillRect(22, 84, CW - 44, 76);   // экранчик
-  c.fillStyle = R.led === 'bad' ? '#ff8a7a' : '#8dffab';
-  c.textAlign = 'center'; c.textBaseline = 'middle';
-  if (R.led === 'bad') { c.font = 'bold 30px monospace'; c.fillText(t('нет такой'), CW / 2, 122); }
-  else if (R.led === 'ok') { c.font = 'bold 34px monospace'; c.fillText(t('открыто'), CW / 2, 122); }
-  else {
-    c.font = 'bold 50px monospace';
-    const blink = ((performance.now() / 450) | 0) % 2 === 0 ? '_' : ' ';
-    c.fillText((R.typed || '') + (R.typed.length < FP.MAXLEN ? blink : ''), CW / 2, 124);
+function showTakeHint () {
+  if (!R.hint) {
+    const el = document.createElement('div');
+    el.id = 'fp-take-hint';
+    el.style.cssText = 'position:absolute;left:50%;bottom:11%;transform:translateX(-50%);z-index:42;padding:12px 18px;border-radius:12px;background:rgba(20,21,28,.88);color:#fff;font:16px sans-serif;text-align:center;cursor:pointer';
+    el.textContent = 'E / A — забрать пиццу';
+    el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); beginTake(); });
+    (document.getElementById('game') || document.body).appendChild(el);
+    R.hint = el;
   }
-  for (let i = 0; i < 12; i++) {
-    const r = KEY_R(i), on = i === press;
-    c.fillStyle = on ? '#e9edf2' : '#a7adb6';
-    c.fillRect(r.x, r.y, r.w, r.h);
-    c.strokeStyle = '#555b64'; c.lineWidth = 3; c.strokeRect(r.x + 1.5, r.y + 1.5, r.w - 3, r.h - 3);
-    c.fillStyle = KEYS[i] === 'call' ? '#1f6f3a' : '#22252a';
-    c.font = KEYS[i] === 'del' || KEYS[i] === 'call' ? 'bold 30px sans-serif' : 'bold 34px sans-serif';
-    c.fillText(KEYS[i] === 'del' ? '⌫' : KEYS[i] === 'call' ? '🔔' : KEYS[i], r.x + r.w / 2, r.y + r.h / 2 + 2);
-  }
-  P.tex.needsUpdate = true;
+  R.hint.hidden = false;
 }
-
-/* бумажка с номером квартиры в левой руке (с накладной заказа) */
-function note () {
-  const T = A.THREE;
-  if (!R.note) {
-    const cv = document.createElement('canvas');
-    cv.width = 256; cv.height = 160;
-    const tex = new T.CanvasTexture(cv);
-    if (T.SRGBColorSpace) tex.colorSpace = T.SRGBColorSpace;
-    const m = new T.Mesh(new T.PlaneGeometry(0.11, 0.069), new T.MeshBasicMaterial({ map: tex }));
-    m.position.set(-0.19, 0.07, -0.55);
-    m.rotation.set(-0.35, 0.55, 0.08);
-    m.userData.cv = cv; m.userData.tex = tex;
-    R.note = m;
-  }
-  const m = R.note, cv = m.userData.cv, c = cv.getContext('2d');
-  c.fillStyle = '#f6efd9'; c.fillRect(0, 0, 256, 160);
-  c.strokeStyle = '#c9bd98'; c.lineWidth = 4; c.strokeRect(2, 2, 252, 156);
-  c.fillStyle = '#5b544a'; c.font = '26px sans-serif'; c.textAlign = 'left'; c.textBaseline = 'top';
-  c.fillText(t('накладная'), 16, 12);
-  c.fillStyle = '#1d3f8f'; c.font = 'bold 64px sans-serif';
-  c.fillText(t('кв. {n}', { n: R.flat }), 16, 56);
-  m.userData.tex.needsUpdate = true;
-  if (R.hands && m.parent !== R.hands) R.hands.add(m);
-  m.visible = true;
+function beginTake () {
+  if (!R.on || R.ph !== 'take-ready') return;
+  const tp = A.trunk ? A.trunk() : null;
+  if (!tp) return;
+  if (R.hint) R.hint.hidden = true;
+  takeBox(tp);
+  R.ph = 'take'; R.t = 0;
 }
-
-/* где панель: на полотне двери (game.js entranceAt: полотно — на 0,09 м наружу от точки двери), правее середины */
-function panelPose () {
-  const d = R.door, tx = d.nz, tz = -d.nx;
-  const gx = d.x + d.nx, gz = d.z + d.nz, gy = A.groundH(gx, gz);
-  const px = d.x + d.nx * 0.115 + tx * FP.PANEL_X, pz = d.z + d.nz * 0.115 + tz * FP.PANEL_X, py = gy + FP.PANEL_Y;
-  return { px, py, pz, cx: px + d.nx * FP.PANEL_D, cy: py + FP.PANEL_EYE, cz: pz + d.nz * FP.PANEL_D };
-}
-
-function startDial () {
-  const p = panel(), d = R.door;
-  const q = panelPose();
-  p.g.position.set(q.px, q.py, q.pz);
-  p.g.rotation.set(0, Math.atan2(d.nx, d.nz), 0);
-  if (!p.g.parent) A.scene.add(p.g);
-  const h = R.st && R.st.home;
-  R.flat = String((h && h.flat) || R.st.flat || 1);
-  Object.assign(R, { ph: 'zoom', t: 0, typed: '', tries: 0, led: '', ledT: 0, keyT: 0, keyI: -1, dialT: 0,
-    z0: { x: d.x + d.nx * FP.AT_DOOR, y: eyeY(d.x + d.nx * FP.AT_DOOR, d.z + d.nz * FP.AT_DOOR), z: d.z + d.nz * FP.AT_DOOR }, pose: q });
-  p.key = '';
-  drawPanel();
-  note();
-  if (ST.last) { ST.last.ph = 'zoom'; ST.last.flat = R.flat; ST.last.dial = null; }
-}
-
-/* пропуск шагов: коробка — сразу в руках, машина закрыта, камера — у панели */
-function toDial () {
-  if (!R.on || R.ph === 'zoom' || R.ph === 'dial' || R.ph === 'opened') return;
+function toTrunk () {
+  if (!R.on || (R.ph !== 'exit' && R.ph !== 'trunk')) return;
   ST.skips++;
   if (ST.last) ST.last.walkSkip = true;
   if (R.doorA) setDoor(0);
-  if (A.setTrunk) A.setTrunk(false);
-  if (!R.box || R.box.parent !== R.hands) {
-    const tp = A.trunk ? A.trunk() : null;
-    if (tp) { takeBox(tp); holdBox(); }
-  }
-  startDial();
-  R.t = FP.ZOOM;                                    // сразу у панели
-  const q = R.pose;
-  R.look.x = q.px; R.look.y = q.py; R.look.z = q.pz;
-}
-
-function keyAt (e) {
-  const P = R.pan;
-  if (!P || !A.cam || typeof innerWidth === 'undefined') return -1;
-  const T = A.THREE;
-  const el = e.target && e.target.getBoundingClientRect ? e.target : null;
-  const rc = el && el.tagName === 'CANVAS' ? el.getBoundingClientRect() : { left: 0, top: 0, width: innerWidth, height: innerHeight };
-  const v = new T.Vector2(((e.clientX - rc.left) / rc.width) * 2 - 1, -((e.clientY - rc.top) / rc.height) * 2 + 1);
-  const ray = new T.Raycaster();
-  ray.setFromCamera(v, A.cam);
-  const hit = ray.intersectObject(P.face, false)[0];
-  if (!hit || !hit.uv) return -1;
-  const x = hit.uv.x * CW, y = (1 - hit.uv.y) * CH;
-  for (let i = 0; i < 12; i++) { const r = KEY_R(i); if (x >= r.x - 4 && x <= r.x + r.w + 4 && y >= r.y - 4 && y <= r.y + r.h + 4) return i; }
-  return -1;
-}
-
-/* нажатие на панели: как у мини-игры домофона (intercom.js) — цифры, стереть, вызов */
-function press (k) {
-  if (!R.on || R.ph === 'opened' || R.led === 'bad') return;
-  if (R.ph === 'zoom') { R.ph = 'dial'; R.t = FP.ZOOM; }   // нажал, пока камера едет, — уже набор
-  R.keyI = KEYS.indexOf(k); R.keyT = 0.12;
-  if (k === 'del') { R.typed = R.typed.slice(0, -1); sfx('key'); }
-  else if (k === 'call') {
-    if (!R.typed) return;
-    R.tries++;
-    if (R.typed === R.flat) {
-      R.led = 'ok'; R.ph = 'opened'; R.t = 0; sfx('ring'); setTimeout(() => sfx('open'), 260);
-    } else { R.led = 'bad'; R.ledT = FP.WRONG; sfx('wrong'); }
-  } else if (R.typed.length < FP.MAXLEN) { R.typed += k; sfx('key'); }
-  drawPanel();
-}
-
-function dialStep (dt) {
-  R.dialT += dt;                                    // R.t — уже в step()
-  if (R.keyT > 0) R.keyT -= dt;
-  if (R.ledT > 0 && (R.ledT -= dt) <= 0 && R.led === 'bad') { R.led = ''; R.typed = ''; }
-  const q = R.pose, z0 = R.z0;
-  const k = R.ph === 'zoom' ? ease(R.t / FP.ZOOM) : 1;
-  R.handK = k;
-  const x = lerp(z0.x, q.cx, k), y = lerp(z0.y, q.cy, k), z = lerp(z0.z, q.cz, k);
-  place(A.cam, x, y, z, q.px, q.py, q.pz, dt, 1);
-  drawPanel();
-  if (R.ph === 'zoom' && R.t >= FP.ZOOM) R.ph = 'dial';
-  if (ST.last) ST.last.ph = R.ph;
-  if (R.ph === 'opened' && R.t >= FP.OPENED) {
-    if (ST.last) { ST.last.dial = { ok: true, tries: R.tries, s: +R.dialT.toFixed(1) }; ST.last.ph = 'door'; }
-    finish(false);
-  }
+  if (A.setTrunk) A.setTrunk(true);
+  R.ph = 'open'; R.t = 0;
 }
 
 export const busy = () => R.on;
@@ -536,11 +329,5 @@ export const DEBUG = {
   FP, ST, R, ON,
   get on () { return R.on; },
   get ph () { return R.ph; },
-  skip: () => finish(true),
-  get typed () { return R.typed; },
-  get led () { return R.led; },
-  get flat () { return R.flat; },
-  toDial: () => toDial(),
-  /* набрать как игрок: '47' — цифры и вызов; 'wrong' — сначала неверно */
-  dial: (s) => { for (const ch of String(s)) press(ch === '<' ? 'del' : ch === '!' ? 'call' : ch); },
+  toTrunk, take: beginTake,
 };

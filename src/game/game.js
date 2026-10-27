@@ -68,10 +68,7 @@ import * as MAFIA from './mafia.js';             // мафиози у адрес
 import * as THUGS from './thugs.js';             // гопники прессуют прохожего в бандитских кругах — помог, респект (thugs.js)
 import * as PROT from './protests.js';         // жизнь города: протест по ступеням, марши, драки, концерты во дворах (protests.js)
 import * as GROW from './growth.js';             // пиццерия растёт: ступени 1—5 по доставкам в районе, вид у шара (growth.js)
-import * as HEROES from './heroes.js';           // герои города: Лёха, Жека, Игорёк, Стёпа, Настюша, Ариша, Андрюша — места и реплики
 import * as HB from './horsebox.js';             // коневозки в потоке: прицеп за машиной, конь в окне (horsebox.js)
-import * as FLIRT from './flirt.js';            // взрослая: клиентка изредка заигрывает при вручении, курьер отказывает (flirt.js)
-import * as ODD from './oddfolk.js';            // странные люди при вручении: крик в квартиру, сценки у двери (oddfolk.js)
 import * as DCAST from './doorcast.js';         // кто говорит у двери — виден в 3D: незнакомец, второй из-за спины, собака, рот (doorcast.js)
 import * as YARDS from './yards.js';             // дворы многоэтажек: лавочки у подъездов, тропинки, низкие заборчики (yards.js)
 import * as RYARD from './routeyard.js';       // навигатор во дворах: последние метры маршрута по клеткам, не сквозь дома (routeyard.js)
@@ -104,13 +101,6 @@ import * as WRONG from './wrongaddr.js';         // клиент ошибся а
 import * as DOOR from './doorstep.js';            // мини-игры у клиента: домофон у подъезда (doorstep.js, minigames/intercom.js; docs/ORDERS.md)              // карьера: очередь заказов, поручения, развоз смены, оплата (docs/ORDERS.md)
 import * as CAREERM from './career.js';          // карьера: смена 9—24, обед, итоги, донаты, слот, звёзды
 import * as STORY from './story.js';             // сюжетные заказы и катсцены (баба Зина)
-import * as HSTORY from './herostories.js';      // герои города, этап 3: истории Стёпы, Ариши, Лёхи по главам (через story.js)
-import * as HEROQ from './heroquests.js';      // прогноз Игорька и удача Лёхи — у профиля свои (reprofile)
-import * as STEPAB from './stepabench.js';     // Стёпа на лавочке у Ленинградской, 8 сам заказывает пиццу (через story.js)
-import * as ST1 from './stepafirst.js';         // учебный заказ Стёпы — сюжетный: катсцена на вручении (через story.js)
-import * as ENC from './encounters.js';         // встречи у двери (трек 10): микрогерои катсценами через story.js — пока только песочница
-import * as FACES from './faces.js';            // знакомые лица района: Глеб, история на 4 появления (faces.js)
-import * as LOCALS from './locals.js';          // жители Юга: пятеро с историями на 4 появления (locals.js)
 import * as BALCS from './balconies.js';      // балконы: плита, перила или решётка, остеклённые, мелочь внутри, люди курят и машут (balconies.js)
 import * as YLIFE from './yardlife.js';      // жизнь во дворах: бабки на лавочке, компании, шашлык, домино, мяч, горки, снеговик, гуляющие с собаками (yardlife.js)
 import * as WORK from './workout.js';         // площадки-качалки у коробок: турник и брусья, люди качаются, курьер подтягивается сам (workout.js)
@@ -5838,15 +5828,6 @@ const growApi = () => ({
   get PIZZA () { return PIZZA; }, get ENV () { return ENV; },
 });
 let GROW_API = null;
-/* что нужно heroes.js (герои города: места, реплики, сбить) */
-const heroesApi = () => ({
-  V, S, scene, CAREER, ADULT, CAR_L, CAR_W, Store, CITY, PITCHES, BENCHES, PIZZERIAS, makeHuman, dropMesh, gibHuman, groundH, curbAt,
-  inHouse, inBounds, nearestRoad, pushOut, emote, fxAdd, puffGeo, Snd,
-  garages: () => (CAREER ? AUTO.garages() : []), hookahSpots: () => HK.spots(),
-  onRunOver: () => { S.people++; Snd.squish(); },
-  get PIZZA () { return PIZZA; },
-});
-let HEROES_API = null;
 /* что нужно fauna.js (лоси, лисы, зайцы в лесах) */
 const faunaApi = () => ({
   V, S, scene, cam, CITY, CAR_L, CAR_W, ADULT, groundH, inPoly, inHouse, inBounds, nearestRoad, toast, emote, sparks, sayBubble, Snd,
@@ -12651,8 +12632,8 @@ function reprofile () {
   S.best = +Store.get('dlv-msk-best', 0) || 0;
   S.name = Platform.features.nameInput ? Store.get('dlv-name', '') : (Platform.player.name || '');
   elName.value = S.name || '';
-  STORY.reload(true); ORD.reloadUsed(); HEROES.reloadSave(); HSTORY.resetSession(); HEROQ.reload(); HINTS.reload(); GROW.reload();
-  RESPECT.DEBUG.reload(); DIRECTOR.reload(); SEAS.reloadSaved(); HUR.reload(); FACES.reload(); LOCALS.reload();
+  STORY.reload(true); ORD.reloadUsed(); HINTS.reload(); GROW.reload();
+  RESPECT.DEBUG.reload(); DIRECTOR.reload(); SEAS.reloadSaved(); HUR.reload();
   if (CAREER) { AUTO.reprofile(); CAREERM.reprofile(); }
   if (DISTRICTS) { CITYOPEN.repair(); usePizzeria(DIST.cur()); FM.dist = null; DW.seen.clear(); districtLocks(); }
   startPose();
@@ -14088,7 +14069,6 @@ function eachTarget (cb) {
     const p = st.at || st.peds[0];
     if (p) cb(p.x, p.z, false, pz);
   }
-  if (o && S.state === 'drive') for (const q of HSTORY.pins()) cb(q.x, q.z, false, '');   // герой: «заехать по пути» (herostories.js)
   cb(S.target.x, S.target.z, true, routeHome() ? 'home' : pz);
 }
 
@@ -14754,7 +14734,7 @@ function popBonus (title, sub, o) {
   CL.event('line ' + text);
   const p = CAREER && CHAT.person ? CHAT.person() : null;
   // в общей очереди уведомлений (notifyq.js); o.urgent — срочное («опаздываешь», «поторопись!») перебивает текущее
-  DLG.line({ person: p, name: $t('Толик управляющий'), text, color: '#3fae5a', urgent: !!(o && o.urgent), onShow: () => Snd.coin() });
+  DLG.line({ person: p, name: $t('Ирина Сергеевна'), text, color: '#3fae5a', urgent: !!(o && o.urgent), onShow: () => Snd.coin() });
 }
 
 /* Оплата за адрес — деньгами, а не строкой сверху: под машиной падает
@@ -15331,8 +15311,8 @@ function showOrderCard (order) {
   const src = elPhone.querySelector('.ph-src');
   if (src) src.textContent = '№ ' + String(S.orders).padStart(4, '0');
   // квартира — в накладной с самого начала (домофон и подъезд берут её же: doorstep.js homeOf, docs/ORDERS.md «Домофон у подъезда»)
-  if (CAREER) for (const st of order.stops) { const at = st.at || (st.peds && st.peds[0]); if (at && !st.pickup && !st.surf && !st.fixAddr) DOOR.homeOf(st, entranceLv(at.x, at.z)); }
-  if (CAREER) ENC.plan(order);                    // встреча у двери (ритм смены, encounters.js): герой дома, мини-игры нет
+  if (CAREER) for (const st of order.stops) { const at = st.at || (st.peds && st.peds[0]); if (at && !st.pickup && !st.surf && !st.fixAddr) DOOR.homeOf(st,
+    order.ord && order.ord.story && order.ord.story.storyId === 'gennady' ? Math.max(5, entranceLv(at.x, at.z)) : entranceLv(at.x, at.z)); }
   // мини-игра у клиента — решена сразу: домофон / подъезд — клиент дома, не на лавочке (doorstep.js); часы подошли —
   // ждут, пока пустит ритм смены (rhythm.js: не на первом и последнем заказе, не в окно «покататься», одно на заказ)
   if (CAREER && (!DOOR.DEBUG.timer.due || DIRECTOR.can('mini'))) DIRECTOR.planned(DOOR.plan(order));
@@ -15573,7 +15553,7 @@ function addXP (n = 1) {
 }
 
 /* учебный заказ был — больше не показываем (полоса маршрута на асфальте горит и дальше) */
-const tutDone = () => String(Store.get('dlv-msk-tut', '')) === '1';
+const tutDone = () => !!(STORY.progress().gennady && STORY.progress().gennady.ch);
 /* Самое начало игры — спокойное: пока не отвезён учебный заказ, соперники
    стоят колонной у пиццерии, нет ни аварий, ни похитителя, ни кофейной
    войны. Только ты, прямая улица и клиент на углу. */
@@ -15640,68 +15620,6 @@ function tutorialWalk (e) {
   return null;
 }
 
-/* Первый заказ за всё время — Степан Тугарев, заядлый кальянщик и бизнесмен (бизнес вот-вот будет)
-   (в детской — любитель самовара). Перед его накладной в первый раз — вступление (intro.js).
-   Только он один раз: дальше, и в карьере тоже, первым приходит обычный заказ смены.
-   Сидит на лавочке в соседнем дворе (45—420 м от машины, ближе к 130) с кальяном
-   и выдувает огромные облака — по ним его и находишь. В детской версии — самовар и пар. */
-let STEPAN = null;
-function stepanPerson () {
-  if (!STEPAN) {
-    STEPAN = makePerson({ seed: 0x5e7a11, first: $t('Степан'), last: $t('Тугарев'), fem: false });
-    STEPAN.desc = ADULT ? $t('заядлый кальянщик и бизнесмен — бизнес вот-вот будет') : $t('любитель самовара и бизнесмен — бизнес вот-вот будет');
-    STEPAN.pos = STEPAN.desc;
-    STEPAN.stepan = true;                       // вступление (intro.js) узнаёт его по этому флагу
-    Object.assign(STEPAN.look, HEROES.look('stepa'));   // тот же Стёпа Тугарев, что ходит по городу (heroes.js)
-  }
-  return STEPAN;
-}
-/* учебный заказ — сюжетный (stepafirst.js): накладная «история», пин и радар — розовые, как главы героев */
-const TUT_LOOK = { type: 'story', color: STORY.COLOR };
-/* прохожий p становится Степаном */
-function asStepan (p) {
-  if (p.idle) releaseIdle(p);
-  p.path = null; p.w = null;
-  dropMesh(p.grp); p.person = stepanPerson(); p.grp = makeHuman(p.person); p.speed = p.base * p.grp.userData.pace; scene.add(p.grp);
-}
-/* Первый заказ — Стёпа на лавочке у своего дома, Ленинградская, 8 (stepabench.js, автор 10.10.2026: «первый заказ
-   Степану нужно везти на Ленинградскую, 8»), если она есть в карте, цела и в районе, где работаешь.
-   Нет — ближайшая подходящая лавочка во дворе (~130 м); relax — дальше (30—900 м) и до дороги до 60 м */
-function stepaHomeBench () {
-  if (!STEPAB.DEBUG.M.ready) { try { stepaBenchInit(); } catch (e) { console.warn('[stepa] bench', e); } }
-  const pr = STEPAB.DEBUG.M.prop;
-  if (!pr || pr.down) return null;
-  const b = BENCHES.find(q => q.prop === pr);
-  if (!b || b.taken || (DISTRICTS && DIST.at(b.x, b.z) !== DIST.cur())) return null;
-  return b;
-}
-function stepanOrder (all, relax) {
-  if (!all || !all.length) return null;
-  let best = relax ? null : stepaHomeBench(), bs = best ? -1 : Infinity;
-  const D0 = relax ? 30 : 45, D1 = relax ? 900 : 420, RD = relax ? 60 : 30;
-  for (const b of (best ? [] : BENCHES)) {
-    if (b.taken || (b.prop && b.prop.down)) continue;
-    const d = Math.hypot(b.x - V.x, b.z - V.z);
-    if (d < D0 || d > D1 || (COURIER_SLOTS && COURIER_SLOTS.some(q => Math.hypot(q.x - b.x, q.z - b.z) < 25))) continue;
-    if (DISTRICTS && DIST.at(b.x, b.z) !== DIST.cur()) continue;           // в районе, где работаешь
-    const r = nearestRoad(b.x, b.z, 7, 4);
-    if (!r || r.d > RD) continue;                   // к лавочке можно подъехать
-    const sc = Math.abs(d - 130);
-    if (sc < bs) { bs = sc; best = b; }
-  }
-  if (!best) return null;
-  const p = all.find(q => !q.guest) || all[0];
-  asStepan(p);
-  p.x = best.x; p.z = best.z;
-  p.idle = { b: best, phase: 'sit', t: 1e9, give: 0 }; best.taken = 1;        // сразу сидит: makeGuest оставит его на лавочке
-  p.grp.rotation.y = best.ry;
-  HK.guest(p, best);
-  const home = best.prop === STEPAB.DEBUG.M.prop;
-  const why = home ? (ADULT ? $t('первый заказ: Стёпа на лавочке у Ленинградской, 8 — ищи облака дыма') : $t('первый заказ: Стёпа на лавочке у Ленинградской, 8 — ищи пар от самовара'))
-    : ADULT ? $t('первый заказ: Степан на лавочке во дворе — ищи облака дыма') : $t('первый заказ: Степан на лавочке во дворе — ищи пар от самовара');
-  return { kind: 'solo', tut: true, stops: [{ peds: [p] }], why, look: TUT_LOOK };
-}
-
 function planOrder () {
   const all = alive();
   if (!all.length) return null;
@@ -15748,24 +15666,6 @@ function planOrder () {
     return same ? $t('групповой: {who}, заказали на всех', { who: $t(pos) }) : $t('групповой: заказали на всех сразу');
   };
 
-  /* Самый первый заказ за всё время — учебный: гость стоит так, что до
-     него прямо и один раз направо. Дальше — случайные заказы, и чем
-     дальше смена, тем дальше адреса. */
-  if (!tutDone()) {
-    const st = stepanOrder(all) || stepanOrder(all, true);   // Степан Тугарев на лавочке с кальяном
-    if (st) return st;
-    // лавочки нет совсем — Степан стоит на углу первого перекрёстка (первая доставка — всегда Стёпа, 10.10.2026)
-    const sp = tutorialSpot();
-    if (sp && (!DISTRICTS || DIST.at(sp.x, sp.z) === DIST.cur())) {
-      const p = all.find(q => !q.guest) || all[0];
-      asStepan(p);
-      p.x = sp.x; p.z = sp.z;
-      return { kind: 'solo', tut: true, stops: [{ peds: [p] }], why: $t('первый заказ: Степан — прямо до перекрёстка, он справа'), look: TUT_LOOK };
-    }
-  }
-  // карьера: учебный не вышел — обычный заказ смены (orders.js: только открытый район, где работаешь),
-  // а не старый московский выбор по всему городу (тот мог увести в закрытый район)
-  if (CAREER) return ORD.nextPlan();
   /* Сложность — от уровня курьера и от того, сколько заказов уже в этой
      смене: каждые три заказа — ступенька выше. На первой ступени — один
      гость рядом, дальше подключаются групповые, последовательные, за
@@ -15830,7 +15730,7 @@ function newOrder () {
   clearGate();
   // карьера: очередь, план смены, без повторов (orders.js); учебный — по-старому
   // Степан Тугарев — только самый первый заказ за всё время (учебный, planOrder), не каждую смену
-  const plan = CAREER && tutDone() ? ORD.nextPlan() : planOrder();
+  const plan = CAREER ? ORD.nextPlan() : planOrder();
   if (!plan) { backToBase(); return; }
   if (plan.story) { ORD.startStory(plan); return; }   // сюжетный: у двери человек из story.js
 
@@ -16008,6 +15908,8 @@ function loadPizza () {
       } else toast($t('пицца в машине — поехали'));
       if (S.coffeeNext) { S.coffeeNext = false; tossCoffee(); }
       Platform.gameplayStart();
+      if (S.order?.ord?.story?.storyId === 'gennady') CHAT.say($t('Женя, заказ готов. И проверь, чтобы пицца ровно лежала. А то в прошлый раз какую-то хрень привёз. Извини за выражение'), null, false,
+        null, { key: 'gennady-before' });
       Snd.fx('go', s => s.blip(760, 0.1, 'square', 0.13));
     },
     nb > 1 ? pizzaBox(Math.min(PBOX.STACK.MAX, nb)) : undefined,   // весь заказ — стопкой в багажник (12бл)
@@ -16156,17 +16058,12 @@ function checkArrival (dt) {
     // оплата — сразу в кошелёк: умер или закрыл вкладку — деньги уже твои
     if (!S.freeRun) addWallet(part);
     if (RIVALS.length && !o.tut) CREWR.delivered();   // рейтинг смены: после чека оплаты — подробная таблица (crewrank.js)
-    S.delivered += st.peds.length;
+    S.delivered += st.peds.length || (o.ord && o.ord.story && o.ord.story.interiorDone ? 1 : 0);
     ACH.deliver({ n: st.peds.length, onTime, left, free: !!S.free, last: o.idx >= o.stops.length - 1, stops: o.stops.length,   // достижения (achievements.js)
       bundle: !!(o.ord && o.ord.bundle), allOnTime: o.stops.every(q => q.pay && !q.pay.late), urgent: !!(o.ord && o.ord.type === 'urgent') });
     if (CAREER && o.ord) DAILY.deliver({ o, st, onTime, tier, last: o.idx >= o.stops.length - 1 });   // задания на день (daily.js)
 
-    // учебный Стёпа (stepafirst.js): вручение — катсцена, коробку отдаёт курьер в ней; чек — после сцены
-    const tutScene = !!(o.tut && o.look && o.idx >= o.stops.length - 1);
-    if (!tutScene) handOver(st, onTime, !!(st.pay && st.pay.story) || !!(o.ord && o.ord.story));
-    const odd = ODD.onHand(st, onTime, o, { hold: on => { if (S.state === 'handover') S.handT = on ? 1e9 : 0.3; } });   // крик в квартиру / сценка у двери (oddfolk.js)
-    if (ADULT && !o.tut && !st.talk && !odd) FLIRT.onHand(st, onTime, { car: () => car, person: st.persons[0], speed: () => Math.hypot(V.vx, V.vz),   // клиентка изредка зовёт зайти — диалог, курьер отказывает (flirt.js)
-      hold: on => { if (S.state === 'handover') S.handT = on ? 1e9 : 0.3; } });
+    handOver(st, onTime, !!(st.pay && st.pay.story) || !!(o.ord && o.ord.story));
     DIRECTOR.delivered();                           // доставка сессии: режиссёр открывает события по нарастающей (director.js)
     // оплата — кучкой денег и чеком (popPay); в сюжетном заказе награду покажет катсцена
     const pp = st.pay;
@@ -16174,7 +16071,7 @@ function checkArrival (dt) {
       if (pp && !pp.story) {
         const rows = [[$t('заказ'), pp.fee, '']];
         if (pp.late) rows.push([$t('опоздал'), part - pp.fee + (pp.stairsGop || 0), 'neg']);   // гопникам отдал отдельно — строкой ниже
-        if (pp.bonus) rows.push([o.tut && o.look && !st.bumped ? $t('чаевые Стёпы · за скорость') : $t('за скорость'), pp.bonus, 'tip']);   // учебный: те же деньги, Стёпа дал их в катсцене
+        if (pp.bonus) rows.push([$t('за скорость'), pp.bonus, 'tip']);
         if (pp.tip) rows.push([pp.rich ? $t('чаевые от богача') : $t('чаевые'), pp.tip, 'tip']);
         if (pp.doorAdd) rows.push([pp.doorMode === 'broken' ? $t('достучался быстро') : $t('домофон с первого раза'), pp.doorAdd, 'tip']);   // мини-игра у подъезда (doorstep.js payAdjust)
         if (pp.doorCut) rows.push([$t('спускался сам'), -pp.doorCut, 'neg']);
@@ -16198,7 +16095,7 @@ function checkArrival (dt) {
         Snd.coin();
       }
     };
-    if (!tutScene) showPay();
+    showPay();
 
     o.idx++;
     if (o.idx < o.stops.length) {
@@ -16217,17 +16114,7 @@ function checkArrival (dt) {
       S.state = 'handover'; S.handT = 0.9;
       addXP(o.ord && o.ord.bundle ? o.stops.length : 1);   // сборный: каждая пицца — заказ (рост курьера, econ.js BUNDLE)
       S.done = (S.done || 0) + 1;
-      if (o.tut) {
-        Store.set('dlv-msk-tut', '1');
-        TEL.first('tut_order');                   // воронка новичка: учебный заказ отвезён (telemetry.js)
-        // катсцена Стёпы (stepafirst.js): знакомство, «вложишься в мой бизнес?», чаевые, облако на машину; после — коробка у него и чек
-        const ped = st.peds[0];
-        if (!(tutScene && ST1.play(ped, { tipped: !!(pp && pp.bonus && !pp.late && !st.bumped), done: () => { takeBox(ped, st, onTime); showPay(); } }))) {
-          if (tutScene) { handOver(st, onTime); showPay(); }
-          HINTS.stepan(ped);                          // сцены нет — старый прикол: зовёт в бизнес и дует облаком на машину (hints.js)
-        }
-      }
-      else if (o.ord) ORD.delivered(o, st, onTime);   // карьера: поручение по SIDE_ORDERS, STORY.onDeliver
+      if (o.ord) ORD.delivered(o, st, onTime);   // карьера: поручение по SIDE_ORDERS, STORY.onDeliver
       else if (!S.ride && onTime && st.persons[0] && chance(0.45)) offerSide(st.peds[0], st.persons[0]);
     }
   } else if (S.state === 'side') {
@@ -16343,7 +16230,7 @@ function choiceStep (dt) {
 const MEAL_EVERY = 4;
 const MEALS = [
   { t: $t('холодная пепперони — клиент не забрал'), s: $t('+1 сердце сверху'), fn () { S.hpMax++; S.hp++; hudHearts(); } },
-  { t: $t('«Директорская» — Палыч не пришёл'), s: $t('чаевые ×2 до конца смены'), fn () { S.tipMul = (S.tipMul || 1) * 2; } },
+  { t: $t('«Директорская» — управляющая доверила смену тебе'), s: $t('чаевые ×2 до конца смены'), fn () { S.tipMul = (S.tipMul || 1) * 2; } },
   { t: $t('пицца с кофейным кремом — перепутали начинку'), s: $t('нитро жжётся вдвое медленнее, бак полный'), fn () { S.nosEff *= 0.5; NOS.tank = 1; } },
   { t: $t('пицца с работы'), s: $t('все сердца обратно'), ok: () => S.hp < S.hpMax, fn () { S.hp = S.hpMax; hudHearts(); } },
   { t: $t('лапша в подсобке'), s: $t('+8 секунд на каждый заказ'), fn () { S.mealTime = (S.mealTime || 0) + 8; } },
@@ -16986,7 +16873,6 @@ function startRun (ride) {
   S.freeRun = S.free;
   S.lvl0 = levelOf(getXP());
   if (CAREER) RAID.shiftStart({ ride: S.ride, quick: QR.on() });   // налёт на точку в эту смену? (raid.js)
-  if (CAREER) { FEST.shiftStart({ ride: S.ride, quick: QR.on(), holiday: !!HOL.active() }); if (!S.ride) FEST.announce(); }   // фестиваль в эту смену? в праздник — нет (festivals.js)
   if (CAREER && !INTRO) PZE.shiftStart({ ride: S.ride, quick: QR.on(), busy: !!HOL.active() || !!FEST.active(), dist: DIST.cur(), shifts: +Store.get('dlv-shifts', 0) || 0 });   // событие пиццерии: у каждой — своё (pzevents.js)
   if (CAREER && !S.ride) HOL.announce();         // праздник: Толик объявляет в чате (holidays.js)
   if (CAREER && !S.ride && !INTRO) CYCLE.announce();   // новый сезон, переход, сюрприз — Толик в чате; накануне стыка — прогноз (seasoncycle.js)
@@ -17453,7 +17339,7 @@ REALCAR.preloadTraffic(() => {
 HAV.init({ S, adult: ADULT });                   // счёт разрушений за смену для Толика (havoc.js)
 CREWR.init({ adult: ADULT, money, face: faceDataURL });   // money — суммы как у игрока, face — лица в таблице после вручения
 CREWC.init({ THREE, ADULT, makePerson, faceDataURL, put, mergeGeos, spec: m => CAR_SPEC[m] || CAR_SPEC.sedan, districtId: i => (DIST.list()[i] || {}).id });
-CHAT.init({ adult: ADULT, person: makePerson({ seed: 0x2E4A17, fem: false }), face: (p, size) => faceDataURL(p, size), blip: (f, d, ty, v) => Snd.blip(f, d, ty, v), fx: (n, synth) => Snd.fx(n, synth),
+CHAT.init({ adult: ADULT, person: makePerson({ seed: 0x1a1a5e, fem: true }), face: (p, size) => faceDataURL(p, size), blip: (f, d, ty, v) => Snd.blip(f, d, ty, v), fx: (n, synth) => Snd.fx(n, synth),
   speed: () => Math.hypot(V.vx || 0, V.vz || 0) });   // телефон: едешь — прочитанные сообщения чата прозрачнее (chat.js PH)
 /* заказы карьеры (orders.js): очередь, поручения, развоз смены — через это */
 if (CAREER) ORD.init({ S, V, CITY, MAP, THREE, Store, ADULT, SPOTS, LIFE, Snd, get PIZZA () { return PIZZA; }, get ENV () { return ENV; }, get DAY_LEN () { return DAY_LEN; }, lang: curLang,
@@ -17469,9 +17355,6 @@ ERRS.init({ S, V, CITY, ADULT, alive, makeGuest, clearGuest, afterDrop, releaseI
   rehuman: (p, person) => { dropMesh(p.grp); p.grp = person ? makeHuman(person) : freshHuman(); p.person = p.grp.userData.person; p.speed = p.base * p.grp.userData.pace; scene.add(p.grp); } });
 /* мини-игры у клиента (doorstep.js): домофон у подъезда многоэтажки и разговор у двери — до вручения, руль стоит, срок идёт */
 DCAST.init({ scene, cam, Snd, makeHuman, dropMesh, groundH, car: () => ({ x: V.x, z: V.z, h: V.h }) });   // люди у двери в 3D (doorcast.js)
-ODD.init({ ADULT, CAREER, Store, money, shiftsDone: () => +Store.get('dlv-shifts', 0) || 0,   // странные люди при вручении (oddfolk.js): качок — +5 000 ₽ в кошелёк и чек
-  pay: (n, row, person) => { if (!(n > 0) || S.freeRun || S.state === 'over' || S.state === 'menu') return 0; S.money += n; addWallet(n); S.tips = (S.tips || 0) + n; popPay(n, [[row, n, 'tip']], $t('чаевые!'), person ? { person, mood: 'happy' } : null); return n; },
-  rehuman: (p, person) => { dropMesh(p.grp); p.grp = makeHuman(person); p.person = p.grp.userData.person; p.speed = p.base * p.grp.userData.pace; scene.add(p.grp); } });   // клиент у двери — тот, чьё лицо в окне (качок, кожа, герой автора)
 if (CAREER) DOOR.init({ ORD, S, Store, ADULT, Snd, money, root: () => $('game') || document.body, paused: () => !!(S.paused || EXT.paused || FM.open),
   entranceLv, shiftsDone: () => +Store.get('dlv-shifts', 0) || 0, onShiftStart: CAREERM.onShiftStart,
   respect: why => RESPECT.gain(why), hintFind,
@@ -17561,21 +17444,6 @@ STORY.init({ THREE, scene, cam, V, S, IN, ADULT, CITY, MAP, Store, SPOTS, ground
   get car () { return car; }, addMoney: n => { S.money += n; if (!S.freeRun) addWallet(n); }, addStars: CAREER ? CAREERM.addStars : null, shift: () => (+Store.get('dlv-shifts', 0) || 0) + 1,
   // гость, который ждал бабушку у точки, после катсцены уходит в другой квартал другим человеком
   retirePed: p => { if (!p || p.dead || p.base === undefined) return; clearGuest(p); dropMesh(p.grp); p.grp = freshHuman(); p.person = p.grp.userData.person; p.speed = p.base * p.grp.userData.pace; p.hold = null; scene.add(p.grp); walkSpawn(p, 120, 380); } });
-/* истории героев города по главам (herostories.js): встречи, условие главы в пути, бонусы */
-HSTORY.init({ S, V, ADULT, CAREER, Snd, toast, shops: () => SIGNS, pizza: () => PIZZA, shiftN: () => (+Store.get('dlv-shifts', 0) || 0) + 1,
-  openAt: (x, z) => !DISTRICTS || DIST.isOpen(DIST.at(x, z)), heal: n => { S.hp = Math.min(S.hpMax, S.hp + n); hudHearts(); } });
-/* учебный заказ Стёпы (stepafirst.js): вручение — катсцена через story.js */
-ST1.init({ THREE, ADULT, V, fxAdd, puffGeo, groundH, Snd, sayBubble, makeHuman, stepanPerson, playerName: () => S.name, cam: () => cam });
-/* встречи у двери (encounters.js): катсцены микрогероев через story.js; в игре пока не выпадают — песочница «Встречи» */
-ENC.init({ THREE, scene, CITY, V, S, ORD, ADULT, car: () => car, groundH, inHouse, makeHuman, people: () => CULL_FAR_LISTS, popPay, money, guestIn, guestOut,
-  rehuman: (p, person) => { dropMesh(p.grp); p.grp = makeHuman(person); p.person = p.grp.userData.person; p.speed = p.base * p.grp.userData.pace; scene.add(p.grp); } });   // жена Глеба выходит к двери вместо него (faces.js)
-FACES.init({ Store, THREE, scene, groundH, ADULT });   // знакомые лица: прогресс истории, плакат «Вернись, Глеб»
-LOCALS.init({ Store, ADULT, money,   // жители Юга (locals.js): к двери выходит другой человек (мама) — rehuman
-  rehuman: (p, person) => { dropMesh(p.grp); p.grp = makeHuman(person); p.person = p.grp.userData.person; p.speed = p.base * p.grp.userData.pace; scene.add(p.grp); } });
-/* Стёпа на лавочке (stepabench.js): лавочка у Ленинградской, 8 и его заказ — через story.js */
-// первый заказ (stepanOrder) зовёт его и сам, если город ещё достраивается: лавочка Ленинградской, 8 нужна сразу
-const stepaBenchInit = () => STEPAB.init({ CITY, ADULT, CAREER, bench, realAddress });
-LATE.add('stepa', stepaBenchInit);
 const NO_E = /[?&]noE(&|$)/.test(location.search);   // ?noE — без леса у Ленина, змеев и качалок (сравнить кадр)
 /* змеи и дроны (kites.js): места в парках и на Ленина, люди — только рядом с камерой */
 if (!NO_E) LATE.add('kites', () => KITES.init({ THREE, scene, CITY, V, get ENV () { return ENV; }, groundH, inHouse, nearestRoad, solidAt, onPave: PAVE.onPave, wood: RINGM.wooded, makeHuman, dropMesh,
@@ -17722,9 +17590,6 @@ LATE.add('weather', () => WTH.init({ THREE, scene, cam, renderer, Store, MAP, CI
 LATE.add('nitro', buildNitro);
 LATE.add('locks', districtLocks);                 // закрытые районы: без перекрытий, lock у графа — 0
 if (!INTRO) LATE.add('hookah', () => HK.init({ THREE, scene, BENCHES, V, S, ADULT, makeHuman, makePerson, dropMesh, gibHuman, groundH, curbAt, fxAdd, puffGeo, steam, toast, Snd, CAR_L, CAR_W, t: $t }));
-if (!INTRO && CAREER) FEST.init({ THREE, scene, V, S, CITY, ADULT, Store, obb, SOLIDS, indexSolids, NODES, TRAFFIC, parkOut: t => { if (t.still) { t.still = 0; PARKI.out(t, true); } }, put, mergeGeos, groundH, inHouse, inPoly, nearestRoad, solidAt,
-  makeHuman, makePerson, dropMesh, sayBubble, fxAdd, puffGeo, steam, gibBurger, popBonus, toast, chat: s => CHAT.say(s), addWallet, money, CASH, Snd, CAR_L, CAR_W, HEROES, DIST,
-  season: () => SEAS.seasonValue() });   // фестивали на парковках ТЦ (festivals.js)
 if (!INTRO && CAREER) PZE.init({ Store, S, ADULT, hour: () => CAREERM.hour(), chat: s => CHAT.say(s), sayBubble, onArrive: cb => ORD.onArrive(cb) });   // события пиццерий (pzevents.js)
 if (!INTRO && CAREER) CYCLE.init({ Store, ADULT, chat: s => CHAT.say(s), playing: isPlaying });   // круг сезонов (seasoncycle.js)
 if (!INTRO && CAREER) HOL.init({ THREE, scene, cam, renderer, Store, CITY, ADULT, V, S, groundH, inBounds, inHouse, inPoly, sayBubble, get PIZZA () { return PIZZA; },
@@ -18773,7 +18638,6 @@ function frameStep (now) {
   CL.step('smokers', updateSmokers, dt);
   CL.step('hookah', HK.step, dt);                                    // кальянщики на лавочках
   if (CAREER && !INTRO) CL.step('pzevents', PZE.step, dt);               // событие пиццерии: начало окна — строка в чат (pzevents.js)
-  if (CAREER) CL.step('festivals', FEST.step, dt);                    // фестиваль на парковке ТЦ (festivals.js)
   if (CAREER && !INTRO) CL.step('holidays', HOL.step, dt);            // праздник: украшения строятся, салют, костюмы (holidays.js)
   CL.step('parties', updateParties, dt);
   CL.step('collect', updateCollect, dt);
@@ -18826,7 +18690,6 @@ function frameStep (now) {
   CL.step('growth', GROW.step, dt, GROW_API || (GROW_API = growApi()));      // пиццерия растёт: вид у шара (growth.js)
   CL.step('director', DIRECTOR.step, dt);                           // режиссёр событий: пауза после крупного (director.js)
   if (CAREER) CL.step('raid', RAID.step, dt);                          // налёт на точку, ёлка-турель (raid.js)
-  CL.step('heroes', HEROES.step, dt, HEROES_API || (HEROES_API = heroesApi()));   // герои города (heroes.js)
   CL.step('fauna', FAUNA.step, dt, FAUNA_API || (FAUNA_API = faunaApi()));   // лоси и звери в лесах (fauna.js)
   CL.step('cats', CATS.step, dt, CATS_API || (CATS_API = catsApi()));      // коты на крышах и у подвалов (cats.js)
   CL.step('ach', ACH.step, dt);                                              // достижения: опрос счётчиков (achievements.js)
@@ -19170,7 +19033,7 @@ if (window.__dlv) Object.assign(window.__dlv, { GRIT: GRITM.GRIT, REALCAR, bounc
   cgLamps: () => CG.lampState(car), EXH: EXH.DEBUG, WIPE: WIPE.STATS, DENT: DENTM.DEBUG, DIRT: DIRT.DEBUG, REAR: REARM.STATS, pizzasInCar, setTrunk });   // фары и фонари (carglass.js), выхлоп (exhaust.js), дворники (wipers.js)   // дымок, стёкла (pixfx.js, carglass.js)
 if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG, CONS: CONSTR.DEBUG, DARK: DARKN.DEBUG, WASTE: WASTE.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)
 if (window.__dlv) Object.defineProperties(window.__dlv, { reprofile: { value: reprofile }, REPROFILE_MS: { get: () => REPROFILE_MS } });   // смена профиля без перезагрузки
-if (window.__dlv) Object.assign(window.__dlv, { ODD: ODD.DEBUG, DCAST: DCAST.DEBUG, DIRECTOR: DIRECTOR.DEBUG, HB: HB.DEBUG, FLIRT: ADULT ? FLIRT.DEBUG : null, popBonus, CHAT_PERSON: () => CHAT.person(), CHAT, HAVOC: HAV.DEBUG });   // коневозки, заигрывание (только взрослая); CHAT — чат Толика (say, react)
+if (window.__dlv) Object.assign(window.__dlv, { DCAST: DCAST.DEBUG, DIRECTOR: DIRECTOR.DEBUG, HB: HB.DEBUG, popBonus, CHAT_PERSON: () => CHAT.person(), CHAT, HAVOC: HAV.DEBUG });
 if (window.__dlv) { window.__dlv.WARM = WARM.DEBUG; window.__dlv.FOREST = FOREST.DEBUG; window.__dlv.LAWN = LAWNP.DEBUG; window.__dlv.MEADOW = MEADOW.DEBUG; window.__dlv.SHORT = SHORT.DEBUG; window.__dlv.PAVE = PAVE.DEBUG; window.__dlv.PZD = PZD.DEBUG; window.__dlv.cam = cam; window.__dlv.RIV = RIVS.DEBUG; window.__dlv.SOFTEDGE = SOFTEDGE.DEBUG; }   // ельник и пиццерия-шар (forest.js, pizzadome.js); край города (softedge.js)
 if (window.__dlv) window.__dlv.RELIEF = { STATS: RELIEF.STATS, at: RELIEF.reliefAt };   // неровный газон (relief.js)
 CBK.init({ V, NODES, edgeRun, pushOut, shown: flowShown, respawn: t => respawnTraffic(t, 'back'),   // на полосу после удара (carback.js)

@@ -24,11 +24,11 @@ const N_ = s => s;
 /* что подсвечиваем (селектор внутри гаража) и что говорит Дядя Женя — коротко, строка на одну мысль
    (автор, 10.10.2026: «не надо лишних слов — мотор лучше, и т.д.») */
 const STEPS = [
-  { sel: '.gr-card.on .gr-pic', text: [N_('здорово! я Дядя Женя, это мой гараж'), N_('листай ◀ ▶, выбирай тачку')] },
+  { sel: '.gr-card.on .gr-pic', text: [N_('Это гараж. Здесь можно выбрать машину.'), N_('листай ◀ ▶, выбирай тачку')] },
   { sel: '.gr-wallet', text: [N_('копилка — твои деньги'), N_('крутым тачкам нужны ещё звёзды ★'), N_('звёзды — за хорошие смены')] },
   { sel: '.gr-card.on .gr-acts', text: [N_('выбрать — едешь на ней'), N_('броня — +1 ♥'), N_('мотор лучше — быстрее едет')] },
-  { sel: '.gr-card.on .gr-row', text: [N_('надоел цвет — перекрашу'), N_('продать — за полцены')] },
-  { sel: '.gr-card.on .gr-stats', text: [N_('мотор изнашивается'), N_('ниже 70 % — глохнет'), N_('чиню на районе — ключ на радаре'), N_('ресурс с каждым ремонтом меньше')] },
+  { sel: '.gr-card.on .gr-row', text: [N_('надоел цвет — можно перекрасить'), N_('продать — за полцены')] },
+  { sel: '.gr-card.on .gr-stats', text: [N_('мотор изнашивается'), N_('ниже 70 % — глохнет'), N_('ремонт на районе — ключ на радаре'), N_('ресурс с каждым ремонтом меньше')] },
   { sel: '.gr-back', text: [N_('насмотрелся — жми «назад»'), N_('заходи ещё!')] },
 ];
 
@@ -54,7 +54,7 @@ export function start (host, api) {
   try { who = A.person ? A.person() : null; } catch (e) { who = null; }
   if (!TF.bind(img, who, 160)) try { img.src = (A.face && A.face()) || ''; } catch (e) { img.src = ''; }
   img.hidden = !img.src;
-  box.querySelector('.gt-head b').textContent = t('Дядя Женя');
+  box.querySelector('.gt-head b').textContent = t('Гараж');
   box.querySelector('.gt-skip').innerHTML = keyHTML('back') + esc(t('пропустить'));
   box.querySelector('.gt-skip').addEventListener('click', e => { e.stopPropagation(); skip(); });
   box.querySelector('.gt-next').addEventListener('click', e => { e.stopPropagation(); next(); });

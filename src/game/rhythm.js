@@ -34,8 +34,6 @@
    ────────────────────────────────────────────────────────────────────────── */
 import { RHYTHM as C } from './econ.js';
 import * as DIST from './districts.js';
-import * as FACES from './faces.js';            // знакомые лица района: Глеб — по одному появлению за смену (faces.js)
-import * as LOCALS from './locals.js';          // жители Юга: пятеро с историями на 4 появления (locals.js)
 
 let A = null;          // { Store, S, career, quick(), doorOn(), errAsked() } — из game.js через director.init
 const PROV = { heroes: [], person: null, door: null };
@@ -105,48 +103,8 @@ export function slot (n, left) {
   else if (!R.peak && n >= 2 && (f >= C.PEAK_AT || (left >= 0 && left < C.LAST_S + C.PEAK_LEFT * avgOrder(left, n)))) { role = 'peak'; R.peak = true; }
   const k = role === 'open' || role === 'last' ? 0 : role === 'peak' ? 1 : Math.min(1, f / C.RAMP);
   R.role = role; R.k = k; R.f = f;
-  let meet = null;
   R.face = false;
-  if (role === 'rise' && (R.meetMax || R.lcHere) && !why('meet')) {
-    const fc = R.meetMax ? faceSlot() : null;       // знакомое лицо (Глеб) — первым
-    if (fc) {
-      register(fc.kind === 'errand' ? 'errand' : 'meet'); R.pend = fc.kind === 'errand' ? 'face' : 'meet'; R.face = true;
-      FACES.planned(R.shift);
-      return { n: R.n, role, k, f, meet: fc };
-    }
-    const lc = R.lcHere ? localSlot() : null;       // жители Юга (locals.js) — раньше случайной встречи
-    if (lc) {
-      register(lc.kind === 'errand' ? 'errand' : 'meet'); R.pend = lc.kind === 'errand' ? 'face' : 'meet'; R.face = true;
-      LOCALS.planned(lc.local);
-      return { n: R.n, role, k, f, meet: lc };
-    }
-    if (R.meetMax) meet = pickHero();
-  }
-  if (meet) { register('meet'); R.pend = 'meet'; R.used.push(meet.id); saveMeets(); }
-  return { n: R.n, role, k, f, meet };
-}
-
-/* появление знакомого лица в этой смене (faces.js want): встреча или поручение — человек в накладной — он (Глеб) */
-function faceSlot () {
-  let w = null;
-  try { w = FACES.want(R.shift); } catch (e) { w = null; }
-  if (!w) return null;
-  if (w.kind === 'errand' && (R.beats.errand || 0) >= (C.MAX.errand || 1)) return null;
-  let person = null;
-  try { person = PROV.person ? PROV.person(w.face) : null; } catch (e) { person = null; }
-  return { ...w, person };
-}
-
-/* появление жителя Юга (locals.js want): окно у двери, поручение или катсцена; в накладной — он */
-function localSlot () {
-  let w = null;
-  try { w = LOCALS.want(R.shift); } catch (e) { console.warn('[rhythm] locals', e); w = null; }
-  if (!w) return null;
-  if (w.kind === 'errand' && (R.beats.errand || 0) >= (C.MAX.errand || 1)) return null;
-  let person = null;
-  try { person = PROV.person ? PROV.person(w.face) : null; } catch (e) { person = null; }
-  LOCALS.own(person, w.name);                       // в накладной и окнах — его имя, не ник из приложения
-  return { ...w, person };
+  return { n: R.n, role, k, f, meet: null };
 }
 
 /* средний заказ этой смены, с (сколько прошло смены / сколько заказов было); в начале — 55 с */
@@ -178,7 +136,7 @@ export function meetFailed () {
   R.pend = '';
   R.beats[kind] = Math.max(0, (R.beats[kind] || 0) - 1); if (!small(kind)) R.total = Math.max(0, R.total - 1);
   R.last = R.lastWas;
-  if (R.face) { R.face = false; FACES.unplan(); LOCALS.unplan(); note('знакомое лицо не поставили: его адрес занят или нет подъезда'); return; }
+  if (R.face) { R.face = false; return; }
   R.used.pop(); saveMeets();
   note('встречу не поставили: нет подъезда');
 }

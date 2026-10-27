@@ -166,6 +166,7 @@ export const MAN = {
 
 /* одежда мужика: майка, семейники, шлёпанцы (модели Quaternius: тело панка — майка, ноги и ступни пляжника) */
 const MAN_LOOK = { shirt: '#ece7da', pants: '#3f5cae', q: { head: ['business', 'casual', 'beach'], body: 'punk', legs: 'beach', feet: 'beach' }, summer: true };
+const GENNADY_LOOK = { shirt: '#ece7da', pants: '#495c7e', q: { head: 'business', body: 'punk', legs: 'casual', feet: 'beach' }, summer: true };
 
 export function create (box, o) {
   const env = ENV || sandboxEnv(), game = !!ENV;
@@ -579,8 +580,9 @@ export function create (box, o) {
     // клиент — мужчина: он сам, раздетый по-домашнему; клиентка — открывает её мужик (свой человек, то же зерно адреса)
     const cl = o.person;
     manP = cl && cl.look && !cl.look.f ? cl : makePerson({ seed: (seed ^ 0x7a11) >>> 0, fem: false });
-    const q = manP === cl ? { body: MAN_LOOK.q.body, legs: MAN_LOOK.q.legs, feet: MAN_LOOK.q.feet } : MAN_LOOK.q;   // клиент — со своей головой
-    man = human(manP, Object.assign({}, MAN_LOOK, { q }));
+    const look = cl && cl.story === 'gennady' ? GENNADY_LOOK : MAN_LOOK;
+    const q = manP === cl && look === MAN_LOOK ? { body: look.q.body, legs: look.q.legs, feet: look.q.feet } : look.q;
+    man = human(manP, { ...look, q });
     const dx = doorX(P.door);
     man.position.set(dx + 0.08, tgt * FH, ZB - 0.42);
     man.rotation.y = 0;
@@ -788,7 +790,7 @@ export function create (box, o) {
     if (!man) return;
     const u = man.userData;
     u.qV = 0;
-    const talk = S.text && !S.given;
+    const talk = (S.text || S.talking) && !S.given;
     S.ph = (S.ph || 0) + dt;
     if (!S.given) {
       u.armR.rotation.x = talk ? -0.5 - 0.45 * Math.max(0, Math.sin(S.ph * 4.2)) : 0;
@@ -814,8 +816,9 @@ export function create (box, o) {
     }
   }
   const sceneApi = {
-    start () { VW.scene = { on: true, t: 0, text: '', pass: -1, given: false, from: null }; makeMan(); },
+    start () { VW.scene = { on: true, t: 0, text: '', talking: false, pass: -1, given: false, from: null }; makeMan(); },
     say (text) { if (!VW.scene) return; VW.scene.text = text; bub.textContent = text; bub.classList.remove('sx3-pop'); void bub.offsetWidth; bub.classList.add('sx3-pop'); },
+    talk (on) { if (VW.scene) VW.scene.talking = !!on; },
     hush () { if (VW.scene) VW.scene.text = ''; },
     give () { if (VW.scene && VW.scene.pass < 0 && !VW.scene.given) VW.scene.pass = 0; },
     given: () => !!(VW.scene && VW.scene.given),
