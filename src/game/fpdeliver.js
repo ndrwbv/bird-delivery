@@ -1,5 +1,5 @@
-/* Этап доставки от машины до подъезда. Камера плавно переходит к глазам курьера,
-   у багажника игрок отдельным действием берёт пиццу. После подхода к двери
+/* Этап доставки от машины до подъезда. Короткое затемнение переводит камеру
+   к глазам курьера; пиццу у багажника он берёт сам. После подхода к двери
    управление передаётся существующему домофону doorstep.js.
    Автомобильное управление и сам домофон здесь не дублируются. */
 import * as WRECK from './carwreck.js';
@@ -9,20 +9,22 @@ export const ON = true;
 export const FP = {
   EYE: 1.62,          // м: глаза над землёй
   FOV: 68,
+  FADE_OUT: 0.25, FADE_IN: 0.35,
   EXIT: 1.0,          // с: камера уходит в глаза, дверь открылась
   OUT: 0.9,           // м: встал от борта (дальше — в окно салон не видно)
   ROUND: 0.8,         // м: обход машины — на столько от кузова
   DOOR_ANG: 1.1,      // рад: насколько открывается водительская дверь
   TO_TRUNK: 1.5,      // с: вдоль борта за корму
-  BACK: 0.7,          // м: стоит за кормой
+  BACK: 1.5,          // м: стоит за кормой, чтобы был виден открытый багажник
   OPEN: 0.45,         // с: крышка поднимается
   TAKE: 0.7,          // с: коробка из багажника в руки
   CLOSE: 0.4,         // с: крышка закрывается
   WALK: 2.6,          // м/с: к двери подъезда (быстрый шаг)
   WALK_MIN: 1.3,      // с: не меньше
-  WALK_MAX: 3.0,      // с: не дольше (далеко — быстрее)
-  AT_DOOR: 2.6,       // м: от точки двери подъезда (game.js nearEntrance — она за полотном) — встал в ~1,5 м от двери
-  HOLD: 0.35,         // с: постоял у двери
+  WALK_MAX: 8.0,      // с: длинный путь не ускоряется до рывка
+  AT_DOOR: 3.2,       // м: остановился перед входом
+  INTERCOM: 2.3,      // м: приблизился к домофону, но не уткнулся в дверь
+  APPROACH: 0.55, HOLD: 0.2,
   LOOK_K: 5,          // как быстро взгляд догоняет цель
   BOB: 0.035, BOB_HZ: 1.9,   // м, шагов/с: голова качается на ходу
   HL: 2.15,           // м: полудлина машины (обход)
@@ -35,7 +37,7 @@ export const ST = { runs: 0, skips: 0, last: null, noDoor: 0 };
 let A = null;
 const R = { on: false, t: 0, ph: '', st: null, n: 1, done: null, path: null, len: 0, dur: 0, door: null, pc: null, doorA: 0,
   p0: null, look: null, hands: null, box: null, from: null, taken: 0, walkT: 0, bob: 0,
-  handK: 0, hint: null };
+  handK: 0, fade: null };
 let V3 = null;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, k) => a + (b - a) * k;
@@ -44,17 +46,18 @@ const ease = k => { k = clamp(k, 0, 1); return k * k * (3 - 2 * k); };
 export function init (api) {
   A = api;
   V3 = new A.THREE.Vector3();
-  if (typeof addEventListener !== 'function') return;
-  const hit = e => {
-    if (!R.on) return;
-    if (e.cancelable) e.preventDefault();
-    e.stopImmediatePropagation();                   // ни руль, ни пауза под сценой (как сцена вручения, handcam.js)
-    if (e.repeat) return;
-    if (R.ph === 'take-ready') { beginTake(); return; }
-    if (R.ph === 'exit' || R.ph === 'trunk') toTrunk();
-  };
-  addEventListener('keydown', hit, true);
-  addEventListener('pointerdown', hit, true);
+}
+
+function fade (alpha) {
+  if (!R.fade) {
+    const el = document.createElement('div');
+    el.id = 'fp-delivery-fade';
+    el.style.cssText = 'position:absolute;inset:0;background:#08090c;z-index:45;pointer-events:none;opacity:0';
+    (document.getElementById('game') || document.body).appendChild(el);
+    R.fade = el;
+  }
+  R.fade.style.opacity = String(clamp(alpha, 0, 1));
+  R.fade.hidden = alpha <= 0;
 }
 
 /* машина: оси — x влево по ходу, z вперёд (как crewride.js) */
@@ -75,14 +78,14 @@ function hands () {
   const m = new T.MeshLambertMaterial({ color: skin, flatShading: true });
   for (const sx of [-1, 1]) {
     const arm = new T.Group();
-    arm.position.set(sx * 0.23, -0.56, -0.2);
-    arm.rotation.set(0.35, sx * 0.12, 0);
-    const fore = new T.Mesh(new T.BoxGeometry(0.085, 0.08, 0.36), m);
-    fore.position.z = -0.18;
-    const palm = new T.Mesh(new T.BoxGeometry(0.08, 0.035, 0.11), m);
-    palm.position.set(-sx * 0.01, 0, -0.41);
-    const thumb = new T.Mesh(new T.BoxGeometry(0.025, 0.06, 0.05), m);
-    thumb.position.set(-sx * 0.045, 0.03, -0.38);
+    arm.position.set(sx * 0.17, -0.58, -0.3);
+    arm.rotation.set(0.18, sx * 0.1, 0);
+    const fore = new T.Mesh(new T.BoxGeometry(0.065, 0.06, 0.18), m);
+    fore.position.z = -0.1;
+    const palm = new T.Mesh(new T.BoxGeometry(0.07, 0.03, 0.09), m);
+    palm.position.set(-sx * 0.01, 0, -0.23);
+    const thumb = new T.Mesh(new T.BoxGeometry(0.023, 0.045, 0.045), m);
+    thumb.position.set(-sx * 0.038, 0.025, -0.21);
     arm.add(fore, palm, thumb);
     g.add(arm);
   }
@@ -90,7 +93,7 @@ function hands () {
   R.hands = g;
   return g;
 }
-const HAND_BOX = { x: 0, y: -0.36, z: -0.6 };     // где коробка в руках (оси рук: −z — вперёд)
+const HAND_BOX = { x: 0, y: -0.42, z: -0.55 };     // где коробка в руках (оси рук: −z — вперёд)
 
 function dropBox () {
   const b = R.box;
@@ -112,8 +115,7 @@ export function run (st, o = {}) {
   const n = Math.max(1, st.boxes || 1);
   const cam = A.cam;
   V3.set(0, 0, -1).applyQuaternion(cam.quaternion).multiplyScalar(6).add(cam.position);
-  Object.assign(R, { on: true, t: 0, ph: 'exit', st, n, taken: 0, walkT: 0, bob: 0, from: null, box: null,
-    p0: { x: cam.position.x, y: cam.position.y, z: cam.position.z },
+  Object.assign(R, { on: true, t: 0, ph: 'fade', st, n, taken: 0, walkT: 0, bob: 0, from: null, box: null,
     look: { x: V3.x, y: V3.y, z: V3.z },
     door: { x: e[0], z: e[1], nx: e[2], nz: e[3] } });
   // водительская дверь — слева (+x), как у коллег (crewride.js); нет куска (сорвало, ?oldwreck) — без неё
@@ -121,11 +123,13 @@ export function run (st, o = {}) {
   try { if (WRECK.WR.on) { const pc = WRECK.piece(car, car.userData.real ? 'dfl' : 'dl'); if (pc && !pc.gone) R.pc = pc; } } catch (e2) { R.pc = null; }
   const seat = A.seatOf ? A.seatOf({ mesh: car }) : null;
   R.seat = { hw: seat && seat.hw ? seat.hw : FP.HW, dz: seat && Number.isFinite(seat.dz) ? seat.dz : 0.2 };
-  if (A.driver) A.driver(false);                    // курьер вышел — за рулём пусто
+  const [sx, sz] = world(car, Math.max(R.seat.hw, FP.HW) + 0.12, R.seat.dz);
+  R.p0 = { x: sx, y: eyeY(sx, sz), z: sz };
   const h = hands();
   if (!h.parent) A.scene.add(h);
-  h.visible = true;
-  ST.last = { n, ph: 'exit', ms: 0, skip: false, walk: 0, door: +Math.hypot(e[0] - car.position.x, e[1] - car.position.z).toFixed(1) };
+  h.visible = false;
+  fade(0);
+  ST.last = { n, ph: 'fade', ms: 0, skip: false, walk: 0, door: +Math.hypot(e[0] - car.position.x, e[1] - car.position.z).toFixed(1) };
   R.t0 = performance.now();
   return new Promise(res => { R.done = res; });
 }
@@ -146,7 +150,7 @@ function finish (skip) {
   if (A.setTrunk) A.setTrunk(false);
   dropBox();
   if (R.hands) { R.hands.visible = false; if (R.hands.parent) R.hands.parent.remove(R.hands); }
-  if (R.hint) R.hint.hidden = true;
+  fade(0);
   R.handK = 0;
   if (A.driver) A.driver(true);
   R.taken = 0;
@@ -184,9 +188,7 @@ function along (P, k) {
 export function step (dt) {
   if (!A || !R.on) return;
   const S = A.S, car = carNow();
-  const pad = !!(A.pad && A.pad.any);
   if (!car || S.state !== 'drive') { finish(false); return; }
-  if (pad) { if (R.ph === 'take-ready') { beginTake(); return; } if (R.ph === 'exit' || R.ph === 'trunk') { toTrunk(); return; } }
   R.t += dt;
   const cam = A.cam, hw = R.seat.hw;
   const side = world(car, Math.max(hw, FP.HW) + FP.OUT, R.seat.dz); // у водительской двери снаружи — от борта, не от сиденья
@@ -194,15 +196,30 @@ export function step (dt) {
   const tp = A.trunk ? A.trunk() : { x: car.position.x, y: car.position.y + 0.9, z: car.position.z };
   let x = 0, z = 0, lx = 0, ly = 0, lz = 0, walking = false;
   const ph = R.ph;
+  if (ph === 'fade') {
+    fade(R.t / FP.FADE_OUT);
+    if (R.t >= FP.FADE_OUT) {
+      R.ph = 'exit'; R.t = 0; fade(1);
+      if (A.driver) A.driver(false);
+      const near = world(car, Math.max(hw, FP.HW) - 0.2, R.seat.dz - 1.2);
+      R.look = { x: near[0], y: eyeY(near[0], near[1]) - 0.3, z: near[1] };
+    }
+    return;
+  }
   if (ph === 'exit') {
     const k = ease(R.t / FP.EXIT);
+    fade(1 - R.t / FP.FADE_IN);
     x = lerp(R.p0.x, side[0], k); z = lerp(R.p0.z, side[1], k);
     const y = lerp(R.p0.y, eyeY(side[0], side[1]), k);
     setDoor(FP.DOOR_ANG * Math.sin(Math.PI * clamp(R.t / FP.EXIT, 0, 1)));   // открылась — и прикрыл за собой
     const ah = world(car, Math.max(hw, FP.HW) + FP.OUT + 0.3, R.seat.dz - 4);   // глядя к корме
-    lx = ah[0]; ly = eyeY(ah[0], ah[1]) - 0.4; lz = ah[1];
+    const near = world(car, Math.max(hw, FP.HW) - 0.2, R.seat.dz - 1.2);
+    const turn = ease((R.t / FP.EXIT - 0.25) / 0.6);
+    lx = lerp(near[0], ah[0], turn);
+    ly = lerp(eyeY(near[0], near[1]) - 0.3, eyeY(ah[0], ah[1]) - 0.4, turn);
+    lz = lerp(near[1], ah[1], turn);
     place(cam, x, y, z, lx, ly, lz, dt, k < 0.5 ? 0 : 1);
-    if (R.t >= FP.EXIT) { setDoor(0); R.ph = 'trunk'; R.t = 0; R.path = pathTo(car, side, back); }
+    if (R.t >= FP.EXIT) { fade(0); setDoor(0); R.ph = 'trunk'; R.t = 0; R.path = pathTo(car, side, back); }
     return;
   }
   if (ph === 'trunk') {
@@ -216,7 +233,7 @@ export function step (dt) {
   } else if (ph === 'open' || ph === 'take' || ph === 'close') {
     [x, z] = back;
     lx = tp.x; ly = tp.y - (ph === 'close' ? 0 : 0.3); lz = tp.z;
-    if (ph === 'open' && R.t >= FP.OPEN) { R.ph = 'take-ready'; R.t = 0; showTakeHint(); }
+    if (ph === 'open' && R.t >= FP.OPEN) { R.ph = 'take-ready'; R.t = 0; beginTake(); }
     else if (ph === 'take' && R.t >= FP.TAKE) { R.ph = 'close'; R.t = 0; holdBox(); if (A.setTrunk) A.setTrunk(false); }
     else if (ph === 'close' && R.t >= FP.CLOSE) {
       R.ph = 'walk'; R.t = 0;
@@ -232,10 +249,17 @@ export function step (dt) {
     [x, z] = along(R.path, ease(k) * 0.15 + clamp(k, 0, 1) * 0.85);  // с места — плавно, дальше ровным шагом
     lx = R.door.x; ly = A.groundH(R.door.x, R.door.z) + 1.35; lz = R.door.z;
     walking = true;
-    if (R.t >= R.dur) { R.ph = 'hold'; R.t = 0; }
+    if (R.t >= R.dur) { R.ph = 'approach'; R.t = 0; }
+  } else if (ph === 'approach') {
+    const d = R.door, k = ease(R.t / FP.APPROACH), dist = lerp(FP.AT_DOOR, FP.INTERCOM, k);
+    R.handK = k;
+    x = d.x + d.nx * dist; z = d.z + d.nz * dist;
+    lx = d.x; ly = A.groundH(d.x, d.z) + 1.35; lz = d.z;
+    if (R.t >= FP.APPROACH) { R.ph = 'hold'; R.t = 0; }
   } else if (ph === 'hold') {
     const d = R.door;
-    x = d.x + d.nx * FP.AT_DOOR; z = d.z + d.nz * FP.AT_DOOR;
+    R.handK = 1;
+    x = d.x + d.nx * FP.INTERCOM; z = d.z + d.nz * FP.INTERCOM;
     lx = d.x; ly = A.groundH(d.x, d.z) + 1.35; lz = d.z;
     if (R.t >= FP.HOLD) { if (R.st) R.st.carry = true; finish(false); return; }
   }
@@ -293,24 +317,13 @@ function holdBox () {
   b.rotation.set(0, 0, 0);
 }
 
-function showTakeHint () {
-  if (!R.hint) {
-    const el = document.createElement('div');
-    el.id = 'fp-take-hint';
-    el.style.cssText = 'position:absolute;left:50%;bottom:11%;transform:translateX(-50%);z-index:42;padding:12px 18px;border-radius:12px;background:rgba(20,21,28,.88);color:#fff;font:16px sans-serif;text-align:center;cursor:pointer';
-    el.textContent = 'E / A — забрать пиццу';
-    el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); beginTake(); });
-    (document.getElementById('game') || document.body).appendChild(el);
-    R.hint = el;
-  }
-  R.hint.hidden = false;
-}
 function beginTake () {
   if (!R.on || R.ph !== 'take-ready') return;
   const tp = A.trunk ? A.trunk() : null;
   if (!tp) return;
-  if (R.hint) R.hint.hidden = true;
   takeBox(tp);
+  if (R.hands) R.hands.visible = true;
+  if (R.st) R.st.carry = true;
   R.ph = 'take'; R.t = 0;
 }
 function toTrunk () {

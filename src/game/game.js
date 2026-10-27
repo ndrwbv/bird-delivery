@@ -100,7 +100,8 @@ import * as LIKES from './likes.js';             // что нравится иг
 import * as WRONG from './wrongaddr.js';         // клиент ошибся адресом: по дороге пишет «я на …» — цель переезжает (wrongaddr.js, ORDERS.md)
 import * as DOOR from './doorstep.js';            // мини-игры у клиента: домофон у подъезда (doorstep.js, minigames/intercom.js; docs/ORDERS.md)              // карьера: очередь заказов, поручения, развоз смены, оплата (docs/ORDERS.md)
 import * as CAREERM from './career.js';          // карьера: смена 9—24, обед, итоги, донаты, слот, звёзды
-import * as STORY from './story.js';             // сюжетные заказы и катсцены (баба Зина)
+import * as STORY from './story.js';             // данные и прогресс сюжетных заказов
+import * as STORYTEST from './storytest.js';     // ?storytest: главы сюжета без поездки
 import * as BALCS from './balconies.js';      // балконы: плита, перила или решётка, остеклённые, мелочь внутри, люди курят и машут (balconies.js)
 import * as YLIFE from './yardlife.js';      // жизнь во дворах: бабки на лавочке, компании, шашлык, домино, мяч, горки, снеговик, гуляющие с собаками (yardlife.js)
 import * as WORK from './workout.js';         // площадки-качалки у коробок: турник и брусья, люди качаются, курьер подтягивается сам (workout.js)
@@ -16058,12 +16059,15 @@ function checkArrival (dt) {
     // оплата — сразу в кошелёк: умер или закрыл вкладку — деньги уже твои
     if (!S.freeRun) addWallet(part);
     if (RIVALS.length && !o.tut) CREWR.delivered();   // рейтинг смены: после чека оплаты — подробная таблица (crewrank.js)
-    S.delivered += st.peds.length || (o.ord && o.ord.story && o.ord.story.interiorDone ? 1 : 0);
-    ACH.deliver({ n: st.peds.length, onTime, left, free: !!S.free, last: o.idx >= o.stops.length - 1, stops: o.stops.length,   // достижения (achievements.js)
+    const deliveredN = st.peds.length || (o.ord && o.ord.story && o.ord.story.interiorDone ? 1 : 0);
+    S.delivered += deliveredN;
+    ACH.deliver({ n: deliveredN, onTime, left, free: !!S.free, last: o.idx >= o.stops.length - 1, stops: o.stops.length,   // достижения (achievements.js)
       bundle: !!(o.ord && o.ord.bundle), allOnTime: o.stops.every(q => q.pay && !q.pay.late), urgent: !!(o.ord && o.ord.type === 'urgent') });
     if (CAREER && o.ord) DAILY.deliver({ o, st, onTime, tier, last: o.idx >= o.stops.length - 1 });   // задания на день (daily.js)
 
-    handOver(st, onTime, !!(st.pay && st.pay.story) || !!(o.ord && o.ord.story));
+    // У сюжетного клиента коробка уже передана у двери квартиры; повторной выдачи с улицы нет.
+    if (!(o.ord && o.ord.story && o.ord.story.interiorDone && !st.peds.length))
+      handOver(st, onTime, !!(o.ord && o.ord.story));
     DIRECTOR.delivered();                           // доставка сессии: режиссёр открывает события по нарастающей (director.js)
     // оплата — кучкой денег и чеком (popPay); в сюжетном заказе награду покажет катсцена
     const pp = st.pay;
@@ -17444,6 +17448,8 @@ STORY.init({ THREE, scene, cam, V, S, IN, ADULT, CITY, MAP, Store, SPOTS, ground
   get car () { return car; }, addMoney: n => { S.money += n; if (!S.freeRun) addWallet(n); }, addStars: CAREER ? CAREERM.addStars : null, shift: () => (+Store.get('dlv-shifts', 0) || 0) + 1,
   // гость, который ждал бабушку у точки, после катсцены уходит в другой квартал другим человеком
   retirePed: p => { if (!p || p.dead || p.base === undefined) return; clearGuest(p); dropMesh(p.grp); p.grp = freshHuman(); p.person = p.grp.userData.person; p.speed = p.base * p.grp.userData.pace; p.hold = null; scene.add(p.grp); walkSpawn(p, 120, 380); } });
+STORYTEST.init({ S, V, car: () => car, parkingNear: (x, z) => nearestRoad(x, z, DRIVE_MAX, 2),
+  parkingClear: pinFree, surfaceAt, setPause, acceptOrder });
 const NO_E = /[?&]noE(&|$)/.test(location.search);   // ?noE — без леса у Ленина, змеев и качалок (сравнить кадр)
 /* змеи и дроны (kites.js): места в парках и на Ленина, люди — только рядом с камерой */
 if (!NO_E) LATE.add('kites', () => KITES.init({ THREE, scene, CITY, V, get ENV () { return ENV; }, groundH, inHouse, nearestRoad, solidAt, onPave: PAVE.onPave, wood: RINGM.wooded, makeHuman, dropMesh,
@@ -18753,7 +18759,7 @@ function frameStep (now) {
   }
 
   // маркер адреса: пульсирует и крутится, его видно издалека
-  if (S.target && S.state !== 'title' && S.state !== 'over' && !HCAM.busy()) {   // в сцене вручения (handcam.js) столб в кадре не нужен
+  if (S.target && S.state !== 'title' && S.state !== 'over' && !HCAM.busy() && !FPD.busy()) {   // во время вручения и пешего подхода столб заслоняет человека/подъезд
     marker.visible = true;
     if (CAREER) ORD.tintMarker(marker);            // цвет вида заказа: пицца, срочно, поручение, развоз, сюжет
     marker.position.set(S.target.x, groundH(S.target.x, S.target.z), S.target.z);

@@ -153,7 +153,7 @@ export function orderFor (storyId, chapter) {
   const s = STORIES.find(q => q.id === storyId), c = s && s.chapters[chapter], h = s && API && homeOf(s);
   if (!c || !h) return null;
   const p = storyPerson(s);
-  return { kind: 'story', type: 'story', storyId, chapter, color: COLOR, x: h.x, z: h.z,
+  return { kind: 'story', type: 'story', storyId, chapter, noGuest: true, color: COLOR, x: h.x, z: h.z,
     door: { x: h.ex, z: h.ez, nx: h.nx, nz: h.nz }, addr: h.addr, person: p, name: p.name,
     title: t(c.name), items: t(c.items || s.items), note: t(c.note), why: t(c.why), reach: 6 };
 }
