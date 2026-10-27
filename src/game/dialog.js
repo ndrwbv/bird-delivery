@@ -170,6 +170,7 @@ function show (o, done) {
   const btns = $('.dlg-btns'), hintEl = $('.dlg-hint'), box = $('.dlg-box');
   root.classList.toggle('compact', o.compact !== false && !o.door2d);
   root.classList.toggle('door2d', !!o.door2d);
+  root.classList.toggle('door2d-courier', !!o.door2d && !!o.courierLine);
   const col = o.color || '#ff8a2b';
   $('.dlg-bar').style.background = col;
   box.style.setProperty('--pp-accent', col);
@@ -304,8 +305,8 @@ function show (o, done) {
     } else if (PAD.connected) {
       const a = PAD.a, b = PAD.b;
       const on = padLit(PAD) && typed;
-      if (on && lit && two && (PAD.menuLeft || PAD.menuUp)) pick = no;      // «отказаться» — слева
-      if (on && lit && two && (PAD.menuRight || PAD.menuDown)) pick = yes;
+      if (on && two && (PAD.menuLeft || PAD.menuUp)) pick = o.door2d ? yes : no;
+      if (on && two && (PAD.menuRight || PAD.menuDown)) pick = o.door2d ? no : yes;
       lit = on;
       mark(on);
       if (a && !padPrev.a) answer(pick !== no);
@@ -332,7 +333,8 @@ function show (o, done) {
       return;                                    // Esc / Backspace — «пропустить сцену» (story.js)
     }
     const eat = () => { e.preventDefault(); e.stopPropagation(); };
-    if (e.code === 'Space' || e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'KeyE') { eat(); if (e.repeat) return; if (!typed) finish(); else if (!two || e.code !== 'Space') answer(true); }
+    if (two && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) { eat(); if (typed) { pick = e.code === 'ArrowLeft' ? (o.door2d ? yes : no) : (o.door2d ? no : yes); mark(true); } }
+    else if (e.code === 'Space' || e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'KeyE') { eat(); if (e.repeat) return; if (!typed) finish(); else if (!two || e.code !== 'Space') answer(pick !== no); }
     else if (o.alt && two && e.code === 'KeyX') { eat(); if (!e.repeat) answer(false); }
     else if (o.alt && (e.code === 'Escape' || e.code === 'Backspace')) return;   // alt: Esc — пропустить сцену (story.js), не ответ
     else if (e.code === 'Escape' || e.code === 'Backspace') { eat(); if (!e.repeat) answer(two ? false : true); }

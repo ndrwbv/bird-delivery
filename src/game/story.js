@@ -21,12 +21,17 @@ export const STORIES = [{
     top: 'tee', shirt: '#e0d8c7', bottom: 'pants', pants: '#596276', shoes: '#47434a', shape: 'normal', bg: '#c9b9a3' } },
   home: { addr: ['Ленинградская улица', '21'], near: [3099, 2876] }, items: N_('пицца'),
   chapters: [{ id: 'gennady-sausage', name: N_('Докторская к пицце'),
-    note: N_('Панельный дом. Квартира и код — в накладной.'), why: N_('Геннадий ждёт пиццу дома'),
+    note: N_('Панельный дом. Квартира — в накладной.'), why: N_('Геннадий ждёт пиццу дома'),
     dialogue: [
-      { speaker: 'gennady', text: N_('О, пицца! А я как раз докторской купил наразвес. Хочу вашу пиццу посыпать. Мне так больше нравится'),
-        choices2d: [{ text: N_('А зачем тогда пиццу заказывали?') }] },
-      { speaker: 'courier', text: N_('А зачем тогда пиццу заказывали?'), omit2d: true },
-      { speaker: 'gennady', text: N_('Ну не буду же я одну колбасу есть'), emotion: 'smile' },
+      { speaker: 'gennady', text: N_('драсте') },
+      { speaker: 'courier', text: N_('драсте, ваша пицца') },
+      { speaker: 'courier', text: N_('у вас в заказе было...'), retryOnFirst: true,
+        wrongReply: N_('не, не мое'), choices: [{ text: N_('диабло') }, { text: N_('пеперони') }] },
+      { speaker: 'courier', text: N_('вот ваша пеперони') },
+      { speaker: 'gennady', text: N_('заебок, ща я на нее колбаской докторской насыплю, а то вы заебали жмотить мяса'),
+        childText: N_('здорово, ща я на нее колбаской докторской насыплю, а то мяса маловато'), emotion: 'smile' },
+      { speaker: 'gennady', text: N_('вот ваши {amount}'), amountLine: true },
+      { speaker: 'gennady', text: N_('досвидания') },
     ] },
   ],
 }];
@@ -166,8 +171,10 @@ export function interiorFor (order) {
   const sp = specOf(order), s = sp && STORIES.find(q => q.id === sp.storyId), c = s && s.chapters[sp.chapter];
   if (!c) return null;
   return { id: c.id || s.id + '-' + sp.chapter, name: t(s.name), person: storyPerson(s), courier: courierPerson(), portrait: s.portrait || null,
-    lines: c.dialogue.map(q => ({ speaker: q.speaker === 'courier' ? t('Евгений') : t(s.name), text: t(q.text),
-      emotion: q.emotion || 'idle', omit2d: !!q.omit2d,
+    lines: c.dialogue.map(q => ({ speaker: q.speaker === 'courier' ? t('Евгений') : t(s.name),
+      text: t(!API.ADULT && q.childText ? q.childText : q.text), amountLine: !!q.amountLine,
+      emotion: q.emotion || 'idle', omit2d: !!q.omit2d, retryOnFirst: !!q.retryOnFirst,
+      wrongReply: q.wrongReply ? t(q.wrongReply) : null,
       choices: q.choices ? q.choices.map(x => ({ text: t(x.text), flag: x.flag })) : null,
       choices2d: q.choices2d ? q.choices2d.map(x => ({ text: t(x.text), flag: x.flag })) : null })) };
 }

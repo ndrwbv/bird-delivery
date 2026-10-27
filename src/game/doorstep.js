@@ -225,13 +225,10 @@ async function storyDelivery (ev) {
   }
   const h = st.home;
   if (!h) return;
-  // Домофон и лестница — те же мини-игры, что у обычных заказов; срок влияет на оплату,
-  // но не может окончательно погасить обязательную сценарную встречу.
-  do {
-    st.door = null;
-    await play(st, 'dial', lv, o, null);
-  } while (A.S.order === o && A.S.state === 'drive' && st.door && !st.door.ok);
-  if (!st.door || !st.door.ok || A.S.order !== o || A.S.state !== 'drive') return;
+  // В сюжетной встрече домофон временно скрыт: после подхода сразу лестница.
+  // Для обычных доставок мини-игра остаётся доступной.
+  st.door = { mode: 'hidden', ok: true, fast: false };
+  if (A.S.order !== o || A.S.state !== 'drive') return;
   const opt = { lv: h.lv, floor: h.floor, per: h.per, entr: h.entr, door: h.door, gop: false,
     scenario: scene, storySpec: sp };
   do {
@@ -356,7 +353,8 @@ function playStairs (st, order, opt) {
       SG.last = st.stairs;
       if (typeof cur.off === 'function') cur.off();
       if (G.cur === cur) { G.cur = null; G.step = null; G.pad = null; }
-      resolve();
+      const leave = res && res.scenarioDone && A.fpReturn ? A.fpReturn(st) : null;
+      if (leave && typeof leave.then === 'function') leave.then(resolve, resolve); else resolve();
     };
     cur.end = end;
     const api = {
@@ -374,7 +372,8 @@ function playStairs (st, order, opt) {
     const fee = feeOf(order, st);
     cur.off = STAIRS.mount(h, Object.assign({
       boxes: st.boxes || 0,                                      // много пицц одному — курьер несёт стопку (12бл)
-      addr: st.addr || '', who: person ? (person.app ? NICK.label(person) : person.first || person.name) : '', person, sheet: sheetOf(order), clock: opt.scenario ? () => null : clock,
+      addr: st.addr || '', who: person ? (person.app ? NICK.label(person) : person.first || person.name) : '', person, sheet: sheetOf(order), clock,
+      payment: money(fee),
       bonus: '+' + money(r10(fee * SR.FAST_BONUS)), gopPay: '−' + money(r10(fee * SR.GOP_PAY)), selfWait: MG.SELF.WAIT,
     }, sceneOf(order, st), opt), api);
   });
@@ -388,6 +387,7 @@ function stairsSound (name) {
     step: s => s.blip(150 + Math.random() * 50, 0.035, 'square', 0.025),
     puff: s => (s.noise ? s.noise(0.3, 0.05) : s.blip(200, 0.2, 'triangle', 0.04)),
     ring: s => { s.blip(1320, 0.1, 'square', 0.05); setTimeout(() => s.blip(990, 0.16, 'square', 0.05), 110); },
+    slam: s => (s.noise ? s.noise(0.18, 0.13) : s.blip(80, 0.14, 'square', 0.12)),
     wrong: s => { s.blip(260, 0.1, 'square', 0.06); setTimeout(() => s.blip(200, 0.16, 'square', 0.06), 110); },
     open: s => [523, 659, 784].forEach((f, i) => setTimeout(() => s.blip(f, 0.1, 'square', 0.06), i * 80)),
     gop: s => s.blip(110, 0.28, 'sawtooth', 0.06),

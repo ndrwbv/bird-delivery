@@ -30,11 +30,13 @@ await Platform.init({ langs: LANGS });
 // профили (game/profiles.js): прогресс каждого — под своими ключами; до первого чтения сохранения. Яндекс — без профилей
 if (Platform.id !== 'yandex') PROF.install(Platform);
 // первый запуск — спросить язык: игра ещё не загружена, перезагружать нечего. На Яндексе язык даёт площадка
-if (Platform.id !== 'yandex' && !Platform.langChosen) {
+const doorPreviewFirstRun = new URLSearchParams(location.search).has('doorpreview') && !Platform.langChosen;
+if (Platform.id !== 'yandex' && !Platform.langChosen && !doorPreviewFirstRun) {
   Platform.setLang(await pickLang(LANGS, LANG_NAMES, Platform.lang));
   Platform.store.flush && Platform.store.flush();
 }
-await initI18n(Platform.lang);
+// Отладочный просмотр не меняет язык в сохранении и не ждёт первого меню.
+await initI18n(doorPreviewFirstRun ? 'ru' : Platform.lang);
 applyDom();
 // фразы экрана загрузки («Покупаем пиццу…», index.html) уже на языке игрока — показать
 document.getElementById('boot')?.classList.add('said');

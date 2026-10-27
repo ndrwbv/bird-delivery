@@ -37,7 +37,7 @@ export const ST = { runs: 0, skips: 0, last: null, noDoor: 0 };
 let A = null;
 const R = { on: false, t: 0, ph: '', st: null, n: 1, done: null, path: null, len: 0, dur: 0, door: null, pc: null, doorA: 0,
   p0: null, look: null, hands: null, box: null, from: null, taken: 0, walkT: 0, bob: 0,
-  handK: 0, fade: null };
+  handK: 0, fade: null, entryDoor: null, entryDark: null };
 let V3 = null;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, k) => a + (b - a) * k;
@@ -103,6 +103,33 @@ function dropBox () {
   R.box = null;
 }
 
+function entryLeaf () {
+  if (R.entryDoor || !R.door) return;
+  const T = A.THREE, d = R.door, ry = Math.atan2(d.nx, d.nz), tx = d.nz, tz = -d.nx;
+  const gy = A.groundH(d.x + d.nx, d.z + d.nz), hinge = new T.Group();
+  const dark = new T.Mesh(new T.PlaneGeometry(1.5, 2.25),
+    new T.MeshBasicMaterial({ color: '#151411', side: T.DoubleSide }));
+  dark.position.set(d.x + d.nx * 0.13, gy + 1.12, d.z + d.nz * 0.13); dark.rotation.y = ry;
+  hinge.position.set(d.x - tx * 0.75 + d.nx * 0.15, gy + 1.12, d.z - tz * 0.75 + d.nz * 0.15);
+  hinge.rotation.y = ry;
+  const leaf = new T.Mesh(new T.PlaneGeometry(1.5, 2.25),
+    new T.MeshLambertMaterial({ color: '#5a4636', side: T.DoubleSide }));
+  leaf.position.x = 0.75;
+  const handle = new T.Mesh(new T.BoxGeometry(0.045, 0.05, 0.03),
+    new T.MeshBasicMaterial({ color: '#c5aa6d' }));
+  handle.position.set(1.33, -0.18, 0.025);
+  hinge.add(leaf, handle); A.scene.add(dark, hinge);
+  R.entryDoor = hinge; R.entryDark = dark;
+}
+function dropEntryLeaf () {
+  for (const g of [R.entryDoor, R.entryDark]) {
+    if (!g) continue;
+    if (g.parent) g.parent.remove(g);
+    g.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+  }
+  R.entryDoor = R.entryDark = null;
+}
+
 /** doorstep.js stairs: подъезд на адресе — сначала дойти до него от первого лица */
 export function run (st, o = {}) {
   if (!ON || !A || R.on || !st) return null;
@@ -134,6 +161,26 @@ export function run (st, o = {}) {
   return new Promise(res => { R.done = res; });
 }
 
+/** После сюжетной встречи: от входа бегом к своей машине и обратно за руль. */
+export function returnToCar (st) {
+  if (!A || R.on || !st) return null;
+  const car = carNow(), at = st.at || (st.peds && st.peds[0]);
+  const e = car && at && A.door && A.door(at.x, at.z) ||
+    (car && st.entry && [st.entry.x, st.entry.z, st.entry.nx, st.entry.nz]);
+  if (!e) return null;
+  const seat = A.seatOf ? A.seatOf({ mesh: car }) : null;
+  R.seat = { hw: seat && seat.hw ? seat.hw : FP.HW, dz: seat && Number.isFinite(seat.dz) ? seat.dz : 0.2 };
+  R.door = { x: e[0], z: e[1], nx: e[2], nz: e[3] };
+  const from = [e[0] + e[2] * FP.INTERCOM, e[1] + e[3] * FP.INTERCOM];
+  const to = world(car, Math.max(R.seat.hw, FP.HW) + FP.OUT, R.seat.dz);
+  R.path = pathTo(car, from, to);
+  R.dur = clamp(R.path.len / 4.5, 0.8, 7);
+  R.t = 0; R.ph = 'return-fade'; R.on = true; R.st = st; R.box = null; R.handK = 0; R.bob = 0;
+  if (R.hands) R.hands.visible = false;
+  fade(1);
+  return new Promise(res => { R.done = res; });
+}
+
 function setDoor (a) {
   if (!R.pc || R.pc.gone) return;
   R.doorA = a;
@@ -144,13 +191,15 @@ function setDoor (a) {
 
 function finish (skip) {
   if (!R.on) return;
+  const leavingEntrance = R.ph === 'entry';
   R.on = false;
   if (skip) { ST.skips++; if (ST.last) ST.last.skip = true; }
   if (R.doorA) setDoor(0);
+  dropEntryLeaf();
   if (A.setTrunk) A.setTrunk(false);
   dropBox();
   if (R.hands) { R.hands.visible = false; if (R.hands.parent) R.hands.parent.remove(R.hands); }
-  fade(0);
+  if (leavingEntrance) requestAnimationFrame(() => fade(0)); else fade(0);
   R.handK = 0;
   if (A.driver) A.driver(true);
   R.taken = 0;
@@ -196,6 +245,28 @@ export function step (dt) {
   const tp = A.trunk ? A.trunk() : { x: car.position.x, y: car.position.y + 0.9, z: car.position.z };
   let x = 0, z = 0, lx = 0, ly = 0, lz = 0, walking = false;
   const ph = R.ph;
+  if (ph === 'return-fade') {
+    if (R.t >= 0.22) { R.ph = 'return-run'; R.t = 0; }
+    return;
+  }
+  if (ph === 'return-run') {
+    const k = clamp(R.t / R.dur, 0, 1), p = along(R.path, k), to = world(car, Math.max(hw, FP.HW) + FP.OUT, R.seat.dz);
+    R.bob += dt * FP.BOB_HZ * Math.PI * 3;
+    const y = eyeY(p[0], p[1]) + Math.abs(Math.sin(R.bob)) * FP.BOB * 1.5;
+    place(cam, p[0], y, p[1], to[0], eyeY(to[0], to[1]) - 0.2, to[1], dt, 1);
+    fade(1 - ease(R.t / 0.35));
+    if (k >= 1) { R.ph = 'return-enter'; R.t = 0; }
+    return;
+  }
+  if (ph === 'return-enter') {
+    const p = world(car, Math.max(hw, FP.HW) + FP.OUT, R.seat.dz);
+    setDoor(FP.DOOR_ANG * Math.sin(Math.PI * clamp(R.t / 0.75, 0, 1)));
+    place(cam, p[0], lerp(eyeY(p[0], p[1]), car.position.y + 1.2, ease(R.t / 0.75)), p[1],
+      car.position.x, car.position.y + 1.2, car.position.z, dt, 0);
+    fade(ease((R.t - 0.35) / 0.35));
+    if (R.t >= 0.75) finish(false);
+    return;
+  }
   if (ph === 'fade') {
     fade(R.t / FP.FADE_OUT);
     if (R.t >= FP.FADE_OUT) {
@@ -261,7 +332,15 @@ export function step (dt) {
     R.handK = 1;
     x = d.x + d.nx * FP.INTERCOM; z = d.z + d.nz * FP.INTERCOM;
     lx = d.x; ly = A.groundH(d.x, d.z) + 1.35; lz = d.z;
-    if (R.t >= FP.HOLD) { if (R.st) R.st.carry = true; finish(false); return; }
+    if (R.t >= FP.HOLD) { R.ph = 'entry'; R.t = 0; return; }
+  } else if (ph === 'entry') {
+    const d = R.door;
+    entryLeaf();
+    if (R.entryDoor) R.entryDoor.rotation.y = Math.atan2(d.nx, d.nz) - 1.35 * ease(R.t / 0.45);
+    x = d.x + d.nx * FP.INTERCOM; z = d.z + d.nz * FP.INTERCOM;
+    lx = d.x; ly = A.groundH(d.x, d.z) + 1.35; lz = d.z;
+    fade(ease(R.t / 0.45));
+    if (R.t >= 0.45) { if (R.st) R.st.carry = true; finish(false); return; }
   }
   if (walking) R.bob += dt * FP.BOB_HZ * Math.PI * 2;
   const y = eyeY(x, z) + (walking ? Math.abs(Math.sin(R.bob)) * FP.BOB - FP.BOB * 0.5 : 0);

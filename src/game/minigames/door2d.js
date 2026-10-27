@@ -1,5 +1,4 @@
-/* Портретная сцена поверх существующего 3D-подъезда. Реплики и выбор ведёт dialog.js;
-   здесь только слои кадра и анимация спрайта из манифеста персонажа. */
+/* 2D-персонаж стоит внутри 3D-квартиры; реплики и выбор ведёт dialog.js. */
 import './door2d.css';
 
 const CACHE = new Map();
@@ -17,7 +16,7 @@ function load (path) {
       const image = new Image();
       image.src = new URL(file, url).href;
       await image.decode();
-      sprites[state] = image.src;
+      sprites[state] = image;
     }));
     if (!sprites.idle || !sprites.talk || !sprites.blink) throw new Error('Не хватает спрайтов диалога');
     return { manifest, sprites };
@@ -31,15 +30,14 @@ export const prepare = path => load(path);
 export const enabled = (scenario, v3) => !!(v3 && scenario && scenario.portrait && scenario.portrait.manifest &&
   !(typeof location !== 'undefined' && new URLSearchParams(location.search).has('door3d')));
 
-export async function open (path, paused = () => false) {
+export async function open (path, paused = () => false, world = null) {
   const { manifest, sprites } = await load(path);
   const root = document.createElement('div');
   root.id = 'door2d';
-  root.innerHTML = '<div class="door2d-shade"></div><div class="door2d-frame"><img alt=""></div>';
+  root.innerHTML = '<div class="door2d-shade"></div>' + (world ? '' : '<div class="door2d-frame"><img alt=""></div>');
   const sprite = root.querySelector('img');
-  sprite.src = sprites.idle;
-  sprite.width = manifest.spriteSize?.[0] || 500;
-  sprite.height = manifest.spriteSize?.[1] || 555;
+  if (sprite) { sprite.src = sprites.idle.src; sprite.width = manifest.spriteSize?.[0] || 500; sprite.height = manifest.spriteSize?.[1] || 555; }
+  if (world) world.portraitSprites(sprites);
   (document.getElementById('game') || document.body).appendChild(root);
   document.body.classList.add('door-dialogue');
   const enterRaf = requestAnimationFrame(() => root.classList.add('on'));
@@ -48,7 +46,11 @@ export async function open (path, paused = () => false) {
   let emotion = 'idle', speaking = false, mouth = false, blinkLeft = 0;
   let blinkAt = between(...(manifest.animation?.blink?.intervalSeconds || [3.5, 7]));
   let mouthAt = between(...(manifest.animation?.talk?.stateSwitchSeconds || [0.15, 0.3]));
-  const show = state => { const src = sprites[state] || sprites.idle; if (sprite.src !== src) sprite.src = src; };
+  const show = state => {
+    const image = sprites[state] || sprites.idle;
+    if (world) world.portraitState(state);
+    else if (sprite && sprite.src !== image.src) sprite.src = image.src;
+  };
   const tick = now => {
     if (closed) return;
     raf = requestAnimationFrame(tick);
@@ -59,7 +61,9 @@ export async function open (path, paused = () => false) {
     const breath = manifest.animation?.idleBreath || {};
     const period = breath.periodSeconds || 3.5, wave = Math.sin(elapsed * Math.PI * 2 / period);
     const sx = breath.scaleX || [0.998, 1.002], sy = breath.scaleY || [0.998, 1.004];
-    sprite.style.transform = `scale(${1 + wave * (sx[1] - sx[0]) / 2}, ${1 + wave * (sy[1] - sy[0]) / 2})`;
+    const scaleX = 1 + wave * (sx[1] - sx[0]) / 2, scaleY = 1 + wave * (sy[1] - sy[0]) / 2;
+    if (world) world.portraitBreath(scaleX, scaleY);
+    else if (sprite) sprite.style.transform = `scale(${scaleX}, ${scaleY})`;
     if (speaking) {
       mouthAt -= dt;
       if (mouthAt <= 0) { mouth = !mouth; mouthAt = between(...(manifest.animation?.talk?.stateSwitchSeconds || [0.15, 0.3])); }
@@ -80,6 +84,7 @@ export async function open (path, paused = () => false) {
     close () {
       if (closed) return;
       closed = true; cancelAnimationFrame(raf); cancelAnimationFrame(enterRaf);
+      if (world) world.portraitClear();
       root.classList.remove('on'); document.body.classList.remove('door-dialogue');
       setTimeout(() => root.remove(), 260);
     },

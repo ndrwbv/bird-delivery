@@ -17363,7 +17363,7 @@ if (CAREER) DOOR.init({ ORD, S, Store, ADULT, Snd, money, root: () => $('game') 
   entranceLv, shiftsDone: () => +Store.get('dlv-shifts', 0) || 0, onShiftStart: CAREERM.onShiftStart,
   respect: why => RESPECT.gain(why), hintFind,
   guestIn, guestOut, guestMove, SPOTS, nearestRoad, routeLen, realAddress,
-  fpWalk: st => FPD.run(st),                       // от первого лица до двери подъезда (fpdeliver.js, ?fpdeliver)
+  fpWalk: st => FPD.run(st), fpReturn: st => FPD.returnToCar(st), // от машины к подъезду и обратно
   handScene: (st, onTime) => { const ped = st && st.peds && st.peds[0]; return ped ? HCAM.scene(ped, { onTime, give: () => preBox(ped) }) : null; },   // сцена перед разговором (handcam.js)
   rehuman: (p, person) => { dropMesh(p.grp); p.grp = makeHuman(person); p.person = p.grp.userData.person; p.speed = p.base * p.grp.userData.pace; scene.add(p.grp); } });   // разговор у двери: клиент в мире — как портрет «под роль» (doorstep.js)   // клиент дома / не дома (doorstep.js plan, «клиент не дома»)
 if (CAREER) WRONG.init({ S, V, ADULT, CHAT, NICK, DIST, ZN, SPOTS, routeLen, realAddress, guestMove, nearestRoad,
@@ -17448,7 +17448,7 @@ STORY.init({ THREE, scene, cam, V, S, IN, ADULT, CITY, MAP, Store, SPOTS, ground
   get car () { return car; }, addMoney: n => { S.money += n; if (!S.freeRun) addWallet(n); }, addStars: CAREER ? CAREERM.addStars : null, shift: () => (+Store.get('dlv-shifts', 0) || 0) + 1,
   // гость, который ждал бабушку у точки, после катсцены уходит в другой квартал другим человеком
   retirePed: p => { if (!p || p.dead || p.base === undefined) return; clearGuest(p); dropMesh(p.grp); p.grp = freshHuman(); p.person = p.grp.userData.person; p.speed = p.base * p.grp.userData.pace; p.hold = null; scene.add(p.grp); walkSpawn(p, 120, 380); } });
-STORYTEST.init({ S, V, car: () => car, parkingNear: (x, z) => nearestRoad(x, z, DRIVE_MAX, 2),
+STORYTEST.init({ S, V, ADULT, car: () => car, parkingNear: (x, z) => nearestRoad(x, z, DRIVE_MAX, 2),
   parkingClear: pinFree, surfaceAt, setPause, acceptOrder });
 const NO_E = /[?&]noE(&|$)/.test(location.search);   // ?noE — без леса у Ленина, змеев и качалок (сравнить кадр)
 /* змеи и дроны (kites.js): места в парках и на Ленина, люди — только рядом с камерой */

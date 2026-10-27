@@ -11,29 +11,43 @@ d.V.x = d.S.target.x; d.V.z = d.S.target.z;
 d.V.vx = 0; d.V.vz = 0;
 d.car.position.x = d.V.x; d.car.position.z = d.V.z;
 await run(10);
-if (!stop.carry || d.DOOR.mode !== 'dial' || document.querySelector('#fp-take-hint')) throw new Error('Автоматический путь от машины до домофона не завершился');
-const intercomFlat = d.DOOR.doorState()?.flat;
-if (intercomFlat !== flat) throw new Error('Код не совпадает с накладной');
+if (!stop.carry || d.DOOR.mode !== 'stairs' || document.querySelector('#fp-take-hint')) throw new Error('Автоматический путь от машины до лестницы не завершился');
+if (stop.door?.mode !== 'hidden' || document.querySelector('.dg')) throw new Error('Домофон не скрыт');
+const atStart = d.DOOR.stairsState();
+dispatchEvent(new KeyboardEvent('keydown', { key: 'w', code: 'KeyW', bubbles: true, cancelable: true }));
+await run(1.3);
+dispatchEvent(new KeyboardEvent('keyup', { key: 'w', code: 'KeyW', bubbles: true, cancelable: true }));
+const walking = d.DOOR.stairsState();
+if (!walking?.v3?.firstPerson || walking.y <= atStart.y + 0.1) throw new Error('Курьер не поднимается при удержании W');
 d.DOOR.solve();
-await run(2);
-if (d.DOOR.mode !== 'stairs') throw new Error('Домофон не открыл подъезд');
-d.DOOR.solve();
-await run(2);
+await until(() => d.DOOR.stairsState()?.scene?.stage === (new URLSearchParams(location.search).has('door3d') ? 'dialog' : 'door_dialogue'), 12000);
 const stairs = d.DOOR.stairsState();
 const oldDoor = new URLSearchParams(location.search).has('door3d');
-if (!stairs?.d3 || stairs.flat !== +flat || stairs.scene?.stage !== (oldDoor ? 'dialog' : 'door_dialogue')) throw new Error('Нет сцены у нужной квартиры');
-for (const seconds of oldDoor ? [7, 4, 4] : [7, 4]) {
-  await run(seconds);
-  const next = document.querySelector('#dlg .dlg-yes');
-  if (!d.DLG.isOpen() || !next) throw new Error('Реплика не открылась');
-  if (!oldDoor && !document.querySelector('#door2d img')) throw new Error('Нет 2D-персонажа в диалоге');
+if (!stairs?.d3 || !stairs.v3?.firstPerson || stairs.flat !== +flat || stairs.scene?.stage !== (oldDoor ? 'dialog' : 'door_dialogue')) throw new Error('Нет сцены у нужной квартиры: ' + JSON.stringify({ stairs, flat, oldDoor }));
+const spoken = [];
+let wrong = false, right = false;
+for (let i = 0; i < 12; i++) {
+  await run(i ? 4 : 7);
+  if (!d.DLG.isOpen()) break;
+  const text = document.querySelector('#dlg .dlg-text')?.textContent;
+  if (!text) throw new Error('Реплика не открылась');
+  if (!oldDoor && (!document.querySelector('#door2d') || !d.DOOR.stairsState()?.v3?.portrait || document.querySelector('#door2d img'))) throw new Error('2D Геннадий не стоит в 3D-коридоре');
+  if (!oldDoor && getComputedStyle(document.querySelector('#dlg .dlg-head img')).display !== 'none') throw new Error('Аватар Геннадия остался в диалоге');
+  spoken.push(text);
+  const choice = text === 'у вас в заказе было...';
+  const next = document.querySelector('#dlg ' + (choice && wrong ? '.dlg-no' : '.dlg-yes'));
+  if (!next) throw new Error('Кнопка ответа не найдена');
+  if (choice) { if (wrong) right = true; else wrong = true; }
   next.click();
   await run(0.35);
 }
+if (!wrong || !right || !spoken.includes('не, не мое') || !spoken.includes('досвидания') ||
+    !spoken.some(s => s.startsWith('вот ваши ')) || spoken.includes('...')) throw new Error('Ветка выбора пиццы не пройдена: ' + JSON.stringify(spoken));
 await run(3);
 await run(7);
 const afterSms = document.querySelector('#chat')?.textContent?.includes('Молодец, Женя. Клиент доволен') || false;
-return { story: order.ord.story.storyId, flat, intercomFlat, stairsFlat: stairs.flat,
+return { story: order.ord.story.storyId, flat, intercom: stop.door?.mode, stairsFlat: stairs.flat,
   carried: stop.carry, scenarioDone: order.ord.story.interiorDone,
   savedProgress: d.STORY.progress().gennady?.ch, delivered: d.S.delivered,
-  state: d.S.state, dialogOpen: d.DLG.isOpen(), doorOpen: d.DOOR.on(), oldDoor, beforeSms, afterSms };
+  state: d.S.state, dialogOpen: d.DLG.isOpen(), doorOpen: d.DOOR.on(), oldDoor, beforeSms, afterSms,
+  spoken, wrong, right };
