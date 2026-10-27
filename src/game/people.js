@@ -1120,7 +1120,7 @@ export function faceDataURL (person, size = 128, mood = '', talk = 0) {
   const Lk = faceLook(person, mood), key = portraitKey(person, Lk, size, mood, talk);
   const hit = PORTRAITS.get(key);
   if (hit) { FACE_STATS.hit++; PORTRAITS.delete(key); PORTRAITS.set(key, hit); return hit; }      // свежие — в конец очереди
-  const t0 = performance.now(), url = drawPortrait(Lk, size, talk), e = performance.now() - t0;
+  const t0 = performance.now(), url = drawPortrait(Lk, size, talk, !!person.story), e = performance.now() - t0;
   FACE_STATS.miss++; FACE_STATS.ms += e; if (e > FACE_STATS.max) FACE_STATS.max = e;
   keepPortrait(key, url);
   return url;
@@ -1129,8 +1129,8 @@ function keepPortrait (key, url) {
   PORTRAITS.set(key, url);
   if (PORTRAITS.size > FACE_CAP_P) { PORTRAITS.delete(PORTRAITS.keys().next().value); FACE_STATS.evict++; }
 }
-function drawPortrait (Lk, size, talk) {
-  const S = buildSpec(Lk);
+function drawPortrait (Lk, size, talk, indoors = false) {
+  const S = buildSpec(Lk, indoors ? { summer: true } : {});
   const G = 32, PY = 14;
   const { c, x, out, o } = portraitCanvas();
   c.width = G;                                    // чистый холст и настройки по умолчанию — как у нового
@@ -1207,7 +1207,7 @@ function soonStep (dl) {
     }
     const Lk = faceLook(person, mood), key = portraitKey(person, Lk, size, mood, talk);
     if (PORTRAITS.has(key)) continue;
-    const t0 = performance.now(), url = drawPortrait(Lk, size, talk), e = performance.now() - t0;
+    const t0 = performance.now(), url = drawPortrait(Lk, size, talk, !!person.story), e = performance.now() - t0;
     FACE_STATS.soon++; FACE_STATS.soonMs += e; if (e > FACE_STATS.soonMax) FACE_STATS.soonMax = e;
     keepPortrait(key, url);
     n++;

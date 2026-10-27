@@ -141,7 +141,6 @@ class Quads {
 }
 
 const CLIENT_LOOK = { shirt: '#ece7da', pants: '#495c7e', q: { head: 'casual', body: 'punk', legs: 'casual', feet: 'beach' }, summer: true };
-const GENNADY_LOOK = { shirt: '#ece7da', pants: '#495c7e', q: { head: 'business', body: 'punk', legs: 'casual', feet: 'beach' }, summer: true };
 
 export function create (box, o) {
   const env = ENV || sandboxEnv(), game = !!ENV;
@@ -555,9 +554,8 @@ export function create (box, o) {
     // У двери появляется клиент из заказа; для обычного заказа используется его внешний вид.
     const cl = o.person;
     manP = cl || makePerson({ seed: (seed ^ 0x7a11) >>> 0, fem: false });
-    const look = cl && cl.story === 'gennady' ? GENNADY_LOOK : CLIENT_LOOK;
-    const q = look.q;
-    man = human(manP, { ...look, q });
+    // Сюжетный клиент берёт внешность из данных персонажа; обычным заказам остаётся прежний временный облик.
+    man = human(manP, cl && cl.story ? { summer: true } : CLIENT_LOOK);
     const dx = doorX(P.door);
     man.position.set(dx + 0.08, tgt * FH, ZB - 0.42);
     man.rotation.y = 0;
