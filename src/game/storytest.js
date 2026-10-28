@@ -218,11 +218,16 @@ function start (id, chapter) {
   if (A?.S.state === 'title' && menuShift) {
     if (pendingStart) return;
     pendingStart = { id, chapter };
+    // Панель меню не должна оставаться модальным окном после начала смены.
+    root?.classList.remove('open');
+    signalPanel();
     try { menuShift(); } catch (e) { pendingStart = null; console.warn('[storytest] start shift', e); }
     render();
     return;
   }
   if (!gameReady()) return;
+  root?.classList.remove('open');
+  signalPanel();
   A.setPause(false);
   const order = ORD.force(spec);
   if (order) A.acceptOrder();

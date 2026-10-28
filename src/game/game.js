@@ -233,6 +233,7 @@ import * as CROOF from './camroof.js';         // камера сзади под
 import * as CLOOK from './camlook.js';          // осмотреться: правая кнопка мыши / правый стик / палец по экрану (camlook.js, CAREER.md «Камера: три вида»)
 import * as HCAM from './handcam.js';           // вручение в кадре: камера на клиента, сцена крупным планом перед разговором (handcam.js, 11бд)
 import * as FPD from './fpdeliver.js';          // доставка от первого лица, проба ?fpdeliver: из машины → багажник → к двери подъезда (fpdeliver.js, Д2)
+import { AREA as STORY_PARK_AREA } from './storyparking.js';
 import * as ST3 from './minigames/stairs3d.js';  // подъезд в 3D (12ас): пока он открыт, этот же рендерер рисует его вместо города (stairs3d.js)
 import * as CV from './camview.js';             // три вида камеры: сзади высоко, сзади близко, из-за руля (camview.js, docs/CAREER.md «Камера: три вида»)
 import * as REPLAY from './replay.js';         // повтор последних 10 с, ролик в «Видео» — выкл с 23.10.2026 (RP.ON, ?replay); тряска на аварии (replay.js, docs/CAREER.md «Повтор»)             // реплики над головами: читаемая плашка, крупнее вблизи, не больше нескольких (talk.js)
@@ -13459,6 +13460,9 @@ DLG.gate(HCAM.gate);                              // окно разговора
 /* доставка от первого лица (fpdeliver.js, Д2, проба ?fpdeliver): перед подъездом — глазами курьера от машины до двери */
 FPD.init({ THREE, cam, scene, V, S, pad: PAD, car: () => car, groundH, courier: () => STORY.PERSON.courier(), box: n => pizzaBox(n),
   door: (x, z) => nearEntrance(x, z, ECON.DOOR.DOOR_R), setTrunk, trunk: () => trunkPoint(), seatOf: t => CEX.DEBUG.seatOf(t),
+  parking: { road: (x, z) => nearestRoad(x, z, DRIVE_MAX, 3), route: (x0, z0, x1, z1) => lanePath(x0, z0, x1, z1),
+    clear: (x, z) => pinFree(x, z), pathClear: (x, z) => pinRay(x, z) && !inHouse(x, z, 0.8),
+    blocked: (x0, z0, x1, z1) => segHouse(x0, z0, x1, z1), height: (x, z) => surfaceAt(x, z) },
   driver: on => { const g = DRIVER.DEBUG.of(car); if (g) g.visible = !!on; }, mode: () => CV.mode(), cameraMode: m => CV.set(m, false), Snd,   // Snd — пики домофона (Д3)
   cabOut: () => { car.visible = true; FPV.hid = 0; CV.undraw(); } });
 ST3.init({ THREE, renderer, human: (p, o) => { const g = makeHuman(p, o); HUMANS.delete(g); return g; }, drop: dropMesh,
@@ -16028,16 +16032,19 @@ function spillStack (ped, box) {
 const STACK_ST = { spills: 0 };
 
 function checkArrival (dt) {
-  if (!S.target) return;
+  if (!S.target || !S.order) return;
   const d = Math.hypot(S.target.x - V.x, S.target.z - V.z);
   const speed = Math.hypot(V.vx, V.vz);
 
   if (S.state === 'drive') {
-    // к гостю надо подъехать и притормозить, а не влететь
-    if (d > (S.order.stops[S.order.idx].reach || 6) || speed > 6) return;
+    const arrivalOrder = S.order, arrivalStop = arrivalOrder.stops[arrivalOrder.idx];
+    const story = arrivalOrder.ord?.story;
+    const storyArrival = !!(story && STORY.interiorFor(story) && !story.interiorDone);
+    // Сюжет перехватывает руль ещё на подъезде к дому: угол и скорость въезда не влияют на выход курьера.
+    if (d > (storyArrival ? STORY_PARK_AREA : (arrivalStop.reach || 6)) || (!storyArrival && speed > 6)) return;
     if (FLYC.blocksHand()) return;                 // летающий родстер: вручить — только на земле (flycar.js)
-    const o = S.order;
-    const st = o.stops[o.idx];
+    const o = arrivalOrder;
+    const st = arrivalStop;
     const onTime = S.free || S.time > 0;
     if (o.ord && ORD.arrive(o, st, onTime)) return;   // карьера: развоз смены, ORD.onArrive (бандиты и т. п.) — ждём
     const share = Math.round(S.fee / o.stops.length);
@@ -17363,7 +17370,7 @@ if (CAREER) DOOR.init({ ORD, S, Store, ADULT, Snd, money, root: () => $('game') 
   entranceLv, shiftsDone: () => +Store.get('dlv-shifts', 0) || 0, onShiftStart: CAREERM.onShiftStart,
   respect: why => RESPECT.gain(why), hintFind,
   guestIn, guestOut, guestMove, SPOTS, nearestRoad, routeLen, realAddress,
-  fpWalk: st => FPD.run(st), fpReturn: st => FPD.returnToCar(st), // от машины к подъезду и обратно
+  fpWalk: (st, opts) => FPD.run(st, opts), fpReturn: st => FPD.returnToCar(st), // от машины к подъезду и обратно
   handScene: (st, onTime) => { const ped = st && st.peds && st.peds[0]; return ped ? HCAM.scene(ped, { onTime, give: () => preBox(ped) }) : null; },   // сцена перед разговором (handcam.js)
   rehuman: (p, person) => { dropMesh(p.grp); p.grp = makeHuman(person); p.person = p.grp.userData.person; p.speed = p.base * p.grp.userData.pace; scene.add(p.grp); } });   // разговор у двери: клиент в мире — как портрет «под роль» (doorstep.js)   // клиент дома / не дома (doorstep.js plan, «клиент не дома»)
 if (CAREER) WRONG.init({ S, V, ADULT, CHAT, NICK, DIST, ZN, SPOTS, routeLen, realAddress, guestMove, nearestRoad,

@@ -297,7 +297,7 @@ function saveName () {
   if (el && shown() && !cb) { show(); focus(); }        // первый запуск: имя есть — рейтинг с ним, фокус на «на смену»
   if (cb) cb(v);
 }
-export const modal = () => (md && !md.hidden && !md.closest('[hidden]') ? md : DP.root() || PROF.root() || BOARD.root() || HONOR.root() || STORYTEST.panelRoot());   // заставку спрятали (поехали) — окна нет
+export const modal = () => (md && !md.hidden && !md.closest('[hidden]') ? md : DP.root() || PROF.root() || BOARD.root() || HONOR.root() || (A?.S.state === 'title' ? STORYTEST.panelRoot() : null));   // заставку спрятали (поехали) — окна нет
 /* назад: из настроек — отмена; при первом запуске окно не закрывается, ждём имя */
 export function back () {
   if (!modal()) return false;

@@ -215,7 +215,7 @@ async function storyDelivery (ev) {
   const o = ev.order, st = ev.stop, sp = o.ord.story;
   const scene = STORY.interiorFor(sp);
   if (!scene || !A.S || A.S.state !== 'drive') return;
-  const walk = A.fpWalk && A.fpWalk(st);
+  const walk = A.fpWalk && A.fpWalk(st, { story: true });
   if (!walk) return;                              // без подъезда не открываем оплату на улице
   await walk;
   if (!st.carry || A.S.order !== o || A.S.state !== 'drive') return;

@@ -16,13 +16,15 @@ const flat = stop.home.flat;
 d.V.x = d.S.target.x; d.V.z = d.S.target.z;
 d.V.vx = 0; d.V.vz = 0;
 d.car.position.x = d.V.x; d.car.position.z = d.V.z;
-await run(10);
+await until(() => stop.carry && d.DOOR.mode === 'stairs', 22000);
+await until(() => d.DLG.isOpen() && document.querySelector('#dlg .dlg-text')?.textContent === 'пахнет ссаниной', 5000);
 if (!stop.carry || d.DOOR.mode !== 'stairs' || document.querySelector('#fp-take-hint')) throw new Error('Автоматический путь от машины до лестницы не завершился');
 if (stop.door?.mode !== 'hidden' || document.querySelector('.dg')) throw new Error('Домофон не скрыт');
 if (!d.DLG.isOpen() || document.querySelector('#dlg .dlg-name')?.textContent !== 'Женя' ||
     document.querySelector('#dlg .dlg-text')?.textContent !== 'пахнет ссаниной') throw new Error('Нет вступительной реплики Жени в интерфейсе диалога');
+await run(2); // дождаться печати букв и паузы перед принятием, как у игрока
 document.querySelector('#dlg .dlg-yes')?.click();
-await run(0.35);
+await until(() => !d.DLG.isOpen(), 2000);
 const atStart = d.DOOR.stairsState();
 dispatchEvent(new KeyboardEvent('keydown', { key: 'w', code: 'KeyW', bubbles: true, cancelable: true }));
 await run(1.3);

@@ -3,6 +3,7 @@
    управление передаётся существующему домофону doorstep.js.
    Автомобильное управление и сам домофон здесь не дублируются. */
 import * as WRECK from './carwreck.js';
+import * as STORYP from './storyparking.js';
 export const ON = true;
 
 export const FP = {
@@ -38,7 +39,7 @@ export const ST = { runs: 0, skips: 0, last: null, noDoor: 0 };
 let A = null;
 const R = { on: false, t: 0, ph: '', st: null, n: 1, done: null, path: null, len: 0, dur: 0, door: null, pc: null, doorA: 0, prevMode: null,
   p0: null, look: null, hands: null, box: null, from: null, taken: 0, walkT: 0, bob: 0,
-  handK: 0, fade: null, entryDoor: null, entryDark: null, entryFrame: null };
+  handK: 0, fade: null, entryDoor: null, entryDark: null, entryFrame: null, parking: null, parkStartH: 0, parkFallback: null, parkCut: false };
 let V3 = null;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, k) => a + (b - a) * k;
@@ -170,9 +171,18 @@ export function run (st, o = {}) {
   const n = Math.max(1, st.boxes || 1);
   const cam = A.cam;
   V3.set(0, 0, -1).applyQuaternion(cam.quaternion).multiplyScalar(6).add(cam.position);
-  Object.assign(R, { on: true, t: 0, ph: 'park', st, n, taken: 0, walkT: 0, bob: 0, from: null, box: null,
+  const door = { x: e[0], z: e[1], nx: e[2], nz: e[3] };
+  const parkT0 = performance.now();
+  const directParking = o.story && A.parking ? STORYP.plan(A.parking, [A.V.x, A.V.z], door) : null;
+  const parking = directParking || (o.story && A.parking ? STORYP.canonical(A.parking, door) : null);
+  const parkCut = !!(parking && !directParking);
+  const fallbackRoad = o.story && !parking && A.parking && STORYP.spot(A.parking, door);
+  const first = parking && parking.pts[0], next = parking && parking.pts[1];
+  Object.assign(R, { on: true, t: 0, ph: parkCut ? 'park-cut' : parking ? 'park-approach' : 'park', st, n, taken: 0, walkT: 0, bob: 0, from: null, box: null,
     look: { x: V3.x, y: V3.y, z: V3.z },
-    door: { x: e[0], z: e[1], nx: e[2], nz: e[3] }, prevMode: A.mode ? A.mode() : null });
+    door, parking, parkCut, parkStartH: parkCut ? Math.atan2(next[0] - first[0], next[1] - first[1]) : A.V.h,
+    parkFallback: fallbackRoad, prevMode: A.mode ? A.mode() : null });
+  if (o.story) A.V.vx = A.V.vz = 0; // катсцена сама ведёт машину; инерция игрока больше не двигает кузов
   // На подъезде к дому камера переходит за руль; исходный вид игрока вернётся после посадки.
   if (A.cameraMode) A.cameraMode('cab');
   // водительская дверь — слева (+x), как у коллег (crewride.js); нет куска (сорвало, ?oldwreck) — без неё
@@ -186,7 +196,9 @@ export function run (st, o = {}) {
   if (!h.parent) A.scene.add(h);
   h.visible = false;
   fade(0);
-  ST.last = { n, ph: 'park', ms: 0, skip: false, walk: 0, door: +Math.hypot(e[0] - car.position.x, e[1] - car.position.z).toFixed(1) };
+  ST.last = { n, ph: R.ph, ms: 0, skip: false, walk: 0, door: +Math.hypot(e[0] - car.position.x, e[1] - car.position.z).toFixed(1),
+    parking: o.story ? (parkCut ? 'cut-route' : parking ? 'route' : 'fade') : 'none', parkLength: parking ? +parking.length.toFixed(1) : 0,
+    parkPlanMs: +(performance.now() - parkT0).toFixed(1) };
   R.t0 = performance.now();
   return new Promise(res => { R.done = res; });
 }
@@ -238,6 +250,7 @@ function finish (skip) {
   if (A.driver) A.driver(!leavingEntrance);
   if (A.cameraMode && R.prevMode) A.cameraMode(R.prevMode);
   R.prevMode = null;
+  R.parking = R.parkFallback = null; R.parkCut = false;
   R.taken = 0;
   if (ST.last) { ST.last.ms = Math.round(performance.now() - R.t0); ST.last.ph = R.ph; }
   const r = R.done; R.done = null; R.st = null;
@@ -304,11 +317,45 @@ export function step (dt) {
   if (!car || S.state !== 'drive') { finish(false); return; }
   R.t += dt;
   const cam = A.cam, hw = R.seat.hw;
+  if (R.ph === 'park-cut') {
+    fade(R.t / 0.28);
+    if (R.t >= 0.28) {
+      const p = R.parking.pts[0];
+      A.V.x = p[0]; A.V.z = p[1]; A.V.y = A.parking.height(p[0], p[1]); A.V.h = R.parkStartH;
+      A.V.vx = A.V.vz = A.V.vy = 0;
+      car.position.set(A.V.x, A.V.y, A.V.z); car.rotation.y = A.V.h; car.userData._pose = undefined;
+      R.ph = 'park-approach'; R.t = 0; fade(1);
+    }
+    return;
+  }
+  if (R.ph === 'park-approach') {
+    const p = STORYP.sample(R.parking, R.t, R.parkStartH), dx = p.x - A.V.x, dz = p.z - A.V.z;
+    A.V.x = p.x; A.V.z = p.z; A.V.h = p.h;
+    A.V.y = A.parking.height(p.x, p.z);
+    A.V.vx = A.V.vz = A.V.vy = 0;
+    car.position.set(p.x, A.V.y, p.z); car.rotation.y = p.h;
+    car.userData._pose = undefined;
+    cam.position.x += dx; cam.position.z += dz;
+    if (R.parkCut) fade(1 - ease(R.t / 0.35));
+    if (ST.last) ST.last.ph = 'park-approach';
+    if (R.t >= R.parking.duration) { R.ph = 'park'; R.t = 0; }
+    return;
+  }
   if (R.ph === 'park') {
     // Физика игры тормозит машину через holdCar; катсцена ждёт, пока колёса перестанут катиться.
     if (ST.last) ST.last.ph = 'park';
     fade(ease((R.t - FP.PARK) / FP.FADE_OUT));
     if (R.t >= FP.PARK + FP.FADE_OUT && (Math.hypot(A.V.vx, A.V.vz) < 0.4 || R.t > 2.2)) {
+      if (R.parkFallback) {
+        // Редкий въезд из двора без безопасного дорожного маршрута: перенос только в полностью тёмном кадре.
+        const road = R.parkFallback;
+        if (A.parking.clear(road.x, road.z)) {
+          A.V.x = road.x; A.V.z = road.z; A.V.y = A.parking.height(road.x, road.z);
+          A.V.h = road.h;
+          car.position.set(A.V.x, A.V.y, A.V.z); car.rotation.y = A.V.h; car.userData._pose = undefined;
+        }
+        R.parkFallback = null;
+      }
       R.ph = 'exit'; R.t = 0;
       if (A.cameraMode) A.cameraMode('near');
       if (A.cabOut) A.cabOut();
@@ -489,6 +536,7 @@ export const taken = () => (R.on ? R.taken : 0);
 
 export const DEBUG = {
   FP, ST, R, ON, pathTo,
+  parkPlan: (x, z) => A && R.door ? STORYP.plan(A.parking, [x, z], R.door) : null,
   get on () { return R.on; },
   get ph () { return R.ph; },
   toTrunk, take: beginTake,
