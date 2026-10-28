@@ -12,7 +12,7 @@
      • расталкиваем по кратчайшей оси: обе подвижные (летящая, стоящая, разбитая, возвращающаяся) — пополам;
        машина потока на полосе и машина с маршрутом (скорая, курьеры) — не двигаются (их ведёт полоса), автобус
        и самосвал — тоже, двигается свободная;
-     • скорость сближения делим, как у двух одинаковых машин (отскок E): летящая толкает ту, в которую влетела;
+     • скорость сближения делим по массе кузовов (отскок E): летящая толкает ту, в которую влетела;
        та получила больше CH.KNOCK м/с — сама летит (knockCar: юзом, с разворотом), меньше — только сдвинута;
      • удар с CH.DENT м/с — мнутся обе в месте удара (как от твоей: dentCar, подробная копия — foewreck.js,
        автобус и самосвал — качка и вмятина, FW.big), искры и звук удара; машине — урон (hp), кончился — горит.
@@ -30,8 +30,9 @@ export const CH = {
   KNOCK: 1.8,      // м/с: столько получила стоящая / едущая — сама отлетает (меньше — только сдвинута)
   DENT: 3,         // м/с сближения — с такого мнутся обе
   CD: 0.25,        // с: одна и та же машина мнётся не чаще
-  HP: [1.0, 1.5],  // урон за 1 м/с удара: той, что влетела, и той, в которую влетели
+  HP: [0.7, 0.9],  // урон за 1 м/с удара: повторные лёгкие толчки не сжигают поток за пару касаний
   SPIN: 0.12,      // разворот от удара не в середину (рад/с на м/с, не больше 2,5)
+  MASS: { moped: 0.4, smart: 0.75, hatch: 0.95, sedan: 1.15, suv: 1.65, dump: 4 }, // относительная масса: при том же ударе тяжёлая получает меньшую скорость
 };
 export const ST = { loose: 0, pairs: 0, hits: 0, dents: 0, knocks: 0, pushes: 0, maxPen: 0, ms: 0 };
 
@@ -43,6 +44,7 @@ const NB = [];                                       // кандидаты near 
 const P = { ax: 0, az: 0, pen: 0, cx: 0, cz: 0 };    // результат overlap: ось (от B к A), глубина, точка удара
 
 const isBig = t => !!(t.bus || t.model === 'dump');
+export const massOf = t => t.bus ? 4 : (CH.MASS[t.model] || CH.MASS.sedan);
 const hlOf = t => t.bus ? t.bus.hl : (t.hl || 2.2);
 function hwOf (t) {
   if (t.bus) return t.bus.W2;
@@ -120,8 +122,8 @@ function hitBoth (a, b, v, cx, cz, nx, nz) {
   ST.hits++;
   A.impact(v, cx, cz, nx, nz);
   if (v < CH.DENT) return;
-  if (cdA) { a.chAt = CLOCK; A.dent(a, cx, cz, v, nx, nz); a.hp -= v * CH.HP[0]; ST.dents++; }
-  if (cdB) { b.chAt = CLOCK; A.dent(b, cx, cz, v, -nx, -nz); if (!isBig(b)) b.hp -= v * CH.HP[1]; ST.dents++; }
+  if (cdA) { a.chAt = CLOCK; A.dent(a, cx, cz, v, nx, nz); a.hp -= v * (a.rival ? 1.0 : CH.HP[0]); ST.dents++; }
+  if (cdB) { b.chAt = CLOCK; A.dent(b, cx, cz, v, -nx, -nz); if (!isBig(b)) b.hp -= v * (b.rival ? 1.5 : CH.HP[1]); ST.dents++; }
   for (const t of [a, b]) if (t.hp <= 0 && !t.wreck && !(t.chainT > 0) && !isBig(t)) t.chainT = 0.25 + Math.random() * 0.5;   // загорится, как от взрыва рядом (updateTraffic chainT)
 }
 
@@ -138,10 +140,10 @@ function pair (a, b) {
   const s = ma + mb;
   if (ma) { a.x += nx * pen * ma / s; a.z += nz * pen * ma / s; }
   if (mb) { shove(b, -nx * pen * mb / s, -nz * pen * mb / s); ST.pushes++; }
-  // скорость сближения: две одинаковые машины (автобус и самосвал — стена)
+  // скорость сближения: импульс делится обратно массе (автобус и самосвал — стена)
   const vn = (velX(a) - velX(b)) * nx + (velZ(a) - velZ(b)) * nz;
   if (vn >= 0) return;
-  const ia = 1, ib = isBig(b) ? 0 : 1, J = -(1 + CH.E) * vn / (ia + ib);
+  const ia = 1 / massOf(a), ib = isBig(b) ? 0 : 1 / massOf(b), J = -(1 + CH.E) * vn / (ia + ib);
   // разворот: удар не в середину кузова — крутит (рычаг поперёк оси удара)
   const sp = t => Math.max(-2.5, Math.min(2.5, ((cx - t.x) * nz - (cz - t.z) * nx) * J * CH.SPIN));
   kick(a, nx * J * ia, nz * J * ia, -sp(a) * ia);
@@ -174,4 +176,4 @@ export function step (list, dt) {
   ST.ms = performance.now() - t0;
 }
 
-export const DEBUG = { CH, ST, overlap: (a, b) => overlap(a, hlOf(a), hwOf(a), b, hlOf(b), hwOf(b)) ? { ...P } : null, hlOf, hwOf };
+export const DEBUG = { CH, ST, massOf, overlap: (a, b) => overlap(a, hlOf(a), hwOf(a), b, hlOf(b), hwOf(b)) ? { ...P } : null, hlOf, hwOf };

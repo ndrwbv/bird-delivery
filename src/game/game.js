@@ -9275,11 +9275,11 @@ function dropMen (m) {
 
 /* Удар отбрасывает машину по земле: юзом, с разворотом и небольшим
    подскоком, а не кувырком в небо. Крен — пружина: качнуло и вернуло. */
-function knockCar (t, nx, nz, force) {
+function knockCar (t, nx, nz, force, minForce = 6) {
   if (t.bus) return;                              // автобус не отбросить (buses.js)
   if (t.still) TGRID.wake(t);                      // стояла в склейке — в ACT, полетит своей моделью (trafficgrid.js)
   t.cb = null;                                     // возвращалась на полосу (carback.js) — снова летит
-  const f = clamp(force, 6, 60);
+  const f = clamp(force, minForce, 60);
   t.knock = 1;
   t.kvx = nx * f * 0.95 + t.kvx * 0.3;
   t.kvz = nz * f * 0.95 + t.kvz * 0.3;
@@ -12800,10 +12800,10 @@ function carStats () {
 /* габариты кузова: по ним считаются все попадания, а не по одному кругу */
 const CAR_L = 2.2, CAR_W = 1.0;
 /* стоящая чужая машина (припаркованная, в пробке, на светофоре — медленнее SPEED м/с, с аварийкой, сгоревшая)
-   твёрдая: въехал быстрее 18 км/ч — её отбрасывает на KNOCK нашей скорости сближения, мы теряем STOP скорости
+   твёрдая: въехал быстрее 18 км/ч — её отбрасывает на KNOCK нашей скорости сближения с поправкой на массу, мы теряем STOP скорости
    по удару (едущую — по-старому: её всей скоростью, мы теряем 10 %). 09.10.2026, автор: «сквозь стоящие машины
    можно проехать» — её отбрасывало всей нашей скоростью, а летящую мы пропускали сквозь себя */
-const CAR_STAND = { SPEED: 1.5, KNOCK: 0.55, STOP: 0.8 };
+const CAR_STAND = { SPEED: 1.5, KNOCK: 0.42, STOP: 0.8 };
 
 /* физика машины — шагами не длиннее 1/60 с: на 30 к/с (графика, gfx.js) кадр считает два шага,
    и путь машины тот же, что на 60 (проверка — docs/CAREER.md «Настройки графики») */
@@ -13021,8 +13021,8 @@ function driveStep (dt) {
     FLYC.STATS.wallHits++;
   }
 
-  // чужие машины: тоже два круга на кузов. Сильный удар по едущей не тормозит нас,
-  // а раскидывает её — иначе таран ощущается как стена. Стоящая (припаркованная, в пробке,
+  // чужие машины: тоже два круга на кузов. Удар по едущей отбрасывает её с учётом массы;
+  // стоящая (припаркованная, в пробке,
   // на светофоре, с аварийкой) — твёрдая (CAR_STAND, 09.10.2026: «сквозь стоящие машины можно проехать»)
   // кто рядом — по сетке (trafficgrid.js): 16 м — с запасом на автобус (BUSES.hit — до hl + 4 м от его середины)
   for (let oi = 0, on = TGRID.near(V.x, V.z, 16, NBR), OL = TGRID.TG.R; oi < on; oi++) {
@@ -13073,15 +13073,15 @@ function driveStep (dt) {
     const graze = t.svc === 'rival' && !(t.ramT > 0) && (hit < 20 || theirs > mine);
     if (graze) { t.passT = Math.max(t.passT || 0, 1.5); t.x -= nx * 0.4; t.z -= nz * 0.4; }
     if (hit > 5 && !t.wreck && !graze) {
-      // таран: их отбрасывает, мы теряем десятую часть хода
+      // таран: их отбрасывает по массе кузова, мы теряем десятую часть хода
       FW.pre(t, hit);                              // ближняя ударенная — подробной копией, как своя (foewreck.js)
       fullCar(t);
       dentCar(t.mesh, hx, hz, hit);
       if (big) FW.big(t, hx, hz, hit); else FW.post(t, hx, hz, hit, -nx, -nz);   // колёса, бампер, осколки; самосвал — качка, вмятина, трещины
       HAV.carHit(t, hit);                          // помял — Толик считает, каждую машину раз за смену (havoc.js)
-      t.hp -= hit * 2.4;
+      t.hp -= t.rival || big ? hit * 2.4 : hit * 1.15 + Math.max(0, hit - 22) * 2.1;
       if (t.rival) t.pHitT = tG;                   // въехал ты — сгорит в ближайшие секунды: конкурент — косарь, свой — штраф (onBoom в rivalSpawn)
-      if (!big) knockCar(t, -nx, -nz, stand ? hit * CAR_STAND.KNOCK : hit);
+      if (!big) knockCar(t, -nx, -nz, hit * (stand ? CAR_STAND.KNOCK : 0.55) / CHIT.massOf(t), 3);
       const rammed = t.ramT > 0, hp0 = S.hp;
       if (t.ramT > 0) {
         // бодает: толкает курьера туда, куда ехала
@@ -13094,7 +13094,7 @@ function driveStep (dt) {
       if (t.rival && t.rival.foe && S.hp < hp0) { RIVAL_STATS.hits++; RIVAL_STATS.hearts += hp0 - S.hp; if (rammed) RIVAL_STATS.ramHearts += hp0 - S.hp; }
       t.hitT = 0.5;
       if (stand) {
-        // стоящая — как стена, которая чуть подаётся: её толкает на ~половину нашей скорости,
+        // стоящая — как стена, которая чуть подаётся: её толкает на 42 % нашей скорости с поправкой на массу,
         // мы теряем CAR_STAND.STOP скорости по удару и не проходим сквозь
         V.x += nx * (need - d) * 0.5; V.z += nz * (need - d) * 0.5;
         t.x -= nx * (need - d) * 0.5; t.z -= nz * (need - d) * 0.5;
@@ -13459,7 +13459,7 @@ DLG.gate(HCAM.gate);                              // окно разговора
 /* доставка от первого лица (fpdeliver.js, Д2, проба ?fpdeliver): перед подъездом — глазами курьера от машины до двери */
 FPD.init({ THREE, cam, scene, V, S, pad: PAD, car: () => car, groundH, courier: () => STORY.PERSON.courier(), box: n => pizzaBox(n),
   door: (x, z) => nearEntrance(x, z, ECON.DOOR.DOOR_R), setTrunk, trunk: () => trunkPoint(), seatOf: t => CEX.DEBUG.seatOf(t),
-  driver: on => { const g = DRIVER.DEBUG.of(car); if (g) g.visible = !!on; }, mode: () => CV.mode(), Snd,   // Snd — пики домофона (Д3)
+  driver: on => { const g = DRIVER.DEBUG.of(car); if (g) g.visible = !!on; }, mode: () => CV.mode(), cameraMode: m => CV.set(m, false), Snd,   // Snd — пики домофона (Д3)
   cabOut: () => { car.visible = true; FPV.hid = 0; CV.undraw(); } });
 ST3.init({ THREE, renderer, human: (p, o) => { const g = makeHuman(p, o); HUMANS.delete(g); return g; }, drop: dropMesh,
   courier: () => STORY.PERSON.courier(), box: n => pizzaBox(n) });
@@ -17413,7 +17413,7 @@ if (CAREER) CAREERM.init({ S, NOS, Snd, ADULT, get DAY_LEN () { return DAY_LEN; 
   atPizza: r => !!PIZZA && Math.hypot(V.x - PIZZA.x, V.z - PIZZA.z) < r,   // полночь у пиццерии — смена всё; дальше — довези и вернись (0п45)
   openShop: cb => { openPanel('shop'); const iv = setInterval(() => { if (elPanel.hidden) { clearInterval(iv); if (cb) cb(); } }, 300); },
   // главное меню карьеры (menu.js) и рейтинг пиццерии
-  menuGo: () => { Snd.boot(); Snd.resume(); goRun(); }, menuRide: () => { Snd.boot(); Snd.resume(); startRun(true); },
+  menuGo: () => { Snd.boot(); Snd.resume(); goRun(); }, menuStoryGo: () => { Snd.boot(); Snd.resume(); goRun(true); }, menuRide: () => { Snd.boot(); Snd.resume(); startRun(true); },
   reprofile: () => reprofile(),                     // профиль сменили в меню — без перезагрузки (profiles.js)
   openCollect: () => openPanel('collect'), openSettings: () => { elPanel.hidden = false; elPanel.dataset.kind = 'settings'; renderSettings(); },
   panelOpen: () => !elPanel.hidden, quit: () => Platform.quit(), canQuit: !!Platform.features.quit, playerName: () => Platform.player.name || '',

@@ -196,7 +196,7 @@ function distRing () {
 }
 
 /* ─────────────── смена ─────────────── */
-const SH = { far: 0, last: 0, gen: 0, zones: new Set(), must: {}, h0: 9, done: 0, log: [], reserved: new Set(), pts: [], breather: false, k: 0, sz: 1, run: { kind: '', n: 0 }, beach: 0, beachAt: -99, prevM: 0 };
+const SH = { far: 0, last: 0, gen: 0, zones: new Set(), must: {}, h0: 9, done: 0, log: [], reserved: new Set(), pts: [], breather: false, k: 0, sz: 1, run: { kind: '', n: 0 }, beach: 0, beachAt: -99, prevM: 0, storyLast: false };
 const Q = [];                                          // заказы наперёд (песочница может положить); в игре — собираем по одному, когда нужен
 
 export function resetShift () {
@@ -206,6 +206,7 @@ export function resetShift () {
   SH.gen = 0;
   SH.zones = new Set(); SH.must = {}; SH.done = 0; SH.log = []; SH.reserved = new Set(); SH.pts = []; SH.breather = false;
   SH.k = 0; SH.sz = 1; SH.run = { kind: '', n: 0 }; SH.far = 0; SH.beach = 0; SH.beachAt = -99; SH.prevM = 0; SH.shortLast = false;
+  SH.storyLast = false;
   SH.h0 = hourNow();
   MIX.beginShift();
   if (!SIM) SKILL.beginShift();                          // умение курьера: новая смена — × SKILL.CARRY (skill.js)
@@ -353,17 +354,20 @@ function genSpec () {
   else if (POOL_AT !== A.PIZZA) rebase();                 // «весь город»: вернулся в другую пиццерию
   let D = distRing();
   // ритм смены (rhythm.js): роль заказа на дуге (начало, подъём, кульминация, последний), напряжение k, встреча у двери
-  const R = SIM ? (SIM_ARC ? simSlot() : null) : RHY.slot(SH.gen, CAR && typeof CAR.shiftLeft === 'function' && CAR.shiftOn() ? CAR.shiftLeft() : -1);
+  const left = CAR && typeof CAR.shiftLeft === 'function' && CAR.shiftOn() ? CAR.shiftLeft() : -1;
+  const R = SIM ? (SIM_ARC ? simSlot() : null) : RHY.slot(SH.gen, left);
   if (R) { R.k0 = R.k; R.k = SKILL.k(R.k); RHY_K = R.k; }   // умение курьера: потолок напряжения (skill.js) — дальность, сборные, срочные «по шансу»
   const tgt = R ? arcTarget(R, D) : 0;                    // сколько метров по дорогам «хочется» этому заказу
   if (R) { D = rampRing(D, R.k); RHY_ROLE = R.role; D.max = Math.max(D.min + 150, Math.min(D.max, Math.round(tgt))); }   // по прямой — не дальше «хочется» по дорогам
-  // Первая встреча проходит через обычную очередь заказов, до случайных событий смены.
-  if (!SIM && STORY && typeof STORY.nextOrder === 'function') {
-    const first = STORY.nextOrder(storyCtx());
-    if (first && first.storyId === 'gennady') {
-      const spec = storySpec(first);
-      if (spec && storyNear(first)) return finishSpec(spec, null, hourNow());
-      storyCancel(first);
+  // Д22: доступную сюжетную главу выдаём только в последнем слоте смены.
+  // ORD.force для ?storytest идёт отдельно через nextPlan и не меняет обычный график.
+  if (!SIM && R?.role === 'last' && left > 0 && STORY && typeof STORY.nextOrder === 'function') {
+    let s = null;
+    try { s = STORY.nextOrder(storyCtx()); } catch (e) { console.warn('[orders] STORY.nextOrder', e); }
+    if (s && typeof s.then !== 'function') {
+      const spec = storyNear(s) ? storySpec(s) : null;
+      if (spec) return finishSpec(spec, null, hourNow());
+      storyCancel(s);
     }
   }
   const easy = easySpec(R);
@@ -404,14 +408,6 @@ function genSpec () {
   } else if (forced === 'urgent') {
     const best = urgentSpot();
     if (best) spec = { type: 'urgent', kind: 'solo', urgent: true, stops: [stopOf(best)] };
-  }
-  if (!spec && !forced && !SIM && STORY && typeof STORY.nextOrder === 'function') {
-    let s = null;
-    try { s = STORY.nextOrder(storyCtx()); } catch (e) { console.warn('[orders] STORY.nextOrder', e); }
-    if (s && typeof s.then !== 'function') {
-      spec = storyNear(s) ? storySpec(s) : null;
-      if (!spec) storyCancel(s);                           // дом героя далеко от района — глава подождёт
-    }
   }
   const life = lifeN();
   // пляж летом (beach.js ORDER): клиент загорает на полотенце — в среднем 1 из EVERY, если пляж в твоём районе
@@ -701,6 +697,7 @@ function finishSpec (spec, forced, hAt) {
   // событие пиццерии (pzevents.js): в окне события часть обычных пицц — «заказ события», оплата ×k
   if (!spec.story && !SIM && !spec.hol && !spec.fest && !spec.beach && !spec.bundle && !spec.urgent && spec.type === 'pizza') { const pz = PZ.tag(); if (pz) spec.pz = pz; }
   spec.n = ++SH.gen;
+  if (spec.story) SH.storyLast = true;
   // ритм размеров (sizeRoll): сколько было после разминки, сколько пицц в прошлом; серия одного вида (kindRoll)
   const size = spec.bundle ? spec.stops.length : 1;
   if (!spec.easy) SH.k++;
@@ -747,9 +744,11 @@ export function nextPlan () {
   SH.last = S.orders;
   let spec;
   if (FORCE) { spec = FORCE; FORCE = null; }
+  else if (SH.storyLast) return null;                  // после сюжетного заказа новых в этой смене нет
   else spec = Q.length ? Q.shift() : genSpec();         // собираем, когда нужен: очередь «дальше» не показываем
   return bindSpec(spec);
 }
+export const storyLast = () => SH.storyLast;
 function bindSpec (spec) {
   if (!spec) return null;
   if (spec.story && (spec.story.noGuest || !A.alive().length)) return { story: true, kind: 'solo', stops: [], why: whyOf(spec), ord: spec };

@@ -29,6 +29,7 @@ import { createHumanFactory, makePerson } from '../people.js';
 import { QP } from '../qpeople.js';
 import * as PBOX from '../pizzabox.js';
 import * as SC from './doorscene.js';
+import { LABELS } from './entrance-labels.js';
 
 export const OLD = typeof location !== 'undefined' && /[?&]old2dstairs\b/.test(location.search);
 
@@ -214,11 +215,23 @@ export function create (box, o) {
       ctx.fillStyle = '#b69a68'; ctx.fillRect(8, 8, 240, 404);
       ctx.fillStyle = '#28291e'; ctx.fillRect(14, 14, 228, 392);
       ctx.fillStyle = '#e3d5a9'; ctx.font = 'bold 19px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('ПРЕДСЕДАТЕЛЬ', 128, 39); ctx.fillText('ПОДЪЕЗДА', 128, 61);
+      ctx.fillText(t(LABELS.chairmanTitle), 128, 39); ctx.fillText(t(LABELS.chairmanPlace), 128, 61);
       if (img) ctx.drawImage(img, 23, 74, 210, 273);
       ctx.fillStyle = '#ad8b5b'; ctx.fillRect(19, 353, 218, 1);
-      ctx.fillStyle = '#e2d5b1'; ctx.font = 'bold 30px sans-serif';
-      ctx.fillText(o.ADULT ? 'ХУЙЛО' : 'ГЕННАДИЙ', 128, 389);
+      ctx.font = 'bold 30px sans-serif';
+      if (o.ADULT) {
+        // Чужая надпись поверх таблички: её пытались затереть, но буквы проступают через краску.
+        ctx.fillStyle = 'rgba(60,27,23,.8)';
+        ctx.save(); ctx.translate(128, 386); ctx.rotate(-0.055);
+        ctx.fillText(t(LABELS.chairmanGraffiti), 0, 0);
+        ctx.restore();
+        ctx.fillStyle = 'rgba(177,151,104,.54)';
+        for (const [x, yy, w, h] of [[43,372,144,4],[71,381,129,6],[39,391,117,5],[96,398,112,3]]) ctx.fillRect(x, yy, w, h);
+        ctx.fillStyle = 'rgba(230,207,156,.19)';
+        for (let i = 0; i < 28; i++) ctx.fillRect(45 + (i * 31 % 159), 371 + (i * 13 % 30), 7 + i % 12, 1 + i % 3);
+      } else {
+        ctx.fillStyle = '#e2d5b1'; ctx.fillText(t(LABELS.chairmanName), 128, 389);
+      }
       if (chairmanMaterial) chairmanMaterial.map.needsUpdate = true;
     };
     draw(null);
@@ -389,7 +402,7 @@ export function create (box, o) {
     SC.rect(g, 0, 0, 128, 96, here ? '#ffd85e' : '#f4efe2');
     SC.rect(g, 6, 6, 116, 84, '#2f5fb0');
     SC.text(g, String(f + 1), 64, 40, 44, '#fff6e0');
-    SC.text(g, t('кв. {a}—{b}', { a: flatAt(f, 0), b: flatAt(f, per - 1) }), 64, 78, 10, '#fff6e0');
+    SC.text(g, t(LABELS.flats, { a: flatAt(f, 0), b: flatAt(f, per - 1) }), 64, 78, 10, '#fff6e0');
     // номерки дверей: латунь, номер чёрным
     for (let i = 0; i < per; i++) {
       const x = 128 + (i % 6) * 64, y = (i / 6 | 0) * 32;
@@ -478,6 +491,12 @@ export function create (box, o) {
       M.box(L - 0.06, y, ZB - 0.2, L, y + DH + 0.06, ZB + 0.03, C.frame);
       M.box(Rr, y, ZB - 0.2, Rr + 0.06, y + DH + 0.06, ZB + 0.03, C.frame);
       M.box(L - 0.06, y + DH, ZB - 0.2, Rr + 0.06, y + DH + 0.06, ZB + 0.03, C.frame);
+      // Скошенный деревянный сандрик над проёмом нарушает ровный ряд коробок.
+      const crown = 0.12 + hsh(n, 72) * 0.045;
+      M.prism([[L - 0.085, y + DH + 0.06], [dx, y + DH + crown],
+        [dx, y + DH + crown + 0.045], [L - 0.085, y + DH + 0.11]], ZB + 0.02, ZB + 0.075, C.frame);
+      M.prism([[dx, y + DH + crown], [Rr + 0.085, y + DH + 0.06],
+        [Rr + 0.085, y + DH + 0.11], [dx, y + DH + crown + 0.045]], ZB + 0.02, ZB + 0.075, C.frame);
       const mine = f === tgt && i === P.door;
       if (!mine) {                                   // чужая: тёмная прихожая, тёплый свет
         M.box(L, y, ZB - 0.62, Rr, y + DH, ZB - 0.6, '#6a4628');
@@ -557,6 +576,9 @@ export function create (box, o) {
       peel(M, f + 1000, RUN, MX, yb + 0.2, yb + 2.4, 5, ZB + 0.002, [[wx0 - 0.15, wx1 + 0.15, wy0 - 0.12, wy1 + 0.08]]);
       M.box(wx0 - 0.05, wy0 - 0.05, ZB - 0.05, wx1 + 0.05, wy0, ZB + 0.04, '#3a2a1e');
       M.box(wx0 - 0.05, wy1, ZB - 0.05, wx1 + 0.05, wy1 + 0.05, ZB + 0.04, '#3a2a1e');
+      // Скосы оконного проёма: грубая штукатурная арка вместо ещё одной прямоугольной рамы.
+      M.prism([[wx0-0.07,wy1],[wx0+0.15,wy1+0.13],[wx0+0.15,wy1+0.18],[wx0-0.07,wy1+0.055]], ZB + 0.03, ZB + 0.09, wallTop);
+      M.prism([[wx1-0.15,wy1+0.13],[wx1+0.07,wy1],[wx1+0.07,wy1+0.055],[wx1-0.15,wy1+0.18]], ZB + 0.03, ZB + 0.09, wallTop);
       M.box(wx0 - 0.05, wy0, ZB - 0.05, wx0, wy1, ZB + 0.04, '#3a2a1e'); M.box(wx1, wy0, ZB - 0.05, wx1 + 0.05, wy1, ZB + 0.04, '#3a2a1e');
       M.box((wx0 + wx1) / 2 - 0.025, wy0, ZB - 0.04, (wx0 + wx1) / 2 + 0.025, wy1, ZB + 0.02, '#3a2a1e');
       M.box(wx0, wy0 + 0.72, ZB - 0.04, wx1, wy0 + 0.76, ZB + 0.02, '#3a2a1e');
@@ -616,18 +638,19 @@ export function create (box, o) {
       M.box(cx + 0.24, y + 0.17, cz - 0.05, cx + 0.262, y + 0.2, cz - 0.02, '#ffd85e'); M.box(cx + 0.24, y + 0.17, cz + 0.02, cx + 0.262, y + 0.2, cz + 0.05, '#ffd85e');
       M.box(cx - 0.3, y + 0.02, cz - 0.02, cx - 0.17, y + 0.05, cz + 0.02, kc);
     }
-    // лампочки на проводе: над площадкой и над промежуточной
+    // Настенные светильники: основание примыкает к торцевой стене, кронштейн и гранёный плафон выступают в клетку.
     const bulbs = [];
-    const lampAt = (bx, by, bz, roof) => {
-      M.box(bx - 0.06, roof - 0.03, bz - 0.06, bx + 0.06, roof, bz + 0.06, '#3a3530');
-      M.box(bx - 0.008, by + 0.08, bz - 0.008, bx + 0.008, roof - 0.02, bz + 0.008, '#1d1a16');
-      M.box(bx - 0.035, by + 0.04, bz - 0.035, bx + 0.035, by + 0.1, bz + 0.035, '#3a3530');
-      M.box(bx - 0.045, by - 0.05, bz - 0.045, bx + 0.045, by + 0.04, bz + 0.045, '#fff3c0', 1.6);
-      const s = new THREE.Sprite(f === flickF ? GLOWF : GLOW); s.position.set(bx, by, bz); s.scale.setScalar(1.6);
+    const lampAt = (wallX, by, bz, dir) => {
+      const bx = wallX + dir * 0.28, x0 = Math.min(wallX, bx), x1 = Math.max(wallX, bx);
+      M.box(wallX - 0.025, by - 0.18, bz - 0.19, wallX + 0.025, by + 0.19, bz + 0.19, '#4b4237');
+      M.box(x0, by - 0.025, bz - 0.035, x1, by + 0.025, bz + 0.035, '#73614c');
+      M.prism([[x0,by-0.02],[x1,by-0.11],[x1,by+0.11],[x0,by+0.02]], bz - 0.14, bz + 0.14, '#9b8567');
+      M.box(bx - 0.055, by - 0.075, bz - 0.09, bx + 0.055, by + 0.07, bz + 0.09, '#fff0c4', 1.5);
+      const s = new THREE.Sprite(f === flickF ? GLOWF : GLOW); s.position.set(bx, by, bz); s.scale.setScalar(1.15);
       bulbs.push(s);
     };
-    lampAt((LX0 + 0) / 2, y + FH - 0.62, -0.1, y + FH);
-    if (flights) lampAt(RUN + 0.75, y + FH - 0.62, -0.3, y + FH);
+    lampAt(LX0 - 0.22, y + 2.13, 0.92, 1);
+    if (f > 0) lampAt(MX + 0.22, y + 0.85, -0.25, -1);
     // ── своя квартира: коридор за дверью (обои, вешалка, зеркало, коврик, свет) ──
     let flat = null;
     if (f === tgt) flat = corridor(M, y);
@@ -640,9 +663,10 @@ export function create (box, o) {
     if (skyM) grp.add(skyM);
     for (const d of doors) grp.add(d.g);
     for (const s of bulbs) grp.add(s);
-    if (o.firstPerson && f === tgt) {
+    if (o.firstPerson && f === 0) {
       const image = new THREE.Mesh(new THREE.PlaneGeometry(0.67, 1.1), chairmanMat());
-      image.position.set(LX0 - 0.231, y + 1.52, -0.35); image.rotation.y = Math.PI / 2;
+      // У входа, на внутренней стене лицом к курьеру: видно уже до первого пролёта.
+      image.position.set(1.34, y + 1.52, ZF + 0.018); image.rotation.y = Math.PI;
       grp.add(image);
     }
     if (flat) grp.add(flat);
@@ -941,7 +965,7 @@ export function create (box, o) {
         if (VW.scene?.portrait) {
           const openT = VW.scene.t;
           const yieldDoor = ease((openT - 0.8) / 0.7) * (1 - ease((openT - 3.1) / 0.9));
-          z += 0.7 * yieldDoor;
+          z += 0.7 * yieldDoor + 0.75 * (VW.scene.retreat || 0);
         }
         yaw = lerpAng(yaw, Math.PI, e);
       }
@@ -1142,6 +1166,7 @@ export function create (box, o) {
     start (o = {}) { VW.scene = { on: true, t: 0, text: '', talking: false, pass: -1, given: false, from: null, portrait: !!o.portrait }; cour.visible = !o.portrait && !o.firstPerson; makeMan().visible = !o.portrait; if (o.portrait && cbox) cbox.visible = false; if (o.portrait) setEntryLight(0); },
     light: setEntryLight,
     portrait (on) { if (VW.scene) { VW.scene.portrait = !!on; cour.visible = !on && !o.firstPerson; makeMan().visible = !on; if (cbox) cbox.visible = !on; } },
+    retreat (k) { if (VW.scene) VW.scene.retreat = clamp(k, 0, 1); },
     portraitSprites,
     portraitState (state) { if (portrait && portraitMaterials) portrait.material = portraitMaterials[state] || portraitMaterials.idle; },
     portraitBreath (x, y) { if (portrait) portrait.scale.set(x, y, 1); },

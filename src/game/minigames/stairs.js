@@ -33,6 +33,7 @@ import * as NICK from '../nicks.js';            // накладная: ават�
 import * as OS from '../ordersheet.js';
 import * as KIT from './doorkit.js';
 import * as SC from './doorscene.js';
+import { LABELS } from './entrance-labels.js';
 import * as COACH from './doorcoach.js';     // обучение первого раза: пауза, подсветка кнопок, «поехали!»
 import * as S3 from './stairs3d.js';         // подъезд в 3D (12ас): лестница, двери, курьер-модель, клиент у своей двери; ?old2dstairs — 2D
 import * as DLG from '../dialog.js';
@@ -197,7 +198,7 @@ export default {
     const box = document.createElement('div');
     box.className = 'mk-full sx sx-' + look + (D3 ? ' sx3' : '');
     box.innerHTML =
-      '<canvas class="mk-cv sx-cv"></canvas>' + (D3 ? '<div class="sx3-hit"></div>' : '') + '<div class="sx-black"></div><div class="sx-entry-line" hidden></div>' +
+      '<canvas class="mk-cv sx-cv"></canvas>' + (D3 ? '<div class="sx3-hit"></div>' : '') + '<div class="sx-black"></div>' +
       '<div class="mk-top">' + KIT.dashHTML() + '<div class="mk-fuse" aria-hidden="true"><i></i></div>' +
         // 11аа (автор 23.10.2026: «интерфейс перегружен»): задание — этаж и квартира, под ним — сколько осталось;
         // подъезда нет (ты уже в нём), дыхалка — только когда тает
@@ -232,11 +233,7 @@ export default {
     let V3 = null;
     if (D3) { try { V3 = S3.create(box, { forceOwn: !!o.forceOwn, plan: P, look, seed, ADULT: !!api.ADULT, t, gopAt: P.gopAt, person, boxes: o.boxes, firstPerson: !!o.scenario?.portrait }); } catch (e) { console.warn('[stairs] 3D не вышло — 2D', e); V3 = null; } }
     const FPS = !!(V3 && o.scenario?.portrait);
-    if (FPS && !new URLSearchParams(location.search).has('doorpreview')) {
-      st.entryTextT = 3.2;
-      q('.sx-entry-line').textContent = t('пахнет ссаниной');
-      q('.sx-entry-line').hidden = false;
-    }
+    const entryRemark = FPS && !new URLSearchParams(location.search).has('doorpreview');
     box.classList.toggle('sx-fps', FPS);
     if (DOOR2D.enabled(o.scenario, V3)) DOOR2D.prepare(o.scenario.portrait.manifest).catch(e => console.warn('[door2d] preload', e));
     if (V3) q('canvas.sx-cv').remove(); else { box.classList.remove('sx3'); const h = q('.sx3-hit'); if (h) h.remove(); }
@@ -458,6 +455,8 @@ export default {
       if (S.stage === 'wait' && V3.scene.given()) { S.stage = 'out'; S.out = S.t + 0.9; }
       if (S.stage === 'out' && S.portrait) {
         const k = clamp((S.t - (S.out - 0.9)) / 0.75, 0, 1), d = doors.get(flat);
+        const away = clamp(k / 0.45, 0, 1);
+        V3.scene.retreat(away * away * (3 - 2 * away));
         if (d) d.open = 1 - k * k * k;
         q('.sx-black').style.opacity = String(clamp((k - 0.78) / 0.22, 0, 1));
         if (!S.slam && k >= 1) { S.slam = true; sfx('slam'); }
@@ -478,6 +477,11 @@ export default {
           catch (e) { console.warn('[door2d] fallback to 3D', e); S.portrait = false; S.stage = 'dialog'; V3.scene.portrait(false); }
         }
         if (st.scene !== S) { if (S.actor) S.actor.close(); return; }
+        const lineText = line => line.amountLine ? line.text.replace('{amount}', o.payment || t('сдача')) : line.text;
+        const nextText = from => {
+          const next = S.dialogue.lines.slice(from + 1).find(line => !S.portrait || !line.omit2d);
+          return next ? lineText(next) : t('Закончить разговор');
+        };
         for (const [lineIndex, line] of S.dialogue.lines.entries()) {
           if (st.scene !== S) return;
           if (S.portrait && line.omit2d) continue;
@@ -489,12 +493,11 @@ export default {
             if (S.actor) S.actor.line(line.emotion);
             V3.scene.talk(host && !S.portrait);
             const answer = await DLG.say({ compact: true, door2d: S.portrait, canonicalName: true, fillers: false, head: t('у квартиры'),
-              name: S.portrait ? host ? S.dialogue.name : '' : line.speaker,
+              name: host ? S.dialogue.name : t('Женя'),
               courierLine: S.portrait && !host,
               person: S.portrait ? null : host ? S.dialogue.person : S.dialogue.courier,
-              text: line.amountLine ? line.text.replace('{amount}', o.payment || t('сдача')) : line.text,
-              accept: choices ? t(choices[0].text) : S.portrait && lineIndex === 0
-                ? line.text === t('драсте') ? t('драсте') : t('извините задержался') : t('дальше'),
+              text: lineText(line),
+              accept: choices ? t(choices[0].text) : nextText(lineIndex),
               decline: choices && choices[1] ? t(choices[1].text) : undefined,
               stack: !!choices && !S.portrait, paused: () => !!(api.paused && api.paused()),
               onShow: () => { if (S.actor) S.actor.talk(host); },
@@ -510,7 +513,7 @@ export default {
               if (S.actor) S.actor.line('angry');
               V3.scene.talk(!S.portrait);
               const correction = await DLG.say({ compact: true, door2d: S.portrait, canonicalName: true, fillers: false,
-                name: S.dialogue.name, person: S.portrait ? null : S.dialogue.person, text: line.wrongReply, accept: t('дальше'),
+                name: S.dialogue.name, person: S.portrait ? null : S.dialogue.person, text: line.wrongReply, accept: lineText(line),
                 paused: () => !!(api.paused && api.paused()),
                 onShow: () => { if (S.actor) S.actor.talk(true); },
                 onTyped: () => { if (S.actor) S.actor.talk(false); } });
@@ -648,7 +651,6 @@ export default {
     function step (dt) {
       dt = clamp(dt, 0, DT_MAX);
       if (st.phase === 'done') return;
-      if (st.entryTextT > 0 && (st.entryTextT -= dt) <= 0) q('.sx-entry-line').hidden = true;
       if (st.phase === 'learn') {                               // обучение первого раза: всё стоит, сцена рисуется, рамка — за целью
         KIT.dashSet(box, clock(), elFuse);
         anim(dt); draw(dt);
@@ -818,7 +820,7 @@ export default {
       R(SX(px - pw / 2) - U, ptop - U, pw * FH + 2 * U, pb - ptop + 2 * U, here ? '#ffd85e' : '#f4efe2');
       R(SX(px - pw / 2), ptop, pw * FH, pb - ptop, '#2f5fb0');
       SC.text(g, String(f + 1), SX(px), ptop + (pb - ptop) * 0.42, (pb - ptop) * 0.5, '#fff6e0');
-      SC.text(g, t('кв. {a}—{b}', { a: flatAt(f, 0), b: flatAt(f, per - 1) }), SX(px), ptop + (pb - ptop) * 0.82, Math.min((pb - ptop) * 0.15, pw * FH / 11), '#fff6e0');
+      SC.text(g, t(LABELS.flats, { a: flatAt(f, 0), b: flatAt(f, per - 1) }), SX(px), ptop + (pb - ptop) * 0.82, Math.min((pb - ptop) * 0.15, pw * FH / 11), '#fff6e0');
       // над дверями: щиток, объявления, граффити (обшарпанный), картинка и почтовые ящики (первый этаж)
       const slots = [];
       for (let i = 0; i + 1 < nl; i++) slots.push((doorX(i) + doorX(i + 1)) / 2);
@@ -1183,6 +1185,8 @@ export default {
     if (api.setPad) api.setPad(pad);
     say({ person, name: client(), text: t('Лифт опять сломан — поднимайтесь пешком!') });
     draw();
+    if (entryRemark) DLG.say({ compact: true, door2d: true, courierLine: true, canonicalName: true, fillers: false,
+      name: t('Женя'), text: t('пахнет ссаниной'), accept: t('Подниматься'), paused: () => !!(api.paused && api.paused()) });
     if (ln) learnStart(mainSteps(), 'stairs');                  // первый подъезд — сначала обучение, потом бежать
 
     // для проверок (probe): пройти как игрок — гопников обойти (arg 'pay' — откупиться), подняться на нужный этаж и позвонить;

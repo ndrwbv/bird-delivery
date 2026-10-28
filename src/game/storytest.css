@@ -1,4 +1,5 @@
 #storytest{position:absolute;top:175px;left:12px;z-index:130;color:#f9f0df;font:13px/1.45 system-ui,sans-serif;pointer-events:auto}
+#storytest[hidden]{display:none}
 #storytest button{font:inherit;cursor:pointer}
 #storytest button:disabled{opacity:.45;cursor:default}
 #storytest .storytest-toggle{display:block;padding:7px 11px;border:1px solid #f0b866;border-radius:9px;background:#282025;color:#fff0d6;box-shadow:0 3px 12px #0008}
@@ -11,6 +12,7 @@
 #storytest .storytest-chapter:hover:enabled,#storytest .storytest-next:hover:enabled{border-color:#f1b766;background:#59404a}
 #storytest .storytest-status{margin:10px 0 8px;color:#f1d7a9}
 #storytest .storytest-next{background:#9b492f;border-color:#e28d59;text-align:center;font-weight:700}
+#storytest .padsel,#storytest button:focus-visible{outline:3px solid #ffd08f;outline-offset:2px}
 #doorpreview{position:absolute;top:12px;left:12px;z-index:130;max-width:260px;padding:10px 12px;border:1px solid #f0b866;border-radius:10px;
   background:rgba(27,23,28,.95);box-shadow:0 3px 15px #0008;color:#fff0d6;font:13px/1.35 system-ui,sans-serif;pointer-events:auto}
 #doorpreview button{width:100%;padding:9px 12px;border:1px solid #f1b766;border-radius:7px;background:#9b492f;color:#fff4dd;font:700 14px system-ui,sans-serif;cursor:pointer}

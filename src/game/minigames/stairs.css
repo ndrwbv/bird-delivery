@@ -68,9 +68,6 @@ body.sx3-on #view { position: relative; z-index: 25; }
 .sx3-tag.on { background: #ffd85e; font-size: var(--pp-fs-m); box-shadow: 0 0 0 3px rgba(255, 216, 94, .45), 0 2px 0 rgba(0, 0, 0, .5); }
 .sx-fps .sx3-tag, .sx-fps .mk-mini, .sx-fps .mk-say, .sx-fps .mk-self, .sx-fps .mk-fuse { display: none !important; }
 .sx-black { position: absolute; inset: 0; z-index: 38; background: #050504; pointer-events: none; opacity: 0; }
-.sx-entry-line { position: absolute; z-index: 31; left: 50%; bottom: 8%; transform: translateX(-50%); padding: .65em 1.15em;
-  color: #e7ddc5; background: rgba(29, 32, 24, .91); border: 1px solid #8b7954; font-weight: 650; font-size: clamp(16px, 2vw, 24px); white-space: nowrap; }
-.sx-entry-line[hidden] { display: none; }
 .sx-fps .mk-top { width: max-content; max-width: min(45vw, 380px); transform: scale(.8); transform-origin: top center; }
 .sx-fps .mk-task { margin: 0; padding: .45em .65em; }
 .sx-fps .mk-help { font-size: 10px; opacity: .88; }

@@ -1,4 +1,4 @@
-/* Просмотр сюжетных доставок в обычной игре без поездки. Включается только ?storytest. */
+/* Просмотр сюжетных доставок без поездки: ?storytest или переключатель в главном меню. */
 import './storytest.css';
 import { t } from '../i18n/index.js';
 import * as STORY from './story.js';
@@ -12,10 +12,16 @@ import STAIRS from './minigames/stairs.js';
 import { pad as PAD } from '../input/gamepad.js';
 
 let A = null, root = null, list = null, status = null, nextButton = null, listKey = '';
+let menuShift = null, pendingStart = null, panelChanged = null;
 const enabled = () => typeof location !== 'undefined' && new URLSearchParams(location.search).has('storytest');
 const doorPreviewEnabled = () => typeof location !== 'undefined' && new URLSearchParams(location.search).has('doorpreview');
 const stairsPreviewEnabled = () => typeof location !== 'undefined' && new URLSearchParams(location.search).has('stairspreview');
 const gameReady = () => A && ['brief', 'loading', 'drive', 'back', 'handover', 'side'].includes(A.S.state);
+export const panelRoot = () => root && root.id === 'storytest' && !root.hidden && root.classList.contains('open') ? root : null;
+export const panelOpen = () => !!panelRoot();
+export function onPanelChange (fn) { panelChanged = fn; }
+export function setMenuShift (fn) { menuShift = fn; }
+const signalPanel = () => { if (panelChanged) panelChanged(panelOpen()); };
 
 let previewRunning = false;
 async function openDoorPreview () {
@@ -52,6 +58,11 @@ async function openDoorPreview () {
     };
     raf = requestAnimationFrame(frame);
     await revealed;
+    const lineText = line => line.amountLine ? t(line.text).replace('{amount}', '1 000 ₽') : t(!A.ADULT && line.childText ? line.childText : line.text);
+    const nextText = from => {
+      const next = story.chapters[0].dialogue.slice(from + 1).find(line => !line.omit2d);
+      return next ? lineText(next) : t('Закончить разговор');
+    };
     for (const [lineIndex, line] of story.chapters[0].dialogue.entries()) {
       if (line.omit2d) continue;
       let retry;
@@ -60,10 +71,10 @@ async function openDoorPreview () {
         const choices = line.choices2d || line.choices;
         actor.line(line.emotion || 'idle');
         const answer = await DLG.say({ compact: true, door2d: true, canonicalName: true, fillers: false,
-          courierLine: line.speaker === 'courier', name: line.speaker === 'courier' ? '' : t(story.name),
+          courierLine: line.speaker === 'courier', name: line.speaker === 'courier' ? t('Женя') : t(story.name),
           person: null,
-          text: line.amountLine ? t(line.text).replace('{amount}', '1 000 ₽') : t(!A.ADULT && line.childText ? line.childText : line.text),
-          accept: choices ? t(choices[0].text) : lineIndex === 0 ? t('драсте') : t('дальше'),
+          text: lineText(line),
+          accept: choices ? t(choices[0].text) : nextText(lineIndex),
           decline: choices?.[1] ? t(choices[1].text) : undefined, stack: false,
           onShow: () => actor.talk(line.speaker === 'gennady'), onTyped: () => actor.talk(false) });
         actor.talk(false);
@@ -71,7 +82,7 @@ async function openDoorPreview () {
         if (line.retryOnFirst && answer === true) {
           actor.line('angry');
           const correction = await DLG.say({ compact: true, door2d: true, canonicalName: true, fillers: false,
-            name: t(story.name), person: null, text: t(line.wrongReply), accept: t('дальше'),
+            name: t(story.name), person: null, text: t(line.wrongReply), accept: lineText(line),
             onShow: () => actor.talk(true), onTyped: () => actor.talk(false) });
           actor.talk(false);
           if (correction === null) return;
@@ -160,7 +171,8 @@ function initDoorPreview () {
 }
 
 function phase () {
-  if (!A || A.S.state === 'title') return t('Начни смену, затем выбери главу');
+  if (pendingStart) return t('Запускаем сюжетную смену');
+  if (!A || A.S.state === 'title') return t('Выбери главу — смена начнётся сама');
   if (DLG.isOpen()) return t('Реплика у двери');
   if (DOOR.on()) return DOOR.DEBUG.mode === 'dial' ? t('Домофон') : t('Подъезд и квартира');
   if (FPD.busy()) return t('Курьер выходит из машины и идёт к домофону');
@@ -173,12 +185,18 @@ function phase () {
 
 function render () {
   if (!root) return;
+  if (pendingStart && gameReady() && A.S.state !== 'loading') {
+    const { id, chapter } = pendingStart;
+    pendingStart = null;
+    start(id, chapter);
+    return;
+  }
   status.textContent = phase();
-  nextButton.disabled = !gameReady() || FPD.busy() || !(DLG.isOpen() || DOOR.on()
+  nextButton.disabled = !!pendingStart || !gameReady() || FPD.busy() || !(DLG.isOpen() || DOOR.on()
     || A.S.state === 'brief' || (A.S.state === 'drive' && A.S.target && A.S.order?.ord?.story));
   nextButton.textContent = DLG.isOpen() ? t('Следующая реплика') : DOOR.on() ? t('Пройти этот этап')
     : A.S.state === 'brief' ? t('Загрузить пиццу') : t('К дому без поездки');
-  const locked = !gameReady() || DOOR.on() || FPD.busy() || DLG.isOpen();
+  const locked = !!pendingStart || !(gameReady() || (A?.S.state === 'title' && menuShift)) || DOOR.on() || FPD.busy() || DLG.isOpen();
   const key = STORY.STORIES.map(s => s.id + ':' + s.chapters.length).join('|') + ':' + locked;
   if (key === listKey) return;
   listKey = key;
@@ -186,6 +204,7 @@ function render () {
   for (const story of STORY.STORIES) story.chapters.forEach((chapter, i) => {
     const button = document.createElement('button');
     button.type = 'button'; button.className = 'storytest-chapter';
+    if (i === 0 && story === STORY.STORIES[0]) button.setAttribute('data-pad-main', '');
     button.textContent = t(story.name) + ' · ' + t(chapter.name || String(i + 1));
     button.disabled = locked;
     button.addEventListener('click', () => start(story.id, i));
@@ -194,9 +213,16 @@ function render () {
 }
 
 function start (id, chapter) {
-  if (!gameReady()) return;
   const spec = STORY.orderFor(id, chapter);
-  if (!spec) { status.textContent = t('Адрес этой главы пока недоступен'); return; }
+  if (!spec) { if (status) status.textContent = t('Адрес этой главы пока недоступен'); return; }
+  if (A?.S.state === 'title' && menuShift) {
+    if (pendingStart) return;
+    pendingStart = { id, chapter };
+    try { menuShift(); } catch (e) { pendingStart = null; console.warn('[storytest] start shift', e); }
+    render();
+    return;
+  }
+  if (!gameReady()) return;
   A.setPause(false);
   const order = ORD.force(spec);
   if (order) A.acceptOrder();
@@ -237,9 +263,8 @@ function advance () {
   status.textContent = t('У дома · начинается выход из машины');
 }
 
-export function init (api) {
-  if (root || (!enabled() && !doorPreviewEnabled() && !stairsPreviewEnabled())) return;
-  A = api;
+function initPanel () {
+  if (root) return;
   if (doorPreviewEnabled() || stairsPreviewEnabled()) { initDoorPreview(); return; }
   root = document.createElement('aside'); root.id = 'storytest';
   const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'storytest-toggle';
@@ -251,11 +276,29 @@ export function init (api) {
   status = document.createElement('p'); status.className = 'storytest-status';
   nextButton = document.createElement('button'); nextButton.type = 'button'; nextButton.className = 'storytest-next';
   nextButton.addEventListener('click', advance);
-  toggle.addEventListener('click', () => { root.classList.toggle('open'); render(); });
+  toggle.addEventListener('click', () => { root.classList.toggle('open'); render(); signalPanel(); });
   body.append(title, note, list, status, nextButton); root.append(toggle, body);
   (document.getElementById('game') || document.body).appendChild(root);
   render();
   setInterval(render, 350);
 }
 
-export const DEBUG = { start, advance, phase, enabled, openDoorPreview, openStairsPreview, doorPreviewEnabled, stairsPreviewEnabled };
+export function init (api) {
+  A = api;
+  if (root) return;
+  if (doorPreviewEnabled() || stairsPreviewEnabled()) { initDoorPreview(); return; }
+  if (enabled()) initPanel();
+}
+
+export function togglePanel (force) {
+  if (!A || doorPreviewEnabled() || stairsPreviewEnabled()) return false;
+  initPanel();
+  const open = force == null ? !panelOpen() : !!force;
+  root.hidden = !open;
+  root.classList.toggle('open', open);
+  render();
+  signalPanel();
+  return open;
+}
+
+export const DEBUG = { start, advance, phase, enabled, openDoorPreview, openStairsPreview, doorPreviewEnabled, stairsPreviewEnabled, panelOpen, togglePanel };

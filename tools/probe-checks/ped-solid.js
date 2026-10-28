@@ -177,6 +177,7 @@ async function across1 (tag, far, put, undo, skip, inspectFixture) {
     const h = Math.atan2(-uz, ux), k = { x: t.x, z: t.z, h: t.h };
     t.x = x; t.z = z; t.h = h; t.speed = 0; t.moved = 1;
     if (t.mesh) { t.mesh.position.set(x, t.mesh.position.y, z); t.mesh.rotation.y = h; }
+    PC.wakeCar(t);                                  // в склейке машина осталась бы в старой клетке до очередного среза
     return k;
   }, k => { t.x = k.x; t.z = k.z; t.h = k.h; t.moved = 1; if (t.mesh) { t.mesh.position.set(t.x, t.mesh.position.y, t.z); t.mesh.rotation.y = t.h; } }, p => {
     const dx = p.x - t.x, dz = p.z - t.z, fx = Math.sin(t.h), fz = Math.cos(t.h), al = dx * fx + dz * fz, ac = dx * fz - dz * fx, hl = t.hl || 2.2;

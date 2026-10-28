@@ -7,7 +7,7 @@
          head  — шапка чека («чек смены · Юг»), no — номер (7 → «№ 0007»), why — строка мелко под шапкой;
          rows  — [[подпись, значение, 'pp-plus' | 'pp-minus' | '']] — строки «подпись ··· значение»;
          total — { k: 'за смену', n: 5261, fmt: n => '+5 261 ₽', cls: 'pp-plus' } — итог крупно, щёлкает счётчиком;
-         hints — [{ text, mark, wal } | { bar } | { cal }] — мелкие строки под итогом (mark — жёлтым маркером; wal — «в копилке теперь»,
+         hints — [{ text, mark, wal } | { bar }] — мелкие строки под итогом (mark — жёлтым маркером; wal — «в копилке теперь»,
                  сумму потом меняет END.wallet; bar — полоска «до следующего района», barHTML); seal — { text, color: 'green' | 'red' | 'rust' | 'pink' };
          party — 'coins' | 'confetti' | 'both' | '' — что вылетит из итога; sticker — { line, face } сообщение Толика (пузырь iMessage);
          stamp — кнопка-штамп (career.js переносит сюда #ov-again), встаёт внизу чека.
@@ -53,7 +53,6 @@ export function receiptHTML ({ head = '', no = 0, why = '', rows = [], total = n
           (h.wal ? ' <b>' + esc(money(h.n || 0)) + '</b>' : '') + '</p>').join('') + '</div>' +
         (seal ? '<div class="pp-seal pp-seal-' + (seal.color || 'red') + ' cr-rc-seal">' + esc(seal.text) + '</div>' : '') + '</div>' +
         hints.filter(h => h.bar).map(h => barHTML(h.bar)).join('') +          // полоска района — на всю ширину, под строками и печатью
-        hints.filter(h => h.cal).map(h => calHTML(h.cal)).join('') +          // календарик сезонов (seasoncycle.js receipt)
         '<div class="cr-rc-stamp"></div>' +
       '</div>' +
     '</div></section>';
@@ -67,17 +66,6 @@ function barHTML (b) {
     .map((p, i) => (i ? '<span class="cr-nw">' + p + '</span>' : p)).join(' · ');
   return '<p class="cr-rc-bar' + (b.done ? ' open' : '') + '"><span class="cr-bar-t">' + txt +
     (b.done ? ' <span class="pp-mark">' + esc(b.done) + '</span>' : '') + '</span><span class="cr-dbar">' + cells + '</span></p>';
-}
-
-/* календарик сезонов (seasoncycle.js receipt): { text: «до весны — 2 смены», sub: что придёт, hol: { text } | null,
-   cells: [{ sea, to — переход в сезон, hol, next, name }] } — клетки следующих смен цветом сезона, звезда — праздник
-   (стиль — seasoncycle.css) */
-const SEA_ICON = { winter: '\u2744\uFE0E', spring: '\u273F', summer: '\u2600\uFE0E', autumn: '\u2766' };
-function calHTML (c) {
-  const cells = (c.cells || []).map(q => '<i class="sc-c sc-' + esc(q.sea) + (q.to ? ' sc-to-' + esc(q.to) : '') + (q.next ? ' sc-next' : '') + (q.hol ? ' sc-hol' : '') +
-    '" title="' + esc(q.name) + '">' + (q.hol ? '\u2605' : SEA_ICON[q.to || q.sea] || '') + '</i>').join('');
-  return '<div class="cr-rc-cal"><p class="sc-t"><span class="pp-mark">' + esc(c.text) + '</span>' + (c.hol ? ' · <b>' + esc(c.hol.text) + '</b>' : '') + '</p>' +
-    (c.sub ? '<p class="sc-s">' + esc(c.sub) + '</p>' : '') + '<p class="sc-row">' + cells + '</p></div>';
 }
 
 export function play ({ host, tap = null, head = '', no = 0, why = '', rows = [], total = null, hints = [], seal = null, party = '', sticker = null,
@@ -98,7 +86,7 @@ export function play ({ host, tap = null, head = '', no = 0, why = '', rows = []
   const walEl = host.querySelector('.cr-rc-wal b');
   WAL = walEl ? { el: walEl, fmt: money } : null;
   const fmt = total ? (total.fmt || money) : money;
-  const lines = [...host.querySelectorAll('.cr-rc-why, .cr-rc-rows .pp-row, .cr-rc-end > .pp-row, .cr-rc-hints > .pp-hint, .cr-rc-end > .cr-rc-bar, .cr-rc-end > .cr-rc-cal')];
+  const lines = [...host.querySelectorAll('.cr-rc-why, .cr-rc-rows .pp-row, .cr-rc-end > .pp-row, .cr-rc-hints > .pp-hint, .cr-rc-end > .cr-rc-bar')];
 
   let finished = false, ended = false;
   const timers = [];

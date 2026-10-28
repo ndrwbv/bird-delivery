@@ -12,9 +12,10 @@
                                  plate — табличка над дверью с рамкой)
      helpers: rect, spr, glow, vignette, poster, sticker, graffiti, plant, urn, bulb, text */
 
-const N_ = s => s;
-export const GRAFFITI = [N_('ЦОЙ ЖИВ'), N_('Вася + Лена'), N_('здесь был Петя'), N_('лифт — для слабаков'), N_('Солнечный — сила'), N_('не курить!')];
-export const ADS = [N_('ПРОДАМ ГАРАЖ'), N_('ВСКРЫТИЕ ЗАМКОВ'), N_('ПРОПАЛ КОТ'), N_('УБОРКА ПОДЪЕЗДА — СУББОТА'), N_('ИНТЕРНЕТ 100 МБ'), N_('ОТДАМ КОТЯТ')];
+import { GRAFFITI } from './entrance-graffiti.js';
+import { ADS } from './entrance-ads.js';
+import { LABELS } from './entrance-labels.js';
+export { GRAFFITI, ADS };
 
 export const PAL = {
   shabby: {
@@ -169,7 +170,7 @@ export function entrance (g, W, H, o) {
   // табличка над дверью: подъезд и квартиры
   const plW = Math.min(D.w * 0.8, P * 46), plH = P * 9, plX = W / 2 - plW / 2, plY = D.y - P * 2 - plH + P * 1;
   rect(g, plX - P, plY - P, plW + 2 * P, plH + 2 * P, '#f4efe2'); rect(g, plX, plY, plW, plH, '#2f5fb0');
-  text(g, (o.entr ? t('подъезд {n}', { n: o.entr }) : t('подъезд')) + (o.range ? ' · ' + o.range : ''), W / 2, plY + plH / 2 + P * 0.3, Math.min(P * 2.6, plW / 22), '#fff6e0');
+  text(g, (o.entr ? t(LABELS.entranceNumber, { n: o.entr }) : t(LABELS.entrance)) + (o.range ? ' · ' + o.range : ''), W / 2, plY + plH / 2 + P * 0.3, Math.min(P * 2.6, plW / 22), '#fff6e0');
   // сама дверь: коробка, полотно, петли, ручка
   rect(g, D.x - P * 2, D.y - P * 2, D.w + P * 4, D.h + P * 2, C.frame);
   rect(g, D.x, D.y, D.w, D.h, C.door);
@@ -195,7 +196,7 @@ export function entrance (g, W, H, o) {
   } else {
     const fx = D.x + D.w * 0.2, fy = D.y + D.h * 0.14, fw = D.w * 0.24, fh = D.w * 0.24;
     rect(g, fx - P, fy - P, fw + 2 * P, fh + 2 * P, '#8a6b4e');
-    poster(g, fx, fy, fw, fh * 0.8, P, N_('УБОРКА ПОДЪЕЗДА — СУББОТА'), t);
+    poster(g, fx, fy, fw, fh * 0.8, P, ADS[3], t);
   }
   // ступеньки и площадка у двери
   const sy0 = D.y + D.h;

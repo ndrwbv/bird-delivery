@@ -36,12 +36,18 @@ import * as UPD from './update.js';              // плашка «есть но
 import { carousel } from './carousel.js';
 import * as PFX from './paperfx.js';
 import * as DP from './distpick.js';            // выбор района — карусель карточек (distpick.js)
+import * as STORYTEST from './storytest.js';      // отладочная панель сюжета у номера версии
 
 let A = null, el = null, md = null, nameCb = null, nameFirst = false, CZ = null, curKey = 'go';
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-export function init (api) { A = api; UPD.onChange(() => { if (el) upd(); }); }
+export function init (api) {
+  A = api;
+  STORYTEST.setMenuShift(() => (A.menuStoryGo || A.menuGo)());
+  STORYTEST.onPanelChange(() => { if (el) syncDebugButton(); });
+  UPD.onChange(() => { if (el) upd(); });
+}
 
 function build () {
   if (el) return el;
@@ -59,7 +65,7 @@ function build () {
     '<div class="crm-sky"></div>' +
     '<div class="crm-car"></div>' +
     '<div class="crm-hint"></div>' +
-    '<div class="crm-ver"></div>';
+    '<div class="crm-meta"><button type="button" class="crm-debug" data-a="storytest"></button><div class="crm-ver"></div></div>';
   big.appendChild(el);
   el.querySelectorAll('[data-a]').forEach(b => b.addEventListener('click', () => act(b.dataset.a)));
   CZ = carousel(el.querySelector('.crm-car'), { cls: 'crm-cz', scales: [1, 0.86, 0.74], reach: 3, onChange: (i, c) => { curKey = c.dataset.key; navReset(); if (A.Snd && A.Snd.click) try { A.Snd.click(520); } catch (e) { /* — */ } } });
@@ -69,7 +75,12 @@ function build () {
 function navReset () { if (A.padClear) A.padClear(); if (A.kbClear) A.kbClear(); }
 
 function act (a) {
-  if ((md && !md.hidden) || DP.root() || BOARD.root() || HONOR.root() || QR.root() || PROF.root() || CITY.root()) return;
+  if (a === 'storytest') {
+    if ((md && !md.hidden) || DP.root() || BOARD.root() || HONOR.root() || QR.root() || PROF.root() || CITY.root()) return;
+    STORYTEST.togglePanel();
+    return;
+  }
+  if ((md && !md.hidden) || DP.root() || BOARD.root() || HONOR.root() || QR.root() || PROF.root() || CITY.root() || STORYTEST.panelRoot()) return;
   A.Snd.boot && A.Snd.boot();
   if (a === 'go') A.menuGo();
   else if (a === 'district') openDistricts();
@@ -130,6 +141,7 @@ export function show () {
   curKey = CZ.card() ? CZ.card().dataset.key : 'go';
   profButton();
   upd();
+  syncDebugButton();
   hint();
   if (!String(A.Store.get('dlv-name', '') || '').trim()) askName(null, true);
   else CITY.check(() => show());                  // открыт весь город, а праздника ещё не было — сейчас (cityopen.js)
@@ -173,6 +185,13 @@ function upd () {
   }
   const v = UPD.version();
   el.querySelector('.crm-ver').textContent = v ? t('версия {v}', { v: String(v).replace(/^v(?=\d)/, '') }) : '';
+}
+function syncDebugButton () {
+  const b = el?.querySelector('.crm-debug');
+  if (!b) return;
+  const open = STORYTEST.panelOpen();
+  b.textContent = open ? t('Дебаг оверлей: скрыть') : t('Дебаг оверлей: показать');
+  b.setAttribute('aria-expanded', String(open));
 }
 
 /* ── профиль: справа сверху портрет курьера, имя и «сменить» — окно профилей (profiles.js) ──
@@ -278,7 +297,7 @@ function saveName () {
   if (el && shown() && !cb) { show(); focus(); }        // первый запуск: имя есть — рейтинг с ним, фокус на «на смену»
   if (cb) cb(v);
 }
-export const modal = () => (md && !md.hidden && !md.closest('[hidden]') ? md : DP.root() || PROF.root() || BOARD.root() || HONOR.root());   // заставку спрятали (поехали) — окна нет
+export const modal = () => (md && !md.hidden && !md.closest('[hidden]') ? md : DP.root() || PROF.root() || BOARD.root() || HONOR.root() || STORYTEST.panelRoot());   // заставку спрятали (поехали) — окна нет
 /* назад: из настроек — отмена; при первом запуске окно не закрывается, ждём имя */
 export function back () {
   if (!modal()) return false;
@@ -286,6 +305,7 @@ export function back () {
   if (modal() === PROF.root()) return PROF.back();
   if (modal() === BOARD.root()) return BOARD.close();
   if (modal() === HONOR.root()) return HONOR.close();
+  if (modal() === STORYTEST.panelRoot()) { STORYTEST.togglePanel(false); focus(); return true; }
   if (nameFirst) return true;
   md.querySelector('input').blur();
   md.hidden = true;

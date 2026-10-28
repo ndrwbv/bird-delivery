@@ -49,13 +49,13 @@ body.door-dialogue .sx .mk-help, body.door-dialogue .sx .sx-bar { visibility: hi
   border: 1px solid #8c7851; border-radius: 0; box-shadow: none; background: #484b36; color: #f1ead4;
   font: 600 clamp(16px, 1.3vw, 21px)/1.25 system-ui, sans-serif; text-align: center;
   clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
-#dlg.door2d .dlg-btns.one button { width: min(50%, 200px); }
+#dlg.door2d .dlg-btns.one button { width: min(100%, 420px); }
 #dlg.door2d .dlg-btns .dlg-no { background: #303229; color: #f1ead4; border-color: #8c7851; }
 #dlg.door2d .dlg-btns button.dlg-cur, #dlg.door2d .dlg-btns button:hover { background: #b69b69; color: #202219; border-color: #dec493; }
 #dlg.door2d .dlg-btns button::before, #dlg.door2d .dlg-btns .pp-key, #dlg.door2d .dlg-hint { display: none; }
 #dlg.door2d.door2d-courier .dlg-row { left: 28%; top: auto; bottom: 5%; width: 44%; max-width: 580px;
   transform: perspective(1000px) rotateY(0) rotateZ(-.5deg); transform-origin: center bottom; }
-#dlg.door2d.door2d-courier .dlg-head { display: none; }
+#dlg.door2d.door2d-courier .dlg-head { display: flex; margin-left: 8px; }
 #dlg.door2d.door2d-courier .dlg-bubble { min-height: 72px; }
 @media (max-width: 900px) {
   #door2d .door2d-frame { left: -3vw; height: 92vh; bottom: 0; }

@@ -3,7 +3,6 @@
    управление передаётся существующему домофону doorstep.js.
    Автомобильное управление и сам домофон здесь не дублируются. */
 import * as WRECK from './carwreck.js';
-import * as CROUND from './carround.js';
 export const ON = true;
 
 export const FP = {
@@ -11,6 +10,7 @@ export const FP = {
   FOV: 68,
   FADE_OUT: 0.25, FADE_IN: 0.35,
   EXIT: 1.0,          // с: камера уходит в глаза, дверь открылась
+  PARK: 0.8,          // с: вид из-за руля, машина плавно останавливается у подъезда
   OUT: 0.9,           // м: встал от борта (дальше — в окно салон не видно)
   ROUND: 0.8,         // м: обход машины — на столько от кузова
   DOOR_ANG: 1.1,      // рад: насколько открывается водительская дверь
@@ -25,6 +25,7 @@ export const FP = {
   AT_DOOR: 3.2,       // м: остановился перед входом
   INTERCOM: 2.3,      // м: приблизился к домофону, но не уткнулся в дверь
   APPROACH: 0.55, HOLD: 0.2,
+  ENTRY_OPEN: 0.8,   // с: сначала видно подробную дверь, потом кадр темнеет к лестнице
   LOOK_K: 5,          // как быстро взгляд догоняет цель
   BOB: 0.035, BOB_HZ: 1.9,   // м, шагов/с: голова качается на ходу
   HL: 2.15,           // м: полудлина машины (обход)
@@ -35,9 +36,9 @@ export const FP = {
 export const ST = { runs: 0, skips: 0, last: null, noDoor: 0 };
 
 let A = null;
-const R = { on: false, t: 0, ph: '', st: null, n: 1, done: null, path: null, len: 0, dur: 0, door: null, pc: null, doorA: 0,
+const R = { on: false, t: 0, ph: '', st: null, n: 1, done: null, path: null, len: 0, dur: 0, door: null, pc: null, doorA: 0, prevMode: null,
   p0: null, look: null, hands: null, box: null, from: null, taken: 0, walkT: 0, bob: 0,
-  handK: 0, fade: null, entryDoor: null, entryDark: null };
+  handK: 0, fade: null, entryDoor: null, entryDark: null, entryFrame: null };
 let V3 = null;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, k) => a + (b - a) * k;
@@ -107,27 +108,54 @@ function entryLeaf () {
   if (R.entryDoor || !R.door) return;
   const T = A.THREE, d = R.door, ry = Math.atan2(d.nx, d.nz), tx = d.nz, tz = -d.nx;
   const gy = A.groundH(d.x + d.nx, d.z + d.nz), hinge = new T.Group();
+  const metal = new T.MeshLambertMaterial({ color: '#5a493d', side: T.DoubleSide });
+  const trim = new T.MeshLambertMaterial({ color: '#7c6852' });
+  const darkMetal = new T.MeshLambertMaterial({ color: '#252a2b' });
+  const glass = new T.MeshLambertMaterial({ color: '#313b38', transparent: true, opacity: 0.83, side: T.DoubleSide });
+  const brass = new T.MeshLambertMaterial({ color: '#b89b63' });
+  const part = (parent, w, h, dep, x, y, z, mat) => {
+    const m = new T.Mesh(new T.BoxGeometry(w, h, dep), mat);
+    m.position.set(x, y, z); parent.add(m); return m;
+  };
   const dark = new T.Mesh(new T.PlaneGeometry(1.5, 2.25),
     new T.MeshBasicMaterial({ color: '#151411', side: T.DoubleSide }));
   dark.position.set(d.x + d.nx * 0.13, gy + 1.12, d.z + d.nz * 0.13); dark.rotation.y = ry;
   hinge.position.set(d.x - tx * 0.75 + d.nx * 0.15, gy + 1.12, d.z - tz * 0.75 + d.nz * 0.15);
   hinge.rotation.y = ry;
-  const leaf = new T.Mesh(new T.PlaneGeometry(1.5, 2.25),
-    new T.MeshLambertMaterial({ color: '#5a4636', side: T.DoubleSide }));
-  leaf.position.x = 0.75;
-  const handle = new T.Mesh(new T.BoxGeometry(0.045, 0.05, 0.03),
-    new T.MeshBasicMaterial({ color: '#c5aa6d' }));
-  handle.position.set(1.33, -0.18, 0.025);
-  hinge.add(leaf, handle); A.scene.add(dark, hinge);
-  R.entryDoor = hinge; R.entryDark = dark;
+  // Стальная дверь: филёнки, стекло под решёткой, замок, ручка, доводчик и петли.
+  part(hinge, 1.48, 2.22, 0.09, 0.75, 0, 0, metal);
+  for (const yy of [-0.75, -0.1, 0.72]) {
+    part(hinge, 1.25, 0.025, 0.025, 0.75, yy, 0.062, trim);
+    part(hinge, 1.25, 0.025, 0.025, 0.75, yy, -0.062, trim);
+  }
+  part(hinge, 0.85, 0.58, 0.018, 0.75, 0.36, 0.055, glass);
+  for (const xx of [0.48, 0.75, 1.02]) part(hinge, 0.018, 0.62, 0.026, xx, 0.36, 0.073, darkMetal);
+  part(hinge, 0.91, 0.02, 0.026, 0.75, 0.66, 0.073, darkMetal);
+  part(hinge, 0.91, 0.02, 0.026, 0.75, 0.06, 0.073, darkMetal);
+  part(hinge, 0.12, 0.18, 0.035, 1.29, -0.29, 0.073, darkMetal);
+  part(hinge, 0.20, 0.04, 0.07, 1.25, -0.25, 0.11, brass);
+  part(hinge, 0.20, 0.04, 0.07, 1.25, -0.25, -0.11, brass);
+  part(hinge, 0.31, 0.08, 0.09, 0.22, 0.97, 0.02, darkMetal);
+  for (const yy of [-0.78, 0.72]) part(hinge, 0.06, 0.2, 0.15, 0.025, yy, 0, brass);
+  const frame = new T.Group();
+  frame.position.set(d.x, gy + 1.12, d.z); frame.rotation.y = ry;
+  for (const xx of [-0.79, 0.79]) part(frame, 0.12, 2.36, 0.17, xx, 0, 0.1, darkMetal);
+  part(frame, 1.69, 0.12, 0.18, 0, 1.18, 0.1, darkMetal);
+  part(frame, 1.7, 0.08, 0.28, 0, -1.14, 0.16, trim);
+  // Домофон находится сбоку от проёма и не двигается вместе с полотном.
+  part(frame, 0.2, 0.34, 0.08, 1.03, -0.12, 0.14, darkMetal);
+  part(frame, 0.14, 0.05, 0.01, 1.03, -0.02, 0.185, glass);
+  for (let i = 0; i < 6; i++) part(frame, 0.025, 0.022, 0.014, 0.98 + i % 2 * 0.09, -0.11 - Math.floor(i / 2) * 0.06, 0.187, brass);
+  A.scene.add(dark, frame, hinge);
+  R.entryDoor = hinge; R.entryDark = dark; R.entryFrame = frame;
 }
 function dropEntryLeaf () {
-  for (const g of [R.entryDoor, R.entryDark]) {
+  for (const g of [R.entryDoor, R.entryDark, R.entryFrame]) {
     if (!g) continue;
     if (g.parent) g.parent.remove(g);
     g.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
   }
-  R.entryDoor = R.entryDark = null;
+  R.entryDoor = R.entryDark = R.entryFrame = null;
 }
 
 /** doorstep.js stairs: подъезд на адресе — сначала дойти до него от первого лица */
@@ -142,9 +170,11 @@ export function run (st, o = {}) {
   const n = Math.max(1, st.boxes || 1);
   const cam = A.cam;
   V3.set(0, 0, -1).applyQuaternion(cam.quaternion).multiplyScalar(6).add(cam.position);
-  Object.assign(R, { on: true, t: 0, ph: 'fade', st, n, taken: 0, walkT: 0, bob: 0, from: null, box: null,
+  Object.assign(R, { on: true, t: 0, ph: 'park', st, n, taken: 0, walkT: 0, bob: 0, from: null, box: null,
     look: { x: V3.x, y: V3.y, z: V3.z },
-    door: { x: e[0], z: e[1], nx: e[2], nz: e[3] } });
+    door: { x: e[0], z: e[1], nx: e[2], nz: e[3] }, prevMode: A.mode ? A.mode() : null });
+  // На подъезде к дому камера переходит за руль; исходный вид игрока вернётся после посадки.
+  if (A.cameraMode) A.cameraMode('cab');
   // водительская дверь — слева (+x), как у коллег (crewride.js); нет куска (сорвало, ?oldwreck) — без неё
   R.pc = null; R.doorA = 0;
   try { if (WRECK.WR.on) { const pc = WRECK.piece(car, car.userData.real ? 'dfl' : 'dl'); if (pc && !pc.gone) R.pc = pc; } } catch (e2) { R.pc = null; }
@@ -156,7 +186,7 @@ export function run (st, o = {}) {
   if (!h.parent) A.scene.add(h);
   h.visible = false;
   fade(0);
-  ST.last = { n, ph: 'fade', ms: 0, skip: false, walk: 0, door: +Math.hypot(e[0] - car.position.x, e[1] - car.position.z).toFixed(1) };
+  ST.last = { n, ph: 'park', ms: 0, skip: false, walk: 0, door: +Math.hypot(e[0] - car.position.x, e[1] - car.position.z).toFixed(1) };
   R.t0 = performance.now();
   return new Promise(res => { R.done = res; });
 }
@@ -176,6 +206,10 @@ export function returnToCar (st) {
   R.path = pathTo(car, from, to);
   R.dur = clamp(R.path.len / 4.5, 0.8, 7);
   R.t = 0; R.ph = 'return-fade'; R.on = true; R.st = st; R.box = null; R.handK = 0; R.bob = 0;
+  R.prevMode = A.mode ? A.mode() : null;
+  if (A.cameraMode) A.cameraMode('near');
+  if (A.cabOut) A.cabOut();
+  if (A.driver) A.driver(false);
   if (R.hands) R.hands.visible = false;
   fade(1);
   return new Promise(res => { R.done = res; });
@@ -201,24 +235,54 @@ function finish (skip) {
   if (R.hands) { R.hands.visible = false; if (R.hands.parent) R.hands.parent.remove(R.hands); }
   if (leavingEntrance) requestAnimationFrame(() => fade(0)); else fade(0);
   R.handK = 0;
-  if (A.driver) A.driver(true);
+  if (A.driver) A.driver(!leavingEntrance);
+  if (A.cameraMode && R.prevMode) A.cameraMode(R.prevMode);
+  R.prevMode = null;
   R.taken = 0;
   if (ST.last) { ST.last.ms = Math.round(performance.now() - R.t0); ST.last.ph = R.ph; }
   const r = R.done; R.done = null; R.st = null;
   if (r) r(!skip);
 }
 
-/* путь пешком: от a к b, в обход машины (carround.js) — точки [x, z] */
+/* Путь пешком: видимые отрезки и углы с запасом вокруг кузова. В отличие от
+   локального обхода прохожих, эта катсцена строит весь путь до начала шага. */
 function pathTo (car, a, b) {
-  const box = { x: car.position.x, z: car.position.z, h: car.rotation.y, hl: FP.HL, hw: FP.HW };
-  const pts = [a];
-  let cur = { x: a[0], z: a[1] };
-  for (let i = 0; i < 3; i++) {
-    const w = CROUND.via(cur.x, cur.z, b[0], b[1], box, FP.ROUND);
-    if (!w) break;
-    pts.push(w); cur = { x: w[0], z: w[1] };
+  const c = Math.cos(car.rotation.y), s = Math.sin(car.rotation.y);
+  const local = p => { const dx = p[0] - car.position.x, dz = p[1] - car.position.z; return [dx * c - dz * s, dx * s + dz * c]; };
+  const worldPt = p => [car.position.x + p[0] * c + p[1] * s, car.position.z - p[0] * s + p[1] * c];
+  const hw = Math.max(R.seat?.hw || 0, FP.HW), hl = FP.HL, m = FP.ROUND;
+  const nodes = [local(a), local(b), [-hw - m, -hl - m], [hw + m, -hl - m],
+    [hw + m, hl + m], [-hw - m, hl + m]];
+  // Отрезок не может пересечь даже внутренний край кузова. Начало и цель у
+  // дверей могут быть ближе к машине, чем обходные углы.
+  const clear = (p, q) => {
+    const hx = hw + 0.03, hz = hl + 0.03;
+    let lo = 0, hi = 1;
+    for (const [v, d, h] of [[p[0], q[0] - p[0], hx], [p[1], q[1] - p[1], hz]]) {
+      if (Math.abs(d) < 1e-9) { if (Math.abs(v) >= h) return true; continue; }
+      const t0 = (-h - v) / d, t1 = (h - v) / d;
+      lo = Math.max(lo, Math.min(t0, t1)); hi = Math.min(hi, Math.max(t0, t1));
+      if (lo >= hi) return true;
+    }
+    return false;
+  };
+  const dist = Array(nodes.length).fill(Infinity), prev = Array(nodes.length).fill(-1), seen = new Set();
+  dist[0] = 0;
+  while (seen.size < nodes.length) {
+    let u = -1;
+    for (let i = 0; i < nodes.length; i++) if (!seen.has(i) && (u < 0 || dist[i] < dist[u])) u = i;
+    if (u < 0 || !Number.isFinite(dist[u]) || u === 1) break;
+    seen.add(u);
+    for (let v = 0; v < nodes.length; v++) {
+      if (v === u || seen.has(v) || !clear(nodes[u], nodes[v])) continue;
+      const d = dist[u] + Math.hypot(nodes[v][0] - nodes[u][0], nodes[v][1] - nodes[u][1]);
+      if (d < dist[v]) { dist[v] = d; prev[v] = u; }
+    }
   }
-  pts.push(b);
+  const order = [];
+  for (let u = 1; u >= 0; u = prev[u]) { order.push(u); if (u === 0) break; }
+  order.reverse();
+  const pts = Number.isFinite(dist[1]) ? order.map(i => worldPt(nodes[i])) : [a, b];
   let len = 0;
   for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
   return { pts, len };
@@ -240,6 +304,22 @@ export function step (dt) {
   if (!car || S.state !== 'drive') { finish(false); return; }
   R.t += dt;
   const cam = A.cam, hw = R.seat.hw;
+  if (R.ph === 'park') {
+    // Физика игры тормозит машину через holdCar; катсцена ждёт, пока колёса перестанут катиться.
+    if (ST.last) ST.last.ph = 'park';
+    fade(ease((R.t - FP.PARK) / FP.FADE_OUT));
+    if (R.t >= FP.PARK + FP.FADE_OUT && (Math.hypot(A.V.vx, A.V.vz) < 0.4 || R.t > 2.2)) {
+      R.ph = 'exit'; R.t = 0;
+      if (A.cameraMode) A.cameraMode('near');
+      if (A.cabOut) A.cabOut();
+      if (A.driver) A.driver(false);
+      const sx = world(car, Math.max(hw, FP.HW) + 0.12, R.seat.dz);
+      R.p0 = { x: sx[0], y: eyeY(sx[0], sx[1]), z: sx[1] };
+      const near = world(car, Math.max(hw, FP.HW) - 0.2, R.seat.dz - 1.2);
+      R.look = { x: near[0], y: eyeY(near[0], near[1]) - 0.3, z: near[1] };
+    }
+    return;
+  }
   const side = world(car, Math.max(hw, FP.HW) + FP.OUT, R.seat.dz); // у водительской двери снаружи — от борта, не от сиденья
   const back = world(car, 0.15, -(FP.HL + FP.BACK));                // за кормой
   const tp = A.trunk ? A.trunk() : { x: car.position.x, y: car.position.y + 0.9, z: car.position.z };
@@ -265,16 +345,6 @@ export function step (dt) {
       car.position.x, car.position.y + 1.2, car.position.z, dt, 0);
     fade(ease((R.t - 0.35) / 0.35));
     if (R.t >= 0.75) finish(false);
-    return;
-  }
-  if (ph === 'fade') {
-    fade(R.t / FP.FADE_OUT);
-    if (R.t >= FP.FADE_OUT) {
-      R.ph = 'exit'; R.t = 0; fade(1);
-      if (A.driver) A.driver(false);
-      const near = world(car, Math.max(hw, FP.HW) - 0.2, R.seat.dz - 1.2);
-      R.look = { x: near[0], y: eyeY(near[0], near[1]) - 0.3, z: near[1] };
-    }
     return;
   }
   if (ph === 'exit') {
@@ -336,11 +406,11 @@ export function step (dt) {
   } else if (ph === 'entry') {
     const d = R.door;
     entryLeaf();
-    if (R.entryDoor) R.entryDoor.rotation.y = Math.atan2(d.nx, d.nz) - 1.35 * ease(R.t / 0.45);
+    if (R.entryDoor) R.entryDoor.rotation.y = Math.atan2(d.nx, d.nz) - 1.35 * ease(R.t / 0.6);
     x = d.x + d.nx * FP.INTERCOM; z = d.z + d.nz * FP.INTERCOM;
     lx = d.x; ly = A.groundH(d.x, d.z) + 1.35; lz = d.z;
-    fade(ease(R.t / 0.45));
-    if (R.t >= 0.45) { if (R.st) R.st.carry = true; finish(false); return; }
+    fade(ease((R.t - 0.4) / (FP.ENTRY_OPEN - 0.4)));
+    if (R.t >= FP.ENTRY_OPEN) { if (R.st) R.st.carry = true; finish(false); return; }
   }
   if (walking) R.bob += dt * FP.BOB_HZ * Math.PI * 2;
   const y = eyeY(x, z) + (walking ? Math.abs(Math.sin(R.bob)) * FP.BOB - FP.BOB * 0.5 : 0);
@@ -418,7 +488,7 @@ export const busy = () => R.on;
 export const taken = () => (R.on ? R.taken : 0);
 
 export const DEBUG = {
-  FP, ST, R, ON,
+  FP, ST, R, ON, pathTo,
   get on () { return R.on; },
   get ph () { return R.ph; },
   toTrunk, take: beginTake,

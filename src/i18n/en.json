@@ -5811,5 +5811,17 @@
  "У дома · начинается выход из машины": "At the building · leaving the car",
  "Сюжет · тест": "Story · test",
  "Сюжетные задания": "Story missions",
- "Выбери главу и проходи этапы без поездки. Доставка засчитывается в этом профиле.": "Choose a chapter and play through its stages without driving. Delivery counts on this profile."
+ "Выбери главу и проходи этапы без поездки. Доставка засчитывается в этом профиле.": "Choose a chapter and play through its stages without driving. Delivery counts on this profile.",
+ "Женя": "Zhenya",
+ "Подниматься": "Go upstairs",
+ "Закончить разговор": "End conversation",
+ "ПРЕДСЕДАТЕЛЬ": "CHAIRMAN",
+ "ПОДЪЕЗДА": "OF THE BUILDING",
+ "ГЕННАДИЙ": "GENNADY",
+ "ХУЙЛО": "DICKHEAD",
+ "сюжетная глава завершена — смена всё": "Story chapter complete — shift over",
+ "Дебаг оверлей: показать": "Debug overlay: show",
+ "Дебаг оверлей: скрыть": "Debug overlay: hide",
+ "Выбери главу — смена начнётся сама": "Choose a chapter — the shift will start automatically",
+ "Запускаем сюжетную смену": "Starting story shift"
 }

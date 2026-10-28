@@ -132,8 +132,12 @@ body.career #build-v { display: none; }          /* версия — в .crm-ver
 .crm-hint { flex: none; align-self: center; margin-top: 6px; padding: .35em .9em .25em; text-align: center; font-size: var(--pp-fs-s); line-height: 2; color: var(--pp-ink);
             background: var(--pp-paper); border: 2px solid var(--pp-ink); border-radius: 2px; box-shadow: 0 3px 0 rgba(51, 33, 12, .7); }
 .crm-hint .pp-key { margin: 0 .2em 0 .4em; }
-.crm-ver { position: absolute; right: max(12px, var(--sa-r, env(safe-area-inset-right))); bottom: max(8px, var(--sa-b, env(safe-area-inset-bottom))); font-size: 11px;
-           color: var(--pp-paper); opacity: .85; text-shadow: 2px 2px 0 var(--pp-ink); pointer-events: none; }
+.crm-meta { position: absolute; right: max(12px, var(--sa-r, env(safe-area-inset-right))); bottom: max(8px, var(--sa-b, env(safe-area-inset-bottom)));
+             display: flex; align-items: center; gap: 9px; z-index: 3; }
+.crm-debug { padding: 4px 8px; border: 1px solid var(--pp-paper); border-radius: 4px; background: rgba(35, 27, 25, .82);
+             color: var(--pp-paper); font: 600 11px/1.3 system-ui, sans-serif; cursor: pointer; }
+.crm-debug:hover, .crm-debug:focus-visible, .crm-debug.padsel { color: var(--pp-ink); background: var(--pp-yellow); outline: 2px solid var(--pp-ink); }
+.crm-ver { font-size: 11px; white-space: nowrap; color: var(--pp-paper); opacity: .85; text-shadow: 2px 2px 0 var(--pp-ink); pointer-events: none; }
 
 .crm-dbox { width: min(560px, 100%); max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 22px 20px 18px; box-sizing: border-box;
             background: var(--pp-paper); color: var(--pp-ink); border: 3px solid var(--pp-ink); border-radius: 4px; box-shadow: 0 8px 0 var(--pp-ink), 0 20px 50px rgba(0, 0, 0, .45); }

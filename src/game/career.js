@@ -305,6 +305,14 @@ export function atBase (next) {
     if (SH.home) { SH.home = false; endLate(); return true; }
     return false;
   }
+  // Д22: сюжетная глава — последняя доставка. После возвращения закрываем смену,
+  // даже если по часам до обычного конца ещё есть время.
+  if (ORD && ORD.storyLast && ORD.storyLast()) {
+    SH.phase = 'late';
+    A.toast(t('сюжетная глава завершена — смена всё'));
+    A.endShift('время');
+    return true;
+  }
   if (SH.lunch || SH.phase !== '') return false;
   const h = schedHour();
   if (h < ECON.SHIFT.LUNCH_H || shiftOver()) return false;

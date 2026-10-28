@@ -392,4 +392,5 @@ function hitOne (p, k, t, vx, vz, sp) {
   ST.killed++;
 }
 
-export const DEBUG = { PC, ST, inside, solidAt, carAt, coverNear };
+export const DEBUG = { PC, ST, inside, solidAt, carAt, coverNear,
+  wakeCar: t => TGRID.wake(t) };   // probe переносит стоящую машину: сначала вывести её из сетки прежней парковки
