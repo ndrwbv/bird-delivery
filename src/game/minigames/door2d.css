@@ -45,6 +45,7 @@ body.door-dialogue .sx .mk-help, body.door-dialogue .sx .sx-bar { visibility: hi
 #dlg.door2d .dlg-btns { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px;
   width: 100%; margin: 13px 0 0; pointer-events: auto; }
 #dlg.door2d .dlg-btns.one { display: flex; justify-content: center; }
+#dlg.door2d .dlg-btns .dlg-yes { order: -1; } /* первый ответ слева: ← выбирает его же */
 #dlg.door2d .dlg-btns button { position: relative; justify-content: center; min-height: 46px; padding: 7px 10px;
   border: 1px solid #8c7851; border-radius: 0; box-shadow: none; background: #484b36; color: #f1ead4;
   font: 600 clamp(16px, 1.3vw, 21px)/1.25 system-ui, sans-serif; text-align: center;
@@ -57,6 +58,11 @@ body.door-dialogue .sx .mk-help, body.door-dialogue .sx .sx-bar { visibility: hi
   transform: perspective(1000px) rotateY(0) rotateZ(-.5deg); transform-origin: center bottom; }
 #dlg.door2d.door2d-courier .dlg-head { display: flex; margin-left: 8px; }
 #dlg.door2d.door2d-courier .dlg-bubble { min-height: 72px; }
+#dlg.door2d.dlg-auto .dlg-row { left: 58%; width: 39%; max-width: 580px; }
+#dlg.door2d.dlg-auto .dlg-col { padding: 9px; }
+#dlg.door2d.dlg-auto .dlg-bubble { min-height: 0; padding: 14px 17px; }
+#dlg.door2d.dlg-auto .dlg-btns { display: none; }
+#dlg.door2d.dlg-auto.door2d-courier .dlg-row { left: 20%; width: 60%; max-width: 740px; }
 @media (max-width: 900px) {
   #door2d .door2d-frame { left: -3vw; height: 92vh; bottom: 0; }
   #dlg.door2d .dlg-row { left: 56%; top: 26%; width: 40%; }

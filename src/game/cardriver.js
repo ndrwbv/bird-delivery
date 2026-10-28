@@ -25,7 +25,7 @@ export function step (car, steer) {
   if (g === null) return;
   if (!g) {
     const p = A.person();
-    g = p ? A.makeHuman(p, { shirt: p.look && p.look.shirt, pants: p.look && p.look.pants }) : null;
+    g = p ? A.makeHuman(p, { summer: true, shirt: p.look && p.look.shirt, pants: p.look && p.look.pants }) : null;
     if (!g || !g.userData.q) { SEAT.set(car, null); ST.skip++; return; }   // люди коробочные (?qp=0) — пусть сидит прежний
     g.position.set(DRV.X, DRV.Y, DRV.Z);
     car.add(g);

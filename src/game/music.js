@@ -233,6 +233,7 @@ function tick () {
   if (q('cut')) k = Math.min(k, MUS.DUCK.cut);
   if (q('dialog')) k = Math.min(k, MUS.DUCK.dialog);
   if (q('chat')) k = Math.min(k, MUS.DUCK.chat);
+  if (q('indoors')) k = 0;
   if (A.S.paused) k = Math.min(k, MUS.DUCK.pause);
   if (D && Math.abs(k - ST.dg) > 0.001) {
     const g = D.gain, tc = Snd.ctx.currentTime;

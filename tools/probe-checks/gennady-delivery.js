@@ -32,6 +32,8 @@ if (document.querySelector('#dlg .dlg-name')?.textContent !== 'Женя' || !doc
   throw new Error('Сюжетный выбор без подписи Жени или без Геннадия');
 const yes = document.querySelector('#dlg .dlg-yes'), no = document.querySelector('#dlg .dlg-no');
 if (!yes || !no) throw new Error('Выбор не построен: ' + JSON.stringify({ dlg: document.querySelector('#dlg')?.outerHTML?.slice(0, 1500), stairs: d.DOOR.stairsState()?.scene, order: d.S.order?.ord?.story?.storyId, warnings, crash: d.crashlog }));
+if (yes.getBoundingClientRect().left >= no.getBoundingClientRect().left)
+  throw new Error('Визуальный порядок ответов расходится со стрелками');
 await run(1);
 const before = [yes.classList.contains('dlg-cur'), no.classList.contains('dlg-cur')];
 dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', bubbles: true, cancelable: true }));
@@ -48,8 +50,11 @@ await run(1);
 dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', bubbles: true, cancelable: true }));
 if (!document.querySelector('#dlg .dlg-no')?.classList.contains('dlg-cur')) throw new Error('Повторная стрелка не выбрала пеперони');
 dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
-await until(() => !d.DOOR.on() && !d.FPD.on, 30000);
+const returnPhases = new Set();
+await until(() => { if (d.FPD.on) returnPhases.add(d.FPD.ph); return !d.DOOR.on() && !d.FPD.on; }, 30000);
 await run(2);
+if (!returnPhases.has('return-open') || !returnPhases.has('return-sit') || !returnPhases.has('return-close'))
+  throw new Error('Посадка не прошла через открытие двери и сиденье: ' + JSON.stringify([...returnPhases]));
 if (!order.ord.story.interiorDone || d.S.delivered < 1)
   throw new Error('Встреча не засчиталась: ' + JSON.stringify({ done: order.ord.story.interiorDone, delivered: d.S.delivered,
     state: d.S.state, stairs: stop.stairs, hold: !!stop.hold, arrived: stop.arrived, target: d.S.target,
@@ -70,4 +75,4 @@ const badOut = blocked(outbound), badReturn = blocked(returned);
 if (badOut.length || badReturn.length) throw new Error('Курьер пересекает геометрию: ' + JSON.stringify({ badOut, badReturn, outbound, returned }));
 if (Math.hypot(d.V.x - spec.parking.x, d.V.z - spec.parking.z) > 0.5)
   throw new Error('Машина сместилась после возвращения');
-return { flat: stop.home.flat, parked, selected, delivered: d.S.delivered, finalCar: [d.V.x, d.V.z], driver: d.DRIVER.of(d.car)?.visible, outbound, returned };
+return { flat: stop.home.flat, parked, selected, returnPhases: [...returnPhases], delivered: d.S.delivered, finalCar: [d.V.x, d.V.z], driver: d.DRIVER.of(d.car)?.visible, outbound, returned };

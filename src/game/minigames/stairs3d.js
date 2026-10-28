@@ -155,7 +155,7 @@ export function create (box, o) {
   const wallTop = oldStairwell ? '#aba99e' : C.wallTop;
   const wallStripe = oldStairwell ? '#294b3a' : C.stripe;
   // У сюжетной квартиры широкий проём и площадка: фигура Геннадия не зажата дверной коробкой.
-  const DW = o.firstPerson ? 1.5 : 0.9, DH = o.firstPerson ? 2.25 : 2.05, DG = o.firstPerson ? 1.85 : 1.3;
+  const DW = o.firstPerson ? 1.5 : 0.9, DH = o.firstPerson ? 2.5 : 2.05, DG = o.firstPerson ? 1.85 : 1.3;
   const { lv, per, first } = P, tgt = P.floor - 1;
   const seed = o.seed >>> 0;
   const hsh = (...n) => { let x = seed ^ 0x9e3779b9; for (const v of n) { x = Math.imul(x ^ (v + 0x7f4a7c15), 0x85ebca6b); x ^= x >>> 13; } x = Math.imul(x, 0xc2b2ae35); return ((x ^ (x >>> 16)) >>> 0) / 4294967296; };
@@ -519,12 +519,19 @@ export function create (box, o) {
       if (mine) {
         // То же полотно видно с обеих сторон при открывании, без смены модели на гладкую изнанку.
         const back = new THREE.Mesh(lm.geometry, MAT);
-        back.rotation.y = Math.PI; back.position.set(DW, 0, 0.11); g.add(back);
+        back.rotation.y = Math.PI; back.position.set(DW, 0, -0.055); g.add(back);
       }
       const pq = new Quads(), u = plateUV(i);
-      pq.add(DW / 2 - 0.13, 1.6, DW / 2 + 0.13, 1.74, 0.07, u, AW, AH);
+      const nw = mine && o.firstPerson ? 0.42 : 0.26, ny = mine && o.firstPerson ? 1.84 : 1.6;
+      pq.add(DW / 2 - nw / 2, ny, DW / 2 + nw / 2, ny + (mine && o.firstPerson ? 0.22 : 0.14), 0.07, u, AW, AH);
       const pm = new THREE.Mesh(pq.geo(), A.mat);
       g.add(pm);
+      if (mine) {
+        // Открытая дверь показывает изнанку: номер остаётся читаемым и на ней.
+        const rearPlate = pm.clone();
+        rearPlate.rotation.y = Math.PI; rearPlate.position.set(DW, 0, -0.14);
+        g.add(rearPlate);
+      }
       doors.push({ g, n, i, open: 0, plate: pm });
     }
     // ── щиток с проводами (слева) и табличка этажа у лестницы ──

@@ -170,6 +170,7 @@ function show (o, done) {
   const btns = $('.dlg-btns'), hintEl = $('.dlg-hint'), box = $('.dlg-box');
   root.classList.toggle('compact', o.compact !== false && !o.door2d);
   root.classList.toggle('door2d', !!o.door2d);
+  root.classList.toggle('dlg-auto', !!o.auto);
   root.classList.toggle('door2d-courier', !!o.door2d && !!o.courierLine);
   const col = o.color || '#ff8a2b';
   $('.dlg-bar').style.background = col;
@@ -254,7 +255,7 @@ function show (o, done) {
     hintEl.hidden = false;
   };
   const CPS = o.cps || 38;                       // букв в секунду; на многоточии — пауза
-  const autoAfter = o.auto ? Math.max(1.5, Math.min(5.5, 1.15 + full.length * 0.042)) : 0;
+  const autoAfter = o.auto ? Math.max(0.9, Math.min(2.8, 0.6 + full.length * 0.025)) : 0;
   const finish = () => {
     if (typed) return; typed = true; armT = 0; el.textContent = full; if (!o.auto) $('.dlg-btns').classList.add('on'); $('.dlg-skip').textContent = '';
     TF.stop(img); root.classList.remove('dlg-talking');

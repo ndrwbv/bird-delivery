@@ -141,7 +141,7 @@ function openStairsPreview () {
   };
   try {
     stop = STAIRS.mount(worldBox, { forceOwn: true, lv: 5, floor: 3, per: 4, entr: 1, door: 1,
-      look: 'shabby', seed: 0x6e6e6164, addr: 'Ленинградская, 21', who: t(story.name), person, scenario,
+      look: 'shabby', seed: 0x6e6e6164, addr: 'улица Царевского, 2', who: t(story.name), person, scenario,
       clockS: 120, payment: '1 000 ₽', boxes: 1 }, { t, ADULT: !!A.ADULT, sfx: () => {}, hold: () => {},
       paused: () => false, setPad: fn => { padCallback = fn; }, done: () => requestAnimationFrame(finish) });
     padRaf = requestAnimationFrame(padFrame);

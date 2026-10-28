@@ -39,7 +39,8 @@ export const ST = { runs: 0, skips: 0, last: null, noDoor: 0 };
 let A = null;
 const R = { on: false, t: 0, ph: '', st: null, n: 1, done: null, path: null, len: 0, dur: 0, door: null, pc: null, doorA: 0, prevMode: null,
   p0: null, look: null, hands: null, box: null, from: null, taken: 0, walkT: 0, bob: 0, parkBay: null,
-  handK: 0, fade: null, entryDoor: null, entryDark: null, entryFrame: null, parking: null, parkStartH: 0, parkFallback: null, parkCut: false };
+  handK: 0, fade: null, entryDoor: null, entryDark: null, entryFrame: null, parking: null, parkStartH: 0, parkFallback: null, parkCut: false,
+  avatar: null, avatarPhase: 0 };
 let V3 = null;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, k) => a + (b - a) * k;
@@ -118,11 +119,12 @@ function entryLeaf () {
     const m = new T.Mesh(new T.BoxGeometry(w, h, dep), mat);
     m.position.set(x, y, z); parent.add(m); return m;
   };
-  const dark = new T.Mesh(new T.PlaneGeometry(1.5, 2.25),
+  const dark = new T.Mesh(new T.PlaneGeometry(1.5, 2.68),
     new T.MeshBasicMaterial({ color: '#151411', side: T.DoubleSide }));
-  dark.position.set(d.x + d.nx * 0.13, gy + 1.12, d.z + d.nz * 0.13); dark.rotation.y = ry;
-  hinge.position.set(d.x - tx * 0.75 + d.nx * 0.15, gy + 1.12, d.z - tz * 0.75 + d.nz * 0.15);
+  dark.position.set(d.x + d.nx * 0.13, gy + 1.34, d.z + d.nz * 0.13); dark.rotation.y = ry;
+  hinge.position.set(d.x - tx * 0.75 + d.nx * 0.15, gy + 1.34, d.z - tz * 0.75 + d.nz * 0.15);
   hinge.rotation.y = ry;
+  hinge.scale.y = 1.2;
   // Стальная дверь: филёнки, стекло под решёткой, замок, ручка, доводчик и петли.
   part(hinge, 1.48, 2.22, 0.09, 0.75, 0, 0, metal);
   for (const yy of [-0.75, -0.1, 0.72]) {
@@ -139,7 +141,7 @@ function entryLeaf () {
   part(hinge, 0.31, 0.08, 0.09, 0.22, 0.97, 0.02, darkMetal);
   for (const yy of [-0.78, 0.72]) part(hinge, 0.06, 0.2, 0.15, 0.025, yy, 0, brass);
   const frame = new T.Group();
-  frame.position.set(d.x, gy + 1.12, d.z); frame.rotation.y = ry;
+  frame.position.set(d.x, gy + 1.34, d.z); frame.rotation.y = ry; frame.scale.y = 1.18;
   for (const xx of [-0.79, 0.79]) part(frame, 0.12, 2.36, 0.17, xx, 0, 0.1, darkMetal);
   part(frame, 1.69, 0.12, 0.18, 0, 1.18, 0.1, darkMetal);
   part(frame, 1.7, 0.08, 0.28, 0, -1.14, 0.16, trim);
@@ -170,7 +172,18 @@ function showParkingBay (spot) {
   for (const z of [-2.65, 2.65]) strip(2.76, 0.065, 0, z);
   g.position.set(spot.x, A.parking.height(spot.x, spot.z) + 0.05, spot.z);
   g.rotation.y = spot.h;
+  g.userData.spot = { x: spot.x, z: spot.z, h: spot.h };
   A.scene.add(g); R.parkBay = g;
+}
+export function holdBay () {
+  const p = R.parkBay?.userData.spot, car = carNow();
+  if (!p || !car) return false;
+  A.V.x = p.x; A.V.z = p.z; A.V.h = p.h;
+  A.V.y = A.parking.height(p.x, p.z);
+  A.V.vx = A.V.vz = A.V.vy = 0;
+  car.position.set(p.x, A.V.y, p.z); car.rotation.y = p.h;
+  car.userData._pose = undefined;
+  return true;
 }
 function dropParkingBay () {
   const g = R.parkBay;
@@ -195,14 +208,15 @@ export function run (st, o = {}) {
   const door = { x: e[0], z: e[1], nx: e[2], nz: e[3] };
   const parkT0 = performance.now();
   const fixed = o.parking || null;
-  const directParking = o.story && A.parking ? STORYP.plan(A.parking, [A.V.x, A.V.z], door, fixed) : null;
+  const directParking = o.story && A.parking && !fixed?.approach ? STORYP.plan(A.parking, [A.V.x, A.V.z], door, fixed) : null;
   const parking = directParking || (o.story && A.parking ? STORYP.canonical(A.parking, door, fixed) : null);
+  if (o.story && fixed?.approach && !parking) { ST.noDoor++; console.warn('[storyparking] нет дорожного маршрута к парковке'); return null; }
   const parkCut = !!(parking && !directParking);
-  const fallbackRoad = o.story && !parking && A.parking && STORYP.spot(A.parking, door);
+  const fallbackRoad = o.story && !parking && !fixed?.approach && A.parking && STORYP.spot(A.parking, door);
   const first = parking && parking.pts[0], next = parking && parking.pts[1];
   Object.assign(R, { on: true, t: 0, ph: o.story ? 'park-intro' : 'park', st, n, taken: 0, walkT: 0, bob: 0, from: null, box: null,
     look: { x: V3.x, y: V3.y, z: V3.z },
-    door, parking, parkCut, parkStartH: parkCut ? Math.atan2(next[0] - first[0], next[1] - first[1]) : A.V.h,
+    door, parking, parkCut, parkStartH: fixed?.approach ? fixed.approach.h : parkCut ? Math.atan2(next[0] - first[0], next[1] - first[1]) : A.V.h,
     parkFallback: fallbackRoad, prevMode: A.mode ? A.mode() : null });
   // На затемнении машина плавно гасит скорость; точку начала маршрута закрепляем под закрытым кадром.
   // Прежний ракурс гаснет до смены камеры и возможного переноса на безопасный подъезд.
@@ -242,6 +256,15 @@ export function returnToCar (st) {
   R.path = pathTo(car, from, to);
   R.dur = clamp(R.path.len / 6.0, 0.7, 5);
   R.t = 0; R.ph = 'return-fade'; R.on = true; R.st = st; R.box = null; R.handK = 0; R.bob = 0;
+  R.pc = null; R.doorA = 0;
+  try { if (WRECK.WR.on) { const pc = WRECK.piece(car, car.userData.real ? 'dfl' : 'dl'); if (pc && !pc.gone) R.pc = pc; } } catch (e2) { R.pc = null; }
+  const courier = A.courier();
+  R.avatar = A.human(courier, { fat: false, summer: true, shirt: courier.look.shirt, pants: courier.look.pants });
+  R.avatar.position.set(from[0], A.groundH(from[0], from[1]), from[1]);
+  R.avatar.rotation.y = Math.atan2(to[0] - from[0], to[1] - from[1]);
+  A.scene.add(R.avatar);
+  R.avatarPhase = 0;
+  R.look = { x: from[0], y: R.avatar.position.y + 1.2, z: from[1] };
   R.prevMode = A.mode ? A.mode() : null;
   if (A.cameraMode) A.cameraMode('near');
   if (A.cabOut) A.cabOut();
@@ -265,10 +288,12 @@ function finish (skip) {
   R.on = false;
   if (skip) { ST.skips++; if (ST.last) ST.last.skip = true; }
   if (R.doorA) setDoor(0);
+  if (R.ph !== 'park-intro' && R.ph !== 'park-approach') holdBay();
   dropEntryLeaf();
   if (!leavingEntrance) dropParkingBay();
   if (A.setTrunk) A.setTrunk(false);
   dropBox();
+  if (R.avatar) { A.drop(R.avatar); R.avatar = null; }
   if (R.hands) { R.hands.visible = false; if (R.hands.parent) R.hands.parent.remove(R.hands); }
   if (leavingEntrance) requestAnimationFrame(() => fade(0)); else fade(0);
   R.handK = 0;
@@ -333,6 +358,25 @@ function along (P, k) {
     d -= s;
   }
   return P.pts[P.pts.length - 1];
+}
+
+function poseAvatar (x, z, yaw, phase, seated = 0) {
+  const g = R.avatar;
+  if (!g) return;
+  g.position.set(x, A.groundH(x, z) - seated * 0.25, z);
+  g.rotation.y = yaw;
+  const u = g.userData, sw = Math.sin(phase) * 0.72 * (1 - seated);
+  if (u.legL) { u.legL.rotation.x = sw + seated * 1.25; u.legR.rotation.x = -sw + seated * 1.25; }
+  if (u.armL) { u.armL.rotation.x = -sw * 0.7 - seated * 0.55; u.armR.rotation.x = sw * 0.7 - seated * 0.3; }
+  if (u.parts?.[2]) u.parts[2].rotation.x = -0.28 * Math.sin(Math.PI * seated);
+}
+
+function followAvatar (cam, x, z, dx, dz, dt, atCar = false) {
+  const l = Math.hypot(dx, dz) || 1, ux = dx / l, uz = dz / l;
+  const side = atCar ? 2.5 : 1.15, back = atCar ? 1.7 : 2.9;
+  const cx = x - ux * back + uz * side, cz = z - uz * back - ux * side;
+  place(cam, cx, A.groundH(cx, cz) + (atCar ? 2.15 : 2.35), cz,
+    x, A.groundH(x, z) + 1.15, z, dt, 1);
 }
 
 /** каждый кадр после camStep / HCAM.step (game.js) */
@@ -407,20 +451,41 @@ export function step (dt) {
   }
   if (ph === 'return-run') {
     const k = clamp(R.t / R.dur, 0, 1), p = along(R.path, k), to = world(car, Math.max(hw, FP.HW) + FP.OUT, R.seat.dz);
-    R.bob += dt * FP.BOB_HZ * Math.PI * 3;
-    const y = eyeY(p[0], p[1]) + Math.abs(Math.sin(R.bob)) * FP.BOB * 1.5;
-    place(cam, p[0], y, p[1], to[0], eyeY(to[0], to[1]) - 0.2, to[1], dt, 1);
+    const ahead = along(R.path, Math.min(1, k + 0.035)), behind = along(R.path, Math.max(0, k - 0.035));
+    const dx = ahead[0] - behind[0], dz = ahead[1] - behind[1];
+    R.avatarPhase += dt * 16;
+    poseAvatar(p[0], p[1], Math.atan2(dx, dz), R.avatarPhase);
+    followAvatar(cam, p[0], p[1], dx, dz, dt);
     fade(1 - ease(R.t / 0.35));
-    if (k >= 1) { R.ph = 'return-enter'; R.t = 0; }
+    if (k >= 1) { R.ph = 'return-open'; R.t = 0; }
     return;
   }
-  if (ph === 'return-enter') {
-    const p = world(car, Math.max(hw, FP.HW) + FP.OUT, R.seat.dz);
-    setDoor(FP.DOOR_ANG * Math.sin(Math.PI * clamp(R.t / 0.75, 0, 1)));
-    place(cam, p[0], lerp(eyeY(p[0], p[1]), car.position.y + 1.2, ease(R.t / 0.75)), p[1],
-      car.position.x, car.position.y + 1.2, car.position.z, dt, 0);
-    fade(ease((R.t - 0.35) / 0.35));
-    if (R.t >= 0.75) finish(false);
+  if (ph === 'return-open') {
+    const p = world(car, Math.max(hw, FP.HW) + FP.OUT, R.seat.dz), q = ease(R.t / 0.38);
+    setDoor(FP.DOOR_ANG * q);
+    poseAvatar(p[0], p[1], car.rotation.y - Math.PI / 2, 0);
+    if (R.avatar?.userData.armL) R.avatar.userData.armL.rotation.x = -1.0 * q;
+    followAvatar(cam, p[0], p[1], -Math.cos(car.rotation.y), Math.sin(car.rotation.y), dt, true);
+    if (q >= 1) { R.ph = 'return-sit'; R.t = 0; }
+    return;
+  }
+  if (ph === 'return-sit') {
+    const q = ease(R.t / 0.72), lx = lerp(Math.max(hw, FP.HW) + FP.OUT, 0.42, q);
+    const p = world(car, lx, R.seat.dz);
+    setDoor(FP.DOOR_ANG);
+    poseAvatar(p[0], p[1], car.rotation.y, 0, q);
+    const outside = world(car, Math.max(hw, FP.HW) + FP.OUT, R.seat.dz);
+    followAvatar(cam, outside[0], outside[1], -Math.cos(car.rotation.y), Math.sin(car.rotation.y), dt, true);
+    if (q >= 1) { R.ph = 'return-close'; R.t = 0; }
+    return;
+  }
+  if (ph === 'return-close') {
+    const q = ease(R.t / 0.35), outside = world(car, Math.max(hw, FP.HW) + FP.OUT, R.seat.dz);
+    if (R.avatar) R.avatar.visible = false;
+    setDoor(FP.DOOR_ANG * (1 - q));
+    followAvatar(cam, outside[0], outside[1], -Math.cos(car.rotation.y), Math.sin(car.rotation.y), dt, true);
+    fade(ease((R.t - 0.12) / 0.23));
+    if (q >= 1) finish(false);
     return;
   }
   if (ph === 'exit') {

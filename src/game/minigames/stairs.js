@@ -429,7 +429,8 @@ export default {
       const arrival = clock();
       if (o.scenario && arrival && arrival.s <= 0) dialogue.lines = [
         { speaker: dialogue.name, text: t('драсте.. че так долго то, а?'), emotion: 'angry' },
-        { speaker: t('Евгений'), text: t('извините задержался') }, ...dialogue.lines.slice(1)];
+        { speaker: t('Евгений'), text: t('извините задержался') },
+        { speaker: t('Евгений'), text: t('ваша пицца') }, ...dialogue.lines.slice(2)];
       const portrait = DOOR2D.enabled(dialogue, V3);
       st.scene = { t: 0, stage: 'open', opened: false, creak: false, running: false, out: 0, dialogue, portrait, actor: null, actorReady: !portrait };
       if (api.hold) api.hold(true);

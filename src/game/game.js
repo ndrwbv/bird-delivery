@@ -13459,8 +13459,9 @@ DLG.gate(HCAM.gate);                              // окно разговора
 /* подъезд в 3D (minigames/stairs3d.js, 12ас): люди — как в городе, но не в «дальних» (humanLod считает от камеры города) */
 /* доставка от первого лица (fpdeliver.js, Д2, проба ?fpdeliver): перед подъездом — глазами курьера от машины до двери */
 FPD.init({ THREE, cam, scene, V, S, pad: PAD, car: () => car, groundH, courier: () => STORY.PERSON.courier(), box: n => pizzaBox(n),
+  human: (p, o) => { const g = makeHuman(p, o); HUMANS.delete(g); return g; }, drop: dropMesh,
   door: (x, z) => nearEntrance(x, z, ECON.DOOR.DOOR_R), setTrunk, trunk: () => trunkPoint(), seatOf: t => CEX.DEBUG.seatOf(t),
-  parking: { road: (x, z) => nearestRoad(x, z, DRIVE_MAX, 3), route: (x0, z0, x1, z1) => lanePath(x0, z0, x1, z1),
+  parking: { road: (x, z) => nearestRoad(x, z, 7, 3), route: (x0, z0, x1, z1) => lanePath(x0, z0, x1, z1),
     clear: (x, z) => pinFree(x, z), pathClear: (x, z) => pinRay(x, z) && !inHouse(x, z, 0.8),
     blocked: (x0, z0, x1, z1) => segHouse(x0, z0, x1, z1), height: (x, z) => surfaceAt(x, z) },
   driver: on => { const g = DRIVER.DEBUG.of(car); if (g) g.visible = !!on; }, mode: () => CV.mode(), cameraMode: m => CV.set(m, false), Snd,   // Snd — пики домофона (Д3)
@@ -17672,7 +17673,7 @@ RADIO.init({ Store, S, ADULT, Snd, isPlaying, root: () => $('game') || document.
   quiet: () => S.state === 'brief' || FM.open || CHAT.talking() || DLG.isOpen() || FIRST.on() || STORY.active() || DOOR.on() || musTense(),
   weather: () => WTH.id(), night: () => (ENV.night || 0) > 0.5, name: () => S.name,
   works: () => (RL.DEBUG.WORKS || []).map(w => { const r = w.e && w.e.road; return r ? (typeof r === 'string' ? r : r.n || '') : ''; }).filter(Boolean) });
-MUS.init({ Snd, S, ENV, isPlaying, tense: musTense, radio: RADIO, Store,
+MUS.init({ Snd, S, ENV, isPlaying, tense: musTense, radio: RADIO, Store, indoors: () => DOOR.on() || ST3.on(),
   sea: () => SEAS.seasonValue(), hol: () => HOL.active(),   // своя музыка кодом (chiptunes.js): трек по сезону и празднику
   strip: () => { const m = document.getElementById('cr-menu'); return S.state === 'title' && elPanel.hidden && !!m && m.isConnected && !m.closest('[hidden]') && !(CAREER && CAREERM.padRoot()); },
   cut: () => FIRST.on() || STORY.active(), dialog: () => DLG.isOpen(), chat: () => CHAT.talking() });
@@ -18608,6 +18609,7 @@ function frameStep (now) {
     CV.jolt(dt, FPV.on ? 'cab' : CV.mode());       // удар — камера «клюёт» вперёд (camview.js, 11би)
     HCAM.step(dt);                                 // вручение в кадре: поворот на клиента / сцена (handcam.js)
     FPD.step(dt);                                  // от первого лица: из машины → багажник → к двери подъезда (fpdeliver.js, ?fpdeliver)
+    if (DOOR.on() || (FPD.busy() && FPD.DEBUG.ph !== 'park-intro' && FPD.DEBUG.ph !== 'park-approach')) FPD.holdBay();
   }
   SEE.step(dt, V.x, V.y, V.z, !FPV.on && S.state !== 'title' && S.state !== 'over');   // между камерой и машиной — тает (seethru.js)
 
@@ -18740,7 +18742,7 @@ function frameStep (now) {
   ERRS.step(dt);                                  // поручение кончилось — клиента и отдающего отпускаем (errands.js)
   if (S.state === 'side') {
     S.time -= dt;
-    if (S.time < 6) { S.tickT += dt; if (S.tickT > 0.4) { S.tickT = 0; Snd.tick(); } }
+    if (S.time > 0 && S.time < 6) { S.tickT += dt; if (S.tickT > 0.4) { S.tickT = 0; Snd.tick(); } }
     if (S.time < 0) sideEnd(false, $t('не успел — клиент передумал'));
     else checkArrival(dt);
     S.routeT += dt;
@@ -18749,7 +18751,7 @@ function frameStep (now) {
   if (S.state === 'drive' || S.state === 'back') {
     if (!S.free) {                                // без времени срок стоит
       S.time -= dt;
-      if (S.time < 6) { S.tickT += dt; if (S.tickT > 0.4) { S.tickT = 0; Snd.tick(); } }
+      if (S.time > 0 && S.time < 6) { S.tickT += dt; if (S.tickT > 0.4) { S.tickT = 0; Snd.tick(); } }
       // карьера: протух — не конец смены (docs/ORDERS.md «Опоздал»): везёшь дальше, клиент злой, платят ECON.PAY.LATE;
       // опоздал обратно в пиццерию — штраф (backLate, econ.js BACK_FINE). Развоз смены после полуночи закрывает сам orders.js. Яндекс — по-старому
       if (CAREER) { if (S.time >= 0) S.lateTold = false; else if (!S.lateTold && S.state === 'drive' && S.order && !(S.order.ord && S.order.ord.type === 'staff')) { S.lateTold = true; if (S.order.ord && S.order.ord.urgent) urgentFail(); else popBonus($t('опаздываешь'), $t('клиент недоволен: заплатит {p} % и без чаевых', { p: Math.round(ECON.PAY.LATE * 100) }), { urgent: true }); }

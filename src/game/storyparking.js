@@ -4,13 +4,17 @@ export const AREA = 38;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
-function safeSegment (a, b, api) {
+function safeSegment (a, b, api, onRoad = false) {
   const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz);
   if (api.blocked(a[0], a[1], b[0], b[1])) return false;
   const nx = -dz / (l || 1), nz = dx / (l || 1);
   for (let d = Math.min(3, l); d <= l; d += 1.5) {
     const t = l ? Math.min(1, d / l) : 0, x = a[0] + dx * t, z = a[1] + dz * t;
     if (!api.pathClear(x, z) || !api.pathClear(x + nx * 0.65, z + nz * 0.65) || !api.pathClear(x - nx * 0.65, z - nz * 0.65)) return false;
+    if (onRoad) {
+      const road = api.road(x, z);
+      if (!road || road.d > (road.seg?.w || 4) / 2 + 1.5) return false;
+    }
   }
   return true;
 }
@@ -46,7 +50,7 @@ export function plan (api, from, door, fixed) {
       const route = useRoad ? api.route(from[0], from[1], to[0], to[1]) : null;
       const raw = useRoad ? [from, ...(route || []), to] : [from, to];
       const pts = raw.filter((p, i) => !i || dist(p, raw[i - 1]) > 0.25);
-      if (pts.length < 2 || pts.some((p, i) => i && !safeSegment(pts[i - 1], p, api))) continue;
+      if (pts.length < 2 || pts.some((p, i) => i && !safeSegment(pts[i - 1], p, api, !!fixed))) continue;
       const length = pts.reduce((n, p, i) => n + (i ? dist(pts[i - 1], p) : 0), 0);
       const score = length + dist(to, [door.x, door.z]) * 0.5;
       if (!best || score < best.score) best = { pts, length, score, to, endHeading: fixed?.h };
@@ -66,6 +70,7 @@ export function plan (api, from, door, fixed) {
 // Если игрок въехал сбоку дома, берём безопасный стандартный старт перед фасадом.
 // Переход к нему происходит только при полностью закрытом кадре.
 export function canonical (api, door, fixed) {
+  if (fixed?.approach) return plan(api, [fixed.approach.x, fixed.approach.z], door, fixed);
   const tx = door.nz, tz = -door.nx;
   for (const depth of [25, 30, 20]) for (const side of [0, -8, 8, -15, 15]) {
     const x = door.x + door.nx * depth + tx * side, z = door.z + door.nz * depth + tz * side;

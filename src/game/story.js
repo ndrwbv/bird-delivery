@@ -19,9 +19,9 @@ export const STORIES = [{
     head: 'none', glasses: 'none', pack: null,
     q: { head: 'business', body: 'punk', legs: 'casual', feet: 'beach' },
     top: 'tee', shirt: '#e0d8c7', bottom: 'pants', pants: '#596276', shoes: '#47434a', shape: 'normal', bg: '#c9b9a3' } },
-  home: { addr: ['Ленинградская улица', '21'], near: [3099, 2876] }, items: N_('пицца'),
+  home: { addr: ['улица Царевского', '2'], near: [1430, 595] }, items: N_('пицца'),
   apartment: { floor: 3, per: 4, entr: 1, door: 1 },
-  parking: { x: 3099.68, z: 2857.27, h: -0.24 },
+  parking: { x: 1446.7, z: 596.9, h: 2.45, approach: { x: 1428.5, z: 620.8, h: 2.45 } },
   chapters: [{ id: 'gennady-sausage', name: N_('Докторская к пицце'),
     note: N_('Панельный дом. Квартира — в накладной.'), why: N_('Геннадий ждёт пиццу дома'),
     dialogue: [
