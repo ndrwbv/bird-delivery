@@ -57,6 +57,7 @@ const DEF = {
   'amb-rain-roof':    { mk: synRain,     prio: 1.6, file: 0.8 },
   'amb-crowd':        { mk: synCrowd,    prio: 1.4, file: 0.8, spatial: true },
   'amb-construction': { mk: synCons,     prio: 1.3, file: 0.8, spatial: true },
+  'amb-stairwell':    { mk: synStairwell, prio: 2,   file: 0.5 },
 };
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -116,7 +117,7 @@ export function step (dt) {
     if (ch.set <= 0 && ch.cur < 0.003) { if ((ch.off += dt) > 1) stopCh(ch); } else ch.off = 0;
   }
   STATS.maxPlaying = Math.max(STATS.maxPlaying, playing);
-  if (MODE === 1) oneShots(dt);
+  if (MODE === 1 && !(A.indoors && A.indoors())) oneShots(dt);
   const ms = now() - t0;
   STATS.ms += ms; STATS.frames++; if (ms > STATS.maxMs) STATS.maxMs = ms;
 }
@@ -124,6 +125,7 @@ export function step (dt) {
 /* сколько слышно: 0…1 для каждой петли */
 function targets () {
   const E = A.ENV, w = {};
+  if (A.indoors && A.indoors()) return { 'amb-stairwell': 0.55 };
   const night = E.night || 0, day = 1 - night;
   const snowy = SEAS.snowy();
   const rain = snowy ? 0 : clamp(E.rain || 0, 0, 1);
@@ -180,7 +182,10 @@ function decide (ready) {
     if (!ch.src) continue;
     // файл положили, пока звучал синтез, — перейти на файл
     if (ch.src.kind === 'synth' && v > 0 && SFX.buffer(n)) { stopCh(ch); startCh(n, ch); ch.set = -1; }
-    if (Math.abs(v - ch.set) > 0.004) { ch.g.gain.setTargetAtTime(v, tnow, AMB.FADE); ch.set = v; }
+    if (Math.abs(v - ch.set) > 0.004) {
+      ch.g.gain.setTargetAtTime(v, tnow, A.indoors && A.indoors() && n !== 'amb-stairwell' ? 0.08 : AMB.FADE);
+      ch.set = v;
+    }
     if (ch.p && ch.at) ch.p.pan.setTargetAtTime(ch.at.pan, tnow, 0.15);
   }
 }
@@ -391,6 +396,14 @@ function synCity (c, out, N) {
   l.connect(lg); lg.connect(ga.gain);
   return { stop: () => kill([a, b, l, lp, ga, bp, gb, lg]) };
 }
+/* Подъезд: глухая вентиляция и тихое электрическое гудение вместо уличного дождя. */
+function synStairwell (c, out, N) {
+  const a = loopSrc(c, N.brown), lp = filt(c, 'lowpass', 115, 0.7), ga = gain(c, 0.026);
+  const b = osc(c, 'sine', 100), gb = gain(c, 0.003);
+  a.connect(lp); lp.connect(ga); ga.connect(out);
+  b.connect(gb); gb.connect(out);
+  return { stop: () => kill([a, lp, ga, b, gb]) };
+}
 /* ветер: полоса бурого шума, порывы — медленные качели громкости и высоты */
 function synWind (c, out, N) {
   const a = loopSrc(c, N.brown), bp = filt(c, 'bandpass', 420, 0.9), g = gain(c, 0.05);
@@ -547,6 +560,7 @@ function synTrain (s) {
 const FORCE = {};
 export const DEBUG = {
   AMB, CTX, STATS, CH, GREEN,
+  targets: () => A ? targets() : {},
   /* что звучит: имя → { want, gain, file|synth } */
   playing () {
     const o = {};

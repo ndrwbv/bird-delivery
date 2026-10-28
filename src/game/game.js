@@ -15317,7 +15317,8 @@ function showOrderCard (order) {
   if (src) src.textContent = '№ ' + String(S.orders).padStart(4, '0');
   // квартира — в накладной с самого начала (домофон и подъезд берут её же: doorstep.js homeOf, docs/ORDERS.md «Домофон у подъезда»)
   if (CAREER) for (const st of order.stops) { const at = st.at || (st.peds && st.peds[0]); if (at && !st.pickup && !st.surf && !st.fixAddr) DOOR.homeOf(st,
-    order.ord && order.ord.story && order.ord.story.storyId === 'gennady' ? Math.max(5, entranceLv(at.x, at.z)) : entranceLv(at.x, at.z)); }
+    order.ord && order.ord.story && order.ord.story.storyId === 'gennady' ? Math.max(5, entranceLv(at.x, at.z)) : entranceLv(at.x, at.z),
+    STORY.apartmentFor(order.ord && order.ord.story)); }
   // мини-игра у клиента — решена сразу: домофон / подъезд — клиент дома, не на лавочке (doorstep.js); часы подошли —
   // ждут, пока пустит ритм смены (rhythm.js: не на первом и последнем заказе, не в окно «покататься», одно на заказ)
   if (CAREER && (!DOOR.DEBUG.timer.due || DIRECTOR.can('mini'))) DIRECTOR.planned(DOOR.plan(order));
@@ -16040,8 +16041,10 @@ function checkArrival (dt) {
     const arrivalOrder = S.order, arrivalStop = arrivalOrder.stops[arrivalOrder.idx];
     const story = arrivalOrder.ord?.story;
     const storyArrival = !!(story && STORY.interiorFor(story) && !story.interiorDone);
+    const storyParked = !!(story?.interiorDone && story.parking &&
+      Math.hypot(V.x - story.parking.x, V.z - story.parking.z) < 1.5);
     // Сюжет перехватывает руль ещё на подъезде к дому: угол и скорость въезда не влияют на выход курьера.
-    if (d > (storyArrival ? STORY_PARK_AREA : (arrivalStop.reach || 6)) || (!storyArrival && speed > 6)) return;
+    if ((!storyParked && d > (storyArrival ? STORY_PARK_AREA : (arrivalStop.reach || 6))) || (!storyArrival && speed > 6)) return;
     if (FLYC.blocksHand()) return;                 // летающий родстер: вручить — только на земле (flycar.js)
     const o = arrivalOrder;
     const st = arrivalStop;
@@ -17652,7 +17655,7 @@ const SKY_KEYS = [
 if (!NLIT.OLD) for (const i of [4, 5]) SKY_KEYS[i] = [SKY_KEYS[i][0], '#1f2a4f', '#222c4f', '#9db4ff', 0.36, '#64749f', '#232c38', 0.62, 0.25, 1];
 const RAIN_SKY = new THREE.Color('#8d97a3');
 const ENV = { t: 0.02, night: 0, rain: 0, rainWant: 0, rainT: 150, rainLeft: 0, phase: '' };
-AMBI.init({ Snd, V, S, ENV, CITY, TRAFFIC, nearestRoad, inPoly, isPlaying, musicK: () => 1 - MUS.MUS.AMB * MUS.level() });
+AMBI.init({ Snd, V, S, ENV, CITY, TRAFFIC, nearestRoad, inPoly, isPlaying, indoors: () => DOOR.on() || ST3.on(), musicK: () => 1 - MUS.MUS.AMB * MUS.level() });
 // музыка: напряжённо — налёт, восстание, мафиози, погоня, ураган; тише — катсцена, диалог, Толик пишет, пауза (music.js)
 const musTense = () => DIRECTOR.going(['raid', 'riot', 'mafia']) || WTH.id() === 'hurricane' || TACT.some(t => t.chase);
 // радио в машине (radio.js): в смене вместо музыки дня / ночи — станция; ведущий молчит, пока эфир занят

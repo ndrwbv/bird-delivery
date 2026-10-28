@@ -190,7 +190,7 @@ export default {
 
     // подъезд по виду: обшарпанный или чистый — по дому (doorscene.js), стиль — общий с домофоном
     const look = o.look === 'clean' || o.look === 'shabby' ? o.look : SC.lookOf(SC.hashStr(o.addr || String(flat)), o.zone);
-    const C = SC.PAL[look], seed = +o.seed || SC.hashStr((o.addr || '') + '|' + flat);
+    const C = SC.PAL[look], seed = o.scenario?.portrait ? 0x6e6e6164 : (+o.seed || SC.hashStr((o.addr || '') + '|' + flat));
     let faceUrl = '';
     try { faceUrl = person ? NICK.avatar(person, 48) : ''; } catch (e) { /* — */ }   // плашка накладной — аватарка из приложения
 
@@ -198,7 +198,7 @@ export default {
     const box = document.createElement('div');
     box.className = 'mk-full sx sx-' + look + (D3 ? ' sx3' : '');
     box.innerHTML =
-      '<canvas class="mk-cv sx-cv"></canvas>' + (D3 ? '<div class="sx3-hit"></div>' : '') + '<div class="sx-black"></div>' +
+      '<canvas class="mk-cv sx-cv"></canvas>' + (D3 ? '<div class="sx3-hit"></div>' : '') + '<div class="sx-breath-fx" hidden></div><div class="sx-black"></div>' +
       '<div class="mk-top">' + KIT.dashHTML() + '<div class="mk-fuse" aria-hidden="true"><i></i></div>' +
         // 11аа (автор 23.10.2026: «интерфейс перегружен»): задание — этаж и квартира, под ним — сколько осталось;
         // подъезда нет (ты уже в нём), дыхалка — только когда тает
@@ -227,7 +227,7 @@ export default {
     const elFuse = q('.mk-fuse i'), elHelp = q('.mk-help'), elSheet = box, elNow = q('.sx-now'), elTask = q('.sx-task');
     const mini = KIT.miniBind(q('.mk-mini')), elInv = mini.body;
     const elSelf = q('.mk-self'), elGoal = q('.mk-goal');
-    const elBreath = q('.sx-breath'), elBreathBar = q('.sx-breath b'), barGo = q('.sx-bar-go'), barGop = q('.sx-bar-gop');
+    const elBreath = q('.sx-breath'), elBreathBar = q('.sx-breath b'), elBreathFX = q('.sx-breath-fx'), barGo = q('.sx-bar-go'), barGop = q('.sx-bar-gop');
     // 3D: сцена — тем же рендерером, что город (в песочнице — свой холст); строится при входе, освобождается при выходе.
     // Не вышло (нет WebGL в песочнице, ошибка) — прежний 2D
     let V3 = null;
@@ -499,7 +499,7 @@ export default {
               text: lineText(line),
               accept: choices ? t(choices[0].text) : nextText(lineIndex),
               decline: choices && choices[1] ? t(choices[1].text) : undefined,
-              stack: !!choices && !S.portrait, paused: () => !!(api.paused && api.paused()),
+              stack: !!choices && !S.portrait, auto: !choices, paused: () => !!(api.paused && api.paused()),
               onShow: () => { if (S.actor) S.actor.talk(host); },
               onTyped: () => { if (S.actor) S.actor.talk(false); } });
             if (S.actor) S.actor.talk(false);
@@ -513,7 +513,7 @@ export default {
               if (S.actor) S.actor.line('angry');
               V3.scene.talk(!S.portrait);
               const correction = await DLG.say({ compact: true, door2d: S.portrait, canonicalName: true, fillers: false,
-                name: S.dialogue.name, person: S.portrait ? null : S.dialogue.person, text: line.wrongReply, accept: lineText(line),
+                name: S.dialogue.name, person: S.portrait ? null : S.dialogue.person, text: line.wrongReply, auto: true,
                 paused: () => !!(api.paused && api.paused()),
                 onShow: () => { if (S.actor) S.actor.talk(true); },
                 onTyped: () => { if (S.actor) S.actor.talk(false); } });
@@ -683,6 +683,8 @@ export default {
       else if (elBreath.hidden ? st.breath < 0.75 || st.puff > 0 : st.breath > 0.95 && st.puff <= 0) elBreath.hidden = !elBreath.hidden;
       elBreath.classList.toggle('sx-low', st.breath < 0.3 || st.puff > 0);
       elBreath.classList.toggle('sx-puff', st.puff > 0);
+      elBreathFX.hidden = st.breath >= 0.42;
+      box.style.setProperty('--sx-breath-haze', String(clamp((0.42 - st.breath) / 0.42, 0, 1) * 0.72));
       where();
       anim(dt); draw(dt);
     }
@@ -1186,7 +1188,7 @@ export default {
     say({ person, name: client(), text: t('Лифт опять сломан — поднимайтесь пешком!') });
     draw();
     if (entryRemark) DLG.say({ compact: true, door2d: true, courierLine: true, canonicalName: true, fillers: false,
-      name: t('Женя'), text: t('пахнет ссаниной'), accept: t('Подниматься'), paused: () => !!(api.paused && api.paused()) });
+      name: t('Женя'), text: t('пахнет ссаниной'), auto: true, paused: () => !!(api.paused && api.paused()) });
     if (ln) learnStart(mainSteps(), 'stairs');                  // первый подъезд — сначала обучение, потом бежать
 
     // для проверок (probe): пройти как игрок — гопников обойти (arg 'pay' — откупиться), подняться на нужный этаж и позвонить;

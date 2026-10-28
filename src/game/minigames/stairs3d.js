@@ -516,6 +516,11 @@ export function create (box, o) {
       g.position.set(L, y, ZB - 0.07);
       const lm = new THREE.Mesh(leaf(kind, (hsh(n, 4) * 5) | 0, look === 'shabby' && kind === 'derm' && hsh(n, 5) < 0.5), MAT);
       g.add(lm);
+      if (mine) {
+        // То же полотно видно с обеих сторон при открывании, без смены модели на гладкую изнанку.
+        const back = new THREE.Mesh(lm.geometry, MAT);
+        back.rotation.y = Math.PI; back.position.set(DW, 0, 0.11); g.add(back);
+      }
       const pq = new Quads(), u = plateUV(i);
       pq.add(DW / 2 - 0.13, 1.6, DW / 2 + 0.13, 1.74, 0.07, u, AW, AH);
       const pm = new THREE.Mesh(pq.geo(), A.mat);
@@ -570,6 +575,11 @@ export function create (box, o) {
       M.box(RUN - 0.02, yb - 0.24, ZB - 0.2, MX + 0.25, yb - 0.012, ZF, slabC);
       M.box(RUN - 0.02, yb - 0.24, ZF - 0.02, MX + 0.25, yb - 0.015, ZF, slabD);
       for (let x0 = RUN, i = 0; x0 < MX - 0.01; x0 += 0.4, i++) for (let z = ZB, j = 0; z < ZF - 0.01; z += 0.4, j++) M.top(x0, z, Math.min(x0 + 0.4, MX), Math.min(z + 0.4, ZF), yb, (i + j) % 2 ? t0 : t1);
+      if (oldStairwell && f === 0) {
+        // Бумага на открытой части площадки, рядом с доской объявлений.
+        M.box(RUN + 0.36, yb + 0.004, 0.2, RUN + 0.63, yb + 0.009, 0.38, '#d0c8b1');
+        M.box(RUN + 0.8, yb + 0.004, -0.22, RUN + 0.97, yb + 0.009, -0.05, '#bba98b');
+      }
       const wx0 = RUN + 0.3, wx1 = MX - 0.3, wy0 = yb + 0.95, wy1 = yb + 2.2;
       wall(M, RUN, wx0, yb, yb + FH, yb + 1.5); wall(M, wx1, MX + 0.25, yb, yb + FH, yb + 1.5);
       wall(M, wx0, wx1, yb, wy0, yb + 1.5); wall(M, wx0, wx1, wy1, yb + FH, yb + 1.5);
@@ -616,7 +626,7 @@ export function create (box, o) {
     // правый край клетки (за промежуточной площадкой) и левый — торцы разреза
     M.box(LX0 - 0.45, y - 0.24, ZB - 0.2, LX0 - 0.25, y + FH, ZF, '#2a211a');
     M.box(MX + 0.25, y - 0.24 + (flights ? 0 : 0), ZB - 0.2, MX + 0.45, y + FH, ZF, '#2a211a');
-    // ── мелочь на площадке: мусор или цветы, иногда кот ──
+    // ── мелочь на площадке: мусор или цветы ──
     const sp = [LX0 + 0.3, -0.75, LX0 + 1.0];
     sp.forEach((sx, k) => {
       const r = hsh(f, k, 31), sz = ZF - 0.5 - hsh(f, k, 32) * 0.6;
@@ -630,13 +640,12 @@ export function create (box, o) {
         M.box(sx - 0.07, y + 0.5, sz - 0.07, sx + 0.07, y + 0.6, sz + 0.07, k % 2 ? '#e8436a' : '#f2a03c');
       }
     });
-    if (hsh(f, 41) < 0.18) {                         // кот
-      const cx = LX0 + 1.6, cz = ZF - 0.55, kc = hsh(f, 42) < 0.5 ? '#2a2622' : '#c87a3a';
-      M.box(cx - 0.18, y, cz - 0.09, cx + 0.14, y + 0.17, cz + 0.09, kc);
-      M.box(cx + 0.1, y + 0.1, cz - 0.08, cx + 0.26, y + 0.26, cz + 0.08, kc);
-      M.box(cx + 0.12, y + 0.26, cz - 0.07, cx + 0.16, y + 0.31, cz - 0.03, kc); M.box(cx + 0.12, y + 0.26, cz + 0.03, cx + 0.16, y + 0.31, cz + 0.07, kc);
-      M.box(cx + 0.24, y + 0.17, cz - 0.05, cx + 0.262, y + 0.2, cz - 0.02, '#ffd85e'); M.box(cx + 0.24, y + 0.17, cz + 0.02, cx + 0.262, y + 0.2, cz + 0.05, '#ffd85e');
-      M.box(cx - 0.3, y + 0.02, cz - 0.02, cx - 0.17, y + 0.05, cz + 0.02, kc);
+    if (oldStairwell && f === 0) {
+      // Плоские обрывки и окурки на полу первого этажа видны при входе и не мешают идти.
+      for (let k = 0; k < 9; k++) {
+        const px = 0.12 + (k % 3) * 0.38, pz = -1.15 + Math.floor(k / 3) * 0.25;
+        M.box(px, y + 0.004, pz, px + 0.13 + hsh(k, 37) * 0.1, y + 0.009, pz + 0.07, k % 3 ? '#a99b82' : '#d0c8b1');
+      }
     }
     // Настенные светильники: основание примыкает к торцевой стене, кронштейн и гранёный плафон выступают в клетку.
     const bulbs = [];
@@ -665,8 +674,8 @@ export function create (box, o) {
     for (const s of bulbs) grp.add(s);
     if (o.firstPerson && f === 0) {
       const image = new THREE.Mesh(new THREE.PlaneGeometry(0.67, 1.1), chairmanMat());
-      // У входа, на внутренней стене лицом к курьеру: видно уже до первого пролёта.
-      image.position.set(1.34, y + 1.52, ZF + 0.018); image.rotation.y = Math.PI;
+      // Рядом с доской объявлений на боковой стене промежуточной площадки.
+      image.position.set(MX + 0.187, y + 2.94, -1.17); image.rotation.y = -Math.PI / 2;
       grp.add(image);
     }
     if (flat) grp.add(flat);

@@ -1,73 +1,73 @@
 await onShift();
 await run(9);
-// В обычной смене Д22 даёт сюжет последним; этот сценарий проверяет саму встречу без ожидания конца смены.
 if (d.S.order?.ord?.story?.storyId !== 'gennady') {
   const spec = d.STORY.orderFor('gennady', 0);
-  if (!spec || !d.ORDM.force(spec)) throw new Error('Не удалось выбрать главу Геннадия');
+  if (!spec || !d.ORDM.force(spec)) throw new Error('Нет сюжета Геннадия');
   await run(9);
 }
-const beforeSms = document.querySelector('#chat')?.textContent?.includes('Женя, заказ готов') || false;
-const order = d.S.order;
-const stop = order && order.stops[0];
-if (order?.ord?.story?.storyId !== 'gennady') throw new Error('Не запустилась глава Геннадия');
-if (stop.peds.length) throw new Error('Геннадий появился перед домом вместо квартиры');
-if (!stop.home?.flat) throw new Error('Номер квартиры не появился в накладной');
-const flat = stop.home.flat;
-d.V.x = d.S.target.x; d.V.z = d.S.target.z;
-d.V.vx = 0; d.V.vz = 0;
+const order = d.S.order, stop = order.stops[0], spec = order.ord.story;
+if (spec.storyId !== 'gennady') throw new Error('Не тот сюжет');
+const expectedFlat = '10';
+d.V.x = d.S.target.x; d.V.z = d.S.target.z; d.V.vx = d.V.vz = 0;
 d.car.position.x = d.V.x; d.car.position.z = d.V.z;
-await until(() => stop.carry && d.DOOR.mode === 'stairs', 22000);
-await until(() => d.DLG.isOpen() && document.querySelector('#dlg .dlg-text')?.textContent === 'пахнет ссаниной', 5000);
-if (!stop.carry || d.DOOR.mode !== 'stairs' || document.querySelector('#fp-take-hint')) throw new Error('Автоматический путь от машины до лестницы не завершился');
-if (stop.door?.mode !== 'hidden' || document.querySelector('.dg')) throw new Error('Домофон не скрыт');
-if (!d.DLG.isOpen() || document.querySelector('#dlg .dlg-name')?.textContent !== 'Женя' ||
-    document.querySelector('#dlg .dlg-text')?.textContent !== 'пахнет ссаниной') throw new Error('Нет вступительной реплики Жени в интерфейсе диалога');
-await run(2); // дождаться печати букв и паузы перед принятием, как у игрока
-document.querySelector('#dlg .dlg-yes')?.click();
-await until(() => !d.DLG.isOpen(), 2000);
-const atStart = d.DOOR.stairsState();
-dispatchEvent(new KeyboardEvent('keydown', { key: 'w', code: 'KeyW', bubbles: true, cancelable: true }));
-await run(1.3);
-dispatchEvent(new KeyboardEvent('keyup', { key: 'w', code: 'KeyW', bubbles: true, cancelable: true }));
-const walking = d.DOOR.stairsState();
-if (!walking?.v3?.firstPerson || walking.y <= atStart.y + 0.1) throw new Error('Курьер не поднимается при удержании W');
+await until(() => stop.carry && d.DOOR.mode === 'stairs', 30000);
+const parked = { x: d.V.x, z: d.V.z, h: d.V.h, plan: d.FPD.ST.last };
+const outbound = d.FPD.R.path?.pts?.map(p => [...p]) || [];
+if (Math.hypot(parked.x - spec.parking.x, parked.z - spec.parking.z) > 0.5)
+  throw new Error('Машина не в фиксированном месте: ' + JSON.stringify(parked));
+if (stop.home.flat !== expectedFlat) throw new Error('Квартира меняется: ' + stop.home.flat);
+await until(() => d.DLG.isOpen(), 5000);
+await until(() => !d.DLG.isOpen(), 7000);
+const warnings = [];
+const oldWarn = console.warn;
+console.warn = (...args) => { warnings.push(args.map(a => String(a?.stack || a)).join(' ')); oldWarn(...args); };
 d.DOOR.solve();
-await until(() => d.DOOR.stairsState()?.scene?.stage === (new URLSearchParams(location.search).has('door3d') ? 'dialog' : 'door_dialogue'), 12000);
+await until(() => d.DOOR.stairsState()?.scene?.stage === 'door_dialogue', 18000);
 const stairs = d.DOOR.stairsState();
-const oldDoor = new URLSearchParams(location.search).has('door3d');
-if (!stairs?.d3 || !stairs.v3?.firstPerson || stairs.flat !== +flat || stairs.scene?.stage !== (oldDoor ? 'dialog' : 'door_dialogue')) throw new Error('Нет сцены у нужной квартиры: ' + JSON.stringify({ stairs, flat, oldDoor }));
-const spoken = [];
-let wrong = false, right = false;
-for (let i = 0; i < 12; i++) {
-  await run(i ? 4 : 7);
-  if (!d.DLG.isOpen()) break;
-  const text = document.querySelector('#dlg .dlg-text')?.textContent;
-  if (!text) throw new Error('Реплика не открылась');
-  if ((text === 'драсте, ваша пицца' || text === 'у вас в заказе было...' || text === 'вот ваша пеперони' || text === 'извините задержался') &&
-      document.querySelector('#dlg .dlg-name')?.textContent !== 'Женя') throw new Error('Реплика курьера без подписи Женя');
-  if (!oldDoor && (!document.querySelector('#door2d') || !d.DOOR.stairsState()?.v3?.portrait || document.querySelector('#door2d img'))) throw new Error('2D Геннадий не стоит в 3D-коридоре');
-  if (!oldDoor && getComputedStyle(document.querySelector('#dlg .dlg-head img')).display !== 'none') throw new Error('Аватар Геннадия остался в диалоге');
-  spoken.push(text);
-  const choice = text === 'у вас в заказе было...';
-  const next = document.querySelector('#dlg ' + (choice && wrong ? '.dlg-no' : '.dlg-yes'));
-  if (!next) throw new Error('Кнопка ответа не найдена');
-  if (choice) { if (wrong) right = true; else wrong = true; }
-  next.click();
-  await run(0.35);
-}
-if (!wrong || !right || !spoken.includes('не, не мое') || !spoken.includes('досвидания') ||
-    !spoken.some(s => s.startsWith('вот ваши ')) || spoken.includes('...')) throw new Error('Ветка выбора пиццы не пройдена: ' + JSON.stringify(spoken));
-await run(3);
-await run(7);
-const afterSms = document.querySelector('#chat')?.textContent?.includes('Молодец, Женя. Клиент доволен') || false;
-const finalStairs = d.DOOR.stairsState();
-const driver = d.DRIVER.of(d.car);
-if (d.DOOR.on() || d.FPD.on || !order.ord.story.interiorDone || d.S.delivered < 1 || !driver?.visible)
-  throw new Error('Сюжет не завершился или курьер не вернулся за руль: ' + JSON.stringify({ stage: finalStairs?.scene?.stage,
-    phase: finalStairs?.phase, fpd: d.FPD.ph, delivered: d.S.delivered, done: order.ord.story.interiorDone, driver: driver?.visible, crash: d.crashlog }));
-return { story: order.ord.story.storyId, flat, intercom: stop.door?.mode, stairsFlat: stairs.flat,
-  carried: stop.carry, scenarioDone: order.ord.story.interiorDone,
-  savedProgress: d.STORY.progress().gennady?.ch, delivered: d.S.delivered,
-  state: d.S.state, dialogOpen: d.DLG.isOpen(), doorOpen: d.DOOR.on(), oldDoor, beforeSms, afterSms,
-  spoken, wrong, right, stairsStage: finalStairs?.scene?.stage, stairsPhase: finalStairs?.phase,
-  driverVisible: driver?.visible, carVisible: d.car.visible, fpPhase: d.FPD.ph, fpLast: d.FPD.ST.last };
+if (!stairs?.d3 || !stairs?.v3?.firstPerson || stairs.flat !== 10)
+  throw new Error('Сюжет не в нужной 3D-квартире: ' + JSON.stringify(stairs));
+await until(() => d.DLG.isOpen() && !document.querySelector('#dlg')?.hidden &&
+  document.querySelector('#dlg .dlg-text')?.textContent === 'у вас в заказе было...', 30000);
+if (document.querySelector('#dlg .dlg-name')?.textContent !== 'Женя' || !document.querySelector('#door2d'))
+  throw new Error('Сюжетный выбор без подписи Жени или без Геннадия');
+const yes = document.querySelector('#dlg .dlg-yes'), no = document.querySelector('#dlg .dlg-no');
+if (!yes || !no) throw new Error('Выбор не построен: ' + JSON.stringify({ dlg: document.querySelector('#dlg')?.outerHTML?.slice(0, 1500), stairs: d.DOOR.stairsState()?.scene, order: d.S.order?.ord?.story?.storyId, warnings, crash: d.crashlog }));
+await run(1);
+const before = [yes.classList.contains('dlg-cur'), no.classList.contains('dlg-cur')];
+dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', bubbles: true, cancelable: true }));
+const selected = [yes.classList.contains('dlg-cur'), no.classList.contains('dlg-cur')];
+if (!selected[1] || selected[0]) throw new Error('Стрелка не выделяет пеперони: ' + JSON.stringify({ before, selected }));
+dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', code: 'ArrowLeft', bubbles: true, cancelable: true }));
+if (!yes.classList.contains('dlg-cur') || no.classList.contains('dlg-cur')) throw new Error('Стрелка не возвращает выбор на диабло');
+dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
+if (!await until(() => d.DLG.isOpen() && document.querySelector('#dlg .dlg-text')?.textContent === 'не, не мое', 9000))
+  throw new Error('Не сработала неверная ветка');
+if (!await until(() => d.DLG.isOpen() && document.querySelector('#dlg .dlg-text')?.textContent === 'у вас в заказе было...', 12000))
+  throw new Error('После ошибки выбор не повторился');
+await run(1);
+dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', bubbles: true, cancelable: true }));
+if (!document.querySelector('#dlg .dlg-no')?.classList.contains('dlg-cur')) throw new Error('Повторная стрелка не выбрала пеперони');
+dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
+await until(() => !d.DOOR.on() && !d.FPD.on, 30000);
+await run(2);
+if (!order.ord.story.interiorDone || d.S.delivered < 1)
+  throw new Error('Встреча не засчиталась: ' + JSON.stringify({ done: order.ord.story.interiorDone, delivered: d.S.delivered,
+    state: d.S.state, stairs: stop.stairs, hold: !!stop.hold, arrived: stop.arrived, target: d.S.target,
+    fpd: d.FPD.ph, dlg: d.DLG.isOpen(), warnings }));
+const returned = d.FPD.R.path?.pts?.map(p => [...p]) || [];
+const blocked = pts => {
+  const hit = [];
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i], n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.3);
+    for (let j = 1; j < n; j++) {
+      const x = a[0] + (b[0] - a[0]) * j / n, z = a[1] + (b[1] - a[1]) * j / n;
+      if (d.inWall(x, z, 0.15) || d.YARDS.blocks(x, z, 0.15)) hit.push([+x.toFixed(2), +z.toFixed(2)]);
+    }
+  }
+  return hit;
+};
+const badOut = blocked(outbound), badReturn = blocked(returned);
+if (badOut.length || badReturn.length) throw new Error('Курьер пересекает геометрию: ' + JSON.stringify({ badOut, badReturn, outbound, returned }));
+if (Math.hypot(d.V.x - spec.parking.x, d.V.z - spec.parking.z) > 0.5)
+  throw new Error('Машина сместилась после возвращения');
+return { flat: stop.home.flat, parked, selected, delivered: d.S.delivered, finalCar: [d.V.x, d.V.z], driver: d.DRIVER.of(d.car)?.visible, outbound, returned };

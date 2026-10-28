@@ -36,11 +36,11 @@ async function openDoorPreview () {
     worldBox = document.createElement('div');
     worldBox.className = 'door-preview-world';
     (document.getElementById('game') || document.body).appendChild(worldBox);
-    const plan = { lv: 5, per: 4, first: 1, floor: 5, door: 1 };
-    world = S3.create(worldBox, { forceOwn: true, firstPerson: true, plan, look: 'shabby', seed: 2710, t,
+    const plan = { lv: 5, per: 4, first: 1, floor: 3, door: 1 };
+    world = S3.create(worldBox, { forceOwn: true, firstPerson: true, plan, look: 'shabby', seed: 0x6e6e6164, t,
       ADULT: !!A.ADULT, boxes: 1 });
-    const st = { y: 4, v: 0, walk: world.standOff(1), door: 1, phase: 'end', bounce: 0, puff: 0, sideT: 0 };
-    const doors = new Map([[18, { open: 0 }]]);
+    const st = { y: 2, v: 0, walk: world.standOff(1), door: 1, phase: 'end', bounce: 0, puff: 0, sideT: 0 };
+    const doors = new Map([[10, { open: 0 }]]);
     world.scene.start({ portrait: true });
     actor = await DOOR2D.open(story.portrait.manifest, () => false, world.scene);
     let last = performance.now(), elapsed = 0, closingAt = -1;
@@ -49,7 +49,7 @@ async function openDoorPreview () {
     const revealed = new Promise(resolve => { reveal = resolve; });
     const frame = now => {
       const dt = Math.min(0.1, (now - last) / 1000); last = now; elapsed += dt;
-      doors.get(18).open = closingAt < 0 ? S3.cinematicDoor(elapsed) : Math.max(0, 1 - Math.pow(Math.min(1, (elapsed - closingAt) / 0.8), 3));
+      doors.get(10).open = closingAt < 0 ? S3.cinematicDoor(elapsed) : Math.max(0, 1 - Math.pow(Math.min(1, (elapsed - closingAt) / 0.8), 3));
       if (closingAt >= 0) blackout.style.opacity = String(Math.max(0, Math.min(1, ((elapsed - closingAt) / 0.8 - 0.78) / 0.22)));
       world.scene.light(S3.cinematicLight(elapsed));
       world.frame(st, dt, { doors, gop: false, t: elapsed }); world.render();
@@ -75,14 +75,14 @@ async function openDoorPreview () {
           person: null,
           text: lineText(line),
           accept: choices ? t(choices[0].text) : nextText(lineIndex),
-          decline: choices?.[1] ? t(choices[1].text) : undefined, stack: false,
+          decline: choices?.[1] ? t(choices[1].text) : undefined, stack: false, auto: !choices,
           onShow: () => actor.talk(line.speaker === 'gennady'), onTyped: () => actor.talk(false) });
         actor.talk(false);
         if (answer === null) return;
         if (line.retryOnFirst && answer === true) {
           actor.line('angry');
           const correction = await DLG.say({ compact: true, door2d: true, canonicalName: true, fillers: false,
-            name: t(story.name), person: null, text: t(line.wrongReply), accept: lineText(line),
+            name: t(story.name), person: null, text: t(line.wrongReply), auto: true,
             onShow: () => actor.talk(true), onTyped: () => actor.talk(false) });
           actor.talk(false);
           if (correction === null) return;
@@ -140,8 +140,8 @@ function openStairsPreview () {
     if (root) root.hidden = false;
   };
   try {
-    stop = STAIRS.mount(worldBox, { forceOwn: true, lv: 5, floor: 5, per: 4, entr: 1, door: 1,
-      look: 'shabby', seed: 2710, addr: 'Ленинградская, 21', who: t(story.name), person, scenario,
+    stop = STAIRS.mount(worldBox, { forceOwn: true, lv: 5, floor: 3, per: 4, entr: 1, door: 1,
+      look: 'shabby', seed: 0x6e6e6164, addr: 'Ленинградская, 21', who: t(story.name), person, scenario,
       clockS: 120, payment: '1 000 ₽', boxes: 1 }, { t, ADULT: !!A.ADULT, sfx: () => {}, hold: () => {},
       paused: () => false, setPad: fn => { padCallback = fn; }, done: () => requestAnimationFrame(finish) });
     padRaf = requestAnimationFrame(padFrame);

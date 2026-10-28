@@ -15,7 +15,8 @@ function safeSegment (a, b, api) {
   return true;
 }
 
-function spots (api, door) {
+function spots (api, door, fixed) {
+  if (fixed) return api.clear(fixed.x, fixed.z) ? [[fixed.x, fixed.z]] : [];
   const road = api.road(door.x + door.nx * 6, door.z + door.nz * 6) || api.road(door.x, door.z);
   const roadNear = road && road.d < 15;
   const candidates = [];
@@ -37,9 +38,9 @@ export function spot (api, door) {
   return to ? { x: to[0], z: to[1], h: Math.atan2(door.x - to[0], door.z - to[1]) } : null;
 }
 
-export function plan (api, from, door) {
+export function plan (api, from, door, fixed) {
   let best = null;
-  const candidates = spots(api, door);
+  const candidates = spots(api, door, fixed);
   for (const useRoad of [false, true]) {
     for (const to of candidates) {
       const route = useRoad ? api.route(from[0], from[1], to[0], to[1]) : null;
@@ -48,7 +49,7 @@ export function plan (api, from, door) {
       if (pts.length < 2 || pts.some((p, i) => i && !safeSegment(pts[i - 1], p, api))) continue;
       const length = pts.reduce((n, p, i) => n + (i ? dist(pts[i - 1], p) : 0), 0);
       const score = length + dist(to, [door.x, door.z]) * 0.5;
-      if (!best || score < best.score) best = { pts, length, score, to };
+      if (!best || score < best.score) best = { pts, length, score, to, endHeading: fixed?.h };
     }
     if (best) break;
     if (!useRoad) {
@@ -64,12 +65,12 @@ export function plan (api, from, door) {
 
 // Если игрок въехал сбоку дома, берём безопасный стандартный старт перед фасадом.
 // Переход к нему происходит только при полностью закрытом кадре.
-export function canonical (api, door) {
+export function canonical (api, door, fixed) {
   const tx = door.nz, tz = -door.nx;
   for (const depth of [25, 30, 20]) for (const side of [0, -8, 8, -15, 15]) {
     const x = door.x + door.nx * depth + tx * side, z = door.z + door.nz * depth + tz * side;
     if (!api.clear(x, z)) continue;
-    const p = plan(api, [x, z], door);
+    const p = plan(api, [x, z], door, fixed);
     if (p && p.length >= 10) return p;
   }
   return null;
@@ -84,8 +85,13 @@ export function sample (p, seconds, initialHeading) {
     const q = clamp(remain / (length || 1), 0, 1);
     const targetHeading = Math.atan2(b[0] - a[0], b[1] - a[1]);
     const delta = Math.atan2(Math.sin(targetHeading - initialHeading), Math.cos(targetHeading - initialHeading));
-    const turn = clamp(seconds / 0.45, 0, 1);
-    return { x: a[0] + (b[0] - a[0]) * q, z: a[1] + (b[1] - a[1]) * q, h: initialHeading + delta * turn };
+    const turn = k * k * (3 - 2 * k);
+    let h = initialHeading + delta * turn;
+    if (Number.isFinite(p.endHeading)) {
+      const tail = clamp((k - 0.7) / 0.3, 0, 1), dh = Math.atan2(Math.sin(p.endHeading - h), Math.cos(p.endHeading - h));
+      h += dh * (tail * tail * (3 - 2 * tail));
+    }
+    return { x: a[0] + (b[0] - a[0]) * q, z: a[1] + (b[1] - a[1]) * q, h };
   }
   const last = p.pts[p.pts.length - 1];
   return { x: last[0], z: last[1], h: initialHeading };

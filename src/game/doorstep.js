@@ -215,13 +215,14 @@ async function storyDelivery (ev) {
   const o = ev.order, st = ev.stop, sp = o.ord.story;
   const scene = STORY.interiorFor(sp);
   if (!scene || !A.S || A.S.state !== 'drive') return;
-  const walk = A.fpWalk && A.fpWalk(st, { story: true });
+  const walk = A.fpWalk && A.fpWalk(st, { story: true, parking: sp.parking });
   if (!walk) return;                              // без подъезда не открываем оплату на улице
   await walk;
   if (!st.carry || A.S.order !== o || A.S.state !== 'drive') return;
   const lv = Math.max(SR.LV, A.entranceLv(ev.x, ev.z));
-  if (!st.home || !Number.isFinite(st.home.floor)) {
-    st.home = STAIRS_PLAN({ lv, gop: false }); st.home.flat = String(st.home.flat);
+  const fixedApartment = STORY.apartmentFor(sp);
+  if (fixedApartment || !st.home || !Number.isFinite(st.home.floor)) {
+    st.home = STAIRS_PLAN({ lv, gop: false, ...(fixedApartment || {}) }); st.home.flat = String(st.home.flat);
   }
   const h = st.home;
   if (!h) return;
@@ -258,8 +259,13 @@ function pickKind (ev) {
 
 /* квартира остановки — с самого начала заказа (game.js showOrderCard пишет её в накладную): подъезд, этаж, дверь —
    как в подъезде (stairs.js plan); дом ниже DOOR.LV этажей или не у подъезда — квартиры нет */
-export function homeOf (st, lv) {
+export function homeOf (st, lv, fixedApartment = null) {
   if (!st) return null;
+  if (fixedApartment) {
+    st.home = Object.assign(STAIRS_PLAN({ lv, gop: false, ...fixedApartment }), { lv });
+    st.home.flat = String(st.home.flat);
+    return st.home;
+  }
   if (st.home !== undefined) return st.home;
   st.home = lv >= D.LV ? Object.assign(STAIRS_PLAN({ lv, gop: false }), { lv }) : null;
   if (st.home) st.home.flat = String(st.home.flat);

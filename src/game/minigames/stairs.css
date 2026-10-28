@@ -10,6 +10,12 @@
 .sx-breath.sx-low b { background: var(--pp-orange); }
 .sx-breath.sx-puff { color: var(--pp-red); }
 .sx-breath.sx-puff b { background: var(--pp-red); }
+.sx-breath-fx[hidden] { display: none; }
+.sx-breath-fx { position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: var(--sx-breath-haze, 0);
+  background: radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(39, 25, 28, .48) 75%, rgba(17, 11, 16, .85) 100%);
+  backdrop-filter: blur(1.5px) contrast(1.08); animation: sx-breathe 1.6s ease-in-out infinite alternate; }
+@keyframes sx-breathe { from { transform: scale(1); } to { transform: scale(1.05); } }
+body.calm-fx .sx-breath-fx { animation: none; }
 
 .sx-bar { position: absolute; z-index: 4; left: 50%; translate: -50% 0; bottom: 52px; display: flex; gap: 8px; width: min(720px, calc(100% - 24px)); }
 .sx-bar[hidden] { display: none; }

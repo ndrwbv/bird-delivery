@@ -20,6 +20,8 @@ export const STORIES = [{
     q: { head: 'business', body: 'punk', legs: 'casual', feet: 'beach' },
     top: 'tee', shirt: '#e0d8c7', bottom: 'pants', pants: '#596276', shoes: '#47434a', shape: 'normal', bg: '#c9b9a3' } },
   home: { addr: ['Ленинградская улица', '21'], near: [3099, 2876] }, items: N_('пицца'),
+  apartment: { floor: 3, per: 4, entr: 1, door: 1 },
+  parking: { x: 3099.68, z: 2857.27, h: -0.24 },
   chapters: [{ id: 'gennady-sausage', name: N_('Докторская к пицце'),
     note: N_('Панельный дом. Квартира — в накладной.'), why: N_('Геннадий ждёт пиццу дома'),
     dialogue: [
@@ -164,7 +166,8 @@ export function orderFor (storyId, chapter) {
   const p = storyPerson(s);
   return { kind: 'story', type: 'story', storyId, chapter, noGuest: true, color: COLOR, x: h.x, z: h.z,
     door: { x: h.ex, z: h.ez, nx: h.nx, nz: h.nz }, addr: h.addr, person: p, name: p.name,
-    title: t(c.name), items: t(c.items || s.items), note: t(c.note), why: t(c.why), reach: 6 };
+    title: t(c.name), items: t(c.items || s.items), note: t(c.note), why: t(c.why), reach: 6,
+    parking: s.parking ? { ...s.parking } : null };
 }
 export function onCancel () { /* глава остаётся доступной в следующую смену */ }
 export function interiorFor (order) {
@@ -177,6 +180,10 @@ export function interiorFor (order) {
       wrongReply: q.wrongReply ? t(q.wrongReply) : null,
       choices: q.choices ? q.choices.map(x => ({ text: t(x.text), flag: x.flag })) : null,
       choices2d: q.choices2d ? q.choices2d.map(x => ({ text: t(x.text), flag: x.flag })) : null })) };
+}
+export function apartmentFor (order) {
+  const sp = specOf(order), s = sp && STORIES.find(q => q.id === sp.storyId);
+  return s && s.apartment ? { ...s.apartment } : null;
 }
 export function onDeliver (order) {
   const sp = specOf(order), s = sp && STORIES.find(q => q.id === sp.storyId);

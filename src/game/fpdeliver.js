@@ -10,19 +10,19 @@ export const FP = {
   EYE: 1.62,          // м: глаза над землёй
   FOV: 68,
   FADE_OUT: 0.25, FADE_IN: 0.35,
-  EXIT: 1.0,          // с: камера уходит в глаза, дверь открылась
-  PARK: 0.8,          // с: вид из-за руля, машина плавно останавливается у подъезда
+  EXIT: 0.65,         // с: курьер торопится к заказу
+  PARK: 0.4,          // с: короткая остановка на парковке
   OUT: 0.9,           // м: встал от борта (дальше — в окно салон не видно)
   ROUND: 0.8,         // м: обход машины — на столько от кузова
   DOOR_ANG: 1.1,      // рад: насколько открывается водительская дверь
-  TO_TRUNK: 1.5,      // с: вдоль борта за корму
+  TO_TRUNK: 0.9,      // с: бегом вдоль борта за корму
   BACK: 1.5,          // м: стоит за кормой, чтобы был виден открытый багажник
-  OPEN: 0.45,         // с: крышка поднимается
-  TAKE: 0.7,          // с: коробка из багажника в руки
-  CLOSE: 0.4,         // с: крышка закрывается
-  WALK: 2.6,          // м/с: к двери подъезда (быстрый шаг)
-  WALK_MIN: 1.3,      // с: не меньше
-  WALK_MAX: 8.0,      // с: длинный путь не ускоряется до рывка
+  OPEN: 0.28,         // с: крышка поднимается
+  TAKE: 0.45,         // с: коробка из багажника в руки
+  CLOSE: 0.26,        // с: крышка закрывается
+  WALK: 5.0,          // м/с: бежит к двери подъезда
+  WALK_MIN: 0.8,      // с: не меньше
+  WALK_MAX: 5.0,      // с: длинный путь не ускоряется до рывка
   AT_DOOR: 3.2,       // м: остановился перед входом
   INTERCOM: 2.3,      // м: приблизился к домофону, но не уткнулся в дверь
   APPROACH: 0.55, HOLD: 0.2,
@@ -38,7 +38,7 @@ export const ST = { runs: 0, skips: 0, last: null, noDoor: 0 };
 
 let A = null;
 const R = { on: false, t: 0, ph: '', st: null, n: 1, done: null, path: null, len: 0, dur: 0, door: null, pc: null, doorA: 0, prevMode: null,
-  p0: null, look: null, hands: null, box: null, from: null, taken: 0, walkT: 0, bob: 0,
+  p0: null, look: null, hands: null, box: null, from: null, taken: 0, walkT: 0, bob: 0, parkBay: null,
   handK: 0, fade: null, entryDoor: null, entryDark: null, entryFrame: null, parking: null, parkStartH: 0, parkFallback: null, parkCut: false };
 let V3 = null;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -158,6 +158,27 @@ function dropEntryLeaf () {
   }
   R.entryDoor = R.entryDark = R.entryFrame = null;
 }
+function showParkingBay (spot) {
+  if (!spot || !A.scene || !A.THREE) return;
+  if (R.parkBay) { A.scene.remove(R.parkBay); R.parkBay = null; }
+  const T = A.THREE, g = new T.Group(), mat = new T.MeshBasicMaterial({ color: '#e3d2a1', transparent: true, opacity: 0.75 });
+  const strip = (w, d, x, z) => {
+    const m = new T.Mesh(new T.BoxGeometry(w, 0.012, d), mat);
+    m.position.set(x, 0, z); g.add(m);
+  };
+  for (const x of [-1.35, 1.35]) strip(0.065, 5.3, x, 0);
+  for (const z of [-2.65, 2.65]) strip(2.76, 0.065, 0, z);
+  g.position.set(spot.x, A.parking.height(spot.x, spot.z) + 0.05, spot.z);
+  g.rotation.y = spot.h;
+  A.scene.add(g); R.parkBay = g;
+}
+function dropParkingBay () {
+  const g = R.parkBay;
+  if (!g) return;
+  if (g.parent) g.parent.remove(g);
+  g.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+  R.parkBay = null;
+}
 
 /** doorstep.js stairs: подъезд на адресе — сначала дойти до него от первого лица */
 export function run (st, o = {}) {
@@ -173,18 +194,19 @@ export function run (st, o = {}) {
   V3.set(0, 0, -1).applyQuaternion(cam.quaternion).multiplyScalar(6).add(cam.position);
   const door = { x: e[0], z: e[1], nx: e[2], nz: e[3] };
   const parkT0 = performance.now();
-  const directParking = o.story && A.parking ? STORYP.plan(A.parking, [A.V.x, A.V.z], door) : null;
-  const parking = directParking || (o.story && A.parking ? STORYP.canonical(A.parking, door) : null);
+  const fixed = o.parking || null;
+  const directParking = o.story && A.parking ? STORYP.plan(A.parking, [A.V.x, A.V.z], door, fixed) : null;
+  const parking = directParking || (o.story && A.parking ? STORYP.canonical(A.parking, door, fixed) : null);
   const parkCut = !!(parking && !directParking);
   const fallbackRoad = o.story && !parking && A.parking && STORYP.spot(A.parking, door);
   const first = parking && parking.pts[0], next = parking && parking.pts[1];
-  Object.assign(R, { on: true, t: 0, ph: parkCut ? 'park-cut' : parking ? 'park-approach' : 'park', st, n, taken: 0, walkT: 0, bob: 0, from: null, box: null,
+  Object.assign(R, { on: true, t: 0, ph: o.story ? 'park-intro' : 'park', st, n, taken: 0, walkT: 0, bob: 0, from: null, box: null,
     look: { x: V3.x, y: V3.y, z: V3.z },
     door, parking, parkCut, parkStartH: parkCut ? Math.atan2(next[0] - first[0], next[1] - first[1]) : A.V.h,
     parkFallback: fallbackRoad, prevMode: A.mode ? A.mode() : null });
-  if (o.story) A.V.vx = A.V.vz = 0; // катсцена сама ведёт машину; инерция игрока больше не двигает кузов
-  // На подъезде к дому камера переходит за руль; исходный вид игрока вернётся после посадки.
-  if (A.cameraMode) A.cameraMode('cab');
+  // На затемнении машина плавно гасит скорость; точку начала маршрута закрепляем под закрытым кадром.
+  // Прежний ракурс гаснет до смены камеры и возможного переноса на безопасный подъезд.
+  if (o.story && fixed) showParkingBay(fixed);
   // водительская дверь — слева (+x), как у коллег (crewride.js); нет куска (сорвало, ?oldwreck) — без неё
   R.pc = null; R.doorA = 0;
   try { if (WRECK.WR.on) { const pc = WRECK.piece(car, car.userData.real ? 'dfl' : 'dl'); if (pc && !pc.gone) R.pc = pc; } } catch (e2) { R.pc = null; }
@@ -192,6 +214,7 @@ export function run (st, o = {}) {
   R.seat = { hw: seat && seat.hw ? seat.hw : FP.HW, dz: seat && Number.isFinite(seat.dz) ? seat.dz : 0.2 };
   const [sx, sz] = world(car, Math.max(R.seat.hw, FP.HW) + 0.12, R.seat.dz);
   R.p0 = { x: sx, y: eyeY(sx, sz), z: sz };
+  entryLeaf(); // то же детальное полотно видно уже на подходе, до начала открывания
   const h = hands();
   if (!h.parent) A.scene.add(h);
   h.visible = false;
@@ -213,10 +236,11 @@ export function returnToCar (st) {
   const seat = A.seatOf ? A.seatOf({ mesh: car }) : null;
   R.seat = { hw: seat && seat.hw ? seat.hw : FP.HW, dz: seat && Number.isFinite(seat.dz) ? seat.dz : 0.2 };
   R.door = { x: e[0], z: e[1], nx: e[2], nz: e[3] };
+  entryLeaf();
   const from = [e[0] + e[2] * FP.INTERCOM, e[1] + e[3] * FP.INTERCOM];
   const to = world(car, Math.max(R.seat.hw, FP.HW) + FP.OUT, R.seat.dz);
   R.path = pathTo(car, from, to);
-  R.dur = clamp(R.path.len / 4.5, 0.8, 7);
+  R.dur = clamp(R.path.len / 6.0, 0.7, 5);
   R.t = 0; R.ph = 'return-fade'; R.on = true; R.st = st; R.box = null; R.handK = 0; R.bob = 0;
   R.prevMode = A.mode ? A.mode() : null;
   if (A.cameraMode) A.cameraMode('near');
@@ -242,6 +266,7 @@ function finish (skip) {
   if (skip) { ST.skips++; if (ST.last) ST.last.skip = true; }
   if (R.doorA) setDoor(0);
   dropEntryLeaf();
+  if (!leavingEntrance) dropParkingBay();
   if (A.setTrunk) A.setTrunk(false);
   dropBox();
   if (R.hands) { R.hands.visible = false; if (R.hands.parent) R.hands.parent.remove(R.hands); }
@@ -317,14 +342,18 @@ export function step (dt) {
   if (!car || S.state !== 'drive') { finish(false); return; }
   R.t += dt;
   const cam = A.cam, hw = R.seat.hw;
-  if (R.ph === 'park-cut') {
-    fade(R.t / 0.28);
+  if (R.ph === 'park-intro') {
+    A.V.vx *= Math.exp(-dt * 9); A.V.vz *= Math.exp(-dt * 9);
+    fade(ease(R.t / 0.28));
     if (R.t >= 0.28) {
-      const p = R.parking.pts[0];
-      A.V.x = p[0]; A.V.z = p[1]; A.V.y = A.parking.height(p[0], p[1]); A.V.h = R.parkStartH;
+      if (R.parking) {
+        const p = R.parking.pts[0];
+        A.V.x = p[0]; A.V.z = p[1]; A.V.y = A.parking.height(p[0], p[1]); A.V.h = R.parkStartH;
+        car.position.set(A.V.x, A.V.y, A.V.z); car.rotation.y = A.V.h; car.userData._pose = undefined;
+      }
       A.V.vx = A.V.vz = A.V.vy = 0;
-      car.position.set(A.V.x, A.V.y, A.V.z); car.rotation.y = A.V.h; car.userData._pose = undefined;
-      R.ph = 'park-approach'; R.t = 0; fade(1);
+      if (A.cameraMode) A.cameraMode('cab');
+      R.ph = R.parking ? 'park-approach' : 'park'; R.t = 0; fade(1);
     }
     return;
   }
@@ -336,7 +365,7 @@ export function step (dt) {
     car.position.set(p.x, A.V.y, p.z); car.rotation.y = p.h;
     car.userData._pose = undefined;
     cam.position.x += dx; cam.position.z += dz;
-    if (R.parkCut) fade(1 - ease(R.t / 0.35));
+    fade(1 - ease(R.t / 0.4));
     if (ST.last) ST.last.ph = 'park-approach';
     if (R.t >= R.parking.duration) { R.ph = 'park'; R.t = 0; }
     return;

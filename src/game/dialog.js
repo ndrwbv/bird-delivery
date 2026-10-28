@@ -235,9 +235,13 @@ function show (o, done) {
   let selectedByKey = false;                     // выбор стрелкой сохраняется, даже пока реплика допечатывается
   const armed = () => typed && armT >= ARM;      // ответы жмутся не сразу после того, как допечаталась
   const mark = on => {
-    if (stack) { yes.classList.toggle('dlg-cur', pick === yes); no.classList.toggle('dlg-cur', pick === no); yes.classList.remove('padsel'); no.classList.remove('padsel'); return; }
+    if (stack || o.door2d) {
+      yes.classList.toggle('dlg-cur', on && pick === yes); no.classList.toggle('dlg-cur', on && pick === no);
+      yes.classList.remove('padsel'); no.classList.remove('padsel'); return;
+    }
     yes.classList.toggle('padsel', on && pick === yes); no.classList.toggle('padsel', on && pick === no);
   };
+  if (two && o.door2d) { btns.classList.add('on'); mark(true); }
   // столбиком: подсказка управления одной строкой внизу — геймпад / клавиатура / палец (как разговор у двери, smalltalk.js)
   let hintKind = '';
   const hint = () => {
@@ -250,8 +254,9 @@ function show (o, done) {
     hintEl.hidden = false;
   };
   const CPS = o.cps || 38;                       // букв в секунду; на многоточии — пауза
+  const autoAfter = o.auto ? Math.max(1.5, Math.min(5.5, 1.15 + full.length * 0.042)) : 0;
   const finish = () => {
-    if (typed) return; typed = true; armT = 0; el.textContent = full; $('.dlg-btns').classList.add('on'); $('.dlg-skip').textContent = '';
+    if (typed) return; typed = true; armT = 0; el.textContent = full; if (!o.auto) $('.dlg-btns').classList.add('on'); $('.dlg-skip').textContent = '';
     TF.stop(img); root.classList.remove('dlg-talking');
     if (o.onTyped) try { o.onTyped(); } catch (e) { console.warn('[dlg] onTyped', e); }
     if (stack || selectedByKey) mark(true);
@@ -267,7 +272,7 @@ function show (o, done) {
     yes.classList.remove('dlg-cur'); no.classList.remove('dlg-cur');
     hintEl.hidden = true;
     root.classList.remove('on');
-    if (v !== null) sfx('pick');
+    if (v !== null && !o.auto) sfx('pick');
     setTimeout(() => { if (!open) { root.hidden = true; document.body.classList.remove('dlg-open'); } }, 180);   // следующая реплика из очереди уже открылась — не прячем её
     open--;
     if (!open) API.pause(false);
@@ -288,7 +293,7 @@ function show (o, done) {
       }
       if ((blabT -= dt) <= 0) { blabT = BLAB; if (/\S/.test(full[i - 1] || '')) sfx('blab'); }   // бормочет, как у двери
       if (i >= full.length) finish();
-    } else armT += dt;
+    } else { armT += dt; if (autoAfter && armT >= autoAfter) { close(true); return; } }
     last = now;
     clock();
     // геймпад: A — пропустить / принять, B — отказаться
@@ -297,18 +302,18 @@ function show (o, done) {
     if (stack) hint();
     if (PAD.connected && stack) {                 // столбиком: крестовина / стик ↑↓ — курсор, A — ответить, X — нижний
       const a = PAD.a, x = !!PAD.x;
-      if (PAD.menuUp) { pick = yes; selectedByKey = false; if (typed) mark(true); }
-      if (PAD.menuDown) { pick = no; selectedByKey = false; if (typed) mark(true); }
+      if (PAD.menuUp) { pick = yes; selectedByKey = false; mark(true); }
+      if (PAD.menuDown) { pick = no; selectedByKey = false; mark(true); }
       if (a && !padPrev.a) answer(pick !== no);
       if (x && !padPrev.x) answer(false);
       padPrev = { a, b: PAD.b, x };
     } else if (PAD.connected) {
       const a = PAD.a, b = PAD.b;
-      const on = padLit(PAD);
+      const on = o.door2d || padLit(PAD);   // у сюжетного выбора первое нажатие уже выбирает, не только будит подсветку
       if (on && two && (PAD.menuLeft || PAD.menuUp)) { pick = o.door2d ? yes : no; selectedByKey = false; }
       if (on && two && (PAD.menuRight || PAD.menuDown)) { pick = o.door2d ? no : yes; selectedByKey = false; }
-      lit = on && typed;
-      mark(lit || (typed && selectedByKey));
+      lit = on && (typed || o.door2d);
+      mark(lit || selectedByKey);
       if (a && !padPrev.a) answer(pick !== no);
       if (b && !padPrev.b && !o.alt) answer(two ? false : true);   // alt: B — пропустить сцену (story.js), не ответ
       const x = !!PAD.x;
@@ -327,13 +332,16 @@ function show (o, done) {
     if (stack) {                                 // столбиком: стрелки / W S — курсор, Enter / пробел — ответить, 1 / 2 — сразу
       const c = e.code, eat = () => { e.preventDefault(); e.stopPropagation(); };
       if (c === 'Space' || c === 'Enter' || c === 'NumpadEnter' || c === 'KeyE') { eat(); if (!e.repeat) answer(pick !== no); }
-      else if (c === 'ArrowUp' || c === 'KeyW' || c === 'ArrowDown' || c === 'KeyS') { eat(); pick = (c === 'ArrowUp' || c === 'KeyW') ? yes : no; selectedByKey = true; if (typed) mark(true); }
+      else if (c === 'ArrowUp' || c === 'KeyW' || c === 'ArrowDown' || c === 'KeyS') { eat(); pick = (c === 'ArrowUp' || c === 'KeyW') ? yes : no; selectedByKey = true; mark(true); }
       else if (c === 'Digit1' || c === 'Numpad1') { eat(); if (typed && armed()) close(true); }
       else if (c === 'Digit2' || c === 'Numpad2' || c === 'KeyX') { eat(); if (!e.repeat) answer(false); }
       return;                                    // Esc / Backspace — «пропустить сцену» (story.js)
     }
     const eat = () => { e.preventDefault(); e.stopPropagation(); };
-    if (two && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) { eat(); pick = e.code === 'ArrowLeft' ? (o.door2d ? yes : no) : (o.door2d ? no : yes); selectedByKey = true; if (typed) mark(true); }
+    if (two && (e.code === 'ArrowLeft' || e.code === 'ArrowRight' || e.code === 'ArrowUp' || e.code === 'ArrowDown')) {
+      eat(); const first = e.code === 'ArrowLeft' || e.code === 'ArrowUp';
+      pick = first ? (o.door2d ? yes : no) : (o.door2d ? no : yes); selectedByKey = true; mark(true);
+    }
     else if (e.code === 'Space' || e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'KeyE') { eat(); if (e.repeat) return; if (!typed) finish(); else if (!two || e.code !== 'Space') answer(pick !== no); }
     else if (o.alt && two && e.code === 'KeyX') { eat(); if (!e.repeat) answer(false); }
     else if (o.alt && (e.code === 'Escape' || e.code === 'Backspace')) return;   // alt: Esc — пропустить сцену (story.js), не ответ
