@@ -6,7 +6,7 @@
        вдоль стены ближе половины арки + полвещи, поперёк — ближе 1,5 м;
      • 0п25 — у каждой арки проезд сквозь неё: ось тоннеля от 1,5 м перед аркой до 1,5 м за ней — вся на асфальте,
        и от обоих устьев по асфальту (клетки 1 м, не дальше 45 м) можно доехать до настоящей улицы или дворового проезда. */
-const R = { shops: 0, shopBad: 0, winBad: 0, by: { sign: 0, door: 0, vitrine: 0 }, sample: [], arches: d.ARCHES.length, archItems: 0, itemsBy: {}, archNoRoad: 0, archSample: [], itemSample: [] };
+const R = { shops: 0, shopBad: 0, winBad: 0, by: { sign: 0, door: 0, vitrine: 0 }, sample: [], arches: d.ARCHES.length, archItems: 0, itemsBy: {}, entranceBad: 0, entranceSample: [], realDoorMissing: [], generatedDoors: d.GEN_ENTR.length, namedShop: [], archNoRoad: 0, archSample: [], itemSample: [] };
 const WL = d.WIN && d.WIN.log;
 if (!WL) return { err: 'нет списка окон: запускать с --q=winlog' };
 // окна по клеткам 8 м
@@ -36,6 +36,30 @@ for (const s of d.SIGNS) {
   }
   if (bad) R.shopBad++;
 }
+// Реальные двери не исчезают ради магазина; удалённые автором дома не восстанавливаем.
+const insideDropped = (x, z) => (d.EDL.HOUSES.dropped || []).some(b => {
+  let inside = false;
+  for (let i = 0, j = b.p.length - 1; i < b.p.length; j = i++) {
+    const a = b.p[i], q = b.p[j];
+    if ((a[1] > z) !== (q[1] > z) && x < (q[0] - a[0]) * (z - a[1]) / (q[1] - a[1]) + a[0]) inside = !inside;
+  }
+  return inside;
+});
+for (const e of d.MAP.data.entrances || []) if (!insideDropped(e[0], e[1]) &&
+    !d.CITY.entrances.some(q => Math.hypot(e[0] - q[0], e[1] - q[1]) < 0.05)) R.realDoorMissing.push(e);
+
+// 0п122: измеряем фактическую ширину витрины/вывески и весь козырёк подъезда.
+for (const s of d.SIGNS) {
+  if (/кул[её]к/i.test(s.n)) R.namedShop.push({ name: s.n, x: s.x, z: s.z });
+  for (const e of d.CITY.entrances) {
+    const dx = e[0] - s.x, dz = e[1] - s.z;
+    if (Math.abs(dx * s.nx + dz * s.nz) >= 2.1) continue;
+    if (Math.abs(dx * s.nz - dz * s.nx) >= Math.max(s.vw || 0, s.w || 0) / 2 + 0.2 + 1.65) continue;
+    R.entranceBad++;
+    if (R.entranceSample.length < 8) R.entranceSample.push([s.n, s.x, s.z, e]);
+  }
+}
+
 // 0с: вещи в устье арки
 const items = [];
 for (const s of d.SIGNS) { items.push(['sign', s.x, s.z, (s.w || 3) / 2, s.n]); if (!s.row) items.push(['shopdoor', s.x, s.z, 0.75, s.n]); }
@@ -94,5 +118,5 @@ for (const a of d.ARCHES) {
   if (!ok) { R.archNoRoad++; if (R.archSample.length < 6) R.archSample.push([Math.round(a.mx), Math.round(a.mz)]); }
 }
 R.windows = WL.length;
-R.ok = !R.shopBad && !R.archItems && !R.archNoRoad && R.arches > 0;
+R.ok = !R.shopBad && !R.realDoorMissing.length && !R.entranceBad && !R.archItems && !R.archNoRoad && R.arches > 0;
 return R;

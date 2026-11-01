@@ -7,7 +7,8 @@
      • участки строек, пустырей, костров и котлов (darknight.js), пляж (beach.js), корты (courts.js), большие трамплины
        (jumps.js, сам скат) — прямоугольник целиком не на асфальте;
      • гаражи-ракушки (lawnprops.js) — собираем клетки у каждого 20-го подъезда, коробка не на асфальте;
-     • коробки-постройки из редактора города (edits.json) — ни одна точка не на асфальте. */
+     • коробки-постройки из редактора города (edits.json) — ни одна точка не на асфальте;
+     • детские/ледяные горки — все вершины и круг столкновения; дворовые площадки — целиком. */
 const RS = d.RSEG, G = new Map(), CELL = 40;
 RS.forEach(s => {
   if (s.c === 6) return;
@@ -85,6 +86,32 @@ for (const s of (d.EDL && d.EDL.BOXES) || []) {
   let w = -99;
   for (const a of [-1, -0.5, 0, 0.5, 1]) for (const b of [-1, -0.5, 0, 0.5, 1]) w = Math.max(w, pen(s.cx + s.hw * a * s.cs - s.hd * b * s.sn, s.cz + s.hw * a * s.sn + s.hd * b * s.cs));
   if (w > 0) hit('коробка из редактора', s.cx, s.cz, w);
+}
+// 5) Горки: основание вне дороги ещё не значит, что скат/выкат или столкновение вне её.
+for (const it of d.SMASH || []) {
+  if (it.kind !== 'slide' && it.kind !== 'ice') continue;
+  const k = it.kind === 'ice' ? 'ледяная горка' : 'детская горка';
+  cnt(k);
+  const a = it.seaPos || (it.mesh && it.mesh.geometry.attributes.position.array), start = it.seaPos ? 0 : it.v0 * 3;
+  let w = -99;
+  if (a) for (let q = start; q < start + it.nv * 3; q += 3) w = Math.max(w, pen(a[q], a[q + 2]));
+  // Круг столкновения сверяем непрерывно: от центра до оси минус полуширина и радиус.
+  const seen = new Set();
+  for (let i = Math.floor((it.x - it.r) / CELL); i <= Math.floor((it.x + it.r) / CELL); i++)
+    for (let j = Math.floor((it.z - it.r) / CELL); j <= Math.floor((it.z + it.r) / CELL); j++)
+      for (const s of G.get(i * 100000 + j) || []) {
+        if (seen.has(s)) continue;
+        seen.add(s);
+        const dx = s.x2 - s.x1, dz = s.z2 - s.z1, l2 = dx * dx + dz * dz || 1;
+        const t = Math.max(0, Math.min(1, ((it.x - s.x1) * dx + (it.z - s.z1) * dz) / l2));
+        w = Math.max(w, s.w / 2 + it.r - Math.hypot(it.x - s.x1 - dx * t, it.z - s.z1 - dz * t));
+      }
+  if (w > 0) hit(k, it.x, it.z, w);
+}
+// Горки заполнения дворов строятся только у камеры: проверяем всю площадку из её постоянных данных.
+for (const a of (d.YFILL && d.YFILL.NEAR.values()) || []) for (let q = 0; q < a.length; q += 6) {
+  if (a[q] !== 2) continue;
+  rect('площадка двора', { x: a[q + 1], z: a[q + 2], ux: Math.cos(a[q + 3]), uz: Math.sin(a[q + 3]), W: 11.2, D: 3.6 });
 }
 const bad = Object.values(R.by).reduce((a, b) => a + b, 0);
 return { ok: bad === 0 && Object.keys(R.n).length > 0, bad, ...R };

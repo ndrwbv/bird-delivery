@@ -44,6 +44,7 @@ import * as DYN from './dynres.js';              // «мыло»: снежинк
 import { SEE_U, SEE_FN } from './seethru.js';    // деревья, кусты и столбы между камерой и машиной тают (seethru.js, 0п47)
 import { BAYER_FN } from './fade.js';
 import { indexPile } from './pileindex.js';
+import { clearPlayArea } from './playclearance.js';
 import * as RLAND from './raisedland.js';
 import { WOOD_ON, WOOD } from './treeform.js';      // деревья «как в глубинке» (2г6, 2г10): два тона кроны, снег на ветках толще, шапки на соснах; ?oldwood — по-старому
 
@@ -822,6 +823,12 @@ export function* seasonYard () {                  // шагами (latebuild.js)
     [px, pz] = W(0, cz); put(g, B(1.3, 0.28, L), '#a8d8f0', px, gy + H / 2 - 0.05, pz, tilt, ry, 0);
     for (const sd of [-1, 1]) { [px, pz] = W(sd * 0.78, cz); put(g, B(0.26, 0.55, L), '#dfe6ee', px, gy + H / 2 + 0.12, pz, tilt, ry, 0); }
     [px, pz] = W(0, 1.2 * k + L + 1.4); put(g, B(1.3, 0.06, 3), '#9fd0ea', px, gy + 0.06, pz, 0, ry, 0);
+    // Скат с выкатом тянется до 11,54 м от основания большой горки; прежний круг 3,2 м его не покрывал.
+    // Проверяем также лестницу и полный круг столкновения, не только основание.
+    if (!clearPlayArea(x, z, Math.sin(ry), Math.cos(ry), -1.2 * k - 1.6, 1.2 * k + L + 2.95, 2.2 * k)) {
+      for (const geo of g) geo.dispose();
+      return;
+    }
     [px, pz] = W(0, (1.2 * k + L) / 2 - 0.3);
     smashAdd('ice', px, pz, 2.2 * k, g, '#dfe6ee');
     track();

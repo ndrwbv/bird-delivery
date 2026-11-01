@@ -957,8 +957,8 @@ export const CAR_LIST = [
      TURN  — скорость поворота кузова: × (0,75 + 0,05·H)       → H1 ×0,8, H5 ×1, H10 ×1,25
      FALL  — на скорости руль «тупеет»: делитель 1 + v·0,014·(1,5 − 0,1·H) → у баржи на 60 км/ч
              поворот слабеет на 25 %, у резкой — на 10 %
-     RATE  — как быстро крутится руль до упора, долей упора в секунду: 2 + 1,2·H → H1 за 0,31 с,
-             H5 за 0,13 с, H10 за 0,07 с; к центру — в RETURN раз быстрее
+     RATE  — как быстро крутится руль до упора, долей упора в секунду: 2,2 + 0,22·H → H1 за 0,41 с,
+             H5 за 0,30 с, H10 за 0,23 с; к центру — в RETURN раз быстрее, дальше центра снова обычный набор
      RMIN  — радиус разворота не меньше 7 − 0,2·H м (13.10.2026, автор: «резко поворачивается, в реальности не так»):
              H1 6,8 м, H5 6 м, H10 5 м; было ~3,5 м у всех до 29 км/ч. Выше ~40 км/ч не мешает — там радиус и так больше
      SIDE  — как быстро гаснет снос вбок (и на сухом, и в дождь): × (0,82 + 0,036·H) → H1 ×0,86, H10 ×1,18;
@@ -966,12 +966,25 @@ export const CAR_LIST = [
    Прокачки «подвеска» нет — управляемость у машины заводская. */
 export const HANDLING = {
   DEF: 5,
-  TURN: [0.75, 0.05], FALL: [1.5, -0.1], RATE: [2, 1.2], RETURN: 1.5, SIDE: [0.82, 0.036],
+  TURN: [0.75, 0.05], FALL: [1.5, -0.1], RATE: [2.2, 0.22], RETURN: 1.75, SIDE: [0.82, 0.036],
   RMIN: [7, -0.2],                                 // радиус разворота не меньше, м: H1 6,8 · H5 6 · H10 5 (13.10.2026)
 };
 export function handlingK (h) {
   const H = Math.max(1, Math.min(10, Number.isFinite(+h) ? +h : HANDLING.DEF)), L = HANDLING;
   return { h: H, turn: L.TURN[0] + L.TURN[1] * H, fall: L.FALL[0] + L.FALL[1] * H, rate: L.RATE[0] + L.RATE[1] * H, side: L.SIDE[0] + L.SIDE[1] * H, rmin: L.RMIN[0] + L.RMIN[1] * H };
+}
+/* Руль клавиатуры и стика: при перекладке сначала возвращаемся к центру, затем
+   набираем противоположный поворот с обычной скоростью. Остаток шага сохраняем:
+   пересечение центра не зависит от FPS и не ускоряет начало нового поворота. */
+export function steeringStep (current, target, rate, dt) {
+  if (!Number.isFinite(rate)) return target;       // машины без характеристики — прежний мгновенный руль
+  if (current * target < 0) {
+    const toCenter = Math.abs(current) / (rate * HANDLING.RETURN);
+    if (dt < toCenter) return current - Math.sign(current) * rate * HANDLING.RETURN * dt;
+    dt -= toCenter; current = 0;
+  }
+  const step = rate * (Math.abs(target) < Math.abs(current) ? HANDLING.RETURN : 1) * dt;
+  return current + Math.max(-step, Math.min(step, target - current));
 }
 export const UPGRADE = { STEPS: 3, SHARE: 0.15, MIN: 6400, HP: 1, VMAX: 0.04 };
 export const upgradePrice = (car, step) => Math.max(UPGRADE.MIN, Math.round(car.price * UPGRADE.SHARE / 100) * 100) * (step + 1);

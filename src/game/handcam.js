@@ -29,6 +29,7 @@
    ?oldhand — по-старому (ни поворота, ни сцены). Отладка: __dlv.HCAM
    ────────────────────────────────────────────────────────────────────────── */
 import { t, N_ } from '../i18n/index.js';
+import * as GPOSE from './guestpose.js';
 
 export const HC = {
   IN: 0.45,           // с: камера разворачивается на клиента
@@ -244,6 +245,7 @@ export function scene (ped, o = {}) {
   const pool = kind === 'late' ? LINES.late.concat(A.ADULT ? LINES.lateAdult : []) : LINES[kind];
   Object.assign(SC, { on: true, t: 0, ped, given: false, said: false, give: o.give || null, line: t(pick(pool)), col: COL[kind],
     emo: late ? 'angry' : 'happy', bub: null, box: null, a: null, mine: false, t0: performance.now(), from: null, cut: false });
+  GPOSE.reach(ped);
   // курьер — перед клиентом лицом к нему, коробка у него в руках (как у клиента: на кистях, qpeople.js CARRY)
   const S = HC.SC;
   const cx = gx + fx * S.STAND, cz = gz + fz * S.STAND;
@@ -285,6 +287,7 @@ function skipScene () {
 function giveNow () {
   if (SC.given) return;
   SC.given = true;
+  GPOSE.caught(SC.ped);
   if (SC.box) { if (SC.box.parent) SC.box.parent.remove(SC.box); disposeBox(SC.box); SC.box = null; }
   try { if (SC.give) SC.give(); } catch (e) { console.warn('[handcam] give', e); }
 }

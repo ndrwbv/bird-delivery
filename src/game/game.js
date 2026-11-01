@@ -33,6 +33,7 @@ import { MAP_IDS, MAP_META } from '../maps/index.js';
 import Platform from '../platform/index.js';
 import { t as $t, tn as $tn, N_, translit, lang as curLang, LANGS, LANG_NAMES } from '../i18n/index.js';
 import { sanitizePois, OWN } from './brands.js';
+import { shopSlot, entranceOverlap } from './facadespace.js';
 import { makePerson, createHumanFactory, faceDataURL, humanStale, FACE_DEBUG, HSTATS, holdFixed } from './people.js';
 import * as HPOOL from './humanpool.js';      // запас готовых людей: собраны заранее, рождение берёт готового (humanpool.js)
 import { pollPad, applyToIN, rumble, pad as PAD } from '../input/gamepad.js';
@@ -41,6 +42,7 @@ import { fixMap, profileFn } from './mapcheck.js';
 import * as MAPW from './mapworks.js';
 import * as CBITS from './citybits.js';
 import * as SEAS from './seasons.js';
+import { clearPlayArea } from './playclearance.js';
 import * as TREES from './trees.js';
 import * as WTH from './weather.js';
 import * as HUR from './hurricane.js';            // ураган: дом проваливается в шейдере статики (holeMat), забор и кран на месте (hurricane.js)
@@ -94,6 +96,7 @@ import * as ZN from './zones.js';                // районы города д
 import * as DIST from './districts.js';          // карьера: 8 районов со своими пиццериями, волны щедрости
 import * as CITYOPEN from './cityopen.js';      // карьера: все районы открыты — праздник, выбор перед сменой, «весь город»
 import * as ORD from './orders.js';
+import * as GPOSE from './guestpose.js';         // ожидание клиента и плавная ловля коробки
 import * as DAYT from './daytime.js';            // ночь держится в развоз смены (NIGHT_HOLD), время суток словами
 import * as ERRS from './errands.js';         // поручения: клиент ждёт на месте, человек у подъезда отдаёт, «на тебе фиолет» (errands.js)
 import * as LIKES from './likes.js';             // что нравится игроку: веса видов поручений и мини-игр (likes.js, docs/ORDERS.md «Что нравится игроку»)
@@ -3074,7 +3077,10 @@ function* osmYardBits () {
       const sl = Math.hypot(run, top - bot), sa = Math.atan2(top - bot, run);
       put(g2, new THREE.BoxGeometry(0.8, 0.08, sl), '#ffd23f', sx + fx * (0.5 + run / 2), (top + bot) / 2, sz + fz * (0.5 + run / 2), sa, rr, 0);   // скат
       put(g2, new THREE.BoxGeometry(0.8, 1.6, 0.08), '#4f7fd6', sx - fx * 0.75, sy + 0.9, sz - fz * 0.75, 0.25, rr, 0);   // лесенка
-      smashAdd('slide', sx + fx * 0.8, sz + fz * 0.8, 2.0, g2, '#ffd23f');
+      // В прямоугольник входят скат до 2,95 м и весь круг столкновения (r=2, центр +0,8 м).
+      // Геометрию создаём и при отказе: её uuid не сдвигают жребий остальных предметов города.
+      if (clearPlayArea(sx, sz, fx, fz, -1.2, 3.05, 2.0)) smashAdd('slide', sx + fx * 0.8, sz + fz * 0.8, 2.0, g2, '#ffd23f');
+      else for (const geo of g2) geo.dispose();
     }
   }
   // кусты: у подъездов по бокам и вдоль стен во дворах
@@ -4355,39 +4361,66 @@ function genEntrances (b, p, ccw, lv, area, arch, bestEdge, doors) {
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
   for (const q of p) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); z0 = Math.min(z0, q[1]); z1 = Math.max(z1, q[1]); }
   if (CITY.entrances.some(e => e[0] > x0 - 3 && e[0] < x1 + 3 && e[1] > z0 - 3 && e[1] < z1 + 3)) return;
+  let shopBlocked = false;
   const ok = (x, z) => {
     if (inHouse(x, z, 0.8) || !inBounds(x, z, -40)) return false;
     const r = nearestRoad(x, z, 7, 1);
     if (r && r.d < r.seg.w / 2 + 1.5) return false;
     if (arch && (Math.hypot(x - arch.mx, z - arch.mz) < 6 || Math.hypot(x - arch.mx - arch.ix * arch.t, z - arch.mz - arch.iz * arch.t) < 6)) return false;   // и в устье со двора (0с)
+    for (const e of shopsNear(x, z, 12)) if (entranceOverlap(e.x, e.z, e.nx, e.nz, e.vw / 2 + 0.2, [x, z, 0, 0, 1])) { shopBlocked = true; return false; }
     return true;
+  };
+  const fit = (wall, s, grand) => {
+    const half = grand ? 2.55 : 1.65, free = wall.len / 2 - half - 0.3;
+    const tx = wall.nz, tz = -wall.nx;
+    for (let d = 0; d <= wall.len; d += 0.5) for (const sign of d ? [-1, 1] : [1]) {
+      const at = s + sign * d;
+      if (Math.abs(at) > free) continue;
+      const x = wall.x + tx * at, z = wall.z + tz * at;
+      if (doors.some(e => Math.hypot(e[0] - x, e[1] - z) < half + (e[4] ? 2.55 : 1.65) + 0.25)) continue;
+      if (ok(x + wall.nx * 1.5, z + wall.nz * 1.5)) return { x, z };
+    }
+    return null;
   };
   // парадная — у старого дома с адресом, на стене к улице
   if (bestEdge && (b.k === 'pub' || (lv <= 6 && b.a && chance(0.3)))) {
-    const x = bestEdge.mx, z = bestEdge.mz;
-    if (ok(x + bestEdge.ox * 1.5, z + bestEdge.oz * 1.5)) { entranceAt(x, z, bestEdge.ox, bestEdge.oz, true); GEN_ENTR.push([x, z, bestEdge.ox, bestEdge.oz]); doors.push([x, z, bestEdge.ox, bestEdge.oz, 1]); }
-    if (b.k === 'pub') return;
+    const pos = fit({ x: bestEdge.mx, z: bestEdge.mz, nx: bestEdge.ox, nz: bestEdge.oz, len: bestEdge.len }, 0, true);
+    if (pos) { const { x, z } = pos; entranceAt(x, z, bestEdge.ox, bestEdge.oz, true); GEN_ENTR.push([x, z, bestEdge.ox, bestEdge.oz]); doors.push([x, z, bestEdge.ox, bestEdge.oz, 1]); }
+    if (b.k === 'pub' && (pos || !shopBlocked)) return;
   }
   // подъезды — на самой длинной стене, которая дальше всех от дороги
   let best = null, score = -1;
+  const alternatives = [];
   const n = p.length;
   for (let i = 0; i < n; i++) {
     const a = p[i], c = p[(i + 1) % n], dx = c[0] - a[0], dz = c[1] - a[1], len = Math.hypot(dx, dz);
-    if (len < 10) continue;
+    if (len < 3.9) continue;
     const ox = (ccw ? dz : -dz) / len, oz = (ccw ? -dx : dx) / len;
     const mx = (a[0] + c[0]) / 2 + ox * 4, mz = (a[1] + c[1]) / 2 + oz * 4;
     const r = SARC ? nearestRoad0(mx, mz, DRIVE_MAX) : nearestRoad(mx, mz, DRIVE_MAX, 1);   // плавные улицы — как до дуг (nearestRoad0)
     const sc = len * (r && (SARC ? r.c : r.seg.c) <= 3 && r.d < 18 ? 0.3 : 1);
-    if (sc > score) { score = sc; best = { a, dx, dz, len, ox, oz }; }
+    alternatives.push({ a, dx, dz, len, ox, oz, score: sc });
+    if (len >= 10 && sc > score) { score = sc; best = { a, dx, dz, len, ox, oz }; }
   }
-  if (!best) return;
-  const k = clamp(Math.floor(best.len / 16), 1, 4);
+  const k = best ? clamp(Math.floor(best.len / 16), 1, 4) : 0;
   for (let i = 0; i < k; i++) {
-    const t = (i + 0.5) / k, x = best.a[0] + best.dx * t, z = best.a[1] + best.dz * t;
-    if (!ok(x + best.ox * 1.5, z + best.oz * 1.5)) continue;
+    const pos = fit({ x: best.a[0] + best.dx / 2, z: best.a[1] + best.dz / 2, nx: best.ox, nz: best.oz, len: best.len },
+      ((i + 0.5) / k - 0.5) * (best.dx * best.oz - best.dz * best.ox), false);
+    if (!pos) continue;
+    const { x, z } = pos;
     entranceAt(x, z, best.ox, best.oz, false);
     GEN_ENTR.push([x, z, best.ox, best.oz]);
     doors.push([x, z, best.ox, best.oz, 0]);
+  }
+  if (!doors.length && shopBlocked) for (const wall of alternatives.sort((a, b) => b.score - a.score)) {
+    // Магазин может занять главный фасад целиком. Сначала ищем дверь на другой
+    // стене того же дома, сохраняя доступный адрес вместо удаления подъезда.
+    const pos = fit({ x: wall.a[0] + wall.dx / 2, z: wall.a[1] + wall.dz / 2, nx: wall.ox, nz: wall.oz, len: wall.len }, 0, false);
+    if (!pos) continue;
+    entranceAt(pos.x, pos.z, wall.ox, wall.oz, false);
+    GEN_ENTR.push([pos.x, pos.z, wall.ox, wall.oz]);
+    doors.push([pos.x, pos.z, wall.ox, wall.oz, 0]);
+    break;
   }
 }
 
@@ -4496,7 +4529,7 @@ function osmBuildings (skip) {
           const ox = ccw ? dz / len : -dz / len;     // наружу из контура
           const oz = ccw ? -dx / len : dx / len;
           bestD = road.d;
-          bestEdge = { mx, mz, ox, oz, road: SARC ? null : road };
+          bestEdge = { mx, mz, ox, oz, len, road: SARC ? null : road };
         }
       }
     }
@@ -5001,13 +5034,24 @@ function shopPlan () {
   SHOP_PLAN = []; SHOP_GRID = new Map();
   for (const poi of CITY.pois) {
     if (!poi.w || SHOP_PLAN.length >= SIGN_CELLS) continue;
-    const [wx, wz, nx, nz, wl] = poi.w;
+    let [wx, wz, nx, nz, wl] = poi.w;
     if (!inBounds(wx, wz, -40)) continue;
+    const w = Math.min(4.6, Math.max(2.4, wl - 1)), hgt = w * 52 / 256;
+    const half = Math.max(w, SHOP_VW) / 2 + 0.2;
+    const doors = osmDoorsNear([[wx - wl, wz - wl], [wx + wl, wz + wl]]);
+    if (doors.some(e => entranceOverlap(wx, wz, nx, nz, half, e))) {
+      const buildings = new Set();
+      for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++)
+        for (const b of HOUSE_GRID.get((Math.floor(wx / 40) + i) + ',' + (Math.floor(wz / 40) + j)) || []) buildings.add(b);
+      const slot = shopSlot(wx, wz, nx, nz, half, buildings, doors);
+      if (!slot) continue;                         // реальный подъезд важнее декоративной второй двери
+      wx = slot.x; wz = slot.z;
+      poi.w = [wx, wz, nx, nz, wl];                 // свет, ограждения и взаимодействие — у того же входа
+    }
     // соседние вывески на одной стене — в ряд вверх, больше двух рядов не лепим
     const same = SHOP_PLAN.filter(q => Math.hypot(q.x - wx, q.z - wz) < 4.8 && q.nx * nx + q.nz * nz > 0.9);
     if (same.length >= 2) continue;
     const row = same.length;
-    const w = Math.min(4.6, Math.max(2.4, wl - 1)), hgt = w * 52 / 256;
     const gy = groundH(wx + nx, wz + nz);
     const e = { poi, x: wx, z: wz, nx, nz, w, hgt, row, gy, y0: gy + 3.25 + row * (hgt + 0.25), vw: Math.max(w, SHOP_VW) };
     SHOP_PLAN.push(e);
@@ -8064,6 +8108,7 @@ function guestMove (st, x, z) {
 function clearGuest (p) {
   if (p.inside) { p.x = p.inside.x; p.z = p.inside.z; p.inside = null; p.grp.position.set(p.x, groundH(p.x, p.z), p.z); }   // был дома — выходит из подъезда
   if (!p.guest) return;
+  GPOSE.clear(p);
   if (p.sitAt) p.sitAt.taken = 0;
   if (p.sitting) offBench(p, p.sitRy);
   p.guest = false; p.sitting = 0; p.sitAt = null; p.waitAt = null; p.party = false;
@@ -8128,32 +8173,24 @@ function guestStep (p, dt) {
     if (Math.abs(off) > 1.9 && Math.hypot(V.x - p.x, V.z - p.z) < 26) { offBench(p, p.sitRy); p.sitting = 0; p.sitAt = null; }
     u.legL.rotation.x = damp(u.legL.rotation.x, -1.45, 8, dt);
     u.legR.rotation.x = damp(u.legR.rotation.x, -1.45, 8, dt);
-    u.armL.rotation.x = damp(u.armL.rotation.x, -0.3, 6, dt);
-    u.armR.rotation.x = damp(u.armR.rotation.x, -0.3, 6, dt);
     // сидя разворачивается головой
     u.head.rotation.y = damp(u.head.rotation.y, clamp(off, -1.1, 1.1), 5, dt);
   } else if (p.party && !p.served) {
-    // тусовка: прыгают в такт, руки вверх по очереди, пританцовывают
+    // тусовка: пританцовывают в такт, руки свободны для коробки
     p.partyPh += dt;
     const t = p.partyPh, beat = Math.abs(Math.sin(t * 7));
     p.grp.position.set(p.x, groundH(p.x, p.z) + curbAt(p.x, p.z) + beat * 0.32, p.z);
     p.grp.rotation.y += Math.sin(t * 1.3) * dt * 2.5;
-    u.armL.rotation.x = -2.6 + Math.sin(t * 7) * 0.5;
-    u.armR.rotation.x = -2.6 + Math.sin(t * 7 + Math.PI) * 0.5;
-    u.armL.rotation.z = -0.3; u.armR.rotation.z = 0.3;
     u.legL.rotation.x = Math.sin(t * 7) * 0.4; u.legR.rotation.x = -Math.sin(t * 7) * 0.4;
     u.head.rotation.y = Math.sin(t * 3.5) * 0.4;
   } else {
     p.grp.position.set(p.x, groundH(p.x, p.z) + curbAt(p.x, p.z), p.z);
     u.legL.rotation.x = damp(u.legL.rotation.x, 0, 6, dt);
     u.legR.rotation.x = damp(u.legR.rotation.x, 0, 6, dt);
-    u.armL.rotation.x = damp(u.armL.rotation.x, 0, 6, dt);
-    u.armR.rotation.x = damp(u.armR.rotation.x, 0, 6, dt);
-    u.armL.rotation.z = damp(u.armL.rotation.z, 0, 6, dt);
-    u.armR.rotation.z = damp(u.armR.rotation.z, 0, 6, dt);
     // стоя разворачивается всем корпусом и ждёт
     p.grp.rotation.y = damp(p.grp.rotation.y, Math.atan2(V.x - p.x, V.z - p.z), 4, dt);
   }
+  GPOSE.rest(p, dt);                            // все оси: не остаётся прежнего жеста/поворота кистей
 
   // получил пиццу — постоял с ней и пошёл дальше (ждёт поручение — p.errand, errands.js — стоит, пока не вернёшься).
   // Пока открыто окно разговора и он рядом с машиной — стоит (автор 18.10.2026, 0щ: «говоришь с людьми — они исчезают»)
@@ -12875,10 +12912,9 @@ function driveStep (dt) {
   if (V.wade && !V.air) vf -= vf * STREAMS.drag(V.wade) * dt;   // вброд по речке или у берега пруда — сильно тормозит (streams.js)
   if (IN.hand) vf -= vf * 1.1 * dt;
   if (sand) vf -= vf * BEACH.SAND.DRAG * sand * dt;
-  // руль крутится до упора не мгновенно: HANDLE.rate долей упора в секунду (к центру — быстрее)
+  // руль набирается плавно; при перекладке быстро возвращается только до центра (econ.js)
   const want = IN.joy ? -clamp(IN.jx * 1.35, -1, 1) : (IN.left ? 1 : 0) - (IN.right ? 1 : 0);
-  const sr = HANDLE.rate * (Math.abs(want) < Math.abs(V.steer || 0) || want * (V.steer || 0) < 0 ? ECON.HANDLING.RETURN : 1) * dt;
-  const sv = V.steer = Number.isFinite(sr) ? (V.steer || 0) + clamp(want - (V.steer || 0), -sr, sr) : want;
+  const sv = V.steer = ECON.steeringStep(V.steer || 0, want, HANDLE.rate, dt);
   // снос вбок гаснет со «сцеплением», 1/с: в дождь чуть носит (WET); у баржи снос гаснет медленнее, у резкой — быстрее (HANDLE.side);
   // на песке — тоже носит. Занос и дрифт (drift.js, 12бо): на скорости в резком повороте — немного, ручник срывает зад, газ держит
   // дрифт, газон и лёд — сильнее; ?olddrift — по-старому (ручник — 2,2 при любой скорости)
@@ -15977,6 +16013,7 @@ function handOver (st, onTime, story) {
     q.tm = setTimeout(() => {
       q.fired = true;
       if (ped.dead || S.state === 'over' || S.state === 'dying') return;
+      GPOSE.reach(ped);
       // в руки перед ним, а не в середину (автор 23.10.2026, 0п9: «коробка проходит сквозь него»)
       const ry = ped.grp ? ped.grp.rotation.y : 0;
       flyBox(trunkPoint(), { x: ped.x + Math.sin(ry) * 0.5, y: (ped.surf ? 0.2 : groundH(ped.x, ped.z)) + 1.15, z: ped.z + Math.cos(ry) * 0.5 }, ped.surf ? 1.1 : 0.6, () => takeBox(ped, st, onTime, true),
@@ -15990,6 +16027,7 @@ function handOver (st, onTime, story) {
    (оплата и takeBox — после разговора, handOver: коробка та же, не летит) */
 function preBox (ped) {
   if (!ped || ped.dead || !ped.grp || ped.preBox) return;
+  GPOSE.caught(ped);
   const box = pizzaBox(ped.boxes);
   box.position.set(0, ped.sitting ? 1.0 : 1.12, 0.48);
   ped.grp.add(box);
@@ -15997,6 +16035,7 @@ function preBox (ped) {
 }
 /* коробка — клиенту в руки (долетела из багажника; учебный Стёпа — сразу после катсцены, коробку ему отдал курьер) */
 function takeBox (ped, st, onTime, thrown) {
+  GPOSE.caught(ped);
   if (ped.preBox) { const b = ped.preBox; ped.preBox = null; if (b.parent) b.parent.remove(b); b.traverse(o => { if (o.isMesh) o.geometry.dispose(); }); }   // коробка из сцены (preBox) — та же, теперь вручена
   if (ped.dead) return;
   const box = pizzaBox(st.boxes);

@@ -29,6 +29,7 @@ import * as THREE from '../vendor/three.module.min.js';
 import { QDATA } from './qpeople.data.js';
 import { QCLIPS } from './qpeople.clips.js';      // добавочные клипы (наклон «Interact» — поднять с земли), tools/quaternius/clipadd.py
 import { BOX as PBOX_DIM } from './pizzabox.js';   // размер коробки в руках (0п54)
+import { RECEIVE } from './guestpose.js';         // клиент поднимает руки до прилёта, затем опускает коробку
 const BOX_H = PBOX_DIM.H;
 
 const SRCH = typeof location !== 'undefined' ? location.search || '' : '';
@@ -479,6 +480,7 @@ function glasses (F, eye, Lk) {
 /* ── поза наших костей → мировые повороты и места всех костей модели; bones — и в сами кости ── */
 const V2 = new THREE.Vector3(), T = new THREE.Quaternion(), IQ = new THREE.Quaternion(), ID = new THREE.Quaternion(), V = new THREE.Vector3(), CQ = new THREE.Quaternion(), CQ2 = new THREE.Quaternion();
 const AX = new THREE.Vector3(1, 0, 0), FM = new THREE.Matrix4(), IM = new THREE.Matrix4(), ONE3 = new THREE.Vector3(1, 1, 1), SC3 = new THREE.Vector3();
+const REST_Q = new THREE.Quaternion();
 function solve (F, dq, ang, WQ, WP, bones) {
   const J = F.J;
   for (const j of F.order) {
@@ -487,6 +489,16 @@ function solve (F, dq, ang, WQ, WP, bones) {
     if (d) T.copy(d).multiply(F.FIX[j]).multiply(F.RQ[j]);
     else if (b) T.setFromAxisAngle(AX, ang[b] || 0).multiply(Wp).multiply(F.LQ[j]);
     else T.copy(Wp).multiply(F.LQ[j]);
+    // В исходном покое M/F предплечья согнуты по-разному. Клиент свободно опускает их
+    // вдоль плеча; перед ловлей этот слой плавно выключается (жесты остальных людей — как были).
+    const hand = j === J.elbowL ? J.handL : j === J.elbowR ? J.handR : -1;
+    if (hand >= 0 && p >= 0 && ang.rest > 0.001) {
+      V.copy(F.LP[hand]).applyQuaternion(T).normalize();
+      V2.copy(F.LP[j]).applyQuaternion(Wp).normalize();   // плечо → локоть
+      V2.z += 0.08; V2.normalize();
+      REST_Q.setFromUnitVectors(V, V2).multiply(T);
+      T.slerp(REST_Q, ang.rest);
+    }
     WQ[j].copy(T);
     if (p < 0) WP[j].copy(F.LP[j]); else WP[j].copy(F.LP[j]).applyQuaternion(Wp).add(WP[p]);
     if (bones) { bones[j].quaternion.copy(IQ.copy(Wp).invert().multiply(T)); bones[j].position.copy(F.LP[j]); }
@@ -553,6 +565,8 @@ export const SIT = { PAD: 0.07, BACK: 0.17 };
 const SQ = new THREE.Quaternion();
 export const CARRY = { ARM: -0.5, ELB: -1.0, IN: 0.1, Y: 0.035, ZMIN: 0.36 };
 const CQL = new THREE.Quaternion().setFromEuler(new THREE.Euler(CARRY.ARM, 0, CARRY.IN)), CQR = new THREE.Quaternion().setFromEuler(new THREE.Euler(CARRY.ARM, 0, -CARRY.IN));
+const RQL = new THREE.Quaternion().setFromEuler(new THREE.Euler(RECEIVE.ARM, 0, RECEIVE.IN)), RQR = new THREE.Quaternion().setFromEuler(new THREE.Euler(RECEIVE.ARM, 0, -RECEIVE.IN));
+const RBL = new THREE.Quaternion(), RBR = new THREE.Quaternion();
 function carriedBox (st) {
   const g = st.g;
   if (g.children.length !== st.nc || (st.box && st.box.parent !== g)) { st.nc = g.children.length; st.box = null; for (const c of g.children) if (c.userData && c.userData.pbox) { st.box = c; break; } }
@@ -606,7 +620,17 @@ function poseHook () {
   a.kneeL = knee(u.legL.rotation.x); a.kneeR = knee(u.legR.rotation.x);
   a.elbL = elb(u.armL.rotation.x); a.elbR = elb(u.armR.rotation.x);
   const box = !u.qAnim && !st.noWalk ? carriedBox(st) : null;   // несёт коробку: руки вперёд, коробка — на кистях (CARRY)
-  if (box) { if (J.armL >= 0) dq[J.armL] = CQL; if (J.armR >= 0) dq[J.armR] = CQR; a.elbL = a.elbR = CARRY.ELB; }
+  const receiving = !u.qAnim && !st.noWalk && !!u.qReceive;
+  st.rest = (st.rest || 0) + (((u.qGuestRest && !box && !receiving) ? 1 : 0) - (st.rest || 0)) * (1 - Math.exp(-RECEIVE.UP * dt));
+  a.rest = st.rest;
+  st.receive = (st.receive || 0) + ((receiving ? 1 : 0) - (st.receive || 0)) * (1 - Math.exp(-(receiving ? RECEIVE.UP : RECEIVE.DOWN) * dt));
+  if (box || st.receive > 0.001) {
+    RBL.copy(box ? CQL : u.armL.quaternion).slerp(RQL, st.receive);
+    RBR.copy(box ? CQR : u.armR.quaternion).slerp(RQR, st.receive);
+    if (J.armL >= 0) dq[J.armL] = RBL; if (J.armR >= 0) dq[J.armR] = RBR;
+    a.elbL = (box ? CARRY.ELB : a.elbL) * (1 - st.receive) + RECEIVE.ELB * st.receive;
+    a.elbR = (box ? CARRY.ELB : a.elbR) * (1 - st.receive) + RECEIVE.ELB * st.receive;
+  }
   // сидит на лавочке (u.qSeat — высота сиденья над землёй, м; группу игра, как всем сидящим, ставит на 0,42 над землёй):
   // таз — на доске (SIT.PAD над ней), бёдра вниз к коленям ровно настолько, чтобы голень встала отвесно, а ступня — на
   // землю; сдвинут к спинке на SIT.BACK (0п75, автор 24.10: «буквально левитируют на лавочке»). Водители, мопедисты — без qSeat, как было
@@ -652,7 +676,7 @@ function poseHook () {
     const sd = u.qSide && st.v > 1 ? (u.qSide > 0 ? F.clips.runl : F.clips.runr) : null;
     const c = sd || (st.run > 0.5 ? F.clips.run : F.clips.walk);
     st.t += dt * st.v / (c.speed * sc);
-    clipPose(st, c, ((st.t / c.T) % 1) * c.nF, true, st.w, box || u.qArms ? armMask(F) : null);   // qArms — руки заняты (митингующий держит плакат, protests.js): ходьба им не машет
+    clipPose(st, c, ((st.t / c.T) % 1) * c.nF, true, st.w, box || st.receive > 0.001 || u.qArms ? armMask(F) : null);   // руки заняты коробкой/ловлей/плакатом — ходьба им не машет
     // голова — куда смотрит игра (на машину, на собеседника)
     if (J.head >= 0 && u.head.rotation.y) st.bones[J.head].rotateY(u.head.rotation.y * st.w);
     QP.walk++;

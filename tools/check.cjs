@@ -101,6 +101,19 @@ const CHECKS = [
     const r=await sh(process.execPath,[path.join(__dirname,file)]);
     return {status:r.code===0?'ok':'fail',info:(r.code===0?r.out:r.err).trim()};
   }})),
+  { id: 'guest-pose', name: 'клиент: свободные кисти, подъём и плавное опускание коробки', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'guest-pose-test.mjs')]);
+    return { status: r.code === 0 ? 'ok' : 'fail', info: (r.out || r.err).trim() };
+  } },
+  { id: 'facade-space', name: 'магазин занимает свободный фасад, адрес подъезда сохранён', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'facade-space-test.mjs')]);
+    return { status: r.code === 0 ? 'ok' : 'fail', info: (r.out || r.err).trim() };
+  } },
+  { id: 'steering', name: 'плавный руль клавишами и стиком, отпускание и перекладка', group: 2, run: async () => {
+    const j = await probe(['--mode=steam', '--size=deck', '--q=gfx=high&gfxdev=deck', '--eval=' + path.join(__dirname, 'probe-checks/steering.js')]);
+    const e = errLine(j), r = j.result;
+    return { status: !e && r?.ok ? 'ok' : 'fail', info: e || JSON.stringify({ fail: r?.fail, crashes: r?.crashes, scenarios: r?.rows?.length }) };
+  } },
   { id: 'daily-race-unit', name: 'задания: отмена старых кадров и затухания', group: 1, run: async () => {
     const r=await sh(process.execPath,[path.join(__dirname,'daily-race-test.cjs')]);
     return {status:r.code===0?'ok':'fail',info:(r.code===0?r.out:r.err).trim()};
@@ -253,8 +266,8 @@ const CHECKS = [
     const e = errLine(j), r = j.result;
     if (e || !r) return { status: 'fail', info: e || 'нет результата' };
     if (r.err) return { status: 'fail', info: r.err };
-    return { status: r.ok ? 'ok' : 'fail', info: `магазинов ${r.shops}, окно на вывеске / двери / витрине у ${r.shopBad} (окон ${r.winBad}: ${JSON.stringify(r.by)}); арок ${r.arches}: в устье дверь, магазин или ворота ${r.archItems}, без проезда ${r.archNoRoad}` +
-      (r.ok ? '' : ' · ' + JSON.stringify(r.sample.slice(0, 2)) + JSON.stringify(r.itemSample.slice(0, 2)) + JSON.stringify(r.archSample.slice(0, 2))) };
+    return { status: r.ok ? 'ok' : 'fail', info: `магазинов ${r.shops}, окно на вывеске / двери / витрине у ${r.shopBad} (окон ${r.winBad}: ${JSON.stringify(r.by)}); пересечений с подъездами ${r.entranceBad}, потерянных реальных дверей ${r.realDoorMissing?.length || 0}, сгенерированных ${r.generatedDoors}; арок ${r.arches}: в устье дверь, магазин или ворота ${r.archItems}, без проезда ${r.archNoRoad}` +
+      (r.ok ? '' : ' · ' + JSON.stringify(r.entranceSample || []) + JSON.stringify(r.sample.slice(0, 2)) + JSON.stringify(r.itemSample.slice(0, 2)) + JSON.stringify(r.archSample.slice(0, 2))) };
   } },
   { id: 'edits', name: 'правки редактора города применены', group: 2, run: async () => {
     const j = await probe(['--eval=' + path.join(__dirname, 'probe-checks/edits.js')]);

@@ -28,6 +28,7 @@
 import { wet } from './streams.js';
 import { CLEAN } from './mobile.js';
 import { WOOD_ON } from './treeform.js';      // рощицы вокруг полянок (2г6); ?oldwood — по-старому
+import { clearPlayArea } from './playclearance.js';
 
 export const FILL = {
   R: 4.5,                      // пустой кусок — круг такого радиуса (Ø 9 м, ~64 м²)
@@ -479,7 +480,11 @@ function booth (x, z, a) {
 function garageN (D) { const q = (D - FILL.GAP - 0.3) ** 2 - 2.7 * 2.7; return q > 0 ? Math.min(5, Math.floor(2 * Math.sqrt(q) / 3.3)) : 0; }
 function choose (x, z, D, wall, road) {
   const h = hsh(x, z, 11), F = FILL;
-  if (!OFF.has('play') && D >= F.PLAY.D && wall >= F.PLAY.WALL && h < F.PLAY.SHARE && !near(PLAYS, x, z, F.PLAY.FAR)) return 'play';
+  if (!OFF.has('play') && D >= F.PLAY.D && wall >= F.PLAY.WALL && h < F.PLAY.SHARE && !near(PLAYS, x, z, F.PLAY.FAR)) {
+    const a = faceRoad(x, z) + Math.PI / 2;
+    // Сетка пустого места 2 м — дополнительно сверяем весь скат/качели и их столкновения точно с мощёным.
+    if (clearPlayArea(x, z, Math.cos(a), Math.sin(a), -5.6, 5.6, 1.8)) return 'play';
+  }
   const h2 = hsh(x, z, 12);
   if (!OFF.has('booth') && road <= F.BOOTH.ROAD && wall >= 3 && h2 < F.BOOTH.SHARE && !near(BOOTHS, x, z, F.BOOTH.FAR)) return 'booth';
   if (!OFF.has('garage') && road >= F.GARAGE.ROAD[0] && road <= F.GARAGE.ROAD[1] && wall >= F.GARAGE.WALL && garageN(D) >= 2 && h2 > 0.5 && h2 < 0.5 + F.GARAGE.SHARE) return 'garage';
