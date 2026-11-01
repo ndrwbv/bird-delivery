@@ -1,0 +1,33 @@
+/* Первый экран итогов: большая копилка и общий кошелёк, подробности вторичны. */
+.ss-cash .ss-cash-grid { grid-template-columns: minmax(0, 1.4fr) minmax(250px, .8fr); gap: 28px; align-items: center; }
+.ss-cash .ss-cash-r { grid-column: 1; grid-row: 1; gap: 4px; }
+.ss-cash .ss-cash-l { grid-column: 2; grid-row: 1; font-size: 12px; }
+.ss-cash .ss-cash-l .ss-cap { margin: 0 0 12px; font-size: 13px; }
+.ss-cash .ss-rows .pp-row { padding: .45em .65em; font-size: 13px; }
+.ss-cash .ss-rows .pp-row b { font-size: 14px; }
+.ss-cash .ss-pig { width: 280px; max-width: 100%; }
+.ss-cash .ss-pig-stage { position: relative; padding-top: 42px; }
+.ss-cash .ss-sum { position: absolute; left: 50%; top: 0; transform: translateX(-50%); margin: 0; font-size: 24px;
+  white-space: nowrap; text-shadow: 0 0 14px #ffd85e66; }
+.ss-cash .ss-sum small { display: block; text-align: center; margin-bottom: 6px; font-size: 10px; color: var(--pp-label); }
+.ss-cash .ss-wal { gap: 6px; }
+.ss-cash .ss-wal span { font-size: 14px; color: #f3dce7; }
+.ss-cash .ss-wal b { font-size: clamp(32px, 3.8vw, 50px); line-height: 1.2; white-space: nowrap; color: #ffb1cb; }
+.ss-cash .ss-wallet-math { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; max-width: 530px;
+  margin: 12px 0 0; color: var(--pp-label); font-size: 10px; line-height: 1.6; }
+.ss-cash .ss-wallet-math b { margin-left: 5px; color: #fff3d6; font-weight: 600; white-space: nowrap; }
+.ss-cash .ss-wallet-math .negative b { color: #ff8d8d; }
+.ss-wallet-bill { position: fixed; z-index: 150; display: grid; place-items: center; width: 32px; height: 19px;
+  background: #8dd964; color: #285522; border: 2px solid #285522; box-shadow: inset 0 0 0 3px #b9f593, 0 3px 6px #0005;
+  font: bold 15px/1 monospace; pointer-events: none; }
+/* Конечный чек оставляет доступными строки/кнопки, кошелёк читается первым. */
+.cr-rc-wallet .cr-wallet-summary { display: flex; align-items: center; justify-content: center; gap: 24px; padding: 18px 12px;
+  border-bottom: 1px dashed var(--pp-label); margin-bottom: 14px; }
+.cr-rc-wallet .cr-wallet-summary > svg { width: 112px; height: 84px; flex: 0 0 auto; }
+.cr-rc-wallet .cr-wallet-summary p { display: flex; flex-direction: column; margin: 0; gap: 9px; }
+.cr-rc-wallet .cr-wallet-summary span { font-size: 12px; color: var(--pp-label); }
+.cr-rc-wallet .cr-rc-balance-sum { font-size: clamp(25px, 3.4vw, 40px); line-height: 1.15; color: #a93967; white-space: nowrap; }
+.cr-rc-wallet .cr-rc-rows .pp-row { font-size: 12px; padding: .35em 0; }
+.cr-rc-wallet .cr-rc-rows .pp-row > b { font-size: 13px; }
+.cr-rc-wallet .cr-rc-end > .pp-total { font-size: 11px; }
+.cr-rc-wallet .cr-rc-end > .pp-total > b { font-size: 15px; }

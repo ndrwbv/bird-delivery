@@ -120,6 +120,9 @@ const CHECKS = [
     ['delivery-sequence', 'багажник, ловля и один поток оплаты', 'delivery-sequence.js', ['--cpu=3'], 80],
     ['rank-after-payment', 'временный рейтинг только после получения оплаты', 'rank-after-payment.js', ['--cpu=3'], 75],
     ['gennady-delivery', 'Геннадий: квартира, возврат и завершение оплаты', 'gennady-delivery.js', ['--cpu=3'], 100],
+    ['meal-chat', 'обед в переписке, выбор, эффекты и продолжение смены', 'meal-chat.js', ['--cpu=3'], 120],
+    ['meal-chat-names-en', 'английская переписка: Ирина и Женя, один эффект и продолжение', 'meal-chat-names.js', ['--cpu=3', '--lang=en'], 50],
+    ['wallet-end', 'копилка в итогах, траты, пауза и отсутствие повторной выплаты', 'wallet-end.js', ['--cpu=3'], 90],
   ].map(([id, name, file, args, w]) => ({ id, name, group: 2, w, run: async () => {
     const j = await probe(['--mode=steam', '--size=deck', '--q=gfx=high&gfxdev=deck', ...args,
       '--eval=' + path.join(__dirname, 'probe-checks', file)]);

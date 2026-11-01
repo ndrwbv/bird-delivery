@@ -2,7 +2,7 @@
    стиль — src/styles/paper.css, движение — paperfx.js). С 09.10.2026 вместо копилки-свиньи с купюрами.
    Тот же чек годится для любого итога (быстрый заезд — quickrun.js может звать play со своими строками).
 
-     END.play({ host, tap, head, no, why, rows, total, hints, seal, party, sticker, stamp, ribbon, money, Snd }, done)
+     END.play({ host, tap, head, no, why, rows, total, hints, balance, seal, party, sticker, stamp, ribbon, money, Snd }, done)
          host  — куда рисовать (#cr-stage); tap — где тап = «допечатать сразу» (#over);
          head  — шапка чека («чек смены · Юг»), no — номер (7 → «№ 0007»), why — строка мелко под шапкой;
          rows  — [[подпись, значение, 'pp-plus' | 'pp-minus' | '']] — строки «подпись ··· значение»;
@@ -17,11 +17,14 @@
          Всё — ~2 с. quick — нажали «допечатать сразу»: всё на месте мгновенно.
      END.active() / END.skip() / END.root() — идёт ли; skip — любая клавиша / тап / кнопка геймпада: всё сразу.
          Ещё 0,35 с после «сразу» нажатия глотаются — не нажать «на новую смену» тем же нажатием.
+     balance — {n: текущий общий кошелёк}: копилка и сумма крупно, подробности вторичны; без повторного счётчика заработка.
      END.wallet(v) — новая сумма «в копилке теперь» (потратил в «депнуть», гараже, донатах — чек тот же)
      END.tolikLine({ mood, opened, killed, adult }) — что скажет Толик: перевод в новый район (шутка про
          сбитых за карьеру) или фраза по смене (chat.js shiftLine: плохая / так себе / хорошая) */
 import { t, tn } from '../i18n/index.js';
 import * as CHAT from './chat.js';
+import { PIGGY } from './shiftcash.js';
+import './shiftwallet.css';
 import * as PFX from './paperfx.js';
 import * as TF from './talkface.js';    // аватарка Толика говорит ртом, когда пришёл текст
 
@@ -30,26 +33,27 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&am
 export const active = () => !!RUN;
 export const root = () => (RUN ? RUN.root : null);
 export function skip () { if (RUN) RUN.skip(); }
-export function wallet (v) { if (WAL && WAL.el.isConnected) WAL.el.textContent = WAL.fmt(Math.round(v)); }
+export function wallet (v) { if (WAL) for (const el of WAL.els) if (el.isConnected) el.textContent = WAL.fmt(Math.round(v)); }
 
 const GUARD = 350;                       // мс: после «сразу» нажатия ещё глотаются
 const T = { ROWS0: 300, ROW: 90, COUNT: 800, SEAL: 120, SLAM: 260, MSG: 950 };   // мс; MSG — когда приходит текст Толика
 
 /** разметка чека (без движения) — для play и для других итогов */
-export function receiptHTML ({ head = '', no = 0, why = '', rows = [], total = null, hints = [], seal = null, ribbon = null, money = n => String(Math.round(n)) } = {}) {
+export function receiptHTML ({ head = '', no = 0, why = '', rows = [], total = null, hints = [], balance = null, seal = null, ribbon = null, money = n => String(Math.round(n)) } = {}) {
   const num = no ? '№ ' + String(Math.max(0, Math.round(no))).padStart(4, '0') : '';
   const row = ([k, v, cls]) => '<p class="pp-row"><span>' + esc(k) + '</span><i></i><b class="' + (cls || '') + '">' + esc(v) + '</b></p>';
-  return '<section class="pp-receipt cr-rc">' +
+  return '<section class="pp-receipt cr-rc' + (balance ? ' cr-rc-wallet' : '') + '">' +
     '<header class="pp-head"><span>' + esc(head) + '</span>' + (num ? '<b>' + esc(num) + '</b>' : '') + '</header>' +
     (why ? '<p class="pp-hint cr-rc-why">' + esc(why) + '</p>' : '') +
     (ribbon ? '<div class="cr-rc-ribbon">' + esc(ribbon.title) + (ribbon.sub ? '<small>' + esc(ribbon.sub) + '</small>' : '') + '</div>' : '') +   // праздничная смена (holidays.js, стиль — holidays.css)
+    (balance ? '<div class="cr-wallet-summary">' + PIGGY + '<p><span>' + esc(t('Всего в копилке')) + '</span><b class="cr-rc-balance-sum">' + esc(money(balance.n)) + '</b></p></div>' : '') +
     '<div class="cr-rc-body">' +
       (rows.length ? '<div class="cr-rc-rows">' + rows.map(row).join('') + '</div>' : '') +
       '<div class="cr-rc-end">' +
         (total ? '<p class="pp-row pp-total"><span>' + esc(total.k) + '</span><i></i><b class="cr-rc-sum ' + (total.cls || '') + '">' +
           esc((total.fmt || money)(total.n)) + '</b></p>' : '') +
         '<div class="cr-rc-mid"><div class="cr-rc-hints">' +
-        hints.filter(h => !h.bar && !h.cal).map(h => '<p class="pp-hint' + (h.wal ? ' cr-rc-wal' : '') + '">' + (h.mark ? '<span class="pp-mark">' + esc(h.text) + '</span>' : esc(h.text)) +
+        hints.filter(h => !h.bar && !h.cal && (!balance || !h.wal)).map(h => '<p class="pp-hint' + (h.wal ? ' cr-rc-wal' : '') + '">' + (h.mark ? '<span class="pp-mark">' + esc(h.text) + '</span>' : esc(h.text)) +
           (h.wal ? ' <b>' + esc(money(h.n || 0)) + '</b>' : '') + '</p>').join('') + '</div>' +
         (seal ? '<div class="pp-seal pp-seal-' + (seal.color || 'red') + ' cr-rc-seal">' + esc(seal.text) + '</div>' : '') + '</div>' +
         hints.filter(h => h.bar).map(h => barHTML(h.bar)).join('') +          // полоска района — на всю ширину, под строками и печатью
@@ -68,12 +72,12 @@ function barHTML (b) {
     (b.done ? ' <span class="pp-mark">' + esc(b.done) + '</span>' : '') + '</span><span class="cr-dbar">' + cells + '</span></p>';
 }
 
-export function play ({ host, tap = null, head = '', no = 0, why = '', rows = [], total = null, hints = [], seal = null, party = '', sticker = null,
+export function play ({ host, tap = null, head = '', no = 0, why = '', rows = [], total = null, hints = [], balance = null, seal = null, party = '', sticker = null,
   stamp = null, ribbon = null, money = n => String(Math.round(n)), Snd = null } = {}, done = () => {}) {
   if (RUN) RUN.end();
   if (!host) { done(); return; }
   const face = sticker ? (sticker.face != null ? sticker.face : CHAT.avatar(96)) : '';
-  host.innerHTML = receiptHTML({ head, no, why, rows, total, hints, seal, ribbon, money }) +
+  host.innerHTML = receiptHTML({ head, no, why, rows, total, hints, balance, seal, ribbon, money }) +
     (sticker && sticker.line ? '<aside class="en-tolik cr-tolik">' + (face ? '<img alt="" src="' + esc(face) + '">' : '<i></i>') +
       '<div class="en-tb"><b>' + esc(t('Ирина Сергеевна')) + '</b><div class="en-st"><p class="typing en-dots"><span></span><span></span><span></span></p>' +
       '<p class="en-msg">' + esc(sticker.line) + '</p></div></div></aside>' : '');   // сообщение как в iMessage (chat.css): «печатает…», потом текст
@@ -83,8 +87,8 @@ export function play ({ host, tap = null, head = '', no = 0, why = '', rows = []
   const slot = host.querySelector('.cr-rc-stamp'), sealEl = host.querySelector('.cr-rc-seal');
   let sumEl = host.querySelector('.cr-rc-sum');
   if (stamp && slot) slot.appendChild(stamp);
-  const walEl = host.querySelector('.cr-rc-wal b');
-  WAL = walEl ? { el: walEl, fmt: money } : null;
+  const walletEls = [...host.querySelectorAll('.cr-rc-wal b, .cr-rc-balance-sum')];
+  WAL = walletEls.length ? { els: walletEls, fmt: money } : null;
   const fmt = total ? (total.fmt || money) : money;
   const lines = [...host.querySelectorAll('.cr-rc-why, .cr-rc-rows .pp-row, .cr-rc-end > .pp-row, .cr-rc-hints > .pp-hint, .cr-rc-end > .cr-rc-bar')];
 
@@ -149,12 +153,14 @@ export function play ({ host, tap = null, head = '', no = 0, why = '', rows = []
     later(T.MSG, said);
   }
   if (sealEl) sealEl.style.visibility = 'hidden';
-  if (sumEl && total) sumEl.textContent = fmt(0);   // итог щёлкнет вверх от нуля, когда строки допечатаются
+  if (sumEl && total) sumEl.textContent = fmt(balance ? total.n : 0);   // итог щёлкнет вверх от нуля, когда строки допечатаются
   PFX.stagger(lines, T.ROW / 1000, T.ROWS0 / 1000);
   lines.forEach((_, i) => later(T.ROWS0 + i * T.ROW, () => blip(620 + i * 60, 0.03, 'square', 0.035, 'receipt')));
   const tCount = T.ROWS0 + Math.max(0, lines.length - 1) * T.ROW + 200;
   later(tCount, () => {
     if (!total || !sumEl) { later(T.SEAL, () => { pop(); later(T.SLAM, () => finish(false)); }); return; }
+    // Основной кошелёк уже вырос на экране копилки; вторичный заработок повторно не пересчитываем.
+    if (balance) { later(T.SEAL, () => { pop(); later(T.SLAM, () => finish(false)); }); return; }
     PFX.countUp(sumEl, 0, total.n, { ms: total.n > 0 ? T.COUNT : 0, fmt }).then(() => {
       if (finished) return;
       later(T.SEAL, () => { pop(); later(T.SLAM + (party ? 120 : 0), () => finish(false)); });

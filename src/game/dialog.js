@@ -102,8 +102,8 @@ export function hold (on) {
   if (!open) { API.pause(false); document.body.classList.remove('dlg-open'); if (root && !root.classList.contains('on')) root.hidden = true; }   // лист разговора под ним уже ушёл — не держать пустой слой поверх хада
 }
 /* закрыть текущую реплику сразу (катсцена пропущена: story.js) — say вернёт null */
-let CUR = null;
-export function dismiss () { if (CUR) CUR(); }
+let CUR = null, CUR_OWNER = null;
+export function dismiss (owner) { if (CUR && (owner === undefined || owner === CUR_OWNER)) CUR(); }
 
 function build () {
   root = document.createElement('div');
@@ -165,13 +165,16 @@ function show (o, done) {
   open++;
   API.pause(true);                               // руль из рук (game.js); мир при этом идёт
   const $ = s => root.querySelector(s);
-  const two = !!o.decline;
-  const stack = two && !!o.stack;                // столбиком: верхний — accept, нижний — decline, курсор ▶
+  const options = Array.isArray(o.choices) && o.choices.length ? o.choices : null;
+  const many = !!options, two = !many && !!o.decline;
+  const stack = many || (two && !!o.stack);                // столбиком: верхний — accept, нижний — decline, курсор ▶
   const btns = $('.dlg-btns'), hintEl = $('.dlg-hint'), box = $('.dlg-box');
   root.classList.toggle('compact', o.compact !== false && !o.door2d);
   root.classList.toggle('door2d', !!o.door2d);
   root.classList.toggle('dlg-auto', !!o.auto);
   root.classList.toggle('door2d-courier', !!o.door2d && !!o.courierLine);
+  root.classList.toggle('dlg-phone', !!o.phone);
+  root.classList.toggle('dlg-phone-courier', !!o.phone && !!o.courierLine);
   const col = o.color || '#ff8a2b';
   $('.dlg-bar').style.background = col;
   box.style.setProperty('--pp-accent', col);
@@ -188,9 +191,32 @@ function show (o, done) {
   payEl.querySelector('span').textContent = payS ? (o.payLabel || '') : '';
   payEl.querySelector('b').textContent = payS;
   const yes = $('.dlg-yes'), no = $('.dlg-no');
+  for (const el of root.querySelectorAll('.dlg-extra')) el.remove();
+  yes.hidden = many;
   yes.querySelector('span').textContent = o.accept || t('дальше');
   no.querySelector('span').textContent = o.decline || '';
   no.hidden = !two;
+  const choiceButtons = many ? options.map((option, index) => {
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = 'dlg-option dlg-extra'; button.dataset.choice = String(option.id ?? index);
+    const title = document.createElement('b'); title.textContent = option.text; button.appendChild(title);
+    if (option.sub) { const sub = document.createElement('small'); sub.textContent = option.sub; button.appendChild(sub); }
+    btns.appendChild(button); return button;
+  }) : [];
+  let history = $('.dlg-phone-history');
+  if (!history) { history = document.createElement('div'); history.className = 'dlg-phone-history'; $('.dlg-col').prepend(history); }
+  history.replaceChildren(); history.hidden = !o.phone;
+  if (o.phone) for (const message of o.history || []) {
+    const bubble = document.createElement('div'); bubble.className = 'dph-message' + (message.courier ? ' dph-out' : '');
+    const sender = document.createElement('b'), text = document.createElement('p');
+    sender.textContent = message.name; text.textContent = message.text; bubble.append(sender, text); history.appendChild(bubble);
+  }
+  let sender = $('.dlg-phone-sender');
+  if (!sender) { sender = document.createElement('b'); sender.className = 'dlg-phone-sender'; $('.dlg-bubble').prepend(sender); }
+  sender.hidden = !o.phone; sender.textContent = appName(o);
+  let exit = $('.dlg-phone-exit');
+  if (!exit) { exit = document.createElement('button'); exit.type = 'button'; exit.className = 'dlg-phone-exit'; exit.textContent = '×'; $('.dlg-top').appendChild(exit); }
+  exit.hidden = !o.phone; exit.setAttribute('aria-label', t('закрыть переписку'));
   const noKey = no.querySelector('[data-pp-key]');
   if (noKey) noKey.dataset.ppKey = o.alt ? 'x' : 'back';   // alt: второй ответ — на X
   btns.classList.remove('on');
@@ -231,11 +257,18 @@ function show (o, done) {
   clock();
 
   let i = 0, typed = false, closed = false, raf = 0, last = performance.now(), acc = 0, padPrev = {}, armT = 0, blabT = 0;
-  let pick = yes;                                // что нажмёт A: по умолчанию «принять»
+  let pick = many ? choiceButtons[0] : yes;
+  if (many || o.phone) padPrev = { a: !!PAD.a, b: !!PAD.b, x: !!PAD.x };                                // что нажмёт A: по умолчанию «принять»
   let lit = false;                               // подсветка видна: первое ←→↑↓ без неё только будит
   let selectedByKey = false;                     // выбор стрелкой сохраняется, даже пока реплика допечатывается
   const armed = () => typed && armT >= ARM;      // ответы жмутся не сразу после того, как допечаталась
+  const reply = () => many ? options[choiceButtons.indexOf(pick)]?.id ?? choiceButtons.indexOf(pick) : pick !== no;
+  const move = delta => {
+    const at = Math.max(0, Math.min(choiceButtons.length - 1, choiceButtons.indexOf(pick) + delta));
+    pick = choiceButtons[at]; selectedByKey = true; mark(true);
+  };
   const mark = on => {
+    if (many) { for (const button of choiceButtons) button.classList.toggle('dlg-cur', on && pick === button); return; }
     if (stack || o.door2d) {
       yes.classList.toggle('dlg-cur', on && pick === yes); no.classList.toggle('dlg-cur', on && pick === no);
       yes.classList.remove('padsel'); no.classList.remove('padsel'); return;
@@ -265,7 +298,7 @@ function show (o, done) {
   };
   const close = v => {
     if (closed) return; closed = true;
-    if (CUR === dismissMe) CUR = null;
+    if (CUR === dismissMe) { CUR = null; CUR_OWNER = null; }
     cancelAnimationFrame(raf);
     removeEventListener('keydown', key, true);
     TF.stop(img); root.classList.remove('dlg-talking');
@@ -301,7 +334,14 @@ function show (o, done) {
     // раскладку (Xbox, сырой Deck) разбирает input/gamepad.js
     glyphs();
     if (stack) hint();
-    if (PAD.connected && stack) {                 // столбиком: крестовина / стик ↑↓ — курсор, A — ответить, X — нижний
+    if (PAD.connected && o.phone && PAD.b && !padPrev.b) { close(null); return; }
+    if (PAD.connected && many) {
+      if (PAD.menuUp || PAD.menuLeft) move(-1);
+      if (PAD.menuDown || PAD.menuRight) move(1);
+      if (PAD.a && !padPrev.a) answer(reply());
+      if (PAD.b && !padPrev.b) close(null);
+      padPrev = { a: PAD.a, b: PAD.b };
+    } else if (PAD.connected && stack) {                 // столбиком: крестовина / стик ↑↓ — курсор, A — ответить, X — нижний
       const a = PAD.a, x = !!PAD.x;
       if (PAD.menuUp) { pick = yes; selectedByKey = false; mark(true); }
       if (PAD.menuDown) { pick = no; selectedByKey = false; mark(true); }
@@ -327,9 +367,21 @@ function show (o, done) {
   if (o.onShow) try { o.onShow(); } catch (e) { console.warn('[dlg] onShow', e); }
   root.classList.add('dlg-talking');
   const dismissMe = () => close(null);
-  CUR = dismissMe;
+  CUR = dismissMe; CUR_OWNER = o.owner ?? null;
   const key = e => {
     if (o.paused && o.paused()) return;
+    if (o.phone && (e.code === 'Escape' || e.code === 'Backspace')) {
+      e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) close(null); return;
+    }
+    if (many) {
+      const c = e.code, eat = () => { e.preventDefault(); e.stopImmediatePropagation(); };
+      if (['Enter', 'NumpadEnter', 'Space', 'KeyE'].includes(c)) { eat(); if (!e.repeat) answer(reply()); }
+      else if (['ArrowUp', 'KeyW', 'ArrowLeft'].includes(c)) { eat(); if (!e.repeat) move(-1); }
+      else if (['ArrowDown', 'KeyS', 'ArrowRight'].includes(c)) { eat(); if (!e.repeat) move(1); }
+      else if (/^(Digit|Numpad)[1-9]$/.test(c)) { const at = +c.slice(-1) - 1; if (at < options.length) { eat(); if (!e.repeat) answer(options[at].id ?? at); } }
+      else if (c === 'Escape' || c === 'Backspace') { eat(); if (!e.repeat) close(null); }
+      return;
+    }
     if (stack) {                                 // столбиком: стрелки / W S — курсор, Enter / пробел — ответить, 1 / 2 — сразу
       const c = e.code, eat = () => { e.preventDefault(); e.stopPropagation(); };
       if (c === 'Space' || c === 'Enter' || c === 'NumpadEnter' || c === 'KeyE') { eat(); if (!e.repeat) answer(pick !== no); }
@@ -350,7 +402,9 @@ function show (o, done) {
   };
   addEventListener('keydown', key, true);
   // клик / тап по облачку: допечатать; одна кнопка — дальше (две — отвечают кнопкой)
-  $('.dlg-bubble').onclick = () => { if (o.paused && o.paused()) return; if (!typed) finish(); else if (!two && armed()) close(true); };
+  $('.dlg-bubble').onclick = () => { if (o.paused && o.paused()) return; if (!typed) finish(); else if (!two && !many && armed()) close(true); };
+  exit.onclick = () => { if (!(o.paused && o.paused())) close(null); };
+  for (let index = 0; index < choiceButtons.length; index++) choiceButtons[index].onclick = () => answer(options[index].id ?? index);
   yes.onclick = () => { if (o.paused && o.paused()) return; if (armed()) close(true); };
   no.onclick = () => { if (o.paused && o.paused()) return; if (armed()) close(false); };
 }

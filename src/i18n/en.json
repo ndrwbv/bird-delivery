@@ -5843,5 +5843,24 @@
  "Коллеги, наш рейтинг вырос до {n} звезды. Молодцы.|Коллеги, наш рейтинг вырос до {n} звёзд. Молодцы.|Коллеги, наш рейтинг вырос до {n} звёзд. Молодцы.": {
   "one": "Team, our rating has risen to {n} star. Well done.",
   "other": "Team, our rating has risen to {n} stars. Well done."
- }
+ },
+ "закрыть переписку": "close conversation",
+ "Сообщения": "Messages",
+ "Поешь, что будешь?": "Have something to eat. What would you like?",
+ "Ок": "OK",
+ "Пицца с кофейным кремом": "Pizza with coffee cream",
+ "Пиццу с кофейным кремом.": "Pizza with coffee cream, please.",
+ "«Директорская»": "The Manager’s Special",
+ "«Директорскую».": "The Manager’s Special, please.",
+ "Холодная пепперони": "Cold pepperoni",
+ "Холодную пепперони.": "Cold pepperoni, please.",
+ "Нитро на {p} % дольше, бак полный": "Nitro lasts {p}% longer, tank filled",
+ "Нитро на {p} % дольше": "Nitro lasts {p}% longer",
+ "+{p} % нитро": "+{p}% nitro",
+ "Шанс чаевых +{p} п.п., размер ×{k}": "Tip chance +{p} percentage points, amount ×{k}",
+ "Всего в копилке": "Total savings",
+ "Подробности": "Details",
+ "Было": "At shift start",
+ "Прочие изменения": "Other changes",
+ "Пополнение": "Added"
 }

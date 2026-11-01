@@ -31,6 +31,8 @@
    ?oldend — как было: сразу чек. Отладка: __dlv.CAREERM.SSTEPS (state, ok, alt, skip, CFG, carState).
    ────────────────────────────────────────────────────────────────────────── */
 import './shiftsteps.css';
+import './shiftwallet.css';
+import { walletSummary } from './shiftwallet.js';
 import { t, tn, N_ } from '../i18n/index.js';
 import * as PFX from './paperfx.js';
 import { keyHTML, inputKind, onInput } from '../input/glyphs.js';
@@ -143,7 +145,7 @@ function onTap (e) {
 }
 
 const later = (ms, f) => { if (R) R.timers.push(setTimeout(f, ms)); };
-const clearT = () => { if (R) { R.timers.forEach(clearTimeout); R.timers.length = 0; } };
+const clearT = () => { if (R) { R.timers.forEach(clearTimeout); R.timers.length = 0; if (R.cash) R.cash.dispose(); } };
 const blip = (name, f, d, ty, v) => { const S = R && R.o.Snd; if (S && S.fx) try { S.fx(name, s => s.blip(f, d, ty, v)); } catch (e) { /* — */ } };
 const coin = () => { const S = R && R.o.Snd; if (S && S.coin) try { S.coin(); } catch (e) { /* — */ } };
 
@@ -183,7 +185,8 @@ function next () {
   if (R.i >= R.screens.length) {
     R.busy = true;
     tabsOn('end');
-    setTimeout(() => end(false), old && !calm() ? CFG.OUT - 80 : 0);
+    const owner = R;
+    later(old && !calm() ? CFG.OUT - 80 : 0, () => { if (R === owner) end(false); });
     return;
   }
   const s = R.screens[R.i];
@@ -259,39 +262,6 @@ function fit () {
 /* общий низ листа: красный штамп «дальше» */
 const goBtn = (txt = t('дальше')) => '<button type="button" class="pp-stamp ss-go">' + esc(txt) + ' ▸</button>';
 
-/* ── счётчик денег (свой: на одном узле подряд несколько — каждый продолжает с того, где стоит) ── */
-function tween (el, from, to, ms, fmt) {
-  if (!el) return;
-  if (el._tw) cancelAnimationFrame(el._tw);
-  if (calm() || ms <= 0) { el.textContent = fmt(to); el._v = to; return; }
-  const t0 = performance.now();
-  let lastTick = 0;
-  const step = now => {
-    const k = Math.min(1, (now - t0) / ms), v = Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3)));
-    if (v !== el._v) { el._v = v; el.textContent = fmt(v); if (now - lastTick > 70) { lastTick = now; PFX.replay(el, 'pp-tick'); } }
-    if (k < 1 && el.isConnected) el._tw = requestAnimationFrame(step); else { el._tw = 0; el._v = to; el.textContent = fmt(to); }
-  };
-  el._tw = requestAnimationFrame(step);
-}
-const stopTween = (el, v, fmt) => { if (!el) return; if (el._tw) cancelAnimationFrame(el._tw); el._tw = 0; el._v = v; el.textContent = fmt(v); };
-
-/* монетка летит из from в to (дугой): снаружи — по x, внутри — по y с «гравитацией» */
-function flyCoin (from, to, delay = 0, bad = false) {
-  if (calm() || !R || !from || !to) return;
-  const a = from.getBoundingClientRect(), b = to.getBoundingClientRect ? to.getBoundingClientRect() : to;
-  const x0 = a.left + a.width * (0.6 + Math.random() * 0.3), y0 = a.top + a.height / 2;
-  const x1 = b.left + b.width * (to.fx ?? 0.5), y1 = b.top + b.height * (to.fy ?? 0.4);
-  const c = document.createElement('i');
-  c.className = 'ss-coin' + (bad ? ' bad' : '');
-  c.style.left = x0 + 'px'; c.style.top = y0 + 'px';
-  c.style.setProperty('--dx', Math.round(x1 - x0) + 'px');
-  c.style.setProperty('--dy', Math.round(y1 - y0) + 'px');
-  c.style.setProperty('--d', (delay / 1000).toFixed(2) + 's');
-  c.innerHTML = '<b>₽</b>';
-  document.body.appendChild(c);
-  setTimeout(() => c.remove(), delay + 900);
-}
-
 /* ═════════════ 1. деньги: копилка наполняется ═════════════ */
 const PIG_BODY = [[7, 4, 16, 16], [5, 6, 20, 12], [4, 8, 22, 8]];
 const rects = (a, fill, cls = '') => a.map(([x, y, w, h]) => '<rect' + (cls ? ' class="' + cls + '"' : '') + ' x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="' + fill + '"/>').join('');
@@ -312,56 +282,79 @@ function pigSVG () {
 const pigLevel = w => Math.max(0, w) / (Math.max(0, w) + CFG.PIG_K);
 
 function buildCash (s) {
-  const m = s.money;
-  return '<header class="pp-head"><span>' + esc(s.head) + '</span><b>' + esc(t('заработано')) + '</b></header>' +
-    '<div class="ss-cash-grid"><div class="ss-cash-l">' +
-      '<p class="ss-cap">' + esc(t('за смену')) + '</p><p class="ss-sum ' + (s.total < 0 ? 'pp-minus' : 'pp-plus') + '">' + esc(s.fmt(0)) + '</p>' +
+  const m = s.money, balance = walletSummary(s.before, s.total, s.after);
+  const otherLabel = t('Прочие изменения');
+  return '<header class="pp-head"><span>' + esc(s.head) + '</span><b>' + esc(t('Всего в копилке')) + '</b></header>' +
+    '<div class="ss-cash-grid"><div class="ss-cash-l"><p class="ss-cap">' + esc(t('Подробности')) + '</p>' +
       '<div class="ss-rows">' + s.rows.map(r => '<p class="pp-row"><span>' + esc(r.k) + '</span><i></i><b class="' + (r.n < 0 ? 'pp-minus' : r.n > 0 ? 'pp-plus' : 'cr-rc-no') + '">' +
         esc(r.v != null ? r.v : (r.n > 0 ? '+' : r.n < 0 ? '−' : '') + m(Math.abs(r.n))) + '</b></p>').join('') + '</div>' +
-    '</div><div class="ss-cash-r">' + pigSVG() +
-      '<p class="ss-wal"><span>' + esc(t('в копилке')) + '</span><b>' + esc(m(s.before)) + '</b></p>' +
+    '</div><div class="ss-cash-r"><div class="ss-pig-stage">' +
+      '<p class="ss-sum ' + (s.total < 0 ? 'pp-minus' : s.total > 0 ? 'pp-plus' : '') + '"><small>' + esc(t('за смену')) + '</small>' + esc(s.fmt(s.total)) + '</p>' + pigSVG() + '</div>' +
+      '<p class="ss-wal"><span>' + esc(t('Всего в копилке')) + '</span><b data-wallet="' + balance.before + '">' + esc(m(balance.before)) + '</b></p>' +
+      '<div class="ss-wallet-math"><span>' + esc(t('Было')) + '<b>' + esc(m(balance.before)) + '</b></span>' +
+      (balance.other ? '<span class="' + (balance.other < 0 ? 'negative' : '') + '">' + esc(otherLabel) + '<b>' + esc(s.fmt(balance.other)) + '</b></span>' : '') +
+      '<span>' + esc(balance.gain < 0 ? t('за смену') : t('Пополнение')) + '<b>' + esc(s.fmt(balance.gain)) + '</b></span></div>' +
     '</div></div>' + goBtn();
 }
 function animCash (sh, s) {
-  const sum = sh.querySelector('.ss-sum'), rows = [...sh.querySelectorAll('.ss-rows .pp-row')], pig = sh.querySelector('.ss-pig'),
-    fill = sh.querySelector('.ss-pig-fill'), wal = sh.querySelector('.ss-wal b'), go = sh.querySelector('.ss-go');
-  const m = s.money, f0 = pigLevel(s.before), f1 = pigLevel(s.after);
-  const setF = f => { if (fill) fill.style.setProperty('--f', f.toFixed(3)); };
-  setF(f0);
-  rows.forEach(r => { r.style.visibility = 'hidden'; });
-  go.classList.add('ss-wait');
-  const slot = { getBoundingClientRect: () => pig.getBoundingClientRect(), fx: 15.5 / 32, fy: 4 / 31 };
-  let cur = 0;
-  const T0 = 420;
-  const fin = () => {                     // всё сразу
-    clearT(); R.anim = null;
-    rows.forEach(r => { r.style.visibility = ''; r.classList.remove('pp-print'); });
-    stopTween(sum, s.total, s.fmt); stopTween(wal, s.after, m);
-    if (fill) fill.classList.add('ss-now');
-    setF(f1);
-    go.classList.remove('ss-wait');
-    R.armAt = performance.now() + 200;
+  const owner = R, balance = walletSummary(s.before, s.total, s.after);
+  const pig = sh.querySelector('.ss-pig'), fill = sh.querySelector('.ss-pig-fill'), wal = sh.querySelector('.ss-wal b'), go = sh.querySelector('.ss-go');
+  const bills = [], effectCount = s.total > 0 ? Math.min(8, 3 + Math.floor(Math.log10(Math.max(10, s.total)))) : 0;
+  let raf = 0, elapsed = 0, previous = performance.now(), disposed = false, completed = false;
+  const gainAt = 250, gainTime = balance.gain || balance.delta ? 1200 : 0, endAt = gainAt + gainTime + 100;
+  const set = value => {
+    wal.textContent = s.money(value); wal.dataset.wallet = String(Math.round(value));
+    if (fill) { fill.classList.add('ss-now'); fill.style.setProperty('--f', pigLevel(value).toFixed(3)); }
   };
-  R.anim = fin;
-  rows.forEach((r, i) => later(T0 + i * CFG.ROW, () => {
-    const row = s.rows[i];
-    r.style.visibility = ''; PFX.replay(r, 'pp-print');
-    blip('receipt', 620 + i * 60, 0.03, 'square', 0.035);
-    if (row.n) {
-      tween(sum, cur, cur + row.n, 280, s.fmt); cur += row.n;
-      const n = row.n > 0 ? Math.min(5, 2 + Math.round(Math.log10(Math.max(10, row.n)) - 2)) : 1;
-      for (let k = 0; k < n; k++) flyCoin(r.querySelector('b'), slot, k * 70, row.n < 0);
-      if (row.n > 0) later(420, coin);
+  const resetClock = () => { previous = performance.now(); };
+  const dispose = () => {
+    if (disposed) return; disposed = true;
+    cancelAnimationFrame(raf); document.removeEventListener('visibilitychange', resetClock);
+    for (const bill of bills) bill.el.remove();
+    if (owner && owner.cash === state) owner.cash = null;
+  };
+  const finish = () => {
+    if (completed) return; completed = true;
+    dispose(); set(balance.after);
+    if (R === owner) { R.anim = null; R.armAt = performance.now() + 200; }
+    go.classList.remove('ss-wait'); PFX.slam(go);
+  };
+  const state = { dispose, summary: balance, get shown () { return +wal.dataset.wallet; } };
+  owner.cash = state; owner.anim = finish; go.classList.add('ss-wait');
+  set(balance.before);
+  document.addEventListener('visibilitychange', resetClock);
+  if (calm()) { finish(); return; }
+  const tick = now => {
+    if (disposed) return;
+    if (R !== owner || owner.sheet !== sh || !owner.host.isConnected || owner.host.hidden) { dispose(); return; }
+    const dt = Math.min(100, now - previous); previous = now;
+    if (!(document.hidden || owner.o.paused?.())) elapsed += dt;
+    const progress = gainTime ? Math.max(0, Math.min(1, (elapsed - gainAt) / gainTime)) : elapsed >= gainAt ? 1 : 0;
+    const smooth = progress * progress * (3 - 2 * progress);
+    // Прочие траты могли случиться уже после заработка: не изображаем выдуманный отрицательный баланс до прихода денег.
+    const value = balance.before + balance.delta * smooth;
+    set(value);
+    if (progress > 0 && effectCount && !bills.length) {
+      const r = pig.getBoundingClientRect();
+      for (let i = 0; i < effectCount; i++) {
+        const el = document.createElement('i'); el.className = 'ss-wallet-bill'; el.textContent = '₽'; el.style.visibility = 'hidden';
+        document.body.appendChild(el);
+        bills.push({ el, at: gainAt + i * 80, x: r.left + r.width * (0.38 + (i % 3) * 0.055), y: r.top - 10,
+          x1: r.left + r.width * 15.5 / 32, y1: r.top + r.height * 11 / 31 });
+      }
     }
-  }));
-  const tWal = T0 + rows.length * CFG.ROW + 250;
-  later(tWal, () => {
-    stopTween(sum, s.total, s.fmt);
-    tween(wal, s.before, s.after, 800, m);
-    setF(f1);
-    if (s.total > 0) { PFX.replay(pig, 'ss-bump'); PFX.burst(pig, { kind: 'coins', n: 14, spread: 1 }); PFX.burst(sum, { kind: 'confetti', n: 34, spread: 1.5 }); }
-  });
-  later(tWal + 900, () => { R.anim = null; go.classList.remove('ss-wait'); PFX.slam(go); blip('stamp', 90, 0.09, 'square', 0.1); });
+    for (const bill of bills) {
+      const k = (elapsed - bill.at) / 540;
+      if (k < 0 || k >= 1) { bill.el.style.visibility = 'hidden'; continue; }
+      bill.el.style.visibility = '';
+      bill.el.style.left = bill.x + (bill.x1 - bill.x) * k + 'px';
+      bill.el.style.top = bill.y + (bill.y1 - bill.y) * k * k + 'px';
+      bill.el.style.transform = 'translate(-50%,-50%) rotate(' + (Math.sin(k * Math.PI) * 12) + 'deg) scale(' + (1 - k * 0.4) + ')';
+    }
+    if (elapsed >= endAt) { if (balance.gain > 0) { PFX.replay(pig, 'ss-bump'); coin(); } finish(); return; }
+    raf = requestAnimationFrame(tick);
+  };
+  raf = requestAnimationFrame(tick);
 }
 
 /* ═════════════ 2. «давай депнем?» ═════════════ */
@@ -581,6 +574,7 @@ const BUILD = { cash: buildCash, dep: buildDep, rank: buildRank, car: buildCar }
 const ANIM = { cash: animCash, dep: animDep, rank: animRank, car: animCar };
 
 export const DEBUG = {
-  CFG, ok, alt, skip, carState,
+  CFG, play, ok, alt, skip, carState, walletSummary,
+  get cash () { return R?.cash ? { ...R.cash.summary, shown: R.cash.shown } : null; },
   get state () { return R ? { on: true, i: R.i, id: R.screens[R.i] ? R.screens[R.i].id : 'end', ids: R.screens.map(s => s.id), anim: !!R.anim, busy: R.busy } : { on: false }; },
 };

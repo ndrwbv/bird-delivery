@@ -1,0 +1,37 @@
+body.meal-chat-open #chat { visibility: hidden; }
+/* Переписка телефона: входящие слева, ответ Жени справа. Управляет существующий DLG. */
+#dlg.dlg-phone { align-items: center; justify-content: flex-end; padding: 40px 24px; background: rgba(40,14,24,.16); }
+#dlg.dlg-phone .dlg-box { width: min(414px, calc(100vw - 48px)); max-height: calc(100vh - 80px); overflow: auto;
+  padding: 0 16px 18px; border: 5px solid var(--pp-ink); border-radius: 28px; background: var(--pp-paper);
+  color: var(--pp-ink); box-shadow: 0 14px 40px #28101b70; rotate: none; }
+#dlg.dlg-phone .dlg-box::before, #dlg.dlg-phone .dlg-box::after, #dlg.dlg-phone .dlg-bar,
+#dlg.dlg-phone .dlg-clock, #dlg.dlg-phone .dlg-head, #dlg.dlg-phone .dlg-skip { display: none; }
+#dlg.dlg-phone .dlg-top { display: flex; align-items: center; justify-content: space-between; margin: 0 -16px 16px;
+  padding: 12px 16px; background: #f0dfbe; border-bottom: 1px solid var(--pp-ink); font: inherit; font-size: 11px; line-height: 1.6; }
+#dlg.dlg-phone .dlg-what { color: var(--pp-ink); font: inherit; }
+.dlg-phone-exit { margin-left: auto; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%;
+  background: #fff8e9; color: var(--pp-ink); font: inherit; font-size: 20px; line-height: 1; cursor: pointer; }
+.dlg-phone-exit[hidden], .dlg-phone-history[hidden], .dlg-phone-sender[hidden] { display: none; }
+#dlg.dlg-phone .dlg-row, #dlg.dlg-phone .dlg-col { display: flex; flex-direction: column; width: 100%; padding: 0; gap: 10px; }
+.dlg-phone-history { display: flex; flex-direction: column; gap: 10px; }
+#dlg.dlg-phone .dlg-bubble, .dph-message { align-self: flex-start; box-sizing: border-box; width: fit-content; max-width: 92%;
+  padding: 10px 12px; margin: 0; min-height: 0; background: #fffaf0; color: var(--pp-ink); border: 2px solid var(--pp-ink); border-radius: 15px 15px 15px 4px;
+  box-shadow: 0 3px 0 #33210c33; font: inherit; font-size: 12px; line-height: 1.7; }
+#dlg.dlg-phone .dlg-bubble::before, #dlg.dlg-phone .dlg-bubble::after { display: none; }
+#dlg.dlg-phone .dlg-text, .dph-message p { margin: 0; padding: 0; font: inherit; color: inherit; min-height: 0; }
+.dlg-phone-sender, .dph-message > b { display: block; margin-bottom: 4px; font: inherit; font-size: 9px; line-height: 1.5; color: #80522b; }
+#dlg.dlg-phone.dlg-phone-courier .dlg-bubble, .dph-message.dph-out { align-self: flex-end; background: #ffe49a;
+  color: var(--pp-ink); border-radius: 15px 15px 4px 15px; }
+#dlg.dlg-phone.dlg-phone-courier .dlg-phone-sender, .dph-out > b { color: #80522b; }
+#dlg.dlg-phone .dlg-btns.stack { margin: 6px 0 0; padding: 0; gap: 8px; }
+#dlg.dlg-phone .dlg-option { width: 100%; min-height: 62px; padding: 10px 12px 10px 30px; border: 2px solid var(--pp-ink);
+  border-radius: 10px; box-shadow: 0 3px 0 var(--pp-ink); background: #fff8e9; color: var(--pp-ink); rotate: none; text-align: left; font: inherit; font-size: 11px; line-height: 1.6; }
+#dlg.dlg-phone .dlg-option b, #dlg.dlg-phone .dlg-option small { display: block; }
+#dlg.dlg-phone .dlg-option small { margin-top: 3px; color: #80522b; font: inherit; font-size: 9px; line-height: 1.65; }
+#dlg.dlg-phone .dlg-option.dlg-cur { border-color: var(--pp-ink); background: #ffe49a; outline: 2px solid #b96930; outline-offset: 3px; }
+#dlg.dlg-phone .dlg-hint { color: #80522b; font: inherit; font-size: 9px; line-height: 1.6; margin: 8px 0 0; }
+.meal-flight { position: fixed; z-index: 150; display: flex; align-items: center; gap: 8px; max-width: 310px; padding: 7px 11px;
+  border: 2px solid var(--pp-ink); border-radius: 14px; background: #fff9dc; color: var(--pp-ink); box-shadow: 0 5px 14px #18263740;
+  pointer-events: none; font-family: "Press Start 2P",ui-monospace,monospace; font-size: 10px; line-height: 1.6; }
+.meal-flight svg { flex: 0 0 auto; width: 32px; height: 36px; }
+.meal-flight b { font: inherit; }

@@ -286,7 +286,7 @@ const INSTALL = `(() => { if (window.__probe) return; const P = window.__probe =
             const root = document.getElementById('dlg'), q = s => root && root.querySelector(s);
             if (root && !root.hidden && q('.dlg-btns.on')) {
               const gang = (q('.dlg-bar').style.backgroundColor || '').replace(/\\s/g, '') === 'rgb(217,52,44)', no = q('.dlg-no'), yes = q('.dlg-yes');
-              const b = !gang && no && !no.hidden ? no : yes;
+              const b = q('.dlg-btns.on .dlg-option') || (!gang && no && !no.hidden ? no : yes);
               cnt('диалог: ' + ((q('.dlg-name').textContent || '?').split(' · ')[0]) + (b === yes && no && !no.hidden ? ' (принял)' : ''));
               b.click();
             } else if (root && !root.hidden) { const bb = q('.dlg-bubble'); if (bb) bb.click(); }   // ещё печатает — пропустить

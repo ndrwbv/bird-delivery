@@ -17337,6 +17337,9 @@ TEL.init({ adult: ADULT, career: CAREER, S, playing: () => isPlaying() && !S.pau
   resErr: () => [['sfx', SFX.STATS.errors], ['music', MUS.STATS.errors]] });
 if (CAREER) CAREERM.init({ S, NOS, Snd, ADULT, get DAY_LEN () { return DAY_LEN; }, env: () => ENV, donated, money, wallet, addWallet, toast, popBonus, showChoice, hideChoice, hudHearts, isPlaying, countUp,
   Store: { get: Store.get, set: Store.set, flush: () => Platform.store.flush && Platform.store.flush() },
+  mealPaused: () => EXT.paused || document.hidden,
+  mealPauseOwners: () => ({ paused: CH.pause || !!(elPause && !elPause.hidden), meal: CH.pause }),
+  mealNitroHud: () => NFRAME.update(NOS.tank, false, $t('нитро')),
   choiceOpen: () => CH.opts.length > 0, endShift, rideOn, dropOrder: () => backToBase(), carChanged: () => { resetCar(); carStats(); },
   atPizza: r => !!PIZZA && Math.hypot(V.x - PIZZA.x, V.z - PIZZA.z) < r,   // полночь у пиццерии — смена всё; дальше — довези и вернись (0п45)
   openShop: cb => { openPanel('shop'); const iv = setInterval(() => { if (elPanel.hidden) { clearInterval(iv); if (cb) cb(); } }, 300); },

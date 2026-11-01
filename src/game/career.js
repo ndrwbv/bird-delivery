@@ -19,7 +19,7 @@
 import * as RESPECT from './respect.js';
 import './career.css';
 import * as ECON from './econ.js';
-import { NITRO_ICON, HEART_ICON, MONEY_ICON } from './lunchicons.js';   // иконки пунктов обеда (11бр)
+import * as MEAL from './mealchat.js';
 import * as GARAGE from './garage.js';
 import * as CL from '../platform/crashlog.js';   // метки переходов: гараж (0п48)
 import { PIGGY } from './shiftcash.js';           // копилка — та же свинья, что на хаде и в гараже
@@ -167,6 +167,7 @@ export function init (api) {
 
 /* ── смена ── */
 export function startShift () {
+  MEAL.cancel();
   closeSpend();
   if (!A) return;
   const S = A.S;
@@ -192,9 +193,9 @@ export function startShift () {
   SH.district = DIST.cur();
   SH.city = DIST.city();                          // «весь город» (cityopen.js): итоги — без района, с премией за дальние
   SH.opened = -1;
+  SH.wallet0 = A.wallet();                        // фактический общий баланс до денег и трат этой смены
   SH.car0 = carNow();                             // мотор и пробег в начале смены — «мотор 87 % (−3 %)», «проехал 9 км» (shiftsteps.js, экран машины)
   if (A.car && A.car.userData) A.car.userData.bumps0 = A.car.userData.bumps || 0;   // удары по кузову до смены (cardent.js hit) — в акте осмотра только за смену (новый кузов — с нуля)
-  lunchClass(false);
   fire(startCbs, { n: SH.n + 1 });
   const L = SH.len, P = SH.pace;
   // попапа «на смене · до конца смены ~N мин» нет: сколько осталось — в паузе
@@ -260,7 +261,6 @@ function clockStep () {
 export function step (dt) {
   if (!A) return;
   const S = A.S;
-  if (!$('choice') || $('choice').hidden) lunchClass(false);
   if (SH.on) watchMoney(S);
   if (!SH.on || S.ride || !A.isPlaying()) { clockStep(); return; }
   if (SH.phase === 'late') lateGuard(dt);
@@ -332,51 +332,35 @@ export function atBase (next) {
   if (h < ECON.SHIFT.LUNCH_H || shiftOver()) return false;
   SH.lunch = true;
   A.S.handT = 1e9;                                  // пока обедаешь — следующий заказ не берём
-  const go = () => { LUNCH_TALK.on = false; if (lunchFits()) showLunch(next); };
-  CHAT.say(lunchLine());
-  go();
+  showLunch(next);
   return true;
 }
 /* обед ещё к месту: смена идёт, до полуночи, стоишь в пиццерии без заказа.
    Гонка (IDEAS «Баги» 5): обед открылся поверх чека, когда смену оборвали, пока Толик говорил «на, похавай» */
-const LUNCH_TALK = { on: false };                   // реплика Толика про обед сейчас на экране
 function lunchFits () {
   const S = A && A.S;
   return !!S && SH.on && SH.phase === '' && S.state === 'handover' && !S.order && !S.ride;
 }
 /* конец смены (полночь, чек, быстрый заезд): реплика про обед на экране — закрыть; карточку обеда снимает endShift */
 function lunchOff () {
-  if (LUNCH_TALK.on) { LUNCH_TALK.on = false; DLG.dismiss(); }
+  MEAL.cancel();
 }
 
 /* ── обед (с 14:00, в пиццерии): одно из трёх до конца смены; next — после выбора.
    Едят пиццу (автор 11.10.2026): холодную, которую приготовили по ошибке, — не шаурму и не бизнес-ланч ── */
-function lunchClass (on) { const c = $('choice'); if (c) c.classList.toggle('cr-lunch', on); }
 function showLunch (next) {
+  if (!A || !lunchFits()) return Promise.resolve(null);
   SH.lunch = true;
-  const S = A.S, L = ECON.LUNCH, T = ECON.TIPS;
-  /* пункты обеда (11бр): иконка вещи из игры, одно слово и число; шутка про пиццу — в подсказке при наведении (tip) */
-  const opts = [
-    { id: 'nitro', icon: NITRO_ICON, label: t('Нитро'), sub: t('бак ×{k}, сразу полный', { k: fmtK(L.nitro.tank) }), tip: t('пицца с кофейным кремом — повар перепутал начинку'),
-      fn () { S.nosEff = (S.nosEff || 1) / L.nitro.tank; A.NOS.tank = 1; } },
-    { id: 'tips', icon: MONEY_ICON, label: t('Деньги'), sub: t('чаевые: +{p} %, ×{k}', { p: Math.round(T.LUNCH_CHANCE * 100), k: fmtK(T.LUNCH_MUL) }), tip: t('«Директорская» — управляющая угощает'),
-      fn () { /* orders.js читает S.lunch === 'tips' */ } },
-    { id: 'hp', icon: HEART_ICON, label: t('Сердце'), sub: tn(L.hp.hearts, '+{n} сердце|+{n} сердца|+{n} сердец'), tip: t('холодная пепперони — клиент не забрал'),
-      fn () { S.hpMax += L.hp.hearts; S.hp += L.hp.hearts; A.hudHearts(); } },
-  ];
-  A.showChoice({
-    title: MEAL_NAME[DAYT.part(hour())](), sub: t('{time} — перерыв. что берёшь?', { time: ECON.clock(hour()) }),
-    pause: true, row: true, okLabel: t('взять'),
-    opts: opts.map(o => ({ label: o.label, sub: o.sub, icon: o.icon, tip: o.tip, fn: () => {
-      S.lunch = o.id;
-      lunchClass(false);
-      o.fn();
-      if (next) next();
-    } })),
-  });
-  lunchClass(true);
+  const person = CHAT.person();
   A.Snd.order();
+  return MEAL.play({ S: A.S, NOS: A.NOS, title: MEAL_NAME[DAYT.part(hour())](), person, name: t('Ирина Сергеевна'),
+    valid: lunchFits, paused: () => !!(A.mealPaused?.() || document.hidden), pauseOwners: () => A.mealPauseOwners?.(),
+    refresh: kind => {
+      if (!kind || kind === 'hp') A.hudHearts();
+      if (!kind || kind === 'nitro-refill') A.mealNitroHud?.();
+    }, next });
 }
+
 const fmtK = k => Number(k).toLocaleString(lang() === 'zh' ? 'zh-CN' : lang());
 
 /* ── полночь: сначала, может быть, развоз смены, потом итоги ── */
@@ -529,7 +513,6 @@ export function showEnd (why, whyText, held) {
   if (!A) return;
   const S = A.S;
   lunchOff();
-  if ($('choice') && $('choice').classList.contains('cr-lunch')) A.hideChoice();   // карточка обеда поверх чека — никогда
   if (QR.on()) { quickEnd(why, whyText); return; }
   if (!held && SH.on && CHAT.busy()) { CHAT.idle(() => { if (A.S.state === 'over') showEnd(why, whyText, true); }); return; }
   CHAT.clear();
@@ -537,7 +520,6 @@ export function showEnd (why, whyText, held) {
   if (wasOn) { SH.endH = hour(); watchMoney(S); }
   SH.bonus = 0; SH.win = 0; SH.rank = null;
   SH.on = false; SH.phase = 'done';
-  lunchClass(false);
   $('cr-clock') && ($('cr-clock').hidden = true);
   const full = why === 'время';
   let placeWas = 0;
@@ -597,7 +579,7 @@ export function showEnd (why, whyText, held) {
   // 11бе (автор 24.10.2026): сначала экраны по очереди — деньги, «давай депнем?», рейтинг, машина (shiftsteps.js), потом этот чек
   const screens = wasOn && !SSTEPS.OFF ? endScreens(full, total) : [];
   if (screens.length) {
-    SSTEPS.play({ host: ov, screens, Snd: A.Snd, padClear: () => { KB.clear(); if (A.padClear) A.padClear(); },
+    SSTEPS.play({ host: ov, screens, Snd: A.Snd, paused: () => !!(A.mealPaused?.() || document.hidden), padClear: () => { KB.clear(); if (A.padClear) A.padClear(); },
       onDep: (stake, next, spin) => { if (A.Snd.boot) A.Snd.boot(); DEP.open({ stake, spin: spin !== false, next }); } }, printCheck);
   } else printCheck();
   function printCheck () {
@@ -605,6 +587,7 @@ export function showEnd (why, whyText, held) {
     refreshEnd();
     END.play({
       host: stage, tap: ov, money: A.money, Snd: A.Snd, stamp: again,
+      balance: wasOn ? { n: A.wallet() } : null,
       head: wasOn ? t('чек смены') + ' · ' + (SH.city ? t('весь город') : DIST.has() ? t(DIST.list()[SH.district >= 0 ? SH.district : DIST.cur()].name) : t('Солнечный'))
         : t('покатался'),
       no: wasOn ? SH.n + 1 : 0,
@@ -657,7 +640,7 @@ function cashScreen (full, total, head) {
   rows.push(full ? { k: t('бонус за смену'), n: SH.bonus || 0 } : { k: t('бонус за смену'), n: 0, v: t('только до конца') });
   if (SH.win) rows.push({ k: t('премия первому'), n: SH.win });
   const after = A.wallet();
-  return { id: 'cash', head, rows, total, fmt: signed, money: A.money, before: Math.max(0, after - total), after };
+  return { id: 'cash', head, rows, total, fmt: signed, money: A.money, before: Number.isFinite(SH.wallet0) ? SH.wallet0 : after - total, after };
 }
 /* 2. «давай депнем?» — только взрослая; первый раз — обязательно (как только есть ¼ смены на ставку), дальше — иногда */
 function depScreen (total) {
@@ -815,7 +798,6 @@ function quickEnd (why, whyText) {
   CHAT.clear();
   if (SH.on) SH.endH = hour();
   SH.on = false; SH.phase = 'done'; SH.bonus = 0;
-  lunchClass(false);
   $('cr-clock') && ($('cr-clock').hidden = true);
   closeSpend();
   QR.finish({
@@ -1331,7 +1313,7 @@ const DEBUG = {
   schedHour, allDay, shiftLeft,
   skipTo (h) { if (A) { A.env().t = SH.on ? (SH.tStart + ECON.tOfHour(h) - ECON.SHIFT.T0) % 1 : ECON.tOfHour(h); if (h > ECON.SHIFT.LUNCH_H + 0.05) SH.lunch = true; else if (h < ECON.SHIFT.LUNCH_H) SH.lunch = false; } },
   useCars (api) { CARS_MOCK = api || null; },
-  showLunch,                                        // обед сразу — проверить карточку (стрелки, Enter)
+  showLunch, MEAL: MEAL.DEBUG,                       // переписка обеда: варианты, этапы и фактический результат
   lunchLine, endWords, midnightNow, staffOver, mealName: (h = hour()) => MEAL_NAME[DAYT.part(h)](),   // слова про время по часам мира (daytime.js)
   STOUR: STOUR.DEBUG, SSTEPS: SSTEPS.DEBUG, crewBoard, crewLoad: () => (A ? crewLoad() : null), openDep: DEP.open, closeDep: DEP.close, openGarage, closeGarage: GARAGE.close, garageFlip: GARAGE.flip, openSpend, menu, askName, back,
 };
