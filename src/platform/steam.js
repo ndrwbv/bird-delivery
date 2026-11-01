@@ -23,8 +23,8 @@ const STEAM_LANGS = {
 };
 
 const player = {
-  // имя из поля ввода игры; пока не ввёл — ник в Steam
-  get name () { return store.get('dlv-name', '') || sw.name || ''; },
+  // Аккаунт Steam сохраняет свой ник; имя персонажа берётся отдельно из heroName().
+  get name () { return sw.name || ''; },
   avatar: '',
   get authorized () { return !!sw.available; },
   async auth () { return !!sw.available; },
@@ -53,7 +53,7 @@ const steamBoard = {
 };
 
 /* Контракт Platform.leaderboard (game.js LB, Москва): Стим, а без него — локальная */
-const local = localBoard(store, 'dlv-lb-local', () => player.name);
+const local = localBoard(store, 'dlv-lb-local', () => '', () => '');
 const leaderboard = {
   /** последний ответ Стима на отправку — для экрана итогов */
   last: null,
@@ -88,7 +88,7 @@ const leaderboard = {
 const Platform = {
   id: 'steam',
   lang: 'en',
-  features: { ads: false, leaderboard: lbOn() ? 'remote' : 'local', externalLinks: false, nameInput: true, gore: true, adult: true, quit: true },
+  features: { ads: false, leaderboard: lbOn() ? 'remote' : 'local', externalLinks: false, nameInput: false, gore: true, adult: true, quit: true },
 
   /** opts.langs — языки, для которых реально есть словари (по умолчанию SUPPORTED_LANGS). */
   async init (opts = {}) {

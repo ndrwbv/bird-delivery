@@ -68,21 +68,28 @@ export function pauseHub () {
 
 /* ── локальная таблица: лучшие смены на этом устройстве ── */
 
-export function localBoard (store, key = 'dlv-lb-local', meName = () => '') {
+export function localBoard (store, key = 'dlv-lb-local', meName = () => '', meId = null) {
   const list = () => { const l = store.get(key, []); return Array.isArray(l) ? l : []; };
   const sorted = () => list().slice().sort((a, b) => b.score - a.score || a.ts - b.ts);
-  const row = (r, i) => ({ rank: i + 1, name: r.name || '', score: r.score, level: r.level || 0, me: !!r.name && r.name === meName() });
+  const mine = r => meId ? !!meId() && r.ownerId === meId() : !!r.name && r.name === meName();
+  const row = (r, i) => ({ rank: i + 1, name: mine(r) ? meName() : r.name || '', score: r.score, level: r.level || 0, me: mine(r) });
   return {
+    // Bootstrap supplies the verified save identity and localized hero name after migration.
+    // Keep this platform utility independent of game modules and their async initialization.
+    setIdentity (readId, readName) {
+      meId = typeof readId === 'function' ? readId : () => '';
+      if (typeof readName === 'function') meName = readName;
+    },
     async submit (score, extra = {}) {
       const l = list();
-      l.push({ name: extra.name || meName(), score: Math.round(+score || 0), level: extra.level || 0, delivered: extra.delivered || 0, ts: Date.now() });
+      l.push({ ...(meId && meId() ? { ownerId: meId() } : {}), name: extra.name || meName(), score: Math.round(+score || 0), level: extra.level || 0, delivered: extra.delivered || 0, ts: Date.now() });
       l.sort((a, b) => b.score - a.score || a.ts - b.ts);
       store.set(key, l.slice(0, 50));
       return true;
     },
     async top (n = 10) { return sorted().slice(0, n).map(row); },
     async mine () {
-      const i = sorted().findIndex(r => r.name === meName());
+      const i = sorted().findIndex(mine);
       return i < 0 ? null : { rank: i + 1, score: sorted()[i].score };
     },
   };

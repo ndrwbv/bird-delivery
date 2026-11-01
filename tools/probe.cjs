@@ -10,6 +10,7 @@
                             --mode steam --outDir папка) — проверить то, что видно только в релизе
    --kids                   ?kids (детская версия; на yandex она и так)
    --map=seversk  --lang=ru  --q=a=1&b  — добавки к адресу игры (?debug&mute&nolb&nointro уже есть)
+   --init-script=path       JS в main world ДО loadURL/импорта игры (CDP Page.addScriptToEvaluateOnNewDocument)
    --fresh                  первый запуск как у новичка: подсказки (hints.js) и учебный заказ не пропущены
    --page=ui.html           другая страница сборки (index.html по умолчанию): ждём не __dlv, а загрузку
                             и window.__probeReady !== false. Песочница интерфейса: --page=ui.html — панель
@@ -84,6 +85,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 let CODE = arg('js', null);
 if (arg('eval')) { try { CODE = fs.readFileSync(path.resolve(arg('eval')), 'utf8'); } catch (e) { err('probe: нет файла', arg('eval')); process.exit(2); } }
+let INIT_SCRIPT = null;
+if (arg('init-script')) { try { INIT_SCRIPT = fs.readFileSync(path.resolve(arg('init-script')), 'utf8'); } catch (e) { err('probe: нет init-script', arg('init-script')); process.exit(2); } }
 
 // чистое сохранение: своя папка userData (кеш, localStorage сессии по умолчанию)
 fs.mkdirSync(BASE, { recursive: true });
@@ -338,16 +341,17 @@ app.whenReady().then(async () => {
   if (arg('q')) q.push(arg('q').replace(/^[?&]/, ''));
   const url = 'app://g/' + PAGE + '?' + q.join('&');
   const dbg = win.webContents.debugger;
-  if ((has('bootcpu') && +arg('cpu', 1) > 1) || arg('cpuprofile') || rnd || MEM) {
+  if ((has('bootcpu') && +arg('cpu', 1) > 1) || arg('cpuprofile') || rnd || MEM || INIT_SCRIPT !== null) {
     try {
       await win.loadURL('app://g/__blank').catch(() => {});   // тот же источник: рендерер не сменится при переходе на игру
       dbg.attach('1.3');
       if (has('bootcpu') && +arg('cpu', 1) > 1) await dbg.sendCommand('Emulation.setCPUThrottlingRate', { rate: +arg('cpu') });
-      if (rnd || MEM) await dbg.sendCommand('Page.enable');
+      if (rnd || MEM || INIT_SCRIPT !== null) await dbg.sendCommand('Page.enable');
       if (rnd) await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: rnd });
+      if (INIT_SCRIPT !== null) await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: INIT_SCRIPT });
       if (MEM) await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: GLMEM });   // видеопамять — с первого вызова WebGL
       if (arg('cpuprofile')) { await dbg.sendCommand('Profiler.enable'); await dbg.sendCommand('Profiler.setSamplingInterval', { interval: 250 }); await dbg.sendCommand('Profiler.start'); }
-    } catch (e) { err('probe: отладчик загрузки:', e.message); }
+    } catch (e) { if (INIT_SCRIPT !== null) throw new Error('probe: init-script не установлен: ' + e.message); err('probe: отладчик загрузки:', e.message); }
   }
   /* --mem: пик памяти процессов за весь запуск (раз в 200 мс) — загрузка и поздняя сборка дают пики, которых нет в метках */
   const PEAK = { page: 0, gpu: 0, pageT: 0, gpuT: 0, n: 0 };

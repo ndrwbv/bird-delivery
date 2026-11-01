@@ -3,34 +3,33 @@
    медленно облетает пиццерию). Листать — свайп, ◀ ▶, ←→, стик и крестовина, LB/RB; выбрать —
    A / Enter / тап — как выбрать, подсказывает только строка внизу (на карточках значка кнопки нет, автор 10.10.2026).
    Сверху слева — логотип бренда: квадратная птица с пиццей (public/brand/logo-px.png) и «Птица Пицца» жирным
-   Rubik Mono One (в переводе — как в словаре, t('Птица Пицца')), справа — профиль: портрет курьера, имя и «сменить»
-   (окно профилей, profiles.js); (сборка с GitHub) плашка «есть новая версия — обновить» (update.js),
+   Rubik Mono One (в переводе — как в словаре, t('Птица Пицца')), справа — Женя и карточка статистики курьера; (сборка с GitHub) плашка «есть новая версия — обновить» (update.js),
    внизу справа — номер версии. Правила — docs/CAREER.md «Главное меню».
 
      MENU.init(api)   — из career.js (api — тот же, что у карьеры, + crew() и garage())
-     MENU.show()      — из showTitle: собрать карточки, рейтинг, при первом запуске — «как тебя зовут?»
+     MENU.show()      — из showTitle: собрать карточки и статистику
      MENU.flip(±1)    — листать (career.js padPre / onKey); MENU.focus() — фокус на карточке в центре
-     MENU.askName(cb) — из настроек: сменить имя
      MENU.cam(cam, P, tG) — камера заставки
-     MENU.modal()     — открытое окно (имя или выбор района: геймпад, клавиатура) или null; MENU.back() — закрыть
+     MENU.modal()     — открытое окно (статистика или выбор района: геймпад, клавиатура) или null; MENU.back() — закрыть
      Район (districts.js): карточки района нет; открыто больше одного (не все) — на карточке «на смену»
        кнопка «сменить район» (карусель районов distpick.js: открытые — «на смену здесь», закрытые — что там
        и сколько смен до открытия); открыто всё —
        выбор перед каждой сменой (cityopen.js picker)
-     MENU.face(id)    — портрет профиля id (data:URL; у каждого профиля свой — по номеру)
+     MENU.face()      — постоянный портрет курьера (data:URL)
      Таблица рекордов (board.js): карточка только в Стим-сборке, окно — тоже modal()
-     Доска почёта (honor.js): достижения и рекорды профиля, окно — тоже modal()
+     Доска почёта (honor.js): достижения и рекорды карьеры, окно — тоже modal()
 
    В Яндексе и Москве (?nocareer) модуль не работает: его зовёт только career.js. */
 import './menu.css';
 import { t } from '../i18n/index.js';
+import { heroName } from './playername.js';
 import * as DIST from './districts.js';
 import * as CITY from './cityopen.js';
 import { keyHTML, onInput, inputKind } from '../input/glyphs.js';   // значки кнопок по текущему вводу
 import './fmlegend.js';                       // легенда полной карты — только то, что сейчас на карте
 import * as BOARD from './board.js';
 import * as HONOR from './honor.js';            // доска почёта: достижения и рекорды (honor.js)
-import * as PROF from './profiles.js';           // профили: у каждого свой прогресс (profiles.js)
+import * as CCARD from './couriercard.js';      // статистика одной карьеры, без выбора/переименования
 import * as QR from './quickrun.js';             // быстрый заезд: сезон, длина смены, машина — без копилки и сюжета
 import * as UPD from './update.js';              // плашка «есть новая версия — обновить» (update.js)
 import { carousel } from './carousel.js';
@@ -38,7 +37,7 @@ import * as PFX from './paperfx.js';
 import * as DP from './distpick.js';            // выбор района — карусель карточек (distpick.js)
 import * as STORYTEST from './storytest.js';      // отладочная панель сюжета у номера версии
 
-let A = null, el = null, md = null, nameCb = null, nameFirst = false, CZ = null, curKey = 'go';
+let A = null, el = null, CZ = null, curKey = 'go';
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -59,7 +58,7 @@ function build () {
     '<div class="crm-top">' +
       '<div class="crm-head"><img class="crm-mark" src="./brand/logo-px.png" alt=""><div class="crm-logo"></div></div>' +
       '<div class="crm-me"><img class="crm-ava" alt=""><div class="crm-who"><small></small><b></b></div>' +
-        '<button type="button" class="crm-swap" data-a="profile"></button></div>' +
+        '<button type="button" class="crm-stats" data-a="stats"></button></div>' +
     '</div>' +
     '<button type="button" class="crm-upd" data-a="update" hidden></button>' +
     '<div class="crm-sky"></div>' +
@@ -75,22 +74,23 @@ function build () {
 function navReset () { if (A.padClear) A.padClear(); if (A.kbClear) A.kbClear(); }
 
 function act (a) {
+  if (A.canNavigate && !A.canNavigate()) return;
   if (a === 'storytest') {
-    if ((md && !md.hidden) || DP.root() || BOARD.root() || HONOR.root() || QR.root() || PROF.root() || CITY.root()) return;
+    if (DP.root() || BOARD.root() || HONOR.root() || QR.root() || CCARD.root() || CITY.root()) return;
     STORYTEST.togglePanel();
     return;
   }
-  if ((md && !md.hidden) || DP.root() || BOARD.root() || HONOR.root() || QR.root() || PROF.root() || CITY.root() || STORYTEST.panelRoot()) return;
+  if (DP.root() || BOARD.root() || HONOR.root() || QR.root() || CCARD.root() || CITY.root() || STORYTEST.panelRoot()) return;
   A.Snd.boot && A.Snd.boot();
   if (a === 'go') A.menuGo();
   else if (a === 'district') openDistricts();
   else if (a === 'quick') { if (QR.available()) QR.openSetup(); }
-  else if (a === 'profile') { if (PROF.on()) openProfiles(); else askName(() => show()); }
+  else if (a === 'stats') openStats();
   else if (a === 'ride') A.menuRide();
   else if (a === 'garage') A.garage(() => show());
   else if (a === 'collect') A.openCollect();
   else if (a === 'board') BOARD.open();
-  else if (a === 'honor') HONOR.open({ api: A, face: face(), name: PROF.on() ? PROF.curName() : String(A.Store.get('dlv-name', '') || '').trim(), onClose: () => { show(); focus(); } });
+  else if (a === 'honor') HONOR.open({ api: A, face: face(), name: heroName(), onClose: () => { show(); focus(); } });
   else if (a === 'settings') A.openSettings();
   else if (a === 'update') UPD.apply();
   else if (a === 'quit') A.quit();
@@ -139,12 +139,11 @@ export function show () {
   const keep = cards.findIndex(c => c.dataset.key === curKey);
   CZ.set(cards, keep >= 0 ? keep : 0);
   curKey = CZ.card() ? CZ.card().dataset.key : 'go';
-  profButton();
+  heroButton();
   upd();
   syncDebugButton();
   hint();
-  if (!String(A.Store.get('dlv-name', '') || '').trim()) askName(null, true);
-  else CITY.check(() => show());                  // открыт весь город, а праздника ещё не было — сейчас (cityopen.js)
+  CITY.check(() => show());                  // открыт весь город, а праздника ещё не было — сейчас (cityopen.js)
 }
 /* подсказка внизу — значком того, чем играют сейчас (glyphs.js): [A] / [Enter]; пальцем — «свайп · тап» */
 function hint () {
@@ -154,11 +153,11 @@ function hint () {
     : esc(t('листай ◀ ▶')) + ' · ' + esc(t('выбрать')) + ' ' + keyHTML('ok');
 }
 onInput(() => hint());
-/** горячие кнопки меню (значки — на самих кнопках): Y — сменить профиль, X — сменить район (если кнопка есть).
-    Зовут career.js padPre (геймпад) и onKey (клавиатура Y / X); true — нажали */
+/** горячие кнопки меню (значки — на самих кнопках): X — сменить район (если кнопка есть).
+    Зовут career.js padPre (геймпад) и onKey (клавиатура X); true — нажали */
 export function hot (k) {
   if (!el || !shown() || modal()) return false;
-  const b = k === 'y' ? el.querySelector('.crm-swap') : k === 'x' ? el.querySelector('.crm-card.cz-card.on .crm-sub') : null;
+  const b = k === 'x' ? el.querySelector('.crm-card.cz-card.on .crm-sub') : null;
   if (!b || b.hidden) return false;
   PFX.press(b);
   b.click();
@@ -194,39 +193,26 @@ function syncDebugButton () {
   b.setAttribute('aria-expanded', String(open));
 }
 
-/* ── профиль: справа сверху портрет курьера, имя и «сменить» — окно профилей (profiles.js) ──
-   портрет — лицо из того же генератора, что у горожан (people.js), зерно — по номеру профиля:
-   у каждого профиля своё лицо, и оно не меняется. Профилей нет (песочница) — «сменить» меняет имя */
-const FACES = new Map();
-export function face (id = PROF.cur()) {
-  if (!A || !A.person || !A.face) return '';
-  if (!FACES.has(id)) {
-    let u = '';
-    try { u = A.face(A.person({ seed: (0x51ED + id * 0x9E3779B1) >>> 0 }), 96); } catch (e) { u = ''; }
-    FACES.set(id, u);
+/* Портрет и карточка единственного курьера. Лицо постоянно, имя — общий источник Жени. */
+let FACE = '';
+export function face () {
+  if (!FACE && A?.person && A?.face) {
+    try { FACE = A.face(A.person({ seed: (0x51ED + 0x9E3779B1) >>> 0 }), 96); } catch (e) { /* — */ }
   }
-  return FACES.get(id);
+  return FACE;
 }
-function profButton () {
-  const m = el.querySelector('.crm-me'), img = m.querySelector('.crm-ava');
-  const name = PROF.on() ? PROF.curName() : (String(A.Store.get('dlv-name', '') || '').trim() || t('курьер'));
-  const u = face();
+function heroButton () {
+  const m = el.querySelector('.crm-me'), img = m.querySelector('.crm-ava'), u = face();
   img.hidden = !u;
   if (u) img.src = u;
-  m.querySelector('small').textContent = t('профиль');
-  m.querySelector('b').textContent = name;
-  m.querySelector('.crm-swap').innerHTML = keyHTML('y') + esc(t('сменить'));
+  m.querySelector('small').textContent = t('курьер');
+  m.querySelector('b').textContent = heroName();
+  m.querySelector('.crm-stats').textContent = t('карточка курьера');
 }
-/* подпись профиля в списке: «смена 12 · 340 000 ₽ · районов 3 из 8» (читается Store профиля — PROF.peek) */
-function profInfo () {
-  const sh = +A.Store.get('dlv-shifts', 0) || 0;
-  const parts = [sh ? t('смен: {n}', { n: sh }) : t('ещё не работал'), A.money(+A.Store.get('dlv-msk-wallet', 0) || 0)];
-  if (DIST.has()) parts.push(DIST.allOpen() ? t('весь город') : t('районов {k} из {n}', { k: DIST.opened(), n: DIST.count() }));
-  return parts.join(' · ');
-}
-/* after — куда вернуться по «назад» (из настроек — снова в настройки, а не в меню) */
-export function openProfiles (after) {
-  PROF.open({ money: A.money, info: profInfo, face, setName: n => A.setName(n), Snd: A.Snd, swap: A.reprofile, onClose: () => { if (el) { profButton(); show(); } if (after) after(); } });
+export function openStats (after) {
+  CCARD.open({ Store: A.Store, money: A.money, face: face(), onClose: () => {
+    if (after) after(); else { show(); focus(); }
+  } });
 }
 
 /* ── район: карусель карточек районов (distpick.js; кнопка «сменить район» на карточке «на смену») ──
@@ -243,77 +229,17 @@ function openDistricts () {
   });
 }
 
-/* ── имя: один раз при первом запуске, потом — из настроек ── */
-function nameBox () {
-  if (md) return md;
-  md = document.createElement('div');
-  md.id = 'crm-name';
-  md.hidden = true;
-  md.innerHTML = '<form class="crm-nbox" autocomplete="off"><label for="crm-nin"></label>' +
-    '<input id="crm-nin" type="text" maxlength="24" autocomplete="off" spellcheck="false">' +
-    '<div class="crm-nbtns"><button type="button" class="crm-ncancel"></button><button type="submit" class="crm-nok" autofocus></button></div>' +
-    '<div class="crm-nn"></div></form>';
-  ($('big') || document.body).appendChild(md);
-  const inp = md.querySelector('input');
-  inp.addEventListener('input', () => nameOk());
-  md.querySelector('form').addEventListener('submit', e => { e.preventDefault(); saveName(); });
-  md.querySelector('.crm-ncancel').addEventListener('click', () => back());
-  return md;
-}
-export function askName (cb, first) {
-  if (!A) return;
-  nameBox();
-  nameCb = cb || null; nameFirst = !!first;
-  const cur = String(A.Store.get('dlv-name', '') || '').trim() || String(A.playerName() || '').trim();
-  md.querySelector('label').textContent = t('как тебя зовут?');
-  md.querySelector('.crm-nok').innerHTML = keyHTML('ok') + esc(t('готово'));
-  md.querySelector('.crm-ncancel').innerHTML = keyHTML('back') + esc(t('отмена'));
-  md.querySelector('.crm-ncancel').hidden = nameFirst;
-  md.querySelector('.crm-nn').textContent = nameFirst ? t('так тебя будут звать в пиццерии. поменять можно в настройках') : '';
-  const inp = md.querySelector('input');
-  inp.placeholder = t('имя и фамилия');
-  inp.value = cur;
-  nameOk();
-  inp.toggleAttribute('data-pad-main', !cur);           // геймпад: пустое имя — курсор сразу на поле (A — клавиатура)
-  md.hidden = false;
-  // пустое поле — сразу в него; имя уже есть (ник в Steam) — достаточно «готово»
-  if (!cur) setTimeout(() => { try { inp.focus(); } catch (e) { /* — */ } }, 50);
-}
-/* «готово» при пустом имени — бледное, но не disabled: иначе геймпаду с поля некуда уйти (↓ — опять поле,
-   при первом запуске «отмены» нет). Жмёшь его пустым — фокус в поле (saveName), на Деке — клавиатура */
-function nameOk () {
-  const ok = md.querySelector('.crm-nok');
-  ok.classList.toggle('crm-off', !md.querySelector('input').value.trim());
-}
-function saveName () {
-  const v = md.querySelector('input').value.trim().slice(0, 24);
-  if (!v) { md.querySelector('input').focus(); return; }
-  A.setName(v);
-  A.Store.flush();
-  md.querySelector('input').blur();
-  md.hidden = true;
-  A.Snd.coin && A.Snd.coin();
-  const cb = nameCb; nameCb = null;
-  if (el && shown() && !cb) { show(); focus(); }        // первый запуск: имя есть — рейтинг с ним, фокус на «на смену»
-  if (cb) cb(v);
-}
-export const modal = () => (md && !md.hidden && !md.closest('[hidden]') ? md : DP.root() || PROF.root() || BOARD.root() || HONOR.root() || (A?.S.state === 'title' ? STORYTEST.panelRoot() : null));   // заставку спрятали (поехали) — окна нет
-/* назад: из настроек — отмена; при первом запуске окно не закрывается, ждём имя */
+export const modal = () => DP.root() || CCARD.root() || BOARD.root() || HONOR.root() || (A?.S.state === 'title' ? STORYTEST.panelRoot() : null);
 export function back () {
-  if (!modal()) return false;
-  if (modal() === DP.root()) return DP.back();
-  if (modal() === PROF.root()) return PROF.back();
-  if (modal() === BOARD.root()) return BOARD.close();
-  if (modal() === HONOR.root()) return HONOR.close();
-  if (modal() === STORYTEST.panelRoot()) { STORYTEST.togglePanel(false); focus(); return true; }
-  if (nameFirst) return true;
-  md.querySelector('input').blur();
-  md.hidden = true;
-  nameCb = null;
-  focus();
-  return true;
+  const root = modal();
+  if (!root) return false;
+  if (root === DP.root()) return DP.back();
+  if (root === CCARD.root()) { CCARD.close(); return true; }
+  if (root === BOARD.root()) return BOARD.close();
+  if (root === HONOR.root()) return HONOR.close();
+  if (root === STORYTEST.panelRoot()) { STORYTEST.togglePanel(false); focus(); return true; }
+  return false;
 }
-export function submitName () { if (PROF.root() && modal() === PROF.root()) PROF.submit(); else if (modal() === md) saveName(); }
 
 /* ── камера заставки: медленный облёт на высоте; меню — полосой внизу, поэтому пиццерия —
    по центру в верхней половине кадра (смотрим ниже её) ── */

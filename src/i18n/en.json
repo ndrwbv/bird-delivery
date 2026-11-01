@@ -1,4 +1,12 @@
 {
+ "достижения устройства": "Device achievements",
+ "карточка курьера": "Courier card",
+ "рекорды карьеры": "Career records",
+ "начать карьеру заново?": "Start your career over?",
+ "Не удалось сохранить сброс. Попробуй ещё раз.": "Could not save the reset. Try again.",
+ "рекорды курьера «{name}»": "Courier records · {name}",
+ "Не удалось открыть сохранение. Повторите попытку.": "Unable to open your save. Please try again.",
+ "Повторить": "Retry",
  "премия за развоз": "Delivery run bonus",
  "Не хочешь бегать — {self} «пусть сам спустится».": "Don’t feel like running? {self} “let them come down”.",
  "Не хочешь бегать — «пусть сам спустится» под заданием.": "Don’t feel like running? Choose “let them come down” under the task.",

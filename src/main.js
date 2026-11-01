@@ -10,11 +10,16 @@ import './input/glyphs.js';            // значки кнопок по тек�
 import './game/orient.js';              // телефон — только боком: стоя — заставка «поверни телефон» (сразу, ещё на экране загрузки)
 import Platform from './platform/index.js';
 import * as CRASH from './platform/crashlog.js';
-import { initI18n, applyDom, LANGS, LANG_NAMES } from './i18n/index.js';
+import { initI18n, applyDom, LANGS, LANG_NAMES, t } from './i18n/index.js';
 import { pickLang } from './langpick.js';
 import { MAP_IDS, loadMap } from './maps/index.js';
 import { useMap } from './game/map.js';
-import * as PROF from './game/profiles.js';
+import { migrateSingleProgress, saveId } from './game/singleprogress.js';
+import { heroName } from './game/playername.js';
+import { requireSingleProgress } from './game/progressboot.js';
+import './game/progressboot.css';
+import { pollPad } from './input/gamepad.js';
+import { makePadMenu } from './input/padmenu.js';
 
 // журнал ошибок и зависаний (docs/CRASHES.md) — первым делом: ловит и ошибки загрузки игры
 CRASH.init();
@@ -27,8 +32,6 @@ if (buildV) buildV.textContent = BUILD;
 for (const el of document.querySelectorAll('.pm-ver')) el.textContent = BUILD;
 
 await Platform.init({ langs: LANGS });
-// профили (game/profiles.js): прогресс каждого — под своими ключами; до первого чтения сохранения. Яндекс — без профилей
-if (Platform.id !== 'yandex') PROF.install(Platform);
 // первый запуск — спросить язык: игра ещё не загружена, перезагружать нечего. На Яндексе язык даёт площадка
 const doorPreviewFirstRun = new URLSearchParams(location.search).has('doorpreview') && !Platform.langChosen;
 if (Platform.id !== 'yandex' && !Platform.langChosen && !doorPreviewFirstRun) {
@@ -41,6 +44,16 @@ applyDom();
 // фразы экрана загрузки («Покупаем пиццу…», index.html) уже на языке игрока — показать
 document.getElementById('boot')?.classList.add('said');
 document.documentElement.dataset.platform = Platform.id;
+
+// i18n is ready; map/game/progress readers remain unloaded until every native write verifies.
+if (Platform.id !== 'yandex') {
+  await requireSingleProgress({
+    migrate: () => migrateSingleProgress({ store: Platform.store }),
+    host: document.getElementById('boot'), t, pollPad, makePadMenu,
+  });
+  // Platform modules have no game/i18n imports: bind readonly identity only after bootstrap succeeds.
+  (Platform.leaderboard.local || Platform.leaderboard).setIdentity?.(saveId, heroName);
+}
 
 // Стим (и dev) — Северск, Яндекс — Москва; ?map= — для отладки
 const want = new URLSearchParams(location.search).get('map') || (Platform.id === 'yandex' ? 'moscow' : 'seversk');

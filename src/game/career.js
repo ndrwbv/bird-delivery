@@ -10,7 +10,7 @@
      CAREERM.clientKilled(victim, fee) — сбил своего клиента: штраф в цену его заказа (CLIENT_KILL)
 
      CAREERM.menu()          — из showTitle: главное меню (menu.js), menuCam — камера заставки
-     CAREERM.padRoot/padPre/back — геймпад: окно имени, гараж (garage.js), «потратить»
+     CAREERM.padRoot/padPre/back — геймпад: карточка курьера, гараж (garage.js), «потратить»
 
    Для других модулей: addStars(n, why), stars(), hour(), isEvening(),
    onShiftStart(cb), onShiftEnd(cb), shiftOn(), crewSeed(i), crewBoard(). В отладке — __dlv.CAREERM.
@@ -23,6 +23,7 @@ import * as MEAL from './mealchat.js';
 import * as GARAGE from './garage.js';
 import * as CL from '../platform/crashlog.js';   // метки переходов: гараж (0п48)
 import { PIGGY } from './shiftcash.js';           // копилка — та же свинья, что на хаде и в гараже
+import { heroName } from './playername.js';
 import * as MENU from './menu.js';
 import * as HONOR from './honor.js';            // доска почёта (honor.js): геймпад и «доставлено всего» профиля
 import * as DLG from './dialog.js';
@@ -146,7 +147,7 @@ const fire = (list, arg) => { for (const cb of list) { try { cb(arg); } catch (e
    toast, popBonus, showChoice, hideChoice, choiceOpen(), hudHearts, isPlaying(), countUp,
    endShift(why), rideOn(), dropOrder(), openShop(), carChanged(), donated(k);
    меню: menuGo(), menuRide(), openCollect(), openSettings(), panelOpen(), quit(), canQuit,
-   playerName(), setName(n); рейтинг: rivalSpec() → [{ hex, fem }], rivals() → [{ i, money }],
+   playerName(); рейтинг: rivalSpec() → [{ hex, fem }], rivals() → [{ i, money }],
    person({ seed, fem }), face(person, size) */
 export function init (api) {
   A = api;
@@ -1095,7 +1096,7 @@ export function crewBoard () {
     if (p && A.face) { try { face = A.face(p, 44); } catch (e) { face = ''; } }
     return { name: p ? p.first : t('курьер'), gen: p ? p.firstGen || p.first : '', total: m.total || 0, hex: spec[i] && spec[i].hex, face };
   });
-  rows.push({ name: String(A.Store.get('dlv-name', '') || '').trim() || t('ты'), total: c.me || 0, me: true });
+  rows.push({ name: heroName(), total: c.me || 0, me: true });
   rows.sort((a, b) => b.total - a.total || (a.me ? -1 : 1));
   return rows;
 }
@@ -1108,13 +1109,12 @@ const menuOn = () => A && A.S.state === 'title' && !(A.panelOpen && A.panelOpen(
 /** после окна поверх меню (праздник, выбор): подсветка клавиатуры сброшена, фокус — на карточке меню */
 export function refocus () { KB.clear(); MENU.focus(); }
 export const kbClear = () => KB.clear();
-export const openProfiles = after => MENU.openProfiles(after);
+export const openStats = after => MENU.openStats(after);
 export const menuCam = (cam, P, tG) => MENU.cam(cam, P, tG);
-export const askName = cb => MENU.askName(cb);
 const spendOpen = () => { const m = $('cr-spend'); return m && !m.hidden ? m : null; };
 /** непрозрачный экран поверх города (гараж, «потратить») — кадр мира можно не рисовать */
 export const covered = () => GARAGE.isOpen() || !!spendOpen() || !!DEP.root();
-/** что сейчас листает геймпад: окно имени, гараж, «депнуть», «потратить» — или null */
+/** что сейчас листает геймпад: карточка курьера, гараж, «депнуть», «потратить» — или null */
 export function padRoot () { return STOUR.root() || QR.root() || END.root() || CITY.root() || MENU.modal() || GARAGE.root() || DEP.root() || spendOpen() || SSTEPS.root(); }
 /** до makePadMenu: в гараже ←→ и LB/RB листают машины, B — закрыть то, что сверху */
 export function padPre (p) {
@@ -1153,7 +1153,7 @@ export function padPre (p) {
     const d = (p.menuRight || p.pageR ? 1 : 0) - (p.menuLeft || p.pageL ? 1 : 0);
     if (d) MENU.flip(d);
     p.menuLeft = p.menuRight = false;
-    if ((p.btnY && MENU.hot('y')) || (p.btnX && MENU.hot('x'))) { p.menuOk = p.menuBack = p.menuUp = p.menuDown = false; return; }   // [Y] профиль, [X] район
+    if (p.btnX && MENU.hot('x')) { p.menuOk = p.menuBack = p.menuUp = p.menuDown = false; return; }   // [X] район
   } else if (DEP.root() && !MENU.modal()) {         // в «депнуть» ←→ и LB/RB — ставка, X / Y — цвет или игрок, после — X «крутить ещё»
     const d = (p.menuRight || p.pageR ? 1 : 0) - (p.menuLeft || p.pageL ? 1 : 0);
     if (d) DEP.stake(d);
@@ -1167,6 +1167,7 @@ export function padPre (p) {
 }
 /** чек смены на экране, допечатан, и поверх него ничего (гаража, трат, «депнуть», выбора района) */
 function endOn () {
+  if (A?.panelOpen?.()) return false;
   const ov = $('over');
   return !!(A && ov && !ov.hidden && ov.classList.contains('cr') && !ov.classList.contains('wait') && !END.active() && !padRoot() && !DP.isOpen());
 }
@@ -1238,12 +1239,11 @@ function onKey (e) {
   const tg = e.target, typing = tg && ((tg.tagName === 'INPUT' && /^(text|search|)$/.test(tg.type)) || tg.tagName === 'TEXTAREA');
   const top = padRoot();                          // окно поверх всего — клавиши игре не отдаём
   if (typing) {
-    if (e.code === 'Enter' || e.code === 'NumpadEnter') { e.preventDefault(); if (MENU.modal()) MENU.submitName(); }
-    else if (e.code === 'Escape') { e.preventDefault(); tg.blur(); MENU.back(); }
+    if (e.code === 'Escape') { e.preventDefault(); tg.blur(); MENU.back(); }
     e.stopPropagation();
     return;
   }
-  if (!top && root.id === 'cr-menu' && !e.repeat && ((matchKey('y', e) && MENU.hot('y')) || (matchKey('x', e) && MENU.hot('x')))) { e.preventDefault(); e.stopPropagation(); return; }   // меню: Y — профиль, X — район
+  if (!top && root.id === 'cr-menu' && !e.repeat && (matchKey('x', e) && MENU.hot('x'))) { e.preventDefault(); e.stopPropagation(); return; }   // меню: X — район
   const k = KEYS[e.code];
   if (!k) { if (top && e.code !== 'KeyM') e.stopPropagation(); return; }
   if ((root.id === 'panel' || root.id === 'pausem') && k === 'menuBack') return;   // окно настроек/находок и паузу закрывает сама игра (Esc)
@@ -1301,8 +1301,8 @@ function paneDonate (p, k) {
 }
 
 /* ── депнуть (взрослая версия) — своё окно на весь экран: dep.js (три игры, свои экраны) ── */
-/** сменили профиль без перезагрузки (game.js reprofile): первая ставка сессии — снова первая */
-export function reprofile () { DEP.reprofile(); }
+/** сбросили карьеру без перезагрузки (game.js reloadCareerState): первая ставка сессии — снова первая */
+export function resetSession () { DEP.reprofile(); }
 
 /* отладка: __dlv.CAREERM.skipTo(13.9) — к обеду, skipTo(23.95) — к полуночи */
 const DEBUG = {
@@ -1315,5 +1315,5 @@ const DEBUG = {
   useCars (api) { CARS_MOCK = api || null; },
   showLunch, MEAL: MEAL.DEBUG,                       // переписка обеда: варианты, этапы и фактический результат
   lunchLine, endWords, midnightNow, staffOver, mealName: (h = hour()) => MEAL_NAME[DAYT.part(h)](),   // слова про время по часам мира (daytime.js)
-  STOUR: STOUR.DEBUG, SSTEPS: SSTEPS.DEBUG, crewBoard, crewLoad: () => (A ? crewLoad() : null), openDep: DEP.open, closeDep: DEP.close, openGarage, closeGarage: GARAGE.close, garageFlip: GARAGE.flip, openSpend, menu, askName, back,
+  STOUR: STOUR.DEBUG, SSTEPS: SSTEPS.DEBUG, crewBoard, crewLoad: () => (A ? crewLoad() : null), openDep: DEP.open, closeDep: DEP.close, openGarage, closeGarage: GARAGE.close, garageFlip: GARAGE.flip, openSpend, menu, openStats, back,
 };

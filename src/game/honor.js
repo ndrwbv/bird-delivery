@@ -36,7 +36,7 @@ import { t, N_, lang } from '../i18n/index.js';
 import { keyHTML, matchKey, onInput, refreshKeys } from '../input/glyphs.js';
 import * as ACH from './achievements.js';
 import * as DIST from './districts.js';
-import * as PROF from './profiles.js';
+import { heroName } from './playername.js';
 import * as PFX from './paperfx.js';
 
 const DELIV = 'dlv-delivered', SEEN = 'dlv-honor';
@@ -67,23 +67,16 @@ const money = n => (A().money ? A().money(n) : num(n));
 const snd = (f, d = 0.05) => { try { A().Snd && A().Snd.click && A().Snd.click(f, 0.05, d); } catch (e) { /* — */ } };
 const adult = () => A().ADULT !== false;
 
-/* ── счётчики профиля ── */
-/** один профиль на устройстве (или профилей нет) — счётчик достижений «заказы» можно считать его */
-const solo = () => { try { return !PROF.on() || PROF.list().length <= 1; } catch (e) { return true; } };
-/** доставлено за всю карьеру профиля; у старого сохранения (ключа ещё нет, смены были) — из достижений */
-function delivered (Store = A().Store, atEnd = false, extra = 0) {
-  const v = Store.get(DELIV, null);
-  if (v != null && v !== '') return Math.max(0, +v || 0);
-  // смен ДО этой: в конце смены dlv-shifts уже с ней (после сброса прогресса — 0, старый счётчик не берём)
-  const shifts = (+Store.get('dlv-shifts', 0) || 0) - (atEnd ? 1 : 0);
-  if (shifts <= 0 || !solo()) return 0;
-  return Math.max(0, (+ACH.stats().orders || 0) - extra);
+/* ── личные счётчики карьеры ── */
+/** Только персональный счётчик: общие достижения не смешиваем с выбранной старой карьерой. */
+function delivered (Store = A().Store) {
+  return Math.max(0, +Store.get(DELIV, 0) || 0);
 }
 /** career.js конец смены карьеры (после записи dlv-shifts): +доставлено этой смены */
 export function shiftEnd (Store, d) {
   if (!Store) return;
   d = Math.max(0, d | 0);
-  try { Store.set(DELIV, delivered(Store, true, d) + d); } catch (e) { /* — */ }
+  try { Store.set(DELIV, delivered(Store) + d); } catch (e) { /* — */ }
 }
 
 /* ── данные страниц ── */
@@ -101,17 +94,17 @@ function records () {
     { id: 'quick', ico: '»', c: 'pink', label: N_('быстрый заезд'), v: quick, fmt: money, none: shifts ? N_('ещё не ездил') : N_('после первой смены'),
       note: N_('больше всего денег за один быстрый заезд') },
     { id: 'deliv', ico: '▤', c: 'orange', label: N_('доставлено всего'), v: delivered(), fmt: num, none: '0',
-      note: N_('заказов за все смены карьеры этого профиля') },
+      note: N_('заказов за все смены этой карьеры') },
   ];
   if (adult()) {
     rows.push({ id: 'hit', ico: '✖', c: 'red', label: N_('сбито всего'), v: Math.max(0, +get('dlv-knocked', 0) || 0), fmt: num, none: '0',
-      note: N_('прохожих за все смены карьеры этого профиля') });
+      note: N_('прохожих за все смены этой карьеры') });
   } else {
     rows.push({ id: 'lamps', ico: '¡', c: 'red', label: N_('фонарей снесено'), v: Math.max(0, +ACH.stats().lamps || 0), fmt: num, none: '0',
       note: N_('за всё время на этом устройстве') });
   }
   rows.push({ id: 'shifts', ico: '☼', c: 'yellow', label: N_('смен отработано'), v: shifts, fmt: num, none: '0',
-    note: N_('смен карьеры этого профиля — и коротких, и до полуночи') });
+    note: N_('смен этой карьеры — и коротких, и до полуночи') });
   if (DIST.has()) {
     const k = DIST.opened(), n = DIST.count();
     rows.push({ id: 'dist', ico: '⌂', c: 'sky', label: N_('районов открыто'), v: k, fmt: v => (k >= n ? t('весь город') : t('{k} из {n}', { k: v, n })), none: '1',
@@ -163,7 +156,7 @@ export function open (o = {}) {
   box.querySelector('.hb-plaque b').textContent = t('доска почёта');
   const img = box.querySelector('.hb-me img');
   img.hidden = !o.face; if (o.face) img.src = o.face;
-  box.querySelector('.hb-me figcaption').textContent = o.name || t('курьер');
+  box.querySelector('.hb-me figcaption').textContent = heroName();
   box.querySelector('.hb-back').innerHTML = keyHTML('back') + esc(t('назад'));
   box.hidden = false;
   const board = box.querySelector('.hb-board');
@@ -213,8 +206,8 @@ function render (first) {
   const got = list.filter(a => a.got).length;
   const steam = Platform.id === 'steam';
   box.querySelector('.hb-plaque small').textContent = ach
-    ? (steam ? t('те же достижения, что в Стиме') : t('общие для всех профилей'))
-    : t('рекорды профиля «{name}»', { name: (H && H.name) || t('курьер') });
+    ? (steam ? t('те же достижения, что в Стиме') : t('достижения устройства'))
+    : t('рекорды курьера «{name}»', { name: heroName() });
   const tabs = box.querySelectorAll('.hb-tab');
   tabs[0].innerHTML = keyHTML('lb') + '<span>' + esc(t('достижения')) + '</span><em>' + got + '/' + list.length + '</em>';
   tabs[1].innerHTML = '<span>' + esc(t('рекорды')) + '</span>' + keyHTML('rb');

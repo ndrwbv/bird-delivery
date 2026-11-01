@@ -13,6 +13,7 @@
 import './board.css';
 import Platform from '../platform/index.js';
 import { t } from '../i18n/index.js';
+import { heroName } from './playername.js';
 import { keyHTML } from '../input/glyphs.js';   // «[B] назад» — значком того, чем играют
 
 export const LB_NAME = 'BEST_SHIFT';
@@ -32,7 +33,7 @@ export function init (api) { A = api; }
 /** career.js onShiftEnd: { money, delivered, … } — смена в таблицу */
 export function shiftEnd (r) {
   if (!A || !on() || A.nolb || !r || !(r.money > 0)) return;
-  const name = String(Platform.player.name || '').trim();
+  const name = heroName();
   Platform.leaderboard.submit(r.money, { name, delivered: r.delivered || 0, level: A.level() }).then(ok => {
     const last = Platform.leaderboard.last;
     const line = !ok ? t('Стим не ответил — смена записана на этом компьютере')

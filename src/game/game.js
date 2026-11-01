@@ -190,7 +190,8 @@ import * as JUMPS from './jumps.js';               // большие трамп�
 import * as GUN from './turret.js';              // гранатомёт на крыше: сам бьёт машины конкурентов (turret.js, CAREER.md «Крылья и гранатомёт»)
 import * as FLYC from './flycar.js';             // летающий родстер: открытый салон, полёт по кнопке, полоска на хаде (flycar.js, CAREER.md «Тесло Родстер: полёт»)
 import * as BOARD from './board.js';               // таблица рекордов «лучшая смена» в Стим-сборке (board.js, docs/STEAM.md §4.2)
-import * as PROF from './profiles.js';           // профили: прогресс каждого под своими ключами, сброс — только текущего (profiles.js)
+import { heroName } from './playername.js';
+import { resetSingleProgress } from './singleprogress.js';
 import * as QR from './quickrun.js';               // быстрый заезд из меню: сезон, длина, машина; сохранение карьеры не трогает (quickrun.js)
 import * as CL from '../platform/crashlog.js';   // журнал ошибок, предохранитель шагов мира, сторож зависаний (docs/CRASHES.md)
 import * as RELIEF from './relief.js';          // неровный газон: бугры и холмики на газонах и пустырях (relief.js)
@@ -10827,7 +10828,7 @@ function updateRivals (dt) {
    Место — по числу доставок (автор 23.10.2026, 11п), при равных — по деньгам, потом ты выше; у тебя — твой ник (0я) */
 $('rivals')?.remove();                           // постоянного места на хаде больше нет
 let rivalsT = 0;
-const myName = () => String((PROF.on() ? PROF.curName() : S.name) || '').trim() || $t('ты');
+const myName = heroName;
 function rivalBoard () {
   const rows = RIVALS.map(R => ({ n: R.name, m: R.money, d: R.done, hex: R.spec.hex, out: R.out ? Math.max(1, Math.ceil(R.outEnd - tG)) : 0, R }));
   rows.push({ n: myName(), m: S.money, d: S.delivered, me: true });   // d — доставок (таблица после вручения, crewrank.js)
@@ -12432,14 +12433,41 @@ function carPic (c) {
 
 /* ─── окна меню: «мои коллекции» и «магазин» ─── */
 const elPanel = $('panel'), elPanelBody = $('pn-body');
+let RESET_LOCKED = false;
+const RESET_BACKGROUND = new Map();
+function lockReset (on) {
+  if (RESET_LOCKED === on) return;
+  RESET_LOCKED = on;
+  for (const id of ['big', 'over']) {
+    const root = $(id); if (!root) continue;
+    if (on) { RESET_BACKGROUND.set(id, root.inert); root.inert = true; }
+    else root.inert = RESET_BACKGROUND.get(id) || false;
+  }
+  if (!on) RESET_BACKGROUND.clear();
+}
+const resetInputGate = e => {
+  if (!RESET_LOCKED) return;
+  const retry = $('rs-yes'), valid = e.target === retry && !retry.disabled && !e.repeat &&
+    (e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space');
+  if (!valid) { e.preventDefault(); retry?.focus(); }
+  e.stopImmediatePropagation();
+};
+addEventListener('keydown', resetInputGate, true);
+addEventListener('keyup', resetInputGate, true);
+addEventListener('click', e => {
+  if (RESET_LOCKED && e.target !== $('rs-yes')) { e.preventDefault(); e.stopImmediatePropagation(); $('rs-yes')?.focus(); }
+}, true);
+addEventListener('focusin', e => { if (RESET_LOCKED && e.target !== $('rs-yes')) $('rs-yes')?.focus(); }, true);
+
 function openPanel (kind) {
+  if (RESET_LOCKED) return;
   elPanel.hidden = false;
   elPanel.dataset.kind = kind;
   if (kind === 'collect') {
     renderCollect();
   } else renderShop();
 }
-function closePanel () { elPanel.hidden = true; elPanel.dataset.back = ''; elPanel.dataset.sub = ''; unscrollUI(); }
+function closePanel () { if (RESET_LOCKED) return; elPanel.hidden = true; elPanel.dataset.back = ''; elPanel.dataset.sub = ''; unscrollUI(); }
 /* 0аб (автор 18.10: прокрутил настройки до «накинуть» — после выхода верх интерфейса срезан): фокус и scrollIntoView
    (геймпад, клавиши) прокручивают и блоки с overflow: hidden — их руками не прокрутишь, и прокрутка оставалась.
    Окно закрылось (любым путём) — всё, что не листается рукой, — обратно в 0; лист окна (.pn-box) — тоже */
@@ -12456,7 +12484,7 @@ function unscrollUI () {
 }
 new MutationObserver(() => { if (elPanel.hidden) unscrollUI(); }).observe(elPanel, { attributes: true, attributeFilter: ['hidden'] });
 /* B / Esc: язык и «стереть прогресс?», открытые из настроек, — назад в настройки */
-function panelBack () { if (elPanel.dataset.back === 'settings') renderSettings(elPanel.dataset.kind === 'reset' ? 'set-reset' : undefined); else closePanel(); }
+function panelBack () { if (RESET_LOCKED) return; if (elPanel.dataset.back === 'settings') renderSettings(elPanel.dataset.kind === 'reset' ? 'set-reset' : undefined); else closePanel(); }
 
 /* ─── площадка: реклама, пауза, язык, настройки ───
    Всё, что зависит от Яндекса или Стима, идёт через Platform. Полноэкранная
@@ -12509,7 +12537,7 @@ $('ov-auth').addEventListener('click', async () => {
   try { await Platform.player.auth(); } catch (e) { /* отказался */ }
   if (Platform.player.authorized) {
     $('ov-auth').hidden = true;
-    S.name = Platform.player.name || S.name;
+    S.name = heroName();
     if (S.money > 0 && !S.freeRun) LB.save({ name: S.name, money: S.money, delivered: S.delivered, lv: levelOf(getXP()) }).then(() => LB.render(S.money));
   }
 });
@@ -12543,8 +12571,7 @@ SET.init({
   inMenu: () => !isPlaying() && !S.paused, career: CAREER, steam: Platform.id === 'steam', Snd, GFX,
   langs: LANGS, langNames: LANG_NAMES, lang: curLang,
   setLang: l => { if (l === curLang()) { closePanel(); return; } Platform.setLang(l); Platform.store.flush && Platform.store.flush(); setTimeout(() => location.reload(), 150); },
-  name: () => S.name, askName: cb => CAREERM.askName(cb),
-  prof: PROF, openProfiles: () => { closePanel(); CAREERM.openProfiles(() => { if (isPlaying() || S.paused) return; elPanel.hidden = false; elPanel.dataset.kind = 'settings'; renderSettings('set-prof'); }); },   // «назад» из профилей — снова в настройки
+  openStats: () => { closePanel(); CAREERM.openStats(() => { if (isPlaying() && !S.paused) return; elPanel.hidden = false; elPanel.dataset.kind = 'settings'; renderSettings('set-hero'); }); },
   unlock: { on: () => !!(DISTRICTS && testTools()), all: () => DIST.allOpen(), run: () => { CITYOPEN.unlockAll(); closePanel(); CITYOPEN.party(() => CAREERM.menu()); } },
   // ТЕСТ «накинуть» (econ.js TEST_MONEY, 12аг): копилка до TO, все районы, все машины со всеми улучшениями, звёзды (cars.js testAll)
   cash: { on: () => !!(CAREER && ECON.TEST_MONEY.ON), to: ECON.TEST_MONEY.TO, money, wallet,
@@ -12560,15 +12587,16 @@ SET.init({
   music: { on: () => MUS.on(), set: () => MUS.toggle(), name: () => MUS.title(), next: () => MUS.next(true), radioKey: RADIO.RAD.HIDDEN },   // своя музыка: вкл / выкл и «трек ▶» (music.js, chiptunes.js)
   selected: () => padSel(), navReset: () => { padMenu.clear(); if (CAREER) CAREERM.kbClear(); },
 });
-function renderSettings (focus) { SET.render(focus); }
+function renderSettings (focus) { if (!RESET_LOCKED) SET.render(focus); }
 // какая кнопка сейчас выбрана геймпадом — чтобы перерисовка её не сбросила
 const padSel = () => { try { const el = padMenu.selected(); return el && el.isConnected ? el : null; } catch (e) { return null; } };
 
 /* ─── сброс прогресса: второй шаг — экран «что сотрётся, что останется» ───
    Стираем все ключи игры (dlv-*), кроме настроек из RESET_KEEP. Список PROGRESS_KEYS —
    на случай, если localStorage закрыт (Яндекс в iframe): ключи из него тоже обнуляются.
-   Через Platform.store — так на Яндексе чистится и облако. Потом — перезагрузка. */
-const RESET_KEEP = ['dlv-lang', 'dlv-sound', 'dlv-doorgames', 'dlv-route', 'dlv-radio', 'dlv-radio-st', 'dlv-vol-music', 'dlv-vol-sfx', 'dlv-vol-eng', 'dlv-gfx', 'dlv-edition', 'dlv-name', 'dlv-map', 'dlv-money-x8', 'dlv-__ts', 'dlv-ach', 'dlv-cam', ...TEL.KEYS];   // dlv-ach — достижения, как в Стиме, не стираются; dlv-tel* — выключатель и номер анонимной статистики (telemetry.js)
+   Steam/web: проверенный native journal, затем перечитывание карьеры или перезапуск.
+   На Яндексе очистка через Platform.store сохраняет прежний путь облака. */
+const RESET_KEEP = ['dlv-lang', 'dlv-sound', 'dlv-doorgames', 'dlv-route', 'dlv-radio', 'dlv-radio-st', 'dlv-vol-music', 'dlv-vol-sfx', 'dlv-vol-eng', 'dlv-gfx', 'dlv-edition', 'dlv-lb-local', 'dlv-map', 'dlv-money-x8', 'dlv-__ts', 'dlv-ach', 'dlv-cam', ...TEL.KEYS];   // dlv-ach — достижения, как в Стиме, не стираются; dlv-tel* — выключатель и номер анонимной статистики (telemetry.js)
 const PROGRESS_KEYS = [
   'dlv-msk-wallet', 'dlv-msk-cars', 'dlv-msk-car', 'dlv-msk-best', 'dlv-msk-xp', 'dlv-msk-col', 'dlv-msk-tut', 'dlv-msk-guide', 'dlv-msk-nostut', 'dlv-intro', 'dlv-garage-tut', 'dlv-shift-tut', 'dlv-hints', 'dlv-route-ask', 'dlv-wx-last', 'dlv-cycle',
   'dlv-shifts', 'dlv-stars', 'dlv-crew', 'dlv-story', 'dlv-season', 'dlv-used-addr', 'dlv-lb-local', 'dlv-boss', 'dlv-clock', 'dlv-rev-sale',
@@ -12576,70 +12604,78 @@ const PROGRESS_KEYS = [
   ...Object.keys(ECON.DONATE || {}).map(k => 'dlv-don-' + k),
 ];
 function renderReset () {
+  if (RESET_LOCKED) return;
+  const requestId = crypto.randomUUID();
   elPanel.dataset.kind = 'reset'; elPanel.dataset.back = 'settings';
   const li = a => '<ul>' + a.map(s => '<li>' + s + '</li>').join('') + '</ul>';
   const gone = [$t('копилка — все деньги'), $t('купленные машины и улучшения'), $t('открытые районы'),
-    $t('смены, звёзды и сюжетные заказы'), $t('мои находки'), PROF.on() ? $t('рекорд профиля') : $t('рекорды и таблица на этом устройстве'),
+    $t('смены, звёзды и сюжетные заказы'), $t('мои находки'), $t('рекорды карьеры'),
     $t('рейтинг пиццерии и донаты'), $t('обучение — покажется заново')];
-  const stay = [$t('язык'), $t('звук'), $t('графика'),
-    ...(Platform.features.nameInput ? [$t('имя курьера')] : []), ...(PROF.on() ? [$t('таблица рекордов на этом устройстве'), ...(PROF.list().length > 1 ? [$t('другие профили')] : [])] : [])];
+  const stay = [$t('язык'), $t('звук'), $t('графика'), $t('достижения'), $t('таблица рекордов на этом устройстве')];
   // «отмена» — первой и выбрана сразу: случайное A ничего не сотрёт
-  elPanelBody.innerHTML = '<div class="pn-t">' + (PROF.on() ? $t('стереть прогресс профиля «{name}»?', { name: escHtml(PROF.curName()) }) : $t('стереть весь прогресс?')) + '</div>' +
+  elPanelBody.innerHTML = '<div class="pn-t">' + $t('начать карьеру заново?') + '</div>' +
     '<div class="rs-cols"><div class="rs-gone"><b>' + $t('сотрётся') + '</b>' + li(gone) + '</div>' +
     '<div class="rs-stay"><b>' + $t('останется') + '</b>' + li(stay) + '</div></div>' +
-    '<div class="pn-n">' + $t('вернуть будет нельзя: игра начнётся с первой смены, как в первый раз') + (PROF.on() && PROF.list().length > 1 ? ' ' + $t('другие профили не тронет') : '') + '</div>' +
+    '<div class="pn-n">' + $t('вернуть будет нельзя: игра начнётся с первой смены, как в первый раз') + '</div>' +
     '<div class="rs-btns"><button type="button" id="rs-no" autofocus>' + $t('отмена') + '</button>' +
     '<button type="button" id="rs-yes" class="set-danger">' + $t('да, стереть всё') + '</button></div>';
   $('rs-no').onclick = () => renderSettings('set-reset');
-  $('rs-yes').onclick = resetProgress;
+  $('rs-yes').onclick = () => resetProgress(requestId);
 }
-async function resetProgress () {
-  if (isPlaying()) return;                          // посреди смены не стираем
+async function resetProgress (requestId) {
+  if (isPlaying() || S.paused) return;
+  lockReset(true);
+  $('pn-close').disabled = true;
   $('rs-yes').disabled = true; $('rs-no').disabled = true;
-  const keys = new Set(PROGRESS_KEYS);
-  for (const k of PROF.keys()) keys.add(k);         // ключи текущего профиля (без профилей — все dlv-*): другие профили не трогаем
-  // Яндекс: null, а не «удалить» — если облако не успеет, пустая локальная копия новее и победит при слиянии
-  const blank = Platform.id === 'yandex' ? null : undefined;
-  for (const k of keys) if (!RESET_KEEP.includes(k) && !(PROF.on() && PROF.shared(k))) Platform.store.set(k, blank);   // общее на все профили (таблица на устройстве) — остаётся
-  // облако Яндекса — дождаться отправки (не дольше 4 с), иначе старое вернётся после перезагрузки
-  try { await Promise.race([Promise.resolve(Platform.store.flush && Platform.store.flush()), new Promise(r => setTimeout(r, 4000))]); } catch (e) { /* — */ }
-  // с профилями (Стим, web) — без перезагрузки: как новый профиль (reprofile); Яндекс — перезагрузка
+  if (Platform.id !== 'yandex') {
+    try {
+      await resetSingleProgress({ store: Platform.store, storage: localStorage, keep: RESET_KEEP, heroName: heroName(), requestId });
+    } catch (e) {
+      console.error('[reset] storage', e);
+      $('rs-yes').disabled = false;
+      $('rs-yes').textContent = $t('Повторить');
+      $('rs-yes').focus();
+      // Сохранение могло быть частично опубликовано: не выпускаем игру до recovery тем же запросом.
+      const note = elPanelBody.querySelector('.pn-n');
+      if (note) note.textContent = $t('Не удалось сохранить сброс. Попробуй ещё раз.');
+      return;
+    }
+  } else {
+    const keys = new Set(PROGRESS_KEYS);
+    try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k?.startsWith('dlv-')) keys.add(k); } } catch (e) { /* — */ }
+    for (const k of keys) if (!RESET_KEEP.includes(k)) Platform.store.set(k, null);
+  }
+  try { await Promise.race([Promise.resolve(Platform.store.flush?.()), new Promise(r => setTimeout(r, 4000))]); } catch (e) { /* — */ }
   let soft = false;
-  if (PROF.on() && CAREER) { try { soft = reprofile(); } catch (e) { console.error('[reset] reprofile', e); } }
-  if (soft) { closePanel(); CAREERM.menu(); return; }
+  if (CAREER) { try { soft = reloadCareerState(); } catch (e) { console.error('[reset] reload', e); } }
+  if (soft) { lockReset(false); $('pn-close').disabled = false; closePanel(); CAREERM.menu(); return; }
   location.reload();
 }
-/* ─── смена профиля без перезагрузки (profiles.js go → api.swap) ───
-   Город у всех профилей один — пересобирать его незачем (на Деке это ~10 с). Ключи сохранения уже
-   смотрят в новый профиль (profiles.js phys); здесь — заново прочитать то, что игра держит в памяти:
-   рекорд и имя, машина, район и пиццерия, перекрытия закрытых районов, находки на карте, сюжет, герои,
-   подсказки обучения, рост пиццерий, унесённые ураганом дома, респект, сезон, сессия режиссёра.
-   Деньги, смены, звёзды, машины, районы и прочее игра и так читает из сохранения каждый раз.
-   Только из меню; посреди смены, в паузе или быстром заезде — false (profiles.js перезагрузит). */
-function reprofile () {
+/* После подтверждённого сброса перечитать одну карьеру без повторного построения города.
+   Готовность мира сохраняется: мягкий сброс выполняется только из меню. */
+function reloadCareerState () {
   LATE.flush();                                   // город ещё достраивался за меню — сначала достроить (latebuild.js)
   if (isPlaying() || S.paused || QR.on() || FIRST.on()) return false;
   const t0 = performance.now();
   S.best = +Store.get('dlv-msk-best', 0) || 0;
-  S.name = Platform.features.nameInput ? Store.get('dlv-name', '') : (Platform.player.name || '');
-  elName.value = S.name || '';
+  S.name = heroName();
   STORY.reload(true); ORD.reloadUsed(); HINTS.reload(); GROW.reload();
   RESPECT.DEBUG.reload(); DIRECTOR.reload(); SEAS.reloadSaved(); HUR.reload();
-  if (CAREER) { AUTO.reprofile(); CAREERM.reprofile(); }
+  if (CAREER) { AUTO.reprofile(); CAREERM.resetSession(); }
   if (DISTRICTS) { CITYOPEN.repair(); usePizzeria(DIST.cur()); FM.dist = null; DW.seen.clear(); districtLocks(); }
   startPose();
   resetCar(); carStats(); S.hpMax = S.hp = curCar().hp;
-  // находки: у профиля свои — снять разложенные и разложить его ненайденные
+  // находки одной карьеры — снять разложенные и разложить его ненайденные
   for (const o of COL_ON_MAP) { scene.remove(o.g); PKI.drop(o.g); }   // столб, склейка и материалы — общие (COL_BEAM, COL_GEO), не освобождаем
   COL_ON_MAP.length = 0;
   buildCollect();
   if (DISTRICTS) scatterPickups();
   renderProfile();
-  GFX.poke(); requestAnimationFrame(() => requestAnimationFrame(() => CULL.refresh()));   // камера меню переехала к пиццерии профиля: дальнее — сразу
-  REPROFILE_MS = performance.now() - t0;
+  GFX.poke(); requestAnimationFrame(() => requestAnimationFrame(() => CULL.refresh()));   // камера меню переехала к пиццерии карьеры: дальнее — сразу
+  CAREER_RELOAD_MS = performance.now() - t0;
   return true;
 }
-let REPROFILE_MS = 0;
+let CAREER_RELOAD_MS = 0;
 $('st-lang').addEventListener('click', () => { elPanel.hidden = false; elPanel.dataset.back = ''; renderLangs(); });
 /* Выбор карты убран: Стим — это Северск, Яндекс — Москва. Для отладки кнопка
    возвращается адресом ?maps. Смена — перезагрузка */
@@ -12660,8 +12696,6 @@ if (MAP_IDS.length > 1 && new URLSearchParams(location.search).has('maps')) {
 $('st-lang-n').textContent = LANG_NAMES[curLang()];
 $('st-set').addEventListener('click', () => { elPanel.hidden = false; elPanel.dataset.kind = 'settings'; renderSettings(); });
 if (Platform.features.quit) { $('st-quit').hidden = false; $('st-quit').addEventListener('click', () => Platform.quit()); }
-/* имя спрашиваем только там, где его нет в профиле площадки */
-if (!Platform.features.nameInput) for (const el of [$('st-name'), document.querySelector('#start label')]) if (el) el.hidden = true;
 $('pn-close').addEventListener('click', closePanel);
 elPanel.addEventListener('click', e => { if (e.target === elPanel) closePanel(); });
 $('st-col').addEventListener('click', () => openPanel('collect'));
@@ -12729,7 +12763,7 @@ const S = {
   state: 'title',          // title | drive | back | handover | over
   hp: 7, hpMax: 7, money: 0, orders: 0, lvl0: 1, burgers: 0, people: 0, wrecks: 0, scoots: 0, delivered: 0, best: +Store.get('dlv-msk-best', 0) || 0,
   target: null, addr: '', fee: 0, time: 0, timeMax: 1, handT: 0,
-  order: null, delivered: 0, name: Platform.features.nameInput ? Store.get('dlv-name', '') : (Platform.player.name || ''),
+  order: null, delivered: 0, name: heroName(),
   routeT: 0, tickT: 0, shake: 0, hurt: 0, paused: false,
   // без времени: срок не тикает и за опоздание смену не снимают;
   // freeRun — смена, в которой режим хоть раз включали: в зачёт она не идёт
@@ -14918,8 +14952,7 @@ function showBig (title, sub, keys, go) {
   elBigK.innerHTML = keys;
   $('lb-wrap').hidden = true;
   elGo.textContent = go || $t('поехали');
-  elName.value = S.name;
-  syncGo();
+  elGo.disabled = false;
   closePanel();
   renderProfile();
   Platform.gameplayStop();
@@ -14931,7 +14964,7 @@ function renderProfile () {
   const xp = getXP(), l = levelOf(xp);
   $('pf-lvl').textContent = l;
   $('pf-lvl').title = $t('уровень курьера {n}', { n: l });
-  $('pf-name').textContent = S.name || Platform.player.name || $t('курьер');
+  $('pf-name').textContent = heroName();
   const mine = (LB.cache || []).find(r => r.me);
   $('pf-rank').textContent = (CAREER ? $t('#{n} в пиццерии', { n: CAREERM.crewPlace() }) + ' · ' : mine ? $t('#{n} в таблице', { n: mine.rank }) + ' · ' : '') + money(wallet()) + (CAREER ? ' · ★ ' + CAREERM.stars() : '') + ' · ' + SEAS.seasonName();
   const lo = LVL_AT[l], hi = LVL_AT[l + 1];
@@ -14939,27 +14972,17 @@ function renderProfile () {
   $('pf-xp').parentElement.title = l < 5 ? $tn(hi - xp, 'до следующего {n} заказ|до следующего {n} заказа|до следующего {n} заказов') : $t('максимальный');
 }
 
-/* Имя — сразу на заставке: большое поле и «поехали», которая оживает,
-   как только имя вписано. Под ним смена сама пишется в таблицу. */
-const elName = $('st-name'), elGo = $('st-go'), elNote = $('st-note2');
-function syncGo () { elGo.disabled = Platform.features.nameInput && !elName.value.trim(); }
-elName.addEventListener('input', () => {
-  syncGo();
-  S.name = elName.value.trim();
-  Store.set('dlv-name', S.name);
-  renderProfile();
-});
-for (const ev of ['keydown', 'keyup', 'keypress']) elName.addEventListener(ev, e => e.stopPropagation());
+/* Единственный герой: кнопка старта не зависит от ввода имени. */
+const elGo = $('st-go'), elNote = $('st-note2');
 $('start').addEventListener('submit', e => {
   e.preventDefault();
-  if (Platform.features.nameInput && !elName.value.trim()) { elName.focus(); return; }
-  S.name = Platform.features.nameInput ? elName.value.trim() : (Platform.player.name || '');
-  elName.blur();
+  S.name = heroName();
   Snd.boot(); Snd.resume();
   goRun();
 });
 /* «ещё раз» после смены — естественная пауза: здесь реклама (если пора) */
 function goRun (picked) {
+  if (RESET_LOCKED) return;
   LATE.flush();                                   // город ещё достраивался за меню — сначала достроить (latebuild.js)
   // все районы открыты: перед сменой — праздник (один раз) и выбор «весь город / пиццерия» (cityopen.js)
   if (!picked && DISTRICTS && CITYOPEN.beforeShift(() => goRun(true))) return;
@@ -16757,6 +16780,7 @@ function reviveTick (dt) {
 }
 
 function startRun (ride) {
+  if (RESET_LOCKED) return;
   const place=PIZZERIAS[DIST.cur()]||PIZZA;
   if (LAND_STREAM && !LATE.busy() && !LAND_STREAM.readyAt(place.bx,place.bz,640)) {
     if (LAND_ENTERING) return;
@@ -16845,7 +16869,7 @@ function rideOn () {
   toast($t('просто катаемся: без заказов и рекордов · esc — пауза и выход'));
 }
 $('menu').addEventListener('click', toMenu);
-$('st-ride').addEventListener('click', () => { Snd.boot(); Snd.resume(); elName.blur(); startRun(true); });
+$('st-ride').addEventListener('click', () => { Snd.boot(); Snd.resume(); startRun(true); });
 
 
 /* звук и пауза кнопками: не все догадаются про M и P */
@@ -17036,7 +17060,7 @@ addEventListener('keydown', e => {
   if (KEY[e.code]) { IN[KEY[e.code]] = 1; e.preventDefault(); }
   Snd.boot(); Snd.resume();
   if (e.code === 'Space' && (S.state === 'title' || (S.state === 'over' && !CAREER))) {   // в карьере на итогах пробел жмёт кнопку, а не «ещё раз»
-    if (S.name || !Platform.features.nameInput) goRun(); else elName.focus();
+    goRun();
   }
   if (phoneT > 0 && e.code !== 'KeyM') hidePhone();
   if (e.code === 'KeyM' && !e.repeat) { Snd.set(!Snd.on); toast(Snd.on ? $t('звук вкл') : $t('звук выкл')); }
@@ -17345,11 +17369,9 @@ if (CAREER) CAREERM.init({ S, NOS, Snd, ADULT, get DAY_LEN () { return DAY_LEN; 
   openShop: cb => { openPanel('shop'); const iv = setInterval(() => { if (elPanel.hidden) { clearInterval(iv); if (cb) cb(); } }, 300); },
   // главное меню карьеры (menu.js) и рейтинг пиццерии
   menuGo: () => { Snd.boot(); Snd.resume(); goRun(); }, menuStoryGo: () => { Snd.boot(); Snd.resume(); goRun(true); }, menuRide: () => { Snd.boot(); Snd.resume(); startRun(true); },
-  reprofile: () => reprofile(),                     // профиль сменили в меню — без перезагрузки (profiles.js)
   openCollect: () => openPanel('collect'), openSettings: () => { elPanel.hidden = false; elPanel.dataset.kind = 'settings'; renderSettings(); },
-  panelOpen: () => !elPanel.hidden, quit: () => Platform.quit(), canQuit: !!Platform.features.quit, playerName: () => Platform.player.name || '',
+  canNavigate: () => !RESET_LOCKED, panelOpen: () => !elPanel.hidden, quit: () => Platform.quit(), canQuit: !!Platform.features.quit, playerName: heroName,
   padClear: () => padMenu.clear(), cardFlip: (root, d) => (root === elPanel ? SET : PAUSE).flip(d),                 // меню-карусель (menu.js): после листания подсветка геймпада — на карточку в центре
-  setName: n => { S.name = n; Store.set('dlv-name', n); elName.value = n; renderProfile(); },
   rivalSpec: () => RIVAL_SPEC.map(q => ({ hex: q.hex, fem: !!q.fem })), rivals: () => RIVALS.map(R => ({ i: R.slot, id: R.mem ? R.mem.id : '', money: R.money || 0 })),
   // рейтинг смены на конец смены (12ан, премия первому — career.js showEnd): place — твоё место, n — коллег на смене, top — имя первого
   shiftTop: () => shiftTop() || LAST_TOP,         // чек может ждать Толика, а курьеров к тому времени уже убрали — тогда снимок (clearRivals)
@@ -17590,7 +17612,7 @@ OTAGS.init({ S, V, faceDataURL, routeLeft: () => {
 } });
 RADIO.init({ Store, S, ADULT, Snd, isPlaying, root: () => $('game') || document.body,
   quiet: () => S.state === 'brief' || FM.open || CHAT.talking() || DLG.isOpen() || FIRST.on() || STORY.active() || DOOR.on() || musTense(),
-  weather: () => WTH.id(), night: () => (ENV.night || 0) > 0.5, name: () => S.name,
+  weather: () => WTH.id(), night: () => (ENV.night || 0) > 0.5, name: heroName,
   works: () => (RL.DEBUG.WORKS || []).map(w => { const r = w.e && w.e.road; return r ? (typeof r === 'string' ? r : r.n || '') : ''; }).filter(Boolean) });
 MUS.init({ Snd, S, ENV, isPlaying, tense: musTense, radio: RADIO, Store, indoors: () => DOOR.on() || ST3.on(),
   sea: () => SEAS.seasonValue(), hol: () => HOL.active(),   // своя музыка кодом (chiptunes.js): трек по сезону и празднику
@@ -18296,7 +18318,7 @@ const padMenu = makePadMenu({
   // A на поле: фокус в поле (печатать с клавиатуры) и экранная клавиатура Steam (Deck): что ввёл — обратно в поле
   onText: el => { try { el.focus({ preventScroll: true }); } catch (e) { /* — */ } steamKeyboard(el, true); },
 });
-/* экранная клавиатура Стима для любого поля ввода текста (имя, профиль): поднять, не поднимать
+/* экранная клавиатура Стима для любого поля ввода текста (отладочные поля): поднять, не поднимать
    второй раз, гасить автоповтор букв, пока висит, и не отдавать игре геймпад (osk.js) */
 const steamKeyboard = (el, force) => OSKM.keyboard(el, force);
 OSKM.init();
@@ -18855,10 +18877,10 @@ REPLAY.init({
 if (LATE.busy()) { try { renderer.compileAsync(scene, cam).catch(() => {}); } catch (e) { /* — */ } }   // остальное, что уже в сцене, — тоже заранее
 requestAnimationFrame(frame);
 /* поздняя сборка (latebuild.js): очередь — после первых кадров меню (или через 1,5 с, если кадров нет — окно скрыто).
-   Выбрал карточку меню (на смену, быстрый заезд, гараж, покататься, находки…) или «сменить профиль», а город ещё
+   Выбрал карточку меню (на смену, быстрый заезд, гараж, покататься, находки…) а город ещё
    строится — снова экран загрузки (птица и полоска), остаток — разом, и тогда нажать (клик, Enter, A геймпада —
-   всё это click). Имя, настройки, доска почёта, находки, рекорды, листание — без ожидания (город достраивается за
-   ними дальше). Смена, заезд и профиль и сами достраивают до начала */
+   всё это click). Карточка курьера, настройки, доска почёта, находки, рекорды, листание — без ожидания (город достраивается за
+   ними дальше). Смена и заезд и сами достраивают до начала */
 if (LATE.busy()) {
   setTimeout(() => LATE.start(), 1500);
   let replay = false;
@@ -18868,9 +18890,9 @@ if (LATE.busy()) {
   const hold = e => {
     if (!LATE.busy() || replay) return;
     const tgt = e.target;
-    const cardEl = tgt && tgt.closest && tgt.closest('.crm-card, .crm-swap');
+    const cardEl = tgt && tgt.closest && tgt.closest('.crm-card');
     if (!cardEl) return;
-    // ждать город — только тем, кому он нужен: смена, быстрый заезд, покататься, гараж, смена профиля;
+    // ждать город — только тем, кому он нужен: смена, быстрый заезд, покататься, гараж;
     // настройки, доска почёта, находки, рекорды, выход — сразу (автор 11.10.2026)
     if (cardEl.classList.contains('crm-card') && ['settings', 'honor', 'collect', 'board', 'quit'].includes(cardEl.dataset.key)) return;
     e.preventDefault(); e.stopImmediatePropagation();
@@ -18982,7 +19004,7 @@ if (window.__dlv) Object.assign(window.__dlv, { GLASSB: GLASSB.DEBUG, CBLOODM: C
 if (window.__dlv) Object.assign(window.__dlv, { GRIT: GRITM.GRIT, REALCAR, bounceBody, SOLIDS, dentCar, PIX: PIX.STATS, CG: CG.STATS, cgState: () => CG.state(car.userData.cg), hurtCar,
   cgLamps: () => CG.lampState(car), EXH: EXH.DEBUG, WIPE: WIPE.STATS, DENT: DENTM.DEBUG, DIRT: DIRT.DEBUG, REAR: REARM.STATS, pizzasInCar, setTrunk });   // фары и фонари (carglass.js), выхлоп (exhaust.js), дворники (wipers.js)   // дымок, стёкла (pixfx.js, carglass.js)
 if (window.__dlv) Object.assign(window.__dlv, { BB: BB.DEBUG, PAINT: PAINT.DEBUG, CONS: CONSTR.DEBUG, DARK: DARKN.DEBUG, WASTE: WASTE.DEBUG });   // щиты с рекламой, дома в цвет и муралы (billboards.js, citypaint.js)
-if (window.__dlv) Object.defineProperties(window.__dlv, { reprofile: { value: reprofile }, REPROFILE_MS: { get: () => REPROFILE_MS } });   // смена профиля без перезагрузки
+if (window.__dlv) Object.defineProperties(window.__dlv, { reloadCareerState: { value: reloadCareerState }, CAREER_RELOAD_MS: { get: () => CAREER_RELOAD_MS } });   // перечитывание карьеры после сброса
 if (window.__dlv) Object.assign(window.__dlv, { DCAST: DCAST.DEBUG, DIRECTOR: DIRECTOR.DEBUG, HB: HB.DEBUG, popBonus, CHAT_PERSON: () => CHAT.person(), CHAT, HAVOC: HAV.DEBUG });
 if (window.__dlv) { window.__dlv.WARM = WARM.DEBUG; window.__dlv.FOREST = FOREST.DEBUG; window.__dlv.LAWN = LAWNP.DEBUG; window.__dlv.MEADOW = MEADOW.DEBUG; window.__dlv.SHORT = SHORT.DEBUG; window.__dlv.PAVE = PAVE.DEBUG; window.__dlv.PZD = PZD.DEBUG; window.__dlv.cam = cam; window.__dlv.RIV = RIVS.DEBUG; window.__dlv.SOFTEDGE = SOFTEDGE.DEBUG; }   // ельник и пиццерия-шар (forest.js, pizzadome.js); край города (softedge.js)
 if (window.__dlv) window.__dlv.RELIEF = { STATS: RELIEF.STATS, at: RELIEF.reliefAt };   // неровный газон (relief.js)

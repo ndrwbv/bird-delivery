@@ -2,7 +2,7 @@
    из главного меню и из паузы (game.js renderSettings → SET.render). Правила словами —
    docs/CAREER.md «Главное меню, пауза и настройки».
 
-   Табы: игра (имя, профиль, камера — три вида по кругу (camview.js), мини-игры у клиента вкл / выкл, путь на дороге вкл / выкл (routeask.js), анонимная статистика вкл / выкл (telemetry.js, только взрослая) и под ней «что собираем ▸» — лист с текстом политики (privacy.js), сбросить прогресс, тестовые районы, версия и обновление, update.js; «авторы и лицензии ▸» — титры, credits.js) ·
+   Табы: игра (карточка курьера, камера — три вида по кругу (camview.js), мини-игры у клиента вкл / выкл, путь на дороге вкл / выкл (routeask.js), анонимная статистика вкл / выкл (telemetry.js, только взрослая) и под ней «что собираем ▸» — лист с текстом политики (privacy.js), сбросить прогресс, тестовые районы, версия и обновление, update.js; «авторы и лицензии ▸» — титры, credits.js) ·
    графика (качество и 7 пунктов, gfx.js) · звук (вкл / выкл и три ползунка: музыка, звуки, мотор — docs/SOUNDS.md;
    музыка в игре вкл / выкл и «трек ▶» — music.js; радио в машине вкл / выкл и станция — radio.js) · управление (какие кнопки за что — геймпад,
    клавиатура или палец) · язык (сетка языков). Внутри таба — обычный вертикальный список; не влез
@@ -10,7 +10,7 @@
    Переключить таб: LB/RB и LT/RT геймпада, ←→ (крестовина, стик, клавиши), когда подсветка на строке
    табов, Q/E и PageUp/PageDown, клик или тап по табу. Строка табов для геймпада и клавиатуры — один
    пункт (виден только выбранный таб, остальные data-pad-skip): ↓ с неё — в список, ↑ с первой строки — к ней.
-   Что перезагружает игру (язык, профиль, сброс) — только в главном меню: в паузе подпись
+   Что перезагружает игру (язык, сброс) — только в главном меню: в паузе подпись
    «меняется в главном меню». Графика и звук из паузы — сразу. Взрослая / детская версия — не
    настройка: её задаёт сборка (Стим — взрослая, Яндекс — детская).
 
@@ -22,6 +22,7 @@
      SET.on()          — настройки на экране */
 import './settings.css';
 import { t } from '../i18n/index.js';
+import { heroName } from './playername.js';
 import * as UPD from './update.js';
 import { keyHTML } from '../input/glyphs.js';
 import * as TEL from './telemetry.js';          // «анонимная статистика: вкл / выкл» — только взрослая версия (telemetry.js, docs/ANALYTICS.md)
@@ -41,7 +42,7 @@ export function init (api) {
     pb.dataset.tel = '1';
     pb.addEventListener('click', e => {
       const el = e.target && e.target.closest ? e.target.closest('button[id^="set-"], button[id^="gfx-"]') : null;
-      if (!el || !on() || /^set-(tab-|cam$|tel$|prof$|name$|l-)/.test(el.id)) return;
+      if (!el || !on() || /^set-(tab-|cam$|tel$|hero$|l-)/.test(el.id)) return;
       const id = el.id;
       setTimeout(() => { const n = document.getElementById(id); TEL.ev('setting', { id: id.replace(/^set-/, ''), v: n ? n.textContent.trim().slice(0, 30) : '' }); }, 40);
     });
@@ -149,15 +150,9 @@ export function render (focus, tab) {
       : still('<b class="set-big">' + esc(A.langNames[A.lang()]) + '</b>' + note(onlyMenu));
   } else {
     let h = '';
-    // профиль (карьера): имя курьера и профили
     if (A.career) {
-      const name = A.name();
-      h += head(t('профиль'));
-      // одна строка (UI-REVIEW № 29): профили есть — «профиль: имя · сменить» (там же и переименовать), нет — «имя»
-      if (!menu) h += still('<b class="set-big">' + esc(name || '—') + '</b>' + note(onlyMenu));
-      else if (A.prof.on()) h += row(t('курьер'), esc(A.prof.curName() || name || '—') + ' · ' + t('сменить'), 'set-prof', focus) +
-        note(t('у каждого профиля свой прогресс: копилка, машины, районы'));
-      else h += row(t('имя'), esc(name || '—'), 'set-name', focus);
+      h += head(t('курьер'));
+      h += row(t('карточка курьера'), esc(heroName()), 'set-hero', focus);
     }
     // камера (camview.js): сзади, высоко → сзади, близко → из-за руля; меняется и из паузы — сразу
     if (A.cam) {
@@ -241,8 +236,7 @@ function wire (body) {
     inp.addEventListener('change', () => { if (A.Snd.preview) try { A.Snd.preview(k); } catch (e) { /* — */ } });
   });
   body.querySelectorAll('[data-l]').forEach(b => b.addEventListener('click', () => A.setLang(b.dataset.l)));
-  if ($('set-name')) $('set-name').onclick = () => A.askName(() => render('set-name'));
-  if ($('set-prof')) $('set-prof').onclick = () => A.openProfiles();
+  if ($('set-hero')) $('set-hero').onclick = () => A.openStats();
   if ($('set-cam')) $('set-cam').onclick = () => { A.cam.next(); render('set-cam'); };
   if ($('set-route')) $('set-route').onclick = () => { A.route.set(!A.route.on()); render('set-route'); };
   if ($('set-tel')) $('set-tel').onclick = () => { TEL.set(!TEL.on()); render('set-tel'); };

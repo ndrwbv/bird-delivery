@@ -7,7 +7,7 @@ const hub = pauseHub();
 let have = SUPPORTED_LANGS;
 
 const player = {
-  get name () { return store.get('dlv-name', '') || ''; },
+  name: '',                                    // no platform account; the hero name is supplied by bootstrap
   avatar: '',
   authorized: false,
   async auth () { return false; },
@@ -16,7 +16,7 @@ const player = {
 const Platform = {
   id: 'web',
   lang: 'ru',
-  features: { ads: false, leaderboard: 'local', externalLinks: true, nameInput: true, gore: true, adult: true, quit: false },   // реклама — только в Яндексе (автор 10.10.2026), в браузере её нет совсем
+  features: { ads: false, leaderboard: 'local', externalLinks: true, nameInput: false, gore: true, adult: true, quit: false },   // реклама — только в Яндексе (автор 10.10.2026), в браузере её нет совсем
 
   /** opts.langs — языки, для которых реально есть словари (по умолчанию SUPPORTED_LANGS). */
   async init (opts = {}) {
@@ -53,7 +53,7 @@ const Platform = {
 
   store,
   player,
-  leaderboard: localBoard(store, 'dlv-lb-local', () => player.name),
+  leaderboard: localBoard(store, 'dlv-lb-local', () => '', () => ''),
   quit () {},
 };
 

@@ -101,6 +101,9 @@ const CHECKS = [
     ['catchpoint','коробка попадает в реальные кисти клиента','catchpoint-test.mjs'],
     ['cargo-anchor','багажник седана, задняя дверь и неподвижный отсек','cargo-anchor-test.mjs'],
     ['payfx','общая оплата: медленные кадры, пауза и отмена','payfx-test.mjs'],
+    ['single-progress','перенос активной карьеры, прерывания и повтор сброса','singleprogress-test.mjs'],
+    ['progress-boot','ошибка сохранения до игры и повтор ru/en','progressboot-test.mjs'],
+    ['single-hero-board','свои локальные рекорды по сохранению, история и язык','check-single-hero-board.mjs'],
   ].map(([id,name,file])=>({id,name,group:1,run:async()=>{
     const r=await sh(process.execPath,[path.join(__dirname,file)]);
     return {status:r.code===0?'ok':'fail',info:(r.code===0?r.out:r.err).trim()};
@@ -123,8 +126,12 @@ const CHECKS = [
     ['meal-chat', 'обед в переписке, выбор, эффекты и продолжение смены', 'meal-chat.js', ['--cpu=3'], 120],
     ['meal-chat-names-en', 'английская переписка: Ирина и Женя, один эффект и продолжение', 'meal-chat-names.js', ['--cpu=3', '--lang=en'], 50],
     ['wallet-end', 'копилка в итогах, траты, пауза и отсутствие повторной выплаты', 'wallet-end.js', ['--cpu=3'], 90],
-  ].map(([id, name, file, args, w]) => ({ id, name, group: 2, w, run: async () => {
-    const j = await probe(['--mode=steam', '--size=deck', '--q=gfx=high&gfxdev=deck', ...args,
+    ['single-hero-ui', 'одна карьера Жени, статистика и подтверждённый сброс', 'single-hero-ui.js', ['--cpu=3'], 80],
+    ['single-hero-ui-en', 'одна карьера Zhenya: английское меню и сброс', 'single-hero-ui.js', ['--cpu=3', '--lang=en'], 80],
+    ['single-progress-native', 'native p2, ошибка до игры и повтор сброса без выхода', 'single-progress-native.js', ['--cpu=3', '--init-script=' + path.join(__dirname, 'probe-checks/single-progress-init.js')], 100],
+    ['single-progress-native-en', 'native p2: отказ marker, английский Retry и один сброс', 'single-progress-native.js', ['--cpu=3', '--lang=en', '--init-script=' + path.join(__dirname, 'probe-checks/single-progress-init.js')], 100, 'gfx=high&gfxdev=deck&singlefail=marker'],
+  ].map(([id, name, file, args, w, query]) => ({ id, name, group: 2, w, run: async () => {
+    const j = await probe(['--mode=steam', '--size=deck', '--q=' + (query || 'gfx=high&gfxdev=deck'), ...args,
       '--eval=' + path.join(__dirname, 'probe-checks', file)]);
     const e = errLine(j), r = j.result;
     const good = !e && r && r.ok !== false && !r.failures?.length && !r.fail?.length && !r.crash?.length && !j.errors.length;

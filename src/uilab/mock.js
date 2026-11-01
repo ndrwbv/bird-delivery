@@ -5,6 +5,7 @@
      makeApi({ adult, money, Store, person, face }) — api для career.js (CAREERM.init): всё, чего нет
                             в заглушке, — пустая функция (новые поля api не роняют песочницу)
      countUp(el, to, fmt, ms) — копия из game.js: цифра докручивается */
+import { heroName } from '../game/playername.js';
 import { tOfHour, DONATE } from '../game/econ.js';
 
 const noop = () => {};
@@ -57,8 +58,7 @@ export function makeApi ({ adult, money, Store, person, face }) {
     isPlaying: () => false,
     choiceOpen: () => false,
     panelOpen: () => false,
-    playerName: () => String(Store.get('dlv-name', '') || ''),
-    setName: n => Store.set('dlv-name', n),
+    playerName: heroName,
     rivalSpec: () => RIVALS.map(q => ({ hex: q.hex, fem: !!q.fem })),
     rivals: () => [],
     person, face,
