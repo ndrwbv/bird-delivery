@@ -303,7 +303,18 @@ const INSTALL = `(() => { if (window.__probe) return; const P = window.__probe =
       if (D.DOOR && D.DOOR.on && D.DOOR.on()) { IN.joy = 0; IN.gas = 0; IN.brake = 0; const n = performance.now(); if (!A.doorT) A.doorT = n; else if (n - A.doorT > 600) { A.doorT = 0; D.DOOR.solve(); } return; }
       A.doorT = 0;
       if (!['drive', 'back', 'side'].includes(S.state)) { IN.joy = 0; IN.gas = 0; IN.brake = 0; return; }
-      const GR = D.route; if (!GR || GR.length < 2) { IN.joy = 0; IN.gas = 0; return; }
+      let GR = D.route;
+      // 0п123: показанная полоса заканчивается на дороге. Для поездки проверки к прежнему
+      // пину во дворе используем полный вспомогательный путь, который игроку не рисуется.
+      if (D.drivingPath && D.roadPath && S.target) {
+        const key = S.target.x + ',' + S.target.z;
+        if (A.deliverySrc !== GR || A.deliveryKey !== key) {
+          A.deliverySrc = GR; A.deliveryKey = key;
+          A.delivery = D.roadPath(V.x, V.z, S.target.x, S.target.z, V.h, V.y - D.groundH(V.x, V.z) > 2.5);
+        }
+        if (A.delivery && A.delivery.length > 1) GR = A.delivery;
+      }
+      if (!GR || GR.length < 2) { IN.joy = 0; IN.gas = 0; return; }
       // таймеры — в игровых секундах (run(secs, 3) ускоряет игру, а не performance.now)
       const now = performance.now(), dts = A.t ? Math.min(0.1, (now - A.t) / 1000) * (window.__warp || 1) : 0; A.t = now;
       /* след вне дорог: со двора (пин во дворе) выезжать тем же путём, каким въехал, — прямая к

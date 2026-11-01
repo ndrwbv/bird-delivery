@@ -101,6 +101,24 @@ const CHECKS = [
     const r=await sh(process.execPath,[path.join(__dirname,file)]);
     return {status:r.code===0?'ok':'fail',info:(r.code===0?r.out:r.err).trim()};
   }})),
+  { id: 'havoc-counts', name: 'счётчики разрушений без разговоров', group: 1, run: async () => {
+    const r = await sh(process.execPath, [path.join(__dirname, 'havoc-counts-test.mjs')]);
+    return { status: r.code === 0 ? 'ok' : 'fail', info: (r.out || r.err).trim() };
+  } },
+  ...[
+    ['route-road', 'автомобильная полоса целиком на связной дороге', 'route-road.js', [], 50],
+    ['first-shift-final', 'первая смена: последний Геннадий, полночь и повторный вход', 'first-shift-final.js', [], 60],
+    ['hud-shift-only', 'деньги смены без респекта и уличных денег', 'hud-shift-only.js', ['--cpu=3'], 65],
+    ['manager-messages', 'SMS рейтинга без дублей и пустых разговоров', 'manager-messages.js', ['--cpu=3'], 75],
+    ['hud-map-ru', 'рамка нитро, пауза и имя внутри бабла: русский', 'hud-map-frame.js', ['--cpu=3'], 45],
+    ['hud-map-en', 'рамка нитро, пауза и имя внутри бабла: английский', 'hud-map-frame.js', ['--cpu=3', '--lang=en'], 45],
+  ].map(([id, name, file, args, w]) => ({ id, name, group: 2, w, run: async () => {
+    const j = await probe(['--mode=steam', '--size=deck', '--q=gfx=high&gfxdev=deck', ...args,
+      '--eval=' + path.join(__dirname, 'probe-checks', file)]);
+    const e = errLine(j), r = j.result;
+    const good = !e && r && r.ok !== false && !r.failures?.length && !r.fail?.length && !r.crash?.length && !j.errors.length;
+    return { status: good ? 'ok' : 'fail', info: e || (good ? 'проверка прошла; ошибок ' + j.errors.length : JSON.stringify(r)) };
+  } })),
   { id: 'guest-pose', name: 'клиент: свободные кисти, подъём и плавное опускание коробки', group: 1, run: async () => {
     const r = await sh(process.execPath, [path.join(__dirname, 'guest-pose-test.mjs')]);
     return { status: r.code === 0 ? 'ok' : 'fail', info: (r.out || r.err).trim() };

@@ -1,7 +1,7 @@
-/* ── Толик управляющий пишет как в iMessage (автор, 10.10.2026: «круглые и с аватаром — верни назад»).
+/* ── Управляющая пишет как в iMessage (автор, 10.10.2026: «круглые и с аватаром — верни назад»).
    Один вид везде, где он пишет: чат справа под хадом (chat.js), реплика на ходу сверху по центру
    (dialog.js DLG.line, стиль — dialog.css), фраза в конце смены рядом с чеком (shiftend.js) и на празднике
-   «весь город» (cityopen.js). Круглая аватарка внизу слева, над пузырём — имя мелко, пузырь серый
+   «весь город» (cityopen.js). Круглая аватарка внизу слева, внутри пузыря — имя мелко, пузырь серый
    скруглённый с хвостиком к аватарке. Несколько сообщений подряд — лентой, как переписка: имя — только
    над первым, аватарка и хвостик — только у последнего, между пузырями 3 px.
    Текст не мельче 11 px, имя — 10 px (телефон — 10 и 9). Правила словами — docs/ORDERS.md «Толик управляющий». ── */
@@ -97,3 +97,20 @@ body.calm-fx .en-in .en-tb p:not(.en-msg), body.calm-fx .en-tolik.said .en-msg {
 #chat.ph .cm > img, #chat.ph .cm > i { width: 24px; height: 24px; }
 #chat.ph .cm > * { transition: opacity .4s; }
 #chat.ph.ph-drive .cm:not(.fresh) > * { opacity: .72; }
+
+/* №15: имя — внутри общего пузыря; длинное имя переносится вместе с сообщением. */
+html body #chat .cm-b, html body .en-tb, html body #dlg-live .dll-b {
+  gap: 0; color: var(--im-text); background: var(--im-bubble); border: 0;
+  border-radius: 18px 18px 18px 6px; padding: 0;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .35);
+}
+html body #chat .cm-b b, html body .en-tb b, html body #dlg-live .dll-b b {
+  box-sizing: border-box; max-width: 100%; margin: 8px 0 0; padding: 0 12px;
+  font-size: 8px; line-height: 1.5; font-weight: normal; color: #65656b;
+  text-shadow: none; white-space: normal; overflow-wrap: anywhere;
+}
+html body .en-tb b, html body #dlg-live .dll-b b { font-size: 9px; }
+html body #chat .cm-b p, html body .en-tb p, html body #dlg-live .dll-b p {
+  background: transparent; box-shadow: none; border-radius: 0;
+}
+html body #chat .cm.big .cm-b { box-shadow: 0 4px 14px rgba(0, 0, 0, .45); }

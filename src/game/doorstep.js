@@ -292,15 +292,15 @@ function sceneOf (order, st) {
 function sheetOf (o) {
   try { return OS.html(o, { extra: A.ORD && A.ORD.cardRows ? A.ORD.cardRows(o) : [], t }); } catch (e) { return ''; }
 }
-/* часы заказа, как на приборке (game.js dashStep: #dash-now, #dash-due) — мини-игра своего таймера не держит */
+/* Мини-игра читает срок самого заказа; верхнего таймера в DOM больше нет (№14). */
 function clock () {
   const S = A.S;
   if (!S || S.free || !(S.timeMax > 0) || !Number.isFinite(S.time)) return null;
-  const now = document.getElementById('dash-now'), dd = document.getElementById('dash-due'), w = document.getElementById('timewrap');
   const k = S.time / S.timeMax;
   const lvl = S.time <= 0 ? 'late' : (k <= 0.18 || S.time < 10) ? 'low' : k <= 0.4 ? 'warn' : '';
-  return { s: S.time, k, now: now ? now.textContent : '', label: dd && dd.firstChild ? dd.firstChild.textContent : t('до опоздания'),
-    due: dd && dd.lastChild ? dd.lastChild.textContent : '', lvl: w && w.classList.contains('late') ? 'late' : lvl };
+  const n = Math.max(0, Math.ceil(S.time));
+  return { s: S.time, k, now: '', label: lvl === 'late' ? t('опоздал') : t('до опоздания'),
+    due: lvl === 'late' ? '' : Math.floor(n / 60) + ':' + String(n % 60).padStart(2, '0'), lvl };
 }
 
 function door (ev, forced) {
@@ -648,6 +648,7 @@ export function stairsAdjust (st, fee, bonus, tip) {
 }
 
 export const DEBUG = {
+  get clock () { return A ? clock() : null; },
   /* общие часы мини-игр: сколько набежало и когда следующая, с; due() — «подошло», следующий подходящий адрес — мини-игра по месту */
   get timer () { return { t: +TM.t.toFixed(1), next: +TM.next.toFixed(1), due: due() }; },
   due: () => { TM.t = TM.next; return true; },

@@ -379,7 +379,6 @@ function card (p) {
       '<dl class="prf-fields">' +
         field(t('фамилия, имя'), esc(name), 'prf-name') +
         field(t('должность'), esc(t('курьер'))) +
-        field(t('звание'), s.rank ? esc(s.rank) + (s.respect ? ' <em>★ ' + num(s.respect) + '</em>' : '') : '') +
         field(t('место работы'), s.place ? esc(s.place) + (s.dist ? ' <em>' + esc(s.dist) + '</em>' : '') : '') +
       '</dl>' +
     '</div>' +

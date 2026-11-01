@@ -13,9 +13,7 @@
               (больше 20 %), и про радар уже сказали; или первый подобранный кофе. Уходит, как
               только нажал кофе;
      hp     — первый удар, который снял сердце: сердца подсвечены;
-     cash   — первые деньги за смену (карьера): после чека оплаты и денег в пачку;
-     wallet — сразу за «cash»: копилка — все твои деньги, пачка ссыпается в неё в конце смены;
-     respect — первый респект (карьера): что такое звезда; звезда подсвечена;
+     cash   — первые деньги за смену (карьера): после чека оплаты и денег в показатель;
      bump   — первый раз задел своего клиента (карьера): без чаевых, а быстрее 43 км/ч — заказ сорван;
      back   — первый раз опоздал обратно в пиццерию (карьера, game.js backLate): «вернуться за» — тоже срок;
      cam    — вид камеры (11р, 23.10.2026): V / View / значок камеры — по кругу высоко, близко, из-за руля;
@@ -23,7 +21,6 @@
               В спокойный момент: «map» уже была, 40 с езды с первого заказа, до цели дальше 60 м, других
               подсказок нет и не ждут. Сам уже переключал вид (есть сохранённый 'dlv-cam') — не показываем.
               Уходит, как только переключил вид (не раньше 1,5 с), или как обычная.
-   «respect», «bump» и «back» видят и ветераны — это правила, о которых раньше не говорили.
 
    Общая очередь уведомлений (notifyq.js, автор 18.10.2026: «одно уведомление за раз»): подсказка держит экран
    (NQ.claim('hint', soft)), пока видна; что-то важнее (чек оплаты, Толик, рейтинг, достижение) — перебивает: подсказка
@@ -54,7 +51,7 @@ import * as TEL from './telemetry.js';          // анонимная стати
 const KEY = 'dlv-hints';
 const PLAY = ['drive', 'back', 'side', 'loading', 'handover'];
 const GAP = 0.6;
-const ALL = ['drive', 'map', 'brake', 'nitro', 'hp', 'cash', 'wallet', 'cam'];
+const ALL = ['drive', 'map', 'brake', 'nitro', 'hp', 'cash', 'cam'];
 const CAM_KEY = 'dlv-cam', CAM_AFTER = 40, CAM_FAR = 60;   // вид камеры (camview.js): спустя сколько с езды и дальше скольких м от цели
 
 let A = null, EL = null, TXT = null;
@@ -108,10 +105,8 @@ function make (id, extra) {
         : t('прямая! жми {key} и помчишь на нитро', { key }) };
     }
     case 'hp': return { hi: '#hearts', text: t('сердца — жизни тачки: врезался — минус половинка, со всей дури — целое') };
-    case 'cash': return { hi: '#shiftcash', text: t('зелёная пачка — заработано за смену') };
-    case 'wallet': return { hi: '#money', text: t('копилка — все твои деньги: в конце смены пачка ссыпается в неё') };
-    case 'respect': return { hi: '#respect', text: t('звезда — респект района: за конкурентов, похитителя и помощь своим. копишь — растёт звание') };
-    case 'back': return { hi: '#timewrap', text: t('«вернуться за» — тоже срок: опоздал обратно в пиццерию — штраф {sum}', { sum: extra || '' }) };
+    case 'cash': return { hi: '#shiftcash', text: t('деньги слева — заработано за смену') };
+    case 'back': return { hi: '#radar', text: t('назад в пиццерию тоже вовремя: опоздал — штраф {sum}', { sum: extra || '' }) };
     case 'bump': return { text: t('задел клиента — без чаевых; быстрее {kmh} км/ч — заказ сорван', { kmh: Math.round(CLIENT_HIT.HARD * 3.6) }) };
     case 'cam': return touch ? { hi: '#cambtn', text: t('значок камеры — вид по кругу: высоко, близко, из-за руля · проведи пальцем по экрану — осмотреться') }
       : { text: t('{key} — вид камеры по кругу: высоко, близко, из-за руля · {look} — осмотреться', { key: k(pad ? 'View' : 'V'), look: k(pad ? t('правый стик') : t('правая кнопка мыши')) }) };   // осмотреться — camlook.js
@@ -154,11 +149,10 @@ function close () {
   highlight(null);
   if (EL) EL.classList.remove('on');
   if (id === 'drive' && need('map')) { const h = make('map'); H.queue.unshift(Object.assign({ id: 'map', min: Math.max(3, readTime(h.text.replace(/<[^>]+>/g, ''))) }, h)); }   // радар — сразу следом
-  if (id === 'cash' && need('wallet')) push('wallet');
 }
 /* в очередь; urgent — сменить текущую (она — первой в очередь, если её почти не видели) */
 function push (id, extra, urgent) {
-  if (!need(id)) return false;
+  if (id === 'wallet' || id === 'respect' || !need(id)) return false;
   const h = Object.assign({ id, min: 0 }, make(id, extra));
   h.min = Math.max(3, readTime(h.text.replace(/<[^>]+>/g, '')));
   if (urgent && H.cur) {
@@ -172,8 +166,6 @@ function push (id, extra, urgent) {
   return true;
 }
 
-/** первый респект (game.js RESPECT.onChange) */
-export function respect () { if (A && A.CAREER) push('respect'); }
 /** первый раз задел своего клиента (game.js clientBump) */
 export function bump () { if (A && A.CAREER) push('bump'); }
 /** первый раз опоздал обратно в пиццерию (game.js backLate); fine — штраф в ₽, как видит игрок */

@@ -605,12 +605,8 @@ export function mapMark (x, fmX, fmZ, u) {
 /* ── «потратить»: вкладка ёлки-турели (career.js) ── */
 export const ready = () => !!A;
 export function spendTab (money) {
-  const sub = hasTurret() ? t('стоит у точки') : !turretOpen() ? t('со звания «{rank}»', { rank: rankName() }) : money(TURRET.PRICE);
+  const sub = hasTurret() ? t('стоит у точки') : !turretOpen() ? t('пока недоступно') : money(TURRET.PRICE);
   return { key: 'turret', name: t('ёлка-турель'), sub };
-}
-function rankName () {
-  const L = RCFG.LEVELS, i = RCFG.TURRET_LEVEL;
-  try { return RESPECT.level(L[i].at).name; } catch (e) { return String(L[i] ? L[i].at : ''); }
 }
 /* el — панель, api — { wallet(), addWallet(n), money(n), Store, Snd }, done() — перерисовать экран */
 export function spendPane (el, api, done) {
@@ -619,7 +615,7 @@ export function spendPane (el, api, done) {
     ? t('Ёлка с гирляндой и стволом у твоей пиццерии. Сама крутится и расстреливает налётчиков и бойцов конкурентов в {r} м. Налёт с ней проще: пока едешь, она уже кладёт их по одному.', { r: TURRET.R })
     : t('Ёлка с гирляндой и снежной пушкой у твоей пиццерии. Сама крутится и закидывает снежками налётчиков и бойцов конкурентов в {r} м — они с визгом убегают. Налёт с ней проще.', { r: TURRET.R })) + '</p>' +
     (owned ? '<div class="cr-done">✓ ' + esc(t('стоит у точки')) + '</div>'
-      : !open ? '<p class="rd-lock">' + esc(t('нужно звание «{rank}» — респект {n}', { rank: rankName(), n: RCFG.LEVELS[RCFG.TURRET_LEVEL].at })) + '</p>'
+      : !open ? '<p class="rd-lock">' + esc(t('пока недоступно')) + '</p>'
         : '<button type="button" class="cr-btn buy">' + esc(t('купить за {money}', { money: api.money(TURRET.PRICE) })) + '</button>') + '</div>';
   const b = el.querySelector('button.buy');
   if (b) {

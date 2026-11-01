@@ -137,18 +137,6 @@ const pick = a => a[(Math.random() * a.length) | 0];
 
 /* ── хад: «место 2 из 5»; сменилось — вспышка и стрелка (crewrank.css) ── */
 const ARROW = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M5 .8 9.4 5.6H6.6V9.2H3.4V5.6H.6Z"/></svg>';
-function hud (el, place, n, quiet) {
-  const key = place + '/' + n;
-  if (key === ST.key) return;
-  const was = ST.key ? +ST.key.split('/')[0] : 0, sameN = ST.key && +ST.key.split('/')[1] === n;
-  ST.key = key;
-  const moved = was && sameN && place !== was ? (place < was ? 'up' : 'down') : '';
-  const dir = quiet ? '' : moved;   // своё вручение: перемену покажет таблица (стрелка там) — строка без вспышки
-  el.innerHTML = '<li class="me' + (dir ? ' cr-' + dir : '') + '"><i class="you"></i><b>' + t('место {i} из {n}', { i: place, n }) + '</b>' +
-    (dir ? '<em class="cr-arr">' + ARROW + '</em>' : '') + '</li>';
-  if (moved) DEBUG.moves.push({ t: Math.round(ST.clock), from: was, to: place, n, sheet: !!quiet });
-}
-
 /* ── чат ── */
 const gapText = n => tn(n, '{n} заказ|{n} заказа|{n} заказов');
 
@@ -230,7 +218,6 @@ export function update (el, rows, live) {
   const me = rows.findIndex(r => r.me), n = rows.length;
   if (me < 0) return;
   if (!SH.snap) SH.snap = rows.map(rowKey);          // начало смены — от этого порядка первые стрелки таблицы
-  if (el) hud(el, me + 1, n, SH.st !== 'idle');
   // кто впереди тебя: сравнить с прошлым разом — кого обогнал, кто обогнал
   const above = new Set(rows.slice(0, me).map(r => r.R));
   if (ST.above && ST.n === n) {
@@ -307,14 +294,16 @@ function sheetOpen (rows, anchor, hold) {
   const host = anchor.offsetParent || anchor.parentNode;
   if (!el || el.parentNode !== host) { if (el) el.remove(); el = SH.el = document.createElement('div'); el.id = 'rank-sheet'; el.setAttribute('aria-hidden', 'true'); host.appendChild(el); }
   el.className = calm ? 'rk-calm' : '';
-  el.style.left = anchor.offsetLeft + 'px'; el.style.top = anchor.offsetTop + 'px';
+  const ar = anchor.getBoundingClientRect(), hr = host.getBoundingClientRect();
+  const left = ar.left - hr.left, top = ar.bottom - hr.top + 8;
+  el.style.left = left + 'px'; el.style.top = top + 'px';
   el.innerHTML = '<div class="rk-head"><i class="rk-you"></i><b>' + esc(t('место {i} из {n}', { i: me + 1, n })) + '</b><span>' + esc(t('рейтинг смены')) + '</span></div>' +
     '<div class="rk-body"><div class="rk-nums">' + nums + '</div><div class="rk-rows">' + body + '</div></div>';
   el.hidden = false;
   // растёт из строки «место N из M»: стартовый масштаб — её размер к размеру листа (один замер на показ)
   const w = el.offsetWidth || 1, h = el.offsetHeight || 1;
   // телефон: внизу слева руль — лист растёт из строки вверх (поверх сердец и денег), низ — по низу строки
-  if (CHAT.phone()) { el.classList.add('rk-tall'); el.style.top = Math.max(0, anchor.offsetTop + anchor.offsetHeight - h) + 'px'; }
+  if (CHAT.phone()) { el.classList.add('rk-tall'); el.style.top = Math.max(0, ar.top - hr.top - h - 8) + 'px'; }
   el.style.setProperty('--sx', Math.min(1, (anchor.offsetWidth || w) / w).toFixed(3));
   el.style.setProperty('--sy', Math.min(1, (anchor.offsetHeight || h) / h).toFixed(3));
   el.style.setProperty('--mv', SHEET.MOVE + 's');
@@ -339,12 +328,14 @@ function sheetHide () {
 }
 
 /** каждый кадр смены (game.js rivalsStep) */
+export function hide () { sheetHide(); SH.st = 'idle'; SH.again = false; }
+
 export function sheet (dt, on, free, clash, rowsFn, anchor) {
   if (SH.st === 'idle') return;
   SH.t += dt;
   if (SH.st === 'wait') {
     if (SH.t > SHEET.DROP) { SH.st = 'idle'; DEBUG.sheets.push({ t: Math.round(ST.clock), skip: true }); return; }
-    if (!on || clash || SH.t < SHEET.MIN || !anchor || anchor.hidden) return;
+    if (!on || clash || SH.t < SHEET.MIN || !anchor || anchor.hidden || !anchor.getClientRects().length) return;
     if (!NQ.claim('rank')) return;                   // экран занят (чек оплаты, Толик…) — ждёт своей очереди (notifyq.js)
     const rows = rowsFn();
     if (rows.length < 2 || rows.findIndex(r => r.me) < 0) NQ.release('rank');

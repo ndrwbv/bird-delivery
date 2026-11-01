@@ -812,7 +812,7 @@ function hitMascot (m, sp) {
     if (!S.freeRun) RESPECT.add(2, 'rivalMascot', true);   // в общую шкалу респекта (respect.js), всплывашка — своя ниже
     S.money += cash;
     if (!S.freeRun) A.addWallet(cash);
-    A.toast(t('маскот митинга сбит!') + ' ' + t('+2 респекта · премия +{money}', { money: A.money(cash) }));
+    A.toast(t('маскот митинга сбит!') + ' ' + t('премия +{money}', { money: A.money(cash) }));
   } else A.toast(t('маскот митинга сбит — премии на сегодня кончились'));
   try { A.Snd.fx('mascot', s => { A.Snd.squish(); s.blip(140, 0.25, 'square', 0.08); }); } catch (e) { /* звук не обязателен */ }
   if (F.host && Math.hypot(F.host.position.x - V.x, F.host.position.z - V.z) < 160) say(F.host, pick([t('Это провокация!'), t('Нашего маскота сбили!'), t('Пиццерия, позор!')]), 3.4);

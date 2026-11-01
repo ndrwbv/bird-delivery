@@ -66,7 +66,7 @@ const calm = () => { try { return matchMedia('(prefers-reduced-motion: reduce)')
 /* фразы: общие и взрослые/детские (мат — только во взрослой) */
 const LINES = {
   fast: /*i18n*/ [N_('Быстро доставил. Молодец, Женя.'), N_('Клиент доволен. Продолжай так же.')],
-  bundle: /*i18n*/ [N_('Все адреса в срок. Молодец.'), N_('Развоз закрыт. Проверь коробки перед следующим.')],
+  bundle: /*i18n*/ [N_('Все адреса в срок. Молодец.')],
 };
 const ADULT_LINES = {
   late: /*i18n*/ [N_('Пицца остыла. Клиент недоволен, замену вычтем из зарплаты.')],
@@ -258,6 +258,8 @@ function shown (m) {
    «курьер»; без who — Толик, «управляющий») */
 export function say (text, onShow, angry, who, o) {
   text = String(text == null ? '' : text);
+  // Пустая реплика не занимает экран и не держит завершение смены; её расчёт всё равно выполняется один раз.
+  if (!text.trim()) { if (onShow) try { onShow(); } catch (e) { console.warn('[chat]', e); } return null; }
   const crew = !!(who && (who.name || who.rank));
   const rec = { m: null, onShow };
   QN++;

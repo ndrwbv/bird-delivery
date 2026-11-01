@@ -170,33 +170,6 @@ export const URGENT = {
 };
 export const urgentFine = (fee, k = 1) => Math.max(Math.round(URGENT.FINE_MIN / k / 10) * 10, Math.round(fee * URGENT.FINE / 10) * 10);
 
-/* ── деньги на улице (02.10.2026): купюры и монеты лежат во дворах, на проездах и тротуарах —
-   не на проезжей части, чтобы за ними надо было чуть свернуть. Проехал сквозь — деньги в
-   кошелёк и в «за смену», звон, «+200 ₽». Вокруг машины в радиусе R[0]—R[1] м лежит ON штук
-   сразу (на радаре — зелёные точки); уехал дальше FAR м — та пропадает, взамен через RESPAWN
-   секунд появится новая рядом. За смену — не больше PER_SHIFT (≈ 1 500—2 500 ₽ за смену:
-   ~5 % заработка). Сколько в одной — по весам AMOUNTS [₽, вес]; с шансом STASH.CHANCE — заначка
-   (пачка) на STASH.AMOUNT ₽, не больше одной за смену. Суммы — карьерные (уже ×8); вне карьеры
-   (Яндекс) — / MONEY_K, округлено до 10 ₽, не меньше 10. В «просто катаемся» — нет. ── */
-export const STREET_CASH = {
-  ON: 4, R: [70, 320], FAR: 480,
-  RESPAWN: [12, 30], FIRST: [8, 20],
-  PER_SHIFT: 12,
-  AMOUNTS: [[50, 30], [100, 30], [200, 24], [400, 12]],
-  STASH: { CHANCE: 0.06, AMOUNT: [1500, 3000] },
-};
-export function streetCash (k = 1, rnd = Math.random, stash = true) {
-  if (stash && rnd() < STREET_CASH.STASH.CHANCE) {
-    const [a, b] = STREET_CASH.STASH.AMOUNT;
-    const step = k > 1 ? 10 : 100;
-    return { amount: Math.max(10, Math.round((a + rnd() * (b - a)) / k / step) * step), stash: true };
-  }
-  const W = STREET_CASH.AMOUNTS, tot = W.reduce((s, w) => s + w[1], 0);
-  let r = rnd() * tot, v = W[0][0];
-  for (const [m, w] of W) { if ((r -= w) <= 0) { v = m; break; } }
-  return { amount: Math.max(10, Math.round(v / k / 10) * 10), stash: false };
-}
-
 /* ── лишнее сердце (02.10.2026): редкое — золотое сердечко во дворе. Не аптечка: аптечка
    (крест) только чинит +1 сердце до полного; это — если сердца полные, даёт ещё одну ячейку
    сверх машины до конца смены (не больше EXTRA_MAX за смену, чинит её полной), а если машина
@@ -388,25 +361,8 @@ export const CLIENT_KILL = { FINE: 1, END_SHIFT: false };
      HARD и быстрее                          — сбил: заказ сорван и штраф в цену заказа (CLIENT_KILL выше). ── */
 export const CLIENT_HIT = { SOFT: 3, HARD: 12 };
 
-/* ── выбил КОНКУРЕНТА: машина курьера чужой сети («Вселенная суши», «Королева Бургеров»)
-   сгорела, а за HIT_S секунд до этого в неё въехал ты — из его сумки разлетаются деньги:
-   BILLS (4—8) купюр на CASH (600—1 500 ₽ вместе, круглыми по 50 ₽, уже в деньгах ×8) ложатся
-   вокруг горящей машины в 3,5—9 м. Проехал сквозь купюру — она твоя (в кошелёк и в «за смену»),
-   не собрал за LIFE (25 с) — пропала (последние 5 с мигает). Плоского «косаря» больше нет:
-   02.10.2026 было +1 000 ₽ сразу, теперь в среднем столько же (≈1 050 ₽), но надо собрать.
-   Один раз за смену с каждого (сгорел снова — уже без денег). Вне карьеры (Яндекс) —
-   CASH / MONEY_K, как прочие суммы. ── */
-export const RIVAL_KO = { CASH: [600, 1500], BILLS: [4, 8], LIFE: 25, R: [3.5, 9], HIT_S: 8 };
-/* разложить сумму выбитого конкурента на купюры: → [суммы], в сумме — total (круглые по step) */
-export function rivalBills (k = 1, rnd = Math.random) {
-  const [a, b] = RIVAL_KO.CASH, step = k > 1 ? 10 : 50;
-  const total = Math.max(step * 2, Math.round((a + rnd() * (b - a)) / k / step) * step);
-  const n = Math.min(Math.floor(total / step), RIVAL_KO.BILLS[0] + Math.floor(rnd() * (RIVAL_KO.BILLS[1] - RIVAL_KO.BILLS[0] + 1)));
-  const w = Array.from({ length: n }, () => 0.5 + rnd()), ws = w.reduce((s, v) => s + v, 0);
-  const out = w.map(v => Math.max(step, Math.floor(total * v / ws / step) * step));
-  out[0] += total - out.reduce((s, v) => s + v, 0);
-  return out;
-}
+/* Окно атрибуции тарана конкурента: наград-предметов на дороге больше нет. */
+export const RIVAL_KO = { HIT_S: 8 };
 /* ── выбил СВОЕГО (коллегу из твоей пиццерии) — штраф FINE из кошелька, каждый раз.
    Позже (docs/IDEAS.md, блок 9) вместо денег — минус респект: см. colleagueKO в game.js. ── */
 export const COLLEAGUE_KO = { FINE: 1000 };

@@ -30,6 +30,7 @@ import { GROWTH as G } from './econ.js';
 import * as DIST from './districts.js';
 import { TIER } from './hits.js';
 import { DEBUG as PZD } from './pizzadome.js';
+import * as CHAT from './chat.js';             // реальный рост рейтинга сообщает управляющая справа
 
 const KEY = 'dlv-pz-grow';
 export const LOOK = { BUILD_R: 300, DROP_R: 420, HIT_R: 24, FLICKER: true };
@@ -85,7 +86,7 @@ export const sizeAdd = () => (on() ? sOf(G.SIZE, stage(here())) : 0);
 /** курьеров своей сети на смене (game.js initRivals) */
 export const couriers = () => (on() ? sOf(G.COURIERS, stage(here())) : 99);
 
-/** отдал адрес в (x, z): +1 доставка пиццерии его района; выросла — всплывашка */
+/** отдал адрес в (x, z): +1 доставка пиццерии его района; выросла — одно SMS управляющей */
 export function delivered (x, z) {
   if (!on()) return;
   const i = distOf(x, z);
@@ -97,8 +98,8 @@ export function delivered (x, z) {
   const now = stage(i);
   if (now > was) {
     ST.ups.push({ i, s: now });
-    const name = t(DIST.list()[i].name);
-    if (A && A.popBonus) A.popBonus(t('пиццерия «{name}» растёт!', { name }), stageName(now) + ' ' + stars(now));
+    CHAT.say(tn(now, 'Коллеги, наш рейтинг вырос до {n} звезды. Молодцы.|Коллеги, наш рейтинг вырос до {n} звёзд. Молодцы.|Коллеги, наш рейтинг вырос до {n} звёзд. Молодцы.'),
+      null, false, null, { key: 'pizzeria-rating:' + i + ':' + now });
   }
 }
 
@@ -436,7 +437,7 @@ export function step (dt, api) {
 export const DEBUG = {
   G, LOOK, ST, DECOR,
   get counts () { return counts().slice(); },
-  stage, label, toNext, rows, payK, tipAdd, sizeAdd, couriers,
+  stage, label, toNext, rows, payK, tipAdd, sizeAdd, couriers, delivered,
   /** выставить пиццерии i n доставок (или ступень s: stageSet(i, s)) */
   set (i, n) { const c = counts(); c[i] = Math.max(0, n | 0); save(); return stage(i); },
   stageSet (i, s) { return DEBUG.set(i, G.AT[Math.max(1, Math.min(STAGES, s)) - 1]); },

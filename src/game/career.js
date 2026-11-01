@@ -299,6 +299,20 @@ function lunchLine (h = hour()) { const pt = DAYT.part(h); return t(DAYT.fresh('
 const MEAL_NAME = { morning: () => t('завтрак'), day: () => t('обед'), evening: () => t('ужин'), night: () => t('ночной перекус') };
 export function atBase (next) {
   if (!A || !SH.on || A.S.ride) return false;
+  // Завершённая глава хранится отдельно от конца смены: закрытие игры между ними
+  // не должно открыть обычные заказы или заплатить за Геннадия ещё раз.
+  if (ORD?.firstFinalComplete()) {
+    SH.phase = 'late'; SH.home = false;
+    A.endShift('время');
+    return true;
+  }
+  // Предыдущая доставка могла занять весь последний слот. Финал всё равно ждёт
+  // в пиццерии после неё; полночь и развоз коллег не вытесняют зарезервированную главу.
+  if (ORD?.firstFinalPending() && (SH.phase === 'late' || ORD.storyLast())) {
+    SH.home = true;                                // после оплаты тоже ждём дорогу назад, а не 6-секундный lateGuard
+    next();
+    return true;
+  }
   if (SH.phase === 'late') {
     if (ORD && ORD.staffHere && ORD.staffHere()) return true;
     // полночь застала в дороге (midnight): последний заказ отвёз и доехал до пиццерии — вот теперь смена всё
@@ -370,6 +384,10 @@ async function midnight () {
   SH.phase = 'late'; SH.lateT = 0;
   lunchOff();
   const S = A.S;
+  if (ORD?.firstFinalPending() || ORD?.firstFinalComplete()) {
+    SH.home = true;                               // довези текущий заказ, забери финал и вернись
+    return;
+  }
   let ride = false;
   // развоз — только если едешь: в полночь на карточке заказа или на погрузке у пиццерии смена просто кончается.
   // Накладная и погрузка — не «в пиццерии», если уже отъехал (руль на накладной не блокируется, погрузка после налёта
@@ -431,6 +449,7 @@ function endLate (ride, quiet) {
    смена кончается сама — чтобы она не повисла, что бы ни случилось с развозом */
 function lateGuard (dt) {
   const S = A.S, riding = S.order && S.order.ord && S.order.ord.type === 'staff';
+  if (ORD?.firstFinalPending()) { SH.lateT = 0; return; }
   if (riding || DLG.isOpen() || A.choiceOpen() || (ORD && ORD.staffWaiting && ORD.staffWaiting())) { SH.lateT = 0; return; }   // едет за ними в пиццерию — ждём
   // последний рейс после полуночи: ждём, пока доедешь до пиццерии (handover у пиццерии → atBase закрывает смену).
   // Что бы ни было по дороге (накладная, погрузка, воскрес после взрыва, «весь город» — другая пиццерия) — не дальше
@@ -521,7 +540,6 @@ export function showEnd (why, whyText, held) {
   lunchClass(false);
   $('cr-clock') && ($('cr-clock').hidden = true);
   const full = why === 'время';
-  const rankWas = RESPECT.level(RESPECT.get() - RESPECT.shift()).i;   // звание до смены — «новое звание» строкой
   let placeWas = 0;
   if (wasOn) {
     A.Store.set('dlv-shifts', SH.n + 1);
@@ -593,7 +611,7 @@ export function showEnd (why, whyText, held) {
       why: wasOn ? (WHY[why] ? WHY[why]() : whyText || '') : '',
       rows: wasOn ? endRows(full) : [],
       total: wasOn ? { k: t('за смену'), n: total, fmt: n => (n > 0 ? '+' : '') + A.money(n), cls: total > 0 ? 'pp-plus' : '' } : null,
-      hints: endHints(wasOn, rankWas, placeWas),
+      hints: endHints(wasOn, placeWas),
       seal, party: seal && total > 0 ? seal.party : '',
       ribbon: wasOn ? HOL.ribbon() : null,          // праздничная смена — лента «С Новым годом!» (holidays.js)
       sticker: wasOn ? { line: END.tolikLine({ mood: SH.mood || 'ok', opened, killed: knocked(), adult: !!A.ADULT }) } : null,
@@ -751,16 +769,12 @@ function endRows (full) {
 }
 
 /* мелко под итогом: копилка, полоска «до следующего района», новости смены (жёлтым маркером) — не больше трёх новостей */
-function endHints (wasOn, rankWas, placeWas) {
+function endHints (wasOn, placeWas) {
   const out = [{ text: t('в копилке теперь'), wal: true, n: A.wallet() }];
   if (!wasOn) return out;
   const dl = districtLine();
   if (dl) out.push(dl);
   const news = [];
-  const lv = RESPECT.level();
-  if (lv.i > rankWas) news.push({ text: t('новое звание: {name}', { name: lv.name }), mark: true });
-  else if (lv.i < rankWas) news.push({ text: t('звание упало: {name}', { name: lv.name }) });
-  for (const [k, v, where] of GROW.rows()) if (where === 'new') news.push({ text: k + (v ? ' · ' + v : ''), mark: true });   // «пиццерия «Юг» выросла · ★★★☆☆»
   const place = crewPlace();
   if (placeWas > 0 && place > 0 && place < placeWas) news.push({ text: t('ты #{n} среди курьеров', { n: place }) });
   const cal = CYCLE.receipt();                       // что будет дальше: сезоны и праздник (seasoncycle.js)

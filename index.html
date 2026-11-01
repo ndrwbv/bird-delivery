@@ -93,15 +93,10 @@
   <div class="hud" id="hud-right">
     <div id="dist"></div>
     <div id="speed"></div>
-    <!-- бак нитро (только Москва): пополняется баллонами на улицах, жжётся на Shift -->
-    <div id="nitro" class="msk-only"><span data-i18n>нитро</span><b><i id="nitrobar"></i></b></div>
     <!-- щит и бист-мод: сколько секунд осталось -->
     <div id="fxs" class="msk-only"></div>
     <!-- «сняться со смены» — только в меню паузы -->
   </div>
-
-  <!-- ── время на заказ: часы как на приборке — сейчас и «до 14:35» (срок заказа) ── -->
-  <div class="hud" id="timewrap"><b id="dash-now"></b><span id="dash-due"><em></em><b></b></span></div>
 
   <!-- ── карта квартала: в Москве по клику раскрывается во весь экран ── -->
   <div class="hud" id="radar"><canvas id="radarc"></canvas></div>
@@ -150,7 +145,6 @@
   <!-- ── звук и пауза: не все догадаются про клавиши ── -->
   <div id="ctrls">
     <button id="sfx" type="button" data-i18n>звук вкл</button>
-    <button id="pause" type="button" aria-label="пауза" data-i18n-title="пауза"><i class="pz-ico" aria-hidden="true"></i></button>
     <button id="cambtn" type="button" aria-label="камера" data-i18n-title="камера"><i class="cam-ico" aria-hidden="true"></i></button>
     <button id="mapbtn" class="msk-only" type="button" data-i18n>карта</button>
     <button id="nos" class="msk-only" type="button" data-i18n>нитро</button>

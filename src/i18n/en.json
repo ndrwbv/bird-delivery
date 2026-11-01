@@ -1023,7 +1023,7 @@
   "one": "{n} address left — pick where next",
   "other": "{n} addresses left — pick where next"
  },
- "слушай, ты растёшь! жалоб на тебя ноль, клиенты довольны. теперь можешь брать два заказа сразу: две пиццы, два адреса. в каком порядке развозить — решай сам, время одно на весь развоз": "listen, you're growing! zero complaints, happy customers. now you can take two orders at once: two pizzas, two addresses. which goes first — your call, one timer for the whole run",
+ "Женя, хорошо справляешься. Даю тебе больше заказов.": "Zhenya, you're doing well. I'm giving you more orders.",
  "клиенты тебя хвалят. держи три адреса за раз — маршрут сам придумаешь, ты уже не стажёр": "customers keep praising you. here, three addresses at once — plan the route yourself, you're no rookie anymore",
  "пять пицц в багажник! кухня еле успевает за тобой. только не перепутай, кому какая": "five pizzas in the trunk! the kitchen can barely keep up with you. just don't mix up who gets which",
  "семь заказов разом — больше нам в багажник не влезет. ты лучший курьер «Птицы Пиццы», так что и времени тебе меньше всех": "seven orders at once — the trunk won't fit any more. you're the best courier at Birdy Pizza, so you get the least time of all",
@@ -5824,5 +5824,16 @@
  "Дебаг оверлей: показать": "Debug overlay: show",
  "Дебаг оверлей: скрыть": "Debug overlay: hide",
  "Выбери главу — смена начнётся сама": "Choose a chapter — the shift will start automatically",
- "Запускаем сюжетную смену": "Starting story shift"
+ "Запускаем сюжетную смену": "Starting story shift",
+ "Все адреса в срок. Молодец.": "All addresses on time. Well done.",
+ "Пицца остыла. Клиент недоволен, замену вычтем из зарплаты.": "The pizza got cold. The customer is unhappy; we will deduct the replacement from your pay.",
+ "деньги слева — заработано за смену": "money on the left — earned this shift",
+ "премия +{money}": "bonus +{money}",
+ "пока недоступно": "not available yet",
+ "курьер «{brand}» выбыл": "the {brand} courier is out",
+ "назад в пиццерию тоже вовремя: опоздал — штраф {sum}": "get back to the pizzeria on time too: late means a {sum} fine",
+ "Коллеги, наш рейтинг вырос до {n} звезды. Молодцы.|Коллеги, наш рейтинг вырос до {n} звёзд. Молодцы.|Коллеги, наш рейтинг вырос до {n} звёзд. Молодцы.": {
+  "one": "Team, our rating has risen to {n} star. Well done.",
+  "other": "Team, our rating has risen to {n} stars. Well done."
+ }
 }

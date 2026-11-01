@@ -33,6 +33,7 @@
    note, why, pay, time, timeK (срок × от обычного), color, reach, noGuest }. why/items/note — уже переведённые; noGuest — человека
    у двери ставит story.js, прохожего не зовём (иначе ждёт прохожий, person — его лицо). */
 import * as RESPECT from './respect.js';
+import * as QR from './quickrun.js';
 import * as TEL from './telemetry.js';          // анонимная статистика: поручения и опоздания (telemetry.js)
 import { t, tn } from '../i18n/index.js';
 import * as ECON from './econ.js';
@@ -199,6 +200,31 @@ function distRing () {
 const SH = { far: 0, last: 0, gen: 0, zones: new Set(), must: {}, h0: 9, done: 0, log: [], reserved: new Set(), pts: [], breather: false, k: 0, sz: 1, run: { kind: '', n: 0 }, beach: 0, beachAt: -99, prevM: 0, storyLast: false };
 const Q = [];                                          // заказы наперёд (песочница может положить); в игре — собираем по одному, когда нужен
 
+/* Финал самой первой карьеры зарезервирован за Геннадием. Опираемся на сохранённую главу,
+   а не на флаг текущего заказа: после перезапуска оплаченная встреча не выдаётся снова. */
+function firstCareerShift () {
+  return !!A && !SIM && !QR.on() && A.MAP.id === 'seversk' && (+A.Store.get('dlv-shifts', 0) || 0) === 0;
+}
+export function firstFinalComplete () {
+  if (!firstCareerShift()) return false;
+  let p = A.Store.get('dlv-story', {});
+  if (typeof p === 'string') { try { p = JSON.parse(p); } catch (e) { p = null; } }
+  return !!(p && p.gennady && +p.gennady.ch > 0);
+}
+export const firstFinalPending = () => firstCareerShift() && !firstFinalComplete();
+
+function firstFinalSpec () {
+  if (!STORY || typeof STORY.orderFor !== 'function') return null;
+  const s = STORY.orderFor('gennady', 0);
+  if (!s) return null;
+  s.shift = 1;
+  s.firstFinal = true;
+  // Этот заданный сюжетный адрес — исключение из районов и дальности обычных заказов.
+  // Город проезжаем целиком; storyNear здесь оставлял первую смену без её финала.
+  const spec = storySpec(s);
+  return spec ? finishSpec(spec, null, hourNow()) : null;
+}
+
 export function resetShift () {
   staffAbort();
   dropQueue();
@@ -355,13 +381,14 @@ function genSpec () {
   let D = distRing();
   // ритм смены (rhythm.js): роль заказа на дуге (начало, подъём, кульминация, последний), напряжение k, встреча у двери
   const left = CAR && typeof CAR.shiftLeft === 'function' && CAR.shiftOn() ? CAR.shiftLeft() : -1;
+  if (firstFinalPending() && (SH.storyLast || (left >= 0 && left < ECON.RHYTHM.LAST_S) || CAR?.phase() === 'late')) return firstFinalSpec();
   const R = SIM ? (SIM_ARC ? simSlot() : null) : RHY.slot(SH.gen, left);
   if (R) { R.k0 = R.k; R.k = SKILL.k(R.k); RHY_K = R.k; }   // умение курьера: потолок напряжения (skill.js) — дальность, сборные, срочные «по шансу»
   const tgt = R ? arcTarget(R, D) : 0;                    // сколько метров по дорогам «хочется» этому заказу
   if (R) { D = rampRing(D, R.k); RHY_ROLE = R.role; D.max = Math.max(D.min + 150, Math.min(D.max, Math.round(tgt))); }   // по прямой — не дальше «хочется» по дорогам
   // Д22: доступную сюжетную главу выдаём только в последнем слоте смены.
   // ORD.force для ?storytest идёт отдельно через nextPlan и не меняет обычный график.
-  if (!SIM && R?.role === 'last' && left > 0 && STORY && typeof STORY.nextOrder === 'function') {
+  if (!SIM && !firstCareerShift() && R?.role === 'last' && left > 0 && STORY && typeof STORY.nextOrder === 'function') {
     let s = null;
     try { s = STORY.nextOrder(storyCtx()); } catch (e) { console.warn('[orders] STORY.nextOrder', e); }
     if (s && typeof s.then !== 'function') {
@@ -473,6 +500,7 @@ function beachSpec (hAt) {
    Адреса — по всему кольцу района, порядок в спецификации — ближайший следующий
    от пиццерии (по нему считаются отрезки, оплата и срок), игрок развозит как хочет. */
 function bundleSpec (life, D, most = 7, top = false, near = 0) {
+  if (firstCareerShift()) return null;               // первая смена — по одному адресу, без перехода к сборным
   const step = ECON.bundleStep(life);
   if (!step) return null;
   let n = sizeRoll(Math.max(2, Math.min(most, SKILL.size(), (step.max || 2) + GROW.sizeAdd())), top);   // умение курьера: пицц не больше SKILL size   // сколько пицц — «вперемешку» (SHIFT_PLAN.sizes), от 2; ступень пиццерии ± (GROWTH.SIZE); top — кульминация смены: самый большой из можно
@@ -744,7 +772,7 @@ export function nextPlan () {
   SH.last = S.orders;
   let spec;
   if (FORCE) { spec = FORCE; FORCE = null; }
-  else if (SH.storyLast) return null;                  // после сюжетного заказа новых в этой смене нет
+  else if (firstFinalComplete() || (SH.storyLast && !firstFinalPending())) return null; // оплаченную первую главу не повторяем и после перезапуска
   else spec = Q.length ? Q.shift() : genSpec();         // собираем, когда нужен: очередь «дальше» не показываем
   return bindSpec(spec);
 }
@@ -870,6 +898,8 @@ function bundleTime (L, n, k) {
 let SIM_TOLD = 0;
 const toldGet = () => (SIM ? SIM_TOLD : +A.Store.get('dlv-boss', 0) || 0);
 function bossSays (k) {
+  // Первую смену не объявляем повышением и не съедаем реплику для следующей смены.
+  if (firstCareerShift()) return;
   A.Store.set('dlv-boss', Math.max(toldGet(), Math.abs(k)));
   const line = k > 0 && BOSS.lines[k];
   if (!line) return;
@@ -1667,6 +1697,7 @@ function simTime (sp, i) {
 /** «весь город»: премия за дальние, заработанная за эту смену (итоги смены, career.js) */
 export const farEarned = () => SH.far || 0;
 export const DEBUG = {
+  firstFinalPending, firstFinalComplete,
   farEarned, Q, SH, get POOL () { return POOL; }, get USED () { return USED; }, STAFF, ARRIVE, simShift, resetShift, genSpec, pickSpot, staffRide, bagMesh,
   get CAR () { return CAR; }, get STORY () { return STORY; }, hourNow, offerSide, sideOpts, force, forceSide, nextPlan, card, onArrive,
   lifeN, bundleSpec, activeStops, pickStop, reachStop, ERR, MIX: MIX.DEBUG,

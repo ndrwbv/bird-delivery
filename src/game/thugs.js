@@ -32,7 +32,6 @@ import * as DIST from './districts.js';
 import { makePerson, holdFixed } from './people.js';
 import { TIER } from './hits.js';
 import { DEBUG as WD } from './world.js';
-import { RESPECT as RG } from './econ.js';
 import * as RESPECT from './respect.js';
 import * as DIRECTOR from './director.js';   // режиссёр событий (director.js)
 import * as CREWS from './crews.js';           // сигнал игрока (H; машина гудит сама, если постоял рядом) — общий с компаниями в форме
@@ -191,12 +190,11 @@ function helped (how) {
     if (A.emote) A.emote(v.x, 2.2, v.z, 'heart', 4);
   }
   // респект и чаевые
-  const gain = RG.GAIN.helpedCivil || 0;                 // econ.js RESPECT.GAIN.helpedCivil
   try { RESPECT.add(null, 'helpedCivil', true); } catch (e) { console.warn('[thugs] respect', e); }
   let tip = 0;
   if (v && !v.dead && chance(PRESS.TIP_CHANCE)) tip = A.reward ? A.reward(Math.round(rand(PRESS.TIP[0], PRESS.TIP[1]) / 50) * 50) : 0;
   SC.tip = tip;
-  if (A.toast) A.toast(t('спас прохожего!') + ' ' + (gain ? t('+{n} респект', { n: gain }) : '') + (tip ? (gain ? ' · ' : '') + t('на чай {money}', { money: A.money(tip) }) : ''));
+  if (A.toast) A.toast(t('спас прохожего!') + (tip ? ' · ' + t('на чай {money}', { money: A.money(tip) }) : ''));
 }
 /* гудок машины (если есть): спугивает ближе HONK_R */
 export function honk (x, z) {

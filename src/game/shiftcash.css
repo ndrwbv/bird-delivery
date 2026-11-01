@@ -1,6 +1,4 @@
-/* ── деньги на хаде — две плашки .mb в #cash (слева под сердцами): #money — копилка-свинья, кошелёк (piggy.js,
-   розовая — career.css), #shiftcash — пачка купюр, за смену (shiftcash.js, зелёная). Подписей нет — только
-   значки и суммы. В покое плашка полупрозрачная; .hot — деньги пришли или ушли: непрозрачная и ×1,4 ── */
+/* Деньги смены без подложки; события оплаты временно увеличивают значок и число. */
 #cash .mb { position: relative; display: flex; align-items: center; gap: 5px; line-height: 1.2; padding: 3px 8px 3px 4px;
             border: 2px solid; border-radius: 6px; opacity: .5; transform-origin: 0 50%;
             transition: opacity .3s ease-out, transform .35s ease-out; }
@@ -8,7 +6,8 @@
 #cash .mb[hidden] { display: none; }
 #cash .mb svg { width: 24px; height: 18px; flex: none; filter: drop-shadow(1px 1px 0 #33210c); transform-origin: 50% 70%; }
 #cash .mb b { font-size: 13px; white-space: nowrap; }
-#cash #shiftcash { background: #2d6a33; border-color: #0f2e14; }
+body.career #money[hidden] { display: none; }
+#cash #shiftcash { background: transparent; border-color: transparent; }
 #shiftcash .sc-txt { display: flex; align-items: center; }
 #shiftcash .sc-txt b { color: #e2ffd2; text-shadow: 2px 2px 0 #0f2e14; }
 /* пришли — число вспыхивает (значок «пухнет» на каждой долетевшей купюре или монете — из js); ушли — краснеет */
@@ -40,8 +39,7 @@
   #cash .mb .sc-pop { font-size: 9px; left: calc(100% + 6px); }
 }
 
-/* подписи под значками — первые 3 смены (game.js hudCaps, body.hud-caps; UI-REVIEW № 20): «копилка», «за смену»,
-   «респект» мелко внутри плашки после суммы. Плашка в покое полупрозрачная — подпись вместе с ней */
+/* Подпись «за смену» — первые 3 смены (game.js hudCaps, body.hud-caps). */
 #cash .mb[data-cap]::after { content: none; }
 body.hud-caps #cash .mb[data-cap]::after { content: attr(data-cap); font-size: 11px; line-height: 1; color: #fff3d6; opacity: .85;
                                            white-space: nowrap; text-shadow: 1px 1px 0 #33210c; margin-left: 2px; }

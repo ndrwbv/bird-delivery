@@ -1,31 +1,17 @@
-/* ── хад как накладная (UI-REVIEW № 20/45, clarity c8, 24.10.2026): деньги, респект и «место N из M» — бумажные
-   ценники: кремовая бумага, чернила, цветная полоска слева (розовая — копилка, зелёная — за смену, коричневая — респект),
-   жёсткая тень и чуть кривой наклон; подсказка первой смены — записка, клавиши — тёмные штампики.
-   Раньше плашки были полупрозрачные тёмные и сливались с городом. Правила цвета и размеров — в shiftcash.css,
-   respect.css, career.css; здесь только вид (поэтому html body — перебивает порядок подключения). Анимации прихода
-   денег (sc-flash / sc-hurt) на бумаге переделаны: белая вспышка на кремовом не видна — теперь зелёная и красная. ── */
-html body.career #cash .mb, html body.career #cash #shiftcash, html body.career #cash #respect { --tag: #8c3a58; background: #fff3d6; border: 2px solid #33210c; border-left-width: 7px; border-left-color: var(--tag);
-                              border-radius: 3px; box-shadow: 2px 2px 0 rgba(51, 33, 12, .85); opacity: .92; text-shadow: none; }
-html body.career #cash #shiftcash { --tag: #2d8a3a; rotate: .8deg; }
-html body.career #cash #money, html body.career #cash #money.mb { rotate: -.8deg; }
-html body.career #cash #respect { --tag: #b0651c; rotate: -.5deg; }
-html body.career #cash .mb b, html body.career #cash #respect b { color: #33210c; text-shadow: none; }
-html body.career #cash #shiftcash b, html body.career #shiftcash .sc-txt b { color: #1f6a2a; text-shadow: none; }
-html body.career #cash .mb svg { filter: none; }
-html body.career #cash .mb.hot { opacity: 1; box-shadow: 3px 3px 0 #33210c; }
+/* Хад: слева открытые значения с обводкой, остальные подсказки и элементы сохраняют бумажный стиль. */
+/* Слева — деньги смены без бумаги и подложки; обводка держит контраст на снегу и ночью. */
+html body.career #cash .mb, html body.career #cash #shiftcash {
+  background: transparent; border: 0; border-radius: 0; box-shadow: none; rotate: none; opacity: 1;
+  padding: 2px 0; text-shadow: -2px 0 #33210c, 2px 0 #33210c, 0 -2px #33210c, 0 2px #33210c, 2px 2px #33210c; }
+html body.career #cash #shiftcash b, html body.career #shiftcash .sc-txt b {
+  color: #ffd85e; font-size: 17px; text-shadow: inherit; }
+html body.career #cash .mb svg { filter: drop-shadow(1px 1px 0 #33210c); }
+html body.career #cash .mb.hot { opacity: 1; box-shadow: none; }
 html body.career #cash .mb.bump b { animation: hp-flash .5s ease-out 1; }
 html body.career #cash .mb.hurt b { animation: hp-hurt .6s steps(3) 1; }
-@keyframes hp-flash { 0% { transform: scale(1); } 35% { transform: scale(1.25); color: #1f9a35; } 100% { transform: scale(1); } }
-@keyframes hp-hurt { 33% { color: #d9342c; } 66% { color: #ff6b5e; } }
-html body.hud-caps #cash .mb[data-cap]::after { color: #8a3b22; opacity: 1; text-shadow: none; }
-
-/* «место 2 из 5» — такой же ценник с красным квадратиком «ты» */
-html body.career #rivals { background: #fff3d6; border: 2px solid #33210c; border-left-width: 7px; border-left-color: #d9342c; border-radius: 3px;
-                           box-shadow: 2px 2px 0 rgba(51, 33, 12, .85); text-shadow: none; rotate: .5deg; opacity: .92; }
-html body.career #rivals li, html body.career #rivals li.me { color: #33210c; }
-html body.career #rivals li.me b { color: #33210c; }
-html body.career #rivals li span { color: #1f6a2a; }
-html body.career #rivals li em { color: #75573b; }
+@keyframes hp-flash { 0% { transform: scale(1); } 35% { transform: scale(1.25); color: #fff3d6; } 100% { transform: scale(1); } }
+@keyframes hp-hurt { 33% { color: #ff6b5e; } 66% { color: #ff9a9a; } }
+html body.hud-caps #cash .mb[data-cap]::after { color: #fff3d6; opacity: 1; text-shadow: inherit; }
 
 /* подсказка первой смены — записка на клочке бумаги */
 html body #hint { color: #33210c; background: #fff3d6; border: 2px solid #33210c; border-radius: 3px; box-shadow: 3px 3px 0 rgba(51, 33, 12, .85);
