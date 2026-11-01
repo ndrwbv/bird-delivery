@@ -46,3 +46,5 @@ ASAR построен локально из точного final dist. Пров�
 Независимый [offline audit](ordinary12-attempt02/independent-audit.md):12 actual raw/commands/status/SHA и6 собственных сессий совпали; Python независимо пересчитал3408 тройки/медианы/min/max, shared pure rebuild дал byte-equal полную сводку. Находок нет.
 
 Итоговый smoke: web350м/p95 18,5мс, Steam Deck high CPU×3 328м/p95 22,1мс, console errors0/crashlog пуст. Shift-loading: реальный вход26,2с/33из1776участков,101м и новый район15,8с — отдельный CPU×1 seed7 сценарий, не медиана обычной12.256 отложенных переводов — предупреждение; языки кромеru/en, телефоны и kids не проверялись.
+
+[Первый фактический CI run](ci-attempt01/README.md): Linux prepare/pack/runtime PASS, Windows build/pack PASS, затем platform separator bug в ASAR verifier остановил публикацию. Исправлены только внутренние lookup paths;13 tiny cases с actual ASAR Win32 VM и адресный check PASS. Первый run остаётся failed; новая попытка обязательна, v0.33.10 пока не опубликована.

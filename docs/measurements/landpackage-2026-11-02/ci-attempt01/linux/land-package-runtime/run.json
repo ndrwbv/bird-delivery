@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "variant": "cache",
+  "preset": "high",
+  "phase": "cold",
+  "cpu": 1,
+  "argv": [
+    "/home/runner/work/bird-delivery/bird-delivery/node_modules/electron/dist/electron",
+    "/home/runner/work/bird-delivery/bird-delivery/tools/probe.cjs",
+    "--no-sandbox",
+    "--disable-gpu-sandbox",
+    "--mode=steam",
+    "--dir=/home/runner/work/bird-delivery/bird-delivery/release/linux-unpacked/resources/app.asar/dist/steam",
+    "--startup-trace",
+    "--startup-session=lp17b-18a3c23a-9f6e-4055-a277-19b3bb0eee0c",
+    "--startup-cold",
+    "--startup-fixture=/home/runner/work/_temp/land-package-runtime/fixture.json",
+    "--fresh",
+    "--early",
+    "--size=deck",
+    "--cpu=1",
+    "--bootcpu",
+    "--init-script=/home/runner/work/bird-delivery/bird-delivery/tools/probe-checks/startup-bootstrap-observe.js",
+    "--q=gfxdev=deck&mute&startupdistrict=0",
+    "--eval=/home/runner/work/bird-delivery/bird-delivery/tools/probe-checks/startup-ready.js",
+    "--bootwait=360",
+    "--timeout=480",
+    "--max=0",
+    "--errors",
+    "--report=/home/runner/work/_temp/land-package-runtime/raw.json"
+  ],
+  "startedAt": "2026-11-01T23:05:42.747Z",
+  "fixtureFile": "/home/runner/work/_temp/land-package-runtime/fixture.json",
+  "fixtureSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+  "catalogFile": "/home/runner/work/bird-delivery/bird-delivery/dist/steam/city-data/catalog.json",
+  "catalogSha256": "f8a181903273368d7fcf96598061886cbdae3ec0e0f481ef5d21e3a6fd917f04",
+  "processStatus": 0,
+  "signal": null,
+  "probe": {
+    "file": "tools/probe.cjs",
+    "sha256": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce"
+  },
+  "eval": {
+    "file": "tools/probe-checks/startup-ready.js",
+    "sha256": "e9ef0e761ff2a5d32b743a7a26990a757089d61d81c703b57d870968a8f7b137"
+  },
+  "observer": {
+    "file": "tools/probe-checks/startup-bootstrap-observe.js",
+    "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+  },
+  "gate": {
+    "file": "tools/startup-report.mjs",
+    "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+  },
+  "admission": {
+    "file": "tools/land-package-smoke.mjs",
+    "sha256": "c96a6ae00986219fad8b20b856bf8aca39c24e71cd7096884321e2b6436a1909"
+  },
+  "pid": 2388,
+  "finishedAt": "2026-11-01T23:08:13.865Z",
+  "rawSha256": "7214b6b688b613efad7f57124dbabacbc9e498b67706ccb76efa5648edb51484",
+  "startupValidation": {
+    "ok": true,
+    "reasons": []
+  },
+  "ok": true,
+  "controlMs": 136308.19999999998,
+  "fromClickMs": 120356.5,
+  "moved": 0.16326654360358986,
+  "cache": {
+    "version": 1,
+    "source": "cache",
+    "phase": "restored",
+    "hit": true,
+    "fatal": false,
+    "reason": null,
+    "cleaned": true,
+    "bufferHeld": false,
+    "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+    "wireSha256": "965ebbc0994bfe82e2943d1ee3f733a4cc8a273d4100adda8f0f0d649c32f9a4",
+    "expectedWireSha256": "965ebbc0994bfe82e2943d1ee3f733a4cc8a273d4100adda8f0f0d649c32f9a4",
+    "rawSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+    "expectedRawSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+    "bytes": 34231591,
+    "encoding": "gzip"
+  }
+}

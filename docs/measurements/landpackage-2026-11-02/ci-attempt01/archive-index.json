@@ -1,0 +1,142 @@
+[
+  {
+    "file": "fix-check.log",
+    "bytes": 379,
+    "sha256": "93fc76ff9bf68387bda3c754e34c073cc8be1252f336f658a7883d19d54fab44"
+  },
+  {
+    "file": "linux/land-package-asar.json",
+    "bytes": 541,
+    "sha256": "79926e5a3d4acd99dcf3ad8461667d87f8f77cc0b819012db5adc8891a58fa04"
+  },
+  {
+    "file": "linux/land-package-runtime/fixture.json",
+    "bytes": 74,
+    "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+  },
+  {
+    "file": "linux/land-package-runtime/raw.json",
+    "bytes": 38764,
+    "sha256": "7214b6b688b613efad7f57124dbabacbc9e498b67706ccb76efa5648edb51484"
+  },
+  {
+    "file": "linux/land-package-runtime/run.json",
+    "bytes": 3281,
+    "sha256": "be3bf836499c65fb401cef96f9101d8da7dd3ede75635101da88b4b86e827067"
+  },
+  {
+    "file": "linux/land-package-runtime/stderr.log",
+    "bytes": 1280,
+    "sha256": "60043b3a5a52c47073439d076ea3dd1de60e5fb26499724ab01f94bdf86b2833"
+  },
+  {
+    "file": "linux/land-package-runtime/stdout.log",
+    "bytes": 38193,
+    "sha256": "df8f3ed0e41e182bd43d49f1f32d4d2c0aa3f336ec5d828c3bf6845f495050c8"
+  },
+  {
+    "file": "prepare/build.stderr.log",
+    "bytes": 1549,
+    "sha256": "16111b5de23dd102ac89fce35524c931812980925c2f29732d049d7302e9b5a7"
+  },
+  {
+    "file": "prepare/build.stdout.log",
+    "bytes": 7632,
+    "sha256": "0aaaa57d53234d60fb0107f599acfaf41688d62e0c80c999e88cd744eb5e12cd"
+  },
+  {
+    "file": "prepare/export-receipt.json",
+    "bytes": 93245,
+    "sha256": "bf55c05947a5e0b6941a64bef2ccc8f8eed5edc027777665af780f57239e369b"
+  },
+  {
+    "file": "prepare/high-1-fixture.json",
+    "bytes": 74,
+    "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+  },
+  {
+    "file": "prepare/high-1.json",
+    "bytes": 30846,
+    "sha256": "ac46c457c2cca375998e82579e77c913cdb8d907210cad4b9a7e0ac44034923d"
+  },
+  {
+    "file": "prepare/high-1.stderr.log",
+    "bytes": 1282,
+    "sha256": "42e114606d1b6a7dc8119219396fea74831405704d54260ccf2a32ac00cf914a"
+  },
+  {
+    "file": "prepare/high-1.stdout.log",
+    "bytes": 2958,
+    "sha256": "35206160ab850838d40f5c61ce3b8736132dbcb989a897ebc704cd5176027924"
+  },
+  {
+    "file": "prepare/high-2-fixture.json",
+    "bytes": 74,
+    "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+  },
+  {
+    "file": "prepare/high-2.json",
+    "bytes": 30516,
+    "sha256": "06d2f38fc6b7fc07438a7b60a2dd8372d7c0d9ae11a592989a849d3b6c415c19"
+  },
+  {
+    "file": "prepare/high-2.stderr.log",
+    "bytes": 1282,
+    "sha256": "cfcc4c6ab38af3850968b6acf09af21e90611adf2cc8f3cba2f58459684ff809"
+  },
+  {
+    "file": "prepare/high-2.stdout.log",
+    "bytes": 2958,
+    "sha256": "35206160ab850838d40f5c61ce3b8736132dbcb989a897ebc704cd5176027924"
+  },
+  {
+    "file": "prepare/mid-1-fixture.json",
+    "bytes": 35,
+    "sha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00"
+  },
+  {
+    "file": "prepare/mid-1.json",
+    "bytes": 30770,
+    "sha256": "98fa513183794209b299d9790686f0886a5cb6d6da5e284a4455cbc1ce833749"
+  },
+  {
+    "file": "prepare/mid-1.stderr.log",
+    "bytes": 1282,
+    "sha256": "8fbfacbf43799ec06be99e5e1432c801352c884e207fc03dd56a883f0b3509b4"
+  },
+  {
+    "file": "prepare/mid-1.stdout.log",
+    "bytes": 2957,
+    "sha256": "1802131f0a56083aa9dabeb9fe4e61f3b8627959c08ac9ed7ea6b329a6b623af"
+  },
+  {
+    "file": "prepare/mid-2-fixture.json",
+    "bytes": 35,
+    "sha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00"
+  },
+  {
+    "file": "prepare/mid-2.json",
+    "bytes": 30547,
+    "sha256": "3d5b43266e9cecb20e34cc3b467123a721f37e9652089f45ec9047ee96f174eb"
+  },
+  {
+    "file": "prepare/mid-2.stderr.log",
+    "bytes": 1282,
+    "sha256": "8bfdd409adb53cd092051fe6d6358b397f1160742efaea3fa220d93f4a9382c6"
+  },
+  {
+    "file": "prepare/mid-2.stdout.log",
+    "bytes": 2957,
+    "sha256": "1802131f0a56083aa9dabeb9fe4e61f3b8627959c08ac9ed7ea6b329a6b623af"
+  },
+  {
+    "file": "prepare/preparation.json",
+    "bytes": 22581,
+    "sha256": "7410609e3509408dbb0233ab7264518ec623e9d451dab0ae83c2efe03b8f0c4d"
+  },
+  {
+    "file": "windows-job.log",
+    "bytes": 37594,
+    "sha256": "29209833732898e40b88a7c29d0594a1dadf2907f1e648e97d5d5272bb0d9630"
+  }
+]

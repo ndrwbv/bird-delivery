@@ -1,0 +1,10 @@
+
+> bird-pizza-delivery@0.1.0 check
+> node tools/check.cjs --serial --only=land-package-asar
+
+  проверок в игре разом: 1
+  ок  фактические данные внутри пакета Electron (0.1 с)
+
+ок        фактические данные внутри пакета Electron   0.1 с  Packaged ASAR data integrity: 13 PASS
+
+всё ок · 0 с
