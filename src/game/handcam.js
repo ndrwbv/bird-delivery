@@ -30,6 +30,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 import { t, N_ } from '../i18n/index.js';
 import * as GPOSE from './guestpose.js';
+import { catchPoint } from './catchpoint.js';
 
 export const HC = {
   IN: 0.45,           // с: камера разворачивается на клиента
@@ -215,6 +216,8 @@ export function gate (o) {
   if (!q || !alive(q.ped) || q.ped.surf) return null;
   ARMED.p = null;
   if (!q.cancel()) return null;                     // коробка уже в полёте — без сцены
+  const skip = o.skip;
+  if (q.valid) o.skip = () => !q.valid() || (skip && skip());
   ST.gates++;
   endTurn();
   const pr = scene(q.ped, { onTime: P.onTime, give: q.give, kind: o.pay ? 'ask' : '' });
@@ -305,6 +308,15 @@ function endScene () {
   if (r) r(true);
 }
 
+/* Reset only the camera/close-up belonging to a cancelled delivery. Its dialog gate
+   observes q.valid(), so resolving the scene cannot reopen an old conversation. */
+export function cancelHanded (list) {
+  const owns = ped => list.some(q => q.ped === ped);
+  if (ARMED.p && ARMED.p.list.some(q => owns(q.ped))) ARMED.p = null;
+  if (TURN.on && TURN.peds.some(owns)) endTurn();
+  if (SC.on && owns(SC.ped)) { SC.give = null; endScene(); }
+}
+
 function sceneStep (dt) {
   const S = HC.SC, cam = A.cam, ped = SC.ped;
   SC.t += dt;
@@ -322,8 +334,7 @@ function sceneStep (dt) {
     }
     const k = ease((SC.t - S.HOLD0) / S.PASS);
     if (b && SC.from) {
-      const g = ped.grp, ry = g.rotation.y;
-      const tx = g.position.x + Math.sin(ry) * 0.45, tz = g.position.z + Math.cos(ry) * 0.45, ty = g.position.y + (ped.sitting ? 0.9 : 1.02);
+      const { x: tx, y: ty, z: tz } = catchPoint(ped);
       b.position.set(lerp(SC.from.x, tx, k), lerp(SC.from.y, ty, k) + Math.sin(k * Math.PI) * 0.12, lerp(SC.from.z, tz, k));
     }
     if (k >= 1 || !b) giveNow();

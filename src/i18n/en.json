@@ -1,4 +1,12 @@
 {
+ "премия за развоз": "Delivery run bonus",
+ "Не хочешь бегать — {self} «пусть сам спустится».": "Don’t feel like running? {self} “let them come down”.",
+ "Не хочешь бегать — «пусть сам спустится» под заданием.": "Don’t feel like running? Choose “let them come down” under the task.",
+ "Не хочешь набирать — {self} «пусть сам спустится».": "Don’t feel like dialing? {self} “let them come down”.",
+ "Не хочешь набирать — «пусть сам спустится» под заданием.": "Don’t feel like dialing? Choose “let them come down” under the task.",
+ "Ты привёз холодную пиццу — всё из-за твоей разбитой машины.": "You delivered a cold pizza — all because of your damaged car.",
+ "Ты привёз холодную пиццу — всё из-за твоей разбитой машины. К тому же опоздал: замену вычтем из зарплаты.": "You delivered a cold pizza because of your damaged car. You were also late, so we will deduct the replacement from your pay.",
+ "Ты опоздал. Клиент недоволен, замену вычтем из зарплаты.": "You were late. The customer is unhappy; we will deduct the replacement from your pay.",
  "разрешение отрисовки": "render resolution",
  "полное": "native",
  "меньше разрешение — выше скорость; интерфейс остаётся чётким. «Тяжёлый кадр» может временно снижать разрешение ещё сильнее": "lower resolution improves performance; the interface stays sharp. Heavy frame mode may temporarily lower resolution further",

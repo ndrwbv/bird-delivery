@@ -167,13 +167,12 @@ export default {
     const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';');
     let fake = null, clock = o.clock;
     if (typeof clock !== 'function') { fake = KIT.fakeClock(o.clockS || 45, t); clock = fake.get; }
-    let person = o.person || null, sheet = o.sheet, bonus = o.bonus, gopPay = o.gopPay;
+    let person = o.person || null, sheet = o.sheet, gopPay = o.gopPay;
     if (!sheet) {   // песочница: заказ-образец на 1 000 ₽ с этой квартирой
       const ord = KIT.fakeOrder(api, { home: { flat: String(flat) } });
       person = person || ord.stops[0].persons[0] || null;
       sheet = OS.html(ord, { extra: ord.extra, t });
       const m = v => (api.money ? api.money(v) : v + ' ₽');
-      bonus = bonus || '+' + m(Math.round(1000 * K.FAST_BONUS));
       gopPay = gopPay || '−' + m(Math.round(1000 * K.GOP_PAY));
     }
     const st = {
@@ -415,7 +414,6 @@ export default {
       setBars();
       box.classList.add(ok ? 'sx-ok' : 'sx-late');
       elGoal.textContent = ok ? t('У квартиры') : t('Клиент спустится сам');
-      if (fast && bonus) { OS.pen(elInv, 'pay', bonus + ' · ' + t('взбежал быстро'), 'os-plus'); mini.peek(); }
       api.log && api.log((ok ? 'дошёл' : 'срок вышел') + ' за ' + st.res.t + ' с (быстро — до ' + (limit * K.FAST).toFixed(1) + '), этаж ' + floor + ', ошибок ' + st.tries + (fast ? ', быстро' : '') + (gop ? ', гопники: ' + (gop.how || '—') : ''));
       if (ok && V3) { sceneStart(); return; }               // 3D: дверь и единый диалог, затем передача коробки
       if (ok) say({ person, name: client(), text: t(ordinaryDoor(client(), person).lines[0].text), mood: 'happy', cls: 'mk-good' });
@@ -997,8 +995,8 @@ export default {
           hit: c => c === 'Enter' || c === 'NumpadEnter' || c === 'KeyE', pad: p => !!p.menuOk },
         { go: true, el: () => { peek(false); return null; },
           text: (k, fam) => L(N_('Готов? Жмёшь «поехали» — и пошёл срок заказа.')) + ' ' +
-            (k === 'touch' ? L(N_('Не хочешь бегать — «пусть сам спустится» под заданием, но без бонуса за скорость.'))
-              : L(N_('Не хочешь бегать — {self} «пусть сам спустится», но без бонуса за скорость.'), { self: KB(KIT.selfKey(k, fam), k === 'kb') })) + KIT.learnAdd(ln, t) },
+            (k === 'touch' ? L(N_('Не хочешь бегать — «пусть сам спустится» под заданием.'))
+              : L(N_('Не хочешь бегать — {self} «пусть сам спустится».'), { self: KB(KIT.selfKey(k, fam), k === 'kb') })) + KIT.learnAdd(ln, t) },
       ];
     }
     function gopSteps () {

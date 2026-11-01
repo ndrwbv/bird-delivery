@@ -380,7 +380,7 @@ function playStairs (st, order, opt) {
       boxes: st.boxes || 0,                                      // много пицц одному — курьер несёт стопку (12бл)
       addr: st.addr || '', who: person ? (person.app ? NICK.label(person) : person.first || person.name) : '', person, sheet: sheetOf(order), clock,
       payment: money(fee),
-      bonus: '+' + money(r10(fee * SR.FAST_BONUS)), gopPay: '−' + money(r10(fee * SR.GOP_PAY)), selfWait: MG.SELF.WAIT,
+      gopPay: '−' + money(r10(fee * SR.GOP_PAY)), selfWait: MG.SELF.WAIT,
     }, sceneOf(order, st), opt), api);
   });
 }
@@ -518,7 +518,7 @@ function play (st, mode, lv, order, ln) {
     cur.off = INTERCOM.mount(hh, Object.assign({
       mode, flat, print: shown, time, knocks: D.KNOCKS, fast: D.FAST, fastPad: D.FAST_PAD, wipeAfter: D.WIPE_AFTER,
       addr: st.addr || '', who: person ? (person.app ? NICK.label(person) : person.first || person.name) : '', person,
-      sheet: sheetOf(order), bonus: '+' + money(r10(fee * D.FAST_BONUS)), clock: order.ord && order.ord.story ? () => null : clock,
+      sheet: sheetOf(order), clock: order.ord && order.ord.story ? () => null : clock,
       away: aw ? { addr: aw.addr, say: awayLine(!!A.ADULT) } : null, learn: ln || null, selfWait: MG.SELF.WAIT,
     }, sceneOf(order, st)), api);
     sound('ring');
@@ -604,7 +604,7 @@ export function step (dt) {
 }
 export function pad (p) { if (G.cur && G.pad && !G.cur.scene) G.pad(p); }
 
-/* деньги: быстро и с первого раза — +FAST_BONUS от цены адреса; не успел — «за скорость» и чаевые × SLOW_K;
+/* Деньги: скорость не даёт надбавки; не успел — чаевые × SLOW_K;
    «пусть сам спустится» — без бонуса, чаевые остались с шансом SELF.TIP_KEEP (не остались — минус чаевые, «спускался сам») */
 /* исход мини-игры — в статистику один раз на адрес (payAdjust / talkAdjust / stairsAdjust зовут при оплате, stairs — дважды при опоздании) */
 function tel (k, r, out) { if (r && !r.tel) { r.tel = 1; TEL.ev('mini', { k, out }); } }
@@ -613,7 +613,7 @@ export function payAdjust (st, fee, bonus, tip) {
   tel('intercom', r, !r ? '' : r.aborted ? 'aborted' : r.self ? 'self' : r.ok && r.fast ? 'fast' : r.timeout ? 'timeout' : r.ok ? 'ok' : 'fail');
   if (!r || r.aborted) return { bonus, tip, add: 0, cut: 0 };
   if (r.self) return { bonus, tip, add: 0, cut: r.tipKeep === false ? tip : 0 };
-  if (r.ok && r.fast) return { bonus, tip, add: Math.round(fee * D.FAST_BONUS / 10) * 10, cut: 0 };
+  if (r.ok && r.fast) return { bonus, tip, add: 0, cut: 0 }; // №18: быстро — без денежной надбавки
   if (r.timeout) {
     const cut = Math.round((bonus + tip) * (1 - D.SLOW_K) / 10) * 10;
     return { bonus, tip, add: 0, cut };
@@ -633,7 +633,7 @@ export function talkAdjust (st, fee, tip) {
   return { add: r10(fee * TK.KEEP_TIP), cut: 0, kind: 'keep', win: false };
 }
 
-/* деньги подъезда: дошёл с первого раза и быстро — +FAST_BONUS цены адреса; не успел — «за скорость» и чаевые × SLOW_K;
+/* Деньги подъезда: скорость не даёт надбавки; не успел — чаевые × SLOW_K;
    откупился от гопников — GOP_PAY цены адреса; «пусть сам спустится» — чаевые остались с шансом SELF.TIP_KEEP */
 export function stairsAdjust (st, fee, bonus, tip) {
   const r = st && st.stairs;
@@ -641,7 +641,7 @@ export function stairsAdjust (st, fee, bonus, tip) {
   if (!r || r.aborted) return { add: 0, cut: 0, gop: 0 };
   const r10 = v => Math.round(v / 10) * 10;
   return {
-    add: r.ok && r.fast ? r10(fee * SR.FAST_BONUS) : 0,
+    add: 0,                                       // №18: скорость подъёма не меняет оплату
     cut: r.timeout ? r10((bonus + tip) * (1 - SR.SLOW_K)) : r.self && r.tipKeep === false ? tip : 0,
     gop: r.gop === 'pay' ? r10(fee * SR.GOP_PAY) : 0,
   };

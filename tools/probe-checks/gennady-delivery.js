@@ -75,4 +75,6 @@ const badOut = blocked(outbound), badReturn = blocked(returned);
 if (badOut.length || badReturn.length) throw new Error('Курьер пересекает геометрию: ' + JSON.stringify({ badOut, badReturn, outbound, returned }));
 if (Math.hypot(d.V.x - spec.parking.x, d.V.z - spec.parking.z) > 0.5)
   throw new Error('Машина сместилась после возвращения');
+if (!await until(() => !d.HANDOFF.current, 15000) || d.SC.pend !== 0 || d.PAYVIS.active)
+  throw new Error('Сюжетное вручение не завершило один поток оплаты');
 return { flat: stop.home.flat, parked, selected, returnPhases: [...returnPhases], delivered: d.S.delivered, finalCar: [d.V.x, d.V.z], driver: d.DRIVER.of(d.car)?.visible, outbound, returned };

@@ -12,7 +12,7 @@
      ORD.reachStop(o)                — каждый кадр в drive: в сборном подъехал к другому неотданному адресу — он цель (true — цель сменилась)
      ORD.activeStops()               — все неотданные адреса текущего заказа для пинов карты: [{ x, z, color, current, name, addr }]
      ORD.arrive(o, st, onTime)       — подъехал к клиенту; true — дальше не идти (развоз смены, ждём onArrive)
-     ORD.payStop(o, st, onTime, tier) → сколько заплатили за остановку (ECON.orderPay / tipFor); разбивку (заказ, скорость, чаевые) кладёт в st.pay — её рисует popPay
+     ORD.payStop(o, st, onTime, tier) → оплата адреса и фактические чаевые; разбивку кладёт в st.pay — её рисует popPay
      ORD.delivered(o, st, onTime)    — заказ весь отдан: поручение, STORY.onDeliver
      ORD.step(dt)                    — каждый кадр: посадка работников, рамка срочного, таймер поручений
      ORD.targetColor(), ORD.tintMarker(marker), ORD.radarRing(ctx, a, b), ORD.bagMesh(bag)
@@ -1008,10 +1008,12 @@ export function arrive (o, st, onTime) {
   return !!(o.ord && o.ord.story && STORY.interiorFor(o.ord.story) && !o.ord.story.interiorDone);
 }
 
-/* оплата остановки: ECON.orderPay (посчитана в setup), скорость, чаевые */
+/* Оплата остановки: цена адреса и фактические чаевые. Скорость не даёт денег. */
 export function payStop (o, st, onTime, tier) {
   const sp = o.ord, fee = st.fee || (sp.fees && sp.fees[o.idx]) || Math.round(S.fee / o.stops.length);
   const zone = st.zone || sp.zone;
+  const cw = A.wear ? ECON.coldCut(A.wear()) : { k: 0, why: '' };
+  const cold = cw.k >= ECON.PRESS.COLD_BAD;         // существующий порог холодной пиццы, без нового числа
   markUsed(st.key);
   st.done = true;                                         // отдали: пины карты и накладная в паузе
   if (sp.type !== 'staff' && !o.tut) SKILL.stop(onTime, !!st.bumped, !!sp.bundle);   // умение курьера: вовремя и чисто — растёт, опоздал — падает (skill.js)
@@ -1023,10 +1025,10 @@ export function payStop (o, st, onTime, tier) {
   if (!onTime) {
     const gop = DOOR.stairsAdjust(st, fee, 0, 0).gop;     // откупился от гопников в подъезде, а всё равно опоздал — «чаевые» им уже отданы
     if (sp.type !== 'staff' && !o.tut) SKILL.rated(false, 'опоздал', !!sp.bundle);   // ужатие срока: «рейтинг» упал (press.js)
-    st.pay = { fee, bonus: 0, tip: 0, late: true, story: !!sp.story, stairsGop: gop };
+    st.pay = { fee, bonus: 0, tip: 0, late: true, story: !!sp.story, stairsGop: gop, cold, coldWhy: cold ? cw.why : '' };
     return Math.round(fee * PAY.LATE) - gop;
   }
-  const bonus = tier ? Math.round(fee * (PAY.SPEED_BONUS[tier] || 0)) : 0;
+  const bonus = 0;                                // tier остаётся статистикой, не частью выплаты
   const lunch = S.lunch === 'tips';
   const pc = DIST.pace();
   const gTip = st.x !== undefined ? GROW.tipAdd(st.x, st.z) : GROW.tipAdd();   // ступень пиццерии (econ.js GROWTH.TIP)
@@ -1038,29 +1040,31 @@ export function payStop (o, st, onTime, tier) {
     rich = true;
   }
   if (tip > 0) tip = Math.round(tip * (RESPECT.perk('tipK') || 1) / 10) * 10;   // звание по респекту — чаевые больше (econ.js RESPECT.LEVELS)
-  if (st.bumped) tip = 0;                                 // задел клиента машиной (game.js clientBump, ECON.CLIENT_HIT) — без чаевых
-  // домофон (doorstep.js): с первого раза и быстро — +add; не успел, клиент спускался сам — минус cut из «за скорость» и чаевых
+  if (st.bumped || cold) tip = 0;                  // холодный заказ — ровно ноль чаевых
+  // Домофон: скорость не даёт надбавки; самостоятельный спуск/опоздание могут уменьшить чаевые.
   const door = DOOR.payAdjust(st, fee, bonus, tip);
   // разговор у двери (doorstep.js talkAdjust): поддержал — +add; поторопил / шутка не зашла — минус cut из чаевых
   const talk = DOOR.talkAdjust(st, fee, tip);
-  // подъезд (doorstep.js stairsAdjust): взбежал быстро — +add; не успел — минус cut из «за скорость» и чаевых; откупился от гопников — минус gop
+  if (cold) talk.add = 0;                          // поддержка/шутка не возвращают чаевые за холодную пиццу
+  // Подъезд: без надбавки за скорость; прежние вычеты чаевых и отдельный откуп гопникам.
   const stairs = DOOR.stairsAdjust(st, fee, bonus, tip);
-  // пицца остыла (econ.js COLD): багажник нараспашку, нет бампера, сердца — чаевые и «за скорость» меньше, не меньше нуля
-  const cw = !o.tut && A.wear ? ECON.coldCut(A.wear()) : { k: 0, why: '' };
-  const coldLeft = Math.max(0, bonus + tip - door.cut - talk.cut - stairs.cut);
-  const cold = cw.k > 0 ? Math.min(coldLeft, Math.round((bonus + tip) * cw.k / 10) * 10) : 0;
   // ужатие срока (press.js): вовремя, пицца не холодная, клиента не задел — хорошо; иначе «рейтинг» упал — срок отпускает
   if (sp.type !== 'staff' && !o.tut) {
     const bad = st.bumped ? 'задел клиента' : cw.k >= ECON.PRESS.COLD_BAD ? 'пицца холодная' : '';
     SKILL.rated(!bad, bad, !!sp.bundle);
   }
   // из чего сложилась оплата — game.js покажет кучкой денег и чеком (popPay); сюжет — катсцена сама покажет награду
-  st.pay = { fee, bonus, tip, rich: rich && tip > 0, late: false, story: !!sp.story, doorAdd: door.add, doorCut: door.cut, doorMode: st.door ? st.door.mode : '',
+  // Ниже порога сохраняется прежняя мягкая поправка к случайной чаевой.
+  // В её базу не входили социальная добавка и откуп; штрафом из цены адреса она не становится.
+  const tipCuts = door.cut + talk.cut + stairs.cut;
+  const tipLeft = Math.max(0, tip - tipCuts);
+  const cooling = !cold && !o.tut && cw.k > 0 ? Math.min(tipLeft, Math.round(tip * cw.k / 10) * 10) : 0;
+  const actualTip = cold ? 0 : Math.max(0, tip + talk.add - tipCuts - cooling);
+  st.pay = { fee, bonus: 0, tip: actualTip, rich: rich && actualTip > 0, late: false, story: !!sp.story, doorAdd: door.add, doorCut: door.cut, doorMode: st.door ? st.door.mode : '',
     talkAdd: talk.add, talkCut: talk.cut, talkKind: talk.kind, stairsAdd: stairs.add, stairsCut: stairs.cut, stairsGop: stairs.gop,
     cold, coldWhy: cold ? cw.why : '' };
-  const extra = door.add - door.cut + talk.add - talk.cut + stairs.add - stairs.cut - stairs.gop - cold;
-  S.tips = (S.tips || 0) + bonus + tip + extra;   // чек смены: строка «чаевые и за скорость» (career.js; обнуляет startShift)
-  return fee + bonus + tip + extra;
+  S.tips = (S.tips || 0) + actualTip;               // только фактические чаевые, без скорости и откупа
+  return fee + actualTip - stairs.gop;
 }
 
 /* весь заказ отдан: сюжет, поручение */
@@ -1697,7 +1701,7 @@ function simTime (sp, i) {
 /** «весь город»: премия за дальние, заработанная за эту смену (итоги смены, career.js) */
 export const farEarned = () => SH.far || 0;
 export const DEBUG = {
-  firstFinalPending, firstFinalComplete,
+  firstFinalPending, firstFinalComplete, payStop, delivered,
   farEarned, Q, SH, get POOL () { return POOL; }, get USED () { return USED; }, STAFF, ARRIVE, simShift, resetShift, genSpec, pickSpot, staffRide, bagMesh,
   get CAR () { return CAR; }, get STORY () { return STORY; }, hourNow, offerSide, sideOpts, force, forceSide, nextPlan, card, onArrive,
   lifeN, bundleSpec, activeStops, pickStop, reachStop, ERR, MIX: MIX.DEBUG,

@@ -56,7 +56,7 @@ export function heat (el, ms) {
 }
 
 let A = null, EL = null, NUM = null, ICO = null;
-const ST = { real: 0, shown: 0, pend: 0, on: false, txt: '', fly: new Set() };
+const ST = { real: 0, shown: 0, pend: 0, held: 0, tickets: new Set(), on: false, txt: '', fly: new Set() };
 
 /* api: money(n) — сумма, как её видит игрок; S — состояние игры (S.money — за смену) */
 export function init (api) {
@@ -88,10 +88,28 @@ export function step (dt, on) {
     if (d >= MIN) fly(d);
     else if (d <= -MIN) { drop(); pop(d); }
   }
-  const goal = m - ST.pend;   // докручивается только до того, что уже долетело
+  const goal = m - ST.pend - ST.held;   // докручивается только до того, что уже долетело
   ST.shown = Math.abs(goal - ST.shown) < 2 ? goal : ST.shown + (goal - ST.shown) * Math.min(1, dt * 8);
   const v = Math.round(ST.shown), txt = (v < 0 ? '−' : '') + A.money(Math.abs(v));
   if (txt !== ST.txt) { ST.txt = txt; NUM.textContent = txt; }
+}
+
+/* The ledger is already updated. Reserve its visual delta before the next HUD frame,
+   then release it only when the existing payfx pile reaches this counter. */
+export function reserve (d) {
+  const ticket = { amount: Math.round(d || 0), live: true };
+  ST.real += ticket.amount; ST.held += ticket.amount; ST.tickets.add(ticket);
+  return ticket;
+}
+export function settle (ticket, visible = false) {
+  if (!ticket || !ticket.live) return;
+  ticket.live = false; ST.tickets.delete(ticket); ST.held -= ticket.amount;
+  if (visible && EL && !EL.hidden) { puff(); pop(ticket.amount); }
+}
+export function extend (ticket, amount) {
+  if (!ticket?.live || !(amount > 0)) return;
+  const d = Math.round(amount);
+  ticket.amount += d; ST.real += d; ST.held += d;
 }
 
 /* откуда летят: кучка денег под машиной (game.js popPay), если она на экране; иначе — низ экрана по центру */
@@ -172,6 +190,8 @@ function puff () {
 function clearFly () {
   for (const e of ST.fly) e.remove();
   ST.fly.clear(); ST.pend = 0;
+  for (const ticket of ST.tickets) ticket.live = false;
+  ST.tickets.clear(); ST.held = 0;
 }
 
 /* «+сумма» под блоком; вычет — ещё и число краснеет */
@@ -187,6 +207,6 @@ function pop (d) {
 /* отладка: что сейчас на хаде; flying — сколько купюр в воздухе, pend — сколько денег ещё летит */
 export const DEBUG = {
   get text () { return EL && !EL.hidden ? NUM.textContent : null; }, get real () { return ST.real; },
-  get shown () { return Math.round(ST.shown); }, get pend () { return ST.pend; }, get flying () { return ST.fly.size; },
+  get shown () { return Math.round(ST.shown); }, get pend () { return ST.pend + ST.held; }, get flying () { return ST.fly.size; },
   get hot () { return !!(EL && EL.classList.contains('hot')); }, get el () { return EL; },
 };

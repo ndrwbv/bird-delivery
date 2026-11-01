@@ -54,7 +54,10 @@ check((en ? (reactionShown(bundle) && text().includes('All addresses on time. We
   && !/развоз закрыт|проверь коробки|dispatch (?:is )?closed|check (?:the )?boxes/i.test(text()), 'bundle reports actual completion without empty instruction');
 d.CHAT.clear(); await run(0.6);
 const late = d.CHAT.react('late', () => out.callbacks++); await run(1);
-check(out.callbacks === 2 && (en ? (reactionShown(late) && text().includes('The pizza got cold. The customer is unhappy; we will deduct the replacement from your pay.') && !/[А-Яа-яЁё]/u.test(text())) : /Пицца остыла|Клиент недоволен/i.test(text())), 'real order problem and its payment callback remain');
+const expectedLate = en ? 'You were late. The customer is unhappy; we will deduct the replacement from your pay.'
+ : 'Ты опоздал. Клиент недоволен, замену вычтем из зарплаты.';
+check(out.callbacks === 2 && reactionShown(late) && text().includes(expectedLate)
+ && !/пицца остыла|pizza got cold/i.test(text()) && (!en || !/[А-Яа-яЁё]/u.test(text())), 'warm late order has one neutral reaction and keeps its payment callback');
 d.CHAT.clear(); await run(0.6);
 check(out.callbacks === 2, 'clearing displayed message does not repeat payment callback');
 out.crash = d.crashlog.entries(); check(!out.crash.length, 'crash log empty');

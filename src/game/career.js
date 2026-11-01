@@ -651,7 +651,7 @@ function cashScreen (full, total, head) {
   const daily = Math.max(0, Math.round(DAILY.earned() || 0)), d = S.delivered || 0;
   const got = Math.max(0, (S.money || 0) - tips - daily + lost);
   const rows = [{ k: d ? tn(d, '{n} заказ доставлен|{n} заказа доставлено|{n} заказов доставлено') : t('заказов не доставлено'), n: got }];
-  if (tips) rows.push({ k: t('чаевые и за скорость'), n: tips });
+  if (tips) rows.push({ k: t('чаевые'), n: tips });
   if (daily) rows.push({ k: t('задания на день'), n: daily });
   if (lost) rows.push({ k: t('штрафы и вычеты'), n: -lost });
   rows.push(full ? { k: t('бонус за смену'), n: SH.bonus || 0 } : { k: t('бонус за смену'), n: 0, v: t('только до конца') });
@@ -747,7 +747,7 @@ function endRows (full) {
   const daily = Math.max(0, Math.round(DAILY.earned() || 0));            // задания на день — своей строкой
   const got = Math.max(0, (S.money || 0) - tips - daily + lost);
   const rows = [[d ? tn(d, '{n} заказ доставлен|{n} заказа доставлено|{n} заказов доставлено') : t('заказов не доставлено'), (got ? '+' : '') + m(got), got ? 'pp-plus' : '']];
-  if (tips) rows.push([t('чаевые и за скорость'), '+' + m(tips), 'pp-plus']);
+  if (tips) rows.push([t('чаевые'), '+' + m(tips), 'pp-plus']);
   const dr = DAILY.endRow();
   if (dr) rows.push(dr);
   rows.push([t('удары'), String(SH.hits || 0), SH.hits ? '' : 'pp-plus']);

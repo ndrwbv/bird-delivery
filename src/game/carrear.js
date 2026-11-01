@@ -289,7 +289,7 @@ const SPD = { car: null, x: 0, z: 0, v: 0 };
 export function step (dt, car, n) {
   const u = car && car.userData, m = u && u.cargo, tr = u && u.trunk, d = u && u.rdoor;
   if (d && !d.p) d.p = d.m.position.clone();        // закрытая — где стоит (уже с занижением)
-  if (d && d.ajar && !d.lost) {
+  if (d && (d.ajar || d.want || d.a > 0.005) && !d.lost) {
     // задняя дверь хэтчбека: петля снизу, над бампером — верх отваливается назад (камера сверху видит проём и коробки)
     if (SPD.car !== car) { SPD.car = car; SPD.x = car.position.x; SPD.z = car.position.z; }
     if (dt > 0) { SPD.v = Math.min(60, Math.hypot(car.position.x - SPD.x, car.position.z - SPD.z) / dt); SPD.x = car.position.x; SPD.z = car.position.z; }

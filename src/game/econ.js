@@ -116,7 +116,7 @@ export const PAY = {
   EDGE: 1.4,                   // «в конец города»
   LATE: 0.45,
   LEVEL_STEP: 0.03, LEVEL_MAX: 0.6,          // +3 % за уровень курьера, до +60 %
-  SPEED_BONUS: [0, 0.15, 0.3],               // «шустро» / «а ты харош» — доля от оплаты
+  SPEED_BONUS: [0, 0, 0],                     // №18: скорость — статистика, денежной надбавки нет
 };
 export function orderPay (meters, zone, { urgent = false, edge = false, level = 0 } = {}) {
   let p = (PAY.BASE + PAY.PER_M * meters) * (PAY.ZONE[zone] || 1);
@@ -1044,7 +1044,7 @@ export const DOOR = {
   FROM_SHIFT: 1, LV: 4, DOOR_R: 9,
   SMUDGE_FROM: 2, SMUDGE_P: 0.3, WIPE_AFTER: 2, TYPO_FROM: 3, TYPO_P: 0.3, BROKEN_FROM: 5, BROKEN_P: 0.2,
   T: { two: 5, three: 6, typo: 0.5, smudge: 1.5, knock: 5 }, KNOCKS: 12,
-  FAST: 0.55, FAST_PAD: 0.8, FAST_BONUS: 0.12, SLOW_K: 0.5,   // FAST_PAD — порог «быстро», если жали геймпадом (крестовиной дольше)
+  FAST: 0.55, FAST_PAD: 0.8, FAST_BONUS: 0, SLOW_K: 0.5,   // FAST_PAD — порог «быстро», если жали геймпадом (крестовиной дольше)
   /* «клиент не дома» (11.10.2026): с FROM-й смены (отработано FROM) в доле P домофонов клиент отвечает «я не дома, я у тёщи,
      <адрес>» — цель переезжает на точку в R м (по прямой) в том же открытом районе, срок заказа + путь туда по дорогам
      (м / V м/с × SLACK + ADD с); один раз за заказ. Чаевые — как обычно */
@@ -1104,7 +1104,7 @@ export const STAIRS = {
   BREATH: { hold: 0.3, tap: 0.025, rest: 0.5 }, PUFF_T: 1.4, PUFF_V: 0.35,
   DOWN_V: 2, DOWN_TAP: 0.9, SNAP: 0.3, WRONG_T: 0.9,
   GOP_FROM: 5, GOP_P: 0.35, GOP_STEPS: 3, GOP_WIN: 0.8, GOP_MISS: 0.5, GOP_PAY: 0.1,
-  FAST: 0.7, FAST_BONUS: 0.1, SLOW_K: 0.5,
+  FAST: 0.7, FAST_BONUS: 0, SLOW_K: 0.5,
 };
 
 /* События пиццерий (12бж, 24.10.2026, `pzevents.js`; правила — docs/CAREER.md «События пиццерий»; сами события, окна и

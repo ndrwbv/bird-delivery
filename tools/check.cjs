@@ -97,6 +97,10 @@ const CHECKS = [
     ['land-workers','рабочие потоки и запасной расчёт земли','landclean-workers-test.mjs'],
     ['late-wait','ожидание рабочих потоков без зависания очереди','latebuild-wait-test.mjs'],
     ['cull-stream','отсечение новых участков после запуска','cull-stream-test.mjs'],
+    ['handover','вручение по этапам, отмена и сон Deck','handover-test.mjs'],
+    ['catchpoint','коробка попадает в реальные кисти клиента','catchpoint-test.mjs'],
+    ['cargo-anchor','багажник седана, задняя дверь и неподвижный отсек','cargo-anchor-test.mjs'],
+    ['payfx','общая оплата: медленные кадры, пауза и отмена','payfx-test.mjs'],
   ].map(([id,name,file])=>({id,name,group:1,run:async()=>{
     const r=await sh(process.execPath,[path.join(__dirname,file)]);
     return {status:r.code===0?'ok':'fail',info:(r.code===0?r.out:r.err).trim()};
@@ -112,6 +116,10 @@ const CHECKS = [
     ['manager-messages', 'SMS рейтинга без дублей и пустых разговоров', 'manager-messages.js', ['--cpu=3'], 75],
     ['hud-map-ru', 'рамка нитро, пауза и имя внутри бабла: русский', 'hud-map-frame.js', ['--cpu=3'], 45],
     ['hud-map-en', 'рамка нитро, пауза и имя внутри бабла: английский', 'hud-map-frame.js', ['--cpu=3', '--lang=en'], 45],
+    ['delivery-payment', 'оплата без скорости, холод, чаевые и штраф один раз', 'delivery-payment.js', [], 75],
+    ['delivery-sequence', 'багажник, ловля и один поток оплаты', 'delivery-sequence.js', ['--cpu=3'], 80],
+    ['rank-after-payment', 'временный рейтинг только после получения оплаты', 'rank-after-payment.js', ['--cpu=3'], 75],
+    ['gennady-delivery', 'Геннадий: квартира, возврат и завершение оплаты', 'gennady-delivery.js', ['--cpu=3'], 100],
   ].map(([id, name, file, args, w]) => ({ id, name, group: 2, w, run: async () => {
     const j = await probe(['--mode=steam', '--size=deck', '--q=gfx=high&gfxdev=deck', ...args,
       '--eval=' + path.join(__dirname, 'probe-checks', file)]);

@@ -97,6 +97,10 @@ import * as DIST from './districts.js';          // карьера: 8 район
 import * as CITYOPEN from './cityopen.js';      // карьера: все районы открыты — праздник, выбор перед сменой, «весь город»
 import * as ORD from './orders.js';
 import * as NFRAME from './nitroframe.js';
+import * as HANDOFF from './handover.js';
+import * as PAYVIS from './payfx.js';
+import { catchPoint } from './catchpoint.js';
+import { cargoAnchor } from './cargo-anchor.js';
 import * as GPOSE from './guestpose.js';         // ожидание клиента и плавная ловля коробки
 import * as DAYT from './daytime.js';            // ночь держится в развоз смены (NIGHT_HOLD), время суток словами
 import * as ERRS from './errands.js';         // поручения: клиент ждёт на месте, человек у подъезда отдаёт, «на тебе фиолет» (errands.js)
@@ -10835,8 +10839,8 @@ function rivalsStep (dt) {
   if (on) CREWR.tick(dt);
   // после вручения — временная таблица под деньгами смены: ждёт, пока улетит чек оплаты
   // и уйдут накладная / разговор / диалог; открылись поверх — сворачивается
-  CREWR.sheet(dt, !!on && ['drive', 'back', 'loading', 'side'].includes(S.state) && !S.ride, !RQ.busy(),
-    briefShown() || DLG.isOpen() || DOOR.on() || STORY.active() || FIRST.on() || !!S.meal || CH.opts.length > 0, rivalBoard, SC.DEBUG.el);
+  CREWR.sheet(dt, !!on && ['drive', 'back', 'handover', 'loading', 'side'].includes(S.state) && !S.ride, !RQ.busy(),
+    FM.open || S.paused || briefShown() || DLG.isOpen() || DOOR.on() || STORY.active() || FIRST.on() || !!S.meal || CH.opts.length > 0, rivalBoard, SC.DEBUG.el);
   if (!on || (rivalsT -= dt) > 0) return;
   rivalsT = 0.5;
   // Расчёт мест сохраняется; постоянной строки и вспышки на хаде нет.
@@ -14274,6 +14278,7 @@ function warStick (hex) {
 }
 
 function setFullMap (on) {
+  if (on) CREWR.hide();                            // после карты прежний рейтинг не возвращается
   const toPause = !on && FM.open && FM.fromPause;   // открыли из паузы — «закрыть» возвращает в паузу, а не в езду
   FM.fromPause = false;
   FM.open = on;
@@ -14691,15 +14696,15 @@ function popBonus (title, sub, o) {
   DLG.line({ person: p, name: $t('Ирина Сергеевна'), text, color: '#3fae5a', urgent: !!(o && o.urgent), onShow: () => Snd.coin() });
 }
 
-/* Оплата за адрес — деньгами, а не строкой сверху: под машиной падает
-   кучка (купюры — за заказ, монеты — чаевые и за скорость), рядом крупно
-   «+N ₽» и чек: «заказ — X», «за скорость — Y», «чаевые — Z», «опоздал — −W»
-   (строки в сумме = N). Через полторы секунды кучка улетает в кошелёк, там
-   цифра докручивается. Всё вместе — 2,4 с, ввод не перехватывает. Узлы
+/* После ловли и опускания рук рядом с самари падает одна кучка: купюры — за заказ,
+   монеты — чаевые. Строки чека в сумме дают начисленную выплату.
+   Через полторы секунды ЭТИ ЖЕ деньги летят в показатель денег смены,
+   где докручивается цифра. Часы анимации — игровые (payfx.js).
+   Всё вместе — 2,4 с, ввод не перехватывает. Узлы
    создаются один раз (14 штук) и переиспользуются.
    rows — [подпись, сумма, 'tip' | 'neg' | ''], title — строка над суммой,
    face — { person, mood }: лицо клиента рядом с ней (payMood). */
-const PAYFX = { el: null, pile: null, sum: null, chk: null, title: null, bits: [], t1: 0, t2: 0 };
+const PAYFX = { el: null, pile: null, sum: null, chk: null, title: null, bits: [] };
 const PAYFX_N = 14;
 function payFxEl () {
   if (PAYFX.el) return PAYFX;
@@ -14721,16 +14726,18 @@ function payFxEl () {
    держит экран 2,5 с; Толик, рейтинг, достижения — после него */
 const PAY_MS = 2500;
 function popPay (total, rows, title, face) {
-  NQ.push({ kind: 'pay', text: (total >= 0 ? '+' : '−') + money(Math.abs(total)), ms: PAY_MS, cut: true, wait: 30,
-    show: () => payShow(total, rows, title, face), hide: payHide });
+  const cash = CAREER ? SC.reserve(total) : null;
+  NQ.push({ kind: 'pay', text: (total >= 0 ? '+' : '−') + money(Math.abs(total)), ms: PAY_MS, manual: true, cut: true, fresh: 1000, wait: 30,
+    show: it => payShow(total, rows, title, face, () => { SC.settle(cash, true); payHide(); NQ.done(it); }, () => NQ.touch(it)),
+    hide: (it, again) => { payHide(); if (!again) SC.settle(cash, false); }, drop: () => SC.settle(cash, false) });
 }
 function payHide () {
   const P = PAYFX;
   if (!P.el) return;
-  clearTimeout(P.t1); clearTimeout(P.t2);
+  PAYVIS.hide();
   P.el.classList.remove('on', 'fly'); P.el.hidden = true;
 }
-function payShow (total, rows, title, face) {
+function payShow (total, rows, title, face, done, touch) {
   const P = payFxEl();
   // лицо клиента (то же, что в карточке заказа) с настроением — payMood
   P.face.hidden = !(face && face.person);
@@ -14757,24 +14764,9 @@ function payShow (total, rows, title, face) {
   P.sum.textContent = (total >= 0 ? '+' : '−') + money(Math.abs(total));
   P.sum.classList.toggle('late', rows.some(r => r[2] === 'neg'));
   P.chk.innerHTML = rows.map(r => '<p class="' + (r[2] || '') + '"><span>' + r[0] + '</span><b>' + (r[1] < 0 ? '−' : '') + money(Math.abs(r[1])) + '</b></p>').join('');
-  const el = P.el;
-  clearTimeout(P.t1); clearTimeout(P.t2);
-  el.hidden = false;
-  el.classList.remove('on', 'fly'); void el.offsetWidth; el.classList.add('on');
-  // кошелёк в карьере не пускает свою летящую цифру — деньги долетят кучкой
-  for (let i = 0; i < Math.min(3, 1 + Math.floor(n / 5)); i++) setTimeout(() => Snd.coin(), i * 170);
-  P.t1 = setTimeout(() => {
-    // куда лететь: середина кошелька минус где лежит каждая бумажка (один замер на всех)
-    const w = elMoney.getBoundingClientRect(), wx = w.left + w.width / 2, wy = w.top + w.height / 2;
-    for (let k = 0; k < n; k++) {
-      const b = P.bits[k], r = b.getBoundingClientRect();
-      b.style.setProperty('--fx', Math.round(wx - r.left - r.width / 2) + 'px');
-      b.style.setProperty('--fy', Math.round(wy - r.top - r.height / 2) + 'px');
-    }
-    el.classList.add('fly');
-    setTimeout(() => REANIM.restart(elMoney, 'bump'), 600);
-  }, 1450);
-  P.t2 = setTimeout(() => { el.classList.remove('on', 'fly'); el.hidden = true; }, 2450);
+  Snd.coin();
+  PAYVIS.show({ el: P.el, bits: P.bits, target: () => CAREER ? SC.DEBUG.el : elMoney,
+    ready: () => NQ.DEBUG.phase() === 'ride' && NQ.showing() === 'pay', done, touch });
 }
 
 
@@ -15003,6 +14995,7 @@ function countUp (el, to, fmt, ms) {
   requestAnimationFrame(step);
 }
 function showOver (why, victims) {
+  HANDOFF.cancel();
   Platform.store.flush && Platform.store.flush();       // итоги смены — в облако сразу
   Platform.gameplayStop();
   const best = S.money > S.best && !QR.on();      // быстрый заезд — не рекорд смены
@@ -15060,20 +15053,26 @@ function showOver (why, victims) {
    в руки гостю. Цель может быть функцией — тогда она едет с машиной. */
 const FLY = [];
 
-function flyBox (from, to, dur, onDone, mesh) {
+function flyBox (from, to, dur, onDone, mesh, receive) {
   const g = mesh || pizzaBox();                  // mesh — вместо коробки (пакет из магазина, ORD.bagMesh)
   g.position.set(from.x, from.y, from.z);
   scene.add(g);
-  FLY.push({ g, from: { x: from.x, y: from.y, z: from.z }, to, t: 0, dur: dur || 0.8, onDone });
+  const f = { g, from: { x: from.x, y: from.y, z: from.z }, to, t: 0, dur: dur || 0.8, onDone, receive };
+  FLY.push(f);
   Snd.fx('box', s => s.blip(880, 0.08, 'triangle', 0.1));
+  const cancel = () => { const i = FLY.indexOf(f); if (i < 0) return; FLY.splice(i, 1); scene.remove(g); g.traverse(o => { if (o.isMesh) o.geometry.dispose(); }); };
+  cancel.data = f;
+  return cancel;
 }
 
+const FLY_Q = new THREE.Quaternion();
 function updateFly (dt) {
   for (let i = FLY.length - 1; i >= 0; i--) {
     const f = FLY[i];
     f.t += dt / f.dur;
     const t = Math.min(1, f.t);
     const to = typeof f.to === 'function' ? f.to() : f.to;
+    f.aim = to;
     f.g.position.set(
       lerp(f.from.x, to.x, t),
       lerp(f.from.y, to.y, t) + Math.sin(t * Math.PI) * 1.9,
@@ -15081,6 +15080,7 @@ function updateFly (dt) {
     );
     if (f.g.userData.stack > 1) f.g.rotation.y += dt * 3;   // стопка летит ровно, крутится вокруг себя (12бл)
     else { f.g.rotation.x += dt * 7; f.g.rotation.y += dt * 4; }
+    if (f.receive && t > 0.65) f.g.quaternion.slerp(f.receive.grp.getWorldQuaternion(FLY_Q), clamp((t - 0.65) / 0.35, 0, 1));
     if (t >= 1) {
       scene.remove(f.g);
       FLY.splice(i, 1);
@@ -15769,9 +15769,7 @@ function newOrder () {
    отдают пиццу, и закрывается, как только коробка влетела или вылетела. */
 const TRUNK_P = new THREE.Vector3();
 function trunkPoint () {
-  const tr = car.userData.trunk;
-  if (!tr) return { x: V.x, y: V.y + 1.2, z: V.z };
-  TRUNK_P.set(0, tr.py, tr.pz);
+  cargoAnchor(car, TRUNK_P);
   car.localToWorld(TRUNK_P);
   return { x: TRUNK_P.x, y: TRUNK_P.y, z: TRUNK_P.z };
 }
@@ -15785,9 +15783,9 @@ function pizzasInCar () {
     const st = o.stops[i], peds = st.peds || [];
     n += peds.length ? (st.boxes > 1 ? (peds[0].served ? 0 : st.boxes) : peds.filter(p => !p.served).length) : 1;   // стопка — все её коробки (12бл)
   }
-  return n;
+  return n + HANDOFF.cargo();                    // paid stop already advanced; its boxes remain inside until launch
 }
-function setTrunk (open) { const tr = car.userData.trunk; if (tr) tr.want = open ? 1.2 : 0; }
+function setTrunk (open) { const tr = car.userData.trunk || car.userData.rdoor; if (tr) tr.want = open ? 1.2 : 0; }
 function updateTrunk (dt) {
   const tr = car.userData.trunk;
   if (!tr || (tr.a < 0.005 && tr.want === 0 && !tr.ajar && !tr.bend && !tr.bendA)) return;     // закрыт — вмятины на крышке не трогаем
@@ -15896,27 +15894,21 @@ function backToBase () {
 
 /* вручение: багажник открывается, коробка вылетает каждому в руки,
    после последней крышка закрывается */
-function handOver (st, onTime, story) {
-  setTrunk(true);
-  setTimeout(() => setTrunk(false), 380 + st.peds.length * 220 + 450);
-  // камера смотрит, как ловят (handcam.js): поворот на клиента; окно разговора с ним сразу следом — сцена, коробку отдаёт курьер
+function handOver (st, onTime, story, payment) {
+  let job;
   const list = st.peds.map((ped, i) => {
-    if (ped.preBox) { takeBox(ped, st, onTime); return { ped, person: st.persons[i], pre: true, cancel: () => false, give: () => {} }; }   // уже отдал в сцене перед разговором у двери
-    const q = { ped, person: st.persons[i], fired: false, tm: 0, cancel: () => { if (q.fired) return false; clearTimeout(q.tm); q.fired = true; return true; },
-      give: () => takeBox(ped, st, onTime) };
-    q.tm = setTimeout(() => {
-      q.fired = true;
-      if (ped.dead || S.state === 'over' || S.state === 'dying') return;
-      GPOSE.reach(ped);
-      // в руки перед ним, а не в середину (автор 23.10.2026, 0п9: «коробка проходит сквозь него»)
-      const ry = ped.grp ? ped.grp.rotation.y : 0;
-      flyBox(trunkPoint(), { x: ped.x + Math.sin(ry) * 0.5, y: (ped.surf ? 0.2 : groundH(ped.x, ped.z)) + 1.15, z: ped.z + Math.cos(ry) * 0.5 }, ped.surf ? 1.1 : 0.6, () => takeBox(ped, st, onTime, true),
-        st.boxes > 1 ? pizzaBox(st.boxes) : undefined);   // много пицц одному — летит стопка (12бл)
-    }, 380 + i * 220);
+    const q = { ped, person: st.persons[i], pre: !!ped.preBox, done: false, fired: false, external: false,
+      giveNow: () => takeBox(ped, st, onTime, !q.pre && !q.external),
+      valid: () => HANDOFF.valid(job),
+      cancel: () => { if (q.fired || q.done || !HANDOFF.valid(job)) return false; q.external = true; return true; },
+      give: () => HANDOFF.caught(job, q) };
     return q;
   });
-  HCAM.handed(st, list, { onTime, story: !!story });
+  job = HANDOFF.begin({ stop: st, pin: S.target && { x: S.target.x, z: S.target.z }, list, ...payment });
+  if (job) HCAM.handed(st, list, { onTime, story: !!story });
+  return job;
 }
+
 /* сцена перед разговором у двери (doorstep.js → handcam.js): коробку отдал курьер — у клиента в руках, но ещё не «вручено»
    (оплата и takeBox — после разговора, handOver: коробка та же, не летит) */
 function preBox (ped) {
@@ -15972,6 +15964,7 @@ function checkArrival (dt) {
   const speed = Math.hypot(V.vx, V.vz);
 
   if (S.state === 'drive') {
+    if (HANDOFF.busy()) return;                  // один визуальный расчёт за раз, повторный въезд не вручает снова
     if (!S.order) return;                         // назад в пиццерию и по поручению едем уже без заказа (0п115)
     const arrivalOrder = S.order, arrivalStop = arrivalOrder.stops[arrivalOrder.idx];
     const story = arrivalOrder.ord?.story;
@@ -15986,65 +15979,67 @@ function checkArrival (dt) {
     const onTime = S.free || S.time > 0;
     if (o.ord && ORD.arrive(o, st, onTime)) return;   // карьера: развоз смены, ORD.onArrive (бандиты и т. п.) — ждём
     const share = Math.round(S.fee / o.stops.length);
-    // бонус за скорость: осталось больше шестидесяти процентов срока —
-    // «молния», больше тридцати пяти — «быстро»
+    // Скорость остаётся статистикой/условием заданий и достижений, без прибавки к оплате.
     const left = clamp(S.time / S.timeMax, 0, 1);
     const tier = S.free ? 0 : left >= 0.5 ? 2 : left >= 0.25 ? 1 : 0;
     let part;
-    if (o.ord) part = ORD.payStop(o, st, onTime, tier);   // карьера: ECON.orderPay, PAY.SPEED_BONUS, ECON.tipFor; из чего сложилось — в st.pay
-    if (o.ord && CAREER && !o.tut && !S.freeRun && o.ord.type !== 'staff') GROW.delivered(V.x, V.z);   // пиццерия района растёт (growth.js)
-    else {
-      const bonus = tier ? Math.round(share * (tier === 2 ? 0.6 : 0.3) * (S.tipMul || 1)) : 0;
-      // клиент-богач (рядом гуляет богач или дом солидный) — изредка крупные чаевые, см. LIFE.richTip
-      const rich = onTime && !st.bumped ? LIFE.richTip(st.peds, share) : 0;   // задел клиента (clientBump) — без чаевых
-      part = onTime ? share + bonus + rich : Math.round(share * 0.45);
-      st.pay = { fee: share, bonus, tip: rich, rich: !!rich, late: !onTime };
+    if (o.ord) {
+      part = ORD.payStop(o, st, onTime, tier);       // единственный расчёт карьеры; GROW не подменяет выплату
+    } else {
+      const cw = ECON.coldCut({ ...DENTM.wear(car), hp: S.hp, hpMax: S.hpMax });
+      const cold = cw.k >= ECON.PRESS.COLD_BAD;
+      const rich = onTime && !st.bumped ? LIFE.richTip(st.peds, share) : 0;
+      const tip = onTime && !cold ? rich : 0;
+      part = (onTime ? share : Math.round(share * ECON.PAY.LATE)) + tip;
+      st.pay = { fee: share, bonus: 0, tip, rich: !!tip, late: !onTime, cold, coldWhy: cold ? cw.why : '' };
+      S.tips = (S.tips || 0) + tip;
     }
+    if (o.ord && CAREER && !o.tut && !S.freeRun && o.ord.type !== 'staff') GROW.delivered(V.x, V.z);
     S.money += part;
     // оплата — сразу в кошелёк: умер или закрыл вкладку — деньги уже твои
     if (!S.freeRun) addWallet(part);
-    if (RIVALS.length && !o.tut) CREWR.delivered();   // рейтинг смены: после чека оплаты — подробная таблица (crewrank.js)
+    if (st.pay && st.pay.cold && !st.coldTold) {
+      st.coldTold = true;                           // один результат конкретной доставки, даже если случайных чаевых не было
+      const chargeLate = !onTime && !st.pay.story && !S.ride, fee = st.pay.fee;
+      const text = chargeLate
+        ? $t('Ты привёз холодную пиццу — всё из-за твоей разбитой машины. К тому же опоздал: замену вычтем из зарплаты.')
+        : $t('Ты привёз холодную пиццу — всё из-за твоей разбитой машины.');
+      CHAT.later(2500, () => {
+        RQ.hold(1500);
+        CHAT.say(text, chargeLate ? () => lateFine(fee) : null, true);
+      });
+    }
     const deliveredN = st.peds.length || (o.ord && o.ord.story && o.ord.story.interiorDone ? 1 : 0);
     S.delivered += deliveredN;
     ACH.deliver({ n: deliveredN, onTime, left, free: !!S.free, last: o.idx >= o.stops.length - 1, stops: o.stops.length,   // достижения (achievements.js)
       bundle: !!(o.ord && o.ord.bundle), allOnTime: o.stops.every(q => q.pay && !q.pay.late), urgent: !!(o.ord && o.ord.type === 'urgent') });
     if (CAREER && o.ord) DAILY.deliver({ o, st, onTime, tier, last: o.idx >= o.stops.length - 1 });   // задания на день (daily.js)
 
-    // У сюжетного клиента коробка уже передана у двери квартиры; повторной выдачи с улицы нет.
-    if (!(o.ord && o.ord.story && o.ord.story.interiorDone && !st.peds.length))
-      handOver(st, onTime, !!(o.ord && o.ord.story));
+    // Interior clients already received their box; the empty list still waits for the farewell scene.
+    const handoff = handOver(st, onTime, !!(o.ord && o.ord.story), {
+      amount: part, onPaid: () => { if (RIVALS.length && !o.tut) CREWR.delivered(); },
+    });
     DIRECTOR.delivered();                           // доставка сессии: режиссёр открывает события по нарастающей (director.js)
-    // оплата — кучкой денег и чеком (popPay); в сюжетном заказе награду покажет катсцена
+    // Денежный визуал ждёт клиента и завершения сцены; начисление выше не откладывается.
     const pp = st.pay;
-    const showPay = () => {
+    const paidOrder = { ...o };
+    let deliveryReacted = false, completionBonus = 0;
+    const showPay = done => {
       if (pp && !pp.story) {
         const rows = [[$t('заказ'), pp.fee, '']];
         if (pp.late) rows.push([$t('опоздал'), part - pp.fee + (pp.stairsGop || 0), 'neg']);   // гопникам отдал отдельно — строкой ниже
-        if (pp.bonus) rows.push([$t('за скорость'), pp.bonus, 'tip']);
         if (pp.tip) rows.push([pp.rich ? $t('чаевые от богача') : $t('чаевые'), pp.tip, 'tip']);
-        if (pp.doorAdd) rows.push([pp.doorMode === 'broken' ? $t('достучался быстро') : $t('домофон с первого раза'), pp.doorAdd, 'tip']);   // мини-игра у подъезда (doorstep.js payAdjust)
-        if (pp.doorCut) rows.push([$t('спускался сам'), -pp.doorCut, 'neg']);
-        // разговор у двери (doorstep.js talkAdjust)
-        // разговор у двери: строка итога — из встречи (smalltalk-lines.js row, «послал бабушку»)
-        if (pp.talkAdd) rows.push([st.talk && st.talk.row ? $t(st.talk.row) : $t('понравился клиенту'), pp.talkAdd, 'tip']);
-        if (pp.talkCut) rows.push([st.talk && st.talk.row ? $t(st.talk.row) : $t('клиенту не понравилось'), -pp.talkCut, 'neg']);
-        // подъезд: бегом на этаж (doorstep.js stairsAdjust)
-        if (pp.stairsAdd) rows.push([$t('взбежал быстро'), pp.stairsAdd, 'tip']);
-        if (pp.stairsCut) rows.push([$t('спускался сам'), -pp.stairsCut, 'neg']);
         if (pp.stairsGop) rows.push([$t('откупился от гопников'), -pp.stairsGop, 'neg']);
-        // пицца остыла — машина разбита (orders.js payStop, econ.js COLD): что студит больше всего
-        if (pp.cold) rows.push([{ trunk: $t('пицца остыла — багажник нараспашку'), ajar: $t('пицца остыла — багажник приоткрыт'),
-          bumper: $t('пицца остыла — нет бампера') }[pp.coldWhy] || $t('пицца остыла — машина разбита'), -pp.cold, 'neg']);
-        popPay(part, rows, pp.late ? (CAREER ? $t('клиент недоволен') : '') : tier === 2 && pp.bonus ? $t('А ты харош!') : tier && pp.bonus ? $t('Шустро!') : pp.rich ? $t('сдачи не надо!') : pp.tip ? $t('чаевые!') : '',
+        if (completionBonus > 0) rows.push([$t('премия за развоз'), completionBonus, '']);
+        payShow(part + completionBonus, rows, pp.late ? (CAREER ? $t('клиент недоволен') : '') : pp.rich ? $t('сдачи не надо!') : pp.tip ? $t('чаевые!') : '',
           st.talk && st.talk.person && !st.talk.aborted ? { person: st.talk.person, mood: payMood(st, onTime, tier) }   // встреча-катсцена (encounters.js): лицо героя
-            : st.persons[0] ? { person: st.persons[0], mood: payMood(st, onTime, tier) } : null);
-        bossOnDeliver(o, st, onTime, tier);
+            : st.persons[0] ? { person: st.persons[0], mood: payMood(st, onTime, tier) } : null, done);
+        if (!deliveryReacted) { deliveryReacted = true; bossOnDeliver(paidOrder, st, onTime, tier); }
       } else {
-        toast((onTime ? '+' : $t('опоздал') + ' · +') + money(part) + ' · ' + S.addr);
-        Snd.coin();
+        payShow(part, [[$t('заказ'), part, '']], '', null, done);
       }
     };
-    showPay();
+    HANDOFF.payment(handoff, showPay);
 
     o.idx++;
     if (o.idx < o.stops.length) {
@@ -16063,7 +16058,12 @@ function checkArrival (dt) {
       S.state = 'handover'; S.handT = 0.9;
       addXP(o.ord && o.ord.bundle ? o.stops.length : 1);   // сборный: каждая пицца — заказ (рост курьера, econ.js BUNDLE)
       S.done = (S.done || 0) + 1;
-      if (o.ord) ORD.delivered(o, st, onTime);   // карьера: поручение по SIDE_ORDERS, STORY.onDeliver
+      if (o.ord) {
+        const beforeCompletion = S.money;
+        ORD.delivered(o, st, onTime);              // authoritative independent bonus stays in orders.js
+        completionBonus = Math.max(0, S.money - beforeCompletion);
+        HANDOFF.addPayment(handoff, completionBonus);
+      }
       else if (!S.ride && onTime && st.persons[0] && chance(0.45)) offerSide(st.peds[0], st.persons[0]);
     }
   } else if (S.state === 'side') {
@@ -16375,7 +16375,7 @@ function sideEnd (ok, msg) {
      покерфейс — вовремя, но впритык (меньше 25 % срока) и без чаевых. */
 function payMood (st, onTime, tier) {
   const pp = st.pay || {};
-  if (!onTime || st.bumped) return 'angry';
+  if (!onTime || st.bumped || pp.cold) return 'angry';
   if (st.talk && st.talk.mood && !st.talk.aborted) return st.talk.mood;   // встреча у двери: лицо — как после ответа (smalltalk.js)
   return tier || pp.tip || S.free ? 'happy' : 'ok';
 }
@@ -16388,11 +16388,11 @@ function payMood (st, onTime, tier) {
      задел этого клиента — молчит (уже наругал в clientBump); без таймера и сюжетный — молчит. */
 function bossOnDeliver (o, st, onTime, tier) {
   const pp = st.pay || {};
-  if (pp.story || S.ride) return;
+  if (pp.story || S.ride || pp.cold) return;        // холодный результат уже даёт одну SMS, включая прежний вычет за опоздание
   const last = o.idx >= o.stops.length - 1, bundle = !!(o.ord && o.ord.bundle);
   let kind = '';
   if (!onTime) kind = 'late';
-  else if (st.bumped || S.free) kind = '';
+  else if (st.bumped || pp.cold || S.free) kind = '';
   else if (bundle) kind = last && o.stops.every(q => q.pay && !q.pay.late) ? 'bundle' : '';
   else kind = tier >= 2 ? 'fast' : '';
   // В спокойном окне езды — только реальные проблемы заказа; счётчики разрушений для daily молчат.
@@ -16516,7 +16516,9 @@ function dropRun () {
 }
 
 function gameOver (why, victims, focus) {
+  CREWR.hide();
   if (S.state === 'over' || S.state === 'dying') return;
+  HANDOFF.cancel();
   CHAT.clear(); DLG.lineClear(); RADIO.clear();
   // карьера, машина взорвалась — можно воскреснуть за деньги из кошелька: заказ пока держим
   ACH.over(why);                                   // взорвал / утопил — достижения (achievements.js)
@@ -16790,6 +16792,7 @@ function startRun (ride) {
   S.done = 0; S.mealDone = 0; S.meals = 0; S.tipMul = 1; S.nosEff = 1; S.mealTime = 0; S.side = null;
   hideChoice();
   THIEF.cd = rand(35, 60);
+  HANDOFF.cancel();
   S.state = 'drive'; S.hp = S.hpMax; S.money = 0; S.orders = 0; S.burgers = 0; S.shiftT = 0;
   S.people = 0; S.wrecks = 0; S.delivered = 0; S.scoots = 0; S.revives = 0;
   JUMPS.reset();                                   // Толик про крышу — снова раз за смену (jumps.js)
@@ -16823,6 +16826,7 @@ function startRun (ride) {
 
 /* из «просто покататься» — обратно в меню */
 function toMenu () {
+  CREWR.hide();
   if (!S.ride || S.state === 'dying') return;
   S.state = 'title'; S.ride = false; S.free = false;
   $('menu').hidden = true;
@@ -16959,6 +16963,8 @@ function setPause (on) {
 }
 /* выйти в меню посреди смены: заработанное уже в кошельке, итоги — как в конце */
 function endShift (why) {
+  HANDOFF.cancel();
+  CREWR.hide();
   CL.transFor('конец смены', 4000);              // метка перехода (crashlog.js, 0п48): чек смены, меню
   setPause(false);
   if (S.side) { S.side.ped.freeT = 3; S.side = null; }
@@ -17286,6 +17292,14 @@ if (CAREER) DOOR.init({ ORD, S, Store, ADULT, Snd, money, root: () => $('game') 
 if (CAREER) WRONG.init({ S, V, ADULT, CHAT, NICK, DIST, ZN, SPOTS, routeLen, realAddress, guestMove, nearestRoad,
   shiftsDone: () => +Store.get('dlv-shifts', 0) || 0, onShiftStart: CAREERM.onShiftStart });   // клиент ошибся адресом (wrongaddr.js)
 if (CAREER) { elMoney.hidden = true; SC.init({ S, money }); }
+HANDOFF.init({
+  reserve: amount => CAREER ? SC.reserve(amount) : null, extend: SC.extend, settle: SC.settle, hidePay: payHide,
+  cancelScene: list => HCAM.cancelHanded(list),
+  alive: () => isPlaying() && S.state !== 'dying', trunk: setTrunk, reach: GPOSE.reach, lower: GPOSE.caught,
+  sceneBusy: () => HCAM.busy() || FPD.busy() || DOOR.on() || DLG.isOpen() || STORY.active() || document.body.classList.contains('story-cut'),
+  fly: (ped, st, done) => flyBox(trunkPoint(), () => catchPoint(ped), ped.surf ? 1.1 : 0.6, done,
+    st.boxes > 1 ? pizzaBox(st.boxes) : undefined, ped),
+});
 /* Внутренний респект: сохранение и преимущества остаются, визуального слоя нет. */
 RESPECT.init({ Store });
 if (CAREER) CAREERM.onShiftStart(RESPECT.shiftReset);
@@ -18212,6 +18226,7 @@ buildFullMap();
 hudHearts();
 resize();
 function showTitle () {
+  HANDOFF.cancel();
   if (INTRO) return;
   CHAT.clear(); DLG.lineClear(); RADIO.clear();
   showBig(OWN.pizza(),
@@ -18576,6 +18591,8 @@ function frameStep (now) {
   CL.step('gore', updateGore, dt);
   CL.step('junk', JUNK.step, dt);                                   // контейнеры катятся, обломки остановок падают (junk.js)
   CL.step('hits', HITS.update, dt);
+  CL.step('handover', HANDOFF.step, dt);
+  CL.step('payfx', PAYVIS.step, dt);
   CL.step('fly', updateFly, dt);
   CL.at.ph = 'nitro';
   updateNitro(dt);
@@ -18664,7 +18681,7 @@ function frameStep (now) {
     S.routeT += dt;
     if (S.routeT > 0.35) { S.routeT = 0; rebuildRoutePath(); }
   } else if (S.state === 'handover') {
-    S.handT -= dt;
+    if (!HANDOFF.handling()) S.handT -= dt;
     if (S.handT <= 0) {
       // вернулся в пиццерию: карьера — обед с 14:00 (Толик «на, похавай») или развоз смены после полуночи (career.js atBase)
       if (!S.order) { if (mealDue()) showMeal(); else if (!(CAREER && CAREERM.atBase(newOrder))) newOrder(); }
@@ -18672,11 +18689,21 @@ function frameStep (now) {
     }
   }
 
+  const handPin = HANDOFF.pin(), targetPin = handPin || S.target;
+  const pinAlpha = handPin ? handPin.alpha : 1;
+  for (const child of marker.children) {
+    const mat = child.material;
+    if (!mat) continue;
+    if (mat.userData.pinOpacity === undefined) { mat.userData.pinOpacity = mat.opacity; mat.userData.pinTransparent = mat.transparent; }
+    const transparent = pinAlpha < 1 || mat.userData.pinTransparent;
+    if (mat.transparent !== transparent) { mat.transparent = transparent; mat.needsUpdate = true; }
+    mat.opacity = mat.userData.pinOpacity * pinAlpha;
+  }
   // маркер адреса: пульсирует и крутится, его видно издалека
-  if (S.target && S.state !== 'title' && S.state !== 'over' && !HCAM.busy() && !FPD.busy()) {   // во время вручения и пешего подхода столб заслоняет человека/подъезд
+  if (targetPin && pinAlpha > 0 && S.state !== 'title' && S.state !== 'over' && !HCAM.busy() && !FPD.busy()) {   // во время вручения и пешего подхода столб заслоняет человека/подъезд
     marker.visible = true;
     if (CAREER) ORD.tintMarker(marker);            // цвет вида заказа: пицца, срочно, поручение, развоз, сюжет
-    marker.position.set(S.target.x, groundH(S.target.x, S.target.z), S.target.z);
+    marker.position.set(targetPin.x, groundH(targetPin.x, targetPin.z), targetPin.z);
     marker.rotation.y = tG * 1.2;
     marker.userData.ball.position.y = 6.6 + Math.sin(tG * 3) * 0.45;
     const p = 1 + Math.sin(tG * 3.4) * 0.12;
@@ -18890,7 +18917,7 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) wi
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта
   groundH, surfaceAt, inBorder, BRIDGES, frame,
   // оплата адреса: лицо клиента и чат Толика
-  popPay, CHAT, bossOnDeliver, payMood,
+  popPay, CHAT, bossOnDeliver, payMood, checkArrival,
   // Москва: граф, светофоры, зебры, самокатчики, ввод
   EDGES, SIG_GROUPS, ZEBRAS, SCOOTS, TL, IN, DRIFT: DRIFTM, touches, lightOf, edgeOf, NAR: NAR.DEBUG, TALK: TALK.DEBUG,
   // песочница: сюжет, карта, сохранения, старт смены, кошелёк, читы
@@ -18999,3 +19026,5 @@ MOBV.init({ car: () => car, cam });                // телефон: обвод
 if (window.__dlv) window.__dlv.MOBV = MOBV.DEBUG;
 // ?mapcheck: сводка проблем карты, столбики над ними, «]» — к следующей (mapworks.js)
 if (MAPCHECK) MAPW.debug(MAPFIX, MAPW_API || (MAPW_API = mapApi()));
+
+if (window.__dlv) { window.__dlv.HANDOFF = HANDOFF.DEBUG; window.__dlv.PAYVIS = PAYVIS.DEBUG; window.__dlv.catchPoint = catchPoint; }

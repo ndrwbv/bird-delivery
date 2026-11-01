@@ -130,13 +130,15 @@ function best () {
 }
 
 function pump () {
-  const t = now(), ph = phase(), dt = Math.min(0.5, Math.max(0, t - (lastPump || t)));
+  const t = now(), ph = phase(), elapsed = Math.max(0, t - (lastPump || t)), dt = Math.min(0.5, elapsed), wasWait = lastPhase === 'wait';
   lastPump = t;
   if (ph === 'out' && lastPhase !== 'out') for (const it of LIST.slice()) if (OUT_DROP.has(it.kind)) dropIt(it, 'out');
   lastPhase = ph;
   // окно поверх (пауза, разговор…): ждущие не стареют, у текущего время стоит — после окна следующее не наложится
   // на недоигравшее (тост под паузой, чек под разговором)
-  if (ph === 'wait') { if (cur && !cur.poll) cur.end += dt; if (gapUntil > t) gapUntil += dt; }
+  // A sleeping/throttled Deck can skip many seconds between pumps. Preserve the full
+  // paused interval, including the first pump after Resume (whose phase is already ride).
+  if (ph === 'wait' || wasWait) { if (cur && !cur.poll) cur.end += elapsed; if (gapUntil > t - elapsed) gapUntil += elapsed; }
   else for (const it of LIST) it.age += dt;
   // устарело: прождало (без окон) дольше своего wait или само сказало stale()
   for (const it of LIST.slice()) {
@@ -184,6 +186,19 @@ export function release (kind) {
 }
 export function done (it) {
   if (cur && !cur.poll && cur.it === it) { finish(); pump(); }
+}
+/* A frame-driven manual scene is alive: renew only ITS safety timeout.
+   It never claims a different/urgent item's slot and stops renewing on cancellation. */
+export function touch (it) {
+  if (cur && !cur.poll && cur.it === it && it.manual) cur.end = now() + Q.SAFE;
+}
+/* Abort one owned presentation without synchronously starting a manager callback
+   while its caller is still switching the game to death/menu/the next shift. */
+export function cancel (it) {
+  if (!it) return;
+  if (cur && !cur.poll && cur.it === it) {
+    call(it.hide, it); finish();
+  } else if (LIST.includes(it)) dropIt(it, 'cancel');
 }
 export function clear (kinds, keep) {
   const ks = kinds ? new Set([].concat(kinds)) : null;

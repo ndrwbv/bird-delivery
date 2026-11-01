@@ -108,13 +108,12 @@ export default {
     const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';');
     let fake = null, clock = o.clock;
     if (typeof clock !== 'function') { fake = KIT.fakeClock(o.clockS || 40, t); clock = fake.get; }
-    let person = o.person || null, sheet = o.sheet, bonus = o.bonus;
+    let person = o.person || null, sheet = o.sheet;
     if (!sheet) {   // песочница: заказ-образец на 1 000 ₽
       const ord = KIT.fakeOrder(api, { home: { flat: shown } });
       person = person || ord.stops[0].persons[0] || null;
       sheet = OS.html(ord, { extra: ord.extra, t });
       if (!o.range && o.entr) o = Object.assign({}, o, { range: t('кв. {a}—{b}', { a: (o.entr - 1) * 36 + 1, b: o.entr * 36 }) });
-      bonus = bonus || '+' + (api.money ? api.money(Math.round(1000 * DOOR.FAST_BONUS)) : Math.round(1000 * DOOR.FAST_BONUS) + ' ₽');
     }
 
     // сцена: дверь подъезда снаружи (doorscene.js), обшарпанная или чистая — по дому
@@ -237,7 +236,6 @@ export default {
       elGoal.textContent = ok ? t('Дверь открыта') : t('Клиент спустится сам');
       if (ok) msgs.say({ person, name: client(), text: mode === 'broken' ? t('Иду, иду! Дверь не ломай!') : t('Открываю, поднимайтесь!'), mood: 'happy', cls: 'mk-good' });
       else msgs.say({ person, name: client(), text: t('Да стой ты там, сам спущусь…'), mood: 'angry', cls: 'mk-bad' });
-      if (fast && bonus) { OS.pen(elInv, 'pay', bonus + ' · ' + t('с первого раза'), 'os-plus'); mini.peek(); }
       sfx(ok ? 'open' : 'fail');
       cursor();
       api.log && api.log((ok ? 'открыли' : 'срок вышел') + ' за ' + st.res.t + ' с, ошибок ' + st.tries + (fast ? ', быстро' : ''));
@@ -450,8 +448,8 @@ export default {
       ];
       steps.push({ go: true,
         text: (k, fam) => L(N_('Готов? Жмёшь «поехали» — и пошёл срок заказа.')) + ' ' +
-          (k === 'touch' ? L(N_('Не хочешь набирать — «пусть сам спустится» под заданием, но без бонуса за скорость.'))
-            : L(N_('Не хочешь набирать — {self} «пусть сам спустится», но без бонуса за скорость.'), { self: KB(KIT.selfKey(k, fam), k === 'kb') })) + KIT.learnAdd(ln, t) });
+          (k === 'touch' ? L(N_('Не хочешь набирать — «пусть сам спустится» под заданием.'))
+            : L(N_('Не хочешь набирать — {self} «пусть сам спустится».'), { self: KB(KIT.selfKey(k, fam), k === 'kb') })) + KIT.learnAdd(ln, t) });
       st.phase = 'learn';
       cursor();                                                   // рамка выбора — только когда домофон пошёл
       if (api.hold) api.hold(true);
