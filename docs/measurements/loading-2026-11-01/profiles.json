@@ -1,0 +1,1 @@
+{"ok":false,"evalErr":"No profile picker","errors":[],"uncaught":0,"frames":{"n":6349,"p50":17,"p95":61.8,"max":1149.9},"logs":[{"early":{"at":11942.799999952316,"busy":true,"left":80,"overlay":true,"openMs":78630,"full":90106,"busyAfter":false}}],"mem":[],"ms":{"total":163295,"build":0,"load":12046,"eval":151186}}
