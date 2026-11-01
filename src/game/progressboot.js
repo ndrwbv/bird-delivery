@@ -1,3 +1,4 @@
+import { STARTUP } from './startuptrace.js';
 /* Runs after i18n and before map/game imports. A storage failure offers ONLY retry.
    Dependencies are supplied by main, so this module cannot eagerly read progress/Platform. */
 function retryPanel ({ host, t, error, pollPad, makePadMenu, raf, cancelRaf }) {
@@ -10,9 +11,11 @@ function retryPanel ({ host, t, error, pollPad, makePadMenu, raf, cancelRaf }) {
     text.textContent = t('Не удалось открыть сохранение. Повторите попытку.');
     button.type = 'button'; button.textContent = t('Повторить');
     panel.appendChild(text); panel.appendChild(button); host.appendChild(panel);
+    const retryEnd = STARTUP.windowStart('external.progressRetry', 'external');
+    STARTUP.flag('progress.retry');
     let frame = 0, done = false;
     const finish = () => {
-      if (done) return; done = true; button.disabled = true;
+      if (done) return; done = true; retryEnd(); button.disabled = true;
       if (frame) cancelRaf(frame);
       panel.remove(); host.classList.remove('save-error');
       if (oldAria === null) host.removeAttribute('aria-hidden'); else host.setAttribute('aria-hidden', oldAria);

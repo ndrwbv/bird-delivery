@@ -1,0 +1,22 @@
+[
+  {
+    "path": "tools/probe-checks/startup-ready.js",
+    "sha256": "044da43ee073f0533427231b14d4ef0a92d61a0c46db718819efc47507942c91"
+  },
+  {
+    "path": "tools/probe-checks/raised-land.js",
+    "sha256": "99324366abd28f28f5e498c68947987cc17791acbfb534792c43852645e7cf3e"
+  },
+  {
+    "path": "tools/probe-checks/raised-land-drive.js",
+    "sha256": "9ccfc2526f01f276af84164a4180215954bf08fd851f7b1e410a6a1ee806d88e"
+  },
+  {
+    "path": "tools/probe-checks/land-boundary.js",
+    "sha256": "616066e1d59083c54d85df8771ccf9d9068c7e838c8e560a3d3e7e587cbfea6e"
+  },
+  {
+    "path": "src/game/landcache17a/landcache-accept.js",
+    "sha256": "a65bc8dc87fded2ef6ecdba5e380449d41efbea1de7b1e00db98c710c4a2e625"
+  }
+]

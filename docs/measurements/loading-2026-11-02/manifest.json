@@ -1,0 +1,1538 @@
+{
+  "version": 2,
+  "source": [
+    {
+      "file": "src/main.js",
+      "sha256": "947e106e1ba534323f64849e58942f6d6c2fbc8e366a9433c9fe97177e585850",
+      "bytes": 5800
+    },
+    {
+      "file": "src/game/menu.js",
+      "sha256": "7cf4a316bec253a54905e8f15971368543326b36a9c0549cc337b9b05c0035fb",
+      "bytes": 16381
+    },
+    {
+      "file": "src/game/progressboot.js",
+      "sha256": "01f1acacf9c9f45b5cf54e547a634243598cbefa802de9664d386d6271e68f8b",
+      "bytes": 2193
+    },
+    {
+      "file": "src/game/game.js",
+      "sha256": "382b0daecaf4d0579b33efdf51b47a17e14c10bf50861b932afb2ef94c720076",
+      "bytes": 1382011
+    },
+    {
+      "file": "src/game/latebuild.js",
+      "sha256": "0b84026873cb0da6b36ae2750c287db48979cfc9c6454ccb214f9b0e4764590e",
+      "bytes": 12851
+    },
+    {
+      "file": "src/game/landcleanpool.js",
+      "sha256": "173c441b24db11cbafe32c6d34a31ff5370ee32148eff5b7415942bfa09b8d1a",
+      "bytes": 4502
+    },
+    {
+      "file": "src/game/landclean.worker.js",
+      "sha256": "f69c1f3b76375fc564ab664b75b65d183263416c3d18d93f573be3cb8cdc21c4",
+      "bytes": 903
+    },
+    {
+      "file": "src/game/landstream.js",
+      "sha256": "3134d2eb48b45e1d4d82009db6b9ca0e782a0a095af25619882a9809fa1f52a2",
+      "bytes": 4835
+    },
+    {
+      "file": "src/game/startuptrace.js",
+      "sha256": "25a96836917f06e232a7027ad7f86b776f9fcbd2444ddcd2ce763813288891bb",
+      "bytes": 6594,
+      "archiveCopy": "measured-source/src/game/startuptrace.js"
+    },
+    {
+      "file": "tools/probe.cjs",
+      "sha256": "c9a94455f712efad88c398ee3e7548cdb060901c84ae45af8215dcabea64e2b2",
+      "bytes": 42270
+    },
+    {
+      "file": "tools/probe-checks/startup-ready.js",
+      "sha256": "602b75ced31b20166798cf15c94f2257e8c7ca40d60f017caa89e9de3bea6856",
+      "bytes": 4749,
+      "archiveCopy": "measured-source/tools/probe-checks/startup-ready.js"
+    },
+    {
+      "file": "tools/probe-checks/startup-bootstrap-observe.js",
+      "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8",
+      "bytes": 654,
+      "archiveCopy": "measured-source/tools/probe-checks/startup-bootstrap-observe.js"
+    },
+    {
+      "file": "tools/startup-bench.mjs",
+      "sha256": "b58388802c94aeb0795a49a90b80a8087bb444c2bcd2e1e2ce95db3b9fc13491",
+      "bytes": 7084,
+      "archiveCopy": "measured-source/tools/startup-bench.mjs"
+    },
+    {
+      "file": "tools/startuptrace-test.mjs",
+      "sha256": "6ae19db414dab77b41da5b4f62f7667bee7935ce35954aa418260c754223dc18",
+      "bytes": 3859,
+      "archiveCopy": "measured-source/tools/startuptrace-test.mjs"
+    }
+  ],
+  "buildTree": {
+    "file": "build-tree.json",
+    "sha256": "e7700f6739ab2410f973331c4121a056dfe33692a181b27c369c0207ce55dcfe",
+    "fileSha256": "3c69eb67244ebc4865463430ce491185dc9822e4584b94ebe1ce8c8486353847",
+    "sha256Encoding": "sha256 is canonical JSON.stringify(parsed list); fileSha256 is the raw pretty-printed file"
+  },
+  "indexSha256": "01f5102a233683919337965e6b71e0259bad2be25385279c3695965e4994ee91",
+  "sha": "5a2028736cf5d5fb48cf8c2f0e649246bb45ea1a",
+  "pilotReport": "reports/pilot-newbie-cold.json",
+  "dir": "/tmp/bird-startup17-candidate-5a20287",
+  "date": "2026-11-01T18:07:44.322Z",
+  "host": {
+    "os": "25.5.0",
+    "arch": "arm64",
+    "cpu": "Apple M4",
+    "cores": 10,
+    "memBytes": 34359738368
+  },
+  "conditions": {
+    "mode": "steam",
+    "size": "1280x800",
+    "gfx": "high",
+    "cpuThrottle": 3,
+    "seed": 7,
+    "cache": "cold empty owned Chromium session; warm process restart on same session; OS/driver caches uncontrolled",
+    "physicalDeck": false
+  },
+  "runs": [
+    {
+      "label": "newbie",
+      "repeat": 1,
+      "phase": "cold",
+      "command": [
+        "npm",
+        "run",
+        "probe",
+        "--",
+        "--mode=steam",
+        "--dir=/tmp/bird-startup17-candidate-5a20287",
+        "--startup-trace",
+        "--startup-session=b17-340d53d8-4235-4b64-a3da-f48348db4f0a",
+        "--startup-fixture=/tmp/bird-startup17-series-5a20287/newbie-1-fixture.json",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--early",
+        "--bootcpu",
+        "--cpu=3",
+        "--seed=7",
+        "--size=deck",
+        "--bootwait=300",
+        "--timeout=420",
+        "--q=gfx=high&gfxdev=deck&mute&startupdistrict=0",
+        "--eval=tools/probe-checks/startup-ready.js",
+        "--max=0",
+        "--report=/tmp/bird-startup17-series-5a20287/newbie-1-cold.json",
+        "--fresh",
+        "--startup-cold"
+      ],
+      "fixture": "fixtures/newbie-1-fixture.json",
+      "fixtureSha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00",
+      "report": "reports/newbie-1-cold.json",
+      "session": "b17-340d53d8-4235-4b64-a3da-f48348db4f0a",
+      "wallMs": 80893,
+      "status": 0,
+      "ok": true,
+      "controlMs": 79751.30000019073,
+      "processToControlMs": 79994.5,
+      "fromClickMs": 70416.40000009537,
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "dialogClicks": 0
+      },
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "resourceIO": "unavailable for app://; zero records is not zero I/O",
+      "dropped": 0,
+      "flags": {},
+      "failed": false,
+      "originalReport": "/tmp/bird-startup17-series-5a20287/newbie-1-cold.json",
+      "originalFixture": "/tmp/bird-startup17-series-5a20287/newbie-1-fixture.json",
+      "reportSha256": "34b2eee0c5dc25581bbea23340ae9b093743ec5a2004bda08bdd2298d6e85124"
+    },
+    {
+      "label": "newbie",
+      "repeat": 1,
+      "phase": "warm",
+      "command": [
+        "npm",
+        "run",
+        "probe",
+        "--",
+        "--mode=steam",
+        "--dir=/tmp/bird-startup17-candidate-5a20287",
+        "--startup-trace",
+        "--startup-session=b17-340d53d8-4235-4b64-a3da-f48348db4f0a",
+        "--startup-fixture=/tmp/bird-startup17-series-5a20287/newbie-1-fixture.json",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--early",
+        "--bootcpu",
+        "--cpu=3",
+        "--seed=7",
+        "--size=deck",
+        "--bootwait=300",
+        "--timeout=420",
+        "--q=gfx=high&gfxdev=deck&mute&startupdistrict=0",
+        "--eval=tools/probe-checks/startup-ready.js",
+        "--max=0",
+        "--report=/tmp/bird-startup17-series-5a20287/newbie-1-warm.json",
+        "--fresh"
+      ],
+      "fixture": "fixtures/newbie-1-fixture.json",
+      "fixtureSha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00",
+      "report": "reports/newbie-1-warm.json",
+      "session": "b17-340d53d8-4235-4b64-a3da-f48348db4f0a",
+      "wallMs": 82016,
+      "status": 0,
+      "ok": true,
+      "controlMs": 80854.90000009537,
+      "processToControlMs": 81057.7998046875,
+      "fromClickMs": 71040.70000004768,
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "dialogClicks": 0
+      },
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "resourceIO": "unavailable for app://; zero records is not zero I/O",
+      "dropped": 0,
+      "flags": {},
+      "failed": false,
+      "originalReport": "/tmp/bird-startup17-series-5a20287/newbie-1-warm.json",
+      "originalFixture": "/tmp/bird-startup17-series-5a20287/newbie-1-fixture.json",
+      "reportSha256": "24d2af0feeb930f0b2589bdf21c964ede63b8794b31266a01d75473874c3751a"
+    },
+    {
+      "label": "newbie",
+      "repeat": 2,
+      "phase": "cold",
+      "command": [
+        "npm",
+        "run",
+        "probe",
+        "--",
+        "--mode=steam",
+        "--dir=/tmp/bird-startup17-candidate-5a20287",
+        "--startup-trace",
+        "--startup-session=b17-4696aff8-0c71-4947-962d-a09bbd8aa7fa",
+        "--startup-fixture=/tmp/bird-startup17-series-5a20287/newbie-2-fixture.json",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--early",
+        "--bootcpu",
+        "--cpu=3",
+        "--seed=7",
+        "--size=deck",
+        "--bootwait=300",
+        "--timeout=420",
+        "--q=gfx=high&gfxdev=deck&mute&startupdistrict=0",
+        "--eval=tools/probe-checks/startup-ready.js",
+        "--max=0",
+        "--report=/tmp/bird-startup17-series-5a20287/newbie-2-cold.json",
+        "--fresh",
+        "--startup-cold"
+      ],
+      "fixture": "fixtures/newbie-2-fixture.json",
+      "fixtureSha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00",
+      "report": "reports/newbie-2-cold.json",
+      "session": "b17-4696aff8-0c71-4947-962d-a09bbd8aa7fa",
+      "wallMs": 82530,
+      "status": 0,
+      "ok": true,
+      "controlMs": 81407.79999995232,
+      "processToControlMs": 81645.30004882812,
+      "fromClickMs": 71432.29999995232,
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "dialogClicks": 0
+      },
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "resourceIO": "unavailable for app://; zero records is not zero I/O",
+      "dropped": 0,
+      "flags": {},
+      "failed": false,
+      "originalReport": "/tmp/bird-startup17-series-5a20287/newbie-2-cold.json",
+      "originalFixture": "/tmp/bird-startup17-series-5a20287/newbie-2-fixture.json",
+      "reportSha256": "fef5edbd47b0f2b205f52aaff3f3073a3590e85dbf00cb8c76a2ea60a035ae0d"
+    },
+    {
+      "label": "newbie",
+      "repeat": 2,
+      "phase": "warm",
+      "command": [
+        "npm",
+        "run",
+        "probe",
+        "--",
+        "--mode=steam",
+        "--dir=/tmp/bird-startup17-candidate-5a20287",
+        "--startup-trace",
+        "--startup-session=b17-4696aff8-0c71-4947-962d-a09bbd8aa7fa",
+        "--startup-fixture=/tmp/bird-startup17-series-5a20287/newbie-2-fixture.json",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--early",
+        "--bootcpu",
+        "--cpu=3",
+        "--seed=7",
+        "--size=deck",
+        "--bootwait=300",
+        "--timeout=420",
+        "--q=gfx=high&gfxdev=deck&mute&startupdistrict=0",
+        "--eval=tools/probe-checks/startup-ready.js",
+        "--max=0",
+        "--report=/tmp/bird-startup17-series-5a20287/newbie-2-warm.json",
+        "--fresh"
+      ],
+      "fixture": "fixtures/newbie-2-fixture.json",
+      "fixtureSha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00",
+      "report": "reports/newbie-2-warm.json",
+      "session": "b17-4696aff8-0c71-4947-962d-a09bbd8aa7fa",
+      "wallMs": 82220,
+      "status": 0,
+      "ok": true,
+      "controlMs": 81097.29999995232,
+      "processToControlMs": 81300.80004882812,
+      "fromClickMs": 71185.79999995232,
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "dialogClicks": 0
+      },
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "resourceIO": "unavailable for app://; zero records is not zero I/O",
+      "dropped": 0,
+      "flags": {},
+      "failed": false,
+      "originalReport": "/tmp/bird-startup17-series-5a20287/newbie-2-warm.json",
+      "originalFixture": "/tmp/bird-startup17-series-5a20287/newbie-2-fixture.json",
+      "reportSha256": "2fd3636a16ae3c1b188a5ed0d99778bd8c668ea38afb6655a4e70923f27f0d8c"
+    },
+    {
+      "label": "newbie",
+      "repeat": 3,
+      "phase": "cold",
+      "command": [
+        "npm",
+        "run",
+        "probe",
+        "--",
+        "--mode=steam",
+        "--dir=/tmp/bird-startup17-candidate-5a20287",
+        "--startup-trace",
+        "--startup-session=b17-9a4f4f39-efdb-4ecb-93aa-0abf0830668c",
+        "--startup-fixture=/tmp/bird-startup17-series-5a20287/newbie-3-fixture.json",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--early",
+        "--bootcpu",
+        "--cpu=3",
+        "--seed=7",
+        "--size=deck",
+        "--bootwait=300",
+        "--timeout=420",
+        "--q=gfx=high&gfxdev=deck&mute&startupdistrict=0",
+        "--eval=tools/probe-checks/startup-ready.js",
+        "--max=0",
+        "--report=/tmp/bird-startup17-series-5a20287/newbie-3-cold.json",
+        "--fresh",
+        "--startup-cold"
+      ],
+      "fixture": "fixtures/newbie-3-fixture.json",
+      "fixtureSha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00",
+      "report": "reports/newbie-3-cold.json",
+      "session": "b17-9a4f4f39-efdb-4ecb-93aa-0abf0830668c",
+      "wallMs": 82394,
+      "status": 0,
+      "ok": true,
+      "controlMs": 81222.60000014305,
+      "processToControlMs": 81483.5,
+      "fromClickMs": 71349.20000004768,
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "dialogClicks": 0
+      },
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "resourceIO": "unavailable for app://; zero records is not zero I/O",
+      "dropped": 0,
+      "flags": {},
+      "failed": false,
+      "originalReport": "/tmp/bird-startup17-series-5a20287/newbie-3-cold.json",
+      "originalFixture": "/tmp/bird-startup17-series-5a20287/newbie-3-fixture.json",
+      "reportSha256": "3d710ac1c3585a3d2a213a7b75da8140e2ab5dae1a4527590fb3cf0006951069"
+    },
+    {
+      "label": "newbie",
+      "repeat": 3,
+      "phase": "warm",
+      "command": [
+        "npm",
+        "run",
+        "probe",
+        "--",
+        "--mode=steam",
+        "--dir=/tmp/bird-startup17-candidate-5a20287",
+        "--startup-trace",
+        "--startup-session=b17-9a4f4f39-efdb-4ecb-93aa-0abf0830668c",
+        "--startup-fixture=/tmp/bird-startup17-series-5a20287/newbie-3-fixture.json",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--early",
+        "--bootcpu",
+        "--cpu=3",
+        "--seed=7",
+        "--size=deck",
+        "--bootwait=300",
+        "--timeout=420",
+        "--q=gfx=high&gfxdev=deck&mute&startupdistrict=0",
+        "--eval=tools/probe-checks/startup-ready.js",
+        "--max=0",
+        "--report=/tmp/bird-startup17-series-5a20287/newbie-3-warm.json",
+        "--fresh"
+      ],
+      "fixture": "fixtures/newbie-3-fixture.json",
+      "fixtureSha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00",
+      "report": "reports/newbie-3-warm.json",
+      "session": "b17-9a4f4f39-efdb-4ecb-93aa-0abf0830668c",
+      "wallMs": 81992,
+      "status": 0,
+      "ok": true,
+      "controlMs": 80858,
+      "processToControlMs": 81058.19995117188,
+      "fromClickMs": 70963.59999990463,
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "dialogClicks": 0
+      },
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "resourceIO": "unavailable for app://; zero records is not zero I/O",
+      "dropped": 0,
+      "flags": {},
+      "failed": false,
+      "originalReport": "/tmp/bird-startup17-series-5a20287/newbie-3-warm.json",
+      "originalFixture": "/tmp/bird-startup17-series-5a20287/newbie-3-fixture.json",
+      "reportSha256": "7248ca2a02b307f95c63259923f79351dcd774768b5eaa3a3afb9b5d56f27f3c"
+    },
+    {
+      "label": "saved-near",
+      "repeat": 1,
+      "phase": "cold",
+      "command": [
+        "npm",
+        "run",
+        "probe",
+        "--",
+        "--mode=steam",
+        "--dir=/tmp/bird-startup17-candidate-5a20287",
+        "--startup-trace",
+        "--startup-session=b17-4076edc6-7640-49ef-9cd3-1b72e774df4b",
+        "--startup-fixture=/tmp/bird-startup17-series-5a20287/saved-near-1-fixture.json",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--early",
+        "--bootcpu",
+        "--cpu=3",
+        "--seed=7",
+        "--size=deck",
+        "--bootwait=300",
+        "--timeout=420",
+        "--q=gfx=high&gfxdev=deck&mute&startupdistrict=0",
+        "--eval=tools/probe-checks/startup-ready.js",
+        "--max=0",
+        "--report=/tmp/bird-startup17-series-5a20287/saved-near-1-cold.json",
+        "--startup-cold"
+      ],
+      "fixture": "fixtures/saved-near-1-fixture.json",
+      "fixtureSha256": "b00382a13530f84154b63ea41871b2d73ebba342cf7ba4f30d4e85d60fb7cf35",
+      "report": "reports/saved-near-1-cold.json",
+      "session": "b17-4076edc6-7640-49ef-9cd3-1b72e774df4b",
+      "wallMs": 82645,
+      "status": 0,
+      "ok": true,
+      "controlMs": 81450.90000009537,
+      "processToControlMs": 81701.59985351562,
+      "fromClickMs": 71576.09999990463,
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 14,
+        "dialogClicks": 0
+      },
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "resourceIO": "unavailable for app://; zero records is not zero I/O",
+      "dropped": 0,
+      "flags": {},
+      "failed": false,
+      "originalReport": "/tmp/bird-startup17-series-5a20287/saved-near-1-cold.json",
+      "originalFixture": "/tmp/bird-startup17-series-5a20287/saved-near-1-fixture.json",
+      "reportSha256": "dbddfb84906be5e3d54f8b725e6a60694bf2e40930afb48cc969b2c039d14875"
+    },
+    {
+      "label": "saved-near",
+      "repeat": 1,
+      "phase": "warm",
+      "command": [
+        "npm",
+        "run",
+        "probe",
+        "--",
+        "--mode=steam",
+        "--dir=/tmp/bird-startup17-candidate-5a20287",
+        "--startup-trace",
+        "--startup-session=b17-4076edc6-7640-49ef-9cd3-1b72e774df4b",
+        "--startup-fixture=/tmp/bird-startup17-series-5a20287/saved-near-1-fixture.json",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--early",
+        "--bootcpu",
+        "--cpu=3",
+        "--seed=7",
+        "--size=deck",
+        "--bootwait=300",
+        "--timeout=420",
+        "--q=gfx=high&gfxdev=deck&mute&startupdistrict=0",
+        "--eval=tools/probe-checks/startup-ready.js",
+        "--max=0",
+        "--report=/tmp/bird-startup17-series-5a20287/saved-near-1-warm.json"
+      ],
+      "fixture": "fixtures/saved-near-1-fixture.json",
+      "fixtureSha256": "b00382a13530f84154b63ea41871b2d73ebba342cf7ba4f30d4e85d60fb7cf35",
+      "report": "reports/saved-near-1-warm.json",
+      "session": "b17-4076edc6-7640-49ef-9cd3-1b72e774df4b",
+      "wallMs": 82392,
+      "status": 0,
+      "ok": true,
+      "controlMs": 81218,
+      "processToControlMs": 81420.39990234375,
+      "fromClickMs": 71359.60000014305,
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 14,
+        "dialogClicks": 0
+      },
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "resourceIO": "unavailable for app://; zero records is not zero I/O",
+      "dropped": 0,
+      "flags": {},
+      "failed": false,
+      "originalReport": "/tmp/bird-startup17-series-5a20287/saved-near-1-warm.json",
+      "originalFixture": "/tmp/bird-startup17-series-5a20287/saved-near-1-fixture.json",
+      "reportSha256": "d119f0a4ebac199449126db868a0ad52431261203aef82e47071a669bb97db9d"
+    },
+    {
+      "label": "saved-near",
+      "repeat": 2,
+      "phase": "cold",
+      "command": [
+        "npm",
+        "run",
+        "probe",
+        "--",
+        "--mode=steam",
+        "--dir=/tmp/bird-startup17-candidate-5a20287",
+        "--startup-trace",
+        "--startup-session=b17-ed3cc8ec-ce5b-4132-b18e-bc937d65b60c",
+        "--startup-fixture=/tmp/bird-startup17-series-5a20287/saved-near-2-fixture.json",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--early",
+        "--bootcpu",
+        "--cpu=3",
+        "--seed=7",
+        "--size=deck",
+        "--bootwait=300",
+        "--timeout=420",
+        "--q=gfx=high&gfxdev=deck&mute&startupdistrict=0",
+        "--eval=tools/probe-checks/startup-ready.js",
+        "--max=0",
+        "--report=/tmp/bird-startup17-series-5a20287/saved-near-2-cold.json",
+        "--startup-cold"
+      ],
+      "fixture": "fixtures/saved-near-2-fixture.json",
+      "fixtureSha256": "b00382a13530f84154b63ea41871b2d73ebba342cf7ba4f30d4e85d60fb7cf35",
+      "report": "reports/saved-near-2-cold.json",
+      "session": "b17-ed3cc8ec-ce5b-4132-b18e-bc937d65b60c",
+      "wallMs": 82467,
+      "status": 0,
+      "ok": true,
+      "controlMs": 81246.90000009537,
+      "processToControlMs": 81497.5,
+      "fromClickMs": 71415.60000014305,
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 14,
+        "dialogClicks": 0
+      },
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "resourceIO": "unavailable for app://; zero records is not zero I/O",
+      "dropped": 0,
+      "flags": {},
+      "failed": false,
+      "originalReport": "/tmp/bird-startup17-series-5a20287/saved-near-2-cold.json",
+      "originalFixture": "/tmp/bird-startup17-series-5a20287/saved-near-2-fixture.json",
+      "reportSha256": "f87e5a08bb23e34d10e5891a8741501580c0eec734b01c29995373f3a0fa9fd7"
+    },
+    {
+      "label": "saved-near",
+      "repeat": 2,
+      "phase": "warm",
+      "command": [
+        "npm",
+        "run",
+        "probe",
+        "--",
+        "--mode=steam",
+        "--dir=/tmp/bird-startup17-candidate-5a20287",
+        "--startup-trace",
+        "--startup-session=b17-ed3cc8ec-ce5b-4132-b18e-bc937d65b60c",
+        "--startup-fixture=/tmp/bird-startup17-series-5a20287/saved-near-2-fixture.json",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--early",
+        "--bootcpu",
+        "--cpu=3",
+        "--seed=7",
+        "--size=deck",
+        "--bootwait=300",
+        "--timeout=420",
+        "--q=gfx=high&gfxdev=deck&mute&startupdistrict=0",
+        "--eval=tools/probe-checks/startup-ready.js",
+        "--max=0",
+        "--report=/tmp/bird-startup17-series-5a20287/saved-near-2-warm.json"
+      ],
+      "fixture": "fixtures/saved-near-2-fixture.json",
+      "fixtureSha256": "b00382a13530f84154b63ea41871b2d73ebba342cf7ba4f30d4e85d60fb7cf35",
+      "report": "reports/saved-near-2-warm.json",
+      "session": "b17-ed3cc8ec-ce5b-4132-b18e-bc937d65b60c",
+      "wallMs": 82407,
+      "status": 0,
+      "ok": true,
+      "controlMs": 81333.70000004768,
+      "processToControlMs": 81532.39990234375,
+      "fromClickMs": 71504.70000004768,
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 14,
+        "dialogClicks": 0
+      },
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "resourceIO": "unavailable for app://; zero records is not zero I/O",
+      "dropped": 0,
+      "flags": {},
+      "failed": false,
+      "originalReport": "/tmp/bird-startup17-series-5a20287/saved-near-2-warm.json",
+      "originalFixture": "/tmp/bird-startup17-series-5a20287/saved-near-2-fixture.json",
+      "reportSha256": "e216c91133bc53b919d948fc8818934292dbb2664ebe818dbd314bbefd991d05"
+    },
+    {
+      "label": "saved-near",
+      "repeat": 3,
+      "phase": "cold",
+      "command": [
+        "npm",
+        "run",
+        "probe",
+        "--",
+        "--mode=steam",
+        "--dir=/tmp/bird-startup17-candidate-5a20287",
+        "--startup-trace",
+        "--startup-session=b17-52482103-a7c9-496b-8c0c-7d36f49dee80",
+        "--startup-fixture=/tmp/bird-startup17-series-5a20287/saved-near-3-fixture.json",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--early",
+        "--bootcpu",
+        "--cpu=3",
+        "--seed=7",
+        "--size=deck",
+        "--bootwait=300",
+        "--timeout=420",
+        "--q=gfx=high&gfxdev=deck&mute&startupdistrict=0",
+        "--eval=tools/probe-checks/startup-ready.js",
+        "--max=0",
+        "--report=/tmp/bird-startup17-series-5a20287/saved-near-3-cold.json",
+        "--startup-cold"
+      ],
+      "fixture": "fixtures/saved-near-3-fixture.json",
+      "fixtureSha256": "b00382a13530f84154b63ea41871b2d73ebba342cf7ba4f30d4e85d60fb7cf35",
+      "report": "reports/saved-near-3-cold.json",
+      "session": "b17-52482103-a7c9-496b-8c0c-7d36f49dee80",
+      "wallMs": 82037,
+      "status": 0,
+      "ok": true,
+      "controlMs": 80897.30000019073,
+      "processToControlMs": 81146.30004882812,
+      "fromClickMs": 71014.30000019073,
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 14,
+        "dialogClicks": 0
+      },
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "resourceIO": "unavailable for app://; zero records is not zero I/O",
+      "dropped": 0,
+      "flags": {},
+      "failed": false,
+      "originalReport": "/tmp/bird-startup17-series-5a20287/saved-near-3-cold.json",
+      "originalFixture": "/tmp/bird-startup17-series-5a20287/saved-near-3-fixture.json",
+      "reportSha256": "08169690a3edbf29f0965df56bf2cd5d70d71333d5be7b1d800c6be02c9ec70a"
+    },
+    {
+      "label": "saved-near",
+      "repeat": 3,
+      "phase": "warm",
+      "command": [
+        "npm",
+        "run",
+        "probe",
+        "--",
+        "--mode=steam",
+        "--dir=/tmp/bird-startup17-candidate-5a20287",
+        "--startup-trace",
+        "--startup-session=b17-52482103-a7c9-496b-8c0c-7d36f49dee80",
+        "--startup-fixture=/tmp/bird-startup17-series-5a20287/saved-near-3-fixture.json",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--early",
+        "--bootcpu",
+        "--cpu=3",
+        "--seed=7",
+        "--size=deck",
+        "--bootwait=300",
+        "--timeout=420",
+        "--q=gfx=high&gfxdev=deck&mute&startupdistrict=0",
+        "--eval=tools/probe-checks/startup-ready.js",
+        "--max=0",
+        "--report=/tmp/bird-startup17-series-5a20287/saved-near-3-warm.json"
+      ],
+      "fixture": "fixtures/saved-near-3-fixture.json",
+      "fixtureSha256": "b00382a13530f84154b63ea41871b2d73ebba342cf7ba4f30d4e85d60fb7cf35",
+      "report": "reports/saved-near-3-warm.json",
+      "session": "b17-52482103-a7c9-496b-8c0c-7d36f49dee80",
+      "wallMs": 82093,
+      "status": 0,
+      "ok": true,
+      "controlMs": 80992.80000019073,
+      "processToControlMs": 81192.19995117188,
+      "fromClickMs": 71027.5,
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 13,
+        "dialogClicks": 0
+      },
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "resourceIO": "unavailable for app://; zero records is not zero I/O",
+      "dropped": 0,
+      "flags": {},
+      "failed": false,
+      "originalReport": "/tmp/bird-startup17-series-5a20287/saved-near-3-warm.json",
+      "originalFixture": "/tmp/bird-startup17-series-5a20287/saved-near-3-fixture.json",
+      "reportSha256": "ad705200efd63c6fff09a61ef09d49363305711d00c7e79c08512e01b5bac2d7"
+    },
+    {
+      "label": "saved-far",
+      "repeat": 1,
+      "phase": "cold",
+      "command": [
+        "npm",
+        "run",
+        "probe",
+        "--",
+        "--mode=steam",
+        "--dir=/tmp/bird-startup17-candidate-5a20287",
+        "--startup-trace",
+        "--startup-session=b17-2b57592d-10c6-4799-a79d-e64029d47bb2",
+        "--startup-fixture=/tmp/bird-startup17-series-5a20287/saved-far-1-fixture.json",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--early",
+        "--bootcpu",
+        "--cpu=3",
+        "--seed=7",
+        "--size=deck",
+        "--bootwait=300",
+        "--timeout=420",
+        "--q=gfx=high&gfxdev=deck&mute&startupdistrict=7",
+        "--eval=tools/probe-checks/startup-ready.js",
+        "--max=0",
+        "--report=/tmp/bird-startup17-series-5a20287/saved-far-1-cold.json",
+        "--startup-cold"
+      ],
+      "fixture": "fixtures/saved-far-1-fixture.json",
+      "fixtureSha256": "e2f0e910a4a7f61115287652cc896cbc63f985a0eeeecabc6acf081cc75df4d0",
+      "report": "reports/saved-far-1-cold.json",
+      "session": "b17-2b57592d-10c6-4799-a79d-e64029d47bb2",
+      "wallMs": 72791,
+      "status": 0,
+      "ok": true,
+      "controlMs": 71661.40000009537,
+      "processToControlMs": 71907.7998046875,
+      "fromClickMs": 61682.200000047684,
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 97,
+        "dialogClicks": 0
+      },
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "resourceIO": "unavailable for app://; zero records is not zero I/O",
+      "dropped": 0,
+      "flags": {},
+      "failed": false,
+      "originalReport": "/tmp/bird-startup17-series-5a20287/saved-far-1-cold.json",
+      "originalFixture": "/tmp/bird-startup17-series-5a20287/saved-far-1-fixture.json",
+      "reportSha256": "5c27c57223bfbebbc3d908a99c70dfd38ae05fba5c8be7eb9716306dada22222"
+    },
+    {
+      "label": "saved-far",
+      "repeat": 1,
+      "phase": "warm",
+      "command": [
+        "npm",
+        "run",
+        "probe",
+        "--",
+        "--mode=steam",
+        "--dir=/tmp/bird-startup17-candidate-5a20287",
+        "--startup-trace",
+        "--startup-session=b17-2b57592d-10c6-4799-a79d-e64029d47bb2",
+        "--startup-fixture=/tmp/bird-startup17-series-5a20287/saved-far-1-fixture.json",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--early",
+        "--bootcpu",
+        "--cpu=3",
+        "--seed=7",
+        "--size=deck",
+        "--bootwait=300",
+        "--timeout=420",
+        "--q=gfx=high&gfxdev=deck&mute&startupdistrict=7",
+        "--eval=tools/probe-checks/startup-ready.js",
+        "--max=0",
+        "--report=/tmp/bird-startup17-series-5a20287/saved-far-1-warm.json"
+      ],
+      "fixture": "fixtures/saved-far-1-fixture.json",
+      "fixtureSha256": "e2f0e910a4a7f61115287652cc896cbc63f985a0eeeecabc6acf081cc75df4d0",
+      "report": "reports/saved-far-1-warm.json",
+      "session": "b17-2b57592d-10c6-4799-a79d-e64029d47bb2",
+      "wallMs": 73453,
+      "status": 0,
+      "ok": true,
+      "controlMs": 72346.29999995232,
+      "processToControlMs": 72544.10009765625,
+      "fromClickMs": 62436.5,
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 91,
+        "dialogClicks": 0
+      },
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "resourceIO": "unavailable for app://; zero records is not zero I/O",
+      "dropped": 0,
+      "flags": {},
+      "failed": false,
+      "originalReport": "/tmp/bird-startup17-series-5a20287/saved-far-1-warm.json",
+      "originalFixture": "/tmp/bird-startup17-series-5a20287/saved-far-1-fixture.json",
+      "reportSha256": "133c5a1c265c31851e25af36ac36ece6a06dc751f38dcfa335f50978ec44b6b3"
+    },
+    {
+      "label": "saved-far",
+      "repeat": 2,
+      "phase": "cold",
+      "command": [
+        "npm",
+        "run",
+        "probe",
+        "--",
+        "--mode=steam",
+        "--dir=/tmp/bird-startup17-candidate-5a20287",
+        "--startup-trace",
+        "--startup-session=b17-215e4bb9-2a28-45d3-9d6e-4791ba7800c2",
+        "--startup-fixture=/tmp/bird-startup17-series-5a20287/saved-far-2-fixture.json",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--early",
+        "--bootcpu",
+        "--cpu=3",
+        "--seed=7",
+        "--size=deck",
+        "--bootwait=300",
+        "--timeout=420",
+        "--q=gfx=high&gfxdev=deck&mute&startupdistrict=7",
+        "--eval=tools/probe-checks/startup-ready.js",
+        "--max=0",
+        "--report=/tmp/bird-startup17-series-5a20287/saved-far-2-cold.json",
+        "--startup-cold"
+      ],
+      "fixture": "fixtures/saved-far-2-fixture.json",
+      "fixtureSha256": "e2f0e910a4a7f61115287652cc896cbc63f985a0eeeecabc6acf081cc75df4d0",
+      "report": "reports/saved-far-2-cold.json",
+      "session": "b17-215e4bb9-2a28-45d3-9d6e-4791ba7800c2",
+      "wallMs": 72779,
+      "status": 0,
+      "ok": true,
+      "controlMs": 71614.60000014305,
+      "processToControlMs": 71864.60009765625,
+      "fromClickMs": 61795.60000014305,
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 94,
+        "dialogClicks": 0
+      },
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "resourceIO": "unavailable for app://; zero records is not zero I/O",
+      "dropped": 0,
+      "flags": {},
+      "failed": false,
+      "originalReport": "/tmp/bird-startup17-series-5a20287/saved-far-2-cold.json",
+      "originalFixture": "/tmp/bird-startup17-series-5a20287/saved-far-2-fixture.json",
+      "reportSha256": "61963ecb44b5ac003b054b62d0a1b0b60d980335316025d28e0d4ebaed207b48"
+    },
+    {
+      "label": "saved-far",
+      "repeat": 2,
+      "phase": "warm",
+      "command": [
+        "npm",
+        "run",
+        "probe",
+        "--",
+        "--mode=steam",
+        "--dir=/tmp/bird-startup17-candidate-5a20287",
+        "--startup-trace",
+        "--startup-session=b17-215e4bb9-2a28-45d3-9d6e-4791ba7800c2",
+        "--startup-fixture=/tmp/bird-startup17-series-5a20287/saved-far-2-fixture.json",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--early",
+        "--bootcpu",
+        "--cpu=3",
+        "--seed=7",
+        "--size=deck",
+        "--bootwait=300",
+        "--timeout=420",
+        "--q=gfx=high&gfxdev=deck&mute&startupdistrict=7",
+        "--eval=tools/probe-checks/startup-ready.js",
+        "--max=0",
+        "--report=/tmp/bird-startup17-series-5a20287/saved-far-2-warm.json"
+      ],
+      "fixture": "fixtures/saved-far-2-fixture.json",
+      "fixtureSha256": "e2f0e910a4a7f61115287652cc896cbc63f985a0eeeecabc6acf081cc75df4d0",
+      "report": "reports/saved-far-2-warm.json",
+      "session": "b17-215e4bb9-2a28-45d3-9d6e-4791ba7800c2",
+      "wallMs": 72761,
+      "status": 0,
+      "ok": true,
+      "controlMs": 71666.79999995232,
+      "processToControlMs": 71866.90014648438,
+      "fromClickMs": 61858.90000009537,
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 92,
+        "dialogClicks": 0
+      },
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "resourceIO": "unavailable for app://; zero records is not zero I/O",
+      "dropped": 0,
+      "flags": {},
+      "failed": false,
+      "originalReport": "/tmp/bird-startup17-series-5a20287/saved-far-2-warm.json",
+      "originalFixture": "/tmp/bird-startup17-series-5a20287/saved-far-2-fixture.json",
+      "reportSha256": "c56e006f7ce9338b04128b0de82a1c6547db2d9d309d315f4bb1b5d6d073f09e"
+    },
+    {
+      "label": "saved-far",
+      "repeat": 3,
+      "phase": "cold",
+      "command": [
+        "npm",
+        "run",
+        "probe",
+        "--",
+        "--mode=steam",
+        "--dir=/tmp/bird-startup17-candidate-5a20287",
+        "--startup-trace",
+        "--startup-session=b17-db66027d-cc9a-4257-b19b-c80452d9c3c7",
+        "--startup-fixture=/tmp/bird-startup17-series-5a20287/saved-far-3-fixture.json",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--early",
+        "--bootcpu",
+        "--cpu=3",
+        "--seed=7",
+        "--size=deck",
+        "--bootwait=300",
+        "--timeout=420",
+        "--q=gfx=high&gfxdev=deck&mute&startupdistrict=7",
+        "--eval=tools/probe-checks/startup-ready.js",
+        "--max=0",
+        "--report=/tmp/bird-startup17-series-5a20287/saved-far-3-cold.json",
+        "--startup-cold"
+      ],
+      "fixture": "fixtures/saved-far-3-fixture.json",
+      "fixtureSha256": "e2f0e910a4a7f61115287652cc896cbc63f985a0eeeecabc6acf081cc75df4d0",
+      "report": "reports/saved-far-3-cold.json",
+      "session": "b17-db66027d-cc9a-4257-b19b-c80452d9c3c7",
+      "wallMs": 72786,
+      "status": 0,
+      "ok": true,
+      "controlMs": 71628.70000004768,
+      "processToControlMs": 71876.30004882812,
+      "fromClickMs": 61904.40000009537,
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 97,
+        "dialogClicks": 0
+      },
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "resourceIO": "unavailable for app://; zero records is not zero I/O",
+      "dropped": 0,
+      "flags": {},
+      "failed": false,
+      "originalReport": "/tmp/bird-startup17-series-5a20287/saved-far-3-cold.json",
+      "originalFixture": "/tmp/bird-startup17-series-5a20287/saved-far-3-fixture.json",
+      "reportSha256": "3c3e14d3c2d55e384eee08a99acc5eba008b0b0d29235091e7c94bbd17251bb9"
+    },
+    {
+      "label": "saved-far",
+      "repeat": 3,
+      "phase": "warm",
+      "command": [
+        "npm",
+        "run",
+        "probe",
+        "--",
+        "--mode=steam",
+        "--dir=/tmp/bird-startup17-candidate-5a20287",
+        "--startup-trace",
+        "--startup-session=b17-db66027d-cc9a-4257-b19b-c80452d9c3c7",
+        "--startup-fixture=/tmp/bird-startup17-series-5a20287/saved-far-3-fixture.json",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--early",
+        "--bootcpu",
+        "--cpu=3",
+        "--seed=7",
+        "--size=deck",
+        "--bootwait=300",
+        "--timeout=420",
+        "--q=gfx=high&gfxdev=deck&mute&startupdistrict=7",
+        "--eval=tools/probe-checks/startup-ready.js",
+        "--max=0",
+        "--report=/tmp/bird-startup17-series-5a20287/saved-far-3-warm.json"
+      ],
+      "fixture": "fixtures/saved-far-3-fixture.json",
+      "fixtureSha256": "e2f0e910a4a7f61115287652cc896cbc63f985a0eeeecabc6acf081cc75df4d0",
+      "report": "reports/saved-far-3-warm.json",
+      "session": "b17-db66027d-cc9a-4257-b19b-c80452d9c3c7",
+      "wallMs": 72963,
+      "status": 0,
+      "ok": true,
+      "controlMs": 71903.59999990463,
+      "processToControlMs": 72102.80004882812,
+      "fromClickMs": 62070.39999985695,
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 95,
+        "dialogClicks": 0
+      },
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "resourceIO": "unavailable for app://; zero records is not zero I/O",
+      "dropped": 0,
+      "flags": {},
+      "failed": false,
+      "originalReport": "/tmp/bird-startup17-series-5a20287/saved-far-3-warm.json",
+      "originalFixture": "/tmp/bird-startup17-series-5a20287/saved-far-3-fixture.json",
+      "reportSha256": "c648111b882ca87e5eb8215c46f3ad4cf6f5e0c56e949b16eae9c839afcf13e3"
+    }
+  ],
+  "summary": [
+    {
+      "label": "newbie",
+      "phase": "cold",
+      "n": 3,
+      "valuesMs": [
+        79751.30000019073,
+        81407.79999995232,
+        81222.60000014305
+      ],
+      "medianMs": 81222.60000014305
+    },
+    {
+      "label": "newbie",
+      "phase": "warm",
+      "n": 3,
+      "valuesMs": [
+        80854.90000009537,
+        81097.29999995232,
+        80858
+      ],
+      "medianMs": 80858
+    },
+    {
+      "label": "saved-near",
+      "phase": "cold",
+      "n": 3,
+      "valuesMs": [
+        81450.90000009537,
+        81246.90000009537,
+        80897.30000019073
+      ],
+      "medianMs": 81246.90000009537
+    },
+    {
+      "label": "saved-near",
+      "phase": "warm",
+      "n": 3,
+      "valuesMs": [
+        81218,
+        81333.70000004768,
+        80992.80000019073
+      ],
+      "medianMs": 81218
+    },
+    {
+      "label": "saved-far",
+      "phase": "cold",
+      "n": 3,
+      "valuesMs": [
+        71661.40000009537,
+        71614.60000014305,
+        71628.70000004768
+      ],
+      "medianMs": 71628.70000004768
+    },
+    {
+      "label": "saved-far",
+      "phase": "warm",
+      "n": 3,
+      "valuesMs": [
+        72346.29999995232,
+        71666.79999995232,
+        71903.59999990463
+      ],
+      "medianMs": 71903.59999990463
+    }
+  ],
+  "pilotReportSha256": "c4e027f75721cf6e957e7b081ae16326b1c64f80b6d22b0de46855934ba6c8f9",
+  "archive": {
+    "status": "awaiting root review; task17ж not archived",
+    "originalManifestSha256": "a7428071f342750a9168c2b813575204621ca4649cf446fe902d839b6324d75a",
+    "trackedPatchSha256": "b514717eba14948f5286cb9d644ee5820139042213f63fd65cddc0be10800954",
+    "sourceIdentity": "base revision + runtime-tracked.patch + five small measured-source files; all14 measured source hashes preserved",
+    "offlineGate": {
+      "tools/startup-report.mjs": "deb607b6825cdb28187b724b76e8945d286c66811ec8d8bcd71b96a618218234",
+      "tools/startup-revalidate.mjs": "60b25d2c8583259855d1b57124d464be829a25f0593822e1dca95ba43aab28aa",
+      "tools/startup-bench.mjs": "814107b94a71a3cdd8062f9c698d6d12f4481163d80c2b115a2bc375f55d1bbe",
+      "tools/startuptrace-test.mjs": "84a8ec518e34f3bdbfcb90a24d01dd5387775f7527aa309d684616ac2b920b94"
+    },
+    "note": "Offline gate fixed after the unchanged18-run series. Original source identity above intentionally remains the measured version. Runtime and startup-ready unchanged during series; integrity checked before gate-only edits."
+  }
+}

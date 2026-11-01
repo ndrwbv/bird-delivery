@@ -1,0 +1,68 @@
+{
+  "ok": true,
+  "validation": {
+    "ok": true,
+    "reasons": []
+  },
+  "pickerExactlyOnce": true,
+  "protocol": 2,
+  "firstControlFromNavigationMs": 70478.60000014305,
+  "firstControlFromClickMs": 61162.700000047684,
+  "moved": 5.850622590023395,
+  "district": {
+    "before": {
+      "district": 7,
+      "opened": 8,
+      "city": false,
+      "partySeen": true
+    },
+    "actual": 7,
+    "atControl": 7,
+    "pizzaIndex": 7,
+    "pizza": {
+      "x": -2372.633066489344,
+      "z": -185.60377094273412,
+      "bx": -2370.9919841429955,
+      "bz": -162.62861809385578
+    },
+    "position": {
+      "x": -2387.473827001825,
+      "z": -171.6108503251087
+    },
+    "pickerClicks": 1,
+    "pickerObservedAt": 64636.700000047684,
+    "pickerClickedAt": 64673.60000014305,
+    "dialogClicks": 0
+  },
+  "firstControl": {
+    "at": 70478.60000014305,
+    "data": {
+      "guardVersion": 2,
+      "state": "drive",
+      "paused": false,
+      "mapOpen": false,
+      "held": false,
+      "localReady": true,
+      "supportReady": true,
+      "x": -2387.473827001825,
+      "z": -171.6108503251087,
+      "gas": 0,
+      "readyTiles": 32
+    }
+  },
+  "bootstrap": {
+    "markerWrites": 1,
+    "bootAbsentAtMarker": true,
+    "earlyBootSeen": false
+  },
+  "flags": {},
+  "dropped": 0,
+  "errors": [],
+  "uncaught": 0,
+  "timingMs": {
+    "total": 71360,
+    "build": 0,
+    "load": 9418,
+    "eval": 61891
+  }
+}

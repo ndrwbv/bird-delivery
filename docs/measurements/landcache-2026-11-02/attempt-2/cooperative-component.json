@@ -1,0 +1,141 @@
+{
+  "ok": true,
+  "runtime": "Node v20.12.1",
+  "platform": "darwin",
+  "arch": "arm64",
+  "cpuThrottle": 1,
+  "nodeOnly": true,
+  "physicalDeck": false,
+  "startupTimingRun": false,
+  "file": "/tmp/bird-landexport17a-attempt2-city-5a20287-1102.land",
+  "bytes": 74735068,
+  "fileSha256": "5bccadeb6d282d69eb4e8f032383a983d129d804c3225d4d4b0875b16b3e15ec",
+  "headerBytes": 73421,
+  "nativeHeaderJSONParse": "One indivisible native decode/JSON.parse bounded by format maxHeaderBytes=4MiB; actual header73,421bytes. Slice maxItems/bytes do not imply 4ms on Deck.",
+  "maxBytes": 65536,
+  "maxItems": 2048,
+  "decode": {
+    "totalMs": 677.6516250000001,
+    "resumes": 9946,
+    "maxMs": 6.417708000000005,
+    "maxPhase": "raisedland.cache.index",
+    "p95Ms": 0.2423750000000382
+  },
+  "prepare": {
+    "totalMs": 588.5573330000001,
+    "resumes": 9864,
+    "maxMs": 2.9751249999999345,
+    "maxPhase": "raisedland.cache.restore.mask",
+    "p95Ms": 0.18741699999998218
+  },
+  "commitMs": 0.046333999999887965,
+  "recaptureEncodeMs": 1140.1918329999999,
+  "byteExact": true,
+  "preclean": {
+    "totalMs": 795.2677090000002,
+    "resumes": 782,
+    "maxMs": 5.67995800000017,
+    "maxPhase": "raisedland.cache.preclean.hash",
+    "p95Ms": 1.51949999999988,
+    "sha256": "ef3b48b5e34c930318805a17c431e411bbe71e7ff1fd2594d818435713d27422",
+    "equalLegacyFramingAndNativeSha": true,
+    "input": "Post-clean real-file cover/green with one explicit test core; not the unavailable original beforeClean snapshot"
+  },
+  "workPhases": [
+    {
+      "name": "raisedland.cache.header",
+      "resumes": 4,
+      "totalMs": 1.75579299999999,
+      "maxMs": 1.2992919999999941
+    },
+    {
+      "name": "raisedland.cache.preflight",
+      "resumes": 1,
+      "totalMs": 1.201625,
+      "maxMs": 1.201625
+    },
+    {
+      "name": "raisedland.cache.blocks",
+      "resumes": 1140,
+      "totalMs": 280.0597560000006,
+      "maxMs": 1.263083999999992
+    },
+    {
+      "name": "raisedland.cache.tree",
+      "resumes": 1,
+      "totalMs": 0.4603339999999889,
+      "maxMs": 0.4603339999999889
+    },
+    {
+      "name": "raisedland.cache.index",
+      "resumes": 246,
+      "totalMs": 59.07841500000012,
+      "maxMs": 6.415957999999989
+    },
+    {
+      "name": "raisedland.cache.validate",
+      "resumes": 17118,
+      "totalMs": 686.8740300000005,
+      "maxMs": 1.6512500000000045
+    },
+    {
+      "name": "raisedland.cache.restore.cover",
+      "resumes": 546,
+      "totalMs": 18.17525599999817,
+      "maxMs": 1.2617499999998927
+    },
+    {
+      "name": "raisedland.cache.restore.green",
+      "resumes": 48,
+      "totalMs": 19.852457999999842,
+      "maxMs": 1.6728749999999764
+    },
+    {
+      "name": "raisedland.cache.restore.mask",
+      "resumes": 714,
+      "totalMs": 193.36112499999808,
+      "maxMs": 2.972833000000037
+    },
+    {
+      "name": "raisedland.cache.preclean.validate",
+      "resumes": 38,
+      "totalMs": 4.736708000000817,
+      "maxMs": 0.36183299999993324
+    },
+    {
+      "name": "raisedland.cache.preclean.hash",
+      "resumes": 745,
+      "totalMs": 790.1849860000088,
+      "maxMs": 5.642832999999882
+    }
+  ],
+  "randomCalls": 0,
+  "notes": "One data-only Node CPU1 pass. max next includes observed scheduling/GC; no idle waits were inserted. No game activation, builds or browser run.",
+  "cooperativeSourceFiles": [
+    {
+      "path": "src/game/landcache17a/cooperative.js",
+      "sha256": "294a5deb69bdd41690ec2dd68d3b9d496344e579a7fddff990ef42b8ffbcfd33"
+    },
+    {
+      "path": "src/game/landcache17a/checkpoint-codec.js",
+      "sha256": "12dfbd786d1636905db3fc0cbb7954f814b086a0b5a4a6340e493313892881ad"
+    },
+    {
+      "path": "src/game/landcache17a/preclean.js",
+      "sha256": "44e7300fb3cbcb0a1a5c2122ee54d9590f4fcf8fbe36b14465236657f8cb3529"
+    },
+    {
+      "path": "src/game/landcache17a/checkpoint-limits.js",
+      "sha256": "b6a3eb7be2ef2f55bf9e4efac6ba8616594d60ac5964726dd9efb17825cfb4f7"
+    },
+    {
+      "path": "src/game/landcover.js",
+      "sha256": "af498dfc2e002b4784bdf87187c72e6fcef26efd43c327740df1439a42ea6535"
+    },
+    {
+      "path": "src/game/landmask.js",
+      "sha256": "209b19103393408fc9f94fab4588c2dba6cfd314f7b62d5c48c4fbea54f099c0"
+    }
+  ],
+  "review": "Independent steering review PASS:38 existing+14cooperative contracts, return/throw forwarding and constant commit confirmed"
+}

@@ -1,0 +1,74 @@
+{
+  "variant": "cache",
+  "argv": [
+    "npm",
+    "run",
+    "probe",
+    "--",
+    "--mode=steam",
+    "--dir=/tmp/bird-landcache17a-protocol2-1102/steam",
+    "--startup-trace",
+    "--startup-cold",
+    "--startup-fixture=/tmp/bird-startup17-series-5a20287/newbie-1-fixture.json",
+    "--fresh",
+    "--early",
+    "--mem",
+    "--size=deck",
+    "--cpu=3",
+    "--bootcpu",
+    "--seed=7",
+    "--init-script=/tmp/bird-landcache17a-reportfix-1102/combined-init.js",
+    "--land-export-manifest=/tmp/bird-landcache17a-reportfix-1102/manifest.json",
+    "--eval=/tmp/bird-landcache17a/memory/memory-eval.js",
+    "--bootwait=300",
+    "--timeout=600",
+    "--max=0",
+    "--errors",
+    "--startup-session=lc17mem-a9386d81-bd4e-40cf-aa5b-e7d49cc3655a",
+    "--q=gfx=high&gfxdev=deck&mute&startupdistrict=0&landcache=1",
+    "--report=/tmp/bird-landcache17a/memory/cache.json",
+    "--land-cache-file=/tmp/bird-landcache17a-reportfix-1102/city.land",
+    "--land-cache-sha=40d8f28821b28ed37330fb23485ca8306cab17931e2ecfd09093b293aa367e08"
+  ],
+  "cwd": "/Users/andrewboev/Desktop/not-work/delivery",
+  "provenance": {
+    "eval": {
+      "path": "/tmp/bird-landcache17a/memory/memory-eval.js",
+      "sha256": "88e8f7669f849a46e3e3e2c562f2123eec5f1784298aced0fde4f47d94c4021c"
+    },
+    "pairGate": {
+      "path": "/tmp/bird-landcache17a/memory/pair-gate.mjs",
+      "sha256": "12b25dd97c889cdbf238fe8eecb68b52893898e52ad9d1cda7314da4053ef327"
+    },
+    "init": {
+      "path": "/tmp/bird-landcache17a-reportfix-1102/combined-init.js",
+      "sha256": "8ef7471ff1270c0ddbf144547f8c0b835ec224a8703e1329267596f7501f8a13"
+    },
+    "fixture": {
+      "path": "/tmp/bird-startup17-series-5a20287/newbie-1-fixture.json",
+      "sha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00"
+    },
+    "manifest": {
+      "path": "/tmp/bird-landcache17a-reportfix-1102/manifest.json",
+      "sha256": "785c5019fc8d86a39e7691cea3b3d63356b820fc677a244529e8fff271bdf257"
+    },
+    "probe": {
+      "path": "tools/probe.cjs",
+      "sha256": "e5ee9ae613ff40fd48a89249a23ab3c1c1b1252920c1244a0609198d765f12eb"
+    }
+  },
+  "sourceHash": "fdb6923c13afc8f369b8c02931174fb953706d52fb5d3f347683dab0f2f6fcce",
+  "buildHash": "382750aa2e2bf4cbfc5943c08b05c1b333f65ac419668c6f5c0d3917ba17760a",
+  "expectedFileSha256": "40d8f28821b28ed37330fb23485ca8306cab17931e2ecfd09093b293aa367e08",
+  "startedEpochMs": 1793567130765,
+  "processStatus": 0,
+  "signal": null,
+  "status": "returned",
+  "raw": "/tmp/bird-landcache17a/memory/cache.json",
+  "pid": 11026,
+  "finishedEpochMs": 1793567242379,
+  "rawSha256": "92edf13d74c65e089380f81bb4dca1ff8a9dfe7bcfe6bb28d2a3394a7deffecd",
+  "stdoutSha256": "6b83cfcae0ff56a38bcc0f4a8744426ded3155f55c0cb59dde9e783c85402c53",
+  "stderrSha256": "2ddd84f16b40104bd17540732c9cfb2699dd76c4e86c148c8ac6f98bbc23e99c",
+  "provenanceUnchanged": true
+}

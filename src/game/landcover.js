@@ -1,3 +1,4 @@
+import {drainSteps,sliceBudget,copyTypedSteps} from './landcache17a/cooperative.js';
 /* Контур мощёного для поднятой земли. Принимает фактические треугольники
    покрытий, а не расстояния до осей дорог: закруглённый тупик, парковка и
    наложение дорожек дают ту же границу в геометрии и в запросе высоты.
@@ -53,7 +54,7 @@ export function intersectConvex(p,polygon){
 }
 
 export function createLandCover(cell=32,snapshot=null) {
-  const grid=snapshot?.grid||new Map(),all=[],cache=new Map(),dirtyCells=new Set();
+  let grid=snapshot?.grid||new Map(),all=[],cache=new Map(),dirtyCells=new Set();
   // n — число фигур; end — следующий id. Перенос готовых страниц
   // сохраняет неполный блок, поэтому после него id могут иметь пропуски.
   let packed=snapshot?.packed||null;
@@ -221,10 +222,23 @@ export function createLandCover(cell=32,snapshot=null) {
     dirtyCells.clear();
     packed.n=n;packed.end=all.at(-1).id+1;all.length=0;cache.clear();
   }
-  const api={triangle,height,covered:(x,z)=>height(x,z)>-Infinity,sideHeights,cut,inside,breaks,compact,stats,
+  const api={get cell(){return cell;},triangle,height,covered:(x,z)=>height(x,z)>-Infinity,sideHeights,cut,inside,breaks,compact,stats,
     // postMessage копирует готовые числовые страницы и индекс за один
     // проход; миллионы промежуточных объектов треугольников не нужны.
     snapshot(){compact();return {version:1,cell,packed,grid};},
+    // All validation/allocation precedes commit; cancelling this generator leaves live state intact.
+    *prepareRestoreSteps(snapshot,options={}){
+      if(snapshot?.version!==1||snapshot.cell!==cell||!(snapshot.grid instanceof Map))throw Error('Invalid cover checkpoint');
+      const preflight=()=>{if(Object.isFrozen(all)||['triangles','queries','cut','parts'].some(k=>!Object.getOwnPropertyDescriptor(stats,k)?.writable))throw Error('Invalid cover target');};preflight();
+      const batch=sliceBudget(options),nextGrid=new Map();
+      for(const[k,v]of snapshot.grid){nextGrid.set(k,yield* copyTypedSteps(v,batch));if(batch.charge())yield 'index';}
+      const next=snapshot.packed?{n:snapshot.packed.n,end:snapshot.packed.end,blocks:[]}:null;
+      if(next)for(const b of snapshot.packed.blocks){const copy={};for(const[k,v]of Object.entries(b)){copy[k]=ArrayBuffer.isView(v)?yield* copyTypedSteps(v,batch):v;if(batch.charge())yield 'page';}next.blocks.push(copy);}
+      const nextAll=[],nextCache=new Map(),nextDirty=new Set();let committed=false;preflight();
+      const commit=()=>{if(committed)return api;committed=true;grid=nextGrid;packed=next;all=nextAll;cache=nextCache;dirtyCells=nextDirty;stats.triangles=packed?.n||0;stats.queries=stats.cut=stats.parts=0;return api;};commit.preflight=preflight;return commit;
+    },
+    prepareRestore(snapshot,options={}){return drainSteps(api.prepareRestoreSteps(snapshot,options));},
+    restore(snapshot){return api.prepareRestore(snapshot)();},
     absorb(other){
       const inspect=COVER_DATA.get(other);if(!inspect||other===api)throw Error('Неверное поле для переноса');
       if(inspect().cell!==cell)throw Error('Разные клетки полей');

@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "manifestFile": "/tmp/bird-landcache17a-reportfix-1102/manifest.json",
+  "manifestHash": "11fa36cfca107d3faf4047d1283f721233beaec41723404421c788c0dbf7d8e8",
+  "pilotCase": "saved-far",
+  "pilots": {
+    "generated": {
+      "report": "/tmp/bird-landcache17a-reportfix-1102/saved-assets/saved-far-pilot.json",
+      "sha256": "b111f0ff098dae1e4288a5fc575974d20bc25833633275ffc1382c630858311c"
+    },
+    "cache": {
+      "report": "/tmp/bird-landcache17a-reportfix-1102/saved-assets/saved-far-cache-pilot.json",
+      "sha256": "d1ab4779a8973c74bf8acf176bc7f16c564ccb3ee36d256c5fc673835f5e3a3d"
+    }
+  },
+  "assets": {
+    "newbie": {
+      "file": "/tmp/bird-landcache17a-reportfix-1102/city.land",
+      "sha256": "40d8f28821b28ed37330fb23485ca8306cab17931e2ecfd09093b293aa367e08",
+      "identity": {
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "mapHash": "bcfd18399236e8ea14312a06caf0b52f16c79e3d8449cbb108923d5d87357ee5",
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "sourceHash": "fdb6923c13afc8f369b8c02931174fb953706d52fb5d3f347683dab0f2f6fcce",
+        "precleanHash": "55c244e410918488e47a199d3f5dd95447e73d9daee54c686cc05e33f1267344",
+        "seed": 7,
+        "flags": {
+          "runtime": "{\"mapId\":\"seversk\",\"mode\":\"steam\",\"adult\":true,\"career\":true,\"intro\":false,\"editor\":false,\"streamed\":true,\"graphics\":\"high\",\"district\":0,\"season\":2.5,\"seasonForced\":false,\"quick\":false,\"donationTrash\":0,\"externalSeed\":true}",
+          "query": "[[\"gfx\",\"high\"],[\"gfxdev\",\"deck\"],[\"lang\",\"ru\"],[\"startupdistrict\",\"0\"]]",
+          "parameters": "{\"minWidth\":0.8,\"coverCell\":32,\"maskCell\":32,\"indexCell\":8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "buildHash": "382750aa2e2bf4cbfc5943c08b05c1b333f65ac419668c6f5c0d3917ba17760a",
+          "rngProvider": "probe-mulberry32-late-fnv1a-v1"
+        }
+      }
+    },
+    "saved-near": {
+      "file": "/tmp/bird-landcache17a-reportfix-1102/saved-assets/saved-near.land",
+      "sha256": "a94b84a49725d6cec934d69128c6e8d72fa6c0541556d996aa91a4ac83ef7bf5",
+      "identity": {
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "mapHash": "bcfd18399236e8ea14312a06caf0b52f16c79e3d8449cbb108923d5d87357ee5",
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "sourceHash": "fdb6923c13afc8f369b8c02931174fb953706d52fb5d3f347683dab0f2f6fcce",
+        "precleanHash": "55c244e410918488e47a199d3f5dd95447e73d9daee54c686cc05e33f1267344",
+        "seed": 7,
+        "flags": {
+          "runtime": "{\"mapId\":\"seversk\",\"mode\":\"steam\",\"adult\":true,\"career\":true,\"intro\":false,\"editor\":false,\"streamed\":true,\"graphics\":\"high\",\"district\":0,\"season\":2.5,\"seasonForced\":false,\"quick\":false,\"donationTrash\":0,\"externalSeed\":true}",
+          "query": "[[\"gfx\",\"high\"],[\"gfxdev\",\"deck\"],[\"lang\",\"ru\"],[\"nointro\",\"\"],[\"startupdistrict\",\"0\"]]",
+          "parameters": "{\"minWidth\":0.8,\"coverCell\":32,\"maskCell\":32,\"indexCell\":8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "buildHash": "382750aa2e2bf4cbfc5943c08b05c1b333f65ac419668c6f5c0d3917ba17760a",
+          "rngProvider": "probe-mulberry32-late-fnv1a-v1"
+        }
+      }
+    },
+    "saved-far": {
+      "file": "/tmp/bird-landcache17a-reportfix-1102/saved-assets/saved-far.land",
+      "sha256": "7c8d542b03e374eda2b5d1a0d9b6e8ed6da2f16dd1cc26d58faa2628f795ac84",
+      "identity": {
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "mapHash": "bcfd18399236e8ea14312a06caf0b52f16c79e3d8449cbb108923d5d87357ee5",
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "sourceHash": "fdb6923c13afc8f369b8c02931174fb953706d52fb5d3f347683dab0f2f6fcce",
+        "precleanHash": "55c244e410918488e47a199d3f5dd95447e73d9daee54c686cc05e33f1267344",
+        "seed": 7,
+        "flags": {
+          "runtime": "{\"mapId\":\"seversk\",\"mode\":\"steam\",\"adult\":true,\"career\":true,\"intro\":false,\"editor\":false,\"streamed\":true,\"graphics\":\"high\",\"district\":7,\"season\":2.5,\"seasonForced\":false,\"quick\":false,\"donationTrash\":0,\"externalSeed\":true}",
+          "query": "[[\"gfx\",\"high\"],[\"gfxdev\",\"deck\"],[\"lang\",\"ru\"],[\"nointro\",\"\"],[\"startupdistrict\",\"7\"]]",
+          "parameters": "{\"minWidth\":0.8,\"coverCell\":32,\"maskCell\":32,\"indexCell\":8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "buildHash": "382750aa2e2bf4cbfc5943c08b05c1b333f65ac419668c6f5c0d3917ba17760a",
+          "rngProvider": "probe-mulberry32-late-fnv1a-v1"
+        }
+      }
+    }
+  }
+}

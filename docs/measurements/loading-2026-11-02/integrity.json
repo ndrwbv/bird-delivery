@@ -1,0 +1,79 @@
+{
+  "ok": true,
+  "source": [
+    {
+      "file": "src/main.js",
+      "unchanged": true,
+      "copyMatches": true
+    },
+    {
+      "file": "src/game/menu.js",
+      "unchanged": true,
+      "copyMatches": true
+    },
+    {
+      "file": "src/game/progressboot.js",
+      "unchanged": true,
+      "copyMatches": true
+    },
+    {
+      "file": "src/game/game.js",
+      "unchanged": true,
+      "copyMatches": true
+    },
+    {
+      "file": "src/game/latebuild.js",
+      "unchanged": true,
+      "copyMatches": true
+    },
+    {
+      "file": "src/game/landcleanpool.js",
+      "unchanged": true,
+      "copyMatches": true
+    },
+    {
+      "file": "src/game/landclean.worker.js",
+      "unchanged": true,
+      "copyMatches": true
+    },
+    {
+      "file": "src/game/landstream.js",
+      "unchanged": true,
+      "copyMatches": true
+    },
+    {
+      "file": "src/game/startuptrace.js",
+      "unchanged": true,
+      "copyMatches": true
+    },
+    {
+      "file": "tools/probe.cjs",
+      "unchanged": true,
+      "copyMatches": true
+    },
+    {
+      "file": "tools/probe-checks/startup-ready.js",
+      "unchanged": true,
+      "copyMatches": true
+    },
+    {
+      "file": "tools/probe-checks/startup-bootstrap-observe.js",
+      "unchanged": true,
+      "copyMatches": true
+    },
+    {
+      "file": "tools/startup-bench.mjs",
+      "unchanged": true,
+      "copyMatches": true
+    },
+    {
+      "file": "tools/startuptrace-test.mjs",
+      "unchanged": true,
+      "copyMatches": true
+    }
+  ],
+  "buildFiles": 93,
+  "changed": [],
+  "controlIndexSha256": "e1610792b37be5920fd6cb177ffac71fb5c5f8cc89763bb044348bb8b77f2193",
+  "candidateIndexSha256": "01f5102a233683919337965e6b71e0259bad2be25385279c3695965e4994ee91"
+}

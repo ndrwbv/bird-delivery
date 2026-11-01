@@ -20,6 +20,7 @@
      Доска почёта (honor.js): достижения и рекорды карьеры, окно — тоже modal()
 
    В Яндексе и Москве (?nocareer) модуль не работает: его зовёт только career.js. */
+import { STARTUP } from './startuptrace.js';
 import './menu.css';
 import { t } from '../i18n/index.js';
 import { heroName } from './playername.js';
@@ -82,7 +83,7 @@ function act (a) {
   }
   if (DP.root() || BOARD.root() || HONOR.root() || QR.root() || CCARD.root() || CITY.root() || STORYTEST.panelRoot()) return;
   A.Snd.boot && A.Snd.boot();
-  if (a === 'go') A.menuGo();
+  if (a === 'go') { STARTUP.request({ menuKey: 'go', district: DIST.cur() }); A.menuGo(); }
   else if (a === 'district') openDistricts();
   else if (a === 'quick') { if (QR.available()) QR.openSetup(); }
   else if (a === 'stats') openStats();

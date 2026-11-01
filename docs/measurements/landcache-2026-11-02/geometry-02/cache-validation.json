@@ -1,0 +1,45 @@
+{
+  "ok": true,
+  "reasons": [],
+  "stage": null,
+  "error": null,
+  "outerOk": true,
+  "resultOk": true,
+  "errors": [],
+  "uncaught": 0,
+  "crash": 0,
+  "reportSha256": "e55bd7a5d4084275f84ce8d605f69bce4f8087f50fc9ed5a3270fddce0d50b65",
+  "coverage": {
+    "poses": 3,
+    "paved": 2,
+    "drives": 6,
+    "boundaries": 12,
+    "props": 8,
+    "benches": 4,
+    "benchRepresentations": [
+      {
+        "representation": "smash",
+        "cpuRange": true,
+        "comparison": "benchY+retained CPU range Y; no GPU proof"
+      },
+      {
+        "representation": "smash",
+        "cpuRange": true,
+        "comparison": "benchY+retained CPU range Y; no GPU proof"
+      },
+      {
+        "representation": "smash",
+        "cpuRange": true,
+        "comparison": "benchY+retained CPU range Y; no GPU proof"
+      },
+      {
+        "representation": "smash",
+        "cpuRange": true,
+        "comparison": "benchY+retained CPU range Y; no GPU proof"
+      }
+    ],
+    "drawDigest": "2dfb7542fb0021e7e4ad1265b5813894071feede82e9cc3d9aefe1d286f98c1b",
+    "maxDriveStep": 0.08946772756696575,
+    "maxLateral": 0.005113715950301412
+  }
+}

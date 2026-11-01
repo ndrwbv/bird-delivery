@@ -1,0 +1,81 @@
+{
+  "ok": true,
+  "validation": {
+    "ok": true,
+    "reasons": []
+  },
+  "kind": "one pilot pair, not medians or physical Deck",
+  "generatedMs": 70478.60000014305,
+  "cacheMs": 54917.59999990463,
+  "observedDifferenceMs": 15561.000000238419,
+  "district": {
+    "before": {
+      "district": 7,
+      "opened": 8,
+      "city": false,
+      "partySeen": true
+    },
+    "actual": 7,
+    "atControl": 7,
+    "pizzaIndex": 7,
+    "pizza": {
+      "x": -2372.633066489344,
+      "z": -185.60377094273412,
+      "bx": -2370.9919841429955,
+      "bz": -162.62861809385578
+    },
+    "position": {
+      "x": -2387.473827001825,
+      "z": -171.6108503251087
+    },
+    "pickerClicks": 1,
+    "pickerObservedAt": 49111.699999809265,
+    "pickerClickedAt": 49148.199999809265,
+    "dialogClicks": 0
+  },
+  "meta": {
+    "version": 1,
+    "source": "cache",
+    "phase": "restored",
+    "hit": true,
+    "cleanCalls": 0,
+    "reason": null,
+    "bytes": 74735087,
+    "bufferHeld": false,
+    "cleaned": true,
+    "fileSha256": "7c8d542b03e374eda2b5d1a0d9b6e8ed6da2f16dd1cc26d58faa2628f795ac84",
+    "expectedSha256": "7c8d542b03e374eda2b5d1a0d9b6e8ed6da2f16dd1cc26d58faa2628f795ac84",
+    "identity": {
+      "mapId": "seversk",
+      "mode": "streamed-deferred",
+      "mapHash": "bcfd18399236e8ea14312a06caf0b52f16c79e3d8449cbb108923d5d87357ee5",
+      "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+      "sourceHash": "fdb6923c13afc8f369b8c02931174fb953706d52fb5d3f347683dab0f2f6fcce",
+      "precleanHash": "55c244e410918488e47a199d3f5dd95447e73d9daee54c686cc05e33f1267344",
+      "seed": 7,
+      "flags": {
+        "runtime": "{\"mapId\":\"seversk\",\"mode\":\"steam\",\"adult\":true,\"career\":true,\"intro\":false,\"editor\":false,\"streamed\":true,\"graphics\":\"high\",\"district\":7,\"season\":2.5,\"seasonForced\":false,\"quick\":false,\"donationTrash\":0,\"externalSeed\":true}",
+        "query": "[[\"gfx\",\"high\"],[\"gfxdev\",\"deck\"],[\"lang\",\"ru\"],[\"nointro\",\"\"],[\"startupdistrict\",\"7\"]]",
+        "parameters": "{\"minWidth\":0.8,\"coverCell\":32,\"maskCell\":32,\"indexCell\":8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+        "buildHash": "382750aa2e2bf4cbfc5943c08b05c1b333f65ac419668c6f5c0d3917ba17760a",
+        "rngProvider": "probe-mulberry32-late-fnv1a-v1"
+      }
+    },
+    "summary": {
+      "source": "cache",
+      "hit": true,
+      "cleanCalls": 0,
+      "bytes": 74735087,
+      "fileSha256": "7c8d542b03e374eda2b5d1a0d9b6e8ed6da2f16dd1cc26d58faa2628f795ac84"
+    }
+  },
+  "land": {
+    "ready": 32,
+    "total": 1776,
+    "steps": 37271,
+    "maxStep": 61.69999980926514,
+    "ms": 4045.7000000476837,
+    "failed": 0
+  },
+  "moved": 5.573349976780864
+}

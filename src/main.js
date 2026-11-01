@@ -2,6 +2,7 @@
    Язык нужен до загрузки игры: её строки переводятся прямо при импорте.
    Карта — тоже: игра строит город при импорте. Выбор карты — ?map=, потом
    иначе Стим и dev — Северск, Яндекс — Москва (выбора в меню больше нет). */
+import { STARTUP } from './game/startuptrace.js';
 import './styles/delivery.css';
 import './input/padmenu.css';
 import './styles/paper.css';            // стиль «как накладная»: бумага, чек, штамп, печать, стикер (П0)
@@ -31,15 +32,16 @@ if (buildV) buildV.textContent = BUILD;
 // и мелко в углу паузы
 for (const el of document.querySelectorAll('.pm-ver')) el.textContent = BUILD;
 
-await Platform.init({ langs: LANGS });
+STARTUP.mark('main.enter');
+await STARTUP.awaited('platform.init', 'platform', () => Platform.init({ langs: LANGS }));
 // первый запуск — спросить язык: игра ещё не загружена, перезагружать нечего. На Яндексе язык даёт площадка
 const doorPreviewFirstRun = new URLSearchParams(location.search).has('doorpreview') && !Platform.langChosen;
 if (Platform.id !== 'yandex' && !Platform.langChosen && !doorPreviewFirstRun) {
-  Platform.setLang(await pickLang(LANGS, LANG_NAMES, Platform.lang));
+  Platform.setLang(await STARTUP.awaited('external.language', 'external', () => pickLang(LANGS, LANG_NAMES, Platform.lang)));
   Platform.store.flush && Platform.store.flush();
 }
 // Отладочный просмотр не меняет язык в сохранении и не ждёт первого меню.
-await initI18n(doorPreviewFirstRun ? 'ru' : Platform.lang);
+await STARTUP.awaited('i18n.import', 'module', () => initI18n(doorPreviewFirstRun ? 'ru' : Platform.lang));
 applyDom();
 // фразы экрана загрузки («Покупаем пиццу…», index.html) уже на языке игрока — показать
 document.getElementById('boot')?.classList.add('said');
@@ -48,7 +50,7 @@ document.documentElement.dataset.platform = Platform.id;
 // i18n is ready; map/game/progress readers remain unloaded until every native write verifies.
 if (Platform.id !== 'yandex') {
   await requireSingleProgress({
-    migrate: () => migrateSingleProgress({ store: Platform.store }),
+    migrate: () => STARTUP.work('progress.migrate', () => migrateSingleProgress({ store: Platform.store })),
     host: document.getElementById('boot'), t, pollPad, makePadMenu,
   });
   // Platform modules have no game/i18n imports: bind readonly identity only after bootstrap succeeds.
@@ -58,20 +60,23 @@ if (Platform.id !== 'yandex') {
 // Стим (и dev) — Северск, Яндекс — Москва; ?map= — для отладки
 const want = new URLSearchParams(location.search).get('map') || (Platform.id === 'yandex' ? 'moscow' : 'seversk');
 const mapId = MAP_IDS.includes(want) ? want : MAP_IDS[0];
-useMap(await loadMap(mapId));
+useMap(await STARTUP.awaited('map.readParseImport', 'module', () => loadMap(mapId)));
+STARTUP.mark('map.ready', { mapId });
 document.documentElement.dataset.city = mapId;
 
 // город строится синхронно при импорте: сначала даём браузеру нарисовать экран загрузки
 await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
 // время запуска (docs/AGENTS.md → «Запуск до меню»): window.__boot — мс от старта страницы
 const BOOT = window.__boot = { pre: Math.round(performance.now()) };
-await import('./game/game.js');
+await STARTUP.awaited('game.import', 'module', () => import('./game/game.js'));
+STARTUP.mark('game.module.ready');
 BOOT.game = Math.round(performance.now());
 document.title = (await import('./game/brands.js')).OWN.pizza();
 Platform.ready();
 // первый кадр игры готов — загрузка плавно уходит, интерфейс плавно проявляется
 requestAnimationFrame(() => requestAnimationFrame(() => {
   BOOT.menu = Math.round(performance.now());
+  STARTUP.mark('menu.visible');
   document.body.classList.remove('booting');
   const boot = document.getElementById('boot');
   if (boot) { boot.classList.add('gone'); setTimeout(() => boot.remove(), 600); }

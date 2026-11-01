@@ -1,0 +1,2114 @@
+{
+  "version": 2,
+  "checkedAt": "2026-11-01T21:01:55.499Z",
+  "manifestSha256": "efb74f119283c12730795fdb87837812cc5008502464204df86f7ddec199e313",
+  "gateSha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3",
+  "expectedRuns": 36,
+  "totalRuns": 36,
+  "errors": [],
+  "runs": [
+    {
+      "id": "newbie/1/generated/cold",
+      "label": "newbie",
+      "repeat": 1,
+      "phase": "cold",
+      "variant": "generated",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/newbie-1-generated-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "d54ed6417950001f6f5da1b78133d3539df6ed772e3850da214d13d06eea5ab6",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "pickerObservedAt": null,
+        "pickerClickedAt": null,
+        "dialogClicks": 0
+      },
+      "moved": 4.784320113907296,
+      "controlMs": 78607.89999985695,
+      "processToControlMs": 78852.5,
+      "fromClickMs": 69413.09999990463
+    },
+    {
+      "id": "newbie/1/generated/warm",
+      "label": "newbie",
+      "repeat": 1,
+      "phase": "warm",
+      "variant": "generated",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/newbie-1-generated-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "251415f819ec497939604fab96c0c29d01b201e9ce88f7d1d772183c063f1ae2",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "pickerObservedAt": null,
+        "pickerClickedAt": null,
+        "dialogClicks": 0
+      },
+      "moved": 5.021541377460115,
+      "controlMs": 80592.59999990463,
+      "processToControlMs": 80793.40014648438,
+      "fromClickMs": 70800.29999995232
+    },
+    {
+      "id": "newbie/1/cache/cold",
+      "label": "newbie",
+      "repeat": 1,
+      "phase": "cold",
+      "variant": "cache",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/newbie-1-cache-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "833e364eec5d53102d91e107761a9f19c36fbf0d95ed18f251a98ede5e3687b7",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "pickerObservedAt": null,
+        "pickerClickedAt": null,
+        "dialogClicks": 0
+      },
+      "moved": 4.784310609327164,
+      "controlMs": 64830.5,
+      "processToControlMs": 65079.10009765625,
+      "fromClickMs": 55129.799999952316
+    },
+    {
+      "id": "newbie/1/cache/warm",
+      "label": "newbie",
+      "repeat": 1,
+      "phase": "warm",
+      "variant": "cache",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/newbie-1-cache-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "13ad655974a2ae0e7d0d0e4f70e276ebf6496d94f767fcf543080dda7f18e826",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "pickerObservedAt": null,
+        "pickerClickedAt": null,
+        "dialogClicks": 0
+      },
+      "moved": 5.018659451283222,
+      "controlMs": 65061.700000047684,
+      "processToControlMs": 65260.699951171875,
+      "fromClickMs": 55168.60000014305
+    },
+    {
+      "id": "newbie/2/cache/cold",
+      "label": "newbie",
+      "repeat": 2,
+      "phase": "cold",
+      "variant": "cache",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/newbie-2-cache-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "f90f663c6b57e9c62717eb59a9f3259557c9d65cdad7836544d56a211cd27cf9",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "pickerObservedAt": null,
+        "pickerClickedAt": null,
+        "dialogClicks": 0
+      },
+      "moved": 5.021543278944817,
+      "controlMs": 65036.59999990463,
+      "processToControlMs": 65289.800048828125,
+      "fromClickMs": 55232
+    },
+    {
+      "id": "newbie/2/cache/warm",
+      "label": "newbie",
+      "repeat": 2,
+      "phase": "warm",
+      "variant": "cache",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/newbie-2-cache-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "0ba5412501fd1022d5ba9eb02e91a94ba4e344b39936d7f931917fb59bba6d3e",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "pickerObservedAt": null,
+        "pickerClickedAt": null,
+        "dialogClicks": 0
+      },
+      "moved": 4.7857321367622525,
+      "controlMs": 65167.699999809265,
+      "processToControlMs": 65378.39990234375,
+      "fromClickMs": 55276.59999990463
+    },
+    {
+      "id": "newbie/2/generated/cold",
+      "label": "newbie",
+      "repeat": 2,
+      "phase": "cold",
+      "variant": "generated",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/newbie-2-generated-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "2433faac2636b98e580732b85d05b6a588e7a799995e4fe1014ba91d50b311aa",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "pickerObservedAt": null,
+        "pickerClickedAt": null,
+        "dialogClicks": 0
+      },
+      "moved": 4.785729415373516,
+      "controlMs": 80998.39999985695,
+      "processToControlMs": 81253.09985351562,
+      "fromClickMs": 71132.19999980927
+    },
+    {
+      "id": "newbie/2/generated/warm",
+      "label": "newbie",
+      "repeat": 2,
+      "phase": "warm",
+      "variant": "generated",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/newbie-2-generated-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "74bdd7fbdad04fb0c8e15e27ea69ea634c277af6a282238f0a9f55493efe00bf",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "pickerObservedAt": null,
+        "pickerClickedAt": null,
+        "dialogClicks": 0
+      },
+      "moved": 5.020247080709552,
+      "controlMs": 81180.40000009537,
+      "processToControlMs": 81383.69995117188,
+      "fromClickMs": 71310.79999995232
+    },
+    {
+      "id": "newbie/3/generated/cold",
+      "label": "newbie",
+      "repeat": 3,
+      "phase": "cold",
+      "variant": "generated",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/newbie-3-generated-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "08cb4fea784042c9f37acf6b13b799f9d958ef4b2d1d1a1f6e3d4fedfffa95f2",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "pickerObservedAt": null,
+        "pickerClickedAt": null,
+        "dialogClicks": 0
+      },
+      "moved": 5.021541967781454,
+      "controlMs": 81238.59999990463,
+      "processToControlMs": 81494.7001953125,
+      "fromClickMs": 71305.40000009537
+    },
+    {
+      "id": "newbie/3/generated/warm",
+      "label": "newbie",
+      "repeat": 3,
+      "phase": "warm",
+      "variant": "generated",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/newbie-3-generated-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "4befa8f99a85ee09a582451266285b06e5bb34aeeea69e673b10335dfb1980db",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "pickerObservedAt": null,
+        "pickerClickedAt": null,
+        "dialogClicks": 0
+      },
+      "moved": 5.018806676814704,
+      "controlMs": 80184.5,
+      "processToControlMs": 80385.80004882812,
+      "fromClickMs": 70340.59999990463
+    },
+    {
+      "id": "newbie/3/cache/cold",
+      "label": "newbie",
+      "repeat": 3,
+      "phase": "cold",
+      "variant": "cache",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/newbie-3-cache-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "8827489a422e31fd4f0648f6f95b90edc019e32e1fd90b5730a099a8d94bca24",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "pickerObservedAt": null,
+        "pickerClickedAt": null,
+        "dialogClicks": 0
+      },
+      "moved": 4.784315083064641,
+      "controlMs": 65246.90000009537,
+      "processToControlMs": 65495.599853515625,
+      "fromClickMs": 55459.09999990463
+    },
+    {
+      "id": "newbie/3/cache/warm",
+      "label": "newbie",
+      "repeat": 3,
+      "phase": "warm",
+      "variant": "cache",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/newbie-3-cache-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "653d61954803d4d7b2db06fd6cc8d86d51d889b000af5d4b4ca2d5e78845889e",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "pickerObservedAt": null,
+        "pickerClickedAt": null,
+        "dialogClicks": 0
+      },
+      "moved": 4.784452215682972,
+      "controlMs": 65226.90000009537,
+      "processToControlMs": 65428.599853515625,
+      "fromClickMs": 55394.300000190735
+    },
+    {
+      "id": "saved-near/1/generated/cold",
+      "label": "saved-near",
+      "repeat": 1,
+      "phase": "cold",
+      "variant": "generated",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-near-1-generated-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "03311fec81120ecbb95cb3f426ff7bb2fbfb4ab3f2cf58479aa53f76b0d5d5f4",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 79945.90000009537,
+        "pickerClickedAt": 79996.40000009537,
+        "dialogClicks": 0
+      },
+      "moved": 4.785581932497676,
+      "controlMs": 81310.90000009537,
+      "processToControlMs": 81554.09985351562,
+      "fromClickMs": 71385.79999995232
+    },
+    {
+      "id": "saved-near/1/generated/warm",
+      "label": "saved-near",
+      "repeat": 1,
+      "phase": "warm",
+      "variant": "generated",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-near-1-generated-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "1d5e13c565f6602ef98423ea47532937f44244f574d3c384a9083d1dce982136",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 79574.80000019073,
+        "pickerClickedAt": 79627.80000019073,
+        "dialogClicks": 0
+      },
+      "moved": 4.785720901291897,
+      "controlMs": 80935.80000019073,
+      "processToControlMs": 81137.5,
+      "fromClickMs": 71101.80000019073
+    },
+    {
+      "id": "saved-near/1/cache/cold",
+      "label": "saved-near",
+      "repeat": 1,
+      "phase": "cold",
+      "variant": "cache",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-near-1-cache-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "0b891a89f548ba31e237f3ac3f074271fd17d95ef2ccf1d790659385b0924d90",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 64411.300000190735,
+        "pickerClickedAt": 64465.5,
+        "dialogClicks": 0
+      },
+      "moved": 4.785728337811468,
+      "controlMs": 65780.20000004768,
+      "processToControlMs": 66032.59985351562,
+      "fromClickMs": 55814.89999985695
+    },
+    {
+      "id": "saved-near/1/cache/warm",
+      "label": "saved-near",
+      "repeat": 1,
+      "phase": "warm",
+      "variant": "cache",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-near-1-cache-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "085803332713dc997ee9721d4b379aa281223310502c37dc7023994ee3c741b5",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 64030.39999985695,
+        "pickerClickedAt": 64082.199999809265,
+        "dialogClicks": 0
+      },
+      "moved": 4.785874287513285,
+      "controlMs": 65381.39999985695,
+      "processToControlMs": 65582.89990234375,
+      "fromClickMs": 55447.09999990463
+    },
+    {
+      "id": "saved-near/2/cache/cold",
+      "label": "saved-near",
+      "repeat": 2,
+      "phase": "cold",
+      "variant": "cache",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-near-2-cache-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "abae06afb12f367278cfc061a6b48bf06d44cf6abc43a81cfeffce194f96cc86",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 64089.200000047684,
+        "pickerClickedAt": 64142.59999990463,
+        "dialogClicks": 0
+      },
+      "moved": 4.553244074763692,
+      "controlMs": 65446.09999990463,
+      "processToControlMs": 65699.5,
+      "fromClickMs": 55510.700000047684
+    },
+    {
+      "id": "saved-near/2/cache/warm",
+      "label": "saved-near",
+      "repeat": 2,
+      "phase": "warm",
+      "variant": "cache",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-near-2-cache-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "cfe30c1a88a8a9b4bb89426fd8b09b35920b682e0d5ec5dcd38af11e71dc23e1",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 63961.299999952316,
+        "pickerClickedAt": 64012.5,
+        "dialogClicks": 0
+      },
+      "moved": 5.0202506568434995,
+      "controlMs": 65318.299999952316,
+      "processToControlMs": 65519.199951171875,
+      "fromClickMs": 55448.40000009537
+    },
+    {
+      "id": "saved-near/2/generated/cold",
+      "label": "saved-near",
+      "repeat": 2,
+      "phase": "cold",
+      "variant": "generated",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-near-2-generated-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "16f4943225b104cf5e65978b2cd731a680cbf53750f3235af7a4c49521d248d2",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 80106.20000004768,
+        "pickerClickedAt": 80160.79999995232,
+        "dialogClicks": 0
+      },
+      "moved": 4.784453538518677,
+      "controlMs": 81477.29999995232,
+      "processToControlMs": 81731.69995117188,
+      "fromClickMs": 71610.39999985695
+    },
+    {
+      "id": "saved-near/2/generated/warm",
+      "label": "saved-near",
+      "repeat": 2,
+      "phase": "warm",
+      "variant": "generated",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-near-2-generated-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "99454791ff79e0044b0cc7adba95f1e82c6f840276acb6bfbe4711b742fe9448",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 79672.40000009537,
+        "pickerClickedAt": 79727,
+        "dialogClicks": 0
+      },
+      "moved": 4.784313801456492,
+      "controlMs": 81044,
+      "processToControlMs": 81245.69995117188,
+      "fromClickMs": 71225.5
+    },
+    {
+      "id": "saved-near/3/generated/cold",
+      "label": "saved-near",
+      "repeat": 3,
+      "phase": "cold",
+      "variant": "generated",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-near-3-generated-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "23106465f8b2d267ee8b91abe22a1aadabc9ccf3bae4265058e71ebbe7289986",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 79882.20000004768,
+        "pickerClickedAt": 79936.90000009537,
+        "dialogClicks": 0
+      },
+      "moved": 4.785726588997071,
+      "controlMs": 81251.20000004768,
+      "processToControlMs": 81507.69995117188,
+      "fromClickMs": 71417.90000009537
+    },
+    {
+      "id": "saved-near/3/generated/warm",
+      "label": "saved-near",
+      "repeat": 3,
+      "phase": "warm",
+      "variant": "generated",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-near-3-generated-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "6ddd0a8ba265d8b1c541f47ee5397ab51d171134a391b15503d2fe1d456dce6c",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 80099.09999990463,
+        "pickerClickedAt": 80154.59999990463,
+        "dialogClicks": 0
+      },
+      "moved": 5.020108090832729,
+      "controlMs": 81455.29999995232,
+      "processToControlMs": 81658,
+      "fromClickMs": 71559.29999995232
+    },
+    {
+      "id": "saved-near/3/cache/cold",
+      "label": "saved-near",
+      "repeat": 3,
+      "phase": "cold",
+      "variant": "cache",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-near-3-cache-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "cda4af6403d23335bdd5a85c6b0053b94e4a0ac76762ae1f1143df76fad828ac",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 64361.700000047684,
+        "pickerClickedAt": 64417.5,
+        "dialogClicks": 0
+      },
+      "moved": 4.784312658530938,
+      "controlMs": 65720,
+      "processToControlMs": 65976,
+      "fromClickMs": 55878.09999990463
+    },
+    {
+      "id": "saved-near/3/cache/warm",
+      "label": "saved-near",
+      "repeat": 3,
+      "phase": "warm",
+      "variant": "cache",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-near-3-cache-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "da1db496da52070568c28d80cae6bcd5a6c7ea2381909a16fa7d9ebe677fd6b7",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 64035,
+        "pickerClickedAt": 64089.39999985695,
+        "dialogClicks": 0
+      },
+      "moved": 4.7857264204775145,
+      "controlMs": 65392.5,
+      "processToControlMs": 65592.80004882812,
+      "fromClickMs": 55377.40000009537
+    },
+    {
+      "id": "saved-far/1/generated/cold",
+      "label": "saved-far",
+      "repeat": 1,
+      "phase": "cold",
+      "variant": "generated",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-far-1-generated-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "066438abd7260797968ba33646f2c19427224d7eaeecbfa792acb0ba82ad5ced",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 65697.39999985695,
+        "pickerClickedAt": 65734.70000004768,
+        "dialogClicks": 0
+      },
+      "moved": 5.574803588241446,
+      "controlMs": 71618.09999990463,
+      "processToControlMs": 71871.40014648438,
+      "fromClickMs": 61864.89999985695
+    },
+    {
+      "id": "saved-far/1/generated/warm",
+      "label": "saved-far",
+      "repeat": 1,
+      "phase": "warm",
+      "variant": "generated",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-far-1-generated-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "ef8db9e9bca9a40075aa6da2725797d97c5258db311152931018888dc473f9c9",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 66017.10000014305,
+        "pickerClickedAt": 66052.20000004768,
+        "dialogClicks": 0
+      },
+      "moved": 5.574970772999906,
+      "controlMs": 71748.90000009537,
+      "processToControlMs": 71949.39990234375,
+      "fromClickMs": 61986.90000009537
+    },
+    {
+      "id": "saved-far/1/cache/cold",
+      "label": "saved-far",
+      "repeat": 1,
+      "phase": "cold",
+      "variant": "cache",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-far-1-cache-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "ba929a069f001b6b4a65c41298a0cfe685eae7b58e51060865450add2bb3a0d1",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 50388.700000047684,
+        "pickerClickedAt": 50425.300000190735,
+        "dialogClicks": 0
+      },
+      "moved": 5.5747989549269406,
+      "controlMs": 56363.60000014305,
+      "processToControlMs": 56620.800048828125,
+      "fromClickMs": 46584.799999952316
+    },
+    {
+      "id": "saved-far/1/cache/warm",
+      "label": "saved-far",
+      "repeat": 1,
+      "phase": "warm",
+      "variant": "cache",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-far-1-cache-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "85387b4483f8d81dde417cecb8ee27449e04a8b96e693d63e19dd4c23feac12a",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 50262.199999809265,
+        "pickerClickedAt": 50296,
+        "dialogClicks": 0
+      },
+      "moved": 5.576475926746587,
+      "controlMs": 56213.89999985695,
+      "processToControlMs": 56415.199951171875,
+      "fromClickMs": 46354.39999985695
+    },
+    {
+      "id": "saved-far/2/cache/cold",
+      "label": "saved-far",
+      "repeat": 2,
+      "phase": "cold",
+      "variant": "cache",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-far-2-cache-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "d0b0eb7fe9f5c373433742d6c36bc0540bcc85127e70458d1ef542d764d9815b",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 49986.700000047684,
+        "pickerClickedAt": 50023.799999952316,
+        "dialogClicks": 0
+      },
+      "moved": 5.576455179493371,
+      "controlMs": 55892.59999990463,
+      "processToControlMs": 56141.2001953125,
+      "fromClickMs": 45964.799999952316
+    },
+    {
+      "id": "saved-far/2/cache/warm",
+      "label": "saved-far",
+      "repeat": 2,
+      "phase": "warm",
+      "variant": "cache",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-far-2-cache-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "73539082f38a35014913eea7458c3b6a188a411659504ccd1cb123f88129d9bb",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 50039.799999952316,
+        "pickerClickedAt": 50077.299999952316,
+        "dialogClicks": 0
+      },
+      "moved": 5.576459425425375,
+      "controlMs": 55874,
+      "processToControlMs": 56073.699951171875,
+      "fromClickMs": 46051.299999952316
+    },
+    {
+      "id": "saved-far/2/generated/cold",
+      "label": "saved-far",
+      "repeat": 2,
+      "phase": "cold",
+      "variant": "generated",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-far-2-generated-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "f1e72e5d0e3c43f39f016f6836f127ffe4b16ca6504fc899f9d867fcf57af521",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 66208.10000014305,
+        "pickerClickedAt": 66244.90000009537,
+        "dialogClicks": 0
+      },
+      "moved": 5.574967547277476,
+      "controlMs": 72202.40000009537,
+      "processToControlMs": 72441.69995117188,
+      "fromClickMs": 62260.90000009537
+    },
+    {
+      "id": "saved-far/2/generated/warm",
+      "label": "saved-far",
+      "repeat": 2,
+      "phase": "warm",
+      "variant": "generated",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-far-2-generated-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "c397ee619b76275343d07f026652463814e16fed9799950273d18c8b16218212",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 65924.5,
+        "pickerClickedAt": 65959.09999990463,
+        "dialogClicks": 0
+      },
+      "moved": 5.575005841596117,
+      "controlMs": 71889.29999995232,
+      "processToControlMs": 72091.69995117188,
+      "fromClickMs": 61987
+    },
+    {
+      "id": "saved-far/3/generated/cold",
+      "label": "saved-far",
+      "repeat": 3,
+      "phase": "cold",
+      "variant": "generated",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-far-3-generated-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "3163864688b03ba3622b36e423b1f630a49f9b1ac19c8b70d86d49824cbe6bdb",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 66086.5,
+        "pickerClickedAt": 66122.30000019073,
+        "dialogClicks": 0
+      },
+      "moved": 5.574999488718802,
+      "controlMs": 71906.60000014305,
+      "processToControlMs": 72162.90014648438,
+      "fromClickMs": 61997.90000009537
+    },
+    {
+      "id": "saved-far/3/generated/warm",
+      "label": "saved-far",
+      "repeat": 3,
+      "phase": "warm",
+      "variant": "generated",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-far-3-generated-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "682b973a83c6ce22062ac812c2627fbf080d5e4df0753b88a655e2eb5f8dfa9d",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 66024.09999990463,
+        "pickerClickedAt": 66060.70000004768,
+        "dialogClicks": 0
+      },
+      "moved": 5.852302062387882,
+      "controlMs": 71864,
+      "processToControlMs": 72064.19995117188,
+      "fromClickMs": 62064.90000009537
+    },
+    {
+      "id": "saved-far/3/cache/cold",
+      "label": "saved-far",
+      "repeat": 3,
+      "phase": "cold",
+      "variant": "cache",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-far-3-cache-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "4da41e3b5b56a1e59bf96e96b85a87f75d1aaede5be013ddfc152b58ba5e30d2",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 49980.5,
+        "pickerClickedAt": 50018.299999952316,
+        "dialogClicks": 0
+      },
+      "moved": 5.3061645443424625,
+      "controlMs": 55905,
+      "processToControlMs": 56155.300048828125,
+      "fromClickMs": 46054.40000009537
+    },
+    {
+      "id": "saved-far/3/cache/warm",
+      "label": "saved-far",
+      "repeat": 3,
+      "phase": "warm",
+      "variant": "cache",
+      "report": "/tmp/bird-landcache17a-comparison36-1102/saved-far-3-cache-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "abb9aa9db5533c70d08f8f37b7c3bdc5ff106a1162a1e645d9cc186934caa448",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 50093.799999952316,
+        "pickerClickedAt": 50124,
+        "dialogClicks": 0
+      },
+      "moved": 5.5762904893563014,
+      "controlMs": 55853.299999952316,
+      "processToControlMs": 56054.400146484375,
+      "fromClickMs": 46065.299999952316
+    }
+  ],
+  "measuredHarnessSha256": "deaba2d55c2649d70a7463364bb3f78611475dcd80c072d97623a5605e22bf39",
+  "measuredHarnessPatchSha256": "e8b6e487990e836946c225b4a0eeaa42110e9ed6b82b9b220103b2ac7c98516b",
+  "pilots": {
+    "generated": {
+      "ok": true,
+      "reasons": []
+    },
+    "cache": {
+      "ok": true,
+      "reasons": []
+    }
+  },
+  "ok": true,
+  "summary": [
+    {
+      "label": "newbie",
+      "variant": "generated",
+      "phase": "cold",
+      "n": 3,
+      "valuesMs": [
+        78607.89999985695,
+        80998.39999985695,
+        81238.59999990463
+      ],
+      "medianMs": 80998.39999985695,
+      "processToControlValuesMs": [
+        78852.5,
+        81253.09985351562,
+        81494.7001953125
+      ],
+      "medianProcessToControlMs": 81253.09985351562,
+      "fromClickValuesMs": [
+        69413.09999990463,
+        71132.19999980927,
+        71305.40000009537
+      ],
+      "medianFromClickMs": 71132.19999980927
+    },
+    {
+      "label": "newbie",
+      "variant": "generated",
+      "phase": "warm",
+      "n": 3,
+      "valuesMs": [
+        80184.5,
+        80592.59999990463,
+        81180.40000009537
+      ],
+      "medianMs": 80592.59999990463,
+      "processToControlValuesMs": [
+        80385.80004882812,
+        80793.40014648438,
+        81383.69995117188
+      ],
+      "medianProcessToControlMs": 80793.40014648438,
+      "fromClickValuesMs": [
+        70340.59999990463,
+        70800.29999995232,
+        71310.79999995232
+      ],
+      "medianFromClickMs": 70800.29999995232
+    },
+    {
+      "label": "newbie",
+      "variant": "cache",
+      "phase": "cold",
+      "n": 3,
+      "valuesMs": [
+        64830.5,
+        65036.59999990463,
+        65246.90000009537
+      ],
+      "medianMs": 65036.59999990463,
+      "processToControlValuesMs": [
+        65079.10009765625,
+        65289.800048828125,
+        65495.599853515625
+      ],
+      "medianProcessToControlMs": 65289.800048828125,
+      "fromClickValuesMs": [
+        55129.799999952316,
+        55232,
+        55459.09999990463
+      ],
+      "medianFromClickMs": 55232
+    },
+    {
+      "label": "newbie",
+      "variant": "cache",
+      "phase": "warm",
+      "n": 3,
+      "valuesMs": [
+        65061.700000047684,
+        65167.699999809265,
+        65226.90000009537
+      ],
+      "medianMs": 65167.699999809265,
+      "processToControlValuesMs": [
+        65260.699951171875,
+        65378.39990234375,
+        65428.599853515625
+      ],
+      "medianProcessToControlMs": 65378.39990234375,
+      "fromClickValuesMs": [
+        55168.60000014305,
+        55276.59999990463,
+        55394.300000190735
+      ],
+      "medianFromClickMs": 55276.59999990463
+    },
+    {
+      "label": "saved-near",
+      "variant": "generated",
+      "phase": "cold",
+      "n": 3,
+      "valuesMs": [
+        81251.20000004768,
+        81310.90000009537,
+        81477.29999995232
+      ],
+      "medianMs": 81310.90000009537,
+      "processToControlValuesMs": [
+        81507.69995117188,
+        81554.09985351562,
+        81731.69995117188
+      ],
+      "medianProcessToControlMs": 81554.09985351562,
+      "fromClickValuesMs": [
+        71385.79999995232,
+        71417.90000009537,
+        71610.39999985695
+      ],
+      "medianFromClickMs": 71417.90000009537
+    },
+    {
+      "label": "saved-near",
+      "variant": "generated",
+      "phase": "warm",
+      "n": 3,
+      "valuesMs": [
+        80935.80000019073,
+        81044,
+        81455.29999995232
+      ],
+      "medianMs": 81044,
+      "processToControlValuesMs": [
+        81137.5,
+        81245.69995117188,
+        81658
+      ],
+      "medianProcessToControlMs": 81245.69995117188,
+      "fromClickValuesMs": [
+        71101.80000019073,
+        71225.5,
+        71559.29999995232
+      ],
+      "medianFromClickMs": 71225.5
+    },
+    {
+      "label": "saved-near",
+      "variant": "cache",
+      "phase": "cold",
+      "n": 3,
+      "valuesMs": [
+        65446.09999990463,
+        65720,
+        65780.20000004768
+      ],
+      "medianMs": 65720,
+      "processToControlValuesMs": [
+        65699.5,
+        65976,
+        66032.59985351562
+      ],
+      "medianProcessToControlMs": 65976,
+      "fromClickValuesMs": [
+        55510.700000047684,
+        55814.89999985695,
+        55878.09999990463
+      ],
+      "medianFromClickMs": 55814.89999985695
+    },
+    {
+      "label": "saved-near",
+      "variant": "cache",
+      "phase": "warm",
+      "n": 3,
+      "valuesMs": [
+        65318.299999952316,
+        65381.39999985695,
+        65392.5
+      ],
+      "medianMs": 65381.39999985695,
+      "processToControlValuesMs": [
+        65519.199951171875,
+        65582.89990234375,
+        65592.80004882812
+      ],
+      "medianProcessToControlMs": 65582.89990234375,
+      "fromClickValuesMs": [
+        55377.40000009537,
+        55447.09999990463,
+        55448.40000009537
+      ],
+      "medianFromClickMs": 55447.09999990463
+    },
+    {
+      "label": "saved-far",
+      "variant": "generated",
+      "phase": "cold",
+      "n": 3,
+      "valuesMs": [
+        71618.09999990463,
+        71906.60000014305,
+        72202.40000009537
+      ],
+      "medianMs": 71906.60000014305,
+      "processToControlValuesMs": [
+        71871.40014648438,
+        72162.90014648438,
+        72441.69995117188
+      ],
+      "medianProcessToControlMs": 72162.90014648438,
+      "fromClickValuesMs": [
+        61864.89999985695,
+        61997.90000009537,
+        62260.90000009537
+      ],
+      "medianFromClickMs": 61997.90000009537
+    },
+    {
+      "label": "saved-far",
+      "variant": "generated",
+      "phase": "warm",
+      "n": 3,
+      "valuesMs": [
+        71748.90000009537,
+        71864,
+        71889.29999995232
+      ],
+      "medianMs": 71864,
+      "processToControlValuesMs": [
+        71949.39990234375,
+        72064.19995117188,
+        72091.69995117188
+      ],
+      "medianProcessToControlMs": 72064.19995117188,
+      "fromClickValuesMs": [
+        61986.90000009537,
+        61987,
+        62064.90000009537
+      ],
+      "medianFromClickMs": 61987
+    },
+    {
+      "label": "saved-far",
+      "variant": "cache",
+      "phase": "cold",
+      "n": 3,
+      "valuesMs": [
+        55892.59999990463,
+        55905,
+        56363.60000014305
+      ],
+      "medianMs": 55905,
+      "processToControlValuesMs": [
+        56141.2001953125,
+        56155.300048828125,
+        56620.800048828125
+      ],
+      "medianProcessToControlMs": 56155.300048828125,
+      "fromClickValuesMs": [
+        45964.799999952316,
+        46054.40000009537,
+        46584.799999952316
+      ],
+      "medianFromClickMs": 46054.40000009537
+    },
+    {
+      "label": "saved-far",
+      "variant": "cache",
+      "phase": "warm",
+      "n": 3,
+      "valuesMs": [
+        55853.299999952316,
+        55874,
+        56213.89999985695
+      ],
+      "medianMs": 55874,
+      "processToControlValuesMs": [
+        56054.400146484375,
+        56073.699951171875,
+        56415.199951171875
+      ],
+      "medianProcessToControlMs": 56073.699951171875,
+      "fromClickValuesMs": [
+        46051.299999952316,
+        46065.299999952316,
+        46354.39999985695
+      ],
+      "medianFromClickMs": 46065.299999952316
+    }
+  ]
+}

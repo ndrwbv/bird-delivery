@@ -1,0 +1,23 @@
+{
+  "config": {
+    "ok": true,
+    "reasons": []
+  },
+  "pilots": {
+    "generated": {
+      "sha256": "b111f0ff098dae1e4288a5fc575974d20bc25833633275ffc1382c630858311c",
+      "pinMatches": true,
+      "ok": true,
+      "reasons": []
+    },
+    "cache": {
+      "sha256": "d1ab4779a8973c74bf8acf176bc7f16c564ccb3ee36d256c5fc673835f5e3a3d",
+      "pinMatches": true,
+      "ok": true,
+      "reasons": []
+    }
+  },
+  "assetBodiesRead": false,
+  "runnerStarted": false,
+  "ok": true
+}

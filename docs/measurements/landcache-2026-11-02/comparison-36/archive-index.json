@@ -1,0 +1,459 @@
+{
+  "version": 1,
+  "sourceFingerprint": "fdb6923c13afc8f369b8c02931174fb953706d52fb5d3f347683dab0f2f6fcce",
+  "buildHash": "382750aa2e2bf4cbfc5943c08b05c1b333f65ac419668c6f5c0d3917ba17760a",
+  "sourceIsGitCommit": false,
+  "copies": [
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/manifest.json",
+      "file": "manifest.json",
+      "bytes": 216920,
+      "sha256": "efb74f119283c12730795fdb87837812cc5008502464204df86f7ddec199e313"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/build-tree.json",
+      "file": "build-tree.json",
+      "bytes": 14921,
+      "sha256": "46a4e08512ef3edd7514dede2be15a42714365ae767f1205557f296393099fd6"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/comparison-input-manifest.json",
+      "file": "comparison-input-manifest.json",
+      "bytes": 87329,
+      "sha256": "785c5019fc8d86a39e7691cea3b3d63356b820fc677a244529e8fff271bdf257"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/comparison-config.json",
+      "file": "comparison-config.json",
+      "bytes": 4926,
+      "sha256": "31079d9e9bf508b61481dae824121c2467017067461e49d736967a4f44e00052"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/comparison-init.js",
+      "file": "comparison-init.js",
+      "bytes": 69473,
+      "sha256": "1e3373205c055b1b70d2545cc88569db7f018409771863250979837e3cc9c804"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/comparison-pilot-generated.json",
+      "file": "comparison-pilot-generated.json",
+      "bytes": 33113,
+      "sha256": "b111f0ff098dae1e4288a5fc575974d20bc25833633275ffc1382c630858311c"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/comparison-pilot-cache.json",
+      "file": "comparison-pilot-cache.json",
+      "bytes": 39033,
+      "sha256": "d1ab4779a8973c74bf8acf176bc7f16c564ccb3ee36d256c5fc673835f5e3a3d"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/comparison-harness.patch",
+      "file": "comparison-harness.patch",
+      "bytes": 56785,
+      "sha256": "e8b6e487990e836946c225b4a0eeaa42110e9ed6b82b9b220103b2ac7c98516b"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/completed-audit.json",
+      "file": "completed-audit.json",
+      "bytes": 12393,
+      "sha256": "6f313f91261b9bf63545aec4624b4f1026d3b05587380bae2593b5a5e22587a1"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/comparison-summary.md",
+      "file": "comparison-summary.md",
+      "bytes": 7546,
+      "sha256": "c6962a3cb0c9fb58b0d5ab0b48645c55a5ca67e7d102b5628d54143c87105ff5"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/comparison-summary.json",
+      "file": "comparison-summary.json",
+      "bytes": 68482,
+      "sha256": "26697980b317df3bcf27273c2defabf9e81e8fca20bd125287c14f90f726575a"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/newbie-1-generated-cold.json",
+      "file": "raw/newbie-1-generated-cold.json",
+      "bytes": 33470,
+      "sha256": "d54ed6417950001f6f5da1b78133d3539df6ed772e3850da214d13d06eea5ab6"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/newbie-1-generated-warm.json",
+      "file": "raw/newbie-1-generated-warm.json",
+      "bytes": 33221,
+      "sha256": "251415f819ec497939604fab96c0c29d01b201e9ce88f7d1d772183c063f1ae2"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/newbie-1-cache-cold.json",
+      "file": "raw/newbie-1-cache-cold.json",
+      "bytes": 38848,
+      "sha256": "833e364eec5d53102d91e107761a9f19c36fbf0d95ed18f251a98ede5e3687b7"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/newbie-1-cache-warm.json",
+      "file": "raw/newbie-1-cache-warm.json",
+      "bytes": 38662,
+      "sha256": "13ad655974a2ae0e7d0d0e4f70e276ebf6496d94f767fcf543080dda7f18e826"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/newbie-2-cache-cold.json",
+      "file": "raw/newbie-2-cache-cold.json",
+      "bytes": 38708,
+      "sha256": "f90f663c6b57e9c62717eb59a9f3259557c9d65cdad7836544d56a211cd27cf9"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/newbie-2-cache-warm.json",
+      "file": "raw/newbie-2-cache-warm.json",
+      "bytes": 38643,
+      "sha256": "0ba5412501fd1022d5ba9eb02e91a94ba4e344b39936d7f931917fb59bba6d3e"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/newbie-2-generated-cold.json",
+      "file": "raw/newbie-2-generated-cold.json",
+      "bytes": 33486,
+      "sha256": "2433faac2636b98e580732b85d05b6a588e7a799995e4fe1014ba91d50b311aa"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/newbie-2-generated-warm.json",
+      "file": "raw/newbie-2-generated-warm.json",
+      "bytes": 33325,
+      "sha256": "74bdd7fbdad04fb0c8e15e27ea69ea634c277af6a282238f0a9f55493efe00bf"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/newbie-3-generated-cold.json",
+      "file": "raw/newbie-3-generated-cold.json",
+      "bytes": 33412,
+      "sha256": "08cb4fea784042c9f37acf6b13b799f9d958ef4b2d1d1a1f6e3d4fedfffa95f2"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/newbie-3-generated-warm.json",
+      "file": "raw/newbie-3-generated-warm.json",
+      "bytes": 32753,
+      "sha256": "4befa8f99a85ee09a582451266285b06e5bb34aeeea69e673b10335dfb1980db"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/newbie-3-cache-cold.json",
+      "file": "raw/newbie-3-cache-cold.json",
+      "bytes": 38549,
+      "sha256": "8827489a422e31fd4f0648f6f95b90edc019e32e1fd90b5730a099a8d94bca24"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/newbie-3-cache-warm.json",
+      "file": "raw/newbie-3-cache-warm.json",
+      "bytes": 38891,
+      "sha256": "653d61954803d4d7b2db06fd6cc8d86d51d889b000af5d4b4ca2d5e78845889e"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-near-1-generated-cold.json",
+      "file": "raw/saved-near-1-generated-cold.json",
+      "bytes": 33541,
+      "sha256": "03311fec81120ecbb95cb3f426ff7bb2fbfb4ab3f2cf58479aa53f76b0d5d5f4"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-near-1-generated-warm.json",
+      "file": "raw/saved-near-1-generated-warm.json",
+      "bytes": 33227,
+      "sha256": "1d5e13c565f6602ef98423ea47532937f44244f574d3c384a9083d1dce982136"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-near-1-cache-cold.json",
+      "file": "raw/saved-near-1-cache-cold.json",
+      "bytes": 38975,
+      "sha256": "0b891a89f548ba31e237f3ac3f074271fd17d95ef2ccf1d790659385b0924d90"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-near-1-cache-warm.json",
+      "file": "raw/saved-near-1-cache-warm.json",
+      "bytes": 38940,
+      "sha256": "085803332713dc997ee9721d4b379aa281223310502c37dc7023994ee3c741b5"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-near-2-cache-cold.json",
+      "file": "raw/saved-near-2-cache-cold.json",
+      "bytes": 38983,
+      "sha256": "abae06afb12f367278cfc061a6b48bf06d44cf6abc43a81cfeffce194f96cc86"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-near-2-cache-warm.json",
+      "file": "raw/saved-near-2-cache-warm.json",
+      "bytes": 38965,
+      "sha256": "cfe30c1a88a8a9b4bb89426fd8b09b35920b682e0d5ec5dcd38af11e71dc23e1"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-near-2-generated-cold.json",
+      "file": "raw/saved-near-2-generated-cold.json",
+      "bytes": 33287,
+      "sha256": "16f4943225b104cf5e65978b2cd731a680cbf53750f3235af7a4c49521d248d2"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-near-2-generated-warm.json",
+      "file": "raw/saved-near-2-generated-warm.json",
+      "bytes": 33218,
+      "sha256": "99454791ff79e0044b0cc7adba95f1e82c6f840276acb6bfbe4711b742fe9448"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-near-3-generated-cold.json",
+      "file": "raw/saved-near-3-generated-cold.json",
+      "bytes": 33468,
+      "sha256": "23106465f8b2d267ee8b91abe22a1aadabc9ccf3bae4265058e71ebbe7289986"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-near-3-generated-warm.json",
+      "file": "raw/saved-near-3-generated-warm.json",
+      "bytes": 33430,
+      "sha256": "6ddd0a8ba265d8b1c541f47ee5397ab51d171134a391b15503d2fe1d456dce6c"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-near-3-cache-cold.json",
+      "file": "raw/saved-near-3-cache-cold.json",
+      "bytes": 39123,
+      "sha256": "cda4af6403d23335bdd5a85c6b0053b94e4a0ac76762ae1f1143df76fad828ac"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-near-3-cache-warm.json",
+      "file": "raw/saved-near-3-cache-warm.json",
+      "bytes": 39255,
+      "sha256": "da1db496da52070568c28d80cae6bcd5a6c7ea2381909a16fa7d9ebe677fd6b7"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-far-1-generated-cold.json",
+      "file": "raw/saved-far-1-generated-cold.json",
+      "bytes": 33504,
+      "sha256": "066438abd7260797968ba33646f2c19427224d7eaeecbfa792acb0ba82ad5ced"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-far-1-generated-warm.json",
+      "file": "raw/saved-far-1-generated-warm.json",
+      "bytes": 33251,
+      "sha256": "ef8db9e9bca9a40075aa6da2725797d97c5258db311152931018888dc473f9c9"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-far-1-cache-cold.json",
+      "file": "raw/saved-far-1-cache-cold.json",
+      "bytes": 39031,
+      "sha256": "ba929a069f001b6b4a65c41298a0cfe685eae7b58e51060865450add2bb3a0d1"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-far-1-cache-warm.json",
+      "file": "raw/saved-far-1-cache-warm.json",
+      "bytes": 38745,
+      "sha256": "85387b4483f8d81dde417cecb8ee27449e04a8b96e693d63e19dd4c23feac12a"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-far-2-cache-cold.json",
+      "file": "raw/saved-far-2-cache-cold.json",
+      "bytes": 38947,
+      "sha256": "d0b0eb7fe9f5c373433742d6c36bc0540bcc85127e70458d1ef542d764d9815b"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-far-2-cache-warm.json",
+      "file": "raw/saved-far-2-cache-warm.json",
+      "bytes": 38593,
+      "sha256": "73539082f38a35014913eea7458c3b6a188a411659504ccd1cb123f88129d9bb"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-far-2-generated-cold.json",
+      "file": "raw/saved-far-2-generated-cold.json",
+      "bytes": 33328,
+      "sha256": "f1e72e5d0e3c43f39f016f6836f127ffe4b16ca6504fc899f9d867fcf57af521"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-far-2-generated-warm.json",
+      "file": "raw/saved-far-2-generated-warm.json",
+      "bytes": 33184,
+      "sha256": "c397ee619b76275343d07f026652463814e16fed9799950273d18c8b16218212"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-far-3-generated-cold.json",
+      "file": "raw/saved-far-3-generated-cold.json",
+      "bytes": 33478,
+      "sha256": "3163864688b03ba3622b36e423b1f630a49f9b1ac19c8b70d86d49824cbe6bdb"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-far-3-generated-warm.json",
+      "file": "raw/saved-far-3-generated-warm.json",
+      "bytes": 33334,
+      "sha256": "682b973a83c6ce22062ac812c2627fbf080d5e4df0753b88a655e2eb5f8dfa9d"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-far-3-cache-cold.json",
+      "file": "raw/saved-far-3-cache-cold.json",
+      "bytes": 38717,
+      "sha256": "4da41e3b5b56a1e59bf96e96b85a87f75d1aaede5be013ddfc152b58ba5e30d2"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-far-3-cache-warm.json",
+      "file": "raw/saved-far-3-cache-warm.json",
+      "bytes": 38837,
+      "sha256": "abb9aa9db5533c70d08f8f37b7c3bdc5ff106a1162a1e645d9cc186934caa448"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/newbie-1-fixture.json",
+      "file": "fixtures/newbie-1-fixture.json",
+      "bytes": 35,
+      "sha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/newbie-2-fixture.json",
+      "file": "fixtures/newbie-2-fixture.json",
+      "bytes": 35,
+      "sha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/newbie-3-fixture.json",
+      "file": "fixtures/newbie-3-fixture.json",
+      "bytes": 35,
+      "sha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-far-1-fixture.json",
+      "file": "fixtures/saved-far-1-fixture.json",
+      "bytes": 262,
+      "sha256": "e2f0e910a4a7f61115287652cc896cbc63f985a0eeeecabc6acf081cc75df4d0"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-far-2-fixture.json",
+      "file": "fixtures/saved-far-2-fixture.json",
+      "bytes": 262,
+      "sha256": "e2f0e910a4a7f61115287652cc896cbc63f985a0eeeecabc6acf081cc75df4d0"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-far-3-fixture.json",
+      "file": "fixtures/saved-far-3-fixture.json",
+      "bytes": 262,
+      "sha256": "e2f0e910a4a7f61115287652cc896cbc63f985a0eeeecabc6acf081cc75df4d0"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-near-1-fixture.json",
+      "file": "fixtures/saved-near-1-fixture.json",
+      "bytes": 262,
+      "sha256": "b00382a13530f84154b63ea41871b2d73ebba342cf7ba4f30d4e85d60fb7cf35"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-near-2-fixture.json",
+      "file": "fixtures/saved-near-2-fixture.json",
+      "bytes": 262,
+      "sha256": "b00382a13530f84154b63ea41871b2d73ebba342cf7ba4f30d4e85d60fb7cf35"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/saved-near-3-fixture.json",
+      "file": "fixtures/saved-near-3-fixture.json",
+      "bytes": 262,
+      "sha256": "b00382a13530f84154b63ea41871b2d73ebba342cf7ba4f30d4e85d60fb7cf35"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/source/tools/probe.cjs",
+      "file": "harness/tools/probe.cjs",
+      "bytes": 44442,
+      "sha256": "e5ee9ae613ff40fd48a89249a23ab3c1c1b1252920c1244a0609198d765f12eb"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/source/tools/probe-checks/startup-ready.js",
+      "file": "harness/tools/probe-checks/startup-ready.js",
+      "bytes": 6053,
+      "sha256": "044da43ee073f0533427231b14d4ef0a92d61a0c46db718819efc47507942c91"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/source/tools/probe-checks/startup-bootstrap-observe.js",
+      "file": "harness/tools/probe-checks/startup-bootstrap-observe.js",
+      "bytes": 654,
+      "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/source/tools/startup-bench.mjs",
+      "file": "harness/tools/startup-bench.mjs",
+      "bytes": 15152,
+      "sha256": "9c79985aa2b813403a2473d6e5aa5ff946d4680ace28627c39caf54490fdc9d9"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/source/tools/startuptrace-test.mjs",
+      "file": "harness/tools/startuptrace-test.mjs",
+      "bytes": 6791,
+      "sha256": "3cba91741239407f846922ed8920b1a8be24e23b9918f4a3e60b65ec5d1e6224"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/source/tools/startup-report.mjs",
+      "file": "harness/tools/startup-report.mjs",
+      "bytes": 13190,
+      "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/source/tools/startup-revalidate.mjs",
+      "file": "harness/tools/startup-revalidate.mjs",
+      "bytes": 11061,
+      "sha256": "ac49c38df2e681319055fda157ee93eddc115f781809977b6850705f199d478b"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/source/tools/land-cache-host.cjs",
+      "file": "harness/tools/land-cache-host.cjs",
+      "bytes": 3763,
+      "sha256": "5ad1524a312fd40e6c7e46530d608bd84819becec6bdeefac39f86add6bcf32c"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison-ready/harness/tools/startup-comparison-test.mjs",
+      "file": "harness/tools/startup-comparison-test.mjs",
+      "bytes": 10437,
+      "sha256": "0c483f3162c5edb92112593b70d5d3f078e627408dfbccec3b0d25170c629dc2"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison-ready/HARNESS.json",
+      "file": "preparation/HARNESS.json",
+      "bytes": 4346,
+      "sha256": "e871b1eb8ca1c7c9fad2f5cfb3f6f9c2afa722750d48d3c4828f1fa37b67febd"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison-ready/ready-validation.json",
+      "file": "preparation/ready-validation.json",
+      "bytes": 486,
+      "sha256": "759788195391246799051ab35d122086300feb2cfbb5fea239180fd71ea5116b"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison-ready/explicit-cli.txt",
+      "file": "preparation/explicit-cli.txt",
+      "bytes": 364,
+      "sha256": "8ae598f980850dc1af69ba80cdfbc4403f8320f139f27c8cbcce494d1fd490a7"
+    },
+    {
+      "original": "/tmp/bird-landcache17a/comparison/REVIEW-SNAPSHOT.json",
+      "file": "preparation/independent-review-snapshot.json",
+      "bytes": 1100,
+      "sha256": "dad15b5acb57bd3bcfc878ca8009e852c4919db9feea5ce138790affabff6a7a"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison-independent-review.json",
+      "file": "preparation/independent-review.json",
+      "bytes": 1737,
+      "sha256": "dec4951207f2072b5121bf0c42653e3e2af50aadf1cdc842fe34335cde62a686"
+    },
+    {
+      "original": "/tmp/bird-landcache17a-comparison36-1102/root-spotcheck.json",
+      "file": "root-spotcheck.json",
+      "bytes": 1588,
+      "sha256": "930543d4c880c6c050aef61dd6a53bbd2971c5af59f605461d577aa0b7ab131a"
+    },
+    {
+      "original": "/Users/andrewboev/Desktop/not-work/delivery/docs/measurements/landcache-2026-11-02/comparison-36/independent-audit.json",
+      "file": "independent-audit.json",
+      "bytes": 38086,
+      "sha256": "104ae5764079327a2507ef36b17b20385cc18d763d334216af266621b2fe19e2",
+      "addedBy": "root from steering independent review"
+    },
+    {
+      "original": "/Users/andrewboev/Desktop/not-work/delivery/docs/measurements/landcache-2026-11-02/comparison-36/independent-audit.md",
+      "file": "independent-audit.md",
+      "bytes": 2754,
+      "sha256": "73fc7bc0ade5e9ac2f51ca5c007f7ada5e2d37338aa4f15670831606eb01527c",
+      "addedBy": "root from steering independent review"
+    },
+    {
+      "original": "/Users/andrewboev/Desktop/not-work/delivery/docs/measurements/landcache-2026-11-02/comparison-36/independent-revalidation.json",
+      "file": "independent-revalidation.json",
+      "bytes": 57089,
+      "sha256": "a81c0cd1d9f0e29d9f08cc8fa840fc09c8196b2ffec409521b3963959ed9bb0b",
+      "addedBy": "root from steering independent review"
+    }
+  ],
+  "assetBodiesReadDuringAuditOrArchive": false,
+  "sourceOrBuildTraversedDuringAuditOrArchive": false,
+  "originalFilesRetained": true,
+  "independentAudit": "All36 reports /18 pairs /actual argv /raw SHA /12 medians /192 stage aggregates PASS; see independent-* files."
+}

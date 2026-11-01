@@ -1,0 +1,5 @@
+
+> bird-pizza-delivery@0.1.0 probe
+> electron tools/probe.cjs --mode=steam --dir=/tmp/bird-landcache17a-protocol2-1102/steam --fresh --early --startup-trace --startup-session=lc17-geometry-generated-2a3bfe6a-cfe7-4fac-9d2e-c9c69666e677 --startup-cold --startup-fixture=/tmp/bird-startup17-series-5a20287/newbie-1-fixture.json --init-script=/tmp/bird-landcache17a-protocol2-1102/combined-init.js --size=deck --cpu=3 --bootcpu --seed=7 --bootwait=300 --timeout=420 --q=gfx=high&gfxdev=deck&mute&startupdistrict=0 --eval=/tmp/bird-landcache17a/cache17a-geometry.js --max=0 --errors --report=/tmp/bird-landcache17a-geometry-1102-steering-01/generated.json
+
+{"ok":false,"timing":false,"stage":"select","error":"TypeError: Cannot read properties of undefined (reading 'position')\n    at <anonymous>:207:205\n    at async <anonymous>:74:14","samples":null,"cache":null,"crash":0}

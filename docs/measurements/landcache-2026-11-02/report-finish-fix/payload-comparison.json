@@ -1,0 +1,27 @@
+{
+  "ok": true,
+  "files": [
+    {
+      "path": "/tmp/bird-landcache17a-protocol2-1102/city.land",
+      "bytes": 74735068,
+      "headerBytes": 73421,
+      "payloadOffset": 73441,
+      "payloadBytes": 74661627,
+      "sourceHash": "e18ef4ddcda05aacbaf491b499952c9d6b9843f575d5d234047613776bde8e18",
+      "fullSha256": "1d37b7f3c446150e8ad81b1047da9c97ed630d7e7f4edc3d785a1857199b7793",
+      "payloadSha256": "939ef3f9088de1bd345a45e207ecd3790029f049b9a9fffb4fa4ec01ac3745b4"
+    },
+    {
+      "path": "/tmp/bird-landcache17a-reportfix-1102/city.land",
+      "bytes": 74735068,
+      "headerBytes": 73421,
+      "payloadOffset": 73441,
+      "payloadBytes": 74661627,
+      "sourceHash": "fdb6923c13afc8f369b8c02931174fb953706d52fb5d3f347683dab0f2f6fcce",
+      "fullSha256": "40d8f28821b28ed37330fb23485ca8306cab17931e2ecfd09093b293aa367e08",
+      "payloadSha256": "939ef3f9088de1bd345a45e207ecd3790029f049b9a9fffb4fa4ec01ac3745b4"
+    }
+  ],
+  "payloadByteExact": true,
+  "headerDiffOnlyIdentitySourceHash": true
+}

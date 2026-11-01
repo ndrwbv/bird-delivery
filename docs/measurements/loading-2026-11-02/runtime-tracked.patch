@@ -1,0 +1,567 @@
+diff --git a/src/game/game.js b/src/game/game.js
+index 0abdced..4247cf0 100644
+--- a/src/game/game.js
++++ b/src/game/game.js
+@@ -16,6 +16,7 @@
+    клику раскрывается в полную карту района.
+    ────────────────────────────────────────────────────────────────────────── */
+ 
++import { STARTUP } from './startuptrace.js';
+ import * as THREE from '../vendor/three.module.min.js';
+ import * as SOFTCITY from './softcity.js';
+ import * as SKYM from './sky.js';               // небо-купол, свет и палитра (2г1)
+@@ -806,13 +807,13 @@ function mergeGeos (list, noNormal, bytes) {      // bytes — цвет верш
+    Омега-мост через реку: настоящего в рамке нет. x на восток, z на юг. */
+ 
+ const CITY = MAP.data;
+-EDL.houses(CITY);                              // правки домов из редактора: этажи, цвет, мурал, убрать (editlayer.js, edits.json → houses)
+-WIDEN.widen(CITY, { off: new URLSearchParams(location.search).has('nowiden') });   // полосы шире — до всего, что строится из улиц (roadwiden.js)
++STARTUP.work('map.edits', () => EDL.houses(CITY));                              // правки домов из редактора: этажи, цвет, мурал, убрать (editlayer.js, edits.json → houses)
++STARTUP.work('roads.widen', () => WIDEN.widen(CITY, { off: new URLSearchParams(location.search).has('nowiden') }));   // полосы шире — до всего, что строится из улиц (roadwiden.js)
+ sanitizePois(CITY.pois);                       // чужие вывески → пародии и выдуманные (brands.js)
+ if (!new URLSearchParams(location.search).has('norings')) RINGM.roundOff(CITY);   // малые круги — ровной окружностью, до всего, что строится из улиц (rings.js)
+-WORLD.prepCity(CITY, MAP, CAREER);               // карьера: дома в круге MAP.career.rich — особняки (world.js); до плавных улиц (0п71): особняки ставятся по улицам углом, как с ?oldroads, а дуги их обходят (проезд R 13 м съедал «Новый проезд, 4 к2»)
++STARTUP.work('roads.prepCity', () => WORLD.prepCity(CITY, MAP, CAREER));               // карьера: дома в круге MAP.career.rich — особняки (world.js); до плавных улиц (0п71): особняки ставятся по улицам углом, как с ?oldroads, а дуги их обходят (проезд R 13 м съедал «Новый проезд, 4 к2»)
+ { const on = !new URLSearchParams(location.search).has('oldroads');   // плавные улицы: изломы — дугой, до fixMap и всего, что строится из улиц (roadsmooth.js); с 24.10.2026 — по умолчанию, ?oldroads — старые улицы углом (бит в бит прежний город), ?smooth — то же, что без флага
+-  SMOOTH.smooth(CITY, { on, circles: on ? RINGM.found(CITY) : [] }); }
++  STARTUP.work('roads.smooth', () => SMOOTH.smooth(CITY, { on, circles: on ? RINGM.found(CITY) : [] })); }
+ /* ТЦ: подсказки стиля из генератора карты (malls[].style) — на сам дом */
+ for (const m of CITY.malls || []) {
+   const b = CITY.buildings.find(q => q.id === m.id);
+@@ -888,33 +889,33 @@ const drivable = r => !r.x && r.c !== 6;
+    (см. Mesher.dtri), поэтому ложится на склон без щелей и не тонет. */
+ const TER = CITY.terrain;
+ const TG = TER.g, TNX = TER.nx, TNZ = TER.nz, TX0 = TER.x0, TZ0 = TER.z0;
+-const TH = (() => {
++const TH = STARTUP.work('terrain.decode', () => {
+   const bin = atob(TER.h), a = new Float32Array(TNX * TNZ);
+   for (let i = 0; i < a.length; i++)
+     a[i] = ((bin.charCodeAt(i * 2) | (bin.charCodeAt(i * 2 + 1) << 8)) - 1000) / 10;
+   return a;
+-})();
++});
+ /* Проверка и починка карты (mapcheck.js): до всего, что строится из улиц и
+    рельефа, — сшить обрывы, выровнять рельеф под дорогами, поднять мосты
+    над улицами и решить, чем закрыть тупики. ?nomapfix — как в выгрузке,
+    ?mapcheck — сводка проблем в консоли и столбики над ними. */
+ const MAPCHECK = new URLSearchParams(location.search).has('mapcheck');
+-const MAPFIX = new URLSearchParams(location.search).has('nomapfix') ? null : fixMap(CITY, TH, { before: MAPCHECK });
++const MAPFIX = new URLSearchParams(location.search).has('nomapfix') ? null : STARTUP.work('terrain.fixMap', () => fixMap(CITY, TH, { before: MAPCHECK }));
+ /* Неровный газон: бугры 0,1—0,4 м и холмики 1—2,5 м на больших газонах — добавкой к высотам сетки
+    до сборки города, поэтому всё (деревья, лавки, люди, колёса) встаёт на рельеф само. У дорог,
+    дорожек, домов, подъездов, площадок, воды и пиццерий — ровно (relief.js, ?norelief — без него) */
+-RELIEF.addRelief(CITY, TH, TER, {
++STARTUP.work('terrain.relief', () => RELIEF.addRelief(CITY, TH, TER, {
+   roadHW: r => (roadWidth(r) + (r.c <= 5 ? 5.5 : 2) + (r.g || 0) * 2) / 2,
+   spots: MAP.career ? [...((MAP.career.districts && MAP.career.districts.list) || []).filter(q => q.pizza).map(q => [q.pizza[0], q.pizza[1], 60]),
+     ...(MAP.career.garages || []).map(q => [q.x, q.z, 45])] : [],
+-});
+-BEACH.shape(TH, TER);                             // пляж: песок намыт в реку, дно пологое — до сборки земли и воды (beach.js)
++}));
++STARTUP.work('terrain.beach', () => BEACH.shape(TH, TER));                             // пляж: песок намыт в реку, дно пологое — до сборки земли и воды (beach.js)
+ /* речки и пруды: русло ниже земли — до сборки города, как рельеф (streams.js; ?nostreams — как было) */
+-STREAMS.carve(CITY, TH, TER, {
++STARTUP.work('terrain.streams', () => STREAMS.carve(CITY, TH, TER, {
+   roadHW: r => (roadWidth(r) + (r.c <= 5 ? 5.5 : 2) + (r.g || 0) * 2) / 2, far: (x, z) => !!DMASK && farOut(x, z),
+   spots: MAP.career ? [...((MAP.career.districts && MAP.career.districts.list) || []).filter(q => q.pizza).map(q => [q.pizza[0], q.pizza[1], 60]),
+     ...(MAP.career.garages || []).map(q => [q.x, q.z, 45])] : [],
+-});
++}));
+ 
+ const LAND_POS = RLAND.ON ? (() => {
+   let low=Infinity,high=-Infinity;for(const y of TH){low=Math.min(low,y);high=Math.max(high,y);}
+@@ -6033,7 +6034,7 @@ function* timedSteps (k, it) {                    // шаги куска (latebu
+ function buildCity () {
+   const house = dodoHouse();
+   const spot = house ? null : pizzaSpot();
+-  const tm0 = (k, f) => { const t0 = performance.now(); f(); BUILD_T[k] = Math.round(performance.now() - t0); };
++  const tm0 = (k, f) => { const t0 = performance.now(); STARTUP.work('city.' + k, f); BUILD_T[k] = Math.round(performance.now() - t0); };
+   tm0('ground', osmGround);
+   RW.init({ CITY, MAP, nearestRoad, get ENV () { return ENV; } });   // вид асфальта улиц — до полотна (roadwear.js); ENV — позже, на дождь
+   tm0('roads', osmRoads);
+@@ -6060,7 +6061,7 @@ function buildCity () {
+ 
+   // дальше — то, что в меню не главное: с поздней сборкой (latebuild.js) — очередью после первого кадра меню, в том же порядке
+   // кусок может вернуть итератор (шаги по кадрам, latebuild.js) — время в BUILD_T тогда суммой шагов
+-  const tm = (k, f) => LATE.add(k, () => { const t0 = performance.now(), r = f(); BUILD_T[k] = Math.round(performance.now() - t0); return r && r.next ? timedSteps(k, r) : r; });
++  const tm = (k, f) => LATE.add(k, () => { const t0 = performance.now(), r = STARTUP.work('city.' + k, f); BUILD_T[k] = Math.round(performance.now() - t0); return r && r.next ? timedSteps(k, r) : r; });
+   if (ADULT && !INTRO) tm('nightlife', () => NIGHT.build(nightApi()));   // стрип-клуб и места «ночных бабочек» (nightlife.js) — до деревьев и лавочек: они обходят пристройку
+   tm('gangmap', () => ZN.prepSteps({ CITY, MAP, groundH }));   // кварталы бандитов — маска клеток до мира (zones.js; без жребия)
+   tm('world', () => WORLD.build(worldApi()));     // аллеи; в карьере — газоны особняков, мусор, гаражи (world.js) — до деревьев и лавочек
+@@ -6114,14 +6115,14 @@ function buildCity () {
+     yield* flushLandStage(GROUND_M);
+     LITM.landPages(LATE.busy());
+     try {
+-      RLAND.prepare(CITY.buildings, p => THREE.ShapeUtils.triangulateShape(p.map(q => new THREE.Vector2(q[0], q[1])), []));
+-      yield* RLAND.cleanContours({M:LITM,terrain:TER,groundH:terrainH,deferDraw:!!LAND_STREAM,skip:DMASK?farOut:null,triangulate:(outer,holes)=>({
++      STARTUP.work('raisedland.prepare', () => RLAND.prepare(CITY.buildings, p => THREE.ShapeUtils.triangulateShape(p.map(q => new THREE.Vector2(q[0], q[1])), [])));
++      yield* STARTUP.steps('raisedland.cleanContours', RLAND.cleanContours({M:LITM,terrain:TER,groundH:terrainH,deferDraw:!!LAND_STREAM,skip:DMASK?farOut:null,triangulate:(outer,holes)=>({
+         points:[...outer,...holes.flat()],
+         triangles:THREE.ShapeUtils.triangulateShape(outer.map(p=>new THREE.Vector2(...p)),holes.map(h=>h.map(p=>new THREE.Vector2(...p))))
+-      })});
++      })}));
+       yield* flushLandStage();
+-      RLAND.activate(DMASK?farOut:null);
+-      const delta=RLAND.alignObjects({lists:[LIT,FLAT,LAMPH],items:SMASH,props:PROPS,benches:BENCHES,baseH:terrainH});
++      STARTUP.work('raisedland.activate', () => RLAND.activate(DMASK?farOut:null));
++      const delta=STARTUP.work('raisedland.alignObjects', () => RLAND.alignObjects({lists:[LIT,FLAT,LAMPH],items:SMASH,props:PROPS,benches:BENCHES,baseH:terrainH}));
+       SEAS.raiseLand(delta);
+     } finally { LITM.landPages(false);LAND_POS.release(); }
+   });
+@@ -6193,6 +6194,7 @@ function buildCity () {
+       const tail=M.mesh(litMat);for(const m of tail.children.slice())g.add(m);
+       return g;
+     },publish(id,g) {
++      STARTUP.geometry('land.surfacePublished', g);
+       groups.push(g);scene.add(g);CULL.register(g);groundStreamMask.update();
+     }});
+     groundStreamMask=streamedGroundMaterial(THREE,litMat,LAND_STREAM);
+@@ -6235,7 +6237,7 @@ function buildCity () {
+     wg.setAttribute('color', new THREE.BufferAttribute(new Uint8Array(12), 4, true));
+     warm4 = [litMat, flatMat].map(m => { const w = new THREE.Mesh(wg, m); w.frustumCulled = false; scene.add(w); return w; });
+     // шейдеры города — видеокарта компилирует их сама, пока здесь строится остальное (первый кадр меню не ждёт компиляции)
+-    try { renderer.compileAsync(scene, cam).catch(() => {}); } catch (e) { /* — */ }
++    try { STARTUP.awaited('gpu.compileAsync', 'gpuWait', () => STARTUP.work('gpu.compileDispatch', () => renderer.compileAsync(scene, cam))).catch(() => { STARTUP.flag('gpu.compileError'); }); } catch (e) { /* — */ }
+   }
+   BUILD_T.mesh = Math.round(performance.now() - tq);
+   // шагами (latebuild.js): общие вершины клеток (ixCell, Mesher prep) — пачками по ~150 тыс. вершин, на Деке ~35—40 мс каждая
+@@ -6277,7 +6279,7 @@ function buildCity () {
+     if (warm4) { for (const w of warm4) scene.remove(w); warm4[0].geometry.dispose(); warm4 = null; }
+     BUILD_T.meshLate = Math.round(ms + performance.now() - t0);
+   });
+-  if(RLAND.ON)LATE.add('raisedlandSurface',buildRaisedLandSurface);
++  if(RLAND.ON)LATE.add('raisedlandSurface', () => STARTUP.steps('raisedland.nearSurface', buildRaisedLandSurface()));
+   WINS.build(scene);                              // окна — по клеткам, один материал (windows.js)
+   PAINT.build(scene);                             // муралы — один меш (citypaint.js)
+   /* Всю статику — сразу в видеокарту, одним кадром в крохотную цель:
+@@ -16781,6 +16783,7 @@ function reviveTick (dt) {
+ 
+ function startRun (ride) {
+   if (RESET_LOCKED) return;
++  STARTUP.request({ ride: !!ride, district: DIST.cur() });
+   const place=PIZZERIAS[DIST.cur()]||PIZZA;
+   if (LAND_STREAM && !LATE.busy() && !LAND_STREAM.readyAt(place.bx,place.bz,640)) {
+     if (LAND_ENTERING) return;
+@@ -17258,7 +17261,8 @@ SEAS.initSeasons({ THREE, scene, cam, renderer, Store, MAP, CITY, V, S, groundH,
+    ?nolate — всё разом, как раньше; ?mapcheck — тоже разом (проверка карты смотрит готовый город) */
+ LATE.enable(!INTRO && !MAPCHECK && !/[?&]nolate(&|$)/.test(location.search));
+ const T0 = performance.now();
+-buildCity();
++STARTUP.work('city.syncBuild', () => buildCity());
++STARTUP.mark('city.syncBuilt');
+ EDL.buildEnd();
+ ZN.init({ CITY, MAP, donated, groundH });      // groundH — Томь не квартал бандитов (zones.js GMAP)
+ /* окно разговора (dialog.js): мир не стоит (автор 16.10.2026) — руль из рук на открытии, держит машину кадр мира ниже
+@@ -18516,7 +18520,7 @@ function frameStep (now) {
+   if (isPlaying() && !S.ride && S.state !== 'brief' && S.state !== 'loading') S.shiftT = (S.shiftT || 0) + dt;
+ 
+   if (FPV.hid) { car.visible = true; FPV.hid = 0; }   // вид из кабины прячет машину только на свой кадр (camStep)
+-  let vf = 0;
++  let vf = 0, startupDrivable = false;
+   if (S.state === 'dying' && DEATH.rev) {
+     for (const k in IN) IN[k] = 0;
+     reviveTick(dt);                              // новая машина спускается с неба
+@@ -18545,6 +18549,7 @@ function frameStep (now) {
+     car.rotation.y = V.h;
+   } else {
+     briefStep(dt);                                 // пицца уже в багажнике, а накладная ещё висит — досчитать её время
++    startupDrivable = S.state === 'drive' && !DOOR.on() && !dlgHold && !HCAM.busy() && !FPD.busy() && !ST3.on();
+     if (DOOR.on() || dlgHold || HCAM.busy() || FPD.busy()) holdCar(dt);   // от первого лица к подъезду (fpdeliver.js); домофон (doorstep.js), окно разговора (dialog.js), сцена вручения (handcam.js): руль из рук, машина стоит
+     vf = driveSub(dt);
+     camStep(dt, vf);
+@@ -18776,6 +18781,12 @@ function frameStep (now) {
+   TUNE.step(raw, wk, isPlaying() && !S.paused && !EXT.paused && !FM.open && !document.hidden && !REPLAY.on(), 1000 / Math.min(GFX.fpsCap() || 60, 60), DYN.timer());   // кадр тяжёлый — ненадолго ближе дальность, люди, машины, мелочь газона (tune.js)
+   CULL.Q.t = TUNE.M.far; WINS.lodScale(TUNE.M.win);
+   GFX.work(wk);
++  if (STARTUP.enabled && startupDrivable && !LATE.busy() && !LAND_ENTERING && !document.hidden &&
++      !document.body.classList.contains('booting') && !document.querySelector('.late-wait') &&
++      (!LAND_STREAM || LAND_STREAM.readyAt(V.x, V.z, 640)) && (!RLAND.ON || RLAND.ST.supportReady)) {
++    STARTUP.control({ state: S.state, held: false, localReady: true, supportReady: !RLAND.ON || !!RLAND.ST.supportReady,
++      x: V.x, z: V.z, gas: IN.gas, readyTiles: LAND_STREAM?.stats.ready ?? null });
++  }
+   CL.step('hpool', HPOOL.step, wk);               // запас готовых людей: короткий кадр — дособрать, ≤ 0,5 мс (humanpool.js)
+   if (isPlaying()) CL.step('svcwarm', SVCP.warm, wk);   // куски улиц «режет ли дом» для путей курьеров — заранее, в короткие кадры (svcpath.js)
+   GFX.watch(isPlaying() && !S.paused && !FM.open && !REPLAY.on() && !(DLG.isOpen && DLG.isOpen()));             // кадр не успевает на Высокой — один раз предложить Среднюю
+@@ -18874,7 +18885,7 @@ REPLAY.init({
+     if (on) { Snd.engine(0); joyReset(); Platform.gameplayStop(); } else if (isPlaying()) Platform.gameplayStart();
+   },
+ });
+-if (LATE.busy()) { try { renderer.compileAsync(scene, cam).catch(() => {}); } catch (e) { /* — */ } }   // остальное, что уже в сцене, — тоже заранее
++if (LATE.busy()) { try { STARTUP.awaited('gpu.compileAsync', 'gpuWait', () => STARTUP.work('gpu.compileDispatch', () => renderer.compileAsync(scene, cam))).catch(() => { STARTUP.flag('gpu.compileError'); }); } catch (e) { /* — */ } }   // остальное, что уже в сцене, — тоже заранее
+ requestAnimationFrame(frame);
+ /* поздняя сборка (latebuild.js): очередь — после первых кадров меню (или через 1,5 с, если кадров нет — окно скрыто).
+    Выбрал карточку меню (на смену, быстрый заезд, гараж, покататься, находки…) а город ещё
+@@ -18895,6 +18906,7 @@ if (LATE.busy()) {
+     // ждать город — только тем, кому он нужен: смена, быстрый заезд, покататься, гараж;
+     // настройки, доска почёта, находки, рекорды, выход — сразу (автор 11.10.2026)
+     if (cardEl.classList.contains('crm-card') && ['settings', 'honor', 'collect', 'board', 'quit'].includes(cardEl.dataset.key)) return;
++    if (cardEl.dataset.key === 'go') STARTUP.request({ menuKey: 'go', district: DIST.cur() });
+     e.preventDefault(); e.stopImmediatePropagation();
+     if (document.querySelector('.late-wait')) return;   // уже ждём
+     const boot = document.createElement('div');
+@@ -18937,6 +18949,7 @@ if (LATE.busy()) {
+ /* песочница (sandbox.html): бесконечное здоровье, нитро, «не глохнет» (noStall читает cars.js) */
+ const SBX = { god: false, nitro: false, noStall: false };
+ if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { SOFTCITY, SOFTSURF, inWall, FLY: FLYC, WRONG: WRONG.DEBUG, GUN, inTallHouse, WIDEN: { ...WIDEN.WIDEN, STATS: WIDEN.STATS }, SMOOTH: { SM: SMOOTH.SM, STATS: SMOOTH.STATS, ARCS: SMOOTH.ARCS, isArc: SMOOTH.isArc }, FACE: FACE_DEBUG, RADAR, HUDC, RYARD: RYARD.DEBUG, RT, RASK: RASK.DEBUG, OTAGS: OTAGS.DEBUG, NICK, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, chaseEnd, CHS, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, TACT, TG: TGRID.TG, PARKI: { ...PARKI.DEBUG, orphans: () => PARKI.orphans(TRAFFIC) }, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, addPickup, PKI: PKI.STATS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get routeOn () { return ROUTE_LINE.slots.some(q => q.m.visible); }, ROUTE_LINE, RP, rebuildRoutePath, updateRouteLine, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, CULLREFRESH: CULL.refresh, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, DYNRES: DYN.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
++  STARTUP,
+   // отладка города: посмотреть на карту сверху и проверить геометрию
+   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
+   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта
+diff --git a/src/game/landclean.worker.js b/src/game/landclean.worker.js
+index 07fedfe..511bd22 100644
+--- a/src/game/landclean.worker.js
++++ b/src/game/landclean.worker.js
+@@ -1,17 +1,19 @@
+ import {createLandCover} from './landcover.js';
+ import {landCleanTileRegion} from './landclean.js';
+ 
+-let cover=null,green=null;
++let cover=null,green=null,trace=false;
+ self.onmessage=({data})=>{
+   try{
+     if(data.type==='init'){
++      trace=!!data.trace;const t=trace?performance.now():0;
+       cover=createLandCover(data.cover.cell,data.cover);
+       green=createLandCover(data.green.cell,data.green);
+-      self.postMessage({type:'ready'});
++      self.postMessage({type:'ready',...(trace?{workMs:performance.now()-t}:{})});
+     }else if(data.type==='batch'){
+       if(!cover||!green)throw Error('Поле земли ещё не передано');
++      const t=trace?performance.now():0;
+       const result=data.cores.map(core=>landCleanTileRegion(cover,green,core));
+-      self.postMessage({type:'batch',id:data.id,result});
++      self.postMessage({type:'batch',id:data.id,result,...(trace?{workMs:performance.now()-t}:{})});
+     }
+   }catch(error){self.postMessage({type:'error',message:String(error?.message||error)});}
+ };
+diff --git a/src/game/landcleanpool.js b/src/game/landcleanpool.js
+index 5b85615..ed767af 100644
+--- a/src/game/landcleanpool.js
++++ b/src/game/landcleanpool.js
+@@ -2,6 +2,7 @@
+    цвета заполнения и запись в сцену остаются в исходном порядке.
+    Не более одной ожидающей пачки на поток: результаты всего города
+    одновременно в памяти не копятся. ?landworkers=0 — синхронная сверка. */
++import { STARTUP } from './startuptrace.js';
+ import {landCleanTileRegion} from './landclean.js';
+ 
+ const makeWorker=()=>new Worker(new URL('./landclean.worker.js',import.meta.url),{type:'module'});
+@@ -29,7 +30,7 @@ export function createLandCleaner({cover,green,cores,batchSize=64,workerCount,wo
+     for(const e of entries.values())e.reject(error||Error('Расчёт продолжен в основном потоке'));
+     entries.clear();
+   }
+-  function fail(error){if(!active)return;stats.workerFallbacks++;shutdown(error);}
++  function fail(error){if(!active)return;STARTUP.flag('land.workerFallback');stats.workerFallbacks++;shutdown(error);}
+   const arm=s=>{clearTimeout(s.timer);s.timer=setTimeout(()=>fail(Error('Время расчёта земли истекло')),timeoutMs);};
+   function pump(){
+     if(!active)return;
+@@ -41,14 +42,14 @@ export function createLandCleaner({cover,green,cores,batchSize=64,workerCount,wo
+   }
+   if(active){
+     try{
+-      const source={type:'init',cover:cover.snapshot(),green:green.snapshot()};
++      const source={type:'init',cover:cover.snapshot(),green:green.snapshot(),trace:STARTUP.enabled};
+       for(let i=0;i<count;i++){
+         const s={worker:workerFactory(),ready:false,id:null,timer:null};slots.push(s);
+         s.worker.onmessage=({data})=>{
+           if(!active)return;
+-          if(data?.type==='ready'&&!s.ready){clearTimeout(s.timer);s.ready=true;pump();return;}
++          if(data?.type==='ready'&&!s.ready){STARTUP.worker('worker.init',data.workMs);clearTimeout(s.timer);s.ready=true;pump();return;}
+           if(data?.type==='batch'&&data.id===s.id&&Array.isArray(data.result)&&data.result.length===slice(data.id).length){
+-            clearTimeout(s.timer);const id=s.id;s.id=null;stats.workerBatches++;entry(id).resolve(data.result);pump();return;
++            clearTimeout(s.timer);const id=s.id;s.id=null;stats.workerBatches++;STARTUP.worker('worker.cleanContours',data.workMs);entry(id).resolve(data.result);pump();return;
+           }
+           fail(Error(data?.message||'Неверный ответ расчёта земли'));
+         };
+diff --git a/src/game/landstream.js b/src/game/landstream.js
+index d4e2828..9afe5ea 100644
+--- a/src/game/landstream.js
++++ b/src/game/landstream.js
+@@ -1,3 +1,4 @@
++import { STARTUP } from './startuptrace.js';
+ /* Подробная поверхность нужна вокруг камеры, а не сразу во всём городе.
+    Опора и правила движения уже готовы; до замены остаётся исходная земля.
+    Готовый участок публикуется целиком, затем скрывается его старый слой. */
+@@ -22,7 +23,7 @@ export function createLandStream({terrain,build,publish=()=>{},radius=832,now=()
+     return best;
+   }
+   function advance(x,z,r) {
+-    if(!active){const id=nearest(x,z,r);if(id===null)return false;active={id,it:build(bounds(id))};}
++    if(!active){const id=nearest(x,z,r);if(id===null)return false;STARTUP.count('land.cellsRequested');active={id,it:build(bounds(id))};}
+     const t=now();
+     try {
+       const result=quiet(()=>active.it.next());
+diff --git a/src/game/latebuild.js b/src/game/latebuild.js
+index 25ee41b..f7738cb 100644
+--- a/src/game/latebuild.js
++++ b/src/game/latebuild.js
+@@ -17,6 +17,7 @@
+    Шаги — в тех же местах при ?nolate и без: зерно --seed — перед каждым шагом (имя#номер). start() — начать разбор очереди (после первого кадра меню), flush() —
+    достроить всё сейчас, flushAsync(cb) — достроить под экраном загрузки тиками с передышкой (память телефона, 0п48),
+    busy() — ещё строится, onDone(fn) — когда всё. */
++import { STARTUP } from './startuptrace.js';
+ import * as CL from '../platform/crashlog.js';
+ import { MOB } from './mobile.js';
+ 
+@@ -65,30 +66,34 @@ export function onDone (fn) { if (DONE) fn(); else WAIT.push(fn); }
+ function one (sync=false) {
+   const q = Q[0], n = q[0];
+   if(q.waiting&&!q.waiting.ready&&!sync)return 0;
++  if(q.waiting && sync && !q.waiting.ready) STARTUP.flag('queue.syncFallback');
+   seed(q[3] ? n + '#' + q[3] : n);
+   const t0 = performance.now();
+   let end = true, lab;
++  const traceSlice = STARTUP.startWork('late.' + n);
+   try {
+     if(q.waiting){
+-      const w=q.waiting;q.waiting=null;
++      const w=q.waiting;q.waiting=null; w.traceEnd?.();
+       q.input=w.ready&&!w.failed?w.result:w.job.sync();
+     }
+     if (!q[2]) { const r = q[1](); if (isIt(r)) q[2] = r; }
+     if (q[2]) {
+       const r = q[2].next(q.input);q.input=undefined;end=r.done;lab=r.value;q[3]++;
+       if(!end&&isWait(lab)){
+-        const job=lab,w={job,ready:false,failed:false,result:undefined};q.waiting=w;lab=job.label||'ожидание';
++        const job=lab,w={job,ready:false,failed:false,result:undefined,traceEnd:STARTUP.windowStart('queue.workerWait','worker')};q.waiting=w;lab=job.label||'ожидание';
+         const settled=(result,failed)=>{
+           // flush мог уже исполнить запасной путь. Запоздалый ответ
+           // не возобновляет генератор второй раз и не меняет новую задачу.
+           if(q.waiting!==w||Q[0]!==q||DONE)return;
+-          w.ready=true;w.failed=failed;w.result=result;next();
++          w.traceEnd?.(); if (failed) STARTUP.flag('queue.workerRejected'); w.ready=true;w.failed=failed;w.result=result;next();
+         };
+         job.wait.then(value=>settled(value,false),error=>settled(error,true));
+       }
+     }
+-  } catch (e) { end = true; console.error('[latebuild]', n, e); try { CL.report('late:' + n, e, 'error'); } catch (e2) { /* — */ } }
++  } catch (e) { STARTUP.flag('queue.error'); end = true; console.error('[latebuild]', n, e); try { CL.report('late:' + n, e, 'error'); } catch (e2) { /* — */ } }
+   const ms = performance.now() - t0;
++  traceSlice();
++
+   T[n] = (T[n] || 0) + ms;
+   if (!(MAX[n] >= ms)) MAX[n] = Math.round(ms);
+   if (q[2]) (STEPS[n] || (STEPS[n] = [])).push(lab ? lab + ':' + Math.round(ms) : Math.round(ms));   // yield 'имя' — подпись шага
+@@ -99,6 +104,7 @@ function one (sync=false) {
+ function finish () {
+   if (DONE) return;
+   DONE = true;
++  STARTUP.mark('queue.full');
+   T.total = Math.round(performance.now() - T0);
+   for (const f of WAIT.splice(0)) { try { f(); } catch (e) { console.error('[latebuild] onDone', e); } }
+ }
+diff --git a/src/game/menu.js b/src/game/menu.js
+index 5bdfcdc..eb99946 100644
+--- a/src/game/menu.js
++++ b/src/game/menu.js
+@@ -20,6 +20,7 @@
+      Доска почёта (honor.js): достижения и рекорды карьеры, окно — тоже modal()
+ 
+    В Яндексе и Москве (?nocareer) модуль не работает: его зовёт только career.js. */
++import { STARTUP } from './startuptrace.js';
+ import './menu.css';
+ import { t } from '../i18n/index.js';
+ import { heroName } from './playername.js';
+@@ -82,7 +83,7 @@ function act (a) {
+   }
+   if (DP.root() || BOARD.root() || HONOR.root() || QR.root() || CCARD.root() || CITY.root() || STORYTEST.panelRoot()) return;
+   A.Snd.boot && A.Snd.boot();
+-  if (a === 'go') A.menuGo();
++  if (a === 'go') { STARTUP.request({ menuKey: 'go', district: DIST.cur() }); A.menuGo(); }
+   else if (a === 'district') openDistricts();
+   else if (a === 'quick') { if (QR.available()) QR.openSetup(); }
+   else if (a === 'stats') openStats();
+diff --git a/src/game/progressboot.js b/src/game/progressboot.js
+index 5927234..f8d6891 100644
+--- a/src/game/progressboot.js
++++ b/src/game/progressboot.js
+@@ -1,3 +1,4 @@
++import { STARTUP } from './startuptrace.js';
+ /* Runs after i18n and before map/game imports. A storage failure offers ONLY retry.
+    Dependencies are supplied by main, so this module cannot eagerly read progress/Platform. */
+ function retryPanel ({ host, t, error, pollPad, makePadMenu, raf, cancelRaf }) {
+@@ -10,9 +11,11 @@ function retryPanel ({ host, t, error, pollPad, makePadMenu, raf, cancelRaf }) {
+     text.textContent = t('Не удалось открыть сохранение. Повторите попытку.');
+     button.type = 'button'; button.textContent = t('Повторить');
+     panel.appendChild(text); panel.appendChild(button); host.appendChild(panel);
++    const retryEnd = STARTUP.windowStart('external.progressRetry', 'external');
++    STARTUP.flag('progress.retry');
+     let frame = 0, done = false;
+     const finish = () => {
+-      if (done) return; done = true; button.disabled = true;
++      if (done) return; done = true; retryEnd(); button.disabled = true;
+       if (frame) cancelRaf(frame);
+       panel.remove(); host.classList.remove('save-error');
+       if (oldAria === null) host.removeAttribute('aria-hidden'); else host.setAttribute('aria-hidden', oldAria);
+diff --git a/src/main.js b/src/main.js
+index 4b91aec..b986e8f 100644
+--- a/src/main.js
++++ b/src/main.js
+@@ -2,6 +2,7 @@
+    Язык нужен до загрузки игры: её строки переводятся прямо при импорте.
+    Карта — тоже: игра строит город при импорте. Выбор карты — ?map=, потом
+    иначе Стим и dev — Северск, Яндекс — Москва (выбора в меню больше нет). */
++import { STARTUP } from './game/startuptrace.js';
+ import './styles/delivery.css';
+ import './input/padmenu.css';
+ import './styles/paper.css';            // стиль «как накладная»: бумага, чек, штамп, печать, стикер (П0)
+@@ -31,15 +32,16 @@ if (buildV) buildV.textContent = BUILD;
+ // и мелко в углу паузы
+ for (const el of document.querySelectorAll('.pm-ver')) el.textContent = BUILD;
+ 
+-await Platform.init({ langs: LANGS });
++STARTUP.mark('main.enter');
++await STARTUP.awaited('platform.init', 'platform', () => Platform.init({ langs: LANGS }));
+ // первый запуск — спросить язык: игра ещё не загружена, перезагружать нечего. На Яндексе язык даёт площадка
+ const doorPreviewFirstRun = new URLSearchParams(location.search).has('doorpreview') && !Platform.langChosen;
+ if (Platform.id !== 'yandex' && !Platform.langChosen && !doorPreviewFirstRun) {
+-  Platform.setLang(await pickLang(LANGS, LANG_NAMES, Platform.lang));
++  Platform.setLang(await STARTUP.awaited('external.language', 'external', () => pickLang(LANGS, LANG_NAMES, Platform.lang)));
+   Platform.store.flush && Platform.store.flush();
+ }
+ // Отладочный просмотр не меняет язык в сохранении и не ждёт первого меню.
+-await initI18n(doorPreviewFirstRun ? 'ru' : Platform.lang);
++await STARTUP.awaited('i18n.import', 'module', () => initI18n(doorPreviewFirstRun ? 'ru' : Platform.lang));
+ applyDom();
+ // фразы экрана загрузки («Покупаем пиццу…», index.html) уже на языке игрока — показать
+ document.getElementById('boot')?.classList.add('said');
+@@ -48,7 +50,7 @@ document.documentElement.dataset.platform = Platform.id;
+ // i18n is ready; map/game/progress readers remain unloaded until every native write verifies.
+ if (Platform.id !== 'yandex') {
+   await requireSingleProgress({
+-    migrate: () => migrateSingleProgress({ store: Platform.store }),
++    migrate: () => STARTUP.work('progress.migrate', () => migrateSingleProgress({ store: Platform.store })),
+     host: document.getElementById('boot'), t, pollPad, makePadMenu,
+   });
+   // Platform modules have no game/i18n imports: bind readonly identity only after bootstrap succeeds.
+@@ -58,20 +60,23 @@ if (Platform.id !== 'yandex') {
+ // Стим (и dev) — Северск, Яндекс — Москва; ?map= — для отладки
+ const want = new URLSearchParams(location.search).get('map') || (Platform.id === 'yandex' ? 'moscow' : 'seversk');
+ const mapId = MAP_IDS.includes(want) ? want : MAP_IDS[0];
+-useMap(await loadMap(mapId));
++useMap(await STARTUP.awaited('map.readParseImport', 'module', () => loadMap(mapId)));
++STARTUP.mark('map.ready', { mapId });
+ document.documentElement.dataset.city = mapId;
+ 
+ // город строится синхронно при импорте: сначала даём браузеру нарисовать экран загрузки
+ await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+ // время запуска (docs/AGENTS.md → «Запуск до меню»): window.__boot — мс от старта страницы
+ const BOOT = window.__boot = { pre: Math.round(performance.now()) };
+-await import('./game/game.js');
++await STARTUP.awaited('game.import', 'module', () => import('./game/game.js'));
++STARTUP.mark('game.module.ready');
+ BOOT.game = Math.round(performance.now());
+ document.title = (await import('./game/brands.js')).OWN.pizza();
+ Platform.ready();
+ // первый кадр игры готов — загрузка плавно уходит, интерфейс плавно проявляется
+ requestAnimationFrame(() => requestAnimationFrame(() => {
+   BOOT.menu = Math.round(performance.now());
++  STARTUP.mark('menu.visible');
+   document.body.classList.remove('booting');
+   const boot = document.getElementById('boot');
+   if (boot) { boot.classList.add('gone'); setTimeout(() => boot.remove(), 600); }
+diff --git a/tools/probe.cjs b/tools/probe.cjs
+index def72f1..5431058 100644
+--- a/tools/probe.cjs
++++ b/tools/probe.cjs
+@@ -93,7 +93,17 @@ fs.mkdirSync(BASE, { recursive: true });
+ for (const f of fs.readdirSync(BASE)) {            // папки упавших запусков — старше часа
+   if (f.startsWith('ud-')) { try { if (Date.now() - fs.statSync(path.join(BASE, f)).mtimeMs > 3600e3) fs.rmSync(path.join(BASE, f), { recursive: true, force: true }); } catch (e) { /* — */ } }
+ }
+-const UD = fs.mkdtempSync(path.join(BASE, 'ud-'));
++// №17ж opt-in retained test session, always inside probe-owned /tmp root.
++const STARTUP_BENCH = has('startup-trace'), STARTUP_SESSION = arg('startup-session', '');
++if (STARTUP_SESSION && (!STARTUP_BENCH || !/^[a-zA-Z0-9_-]{1,64}$/.test(STARTUP_SESSION))) throw Error('Invalid startup session');
++const UD = STARTUP_SESSION ? path.join(BASE, 'startup17-' + STARTUP_SESSION) : fs.mkdtempSync(path.join(BASE, 'ud-'));
++if (STARTUP_SESSION) {
++  const seal = path.join(UD, '.startup17-owned');
++  if (fs.existsSync(UD) && (!fs.existsSync(seal) || fs.readFileSync(seal, 'utf8') !== 'bird-startup17-v1')) throw Error('Session is not owned by startup probe');
++  fs.mkdirSync(UD, { recursive: true }); fs.writeFileSync(seal, 'bird-startup17-v1');
++}
++const STARTUP_HOST = { processEpochMs: Math.round(performance.timeOrigin), electron: process.versions.electron,
++  chrome: process.versions.chrome, node: process.versions.node, platform: process.platform, arch: process.arch, seed: arg('seed', null), cpuThrottle: +arg('cpu', 1), bootcpu: has('bootcpu') };
+ app.setPath('userData', UD);
+ if (app.dock) app.dock.hide();
+ protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);   // stream — <audio> музыки (music.js), как в electron/main.cjs
+@@ -107,7 +117,7 @@ if (JSF) app.commandLine.appendSwitch('js-flags', JSF);   // --jsflags="--trace-
+ 
+ function finish (code, report) {
+   if (arg('report')) { try { fs.writeFileSync(path.resolve(arg('report')), JSON.stringify(report)); } catch (e) { err('probe: отчёт не записан:', e.message); } }
+-  try { fs.rmSync(UD, { recursive: true, force: true }); } catch (e) { /* — */ }
++  try { if (!STARTUP_SESSION) fs.rmSync(UD, { recursive: true, force: true }); } catch (e) { /* — */ }
+   app.exit(code);
+ }
+ 
+@@ -128,7 +138,7 @@ app.whenReady().then(async () => {
+   const tBuild = Date.now() - T0;
+   const DIST = b.dir;
+ 
+-  const SES = session.fromPartition('probe-' + process.pid + '-' + Date.now());   // без persist: — только в памяти
++  const SES = session.fromPartition(STARTUP_SESSION ? 'persist:startup17' : 'probe-' + process.pid + '-' + Date.now());   // без persist: — только в памяти
+   SES.protocol.handle('app', req => {
+     let p = decodeURIComponent(new URL(req.url).pathname);
+     if (p === '/' || p === '') p = '/index.html';
+@@ -140,6 +150,13 @@ app.whenReady().then(async () => {
+     return net.fetch(pathToFileURL(f).toString());
+   });
+   // до первой страницы: язык выбран, гайд, учебный заказ и обучение на чеке смены пройдены (--fresh — как у новичка)
++  if (STARTUP_BENCH && has('startup-cold')) { await SES.clearCache(); await SES.clearStorageData(); }
++  let startupFixture = null;
++  if (arg('startup-fixture')) {
++    if (!STARTUP_BENCH || !STARTUP_SESSION) throw Error('Startup fixture requires an owned session');
++    startupFixture = JSON.parse(fs.readFileSync(path.resolve(arg('startup-fixture')), 'utf8'));
++    if (!startupFixture || typeof startupFixture !== 'object' || Array.isArray(startupFixture) || Object.keys(startupFixture).some(k => !k.startsWith('dlv-'))) throw Error('Invalid startup fixture');
++  }
+   const LANG = arg('lang', 'ru');
+   const seed = has('fresh') ? { 'dlv-lang': LANG } : { 'dlv-lang': LANG, 'dlv-msk-guide': 1, 'dlv-msk-tut': '1', 'dlv-msk-nostut': 1, 'dlv-shift-tut': 1 };
+   const pre = path.join(UD, 'seed-preload.js');
+@@ -156,7 +173,7 @@ app.whenReady().then(async () => {
+   const rnd = arg('seed') ? `(() => { let a = ${+arg('seed') >>> 0}; Math.random = () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+     // каждый кусок поздней сборки — со своего зерна (latebuild.js): город один и тот же с ?nolate и без, что бы ни шло между кусками
+     window.__lateSeed = n => { let h = ${+arg('seed') >>> 0} ^ 0x9E3779B9; for (let i = 0; i < n.length; i++) h = Math.imul(h ^ n.charCodeAt(i), 0x01000193); a = h; }; })();` : '';
+-  fs.writeFileSync(pre, `try { const S = ${JSON.stringify(seed)}; for (const k in S) if (localStorage.getItem(k) === null) localStorage.setItem(k, JSON.stringify(S[k])); } catch (e) {}` + touch);
++  fs.writeFileSync(pre, (startupFixture ? `try { localStorage.clear(); const F = ${JSON.stringify(startupFixture)}; for (const k of Object.keys(F)) localStorage.setItem(k, JSON.stringify(F[k])); } catch(e) { throw e; }` : '') + `try { const S = ${JSON.stringify(seed)}; for (const k in S) if (localStorage.getItem(k) === null) localStorage.setItem(k, JSON.stringify(S[k])); } catch (e) {}` + touch);
+ 
+   const win = new BrowserWindow({ width: W, height: H, useContentSize: true, show: false,
+     webPreferences: { offscreen: true, backgroundThrottling: false, session: SES, preload: pre, sandbox: false, contextIsolation: !PHONE } });
+@@ -334,6 +351,7 @@ app.whenReady().then(async () => {
+   const timer = setTimeout(() => { err('probe: время вышло (--timeout=' + arg('timeout', 360) + ')'); finish(1, { ok: false, timeout: true, errors }); }, +arg('timeout', 360) * 1000);
+ 
+   const q = ['debug', 'mute', 'nolb', 'lang=' + LANG];
++  if (STARTUP_BENCH) q.push('startuptrace');
+   if (!has('fresh')) q.push('nointro');
+   if (has('kids')) q.push('kids');
+   if (arg('map')) q.push('map=' + arg('map'));
+@@ -341,12 +359,12 @@ app.whenReady().then(async () => {
+   if (arg('q')) q.push(arg('q').replace(/^[?&]/, ''));
+   const url = 'app://g/' + PAGE + '?' + q.join('&');
+   const dbg = win.webContents.debugger;
+-  if ((has('bootcpu') && +arg('cpu', 1) > 1) || arg('cpuprofile') || rnd || MEM || INIT_SCRIPT !== null) {
++  if ((has('bootcpu') && +arg('cpu', 1) > 1) || arg('cpuprofile') || rnd || MEM || INIT_SCRIPT !== null || STARTUP_BENCH) {
+     try {
+       await win.loadURL('app://g/__blank').catch(() => {});   // тот же источник: рендерер не сменится при переходе на игру
+       dbg.attach('1.3');
+       if (has('bootcpu') && +arg('cpu', 1) > 1) await dbg.sendCommand('Emulation.setCPUThrottlingRate', { rate: +arg('cpu') });
+-      if (rnd || MEM || INIT_SCRIPT !== null) await dbg.sendCommand('Page.enable');
++      if (rnd || MEM || INIT_SCRIPT !== null || STARTUP_BENCH) await dbg.sendCommand('Page.enable');
+       if (rnd) await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: rnd });
+       if (INIT_SCRIPT !== null) await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: INIT_SCRIPT });
+       if (MEM) await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: GLMEM });   // видеопамять — с первого вызова WebGL
+@@ -366,6 +384,10 @@ app.whenReady().then(async () => {
+       PEAK.n++;
+     } catch (e) { /* — */ }
+   }, 200) : null;
++  if (STARTUP_BENCH) {
++    STARTUP_HOST.navigateEpochMs = Date.now();
++    await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: 'window.__startupHost=' + JSON.stringify(STARTUP_HOST) + ';' });
++  }
+   try { await win.loadURL(url); } catch (e) { err('probe: не открылась', url, e.message); }
+   let ok = false;
+   const bootWait=+arg('bootwait',240);                // окончательный контур земли строится за меню; смена — только после полной готовности
+@@ -432,5 +454,5 @@ app.whenReady().then(async () => {
+   const code = uncaught || evalErr ? 1 : 0;
+   if (peakT) clearInterval(peakT);
+   if (MEM) err('probe: память процессов, МБ (страница/видеокарта):', MEMLOG.map(m => m.label + ' ' + m.page + '/' + m.gpu + (m.foot ? ' (след ' + m.foot + ', пик ' + m.footPeak + ')' : '')).join(', ') + (MEMLOG.length ? ', ' : '') + 'пик ' + PEAK.page + ' (на ' + (PEAK.pageT / 1000).toFixed(1) + ' с)/' + PEAK.gpu);
+-  finish(code, { ok: !code, result, evalErr, errors, uncaught, frames: fstats, logs, mem: MEMLOG, memPeak: MEM ? PEAK : undefined, ms: { total, build: b.built ? b.ms : 0, load: tLoad - tBuild, eval: tEval - tLoad } });
++  finish(code, { ok: !code, result, evalErr, errors, uncaught, frames: fstats, logs, mem: MEMLOG, memPeak: MEM ? PEAK : undefined, startupHost: STARTUP_BENCH ? STARTUP_HOST : undefined, ms: { total, build: b.built ? b.ms : 0, load: tLoad - tBuild, eval: tEval - tLoad } });
+ }).catch(e => { err('probe:', e && e.stack || e); finish(1, { ok: false, error: String(e) }); });

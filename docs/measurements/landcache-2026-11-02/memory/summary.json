@@ -1,0 +1,496 @@
+{
+  "ok": true,
+  "pairValidation": {
+    "ok": true,
+    "reasons": [],
+    "unavailable": [],
+    "notes": "Memory pair only. No physical Deck claim; peaks are different measures, do not sum asynchronous component maxima."
+  },
+  "nPairs": 1,
+  "nPerVariant": 1,
+  "memoryRunOnly": true,
+  "physicalDeck": false,
+  "sourceHash": "fdb6923c13afc8f369b8c02931174fb953706d52fb5d3f347683dab0f2f6fcce",
+  "buildHash": "382750aa2e2bf4cbfc5943c08b05c1b333f65ac419668c6f5c0d3917ba17760a",
+  "inputs": {
+    "eval": {
+      "original": "/tmp/bird-landcache17a/memory/memory-eval.js",
+      "archive": "memory-eval.js",
+      "sha256": "88e8f7669f849a46e3e3e2c562f2123eec5f1784298aced0fde4f47d94c4021c",
+      "bytes": 5655
+    },
+    "pairGate": {
+      "original": "/tmp/bird-landcache17a/memory/pair-gate.mjs",
+      "archive": "pair-gate.mjs",
+      "sha256": "12b25dd97c889cdbf238fe8eecb68b52893898e52ad9d1cda7314da4053ef327",
+      "bytes": 3820
+    },
+    "init": {
+      "original": "/tmp/bird-landcache17a-reportfix-1102/combined-init.js",
+      "archive": "inputs/combined-init.js",
+      "sha256": "8ef7471ff1270c0ddbf144547f8c0b835ec224a8703e1329267596f7501f8a13",
+      "bytes": 69474
+    },
+    "fixture": {
+      "original": "/tmp/bird-startup17-series-5a20287/newbie-1-fixture.json",
+      "archive": "inputs/newbie-fixture.json",
+      "sha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00",
+      "bytes": 35
+    },
+    "manifest": {
+      "original": "/tmp/bird-landcache17a-reportfix-1102/manifest.json",
+      "archive": "inputs/manifest.json",
+      "sha256": "785c5019fc8d86a39e7691cea3b3d63356b820fc677a244529e8fff271bdf257",
+      "bytes": 87329
+    },
+    "probe": {
+      "original": "tools/probe.cjs",
+      "archive": "inputs/probe.cjs",
+      "sha256": "e5ee9ae613ff40fd48a89249a23ab3c1c1b1252920c1244a0609198d765f12eb",
+      "bytes": 44442
+    }
+  },
+  "sameReadyCellIds": true,
+  "readyCount": 49,
+  "variants": {
+    "generated": {
+      "processStatus": 0,
+      "signal": null,
+      "rawSha256": "6acf4021cc7011fafa6423e673c30d9fd0e4a0d759ba159c50ab3c5c187c2a3d",
+      "processPeak": {
+        "page": 2789,
+        "gpu": 885,
+        "pageT": 107274,
+        "gpuT": 127309,
+        "n": 624
+      },
+      "startupWindow": {
+        "foot0": 843,
+        "peak": 2055,
+        "exact": true,
+        "sampled": 2049,
+        "peakT": 30323,
+        "foot1": 1627,
+        "life0": 848,
+        "life1": 2055,
+        "page": 2788,
+        "gpu": 853,
+        "n": 1265,
+        "ms": 117046
+      },
+      "watchAverageMsPerPoll": 92.52648221343874,
+      "steady": {
+        "label": "steady-after-ready",
+        "heap": 839.7,
+        "gl": {
+          "buf": 351.8,
+          "tex": 115.4,
+          "rb": 1,
+          "fb": 35.2,
+          "total": 503.4,
+          "peak": 503.4,
+          "nb": 18447,
+          "nt": 73,
+          "nr": 5,
+          "heapPeak": 1603.9
+        },
+        "glJs": {
+          "mb": 28.7,
+          "n": 1565
+        },
+        "geo": 6507,
+        "tex": 64,
+        "prog": 228,
+        "proc": {
+          "gpu": 853,
+          "page": 2776,
+          "foot": 1605,
+          "footPeak": 2055
+        }
+      },
+      "ready": {
+        "state": "title",
+        "paused": false,
+        "bootFull": true,
+        "lateBusy": false,
+        "supportReady": true,
+        "ready": {
+          "ready": 49,
+          "total": 1776,
+          "steps": 186769,
+          "maxStep": 80.79999995231628,
+          "ms": 21744.09999203682,
+          "failed": 0
+        },
+        "ready640": true,
+        "ready832": true,
+        "position": {
+          "x": 3110.816648917971,
+          "z": 2073.230921741487
+        }
+      },
+      "readyCellIds": [
+        1091,
+        1092,
+        1137,
+        1138,
+        1139,
+        1140,
+        1141,
+        1142,
+        1184,
+        1185,
+        1186,
+        1187,
+        1188,
+        1189,
+        1190,
+        1232,
+        1233,
+        1234,
+        1235,
+        1236,
+        1237,
+        1238,
+        1239,
+        1280,
+        1281,
+        1282,
+        1283,
+        1284,
+        1285,
+        1286,
+        1287,
+        1328,
+        1329,
+        1330,
+        1331,
+        1332,
+        1333,
+        1334,
+        1335,
+        1377,
+        1378,
+        1379,
+        1380,
+        1381,
+        1382,
+        1426,
+        1427,
+        1428,
+        1429
+      ],
+      "gcAvailable": true,
+      "watchStopped": {
+        "pageMs": 126748.70000004768,
+        "epochMs": 1793567099001
+      },
+      "gcCheckpointStarted": {
+        "pageMs": 126748.70000004768,
+        "epochMs": 1793567099001
+      },
+      "gcCheckpointEnded": {
+        "pageMs": 127148.10000014305,
+        "epochMs": 1793567099400
+      },
+      "evalFinishedProbeT": 127307,
+      "phaseMarks": [
+        {
+          "label": "mainwork-menu",
+          "requested": {
+            "pageMs": 9677.600000143051,
+            "epochMs": 1793566981929
+          },
+          "completed": {
+            "pageMs": 9825,
+            "epochMs": 1793566982077
+          },
+          "phaseBefore": "mainwork",
+          "phaseAfter": "mainwork",
+          "heapRawMiB": 664.1738977432251,
+          "proc": {
+            "gpu": 269,
+            "page": 1179,
+            "foot": 831,
+            "footPeak": 848
+          }
+        },
+        {
+          "label": "generated-clean",
+          "requested": {
+            "pageMs": 29974,
+            "epochMs": 1793567002226
+          },
+          "completed": {
+            "pageMs": 30074.400000095367,
+            "epochMs": 1793567002326
+          },
+          "phaseBefore": "generated-clean",
+          "phaseAfter": "generated-clean",
+          "heapRawMiB": 1193.0930185317993,
+          "proc": {
+            "gpu": 500,
+            "page": 2268,
+            "foot": 1630,
+            "footPeak": 1856
+          }
+        }
+      ],
+      "missedPhaseMarkers": [],
+      "rawMs": {
+        "total": 127342,
+        "build": 0,
+        "load": 9709,
+        "eval": 117598
+      }
+    },
+    "cache": {
+      "processStatus": 0,
+      "signal": null,
+      "rawSha256": "92edf13d74c65e089380f81bb4dca1ff8a9dfe7bcfe6bb28d2a3394a7deffecd",
+      "processPeak": {
+        "page": 2524,
+        "gpu": 861,
+        "pageT": 92067,
+        "gpuT": 90644,
+        "n": 545
+      },
+      "startupWindow": {
+        "foot0": 844,
+        "peak": 1847,
+        "exact": true,
+        "sampled": 1837,
+        "peakT": 19645,
+        "foot1": 1364,
+        "life0": 849,
+        "life1": 1847,
+        "page": 2524,
+        "gpu": 861,
+        "n": 1100,
+        "ms": 100699
+      },
+      "watchAverageMsPerPoll": 91.54454545454546,
+      "steady": {
+        "label": "steady-after-ready",
+        "heap": 836.8,
+        "gl": {
+          "buf": 351.1,
+          "tex": 115.4,
+          "rb": 1,
+          "fb": 35.2,
+          "total": 502.7,
+          "peak": 502.7,
+          "nb": 18336,
+          "nt": 67,
+          "nr": 5,
+          "heapPeak": 1556.1
+        },
+        "glJs": {
+          "mb": 28,
+          "n": 1454
+        },
+        "geo": 6473,
+        "tex": 58,
+        "prog": 228,
+        "proc": {
+          "gpu": 837,
+          "page": 2508,
+          "foot": 1335,
+          "footPeak": 1847
+        }
+      },
+      "ready": {
+        "state": "title",
+        "paused": false,
+        "bootFull": true,
+        "lateBusy": false,
+        "supportReady": true,
+        "ready": {
+          "ready": 49,
+          "total": 1776,
+          "steps": 186769,
+          "maxStep": 77.59999990463257,
+          "ms": 21617.10000514984,
+          "failed": 0
+        },
+        "ready640": true,
+        "ready832": true,
+        "position": {
+          "x": 3110.816648917971,
+          "z": 2073.230921741487
+        }
+      },
+      "readyCellIds": [
+        1091,
+        1092,
+        1137,
+        1138,
+        1139,
+        1140,
+        1141,
+        1142,
+        1184,
+        1185,
+        1186,
+        1187,
+        1188,
+        1189,
+        1190,
+        1232,
+        1233,
+        1234,
+        1235,
+        1236,
+        1237,
+        1238,
+        1239,
+        1280,
+        1281,
+        1282,
+        1283,
+        1284,
+        1285,
+        1286,
+        1287,
+        1328,
+        1329,
+        1330,
+        1331,
+        1332,
+        1333,
+        1334,
+        1335,
+        1377,
+        1378,
+        1379,
+        1380,
+        1381,
+        1382,
+        1426,
+        1427,
+        1428,
+        1429
+      ],
+      "gcAvailable": true,
+      "watchStopped": {
+        "pageMs": 110727.20000004768,
+        "epochMs": 1793567241893
+      },
+      "gcCheckpointStarted": {
+        "pageMs": 110727.20000004768,
+        "epochMs": 1793567241893
+      },
+      "gcCheckpointEnded": {
+        "pageMs": 111119.90000009537,
+        "epochMs": 1793567242286
+      },
+      "evalFinishedProbeT": 111277,
+      "phaseMarks": [
+        {
+          "label": "mainwork-menu",
+          "requested": {
+            "pageMs": 10008.600000143051,
+            "epochMs": 1793567141174
+          },
+          "completed": {
+            "pageMs": 10157.600000143051,
+            "epochMs": 1793567141323
+          },
+          "phaseBefore": "idle",
+          "phaseAfter": "idle",
+          "heapRawMiB": 667.0619049072266,
+          "proc": {
+            "gpu": 270,
+            "page": 1184,
+            "foot": 838,
+            "footPeak": 851
+          }
+        },
+        {
+          "label": "decoding",
+          "requested": {
+            "pageMs": 32436.800000190735,
+            "epochMs": 1793567163602
+          },
+          "completed": {
+            "pageMs": 32549,
+            "epochMs": 1793567163714
+          },
+          "phaseBefore": "decoding",
+          "phaseAfter": "decoding",
+          "heapRawMiB": 1136.6431789398193,
+          "proc": {
+            "gpu": 502,
+            "page": 2364,
+            "foot": 1577,
+            "footPeak": 1847
+          }
+        },
+        {
+          "label": "preparing",
+          "requested": {
+            "pageMs": 35104.200000047684,
+            "epochMs": 1793567166270
+          },
+          "completed": {
+            "pageMs": 35204.60000014305,
+            "epochMs": 1793567166370
+          },
+          "phaseBefore": "preparing",
+          "phaseAfter": "preparing",
+          "heapRawMiB": 1171.2076330184937,
+          "proc": {
+            "gpu": 502,
+            "page": 2396,
+            "foot": 1567,
+            "footPeak": 1847
+          }
+        }
+      ],
+      "missedPhaseMarkers": [],
+      "rawMs": {
+        "total": 111323,
+        "build": 0,
+        "load": 10048,
+        "eval": 101229
+      }
+    }
+  },
+  "observedDeltasCacheMinusGeneratedMiB": {
+    "startupFootprintPeak": -208,
+    "startupWatchRendererWorkingSetPeak": -264,
+    "startupWatchGPUWorkingSetPeak": 8,
+    "steadyJSHeap": -2.900000000000091,
+    "steadyTrackedGL": -0.6999999999999886,
+    "steadyFootprint": -270
+  },
+  "resourceDifferences": {
+    "generated": {
+      "geo": 6507,
+      "tex": 64,
+      "prog": 228
+    },
+    "cache": {
+      "geo": 6473,
+      "tex": 58,
+      "prog": 228
+    },
+    "cause": "Not established. Different resource warm-up/pools are possible; not a fully isolated accounting of all world allocations."
+  },
+  "lateGlobalGPUObservation": {
+    "generatedPeakMiB": 885,
+    "probeTms": 127309,
+    "evalFinishedProbeTms": 127307,
+    "afterCompletedEval": true,
+    "startupWindowGPUWorkingSetPeakMiB": 853,
+    "note": "885MiB was observed after the startup window and after completed eval, not the startup GPU peak."
+  },
+  "limits": [
+    "One n1 memory pair, not a statistical estimate or guarantee for players.",
+    "Observed footprint peak is lower; no exact memory-saving promise and no full isolation of all world allocations.",
+    "Working-set/footprint/JS heap/tracked GL are different measures; asynchronous component maxima must not be summed.",
+    "Manifest1GiB/default512MiB structural ceilings are not measured heap/RSS/Deck budgets.",
+    "No claim that native in-flight fetch/WebCrypto copies are freed on cancel.",
+    "No proof of long-route leak freedom or physical Steam Deck memory behavior."
+  ]
+}

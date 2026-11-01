@@ -1,0 +1,754 @@
+{
+  "version": 1,
+  "checkedAt": "2026-11-01T18:36:17.051Z",
+  "manifestSha256": "b8086934e0e46097a681f6891305dbb68ecf6ec0ebdb7c8fc70db5b66f951ffc",
+  "gateSha256": "deb607b6825cdb28187b724b76e8945d286c66811ec8d8bcd71b96a618218234",
+  "expectedRuns": 18,
+  "totalRuns": 18,
+  "errors": [],
+  "runs": [
+    {
+      "id": "newbie/1/cold",
+      "report": "reports/newbie-1-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "34b2eee0c5dc25581bbea23340ae9b093743ec5a2004bda08bdd2298d6e85124",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "dialogClicks": 0
+      },
+      "moved": 4.784456264918376
+    },
+    {
+      "id": "newbie/1/warm",
+      "report": "reports/newbie-1-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "24d2af0feeb930f0b2589bdf21c964ede63b8794b31266a01d75473874c3751a",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "dialogClicks": 0
+      },
+      "moved": 5.020106758754587
+    },
+    {
+      "id": "newbie/2/cold",
+      "report": "reports/newbie-2-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "fef5edbd47b0f2b205f52aaff3f3073a3590e85dbf00cb8c76a2ea60a035ae0d",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "dialogClicks": 0
+      },
+      "moved": 4.553100721481575
+    },
+    {
+      "id": "newbie/2/warm",
+      "report": "reports/newbie-2-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "2fd3636a16ae3c1b188a5ed0d99778bd8c668ea38afb6655a4e70923f27f0d8c",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "dialogClicks": 0
+      },
+      "moved": 4.785726371975145
+    },
+    {
+      "id": "newbie/3/cold",
+      "report": "reports/newbie-3-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "3d710ac1c3585a3d2a213a7b75da8140e2ab5dae1a4527590fb3cf0006951069",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "dialogClicks": 0
+      },
+      "moved": 4.784458298605125
+    },
+    {
+      "id": "newbie/3/warm",
+      "report": "reports/newbie-3-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "7248ca2a02b307f95c63259923f79351dcd774768b5eaa3a3afb9b5d56f27f3c",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "dialogClicks": 0
+      },
+      "moved": 5.018807978883463
+    },
+    {
+      "id": "saved-near/1/cold",
+      "report": "reports/saved-near-1-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "dbddfb84906be5e3d54f8b725e6a60694bf2e40930afb48cc969b2c039d14875",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 14,
+        "dialogClicks": 0
+      },
+      "moved": 4.555732476035502
+    },
+    {
+      "id": "saved-near/1/warm",
+      "report": "reports/saved-near-1-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "d119f0a4ebac199449126db868a0ad52431261203aef82e47071a669bb97db9d",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 14,
+        "dialogClicks": 0
+      },
+      "moved": 4.784457383983363
+    },
+    {
+      "id": "saved-near/2/cold",
+      "report": "reports/saved-near-2-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "f87e5a08bb23e34d10e5891a8741501580c0eec734b01c29995373f3a0fa9fd7",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 14,
+        "dialogClicks": 0
+      },
+      "moved": 4.783042754487475
+    },
+    {
+      "id": "saved-near/2/warm",
+      "report": "reports/saved-near-2-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "e216c91133bc53b919d948fc8818934292dbb2664ebe818dbd314bbefd991d05",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 14,
+        "dialogClicks": 0
+      },
+      "moved": 4.55449649702912
+    },
+    {
+      "id": "saved-near/3/cold",
+      "report": "reports/saved-near-3-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "08169690a3edbf29f0965df56bf2cd5d70d71333d5be7b1d800c6be02c9ec70a",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 14,
+        "dialogClicks": 0
+      },
+      "moved": 4.784315909988364
+    },
+    {
+      "id": "saved-near/3/warm",
+      "report": "reports/saved-near-3-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "ad705200efd63c6fff09a61ef09d49363305711d00c7e79c08512e01b5bac2d7",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 0,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 13,
+        "dialogClicks": 0
+      },
+      "moved": 4.784452475041037
+    },
+    {
+      "id": "saved-far/1/cold",
+      "report": "reports/saved-far-1-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "5c27c57223bfbebbc3d908a99c70dfd38ae05fba5c8be7eb9716306dada22222",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 97,
+        "dialogClicks": 0
+      },
+      "moved": 5.574968161968555
+    },
+    {
+      "id": "saved-far/1/warm",
+      "report": "reports/saved-far-1-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "133c5a1c265c31851e25af36ac36ece6a06dc751f38dcfa335f50978ec44b6b3",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 91,
+        "dialogClicks": 0
+      },
+      "moved": 5.575005305953727
+    },
+    {
+      "id": "saved-far/2/cold",
+      "report": "reports/saved-far-2-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "61963ecb44b5ac003b054b62d0a1b0b60d980335316025d28e0d4ebaed207b48",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 94,
+        "dialogClicks": 0
+      },
+      "moved": 5.576455301395222
+    },
+    {
+      "id": "saved-far/2/warm",
+      "report": "reports/saved-far-2-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "c56e006f7ce9338b04128b0de82a1c6547db2d9d309d315f4bb1b5d6d073f09e",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 92,
+        "dialogClicks": 0
+      },
+      "moved": 5.576465971192793
+    },
+    {
+      "id": "saved-far/3/cold",
+      "report": "reports/saved-far-3-cold.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "3c3e14d3c2d55e384eee08a99acc5eba008b0b0d29235091e7c94bbd17251bb9",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 97,
+        "dialogClicks": 0
+      },
+      "moved": 5.8508207102196685
+    },
+    {
+      "id": "saved-far/3/warm",
+      "report": "reports/saved-far-3-warm.json",
+      "ok": true,
+      "reasons": [],
+      "reportSha256": "c648111b882ca87e5eb8215c46f3ad4cf6f5e0c56e949b16eae9c839afcf13e3",
+      "errors": 0,
+      "uncaught": 0,
+      "flags": {},
+      "dropped": 0,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "district": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 95,
+        "dialogClicks": 0
+      },
+      "moved": 5.574805241158594
+    }
+  ],
+  "pilot": {
+    "ok": true,
+    "reasons": []
+  },
+  "ok": true
+}

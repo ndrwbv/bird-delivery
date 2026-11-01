@@ -93,7 +93,17 @@ fs.mkdirSync(BASE, { recursive: true });
 for (const f of fs.readdirSync(BASE)) {            // папки упавших запусков — старше часа
   if (f.startsWith('ud-')) { try { if (Date.now() - fs.statSync(path.join(BASE, f)).mtimeMs > 3600e3) fs.rmSync(path.join(BASE, f), { recursive: true, force: true }); } catch (e) { /* — */ } }
 }
-const UD = fs.mkdtempSync(path.join(BASE, 'ud-'));
+// №17ж opt-in retained test session, always inside probe-owned /tmp root.
+const STARTUP_BENCH = has('startup-trace'), STARTUP_SESSION = arg('startup-session', '');
+if (STARTUP_SESSION && (!STARTUP_BENCH || !/^[a-zA-Z0-9_-]{1,64}$/.test(STARTUP_SESSION))) throw Error('Invalid startup session');
+const UD = STARTUP_SESSION ? path.join(BASE, 'startup17-' + STARTUP_SESSION) : fs.mkdtempSync(path.join(BASE, 'ud-'));
+if (STARTUP_SESSION) {
+  const seal = path.join(UD, '.startup17-owned');
+  if (fs.existsSync(UD) && (!fs.existsSync(seal) || fs.readFileSync(seal, 'utf8') !== 'bird-startup17-v1')) throw Error('Session is not owned by startup probe');
+  fs.mkdirSync(UD, { recursive: true }); fs.writeFileSync(seal, 'bird-startup17-v1');
+}
+const STARTUP_HOST = { processEpochMs: Math.round(performance.timeOrigin), electron: process.versions.electron,
+  chrome: process.versions.chrome, node: process.versions.node, platform: process.platform, arch: process.arch, seed: arg('seed', null), cpuThrottle: +arg('cpu', 1), bootcpu: has('bootcpu') };
 app.setPath('userData', UD);
 if (app.dock) app.dock.hide();
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);   // stream — <audio> музыки (music.js), как в electron/main.cjs
@@ -105,15 +115,18 @@ if (MEM) app.commandLine.appendSwitch('enable-precise-memory-info');   // perfor
 const JSF = [arg('jsflags', ''), MEM ? '--expose-gc' : ''].filter(Boolean).join(' ');
 if (JSF) app.commandLine.appendSwitch('js-flags', JSF);   // --jsflags="--trace-deopt" — флаги V8 (вывод — в stdout страницы), docs/AGENTS.md «Хвост кадров»
 
+let finished = false;
 function finish (code, report) {
+  if (finished) return;
+  finished = true;                               // first terminal result wins, before writing or app.exit callbacks
   if (arg('report')) { try { fs.writeFileSync(path.resolve(arg('report')), JSON.stringify(report)); } catch (e) { err('probe: отчёт не записан:', e.message); } }
-  try { fs.rmSync(UD, { recursive: true, force: true }); } catch (e) { /* — */ }
+  try { if (!STARTUP_SESSION) fs.rmSync(UD, { recursive: true, force: true }); } catch (e) { /* — */ }
   app.exit(code);
 }
 
 // ошибка в самом probe — в stderr и выход, без окна Электрона «A JavaScript error occurred in the main process»
 // (агенты гоняют по 6 probe разом — окна сыпались автору на экран)
-const fatal = e => { err('probe: ошибка probe:', (e && e.stack) || e); finish(1, { ok: false, probeError: String((e && e.message) || e) }); };
+const fatal = e => { if (finished) return; err('probe: ошибка probe:', (e && e.stack) || e); finish(1, { ok: false, probeError: String((e && e.message) || e) }); };
 process.on('uncaughtException', fatal);
 process.on('unhandledRejection', fatal);
 
@@ -121,6 +134,7 @@ const { PRELUDE, INSTALL } = require('./probe-page.cjs');   // помощник�
 const { GLMEM } = require('./probe-glmem.cjs');                 // --mem: видеопамять по обёрткам WebGL
 
 app.whenReady().then(async () => {
+  if (finished) return;
   // --dir=папка — готовая сборка (например, релизная с BUILD_VERSION), без своей пересборки
   const b = arg('dir') ? (fs.existsSync(path.join(path.resolve(arg('dir')), 'index.html')) ? { dir: path.resolve(arg('dir')) } : { error: 'нет index.html в ' + arg('dir') })
     : ensureBuild(MODE, { force: has('rebuild'), skip: has('no-build') });
@@ -128,10 +142,19 @@ app.whenReady().then(async () => {
   const tBuild = Date.now() - T0;
   const DIST = b.dir;
 
-  const SES = session.fromPartition('probe-' + process.pid + '-' + Date.now());   // без persist: — только в памяти
+  const LAND_CACHE_PROBE=new URLSearchParams(arg('q','').replace(/^[?&]/,'')).has('landcache');
+  let landCacheAsset=null,landCacheStopped=false;
+  if(arg('land-cache-file')){
+    if(!STARTUP_BENCH||!LAND_CACHE_PROBE||MODE!=='steam'||!arg('land-export-manifest'))throw Error('land-cache17a:HOST_EXPLICIT_SETUP');
+    landCacheAsset=require('./land-cache-host.cjs').bindCacheAsset({file:arg('land-cache-file'),sha256:arg('land-cache-sha'),manifestFile:arg('land-export-manifest'),dist:DIST,repo:path.resolve(__dirname,'..')});
+    STARTUP_HOST.landCacheManifestHash=landCacheAsset.manifestHash;
+    STARTUP_HOST.landCacheSha256=landCacheAsset.sha256;
+  }
+  const SES = session.fromPartition(STARTUP_SESSION ? 'persist:startup17' : 'probe-' + process.pid + '-' + Date.now());   // без persist: — только в памяти
   SES.protocol.handle('app', req => {
     let p = decodeURIComponent(new URL(req.url).pathname);
     if (p === '/' || p === '') p = '/index.html';
+    if(p==='/__landcache17a__/result.land')return landCacheAsset?net.fetch(landCacheAsset.url):new Response('land-cache17a:EXPLICIT_ASSET_MISSING',{status:404});
     const f = path.join(DIST, p);
     if (!fs.existsSync(f)) {
       if (p === '/sdk.js') return new Response('/* probe: без SDK Яндекса */', { headers: { 'content-type': 'text/javascript' } });
@@ -140,6 +163,13 @@ app.whenReady().then(async () => {
     return net.fetch(pathToFileURL(f).toString());
   });
   // до первой страницы: язык выбран, гайд, учебный заказ и обучение на чеке смены пройдены (--fresh — как у новичка)
+  if (STARTUP_BENCH && has('startup-cold')) { await SES.clearCache(); await SES.clearStorageData(); }
+  let startupFixture = null;
+  if (arg('startup-fixture')) {
+    if (!STARTUP_BENCH || !STARTUP_SESSION) throw Error('Startup fixture requires an owned session');
+    startupFixture = JSON.parse(fs.readFileSync(path.resolve(arg('startup-fixture')), 'utf8'));
+    if (!startupFixture || typeof startupFixture !== 'object' || Array.isArray(startupFixture) || Object.keys(startupFixture).some(k => !k.startsWith('dlv-'))) throw Error('Invalid startup fixture');
+  }
   const LANG = arg('lang', 'ru');
   const seed = has('fresh') ? { 'dlv-lang': LANG } : { 'dlv-lang': LANG, 'dlv-msk-guide': 1, 'dlv-msk-tut': '1', 'dlv-msk-nostut': 1, 'dlv-shift-tut': 1 };
   const pre = path.join(UD, 'seed-preload.js');
@@ -156,7 +186,7 @@ app.whenReady().then(async () => {
   const rnd = arg('seed') ? `(() => { let a = ${+arg('seed') >>> 0}; Math.random = () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
     // каждый кусок поздней сборки — со своего зерна (latebuild.js): город один и тот же с ?nolate и без, что бы ни шло между кусками
     window.__lateSeed = n => { let h = ${+arg('seed') >>> 0} ^ 0x9E3779B9; for (let i = 0; i < n.length; i++) h = Math.imul(h ^ n.charCodeAt(i), 0x01000193); a = h; }; })();` : '';
-  fs.writeFileSync(pre, `try { const S = ${JSON.stringify(seed)}; for (const k in S) if (localStorage.getItem(k) === null) localStorage.setItem(k, JSON.stringify(S[k])); } catch (e) {}` + touch);
+  fs.writeFileSync(pre, (startupFixture ? `try { localStorage.clear(); const F = ${JSON.stringify(startupFixture)}; for (const k of Object.keys(F)) localStorage.setItem(k, JSON.stringify(F[k])); } catch(e) { throw e; }` : '') + `try { const S = ${JSON.stringify(seed)}; for (const k in S) if (localStorage.getItem(k) === null) localStorage.setItem(k, JSON.stringify(S[k])); } catch (e) {}` + touch);
 
   const win = new BrowserWindow({ width: W, height: H, useContentSize: true, show: false,
     webPreferences: { offscreen: true, backgroundThrottling: false, session: SES, preload: pre, sandbox: false, contextIsolation: !PHONE } });
@@ -164,6 +194,12 @@ app.whenReady().then(async () => {
   const errors = [];
   let uncaught = 0;
   win.webContents.on('console-message', (e, level, msg, line, src) => {
+    if (finished) return;
+    if(LAND_CACHE_PROBE&&!landCacheStopped){
+      const failure=require('./land-cache-host.cjs').parseFailure(msg);
+      if(failure){landCacheStopped=true;clearTimeout(timer);err('probe: strict land cache:',failure.reason);
+        return finish(1,{ok:false,landCacheFailure:failure,errors,uncaught,startupHost:STARTUP_HOST});}
+    }
     if (MEM && typeof msg === 'string' && msg.startsWith('__probemem:')) { memMark(msg.slice(11)); return; }
     if (MEM && typeof msg === 'string' && msg.startsWith('__probewatch:')) { watchMark(msg.slice(13)); return; }
     // повернуть «телефон» из скрипта: console.log('__proberesize:844x390') — окно меняет размер (orient.js, поворот туда-обратно)
@@ -182,7 +218,7 @@ app.whenReady().then(async () => {
       if (errors.length < 50) errors.push((un ? '' : '') + msg.slice(0, 400) + (src ? ' @' + String(src).split('/').pop() + ':' + line : ''));
     }
   });
-  win.webContents.on('render-process-gone', (e, d) => { err('probe: страница упала:', d.reason); finish(1, { ok: false, crashed: d.reason, errors }); });
+  win.webContents.on('render-process-gone', (e, d) => { if (finished) return; err('probe: страница упала:', d.reason); finish(1, { ok: false, crashed: d.reason, errors }); });
   const js = c => win.webContents.executeJavaScript(c, true);
   /* --mem: память процессов Электрона по метке из страницы (mem('метка') в PRELUDE); --heapsnap — ещё и снимок кучи */
   const MEMLOG = [];
@@ -334,6 +370,7 @@ app.whenReady().then(async () => {
   const timer = setTimeout(() => { err('probe: время вышло (--timeout=' + arg('timeout', 360) + ')'); finish(1, { ok: false, timeout: true, errors }); }, +arg('timeout', 360) * 1000);
 
   const q = ['debug', 'mute', 'nolb', 'lang=' + LANG];
+  if (STARTUP_BENCH) q.push('startuptrace');
   if (!has('fresh')) q.push('nointro');
   if (has('kids')) q.push('kids');
   if (arg('map')) q.push('map=' + arg('map'));
@@ -341,12 +378,12 @@ app.whenReady().then(async () => {
   if (arg('q')) q.push(arg('q').replace(/^[?&]/, ''));
   const url = 'app://g/' + PAGE + '?' + q.join('&');
   const dbg = win.webContents.debugger;
-  if ((has('bootcpu') && +arg('cpu', 1) > 1) || arg('cpuprofile') || rnd || MEM || INIT_SCRIPT !== null) {
+  if ((has('bootcpu') && +arg('cpu', 1) > 1) || arg('cpuprofile') || rnd || MEM || INIT_SCRIPT !== null || STARTUP_BENCH) {
     try {
       await win.loadURL('app://g/__blank').catch(() => {});   // тот же источник: рендерер не сменится при переходе на игру
       dbg.attach('1.3');
       if (has('bootcpu') && +arg('cpu', 1) > 1) await dbg.sendCommand('Emulation.setCPUThrottlingRate', { rate: +arg('cpu') });
-      if (rnd || MEM || INIT_SCRIPT !== null) await dbg.sendCommand('Page.enable');
+      if (rnd || MEM || INIT_SCRIPT !== null || STARTUP_BENCH) await dbg.sendCommand('Page.enable');
       if (rnd) await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: rnd });
       if (INIT_SCRIPT !== null) await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: INIT_SCRIPT });
       if (MEM) await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: GLMEM });   // видеопамять — с первого вызова WebGL
@@ -366,11 +403,18 @@ app.whenReady().then(async () => {
       PEAK.n++;
     } catch (e) { /* — */ }
   }, 200) : null;
-  try { await win.loadURL(url); } catch (e) { err('probe: не открылась', url, e.message); }
+  if (STARTUP_BENCH) {
+    STARTUP_HOST.navigateEpochMs = Date.now();
+    await dbg.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: 'window.__startupHost=' + JSON.stringify(STARTUP_HOST) + ';' });
+  }
+  try { await win.loadURL(url); } catch (e) { if (finished) return; err('probe: не открылась', url, e.message); }
+  if (finished) return;
   let ok = false;
   const bootWait=+arg('bootwait',240);                // окончательный контур земли строится за меню; смена — только после полной готовности
   for (let i = 0; i < bootWait*10; i++) {
+    if (finished) return;
     try { ok = await js(GAME ? `!!(window.__dlv && __dlv.frame && __dlv.S && !document.body.classList.contains('booting')${has('early') ? '' : ' && (!window.__boot || window.__boot.full)'})` : `document.readyState === 'complete' && window.__probeReady !== false`); } catch (e) { /* — */ }
+    if (finished) return;
     if (ok) break;
     await sleep(100);
   }
@@ -403,19 +447,28 @@ app.whenReady().then(async () => {
   if (CODE) {
     try {
       const out = await js(`(async () => { ${PRELUDE}\n const __r = await (async () => {\n${CODE}\n})();\n return JSON.stringify(__r === undefined ? null : __r); })()`);
+      if (finished) return;
       result = JSON.parse(out);
     } catch (e) {
+      if (finished) return;
       evalErr = String(e && e.message || e).replace(/^Error: /, '');
       await sleep(50);                                  // синтаксическая ошибка — текст только в консоли страницы
       if (/Script failed to execute/.test(evalErr) && errors.length) evalErr = errors[errors.length - 1];
     }
   }
+  if (finished) return;
+  let landExport=null,landExportError=null,landExportDiagnostics=null;
+  if(arg('land-export')){
+    ({landExport,landExportError,landExportDiagnostics,evalErr}=await require('./land-export-host.cjs').exportWithDiagnostics({js,priorEvalErr:evalErr,uncaught,errors,allowed:!!arg('land-export-manifest')&&STARTUP_BENCH&&!MEM&&!RUNP&&!ALLOCP,args:{file:arg('land-export'),manifestFile:arg('land-export-manifest'),dist:DIST,repo:path.resolve(__dirname,'..')}}));
+  }
+  if (finished) return;
   const tEval = Date.now() - T0;
   if (RUNP) { try { const { profile } = await dbg.sendCommand('Profiler.stop'); fs.writeFileSync(path.resolve(RUNP), JSON.stringify(profile)); err('probe: профиль скрипта →', path.resolve(RUNP)); } catch (e) { err('probe: профиль не снят:', e.message); } }
   if (ALLOCP) { try { const { profile } = await dbg.sendCommand('HeapProfiler.stopSampling'); fs.writeFileSync(path.resolve(ALLOCP), JSON.stringify(profile)); err('probe: выделения памяти →', path.resolve(ALLOCP)); } catch (e) { err('probe: выделения не сняты:', e.message); } }
   if (+arg('secs', 0) > 0) await sleep(+arg('secs') * 1000);
   const logs = await js('window.__probe.logs').catch(() => []);
   const fstats = await js('window.__probe.stats()').catch(() => null);
+  if (finished) return;
   if (arg('shot')) {
     const f = path.resolve(arg('shot'));
     try { const r = await shot(f); err('probe: кадр →', f, r.w + '×' + r.h + (r.sharp ? '' : ' (без растяжки кадра: ' + (r.skip || 'нет холста') + ')')); } catch (e) { err('probe: кадр не снят:', e.message); }
@@ -432,5 +485,5 @@ app.whenReady().then(async () => {
   const code = uncaught || evalErr ? 1 : 0;
   if (peakT) clearInterval(peakT);
   if (MEM) err('probe: память процессов, МБ (страница/видеокарта):', MEMLOG.map(m => m.label + ' ' + m.page + '/' + m.gpu + (m.foot ? ' (след ' + m.foot + ', пик ' + m.footPeak + ')' : '')).join(', ') + (MEMLOG.length ? ', ' : '') + 'пик ' + PEAK.page + ' (на ' + (PEAK.pageT / 1000).toFixed(1) + ' с)/' + PEAK.gpu);
-  finish(code, { ok: !code, result, evalErr, errors, uncaught, frames: fstats, logs, mem: MEMLOG, memPeak: MEM ? PEAK : undefined, ms: { total, build: b.built ? b.ms : 0, load: tLoad - tBuild, eval: tEval - tLoad } });
-}).catch(e => { err('probe:', e && e.stack || e); finish(1, { ok: false, error: String(e) }); });
+  finish(code, { ok: !code, result, landExport, landExportError, landExportDiagnostics, evalErr, errors, uncaught, frames: fstats, logs, mem: MEMLOG, memPeak: MEM ? PEAK : undefined, startupHost: STARTUP_BENCH ? STARTUP_HOST : undefined, ms: { total, build: b.built ? b.ms : 0, load: tLoad - tBuild, eval: tEval - tLoad } });
+}).catch(e => { if (finished) return; err('probe:', e && e.stack || e); finish(1, { ok: false, error: String(e) }); });

@@ -1,0 +1,61 @@
+--- /tmp/bird-landcache17a-geometry-1102-steering-01/cache17a-geometry.js
++++ /tmp/bird-landcache17a/cache17a-geometry.js
+@@ -4,6 +4,31 @@
+ const provenance=[{"path": "tools/probe-checks/startup-ready.js", "sha256": "044da43ee073f0533427231b14d4ef0a92d61a0c46db718819efc47507942c91"}, {"path": "tools/probe-checks/raised-land.js", "sha256": "99324366abd28f28f5e498c68947987cc17791acbfb534792c43852645e7cf3e"}, {"path": "tools/probe-checks/raised-land-drive.js", "sha256": "9ccfc2526f01f276af84164a4180215954bf08fd851f7b1e410a6a1ee806d88e"}, {"path": "tools/probe-checks/land-boundary.js", "sha256": "616066e1d59083c54d85df8771ccf9d9068c7e838c8e560a3d3e7e587cbfea6e"}, {"path": "src/game/landcache17a/landcache-accept.js", "sha256": "a65bc8dc87fded2ef6ecdba5e380449d41efbea1de7b1e00db98c710c4a2e625"}];
+ const geometry={stage:'startup',samples:null};window.__cacheGeometry17a=geometry;
+ const need=(ok,message)=>{if(!ok)throw Error('cache-geometry17a: '+message);};
++/* Actual BENCHES variants: addProp pivot, or smashAdd mesh/v0/nv. Read-only. */
++function benchState(b){
++ if(!Number.isFinite(b.y))throw Error('benchY is not finite');
++ const p=b.prop,pivot=p?.pivot;
++ if(pivot){if(!Number.isFinite(pivot.position?.y))throw Error('pivotY is not finite');return{representation:'pivot',benchY:b.y,pivotY:pivot.position.y};}
++ const mesh=p?.mesh,v0=p?.v0,nv=p?.nv,attr=mesh?.geometry?.attributes?.position;
++ const state={representation:'smash',benchY:b.y,meshPresent:!!mesh,meshPositionY:Number.isFinite(mesh?.position?.y)?mesh.position.y:null,v0:Number.isInteger(v0)?v0:null,nv:Number.isInteger(nv)?nv:null,cpuRange:{available:false,reason:'CPU position storage unavailable; benchY only',gpuProof:false}};
++ const storage=attr?.array||attr?.data?.array,stride=attr?.isInterleavedBufferAttribute?attr.data.stride:attr?.itemSize,offset=attr?.isInterleavedBufferAttribute?attr.offset:0;
++ if(!ArrayBuffer.isView(storage)||!Number.isInteger(v0)||!Number.isInteger(nv)||v0<0||nv<=0||!Number.isInteger(stride)||stride<3||offset<0||(v0+nv-1)*stride+offset+1>=storage.length)return state;
++ let minY=Infinity,maxY=-Infinity,sumY=0;const selected=[0,Math.floor(nv/2),nv-1],ys=[];
++ for(let i=0;i<nv;i++){const y=storage[(v0+i)*stride+offset+1];if(!Number.isFinite(y))throw Error('SMASH bench range Y is not finite');minY=Math.min(minY,y);maxY=Math.max(maxY,y);sumY+=y;if(selected.includes(i))ys.push({vertex:i,y});}
++ state.cpuRange={available:true,minY,maxY,meanY:sumY/nv,ys,gpuProof:false};return state;
++}
++function compareBenchState(expected,actual){
++ const close=(a,b)=>Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<1e-6;
++ if(expected.representation!==actual.representation||!close(expected.benchY,actual.benchY))throw Error('bench representation or benchY differs');
++ if(actual.representation==='pivot'){if(!close(expected.pivotY,actual.pivotY))throw Error('pivot bench alignment differs');return'pivotY+benchY';}
++ if(expected.meshPresent!==actual.meshPresent||expected.v0!==actual.v0||expected.nv!==actual.nv||expected.meshPositionY!==actual.meshPositionY)throw Error('SMASH bench mesh/range identity differs');
++ if(expected.cpuRange.available!==actual.cpuRange.available)throw Error('SMASH bench CPU range availability mismatch');
++ if(!actual.cpuRange.available)return'benchY-only; CPU arrays unavailable in both processes; no GPU proof';
++ for(const key of ['minY','maxY','meanY'])if(!close(expected.cpuRange[key],actual.cpuRange[key]))throw Error('SMASH bench range Y differs');
++ if(expected.cpuRange.ys.length!==actual.cpuRange.ys.length||expected.cpuRange.ys.some((p,i)=>p.vertex!==actual.cpuRange.ys[i].vertex||!close(p.y,actual.cpuRange.ys[i].y)))throw Error('SMASH bench selected vertex Y differs');
++ return'benchY+retained CPU range Y; no GPU proof';
++}
++
+ try{
+  const startup=await(async()=>{
+ /* №17ж: actual menu action -> non-held physics + completed visible frame + ready local support.
+@@ -94,7 +119,7 @@
+  need(!isCache||samples,'cache requires generated sample lock, not a new selection');
+  if(isCache)need(/^[a-f0-9]{64}$/.test(samples.drawDigest||''),'generated draw digest missing from sample lock');
+  if(!samples){
+-  samples={version:1,district:d.DIST.cur(),home,landPoses:[],pavedPoses:[],driveEdges:[],boundaries:[],seams:[],props:[],benches:[]};
++  samples={version:1,district:d.DIST.cur(),home,landPoses:[],pavedPoses:[],driveEdges:[],boundaries:[],seams:[],props:[],benches:[]};geometry.samples=samples;
+   // raised-land.js selection, with local-ready and obstacle filters only.
+   for(const t of L.cover.triangles){
+    if(t.lift>=.49)continue;
+@@ -130,7 +155,7 @@
+    }
+   }
+   for(let i=0;i<d.PROPS.length&&samples.props.length<8;i++){const p=d.PROPS[i];if(near(p.x,p.z)&&L.onLand(p.x,p.z)&&!p.down)samples.props.push({index:i,kind:p.kind,x:p.x,z:p.z,y:p.pivot.position.y});}
+-  for(let i=0;i<d.BENCHES.length&&samples.benches.length<4;i++){const b=d.BENCHES[i];if(near(b.x,b.z)&&L.onLand(b.x,b.z)&&!b.prop?.down)samples.benches.push({index:i,x:b.x,z:b.z,y:b.y,pivotY:b.prop?.pivot.position.y});}
++  for(let i=0;i<d.BENCHES.length&&samples.benches.length<4;i++){const b=d.BENCHES[i];if(near(b.x,b.z)&&L.onLand(b.x,b.z)&&!b.prop?.down)samples.benches.push({index:i,x:b.x,z:b.z,state:benchState(b)});}
+  }
+  geometry.samples=samples;
+  need(samples.version===1&&samples.district===d.DIST.cur()&&Math.hypot(samples.home.x-home.x,samples.home.z-home.z)<.001,'sample lock belongs to another start');
+@@ -147,7 +172,7 @@
+  const drawDigest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(safe))),v=>v.toString(16).padStart(2,'0')).join('');
+  if(samples.drawDigest)need(drawDigest===samples.drawDigest,'selected draw/query inputs differ from generated');else samples.drawDigest=drawDigest;
+  const props=samples.props.map(e=>{const p=d.PROPS[e.index];need(p&&p.kind===e.kind&&Math.hypot(p.x-e.x,p.z-e.z)<1e-7,'prop identity');need(Math.abs(p.pivot.position.y-e.y)<1e-6,'prop double/missing align');return{...e,actualY:p.pivot.position.y};});
+- const benches=samples.benches.map(e=>{const b=d.BENCHES[e.index];need(b&&Math.hypot(b.x-e.x,b.z-e.z)<1e-7,'bench identity');need(Math.abs(b.y-e.y)<1e-6&&Math.abs(b.prop.pivot.position.y-e.pivotY)<1e-6,'bench double/missing align');return{...e,actualY:b.y,actualPivotY:b.prop.pivot.position.y};});
++ const benches=samples.benches.map(e=>{const b=d.BENCHES[e.index];need(b&&Math.hypot(b.x-e.x,b.z-e.z)<1e-7,'bench identity');const actual=benchState(b),comparison=compareBenchState(e.state,actual);return{...e,actual,comparison};});
+  geometry.stage='boundaries';
+  const boundary={checked:0,bad:0,thin:0,narrow:0,minWidth:Infinity};
+  // Numeric body from land-boundary.js, plus existing raised-land-width.js threshold.

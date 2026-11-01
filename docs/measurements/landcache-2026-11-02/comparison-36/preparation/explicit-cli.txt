@@ -1,0 +1,1 @@
+node tools/startup-bench.mjs --dir=/tmp/bird-landcache17a-protocol2-1102/steam --sha=fdb6923c13afc8f369b8c02931174fb953706d52fb5d3f347683dab0f2f6fcce --comparison-config=/tmp/bird-landcache17a-comparison-ready/comparison-config.json --harness-patch=/tmp/bird-landcache17a-comparison-ready/comparison-with-tests.patch --out=/tmp/bird-landcache17a-comparison36-1102

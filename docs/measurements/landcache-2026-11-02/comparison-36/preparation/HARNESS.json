@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "state": "ready; both pilots root-accepted and raw-SHA pinned; no series authorized or started",
+  "projectApplied": true,
+  "unit": {
+    "file": "tools/startup-comparison-test.mjs",
+    "sha256": "0c483f3162c5edb92112593b70d5d3f078e627408dfbccec3b0d25170c629dc2",
+    "checks": 77,
+    "pass": true,
+    "copy": "/tmp/bird-landcache17a-comparison-ready/harness/tools/startup-comparison-test.mjs"
+  },
+  "runtimeManifest": "/tmp/bird-landcache17a-reportfix-1102/manifest.json",
+  "runtimeSourceHash": "fdb6923c13afc8f369b8c02931174fb953706d52fb5d3f347683dab0f2f6fcce",
+  "runtimeBuildHash": "382750aa2e2bf4cbfc5943c08b05c1b333f65ac419668c6f5c0d3917ba17760a",
+  "runtimeManifestHash": "11fa36cfca107d3faf4047d1283f721233beaec41723404421c788c0dbf7d8e8",
+  "buildDir": "/tmp/bird-landcache17a-protocol2-1102/steam",
+  "assetIndex": "/tmp/bird-landcache17a-reportfix-1102/saved-assets/asset-index.json",
+  "assetIndexSha256": "49422e854500517d74bb9e59a745945b4244cabd045a48c12805654333006eb8",
+  "assetBodiesRead": false,
+  "harness": [
+    {
+      "file": "tools/probe.cjs",
+      "sha256": "e5ee9ae613ff40fd48a89249a23ab3c1c1b1252920c1244a0609198d765f12eb",
+      "bytes": 44442,
+      "copy": "/tmp/bird-landcache17a-comparison-ready/harness/tools/probe.cjs"
+    },
+    {
+      "file": "tools/probe-checks/startup-ready.js",
+      "sha256": "044da43ee073f0533427231b14d4ef0a92d61a0c46db718819efc47507942c91",
+      "bytes": 6053,
+      "copy": "/tmp/bird-landcache17a-comparison-ready/harness/tools/probe-checks/startup-ready.js"
+    },
+    {
+      "file": "tools/probe-checks/startup-bootstrap-observe.js",
+      "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8",
+      "bytes": 654,
+      "copy": "/tmp/bird-landcache17a-comparison-ready/harness/tools/probe-checks/startup-bootstrap-observe.js"
+    },
+    {
+      "file": "tools/startup-bench.mjs",
+      "sha256": "9c79985aa2b813403a2473d6e5aa5ff946d4680ace28627c39caf54490fdc9d9",
+      "bytes": 15152,
+      "copy": "/tmp/bird-landcache17a-comparison-ready/harness/tools/startup-bench.mjs"
+    },
+    {
+      "file": "tools/startuptrace-test.mjs",
+      "sha256": "3cba91741239407f846922ed8920b1a8be24e23b9918f4a3e60b65ec5d1e6224",
+      "bytes": 6791,
+      "copy": "/tmp/bird-landcache17a-comparison-ready/harness/tools/startuptrace-test.mjs"
+    },
+    {
+      "file": "tools/startup-report.mjs",
+      "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3",
+      "bytes": 13190,
+      "copy": "/tmp/bird-landcache17a-comparison-ready/harness/tools/startup-report.mjs"
+    },
+    {
+      "file": "tools/startup-revalidate.mjs",
+      "sha256": "ac49c38df2e681319055fda157ee93eddc115f781809977b6850705f199d478b",
+      "bytes": 11061,
+      "copy": "/tmp/bird-landcache17a-comparison-ready/harness/tools/startup-revalidate.mjs"
+    },
+    {
+      "file": "tools/land-cache-host.cjs",
+      "sha256": "5ad1524a312fd40e6c7e46530d608bd84819becec6bdeefac39f86add6bcf32c",
+      "bytes": 3763,
+      "copy": "/tmp/bird-landcache17a-comparison-ready/harness/tools/land-cache-host.cjs"
+    }
+  ],
+  "harnessSha256": "deaba2d55c2649d70a7463364bb3f78611475dcd80c072d97623a5605e22bf39",
+  "appliedPatch": {
+    "file": "/tmp/bird-landcache17a-comparison-ready/comparison-with-tests.patch",
+    "sha256": "e8b6e487990e836946c225b4a0eeaa42110e9ed6b82b9b220103b2ac7c98516b"
+  },
+  "measurementStarted": false,
+  "note": "Current tools snapshot is separate from immutable runtime/source manifest and old integrityExtraMeasured hashes.",
+  "comparisonConfig": {
+    "file": "/tmp/bird-landcache17a-comparison-ready/comparison-config.json",
+    "sha256": "31079d9e9bf508b61481dae824121c2467017067461e49d736967a4f44e00052"
+  },
+  "pilotRawSha256": {
+    "generated": "b111f0ff098dae1e4288a5fc575974d20bc25833633275ffc1382c630858311c",
+    "cache": "d1ab4779a8973c74bf8acf176bc7f16c564ccb3ee36d256c5fc673835f5e3a3d"
+  },
+  "rootAcceptedPilots": true,
+  "readyValidation": {
+    "file": "/tmp/bird-landcache17a-comparison-ready/ready-validation.json",
+    "sha256": "759788195391246799051ab35d122086300feb2cfbb5fea239180fd71ea5116b"
+  },
+  "explicitCli": {
+    "file": "/tmp/bird-landcache17a-comparison-ready/explicit-cli.txt",
+    "sha256": "8ae598f980850dc1af69ba80cdfbc4403f8320f139f27c8cbcce494d1fd490a7",
+    "invoked": false
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "variant": "generated",
+  "argv": [
+    "npm",
+    "run",
+    "probe",
+    "--",
+    "--mode=steam",
+    "--dir=/tmp/bird-landcache17a-protocol2-1102/steam",
+    "--startup-trace",
+    "--startup-cold",
+    "--startup-fixture=/tmp/bird-startup17-series-5a20287/newbie-1-fixture.json",
+    "--fresh",
+    "--early",
+    "--mem",
+    "--size=deck",
+    "--cpu=3",
+    "--bootcpu",
+    "--seed=7",
+    "--init-script=/tmp/bird-landcache17a-reportfix-1102/combined-init.js",
+    "--land-export-manifest=/tmp/bird-landcache17a-reportfix-1102/manifest.json",
+    "--eval=/tmp/bird-landcache17a/memory/memory-eval.js",
+    "--bootwait=300",
+    "--timeout=600",
+    "--max=0",
+    "--errors",
+    "--startup-session=lc17mem-f87c07db-7015-490f-be17-84b52f1bff42",
+    "--q=gfx=high&gfxdev=deck&mute&startupdistrict=0",
+    "--report=/tmp/bird-landcache17a/memory/generated.json"
+  ],
+  "cwd": "/Users/andrewboev/Desktop/not-work/delivery",
+  "provenance": {
+    "eval": {
+      "path": "/tmp/bird-landcache17a/memory/memory-eval.js",
+      "sha256": "88e8f7669f849a46e3e3e2c562f2123eec5f1784298aced0fde4f47d94c4021c"
+    },
+    "pairGate": {
+      "path": "/tmp/bird-landcache17a/memory/pair-gate.mjs",
+      "sha256": "12b25dd97c889cdbf238fe8eecb68b52893898e52ad9d1cda7314da4053ef327"
+    },
+    "init": {
+      "path": "/tmp/bird-landcache17a-reportfix-1102/combined-init.js",
+      "sha256": "8ef7471ff1270c0ddbf144547f8c0b835ec224a8703e1329267596f7501f8a13"
+    },
+    "fixture": {
+      "path": "/tmp/bird-startup17-series-5a20287/newbie-1-fixture.json",
+      "sha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00"
+    },
+    "manifest": {
+      "path": "/tmp/bird-landcache17a-reportfix-1102/manifest.json",
+      "sha256": "785c5019fc8d86a39e7691cea3b3d63356b820fc677a244529e8fff271bdf257"
+    },
+    "probe": {
+      "path": "tools/probe.cjs",
+      "sha256": "e5ee9ae613ff40fd48a89249a23ab3c1c1b1252920c1244a0609198d765f12eb"
+    }
+  },
+  "sourceHash": "fdb6923c13afc8f369b8c02931174fb953706d52fb5d3f347683dab0f2f6fcce",
+  "buildHash": "382750aa2e2bf4cbfc5943c08b05c1b333f65ac419668c6f5c0d3917ba17760a",
+  "startedEpochMs": 1793566971861,
+  "processStatus": 0,
+  "signal": null,
+  "status": "returned",
+  "raw": "/tmp/bird-landcache17a/memory/generated.json",
+  "pid": 91777,
+  "finishedEpochMs": 1793567099493,
+  "rawSha256": "6acf4021cc7011fafa6423e673c30d9fd0e4a0d759ba159c50ab3c5c187c2a3d",
+  "stdoutSha256": "4bd074c8be2dfe8a76d905994e198e86ade61ee72a272e2cca0a962f65f15632",
+  "stderrSha256": "c9c22b2d33c90c08ee63c8cbd2baeaad11a7a5909f11d747b3faab6294979e1e",
+  "provenanceUnchanged": true
+}

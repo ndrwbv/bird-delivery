@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "date": "2026-11-01T19:27:49.838629+00:00",
+  "kind": "outside-timing generated/cache geometry; no medians",
+  "frozenBuild": "/tmp/bird-landcache17a-protocol2-1102/steam",
+  "manifest": "/tmp/bird-landcache17a-protocol2-1102/manifest/manifest.json",
+  "trustedCacheFile": "/tmp/bird-landcache17a-protocol2-1102/city.land",
+  "trustedCacheSha256": "1d37b7f3c446150e8ad81b1047da9c97ed630d7e7f4edc3d785a1857199b7793",
+  "fixture": "/tmp/bird-startup17-series-5a20287/newbie-1-fixture.json",
+  "fixtureSha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00",
+  "eval": "/tmp/bird-landcache17a/cache17a-geometry.js",
+  "evalSha256": "980cefef398be6cad1a68a43f9c4795502aa385bee36c5df33f973fed137875b",
+  "init": "/tmp/bird-landcache17a-protocol2-1102/combined-init.js",
+  "initSha256": "255d28757d08706ff2eb7882ea8d31d686e09d8a8eb4bed1f3ec909b46d968ed",
+  "geometryInitHelperSha256": "ace431151fb5b3d43bdb876575d1e4535095cb6152e667e6f2bfdfbf1db0f8af",
+  "commands": {
+    "generated": [
+      "npm",
+      "run",
+      "probe",
+      "--",
+      "--mode=steam",
+      "--dir=/tmp/bird-landcache17a-protocol2-1102/steam",
+      "--fresh",
+      "--early",
+      "--startup-trace",
+      "--startup-session=lc17-geometry-generated-2a3bfe6a-cfe7-4fac-9d2e-c9c69666e677",
+      "--startup-cold",
+      "--startup-fixture=/tmp/bird-startup17-series-5a20287/newbie-1-fixture.json",
+      "--init-script=/tmp/bird-landcache17a-protocol2-1102/combined-init.js",
+      "--size=deck",
+      "--cpu=3",
+      "--bootcpu",
+      "--seed=7",
+      "--bootwait=300",
+      "--timeout=420",
+      "--q=gfx=high&gfxdev=deck&mute&startupdistrict=0",
+      "--eval=/tmp/bird-landcache17a/cache17a-geometry.js",
+      "--max=0",
+      "--errors",
+      "--report=/tmp/bird-landcache17a-geometry-1102-steering-01/generated.json"
+    ]
+  },
+  "conditions": {
+    "fresh": true,
+    "mode": "steam",
+    "size": "1280x800",
+    "gfx": "high",
+    "cpu": 3,
+    "bootcpu": true,
+    "seed": 7,
+    "mute": true,
+    "physicalDeck": false
+  },
+  "status": "generated FAILED; cache NOT RUN; no retry",
+  "generatedValidation": {
+    "ok": false,
+    "processExit": 0,
+    "reasons": [
+      "result.ok"
+    ],
+    "stage": "select",
+    "error": "TypeError: Cannot read properties of undefined (reading 'position')\n    at <anonymous>:207:205\n    at async <anonymous>:74:14",
+    "outerOk": true,
+    "resultOk": false,
+    "errors": [],
+    "uncaught": 0,
+    "crash": 0,
+    "reportSha256": "5c7d1b40b7434c8d3a7ea2a378dfa03218bf7badd58e76ed59b231ca3d42890b",
+    "coverage": null
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "sourceRevision": "5a2028736cf5d5fb48cf8c2f0e649246bb45ea1a",
+  "candidateChanges": "17ж startup instrumentation only",
+  "buildVersion": "0.33.9",
+  "date": "2026-11-01T17:58:04.942Z",
+  "builds": [
+    {
+      "dir": "/tmp/bird-startup17-control-5a20287",
+      "indexSha256": "e1610792b37be5920fd6cb177ffac71fb5c5f8cc89763bb044348bb8b77f2193",
+      "hasEditor": false
+    },
+    {
+      "dir": "/tmp/bird-startup17-candidate-5a20287",
+      "indexSha256": "01f5102a233683919337965e6b71e0259bad2be25385279c3695965e4994ee91",
+      "hasEditor": false
+    }
+  ],
+  "buildCommands": [
+    "env -u BIRD_EDITOR BUILD_VERSION=0.33.9 npx vite build --mode web --outDir /tmp/bird-startup17-web-candidate-5a20287 --emptyOutDir --logLevel warn",
+    "env -u BIRD_EDITOR BUILD_VERSION=0.33.9 npx vite build --mode steam --outDir /tmp/bird-startup17-candidate-5a20287 --emptyOutDir --logLevel warn"
+  ],
+  "pilotCommand": [
+    "npm",
+    "run",
+    "probe",
+    "--",
+    "--mode=steam",
+    "--dir=/tmp/bird-startup17-candidate-5a20287",
+    "--fresh",
+    "--early",
+    "--startup-trace",
+    "--startup-session=pilot-5a20287-newbie-20261102",
+    "--startup-cold",
+    "--startup-fixture=/tmp/bird-startup17-pilot-5a20287/newbie.json",
+    "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+    "--size=deck",
+    "--cpu=3",
+    "--bootcpu",
+    "--seed=7",
+    "--bootwait=300",
+    "--timeout=420",
+    "--q=gfx=high&gfxdev=deck&mute&startupdistrict=0",
+    "--eval=tools/probe-checks/startup-ready.js",
+    "--max=0",
+    "--errors",
+    "--report=/tmp/bird-startup17-pilot-5a20287/pilot.json"
+  ],
+  "conditions": {
+    "mode": "steam",
+    "width": 1280,
+    "height": 800,
+    "gfx": "high",
+    "cpu": 3,
+    "bootcpu": true,
+    "seed": 7,
+    "scenario": "newbie",
+    "cache": "empty isolated Chromium session; OS/driver cache uncontrolled",
+    "physicalDeck": false
+  },
+  "host": {
+    "os": "25.5.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M4",
+    "cores": 10,
+    "memoryBytes": 34359738368
+  },
+  "result": {
+    "ok": true,
+    "summary": "/tmp/bird-startup17-pilot-5a20287/summary.json",
+    "report": "/tmp/bird-startup17-pilot-5a20287/pilot.json",
+    "controlHashUnchanged": true
+  }
+}

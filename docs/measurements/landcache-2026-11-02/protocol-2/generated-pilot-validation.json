@@ -1,0 +1,117 @@
+{
+  "validation": {
+    "ok": true,
+    "reasons": []
+  },
+  "protocol": 2,
+  "totalMs": 80071,
+  "firstControlFromNavigationMs": 79269.89999985695,
+  "firstControlFromClickMs": 70021.79999995232,
+  "firstControl": {
+    "at": 79269.89999985695,
+    "data": {
+      "guardVersion": 2,
+      "state": "drive",
+      "paused": false,
+      "mapOpen": false,
+      "held": false,
+      "localReady": true,
+      "supportReady": true,
+      "x": 3124.9371185058994,
+      "z": 2046.8247636833012,
+      "gas": 0,
+      "readyTiles": 32
+    }
+  },
+  "moved": 4.784452102297359,
+  "bootstrap": {
+    "markerWrites": 1,
+    "bootAbsentAtMarker": true,
+    "earlyBootSeen": false
+  },
+  "district": {
+    "before": {
+      "district": 0,
+      "opened": 1,
+      "city": false,
+      "partySeen": false
+    },
+    "actual": 0,
+    "atControl": 0,
+    "pizzaIndex": 0,
+    "pizza": {
+      "x": 3127.602428674413,
+      "z": 2075.7340376573325,
+      "bx": 3110.816648917971,
+      "bz": 2073.230921741487
+    },
+    "position": {
+      "x": 3124.9371185058994,
+      "z": 2046.8247636833012
+    },
+    "pickerClicks": 0,
+    "pickerObservedAt": null,
+    "pickerClickedAt": null,
+    "dialogClicks": 0
+  },
+  "cache": null,
+  "flags": {},
+  "dropped": 0,
+  "largest": [
+    {
+      "name": "city.syncBuild",
+      "workMs": 6208.600000143051,
+      "exclusiveWorkMs": 2241,
+      "maxWorkMs": 6208.600000143051,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "city.roads",
+      "workMs": 1800.2999999523163,
+      "exclusiveWorkMs": 1800.2999999523163,
+      "maxWorkMs": 1800.2999999523163,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "late.raisedland",
+      "workMs": 22194.89999604225,
+      "exclusiveWorkMs": 1444.7000000476837,
+      "maxWorkMs": 1011.5,
+      "steps": 32578,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "city.curbs",
+      "workMs": 769,
+      "exclusiveWorkMs": 769,
+      "maxWorkMs": 769,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "city.ground",
+      "workMs": 575.7000000476837,
+      "exclusiveWorkMs": 575.7000000476837,
+      "maxWorkMs": 575.7000000476837,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    }
+  ]
+}

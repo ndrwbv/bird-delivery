@@ -1,0 +1,53 @@
+{
+  "runtimeProtocol": 2,
+  "bootstrapGuardRequired": 2,
+  "comparisonManifest": 3,
+  "comparisonConfig": 1,
+  "comparisonCases": 77,
+  "fullVariantInputIdentity": true,
+  "actualCommandColdSessionBound": true,
+  "sourceFingerprint": "fdb6923c13afc8f369b8c02931174fb953706d52fb5d3f347683dab0f2f6fcce",
+  "sourceFingerprintIsGitCommit": false,
+  "buildHash": "382750aa2e2bf4cbfc5943c08b05c1b333f65ac419668c6f5c0d3917ba17760a",
+  "sharedManifestHash": "11fa36cfca107d3faf4047d1283f721233beaec41723404421c788c0dbf7d8e8",
+  "harnessSha256": "deaba2d55c2649d70a7463364bb3f78611475dcd80c072d97623a5605e22bf39",
+  "exactAppliedPatchSha256": "e8b6e487990e836946c225b4a0eeaa42110e9ed6b82b9b220103b2ac7c98516b",
+  "gateSnapshots": [
+    {
+      "file": "tools/probe-checks/startup-ready.js",
+      "sha256": "044da43ee073f0533427231b14d4ef0a92d61a0c46db718819efc47507942c91",
+      "bytes": 6053
+    },
+    {
+      "file": "tools/probe-checks/startup-bootstrap-observe.js",
+      "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8",
+      "bytes": 654
+    },
+    {
+      "file": "tools/startup-bench.mjs",
+      "sha256": "9c79985aa2b813403a2473d6e5aa5ff946d4680ace28627c39caf54490fdc9d9",
+      "bytes": 15152
+    },
+    {
+      "file": "tools/startup-report.mjs",
+      "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3",
+      "bytes": 13190
+    },
+    {
+      "file": "tools/startup-revalidate.mjs",
+      "sha256": "ac49c38df2e681319055fda157ee93eddc115f781809977b6850705f199d478b",
+      "bytes": 11061
+    }
+  ],
+  "result": {
+    "runs": 36,
+    "ok": true,
+    "errors": 0,
+    "retries": 0,
+    "nPerMedian": 3
+  },
+  "old18": "Diagnostic only: old18 raw is not reclassified as a matched cache variant and is excluded from every statistic in this archive.",
+  "scope": "Steam high, 1280x800 Steam Deck emulation, renderer CPU3; not physical Deck. OS and driver caches uncontrolled. Memory not measured.",
+  "offlineAudit": "completed-audit.json; report SHA, full identity, actual argv, processStatus0/signalnull. Separate independent revalidation is owned by coordinator.",
+  "omitted": "External binary cache assets, immutable build files and runtime source copies (including game.js) intentionally omitted. Original absolute paths in raw/manifests remain unchanged; archive-index maps archived copies."
+}

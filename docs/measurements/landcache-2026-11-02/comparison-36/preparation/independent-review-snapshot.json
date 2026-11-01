@@ -1,0 +1,37 @@
+{
+  "version": 2,
+  "pureCases": 77,
+  "actualNewbiePairMetadataGate": true,
+  "assetRead": false,
+  "projectApplied": false,
+  "files": [
+    {
+      "file": "tools/startup-bench.mjs",
+      "sha256": "9c79985aa2b813403a2473d6e5aa5ff946d4680ace28627c39caf54490fdc9d9"
+    },
+    {
+      "file": "tools/startup-report.mjs",
+      "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+    },
+    {
+      "file": "tools/startup-revalidate.mjs",
+      "sha256": "ac49c38df2e681319055fda157ee93eddc115f781809977b6850705f199d478b"
+    },
+    {
+      "file": "tools/startup-comparison-test.mjs",
+      "sha256": "0c483f3162c5edb92112593b70d5d3f078e627408dfbccec3b0d25170c629dc2"
+    },
+    {
+      "file": "comparison.patch",
+      "sha256": "08482e71d19bf94b61ae4f17f16ad5238fd382556d7f54069988feebe7d532c1"
+    },
+    {
+      "file": "comparison-with-tests.patch",
+      "sha256": "e8b6e487990e836946c225b4a0eeaa42110e9ed6b82b9b220103b2ac7c98516b"
+    },
+    {
+      "file": "PLAN.md",
+      "sha256": "544ceed6a25fbfb425f088a0442b543d76a5fece70c4d69c7594760247f3b493"
+    }
+  ]
+}

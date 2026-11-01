@@ -1,0 +1,61 @@
+{
+  "ok": true,
+  "file": "/tmp/bird-landexport17a-attempt2-city-5a20287-1102.land",
+  "bytes": 74735068,
+  "kind": "one Node CPU1 component observation; not renderer/Steam Deck/startup or peak memory",
+  "expectedIdentity": "from wire for component timing only; does not prove runtime input compatibility",
+  "ms": 1001.409375,
+  "rows": [
+    {
+      "name": "raisedland.cache.header",
+      "ms": 1.689708000000003
+    },
+    {
+      "name": "raisedland.cache.preflight",
+      "ms": 1.0062080000000009
+    },
+    {
+      "name": "raisedland.cache.blocks",
+      "ms": 466.237667
+    },
+    {
+      "name": "raisedland.cache.tree",
+      "ms": 1.076250000000016
+    },
+    {
+      "name": "raisedland.cache.index",
+      "ms": 59.279416000000026
+    },
+    {
+      "name": "raisedland.cache.validate",
+      "ms": 195.23929199999998
+    },
+    {
+      "name": "restoreResult",
+      "ms": 276.42945899999995
+    }
+  ],
+  "before": {
+    "rss": 197771264,
+    "heapTotal": 8896512,
+    "heapUsed": 4039672,
+    "external": 151932509,
+    "arrayBuffers": 149481650
+  },
+  "after": {
+    "rss": 648757248,
+    "heapTotal": 303316992,
+    "heapUsed": 271314472,
+    "external": 205200453,
+    "arrayBuffers": 202749594
+  },
+  "counts": {
+    "cover": 1070943,
+    "green": 14036,
+    "kept": 360924,
+    "domainCells": 31769,
+    "segments": 370726,
+    "supportReady": false,
+    "built": false
+  }
+}

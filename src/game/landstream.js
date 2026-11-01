@@ -1,3 +1,4 @@
+import { STARTUP } from './startuptrace.js';
 /* Подробная поверхность нужна вокруг камеры, а не сразу во всём городе.
    Опора и правила движения уже готовы; до замены остаётся исходная земля.
    Готовый участок публикуется целиком, затем скрывается его старый слой. */
@@ -22,7 +23,7 @@ export function createLandStream({terrain,build,publish=()=>{},radius=832,now=()
     return best;
   }
   function advance(x,z,r) {
-    if(!active){const id=nearest(x,z,r);if(id===null)return false;active={id,it:build(bounds(id))};}
+    if(!active){const id=nearest(x,z,r);if(id===null)return false;STARTUP.count('land.cellsRequested');active={id,it:build(bounds(id))};}
     const t=now();
     try {
       const result=quiet(()=>active.it.next());

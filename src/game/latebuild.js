@@ -17,6 +17,7 @@
    Шаги — в тех же местах при ?nolate и без: зерно --seed — перед каждым шагом (имя#номер). start() — начать разбор очереди (после первого кадра меню), flush() —
    достроить всё сейчас, flushAsync(cb) — достроить под экраном загрузки тиками с передышкой (память телефона, 0п48),
    busy() — ещё строится, onDone(fn) — когда всё. */
+import { STARTUP } from './startuptrace.js';
 import * as CL from '../platform/crashlog.js';
 import { MOB } from './mobile.js';
 
@@ -65,30 +66,34 @@ export function onDone (fn) { if (DONE) fn(); else WAIT.push(fn); }
 function one (sync=false) {
   const q = Q[0], n = q[0];
   if(q.waiting&&!q.waiting.ready&&!sync)return 0;
+  if(q.waiting && sync && !q.waiting.ready) STARTUP.flag('queue.syncFallback');
   seed(q[3] ? n + '#' + q[3] : n);
   const t0 = performance.now();
   let end = true, lab;
+  const traceSlice = STARTUP.startWork('late.' + n);
   try {
     if(q.waiting){
-      const w=q.waiting;q.waiting=null;
+      const w=q.waiting;q.waiting=null; w.traceEnd?.();
       q.input=w.ready&&!w.failed?w.result:w.job.sync();
     }
     if (!q[2]) { const r = q[1](); if (isIt(r)) q[2] = r; }
     if (q[2]) {
       const r = q[2].next(q.input);q.input=undefined;end=r.done;lab=r.value;q[3]++;
       if(!end&&isWait(lab)){
-        const job=lab,w={job,ready:false,failed:false,result:undefined};q.waiting=w;lab=job.label||'ожидание';
+        const job=lab,w={job,ready:false,failed:false,result:undefined,traceEnd:STARTUP.windowStart(job.traceName||'queue.workerWait',job.traceKind||'worker')};q.waiting=w;lab=job.label||'ожидание';
         const settled=(result,failed)=>{
           // flush мог уже исполнить запасной путь. Запоздалый ответ
           // не возобновляет генератор второй раз и не меняет новую задачу.
           if(q.waiting!==w||Q[0]!==q||DONE)return;
-          w.ready=true;w.failed=failed;w.result=result;next();
+          w.traceEnd?.(); if (failed) STARTUP.flag('queue.workerRejected'); w.ready=true;w.failed=failed;w.result=result;next();
         };
         job.wait.then(value=>settled(value,false),error=>settled(error,true));
       }
     }
-  } catch (e) { end = true; console.error('[latebuild]', n, e); try { CL.report('late:' + n, e, 'error'); } catch (e2) { /* — */ } }
+  } catch (e) { STARTUP.flag('queue.error'); end = true; console.error('[latebuild]', n, e); try { CL.report('late:' + n, e, 'error'); } catch (e2) { /* — */ } }
   const ms = performance.now() - t0;
+  traceSlice();
+
   T[n] = (T[n] || 0) + ms;
   if (!(MAX[n] >= ms)) MAX[n] = Math.round(ms);
   if (q[2]) (STEPS[n] || (STEPS[n] = [])).push(lab ? lab + ':' + Math.round(ms) : Math.round(ms));   // yield 'имя' — подпись шага
@@ -99,6 +104,7 @@ function one (sync=false) {
 function finish () {
   if (DONE) return;
   DONE = true;
+  STARTUP.mark('queue.full');
   T.total = Math.round(performance.now() - T0);
   for (const f of WAIT.splice(0)) { try { f(); } catch (e) { console.error('[latebuild] onDone', e); } }
 }

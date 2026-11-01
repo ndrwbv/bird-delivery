@@ -100,6 +100,15 @@ export function prepare(buildings,triangulate){
   prepared=true;
   compact();
 }
+export const cleanParameters=()=>({minWidth:LAND_MIN_WIDTH,coverCell:cover.cell,maskCell:32,indexCell:finalMask.indexCell});
+export function* cleanCorePlan(skip=null,onReserve=null){
+  for(const core of cover.cells()){
+    onReserve?.(core);
+    const [x0,z0,x1,z1]=core;
+    const skipped=!!(skip&&[[x0,z0],[x1,z0],[x1,z1],[x0,z1],[(x0+x1)/2,(z0+z1)/2]].every(p=>skip(...p)));
+    yield {core,skipped};
+  }
+}
 export function* cleanContours({M,triangulate,skip,terrain,groundH,deferDraw=false}){
   const fills=createLandCover();
   ST.minWidth=LAND_MIN_WIDTH;ST.cleanedArea=0;ST.fillTriangles=0;ST.fillDraw=0;ST.cleanTiles=0;
@@ -154,12 +163,7 @@ export function* cleanContours({M,triangulate,skip,terrain,groundH,deferDraw=fal
   building=true;
   try{
     const cores=[];
-    for(const core of cover.cells()){
-      finalMask.reserve(core);
-      const [x0,z0,x1,z1]=core;
-      if(skip&&[[x0,z0],[x1,z0],[x1,z1],[x0,z1],[(x0+x1)/2,(z0+z1)/2]].every(p=>skip(...p)))continue;
-      cores.push(core);
-    }
+    for(const {core,skipped}of cleanCorePlan(skip,finalMask.reserve))if(!skipped)cores.push(core);
     cleaner=createLandCleaner({cover,green,cores,stats:ST});
     for(let batch=0;batch<cleaner.batches;batch++){
       const request=cleaner.take(batch),results=Array.isArray(request)?request:yield request;

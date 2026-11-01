@@ -1,0 +1,62 @@
+[
+  {
+    "id": "mvy69b1y28aq-1",
+    "session": "mvy69b1y28aq",
+    "kind": "error",
+    "where": "late:raisedland",
+    "msg": "land-export17a:WORKING_BUDGET",
+    "stack": "Error: land-export17a:WORKING_BUDGET\n    at xL (app://g/assets/game-TqyH8J-b.js:4384:170680)\n    at PV (app://g/assets/game-TqyH8J-b.js:4384:148823)\n    at H4t (app://g/assets/game-TqyH8J-b.js:4384:172822)\n    at app://g/assets/game-TqyH8J-b.js:4384:176840\n    at Q (app://g/assets/playername-B6nkJStK.js:2:1191)\n    at Object.afterClean (app://g/assets/game-TqyH8J-b.js:4384:176804)\n    at Array.<anonymous> (app://g/assets/game-TqyH8J-b.js:6180:120510)\n    at Generator.next (<anonymous>)\n    at vwt (app://g/assets/game-TqyH8J-b.js:6004:2368)\n    at LEA (app://g/assets/game-TqyH8J-b.js:6004:3624)",
+    "n": 1,
+    "first": "2026-11-01T18:37:58.069Z",
+    "last": "2026-11-01T18:37:58.069Z",
+    "snap": {
+      "build": "v0.33.9",
+      "platform": "steam",
+      "up": 53.6,
+      "fps": 18,
+      "frames": 2003,
+      "phase": "pre",
+      "screen": "1280×800",
+      "url": "?debug&mute&nolb&lang=ru&startuptrace&gfx=high&gfxdev=deck&mute&startupdistrict=0&landexport17a=1",
+      "map": "seversk",
+      "adult": true,
+      "gore": true,
+      "career": true,
+      "state": "title",
+      "ride": false,
+      "paused": false,
+      "fullMap": false,
+      "dialog": false,
+      "shiftT": 0,
+      "clock": "06:20",
+      "envT": 0.02,
+      "season": "разгар зимы",
+      "rain": false,
+      "district": "Юг",
+      "pizzeria": "Птица Пицца · улица Победы, 1Б",
+      "order": null,
+      "target": null,
+      "time": 0,
+      "car": {
+        "x": 3124.9,
+        "z": 2046.8,
+        "y": 23.23,
+        "h": 1.42,
+        "kmh": 0
+      },
+      "hp": 7,
+      "hpMax": 7,
+      "delivered": 0,
+      "money": 0,
+      "n": {
+        "traffic": 0,
+        "people": 0,
+        "peds": 0,
+        "scoots": 0
+      },
+      "stalled": false,
+      "story": false,
+      "events": []
+    }
+  }
+]

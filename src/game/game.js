@@ -16,15 +16,32 @@
    клику раскрывается в полную карту района.
    ────────────────────────────────────────────────────────────────────────── */
 
+import { STARTUP } from './startuptrace.js';
 import * as THREE from '../vendor/three.module.min.js';
 import * as SOFTCITY from './softcity.js';
 import * as SKYM from './sky.js';               // небо-купол, свет и палитра (2г1)
 import * as MATS from './materials.js';         // блики и отклик по классу поверхности (2г11)
 import * as SOFTSURF from './softsurfaces.js';
 import * as RLAND from './raisedland.js';
+import {createLandExporter} from './landcache17a/landcache-export.js';
+import {createLandReader} from './landcache17a/landcache-reader.js';
 import {createLandStream,streamedGroundMaterial} from './landstream.js';
 import {clippedMesher} from './landclip.js';
 let LAND_STREAM = null, LAND_ENTERING = false;
+const LAND_READ17 = new URLSearchParams(location.search).has('landcache') ? createLandReader({
+  query:location.search,manifest:window.__landExport17aManifest,host:window.__startupHost,
+  expose:api=>{window.__landCache17a=api;},work:STARTUP.work,steps:STARTUP.steps,awaited:STARTUP.awaited,count:STARTUP.count,flag:STARTUP.flag,mark:STARTUP.mark,
+  onFailure:landCacheFailure17
+}) : null;
+function landCacheFailure17(meta){
+  const trace=STARTUP.report(),allRows=trace.rows.filter(row=>/^raisedland[.]/.test(row.name)),rows=allRows.slice(0,32);
+  const activateCalls=trace.rows.find(row=>row.name==='raisedland.activate')?.steps||0;
+  const alignCalls=trace.rows.find(row=>row.name==='raisedland.alignObjects')?.steps||0;
+  console.error('__landcache17a:failed:'+JSON.stringify({...meta,publishedCells:LAND_STREAM?.stats.ready||0,
+    supportReady:!!RLAND.ST.supportReady,built:!!RLAND.ST.built,maskReady:!!RLAND.finalMask?.ready,
+    firstControl:trace.marks['first.control']||null,activateCalls,alignCalls,
+    trace:{rows,totalRows:allRows.length,truncatedRows:Math.max(0,allRows.length-rows.length),flags:trace.flags,counters:trace.counters,dropped:trace.dropped}}));
+}
 import { landCarSupport } from './landdrive.js';
 import { createLandMeshPages } from './landmeshpages.js';
 import { createLandPositionCodec, landPositionMaterial } from './landpositions.js';
@@ -806,13 +823,13 @@ function mergeGeos (list, noNormal, bytes) {      // bytes — цвет верш
    Омега-мост через реку: настоящего в рамке нет. x на восток, z на юг. */
 
 const CITY = MAP.data;
-EDL.houses(CITY);                              // правки домов из редактора: этажи, цвет, мурал, убрать (editlayer.js, edits.json → houses)
-WIDEN.widen(CITY, { off: new URLSearchParams(location.search).has('nowiden') });   // полосы шире — до всего, что строится из улиц (roadwiden.js)
+STARTUP.work('map.edits', () => EDL.houses(CITY));                              // правки домов из редактора: этажи, цвет, мурал, убрать (editlayer.js, edits.json → houses)
+STARTUP.work('roads.widen', () => WIDEN.widen(CITY, { off: new URLSearchParams(location.search).has('nowiden') }));   // полосы шире — до всего, что строится из улиц (roadwiden.js)
 sanitizePois(CITY.pois);                       // чужие вывески → пародии и выдуманные (brands.js)
 if (!new URLSearchParams(location.search).has('norings')) RINGM.roundOff(CITY);   // малые круги — ровной окружностью, до всего, что строится из улиц (rings.js)
-WORLD.prepCity(CITY, MAP, CAREER);               // карьера: дома в круге MAP.career.rich — особняки (world.js); до плавных улиц (0п71): особняки ставятся по улицам углом, как с ?oldroads, а дуги их обходят (проезд R 13 м съедал «Новый проезд, 4 к2»)
+STARTUP.work('roads.prepCity', () => WORLD.prepCity(CITY, MAP, CAREER));               // карьера: дома в круге MAP.career.rich — особняки (world.js); до плавных улиц (0п71): особняки ставятся по улицам углом, как с ?oldroads, а дуги их обходят (проезд R 13 м съедал «Новый проезд, 4 к2»)
 { const on = !new URLSearchParams(location.search).has('oldroads');   // плавные улицы: изломы — дугой, до fixMap и всего, что строится из улиц (roadsmooth.js); с 24.10.2026 — по умолчанию, ?oldroads — старые улицы углом (бит в бит прежний город), ?smooth — то же, что без флага
-  SMOOTH.smooth(CITY, { on, circles: on ? RINGM.found(CITY) : [] }); }
+  STARTUP.work('roads.smooth', () => SMOOTH.smooth(CITY, { on, circles: on ? RINGM.found(CITY) : [] })); }
 /* ТЦ: подсказки стиля из генератора карты (malls[].style) — на сам дом */
 for (const m of CITY.malls || []) {
   const b = CITY.buildings.find(q => q.id === m.id);
@@ -888,33 +905,33 @@ const drivable = r => !r.x && r.c !== 6;
    (см. Mesher.dtri), поэтому ложится на склон без щелей и не тонет. */
 const TER = CITY.terrain;
 const TG = TER.g, TNX = TER.nx, TNZ = TER.nz, TX0 = TER.x0, TZ0 = TER.z0;
-const TH = (() => {
+const TH = STARTUP.work('terrain.decode', () => {
   const bin = atob(TER.h), a = new Float32Array(TNX * TNZ);
   for (let i = 0; i < a.length; i++)
     a[i] = ((bin.charCodeAt(i * 2) | (bin.charCodeAt(i * 2 + 1) << 8)) - 1000) / 10;
   return a;
-})();
+});
 /* Проверка и починка карты (mapcheck.js): до всего, что строится из улиц и
    рельефа, — сшить обрывы, выровнять рельеф под дорогами, поднять мосты
    над улицами и решить, чем закрыть тупики. ?nomapfix — как в выгрузке,
    ?mapcheck — сводка проблем в консоли и столбики над ними. */
 const MAPCHECK = new URLSearchParams(location.search).has('mapcheck');
-const MAPFIX = new URLSearchParams(location.search).has('nomapfix') ? null : fixMap(CITY, TH, { before: MAPCHECK });
+const MAPFIX = new URLSearchParams(location.search).has('nomapfix') ? null : STARTUP.work('terrain.fixMap', () => fixMap(CITY, TH, { before: MAPCHECK }));
 /* Неровный газон: бугры 0,1—0,4 м и холмики 1—2,5 м на больших газонах — добавкой к высотам сетки
    до сборки города, поэтому всё (деревья, лавки, люди, колёса) встаёт на рельеф само. У дорог,
    дорожек, домов, подъездов, площадок, воды и пиццерий — ровно (relief.js, ?norelief — без него) */
-RELIEF.addRelief(CITY, TH, TER, {
+STARTUP.work('terrain.relief', () => RELIEF.addRelief(CITY, TH, TER, {
   roadHW: r => (roadWidth(r) + (r.c <= 5 ? 5.5 : 2) + (r.g || 0) * 2) / 2,
   spots: MAP.career ? [...((MAP.career.districts && MAP.career.districts.list) || []).filter(q => q.pizza).map(q => [q.pizza[0], q.pizza[1], 60]),
     ...(MAP.career.garages || []).map(q => [q.x, q.z, 45])] : [],
-});
-BEACH.shape(TH, TER);                             // пляж: песок намыт в реку, дно пологое — до сборки земли и воды (beach.js)
+}));
+STARTUP.work('terrain.beach', () => BEACH.shape(TH, TER));                             // пляж: песок намыт в реку, дно пологое — до сборки земли и воды (beach.js)
 /* речки и пруды: русло ниже земли — до сборки города, как рельеф (streams.js; ?nostreams — как было) */
-STREAMS.carve(CITY, TH, TER, {
+STARTUP.work('terrain.streams', () => STREAMS.carve(CITY, TH, TER, {
   roadHW: r => (roadWidth(r) + (r.c <= 5 ? 5.5 : 2) + (r.g || 0) * 2) / 2, far: (x, z) => !!DMASK && farOut(x, z),
   spots: MAP.career ? [...((MAP.career.districts && MAP.career.districts.list) || []).filter(q => q.pizza).map(q => [q.pizza[0], q.pizza[1], 60]),
     ...(MAP.career.garages || []).map(q => [q.x, q.z, 45])] : [],
-});
+}));
 
 const LAND_POS = RLAND.ON ? (() => {
   let low=Infinity,high=-Infinity;for(const y of TH){low=Math.min(low,y);high=Math.max(high,y);}
@@ -6033,7 +6050,7 @@ function* timedSteps (k, it) {                    // шаги куска (latebu
 function buildCity () {
   const house = dodoHouse();
   const spot = house ? null : pizzaSpot();
-  const tm0 = (k, f) => { const t0 = performance.now(); f(); BUILD_T[k] = Math.round(performance.now() - t0); };
+  const tm0 = (k, f) => { const t0 = performance.now(); STARTUP.work('city.' + k, f); BUILD_T[k] = Math.round(performance.now() - t0); };
   tm0('ground', osmGround);
   RW.init({ CITY, MAP, nearestRoad, get ENV () { return ENV; } });   // вид асфальта улиц — до полотна (roadwear.js); ENV — позже, на дождь
   tm0('roads', osmRoads);
@@ -6060,7 +6077,7 @@ function buildCity () {
 
   // дальше — то, что в меню не главное: с поздней сборкой (latebuild.js) — очередью после первого кадра меню, в том же порядке
   // кусок может вернуть итератор (шаги по кадрам, latebuild.js) — время в BUILD_T тогда суммой шагов
-  const tm = (k, f) => LATE.add(k, () => { const t0 = performance.now(), r = f(); BUILD_T[k] = Math.round(performance.now() - t0); return r && r.next ? timedSteps(k, r) : r; });
+  const tm = (k, f) => LATE.add(k, () => { const t0 = performance.now(), r = STARTUP.work('city.' + k, f); BUILD_T[k] = Math.round(performance.now() - t0); return r && r.next ? timedSteps(k, r) : r; });
   if (ADULT && !INTRO) tm('nightlife', () => NIGHT.build(nightApi()));   // стрип-клуб и места «ночных бабочек» (nightlife.js) — до деревьев и лавочек: они обходят пристройку
   tm('gangmap', () => ZN.prepSteps({ CITY, MAP, groundH }));   // кварталы бандитов — маска клеток до мира (zones.js; без жребия)
   tm('world', () => WORLD.build(worldApi()));     // аллеи; в карьере — газоны особняков, мусор, гаражи (world.js) — до деревьев и лавочек
@@ -6109,23 +6126,36 @@ function buildCity () {
   if (!INTRO) tm('bollards', () => BOLL.build({ CITY, ZEBRAS, nearestRoad, roadWidth, inHouse, inBounds, groundH, curbAt, smashAdd, onPave: PAVE.onPave, introClear, startClear }));   // полусферы и столбики у зебр, магазинов и въездов — до smashBuild (bollards.js); ?nobollard — без них
   tm('smash', smashBuild);
   if (RLAND.ON) LATE.add('raisedland', function* () {
+    const query17a=new URLSearchParams(location.search);
+    const export17a=!LAND_READ17&&query17a.has('landexport17a')?createLandExporter({manifest:window.__landExport17aManifest,host:window.__startupHost,expose:api=>{window.__landExport17a=api;},work:STARTUP.work,mark:STARTUP.mark,flag:STARTUP.flag}):null;
+    const inspect17a=it=>export17a?export17a.watch(it):it;
     CURB_M.discard();
     yield* flushLandStage();
     yield* flushLandStage(GROUND_M);
     LITM.landPages(LATE.busy());
     try {
-      RLAND.prepare(CITY.buildings, p => THREE.ShapeUtils.triangulateShape(p.map(q => new THREE.Vector2(q[0], q[1])), []));
-      yield* RLAND.cleanContours({M:LITM,terrain:TER,groundH:terrainH,deferDraw:!!LAND_STREAM,skip:DMASK?farOut:null,triangulate:(outer,holes)=>({
-        points:[...outer,...holes.flat()],
-        triangles:THREE.ShapeUtils.triangulateShape(outer.map(p=>new THREE.Vector2(...p)),holes.map(h=>h.map(p=>new THREE.Vector2(...p))))
-      })});
+      STARTUP.work('raisedland.prepare', () => RLAND.prepare(CITY.buildings, p => THREE.ShapeUtils.triangulateShape(p.map(q => new THREE.Vector2(q[0], q[1])), [])));
+      const inputs17a=(export17a||LAND_READ17)?{source:RLAND,cores:RLAND.cleanCorePlan(DMASK?farOut:null),parameters:{...RLAND.cleanParameters(),terrainG:TER.g,terrainNX:TER.nx,terrainNZ:TER.nz,terrainX0:TER.x0,terrainZ0:TER.z0},runtime:{mapId:MAP.id,mode:import.meta.env.MODE,adult:!!ADULT,career:!!CAREER,intro:!!INTRO,editor:!!EDL.ED.on||!!window.__EDITOR,streamed:!!LAND_STREAM,graphics:GFX.preset(),district:DIST.cur(),season:SEAS.seasonValue(),seasonForced:SEAS.seasonForced()??null,quick:QR.on(),donationTrash:donated('trash'),externalSeed:typeof window.__lateSeed==='function'},query:location.search}:null;
+      if(LAND_READ17){
+        yield* LAND_READ17.readSteps(inputs17a);
+        LAND_READ17.assertReady();
+      }else{
+        if(export17a)export17a.beforeClean(inputs17a);
+        STARTUP.count('raisedland.cleanCalls');
+        yield* STARTUP.steps('raisedland.cleanContours', inspect17a(RLAND.cleanContours({M:LITM,terrain:TER,groundH:terrainH,deferDraw:!!LAND_STREAM,skip:DMASK?farOut:null,triangulate:(outer,holes)=>({
+          points:[...outer,...holes.flat()],
+          triangles:THREE.ShapeUtils.triangulateShape(outer.map(p=>new THREE.Vector2(...p)),holes.map(h=>h.map(p=>new THREE.Vector2(...p))))
+        })})));
+        if(export17a)export17a.afterClean({source:RLAND,skip:DMASK?farOut:null});
+      }
       yield* flushLandStage();
-      RLAND.activate(DMASK?farOut:null);
-      const delta=RLAND.alignObjects({lists:[LIT,FLAT,LAMPH],items:SMASH,props:PROPS,benches:BENCHES,baseH:terrainH});
+      STARTUP.work('raisedland.activate', () => RLAND.activate(DMASK?farOut:null));
+      const delta=STARTUP.work('raisedland.alignObjects', () => RLAND.alignObjects({lists:[LIT,FLAT,LAMPH],items:SMASH,props:PROPS,benches:BENCHES,baseH:terrainH}));
       SEAS.raiseLand(delta);
-    } finally { LITM.landPages(false);LAND_POS.release(); }
+    } catch(error){LAND_READ17?.cancel('PIPELINE:'+String(error?.message||error));export17a?.fail(error);throw error;} finally { LITM.landPages(false);LAND_POS.release(); }
   });
   function* buildRaisedLandSurface(){
+    LAND_READ17?.assertReady();
     // Сначала освобождается исходная статика города. Самый большой
     // новый граф камня и новые вершины не держатся вместе с её копиями.
     LITM.landPages(LATE.busy());
@@ -6178,6 +6208,7 @@ function buildCity () {
   let groundMat=litMat,groundStreamMask=null;
   if (RLAND.ON && LATE.busy() && !new URLSearchParams(location.search).has('fullterrain')) {
     LAND_STREAM=createLandStream({terrain:TER,build:function* (bounds) {
+      LAND_READ17?.assertReady();
       const M=Mesher({alpha:true,index:true,keepFront:true,mainRGB:true,noLandRecord:true});
       if (!INTRO) {
         const halo=[bounds[0]-8,bounds[1]-8,bounds[2]+8,bounds[3]+8];
@@ -6193,6 +6224,7 @@ function buildCity () {
       const tail=M.mesh(litMat);for(const m of tail.children.slice())g.add(m);
       return g;
     },publish(id,g) {
+      STARTUP.geometry('land.surfacePublished', g);
       groups.push(g);scene.add(g);CULL.register(g);groundStreamMask.update();
     }});
     groundStreamMask=streamedGroundMaterial(THREE,litMat,LAND_STREAM);
@@ -6235,7 +6267,7 @@ function buildCity () {
     wg.setAttribute('color', new THREE.BufferAttribute(new Uint8Array(12), 4, true));
     warm4 = [litMat, flatMat].map(m => { const w = new THREE.Mesh(wg, m); w.frustumCulled = false; scene.add(w); return w; });
     // шейдеры города — видеокарта компилирует их сама, пока здесь строится остальное (первый кадр меню не ждёт компиляции)
-    try { renderer.compileAsync(scene, cam).catch(() => {}); } catch (e) { /* — */ }
+    try { STARTUP.awaited('gpu.compileAsync', 'gpuWait', () => STARTUP.work('gpu.compileDispatch', () => renderer.compileAsync(scene, cam))).catch(() => { STARTUP.flag('gpu.compileError'); }); } catch (e) { /* — */ }
   }
   BUILD_T.mesh = Math.round(performance.now() - tq);
   // шагами (latebuild.js): общие вершины клеток (ixCell, Mesher prep) — пачками по ~150 тыс. вершин, на Деке ~35—40 мс каждая
@@ -6277,7 +6309,7 @@ function buildCity () {
     if (warm4) { for (const w of warm4) scene.remove(w); warm4[0].geometry.dispose(); warm4 = null; }
     BUILD_T.meshLate = Math.round(ms + performance.now() - t0);
   });
-  if(RLAND.ON)LATE.add('raisedlandSurface',buildRaisedLandSurface);
+  if(RLAND.ON)LATE.add('raisedlandSurface', () => STARTUP.steps('raisedland.nearSurface', buildRaisedLandSurface()));
   WINS.build(scene);                              // окна — по клеткам, один материал (windows.js)
   PAINT.build(scene);                             // муралы — один меш (citypaint.js)
   /* Всю статику — сразу в видеокарту, одним кадром в крохотную цель:
@@ -16780,7 +16812,8 @@ function reviveTick (dt) {
 }
 
 function startRun (ride) {
-  if (RESET_LOCKED) return;
+  if (RESET_LOCKED || LAND_READ17?.failed) return;
+  STARTUP.request({ ride: !!ride, district: DIST.cur() });
   const place=PIZZERIAS[DIST.cur()]||PIZZA;
   if (LAND_STREAM && !LATE.busy() && !LAND_STREAM.readyAt(place.bx,place.bz,640)) {
     if (LAND_ENTERING) return;
@@ -16799,6 +16832,7 @@ function startRun (ride) {
   }
   CL.transFor('начало смены', 3000);             // метка перехода (crashlog.js, 0п48): оборвётся — следующий запуск запишет
   LATE.flush();                                   // город ещё достраивался за меню — сначала достроить (latebuild.js)
+  if(LAND_READ17){try{LAND_READ17.assertReady();}catch{return;}}
   S.ride = !!ride;
   DIRECTOR.shiftStart(S.ride);                   // режиссёр событий: смена сессии (director.js) — до погоды и фестиваля
   WTH.shiftStart(S.ride);                         // смена карьеры: сезон и погода жребием — жара, гроза, снежная зима… (weather.js)
@@ -17258,7 +17292,8 @@ SEAS.initSeasons({ THREE, scene, cam, renderer, Store, MAP, CITY, V, S, groundH,
    ?nolate — всё разом, как раньше; ?mapcheck — тоже разом (проверка карты смотрит готовый город) */
 LATE.enable(!INTRO && !MAPCHECK && !/[?&]nolate(&|$)/.test(location.search));
 const T0 = performance.now();
-buildCity();
+STARTUP.work('city.syncBuild', () => buildCity());
+STARTUP.mark('city.syncBuilt');
 EDL.buildEnd();
 ZN.init({ CITY, MAP, donated, groundH });      // groundH — Томь не квартал бандитов (zones.js GMAP)
 /* окно разговора (dialog.js): мир не стоит (автор 16.10.2026) — руль из рук на открытии, держит машину кадр мира ниже
@@ -18480,7 +18515,8 @@ function frame (now) {
 function frameStep (now) {
   CL.at.ph = 'pre';
   if (LATE.busy() && lateFrame(now)) return;      // город ещё достраивается за меню (latebuild.js)
-  if (LAND_STREAM && !LAND_ENTERING) CL.step('земля рядом', () => {
+  if (LAND_READ17 && !LAND_READ17.ready) return;
+  if (LAND_STREAM && !LAND_ENTERING && (!LAND_READ17 || LAND_READ17.ready)) CL.step('земля рядом', () => {
     const menu=S.state==='title'||S.state==='over';
     LAND_STREAM.step(menu?PIZZA.bx:cam.position.x,menu?PIZZA.bz:cam.position.z);
   }, 0);
@@ -18516,7 +18552,7 @@ function frameStep (now) {
   if (isPlaying() && !S.ride && S.state !== 'brief' && S.state !== 'loading') S.shiftT = (S.shiftT || 0) + dt;
 
   if (FPV.hid) { car.visible = true; FPV.hid = 0; }   // вид из кабины прячет машину только на свой кадр (camStep)
-  let vf = 0;
+  let vf = 0, startupDrivable = false;
   if (S.state === 'dying' && DEATH.rev) {
     for (const k in IN) IN[k] = 0;
     reviveTick(dt);                              // новая машина спускается с неба
@@ -18545,6 +18581,7 @@ function frameStep (now) {
     car.rotation.y = V.h;
   } else {
     briefStep(dt);                                 // пицца уже в багажнике, а накладная ещё висит — досчитать её время
+    startupDrivable = S.state === 'drive' && !DOOR.on() && !dlgHold && !HCAM.busy() && !FPD.busy() && !ST3.on();
     if (DOOR.on() || dlgHold || HCAM.busy() || FPD.busy()) holdCar(dt);   // от первого лица к подъезду (fpdeliver.js); домофон (doorstep.js), окно разговора (dialog.js), сцена вручения (handcam.js): руль из рук, машина стоит
     vf = driveSub(dt);
     camStep(dt, vf);
@@ -18776,6 +18813,15 @@ function frameStep (now) {
   TUNE.step(raw, wk, isPlaying() && !S.paused && !EXT.paused && !FM.open && !document.hidden && !REPLAY.on(), 1000 / Math.min(GFX.fpsCap() || 60, 60), DYN.timer());   // кадр тяжёлый — ненадолго ближе дальность, люди, машины, мелочь газона (tune.js)
   CULL.Q.t = TUNE.M.far; WINS.lodScale(TUNE.M.win);
   GFX.work(wk);
+  if (STARTUP.enabled && startupDrivable && S.state === 'drive' && !S.paused && !EXT.paused && !FM.open &&
+      !DOOR.on() && !DLG.isOpen() && !HCAM.busy() && !FPD.busy() && !ST3.on() && !REPLAY.on() &&
+      (!CAREER || !CAREERM.covered()) && !LATE.busy() && !LAND_ENTERING && !document.hidden &&
+      !document.body.classList.contains('booting') && !document.querySelector('.late-wait') &&
+      (!LAND_STREAM || LAND_STREAM.readyAt(V.x, V.z, 640)) && (!RLAND.ON || RLAND.ST.supportReady)) {
+    STARTUP.control({ guardVersion: 2, state: S.state, paused: S.paused || EXT.paused, mapOpen: FM.open,
+      held: DOOR.on() || DLG.isOpen() || HCAM.busy() || FPD.busy() || ST3.on(), localReady: true, supportReady: !RLAND.ON || !!RLAND.ST.supportReady,
+      x: V.x, z: V.z, gas: IN.gas, readyTiles: LAND_STREAM?.stats.ready ?? null });
+  }
   CL.step('hpool', HPOOL.step, wk);               // запас готовых людей: короткий кадр — дособрать, ≤ 0,5 мс (humanpool.js)
   if (isPlaying()) CL.step('svcwarm', SVCP.warm, wk);   // куски улиц «режет ли дом» для путей курьеров — заранее, в короткие кадры (svcpath.js)
   GFX.watch(isPlaying() && !S.paused && !FM.open && !REPLAY.on() && !(DLG.isOpen && DLG.isOpen()));             // кадр не успевает на Высокой — один раз предложить Среднюю
@@ -18874,7 +18920,7 @@ REPLAY.init({
     if (on) { Snd.engine(0); joyReset(); Platform.gameplayStop(); } else if (isPlaying()) Platform.gameplayStart();
   },
 });
-if (LATE.busy()) { try { renderer.compileAsync(scene, cam).catch(() => {}); } catch (e) { /* — */ } }   // остальное, что уже в сцене, — тоже заранее
+if (LATE.busy()) { try { STARTUP.awaited('gpu.compileAsync', 'gpuWait', () => STARTUP.work('gpu.compileDispatch', () => renderer.compileAsync(scene, cam))).catch(() => { STARTUP.flag('gpu.compileError'); }); } catch (e) { /* — */ } }   // остальное, что уже в сцене, — тоже заранее
 requestAnimationFrame(frame);
 /* поздняя сборка (latebuild.js): очередь — после первых кадров меню (или через 1,5 с, если кадров нет — окно скрыто).
    Выбрал карточку меню (на смену, быстрый заезд, гараж, покататься, находки…) а город ещё
@@ -18895,6 +18941,7 @@ if (LATE.busy()) {
     // ждать город — только тем, кому он нужен: смена, быстрый заезд, покататься, гараж;
     // настройки, доска почёта, находки, рекорды, выход — сразу (автор 11.10.2026)
     if (cardEl.classList.contains('crm-card') && ['settings', 'honor', 'collect', 'board', 'quit'].includes(cardEl.dataset.key)) return;
+    if (cardEl.dataset.key === 'go') STARTUP.request({ menuKey: 'go', district: DIST.cur() });
     e.preventDefault(); e.stopImmediatePropagation();
     if (document.querySelector('.late-wait')) return;   // уже ждём
     const boot = document.createElement('div');
@@ -18937,6 +18984,7 @@ if (LATE.busy()) {
 /* песочница (sandbox.html): бесконечное здоровье, нитро, «не глохнет» (noStall читает cars.js) */
 const SBX = { god: false, nitro: false, noStall: false };
 if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { SOFTCITY, SOFTSURF, inWall, FLY: FLYC, WRONG: WRONG.DEBUG, GUN, inTallHouse, WIDEN: { ...WIDEN.WIDEN, STATS: WIDEN.STATS }, SMOOTH: { SM: SMOOTH.SM, STATS: SMOOTH.STATS, ARCS: SMOOTH.ARCS, isArc: SMOOTH.isArc }, FACE: FACE_DEBUG, RADAR, HUDC, RYARD: RYARD.DEBUG, RT, RASK: RASK.DEBUG, OTAGS: OTAGS.DEBUG, NICK, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, chaseEnd, CHS, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, TACT, TG: TGRID.TG, PARKI: { ...PARKI.DEBUG, orphans: () => PARKI.orphans(TRAFFIC) }, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, addPickup, PKI: PKI.STATS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get routeOn () { return ROUTE_LINE.slots.some(q => q.m.visible); }, ROUTE_LINE, RP, rebuildRoutePath, updateRouteLine, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, CULLREFRESH: CULL.refresh, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, DYNRES: DYN.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
+  STARTUP,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта

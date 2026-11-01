@@ -1,0 +1,11 @@
+
+> bird-pizza-delivery@0.1.0 probe
+> electron tools/probe.cjs --mode=steam --dir=/tmp/bird-landexport17a-steam-5a20287-1102 --startup-trace --startup-session=landexport17a-newbie-5a20287-1102 --startup-cold --startup-fixture=/tmp/bird-startup17-series-5a20287/newbie-1-fixture.json --fresh --size=deck --cpu=3 --bootcpu --seed=7 --q=gfx=high&gfxdev=deck&mute&startupdistrict=0&landexport17a=1 --init-script=/tmp/bird-landexport17a-manifest-5a20287-1102/init.js --eval=tools/probe-checks/land-export.js --land-export=/tmp/bird-landexport17a-city-5a20287-1102.land --land-export-manifest=/tmp/bird-landexport17a-manifest-5a20287-1102/manifest.json --report=/tmp/bird-landexport17a-report-5a20287-1102.json --errors --timeout=600 --bootwait=540 --max=0
+
+[page] [latebuild] raisedland Error: land-export17a:WORKING_BUDGET
+[page] [crashlog] error late:raisedland land-export17a:WORKING_BUDGET
+probe: исключение в скрипте: land-export: land-export refused after renderer/eval errors
+ошибки консоли:
+  [latebuild] raisedland Error: land-export17a:WORKING_BUDGET @game-TqyH8J-b.js:5197
+  [crashlog] error late:raisedland land-export17a:WORKING_BUDGET @game-TqyH8J-b.js:5197
+probe: steam 1280×800 · 76.3 с (сборка свежая, загрузка 76.2 с) · кадр p50 26.2 p95 32.6 мс · ошибок консоли 2, необработанных 0

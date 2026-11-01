@@ -1,3 +1,4 @@
+import {drainSteps,sliceBudget,copyTypedSteps} from './landcache17a/cooperative.js';
 /* Окончательный газон хранится положительной областью. Серое заполнение
    больше не может вернуть в него случайную зелёную щель между гранями.
    Та же область отвечает на запросы опоры и обрезает видимую землю. */
@@ -8,7 +9,7 @@ const CELL=32;
 export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[],indexCell=8){
   // Размер очищаемой области остаётся 32 м. Более мелкая поисковая
   // сетка не меняет контуры: опора и бордюры обходят меньше чужих граней.
-  const kept=createLandCover(indexCell),domain=new Map(),pending=[],removedRegions=[];let segments=[];
+  const kept=createLandCover(indexCell);let pending=[],removedRegions=[],domain=new Map(),segments=[];
   let ready=false,domainCells=0,segmentGrid=null;
   const stateIndex=(i,j)=>domain.get(i)?.get(j);
   const stateAt=(x,z)=>stateIndex(Math.floor(x/CELL),Math.floor(z/CELL));
@@ -181,8 +182,23 @@ export function createLandMask(fallback=()=>true,fallbackBreaks=()=>[],indexCell
       if(i%512===0)yield null;
     }
   }
-  return {reserve,add,contains,parts,breaks,sides,kept,removedRegions,
+  function snapshot(){
+    if(!ready||pending.length||removedRegions.length)throw Error('Mask checkpoint requires completed finishSteps');
+    return {version:1,cell:CELL,indexCell,kept:kept.snapshot(),domain:new Map([...domain].map(([i,row])=>[i,new Map(row)])),segments,domainCells,ready};
+  }
+  function* prepareRestoreSteps(value,options={}){
+    if(value?.version!==1||value.cell!==CELL||value.indexCell!==indexCell||!value.ready)throw Error('Invalid mask checkpoint/target');
+    const preflight=()=>{if(Object.isFrozen(pending)||Object.isFrozen(removedRegions))throw Error('Invalid mask checkpoint/target');};preflight();
+    const batch=sliceBudget(options),commitKept=yield* kept.prepareRestoreSteps(value.kept,options),nextDomain=new Map();
+    for(const[i,row]of value.domain){const copy=new Map();for(const[j,state]of row){copy.set(j,state);if(batch.charge())yield 'domain';}nextDomain.set(i,copy);if(batch.charge())yield 'row';}
+    const nextSegments=yield* copyTypedSteps(value.segments,batch),nextCells=value.domainCells,nextReady=value.ready,nextPending=[],nextRemoved=[];
+    let committed=false;preflight();commitKept.preflight();
+    const commit=()=>{if(committed)return;committed=true;commitKept();domain=nextDomain;pending=nextPending;removedRegions=nextRemoved;segments=nextSegments;domainCells=nextCells;ready=nextReady;segmentGrid=null;};commit.preflight=()=>{preflight();commitKept.preflight();};return commit;
+  }
+  function prepareRestore(value,options={}){return drainSteps(prepareRestoreSteps(value,options));}
+  function restore(value){prepareRestore(value)();}
+  return {reserve,add,contains,parts,breaks,sides,kept,get removedRegions(){return removedRegions;},snapshot,prepareRestore,prepareRestoreSteps,restore,
     cellState:(x,z)=>stateAt(x,z),
     boundaries,finishSteps,finish(){for(const step of finishSteps()){}},get ready(){return ready;},get count(){return kept.count;},
-    get segments(){return segments;},get cells(){return domainCells;}};
+    get segments(){return segments;},get cells(){return domainCells;},get indexCell(){return indexCell;}};
 }

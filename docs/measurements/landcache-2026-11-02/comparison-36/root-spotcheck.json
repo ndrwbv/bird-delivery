@@ -1,0 +1,61 @@
+{
+  "checkedAt": "2026-11-01T21:02:32.528Z",
+  "scope": "Independent raw SHA for 36; medians recomputed from raw first.control for all groups; guardVersion2/clean0/no errors for all 18 cache runs. Full process/config/identity audit delegated separately.",
+  "ok": true,
+  "rows": [
+    {
+      "label": "newbie",
+      "phase": "cold",
+      "n": 3,
+      "generatedMs": 80998.39999985695,
+      "cacheMs": 65036.59999990463,
+      "gainMs": 15961.799999952316,
+      "gainPercent": 19.70631518644875
+    },
+    {
+      "label": "newbie",
+      "phase": "warm",
+      "n": 3,
+      "generatedMs": 80592.59999990463,
+      "cacheMs": 65167.699999809265,
+      "gainMs": 15424.900000095367,
+      "gainPercent": 19.139350263068344
+    },
+    {
+      "label": "saved-near",
+      "phase": "cold",
+      "n": 3,
+      "generatedMs": 81310.90000009537,
+      "cacheMs": 65720,
+      "gainMs": 15590.900000095367,
+      "gainPercent": 19.174428028809277
+    },
+    {
+      "label": "saved-near",
+      "phase": "warm",
+      "n": 3,
+      "generatedMs": 81044,
+      "cacheMs": 65381.39999985695,
+      "gainMs": 15662.600000143051,
+      "gainPercent": 19.326045111474077
+    },
+    {
+      "label": "saved-far",
+      "phase": "cold",
+      "n": 3,
+      "generatedMs": 71906.60000014305,
+      "cacheMs": 55905,
+      "gainMs": 16001.600000143051,
+      "gainPercent": 22.25331193535951
+    },
+    {
+      "label": "saved-far",
+      "phase": "warm",
+      "n": 3,
+      "generatedMs": 71864,
+      "cacheMs": 55874,
+      "gainMs": 15990,
+      "gainPercent": 22.250361794500726
+    }
+  ]
+}

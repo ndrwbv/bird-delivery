@@ -1,0 +1,85 @@
+{
+  "ok": true,
+  "snapshotVersion": 2,
+  "patchSha256": "e8b6e487990e836946c225b4a0eeaa42110e9ed6b82b9b220103b2ac7c98516b",
+  "integrity": [
+    {
+      "file": "tools/startup-bench.mjs",
+      "ok": true
+    },
+    {
+      "file": "tools/startup-report.mjs",
+      "ok": true
+    },
+    {
+      "file": "tools/startup-revalidate.mjs",
+      "ok": true
+    },
+    {
+      "file": "tools/startup-comparison-test.mjs",
+      "ok": true
+    },
+    {
+      "file": "comparison.patch",
+      "ok": true
+    },
+    {
+      "file": "comparison-with-tests.patch",
+      "ok": true
+    },
+    {
+      "file": "PLAN.md",
+      "ok": true
+    }
+  ],
+  "pureCases": 77,
+  "realExistingMetadata": {
+    "generated": {
+      "ok": true,
+      "reasons": []
+    },
+    "cache": {
+      "ok": true,
+      "reasons": []
+    }
+  },
+  "rejectedOldHoles": [
+    {
+      "kind": "runtime",
+      "validation": {
+        "ok": false,
+        "reasons": [
+          "runtime differs from known case/high Steam conditions",
+          "full cache identity differs from case export metadata"
+        ]
+      }
+    },
+    {
+      "kind": "query",
+      "validation": {
+        "ok": false,
+        "reasons": [
+          "identity query differs from known case",
+          "identity query differs from actual URL",
+          "full cache identity differs from case export metadata"
+        ]
+      }
+    },
+    {
+      "kind": "parameters",
+      "validation": {
+        "ok": false,
+        "reasons": [
+          "grid/terrain preparation parameters invalid",
+          "full cache identity differs from case export metadata"
+        ]
+      }
+    }
+  ],
+  "legacy18": {
+    "ok": true,
+    "runs": 18
+  },
+  "gameOrRunnerLaunched": false,
+  "assetRead": false
+}

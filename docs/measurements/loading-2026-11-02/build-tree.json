@@ -1,0 +1,467 @@
+[
+  {
+    "file": "assets/be-S040HCOM.js",
+    "sha256": "374209bf9ef7e9b065d99735d2bf231e6742866e666daf14ba5b8721496e4b8f",
+    "bytes": 340154
+  },
+  {
+    "file": "assets/brands-CS0AufFl.js",
+    "sha256": "7427442aa92d7766a864afbca0daee10ac4e623e833d17adf147fba3463a4cd6",
+    "bytes": 6608
+  },
+  {
+    "file": "assets/carlab-D0J6ts9U.js",
+    "sha256": "8e9cb06719967ac950eeda947fb0f196ca1c622f85465cf8efcb3e7415170ef4",
+    "bytes": 4845
+  },
+  {
+    "file": "assets/de-BcbwU-Lh.js",
+    "sha256": "e63b1426e89aeed904d854cc3164516e5a4ff5d8ed400ac26790376f427b05a7",
+    "bytes": 288549
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/angry.png",
+    "sha256": "a3dbdd4c2901cf41eb1d06250bb05e7f5450ff343514612617df4f87f20a3e48",
+    "bytes": 2308321
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/blink.png",
+    "sha256": "d357a6c7b76368fc25b0ba0221636012167d98601ed20bee576a60625a064b61",
+    "bytes": 2313862
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/cutline.png",
+    "sha256": "17a72dbaee0d0262be434ee2fa5c5575e830809ab4b02e2c6370b26e3380c834",
+    "bytes": 18428
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/cutting_guide.png",
+    "sha256": "c36682fe9da16844248a4bd04033f50b35c39921c57b9237d13f02aa9b0b9428",
+    "bytes": 1840833
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/fullbody/angry.png",
+    "sha256": "1c77590cefc449795dbcf8d9d4f07d9adf97a8eb58d662d20822ff4b864f7f5a",
+    "bytes": 1372719
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/fullbody/blink.png",
+    "sha256": "add5b4237e243b03d195a499c08432cb98462c815c938d005083a5af04ba84e7",
+    "bytes": 1372265
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/fullbody/idle.png",
+    "sha256": "5d660aa1b0d217269fd92740f2db34d1faf90a9cfaefffd95201f2d05358e824",
+    "bytes": 1098480
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/fullbody/smile.png",
+    "sha256": "31015b4eb0bc354a2ba1682345c30587a9f46db2cab797f4c9e4bdf2e891ee31",
+    "bytes": 1372236
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/fullbody/talk.png",
+    "sha256": "73cb9d99ee16cffb0656e509e3dfb10b146132e274c3ad535afae1b96f62a6d7",
+    "bytes": 1372494
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/idle.png",
+    "sha256": "7cdeac5fc4e55c288dadb5ca5051a87fa983664d40001c0bff4827db5d4b1d14",
+    "bytes": 2317616
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/silhouette_mask.png",
+    "sha256": "a56a72e3f18c94c15aa92d2a3461800dec938f66957b93f0b92b8eacb0c1bb2c",
+    "bytes": 7368
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/smile.png",
+    "sha256": "5e0a17d5b86bb6ae01e69ddf600da41cb0822e2efc27d8b98cb69a125ab23b52",
+    "bytes": 2313502
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/talk.png",
+    "sha256": "ea2798e23555fa8dfc86601e1ee7db9ef7b6b6e6dcb555bb2fdde2be8a7f914f",
+    "bytes": 2314302
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/family-dacha.webp",
+    "sha256": "56be7d88b93e1aa95a80c442c6534f7dfc8f87109e6a9d86e0edea58841b16fc",
+    "bytes": 73304
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/family-room.webp",
+    "sha256": "6fdb0664d60f35d3115a8c8f4d42f84454d017e9c1f34cbe697fa6360ab9512b",
+    "bytes": 67820
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/gennady-chairman.webp",
+    "sha256": "ee5d3fc2fee02886c5be50c71514dbb468369cb30a91408d4f61ca27f57d8529",
+    "bytes": 166544
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/manifest.json",
+    "sha256": "a706b5a3b7b0f6d2ebb5cc0454c91a9d4d26e7c10acc3c12b76684b2fb9e6ac6",
+    "bytes": 3136
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/optional/hallway_background_draft.png",
+    "sha256": "f2b06fe1fcead061d769d6076e67d98b9d0b1b3917a185b3ce0764ea624b0320",
+    "bytes": 222072
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/optional/old_animation_demo.gif",
+    "sha256": "e7007719e6f458110a44616fbf35d3f4e971acf7be2f3441fec9f2cc4ae2f774",
+    "bytes": 5157841
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/PROMPT_FOR_AGENT.md",
+    "sha256": "c5cdbb55a4775f2b49b1b84942ca3ed92f7ade2aaaf546c3bfe6e5b8a513d4fc",
+    "bytes": 10694
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/README.md",
+    "sha256": "2bd18aecb0e2b30f6275f443b9a3540ee3b730019ee5f1f02f1958d50bd9b736",
+    "bytes": 4223
+  },
+  {
+    "file": "assets/dialogue/ZATO_Gennady_dialogue_assets/reference/approved_ui_reference.png",
+    "sha256": "f0c27223ae5bb5b33051420e9766fff4c21080bbcae2682edf0890c553d88c30",
+    "bytes": 2208256
+  },
+  {
+    "file": "assets/en-BQJBvVwm.js",
+    "sha256": "56d0f3b9d8aabe9eedac42330f5a770160e482c69db92761a9a6a562396c193f",
+    "bytes": 558140
+  },
+  {
+    "file": "assets/es-BCg-r20a.js",
+    "sha256": "0ffb17a5b6f7b672fba3094ca634ae55bf92e6635dcb951fc43dfedc6a3859e8",
+    "bytes": 285870
+  },
+  {
+    "file": "assets/fr-C3ZL4-A1.js",
+    "sha256": "d579ffbfe628888d11c3fbb1118f06b6c344d6bde24e6e9a51968a9cec091aec",
+    "bytes": 295317
+  },
+  {
+    "file": "assets/game-BcuaQB8I.css",
+    "sha256": "65edc113ed2d19571cf216439e0fed9346aaf0fbbd7801ecfc5c5dff51a0140a",
+    "bytes": 252410
+  },
+  {
+    "file": "assets/game-CBYeXgYQ.js",
+    "sha256": "49e7aad51bd7eb720fa4f87ef44ea0b941e40c3349f2dd88d3974727379ab749",
+    "bytes": 6608914
+  },
+  {
+    "file": "assets/index-B4b5pq-v.js",
+    "sha256": "7bfd4672e3978d737c825bdf153369ecf18009836d19578e2fe2fd2ce14808a5",
+    "bytes": 4841
+  },
+  {
+    "file": "assets/index-BT_lyAkV.css",
+    "sha256": "b9cd2c4edf8b96de96dd5a1f0bc0d4a6fdd4a0236ce7f70e8417932ce97ed684",
+    "bytes": 78898
+  },
+  {
+    "file": "assets/index-CsPFG6fw.js",
+    "sha256": "a87e09cab3a001c29a2e4b914058036b764f344560908cd7a4af7fb4e79821cb",
+    "bytes": 1944116
+  },
+  {
+    "file": "assets/index-Da3NSRTx.js",
+    "sha256": "7b35883adcc9041b295768fad74d960e0bafa507f7f5032e0d58c077628d6268",
+    "bytes": 3759
+  },
+  {
+    "file": "assets/it-DRhlQ0nb.js",
+    "sha256": "4182c0525d535099cc480428eea65169041c27b6e81f29582d336e4aa64c4c3d",
+    "bytes": 285294
+  },
+  {
+    "file": "assets/ja-hs9orTDF.js",
+    "sha256": "41ed72f61c432cde3fd620a8e2de817b5c78ba4ab2cbbca990ba310ce07c430d",
+    "bytes": 309549
+  },
+  {
+    "file": "assets/kk-LNzSwJOI.js",
+    "sha256": "29f9c5b6fd26fe88199d766aebb2795362e82dc0fdf7bb2e55f3060f9f15628d",
+    "bytes": 350353
+  },
+  {
+    "file": "assets/landclean.worker-BA4DnVfb.js",
+    "sha256": "34494442265314d21179c4b179883754ee00fabcb9e868c3e1cbcb90a1c1bb2e",
+    "bytes": 110292
+  },
+  {
+    "file": "assets/modulepreload-polyfill-B5Qt9EMX.js",
+    "sha256": "d2a32840421496e872ade591618d2fa5c33797605d1aec04301717e5a90757d0",
+    "bytes": 711
+  },
+  {
+    "file": "assets/orders.config-iIr8IAQs.js",
+    "sha256": "6be86de01b95bedbd4b6b1d170171570ae4ae6b00f5cfd12f2bfe208a3cddf79",
+    "bytes": 19285
+  },
+  {
+    "file": "assets/pad-DHYEagai.js",
+    "sha256": "da61ce12e2b0189b781733a036dcede02b992430a21458050968a529abf1bba4",
+    "bytes": 2747
+  },
+  {
+    "file": "assets/padmenu--jHCnbA9.js",
+    "sha256": "e2b2b17d66bf501ad7f45d34591ad06b9628e37d440d4088b1a68d6f254cb991",
+    "bytes": 7946
+  },
+  {
+    "file": "assets/padmenu-DOFw7avD.css",
+    "sha256": "4975bcf03a8150bfa6656231866f8d35c7549111aa0932f661d24c479d3a24cb",
+    "bytes": 428
+  },
+  {
+    "file": "assets/pl-DyPPIo7r.js",
+    "sha256": "fcf3e9c01dd21dbaa468d212bc4bb03856348b42314064b191c0bb1008b5c425",
+    "bytes": 281676
+  },
+  {
+    "file": "assets/playername-3UM9DJra.css",
+    "sha256": "88ddacaf2b19604a0a20ae68019d56d0187def512f44802d6b7f9448068b0d78",
+    "bytes": 1434
+  },
+  {
+    "file": "assets/playername-B6nkJStK.js",
+    "sha256": "b4a65ba41df2c65819ac40140b1d7270bd78878ccb2e8426f7c471ea4336a26b",
+    "bytes": 30037
+  },
+  {
+    "file": "assets/preload-helper-Ct5FWWRu.js",
+    "sha256": "edf934a2325dce089a29387f0269fbe66cefdb20c247ad0822677bd769bc7ae6",
+    "bytes": 1234
+  },
+  {
+    "file": "assets/pt-CMsqGB4H.js",
+    "sha256": "623dd0197e26a0b47910eb943aad47bdc9038d0611d8e3fbd70cd7a0f6d974cc",
+    "bytes": 282624
+  },
+  {
+    "file": "assets/sandbox-B3uuqu8o.css",
+    "sha256": "51a1171aa1b8e8df625a1f0f5e497950ab99e0298146133ee5e9d89cfb5eecfa",
+    "bytes": 4709
+  },
+  {
+    "file": "assets/sandbox-BCEDU6MC.js",
+    "sha256": "345bf01adad25a63d07372ba40ea9d638c5b1250ff8b19d53dae5167bcdc12df",
+    "bytes": 35248
+  },
+  {
+    "file": "assets/steam-Cwzudoc2.js",
+    "sha256": "9878329161386eb72dafb82d4312f7477f4ec81e796d1120c8becbf85f0aa188",
+    "bytes": 5838
+  },
+  {
+    "file": "assets/steam-mock-BLAErFH-.js",
+    "sha256": "e4dede7c9034c539f3560cafcc261c93da6bf6dae5b17fecce2f8f57c6d657d2",
+    "bytes": 2302
+  },
+  {
+    "file": "assets/tr-BkJwbZlQ.js",
+    "sha256": "26c7108aaf6d464df261872b8b864747bc145583d407b4d8e007a1d3a4975433",
+    "bytes": 278786
+  },
+  {
+    "file": "assets/uk-CM1R9mRA.js",
+    "sha256": "30fc9f6e944ddce99714ed78c3eb0b01529a1b31e6098cc0f03a89b71805d19c",
+    "bytes": 340110
+  },
+  {
+    "file": "assets/uz-CKwHV-_H.js",
+    "sha256": "fd947bca7d9c397cca8b5818cc94929874ff25d7e775189e03c7d1a44414a8db",
+    "bytes": 282043
+  },
+  {
+    "file": "assets/zh-CmaIi2cP.js",
+    "sha256": "0c69b12d3f81d8b3bc19e525f189411ae336096b770405dda706b70303dde052",
+    "bytes": 274136
+  },
+  {
+    "file": "brand/logo-1024.jpg",
+    "sha256": "b6fec9c9f563f319a3f39a3338cc1960af759ef68dae4e58a328cf0f5d365858",
+    "bytes": 126801
+  },
+  {
+    "file": "brand/logo-256.jpg",
+    "sha256": "5ddd353a0af6766b3fa631fd58ba56134ded84c341827f2edcd8b78268b5c623",
+    "bytes": 18050
+  },
+  {
+    "file": "brand/logo-px.png",
+    "sha256": "7fe2c91757bdef75ed9d1b20be6eaf94e36b4d488ec1a67b86efd8b0d3277e24",
+    "bytes": 4993
+  },
+  {
+    "file": "carlab.html",
+    "sha256": "d780da439fde9bc3b18f1a5c2f0468ac31857bf36c2937f8970eecf915e1538a",
+    "bytes": 1347
+  },
+  {
+    "file": "fonts/OFL.txt",
+    "sha256": "705960c3281a5765ecc0b59bd4ed7ca59eed165748076bc2fc3e8fdbfeb944b0",
+    "bytes": 4413
+  },
+  {
+    "file": "fonts/PressStart2P-Regular.ttf",
+    "sha256": "034c77f1f05ec89421e4a63f0e3a4ca1ecf852cc6d2bf611f126f275728e017d",
+    "bytes": 118204
+  },
+  {
+    "file": "fonts/RubikMonoOne-OFL.txt",
+    "sha256": "43d530580461a574f6dfed9e15af6a74e95f7c04d9bfa1174a63ff036e8eee07",
+    "bytes": 4462
+  },
+  {
+    "file": "fonts/RubikMonoOne-Regular.ttf",
+    "sha256": "b22624b6a36e543e942106edfccd198c50b57b65b924bfe02a6f0a5699429e6b",
+    "bytes": 141088
+  },
+  {
+    "file": "icon-16.png",
+    "sha256": "793387f1aa5d9896358d513ae9d0cec84f878d6c3b90e4e3f33ccb3eae434cfb",
+    "bytes": 778
+  },
+  {
+    "file": "icon-32.png",
+    "sha256": "729d63f4fab9bcabbe41a126fd9efdb124e5d025993a23b906ea38583464514b",
+    "bytes": 2523
+  },
+  {
+    "file": "icon.png",
+    "sha256": "a341aa1cf1fc11fac4960f4d39b2cb48d882f06f1088ff45c189d3b9d793eaeb",
+    "bytes": 9870
+  },
+  {
+    "file": "index.html",
+    "sha256": "01f5102a233683919337965e6b71e0259bad2be25385279c3695965e4994ee91",
+    "bytes": 19236
+  },
+  {
+    "file": "manifest.webmanifest",
+    "sha256": "c72ccb4ff71f1e643bc92d436ad392ffef538ba714679033d1f27ee8ee24d144",
+    "bytes": 459
+  },
+  {
+    "file": "models/vaz2101/car_lite.bin",
+    "sha256": "b83dd34b0e984c32112586acb24357f8ab62354f36afa9ddf1551344e9701b18",
+    "bytes": 40508
+  },
+  {
+    "file": "models/vaz2101/car_lite.json",
+    "sha256": "e6d5c5a560ae180d327a0c55094817e42ac3da50584e80a18cbe001c0be46fbd",
+    "bytes": 698
+  },
+  {
+    "file": "models/vaz2101/car.bin",
+    "sha256": "dc527ba6a2138517d1d3571c69d80ce0f7e66ef63c3613285698946c7f88e9e8",
+    "bytes": 84204
+  },
+  {
+    "file": "models/vaz2101/car.json",
+    "sha256": "2e345b010b8ef4f886089e927eaded0901daab8060b03be54f77884145a050d0",
+    "bytes": 2688
+  },
+  {
+    "file": "models/vaz2101/kopeika_kopeika.png",
+    "sha256": "3971d96dfc766bbc7a9f529ccc4fe66f305d1bf365aeec38a1d8ff9e82755144",
+    "bytes": 2904
+  },
+  {
+    "file": "models/vaz2101/LICENSE.txt",
+    "sha256": "98caa135b9fc38878ca4abf627649b79916db0849dbddd6e79d35582b93af96a",
+    "bytes": 644
+  },
+  {
+    "file": "models/vaz2107/bottom.png",
+    "sha256": "285a8c682167eb7d998df9cadd2ac0690643d2f60f660427e18086936cc1dd4f",
+    "bytes": 1497
+  },
+  {
+    "file": "models/vaz2107/car_lite.bin",
+    "sha256": "eed9345637ff89c82b245752e0402537542c74698bb5eb171f61a10abd40edf1",
+    "bytes": 112576
+  },
+  {
+    "file": "models/vaz2107/car_lite.json",
+    "sha256": "754a19ac24f7eae81f2bf447ce0fb3754ae368f1f1407c88b996dd569d226015",
+    "bytes": 1458
+  },
+  {
+    "file": "models/vaz2107/car.bin",
+    "sha256": "1801adcf93c24cd51e3e321b6cfe921c50d032cd1f8179f3e160bc76c9114118",
+    "bytes": 257088
+  },
+  {
+    "file": "models/vaz2107/car.json",
+    "sha256": "88d5e422adbcb67e07cc89e49352fafff7c57f503a0c64d3d76e4903512f0db9",
+    "bytes": 3532
+  },
+  {
+    "file": "models/vaz2107/carbody.png",
+    "sha256": "b029ce55b6a42e6dd8b6d7a2693fc97d3c4cae50c1d31e62259de06e365c5603",
+    "bytes": 1265
+  },
+  {
+    "file": "models/vaz2107/details_transparent.png",
+    "sha256": "42ab41dbc4a861cc756a5013fbb671993c90807e0a2a8ae6a7ab9c869685180a",
+    "bytes": 4335
+  },
+  {
+    "file": "models/vaz2107/details.png",
+    "sha256": "905e74eec74f55b87cf9160469c5e117637e63c8878371676b5c3d296966dc86",
+    "bytes": 13678
+  },
+  {
+    "file": "models/vaz2107/interior.png",
+    "sha256": "ba793ee8376e4332bbcc759005dc334daf6615d5e9d1fc1e4655dfb5d192bcb4",
+    "bytes": 1651
+  },
+  {
+    "file": "models/vaz2107/LICENSE.txt",
+    "sha256": "4524d4218e3859c350e425485b5074dd43b98d44613e61b512f636fe27a6f2c2",
+    "bytes": 706
+  },
+  {
+    "file": "music/.gitkeep",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "file": "music/index.json",
+    "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+    "bytes": 3
+  },
+  {
+    "file": "pad.html",
+    "sha256": "0a03592a01720d141b148bf29318e9c2c784256d53e3cfdb5aeca3538934897c",
+    "bytes": 2140
+  },
+  {
+    "file": "privacy.html",
+    "sha256": "fdbaf1a6f15a339ba5a0fc1fae0eebaef672c80c1c1c38293f0ace9cc0624cb5",
+    "bytes": 6670
+  },
+  {
+    "file": "sandbox.html",
+    "sha256": "be4b452951cbe8b296ecb1e3ace25c595adc31d5a33719443b80e14e6c6bdc0f",
+    "bytes": 1520
+  },
+  {
+    "file": "sfx/.gitkeep",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "file": "sfx/index.json",
+    "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+    "bytes": 3
+  }
+]

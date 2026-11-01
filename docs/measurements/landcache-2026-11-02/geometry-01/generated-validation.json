@@ -1,0 +1,16 @@
+{
+  "ok": false,
+  "processExit": 0,
+  "reasons": [
+    "result.ok"
+  ],
+  "stage": "select",
+  "error": "TypeError: Cannot read properties of undefined (reading 'position')\n    at <anonymous>:207:205\n    at async <anonymous>:74:14",
+  "outerOk": true,
+  "resultOk": false,
+  "errors": [],
+  "uncaught": 0,
+  "crash": 0,
+  "reportSha256": "5c7d1b40b7434c8d3a7ea2a378dfa03218bf7badd58e76ed59b231ca3d42890b",
+  "coverage": null
+}

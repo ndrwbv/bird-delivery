@@ -1,0 +1,356 @@
+{
+  "validation": {
+    "ok": true,
+    "reasons": []
+  },
+  "cacheControlMs": 63793.700000047684,
+  "generatedControlMs": 79269.89999985695,
+  "observedDeltaMs": 15476.199999809265,
+  "kind": "one pilot each, not medians or physical Deck",
+  "cache": {
+    "source": "cache",
+    "hit": true,
+    "cleanCalls": 0,
+    "bytes": 74735068,
+    "fileSha256": "1d37b7f3c446150e8ad81b1047da9c97ed630d7e7f4edc3d785a1857199b7793"
+  },
+  "rows": [
+    {
+      "name": "late.raisedland",
+      "workMs": 8377.29999947548,
+      "exclusiveWorkMs": 1548.300000667572,
+      "maxWorkMs": 908.0999999046326,
+      "steps": 21649,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.prepare",
+      "workMs": 146.5,
+      "exclusiveWorkMs": 146.5,
+      "maxWorkMs": 146.5,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cache.preclean.validate",
+      "workMs": 9.40000033378601,
+      "exclusiveWorkMs": 9.40000033378601,
+      "maxWorkMs": 0.8999998569488525,
+      "steps": 38,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cache.precleanHash",
+      "workMs": 1838.8999998569489,
+      "exclusiveWorkMs": 2.499999761581421,
+      "maxWorkMs": 8.700000047683716,
+      "steps": 595,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cache.preclean.hash",
+      "workMs": 1826.9999997615814,
+      "exclusiveWorkMs": 1826.9999997615814,
+      "maxWorkMs": 8.299999952316284,
+      "steps": 558,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cache.read.dispatch",
+      "workMs": 0.7999999523162842,
+      "exclusiveWorkMs": 0.7999999523162842,
+      "maxWorkMs": 0.7999999523162842,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cache.read",
+      "workMs": 0,
+      "exclusiveWorkMs": 0,
+      "maxWorkMs": 0,
+      "steps": 0,
+      "windowMs": 265.7999999523163,
+      "windows": 1,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "queue.cacheReadWait",
+      "workMs": 0,
+      "exclusiveWorkMs": 0,
+      "maxWorkMs": 0,
+      "steps": 0,
+      "windowMs": 265.09999990463257,
+      "windows": 1,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cache.inputCopy",
+      "workMs": 26.59999966621399,
+      "exclusiveWorkMs": 26.59999966621399,
+      "maxWorkMs": 0.6999998092651367,
+      "steps": 1141,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cache.fileHash.dispatch",
+      "workMs": 78.40000009536743,
+      "exclusiveWorkMs": 78.40000009536743,
+      "maxWorkMs": 78.40000009536743,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cache.fileHash",
+      "workMs": 0,
+      "exclusiveWorkMs": 0,
+      "maxWorkMs": 0,
+      "steps": 0,
+      "windowMs": 110.79999995231628,
+      "windows": 1,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "queue.cacheHashWait",
+      "workMs": 0,
+      "exclusiveWorkMs": 0,
+      "maxWorkMs": 0,
+      "steps": 0,
+      "windowMs": 32.299999952316284,
+      "windows": 1,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cache.header",
+      "workMs": 3.499999761581421,
+      "exclusiveWorkMs": 3.499999761581421,
+      "maxWorkMs": 2.3999998569488525,
+      "steps": 4,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cache.decode",
+      "workMs": 2499.7000002861023,
+      "exclusiveWorkMs": 16.29999804496765,
+      "maxWorkMs": 10.200000047683716,
+      "steps": 9946,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cache.preflight",
+      "workMs": 2.1000001430511475,
+      "exclusiveWorkMs": 2.1000001430511475,
+      "maxWorkMs": 2.1000001430511475,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cache.blocks",
+      "workMs": 1291.099999666214,
+      "exclusiveWorkMs": 1291.099999666214,
+      "maxWorkMs": 3.700000047683716,
+      "steps": 1140,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cache.tree",
+      "workMs": 1.0999999046325684,
+      "exclusiveWorkMs": 1.0999999046325684,
+      "maxWorkMs": 1.0999999046325684,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cache.index",
+      "workMs": 219.89999961853027,
+      "exclusiveWorkMs": 219.89999961853027,
+      "maxWorkMs": 10.100000143051147,
+      "steps": 246,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cache.validate",
+      "workMs": 1988.4000027179718,
+      "exclusiveWorkMs": 1988.4000027179718,
+      "maxWorkMs": 2.5999999046325684,
+      "steps": 17118,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cache.prepareRestore",
+      "workMs": 1788.4999990463257,
+      "exclusiveWorkMs": 14.799999237060547,
+      "maxWorkMs": 8.200000047683716,
+      "steps": 9864,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cache.restore.cover",
+      "workMs": 68.69999957084656,
+      "exclusiveWorkMs": 68.69999957084656,
+      "maxWorkMs": 5.699999809265137,
+      "steps": 546,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cache.restore.green",
+      "workMs": 67.40000033378601,
+      "exclusiveWorkMs": 67.40000033378601,
+      "maxWorkMs": 4.900000095367432,
+      "steps": 48,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cache.restore.mask",
+      "workMs": 614.900000333786,
+      "exclusiveWorkMs": 614.900000333786,
+      "maxWorkMs": 8.200000047683716,
+      "steps": 714,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cache.commit",
+      "workMs": 0.09999990463256836,
+      "exclusiveWorkMs": 0.09999990463256836,
+      "maxWorkMs": 0.09999990463256836,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.activate",
+      "workMs": 0.09999990463256836,
+      "exclusiveWorkMs": 0.09999990463256836,
+      "maxWorkMs": 0.09999990463256836,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.alignObjects",
+      "workMs": 449.40000009536743,
+      "exclusiveWorkMs": 449.40000009536743,
+      "maxWorkMs": 449.40000009536743,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.nearSurface",
+      "workMs": 16047.2000041008,
+      "exclusiveWorkMs": 16047.2000041008,
+      "maxWorkMs": 54.80000019073486,
+      "steps": 140995,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "late.raisedlandSurface",
+      "workMs": 16179.800007343292,
+      "exclusiveWorkMs": 132.60000324249268,
+      "maxWorkMs": 54.90000009536743,
+      "steps": 140995,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    }
+  ],
+  "waits": {
+    "platform": 0.10000014305114746,
+    "module": 8784.899999856949,
+    "gpuWait": 561.7999999523163,
+    "menuInput": 385.2000000476837,
+    "cacheIO": 265.89999985694885,
+    "cacheHash": 110.79999995231628
+  },
+  "counters": {
+    "raisedland.cleanCalls": 0,
+    "land.cellsRequested": 33,
+    "land.surfacePublished.cells": 32,
+    "land.surfacePublished.attributeBytes": 23423518
+  },
+  "moved": 4.7843118712321155,
+  "land": {
+    "ready": 32,
+    "total": 1776,
+    "steps": 141728,
+    "maxStep": 53.90000009536743,
+    "ms": 16043.1000020504,
+    "failed": 0
+  },
+  "ms": {
+    "total": 64637,
+    "build": 0,
+    "load": 9567,
+    "eval": 55030
+  }
+}

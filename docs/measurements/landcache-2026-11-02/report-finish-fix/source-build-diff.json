@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "oldManifest": "/tmp/bird-landcache17a-protocol2-1102/manifest/manifest.json",
+  "oldSourceHash": "e18ef4ddcda05aacbaf491b499952c9d6b9843f575d5d234047613776bde8e18",
+  "sourceDiff": [
+    {
+      "path": "tools/probe.cjs",
+      "oldSha256": "9f3a8e52ab74c4beae70af75fbc0873322ff714df2744c3d0c824769841222c0",
+      "newSha256": "e5ee9ae613ff40fd48a89249a23ab3c1c1b1252920c1244a0609198d765f12eb"
+    }
+  ],
+  "oldBuildHash": "382750aa2e2bf4cbfc5943c08b05c1b333f65ac419668c6f5c0d3917ba17760a",
+  "actualBuildHash": "382750aa2e2bf4cbfc5943c08b05c1b333f65ac419668c6f5c0d3917ba17760a",
+  "buildDir": "/tmp/bird-landcache17a-protocol2-1102/steam",
+  "buildFiles": 93,
+  "buildFilesByteExact": true,
+  "runtimeBuildRegenerated": false,
+  "scope": "Only host probe terminal report idempotence; no new runtime/city rules"
+}

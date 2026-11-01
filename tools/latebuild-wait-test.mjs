@@ -2,7 +2,9 @@
    устройства (в Node нет Vite import.meta.glob из перевода журнала). */
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+const startupURL=new URL('../src/game/startuptrace.js',import.meta.url).href;
 const source=(await readFile(new URL('../src/game/latebuild.js',import.meta.url),'utf8'))
+  .replace("import { STARTUP } from './startuptrace.js';",`import { STARTUP } from '${startupURL}';`)
   .replace("import * as CL from '../platform/crashlog.js';","const CL={report(){},trans(){},transEnd(){}};")
   .replace("import { MOB } from './mobile.js';","const MOB={on:false};")
   .replace("const MC = typeof MessageChannel !== 'undefined' ? new MessageChannel() : null;","const MC=null;");

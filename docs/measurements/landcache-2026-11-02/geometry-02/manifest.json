@@ -1,0 +1,178 @@
+{
+  "version": 2,
+  "date": "2026-11-01T19:34:52.877058+00:00",
+  "kind": "outside-timing geometry attempt02; prior01 fixture failure retained",
+  "priorFailure": "/tmp/bird-landcache17a-geometry-1102-steering-01",
+  "frozenBuild": "/tmp/bird-landcache17a-protocol2-1102/steam",
+  "manifest": "/tmp/bird-landcache17a-protocol2-1102/manifest/manifest.json",
+  "trustedCacheFile": "/tmp/bird-landcache17a-protocol2-1102/city.land",
+  "trustedCacheSha256": "1d37b7f3c446150e8ad81b1047da9c97ed630d7e7f4edc3d785a1857199b7793",
+  "fixture": "/tmp/bird-startup17-series-5a20287/newbie-1-fixture.json",
+  "fixtureSha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00",
+  "eval": "/tmp/bird-landcache17a/cache17a-geometry.js",
+  "evalSha256": "dd46fbf693c9e7649d382a32fc269d271e892cda0b29d42e46e02c0bdb23dd56",
+  "init": "/tmp/bird-landcache17a-protocol2-1102/combined-init.js",
+  "initSha256": "255d28757d08706ff2eb7882ea8d31d686e09d8a8eb4bed1f3ec909b46d968ed",
+  "helperSha256": "ace431151fb5b3d43bdb876575d1e4535095cb6152e667e6f2bfdfbf1db0f8af",
+  "benchHelperSha256": "63ce213bee6c8e5212599a1ccbec975d3523ad59ed99d54bbd99f54c8d1ab5e3",
+  "commands": {
+    "generated": [
+      "npm",
+      "run",
+      "probe",
+      "--",
+      "--mode=steam",
+      "--dir=/tmp/bird-landcache17a-protocol2-1102/steam",
+      "--fresh",
+      "--early",
+      "--startup-trace",
+      "--startup-session=lc17-geometry02-generated-0ec8e73a-8b73-4c2d-aad4-185e24d4ef90",
+      "--startup-cold",
+      "--startup-fixture=/tmp/bird-startup17-series-5a20287/newbie-1-fixture.json",
+      "--init-script=/tmp/bird-landcache17a-protocol2-1102/combined-init.js",
+      "--size=deck",
+      "--cpu=3",
+      "--bootcpu",
+      "--seed=7",
+      "--bootwait=300",
+      "--timeout=420",
+      "--q=gfx=high&gfxdev=deck&mute&startupdistrict=0",
+      "--eval=/tmp/bird-landcache17a/cache17a-geometry.js",
+      "--max=0",
+      "--errors",
+      "--report=/tmp/bird-landcache17a-geometry-1102-steering-02/generated.json"
+    ],
+    "cache": [
+      "npm",
+      "run",
+      "probe",
+      "--",
+      "--mode=steam",
+      "--dir=/tmp/bird-landcache17a-protocol2-1102/steam",
+      "--fresh",
+      "--early",
+      "--startup-trace",
+      "--startup-session=lc17-geometry02-cache-4df5dc55-4edf-4144-8c91-63b79a42095e",
+      "--startup-cold",
+      "--startup-fixture=/tmp/bird-startup17-series-5a20287/newbie-1-fixture.json",
+      "--init-script=/tmp/bird-landcache17a-geometry-1102-steering-02/locked-init.js",
+      "--size=deck",
+      "--cpu=3",
+      "--bootcpu",
+      "--seed=7",
+      "--bootwait=300",
+      "--timeout=420",
+      "--q=gfx=high&gfxdev=deck&mute&startupdistrict=0&landcache=1",
+      "--eval=/tmp/bird-landcache17a/cache17a-geometry.js",
+      "--max=0",
+      "--errors",
+      "--report=/tmp/bird-landcache17a-geometry-1102-steering-02/cache.json",
+      "--land-cache-file=/tmp/bird-landcache17a-protocol2-1102/city.land",
+      "--land-cache-sha=1d37b7f3c446150e8ad81b1047da9c97ed630d7e7f4edc3d785a1857199b7793",
+      "--land-export-manifest=/tmp/bird-landcache17a-protocol2-1102/manifest/manifest.json"
+    ]
+  },
+  "conditions": {
+    "fresh": true,
+    "mode": "steam",
+    "size": "1280x800",
+    "gfx": "high",
+    "cpu": 3,
+    "bootcpu": true,
+    "seed": 7,
+    "mute": true,
+    "physicalDeck": false
+  },
+  "status": "both geometry PASS; no further gaming",
+  "generatedValidation": {
+    "ok": true,
+    "reasons": [],
+    "stage": null,
+    "error": null,
+    "outerOk": true,
+    "resultOk": true,
+    "errors": [],
+    "uncaught": 0,
+    "crash": 0,
+    "reportSha256": "2ff122577dcee7c47c57152cfbd46cf81bf5810edfe7401d09e241385c30e304",
+    "coverage": {
+      "poses": 3,
+      "paved": 2,
+      "drives": 6,
+      "boundaries": 12,
+      "props": 8,
+      "benches": 4,
+      "benchRepresentations": [
+        {
+          "representation": "smash",
+          "cpuRange": true,
+          "comparison": "benchY+retained CPU range Y; no GPU proof"
+        },
+        {
+          "representation": "smash",
+          "cpuRange": true,
+          "comparison": "benchY+retained CPU range Y; no GPU proof"
+        },
+        {
+          "representation": "smash",
+          "cpuRange": true,
+          "comparison": "benchY+retained CPU range Y; no GPU proof"
+        },
+        {
+          "representation": "smash",
+          "cpuRange": true,
+          "comparison": "benchY+retained CPU range Y; no GPU proof"
+        }
+      ],
+      "drawDigest": "2dfb7542fb0021e7e4ad1265b5813894071feede82e9cc3d9aefe1d286f98c1b",
+      "maxDriveStep": 0.06558022458360213,
+      "maxLateral": 0.00952461055794629
+    }
+  },
+  "lockedInitSha256": "fcca35c070fe9e87cb5f1d20281bf26bd7145bb208356bb7e6e31774819478da",
+  "cacheValidation": {
+    "ok": true,
+    "reasons": [],
+    "stage": null,
+    "error": null,
+    "outerOk": true,
+    "resultOk": true,
+    "errors": [],
+    "uncaught": 0,
+    "crash": 0,
+    "reportSha256": "e55bd7a5d4084275f84ce8d605f69bce4f8087f50fc9ed5a3270fddce0d50b65",
+    "coverage": {
+      "poses": 3,
+      "paved": 2,
+      "drives": 6,
+      "boundaries": 12,
+      "props": 8,
+      "benches": 4,
+      "benchRepresentations": [
+        {
+          "representation": "smash",
+          "cpuRange": true,
+          "comparison": "benchY+retained CPU range Y; no GPU proof"
+        },
+        {
+          "representation": "smash",
+          "cpuRange": true,
+          "comparison": "benchY+retained CPU range Y; no GPU proof"
+        },
+        {
+          "representation": "smash",
+          "cpuRange": true,
+          "comparison": "benchY+retained CPU range Y; no GPU proof"
+        },
+        {
+          "representation": "smash",
+          "cpuRange": true,
+          "comparison": "benchY+retained CPU range Y; no GPU proof"
+        }
+      ],
+      "drawDigest": "2dfb7542fb0021e7e4ad1265b5813894071feede82e9cc3d9aefe1d286f98c1b",
+      "maxDriveStep": 0.08946772756696575,
+      "maxLateral": 0.005113715950301412
+    }
+  }
+}

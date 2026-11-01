@@ -1,0 +1,66 @@
+{
+  "baselineHead": "5a2028736cf5d5fb48cf8c2f0e649246bb45ea1a",
+  "sourceHash": "e18ef4ddcda05aacbaf491b499952c9d6b9843f575d5d234047613776bde8e18",
+  "buildHash": "382750aa2e2bf4cbfc5943c08b05c1b333f65ac419668c6f5c0d3917ba17760a",
+  "manifestHash": "c3eb3efcd0e50929a3f579444df706576deffd3a33facbb11c7b7e0e52872dfd",
+  "combinedInitSha256": "255d28757d08706ff2eb7882ea8d31d686e09d8a8eb4bed1f3ec909b46d968ed",
+  "fixtureSha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00",
+  "fixtureUsedDirectly": "/tmp/bird-startup17-series-5a20287/newbie-1-fixture.json",
+  "extraMeasuredSource": [
+    {
+      "path": "tools/probe-checks/startup-ready.js",
+      "sha256": "044da43ee073f0533427231b14d4ef0a92d61a0c46db718819efc47507942c91",
+      "bytes": 6053
+    },
+    {
+      "path": "tools/probe-checks/startup-bootstrap-observe.js",
+      "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8",
+      "bytes": 654
+    },
+    {
+      "path": "tools/probe-checks/land-export.js",
+      "sha256": "4dee86489413304db423efc50debce3c0fd86448f2d9c0c341ccf4a8bc957db8",
+      "bytes": 569
+    },
+    {
+      "path": "tools/land-export-manifest.mjs",
+      "sha256": "28a03216eb40cbaf7e7c2fd36e84204c215c60de2452ee0bcbd92e3421e39f74",
+      "bytes": 3576
+    },
+    {
+      "path": "tools/land-export-host.cjs",
+      "sha256": "409c91f59bb3cbe1d54347fdc5622027cb702807c4c504669adf2b9ac76f54ff",
+      "bytes": 4958
+    },
+    {
+      "path": "tools/land-cache-host.cjs",
+      "sha256": "5ad1524a312fd40e6c7e46530d608bd84819becec6bdeefac39f86add6bcf32c",
+      "bytes": 3763
+    },
+    {
+      "path": "tools/startup-report.mjs",
+      "sha256": "c501b3700d5c3dfe16e178506941b2ed339699c2cddcb9c875509105023b1063",
+      "bytes": 2432
+    },
+    {
+      "path": "tools/startup-bench.mjs",
+      "sha256": "f23bf53792d2f1bd0774d84e3574d4c3c490db8aadc1a35789c6272f5f364c2f",
+      "bytes": 7118
+    },
+    {
+      "path": "tools/startup-revalidate.mjs",
+      "sha256": "814606fa4be0516cd9ca63e00b889cd6208b811ca0506b017ff10281e075c51d",
+      "bytes": 3188
+    },
+    {
+      "path": "tools/latebuild-wait-test.mjs",
+      "sha256": "d56bf9a554a220834854b56bb2949de6772b555bcb32a563e3e81094941a72b4",
+      "bytes": 3214
+    }
+  ],
+  "pilotSession": "lc17p2-207fb4f4-d785-43b9-b7e0-cee8b1a3d79c",
+  "exportSession": "lc17p2-0119b839-d274-4703-94a2-78241d98df0c",
+  "protocolVersion": 2,
+  "cacheReadUsed": false,
+  "physicalDeck": false
+}

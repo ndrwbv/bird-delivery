@@ -1,0 +1,95 @@
+{
+  "ok": true,
+  "case": "saved-near",
+  "file": "/tmp/bird-landcache17a-reportfix-1102/saved-assets/saved-near.land",
+  "bytes": 74735087,
+  "sha256": "a94b84a49725d6cec934d69128c6e8d72fa6c0541556d996aa91a4ac83ef7bf5",
+  "payloadSha256": "939ef3f9088de1bd345a45e207ecd3790029f049b9a9fffb4fa4ec01ac3745b4",
+  "headerBytes": 73440,
+  "payloadBytes": 74661627,
+  "identity": {
+    "mapId": "seversk",
+    "mode": "streamed-deferred",
+    "mapHash": "bcfd18399236e8ea14312a06caf0b52f16c79e3d8449cbb108923d5d87357ee5",
+    "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+    "sourceHash": "fdb6923c13afc8f369b8c02931174fb953706d52fb5d3f347683dab0f2f6fcce",
+    "precleanHash": "55c244e410918488e47a199d3f5dd95447e73d9daee54c686cc05e33f1267344",
+    "seed": 7,
+    "flags": {
+      "runtime": "{\"mapId\":\"seversk\",\"mode\":\"steam\",\"adult\":true,\"career\":true,\"intro\":false,\"editor\":false,\"streamed\":true,\"graphics\":\"high\",\"district\":0,\"season\":2.5,\"seasonForced\":false,\"quick\":false,\"donationTrash\":0,\"externalSeed\":true}",
+      "query": "[[\"gfx\",\"high\"],[\"gfxdev\",\"deck\"],[\"lang\",\"ru\"],[\"nointro\",\"\"],[\"startupdistrict\",\"0\"]]",
+      "parameters": "{\"minWidth\":0.8,\"coverCell\":32,\"maskCell\":32,\"indexCell\":8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+      "buildHash": "382750aa2e2bf4cbfc5943c08b05c1b333f65ac419668c6f5c0d3917ba17760a",
+      "rngProvider": "probe-mulberry32-late-fnv1a-v1"
+    }
+  },
+  "runtime": {
+    "mapId": "seversk",
+    "mode": "steam",
+    "adult": true,
+    "career": true,
+    "intro": false,
+    "editor": false,
+    "streamed": true,
+    "graphics": "high",
+    "district": 0,
+    "season": 2.5,
+    "seasonForced": false,
+    "quick": false,
+    "donationTrash": 0,
+    "externalSeed": true
+  },
+  "query": [
+    [
+      "gfx",
+      "high"
+    ],
+    [
+      "gfxdev",
+      "deck"
+    ],
+    [
+      "lang",
+      "ru"
+    ],
+    [
+      "nointro",
+      ""
+    ],
+    [
+      "startupdistrict",
+      "0"
+    ]
+  ],
+  "precleanHash": "55c244e410918488e47a199d3f5dd95447e73d9daee54c686cc05e33f1267344",
+  "acceptance": {
+    "version": 1,
+    "byteExact": true,
+    "repeated": true,
+    "queryPoints": 27,
+    "selectedDrawInputs": true,
+    "rendered": false,
+    "bytes": 74735087,
+    "liveRestored": false,
+    "activated": false,
+    "source": "generated",
+    "fileSha256": "a94b84a49725d6cec934d69128c6e8d72fa6c0541556d996aa91a4ac83ef7bf5",
+    "runtimeInputHash": "ee640653ecc6bdcd7c9caf08c0c22c97936265fc5970d9a2abcfc1b40687c579"
+  },
+  "cleanCalls": 1,
+  "randomCalls": 0,
+  "flags": {},
+  "dropped": 0,
+  "timingMs": {
+    "total": 116401,
+    "build": 0,
+    "load": 96367,
+    "eval": 20010
+  },
+  "fixture": "/tmp/bird-startup17-series-5a20287/saved-near-1-fixture.json",
+  "fixtureSha256": "b00382a13530f84154b63ea41871b2d73ebba342cf7ba4f30d4e85d60fb7cf35",
+  "sourceHash": "fdb6923c13afc8f369b8c02931174fb953706d52fb5d3f347683dab0f2f6fcce",
+  "buildHash": "382750aa2e2bf4cbfc5943c08b05c1b333f65ac419668c6f5c0d3917ba17760a",
+  "outsideTiming": true,
+  "physicalDeck": false
+}

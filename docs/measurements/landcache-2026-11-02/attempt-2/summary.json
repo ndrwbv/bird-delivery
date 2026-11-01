@@ -1,0 +1,220 @@
+{
+  "ok": true,
+  "baselineHead": "5a2028736cf5d5fb48cf8c2f0e649246bb45ea1a",
+  "manifest": "/tmp/bird-landexport17a-attempt2-manifest-5a20287-1102/manifest.json",
+  "manifestHash": "3b63fea90abd99e59778f9dca188532324948a2265dee78012ca65545c5c747c",
+  "sourceHash": "03c79af49b2f97b23fe4fb78bba6ad36a3b0f5689ef9ae45bdbf96e7a01692f1",
+  "buildHash": "72259654ca395b5da3cf087cf720d4d984a29244977025ac067c56fcc287c679",
+  "fixture": "/tmp/bird-startup17-series-5a20287/newbie-1-fixture.json",
+  "fixtureSha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00",
+  "probeCommandFile": "/tmp/bird-landexport17a-attempt2-run-5a20287-1102.log",
+  "report": "/tmp/bird-landexport17a-attempt2-report-5a20287-1102.json",
+  "binary": "/tmp/bird-landexport17a-attempt2-city-5a20287-1102.land",
+  "binaryBytes": 74735068,
+  "binaryMiB": 71.27291488647461,
+  "binarySha256": "5bccadeb6d282d69eb4e8f032383a983d129d804c3225d4d4b0875b16b3e15ec",
+  "headerBytes": 73421,
+  "payloadBytes": 74661627,
+  "blocks": 563,
+  "fields": {
+    "cover": {
+      "triangles": 1070943,
+      "end": 1086707,
+      "pages": 67,
+      "cells": 31774,
+      "ids": 1545856
+    },
+    "green": {
+      "triangles": 14036,
+      "end": 14036,
+      "pages": 1,
+      "cells": 43918,
+      "ids": 257636
+    },
+    "kept": {
+      "triangles": 360924,
+      "end": 360924,
+      "pages": 23,
+      "cells": 394218,
+      "ids": 2674970
+    }
+  },
+  "domainCells": 31769,
+  "domainRows": 367,
+  "segmentCount": 370726,
+  "resultStats": {
+    "minWidth": 0.8,
+    "cleanedArea": 39972.91,
+    "fillTriangles": 611571,
+    "fillDraw": 0,
+    "cleanTiles": 31759,
+    "maskTriangles": 360924,
+    "maskEdges": 370726
+  },
+  "acceptanceBudget": {
+    "required": 821688488,
+    "limit": 1073741824,
+    "defaultLimit": 536870912,
+    "bytes": 74735068,
+    "pages": 91,
+    "cells": 469910,
+    "domainCells": 31769,
+    "domainRows": 367,
+    "ids": 4478462,
+    "inputBytes": 504163764,
+    "headerBytes": 0,
+    "note": "Structural charged estimate with multiple acceptance copies; not measured JS heap/Deck usage"
+  },
+  "acceptance": {
+    "version": 1,
+    "byteExact": true,
+    "repeated": true,
+    "queryPoints": 27,
+    "selectedDrawInputs": true,
+    "rendered": false,
+    "bytes": 74735068,
+    "liveRestored": false,
+    "activated": false,
+    "source": "generated",
+    "fileSha256": "5bccadeb6d282d69eb4e8f032383a983d129d804c3225d4d4b0875b16b3e15ec",
+    "runtimeInputHash": "ee640653ecc6bdcd7c9caf08c0c22c97936265fc5970d9a2abcfc1b40687c579"
+  },
+  "cleanCalls": 1,
+  "randomCalls": 0,
+  "timingMs": {
+    "total": 109705,
+    "build": 0,
+    "load": 90656,
+    "eval": 19028
+  },
+  "raisedlandRows": [
+    {
+      "name": "late.raisedland",
+      "workMs": 38631.89999675751,
+      "exclusiveWorkMs": 1344.2999985218048,
+      "maxWorkMs": 17470.5,
+      "steps": 32578,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.prepare",
+      "workMs": 134.29999995231628,
+      "exclusiveWorkMs": 134.29999995231628,
+      "maxWorkMs": 134.29999995231628,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.export.precleanHash",
+      "workMs": 1641.2999999523163,
+      "exclusiveWorkMs": 1641.2999999523163,
+      "maxWorkMs": 1641.2999999523163,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.cleanContours",
+      "workMs": 18614.699998378754,
+      "exclusiveWorkMs": 18614.699998378754,
+      "maxWorkMs": 204.5,
+      "steps": 32475,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.export.capture",
+      "workMs": 986,
+      "exclusiveWorkMs": 986,
+      "maxWorkMs": 986,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.export.roundtrip",
+      "workMs": 12366.299999952316,
+      "exclusiveWorkMs": 12366.299999952316,
+      "maxWorkMs": 12366.299999952316,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.export.fileHash",
+      "workMs": 3211,
+      "exclusiveWorkMs": 3211,
+      "maxWorkMs": 3211,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.activate",
+      "workMs": 0,
+      "exclusiveWorkMs": 0,
+      "maxWorkMs": 0,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.alignObjects",
+      "workMs": 334,
+      "exclusiveWorkMs": 334,
+      "maxWorkMs": 334,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "raisedland.nearSurface",
+      "workMs": 15012.900002479553,
+      "exclusiveWorkMs": 15012.900002479553,
+      "maxWorkMs": 40.59999990463257,
+      "steps": 140995,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "late.raisedlandSurface",
+      "workMs": 15132.900003433228,
+      "exclusiveWorkMs": 120.00000095367432,
+      "maxWorkMs": 40.59999990463257,
+      "steps": 140995,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    }
+  ],
+  "flags": {},
+  "dropped": 0,
+  "consoleErrors": [],
+  "uncaught": 0,
+  "startupTimingRun": false,
+  "physicalDeck": false,
+  "readerInstalled": false
+}

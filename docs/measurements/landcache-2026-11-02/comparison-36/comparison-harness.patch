@@ -1,0 +1,406 @@
+--- a/tools/startup-bench.mjs
++++ b/tools/startup-bench.mjs
+@@ -1,66 +1,126 @@
+-/* №17ж. Sequential cold/warm pairs on one immutable already-built Steam directory.
+-   node tools/startup-bench.mjs --dir=/tmp/control --sha=<recorded-sha> --out=/tmp/report
+-   Each pair owns an isolated probe session; identical fixture is restored while its browser cache is retained.
+-   No builds, git, background workers or real user saves are touched by this runner. */
++/* №17ж/17а. Existing sequential runner; --comparison-config opts into matched same-build generated/cache pairs.
++   No build/export/retry is launched here. A comparison is a separate root-authorized invocation after acceptance. */
+ import fs from 'node:fs';
+-import { validateStartupReport } from './startup-report.mjs';
++import { validateStartupReport,validateStartupVariant,validateStartupComparisonConfig,validateStartupCommand,startupInputIdentityKey } from './startup-report.mjs';
+ import os from 'node:os';
+ import path from 'node:path';
+ import { spawnSync } from 'node:child_process';
+ import { randomUUID, createHash } from 'node:crypto';
++import { createRequire } from 'node:module';
+ const arg=(key,fallback)=>process.argv.slice(2).find(a=>a.startsWith('--'+key+'='))?.slice(key.length+3)??fallback;
+ const dir=arg('dir'),sha=arg('sha'),out=path.resolve(arg('out','/tmp/bird-startup17-report'));
+ if(!dir||!sha)throw Error('--dir immutable build and --sha recorded source revision are required');
+ if(!fs.existsSync(path.join(dir,'index.html')))throw Error('Build directory has no index.html');
+-const pilotFile=arg('pilot-report');
+-if(!pilotFile)throw Error('--pilot-report from one valid pilot is required before the 18-run series');
+-const pilot=JSON.parse(fs.readFileSync(path.resolve(pilotFile),'utf8'));
+-if(!validateStartupReport(pilot,{requireGuardV2:true}).ok)throw Error('Pilot report is not complete/valid; series was not started');
++const hash=b=>createHash('sha256').update(b).digest('hex');
++const comparisonFile=arg('comparison-config');
++let comparison=null,landManifest=null,initFile='tools/probe-checks/startup-bootstrap-observe.js',initSha256=null;
++let pilotFile=arg('pilot-report');
++if(comparisonFile){
++ if(fs.existsSync(path.join(out,'manifest.json')))throw Error('Comparison output already contains an attempt; use a new directory without retry');
++ const configPath=path.resolve(comparisonFile),configBytes=fs.readFileSync(configPath),config=JSON.parse(configBytes);
++ const gate=validateStartupComparisonConfig(config);if(!gate.ok)throw Error('Comparison config: '+gate.reasons.join('; '));
++ const resolve=file=>path.resolve(path.dirname(configPath),file),manifestFile=resolve(config.manifestFile),manifestBytes=fs.readFileSync(manifestFile);
++ const {verifyManifest}=createRequire(import.meta.url)('./land-cache-host.cjs');
++ landManifest=verifyManifest({manifestFile,dist:path.resolve(dir),repo:process.cwd()});
++ if(landManifest.manifestHash!==config.manifestHash||landManifest.seed!==7)throw Error('Shared comparison manifest/seed differs');
++ const inputsGate=validateStartupComparisonConfig(config,{manifest:landManifest});if(!inputsGate.ok)throw Error('Case input metadata: '+inputsGate.reasons.join('; '));
++ const assets=Object.fromEntries(Object.entries(config.assets).map(([label,asset])=>{
++  const file=resolve(asset.file),stat=fs.statSync(file),limit=(landManifest.limits?.maxPayloadBytes||128*1024*1024)+(landManifest.limits?.maxHeaderBytes||4*1024*1024)+20;
++  if(!stat.isFile()||stat.size<=0||stat.size>limit)throw Error('Invalid explicit cache asset metadata: '+label);
++  return[label,{file,sha256:asset.sha256,bytes:stat.size,identity:asset.identity,identitySha256:hash(startupInputIdentityKey(asset.identity))}];
++ }));
++ const pilots={};
++ for(const variant of ['generated','cache']){
++  const expected=config.pilots[variant],file=resolve(expected.report),bytes=fs.readFileSync(file);
++  if(hash(bytes)!==expected.sha256)throw Error('Pilot SHA mismatch: '+variant);
++  const validation=validateStartupVariant(JSON.parse(bytes),{variant,label:config.pilotCase,manifest:landManifest,asset:assets[config.pilotCase]});
++  if(!validation.ok)throw Error('Invalid matched '+variant+' pilot: '+validation.reasons.join('; '));
++  pilots[variant]={report:file,sha256:expected.sha256,validation};
++ }
++ const patchFile=arg('harness-patch');if(!patchFile)throw Error('--harness-patch=exact applied comparison patch is required');
++ const patchBytes=fs.readFileSync(path.resolve(patchFile));
++ // One full content preflight before any measured process. Never read/hash cache assets here.
++ verifyManifest({manifestFile,dist:path.resolve(dir),repo:process.cwd(),full:true});
++ fs.mkdirSync(out,{recursive:true});
++ const copiedManifest=path.join(out,'comparison-input-manifest.json');fs.writeFileSync(copiedManifest,manifestBytes);
++ const copiedConfig=path.join(out,'comparison-config.json');fs.writeFileSync(copiedConfig,configBytes);
++ const copiedPatch=path.join(out,'comparison-harness.patch');fs.writeFileSync(copiedPatch,patchBytes);
++ const observer=fs.readFileSync('tools/probe-checks/startup-bootstrap-observe.js','utf8');
++ const init='Object.defineProperty(window,"__landExport17aManifest",{value:'+JSON.stringify(landManifest)+',writable:false,configurable:false});\n'+observer;
++ initFile=path.join(out,'comparison-init.js');fs.writeFileSync(initFile,init);initSha256=hash(init);
++ for(const variant of ['generated','cache']){const copy=path.join(out,'comparison-pilot-'+variant+'.json');fs.copyFileSync(pilots[variant].report,copy);pilots[variant]={...pilots[variant],originalReport:pilots[variant].report,report:copy};}
++ comparison={version:1,expectedRuns:36,pilotCase:config.pilotCase,assets,pilots,configFile:copiedConfig,originalConfigFile:configPath,configSha256:hash(configBytes),
++  manifestFile:copiedManifest,originalManifestFile:manifestFile,manifestFileSha256:hash(manifestBytes),manifestHash:landManifest.manifestHash,sourceHash:landManifest.sourceHash,buildHash:landManifest.buildHash,
++  mapHash:landManifest.mapHash,editsHash:landManifest.editsHash,mapId:landManifest.mapId,seed:landManifest.seed,initFile,initSha256,
++  harnessPatch:{file:copiedPatch,sha256:hash(patchBytes)},fullPreflight:{once:true,sourceHash:landManifest.sourceHash,buildHash:landManifest.buildHash,cacheAssetsRead:false}};
++ pilotFile=pilots.generated.report;
++}else{
++ if(!pilotFile)throw Error('--pilot-report from one valid pilot is required before the 18-run series');
++ const pilot=JSON.parse(fs.readFileSync(path.resolve(pilotFile),'utf8'));
++ if(!validateStartupReport(pilot,{requireGuardV2:true}).ok)throw Error('Pilot report is not complete/valid; series was not started');
++}
+ fs.mkdirSync(out,{recursive:true});
+-const common={'dlv-lang':'ru','dlv-sound':false}; // Quality is fixed by the same gfx=high&gfxdev=deck query in every process.
++const common={'dlv-lang':'ru','dlv-sound':false};
+ const mature={'dlv-msk-guide':1,'dlv-msk-tut':'1','dlv-msk-nostut':1,'dlv-shift-tut':1,'dlv-msk-wallet':30000,
+  'dlv-shifts':40,'dlv-city-party':true,'dlv-city-mode':false,'dlv-dist-open':8,'dlv-dist-shifts':[4,5,5,6,6,7,7,0]};
+-const cases=[['newbie',{...common},0,true],['saved-near',{...common,...mature,'dlv-district':0},0,false],
+- ['saved-far',{...common,...mature,'dlv-district':7},7,false]];
+-const hash=b=>createHash('sha256').update(b).digest('hex');
+-const sourceFiles=['src/main.js','src/game/menu.js','src/game/progressboot.js','src/game/game.js','src/game/latebuild.js','src/game/landcleanpool.js','src/game/landclean.worker.js','src/game/landstream.js','src/game/startuptrace.js','tools/probe.cjs','tools/probe-checks/startup-ready.js','tools/probe-checks/startup-bootstrap-observe.js','tools/startup-bench.mjs','tools/startuptrace-test.mjs','tools/startup-report.mjs','tools/startup-revalidate.mjs'];
++const cases=[['newbie',{...common},0,true],['saved-near',{...common,...mature,'dlv-district':0},0,false],['saved-far',{...common,...mature,'dlv-district':7},7,false]];
++const sourceFiles=['src/main.js','src/game/menu.js','src/game/progressboot.js','src/game/game.js','src/game/latebuild.js','src/game/landcleanpool.js','src/game/landclean.worker.js','src/game/landstream.js','src/game/startuptrace.js','tools/probe.cjs','tools/probe-checks/startup-ready.js','tools/probe-checks/startup-bootstrap-observe.js','tools/startup-bench.mjs','tools/startuptrace-test.mjs','tools/startup-report.mjs','tools/startup-revalidate.mjs',...(comparison?['tools/land-cache-host.cjs']:[])];
+ const copies=path.join(out,'source');
+ const source=sourceFiles.map(file=>{const bytes=fs.readFileSync(file),copy=path.join(copies,file);fs.mkdirSync(path.dirname(copy),{recursive:true});fs.writeFileSync(copy,bytes);return{file,sha256:hash(bytes),bytes:bytes.length,copy};});
+-const buildFiles=[];function tree(base,rel=''){for(const e of fs.readdirSync(path.join(base,rel),{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){const name=path.join(rel,e.name);if(e.isDirectory())tree(base,name);else{const bytes=fs.readFileSync(path.join(base,name));buildFiles.push({file:name,sha256:hash(bytes),bytes:bytes.length});}}}tree(dir);
++const buildFiles=[];function tree(base,rel=''){for(const e of fs.readdirSync(path.join(base,rel),{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){const name=path.join(rel,e.name);if(e.isDirectory())tree(base,name);else{const bytes=fs.readFileSync(path.join(base,name));buildFiles.push({file:name,sha256:hash(bytes),bytes:bytes.length});}}}
++if(comparison)buildFiles.push(...landManifest.buildFiles.map(row=>({file:row.path,sha256:row.sha256,bytes:row.bytes})));else tree(dir);
+ fs.writeFileSync(path.join(out,'build-tree.json'),JSON.stringify(buildFiles,null,2));
+-const manifest={version:2,source,buildTree:{file:path.join(out,'build-tree.json'),sha256:hash(JSON.stringify(buildFiles))},indexSha256:hash(fs.readFileSync(path.join(dir,'index.html'))),sha,pilotReport:path.resolve(pilotFile),dir:path.resolve(dir),date:new Date().toISOString(),host:{os:os.release(),arch:os.arch(),cpu:os.cpus()[0]?.model,cores:os.cpus().length,memBytes:os.totalmem()},
+- conditions:{mode:'steam',size:'1280x800',gfx:'high',cpuThrottle:3,seed:7,cache:'cold empty owned Chromium session; warm process restart on same session; OS/driver caches uncontrolled',physicalDeck:false},runs:[]};
++const harness=source.filter(row=>row.file.startsWith('tools/')).map(({file,sha256,bytes,copy})=>({file,sha256,bytes,copy}));
++const harnessSha256=hash(JSON.stringify(harness.map(({file,sha256,bytes})=>({file,sha256,bytes}))));
++const manifest={version:comparison?3:2,source,buildTree:{file:path.join(out,'build-tree.json'),sha256:hash(JSON.stringify(buildFiles))},indexSha256:comparison?buildFiles.find(row=>row.file==='index.html')?.sha256:hash(fs.readFileSync(path.join(dir,'index.html'))),sha,pilotReport:path.resolve(pilotFile),dir:path.resolve(dir),date:new Date().toISOString(),host:{os:os.release(),arch:os.arch(),cpu:os.cpus()[0]?.model,cores:os.cpus().length,memBytes:os.totalmem()},
++ conditions:{mode:'steam',size:'1280x800',gfx:'high',cpuThrottle:3,seed:7,cache:'cold empty owned Chromium session; warm process restart on same session; OS/driver caches uncontrolled',physicalDeck:false},...(comparison?{comparison,harness,harnessSha256}:{}),runs:[]};
++if(comparison)manifest.conditions.timing='controlMs uses renderer navigation origin; processToControlMs is recorded separately; full preflight occurs once outside measured processes';
++const save=()=>fs.writeFileSync(path.join(out,'manifest.json'),JSON.stringify(manifest,null,2));
+ const median=a=>a.slice().sort((x,y)=>x-y)[Math.floor(a.length/2)];
+-for(const[label,fixture,district,fresh]of cases)for(let repeat=1;repeat<=3;repeat++){
+- const session='b17-'+randomUUID(),file=path.join(out,label+'-'+repeat+'-fixture.json');fs.writeFileSync(file,JSON.stringify(fixture));
+- for(const phase of ['cold','warm']){
+-  const report=path.join(out,label+'-'+repeat+'-'+phase+'.json');
+-  const args=['run','probe','--','--mode=steam','--dir='+path.resolve(dir),'--startup-trace','--startup-session='+session,
+-   '--startup-fixture='+file,'--init-script=tools/probe-checks/startup-bootstrap-observe.js','--early','--bootcpu','--cpu=3','--seed=7','--size=deck','--bootwait=300','--timeout=420',
+-   '--q=gfx=high&gfxdev=deck&mute&startupdistrict='+district,'--eval=tools/probe-checks/startup-ready.js','--max=0','--report='+report];
+-  if(fresh)args.push('--fresh');if(phase==='cold')args.push('--startup-cold');
+-  console.log('START '+label+' '+repeat+' '+phase);
+-  const started=Date.now(),result=spawnSync('npm',args,{encoding:'utf8',maxBuffer:32*1024*1024,env:process.env});
+-  fs.writeFileSync(report+'.stdout.log',result.stdout||'');fs.writeFileSync(report+'.stderr.log',result.stderr||'');
+-  const record={label,repeat,phase,command:['npm',...args],fixture:file,fixtureSha256:hash(fs.readFileSync(file)),report,session,wallMs:Date.now()-started,status:result.status};
+-  if(result.status===0&&fs.existsSync(report)){
+-   const value=JSON.parse(fs.readFileSync(report,'utf8'));record.validation=validateStartupReport(value,{requireDistrict:true,expectedDistrict:district,requireGuardV2:true});record.ok=record.validation.ok;
+-   const data=value.result,trace=data?.report,host=data?.host;
+-   record.controlMs=trace?.marks?.['first.control']?.at;
+-   record.processToControlMs=host?trace.clock.timeOrigin+record.controlMs-host.processEpochMs:null;
+-   record.fromClickMs=data?.firstControlFromClickMs;
+-   record.district=data?.district;record.resourceCapture=trace?.resourceCapture;record.resourceIO=trace?.resourceCapture?.totalCount?'available ResourceTiming; timings do not separate parse/evaluate':'unavailable for app://; zero records is not zero I/O';record.dropped=trace?.dropped;
+-   record.flags=trace?.flags;record.failed=!!Object.keys(trace?.flags||{}).some(k=>/error|fallback|rejected/i.test(k));
++save();
++try{
++ for(const[label,fixture,district,fresh]of cases)for(let repeat=1;repeat<=3;repeat++){
++  const variants=comparison?(repeat%2?['generated','cache']:['cache','generated']):['generated'];
++  const file=path.join(out,label+'-'+repeat+'-fixture.json'),fixtureBytes=JSON.stringify(fixture);fs.writeFileSync(file,fixtureBytes);const fixtureSha256=hash(fixtureBytes);
++  for(const variant of variants){
++   const session='b17-'+randomUUID();
++   for(const phase of ['cold','warm']){
++    const report=path.join(out,label+'-'+repeat+'-'+(comparison?variant+'-':'')+phase+'.json');
++    const args=['run','probe','--','--mode=steam','--dir='+path.resolve(dir),'--startup-trace','--startup-session='+session,
++     '--startup-fixture='+file,'--init-script='+initFile,'--early','--bootcpu','--cpu=3','--seed=7','--size=deck','--bootwait=300','--timeout=420',
++     '--q=gfx=high&gfxdev=deck&mute&startupdistrict='+district+(comparison&&variant==='cache'?'&landcache=1':''),'--eval=tools/probe-checks/startup-ready.js','--max=0','--report='+report];
++    if(fresh)args.push('--fresh');if(phase==='cold')args.push('--startup-cold');
++    const asset=comparison?.assets[label];
++    if(comparison){args.push('--land-export-manifest='+comparison.manifestFile);if(variant==='cache')args.push('--land-cache-file='+asset.file,'--land-cache-sha='+asset.sha256);}
++    const record={label,repeat,phase,...(comparison?{variant,variantOrder:variants,initFile,initSha256,sourceManifest:comparison.manifestFile,manifestFileSha256:comparison.manifestFileSha256,manifestHash:comparison.manifestHash,sourceHash:comparison.sourceHash,buildHash:comparison.buildHash,configSha256:comparison.configSha256,harnessSha256,harnessPatchSha256:comparison.harnessPatch.sha256,cacheAsset:asset.file,cacheAssetBytes:asset.bytes,expectedInputIdentitySha256:asset.identitySha256,expectedCacheSha256:asset.sha256,pilotHashes:Object.fromEntries(Object.entries(comparison.pilots).map(([key,value])=>[key,value.sha256]))}:{}),command:['npm',...args],fixture:file,fixtureSha256,report,session,state:'running',reason:'Attempt has not completed; an interrupted runner never retries it automatically',startedAt:new Date().toISOString(),status:null,processStatus:null,signal:null};
++    manifest.runs.push(record);manifest.activeRun={label,repeat,variant,phase};save();
++    console.log('START '+label+' '+repeat+' '+(comparison?variant+' ':'')+phase);
++    const started=Date.now(),result=spawnSync('npm',args,{encoding:'utf8',maxBuffer:32*1024*1024,env:process.env});
++    Object.assign(record,{wallMs:Date.now()-started,status:result.status,processStatus:result.status,signal:result.signal||null,spawnError:result.error?.message||null});
++    fs.writeFileSync(report+'.stdout.log',result.stdout||'');fs.writeFileSync(report+'.stderr.log',result.stderr||'');
++    try{
++     const raw=fs.readFileSync(report);record.reportSha256=hash(raw);const value=JSON.parse(raw);
++     record.validation=comparison?validateStartupVariant(value,{variant,label,manifest:landManifest,asset}):validateStartupReport(value,{requireDistrict:true,expectedDistrict:district,requireGuardV2:true});
++     if(comparison){const commandGate=validateStartupCommand(record,{comparison,dir:path.resolve(dir)});record.validation={ok:record.validation.ok&&commandGate.ok,reasons:[...record.validation.reasons,...commandGate.reasons]};}
++     record.ok=result.status===0&&!result.signal&&!result.error&&record.validation.ok;
++     const data=value.result,trace=data?.report,host=data?.host;
++     record.controlMs=trace?.marks?.['first.control']?.at;record.processToControlMs=host?trace.clock.timeOrigin+record.controlMs-host.processEpochMs:null;record.fromClickMs=data?.firstControlFromClickMs;
++     record.district=data?.district;record.resourceCapture=trace?.resourceCapture;record.resourceIO=trace?.resourceCapture?.totalCount?'available ResourceTiming; timings do not separate parse/evaluate':'unavailable for app://; zero records is not zero I/O';record.dropped=trace?.dropped;record.flags=trace?.flags;record.failed=!!Object.keys(trace?.flags||{}).some(key=>/error|fallback|rejected/i.test(key));
++     if(comparison){record.cache=data?.cache||null;record.cacheFailure=value.landCacheFailure||null;}
++     record.reason=record.ok?null:[result.error?.message,result.signal,value.landCacheFailure?.reason,value.evalErr,...record.validation.reasons].filter(Boolean).join('; ')||'Nonzero process status';
++    }catch(error){record.ok=false;record.reason='Raw report missing/invalid: '+error.message;}
++    record.state=record.ok?'complete':'failed';manifest.activeRun=null;save();
++    console.log((record.ok?'PASS ':'FAIL ')+label+' '+repeat+' '+(comparison?variant+' ':'')+phase+' control='+record.controlMs+' click='+record.fromClickMs);
++    if(result.status!==0||!record.ok||record.failed||record.dropped)throw Error('Failed startup run retained without retry: '+report+'; '+record.reason);
++   }
++   const owned=path.join(os.tmpdir(),'bird-probe','startup17-'+session),seal=path.join(owned,'.startup17-owned');
++   if(fs.existsSync(seal)&&fs.readFileSync(seal,'utf8')==='bird-startup17-v1')fs.rmSync(owned,{recursive:true,force:true});
+   }
+-  manifest.runs.push(record);fs.writeFileSync(path.join(out,'manifest.json'),JSON.stringify(manifest,null,2));
+-  console.log((record.ok?'PASS ':'FAIL ')+label+' '+repeat+' '+phase+' control='+record.controlMs+' click='+record.fromClickMs);
+-  if(result.status!==0||!record.ok||record.failed||record.dropped)throw Error('Failed startup run retained for diagnosis: '+report);
+  }
+- const owned=path.join(os.tmpdir(),'bird-probe','startup17-'+session),seal=path.join(owned,'.startup17-owned');
+- if(fs.existsSync(seal)&&fs.readFileSync(seal,'utf8')==='bird-startup17-v1')fs.rmSync(owned,{recursive:true,force:true});
+-}
+-manifest.summary=cases.flatMap(([label])=>['cold','warm'].map(phase=>{
+- const values=manifest.runs.filter(r=>r.label===label&&r.phase===phase&&!r.failed).map(r=>r.controlMs);
+- return{label,phase,n:values.length,valuesMs:values,medianMs:values.length===3?median(values):null};
+-}));
+-fs.writeFileSync(path.join(out,'manifest.json'),JSON.stringify(manifest,null,2));console.log(JSON.stringify(manifest.summary));
++}catch(error){manifest.failure={reason:error.message,activeRun:manifest.activeRun,at:new Date().toISOString()};save();throw error;}
++manifest.summary=cases.flatMap(([label])=>(comparison?['generated','cache']:[null]).flatMap(variant=>['cold','warm'].map(phase=>{
++ const completed=manifest.runs.filter(row=>row.label===label&&row.phase===phase&&(!comparison||row.variant===variant)&&row.ok===true&&row.state==='complete'&&!row.failed),values=completed.map(row=>row.controlMs);
++ const processValues=completed.map(row=>row.processToControlMs),clickValues=completed.map(row=>row.fromClickMs);
++ return{label,...(comparison?{variant}:{}),phase,n:values.length,valuesMs:values,medianMs:values.length===3?median(values):null,...(comparison?{processToControlValuesMs:processValues,medianProcessToControlMs:processValues.length===3&&processValues.every(Number.isFinite)?median(processValues):null,fromClickValuesMs:clickValues,medianFromClickMs:clickValues.length===3&&clickValues.every(Number.isFinite)?median(clickValues):null}:{})};
++})));
++save();console.log(JSON.stringify(manifest.summary));
+--- a/tools/startup-report.mjs
++++ b/tools/startup-report.mjs
+@@ -20,3 +20,78 @@
+  need(Number.isFinite(sum)&&Number.isFinite(t?.workUnionMs)&&Math.abs(sum-t.workUnionMs)<.001,'exclusive work does not reconcile');
+  return{ok:reasons.length===0,reasons};
+ }
++
++/* 17a same-build admission only. Legacy 18-run callers retain the gate above. */
++const comparisonLabels=['newbie','saved-near','saved-far'];
++const hex=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);
++const canonical=value=>JSON.stringify(value,(_key,item)=>item&&typeof item==='object'&&!Array.isArray(item)?Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]])):item);
++const normalizedQuery=query=>[...new URLSearchParams(query)].filter(([key])=>!['landexport17a','landcache','landcachefile','startuptrace','mute','debug','nolb'].includes(key)).sort(([a],[b])=>a<b?-1:a>b?1:0);
++const caseDistrict=label=>label==='saved-far'?7:0;
++const caseInputQuery=label=>normalizedQuery('gfx=high&gfxdev=deck&lang=ru&startupdistrict='+caseDistrict(label)+(label==='newbie'?'':'&nointro'));
++function unpackIdentity(identity){
++ if(!identity||!identity.flags)throw Error('identity missing');
++ const flags={...identity.flags};for(const key of ['runtime','query','parameters']){if(typeof flags[key]!=='string')throw Error('identity '+key+' missing');flags[key]=JSON.parse(flags[key]);}
++ return{...identity,flags};
++}
++export const startupInputIdentityKey=identity=>canonical(unpackIdentity(identity));
++function inputProblems(identity,{label,manifest,query}={}){
++ const reasons=[],need=(ok,why)=>{if(!ok)reasons.push(why);};let input;
++ try{input=unpackIdentity(identity);}catch(error){return['full input identity invalid: '+error.message];}
++ const {flags}=input,r=flags.runtime,p=flags.parameters,q=flags.query;
++ need(Object.keys(input).sort().join(',')==='editsHash,flags,mapHash,mapId,mode,precleanHash,seed,sourceHash'&&input.mode==='streamed-deferred'&&input.seed===7&&typeof input.mapId==='string'&&input.mapId.length>0&&['mapHash','editsHash','sourceHash','precleanHash'].every(key=>hex(input[key])),'full identity fields invalid');
++ need(Object.keys(flags).sort().join(',')==='buildHash,parameters,query,rngProvider,runtime'&&hex(flags.buildHash)&&flags.rngProvider==='probe-mulberry32-late-fnv1a-v1','full identity flags invalid');
++ need(r&&Object.keys(r).sort().join(',')==='adult,career,district,donationTrash,editor,externalSeed,graphics,intro,mapId,mode,quick,season,seasonForced,streamed'&&r.mapId===input.mapId&&r.mode==='steam'&&r.adult===true&&r.career===true&&r.intro===false&&r.editor===false&&r.streamed===true&&r.graphics==='high'&&r.district===caseDistrict(label)&&r.quick===false&&r.externalSeed===true&&Number.isFinite(r.season)&&r.season>=0&&r.season<4&&(typeof r.seasonForced==='boolean'||r.seasonForced===null)&&Number.isFinite(r.donationTrash)&&r.donationTrash>=0&&r.donationTrash<=1,'runtime differs from known case/high Steam conditions');
++ need(p&&Object.keys(p).sort().join(',')==='coverCell,indexCell,maskCell,minWidth,terrainG,terrainNX,terrainNZ,terrainX0,terrainZ0'&&p.coverCell===32&&p.maskCell===32&&p.indexCell===8&&Number.isFinite(p.minWidth)&&p.minWidth>0&&Number.isFinite(p.terrainG)&&p.terrainG>0&&['terrainNX','terrainNZ'].every(key=>Number.isSafeInteger(p[key])&&p[key]>=2)&&['terrainX0','terrainZ0'].every(key=>Number.isFinite(p[key])),'grid/terrain preparation parameters invalid');
++ need(Array.isArray(q)&&q.every(pair=>Array.isArray(pair)&&pair.length===2&&pair.every(value=>typeof value==='string'))&&canonical(q)===canonical(caseInputQuery(label)),'identity query differs from known case');
++ if(query)need(canonical(q)===canonical(normalizedQuery(query)),'identity query differs from actual URL');
++ if(manifest)need(['mapId','mapHash','editsHash','sourceHash','seed'].every(key=>input[key]===manifest[key])&&flags.buildHash===manifest.buildHash,'identity differs from shared manifest');
++ return reasons;
++}
++export function validateStartupComparisonConfig(config,{manifest}={}){
++ const reasons=[],text=value=>typeof value==='string'&&value.length>0,need=(ok,why)=>{if(!ok)reasons.push(why);};
++ need(config?.version===1,'comparison config version');need(text(config?.manifestFile)&&hex(config?.manifestHash),'shared manifest path/hash');need(comparisonLabels.includes(config?.pilotCase),'pilotCase must identify one known fixture');
++ need(config?.assets&&Object.keys(config.assets).sort().join(',')===comparisonLabels.slice().sort().join(','),'exactly three known cache assets required');
++ const parameters=[];
++ for(const label of comparisonLabels){const asset=config?.assets?.[label];need(text(asset?.file)&&hex(asset?.sha256),'cache file/SHA missing for '+label);reasons.push(...inputProblems(asset?.identity,{label,manifest}).map(reason=>label+': '+reason));try{parameters.push(canonical(unpackIdentity(asset.identity).flags.parameters));}catch{}}
++ need(parameters.length===3&&new Set(parameters).size===1,'three cases must use identical grid/terrain parameters');
++ need(config?.pilots&&Object.keys(config.pilots).sort().join(',')==='cache,generated','both matched pilot reports required');
++ for(const variant of ['generated','cache']){const pilot=config?.pilots?.[variant];need(text(pilot?.report)&&hex(pilot?.sha256),'pilot path/SHA missing for '+variant);}
++ return{ok:reasons.length===0,reasons};
++}
++export function validateStartupVariant(value,{variant,label,manifest,asset}={}){
++ const base=validateStartupReport(value,{requireDistrict:true,expectedDistrict:caseDistrict(label),requireGuardV2:true}),reasons=[...base.reasons];
++ const need=(ok,why)=>{if(!ok)reasons.push(why);},r=value?.result,t=r?.report,c=r?.cache;
++ const row=name=>Array.isArray(t?.rows)?t.rows.find(row=>row.name===name):undefined,zero=value=>value===undefined||value===0;
++ need(comparisonLabels.includes(label)&&['generated','cache'].includes(variant),'unknown comparison variant/case');need(r?.protocolVersion===2,'protocol2 required');
++ need(Number.isFinite(r?.host?.processEpochMs)&&Number.isFinite(t?.clock?.timeOrigin)&&Number.isFinite(t?.marks?.['first.control']?.at)&&t.clock.timeOrigin+t.marks['first.control'].at>r.host.processEpochMs&&Number.isFinite(r?.firstControlFromClickMs)&&r.firstControlFromClickMs>0,'process/click timing origin missing');
++ need(r?.conditions?.lang==='ru'&&r.conditions.physicalDeck===false&&Number(r?.host?.seed)===7&&r?.host?.cpuThrottle===3&&r.host.bootcpu===true,'comparison seed/language/device/throttle differs');
++ let query;try{const url=new URL(r?.conditions?.url);query=url.searchParams;need(url.protocol==='app:'&&url.hostname==='g'&&url.pathname==='/index.html','comparison entry URL differs');}catch{need(false,'comparison URL missing');}
++ need(query?.get('gfx')==='high'&&query.get('gfxdev')==='deck'&&query.get('startupdistrict')===String(caseDistrict(label))&&query.has('mute'),'comparison graphics/district/mute differs');need(query?.has('nointro')===(label!=='newbie'),'fresh/nointro fixture differs');need(!query?.has('landexport17a'),'export cannot be a timing variant');
++ reasons.push(...inputProblems(asset?.identity,{label,manifest,query}));
++ need(row('raisedland.activate')?.steps===1&&row('raisedland.alignObjects')?.steps===1,'activate/align must occur exactly once');
++ if(variant==='generated'){
++  need(c===null||c===undefined,'generated variant has a reader result');need(!query?.has('landcache')&&t?.counters?.['raisedland.cleanCalls']===1,'generated cleanCalls must be one');
++ }else if(variant==='cache'){
++  need(query?.getAll('landcache').length===1&&query.get('landcache')==='1','explicit cache flag missing');
++  need(c?.source==='cache'&&c.phase==='restored'&&c.hit===true&&c.cleaned===true&&c.bufferHeld===false&&!c.reason,'cache restore/cleanup not proven');need(c?.cleanCalls===0&&c?.summary?.cleanCalls===0&&t?.counters?.['raisedland.cleanCalls']===0,'cache cleanCalls must be zero');
++  need(!Number.isSafeInteger(asset?.bytes)||c?.bytes===asset.bytes,'cache byte length differs');need(asset&&c?.fileSha256===asset.sha256&&c?.summary?.fileSha256===asset.sha256&&c?.expectedSha256===asset.sha256&&r?.host?.landCacheSha256===asset.sha256,'cache file SHA differs from trusted configuration');need(manifest&&r?.host?.landCacheManifestHash===manifest.manifestHash,'host manifest binding differs');
++  reasons.push(...inputProblems(c?.identity,{label,manifest,query}));try{need(startupInputIdentityKey(c?.identity)===startupInputIdentityKey(asset?.identity),'full cache identity differs from case export metadata');}catch{need(false,'full cache identity cannot be compared');}
++  need(r?.raised&&['workers','workerBatches','workerFallbacks'].every(key=>zero(r.raised[key])),'cache created/used/fell back from land workers');need(Array.isArray(t?.rows)&&t.rows.every(row=>row.workerWorkMs===0&&row.workerBatches===0)&&zero(t?.waitUnionMs?.worker)&&zero(row('queue.workerWait')?.windows),'cache reports worker work/waits');need(Array.isArray(t?.rows)&&!t.rows.some(row=>/cleanContours/.test(row.name)&&row.steps>0),'cache ran cleanContours work');
++ }
++ return{ok:reasons.length===0,reasons};
++}
++/* Bind forensic labels to the actual probe invocation, not only to other record fields. */
++export function validateStartupCommand(record,{comparison,dir}={}){
++ const reasons=[],need=(ok,why)=>{if(!ok)reasons.push(why);},command=record?.command;
++ if(!Array.isArray(command)||command.slice(0,4).join(' ')!=='npm run probe --')return{ok:false,reasons:['actual probe command missing']};
++ const values=key=>command.filter(value=>typeof value==='string'&&value.startsWith('--'+key+'=')).map(value=>value.slice(key.length+3));
++ const one=(key,expected)=>{const found=values(key);need(found.length===1&&found[0]===String(expected)&&!command.includes('--'+key),'actual --'+key+' differs from record/config');};
++ const flag=(key,expected)=>need(command.filter(value=>value==='--'+key).length===(expected?1:0)&&values(key).length===0,'actual --'+key+' differs from scenario');
++ one('startup-session',record.session);need(typeof record.session==='string'&&/^[a-zA-Z0-9_-]{1,64}$/.test(record.session),'record session invalid');flag('startup-cold',record.phase==='cold');flag('fresh',record.label==='newbie');
++ for(const key of ['startup-trace','early','bootcpu'])flag(key,true);
++ for(const[key,value]of Object.entries({mode:'steam',dir,'startup-fixture':record.fixture,'init-script':comparison?.initFile,cpu:3,seed:7,size:'deck',bootwait:300,timeout:420,eval:'tools/probe-checks/startup-ready.js',max:0,report:record.report,'land-export-manifest':comparison?.manifestFile}))one(key,value);
++ one('q','gfx=high&gfxdev=deck&mute&startupdistrict='+caseDistrict(record.label)+(record.variant==='cache'?'&landcache=1':''));
++ if(record.variant==='cache'){one('land-cache-file',comparison?.assets?.[record.label]?.file);one('land-cache-sha',comparison?.assets?.[record.label]?.sha256);}
++ else for(const key of ['land-cache-file','land-cache-sha'])need(values(key).length===0&&!command.includes('--'+key),'generated command binds a cache asset');
++ return{ok:reasons.length===0,reasons};
++}
+--- a/tools/startup-revalidate.mjs
++++ b/tools/startup-revalidate.mjs
+@@ -1,30 +1,77 @@
+-/* №17ж: offline-only reclassification; never launches or modifies the game or raw reports. */
++/* Offline-only reclassification. Old18 never gets the optional 17a variant gate. No asset reads or game launches. */
+ import fs from 'node:fs';import path from 'node:path';import {createHash} from 'node:crypto';
+-import {validateStartupReport} from './startup-report.mjs';
+-const arg=(k,f)=>process.argv.slice(2).find(a=>a.startsWith('--'+k+'='))?.slice(k.length+3)??f;
++import {validateStartupReport,validateStartupVariant,validateStartupComparisonConfig,validateStartupCommand,startupInputIdentityKey} from './startup-report.mjs';
++const arg=(key,fallback)=>process.argv.slice(2).find(value=>value.startsWith('--'+key+'='))?.slice(key.length+3)??fallback;
+ const file=arg('manifest');if(!file)throw Error('--manifest=... is required');
+ const requireGuardV2=process.argv.includes('--guard-v2');
+-const root=path.dirname(path.resolve(file)),m=JSON.parse(fs.readFileSync(file,'utf8'));
+-const resolve=p=>path.isAbsolute(p)?p:path.join(root,p),hash=b=>createHash('sha256').update(b).digest('hex');
+-const result={version:1,checkedAt:new Date().toISOString(),manifestSha256:hash(fs.readFileSync(file)),gateSha256:hash(fs.readFileSync(new URL('./startup-report.mjs',import.meta.url))),expectedRuns:18,totalRuns:m.runs.length,errors:[],runs:[]};
++const root=path.dirname(path.resolve(file)),m=JSON.parse(fs.readFileSync(file,'utf8')),comparison=m.comparison||null;
++const resolve=file=>path.isAbsolute(file)?file:path.join(root,file),hash=bytes=>createHash('sha256').update(bytes).digest('hex');
++const result={version:comparison?2:1,checkedAt:new Date().toISOString(),manifestSha256:hash(fs.readFileSync(file)),gateSha256:hash(fs.readFileSync(new URL('./startup-report.mjs',import.meta.url))),expectedRuns:comparison?36:18,totalRuns:m.runs.length,errors:[],runs:[]};
++let landManifest=null,comparisonConfig=null;
++function checkedFile(file,expected,why){try{const bytes=fs.readFileSync(resolve(file));if(hash(bytes)!==expected)result.errors.push(why+' SHA256 mismatch');return bytes;}catch(error){result.errors.push(why+' unreadable: '+error.message);return null;}}
++if(comparison){
++ const configBytes=checkedFile(comparison.configFile,comparison.configSha256,'Comparison config');
++ if(configBytes){try{const config=JSON.parse(configBytes);comparisonConfig=config;const gate=validateStartupComparisonConfig(config);if(!gate.ok)result.errors.push(...gate.reasons);
++   if(config.manifestHash!==comparison.manifestHash||config.pilotCase!==comparison.pilotCase)result.errors.push('Comparison config manifest/pilot differs');
++   for(const label of ['newbie','saved-near','saved-far'])if(config.assets?.[label]?.sha256!==comparison.assets?.[label]?.sha256||startupInputIdentityKey(config.assets?.[label]?.identity)!==startupInputIdentityKey(comparison.assets?.[label]?.identity))result.errors.push('Configured asset SHA/full identity differs '+label);
++   for(const variant of ['generated','cache'])if(config.pilots?.[variant]?.sha256!==comparison.pilots?.[variant]?.sha256)result.errors.push('Configured pilot SHA differs '+variant);
++  }catch(error){result.errors.push('Invalid comparison config: '+error.message);}}
++ const bytes=checkedFile(comparison.manifestFile,comparison.manifestFileSha256,'Shared source/build manifest');
++ if(bytes){try{landManifest=JSON.parse(bytes);const copy={...landManifest};delete copy.manifestHash;
++   if(hash(JSON.stringify(copy))!==comparison.manifestHash||['sourceHash','buildHash','mapHash','editsHash','mapId','seed'].some(key=>landManifest[key]!==comparison[key]))result.errors.push('Shared manifest input hashes differ');
++  }catch(error){result.errors.push('Invalid shared manifest: '+error.message);}}
++ if(comparisonConfig&&landManifest){const gate=validateStartupComparisonConfig(comparisonConfig,{manifest:landManifest});if(!gate.ok)result.errors.push(...gate.reasons);}
++ checkedFile(comparison.initFile,comparison.initSha256,'Combined init');
++ checkedFile(comparison.harnessPatch?.file,comparison.harnessPatch?.sha256,'Exact measured harness patch');
++ if(!Array.isArray(m.harness)||!m.harness.length)result.errors.push('Measured harness snapshots missing');
++ else{for(const row of m.harness)checkedFile(row.copy,row.sha256,'Harness '+row.file);
++  const digest=hash(JSON.stringify(m.harness.map(({file,sha256,bytes})=>({file,sha256,bytes}))));if(digest!==m.harnessSha256)result.errors.push('Measured harness aggregate differs');}
++ if(comparison.expectedRuns!==36||comparison.fullPreflight?.once!==true||comparison.fullPreflight.cacheAssetsRead!==false||comparison.fullPreflight.sourceHash!==comparison.sourceHash||comparison.fullPreflight.buildHash!==comparison.buildHash)result.errors.push('One full immutable-build preflight not recorded');
++ result.measuredHarnessSha256=m.harnessSha256;result.measuredHarnessPatchSha256=comparison.harnessPatch?.sha256;
++}
+ const seen=new Set();
+ for(const r of m.runs){
+- const id=r.label+'/'+r.repeat+'/'+r.phase,reasons=[];let value,bytes;
+- try{bytes=fs.readFileSync(resolve(r.report));value=JSON.parse(bytes);}catch(e){reasons.push('Raw report unreadable: '+e.message);}
+- if(seen.has(id))reasons.push('Duplicate scenario/repeat/phase');seen.add(id);
+- if(!['newbie','saved-near','saved-far'].includes(r.label)||!['cold','warm'].includes(r.phase)||![1,2,3].includes(r.repeat))reasons.push('Unexpected run identity');
+- if(r.status!==0)reasons.push('Process status was not zero');
+- if(value)reasons.push(...validateStartupReport(value,{requireDistrict:true,requireGuardV2,expectedDistrict:r.label==='saved-far'?7:0}).reasons);
+- try{if(hash(fs.readFileSync(resolve(r.fixture)))!==r.fixtureSha256)reasons.push('Fixture SHA256 mismatch');}catch(e){reasons.push('Fixture unreadable: '+e.message);}
+- result.runs.push({id,report:r.report,ok:reasons.length===0,reasons,reportSha256:bytes&&hash(bytes),errors:value?.errors?.length,uncaught:value?.uncaught,flags:value?.result?.report?.flags,dropped:value?.result?.report?.dropped,resourceCapture:value?.result?.report?.resourceCapture,district:value?.result?.district,moved:value?.result?.moved});
++ const id=r.label+'/'+r.repeat+'/'+(comparison?r.variant+'/':'')+r.phase,reasons=[];let value,bytes;
++ try{bytes=fs.readFileSync(resolve(r.report));value=JSON.parse(bytes);}catch(error){reasons.push('Raw report unreadable: '+error.message);}
++ if(seen.has(id))reasons.push('Duplicate scenario/repeat/variant/phase');seen.add(id);
++ if(!['newbie','saved-near','saved-far'].includes(r.label)||!['cold','warm'].includes(r.phase)||![1,2,3].includes(r.repeat)||comparison&&!['generated','cache'].includes(r.variant))reasons.push('Unexpected run identity');
++ if(r.status!==0||r.processStatus!==undefined&&r.processStatus!==0||r.signal||r.spawnError)reasons.push('Process did not exit successfully');
++ if(value)reasons.push(...(comparison?validateStartupVariant(value,{variant:r.variant,label:r.label,manifest:landManifest,asset:comparison.assets?.[r.label]}):validateStartupReport(value,{requireDistrict:true,requireGuardV2,expectedDistrict:r.label==='saved-far'?7:0})).reasons);
++ try{if(hash(fs.readFileSync(resolve(r.fixture)))!==r.fixtureSha256)reasons.push('Fixture SHA256 mismatch');}catch(error){reasons.push('Fixture unreadable: '+error.message);}
++ if(comparison){
++  if(r.state!=='complete'||r.ok!==true)reasons.push('Attempt incomplete/failed; no implicit retry');
++  if(!bytes||hash(bytes)!==r.reportSha256)reasons.push('Raw report SHA differs');
++  const asset=comparison.assets?.[r.label];
++  if(r.cacheAsset!==asset?.file||r.cacheAssetBytes!==asset?.bytes||r.expectedCacheSha256!==asset?.sha256||r.expectedInputIdentitySha256!==asset?.identitySha256)reasons.push('Expected cache configuration differs');
++  try{if(hash(startupInputIdentityKey(asset?.identity))!==asset.identitySha256)reasons.push('Expected input identity SHA differs');}catch{reasons.push('Expected input identity invalid');}
++  if(['manifestHash','sourceHash','buildHash','configSha256','initSha256','manifestFileSha256'].some(key=>r[key]!==comparison[key])||r.sourceManifest!==comparison.manifestFile||r.initFile!==comparison.initFile||r.harnessSha256!==m.harnessSha256||r.harnessPatchSha256!==comparison.harnessPatch?.sha256)reasons.push('Run provenance differs from shared measured configuration');
++  if(['generated','cache'].some(variant=>r.pilotHashes?.[variant]!==comparison.pilots?.[variant]?.sha256))reasons.push('Pilot provenance differs');
++  reasons.push(...validateStartupCommand(r,{comparison,dir:m.dir}).reasons);
++  if(value&&r.controlMs!==value.result?.report?.marks?.['first.control']?.at)reasons.push('Stored control timing differs from raw report');
++ }
++ result.runs.push({id,label:r.label,repeat:r.repeat,phase:r.phase,...(comparison?{variant:r.variant}:{}),report:r.report,ok:reasons.length===0,reasons,reportSha256:bytes&&hash(bytes),errors:value?.errors?.length,uncaught:value?.uncaught,flags:value?.result?.report?.flags,dropped:value?.result?.report?.dropped,resourceCapture:value?.result?.report?.resourceCapture,district:value?.result?.district,moved:value?.result?.moved,controlMs:value?.result?.report?.marks?.['first.control']?.at,processToControlMs:value?.result?.host?value.result.report?.clock?.timeOrigin+value.result.report?.marks?.['first.control']?.at-value.result.host.processEpochMs:null,fromClickMs:value?.result?.firstControlFromClickMs});
+ }
++const sessions=new Set();
+ for(const label of ['newbie','saved-near','saved-far'])for(let repeat=1;repeat<=3;repeat++){
+- const pair=m.runs.filter(r=>r.label===label&&r.repeat===repeat);
+- if(pair.length!==2||new Set(pair.map(r=>r.phase)).size!==2||pair[0].fixtureSha256!==pair[1].fixtureSha256||pair[0].session!==pair[1].session)result.errors.push('Invalid matched cold/warm pair '+label+'/'+repeat);
++ const variants=comparison?['generated','cache']:[undefined];
++ for(const variant of variants){const pair=m.runs.filter(row=>row.label===label&&row.repeat===repeat&&(!comparison||row.variant===variant));
++  if(pair.length!==2||new Set(pair.map(row=>row.phase)).size!==2||pair[0].fixtureSha256!==pair[1].fixtureSha256||pair[0].session!==pair[1].session)result.errors.push('Invalid matched cold/warm pair '+label+'/'+repeat+(comparison?'/'+variant:''));
++  if(comparison&&pair.length===2){if(pair[0].phase!=='cold'||pair[1].phase!=='warm'||sessions.has(pair[0].session))result.errors.push('Comparison process/profile ordering or isolation differs '+label+'/'+repeat+'/'+variant);sessions.add(pair[0].session);}
++ }
++ if(comparison){const group=m.runs.filter(row=>row.label===label&&row.repeat===repeat),order=repeat%2?['generated','cache']:['cache','generated'];
++  if(group.map(row=>row.variant+':'+row.phase).join(',')!==order.flatMap(variant=>[variant+':cold',variant+':warm']).join(',')||new Set(group.map(row=>row.fixtureSha256)).size!==1||group.some(row=>JSON.stringify(row.variantOrder)!==JSON.stringify(order)))result.errors.push('Generated/cache matching or alternating order differs '+label+'/'+repeat);}
+ }
+-try{const pilot=JSON.parse(fs.readFileSync(resolve(m.pilotReport),'utf8'));result.pilot=validateStartupReport(pilot,{requireGuardV2});if(!result.pilot.ok)result.errors.push('Invalid pilot');}catch(e){result.errors.push('Pilot unreadable: '+e.message);}
+-if(m.runs.length!==18)result.errors.push('Expected exactly 18 runs');
+-result.ok=result.errors.length===0&&result.runs.every(r=>r.ok);
++if(comparison){result.pilots={};for(const variant of ['generated','cache']){
++ const pilot=comparison.pilots?.[variant],bytes=checkedFile(pilot?.report,pilot?.sha256,'Matched '+variant+' pilot');
++ if(bytes){try{result.pilots[variant]=validateStartupVariant(JSON.parse(bytes),{variant,label:comparison.pilotCase,manifest:landManifest,asset:comparison.assets?.[comparison.pilotCase]});if(!result.pilots[variant].ok)result.errors.push('Invalid matched '+variant+' pilot');}catch(error){result.errors.push('Pilot invalid: '+error.message);}}
++ }}else{try{const pilot=JSON.parse(fs.readFileSync(resolve(m.pilotReport),'utf8'));result.pilot=validateStartupReport(pilot,{requireGuardV2});if(!result.pilot.ok)result.errors.push('Invalid pilot');}catch(error){result.errors.push('Pilot unreadable: '+error.message);}}
++if(m.runs.length!==result.expectedRuns)result.errors.push('Expected exactly '+result.expectedRuns+' runs');
++if(comparison&&(m.failure||m.activeRun))result.errors.push('Series failure/interrupted attempt retained in manifest');
++result.ok=result.errors.length===0&&result.runs.every(row=>row.ok);
++if(comparison)result.summary=['newbie','saved-near','saved-far'].flatMap(label=>['generated','cache'].flatMap(variant=>['cold','warm'].map(phase=>{
++ const completed=result.runs.filter(row=>row.ok&&row.label===label&&row.variant===variant&&row.phase===phase),values=completed.map(row=>row.controlMs).sort((a,b)=>a-b),processValues=completed.map(row=>row.processToControlMs).sort((a,b)=>a-b),clickValues=completed.map(row=>row.fromClickMs).sort((a,b)=>a-b);
++ return{label,variant,phase,n:values.length,valuesMs:values,medianMs:result.ok&&values.length===3?values[1]:null,processToControlValuesMs:processValues,medianProcessToControlMs:result.ok&&processValues.length===3&&processValues.every(Number.isFinite)?processValues[1]:null,fromClickValuesMs:clickValues,medianFromClickMs:result.ok&&clickValues.length===3&&clickValues.every(Number.isFinite)?clickValues[1]:null};
++})));
+ const output=arg('out',path.join(root,'revalidation.json'));fs.writeFileSync(output,JSON.stringify(result,null,2));
+-console.log(JSON.stringify({ok:result.ok,runs:result.runs.length,failed:result.runs.filter(r=>!r.ok),errors:result.errors,output}));
++console.log(JSON.stringify({ok:result.ok,runs:result.runs.length,failed:result.runs.filter(row=>!row.ok),errors:result.errors,output}));
+ if(!result.ok)process.exitCode=1;
+--- /dev/null
++++ b/tools/startup-comparison-test.mjs
+@@ -0,0 +1,45 @@
++/* Pure comparison admission fixtures. No runner/probe, asset reads or existing raw revalidation. */
++import assert from 'node:assert/strict';
++import {validateStartupReport,validateStartupVariant,validateStartupComparisonConfig,validateStartupCommand,startupInputIdentityKey} from './startup-report.mjs';
++const manifest={mapId:'fixture',seed:7,manifestHash:'a'.repeat(64),sourceHash:'b'.repeat(64),buildHash:'c'.repeat(64),mapHash:'d'.repeat(64),editsHash:'e'.repeat(64)};
++const labels=['newbie','saved-near','saved-far'],parameters={minWidth:.8,coverCell:32,maskCell:32,indexCell:8,terrainG:8,terrainNX:3,terrainNZ:3,terrainX0:0,terrainZ0:0};
++function identity(label){const district=label==='saved-far'?7:0,runtime={mapId:'fixture',mode:'steam',adult:true,career:true,intro:false,editor:false,streamed:true,graphics:'high',district,season:2.5,seasonForced:false,quick:false,donationTrash:0,externalSeed:true};
++ const query=[['gfx','high'],['gfxdev','deck'],['lang','ru'],...(label==='newbie'?[]:[['nointro','']]),['startupdistrict',String(district)]];
++ return{mapId:'fixture',mode:'streamed-deferred',mapHash:manifest.mapHash,editsHash:manifest.editsHash,sourceHash:manifest.sourceHash,precleanHash:'9'.repeat(64),seed:7,flags:{buildHash:manifest.buildHash,rngProvider:'probe-mulberry32-late-fnv1a-v1',runtime:JSON.stringify(runtime),query:JSON.stringify(query),parameters:JSON.stringify(parameters)}};
++}
++const assets=Object.fromEntries(labels.map(label=>[label,{file:'/tmp/'+label+'.land',sha256:'f'.repeat(64),bytes:8599,identity:identity(label)}]));
++const config={version:1,manifestFile:'/tmp/manifest.json',manifestHash:manifest.manifestHash,pilotCase:'newbie',assets:structuredClone(assets),pilots:{generated:{report:'/tmp/g.json',sha256:'1'.repeat(64)},cache:{report:'/tmp/c.json',sha256:'2'.repeat(64)}}};
++function report(variant='generated',label='newbie'){
++ const district=label==='saved-far'?7:0,asset=assets[label],row=name=>({name,steps:1,exclusiveWorkMs:5,workerWorkMs:0,workerBatches:0,windows:0});
++ const trace={enabled:true,dropped:0,overflow:{rows:0,marks:0,flags:0,counters:0},flags:{},counters:{'raisedland.cleanCalls':variant==='cache'?0:1},resourceCapture:{truncatedCount:0},rows:[row('raisedland.activate'),row('raisedland.alignObjects')],workUnionMs:10,waitUnionMs:{},clock:{timeOrigin:1000},marks:{'first.control':{at:100,data:{state:'drive',held:false,localReady:true,supportReady:true,guardVersion:2,paused:false,mapOpen:false}}}};
++ const host={seed:'7',cpuThrottle:3,bootcpu:true,processEpochMs:1000};
++ const cache=variant==='cache'?{source:'cache',phase:'restored',hit:true,cleaned:true,bufferHeld:false,reason:null,cleanCalls:0,bytes:asset.bytes,fileSha256:asset.sha256,expectedSha256:asset.sha256,summary:{cleanCalls:0,fileSha256:asset.sha256},identity:structuredClone(asset.identity)}:null;
++ if(cache)Object.assign(host,{landCacheSha256:asset.sha256,landCacheManifestHash:manifest.manifestHash});
++ return{ok:true,errors:[],uncaught:0,result:{ok:true,protocolVersion:2,report:trace,moved:1,crash:[],cache,host,raised:{},firstControlFromClickMs:80,bootstrap:{markerWrites:1,bootAbsentAtMarker:true,earlyBootSeen:false},district:{actual:district,atControl:district,pizzaIndex:district,pizza:{bx:0,bz:0},position:{x:0,z:0},before:{opened:8,partySeen:true,city:false},pickerClicks:district?1:0},conditions:{lang:'ru',physicalDeck:false,url:'app://g/index.html?lang=ru&gfx=high&gfxdev=deck&mute&startupdistrict='+district+(label==='newbie'?'':'&nointro')+(cache?'&landcache=1':'')}}};
++}
++let checks=0;assert.equal(validateStartupComparisonConfig(config,{manifest}).ok,true);checks++;
++for(const mutate of [value=>delete value.assets['saved-far'],value=>delete value.pilots.cache,value=>value.assets.newbie.sha256='broken',value=>delete value.assets.newbie.identity,value=>value.assets.newbie.identity.flags.parameters='{}',value=>value.assets['saved-near'].identity.flags.parameters=JSON.stringify({...parameters,terrainG:16}),value=>value.assets['saved-near'].identity.sourceHash='0'.repeat(64),value=>value.manifestHash='broken',value=>value.pilotCase='unknown']){const bad=structuredClone(config);mutate(bad);assert.equal(validateStartupComparisonConfig(bad,{manifest}).ok,false);checks++;}
++for(const label of labels)for(const variant of ['generated','cache'])assert.equal(validateStartupVariant(report(variant,label),{variant,label,manifest,asset:assets[label]}).ok,true),checks++;
++const setInput=(value,key,update)=>{const input=JSON.parse(value.result.cache.identity.flags[key]);value.result.cache.identity.flags[key]=JSON.stringify(update(input));};
++const negatives={
++ exitZeroButResultFailed:value=>value.result.ok=false,consoleError:value=>value.errors.push('failure'),guardOld:value=>value.result.report.marks['first.control'].data.guardVersion=1,protocolOld:value=>delete value.result.protocolVersion,wrongFresh:value=>value.result.conditions.url+='&nointro',wrongCpu:value=>value.result.host.cpuThrottle=1,
++ wrongBytes:value=>value.result.cache.bytes++,wrongHash:value=>value.result.cache.fileSha256='0'.repeat(64),wrongExpected:value=>value.result.cache.expectedSha256='0'.repeat(64),wrongHostHash:value=>value.result.host.landCacheSha256='0'.repeat(64),wrongManifest:value=>value.result.host.landCacheManifestHash='0'.repeat(64),wrongSource:value=>value.result.cache.identity.sourceHash='0'.repeat(64),wrongBuild:value=>value.result.cache.identity.flags.buildHash='0'.repeat(64),
++ runtimeDistrict:value=>setInput(value,'runtime',input=>({...input,district:7})),runtimeGraphics:value=>setInput(value,'runtime',input=>({...input,graphics:'low'})),runtimeSeason:value=>setInput(value,'runtime',input=>({...input,season:3})),runtimeQuick:value=>setInput(value,'runtime',input=>({...input,quick:true})),queryEmpty:value=>value.result.cache.identity.flags.query='[]',queryActualURL:value=>value.result.conditions.url+='&slowboot=1',parametersEmpty:value=>value.result.cache.identity.flags.parameters='{}',parametersChanged:value=>setInput(value,'parameters',input=>({...input,terrainG:16})),wrongPreclean:value=>value.result.cache.identity.precleanHash='0'.repeat(64),
++ cleanedFalse:value=>value.result.cache.cleaned=false,heldBuffer:value=>value.result.cache.bufferHeld=true,cleanMeta:value=>value.result.cache.cleanCalls=1,cleanTrace:value=>value.result.report.counters['raisedland.cleanCalls']=1,cleanWork:value=>value.result.report.rows[0].name='raisedland.cleanContours',activateTwice:value=>value.result.report.rows[0].steps=2,alignMissing:value=>value.result.report.rows.pop(),workers:value=>value.result.raised.workers=1,workerBatches:value=>value.result.raised.workerBatches=1,workerWork:value=>value.result.report.rows[0].workerWorkMs=1,workerWait:value=>value.result.report.waitUnionMs.worker=1,fallback:value=>value.result.report.flags['gpu.compileError']=1
++};
++for(const[name,mutate]of Object.entries(negatives)){const value=report('cache');mutate(value);assert.equal(validateStartupVariant(value,{variant:'cache',label:'newbie',manifest,asset:assets.newbie}).ok,false,name);checks++;}
++const reordered=structuredClone(assets.newbie.identity),runtime=JSON.parse(reordered.flags.runtime);reordered.flags.runtime=JSON.stringify(Object.fromEntries(Object.entries(runtime).reverse()));assert.equal(startupInputIdentityKey(reordered),startupInputIdentityKey(assets.newbie.identity));checks++;
++const legacy=report();delete legacy.result.protocolVersion;legacy.result.report.marks['first.control'].data.guardVersion=1;assert.equal(validateStartupReport(legacy).ok,true);assert.equal(validateStartupVariant(legacy,{variant:'generated',label:'newbie',manifest,asset:assets.newbie}).ok,false);checks++;
++assert.equal(validateStartupVariant({}, {variant:'cache',label:'newbie',manifest,asset:assets.newbie}).ok,false);checks++;
++const comparison={initFile:'/tmp/init.js',manifestFile:'/tmp/manifest.json',assets},dir='/tmp/build';
++function record(variant='generated',label='newbie',phase='cold'){
++ const value={variant,label,phase,session:'b17-fixture-'+label+'-'+variant,fixture:'/tmp/fixture.json',report:'/tmp/report.json'},district=label==='saved-far'?7:0;
++ value.command=['npm','run','probe','--','--mode=steam','--dir='+dir,'--startup-trace','--startup-session='+value.session,'--startup-fixture='+value.fixture,'--init-script='+comparison.initFile,'--early','--bootcpu','--cpu=3','--seed=7','--size=deck','--bootwait=300','--timeout=420','--q=gfx=high&gfxdev=deck&mute&startupdistrict='+district+(variant==='cache'?'&landcache=1':''),'--eval=tools/probe-checks/startup-ready.js','--max=0','--report='+value.report,'--land-export-manifest='+comparison.manifestFile];
++ if(label==='newbie')value.command.push('--fresh');if(phase==='cold')value.command.push('--startup-cold');if(variant==='cache')value.command.push('--land-cache-file='+assets[label].file,'--land-cache-sha='+assets[label].sha256);return value;
++}
++for(const label of labels)for(const variant of ['generated','cache'])for(const phase of ['cold','warm'])assert.equal(validateStartupCommand(record(variant,label,phase),{comparison,dir}).ok,true),checks++;
++for(const[name,mutate]of Object.entries({warmLabeledCold:value=>value.phase='warm',missingCold:value=>value.command=value.command.filter(arg=>arg!=='--startup-cold'),otherActualSession:value=>value.command=value.command.map(arg=>arg.startsWith('--startup-session=')?'--startup-session=other-profile':arg),otherRecordedSession:value=>value.session='spoofed-profile',duplicateSession:value=>value.command.push('--startup-session=second-profile'),wrongFixture:value=>value.fixture='/tmp/other-fixture.json',wrongInit:value=>value.command=value.command.map(arg=>arg.startsWith('--init-script=')?'--init-script=/tmp/other.js':arg),wrongCpu:value=>value.command=value.command.map(arg=>arg==='--cpu=3'?'--cpu=1':arg),wrongQuery:value=>value.command=value.command.map(arg=>arg.startsWith('--q=')?'--q=gfx=low':arg),wrongReport:value=>value.report='/tmp/different-report.json',wrongFresh:value=>value.command=value.command.filter(arg=>arg!=='--fresh')})){
++ const value=record('cache');mutate(value);assert.equal(validateStartupCommand(value,{comparison,dir}).ok,false,name);checks++;
++}
++const warm=record('cache','newbie','warm');warm.command.push('--startup-cold');assert.equal(validateStartupCommand(warm,{comparison,dir}).ok,false);checks++;
++console.log(JSON.stringify({ok:true,checks,fullCaseInputIdentity:true,actualCommandBound:true,legacyGateCompatible:true,gameOrRunnerLaunched:false}));

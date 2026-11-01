@@ -2,6 +2,7 @@
    цвета заполнения и запись в сцену остаются в исходном порядке.
    Не более одной ожидающей пачки на поток: результаты всего города
    одновременно в памяти не копятся. ?landworkers=0 — синхронная сверка. */
+import { STARTUP } from './startuptrace.js';
 import {landCleanTileRegion} from './landclean.js';
 
 const makeWorker=()=>new Worker(new URL('./landclean.worker.js',import.meta.url),{type:'module'});
@@ -29,7 +30,7 @@ export function createLandCleaner({cover,green,cores,batchSize=64,workerCount,wo
     for(const e of entries.values())e.reject(error||Error('Расчёт продолжен в основном потоке'));
     entries.clear();
   }
-  function fail(error){if(!active)return;stats.workerFallbacks++;shutdown(error);}
+  function fail(error){if(!active)return;STARTUP.flag('land.workerFallback');stats.workerFallbacks++;shutdown(error);}
   const arm=s=>{clearTimeout(s.timer);s.timer=setTimeout(()=>fail(Error('Время расчёта земли истекло')),timeoutMs);};
   function pump(){
     if(!active)return;
@@ -41,14 +42,14 @@ export function createLandCleaner({cover,green,cores,batchSize=64,workerCount,wo
   }
   if(active){
     try{
-      const source={type:'init',cover:cover.snapshot(),green:green.snapshot()};
+      const source={type:'init',cover:cover.snapshot(),green:green.snapshot(),trace:STARTUP.enabled};
       for(let i=0;i<count;i++){
         const s={worker:workerFactory(),ready:false,id:null,timer:null};slots.push(s);
         s.worker.onmessage=({data})=>{
           if(!active)return;
-          if(data?.type==='ready'&&!s.ready){clearTimeout(s.timer);s.ready=true;pump();return;}
+          if(data?.type==='ready'&&!s.ready){STARTUP.worker('worker.init',data.workMs);clearTimeout(s.timer);s.ready=true;pump();return;}
           if(data?.type==='batch'&&data.id===s.id&&Array.isArray(data.result)&&data.result.length===slice(data.id).length){
-            clearTimeout(s.timer);const id=s.id;s.id=null;stats.workerBatches++;entry(id).resolve(data.result);pump();return;
+            clearTimeout(s.timer);const id=s.id;s.id=null;stats.workerBatches++;STARTUP.worker('worker.cleanContours',data.workMs);entry(id).resolve(data.result);pump();return;
           }
           fail(Error(data?.message||'Неверный ответ расчёта земли'));
         };

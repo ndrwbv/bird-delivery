@@ -1,0 +1,17 @@
+{
+  "kind": "fixture failure; not a cache geometry result",
+  "stackEvalLine": 207,
+  "probePreludeOffset": 74,
+  "fixtureSourceLine": 133,
+  "cause": "BENCHES.prop is heterogeneous: game.addBench uses pivot-backed prop; yards/world use smashAdd entry without pivot. Optional b.prop?.pivot.position only protects prop, not absent pivot.",
+  "sourceEvidence": [
+    "src/game/yards.js:613 BENCHES.push prop=smashAdd result",
+    "src/game/world.js:382 BENCHES.push prop=SMASH[last]",
+    "src/game/game.js:2841 BENCHES.push prop=addProp result"
+  ],
+  "sourceUnchanged": true,
+  "evalUnchanged": true,
+  "cacheRun": false,
+  "retry": false,
+  "artifactLimitation": "catch result samples=null because sample state was assigned only after selection completed; no benchmark/geometry conclusions from this failure"
+}
