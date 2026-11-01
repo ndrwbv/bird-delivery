@@ -65,6 +65,12 @@ const smoke = (args, label) => async () => {
 };
 
 const CHECKS = [
+  { id: 'pizza-return', name: 'зелёная зона пиццерии выдаёт следующий заказ', group: 2, run: async () => {
+    const j = await probe(['--mode=steam', '--size=deck', '--seed=7', '--q=gfx=high&gfxdev=deck', '--eval=' + path.join(__dirname, 'probe-checks/pizza-return.js')]);
+    const e = errLine(j), r = j.result;
+    return { status: !e && r?.ok && !j.errors.length ? 'ok' : 'fail',
+      info: e || (r?.ok ? '3 возврата без старого заказа → 3 новые погрузки; вне зоны выдачи нет' : JSON.stringify(r)) };
+  } },
   {id:'render-resolution',name:'разрешение отрисовки: выбор, буфер, сохранение и автоматика',group:2,run:async()=>{
     for(const device of ['pc','deck']) {
       const j=await probe(['--mode='+ (device==='pc'?'web':'steam'),'--size='+ (device==='pc'?'desktop':'deck'),'--q=gfxdev='+device+'&resolutionShot','--eval='+path.join(__dirname,'probe-checks/render-resolution.js')]);

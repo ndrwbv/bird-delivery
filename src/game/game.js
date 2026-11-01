@@ -16034,11 +16034,12 @@ function spillStack (ped, box) {
 const STACK_ST = { spills: 0 };
 
 function checkArrival (dt) {
-  if (!S.target || !S.order) return;
+  if (!S.target) return;
   const d = Math.hypot(S.target.x - V.x, S.target.z - V.z);
   const speed = Math.hypot(V.vx, V.vz);
 
   if (S.state === 'drive') {
+    if (!S.order) return;                         // назад в пиццерию и по поручению едем уже без заказа (0п115)
     const arrivalOrder = S.order, arrivalStop = arrivalOrder.stops[arrivalOrder.idx];
     const story = arrivalOrder.ord?.story;
     const storyArrival = !!(story && STORY.interiorFor(story) && !story.interiorDone);
