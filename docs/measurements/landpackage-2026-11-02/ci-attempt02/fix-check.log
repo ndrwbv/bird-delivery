@@ -1,0 +1,18 @@
+
+> bird-pizza-delivery@0.1.0 check
+> node tools/check.cjs --serial --only=probe-terminal,startup-trace,startup-ordinary,land-package-asar
+
+  проверок в игре разом: 1
+  ок  вложенная работа, перекрывающиеся ожидания и пределы измерений (0.0 с)
+  ок  первый итог проверки сохраняется при поздних ошибках окна (0.0 с)
+  ок  обычные cold/warm запуски: ввод, источник и полные пары (0.1 с)
+  ок  фактические данные внутри пакета Electron (0.1 с)
+
+ок        вложенная работа, перекрывающиеся ожидания и пределы измерений   0.0 с  {"ok":true,"nestedWorkUnion":10,"overlappingWorkerWaitUnion":9,"boundedRows":256,"overflow":{"rows":1,"marks":1,"flags":1,"counters":1},"resourceTruncated":16,"legacyBootUntouched":true}
+{"startupReportGate":true,"rejectedVariants":16}
+{"guardV2":true,"legacyDefaultUnchanged":true,"freshGateRejects":4}
+ок        первый итог проверки сохраняется при поздних ошибках окна        0.0 с  {"ok":true,"checks":5,"firstTerminalWins":true,"lateEvalCannotOverwrite":true,"lateGlobalCatchQuiet":true,"realFatalPreserved":true,"electronOrGameLaunched":false}
+ок        обычные cold/warm запуски: ввод, источник и полные пары          0.1 с  {"ok":true,"checks":33,"ordinaryOnly":true,"realPilotWitness":true,"noAssetReads":true,"noProcesses":true}
+ок        фактические данные внутри пакета Electron                        0.1 с  Packaged ASAR data integrity: 13 PASS
+
+всё ок · 0 с

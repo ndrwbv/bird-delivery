@@ -1589,3 +1589,7 @@ ring — `__dlv.RF.play` (ringfight.js); shiftend — `endShift`, чек; dep �
 куска сдвигают **его же** дальнейший жребий — меняется этот дом (окна, арка, подъезды, а с ними лавки у дверей) или этот
 кусок до следующего шага. Это зависимость от кода, не от скорости: новое со случайностью внутри стройки — тянуть свой жребий
 по месту (`seedAt`, `hsh`) или после всех бросков дома/куска.
+
+### CI-приёмка упакованных данных №17б
+
+`node tools/land-package-smoke.mjs --dir=<app.asar/dist/steam> --catalog=<внешний dist/steam/city-data/catalog.json> --out=<новая папка вне репо> --preset=high --admission=settled` ждёт полную настоящую очередь меню до Go. Это проверка поставки на медленной software-GPU VM, не ранний startup-бенч: markers не сбрасывает, требует title/queuefull/нетfirstControl, затем настоящий Go/W, freshguard2 и строгий cache hit/SHA/clean0/activate-align1. Default безflag остаётся early с прежними пределами. Settled:1200сboot/420сcontrol/1740сprobe/1800сouter; CIstep31мин. В control-failure raw есть `startupFailure`; unknownguards=null. Bootwait/globaltimeout/preassert такого снимка не гарантируют. Не использовать CIцифры как скорость Deck.

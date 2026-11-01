@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "variant": "cache",
+  "preset": "high",
+  "phase": "cold",
+  "cpu": 1,
+  "argv": [
+    "D:\\a\\bird-delivery\\bird-delivery\\node_modules\\electron\\dist\\electron.exe",
+    "D:\\a\\bird-delivery\\bird-delivery\\tools\\probe.cjs",
+    "--mode=steam",
+    "--dir=D:\\a\\bird-delivery\\bird-delivery\\release\\win-unpacked\\resources\\app.asar\\dist\\steam",
+    "--startup-trace",
+    "--startup-session=lp17b-0aeb68bb-e9b5-42e5-9dff-4a7ff6271a5f",
+    "--startup-cold",
+    "--startup-fixture=D:\\a\\_temp\\land-package-runtime\\fixture.json",
+    "--fresh",
+    "--early",
+    "--size=deck",
+    "--cpu=1",
+    "--bootcpu",
+    "--init-script=D:\\a\\bird-delivery\\bird-delivery\\tools\\probe-checks\\startup-bootstrap-observe.js",
+    "--q=gfxdev=deck&mute&startupdistrict=0",
+    "--eval=D:\\a\\bird-delivery\\bird-delivery\\tools\\probe-checks\\startup-ready.js",
+    "--bootwait=360",
+    "--timeout=480",
+    "--max=0",
+    "--errors",
+    "--report=D:\\a\\_temp\\land-package-runtime\\raw.json"
+  ],
+  "startedAt": "2026-11-01T23:28:21.533Z",
+  "fixtureFile": "D:\\a\\_temp\\land-package-runtime\\fixture.json",
+  "fixtureSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+  "catalogFile": "D:\\a\\bird-delivery\\bird-delivery\\dist\\steam\\city-data\\catalog.json",
+  "catalogSha256": "f8a181903273368d7fcf96598061886cbdae3ec0e0f481ef5d21e3a6fd917f04",
+  "processStatus": 1,
+  "signal": null,
+  "probe": {
+    "file": "tools/probe.cjs",
+    "sha256": "85f82ce60004446e3fcc1a12cef085c0195b1e98d664c3b75857a972696be375"
+  },
+  "eval": {
+    "file": "tools/probe-checks/startup-ready.js",
+    "sha256": "9069989a4c4379641cf41e99d1fde4f10df9f23ff1b7063763de8da8c985cc5f"
+  },
+  "observer": {
+    "file": "tools/probe-checks/startup-bootstrap-observe.js",
+    "sha256": "f287a6c7f5abe14e2944235fa81295aefe37051cb75950ab98ea6783655e86cc"
+  },
+  "gate": {
+    "file": "tools/startup-report.mjs",
+    "sha256": "c40d8de9bf9545ba54e767ad74bd2bbaed5713be09aeb4a792ce9350166dd600"
+  },
+  "admission": {
+    "file": "tools/land-package-smoke.mjs",
+    "sha256": "c96a6ae00986219fad8b20b856bf8aca39c24e71cd7096884321e2b6436a1909"
+  },
+  "pid": 4448,
+  "finishedAt": "2026-11-01T23:33:28.653Z",
+  "ok": false,
+  "failure": "Error: land-package17b:SMOKE_PROCESS\n    at need (file:///D:/a/bird-delivery/bird-delivery/src/game/landdata/land-package-key.js:3:46)\n    at file:///D:/a/bird-delivery/bird-delivery/tools/land-package-smoke.mjs:41:2\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)"
+}

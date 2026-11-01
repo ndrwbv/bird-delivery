@@ -95,6 +95,9 @@ for (const f of fs.readdirSync(BASE)) {            // папки упавших 
 }
 // №17ж opt-in retained test session, always inside probe-owned /tmp root.
 const STARTUP_BENCH = has('startup-trace'), STARTUP_SESSION = arg('startup-session', '');
+const STARTUP_ADMISSION = arg('startup-admission',null);
+const ADMISSION_SETTINGS = STARTUP_ADMISSION===null ? null : require('./startup-admission.cjs').admissionSettings(STARTUP_ADMISSION);
+if(ADMISSION_SETTINGS&&(!STARTUP_BENCH||ADMISSION_SETTINGS.mode==='settled'&&has('early')))throw Error('Settled admission requires startup trace and no --early');
 if (STARTUP_SESSION && (!STARTUP_BENCH || !/^[a-zA-Z0-9_-]{1,64}$/.test(STARTUP_SESSION))) throw Error('Invalid startup session');
 const UD = STARTUP_SESSION ? path.join(BASE, 'startup17-' + STARTUP_SESSION) : fs.mkdtempSync(path.join(BASE, 'ud-'));
 if (STARTUP_SESSION) {
@@ -104,6 +107,7 @@ if (STARTUP_SESSION) {
 }
 const STARTUP_HOST = { processEpochMs: Math.round(performance.timeOrigin), electron: process.versions.electron,
   chrome: process.versions.chrome, node: process.versions.node, platform: process.platform, arch: process.arch, seed: arg('seed', null), cpuThrottle: +arg('cpu', 1), bootcpu: has('bootcpu') };
+if(ADMISSION_SETTINGS)STARTUP_HOST.admission=ADMISSION_SETTINGS;
 app.setPath('userData', UD);
 if (app.dock) app.dock.hide();
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);   // stream — <audio> музыки (music.js), как в electron/main.cjs
@@ -483,6 +487,7 @@ app.whenReady().then(async () => {
   if (+arg('secs', 0) > 0) await sleep(+arg('secs') * 1000);
   const logs = await js('window.__probe.logs').catch(() => []);
   const fstats = await js('window.__probe.stats()').catch(() => null);
+  const startupFailure=STARTUP_BENCH&&evalErr?await js('window.__startupFailureState || null').catch(()=>null):null;
   if (finished) return;
   if (arg('shot')) {
     const f = path.resolve(arg('shot'));
@@ -500,5 +505,5 @@ app.whenReady().then(async () => {
   const code = uncaught || evalErr ? 1 : 0;
   if (peakT) clearInterval(peakT);
   if (MEM) err('probe: память процессов, МБ (страница/видеокарта):', MEMLOG.map(m => m.label + ' ' + m.page + '/' + m.gpu + (m.foot ? ' (след ' + m.foot + ', пик ' + m.footPeak + ')' : '')).join(', ') + (MEMLOG.length ? ', ' : '') + 'пик ' + PEAK.page + ' (на ' + (PEAK.pageT / 1000).toFixed(1) + ' с)/' + PEAK.gpu);
-  finish(code, { ok: !code, result, landExport, landExportError, landExportDiagnostics, landPackageExport,landPackageExportError,landPackageExportDiagnostics,evalErr, errors, uncaught, frames: fstats, logs, mem: MEMLOG, memPeak: MEM ? PEAK : undefined, startupHost: STARTUP_BENCH ? STARTUP_HOST : undefined, ms: { total, build: b.built ? b.ms : 0, load: tLoad - tBuild, eval: tEval - tLoad } });
+  finish(code, { ok: !code, result, landExport, landExportError, landExportDiagnostics, landPackageExport,landPackageExportError,landPackageExportDiagnostics,evalErr, errors, uncaught, frames: fstats, logs, mem: MEMLOG, memPeak: MEM ? PEAK : undefined, startupHost: STARTUP_BENCH ? STARTUP_HOST : undefined,...(startupFailure?{startupFailure}:{}), ms: { total, build: b.built ? b.ms : 0, load: tLoad - tBuild, eval: tEval - tLoad } });
 }).catch(e => { if (finished) return; err('probe:', e && e.stack || e); finish(1, { ok: false, error: String(e) }); });

@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "variant": "cache",
+  "preset": "high",
+  "phase": "cold",
+  "cpu": 1,
+  "argv": [
+    "/home/runner/work/bird-delivery/bird-delivery/node_modules/electron/dist/electron",
+    "/home/runner/work/bird-delivery/bird-delivery/tools/probe.cjs",
+    "--no-sandbox",
+    "--disable-gpu-sandbox",
+    "--mode=steam",
+    "--dir=/home/runner/work/bird-delivery/bird-delivery/release/linux-unpacked/resources/app.asar/dist/steam",
+    "--startup-trace",
+    "--startup-session=lp17b-b16e98e9-70e0-454c-80e6-1d5904933fe0",
+    "--startup-cold",
+    "--startup-fixture=/home/runner/work/_temp/land-package-runtime/fixture.json",
+    "--fresh",
+    "--early",
+    "--size=deck",
+    "--cpu=1",
+    "--bootcpu",
+    "--init-script=/home/runner/work/bird-delivery/bird-delivery/tools/probe-checks/startup-bootstrap-observe.js",
+    "--q=gfxdev=deck&mute&startupdistrict=0",
+    "--eval=/home/runner/work/bird-delivery/bird-delivery/tools/probe-checks/startup-ready.js",
+    "--bootwait=360",
+    "--timeout=480",
+    "--max=0",
+    "--errors",
+    "--report=/home/runner/work/_temp/land-package-runtime/raw.json"
+  ],
+  "startedAt": "2026-11-01T23:26:38.180Z",
+  "fixtureFile": "/home/runner/work/_temp/land-package-runtime/fixture.json",
+  "fixtureSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+  "catalogFile": "/home/runner/work/bird-delivery/bird-delivery/dist/steam/city-data/catalog.json",
+  "catalogSha256": "f8a181903273368d7fcf96598061886cbdae3ec0e0f481ef5d21e3a6fd917f04",
+  "processStatus": 1,
+  "signal": null,
+  "probe": {
+    "file": "tools/probe.cjs",
+    "sha256": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce"
+  },
+  "eval": {
+    "file": "tools/probe-checks/startup-ready.js",
+    "sha256": "e9ef0e761ff2a5d32b743a7a26990a757089d61d81c703b57d870968a8f7b137"
+  },
+  "observer": {
+    "file": "tools/probe-checks/startup-bootstrap-observe.js",
+    "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+  },
+  "gate": {
+    "file": "tools/startup-report.mjs",
+    "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+  },
+  "admission": {
+    "file": "tools/land-package-smoke.mjs",
+    "sha256": "c96a6ae00986219fad8b20b856bf8aca39c24e71cd7096884321e2b6436a1909"
+  },
+  "pid": 2537,
+  "finishedAt": "2026-11-01T23:31:17.531Z",
+  "ok": false,
+  "failure": "Error: land-package17b:SMOKE_PROCESS\n    at need (file:///home/runner/work/bird-delivery/bird-delivery/src/game/landdata/land-package-key.js:3:46)\n    at file:///home/runner/work/bird-delivery/bird-delivery/tools/land-package-smoke.mjs:41:2\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)"
+}
