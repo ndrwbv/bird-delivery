@@ -1,0 +1,303 @@
+{
+  "version": 1,
+  "kind": "startup-ordinary",
+  "expectedRuns": 12,
+  "state": "failed",
+  "ok": false,
+  "config": {
+    "version": 1,
+    "kind": "startup-ordinary",
+    "dir": "/tmp/bird-ordinary17b-final-1102",
+    "base": {
+      "mapId": "seversk",
+      "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+      "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+      "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e"
+    },
+    "buildHash": "2a4474c94d92bb413ed7dd132391044cef8ac89d671bc63e9c37d7be340d04b1",
+    "fixture": {
+      "file": "/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+      "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+    },
+    "catalog": {
+      "file": "/tmp/bird-ordinary17b-final-1102/city-data/catalog.json",
+      "sha256": "ff1f17e967c7f11dcdc6a929d6ef9ffb423f6b0b7a90ed546e8fab52d2d356e5"
+    },
+    "pilots": {
+      "generated": {
+        "report": "/tmp/bird-ordinary17b-generated-pilot-1102/raw.json",
+        "sha256": "75a801c96e853ef093d7421d5d18548e03874d2c1506da26b474b6f4533a7a9d"
+      },
+      "cache": {
+        "report": "/tmp/bird-ordinary17b-pilot-high-1102.json",
+        "sha256": "9f1ad5c2256ef9fd40210fabada9c3012bce13f1bb1bcbd26027b3f4aeb74eac"
+      }
+    }
+  },
+  "configFile": "/private/tmp/bird-ordinary17b-comparison12-1102/ordinary-config.json",
+  "configSha256": "e0468f3be25fdf31dabde94d6aa7467bdaf11e223a4b5c2e6d61accdfc2dc907",
+  "dir": "/tmp/bird-ordinary17b-final-1102",
+  "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+  "buildHash": "2a4474c94d92bb413ed7dd132391044cef8ac89d671bc63e9c37d7be340d04b1",
+  "createdAt": "2026-11-01T22:26:34.164Z",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "os": "25.5.0",
+    "cpu": "Apple M4",
+    "cores": 10,
+    "memBytes": 34359738368
+  },
+  "conditions": {
+    "case": "newbie",
+    "preset": "high",
+    "district": 0,
+    "seed": null,
+    "cpuThrottle": 3,
+    "size": "1280x800",
+    "physicalDeck": false,
+    "cache": "cold cleared owned Chromium session; warm new process reusing that pair session; OS/driver caches uncontrolled"
+  },
+  "runs": [
+    {
+      "label": "newbie",
+      "repeat": 1,
+      "variant": "generated",
+      "phase": "cold",
+      "variantOrder": [
+        "generated",
+        "cache"
+      ],
+      "session": "ordinary17-ca761cba-5708-4c4e-8678-b8039a707542",
+      "runDir": "/private/tmp/bird-ordinary17b-comparison12-1102/runs/1-generated-cold",
+      "report": "/private/tmp/bird-ordinary17b-comparison12-1102/runs/1-generated-cold/raw.json",
+      "smokeRecord": "/private/tmp/bird-ordinary17b-comparison12-1102/runs/1-generated-cold/run.json",
+      "command": [
+        "/usr/local/bin/node",
+        "/Users/andrewboev/Desktop/not-work/delivery/tools/land-package-smoke.mjs",
+        "--dir=/tmp/bird-ordinary17b-final-1102",
+        "--catalog=/tmp/bird-ordinary17b-final-1102/city-data/catalog.json",
+        "--fixture=/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+        "--out=/private/tmp/bird-ordinary17b-comparison12-1102/runs/1-generated-cold",
+        "--preset=high",
+        "--variant=generated",
+        "--phase=cold",
+        "--cpu=3",
+        "--session=ordinary17-ca761cba-5708-4c4e-8678-b8039a707542"
+      ],
+      "fixture": "/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+      "fixtureSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "catalogSha256": "ff1f17e967c7f11dcdc6a929d6ef9ffb423f6b0b7a90ed546e8fab52d2d356e5",
+      "configSha256": "e0468f3be25fdf31dabde94d6aa7467bdaf11e223a4b5c2e6d61accdfc2dc907",
+      "harnessSha256": "4cc3306a08a753f4c9a6118e51d22fc3d943fae6206e745d3f1baaab8b20ae4a",
+      "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+      "buildHash": "2a4474c94d92bb413ed7dd132391044cef8ac89d671bc63e9c37d7be340d04b1",
+      "state": "failed",
+      "ok": false,
+      "processStatus": 0,
+      "signal": null,
+      "startedAt": "2026-11-01T22:26:34.276Z",
+      "reason": "actual gate body differs",
+      "wallMs": 81643,
+      "finishedAt": "2026-11-01T22:27:55.920Z",
+      "spawnError": null,
+      "stdoutSha256": "eb8b042c95717b63441ccdd96059c9a7ae94fa6106eab6fa6481c23983bf3e72",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reportSha256": "60735d0376318c85cb4eeb41ed726f9938e4b04904c885b2f00c807552b2b16b",
+      "smokeRecordSha256": "d6fdd3c44a604ed8a151d21eecec949c3b199ef2d11da42d9a7ebed906775059",
+      "validation": {
+        "ok": false,
+        "reasons": [
+          "actual gate body differs"
+        ]
+      },
+      "probeCommand": [
+        "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+        "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+        "--mode=steam",
+        "--dir=/tmp/bird-ordinary17b-final-1102",
+        "--startup-trace",
+        "--startup-session=ordinary17-ca761cba-5708-4c4e-8678-b8039a707542",
+        "--startup-cold",
+        "--startup-fixture=/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--cpu=3",
+        "--bootcpu",
+        "--init-script=/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/startup-bootstrap-observe.js",
+        "--q=gfxdev=deck&mute&startupdistrict=0&landpackage=0",
+        "--eval=/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/startup-ready.js",
+        "--bootwait=360",
+        "--timeout=480",
+        "--max=0",
+        "--errors",
+        "--report=/private/tmp/bird-ordinary17b-comparison12-1102/runs/1-generated-cold/raw.json"
+      ],
+      "controlMs": 80607.89999985695,
+      "processToControlMs": 80862,
+      "fromClickMs": 71146.59999990463,
+      "resourceCapture": {
+        "totalCount": 0,
+        "includedCount": 0,
+        "truncatedCount": 0,
+        "limit": 64
+      },
+      "resourceIO": "app:// ResourceTiming unavailable; zero records is not zero I/O"
+    }
+  ],
+  "activeRun": null,
+  "summary": null,
+  "catalogBody": {
+    "version": 1,
+    "kind": "land-package17b-catalog",
+    "manifest": {
+      "version": 1,
+      "kind": "land-package17b",
+      "mapId": "seversk",
+      "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+      "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+      "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+      "parameters": {
+        "coverCell": 32,
+        "indexCell": 8,
+        "maskCell": 32,
+        "minWidth": 0.8,
+        "terrainG": 16,
+        "terrainNX": 764,
+        "terrainNZ": 581,
+        "terrainX0": -6097,
+        "terrainZ0": -4635
+      }
+    },
+    "entries": [
+      {
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "path": "city-data/2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd.land.gz",
+        "encoding": "gzip",
+        "bytes": 34231591,
+        "sha256": "2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd",
+        "rawBytes": 74952828,
+        "rawSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c"
+      }
+    ]
+  },
+  "pilots": {
+    "generated": {
+      "originalReport": "/tmp/bird-ordinary17b-generated-pilot-1102/raw.json",
+      "report": "/private/tmp/bird-ordinary17b-comparison12-1102/pilot-generated.json",
+      "sha256": "75a801c96e853ef093d7421d5d18548e03874d2c1506da26b474b6f4533a7a9d",
+      "validation": {
+        "ok": true,
+        "reasons": []
+      }
+    },
+    "cache": {
+      "originalReport": "/tmp/bird-ordinary17b-pilot-high-1102.json",
+      "report": "/private/tmp/bird-ordinary17b-comparison12-1102/pilot-cache.json",
+      "sha256": "9f1ad5c2256ef9fd40210fabada9c3012bce13f1bb1bcbd26027b3f4aeb74eac",
+      "validation": {
+        "ok": true,
+        "reasons": []
+      }
+    }
+  },
+  "preflight": {
+    "once": true,
+    "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+    "buildHash": "2a4474c94d92bb413ed7dd132391044cef8ac89d671bc63e9c37d7be340d04b1",
+    "sourceFile": "/private/tmp/bird-ordinary17b-comparison12-1102/source-receipt.json",
+    "sourceFileSha256": "85ac560c10cbc3eceba75c9b39675e21cdca8765b0f4fc3b7ef84c8d3484bb7b",
+    "buildFile": "/private/tmp/bird-ordinary17b-comparison12-1102/build-tree.json",
+    "buildFileSha256": "18ab6d551886a01f0705772a6580a58b73507aed9b8e16d2127f7125fb1f2d20",
+    "completedAt": "2026-11-01T22:26:34.272Z",
+    "assetContentRead": "once, in initial build inventory only; no per-process asset hashes"
+  },
+  "harness": [
+    {
+      "file": "tools/startup-bench.mjs",
+      "sha256": "2f5e1999dc5394c5a5d5aeba643e6494643105e550d1134b977d9afe063965ef",
+      "bytes": 15500,
+      "copy": "/private/tmp/bird-ordinary17b-comparison12-1102/measured-harness/tools/startup-bench.mjs"
+    },
+    {
+      "file": "tools/startup-ordinary.mjs",
+      "sha256": "4c685f6134900c8929ff886e5538f3d47dc6237fe3a1293ad629bd0f303c95b7",
+      "bytes": 10335,
+      "copy": "/private/tmp/bird-ordinary17b-comparison12-1102/measured-harness/tools/startup-ordinary.mjs"
+    },
+    {
+      "file": "tools/startup-ordinary-gate.mjs",
+      "sha256": "67dfd002d22dba156e72d15ea3a5a263385f073500bff4844dc0b6e866451d27",
+      "bytes": 11603,
+      "copy": "/private/tmp/bird-ordinary17b-comparison12-1102/measured-harness/tools/startup-ordinary-gate.mjs"
+    },
+    {
+      "file": "tools/startup-report.mjs",
+      "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3",
+      "bytes": 13190,
+      "copy": "/private/tmp/bird-ordinary17b-comparison12-1102/measured-harness/tools/startup-report.mjs"
+    },
+    {
+      "file": "tools/land-package-smoke.mjs",
+      "sha256": "4130959a8a75347ae1d2f6e5f8855c1f78489b97964f1555a8b8b432658b2a5a",
+      "bytes": 6084,
+      "copy": "/private/tmp/bird-ordinary17b-comparison12-1102/measured-harness/tools/land-package-smoke.mjs"
+    },
+    {
+      "file": "tools/land-package-files.mjs",
+      "sha256": "4e5d33ec290e21e306fb65d32ea24290f2d58900f0821c984cd4945e3c2287b8",
+      "bytes": 4850,
+      "copy": "/private/tmp/bird-ordinary17b-comparison12-1102/measured-harness/tools/land-package-files.mjs"
+    },
+    {
+      "file": "tools/land-package-source-key.mjs",
+      "sha256": "c581661cfa3fac423a8dec95708aba8ff64a9cebae4e308760cf35b739d45a13",
+      "bytes": 1386,
+      "copy": "/private/tmp/bird-ordinary17b-comparison12-1102/measured-harness/tools/land-package-source-key.mjs"
+    },
+    {
+      "file": "tools/land-package-build.mjs",
+      "sha256": "563dd10a01f2c7a8c9a0622cad6b9944952cb9a36c2be2e764f28367e79ef258",
+      "bytes": 3010,
+      "copy": "/private/tmp/bird-ordinary17b-comparison12-1102/measured-harness/tools/land-package-build.mjs"
+    },
+    {
+      "file": "tools/probe.cjs",
+      "sha256": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce",
+      "bytes": 45888,
+      "copy": "/private/tmp/bird-ordinary17b-comparison12-1102/measured-harness/tools/probe.cjs"
+    },
+    {
+      "file": "tools/probe-page.cjs",
+      "sha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd",
+      "bytes": 37506,
+      "copy": "/private/tmp/bird-ordinary17b-comparison12-1102/measured-harness/tools/probe-page.cjs"
+    },
+    {
+      "file": "tools/probe-build.cjs",
+      "sha256": "3eda8b68163026fa436345f97814791270f16eb6844584176ae6c8a531c4b09f",
+      "bytes": 4916,
+      "copy": "/private/tmp/bird-ordinary17b-comparison12-1102/measured-harness/tools/probe-build.cjs"
+    },
+    {
+      "file": "tools/probe-checks/startup-ready.js",
+      "sha256": "e9ef0e761ff2a5d32b743a7a26990a757089d61d81c703b57d870968a8f7b137",
+      "bytes": 6203,
+      "copy": "/private/tmp/bird-ordinary17b-comparison12-1102/measured-harness/tools/probe-checks/startup-ready.js"
+    },
+    {
+      "file": "tools/probe-checks/startup-bootstrap-observe.js",
+      "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8",
+      "bytes": 654,
+      "copy": "/private/tmp/bird-ordinary17b-comparison12-1102/measured-harness/tools/probe-checks/startup-bootstrap-observe.js"
+    }
+  ],
+  "harnessSha256": "4cc3306a08a753f4c9a6118e51d22fc3d943fae6206e745d3f1baaab8b20ae4a",
+  "electron": "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+  "failure": {
+    "message": "Error: startup-ordinary:failed attempt retained: /private/tmp/bird-ordinary17b-comparison12-1102/runs/1-generated-cold/raw.json; actual gate body differs\n    at need (file:///Users/andrewboev/Desktop/not-work/delivery/tools/startup-ordinary.mjs:13:34)\n    at runOrdinaryBench (file:///Users/andrewboev/Desktop/not-work/delivery/tools/startup-ordinary.mjs:77:6)\n    at file:///Users/andrewboev/Desktop/not-work/delivery/tools/startup-bench.mjs:14:2",
+    "at": "2026-11-01T22:27:55.921Z",
+    "activeRun": null
+  }
+}

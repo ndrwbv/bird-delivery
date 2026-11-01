@@ -1,0 +1,18 @@
+node:fs:457
+    return binding.readFileUtf8(path, stringToFlags(options.flag));
+                   ^
+
+Error: ENOTDIR: not a directory, open '/tmp/bird-ordinary17b-asar-1102/app.asar/dist/steam/city-data/catalog.json'
+    at Object.readFileSync (node:fs:457:20)
+    at file:///Users/andrewboev/Desktop/not-work/delivery/tools/land-package-smoke.mjs:21:42
+    at ModuleJob.run (node:internal/modules/esm/module_job:222:25)
+    at async ModuleLoader.import (node:internal/modules/esm/loader:323:24)
+    at async loadESM (node:internal/process/esm_loader:28:7)
+    at async handleMainPromise (node:internal/modules/run_main:113:12) {
+  errno: -20,
+  code: 'ENOTDIR',
+  syscall: 'open',
+  path: '/tmp/bird-ordinary17b-asar-1102/app.asar/dist/steam/city-data/catalog.json'
+}
+
+Node.js v20.12.1

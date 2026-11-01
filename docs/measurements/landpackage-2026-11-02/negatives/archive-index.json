@@ -1,0 +1,332 @@
+{
+  "version": 1,
+  "sourceFingerprint": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+  "sourceIsGitCommit": false,
+  "immutableBuild": "/tmp/bird-ordinary17b-final-1102",
+  "results": "4/4 PASS, first attempt each; errors/uncaught/partial/late-cache-publication0",
+  "faultIntents": {
+    "missing-asset": "exact-path synthetic404 before decode",
+    "wrong-wire-sha": "one wire-stream byte flipped, same length, reject by digest before decode",
+    "cancel-preparing": "public cancel only in preparing; clean immediate fallback with preclean model refs unchanged",
+    "input-miss": "real nowiden geometry query, different exact key and zero asset fetch"
+  },
+  "files": [
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/CRITERIA.md",
+      "file": "CRITERIA.md",
+      "bytes": 4319,
+      "sha256": "3f707317e22e1efb7b014c6ee432c5664a849237ab4ddeaebebe95e303eed433",
+      "intentionalFault": null
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/cancel-preparing/command.txt",
+      "file": "cancel-preparing/command.txt",
+      "bytes": 941,
+      "sha256": "0630bf2a80d75438b78b2f2ab5b7834fc4fcd4e1d3f4afa96de3d2fe72802ea5",
+      "intentionalFault": "cancel-preparing"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/cancel-preparing/fixture.json",
+      "file": "cancel-preparing/fixture.json",
+      "bytes": 75,
+      "sha256": "128185ce9de7495c1c6f7782c6f97210c5b258f5e704c26ea019ac6781695c23",
+      "intentionalFault": "cancel-preparing"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/cancel-preparing/init.js",
+      "file": "cancel-preparing/init.js",
+      "bytes": 4041,
+      "sha256": "a650add4bb260d876aaf799435a62cfaf466325f855715536b7ab66093a40190",
+      "intentionalFault": "cancel-preparing"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/cancel-preparing/raw.json",
+      "file": "cancel-preparing/raw.json",
+      "bytes": 40209,
+      "sha256": "f6819f6dec75d82ce10ae75e61bfe433b003a22608615d9871428aab883e9ff8",
+      "intentionalFault": "cancel-preparing"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/cancel-preparing/run.json",
+      "file": "cancel-preparing/run.json",
+      "bytes": 9361,
+      "sha256": "94c23cb6b6af26a81bc2084cd98e6cb71e227cb0216dfaadefd9fdd8904e6f21",
+      "intentionalFault": "cancel-preparing"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/cancel-preparing/stderr.log",
+      "file": "cancel-preparing/stderr.log",
+      "bytes": 187,
+      "sha256": "a81c975c9513e93b4896c50bba5cb768c3bf5c254a7c08d1fc893e3c35bd2936",
+      "intentionalFault": "cancel-preparing"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/cancel-preparing/stdout.log",
+      "file": "cancel-preparing/stdout.log",
+      "bytes": 39637,
+      "sha256": "6bbd72a3718e2266ec70258a242312274f1042c88f9a1552b6ded0324d6a7e06",
+      "intentionalFault": "cancel-preparing"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/four-commands.txt",
+      "file": "four-commands.txt",
+      "bytes": 3720,
+      "sha256": "758952c24b7ebceba1c474c9e54dd9c3176c850dd88aaee0c1e19828ec649602",
+      "intentionalFault": null
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/input-miss/command.txt",
+      "file": "input-miss/command.txt",
+      "bytes": 919,
+      "sha256": "1e1b33ab31414a01853ae57affd0cc40762d0cae98ad4cb5cafb3d67f16e7651",
+      "intentionalFault": "input-miss"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/input-miss/fixture.json",
+      "file": "input-miss/fixture.json",
+      "bytes": 75,
+      "sha256": "128185ce9de7495c1c6f7782c6f97210c5b258f5e704c26ea019ac6781695c23",
+      "intentionalFault": "input-miss"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/input-miss/init.js",
+      "file": "input-miss/init.js",
+      "bytes": 4035,
+      "sha256": "93289ddf76082ec398e7f648d07a4f7430ddb4fa131c8187d9ae9002c73fe29c",
+      "intentionalFault": "input-miss"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/input-miss/raw.json",
+      "file": "input-miss/raw.json",
+      "bytes": 34931,
+      "sha256": "f16fd860cf9bd9ff66625e01a2e07532a36231ef57790aadc7dc39b239e58390",
+      "intentionalFault": "input-miss"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/input-miss/run.json",
+      "file": "input-miss/run.json",
+      "bytes": 7395,
+      "sha256": "6c9cc7faf17dfcf1b333d482999594b985b6aab7260805cd31ec271e680c0cd8",
+      "intentionalFault": "input-miss"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/input-miss/stderr.log",
+      "file": "input-miss/stderr.log",
+      "bytes": 187,
+      "sha256": "b1a59321b74db4c765915e292ea27d9226430c37b098920492abc15522c80f06",
+      "intentionalFault": "input-miss"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/input-miss/stdout.log",
+      "file": "input-miss/stdout.log",
+      "bytes": 34359,
+      "sha256": "258108dbe0e17fe69c9f07ed1a4f69b0a0f11f4738fcc3dac7df653f69d1d40d",
+      "intentionalFault": "input-miss"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/missing-asset/command.txt",
+      "file": "missing-asset/command.txt",
+      "bytes": 926,
+      "sha256": "fed6fb0f8a4772152c7e2d3bab468200ee80fb78f6aa9def81e13a35b9f95da7",
+      "intentionalFault": "missing-asset"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/missing-asset/fixture.json",
+      "file": "missing-asset/fixture.json",
+      "bytes": 75,
+      "sha256": "128185ce9de7495c1c6f7782c6f97210c5b258f5e704c26ea019ac6781695c23",
+      "intentionalFault": "missing-asset"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/missing-asset/init.js",
+      "file": "missing-asset/init.js",
+      "bytes": 4038,
+      "sha256": "2e49fa19061471e3586582490477c3547e903d9658d42c5a3c101aa1f5525962",
+      "intentionalFault": "missing-asset"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/missing-asset/raw.json",
+      "file": "missing-asset/raw.json",
+      "bytes": 35926,
+      "sha256": "2d1cecf6c914fbb1c70bdf9c71d3fd8181d3877ccbfa3044930c1121f3fc37d6",
+      "intentionalFault": "missing-asset"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/missing-asset/run.json",
+      "file": "missing-asset/run.json",
+      "bytes": 7763,
+      "sha256": "6fd3ab52543ab703090a4d26427f9f1df00371ef5f213a6b245d02b758c3be21",
+      "intentionalFault": "missing-asset"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/missing-asset/stderr.log",
+      "file": "missing-asset/stderr.log",
+      "bytes": 187,
+      "sha256": "4767bf193f3941c4510bd65686a56d1a05caacf4f764355741254fdac7bcdb57",
+      "intentionalFault": "missing-asset"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/missing-asset/stdout.log",
+      "file": "missing-asset/stdout.log",
+      "bytes": 35354,
+      "sha256": "e26d503d69e6049336cdb6f4d33ba3d23871a8b4b50d3e0dc3e7efcadf10594b",
+      "intentionalFault": "missing-asset"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/negative-eval-suffix.js",
+      "file": "negative-eval-suffix.js",
+      "bytes": 4256,
+      "sha256": "736f5f4257f136c4a10c51c70bcefc21e4056e6a058e1ad11d5224ff4ac8a6ca",
+      "intentionalFault": null
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/negative-init-template.js",
+      "file": "negative-init-template.js",
+      "bytes": 3323,
+      "sha256": "ee80da03dc9c8f7057a5cff6ab162b7f0592645c42813ad7130eb00e438a6db0",
+      "intentionalFault": null
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/negative-startup-ready.js",
+      "file": "negative-startup-ready.js",
+      "bytes": 10614,
+      "sha256": "689437990dd616a5f3fe4fc90160a438a37d8bb2666ceba9620a7c09c7bb3343",
+      "intentionalFault": null
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/prepared.json",
+      "file": "prepared.json",
+      "bytes": 14193,
+      "sha256": "cffce9843bd63cdbf03e7770125f4feb963b1439050923f5fcccb0c0d4176081",
+      "intentionalFault": null
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/record-result.mjs",
+      "file": "record-result.mjs",
+      "bytes": 2712,
+      "sha256": "f4c0368ffcc9a40fb09ae12dbef99b3ad5b37ace6f67c51023fafee5fa7e2dca",
+      "intentionalFault": null
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/summary.json",
+      "file": "summary.json",
+      "bytes": 5508,
+      "sha256": "440561d5a8e468cf1557c88d633c7427f8ec9b2c067f48203cd8b0eebf064295",
+      "intentionalFault": null
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/summary.md",
+      "file": "summary.md",
+      "bytes": 1580,
+      "sha256": "a6a84777eb1197aba84383ac058b2ed8c4b2fbfd6a9c802cfa6cd80987338ec3",
+      "intentionalFault": null
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/wrong-wire-sha/command.txt",
+      "file": "wrong-wire-sha/command.txt",
+      "bytes": 931,
+      "sha256": "81c0b60842097e560e7fb5be677e186b3d5f668b491899516b2110301b3c69ef",
+      "intentionalFault": "wrong-wire-sha"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/wrong-wire-sha/fixture.json",
+      "file": "wrong-wire-sha/fixture.json",
+      "bytes": 75,
+      "sha256": "128185ce9de7495c1c6f7782c6f97210c5b258f5e704c26ea019ac6781695c23",
+      "intentionalFault": "wrong-wire-sha"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/wrong-wire-sha/init.js",
+      "file": "wrong-wire-sha/init.js",
+      "bytes": 4039,
+      "sha256": "55e6796067f0a06767dd4260d8307b0baba06e99357efa32736d052e5eb89ee7",
+      "intentionalFault": "wrong-wire-sha"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/wrong-wire-sha/raw.json",
+      "file": "wrong-wire-sha/raw.json",
+      "bytes": 37007,
+      "sha256": "1ac3b367fb39f4d6e000bf0dbc0229e4e456d70ac9be23f4130f0d9b643776d7",
+      "intentionalFault": "wrong-wire-sha"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/wrong-wire-sha/run.json",
+      "file": "wrong-wire-sha/run.json",
+      "bytes": 7922,
+      "sha256": "0d10f52e635e016b5da02b628b0e87cb6a32757376a4dcec2c0dd3caf4eb8a5b",
+      "intentionalFault": "wrong-wire-sha"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/wrong-wire-sha/stderr.log",
+      "file": "wrong-wire-sha/stderr.log",
+      "bytes": 187,
+      "sha256": "51b669d0c8736856987992e4084b9695428237b58ab89b5594f2b84b835e8f48",
+      "intentionalFault": "wrong-wire-sha"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-negatives-1102-prepared/wrong-wire-sha/stdout.log",
+      "file": "wrong-wire-sha/stdout.log",
+      "bytes": 36435,
+      "sha256": "5ae27d05a86a056920d9f0e0d1eb90a257f350a053f3c656d00ee4510e9da4cb",
+      "intentionalFault": "wrong-wire-sha"
+    },
+    {
+      "original": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+      "file": "harness/tools/probe.cjs",
+      "bytes": 45888,
+      "sha256": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce",
+      "intentionalFault": null
+    },
+    {
+      "original": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/startup-ready.js",
+      "file": "harness/tools/probe-checks/startup-ready.js",
+      "bytes": 6203,
+      "sha256": "e9ef0e761ff2a5d32b743a7a26990a757089d61d81c703b57d870968a8f7b137",
+      "intentionalFault": null
+    },
+    {
+      "original": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/startup-bootstrap-observe.js",
+      "file": "harness/tools/probe-checks/startup-bootstrap-observe.js",
+      "bytes": 654,
+      "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8",
+      "intentionalFault": null
+    },
+    {
+      "original": "/Users/andrewboev/Desktop/not-work/delivery/tools/startup-report.mjs",
+      "file": "harness/tools/startup-report.mjs",
+      "bytes": 13190,
+      "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3",
+      "intentionalFault": null
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-final-1102/city-data/catalog.json",
+      "file": "pins/catalog.json",
+      "bytes": 903,
+      "sha256": "ff1f17e967c7f11dcdc6a929d6ef9ffb423f6b0b7a90ed546e8fab52d2d356e5",
+      "intentionalFault": null
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-prepare-1102/export-receipt.json",
+      "file": "pins/export-receipt.json",
+      "bytes": 93242,
+      "sha256": "f8ccf2752426a12a644fc7e98fd5bc2b2140fc68600e23344e4e9eeb814bd4c7",
+      "intentionalFault": null
+    },
+    {
+      "original": "generated offline from preserved run/receipt evidence",
+      "file": "source-guard-setup.json",
+      "bytes": 1290,
+      "sha256": "d3fe791fe699c400f3d171bb75f0f740bc8aea01c42b8b442266137c5623c815",
+      "intentionalFault": null
+    },
+    {
+      "original": "generated offline from preserved run/receipt evidence",
+      "file": "cancel-before-after-proof.json",
+      "bytes": 1913,
+      "sha256": "ef45f97cc9ffd393640ab587f94e3a671e8e8dc08ca05dfdd367b93d1cf9e574",
+      "intentionalFault": "cancel-preparing"
+    }
+  ],
+  "preservation": "Raw and run content including original absolute paths kept byte-for-byte. prepared.json remains the original pre-execution manifest; final statuses/SHA are in each run.json. No binary assets or build copied.",
+  "gate": "Protocol2, fresh bootstrap/control guard2, same existing startup-ready plus case assertions; measured script and offline validator snapshots under harness/. Exact hashes in prepared/run/index."
+}

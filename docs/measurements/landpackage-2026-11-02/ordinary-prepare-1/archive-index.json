@@ -1,0 +1,344 @@
+{
+  "source": "/tmp/bird-ordinary17b-prepare-1102",
+  "scope": "Four ordinary exports, one immutable prepare build, not runtime timing/physical Deck",
+  "files": [
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/build.stderr.log",
+      "copy": "build.stderr.log",
+      "bytes": 1497,
+      "sha256": "43d817da84c8943f76d6482fcd87025671f720e77e105724d6349d9807517f58"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/build.stdout.log",
+      "copy": "build.stdout.log",
+      "bytes": 6187,
+      "sha256": "3f923516b8c96df8f80f0f5c71338c8d417f1f688cfa3e44060bb7ff547e705c"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/export-receipt.json",
+      "copy": "export-receipt.json",
+      "bytes": 93242,
+      "sha256": "f8ccf2752426a12a644fc7e98fd5bc2b2140fc68600e23344e4e9eeb814bd4c7"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+      "copy": "high-1-fixture.json",
+      "bytes": 74,
+      "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/high-1.json",
+      "copy": "high-1.json",
+      "bytes": 30660,
+      "sha256": "b224f3fbbbc9593b8b29863ed90e2480c3eb141de85bb11c47df893014f73829"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/high-1.stderr.log",
+      "copy": "high-1.stderr.log",
+      "bytes": 187,
+      "sha256": "2d79f70eaf1787a4be4b7d70f9a371e3413e1a4083af6f2ca4a9ad7c913b3ef7"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/high-1.stdout.log",
+      "copy": "high-1.stdout.log",
+      "bytes": 2958,
+      "sha256": "7ed5d4d1a213a4dc60574bf9644d6707456f75d49cbbfcc1a77b1dcdd4e4d607"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/high-2-fixture.json",
+      "copy": "high-2-fixture.json",
+      "bytes": 74,
+      "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/high-2.json",
+      "copy": "high-2.json",
+      "bytes": 30651,
+      "sha256": "fd286d8566aaa15a262160120626e44e2008cc465ff5339e91f8096f4d13de65"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/high-2.stderr.log",
+      "copy": "high-2.stderr.log",
+      "bytes": 187,
+      "sha256": "a8e437e7cf2dc7c81d3749db415aceb3018a18de8d36fd505e7236586861df0e"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/high-2.stdout.log",
+      "copy": "high-2.stdout.log",
+      "bytes": 2958,
+      "sha256": "7ed5d4d1a213a4dc60574bf9644d6707456f75d49cbbfcc1a77b1dcdd4e4d607"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/mid-1-fixture.json",
+      "copy": "mid-1-fixture.json",
+      "bytes": 35,
+      "sha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/mid-1.json",
+      "copy": "mid-1.json",
+      "bytes": 30676,
+      "sha256": "98493e601698cbe2a357865a4990b9673d550a7ff0de91040f41a1d9a94aeb43"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/mid-1.stderr.log",
+      "copy": "mid-1.stderr.log",
+      "bytes": 187,
+      "sha256": "ea3582868aece1e7817cfdcdb6ef11f8833be9cd0aefcbb6ce8f09f98305080f"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/mid-1.stdout.log",
+      "copy": "mid-1.stdout.log",
+      "bytes": 2957,
+      "sha256": "39bac5e4fb2dfee8c05e3f8d25da23d767362b06163f1aa00c85f7400edf23ee"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/mid-2-fixture.json",
+      "copy": "mid-2-fixture.json",
+      "bytes": 35,
+      "sha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/mid-2.json",
+      "copy": "mid-2.json",
+      "bytes": 30641,
+      "sha256": "ce0a9a6a6f2d73959992035a1a2f17594a92595cb9e3d36698775240a457fa90"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/mid-2.stderr.log",
+      "copy": "mid-2.stderr.log",
+      "bytes": 187,
+      "sha256": "10a5b417f7da14926c7b524fb7f25be39a175fa3b100ec7152f135966f8d4fc2"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/mid-2.stdout.log",
+      "copy": "mid-2.stdout.log",
+      "bytes": 2957,
+      "sha256": "39bac5e4fb2dfee8c05e3f8d25da23d767362b06163f1aa00c85f7400edf23ee"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/preparation.json",
+      "copy": "preparation.json",
+      "bytes": 22232,
+      "sha256": "0e50b15314e66bfb7c53b8969c574f887cfa2b92f204ecf32c3e19147597292e"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102.stdout.log",
+      "copy": "preparation.stdout.log",
+      "bytes": 193,
+      "sha256": "c38a43ef6a1db5dcf393a544d073fea13f0c3f13c1e8146513768e461ddda52a"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102.stderr.log",
+      "copy": "preparation.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "tools/land-package-prepare.mjs",
+      "copy": "harness/tools/land-package-prepare.mjs",
+      "bytes": 8424,
+      "sha256": "0562d3d5dc8e8efcb66887333ebca1da18e4dbf50f49efeaae992bd4bed48b8f"
+    },
+    {
+      "source": "tools/probe.cjs",
+      "copy": "harness/tools/probe.cjs",
+      "bytes": 45888,
+      "sha256": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce"
+    },
+    {
+      "source": "tools/probe-page.cjs",
+      "copy": "harness/tools/probe-page.cjs",
+      "bytes": 37506,
+      "sha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd"
+    },
+    {
+      "source": "tools/land-package-export-host.cjs",
+      "copy": "harness/tools/land-package-export-host.cjs",
+      "bytes": 6860,
+      "sha256": "ed347ae1a28284a786491752d6cd04ce91692052f13d40e166f31f2b3ec820f9"
+    },
+    {
+      "source": "tools/probe-checks/land-package-export.js",
+      "copy": "harness/tools/probe-checks/land-package-export.js",
+      "bytes": 564,
+      "sha256": "1b46b77505f9b9be1a65a01225be068eca849e7cf63dffc5d3046b7cdb50556a"
+    },
+    {
+      "source": "tools/land-package-files.mjs",
+      "copy": "harness/tools/land-package-files.mjs",
+      "bytes": 4850,
+      "sha256": "4e5d33ec290e21e306fb65d32ea24290f2d58900f0821c984cd4945e3c2287b8"
+    },
+    {
+      "source": "tools/land-package-source-key.mjs",
+      "copy": "harness/tools/land-package-source-key.mjs",
+      "bytes": 1386,
+      "sha256": "c581661cfa3fac423a8dec95708aba8ff64a9cebae4e308760cf35b739d45a13"
+    },
+    {
+      "source": "tools/land-package-build.mjs",
+      "copy": "harness/tools/land-package-build.mjs",
+      "bytes": 3010,
+      "sha256": "563dd10a01f2c7a8c9a0622cad6b9944952cb9a36c2be2e764f28367e79ef258"
+    },
+    {
+      "source": "src/game/landdata/land-package-catalog.js",
+      "copy": "runtime/src/game/landdata/land-package-catalog.js",
+      "bytes": 2062,
+      "sha256": "5094beb3023ab9188968dc965a6932a79abc52ff9c45a9eff500ac3906c94df3"
+    },
+    {
+      "source": "src/game/landdata/land-package-config.js",
+      "copy": "runtime/src/game/landdata/land-package-config.js",
+      "bytes": 258,
+      "sha256": "f706d104b2d6e2a8bd48b143bd0003b9451b6870346542626d6dc8092f60df53"
+    },
+    {
+      "source": "src/game/landdata/land-package-export.js",
+      "copy": "runtime/src/game/landdata/land-package-export.js",
+      "bytes": 9919,
+      "sha256": "4642f2ba9b37eea9566b4c5f3acc9e515cc5eee53b638205659c5a20b0aa5688"
+    },
+    {
+      "source": "src/game/landdata/land-package-key.js",
+      "copy": "runtime/src/game/landdata/land-package-key.js",
+      "bytes": 2978,
+      "sha256": "860650bc6f991a4475c61b74c6a579e5fe2afe503076446d9c99c0336c67a82a"
+    },
+    {
+      "source": "src/game/landdata/land-package-reader.js",
+      "copy": "runtime/src/game/landdata/land-package-reader.js",
+      "bytes": 12901,
+      "sha256": "c3aeb229e4008e4a2febc2c8a63442d2938676a3574967857a478598da5cab6e"
+    },
+    {
+      "copy": "runtime-tracked.patch",
+      "bytes": 22520,
+      "sha256": "5b277b80382967b067603a3dd4ad5a17c17014459dc791f708bcca19bc08d466",
+      "base": "baa44252ce6bb6de2c6d8f4226d75c370a21272a"
+    },
+    {
+      "source": "/tmp/bird-production17b-fs-review.md",
+      "copy": "fs-review.md",
+      "bytes": 4773,
+      "sha256": "9451ab9702f9ca2c5c2484d5089d008782c5850d68be8b78222aa2d081e69c00"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/package/catalog.json",
+      "copy": "catalog.json",
+      "bytes": 1111,
+      "sha256": "21979398c19bb7a5cf10f50990c0b46cc5cc65790ab032c6749e8664d9a57b1d"
+    }
+  ],
+  "omitted": "Binary .land files and immutable build tree remain external, SHA/bytes in receipt/reports",
+  "sourceKey": {
+    "mapId": "seversk",
+    "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+    "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+    "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e"
+  },
+  "ok": true,
+  "exports": [
+    {
+      "label": "mid-1",
+      "bytes": 74952828,
+      "sha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+      "identity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e"
+      },
+      "provenance": {
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+        "buildHash": "5a99fd945d13dc90d5a9d2ba92c4c5c20b4048955db85ebe28f283c0544be224",
+        "buildDir": "/private/tmp/bird-ordinary17b-prepare-1102/prepare-steam"
+      }
+    },
+    {
+      "label": "mid-2",
+      "bytes": 74952828,
+      "sha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+      "identity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e"
+      },
+      "provenance": {
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+        "buildHash": "5a99fd945d13dc90d5a9d2ba92c4c5c20b4048955db85ebe28f283c0544be224",
+        "buildDir": "/private/tmp/bird-ordinary17b-prepare-1102/prepare-steam"
+      }
+    },
+    {
+      "label": "high-1",
+      "bytes": 74952828,
+      "sha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+      "identity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e"
+      },
+      "provenance": {
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+        "buildHash": "5a99fd945d13dc90d5a9d2ba92c4c5c20b4048955db85ebe28f283c0544be224",
+        "buildDir": "/private/tmp/bird-ordinary17b-prepare-1102/prepare-steam"
+      }
+    },
+    {
+      "label": "high-2",
+      "bytes": 74952828,
+      "sha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+      "identity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e"
+      },
+      "provenance": {
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+        "buildHash": "5a99fd945d13dc90d5a9d2ba92c4c5c20b4048955db85ebe28f283c0544be224",
+        "buildDir": "/private/tmp/bird-ordinary17b-prepare-1102/prepare-steam"
+      }
+    }
+  ]
+}

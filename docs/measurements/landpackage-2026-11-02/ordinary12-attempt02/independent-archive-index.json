@@ -1,0 +1,17 @@
+[
+  {
+    "file": "independent-audit.json",
+    "bytes": 22277,
+    "sha256": "7a13195133bd00918e181f8ebf3fd4ccab33f2a5d421995d2c724bd1f0e0ce48"
+  },
+  {
+    "file": "independent-audit.md",
+    "bytes": 1732,
+    "sha256": "50a2c4b6a008ffe393c03c4159473c1cd29762dd21ae2f4ed7b7e84d84492ac8"
+  },
+  {
+    "file": "independent-pure-gate.json",
+    "bytes": 1220,
+    "sha256": "07e67a0a07da6075dcfa4cc07ed3b906461693610ae1a351df7a633fe06d4430"
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "ok": true,
+  "kind": "ordinary17b-geometry-archive-audit",
+  "attempt1ByteIdentical": true,
+  "attempt2ByteIdentical": true,
+  "evalChangeExactlyOneBlanketHookCondition": true,
+  "attempt1Classification": "failed fixture; cache not run; no silent retry",
+  "attempt2Classification": "generated then locked cache strict PASS",
+  "attempt1RawSha256": "6210b6173013cb24639e653e8d14fd7a3d7e0d6caed02117f7117e984ddfc9af",
+  "attempt1EvalSha256": "130ea2453fe2cb2307a3f71293c57659787c56e1b3ef356406a99a136dc9ed81",
+  "attempt2GeneratedRawSha256": "7a66b9321e22338b7734846b9e67b40cc0bd413bdeb2f74602a9ef0aef68e528",
+  "attempt2CacheRawSha256": "87cb9448fbeff2ea5e3a2af88e865903f4adf6da4af8266550863803de019498",
+  "attempt2EvalSha256": "cb01204ead0689b13cc4196dffcf03a1eff3eed60c1b9a40912c7b9423f69df9",
+  "selectedCpuDrawQuerySha256": "e537fb304916621064c5ca63fe1f11f0e7d5f2c8a325bc44f61c74a36b5cc533",
+  "fullGpuByteExact": false,
+  "physicalDeck": false,
+  "timing": false,
+  "copiedFiles": 42,
+  "copiedBytes": 169725,
+  "largeAssetsCopied": false,
+  "buildCopied": false,
+  "gameJsCopied": false
+}

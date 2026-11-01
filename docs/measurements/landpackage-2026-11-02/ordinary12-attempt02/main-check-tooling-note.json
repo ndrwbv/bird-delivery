@@ -1,0 +1,15 @@
+{
+  "kind": "separate-final-check-tooling-note",
+  "source": "root report during serial main check",
+  "ordinary12ResultChanged": false,
+  "firstCheck": {
+    "tiny": "PASS",
+    "web": "PASS",
+    "steam": "FAIL at editor/package production guard",
+    "cause": "tools/probe-build.cjs always injects BIRD_EDITOR=1; env -u BIRD_EDITOR at the parent command does not prevent that child override"
+  },
+  "productionGuardWeakened": false,
+  "sourceOrHelperChanged": false,
+  "rootAuthorizedNext": "Repeat only failed build-steam/shift-loading/progress-boot/smoke/crashlog without BIRD_LAND_DATA_DIR, exercising the generated fallback check build. Existing ordinary12, ASAR proofs and normal release Vite pipeline cover the ordinary package.",
+  "rawCheckLogs": "Preserved separately by root; no unavailable paths invented here."
+}

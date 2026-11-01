@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "kind": "land-package17b-catalog",
+  "manifest": {
+    "version": 1,
+    "kind": "land-package17b",
+    "mapId": "seversk",
+    "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+    "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+    "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+    "parameters": {
+      "coverCell": 32,
+      "indexCell": 8,
+      "maskCell": 32,
+      "minWidth": 0.8,
+      "terrainG": 16,
+      "terrainNX": 764,
+      "terrainNZ": 581,
+      "terrainX0": -6097,
+      "terrainZ0": -4635
+    }
+  },
+  "entries": [
+    {
+      "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+      "path": "city-data/2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd.land.gz",
+      "encoding": "gzip",
+      "bytes": 34231591,
+      "sha256": "2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd",
+      "rawBytes": 74952828,
+      "rawSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c"
+    }
+  ]
+}

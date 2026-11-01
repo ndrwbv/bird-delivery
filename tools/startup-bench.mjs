@@ -8,6 +8,11 @@ import { spawnSync } from 'node:child_process';
 import { randomUUID, createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 const arg=(key,fallback)=>process.argv.slice(2).find(a=>a.startsWith('--'+key+'='))?.slice(key.length+3)??fallback;
+if(arg('ordinary-config')){
+ if(arg('comparison-config')||arg('dir')||arg('sha')||arg('pilot-report')||arg('harness-patch'))throw Error('Ordinary config cannot be combined with legacy runner options');
+ const {runOrdinaryBench}=await import('./startup-ordinary.mjs');
+ runOrdinaryBench({configFile:arg('ordinary-config'),out:arg('out')});
+}else{
 const dir=arg('dir'),sha=arg('sha'),out=path.resolve(arg('out','/tmp/bird-startup17-report'));
 if(!dir||!sha)throw Error('--dir immutable build and --sha recorded source revision are required');
 if(!fs.existsSync(path.join(dir,'index.html')))throw Error('Build directory has no index.html');
@@ -124,3 +129,4 @@ manifest.summary=cases.flatMap(([label])=>(comparison?['generated','cache']:[nul
  return{label,...(comparison?{variant}:{}),phase,n:values.length,valuesMs:values,medianMs:values.length===3?median(values):null,...(comparison?{processToControlValuesMs:processValues,medianProcessToControlMs:processValues.length===3&&processValues.every(Number.isFinite)?median(processValues):null,fromClickValuesMs:clickValues,medianFromClickMs:clickValues.length===3&&clickValues.every(Number.isFinite)?median(clickValues):null}:{})};
 })));
 save();console.log(JSON.stringify(manifest.summary));
+}

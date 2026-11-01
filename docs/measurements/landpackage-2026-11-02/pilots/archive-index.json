@@ -1,0 +1,155 @@
+{
+  "scope": "Ordinary one-shot pilots and synthetic ASAR packaged-dist proof. ASAR1 failed in Node before launching Electron; no runtime change/rebuild for ASAR2. No binaries archived.",
+  "rows": [
+    {
+      "source": "/tmp/bird-ordinary17b-pilot-high-1102.json",
+      "copy": "high-direct.json",
+      "bytes": 38778,
+      "sha256": "9f1ad5c2256ef9fd40210fabada9c3012bce13f1bb1bcbd26027b3f4aeb74eac"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-pilot-high-1102.stdout.log",
+      "copy": "high-direct.stdout.log",
+      "bytes": 38754,
+      "sha256": "7e633b7ffb7748ffe1205fa092427cf3335d07929776dee793564efc8ca973b5"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-pilot-high-1102.stderr.log",
+      "copy": "high-direct.stderr.log",
+      "bytes": 187,
+      "sha256": "6b9bca08c268f7bd5456af61d2b3747cc81bca1929694d0bdfba8c40e1f8842a"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-pilot-mid-1102/raw.json",
+      "copy": "mid-raw.json",
+      "bytes": 38574,
+      "sha256": "6fd63b2fb30f0db3853248daac8866b1aa31a4532afac1158df991301119bfe1"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-pilot-mid-1102/run.json",
+      "copy": "mid-run.json",
+      "bytes": 2929,
+      "sha256": "14cbfe1c9569092c129e46a809de487a229f01e44a3f474e788ca65f3527ebda"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-pilot-mid-1102/fixture.json",
+      "copy": "mid-fixture.json",
+      "bytes": 35,
+      "sha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-pilot-mid-1102/stdout.log",
+      "copy": "mid-stdout.log",
+      "bytes": 38003,
+      "sha256": "6b7fff6e7d1c4f0e4b67b89f6843ef415be61a9468f48e4b276c87a251fdb831"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-pilot-mid-1102/stderr.log",
+      "copy": "mid-stderr.log",
+      "bytes": 187,
+      "sha256": "926c1d966c3a3fbddbe576c3ddb7260b34af97990fb81f5265f0a4c4e088c2d4"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-generated-pilot-1102/raw.json",
+      "copy": "generated-raw.json",
+      "bytes": 33441,
+      "sha256": "75a801c96e853ef093d7421d5d18548e03874d2c1506da26b474b6f4533a7a9d"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-generated-pilot-1102/run.json",
+      "copy": "generated-run.json",
+      "bytes": 2392,
+      "sha256": "860c39956357221424342b19f195a3ea2997855135e20fa80bf99ba742fb71de"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-generated-pilot-1102/fixture.json",
+      "copy": "generated-fixture.json",
+      "bytes": 74,
+      "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-generated-pilot-1102/stdout.log",
+      "copy": "generated-stdout.log",
+      "bytes": 32869,
+      "sha256": "5e061a07f611227a0d95d2e6ae4ec76802f1d2956fe7380a04ae0c931c581f78"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-generated-pilot-1102/stderr.log",
+      "copy": "generated-stderr.log",
+      "bytes": 187,
+      "sha256": "749b4cf08068e18f0a57e59b7f9cdceec05b1fbaaa97eb996832136219f69815"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-asar-pilot2-1102/raw.json",
+      "copy": "asar2-raw.json",
+      "bytes": 38671,
+      "sha256": "9bdf9a1c09642460ca8c1f354a269516c1952e0f0c68a91a6f327c585f50fdf4"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-asar-pilot2-1102/run.json",
+      "copy": "asar2-run.json",
+      "bytes": 3044,
+      "sha256": "45eedbc97fc716150225a405f7c6db46d229865830dd1638b31f08727efc1097"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-asar-pilot2-1102/fixture.json",
+      "copy": "asar2-fixture.json",
+      "bytes": 74,
+      "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-asar-pilot2-1102/stdout.log",
+      "copy": "asar2-stdout.log",
+      "bytes": 38102,
+      "sha256": "56494c3ec82d8a7844a450433e8df4e536b39b3bc19133e0c1656d8919d6bafa"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-asar-pilot2-1102/stderr.log",
+      "copy": "asar2-stderr.log",
+      "bytes": 185,
+      "sha256": "a686ac204143f3e15536c6be2d650171420637f20c32e50b0b522666a7d80051"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-pilot-mid-1102/admission-measured.mjs",
+      "copy": "admission-mid-measured.mjs",
+      "bytes": 5867,
+      "sha256": "9180b2209f56800c0daf427c09e69dfa7e80a6b4937fb9445a826dfbf656c327"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-asar-pilot2-1102/admission-measured.mjs",
+      "copy": "admission-asar2-generated-measured.mjs",
+      "bytes": 6013,
+      "sha256": "8a98178db97a9e2200e318ea9bb126bedf053e696c1eb2a85736d40b915e8e8e"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-asar-1102/construction.json",
+      "copy": "asar-construction.json",
+      "bytes": 219,
+      "sha256": "600a08707c310471303294ef97eb43f23e9b6719f453a644452df41579d31fe4"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-asar-1102/verification.json",
+      "copy": "asar-verification.json",
+      "bytes": 494,
+      "sha256": "c1fbc8d79e7f9698e098338169d83e0d8c57885f95df6d0122b6810940c06508"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-asar-pilot-1102.stderr.log",
+      "copy": "asar1-before-electron-failure.stderr.log",
+      "bytes": 787,
+      "sha256": "b3e08b5cf8dcc735e750864fff31cd36ee50293561c348494402e5d860f8c3ec"
+    },
+    {
+      "source": "/tmp/bird-production17b-release-review.md",
+      "copy": "release-review.md",
+      "bytes": 4732,
+      "sha256": "73c9dbf9f304d349d7cea08171af7b14b513e41b3b142d5d4795f2c113d88a25"
+    },
+    {
+      "source": "tools/land-package-verify-asar.mjs",
+      "copy": "asar-verifier-measured.mjs",
+      "bytes": 2682,
+      "sha256": "69cc79691f70643caff2e7a830eae1b8440d7e32c82b1d965216613cb2a977ee"
+    }
+  ]
+}

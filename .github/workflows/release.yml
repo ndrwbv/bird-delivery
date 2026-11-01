@@ -75,8 +75,38 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "версия: ${LAST:-тегов не было} → $TAG ($BUMP)" >> "$GITHUB_STEP_SUMMARY"
 
-  build:
+  prepare-land:
     needs: meta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Подготовить обычный город и проверить повторяемость
+        env:
+          BUILD_VERSION: ${{ needs.meta.outputs.version }}
+        run: xvfb-run -a node tools/land-package-prepare.mjs "--out=$RUNNER_TEMP/bird-land-preparation"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prepared-land-data
+          path: ${{ runner.temp }}/bird-land-preparation/package
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prepared-land-proof
+          path: |
+            ${{ runner.temp }}/bird-land-preparation/*.json
+            ${{ runner.temp }}/bird-land-preparation/*.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  build:
+    needs: [meta, prepare-land]
     strategy:
       fail-fast: false
       matrix:
@@ -100,6 +130,11 @@ jobs:
       - name: Зависимости
         run: npm ci
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: prepared-land-data
+          path: ${{ runner.temp }}/prepared-land-data
+
       # номер релиза — в package.json: из него Электрон (app.getVersion()), свойства .exe и установщик
       - name: Версия
         run: npm version "${{ needs.meta.outputs.version }}" --no-git-tag-version --allow-same-version
@@ -115,6 +150,7 @@ jobs:
       - name: Сборка веб-части (steam)
         env:
           BUILD_VERSION: ${{ needs.meta.outputs.version }}     # подпись версии на заставке
+          BIRD_LAND_DATA_DIR: ${{ runner.temp }}/prepared-land-data
         run: npm run build:steam
 
       - name: Пакет Electron linux-x64
@@ -136,6 +172,29 @@ jobs:
       - name: Установщик win-x64
         if: matrix.target == 'win'
         run: npx electron-builder --win nsis --x64 --publish never
+
+      - name: Проверить готовые данные внутри выпускаемого пакета
+        run: |
+          if [ "${{ matrix.target }}" = linux ]; then PACK=release/linux-unpacked; else PACK=release/win-unpacked; fi
+          node tools/land-package-verify-asar.mjs "--asar=$PACK/resources/app.asar" --dir=dist/steam "--report=$RUNNER_TEMP/land-package-asar.json"
+
+      - name: Обычный запуск из пакета — Linux
+        if: matrix.target == 'linux'
+        run: xvfb-run -a node tools/land-package-smoke.mjs --dir=release/linux-unpacked/resources/app.asar/dist/steam --catalog=dist/steam/city-data/catalog.json "--out=$RUNNER_TEMP/land-package-runtime" --preset=high
+
+      - name: Обычный запуск из пакета — Windows
+        if: matrix.target == 'win'
+        run: node tools/land-package-smoke.mjs --dir=release/win-unpacked/resources/app.asar/dist/steam --catalog=dist/steam/city-data/catalog.json "--out=$RUNNER_TEMP/land-package-runtime" --preset=high
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: land-package-runtime-${{ matrix.target }}
+          path: |
+            ${{ runner.temp }}/land-package-asar.json
+            ${{ runner.temp }}/land-package-runtime/**
+          if-no-files-found: ignore
+          retention-days: 7
 
       - uses: actions/upload-artifact@v4
         if: matrix.target == 'linux'

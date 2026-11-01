@@ -1,0 +1,182 @@
+{
+  "version": 1,
+  "variant": "generated",
+  "argv": [
+    "npm",
+    "run",
+    "probe",
+    "--",
+    "--mode=steam",
+    "--dir=/tmp/bird-ordinary17b-final-1102",
+    "--startup-trace",
+    "--startup-cold",
+    "--startup-fixture=/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+    "--fresh",
+    "--early",
+    "--mem",
+    "--size=deck",
+    "--cpu=3",
+    "--bootcpu",
+    "--eval=/tmp/bird-ordinary17b-memory/memory-eval.js",
+    "--bootwait=300",
+    "--timeout=600",
+    "--max=0",
+    "--errors",
+    "--startup-session=lp17bmem-generated-1102-a",
+    "--q=gfxdev=deck&mute&startupdistrict=0&landpackage=0",
+    "--report=/tmp/bird-ordinary17b-memory/generated.json"
+  ],
+  "cwd": "/Users/andrewboev/Desktop/not-work/delivery",
+  "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+  "sourceHashIsGitCommit": false,
+  "buildDir": "/tmp/bird-ordinary17b-final-1102",
+  "provenance": {
+    "eval": {
+      "path": "/tmp/bird-ordinary17b-memory/memory-eval.js",
+      "sha256": "84553092eca137bce2c10c291f51ba45a033b1c1cb0b02efa11f909ccee8a200",
+      "copy": "/tmp/bird-ordinary17b-memory/generated-measured-inputs/eval.js"
+    },
+    "pairGate": {
+      "path": "/tmp/bird-ordinary17b-memory/pair-gate.mjs",
+      "sha256": "f347ed544a6873ef3ceeda5df46b71bf749b8fb07d0a56d7a2f56db69b9290a7",
+      "copy": "/tmp/bird-ordinary17b-memory/generated-measured-inputs/pairGate.mjs"
+    },
+    "fixture": {
+      "path": "/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+      "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "copy": "/tmp/bird-ordinary17b-memory/generated-measured-inputs/fixture.json"
+    },
+    "catalog": {
+      "path": "/tmp/bird-ordinary17b-final-1102/city-data/catalog.json",
+      "sha256": "ff1f17e967c7f11dcdc6a929d6ef9ffb423f6b0b7a90ed546e8fab52d2d356e5",
+      "copy": "/tmp/bird-ordinary17b-memory/generated-measured-inputs/catalog.json"
+    },
+    "index": {
+      "path": "/tmp/bird-ordinary17b-final-1102/index.html",
+      "sha256": "715baeda6267ccb7d96ca0afcc42d2a45d5d5a39bcc58fea2bfbcbcb4191fec1",
+      "copy": "/tmp/bird-ordinary17b-memory/generated-measured-inputs/index.html"
+    },
+    "probe": {
+      "path": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+      "sha256": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce",
+      "copy": "/tmp/bird-ordinary17b-memory/generated-measured-inputs/probe.cjs"
+    },
+    "probePage": {
+      "path": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe-page.cjs",
+      "sha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd",
+      "copy": "/tmp/bird-ordinary17b-memory/generated-measured-inputs/probePage.cjs"
+    }
+  },
+  "observedBefore": {
+    "eval": {
+      "path": "/tmp/bird-ordinary17b-memory/memory-eval.js",
+      "sha256": "84553092eca137bce2c10c291f51ba45a033b1c1cb0b02efa11f909ccee8a200"
+    },
+    "pairGate": {
+      "path": "/tmp/bird-ordinary17b-memory/pair-gate.mjs",
+      "sha256": "f347ed544a6873ef3ceeda5df46b71bf749b8fb07d0a56d7a2f56db69b9290a7"
+    },
+    "fixture": {
+      "path": "/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+      "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+    },
+    "catalog": {
+      "path": "/tmp/bird-ordinary17b-final-1102/city-data/catalog.json",
+      "sha256": "ff1f17e967c7f11dcdc6a929d6ef9ffb423f6b0b7a90ed546e8fab52d2d356e5"
+    },
+    "index": {
+      "path": "/tmp/bird-ordinary17b-final-1102/index.html",
+      "sha256": "715baeda6267ccb7d96ca0afcc42d2a45d5d5a39bcc58fea2bfbcbcb4191fec1"
+    },
+    "probe": {
+      "path": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+      "sha256": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce"
+    },
+    "probePage": {
+      "path": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe-page.cjs",
+      "sha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd"
+    }
+  },
+  "observedAfter": {
+    "eval": {
+      "path": "/tmp/bird-ordinary17b-memory/memory-eval.js",
+      "sha256": "84553092eca137bce2c10c291f51ba45a033b1c1cb0b02efa11f909ccee8a200"
+    },
+    "pairGate": {
+      "path": "/tmp/bird-ordinary17b-memory/pair-gate.mjs",
+      "sha256": "f347ed544a6873ef3ceeda5df46b71bf749b8fb07d0a56d7a2f56db69b9290a7"
+    },
+    "fixture": {
+      "path": "/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+      "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+    },
+    "catalog": {
+      "path": "/tmp/bird-ordinary17b-final-1102/city-data/catalog.json",
+      "sha256": "ff1f17e967c7f11dcdc6a929d6ef9ffb423f6b0b7a90ed546e8fab52d2d356e5"
+    },
+    "index": {
+      "path": "/tmp/bird-ordinary17b-final-1102/index.html",
+      "sha256": "715baeda6267ccb7d96ca0afcc42d2a45d5d5a39bcc58fea2bfbcbcb4191fec1"
+    },
+    "probe": {
+      "path": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+      "sha256": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce"
+    },
+    "probePage": {
+      "path": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe-page.cjs",
+      "sha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd"
+    }
+  },
+  "provenanceUnchanged": true,
+  "startedEpochMs": 1793571538292,
+  "finishedEpochMs": 1793571666188,
+  "pid": 42069,
+  "processStatus": 0,
+  "signal": null,
+  "status": "returned",
+  "raw": "/tmp/bird-ordinary17b-memory/generated.json",
+  "rawSha256": "67d795cfb6d64abf9180e4eec1203c1fdd2acc9286618a3fdede90dd91a894d0",
+  "stdoutSha256": "39b8fa1ba23699c61302177177194358297387179c1cedc533aba076c87e3f42",
+  "stderrSha256": "5fefa6380c534ae38801014f33b1a0a4d232b10cdb0e5c61a21843fc08c81a2d",
+  "outputsBefore": {
+    "raw": {
+      "exists": false,
+      "sha256": null
+    },
+    "stdout": {
+      "exists": false,
+      "sha256": null
+    },
+    "stderr": {
+      "exists": false,
+      "sha256": null
+    }
+  },
+  "outputsAfter": {
+    "raw": {
+      "exists": true,
+      "sha256": "67d795cfb6d64abf9180e4eec1203c1fdd2acc9286618a3fdede90dd91a894d0"
+    },
+    "stdout": {
+      "exists": true,
+      "sha256": "39b8fa1ba23699c61302177177194358297387179c1cedc533aba076c87e3f42"
+    },
+    "stderr": {
+      "exists": true,
+      "sha256": "5fefa6380c534ae38801014f33b1a0a4d232b10cdb0e5c61a21843fc08c81a2d"
+    }
+  },
+  "wrapper": {
+    "path": "/tmp/bird-ordinary17b-memory/run-memory-once.mjs",
+    "sha256": "4aa50ba35bdef7776c97542890daeb51bf9719c3dd33a438bcb12db74477273e",
+    "afterSha256": "4aa50ba35bdef7776c97542890daeb51bf9719c3dd33a438bcb12db74477273e",
+    "unchanged": true
+  },
+  "attempts": 1,
+  "ok": true,
+  "pidKind": "Actual spawned npm launcher; renderer process epoch is separately in raw startupHost",
+  "singleAdmission": {
+    "ok": true,
+    "reasons": []
+  }
+}

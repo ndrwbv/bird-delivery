@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sfxIndex, MUSIC_DIR } from './tools/sfx-index.mjs';
+import { verifyLandPackage, landPackagePlugin } from './tools/land-package-build.mjs';
 
 // Версия сборки — подпись в углу заставки (src/main.js, __BUILD__). В CI релиз задаёт
 // BUILD_VERSION=X.Y.Z (тот же номер, что тег и package.json) → «v0.0.8»; локально — «dev-<коммит>».
@@ -79,10 +80,14 @@ const editorFiles = () => {
 };
 const sfxList = () => [fileList('sfx', () => sfxIndex()), fileList('music', () => sfxIndex(MUSIC_DIR))];
 
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+  const land = mode === 'steam' && process.env.BIRD_LAND_DATA_DIR
+    ? verifyLandPackage({ repo: path.dirname(fileURLToPath(import.meta.url)), dir: process.env.BIRD_LAND_DATA_DIR }) : null;
+  if (land && process.env.BIRD_EDITOR) throw Error('Prepared land package requires the ordinary Steam build');
+  return ({
   base: './',
-  plugins: mode === 'yandex' ? [yandexSdk(), ...sfxList()] : [...sfxList(), editorFiles()],
-  define: { __BUILD__: JSON.stringify(buildLabel()), __RELEASE__: JSON.stringify(isRelease()) },
+  plugins: [...(mode === 'yandex' ? [yandexSdk(), ...sfxList()] : [...sfxList(), editorFiles()]), ...(land ? [landPackagePlugin(land)] : [])],
+  define: { __BUILD__: JSON.stringify(buildLabel()), __RELEASE__: JSON.stringify(isRelease()), __LAND_PACKAGE_CATALOG__: JSON.stringify(land?.catalog || null) },
   build: {
     target: 'es2022', outDir: 'dist/' + mode, assetsInlineLimit: 0, sourcemap: false, emptyOutDir: true,
     // sandbox.html — песочница для проверки механик (docs/SANDBOX.md): в web и Стиме есть, в Яндекс не попадает.
@@ -93,4 +98,5 @@ export default defineConfig(({ mode }) => ({
   },
   // AGENT=1 — dev-сервер для агентов: не перезагружается от чужих правок (docs/AGENTS.md); свежий код — F5
   server: { host: '127.0.0.1', ...(process.env.AGENT ? { watch: null, hmr: false } : {}) },
-}));
+  });
+});

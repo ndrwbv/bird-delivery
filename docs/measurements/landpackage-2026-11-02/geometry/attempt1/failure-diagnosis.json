@@ -1,0 +1,29 @@
+{
+  "classification": "fixture failure; not accepted as geometry or game regression",
+  "stage": "select",
+  "cause": "The normal EDL-owned path itself installs window.__lateSeed = OWN_LATE_SEED. The eval incorrectly forbids all __lateSeed functions even after passing private rngDescriptor ownership/baseSeed checks.",
+  "evidence": [
+    {
+      "path": "/Users/andrewboev/Desktop/not-work/delivery/src/game/editlayer.js",
+      "sha256": "4bc2b8b4119bf80844a9c0ae730d1a49f2ff5b1cf88bcdd8bb3119b67558eedd",
+      "lines": [
+        227,
+        238,
+        241,
+        242
+      ]
+    }
+  ],
+  "rawSha256": "6210b6173013cb24639e653e8d14fd7a3d7e0d6caed02117f7117e984ddfc9af",
+  "processStatus": 0,
+  "outerOk": true,
+  "resultOk": false,
+  "errors": [],
+  "uncaught": 0,
+  "crash": 0,
+  "cacheStarted": false,
+  "retryStarted": false,
+  "runtimeChanged": false,
+  "evalChangedAfterFailure": false,
+  "proposedNarrowCorrection": "Retain host.seed===null, exact argv with no --seed, query exclusions, and owned ordinary rngDescriptor; remove only the invalid blanket absence requirement for __lateSeed."
+}

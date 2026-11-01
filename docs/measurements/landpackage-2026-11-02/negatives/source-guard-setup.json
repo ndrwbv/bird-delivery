@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "sameImmutableBuildPath": "/tmp/bird-ordinary17b-final-1102",
+  "sourceFingerprint": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+  "sourceFingerprintIsGitCommit": false,
+  "receiptHash": "d626f6c216f3652655816d296775a7e09251ae1b8ac0a51e49498f948f3a6f84",
+  "catalogSha256": "ff1f17e967c7f11dcdc6a929d6ef9ffb423f6b0b7a90ed546e8fab52d2d356e5",
+  "readerUnchangedFromOrdinaryPreparation": {
+    "file": "src/game/landdata/land-package-reader.js",
+    "sha256": "c3aeb229e4008e4a2febc2c8a63442d2938676a3574967857a478598da5cab6e",
+    "bytes": 12901,
+    "matchesReceipt": true
+  },
+  "perAttemptInitEvalFixtureProbeHashesRechecked": true,
+  "fullSourceOrBuildTraversalDuringNegatives": false,
+  "assetBodiesReadByHost": false,
+  "runtimeOrBuildModifiedByNegativeTests": false,
+  "ordinaryEDL": "No probe seed or RNG hook override; actual provider/ordinaryAtImport/hookOwned checked in each renderer result.",
+  "setup": "Shared stock bootstrap+Go/tutorial/W script; high saved preference, fresh isolated sessions, Steam Deck1280x800 emulation, renderer CPU3. Only exact fetch response or public preparing cancel injected.",
+  "scope": "Reference/publication cancellation proof, not a second byte-exact city roundtrip or memory/timing measurement."
+}

@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "checks": 11,
+  "ordinaryOwnedHookPresentAccepted": true,
+  "externalDescriptorRejected": true,
+  "hostSeedRejected": true,
+  "queryOverridesRejected": true,
+  "commandsOmitSeed": true,
+  "observerNoRngAssignment": true,
+  "gameExecuted": false,
+  "evalSha256": "cb01204ead0689b13cc4196dffcf03a1eff3eed60c1b9a40912c7b9423f69df9",
+  "guard": " need(startup.host?.seed===null&&!flags.has('seed')&&!flags.has('landcache')&&!flags.has('landexport17a')&&!flags.has('landexport17b'),'external RNG/cache/export override');"
+}

@@ -1,0 +1,777 @@
+{
+  "version": 1,
+  "ok": true,
+  "checkedAt": "2026-11-01T22:52:41.954815+00:00",
+  "manifest": "/tmp/bird-ordinary17b-comparison12-attempt2-1102/manifest.json",
+  "manifestSha256": "6401c31cd479824a1c5d8cf146cb309c8c779ea0bb6214f8b506833025f7e526",
+  "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+  "buildHash": "2a4474c94d92bb413ed7dd132391044cef8ac89d671bc63e9c37d7be340d04b1",
+  "runs": 12,
+  "pairs": [
+    {
+      "repeat": 1,
+      "variant": "generated",
+      "session": "ordinary17-9f66d630-7d67-4a2a-b083-d8f9b94f1cd7"
+    },
+    {
+      "repeat": 1,
+      "variant": "cache",
+      "session": "ordinary17-69ad977d-a7e2-4b87-955a-17a1be4dc39d"
+    },
+    {
+      "repeat": 2,
+      "variant": "generated",
+      "session": "ordinary17-3828a86f-4981-4ef7-84d4-d2ede74de683"
+    },
+    {
+      "repeat": 2,
+      "variant": "cache",
+      "session": "ordinary17-ef585eca-24d2-48f5-b383-3c2d43e03ee1"
+    },
+    {
+      "repeat": 3,
+      "variant": "generated",
+      "session": "ordinary17-2cc8261b-115b-4d0f-8838-fac905ce9dcb"
+    },
+    {
+      "repeat": 3,
+      "variant": "cache",
+      "session": "ordinary17-9d78f190-72b8-45fe-89dd-45fa6afd6b1d"
+    }
+  ],
+  "stageAndTimingAggregatesVerified": 3408,
+  "errors": [],
+  "perRun": [
+    {
+      "id": "1/generated/cold",
+      "reportSha256": "fa6b9958bf2cace107cdaa12a5bf2ad79a4b65bd3387255cb3897b25312a93ba",
+      "smokeRecordSha256": "24659f07029b6689385bcdb2e1ec8c714dabba305f614615c5a33f8271ee4fd9",
+      "moved": 4.784313980138737,
+      "guard": {
+        "guardVersion": 2,
+        "state": "drive",
+        "paused": false,
+        "mapOpen": false,
+        "held": false,
+        "localReady": true,
+        "supportReady": true,
+        "x": 3124.9371185058994,
+        "z": 2046.8247636833012,
+        "gas": 0,
+        "readyTiles": 32
+      },
+      "times": {
+        "controlMs": 80019.10000014305,
+        "processToControlMs": 80284.5,
+        "fromClickMs": 70670.79999995232
+      }
+    },
+    {
+      "id": "1/generated/warm",
+      "reportSha256": "eae4bbfe462d9eecc95655b65f093a4126b0ec625d9a9808b2e2ee4d2f4d848e",
+      "smokeRecordSha256": "f7e57eb2c13d89fe7fd1493486de1ca26511636fb7b7cf51b7a2b73062b5c8aa",
+      "moved": 5.020247123167947,
+      "guard": {
+        "guardVersion": 2,
+        "state": "drive",
+        "paused": false,
+        "mapOpen": false,
+        "held": false,
+        "localReady": true,
+        "supportReady": true,
+        "x": 3124.9371185058994,
+        "z": 2046.8247636833012,
+        "gas": 0,
+        "readyTiles": 32
+      },
+      "times": {
+        "controlMs": 81442.89999985695,
+        "processToControlMs": 81644.7998046875,
+        "fromClickMs": 71553.39999985695
+      }
+    },
+    {
+      "id": "1/cache/cold",
+      "reportSha256": "040ac0b4735816fcd3af6b806b834ccc39b7bdaa1bbeddd4c656ed1c3f6ae94b",
+      "smokeRecordSha256": "3f2b4fff43c7d6b165b7fa1ad1c7ceaa85838d501b6b02f326be10c872e2542b",
+      "moved": 4.785729573354238,
+      "guard": {
+        "guardVersion": 2,
+        "state": "drive",
+        "paused": false,
+        "mapOpen": false,
+        "held": false,
+        "localReady": true,
+        "supportReady": true,
+        "x": 3124.9371185058994,
+        "z": 2046.8247636833012,
+        "gas": 0,
+        "readyTiles": 32
+      },
+      "times": {
+        "controlMs": 66034.79999995232,
+        "processToControlMs": 66274.69995117188,
+        "fromClickMs": 56111
+      }
+    },
+    {
+      "id": "1/cache/warm",
+      "reportSha256": "cb5979bf8bf70ba8fcb0b9517d1b7052b1464a03afb2a144d0016d6a68198223",
+      "smokeRecordSha256": "960382602f00abefe0e5703743f92651c8d4f54f1021318baea69b983b3e5e70",
+      "moved": 4.784458860136974,
+      "guard": {
+        "guardVersion": 2,
+        "state": "drive",
+        "paused": false,
+        "mapOpen": false,
+        "held": false,
+        "localReady": true,
+        "supportReady": true,
+        "x": 3124.9371185058994,
+        "z": 2046.8247636833012,
+        "gas": 0,
+        "readyTiles": 32
+      },
+      "times": {
+        "controlMs": 65656.59999990463,
+        "processToControlMs": 65857.30004882812,
+        "fromClickMs": 55774.799999952316
+      }
+    },
+    {
+      "id": "2/cache/cold",
+      "reportSha256": "3a25097c4d60b03f27d3a3a0712e8848b05a9a21ded64e056d342729032a6c49",
+      "smokeRecordSha256": "15e4d3da849c570b58af21d591db819e32a57034ea610854c70aea97cd75152e",
+      "moved": 5.021396095950386,
+      "guard": {
+        "guardVersion": 2,
+        "state": "drive",
+        "paused": false,
+        "mapOpen": false,
+        "held": false,
+        "localReady": true,
+        "supportReady": true,
+        "x": 3124.9371185058994,
+        "z": 2046.8247636833012,
+        "gas": 0,
+        "readyTiles": 32
+      },
+      "times": {
+        "controlMs": 65936.89999985695,
+        "processToControlMs": 66184.5,
+        "fromClickMs": 56012.5
+      }
+    },
+    {
+      "id": "2/cache/warm",
+      "reportSha256": "30912844ef843047b7e647375a5ed0bcb27f924ea1d99f2f75f5a884af1ebd6d",
+      "smokeRecordSha256": "c22ff185bd92282b5c59b0e647d996379b7bef22a689a594e37eed5c65f1787d",
+      "moved": 5.0188048311192945,
+      "guard": {
+        "guardVersion": 2,
+        "state": "drive",
+        "paused": false,
+        "mapOpen": false,
+        "held": false,
+        "localReady": true,
+        "supportReady": true,
+        "x": 3124.9371185058994,
+        "z": 2046.8247636833012,
+        "gas": 0,
+        "readyTiles": 32
+      },
+      "times": {
+        "controlMs": 65685,
+        "processToControlMs": 65886.5,
+        "fromClickMs": 55790.199999809265
+      }
+    },
+    {
+      "id": "2/generated/cold",
+      "reportSha256": "6033b0b1c49ee4d04285607437824df537e6f70c16dc6535fe28445cd5d03266",
+      "smokeRecordSha256": "8ab614878a15f13b1ec00847688fbbe6a157b117f2c65e448c33ed92ac109e8d",
+      "moved": 4.692849099429169,
+      "guard": {
+        "guardVersion": 2,
+        "state": "drive",
+        "paused": false,
+        "mapOpen": false,
+        "held": false,
+        "localReady": true,
+        "supportReady": true,
+        "x": 3124.9371185058994,
+        "z": 2046.8247636833012,
+        "gas": 0,
+        "readyTiles": 32
+      },
+      "times": {
+        "controlMs": 81385.89999985695,
+        "processToControlMs": 81625.5,
+        "fromClickMs": 71473.09999990463
+      }
+    },
+    {
+      "id": "2/generated/warm",
+      "reportSha256": "12492db5fa784531a5b6cca8d3f2b3e308d129c2781fbc1a2f75635ddc8ab31b",
+      "smokeRecordSha256": "ce2ce05fbafacc24ddc300d934c0f3f16d2ebedc7551b4f7c0adefe68277aa95",
+      "moved": 5.021543611522675,
+      "guard": {
+        "guardVersion": 2,
+        "state": "drive",
+        "paused": false,
+        "mapOpen": false,
+        "held": false,
+        "localReady": true,
+        "supportReady": true,
+        "x": 3124.9371185058994,
+        "z": 2046.8247636833012,
+        "gas": 0,
+        "readyTiles": 32
+      },
+      "times": {
+        "controlMs": 81752.5,
+        "processToControlMs": 81955.69995117188,
+        "fromClickMs": 71884.10000014305
+      }
+    },
+    {
+      "id": "3/generated/cold",
+      "reportSha256": "b58897001064c67adb6d1660ebf32981ee566aa69c1fc33b5774afe38f284bbe",
+      "smokeRecordSha256": "980c48a781455056062973dff50c8c2dc708a9b8498f3105055c7d382fd29680",
+      "moved": 5.01865717584541,
+      "guard": {
+        "guardVersion": 2,
+        "state": "drive",
+        "paused": false,
+        "mapOpen": false,
+        "held": false,
+        "localReady": true,
+        "supportReady": true,
+        "x": 3124.9371185058994,
+        "z": 2046.8247636833012,
+        "gas": 0,
+        "readyTiles": 32
+      },
+      "times": {
+        "controlMs": 81312.40000009537,
+        "processToControlMs": 81569.89990234375,
+        "fromClickMs": 71392.5
+      }
+    },
+    {
+      "id": "3/generated/warm",
+      "reportSha256": "de5cf18c169dad732b1ec3b1f1d9c60916b13f4e41d59ed966f351e51f1423f8",
+      "smokeRecordSha256": "9a06e77443de2527f946c02319937eccad4f6f11a71dedc707c7b9f8db722c8d",
+      "moved": 4.476183995019568,
+      "guard": {
+        "guardVersion": 2,
+        "state": "drive",
+        "paused": false,
+        "mapOpen": false,
+        "held": false,
+        "localReady": true,
+        "supportReady": true,
+        "x": 3124.9371185058994,
+        "z": 2046.8247636833012,
+        "gas": 0,
+        "readyTiles": 32
+      },
+      "times": {
+        "controlMs": 80819.70000004768,
+        "processToControlMs": 81023.69995117188,
+        "fromClickMs": 70967.5
+      }
+    },
+    {
+      "id": "3/cache/cold",
+      "reportSha256": "f281f476de5e28bfea759ed235c8b90b8fabc9a6582139c37544688a4157b7f7",
+      "smokeRecordSha256": "01739c725af2ffc52587939738bc63952e1e7b1a035601296de7112bae527788",
+      "moved": 4.7844589908231185,
+      "guard": {
+        "guardVersion": 2,
+        "state": "drive",
+        "paused": false,
+        "mapOpen": false,
+        "held": false,
+        "localReady": true,
+        "supportReady": true,
+        "x": 3124.9371185058994,
+        "z": 2046.8247636833012,
+        "gas": 0,
+        "readyTiles": 32
+      },
+      "times": {
+        "controlMs": 66193.5,
+        "processToControlMs": 66436.19995117188,
+        "fromClickMs": 56357
+      }
+    },
+    {
+      "id": "3/cache/warm",
+      "reportSha256": "a3229f1db779e8c153bd54f81160486e11cc8f3b9bb82917ce6d9f41c3e3f46e",
+      "smokeRecordSha256": "9f58e0d9997b3cde164694b4c830f39788fbf0c28d4ee4a1054c6ff35755e992",
+      "moved": 4.554348338160456,
+      "guard": {
+        "guardVersion": 2,
+        "state": "drive",
+        "paused": false,
+        "mapOpen": false,
+        "held": false,
+        "localReady": true,
+        "supportReady": true,
+        "x": 3124.9371185058994,
+        "z": 2046.8247636833012,
+        "gas": 0,
+        "readyTiles": 32
+      },
+      "times": {
+        "controlMs": 65649,
+        "processToControlMs": 65846.10009765625,
+        "fromClickMs": 55868.10000014305
+      }
+    }
+  ],
+  "manualSamples": [
+    {
+      "id": "1/generated/cold",
+      "control": {
+        "at": 80019.10000014305,
+        "data": {
+          "guardVersion": 2,
+          "state": "drive",
+          "paused": false,
+          "mapOpen": false,
+          "held": false,
+          "localReady": true,
+          "supportReady": true,
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012,
+          "gas": 0,
+          "readyTiles": 32
+        }
+      },
+      "moved": 4.784313980138737,
+      "rng": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "cleanCalls": 1,
+      "activate": 1,
+      "align": 1,
+      "cache": null
+    },
+    {
+      "id": "1/cache/warm",
+      "control": {
+        "at": 65656.59999990463,
+        "data": {
+          "guardVersion": 2,
+          "state": "drive",
+          "paused": false,
+          "mapOpen": false,
+          "held": false,
+          "localReady": true,
+          "supportReady": true,
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012,
+          "gas": 0,
+          "readyTiles": 32
+        }
+      },
+      "moved": 4.784458860136974,
+      "rng": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "cleanCalls": 0,
+      "activate": 1,
+      "align": 1,
+      "cache": {
+        "version": 1,
+        "source": "cache",
+        "phase": "restored",
+        "hit": true,
+        "fatal": false,
+        "reason": null,
+        "cleaned": true,
+        "bufferHeld": false,
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "wireSha256": "2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd",
+        "expectedWireSha256": "2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd",
+        "rawSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+        "expectedRawSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+        "bytes": 34231591,
+        "encoding": "gzip"
+      }
+    },
+    {
+      "id": "2/cache/cold",
+      "control": {
+        "at": 65936.89999985695,
+        "data": {
+          "guardVersion": 2,
+          "state": "drive",
+          "paused": false,
+          "mapOpen": false,
+          "held": false,
+          "localReady": true,
+          "supportReady": true,
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012,
+          "gas": 0,
+          "readyTiles": 32
+        }
+      },
+      "moved": 5.021396095950386,
+      "rng": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "cleanCalls": 0,
+      "activate": 1,
+      "align": 1,
+      "cache": {
+        "version": 1,
+        "source": "cache",
+        "phase": "restored",
+        "hit": true,
+        "fatal": false,
+        "reason": null,
+        "cleaned": true,
+        "bufferHeld": false,
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "wireSha256": "2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd",
+        "expectedWireSha256": "2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd",
+        "rawSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+        "expectedRawSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+        "bytes": 34231591,
+        "encoding": "gzip"
+      }
+    },
+    {
+      "id": "2/generated/warm",
+      "control": {
+        "at": 81752.5,
+        "data": {
+          "guardVersion": 2,
+          "state": "drive",
+          "paused": false,
+          "mapOpen": false,
+          "held": false,
+          "localReady": true,
+          "supportReady": true,
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012,
+          "gas": 0,
+          "readyTiles": 32
+        }
+      },
+      "moved": 5.021543611522675,
+      "rng": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "cleanCalls": 1,
+      "activate": 1,
+      "align": 1,
+      "cache": null
+    },
+    {
+      "id": "3/generated/cold",
+      "control": {
+        "at": 81312.40000009537,
+        "data": {
+          "guardVersion": 2,
+          "state": "drive",
+          "paused": false,
+          "mapOpen": false,
+          "held": false,
+          "localReady": true,
+          "supportReady": true,
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012,
+          "gas": 0,
+          "readyTiles": 32
+        }
+      },
+      "moved": 5.01865717584541,
+      "rng": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "cleanCalls": 1,
+      "activate": 1,
+      "align": 1,
+      "cache": null
+    },
+    {
+      "id": "3/cache/warm",
+      "control": {
+        "at": 65649,
+        "data": {
+          "guardVersion": 2,
+          "state": "drive",
+          "paused": false,
+          "mapOpen": false,
+          "held": false,
+          "localReady": true,
+          "supportReady": true,
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012,
+          "gas": 0,
+          "readyTiles": 32
+        }
+      },
+      "moved": 4.554348338160456,
+      "rng": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "cleanCalls": 0,
+      "activate": 1,
+      "align": 1,
+      "cache": {
+        "version": 1,
+        "source": "cache",
+        "phase": "restored",
+        "hit": true,
+        "fatal": false,
+        "reason": null,
+        "cleaned": true,
+        "bufferHeld": false,
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "wireSha256": "2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd",
+        "expectedWireSha256": "2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd",
+        "rawSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+        "expectedRawSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+        "bytes": 34231591,
+        "encoding": "gzip"
+      }
+    }
+  ],
+  "summary": [
+    {
+      "variant": "generated",
+      "phase": "cold",
+      "n": 3,
+      "timings": {
+        "controlMs": {
+          "n": 3,
+          "valuesMs": [
+            80019.10000014305,
+            81385.89999985695,
+            81312.40000009537
+          ],
+          "medianMs": 81312.40000009537,
+          "minMs": 80019.10000014305,
+          "maxMs": 81385.89999985695
+        },
+        "processToControlMs": {
+          "n": 3,
+          "valuesMs": [
+            80284.5,
+            81625.5,
+            81569.89990234375
+          ],
+          "medianMs": 81569.89990234375,
+          "minMs": 80284.5,
+          "maxMs": 81625.5
+        },
+        "fromClickMs": {
+          "n": 3,
+          "valuesMs": [
+            70670.79999995232,
+            71473.09999990463,
+            71392.5
+          ],
+          "medianMs": 71392.5,
+          "minMs": 70670.79999995232,
+          "maxMs": 71473.09999990463
+        }
+      },
+      "workUnion": {
+        "n": 3,
+        "valuesMs": [
+          70924.79999637604,
+          72165.80000281334,
+          72233.4999859333
+        ],
+        "medianMs": 72165.80000281334,
+        "minMs": 70924.79999637604,
+        "maxMs": 72233.4999859333
+      }
+    },
+    {
+      "variant": "generated",
+      "phase": "warm",
+      "n": 3,
+      "timings": {
+        "controlMs": {
+          "n": 3,
+          "valuesMs": [
+            81442.89999985695,
+            81752.5,
+            80819.70000004768
+          ],
+          "medianMs": 81442.89999985695,
+          "minMs": 80819.70000004768,
+          "maxMs": 81752.5
+        },
+        "processToControlMs": {
+          "n": 3,
+          "valuesMs": [
+            81644.7998046875,
+            81955.69995117188,
+            81023.69995117188
+          ],
+          "medianMs": 81644.7998046875,
+          "minMs": 81023.69995117188,
+          "maxMs": 81955.69995117188
+        },
+        "fromClickMs": {
+          "n": 3,
+          "valuesMs": [
+            71553.39999985695,
+            71884.10000014305,
+            70967.5
+          ],
+          "medianMs": 71553.39999985695,
+          "minMs": 70967.5,
+          "maxMs": 71884.10000014305
+        }
+      },
+      "workUnion": {
+        "n": 3,
+        "valuesMs": [
+          72590.99999952316,
+          72679.79999828339,
+          72073.3999979496
+        ],
+        "medianMs": 72590.99999952316,
+        "minMs": 72073.3999979496,
+        "maxMs": 72679.79999828339
+      }
+    },
+    {
+      "variant": "cache",
+      "phase": "cold",
+      "n": 3,
+      "timings": {
+        "controlMs": {
+          "n": 3,
+          "valuesMs": [
+            66034.79999995232,
+            65936.89999985695,
+            66193.5
+          ],
+          "medianMs": 66034.79999995232,
+          "minMs": 65936.89999985695,
+          "maxMs": 66193.5
+        },
+        "processToControlMs": {
+          "n": 3,
+          "valuesMs": [
+            66274.69995117188,
+            66184.5,
+            66436.19995117188
+          ],
+          "medianMs": 66274.69995117188,
+          "minMs": 66184.5,
+          "maxMs": 66436.19995117188
+        },
+        "fromClickMs": {
+          "n": 3,
+          "valuesMs": [
+            56111,
+            56012.5,
+            56357
+          ],
+          "medianMs": 56111,
+          "minMs": 56012.5,
+          "maxMs": 56357
+        }
+      },
+      "workUnion": {
+        "n": 3,
+        "valuesMs": [
+          58394.19999074936,
+          58252.20001101494,
+          58328.59999871254
+        ],
+        "medianMs": 58328.59999871254,
+        "minMs": 58252.20001101494,
+        "maxMs": 58394.19999074936
+      }
+    },
+    {
+      "variant": "cache",
+      "phase": "warm",
+      "n": 3,
+      "timings": {
+        "controlMs": {
+          "n": 3,
+          "valuesMs": [
+            65656.59999990463,
+            65685,
+            65649
+          ],
+          "medianMs": 65656.59999990463,
+          "minMs": 65649,
+          "maxMs": 65685
+        },
+        "processToControlMs": {
+          "n": 3,
+          "valuesMs": [
+            65857.30004882812,
+            65886.5,
+            65846.10009765625
+          ],
+          "medianMs": 65857.30004882812,
+          "minMs": 65846.10009765625,
+          "maxMs": 65886.5
+        },
+        "fromClickMs": {
+          "n": 3,
+          "valuesMs": [
+            55774.799999952316,
+            55790.199999809265,
+            55868.10000014305
+          ],
+          "medianMs": 55790.199999809265,
+          "minMs": 55774.799999952316,
+          "maxMs": 55868.10000014305
+        }
+      },
+      "workUnion": {
+        "n": 3,
+        "valuesMs": [
+          58232.39999675751,
+          58417.30000424385,
+          58152.29999780655
+        ],
+        "medianMs": 58232.39999675751,
+        "minMs": 58152.29999780655,
+        "maxMs": 58417.30000424385
+      }
+    }
+  ],
+  "limitations": [
+    "Only recorded metadata/raw/harness copies read; no build/source traversal or binary asset reads. Saved preflight authenticity remains root initial content verification, not a fresh audit of installed bytes.",
+    "Ordinary EDL/newbie/stored high/district0 only, n3 per cell on macOS arm64 Electron33/Chromium130 CPU3 emulation; not physical Steam Deck or a guarantee for other careers.",
+    "Cold/warm refer to owned Chromium session clearing/reuse; OS/driver caches uncontrolled.",
+    "Navigation/process/click origins differ. Individual stage and wait windows overlap and are never summed; import wall is not parse/CPU. app:// ResourceTiming is unavailable.",
+    "Failed attempt01 is excluded and remains retained as a metadata failure; this audit never rewrites or reclassifies it. Memory/geometry/release checks remain separate."
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "reasons": [],
+  "mode": "cache",
+  "reportSha256": "87cb9448fbeff2ea5e3a2af88e865903f4adf6da4af8266550863803de019498",
+  "stage": null,
+  "error": null,
+  "coverage": {
+    "poses": 3,
+    "paved": 2,
+    "crossings": 6,
+    "boundaries": 12,
+    "props": 8,
+    "benches": 4,
+    "drawDigest": "e537fb304916621064c5ca63fe1f11f0e7d5f2c8a325bc44f61c74a36b5cc533",
+    "maxDriveStep": 0.06527746178180749,
+    "maxLateral": 1.5543122344752192e-12,
+    "benchProof": [
+      "benchY+retained CPU range Y; no GPU proof",
+      "benchY+retained CPU range Y; no GPU proof",
+      "benchY+retained CPU range Y; no GPU proof",
+      "benchY+retained CPU range Y; no GPU proof"
+    ]
+  }
+}

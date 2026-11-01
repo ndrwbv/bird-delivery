@@ -1,0 +1,50 @@
+{
+  "sourceFingerprint": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+  "readerSourceSha256": "c3aeb229e4008e4a2febc2c8a63442d2938676a3574967857a478598da5cab6e",
+  "rawSha256": "f6819f6dec75d82ce10ae75e61bfe433b003a22608615d9871428aab883e9ff8",
+  "before": {
+    "built": false,
+    "supportReady": false,
+    "maskReady": false,
+    "maskCells": 0,
+    "maskCount": 0,
+    "published": 0,
+    "cacheCommitSteps": 0
+  },
+  "after": {
+    "built": false,
+    "supportReady": false,
+    "maskReady": false,
+    "maskCells": 0,
+    "maskCount": 0,
+    "published": 0,
+    "cacheCommitSteps": 0,
+    "meta": {
+      "version": 1,
+      "source": "generated",
+      "phase": "fallback",
+      "hit": false,
+      "fatal": false,
+      "reason": "land-package-reader:ACCEPTANCE_CANCEL_PREPARING",
+      "cleaned": true,
+      "bufferHeld": false,
+      "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+      "wireSha256": "2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd",
+      "expectedWireSha256": "2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd",
+      "rawSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+      "expectedRawSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+      "bytes": 34231591,
+      "encoding": "gzip"
+    }
+  },
+  "baselineCaptured": true,
+  "unchangedPrecleanModelPackedGridReferencesAtCancel": true,
+  "lateCachePublication": 0,
+  "partialPublication": 0,
+  "thenGeneratedCleanActivateAlign": {
+    "clean": 1,
+    "activate": 1,
+    "align": 1
+  },
+  "scope": "Snapshot calls only after rawCount0, so compact is a no-op; no whole-city copy/hash during cancellation. References are released in observer after cancel. This proves no model reference install/readiness/publication at cancel, not an independent byte-exact full target digest."
+}

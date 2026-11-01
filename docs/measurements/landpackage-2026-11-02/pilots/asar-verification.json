@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "archive": "/tmp/bird-ordinary17b-asar-1102/app.asar",
+  "catalogSha256": "ff1f17e967c7f11dcdc6a929d6ef9ffb423f6b0b7a90ed546e8fab52d2d356e5",
+  "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+  "assets": [
+    {
+      "path": "dist/steam/city-data/2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd.land.gz",
+      "bytes": 34231591,
+      "sha256": "2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd"
+    }
+  ]
+}

@@ -1,0 +1,909 @@
+{
+  "version": 1,
+  "ok": true,
+  "sample": "n1 pair, each variant one actual process, no retries",
+  "scope": "Adult Steam, ordinary EDL without seed/init/quality override, saved Deck high1280x800, rendererCPU3, title/menu checkpoint; macOS emulation, not physical Steam Deck. Not a timing series.",
+  "sourceFingerprint": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+  "sourceIsGitCommit": false,
+  "coverage": "Identical49 naturally ready IDs, radius832 plus ready640, same position; same IDs before/after2GC and across variants",
+  "counts": {
+    "geo": [
+      6504,
+      6493
+    ],
+    "tex": [
+      65,
+      65
+    ],
+    "programs": [
+      228,
+      228
+    ]
+  },
+  "noExactSavingClaim": true,
+  "accounting": "Helper MB/MiB fields are retained as emitted. Heap, estimated GL, typed-array JS backing, process working set and macOS footprint overlap/differ and are never added. n1 absolute observations do not promise exact memory savings. Buffer cleanup does not imply forced native memory reclamation.",
+  "pairValidation": {
+    "ok": true,
+    "reasons": [],
+    "unavailable": [],
+    "observedSceneCounts": {
+      "geo": [
+        6504,
+        6493
+      ],
+      "tex": [
+        65,
+        65
+      ],
+      "programs": [
+        228,
+        228
+      ]
+    },
+    "notes": "Ordinary17b n1 memory pair on emulated Deck. No physical Deck claim or exact saving claim; geo/tex differences disclosed; asynchronous component peaks never summed.",
+    "generatedRawSha256": "67d795cfb6d64abf9180e4eec1203c1fdd2acc9286618a3fdede90dd91a894d0",
+    "cacheRawSha256": "84ce627ade19c1ee3ce20263403914bd590c9e955da2ee52fa15049555b417c0",
+    "observedHashes": {
+      "eval": "84553092eca137bce2c10c291f51ba45a033b1c1cb0b02efa11f909ccee8a200",
+      "pairGate": "f347ed544a6873ef3ceeda5df46b71bf749b8fb07d0a56d7a2f56db69b9290a7",
+      "fixture": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "catalog": "ff1f17e967c7f11dcdc6a929d6ef9ffb423f6b0b7a90ed546e8fab52d2d356e5",
+      "index": "715baeda6267ccb7d96ca0afcc42d2a45d5d5a39bcc58fea2bfbcbcb4191fec1",
+      "probe": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce",
+      "probePage": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd"
+    },
+    "gateSha256": "f347ed544a6873ef3ceeda5df46b71bf749b8fb07d0a56d7a2f56db69b9290a7",
+    "pids": [
+      42069,
+      60485
+    ],
+    "processStatus": [
+      0,
+      0
+    ],
+    "signals": [
+      null,
+      null
+    ]
+  },
+  "runs": [
+    {
+      "variant": "generated",
+      "sourceFingerprint": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+      "sourceIsGitCommit": false,
+      "actualPid": 42069,
+      "pidKind": "Actual spawned npm launcher; renderer process epoch is separately in raw startupHost",
+      "status": 0,
+      "signal": null,
+      "rawSha256": "67d795cfb6d64abf9180e4eec1203c1fdd2acc9286618a3fdede90dd91a894d0",
+      "provenanceUnchanged": true,
+      "startupFootprintWatch": {
+        "foot0": 844,
+        "peak": 2091,
+        "exact": true,
+        "sampled": 2079,
+        "peakT": 44228,
+        "foot1": 1735,
+        "life0": 850,
+        "life1": 2091,
+        "page": 2918,
+        "gpu": 872,
+        "n": 1259,
+        "ms": 117529
+      },
+      "watchStarted": {
+        "pageMs": 9511.599999904633,
+        "epochMs": 1793571548190
+      },
+      "watchStopped": {
+        "pageMs": 127015.5,
+        "epochMs": 1793571665694
+      },
+      "gcStart": {
+        "pageMs": 127015.5,
+        "epochMs": 1793571665694
+      },
+      "gcEnd": {
+        "pageMs": 127401.70000004768,
+        "epochMs": 1793571666080
+      },
+      "metadataReadStart": {
+        "pageMs": 127403.09999990463,
+        "epochMs": 1793571666081
+      },
+      "metadataReadEnd": {
+        "pageMs": 127433.89999985695,
+        "epochMs": 1793571666112
+      },
+      "steadyAfter2GC": {
+        "label": "steady-after-ready",
+        "heap": 839,
+        "gl": {
+          "buf": 353.8,
+          "tex": 115.4,
+          "rb": 1,
+          "fb": 35.2,
+          "total": 505.4,
+          "peak": 505.4,
+          "nb": 18450,
+          "nt": 74,
+          "nr": 5,
+          "heapPeak": 1727.8
+        },
+        "glJs": {
+          "mb": 27.8,
+          "n": 1556
+        },
+        "geo": 6504,
+        "tex": 65,
+        "prog": 228,
+        "proc": {
+          "gpu": 872,
+          "page": 2907,
+          "foot": 1714,
+          "footPeak": 2091
+        }
+      },
+      "globalSampledWorkingSetPeak": {
+        "page": 2917,
+        "gpu": 888,
+        "pageT": 106105,
+        "gpuT": 127566,
+        "n": 625
+      },
+      "globalPeakEpochBounds": {
+        "page": [
+          1793571644545,
+          1793571644687
+        ],
+        "gpu": [
+          1793571666006,
+          1793571666148
+        ]
+      },
+      "globalGpuPeakGuaranteedAfterStartupWatch": true,
+      "globalPeakNote": "Whole-run200ms sampling continues through2GC and metadata. Exact T0 epoch not exported; epoch bounds use process origin, navigation and host finish-total. Never relabel as startup-window peak.",
+      "observedPhaseNoGC": [
+        {
+          "label": "mainwork-menu",
+          "requested": {
+            "pageMs": 9511.599999904633,
+            "epochMs": 1793571548190
+          },
+          "completed": {
+            "pageMs": 9584.599999904633,
+            "epochMs": 1793571548263
+          },
+          "phaseBefore": "mainwork",
+          "phaseAfter": "mainwork",
+          "state": {
+            "state": "title",
+            "paused": false,
+            "bootFull": false,
+            "lateBusy": true,
+            "supportReady": false,
+            "ready": {
+              "ready": 0,
+              "total": 1776,
+              "steps": 0,
+              "maxStep": 0,
+              "ms": 0,
+              "failed": 0
+            },
+            "ready640": false,
+            "ready832": false,
+            "position": {
+              "x": 3110.816648917971,
+              "z": 2073.230921741487
+            }
+          },
+          "heapRawMiB": 652.3277702331543,
+          "proc": {
+            "gpu": 276,
+            "page": 1189,
+            "foot": 848,
+            "footPeak": 850
+          }
+        },
+        {
+          "label": "generated-clean",
+          "requested": {
+            "pageMs": 29838.5,
+            "epochMs": 1793571568517
+          },
+          "completed": {
+            "pageMs": 29939.5,
+            "epochMs": 1793571568618
+          },
+          "phaseBefore": "generated-clean",
+          "phaseAfter": "generated-clean",
+          "state": {
+            "state": "title",
+            "paused": false,
+            "bootFull": false,
+            "lateBusy": true,
+            "supportReady": false,
+            "ready": {
+              "ready": 0,
+              "total": 1776,
+              "steps": 0,
+              "maxStep": 0,
+              "ms": 0,
+              "failed": 0
+            },
+            "ready640": false,
+            "ready832": false,
+            "position": {
+              "x": 3110.816648917971,
+              "z": 2073.230921741487
+            }
+          },
+          "heapRawMiB": 1265.949450492859,
+          "proc": {
+            "gpu": 508,
+            "page": 2279,
+            "foot": 1693,
+            "footPeak": 1852
+          }
+        }
+      ],
+      "missedPhaseMarkers": [],
+      "readyBefore": {
+        "at": {
+          "pageMs": 126901.79999995232,
+          "epochMs": 1793571665580
+        },
+        "state": {
+          "state": "title",
+          "paused": false,
+          "bootFull": true,
+          "lateBusy": false,
+          "supportReady": true,
+          "ready": {
+            "ready": 49,
+            "total": 1776,
+            "steps": 188498,
+            "maxStep": 56.09999990463257,
+            "ms": 21966.800001859665,
+            "failed": 0
+          },
+          "ready640": true,
+          "ready832": true,
+          "position": {
+            "x": 3110.816648917971,
+            "z": 2073.230921741487
+          }
+        },
+        "readyCellIds": [
+          1091,
+          1092,
+          1137,
+          1138,
+          1139,
+          1140,
+          1141,
+          1142,
+          1184,
+          1185,
+          1186,
+          1187,
+          1188,
+          1189,
+          1190,
+          1232,
+          1233,
+          1234,
+          1235,
+          1236,
+          1237,
+          1238,
+          1239,
+          1280,
+          1281,
+          1282,
+          1283,
+          1284,
+          1285,
+          1286,
+          1287,
+          1328,
+          1329,
+          1330,
+          1331,
+          1332,
+          1333,
+          1334,
+          1335,
+          1377,
+          1378,
+          1379,
+          1380,
+          1381,
+          1382,
+          1426,
+          1427,
+          1428,
+          1429
+        ]
+      },
+      "readyAfter": {
+        "state": {
+          "state": "title",
+          "paused": false,
+          "bootFull": true,
+          "lateBusy": false,
+          "supportReady": true,
+          "ready": {
+            "ready": 49,
+            "total": 1776,
+            "steps": 188498,
+            "maxStep": 56.09999990463257,
+            "ms": 21966.800001859665,
+            "failed": 0
+          },
+          "ready640": true,
+          "ready832": true,
+          "position": {
+            "x": 3110.816648917971,
+            "z": 2073.230921741487
+          }
+        },
+        "readyCellIds": [
+          1091,
+          1092,
+          1137,
+          1138,
+          1139,
+          1140,
+          1141,
+          1142,
+          1184,
+          1185,
+          1186,
+          1187,
+          1188,
+          1189,
+          1190,
+          1232,
+          1233,
+          1234,
+          1235,
+          1236,
+          1237,
+          1238,
+          1239,
+          1280,
+          1281,
+          1282,
+          1283,
+          1284,
+          1285,
+          1286,
+          1287,
+          1328,
+          1329,
+          1330,
+          1331,
+          1332,
+          1333,
+          1334,
+          1335,
+          1377,
+          1378,
+          1379,
+          1380,
+          1381,
+          1382,
+          1426,
+          1427,
+          1428,
+          1429
+        ]
+      },
+      "cleanCalls": 1
+    },
+    {
+      "variant": "cache",
+      "sourceFingerprint": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+      "sourceIsGitCommit": false,
+      "actualPid": 60485,
+      "pidKind": "Actual spawned npm launcher; renderer process epoch is separately in raw startupHost",
+      "status": 0,
+      "signal": null,
+      "rawSha256": "84ce627ade19c1ee3ce20263403914bd590c9e955da2ee52fa15049555b417c0",
+      "provenanceUnchanged": true,
+      "startupFootprintWatch": {
+        "foot0": 844,
+        "peak": 1859,
+        "exact": true,
+        "sampled": 1843,
+        "peakT": 19210,
+        "foot1": 1349,
+        "life0": 854,
+        "life1": 1859,
+        "page": 2564,
+        "gpu": 874,
+        "n": 1111,
+        "ms": 102379
+      },
+      "watchStarted": {
+        "pageMs": 9960.900000095367,
+        "epochMs": 1793571690815
+      },
+      "watchStopped": {
+        "pageMs": 112367.40000009537,
+        "epochMs": 1793571793222
+      },
+      "gcStart": {
+        "pageMs": 112367.40000009537,
+        "epochMs": 1793571793222
+      },
+      "gcEnd": {
+        "pageMs": 112752.20000004768,
+        "epochMs": 1793571793607
+      },
+      "metadataReadStart": {
+        "pageMs": 112754.20000004768,
+        "epochMs": 1793571793609
+      },
+      "metadataReadEnd": {
+        "pageMs": 112768.79999995232,
+        "epochMs": 1793571793623
+      },
+      "steadyAfter2GC": {
+        "label": "steady-after-ready",
+        "heap": 836.1,
+        "gl": {
+          "buf": 353.4,
+          "tex": 115.4,
+          "rb": 1,
+          "fb": 35.2,
+          "total": 504.9,
+          "peak": 504.9,
+          "nb": 18397,
+          "nt": 74,
+          "nr": 5,
+          "heapPeak": 1564.6
+        },
+        "glJs": {
+          "mb": 27.4,
+          "n": 1503
+        },
+        "geo": 6493,
+        "tex": 65,
+        "prog": 228,
+        "proc": {
+          "gpu": 874,
+          "page": 2551,
+          "foot": 1327,
+          "footPeak": 1859
+        }
+      },
+      "globalSampledWorkingSetPeak": {
+        "page": 2566,
+        "gpu": 874,
+        "pageT": 95127,
+        "gpuT": 110345,
+        "n": 552
+      },
+      "globalPeakEpochBounds": {
+        "page": [
+          1793571775733,
+          1793571775872
+        ],
+        "gpu": [
+          1793571790951,
+          1793571791090
+        ]
+      },
+      "globalGpuPeakGuaranteedAfterStartupWatch": false,
+      "globalPeakNote": "Whole-run200ms sampling continues through2GC and metadata. Exact T0 epoch not exported; epoch bounds use process origin, navigation and host finish-total. Never relabel as startup-window peak.",
+      "observedPhaseNoGC": [
+        {
+          "label": "mainwork-menu",
+          "requested": {
+            "pageMs": 9961,
+            "epochMs": 1793571690815
+          },
+          "completed": {
+            "pageMs": 10112,
+            "epochMs": 1793571690966
+          },
+          "phaseBefore": "idle",
+          "phaseAfter": "idle",
+          "state": {
+            "state": "title",
+            "paused": false,
+            "bootFull": false,
+            "lateBusy": true,
+            "supportReady": false,
+            "ready": {
+              "ready": 0,
+              "total": 1776,
+              "steps": 0,
+              "maxStep": 0,
+              "ms": 0,
+              "failed": 0
+            },
+            "ready640": false,
+            "ready832": false,
+            "position": {
+              "x": 3110.816648917971,
+              "z": 2073.230921741487
+            }
+          },
+          "heapRawMiB": 650.1408519744873,
+          "proc": {
+            "gpu": 274,
+            "page": 1179,
+            "foot": 848,
+            "footPeak": 854
+          }
+        },
+        {
+          "label": "reading",
+          "requested": {
+            "pageMs": 31975.700000047684,
+            "epochMs": 1793571712830
+          },
+          "completed": {
+            "pageMs": 32076.400000095367,
+            "epochMs": 1793571712931
+          },
+          "phaseBefore": "reading",
+          "phaseAfter": "reading",
+          "state": {
+            "state": "title",
+            "paused": false,
+            "bootFull": false,
+            "lateBusy": true,
+            "supportReady": false,
+            "ready": {
+              "ready": 0,
+              "total": 1776,
+              "steps": 0,
+              "maxStep": 0,
+              "ms": 0,
+              "failed": 0
+            },
+            "ready640": false,
+            "ready832": false,
+            "position": {
+              "x": 3110.816648917971,
+              "z": 2073.230921741487
+            }
+          },
+          "heapRawMiB": 1257.1836919784546,
+          "proc": {
+            "gpu": 509,
+            "page": 2233,
+            "foot": 1640,
+            "footPeak": 1859
+          }
+        },
+        {
+          "label": "fileHash",
+          "requested": {
+            "pageMs": 32252.700000047684,
+            "epochMs": 1793571713107
+          },
+          "completed": {
+            "pageMs": 32717.10000014305,
+            "epochMs": 1793571713571
+          },
+          "phaseBefore": "fileHash",
+          "phaseAfter": "rawCopy",
+          "state": {
+            "state": "title",
+            "paused": false,
+            "bootFull": false,
+            "lateBusy": true,
+            "supportReady": false,
+            "ready": {
+              "ready": 0,
+              "total": 1776,
+              "steps": 0,
+              "maxStep": 0,
+              "ms": 0,
+              "failed": 0
+            },
+            "ready640": false,
+            "ready832": false,
+            "position": {
+              "x": 3110.816648917971,
+              "z": 2073.230921741487
+            }
+          },
+          "heapRawMiB": 1287.2239141464233,
+          "proc": {
+            "gpu": 509,
+            "page": 2334,
+            "foot": 1534,
+            "footPeak": 1859
+          }
+        },
+        {
+          "label": "rawHash",
+          "requested": {
+            "pageMs": 32816.10000014305,
+            "epochMs": 1793571713671
+          },
+          "completed": {
+            "pageMs": 32945.40000009537,
+            "epochMs": 1793571713800
+          },
+          "phaseBefore": "rawHash",
+          "phaseAfter": "decoding",
+          "state": {
+            "state": "title",
+            "paused": false,
+            "bootFull": false,
+            "lateBusy": true,
+            "supportReady": false,
+            "ready": {
+              "ready": 0,
+              "total": 1776,
+              "steps": 0,
+              "maxStep": 0,
+              "ms": 0,
+              "failed": 0
+            },
+            "ready640": false,
+            "ready832": false,
+            "position": {
+              "x": 3110.816648917971,
+              "z": 2073.230921741487
+            }
+          },
+          "heapRawMiB": 1203.35906124115,
+          "proc": {
+            "gpu": 509,
+            "page": 2515,
+            "foot": 1598,
+            "footPeak": 1859
+          }
+        },
+        {
+          "label": "decoding",
+          "requested": {
+            "pageMs": 32997.799999952316,
+            "epochMs": 1793571713852
+          },
+          "completed": {
+            "pageMs": 33106.40000009537,
+            "epochMs": 1793571713961
+          },
+          "phaseBefore": "decoding",
+          "phaseAfter": "decoding",
+          "state": {
+            "state": "title",
+            "paused": false,
+            "bootFull": false,
+            "lateBusy": true,
+            "supportReady": false,
+            "ready": {
+              "ready": 0,
+              "total": 1776,
+              "steps": 0,
+              "maxStep": 0,
+              "ms": 0,
+              "failed": 0
+            },
+            "ready640": false,
+            "ready832": false,
+            "position": {
+              "x": 3110.816648917971,
+              "z": 2073.230921741487
+            }
+          },
+          "heapRawMiB": 1175.281289100647,
+          "proc": {
+            "gpu": 509,
+            "page": 2428,
+            "foot": 1601,
+            "footPeak": 1859
+          }
+        },
+        {
+          "label": "preparing",
+          "requested": {
+            "pageMs": 35582.40000009537,
+            "epochMs": 1793571716437
+          },
+          "completed": {
+            "pageMs": 35714.700000047684,
+            "epochMs": 1793571716569
+          },
+          "phaseBefore": "preparing",
+          "phaseAfter": "preparing",
+          "state": {
+            "state": "title",
+            "paused": false,
+            "bootFull": false,
+            "lateBusy": true,
+            "supportReady": false,
+            "ready": {
+              "ready": 0,
+              "total": 1776,
+              "steps": 0,
+              "maxStep": 0,
+              "ms": 0,
+              "failed": 0
+            },
+            "ready640": false,
+            "ready832": false,
+            "position": {
+              "x": 3110.816648917971,
+              "z": 2073.230921741487
+            }
+          },
+          "heapRawMiB": 1173.6120767593384,
+          "proc": {
+            "gpu": 509,
+            "page": 2439,
+            "foot": 1568,
+            "footPeak": 1859
+          }
+        }
+      ],
+      "missedPhaseMarkers": [
+        "inputCopy",
+        "decompressing",
+        "rawCopy"
+      ],
+      "readyBefore": {
+        "at": {
+          "pageMs": 112203.70000004768,
+          "epochMs": 1793571793058
+        },
+        "state": {
+          "state": "title",
+          "paused": false,
+          "bootFull": true,
+          "lateBusy": false,
+          "supportReady": true,
+          "ready": {
+            "ready": 49,
+            "total": 1776,
+            "steps": 188498,
+            "maxStep": 56.5,
+            "ms": 22005.499997138977,
+            "failed": 0
+          },
+          "ready640": true,
+          "ready832": true,
+          "position": {
+            "x": 3110.816648917971,
+            "z": 2073.230921741487
+          }
+        },
+        "readyCellIds": [
+          1091,
+          1092,
+          1137,
+          1138,
+          1139,
+          1140,
+          1141,
+          1142,
+          1184,
+          1185,
+          1186,
+          1187,
+          1188,
+          1189,
+          1190,
+          1232,
+          1233,
+          1234,
+          1235,
+          1236,
+          1237,
+          1238,
+          1239,
+          1280,
+          1281,
+          1282,
+          1283,
+          1284,
+          1285,
+          1286,
+          1287,
+          1328,
+          1329,
+          1330,
+          1331,
+          1332,
+          1333,
+          1334,
+          1335,
+          1377,
+          1378,
+          1379,
+          1380,
+          1381,
+          1382,
+          1426,
+          1427,
+          1428,
+          1429
+        ]
+      },
+      "readyAfter": {
+        "state": {
+          "state": "title",
+          "paused": false,
+          "bootFull": true,
+          "lateBusy": false,
+          "supportReady": true,
+          "ready": {
+            "ready": 49,
+            "total": 1776,
+            "steps": 188498,
+            "maxStep": 56.5,
+            "ms": 22005.499997138977,
+            "failed": 0
+          },
+          "ready640": true,
+          "ready832": true,
+          "position": {
+            "x": 3110.816648917971,
+            "z": 2073.230921741487
+          }
+        },
+        "readyCellIds": [
+          1091,
+          1092,
+          1137,
+          1138,
+          1139,
+          1140,
+          1141,
+          1142,
+          1184,
+          1185,
+          1186,
+          1187,
+          1188,
+          1189,
+          1190,
+          1232,
+          1233,
+          1234,
+          1235,
+          1236,
+          1237,
+          1238,
+          1239,
+          1280,
+          1281,
+          1282,
+          1283,
+          1284,
+          1285,
+          1286,
+          1287,
+          1328,
+          1329,
+          1330,
+          1331,
+          1332,
+          1333,
+          1334,
+          1335,
+          1377,
+          1378,
+          1379,
+          1380,
+          1381,
+          1382,
+          1426,
+          1427,
+          1428,
+          1429
+        ]
+      },
+      "cleanCalls": 0
+    }
+  ]
+}

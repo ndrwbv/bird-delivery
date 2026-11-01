@@ -1,0 +1,228 @@
+{
+  "version": 1,
+  "scope": "Prepared only. No probe/build launched. Fresh owned sessions, ordinary EDL (NO --seed), real menu Go / tutorial / W through unchanged startup-ready. No force states.",
+  "buildDir": "/tmp/bird-ordinary17b-final-1102",
+  "sourceFingerprint": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+  "sourceIsGitCommit": false,
+  "catalog": {
+    "file": "/tmp/bird-ordinary17b-final-1102/city-data/catalog.json",
+    "sha256": "ff1f17e967c7f11dcdc6a929d6ef9ffb423f6b0b7a90ed546e8fab52d2d356e5"
+  },
+  "asset": {
+    "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+    "path": "city-data/2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd.land.gz",
+    "encoding": "gzip",
+    "bytes": 34231591,
+    "sha256": "2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd",
+    "rawBytes": 74952828,
+    "rawSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c"
+  },
+  "assetBodiesReadByHost": false,
+  "probe": {
+    "file": "tools/probe.cjs",
+    "sha256": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce"
+  },
+  "stockEval": {
+    "file": "tools/probe-checks/startup-ready.js",
+    "sha256": "e9ef0e761ff2a5d32b743a7a26990a757089d61d81c703b57d870968a8f7b137"
+  },
+  "observer": {
+    "file": "tools/probe-checks/startup-bootstrap-observe.js",
+    "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+  },
+  "commands": [
+    {
+      "kind": "missing-asset",
+      "state": "prepared-not-authorized-to-run",
+      "argv": [
+        "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+        "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+        "--mode=steam",
+        "--dir=/tmp/bird-ordinary17b-final-1102",
+        "--startup-trace",
+        "--startup-session=lp17b-neg-0c45a21c-9919-4367-b1d6-e40d65db4bba",
+        "--startup-cold",
+        "--startup-fixture=/tmp/bird-ordinary17b-negatives-1102-prepared/missing-asset/fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--cpu=3",
+        "--bootcpu",
+        "--init-script=/tmp/bird-ordinary17b-negatives-1102-prepared/missing-asset/init.js",
+        "--q=gfxdev=deck&mute&startupdistrict=0",
+        "--eval=/tmp/bird-ordinary17b-negatives-1102-prepared/negative-startup-ready.js",
+        "--bootwait=360",
+        "--timeout=480",
+        "--max=0",
+        "--errors",
+        "--report=/tmp/bird-ordinary17b-negatives-1102-prepared/missing-asset/raw.json"
+      ],
+      "command": "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron /Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs --mode=steam --dir=/tmp/bird-ordinary17b-final-1102 --startup-trace --startup-session=lp17b-neg-0c45a21c-9919-4367-b1d6-e40d65db4bba --startup-cold --startup-fixture=/tmp/bird-ordinary17b-negatives-1102-prepared/missing-asset/fixture.json --fresh --early --size=deck --cpu=3 --bootcpu --init-script=/tmp/bird-ordinary17b-negatives-1102-prepared/missing-asset/init.js '--q=gfxdev=deck&mute&startupdistrict=0' --eval=/tmp/bird-ordinary17b-negatives-1102-prepared/negative-startup-ready.js --bootwait=360 --timeout=480 --max=0 --errors --report=/tmp/bird-ordinary17b-negatives-1102-prepared/missing-asset/raw.json > /tmp/bird-ordinary17b-negatives-1102-prepared/missing-asset/stdout.log 2> /tmp/bird-ordinary17b-negatives-1102-prepared/missing-asset/stderr.log",
+      "cwd": "/Users/andrewboev/Desktop/not-work/delivery",
+      "raw": "/tmp/bird-ordinary17b-negatives-1102-prepared/missing-asset/raw.json",
+      "stdout": "/tmp/bird-ordinary17b-negatives-1102-prepared/missing-asset/stdout.log",
+      "stderr": "/tmp/bird-ordinary17b-negatives-1102-prepared/missing-asset/stderr.log",
+      "init": {
+        "file": "/tmp/bird-ordinary17b-negatives-1102-prepared/missing-asset/init.js",
+        "sha256": "2e49fa19061471e3586582490477c3547e903d9658d42c5a3c101aa1f5525962"
+      },
+      "fixture": {
+        "file": "/tmp/bird-ordinary17b-negatives-1102-prepared/missing-asset/fixture.json",
+        "sha256": "128185ce9de7495c1c6f7782c6f97210c5b258f5e704c26ea019ac6781695c23"
+      },
+      "eval": {
+        "file": "/tmp/bird-ordinary17b-negatives-1102-prepared/negative-startup-ready.js",
+        "sha256": "689437990dd616a5f3fe4fc90160a438a37d8bb2666ceba9620a7c09c7bb3343"
+      },
+      "processStatus": null,
+      "signal": null,
+      "rawSha256": null,
+      "attempts": 0
+    },
+    {
+      "kind": "wrong-wire-sha",
+      "state": "prepared-not-authorized-to-run",
+      "argv": [
+        "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+        "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+        "--mode=steam",
+        "--dir=/tmp/bird-ordinary17b-final-1102",
+        "--startup-trace",
+        "--startup-session=lp17b-neg-36064263-1570-4544-8daf-42bffd51516a",
+        "--startup-cold",
+        "--startup-fixture=/tmp/bird-ordinary17b-negatives-1102-prepared/wrong-wire-sha/fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--cpu=3",
+        "--bootcpu",
+        "--init-script=/tmp/bird-ordinary17b-negatives-1102-prepared/wrong-wire-sha/init.js",
+        "--q=gfxdev=deck&mute&startupdistrict=0",
+        "--eval=/tmp/bird-ordinary17b-negatives-1102-prepared/negative-startup-ready.js",
+        "--bootwait=360",
+        "--timeout=480",
+        "--max=0",
+        "--errors",
+        "--report=/tmp/bird-ordinary17b-negatives-1102-prepared/wrong-wire-sha/raw.json"
+      ],
+      "command": "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron /Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs --mode=steam --dir=/tmp/bird-ordinary17b-final-1102 --startup-trace --startup-session=lp17b-neg-36064263-1570-4544-8daf-42bffd51516a --startup-cold --startup-fixture=/tmp/bird-ordinary17b-negatives-1102-prepared/wrong-wire-sha/fixture.json --fresh --early --size=deck --cpu=3 --bootcpu --init-script=/tmp/bird-ordinary17b-negatives-1102-prepared/wrong-wire-sha/init.js '--q=gfxdev=deck&mute&startupdistrict=0' --eval=/tmp/bird-ordinary17b-negatives-1102-prepared/negative-startup-ready.js --bootwait=360 --timeout=480 --max=0 --errors --report=/tmp/bird-ordinary17b-negatives-1102-prepared/wrong-wire-sha/raw.json > /tmp/bird-ordinary17b-negatives-1102-prepared/wrong-wire-sha/stdout.log 2> /tmp/bird-ordinary17b-negatives-1102-prepared/wrong-wire-sha/stderr.log",
+      "cwd": "/Users/andrewboev/Desktop/not-work/delivery",
+      "raw": "/tmp/bird-ordinary17b-negatives-1102-prepared/wrong-wire-sha/raw.json",
+      "stdout": "/tmp/bird-ordinary17b-negatives-1102-prepared/wrong-wire-sha/stdout.log",
+      "stderr": "/tmp/bird-ordinary17b-negatives-1102-prepared/wrong-wire-sha/stderr.log",
+      "init": {
+        "file": "/tmp/bird-ordinary17b-negatives-1102-prepared/wrong-wire-sha/init.js",
+        "sha256": "55e6796067f0a06767dd4260d8307b0baba06e99357efa32736d052e5eb89ee7"
+      },
+      "fixture": {
+        "file": "/tmp/bird-ordinary17b-negatives-1102-prepared/wrong-wire-sha/fixture.json",
+        "sha256": "128185ce9de7495c1c6f7782c6f97210c5b258f5e704c26ea019ac6781695c23"
+      },
+      "eval": {
+        "file": "/tmp/bird-ordinary17b-negatives-1102-prepared/negative-startup-ready.js",
+        "sha256": "689437990dd616a5f3fe4fc90160a438a37d8bb2666ceba9620a7c09c7bb3343"
+      },
+      "processStatus": null,
+      "signal": null,
+      "rawSha256": null,
+      "attempts": 0
+    },
+    {
+      "kind": "cancel-preparing",
+      "state": "prepared-not-authorized-to-run",
+      "argv": [
+        "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+        "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+        "--mode=steam",
+        "--dir=/tmp/bird-ordinary17b-final-1102",
+        "--startup-trace",
+        "--startup-session=lp17b-neg-474ccbd5-acd3-45e3-940c-c594f5551ea8",
+        "--startup-cold",
+        "--startup-fixture=/tmp/bird-ordinary17b-negatives-1102-prepared/cancel-preparing/fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--cpu=3",
+        "--bootcpu",
+        "--init-script=/tmp/bird-ordinary17b-negatives-1102-prepared/cancel-preparing/init.js",
+        "--q=gfxdev=deck&mute&startupdistrict=0",
+        "--eval=/tmp/bird-ordinary17b-negatives-1102-prepared/negative-startup-ready.js",
+        "--bootwait=360",
+        "--timeout=480",
+        "--max=0",
+        "--errors",
+        "--report=/tmp/bird-ordinary17b-negatives-1102-prepared/cancel-preparing/raw.json"
+      ],
+      "command": "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron /Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs --mode=steam --dir=/tmp/bird-ordinary17b-final-1102 --startup-trace --startup-session=lp17b-neg-474ccbd5-acd3-45e3-940c-c594f5551ea8 --startup-cold --startup-fixture=/tmp/bird-ordinary17b-negatives-1102-prepared/cancel-preparing/fixture.json --fresh --early --size=deck --cpu=3 --bootcpu --init-script=/tmp/bird-ordinary17b-negatives-1102-prepared/cancel-preparing/init.js '--q=gfxdev=deck&mute&startupdistrict=0' --eval=/tmp/bird-ordinary17b-negatives-1102-prepared/negative-startup-ready.js --bootwait=360 --timeout=480 --max=0 --errors --report=/tmp/bird-ordinary17b-negatives-1102-prepared/cancel-preparing/raw.json > /tmp/bird-ordinary17b-negatives-1102-prepared/cancel-preparing/stdout.log 2> /tmp/bird-ordinary17b-negatives-1102-prepared/cancel-preparing/stderr.log",
+      "cwd": "/Users/andrewboev/Desktop/not-work/delivery",
+      "raw": "/tmp/bird-ordinary17b-negatives-1102-prepared/cancel-preparing/raw.json",
+      "stdout": "/tmp/bird-ordinary17b-negatives-1102-prepared/cancel-preparing/stdout.log",
+      "stderr": "/tmp/bird-ordinary17b-negatives-1102-prepared/cancel-preparing/stderr.log",
+      "init": {
+        "file": "/tmp/bird-ordinary17b-negatives-1102-prepared/cancel-preparing/init.js",
+        "sha256": "a650add4bb260d876aaf799435a62cfaf466325f855715536b7ab66093a40190"
+      },
+      "fixture": {
+        "file": "/tmp/bird-ordinary17b-negatives-1102-prepared/cancel-preparing/fixture.json",
+        "sha256": "128185ce9de7495c1c6f7782c6f97210c5b258f5e704c26ea019ac6781695c23"
+      },
+      "eval": {
+        "file": "/tmp/bird-ordinary17b-negatives-1102-prepared/negative-startup-ready.js",
+        "sha256": "689437990dd616a5f3fe4fc90160a438a37d8bb2666ceba9620a7c09c7bb3343"
+      },
+      "processStatus": null,
+      "signal": null,
+      "rawSha256": null,
+      "attempts": 0
+    },
+    {
+      "kind": "input-miss",
+      "state": "prepared-not-authorized-to-run",
+      "argv": [
+        "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+        "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+        "--mode=steam",
+        "--dir=/tmp/bird-ordinary17b-final-1102",
+        "--startup-trace",
+        "--startup-session=lp17b-neg-27fbc354-ca7b-4403-94ce-d7d97742476b",
+        "--startup-cold",
+        "--startup-fixture=/tmp/bird-ordinary17b-negatives-1102-prepared/input-miss/fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--cpu=3",
+        "--bootcpu",
+        "--init-script=/tmp/bird-ordinary17b-negatives-1102-prepared/input-miss/init.js",
+        "--q=gfxdev=deck&mute&startupdistrict=0&nowiden",
+        "--eval=/tmp/bird-ordinary17b-negatives-1102-prepared/negative-startup-ready.js",
+        "--bootwait=360",
+        "--timeout=480",
+        "--max=0",
+        "--errors",
+        "--report=/tmp/bird-ordinary17b-negatives-1102-prepared/input-miss/raw.json"
+      ],
+      "command": "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron /Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs --mode=steam --dir=/tmp/bird-ordinary17b-final-1102 --startup-trace --startup-session=lp17b-neg-27fbc354-ca7b-4403-94ce-d7d97742476b --startup-cold --startup-fixture=/tmp/bird-ordinary17b-negatives-1102-prepared/input-miss/fixture.json --fresh --early --size=deck --cpu=3 --bootcpu --init-script=/tmp/bird-ordinary17b-negatives-1102-prepared/input-miss/init.js '--q=gfxdev=deck&mute&startupdistrict=0&nowiden' --eval=/tmp/bird-ordinary17b-negatives-1102-prepared/negative-startup-ready.js --bootwait=360 --timeout=480 --max=0 --errors --report=/tmp/bird-ordinary17b-negatives-1102-prepared/input-miss/raw.json > /tmp/bird-ordinary17b-negatives-1102-prepared/input-miss/stdout.log 2> /tmp/bird-ordinary17b-negatives-1102-prepared/input-miss/stderr.log",
+      "cwd": "/Users/andrewboev/Desktop/not-work/delivery",
+      "raw": "/tmp/bird-ordinary17b-negatives-1102-prepared/input-miss/raw.json",
+      "stdout": "/tmp/bird-ordinary17b-negatives-1102-prepared/input-miss/stdout.log",
+      "stderr": "/tmp/bird-ordinary17b-negatives-1102-prepared/input-miss/stderr.log",
+      "init": {
+        "file": "/tmp/bird-ordinary17b-negatives-1102-prepared/input-miss/init.js",
+        "sha256": "93289ddf76082ec398e7f648d07a4f7430ddb4fa131c8187d9ae9002c73fe29c"
+      },
+      "fixture": {
+        "file": "/tmp/bird-ordinary17b-negatives-1102-prepared/input-miss/fixture.json",
+        "sha256": "128185ce9de7495c1c6f7782c6f97210c5b258f5e704c26ea019ac6781695c23"
+      },
+      "eval": {
+        "file": "/tmp/bird-ordinary17b-negatives-1102-prepared/negative-startup-ready.js",
+        "sha256": "689437990dd616a5f3fe4fc90160a438a37d8bb2666ceba9620a7c09c7bb3343"
+      },
+      "processStatus": null,
+      "signal": null,
+      "rawSha256": null,
+      "attempts": 0
+    }
+  ],
+  "executionRule": "Coordinator GO, one foreground process at a time. Before launch save exact argv/startedAt/pid if available. Record actual processStatus/signal and SHA of the first raw even on failure. Preserve logs/raw without overwrite. Stop on first unexpected failure; no retry/resume."
+}

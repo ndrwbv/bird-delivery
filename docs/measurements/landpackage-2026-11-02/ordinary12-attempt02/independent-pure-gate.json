@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "manifestSha256": "6401c31cd479824a1c5d8cf146cb309c8c779ea0bb6214f8b506833025f7e526",
+  "ok": true,
+  "series": {
+    "ok": true,
+    "reasons": []
+  },
+  "attempts": [
+    {
+      "id": "1/generated/cold",
+      "ok": true,
+      "reasons": []
+    },
+    {
+      "id": "1/generated/warm",
+      "ok": true,
+      "reasons": []
+    },
+    {
+      "id": "1/cache/cold",
+      "ok": true,
+      "reasons": []
+    },
+    {
+      "id": "1/cache/warm",
+      "ok": true,
+      "reasons": []
+    },
+    {
+      "id": "2/cache/cold",
+      "ok": true,
+      "reasons": []
+    },
+    {
+      "id": "2/cache/warm",
+      "ok": true,
+      "reasons": []
+    },
+    {
+      "id": "2/generated/cold",
+      "ok": true,
+      "reasons": []
+    },
+    {
+      "id": "2/generated/warm",
+      "ok": true,
+      "reasons": []
+    },
+    {
+      "id": "3/generated/cold",
+      "ok": true,
+      "reasons": []
+    },
+    {
+      "id": "3/generated/warm",
+      "ok": true,
+      "reasons": []
+    },
+    {
+      "id": "3/cache/cold",
+      "ok": true,
+      "reasons": []
+    },
+    {
+      "id": "3/cache/warm",
+      "ok": true,
+      "reasons": []
+    }
+  ],
+  "fullSummaryByteEqual": true,
+  "assetRead": false
+}

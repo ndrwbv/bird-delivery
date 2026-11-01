@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "dir": "/tmp/bird-ordinary17b-final-1102",
+  "fixture": "/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+  "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+  "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+  "wireSha256": "2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd",
+  "rawSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+  "wireBytes": 34231591,
+  "rawBytes": 74952828,
+  "catalogSha256": "ff1f17e967c7f11dcdc6a929d6ef9ffb423f6b0b7a90ed546e8fab52d2d356e5",
+  "expectedReadyIds": 49,
+  "radius": 832,
+  "cpu": 3,
+  "preset": "high"
+}

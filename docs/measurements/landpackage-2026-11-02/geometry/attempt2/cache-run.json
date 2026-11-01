@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "attempt": 2,
+  "mode": "cache",
+  "argv": [
+    "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+    "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+    "--mode=steam",
+    "--dir=/tmp/bird-ordinary17b-final-1102",
+    "--fresh",
+    "--early",
+    "--startup-trace",
+    "--startup-session=lp17b-geometry2-cache-bdc68a11-4d0f-4c59-b1e1-92e2d9b61b97",
+    "--startup-cold",
+    "--startup-fixture=/tmp/bird-ordinary17b-geometry-attempt2-1102/fixture.json",
+    "--init-script=/tmp/bird-ordinary17b-geometry-attempt2-1102/locked-init.js",
+    "--size=deck",
+    "--cpu=3",
+    "--bootcpu",
+    "--bootwait=360",
+    "--timeout=480",
+    "--q=gfxdev=deck&mute&startupdistrict=0",
+    "--eval=/tmp/bird-ordinary17b-geometry-attempt2-1102/ordinary-geometry.js",
+    "--max=0",
+    "--errors",
+    "--report=/tmp/bird-ordinary17b-geometry-attempt2-1102/cache.json"
+  ],
+  "cwd": "/Users/andrewboev/Desktop/not-work/delivery",
+  "startedAt": "2026-11-01T22:15:34.332910+00:00",
+  "processStatus": 0,
+  "signal": null,
+  "inputs": {
+    "eval": {
+      "path": "/tmp/bird-ordinary17b-geometry-attempt2-1102/ordinary-geometry.js",
+      "sha256": "cb01204ead0689b13cc4196dffcf03a1eff3eed60c1b9a40912c7b9423f69df9"
+    },
+    "init": {
+      "path": "/tmp/bird-ordinary17b-geometry-attempt2-1102/locked-init.js",
+      "sha256": "5c857c0cb9d6056bf0c52e86e93761b687d2527e82cb7084fd0f0180b23a72b1"
+    },
+    "fixture": {
+      "path": "/tmp/bird-ordinary17b-geometry-attempt2-1102/fixture.json",
+      "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+    },
+    "probe": {
+      "file": "tools/probe.cjs",
+      "sha256": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce"
+    },
+    "catalogSha256": "ff1f17e967c7f11dcdc6a929d6ef9ffb423f6b0b7a90ed546e8fab52d2d356e5",
+    "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+    "manifestSha256": "179e0694b7bc197d2b1d92db377124664f8c4d6deae32b4c1a746535bb60f88f",
+    "commandsSha256": "dad3b07fdc184ba9f2b99cec237e26f3e898c0270c1b76eb75c18b177cc38396",
+    "generatedRawSha256": "7a66b9321e22338b7734846b9e67b40cc0bd413bdeb2f74602a9ef0aef68e528",
+    "generatedValidationSha256": "5ac05b1345329cdfeb9e4910e4df32a8390665dc7936302ea111be0b9c68eee4",
+    "lockHelper": {
+      "file": "/tmp/bird-ordinary17b-geometry-attempt2-1102/lock-samples.mjs",
+      "sha256": "49d18db2c9ad65e58368439ab219e172207fb2676dce7bb1161e36a606bbc3b3"
+    }
+  },
+  "harness": [
+    {
+      "path": "docs/measurements/landcache-2026-11-02/geometry-02/cache17a-geometry.js",
+      "sha256": "dd46fbf693c9e7649d382a32fc269d271e892cda0b29d42e46e02c0bdb23dd56"
+    },
+    {
+      "path": "tools/probe-checks/startup-ready.js",
+      "sha256": "e9ef0e761ff2a5d32b743a7a26990a757089d61d81c703b57d870968a8f7b137"
+    },
+    {
+      "path": "tools/probe-checks/startup-bootstrap-observe.js",
+      "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+    },
+    {
+      "path": "tools/probe-checks/raised-land.js",
+      "sha256": "99324366abd28f28f5e498c68947987cc17791acbfb534792c43852645e7cf3e"
+    },
+    {
+      "path": "tools/probe-checks/raised-land-drive.js",
+      "sha256": "9ccfc2526f01f276af84164a4180215954bf08fd851f7b1e410a6a1ee806d88e"
+    },
+    {
+      "path": "tools/probe-checks/land-boundary.js",
+      "sha256": "616066e1d59083c54d85df8771ccf9d9068c7e838c8e560a3d3e7e587cbfea6e"
+    },
+    {
+      "path": "src/game/landcache17a/landcache-accept.js",
+      "sha256": "a65bc8dc87fded2ef6ecdba5e380449d41efbea1de7b1e00db98c710c4a2e625"
+    }
+  ],
+  "pid": 41260,
+  "finishedAt": "2026-11-01T22:17:00.031172+00:00",
+  "stdoutSha256": "6d0d5962cdd3c6844d2ed87c7132e548fba161af653053510b7c846a38d9c32f",
+  "stderrSha256": "9687c6ae35d768199d0ffa4de0b14918f962c4113a6e722bb1ca3b85e056f618",
+  "rawSha256": "87cb9448fbeff2ea5e3a2af88e865903f4adf6da4af8266550863803de019498"
+}

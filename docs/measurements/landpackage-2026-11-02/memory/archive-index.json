@@ -1,0 +1,245 @@
+{
+  "version": 1,
+  "sourceFingerprint": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+  "sourceFingerprintIsGitCommit": false,
+  "immutableBuildDir": "/tmp/bird-ordinary17b-final-1102",
+  "sample": "n1 generated/cache pair; exactly2 actual npm processes, no retries",
+  "results": "Both actual run gates and reviewed original-raw-text pair gate PASS",
+  "ready": "49 same naturally ready IDs, radius832, fixed position, stable before/after2GC and across variants",
+  "counts": {
+    "geo": [
+      6504,
+      6493
+    ],
+    "tex": [
+      65,
+      65
+    ],
+    "programs": [
+      228,
+      228
+    ]
+  },
+  "proof": "Measured small input copies and raw/status/clock/log hashes preserved; each input pin equals before/after/expected. Wrapper hash before/after agrees. Actual process records are distinct from NOT_STARTED templates.",
+  "exclusions": "No cache payload, build tree or current runtime source copied/read during this archive. Index.html is only the already captured small pin, not whole-build proof.",
+  "measurementScope": "macOS Steam Deck emulationCPU3/high, not physical Deck; n1 observations are not exact savings. Whole-process page/GPU PEAK continues through GC/metadata and is separate from startup footprint watch. Heap/GL/glJs/workingSet/footprint overlap and are never summed.",
+  "preservation": "Original absolute paths in raw/run/pins/protocol preserved byte-for-byte; this index maps archived files. Historical protocol/templates remain explicitly pre-execution; actual run/status evidence is in *-run.json.",
+  "files": [
+    {
+      "original": "/tmp/bird-ordinary17b-memory/EXECUTION.md",
+      "file": "EXECUTION.md",
+      "bytes": 1594,
+      "sha256": "17eabf1e03759cd0e3192f39bfd596ef8ba563c046d89919f6a5c59641355599"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/PROTOCOL.md",
+      "file": "PROTOCOL.md",
+      "bytes": 9374,
+      "sha256": "767dfe448dae769fdca33cc4c2f883641b8664c3d0aa65e4f83c9142585e453c"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/actual-commands.json",
+      "file": "actual-commands.json",
+      "bytes": 2865,
+      "sha256": "7b9c7ee76e20ab8017f53431f61437857b66103277b066f5a8a29ac8838b4148"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/cache-measured-inputs/catalog.json",
+      "file": "cache-measured-inputs/catalog.json",
+      "bytes": 903,
+      "sha256": "ff1f17e967c7f11dcdc6a929d6ef9ffb423f6b0b7a90ed546e8fab52d2d356e5"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/cache-measured-inputs/eval.js",
+      "file": "cache-measured-inputs/eval.js",
+      "bytes": 8568,
+      "sha256": "84553092eca137bce2c10c291f51ba45a033b1c1cb0b02efa11f909ccee8a200"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/cache-measured-inputs/fixture.json",
+      "file": "cache-measured-inputs/fixture.json",
+      "bytes": 74,
+      "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/cache-measured-inputs/index.html",
+      "file": "cache-measured-inputs/index.html",
+      "bytes": 19236,
+      "sha256": "715baeda6267ccb7d96ca0afcc42d2a45d5d5a39bcc58fea2bfbcbcb4191fec1"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/cache-measured-inputs/pairGate.mjs",
+      "file": "cache-measured-inputs/pairGate.mjs",
+      "bytes": 9112,
+      "sha256": "f347ed544a6873ef3ceeda5df46b71bf749b8fb07d0a56d7a2f56db69b9290a7"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/cache-measured-inputs/probe.cjs",
+      "file": "cache-measured-inputs/probe.cjs",
+      "bytes": 45888,
+      "sha256": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/cache-measured-inputs/probePage.cjs",
+      "file": "cache-measured-inputs/probePage.cjs",
+      "bytes": 37506,
+      "sha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/cache-run.json",
+      "file": "cache-run.json",
+      "bytes": 6802,
+      "sha256": "974736c1631f215f8f94bdcd72f0c87af4cbbb91da81e57d78cfd134feedf670"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/cache-run.template.json",
+      "file": "cache-run.template.json",
+      "bytes": 2411,
+      "sha256": "a4ad350b911aee50a071a3d4ebc46c011e77b18884a6d0fbeb596edea7b0606f"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/cache.json",
+      "file": "cache.json",
+      "bytes": 45971,
+      "sha256": "84ce627ade19c1ee3ce20263403914bd590c9e955da2ee52fa15049555b417c0"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/cache.stderr.log",
+      "file": "cache.stderr.log",
+      "bytes": 728,
+      "sha256": "dd97fc754eff26c7f93fe4f75756d9458f8f360c4c757516c23946a34e3aeca5"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/cache.stdout.log",
+      "file": "cache.stdout.log",
+      "bytes": 45208,
+      "sha256": "883077b96cda3087b9ac158769c8dfef20a0e9cd597f1a44537ae7e0c0c52fd9"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/conditions.json",
+      "file": "conditions.json",
+      "bytes": 683,
+      "sha256": "97f3056b70c7e21d2078d183bbf071198c9f2408a0309be4001064af4b680158"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/generated-measured-inputs/catalog.json",
+      "file": "generated-measured-inputs/catalog.json",
+      "bytes": 903,
+      "sha256": "ff1f17e967c7f11dcdc6a929d6ef9ffb423f6b0b7a90ed546e8fab52d2d356e5"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/generated-measured-inputs/eval.js",
+      "file": "generated-measured-inputs/eval.js",
+      "bytes": 8568,
+      "sha256": "84553092eca137bce2c10c291f51ba45a033b1c1cb0b02efa11f909ccee8a200"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/generated-measured-inputs/fixture.json",
+      "file": "generated-measured-inputs/fixture.json",
+      "bytes": 74,
+      "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/generated-measured-inputs/index.html",
+      "file": "generated-measured-inputs/index.html",
+      "bytes": 19236,
+      "sha256": "715baeda6267ccb7d96ca0afcc42d2a45d5d5a39bcc58fea2bfbcbcb4191fec1"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/generated-measured-inputs/pairGate.mjs",
+      "file": "generated-measured-inputs/pairGate.mjs",
+      "bytes": 9112,
+      "sha256": "f347ed544a6873ef3ceeda5df46b71bf749b8fb07d0a56d7a2f56db69b9290a7"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/generated-measured-inputs/probe.cjs",
+      "file": "generated-measured-inputs/probe.cjs",
+      "bytes": 45888,
+      "sha256": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/generated-measured-inputs/probePage.cjs",
+      "file": "generated-measured-inputs/probePage.cjs",
+      "bytes": 37506,
+      "sha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/generated-run.json",
+      "file": "generated-run.json",
+      "bytes": 6860,
+      "sha256": "3e2c054fa8c0755e23f6df4d5ee6c079eb207b2e6447b98ef630bfc8858f1ee7"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/generated-run.template.json",
+      "file": "generated-run.template.json",
+      "bytes": 2441,
+      "sha256": "2fc6a3c50c163b304a44436c12c8ca2ef1540fa36f864928b03950f08e09317d"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/generated.json",
+      "file": "generated.json",
+      "bytes": 37934,
+      "sha256": "67d795cfb6d64abf9180e4eec1203c1fdd2acc9286618a3fdede90dd91a894d0"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/generated.stderr.log",
+      "file": "generated.stderr.log",
+      "bytes": 544,
+      "sha256": "5fefa6380c534ae38801014f33b1a0a4d232b10cdb0e5c61a21843fc08c81a2d"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/generated.stdout.log",
+      "file": "generated.stdout.log",
+      "bytes": 37470,
+      "sha256": "39b8fa1ba23699c61302177177194358297387179c1cedc533aba076c87e3f42"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/memory-eval.js",
+      "file": "memory-eval.js",
+      "bytes": 8568,
+      "sha256": "84553092eca137bce2c10c291f51ba45a033b1c1cb0b02efa11f909ccee8a200"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/pair-gate.mjs",
+      "file": "pair-gate.mjs",
+      "bytes": 9112,
+      "sha256": "f347ed544a6873ef3ceeda5df46b71bf749b8fb07d0a56d7a2f56db69b9290a7"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/pair-validation.json",
+      "file": "pair-validation.json",
+      "bytes": 1376,
+      "sha256": "cadc091fb3d04102270471b001610f5c72d787890307386ea93a84ad27920689"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/pins.json",
+      "file": "pins.json",
+      "bytes": 3383,
+      "sha256": "17a4c91e44667d0b4c1dbb7b457cb385b7bf3d1f3fc092f5314d2f393cd0ad94"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/run-memory-once.mjs",
+      "file": "run-memory-once.mjs",
+      "bytes": 9669,
+      "sha256": "4aa50ba35bdef7776c97542890daeb51bf9719c3dd33a438bcb12db74477273e"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/summary.json",
+      "file": "summary.json",
+      "bytes": 22611,
+      "sha256": "654ac7590999e969b9846ff870a6eb094aa33a10588fd525241dc668cf190671"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/summary.md",
+      "file": "summary.md",
+      "bytes": 3054,
+      "sha256": "1b5feaaa0b818396a252b7a5468867b2f330fc8a24be275ce897ba7ec3f83577"
+    },
+    {
+      "original": "/tmp/bird-ordinary17b-memory/syntax-preparation.json",
+      "file": "syntax-preparation.json",
+      "bytes": 699,
+      "sha256": "13d301710dd3cbeb17b45499e93ed3bc8ad519297bcf48b38946e8af2268d0a9"
+    }
+  ]
+}

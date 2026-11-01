@@ -1,0 +1,44 @@
+{
+  "ok": true,
+  "reasons": [],
+  "unavailable": [],
+  "observedSceneCounts": {
+    "geo": [
+      6504,
+      6493
+    ],
+    "tex": [
+      65,
+      65
+    ],
+    "programs": [
+      228,
+      228
+    ]
+  },
+  "notes": "Ordinary17b n1 memory pair on emulated Deck. No physical Deck claim or exact saving claim; geo/tex differences disclosed; asynchronous component peaks never summed.",
+  "generatedRawSha256": "67d795cfb6d64abf9180e4eec1203c1fdd2acc9286618a3fdede90dd91a894d0",
+  "cacheRawSha256": "84ce627ade19c1ee3ce20263403914bd590c9e955da2ee52fa15049555b417c0",
+  "observedHashes": {
+    "eval": "84553092eca137bce2c10c291f51ba45a033b1c1cb0b02efa11f909ccee8a200",
+    "pairGate": "f347ed544a6873ef3ceeda5df46b71bf749b8fb07d0a56d7a2f56db69b9290a7",
+    "fixture": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+    "catalog": "ff1f17e967c7f11dcdc6a929d6ef9ffb423f6b0b7a90ed546e8fab52d2d356e5",
+    "index": "715baeda6267ccb7d96ca0afcc42d2a45d5d5a39bcc58fea2bfbcbcb4191fec1",
+    "probe": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce",
+    "probePage": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd"
+  },
+  "gateSha256": "f347ed544a6873ef3ceeda5df46b71bf749b8fb07d0a56d7a2f56db69b9290a7",
+  "pids": [
+    42069,
+    60485
+  ],
+  "processStatus": [
+    0,
+    0
+  ],
+  "signals": [
+    null,
+    null
+  ]
+}

@@ -1,0 +1,11 @@
+--- attempt1/ordinary-geometry.js
++++ attempt2/ordinary-geometry.js
+@@ -108,7 +108,7 @@
+  const checkOrdinary=()=>{const r=d.LAND_RNG?.();need(r?.provider==='edl-owned-fnv1a-mulberry32-v1'&&r.ordinaryAtImport===true&&r.hookOwned===true&&r.baseSeed===0x5EED,'ordinary EDL ownership/seed');return r;};
+  const rng=checkOrdinary();
+  need(d.GFX.preset==='high'&&d.GFX.dev==='deck'&&innerWidth===1280&&innerHeight===800,'high Deck graphics/viewport');
+- need(startup.host?.seed===null&&typeof window.__lateSeed!=='function'&&!flags.has('seed')&&!flags.has('landcache')&&!flags.has('landexport17a')&&!flags.has('landexport17b'),'external RNG/cache/export override');
++ need(startup.host?.seed===null&&!flags.has('seed')&&!flags.has('landcache')&&!flags.has('landexport17a')&&!flags.has('landexport17b'),'external RNG/cache/export override');
+  const cleanCalls=startup.report.counters?.['raisedland.cleanCalls'];
+  if(isCache){need(packageMeta?.source==='cache'&&packageMeta.phase==='restored'&&packageMeta.hit===true&&packageMeta.fatal===false&&packageMeta.reason===null&&packageMeta.cleaned===true&&packageMeta.bufferHeld===false&&cleanCalls===0,'ordinary cache admission');
+   need(packageMeta.precleanHash==='c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4'&&packageMeta.wireSha256==='2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd'&&packageMeta.expectedWireSha256===packageMeta.wireSha256&&packageMeta.rawSha256==='13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c'&&packageMeta.expectedRawSha256===packageMeta.rawSha256,'ordinary trusted package identity');

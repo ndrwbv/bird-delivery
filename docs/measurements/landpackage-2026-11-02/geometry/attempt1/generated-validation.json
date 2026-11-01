@@ -1,0 +1,11 @@
+{
+  "ok": false,
+  "reasons": [
+    "outer/result ok"
+  ],
+  "mode": "generated",
+  "reportSha256": "6210b6173013cb24639e653e8d14fd7a3d7e0d6caed02117f7117e984ddfc9af",
+  "stage": "select",
+  "error": "Error: ordinary-geometry17b: external RNG/cache/export override\n    at need (<anonymous>:80:40)\n    at <anonymous>:185:2\n    at async <anonymous>:74:14",
+  "coverage": null
+}

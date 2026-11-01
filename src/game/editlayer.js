@@ -229,11 +229,19 @@ function seedOn (name) {
   Math.random = mulberry(hashName(name));
   if (!back) { back = true; queueMicrotask(() => { back = false; Math.random = ORIG; }); }   // кусок кончился — игра снова случайная
 }
+let OWN_LATE_SEED = null;
 if (OURS) {
-  window.__lateSeed = name => {
+  OWN_LATE_SEED = name => {
     name = String(name);
     if (SEEDED.has(name.split('#')[0])) seedOn(name); else Math.random = ORIG;
   };
+  window.__lateSeed = OWN_LATE_SEED;
+}
+/** Read-only provenance; baseSeed is EDL's name-hash base, never a probe seed. */
+export function rngDescriptor () {
+  const hookOwned = OURS && window.__lateSeed === OWN_LATE_SEED;
+  return { provider: hookOwned ? 'edl-owned-fnv1a-mulberry32-v1' : 'external-or-replaced',
+    ordinaryAtImport: OURS, hookOwned, baseSeed: OURS ? 0x5EED : null };
 }
 /** game.js osmBuildings: каждый дом — своим жребием по номеру (b.id), houseRnd(null) после всех домов — снова жребий города.
     Так у дома окна, арка, подъезды зависят только от него самого: правка этажей или мурала, убранный дом

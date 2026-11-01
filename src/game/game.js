@@ -25,6 +25,9 @@ import * as SOFTSURF from './softsurfaces.js';
 import * as RLAND from './raisedland.js';
 import {createLandExporter} from './landcache17a/landcache-export.js';
 import {createLandReader} from './landcache17a/landcache-reader.js';
+import {createLandPackageReader} from './landdata/land-package-reader.js';
+import {createLandPackageExporter} from './landdata/land-package-export.js';
+import {LAND_PACKAGE_LIMITS} from './landdata/land-package-config.js';
 import {createLandStream,streamedGroundMaterial} from './landstream.js';
 import {clippedMesher} from './landclip.js';
 let LAND_STREAM = null, LAND_ENTERING = false;
@@ -33,6 +36,15 @@ const LAND_READ17 = new URLSearchParams(location.search).has('landcache') ? crea
   expose:api=>{window.__landCache17a=api;},work:STARTUP.work,steps:STARTUP.steps,awaited:STARTUP.awaited,count:STARTUP.count,flag:STARTUP.flag,mark:STARTUP.mark,
   onFailure:landCacheFailure17
 }) : null;
+const LAND_PACKAGE_CATALOG = typeof __LAND_PACKAGE_CATALOG__ !== 'undefined' ? __LAND_PACKAGE_CATALOG__ : null;
+const LAND_PACKAGE = import.meta.env.MODE==='steam'&&LAND_PACKAGE_CATALOG&&!LAND_READ17&&
+  new URLSearchParams(location.search).get('landpackage')!=='0'&&
+  !new URLSearchParams(location.search).has('landexport17a')&&!new URLSearchParams(location.search).has('landexport17b')
+  ? createLandPackageReader({catalog:LAND_PACKAGE_CATALOG,manifest:LAND_PACKAGE_CATALOG.manifest,
+    descriptor:()=>EDL.rngDescriptor(),query:location.search,trustedLimits:LAND_PACKAGE_LIMITS,
+    assetBase:new URL('./',location.href).href,work:STARTUP.work,steps:STARTUP.steps,awaited:STARTUP.awaited,
+    count:STARTUP.count,flag:STARTUP.flag,mark:STARTUP.mark}) : null;
+function landPackageUsable(){if(LAND_PACKAGE?.fatal)throw Error('land-package17b:FATAL_PIPELINE');}
 function landCacheFailure17(meta){
   const trace=STARTUP.report(),allRows=trace.rows.filter(row=>/^raisedland[.]/.test(row.name)),rows=allRows.slice(0,32);
   const activateCalls=trace.rows.find(row=>row.name==='raisedland.activate')?.steps||0;
@@ -6128,34 +6140,41 @@ function buildCity () {
   if (RLAND.ON) LATE.add('raisedland', function* () {
     const query17a=new URLSearchParams(location.search);
     const export17a=!LAND_READ17&&query17a.has('landexport17a')?createLandExporter({manifest:window.__landExport17aManifest,host:window.__startupHost,expose:api=>{window.__landExport17a=api;},work:STARTUP.work,mark:STARTUP.mark,flag:STARTUP.flag}):null;
-    const inspect17a=it=>export17a?export17a.watch(it):it;
+    const exportPackage=!LAND_READ17&&!export17a&&query17a.has('landexport17b')?createLandPackageExporter({receipt:window.__landPackage17bManifest,
+      descriptor:()=>EDL.rngDescriptor(),expose:api=>{window.__landPackage17bExport=api;},work:STARTUP.work,mark:STARTUP.mark,flag:STARTUP.flag}):null;
+    const inspect17a=it=>export17a?export17a.watch(it):exportPackage?exportPackage.watch(it):it;
     CURB_M.discard();
     yield* flushLandStage();
     yield* flushLandStage(GROUND_M);
     LITM.landPages(LATE.busy());
     try {
       STARTUP.work('raisedland.prepare', () => RLAND.prepare(CITY.buildings, p => THREE.ShapeUtils.triangulateShape(p.map(q => new THREE.Vector2(q[0], q[1])), [])));
-      const inputs17a=(export17a||LAND_READ17)?{source:RLAND,cores:RLAND.cleanCorePlan(DMASK?farOut:null),parameters:{...RLAND.cleanParameters(),terrainG:TER.g,terrainNX:TER.nx,terrainNZ:TER.nz,terrainX0:TER.x0,terrainZ0:TER.z0},runtime:{mapId:MAP.id,mode:import.meta.env.MODE,adult:!!ADULT,career:!!CAREER,intro:!!INTRO,editor:!!EDL.ED.on||!!window.__EDITOR,streamed:!!LAND_STREAM,graphics:GFX.preset(),district:DIST.cur(),season:SEAS.seasonValue(),seasonForced:SEAS.seasonForced()??null,quick:QR.on(),donationTrash:donated('trash'),externalSeed:typeof window.__lateSeed==='function'},query:location.search}:null;
+      const inputs17a=(export17a||LAND_READ17||exportPackage||LAND_PACKAGE)?{source:RLAND,cores:RLAND.cleanCorePlan(DMASK?farOut:null),parameters:{...RLAND.cleanParameters(),terrainG:TER.g,terrainNX:TER.nx,terrainNZ:TER.nz,terrainX0:TER.x0,terrainZ0:TER.z0},runtime:{mapId:MAP.id,mode:import.meta.env.MODE,adult:!!ADULT,career:!!CAREER,intro:!!INTRO,editor:!!EDL.ED.on||!!window.__EDITOR,streamed:!!LAND_STREAM,graphics:GFX.preset(),district:DIST.cur(),season:SEAS.seasonValue(),seasonForced:SEAS.seasonForced()??null,quick:QR.on(),donationTrash:donated('trash'),externalSeed:!EDL.rngDescriptor().ordinaryAtImport},query:location.search,prepared:true,deferDraw:!!LAND_STREAM}:null;
+      let restored=false;
       if(LAND_READ17){
         yield* LAND_READ17.readSteps(inputs17a);
-        LAND_READ17.assertReady();
-      }else{
+        LAND_READ17.assertReady();restored=true;
+      }else if(LAND_PACKAGE)restored=yield* LAND_PACKAGE.tryReadSteps(inputs17a);
+      if(!restored){
         if(export17a)export17a.beforeClean(inputs17a);
+        if(exportPackage)yield* exportPackage.beforeCleanSteps(inputs17a);
         STARTUP.count('raisedland.cleanCalls');
         yield* STARTUP.steps('raisedland.cleanContours', inspect17a(RLAND.cleanContours({M:LITM,terrain:TER,groundH:terrainH,deferDraw:!!LAND_STREAM,skip:DMASK?farOut:null,triangulate:(outer,holes)=>({
           points:[...outer,...holes.flat()],
           triangles:THREE.ShapeUtils.triangulateShape(outer.map(p=>new THREE.Vector2(...p)),holes.map(h=>h.map(p=>new THREE.Vector2(...p))))
         })})));
         if(export17a)export17a.afterClean({source:RLAND,skip:DMASK?farOut:null});
+        if(exportPackage)yield* exportPackage.afterCleanSteps({source:RLAND,skip:DMASK?farOut:null});
       }
       yield* flushLandStage();
       STARTUP.work('raisedland.activate', () => RLAND.activate(DMASK?farOut:null));
       const delta=STARTUP.work('raisedland.alignObjects', () => RLAND.alignObjects({lists:[LIT,FLAT,LAMPH],items:SMASH,props:PROPS,benches:BENCHES,baseH:terrainH}));
       SEAS.raiseLand(delta);
-    } catch(error){LAND_READ17?.cancel('PIPELINE:'+String(error?.message||error));export17a?.fail(error);throw error;} finally { LITM.landPages(false);LAND_POS.release(); }
+    } catch(error){LAND_READ17?.cancel('PIPELINE:'+String(error?.message||error));LAND_PACKAGE?.cancel('PIPELINE:'+String(error?.message||error));export17a?.fail(error);exportPackage?.fail(error);throw error;} finally { LITM.landPages(false);LAND_POS.release(); }
   });
   function* buildRaisedLandSurface(){
     LAND_READ17?.assertReady();
+    landPackageUsable();
     // Сначала освобождается исходная статика города. Самый большой
     // новый граф камня и новые вершины не держатся вместе с её копиями.
     LITM.landPages(LATE.busy());
@@ -6209,6 +6228,7 @@ function buildCity () {
   if (RLAND.ON && LATE.busy() && !new URLSearchParams(location.search).has('fullterrain')) {
     LAND_STREAM=createLandStream({terrain:TER,build:function* (bounds) {
       LAND_READ17?.assertReady();
+      landPackageUsable();
       const M=Mesher({alpha:true,index:true,keepFront:true,mainRGB:true,noLandRecord:true});
       if (!INTRO) {
         const halo=[bounds[0]-8,bounds[1]-8,bounds[2]+8,bounds[3]+8];
@@ -16812,7 +16832,7 @@ function reviveTick (dt) {
 }
 
 function startRun (ride) {
-  if (RESET_LOCKED || LAND_READ17?.failed) return;
+  if (RESET_LOCKED || LAND_READ17?.failed || LAND_PACKAGE?.fatal) return;
   STARTUP.request({ ride: !!ride, district: DIST.cur() });
   const place=PIZZERIAS[DIST.cur()]||PIZZA;
   if (LAND_STREAM && !LATE.busy() && !LAND_STREAM.readyAt(place.bx,place.bz,640)) {
@@ -16833,6 +16853,7 @@ function startRun (ride) {
   CL.transFor('начало смены', 3000);             // метка перехода (crashlog.js, 0п48): оборвётся — следующий запуск запишет
   LATE.flush();                                   // город ещё достраивался за меню — сначала достроить (latebuild.js)
   if(LAND_READ17){try{LAND_READ17.assertReady();}catch{return;}}
+  if(LAND_PACKAGE?.fatal)return;
   S.ride = !!ride;
   DIRECTOR.shiftStart(S.ride);                   // режиссёр событий: смена сессии (director.js) — до погоды и фестиваля
   WTH.shiftStart(S.ride);                         // смена карьеры: сезон и погода жребием — жара, гроза, снежная зима… (weather.js)
@@ -18515,7 +18536,7 @@ function frame (now) {
 function frameStep (now) {
   CL.at.ph = 'pre';
   if (LATE.busy() && lateFrame(now)) return;      // город ещё достраивается за меню (latebuild.js)
-  if (LAND_READ17 && !LAND_READ17.ready) return;
+  if (LAND_READ17 && !LAND_READ17.ready || LAND_PACKAGE?.fatal) return;
   if (LAND_STREAM && !LAND_ENTERING && (!LAND_READ17 || LAND_READ17.ready)) CL.step('земля рядом', () => {
     const menu=S.state==='title'||S.state==='over';
     LAND_STREAM.step(menu?PIZZA.bx:cam.position.x,menu?PIZZA.bz:cam.position.z);
@@ -18985,6 +19006,8 @@ if (LATE.busy()) {
 const SBX = { god: false, nitro: false, noStall: false };
 if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { SOFTCITY, SOFTSURF, inWall, FLY: FLYC, WRONG: WRONG.DEBUG, GUN, inTallHouse, WIDEN: { ...WIDEN.WIDEN, STATS: WIDEN.STATS }, SMOOTH: { SM: SMOOTH.SM, STATS: SMOOTH.STATS, ARCS: SMOOTH.ARCS, isArc: SMOOTH.isArc }, FACE: FACE_DEBUG, RADAR, HUDC, RYARD: RYARD.DEBUG, RT, RASK: RASK.DEBUG, OTAGS: OTAGS.DEBUG, NICK, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, chaseEnd, CHS, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, TACT, TG: TGRID.TG, PARKI: { ...PARKI.DEBUG, orphans: () => PARKI.orphans(TRAFFIC) }, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, addPickup, PKI: PKI.STATS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get routeOn () { return ROUTE_LINE.slots.some(q => q.m.visible); }, ROUTE_LINE, RP, rebuildRoutePath, updateRouteLine, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, CULLREFRESH: CULL.refresh, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, DYNRES: DYN.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
   STARTUP,
+  LAND_PACKAGE,
+  LAND_RNG:EDL.rngDescriptor,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,
   // рельеф и шаг цикла: прогнать смену без экрана, когда вкладка скрыта

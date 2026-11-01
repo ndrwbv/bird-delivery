@@ -1,0 +1,5 @@
+{
+  "scope": "Synthetic local ASAR of exact final Steam dist; not Electron-builder release or physical Deck",
+  "sourceDist": "/tmp/bird-ordinary17b-final-1102",
+  "archive": "/tmp/bird-ordinary17b-asar-1102/app.asar"
+}

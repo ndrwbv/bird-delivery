@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "kind": "ordinary-geometry17b-acceptance",
+  "status": "prepared; no process run",
+  "dist": "/tmp/bird-ordinary17b-final-1102",
+  "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+  "catalogSha256": "ff1f17e967c7f11dcdc6a929d6ef9ffb423f6b0b7a90ed546e8fab52d2d356e5",
+  "packageEntry": {
+    "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+    "path": "city-data/2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd.land.gz",
+    "encoding": "gzip",
+    "bytes": 34231591,
+    "sha256": "2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd",
+    "rawBytes": 74952828,
+    "rawSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c"
+  },
+  "provenance": [
+    {
+      "path": "docs/measurements/landcache-2026-11-02/geometry-02/cache17a-geometry.js",
+      "sha256": "dd46fbf693c9e7649d382a32fc269d271e892cda0b29d42e46e02c0bdb23dd56"
+    },
+    {
+      "path": "tools/probe-checks/startup-ready.js",
+      "sha256": "e9ef0e761ff2a5d32b743a7a26990a757089d61d81c703b57d870968a8f7b137"
+    },
+    {
+      "path": "tools/probe-checks/startup-bootstrap-observe.js",
+      "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+    },
+    {
+      "path": "tools/probe-checks/raised-land.js",
+      "sha256": "99324366abd28f28f5e498c68947987cc17791acbfb534792c43852645e7cf3e"
+    },
+    {
+      "path": "tools/probe-checks/raised-land-drive.js",
+      "sha256": "9ccfc2526f01f276af84164a4180215954bf08fd851f7b1e410a6a1ee806d88e"
+    },
+    {
+      "path": "tools/probe-checks/land-boundary.js",
+      "sha256": "616066e1d59083c54d85df8771ccf9d9068c7e838c8e560a3d3e7e587cbfea6e"
+    },
+    {
+      "path": "src/game/landcache17a/landcache-accept.js",
+      "sha256": "a65bc8dc87fded2ef6ecdba5e380449d41efbea1de7b1e00db98c710c4a2e625"
+    }
+  ],
+  "eval": "/tmp/bird-ordinary17b-geometry-1102/ordinary-geometry.js",
+  "evalSha256": "130ea2453fe2cb2307a3f71293c57659787c56e1b3ef356406a99a136dc9ed81",
+  "fixture": "/tmp/bird-ordinary17b-geometry-1102/fixture.json",
+  "fixtureSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+  "observer": "/tmp/bird-ordinary17b-geometry-1102/observer-init.js",
+  "observerSha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8",
+  "physicalDeck": false,
+  "timing": false,
+  "generatedQuery": "gfxdev=deck&mute&startupdistrict=0&landpackage=0",
+  "cacheQuery": "gfxdev=deck&mute&startupdistrict=0",
+  "probe": {
+    "file": "tools/probe.cjs",
+    "sha256": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce"
+  },
+  "lockHelper": {
+    "file": "/tmp/bird-ordinary17b-geometry-1102/lock-samples.mjs",
+    "sha256": "49d18db2c9ad65e58368439ab219e172207fb2676dce7bb1161e36a606bbc3b3"
+  }
+}

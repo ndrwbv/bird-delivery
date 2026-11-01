@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "variant": "generated",
+  "preset": "high",
+  "phase": "cold",
+  "cpu": 3,
+  "argv": [
+    "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+    "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+    "--mode=steam",
+    "--dir=/tmp/bird-ordinary17b-final-1102",
+    "--startup-trace",
+    "--startup-session=ordinary17-ca761cba-5708-4c4e-8678-b8039a707542",
+    "--startup-cold",
+    "--startup-fixture=/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+    "--fresh",
+    "--early",
+    "--size=deck",
+    "--cpu=3",
+    "--bootcpu",
+    "--init-script=/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/startup-bootstrap-observe.js",
+    "--q=gfxdev=deck&mute&startupdistrict=0&landpackage=0",
+    "--eval=/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/startup-ready.js",
+    "--bootwait=360",
+    "--timeout=480",
+    "--max=0",
+    "--errors",
+    "--report=/private/tmp/bird-ordinary17b-comparison12-1102/runs/1-generated-cold/raw.json"
+  ],
+  "startedAt": "2026-11-01T22:26:34.304Z",
+  "fixtureFile": "/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+  "fixtureSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+  "catalogFile": "/tmp/bird-ordinary17b-final-1102/city-data/catalog.json",
+  "catalogSha256": "ff1f17e967c7f11dcdc6a929d6ef9ffb423f6b0b7a90ed546e8fab52d2d356e5",
+  "processStatus": 0,
+  "signal": null,
+  "probe": {
+    "file": "tools/probe.cjs",
+    "sha256": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce"
+  },
+  "eval": {
+    "file": "tools/probe-checks/startup-ready.js",
+    "sha256": "e9ef0e761ff2a5d32b743a7a26990a757089d61d81c703b57d870968a8f7b137"
+  },
+  "observer": {
+    "file": "tools/probe-checks/startup-bootstrap-observe.js",
+    "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+  },
+  "gate": {
+    "ok": true,
+    "reasons": []
+  },
+  "admission": {
+    "file": "tools/land-package-smoke.mjs",
+    "sha256": "4130959a8a75347ae1d2f6e5f8855c1f78489b97964f1555a8b8b432658b2a5a"
+  },
+  "pid": 77610,
+  "finishedAt": "2026-11-01T22:27:55.916Z",
+  "rawSha256": "60735d0376318c85cb4eeb41ed726f9938e4b04904c885b2f00c807552b2b16b",
+  "ok": true,
+  "controlMs": 80607.89999985695,
+  "fromClickMs": 71146.59999990463,
+  "moved": 5.020106405560946,
+  "cache": null
+}

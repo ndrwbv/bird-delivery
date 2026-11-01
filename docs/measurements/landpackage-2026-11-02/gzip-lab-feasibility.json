@@ -1,0 +1,12 @@
+{
+  "scope": "Host Node CPU1 component on seed7 laboratory file; not ordinary EDL, renderer, startup or physical Deck",
+  "rawBytes": 74735068,
+  "gzipBytes": 34125175,
+  "ratio": 0.4566152933720486,
+  "level": 6,
+  "encodeMs": 882.276041,
+  "decodeMs": 125.36129200000005,
+  "byteExact": true,
+  "rawSha256": "40d8f28821b28ed37330fb23485ca8306cab17931e2ecfd09093b293aa367e08",
+  "gzipSha256": "38fd8e831857ac91c1f4cf8ddca05cc5e23b41ba3fb43a6d4694563b379b9725"
+}

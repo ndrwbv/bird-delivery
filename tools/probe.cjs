@@ -142,6 +142,14 @@ app.whenReady().then(async () => {
   const tBuild = Date.now() - T0;
   const DIST = b.dir;
 
+  // Ordinary package export forbids every pre-page random/seed override. Receipt injection is host-owned.
+  if(arg('land-package-export')){
+    if(MODE!=='steam'||!STARTUP_BENCH||!arg('land-package-manifest')||arg('seed',null)!==null||INIT_SCRIPT!==null||MEM||arg('cpuprofile')||arg('runprofile')||arg('allocprofile'))throw Error('land-package17b:ORDINARY_EXPORT_SETUP');
+    const {readExportReceipt}=await import('./land-package-files.mjs');
+    const receipt=readExportReceipt(arg('land-package-manifest'),{repo:path.resolve(__dirname,'..'),dist:DIST});
+    INIT_SCRIPT='Object.defineProperty(window,"__landPackage17bManifest",{value:'+JSON.stringify({base:receipt.base,limits:receipt.limits,receiptHash:receipt.receiptHash})+',writable:false,configurable:false});';
+  }
+
   const LAND_CACHE_PROBE=new URLSearchParams(arg('q','').replace(/^[?&]/,'')).has('landcache');
   let landCacheAsset=null,landCacheStopped=false;
   if(arg('land-cache-file')){
@@ -461,6 +469,13 @@ app.whenReady().then(async () => {
   if(arg('land-export')){
     ({landExport,landExportError,landExportDiagnostics,evalErr}=await require('./land-export-host.cjs').exportWithDiagnostics({js,priorEvalErr:evalErr,uncaught,errors,allowed:!!arg('land-export-manifest')&&STARTUP_BENCH&&!MEM&&!RUNP&&!ALLOCP,args:{file:arg('land-export'),manifestFile:arg('land-export-manifest'),dist:DIST,repo:path.resolve(__dirname,'..')}}));
   }
+  let landPackageExport=null,landPackageExportError=null,landPackageExportDiagnostics=null;
+  if(arg('land-package-export')){
+    const exported=await require('./land-package-export-host.cjs').exportWithDiagnostics({js,priorEvalErr:evalErr,uncaught,errors,
+      allowed:MODE==='steam'&&STARTUP_BENCH&&arg('seed',null)===null&&!MEM&&!RUNP&&!ALLOCP,
+      args:{file:arg('land-package-export'),manifestFile:arg('land-package-manifest'),dist:DIST,repo:path.resolve(__dirname,'..')}});
+    ({landPackageExport,landPackageExportError,landPackageExportDiagnostics}=exported);evalErr=exported.evalErr;
+  }
   if (finished) return;
   const tEval = Date.now() - T0;
   if (RUNP) { try { const { profile } = await dbg.sendCommand('Profiler.stop'); fs.writeFileSync(path.resolve(RUNP), JSON.stringify(profile)); err('probe: профиль скрипта →', path.resolve(RUNP)); } catch (e) { err('probe: профиль не снят:', e.message); } }
@@ -485,5 +500,5 @@ app.whenReady().then(async () => {
   const code = uncaught || evalErr ? 1 : 0;
   if (peakT) clearInterval(peakT);
   if (MEM) err('probe: память процессов, МБ (страница/видеокарта):', MEMLOG.map(m => m.label + ' ' + m.page + '/' + m.gpu + (m.foot ? ' (след ' + m.foot + ', пик ' + m.footPeak + ')' : '')).join(', ') + (MEMLOG.length ? ', ' : '') + 'пик ' + PEAK.page + ' (на ' + (PEAK.pageT / 1000).toFixed(1) + ' с)/' + PEAK.gpu);
-  finish(code, { ok: !code, result, landExport, landExportError, landExportDiagnostics, evalErr, errors, uncaught, frames: fstats, logs, mem: MEMLOG, memPeak: MEM ? PEAK : undefined, startupHost: STARTUP_BENCH ? STARTUP_HOST : undefined, ms: { total, build: b.built ? b.ms : 0, load: tLoad - tBuild, eval: tEval - tLoad } });
+  finish(code, { ok: !code, result, landExport, landExportError, landExportDiagnostics, landPackageExport,landPackageExportError,landPackageExportDiagnostics,evalErr, errors, uncaught, frames: fstats, logs, mem: MEMLOG, memPeak: MEM ? PEAK : undefined, startupHost: STARTUP_BENCH ? STARTUP_HOST : undefined, ms: { total, build: b.built ? b.ms : 0, load: tLoad - tBuild, eval: tEval - tLoad } });
 }).catch(e => { if (finished) return; err('probe:', e && e.stack || e); finish(1, { ok: false, error: String(e) }); });

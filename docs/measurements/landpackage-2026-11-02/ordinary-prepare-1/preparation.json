@@ -1,0 +1,527 @@
+{
+  "version": 1,
+  "kind": "ordinary-land-preparation",
+  "startedAt": "2026-11-01T21:44:26.574Z",
+  "out": "/private/tmp/bird-ordinary17b-prepare-1102",
+  "runs": [
+    {
+      "label": "build",
+      "argv": [
+        "/usr/local/bin/node",
+        "/Users/andrewboev/Desktop/not-work/delivery/node_modules/vite/bin/vite.js",
+        "build",
+        "--mode",
+        "steam",
+        "--outDir",
+        "/private/tmp/bird-ordinary17b-prepare-1102/prepare-steam"
+      ],
+      "cwd": "/Users/andrewboev/Desktop/not-work/delivery",
+      "startedAt": "2026-11-01T21:44:26.644Z",
+      "status": "returned",
+      "processStatus": 0,
+      "signal": null,
+      "pid": 34958,
+      "finishedAt": "2026-11-01T21:44:31.468Z",
+      "stdoutSha256": "3f923516b8c96df8f80f0f5c71338c8d417f1f688cfa3e44060bb7ff547e705c",
+      "stderrSha256": "43d817da84c8943f76d6482fcd87025671f720e77e105724d6349d9807517f58"
+    },
+    {
+      "label": "mid-1",
+      "argv": [
+        "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+        "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+        "--mode=steam",
+        "--dir=/private/tmp/bird-ordinary17b-prepare-1102/prepare-steam",
+        "--startup-trace",
+        "--startup-cold",
+        "--startup-session=lp17b-eeb330e6-ff9f-47da-a3f8-f041f0a5960d",
+        "--startup-fixture=/private/tmp/bird-ordinary17b-prepare-1102/mid-1-fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--max=0",
+        "--errors",
+        "--q=gfxdev=deck&mute&landexport17b",
+        "--eval=/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/land-package-export.js",
+        "--bootwait=360",
+        "--timeout=600",
+        "--land-package-export=/private/tmp/bird-ordinary17b-prepare-1102/mid-1.land",
+        "--land-package-manifest=/private/tmp/bird-ordinary17b-prepare-1102/export-receipt.json",
+        "--report=/private/tmp/bird-ordinary17b-prepare-1102/mid-1.json"
+      ],
+      "cwd": "/Users/andrewboev/Desktop/not-work/delivery",
+      "startedAt": "2026-11-01T21:44:31.615Z",
+      "status": "returned",
+      "processStatus": 0,
+      "signal": null,
+      "pid": 34960,
+      "finishedAt": "2026-11-01T21:45:09.837Z",
+      "stdoutSha256": "39bac5e4fb2dfee8c05e3f8d25da23d767362b06163f1aa00c85f7400edf23ee",
+      "stderrSha256": "ea3582868aece1e7817cfdcdb6ef11f8833be9cd0aefcbb6ce8f09f98305080f"
+    },
+    {
+      "label": "mid-2",
+      "argv": [
+        "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+        "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+        "--mode=steam",
+        "--dir=/private/tmp/bird-ordinary17b-prepare-1102/prepare-steam",
+        "--startup-trace",
+        "--startup-cold",
+        "--startup-session=lp17b-161660f1-1525-4040-a929-773d59067c52",
+        "--startup-fixture=/private/tmp/bird-ordinary17b-prepare-1102/mid-2-fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--max=0",
+        "--errors",
+        "--q=gfxdev=deck&mute&landexport17b",
+        "--eval=/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/land-package-export.js",
+        "--bootwait=360",
+        "--timeout=600",
+        "--land-package-export=/private/tmp/bird-ordinary17b-prepare-1102/mid-2.land",
+        "--land-package-manifest=/private/tmp/bird-ordinary17b-prepare-1102/export-receipt.json",
+        "--report=/private/tmp/bird-ordinary17b-prepare-1102/mid-2.json"
+      ],
+      "cwd": "/Users/andrewboev/Desktop/not-work/delivery",
+      "startedAt": "2026-11-01T21:45:09.874Z",
+      "status": "returned",
+      "processStatus": 0,
+      "signal": null,
+      "pid": 35393,
+      "finishedAt": "2026-11-01T21:45:48.400Z",
+      "stdoutSha256": "39bac5e4fb2dfee8c05e3f8d25da23d767362b06163f1aa00c85f7400edf23ee",
+      "stderrSha256": "10a5b417f7da14926c7b524fb7f25be39a175fa3b100ec7152f135966f8d4fc2"
+    },
+    {
+      "label": "high-1",
+      "argv": [
+        "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+        "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+        "--mode=steam",
+        "--dir=/private/tmp/bird-ordinary17b-prepare-1102/prepare-steam",
+        "--startup-trace",
+        "--startup-cold",
+        "--startup-session=lp17b-08247219-ce60-4ff5-8921-517e1c9a0e5a",
+        "--startup-fixture=/private/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--max=0",
+        "--errors",
+        "--q=gfxdev=deck&mute&landexport17b",
+        "--eval=/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/land-package-export.js",
+        "--bootwait=360",
+        "--timeout=600",
+        "--land-package-export=/private/tmp/bird-ordinary17b-prepare-1102/high-1.land",
+        "--land-package-manifest=/private/tmp/bird-ordinary17b-prepare-1102/export-receipt.json",
+        "--report=/private/tmp/bird-ordinary17b-prepare-1102/high-1.json"
+      ],
+      "cwd": "/Users/andrewboev/Desktop/not-work/delivery",
+      "startedAt": "2026-11-01T21:45:48.438Z",
+      "status": "returned",
+      "processStatus": 0,
+      "signal": null,
+      "pid": 35470,
+      "finishedAt": "2026-11-01T21:46:27.528Z",
+      "stdoutSha256": "7ed5d4d1a213a4dc60574bf9644d6707456f75d49cbbfcc1a77b1dcdd4e4d607",
+      "stderrSha256": "2d79f70eaf1787a4be4b7d70f9a371e3413e1a4083af6f2ca4a9ad7c913b3ef7"
+    },
+    {
+      "label": "high-2",
+      "argv": [
+        "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+        "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+        "--mode=steam",
+        "--dir=/private/tmp/bird-ordinary17b-prepare-1102/prepare-steam",
+        "--startup-trace",
+        "--startup-cold",
+        "--startup-session=lp17b-e4481cb4-ca86-4922-acb3-7b94748512de",
+        "--startup-fixture=/private/tmp/bird-ordinary17b-prepare-1102/high-2-fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--max=0",
+        "--errors",
+        "--q=gfxdev=deck&mute&landexport17b",
+        "--eval=/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/land-package-export.js",
+        "--bootwait=360",
+        "--timeout=600",
+        "--land-package-export=/private/tmp/bird-ordinary17b-prepare-1102/high-2.land",
+        "--land-package-manifest=/private/tmp/bird-ordinary17b-prepare-1102/export-receipt.json",
+        "--report=/private/tmp/bird-ordinary17b-prepare-1102/high-2.json"
+      ],
+      "cwd": "/Users/andrewboev/Desktop/not-work/delivery",
+      "startedAt": "2026-11-01T21:46:27.567Z",
+      "status": "returned",
+      "processStatus": 0,
+      "signal": null,
+      "pid": 35507,
+      "finishedAt": "2026-11-01T21:47:06.595Z",
+      "stdoutSha256": "7ed5d4d1a213a4dc60574bf9644d6707456f75d49cbbfcc1a77b1dcdd4e4d607",
+      "stderrSha256": "a8e437e7cf2dc7c81d3749db415aceb3018a18de8d36fd505e7236586861df0e"
+    }
+  ],
+  "harness": [
+    {
+      "file": "tools/land-package-prepare.mjs",
+      "bytes": 8424,
+      "sha256": "0562d3d5dc8e8efcb66887333ebca1da18e4dbf50f49efeaae992bd4bed48b8f"
+    },
+    {
+      "file": "tools/probe.cjs",
+      "bytes": 45888,
+      "sha256": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce"
+    },
+    {
+      "file": "tools/probe-page.cjs",
+      "bytes": 37506,
+      "sha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd"
+    },
+    {
+      "file": "tools/land-package-export-host.cjs",
+      "bytes": 6860,
+      "sha256": "ed347ae1a28284a786491752d6cd04ce91692052f13d40e166f31f2b3ec820f9"
+    },
+    {
+      "file": "tools/probe-checks/land-package-export.js",
+      "bytes": 564,
+      "sha256": "1b46b77505f9b9be1a65a01225be068eca849e7cf63dffc5d3046b7cdb50556a"
+    }
+  ],
+  "source": {
+    "mapId": "seversk",
+    "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+    "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+    "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e"
+  },
+  "receiptHash": "d626f6c216f3652655816d296775a7e09251ae1b8ac0a51e49498f948f3a6f84",
+  "exports": [
+    {
+      "label": "mid-1",
+      "preset": "mid",
+      "repeat": 1,
+      "fixtureFile": "/private/tmp/bird-ordinary17b-prepare-1102/mid-1-fixture.json",
+      "fixtureSha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00",
+      "report": "/private/tmp/bird-ordinary17b-prepare-1102/mid-1.json",
+      "reportSha256": "98493e601698cbe2a357865a4990b9673d550a7ff0de91040f41a1d9a94aeb43",
+      "file": "/private/tmp/bird-ordinary17b-prepare-1102/mid-1.land",
+      "path": "/private/tmp/bird-ordinary17b-prepare-1102/mid-1.land",
+      "bytes": 74952828,
+      "sha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+      "identity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e"
+      },
+      "manifest": {
+        "version": 1,
+        "kind": "land-package17b",
+        "mapId": "seversk",
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+        "parameters": {
+          "coverCell": 32,
+          "indexCell": 8,
+          "maskCell": 32,
+          "minWidth": 0.8,
+          "terrainG": 16,
+          "terrainNX": 764,
+          "terrainNZ": 581,
+          "terrainX0": -6097,
+          "terrainZ0": -4635
+        }
+      },
+      "receiptHash": "d626f6c216f3652655816d296775a7e09251ae1b8ac0a51e49498f948f3a6f84",
+      "acceptance": {
+        "activated": false,
+        "byteExact": true,
+        "bytes": 74952828,
+        "fileSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+        "liveRestored": false,
+        "ordinary": true,
+        "queryPoints": 27,
+        "rendered": false,
+        "repeated": true,
+        "selectedDrawInputs": true,
+        "source": "generated",
+        "version": 1,
+        "workerRngInstrumented": false
+      },
+      "provenance": {
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+        "buildHash": "5a99fd945d13dc90d5a9d2ba92c4c5c20b4048955db85ebe28f283c0544be224",
+        "buildDir": "/private/tmp/bird-ordinary17b-prepare-1102/prepare-steam"
+      }
+    },
+    {
+      "label": "mid-2",
+      "preset": "mid",
+      "repeat": 2,
+      "fixtureFile": "/private/tmp/bird-ordinary17b-prepare-1102/mid-2-fixture.json",
+      "fixtureSha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00",
+      "report": "/private/tmp/bird-ordinary17b-prepare-1102/mid-2.json",
+      "reportSha256": "ce0a9a6a6f2d73959992035a1a2f17594a92595cb9e3d36698775240a457fa90",
+      "file": "/private/tmp/bird-ordinary17b-prepare-1102/mid-2.land",
+      "path": "/private/tmp/bird-ordinary17b-prepare-1102/mid-2.land",
+      "bytes": 74952828,
+      "sha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+      "identity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e"
+      },
+      "manifest": {
+        "version": 1,
+        "kind": "land-package17b",
+        "mapId": "seversk",
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+        "parameters": {
+          "coverCell": 32,
+          "indexCell": 8,
+          "maskCell": 32,
+          "minWidth": 0.8,
+          "terrainG": 16,
+          "terrainNX": 764,
+          "terrainNZ": 581,
+          "terrainX0": -6097,
+          "terrainZ0": -4635
+        }
+      },
+      "receiptHash": "d626f6c216f3652655816d296775a7e09251ae1b8ac0a51e49498f948f3a6f84",
+      "acceptance": {
+        "activated": false,
+        "byteExact": true,
+        "bytes": 74952828,
+        "fileSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+        "liveRestored": false,
+        "ordinary": true,
+        "queryPoints": 27,
+        "rendered": false,
+        "repeated": true,
+        "selectedDrawInputs": true,
+        "source": "generated",
+        "version": 1,
+        "workerRngInstrumented": false
+      },
+      "provenance": {
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+        "buildHash": "5a99fd945d13dc90d5a9d2ba92c4c5c20b4048955db85ebe28f283c0544be224",
+        "buildDir": "/private/tmp/bird-ordinary17b-prepare-1102/prepare-steam"
+      }
+    },
+    {
+      "label": "high-1",
+      "preset": "high",
+      "repeat": 1,
+      "fixtureFile": "/private/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+      "fixtureSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "report": "/private/tmp/bird-ordinary17b-prepare-1102/high-1.json",
+      "reportSha256": "b224f3fbbbc9593b8b29863ed90e2480c3eb141de85bb11c47df893014f73829",
+      "file": "/private/tmp/bird-ordinary17b-prepare-1102/high-1.land",
+      "path": "/private/tmp/bird-ordinary17b-prepare-1102/high-1.land",
+      "bytes": 74952828,
+      "sha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+      "identity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e"
+      },
+      "manifest": {
+        "version": 1,
+        "kind": "land-package17b",
+        "mapId": "seversk",
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+        "parameters": {
+          "coverCell": 32,
+          "indexCell": 8,
+          "maskCell": 32,
+          "minWidth": 0.8,
+          "terrainG": 16,
+          "terrainNX": 764,
+          "terrainNZ": 581,
+          "terrainX0": -6097,
+          "terrainZ0": -4635
+        }
+      },
+      "receiptHash": "d626f6c216f3652655816d296775a7e09251ae1b8ac0a51e49498f948f3a6f84",
+      "acceptance": {
+        "activated": false,
+        "byteExact": true,
+        "bytes": 74952828,
+        "fileSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+        "liveRestored": false,
+        "ordinary": true,
+        "queryPoints": 27,
+        "rendered": false,
+        "repeated": true,
+        "selectedDrawInputs": true,
+        "source": "generated",
+        "version": 1,
+        "workerRngInstrumented": false
+      },
+      "provenance": {
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+        "buildHash": "5a99fd945d13dc90d5a9d2ba92c4c5c20b4048955db85ebe28f283c0544be224",
+        "buildDir": "/private/tmp/bird-ordinary17b-prepare-1102/prepare-steam"
+      }
+    },
+    {
+      "label": "high-2",
+      "preset": "high",
+      "repeat": 2,
+      "fixtureFile": "/private/tmp/bird-ordinary17b-prepare-1102/high-2-fixture.json",
+      "fixtureSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "report": "/private/tmp/bird-ordinary17b-prepare-1102/high-2.json",
+      "reportSha256": "fd286d8566aaa15a262160120626e44e2008cc465ff5339e91f8096f4d13de65",
+      "file": "/private/tmp/bird-ordinary17b-prepare-1102/high-2.land",
+      "path": "/private/tmp/bird-ordinary17b-prepare-1102/high-2.land",
+      "bytes": 74952828,
+      "sha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+      "identity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e"
+      },
+      "manifest": {
+        "version": 1,
+        "kind": "land-package17b",
+        "mapId": "seversk",
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+        "parameters": {
+          "coverCell": 32,
+          "indexCell": 8,
+          "maskCell": 32,
+          "minWidth": 0.8,
+          "terrainG": 16,
+          "terrainNX": 764,
+          "terrainNZ": 581,
+          "terrainX0": -6097,
+          "terrainZ0": -4635
+        }
+      },
+      "receiptHash": "d626f6c216f3652655816d296775a7e09251ae1b8ac0a51e49498f948f3a6f84",
+      "acceptance": {
+        "activated": false,
+        "byteExact": true,
+        "bytes": 74952828,
+        "fileSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+        "liveRestored": false,
+        "ordinary": true,
+        "queryPoints": 27,
+        "rendered": false,
+        "repeated": true,
+        "selectedDrawInputs": true,
+        "source": "generated",
+        "version": 1,
+        "workerRngInstrumented": false
+      },
+      "provenance": {
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+        "buildHash": "5a99fd945d13dc90d5a9d2ba92c4c5c20b4048955db85ebe28f283c0544be224",
+        "buildDir": "/private/tmp/bird-ordinary17b-prepare-1102/prepare-steam"
+      }
+    }
+  ],
+  "compression": [
+    {
+      "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+      "rawBytes": 74952828,
+      "wireBytes": 34231591,
+      "encodeMs": 919.0613749999902,
+      "decodeMs": 163.60262499999953,
+      "level": 6,
+      "scope": "Node host CPU1 component, not renderer startup or Deck",
+      "byteExact": true
+    }
+  ],
+  "package": {
+    "dir": "/private/tmp/bird-ordinary17b-prepare-1102/package",
+    "uniqueInputs": 1,
+    "rawBytes": 74952828,
+    "wireBytes": 34231591,
+    "catalog": {
+      "version": 1,
+      "kind": "land-package17b-catalog",
+      "manifest": {
+        "version": 1,
+        "kind": "land-package17b",
+        "mapId": "seversk",
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+        "parameters": {
+          "coverCell": 32,
+          "indexCell": 8,
+          "maskCell": 32,
+          "minWidth": 0.8,
+          "terrainG": 16,
+          "terrainNX": 764,
+          "terrainNZ": 581,
+          "terrainX0": -6097,
+          "terrainZ0": -4635
+        }
+      },
+      "entries": [
+        {
+          "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+          "path": "city-data/2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd.land.gz",
+          "encoding": "gzip",
+          "bytes": 34231591,
+          "sha256": "2ecd942570b7955f82c20fe7e11bfbcfd006b00c382e5ab044e095a2834dc8bd",
+          "rawBytes": 74952828,
+          "rawSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c"
+        }
+      ]
+    }
+  },
+  "ok": true,
+  "finishedAt": "2026-11-01T21:47:07.734Z"
+}

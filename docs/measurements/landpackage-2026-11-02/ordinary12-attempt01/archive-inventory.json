@@ -1,0 +1,143 @@
+{
+  "version": 1,
+  "kind": "retained-harness-metadata-failure",
+  "original": "/tmp/bird-ordinary17b-comparison12-1102",
+  "classification": "Runtime PASS, metadata admission FAIL; not part of successful12, never reclassified.",
+  "files": [
+    {
+      "path": "build-tree.json",
+      "bytes": 16376,
+      "sha256": "18ab6d551886a01f0705772a6580a58b73507aed9b8e16d2127f7125fb1f2d20"
+    },
+    {
+      "path": "catalog.json",
+      "bytes": 903,
+      "sha256": "ff1f17e967c7f11dcdc6a929d6ef9ffb423f6b0b7a90ed546e8fab52d2d356e5"
+    },
+    {
+      "path": "fixture.json",
+      "bytes": 74,
+      "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 13167,
+      "sha256": "f6ec66c54daaa76adac21b91f61948a817c0a18b7900964b3a984b97e2a57953"
+    },
+    {
+      "path": "measured-harness/tools/land-package-build.mjs",
+      "bytes": 3010,
+      "sha256": "563dd10a01f2c7a8c9a0622cad6b9944952cb9a36c2be2e764f28367e79ef258"
+    },
+    {
+      "path": "measured-harness/tools/land-package-files.mjs",
+      "bytes": 4850,
+      "sha256": "4e5d33ec290e21e306fb65d32ea24290f2d58900f0821c984cd4945e3c2287b8"
+    },
+    {
+      "path": "measured-harness/tools/land-package-smoke.mjs",
+      "bytes": 6084,
+      "sha256": "4130959a8a75347ae1d2f6e5f8855c1f78489b97964f1555a8b8b432658b2a5a"
+    },
+    {
+      "path": "measured-harness/tools/land-package-source-key.mjs",
+      "bytes": 1386,
+      "sha256": "c581661cfa3fac423a8dec95708aba8ff64a9cebae4e308760cf35b739d45a13"
+    },
+    {
+      "path": "measured-harness/tools/probe-build.cjs",
+      "bytes": 4916,
+      "sha256": "3eda8b68163026fa436345f97814791270f16eb6844584176ae6c8a531c4b09f"
+    },
+    {
+      "path": "measured-harness/tools/probe-checks/startup-bootstrap-observe.js",
+      "bytes": 654,
+      "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+    },
+    {
+      "path": "measured-harness/tools/probe-checks/startup-ready.js",
+      "bytes": 6203,
+      "sha256": "e9ef0e761ff2a5d32b743a7a26990a757089d61d81c703b57d870968a8f7b137"
+    },
+    {
+      "path": "measured-harness/tools/probe-page.cjs",
+      "bytes": 37506,
+      "sha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd"
+    },
+    {
+      "path": "measured-harness/tools/probe.cjs",
+      "bytes": 45888,
+      "sha256": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce"
+    },
+    {
+      "path": "measured-harness/tools/startup-bench.mjs",
+      "bytes": 15500,
+      "sha256": "2f5e1999dc5394c5a5d5aeba643e6494643105e550d1134b977d9afe063965ef"
+    },
+    {
+      "path": "measured-harness/tools/startup-ordinary-gate.mjs",
+      "bytes": 11603,
+      "sha256": "67dfd002d22dba156e72d15ea3a5a263385f073500bff4844dc0b6e866451d27"
+    },
+    {
+      "path": "measured-harness/tools/startup-ordinary.mjs",
+      "bytes": 10335,
+      "sha256": "4c685f6134900c8929ff886e5538f3d47dc6237fe3a1293ad629bd0f303c95b7"
+    },
+    {
+      "path": "measured-harness/tools/startup-report.mjs",
+      "bytes": 13190,
+      "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+    },
+    {
+      "path": "ordinary-config.json",
+      "bytes": 1179,
+      "sha256": "e0468f3be25fdf31dabde94d6aa7467bdaf11e223a4b5c2e6d61accdfc2dc907"
+    },
+    {
+      "path": "pilot-cache.json",
+      "bytes": 38778,
+      "sha256": "9f1ad5c2256ef9fd40210fabada9c3012bce13f1bb1bcbd26027b3f4aeb74eac"
+    },
+    {
+      "path": "pilot-generated.json",
+      "bytes": 33441,
+      "sha256": "75a801c96e853ef093d7421d5d18548e03874d2c1506da26b474b6f4533a7a9d"
+    },
+    {
+      "path": "runs/1-generated-cold/raw.json",
+      "bytes": 33376,
+      "sha256": "60735d0376318c85cb4eeb41ed726f9938e4b04904c885b2f00c807552b2b16b"
+    },
+    {
+      "path": "runs/1-generated-cold/run.json",
+      "bytes": 2398,
+      "sha256": "d6fdd3c44a604ed8a151d21eecec949c3b199ef2d11da42d9a7ebed906775059"
+    },
+    {
+      "path": "runs/1-generated-cold/smoke.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "runs/1-generated-cold/smoke.stdout.log",
+      "bytes": 205,
+      "sha256": "eb8b042c95717b63441ccdd96059c9a7ae94fa6106eab6fa6481c23983bf3e72"
+    },
+    {
+      "path": "runs/1-generated-cold/stderr.log",
+      "bytes": 185,
+      "sha256": "a9d21b393aaa66e05a3a84a53d2b8a33cabf6e0f378ac38dc4b51ba043e9ba3a"
+    },
+    {
+      "path": "runs/1-generated-cold/stdout.log",
+      "bytes": 32806,
+      "sha256": "f45e002cd69c159e5459f8351ba01bd70ca3fcf684a3b5fbe001e1cbd86c3d0c"
+    },
+    {
+      "path": "source-receipt.json",
+      "bytes": 75746,
+      "sha256": "85ac560c10cbc3eceba75c9b39675e21cdca8765b0f4fc3b7ef84c8d3484bb7b"
+    }
+  ]
+}

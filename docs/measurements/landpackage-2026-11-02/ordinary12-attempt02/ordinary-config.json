@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "kind": "startup-ordinary",
+  "dir": "/tmp/bird-ordinary17b-final-1102",
+  "base": {
+    "mapId": "seversk",
+    "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+    "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+    "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e"
+  },
+  "buildHash": "2a4474c94d92bb413ed7dd132391044cef8ac89d671bc63e9c37d7be340d04b1",
+  "fixture": {
+    "file": "/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+    "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+  },
+  "catalog": {
+    "file": "/tmp/bird-ordinary17b-final-1102/city-data/catalog.json",
+    "sha256": "ff1f17e967c7f11dcdc6a929d6ef9ffb423f6b0b7a90ed546e8fab52d2d356e5"
+  },
+  "pilots": {
+    "generated": {
+      "report": "/tmp/bird-ordinary17b-generated-pilot-1102/raw.json",
+      "sha256": "75a801c96e853ef093d7421d5d18548e03874d2c1506da26b474b6f4533a7a9d"
+    },
+    "cache": {
+      "report": "/tmp/bird-ordinary17b-pilot-high-1102.json",
+      "sha256": "9f1ad5c2256ef9fd40210fabada9c3012bce13f1bb1bcbd26027b3f4aeb74eac"
+    }
+  }
+}
