@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "kind": "ci-first-ordinary-address-failure",
+  "workflowRunId": 41385241522,
+  "outcome": "FAIL",
+  "scope": "First failed producer attempt only; not a successful release or a completed four-export preparation.",
+  "sourceBase": {
+    "mapId": "seversk",
+    "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+    "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+    "sourceHash": "7c2b69b062fda7248d4a66d01207c216ccea9b9edf3f72614be4dd946e2a0fef"
+  },
+  "prepareBuildHash": "432f193b9c459a30792ea4de282bf0b9be486e624fac4179f28bae69343d16c5",
+  "capturedFacts": {
+    "case": "fresh-mid-1",
+    "processStatus": 1,
+    "signal": null,
+    "evalErr": "Control marker did not permit real acceleration: 0",
+    "movementMeters": 0,
+    "consoleErrors": 0,
+    "uncaught": 0,
+    "crashCount": 0,
+    "frameP95Ms": 916.7,
+    "frameMaxMs": 8163.4,
+    "totalMs": 247844,
+    "supportReady": true,
+    "localReady": true,
+    "lateBusy": false,
+    "completedExports": 0
+  },
+  "interpretation": {
+    "movementProtocol": "Original --early producer used a 600 ms W window. Its deadline failed with zero movement; no game console/uncaught/crash error was recorded.",
+    "softwareGpuDiagnosis": "Root diagnosis of CI software-GPU timing sensitivity; GPU backend itself is not present in the raw report.",
+    "followup": "Producer-only settled admission/30-second real-W allowance is pending recheck; no PASS is inferred. A fresh preparation must record its own source/build/harness provenance."
+  },
+  "audit": {
+    "copiedBytesExact": true,
+    "producerLogHashesMatchJournal": true,
+    "buildSourceOrTempDirectoriesIncluded": false,
+    "originalArgvAndPathsPreservedInJournal": true
+  },
+  "files": [
+    {
+      "archivePath": "bird-address-preparation/build.stderr.log",
+      "downloadedPath": "/tmp/bird-address-ordinary-1102-v2/ci-failed-address-proof/bird-address-preparation/build.stderr.log",
+      "bytes": 1549,
+      "sha256": "16111b5de23dd102ac89fce35524c931812980925c2f29732d049d7302e9b5a7"
+    },
+    {
+      "archivePath": "bird-address-preparation/build.stdout.log",
+      "downloadedPath": "/tmp/bird-address-ordinary-1102-v2/ci-failed-address-proof/bird-address-preparation/build.stdout.log",
+      "bytes": 7942,
+      "sha256": "e5124ea371c5bddd03982a11e2033874f21c5b9d416ec27571a978a01d77bc72"
+    },
+    {
+      "archivePath": "bird-address-preparation/fresh-mid-1/fixture.json",
+      "downloadedPath": "/tmp/bird-address-ordinary-1102-v2/ci-failed-address-proof/bird-address-preparation/fresh-mid-1/fixture.json",
+      "bytes": 23,
+      "sha256": "b6abac7d6a3d12b6d19d37b24ce2ac6e2412c0cf0788a5107d9ffad1058806d7"
+    },
+    {
+      "archivePath": "bird-address-preparation/fresh-mid-1/raw.json",
+      "downloadedPath": "/tmp/bird-address-ordinary-1102-v2/ci-failed-address-proof/bird-address-preparation/fresh-mid-1/raw.json",
+      "bytes": 1640,
+      "sha256": "e40adf912fb0150d81d116b03958927e884abe43516f79588d1dd819d84c22b2"
+    },
+    {
+      "archivePath": "bird-address-preparation/fresh-mid-1.stderr.log",
+      "downloadedPath": "/tmp/bird-address-ordinary-1102-v2/ci-failed-address-proof/bird-address-preparation/fresh-mid-1.stderr.log",
+      "bytes": 1378,
+      "sha256": "8b36be5b13434bb062cdb58699671cd17ea2fd24fb03b48db4ad7e4402b2fe18"
+    },
+    {
+      "archivePath": "bird-address-preparation/fresh-mid-1.stdout.log",
+      "downloadedPath": "/tmp/bird-address-ordinary-1102-v2/ci-failed-address-proof/bird-address-preparation/fresh-mid-1.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "archivePath": "bird-address-preparation/preparation.json",
+      "downloadedPath": "/tmp/bird-address-ordinary-1102-v2/ci-failed-address-proof/bird-address-preparation/preparation.json",
+      "bytes": 105778,
+      "sha256": "1544a5f20f88c01c5de2b34be0760a6ddfbcf774f2cd4547ceb9a7c94efab08c"
+    },
+    {
+      "archivePath": "bird-address-preparation.log",
+      "downloadedPath": "/tmp/bird-address-ordinary-1102-v2/ci-failed-address-proof/bird-address-preparation.log",
+      "bytes": 568,
+      "sha256": "baff8b2fbce45d7d061be47e7b876e106878b753be086768850e4a0122a12914"
+    },
+    {
+      "archivePath": "ci-prepare-address-failed.log",
+      "downloadedPath": "/tmp/bird-address-ordinary-1102-v2/ci-prepare-address-failed.log",
+      "bytes": 19730,
+      "sha256": "71c5ab24a92c906233db18857db3ae0c67d83e2b514b702f00308d02931d4331"
+    }
+  ]
+}

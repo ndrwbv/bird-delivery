@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 import {createAddressCatalogRecorder} from '../src/game/addresscatalog.js';
 import {encodeAddressCatalog} from '../src/game/addresscodec17b.js';
 import {RNG_PROVIDER,BASE_SEED} from '../src/game/landdata/land-package-key.js';
-import {ADDRESS_EXPORT_QUERY,FRESH_ADDRESS_EXPORT_QUERY,addressPreparationFixture,freshAddressPreparationFixture,parseAddressPreparationArgs,addressProductCatalog,checkAddressExport,checkAddressRepeats,earlyQueryArtifact,earlyQueryInit} from './address-package-prepare.mjs';
+import {ADDRESS_EXPORT_QUERY,FRESH_ADDRESS_EXPORT_QUERY,addressPreparationFixture,freshAddressPreparationFixture,parseAddressPreparationArgs,addressPreparationSchedule,addressProductCatalog,checkAddressExport,checkAddressRepeats,earlyQueryArtifact,earlyQueryInit} from './address-package-prepare.mjs';
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex'),base={mapId:'fixture',mapHash:'a'.repeat(64),editsHash:'b'.repeat(64),sourceHash:'c'.repeat(64)},identity={...base,inputHash:'d'.repeat(64)};
 function exact(v){if(v===null)return['null'];if(v===undefined)return['undefined'];if(typeof v==='number'){const b=Buffer.alloc(8);b.writeDoubleLE(v);return['number',b.toString('hex')];}if(['string','boolean'].includes(typeof v))return[typeof v,v];if(Array.isArray(v))return['array',v.map(exact)];return['object',Object.keys(v).map(k=>[k,exact(v[k])])];}
 const targets={buildings:[{id:-0}],houses:[],generatedDoors:[],entrances:[[-0,0,1,0]],spots:[]},rec=createAddressCatalogRecorder(targets);
@@ -25,6 +25,8 @@ function fixture(){
 }
 function freshFixture(graphics='mid'){
  const v=fixture(),r=v.result,p=r.addressClosure,initial=p.initial;
+ r.host.admission={...addressPreparationSchedule(true)};v.startupHost.admission={...r.host.admission};
+ r.startConditions={state:'title',queueBusy:false,queueFullAt:4,bootFull:5,preexistingControl:false};
  initial.season.saved=null;initial.district.opened=1;initial.car.inputs=Object.fromEntries(['dlv-car-owned','dlv-car-cur','dlv-car-up','dlv-car-L','dlv-car-paint','dlv-car-eng'].map(k=>[k,null]));initial.graphics.preset=graphics;
  r.district.pickerClicks=0;r.district.before.opened=1;r.conditions.graphics.preset=graphics;
  const raw='?debug&mute&nolb&startuptrace&'+FRESH_ADDRESS_EXPORT_QUERY;r.conditions.url='app://g/index.html'+raw;r.freshEnvironment={userAgent:'Mozilla/5.0 Steam Deck SteamOS',rawQuery:raw};
@@ -81,6 +83,19 @@ await test('ordinary CLI is explicit and preserves the legacy --out path',()=>{
  assert.deepEqual(parseAddressPreparationArgs(['--out=/tmp/new','--ordinary']),{ordinary:true,out:'/tmp/new'});
  for(const args of [[],['--ordinary'],['--out='],['--out=/tmp/a','--out=/tmp/b'],['--ordinary','--ordinary','--out=/tmp/a'],['--ordinary=1','--out=/tmp/a']])assert.throws(()=>parseAddressPreparationArgs(args),/CLI_OUT/);
 });
+await test('ordinary settled budget and actual CLI path preserve legacy B1 early allowances',()=>{
+ assert.deepEqual(addressPreparationSchedule(true),{mode:'settled',early:false,bootWaitSec:1200,controlWaitMs:420000,probeTimeoutSec:1740,hardTimeoutMs:1800000,movementWaitMs:30000});
+ assert.deepEqual(addressPreparationSchedule(false),{mode:'early',early:true,bootWaitSec:360,controlWaitMs:240000,probeTimeoutSec:900,hardTimeoutMs:950000,movementWaitMs:600});
+ const source=fs.readFileSync(new URL('./address-package-prepare.mjs',import.meta.url),'utf8'),expression=source.match(/const args=(\[[^\n]+\]);/)[1];
+ const build=new Function('path','repo','process','dist','session','fixtureFile','report','ordinary','schedule','FRESH_ADDRESS_EXPORT_QUERY','ADDRESS_EXPORT_QUERY','return '+expression),path={join:(...parts)=>parts.join('/')};
+ for(const ordinary of [false,true]){
+  const schedule=addressPreparationSchedule(ordinary),args=build(path,'repo',{platform:'darwin'},'dist','session','fixture','raw',ordinary,schedule,FRESH_ADDRESS_EXPORT_QUERY,ADDRESS_EXPORT_QUERY);
+  assert.equal(args.includes('--early'),!ordinary);assert.equal(args.includes('--startup-admission=settled'),ordinary);
+  assert.ok(args.includes('--bootwait='+schedule.bootWaitSec));assert.ok(args.includes('--timeout='+schedule.probeTimeoutSec));
+ }
+ const harness=JSON.parse(source.match(/const HARNESS=(\[[^\n]+\]);/)[1].replaceAll("'",'"'));
+ assert.ok(harness.includes('tools/startup-admission.cjs'));assert.equal(Object.isFrozen(addressPreparationSchedule(true)),true);
+});
 await test('fresh fixture seeds only ordinary language and optional saved high setting',()=>{
  assert.deepEqual(freshAddressPreparationFixture('mid'),{'dlv-lang':'ru'});assert.deepEqual(freshAddressPreparationFixture('high'),{'dlv-lang':'ru','dlv-gfx':{deck:{p:'high',rv:2}}});
  for(const graphics of ['mid','high']){const f=freshAddressPreparationFixture(graphics);for(const key of ['dlv-sound','dlv-shifts','dlv-msk-wallet','dlv-msk-guide','dlv-msk-nostut','dlv-car-cur','dlv-money-x8','dlv-single-marker-v1'])assert.equal(Object.hasOwn(f,key),false);}
@@ -90,6 +105,14 @@ for(const graphics of ['mid','high'])await test('fresh '+graphics+' host gate su
  const v=freshFixture(graphics),a=await checkAddressExport(v,{base,ordinary:true,graphics});assert.deepEqual(a.snapshot,snapshot);assert.equal(a.identity.inputHash,(graphics==='mid'?'d':'e').repeat(64));
 });
 for(const [name,change,pattern]of [
+ ['missing settled host',v=>delete v.startupHost.admission,/SETTLED_HOST/],
+ ['wrong movement allowance',v=>v.result.host.admission.movementWaitMs=600,/SETTLED_HOST/],
+ ['unfinished title queue',v=>v.result.startConditions.queueBusy=true,/SETTLED_START/],
+ ['boolean boot completion is not the real timestamp',v=>v.result.startConditions.bootFull=true,/SETTLED_START/],
+ ['missing boot completion',v=>v.result.startConditions.bootFull=false,/SETTLED_START/],
+ ['preexisting control',v=>v.result.startConditions.preexistingControl=true,/SETTLED_START/],
+ ['missing completed queue evidence',v=>v.result.startConditions.queueFullAt=null,/SETTLED_START/],
+ ['zero actual W movement despite settled allowance',v=>v.result.moved=0,/STARTUP/],
  ['mature picker in fresh',v=>v.result.district.pickerClicks=1,/ACTUAL_FRESH_START/],
  ['opened eight in initial',v=>v.result.addressClosure.initial.district.opened=8,/ACTUAL_PREVISUAL_DESCRIPTOR/],
  ['sound or world override query',v=>v.result.conditions.url+='&gfxdev=deck',/ACTUAL_QUERY/],

@@ -12,12 +12,13 @@ import {assertOrdinaryEDL} from '../src/game/landdata/land-package-key.js';
 import {encodeAddressCatalog,decodeAddressCatalog} from '../src/game/addresscodec17b.js';
 import * as AddressPackages from '../src/game/addresspackage17b.js';
 const {checkAddressPackageCatalog}=AddressPackages;
+const {admissionSettings}=createRequire(import.meta.url)('./startup-admission.cjs');
 
 export const FRESH_ADDRESS_EXPORT_QUERY='addressexport17b&addressclosure17b';
 export const ADDRESS_EXPORT_QUERY='gfxdev=deck&mute&startupdistrict=0&addresspackage17b=1&addressexport17b&addressclosure17b';
 const WIRE_LIMIT=16*1024*1024,REPORT_LIMIT=64*1024*1024;
 const ID_FIELDS=['mapId','mapHash','editsHash','sourceHash','inputHash'];
-const HARNESS=['tools/address-package-prepare.mjs','tools/probe-checks/address-package-export.js','tools/probe-checks/address-package-fresh-export.js','tools/probe.cjs','tools/probe-page.cjs','tools/startup-environment.cjs','tools/startup-report.mjs','tools/probe-checks/startup-bootstrap-observe.js'];
+const HARNESS=['tools/address-package-prepare.mjs','tools/probe-checks/address-package-export.js','tools/probe-checks/address-package-fresh-export.js','tools/probe.cjs','tools/probe-page.cjs','tools/startup-environment.cjs','tools/startup-admission.cjs','tools/startup-report.mjs','tools/probe-checks/startup-bootstrap-observe.js'];
 const need=(ok,why)=>{if(!ok)throw Error('address-package-prepare:'+why);};
 const hash=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);
 function exact(value){
@@ -51,6 +52,10 @@ export function parseAddressPreparationArgs(argv){
  need(outputs.length===1&&outputs[0].length>6&&argv.length===(ordinary?2:1)&&argv.filter(v=>v==='--ordinary').length===(ordinary?1:0),'CLI_OUT');
  return{ordinary,out:outputs[0].slice(6)};
 }
+export function addressPreparationSchedule(ordinary=false){
+ // Keep the original B1 producer's 900s/950s allowances and early input path.
+ return ordinary?admissionSettings('settled'):Object.freeze({...admissionSettings('early'),probeTimeoutSec:900,hardTimeoutMs:950000});
+}
 const nativeSHA=async bytes=>Buffer.from(await webcrypto.subtle.digest('SHA-256',bytes)).toString('hex');
 function checkIdentity(identity,base){
  need(identity&&Object.keys(identity).sort().join(',')===ID_FIELDS.slice().sort().join(',')&&/^[a-z0-9_-]{1,64}$/.test(identity.mapId)&&ID_FIELDS.slice(1).every(k=>hash(identity[k])),'IDENTITY');
@@ -62,6 +67,11 @@ export async function checkAddressExport(value,{base,ordinary=false,graphics='hi
  const r=value.result,p=r.addressClosure,a=r.addressExport,m=a?.meta,input=m?.input;
  need(r.protocolVersion===2&&r.district.pickerClicks===(ordinary?0:1)&&r.district.before?.opened===(ordinary?1:8)&&r.district.before.city===false,ordinary?'ACTUAL_FRESH_START':'ACTUAL_MATURE_PICKER');
  need(r.host?.seed===null&&value.startupHost?.seed===null&&r.host.cpuThrottle===1&&r.host.bootcpu===true,'ORDINARY_HOST');
+ if(ordinary){
+  const schedule=addressPreparationSchedule(true),start=r.startConditions;
+  need([r.host,value.startupHost].every(host=>Object.keys(schedule).every(k=>host?.admission?.[k]===schedule[k])),'SETTLED_HOST');
+  need(start?.state==='title'&&start.queueBusy===false&&Number.isFinite(start.bootFull)&&start.bootFull>0&&Number.isFinite(start.queueFullAt)&&start.queueFullAt>=0&&start.preexistingControl===false,'SETTLED_START');
+ }
  assertOrdinaryEDL(r.rng);need(r.conditions?.lang==='ru'&&r.conditions.graphics?.preset===graphics&&r.conditions.graphics.device==='deck'&&r.conditions.graphics.width===1280&&r.conditions.graphics.height===800,'GRAPHICS');
  need(r.landPackage===null&&r.cache===null&&r.report.counters?.['raisedland.cleanCalls']===1,'UNBUNDLED_GENERATED_LAND');
  const actualQuery=[...new URL(r.conditions.url).searchParams].sort(([a],[b])=>a<b?-1:a>b?1:0);
@@ -129,8 +139,9 @@ export function earlyQueryInit(artifact,observerSource){
 }
 async function main(){
  const {ordinary,out:requestedOut}=parseAddressPreparationArgs(process.argv.slice(2));
+ const schedule=addressPreparationSchedule(ordinary);
  const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),out=newExternalPath(repo,requestedOut);fs.mkdirSync(out,{recursive:true});
- const journal={version:1,kind:'ordinary-address-preparation',out,startedAt:new Date().toISOString(),protocol:{exports:ordinary?4:2,fixture:ordinary?'ordinary-first-career-mid-high-ru':'exact-B1-mature0-high-semerka-ru',query:ordinary?FRESH_ADDRESS_EXPORT_QUERY:ADDRESS_EXPORT_QUERY,seed:null,cpu:1,fresh:true,maxWireBytes:WIRE_LIMIT,maxReportBytes:REPORT_LIMIT},runs:[]};
+ const journal={version:1,kind:'ordinary-address-preparation',out,startedAt:new Date().toISOString(),protocol:{exports:ordinary?4:2,fixture:ordinary?'ordinary-first-career-mid-high-ru':'exact-B1-mature0-high-semerka-ru',query:ordinary?FRESH_ADDRESS_EXPORT_QUERY:ADDRESS_EXPORT_QUERY,seed:null,cpu:1,fresh:true,maxWireBytes:WIRE_LIMIT,maxReportBytes:REPORT_LIMIT},...(ordinary?{schedule}:{}),runs:[]};
  const harness=()=>HARNESS.map(file=>{const bytes=fs.readFileSync(path.join(repo,file));return{file,bytes:bytes.length,sha256:sha256(bytes)};});journal.harness=harness();
  const save=()=>fs.writeFileSync(path.join(out,'preparation.json'),JSON.stringify(journal,null,2));save();
  const env={...process.env};for(const key of ['BIRD_EDITOR','BIRD_LAND_DATA_DIR','BIRD_ADDRESS_DATA_DIR'])delete env[key];
@@ -153,8 +164,8 @@ async function main(){
   for(const graphics of ordinary?['mid','high']:['high'])for(const repeat of [1,2]){
    const label=ordinary?'fresh-'+graphics+'-'+repeat:'B1-'+repeat,folder=path.join(out,label);fs.mkdirSync(folder);const fixtureFile=path.join(folder,'fixture.json'),report=path.join(folder,'raw.json'),wireFile=path.join(folder,'catalog.addr'),session='address17b-'+randomUUID();
    const fixtureText=JSON.stringify(ordinary?freshAddressPreparationFixture(graphics):addressPreparationFixture(),null,2)+'\n';fs.writeFileSync(fixtureFile,fixtureText,{flag:'wx'});
-   const args=[path.join(repo,'tools/probe.cjs'),...(process.platform==='linux'?['--no-sandbox','--disable-gpu-sandbox']:[]),'--mode=steam','--dir='+dist,'--startup-trace','--startup-cold','--startup-session='+session,'--startup-fixture='+fixtureFile,...(ordinary?['--startup-no-lang','--startup-deck']:[]),'--fresh','--early','--size=deck','--cpu=1','--bootcpu','--init-script='+path.join(repo,'tools/probe-checks/startup-bootstrap-observe.js'),'--q='+(ordinary?FRESH_ADDRESS_EXPORT_QUERY:ADDRESS_EXPORT_QUERY),'--eval='+path.join(repo,ordinary?'tools/probe-checks/address-package-fresh-export.js':'tools/probe-checks/address-package-export.js'),'--bootwait=360','--timeout=900','--max=0','--errors','--report='+report];
-   const child=await run(label,electron,args,950000);need(fs.statSync(report).size>0&&fs.statSync(report).size<=REPORT_LIMIT,'REPORT_BUDGET');const raw=fs.readFileSync(report),value=JSON.parse(raw),accepted=await checkAddressExport(value,{base:source.base,ordinary,graphics});
+   const args=[path.join(repo,'tools/probe.cjs'),...(process.platform==='linux'?['--no-sandbox','--disable-gpu-sandbox']:[]),'--mode=steam','--dir='+dist,'--startup-trace','--startup-cold','--startup-session='+session,'--startup-fixture='+fixtureFile,...(ordinary?['--startup-no-lang','--startup-deck']:[]),'--fresh',...(schedule.early?['--early']:['--startup-admission=settled']),'--size=deck','--cpu=1','--bootcpu','--init-script='+path.join(repo,'tools/probe-checks/startup-bootstrap-observe.js'),'--q='+(ordinary?FRESH_ADDRESS_EXPORT_QUERY:ADDRESS_EXPORT_QUERY),'--eval='+path.join(repo,ordinary?'tools/probe-checks/address-package-fresh-export.js':'tools/probe-checks/address-package-export.js'),'--bootwait='+schedule.bootWaitSec,'--timeout='+schedule.probeTimeoutSec,'--max=0','--errors','--report='+report];
+   const child=await run(label,electron,args,schedule.hardTimeoutMs);need(fs.statSync(report).size>0&&fs.statSync(report).size<=REPORT_LIMIT,'REPORT_BUDGET');const raw=fs.readFileSync(report),value=JSON.parse(raw),accepted=await checkAddressExport(value,{base:source.base,ordinary,graphics});
    fs.writeFileSync(wireFile,accepted.bytes,{flag:'wx'});checked.push({graphics,repeat,session,checked:accepted});journal.exports.push({label,graphics,repeat,session,report,reportSha256:sha256(raw),fixtureFile,fixtureSha256:sha256(Buffer.from(fixtureText)),wireFile,bytes:accepted.bytes.length,sha256:accepted.wireSha256,identity:accepted.identity,inputDescriptorExact:accepted.descriptorExact,processStatus:child.processStatus,signal:child.signal});save();
   }
   need(new Set(journal.exports.map(row=>row.session)).size===journal.exports.length,'INDEPENDENT_SESSIONS');if(!ordinary)checkAddressRepeats(checked[0].checked,checked[1].checked);

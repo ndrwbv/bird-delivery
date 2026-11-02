@@ -1,0 +1,8 @@
+[2415:1102/035141.444594:ERROR:bus.cc(407)] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[2415:1102/035141.444947:ERROR:bus.cc(407)] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[2415:1102/035141.444970:ERROR:bus.cc(407)] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[2415:1102/035141.444982:ERROR:bus.cc(407)] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[2415:1102/035141.444990:ERROR:bus.cc(407)] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[2415:1102/035141.561613:ERROR:bus.cc(407)] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+probe: исключение в скрипте: Control marker did not permit real acceleration: 0
+probe: steam 1280×800 · 247.8 с (сборка свежая, загрузка 30.1 с) · кадр p50 21 p95 916.7 мс · ошибок консоли 0, необработанных 0

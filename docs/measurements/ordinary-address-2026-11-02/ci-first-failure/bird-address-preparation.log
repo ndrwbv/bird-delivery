@@ -1,0 +1,6 @@
+Error: address-package-prepare:PROCESS_fresh-mid-1
+    at need (file:///home/runner/work/bird-delivery/bird-delivery/tools/address-package-prepare.mjs:21:36)
+    at run (file:///home/runner/work/bird-delivery/bird-delivery/tools/address-package-prepare.mjs:145:60)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async main (file:///home/runner/work/bird-delivery/bird-delivery/tools/address-package-prepare.mjs:157:16)
+    at async file:///home/runner/work/bird-delivery/bird-delivery/tools/address-package-prepare.mjs:175:84
