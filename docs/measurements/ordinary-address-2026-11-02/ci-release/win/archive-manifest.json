@@ -1,0 +1,205 @@
+{
+  "ok": true,
+  "platform": "win",
+  "workflowRun": 41386459707,
+  "sourceHash": "ad8d466780cab3b6224b5b00d8e392c55b83c79c06d8ae9ae3791d3b4eb31820",
+  "address": [
+    {
+      "preset": "mid",
+      "processStatus": 0,
+      "signal": null,
+      "validation": {
+        "ok": true,
+        "reasons": []
+      },
+      "moved": 0.16326654360358986,
+      "sourceHash": "ad8d466780cab3b6224b5b00d8e392c55b83c79c06d8ae9ae3791d3b4eb31820",
+      "inputHash": "c30334cdeed08314c0a211e4904fc0d9617603e1f832908322394bec9a2d5af4"
+    },
+    {
+      "preset": "high",
+      "processStatus": 0,
+      "signal": null,
+      "validation": {
+        "ok": true,
+        "reasons": []
+      },
+      "moved": 0.34689210233132256,
+      "sourceHash": "ad8d466780cab3b6224b5b00d8e392c55b83c79c06d8ae9ae3791d3b4eb31820",
+      "inputHash": "0c38e941cc6617ad62be4cd8aad1983a432c803998aebb0faed665b662811783"
+    }
+  ],
+  "land": {
+    "ok": true,
+    "moved": 0.16326654360358986,
+    "validation": {
+      "ok": true,
+      "reasons": []
+    }
+  },
+  "files": [
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-win/address-package-asar.json",
+      "archived": "address/address-package-asar.json",
+      "originalBytes": 1030,
+      "originalSha256": "23f3387a741d4b6f781e808a483d17e0654179210c0319b472e470b12221fc65",
+      "bytes": 1030,
+      "sha256": "23f3387a741d4b6f781e808a483d17e0654179210c0319b472e470b12221fc65",
+      "encoding": "identity"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-win/address-package-asar.log",
+      "archived": "address/address-package-asar.log.gz",
+      "originalBytes": 899,
+      "originalSha256": "d1829dc7497c6b4f9e440cf7fc3abefebefcbf3419de3a01dd28b73270613192",
+      "bytes": 477,
+      "sha256": "e123a2c326efc3471879f4e37f8be73ca841ff7a48b5466119a95adbe53c8359",
+      "encoding": "gzip"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-win/address-package-runtime-high/fixture.json",
+      "archived": "address/address-package-runtime-high/fixture.json",
+      "originalBytes": 56,
+      "originalSha256": "79588fe961c376b1aa0a95bd04d833f7899ed2cfc4617f39f4b42bb89af93141",
+      "bytes": 56,
+      "sha256": "79588fe961c376b1aa0a95bd04d833f7899ed2cfc4617f39f4b42bb89af93141",
+      "encoding": "identity"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-win/address-package-runtime-high/raw.json",
+      "archived": "address/address-package-runtime-high/raw.json.gz",
+      "originalBytes": 44815,
+      "originalSha256": "d268151e22cb60730f0f4cabae2967d656a9b303ccfb1a399202bd4eb2028e7e",
+      "bytes": 7270,
+      "sha256": "a559f91a5595e64400378531b9666e99a4407f0e6c29bdd59d7c8676594e141b",
+      "encoding": "gzip"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-win/address-package-runtime-high/run.json",
+      "archived": "address/address-package-runtime-high/run.json",
+      "originalBytes": 4018,
+      "originalSha256": "8683278316cfc860a8520ca22ceb374641e7422f2a8824e7b112512c45b359eb",
+      "bytes": 4018,
+      "sha256": "8683278316cfc860a8520ca22ceb374641e7422f2a8824e7b112512c45b359eb",
+      "encoding": "identity"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-win/address-package-runtime-high/stderr.log",
+      "archived": "address/address-package-runtime-high/stderr.log.gz",
+      "originalBytes": 304,
+      "originalSha256": "0ca992d6bb5384f7172f44a07b77d1a4f95984603e7c7da6951b32393e02b9de",
+      "bytes": 285,
+      "sha256": "993f804b0bded4eb295de502e950d0aa9d61771528c399403e87b8a7e4b24d05",
+      "encoding": "gzip"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-win/address-package-runtime-high/stdout.log",
+      "archived": "address/address-package-runtime-high/stdout.log.gz",
+      "originalBytes": 43409,
+      "originalSha256": "395139b505c2e3244359ee6bd3dfcfbe4eaeec010f4db437a75e66b9ffa02b8f",
+      "bytes": 7128,
+      "sha256": "06edd35909c3389cb8a94a6803b2442cd3a567e3bb12df24fb6c91000d378b78",
+      "encoding": "gzip"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-win/address-package-runtime-mid/fixture.json",
+      "archived": "address/address-package-runtime-mid/fixture.json",
+      "originalBytes": 17,
+      "originalSha256": "c75469c8666ddd05c141f9f482ff19aecf5469bea3577970f6842736cc7e2717",
+      "bytes": 17,
+      "sha256": "c75469c8666ddd05c141f9f482ff19aecf5469bea3577970f6842736cc7e2717",
+      "encoding": "identity"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-win/address-package-runtime-mid/raw.json",
+      "archived": "address/address-package-runtime-mid/raw.json.gz",
+      "originalBytes": 45082,
+      "originalSha256": "d653d8c6f52eefc36bf31922739c74ace3f0f6b5f62b61024978b5b6b5753d11",
+      "bytes": 7253,
+      "sha256": "149876e6cb5fb4b34581dc974dc5fc43c648bbeb7e536c81e94a9b54c142dc97",
+      "encoding": "gzip"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-win/address-package-runtime-mid/run.json",
+      "archived": "address/address-package-runtime-mid/run.json",
+      "originalBytes": 4014,
+      "originalSha256": "e8a5ea4ed356bf4c138e9c1415b79f302c350ec4463ddf38d7a1b6b2dcb5ce12",
+      "bytes": 4014,
+      "sha256": "e8a5ea4ed356bf4c138e9c1415b79f302c350ec4463ddf38d7a1b6b2dcb5ce12",
+      "encoding": "identity"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-win/address-package-runtime-mid/stderr.log",
+      "archived": "address/address-package-runtime-mid/stderr.log.gz",
+      "originalBytes": 306,
+      "originalSha256": "bf80d7a25ff62e3590be0ba5a20e075ac67c65ce08081f9928a00b98da9eb7b7",
+      "bytes": 286,
+      "sha256": "6f70861469e796b478cf7d59f4fd78ded17b43737810c49d37cb9f585dfbf8dd",
+      "encoding": "gzip"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-win/address-package-runtime-mid/stdout.log",
+      "archived": "address/address-package-runtime-mid/stdout.log.gz",
+      "originalBytes": 43674,
+      "originalSha256": "656cf1ecd1a694fb2de4f552b161af22f174832ede302b28460a1af5faa1973c",
+      "bytes": 7104,
+      "sha256": "5ed351a0b67e61e613519adbe1fe9fefd6be5947f683cd508262abbc84521de7",
+      "encoding": "gzip"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-land-runtime-win/land-package-asar.json",
+      "archived": "land/land-package-asar.json",
+      "originalBytes": 533,
+      "originalSha256": "fa6f5999b8d1c693262fbdd81757afccdc3f9a982ecde12a60f7e671b56a258a",
+      "bytes": 533,
+      "sha256": "fa6f5999b8d1c693262fbdd81757afccdc3f9a982ecde12a60f7e671b56a258a",
+      "encoding": "identity"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-land-runtime-win/land-package-runtime/fixture.json",
+      "archived": "land/land-package-runtime/fixture.json",
+      "originalBytes": 74,
+      "originalSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "bytes": 74,
+      "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "encoding": "identity"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-land-runtime-win/land-package-runtime/raw.json",
+      "archived": "land/land-package-runtime/raw.json.gz",
+      "originalBytes": 42025,
+      "originalSha256": "2044f1b74947758610fe220e06fe298abffae7c6965770f8efb890a221d0da40",
+      "bytes": 7317,
+      "sha256": "f5c29f77a6de2df269be22229b2dc508a5dc1ccce72f3e27ad0d62ae5a487f76",
+      "encoding": "gzip"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-land-runtime-win/land-package-runtime/run.json",
+      "archived": "land/land-package-runtime/run.json",
+      "originalBytes": 3877,
+      "originalSha256": "92873ac34c8ea9ddc517378e66ed661c655f9b87ecb26d70a8dacc14416aa8e1",
+      "bytes": 3877,
+      "sha256": "92873ac34c8ea9ddc517378e66ed661c655f9b87ecb26d70a8dacc14416aa8e1",
+      "encoding": "identity"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-land-runtime-win/land-package-runtime/stderr.log",
+      "archived": "land/land-package-runtime/stderr.log.gz",
+      "originalBytes": 306,
+      "originalSha256": "7a1b79d06110fa2466ae068d8973efc8aa3502c1452a938268817eb3d3d1bf26",
+      "bytes": 288,
+      "sha256": "097fce50c3f9d9e9f9fb2741f162af4aaa3f0bc125a9777a4b635c90ac51edfa",
+      "encoding": "gzip"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-land-runtime-win/land-package-runtime/stdout.log",
+      "archived": "land/land-package-runtime/stdout.log.gz",
+      "originalBytes": 41067,
+      "originalSha256": "722aad980648b45b7406c8c521c4e123c36cf1bc5a8b8044fd1e2052a7a64018",
+      "bytes": 6912,
+      "sha256": "93d6332ec8efe5c82ed7e5d86757c16c7cf559c6381ed15d188005e79b29f5ee",
+      "encoding": "gzip"
+    }
+  ],
+  "scope": "Downloaded actual CI package admissions, revalidated after download; not physical Steam Deck or a startup performance comparison."
+}

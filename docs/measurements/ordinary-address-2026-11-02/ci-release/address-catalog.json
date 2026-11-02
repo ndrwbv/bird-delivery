@@ -1,0 +1,36 @@
+{
+  "version": 2,
+  "kind": "address-package17b",
+  "slots": [
+    {
+      "graphics": "mid",
+      "identity": {
+        "mapId": "seversk",
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "sourceHash": "ad8d466780cab3b6224b5b00d8e392c55b83c79c06d8ae9ae3791d3b4eb31820",
+        "inputHash": "c30334cdeed08314c0a211e4904fc0d9617603e1f832908322394bec9a2d5af4"
+      },
+      "entry": {
+        "path": "address-data/7f5f3a6fc2870bb0ec57350f340b815e895ecccbd2227d5181fc6081887b6f1a.addr",
+        "bytes": 413028,
+        "sha256": "7f5f3a6fc2870bb0ec57350f340b815e895ecccbd2227d5181fc6081887b6f1a"
+      }
+    },
+    {
+      "graphics": "high",
+      "identity": {
+        "mapId": "seversk",
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "sourceHash": "ad8d466780cab3b6224b5b00d8e392c55b83c79c06d8ae9ae3791d3b4eb31820",
+        "inputHash": "0c38e941cc6617ad62be4cd8aad1983a432c803998aebb0faed665b662811783"
+      },
+      "entry": {
+        "path": "address-data/64c19f60afb25b8c419d99c9b9bd4f703b5eedfadd4b5febc0854ed0b35765be.addr",
+        "bytes": 413028,
+        "sha256": "64c19f60afb25b8c419d99c9b9bd4f703b5eedfadd4b5febc0854ed0b35765be"
+      }
+    }
+  ]
+}

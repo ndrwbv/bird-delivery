@@ -1,0 +1,67 @@
+{
+  "runs": [
+    {
+      "label": "mid",
+      "argv": [
+        "/usr/local/bin/node",
+        "/Users/andrewboev/Desktop/not-work/delivery/tools/address-package-smoke.mjs",
+        "--dir=/tmp/bird-address-ordinary-final-1102/candidate.asar/dist/steam",
+        "--catalog=/tmp/bird-address-ordinary-final-1102/production-steam/address-data/catalog.json",
+        "--admission=settled",
+        "--out=/tmp/bird-address-ordinary-final-1102/runtime-mid",
+        "--preset=mid",
+        "--init=/tmp/bird-address-ordinary-final-1102/early-queries-mid-init.js"
+      ],
+      "status": "returned",
+      "processStatus": 0,
+      "signal": null
+    },
+    {
+      "label": "generated",
+      "argv": [
+        "/usr/local/bin/node",
+        "/Users/andrewboev/Desktop/not-work/delivery/tools/address-package-smoke.mjs",
+        "--dir=/tmp/bird-address-ordinary-final-1102/candidate.asar/dist/steam",
+        "--catalog=/tmp/bird-address-ordinary-final-1102/production-steam/address-data/catalog.json",
+        "--admission=settled",
+        "--out=/tmp/bird-address-ordinary-final-1102/runtime-generated",
+        "--preset=high",
+        "--variant=generated"
+      ],
+      "status": "returned",
+      "processStatus": 0,
+      "signal": null
+    },
+    {
+      "label": "notrace",
+      "argv": [
+        "/usr/local/bin/node",
+        "/tmp/bird-address-ordinary-final-1102/run-notrace.mjs"
+      ],
+      "status": "returned",
+      "processStatus": 0,
+      "signal": null
+    },
+    {
+      "label": "settled-failure-archive",
+      "argv": [
+        "python3",
+        "/tmp/bird-address-ordinary-settled-1102/archive-settled-failure.py"
+      ],
+      "status": "returned",
+      "processStatus": 0,
+      "signal": null
+    },
+    {
+      "label": "archive",
+      "argv": [
+        "/usr/local/bin/node",
+        "/tmp/bird-address-ordinary-final-1102/archive-evidence.mjs"
+      ],
+      "status": "returned",
+      "processStatus": 0,
+      "signal": null
+    }
+  ],
+  "ok": true
+}

@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "kind": "ordinary-address-runtime-admission",
+  "variant": "cache",
+  "preset": "high",
+  "session": "addr17b-7548e0c8-ad93-4f0a-82ef-29d5f2835c31",
+  "schedule": {
+    "mode": "settled",
+    "early": false,
+    "bootWaitSec": 1200,
+    "controlWaitMs": 420000,
+    "probeTimeoutSec": 1740,
+    "hardTimeoutMs": 1800000,
+    "movementWaitMs": 30000
+  },
+  "scope": {
+    "kind": "supplied Steam directory/ASAR body; not installer/distribution or timing comparison",
+    "packagedAsarPath": false
+  },
+  "argv": [
+    "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+    "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+    "--mode=steam",
+    "--dir=/tmp/bird-address-ordinary-final-1102/candidate.asar/dist/steam",
+    "--startup-trace",
+    "--startup-session=addr17b-7548e0c8-ad93-4f0a-82ef-29d5f2835c31",
+    "--startup-cold",
+    "--startup-fixture=/private/tmp/bird-address-ordinary-final-1102/runtime-high/fixture.json",
+    "--fresh",
+    "--startup-production-query",
+    "--startup-deck",
+    "--startup-admission=settled",
+    "--size=deck",
+    "--cpu=1",
+    "--bootcpu",
+    "--init-script=/tmp/bird-address-ordinary-final-1102/early-queries-high-init.js",
+    "--eval=/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/address-package-ready.js",
+    "--bootwait=1200",
+    "--timeout=1740",
+    "--max=0",
+    "--errors",
+    "--report=/private/tmp/bird-address-ordinary-final-1102/runtime-high/raw.json"
+  ],
+  "dist": "/tmp/bird-address-ordinary-final-1102/candidate.asar/dist/steam",
+  "startedAt": "2026-11-02T04:06:29.924Z",
+  "status": "returned",
+  "processStatus": 0,
+  "signal": null,
+  "fixtureFile": "/private/tmp/bird-address-ordinary-final-1102/runtime-high/fixture.json",
+  "fixtureSha256": "79588fe961c376b1aa0a95bd04d833f7899ed2cfc4617f39f4b42bb89af93141",
+  "catalogFile": "/tmp/bird-address-ordinary-final-1102/production-steam/address-data/catalog.json",
+  "catalogSha256": "cd38323fa7b2ce67bbde39fb43d9fc044232590c8d689a77ad3654b5f3f3caf4",
+  "initFile": "/tmp/bird-address-ordinary-final-1102/early-queries-high-init.js",
+  "initSha256": "05c8e7cefb2be518afc4d1e30a87a5efaab0db181723e103d452cc819377cf5e",
+  "harness": [
+    {
+      "file": "tools/address-package-smoke.mjs",
+      "sha256": "5e29e91cb91d96f41e5186c309d873fd5a4295f5372589ba85796c96aa91eb9e"
+    },
+    {
+      "file": "tools/probe-checks/address-package-ready.js",
+      "sha256": "6e55b04082409eb74c5d9c17c301e1cdd9550bf0b9db01efcfe1599f592b2cb8"
+    },
+    {
+      "file": "tools/address-package-prepare.mjs",
+      "sha256": "f87ba919840218dd3958548b80e8a8fb5a8bb57e74d63e245935f830e3ed4c78"
+    },
+    {
+      "file": "tools/probe.cjs",
+      "sha256": "031a6145f0a9556534e0b15201acfc24ab012022824be0e66e6427b843c7addc"
+    },
+    {
+      "file": "tools/probe-page.cjs",
+      "sha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd"
+    },
+    {
+      "file": "tools/startup-report.mjs",
+      "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+    },
+    {
+      "file": "tools/startup-admission.cjs",
+      "sha256": "fec1148600e1ff8f58f643541592121095c717390b09cb57014a88d64e6e0e33"
+    },
+    {
+      "file": "tools/startup-environment.cjs",
+      "sha256": "948e7bca2a5bae0c49d854ff499802d20530820935429f6a848e7390b63881b3"
+    },
+    {
+      "file": "tools/probe-checks/startup-bootstrap-observe.js",
+      "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+    }
+  ],
+  "pid": 46127,
+  "finishedAt": "2026-11-02T04:07:00.834Z",
+  "stdoutSha256": "aca133b2a4f0b2d5e3d4e6c5a37e60b4d0544904faf9b98d2613c78f56cdd385",
+  "stderrSha256": "b2222db4c3ecf92a81d146f51ced2df6a7ed56c85b69b1ad231c8b4a4ab12af7",
+  "reportBytes": 2722949,
+  "rawSha256": "0353746661dd4ddc5265aeed05a7f57fe29bbc2a27570bc72d5166d64f29b1a2",
+  "validation": {
+    "ok": true,
+    "reasons": []
+  },
+  "ok": true,
+  "moved": 0.16328072395985696
+}

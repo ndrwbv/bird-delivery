@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "kind": "ordinary-address-runtime-admission",
+  "variant": "cache",
+  "preset": "high",
+  "session": "addr17b-9e2b6c73-5553-4fee-b598-f7283d3ef792",
+  "schedule": {
+    "mode": "settled",
+    "early": false,
+    "bootWaitSec": 1200,
+    "controlWaitMs": 420000,
+    "probeTimeoutSec": 1740,
+    "hardTimeoutMs": 1800000,
+    "movementWaitMs": 30000
+  },
+  "scope": {
+    "kind": "supplied Steam directory/ASAR body; not installer/distribution or timing comparison",
+    "packagedAsarPath": true
+  },
+  "argv": [
+    "D:\\a\\bird-delivery\\bird-delivery\\node_modules\\electron\\dist\\electron.exe",
+    "D:\\a\\bird-delivery\\bird-delivery\\tools\\probe.cjs",
+    "--mode=steam",
+    "--dir=D:\\a\\bird-delivery\\bird-delivery\\release\\win-unpacked\\resources\\app.asar\\dist\\steam",
+    "--startup-trace",
+    "--startup-session=addr17b-9e2b6c73-5553-4fee-b598-f7283d3ef792",
+    "--startup-cold",
+    "--startup-fixture=D:\\a\\_temp\\address-package-runtime-high\\fixture.json",
+    "--fresh",
+    "--startup-production-query",
+    "--startup-deck",
+    "--startup-admission=settled",
+    "--size=deck",
+    "--cpu=1",
+    "--bootcpu",
+    "--init-script=D:\\a\\bird-delivery\\bird-delivery\\tools\\probe-checks\\startup-bootstrap-observe.js",
+    "--eval=D:\\a\\bird-delivery\\bird-delivery\\tools\\probe-checks\\address-package-ready.js",
+    "--bootwait=1200",
+    "--timeout=1740",
+    "--max=0",
+    "--errors",
+    "--report=D:\\a\\_temp\\address-package-runtime-high\\raw.json"
+  ],
+  "dist": "D:\\a\\bird-delivery\\bird-delivery\\release\\win-unpacked\\resources\\app.asar\\dist\\steam",
+  "startedAt": "2026-11-02T04:33:40.131Z",
+  "status": "returned",
+  "processStatus": 0,
+  "signal": null,
+  "fixtureFile": "D:\\a\\_temp\\address-package-runtime-high\\fixture.json",
+  "fixtureSha256": "79588fe961c376b1aa0a95bd04d833f7899ed2cfc4617f39f4b42bb89af93141",
+  "catalogFile": "D:\\a\\bird-delivery\\bird-delivery\\dist\\steam\\address-data\\catalog.json",
+  "catalogSha256": "cd38323fa7b2ce67bbde39fb43d9fc044232590c8d689a77ad3654b5f3f3caf4",
+  "initFile": "D:\\a\\bird-delivery\\bird-delivery\\tools\\probe-checks\\startup-bootstrap-observe.js",
+  "initSha256": "f287a6c7f5abe14e2944235fa81295aefe37051cb75950ab98ea6783655e86cc",
+  "harness": [
+    {
+      "file": "tools/address-package-smoke.mjs",
+      "sha256": "5e29e91cb91d96f41e5186c309d873fd5a4295f5372589ba85796c96aa91eb9e"
+    },
+    {
+      "file": "tools/probe-checks/address-package-ready.js",
+      "sha256": "8b4b32d7ccd203b1262c43928152d20892ff72e5d51b419c03c88453d8744386"
+    },
+    {
+      "file": "tools/address-package-prepare.mjs",
+      "sha256": "f87ba919840218dd3958548b80e8a8fb5a8bb57e74d63e245935f830e3ed4c78"
+    },
+    {
+      "file": "tools/probe.cjs",
+      "sha256": "dc8bbb80868e099c56151bd94b99f67f69da52f3400d25bf1b4b13d78181353e"
+    },
+    {
+      "file": "tools/probe-page.cjs",
+      "sha256": "00251b1d2e79d622f670777c65260c8e43a63a4e8043c30486737a2d1d3ff601"
+    },
+    {
+      "file": "tools/startup-report.mjs",
+      "sha256": "c40d8de9bf9545ba54e767ad74bd2bbaed5713be09aeb4a792ce9350166dd600"
+    },
+    {
+      "file": "tools/startup-admission.cjs",
+      "sha256": "fec1148600e1ff8f58f643541592121095c717390b09cb57014a88d64e6e0e33"
+    },
+    {
+      "file": "tools/startup-environment.cjs",
+      "sha256": "948e7bca2a5bae0c49d854ff499802d20530820935429f6a848e7390b63881b3"
+    },
+    {
+      "file": "tools/probe-checks/startup-bootstrap-observe.js",
+      "sha256": "f287a6c7f5abe14e2944235fa81295aefe37051cb75950ab98ea6783655e86cc"
+    }
+  ],
+  "pid": 6768,
+  "finishedAt": "2026-11-02T04:39:31.590Z",
+  "stdoutSha256": "395139b505c2e3244359ee6bd3dfcfbe4eaeec010f4db437a75e66b9ffa02b8f",
+  "stderrSha256": "0ca992d6bb5384f7172f44a07b77d1a4f95984603e7c7da6951b32393e02b9de",
+  "reportBytes": 44815,
+  "rawSha256": "d268151e22cb60730f0f4cabae2967d656a9b303ccfb1a399202bd4eb2028e7e",
+  "validation": {
+    "ok": true,
+    "reasons": []
+  },
+  "ok": true,
+  "moved": 0.34689210233132256
+}

@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "kind": "ordinary-address-runtime-admission",
+  "variant": "cache",
+  "preset": "mid",
+  "session": "addr17b-70c96b14-085c-4160-8f97-8a1cb0c34bad",
+  "schedule": {
+    "mode": "settled",
+    "early": false,
+    "bootWaitSec": 1200,
+    "controlWaitMs": 420000,
+    "probeTimeoutSec": 1740,
+    "hardTimeoutMs": 1800000,
+    "movementWaitMs": 30000
+  },
+  "scope": {
+    "kind": "supplied Steam directory/ASAR body; not installer/distribution or timing comparison",
+    "packagedAsarPath": false
+  },
+  "argv": [
+    "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+    "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+    "--mode=steam",
+    "--dir=/tmp/bird-address-ordinary-final-1102/candidate.asar/dist/steam",
+    "--startup-trace",
+    "--startup-session=addr17b-70c96b14-085c-4160-8f97-8a1cb0c34bad",
+    "--startup-cold",
+    "--startup-fixture=/private/tmp/bird-address-ordinary-final-1102/runtime-mid/fixture.json",
+    "--fresh",
+    "--startup-production-query",
+    "--startup-deck",
+    "--startup-admission=settled",
+    "--size=deck",
+    "--cpu=1",
+    "--bootcpu",
+    "--init-script=/tmp/bird-address-ordinary-final-1102/early-queries-mid-init.js",
+    "--eval=/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/address-package-ready.js",
+    "--bootwait=1200",
+    "--timeout=1740",
+    "--max=0",
+    "--errors",
+    "--report=/private/tmp/bird-address-ordinary-final-1102/runtime-mid/raw.json"
+  ],
+  "dist": "/tmp/bird-address-ordinary-final-1102/candidate.asar/dist/steam",
+  "startedAt": "2026-11-02T04:07:14.260Z",
+  "status": "returned",
+  "processStatus": 0,
+  "signal": null,
+  "fixtureFile": "/private/tmp/bird-address-ordinary-final-1102/runtime-mid/fixture.json",
+  "fixtureSha256": "c75469c8666ddd05c141f9f482ff19aecf5469bea3577970f6842736cc7e2717",
+  "catalogFile": "/tmp/bird-address-ordinary-final-1102/production-steam/address-data/catalog.json",
+  "catalogSha256": "cd38323fa7b2ce67bbde39fb43d9fc044232590c8d689a77ad3654b5f3f3caf4",
+  "initFile": "/tmp/bird-address-ordinary-final-1102/early-queries-mid-init.js",
+  "initSha256": "8e35c43d8a6624cc011730ebb868848b65d4cd7d15474d43dad9e4ef0fa2c1e8",
+  "harness": [
+    {
+      "file": "tools/address-package-smoke.mjs",
+      "sha256": "5e29e91cb91d96f41e5186c309d873fd5a4295f5372589ba85796c96aa91eb9e"
+    },
+    {
+      "file": "tools/probe-checks/address-package-ready.js",
+      "sha256": "6e55b04082409eb74c5d9c17c301e1cdd9550bf0b9db01efcfe1599f592b2cb8"
+    },
+    {
+      "file": "tools/address-package-prepare.mjs",
+      "sha256": "f87ba919840218dd3958548b80e8a8fb5a8bb57e74d63e245935f830e3ed4c78"
+    },
+    {
+      "file": "tools/probe.cjs",
+      "sha256": "031a6145f0a9556534e0b15201acfc24ab012022824be0e66e6427b843c7addc"
+    },
+    {
+      "file": "tools/probe-page.cjs",
+      "sha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd"
+    },
+    {
+      "file": "tools/startup-report.mjs",
+      "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+    },
+    {
+      "file": "tools/startup-admission.cjs",
+      "sha256": "fec1148600e1ff8f58f643541592121095c717390b09cb57014a88d64e6e0e33"
+    },
+    {
+      "file": "tools/startup-environment.cjs",
+      "sha256": "948e7bca2a5bae0c49d854ff499802d20530820935429f6a848e7390b63881b3"
+    },
+    {
+      "file": "tools/probe-checks/startup-bootstrap-observe.js",
+      "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+    }
+  ],
+  "pid": 46227,
+  "finishedAt": "2026-11-02T04:07:44.794Z",
+  "stdoutSha256": "5756cd0b3b2ed569c34c165e668c44a75bf0f12dfa3fe42706f4bd7c1eb93d7d",
+  "stderrSha256": "f683ee5b4e59616998a1ddd2d44cd6b5b6ea584850b1b37bd0ba4be824b25f8c",
+  "reportBytes": 2722865,
+  "rawSha256": "fda96f98eba46b9bfd898564fadf423ff23e315a28d606f5c0657543949bafbb",
+  "validation": {
+    "ok": true,
+    "reasons": []
+  },
+  "ok": true,
+  "moved": 0.16328072395985696
+}

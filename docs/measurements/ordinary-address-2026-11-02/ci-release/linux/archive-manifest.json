@@ -1,0 +1,205 @@
+{
+  "ok": true,
+  "platform": "linux",
+  "workflowRun": 41386459707,
+  "sourceHash": "ad8d466780cab3b6224b5b00d8e392c55b83c79c06d8ae9ae3791d3b4eb31820",
+  "address": [
+    {
+      "preset": "mid",
+      "processStatus": 0,
+      "signal": null,
+      "validation": {
+        "ok": true,
+        "reasons": []
+      },
+      "moved": 0.16326654360358986,
+      "sourceHash": "ad8d466780cab3b6224b5b00d8e392c55b83c79c06d8ae9ae3791d3b4eb31820",
+      "inputHash": "c30334cdeed08314c0a211e4904fc0d9617603e1f832908322394bec9a2d5af4"
+    },
+    {
+      "preset": "high",
+      "processStatus": 0,
+      "signal": null,
+      "validation": {
+        "ok": true,
+        "reasons": []
+      },
+      "moved": 0.16326654360358986,
+      "sourceHash": "ad8d466780cab3b6224b5b00d8e392c55b83c79c06d8ae9ae3791d3b4eb31820",
+      "inputHash": "0c38e941cc6617ad62be4cd8aad1983a432c803998aebb0faed665b662811783"
+    }
+  ],
+  "land": {
+    "ok": true,
+    "moved": 0.16326654360358986,
+    "validation": {
+      "ok": true,
+      "reasons": []
+    }
+  },
+  "files": [
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-linux/address-package-asar.json",
+      "archived": "address/address-package-asar.json",
+      "originalBytes": 1038,
+      "originalSha256": "602516ec87ad6fead8b68ef0855fb4b9204441bff92a1a785d7366eb97efd609",
+      "bytes": 1038,
+      "sha256": "602516ec87ad6fead8b68ef0855fb4b9204441bff92a1a785d7366eb97efd609",
+      "encoding": "identity"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-linux/address-package-asar.log",
+      "archived": "address/address-package-asar.log.gz",
+      "originalBytes": 907,
+      "originalSha256": "695734097affc6db58352c84cc1f2e707baf0c10370fb3f59a8aff2d6efcba27",
+      "bytes": 484,
+      "sha256": "058bfb7900be5ddec6b95754cda47dedcb673bede55455dc4cae40935322c01b",
+      "encoding": "gzip"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-linux/address-package-runtime-high/fixture.json",
+      "archived": "address/address-package-runtime-high/fixture.json",
+      "originalBytes": 56,
+      "originalSha256": "79588fe961c376b1aa0a95bd04d833f7899ed2cfc4617f39f4b42bb89af93141",
+      "bytes": 56,
+      "sha256": "79588fe961c376b1aa0a95bd04d833f7899ed2cfc4617f39f4b42bb89af93141",
+      "encoding": "identity"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-linux/address-package-runtime-high/raw.json",
+      "archived": "address/address-package-runtime-high/raw.json.gz",
+      "originalBytes": 44963,
+      "originalSha256": "74f41e531415426b4613c79a408171b556d7ebc6136f4c418d6a54d50e3eac0e",
+      "bytes": 7259,
+      "sha256": "27ecff79d3db8d810b2711818f1a34442efe91871e1eec4acd303d289926dcaa",
+      "encoding": "gzip"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-linux/address-package-runtime-high/run.json",
+      "archived": "address/address-package-runtime-high/run.json",
+      "originalBytes": 4143,
+      "originalSha256": "07d254c93e36118c95f9306d4d3355b90eb1da0682f46f20fa97eabaeea6a768",
+      "bytes": 4143,
+      "sha256": "07d254c93e36118c95f9306d4d3355b90eb1da0682f46f20fa97eabaeea6a768",
+      "encoding": "identity"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-linux/address-package-runtime-high/stderr.log",
+      "archived": "address/address-package-runtime-high/stderr.log.gz",
+      "originalBytes": 1283,
+      "originalSha256": "0c389b84c103f774b02f42c7d592c92595d63811f20ba1c681b3a2cd82b6bb5b",
+      "bytes": 359,
+      "sha256": "3213cffd92fd42a8d313b6e68a75e6712e0b9a438a6b094b2343d391d6bdc226",
+      "encoding": "gzip"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-linux/address-package-runtime-high/stdout.log",
+      "archived": "address/address-package-runtime-high/stdout.log.gz",
+      "originalBytes": 43577,
+      "originalSha256": "02cf82c4dcf5e33116a18e1c59d20fa7f53307786ba686c67e801862ede41aab",
+      "bytes": 7113,
+      "sha256": "2ebaacc635877799aa0b0a6cf4ac5b7580adeec44f88d7c6b3991b17235d59bf",
+      "encoding": "gzip"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-linux/address-package-runtime-mid/fixture.json",
+      "archived": "address/address-package-runtime-mid/fixture.json",
+      "originalBytes": 17,
+      "originalSha256": "c75469c8666ddd05c141f9f482ff19aecf5469bea3577970f6842736cc7e2717",
+      "bytes": 17,
+      "sha256": "c75469c8666ddd05c141f9f482ff19aecf5469bea3577970f6842736cc7e2717",
+      "encoding": "identity"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-linux/address-package-runtime-mid/raw.json",
+      "archived": "address/address-package-runtime-mid/raw.json.gz",
+      "originalBytes": 44967,
+      "originalSha256": "6fdc400c0c9a8687bf406d37bf781194c713c06896fd8113490a9d7d17bda430",
+      "bytes": 7169,
+      "sha256": "e993dc6b6486f0dba62ef35dc5633450ff3c0e0a1be6d3bb2679e16641c2fd70",
+      "encoding": "gzip"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-linux/address-package-runtime-mid/run.json",
+      "archived": "address/address-package-runtime-mid/run.json",
+      "originalBytes": 4139,
+      "originalSha256": "1b2e056b5ed8951d2eae499a4888a34d201c1954f182a7efeb36c0d947dee8c7",
+      "bytes": 4139,
+      "sha256": "1b2e056b5ed8951d2eae499a4888a34d201c1954f182a7efeb36c0d947dee8c7",
+      "encoding": "identity"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-linux/address-package-runtime-mid/stderr.log",
+      "archived": "address/address-package-runtime-mid/stderr.log.gz",
+      "originalBytes": 1285,
+      "originalSha256": "d09a77fc2eb9ca0fb2860852c1659c1f76b84520042c5630e3692a27aac8d597",
+      "bytes": 362,
+      "sha256": "835e6a59e5e91c258123ea664a149676189d67a623e69847d33c8eccd4d7444e",
+      "encoding": "gzip"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-runtime-linux/address-package-runtime-mid/stdout.log",
+      "archived": "address/address-package-runtime-mid/stdout.log.gz",
+      "originalBytes": 43577,
+      "originalSha256": "8b028c5167409b0b002668c27cba7f845cd32c1536820dbfe5790122dccfcda4",
+      "bytes": 7021,
+      "sha256": "ba151c1c374512bb55e484a01fd1f8c55e13d132b4a36ba1a35a855b86889aef",
+      "encoding": "gzip"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-land-runtime-linux/land-package-asar.json",
+      "archived": "land/land-package-asar.json",
+      "originalBytes": 541,
+      "originalSha256": "399eb5342996b5c00d711c801a91feba97da0793167d21f726afcf6e1e51a907",
+      "bytes": 541,
+      "sha256": "399eb5342996b5c00d711c801a91feba97da0793167d21f726afcf6e1e51a907",
+      "encoding": "identity"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-land-runtime-linux/land-package-runtime/fixture.json",
+      "archived": "land/land-package-runtime/fixture.json",
+      "originalBytes": 74,
+      "originalSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "bytes": 74,
+      "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "encoding": "identity"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-land-runtime-linux/land-package-runtime/raw.json",
+      "archived": "land/land-package-runtime/raw.json.gz",
+      "originalBytes": 41333,
+      "originalSha256": "ed62d4321b023a6c8553615e17411a299a8fb39eaeffb33803004d76b8416a38",
+      "bytes": 7249,
+      "sha256": "3f379cf77c32506add50e8d5574d3be00e03457a559b1aa214f6d3f367777ee6",
+      "encoding": "gzip"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-land-runtime-linux/land-package-runtime/run.json",
+      "archived": "land/land-package-runtime/run.json",
+      "originalBytes": 3999,
+      "originalSha256": "59cd561838f16e9894bb7b4497c49394a778817b5fc9a5e056645d1d75ccaf32",
+      "bytes": 3999,
+      "sha256": "59cd561838f16e9894bb7b4497c49394a778817b5fc9a5e056645d1d75ccaf32",
+      "encoding": "identity"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-land-runtime-linux/land-package-runtime/stderr.log",
+      "archived": "land/land-package-runtime/stderr.log.gz",
+      "originalBytes": 1286,
+      "originalSha256": "a9153e5eb86e8a26a6207e12238b4ad06e0201515c5de3e0b7a27d5fba37e3fd",
+      "bytes": 365,
+      "sha256": "d206d3868d3246e2aba39268e2d607a1cb24a61b0fa82018b422fbed66b24038",
+      "encoding": "gzip"
+    },
+    {
+      "original": "/tmp/bird-address-ordinary-final-1102/ci-land-runtime-linux/land-package-runtime/stdout.log",
+      "archived": "land/land-package-runtime/stdout.log.gz",
+      "originalBytes": 40373,
+      "originalSha256": "a614d0354b70431a49d2126df76e359ea3012aee6c03fb21731d0c32407f333a",
+      "bytes": 6848,
+      "sha256": "8f02127e9027ed19bb8e6f3c1ec8eb1f2219987c74bd8da63774e270268714ff",
+      "encoding": "gzip"
+    }
+  ],
+  "scope": "Downloaded actual CI package admissions, revalidated after download; not physical Steam Deck or a startup performance comparison."
+}

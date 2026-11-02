@@ -1,0 +1,13 @@
+{
+  "originalSourceHash": "7c2b69b062fda7248d4a66d01207c216ccea9b9edf3f72614be4dd946e2a0fef",
+  "finalSourceHash": "ad8d466780cab3b6224b5b00d8e392c55b83c79c06d8ae9ae3791d3b4eb31820",
+  "sameGameAndViteInventory": true,
+  "sameNormalizedLockHash": true,
+  "changedPreparationHelpers": {
+    "tools/address-package-prepare.mjs": {
+      "before": "c33d3a95694e82f2e783f8149976e634f91b85bf97f066486a29416cb5f796de",
+      "after": "f87ba919840218dd3958548b80e8a8fb5a8bb57e74d63e245935f830e3ed4c78"
+    }
+  },
+  "scope": "All measured game and Vite bytes identical; full source identity changes because producer helper is included. The original general gameplay check was not rerun or relabeled; final producer, readers and runtime admissions have their own journals."
+}

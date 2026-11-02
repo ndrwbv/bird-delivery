@@ -1,0 +1,157 @@
+{
+  "version": 1,
+  "kind": "ordinary-address-settled-node-gate-failure",
+  "outcome": "FAIL preserved: Node SETTLED_START, despite successful game child",
+  "sourceBase": {
+    "mapId": "seversk",
+    "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+    "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+    "sourceHash": "9ebdd557d59fd40479795e53f9ab47ddb9b4275ad8a0c944dc6a47f3de671f30"
+  },
+  "buildHash": "7e0e4771ef54cf2f95273e2966beec17b2f774fb6a42cf33015d2c8a5b217ee1",
+  "facts": {
+    "childProcessStatus": 0,
+    "childSignal": null,
+    "rawOk": true,
+    "gameEvalOk": true,
+    "movedMeters": 0.078064002513824,
+    "bootFull": 27151,
+    "bootFullType": "number",
+    "producerOk": false,
+    "producerFailure": "Error: address-package-prepare:SETTLED_START\n    at need (file:///Users/andrewboev/Desktop/not-work/delivery/tools/address-package-prepare.mjs:22:36)\n    at checkAddressExport (file:///Users/andrewboev/Desktop/not-work/delivery/tools/address-package-prepare.mjs:73:3)\n    at main (file:///Users/andrewboev/Desktop/not-work/delivery/tools/address-package-prepare.mjs:168:230)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async file:///Users/andrewboev/Desktop/not-work/delivery/tools/address-package-prepare.mjs:186:84",
+    "completedExports": 0,
+    "consoleErrors": 0,
+    "uncaught": 0,
+    "crashCount": 0
+  },
+  "interpretation": "The Node gate incorrectly required boolean true for the numeric completion timestamp. No game or Vite change is asserted from this archive alone; root separately reported unchanged game/Vite hashes. The corrected producer/new final preparation must keep its own provenance and is not declared PASS here.",
+  "audit": {
+    "filesByteExact": true,
+    "gzipRoundtrip": true,
+    "logPins": [
+      {
+        "label": "build",
+        "stream": "stdout",
+        "actual": {
+          "bytes": 6545,
+          "sha256": "9a5f15d47158a679ec518eac3db5bb668629b2e14c1341a1a42ea0ba93b3a02d"
+        },
+        "journalSha256": "9a5f15d47158a679ec518eac3db5bb668629b2e14c1341a1a42ea0ba93b3a02d",
+        "matchesJournal": true
+      },
+      {
+        "label": "build",
+        "stream": "stderr",
+        "actual": {
+          "bytes": 1497,
+          "sha256": "43d817da84c8943f76d6482fcd87025671f720e77e105724d6349d9807517f58"
+        },
+        "journalSha256": "43d817da84c8943f76d6482fcd87025671f720e77e105724d6349d9807517f58",
+        "matchesJournal": true
+      },
+      {
+        "label": "fresh-mid-1",
+        "stream": "stdout",
+        "actual": {
+          "bytes": 40960,
+          "sha256": "52055c477538af3aaa3ec173073dccc6c9b149a38ed3ff2e369be04ac3416e64"
+        },
+        "journalSha256": "52055c477538af3aaa3ec173073dccc6c9b149a38ed3ff2e369be04ac3416e64",
+        "matchesJournal": true
+      },
+      {
+        "label": "fresh-mid-1",
+        "stream": "stderr",
+        "actual": {
+          "bytes": 188,
+          "sha256": "f28227689500e7c57f6ee4bfa97905fc129921af4b409b69fc08ffa6a7e3873f"
+        },
+        "journalSha256": "f28227689500e7c57f6ee4bfa97905fc129921af4b409b69fc08ffa6a7e3873f",
+        "matchesJournal": true
+      }
+    ],
+    "sourceBuildTempTreesIncluded": false
+  },
+  "files": [
+    {
+      "originalPath": "/tmp/bird-address-ordinary-settled-1102/preparation.json",
+      "archivePath": "preparation.json",
+      "original": {
+        "bytes": 106087,
+        "sha256": "4396191e851b160b2cf41f780def6dd8a682a40cea3cd8a4ba9e7147bbe5ba18"
+      },
+      "archived": {
+        "bytes": 106087,
+        "sha256": "4396191e851b160b2cf41f780def6dd8a682a40cea3cd8a4ba9e7147bbe5ba18"
+      },
+      "copiedByteExact": true
+    },
+    {
+      "originalPath": "/tmp/bird-address-ordinary-settled-1102/build.stdout.log",
+      "archivePath": "build.stdout.log",
+      "original": {
+        "bytes": 6545,
+        "sha256": "9a5f15d47158a679ec518eac3db5bb668629b2e14c1341a1a42ea0ba93b3a02d"
+      },
+      "archived": {
+        "bytes": 6545,
+        "sha256": "9a5f15d47158a679ec518eac3db5bb668629b2e14c1341a1a42ea0ba93b3a02d"
+      },
+      "copiedByteExact": true
+    },
+    {
+      "originalPath": "/tmp/bird-address-ordinary-settled-1102/build.stderr.log",
+      "archivePath": "build.stderr.log",
+      "original": {
+        "bytes": 1497,
+        "sha256": "43d817da84c8943f76d6482fcd87025671f720e77e105724d6349d9807517f58"
+      },
+      "archived": {
+        "bytes": 1497,
+        "sha256": "43d817da84c8943f76d6482fcd87025671f720e77e105724d6349d9807517f58"
+      },
+      "copiedByteExact": true
+    },
+    {
+      "originalPath": "/tmp/bird-address-ordinary-settled-1102/fresh-mid-1.stdout.log",
+      "archivePath": "fresh-mid-1.stdout.log",
+      "original": {
+        "bytes": 40960,
+        "sha256": "52055c477538af3aaa3ec173073dccc6c9b149a38ed3ff2e369be04ac3416e64"
+      },
+      "archived": {
+        "bytes": 40960,
+        "sha256": "52055c477538af3aaa3ec173073dccc6c9b149a38ed3ff2e369be04ac3416e64"
+      },
+      "copiedByteExact": true
+    },
+    {
+      "originalPath": "/tmp/bird-address-ordinary-settled-1102/fresh-mid-1.stderr.log",
+      "archivePath": "fresh-mid-1.stderr.log",
+      "original": {
+        "bytes": 188,
+        "sha256": "f28227689500e7c57f6ee4bfa97905fc129921af4b409b69fc08ffa6a7e3873f"
+      },
+      "archived": {
+        "bytes": 188,
+        "sha256": "f28227689500e7c57f6ee4bfa97905fc129921af4b409b69fc08ffa6a7e3873f"
+      },
+      "copiedByteExact": true
+    },
+    {
+      "originalPath": "/tmp/bird-address-ordinary-settled-1102/fresh-mid-1/raw.json",
+      "archivePath": "raw.json.gz",
+      "original": {
+        "bytes": 12132988,
+        "sha256": "f8a3dc1d2de2f6983819fe48d5f5cb5de784b50839033e5215b06bba98f469d5"
+      },
+      "archived": {
+        "bytes": 1396759,
+        "sha256": "adbffcecb47bf8288aaca101ae27fdc14725f642af3ddc77c682f02b7330846b"
+      },
+      "encoding": "gzip",
+      "roundtripSha256": "f8a3dc1d2de2f6983819fe48d5f5cb5de784b50839033e5215b06bba98f469d5",
+      "roundtripBytes": 12132988
+    }
+  ]
+}
