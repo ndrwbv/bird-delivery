@@ -27,6 +27,15 @@ on:
         description: 'Что нового — попадёт в описание релиза.'
         required: false
         default: ''
+      checks:
+        description: 'Дополнительные проверки пакетов (только по отдельной просьбе автора)'
+        type: boolean
+        default: false
+      prepared_from:
+        description: 'Номер прогона с уже подготовленными совместимыми данными города (пусто — подготовить при сборке)'
+        type: string
+        required: false
+        default: ''
       yandex:
         description: 'Собрать ещё и zip для Яндекс Игр (только когда нужно заливать в Яндекс)'
         type: boolean
@@ -39,6 +48,7 @@ concurrency:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   meta:
@@ -85,7 +95,16 @@ jobs:
           node-version: '20'
           cache: npm
       - run: npm ci
+      - name: Взять уже подготовленные данные
+        if: inputs.prepared_from != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: prepared-land-data
+          path: ${{ runner.temp }}/bird-land-preparation/package
+          run-id: ${{ inputs.prepared_from }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Подготовить обычный город и проверить повторяемость
+        if: inputs.prepared_from == ''
         env:
           BUILD_VERSION: ${{ needs.meta.outputs.version }}
         run: xvfb-run -a node tools/land-package-prepare.mjs "--out=$RUNNER_TEMP/bird-land-preparation"
@@ -115,7 +134,16 @@ jobs:
           node-version: '20'
           cache: npm
       - run: npm ci
+      - name: Взять уже подготовленные данные
+        if: inputs.prepared_from != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: prepared-address-data
+          path: ${{ runner.temp }}/bird-address-preparation/package
+          run-id: ${{ inputs.prepared_from }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Подготовить обычные адреса mid/high и проверить повторяемость
+        if: inputs.prepared_from == ''
         env:
           BUILD_VERSION: ${{ needs.meta.outputs.version }}
         run: |
@@ -215,43 +243,45 @@ jobs:
         run: npx electron-builder --win nsis --x64 --publish never
 
       - name: Проверить готовые данные внутри выпускаемого пакета
+        if: inputs.checks
         run: |
           if [ "${{ matrix.target }}" = linux ]; then PACK=release/linux-unpacked; else PACK=release/win-unpacked; fi
           node tools/land-package-verify-asar.mjs "--asar=$PACK/resources/app.asar" --dir=dist/steam "--report=$RUNNER_TEMP/land-package-asar.json"
 
       - name: Проверить адреса внутри выпускаемого пакета
+        if: inputs.checks
         run: |
           set -o pipefail
           if [ "${{ matrix.target }}" = linux ]; then PACK=release/linux-unpacked; else PACK=release/win-unpacked; fi
           node tools/address-package-verify-asar.mjs "--asar=$PACK/resources/app.asar" --dir=dist/steam "--report=$RUNNER_TEMP/address-package-asar.json" 2>&1 | tee "$RUNNER_TEMP/address-package-asar.log"
 
       - name: Обычный запуск из пакета — Linux
-        if: matrix.target == 'linux'
+        if: inputs.checks && matrix.target == 'linux'
         timeout-minutes: 31
         run: xvfb-run -a node tools/land-package-smoke.mjs --dir=release/linux-unpacked/resources/app.asar/dist/steam --catalog=dist/steam/city-data/catalog.json "--out=$RUNNER_TEMP/land-package-runtime" --preset=high --admission=settled
 
       - name: Обычный запуск из пакета — Windows
-        if: matrix.target == 'win'
+        if: inputs.checks && matrix.target == 'win'
         timeout-minutes: 31
         run: node tools/land-package-smoke.mjs --dir=release/win-unpacked/resources/app.asar/dist/steam --catalog=dist/steam/city-data/catalog.json "--out=$RUNNER_TEMP/land-package-runtime" --preset=high --admission=settled
 
       - name: Обычные адреса mid из пакета — Linux
-        if: matrix.target == 'linux'
+        if: inputs.checks && matrix.target == 'linux'
         timeout-minutes: 31
         run: xvfb-run -a node tools/address-package-smoke.mjs --dir=release/linux-unpacked/resources/app.asar/dist/steam --catalog=dist/steam/address-data/catalog.json "--out=$RUNNER_TEMP/address-package-runtime-mid" --preset=mid --admission=settled
 
       - name: Обычные адреса high из пакета — Linux
-        if: matrix.target == 'linux'
+        if: inputs.checks && matrix.target == 'linux'
         timeout-minutes: 31
         run: xvfb-run -a node tools/address-package-smoke.mjs --dir=release/linux-unpacked/resources/app.asar/dist/steam --catalog=dist/steam/address-data/catalog.json "--out=$RUNNER_TEMP/address-package-runtime-high" --preset=high --admission=settled
 
       - name: Обычные адреса mid из пакета — Windows
-        if: matrix.target == 'win'
+        if: inputs.checks && matrix.target == 'win'
         timeout-minutes: 31
         run: node tools/address-package-smoke.mjs --dir=release/win-unpacked/resources/app.asar/dist/steam --catalog=dist/steam/address-data/catalog.json "--out=$RUNNER_TEMP/address-package-runtime-mid" --preset=mid --admission=settled
 
       - name: Обычные адреса high из пакета — Windows
-        if: matrix.target == 'win'
+        if: inputs.checks && matrix.target == 'win'
         timeout-minutes: 31
         run: node tools/address-package-smoke.mjs --dir=release/win-unpacked/resources/app.asar/dist/steam --catalog=dist/steam/address-data/catalog.json "--out=$RUNNER_TEMP/address-package-runtime-high" --preset=high --admission=settled
 
