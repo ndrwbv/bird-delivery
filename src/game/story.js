@@ -1,6 +1,6 @@
 /* Сценарные встречи. Данные и прогресс отделены от подъезда, камеры и диалога.
    Подъезд играет сцену через doorstep.js / stairs.js; здесь только описание и сохранение. */
-import { t, N_ } from '../i18n/index.js';
+import { t, N_, translit } from '../i18n/index.js';
 import * as ECON from './econ.js';
 import * as QR from './quickrun.js';
 import { STORY_PEOPLE, ORDER_TYPES } from './orders.config.js';
@@ -19,9 +19,9 @@ export const STORIES = [{
     head: 'none', glasses: 'none', pack: null,
     q: { head: 'business', body: 'punk', legs: 'casual', feet: 'beach' },
     top: 'tee', shirt: '#e0d8c7', bottom: 'pants', pants: '#596276', shoes: '#47434a', shape: 'normal', bg: '#c9b9a3' } },
-  home: { addr: ['улица Царевского', '2'], near: [1430, 595] }, items: N_('пицца'),
+  home: { addr: ['улица Калинина', '96'] }, items: N_('пицца'),
   apartment: { floor: 3, per: 4, entr: 1, door: 1 },
-  parking: { x: 1446.7, z: 596.9, h: 2.45, approach: { x: 1428.5, z: 620.8, h: 2.45 } },
+  parking: { x: 3532.45, z: 1406.34, h: -2.2394, approach: { x: 3541.87, z: 1413.78, h: -2.2394 } },
   chapters: [{ id: 'gennady-sausage', name: N_('Докторская к пицце'),
     note: N_('Панельный дом. Квартира — в накладной.'), why: N_('Геннадий ждёт пиццу дома'),
     dialogue: [
@@ -137,7 +137,8 @@ function homeOf (s) {
     if (d < sd) { sd = d; spot = q; }
   }
   if (!spot) spot = want4;
-  const h = { ex, ez, nx, nz, sx: -nz, sz: nx, x: spot.x, z: spot.z, addr: b.a ? API.realAddress(ex + nx * 2, ez + nz * 2) : '' };
+  // Заданный сюжетный адрес принадлежит выбранному дому, а не соседу с более близким центром.
+  const h = { ex, ez, nx, nz, sx: -nz, sz: nx, x: spot.x, z: spot.z, addr: want ? translit(want.join(', ')) : b.a ? API.realAddress(ex + nx * 2, ez + nz * 2) : '' };
   HOME.set(hk, h);
   return h;
 }

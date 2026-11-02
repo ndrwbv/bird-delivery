@@ -7,6 +7,8 @@ if (d.S.order?.ord?.story?.storyId !== 'gennady') {
 }
 const order = d.S.order, stop = order.stops[0], spec = order.ord.story;
 if (spec.storyId !== 'gennady') throw new Error('Не тот сюжет');
+if (spec.addr !== 'улица Калинина, 96' || d.DIST.at(spec.door.x, spec.door.z) !== 0)
+  throw new Error('Геннадий у другого дома: ' + JSON.stringify({ addr: spec.addr, door: spec.door }));
 const expectedFlat = '10';
 d.V.x = d.S.target.x; d.V.z = d.S.target.z; d.V.vx = d.V.vz = 0;
 d.car.position.x = d.V.x; d.car.position.z = d.V.z;
