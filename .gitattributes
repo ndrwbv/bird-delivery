@@ -18,5 +18,6 @@ tools/land-package-*.mjs text eol=lf
 tools/land-package-*.cjs text eol=lf
 # Unified patch context includes a mandatory space on empty context lines.
 docs/measurements/**/*.patch -whitespace
+docs/measurements/**/*.diff -whitespace
 # Raw tool output is kept byte-exact, including its original trailing spaces.
 docs/measurements/**/*.log -whitespace
