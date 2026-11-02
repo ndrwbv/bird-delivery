@@ -1,0 +1,24 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {pathToFileURL} from 'node:url';
+const {validateStartupReport}=await import(pathToFileURL(process.cwd()+'/tools/startup-report.mjs'));
+const a=JSON.parse(fs.readFileSync('/tmp/bird-logical17b-query1-1102.json')).result;
+const file='/tmp/bird-logical17b-savedkeys-1102.json',bytes=fs.readFileSync(file),j=JSON.parse(bytes),r=j.result;
+const keys=JSON.parse(fs.readFileSync('/tmp/bird-logical17b-saved-keys-fixture-1102.json'))['dlv-used-addr'];
+assert.equal(j.ok,true);const gate=validateStartupReport(j,{expectedDistrict:0,requireDistrict:true,requireGuardV2:true});assert.equal(gate.ok,true);
+// The measured eval publishes USED rows {index,key,poolIndices}, not bare strings.
+assert.deepEqual(r.functionalQueries.used.map(row=>row.key),keys);
+assert.deepEqual(r.functionalQueries.used.map(row=>row.index),[0,1,2,3,4]);
+assert.deepEqual(r.functionalQueries.rawSavedUsed,keys);
+assert.deepEqual(r.functionalQueries.savedKeysBefore,r.functionalQueries.savedKeysAfter);
+assert.deepEqual(r.logical,a.logical);assert.deepEqual(r.addressCatalog,a.addressCatalog);
+assert.equal(r.graphExport.wireBase64,a.graphExport.wireBase64);
+assert.deepEqual(r.functionalQueries.pool,a.functionalQueries.pool);
+for(const k of ['addresses','levels','home'])assert.deepEqual(r.functionalQueries[k],a.functionalQueries[k]);
+const expectedIndices=keys.map(key=>a.functionalQueries.pool.flatMap((row,index)=>row.actual.key===key?[index]:[]));
+assert.deepEqual(r.functionalQueries.used.map(row=>row.poolIndices),expectedIndices);
+assert.ok(expectedIndices.slice(0,4).every(indices=>indices.length));assert.equal(expectedIndices[4].length,0);
+assert.ok(Object.values(r.functionalQueries.unchanged).every(value=>value===true));
+const summary={ok:true,gate,used:r.functionalQueries.used,rawSavedUsed:r.functionalQueries.rawSavedUsed,counts:r.functionalQueries.counts,wireSame:true,logicalAndCatalogSame:true,allFunctionalTablesSame:true,poolSame:true,fourKeysInPool:true,legacyKeyOutsidePool:true,keysUnchanged:true,rawSha256:createHash('sha256').update(bytes).digest('hex'),offlineCorrection:'First one-line validator expected bare USED strings; actual eval intentionally returns rows. Only validator projection corrected; raw/eval/game/expected keys unchanged, no game retry.'};
+fs.writeFileSync('/tmp/bird-logical17b-saved-key-summary-1102.json',JSON.stringify(summary,null,2));console.log(JSON.stringify(summary,null,2));

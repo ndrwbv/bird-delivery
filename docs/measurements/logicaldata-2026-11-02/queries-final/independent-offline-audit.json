@@ -1,0 +1,161 @@
+{
+  "version": 1,
+  "kind": "independent-raw-query-triple-audit",
+  "ok": true,
+  "checks": [
+    "query1: actual startup and live eval assertions",
+    "query1: actual graph packet/immutable source/owned rows",
+    "query2: actual startup and live eval assertions",
+    "query2: actual graph packet/immutable source/owned rows",
+    "savedkeys: actual startup and live eval assertions",
+    "savedkeys: actual graph packet/immutable source/owned rows",
+    "two actual independent fresh raws: full functional object exact except elapsedMs",
+    "independent scalar nearest/strict-radius/house60 oracles for actual tables, then exact same all3 cases",
+    "witnesses prove non-vacuous first-wins/strict 9m/strict 60m over real rows",
+    "actual Gennady home at measured building/entrance/spot and nearest address",
+    "all ordered actual POOL source indices/4m keys/quarter-metre entrance/distance",
+    "saved fixture changes one input only and actual USED five rows retain ordered keys/mappings",
+    "root-transcribed actual argv/status and explicitly after-run harness pins",
+    "all stdout exact reconstruction and archive compression bytes/hashes"
+  ],
+  "cases": [
+    {
+      "name": "query1",
+      "rawOriginalPath": "/tmp/bird-logical17b-query1-1102.json",
+      "rawSha256": "d131206b2f2ce39c328e255338b2517ef17f7e4da8787cad16e9efeb99a8b35c",
+      "counts": {
+        "realAddress": 5061,
+        "entranceLv": 7608,
+        "doorWrapper": 7608,
+        "pool": 1214,
+        "used": 0
+      },
+      "functionalElapsedMs": 692.3000001907349,
+      "moved": 4.784459922403517,
+      "graphSha256": "a64d843e741592f93be9707c8ecd9a577ab9df767002e5febebfbd68675a0c34",
+      "sourceFingerprint": "b26caf3f59baa1bcf694fcd0336b4608b58e46447d5bd2d54c60beb746c41d85",
+      "unchanged": {
+        "arrayAndRowReferences": true,
+        "exactRows": true,
+        "pool": true,
+        "used": true,
+        "savedKeys": true,
+        "district": true,
+        "pizzaReference": true,
+        "ownerSnapshotReference": true,
+        "rngDescriptor": true
+      }
+    },
+    {
+      "name": "query2",
+      "rawOriginalPath": "/tmp/bird-logical17b-query2-1102.json",
+      "rawSha256": "3aaad7e76f3afa3d6f25f3a817e029d83abea7ea8fc09d13e533adc6765e0a29",
+      "counts": {
+        "realAddress": 5061,
+        "entranceLv": 7608,
+        "doorWrapper": 7608,
+        "pool": 1214,
+        "used": 0
+      },
+      "functionalElapsedMs": 689,
+      "moved": 4.553241539681569,
+      "graphSha256": "a64d843e741592f93be9707c8ecd9a577ab9df767002e5febebfbd68675a0c34",
+      "sourceFingerprint": "b26caf3f59baa1bcf694fcd0336b4608b58e46447d5bd2d54c60beb746c41d85",
+      "unchanged": {
+        "arrayAndRowReferences": true,
+        "exactRows": true,
+        "pool": true,
+        "used": true,
+        "savedKeys": true,
+        "district": true,
+        "pizzaReference": true,
+        "ownerSnapshotReference": true,
+        "rngDescriptor": true
+      }
+    },
+    {
+      "name": "savedkeys",
+      "rawOriginalPath": "/tmp/bird-logical17b-savedkeys-1102.json",
+      "rawSha256": "5be79369a1349aece4fe150fbbfbfa92e4f0f94cd8bba538156e91c1d17634cc",
+      "counts": {
+        "realAddress": 5061,
+        "entranceLv": 7608,
+        "doorWrapper": 7608,
+        "pool": 1214,
+        "used": 5
+      },
+      "functionalElapsedMs": 687.7999999523163,
+      "moved": 4.5518611448996245,
+      "graphSha256": "a64d843e741592f93be9707c8ecd9a577ab9df767002e5febebfbd68675a0c34",
+      "sourceFingerprint": "b26caf3f59baa1bcf694fcd0336b4608b58e46447d5bd2d54c60beb746c41d85",
+      "unchanged": {
+        "arrayAndRowReferences": true,
+        "exactRows": true,
+        "pool": true,
+        "used": true,
+        "savedKeys": true,
+        "district": true,
+        "pizzaReference": true,
+        "ownerSnapshotReference": true,
+        "rngDescriptor": true
+      }
+    }
+  ],
+  "sourceFingerprint": "b26caf3f59baa1bcf694fcd0336b4608b58e46447d5bd2d54c60beb746c41d85",
+  "buildFingerprint": "db818ab44b1a87d9ad2c4fa1c0ee4a8939e682dd3f4df5d383355b428b35a634",
+  "functionalSameFreshPair": true,
+  "staticSameAll3": true,
+  "actualAddressLevelHomePoolSameAll3": true,
+  "savedKeysRetained": [
+    "ly.kd",
+    "kj.gx",
+    "nr.db",
+    "lu.bx",
+    "c4.7x"
+  ],
+  "savedKeyMappings": [
+    {
+      "index": 0,
+      "key": "ly.kd",
+      "poolIndices": [
+        0
+      ]
+    },
+    {
+      "index": 1,
+      "key": "kj.gx",
+      "poolIndices": [
+        6
+      ]
+    },
+    {
+      "index": 2,
+      "key": "nr.db",
+      "poolIndices": [
+        389
+      ]
+    },
+    {
+      "index": 3,
+      "key": "lu.bx",
+      "poolIndices": [
+        404
+      ]
+    },
+    {
+      "index": 4,
+      "key": "c4.7x",
+      "poolIndices": []
+    }
+  ],
+  "graphSha256": "a64d843e741592f93be9707c8ecd9a577ab9df767002e5febebfbd68675a0c34",
+  "graphBytes": 3143227,
+  "validatorCorrection": "First one-line validator expected bare USED strings; actual eval intentionally returns rows. Only validator projection corrected; raw/eval/game/expected keys unchanged, no game retry.",
+  "limits": [
+    "This offline gate reads actual raws and recomputes value oracles; it cannot recreate JS reference identity after serialization. Ref assertions ran in captured eval.",
+    "RNG descriptor equality is not Math.random call-count instrumentation.",
+    "Functional query elapsed is diagnostic after first.control; no startup A/B or physical Deck claim.",
+    "Saved case proves loading/key compatibility, not delivery/markUsed/aging selection.",
+    "Exact process argv/status are separately transcribed by root protocol; raw alone does not prove argv or process signal."
+  ]
+}

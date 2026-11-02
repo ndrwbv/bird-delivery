@@ -1,0 +1,473 @@
+{
+  "ok": true,
+  "scope": "exact logical generated refactor acceptance; diagnostic n1 baseline and n1 candidate, not performance AB/medians",
+  "timingAB": false,
+  "physicalDeck": false,
+  "fullGpuByteExact": false,
+  "counts": {
+    "nodes": 15009,
+    "edges": 31764,
+    "segments": 16596,
+    "houses": 1174,
+    "generated": 3699,
+    "entrances": 3711,
+    "spots": 5283,
+    "routes": 12,
+    "nearestRoadQueries": 171
+  },
+  "sections": [
+    {
+      "section": "graph",
+      "exactJson": true,
+      "bytes": 7978106,
+      "sha256": "81ed459df8598a27dbfc83de61880bf4ecf04cacf9975e347345837894fa87dc"
+    },
+    {
+      "section": "addresses",
+      "exactJson": true,
+      "bytes": 773157,
+      "sha256": "767421960390d1be9e7d8b95502336a3d46f926be699fed7bc482df0c8dbe24a"
+    },
+    {
+      "section": "aliases",
+      "exactJson": true,
+      "bytes": 17493,
+      "sha256": "95a11a5ca47292c6cace4a940582bbaa30cb80a7280c24a9ed8f8aebef0630dc"
+    },
+    {
+      "section": "roadQueries",
+      "exactJson": true,
+      "bytes": 17309,
+      "sha256": "f5d1fb0ecc3252df25432f394addaa7f6a32ae12b70e19318bac498c8eb69bf6"
+    }
+  ],
+  "stages": {
+    "baseline": {
+      "gate": {
+        "ok": true,
+        "reasons": []
+      },
+      "ordinary": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "host": {
+        "processEpochMs": 1793574153801,
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191",
+        "node": "20.18.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "seed": null,
+        "cpuThrottle": 3,
+        "bootcpu": true,
+        "navigateEpochMs": 1793574154053
+      },
+      "conditions": {
+        "lang": "ru",
+        "seed": null,
+        "url": "app://g/index.html?debug&mute&nolb&lang=ru&startuptrace&gfxdev=deck&mute&startupdistrict=0&landpackage=0",
+        "physicalDeck": false,
+        "graphics": {
+          "preset": "high",
+          "device": "deck",
+          "width": 1280,
+          "height": 800
+        }
+      },
+      "moved": 4.55448742769764,
+      "crash": [],
+      "errors": [],
+      "uncaught": 0,
+      "firstControlMs": 80663,
+      "reportedAsTimingAB": false
+    },
+    "candidate": {
+      "gate": {
+        "ok": true,
+        "reasons": []
+      },
+      "ordinary": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "host": {
+        "processEpochMs": 1793574308487,
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191",
+        "node": "20.18.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "seed": null,
+        "cpuThrottle": 3,
+        "bootcpu": true,
+        "navigateEpochMs": 1793574308742
+      },
+      "conditions": {
+        "lang": "ru",
+        "seed": null,
+        "url": "app://g/index.html?debug&mute&nolb&lang=ru&startuptrace&gfxdev=deck&mute&startupdistrict=0&landpackage=0",
+        "physicalDeck": false,
+        "graphics": {
+          "preset": "high",
+          "device": "deck",
+          "width": 1280,
+          "height": 800
+        }
+      },
+      "moved": 5.018812815064348,
+      "crash": [],
+      "errors": [],
+      "uncaught": 0,
+      "firstControlMs": 80969.79999995232,
+      "reportedAsTimingAB": false
+    }
+  },
+  "baseline": {
+    "sourceHash": "6b90c550087f18b25fbd3bb7b3b9196aab64d102b8ae287fa3f4be2eb893f97a",
+    "buildHash": "6cd35dbd6f3638fe1b476dae41886468e7772cdce21438f8cb0c73d703731975"
+  },
+  "candidate": {
+    "sourceHash": "2891bbe16bd501f5536d4bd760b2e0c1aef84526c365b4233a10f80cc7567219",
+    "buildHash": "40961edfe08a2070200ad7ef1e3b2b435919f77a743d7ed58d135dc3fa0f7225"
+  },
+  "n1": {
+    "gate": {
+      "ok": true,
+      "reasons": []
+    },
+    "traceRows": [
+      {
+        "name": "roads.segments",
+        "workMs": 5.5,
+        "exclusiveWorkMs": 5.5,
+        "maxWorkMs": 5.5,
+        "steps": 1,
+        "windowMs": 0,
+        "windows": 0,
+        "workerWorkMs": 0,
+        "workerBatches": 0
+      },
+      {
+        "name": "roads.segmentGrid",
+        "workMs": 5.599999904632568,
+        "exclusiveWorkMs": 5.599999904632568,
+        "maxWorkMs": 5.599999904632568,
+        "steps": 1,
+        "windowMs": 0,
+        "windows": 0,
+        "workerWorkMs": 0,
+        "workerBatches": 0
+      },
+      {
+        "name": "roads.segmentDenseGrid",
+        "workMs": 11.200000047683716,
+        "exclusiveWorkMs": 11.200000047683716,
+        "maxWorkMs": 11.200000047683716,
+        "steps": 1,
+        "windowMs": 0,
+        "windows": 0,
+        "workerWorkMs": 0,
+        "workerBatches": 0
+      },
+      {
+        "name": "roads.segmentArcIndex",
+        "workMs": 9.799999952316284,
+        "exclusiveWorkMs": 9.799999952316284,
+        "maxWorkMs": 9.799999952316284,
+        "steps": 1,
+        "windowMs": 0,
+        "windows": 0,
+        "workerWorkMs": 0,
+        "workerBatches": 0
+      },
+      {
+        "name": "roads.baseGraph",
+        "workMs": 60.10000014305115,
+        "exclusiveWorkMs": 60.10000014305115,
+        "maxWorkMs": 60.10000014305115,
+        "steps": 1,
+        "windowMs": 0,
+        "windows": 0,
+        "workerWorkMs": 0,
+        "workerBatches": 0
+      },
+      {
+        "name": "roads.nodeGrid",
+        "workMs": 3,
+        "exclusiveWorkMs": 3,
+        "maxWorkMs": 3,
+        "steps": 1,
+        "windowMs": 0,
+        "windows": 0,
+        "workerWorkMs": 0,
+        "workerBatches": 0
+      },
+      {
+        "name": "roads.routechain",
+        "workMs": 12.799999952316284,
+        "exclusiveWorkMs": 12.799999952316284,
+        "maxWorkMs": 12.799999952316284,
+        "steps": 1,
+        "windowMs": 0,
+        "windows": 0,
+        "workerWorkMs": 0,
+        "workerBatches": 0
+      },
+      {
+        "name": "city.housesVisualAndLayout",
+        "workMs": 1373,
+        "exclusiveWorkMs": 1373,
+        "maxWorkMs": 1373,
+        "steps": 1,
+        "windowMs": 0,
+        "windows": 0,
+        "workerWorkMs": 0,
+        "workerBatches": 0
+      },
+      {
+        "name": "addresses.buildSpots",
+        "workMs": 111.5,
+        "exclusiveWorkMs": 111.5,
+        "maxWorkMs": 15,
+        "steps": 15,
+        "windowMs": 0,
+        "windows": 0,
+        "workerWorkMs": 0,
+        "workerBatches": 0
+      },
+      {
+        "name": "addresses.buildCollect",
+        "workMs": 35.299999952316284,
+        "exclusiveWorkMs": 35.299999952316284,
+        "maxWorkMs": 35.299999952316284,
+        "steps": 1,
+        "windowMs": 0,
+        "windows": 0,
+        "workerWorkMs": 0,
+        "workerBatches": 0
+      }
+    ],
+    "sourceHash": "6b90c550087f18b25fbd3bb7b3b9196aab64d102b8ae287fa3f4be2eb893f97a",
+    "buildHash": "6cd35dbd6f3638fe1b476dae41886468e7772cdce21438f8cb0c73d703731975"
+  },
+  "rawHashDefinition": "SHA256 of original file bytes (createHash.update(Buffer)); never JSON.stringify(Buffer)",
+  "sourceReconstruction": {
+    "before": "/tmp/bird-logical17b-before-game-1102.js",
+    "method": "root reconstructed git show bec86a9 + measured trace-before.patch; exact SHA matches baseline inventory",
+    "sha256": "c1aaabd4549b1eb978431cf8d95b49c060a43f70132ca42fcf3c63184693b0ce",
+    "afterSha256": "afa410b1c8a56ce40b69f00e75b091bdaed5135e013424ce050edf384eafad49"
+  },
+  "copies": [
+    {
+      "source": "/tmp/bird-logical17b-trace-provenance-1102.json",
+      "path": "provenance/baseline.json",
+      "bytes": 97251,
+      "sha256": "7bb41cbb6802e159c9c849a77dd629874063cdcb51d228476f98ab7c86738ff5"
+    },
+    {
+      "source": "/tmp/bird-logical17b-candidate-provenance-1102.json",
+      "path": "provenance/candidate.json",
+      "bytes": 97613,
+      "sha256": "e8da9fc199e73052ea79763527f9a76aa0df8de949c31a5769ec0d4a09d3a3e8"
+    },
+    {
+      "source": "/tmp/bird-logical17b-trace-build-1102.log",
+      "path": "builds/baseline.log",
+      "bytes": 6659,
+      "sha256": "e7610b1625fb3040304f04198d9f1135ccae73be147f3dd17734ad425048020b"
+    },
+    {
+      "source": "/tmp/bird-logical17b-candidate-build-1102.log",
+      "path": "builds/candidate.log",
+      "bytes": 6823,
+      "sha256": "e311d5536113d27e70501ada0d347d097754274ed981dc599829e3f42ee82c8c"
+    },
+    {
+      "source": "/tmp/bird-logical17b-trace-game.patch",
+      "path": "source/trace-before.patch",
+      "bytes": 8369,
+      "sha256": "6d1fb751421a81755af2bffc2e5451a5d2190bcd24364cbbc2d1c06ce6560128"
+    },
+    {
+      "source": "/tmp/bird-logical17b-equivalence-eval-1102.js",
+      "path": "harness/logical-equivalence.js",
+      "bytes": 8210,
+      "sha256": "c84c0083fcd7a95e40e7cb71af3c88f8492013331d6d47fb7b38e0e242ec7197"
+    },
+    {
+      "source": "/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+      "path": "inputs/high-fixture.json",
+      "bytes": 74,
+      "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+    },
+    {
+      "source": "/tmp/bird-logical17b-trace-pilot-1102/raw.json",
+      "path": "trace/n1/raw.json",
+      "bytes": 35538,
+      "sha256": "f1d854ad26801d804b9dc87bb5dab0c216e615e15c228591ea0b7cf6511f9764"
+    },
+    {
+      "source": "/tmp/bird-logical17b-trace-pilot-1102/run.json",
+      "path": "trace/n1/run.json",
+      "bytes": 2520,
+      "sha256": "05580c71586a0bf98e5217abc250609a88c5cac065a79fac44dafcb0a1db06bc"
+    },
+    {
+      "source": "/tmp/bird-logical17b-trace-pilot-1102/stdout.log",
+      "path": "trace/n1/stdout.log",
+      "bytes": 34966,
+      "sha256": "1e0c168aa6b22e4e29a0f86c5779da6cda1a5364aa558194fd683df6312ad50e"
+    },
+    {
+      "source": "/tmp/bird-logical17b-trace-pilot-1102/stderr.log",
+      "path": "trace/n1/stderr.log",
+      "bytes": 187,
+      "sha256": "0461a6f1638cec211e7ae16be14087c91afac9b1eff06c2ebe2178471b34b6bd"
+    },
+    {
+      "source": "/tmp/bird-logical17b-trace-pilot-1102.stdout.log",
+      "path": "trace/outer.stdout.log",
+      "bytes": 182,
+      "sha256": "41f2d3f34fc3b4934260d3161f2ff7528ba77b6bbdb9ddd591ecc412d139df50"
+    },
+    {
+      "source": "/tmp/bird-logical17b-trace-pilot-1102.stderr.log",
+      "path": "trace/outer.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "src/game/addresslayout.js",
+      "path": "source/src/game/addresslayout.js",
+      "bytes": 2411,
+      "sha256": "ee5ab51e06ff5ff51187c73dbfbd2aefb170f69bad482bf9d798b819183b99bc"
+    },
+    {
+      "source": "src/game/streetgraph.js",
+      "path": "source/src/game/streetgraph.js",
+      "bytes": 2511,
+      "sha256": "fccbf4b0f021313693be8de35a0aa82f854fcd7236999dbca448031e9fd85c1e"
+    },
+    {
+      "source": "tools/addresslayout-test.mjs",
+      "path": "source/tools/addresslayout-test.mjs",
+      "bytes": 9903,
+      "sha256": "1e00ba727b5c2c7b559f67e6af7ed9bc738349a55907738a9708087361ceb426"
+    },
+    {
+      "source": "tools/streetgraph-test.mjs",
+      "path": "source/tools/streetgraph-test.mjs",
+      "bytes": 10404,
+      "sha256": "6b9a99766a6b4c317a8feba56dea2d7420db787c73e7201c5d96f460385219f7"
+    },
+    {
+      "source": "tools/probe.cjs",
+      "path": "harness/tools/probe.cjs",
+      "bytes": 45888,
+      "sha256": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce"
+    },
+    {
+      "source": "tools/probe-page.cjs",
+      "path": "harness/tools/probe-page.cjs",
+      "bytes": 37506,
+      "sha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd"
+    },
+    {
+      "source": "tools/probe-build.cjs",
+      "path": "harness/tools/probe-build.cjs",
+      "bytes": 4916,
+      "sha256": "3eda8b68163026fa436345f97814791270f16eb6844584176ae6c8a531c4b09f"
+    },
+    {
+      "source": "tools/startup-report.mjs",
+      "path": "harness/tools/startup-report.mjs",
+      "bytes": 13190,
+      "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+    },
+    {
+      "source": "tools/probe-checks/startup-ready.js",
+      "path": "harness/tools/probe-checks/startup-ready.js",
+      "bytes": 6203,
+      "sha256": "e9ef0e761ff2a5d32b743a7a26990a757089d61d81c703b57d870968a8f7b137"
+    },
+    {
+      "source": "tools/probe-checks/startup-bootstrap-observe.js",
+      "path": "harness/tools/probe-checks/startup-bootstrap-observe.js",
+      "bytes": 654,
+      "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+    }
+  ],
+  "compressed": [
+    {
+      "source": "/tmp/bird-logical17b-baseline-1102.json",
+      "path": "pair/baseline.json.gz",
+      "encoding": "gzip",
+      "level": 6,
+      "rawBytes": 8821382,
+      "rawSha256": "bbbf5dde9446334538cd9a743c4103b65d41c31d6a7a389c265f20815ebe14bf",
+      "bytes": 1840234,
+      "sha256": "2d0288ba3348fd1bb39e6b05d9a8ca15574260ba140561adcfdbe50a9b7e1b0c",
+      "roundtripByteExact": true
+    },
+    {
+      "source": "/tmp/bird-logical17b-candidate-1102.json",
+      "path": "pair/candidate.json.gz",
+      "encoding": "gzip",
+      "level": 6,
+      "rawBytes": 8821814,
+      "rawSha256": "4fbf3232eca39470b9553ea8cde3e1a899c599cc3b045bb9340efb27e0ea319c",
+      "bytes": 1840186,
+      "sha256": "fe0ca83f56359cbb2af08b8d25aa6429f31d96b03d2905179043bfdf099012fa",
+      "roundtripByteExact": true
+    },
+    {
+      "source": "/tmp/bird-logical17b-baseline-1102.stdout.log",
+      "path": "pair/baseline.stdout.log.gz",
+      "encoding": "gzip",
+      "level": 6,
+      "rawBytes": 8820810,
+      "rawSha256": "d2e0f3d13bd770fec10e832c79be4feea5cb9f6e29e399bbb2dbbeea21b833b5",
+      "bytes": 1839801,
+      "sha256": "f914844115f6454cc49d2e610a41439d31ba6bdda5261a7f52729a234b97a86f",
+      "roundtripByteExact": true
+    },
+    {
+      "source": "/tmp/bird-logical17b-candidate-1102.stdout.log",
+      "path": "pair/candidate.stdout.log.gz",
+      "encoding": "gzip",
+      "level": 6,
+      "rawBytes": 8821242,
+      "rawSha256": "e05237fbff22f16423e7283ce7265e89693ab8e08c8a8f9a59c1b6c81d1b9049",
+      "bytes": 1839754,
+      "sha256": "3a5671f4531efccd987d09320b84861bf2c525658bc9a1b4e08e6a7afb5fe352",
+      "roundtripByteExact": true
+    },
+    {
+      "source": "/tmp/bird-logical17b-before-game-1102.js",
+      "path": "source/game.before.js.gz",
+      "encoding": "gzip",
+      "level": 6,
+      "rawBytes": 1387810,
+      "rawSha256": "c1aaabd4549b1eb978431cf8d95b49c060a43f70132ca42fcf3c63184693b0ce",
+      "bytes": 451874,
+      "sha256": "dcea4d41fa9e74ea74e4bd5c5af9eb971e616f3c573944ea4cf197a36340f46d",
+      "roundtripByteExact": true
+    },
+    {
+      "source": "src/game/game.js",
+      "path": "source/game.after.js.gz",
+      "encoding": "gzip",
+      "level": 6,
+      "rawBytes": 1384152,
+      "rawSha256": "afa410b1c8a56ce40b69f00e75b091bdaed5135e013424ce050edf384eafad49",
+      "bytes": 450718,
+      "sha256": "7a95b1f15528e0de70e2b9559f1f51f766e080fdd4048b33660cefef03d29964",
+      "roundtripByteExact": true
+    }
+  ]
+}

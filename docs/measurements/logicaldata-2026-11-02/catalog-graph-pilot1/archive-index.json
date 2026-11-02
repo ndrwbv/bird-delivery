@@ -1,0 +1,346 @@
+{
+  "version": 1,
+  "kind": "catalog-graph-pilot1-archive",
+  "sourceFingerprint": "ebe1c7a1cf3cb5c8479039d71e478657f1972fc6532b6a69043de9cf1b28538c",
+  "buildFingerprint": "de6c06cb29ea1adb6fb06aaf663931b315ffeff3e65d67c5177640bfd2fa0d4a",
+  "rawOriginalPathsPreserved": true,
+  "compression": "gzip level6; roundtrip SHA verified",
+  "originalPurePairChanged": false,
+  "fullBuildIncluded": false,
+  "recordedProcessSignal": null,
+  "signalProvenance": "not provided by root tool",
+  "entries": [
+    {
+      "archivePath": "README.md",
+      "archiveBytes": 5323,
+      "archiveSha256": "c8b58d55c9f6f02c8bf9cb6b83150df7a613785a015d05633736cf763cbef609",
+      "origin": "offline-generated archive metadata/gate, not measured runtime"
+    },
+    {
+      "archivePath": "copy-records.json",
+      "archiveBytes": 5857,
+      "archiveSha256": "f5c58757c7c209b6c2fee335d05459ec72ee91992b9211fcab4b2837429178f8",
+      "origin": "offline-generated archive metadata/gate, not measured runtime"
+    },
+    {
+      "archivePath": "harness/archive-pilot1.py",
+      "archiveBytes": 2050,
+      "archiveSha256": "7433832ebf097847573023be9bd3e156f1f41bbaf6c5e2f7df85485d6135055d",
+      "originalPath": "/private/tmp/bird-logical17b-archive-pilot1.py",
+      "originalBytes": 2050,
+      "originalSha256": "7433832ebf097847573023be9bd3e156f1f41bbaf6c5e2f7df85485d6135055d",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "harness/eval.js",
+      "archiveBytes": 9429,
+      "archiveSha256": "f32fc22f2a7308bad1e1313e53d8152b684386918a200fb8fcbc880acfa6d07d",
+      "originalPath": "/private/tmp/bird-logical17b-export-eval-1102.js",
+      "originalBytes": 9429,
+      "originalSha256": "f32fc22f2a7308bad1e1313e53d8152b684386918a200fb8fcbc880acfa6d07d",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "harness/init.js",
+      "archiveBytes": 1029,
+      "archiveSha256": "3a8c053bbed9618fcb66c6d4168b27dcc0effc523d516185d36d0b1a9f93c205",
+      "originalPath": "/private/tmp/bird-logical17b-export-init-1102.js",
+      "originalBytes": 1029,
+      "originalSha256": "3a8c053bbed9618fcb66c6d4168b27dcc0effc523d516185d36d0b1a9f93c205",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "harness/offline-gate.mjs",
+      "archiveBytes": 6143,
+      "archiveSha256": "6f59513fc34cd8dba7700168b59cda3eb6cd6593dcd88c645f2820d98821d798",
+      "origin": "offline-generated archive metadata/gate, not measured runtime"
+    },
+    {
+      "archivePath": "harness/startup-bootstrap-observe.js",
+      "archiveBytes": 654,
+      "archiveSha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/startup-bootstrap-observe.js",
+      "originalBytes": 654,
+      "originalSha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "inputs/high-1-fixture.json",
+      "archiveBytes": 74,
+      "archiveSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "originalPath": "/private/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+      "originalBytes": 74,
+      "originalSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "notes/next-functional-acceptance-plan.md",
+      "archiveBytes": 11373,
+      "archiveSha256": "8a04d497fac37a81c8ec7954b03aeba827b0d1be1eb919f4f57dd59663ef7992",
+      "originalPath": "/private/tmp/bird-logical17b-functional-acceptance-plan.md",
+      "originalBytes": 11373,
+      "originalSha256": "8a04d497fac37a81c8ec7954b03aeba827b0d1be1eb919f4f57dd59663ef7992",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "offline-gate.json",
+      "archiveBytes": 3954,
+      "archiveSha256": "c29f98cfca9170c2e4c467160e063d2348fa30a4f136d5dbf7d48fd2cf4f95b4",
+      "origin": "offline-generated archive metadata/gate, not measured runtime"
+    },
+    {
+      "archivePath": "provenance/source-build.json",
+      "archiveBytes": 98344,
+      "archiveSha256": "d18e365c4739f8ebecc1c33efc4289e86c785bfc913e4b60fc61ebc0c49d0431",
+      "originalPath": "/private/tmp/bird-logical17b-export-provenance-1102.json",
+      "originalBytes": 98344,
+      "originalSha256": "d18e365c4739f8ebecc1c33efc4289e86c785bfc913e4b60fc61ebc0c49d0431",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "provenance/source.json",
+      "archiveBytes": 76778,
+      "archiveSha256": "9ad8540e44f313913458b89095e0307ac6d7116798292c7416226277db93f862",
+      "originalPath": "/private/tmp/bird-logical17b-export-source-1102.json",
+      "originalBytes": 76778,
+      "originalSha256": "9ad8540e44f313913458b89095e0307ac6d7116798292c7416226277db93f862",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "run/build.log",
+      "archiveBytes": 6700,
+      "archiveSha256": "861c84c26094c6aaee40c25551a9b39320adf3dd813b99b95cbd9313b6d2459f",
+      "originalPath": "/private/tmp/bird-logical17b-export-build-1102.log",
+      "originalBytes": 6700,
+      "originalSha256": "861c84c26094c6aaee40c25551a9b39320adf3dd813b99b95cbd9313b6d2459f",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "run/city.graph.gz",
+      "archiveBytes": 777465,
+      "archiveSha256": "4312c86fb6b000306a32c355bf009323d1056ab809ee2e1eb985e83ce814f3e0",
+      "originalPath": "/private/tmp/bird-logical17b-export-1102.graph",
+      "originalBytes": 3143227,
+      "originalSha256": "75b41dbbb19bcfe7d32f617036aeac3c1c75fda2aa3bc4f5d964bf295ac950c2",
+      "gzipLevel": 6,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "run/protocol.json",
+      "archiveBytes": 1749,
+      "archiveSha256": "5912589b5ea23485ba73c132fad064bf44340eab860b0a9cf27ee8038ae0c03b",
+      "originalPath": "/private/tmp/bird-logical17b-export-protocol-1102.json",
+      "originalBytes": 1749,
+      "originalSha256": "5912589b5ea23485ba73c132fad064bf44340eab860b0a9cf27ee8038ae0c03b",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "run/raw.json.gz",
+      "archiveBytes": 3143765,
+      "archiveSha256": "7a524a9fff533ea00002b7b9ba4c8459b3743dfa1d2dc2deca21f5a4ba975487",
+      "originalPath": "/private/tmp/bird-logical17b-export-1102.json",
+      "originalBytes": 14112573,
+      "originalSha256": "f815212e69ed5e9f0b88d96bb2ec74865bbaaa8edb5d82c488301de9f5b3e929",
+      "gzipLevel": 6,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "run/stderr.log",
+      "archiveBytes": 188,
+      "archiveSha256": "327d2cd59cf752685a8de70c14e05e7752cc5342abc65b316ce36b43a74c4084",
+      "originalPath": "/private/tmp/bird-logical17b-export-1102.stderr.log",
+      "originalBytes": 188,
+      "originalSha256": "327d2cd59cf752685a8de70c14e05e7752cc5342abc65b316ce36b43a74c4084",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "run/stdout.log.gz",
+      "archiveBytes": 3143433,
+      "archiveSha256": "a53a9d0ef4640f4b1fd37637c61350d0a066554eb095bd16350d915dbe84200f",
+      "originalPath": "/private/tmp/bird-logical17b-export-1102.stdout.log",
+      "originalBytes": 14112000,
+      "originalSha256": "423193f9b8af9acaa7da0a9e8f8b39e79434c1f46ee2c15a1ffe9e8be7ca12bf",
+      "gzipLevel": 6,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "source/src/game/addresscatalog.js",
+      "archiveBytes": 7089,
+      "archiveSha256": "d9090448e8734e4e29ef5299e1a0c970e49e40da32ba5cccda1908bfff62244a",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/addresscatalog.js",
+      "originalBytes": 7089,
+      "originalSha256": "d9090448e8734e4e29ef5299e1a0c970e49e40da32ba5cccda1908bfff62244a",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "source/src/game/addresslayout.js",
+      "archiveBytes": 2411,
+      "archiveSha256": "ee5ab51e06ff5ff51187c73dbfbd2aefb170f69bad482bf9d798b819183b99bc",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/addresslayout.js",
+      "originalBytes": 2411,
+      "originalSha256": "ee5ab51e06ff5ff51187c73dbfbd2aefb170f69bad482bf9d798b819183b99bc",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "source/src/game/game.js.gz",
+      "archiveBytes": 450452,
+      "archiveSha256": "4d5c84e4c0ee6c60d35a3cdbaba8f13b257770a6b170b16805e5a3b2ad8ea7ff",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/game.js",
+      "originalBytes": 1385847,
+      "originalSha256": "659fc8ff9e2462a4f1f94ff020d7cf8e4adda866b0fa3bb441fa2c617b860a37",
+      "gzipLevel": 6,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "source/src/game/landcache17a/sha256.js",
+      "archiveBytes": 2443,
+      "archiveSha256": "1e60d75a1cade05c66bc4b86af6f046f7f6ff5eb84232bf450fb6be1218f83f3",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/landcache17a/sha256.js",
+      "originalBytes": 2443,
+      "originalSha256": "1e60d75a1cade05c66bc4b86af6f046f7f6ff5eb84232bf450fb6be1218f83f3",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "source/src/game/streetgraph-codec.js",
+      "archiveBytes": 12395,
+      "archiveSha256": "10d7d2f619295f157c2da0457009fd05db2f31653aee73ea12492f2764435b82",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/streetgraph-codec.js",
+      "originalBytes": 12395,
+      "originalSha256": "10d7d2f619295f157c2da0457009fd05db2f31653aee73ea12492f2764435b82",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "source/src/game/streetgraph-input.js",
+      "archiveBytes": 2506,
+      "archiveSha256": "83b315f5fe0a1abc27b0c2eab8df3a77ec6569f09819fb69ebe4e48af8cabd8d",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/streetgraph-input.js",
+      "originalBytes": 2506,
+      "originalSha256": "83b315f5fe0a1abc27b0c2eab8df3a77ec6569f09819fb69ebe4e48af8cabd8d",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "source/src/game/streetgraph.js",
+      "archiveBytes": 2511,
+      "archiveSha256": "fccbf4b0f021313693be8de35a0aa82f854fcd7236999dbca448031e9fd85c1e",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/streetgraph.js",
+      "originalBytes": 2511,
+      "originalSha256": "fccbf4b0f021313693be8de35a0aa82f854fcd7236999dbca448031e9fd85c1e",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "source/src/game/streetgraphexport.js",
+      "archiveBytes": 1503,
+      "archiveSha256": "71305ef68d3b692e75d33e305e35039a94ef18c1fabae7233d36ecfa56e7c6fe",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/streetgraphexport.js",
+      "originalBytes": 1503,
+      "originalSha256": "71305ef68d3b692e75d33e305e35039a94ef18c1fabae7233d36ecfa56e7c6fe",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "source/tools/addresscatalog-test.mjs",
+      "archiveBytes": 8083,
+      "archiveSha256": "6fe1a86216059f44e4200c7345dc50c9ca8b5de1297bcfbebfc870b54bb7176d",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/addresscatalog-test.mjs",
+      "originalBytes": 8083,
+      "originalSha256": "6fe1a86216059f44e4200c7345dc50c9ca8b5de1297bcfbebfc870b54bb7176d",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "source/tools/addresslayout-test.mjs",
+      "archiveBytes": 9903,
+      "archiveSha256": "1e00ba727b5c2c7b559f67e6af7ed9bc738349a55907738a9708087361ceb426",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/addresslayout-test.mjs",
+      "originalBytes": 9903,
+      "originalSha256": "1e00ba727b5c2c7b559f67e6af7ed9bc738349a55907738a9708087361ceb426",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "source/tools/probe-page.cjs",
+      "archiveBytes": 37506,
+      "archiveSha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe-page.cjs",
+      "originalBytes": 37506,
+      "originalSha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "source/tools/probe.cjs",
+      "archiveBytes": 45888,
+      "archiveSha256": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+      "originalBytes": 45888,
+      "originalSha256": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "source/tools/streetgraph-codec-test.mjs",
+      "archiveBytes": 12350,
+      "archiveSha256": "6ce964dad76c93f0248063f24e1dc75e31d5b3d7c13e4e91dbd1780616a09615",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/streetgraph-codec-test.mjs",
+      "originalBytes": 12350,
+      "originalSha256": "6ce964dad76c93f0248063f24e1dc75e31d5b3d7c13e4e91dbd1780616a09615",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "source/tools/streetgraph-input-test.mjs",
+      "archiveBytes": 3916,
+      "archiveSha256": "25e2b79a9e8326a263fecccb933b9e80e169ade41bf7f9c24de707a2d2b725ab",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/streetgraph-input-test.mjs",
+      "originalBytes": 3916,
+      "originalSha256": "25e2b79a9e8326a263fecccb933b9e80e169ade41bf7f9c24de707a2d2b725ab",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "source/tools/streetgraph-test.mjs",
+      "archiveBytes": 10404,
+      "archiveSha256": "6b9a99766a6b4c317a8feba56dea2d7420db787c73e7201c5d96f460385219f7",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/streetgraph-test.mjs",
+      "originalBytes": 10404,
+      "originalSha256": "6b9a99766a6b4c317a8feba56dea2d7420db787c73e7201c5d96f460385219f7",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "source/tools/streetgraphexport-test.mjs",
+      "archiveBytes": 1642,
+      "archiveSha256": "f5d643e588b8fea5c3a8b972f6062740845a87ab8b3f040b34f2327ecb2c8d6c",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/streetgraphexport-test.mjs",
+      "originalBytes": 1642,
+      "originalSha256": "f5d643e588b8fea5c3a8b972f6062740845a87ab8b3f040b34f2327ecb2c8d6c",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "source-snapshot.json",
+      "archiveBytes": 5169,
+      "archiveSha256": "2f1ef95723f2a1e2ea38955a8f9511a04b07e2af2e920a470d5cc9d9be361f77",
+      "origin": "offline-generated archive metadata/gate, not measured runtime"
+    }
+  ],
+  "indexedFiles": 35,
+  "indexedBytes": 7910479
+}

@@ -1,0 +1,136 @@
+--- measured-before/src/game/game.js
++++ measured-after/src/game/game.js
+@@ -22,6 +22,8 @@
+ import * as SKYM from './sky.js';               // небо-купол, свет и палитра (2г1)
+ import * as MATS from './materials.js';         // блики и отклик по классу поверхности (2г11)
+ import * as SOFTSURF from './softsurfaces.js';
++import {buildAddressSpotsSteps} from './addresslayout.js';
++import {edgeKey,createStreetGraph,bindSegmentNodes,applyStaticBoundary,buildNodeGrid} from './streetgraph.js';
+ import * as RLAND from './raisedland.js';
+ import {createLandExporter} from './landcache17a/landcache-export.js';
+ import {createLandReader} from './landcache17a/landcache-reader.js';
+@@ -6373,61 +6375,22 @@
+    сторона, свои полосы и своё «можно ли сюда ехать» — на односторонней
+    улице трафик против шерсти не поедет. */
+ 
+-const NODES = [];
+-const NODE_IDX = new Map();
+-const EDGES = new Map();                          // направленные рёбра
+-const ekey = (a, b) => a * 100000 + b;
++const STREET_GRAPH = STARTUP.work('roads.baseGraph', () => {
++  const graph=createStreetGraph({roads:CITY.roads,roadWidth,drivable});
++  bindSegmentNodes(RSEG,graph.nodeIndex);
++  return applyStaticBoundary(graph,{open:MAP.open,inBorder});
++});
++const NODES = STREET_GRAPH.nodes;
++const NODE_IDX = STREET_GRAPH.nodeIndex;
++const EDGES = STREET_GRAPH.edges;                   // направленные рёбра; road — исходный объект CITY
++const ekey = edgeKey;
+ const edgeOf = (a, b) => EDGES.get(ekey(a, b));
+-const ukey = (a, b) => (a < b ? ekey(a, b) : ekey(b, a));    // ребро без направления
+-STARTUP.work('roads.baseGraph', () => {
+-  const node = (x, z) => {
+-    const k = x + ',' + z;
+-    let i = NODE_IDX.get(k);
+-    if (i === undefined) { i = NODES.length; NODE_IDX.set(k, i); NODES.push({ x, z, nb: [] }); }
+-    return i;
+-  };
+-  const link = (a, b, r, okAB, okBA) => {
+-    if (EDGES.has(ekey(a, b))) return;            // две улицы по одним узлам — берём первую
+-    const A = NODES[a], B = NODES[b];
+-    const len = Math.hypot(B.x - A.x, B.z - A.z);
+-    if (len < 0.3) return;
+-    const ux = (B.x - A.x) / len, uz = (B.z - A.z) / len, w = roadWidth(r);
+-    const mk = (from, to, ok, sg) => ({
+-      a: from, b: to, len, ux: ux * sg, uz: uz * sg, rx: -uz * sg, rz: ux * sg,
+-      w, w0: r.w0 || w, c: r.c, ok, oneway: !!r.o, lanes: r.l || 0, road: r, tA: 0, tB: 0, sig: null, stopAt: 0,
+-    });
+-    A.nb.push(b); B.nb.push(a);
+-    EDGES.set(ekey(a, b), mk(a, b, okAB, 1));
+-    EDGES.set(ekey(b, a), mk(b, a, okBA, -1));
+-  };
+-  for (const r of CITY.roads) {
+-    if (!drivable(r)) continue;                    // пешеходка и обрывки за рамкой не в счёт
+-    let prev = node(r.p[0][0], r.p[0][1]);
+-    for (let i = 1; i < r.p.length; i++) {
+-      const cur = node(r.p[i][0], r.p[i][1]);
+-      if (cur === prev) continue;
+-      link(prev, cur, r, true, !r.o);
+-      prev = cur;
+-    }
+-  }
+-// номера узлов на концах куска (b у куска уже занято — это мост)
+-for (const s of RSEG) { s.na = NODE_IDX.get(s.x1 + ',' + s.z1); s.nb = NODE_IDX.get(s.x2 + ',' + s.z2); }
+-/* закрытая часть города (MAP.open): узлы за линией — out, рёбра к ним закрыты (openEdges) */
+-if (MAP.open) {
+-  for (const N of NODES) N.out = !inBorder(N.x, N.z);
+-  for (const e of EDGES.values()) if (NODES[e.a].out || NODES[e.b].out) e.closed = 1;
+-}
+-});
++const ukey = (a, b) => (a < b ? ekey(a, b) : ekey(b, a));
+ 
+ /* узлов тысячи, перебирать их на каждый пересчёт маршрута
+    незачем — раскладываем по клеткам сто двадцать метров */
+-const NCELL = 120, NODE_GRID = new Map();
+-STARTUP.work('roads.nodeGrid', () => { for (let k = 0; k < NODES.length; k++) {
+-  const key = Math.floor(NODES[k].x / NCELL) + ',' + Math.floor(NODES[k].z / NCELL);
+-  let a = NODE_GRID.get(key);
+-  if (!a) NODE_GRID.set(key, a = []);
+-  a.push(k);
+-} });
++const NCELL = 120;
++const NODE_GRID = STARTUP.work('roads.nodeGrid', () => buildNodeGrid(NODES,NCELL));
+ 
+ function nearestNode (x, z) {
+   const ci = Math.floor(x / NCELL), cj = Math.floor(z / NCELL);
+@@ -15401,48 +15364,8 @@
+ /* шагами (function*, latebuild.js): на Деке ~0,25 с одним куском; «рядом уже есть адрес» — по клеткам 6 м, а не перебором
+    всех адресов (тот же ответ: |dx| < 6 и |dz| < 6) */
+ function* buildSpots () {
+-  const cand = [];
+-  for (const [x, z, nx, nz] of CITY.entrances) cand.push([x + nx * 3, z + nz * 3]);
+-  for (const q of CITY.paths) {
+-    if (q.far) continue;                           // длинный выход двора через газон к улице (yards.js farLinks) — не адрес
+-    let acc = 0;
+-    for (let i = 1; i < q.length; i++) {
+-      const l = Math.hypot(q[i][0] - q[i - 1][0], q[i][1] - q[i - 1][1]);
+-      for (let d = 12 - acc; d < l; d += 25) cand.push([lerp(q[i - 1][0], q[i][0], d / l), lerp(q[i - 1][1], q[i][1], d / l)]);
+-      acc = (acc + l) % 25;
+-    }
+-  }
+-  for (const lot of CITY.lots) {
+-    if (lot.k !== 'park') continue;
+-    let x = 0, z = 0;
+-    for (const q of lot.p) { x += q[0] / lot.p.length; z += q[1] / lot.p.length; }
+-    if (inPoly(x, z, lot.p)) cand.push([x, z]);
+-  }
+-  yield 'cand';
+-  const G = new Map(), gk6 = (i, j) => i * 100003 + j;
+-  for (const s of SPOTS) { const k = gk6(Math.floor(s.x / 6), Math.floor(s.z / 6)); const a = G.get(k); if (a) a.push(s); else G.set(k, [s]); }
+-  const near = (x, z) => {
+-    const ci = Math.floor(x / 6), cj = Math.floor(z / 6);
+-    for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
+-      const a = G.get(gk6(i, j));
+-      if (a) for (const s of a) if (Math.abs(s.x - x) < 6 && Math.abs(s.z - z) < 6) return true;
+-    }
+-    return false;
+-  };
+-  let n = 0;
+-  for (const [x, z] of cand) {
+-    if (++n % 1500 === 0) yield 'spots';
+-    if (!inBounds(x, z, 20) || groundH(x, z) < 0.3 || inHouse(x, z, 1.4)) continue;
+-    const any = nearestRoad(x, z, 7, 1);
+-    if (any && any.d < any.seg.w / 2 + 1.2) continue;           // на асфальте не стоим
+-    const street = nearestRoad(x, z, 5, 1);
+-    if (street && street.d < street.seg.w / 2 + 12) continue;   // у самой улицы — не вглубь
+-    if (near(x, z)) continue;
+-    if (JUMPS.blocks(x, z, 4)) continue;                       // не на горке, разгоне и полёте большого трамплина (jumps.js)
+-    const s = { x, z };
+-    SPOTS.push(s);
+-    const k = gk6(Math.floor(x / 6), Math.floor(z / 6)); const a = G.get(k); if (a) a.push(s); else G.set(k, [s]);
+-  }
++  yield* buildAddressSpotsSteps({entrances:CITY.entrances,paths:CITY.paths,lots:CITY.lots,spots:SPOTS,
++    lerp,inPoly,inBounds,groundH,inHouse,nearestRoad,blocks:(x,z,r)=>JUMPS.blocks(x,z,r)});
+ }
+ 
+ /* точка в кольце от центра — случайная из подходящих */

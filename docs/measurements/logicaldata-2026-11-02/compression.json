@@ -1,0 +1,68 @@
+[
+  {
+    "source": "/tmp/bird-logical17b-baseline-1102.json",
+    "path": "pair/baseline.json.gz",
+    "encoding": "gzip",
+    "level": 6,
+    "rawBytes": 8821382,
+    "rawSha256": "bbbf5dde9446334538cd9a743c4103b65d41c31d6a7a389c265f20815ebe14bf",
+    "bytes": 1840234,
+    "sha256": "2d0288ba3348fd1bb39e6b05d9a8ca15574260ba140561adcfdbe50a9b7e1b0c",
+    "roundtripByteExact": true
+  },
+  {
+    "source": "/tmp/bird-logical17b-candidate-1102.json",
+    "path": "pair/candidate.json.gz",
+    "encoding": "gzip",
+    "level": 6,
+    "rawBytes": 8821814,
+    "rawSha256": "4fbf3232eca39470b9553ea8cde3e1a899c599cc3b045bb9340efb27e0ea319c",
+    "bytes": 1840186,
+    "sha256": "fe0ca83f56359cbb2af08b8d25aa6429f31d96b03d2905179043bfdf099012fa",
+    "roundtripByteExact": true
+  },
+  {
+    "source": "/tmp/bird-logical17b-baseline-1102.stdout.log",
+    "path": "pair/baseline.stdout.log.gz",
+    "encoding": "gzip",
+    "level": 6,
+    "rawBytes": 8820810,
+    "rawSha256": "d2e0f3d13bd770fec10e832c79be4feea5cb9f6e29e399bbb2dbbeea21b833b5",
+    "bytes": 1839801,
+    "sha256": "f914844115f6454cc49d2e610a41439d31ba6bdda5261a7f52729a234b97a86f",
+    "roundtripByteExact": true
+  },
+  {
+    "source": "/tmp/bird-logical17b-candidate-1102.stdout.log",
+    "path": "pair/candidate.stdout.log.gz",
+    "encoding": "gzip",
+    "level": 6,
+    "rawBytes": 8821242,
+    "rawSha256": "e05237fbff22f16423e7283ce7265e89693ab8e08c8a8f9a59c1b6c81d1b9049",
+    "bytes": 1839754,
+    "sha256": "3a5671f4531efccd987d09320b84861bf2c525658bc9a1b4e08e6a7afb5fe352",
+    "roundtripByteExact": true
+  },
+  {
+    "source": "/tmp/bird-logical17b-before-game-1102.js",
+    "path": "source/game.before.js.gz",
+    "encoding": "gzip",
+    "level": 6,
+    "rawBytes": 1387810,
+    "rawSha256": "c1aaabd4549b1eb978431cf8d95b49c060a43f70132ca42fcf3c63184693b0ce",
+    "bytes": 451874,
+    "sha256": "dcea4d41fa9e74ea74e4bd5c5af9eb971e616f3c573944ea4cf197a36340f46d",
+    "roundtripByteExact": true
+  },
+  {
+    "source": "src/game/game.js",
+    "path": "source/game.after.js.gz",
+    "encoding": "gzip",
+    "level": 6,
+    "rawBytes": 1384152,
+    "rawSha256": "afa410b1c8a56ce40b69f00e75b091bdaed5135e013424ce050edf384eafad49",
+    "bytes": 450718,
+    "sha256": "7a95b1f15528e0de70e2b9559f1f51f766e080fdd4048b33660cefef03d29964",
+    "roundtripByteExact": true
+  }
+]

@@ -1,0 +1,501 @@
+{
+  "version": 1,
+  "kind": "queries-final-archive",
+  "sourceFingerprint": "b26caf3f59baa1bcf694fcd0336b4608b58e46447d5bd2d54c60beb746c41d85",
+  "buildFingerprint": "db818ab44b1a87d9ad2c4fa1c0ee4a8939e682dd3f4df5d383355b428b35a634",
+  "oldPairAndPilotChanged": false,
+  "fullBuildIncluded": false,
+  "signalProvidedByRootTool": false,
+  "processProvenance": "root-tool-transcribed protocol; no child process telemetry",
+  "harnessCapture": "after-runs filesystem snapshot under root-attested freeze; see exact capture labels",
+  "stdoutPhysicalCopies": false,
+  "stdoutReconstruction": "UTF-8 JSON.stringify(raw.result)+LF; exact original bytes/SHA verified for all3",
+  "deduplicatedStdouts": [
+    {
+      "label": "query1",
+      "rawOriginalPath": "/tmp/bird-logical17b-query1-1102.json",
+      "rawBytes": 16535119,
+      "rawSha256": "d131206b2f2ce39c328e255338b2517ef17f7e4da8787cad16e9efeb99a8b35c",
+      "stdoutOriginalPath": "/tmp/bird-logical17b-query1-1102.stdout.log",
+      "stdoutBytes": 16534546,
+      "stdoutSha256": "ab4706aed0056a60e080ef8499d99deddd21d7c65b1134e18d6aa63c378cc83f",
+      "stdoutDeduplicated": true,
+      "stdoutReconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'"
+    },
+    {
+      "label": "query2",
+      "rawOriginalPath": "/tmp/bird-logical17b-query2-1102.json",
+      "rawBytes": 16535171,
+      "rawSha256": "3aaad7e76f3afa3d6f25f3a817e029d83abea7ea8fc09d13e533adc6765e0a29",
+      "stdoutOriginalPath": "/tmp/bird-logical17b-query2-1102.stdout.log",
+      "stdoutBytes": 16534598,
+      "stdoutSha256": "cd1b97292ac1090d6f3224865053288df634ce954f5306847ae7c40b30979945",
+      "stdoutDeduplicated": true,
+      "stdoutReconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'"
+    },
+    {
+      "label": "savedkeys",
+      "rawOriginalPath": "/tmp/bird-logical17b-savedkeys-1102.json",
+      "rawBytes": 16534892,
+      "rawSha256": "5be79369a1349aece4fe150fbbfbfa92e4f0f94cd8bba538156e91c1d17634cc",
+      "stdoutOriginalPath": "/tmp/bird-logical17b-savedkeys-1102.stdout.log",
+      "stdoutBytes": 16534319,
+      "stdoutSha256": "9766cfc778afba81c0f77d9d4a6ddd085ee43474c090c4050c899fcddd33f2bb",
+      "stdoutDeduplicated": true,
+      "stdoutReconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'"
+    }
+  ],
+  "entries": [
+    {
+      "archivePath": "README.md",
+      "archiveBytes": 9171,
+      "archiveSha256": "2ecd5f9b7d4f2a086070e7bcdc04f0f5f8475449132bd7bb08225bac19459c8a",
+      "origin": "offline-generated archive metadata/audit/reconstruction helper, not measured runtime"
+    },
+    {
+      "archivePath": "artifacts/city.graph.gz",
+      "archiveBytes": 795322,
+      "archiveSha256": "b45281b429f3012e20aee534f7cc98cab0ea13ea3a886810f6849f91f6b1af96",
+      "originalBytes": 3143227,
+      "originalSha256": "a64d843e741592f93be9707c8ecd9a577ab9df767002e5febebfbd68675a0c34",
+      "gzipLevel": 6,
+      "byteExactRoundtrip": true,
+      "origin": "extracted from measured query1 raw.result.graphExport.wireBase64",
+      "sourceRawSha256": "d131206b2f2ce39c328e255338b2517ef17f7e4da8787cad16e9efeb99a8b35c"
+    },
+    {
+      "archivePath": "copy-records.json",
+      "archiveBytes": 9640,
+      "archiveSha256": "0aa39c86c733b9f628ce7a851b29dd19ef982b65b093930a647812c713314cd0",
+      "origin": "offline-generated archive metadata/audit/reconstruction helper, not measured runtime"
+    },
+    {
+      "archivePath": "harness/archive-queries.mjs",
+      "archiveBytes": 3819,
+      "archiveSha256": "d874c96db3a6685c080ee6f9c3e6957d85c63d9f16a8c5fc453035871252128b",
+      "originalBytes": 3819,
+      "originalSha256": "d874c96db3a6685c080ee6f9c3e6957d85c63d9f16a8c5fc453035871252128b",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-archive-queries-1102.mjs"
+    },
+    {
+      "archivePath": "harness/init.js",
+      "archiveBytes": 1029,
+      "archiveSha256": "2b86ab2f274c5ac2778b33978e6ac8cf79b4fbe971a94965a51db98a9b7d5342",
+      "originalBytes": 1029,
+      "originalSha256": "2b86ab2f274c5ac2778b33978e6ac8cf79b4fbe971a94965a51db98a9b7d5342",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-query-init-1102.js"
+    },
+    {
+      "archivePath": "harness/offline-query-audit.mjs",
+      "archiveBytes": 12798,
+      "archiveSha256": "cf959fcd09257255d5a464735e3f8a903ee522a4c8ab2012b25654b0b00b4b34",
+      "origin": "offline-generated archive metadata/audit/reconstruction helper, not measured runtime"
+    },
+    {
+      "archivePath": "harness/original-query1-audit.mjs",
+      "archiveBytes": 9444,
+      "archiveSha256": "bcf617861134ce3c016819387f498d1f938428fdac38111a2d58e1e44554b590",
+      "originalBytes": 9444,
+      "originalSha256": "bcf617861134ce3c016819387f498d1f938428fdac38111a2d58e1e44554b590",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-query1-audit-1102.mjs"
+    },
+    {
+      "archivePath": "harness/query-eval.js",
+      "archiveBytes": 21444,
+      "archiveSha256": "bee99bb14c491c347208a8aaedf97ffbc3894db63941f5da1d194bcb0c782cee",
+      "originalBytes": 21444,
+      "originalSha256": "bee99bb14c491c347208a8aaedf97ffbc3894db63941f5da1d194bcb0c782cee",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-query-export-eval-1102.js"
+    },
+    {
+      "archivePath": "harness/reconstruct-stdout.mjs",
+      "archiveBytes": 1160,
+      "archiveSha256": "35fa413482b81fd05d10397af6650035228204f6acf27becb1774e38b68d2d09",
+      "origin": "offline-generated archive metadata/audit/reconstruction helper, not measured runtime"
+    },
+    {
+      "archivePath": "harness/root-saved-key-gate.mjs",
+      "archiveBytes": 2513,
+      "archiveSha256": "6b04b75bc257566a61c12b5faeda1bc093413a66c8129140f9cc980b85021f65",
+      "originalBytes": 2513,
+      "originalSha256": "6b04b75bc257566a61c12b5faeda1bc093413a66c8129140f9cc980b85021f65",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-saved-key-gate-1102.mjs"
+    },
+    {
+      "archivePath": "independent-offline-audit.json",
+      "archiveBytes": 5663,
+      "archiveSha256": "38f5e1ea2dcb015b8a56da66ccfbf239a8f3f021ed1332749988f2089a838ddb",
+      "origin": "offline-generated archive metadata/audit/reconstruction helper, not measured runtime"
+    },
+    {
+      "archivePath": "inputs/fresh-high-fixture.json",
+      "archiveBytes": 74,
+      "archiveSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "originalBytes": 74,
+      "originalSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json"
+    },
+    {
+      "archivePath": "inputs/saved-keys-fixture.json",
+      "archiveBytes": 133,
+      "archiveSha256": "67d53f57494c20845135154ae81ece0236f6e116557b0cbfbd9d29df56476c54",
+      "originalBytes": 133,
+      "originalSha256": "67d53f57494c20845135154ae81ece0236f6e116557b0cbfbd9d29df56476c54",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-saved-keys-fixture-1102.json"
+    },
+    {
+      "archivePath": "notes/original-saved-key-proposal.json",
+      "archiveBytes": 3122,
+      "archiveSha256": "b3116054c293d219a7c436b9ddf2c3a40ded27c6fbdeba46bd66fc93e4931742",
+      "originalBytes": 3122,
+      "originalSha256": "b3116054c293d219a7c436b9ddf2c3a40ded27c6fbdeba46bd66fc93e4931742",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-saved-key-proposal-1102.json"
+    },
+    {
+      "archivePath": "notes/saved-key-fixture-plan.md",
+      "archiveBytes": 5091,
+      "archiveSha256": "ef67846ffb6f0e99ee246ebc9cfe460509e93508f566e5405c391c1ea121965e",
+      "originalBytes": 5091,
+      "originalSha256": "ef67846ffb6f0e99ee246ebc9cfe460509e93508f566e5405c391c1ea121965e",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-saved-key-fixture-plan-1102.md"
+    },
+    {
+      "archivePath": "provenance/build.log",
+      "archiveBytes": 6905,
+      "archiveSha256": "b6e750a793951a5a3ead69e10c0e8bfdddc9ad3c6763c669d2e22d6b7367c5e4",
+      "originalBytes": 6905,
+      "originalSha256": "b6e750a793951a5a3ead69e10c0e8bfdddc9ad3c6763c669d2e22d6b7367c5e4",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-query-build-1102.log"
+    },
+    {
+      "archivePath": "provenance/root-protocol.json",
+      "archiveBytes": 5316,
+      "archiveSha256": "bc5994a2d9c044d51286e49d07fca7b07539cb914c960f37a26589fedd9fd9cc",
+      "originalBytes": 5316,
+      "originalSha256": "bc5994a2d9c044d51286e49d07fca7b07539cb914c960f37a26589fedd9fd9cc",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-query-protocol-1102.json"
+    },
+    {
+      "archivePath": "provenance/source-build.json",
+      "archiveBytes": 98349,
+      "archiveSha256": "f40c3cd0b553aea7fcedc7e46bbde4a20595c91e80a9bb2a1716a706b780c05c",
+      "originalBytes": 98349,
+      "originalSha256": "f40c3cd0b553aea7fcedc7e46bbde4a20595c91e80a9bb2a1716a706b780c05c",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-query-provenance-1102.json"
+    },
+    {
+      "archivePath": "provenance/source.json",
+      "archiveBytes": 76778,
+      "archiveSha256": "019d5554d90221103c63b28859a94ea4742572bc9a7ab8dea9558761e52bc124",
+      "originalBytes": 76778,
+      "originalSha256": "019d5554d90221103c63b28859a94ea4742572bc9a7ab8dea9558761e52bc124",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-query-source-1102.json"
+    },
+    {
+      "archivePath": "raw-records.json",
+      "archiveBytes": 1506,
+      "archiveSha256": "a2ed1ffd1338171e78e4be36c59bf4a5e64b6bb2302793d9ffb2469439204930",
+      "origin": "offline-generated archive metadata/audit/reconstruction helper, not measured runtime"
+    },
+    {
+      "archivePath": "root-evidence/independent-query1-audit.json",
+      "archiveBytes": 2432,
+      "archiveSha256": "bc46c2ffbaf105c7d378ee32c08a5edc9580a867b2c40f6b59c0f7cce9201adc",
+      "originalBytes": 2432,
+      "originalSha256": "bc46c2ffbaf105c7d378ee32c08a5edc9580a867b2c40f6b59c0f7cce9201adc",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-query1-audit-1102.json"
+    },
+    {
+      "archivePath": "root-evidence/query-pair-summary.json",
+      "archiveBytes": 666,
+      "archiveSha256": "dee154ddf6a409ac59cfe893e50b639d1464c542a59e9626bf7b950887b262fc",
+      "originalBytes": 666,
+      "originalSha256": "dee154ddf6a409ac59cfe893e50b639d1464c542a59e9626bf7b950887b262fc",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-query-pair-summary-1102.json"
+    },
+    {
+      "archivePath": "root-evidence/saved-key-summary.json",
+      "archiveBytes": 1238,
+      "archiveSha256": "9c2dcf0ee2cebaef277c839f35f766a9663fe371c6817d175f25cb3cf427b45a",
+      "originalBytes": 1238,
+      "originalSha256": "9c2dcf0ee2cebaef277c839f35f766a9663fe371c6817d175f25cb3cf427b45a",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-saved-key-summary-1102.json"
+    },
+    {
+      "archivePath": "runs/query1/raw.json.gz",
+      "archiveBytes": 3406934,
+      "archiveSha256": "710e1aca3d796ff183d35116735255d6a29060c6a02f8035311fa4e6cee9fba3",
+      "originalBytes": 16535119,
+      "originalSha256": "d131206b2f2ce39c328e255338b2517ef17f7e4da8787cad16e9efeb99a8b35c",
+      "gzipLevel": 6,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-query1-1102.json"
+    },
+    {
+      "archivePath": "runs/query1/stderr.log",
+      "archiveBytes": 188,
+      "archiveSha256": "36a1e0ea1399282a1d933bb9b2b435f7e9731f6ff0b9920fc9a5ad5d4cddac0f",
+      "originalBytes": 188,
+      "originalSha256": "36a1e0ea1399282a1d933bb9b2b435f7e9731f6ff0b9920fc9a5ad5d4cddac0f",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-query1-1102.stderr.log"
+    },
+    {
+      "archivePath": "runs/query2/raw.json.gz",
+      "archiveBytes": 3406977,
+      "archiveSha256": "dafff45de26db68f01ed06407c6b806e1b8c1cf3c3dd9418b281f0054923dca6",
+      "originalBytes": 16535171,
+      "originalSha256": "3aaad7e76f3afa3d6f25f3a817e029d83abea7ea8fc09d13e533adc6765e0a29",
+      "gzipLevel": 6,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-query2-1102.json"
+    },
+    {
+      "archivePath": "runs/query2/stderr.log",
+      "archiveBytes": 188,
+      "archiveSha256": "56b30a00e6610c15a0741dd45c395d23e969b424f9399721b04c74f0af9bedab",
+      "originalBytes": 188,
+      "originalSha256": "56b30a00e6610c15a0741dd45c395d23e969b424f9399721b04c74f0af9bedab",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-query2-1102.stderr.log"
+    },
+    {
+      "archivePath": "runs/savedkeys/raw.json.gz",
+      "archiveBytes": 3406916,
+      "archiveSha256": "dbc5eb7f5e6e1c706ca484440567144ae2cf086aca20a47bc7bd762e9783a946",
+      "originalBytes": 16534892,
+      "originalSha256": "5be79369a1349aece4fe150fbbfbfa92e4f0f94cd8bba538156e91c1d17634cc",
+      "gzipLevel": 6,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-savedkeys-1102.json"
+    },
+    {
+      "archivePath": "runs/savedkeys/stderr.log",
+      "archiveBytes": 188,
+      "archiveSha256": "0af6ca17ee76cebf3cac044c358eee13c88c4acef490655ed6d2d6960fab5667",
+      "originalBytes": 188,
+      "originalSha256": "0af6ca17ee76cebf3cac044c358eee13c88c4acef490655ed6d2d6960fab5667",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "originalPath": "/tmp/bird-logical17b-savedkeys-1102.stderr.log"
+    },
+    {
+      "archivePath": "source/src/game/addresscatalog.js",
+      "archiveBytes": 7089,
+      "archiveSha256": "d9090448e8734e4e29ef5299e1a0c970e49e40da32ba5cccda1908bfff62244a",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/addresscatalog.js",
+      "originalBytes": 7089,
+      "originalSha256": "d9090448e8734e4e29ef5299e1a0c970e49e40da32ba5cccda1908bfff62244a",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "sourceInventoryVerified": true
+    },
+    {
+      "archivePath": "source/src/game/addresslayout.js",
+      "archiveBytes": 2411,
+      "archiveSha256": "ee5ab51e06ff5ff51187c73dbfbd2aefb170f69bad482bf9d798b819183b99bc",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/addresslayout.js",
+      "originalBytes": 2411,
+      "originalSha256": "ee5ab51e06ff5ff51187c73dbfbd2aefb170f69bad482bf9d798b819183b99bc",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "sourceInventoryVerified": true
+    },
+    {
+      "archivePath": "source/src/game/game.js.gz",
+      "archiveBytes": 450477,
+      "archiveSha256": "c916a3b7eccdd64cc3cb4f719a1b2b4b69b03fdbd6e786df0f5cc66d6efcec00",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/game.js",
+      "originalBytes": 1385889,
+      "originalSha256": "6505381a0fa1877c7c72e01f9786196354fee558c4494fb320e51843c2be6778",
+      "gzipLevel": 6,
+      "byteExactRoundtrip": true,
+      "sourceInventoryVerified": true
+    },
+    {
+      "archivePath": "source/src/game/landcache17a/sha256.js",
+      "archiveBytes": 2443,
+      "archiveSha256": "1e60d75a1cade05c66bc4b86af6f046f7f6ff5eb84232bf450fb6be1218f83f3",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/landcache17a/sha256.js",
+      "originalBytes": 2443,
+      "originalSha256": "1e60d75a1cade05c66bc4b86af6f046f7f6ff5eb84232bf450fb6be1218f83f3",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "sourceInventoryVerified": true
+    },
+    {
+      "archivePath": "source/src/game/streetgraph-codec.js",
+      "archiveBytes": 12395,
+      "archiveSha256": "10d7d2f619295f157c2da0457009fd05db2f31653aee73ea12492f2764435b82",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/streetgraph-codec.js",
+      "originalBytes": 12395,
+      "originalSha256": "10d7d2f619295f157c2da0457009fd05db2f31653aee73ea12492f2764435b82",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "sourceInventoryVerified": true
+    },
+    {
+      "archivePath": "source/src/game/streetgraph-input.js",
+      "archiveBytes": 2506,
+      "archiveSha256": "83b315f5fe0a1abc27b0c2eab8df3a77ec6569f09819fb69ebe4e48af8cabd8d",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/streetgraph-input.js",
+      "originalBytes": 2506,
+      "originalSha256": "83b315f5fe0a1abc27b0c2eab8df3a77ec6569f09819fb69ebe4e48af8cabd8d",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "sourceInventoryVerified": true
+    },
+    {
+      "archivePath": "source/src/game/streetgraph.js",
+      "archiveBytes": 2511,
+      "archiveSha256": "fccbf4b0f021313693be8de35a0aa82f854fcd7236999dbca448031e9fd85c1e",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/streetgraph.js",
+      "originalBytes": 2511,
+      "originalSha256": "fccbf4b0f021313693be8de35a0aa82f854fcd7236999dbca448031e9fd85c1e",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "sourceInventoryVerified": true
+    },
+    {
+      "archivePath": "source/src/game/streetgraphexport.js",
+      "archiveBytes": 1531,
+      "archiveSha256": "a3f9e1f7dba9e72ae9b60e97eae614377aab1ef0040c636e46c69eeb84daf677",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/streetgraphexport.js",
+      "originalBytes": 1531,
+      "originalSha256": "a3f9e1f7dba9e72ae9b60e97eae614377aab1ef0040c636e46c69eeb84daf677",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "sourceInventoryVerified": true
+    },
+    {
+      "archivePath": "source/tools/addresscatalog-test.mjs",
+      "archiveBytes": 8083,
+      "archiveSha256": "6fe1a86216059f44e4200c7345dc50c9ca8b5de1297bcfbebfc870b54bb7176d",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/addresscatalog-test.mjs",
+      "originalBytes": 8083,
+      "originalSha256": "6fe1a86216059f44e4200c7345dc50c9ca8b5de1297bcfbebfc870b54bb7176d",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "sourceInventoryVerified": false
+    },
+    {
+      "archivePath": "source/tools/addresslayout-test.mjs",
+      "archiveBytes": 9903,
+      "archiveSha256": "1e00ba727b5c2c7b559f67e6af7ed9bc738349a55907738a9708087361ceb426",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/addresslayout-test.mjs",
+      "originalBytes": 9903,
+      "originalSha256": "1e00ba727b5c2c7b559f67e6af7ed9bc738349a55907738a9708087361ceb426",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "sourceInventoryVerified": false
+    },
+    {
+      "archivePath": "source/tools/probe-page.cjs",
+      "archiveBytes": 37506,
+      "archiveSha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe-page.cjs",
+      "originalBytes": 37506,
+      "originalSha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "sourceInventoryVerified": false
+    },
+    {
+      "archivePath": "source/tools/probe.cjs",
+      "archiveBytes": 46464,
+      "archiveSha256": "54b8156913fa04b036676c4ebb87045361bbbec5fdfd41beae7e2f3541072abd",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+      "originalBytes": 46464,
+      "originalSha256": "54b8156913fa04b036676c4ebb87045361bbbec5fdfd41beae7e2f3541072abd",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "sourceInventoryVerified": false
+    },
+    {
+      "archivePath": "source/tools/streetgraph-codec-test.mjs",
+      "archiveBytes": 12350,
+      "archiveSha256": "6ce964dad76c93f0248063f24e1dc75e31d5b3d7c13e4e91dbd1780616a09615",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/streetgraph-codec-test.mjs",
+      "originalBytes": 12350,
+      "originalSha256": "6ce964dad76c93f0248063f24e1dc75e31d5b3d7c13e4e91dbd1780616a09615",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "sourceInventoryVerified": false
+    },
+    {
+      "archivePath": "source/tools/streetgraph-input-test.mjs",
+      "archiveBytes": 3916,
+      "archiveSha256": "25e2b79a9e8326a263fecccb933b9e80e169ade41bf7f9c24de707a2d2b725ab",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/streetgraph-input-test.mjs",
+      "originalBytes": 3916,
+      "originalSha256": "25e2b79a9e8326a263fecccb933b9e80e169ade41bf7f9c24de707a2d2b725ab",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "sourceInventoryVerified": false
+    },
+    {
+      "archivePath": "source/tools/streetgraph-test.mjs",
+      "archiveBytes": 10404,
+      "archiveSha256": "6b9a99766a6b4c317a8feba56dea2d7420db787c73e7201c5d96f460385219f7",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/streetgraph-test.mjs",
+      "originalBytes": 10404,
+      "originalSha256": "6b9a99766a6b4c317a8feba56dea2d7420db787c73e7201c5d96f460385219f7",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "sourceInventoryVerified": false
+    },
+    {
+      "archivePath": "source/tools/streetgraphexport-test.mjs",
+      "archiveBytes": 1778,
+      "archiveSha256": "6c6fea216bfcd8774b5ec39af3712495e12a0eb4f2e5c6a78869862ddd34a17b",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/streetgraphexport-test.mjs",
+      "originalBytes": 1778,
+      "originalSha256": "6c6fea216bfcd8774b5ec39af3712495e12a0eb4f2e5c6a78869862ddd34a17b",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "sourceInventoryVerified": false
+    },
+    {
+      "archivePath": "source-snapshot.json",
+      "archiveBytes": 5169,
+      "archiveSha256": "281c6b6001831860af90ae376665f722205dd5581309c6ba740d00d8bcba87c5",
+      "origin": "offline-generated archive metadata/audit/reconstruction helper, not measured runtime"
+    }
+  ],
+  "indexedFiles": 46,
+  "indexedBytes": 11911940
+}

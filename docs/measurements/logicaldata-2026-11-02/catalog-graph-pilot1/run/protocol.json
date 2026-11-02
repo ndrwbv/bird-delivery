@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "kind": "root-tool-transcribed-protocol",
+  "cwd": "/Users/andrewboev/Desktop/not-work/delivery",
+  "envUnset": [
+    "BIRD_EDITOR",
+    "BIRD_LAND_DATA_DIR"
+  ],
+  "build": {
+    "argv": [
+      "npx",
+      "vite",
+      "build",
+      "--mode",
+      "steam",
+      "--outDir",
+      "/tmp/bird-logical17b-export-1102"
+    ],
+    "env": {
+      "BUILD_VERSION": "0.33.11"
+    },
+    "execSession": 4767,
+    "exitCode": 0
+  },
+  "probe": {
+    "argvTranscribedFromExecutedRootToolCall": [
+      "node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+      "tools/probe.cjs",
+      "--mode=steam",
+      "--dir=/tmp/bird-logical17b-export-1102",
+      "--startup-trace",
+      "--startup-session=logical17b-export-1102",
+      "--startup-cold",
+      "--startup-fixture=/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+      "--fresh",
+      "--early",
+      "--size=deck",
+      "--cpu=3",
+      "--bootcpu",
+      "--init-script=/tmp/bird-logical17b-export-init-1102.js",
+      "--q=gfxdev=deck&mute&startupdistrict=0&landpackage=0&logicalexport17b",
+      "--eval=/tmp/bird-logical17b-export-eval-1102.js",
+      "--bootwait=360",
+      "--timeout=480",
+      "--max=0",
+      "--errors",
+      "--report=/tmp/bird-logical17b-export-1102.json"
+    ],
+    "execSession": 7193,
+    "exitCode": 0,
+    "signalProvidedByTool": false,
+    "stdout": "/tmp/bird-logical17b-export-1102.stdout.log",
+    "stderr": "/tmp/bird-logical17b-export-1102.stderr.log"
+  },
+  "notes": "Exact executed arguments recorded from root tool input and completed exit0 results, not child-captured argv telemetry. Source/build capture immediately after spawn; this is a profiled structural proof, not startup timing comparison."
+}

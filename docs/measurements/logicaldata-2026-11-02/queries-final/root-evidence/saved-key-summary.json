@@ -1,0 +1,65 @@
+{
+  "ok": true,
+  "gate": {
+    "ok": true,
+    "reasons": []
+  },
+  "used": [
+    {
+      "index": 0,
+      "key": "ly.kd",
+      "poolIndices": [
+        0
+      ]
+    },
+    {
+      "index": 1,
+      "key": "kj.gx",
+      "poolIndices": [
+        6
+      ]
+    },
+    {
+      "index": 2,
+      "key": "nr.db",
+      "poolIndices": [
+        389
+      ]
+    },
+    {
+      "index": 3,
+      "key": "lu.bx",
+      "poolIndices": [
+        404
+      ]
+    },
+    {
+      "index": 4,
+      "key": "c4.7x",
+      "poolIndices": []
+    }
+  ],
+  "rawSavedUsed": [
+    "ly.kd",
+    "kj.gx",
+    "nr.db",
+    "lu.bx",
+    "c4.7x"
+  ],
+  "counts": {
+    "realAddress": 5061,
+    "entranceLv": 7608,
+    "doorWrapper": 7608,
+    "pool": 1214,
+    "used": 5
+  },
+  "wireSame": true,
+  "logicalAndCatalogSame": true,
+  "allFunctionalTablesSame": true,
+  "poolSame": true,
+  "fourKeysInPool": true,
+  "legacyKeyOutsidePool": true,
+  "keysUnchanged": true,
+  "rawSha256": "5be79369a1349aece4fe150fbbfbfa92e4f0f94cd8bba538156e91c1d17634cc",
+  "offlineCorrection": "First one-line validator expected bare USED strings; actual eval intentionally returns rows. Only validator projection corrected; raw/eval/game/expected keys unchanged, no game retry."
+}

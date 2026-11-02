@@ -1,0 +1,37 @@
+# Следующая адресная приёмка: план, без запуска
+
+Дата: 2026-11-02. Текущее чтение во время root probe 7193; frozen source fingerprint `ebe1c7a1cf3cb5c8479039d71e478657f1972fc6532b6a69043de9cf1b28538c`. Ничего в src/tools/build не изменено. Это план будущего eval, не результат проверки.
+
+## Действующие точки доступа
+
+- `d.DOOR.lv(x,z)` вызывает именно game `entranceLv(x,z)` через сохранённый API, без постановки мини-игры: doorstep.js:673; game.js:8271/17308/18982. Поддержан дефолтный `ECON.DOOR.DOOR_R`; произвольный третий аргумент wrapper не передаёт.
+- `d.STORY_DBG.homeOf(id)` вызывает действующий story `homeOf`, включая разрешение здания, реальный порядок entrances/SPOTS и game realAddress внутри: story.js:98–142/204. Первый вызов может заполнить внутренний HOME cache; это не абсолютно pure вызов, но не создаёт заказ, не пишет сохранение, не меняет город/RNG. Для истории с `place()` сначала отдельно проверить её реализацию; не вызывать все зарегистрированные истории вслепую.
+- `d.ORDM.DEBUG.POOL` и `.USED` — getter действующих массивов, доступны независимо от того, успел ли ORD.step создать `d.ORD`. `d.Store.get('dlv-used-addr',[])` — сохранённый список. Использовать проекции, не менять полученные массивы.
+- `d.CITY`, `d.HOUSES`, `d.GEN_ENTR`, `d.SPOTS`, `d.PZ_CUR`, `d.DIST`, `d.ZN`, `d.ECON`, `d.nearestRoad` уже доступны.
+- Полный game `realAddress(x,z)` НЕ опубликован в текущем debug object. Нельзя достать lexical closure через Function.toString/eval. `d.ORDM.DEBUG.MIX.street(q)` обрезает номер дома и кеширует по округлённому метру; это не эквивалент прямой проверки адреса. Telemetry heat пишет события, setup/force меняют заказ — не использовать как обход.
+
+## Единственный необходимый следующий debug hook
+
+После завершения нынешней frozen приёмки root может добавить в существующий debug object `realAddress` — саму действующую функцию, без wrapper-копии алгоритма. При желании `entranceLv` тоже можно добавить для проверки явного r, но для обязательного default пути уже хватает DOOR.lv. Это новый source fingerprint и новый immutable build: нельзя приписать такой helper старой сборке ebe1. Нынешняя сборка позволяет все остальные проверки и только ограниченное косвенное наблюдение realAddress через story-home.
+
+## Один eval после штатного старта
+
+1. Reuse действующий startup-ready/bootstrap observer и реальный menu Go, тот же ordinary high / district0 / ru / seed=null, те же размеры и CPU3. Никаких `startRun`, resetShift, force, ручной фазы или смены district. Дождаться штатного first.control guard2 + подтверждённого движения и завершения LATE; проверить sealed owner, prefix/aliases/links. Functional queries выполнить ПОСЛЕ окна startup-замера, их время не смешивать со startup.
+2. Снять перед запросами exact ordered scalar rows HOUSES/GEN/entrances/SPOTS, ссылки массивов и элементов, owner.checkLinks(), PIZZA/district/opened/city, POOL и USED, raw сохранённое значение и известные progress keys. После запросов проверить их неизменность. Не пытаться сериализовать весь world. Для HOME отдельно признать допустимый внутренний memo-cache.
+3. **realAddress:** вызвать настоящую функцию на всех HOUSES door x/z, на передних точках generated doors, на фиксированной выборке SPOTS и краевых/negative координатах. Сохранить ordered `[queryIndex,x,z,actual]`. В ru expected берётся из независимого ближайшего ordered HOUSES oracle со строгим `<`; tie case публиковать только если проверено, что третья точка не ближе. Проверка по source rows — oracle, не подмена вызова actual helper. Для другой локали отдельный контракт translit, его здесь не заявлять.
+4. **entranceLv:** реальные DOOR.lv на каждой raw/generated двери, их передних точках и выбранных SPOTS; expected учитывает СНАЧАЛА наличие любой CITY.entrance на строго `< DOOR_R²`, ПОТОМ ближайший HOUSES на строго `<60²`, first wins, `lv||0`. Включить далёкую точку с доказанным отсутствием дверей. Пограничные `r−eps/r/r+eps` и house60 проверять только с найденным witness без конкурирующих ближайших объектов; не считать удобную сдвинутую точку гарантированной границей.
+5. **story home:** минимум действующая фиксированная история `gennady`; получить actual `homeOf(id)` дважды и сравнить полный scalar результат `{ex,ez,nx,nz,sx,sz,x,z,addr}` и стабильность ссылки memo. Независимо проверить выбранный building ordinal/raw id, исходный entrance ordinal, нормализацию, принадлежность выбранного SPOT либо штатный want4 fallback. Addr дополнительно сравнить с настоящим realAddress на `ex+nx*2,ez+nz*2`. Не вызывать orderFor/nextOrder/reset/register и не ставить сюжет вручную. Любой другой story id — только после проверки place/home callback на побочные эффекты.
+6. **ordered POOL:** после настоящего startShift должен быть непустым; читать `d.ORDM.DEBUG.POOL`, не вызывать resetShift ради наполнения. Снять ВСЕ ordered `{x,z,entr,key,zone,d}`, без sort/dedup. Сопоставить каждому row исходный SPOTS index и убедиться в сохранённом порядке/кратности; expected фильтр района использует actual DIST/nearestRoad/openSpot условия; entr классификация — quarter-metre множества перед дверями, key — другая, 4m сетка. d от actual PZ_CUR, zone от actual ZN. Различать измеренную actual POOL и независимо рассчитанную expected projection; одна expected таблица сама по себе не доказывает runtime.
+
+## Сохранённые 4m keys, без изменения игрового заказа
+
+Отдельный подготовленный init fixture в изолированном probe profile ДО импорта игры: в `dlv-used-addr` задать небольшой ordered список из уже измеренных реальных pool keys: raw-door spot, generated-door spot, обычный path spot, negative-coordinate key (если имеется), плюс один legacy key вне текущего district/POOL. Включить два разных SPOTS, разделяющих один 4m key, только если такой witness найден; это допустимая коллизия, не ошибка каталога. Не изобретать новый catalog-ID и не подменять им saved key.
+
+В том же immutable build и с тем же fixture сравнить `Store.get` с actual `ORDM.DEBUG.USED` и exact POOL key transcript. Ожидать сохранённый порядок, сохранность внепулового legacy ключа и неизменность storage после readonly eval. Не вызывать clearUsed/reloadUsed/markUsed/delivered ради этой приёмки. Она доказывает совместимость загрузки прежних ключей и их связывания с runtime pool; правила старения/выбора очередного заказа требуют отдельной мутирующей проверки и здесь не заявляются. Для расширенного legacy string/filter input достаточно existing unit-покрытия либо отдельного согласованного fixture, не скрытой второй версии того же запуска.
+
+## Сравнение и границы вывода
+
+- На одном frozen final build можно снять owner-off и `?logicalexport17b` результаты при одинаковом input descriptor/save fixture; отличаться должен только диагностический query. Root решает необходимость пары; сейчас ни один запуск не выполнен.
+- Старые baseline/candidate raw содержат ordered rows, но НЕ actual function transcripts/POOL/USED/story-home. Их совпадение не следует переименовывать в уже доказанное совпадение этих запросов.
+- До запуска pin eval/init/probe/build/source/fixture hashes; после — actual argv/status/signal/raw SHA и строгий gate. Первая ошибка — сохранить и остановить, без повторов. Результат содержит actual и expected отдельно, число проверок и witness inputs; отсутствие нужного witness отмечается, не заменяется выдуманным PASS.
+- За пределами этой приёмки: ранний reader/default eligibility, визуальная стоимость домов, новые карьерные ID, изменение RNG/генерации или выпуск пакета. Здесь проверяем текущую семантику queries и совместимость сохранений.

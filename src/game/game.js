@@ -22,6 +22,11 @@ import * as SOFTCITY from './softcity.js';
 import * as SKYM from './sky.js';               // небо-купол, свет и палитра (2г1)
 import * as MATS from './materials.js';         // блики и отклик по классу поверхности (2г11)
 import * as SOFTSURF from './softsurfaces.js';
+import {buildAddressSpotsSteps} from './addresslayout.js';
+import {createAddressCatalogRecorder} from './addresscatalog.js';
+import {streetGraphInputHash} from './streetgraph-input.js';
+import {createStreetGraphExport} from './streetgraphexport.js';
+import {edgeKey,createStreetGraph,bindSegmentNodes,applyStaticBoundary,buildNodeGrid} from './streetgraph.js';
 import * as RLAND from './raisedland.js';
 import {createLandExporter} from './landcache17a/landcache-export.js';
 import {createLandReader} from './landcache17a/landcache-reader.js';
@@ -1133,16 +1138,16 @@ function pushOut (p, r) {
    Нужно постоянно: куда развернуть лавочку, с какой стороны у дома
    подъезд, где припарковать чужую машину, что нарисовать на радаре. */
 const RSEG = [];
-for (const r of CITY.roads) {
+STARTUP.work('roads.segments', () => { for (const r of CITY.roads) {
   const w = roadWidth(r), p = r.p;
   for (let i = 1; i < p.length; i++)
     RSEG.push({ x1: p[i - 1][0], z1: p[i - 1][1], x2: p[i][0], z2: p[i][1], c: r.c, w, name: r.n, b: r.b || 0, x: r.x || 0, g: r.g || 0 });   // g — газон бульвара: ширина плиты за бордюром (hits.js)
-}
+} });
 
 PAVE.init({ RSEG, CITY, onAlley: (x, z, m) => WORLD.onAlley(x, z, m) });   // тротуары и дорожки: общее «сюда не ставить» (pave.js)
 
 const RCELL = 64, ROAD_GRID = new Map();
-for (let k = 0; k < RSEG.length; k++) {
+STARTUP.work('roads.segmentGrid', () => { for (let k = 0; k < RSEG.length; k++) {
   const s = RSEG[k];
   const i0 = Math.floor(Math.min(s.x1, s.x2) / RCELL), i1 = Math.floor(Math.max(s.x1, s.x2) / RCELL);
   const j0 = Math.floor(Math.min(s.z1, s.z2) / RCELL), j1 = Math.floor(Math.max(s.z1, s.z2) / RCELL);
@@ -1153,11 +1158,11 @@ for (let k = 0; k < RSEG.length; k++) {
       if (!a) ROAD_GRID.set(key, a = []);
       a.push(k);
     }
-}
+} });
 
 /* те же клетки сплошным массивом: при сборке города ближайшую дорогу
    спрашивают сотни тысяч раз, и строка-ключ на каждую клетку стоила заметно */
-const RG = (() => {
+const RG = STARTUP.work('roads.segmentDenseGrid', () => {
   let i0 = Infinity, i1 = -Infinity, j0 = Infinity, j1 = -Infinity;
   for (const key of ROAD_GRID.keys()) { const [i, j] = key.split(',').map(Number); i0 = Math.min(i0, i); i1 = Math.max(i1, i); j0 = Math.min(j0, j); j1 = Math.max(j1, j); }
   if (!(i1 >= i0)) return { i0: 0, j0: 0, ni: 0, nj: 0, cells: [] };
@@ -1169,16 +1174,16 @@ const RG = (() => {
   for (let q = 0; q < ni * nj; q++) { box[q * 4] = box[q * 4 + 1] = Infinity; box[q * 4 + 2] = box[q * 4 + 3] = -Infinity; }
   for (let q = 0; q < ni * nj; q++) if (cells[q]) for (const k of cells[q]) rgBoxAdd(box, q, RSEG[k]);
   return { i0, j0, ni, nj, cells, box };
-})();
+});
 /* плавные улицы (?smooth, roadsmooth.js): ближайшая улица «как до дуг» — кусок внутри дуги (между точками одной дуги) не в
    счёт, вместо него — прежний угол (касание — вершина — касание). По ней выбирается «лицевая» стена дома с адресом (bestEdge)
    и стена подъездов: фасады угловых домов — как без скругления (на внутренней стороне изгиба дуга ближе к стене на срез
    угла, до 3 м, и «лицевой» становилась соседняя стена). Те же клетки ROAD_GRID, что у nearestRoad(…, 1). Без ?smooth — null */
-const SARC = SMOOTH.STATS.done ? (() => {
+const SARC = SMOOTH.STATS.done ? STARTUP.work('roads.segmentArcIndex', () => {
   const a = new Uint8Array(RSEG.length);
   for (let k = 0; k < RSEG.length; k++) { const s = RSEG[k], i = SMOOTH.arcOf(s.x1, s.z1); if (i >= 0 && i === SMOOTH.arcOf(s.x2, s.z2)) a[k] = 1; }
   return a;
-})() : null;
+}) : null;
 const CORNERS = SARC ? (() => {
   const G = new Map();
   for (const A of SMOOTH.ARCS) {
@@ -4419,7 +4424,7 @@ function genEntrances (b, p, ccw, lv, area, arch, bestEdge, doors) {
   // парадная — у старого дома с адресом, на стене к улице
   if (bestEdge && (b.k === 'pub' || (lv <= 6 && b.a && chance(0.3)))) {
     const pos = fit({ x: bestEdge.mx, z: bestEdge.mz, nx: bestEdge.ox, nz: bestEdge.oz, len: bestEdge.len }, 0, true);
-    if (pos) { const { x, z } = pos; entranceAt(x, z, bestEdge.ox, bestEdge.oz, true); GEN_ENTR.push([x, z, bestEdge.ox, bestEdge.oz]); doors.push([x, z, bestEdge.ox, bestEdge.oz, 1]); }
+    if (pos) { const { x, z } = pos; entranceAt(x, z, bestEdge.ox, bestEdge.oz, true); emitGeneratedDoor(b,[x,z,bestEdge.ox,bestEdge.oz],true); doors.push([x, z, bestEdge.ox, bestEdge.oz, 1]); }
     if (b.k === 'pub' && (pos || !shopBlocked)) return;
   }
   // подъезды — на самой длинной стене, которая дальше всех от дороги
@@ -4443,7 +4448,7 @@ function genEntrances (b, p, ccw, lv, area, arch, bestEdge, doors) {
     if (!pos) continue;
     const { x, z } = pos;
     entranceAt(x, z, best.ox, best.oz, false);
-    GEN_ENTR.push([x, z, best.ox, best.oz]);
+    emitGeneratedDoor(b,[x,z,best.ox,best.oz],false);
     doors.push([x, z, best.ox, best.oz, 0]);
   }
   if (!doors.length && shopBlocked) for (const wall of alternatives.sort((a, b) => b.score - a.score)) {
@@ -4452,7 +4457,7 @@ function genEntrances (b, p, ccw, lv, area, arch, bestEdge, doors) {
     const pos = fit({ x: wall.a[0] + wall.dx / 2, z: wall.a[1] + wall.dz / 2, nx: wall.ox, nz: wall.oz, len: wall.len }, 0, false);
     if (!pos) continue;
     entranceAt(pos.x, pos.z, wall.ox, wall.oz, false);
-    GEN_ENTR.push([pos.x, pos.z, wall.ox, wall.oz]);
+    emitGeneratedDoor(b,[pos.x,pos.z,wall.ox,wall.oz],false);
     doors.push([pos.x, pos.z, wall.ox, wall.oz, 0]);
     break;
   }
@@ -4598,7 +4603,7 @@ function osmBuildings (skip) {
 
     // дом с адресом — точка доставки
     if (b.a && bestEdge) {
-      HOUSES.push({
+      emitAddressHouse(b,{
         x: bestEdge.mx + bestEdge.ox * 1.2,
         z: bestEdge.mz + bestEdge.oz * 1.2,
         mx: bestEdge.mx + bestEdge.ox * 5,
@@ -4848,8 +4853,8 @@ function inWall (x, z, m = 0) {
    над дверью и ступенька, у части — лавочка и урна. Дом в карте знает,
    где у него подъезды, поэтому они стоят не где попало, а где в жизни. */
 function* osmEntrances () {                      // шагами (yield) — поздняя сборка, latebuild.js
-  const osm = CITY.entrances.length;
-  for (const e of GEN_ENTR) CITY.entrances.push(e);      // свои подъезды — тоже точки доставки
+  const osm = ADDRESS_CATALOG ? ADDRESS_CATALOG.mergeDoorsOnce() : CITY.entrances.length;
+  if (!ADDRESS_CATALOG) for (const e of GEN_ENTR) CITY.entrances.push(e);      // свои подъезды — тоже точки доставки
   for (const [x, z, nx, nz] of CITY.entrances.slice(0, osm)) {
     if (!inBounds(x, z, -60)) continue;
     EDL.seedAt('door', x, z);                        // жребий по месту двери: убранный в редакторе дом не сдвигает соседей (editlayer.js)
@@ -6074,7 +6079,7 @@ function buildCity () {
   if (MAPFIX) { BUILD_T.mapfix = Math.round(MAPFIX.ms); BUILD_T.mapfixT = MAPFIX.T; tm0('mapworks', () => MAPW.buildWorks(MAPFIX, mapApi())); }   // тупики: блоки и ремонт
   { const t0 = performance.now();
     LAND_OBJECT=false;
-    try { osmBuildings(spot); } finally { LAND_OBJECT=true; }
+    try { STARTUP.work('city.housesVisualAndLayout', () => osmBuildings(spot)); } finally { LAND_OBJECT=true; }
     BUILD_T.houses = Math.round(performance.now() - t0);
   }
   LAND_OBJECT=false;
@@ -6373,61 +6378,32 @@ function buildCity () {
    сторона, свои полосы и своё «можно ли сюда ехать» — на односторонней
    улице трафик против шерсти не поедет. */
 
-const NODES = [];
-const NODE_IDX = new Map();
-const EDGES = new Map();                          // направленные рёбра
-const ekey = (a, b) => a * 100000 + b;
-const edgeOf = (a, b) => EDGES.get(ekey(a, b));
-const ukey = (a, b) => (a < b ? ekey(a, b) : ekey(b, a));    // ребро без направления
-{
-  const node = (x, z) => {
-    const k = x + ',' + z;
-    let i = NODE_IDX.get(k);
-    if (i === undefined) { i = NODES.length; NODE_IDX.set(k, i); NODES.push({ x, z, nb: [] }); }
-    return i;
-  };
-  const link = (a, b, r, okAB, okBA) => {
-    if (EDGES.has(ekey(a, b))) return;            // две улицы по одним узлам — берём первую
-    const A = NODES[a], B = NODES[b];
-    const len = Math.hypot(B.x - A.x, B.z - A.z);
-    if (len < 0.3) return;
-    const ux = (B.x - A.x) / len, uz = (B.z - A.z) / len, w = roadWidth(r);
-    const mk = (from, to, ok, sg) => ({
-      a: from, b: to, len, ux: ux * sg, uz: uz * sg, rx: -uz * sg, rz: ux * sg,
-      w, w0: r.w0 || w, c: r.c, ok, oneway: !!r.o, lanes: r.l || 0, road: r, tA: 0, tB: 0, sig: null, stopAt: 0,
-    });
-    A.nb.push(b); B.nb.push(a);
-    EDGES.set(ekey(a, b), mk(a, b, okAB, 1));
-    EDGES.set(ekey(b, a), mk(b, a, okBA, -1));
-  };
-  for (const r of CITY.roads) {
-    if (!drivable(r)) continue;                    // пешеходка и обрывки за рамкой не в счёт
-    let prev = node(r.p[0][0], r.p[0][1]);
-    for (let i = 1; i < r.p.length; i++) {
-      const cur = node(r.p[i][0], r.p[i][1]);
-      if (cur === prev) continue;
-      link(prev, cur, r, true, !r.o);
-      prev = cur;
-    }
+let STREET_GRAPH_EXPORT = null;
+const STREET_GRAPH = STARTUP.work('roads.baseGraph', () => {
+  let graph=createStreetGraph({roads:CITY.roads,roadWidth,drivable});
+  bindSegmentNodes(RSEG,graph.nodeIndex);
+  applyStaticBoundary(graph,{open:MAP.open,inBorder});
+  if(new URLSearchParams(location.search).has('logicalexport17b')){
+    const rng=EDL.rngDescriptor(),base=window.__streetGraphExportIdentity;
+    if(!rng.ordinaryAtImport||!rng.hookOwned||!base||base.mapId!==MAP.id)throw Error('streetgraph-export:ORDINARY_IDENTITY_REQUIRED');
+    const inputHash=STARTUP.work('roads.graphInput',()=>streetGraphInputHash({roads:CITY.roads,roadWidth,drivable,open:MAP.open,borderMask:BMASK}));
+    STREET_GRAPH_EXPORT=createStreetGraphExport({graph,roads:CITY.roads,identity:{...base,inputHash},work:STARTUP.work});
+    graph=STREET_GRAPH_EXPORT.graph;
+    bindSegmentNodes(RSEG,graph.nodeIndex);
   }
-}
-// номера узлов на концах куска (b у куска уже занято — это мост)
-for (const s of RSEG) { s.na = NODE_IDX.get(s.x1 + ',' + s.z1); s.nb = NODE_IDX.get(s.x2 + ',' + s.z2); }
-/* закрытая часть города (MAP.open): узлы за линией — out, рёбра к ним закрыты (openEdges) */
-if (MAP.open) {
-  for (const N of NODES) N.out = !inBorder(N.x, N.z);
-  for (const e of EDGES.values()) if (NODES[e.a].out || NODES[e.b].out) e.closed = 1;
-}
+  return graph;
+});
+const NODES = STREET_GRAPH.nodes;
+const NODE_IDX = STREET_GRAPH.nodeIndex;
+const EDGES = STREET_GRAPH.edges;                   // направленные рёбра; road — исходный объект CITY
+const ekey = edgeKey;
+const edgeOf = (a, b) => EDGES.get(ekey(a, b));
+const ukey = (a, b) => (a < b ? ekey(a, b) : ekey(b, a));
 
 /* узлов тысячи, перебирать их на каждый пересчёт маршрута
    незачем — раскладываем по клеткам сто двадцать метров */
-const NCELL = 120, NODE_GRID = new Map();
-for (let k = 0; k < NODES.length; k++) {
-  const key = Math.floor(NODES[k].x / NCELL) + ',' + Math.floor(NODES[k].z / NCELL);
-  let a = NODE_GRID.get(key);
-  if (!a) NODE_GRID.set(key, a = []);
-  a.push(k);
-}
+const NCELL = 120;
+const NODE_GRID = STARTUP.work('roads.nodeGrid', () => buildNodeGrid(NODES,NCELL));
 
 function nearestNode (x, z) {
   const ci = Math.floor(x / NCELL), cj = Math.floor(z / NCELL);
@@ -6449,7 +6425,7 @@ function nearestNode (x, z) {
 
 /* плавные улицы (по умолчанию, routechain.js): узлы с двумя соседями — цепочками, поиск пути проходит цепочку разом.
    С ?oldroads — null: поиск как был */
-const RC = SMOOTH.STATS.done ? RCHAIN.build(NODES, edgeOf) : null;
+const RC = SMOOTH.STATS.done ? STARTUP.work('roads.routechain', () => RCHAIN.build(NODES, edgeOf)) : null;
 const BF = RC ? { prev: new Int32Array(NODES.length), seen: new Uint32Array(NODES.length), po: new Array(NODES.length).fill(null), gen: 0 } : null;
 /* то же, по цепочкам: поиск в ширину, цепочка — один шаг (от перекрёстка к перекрёстку). Внутри цепочки узлы не
    перебираем: мягкий узел не за линией закрытого города (иначе он развилка), а lock у узлов всегда 0 (districtLocks);
@@ -15398,51 +15374,17 @@ function dropPhone () {
    собираются один раз: не на асфальте, не в доме, не в реке и не ближе
    двенадцати метров к улице. */
 const SPOTS = [];
+// Offline preparation only until the early catalog's complete functional input has been proven.
+const ADDRESS_CATALOG = new URLSearchParams(location.search).has('logicalexport17b')
+  ? createAddressCatalogRecorder({houses:HOUSES,generatedDoors:GEN_ENTR,entrances:CITY.entrances,spots:SPOTS,buildings:CITY.buildings}) : null;
+function emitAddressHouse(building,row){if(ADDRESS_CATALOG)ADDRESS_CATALOG.acceptHouse(building,row);else HOUSES.push(row);}
+function emitGeneratedDoor(building,row,grand){if(ADDRESS_CATALOG)ADDRESS_CATALOG.acceptDoor(building,row,grand);else GEN_ENTR.push(row);}
+
 /* шагами (function*, latebuild.js): на Деке ~0,25 с одним куском; «рядом уже есть адрес» — по клеткам 6 м, а не перебором
    всех адресов (тот же ответ: |dx| < 6 и |dz| < 6) */
 function* buildSpots () {
-  const cand = [];
-  for (const [x, z, nx, nz] of CITY.entrances) cand.push([x + nx * 3, z + nz * 3]);
-  for (const q of CITY.paths) {
-    if (q.far) continue;                           // длинный выход двора через газон к улице (yards.js farLinks) — не адрес
-    let acc = 0;
-    for (let i = 1; i < q.length; i++) {
-      const l = Math.hypot(q[i][0] - q[i - 1][0], q[i][1] - q[i - 1][1]);
-      for (let d = 12 - acc; d < l; d += 25) cand.push([lerp(q[i - 1][0], q[i][0], d / l), lerp(q[i - 1][1], q[i][1], d / l)]);
-      acc = (acc + l) % 25;
-    }
-  }
-  for (const lot of CITY.lots) {
-    if (lot.k !== 'park') continue;
-    let x = 0, z = 0;
-    for (const q of lot.p) { x += q[0] / lot.p.length; z += q[1] / lot.p.length; }
-    if (inPoly(x, z, lot.p)) cand.push([x, z]);
-  }
-  yield 'cand';
-  const G = new Map(), gk6 = (i, j) => i * 100003 + j;
-  for (const s of SPOTS) { const k = gk6(Math.floor(s.x / 6), Math.floor(s.z / 6)); const a = G.get(k); if (a) a.push(s); else G.set(k, [s]); }
-  const near = (x, z) => {
-    const ci = Math.floor(x / 6), cj = Math.floor(z / 6);
-    for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
-      const a = G.get(gk6(i, j));
-      if (a) for (const s of a) if (Math.abs(s.x - x) < 6 && Math.abs(s.z - z) < 6) return true;
-    }
-    return false;
-  };
-  let n = 0;
-  for (const [x, z] of cand) {
-    if (++n % 1500 === 0) yield 'spots';
-    if (!inBounds(x, z, 20) || groundH(x, z) < 0.3 || inHouse(x, z, 1.4)) continue;
-    const any = nearestRoad(x, z, 7, 1);
-    if (any && any.d < any.seg.w / 2 + 1.2) continue;           // на асфальте не стоим
-    const street = nearestRoad(x, z, 5, 1);
-    if (street && street.d < street.seg.w / 2 + 12) continue;   // у самой улицы — не вглубь
-    if (near(x, z)) continue;
-    if (JUMPS.blocks(x, z, 4)) continue;                       // не на горке, разгоне и полёте большого трамплина (jumps.js)
-    const s = { x, z };
-    SPOTS.push(s);
-    const k = gk6(Math.floor(x / 6), Math.floor(z / 6)); const a = G.get(k); if (a) a.push(s); else G.set(k, [s]);
-  }
+  yield* buildAddressSpotsSteps({entrances:CITY.entrances,paths:CITY.paths,lots:CITY.lots,spots:SPOTS,
+    lerp,inPoly,inBounds,groundH,inHouse,nearestRoad,blocks:(x,z,r)=>JUMPS.blocks(x,z,r)});
 }
 
 /* точка в кольце от центра — случайная из подходящих */
@@ -17595,7 +17537,7 @@ if (!INTRO) LATE.add('yardcars2', () => YCARS.cars());   // машины во д
 // 02.10.2026: 24 — это теперь обычный день; по часам — econ.js TRAFFIC (пик 28, ночь 4–8), добирается trafficDensity
 const TRAFFIC_N = 24;
 LATE.add('traffic', () => spawnTraffic(INTRO ? 22 : Math.min(TRAFFIC_N, trafficWant())));
-if (!INTRO) LATE.add('spots', function* () { yield* buildSpots(); yield 'spots'; buildCollect(); });
+if (!INTRO) LATE.add('spots', function* () { yield* STARTUP.steps('addresses.buildSpots', buildSpots()); if(ADDRESS_CATALOG)STARTUP.work('addresses.sealCatalog',()=>ADDRESS_CATALOG.sealSpots()); yield 'spots'; STARTUP.work('addresses.buildCollect', buildCollect); });
 /* погода смены (weather.js): сугробы снежной зимы — после адресов, чтобы их не завалить */
 LATE.add('weather', () => WTH.init({ THREE, scene, cam, renderer, Store, MAP, CITY, V, S, SPOTS, ZEBRAS, Snd, toast, groundH, curbAt, nearestRoad, roadWidth, drivable, inHouse, inPoly, inBounds, jumpBlocks: JUMPS.blocks,
   makeHuman, dropMesh, gibHuman, CAR_L, CAR_W, isPlaying, intro: INTRO, PIZZERIAS, get PIZZA () { return PIZZA; },
@@ -19007,6 +18949,9 @@ const SBX = { god: false, nitro: false, noStall: false };
 if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { SOFTCITY, SOFTSURF, inWall, FLY: FLYC, WRONG: WRONG.DEBUG, GUN, inTallHouse, WIDEN: { ...WIDEN.WIDEN, STATS: WIDEN.STATS }, SMOOTH: { SM: SMOOTH.SM, STATS: SMOOTH.STATS, ARCS: SMOOTH.ARCS, isArc: SMOOTH.isArc }, FACE: FACE_DEBUG, RADAR, HUDC, RYARD: RYARD.DEBUG, RT, RASK: RASK.DEBUG, OTAGS: OTAGS.DEBUG, NICK, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, chaseEnd, CHS, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, TACT, TG: TGRID.TG, PARKI: { ...PARKI.DEBUG, orphans: () => PARKI.orphans(TRAFFIC) }, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, addPickup, PKI: PKI.STATS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get routeOn () { return ROUTE_LINE.slots.some(q => q.m.visible); }, ROUTE_LINE, RP, rebuildRoutePath, updateRouteLine, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, CULLREFRESH: CULL.refresh, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, DYNRES: DYN.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
   STARTUP,
   LAND_PACKAGE,
+  ADDRESS_CATALOG,
+  ADDRESS_QUERY:{realAddress,entranceLv},
+  STREET_GRAPH_EXPORT,
   LAND_RNG:EDL.rngDescriptor,
   // отладка города: посмотреть на карту сверху и проверить геометрию
   CITY, HOUSES, RSEG, scene, renderer, cam, nearestRoad, startPose, THREE,

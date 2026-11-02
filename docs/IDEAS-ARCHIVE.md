@@ -2979,3 +2979,28 @@ npm run probe -- --dir="$bench17/baseline-steam" --mode=steam --early --seed=7 -
 Журнал02.11.2026: №17б CI41360991328 — подготовка/обеASAR PASS, обаearlyruntime scripts превысили240с, публикацияпропущена. Введён отдельный CIsettled-menu admission безизмененияearly12/default: настоящийGo/W/guard2/high/cacheSHA/clean0; согласованныетаймеры, control-failure state сunknown=null. ДваlocalASAR pilots+адресныйcheckPASS, данныепервыхпроваловсохранены. [Материалы](measurements/landpackage-2026-11-02/ci-attempt02/README.md). Следующаяпопыткаотдельно; играпоканаv0.33.9.
 
 Журнал02.11.2026: CI41363861435 — LinuxPASS, Windowsactualcache/controlPASS, общийFAILED наstrict1280×800size (сервер ограничил1024×720); release/Pages пропущены. Settled harness теперь задаёт реальныйCDPviewport доnavigation и проверяет фактическийCSS/DPR; earlyнетронут. MinimalElectron layout/canvas/WebGL1280×800 +localASARgame/строгиегейты/адресныйcheckPASS. [Отчёт](measurements/landpackage-2026-11-02/ci-attempt03/README.md); actualWindowsповторобязателен.
+
+
+<a id="q17b-logic"></a>
+<details><summary><b>17б</b> · Логические модули, связи адресов и проверяемый снимок графа · <b>S</b> — 02.11.2026</summary>
+
+Завершён только этот пакет подготовки данных; ранний каталог/прочее покрытие и родительский №17б остаются в беклоге. Историческое задание и исходные ограничения:
+
+**Следующий хвост №17б, разбор агента 02.11.2026:** сначала отдельно измерить RSEG/grid, NODES/EDGES/routechain и логические адреса. В текущей трассе нет их собственных строк: `city.roads` — рисунок дорог, `late.entr` смешивает двери/дворы, `late.spots` — адреса и collect. Не обещать выигрыш от файла графа без сравнения стоимости построения и чтения. Это прежде всего подготовка независимых логических данных для17в/17г.
+
+**Ближайший пакет №17б · S, решение агента 02.11.2026:** отделить прежний generated base graph и чистый генератор SPOTS в модули данных, пока без нового чтения файлов и без переноса фаз фасадов/дверей. Один ordinary high CPU×3 замер: baseGraph60,1мс, nodeGrid3,0мс, routechain12,8мс, сегменты/их индексы32,1мс; SPOTS111,5мс/15шагов, collect35,3мс, housesVisualAndLayout1373мс. Это n1 диагностика, не медиана/OS CPU/физическая Deck. Большое ускорение от сериализации графа не доказано; извлечение нужно для владения данными перед17в/17г. Приёмка этого пакета — независимые edge-case fixtures и actual ordinary до/после: упорядоченные граф/сегменты/цепочки/адреса и сохранённые общие ссылки должны совпасть. Карьеру/ключи/RNG/число yield не менять.
+
+**Следующая часть пакета, решение агента 02.11.2026:** связать декларативные HOUSES/GEN_ENTR с порядковыми номерами настоящих post-prep buildings и исходным b.id, не добавляя новые ключи карьеры. Recorder сохраняет исходные объекты/порядок; merge дверей и готовность SPOTS публикуются только на прежних барьерах. После этого — ограниченный версионированный бинарный снимок чистого base graph (Float64/явные типы/ссылки на roads по индексу), без сигналов, runtime locks/closed и scratch. До чтения готовых адресов отдельно доказать functional input closure: совпадение source hash само по себе не доказывает совместимость остальных входов. Снимать результаты builder и затем выдавать их за раннюю готовность нельзя.
+
+**Проверка входа, агент 02.11.2026:** для графа использовать точный SHA числовых post-fix roads в исходном порядке, фактических roadWidth/drivable/oneway/w0/lanes и BMASK (включая Float64 со знаком нуля и байты маски), а не JSON с потерей−0 или один hash карты. Для адресов ранняя совместимость пока не доказана: до weather.shiftStart действует сохранённый начальный сезон; графика, донаты, выбранная пиццерия/район и конструкторы машин/фасадов могут влиять на RNG/опору. `dlv-shifts=0` не доказывает свежую карьеру. Не включать ранний готовый каталог по одному такому признаку; следующий proof — два независимых экспорта одного точного descriptor и отдельные one-axis проверки входов/realAddress/entranceLv/story/POOL. Неподтверждённые состояния — generated с причиной; основной рисунок и сохранённые ключи не менять.
+
+
+**Приёмка:** [материалы](measurements/logicaldata-2026-11-02/README.md). Data-only graph/SPOTS сохраняют прежние refs/order/yields/RNG; recorder+binary proof включены только diagnostic `logicalexport17b`, обычная игра пока generated. Graph3 143 227байт, actuallive-restored/Float64 byte round-trip/road refs PASS. Два независимых final high CPU×3 экспорта b26/db818 совпали по wire/catalog/логике/actualqueries;5061 realAddress,7608 entranceLv+DOOR.lv,1214 orderedPOOL, Gennady home и реальные boundary/tie witnesses. Третий случай сохранил пять старых4мключей, включаяoutsidePOOL, при техже данных/запросах. Семантика aging/выбора очередного заказа не проверялась.
+
+Graphinput26,8+decode195,8мс противfreshgraph60,1мс вn1диагностике: defaultgraphcache не включать ради ускорения. F64/порядок/alias tests, strictCRC/limits/отказы иmetadataimmutability прошли; не измерениеOSCPU/physicalDeck/RAM. Первыйsaved offlinevalidator ожидалневернуюформуUSED, исправлена толькопроекцияпроверкибезповтораигры; историясохранена.
+
+Общий `npm run check -- --rebuild --serial` с выбором затронутыхbuilds/graph/address/land/startup/latewait/route/shift/native-progress/smoke/i18n — PASS411с. Web238м/p9518,5мс; DeckhighCPU×3 337м/p9520,7мс, console/crashlog0. Единственноеwarning256отложенныхпереводов. Новых мировых правил/сохранённыхID/телефонных илиkidsпроверокнет.
+
+</details>
+
+Журнал02.11.2026: №17б, S-пакет логических данных принят. Puregraph/SPOTS, diagnosticaddresslinks иboundedbinarygraph; baseline/candidate/actualqueries/savedkeys PASS, общаяпроверка411сPASS. Раннийкаталог/coverageостаютсявтреке; выпускпервогопакетаземлиpendingCI4.

@@ -1,0 +1,60 @@
+# №17б — functional inputs для раннего логического каталога: read-only audit
+
+02.11.2026. Только source/dependency reading и уже существующая приёмка. Новых городов, probe/build/tests, подмен Store/Math.random и правок проекта нет. Цель — независимые адресные queries для17в/17г; экономия111.5мс buildSpots не обосновывает самостоятельный startup-cache проект.
+
+## Что фактически доказано
+
+Архив `docs/measurements/logicaldata-2026-11-02/` доказал точное ordered JSON совпадение generated baseline/candidate после pure extraction: HOUSES1174/GEN3699/CITY.entrances3711/SPOTS5283, граф/RC,12 маршрутов,171nearestRoad query и алиасы. Обе наблюдавшиеся среды — fresh high Deck emulation, district0, ordinary EDL, host.seed=null, ru, Mac arm64/Electron33.4.11/Chrome130.0.6723.191. Это две наблюдавшиеся реализации одного входа, **не доказательство полного functional input closure и не готовый production eligibility gate**. Полные realAddress/entranceLv/story-home queries в этой паре не снимались (есть сами ordered данные); нельзя сообщать, что они уже проверены.
+
+Минимальный кандидат supported subset — ровно bootstrap-профиль этих наблюдений. До закрытия перечисленных ниже дыр признать runtime hit по одному sourceHash нельзя. Широкий «все fresh при dlv-shifts0» сейчас не доказан.
+
+## Граница данных и реальные зависимости
+
+- `HOUSES`/`GEN_ENTR`: `osmBuildings` после WORLD.prepCity и post-fix улиц. HOUSES — nearest facade edge, lv, addr/name. Двери — archFor → facade → genEntrances; archFor и grand-door decision читают RNG после реальных визуальных вызовов. `shopPlan` не случайный, но меняет poi.w. Поэтому source/map/edits не заменяют runtime flags/EDL provenance.
+- `SPOTS`: вынесенный addresslayout.js читает упорядоченные entrances → paths → park lots; потом inBounds/groundH/inHouse/nearestRoad/JUMPS.blocks. `houseWalks` и YARDS дописывают paths, включая собственные поля hw/far (far исключён из адресов). `groundH=terrainH+RLAND.offset`; JUMPS строится после дворов, сезонных объектов и edits. Ключ по готовым paths/HOUSES/SPOTS/JUMPS/preclean здесь запрещён как круговая зависимость, если объявляется ранняя готовность.
+- `WORLD.prepCity(CITY,MAP,CAREER)` меняет здания/сырые entrances/POIs/trees/benches на особняки до домов. Post-prep input определяется исходными map/edits+CAREER+кодом, но не следует подменять его raw centroids.
+- `CITY.entrances` до osmEntrances содержит только raw; позже дописываются те же GEN tuple objects. Ранний logical view должен жить отдельно от legacy phase-views. Иначе raw-door checks/OSM_DOORS/arch/shop и ранние `.concat(GEN_ENTR)` получат другой результат/дубли.
+
+## Проверяемый кандидат bootstrap descriptor (без вычисления результатов)
+
+Это перечень для будущего proof/export, **не уже реализованный key**. Результирующие адреса сюда не входят.
+
+| Полюс | Candidate eligible | Явный miss / отдельное доказательство |
+|---|---|---|
+| Code/data | Точный format/generator + source key/map/edits/dependency identity из verified receipt; карта seversk | Любое несовпадение, editor overrides не из certified edits, неизвестный источник |
+| Platform/world | Steam adult=true, CAREER=true, INTRO=false, EDL.ED.on=false, window.__EDITOR false, MOB.on=false, quick=false | kids/nocareer/editor/mobile/mapcheck/quick/другая карта |
+| RNG | EDL.rngDescriptor: provider edl-owned-fnv1a-mulberry32-v1, ordinaryAtImport/hookOwned true, baseSeed0x5EED; host.seed=null | Внешний/заменённый hook, probe --seed (включая численно0x5EED), неизвестное происхождение ORIG |
+| District/start | effective cur0/opened1/cityfalse; intended starting pizzeria index0 из static district config | Другой район, весь город, другая стартовая пиццерия. Не вычислять PIZZA/HOUSES ради ключа |
+| Graphics/device | effective GFX.device=deck, preset=high, все GFX.opts точно high; MOB=false; ru | Mid/low/custom, иной device/language пока не доказаны для **полного logical catalog**, даже если land mid/high совпали |
+| Initial season | **До Go/shiftStart** SEAS.value2.5, forced=false, variant=null, source default при отсутствии dlv-season | Saved/forced season, quick weather/variant; нельзя брать сезон уже после первого управления |
+| Donations | effective donated('gang')0 и donated('trash')0; provenance исходных значений | Любые другие значения до variation proof; sourceHash не покрывает Store |
+| Boot/session | Первый чистый bootstrap после миграции; catalog owner lifetime не менялся, нет reset/quick/settings mutation, нет второго install | Изменение любого descriptor input после начала чтения, native/cloud/migration state ещё не settled |
+| Terrain/road mode | Те же default post-fix/smooth/widen/stream modes, verified source parameters | nowiden/oldroads/nomapfix/oldland/fullterrain/nolate/неизвестный флаг |
+| Land delivery branch | В двух logical observations landpackage=0 / generated | Точное полное logical совпадение с **обычным default cache** на новом source не измерено этой парой. Старый selected geometry PASS не объявлять такой проверкой |
+
+`query` на первом proof лучше ограничить exact allowlist известной формы и значений/duplicate-order: debug, mute, nolb, lang=ru, startuptrace, gfxdev=deck, startupdistrict=0, diagnostic landpackage=0. Оба наблюдения были этой формы. Root обычный релиз без debug/nolb/startuptrace — ещё не тот же доказанный query contract: сначала показать, что его отличия только инструментальные. Unknown flag/duplicate/conflicting value → miss, а не «скорее visual». В частности oldlook/oldfacade/oldporch/hardcity/softlightonly/nofvar/norings/nocons/norivals/nowaste/noyc/nojumps и scheduling/debug flags нельзя молча вычёркивать из ключа. Query-порядок одинаковых ключей сохранять из-за URLSearchParams.get(). Нормализация transport-only собственного logical-cache flag возможна лишь как отдельный явный контракт.
+
+## Точные Store-входы: известные и ещё не закрытые
+
+`fresh` требует снимка **значений и отсутствия** до side effects: dlv-shifts0 не исключает уже оплаченный первый Геннадий, использованные адреса, донаты, сезон/машину или частичный незаконченный прогресс.
+
+1. **Прямой подтверждённый путь:** dlv-gfx → device entry/preset/effective opts (gfx.js load; defaults deck=mid, поэтому stored-high fixture принципиальна). dlv-season: отсутствует/null→2.5; численный0→0, отличать. dlv-don-trash→world.trashSteps округляет clamp ratio к1/240, меняя построенную мелочь/поток веток. dlv-don-gang→zones donP→zoneAt→cars.buildPotholes weighted segments→LITM/RLAND→groundH; эффект на конечный SPOTS для конкретного доната ещё **не измерен**, но функциональный путь есть.
+2. **Район:** dlv-district, dlv-dist-open, dlv-dist-shifts, dlv-city-mode. opened() использует сохранённое opened и counts; cur() ограничен opened. Для кандидата effective0/1/false, плюс исходные значения/malformed-value handling нужно явно задокументировать. Один raw dlv-district0 недостаточен.
+3. **Реальный пользовательский mesh до buildCity:** cars.js K_OWN=dlv-car-owned, K_CUR=dlv-car-cur, K_UP=dlv-car-up, K_L=dlv-car-L, K_PAINT=dlv-car-paint, K_ENG=dlv-car-eng; `makeCourier` строит AUTO.makeModel/REALCAR.dress до sync city. Это реальные Store reads. Для минимального proof — исходные defaults/отсутствие этих полей либо точный resolved initial car descriptor, **не** бездоказательное исключение «не относится к адресам». Полная цепь addon/paint/eng-derived reads здесь не закрыта. Legacy dlv-msk-car/dlv-msk-cars — noncareer branch, кандидат CAREERtrue её исключает.
+4. **Остальные career/session reads:** dlv-clock, dlv-shifts, dlv-stars, dlv-story, dlv-used-addr, dlv-boss, dlv-msk-xp и денежные/crew migration поля реально читаются ранними системами; их участие в геометрическом RNG consumption/вызовах ещё не исчерпывающе доказано. Нельзя приписывать всем геометрический эффект. Но для первого строгого clean-bootstrap subset они должны быть certified-default либо явно проверенными noninputs; «один dlv-shifts» не является substitute. Сохранения не перезаписывать: catalog ID не заменяет 4м used-address key,¼м ENTR classification, story/district counters.
+5. dlv-lang→ru; dlv-sound/vol и некоторые shared настройки выглядят вне логических данных, но текущие доказательства были mute+soundfalse. Read-only аудит отдельного sound/mute пути нужен прежде, чем разрешить отличающиеся значения. Случайный saveId/Steam user name/achievements не следует включать без чтения dataflow: полный localStorage hash уничтожит reuse и **не** является разумным минимальным closure.
+
+Полный read-set не доказан этим просмотром. `Store`/Platform.store доступны через несколько api, GFX читает напрямую Platform.store; только перехват game.Store пропустил бы часть. Допустимый следующий вариант — обычный явный descriptor-getter с перечисленными reads + изолированный **наблюдательный** список фактических reads экспортного процесса, потом ручная классификация transitive reads. Ничего не monkeypatch-ить в runtime ради текущего вывода. Не замораживать в пакете live POOL/USED/reserved/zone/d/current holiday/order state: это runtime overlay, не статический адресный каталог.
+
+## Date/time/native UUID/RNG риски
+
+- В прочитанных адресных builders/world/yards/jumps/roads/season/gfx/districts не найдено прямого Date.now/new Date как входа статической раскладки. season init берёт query/saved, праздник выбирается **по смене/season cycle**, а не реальному календарю (holidays.shiftStart позже LATE.flush). Поэтому не добавлять текущую дату в key только «на всякий случай». Это не полный доказанный аудит всех transitive импортов.
+- Пока lateFrame обслуживает title, `updateEnv(0)`, ранний return до CL.step clock; world time стоит. `goRun`/`startRun` сначала вызывают synchronous LATE.flush; shiftStart weather/holidays после него. Это полезное source-основание против зависимости bootstrap от длительности ожидания меню, **но** прямые quick/ride/debug/lifecycle пути и смена настроек всё ещё нуждаются в отдельном guard/proof. Результат раннего каталога должен представлять именно initial bootstrap state, не случайно уже изменённый shift season.
+- THREE generateUUID в vendored code делает **четыре Math.random**; архивация/источник обеспечивают тот же код, не тот же динамический вызовный граф. facade уже вручную сохраняет4 UUID draws в подавленной ветке балконов. Перенос/удаление визуальных constructor calls до genEntrances меняет дверь при той же house seed. New module до EDL/buildCity обязан быть data-only без THREE/material/texture/UUID и RNG.
+- houseRnd per house, seedAt по месту и LATE name#resume — не разрешение вычеркнуть RNG из inputs. Нельзя менять stage names/yield boundaries или предполагать probe seed7 эквивалентным ordinary. Native ORIG после seedBack и async callbacks/lazy caches требуют аудита при отказе от visual builders. Same-source разные GPU/capability/backend/JS Math approximations/платформы пока не покрыты полной logical-парой; sourceHash сам не хеширует native implementation.
+
+## Где остановиться и что измерять дальше
+
+Сейчас можно предлагать **только proof candidate** выше, не production hit. Hard miss: иной source/map/edits, неизвестный query, чужой RNG, nondefault career/donation/season/graphics/start, lifecycle mutation/неполная migration, неподдержанная native/runtime среда. Если часть closure неизвестна — причина `input-closure-unproved`, обычный generated путь, никаких частичных HOUSES/SPOTS публикаций.
+
+Чтобы сузить эти ограничения: на одном frozen source снять два независимых generated logical exports при exact descriptor; сравнить не только snapshots/aliases, но actual realAddress/entranceLv/story-home/POOL+existing4m keys; затем по одному менять key-полюс (season/донат/car/device/language/control-query) и видеть совпадение/расхождение. Только после этого исключать доказанные noninputs и сертифицировать reuse. Не использовать готовые адреса в ключе этих сравнений. В будущем ранний файл можно прочитать и проверить в detached data target до builders, дать queries отдельному view, а legacy arrays/refs публиковать на прежних барьерах. Удаление visual-driven логики/конструкторов — следующая отдельная стадия с RNG proof, не свойство текущего pure extraction.

@@ -1,0 +1,130 @@
+[
+  {
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/game.js",
+    "archivePath": "source/src/game/game.js.gz",
+    "bytes": 1385889,
+    "sha256": "6505381a0fa1877c7c72e01f9786196354fee558c4494fb320e51843c2be6778",
+    "sourceInventoryVerified": true,
+    "compressed": true
+  },
+  {
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/addresscatalog.js",
+    "archivePath": "source/src/game/addresscatalog.js",
+    "bytes": 7089,
+    "sha256": "d9090448e8734e4e29ef5299e1a0c970e49e40da32ba5cccda1908bfff62244a",
+    "sourceInventoryVerified": true,
+    "compressed": false
+  },
+  {
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/addresslayout.js",
+    "archivePath": "source/src/game/addresslayout.js",
+    "bytes": 2411,
+    "sha256": "ee5ab51e06ff5ff51187c73dbfbd2aefb170f69bad482bf9d798b819183b99bc",
+    "sourceInventoryVerified": true,
+    "compressed": false
+  },
+  {
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/streetgraph.js",
+    "archivePath": "source/src/game/streetgraph.js",
+    "bytes": 2511,
+    "sha256": "fccbf4b0f021313693be8de35a0aa82f854fcd7236999dbca448031e9fd85c1e",
+    "sourceInventoryVerified": true,
+    "compressed": false
+  },
+  {
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/streetgraph-input.js",
+    "archivePath": "source/src/game/streetgraph-input.js",
+    "bytes": 2506,
+    "sha256": "83b315f5fe0a1abc27b0c2eab8df3a77ec6569f09819fb69ebe4e48af8cabd8d",
+    "sourceInventoryVerified": true,
+    "compressed": false
+  },
+  {
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/streetgraph-codec.js",
+    "archivePath": "source/src/game/streetgraph-codec.js",
+    "bytes": 12395,
+    "sha256": "10d7d2f619295f157c2da0457009fd05db2f31653aee73ea12492f2764435b82",
+    "sourceInventoryVerified": true,
+    "compressed": false
+  },
+  {
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/streetgraphexport.js",
+    "archivePath": "source/src/game/streetgraphexport.js",
+    "bytes": 1531,
+    "sha256": "a3f9e1f7dba9e72ae9b60e97eae614377aab1ef0040c636e46c69eeb84daf677",
+    "sourceInventoryVerified": true,
+    "compressed": false
+  },
+  {
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/landcache17a/sha256.js",
+    "archivePath": "source/src/game/landcache17a/sha256.js",
+    "bytes": 2443,
+    "sha256": "1e60d75a1cade05c66bc4b86af6f046f7f6ff5eb84232bf450fb6be1218f83f3",
+    "sourceInventoryVerified": true,
+    "compressed": false
+  },
+  {
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/addresscatalog-test.mjs",
+    "archivePath": "source/tools/addresscatalog-test.mjs",
+    "bytes": 8083,
+    "sha256": "6fe1a86216059f44e4200c7345dc50c9ca8b5de1297bcfbebfc870b54bb7176d",
+    "sourceInventoryVerified": false,
+    "compressed": false
+  },
+  {
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/addresslayout-test.mjs",
+    "archivePath": "source/tools/addresslayout-test.mjs",
+    "bytes": 9903,
+    "sha256": "1e00ba727b5c2c7b559f67e6af7ed9bc738349a55907738a9708087361ceb426",
+    "sourceInventoryVerified": false,
+    "compressed": false
+  },
+  {
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/streetgraph-test.mjs",
+    "archivePath": "source/tools/streetgraph-test.mjs",
+    "bytes": 10404,
+    "sha256": "6b9a99766a6b4c317a8feba56dea2d7420db787c73e7201c5d96f460385219f7",
+    "sourceInventoryVerified": false,
+    "compressed": false
+  },
+  {
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/streetgraph-input-test.mjs",
+    "archivePath": "source/tools/streetgraph-input-test.mjs",
+    "bytes": 3916,
+    "sha256": "25e2b79a9e8326a263fecccb933b9e80e169ade41bf7f9c24de707a2d2b725ab",
+    "sourceInventoryVerified": false,
+    "compressed": false
+  },
+  {
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/streetgraph-codec-test.mjs",
+    "archivePath": "source/tools/streetgraph-codec-test.mjs",
+    "bytes": 12350,
+    "sha256": "6ce964dad76c93f0248063f24e1dc75e31d5b3d7c13e4e91dbd1780616a09615",
+    "sourceInventoryVerified": false,
+    "compressed": false
+  },
+  {
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/streetgraphexport-test.mjs",
+    "archivePath": "source/tools/streetgraphexport-test.mjs",
+    "bytes": 1778,
+    "sha256": "6c6fea216bfcd8774b5ec39af3712495e12a0eb4f2e5c6a78869862ddd34a17b",
+    "sourceInventoryVerified": false,
+    "compressed": false
+  },
+  {
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+    "archivePath": "source/tools/probe.cjs",
+    "bytes": 46464,
+    "sha256": "54b8156913fa04b036676c4ebb87045361bbbec5fdfd41beae7e2f3541072abd",
+    "sourceInventoryVerified": false,
+    "compressed": false
+  },
+  {
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe-page.cjs",
+    "archivePath": "source/tools/probe-page.cjs",
+    "bytes": 37506,
+    "sha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd",
+    "sourceInventoryVerified": false,
+    "compressed": false
+  }
+]

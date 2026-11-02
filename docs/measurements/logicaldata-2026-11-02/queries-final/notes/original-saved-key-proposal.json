@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "status": "PROPOSAL ONLY; wait for independent query2 PASS before creating fixture",
+  "sourceRaw": "/tmp/bird-logical17b-query1-1102.json",
+  "sourceRawSha256": "d131206b2f2ce39c328e255338b2517ef17f7e4da8787cad16e9efeb99a8b35c",
+  "sourceFingerprint": "b26caf3f59baa1bcf694fcd0336b4608b58e46447d5bd2d54c60beb746c41d85",
+  "buildFingerprint": "root frozen db818ab4 (full build hash must be pinned from provenance)",
+  "selectionAvailability": {
+    "rawDoor": true,
+    "generatedDoor": true,
+    "path": true,
+    "negativeCoordinate": false
+  },
+  "selectedPoolKeys": [
+    {
+      "selection": "raw-door",
+      "key": "ly.kd",
+      "poolIndex": 0,
+      "sourceSPOTSindex": 0,
+      "x": 3160.059,
+      "z": 2931.8819999999996,
+      "entr": true,
+      "zone": "normal",
+      "d": 856.7629558084978,
+      "quarterKey": "12640,11728",
+      "rawDoorWitness": true,
+      "generatedDoorWitness": false
+    },
+    {
+      "selection": "generated-door",
+      "key": "kj.gx",
+      "poolIndex": 6,
+      "sourceSPOTSindex": 42,
+      "x": 2955.8035344243235,
+      "z": 2435.1857831876364,
+      "entr": true,
+      "zone": "normal",
+      "d": 398.3973110229735,
+      "quarterKey": "11823,9741",
+      "rawDoorWitness": false,
+      "generatedDoorWitness": true
+    },
+    {
+      "selection": "path",
+      "key": "nr.db",
+      "poolIndex": 389,
+      "sourceSPOTSindex": 2968,
+      "x": 3418.4565119475706,
+      "z": 1914.5022001587797,
+      "entr": false,
+      "zone": "normal",
+      "d": 332.5534591307516,
+      "quarterKey": "13674,7658",
+      "rawDoorWitness": false,
+      "generatedDoorWitness": false
+    },
+    {
+      "selection": "ordered-fallback-404",
+      "key": "lu.bx",
+      "poolIndex": 404,
+      "sourceSPOTSindex": 2983,
+      "x": 3142.013027401151,
+      "z": 1717.4652042373054,
+      "entr": false,
+      "zone": "normal",
+      "d": 358.5585340719283,
+      "quarterKey": "12568,6870",
+      "rawDoorWitness": false,
+      "generatedDoorWitness": false
+    }
+  ],
+  "legacyOutsidePool": {
+    "key": "c4.7x",
+    "sourceSPOTSindex": 1,
+    "x": 1742.431,
+    "z": 1138.8039999999999,
+    "entr": true,
+    "quarterKey": "6970,4555",
+    "poolIndices": [],
+    "district": "not observed offline; do not infer"
+  },
+  "proposedDlvUsedAddr": [
+    "ly.kd",
+    "kj.gx",
+    "nr.db",
+    "lu.bx",
+    "c4.7x"
+  ],
+  "expectedLoad": {
+    "code": "orders.loadUsed: Store.get(key,[]) -> array string filter, or string split/filter; reindex UIDX. resetShift builds POOL but does not clear/rewrite USED; reloadUsed re-reads only if explicitly called (eval does not call it).",
+    "freshObservation": "USED=[] while raw saved dlv-used-addr is absent; no delivery performed.",
+    "thirdCaseExpected": "exact ordered five strings in actual USED and Store before/after queries; 4 map to existing POOL key sets, legacy outside key maps to none",
+    "notYetProved": [
+      "Third saved fixture not written or executed",
+      "No claim about selection/aging/markUsed",
+      "Geometry/noninput invariance under saved list must pass third case, not assumed"
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "copyShaVerified": true,
+  "gzipLevel": 6,
+  "compressedRoundtripByteExact": true,
+  "rawHashUsesActualBytes": true,
+  "wrongJsonStringifyBufferHashDiscarded": true,
+  "pairRootRecordedCommands": true,
+  "pairChildRecordedTelemetry": false,
+  "pairSignalsUnknown": true,
+  "n1ActualChildArgvAndStatus": true,
+  "sourceBeforeReconstructedAndInventoryMatched": true,
+  "noBuildAssetsCopied": true,
+  "noGameExecutionDuringArchive": true,
+  "fullGpuByteExact": false,
+  "physicalDeck": false,
+  "performanceAB": false
+}

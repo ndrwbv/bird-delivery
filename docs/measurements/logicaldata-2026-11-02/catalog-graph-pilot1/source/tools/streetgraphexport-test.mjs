@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {createStreetGraph} from '../src/game/streetgraph.js';
+import {createStreetGraphExport} from '../src/game/streetgraphexport.js';
+const roads=[{c:1,p:[[-0,0],[10,0],[10,20]]}],identity={mapId:'fixture',mapHash:'a'.repeat(64),editsHash:'b'.repeat(64),sourceHash:'c'.repeat(64),inputHash:'d'.repeat(64)};
+const graph=createStreetGraph({roads,roadWidth:()=>6,drivable:()=>true});
+const order=[],api=createStreetGraphExport({graph,roads,identity,work:(name,fn)=>{order.push(name);return fn();}});
+assert.deepEqual(order,['roads.graphExport.encode','roads.graphExport.decode','roads.graphExport.exact']);
+assert.notEqual(api.graph.nodes,graph.nodes);assert.notEqual(api.graph.edges,graph.edges);
+assert.ok(Object.is(api.graph.nodes[0].x,-0));assert.equal([...api.graph.edges.values()][0].road,roads[0]);
+assert.ok(api.meta().byteExact&&api.meta().bufferHeld);const held=api.bytes;api.release();api.release();
+assert.equal(api.bytes,null);assert.equal(api.meta().bufferHeld,false);assert.ok(held.length>0);assert.equal(api.graph.nodes.length,3);
+assert.throws(()=>createStreetGraphExport({graph,roads,identity,work:(name,fn)=>{const result=fn();if(name==='roads.graphExport.decode')result.nodes[0].x=3;return result;}}),/NODE_INDEX|ROUNDTRIP_BYTES/);
+assert.throws(()=>createStreetGraphExport({graph,roads,identity,work:(name,fn)=>{const result=fn();if(name==='roads.graphExport.decode')[...result.edges.values()][0].road={...roads[0]};return result;}}),/EDGE_REFERENCE|ROAD_ALIASES/);
+console.log('Cold graph export proof: fresh references, exact signed-zero bytes, release and tamper checks PASS');

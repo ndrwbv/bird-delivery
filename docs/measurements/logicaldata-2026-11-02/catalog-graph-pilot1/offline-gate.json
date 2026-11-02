@@ -1,0 +1,130 @@
+{
+  "ok": true,
+  "kind": "offline-catalog-graph-pilot1",
+  "gateVersion": 1,
+  "sourceFingerprint": "ebe1c7a1cf3cb5c8479039d71e478657f1972fc6532b6a69043de9cf1b28538c",
+  "buildFingerprint": "de6c06cb29ea1adb6fb06aaf663931b315ffeff3e65d67c5177640bfd2fa0d4a",
+  "processEvidence": "root tool transcription: session7193 exit0; signal not provided; not child process telemetry",
+  "rawSha256": "f815212e69ed5e9f0b88d96bb2ec74865bbaaa8edb5d82c488301de9f5b3e929",
+  "baselineReference": "../pair/baseline.json.gz",
+  "sections": {
+    "graph": {
+      "byteExact": true,
+      "bytes": 7978106,
+      "sha256": "81ed459df8598a27dbfc83de61880bf4ecf04cacf9975e347345837894fa87dc"
+    },
+    "addresses": {
+      "byteExact": true,
+      "bytes": 773157,
+      "sha256": "767421960390d1be9e7d8b95502336a3d46f926be699fed7bc482df0c8dbe24a"
+    },
+    "aliases": {
+      "byteExact": true,
+      "bytes": 17493,
+      "sha256": "95a11a5ca47292c6cace4a940582bbaa30cb80a7280c24a9ed8f8aebef0630dc"
+    },
+    "roadQueries": {
+      "byteExact": true,
+      "bytes": 17309,
+      "sha256": "f5d1fb0ecc3252df25432f394addaa7f6a32ae12b70e19318bac498c8eb69bf6"
+    }
+  },
+  "graph": {
+    "bytes": 3143227,
+    "sha256": "75b41dbbb19bcfe7d32f617036aeac3c1c75fda2aa3bc4f5d964bf295ac950c2",
+    "version": 1,
+    "identity": {
+      "mapId": "seversk",
+      "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+      "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+      "sourceHash": "ebe1c7a1cf3cb5c8479039d71e478657f1972fc6532b6a69043de9cf1b28538c",
+      "inputHash": "3051e064902d3bce71a966259071c13d666f8e9c875dcef7073de3f3821d4fb5"
+    },
+    "nodes": 15009,
+    "edges": 31764,
+    "roads": 2047,
+    "byteExact": true,
+    "roadAliases": true,
+    "nodeIndexExact": true,
+    "liveRestored": true,
+    "bufferHeld": false
+  },
+  "catalog": {
+    "phase": "sealed",
+    "buildingCount": 2481,
+    "houses": 1174,
+    "generatedDoors": 3699,
+    "rawEntrances": 12,
+    "entrances": 3711,
+    "spots": 5283
+  },
+  "actualStartup": {
+    "guardVersion": 2,
+    "moved": 4.7857292572160555,
+    "errors": 0,
+    "uncaught": 0
+  },
+  "stages": [
+    {
+      "name": "roads.graphInput",
+      "workMs": 26.799999952316284,
+      "exclusiveWorkMs": 26.799999952316284,
+      "maxWorkMs": 26.799999952316284,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "roads.graphExport.encode",
+      "workMs": 325.10000014305115,
+      "exclusiveWorkMs": 325.10000014305115,
+      "maxWorkMs": 325.10000014305115,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "roads.graphExport.decode",
+      "workMs": 195.79999995231628,
+      "exclusiveWorkMs": 195.79999995231628,
+      "maxWorkMs": 195.79999995231628,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "roads.graphExport.exact",
+      "workMs": 375.09999990463257,
+      "exclusiveWorkMs": 375.09999990463257,
+      "maxWorkMs": 375.09999990463257,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    },
+    {
+      "name": "addresses.sealCatalog",
+      "workMs": 18.299999952316284,
+      "exclusiveWorkMs": 18.299999952316284,
+      "maxWorkMs": 18.299999952316284,
+      "steps": 1,
+      "windowMs": 0,
+      "windows": 0,
+      "workerWorkMs": 0,
+      "workerBatches": 0
+    }
+  ],
+  "limits": [
+    "Profiled diagnostic, not startup A/B",
+    "195.8ms sync decode is not a nonblocking or speedup proof",
+    "Live reference/source building/owned alias assertions were executed in archived eval; JSON replay verifies values only",
+    "No actual direct realAddress/entranceLv/story-home/POOL/USED query transcript in this pilot"
+  ]
+}

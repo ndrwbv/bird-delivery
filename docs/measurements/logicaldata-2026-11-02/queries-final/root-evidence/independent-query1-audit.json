@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "kind": "query1-readonly-offline-audit",
+  "rawPath": "/tmp/bird-logical17b-query1-1102.json",
+  "rawBytes": 16535119,
+  "rawSha256": "d131206b2f2ce39c328e255338b2517ef17f7e4da8787cad16e9efeb99a8b35c",
+  "checks": [
+    "actual process report/startup",
+    "all actual address rows independently recomputed",
+    "all actual level/DOOR wrapper rows independently recomputed",
+    "real non-vacuous exact nearest tie/radius/house60 witnesses",
+    "actual fixed story home/reference proof and real ordered source values",
+    "all ordered actual POOL coordinates/indices/4m keys/quarter entr/distances",
+    "fresh actual USED plus 12 saved keys unchanged; captured reference invariants"
+  ],
+  "ok": true,
+  "counts": {
+    "realAddress": 5061,
+    "entranceLv": 7608,
+    "doorWrapper": 7608,
+    "pool": 1214,
+    "used": 0
+  },
+  "witnesses": {
+    "ties": 4,
+    "radius": 4,
+    "house60": 2
+  },
+  "home": {
+    "id": "gennady",
+    "actual": {
+      "ex": 1440.5,
+      "ez": 591.75,
+      "nx": 0.7966912709023964,
+      "nz": 0.6043864813742318,
+      "sx": -0.6043864813742318,
+      "sz": 0.7966912709023964,
+      "x": 1442.8900738127072,
+      "z": 593.5631594441227,
+      "addr": "улица Царевского, 2"
+    },
+    "expected": {
+      "ex": 1440.5,
+      "ez": 591.75,
+      "nx": 0.7966912709023964,
+      "nz": 0.6043864813742318,
+      "sx": -0.6043864813742318,
+      "sz": 0.7966912709023964,
+      "x": 1442.8900738127072,
+      "z": 593.5631594441227,
+      "addr": "улица Царевского, 2"
+    },
+    "memoSameReference": true,
+    "building": 229,
+    "sourceId": 118892081,
+    "entrance": 477,
+    "spot": 363,
+    "fallbackWant4": false
+  },
+  "unchanged": {
+    "arrayAndRowReferences": true,
+    "exactRows": true,
+    "pool": true,
+    "used": true,
+    "savedKeys": true,
+    "district": true,
+    "pizzaReference": true,
+    "ownerSnapshotReference": true,
+    "rngDescriptor": true
+  },
+  "elapsedFunctionalMs": 692.3000001907349,
+  "proposal": "/tmp/bird-logical17b-saved-key-proposal-1102.json",
+  "limits": [
+    "Offline cannot re-prove JS object identity: references are captured eval assertions",
+    "Pool zone/eligibility expected values were evaluated via actual runtime ZN/DIST/nearestRoad; offline verifies recorded projection/order/key/entr/d, not a rewritten world",
+    "Fresh case does not prove saved fixture behavior before case3"
+  ]
+}

@@ -1,0 +1,140 @@
+{
+  "version": 1,
+  "kind": "root-tool-transcribed-protocol",
+  "cwd": "/Users/andrewboev/Desktop/not-work/delivery",
+  "envUnset": [
+    "BIRD_EDITOR",
+    "BIRD_LAND_DATA_DIR"
+  ],
+  "build": {
+    "argv": [
+      "npx",
+      "vite",
+      "build",
+      "--mode",
+      "steam",
+      "--outDir",
+      "/tmp/bird-logical17b-query-final-1102"
+    ],
+    "env": {
+      "BUILD_VERSION": "0.33.11"
+    },
+    "execSession": 97694,
+    "exitCode": 0
+  },
+  "runs": [
+    {
+      "name": "query1",
+      "argvTranscribedFromExecutedRootToolCall": [
+        "node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+        "tools/probe.cjs",
+        "--mode=steam",
+        "--dir=/tmp/bird-logical17b-query-final-1102",
+        "--startup-trace",
+        "--startup-session=logical17b-query1-1102",
+        "--startup-cold",
+        "--startup-fixture=/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--cpu=3",
+        "--bootcpu",
+        "--init-script=/tmp/bird-logical17b-query-init-1102.js",
+        "--q=gfxdev=deck&mute&startupdistrict=0&landpackage=0&logicalexport17b",
+        "--eval=/tmp/bird-logical17b-query-export-eval-1102.js",
+        "--bootwait=360",
+        "--timeout=480",
+        "--max=0",
+        "--errors",
+        "--report=/tmp/bird-logical17b-query1-1102.json"
+      ],
+      "execSession": 81251,
+      "exitCodeFromCompletedToolResult": 0,
+      "signalProvidedByTool": false,
+      "fixtureSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+    },
+    {
+      "name": "query2",
+      "argvTranscribedFromExecutedRootToolCall": [
+        "node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+        "tools/probe.cjs",
+        "--mode=steam",
+        "--dir=/tmp/bird-logical17b-query-final-1102",
+        "--startup-trace",
+        "--startup-session=logical17b-query2-1102",
+        "--startup-cold",
+        "--startup-fixture=/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--cpu=3",
+        "--bootcpu",
+        "--init-script=/tmp/bird-logical17b-query-init-1102.js",
+        "--q=gfxdev=deck&mute&startupdistrict=0&landpackage=0&logicalexport17b",
+        "--eval=/tmp/bird-logical17b-query-export-eval-1102.js",
+        "--bootwait=360",
+        "--timeout=480",
+        "--max=0",
+        "--errors",
+        "--report=/tmp/bird-logical17b-query2-1102.json"
+      ],
+      "execSession": 64001,
+      "exitCodeFromCompletedToolResult": 0,
+      "signalProvidedByTool": false,
+      "fixtureSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+    },
+    {
+      "name": "savedkeys",
+      "argvTranscribedFromExecutedRootToolCall": [
+        "node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+        "tools/probe.cjs",
+        "--mode=steam",
+        "--dir=/tmp/bird-logical17b-query-final-1102",
+        "--startup-trace",
+        "--startup-session=logical17b-savedkeys-1102",
+        "--startup-cold",
+        "--startup-fixture=/tmp/bird-logical17b-saved-keys-fixture-1102.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--cpu=3",
+        "--bootcpu",
+        "--init-script=/tmp/bird-logical17b-query-init-1102.js",
+        "--q=gfxdev=deck&mute&startupdistrict=0&landpackage=0&logicalexport17b",
+        "--eval=/tmp/bird-logical17b-query-export-eval-1102.js",
+        "--bootwait=360",
+        "--timeout=480",
+        "--max=0",
+        "--errors",
+        "--report=/tmp/bird-logical17b-savedkeys-1102.json"
+      ],
+      "execSession": 82929,
+      "exitCodeFromCompletedToolResult": 0,
+      "signalProvidedByTool": false,
+      "fixtureSha256": "67d53f57494c20845135154ae81ece0236f6e116557b0cbfbd9d29df56476c54"
+    }
+  ],
+  "harnessPins": [
+    {
+      "file": "tools/probe.cjs",
+      "sha256": "54b8156913fa04b036676c4ebb87045361bbbec5fdfd41beae7e2f3541072abd",
+      "capture": "after-runs root filesystem snapshot; source frozen, probe matches commit33be110, not child-captured hashes"
+    },
+    {
+      "file": "tools/probe-page.cjs",
+      "sha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd",
+      "capture": "after-runs root filesystem snapshot; source frozen, probe matches commit33be110, not child-captured hashes"
+    },
+    {
+      "file": "/tmp/bird-logical17b-query-export-eval-1102.js",
+      "sha256": "bee99bb14c491c347208a8aaedf97ffbc3894db63941f5da1d194bcb0c782cee",
+      "capture": "after-runs root filesystem snapshot; source frozen, probe matches commit33be110, not child-captured hashes"
+    },
+    {
+      "file": "/tmp/bird-logical17b-query-init-1102.js",
+      "sha256": "2b86ab2f274c5ac2778b33978e6ac8cf79b4fbe971a94965a51db98a9b7d5342",
+      "capture": "after-runs root filesystem snapshot; source frozen, probe matches commit33be110, not child-captured hashes"
+    }
+  ],
+  "notes": "Source b26 and build db818 fixed throughout. Arguments and exit0 recorded from root tools, not child argv/status telemetry; after-run harness hashes are identified separately. 33be110 is a Git commit, not a file SHA. No game retry; initial saved-key offline assertion expected wrong output shape, then only validator projection was corrected."
+}

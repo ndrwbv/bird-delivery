@@ -1,0 +1,37 @@
+{
+  "ok": true,
+  "gates": [
+    {
+      "ok": true,
+      "reasons": []
+    },
+    {
+      "ok": true,
+      "reasons": []
+    }
+  ],
+  "wireSame": true,
+  "wireSha": [
+    "a64d843e741592f93be9707c8ecd9a577ab9df767002e5febebfbd68675a0c34",
+    "a64d843e741592f93be9707c8ecd9a577ab9df767002e5febebfbd68675a0c34"
+  ],
+  "catalogSame": true,
+  "logicalSame": true,
+  "functionalSame": true,
+  "counts": [
+    {
+      "realAddress": 5061,
+      "entranceLv": 7608,
+      "doorWrapper": 7608,
+      "pool": 1214,
+      "used": 0
+    },
+    {
+      "realAddress": 5061,
+      "entranceLv": 7608,
+      "doorWrapper": 7608,
+      "pool": 1214,
+      "used": 0
+    }
+  ]
+}

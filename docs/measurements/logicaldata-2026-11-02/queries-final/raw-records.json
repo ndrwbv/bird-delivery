@@ -1,0 +1,35 @@
+[
+  {
+    "label": "query1",
+    "rawOriginalPath": "/tmp/bird-logical17b-query1-1102.json",
+    "rawBytes": 16535119,
+    "rawSha256": "d131206b2f2ce39c328e255338b2517ef17f7e4da8787cad16e9efeb99a8b35c",
+    "stdoutOriginalPath": "/tmp/bird-logical17b-query1-1102.stdout.log",
+    "stdoutBytes": 16534546,
+    "stdoutSha256": "ab4706aed0056a60e080ef8499d99deddd21d7c65b1134e18d6aa63c378cc83f",
+    "stdoutDeduplicated": true,
+    "stdoutReconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'"
+  },
+  {
+    "label": "query2",
+    "rawOriginalPath": "/tmp/bird-logical17b-query2-1102.json",
+    "rawBytes": 16535171,
+    "rawSha256": "3aaad7e76f3afa3d6f25f3a817e029d83abea7ea8fc09d13e533adc6765e0a29",
+    "stdoutOriginalPath": "/tmp/bird-logical17b-query2-1102.stdout.log",
+    "stdoutBytes": 16534598,
+    "stdoutSha256": "cd1b97292ac1090d6f3224865053288df634ce954f5306847ae7c40b30979945",
+    "stdoutDeduplicated": true,
+    "stdoutReconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'"
+  },
+  {
+    "label": "savedkeys",
+    "rawOriginalPath": "/tmp/bird-logical17b-savedkeys-1102.json",
+    "rawBytes": 16534892,
+    "rawSha256": "5be79369a1349aece4fe150fbbfbfa92e4f0f94cd8bba538156e91c1d17634cc",
+    "stdoutOriginalPath": "/tmp/bird-logical17b-savedkeys-1102.stdout.log",
+    "stdoutBytes": 16534319,
+    "stdoutSha256": "9766cfc778afba81c0f77d9d4a6ddd085ee43474c090c4050c899fcddd33f2bb",
+    "stdoutDeduplicated": true,
+    "stdoutReconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'"
+  }
+]

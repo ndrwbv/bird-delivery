@@ -1,0 +1,197 @@
+{
+  "version": 1,
+  "kind": "logicaldata-generated-refactor-acceptance",
+  "payloadFiles": 37,
+  "payloadBytes": 8729422,
+  "excludes": [
+    "archive-index.json",
+    "SHA256SUMS"
+  ],
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 6192,
+      "sha256": "f85a6aff7fd873bd56d68dbdc6e03178543a146bcbbb783b26a0ca36fb74beb2"
+    },
+    {
+      "path": "archive-audit.json",
+      "bytes": 535,
+      "sha256": "dcb56ad494c8c014ed298e893cc748c88a995c6c92c2305791386f4e4463638d"
+    },
+    {
+      "path": "builds/baseline.log",
+      "bytes": 6659,
+      "sha256": "e7610b1625fb3040304f04198d9f1135ccae73be147f3dd17734ad425048020b"
+    },
+    {
+      "path": "builds/candidate.log",
+      "bytes": 6823,
+      "sha256": "e311d5536113d27e70501ada0d347d097754274ed981dc599829e3f42ee82c8c"
+    },
+    {
+      "path": "compression.json",
+      "bytes": 2340,
+      "sha256": "e3e3a1ae70d8ffe5d67c807119310648107ca62786639fb2fbdf149640f6ddf2"
+    },
+    {
+      "path": "harness/logical-equivalence.js",
+      "bytes": 8210,
+      "sha256": "c84c0083fcd7a95e40e7cb71af3c88f8492013331d6d47fb7b38e0e242ec7197"
+    },
+    {
+      "path": "harness/tools/probe-build.cjs",
+      "bytes": 4916,
+      "sha256": "3eda8b68163026fa436345f97814791270f16eb6844584176ae6c8a531c4b09f"
+    },
+    {
+      "path": "harness/tools/probe-checks/startup-bootstrap-observe.js",
+      "bytes": 654,
+      "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+    },
+    {
+      "path": "harness/tools/probe-checks/startup-ready.js",
+      "bytes": 6203,
+      "sha256": "e9ef0e761ff2a5d32b743a7a26990a757089d61d81c703b57d870968a8f7b137"
+    },
+    {
+      "path": "harness/tools/probe-page.cjs",
+      "bytes": 37506,
+      "sha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd"
+    },
+    {
+      "path": "harness/tools/probe.cjs",
+      "bytes": 45888,
+      "sha256": "640e74bf1019cd85a974eb73e0a9d78267e458e75ce56f8b2899bb1f549f1cce"
+    },
+    {
+      "path": "harness/tools/startup-report.mjs",
+      "bytes": 13190,
+      "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+    },
+    {
+      "path": "inputs/high-fixture.json",
+      "bytes": 74,
+      "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+    },
+    {
+      "path": "pair/baseline.json.gz",
+      "bytes": 1840234,
+      "sha256": "2d0288ba3348fd1bb39e6b05d9a8ca15574260ba140561adcfdbe50a9b7e1b0c"
+    },
+    {
+      "path": "pair/baseline.stderr.log",
+      "bytes": 187,
+      "sha256": "6fc5e31cc31f7cdc94bf0367190490291e752ef47a7bcdadff5fa20f989b6c3e"
+    },
+    {
+      "path": "pair/baseline.stdout.log.gz",
+      "bytes": 1839801,
+      "sha256": "f914844115f6454cc49d2e610a41439d31ba6bdda5261a7f52729a234b97a86f"
+    },
+    {
+      "path": "pair/candidate.json.gz",
+      "bytes": 1840186,
+      "sha256": "fe0ca83f56359cbb2af08b8d25aa6429f31d96b03d2905179043bfdf099012fa"
+    },
+    {
+      "path": "pair/candidate.stderr.log",
+      "bytes": 187,
+      "sha256": "29862635a798355cccc4719dc4e0486389b3b1db149aa192084e66f67e751ff8"
+    },
+    {
+      "path": "pair/candidate.stdout.log.gz",
+      "bytes": 1839754,
+      "sha256": "3a5671f4531efccd987d09320b84861bf2c525658bc9a1b4e08e6a7afb5fe352"
+    },
+    {
+      "path": "pair/protocol.json",
+      "bytes": 3152,
+      "sha256": "87de41c74b1e4a45fdef74ea9b0dd8c1a858d2ed9b68236a1f2fef6b59e9c9b5"
+    },
+    {
+      "path": "provenance/baseline.json",
+      "bytes": 97251,
+      "sha256": "7bb41cbb6802e159c9c849a77dd629874063cdcb51d228476f98ab7c86738ff5"
+    },
+    {
+      "path": "provenance/candidate.json",
+      "bytes": 97613,
+      "sha256": "e8da9fc199e73052ea79763527f9a76aa0df8de949c31a5769ec0d4a09d3a3e8"
+    },
+    {
+      "path": "source/extraction.diff",
+      "bytes": 7349,
+      "sha256": "08b7c4a79205d206c5a3b5bc430dffbdbd74cfc18205f2f1e619f273a22d17b9"
+    },
+    {
+      "path": "source/game.after.js.gz",
+      "bytes": 450718,
+      "sha256": "7a95b1f15528e0de70e2b9559f1f51f766e080fdd4048b33660cefef03d29964"
+    },
+    {
+      "path": "source/game.before.js.gz",
+      "bytes": 451874,
+      "sha256": "dcea4d41fa9e74ea74e4bd5c5af9eb971e616f3c573944ea4cf197a36340f46d"
+    },
+    {
+      "path": "source/src/game/addresslayout.js",
+      "bytes": 2411,
+      "sha256": "ee5ab51e06ff5ff51187c73dbfbd2aefb170f69bad482bf9d798b819183b99bc"
+    },
+    {
+      "path": "source/src/game/streetgraph.js",
+      "bytes": 2511,
+      "sha256": "fccbf4b0f021313693be8de35a0aa82f854fcd7236999dbca448031e9fd85c1e"
+    },
+    {
+      "path": "source/tools/addresslayout-test.mjs",
+      "bytes": 9903,
+      "sha256": "1e00ba727b5c2c7b559f67e6af7ed9bc738349a55907738a9708087361ceb426"
+    },
+    {
+      "path": "source/tools/streetgraph-test.mjs",
+      "bytes": 10404,
+      "sha256": "6b9a99766a6b4c317a8feba56dea2d7420db787c73e7201c5d96f460385219f7"
+    },
+    {
+      "path": "source/trace-before.patch",
+      "bytes": 8369,
+      "sha256": "6d1fb751421a81755af2bffc2e5451a5d2190bcd24364cbbc2d1c06ce6560128"
+    },
+    {
+      "path": "summary.json",
+      "bytes": 14935,
+      "sha256": "f31d1ffd504ddebc641daf3c59a4d980d030fccea57464b9630e424eb8aa2fb0"
+    },
+    {
+      "path": "trace/n1/raw.json",
+      "bytes": 35538,
+      "sha256": "f1d854ad26801d804b9dc87bb5dab0c216e615e15c228591ea0b7cf6511f9764"
+    },
+    {
+      "path": "trace/n1/run.json",
+      "bytes": 2520,
+      "sha256": "05580c71586a0bf98e5217abc250609a88c5cac065a79fac44dafcb0a1db06bc"
+    },
+    {
+      "path": "trace/n1/stderr.log",
+      "bytes": 187,
+      "sha256": "0461a6f1638cec211e7ae16be14087c91afac9b1eff06c2ebe2178471b34b6bd"
+    },
+    {
+      "path": "trace/n1/stdout.log",
+      "bytes": 34966,
+      "sha256": "1e0c168aa6b22e4e29a0f86c5779da6cda1a5364aa558194fd683df6312ad50e"
+    },
+    {
+      "path": "trace/outer.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "trace/outer.stdout.log",
+      "bytes": 182,
+      "sha256": "41f2d3f34fc3b4934260d3161f2ff7528ba77b6bbdb9ddd591ecc412d139df50"
+    }
+  ]
+}

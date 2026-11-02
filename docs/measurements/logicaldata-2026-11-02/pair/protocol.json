@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "kind": "root-recorded-logical-pair",
+  "cwd": "/Users/andrewboev/Desktop/not-work/delivery",
+  "envUnset": [
+    "BIRD_EDITOR",
+    "BIRD_LAND_DATA_DIR"
+  ],
+  "provenance": "Commands transcribed from root exec tool inputs; exitCode=0 from completed tool sessions13599/50282. This is NOT child-recorded argv/status/signal telemetry. Actual host conditions and normal bootstrap guards are independently in each raw report. No repeat and no performance A/B claim.",
+  "runs": [
+    {
+      "label": "baseline",
+      "rootExecSession": 13599,
+      "rootToolExitCode": 0,
+      "signalReportedByTool": false,
+      "argvRecordedFromExecutedRootToolCall": [
+        "node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+        "tools/probe.cjs",
+        "--mode=steam",
+        "--dir=/tmp/bird-logical17b-trace-1102",
+        "--startup-trace",
+        "--startup-session=logical17b-baseline-1102",
+        "--startup-cold",
+        "--startup-fixture=/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--cpu=3",
+        "--bootcpu",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--q=gfxdev=deck&mute&startupdistrict=0&landpackage=0",
+        "--eval=/tmp/bird-logical17b-equivalence-eval-1102.js",
+        "--bootwait=360",
+        "--timeout=480",
+        "--max=0",
+        "--errors",
+        "--report=/tmp/bird-logical17b-baseline-1102.json"
+      ],
+      "report": "/tmp/bird-logical17b-baseline-1102.json",
+      "reportBytes": 8821382,
+      "reportSha256": "bbbf5dde9446334538cd9a743c4103b65d41c31d6a7a389c265f20815ebe14bf",
+      "stdout": "/tmp/bird-logical17b-baseline-1102.stdout.log",
+      "stderr": "/tmp/bird-logical17b-baseline-1102.stderr.log"
+    },
+    {
+      "label": "candidate",
+      "rootExecSession": 50282,
+      "rootToolExitCode": 0,
+      "signalReportedByTool": false,
+      "argvRecordedFromExecutedRootToolCall": [
+        "node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+        "tools/probe.cjs",
+        "--mode=steam",
+        "--dir=/tmp/bird-logical17b-candidate-1102",
+        "--startup-trace",
+        "--startup-session=logical17b-candidate-1102",
+        "--startup-cold",
+        "--startup-fixture=/tmp/bird-ordinary17b-prepare-1102/high-1-fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--cpu=3",
+        "--bootcpu",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--q=gfxdev=deck&mute&startupdistrict=0&landpackage=0",
+        "--eval=/tmp/bird-logical17b-equivalence-eval-1102.js",
+        "--bootwait=360",
+        "--timeout=480",
+        "--max=0",
+        "--errors",
+        "--report=/tmp/bird-logical17b-candidate-1102.json"
+      ],
+      "report": "/tmp/bird-logical17b-candidate-1102.json",
+      "reportBytes": 8821814,
+      "reportSha256": "4fbf3232eca39470b9553ea8cde3e1a899c599cc3b045bb9340efb27e0ea319c",
+      "stdout": "/tmp/bird-logical17b-candidate-1102.stdout.log",
+      "stderr": "/tmp/bird-logical17b-candidate-1102.stderr.log"
+    }
+  ]
+}

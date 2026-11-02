@@ -1,0 +1,122 @@
+diff --git a/src/game/game.js b/src/game/game.js
+index a6e346f..495ee09 100644
+--- a/src/game/game.js
++++ b/src/game/game.js
+@@ -1133,16 +1133,16 @@ function pushOut (p, r) {
+    Нужно постоянно: куда развернуть лавочку, с какой стороны у дома
+    подъезд, где припарковать чужую машину, что нарисовать на радаре. */
+ const RSEG = [];
+-for (const r of CITY.roads) {
++STARTUP.work('roads.segments', () => { for (const r of CITY.roads) {
+   const w = roadWidth(r), p = r.p;
+   for (let i = 1; i < p.length; i++)
+     RSEG.push({ x1: p[i - 1][0], z1: p[i - 1][1], x2: p[i][0], z2: p[i][1], c: r.c, w, name: r.n, b: r.b || 0, x: r.x || 0, g: r.g || 0 });   // g — газон бульвара: ширина плиты за бордюром (hits.js)
+-}
++} });
+ 
+ PAVE.init({ RSEG, CITY, onAlley: (x, z, m) => WORLD.onAlley(x, z, m) });   // тротуары и дорожки: общее «сюда не ставить» (pave.js)
+ 
+ const RCELL = 64, ROAD_GRID = new Map();
+-for (let k = 0; k < RSEG.length; k++) {
++STARTUP.work('roads.segmentGrid', () => { for (let k = 0; k < RSEG.length; k++) {
+   const s = RSEG[k];
+   const i0 = Math.floor(Math.min(s.x1, s.x2) / RCELL), i1 = Math.floor(Math.max(s.x1, s.x2) / RCELL);
+   const j0 = Math.floor(Math.min(s.z1, s.z2) / RCELL), j1 = Math.floor(Math.max(s.z1, s.z2) / RCELL);
+@@ -1153,11 +1153,11 @@ for (let k = 0; k < RSEG.length; k++) {
+       if (!a) ROAD_GRID.set(key, a = []);
+       a.push(k);
+     }
+-}
++} });
+ 
+ /* те же клетки сплошным массивом: при сборке города ближайшую дорогу
+    спрашивают сотни тысяч раз, и строка-ключ на каждую клетку стоила заметно */
+-const RG = (() => {
++const RG = STARTUP.work('roads.segmentDenseGrid', () => {
+   let i0 = Infinity, i1 = -Infinity, j0 = Infinity, j1 = -Infinity;
+   for (const key of ROAD_GRID.keys()) { const [i, j] = key.split(',').map(Number); i0 = Math.min(i0, i); i1 = Math.max(i1, i); j0 = Math.min(j0, j); j1 = Math.max(j1, j); }
+   if (!(i1 >= i0)) return { i0: 0, j0: 0, ni: 0, nj: 0, cells: [] };
+@@ -1169,16 +1169,16 @@ const RG = (() => {
+   for (let q = 0; q < ni * nj; q++) { box[q * 4] = box[q * 4 + 1] = Infinity; box[q * 4 + 2] = box[q * 4 + 3] = -Infinity; }
+   for (let q = 0; q < ni * nj; q++) if (cells[q]) for (const k of cells[q]) rgBoxAdd(box, q, RSEG[k]);
+   return { i0, j0, ni, nj, cells, box };
+-})();
++});
+ /* плавные улицы (?smooth, roadsmooth.js): ближайшая улица «как до дуг» — кусок внутри дуги (между точками одной дуги) не в
+    счёт, вместо него — прежний угол (касание — вершина — касание). По ней выбирается «лицевая» стена дома с адресом (bestEdge)
+    и стена подъездов: фасады угловых домов — как без скругления (на внутренней стороне изгиба дуга ближе к стене на срез
+    угла, до 3 м, и «лицевой» становилась соседняя стена). Те же клетки ROAD_GRID, что у nearestRoad(…, 1). Без ?smooth — null */
+-const SARC = SMOOTH.STATS.done ? (() => {
++const SARC = SMOOTH.STATS.done ? STARTUP.work('roads.segmentArcIndex', () => {
+   const a = new Uint8Array(RSEG.length);
+   for (let k = 0; k < RSEG.length; k++) { const s = RSEG[k], i = SMOOTH.arcOf(s.x1, s.z1); if (i >= 0 && i === SMOOTH.arcOf(s.x2, s.z2)) a[k] = 1; }
+   return a;
+-})() : null;
++}) : null;
+ const CORNERS = SARC ? (() => {
+   const G = new Map();
+   for (const A of SMOOTH.ARCS) {
+@@ -6074,7 +6074,7 @@ function buildCity () {
+   if (MAPFIX) { BUILD_T.mapfix = Math.round(MAPFIX.ms); BUILD_T.mapfixT = MAPFIX.T; tm0('mapworks', () => MAPW.buildWorks(MAPFIX, mapApi())); }   // тупики: блоки и ремонт
+   { const t0 = performance.now();
+     LAND_OBJECT=false;
+-    try { osmBuildings(spot); } finally { LAND_OBJECT=true; }
++    try { STARTUP.work('city.housesVisualAndLayout', () => osmBuildings(spot)); } finally { LAND_OBJECT=true; }
+     BUILD_T.houses = Math.round(performance.now() - t0);
+   }
+   LAND_OBJECT=false;
+@@ -6379,7 +6379,7 @@ const EDGES = new Map();                          // направленные р
+ const ekey = (a, b) => a * 100000 + b;
+ const edgeOf = (a, b) => EDGES.get(ekey(a, b));
+ const ukey = (a, b) => (a < b ? ekey(a, b) : ekey(b, a));    // ребро без направления
+-{
++STARTUP.work('roads.baseGraph', () => {
+   const node = (x, z) => {
+     const k = x + ',' + z;
+     let i = NODE_IDX.get(k);
+@@ -6410,7 +6410,6 @@ const ukey = (a, b) => (a < b ? ekey(a, b) : ekey(b, a));    // ребро бе
+       prev = cur;
+     }
+   }
+-}
+ // номера узлов на концах куска (b у куска уже занято — это мост)
+ for (const s of RSEG) { s.na = NODE_IDX.get(s.x1 + ',' + s.z1); s.nb = NODE_IDX.get(s.x2 + ',' + s.z2); }
+ /* закрытая часть города (MAP.open): узлы за линией — out, рёбра к ним закрыты (openEdges) */
+@@ -6418,16 +6417,17 @@ if (MAP.open) {
+   for (const N of NODES) N.out = !inBorder(N.x, N.z);
+   for (const e of EDGES.values()) if (NODES[e.a].out || NODES[e.b].out) e.closed = 1;
+ }
++});
+ 
+ /* узлов тысячи, перебирать их на каждый пересчёт маршрута
+    незачем — раскладываем по клеткам сто двадцать метров */
+ const NCELL = 120, NODE_GRID = new Map();
+-for (let k = 0; k < NODES.length; k++) {
++STARTUP.work('roads.nodeGrid', () => { for (let k = 0; k < NODES.length; k++) {
+   const key = Math.floor(NODES[k].x / NCELL) + ',' + Math.floor(NODES[k].z / NCELL);
+   let a = NODE_GRID.get(key);
+   if (!a) NODE_GRID.set(key, a = []);
+   a.push(k);
+-}
++} });
+ 
+ function nearestNode (x, z) {
+   const ci = Math.floor(x / NCELL), cj = Math.floor(z / NCELL);
+@@ -6449,7 +6449,7 @@ function nearestNode (x, z) {
+ 
+ /* плавные улицы (по умолчанию, routechain.js): узлы с двумя соседями — цепочками, поиск пути проходит цепочку разом.
+    С ?oldroads — null: поиск как был */
+-const RC = SMOOTH.STATS.done ? RCHAIN.build(NODES, edgeOf) : null;
++const RC = SMOOTH.STATS.done ? STARTUP.work('roads.routechain', () => RCHAIN.build(NODES, edgeOf)) : null;
+ const BF = RC ? { prev: new Int32Array(NODES.length), seen: new Uint32Array(NODES.length), po: new Array(NODES.length).fill(null), gen: 0 } : null;
+ /* то же, по цепочкам: поиск в ширину, цепочка — один шаг (от перекрёстка к перекрёстку). Внутри цепочки узлы не
+    перебираем: мягкий узел не за линией закрытого города (иначе он развилка), а lock у узлов всегда 0 (districtLocks);
+@@ -17595,7 +17595,7 @@ if (!INTRO) LATE.add('yardcars2', () => YCARS.cars());   // машины во д
+ // 02.10.2026: 24 — это теперь обычный день; по часам — econ.js TRAFFIC (пик 28, ночь 4–8), добирается trafficDensity
+ const TRAFFIC_N = 24;
+ LATE.add('traffic', () => spawnTraffic(INTRO ? 22 : Math.min(TRAFFIC_N, trafficWant())));
+-if (!INTRO) LATE.add('spots', function* () { yield* buildSpots(); yield 'spots'; buildCollect(); });
++if (!INTRO) LATE.add('spots', function* () { yield* STARTUP.steps('addresses.buildSpots', buildSpots()); yield 'spots'; STARTUP.work('addresses.buildCollect', buildCollect); });
+ /* погода смены (weather.js): сугробы снежной зимы — после адресов, чтобы их не завалить */
+ LATE.add('weather', () => WTH.init({ THREE, scene, cam, renderer, Store, MAP, CITY, V, S, SPOTS, ZEBRAS, Snd, toast, groundH, curbAt, nearestRoad, roadWidth, drivable, inHouse, inPoly, inBounds, jumpBlocks: JUMPS.blocks,
+   makeHuman, dropMesh, gibHuman, CAR_L, CAR_W, isPlaying, intro: INTRO, PIZZERIAS, get PIZZA () { return PIZZA; },
