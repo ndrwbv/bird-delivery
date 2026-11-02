@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 import {createAddressCatalogRecorder} from '../src/game/addresscatalog.js';
 import {encodeAddressCatalog} from '../src/game/addresscodec17b.js';
 import {RNG_PROVIDER,BASE_SEED} from '../src/game/landdata/land-package-key.js';
-import {ADDRESS_EXPORT_QUERY,addressPreparationFixture,checkAddressExport,checkAddressRepeats,earlyQueryArtifact,earlyQueryInit} from './address-package-prepare.mjs';
+import {ADDRESS_EXPORT_QUERY,FRESH_ADDRESS_EXPORT_QUERY,addressPreparationFixture,freshAddressPreparationFixture,parseAddressPreparationArgs,addressProductCatalog,checkAddressExport,checkAddressRepeats,earlyQueryArtifact,earlyQueryInit} from './address-package-prepare.mjs';
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex'),base={mapId:'fixture',mapHash:'a'.repeat(64),editsHash:'b'.repeat(64),sourceHash:'c'.repeat(64)},identity={...base,inputHash:'d'.repeat(64)};
 function exact(v){if(v===null)return['null'];if(v===undefined)return['undefined'];if(typeof v==='number'){const b=Buffer.alloc(8);b.writeDoubleLE(v);return['number',b.toString('hex')];}if(['string','boolean'].includes(typeof v))return[typeof v,v];if(Array.isArray(v))return['array',v.map(exact)];return['object',Object.keys(v).map(k=>[k,exact(v[k])])];}
 const targets={buildings:[{id:-0}],houses:[],generatedDoors:[],entrances:[[-0,0,1,0]],spots:[]},rec=createAddressCatalogRecorder(targets);
@@ -22,6 +22,19 @@ function fixture(){
  const r={ok:true,protocolVersion:2,report:{enabled:true,dropped:0,overflow:{rows:0,marks:0,flags:0,counters:0},flags:{},resourceCapture:{truncatedCount:0},marks:{'city.syncBuilt':{at:5},'first.control':{at:10,data:{state:'drive',held:false,localReady:true,supportReady:true,guardVersion:2,paused:false,mapOpen:false}}},rows:[],workUnionMs:0,counters:{'raisedland.cleanCalls':1}},moved:.163,bootstrap:{markerWrites:1,bootAbsentAtMarker:true,earlyBootSeen:false},crash:[],district:{actual:0,atControl:0,pizzaIndex:0,pizza:{bx:1,bz:2},position:{x:1,z:2},pickerClicks:1,before:{opened:8,city:false}},host:{seed:null,cpuThrottle:1,bootcpu:true},rng:descriptorRNG(),conditions:{url,lang:'ru',graphics:{preset:'high',device:'deck',width:1280,height:800}},landPackage:null,cache:null,addressClosure:p,addressExport:{version:1,meta:{phase:'sealed',preVisual:{phase:'before-city-syncBuild',at:2,before:{houses:0,generatedDoors:0,spots:0,rawEntrances:1},after:{houses:0,generatedDoors:0,spots:0,rawEntrances:1},lateWorkStarted:false,inputHash:identity.inputHash},input:{eligible:true,identity:{...identity},descriptor},preload:{phase:'generated',reason:'address-package17b:CATALOG',held:false,consumed:true}},inputDescriptorExact:exact(descriptor),preparedReplay:false,wire:{bytes:wire.length,sha256:hash(wire),base64:wire.toString('base64')},oracleBody:{kind:'historical-oracle-body-not-runtime-identity',sha256:'e'.repeat(64)}}};
  // Real probe JSON erases undefined/-0 in generic objects. Only inputDescriptorExact/menuExact remain authoritative.
  return JSON.parse(JSON.stringify({fixtureKind:'synthetic-host-contract-not-game-observation',ok:true,errors:[],uncaught:0,evalErr:null,startupHost:{seed:null},result:r}));
+}
+function freshFixture(graphics='mid'){
+ const v=fixture(),r=v.result,p=r.addressClosure,initial=p.initial;
+ initial.season.saved=null;initial.district.opened=1;initial.car.inputs=Object.fromEntries(['dlv-car-owned','dlv-car-cur','dlv-car-up','dlv-car-L','dlv-car-paint','dlv-car-eng'].map(k=>[k,null]));initial.graphics.preset=graphics;
+ r.district.pickerClicks=0;r.district.before.opened=1;r.conditions.graphics.preset=graphics;
+ const raw='?debug&mute&nolb&startuptrace&'+FRESH_ADDRESS_EXPORT_QUERY;r.conditions.url='app://g/index.html'+raw;r.freshEnvironment={userAgent:'Mozilla/5.0 Steam Deck SteamOS',rawQuery:raw};
+ p.case='fresh-'+graphics;p.profile='ordinary-first-career';p.repairNoop={district:0,opened:1,city:false,partySeen:false};
+ const own={...initial};delete own.at;
+ const descriptor={version:2,profile:'fresh-v1',base:{...base},initial:own,progress:{values:{'dlv-money-x8':1},presentKeys:['dlv-money-x8']},query:{normalization:'fresh-diagnostics-v1',raw:'',entries:[]},diagnosticQuery:{raw,entries:[...new URL(r.conditions.url).searchParams].sort(([a],[b])=>a<b?-1:a>b?1:0)},counts:{buildings:1}};
+ const id={...identity,inputHash:(graphics==='mid'?'d':'e').repeat(64)},bytes=Buffer.from(encodeAddressCatalog(snapshot,id));
+ r.addressExport.meta.input={eligible:true,identity:id,descriptor};r.addressExport.inputDescriptorExact=exact(descriptor);r.addressExport.meta.preVisual.inputHash=id.inputHash;
+ r.addressExport.wire={bytes:bytes.length,sha256:hash(bytes),base64:bytes.toString('base64')};r.addressExport.oracleBody.kind='fresh-proof-with-original-functional-oracles';
+ return JSON.parse(JSON.stringify(v));
 }
 let count=0;async function test(name,fn){await fn();count++;}
 await test('exact B1 literal keeps legacy money migration and has no fabricated service markers',()=>{
@@ -62,5 +75,39 @@ await test('proof query indices may be negative preserved safe integers',async()
 });
 await test('unmigrated wallet cannot masquerade as B1 actual input',async()=>{
  const v=fixture();const d={version:1,base,initial:{...v.result.addressClosure.initial},progress:{values:{'dlv-money-x8':1,'dlv-msk-wallet':30000},presentKeys:['dlv-money-x8','dlv-msk-wallet']},query:{raw:new URL(url).search,entries:query},counts:{}};delete d.initial.at;v.result.addressExport.inputDescriptorExact=exact(d);await assert.rejects(checkAddressExport(v,{base}),/POST_MIGRATION_B1_PROGRESS/);
+});
+await test('ordinary CLI is explicit and preserves the legacy --out path',()=>{
+ assert.deepEqual(parseAddressPreparationArgs(['--out=/tmp/new']),{ordinary:false,out:'/tmp/new'});assert.deepEqual(parseAddressPreparationArgs(['--ordinary','--out=/tmp/new']),{ordinary:true,out:'/tmp/new'});
+ assert.deepEqual(parseAddressPreparationArgs(['--out=/tmp/new','--ordinary']),{ordinary:true,out:'/tmp/new'});
+ for(const args of [[],['--ordinary'],['--out='],['--out=/tmp/a','--out=/tmp/b'],['--ordinary','--ordinary','--out=/tmp/a'],['--ordinary=1','--out=/tmp/a']])assert.throws(()=>parseAddressPreparationArgs(args),/CLI_OUT/);
+});
+await test('fresh fixture seeds only ordinary language and optional saved high setting',()=>{
+ assert.deepEqual(freshAddressPreparationFixture('mid'),{'dlv-lang':'ru'});assert.deepEqual(freshAddressPreparationFixture('high'),{'dlv-lang':'ru','dlv-gfx':{deck:{p:'high',rv:2}}});
+ for(const graphics of ['mid','high']){const f=freshAddressPreparationFixture(graphics);for(const key of ['dlv-sound','dlv-shifts','dlv-msk-wallet','dlv-msk-guide','dlv-msk-nostut','dlv-car-cur','dlv-money-x8','dlv-single-marker-v1'])assert.equal(Object.hasOwn(f,key),false);}
+ assert.throws(()=>freshAddressPreparationFixture('low'),/FRESH_PRESET/);
+});
+for(const graphics of ['mid','high'])await test('fresh '+graphics+' host gate supports native absence and actual first Go',async()=>{
+ const v=freshFixture(graphics),a=await checkAddressExport(v,{base,ordinary:true,graphics});assert.deepEqual(a.snapshot,snapshot);assert.equal(a.identity.inputHash,(graphics==='mid'?'d':'e').repeat(64));
+});
+for(const [name,change,pattern]of [
+ ['mature picker in fresh',v=>v.result.district.pickerClicks=1,/ACTUAL_FRESH_START/],
+ ['opened eight in initial',v=>v.result.addressClosure.initial.district.opened=8,/ACTUAL_PREVISUAL_DESCRIPTOR/],
+ ['sound or world override query',v=>v.result.conditions.url+='&gfxdev=deck',/ACTUAL_QUERY/],
+ ['empty normalized query missing profile version',v=>{const d=JSON.parse(JSON.stringify(v.result.addressExport.meta.input.descriptor));d.version=1;v.result.addressExport.inputDescriptorExact=exact(d);},/FRESH_NORMALIZED_QUERY/],
+ ['fake guide progress',v=>{const d=structuredClone(v.result.addressExport.meta.input.descriptor);d.progress.values['dlv-msk-guide']=1;v.result.addressExport.inputDescriptorExact=exact(d);},/NO_FAKE_FRESH_MARKERS/],
+ ['nonzero wallet before fresh generation',v=>{const d=structuredClone(v.result.addressExport.meta.input.descriptor);d.progress.values['dlv-msk-wallet']=1;v.result.addressExport.inputDescriptorExact=exact(d);},/ACTUAL_FRESH_PROGRESS/],
+ ['no actual Steam Deck UA',v=>v.result.freshEnvironment.userAgent='ordinary PC',/ACTUAL_DECK_ENVIRONMENT/],
+ ['repair not no-op',v=>v.result.addressClosure.repairNoop.partySeen=true,/FRESH_REPAIR_NOOP/]
+])await test('fresh rejects '+name,async()=>{const v=freshFixture();change(v);await assert.rejects(checkAddressExport(v,{base,ordinary:true,graphics:'mid'}),pattern);});
+await test('product needs four independent per-preset repeats, keeps different profile identities/bytes',async()=>{
+ const rows=[];for(const graphics of ['mid','high'])for(const repeat of [1,2])rows.push({graphics,repeat,session:graphics+'-'+repeat,checked:await checkAddressExport(freshFixture(graphics),{base,ordinary:true,graphics})});
+ const product=addressProductCatalog(rows);assert.equal(product.version,2);assert.deepEqual(product.slots.map(s=>s.graphics),['mid','high']);assert.notEqual(product.slots[0].identity.inputHash,product.slots[1].identity.inputHash);assert.notEqual(product.slots[0].entry.path,product.slots[1].entry.path);
+ assert.throws(()=>addressProductCatalog(rows.slice(1)),/FOUR_INDEPENDENT/);assert.throws(()=>addressProductCatalog(rows.map((r,i)=>i===1?{...r,session:rows[0].session}:r)),/FOUR_INDEPENDENT/);
+ assert.throws(()=>addressProductCatalog(rows.map(r=>({...r,graphics:'mid'}))),/PRESET_REPEATS/);
+ assert.throws(()=>addressProductCatalog(rows.map((r,i)=>i===1?{...r,repeat:1}:r)),/PRESET_REPEATS/);
+});
+await test('fresh eval preserves actual functional oracle body and compiles without running game',()=>{
+ const fresh=fs.readFileSync(new URL('./probe-checks/address-package-fresh-export.js',import.meta.url),'utf8'),old=fs.readFileSync(new URL('./probe-checks/address-package-export.js',import.meta.url),'utf8'),start=old.indexOf('const functionalQueries=(()=>{'),end=old.indexOf('\n})();',start)+'\n})();'.length,body=old.slice(start,end);
+ assert.ok(fresh.includes(body));const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;new AsyncFunction('d','until','wait',fresh);assert.ok(fresh.includes('async function addressFreshProof17b()'));assert.ok(!fresh.includes('const EXPECTED={'));
 });
 console.log(JSON.stringify({ok:true,checks:count,realRecorderCodec:true,nativeSHA:true,syntheticHostEnvelopes:true,noGame:true}));

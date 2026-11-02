@@ -9,7 +9,7 @@ import {limitsOf} from '../src/game/landcache17a/checkpoint-limits.js';
 
 export const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 // Code only: no output/catalog/build-tree digest participates in source identity.
-export const PREPARATION_HELPERS=Object.freeze(['tools/land-package-files.mjs','tools/land-package-source-key.mjs','tools/land-package-build.mjs','tools/land-package-prepare.mjs','tools/probe-checks/land-package-district-export.js','tools/address-package-build.mjs','tools/address-package-prepare.mjs','tools/probe-checks/address-package-export.js']);
+export const PREPARATION_HELPERS=Object.freeze(['tools/land-package-files.mjs','tools/land-package-source-key.mjs','tools/land-package-build.mjs','tools/land-package-prepare.mjs','tools/probe-checks/land-package-district-export.js','tools/address-package-build.mjs','tools/address-package-prepare.mjs','tools/probe-checks/address-package-export.js','tools/probe-checks/address-package-fresh-export.js','tools/startup-environment.cjs']);
 const slash=value=>value.split(path.sep).join('/');
 const textFile=file=>/\.(?:[cm]?js|json|css|svg|txt|glsl|vert|frag|html|md)$/.test(file);
 function tree(root,dir=root){

@@ -21,6 +21,7 @@ import { requireSingleProgress } from './game/progressboot.js';
 import './game/progressboot.css';
 import { pollPad } from './input/gamepad.js';
 import { makePadMenu } from './input/padmenu.js';
+import {selectAddressBoot17b} from './game/addressboot17b.js';
 
 // журнал ошибок и зависаний (docs/CRASHES.md) — первым делом: ловит и ошибки загрузки игры
 CRASH.init();
@@ -64,12 +65,14 @@ useMap(await STARTUP.awaited('map.readParseImport', 'module', () => loadMap(mapI
 STARTUP.mark('map.ready', { mapId });
 document.documentElement.dataset.city = mapId;
 
-// The first address package is an explicit diagnostic consumer, before game/visual builders.
-if(import.meta.env.MODE==='steam'&&new URLSearchParams(location.search).has('addresspackage17b')){
+// This is only a cheap candidate choice. The game validates its full actual previsual key.
+const addressCatalog17=typeof __ADDRESS_PACKAGE_CATALOG__!=='undefined'?__ADDRESS_PACKAGE_CATALOG__:null;
+const addressBoot17=selectAddressBoot17b({mode:import.meta.env.MODE,mapId,deck:!!Platform.steam?.deck,userAgent:navigator.userAgent,
+  get:(key,fallback)=>{const value=Platform.store.get(key);return value===undefined?fallback:value;},query:location.search,catalog:addressCatalog17});
+if(addressBoot17.enabled){
   const {ADDRESS_PACKAGE_PRELOAD17B}=await import('./game/addresspackage17b.js');
   await STARTUP.awaited('addresses.preload','cacheIO',()=>ADDRESS_PACKAGE_PRELOAD17B.preload({
-    enabled:new URLSearchParams(location.search).get('addresspackage17b')!=='0',
-    catalog:typeof __ADDRESS_PACKAGE_CATALOG__!=='undefined'?__ADDRESS_PACKAGE_CATALOG__:null,
+    enabled:true,graphics:addressBoot17.graphics,catalog:addressCatalog17,
   }));
 }
 

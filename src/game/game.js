@@ -30,6 +30,7 @@ import {ADDRESS_PACKAGE_PRELOAD17B} from './addresspackage17b.js';
 import {encodeAddressCatalog} from './addresscodec17b.js';
 import {captureAddressProgress17b,captureAddressInput17b} from './addresskey17b.js';
 import {captureEarlyAddressQueries17b} from './addressproof17b.js';
+import {publishAddressAcceptance17b} from './addressacceptance17b.js';
 import {streetGraphInputHash} from './streetgraph-input.js';
 import {createStreetGraphExport} from './streetgraphexport.js';
 import {edgeKey,createStreetGraph,bindSegmentNodes,applyStaticBoundary,buildNodeGrid} from './streetgraph.js';
@@ -6103,7 +6104,7 @@ function buildCity () {
     else buildPizzeria(spot.x, spot.z, spot.ry);
     if (DISTRICTS && house) { buildDistrictPizzerias(); usePizzeria(DIST.cur()); }
   } finally { LAND_OBJECT=true; }
-  if (['landexport17b','addressclosure17b','addressexport17b','addresspackage17b'].some(key=>new URLSearchParams(location.search).has(key))) {
+  if (window.__startupHost?.environment?.productionQuery || ['landexport17b','addressclosure17b','addressexport17b','addresspackage17b'].some(key=>new URLSearchParams(location.search).has(key))) {
     const pizza = { x: PIZZA?.x, z: PIZZA?.z, bx: PIZZA?.bx, bz: PIZZA?.bz };
     if (!Object.values(pizza).every(Number.isFinite)) throw Error('land-package17b-export:PRE_LATE_PIZZA_COORDINATES');
     Object.defineProperty(window, '__landPackage17bPreLate', { value: Object.freeze({
@@ -17282,7 +17283,7 @@ SEAS.initSeasons({ THREE, scene, cam, renderer, Store, MAP, CITY, V, S, groundH,
 /* поздняя сборка (latebuild.js): то, что в меню не главное, — очередью после первого кадра меню.
    ?nolate — всё разом, как раньше; ?mapcheck — тоже разом (проверка карты смотрит готовый город) */
 LATE.enable(!INTRO && !MAPCHECK && !/[?&]nolate(&|$)/.test(location.search));
-if (['addressclosure17b','addressexport17b','addresspackage17b'].some(key=>new URLSearchParams(location.search).has(key))) {
+if (ADDRESS_PACKAGE_PRELOAD17B.meta().held || ['addressclosure17b','addressexport17b','addresspackage17b'].some(key=>new URLSearchParams(location.search).has(key))) {
   Object.defineProperty(window, '__addressClosure17bInitial', { value: snapshotAddressInitial17b({
     phase: 'before-city-syncBuild', at: performance.now(),
     mapId: MAP.id, mode: import.meta.env.MODE, adult: !!ADULT, career: !!CAREER,
@@ -19157,3 +19158,20 @@ if (window.__dlv) window.__dlv.MOBV = MOBV.DEBUG;
 if (MAPCHECK) MAPW.debug(MAPFIX, MAPW_API || (MAPW_API = mapApi()));
 
 if (window.__dlv) { window.__dlv.HANDOFF = HANDOFF.DEBUG; window.__dlv.PAYVIS = PAYVIS.DEBUG; window.__dlv.catchPoint = catchPoint; }
+
+publishAddressAcceptance17b({target:window,host:window.__startupHost,
+  read:()=>{
+    const control=window.__startupTrace?.firstControl||null;
+    return{state:S.state,position:{x:V.x,z:V.z},testTools:testTools(),
+      district:{current:DIST.cur(),opened:DIST.opened(),city:DIST.city(),partySeen:CITYOPEN.seen(),pizzaIndex:PIZZERIAS.indexOf(PIZZA),pizza:PIZZA?{x:PIZZA.x,z:PIZZA.z,bx:PIZZA.bx,bz:PIZZA.bz}:null,atControl:control?DIST.at(control.data.x,control.data.z):null},
+      firstControl:control,graphics:{preset:GFX.preset(),device:GFX.DEBUG.dev,width:innerWidth,height:innerHeight}};
+  },
+  details:()=>({input:ADDRESS_INPUT17B,preVisual:ADDRESS_PREVISUAL17B,status:ADDRESS_STATUS17B,preload:ADDRESS_PACKAGE_PRELOAD17B.meta(),provider:ADDRESS_PREPARED17?.meta()||null,early:window.__addressPackage17bEarly||null,preLate:window.__landPackage17bPreLate||null,rng:EDL.rngDescriptor()}),
+  report:()=>window.__startupTrace?.firstReport||STARTUP.report(),
+  queries:()=>{
+    const points=Object.getOwnPropertyDescriptor(window,'__addressPackage17bEarlyQueryInput')?.value;
+    if(!points||!ADDRESS_INPUT17B?.identity)return null;
+    return captureEarlyAddressQueries17b({provider:{queryAddress:realAddress,queryEntranceLevel:entranceLv},identity:ADDRESS_INPUT17B.identity,input:points});
+  },
+  crashes:()=>CL.entries(),
+});

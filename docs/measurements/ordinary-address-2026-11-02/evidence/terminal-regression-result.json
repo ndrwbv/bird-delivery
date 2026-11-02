@@ -1,0 +1,18 @@
+{
+  "kind": "root-transcribed-tool-result",
+  "argv": [
+    "node",
+    "tools/probe-terminal-test.mjs"
+  ],
+  "observedExitCode": 0,
+  "signal": "not reported by tool; not invented",
+  "stdout": {
+    "ok": true,
+    "checks": 5,
+    "firstTerminalWins": true,
+    "lateEvalCannotOverwrite": true,
+    "lateGlobalCatchQuiet": true,
+    "realFatalPreserved": true,
+    "electronOrGameLaunched": false
+  }
+}

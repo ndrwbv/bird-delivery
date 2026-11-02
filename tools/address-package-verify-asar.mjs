@@ -20,19 +20,23 @@ export function verifyAsarAddresses(archive,expectedExternalCatalog){
  const bytes=asar.extractFile(archive,toAsarInternalPath(catalogPath),false);need(bytes.length===stat.size,'PACKAGED_CATALOG');
  let parsed;try{parsed=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}catch{need(false,'CATALOG_JSON');}
  const catalog=checkAddressPackageCatalog(parsed);need(canonical(catalog)===canonical(expected),'PACKAGED_CATALOG_CHANGED');
- const entry=catalog.entry,file=prefix+entry.path;
- need(Number.isSafeInteger(entry.bytes)&&entry.bytes>0&&entry.bytes<=16*1024*1024,'PACKAGED_CONTENT_BUDGET');
- // Every address-data entry is accounted for. No extra nested directory, link or payload is silently ignored.
- const actual=asar.listPackage(archive).map(name=>name.replaceAll('\\','/').replace(/^\/+/,''))
+ const slots=catalog.version===1?[{graphics:null,identity:catalog.identity,entry:catalog.entry}]:catalog.slots;
+ const wanted=[catalogPath,...slots.map(slot=>prefix+slot.entry.path)].sort();
+ const actual=asar.listPackage(archive).map(name=>name.replaceAll('\\','/').replace(/^\/+/ ,''))
   .filter(name=>name.startsWith(dataPrefix)).sort();
- need(canonical(actual)===canonical([catalogPath,file].sort()),'PACKAGED_DATA_INVENTORY');
- const s=asar.statFile(archive,toAsarInternalPath(file),false);
- need(s&&s.size===entry.bytes&&!s.link&&!s.unpacked&&!('files'in s),'PACKAGED_FILE');
- const payload=asar.extractFile(archive,toAsarInternalPath(file),false);
- need(payload.length===entry.bytes&&sha256(payload)===entry.sha256,'PACKAGED_SHA');
- decodeAddressCatalog(payload,catalog.identity);
- return{ok:true,archive,catalogSha256:sha256(bytes),sourceHash:catalog.identity.sourceHash,inputHash:catalog.identity.inputHash,
-  assets:[{path:file,bytes:payload.length,sha256:entry.sha256}]};
+ need(canonical(actual)===canonical(wanted),'PACKAGED_DATA_INVENTORY');
+ const assets=[];
+ for(const slot of slots){
+  const {entry,identity}=slot,file=prefix+entry.path;
+  need(Number.isSafeInteger(entry.bytes)&&entry.bytes>0&&entry.bytes<=16*1024*1024,'PACKAGED_CONTENT_BUDGET');
+  const s=asar.statFile(archive,toAsarInternalPath(file),false);
+  need(s&&s.size===entry.bytes&&!s.link&&!s.unpacked&&!('files'in s),'PACKAGED_FILE');
+  const payload=asar.extractFile(archive,toAsarInternalPath(file),false);
+  need(payload.length===entry.bytes&&sha256(payload)===entry.sha256,'PACKAGED_SHA');decodeAddressCatalog(payload,identity);
+  assets.push({path:file,bytes:payload.length,sha256:entry.sha256,...(catalog.version===2?{graphics:slot.graphics,inputHash:identity.inputHash}:{})});
+ }
+ return{ok:true,archive,catalogSha256:sha256(bytes),catalogVersion:catalog.version,sourceHash:slots[0].identity.sourceHash,
+  inputHash:catalog.version===1?catalog.identity.inputHash:null,assets};
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const arg=key=>process.argv.slice(2).find(v=>v.startsWith('--'+key+'='))?.slice(key.length+3);

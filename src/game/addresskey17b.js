@@ -96,6 +96,37 @@ function roadRows(roads,B){
 }
 function points(rows,min){for(const row of rows){need(Array.isArray(row)&&row.length>=min,'points');for(const p of row)need(Array.isArray(p)&&p.length>=2&&typeof p[0]==='number'&&typeof p[1]==='number','point');}}
 
+const FRESH_DIAGNOSTICS=new Set(['mute','debug','nolb','startuptrace','addressclosure17b','addressexport17b','addresspackage17b=1']);
+const FRESH_ZERO=new Set(['dlv-msk-wallet','dlv-msk-best','dlv-msk-xp','dlv-msk-col','dlv-shifts','dlv-stars','dlv-don-trash','dlv-don-gang','dlv-district','dlv-delivered']);
+const nil=value=>value===undefined||value===null;
+function freshProgress(initial,progress){
+  const v=progress.values;
+  need(initial.district.current===0&&initial.district.opened===1&&initial.district.city===false,'unsupported-fresh-district');
+  // cityopen.repair runs later and debug disables it. These exact states give it no work.
+  for(const k of ['dlv-city-party','dlv-city-mode'])need(nil(v[k])||v[k]===false||v[k]===0,'unsupported-fresh-repair:'+k);
+  need(v['dlv-dist-open']===undefined||v['dlv-dist-open']===1,'unsupported-fresh-open');
+  need(initial.season.saved===null||initial.season.saved===undefined,'unsupported-fresh-season');
+  need(CAR_KEYS.every(k=>nil(initial.car.inputs[k])&&nil(v[k])),'unsupported-fresh-car');
+  need(v['dlv-money-x8']===1&&progress.presentKeys.includes('dlv-money-x8'),'unsupported-fresh-money-version');
+  for(const k of KNOWN){
+    if(CAR_KEYS.includes(k)||k==='dlv-city-party'||k==='dlv-city-mode'||k==='dlv-dist-open')continue;
+    const value=v[k];
+    if(k==='dlv-name'){need(value===undefined||value==='Женя','unsupported-fresh-progress:'+k);continue;}
+    if(FRESH_ZERO.has(k)){need(value===undefined||value===0,'unsupported-fresh-progress:'+k);continue;}
+    if(k==='dlv-season'){need(nil(value),'unsupported-fresh-progress:'+k);continue;}
+    if(k==='dlv-dist-shifts'){need(value===undefined||Array.isArray(value)&&value.length<=8&&value.every(n=>n===0),'unsupported-fresh-progress:'+k);continue;}
+    need(value===undefined,'unsupported-fresh-progress:'+k);
+  }
+}
+function orderedEntries(raw){return[...new URLSearchParams(raw)].map((row,index)=>({row,index})).sort((a,b)=>a.row[0]<b.row[0]?-1:a.row[0]>b.row[0]?1:a.index-b.index).map(v=>v.row);}
+function freshQuery(raw){
+  // Match literal ASCII tokens BEFORE decoding. Encoded/case/value/world variants are retained.
+  const body=raw.startsWith('?')?raw.slice(1):raw;
+  const normalized=body.split('&').filter(token=>!FRESH_DIAGNOSTICS.has(token)).join('&');
+  need(normalized==='','unsupported-fresh-query');
+  return{normalization:'fresh-diagnostics-v1',raw:normalized,entries:orderedEntries(normalized)};
+}
+
 /** city is an explicit port, not a scene-bearing CITY clone:
     {roads,buildings,entrances,paths,lots,terrain:{g,nx,nz,x0,z0},roadFacts:{widths,drivable}}.
     width/drivable arrays MUST be computed by the actual game helpers, in original road order. */
@@ -110,14 +141,21 @@ export function captureAddressInput17b(args){
     const initial=Object.create(null);for(const k of Object.keys(rawInitial))if(k!=='at')ownSet(initial,k,clone(data(rawInitial,k),B));
     shape(initial.season,['value','forced','saved']);shape(initial.donation,['trashRaw','trashGoal','trashFraction']);shape(initial.district,['current','opened','city']);shape(initial.car,['id','inputs']);shape(initial.car.inputs,CAR_KEYS);shape(initial.graphics,['preset','device']);shape(initial.ordinary,['provider','ordinaryAtImport','hookOwned','baseSeed']);
     need(initial.phase==='before-city-syncBuild'&&initial.mapId===base.mapId&&initial.mode==='steam'&&initial.adult===true&&initial.career===true&&initial.intro===false&&initial.editor===false&&initial.language==='ru','unsupported-runtime');
-    need(initial.graphics.preset==='high'&&initial.graphics.device==='deck'&&initial.car.id==='semerka'&&initial.district.current===0&&initial.district.opened===8&&initial.district.city===false,'unsupported-slot');
+    need(['mid','high'].includes(initial.graphics.preset)&&initial.graphics.device==='deck'&&initial.car.id==='semerka'&&initial.district.current===0&&initial.district.city===false,'unsupported-slot');
     need(initial.season.value===2.5&&initial.season.forced===false&&initial.donation.trashRaw===0&&initial.donation.trashFraction===0&&initial.donation.trashGoal===480000,'unsupported-initial-axis');
     need(initial.ordinary.provider==='edl-owned-fnv1a-mulberry32-v1'&&initial.ordinary.baseSeed===0x5EED&&initial.ordinary.ordinaryAtImport===true&&initial.ordinary.hookOwned===true,'unsupported-rng');
-    const rawProgress=data(args,'progress');fields(rawProgress);if(data(rawProgress,'eligible')===false){const reason=data(rawProgress,'reason');need(typeof reason==='string'&&reason.length<=2048,'progress-capture');throw Error(reason);}const progress=progressSnapshot(rawProgress,B);need(progress.values['dlv-shifts']===40,'unsupported-maturity');
+    const rawProgress=data(args,'progress');fields(rawProgress);if(data(rawProgress,'eligible')===false){const reason=data(rawProgress,'reason');need(typeof reason==='string'&&reason.length<=2048,'progress-capture');throw Error(reason);}const progress=progressSnapshot(rawProgress,B);
     const rawQuery=data(args,'query');need(typeof rawQuery==='string'&&rawQuery.length<=16384,'query');
-    const entries=[...new URLSearchParams(rawQuery)],opt=entries.filter(([k])=>k==='addresspackage17b');need(opt.length===1&&['0','1'].includes(opt[0][1]),'requires-opt-in');
-    // Some game consumers inspect raw search with regex; decoded pairs alone could collide.
-    const query={raw:rawQuery,entries:entries.map((row,index)=>({row,index})).sort((a,b)=>a.row[0]<b.row[0]?-1:a.row[0]>b.row[0]?1:a.index-b.index).map(v=>v.row)};
+    const mature=initial.district.opened===8&&initial.graphics.preset==='high';
+    let query,diagnosticQuery;
+    if(mature){
+      need(progress.values['dlv-shifts']===40,'unsupported-maturity');
+      const entries=[...new URLSearchParams(rawQuery)],opt=entries.filter(([k])=>k==='addresspackage17b');need(opt.length===1&&['0','1'].includes(opt[0][1]),'requires-opt-in');
+      // Historical mature diagnostic mode keeps its entire raw query identity unchanged.
+      query={raw:rawQuery,entries:orderedEntries(rawQuery)};
+    }else{
+      freshProgress(initial,progress);query=freshQuery(rawQuery);diagnosticQuery={raw:rawQuery,entries:orderedEntries(rawQuery)};
+    }
     const port=data(args,'city');shape(port,['roads','buildings','entrances','paths','lots','terrain','roadFacts']);
     // First-slot key does not encode reference topology. Reject it before cloning erases it.
     need(new Set(['roads','buildings','entrances','paths','lots'].map(k=>data(port,k))).size===5,'unsupported-table-alias');
@@ -133,8 +171,10 @@ export function captureAddressInput17b(args){
     const heights=data(args,'terrainHeights'),heightCount=typed(heights,Float32Array,B);need(heightCount===terrain.nx*terrain.nz,'terrain-length');B.node(heightCount);
     let mask=null,maskBytes=null,maskCount=0;const rawMask=data(args,'borderMask');
     if(rawMask!==null){shape(rawMask,['C','x0','z0','nx','nz','a']);mask={C:data(rawMask,'C'),x0:data(rawMask,'x0'),z0:data(rawMask,'z0'),nx:data(rawMask,'nx'),nz:data(rawMask,'nz')};need(Number.isFinite(mask.C)&&mask.C>0&&Number.isFinite(mask.x0)&&Number.isFinite(mask.z0)&&Number.isSafeInteger(mask.nx)&&mask.nx>0&&Number.isSafeInteger(mask.nz)&&mask.nz>0,'border-mask');maskBytes=data(rawMask,'a');maskCount=typed(maskBytes,Uint8Array,B);need(maskCount===mask.nx*mask.nz,'mask-length');}
-    const descriptor=freeze({version:1,base,initial,progress,query,counts:{roads:roads.length,buildings:buildings.length,rawEntrances:entrances.length,paths:paths.length,lots:lots.length,terrainSamples:heightCount,maskBytes:maskCount}});
-    const writer=new Writer();writer.string('bird-address-input-17b-v1');writer.value({base,initial,progress,query,city:{roads,buildings,entrances,paths,lots,terrain,roadFacts:facts},mask});writer.f32(heights,heightCount);if(maskBytes)writer.bytes(maskBytes,maskCount);
+    const counts={roads:roads.length,buildings:buildings.length,rawEntrances:entrances.length,paths:paths.length,lots:lots.length,terrainSamples:heightCount,maskBytes:maskCount};
+    const descriptor=freeze(mature?{version:1,base,initial,progress,query,counts}:{version:2,profile:'fresh-v1',base,initial,progress,query,counts,diagnosticQuery});
+    // diagnosticQuery is deliberately absent here. No removed raw token can leak back via descriptor.
+    const writer=new Writer();writer.string(mature?'bird-address-input-17b-v1':'bird-address-input-17b-fresh-v1');writer.value({base,initial,progress,query,city:{roads,buildings,entrances,paths,lots,terrain,roadFacts:facts},mask});writer.f32(heights,heightCount);if(maskBytes)writer.bytes(maskBytes,maskCount);
     const identity=Object.freeze({...base,inputHash:writer.end()});return{eligible:true,identity,descriptor};
   }catch(error){return miss(error);}
 }

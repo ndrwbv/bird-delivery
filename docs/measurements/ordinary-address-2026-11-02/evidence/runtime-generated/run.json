@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "kind": "ordinary-address-runtime-admission",
+  "variant": "generated",
+  "preset": "high",
+  "session": "addr17b-51ed5d44-5ab4-4091-b6dc-72391cf96cbd",
+  "schedule": {
+    "mode": "settled",
+    "early": false,
+    "bootWaitSec": 1200,
+    "controlWaitMs": 420000,
+    "probeTimeoutSec": 1740,
+    "hardTimeoutMs": 1800000,
+    "movementWaitMs": 30000
+  },
+  "scope": {
+    "kind": "supplied Steam directory/ASAR body; not installer/distribution or timing comparison",
+    "packagedAsarPath": false
+  },
+  "argv": [
+    "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+    "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+    "--mode=steam",
+    "--dir=/tmp/bird-address-ordinary-1102-v2/candidate.asar/dist/steam",
+    "--startup-trace",
+    "--startup-session=addr17b-51ed5d44-5ab4-4091-b6dc-72391cf96cbd",
+    "--startup-cold",
+    "--startup-fixture=/private/tmp/bird-address-ordinary-1102-v2/runtime-generated/fixture.json",
+    "--fresh",
+    "--startup-production-query",
+    "--startup-deck",
+    "--startup-admission=settled",
+    "--size=deck",
+    "--cpu=1",
+    "--bootcpu",
+    "--init-script=/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/startup-bootstrap-observe.js",
+    "--q=addresspackage17b=0",
+    "--eval=/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/address-package-ready.js",
+    "--bootwait=1200",
+    "--timeout=1740",
+    "--max=0",
+    "--errors",
+    "--report=/private/tmp/bird-address-ordinary-1102-v2/runtime-generated/raw.json"
+  ],
+  "dist": "/tmp/bird-address-ordinary-1102-v2/candidate.asar/dist/steam",
+  "startedAt": "2026-11-02T03:38:20.233Z",
+  "status": "returned",
+  "processStatus": 0,
+  "signal": null,
+  "fixtureFile": "/private/tmp/bird-address-ordinary-1102-v2/runtime-generated/fixture.json",
+  "fixtureSha256": "79588fe961c376b1aa0a95bd04d833f7899ed2cfc4617f39f4b42bb89af93141",
+  "catalogFile": "/tmp/bird-address-ordinary-1102-v2/production-steam/address-data/catalog.json",
+  "catalogSha256": "48f2a3ea8f4a087db2f5c055f1432f1499e0490cf802bd48f6d5cdbf2741785c",
+  "initFile": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/startup-bootstrap-observe.js",
+  "initSha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8",
+  "harness": [
+    {
+      "file": "tools/address-package-smoke.mjs",
+      "sha256": "5e29e91cb91d96f41e5186c309d873fd5a4295f5372589ba85796c96aa91eb9e"
+    },
+    {
+      "file": "tools/probe-checks/address-package-ready.js",
+      "sha256": "6e55b04082409eb74c5d9c17c301e1cdd9550bf0b9db01efcfe1599f592b2cb8"
+    },
+    {
+      "file": "tools/address-package-prepare.mjs",
+      "sha256": "c33d3a95694e82f2e783f8149976e634f91b85bf97f066486a29416cb5f796de"
+    },
+    {
+      "file": "tools/probe.cjs",
+      "sha256": "031a6145f0a9556534e0b15201acfc24ab012022824be0e66e6427b843c7addc"
+    },
+    {
+      "file": "tools/probe-page.cjs",
+      "sha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd"
+    },
+    {
+      "file": "tools/startup-report.mjs",
+      "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+    },
+    {
+      "file": "tools/startup-admission.cjs",
+      "sha256": "fec1148600e1ff8f58f643541592121095c717390b09cb57014a88d64e6e0e33"
+    },
+    {
+      "file": "tools/startup-environment.cjs",
+      "sha256": "948e7bca2a5bae0c49d854ff499802d20530820935429f6a848e7390b63881b3"
+    },
+    {
+      "file": "tools/probe-checks/startup-bootstrap-observe.js",
+      "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+    }
+  ],
+  "pid": 41222,
+  "finishedAt": "2026-11-02T03:38:49.894Z",
+  "stdoutSha256": "436f552bbe7eacf8bb5f3cfb1c69585e63f02bc50f5d59e259af9bb1e3b0da4f",
+  "stderrSha256": "cc28cd286281b2c0d40b96b2fa046120c9db9c79a1d8a5aae3467f66bfe6b7e4",
+  "reportBytes": 37604,
+  "rawSha256": "ed3f57ffe8bbb6e41c97e8d9711cca2c9aa7430589cc4b5905b114b55f7fe6ef",
+  "validation": {
+    "ok": true,
+    "reasons": []
+  },
+  "ok": true,
+  "moved": 0.16295629120598285
+}

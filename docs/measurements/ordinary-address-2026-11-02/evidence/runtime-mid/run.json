@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "kind": "ordinary-address-runtime-admission",
+  "variant": "cache",
+  "preset": "mid",
+  "session": "addr17b-08710e1a-ae2e-4e8c-a374-41ab67289fcc",
+  "schedule": {
+    "mode": "settled",
+    "early": false,
+    "bootWaitSec": 1200,
+    "controlWaitMs": 420000,
+    "probeTimeoutSec": 1740,
+    "hardTimeoutMs": 1800000,
+    "movementWaitMs": 30000
+  },
+  "scope": {
+    "kind": "supplied Steam directory/ASAR body; not installer/distribution or timing comparison",
+    "packagedAsarPath": false
+  },
+  "argv": [
+    "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+    "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+    "--mode=steam",
+    "--dir=/tmp/bird-address-ordinary-1102-v2/candidate.asar/dist/steam",
+    "--startup-trace",
+    "--startup-session=addr17b-08710e1a-ae2e-4e8c-a374-41ab67289fcc",
+    "--startup-cold",
+    "--startup-fixture=/private/tmp/bird-address-ordinary-1102-v2/runtime-mid/fixture.json",
+    "--fresh",
+    "--startup-production-query",
+    "--startup-deck",
+    "--startup-admission=settled",
+    "--size=deck",
+    "--cpu=1",
+    "--bootcpu",
+    "--init-script=/tmp/bird-address-ordinary-1102-v2/early-queries-mid-init.js",
+    "--eval=/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/address-package-ready.js",
+    "--bootwait=1200",
+    "--timeout=1740",
+    "--max=0",
+    "--errors",
+    "--report=/private/tmp/bird-address-ordinary-1102-v2/runtime-mid/raw.json"
+  ],
+  "dist": "/tmp/bird-address-ordinary-1102-v2/candidate.asar/dist/steam",
+  "startedAt": "2026-11-02T03:37:40.179Z",
+  "status": "returned",
+  "processStatus": 0,
+  "signal": null,
+  "fixtureFile": "/private/tmp/bird-address-ordinary-1102-v2/runtime-mid/fixture.json",
+  "fixtureSha256": "c75469c8666ddd05c141f9f482ff19aecf5469bea3577970f6842736cc7e2717",
+  "catalogFile": "/tmp/bird-address-ordinary-1102-v2/production-steam/address-data/catalog.json",
+  "catalogSha256": "48f2a3ea8f4a087db2f5c055f1432f1499e0490cf802bd48f6d5cdbf2741785c",
+  "initFile": "/tmp/bird-address-ordinary-1102-v2/early-queries-mid-init.js",
+  "initSha256": "69c8d7166b95815dd5951b7bde4b1f60ee3bdacf22d8590783616ab76e7851b1",
+  "harness": [
+    {
+      "file": "tools/address-package-smoke.mjs",
+      "sha256": "5e29e91cb91d96f41e5186c309d873fd5a4295f5372589ba85796c96aa91eb9e"
+    },
+    {
+      "file": "tools/probe-checks/address-package-ready.js",
+      "sha256": "6e55b04082409eb74c5d9c17c301e1cdd9550bf0b9db01efcfe1599f592b2cb8"
+    },
+    {
+      "file": "tools/address-package-prepare.mjs",
+      "sha256": "c33d3a95694e82f2e783f8149976e634f91b85bf97f066486a29416cb5f796de"
+    },
+    {
+      "file": "tools/probe.cjs",
+      "sha256": "031a6145f0a9556534e0b15201acfc24ab012022824be0e66e6427b843c7addc"
+    },
+    {
+      "file": "tools/probe-page.cjs",
+      "sha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd"
+    },
+    {
+      "file": "tools/startup-report.mjs",
+      "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+    },
+    {
+      "file": "tools/startup-admission.cjs",
+      "sha256": "fec1148600e1ff8f58f643541592121095c717390b09cb57014a88d64e6e0e33"
+    },
+    {
+      "file": "tools/startup-environment.cjs",
+      "sha256": "948e7bca2a5bae0c49d854ff499802d20530820935429f6a848e7390b63881b3"
+    },
+    {
+      "file": "tools/probe-checks/startup-bootstrap-observe.js",
+      "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+    }
+  ],
+  "pid": 40736,
+  "finishedAt": "2026-11-02T03:38:10.698Z",
+  "stdoutSha256": "114a35876fe961921c6c0cb58044246b57d68aaf70585fe0b434c06c54c44d85",
+  "stderrSha256": "1effa7997034bdefaf0bbda5379320d3120b9ada9af337f67c348eb3f3ade0ae",
+  "reportBytes": 2723195,
+  "rawSha256": "303279150bd4833a7629a79973040c20a7aa8c00ffc21023fab5d648fb944519",
+  "validation": {
+    "ok": true,
+    "reasons": []
+  },
+  "ok": true,
+  "moved": 0.21728040488412365
+}

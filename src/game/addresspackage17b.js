@@ -4,13 +4,38 @@ import {decodeAddressCatalog} from './addresscodec17b.js';
 const MAX_FILE=16*1024*1024;
 const need=(yes,code)=>{if(!yes)throw Error('address-package17b:'+code);};
 const hash=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);
-const fields=(value,names)=>value&&Object.getPrototypeOf(value)===Object.prototype&&Object.keys(value).sort().join(',')===names.split(',').sort().join(',');
+const fields=(value,names)=>{
+  if(!value||Object.getPrototypeOf(value)!==Object.prototype)return false;
+  const keys=Reflect.ownKeys(value),required=names.split(',');
+  return keys.length===required.length&&required.every(k=>{const d=Object.getOwnPropertyDescriptor(value,k);return d&&Object.hasOwn(d,'value')&&d.enumerable;});
+};
+function ownSlot(identity,entry){
+  need(fields(identity,'mapId,mapHash,editsHash,sourceHash,inputHash')&&typeof identity.mapId==='string'&&/^[a-z0-9_-]{1,64}$/.test(identity.mapId)&&['mapHash','editsHash','sourceHash','inputHash'].every(k=>hash(identity[k])),'IDENTITY');
+  need(fields(entry,'path,bytes,sha256')&&hash(entry.sha256)&&Number.isSafeInteger(entry.bytes)&&entry.bytes>0&&entry.bytes<=MAX_FILE&&entry.path==='address-data/'+entry.sha256+'.addr','ENTRY');
+  return {identity:Object.freeze({...identity}),entry:Object.freeze({...entry})};
+}
 export function checkAddressPackageCatalog(value){
-  need(fields(value,'version,kind,identity,entry')&&value.version===1&&value.kind==='address-package17b','CATALOG');
-  const i=value.identity,e=value.entry;
-  need(fields(i,'mapId,mapHash,editsHash,sourceHash,inputHash')&&typeof i.mapId==='string'&&i.mapId.length>0&&i.mapId.length<=64&&['mapHash','editsHash','sourceHash','inputHash'].every(k=>hash(i[k])),'IDENTITY');
-  need(fields(e,'path,bytes,sha256')&&hash(e.sha256)&&Number.isSafeInteger(e.bytes)&&e.bytes>0&&e.bytes<=MAX_FILE&&e.path==='address-data/'+e.sha256+'.addr','ENTRY');
-  return Object.freeze({version:1,kind:value.kind,identity:Object.freeze({...i}),entry:Object.freeze({...e})});
+  const version=value&&Object.getOwnPropertyDescriptor(value,'version');
+  need(version&&Object.hasOwn(version,'value')&&[1,2].includes(version.value),'CATALOG');
+  if(version.value===1){
+    need(fields(value,'version,kind,identity,entry')&&value.kind==='address-package17b','CATALOG');
+    return Object.freeze({version:1,kind:value.kind,...ownSlot(value.identity,value.entry)});
+  }
+  need(fields(value,'version,kind,slots')&&value.kind==='address-package17b'&&Array.isArray(value.slots)&&Object.getPrototypeOf(value.slots)===Array.prototype&&value.slots.length===2&&Reflect.ownKeys(value.slots).length===3,'CATALOG_SLOTS');
+  for(let index=0;index<2;index++)need(Object.hasOwn(Object.getOwnPropertyDescriptor(value.slots,index)||{},'value'),'CATALOG_SLOTS');
+  const slots=value.slots.map(slot=>{need(fields(slot,'graphics,identity,entry')&&['mid','high'].includes(slot.graphics),'SLOT');return Object.freeze({graphics:slot.graphics,...ownSlot(slot.identity,slot.entry)});});
+  need(new Set(slots.map(slot=>slot.graphics)).size===2&&new Set(slots.map(slot=>slot.entry.path)).size===2&&new Set(slots.map(slot=>slot.identity.inputHash)).size===2,'DUPLICATE_SLOT');
+  need(slots.every(slot=>['mapId','mapHash','editsHash','sourceHash'].every(k=>slot.identity[k]===slots[0].identity[k])),'SLOT_BASE');
+  need(slots.reduce((sum,slot)=>sum+slot.entry.bytes,0)<=MAX_FILE,'AGGREGATE_BUDGET');
+  slots.sort((a,b)=>['mid','high'].indexOf(a.graphics)-['mid','high'].indexOf(b.graphics));
+  return Object.freeze({version:2,kind:value.kind,slots:Object.freeze(slots)});
+}
+export function assertProductAddressCatalog(value){const checked=checkAddressPackageCatalog(value);need(checked.version===2,'PRODUCT_CATALOG_V2');return checked;}
+export function selectAddressPackageCatalog(value,graphics){
+  const checked=checkAddressPackageCatalog(value);
+  if(checked.version===1)return graphics===undefined||['mid','high'].includes(graphics)?checked:null;
+  const slot=checked.slots.find(slot=>slot.graphics===graphics);
+  return slot?Object.freeze({version:1,kind:checked.kind,identity:slot.identity,entry:slot.entry}):null;
 }
 const identitySame=(a,b)=>a&&b&&['mapId','mapHash','editsHash','sourceHash','inputHash'].every(k=>a[k]===b[k]);
 const digest=async bytes=>{
@@ -18,9 +43,9 @@ const digest=async bytes=>{
   return Array.from(new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256',bytes)),v=>v.toString(16).padStart(2,'0')).join('');
 };
 export function createAddressPackagePreloader({fetchAsset=(...args)=>fetch(...args),digestBytes=digest,timeoutMs=2000}={}){
-  let phase='off',reason=null,task=null,candidate=null,wireHash=null,wireBytes=0,consumed=false;
-  const meta=()=>({phase,reason,wireHash,wireBytes,held:!!candidate,consumed});
-  async function preload({enabled=false,catalog,baseURL=globalThis.location?.href}={}){
+  let phase='off',reason=null,task=null,candidate=null,wireHash=null,wireBytes=0,consumed=false,selectedGraphics=null,catalogVersion=null;
+  const meta=()=>({phase,reason,wireHash,wireBytes,held:!!candidate,consumed,selectedGraphics,catalogVersion});
+  async function preload({enabled=false,catalog,graphics,baseURL=globalThis.location?.href}={}){
     if(task)return task;
     if(!enabled||consumed)return meta();
     task=(async()=>{
@@ -28,7 +53,9 @@ export function createAddressPackagePreloader({fetchAsset=(...args)=>fetch(...ar
       const alive=()=>need(!stopped&&!controller?.signal.aborted,'CANCELLED');
       try{
         need(Number.isSafeInteger(timeoutMs)&&timeoutMs>0&&timeoutMs<=30000,'TIMEOUT');
-        const checked=checkAddressPackageCatalog(catalog),entry=checked.entry;
+        const complete=checkAddressPackageCatalog(catalog);catalogVersion=complete.version;
+        const checked=selectAddressPackageCatalog(complete,graphics);need(checked,'UNSUPPORTED_GRAPHICS');
+        selectedGraphics=graphics??null;const entry=checked.entry;
         const here=new URL(baseURL),url=new URL(entry.path,new URL('./',here));
         need(['app:','http:','https:'].includes(here.protocol)&&url.protocol===here.protocol&&url.host===here.host&&url.pathname==='/'+entry.path&&!url.search&&!url.hash,'LOCAL_URL');
         phase='reading';controller=new AbortController();

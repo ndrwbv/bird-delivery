@@ -36,7 +36,7 @@ function host(pause='eval'){
    if(name==='./probe-build.cjs')return{BASE:'/virtual/probe',ensureBuild:()=>({dir:'/virtual/build'})};
    if(name==='./probe-page.cjs')return{PRELUDE:'',INSTALL:'INSTALL'};
    if(name==='./probe-glmem.cjs')return{GLMEM:''};
-   if(name==='./land-cache-host.cjs')return requireHere(name);
+   if(['./land-cache-host.cjs','./land-package-export-host.cjs','./startup-environment.cjs'].includes(name))return requireHere(name);
    throw Error('Unexpected probe dependency: '+name);
   }};
  vm.runInNewContext(source+'\nmodule.exports={finish,fatal,get finished(){return finished;}};',sandbox,{filename:'probe.cjs',timeout:2000});

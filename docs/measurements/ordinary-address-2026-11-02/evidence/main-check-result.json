@@ -1,0 +1,20 @@
+{
+  "kind": "root-observed-exec-result",
+  "argv": [
+    "npm",
+    "run",
+    "check",
+    "--",
+    "--rebuild",
+    "--serial",
+    "--only=build-,i18n,late-wait,startup-,address-,streetgraph,land-package-,land-cache-,probe-terminal,routehouse,shift-loading,smoke-"
+  ],
+  "rootToolSession": 29218,
+  "observedExitCode": 1,
+  "checks": 43,
+  "failedCheck": "probe-terminal",
+  "reason": "VM boundary rejected two real host helpers: startup-environment.cjs and preexisting land-package-export-host.cjs",
+  "allGameChecksPassed": true,
+  "translationsWarningKept": true,
+  "resolution": "Only the offline terminal-test dependency boundary was extended; actual host/game/preparation source unchanged. Focused regression passed."
+}

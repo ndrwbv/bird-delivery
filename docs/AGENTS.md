@@ -199,6 +199,14 @@ dev-сервер для агентов — без перезагрузки от 
 `node tools/land-package-smoke.mjs --dir=<готовая Steam-сборка> --out=<новый внешний каталог> --preset=high --cpu=3` — один реальный Go/W, fresh guard2, ordinary ownership, cache hit/clean0, SHA и activate/align1. Это admission, не итоговая серия. Для warm обязательно передать `--session` той же успешно завершённой cold-пары; одинаковый профиль не доказывает OS/driver cache hit. `tools/land-package-verify-asar.mjs --asar=<app.asar> --dir=<готовая Steam-сборка>` сверяет actual packaged catalog/inventory/wire SHA. Для запуска probe над ASAR передать smoke `--catalog=<готовая Steam-сборка>/city-data/catalog.json`: обычный Node сам не читает виртуальную папку ASAR, Electron читает. Такой smoke проверяет packaged dist через тестовый Electron, не release executable/main/Steam Cloud. Не запускать production main над сохранением автора ради такой проверки.
 
 
+**Обычный запуск адресного пакета №17б (02.11.2026):** флаги probe `--startup-no-lang`, `--startup-deck` и `--startup-production-query` разрешены только для startup-проверки Steam. Первый убирает автоматический `lang`, второй задаёт User-Agent Steam Deck на стороне host — это эмуляция устройства, не физическая Deck. Третий убирает автоматические `debug`, `nolb` и `lang`; доступен только порт снимков `window.__addressAcceptance17b`, без включения `__dlv` и тестовых инструментов игры. Звук остаётся выключенным (`mute`).
+
+```sh
+node tools/address-package-smoke.mjs --dir=<actualASAR/dist/steam> --catalog=<externaldist/address-data/catalog.json> --out=/tmp/new --preset=high --admission=settled
+```
+
+Каталог вывода должен быть новым. Проверяются свежая карьера ru, начальная «Семёрка» и `mid` либо `high`; smoke сам создаёт минимальное сохранение, выбирает CPU×1/Deck viewport и нажимает настоящие Go, кнопки обучения и W. `settled` ждёт готовую очередь; `--admission=early` проверяет раннее нажатие. Дополнительный `--init=<sidecar-init.js>` допустим только для cache-проверки с соответствующими фиксированными запросами; generated-контроль (`--variant=generated`) запускается без него. Неизвестные адресному пакету состояния остаются на обычной генерации. Эта приёмка тела ASAR не меняет глобальную очередь `LATE`, не проверяет установщик и не является доказательством ускорения; все прогоны — без звука.
+
 Город строился весь при загрузке, до первого кадра меню: ~5 с на обычном компьютере, ~14,5 с на
 «Деке» (`--cpu=3 --bootcpu`; автор на настоящей Деке — 12,5 с). Теперь (`src/game/latebuild.js`, порядок — `buildCity` в game.js):
 

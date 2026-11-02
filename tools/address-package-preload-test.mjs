@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createHash,webcrypto} from 'node:crypto';
 import {createAddressCatalogRecorder} from '../src/game/addresscatalog.js';
 import {encodeAddressCatalog} from '../src/game/addresscodec17b.js';
-import {checkAddressPackageCatalog,createAddressPackagePreloader} from '../src/game/addresspackage17b.js';
+import {checkAddressPackageCatalog,assertProductAddressCatalog,selectAddressPackageCatalog,createAddressPackagePreloader} from '../src/game/addresspackage17b.js';
 const identity={mapId:'fixture',mapHash:'a'.repeat(64),editsHash:'b'.repeat(64),sourceHash:'c'.repeat(64),inputHash:'d'.repeat(64)};
 const targets={buildings:[{id:'дом😀'},{id:-0}],houses:[],generatedDoors:[],entrances:[[-0,0,1,0]],spots:[]};
 const record=createAddressCatalogRecorder(targets);
@@ -23,7 +23,7 @@ const native=Object.getOwnPropertyDescriptor(globalThis,'crypto');Object.defineP
 try{
  await test('disabled preloader never validates/fetches or accepts a candidate',async()=>{
   let calls=0;const p=createAddressPackagePreloader({fetchAsset:()=>{calls++;assert.fail('disabled fetch');}}),m=await p.preload({enabled:false,catalog:{bad:true}});
-  assert.deepEqual(m,{phase:'off',reason:null,wireHash:null,wireBytes:0,held:false,consumed:false});assert.equal(calls,0);assert.equal(p.take(identity),null);assert.equal(p.meta().held,false);
+  assert.deepEqual(m,{phase:'off',reason:null,wireHash:null,wireBytes:0,held:false,consumed:false,selectedGraphics:null,catalogVersion:null});assert.equal(calls,0);assert.equal(p.take(identity),null);assert.equal(p.meta().held,false);
  });
  await test('valid native SHA/codec hit is single-flight, consumed once, immutable and detached',async()=>{
   let calls=0;const p=createAddressPackagePreloader({fetchAsset:async(url,opts)=>{calls++;assert.equal(url,'app://g/'+catalog().entry.path);assert.equal(opts.cache,'default');assert.ok(opts.signal instanceof AbortSignal);return response();}});
@@ -104,5 +104,28 @@ try{
   for(const timeoutMs of [0,-1,1.5,30001,Infinity]){let calls=0;const p=createAddressPackagePreloader({timeoutMs,fetchAsset:()=>calls++});await p.preload(options());assert.match(cleanMiss(p).reason,/TIMEOUT/);assert.equal(calls,0);}
  });
  await test('catalog validator returns frozen detached identity and entry',async()=>{const c=catalog(),checked=checkAddressPackageCatalog(c);assert.deepEqual(checked,c);assert.notEqual(checked.identity,c.identity);assert.notEqual(checked.entry,c.entry);assert.equal(Object.isFrozen(checked),true);c.identity.mapId='other';assert.equal(checked.identity.mapId,'fixture');});
+ const highIdentity={...identity,inputHash:'e'.repeat(64)},highWire=encodeAddressCatalog(source,highIdentity);
+ const v2=()=>({version:2,kind:'address-package17b',slots:[
+  {graphics:'high',identity:{...highIdentity},entry:{path:'address-data/'+sha(highWire)+'.addr',bytes:highWire.length,sha256:sha(highWire)}},
+  {graphics:'mid',identity:{...identity},entry:{...catalog().entry}},
+ ]});
+ await test('v2 product normalized mid/high, owned immutable metadata only',()=>{const c=v2(),owned=assertProductAddressCatalog(c);assert.deepEqual(owned.slots.map(slot=>slot.graphics),['mid','high']);assert.equal(Object.isFrozen(owned.slots),true);assert.equal(Object.isFrozen(owned.slots[0].entry),true);assert.notEqual(owned.slots[0].identity,c.slots[1].identity);assert.equal(Object.isFrozen(c.slots),false);assert.equal(selectAddressPackageCatalog(owned,'mid').version,1);assert.throws(()=>assertProductAddressCatalog(catalog()),/PRODUCT_CATALOG_V2/);});
+ for(const graphics of ['mid','high'])await test('v2 fetches/decode only selected '+graphics+' profile',async()=>{
+  let calls=0;const c=v2(),slot=c.slots.find(slot=>slot.graphics===graphics),wanted=graphics==='mid'?wire:highWire;
+  const p=createAddressPackagePreloader({fetchAsset:async url=>{calls++;assert.equal(url,'app://g/'+slot.entry.path);return response(wanted);}});
+  await p.preload(options({catalog:c,graphics}));assert.equal(calls,1);assert.equal(p.meta().selectedGraphics,graphics);assert.equal(p.meta().catalogVersion,2);assert.equal(p.meta().held,true);
+  const taken=p.take(slot.identity);assert.equal(taken.catalog.version,1);assert.equal(taken.catalog.entry.sha256,sha(wanted));assert.deepEqual(taken.snapshot,source);assert.equal(p.meta().held,false);
+ });
+ for(const graphics of ['low','custom',undefined])await test('v2 unsupported/missing preset never fetches',async()=>{let calls=0;const p=createAddressPackagePreloader({fetchAsset:()=>{calls++;assert.fail('unsupported fetch');}});await p.preload(options({catalog:v2(),graphics}));assert.match(cleanMiss(p).reason,/UNSUPPORTED_GRAPHICS/);assert.equal(p.meta().catalogVersion,2);assert.equal(p.meta().selectedGraphics,null);assert.equal(calls,0);});
+ for(const [label,mutate,reason]of [
+  ['missing',c=>c.slots.pop(),/CATALOG_SLOTS/],['duplicate preset',c=>c.slots[0].graphics='mid',/DUPLICATE_SLOT/],
+  ['unsupported preset',c=>c.slots[0].graphics='low',/SLOT/],['duplicate path',c=>c.slots[0].entry={...c.slots[1].entry},/DUPLICATE_SLOT/],
+  ['duplicate key',c=>c.slots[0].identity.inputHash=c.slots[1].identity.inputHash,/DUPLICATE_SLOT/],
+  ['foreign source',c=>c.slots[0].identity.sourceHash='f'.repeat(64),/SLOT_BASE/],
+  ['aggregate ceiling',c=>{for(const slot of c.slots)slot.entry.bytes=8*1024*1024+1;},/AGGREGATE_BUDGET/],
+ ])await test('v2 refuses '+label+' before any fetch',async()=>{const c=v2();mutate(c);let calls=0;const p=createAddressPackagePreloader({fetchAsset:()=>{calls++;assert.fail('invalid v2 fetch');}});await p.preload(options({catalog:c,graphics:'mid'}));assert.match(cleanMiss(p).reason,reason);assert.equal(calls,0);});
+ await test('v2 selection remains single flight even when another profile is requested later',async()=>{let calls=0;const p=createAddressPackagePreloader({fetchAsset:async()=>{calls++;return response();}});await p.preload(options({catalog:v2(),graphics:'mid'}));await p.preload(options({catalog:v2(),graphics:'high'}));assert.equal(calls,1);assert.equal(p.meta().selectedGraphics,'mid');assert.equal(p.take(highIdentity),null);assert.equal(p.meta().reason,'input-mismatch');assert.equal(p.meta().held,false);});
+ await test('v2 selected profile still verifies actual SHA, not another valid slot',async()=>{const p=createAddressPackagePreloader({fetchAsset:async()=>response(highWire)});await p.preload(options({catalog:v2(),graphics:'mid'}));assert.match(cleanMiss(p).reason,/FILE_SHA/);});
+ await test('v2 metadata accessors refused without execution',async()=>{const c=v2();let reads=0;Object.defineProperty(c.slots,0,{get(){reads++;return c.slots[1];}});assert.throws(()=>checkAddressPackageCatalog(c),/CATALOG_SLOTS/);assert.equal(reads,0);});
  console.log(JSON.stringify({ok:true,checks,wireBytes:wire.length,actualRecorder:true,actualCodec:true,nativeCrypto:true,pendingTimeoutMs:2,noGame:true}));
 }finally{if(native)Object.defineProperty(globalThis,'crypto',native);else delete globalThis.crypto;}

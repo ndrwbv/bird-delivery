@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "kind": "ordinary-address-runtime-admission",
+  "variant": "cache",
+  "preset": "high",
+  "session": "addr17b-f2eb5544-1b24-48f7-a42f-6c24e5fa82bf",
+  "schedule": {
+    "mode": "settled",
+    "early": false,
+    "bootWaitSec": 1200,
+    "controlWaitMs": 420000,
+    "probeTimeoutSec": 1740,
+    "hardTimeoutMs": 1800000,
+    "movementWaitMs": 30000
+  },
+  "scope": {
+    "kind": "supplied Steam directory/ASAR body; not installer/distribution or timing comparison",
+    "packagedAsarPath": false
+  },
+  "argv": [
+    "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+    "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+    "--mode=steam",
+    "--dir=/tmp/bird-address-ordinary-1102-v2/candidate.asar/dist/steam",
+    "--startup-trace",
+    "--startup-session=addr17b-f2eb5544-1b24-48f7-a42f-6c24e5fa82bf",
+    "--startup-cold",
+    "--startup-fixture=/private/tmp/bird-address-ordinary-1102-v2/runtime-high/fixture.json",
+    "--fresh",
+    "--startup-production-query",
+    "--startup-deck",
+    "--startup-admission=settled",
+    "--size=deck",
+    "--cpu=1",
+    "--bootcpu",
+    "--init-script=/tmp/bird-address-ordinary-1102-v2/early-queries-high-init.js",
+    "--eval=/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/address-package-ready.js",
+    "--bootwait=1200",
+    "--timeout=1740",
+    "--max=0",
+    "--errors",
+    "--report=/private/tmp/bird-address-ordinary-1102-v2/runtime-high/raw.json"
+  ],
+  "dist": "/tmp/bird-address-ordinary-1102-v2/candidate.asar/dist/steam",
+  "startedAt": "2026-11-02T03:36:08.574Z",
+  "status": "returned",
+  "processStatus": 0,
+  "signal": null,
+  "fixtureFile": "/private/tmp/bird-address-ordinary-1102-v2/runtime-high/fixture.json",
+  "fixtureSha256": "79588fe961c376b1aa0a95bd04d833f7899ed2cfc4617f39f4b42bb89af93141",
+  "catalogFile": "/tmp/bird-address-ordinary-1102-v2/production-steam/address-data/catalog.json",
+  "catalogSha256": "48f2a3ea8f4a087db2f5c055f1432f1499e0490cf802bd48f6d5cdbf2741785c",
+  "initFile": "/tmp/bird-address-ordinary-1102-v2/early-queries-high-init.js",
+  "initSha256": "0dfa7ed5507f9ede39ba15af74ad9ce4749fede5c95a6dbc4591d46c61cb11f3",
+  "harness": [
+    {
+      "file": "tools/address-package-smoke.mjs",
+      "sha256": "5e29e91cb91d96f41e5186c309d873fd5a4295f5372589ba85796c96aa91eb9e"
+    },
+    {
+      "file": "tools/probe-checks/address-package-ready.js",
+      "sha256": "6e55b04082409eb74c5d9c17c301e1cdd9550bf0b9db01efcfe1599f592b2cb8"
+    },
+    {
+      "file": "tools/address-package-prepare.mjs",
+      "sha256": "c33d3a95694e82f2e783f8149976e634f91b85bf97f066486a29416cb5f796de"
+    },
+    {
+      "file": "tools/probe.cjs",
+      "sha256": "031a6145f0a9556534e0b15201acfc24ab012022824be0e66e6427b843c7addc"
+    },
+    {
+      "file": "tools/probe-page.cjs",
+      "sha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd"
+    },
+    {
+      "file": "tools/startup-report.mjs",
+      "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+    },
+    {
+      "file": "tools/startup-admission.cjs",
+      "sha256": "fec1148600e1ff8f58f643541592121095c717390b09cb57014a88d64e6e0e33"
+    },
+    {
+      "file": "tools/startup-environment.cjs",
+      "sha256": "948e7bca2a5bae0c49d854ff499802d20530820935429f6a848e7390b63881b3"
+    },
+    {
+      "file": "tools/probe-checks/startup-bootstrap-observe.js",
+      "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+    }
+  ],
+  "pid": 40354,
+  "finishedAt": "2026-11-02T03:36:39.741Z",
+  "stdoutSha256": "f7fc7017fd14d74e84203041434228086c8c83835b92576a4ae718a82f80e27a",
+  "stderrSha256": "ed2636552dae7ff70775b006c536c1b84d2fb3e2f298871299f39aa160be1f11",
+  "reportBytes": 2722787,
+  "rawSha256": "25250bbdce42dc18e1a305d9a1d19946a85178ac754d16ea67c6a6aa3cb012f9",
+  "validation": {
+    "ok": true,
+    "reasons": []
+  },
+  "ok": true,
+  "moved": 0.16325949724640262
+}

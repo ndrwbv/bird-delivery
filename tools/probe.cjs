@@ -36,6 +36,9 @@
    --cpu=N                  процессор медленнее в N раз (после загрузки, как perf.cjs --deck; Дека ≈ 3)
    --early                  не ждать, пока город достроится за меню (latebuild.js): скрипт — сразу с первым кадром меню
    --bootcpu                --cpu уже с начала загрузки (замер запуска на «Деке»: window.__boot — мс от старта страницы)
+   --startup-no-lang        только startup Steam: язык из настоящего сохранения, без автоматического ?lang
+   --startup-deck           только startup Steam: host User-Agent Steam Deck, без ?gfxdev
+   --startup-production-query  только startup Steam: без автоматических debug/nolb/lang; mute сохраняется
    --land-package-district=0|3|7  ожидаемый реальный район экспорта (0); только вместе с --land-package-export
    --seed=N                 Math.random с зерном — город одинаковый от запуска к запуску (сравнить до/после)
    --cpuprofile=f.cpuprofile  профиль процессора загрузки (до меню) — для разбора, что долго строится
@@ -96,6 +99,7 @@ for (const f of fs.readdirSync(BASE)) {            // папки упавших 
 }
 // №17ж opt-in retained test session, always inside probe-owned /tmp root.
 const STARTUP_BENCH = has('startup-trace'), STARTUP_SESSION = arg('startup-session', '');
+const STARTUP_ENVIRONMENT=require('./startup-environment.cjs').startupEnvironment(argv,{benchmark:STARTUP_BENCH,mode:MODE,phone:PHONE});
 const STARTUP_ADMISSION = arg('startup-admission',null);
 const ADMISSION_SETTINGS = STARTUP_ADMISSION===null ? null : require('./startup-admission.cjs').admissionSettings(STARTUP_ADMISSION);
 if(ADMISSION_SETTINGS&&(!STARTUP_BENCH||ADMISSION_SETTINGS.mode==='settled'&&has('early')))throw Error('Settled admission requires startup trace and no --early');
@@ -109,6 +113,7 @@ if (STARTUP_SESSION) {
 const STARTUP_HOST = { processEpochMs: Math.round(performance.timeOrigin), electron: process.versions.electron,
   chrome: process.versions.chrome, node: process.versions.node, platform: process.platform, arch: process.arch, seed: arg('seed', null), cpuThrottle: +arg('cpu', 1), bootcpu: has('bootcpu') };
 if(ADMISSION_SETTINGS)STARTUP_HOST.admission=ADMISSION_SETTINGS;
+if(STARTUP_ENVIRONMENT.noLanguage||STARTUP_ENVIRONMENT.deck||STARTUP_ENVIRONMENT.productionQuery)STARTUP_HOST.environment=STARTUP_ENVIRONMENT;
 app.setPath('userData', UD);
 if (app.dock) app.dock.hide();
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);   // stream — <audio> музыки (music.js), как в electron/main.cjs
@@ -205,6 +210,10 @@ app.whenReady().then(async () => {
 
   const win = new BrowserWindow({ width: W, height: H, useContentSize: true, show: false,
     webPreferences: { offscreen: true, backgroundThrottling: false, session: SES, preload: pre, sandbox: false, contextIsolation: !PHONE } });
+  if(STARTUP_ENVIRONMENT.deck){
+    const nativeUA=win.webContents.getUserAgent(),actualUA=require('./startup-environment.cjs').startupUserAgent(nativeUA,STARTUP_ENVIRONMENT);
+    win.webContents.setUserAgent(actualUA);STARTUP_HOST.userAgent={native:nativeUA,actual:actualUA,scope:'host Steam Deck device emulation; not physical hardware'};
+  }
   win.webContents.setFrameRate(60);
   const errors = [];
   let uncaught = 0;
@@ -384,8 +393,7 @@ app.whenReady().then(async () => {
 
   const timer = setTimeout(() => { err('probe: время вышло (--timeout=' + arg('timeout', 360) + ')'); finish(1, { ok: false, timeout: true, errors }); }, +arg('timeout', 360) * 1000);
 
-  const q = ['debug', 'mute', 'nolb', 'lang=' + LANG];
-  if (STARTUP_BENCH) q.push('startuptrace');
+  const q = require('./startup-environment.cjs').startupQueryPrefix({environment:STARTUP_ENVIRONMENT,language:LANG,benchmark:STARTUP_BENCH});
   if (!has('fresh')) q.push('nointro');
   if (has('kids')) q.push('kids');
   if (arg('map')) q.push('map=' + arg('map'));
@@ -435,7 +443,10 @@ app.whenReady().then(async () => {
   const bootWait=+arg('bootwait',240);                // окончательный контур земли строится за меню; смена — только после полной готовности
   for (let i = 0; i < bootWait*10; i++) {
     if (finished) return;
-    try { ok = await js(GAME ? `!!(window.__dlv && __dlv.frame && __dlv.S && !document.body.classList.contains('booting')${has('early') ? '' : ' && (!window.__boot || window.__boot.full)'})` : `document.readyState === 'complete' && window.__probeReady !== false`); } catch (e) { /* — */ }
+    try { ok = await js(GAME ? STARTUP_ENVIRONMENT.productionQuery
+      ? `!!(window.__addressAcceptance17b && __addressAcceptance17b.ready && !document.body.classList.contains('booting')${has('early') ? '' : ' && (!window.__boot || window.__boot.full)'})`
+      : `!!(window.__dlv && __dlv.frame && __dlv.S && !document.body.classList.contains('booting')${has('early') ? '' : ' && (!window.__boot || window.__boot.full)'})`
+      : `document.readyState === 'complete' && window.__probeReady !== false`); } catch (e) { /* — */ }
     if (finished) return;
     if (ok) break;
     await sleep(100);

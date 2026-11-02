@@ -1,0 +1,7 @@
+{
+  "baseCommit": "3e09526c969cae53973aa734524db208f906a978",
+  "sourceHash": "7c2b69b062fda7248d4a66d01207c216ccea9b9edf3f72614be4dd946e2a0fef",
+  "patchSha256": "e451af4c3138dd80beb21262513e22259880b6c19b31511e11bc50128c01cba0",
+  "patchBytes": 231145,
+  "scope": "Working checkout patch before commit; measurement directory excluded to avoid circular inclusion. Measured source and harness snapshots are separately byte-pinned by archive-manifest.json."
+}

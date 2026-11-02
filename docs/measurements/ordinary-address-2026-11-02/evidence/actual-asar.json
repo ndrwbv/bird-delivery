@@ -1,0 +1,24 @@
+{
+  "ok": true,
+  "archive": "/tmp/bird-address-ordinary-1102-v2/candidate.asar",
+  "catalogSha256": "48f2a3ea8f4a087db2f5c055f1432f1499e0490cf802bd48f6d5cdbf2741785c",
+  "catalogVersion": 2,
+  "sourceHash": "7c2b69b062fda7248d4a66d01207c216ccea9b9edf3f72614be4dd946e2a0fef",
+  "inputHash": null,
+  "assets": [
+    {
+      "path": "dist/steam/address-data/80191ea4d1c8c973aa8c169ff0d7a0f6555f98d49b3fd88ef1f123eb81003a38.addr",
+      "bytes": 413028,
+      "sha256": "80191ea4d1c8c973aa8c169ff0d7a0f6555f98d49b3fd88ef1f123eb81003a38",
+      "graphics": "mid",
+      "inputHash": "372d82ede6a54aa8581c503aaf6143dff67ecc783ada734e566f9fa22d61a08b"
+    },
+    {
+      "path": "dist/steam/address-data/4531b47738693532d875a7dbb97633060ddd9fc0c04169d795ab3407dea1e6f2.addr",
+      "bytes": 413028,
+      "sha256": "4531b47738693532d875a7dbb97633060ddd9fc0c04169d795ab3407dea1e6f2",
+      "graphics": "high",
+      "inputHash": "aaa7f2f0ecf627e74be8fe192c8f09fdcbf568f24ad3b259aae9ffc87af52d77"
+    }
+  ]
+}
