@@ -25,6 +25,11 @@ import * as SOFTSURF from './softsurfaces.js';
 import {buildAddressSpotsSteps} from './addresslayout.js';
 import {createAddressCatalogRecorder} from './addresscatalog.js';
 import {snapshotAddressInitial17b} from './addressinput17b.js';
+import {createPreparedAddressProvider} from './addressprovider17b.js';
+import {ADDRESS_PACKAGE_PRELOAD17B} from './addresspackage17b.js';
+import {encodeAddressCatalog} from './addresscodec17b.js';
+import {captureAddressProgress17b,captureAddressInput17b} from './addresskey17b.js';
+import {captureEarlyAddressQueries17b} from './addressproof17b.js';
 import {streetGraphInputHash} from './streetgraph-input.js';
 import {createStreetGraphExport} from './streetgraphexport.js';
 import {edgeKey,createStreetGraph,bindSegmentNodes,applyStaticBoundary,buildNodeGrid} from './streetgraph.js';
@@ -50,7 +55,7 @@ const LAND_PACKAGE = import.meta.env.MODE==='steam'&&LAND_PACKAGE_CATALOG&&!LAND
     descriptor:()=>EDL.rngDescriptor(),query:location.search,trustedLimits:LAND_PACKAGE_LIMITS,
     assetBase:new URL('./',location.href).href,work:STARTUP.work,steps:STARTUP.steps,awaited:STARTUP.awaited,
     count:STARTUP.count,flag:STARTUP.flag,mark:STARTUP.mark}) : null;
-function landPackageUsable(){if(LAND_PACKAGE?.fatal)throw Error('land-package17b:FATAL_PIPELINE');}
+function landPackageUsable(){if(LAND_PACKAGE?.fatal)throw Error('land-package17b:FATAL_PIPELINE');if(ADDRESS_PREPARED17?.meta().fatal)throw Error('address-package17b:FATAL_PIPELINE');}
 function landCacheFailure17(meta){
   const trace=STARTUP.report(),allRows=trace.rows.filter(row=>/^raisedland[.]/.test(row.name)),rows=allRows.slice(0,32);
   const activateCalls=trace.rows.find(row=>row.name==='raisedland.activate')?.steps||0;
@@ -4854,8 +4859,17 @@ function inWall (x, z, m = 0) {
    над дверью и ступенька, у части — лавочка и урна. Дом в карте знает,
    где у него подъезды, поэтому они стоят не где попало, а где в жизни. */
 function* osmEntrances () {                      // шагами (yield) — поздняя сборка, latebuild.js
-  const osm = ADDRESS_CATALOG ? ADDRESS_CATALOG.mergeDoorsOnce() : CITY.entrances.length;
-  if (!ADDRESS_CATALOG) for (const e of GEN_ENTR) CITY.entrances.push(e);      // свои подъезды — тоже точки доставки
+  let osm;
+  if(ADDRESS_PREPARED17){
+    osm=ADDRESS_PREPARED17.mergeDoorsOnce(()=>{
+      const raw=ADDRESS_CATALOG?ADDRESS_CATALOG.mergeDoorsOnce():CITY.entrances.length;
+      if(!ADDRESS_CATALOG)for(const e of GEN_ENTR)CITY.entrances.push(e);
+      return raw;
+    });
+  }else{
+    osm = ADDRESS_CATALOG ? ADDRESS_CATALOG.mergeDoorsOnce() : CITY.entrances.length;
+    if (!ADDRESS_CATALOG) for (const e of GEN_ENTR) CITY.entrances.push(e);      // свои подъезды — тоже точки доставки
+  }
   for (const [x, z, nx, nz] of CITY.entrances.slice(0, osm)) {
     if (!inBounds(x, z, -60)) continue;
     EDL.seedAt('door', x, z);                        // жребий по месту двери: убранный в редакторе дом не сдвигает соседей (editlayer.js)
@@ -6089,7 +6103,7 @@ function buildCity () {
     else buildPizzeria(spot.x, spot.z, spot.ry);
     if (DISTRICTS && house) { buildDistrictPizzerias(); usePizzeria(DIST.cur()); }
   } finally { LAND_OBJECT=true; }
-  if (new URLSearchParams(location.search).has('landexport17b') || new URLSearchParams(location.search).has('addressclosure17b')) {
+  if (['landexport17b','addressclosure17b','addressexport17b','addresspackage17b'].some(key=>new URLSearchParams(location.search).has(key))) {
     const pizza = { x: PIZZA?.x, z: PIZZA?.z, bx: PIZZA?.bx, bz: PIZZA?.bz };
     if (!Object.values(pizza).every(Number.isFinite)) throw Error('land-package17b-export:PRE_LATE_PIZZA_COORDINATES');
     Object.defineProperty(window, '__landPackage17bPreLate', { value: Object.freeze({
@@ -15384,16 +15398,21 @@ function dropPhone () {
    двенадцати метров к улице. */
 const SPOTS = [];
 // Offline preparation only until the early catalog's complete functional input has been proven.
-const ADDRESS_CATALOG = (new URLSearchParams(location.search).has('logicalexport17b') || new URLSearchParams(location.search).has('addressclosure17b'))
+const ADDRESS_CATALOG = ['logicalexport17b','addressclosure17b','addressexport17b','addresspackage17b'].some(key=>new URLSearchParams(location.search).has(key))
   ? createAddressCatalogRecorder({houses:HOUSES,generatedDoors:GEN_ENTR,entrances:CITY.entrances,spots:SPOTS,buildings:CITY.buildings}) : null;
-function emitAddressHouse(building,row){if(ADDRESS_CATALOG)ADDRESS_CATALOG.acceptHouse(building,row);else HOUSES.push(row);}
-function emitGeneratedDoor(building,row,grand){if(ADDRESS_CATALOG)ADDRESS_CATALOG.acceptDoor(building,row,grand);else GEN_ENTR.push(row);}
+let ADDRESS_PREPARED17=null,ADDRESS_INPUT17B=null,ADDRESS_PREVISUAL17B=null,ADDRESS_STATUS17B=null;
+function emitAddressHouse(building,row){const accepted=ADDRESS_PREPARED17?ADDRESS_PREPARED17.acceptHouse(building,row):row;if(ADDRESS_CATALOG)ADDRESS_CATALOG.acceptHouse(building,accepted);else HOUSES.push(accepted);}
+function emitGeneratedDoor(building,row,grand){const accepted=ADDRESS_PREPARED17?ADDRESS_PREPARED17.acceptDoor(building,row,grand):row;if(ADDRESS_CATALOG)ADDRESS_CATALOG.acceptDoor(building,accepted,grand);else GEN_ENTR.push(accepted);}
+const ADDRESS_EXPORT17B=new URLSearchParams(location.search).has('addressexport17b')?Object.freeze({
+  meta:()=>({phase:ADDRESS_CATALOG?.phase,input:ADDRESS_INPUT17B,preVisual:ADDRESS_PREVISUAL17B,status:ADDRESS_STATUS17B,preload:ADDRESS_PACKAGE_PRELOAD17B.meta()}),
+  bytes:()=>{if(!ADDRESS_INPUT17B?.eligible||!ADDRESS_INPUT17B.identity)throw Error('address-export17b:UNSUPPORTED_INPUT');return encodeAddressCatalog(ADDRESS_CATALOG.snapshot(),ADDRESS_INPUT17B.identity);},
+}):null;
 
 /* шагами (function*, latebuild.js): на Деке ~0,25 с одним куском; «рядом уже есть адрес» — по клеткам 6 м, а не перебором
    всех адресов (тот же ответ: |dx| < 6 и |dz| < 6) */
 function* buildSpots () {
   yield* buildAddressSpotsSteps({entrances:CITY.entrances,paths:CITY.paths,lots:CITY.lots,spots:SPOTS,
-    lerp,inPoly,inBounds,groundH,inHouse,nearestRoad,blocks:(x,z,r)=>JUMPS.blocks(x,z,r)});
+    lerp,inPoly,inBounds,groundH,inHouse,nearestRoad,blocks:(x,z,r)=>JUMPS.blocks(x,z,r),acceptSpot:ADDRESS_PREPARED17?row=>ADDRESS_PREPARED17.acceptSpot(row):undefined});
 }
 
 /* точка в кольце от центра — случайная из подходящих */
@@ -16783,7 +16802,7 @@ function reviveTick (dt) {
 }
 
 function startRun (ride) {
-  if (RESET_LOCKED || LAND_READ17?.failed || LAND_PACKAGE?.fatal) return;
+  if (RESET_LOCKED || LAND_READ17?.failed || LAND_PACKAGE?.fatal || ADDRESS_PREPARED17?.meta().fatal) return;
   STARTUP.request({ ride: !!ride, district: DIST.cur() });
   const place=PIZZERIAS[DIST.cur()]||PIZZA;
   if (LAND_STREAM && !LATE.busy() && !LAND_STREAM.readyAt(place.bx,place.bz,640)) {
@@ -16804,7 +16823,7 @@ function startRun (ride) {
   CL.transFor('начало смены', 3000);             // метка перехода (crashlog.js, 0п48): оборвётся — следующий запуск запишет
   LATE.flush();                                   // город ещё достраивался за меню — сначала достроить (latebuild.js)
   if(LAND_READ17){try{LAND_READ17.assertReady();}catch{return;}}
-  if(LAND_PACKAGE?.fatal)return;
+  if(LAND_PACKAGE?.fatal||ADDRESS_PREPARED17?.meta().fatal)return;
   S.ride = !!ride;
   DIRECTOR.shiftStart(S.ride);                   // режиссёр событий: смена сессии (director.js) — до погоды и фестиваля
   WTH.shiftStart(S.ride);                         // смена карьеры: сезон и погода жребием — жара, гроза, снежная зима… (weather.js)
@@ -17263,7 +17282,7 @@ SEAS.initSeasons({ THREE, scene, cam, renderer, Store, MAP, CITY, V, S, groundH,
 /* поздняя сборка (latebuild.js): то, что в меню не главное, — очередью после первого кадра меню.
    ?nolate — всё разом, как раньше; ?mapcheck — тоже разом (проверка карты смотрит готовый город) */
 LATE.enable(!INTRO && !MAPCHECK && !/[?&]nolate(&|$)/.test(location.search));
-if (new URLSearchParams(location.search).has('addressclosure17b')) {
+if (['addressclosure17b','addressexport17b','addresspackage17b'].some(key=>new URLSearchParams(location.search).has(key))) {
   Object.defineProperty(window, '__addressClosure17bInitial', { value: snapshotAddressInitial17b({
     phase: 'before-city-syncBuild', at: performance.now(),
     mapId: MAP.id, mode: import.meta.env.MODE, adult: !!ADULT, career: !!CAREER,
@@ -17283,6 +17302,44 @@ if (new URLSearchParams(location.search).has('addressclosure17b')) {
     graphics: { preset: GFX.preset(), device: GFX.DEBUG.dev },
     ordinary: EDL.rngDescriptor(),
   }), writable: false, configurable: false });
+  const counts17=()=>({houses:HOUSES.length,generatedDoors:GEN_ENTR.length,spots:SPOTS.length,rawEntrances:CITY.entrances.length});
+  const before17=counts17();
+  try{
+    const storageKeys17=[];
+    for(let i=0;i<localStorage.length;i++)storageKeys17.push(localStorage.key(i));
+    const progress17=captureAddressProgress17b({get:(key,fallback)=>{const value=Platform.store.get(key);return value===undefined?fallback:value;},keys:storageKeys17});
+    ADDRESS_INPUT17B=STARTUP.work('addresses.inputHash',()=>captureAddressInput17b({
+      base:typeof __CITY_SOURCE_BASE17B__!=='undefined'?__CITY_SOURCE_BASE17B__:null,
+      city:{roads:CITY.roads,buildings:CITY.buildings,entrances:CITY.entrances,paths:CITY.paths,lots:CITY.lots,
+        terrain:{g:TER.g,nx:TER.nx,nz:TER.nz,x0:TER.x0,z0:TER.z0},
+        roadFacts:{widths:CITY.roads.map(roadWidth),drivable:CITY.roads.map(drivable)}},
+      terrainHeights:TH,borderMask:BMASK,initial:window.__addressClosure17bInitial,progress:progress17,query:location.search,
+    }));
+  }catch(error){ADDRESS_INPUT17B={eligible:false,reason:String(error?.message||error).slice(0,240)};}
+  Object.freeze(ADDRESS_INPUT17B);
+  ADDRESS_PREVISUAL17B=Object.freeze({phase:'before-city-syncBuild',at:performance.now(),before:Object.freeze(before17),after:Object.freeze(counts17()),lateWorkStarted:Object.keys(LATE.T).length>0,inputHash:ADDRESS_INPUT17B.identity?.inputHash||null});
+  const prepared17=ADDRESS_PACKAGE_PRELOAD17B.take(ADDRESS_INPUT17B.eligible?ADDRESS_INPUT17B.identity:null);
+  ADDRESS_STATUS17B={phase:'generated',reason:ADDRESS_INPUT17B.reason||ADDRESS_PACKAGE_PRELOAD17B.meta().reason||null};
+  if(prepared17){
+    let provider17=null;
+    try{
+      provider17=createPreparedAddressProvider({catalog:prepared17.snapshot,
+        targets:{get houses(){return HOUSES;},get generatedDoors(){return GEN_ENTR;},get entrances(){return CITY.entrances;},get spots(){return SPOTS;},get buildings(){return CITY.buildings;}},
+        isCurrent:()=>!RESET_LOCKED,fallbackAddress:MAP.fallbackAddr||'',formatAddress:translit,doorRadius:ECON.DOOR.DOOR_R});
+      provider17.publishPrivate();ADDRESS_PREPARED17=provider17;
+      const proofInput17=Object.getOwnPropertyDescriptor(window,'__addressPackage17bEarlyQueryInput')?.value;
+      const queries17=proofInput17?captureEarlyAddressQueries17b({provider:provider17,identity:ADDRESS_INPUT17B.identity,input:proofInput17}):null;
+      const after17=counts17();
+      if(Object.keys(before17).some(key=>before17[key]!==after17[key]))throw Error('address-package17b:EARLY_CONSUMER_MUTATED_LIVE_COUNTS');
+      Object.defineProperty(window,'__addressPackage17bEarly',{value:Object.freeze({phase:'before-city-syncBuild',at:performance.now(),before:Object.freeze({...before17}),after:Object.freeze(after17),queries:queries17,provider:provider17.meta()}),writable:false,configurable:false});
+      ADDRESS_STATUS17B={phase:'private-ready',reason:null};
+    }catch(error){
+      if(provider17?.meta().published)provider17.cancel('EARLY_CONSUMER:'+String(error?.message||error).slice(0,240));
+      if(error?.addressPackageFatal)throw error;
+      ADDRESS_STATUS17B={phase:'generated',reason:String(error?.message||error).slice(0,240)};
+    }
+  }
+  Object.freeze(ADDRESS_STATUS17B);
 }
 const T0 = performance.now();
 STARTUP.work('city.syncBuild', () => buildCity());
@@ -17567,7 +17624,7 @@ if (!INTRO) LATE.add('yardcars2', () => YCARS.cars());   // машины во д
 // 02.10.2026: 24 — это теперь обычный день; по часам — econ.js TRAFFIC (пик 28, ночь 4–8), добирается trafficDensity
 const TRAFFIC_N = 24;
 LATE.add('traffic', () => spawnTraffic(INTRO ? 22 : Math.min(TRAFFIC_N, trafficWant())));
-if (!INTRO) LATE.add('spots', function* () { yield* STARTUP.steps('addresses.buildSpots', buildSpots()); if(ADDRESS_CATALOG)STARTUP.work('addresses.sealCatalog',()=>ADDRESS_CATALOG.sealSpots()); yield 'spots'; STARTUP.work('addresses.buildCollect', buildCollect); });
+if (!INTRO) LATE.add('spots', function* () { yield* STARTUP.steps('addresses.buildSpots', buildSpots()); if(ADDRESS_CATALOG)STARTUP.work('addresses.sealCatalog',()=>ADDRESS_CATALOG.sealSpots()); if(ADDRESS_PREPARED17)STARTUP.work('addresses.reconcileSeal',()=>ADDRESS_PREPARED17.sealSpots()); yield 'spots'; STARTUP.work('addresses.buildCollect', buildCollect); });
 /* погода смены (weather.js): сугробы снежной зимы — после адресов, чтобы их не завалить */
 LATE.add('weather', () => WTH.init({ THREE, scene, cam, renderer, Store, MAP, CITY, V, S, SPOTS, ZEBRAS, Snd, toast, groundH, curbAt, nearestRoad, roadWidth, drivable, inHouse, inPoly, inBounds, jumpBlocks: JUMPS.blocks,
   makeHuman, dropMesh, gibHuman, CAR_L, CAR_W, isPlaying, intro: INTRO, PIZZERIAS, get PIZZA () { return PIZZA; },
@@ -18508,7 +18565,7 @@ function frame (now) {
 function frameStep (now) {
   CL.at.ph = 'pre';
   if (LATE.busy() && lateFrame(now)) return;      // город ещё достраивается за меню (latebuild.js)
-  if (LAND_READ17 && !LAND_READ17.ready || LAND_PACKAGE?.fatal) return;
+  if (LAND_READ17 && !LAND_READ17.ready || LAND_PACKAGE?.fatal || ADDRESS_PREPARED17?.meta().fatal) return;
   if (LAND_STREAM && !LAND_ENTERING && (!LAND_READ17 || LAND_READ17.ready)) CL.step('земля рядом', () => {
     const menu=S.state==='title'||S.state==='over';
     LAND_STREAM.step(menu?PIZZA.bx:cam.position.x,menu?PIZZA.bz:cam.position.z);
@@ -18979,6 +19036,7 @@ const SBX = { god: false, nitro: false, noStall: false };
 if (import.meta.env.DEV || new URLSearchParams(location.search).has('debug')) window.__dlv = { SOFTCITY, SOFTSURF, inWall, FLY: FLYC, WRONG: WRONG.DEBUG, GUN, inTallHouse, WIDEN: { ...WIDEN.WIDEN, STATS: WIDEN.STATS }, SMOOTH: { SM: SMOOTH.SM, STATS: SMOOTH.STATS, ARCS: SMOOTH.ARCS, isArc: SMOOTH.isArc }, FACE: FACE_DEBUG, RADAR, HUDC, RYARD: RYARD.DEBUG, RT, RASK: RASK.DEBUG, OTAGS: OTAGS.DEBUG, NICK, RADIO: RADIO.DEBUG, OSK: OSKM, REPLAY: REPLAY.DEBUG, ACH: ACH.DEBUG, YARDS: YARDS.DEBUG, CITYOPEN: CITYOPEN.DEBUG, SC: SC.DEBUG, RL: RL.DEBUG, CHASE, chaseStart, chaseEnd, CHS, TDEN, trafficWant, ENV, LOCKS, districtLocks, S, V, DEATH, revive, TRAFFIC, TACT, TG: TGRID.TG, PARKI: { ...PARKI.DEBUG, orphans: () => PARKI.orphans(TRAFFIC) }, DEADENDS: { ...DEADENDS.DEBUG, blocks: e => DEADENDS.blocksExit(DE_API, e) }, PEDS, PEOPLE, PIZZA, PIZZERIAS, PICK_INFO, DIST: DIST.DEBUG, scatterPickups, NITRO_CANS, addPickup, PKI: PKI.STATS, get PZ_CUR () { return PIZZA; }, NODES, BENCHES, PROPS, SOLIDS, RINGS, YARD_RINGS, PARKINGS, LB, get car () { return car; }, get route () { return routePts; }, get routeOn () { return ROUTE_LINE.slots.some(q => q.m.visible); }, ROUTE_LINE, RP, rebuildRoutePath, updateRouteLine, CAREER, AUTO, DLG, ZN, ECON, donated, get RINK () { return RINK; }, FUEL_LOG: LM.FUEL_LOG, CULL: CULL.STATS, CULLREFRESH: CULL.refresh, RW: RW.DEBUG, CULLQ: CULL.Q, GFX: GFX.DEBUG, DYNRES: DYN.DEBUG, WIN: WINS.STATS, WINQ: WINS.quality, RAISED, SOLID_GRID, HOUSE_GRID, SMASH, setFullMap, setPause, newOrder, acceptOrder, gameOver, dentCar, boom, sparks, blood, runOver, runOverScoot, SCOOTS, HITS, wreckCar, knockCar, setGate, clearGate,
   STARTUP,
   LAND_PACKAGE,
+  ADDRESS_PREPARED17,ADDRESS_INPUT17B,ADDRESS_EXPORT17B,ADDRESS_PACKAGE_PRELOAD17B,ADDRESS_PREVISUAL17B,ADDRESS_STATUS17B,
   ADDRESS_CATALOG,
   ADDRESS_QUERY:{realAddress,entranceLv},
   STREET_GRAPH_EXPORT,

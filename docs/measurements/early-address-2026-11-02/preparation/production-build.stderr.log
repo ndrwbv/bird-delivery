@@ -1,0 +1,13 @@
+
+./fonts/PressStart2P-Regular.ttf referenced in ./fonts/PressStart2P-Regular.ttf didn't resolve at build time, it will remain unchanged to be resolved at runtime
+[plugin vite:reporter] 
+(!) /Users/andrewboev/Desktop/not-work/delivery/src/game/story.js is dynamically imported by /Users/andrewboev/Desktop/not-work/delivery/src/game/orders.js but also statically imported by /Users/andrewboev/Desktop/not-work/delivery/src/game/achievements.js, /Users/andrewboev/Desktop/not-work/delivery/src/game/doorstep.js, /Users/andrewboev/Desktop/not-work/delivery/src/game/game.js, /Users/andrewboev/Desktop/not-work/delivery/src/game/minigames/stairs.js, /Users/andrewboev/Desktop/not-work/delivery/src/game/storytest.js, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/andrewboev/Desktop/not-work/delivery/src/game/career.js is dynamically imported by /Users/andrewboev/Desktop/not-work/delivery/src/game/orders.js but also statically imported by /Users/andrewboev/Desktop/not-work/delivery/src/game/game.js, /Users/andrewboev/Desktop/not-work/delivery/src/game/world.js, dynamic import will not move module into another chunk.
+
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.

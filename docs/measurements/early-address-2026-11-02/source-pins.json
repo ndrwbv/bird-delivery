@@ -1,0 +1,141 @@
+[
+  {
+    "file": "src/game/addresscatalog.js",
+    "sha256": "d9090448e8734e4e29ef5299e1a0c970e49e40da32ba5cccda1908bfff62244a",
+    "measured": true
+  },
+  {
+    "file": "src/game/addresscodec17b.js",
+    "sha256": "1015479c6581302d03b75209aed77ae4c1c6f774aa8bd072a14d6356779cc362",
+    "measured": true
+  },
+  {
+    "file": "src/game/addressinput17b.js",
+    "sha256": "5dc5206edb681d07ed7e924a32d42c384ad134bd4cd431660ff2c0376eeaae6a",
+    "measured": true
+  },
+  {
+    "file": "src/game/addresskey17b.js",
+    "sha256": "b7d214124b30672a61b0dec09d282dda8612eef82bd529119280a782e530e16b",
+    "measured": true
+  },
+  {
+    "file": "src/game/addresslayout.js",
+    "sha256": "b55792f62d5657c5d81705d00e43547fa7e96c4366be9329c1551310bc9316de",
+    "measured": true
+  },
+  {
+    "file": "src/game/addresspackage17b.js",
+    "sha256": "388f0d591ba548d4da01e15bccc1c119df4dceeb77defb19d624623e5aa9fd92",
+    "measured": true
+  },
+  {
+    "file": "src/game/addressproof17b.js",
+    "sha256": "54b3cd5e2bef7f4f3bdea10dd1b75ef0d60ac917dd9e4ce390cbf35d076b2f6c",
+    "measured": true
+  },
+  {
+    "file": "src/game/addressprovider17b.js",
+    "sha256": "e77a111e5d9158c0a9e6b601dcef2c041b4a3142209e129af69bc47c10141be6",
+    "measured": true
+  },
+  {
+    "file": "src/game/game.js",
+    "sha256": "f6d3b57018349ec32309706b0944b638e431e3c183a2c246b69964644b83fe0d",
+    "measured": true
+  },
+  {
+    "file": "src/game/landcache17a/sha256.js",
+    "sha256": "1e60d75a1cade05c66bc4b86af6f046f7f6ff5eb84232bf450fb6be1218f83f3",
+    "measured": true
+  },
+  {
+    "file": "src/game/singleprogress.js",
+    "sha256": "cedf641409555de8f1a57784215602e17153a9c36659fc6f4f0211f2ada9b4af",
+    "measured": true
+  },
+  {
+    "file": "tools/address-package-prepare.mjs",
+    "sha256": "21b565c14e0217d6815dddb2622ad3e098c8e133822461b7043981cc2e791761",
+    "measured": true
+  },
+  {
+    "file": "tools/probe-checks/address-package-export.js",
+    "sha256": "969e5d156432ae2d1048ab350de454182e40f92c1304fd08a3db67fecf63db55",
+    "measured": true
+  },
+  {
+    "file": "tools/probe.cjs",
+    "sha256": "f05e1c79f1a007f11290a3bad2dda758b643ca39a6ac2c71b971a5bfeb2edca8",
+    "measured": true
+  },
+  {
+    "file": "tools/probe-page.cjs",
+    "sha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd",
+    "measured": true
+  },
+  {
+    "file": "tools/startup-report.mjs",
+    "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3",
+    "measured": true
+  },
+  {
+    "file": "tools/probe-checks/startup-bootstrap-observe.js",
+    "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8",
+    "measured": true
+  },
+  {
+    "file": "tools/land-package-files.mjs",
+    "sha256": "80a66fe94c2c4f7a2a287b18cfeda05bb40692531ae16f66be4cb07bb992bf23",
+    "measured": true
+  },
+  {
+    "file": "tools/land-package-source-key.mjs",
+    "sha256": "c581661cfa3fac423a8dec95708aba8ff64a9cebae4e308760cf35b739d45a13",
+    "measured": true
+  },
+  {
+    "file": "tools/land-package-build.mjs",
+    "sha256": "6c340797690d87eb86ae224cdb2f0f815cdea58675142700ae8f5a40ee229285",
+    "measured": true
+  },
+  {
+    "file": "tools/land-package-prepare.mjs",
+    "sha256": "ff3644b6eab5583cd1928f79d90564f5daf730ab9a27d0b7bccf3b11835261ca",
+    "measured": true
+  },
+  {
+    "file": "tools/probe-checks/land-package-district-export.js",
+    "sha256": "bc69334147fd594dc2387b18897b3f7612bd1ceba70a9aeaf00d7e7080220150",
+    "measured": true
+  },
+  {
+    "file": "tools/address-package-build.mjs",
+    "sha256": "d7a27e9a287d342a54912441a56017d6998a4e4939e42167f9a8596ad76b9efa",
+    "measured": true
+  },
+  {
+    "file": "tools/addresscodec17b-test.mjs",
+    "sha256": "c9be84fcc435dcab7b431c9b6a27423b63d4b46715fc7f8921555c628bc78c6b",
+    "measured": false,
+    "capture": "archive phase under root freeze; maincheck exact log retained"
+  },
+  {
+    "file": "tools/addresskey17b-test.mjs",
+    "sha256": "fa0441b94a1e1912f16e4bda5cb59a0bf0fc52dcde2967159a7f6352a3589e2c",
+    "measured": false,
+    "capture": "archive phase under root freeze; maincheck exact log retained"
+  },
+  {
+    "file": "tools/addressproof17b-test.mjs",
+    "sha256": "46d5e4bf28d27be99a859b3488d1b33a83e0cc2bdae14ae4507a6d34b3f80d7f",
+    "measured": false,
+    "capture": "archive phase under root freeze; maincheck exact log retained"
+  },
+  {
+    "file": "tools/addressprovider17b-test.mjs",
+    "sha256": "89abe0950638d7809a1907b6ac18f16b407eb1a89a91979a49bd7d9f1ddefc1b",
+    "measured": false,
+    "capture": "archive phase under root freeze; maincheck exact log retained"
+  }
+]

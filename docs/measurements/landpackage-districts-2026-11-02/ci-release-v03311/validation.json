@@ -1,0 +1,575 @@
+{
+  "version": 1,
+  "ok": true,
+  "runId": 41371474851,
+  "runHeadSha": "93667c1d160deec5eb4c27ba5f29822f0182d7b1",
+  "runUrl": "https://github.com/ndrwbv/bird-delivery/actions/runs/41371474851",
+  "publication": {
+    "status": "PUBLISHED",
+    "at": "2026-11-02T01:47:41Z",
+    "url": "https://github.com/ndrwbv/bird-delivery/releases/tag/v0.33.11",
+    "tag": "v0.33.11",
+    "assets": [
+      {
+        "name": "bird-pizza-deck.tar.gz",
+        "size": 176938590,
+        "digest": "sha256:66af90ed782ac1fba2a375d54c7f79373ea6d5120dbe91a4161c8fff2182efea"
+      },
+      {
+        "name": "bird-pizza-setup.exe",
+        "size": 146915932,
+        "digest": "sha256:bdfdb08c9a02d136b3dca3f2e94b55a002508244fd066fc856db80dd7203c1b3"
+      },
+      {
+        "name": "bird-pizza-win.zip",
+        "size": 181080456,
+        "digest": "sha256:a14c4c0403ca3179abc4f5fe122ffe99474982b1eba86579a9525b9ad086714a"
+      },
+      {
+        "name": "install-deck.sh",
+        "size": 5272,
+        "digest": "sha256:c272009d5f3b9c4d18405b57616e36a8f5b1fa9e92f97b106d8bba77ee92838e"
+      }
+    ]
+  },
+  "pages": {
+    "id": 41374375401,
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/ndrwbv/bird-delivery/actions/runs/41374375401",
+    "headSha": "c4eb6202e02ce7dd4f2b87405d0b732e5a5e7fb6"
+  },
+  "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+  "prepareBuildHash": "f5de55c855090af8e380510b40c05ab9a8b9794186dafa88144e3936745a6d76",
+  "coverage": [
+    {
+      "district": 0,
+      "graphics": "mid",
+      "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4"
+    },
+    {
+      "district": 0,
+      "graphics": "high",
+      "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4"
+    },
+    {
+      "district": 3,
+      "graphics": "high",
+      "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4"
+    },
+    {
+      "district": 7,
+      "graphics": "high",
+      "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4"
+    }
+  ],
+  "rawBytes": 74952828,
+  "rawSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+  "wireBytes": 34231572,
+  "wireSha256": "278b3223bc7420a119af4e1198e2a57068dd8f850daa5386ef04c3c2fe806744",
+  "catalogSha256": "5e70bb50c2b139570b8f61e695019364f84b669a3d72305962afaf00bf33772e",
+  "exports": [
+    {
+      "label": "mid-1",
+      "district": 0,
+      "graphics": "mid",
+      "repeat": 1,
+      "session": "lp17b-20233164-e559-4644-b36c-d3a6490cd686",
+      "rawSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "rawBytes": 74952828,
+      "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+      "preLate": {
+        "phase": "city-pizzeria-before-late",
+        "at": 12165.200000000004,
+        "district": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "lateWorkStarted": false
+      },
+      "current": {
+        "district": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "samePizzeriaReference": true
+      },
+      "ordinary": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "cleanCalls": 1,
+      "randomCalls": 0,
+      "byteExact": true
+    },
+    {
+      "label": "mid-2",
+      "district": 0,
+      "graphics": "mid",
+      "repeat": 2,
+      "session": "lp17b-5d11923a-8b57-42aa-ad5d-42adf25061d3",
+      "rawSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "rawBytes": 74952828,
+      "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+      "preLate": {
+        "phase": "city-pizzeria-before-late",
+        "at": 9754.700000000012,
+        "district": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "lateWorkStarted": false
+      },
+      "current": {
+        "district": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "samePizzeriaReference": true
+      },
+      "ordinary": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "cleanCalls": 1,
+      "randomCalls": 0,
+      "byteExact": true
+    },
+    {
+      "label": "high-1",
+      "district": 0,
+      "graphics": "high",
+      "repeat": 1,
+      "session": "lp17b-03658c10-220b-4bbd-b2d0-79b09526dc40",
+      "rawSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "rawBytes": 74952828,
+      "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+      "preLate": {
+        "phase": "city-pizzeria-before-late",
+        "at": 9991.899999999965,
+        "district": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "lateWorkStarted": false
+      },
+      "current": {
+        "district": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "samePizzeriaReference": true
+      },
+      "ordinary": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "cleanCalls": 1,
+      "randomCalls": 0,
+      "byteExact": true
+    },
+    {
+      "label": "high-2",
+      "district": 0,
+      "graphics": "high",
+      "repeat": 2,
+      "session": "lp17b-f5bcb3ea-c935-4265-94ad-830a54145897",
+      "rawSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "rawBytes": 74952828,
+      "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+      "preLate": {
+        "phase": "city-pizzeria-before-late",
+        "at": 9889.100000000093,
+        "district": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "lateWorkStarted": false
+      },
+      "current": {
+        "district": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "samePizzeriaReference": true
+      },
+      "ordinary": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "cleanCalls": 1,
+      "randomCalls": 0,
+      "byteExact": true
+    },
+    {
+      "label": "district3-high-1",
+      "district": 3,
+      "graphics": "high",
+      "repeat": 1,
+      "session": "lp17b-1052ec43-dcad-4455-8686-65da1639bc3b",
+      "rawSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "rawBytes": 74952828,
+      "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+      "preLate": {
+        "phase": "city-pizzeria-before-late",
+        "at": 9666.099999999977,
+        "district": 3,
+        "pizzaIndex": 3,
+        "pizza": {
+          "x": 995.3885106385183,
+          "z": -477.4078392869484,
+          "bx": 982.4553553693426,
+          "bz": -487.69772194636556
+        },
+        "lateWorkStarted": false
+      },
+      "current": {
+        "district": 3,
+        "pizzaIndex": 3,
+        "pizza": {
+          "x": 995.3885106385183,
+          "z": -477.4078392869484,
+          "bx": 982.4553553693426,
+          "bz": -487.69772194636556
+        },
+        "samePizzeriaReference": true
+      },
+      "ordinary": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "cleanCalls": 1,
+      "randomCalls": 0,
+      "byteExact": true
+    },
+    {
+      "label": "district3-high-2",
+      "district": 3,
+      "graphics": "high",
+      "repeat": 2,
+      "session": "lp17b-6357db14-a7e1-44ba-ab81-3ffc745e549b",
+      "rawSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "rawBytes": 74952828,
+      "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+      "preLate": {
+        "phase": "city-pizzeria-before-late",
+        "at": 9807,
+        "district": 3,
+        "pizzaIndex": 3,
+        "pizza": {
+          "x": 995.3885106385183,
+          "z": -477.4078392869484,
+          "bx": 982.4553553693426,
+          "bz": -487.69772194636556
+        },
+        "lateWorkStarted": false
+      },
+      "current": {
+        "district": 3,
+        "pizzaIndex": 3,
+        "pizza": {
+          "x": 995.3885106385183,
+          "z": -477.4078392869484,
+          "bx": 982.4553553693426,
+          "bz": -487.69772194636556
+        },
+        "samePizzeriaReference": true
+      },
+      "ordinary": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "cleanCalls": 1,
+      "randomCalls": 0,
+      "byteExact": true
+    },
+    {
+      "label": "district7-high-1",
+      "district": 7,
+      "graphics": "high",
+      "repeat": 1,
+      "session": "lp17b-c41a0ac9-5d8a-4d18-a5c3-5283b8851b94",
+      "rawSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "rawBytes": 74952828,
+      "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+      "preLate": {
+        "phase": "city-pizzeria-before-late",
+        "at": 10145.199999999953,
+        "district": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "lateWorkStarted": false
+      },
+      "current": {
+        "district": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "samePizzeriaReference": true
+      },
+      "ordinary": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "cleanCalls": 1,
+      "randomCalls": 0,
+      "byteExact": true
+    },
+    {
+      "label": "district7-high-2",
+      "district": 7,
+      "graphics": "high",
+      "repeat": 2,
+      "session": "lp17b-edda5339-59d4-4991-b602-5193c3f9bb95",
+      "rawSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "rawBytes": 74952828,
+      "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+      "preLate": {
+        "phase": "city-pizzeria-before-late",
+        "at": 9812.899999999907,
+        "district": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "lateWorkStarted": false
+      },
+      "current": {
+        "district": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "samePizzeriaReference": true
+      },
+      "ordinary": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "cleanCalls": 1,
+      "randomCalls": 0,
+      "byteExact": true
+    }
+  ],
+  "linux": {
+    "packagedAsar": true,
+    "schedule": {
+      "mode": "settled",
+      "early": false,
+      "bootWaitSec": 1200,
+      "controlWaitMs": 420000,
+      "probeTimeoutSec": 1740,
+      "hardTimeoutMs": 1800000,
+      "movementWaitMs": 30000
+    },
+    "physicalDeck": false,
+    "cpuThrottle": 1,
+    "district": {
+      "before": {
+        "district": 0,
+        "opened": 1,
+        "city": false,
+        "partySeen": false
+      },
+      "actual": 0,
+      "atControl": 0,
+      "pizzaIndex": 0,
+      "pizza": {
+        "x": 3127.602428674413,
+        "z": 2075.7340376573325,
+        "bx": 3110.816648917971,
+        "bz": 2073.230921741487
+      },
+      "position": {
+        "x": 3124.9371185058994,
+        "z": 2046.8247636833012
+      },
+      "pickerClicks": 0,
+      "pickerObservedAt": null,
+      "pickerClickedAt": null,
+      "dialogClicks": 0
+    },
+    "graphics": {
+      "preset": "high",
+      "device": "deck",
+      "width": 1280,
+      "height": 800
+    },
+    "ordinary": {
+      "provider": "edl-owned-fnv1a-mulberry32-v1",
+      "ordinaryAtImport": true,
+      "hookOwned": true,
+      "baseSeed": 24301
+    },
+    "realW": 0.16326654360358986,
+    "cleanCalls": 0,
+    "activate": 1,
+    "align": 1,
+    "cache": {
+      "version": 1,
+      "source": "cache",
+      "phase": "restored",
+      "hit": true,
+      "fatal": false,
+      "reason": null,
+      "cleaned": true,
+      "bufferHeld": false,
+      "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+      "wireSha256": "278b3223bc7420a119af4e1198e2a57068dd8f850daa5386ef04c3c2fe806744",
+      "expectedWireSha256": "278b3223bc7420a119af4e1198e2a57068dd8f850daa5386ef04c3c2fe806744",
+      "rawSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "expectedRawSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "bytes": 34231572,
+      "encoding": "gzip"
+    },
+    "errors": 0,
+    "rawSha256": "488d660ce07ff39a4ef63c334e398b48d4c52382a46a586909b877b59e3a7b66",
+    "catalogSha256": "5e70bb50c2b139570b8f61e695019364f84b669a3d72305962afaf00bf33772e"
+  },
+  "windows": {
+    "packagedAsar": true,
+    "schedule": {
+      "mode": "settled",
+      "early": false,
+      "bootWaitSec": 1200,
+      "controlWaitMs": 420000,
+      "probeTimeoutSec": 1740,
+      "hardTimeoutMs": 1800000,
+      "movementWaitMs": 30000
+    },
+    "physicalDeck": false,
+    "cpuThrottle": 1,
+    "district": {
+      "before": {
+        "district": 0,
+        "opened": 1,
+        "city": false,
+        "partySeen": false
+      },
+      "actual": 0,
+      "atControl": 0,
+      "pizzaIndex": 0,
+      "pizza": {
+        "x": 3127.602428674413,
+        "z": 2075.7340376573325,
+        "bx": 3110.816648917971,
+        "bz": 2073.230921741487
+      },
+      "position": {
+        "x": 3124.9371185058994,
+        "z": 2046.8247636833012
+      },
+      "pickerClicks": 0,
+      "pickerObservedAt": null,
+      "pickerClickedAt": null,
+      "dialogClicks": 0
+    },
+    "graphics": {
+      "preset": "high",
+      "device": "deck",
+      "width": 1280,
+      "height": 800
+    },
+    "ordinary": {
+      "provider": "edl-owned-fnv1a-mulberry32-v1",
+      "ordinaryAtImport": true,
+      "hookOwned": true,
+      "baseSeed": 24301
+    },
+    "realW": 0.16326654360358986,
+    "cleanCalls": 0,
+    "activate": 1,
+    "align": 1,
+    "cache": {
+      "version": 1,
+      "source": "cache",
+      "phase": "restored",
+      "hit": true,
+      "fatal": false,
+      "reason": null,
+      "cleaned": true,
+      "bufferHeld": false,
+      "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+      "wireSha256": "278b3223bc7420a119af4e1198e2a57068dd8f850daa5386ef04c3c2fe806744",
+      "expectedWireSha256": "278b3223bc7420a119af4e1198e2a57068dd8f850daa5386ef04c3c2fe806744",
+      "rawSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "expectedRawSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "bytes": 34231572,
+      "encoding": "gzip"
+    },
+    "errors": 0,
+    "rawSha256": "9ed1fb1268fb339c4d96dabdbdda49c53aa0a70b47b3c0d13de4bad46301bf03",
+    "catalogSha256": "5e70bb50c2b139570b8f61e695019364f84b669a3d72305962afaf00bf33772e"
+  },
+  "scope": {
+    "metadataOnly": true,
+    "assetsDownloaded": false,
+    "currentSourceCaptured": false,
+    "physicalDeck": false,
+    "timingComparison": false,
+    "preparationPickerProof": false
+  }
+}

@@ -1,0 +1,29 @@
+[
+  {
+    "case": "reader",
+    "originalPath": "/tmp/bird-address-package17b-prepare-1102/consumer-reader.stdout.log",
+    "bytes": 14285177,
+    "sha256": "7d993ab7479d67818d9814e12e298516e18c37e5c663254aa29f4805b341c2f2",
+    "deduplicated": true,
+    "reconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'",
+    "rawArchivePath": "preparation/consumer-reader.json.gz"
+  },
+  {
+    "case": "generated",
+    "originalPath": "/tmp/bird-address-package17b-prepare-1102/consumer-generated.stdout.log",
+    "bytes": 11601436,
+    "sha256": "cdf2abfc3dfc1204c1869c4fcec38bc00a72b72239f7cde9f6c59d240d800afe",
+    "deduplicated": true,
+    "reconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'",
+    "rawArchivePath": "preparation/consumer-generated.json.gz"
+  },
+  {
+    "case": "asar",
+    "originalPath": "/tmp/bird-address-package17b-prepare-1102/consumer-asar.stdout.log",
+    "bytes": 14284843,
+    "sha256": "d6789d2ff30b6faef3824d8f1f82603bcf9d480f6eb4011896b1f58d4baad8d9",
+    "deduplicated": true,
+    "reconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'",
+    "rawArchivePath": "preparation/consumer-asar.json.gz"
+  }
+]

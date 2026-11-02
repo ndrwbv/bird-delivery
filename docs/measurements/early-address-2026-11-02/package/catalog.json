@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "kind": "address-package17b",
+  "identity": {
+    "mapId": "seversk",
+    "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+    "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+    "sourceHash": "b85f25f6152ad0a2231bedf2333abb89e593778b5eda1d0a5aca65bd65bbb9af",
+    "inputHash": "45be0886eb4fe7a5f4fc1817484bd80b688ebd5648da26aab448a9c1db5e67ba"
+  },
+  "entry": {
+    "path": "address-data/26bbf94fa99eec2bb30be5ee3e0ae23e83046e6a4718fcc3e2374e95d5682cf5.addr",
+    "bytes": 413028,
+    "sha256": "26bbf94fa99eec2bb30be5ee3e0ae23e83046e6a4718fcc3e2374e95d5682cf5"
+  }
+}

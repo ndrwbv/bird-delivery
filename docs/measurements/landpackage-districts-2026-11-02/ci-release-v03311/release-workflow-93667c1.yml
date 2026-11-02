@@ -1,0 +1,316 @@
+# Ручной релиз: Steam Deck / Linux (x64) и Windows (x64) + zip для Яндекс Игр.
+# Запуск: Actions → «Релиз» → Run workflow → выбрать, что поднять: patch / minor / major.
+# Номер считается сам от последнего тега vX.Y.Z: patch — v0.0.7 → v0.0.8 (правки),
+# minor — v0.0.7 → v0.1.0 (заметное новое), major — v0.0.7 → v1.0.0. Тегов ещё нет —
+# v0.0.1 / v0.1.0 / v1.0.0. Руками номер не вводится и в package.json не правится.
+# Этот номер — везде: version в package.json (Электрон, свойства .exe, установщик, имя zip
+# для Яндекса), подпись версии на заставке игры (vite, BUILD_VERSION → __BUILD__) и
+# electron/build-tag.json (тег/коммит/дата: по нему установка с GitHub понимает, что вышла
+# версия свежее, и предлагает обновиться).
+# Два запуска подряд не возьмут один номер: они идут по очереди (concurrency), второй
+# считает номер, когда первый уже выложил тег. Если тег вдруг уже есть — прогон падает сразу.
+# В гит-релиз идут bird-pizza-deck.tar.gz + install-deck.sh (Deck), bird-pizza-setup.exe
+# (установщик для Windows) и bird-pizza-win.zip (та же игра папкой — для депота Steam и вручную).
+# Zip для Яндекса — только артефакт прогона: его заливают руками в консоль разработчика.
+# После релиза та же игра (сборка web) выкладывается на GitHub Pages — ndrwbv.github.io/bird-delivery.
+name: Релиз
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Что поднять в версии: patch — правки (0.0.7 → 0.0.8), minor — новое (→ 0.1.0), major — большое (→ 1.0.0)'
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      notes:
+        description: 'Что нового — попадёт в описание релиза.'
+        required: false
+        default: ''
+      yandex:
+        description: 'Собрать ещё и zip для Яндекс Игр (только когда нужно заливать в Яндекс)'
+        type: boolean
+        default: false
+
+# релизы — строго по одному: иначе два прогона посчитают одинаковый номер
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.t.outputs.tag }}
+      version: ${{ steps.t.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # с тегами: от последнего vX.Y.Z считается следующий номер
+
+      - id: t
+        name: Номер версии
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          set -eu
+          git fetch --tags --force --quiet origin
+          LAST=$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)
+          if [ -n "$LAST" ]; then IFS=. read -r MA MI PA <<< "${LAST#v}"; else MA=0; MI=0; PA=0; fi
+          case "$BUMP" in
+            patch) PA=$((PA + 1)) ;;
+            minor) MI=$((MI + 1)); PA=0 ;;
+            major) MA=$((MA + 1)); MI=0; PA=0 ;;
+            *) echo "::error::bump должен быть patch, minor или major, а пришло «$BUMP»"; exit 1 ;;
+          esac
+          VERSION="$MA.$MI.$PA"
+          TAG="v$VERSION"
+          if git rev-parse -q --verify "refs/tags/$TAG" > /dev/null || git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null; then
+            echo "::error::тег $TAG уже есть — релиз с таким номером уже выходил"; exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "версия: ${LAST:-тегов не было} → $TAG ($BUMP)" >> "$GITHUB_STEP_SUMMARY"
+
+  prepare-land:
+    needs: meta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Подготовить обычный город и проверить повторяемость
+        env:
+          BUILD_VERSION: ${{ needs.meta.outputs.version }}
+        run: xvfb-run -a node tools/land-package-prepare.mjs "--out=$RUNNER_TEMP/bird-land-preparation"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prepared-land-data
+          path: ${{ runner.temp }}/bird-land-preparation/package
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prepared-land-proof
+          path: |
+            ${{ runner.temp }}/bird-land-preparation/*.json
+            ${{ runner.temp }}/bird-land-preparation/*.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  build:
+    needs: [meta, prepare-land]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux
+          - os: windows-latest
+            target: win
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Зависимости
+        run: npm ci
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: prepared-land-data
+          path: ${{ runner.temp }}/prepared-land-data
+
+      # номер релиза — в package.json: из него Электрон (app.getVersion()), свойства .exe и установщик
+      - name: Версия
+        run: npm version "${{ needs.meta.outputs.version }}" --no-git-tag-version --allow-same-version
+
+      - name: Метка сборки
+        env:
+          TAG: ${{ needs.meta.outputs.tag }}
+        run: |
+          set -eu
+          printf '{"tag":"%s","sha":"%s","date":"%s"}\n' "$TAG" "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > electron/build-tag.json
+          cat electron/build-tag.json
+
+      - name: Сборка веб-части (steam)
+        env:
+          BUILD_VERSION: ${{ needs.meta.outputs.version }}     # подпись версии на заставке
+          BIRD_LAND_DATA_DIR: ${{ runner.temp }}/prepared-land-data
+        run: npm run build:steam
+
+      - name: Пакет Electron linux-x64
+        if: matrix.target == 'linux'
+        run: |
+          npx electron-builder --linux dir --x64 --publish never
+          node tools/pack-deck.mjs
+          cp tools/install-deck.sh release/install-deck.sh
+
+      # zip-таргет — распакованная папка без инсталлятора: Steam раздаёт именно такие файлы.
+      # На windows-раннере, потому что правка иконки и версии .exe на Linux требует wine.
+      - name: Пакет Electron win-x64
+        if: matrix.target == 'win'
+        run: npx electron-builder --win zip --x64 --publish never -c.win.artifactName='bird-pizza-win.${ext}'
+
+      # Установщик для игроков мимо Steam: ставится в профиль без прав админа, ярлыки «Птица Пицца»,
+      # игра сама предлагает обновления. Настройки — build.nsis в package.json. Отдельным прогоном
+      # после zip, чтобы zip для Steam остался ровно тем же. Не подписан — SmartScreen спросит.
+      - name: Установщик win-x64
+        if: matrix.target == 'win'
+        run: npx electron-builder --win nsis --x64 --publish never
+
+      - name: Проверить готовые данные внутри выпускаемого пакета
+        run: |
+          if [ "${{ matrix.target }}" = linux ]; then PACK=release/linux-unpacked; else PACK=release/win-unpacked; fi
+          node tools/land-package-verify-asar.mjs "--asar=$PACK/resources/app.asar" --dir=dist/steam "--report=$RUNNER_TEMP/land-package-asar.json"
+
+      - name: Обычный запуск из пакета — Linux
+        if: matrix.target == 'linux'
+        timeout-minutes: 31
+        run: xvfb-run -a node tools/land-package-smoke.mjs --dir=release/linux-unpacked/resources/app.asar/dist/steam --catalog=dist/steam/city-data/catalog.json "--out=$RUNNER_TEMP/land-package-runtime" --preset=high --admission=settled
+
+      - name: Обычный запуск из пакета — Windows
+        if: matrix.target == 'win'
+        timeout-minutes: 31
+        run: node tools/land-package-smoke.mjs --dir=release/win-unpacked/resources/app.asar/dist/steam --catalog=dist/steam/city-data/catalog.json "--out=$RUNNER_TEMP/land-package-runtime" --preset=high --admission=settled
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: land-package-runtime-${{ matrix.target }}
+          path: |
+            ${{ runner.temp }}/land-package-asar.json
+            ${{ runner.temp }}/land-package-runtime/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.target == 'linux'
+        with:
+          name: bird-pizza-linux
+          path: |
+            release/bird-pizza-deck.tar.gz
+            release/install-deck.sh
+          if-no-files-found: error
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.target == 'win'
+        with:
+          name: bird-pizza-win
+          path: |
+            release/bird-pizza-win.zip
+            release/bird-pizza-setup.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  yandex:
+    needs: meta
+    if: inputs.yandex
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Версия
+        run: npm version "${{ needs.meta.outputs.version }}" --no-git-tag-version --allow-same-version
+      - name: Сборка для Яндекс Игр
+        env:
+          BUILD_VERSION: ${{ needs.meta.outputs.version }}
+        run: npm run build:yandex      # → release/yandex-<версия>.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: yandex-zip
+          path: release/yandex-*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    needs: [meta, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bird-pizza-*
+          path: assets
+          merge-multiple: true
+
+      - name: Выложить релиз
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.meta.outputs.tag }}
+          IN_NOTES: ${{ inputs.notes }}
+        run: |
+          set -eu
+          ls -l assets
+          NOTES="$IN_NOTES"
+          if [ -z "$NOTES" ]; then NOTES="Сборка из ${GITHUB_SHA:0:7}."; fi
+          # как поставить и обновить — тот же текст, что в README (между метками deck-install)
+          {
+            printf '%s\n\n' "$NOTES"
+            sed -n '/<!-- deck-install:/,/<!-- deck-install-end -->/p' README.md | sed '1d;$d'
+          } > notes.md
+          grep -q 'install-deck.sh' notes.md || { echo 'в README нет блока deck-install'; exit 1; }
+          grep -q 'bird-pizza-setup.exe' notes.md || { echo 'в блоке deck-install нет Windows'; exit 1; }
+          gh release create "$TAG" \
+            assets/bird-pizza-deck.tar.gz assets/install-deck.sh \
+            assets/bird-pizza-setup.exe assets/bird-pizza-win.zip \
+            --title "Птица Пицца $TAG" --notes-file notes.md --target "$GITHUB_SHA"
+          echo "релиз: $TAG" >> "$GITHUB_STEP_SUMMARY"
+
+  # Браузерная версия на GitHub Pages (https://ndrwbv.github.io/bird-delivery/) — та же игра,
+  # что в релизе, сборка web. Ветка gh-pages каждый раз перезаписывается одним коммитом
+  # (история не копится). Идёт после релиза: не вышел релиз — Pages не трогаем.
+  pages:
+    needs: [meta, release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Сборка web
+        env:
+          BUILD_VERSION: ${{ needs.meta.outputs.version }}
+        run: npm run build:web
+      - name: Выложить в gh-pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.meta.outputs.tag }}
+        run: |
+          set -eu
+          cd dist/web
+          touch .nojekyll
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Сборка для GitHub Pages $TAG (${GITHUB_SHA:0:7})"
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
+          # подстраховка: попросить Pages пересобраться (пуш от github.token обычно и так запускает)
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/pages/builds" > /dev/null || true
+          echo "Pages: https://ndrwbv.github.io/bird-delivery/ ($TAG)" >> "$GITHUB_STEP_SUMMARY"

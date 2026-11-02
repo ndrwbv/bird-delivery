@@ -1,0 +1,69 @@
+{
+  "scope": "Finish authorized S acceptance archive only; no new stages/key changes",
+  "pendingRootCompressionGO": false,
+  "exclude": [
+    "whole builds",
+    "candidate.asar",
+    "catalog.addr duplicates"
+  ],
+  "deferred": [
+    {
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/consumer-asar.json",
+      "archivePath": "preparation/consumer-asar.json",
+      "bytes": 14285414
+    },
+    {
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/consumer-asar.stdout.log",
+      "archivePath": "preparation/consumer-asar.stdout.log",
+      "bytes": 14284843
+    },
+    {
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/consumer-generated.json",
+      "archivePath": "preparation/consumer-generated.json",
+      "bytes": 11602007
+    },
+    {
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/consumer-generated.stdout.log",
+      "archivePath": "preparation/consumer-generated.stdout.log",
+      "bytes": 11601436
+    },
+    {
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/consumer-reader.json",
+      "archivePath": "preparation/consumer-reader.json",
+      "bytes": 14285748
+    },
+    {
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/consumer-reader.stdout.log",
+      "archivePath": "preparation/consumer-reader.stdout.log",
+      "bytes": 14285177
+    },
+    {
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/early-queries-init.js",
+      "archivePath": "preparation/early-queries-init.js",
+      "bytes": 1660507
+    },
+    {
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/early-queries.json",
+      "archivePath": "preparation/early-queries.json",
+      "bytes": 6207595
+    },
+    {
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/B1-1/raw.json",
+      "archivePath": "preparation/B1-1/raw.json",
+      "bytes": 12159086
+    },
+    {
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/B1-2/raw.json",
+      "archivePath": "preparation/B1-2/raw.json",
+      "bytes": 12158648
+    }
+  ],
+  "completed": true,
+  "excludedBinaryFiles": [
+    "candidate.asar",
+    "B1-1/catalog.addr",
+    "B1-2/catalog.addr",
+    "package/address-data/*.addr",
+    "whole builds"
+  ]
+}

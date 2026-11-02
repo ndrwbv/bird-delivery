@@ -1,0 +1,126 @@
+{
+  "kind": "root-transcribed-actual-consumer-protocol",
+  "scope": "Executed root argv and terminal tool statuses, not a child-captured process journal",
+  "cwd": "/Users/andrewboev/Desktop/not-work/delivery",
+  "unsetEnvironment": [
+    "BIRD_EDITOR",
+    "BIRD_LAND_DATA_DIR",
+    "BIRD_ADDRESS_DATA_DIR"
+  ],
+  "sourceHash": "b85f25f6152ad0a2231bedf2333abb89e593778b5eda1d0a5aca65bd65bbb9af",
+  "productionBuildHash": "318cd44ce87f683d0f445320e7583a6e8a513d9f2b1d94695cc224e4fdcc4d7d",
+  "productionBuild": {
+    "rootToolSession": 87291,
+    "rootObservedExitCode": 0,
+    "env": {
+      "BUILD_VERSION": "0.33.12",
+      "BIRD_ADDRESS_DATA_DIR": "/tmp/bird-address-package17b-prepare-1102/package"
+    },
+    "argv": [
+      "node",
+      "node_modules/vite/bin/vite.js",
+      "build",
+      "--mode",
+      "steam",
+      "--outDir",
+      "/tmp/bird-address-package17b-prepare-1102/production-steam"
+    ]
+  },
+  "cases": [
+    {
+      "label": "reader",
+      "rootToolSession": 20201,
+      "rootObservedExitCode": 0,
+      "childSignal": "not reported by root tool; not invented",
+      "argv": [
+        "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+        "tools/probe.cjs",
+        "--mode=steam",
+        "--dir=/tmp/bird-address-package17b-prepare-1102/production-steam",
+        "--startup-trace",
+        "--startup-cold",
+        "--startup-session=address-private-reader-1102",
+        "--startup-fixture=/tmp/bird-address-package17b-prepare-1102/B1-1/fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--cpu=1",
+        "--bootcpu",
+        "--init-script=/tmp/bird-address-package17b-prepare-1102/early-queries-init.js",
+        "--q=gfxdev=deck&mute&startupdistrict=0&addresspackage17b=1&addressexport17b&addressclosure17b",
+        "--eval=/tmp/bird-address-package17b-prepare-1102/consumer-eval.js",
+        "--bootwait=360",
+        "--timeout=900",
+        "--max=0",
+        "--errors",
+        "--report=/tmp/bird-address-package17b-prepare-1102/consumer-reader.json"
+      ],
+      "stdout": "/tmp/bird-address-package17b-prepare-1102/consumer-reader.stdout.log",
+      "stderr": "/tmp/bird-address-package17b-prepare-1102/consumer-reader.stderr.log"
+    },
+    {
+      "label": "generated",
+      "rootToolSession": 29434,
+      "rootObservedExitCode": 0,
+      "childSignal": "not reported by root tool; not invented",
+      "argv": [
+        "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+        "tools/probe.cjs",
+        "--mode=steam",
+        "--dir=/tmp/bird-address-package17b-prepare-1102/production-steam",
+        "--startup-trace",
+        "--startup-cold",
+        "--startup-session=address-private-generated-1102",
+        "--startup-fixture=/tmp/bird-address-package17b-prepare-1102/B1-1/fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--cpu=1",
+        "--bootcpu",
+        "--init-script=tools/probe-checks/startup-bootstrap-observe.js",
+        "--q=gfxdev=deck&mute&startupdistrict=0&addresspackage17b=0&addressexport17b&addressclosure17b",
+        "--eval=/tmp/bird-address-package17b-prepare-1102/consumer-eval.js",
+        "--bootwait=360",
+        "--timeout=900",
+        "--max=0",
+        "--errors",
+        "--report=/tmp/bird-address-package17b-prepare-1102/consumer-generated.json"
+      ],
+      "stdout": "/tmp/bird-address-package17b-prepare-1102/consumer-generated.stdout.log",
+      "stderr": "/tmp/bird-address-package17b-prepare-1102/consumer-generated.stderr.log"
+    },
+    {
+      "label": "asar",
+      "rootToolSession": 11482,
+      "rootObservedExitCode": 0,
+      "childSignal": "not reported by root tool; not invented",
+      "argv": [
+        "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+        "tools/probe.cjs",
+        "--mode=steam",
+        "--dir=/tmp/bird-address-package17b-prepare-1102/candidate.asar/dist/steam",
+        "--startup-trace",
+        "--startup-cold",
+        "--startup-session=address-private-asar-1102",
+        "--startup-fixture=/tmp/bird-address-package17b-prepare-1102/B1-1/fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--cpu=1",
+        "--bootcpu",
+        "--init-script=/tmp/bird-address-package17b-prepare-1102/early-queries-init.js",
+        "--q=gfxdev=deck&mute&startupdistrict=0&addresspackage17b=1&addressexport17b&addressclosure17b",
+        "--eval=/tmp/bird-address-package17b-prepare-1102/consumer-eval.js",
+        "--bootwait=360",
+        "--timeout=900",
+        "--max=0",
+        "--errors",
+        "--report=/tmp/bird-address-package17b-prepare-1102/consumer-asar.json"
+      ],
+      "stdout": "/tmp/bird-address-package17b-prepare-1102/consumer-asar.stdout.log",
+      "stderr": "/tmp/bird-address-package17b-prepare-1102/consumer-asar.stderr.log"
+    }
+  ],
+  "differentReadModesAreNotStartupAB": true,
+  "assetCreation": "Full production-steam recursively copied into asar-stage/dist/steam, then @electron/asar.createPackage(stage,candidate.asar); verified full address-data inventory/payload/header and full archive SHA; no release application process was launched"
+}

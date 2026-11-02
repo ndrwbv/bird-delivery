@@ -1,0 +1,1211 @@
+{
+  "version": 2,
+  "kind": "ordinary-land-preparation",
+  "startedAt": "2026-11-02T01:15:35.739Z",
+  "out": "/home/runner/work/_temp/bird-land-preparation",
+  "protocol": {
+    "coverage": [
+      {
+        "district": 0,
+        "graphics": "mid"
+      },
+      {
+        "district": 0,
+        "graphics": "high"
+      },
+      {
+        "district": 3,
+        "graphics": "high"
+      },
+      {
+        "district": 7,
+        "graphics": "high"
+      }
+    ],
+    "independentRepeats": 2,
+    "exports": 8,
+    "fresh": true,
+    "seed": null,
+    "externalInit": false
+  },
+  "runs": [
+    {
+      "label": "build",
+      "argv": [
+        "/opt/hostedtoolcache/node/20.20.2/x64/bin/node",
+        "/home/runner/work/bird-delivery/bird-delivery/node_modules/vite/bin/vite.js",
+        "build",
+        "--mode",
+        "steam",
+        "--outDir",
+        "/home/runner/work/_temp/bird-land-preparation/prepare-steam"
+      ],
+      "cwd": "/home/runner/work/bird-delivery/bird-delivery",
+      "startedAt": "2026-11-02T01:15:35.927Z",
+      "status": "returned",
+      "processStatus": 0,
+      "signal": null,
+      "pid": 2456,
+      "finishedAt": "2026-11-02T01:15:50.948Z",
+      "stdoutSha256": "3b7f0afdcaedfb717d6b091c31f9e42a6bb98e0e8bcb2f2e21181b86f536128f",
+      "stderrSha256": "16111b5de23dd102ac89fce35524c931812980925c2f29732d049d7302e9b5a7"
+    },
+    {
+      "label": "mid-1",
+      "argv": [
+        "/home/runner/work/bird-delivery/bird-delivery/node_modules/electron/dist/electron",
+        "/home/runner/work/bird-delivery/bird-delivery/tools/probe.cjs",
+        "--no-sandbox",
+        "--disable-gpu-sandbox",
+        "--mode=steam",
+        "--dir=/home/runner/work/_temp/bird-land-preparation/prepare-steam",
+        "--startup-trace",
+        "--startup-cold",
+        "--startup-session=lp17b-20233164-e559-4644-b36c-d3a6490cd686",
+        "--startup-fixture=/home/runner/work/_temp/bird-land-preparation/mid-1-fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--max=0",
+        "--errors",
+        "--q=gfxdev=deck&mute&startupdistrict=0&landexport17b",
+        "--eval=/home/runner/work/bird-delivery/bird-delivery/tools/probe-checks/land-package-district-export.js",
+        "--bootwait=360",
+        "--timeout=600",
+        "--land-package-district=0",
+        "--land-package-export=/home/runner/work/_temp/bird-land-preparation/mid-1.land",
+        "--land-package-manifest=/home/runner/work/_temp/bird-land-preparation/export-receipt.json",
+        "--report=/home/runner/work/_temp/bird-land-preparation/mid-1.json"
+      ],
+      "cwd": "/home/runner/work/bird-delivery/bird-delivery",
+      "startedAt": "2026-11-02T01:15:51.309Z",
+      "status": "returned",
+      "processStatus": 0,
+      "signal": null,
+      "pid": 2477,
+      "finishedAt": "2026-11-02T01:19:02.812Z",
+      "stdoutSha256": "43f14e4b6ff04e068ee6741a0fba3f67691cc4aa81c8db18d4ddaa6c1212cfa7",
+      "stderrSha256": "bc73dad3cb6a5851731e738afa4accc33cbcd02049db2797f5ed886a589d9125"
+    },
+    {
+      "label": "mid-2",
+      "argv": [
+        "/home/runner/work/bird-delivery/bird-delivery/node_modules/electron/dist/electron",
+        "/home/runner/work/bird-delivery/bird-delivery/tools/probe.cjs",
+        "--no-sandbox",
+        "--disable-gpu-sandbox",
+        "--mode=steam",
+        "--dir=/home/runner/work/_temp/bird-land-preparation/prepare-steam",
+        "--startup-trace",
+        "--startup-cold",
+        "--startup-session=lp17b-5d11923a-8b57-42aa-ad5d-42adf25061d3",
+        "--startup-fixture=/home/runner/work/_temp/bird-land-preparation/mid-2-fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--max=0",
+        "--errors",
+        "--q=gfxdev=deck&mute&startupdistrict=0&landexport17b",
+        "--eval=/home/runner/work/bird-delivery/bird-delivery/tools/probe-checks/land-package-district-export.js",
+        "--bootwait=360",
+        "--timeout=600",
+        "--land-package-district=0",
+        "--land-package-export=/home/runner/work/_temp/bird-land-preparation/mid-2.land",
+        "--land-package-manifest=/home/runner/work/_temp/bird-land-preparation/export-receipt.json",
+        "--report=/home/runner/work/_temp/bird-land-preparation/mid-2.json"
+      ],
+      "cwd": "/home/runner/work/bird-delivery/bird-delivery",
+      "startedAt": "2026-11-02T01:19:02.936Z",
+      "status": "returned",
+      "processStatus": 0,
+      "signal": null,
+      "pid": 2606,
+      "finishedAt": "2026-11-02T01:21:50.009Z",
+      "stdoutSha256": "75091edf2eaea6b0cff37ae4e3f0075ae990ceef05565f88609b2bdc2e1266cb",
+      "stderrSha256": "dab5fde738a0c0d0e1e0ae5da787ec32487989eaad30134c9f6b0ec0fdac2d0b"
+    },
+    {
+      "label": "high-1",
+      "argv": [
+        "/home/runner/work/bird-delivery/bird-delivery/node_modules/electron/dist/electron",
+        "/home/runner/work/bird-delivery/bird-delivery/tools/probe.cjs",
+        "--no-sandbox",
+        "--disable-gpu-sandbox",
+        "--mode=steam",
+        "--dir=/home/runner/work/_temp/bird-land-preparation/prepare-steam",
+        "--startup-trace",
+        "--startup-cold",
+        "--startup-session=lp17b-03658c10-220b-4bbd-b2d0-79b09526dc40",
+        "--startup-fixture=/home/runner/work/_temp/bird-land-preparation/high-1-fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--max=0",
+        "--errors",
+        "--q=gfxdev=deck&mute&startupdistrict=0&landexport17b",
+        "--eval=/home/runner/work/bird-delivery/bird-delivery/tools/probe-checks/land-package-district-export.js",
+        "--bootwait=360",
+        "--timeout=600",
+        "--land-package-district=0",
+        "--land-package-export=/home/runner/work/_temp/bird-land-preparation/high-1.land",
+        "--land-package-manifest=/home/runner/work/_temp/bird-land-preparation/export-receipt.json",
+        "--report=/home/runner/work/_temp/bird-land-preparation/high-1.json"
+      ],
+      "cwd": "/home/runner/work/bird-delivery/bird-delivery",
+      "startedAt": "2026-11-02T01:21:50.131Z",
+      "status": "returned",
+      "processStatus": 0,
+      "signal": null,
+      "pid": 2752,
+      "finishedAt": "2026-11-02T01:24:49.151Z",
+      "stdoutSha256": "7281177ac4ccb26ccb36fbbf89a180d96d0941d5ca25941e22563e9de83cf451",
+      "stderrSha256": "dde8a612daf7abb6cbf066e1347a1657406a6be66c09117f201b142bd3526698"
+    },
+    {
+      "label": "high-2",
+      "argv": [
+        "/home/runner/work/bird-delivery/bird-delivery/node_modules/electron/dist/electron",
+        "/home/runner/work/bird-delivery/bird-delivery/tools/probe.cjs",
+        "--no-sandbox",
+        "--disable-gpu-sandbox",
+        "--mode=steam",
+        "--dir=/home/runner/work/_temp/bird-land-preparation/prepare-steam",
+        "--startup-trace",
+        "--startup-cold",
+        "--startup-session=lp17b-f5bcb3ea-c935-4265-94ad-830a54145897",
+        "--startup-fixture=/home/runner/work/_temp/bird-land-preparation/high-2-fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--max=0",
+        "--errors",
+        "--q=gfxdev=deck&mute&startupdistrict=0&landexport17b",
+        "--eval=/home/runner/work/bird-delivery/bird-delivery/tools/probe-checks/land-package-district-export.js",
+        "--bootwait=360",
+        "--timeout=600",
+        "--land-package-district=0",
+        "--land-package-export=/home/runner/work/_temp/bird-land-preparation/high-2.land",
+        "--land-package-manifest=/home/runner/work/_temp/bird-land-preparation/export-receipt.json",
+        "--report=/home/runner/work/_temp/bird-land-preparation/high-2.json"
+      ],
+      "cwd": "/home/runner/work/bird-delivery/bird-delivery",
+      "startedAt": "2026-11-02T01:24:49.275Z",
+      "status": "returned",
+      "processStatus": 0,
+      "signal": null,
+      "pid": 2874,
+      "finishedAt": "2026-11-02T01:27:41.439Z",
+      "stdoutSha256": "ac262ff9ca63960d0d6458e7a50e410646fa50ddb79190baea0fa516d07879cf",
+      "stderrSha256": "24d2b08b697e38cf1db6e1814941a48710b7e1c9c2f669a936275b542d880239"
+    },
+    {
+      "label": "district3-high-1",
+      "argv": [
+        "/home/runner/work/bird-delivery/bird-delivery/node_modules/electron/dist/electron",
+        "/home/runner/work/bird-delivery/bird-delivery/tools/probe.cjs",
+        "--no-sandbox",
+        "--disable-gpu-sandbox",
+        "--mode=steam",
+        "--dir=/home/runner/work/_temp/bird-land-preparation/prepare-steam",
+        "--startup-trace",
+        "--startup-cold",
+        "--startup-session=lp17b-1052ec43-dcad-4455-8686-65da1639bc3b",
+        "--startup-fixture=/home/runner/work/_temp/bird-land-preparation/district3-high-1-fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--max=0",
+        "--errors",
+        "--q=gfxdev=deck&mute&startupdistrict=3&landexport17b",
+        "--eval=/home/runner/work/bird-delivery/bird-delivery/tools/probe-checks/land-package-district-export.js",
+        "--bootwait=360",
+        "--timeout=600",
+        "--land-package-district=3",
+        "--land-package-export=/home/runner/work/_temp/bird-land-preparation/district3-high-1.land",
+        "--land-package-manifest=/home/runner/work/_temp/bird-land-preparation/export-receipt.json",
+        "--report=/home/runner/work/_temp/bird-land-preparation/district3-high-1.json"
+      ],
+      "cwd": "/home/runner/work/bird-delivery/bird-delivery",
+      "startedAt": "2026-11-02T01:27:41.562Z",
+      "status": "returned",
+      "processStatus": 0,
+      "signal": null,
+      "pid": 2986,
+      "finishedAt": "2026-11-02T01:30:48.377Z",
+      "stdoutSha256": "d51da0a9bd0980e124975f6f2fe1b5f95bc06875386061a471be86a6786d0c4c",
+      "stderrSha256": "8dc845944a257e5bc4d49d732586fb39f1770f69a80c4a78cd897574e91d4e31"
+    },
+    {
+      "label": "district3-high-2",
+      "argv": [
+        "/home/runner/work/bird-delivery/bird-delivery/node_modules/electron/dist/electron",
+        "/home/runner/work/bird-delivery/bird-delivery/tools/probe.cjs",
+        "--no-sandbox",
+        "--disable-gpu-sandbox",
+        "--mode=steam",
+        "--dir=/home/runner/work/_temp/bird-land-preparation/prepare-steam",
+        "--startup-trace",
+        "--startup-cold",
+        "--startup-session=lp17b-6357db14-a7e1-44ba-ab81-3ffc745e549b",
+        "--startup-fixture=/home/runner/work/_temp/bird-land-preparation/district3-high-2-fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--max=0",
+        "--errors",
+        "--q=gfxdev=deck&mute&startupdistrict=3&landexport17b",
+        "--eval=/home/runner/work/bird-delivery/bird-delivery/tools/probe-checks/land-package-district-export.js",
+        "--bootwait=360",
+        "--timeout=600",
+        "--land-package-district=3",
+        "--land-package-export=/home/runner/work/_temp/bird-land-preparation/district3-high-2.land",
+        "--land-package-manifest=/home/runner/work/_temp/bird-land-preparation/export-receipt.json",
+        "--report=/home/runner/work/_temp/bird-land-preparation/district3-high-2.json"
+      ],
+      "cwd": "/home/runner/work/bird-delivery/bird-delivery",
+      "startedAt": "2026-11-02T01:30:48.499Z",
+      "status": "returned",
+      "processStatus": 0,
+      "signal": null,
+      "pid": 3092,
+      "finishedAt": "2026-11-02T01:33:55.587Z",
+      "stdoutSha256": "9035ea745a3d57849f0ca8d44f1cf7f5ac9a323f197fe50fbc3a97df5dc8e13b",
+      "stderrSha256": "53504ab6c54e538995b3823c66f8c6b310dffc3a4c1c45d4592681c3c1f79556"
+    },
+    {
+      "label": "district7-high-1",
+      "argv": [
+        "/home/runner/work/bird-delivery/bird-delivery/node_modules/electron/dist/electron",
+        "/home/runner/work/bird-delivery/bird-delivery/tools/probe.cjs",
+        "--no-sandbox",
+        "--disable-gpu-sandbox",
+        "--mode=steam",
+        "--dir=/home/runner/work/_temp/bird-land-preparation/prepare-steam",
+        "--startup-trace",
+        "--startup-cold",
+        "--startup-session=lp17b-c41a0ac9-5d8a-4d18-a5c3-5283b8851b94",
+        "--startup-fixture=/home/runner/work/_temp/bird-land-preparation/district7-high-1-fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--max=0",
+        "--errors",
+        "--q=gfxdev=deck&mute&startupdistrict=7&landexport17b",
+        "--eval=/home/runner/work/bird-delivery/bird-delivery/tools/probe-checks/land-package-district-export.js",
+        "--bootwait=360",
+        "--timeout=600",
+        "--land-package-district=7",
+        "--land-package-export=/home/runner/work/_temp/bird-land-preparation/district7-high-1.land",
+        "--land-package-manifest=/home/runner/work/_temp/bird-land-preparation/export-receipt.json",
+        "--report=/home/runner/work/_temp/bird-land-preparation/district7-high-1.json"
+      ],
+      "cwd": "/home/runner/work/bird-delivery/bird-delivery",
+      "startedAt": "2026-11-02T01:33:55.704Z",
+      "status": "returned",
+      "processStatus": 0,
+      "signal": null,
+      "pid": 3192,
+      "finishedAt": "2026-11-02T01:36:59.757Z",
+      "stdoutSha256": "7a207f1c6f9c68be31eaf94ad32768a533258fe8816e682177257f8ce0507cc0",
+      "stderrSha256": "da09b3fb2a03eedcb9756edbd441fe0d38541985eb654b4bd625a67e89dd1a8b"
+    },
+    {
+      "label": "district7-high-2",
+      "argv": [
+        "/home/runner/work/bird-delivery/bird-delivery/node_modules/electron/dist/electron",
+        "/home/runner/work/bird-delivery/bird-delivery/tools/probe.cjs",
+        "--no-sandbox",
+        "--disable-gpu-sandbox",
+        "--mode=steam",
+        "--dir=/home/runner/work/_temp/bird-land-preparation/prepare-steam",
+        "--startup-trace",
+        "--startup-cold",
+        "--startup-session=lp17b-edda5339-59d4-4991-b602-5193c3f9bb95",
+        "--startup-fixture=/home/runner/work/_temp/bird-land-preparation/district7-high-2-fixture.json",
+        "--fresh",
+        "--early",
+        "--size=deck",
+        "--max=0",
+        "--errors",
+        "--q=gfxdev=deck&mute&startupdistrict=7&landexport17b",
+        "--eval=/home/runner/work/bird-delivery/bird-delivery/tools/probe-checks/land-package-district-export.js",
+        "--bootwait=360",
+        "--timeout=600",
+        "--land-package-district=7",
+        "--land-package-export=/home/runner/work/_temp/bird-land-preparation/district7-high-2.land",
+        "--land-package-manifest=/home/runner/work/_temp/bird-land-preparation/export-receipt.json",
+        "--report=/home/runner/work/_temp/bird-land-preparation/district7-high-2.json"
+      ],
+      "cwd": "/home/runner/work/bird-delivery/bird-delivery",
+      "startedAt": "2026-11-02T01:36:59.883Z",
+      "status": "returned",
+      "processStatus": 0,
+      "signal": null,
+      "pid": 3296,
+      "finishedAt": "2026-11-02T01:39:41.963Z",
+      "stdoutSha256": "b050d72d619154efa475a6f05f5e1789bdea58bd47de6f446b93a7b5340ddd81",
+      "stderrSha256": "5f916395f46991994ff01398186f6d9c348fb56787388a6ebfdf9374b2de070d"
+    }
+  ],
+  "harness": [
+    {
+      "file": "tools/land-package-files.mjs",
+      "bytes": 5088,
+      "sha256": "a03bc8a301b0f2991dc0ff2aec882cfff9fb2d953f1627af2dee2596823b1589"
+    },
+    {
+      "file": "tools/land-package-source-key.mjs",
+      "bytes": 1386,
+      "sha256": "c581661cfa3fac423a8dec95708aba8ff64a9cebae4e308760cf35b739d45a13"
+    },
+    {
+      "file": "tools/land-package-build.mjs",
+      "bytes": 3129,
+      "sha256": "6c340797690d87eb86ae224cdb2f0f815cdea58675142700ae8f5a40ee229285"
+    },
+    {
+      "file": "tools/land-package-prepare.mjs",
+      "bytes": 13091,
+      "sha256": "ff3644b6eab5583cd1928f79d90564f5daf730ab9a27d0b7bccf3b11835261ca"
+    },
+    {
+      "file": "tools/probe-checks/land-package-district-export.js",
+      "bytes": 2845,
+      "sha256": "bc69334147fd594dc2387b18897b3f7612bd1ceba70a9aeaf00d7e7080220150"
+    },
+    {
+      "file": "tools/probe.cjs",
+      "bytes": 47458,
+      "sha256": "f05e1c79f1a007f11290a3bad2dda758b643ca39a6ac2c71b971a5bfeb2edca8"
+    },
+    {
+      "file": "tools/probe-page.cjs",
+      "bytes": 37506,
+      "sha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd"
+    },
+    {
+      "file": "tools/land-package-export-host.cjs",
+      "bytes": 7902,
+      "sha256": "3fd594ca5c53079d213d6487aca98177218a9201711448ff489d11572950faa4"
+    }
+  ],
+  "source": {
+    "mapId": "seversk",
+    "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+    "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+    "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679"
+  },
+  "receiptHash": "526ec1953c806b237e25e81895389f2d2dc27c7e093944342ea728883a1c2ecc",
+  "exports": [
+    {
+      "label": "mid-1",
+      "district": 0,
+      "preset": "mid",
+      "repeat": 1,
+      "session": "lp17b-20233164-e559-4644-b36c-d3a6490cd686",
+      "fixtureFile": "/home/runner/work/_temp/bird-land-preparation/mid-1-fixture.json",
+      "fixtureSha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00",
+      "report": "/home/runner/work/_temp/bird-land-preparation/mid-1.json",
+      "reportSha256": "22ce3721f9d1d3ed91d65f9bbfb79ad299b2b7dc1022b9234e24967ec73a34ef",
+      "file": "/home/runner/work/_temp/bird-land-preparation/mid-1.land",
+      "path": "/home/runner/work/_temp/bird-land-preparation/mid-1.land",
+      "bytes": 74952828,
+      "sha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "identity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679"
+      },
+      "manifest": {
+        "version": 1,
+        "kind": "land-package17b",
+        "mapId": "seversk",
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+        "parameters": {
+          "coverCell": 32,
+          "indexCell": 8,
+          "maskCell": 32,
+          "minWidth": 0.8,
+          "terrainG": 16,
+          "terrainNX": 764,
+          "terrainNZ": 581,
+          "terrainX0": -6097,
+          "terrainZ0": -4635
+        }
+      },
+      "receiptHash": "526ec1953c806b237e25e81895389f2d2dc27c7e093944342ea728883a1c2ecc",
+      "acceptance": {
+        "activated": false,
+        "byteExact": true,
+        "bytes": 74952828,
+        "fileSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+        "liveRestored": false,
+        "ordinary": true,
+        "queryPoints": 27,
+        "rendered": false,
+        "repeated": true,
+        "selectedDrawInputs": true,
+        "source": "generated",
+        "version": 1,
+        "workerRngInstrumented": false
+      },
+      "expectedDistrict": 0,
+      "conditions": {
+        "adult": true,
+        "career": true,
+        "descriptor": {
+          "baseSeed": 24301,
+          "hookOwned": true,
+          "ordinaryAtImport": true,
+          "provider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "district": 0,
+        "editor": false,
+        "graphics": "mid",
+        "intro": false,
+        "mapId": "seversk",
+        "mode": "steam",
+        "quick": false,
+        "streamed": true
+      },
+      "provenance": {
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+        "buildHash": "f5de55c855090af8e380510b40c05ab9a8b9794186dafa88144e3936745a6d76",
+        "buildDir": "/home/runner/work/_temp/bird-land-preparation/prepare-steam"
+      }
+    },
+    {
+      "label": "mid-2",
+      "district": 0,
+      "preset": "mid",
+      "repeat": 2,
+      "session": "lp17b-5d11923a-8b57-42aa-ad5d-42adf25061d3",
+      "fixtureFile": "/home/runner/work/_temp/bird-land-preparation/mid-2-fixture.json",
+      "fixtureSha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00",
+      "report": "/home/runner/work/_temp/bird-land-preparation/mid-2.json",
+      "reportSha256": "d83580d781955dd56f106dd7837e4bd062f7df31e16bd2592f88445f10247920",
+      "file": "/home/runner/work/_temp/bird-land-preparation/mid-2.land",
+      "path": "/home/runner/work/_temp/bird-land-preparation/mid-2.land",
+      "bytes": 74952828,
+      "sha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "identity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679"
+      },
+      "manifest": {
+        "version": 1,
+        "kind": "land-package17b",
+        "mapId": "seversk",
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+        "parameters": {
+          "coverCell": 32,
+          "indexCell": 8,
+          "maskCell": 32,
+          "minWidth": 0.8,
+          "terrainG": 16,
+          "terrainNX": 764,
+          "terrainNZ": 581,
+          "terrainX0": -6097,
+          "terrainZ0": -4635
+        }
+      },
+      "receiptHash": "526ec1953c806b237e25e81895389f2d2dc27c7e093944342ea728883a1c2ecc",
+      "acceptance": {
+        "activated": false,
+        "byteExact": true,
+        "bytes": 74952828,
+        "fileSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+        "liveRestored": false,
+        "ordinary": true,
+        "queryPoints": 27,
+        "rendered": false,
+        "repeated": true,
+        "selectedDrawInputs": true,
+        "source": "generated",
+        "version": 1,
+        "workerRngInstrumented": false
+      },
+      "expectedDistrict": 0,
+      "conditions": {
+        "adult": true,
+        "career": true,
+        "descriptor": {
+          "baseSeed": 24301,
+          "hookOwned": true,
+          "ordinaryAtImport": true,
+          "provider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "district": 0,
+        "editor": false,
+        "graphics": "mid",
+        "intro": false,
+        "mapId": "seversk",
+        "mode": "steam",
+        "quick": false,
+        "streamed": true
+      },
+      "provenance": {
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+        "buildHash": "f5de55c855090af8e380510b40c05ab9a8b9794186dafa88144e3936745a6d76",
+        "buildDir": "/home/runner/work/_temp/bird-land-preparation/prepare-steam"
+      }
+    },
+    {
+      "label": "high-1",
+      "district": 0,
+      "preset": "high",
+      "repeat": 1,
+      "session": "lp17b-03658c10-220b-4bbd-b2d0-79b09526dc40",
+      "fixtureFile": "/home/runner/work/_temp/bird-land-preparation/high-1-fixture.json",
+      "fixtureSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "report": "/home/runner/work/_temp/bird-land-preparation/high-1.json",
+      "reportSha256": "c23b30ffc5b0221e892ea3908daacbc1860453b56a9985b79579f8e95ff996f9",
+      "file": "/home/runner/work/_temp/bird-land-preparation/high-1.land",
+      "path": "/home/runner/work/_temp/bird-land-preparation/high-1.land",
+      "bytes": 74952828,
+      "sha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "identity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679"
+      },
+      "manifest": {
+        "version": 1,
+        "kind": "land-package17b",
+        "mapId": "seversk",
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+        "parameters": {
+          "coverCell": 32,
+          "indexCell": 8,
+          "maskCell": 32,
+          "minWidth": 0.8,
+          "terrainG": 16,
+          "terrainNX": 764,
+          "terrainNZ": 581,
+          "terrainX0": -6097,
+          "terrainZ0": -4635
+        }
+      },
+      "receiptHash": "526ec1953c806b237e25e81895389f2d2dc27c7e093944342ea728883a1c2ecc",
+      "acceptance": {
+        "activated": false,
+        "byteExact": true,
+        "bytes": 74952828,
+        "fileSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+        "liveRestored": false,
+        "ordinary": true,
+        "queryPoints": 27,
+        "rendered": false,
+        "repeated": true,
+        "selectedDrawInputs": true,
+        "source": "generated",
+        "version": 1,
+        "workerRngInstrumented": false
+      },
+      "expectedDistrict": 0,
+      "conditions": {
+        "adult": true,
+        "career": true,
+        "descriptor": {
+          "baseSeed": 24301,
+          "hookOwned": true,
+          "ordinaryAtImport": true,
+          "provider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "district": 0,
+        "editor": false,
+        "graphics": "high",
+        "intro": false,
+        "mapId": "seversk",
+        "mode": "steam",
+        "quick": false,
+        "streamed": true
+      },
+      "provenance": {
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+        "buildHash": "f5de55c855090af8e380510b40c05ab9a8b9794186dafa88144e3936745a6d76",
+        "buildDir": "/home/runner/work/_temp/bird-land-preparation/prepare-steam"
+      }
+    },
+    {
+      "label": "high-2",
+      "district": 0,
+      "preset": "high",
+      "repeat": 2,
+      "session": "lp17b-f5bcb3ea-c935-4265-94ad-830a54145897",
+      "fixtureFile": "/home/runner/work/_temp/bird-land-preparation/high-2-fixture.json",
+      "fixtureSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "report": "/home/runner/work/_temp/bird-land-preparation/high-2.json",
+      "reportSha256": "349eaa5050a77cfa4cf6ea0df9be091d9e59c38f40d03e6f1b0860d921733372",
+      "file": "/home/runner/work/_temp/bird-land-preparation/high-2.land",
+      "path": "/home/runner/work/_temp/bird-land-preparation/high-2.land",
+      "bytes": 74952828,
+      "sha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "identity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679"
+      },
+      "manifest": {
+        "version": 1,
+        "kind": "land-package17b",
+        "mapId": "seversk",
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+        "parameters": {
+          "coverCell": 32,
+          "indexCell": 8,
+          "maskCell": 32,
+          "minWidth": 0.8,
+          "terrainG": 16,
+          "terrainNX": 764,
+          "terrainNZ": 581,
+          "terrainX0": -6097,
+          "terrainZ0": -4635
+        }
+      },
+      "receiptHash": "526ec1953c806b237e25e81895389f2d2dc27c7e093944342ea728883a1c2ecc",
+      "acceptance": {
+        "activated": false,
+        "byteExact": true,
+        "bytes": 74952828,
+        "fileSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+        "liveRestored": false,
+        "ordinary": true,
+        "queryPoints": 27,
+        "rendered": false,
+        "repeated": true,
+        "selectedDrawInputs": true,
+        "source": "generated",
+        "version": 1,
+        "workerRngInstrumented": false
+      },
+      "expectedDistrict": 0,
+      "conditions": {
+        "adult": true,
+        "career": true,
+        "descriptor": {
+          "baseSeed": 24301,
+          "hookOwned": true,
+          "ordinaryAtImport": true,
+          "provider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "district": 0,
+        "editor": false,
+        "graphics": "high",
+        "intro": false,
+        "mapId": "seversk",
+        "mode": "steam",
+        "quick": false,
+        "streamed": true
+      },
+      "provenance": {
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+        "buildHash": "f5de55c855090af8e380510b40c05ab9a8b9794186dafa88144e3936745a6d76",
+        "buildDir": "/home/runner/work/_temp/bird-land-preparation/prepare-steam"
+      }
+    },
+    {
+      "label": "district3-high-1",
+      "district": 3,
+      "preset": "high",
+      "repeat": 1,
+      "session": "lp17b-1052ec43-dcad-4455-8686-65da1639bc3b",
+      "fixtureFile": "/home/runner/work/_temp/bird-land-preparation/district3-high-1-fixture.json",
+      "fixtureSha256": "11a7b7b4df9fd1d30cf3c37d6676cf6f0ae70e95eba1649f74de34837eb20991",
+      "report": "/home/runner/work/_temp/bird-land-preparation/district3-high-1.json",
+      "reportSha256": "b8cc15f0818b3e8e31ec63e46598a10a8e1058a9fba7fba925cb71f52ecc94d5",
+      "file": "/home/runner/work/_temp/bird-land-preparation/district3-high-1.land",
+      "path": "/home/runner/work/_temp/bird-land-preparation/district3-high-1.land",
+      "bytes": 74952828,
+      "sha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "identity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679"
+      },
+      "manifest": {
+        "version": 1,
+        "kind": "land-package17b",
+        "mapId": "seversk",
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+        "parameters": {
+          "coverCell": 32,
+          "indexCell": 8,
+          "maskCell": 32,
+          "minWidth": 0.8,
+          "terrainG": 16,
+          "terrainNX": 764,
+          "terrainNZ": 581,
+          "terrainX0": -6097,
+          "terrainZ0": -4635
+        }
+      },
+      "receiptHash": "526ec1953c806b237e25e81895389f2d2dc27c7e093944342ea728883a1c2ecc",
+      "acceptance": {
+        "activated": false,
+        "byteExact": true,
+        "bytes": 74952828,
+        "fileSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+        "liveRestored": false,
+        "ordinary": true,
+        "queryPoints": 27,
+        "rendered": false,
+        "repeated": true,
+        "selectedDrawInputs": true,
+        "source": "generated",
+        "version": 1,
+        "workerRngInstrumented": false
+      },
+      "expectedDistrict": 3,
+      "conditions": {
+        "adult": true,
+        "career": true,
+        "descriptor": {
+          "baseSeed": 24301,
+          "hookOwned": true,
+          "ordinaryAtImport": true,
+          "provider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "district": 3,
+        "editor": false,
+        "graphics": "high",
+        "intro": false,
+        "mapId": "seversk",
+        "mode": "steam",
+        "quick": false,
+        "streamed": true
+      },
+      "provenance": {
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+        "buildHash": "f5de55c855090af8e380510b40c05ab9a8b9794186dafa88144e3936745a6d76",
+        "buildDir": "/home/runner/work/_temp/bird-land-preparation/prepare-steam"
+      }
+    },
+    {
+      "label": "district3-high-2",
+      "district": 3,
+      "preset": "high",
+      "repeat": 2,
+      "session": "lp17b-6357db14-a7e1-44ba-ab81-3ffc745e549b",
+      "fixtureFile": "/home/runner/work/_temp/bird-land-preparation/district3-high-2-fixture.json",
+      "fixtureSha256": "11a7b7b4df9fd1d30cf3c37d6676cf6f0ae70e95eba1649f74de34837eb20991",
+      "report": "/home/runner/work/_temp/bird-land-preparation/district3-high-2.json",
+      "reportSha256": "aae3629329d4506f7f03959b2ab232d95f5f02c8d86a6bf7a9c8c59465f5c104",
+      "file": "/home/runner/work/_temp/bird-land-preparation/district3-high-2.land",
+      "path": "/home/runner/work/_temp/bird-land-preparation/district3-high-2.land",
+      "bytes": 74952828,
+      "sha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "identity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679"
+      },
+      "manifest": {
+        "version": 1,
+        "kind": "land-package17b",
+        "mapId": "seversk",
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+        "parameters": {
+          "coverCell": 32,
+          "indexCell": 8,
+          "maskCell": 32,
+          "minWidth": 0.8,
+          "terrainG": 16,
+          "terrainNX": 764,
+          "terrainNZ": 581,
+          "terrainX0": -6097,
+          "terrainZ0": -4635
+        }
+      },
+      "receiptHash": "526ec1953c806b237e25e81895389f2d2dc27c7e093944342ea728883a1c2ecc",
+      "acceptance": {
+        "activated": false,
+        "byteExact": true,
+        "bytes": 74952828,
+        "fileSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+        "liveRestored": false,
+        "ordinary": true,
+        "queryPoints": 27,
+        "rendered": false,
+        "repeated": true,
+        "selectedDrawInputs": true,
+        "source": "generated",
+        "version": 1,
+        "workerRngInstrumented": false
+      },
+      "expectedDistrict": 3,
+      "conditions": {
+        "adult": true,
+        "career": true,
+        "descriptor": {
+          "baseSeed": 24301,
+          "hookOwned": true,
+          "ordinaryAtImport": true,
+          "provider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "district": 3,
+        "editor": false,
+        "graphics": "high",
+        "intro": false,
+        "mapId": "seversk",
+        "mode": "steam",
+        "quick": false,
+        "streamed": true
+      },
+      "provenance": {
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+        "buildHash": "f5de55c855090af8e380510b40c05ab9a8b9794186dafa88144e3936745a6d76",
+        "buildDir": "/home/runner/work/_temp/bird-land-preparation/prepare-steam"
+      }
+    },
+    {
+      "label": "district7-high-1",
+      "district": 7,
+      "preset": "high",
+      "repeat": 1,
+      "session": "lp17b-c41a0ac9-5d8a-4d18-a5c3-5283b8851b94",
+      "fixtureFile": "/home/runner/work/_temp/bird-land-preparation/district7-high-1-fixture.json",
+      "fixtureSha256": "713bf74b0eae7360219557e7995f3299db5cdc519429ec456570428d6fbdcb00",
+      "report": "/home/runner/work/_temp/bird-land-preparation/district7-high-1.json",
+      "reportSha256": "a445ea8a20a8dd34ed9e04ed9f3d3410327b5cba5d9c1aa779a0af92b2c05703",
+      "file": "/home/runner/work/_temp/bird-land-preparation/district7-high-1.land",
+      "path": "/home/runner/work/_temp/bird-land-preparation/district7-high-1.land",
+      "bytes": 74952828,
+      "sha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "identity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679"
+      },
+      "manifest": {
+        "version": 1,
+        "kind": "land-package17b",
+        "mapId": "seversk",
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+        "parameters": {
+          "coverCell": 32,
+          "indexCell": 8,
+          "maskCell": 32,
+          "minWidth": 0.8,
+          "terrainG": 16,
+          "terrainNX": 764,
+          "terrainNZ": 581,
+          "terrainX0": -6097,
+          "terrainZ0": -4635
+        }
+      },
+      "receiptHash": "526ec1953c806b237e25e81895389f2d2dc27c7e093944342ea728883a1c2ecc",
+      "acceptance": {
+        "activated": false,
+        "byteExact": true,
+        "bytes": 74952828,
+        "fileSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+        "liveRestored": false,
+        "ordinary": true,
+        "queryPoints": 27,
+        "rendered": false,
+        "repeated": true,
+        "selectedDrawInputs": true,
+        "source": "generated",
+        "version": 1,
+        "workerRngInstrumented": false
+      },
+      "expectedDistrict": 7,
+      "conditions": {
+        "adult": true,
+        "career": true,
+        "descriptor": {
+          "baseSeed": 24301,
+          "hookOwned": true,
+          "ordinaryAtImport": true,
+          "provider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "district": 7,
+        "editor": false,
+        "graphics": "high",
+        "intro": false,
+        "mapId": "seversk",
+        "mode": "steam",
+        "quick": false,
+        "streamed": true
+      },
+      "provenance": {
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+        "buildHash": "f5de55c855090af8e380510b40c05ab9a8b9794186dafa88144e3936745a6d76",
+        "buildDir": "/home/runner/work/_temp/bird-land-preparation/prepare-steam"
+      }
+    },
+    {
+      "label": "district7-high-2",
+      "district": 7,
+      "preset": "high",
+      "repeat": 2,
+      "session": "lp17b-edda5339-59d4-4991-b602-5193c3f9bb95",
+      "fixtureFile": "/home/runner/work/_temp/bird-land-preparation/district7-high-2-fixture.json",
+      "fixtureSha256": "713bf74b0eae7360219557e7995f3299db5cdc519429ec456570428d6fbdcb00",
+      "report": "/home/runner/work/_temp/bird-land-preparation/district7-high-2.json",
+      "reportSha256": "8a63a849444eae2d7f40ccb63df22aca29d0979b60f7a20ea12139c918118968",
+      "file": "/home/runner/work/_temp/bird-land-preparation/district7-high-2.land",
+      "path": "/home/runner/work/_temp/bird-land-preparation/district7-high-2.land",
+      "bytes": 74952828,
+      "sha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "identity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679"
+      },
+      "manifest": {
+        "version": 1,
+        "kind": "land-package17b",
+        "mapId": "seversk",
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+        "parameters": {
+          "coverCell": 32,
+          "indexCell": 8,
+          "maskCell": 32,
+          "minWidth": 0.8,
+          "terrainG": 16,
+          "terrainNX": 764,
+          "terrainNZ": 581,
+          "terrainX0": -6097,
+          "terrainZ0": -4635
+        }
+      },
+      "receiptHash": "526ec1953c806b237e25e81895389f2d2dc27c7e093944342ea728883a1c2ecc",
+      "acceptance": {
+        "activated": false,
+        "byteExact": true,
+        "bytes": 74952828,
+        "fileSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+        "liveRestored": false,
+        "ordinary": true,
+        "queryPoints": 27,
+        "rendered": false,
+        "repeated": true,
+        "selectedDrawInputs": true,
+        "source": "generated",
+        "version": 1,
+        "workerRngInstrumented": false
+      },
+      "expectedDistrict": 7,
+      "conditions": {
+        "adult": true,
+        "career": true,
+        "descriptor": {
+          "baseSeed": 24301,
+          "hookOwned": true,
+          "ordinaryAtImport": true,
+          "provider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "district": 7,
+        "editor": false,
+        "graphics": "high",
+        "intro": false,
+        "mapId": "seversk",
+        "mode": "steam",
+        "quick": false,
+        "streamed": true
+      },
+      "provenance": {
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+        "buildHash": "f5de55c855090af8e380510b40c05ab9a8b9794186dafa88144e3936745a6d76",
+        "buildDir": "/home/runner/work/_temp/bird-land-preparation/prepare-steam"
+      }
+    }
+  ],
+  "compression": [
+    {
+      "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+      "rawBytes": 74952828,
+      "wireBytes": 34231572,
+      "encodeMs": 1514.9157150001265,
+      "decodeVerifyHashWriteMs": 290.93519099988043,
+      "level": 6,
+      "scope": "Node host CPU1 component; decode/verify/hash/write span, not renderer startup or Deck",
+      "byteExact": true
+    }
+  ],
+  "package": {
+    "dir": "/home/runner/work/_temp/bird-land-preparation/package",
+    "uniqueInputs": 1,
+    "coverage": [
+      {
+        "district": 0,
+        "graphics": "mid",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4"
+      },
+      {
+        "district": 0,
+        "graphics": "high",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4"
+      },
+      {
+        "district": 3,
+        "graphics": "high",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4"
+      },
+      {
+        "district": 7,
+        "graphics": "high",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4"
+      }
+    ],
+    "rawBytes": 74952828,
+    "wireBytes": 34231572,
+    "catalog": {
+      "version": 2,
+      "kind": "land-package17b-catalog",
+      "manifest": {
+        "version": 1,
+        "kind": "land-package17b",
+        "mapId": "seversk",
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+        "parameters": {
+          "coverCell": 32,
+          "indexCell": 8,
+          "maskCell": 32,
+          "minWidth": 0.8,
+          "terrainG": 16,
+          "terrainNX": 764,
+          "terrainNZ": 581,
+          "terrainX0": -6097,
+          "terrainZ0": -4635
+        }
+      },
+      "entries": [
+        {
+          "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+          "path": "city-data/278b3223bc7420a119af4e1198e2a57068dd8f850daa5386ef04c3c2fe806744.land.gz",
+          "encoding": "gzip",
+          "bytes": 34231572,
+          "sha256": "278b3223bc7420a119af4e1198e2a57068dd8f850daa5386ef04c3c2fe806744",
+          "rawBytes": 74952828,
+          "rawSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c"
+        }
+      ],
+      "coverage": [
+        {
+          "district": 0,
+          "graphics": "mid",
+          "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4"
+        },
+        {
+          "district": 0,
+          "graphics": "high",
+          "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4"
+        },
+        {
+          "district": 3,
+          "graphics": "high",
+          "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4"
+        },
+        {
+          "district": 7,
+          "graphics": "high",
+          "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4"
+        }
+      ]
+    }
+  },
+  "ok": true,
+  "finishedAt": "2026-11-02T01:39:46.983Z"
+}

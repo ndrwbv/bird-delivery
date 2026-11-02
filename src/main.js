@@ -64,6 +64,15 @@ useMap(await STARTUP.awaited('map.readParseImport', 'module', () => loadMap(mapI
 STARTUP.mark('map.ready', { mapId });
 document.documentElement.dataset.city = mapId;
 
+// The first address package is an explicit diagnostic consumer, before game/visual builders.
+if(import.meta.env.MODE==='steam'&&new URLSearchParams(location.search).has('addresspackage17b')){
+  const {ADDRESS_PACKAGE_PRELOAD17B}=await import('./game/addresspackage17b.js');
+  await STARTUP.awaited('addresses.preload','cacheIO',()=>ADDRESS_PACKAGE_PRELOAD17B.preload({
+    enabled:new URLSearchParams(location.search).get('addresspackage17b')!=='0',
+    catalog:typeof __ADDRESS_PACKAGE_CATALOG__!=='undefined'?__ADDRESS_PACKAGE_CATALOG__:null,
+  }));
+}
+
 // город строится синхронно при импорте: сначала даём браузеру нарисовать экран загрузки
 await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
 // время запуска (docs/AGENTS.md → «Запуск до меню»): window.__boot — мс от старта страницы

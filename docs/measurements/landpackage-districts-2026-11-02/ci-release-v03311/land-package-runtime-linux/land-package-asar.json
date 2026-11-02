@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "archive": "/home/runner/work/bird-delivery/bird-delivery/release/linux-unpacked/resources/app.asar",
+  "catalogSha256": "5e70bb50c2b139570b8f61e695019364f84b669a3d72305962afaf00bf33772e",
+  "sourceHash": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+  "assets": [
+    {
+      "path": "dist/steam/city-data/278b3223bc7420a119af4e1198e2a57068dd8f850daa5386ef04c3c2fe806744.land.gz",
+      "bytes": 34231572,
+      "sha256": "278b3223bc7420a119af4e1198e2a57068dd8f850daa5386ef04c3c2fe806744"
+    }
+  ]
+}

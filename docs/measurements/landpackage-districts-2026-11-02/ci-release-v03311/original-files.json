@@ -1,0 +1,398 @@
+{
+  "version": 1,
+  "runId": 41371474851,
+  "runHeadSha": "93667c1d160deec5eb4c27ba5f29822f0182d7b1",
+  "downloadedArtifactNames": [
+    "prepared-land-proof",
+    "land-package-runtime-linux",
+    "land-package-runtime-win"
+  ],
+  "binaryAssetsDownloaded": false,
+  "artifactArchivesRetainedOutsideRepository": "/tmp/bird-ci-v03311-41371474851",
+  "files": [
+    {
+      "path": "prepared-land-proof/build.stderr.log",
+      "bytes": 1549,
+      "sha256": "16111b5de23dd102ac89fce35524c931812980925c2f29732d049d7302e9b5a7",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/build.stdout.log",
+      "bytes": 7632,
+      "sha256": "3b7f0afdcaedfb717d6b091c31f9e42a6bb98e0e8bcb2f2e21181b86f536128f",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/district3-high-1-fixture.json",
+      "bytes": 301,
+      "sha256": "11a7b7b4df9fd1d30cf3c37d6676cf6f0ae70e95eba1649f74de34837eb20991",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/district3-high-1.json",
+      "bytes": 32688,
+      "sha256": "b8cc15f0818b3e8e31ec63e46598a10a8e1058a9fba7fba925cb71f52ecc94d5",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/district3-high-1.stderr.log",
+      "bytes": 1283,
+      "sha256": "8dc845944a257e5bc4d49d732586fb39f1770f69a80c4a78cd897574e91d4e31",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/district3-high-1.stdout.log",
+      "bytes": 3438,
+      "sha256": "d51da0a9bd0980e124975f6f2fe1b5f95bc06875386061a471be86a6786d0c4c",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/district3-high-2-fixture.json",
+      "bytes": 301,
+      "sha256": "11a7b7b4df9fd1d30cf3c37d6676cf6f0ae70e95eba1649f74de34837eb20991",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/district3-high-2.json",
+      "bytes": 32853,
+      "sha256": "aae3629329d4506f7f03959b2ab232d95f5f02c8d86a6bf7a9c8c59465f5c104",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/district3-high-2.stderr.log",
+      "bytes": 1283,
+      "sha256": "53504ab6c54e538995b3823c66f8c6b310dffc3a4c1c45d4592681c3c1f79556",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/district3-high-2.stdout.log",
+      "bytes": 3425,
+      "sha256": "9035ea745a3d57849f0ca8d44f1cf7f5ac9a323f197fe50fbc3a97df5dc8e13b",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/district7-high-1-fixture.json",
+      "bytes": 301,
+      "sha256": "713bf74b0eae7360219557e7995f3299db5cdc519429ec456570428d6fbdcb00",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/district7-high-1.json",
+      "bytes": 32930,
+      "sha256": "a445ea8a20a8dd34ed9e04ed9f3d3410327b5cba5d9c1aa779a0af92b2c05703",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/district7-high-1.stderr.log",
+      "bytes": 1282,
+      "sha256": "da09b3fb2a03eedcb9756edbd441fe0d38541985eb654b4bd625a67e89dd1a8b",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/district7-high-1.stdout.log",
+      "bytes": 3447,
+      "sha256": "7a207f1c6f9c68be31eaf94ad32768a533258fe8816e682177257f8ce0507cc0",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/district7-high-2-fixture.json",
+      "bytes": 301,
+      "sha256": "713bf74b0eae7360219557e7995f3299db5cdc519429ec456570428d6fbdcb00",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/district7-high-2.json",
+      "bytes": 33285,
+      "sha256": "8a63a849444eae2d7f40ccb63df22aca29d0979b60f7a20ea12139c918118968",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/district7-high-2.stderr.log",
+      "bytes": 1282,
+      "sha256": "5f916395f46991994ff01398186f6d9c348fb56787388a6ebfdf9374b2de070d",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/district7-high-2.stdout.log",
+      "bytes": 3446,
+      "sha256": "b050d72d619154efa475a6f05f5e1789bdea58bd47de6f446b93a7b5340ddd81",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/export-receipt.json",
+      "bytes": 94517,
+      "sha256": "404af8b3469f52551974c7d84c8f8945590c6b2a2db166ae6299ba33718500a7",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/high-1-fixture.json",
+      "bytes": 74,
+      "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/high-1.json",
+      "bytes": 33190,
+      "sha256": "c23b30ffc5b0221e892ea3908daacbc1860453b56a9985b79579f8e95ff996f9",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/high-1.stderr.log",
+      "bytes": 1282,
+      "sha256": "dde8a612daf7abb6cbf066e1347a1657406a6be66c09117f201b142bd3526698",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/high-1.stdout.log",
+      "bytes": 3434,
+      "sha256": "7281177ac4ccb26ccb36fbbf89a180d96d0941d5ca25941e22563e9de83cf451",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/high-2-fixture.json",
+      "bytes": 74,
+      "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/high-2.json",
+      "bytes": 32882,
+      "sha256": "349eaa5050a77cfa4cf6ea0df9be091d9e59c38f40d03e6f1b0860d921733372",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/high-2.stderr.log",
+      "bytes": 1282,
+      "sha256": "24d2b08b697e38cf1db6e1814941a48710b7e1c9c2f669a936275b542d880239",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/high-2.stdout.log",
+      "bytes": 3434,
+      "sha256": "ac262ff9ca63960d0d6458e7a50e410646fa50ddb79190baea0fa516d07879cf",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/mid-1-fixture.json",
+      "bytes": 35,
+      "sha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/mid-1.json",
+      "bytes": 33143,
+      "sha256": "22ce3721f9d1d3ed91d65f9bbfb79ad299b2b7dc1022b9234e24967ec73a34ef",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/mid-1.stderr.log",
+      "bytes": 1282,
+      "sha256": "bc73dad3cb6a5851731e738afa4accc33cbcd02049db2797f5ed886a589d9125",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/mid-1.stdout.log",
+      "bytes": 3433,
+      "sha256": "43f14e4b6ff04e068ee6741a0fba3f67691cc4aa81c8db18d4ddaa6c1212cfa7",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/mid-2-fixture.json",
+      "bytes": 35,
+      "sha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/mid-2.json",
+      "bytes": 32896,
+      "sha256": "d83580d781955dd56f106dd7837e4bd062f7df31e16bd2592f88445f10247920",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/mid-2.stderr.log",
+      "bytes": 1282,
+      "sha256": "dab5fde738a0c0d0e1e0ae5da787ec32487989eaad30134c9f6b0ec0fdac2d0b",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/mid-2.stdout.log",
+      "bytes": 3432,
+      "sha256": "75091edf2eaea6b0cff37ae4e3f0075ae990ceef05565f88609b2bdc2e1266cb",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "prepared-land-proof/preparation.json",
+      "bytes": 48861,
+      "sha256": "14f276e5c0fbfdd29886b916aff99b5814eaba184bde22eefbd9d47493132c63",
+      "artifactId": 13110137313,
+      "artifactName": "prepared-land-proof",
+      "artifactArchiveSha256": "fc509d15206e237cc5cf4cd8183c73a4a118e0b3444efe3f721d29ad403b3131"
+    },
+    {
+      "path": "land-package-runtime-linux/land-package-asar.json",
+      "bytes": 541,
+      "sha256": "61940144475bdedc8127436020d1de561995587baaaff521ad7a604c7a32c9ea",
+      "artifactId": 13109999520,
+      "artifactName": "land-package-runtime-linux",
+      "artifactArchiveSha256": "f685fccdad7e111435d92d87c8db955161499aeda78b48e859bae8cd681e823e"
+    },
+    {
+      "path": "land-package-runtime-linux/land-package-runtime/raw.json",
+      "bytes": 41900,
+      "sha256": "488d660ce07ff39a4ef63c334e398b48d4c52382a46a586909b877b59e3a7b66",
+      "artifactId": 13109999520,
+      "artifactName": "land-package-runtime-linux",
+      "artifactArchiveSha256": "f685fccdad7e111435d92d87c8db955161499aeda78b48e859bae8cd681e823e"
+    },
+    {
+      "path": "land-package-runtime-linux/land-package-runtime/fixture.json",
+      "bytes": 74,
+      "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "artifactId": 13109999520,
+      "artifactName": "land-package-runtime-linux",
+      "artifactArchiveSha256": "f685fccdad7e111435d92d87c8db955161499aeda78b48e859bae8cd681e823e"
+    },
+    {
+      "path": "land-package-runtime-linux/land-package-runtime/run.json",
+      "bytes": 3989,
+      "sha256": "3f91b28e0c5b81185015bd6dbad0e45ba4a0dc85705c00eba27cb7353d661996",
+      "artifactId": 13109999520,
+      "artifactName": "land-package-runtime-linux",
+      "artifactArchiveSha256": "f685fccdad7e111435d92d87c8db955161499aeda78b48e859bae8cd681e823e"
+    },
+    {
+      "path": "land-package-runtime-linux/land-package-runtime/stderr.log",
+      "bytes": 1283,
+      "sha256": "23546e6723d52d46aebea70f4fd7245b1f07948c72969af6f04cf13e1e83ddf1",
+      "artifactId": 13109999520,
+      "artifactName": "land-package-runtime-linux",
+      "artifactArchiveSha256": "f685fccdad7e111435d92d87c8db955161499aeda78b48e859bae8cd681e823e"
+    },
+    {
+      "path": "land-package-runtime-linux/land-package-runtime/stdout.log",
+      "bytes": 40941,
+      "sha256": "8a1df8acde4f6f3962e3fa82d9ef20db188285f2c5a0cc2b78a73648f5ab6bc7",
+      "artifactId": 13109999520,
+      "artifactName": "land-package-runtime-linux",
+      "artifactArchiveSha256": "f685fccdad7e111435d92d87c8db955161499aeda78b48e859bae8cd681e823e"
+    },
+    {
+      "path": "land-package-runtime-win/land-package-asar.json",
+      "bytes": 533,
+      "sha256": "d6a71ed61f4923f7c94f6b5b6332cc86cdcf0514a95fab5ed786a2419543b02b",
+      "artifactId": 13110626456,
+      "artifactName": "land-package-runtime-win",
+      "artifactArchiveSha256": "f937e251a3318676fef7cf2e5eef342bf6385ba7dd1268c31526a0ae76d0dfa1"
+    },
+    {
+      "path": "land-package-runtime-win/land-package-runtime/fixture.json",
+      "bytes": 74,
+      "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "artifactId": 13110626456,
+      "artifactName": "land-package-runtime-win",
+      "artifactArchiveSha256": "f937e251a3318676fef7cf2e5eef342bf6385ba7dd1268c31526a0ae76d0dfa1"
+    },
+    {
+      "path": "land-package-runtime-win/land-package-runtime/run.json",
+      "bytes": 3876,
+      "sha256": "4b7b8bbce6bbe301c6f02eb03e87b8a8f03253e0f54af7bb574bf626f889fcf1",
+      "artifactId": 13110626456,
+      "artifactName": "land-package-runtime-win",
+      "artifactArchiveSha256": "f937e251a3318676fef7cf2e5eef342bf6385ba7dd1268c31526a0ae76d0dfa1"
+    },
+    {
+      "path": "land-package-runtime-win/land-package-runtime/raw.json",
+      "bytes": 42017,
+      "sha256": "9ed1fb1268fb339c4d96dabdbdda49c53aa0a70b47b3c0d13de4bad46301bf03",
+      "artifactId": 13110626456,
+      "artifactName": "land-package-runtime-win",
+      "artifactArchiveSha256": "f937e251a3318676fef7cf2e5eef342bf6385ba7dd1268c31526a0ae76d0dfa1"
+    },
+    {
+      "path": "land-package-runtime-win/land-package-runtime/stderr.log",
+      "bytes": 304,
+      "sha256": "49b5989032f3a3913e2e7a0f322c615b18a6df3c957b7c2afc7df0c0a5278a99",
+      "artifactId": 13110626456,
+      "artifactName": "land-package-runtime-win",
+      "artifactArchiveSha256": "f937e251a3318676fef7cf2e5eef342bf6385ba7dd1268c31526a0ae76d0dfa1"
+    },
+    {
+      "path": "land-package-runtime-win/land-package-runtime/stdout.log",
+      "bytes": 41061,
+      "sha256": "26ba04cfe527c57c587afe44d440b34451405b853538e50d4c4c5e5a3be079fb",
+      "artifactId": 13110626456,
+      "artifactName": "land-package-runtime-win",
+      "artifactArchiveSha256": "f937e251a3318676fef7cf2e5eef342bf6385ba7dd1268c31526a0ae76d0dfa1"
+    }
+  ]
+}

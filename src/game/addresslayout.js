@@ -1,5 +1,5 @@
 /* Address data only. Keep legacy candidate order, strict 6m exclusion and generator boundaries. */
-export function* buildAddressSpotsSteps ({entrances,paths,lots,spots,lerp,inPoly,inBounds,groundH,inHouse,nearestRoad,blocks}) {
+export function* buildAddressSpotsSteps ({entrances,paths,lots,spots,lerp,inPoly,inBounds,groundH,inHouse,nearestRoad,blocks,acceptSpot}) {
   const cand = [];
   for (const [x, z, nx, nz] of entrances) cand.push([x + nx * 3, z + nz * 3]);
   for (const q of paths) {
@@ -38,7 +38,7 @@ export function* buildAddressSpotsSteps ({entrances,paths,lots,spots,lerp,inPoly
     if (street && street.d < street.seg.w / 2 + 12) continue;   // у самой улицы — не вглубь
     if (near(x, z)) continue;
     if (blocks(x, z, 4)) continue;                       // не на горке, разгоне и полёте большого трамплина (jumps.js)
-    const s = { x, z };
+    const candidate = { x, z }, s = acceptSpot ? acceptSpot(candidate) : candidate;
     spots.push(s);
     const k = gk6(Math.floor(x / 6), Math.floor(z / 6)); const a = G.get(k); if (a) a.push(s); else G.set(k, [s]);
   }

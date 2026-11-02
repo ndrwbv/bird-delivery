@@ -1,0 +1,719 @@
+{
+  "version": 1,
+  "kind": "authorized-early-address-S-acceptance-archive",
+  "sourceFingerprint": "b85f25f6152ad0a2231bedf2333abb89e593778b5eda1d0a5aca65bd65bbb9af",
+  "productionBuildFingerprint": "318cd44ce87f683d0f445320e7583a6e8a513d9f2b1d94695cc224e4fdcc4d7d",
+  "inputHash": "45be0886eb4fe7a5f4fc1817484bd80b688ebd5648da26aab448a9c1db5e67ba",
+  "wireBytes": 413028,
+  "wireSha256": "26bbf94fa99eec2bb30be5ee3e0ae23e83046e6a4718fcc3e2374e95d5682cf5",
+  "wireReconstructibleFromExportBase64": true,
+  "physicalWireDuplicateIncluded": false,
+  "ASARBinaryReadOrIncluded": false,
+  "wholeBuildIncluded": false,
+  "compressedRawReports": 5,
+  "gzipRoundtrips": 8,
+  "consumerStdoutDedup": 3,
+  "keyPilotIsMenuOnly": true,
+  "earlyControlClaim": false,
+  "defaultOrdinaryBenefitClaim": false,
+  "physicalDeckClaim": false,
+  "entries": [
+    {
+      "archivePath": "README.md",
+      "archiveBytes": 5395,
+      "archiveSha256": "c04dddbd186b46098a41ca9b3e7e6556c52a5b5e768e728d87cce077f9484cdc",
+      "origin": "archive metadata/helper; not a new game measurement"
+    },
+    {
+      "archivePath": "copy-records.json",
+      "archiveBytes": 30185,
+      "archiveSha256": "f151b6ccfe3871226e0de8691bc25bca873e99caa06e50048b425ecae9831869",
+      "origin": "archive metadata/helper; not a new game measurement"
+    },
+    {
+      "archivePath": "deferred-plan.json",
+      "archiveBytes": 2244,
+      "archiveSha256": "7db104912edc503f5ef9c7f2b60d90793938d237cfb3ad09922aed77daf3e7ee",
+      "origin": "archive metadata/helper; not a new game measurement"
+    },
+    {
+      "archivePath": "harness/archive-finish.mjs",
+      "archiveBytes": 4972,
+      "archiveSha256": "515b10ba4ffb818b684f8edab03f07141dd2d9e6243e499bbe4dfbd34e71f9fe",
+      "originalPath": "/tmp/bird-early-address-archive-finish-1102.mjs",
+      "originalBytes": 4972,
+      "originalSha256": "515b10ba4ffb818b684f8edab03f07141dd2d9e6243e499bbe4dfbd34e71f9fe",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "harness/reconstruct.mjs",
+      "archiveBytes": 1195,
+      "archiveSha256": "6506c2888cd6db5ba127a47d8217a7d7ca4a6c8e84acd048b542e9f794b52d32",
+      "origin": "archive metadata/helper; not a new game measurement"
+    },
+    {
+      "archivePath": "key-pilot/before-source.json",
+      "archiveBytes": 78404,
+      "archiveSha256": "91b63d665a3e0390802d3c724f64c86869a503c26fd0350915c3d077ba212036",
+      "originalPath": "/tmp/bird-early-address17b-key-pilot-1102/before-source.json",
+      "originalBytes": 78404,
+      "originalSha256": "91b63d665a3e0390802d3c724f64c86869a503c26fd0350915c3d077ba212036",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "key-pilot/build-pins.json",
+      "archiveBytes": 100237,
+      "archiveSha256": "716d5f4d20bf5fbbdedbd0e4365d3f8a182a346967c6e9ea5af6a7263fe63860",
+      "originalPath": "/tmp/bird-early-address17b-key-pilot-1102/build-pins.json",
+      "originalBytes": 100237,
+      "originalSha256": "716d5f4d20bf5fbbdedbd0e4365d3f8a182a346967c6e9ea5af6a7263fe63860",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "key-pilot/build.stderr.log",
+      "archiveBytes": 1497,
+      "archiveSha256": "43d817da84c8943f76d6482fcd87025671f720e77e105724d6349d9807517f58",
+      "originalPath": "/tmp/bird-early-address17b-key-pilot-1102/build.stderr.log",
+      "originalBytes": 1497,
+      "originalSha256": "43d817da84c8943f76d6482fcd87025671f720e77e105724d6349d9807517f58",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "key-pilot/build.stdout.log",
+      "archiveBytes": 5957,
+      "archiveSha256": "bed88b0680c7659ce03e4af46cc9c3b3d19d7c18842f57fc58a2c0b93b7cf5f8",
+      "originalPath": "/tmp/bird-early-address17b-key-pilot-1102/build.stdout.log",
+      "originalBytes": 5957,
+      "originalSha256": "bed88b0680c7659ce03e4af46cc9c3b3d19d7c18842f57fc58a2c0b93b7cf5f8",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "key-pilot/raw.json",
+      "archiveBytes": 2699,
+      "archiveSha256": "423fd786e1b17f87ee2a9ea7774398264a7167d99452d51b1a93df6c5e523ebc",
+      "originalPath": "/tmp/bird-early-address17b-key-pilot-1102/raw.json",
+      "originalBytes": 2699,
+      "originalSha256": "423fd786e1b17f87ee2a9ea7774398264a7167d99452d51b1a93df6c5e523ebc",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "key-pilot/stderr.log",
+      "archiveBytes": 186,
+      "archiveSha256": "54d5b98c4a64568d6cfbad2b5a232d0941a7ae02b25b83c8d4f8466566ae7e05",
+      "originalPath": "/tmp/bird-early-address17b-key-pilot-1102/stderr.log",
+      "originalBytes": 186,
+      "originalSha256": "54d5b98c4a64568d6cfbad2b5a232d0941a7ae02b25b83c8d4f8466566ae7e05",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "key-pilot/stdout.log",
+      "archiveBytes": 2136,
+      "archiveSha256": "fd1defac2a2ae80a2a44fabf46fceaac86cd5018837e09113fe338b9f7fcc026",
+      "originalPath": "/tmp/bird-early-address17b-key-pilot-1102/stdout.log",
+      "originalBytes": 2136,
+      "originalSha256": "fd1defac2a2ae80a2a44fabf46fceaac86cd5018837e09113fe338b9f7fcc026",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "lineage/historical-oracle-body.js",
+      "archiveBytes": 29064,
+      "archiveSha256": "a246e97e024ba99add1a9911775ed6c8f0543aa9b563372497351ecd3f64fdb0",
+      "originalPath": "/tmp/bird-address-closure17b-1102/cases/B1/eval.js",
+      "originalBytes": 29064,
+      "originalSha256": "a246e97e024ba99add1a9911775ed6c8f0543aa9b563372497351ecd3f64fdb0",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "role": "historical-oracle-body-not-runtime-identity"
+    },
+    {
+      "archivePath": "package/catalog.json",
+      "archiveBytes": 651,
+      "archiveSha256": "15289b40c085ed9c2dc2136f1ffcc2a050bd24b81883ca362e22a342b6819d47",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/package/catalog.json",
+      "originalBytes": 651,
+      "originalSha256": "15289b40c085ed9c2dc2136f1ffcc2a050bd24b81883ca362e22a342b6819d47",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/B1-1/fixture.json",
+      "archiveBytes": 771,
+      "archiveSha256": "befff63fde0ebb4936291884fbaa605b02f135006b19761f923775568ce1f95f",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/B1-1/fixture.json",
+      "originalBytes": 771,
+      "originalSha256": "befff63fde0ebb4936291884fbaa605b02f135006b19761f923775568ce1f95f",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/B1-1/raw.json.gz",
+      "archiveBytes": 1363878,
+      "archiveSha256": "e718ade1beb10f8b73f64596318be474f077ce11e3632486e23ee0d2fcad52af",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/B1-1/raw.json",
+      "originalBytes": 12159086,
+      "originalSha256": "3917042262a13838bb076c69ebfe0825ae50e323a9b8ff75b6b68be39e7dff9f",
+      "gzipLevel": 6,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "preparation/B1-1.stderr.log",
+      "archiveBytes": 187,
+      "archiveSha256": "7fa1d62753c37655dddd90e52a442c3e820cb4e254b2b02be6f270705477b076",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/B1-1.stderr.log",
+      "originalBytes": 187,
+      "originalSha256": "7fa1d62753c37655dddd90e52a442c3e820cb4e254b2b02be6f270705477b076",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/B1-1.stdout.log",
+      "archiveBytes": 40960,
+      "archiveSha256": "2cb0ef7242d6c93e2ab56c0c57827167c96196929298a6b32a7b1ad71f71e8a3",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/B1-1.stdout.log",
+      "originalBytes": 40960,
+      "originalSha256": "2cb0ef7242d6c93e2ab56c0c57827167c96196929298a6b32a7b1ad71f71e8a3",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/B1-2/fixture.json",
+      "archiveBytes": 771,
+      "archiveSha256": "befff63fde0ebb4936291884fbaa605b02f135006b19761f923775568ce1f95f",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/B1-2/fixture.json",
+      "originalBytes": 771,
+      "originalSha256": "befff63fde0ebb4936291884fbaa605b02f135006b19761f923775568ce1f95f",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/B1-2/raw.json.gz",
+      "archiveBytes": 1363841,
+      "archiveSha256": "8e9f953ec543d5b6bcdd53ada8107fa46cce16e32016cddb62027b0abe04866a",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/B1-2/raw.json",
+      "originalBytes": 12158648,
+      "originalSha256": "2261bac01a20034c6697a81b340be7b091ce256dfcc9f78033cc6b52be4c034a",
+      "gzipLevel": 6,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "preparation/B1-2.stderr.log",
+      "archiveBytes": 187,
+      "archiveSha256": "3b8f6d33a964257201c7ad05f743167664fabc6ae1506970cc1f0708aa8607bd",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/B1-2.stderr.log",
+      "originalBytes": 187,
+      "originalSha256": "3b8f6d33a964257201c7ad05f743167664fabc6ae1506970cc1f0708aa8607bd",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/B1-2.stdout.log",
+      "archiveBytes": 49152,
+      "archiveSha256": "0cd41be6bb69291206178fb2614dfa1290381c054b781d3d749c516f503d7569",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/B1-2.stdout.log",
+      "originalBytes": 49152,
+      "originalSha256": "0cd41be6bb69291206178fb2614dfa1290381c054b781d3d749c516f503d7569",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/actual-asar.json",
+      "archiveBytes": 706,
+      "archiveSha256": "df4babf240953d16637823ce0e8a282adae35675f26a7e28bcf61038dc9da91b",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/actual-asar.json",
+      "originalBytes": 706,
+      "originalSha256": "df4babf240953d16637823ce0e8a282adae35675f26a7e28bcf61038dc9da91b",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/after-consumer-pins.json",
+      "archiveBytes": 100916,
+      "archiveSha256": "856b479629a60945027286e1c79fba2af651ecc2f0bc618ab822b0f9cb41c345",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/after-consumer-pins.json",
+      "originalBytes": 100916,
+      "originalSha256": "856b479629a60945027286e1c79fba2af651ecc2f0bc618ab822b0f9cb41c345",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/before-consumer-pins.json",
+      "archiveBytes": 100983,
+      "archiveSha256": "a258e4ec02113072131aba14dd45298e986a9bd25f2f7305c882301dab616d52",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/before-consumer-pins.json",
+      "originalBytes": 100983,
+      "originalSha256": "a258e4ec02113072131aba14dd45298e986a9bd25f2f7305c882301dab616d52",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/build.stderr.log",
+      "archiveBytes": 1497,
+      "archiveSha256": "43d817da84c8943f76d6482fcd87025671f720e77e105724d6349d9807517f58",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/build.stderr.log",
+      "originalBytes": 1497,
+      "originalSha256": "43d817da84c8943f76d6482fcd87025671f720e77e105724d6349d9807517f58",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/build.stdout.log",
+      "archiveBytes": 6629,
+      "archiveSha256": "c7eb883f2232843f0e59e661da7949a9c05c188b03d196a352a6d13fae01f183",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/build.stdout.log",
+      "originalBytes": 6629,
+      "originalSha256": "c7eb883f2232843f0e59e661da7949a9c05c188b03d196a352a6d13fae01f183",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/consumer-asar.json.gz",
+      "archiveBytes": 1346360,
+      "archiveSha256": "b5028b22daea93a2ae4e687a5dee05b11acda96eeb4f71c3c36b686346256161",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/consumer-asar.json",
+      "originalBytes": 14285414,
+      "originalSha256": "5260ebd1d13436f95915a2cc9e565419fc5ad6ebfd20ebdde30a76b8488c3c17",
+      "gzipLevel": 6,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "preparation/consumer-asar.stderr.log",
+      "archiveBytes": 187,
+      "archiveSha256": "bc0d01bca7f33aaffdc0b93454aa6217242f333a7f90c59f20dd045769ca2e59",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/consumer-asar.stderr.log",
+      "originalBytes": 187,
+      "originalSha256": "bc0d01bca7f33aaffdc0b93454aa6217242f333a7f90c59f20dd045769ca2e59",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/consumer-audit.json",
+      "archiveBytes": 1103,
+      "archiveSha256": "c312d8280c6d9eca0e98c42ac433c1a55725e0a989922793af4f4128e6db0f1a",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/consumer-audit.json",
+      "originalBytes": 1103,
+      "originalSha256": "c312d8280c6d9eca0e98c42ac433c1a55725e0a989922793af4f4128e6db0f1a",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/consumer-eval.js",
+      "archiveBytes": 32398,
+      "archiveSha256": "20d3c76ff5049e2da6721fb82e0ebad12ac9ecf63d9c42e57b597844b05b0805",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/consumer-eval.js",
+      "originalBytes": 32398,
+      "originalSha256": "20d3c76ff5049e2da6721fb82e0ebad12ac9ecf63d9c42e57b597844b05b0805",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/consumer-generated.json.gz",
+      "archiveBytes": 1118242,
+      "archiveSha256": "5f795b88115b9717f8611c21a44b1f1223f5b38f3f7c9e576013f25bf45e6d0b",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/consumer-generated.json",
+      "originalBytes": 11602007,
+      "originalSha256": "d5a8efcfde21360c1711a196dfbd59cc5bf5b6243349fb52f35c3f092e25635f",
+      "gzipLevel": 6,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "preparation/consumer-generated.stderr.log",
+      "archiveBytes": 187,
+      "archiveSha256": "7dc2148cf4200378eea817e26574eed5d02d3c19009e7e42123cde11334ca5db",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/consumer-generated.stderr.log",
+      "originalBytes": 187,
+      "originalSha256": "7dc2148cf4200378eea817e26574eed5d02d3c19009e7e42123cde11334ca5db",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/consumer-reader.json.gz",
+      "archiveBytes": 1346368,
+      "archiveSha256": "3b447bd98bb9b36217af877c04ef31bd51ba23d3b9db5c27bd7db3243992803e",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/consumer-reader.json",
+      "originalBytes": 14285748,
+      "originalSha256": "3e5ec510a764c37a3a3e1d7b00023feea223d89b3d55655eb01b4679215adfde",
+      "gzipLevel": 6,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "preparation/consumer-reader.stderr.log",
+      "archiveBytes": 187,
+      "archiveSha256": "42770c7cbc884bab787788a72657ac3f805140911266363cc22b10ac84955b7b",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/consumer-reader.stderr.log",
+      "originalBytes": 187,
+      "originalSha256": "42770c7cbc884bab787788a72657ac3f805140911266363cc22b10ac84955b7b",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/early-queries-init.js.gz",
+      "archiveBytes": 201457,
+      "archiveSha256": "b63597220f35c8a5a759a2f7f2e755ada3c827db466b276b894a8b8974a6fab1",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/early-queries-init.js",
+      "originalBytes": 1660507,
+      "originalSha256": "431b7c3dddef8680f21b58483a89170bcdc009ba958596ed6c12434950b47562",
+      "gzipLevel": 6,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "preparation/early-queries.json.gz",
+      "archiveBytes": 248248,
+      "archiveSha256": "fe37708435f1f05eaf58a72129ffd65d6c169e94ab33ea8c5a91729c44564205",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/early-queries.json",
+      "originalBytes": 6207595,
+      "originalSha256": "bc3a6d73afe7b07a34d4566440a4a58e18f829cc18fb3d291d5584612ef6e34d",
+      "gzipLevel": 6,
+      "byteExactRoundtrip": true
+    },
+    {
+      "archivePath": "preparation/preparation.json",
+      "archiveBytes": 183489,
+      "archiveSha256": "2545e742af64afe76fe48cfb6f334f61b91a93aed287e8fec8d176c5a7cfee02",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/preparation.json",
+      "originalBytes": 183489,
+      "originalSha256": "2545e742af64afe76fe48cfb6f334f61b91a93aed287e8fec8d176c5a7cfee02",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/production-build.stderr.log",
+      "archiveBytes": 1497,
+      "archiveSha256": "43d817da84c8943f76d6482fcd87025671f720e77e105724d6349d9807517f58",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/production-build.stderr.log",
+      "originalBytes": 1497,
+      "originalSha256": "43d817da84c8943f76d6482fcd87025671f720e77e105724d6349d9807517f58",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/production-build.stdout.log",
+      "archiveBytes": 8501,
+      "archiveSha256": "6104b3972884794f8bd333f5c1e0504a1fcbfb53aa42b7c2de0b50b9163b7da4",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/production-build.stdout.log",
+      "originalBytes": 8501,
+      "originalSha256": "6104b3972884794f8bd333f5c1e0504a1fcbfb53aa42b7c2de0b50b9163b7da4",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/root-consumer-protocol.json",
+      "archiveBytes": 5315,
+      "archiveSha256": "e17e540f4944d0dd88959f5276166ca4c8f4f60d01a2721f188b6aafa1f41c37",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/root-consumer-protocol.json",
+      "originalBytes": 5315,
+      "originalSha256": "e17e540f4944d0dd88959f5276166ca4c8f4f60d01a2721f188b6aafa1f41c37",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "preparation/validate-consumers.mjs",
+      "archiveBytes": 4224,
+      "archiveSha256": "805c4b06c7bd7f108518c830b4e8f1395c41708b5217b526036337114c668c6f",
+      "originalPath": "/tmp/bird-address-package17b-prepare-1102/validate-consumers.mjs",
+      "originalBytes": 4224,
+      "originalSha256": "805c4b06c7bd7f108518c830b4e8f1395c41708b5217b526036337114c668c6f",
+      "gzipLevel": null
+    },
+    {
+      "archivePath": "source/src/game/addresscatalog.js",
+      "archiveBytes": 7089,
+      "archiveSha256": "d9090448e8734e4e29ef5299e1a0c970e49e40da32ba5cccda1908bfff62244a",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/addresscatalog.js",
+      "originalBytes": 7089,
+      "originalSha256": "d9090448e8734e4e29ef5299e1a0c970e49e40da32ba5cccda1908bfff62244a",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/src/game/addresscodec17b.js",
+      "archiveBytes": 15286,
+      "archiveSha256": "1015479c6581302d03b75209aed77ae4c1c6f774aa8bd072a14d6356779cc362",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/addresscodec17b.js",
+      "originalBytes": 15286,
+      "originalSha256": "1015479c6581302d03b75209aed77ae4c1c6f774aa8bd072a14d6356779cc362",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/src/game/addressinput17b.js",
+      "archiveBytes": 1694,
+      "archiveSha256": "5dc5206edb681d07ed7e924a32d42c384ad134bd4cd431660ff2c0376eeaae6a",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/addressinput17b.js",
+      "originalBytes": 1694,
+      "originalSha256": "5dc5206edb681d07ed7e924a32d42c384ad134bd4cd431660ff2c0376eeaae6a",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/src/game/addresskey17b.js",
+      "archiveBytes": 15662,
+      "archiveSha256": "b7d214124b30672a61b0dec09d282dda8612eef82bd529119280a782e530e16b",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/addresskey17b.js",
+      "originalBytes": 15662,
+      "originalSha256": "b7d214124b30672a61b0dec09d282dda8612eef82bd529119280a782e530e16b",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/src/game/addresslayout.js",
+      "archiveBytes": 2482,
+      "archiveSha256": "b55792f62d5657c5d81705d00e43547fa7e96c4366be9329c1551310bc9316de",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/addresslayout.js",
+      "originalBytes": 2482,
+      "originalSha256": "b55792f62d5657c5d81705d00e43547fa7e96c4366be9329c1551310bc9316de",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/src/game/addresspackage17b.js",
+      "archiveBytes": 5027,
+      "archiveSha256": "388f0d591ba548d4da01e15bccc1c119df4dceeb77defb19d624623e5aa9fd92",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/addresspackage17b.js",
+      "originalBytes": 5027,
+      "originalSha256": "388f0d591ba548d4da01e15bccc1c119df4dceeb77defb19d624623e5aa9fd92",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/src/game/addressproof17b.js",
+      "archiveBytes": 4583,
+      "archiveSha256": "54b3cd5e2bef7f4f3bdea10dd1b75ef0d60ac917dd9e4ce390cbf35d076b2f6c",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/addressproof17b.js",
+      "originalBytes": 4583,
+      "originalSha256": "54b3cd5e2bef7f4f3bdea10dd1b75ef0d60ac917dd9e4ce390cbf35d076b2f6c",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/src/game/addressprovider17b.js",
+      "archiveBytes": 10809,
+      "archiveSha256": "e77a111e5d9158c0a9e6b601dcef2c041b4a3142209e129af69bc47c10141be6",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/addressprovider17b.js",
+      "originalBytes": 10809,
+      "originalSha256": "e77a111e5d9158c0a9e6b601dcef2c041b4a3142209e129af69bc47c10141be6",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/src/game/game.js.gz",
+      "archiveBytes": 454356,
+      "archiveSha256": "c4c1644ba12b294f286c8ed302d3f1ff64e19c833cd9a73bbc518c2dce8f2055",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/game.js",
+      "originalBytes": 1393189,
+      "originalSha256": "f6d3b57018349ec32309706b0944b638e431e3c183a2c246b69964644b83fe0d",
+      "gzipLevel": 6,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/src/game/landcache17a/sha256.js",
+      "archiveBytes": 2443,
+      "archiveSha256": "1e60d75a1cade05c66bc4b86af6f046f7f6ff5eb84232bf450fb6be1218f83f3",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/landcache17a/sha256.js",
+      "originalBytes": 2443,
+      "originalSha256": "1e60d75a1cade05c66bc4b86af6f046f7f6ff5eb84232bf450fb6be1218f83f3",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/src/game/singleprogress.js",
+      "archiveBytes": 13418,
+      "archiveSha256": "cedf641409555de8f1a57784215602e17153a9c36659fc6f4f0211f2ada9b4af",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/singleprogress.js",
+      "originalBytes": 13418,
+      "originalSha256": "cedf641409555de8f1a57784215602e17153a9c36659fc6f4f0211f2ada9b4af",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/tools/address-package-build.mjs",
+      "archiveBytes": 1799,
+      "archiveSha256": "d7a27e9a287d342a54912441a56017d6998a4e4939e42167f9a8596ad76b9efa",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/address-package-build.mjs",
+      "originalBytes": 1799,
+      "originalSha256": "d7a27e9a287d342a54912441a56017d6998a4e4939e42167f9a8596ad76b9efa",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/tools/address-package-prepare.mjs",
+      "archiveBytes": 16357,
+      "archiveSha256": "21b565c14e0217d6815dddb2622ad3e098c8e133822461b7043981cc2e791761",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/address-package-prepare.mjs",
+      "originalBytes": 16357,
+      "originalSha256": "21b565c14e0217d6815dddb2622ad3e098c8e133822461b7043981cc2e791761",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/tools/addresscodec17b-test.mjs",
+      "archiveBytes": 12498,
+      "archiveSha256": "c9be84fcc435dcab7b431c9b6a27423b63d4b46715fc7f8921555c628bc78c6b",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/addresscodec17b-test.mjs",
+      "originalBytes": 12498,
+      "originalSha256": "c9be84fcc435dcab7b431c9b6a27423b63d4b46715fc7f8921555c628bc78c6b",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "frozen archive-phase unit body; not a pre-run harness pin"
+    },
+    {
+      "archivePath": "source/tools/addresskey17b-test.mjs",
+      "archiveBytes": 13742,
+      "archiveSha256": "fa0441b94a1e1912f16e4bda5cb59a0bf0fc52dcde2967159a7f6352a3589e2c",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/addresskey17b-test.mjs",
+      "originalBytes": 13742,
+      "originalSha256": "fa0441b94a1e1912f16e4bda5cb59a0bf0fc52dcde2967159a7f6352a3589e2c",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "frozen archive-phase unit body; not a pre-run harness pin"
+    },
+    {
+      "archivePath": "source/tools/addressproof17b-test.mjs",
+      "archiveBytes": 11883,
+      "archiveSha256": "46d5e4bf28d27be99a859b3488d1b33a83e0cc2bdae14ae4507a6d34b3f80d7f",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/addressproof17b-test.mjs",
+      "originalBytes": 11883,
+      "originalSha256": "46d5e4bf28d27be99a859b3488d1b33a83e0cc2bdae14ae4507a6d34b3f80d7f",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "frozen archive-phase unit body; not a pre-run harness pin"
+    },
+    {
+      "archivePath": "source/tools/addressprovider17b-test.mjs",
+      "archiveBytes": 15276,
+      "archiveSha256": "89abe0950638d7809a1907b6ac18f16b407eb1a89a91979a49bd7d9f1ddefc1b",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/addressprovider17b-test.mjs",
+      "originalBytes": 15276,
+      "originalSha256": "89abe0950638d7809a1907b6ac18f16b407eb1a89a91979a49bd7d9f1ddefc1b",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "frozen archive-phase unit body; not a pre-run harness pin"
+    },
+    {
+      "archivePath": "source/tools/land-package-build.mjs",
+      "archiveBytes": 3129,
+      "archiveSha256": "6c340797690d87eb86ae224cdb2f0f815cdea58675142700ae8f5a40ee229285",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/land-package-build.mjs",
+      "originalBytes": 3129,
+      "originalSha256": "6c340797690d87eb86ae224cdb2f0f815cdea58675142700ae8f5a40ee229285",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/tools/land-package-files.mjs",
+      "archiveBytes": 5205,
+      "archiveSha256": "80a66fe94c2c4f7a2a287b18cfeda05bb40692531ae16f66be4cb07bb992bf23",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/land-package-files.mjs",
+      "originalBytes": 5205,
+      "originalSha256": "80a66fe94c2c4f7a2a287b18cfeda05bb40692531ae16f66be4cb07bb992bf23",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/tools/land-package-prepare.mjs",
+      "archiveBytes": 13091,
+      "archiveSha256": "ff3644b6eab5583cd1928f79d90564f5daf730ab9a27d0b7bccf3b11835261ca",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/land-package-prepare.mjs",
+      "originalBytes": 13091,
+      "originalSha256": "ff3644b6eab5583cd1928f79d90564f5daf730ab9a27d0b7bccf3b11835261ca",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/tools/land-package-source-key.mjs",
+      "archiveBytes": 1386,
+      "archiveSha256": "c581661cfa3fac423a8dec95708aba8ff64a9cebae4e308760cf35b739d45a13",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/land-package-source-key.mjs",
+      "originalBytes": 1386,
+      "originalSha256": "c581661cfa3fac423a8dec95708aba8ff64a9cebae4e308760cf35b739d45a13",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/tools/probe-checks/address-package-export.js",
+      "archiveBytes": 31801,
+      "archiveSha256": "969e5d156432ae2d1048ab350de454182e40f92c1304fd08a3db67fecf63db55",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/address-package-export.js",
+      "originalBytes": 31801,
+      "originalSha256": "969e5d156432ae2d1048ab350de454182e40f92c1304fd08a3db67fecf63db55",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/tools/probe-checks/land-package-district-export.js",
+      "archiveBytes": 2845,
+      "archiveSha256": "bc69334147fd594dc2387b18897b3f7612bd1ceba70a9aeaf00d7e7080220150",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/land-package-district-export.js",
+      "originalBytes": 2845,
+      "originalSha256": "bc69334147fd594dc2387b18897b3f7612bd1ceba70a9aeaf00d7e7080220150",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/tools/probe-checks/startup-bootstrap-observe.js",
+      "archiveBytes": 654,
+      "archiveSha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/startup-bootstrap-observe.js",
+      "originalBytes": 654,
+      "originalSha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/tools/probe-page.cjs",
+      "archiveBytes": 37506,
+      "archiveSha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe-page.cjs",
+      "originalBytes": 37506,
+      "originalSha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/tools/probe.cjs",
+      "archiveBytes": 47458,
+      "archiveSha256": "f05e1c79f1a007f11290a3bad2dda758b643ca39a6ac2c71b971a5bfeb2edca8",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+      "originalBytes": 47458,
+      "originalSha256": "f05e1c79f1a007f11290a3bad2dda758b643ca39a6ac2c71b971a5bfeb2edca8",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source/tools/startup-report.mjs",
+      "archiveBytes": 13190,
+      "archiveSha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3",
+      "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/startup-report.mjs",
+      "originalBytes": 13190,
+      "originalSha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true,
+      "measuredPin": "preparation source inventory/harness/helper pins"
+    },
+    {
+      "archivePath": "source-pins.json",
+      "archiveBytes": 4576,
+      "archiveSha256": "ec263f939a755b971c84fb90fc8b8696a848dca00b3dc1357c69617e00136069",
+      "origin": "archive metadata/helper; not a new game measurement"
+    },
+    {
+      "archivePath": "stdout-records.json",
+      "archiveBytes": 1140,
+      "archiveSha256": "8aa36c4975cb4c1158b3759f6b7749454dcb0ba19b9a39b10eb088e8bbed7e86",
+      "origin": "archive metadata/helper; not a new game measurement"
+    },
+    {
+      "archivePath": "validation/maincheck-96676.log",
+      "archiveBytes": 25834,
+      "archiveSha256": "d1141b5b207bae807490f2e3354aa39e6aa25884bdee9a51f48aef083d28558e",
+      "originalPath": "/tmp/bird-address-package17b-final-check-1102.log",
+      "originalBytes": 25834,
+      "originalSha256": "d1141b5b207bae807490f2e3354aa39e6aa25884bdee9a51f48aef083d28558e",
+      "gzipLevel": null,
+      "byteExactRoundtrip": true
+    }
+  ],
+  "indexedFiles": 72,
+  "indexedBytes": 8585282
+}

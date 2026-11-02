@@ -1,0 +1,36 @@
+{
+  "ok": true,
+  "cases": [
+    {
+      "mode": "reader",
+      "rawSha256": "3e5ec510a764c37a3a3e1d7b00023feea223d89b3d55655eb01b4679215adfde",
+      "moved": 4.554490549563059,
+      "inputHash": "45be0886eb4fe7a5f4fc1817484bd80b688ebd5648da26aab448a9c1db5e67ba",
+      "provider": {
+        "version": 1,
+        "phase": "sealed",
+        "privateReady": true,
+        "published": true,
+        "fatal": false,
+        "reason": null,
+        "counts": {
+          "houses": 1174,
+          "generatedDoors": 3699,
+          "spots": 5283,
+          "rawEntrances": 12
+        },
+        "auditRetained": false
+      }
+    },
+    {
+      "mode": "generated",
+      "rawSha256": "d5a8efcfde21360c1711a196dfbd59cc5bf5b6243349fb52f35c3f092e25635f",
+      "moved": 4.785726815602575,
+      "inputHash": "fb6322057466cd75e60db5a49e909a8f995916c61687f62771d5bd00cc9fa3d5",
+      "provider": null
+    }
+  ],
+  "sameOrderedMenuAndQueries": true,
+  "earlyQueriesExactMatchLegacy": true,
+  "scope": "One exact B1 input, private early data before city; no early control/all axes/speed/physical Deck claim"
+}

@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "variant": "cache",
+  "preset": "high",
+  "district": 0,
+  "coverageSlot": {
+    "district": 0,
+    "graphics": "high",
+    "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4"
+  },
+  "phase": "cold",
+  "cpu": 1,
+  "schedule": {
+    "mode": "settled",
+    "early": false,
+    "bootWaitSec": 1200,
+    "controlWaitMs": 420000,
+    "probeTimeoutSec": 1740,
+    "hardTimeoutMs": 1800000,
+    "movementWaitMs": 30000
+  },
+  "argv": [
+    "/home/runner/work/bird-delivery/bird-delivery/node_modules/electron/dist/electron",
+    "/home/runner/work/bird-delivery/bird-delivery/tools/probe.cjs",
+    "--no-sandbox",
+    "--disable-gpu-sandbox",
+    "--mode=steam",
+    "--dir=/home/runner/work/bird-delivery/bird-delivery/release/linux-unpacked/resources/app.asar/dist/steam",
+    "--startup-trace",
+    "--startup-session=lp17b-c083c710-1494-4b77-abb5-53eeefa7fa0f",
+    "--startup-cold",
+    "--startup-fixture=/home/runner/work/_temp/land-package-runtime/fixture.json",
+    "--fresh",
+    "--startup-admission=settled",
+    "--size=deck",
+    "--cpu=1",
+    "--bootcpu",
+    "--init-script=/home/runner/work/bird-delivery/bird-delivery/tools/probe-checks/startup-bootstrap-observe.js",
+    "--q=gfxdev=deck&mute&startupdistrict=0",
+    "--eval=/home/runner/work/bird-delivery/bird-delivery/tools/probe-checks/startup-ready.js",
+    "--bootwait=1200",
+    "--timeout=1740",
+    "--max=0",
+    "--errors",
+    "--report=/home/runner/work/_temp/land-package-runtime/raw.json"
+  ],
+  "startedAt": "2026-11-02T01:40:50.384Z",
+  "fixtureFile": "/home/runner/work/_temp/land-package-runtime/fixture.json",
+  "fixtureSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+  "catalogFile": "/home/runner/work/bird-delivery/bird-delivery/dist/steam/city-data/catalog.json",
+  "catalogSha256": "5e70bb50c2b139570b8f61e695019364f84b669a3d72305962afaf00bf33772e",
+  "processStatus": 0,
+  "signal": null,
+  "probe": {
+    "file": "tools/probe.cjs",
+    "sha256": "f05e1c79f1a007f11290a3bad2dda758b643ca39a6ac2c71b971a5bfeb2edca8"
+  },
+  "eval": {
+    "file": "tools/probe-checks/startup-ready.js",
+    "sha256": "6936e604198b5f3b59865181a1df646645ee42c07e11ff809c2d8230b015bd52"
+  },
+  "observer": {
+    "file": "tools/probe-checks/startup-bootstrap-observe.js",
+    "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+  },
+  "gate": {
+    "file": "tools/startup-report.mjs",
+    "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+  },
+  "admission": {
+    "file": "tools/land-package-smoke.mjs",
+    "sha256": "9b4563ea5dbdb6c760d037a4afca689a72fdf1fa20093bf963e56fbf413ab4e7"
+  },
+  "admissionSettings": {
+    "file": "tools/startup-admission.cjs",
+    "sha256": "fec1148600e1ff8f58f643541592121095c717390b09cb57014a88d64e6e0e33"
+  },
+  "districtGate": {
+    "file": "tools/land-package-smoke-gate.mjs",
+    "sha256": "457c412d0c4628a3742a57351ea1faa5787398728eecb16ff9fb8596ab17b0a5"
+  },
+  "pid": 2377,
+  "finishedAt": "2026-11-02T01:43:34.043Z",
+  "rawSha256": "488d660ce07ff39a4ef63c334e398b48d4c52382a46a586909b877b59e3a7b66",
+  "startupValidation": {
+    "ok": true,
+    "reasons": []
+  },
+  "ok": true,
+  "controlMs": 152002.4,
+  "fromClickMs": 35725.399999999994,
+  "moved": 0.16326654360358986,
+  "cache": {
+    "version": 1,
+    "source": "cache",
+    "phase": "restored",
+    "hit": true,
+    "fatal": false,
+    "reason": null,
+    "cleaned": true,
+    "bufferHeld": false,
+    "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+    "wireSha256": "278b3223bc7420a119af4e1198e2a57068dd8f850daa5386ef04c3c2fe806744",
+    "expectedWireSha256": "278b3223bc7420a119af4e1198e2a57068dd8f850daa5386ef04c3c2fe806744",
+    "rawSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+    "expectedRawSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+    "bytes": 34231572,
+    "encoding": "gzip"
+  }
+}
