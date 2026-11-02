@@ -1,0 +1,330 @@
+{
+  "version": 1,
+  "kind": "independent-address-input-axes-archive-audit",
+  "ok": true,
+  "cases": [
+    {
+      "label": "B1",
+      "rawReportSha256": "f06b8db4c50ea76e93462bd8845c5ca60196203bef903c66d9842192c371729c",
+      "session": "address17b-8e731e69-885b-499b-8af4-3de561b6a6e1",
+      "pid": 16043,
+      "status": 0,
+      "initial": {
+        "phase": "before-city-syncBuild",
+        "at": 924.7000000476837,
+        "mapId": "seversk",
+        "mode": "steam",
+        "adult": true,
+        "career": true,
+        "intro": false,
+        "editor": false,
+        "language": "ru",
+        "season": {
+          "value": 2.5,
+          "forced": false,
+          "saved": 2.5
+        },
+        "donation": {
+          "trashRaw": 0,
+          "trashGoal": 480000,
+          "trashFraction": 0
+        },
+        "district": {
+          "current": 0,
+          "opened": 8,
+          "city": false
+        },
+        "car": {
+          "id": "semerka",
+          "inputs": {
+            "dlv-car-owned": [
+              "semerka"
+            ],
+            "dlv-car-cur": "semerka",
+            "dlv-car-up": {},
+            "dlv-car-L": {},
+            "dlv-car-paint": {
+              "_v": 2
+            },
+            "dlv-car-eng": {
+              "semerka": {
+                "c": 100,
+                "r": 100,
+                "km": 0,
+                "n": 0
+              }
+            }
+          }
+        },
+        "graphics": {
+          "preset": "high",
+          "device": "deck"
+        },
+        "ordinary": {
+          "provider": "edl-owned-fnv1a-mulberry32-v1",
+          "ordinaryAtImport": true,
+          "hookOwned": true,
+          "baseSeed": 24301
+        }
+      },
+      "counts": {
+        "realAddress": 5061,
+        "entranceLv": 7608,
+        "doorWrapper": 7608,
+        "pool": 1241,
+        "used": 0
+      },
+      "moved": 4.785724793151358,
+      "menuExactSha256": "74aa716529b176bafa3a9aa75f08cd2c8c04609ba274cf879c3c0aed7a4e227a",
+      "queryTablesSha256": "b746e5416c83edcfefac875d4c215aed96b02703672fe4ffa852931b6144504c"
+    },
+    {
+      "label": "B2",
+      "rawReportSha256": "0a9c9213c36704bf7bc41c7b01b7472f78f714d90d8b7f63a84083adc3cbaec5",
+      "session": "address17b-19a00082-be75-460e-b61a-511b385cb390",
+      "pid": 16160,
+      "status": 0,
+      "initial": {
+        "phase": "before-city-syncBuild",
+        "at": 905.7000000476837,
+        "mapId": "seversk",
+        "mode": "steam",
+        "adult": true,
+        "career": true,
+        "intro": false,
+        "editor": false,
+        "language": "ru",
+        "season": {
+          "value": 2.5,
+          "forced": false,
+          "saved": 2.5
+        },
+        "donation": {
+          "trashRaw": 0,
+          "trashGoal": 480000,
+          "trashFraction": 0
+        },
+        "district": {
+          "current": 0,
+          "opened": 8,
+          "city": false
+        },
+        "car": {
+          "id": "semerka",
+          "inputs": {
+            "dlv-car-owned": [
+              "semerka"
+            ],
+            "dlv-car-cur": "semerka",
+            "dlv-car-up": {},
+            "dlv-car-L": {},
+            "dlv-car-paint": {
+              "_v": 2
+            },
+            "dlv-car-eng": {
+              "semerka": {
+                "c": 100,
+                "r": 100,
+                "km": 0,
+                "n": 0
+              }
+            }
+          }
+        },
+        "graphics": {
+          "preset": "high",
+          "device": "deck"
+        },
+        "ordinary": {
+          "provider": "edl-owned-fnv1a-mulberry32-v1",
+          "ordinaryAtImport": true,
+          "hookOwned": true,
+          "baseSeed": 24301
+        }
+      },
+      "counts": {
+        "realAddress": 5061,
+        "entranceLv": 7608,
+        "doorWrapper": 7608,
+        "pool": 1241,
+        "used": 0
+      },
+      "moved": 4.55463482703624,
+      "menuExactSha256": "74aa716529b176bafa3a9aa75f08cd2c8c04609ba274cf879c3c0aed7a4e227a",
+      "queryTablesSha256": "b746e5416c83edcfefac875d4c215aed96b02703672fe4ffa852931b6144504c"
+    },
+    {
+      "label": "S",
+      "rawReportSha256": "44893a6da7f9610ce43dbe0b83ce28f9a74172e09296eec4fe48cec772c00f43",
+      "session": "address17b-daaf0120-ba1d-4f8b-9be3-d7ccf43158ce",
+      "pid": 16242,
+      "status": 0,
+      "initial": {
+        "phase": "before-city-syncBuild",
+        "at": 864.7000000476837,
+        "mapId": "seversk",
+        "mode": "steam",
+        "adult": true,
+        "career": true,
+        "intro": false,
+        "editor": false,
+        "language": "ru",
+        "season": {
+          "value": 0.5,
+          "forced": false,
+          "saved": 0.5
+        },
+        "donation": {
+          "trashRaw": 0,
+          "trashGoal": 480000,
+          "trashFraction": 0
+        },
+        "district": {
+          "current": 0,
+          "opened": 8,
+          "city": false
+        },
+        "car": {
+          "id": "semerka",
+          "inputs": {
+            "dlv-car-owned": [
+              "semerka"
+            ],
+            "dlv-car-cur": "semerka",
+            "dlv-car-up": {},
+            "dlv-car-L": {},
+            "dlv-car-paint": {
+              "_v": 2
+            },
+            "dlv-car-eng": {
+              "semerka": {
+                "c": 100,
+                "r": 100,
+                "km": 0,
+                "n": 0
+              }
+            }
+          }
+        },
+        "graphics": {
+          "preset": "high",
+          "device": "deck"
+        },
+        "ordinary": {
+          "provider": "edl-owned-fnv1a-mulberry32-v1",
+          "ordinaryAtImport": true,
+          "hookOwned": true,
+          "baseSeed": 24301
+        }
+      },
+      "counts": {
+        "realAddress": 5061,
+        "entranceLv": 7608,
+        "doorWrapper": 7608,
+        "pool": 1241,
+        "used": 0
+      },
+      "moved": 4.554487134101365,
+      "menuExactSha256": "74aa716529b176bafa3a9aa75f08cd2c8c04609ba274cf879c3c0aed7a4e227a",
+      "queryTablesSha256": "b746e5416c83edcfefac875d4c215aed96b02703672fe4ffa852931b6144504c"
+    },
+    {
+      "label": "T",
+      "rawReportSha256": "508fc23143d5985647243c44665f5536a8f00c2a5e93775c2ef19eb6cfc81ed3",
+      "session": "address17b-c3798037-1dc1-47a3-b0a8-cc0026bfbd9c",
+      "pid": 16623,
+      "status": 0,
+      "initial": {
+        "phase": "before-city-syncBuild",
+        "at": 893.7000000476837,
+        "mapId": "seversk",
+        "mode": "steam",
+        "adult": true,
+        "career": true,
+        "intro": false,
+        "editor": false,
+        "language": "ru",
+        "season": {
+          "value": 2.5,
+          "forced": false,
+          "saved": 2.5
+        },
+        "donation": {
+          "trashRaw": 480000,
+          "trashGoal": 480000,
+          "trashFraction": 1
+        },
+        "district": {
+          "current": 0,
+          "opened": 8,
+          "city": false
+        },
+        "car": {
+          "id": "semerka",
+          "inputs": {
+            "dlv-car-owned": [
+              "semerka"
+            ],
+            "dlv-car-cur": "semerka",
+            "dlv-car-up": {},
+            "dlv-car-L": {},
+            "dlv-car-paint": {
+              "_v": 2
+            },
+            "dlv-car-eng": {
+              "semerka": {
+                "c": 100,
+                "r": 100,
+                "km": 0,
+                "n": 0
+              }
+            }
+          }
+        },
+        "graphics": {
+          "preset": "high",
+          "device": "deck"
+        },
+        "ordinary": {
+          "provider": "edl-owned-fnv1a-mulberry32-v1",
+          "ordinaryAtImport": true,
+          "hookOwned": true,
+          "baseSeed": 24301
+        }
+      },
+      "counts": {
+        "realAddress": 5061,
+        "entranceLv": 7608,
+        "doorWrapper": 7608,
+        "pool": 1241,
+        "used": 0
+      },
+      "moved": 4.554489094404165,
+      "menuExactSha256": "74aa716529b176bafa3a9aa75f08cd2c8c04609ba274cf879c3c0aed7a4e227a",
+      "queryTablesSha256": "b746e5416c83edcfefac875d4c215aed96b02703672fe4ffa852931b6144504c"
+    }
+  ],
+  "sourceFingerprint": "875182ea37bc3dae1fdd5969e96106aab30ff1915bd7386c96a6278c679cf88b",
+  "buildFingerprint": "3b144028a7f2497037273f8ff83068f4a2282a566f72461c0773501c548c71d3",
+  "actualProcesses": 5,
+  "passes": 4,
+  "failuresPreserved": 1,
+  "inheritedCases": [
+    "B1",
+    "B2",
+    "S"
+  ],
+  "actualFixedTrash": 480000,
+  "failedTrashActual": "not captured; root diagnosis is explicitly inferred",
+  "menuExactSameAll4": true,
+  "fixedQueryTablesSameAll4": true,
+  "oneTargetedCorrectionOnly": true,
+  "claims": {
+    "earlyReady": false,
+    "readerEnabled": false,
+    "allAxesClosed": false,
+    "rngCallCountProved": false,
+    "medians": false,
+    "physicalDeck": false
+  }
+}

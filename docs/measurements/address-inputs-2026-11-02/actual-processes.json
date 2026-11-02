@@ -1,0 +1,57 @@
+[
+  {
+    "processCase": "original-series:B1",
+    "label": "B1",
+    "tree": "original-series",
+    "rawOriginalPath": "/tmp/bird-address-closure17b-1102/cases/B1/raw.json",
+    "rawArchivePath": "original-series/cases/B1/raw.json.gz",
+    "rawReportSha256": "f06b8db4c50ea76e93462bd8845c5ca60196203bef903c66d9842192c371729c",
+    "rawBytes": 11597687,
+    "rawPassed": true,
+    "evalErr": null
+  },
+  {
+    "processCase": "original-series:B2",
+    "label": "B2",
+    "tree": "original-series",
+    "rawOriginalPath": "/tmp/bird-address-closure17b-1102/cases/B2/raw.json",
+    "rawArchivePath": "original-series/cases/B2/raw.json.gz",
+    "rawReportSha256": "0a9c9213c36704bf7bc41c7b01b7472f78f714d90d8b7f63a84083adc3cbaec5",
+    "rawBytes": 11597591,
+    "rawPassed": true,
+    "evalErr": null
+  },
+  {
+    "processCase": "original-series:S",
+    "label": "S",
+    "tree": "original-series",
+    "rawOriginalPath": "/tmp/bird-address-closure17b-1102/cases/S/raw.json",
+    "rawArchivePath": "original-series/cases/S/raw.json.gz",
+    "rawReportSha256": "44893a6da7f9610ce43dbe0b83ce28f9a74172e09296eec4fe48cec772c00f43",
+    "rawBytes": 11597610,
+    "rawPassed": true,
+    "evalErr": null
+  },
+  {
+    "processCase": "original-series:T",
+    "label": "T",
+    "tree": "original-series",
+    "rawOriginalPath": "/tmp/bird-address-closure17b-1102/cases/T/raw.json",
+    "rawArchivePath": "original-series/cases/T/raw.json",
+    "rawReportSha256": "74b232b804d41c623bb61a3ebce7924ee087b2a258edfd842645eeca1732abb2",
+    "rawBytes": 588,
+    "rawPassed": false,
+    "evalErr": "addressClosure:actual trash input"
+  },
+  {
+    "processCase": "targeted-money-fix:T",
+    "label": "T",
+    "tree": "targeted-money-fix",
+    "rawOriginalPath": "/tmp/bird-address-closure17b-money-fix-1102/cases/T/raw.json",
+    "rawArchivePath": "targeted-money-fix/cases/T/raw.json.gz",
+    "rawReportSha256": "508fc23143d5985647243c44665f5536a8f00c2a5e93775c2ef19eb6cfc81ed3",
+    "rawBytes": 11597806,
+    "rawPassed": true,
+    "evalErr": null
+  }
+]

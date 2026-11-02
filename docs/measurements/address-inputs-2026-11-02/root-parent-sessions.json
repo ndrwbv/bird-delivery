@@ -1,0 +1,35 @@
+{
+  "provenance": "root task messages, not independent child-captured parent tool telemetry",
+  "sessions": [
+    {
+      "case": "B1",
+      "toolSession": 24379,
+      "exitCode": 0
+    },
+    {
+      "case": "B2",
+      "toolSession": 64470,
+      "exitCode": 0
+    },
+    {
+      "case": "S",
+      "toolSession": 1288,
+      "exitCode": 0
+    },
+    {
+      "case": "T-original-failed",
+      "toolSession": 22001,
+      "exitCode": 1
+    },
+    {
+      "case": "T-targeted-money-fix",
+      "toolSession": 44583,
+      "exitCode": 0
+    }
+  ],
+  "maincheck": {
+    "toolSession": 40084,
+    "exitCode": 0,
+    "scope": "root reported completed broad check; exact log archived"
+  }
+}

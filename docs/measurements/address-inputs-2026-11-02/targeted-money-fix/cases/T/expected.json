@@ -1,0 +1,12 @@
+{
+  "case": "T",
+  "season": 2.5,
+  "trashRaw": 480000,
+  "trashFraction": 1,
+  "trashGoal": 480000,
+  "district": 0,
+  "graphics": "high",
+  "car": "semerka",
+  "language": "ru",
+  "fixtureSha256": "82396db20be5174e5ac62268c322e7bf4e648d2f8a73a9521c042ca5b8f294c9"
+}

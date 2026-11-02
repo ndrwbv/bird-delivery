@@ -1,0 +1,134 @@
+[
+  {
+    "file": "src/game/game.js",
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/game.js",
+    "archivePath": "source/src/game/game.js.gz",
+    "originalBytes": 1387951,
+    "originalSha256": "9d3f8970908b54359a1455f13ecf687d20620cfbb220655ffff0bfd9898bf571",
+    "archiveBytes": 451340,
+    "archiveSha256": "39b9b2924036476d7c28d9eb812cf6a57ac7b0df66250035c55c7189b9c3dc86",
+    "gzipLevel": 6,
+    "byteExactRoundtrip": true
+  },
+  {
+    "file": "src/game/addressinput17b.js",
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/addressinput17b.js",
+    "archivePath": "source/src/game/addressinput17b.js",
+    "originalBytes": 1694,
+    "originalSha256": "5dc5206edb681d07ed7e924a32d42c384ad134bd4cd431660ff2c0376eeaae6a",
+    "archiveBytes": 1694,
+    "archiveSha256": "5dc5206edb681d07ed7e924a32d42c384ad134bd4cd431660ff2c0376eeaae6a",
+    "gzipLevel": null,
+    "byteExactRoundtrip": true
+  },
+  {
+    "file": "src/game/addresscatalog.js",
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/addresscatalog.js",
+    "archivePath": "source/src/game/addresscatalog.js",
+    "originalBytes": 7089,
+    "originalSha256": "d9090448e8734e4e29ef5299e1a0c970e49e40da32ba5cccda1908bfff62244a",
+    "archiveBytes": 7089,
+    "archiveSha256": "d9090448e8734e4e29ef5299e1a0c970e49e40da32ba5cccda1908bfff62244a",
+    "gzipLevel": null,
+    "byteExactRoundtrip": true
+  },
+  {
+    "file": "src/game/addresslayout.js",
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/addresslayout.js",
+    "archivePath": "source/src/game/addresslayout.js",
+    "originalBytes": 2411,
+    "originalSha256": "ee5ab51e06ff5ff51187c73dbfbd2aefb170f69bad482bf9d798b819183b99bc",
+    "archiveBytes": 2411,
+    "archiveSha256": "ee5ab51e06ff5ff51187c73dbfbd2aefb170f69bad482bf9d798b819183b99bc",
+    "gzipLevel": null,
+    "byteExactRoundtrip": true
+  },
+  {
+    "file": "src/game/orders.js",
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/orders.js",
+    "archivePath": "source/src/game/orders.js.gz",
+    "originalBytes": 125755,
+    "originalSha256": "1479c0b75bdb86cc7c74b89995c8546380d9d87c041f85e848c9431ee484d7a5",
+    "archiveBytes": 40422,
+    "archiveSha256": "4d1da3df36137da8c0c54ed9633ceb3c1ff061cda6e85492c7a89ef1c0066ff9",
+    "gzipLevel": 6,
+    "byteExactRoundtrip": true
+  },
+  {
+    "file": "src/game/story.js",
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/story.js",
+    "archivePath": "source/src/game/story.js",
+    "originalBytes": 12596,
+    "originalSha256": "cb2b7021d841af6029cbc1e0133d37d67647e9747afd5c012eaabf4b57219402",
+    "archiveBytes": 12596,
+    "archiveSha256": "cb2b7021d841af6029cbc1e0133d37d67647e9747afd5c012eaabf4b57219402",
+    "gzipLevel": null,
+    "byteExactRoundtrip": true
+  },
+  {
+    "file": "src/game/econ.js",
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/src/game/econ.js",
+    "archivePath": "source/src/game/econ.js.gz",
+    "originalBytes": 117824,
+    "originalSha256": "4b729e23e52bc64d6aca7652f4cdc2979e57e7a17cad9d56003d37f2441210c5",
+    "archiveBytes": 38767,
+    "archiveSha256": "03ff3467883da8e72a6de1df422216146bc4af59c38cba2e02aa147db5e5b741",
+    "gzipLevel": 6,
+    "byteExactRoundtrip": true
+  },
+  {
+    "file": "tools/probe.cjs",
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+    "archivePath": "source/tools/probe.cjs",
+    "originalBytes": 47458,
+    "originalSha256": "f05e1c79f1a007f11290a3bad2dda758b643ca39a6ac2c71b971a5bfeb2edca8",
+    "archiveBytes": 47458,
+    "archiveSha256": "f05e1c79f1a007f11290a3bad2dda758b643ca39a6ac2c71b971a5bfeb2edca8",
+    "gzipLevel": null,
+    "byteExactRoundtrip": true
+  },
+  {
+    "file": "tools/probe-page.cjs",
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe-page.cjs",
+    "archivePath": "source/tools/probe-page.cjs",
+    "originalBytes": 37506,
+    "originalSha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd",
+    "archiveBytes": 37506,
+    "archiveSha256": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd",
+    "gzipLevel": null,
+    "byteExactRoundtrip": true
+  },
+  {
+    "file": "tools/probe-checks/startup-ready.js",
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/startup-ready.js",
+    "archivePath": "source/tools/probe-checks/startup-ready.js",
+    "originalBytes": 8667,
+    "originalSha256": "6936e604198b5f3b59865181a1df646645ee42c07e11ff809c2d8230b015bd52",
+    "archiveBytes": 8667,
+    "archiveSha256": "6936e604198b5f3b59865181a1df646645ee42c07e11ff809c2d8230b015bd52",
+    "gzipLevel": null,
+    "byteExactRoundtrip": true
+  },
+  {
+    "file": "tools/probe-checks/startup-bootstrap-observe.js",
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/startup-bootstrap-observe.js",
+    "archivePath": "source/tools/probe-checks/startup-bootstrap-observe.js",
+    "originalBytes": 654,
+    "originalSha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8",
+    "archiveBytes": 654,
+    "archiveSha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8",
+    "gzipLevel": null,
+    "byteExactRoundtrip": true
+  },
+  {
+    "file": "tools/startup-report.mjs",
+    "originalPath": "/Users/andrewboev/Desktop/not-work/delivery/tools/startup-report.mjs",
+    "archivePath": "source/tools/startup-report.mjs",
+    "originalBytes": 13190,
+    "originalSha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3",
+    "archiveBytes": 13190,
+    "archiveSha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3",
+    "gzipLevel": null,
+    "byteExactRoundtrip": true
+  }
+]

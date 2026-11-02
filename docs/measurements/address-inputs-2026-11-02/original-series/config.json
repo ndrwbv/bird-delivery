@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "ready": true,
+  "observerContractReviewed": true,
+  "repo": "/Users/andrewboev/Desktop/not-work/delivery",
+  "dist": "/tmp/bird-address-closure17b-1102/steam",
+  "electron": "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+  "sourceHash": "875182ea37bc3dae1fdd5969e96106aab30ff1915bd7386c96a6278c679cf88b",
+  "buildHash": "3b144028a7f2497037273f8ff83068f4a2282a566f72461c0773501c548c71d3",
+  "originalFunctionalSha256": "eefafb2f9f082a6afe99ff162d453caec6a073cc0e03af14f1eb2e38f375216e",
+  "adaptedFunctionalSha256": "e62111d2746ede6f1754facb914dd3ea80a589a7f461eaf67cc09f0e68550644",
+  "harnessSha256": {
+    "tools/probe.cjs": "f05e1c79f1a007f11290a3bad2dda758b643ca39a6ac2c71b971a5bfeb2edca8",
+    "tools/probe-page.cjs": "f4de01a97466fb109319b86a82bbe47f9f498ef410c976df76e85cb94005d9dd",
+    "tools/probe-checks/startup-ready.js": "6936e604198b5f3b59865181a1df646645ee42c07e11ff809c2d8230b015bd52",
+    "tools/probe-checks/startup-bootstrap-observe.js": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8",
+    "tools/startup-report.mjs": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+  },
+  "cases": {
+    "B1": {
+      "status": "complete",
+      "attempts": 1,
+      "processStatus": 0,
+      "signal": null,
+      "rawSha256": "f06b8db4c50ea76e93462bd8845c5ca60196203bef903c66d9842192c371729c",
+      "rawFile": "/tmp/bird-address-closure17b-1102/cases/B1/raw.json",
+      "commandFile": "/tmp/bird-address-closure17b-1102/cases/B1/command.json",
+      "startedAt": "2026-11-02T01:17:26.145Z",
+      "pid": 16043,
+      "finishedAt": "2026-11-02T01:17:56.761Z"
+    },
+    "B2": {
+      "status": "complete",
+      "attempts": 1,
+      "processStatus": 0,
+      "signal": null,
+      "rawSha256": "0a9c9213c36704bf7bc41c7b01b7472f78f714d90d8b7f63a84083adc3cbaec5",
+      "rawFile": "/tmp/bird-address-closure17b-1102/cases/B2/raw.json",
+      "commandFile": "/tmp/bird-address-closure17b-1102/cases/B2/command.json",
+      "startedAt": "2026-11-02T01:18:54.237Z",
+      "pid": 16160,
+      "finishedAt": "2026-11-02T01:19:24.912Z"
+    },
+    "S": {
+      "status": "complete",
+      "attempts": 1,
+      "processStatus": 0,
+      "signal": null,
+      "rawSha256": "44893a6da7f9610ce43dbe0b83ce28f9a74172e09296eec4fe48cec772c00f43",
+      "rawFile": "/tmp/bird-address-closure17b-1102/cases/S/raw.json",
+      "commandFile": "/tmp/bird-address-closure17b-1102/cases/S/command.json",
+      "startedAt": "2026-11-02T01:20:12.649Z",
+      "pid": 16242,
+      "finishedAt": "2026-11-02T01:20:43.536Z"
+    },
+    "T": {
+      "status": "failed",
+      "attempts": 1,
+      "processStatus": 1,
+      "signal": null,
+      "rawSha256": null,
+      "rawFile": "/tmp/bird-address-closure17b-1102/cases/T/raw.json",
+      "commandFile": "/tmp/bird-address-closure17b-1102/cases/T/command.json",
+      "startedAt": "2026-11-02T01:21:50.245Z",
+      "pid": 16349,
+      "finishedAt": "2026-11-02T01:21:54.691Z",
+      "failure": "Error: Actual child failed\n    at need (file:///private/tmp/bird-address-closure17b-1102/run-once.mjs:3:114)\n    at file:///private/tmp/bird-address-closure17b-1102/run-once.mjs:20:2\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)"
+    }
+  }
+}

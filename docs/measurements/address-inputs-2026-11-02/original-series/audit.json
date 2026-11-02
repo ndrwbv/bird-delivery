@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "ok": false,
+  "reasons": [
+    "T terminal process did not pass",
+    "T raw SHA",
+    "T: report/result did not pass",
+    "T: evalErr reported by probe",
+    "T: crash log missing or nonempty",
+    "T: trace disabled, incomplete or missing",
+    "T: aggregate overflow missing or nonzero",
+    "T: error/fallback/rejected flag",
+    "T: resource capture missing or truncated",
+    "T: invalid first control",
+    "T: fresh guardVersion2 control state not proven",
+    "T: real W acceleration missing",
+    "T: legacy __boot bootstrap semantics not proven",
+    "T: physical district differs from fixture",
+    "T: physical pizza/car coordinates missing",
+    "T: exclusive work does not reconcile",
+    "T: Cannot read properties of undefined (reading 'host')",
+    "Four complete named raw reports required",
+    "Independent process sessions required"
+  ],
+  "raw": [
+    {
+      "label": "B1",
+      "rawSha256": "f06b8db4c50ea76e93462bd8845c5ca60196203bef903c66d9842192c371729c",
+      "session": "address17b-8e731e69-885b-499b-8af4-3de561b6a6e1"
+    },
+    {
+      "label": "B2",
+      "rawSha256": "0a9c9213c36704bf7bc41c7b01b7472f78f714d90d8b7f63a84083adc3cbaec5",
+      "session": "address17b-19a00082-be75-460e-b61a-511b385cb390"
+    },
+    {
+      "label": "S",
+      "rawSha256": "44893a6da7f9610ce43dbe0b83ce28f9a74172e09296eec4fe48cec772c00f43",
+      "session": "address17b-daaf0120-ba1d-4f8b-9be3-d7ccf43158ce"
+    }
+  ],
+  "comparisons": [
+    {
+      "case": "S",
+      "menuExactSame": true,
+      "queryTablesSame": true,
+      "menuSha256": "74aa716529b176bafa3a9aa75f08cd2c8c04609ba274cf879c3c0aed7a4e227a",
+      "queriesSha256": "b746e5416c83edcfefac875d4c215aed96b02703672fe4ffa852931b6144504c",
+      "meaning": "Observed one-axis comparison; equality does not prove all functional inputs closed"
+    }
+  ],
+  "claims": {
+    "allAxesClosed": false,
+    "earlyReady": false,
+    "readerEnabled": false
+  },
+  "limitations": [
+    "USED/first randomly selected order are checked within each process, not equated across processes",
+    "Only initial season2.5→0.5 and trash0→goal varied; DIST/car/gfx/lang fixed",
+    "Readonly observed later arrays do not constitute an early cache key",
+    "Ordinary RNG descriptor identity is not a count of Math.random calls",
+    "Source/build pins must come from an independent immutable-build receipt; this offline tool does not traverse assets"
+  ]
+}

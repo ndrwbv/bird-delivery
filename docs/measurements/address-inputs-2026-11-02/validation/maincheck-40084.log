@@ -1,0 +1,32 @@
+
+> bird-pizza-delivery@0.1.0 check
+> node tools/check.cjs --rebuild --serial --only=build-web,build-steam,address-,streetgraph,smoke-deck,smoke-crashlog,i18n
+
+  проверок в игре разом: 1
+  ок  логический граф: порядок, маршруты и общие ссылки (0.0 с)
+  ок  точный вход графа: Float64, ссылки и маска границ (0.0 с)
+  ок  бинарный граф: границы, ссылки и повреждения (0.0 с)
+  ок  холодный снимок графа и освобождение буфера (0.0 с)
+  ок  адресные точки: порядок, точность и прежние шаги (0.1 с)
+  ок  источники адресов и прежние барьеры публикации (0.0 с)
+  ок  снимок начальных условий без заморозки живого сохранения (0.0 с)
+  ок  сборка web (4.6 с)
+  ок  сборка steam (4.7 с)
+  внм i18n:check (0.1 с)
+  ок  30 с автопилота: Steam Deck, высокая графика, CPU ×3 (58.9 с)
+  ок  журнал ошибок пуст после дымовых (0.0 с)
+
+ок        логический граф: порядок, маршруты и общие ссылки          0.0 с  {"ok":true,"checks":12,"frozenOldReference":true,"float64AndOrderExact":true,"liveRoadAndEdgeRefs":true,"realCityMeasured":false}
+ок        точный вход графа: Float64, ссылки и маска границ          0.0 с  Street graph functional input: 31 PASS
+ок        бинарный граф: границы, ссылки и повреждения               0.0 с  {"ok":true,"checks":54,"wireBytes":2043,"openWireBytes":2043,"littleEndian":true,"realConstructor":true,"realCityMeasured":false,"workingBudgetIsNotRAM":true}
+ок        холодный снимок графа и освобождение буфера                0.0 с  Cold graph export proof: fresh references, exact signed-zero bytes, release and tamper checks PASS
+ок        адресные точки: порядок, точность и прежние шаги           0.1 с  {"ok":true,"checks":10,"independentFrozenOldReference":true,"noRng":true,"noThree":true,"noGame":true,"exactYields":true,"liveReferences":true}
+ок        источники адресов и прежние барьеры публикации             0.0 с  {"ok":true,"checks":29,"legacyTranscript":true,"originalAliases":true,"grandSeparate":true,"ordinalRawId":true,"noEarlySnapshot":true,"noWorldOrRNG":true,"gameIntegration":false}
+ок        снимок начальных условий без заморозки живого сохранения   0.0 с  {"ok":true,"checks":8,"scope":"owned readonly diagnostic inputs; no game run"}
+ок        сборка web                                                 4.6 с  собрана за 4.6 с
+ок        сборка steam                                               4.7 с  собрана за 4.7 с
+внимание  i18n:check                                                 0.1 с  без перевода 256 строк (на все языки)
+ок        30 с автопилота: Steam Deck, высокая графика, CPU ×3      58.9 с  317 м, кадр p50 16.6 p95 20 мс, ошибок консоли 0
+ок        журнал ошибок пуст после дымовых                           0.0 с  пуст
+
+всё ок, предупреждений 1 · 69 с

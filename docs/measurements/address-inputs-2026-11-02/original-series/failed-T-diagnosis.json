@@ -1,0 +1,10 @@
+{
+  "kind": "root-diagnosis-after-stopped-first-four",
+  "failedRawFile": "/tmp/bird-address-closure17b-1102/cases/T/raw.json",
+  "failedRawSha256": "74b232b804d41c623bb61a3ebce7924ee087b2a258edfd842645eeca1732abb2",
+  "actualEvalErr": "addressClosure:actual trash input",
+  "source": "src/game/game.js money migration lines334-342 on source875182ea",
+  "inference": "Input raw480000 lacks dlv-money-x8; game normal bootstrap multiplies by8 before observer, so expected raw480000 is wrong. Failed report did not return observer; actual3840000 is inferred from unchanged source and fixture, not directly captured. Corrected case will directly observe actual480000.",
+  "newTargetedDirectory": "/tmp/bird-address-closure17b-money-fix-1102",
+  "originalInputsUntouched": true
+}

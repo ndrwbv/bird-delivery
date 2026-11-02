@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "ready": false,
+  "observerContractReviewed": false,
+  "repo": "/Users/andrewboev/Desktop/not-work/delivery",
+  "dist": "REQUIRED_NEW_IMMUTABLE_BUILD_AFTER_DIAGNOSTIC_HOOK",
+  "electron": "/Users/andrewboev/Desktop/not-work/delivery/node_modules/.bin/electron",
+  "sourceHash": "REQUIRED_NEW_SOURCE_SHA256",
+  "buildHash": "REQUIRED_NEW_BUILD_SHA256",
+  "originalFunctionalSha256": "eefafb2f9f082a6afe99ff162d453caec6a073cc0e03af14f1eb2e38f375216e",
+  "adaptedFunctionalSha256": "e62111d2746ede6f1754facb914dd3ea80a589a7f461eaf67cc09f0e68550644",
+  "harnessSha256": {},
+  "cases": {
+    "B1": {
+      "status": "planned",
+      "attempts": 0,
+      "processStatus": null,
+      "signal": null,
+      "rawSha256": null,
+      "rawFile": "/tmp/bird-address-closure17b-1102/cases/B1/raw.json",
+      "commandFile": "/tmp/bird-address-closure17b-1102/cases/B1/command.json"
+    },
+    "B2": {
+      "status": "planned",
+      "attempts": 0,
+      "processStatus": null,
+      "signal": null,
+      "rawSha256": null,
+      "rawFile": "/tmp/bird-address-closure17b-1102/cases/B2/raw.json",
+      "commandFile": "/tmp/bird-address-closure17b-1102/cases/B2/command.json"
+    },
+    "S": {
+      "status": "planned",
+      "attempts": 0,
+      "processStatus": null,
+      "signal": null,
+      "rawSha256": null,
+      "rawFile": "/tmp/bird-address-closure17b-1102/cases/S/raw.json",
+      "commandFile": "/tmp/bird-address-closure17b-1102/cases/S/command.json"
+    },
+    "T": {
+      "status": "planned",
+      "attempts": 0,
+      "processStatus": null,
+      "signal": null,
+      "rawSha256": null,
+      "rawFile": "/tmp/bird-address-closure17b-1102/cases/T/raw.json",
+      "commandFile": "/tmp/bird-address-closure17b-1102/cases/T/command.json"
+    }
+  }
+}

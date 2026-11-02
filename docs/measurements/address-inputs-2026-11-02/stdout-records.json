@@ -1,0 +1,47 @@
+[
+  {
+    "processCase": "original-series:B1",
+    "originalPath": "/tmp/bird-address-closure17b-1102/cases/B1/stdout.log",
+    "originalBytes": 11597116,
+    "originalSha256": "8706067a56b73dcfe6bca8e699f11991f690b765ca7265348202bc4e8ba88335",
+    "deduplicated": true,
+    "reconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'",
+    "rawArchivePath": "original-series/cases/B1/raw.json.gz"
+  },
+  {
+    "processCase": "original-series:B2",
+    "originalPath": "/tmp/bird-address-closure17b-1102/cases/B2/stdout.log",
+    "originalBytes": 11597020,
+    "originalSha256": "f268df648368460f7534db6caa3dee09960b1950a547ceef44055d6f183d00de",
+    "deduplicated": true,
+    "reconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'",
+    "rawArchivePath": "original-series/cases/B2/raw.json.gz"
+  },
+  {
+    "processCase": "original-series:S",
+    "originalPath": "/tmp/bird-address-closure17b-1102/cases/S/stdout.log",
+    "originalBytes": 11597039,
+    "originalSha256": "18c99c4e5a4d2d6f8023b4e808d294bb54eab408f39770d683da300808fcbcb0",
+    "deduplicated": true,
+    "reconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'",
+    "rawArchivePath": "original-series/cases/S/raw.json.gz"
+  },
+  {
+    "processCase": "original-series:T",
+    "originalPath": "/tmp/bird-address-closure17b-1102/cases/T/stdout.log",
+    "originalBytes": 0,
+    "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "deduplicated": false,
+    "reconstruction": null,
+    "rawArchivePath": "original-series/cases/T/raw.json"
+  },
+  {
+    "processCase": "targeted-money-fix:T",
+    "originalPath": "/tmp/bird-address-closure17b-money-fix-1102/cases/T/stdout.log",
+    "originalBytes": 11597237,
+    "originalSha256": "adc0890a5952f183412774b06d0bebef24088d0ce4e62c51e43d5342f802c375",
+    "deduplicated": true,
+    "reconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'",
+    "rawArchivePath": "targeted-money-fix/cases/T/raw.json.gz"
+  }
+]

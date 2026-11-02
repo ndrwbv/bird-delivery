@@ -1,0 +1,16 @@
+{
+  "originalFile": "/tmp/bird-logical17b-query-export-eval-1102.js",
+  "originalFileSha256": "bee99bb14c491c347208a8aaedf97ffbc3894db63941f5da1d194bcb0c782cee",
+  "originalFunctionalSha256": "eefafb2f9f082a6afe99ff162d453caec6a073cc0e03af14f1eb2e38f375216e",
+  "adaptedFunctionalSha256": "e62111d2746ede6f1754facb914dd3ea80a589a7f461eaf67cc09f0e68550644",
+  "startupFile": "tools/probe-checks/startup-ready.js",
+  "startupSha256": "6936e604198b5f3b59865181a1df646645ee42c07e11ff809c2d8230b015bd52",
+  "preparationFixtureSource": "tools/land-package-prepare.mjs",
+  "preparationFixtureSourceSha256": "ff3644b6eab5583cd1928f79d90564f5daf730ab9a27d0b7bccf3b11835261ca",
+  "adapterChanges": [
+    "Optional B1 fixed address coordinates before actual addressRows loop",
+    "Optional B1 fixed level coordinates before actual levelRows loop",
+    "Fail closed at 60000 actual query calls; no truncation"
+  ],
+  "scope": "No graph packet, graph codec, seed override, or runtime phase substitution"
+}

@@ -1,0 +1,20 @@
+--- functional-queries.original.js
++++ functional-queries.adapted.js
+@@ -45,6 +45,8 @@
+   const tied=houses.filter(v=>(v.x-x)**2+(v.z-z)**2===h.distance).map(v=>v.index);
+   if(tied.length>1){tieWitnesses.push({x,z,houses:tied,winner:h.index,squaredDistance:h.distance});inputs.push(['exactTie',tieWitnesses.length-1,x,z]);}
+  }
++ if(LOCKED)inputs.splice(0,inputs.length,...LOCKED.addresses.map(row=>row.slice()));
++ need(inputs.length<=60000,'address query ceiling');
+  const addressRows=inputs.map(([kind,index,x,z])=>{
+   const expected=addressExpected(x,z),actual=Q.realAddress(x,z);
+   need(actual===expected.value,'realAddress '+kind+':'+index);
+@@ -74,6 +76,8 @@
+    house60Witnesses.push({house:i,x,z,nearest:n.index,squaredDistance:n.distance});lvInputs.push(['house60Exact',house60Witnesses.length-1,x,z]);
+   }
+  }
++ if(LOCKED)lvInputs.splice(0,lvInputs.length,...LOCKED.levels.map(row=>row.slice()));
++ need(inputs.length+2*lvInputs.length<=60000,'total real query ceiling');
+  const levelRows=lvInputs.map(([kind,index,x,z])=>{
+   const expected=levelExpected(x,z),actual=Q.entranceLv(x,z),viaDoor=d.DOOR.lv(x,z);
+   need(actual===expected.value&&viaDoor===actual,'entranceLv/DOOR.lv '+kind+':'+index);

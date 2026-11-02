@@ -24,6 +24,7 @@ import * as MATS from './materials.js';         // блики и отклик п
 import * as SOFTSURF from './softsurfaces.js';
 import {buildAddressSpotsSteps} from './addresslayout.js';
 import {createAddressCatalogRecorder} from './addresscatalog.js';
+import {snapshotAddressInitial17b} from './addressinput17b.js';
 import {streetGraphInputHash} from './streetgraph-input.js';
 import {createStreetGraphExport} from './streetgraphexport.js';
 import {edgeKey,createStreetGraph,bindSegmentNodes,applyStaticBoundary,buildNodeGrid} from './streetgraph.js';
@@ -6088,7 +6089,7 @@ function buildCity () {
     else buildPizzeria(spot.x, spot.z, spot.ry);
     if (DISTRICTS && house) { buildDistrictPizzerias(); usePizzeria(DIST.cur()); }
   } finally { LAND_OBJECT=true; }
-  if (new URLSearchParams(location.search).has('landexport17b')) {
+  if (new URLSearchParams(location.search).has('landexport17b') || new URLSearchParams(location.search).has('addressclosure17b')) {
     const pizza = { x: PIZZA?.x, z: PIZZA?.z, bx: PIZZA?.bx, bz: PIZZA?.bz };
     if (!Object.values(pizza).every(Number.isFinite)) throw Error('land-package17b-export:PRE_LATE_PIZZA_COORDINATES');
     Object.defineProperty(window, '__landPackage17bPreLate', { value: Object.freeze({
@@ -15383,7 +15384,7 @@ function dropPhone () {
    двенадцати метров к улице. */
 const SPOTS = [];
 // Offline preparation only until the early catalog's complete functional input has been proven.
-const ADDRESS_CATALOG = new URLSearchParams(location.search).has('logicalexport17b')
+const ADDRESS_CATALOG = (new URLSearchParams(location.search).has('logicalexport17b') || new URLSearchParams(location.search).has('addressclosure17b'))
   ? createAddressCatalogRecorder({houses:HOUSES,generatedDoors:GEN_ENTR,entrances:CITY.entrances,spots:SPOTS,buildings:CITY.buildings}) : null;
 function emitAddressHouse(building,row){if(ADDRESS_CATALOG)ADDRESS_CATALOG.acceptHouse(building,row);else HOUSES.push(row);}
 function emitGeneratedDoor(building,row,grand){if(ADDRESS_CATALOG)ADDRESS_CATALOG.acceptDoor(building,row,grand);else GEN_ENTR.push(row);}
@@ -17262,6 +17263,27 @@ SEAS.initSeasons({ THREE, scene, cam, renderer, Store, MAP, CITY, V, S, groundH,
 /* поздняя сборка (latebuild.js): то, что в меню не главное, — очередью после первого кадра меню.
    ?nolate — всё разом, как раньше; ?mapcheck — тоже разом (проверка карты смотрит готовый город) */
 LATE.enable(!INTRO && !MAPCHECK && !/[?&]nolate(&|$)/.test(location.search));
+if (new URLSearchParams(location.search).has('addressclosure17b')) {
+  Object.defineProperty(window, '__addressClosure17bInitial', { value: snapshotAddressInitial17b({
+    phase: 'before-city-syncBuild', at: performance.now(),
+    mapId: MAP.id, mode: import.meta.env.MODE, adult: !!ADULT, career: !!CAREER,
+    intro: !!INTRO, editor: !!EDL.ED.on || !!window.__EDITOR,
+    language: document.documentElement.lang,
+    season: { value: SEAS.seasonValue(), forced: SEAS.seasonForced(), saved: Store.get('dlv-season', null) },
+    donation: { trashRaw: Store.get('dlv-don-trash', 0), trashGoal: ECON.DONATE.trash.goal, trashFraction: donated('trash') },
+    district: { current: DIST.cur(), opened: DIST.opened(), city: DIST.city() },
+    car: { id: AUTO.current().id, inputs: {
+      'dlv-car-owned': Store.get('dlv-car-owned', null),
+      'dlv-car-cur': Store.get('dlv-car-cur', null),
+      'dlv-car-up': Store.get('dlv-car-up', null),
+      'dlv-car-L': Store.get('dlv-car-L', null),
+      'dlv-car-paint': Store.get('dlv-car-paint', null),
+      'dlv-car-eng': Store.get('dlv-car-eng', null),
+    } },
+    graphics: { preset: GFX.preset(), device: GFX.DEBUG.dev },
+    ordinary: EDL.rngDescriptor(),
+  }), writable: false, configurable: false });
+}
 const T0 = performance.now();
 STARTUP.work('city.syncBuild', () => buildCity());
 STARTUP.mark('city.syncBuilt');

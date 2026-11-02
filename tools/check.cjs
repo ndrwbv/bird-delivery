@@ -110,6 +110,7 @@ const CHECKS = [
     ['streetgraph-export','холодный снимок графа и освобождение буфера','streetgraphexport-test.mjs'],
     ['address-layout','адресные точки: порядок, точность и прежние шаги','addresslayout-test.mjs'],
     ['address-catalog','источники адресов и прежние барьеры публикации','addresscatalog-test.mjs'],
+    ['address-input','снимок начальных условий без заморозки живого сохранения','addressinput17b-test.mjs'],
     ['land-package-shared','совместимость обычных подготовленных данных и источник жребия','land-package-shared-test.mjs'],
     ['land-package-reader','чтение обычной земли: отказ, отмена и штатный пересчёт','land-package-reader-test.mjs'],
     ['land-package-export','экспорт земли обычным генератором без смены жребия','land-package-export-test.mjs'],
