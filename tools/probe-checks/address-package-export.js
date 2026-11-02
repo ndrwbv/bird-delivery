@@ -231,6 +231,7 @@ const functionalQueries=(()=>{
  const home1=d.STORY_DBG.homeOf('gennady'),home2=d.STORY_DBG.homeOf('gennady');
  need(home1&&home1===home2,'actual home memo identity');
  const hm=story.home;
+ need(json(hm.addr)===json(['улица Калинина','96'])&&!hm.near,'fixed Gennady Kalinina 96 home');
  let buildingIndex=hm.addr?d.CITY.buildings.findIndex(b=>b.a&&b.a[0]===hm.addr[0]&&b.a[1]===hm.addr[1]):-1;
  const centroid=b=>b.p.reduce((sum,q)=>[sum[0]+q[0]/b.p.length,sum[1]+q[1]/b.p.length],[0,0]);
  if(buildingIndex<0&&hm.near){let best=Infinity;d.CITY.buildings.forEach((b,i)=>{if(!b.a||(!hm.any&&b.st!=='panel'))return;const c=centroid(b),v=(c[0]-hm.near[0])**2+(c[1]-hm.near[1])**2;if(v<best){best=v;buildingIndex=i;}});}
@@ -244,10 +245,10 @@ const functionalQueries=(()=>{
  let spotIndex=-1,bestSpot=900;
  d.SPOTS.forEach((s,i)=>{const distance=(s.x-want4.x)**2+(s.z-want4.z)**2;if(distance<bestSpot){bestSpot=distance;spotIndex=i;}});
  const spot=spotIndex>=0?d.SPOTS[spotIndex]:want4;
- const expectedHome={ex,ez,nx,nz,sx:-nz,sz:nx,x:spot.x,z:spot.z,addr:b.a?addressExpected(ex+nx*2,ez+nz*2).value:''};
+ const expectedHome={ex,ez,nx,nz,sx:-nz,sz:nx,x:spot.x,z:spot.z,addr:'улица Калинина, 96'};
  const homeKeys=['ex','ez','nx','nz','sx','sz','x','z','addr'],actualHome=Object.fromEntries(homeKeys.map(k=>[k,home1[k]]));
  same(actualHome,expectedHome,'actual story home scalar');
- need(actualHome.addr===(b.a?Q.realAddress(ex+nx*2,ez+nz*2):''),'actual home/address helper link');
+ need(json(b.a)===json(['улица Калинина','96'])&&actualHome.addr==='улица Калинина, 96','actual home/fixed building address link');
  const home={id:'gennady',actual:actualHome,expected:expectedHome,memoSameReference:true,building:buildingIndex,sourceId:b.id??null,entrance:entranceIndex,spot:spotIndex,fallbackWant4:spotIndex<0};
  // POOL remains a runtime overlay. Expected projection is not substituted for actual POOL.
  const opened=d.DIST.opened(),hasDistricts=d.DIST.list().length>0,di=hasDistricts&&!d.DIST.city()?d.DIST.cur():-1;

@@ -63,11 +63,11 @@ await test('sidecar carries only first actual proof points, not a key; full orig
  assert.equal(context.window.__addressPackage17bEarlyQueryObserver.sha256,hash(Buffer.from(observer)));assert.equal(context.window.__startupBootGuard.markerWrites,0);
  const originalExact=JSON.stringify(checked.proof.fixedQueriesExact);assert.equal(JSON.stringify(context.window.__addressPackage17bEarlyQueryInput.fixedQueriesExact),originalExact);
 });
-await test('outer export helper accepts null-prototype exact descriptor without altering historical oracle body',()=>{
+await test('outer exact helper and reviewed Kalinina 96 story-address oracle stay pinned',()=>{
  const body=fs.readFileSync(new URL('./probe-checks/address-package-export.js',import.meta.url),'utf8'),at=body.lastIndexOf('function toExact(value){'),end=body.indexOf('const needExport=',at),helper=body.slice(at,end);
  const input=Object.assign(Object.create(null),{missing:undefined,zero:-0,nested:Object.assign(Object.create(null),{value:1})});
  const actual=new Function('input',helper+';return toExact(input);')(input);assert.deepEqual(actual,exact(input));
- const prefix='const proof=await(async()=>{\n',start=body.indexOf(prefix)+prefix.length,finish=body.lastIndexOf('\n})();\nfunction toExact');assert.ok(start>0&&finish>start);assert.equal(hash(Buffer.from(body.slice(start,finish))),'a246e97e024ba99add1a9911775ed6c8f0543aa9b563372497351ecd3f64fdb0');
+ const prefix='const proof=await(async()=>{\n',start=body.indexOf(prefix)+prefix.length,finish=body.lastIndexOf('\n})();\nfunction toExact');assert.ok(start>0&&finish>start);assert.equal(hash(Buffer.from(body.slice(start,finish))),'1903b37d448f0bfe479932d13dee5dcdd3fe589bef356acfcd10afed508a845a');
 });
 await test('Node exact repeat comparison accepts null-prototype identity records',async()=>{
  const a=await checkAddressExport(fixture(),{base}),b=await checkAddressExport(fixture(),{base});b.identity=Object.assign(Object.create(null),b.identity);assert.doesNotThrow(()=>checkAddressRepeats(a,b));
