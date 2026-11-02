@@ -3004,3 +3004,26 @@ Graphinput26,8+decode195,8мс противfreshgraph60,1мс вn1диагнос
 </details>
 
 Журнал02.11.2026: №17б, S-пакет логических данных принят. Puregraph/SPOTS, diagnosticaddresslinks иboundedbinarygraph; baseline/candidate/actualqueries/savedkeys PASS, общаяпроверка411сPASS. Раннийкаталог/coverageостаютсявтреке; выпускпервогопакетаземлиpendingCI4.
+
+Журнал 02.11.2026: первый пакет №17б опубликован как v0.33.10 из2bd815e. CI41366554426 полностью PASS: общий подготовленный пакет, Linux/Windows ASAR и настоящий Go/W с guard2/cacheSHA/clean0/viewport1280×800, release и Pages. Выпуск00:38:28UTC, четыре Steam assets; предыдущие три failed-попытки сохранены. Логические модули c6ded71 идут следующим выпуском; расширение районов и ранний каталог №17б остаются в работе. [Фактические материалы](measurements/landpackage-2026-11-02/ci-attempt04/README.md).
+
+<a id="q17b-coverage"></a>
+<details><summary><b>17б</b> · Проверенное покрытие земли: Юг, Центр и Частный сектор · <b>S</b> — 02.11.2026</summary>
+
+Завершён этот пакет; родительский №17б и ранний каталог остаются в беклоге идей. Исходные этапы сохранены как были записаны:
+
+**Ближайший пакет №17б · S, агент02.11.2026:** actual exports районов3/7 дважды и0/high control на общей source2a72a073/build8277c68c/receipt7eab6c83 совпали целиком (74952828байт, SHA5c9de2b…668). Выбранная PIZZA подтверждена до LATE; это menu-only CPU1 export, не приёмка управления и не замер загрузки. [Доказательства](../measurements/landpackage-districts-2026-11-02/pilot-source2a/README.md). Теперь свежая подготовка всех четырёх сочетаний на финальном source и обычный UIpicker→Go/W для3/7; только затем выпуск. Непроверенные сочетания не расширять.
+
+**Полнота следующей поставки, агент02.11.2026:** каталогv2 с явными проверенными slots0/mid,0/high,3/high,7/high иихexactpreclean keys; legacyv1 оставить для прежних диагностик, production-build требуетполнуюv2матрицу. CI генерирует каждыйslot двумя независимыми ordinary процессами, доказываетповтор/вход/PZ и только затем дедуплицирует одинаковыеpayload. Reader допускаетslotпоcoverage доhash, но по-прежнему требуетполныйactualpreclean key; неизвестныеграфики/районы skipбыстро. Подготовку/проверкуcoverage связатьсsourceidentity. Никакогоручногоприсваиванияkeyсуществующемуфайлу илирасширениянаall8безпроверки.
+
+**Приёмка выбранного района, агент02.11.2026:** `land-package-smoke --district=0|3|7` по умолчанию сохраняет район0. Для3/7 обязательны явный файл зрелой карьеры и high; общий стартовый gate проверяет фактический район, пиццерию и положение машины, а отдельный guard требует настоящий обычный picker с положительным числом нажатий. Готовые данные принимаются только при совпадении выбранного slot каталогаv2 по району/графике и его exactprecleanHash, не просто при наличии похожей entry. Generated и cache запускаются отдельно через то же меню; этот шаг не устанавливает район после загрузки, не расширяет поддержку all8 и не является новым замером скорости. После малой проверки ещё нужны actual Go/W прогоны3/7 на финальном пакете.
+
+**Приёмка:** [freshprepare8](measurements/landpackage-districts-2026-11-02/coverage-v2-final/README.md) — два независимых процесса на каждый слот0/mid,0/high,3/high,7/high. Source36e181620e…d679, все raw74952828байт/SHA24bdea…e01c совпали; один gzip34231572байта (32,65МиБ), exact4coverage v2. Reader проверяет фактический preclean key, неподдержанные сочетания пропускает до hash; build требует полную проверенную матрицу. Новый helper закреплён LF для Windows, измеренные source bytes не менялись.
+
+[Шесть actual Go/W](measurements/landpackage-districts-2026-11-02/ordinary-admission/README.md) — PASS: четыре cache-слота и generated control для3/7, настоящий picker, guard2/supportReady/realW; cache clean0, generated clean1, activate/align1, errors/crash0. CPU×3 macOS, n1 каждого случая, не медианы и не physicalDeck. Полный production-build hashfa39c622…de52 снят честно после серии, отдельно от prepare-build f5de55…; не preflight pin. Адреса/маршруты сохраняются благодаря предыдущему S-пакету, но ранняя готовность каталога не объявляется.
+
+Общий `npm run check -- --rebuild --serial` для затронутых build/land/startup/late/graph/address/route/first-shift/shift-loading/smoke/i18n — PASS265с. Взрослая web373м/p9518,5мс; DeckhighCPU×3 349м/p9520,3мс, console/crash0. Единственное предупреждение —256 отложенных переводов. Физический Deck/mobile/kids не проверялись. Выпуск подтверждается отдельной строкой журнала.
+
+</details>
+
+Журнал 02.11.2026: №17б, S-пакет проверенного покрытия0/mid,0/high,3/high,7/high принят. Freshprepare8 и actualGo/W6 PASS, общий check265с PASS, единый payload32,65МиБ. Ранний адресный вход/каталог остаются в беклоге; релиз следующей пачкой после v0.33.10.

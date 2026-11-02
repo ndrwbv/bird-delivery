@@ -1,5 +1,5 @@
 /* Ordinary local package reader. Strict landcache17a stays a separate terminal experiment. */
-import {lookupCatalog} from './land-package-catalog.js';
+import {lookupCatalog,checkCatalog} from './land-package-catalog.js';
 import {assertOrdinaryEDL,checkManifest,canonical} from './land-package-key.js';
 import {precleanHashSteps} from '../landcache17a/preclean.js';
 import {decodeCheckpointSteps,prepareRestoreResultSteps} from '../landcache17a/checkpoint-codec.js';
@@ -106,7 +106,12 @@ export function createLandPackageReader({catalog,manifest,descriptor,query='',tr
         fresh();refs=[ctx.source.cover,ctx.source.green,ctx.source.finalMask,ctx.source.finalMask.kept,ctx.source.ST];
         need(ctx.prepared===true&&ctx.deferDraw===true,'PREPARED_DEFERRED_REQUIRED');
         const r=ctx.runtime;need(r?.mode==='steam'&&r.adult===true&&r.career===true&&r.streamed===true&&r.intro===false&&r.editor===false&&r.quick===false&&['mid','high'].includes(r.graphics)&&r.mapId===manifest?.mapId,'UNSUPPORTED_MODE');
-        if(r.district!==0){reason='unsupported-district';phase='fallback';return false;}
+        let selectedCatalog=catalog,coverageSlot=null;
+        if(catalog?.version===2){
+          selectedCatalog=checkCatalog(catalog);
+          coverageSlot=selectedCatalog.coverage.find(slot=>slot.district===r.district&&slot.graphics===r.graphics);
+          if(!coverageSlot){reason='unsupported-coverage';phase='fallback';return false;}
+        }else if(r.district!==0){reason='unsupported-district';phase='fallback';return false;}
         const q=new URLSearchParams(query);need(!['landcache','landexport17a','landexport17b','editor','mapcheck','fullterrain','oldland','nolate'].some(k=>q.has(k)),'UNSUPPORTED_QUERY');
         assertOrdinaryEDL(descriptor?.());
         need(trustedLimits&&typeof trustedLimits==='object','TRUSTED_LIMITS_REQUIRED');
@@ -115,7 +120,8 @@ export function createLandPackageReader({catalog,manifest,descriptor,query='',tr
         const expected=checkManifest({...manifest,parameters:ctx.parameters});
         if(canonical(expected.parameters)!==canonical(manifest.parameters)){reason='input-mismatch';phase='fallback';return false;}
         phase='preclean';precleanHash=yield* steps('raisedland.cache.precleanHash',checked(precleanHashSteps({cover:ctx.source.cover,green:ctx.source.green,cores:ctx.cores,parameters:ctx.parameters},options),token));
-        const found=lookupCatalog(catalog,{manifest:expected,precleanHash});
+        if(coverageSlot&&precleanHash!==coverageSlot.precleanHash){reason='coverage-input-mismatch';phase='fallback';return false;}
+        const found=lookupCatalog(selectedCatalog,{manifest:expected,precleanHash});
         if(!found.hit){reason=found.reason;phase='fallback';return false;}
         entry=found.entry;
         const limit=limits.maxHeaderBytes+limits.maxPayloadBytes+20;need(entry.bytes<=limit&&entry.rawBytes<=limit,'WIRE_LIMIT');

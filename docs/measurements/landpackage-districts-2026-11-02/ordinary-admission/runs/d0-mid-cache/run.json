@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "variant": "cache",
+  "preset": "mid",
+  "district": 0,
+  "coverageSlot": {
+    "district": 0,
+    "graphics": "mid",
+    "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4"
+  },
+  "phase": "cold",
+  "cpu": 3,
+  "schedule": {
+    "mode": "early",
+    "early": true,
+    "bootWaitSec": 360,
+    "controlWaitMs": 240000,
+    "probeTimeoutSec": 480,
+    "hardTimeoutMs": 520000,
+    "movementWaitMs": 600
+  },
+  "argv": [
+    "/Users/andrewboev/Desktop/not-work/delivery/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron",
+    "/Users/andrewboev/Desktop/not-work/delivery/tools/probe.cjs",
+    "--mode=steam",
+    "--dir=/tmp/bird-landcoverage-v2-final-1102/production-steam",
+    "--startup-trace",
+    "--startup-session=lp17b-e43c65b6-bd10-4297-b282-02d42cec37fe",
+    "--startup-cold",
+    "--startup-fixture=/private/tmp/bird-landcoverage-v2-d0-mid-cache-1102/fixture.json",
+    "--fresh",
+    "--early",
+    "--size=deck",
+    "--cpu=3",
+    "--bootcpu",
+    "--init-script=/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/startup-bootstrap-observe.js",
+    "--q=gfxdev=deck&mute&startupdistrict=0",
+    "--eval=/Users/andrewboev/Desktop/not-work/delivery/tools/probe-checks/startup-ready.js",
+    "--bootwait=360",
+    "--timeout=480",
+    "--max=0",
+    "--errors",
+    "--report=/private/tmp/bird-landcoverage-v2-d0-mid-cache-1102/raw.json"
+  ],
+  "startedAt": "2026-11-02T01:05:14.047Z",
+  "fixtureFile": "/private/tmp/bird-landcoverage-v2-d0-mid-cache-1102/fixture.json",
+  "fixtureSha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00",
+  "catalogFile": "/tmp/bird-landcoverage-v2-final-1102/production-steam/city-data/catalog.json",
+  "catalogSha256": "562eea6bb6a116ae0b583c4d300b6c52a9863879623ff37bcf0d128d7e6a5192",
+  "processStatus": 0,
+  "signal": null,
+  "probe": {
+    "file": "tools/probe.cjs",
+    "sha256": "f05e1c79f1a007f11290a3bad2dda758b643ca39a6ac2c71b971a5bfeb2edca8"
+  },
+  "eval": {
+    "file": "tools/probe-checks/startup-ready.js",
+    "sha256": "6936e604198b5f3b59865181a1df646645ee42c07e11ff809c2d8230b015bd52"
+  },
+  "observer": {
+    "file": "tools/probe-checks/startup-bootstrap-observe.js",
+    "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+  },
+  "gate": {
+    "file": "tools/startup-report.mjs",
+    "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+  },
+  "admission": {
+    "file": "tools/land-package-smoke.mjs",
+    "sha256": "9b4563ea5dbdb6c760d037a4afca689a72fdf1fa20093bf963e56fbf413ab4e7"
+  },
+  "admissionSettings": {
+    "file": "tools/startup-admission.cjs",
+    "sha256": "fec1148600e1ff8f58f643541592121095c717390b09cb57014a88d64e6e0e33"
+  },
+  "districtGate": {
+    "file": "tools/land-package-smoke-gate.mjs",
+    "sha256": "457c412d0c4628a3742a57351ea1faa5787398728eecb16ff9fb8596ab17b0a5"
+  },
+  "pid": 12208,
+  "finishedAt": "2026-11-02T01:06:19.351Z",
+  "rawSha256": "dadf13e084046527f9bb6e8bd83032179bca8efbf5d4cbe35534b570bdf335b7",
+  "startupValidation": {
+    "ok": true,
+    "reasons": []
+  },
+  "ok": true,
+  "controlMs": 64328.699999809265,
+  "fromClickMs": 54617.299999952316,
+  "moved": 5.020099419623746,
+  "cache": {
+    "version": 1,
+    "source": "cache",
+    "phase": "restored",
+    "hit": true,
+    "fatal": false,
+    "reason": null,
+    "cleaned": true,
+    "bufferHeld": false,
+    "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+    "wireSha256": "f6e2c6b18c6ec026bca34c910f0c142d0d4856cd9ee124a29421774a91fa5d41",
+    "expectedWireSha256": "f6e2c6b18c6ec026bca34c910f0c142d0d4856cd9ee124a29421774a91fa5d41",
+    "rawSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+    "expectedRawSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+    "bytes": 34231572,
+    "encoding": "gzip"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "kind": "root preflight before actual exports",
+  "files": [
+    {
+      "file": "tools/probe.cjs",
+      "sha256": "f05e1c79f1a007f11290a3bad2dda758b643ca39a6ac2c71b971a5bfeb2edca8"
+    },
+    {
+      "file": "tools/probe-checks/land-package-district-export.js",
+      "sha256": "bc69334147fd594dc2387b18897b3f7612bd1ceba70a9aeaf00d7e7080220150"
+    },
+    {
+      "file": "tools/land-package-export-host.cjs",
+      "sha256": "3fd594ca5c53079d213d6487aca98177218a9201711448ff489d11572950faa4"
+    }
+  ],
+  "source": {
+    "mapId": "seversk",
+    "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+    "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+    "sourceHash": "2a72a0737403b5153a7ce813cd096217299e92d33066de2aa8332a2aa0df80ca"
+  },
+  "build": "8277c68c61fe4aff80c60af3b4b2c1b8a3ca7acec4db8827bb66857393a933c4",
+  "receiptHash": "7eab6c83fd2ef86e86701a37d64247edc1aae9818571b7f3198db0e576c009a0"
+}

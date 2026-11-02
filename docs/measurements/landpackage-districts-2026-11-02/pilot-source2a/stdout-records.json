@@ -1,0 +1,42 @@
+[
+  {
+    "name": "district3-1",
+    "originalPath": "/tmp/bird-landdistrict17b-1102/district3-1.stdout.log",
+    "bytes": 3438,
+    "sha256": "7ad1d0eb1bff2d45a1b5bc7f908b454de7e284b0aa78bc98825454986044ee11",
+    "deduplicated": true,
+    "reconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'"
+  },
+  {
+    "name": "district7-1",
+    "originalPath": "/tmp/bird-landdistrict17b-1102/district7-1.stdout.log",
+    "bytes": 3446,
+    "sha256": "15a5c8ad85706574ad9ba7e4be8f6cc906dab9a7f27ca75d8305c014dd0f01aa",
+    "deduplicated": true,
+    "reconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'"
+  },
+  {
+    "name": "district3-2",
+    "originalPath": "/tmp/bird-landdistrict17b-1102/district3-2.stdout.log",
+    "bytes": 3438,
+    "sha256": "6e1818624fbb3250f755cf83e1c04ae511dec1d4eee2ca8d53802fc57ef07d66",
+    "deduplicated": true,
+    "reconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'"
+  },
+  {
+    "name": "district7-2",
+    "originalPath": "/tmp/bird-landdistrict17b-1102/district7-2.stdout.log",
+    "bytes": 3435,
+    "sha256": "d73c69da00eb7c8fef23c87b08dc9fd0b41f2df9b2a69ce5795a4609b5dcbcec",
+    "deduplicated": true,
+    "reconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'"
+  },
+  {
+    "name": "district0-control",
+    "originalPath": "/tmp/bird-landdistrict17b-1102/district0-control.stdout.log",
+    "bytes": 3435,
+    "sha256": "c680db6dfaa768bcf45fc6fb8eeecbf6f649bb5ba1d93c3100a416cdd5e9a175",
+    "deduplicated": true,
+    "reconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'"
+  }
+]

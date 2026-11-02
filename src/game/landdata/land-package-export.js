@@ -62,11 +62,11 @@ export function createLandPackageExporter({receipt,descriptor,expose,work=(_name
   return yield* wrapped;
  }
  function checkBefore({source,runtime,prepared,deferDraw,query=''}){
-  need(runtime?.mapId===input.base.mapId&&runtime.mode==='steam'&&runtime.adult===true&&runtime.career===true&&runtime.intro===false&&runtime.editor===false&&runtime.streamed===true&&runtime.district===0&&runtime.quick===false&&runtime.externalSeed!==true&&['mid','high'].includes(runtime.graphics),'UNSUPPORTED_MODE');
+  need(runtime?.mapId===input.base.mapId&&runtime.mode==='steam'&&runtime.adult===true&&runtime.career===true&&runtime.intro===false&&runtime.editor===false&&runtime.streamed===true&&[0,3,7].includes(runtime.district)&&runtime.quick===false&&runtime.externalSeed!==true&&['mid','high'].includes(runtime.graphics),'UNSUPPORTED_MODE');
   need(prepared===true&&deferDraw===true,'PREPARE_DEFER_BARRIER');
   fresh(source);
   const q=new URLSearchParams(query);need(!['landcache','landexport17a','editor','mapcheck','oldland','fullterrain','nolate'].some(k=>q.has(k)),'UNSUPPORTED_QUERY');
-  conditions={mapId:runtime.mapId,mode:runtime.mode,adult:true,career:true,intro:false,editor:false,streamed:true,district:0,quick:false,graphics:runtime.graphics,descriptor:ordinary()};
+  conditions={mapId:runtime.mapId,mode:runtime.mode,adult:true,career:true,intro:false,editor:false,streamed:true,district:runtime.district,quick:false,graphics:runtime.graphics,descriptor:ordinary()};
  }
  function* beforeCleanSteps(context){
   let finished=false;

@@ -11,8 +11,8 @@ fs.mkdirSync(repo);fs.mkdirSync(dist);let checks=0;
 const hash=b=>createHash('sha256').update(b).digest('hex');
 const verified={version:1,kind:'land-package17b-export-receipt',...structuredClone(receipt),build:{dir:dist,hash:'e'.repeat(64),files:[]},source:{files:[],normalizedLockHash:'d'.repeat(64),buildConfig:{}}};
 const args={manifestFile:path.join(dir,'receipt.json'),dist,repo};
-function setup({mutate=()=>{},bytes=null,chunk,release,read}={}){
- const s=fixture();s.ready();const meta=s.endpoint.meta(),original=s.endpoint;
+function setup({district=0,mutate=()=>{},bytes=null,chunk,release,read}={}){
+ const s=fixture({district});s.ready();const meta=s.endpoint.meta(),original=s.endpoint;
  // Large-enough bounded synthetic payload exercises 3 transport chunks; the renderer codec has its own real tiny round-trip test.
  if(bytes){meta.bytes=bytes.length;meta.summary.bytes=bytes.length;meta.summary.fileSha256=hash(bytes);}
  mutate(meta);let released=0,pulls=0,reads=0;
@@ -24,6 +24,39 @@ function setup({mutate=()=>{},bytes=null,chunk,release,read}={}){
 const file=name=>path.join(dir,name+'.land');
 const noPartial=()=>assert.equal(fs.readdirSync(dir).some(name=>name.includes('.part-')),false);
 try{
+ // The CLI expectation cannot create progress or configure the renderer. Reject ambiguous/bare values before Page.
+ assert.equal(host.expectedDistrictFromArgs([]),0);checks++;
+ assert.equal(host.expectedDistrictFromArgs(['--land-package-export=result.land']),0);checks++;
+ for(const district of [0,3,7]){
+  assert.equal(host.expectedDistrictFromArgs(['--land-package-export=result.land','--land-package-district='+district]),district);checks++;
+ }
+ for(const value of ['', '1','2','4','5','6','8','-1','-0','03','3.0','3.5',' 3','3 ','NaN','Infinity','true']){
+  assert.throws(()=>host.expectedDistrictFromArgs(['--land-package-export=result.land','--land-package-district='+value]),/EXPECTED_DISTRICT_CLI/);checks++;
+ }
+ for(const argv of [['--land-package-district=3'],['--land-package-export=','--land-package-district=3'],['--land-package-export=result.land','--land-package-district'],['--land-package-export=result.land','--land-package-district=3','--land-package-district=7'],['--land-package-export=result.land','--land-package-district=3','--land-package-district=3']]){
+  assert.throws(()=>host.expectedDistrictFromArgs(argv),/EXPECTED_DISTRICT/);checks++;
+ }
+ for(const argv of [['--land-package-export=','--land-package-export=result.land','--land-package-district=3'],['--land-package-export=a.land','--land-package-export=b.land','--land-package-district=7']]){
+  assert.throws(()=>host.expectedDistrictFromArgs(argv),/EXPECTED_DISTRICT_REQUIRES_EXPORT/);checks++;
+ }
+ for(const district of [0,3,7]){
+  const s=setup({district}),out=await s.h.exportLandPackageResult({...args,file:file('district'+district),js:s.js,expectedDistrict:district});
+  assert.equal(out.expectedDistrict,district);assert.equal(out.conditions.district,district);assert.equal(s.reads,2);assert.equal(s.pulls,1);assert.equal(s.released,1);checks++;
+ }
+ for(const [district,expectedDistrict] of [[3,0],[7,0],[0,3],[0,7],[3,7],[7,3]]){
+  const s=setup({district}),target=file('mismatch'+district+'-'+expectedDistrict);
+  await assert.rejects(s.h.exportLandPackageResult({...args,file:target,js:s.js,expectedDistrict}),/DISTRICT_MISMATCH/);
+  assert.equal(s.pulls,0);assert.equal(fs.existsSync(target),false);checks++;
+ }
+ for(const expectedDistrict of [1,2,4,5,6,8,-1,-0,3.5,'3',null,NaN,Infinity]){
+  const s=setup(),target=file('expected'+checks);
+  await assert.rejects(s.h.exportLandPackageResult({...args,file:target,js:s.js,expectedDistrict}),/EXPECTED_DISTRICT/);
+  assert.equal(s.reads,0);assert.equal(s.pulls,0);assert.equal(fs.existsSync(target),false);checks++;
+ }
+ {
+  const s=setup({district:3}),target=file('default-target-zero');
+  await assert.rejects(s.h.exportLandPackageResult({...args,file:target,js:s.js}),/DISTRICT_MISMATCH/);assert.equal(s.pulls,0);checks++;
+ }
  const bytes=Uint8Array.from({length:131077},(_,i)=>i%251),s=setup({bytes}),out=await s.h.exportLandPackageResult({...args,file:file('good'),js:s.js});
  assert.equal(out.sha256,hash(bytes));assert.equal(hash(fs.readFileSync(out.path)),hash(bytes));assert.equal(s.pulls,3);assert.equal(s.reads,2);assert.equal(s.released,1);assert.equal(out.provenance.buildHash,verified.build.hash);assert.equal(Object.hasOwn(out.identity.flags,'buildHash'),false);checks++;
  {
@@ -65,5 +98,5 @@ try{
   const s=setup(),result=await s.h.exportWithDiagnostics({js:async()=>{throw Error('diagnostic read failed');},priorEvalErr:'primary evaluation',allowed:true,args:{}});
   assert.equal(result.evalErr,'primary evaluation');assert.equal(result.landPackageExportDiagnostics.readError,'diagnostic read failed');checks++;
  }
- console.log(JSON.stringify({ok:true,checks,threeChunks:true,receiptReverified:true,atomicNoOverwrite:true,primaryFailurePreserved:true,noCity:true}));
+ console.log(JSON.stringify({ok:true,checks,threeChunks:true,receiptReverified:true,atomicNoOverwrite:true,primaryFailurePreserved:true,exportDistricts:[0,3,7],expectedDistrictChecked:true,noCity:true}));
 }finally{fs.rmSync(dir,{recursive:true,force:true});}

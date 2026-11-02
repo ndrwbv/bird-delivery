@@ -1,0 +1,10 @@
+{
+  "provenance": "root message; not independently child-captured parent process telemetry",
+  "productionBuildToolSession": 34394,
+  "productionBuildToolExitCode": 0,
+  "productionBuildDir": "/tmp/bird-landcoverage-v2-final-1102/production-steam",
+  "sourceFingerprint": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+  "fullProductionContentHashPreflight": false,
+  "prepareBuildHashMustNotBeReusedForProduction": true,
+  "immutability": "root states productiondir stayed unchanged throughout actual runs; root will capture full content pins once after series"
+}

@@ -1,0 +1,196 @@
+{
+  "version": 1,
+  "kind": "ci-attempt04-independent-offline-proof-audit",
+  "ok": true,
+  "platforms": [
+    {
+      "platform": "linux",
+      "pid": 2611,
+      "processStatus": 0,
+      "signal": null,
+      "startedAt": "2026-11-02T00:28:08.886Z",
+      "finishedAt": "2026-11-02T00:32:27.027Z",
+      "rawSha256": "6fcd2c4353fb2e2a962a44b41a56f59eb63459e6676298fd51d70f03ac82402d",
+      "viewport": {
+        "method": "CDP.Emulation.setDeviceMetricsOverride",
+        "requested": {
+          "width": 1280,
+          "height": 800,
+          "devicePixelRatio": 1
+        },
+        "actual": {
+          "width": 1280,
+          "height": 800,
+          "devicePixelRatio": 1
+        },
+        "nativeContentSize": {
+          "width": 1280,
+          "height": 800
+        }
+      },
+      "cache": {
+        "source": "cache",
+        "phase": "restored",
+        "encoding": "gzip",
+        "bytes": 34231591,
+        "wireSha256": "965ebbc0994bfe82e2943d1ee3f733a4cc8a273d4100adda8f0f0d649c32f9a4",
+        "rawSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+        "cleanCalls": 0
+      },
+      "control": {
+        "guardVersion": 2,
+        "localReady": true,
+        "supportReady": true,
+        "held": false,
+        "paused": false,
+        "mapOpen": false
+      },
+      "moved": 0.16326654360358986,
+      "consoleErrors": 0,
+      "uncaught": 0,
+      "crashes": 0,
+      "asar": {
+        "ok": true,
+        "archive": "/home/runner/work/bird-delivery/bird-delivery/release/linux-unpacked/resources/app.asar",
+        "catalogSha256": "f8a181903273368d7fcf96598061886cbdae3ec0e0f481ef5d21e3a6fd917f04",
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+        "assets": [
+          {
+            "path": "dist/steam/city-data/965ebbc0994bfe82e2943d1ee3f733a4cc8a273d4100adda8f0f0d649c32f9a4.land.gz",
+            "bytes": 34231591,
+            "sha256": "965ebbc0994bfe82e2943d1ee3f733a4cc8a273d4100adda8f0f0d649c32f9a4"
+          }
+        ]
+      },
+      "stderrPreserved": true,
+      "harnessPins": {
+        "probe": {
+          "file": "tools/probe.cjs",
+          "sha256": "aa617565b1a4f4320d7bc5240d2a707f90c36f552d186eba9bdb3165910cabe7"
+        },
+        "eval": {
+          "file": "tools/probe-checks/startup-ready.js",
+          "sha256": "6936e604198b5f3b59865181a1df646645ee42c07e11ff809c2d8230b015bd52"
+        },
+        "observer": {
+          "file": "tools/probe-checks/startup-bootstrap-observe.js",
+          "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+        },
+        "gate": {
+          "file": "tools/startup-report.mjs",
+          "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+        },
+        "admission": {
+          "file": "tools/land-package-smoke.mjs",
+          "sha256": "795a1f38686c19fbab2dd487535e4cb95aa71c34852616c23ac344f1799705df"
+        },
+        "admissionSettings": {
+          "file": "tools/startup-admission.cjs",
+          "sha256": "fec1148600e1ff8f58f643541592121095c717390b09cb57014a88d64e6e0e33"
+        }
+      }
+    },
+    {
+      "platform": "windows",
+      "pid": 2972,
+      "processStatus": 0,
+      "signal": null,
+      "startedAt": "2026-11-02T00:30:02.068Z",
+      "finishedAt": "2026-11-02T00:37:35.832Z",
+      "rawSha256": "6ba1940320e41ed327f260fb52f8975c5d9437d12e104f8be8d37a1b14f0b7fd",
+      "viewport": {
+        "method": "CDP.Emulation.setDeviceMetricsOverride",
+        "requested": {
+          "width": 1280,
+          "height": 800,
+          "devicePixelRatio": 1
+        },
+        "actual": {
+          "width": 1280,
+          "height": 800,
+          "devicePixelRatio": 1
+        },
+        "nativeContentSize": {
+          "width": 1024,
+          "height": 720
+        }
+      },
+      "cache": {
+        "source": "cache",
+        "phase": "restored",
+        "encoding": "gzip",
+        "bytes": 34231591,
+        "wireSha256": "965ebbc0994bfe82e2943d1ee3f733a4cc8a273d4100adda8f0f0d649c32f9a4",
+        "rawSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+        "cleanCalls": 0
+      },
+      "control": {
+        "guardVersion": 2,
+        "localReady": true,
+        "supportReady": true,
+        "held": false,
+        "paused": false,
+        "mapOpen": false
+      },
+      "moved": 0.34689210233132256,
+      "consoleErrors": 0,
+      "uncaught": 0,
+      "crashes": 0,
+      "asar": {
+        "ok": true,
+        "archive": "D:\\a\\bird-delivery\\bird-delivery\\release\\win-unpacked\\resources\\app.asar",
+        "catalogSha256": "f8a181903273368d7fcf96598061886cbdae3ec0e0f481ef5d21e3a6fd917f04",
+        "sourceHash": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+        "assets": [
+          {
+            "path": "dist/steam/city-data/965ebbc0994bfe82e2943d1ee3f733a4cc8a273d4100adda8f0f0d649c32f9a4.land.gz",
+            "bytes": 34231591,
+            "sha256": "965ebbc0994bfe82e2943d1ee3f733a4cc8a273d4100adda8f0f0d649c32f9a4"
+          }
+        ]
+      },
+      "stderrPreserved": true,
+      "harnessPins": {
+        "probe": {
+          "file": "tools/probe.cjs",
+          "sha256": "c45619d16580f91321cc5f3f4bd789984e4b007f9adccf6a94b1206e3ad7a980"
+        },
+        "eval": {
+          "file": "tools/probe-checks/startup-ready.js",
+          "sha256": "09981414832a273f6d7d2b0d016fa3ae9f2b757bfdcd959125582f4c246bdb87"
+        },
+        "observer": {
+          "file": "tools/probe-checks/startup-bootstrap-observe.js",
+          "sha256": "f287a6c7f5abe14e2944235fa81295aefe37051cb75950ab98ea6783655e86cc"
+        },
+        "gate": {
+          "file": "tools/startup-report.mjs",
+          "sha256": "c40d8de9bf9545ba54e767ad74bd2bbaed5713be09aeb4a792ce9350166dd600"
+        },
+        "admission": {
+          "file": "tools/land-package-smoke.mjs",
+          "sha256": "795a1f38686c19fbab2dd487535e4cb95aa71c34852616c23ac344f1799705df"
+        },
+        "admissionSettings": {
+          "file": "tools/startup-admission.cjs",
+          "sha256": "8789f709dc9a21a5ad36302bed1a8f28d11ef847ac9b4a99705253466c116494"
+        }
+      }
+    }
+  ],
+  "workflowUrl": "https://github.com/ndrwbv/bird-delivery/actions/runs/41366554426",
+  "releaseUrl": "https://github.com/ndrwbv/bird-delivery/releases/tag/v0.33.10",
+  "releaseCommit": "2bd815edfedefe8edc2b68ea72a57592677655e1",
+  "releaseTag": "v0.33.10",
+  "publishedAt": "2026-11-02T00:38:28Z",
+  "packageSourceFingerprint": "0fd44d87acaaefeef93da4ac376070cd5a22474af7c4ffbf7c75e557704ec07e",
+  "catalogSha256": "f8a181903273368d7fcf96598061886cbdae3ec0e0f481ef5d21e3a6fd917f04",
+  "limits": [
+    "CI CPU1/settled functional smoke, not physical Steam Deck or startup latency A/B",
+    "Actual CDP viewport is1280x800; Windows native content size remains1024x720 and is preserved",
+    "Movement is the actual measured positive displacement (0.163m/0.347m), not a long driving/geometry acceptance",
+    "No release binary/ASAR/assets downloaded or reread here; packaged file integrity is the supplied ASAR audit proof",
+    "Native D-Bus/GPU stderr messages remain in exact logs; renderer errors/uncaught/crash counters are zero",
+    "Per-platform harness pins are preserved as measured; current source is not substituted"
+  ]
+}

@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {gunzipSync} from 'node:zlib';
-import {checkCatalog} from '../src/game/landdata/land-package-catalog.js';
+import {assertProductCoverage} from '../src/game/landdata/land-package-catalog.js';
 import {canonical,need,makeIdentity} from '../src/game/landdata/land-package-key.js';
 import {captureSource,sha256} from './land-package-files.mjs';
 import {DEFAULT_LIMITS} from '../src/game/landcache17a/checkpoint-limits.js';
@@ -12,7 +12,8 @@ import {decodeCheckpoint} from '../src/game/landcache17a/checkpoint-codec.js';
 const rawCeiling=DEFAULT_LIMITS.maxPayloadBytes+DEFAULT_LIMITS.maxHeaderBytes+20;
 export function verifyLandPackage({repo,dir,catalogFile='catalog.json'}){
  dir=fs.realpathSync(dir);
- const catalog=checkCatalog(JSON.parse(fs.readFileSync(path.join(dir,catalogFile),'utf8')));
+ // Historical v1 remains parseable by checkCatalog; a NEW product build requires all four v2 slots.
+ const catalog=assertProductCoverage(JSON.parse(fs.readFileSync(path.join(dir,catalogFile),'utf8')));
  const current=captureSource(repo).base,declared=catalog.manifest;
  need(['mapId','mapHash','editsHash','sourceHash'].every(key=>declared[key]===current[key]),'PACKAGE_SOURCE_MISMATCH');
  const assets=[];

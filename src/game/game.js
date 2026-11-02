@@ -6088,6 +6088,14 @@ function buildCity () {
     else buildPizzeria(spot.x, spot.z, spot.ry);
     if (DISTRICTS && house) { buildDistrictPizzerias(); usePizzeria(DIST.cur()); }
   } finally { LAND_OBJECT=true; }
+  if (new URLSearchParams(location.search).has('landexport17b')) {
+    const pizza = { x: PIZZA?.x, z: PIZZA?.z, bx: PIZZA?.bx, bz: PIZZA?.bz };
+    if (!Object.values(pizza).every(Number.isFinite)) throw Error('land-package17b-export:PRE_LATE_PIZZA_COORDINATES');
+    Object.defineProperty(window, '__landPackage17bPreLate', { value: Object.freeze({
+      phase: 'city-pizzeria-before-late', at: performance.now(), district: DIST.cur(),
+      pizzaIndex: PIZZERIAS.indexOf(PIZZA), pizza: Object.freeze(pizza), lateWorkStarted: Object.keys(LATE.T).length > 0,
+    }), writable: false, configurable: false });
+  }
   // бордюры — после пиццерий: перед стоянкой курьеров бордюр опущен (заезд, pizzeria.js DRIVEWAYS); растр асфальта нужен только им (mapworks.js) — сразу отпускаем
   tm0('curbs', () => { osmCurbs(); MAPW.freeAsphalt(); });
   // во вступлении место под кружок знаем заранее — его держим пустым

@@ -1,0 +1,355 @@
+{
+  "version": 1,
+  "kind": "ordinary-admission-small-proof-archive",
+  "cases": 6,
+  "sourceFingerprint": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+  "catalogSha256": "562eea6bb6a116ae0b583c4d300b6c52a9863879623ff37bcf0d128d7e6a5192",
+  "fullProductionContentHashPreflight": false,
+  "lightweightMetadataInventorySha256": "e7c9a099f7a380c54c019bbf53a8e1864a3c4226829b519a8a8db9af186a2bee",
+  "postSeriesFullProductionBuildHash": "fa39c62257b663c7f1fabf692dedfc80fdae557f310b737bebeb38cf00bede52",
+  "postSeriesCaptureAt": "2026-11-02T01:08:56.165Z",
+  "oldPrepareBuildHashUsedAsProduction": false,
+  "rawReportShaAndRawPayloadShaSeparate": true,
+  "physicalPayloadOrBuildCopies": 0,
+  "physicalStdoutCopies": 6,
+  "entries": [
+    {
+      "archivePath": "README.md",
+      "archiveBytes": 6828,
+      "archiveSha256": "172def9a202abb99edebccdc8b51e00d5654dc4a28833afc86ce126443666a5d",
+      "origin": "offline-generated archive metadata/summary/audit, not measured game runtime"
+    },
+    {
+      "archivePath": "copy-records.json",
+      "archiveBytes": 8587,
+      "archiveSha256": "266407f88a32fe6b405aa27ad5188b3f9f89d9b281f96e912edd091475d2aa46",
+      "origin": "offline-generated archive metadata/summary/audit, not measured game runtime"
+    },
+    {
+      "archivePath": "harness/archive-cases.py",
+      "archiveBytes": 1605,
+      "archiveSha256": "100d957ee5beea16efa3d90e434965d2bd9accabc7566ee9381893b10e5c16a4",
+      "originalPath": "/tmp/bird-landcoverage-v2-admission-copy-1102.py",
+      "originalBytes": 1605,
+      "originalSha256": "100d957ee5beea16efa3d90e434965d2bd9accabc7566ee9381893b10e5c16a4"
+    },
+    {
+      "archivePath": "independent-audit-4cases.json",
+      "archiveBytes": 13024,
+      "archiveSha256": "044bb8d130ee44199d1e8fe981ccd225a559b3d659e29940422a9ecf39c99554",
+      "origin": "offline-generated archive metadata/summary/audit, not measured game runtime"
+    },
+    {
+      "archivePath": "independent-audit-6cases.json",
+      "archiveBytes": 19501,
+      "archiveSha256": "aa82a5ff93c915cd2d1a6c5149c1493aa290d8c0e24e1327a9870f45308ea0f7",
+      "origin": "offline-generated archive metadata/summary/audit, not measured game runtime"
+    },
+    {
+      "archivePath": "offline-admission-audit.mjs",
+      "archiveBytes": 9190,
+      "archiveSha256": "50badf159b72e2acd4c0bcde48f1f07ffb38f37d4cb6d98521dca555bf3ecb1d",
+      "origin": "offline-generated archive metadata/summary/audit, not measured game runtime"
+    },
+    {
+      "archivePath": "production-build-metadata-inventory.json",
+      "archiveBytes": 15759,
+      "archiveSha256": "1123ebdc126ebba47ba589776c4f5363579a6d7efe88bf991b9f399747002826",
+      "origin": "offline-generated archive metadata/summary/audit, not measured game runtime"
+    },
+    {
+      "archivePath": "provenance/catalog.json",
+      "archiveBytes": 1375,
+      "archiveSha256": "562eea6bb6a116ae0b583c4d300b6c52a9863879623ff37bcf0d128d7e6a5192",
+      "originalPath": "/tmp/bird-landcoverage-v2-final-1102/production-steam/city-data/catalog.json",
+      "originalBytes": 1375,
+      "originalSha256": "562eea6bb6a116ae0b583c4d300b6c52a9863879623ff37bcf0d128d7e6a5192"
+    },
+    {
+      "archivePath": "provenance/post-admission-pins.json",
+      "archiveBytes": 99404,
+      "archiveSha256": "6df7f87965b96ea4a32b916178a7ce56d107a28875e5d8c9bc5b266f40dee617",
+      "originalPath": "/tmp/bird-landcoverage-v2-final-1102/post-admission-pins.json",
+      "originalBytes": 99404,
+      "originalSha256": "6df7f87965b96ea4a32b916178a7ce56d107a28875e5d8c9bc5b266f40dee617"
+    },
+    {
+      "archivePath": "provenance/preparation-source-receipt.json",
+      "archiveBytes": 94516,
+      "archiveSha256": "59efa52afb2a5467e414033808369200ad75543540fd6c72063eac9671c10f42",
+      "originalPath": "/tmp/bird-landcoverage-v2-final-1102/export-receipt.json",
+      "originalBytes": 94516,
+      "originalSha256": "59efa52afb2a5467e414033808369200ad75543540fd6c72063eac9671c10f42"
+    },
+    {
+      "archivePath": "provenance/production-build.stderr.log",
+      "archiveBytes": 1497,
+      "archiveSha256": "43d817da84c8943f76d6482fcd87025671f720e77e105724d6349d9807517f58",
+      "originalPath": "/tmp/bird-landcoverage-v2-final-1102/production-build.stderr.log",
+      "originalBytes": 1497,
+      "originalSha256": "43d817da84c8943f76d6482fcd87025671f720e77e105724d6349d9807517f58"
+    },
+    {
+      "archivePath": "provenance/production-build.stdout.log",
+      "archiveBytes": 8138,
+      "archiveSha256": "f4646d1d3084034b8f9e0b9298ddcb315f2d54bd0c9eb779138c92863e744838",
+      "originalPath": "/tmp/bird-landcoverage-v2-final-1102/production-build.stdout.log",
+      "originalBytes": 8138,
+      "originalSha256": "f4646d1d3084034b8f9e0b9298ddcb315f2d54bd0c9eb779138c92863e744838"
+    },
+    {
+      "archivePath": "root-build-attestation.json",
+      "archiveBytes": 586,
+      "archiveSha256": "cfb5c1db7f8a37dcc0ead8421290dbfec525db3e234ce52e5fb2c77abd38b01b",
+      "origin": "offline-generated archive metadata/summary/audit, not measured game runtime"
+    },
+    {
+      "archivePath": "runs/d0-high-cache/fixture.json",
+      "archiveBytes": 74,
+      "archiveSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d0-high-cache-1102/fixture.json",
+      "originalBytes": 74,
+      "originalSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+    },
+    {
+      "archivePath": "runs/d0-high-cache/raw.json",
+      "archiveBytes": 40453,
+      "archiveSha256": "2dde7b4a8db7053949cfc3ea5fc9fb1098a3de52bb31970154bebfb355f72461",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d0-high-cache-1102/raw.json",
+      "originalBytes": 40453,
+      "originalSha256": "2dde7b4a8db7053949cfc3ea5fc9fb1098a3de52bb31970154bebfb355f72461"
+    },
+    {
+      "archivePath": "runs/d0-high-cache/run.json",
+      "archiveBytes": 3904,
+      "archiveSha256": "5f03e9c328c49c1d10545fadc05fbc3f969a36327fc6ca3f109e5be60b6ebbf0",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d0-high-cache-1102/run.json",
+      "originalBytes": 3904,
+      "originalSha256": "5f03e9c328c49c1d10545fadc05fbc3f969a36327fc6ca3f109e5be60b6ebbf0"
+    },
+    {
+      "archivePath": "runs/d0-high-cache/stderr.log",
+      "archiveBytes": 187,
+      "archiveSha256": "88b9e6261a36688b4f6dfd56f5ff447969b41e9aff5c99a731dd1239fc53bdb5",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d0-high-cache-1102/stderr.log",
+      "originalBytes": 187,
+      "originalSha256": "88b9e6261a36688b4f6dfd56f5ff447969b41e9aff5c99a731dd1239fc53bdb5"
+    },
+    {
+      "archivePath": "runs/d0-high-cache/stdout.log",
+      "archiveBytes": 39882,
+      "archiveSha256": "c0b1b03b034ce2f5ef82258d7b5767546f30b40d1985bbc224188cafc71e4694",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d0-high-cache-1102/stdout.log",
+      "originalBytes": 39882,
+      "originalSha256": "c0b1b03b034ce2f5ef82258d7b5767546f30b40d1985bbc224188cafc71e4694"
+    },
+    {
+      "archivePath": "runs/d0-mid-cache/fixture.json",
+      "archiveBytes": 35,
+      "archiveSha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d0-mid-cache-1102/fixture.json",
+      "originalBytes": 35,
+      "originalSha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00"
+    },
+    {
+      "archivePath": "runs/d0-mid-cache/raw.json",
+      "archiveBytes": 40757,
+      "archiveSha256": "dadf13e084046527f9bb6e8bd83032179bca8efbf5d4cbe35534b570bdf335b7",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d0-mid-cache-1102/raw.json",
+      "originalBytes": 40757,
+      "originalSha256": "dadf13e084046527f9bb6e8bd83032179bca8efbf5d4cbe35534b570bdf335b7"
+    },
+    {
+      "archivePath": "runs/d0-mid-cache/run.json",
+      "archiveBytes": 3910,
+      "archiveSha256": "4737a48a331cb7983646d80058b9ed1cf1a1102a4df97658e80432e112cc90ea",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d0-mid-cache-1102/run.json",
+      "originalBytes": 3910,
+      "originalSha256": "4737a48a331cb7983646d80058b9ed1cf1a1102a4df97658e80432e112cc90ea"
+    },
+    {
+      "archivePath": "runs/d0-mid-cache/stderr.log",
+      "archiveBytes": 187,
+      "archiveSha256": "9257bf4a8900fc9b0368e4bda48a4d74674f532a6c0ed7006ebe67715f182bae",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d0-mid-cache-1102/stderr.log",
+      "originalBytes": 187,
+      "originalSha256": "9257bf4a8900fc9b0368e4bda48a4d74674f532a6c0ed7006ebe67715f182bae"
+    },
+    {
+      "archivePath": "runs/d0-mid-cache/stdout.log",
+      "archiveBytes": 40186,
+      "archiveSha256": "77a5696252965a4502842327ee0cf8fea520701c6d83ed920c146c4d58ee2a61",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d0-mid-cache-1102/stdout.log",
+      "originalBytes": 40186,
+      "originalSha256": "77a5696252965a4502842327ee0cf8fea520701c6d83ed920c146c4d58ee2a61"
+    },
+    {
+      "archivePath": "runs/d3-cache/fixture.json",
+      "archiveBytes": 301,
+      "archiveSha256": "11a7b7b4df9fd1d30cf3c37d6676cf6f0ae70e95eba1649f74de34837eb20991",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-final-1102/district3-high-1-fixture.json",
+      "originalBytes": 301,
+      "originalSha256": "11a7b7b4df9fd1d30cf3c37d6676cf6f0ae70e95eba1649f74de34837eb20991"
+    },
+    {
+      "archivePath": "runs/d3-cache/raw.json",
+      "archiveBytes": 40638,
+      "archiveSha256": "5f6b4387389fbc7302bc664bb2eb6f6b684f612699c1b0bae6a0ec7d34334af6",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d3-cache-1102/raw.json",
+      "originalBytes": 40638,
+      "originalSha256": "5f6b4387389fbc7302bc664bb2eb6f6b684f612699c1b0bae6a0ec7d34334af6"
+    },
+    {
+      "archivePath": "runs/d3-cache/run.json",
+      "archiveBytes": 3911,
+      "archiveSha256": "2ef404cc9174e0c4acb5d76cacab03c2da4f83187488385ee159ff1cfb3e08e5",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d3-cache-1102/run.json",
+      "originalBytes": 3911,
+      "originalSha256": "2ef404cc9174e0c4acb5d76cacab03c2da4f83187488385ee159ff1cfb3e08e5"
+    },
+    {
+      "archivePath": "runs/d3-cache/stderr.log",
+      "archiveBytes": 187,
+      "archiveSha256": "bbf0687c11c3461581320bf4fda23c76ec879a1c8a801f7cb89245c93706ce34",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d3-cache-1102/stderr.log",
+      "originalBytes": 187,
+      "originalSha256": "bbf0687c11c3461581320bf4fda23c76ec879a1c8a801f7cb89245c93706ce34"
+    },
+    {
+      "archivePath": "runs/d3-cache/stdout.log",
+      "archiveBytes": 40067,
+      "archiveSha256": "4a0b15e495a73c2b5fdaf16136b8f157e96a02909c2133b07e19c1f45e7b08ba",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d3-cache-1102/stdout.log",
+      "originalBytes": 40067,
+      "originalSha256": "4a0b15e495a73c2b5fdaf16136b8f157e96a02909c2133b07e19c1f45e7b08ba"
+    },
+    {
+      "archivePath": "runs/d3-generated/fixture.json",
+      "archiveBytes": 301,
+      "archiveSha256": "11a7b7b4df9fd1d30cf3c37d6676cf6f0ae70e95eba1649f74de34837eb20991",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-final-1102/district3-high-1-fixture.json",
+      "originalBytes": 301,
+      "originalSha256": "11a7b7b4df9fd1d30cf3c37d6676cf6f0ae70e95eba1649f74de34837eb20991"
+    },
+    {
+      "archivePath": "runs/d3-generated/raw.json",
+      "archiveBytes": 35629,
+      "archiveSha256": "c862f101efc072917938d02bf67263d72b00b470ba56f55d762bb9eab4ac8622",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d3-generated-1102/raw.json",
+      "originalBytes": 35629,
+      "originalSha256": "c862f101efc072917938d02bf67263d72b00b470ba56f55d762bb9eab4ac8622"
+    },
+    {
+      "archivePath": "runs/d3-generated/run.json",
+      "archiveBytes": 3139,
+      "archiveSha256": "91bb1322227ec631a39f5179fc1f26d1c204dd134bca8d75a77df034a2ac7c38",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d3-generated-1102/run.json",
+      "originalBytes": 3139,
+      "originalSha256": "91bb1322227ec631a39f5179fc1f26d1c204dd134bca8d75a77df034a2ac7c38"
+    },
+    {
+      "archivePath": "runs/d3-generated/stderr.log",
+      "archiveBytes": 187,
+      "archiveSha256": "0b31b9aa48a7f618b07902738693ef0491a86e9549d5f5a81f2d0219de6188cd",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d3-generated-1102/stderr.log",
+      "originalBytes": 187,
+      "originalSha256": "0b31b9aa48a7f618b07902738693ef0491a86e9549d5f5a81f2d0219de6188cd"
+    },
+    {
+      "archivePath": "runs/d3-generated/stdout.log",
+      "archiveBytes": 35057,
+      "archiveSha256": "4de6da51209a0e4f447c84325f0cd5d75c349fe6bab855fb7d9b22f0d79d6dbf",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d3-generated-1102/stdout.log",
+      "originalBytes": 35057,
+      "originalSha256": "4de6da51209a0e4f447c84325f0cd5d75c349fe6bab855fb7d9b22f0d79d6dbf"
+    },
+    {
+      "archivePath": "runs/d7-cache/fixture.json",
+      "archiveBytes": 301,
+      "archiveSha256": "713bf74b0eae7360219557e7995f3299db5cdc519429ec456570428d6fbdcb00",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-final-1102/district7-high-1-fixture.json",
+      "originalBytes": 301,
+      "originalSha256": "713bf74b0eae7360219557e7995f3299db5cdc519429ec456570428d6fbdcb00"
+    },
+    {
+      "archivePath": "runs/d7-cache/raw.json",
+      "archiveBytes": 40904,
+      "archiveSha256": "09cc77c72a02f9cb365087655595ec6e67859629b752ec3bd15ac3056ca7e90e",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d7-cache-1102/raw.json",
+      "originalBytes": 40904,
+      "originalSha256": "09cc77c72a02f9cb365087655595ec6e67859629b752ec3bd15ac3056ca7e90e"
+    },
+    {
+      "archivePath": "runs/d7-cache/run.json",
+      "archiveBytes": 3912,
+      "archiveSha256": "e27198ec400e351d4d7eb435eb2fd89ff1527f03ff95e68ed15a0d5cca054515",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d7-cache-1102/run.json",
+      "originalBytes": 3912,
+      "originalSha256": "e27198ec400e351d4d7eb435eb2fd89ff1527f03ff95e68ed15a0d5cca054515"
+    },
+    {
+      "archivePath": "runs/d7-cache/stderr.log",
+      "archiveBytes": 187,
+      "archiveSha256": "2d2ce1ec2fd1fdac431151c236e793715cfca758c92344e2554311244a27f5e5",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d7-cache-1102/stderr.log",
+      "originalBytes": 187,
+      "originalSha256": "2d2ce1ec2fd1fdac431151c236e793715cfca758c92344e2554311244a27f5e5"
+    },
+    {
+      "archivePath": "runs/d7-cache/stdout.log",
+      "archiveBytes": 40333,
+      "archiveSha256": "be417ae431120d8df10b9403761b1c147abe20ecab16afadc440efa37b2616ab",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d7-cache-1102/stdout.log",
+      "originalBytes": 40333,
+      "originalSha256": "be417ae431120d8df10b9403761b1c147abe20ecab16afadc440efa37b2616ab"
+    },
+    {
+      "archivePath": "runs/d7-generated/fixture.json",
+      "archiveBytes": 301,
+      "archiveSha256": "713bf74b0eae7360219557e7995f3299db5cdc519429ec456570428d6fbdcb00",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-final-1102/district7-high-1-fixture.json",
+      "originalBytes": 301,
+      "originalSha256": "713bf74b0eae7360219557e7995f3299db5cdc519429ec456570428d6fbdcb00"
+    },
+    {
+      "archivePath": "runs/d7-generated/raw.json",
+      "archiveBytes": 35579,
+      "archiveSha256": "0cbc1a3c8c101efe585242522820abd89d9bba598991a700f2b6339115003473",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d7-generated-1102/raw.json",
+      "originalBytes": 35579,
+      "originalSha256": "0cbc1a3c8c101efe585242522820abd89d9bba598991a700f2b6339115003473"
+    },
+    {
+      "archivePath": "runs/d7-generated/run.json",
+      "archiveBytes": 3139,
+      "archiveSha256": "adf4331f8f7210e08aa7482a1232b7fda97bdf1c4f30f4b189682e2a224461b1",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d7-generated-1102/run.json",
+      "originalBytes": 3139,
+      "originalSha256": "adf4331f8f7210e08aa7482a1232b7fda97bdf1c4f30f4b189682e2a224461b1"
+    },
+    {
+      "archivePath": "runs/d7-generated/stderr.log",
+      "archiveBytes": 187,
+      "archiveSha256": "ecff5c1022bd6b6e3d81d667bbed309d98a0d8174b759fc37abb49c8d6e3854f",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d7-generated-1102/stderr.log",
+      "originalBytes": 187,
+      "originalSha256": "ecff5c1022bd6b6e3d81d667bbed309d98a0d8174b759fc37abb49c8d6e3854f"
+    },
+    {
+      "archivePath": "runs/d7-generated/stdout.log",
+      "archiveBytes": 35007,
+      "archiveSha256": "501b16e5fb0730903be78fbcb704c0758c6ba2d19409cd9b5c8c8fcedc21cf5b",
+      "originalPath": "/private/tmp/bird-landcoverage-v2-d7-generated-1102/stdout.log",
+      "originalBytes": 35007,
+      "originalSha256": "501b16e5fb0730903be78fbcb704c0758c6ba2d19409cd9b5c8c8fcedc21cf5b"
+    },
+    {
+      "archivePath": "stdout-records.json",
+      "archiveBytes": 1633,
+      "archiveSha256": "b0c031680fec68b8fc9edb81b774f7578e5be03bf2d94b75febd6cde4cb94189",
+      "origin": "offline-generated archive metadata/summary/audit, not measured game runtime"
+    }
+  ],
+  "indexedFiles": 44,
+  "indexedBytes": 770485
+}

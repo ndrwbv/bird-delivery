@@ -1,0 +1,212 @@
+[
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d3-cache-1102/raw.json",
+    "archivePath": "runs/d3-cache/raw.json",
+    "bytes": 40638,
+    "sha256": "5f6b4387389fbc7302bc664bb2eb6f6b684f612699c1b0bae6a0ec7d34334af6"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d3-cache-1102/run.json",
+    "archivePath": "runs/d3-cache/run.json",
+    "bytes": 3911,
+    "sha256": "2ef404cc9174e0c4acb5d76cacab03c2da4f83187488385ee159ff1cfb3e08e5"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d3-cache-1102/stderr.log",
+    "archivePath": "runs/d3-cache/stderr.log",
+    "bytes": 187,
+    "sha256": "bbf0687c11c3461581320bf4fda23c76ec879a1c8a801f7cb89245c93706ce34"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d3-cache-1102/stdout.log",
+    "archivePath": "runs/d3-cache/stdout.log",
+    "bytes": 40067,
+    "sha256": "4a0b15e495a73c2b5fdaf16136b8f157e96a02909c2133b07e19c1f45e7b08ba"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-final-1102/district3-high-1-fixture.json",
+    "archivePath": "runs/d3-cache/fixture.json",
+    "bytes": 301,
+    "sha256": "11a7b7b4df9fd1d30cf3c37d6676cf6f0ae70e95eba1649f74de34837eb20991"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d3-generated-1102/raw.json",
+    "archivePath": "runs/d3-generated/raw.json",
+    "bytes": 35629,
+    "sha256": "c862f101efc072917938d02bf67263d72b00b470ba56f55d762bb9eab4ac8622"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d3-generated-1102/run.json",
+    "archivePath": "runs/d3-generated/run.json",
+    "bytes": 3139,
+    "sha256": "91bb1322227ec631a39f5179fc1f26d1c204dd134bca8d75a77df034a2ac7c38"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d3-generated-1102/stderr.log",
+    "archivePath": "runs/d3-generated/stderr.log",
+    "bytes": 187,
+    "sha256": "0b31b9aa48a7f618b07902738693ef0491a86e9549d5f5a81f2d0219de6188cd"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d3-generated-1102/stdout.log",
+    "archivePath": "runs/d3-generated/stdout.log",
+    "bytes": 35057,
+    "sha256": "4de6da51209a0e4f447c84325f0cd5d75c349fe6bab855fb7d9b22f0d79d6dbf"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-final-1102/district3-high-1-fixture.json",
+    "archivePath": "runs/d3-generated/fixture.json",
+    "bytes": 301,
+    "sha256": "11a7b7b4df9fd1d30cf3c37d6676cf6f0ae70e95eba1649f74de34837eb20991"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d7-cache-1102/raw.json",
+    "archivePath": "runs/d7-cache/raw.json",
+    "bytes": 40904,
+    "sha256": "09cc77c72a02f9cb365087655595ec6e67859629b752ec3bd15ac3056ca7e90e"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d7-cache-1102/run.json",
+    "archivePath": "runs/d7-cache/run.json",
+    "bytes": 3912,
+    "sha256": "e27198ec400e351d4d7eb435eb2fd89ff1527f03ff95e68ed15a0d5cca054515"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d7-cache-1102/stderr.log",
+    "archivePath": "runs/d7-cache/stderr.log",
+    "bytes": 187,
+    "sha256": "2d2ce1ec2fd1fdac431151c236e793715cfca758c92344e2554311244a27f5e5"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d7-cache-1102/stdout.log",
+    "archivePath": "runs/d7-cache/stdout.log",
+    "bytes": 40333,
+    "sha256": "be417ae431120d8df10b9403761b1c147abe20ecab16afadc440efa37b2616ab"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-final-1102/district7-high-1-fixture.json",
+    "archivePath": "runs/d7-cache/fixture.json",
+    "bytes": 301,
+    "sha256": "713bf74b0eae7360219557e7995f3299db5cdc519429ec456570428d6fbdcb00"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d7-generated-1102/raw.json",
+    "archivePath": "runs/d7-generated/raw.json",
+    "bytes": 35579,
+    "sha256": "0cbc1a3c8c101efe585242522820abd89d9bba598991a700f2b6339115003473"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d7-generated-1102/run.json",
+    "archivePath": "runs/d7-generated/run.json",
+    "bytes": 3139,
+    "sha256": "adf4331f8f7210e08aa7482a1232b7fda97bdf1c4f30f4b189682e2a224461b1"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d7-generated-1102/stderr.log",
+    "archivePath": "runs/d7-generated/stderr.log",
+    "bytes": 187,
+    "sha256": "ecff5c1022bd6b6e3d81d667bbed309d98a0d8174b759fc37abb49c8d6e3854f"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d7-generated-1102/stdout.log",
+    "archivePath": "runs/d7-generated/stdout.log",
+    "bytes": 35007,
+    "sha256": "501b16e5fb0730903be78fbcb704c0758c6ba2d19409cd9b5c8c8fcedc21cf5b"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-final-1102/district7-high-1-fixture.json",
+    "archivePath": "runs/d7-generated/fixture.json",
+    "bytes": 301,
+    "sha256": "713bf74b0eae7360219557e7995f3299db5cdc519429ec456570428d6fbdcb00"
+  },
+  {
+    "originalPath": "/tmp/bird-landcoverage-v2-final-1102/production-build.stdout.log",
+    "archivePath": "provenance/production-build.stdout.log",
+    "bytes": 8138,
+    "sha256": "f4646d1d3084034b8f9e0b9298ddcb315f2d54bd0c9eb779138c92863e744838"
+  },
+  {
+    "originalPath": "/tmp/bird-landcoverage-v2-final-1102/production-build.stderr.log",
+    "archivePath": "provenance/production-build.stderr.log",
+    "bytes": 1497,
+    "sha256": "43d817da84c8943f76d6482fcd87025671f720e77e105724d6349d9807517f58"
+  },
+  {
+    "originalPath": "/tmp/bird-landcoverage-v2-final-1102/export-receipt.json",
+    "archivePath": "provenance/preparation-source-receipt.json",
+    "bytes": 94516,
+    "sha256": "59efa52afb2a5467e414033808369200ad75543540fd6c72063eac9671c10f42"
+  },
+  {
+    "originalPath": "/tmp/bird-landcoverage-v2-admission-copy-1102.py",
+    "archivePath": "harness/archive-cases.py",
+    "bytes": 1605,
+    "sha256": "100d957ee5beea16efa3d90e434965d2bd9accabc7566ee9381893b10e5c16a4"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d0-mid-cache-1102/raw.json",
+    "archivePath": "runs/d0-mid-cache/raw.json",
+    "bytes": 40757,
+    "sha256": "dadf13e084046527f9bb6e8bd83032179bca8efbf5d4cbe35534b570bdf335b7"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d0-mid-cache-1102/run.json",
+    "archivePath": "runs/d0-mid-cache/run.json",
+    "bytes": 3910,
+    "sha256": "4737a48a331cb7983646d80058b9ed1cf1a1102a4df97658e80432e112cc90ea"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d0-mid-cache-1102/stderr.log",
+    "archivePath": "runs/d0-mid-cache/stderr.log",
+    "bytes": 187,
+    "sha256": "9257bf4a8900fc9b0368e4bda48a4d74674f532a6c0ed7006ebe67715f182bae"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d0-mid-cache-1102/stdout.log",
+    "archivePath": "runs/d0-mid-cache/stdout.log",
+    "bytes": 40186,
+    "sha256": "77a5696252965a4502842327ee0cf8fea520701c6d83ed920c146c4d58ee2a61"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d0-mid-cache-1102/fixture.json",
+    "archivePath": "runs/d0-mid-cache/fixture.json",
+    "bytes": 35,
+    "sha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d0-high-cache-1102/raw.json",
+    "archivePath": "runs/d0-high-cache/raw.json",
+    "bytes": 40453,
+    "sha256": "2dde7b4a8db7053949cfc3ea5fc9fb1098a3de52bb31970154bebfb355f72461"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d0-high-cache-1102/run.json",
+    "archivePath": "runs/d0-high-cache/run.json",
+    "bytes": 3904,
+    "sha256": "5f03e9c328c49c1d10545fadc05fbc3f969a36327fc6ca3f109e5be60b6ebbf0"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d0-high-cache-1102/stderr.log",
+    "archivePath": "runs/d0-high-cache/stderr.log",
+    "bytes": 187,
+    "sha256": "88b9e6261a36688b4f6dfd56f5ff447969b41e9aff5c99a731dd1239fc53bdb5"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d0-high-cache-1102/stdout.log",
+    "archivePath": "runs/d0-high-cache/stdout.log",
+    "bytes": 39882,
+    "sha256": "c0b1b03b034ce2f5ef82258d7b5767546f30b40d1985bbc224188cafc71e4694"
+  },
+  {
+    "originalPath": "/private/tmp/bird-landcoverage-v2-d0-high-cache-1102/fixture.json",
+    "archivePath": "runs/d0-high-cache/fixture.json",
+    "bytes": 74,
+    "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+  },
+  {
+    "originalPath": "/tmp/bird-landcoverage-v2-final-1102/post-admission-pins.json",
+    "archivePath": "provenance/post-admission-pins.json",
+    "bytes": 99404,
+    "sha256": "6df7f87965b96ea4a32b916178a7ce56d107a28875e5d8c9bc5b266f40dee617"
+  }
+]

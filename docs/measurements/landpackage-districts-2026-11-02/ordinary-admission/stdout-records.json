@@ -1,0 +1,50 @@
+[
+  {
+    "label": "d3-cache",
+    "originalPath": "/tmp/bird-landcoverage-v2-d3-cache-1102/stdout.log",
+    "bytes": 40067,
+    "sha256": "4a0b15e495a73c2b5fdaf16136b8f157e96a02909c2133b07e19c1f45e7b08ba",
+    "physicallyCopied": true,
+    "deduplicated": false
+  },
+  {
+    "label": "d3-generated",
+    "originalPath": "/tmp/bird-landcoverage-v2-d3-generated-1102/stdout.log",
+    "bytes": 35057,
+    "sha256": "4de6da51209a0e4f447c84325f0cd5d75c349fe6bab855fb7d9b22f0d79d6dbf",
+    "physicallyCopied": true,
+    "deduplicated": false
+  },
+  {
+    "label": "d7-cache",
+    "originalPath": "/tmp/bird-landcoverage-v2-d7-cache-1102/stdout.log",
+    "bytes": 40333,
+    "sha256": "be417ae431120d8df10b9403761b1c147abe20ecab16afadc440efa37b2616ab",
+    "physicallyCopied": true,
+    "deduplicated": false
+  },
+  {
+    "label": "d7-generated",
+    "originalPath": "/tmp/bird-landcoverage-v2-d7-generated-1102/stdout.log",
+    "bytes": 35007,
+    "sha256": "501b16e5fb0730903be78fbcb704c0758c6ba2d19409cd9b5c8c8fcedc21cf5b",
+    "physicallyCopied": true,
+    "deduplicated": false
+  },
+  {
+    "label": "d0-mid-cache",
+    "originalPath": "/tmp/bird-landcoverage-v2-d0-mid-cache-1102/stdout.log",
+    "bytes": 40186,
+    "sha256": "77a5696252965a4502842327ee0cf8fea520701c6d83ed920c146c4d58ee2a61",
+    "physicallyCopied": true,
+    "deduplicated": false
+  },
+  {
+    "label": "d0-high-cache",
+    "originalPath": "/tmp/bird-landcoverage-v2-d0-high-cache-1102/stdout.log",
+    "bytes": 39882,
+    "sha256": "c0b1b03b034ce2f5ef82258d7b5767546f30b40d1985bbc224188cafc71e4694",
+    "physicallyCopied": true,
+    "deduplicated": false
+  }
+]

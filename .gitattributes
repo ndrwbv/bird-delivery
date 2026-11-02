@@ -16,6 +16,7 @@ package.json text eol=lf
 package-lock.json text eol=lf
 tools/land-package-*.mjs text eol=lf
 tools/land-package-*.cjs text eol=lf
+tools/probe-checks/land-package-district-export.js text eol=lf
 # Unified patch context includes a mandatory space on empty context lines.
 docs/measurements/**/*.patch -whitespace
 docs/measurements/**/*.diff -whitespace

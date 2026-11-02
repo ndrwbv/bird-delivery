@@ -1,0 +1,86 @@
+[
+  {
+    "originalPath": "/tmp/bird-release41366554426-proofs/linux/land-package-asar.json",
+    "archivePath": "linux/land-package-asar.json",
+    "bytes": 541,
+    "sha256": "79926e5a3d4acd99dcf3ad8461667d87f8f77cc0b819012db5adc8891a58fa04"
+  },
+  {
+    "originalPath": "/tmp/bird-release41366554426-proofs/linux/land-package-runtime/fixture.json",
+    "archivePath": "linux/land-package-runtime/fixture.json",
+    "bytes": 74,
+    "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+  },
+  {
+    "originalPath": "/tmp/bird-release41366554426-proofs/linux/land-package-runtime/raw.json",
+    "archivePath": "linux/land-package-runtime/raw.json",
+    "bytes": 40028,
+    "sha256": "6fcd2c4353fb2e2a962a44b41a56f59eb63459e6676298fd51d70f03ac82402d"
+  },
+  {
+    "originalPath": "/tmp/bird-release41366554426-proofs/linux/land-package-runtime/run.json",
+    "archivePath": "linux/land-package-runtime/run.json",
+    "bytes": 3671,
+    "sha256": "6fb6909f1ee04c014b760e59ebee06dc6b623d0fd180c3f9f57db2bcf63a3a38"
+  },
+  {
+    "originalPath": "/tmp/bird-release41366554426-proofs/linux/land-package-runtime/stderr.log",
+    "archivePath": "linux/land-package-runtime/stderr.log",
+    "bytes": 1286,
+    "sha256": "d219d706dbd5edcbdccecdfa85cdc8bb3702cbfd2354e165aa00ad34617e8d75"
+  },
+  {
+    "originalPath": "/tmp/bird-release41366554426-proofs/linux/land-package-runtime/stdout.log",
+    "archivePath": "linux/land-package-runtime/stdout.log",
+    "bytes": 39066,
+    "sha256": "8c8477051a7b18c3f5b32861e31ca62ebd5da11a10f4c367715704a5677915fc"
+  },
+  {
+    "originalPath": "/tmp/bird-release41366554426-proofs/windows/land-package-asar.json",
+    "archivePath": "windows/land-package-asar.json",
+    "bytes": 533,
+    "sha256": "8a7b16060504fd06666624760c07263eb177f9aeefcd02e31b914f4beb205987"
+  },
+  {
+    "originalPath": "/tmp/bird-release41366554426-proofs/windows/land-package-runtime/fixture.json",
+    "archivePath": "windows/land-package-runtime/fixture.json",
+    "bytes": 74,
+    "sha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520"
+  },
+  {
+    "originalPath": "/tmp/bird-release41366554426-proofs/windows/land-package-runtime/raw.json",
+    "archivePath": "windows/land-package-runtime/raw.json",
+    "bytes": 40104,
+    "sha256": "6ba1940320e41ed327f260fb52f8975c5d9437d12e104f8be8d37a1b14f0b7fd"
+  },
+  {
+    "originalPath": "/tmp/bird-release41366554426-proofs/windows/land-package-runtime/run.json",
+    "archivePath": "windows/land-package-runtime/run.json",
+    "bytes": 3550,
+    "sha256": "66145d9fd30be71d36f0895dec174dc86b9a5b482bb5eb8a3fec0d65ac62fd9f"
+  },
+  {
+    "originalPath": "/tmp/bird-release41366554426-proofs/windows/land-package-runtime/stderr.log",
+    "archivePath": "windows/land-package-runtime/stderr.log",
+    "bytes": 304,
+    "sha256": "d8c5cc7e4929920d0f9db7dea5155b27b8e531e72320daee05c628af1b080705"
+  },
+  {
+    "originalPath": "/tmp/bird-release41366554426-proofs/windows/land-package-runtime/stdout.log",
+    "archivePath": "windows/land-package-runtime/stdout.log",
+    "bytes": 39148,
+    "sha256": "dcbd54628d95db9add0fc406140e537c4de5eb502201dfe23816bf1447ed3392"
+  },
+  {
+    "originalPath": "/tmp/bird-release41366554426-success.json",
+    "archivePath": "github/workflow-success.json",
+    "bytes": 13788,
+    "sha256": "fe4f8369c6c67aeb2d08ead310acde09ca6797e344db7b3e4cc2178f75fe6617"
+  },
+  {
+    "originalPath": "/tmp/bird-release-v03310-success.json",
+    "archivePath": "github/release-success.json",
+    "bytes": 7895,
+    "sha256": "a288c15256046db06178e4043c8fad39eb4bf41a8f6f6540b953e230ba9028b5"
+  }
+]

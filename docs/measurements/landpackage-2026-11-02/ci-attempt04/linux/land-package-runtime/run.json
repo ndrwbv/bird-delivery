@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "variant": "cache",
+  "preset": "high",
+  "phase": "cold",
+  "cpu": 1,
+  "schedule": {
+    "mode": "settled",
+    "early": false,
+    "bootWaitSec": 1200,
+    "controlWaitMs": 420000,
+    "probeTimeoutSec": 1740,
+    "hardTimeoutMs": 1800000,
+    "movementWaitMs": 30000
+  },
+  "argv": [
+    "/home/runner/work/bird-delivery/bird-delivery/node_modules/electron/dist/electron",
+    "/home/runner/work/bird-delivery/bird-delivery/tools/probe.cjs",
+    "--no-sandbox",
+    "--disable-gpu-sandbox",
+    "--mode=steam",
+    "--dir=/home/runner/work/bird-delivery/bird-delivery/release/linux-unpacked/resources/app.asar/dist/steam",
+    "--startup-trace",
+    "--startup-session=lp17b-bd62ba71-fc1f-4033-b7fb-8cfae481a111",
+    "--startup-cold",
+    "--startup-fixture=/home/runner/work/_temp/land-package-runtime/fixture.json",
+    "--fresh",
+    "--startup-admission=settled",
+    "--size=deck",
+    "--cpu=1",
+    "--bootcpu",
+    "--init-script=/home/runner/work/bird-delivery/bird-delivery/tools/probe-checks/startup-bootstrap-observe.js",
+    "--q=gfxdev=deck&mute&startupdistrict=0",
+    "--eval=/home/runner/work/bird-delivery/bird-delivery/tools/probe-checks/startup-ready.js",
+    "--bootwait=1200",
+    "--timeout=1740",
+    "--max=0",
+    "--errors",
+    "--report=/home/runner/work/_temp/land-package-runtime/raw.json"
+  ],
+  "startedAt": "2026-11-02T00:28:08.886Z",
+  "fixtureFile": "/home/runner/work/_temp/land-package-runtime/fixture.json",
+  "fixtureSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+  "catalogFile": "/home/runner/work/bird-delivery/bird-delivery/dist/steam/city-data/catalog.json",
+  "catalogSha256": "f8a181903273368d7fcf96598061886cbdae3ec0e0f481ef5d21e3a6fd917f04",
+  "processStatus": 0,
+  "signal": null,
+  "probe": {
+    "file": "tools/probe.cjs",
+    "sha256": "aa617565b1a4f4320d7bc5240d2a707f90c36f552d186eba9bdb3165910cabe7"
+  },
+  "eval": {
+    "file": "tools/probe-checks/startup-ready.js",
+    "sha256": "6936e604198b5f3b59865181a1df646645ee42c07e11ff809c2d8230b015bd52"
+  },
+  "observer": {
+    "file": "tools/probe-checks/startup-bootstrap-observe.js",
+    "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+  },
+  "gate": {
+    "file": "tools/startup-report.mjs",
+    "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+  },
+  "admission": {
+    "file": "tools/land-package-smoke.mjs",
+    "sha256": "795a1f38686c19fbab2dd487535e4cb95aa71c34852616c23ac344f1799705df"
+  },
+  "admissionSettings": {
+    "file": "tools/startup-admission.cjs",
+    "sha256": "fec1148600e1ff8f58f643541592121095c717390b09cb57014a88d64e6e0e33"
+  },
+  "pid": 2611,
+  "finishedAt": "2026-11-02T00:32:27.027Z",
+  "rawSha256": "6fcd2c4353fb2e2a962a44b41a56f59eb63459e6676298fd51d70f03ac82402d",
+  "startupValidation": {
+    "ok": true,
+    "reasons": []
+  },
+  "ok": true,
+  "controlMs": 246040.30000000002,
+  "fromClickMs": 53461.80000000005,
+  "moved": 0.16326654360358986,
+  "cache": {
+    "version": 1,
+    "source": "cache",
+    "phase": "restored",
+    "hit": true,
+    "fatal": false,
+    "reason": null,
+    "cleaned": true,
+    "bufferHeld": false,
+    "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+    "wireSha256": "965ebbc0994bfe82e2943d1ee3f733a4cc8a273d4100adda8f0f0d649c32f9a4",
+    "expectedWireSha256": "965ebbc0994bfe82e2943d1ee3f733a4cc8a273d4100adda8f0f0d649c32f9a4",
+    "rawSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+    "expectedRawSha256": "13b2851eaeb32e49d3f2865448a87b191ec6ef3839d747a597365e2e689aa89c",
+    "bytes": 34231591,
+    "encoding": "gzip"
+  }
+}

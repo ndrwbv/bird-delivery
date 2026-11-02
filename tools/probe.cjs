@@ -36,6 +36,7 @@
    --cpu=N                  процессор медленнее в N раз (после загрузки, как perf.cjs --deck; Дека ≈ 3)
    --early                  не ждать, пока город достроится за меню (latebuild.js): скрипт — сразу с первым кадром меню
    --bootcpu                --cpu уже с начала загрузки (замер запуска на «Деке»: window.__boot — мс от старта страницы)
+   --land-package-district=0|3|7  ожидаемый реальный район экспорта (0); только вместе с --land-package-export
    --seed=N                 Math.random с зерном — город одинаковый от запуска к запуску (сравнить до/после)
    --cpuprofile=f.cpuprofile  профиль процессора загрузки (до меню) — для разбора, что долго строится
    --runprofile=f.cpuprofile  профиль процессора, пока идёт скрипт; --allocprofile=f.heapprofile — выборка
@@ -146,6 +147,8 @@ app.whenReady().then(async () => {
   const tBuild = Date.now() - T0;
   const DIST = b.dir;
 
+  // Expected district is admission only; it does not configure the renderer/world.
+  const landPackageExpectedDistrict=require('./land-package-export-host.cjs').expectedDistrictFromArgs(argv);
   // Ordinary package export forbids every pre-page random/seed override. Receipt injection is host-owned.
   if(arg('land-package-export')){
     if(MODE!=='steam'||!STARTUP_BENCH||!arg('land-package-manifest')||arg('seed',null)!==null||INIT_SCRIPT!==null||MEM||arg('cpuprofile')||arg('runprofile')||arg('allocprofile'))throw Error('land-package17b:ORDINARY_EXPORT_SETUP');
@@ -484,7 +487,7 @@ app.whenReady().then(async () => {
   if(arg('land-package-export')){
     const exported=await require('./land-package-export-host.cjs').exportWithDiagnostics({js,priorEvalErr:evalErr,uncaught,errors,
       allowed:MODE==='steam'&&STARTUP_BENCH&&arg('seed',null)===null&&!MEM&&!RUNP&&!ALLOCP,
-      args:{file:arg('land-package-export'),manifestFile:arg('land-package-manifest'),dist:DIST,repo:path.resolve(__dirname,'..')}});
+      args:{file:arg('land-package-export'),manifestFile:arg('land-package-manifest'),dist:DIST,repo:path.resolve(__dirname,'..'),expectedDistrict:landPackageExpectedDistrict}});
     ({landPackageExport,landPackageExportError,landPackageExportDiagnostics}=exported);evalErr=exported.evalErr;
   }
   if (finished) return;

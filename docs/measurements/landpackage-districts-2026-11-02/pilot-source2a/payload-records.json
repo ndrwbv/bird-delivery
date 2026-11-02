@@ -1,0 +1,42 @@
+[
+  {
+    "name": "district3-1",
+    "externalPath": "/private/tmp/bird-landdistrict17b-1102/district3-1.land",
+    "bytes": 74952828,
+    "sha256": "5c9de2b05148a3703d6e5967061300a57a3c84d9838211afd74c87e747aad668",
+    "actuallyStreamed": true,
+    "archived": false
+  },
+  {
+    "name": "district7-1",
+    "externalPath": "/private/tmp/bird-landdistrict17b-1102/district7-1.land",
+    "bytes": 74952828,
+    "sha256": "5c9de2b05148a3703d6e5967061300a57a3c84d9838211afd74c87e747aad668",
+    "actuallyStreamed": true,
+    "archived": false
+  },
+  {
+    "name": "district3-2",
+    "externalPath": "/private/tmp/bird-landdistrict17b-1102/district3-2.land",
+    "bytes": 74952828,
+    "sha256": "5c9de2b05148a3703d6e5967061300a57a3c84d9838211afd74c87e747aad668",
+    "actuallyStreamed": true,
+    "archived": false
+  },
+  {
+    "name": "district7-2",
+    "externalPath": "/private/tmp/bird-landdistrict17b-1102/district7-2.land",
+    "bytes": 74952828,
+    "sha256": "5c9de2b05148a3703d6e5967061300a57a3c84d9838211afd74c87e747aad668",
+    "actuallyStreamed": true,
+    "archived": false
+  },
+  {
+    "name": "district0-control",
+    "externalPath": "/private/tmp/bird-landdistrict17b-1102/district0-control.land",
+    "bytes": 74952828,
+    "sha256": "5c9de2b05148a3703d6e5967061300a57a3c84d9838211afd74c87e747aad668",
+    "actuallyStreamed": true,
+    "archived": false
+  }
+]

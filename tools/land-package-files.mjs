@@ -8,6 +8,8 @@ import {makeSourceKey} from './land-package-source-key.mjs';
 import {limitsOf} from '../src/game/landcache17a/checkpoint-limits.js';
 
 export const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
+// Code only: no output/catalog/build-tree digest participates in source identity.
+export const PREPARATION_HELPERS=Object.freeze(['tools/land-package-files.mjs','tools/land-package-source-key.mjs','tools/land-package-build.mjs','tools/land-package-prepare.mjs','tools/probe-checks/land-package-district-export.js']);
 const slash=value=>value.split(path.sep).join('/');
 const textFile=file=>/\.(?:[cm]?js|json|css|svg|txt|glsl|vert|frag|html|md)$/.test(file);
 function tree(root,dir=root){
@@ -40,7 +42,7 @@ export function captureSource(repo){
   version:JSON.parse(fs.readFileSync(clipperPackage,'utf8')).version,
   sha256:sha256(fs.readFileSync(clipper)),packageSha256:sha256(fs.readFileSync(clipperPackage))
  }}};
- buildConfig.preparationHelpers=Object.fromEntries(['tools/land-package-files.mjs','tools/land-package-source-key.mjs','tools/land-package-build.mjs'].map(file=>[file,sha256(fs.readFileSync(path.join(repo,file)))]));
+ buildConfig.preparationHelpers=Object.fromEntries(PREPARATION_HELPERS.map(file=>[file,sha256(fs.readFileSync(path.join(repo,file)))]));
  const files=tree(repo,path.join(repo,'src'));
  files.push({path:'vite.config.js',bytes:fs.readFileSync(path.join(repo,'vite.config.js'))});
  files.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);

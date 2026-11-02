@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import {createHash,webcrypto} from 'node:crypto';
 import {gzipSync} from 'node:zlib';
 import {createLandPackageReader} from '../src/game/landdata/land-package-reader.js';
-import {createCatalog} from '../src/game/landdata/land-package-catalog.js';
+import {createCatalog,PRODUCT_LAND_COVERAGE} from '../src/game/landdata/land-package-catalog.js';
 import {makeIdentity,RNG_PROVIDER,BASE_SEED} from '../src/game/landdata/land-package-key.js';
 import {precleanHash} from '../src/game/landcache17a/preclean.js';
 import {captureResult,encodeCheckpoint,restoreResult} from '../src/game/landcache17a/checkpoint-codec.js';
@@ -64,6 +64,27 @@ for(const encoding of ['identity','gzip']){
 {
  const names=[],counts=[],s=setup({work:(n,fn)=>{names.push(n);return fn();},count:(...v)=>counts.push(v)},s=>s.ctx.runtime={...runtime,district:7});
  const run=await launch(s);await finish(s,run,false);assert.equal(s.reader.meta().reason,'unsupported-district');assert.equal(s.calls.fetch,0);assert.deepEqual(names,[]);assert.deepEqual(counts,[['raisedland.cleanCalls',0]]);
+}
+const productCatalog=(entries=[entry()],rows=PRODUCT_LAND_COVERAGE.map(slot=>({...slot,precleanHash:identity.precleanHash})))=>createCatalog(manifest,entries,{coverage:rows});
+for(const slot of PRODUCT_LAND_COVERAGE){
+ const counts=[],s=setup({catalog:productCatalog(),count:(...v)=>counts.push(v)},s=>s.ctx.runtime={...runtime,...slot});
+ const run=await launch(s);await finish(s,run,true);assert.equal(s.calls.fetch,1);assert.equal(s.reader.meta().precleanHash,identity.precleanHash);assert.deepEqual(counts,[['raisedland.cleanCalls',0]]);
+ assert.deepEqual(encodeCheckpoint(run.installedSnapshot,identity),wire);
+}
+for(const slot of [{district:3,graphics:'mid'},{district:7,graphics:'mid'},{district:1,graphics:'high'},{district:2,graphics:'high'},{district:4,graphics:'high'},{district:5,graphics:'high'},{district:6,graphics:'high'},{district:8,graphics:'high'},{district:0,graphics:'low'}]){
+ const names=[],counts=[],s=setup({catalog:productCatalog(),work:(n,fn)=>{names.push(n);return fn();},count:(...v)=>counts.push(v)},s=>s.ctx.runtime={...runtime,...slot});
+ const run=await launch(s);await finish(s,run,false);assert.equal(s.calls.fetch,0);assert.deepEqual(names,[]);assert.deepEqual(counts,[['raisedland.cleanCalls',0]]);assert.equal(s.reader.meta().precleanHash,null);
+ if(slot.graphics!=='low')assert.equal(s.reader.meta().reason,'unsupported-coverage');
+}
+{
+ // A matching unrelated entry must never bypass the selected slot's exact fingerprint.
+ const other=entry(wire,{precleanHash:'0'.repeat(64)}),rows=PRODUCT_LAND_COVERAGE.map(slot=>({...slot,precleanHash:slot.district===3?other.precleanHash:identity.precleanHash}));
+ const s=setup({catalog:productCatalog([entry(),other],rows)},s=>s.ctx.runtime={...runtime,district:3,graphics:'high'});
+ const run=await launch(s);await finish(s,run,false);assert.equal(s.reader.meta().reason,'coverage-input-mismatch');assert.equal(s.reader.meta().precleanHash,identity.precleanHash);assert.equal(s.calls.fetch,0);
+}
+{
+ const names=[],c=productCatalog();c.coverage[0].precleanHash='0'.repeat(64);
+ const s=setup({catalog:c,work:(n,fn)=>{names.push(n);return fn();}}),run=await launch(s);await finish(s,run,false);assert.equal(s.calls.fetch,0);assert.deepEqual(names,[]);
 }
 for(const opts of [{assetBase:'app://birdpizza/'},{trustedLimits:undefined},{catalog:null},{query:'?nolate'}]){
  const s=setup(opts),run=await launch(s);await finish(s,run,false);assert.equal(s.calls.fetch,0);

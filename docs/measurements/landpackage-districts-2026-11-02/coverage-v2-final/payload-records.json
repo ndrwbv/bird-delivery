@@ -1,0 +1,75 @@
+{
+  "rawCases": [
+    {
+      "label": "mid-1",
+      "externalPath": "/private/tmp/bird-landcoverage-v2-final-1102/mid-1.land",
+      "bytes": 74952828,
+      "sha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "actuallyStreamed": true,
+      "archived": false
+    },
+    {
+      "label": "mid-2",
+      "externalPath": "/private/tmp/bird-landcoverage-v2-final-1102/mid-2.land",
+      "bytes": 74952828,
+      "sha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "actuallyStreamed": true,
+      "archived": false
+    },
+    {
+      "label": "high-1",
+      "externalPath": "/private/tmp/bird-landcoverage-v2-final-1102/high-1.land",
+      "bytes": 74952828,
+      "sha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "actuallyStreamed": true,
+      "archived": false
+    },
+    {
+      "label": "high-2",
+      "externalPath": "/private/tmp/bird-landcoverage-v2-final-1102/high-2.land",
+      "bytes": 74952828,
+      "sha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "actuallyStreamed": true,
+      "archived": false
+    },
+    {
+      "label": "district3-high-1",
+      "externalPath": "/private/tmp/bird-landcoverage-v2-final-1102/district3-high-1.land",
+      "bytes": 74952828,
+      "sha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "actuallyStreamed": true,
+      "archived": false
+    },
+    {
+      "label": "district3-high-2",
+      "externalPath": "/private/tmp/bird-landcoverage-v2-final-1102/district3-high-2.land",
+      "bytes": 74952828,
+      "sha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "actuallyStreamed": true,
+      "archived": false
+    },
+    {
+      "label": "district7-high-1",
+      "externalPath": "/private/tmp/bird-landcoverage-v2-final-1102/district7-high-1.land",
+      "bytes": 74952828,
+      "sha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "actuallyStreamed": true,
+      "archived": false
+    },
+    {
+      "label": "district7-high-2",
+      "externalPath": "/private/tmp/bird-landcoverage-v2-final-1102/district7-high-2.land",
+      "bytes": 74952828,
+      "sha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "actuallyStreamed": true,
+      "archived": false
+    }
+  ],
+  "gzip": {
+    "bytes": 34231572,
+    "sha256": "f6e2c6b18c6ec026bca34c910f0c142d0d4856cd9ee124a29421774a91fa5d41",
+    "externalPath": "/tmp/bird-landcoverage-v2-final-1102/package/city-data/f6e2c6b18c6ec026bca34c910f0c142d0d4856cd9ee124a29421774a91fa5d41.land.gz",
+    "hashEvidence": "exact preparation journal/catalog record; stat independently verified, content NOT reread/decompressed in this audit",
+    "archived": false
+  }
+}

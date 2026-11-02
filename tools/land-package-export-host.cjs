@@ -2,6 +2,17 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const need=(yes,code)=>{if(!yes)throw Error('land-package17b-export-host:'+code);};
 const message=e=>String(e?.message||e).slice(0,1200);
+// Admission target only: never injected into the renderer, saved progress or geometry identity.
+function expectedDistrictFromArgs(argv){
+ const prefix='--land-package-district=',options=argv.filter(a=>a==='--land-package-district'||a.startsWith(prefix));
+ need(options.length<=1,'EXPECTED_DISTRICT_CLI');
+ if(!options.length)return 0;
+ const outputs=argv.filter(a=>a==='--land-package-export'||a.startsWith('--land-package-export='));
+ need(outputs.length===1&&outputs[0].startsWith('--land-package-export=')&&outputs[0].length>'--land-package-export='.length,'EXPECTED_DISTRICT_REQUIRES_EXPORT');
+ need(options[0].startsWith(prefix)&&/^(0|3|7)$/.test(options[0].slice(prefix.length)),'EXPECTED_DISTRICT_CLI');
+ return Number(options[0].slice(prefix.length));
+}
+exports.expectedDistrictFromArgs=expectedDistrictFromArgs;
 const inside=(root,file)=>{const rel=path.relative(root,file);return !rel||rel!=='..'&&!rel.startsWith('..'+path.sep)&&!path.isAbsolute(rel);};
 function outputPath(file,repo,dist){
  const final=path.resolve(file),roots=[fs.realpathSync(repo),fs.realpathSync(dist)];
@@ -19,7 +30,8 @@ function outputPath(file,repo,dist){
 // Dependency injection is for tiny transport contracts; production always uses the filesystem receipt verifier.
 exports.createLandPackageExportHost=({readExportReceipt}={})=>{
  const read=readExportReceipt||((file,options)=>import('./land-package-files.mjs').then(m=>m.readExportReceipt(file,options)));
- async function exportLandPackageResult({js,file,manifestFile,dist,repo}){
+ async function exportLandPackageResult({js,file,manifestFile,dist,repo,expectedDistrict=0}){
+  need([0,3,7].includes(expectedDistrict)&&!Object.is(expectedDistrict,-0),'EXPECTED_DISTRICT');
   const {canonical,checkReceipt,makeManifest,makeIdentity,isHash,assertOrdinaryEDL}=await import('../src/game/landdata/land-package-key.js');
   const {limitsOf}=await import('../src/game/landcache17a/checkpoint-limits.js');
   const receipt=await read(manifestFile,{repo,dist}),receiptText=canonical(receipt);
@@ -33,7 +45,8 @@ exports.createLandPackageExportHost=({readExportReceipt}={})=>{
   const manifest=makeManifest(receipt.base,meta.actualParams);
   need(canonical(manifest)===canonical(meta.manifest)&&canonical(makeIdentity(manifest,meta.identity?.precleanHash))===canonical(meta.identity),'IDENTITY');
   const c=meta.conditions;
-  need(c?.mapId===receipt.base.mapId&&c.mode==='steam'&&c.adult===true&&c.career===true&&c.intro===false&&c.editor===false&&c.streamed===true&&c.district===0&&c.quick===false&&['mid','high'].includes(c.graphics),'CONDITIONS');
+  need(c?.district===expectedDistrict,'DISTRICT_MISMATCH');
+  need(c?.mapId===receipt.base.mapId&&c.mode==='steam'&&c.adult===true&&c.career===true&&c.intro===false&&c.editor===false&&c.streamed===true&&[0,3,7].includes(c.district)&&c.quick===false&&['mid','high'].includes(c.graphics),'CONDITIONS');
   assertOrdinaryEDL(c.descriptor);
   need(Number.isSafeInteger(meta.bytes)&&meta.bytes>0&&meta.bytes<=limits.maxPayloadBytes+limits.maxHeaderBytes+20&&s.bytes===meta.bytes,'TRANSPORT_BUDGET');
   const final=outputPath(file,repo,dist),temporary=final+'.part-'+process.pid;
@@ -53,7 +66,7 @@ exports.createLandPackageExportHost=({readExportReceipt}={})=>{
    await js('window.__landPackage17bExport.release()');released=true;
    // Hard-link publication never replaces a previous package, even if another producer won the race.
    fs.linkSync(temporary,final);fs.unlinkSync(temporary);created=false;
-   return{path:final,bytes:meta.bytes,sha256:s.fileSha256,identity:meta.identity,manifest,receiptHash:receipt.receiptHash,acceptance:s,
+   return{path:final,bytes:meta.bytes,sha256:s.fileSha256,identity:meta.identity,manifest,receiptHash:receipt.receiptHash,acceptance:s,expectedDistrict,conditions:c,
     provenance:{sourceHash:receipt.base.sourceHash,buildHash:receipt.build.hash,buildDir:receipt.build.dir}};
   }catch(error){primary=error;throw error;}finally{
    const cleanup=[];

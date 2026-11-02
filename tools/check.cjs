@@ -115,6 +115,7 @@ const CHECKS = [
     ['land-package-export','экспорт земли обычным генератором без смены жребия','land-package-export-test.mjs'],
     ['land-package-export-host','передача результата и атомарный файл готовой земли','land-package-export-host-test.mjs'],
     ['land-package-build','целостность подготовленной земли в поставке','land-package-build-test.mjs'],
+    ['land-package-smoke-gate','проверенные районы и настоящий выбор пиццерии при входе','land-package-smoke-gate-test.mjs'],
     ['land-package-asar','фактические данные внутри пакета Electron','land-package-asar-test.mjs'],
     ['cull-stream','отсечение новых участков после запуска','cull-stream-test.mjs'],
     ['handover','вручение по этапам, отмена и сон Deck','handover-test.mjs'],

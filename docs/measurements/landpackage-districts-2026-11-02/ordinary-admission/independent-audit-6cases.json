@@ -1,0 +1,517 @@
+{
+  "version": 1,
+  "kind": "ordinary-coverage-v2-actual-admission-offline-audit",
+  "ok": true,
+  "cases": [
+    {
+      "label": "d0-high-cache",
+      "variant": "cache",
+      "district": 0,
+      "preset": "high",
+      "pid": 12705,
+      "processStatus": 0,
+      "signal": null,
+      "startedAt": "2026-11-02T01:07:05.219Z",
+      "finishedAt": "2026-11-02T01:08:11.608Z",
+      "rawReportSha256": "2dde7b4a8db7053949cfc3ea5fc9fb1098a3de52bb31970154bebfb355f72461",
+      "fixtureSha256": "adf519c68e2ce205f3af617fefd87e0400a215abfba1569d4ea7c5c2b4722520",
+      "catalogSha256": "562eea6bb6a116ae0b583c4d300b6c52a9863879623ff37bcf0d128d7e6a5192",
+      "sourceFingerprintFromCatalog": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+      "rawPayloadSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "wirePayloadSha256": "f6e2c6b18c6ec026bca34c910f0c142d0d4856cd9ee124a29421774a91fa5d41",
+      "cleanCalls": 0,
+      "cacheSource": "cache",
+      "guardVersion": 2,
+      "pickerClicks": 0,
+      "moved": 5.018805875901607,
+      "navToControlMs": 65377.5,
+      "clickToControlMs": 55810.200000047684,
+      "actualDistrict": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "pickerObservedAt": null,
+        "pickerClickedAt": null,
+        "dialogClicks": 0
+      },
+      "harnessPins": {
+        "probe": {
+          "file": "tools/probe.cjs",
+          "sha256": "f05e1c79f1a007f11290a3bad2dda758b643ca39a6ac2c71b971a5bfeb2edca8"
+        },
+        "eval": {
+          "file": "tools/probe-checks/startup-ready.js",
+          "sha256": "6936e604198b5f3b59865181a1df646645ee42c07e11ff809c2d8230b015bd52"
+        },
+        "observer": {
+          "file": "tools/probe-checks/startup-bootstrap-observe.js",
+          "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+        },
+        "gate": {
+          "file": "tools/startup-report.mjs",
+          "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+        },
+        "admission": {
+          "file": "tools/land-package-smoke.mjs",
+          "sha256": "9b4563ea5dbdb6c760d037a4afca689a72fdf1fa20093bf963e56fbf413ab4e7"
+        },
+        "admissionSettings": {
+          "file": "tools/startup-admission.cjs",
+          "sha256": "fec1148600e1ff8f58f643541592121095c717390b09cb57014a88d64e6e0e33"
+        },
+        "districtGate": {
+          "file": "tools/land-package-smoke-gate.mjs",
+          "sha256": "457c412d0c4628a3742a57351ea1faa5787398728eecb16ff9fb8596ab17b0a5"
+        }
+      }
+    },
+    {
+      "label": "d0-mid-cache",
+      "variant": "cache",
+      "district": 0,
+      "preset": "mid",
+      "pid": 12208,
+      "processStatus": 0,
+      "signal": null,
+      "startedAt": "2026-11-02T01:05:14.047Z",
+      "finishedAt": "2026-11-02T01:06:19.351Z",
+      "rawReportSha256": "dadf13e084046527f9bb6e8bd83032179bca8efbf5d4cbe35534b570bdf335b7",
+      "fixtureSha256": "1bcf54279314406355a1b1d3c11040eaec9c37864d658e4af430e2969f05eb00",
+      "catalogSha256": "562eea6bb6a116ae0b583c4d300b6c52a9863879623ff37bcf0d128d7e6a5192",
+      "sourceFingerprintFromCatalog": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+      "rawPayloadSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "wirePayloadSha256": "f6e2c6b18c6ec026bca34c910f0c142d0d4856cd9ee124a29421774a91fa5d41",
+      "cleanCalls": 0,
+      "cacheSource": "cache",
+      "guardVersion": 2,
+      "pickerClicks": 0,
+      "moved": 5.020099419623746,
+      "navToControlMs": 64328.699999809265,
+      "clickToControlMs": 54617.299999952316,
+      "actualDistrict": {
+        "before": {
+          "district": 0,
+          "opened": 1,
+          "city": false,
+          "partySeen": false
+        },
+        "actual": 0,
+        "atControl": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "position": {
+          "x": 3124.9371185058994,
+          "z": 2046.8247636833012
+        },
+        "pickerClicks": 0,
+        "pickerObservedAt": null,
+        "pickerClickedAt": null,
+        "dialogClicks": 0
+      },
+      "harnessPins": {
+        "probe": {
+          "file": "tools/probe.cjs",
+          "sha256": "f05e1c79f1a007f11290a3bad2dda758b643ca39a6ac2c71b971a5bfeb2edca8"
+        },
+        "eval": {
+          "file": "tools/probe-checks/startup-ready.js",
+          "sha256": "6936e604198b5f3b59865181a1df646645ee42c07e11ff809c2d8230b015bd52"
+        },
+        "observer": {
+          "file": "tools/probe-checks/startup-bootstrap-observe.js",
+          "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+        },
+        "gate": {
+          "file": "tools/startup-report.mjs",
+          "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+        },
+        "admission": {
+          "file": "tools/land-package-smoke.mjs",
+          "sha256": "9b4563ea5dbdb6c760d037a4afca689a72fdf1fa20093bf963e56fbf413ab4e7"
+        },
+        "admissionSettings": {
+          "file": "tools/startup-admission.cjs",
+          "sha256": "fec1148600e1ff8f58f643541592121095c717390b09cb57014a88d64e6e0e33"
+        },
+        "districtGate": {
+          "file": "tools/land-package-smoke-gate.mjs",
+          "sha256": "457c412d0c4628a3742a57351ea1faa5787398728eecb16ff9fb8596ab17b0a5"
+        }
+      }
+    },
+    {
+      "label": "d3-cache",
+      "variant": "cache",
+      "district": 3,
+      "preset": "high",
+      "pid": 10493,
+      "processStatus": 0,
+      "signal": null,
+      "startedAt": "2026-11-02T00:59:00.569Z",
+      "finishedAt": "2026-11-02T01:00:07.426Z",
+      "rawReportSha256": "5f6b4387389fbc7302bc664bb2eb6f6b684f612699c1b0bae6a0ec7d34334af6",
+      "fixtureSha256": "11a7b7b4df9fd1d30cf3c37d6676cf6f0ae70e95eba1649f74de34837eb20991",
+      "catalogSha256": "562eea6bb6a116ae0b583c4d300b6c52a9863879623ff37bcf0d128d7e6a5192",
+      "sourceFingerprintFromCatalog": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+      "rawPayloadSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "wirePayloadSha256": "f6e2c6b18c6ec026bca34c910f0c142d0d4856cd9ee124a29421774a91fa5d41",
+      "cleanCalls": 0,
+      "cacheSource": "cache",
+      "guardVersion": 2,
+      "pickerClicks": 1,
+      "moved": 4.9793790074981725,
+      "navToControlMs": 65849.90000009537,
+      "clickToControlMs": 56235.90000009537,
+      "actualDistrict": {
+        "before": {
+          "district": 3,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 3,
+        "atControl": 3,
+        "pizzaIndex": 3,
+        "pizza": {
+          "x": 995.3885106385183,
+          "z": -477.4078392869484,
+          "bx": 982.4553553693426,
+          "bz": -487.69772194636556
+        },
+        "position": {
+          "x": 980.190998153709,
+          "z": -469.3085730069659
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 64495.90000009537,
+        "pickerClickedAt": 64551,
+        "dialogClicks": 0
+      },
+      "harnessPins": {
+        "probe": {
+          "file": "tools/probe.cjs",
+          "sha256": "f05e1c79f1a007f11290a3bad2dda758b643ca39a6ac2c71b971a5bfeb2edca8"
+        },
+        "eval": {
+          "file": "tools/probe-checks/startup-ready.js",
+          "sha256": "6936e604198b5f3b59865181a1df646645ee42c07e11ff809c2d8230b015bd52"
+        },
+        "observer": {
+          "file": "tools/probe-checks/startup-bootstrap-observe.js",
+          "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+        },
+        "gate": {
+          "file": "tools/startup-report.mjs",
+          "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+        },
+        "admission": {
+          "file": "tools/land-package-smoke.mjs",
+          "sha256": "9b4563ea5dbdb6c760d037a4afca689a72fdf1fa20093bf963e56fbf413ab4e7"
+        },
+        "admissionSettings": {
+          "file": "tools/startup-admission.cjs",
+          "sha256": "fec1148600e1ff8f58f643541592121095c717390b09cb57014a88d64e6e0e33"
+        },
+        "districtGate": {
+          "file": "tools/land-package-smoke-gate.mjs",
+          "sha256": "457c412d0c4628a3742a57351ea1faa5787398728eecb16ff9fb8596ab17b0a5"
+        }
+      }
+    },
+    {
+      "label": "d3-generated",
+      "variant": "generated",
+      "district": 3,
+      "preset": "high",
+      "pid": 10848,
+      "processStatus": 0,
+      "signal": null,
+      "startedAt": "2026-11-02T01:00:33.014Z",
+      "finishedAt": "2026-11-02T01:01:55.328Z",
+      "rawReportSha256": "c862f101efc072917938d02bf67263d72b00b470ba56f55d762bb9eab4ac8622",
+      "fixtureSha256": "11a7b7b4df9fd1d30cf3c37d6676cf6f0ae70e95eba1649f74de34837eb20991",
+      "catalogSha256": "562eea6bb6a116ae0b583c4d300b6c52a9863879623ff37bcf0d128d7e6a5192",
+      "sourceFingerprintFromCatalog": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+      "rawPayloadSha256": null,
+      "wirePayloadSha256": null,
+      "cleanCalls": 1,
+      "cacheSource": "generated override",
+      "guardVersion": 2,
+      "pickerClicks": 1,
+      "moved": 4.979236055417443,
+      "navToControlMs": 81277.10000014305,
+      "clickToControlMs": 71479.79999995232,
+      "actualDistrict": {
+        "before": {
+          "district": 3,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 3,
+        "atControl": 3,
+        "pizzaIndex": 3,
+        "pizza": {
+          "x": 995.3885106385183,
+          "z": -477.4078392869484,
+          "bx": 982.4553553693426,
+          "bz": -487.69772194636556
+        },
+        "position": {
+          "x": 980.190998153709,
+          "z": -469.3085730069659
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 79959.20000004768,
+        "pickerClickedAt": 80014,
+        "dialogClicks": 0
+      },
+      "harnessPins": {
+        "probe": {
+          "file": "tools/probe.cjs",
+          "sha256": "f05e1c79f1a007f11290a3bad2dda758b643ca39a6ac2c71b971a5bfeb2edca8"
+        },
+        "eval": {
+          "file": "tools/probe-checks/startup-ready.js",
+          "sha256": "6936e604198b5f3b59865181a1df646645ee42c07e11ff809c2d8230b015bd52"
+        },
+        "observer": {
+          "file": "tools/probe-checks/startup-bootstrap-observe.js",
+          "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+        },
+        "gate": {
+          "file": "tools/startup-report.mjs",
+          "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+        },
+        "admission": {
+          "file": "tools/land-package-smoke.mjs",
+          "sha256": "9b4563ea5dbdb6c760d037a4afca689a72fdf1fa20093bf963e56fbf413ab4e7"
+        },
+        "admissionSettings": {
+          "file": "tools/startup-admission.cjs",
+          "sha256": "fec1148600e1ff8f58f643541592121095c717390b09cb57014a88d64e6e0e33"
+        },
+        "districtGate": {
+          "file": "tools/land-package-smoke-gate.mjs",
+          "sha256": "457c412d0c4628a3742a57351ea1faa5787398728eecb16ff9fb8596ab17b0a5"
+        }
+      }
+    },
+    {
+      "label": "d7-cache",
+      "variant": "cache",
+      "district": 7,
+      "preset": "high",
+      "pid": 11027,
+      "processStatus": 0,
+      "signal": null,
+      "startedAt": "2026-11-02T01:02:18.063Z",
+      "finishedAt": "2026-11-02T01:03:15.738Z",
+      "rawReportSha256": "09cc77c72a02f9cb365087655595ec6e67859629b752ec3bd15ac3056ca7e90e",
+      "fixtureSha256": "713bf74b0eae7360219557e7995f3299db5cdc519429ec456570428d6fbdcb00",
+      "catalogSha256": "562eea6bb6a116ae0b583c4d300b6c52a9863879623ff37bcf0d128d7e6a5192",
+      "sourceFingerprintFromCatalog": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+      "rawPayloadSha256": "24bdea536a1a6491a06e2a531f588b1606ac21b0bae2529ea83b5644226be01c",
+      "wirePayloadSha256": "f6e2c6b18c6ec026bca34c910f0c142d0d4856cd9ee124a29421774a91fa5d41",
+      "cleanCalls": 0,
+      "cacheSource": "cache",
+      "guardVersion": 2,
+      "pickerClicks": 1,
+      "moved": 5.850820877198316,
+      "navToControlMs": 56608.299999952316,
+      "clickToControlMs": 46849.700000047684,
+      "actualDistrict": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 50856.59999990463,
+        "pickerClickedAt": 50882,
+        "dialogClicks": 0
+      },
+      "harnessPins": {
+        "probe": {
+          "file": "tools/probe.cjs",
+          "sha256": "f05e1c79f1a007f11290a3bad2dda758b643ca39a6ac2c71b971a5bfeb2edca8"
+        },
+        "eval": {
+          "file": "tools/probe-checks/startup-ready.js",
+          "sha256": "6936e604198b5f3b59865181a1df646645ee42c07e11ff809c2d8230b015bd52"
+        },
+        "observer": {
+          "file": "tools/probe-checks/startup-bootstrap-observe.js",
+          "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+        },
+        "gate": {
+          "file": "tools/startup-report.mjs",
+          "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+        },
+        "admission": {
+          "file": "tools/land-package-smoke.mjs",
+          "sha256": "9b4563ea5dbdb6c760d037a4afca689a72fdf1fa20093bf963e56fbf413ab4e7"
+        },
+        "admissionSettings": {
+          "file": "tools/startup-admission.cjs",
+          "sha256": "fec1148600e1ff8f58f643541592121095c717390b09cb57014a88d64e6e0e33"
+        },
+        "districtGate": {
+          "file": "tools/land-package-smoke-gate.mjs",
+          "sha256": "457c412d0c4628a3742a57351ea1faa5787398728eecb16ff9fb8596ab17b0a5"
+        }
+      }
+    },
+    {
+      "label": "d7-generated",
+      "variant": "generated",
+      "district": 7,
+      "preset": "high",
+      "pid": 11670,
+      "processStatus": 0,
+      "signal": null,
+      "startedAt": "2026-11-02T01:03:27.844Z",
+      "finishedAt": "2026-11-02T01:04:40.844Z",
+      "rawReportSha256": "0cbc1a3c8c101efe585242522820abd89d9bba598991a700f2b6339115003473",
+      "fixtureSha256": "713bf74b0eae7360219557e7995f3299db5cdc519429ec456570428d6fbdcb00",
+      "catalogSha256": "562eea6bb6a116ae0b583c4d300b6c52a9863879623ff37bcf0d128d7e6a5192",
+      "sourceFingerprintFromCatalog": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+      "rawPayloadSha256": null,
+      "wirePayloadSha256": null,
+      "cleanCalls": 1,
+      "cacheSource": "generated override",
+      "guardVersion": 2,
+      "pickerClicks": 1,
+      "moved": 5.306031914211808,
+      "navToControlMs": 71978.70000004768,
+      "clickToControlMs": 62169.90000009537,
+      "actualDistrict": {
+        "before": {
+          "district": 7,
+          "opened": 8,
+          "city": false,
+          "partySeen": true
+        },
+        "actual": 7,
+        "atControl": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "position": {
+          "x": -2387.473827001825,
+          "z": -171.6108503251087
+        },
+        "pickerClicks": 1,
+        "pickerObservedAt": 66000.59999990463,
+        "pickerClickedAt": 66029.5,
+        "dialogClicks": 0
+      },
+      "harnessPins": {
+        "probe": {
+          "file": "tools/probe.cjs",
+          "sha256": "f05e1c79f1a007f11290a3bad2dda758b643ca39a6ac2c71b971a5bfeb2edca8"
+        },
+        "eval": {
+          "file": "tools/probe-checks/startup-ready.js",
+          "sha256": "6936e604198b5f3b59865181a1df646645ee42c07e11ff809c2d8230b015bd52"
+        },
+        "observer": {
+          "file": "tools/probe-checks/startup-bootstrap-observe.js",
+          "sha256": "49b1e9ae83a286fcb8a81702b008f0cb48bbe8dbbc1ad1ed7a7b742a0c1620c8"
+        },
+        "gate": {
+          "file": "tools/startup-report.mjs",
+          "sha256": "07e9fce40c00a9ab30ddae3fa07d67a6015ae156f6066705e17cffc8335234c3"
+        },
+        "admission": {
+          "file": "tools/land-package-smoke.mjs",
+          "sha256": "9b4563ea5dbdb6c760d037a4afca689a72fdf1fa20093bf963e56fbf413ab4e7"
+        },
+        "admissionSettings": {
+          "file": "tools/startup-admission.cjs",
+          "sha256": "fec1148600e1ff8f58f643541592121095c717390b09cb57014a88d64e6e0e33"
+        },
+        "districtGate": {
+          "file": "tools/land-package-smoke-gate.mjs",
+          "sha256": "457c412d0c4628a3742a57351ea1faa5787398728eecb16ff9fb8596ab17b0a5"
+        }
+      }
+    }
+  ],
+  "sourceFingerprintFromCatalog": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+  "catalogSha256": "562eea6bb6a116ae0b583c4d300b6c52a9863879623ff37bcf0d128d7e6a5192",
+  "metadataInventorySha256": "e7c9a099f7a380c54c019bbf53a8e1864a3c4226829b519a8a8db9af186a2bee",
+  "metadataInventoryIsNotFullBuildHash": true,
+  "pairs": [
+    {
+      "district": 3,
+      "nPerVariant": 1,
+      "cacheNavToControlMs": 65849.90000009537,
+      "generatedNavToControlMs": 81277.10000014305,
+      "scope": "single actual admission pair; not median/performance series"
+    },
+    {
+      "district": 7,
+      "nPerVariant": 1,
+      "cacheNavToControlMs": 56608.299999952316,
+      "generatedNavToControlMs": 71978.70000004768,
+      "scope": "single actual admission pair; not median/performance series"
+    }
+  ],
+  "postSeriesContentPins": {
+    "capturedAt": "2026-11-02T01:08:56.165Z",
+    "scope": "After six completed runtime admissions, before broad check; not preflight runtime build pins. Production directory immutable since root build34394 exit0.",
+    "sourceFingerprint": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+    "fullProductionBuildHash": "fa39c62257b663c7f1fabf692dedfc80fdae557f310b737bebeb38cf00bede52",
+    "preflight": false,
+    "provenance": "root capture after all6; this offline audit verifies supplied pins/list consistency, does not reread compiled payload bytes"
+  },
+  "limits": [
+    "CPU3/Deck-sized emulation, not physical Deck",
+    "Each variant/district is n1; no medians or performance series",
+    "Runtime ordinary menu/actual picker/guard2/W; export preparation is a separate proof",
+    "Production directory immutability was root-attested; full production content hash was not captured preflight",
+    "Raw report SHA and raw binary payload SHA are distinct fields",
+    "Prepared source receipt buildHash is NOT assigned to production build"
+  ]
+}

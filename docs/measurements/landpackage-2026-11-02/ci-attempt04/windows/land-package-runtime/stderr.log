@@ -1,0 +1,2 @@
+probe: steam 1280×800 · 451.7 с (сборка свежая, загрузка 429.7 с) · кадр p50 696.9 p95 2316 мс · ошибок консоли 0, необработанных 0
+[2972:1102/003735.713:ERROR:command_buffer_proxy_impl.cc(324)] GPU state invalid after WaitForGetOffsetInRange.

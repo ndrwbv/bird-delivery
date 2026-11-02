@@ -3,15 +3,15 @@ import {createHash} from 'node:crypto';
 import {fixture,descriptor,parameters,runtime,base,receipt} from './land-package-export-fixture.mjs';
 import {createLandPackageExporter} from '../src/game/landdata/land-package-export.js';
 let checks=0;
-for(const graphics of ['mid','high']){
- const s=fixture();s.ctx.runtime.graphics=graphics;s.ready();const m=s.endpoint.meta();
+for(const graphics of ['mid','high'])for(const district of [0,3,7]){
+ const s=fixture({district});s.ctx.runtime.graphics=graphics;s.ready();const m=s.endpoint.meta();
  assert.equal(m.summary.byteExact,true);assert.equal(m.summary.repeated,true);assert.equal(m.summary.liveRestored,false);assert.equal(m.summary.ordinary,true);assert.equal(m.cleanCalls,1);assert.equal(m.randomCalls,0);
- assert.equal(m.conditions.graphics,graphics);assert.deepEqual(m.actualParams,parameters);assert.deepEqual(m.manifest.parameters,parameters);assert.equal(m.identity.seed,0x5EED);assert.equal(Object.hasOwn(m.identity.flags,'buildHash'),false);
+ assert.equal(m.conditions.graphics,graphics);assert.equal(m.conditions.district,district);assert.equal(s.ctx.runtime.district,district);assert.deepEqual(m.actualParams,parameters);assert.deepEqual(m.manifest.parameters,parameters);assert.equal(m.identity.seed,0x5EED);assert.equal(Object.hasOwn(m.identity.flags,'buildHash'),false);
  const bytes=Buffer.from(s.endpoint.chunk(0,m.bytes),'base64');assert.equal(createHash('sha256').update(bytes).digest('hex'),m.summary.fileSha256);
  m.manifest.parameters.minWidth=999;assert.equal(s.endpoint.meta().manifest.parameters.minWidth,.8);assert.equal(s.ctx.source.ST.built,false);assert.equal(s.ctx.source.ST.supportReady,false);
  assert.throws(()=>s.endpoint.chunk(0,65537),/CHUNK/);s.endpoint.release();s.endpoint.release();assert.throws(()=>s.endpoint.chunk(0,1),/CHUNK/);checks++;
 }
-for(const change of [s=>s.ctx.runtime.graphics='low',s=>s.ctx.runtime.district=7,s=>s.ctx.runtime.quick=true,s=>delete s.ctx.runtime.quick,s=>s.ctx.runtime.externalSeed=true,s=>s.ctx.runtime.editor=true,s=>s.ctx.deferDraw=false,s=>s.ctx.prepared=false,s=>s.source.ST.minWidth=.8,s=>s.ctx.query+='&landcache=1',s=>s.ctx.parameters={...parameters,terrainNX:1}]){
+for(const change of [s=>s.ctx.runtime.graphics='low',...[1,2,4,5,6,8,-1,3.5,'3',null,undefined].map(district=>s=>s.ctx.runtime.district=district),s=>s.ctx.runtime.quick=true,s=>delete s.ctx.runtime.quick,s=>s.ctx.runtime.externalSeed=true,s=>s.ctx.runtime.editor=true,s=>s.ctx.deferDraw=false,s=>s.ctx.prepared=false,s=>s.source.ST.minWidth=.8,s=>s.ctx.query+='&landcache=1',s=>s.ctx.parameters={...parameters,terrainNX:1}]){
  const s=fixture();change(s);assert.throws(()=>s.exporter.beforeClean(s.ctx));assert.equal(s.endpoint.meta().phase,'failed');assert.equal(s.endpoint.meta().cleanCalls,0);checks++;
 }
 {
@@ -75,4 +75,4 @@ let endpoint;const e=createLandPackageExporter({receipt,descriptor,expose:a=>end
 e.beforeClean({source:real,cores:real.cleanCorePlan(),parameters,runtime,prepared:true,deferDraw:true});
 for(const _ of e.watch(real.cleanContours({M:{grad(){},up(){assert.fail('deferred draw');}},deferDraw:true,groundH:()=>1,terrain:{},triangulate:(outer,holes=[])=>({points:[...outer,...holes.flat()],triangles:ShapeUtils.triangulateShape(outer.map(p=>new Vector2(...p)),holes.map(h=>h.map(p=>new Vector2(...p))))})}))){}
 e.afterClean({source:real});assert.equal(endpoint.meta().summary.byteExact,true);assert.equal(endpoint.meta().randomCalls,0);assert.equal(real.ST.built,false);checks++;
-console.log(JSON.stringify({ok:true,checks,ordinary:true,actualTinyClean:true,midHighBothAccepted:true,externalSeedRejected:true,noCity:true}));
+console.log(JSON.stringify({ok:true,checks,ordinary:true,actualTinyClean:true,midHighBothAccepted:true,exportDistricts:[0,3,7],externalSeedRejected:true,noCity:true}));

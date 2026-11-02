@@ -1,0 +1,27 @@
+[
+  {
+    "file": "src/game/landdata/land-package-catalog.js",
+    "sha256": "5094beb3023ab9188968dc965a6932a79abc52ff9c45a9eff500ac3906c94df3",
+    "origin": "git9c8be0e, compare measured2a receipt inventory/helper hash before claiming exact"
+  },
+  {
+    "file": "src/game/landdata/land-package-reader.js",
+    "sha256": "c3aeb229e4008e4a2febc2c8a63442d2938676a3574967857a478598da5cab6e",
+    "origin": "git9c8be0e, compare measured2a receipt inventory/helper hash before claiming exact"
+  },
+  {
+    "file": "tools/land-package-files.mjs",
+    "sha256": "4e5d33ec290e21e306fb65d32ea24290f2d58900f0821c984cd4945e3c2287b8",
+    "origin": "git9c8be0e, compare measured2a receipt inventory/helper hash before claiming exact"
+  },
+  {
+    "file": "tools/land-package-source-key.mjs",
+    "sha256": "c581661cfa3fac423a8dec95708aba8ff64a9cebae4e308760cf35b739d45a13",
+    "origin": "git9c8be0e, compare measured2a receipt inventory/helper hash before claiming exact"
+  },
+  {
+    "file": "tools/land-package-build.mjs",
+    "sha256": "563dd10a01f2c7a8c9a0622cad6b9944952cb9a36c2be2e764f28367e79ef258",
+    "origin": "git9c8be0e, compare measured2a receipt inventory/helper hash before claiming exact"
+  }
+]

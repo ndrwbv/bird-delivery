@@ -1,0 +1,531 @@
+{
+  "version": 1,
+  "kind": "independent-five-menu-export-raw-file-audit",
+  "ok": true,
+  "cases": [
+    {
+      "name": "district3-1",
+      "target": 3,
+      "rawPath": "/tmp/bird-landdistrict17b-1102/district3-1.json",
+      "rawBytes": 32758,
+      "rawSha256": "a1807de690a4c18e247fcaf39fc09e764278fe6f2ccfea22e7c2827925ca8582",
+      "payload": {
+        "externalPath": "/private/tmp/bird-landdistrict17b-1102/district3-1.land",
+        "bytes": 74952828,
+        "sha256": "5c9de2b05148a3703d6e5967061300a57a3c84d9838211afd74c87e747aad668",
+        "actuallyStreamed": true,
+        "archived": false
+      },
+      "preLate": {
+        "phase": "city-pizzeria-before-late",
+        "at": 2624.600000143051,
+        "district": 3,
+        "pizzaIndex": 3,
+        "pizza": {
+          "x": 995.3885106385183,
+          "z": -477.4078392869484,
+          "bx": 982.4553553693426,
+          "bz": -487.69772194636556
+        },
+        "lateWorkStarted": false
+      },
+      "current": {
+        "district": 3,
+        "pizzaIndex": 3,
+        "pizza": {
+          "x": 995.3885106385183,
+          "z": -477.4078392869484,
+          "bx": 982.4553553693426,
+          "bz": -487.69772194636556
+        },
+        "samePizzeriaReference": true
+      },
+      "conditions": {
+        "adult": true,
+        "career": true,
+        "descriptor": {
+          "baseSeed": 24301,
+          "hookOwned": true,
+          "ordinaryAtImport": true,
+          "provider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "district": 3,
+        "editor": false,
+        "graphics": "high",
+        "intro": false,
+        "mapId": "seversk",
+        "mode": "steam",
+        "quick": false,
+        "streamed": true
+      },
+      "descriptor": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "graphics": {
+        "preset": "high",
+        "device": "deck",
+        "width": 1280,
+        "height": 800
+      },
+      "host": {
+        "processEpochMs": 1793579512442,
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191",
+        "node": "20.18.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "seed": null,
+        "cpuThrottle": 1,
+        "bootcpu": false,
+        "navigateEpochMs": 1793579512781
+      },
+      "metaIdentity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "2a72a0737403b5153a7ce813cd096217299e92d33066de2aa8332a2aa0df80ca"
+      },
+      "stdout": {
+        "originalPath": "/tmp/bird-landdistrict17b-1102/district3-1.stdout.log",
+        "bytes": 3438,
+        "sha256": "7ad1d0eb1bff2d45a1b5bc7f908b454de7e284b0aa78bc98825454986044ee11",
+        "deduplicated": true,
+        "reconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'"
+      }
+    },
+    {
+      "name": "district7-1",
+      "target": 7,
+      "rawPath": "/tmp/bird-landdistrict17b-1102/district7-1.json",
+      "rawBytes": 32865,
+      "rawSha256": "5ff7253c655c788b694a297987de8f7fe685bf868152c4f8d6cf956915890f84",
+      "payload": {
+        "externalPath": "/private/tmp/bird-landdistrict17b-1102/district7-1.land",
+        "bytes": 74952828,
+        "sha256": "5c9de2b05148a3703d6e5967061300a57a3c84d9838211afd74c87e747aad668",
+        "actuallyStreamed": true,
+        "archived": false
+      },
+      "preLate": {
+        "phase": "city-pizzeria-before-late",
+        "at": 2621.699999809265,
+        "district": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "lateWorkStarted": false
+      },
+      "current": {
+        "district": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "samePizzeriaReference": true
+      },
+      "conditions": {
+        "adult": true,
+        "career": true,
+        "descriptor": {
+          "baseSeed": 24301,
+          "hookOwned": true,
+          "ordinaryAtImport": true,
+          "provider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "district": 7,
+        "editor": false,
+        "graphics": "high",
+        "intro": false,
+        "mapId": "seversk",
+        "mode": "steam",
+        "quick": false,
+        "streamed": true
+      },
+      "descriptor": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "graphics": {
+        "preset": "high",
+        "device": "deck",
+        "width": 1280,
+        "height": 800
+      },
+      "host": {
+        "processEpochMs": 1793579605245,
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191",
+        "node": "20.18.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "seed": null,
+        "cpuThrottle": 1,
+        "bootcpu": false,
+        "navigateEpochMs": 1793579605593
+      },
+      "metaIdentity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "2a72a0737403b5153a7ce813cd096217299e92d33066de2aa8332a2aa0df80ca"
+      },
+      "stdout": {
+        "originalPath": "/tmp/bird-landdistrict17b-1102/district7-1.stdout.log",
+        "bytes": 3446,
+        "sha256": "15a5c8ad85706574ad9ba7e4be8f6cc906dab9a7f27ca75d8305c014dd0f01aa",
+        "deduplicated": true,
+        "reconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'"
+      }
+    },
+    {
+      "name": "district3-2",
+      "target": 3,
+      "rawPath": "/tmp/bird-landdistrict17b-1102/district3-2.json",
+      "rawBytes": 33000,
+      "rawSha256": "bfc5f1c0a4dc027c45314cea09aed56fa0b743e02974950dfedc8110318933e1",
+      "payload": {
+        "externalPath": "/private/tmp/bird-landdistrict17b-1102/district3-2.land",
+        "bytes": 74952828,
+        "sha256": "5c9de2b05148a3703d6e5967061300a57a3c84d9838211afd74c87e747aad668",
+        "actuallyStreamed": true,
+        "archived": false
+      },
+      "preLate": {
+        "phase": "city-pizzeria-before-late",
+        "at": 2673.100000143051,
+        "district": 3,
+        "pizzaIndex": 3,
+        "pizza": {
+          "x": 995.3885106385183,
+          "z": -477.4078392869484,
+          "bx": 982.4553553693426,
+          "bz": -487.69772194636556
+        },
+        "lateWorkStarted": false
+      },
+      "current": {
+        "district": 3,
+        "pizzaIndex": 3,
+        "pizza": {
+          "x": 995.3885106385183,
+          "z": -477.4078392869484,
+          "bx": 982.4553553693426,
+          "bz": -487.69772194636556
+        },
+        "samePizzeriaReference": true
+      },
+      "conditions": {
+        "adult": true,
+        "career": true,
+        "descriptor": {
+          "baseSeed": 24301,
+          "hookOwned": true,
+          "ordinaryAtImport": true,
+          "provider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "district": 3,
+        "editor": false,
+        "graphics": "high",
+        "intro": false,
+        "mapId": "seversk",
+        "mode": "steam",
+        "quick": false,
+        "streamed": true
+      },
+      "descriptor": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "graphics": {
+        "preset": "high",
+        "device": "deck",
+        "width": 1280,
+        "height": 800
+      },
+      "host": {
+        "processEpochMs": 1793579726344,
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191",
+        "node": "20.18.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "seed": null,
+        "cpuThrottle": 1,
+        "bootcpu": false,
+        "navigateEpochMs": 1793579726690
+      },
+      "metaIdentity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "2a72a0737403b5153a7ce813cd096217299e92d33066de2aa8332a2aa0df80ca"
+      },
+      "stdout": {
+        "originalPath": "/tmp/bird-landdistrict17b-1102/district3-2.stdout.log",
+        "bytes": 3438,
+        "sha256": "6e1818624fbb3250f755cf83e1c04ae511dec1d4eee2ca8d53802fc57ef07d66",
+        "deduplicated": true,
+        "reconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'"
+      }
+    },
+    {
+      "name": "district7-2",
+      "target": 7,
+      "rawPath": "/tmp/bird-landdistrict17b-1102/district7-2.json",
+      "rawBytes": 32948,
+      "rawSha256": "d3faa7f7e8387c1862ec0115bcec17b100b9bc9f43ab7c46e46ca096858784ca",
+      "payload": {
+        "externalPath": "/private/tmp/bird-landdistrict17b-1102/district7-2.land",
+        "bytes": 74952828,
+        "sha256": "5c9de2b05148a3703d6e5967061300a57a3c84d9838211afd74c87e747aad668",
+        "actuallyStreamed": true,
+        "archived": false
+      },
+      "preLate": {
+        "phase": "city-pizzeria-before-late",
+        "at": 2682.5,
+        "district": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "lateWorkStarted": false
+      },
+      "current": {
+        "district": 7,
+        "pizzaIndex": 7,
+        "pizza": {
+          "x": -2372.633066489344,
+          "z": -185.60377094273412,
+          "bx": -2370.9919841429955,
+          "bz": -162.62861809385578
+        },
+        "samePizzeriaReference": true
+      },
+      "conditions": {
+        "adult": true,
+        "career": true,
+        "descriptor": {
+          "baseSeed": 24301,
+          "hookOwned": true,
+          "ordinaryAtImport": true,
+          "provider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "district": 7,
+        "editor": false,
+        "graphics": "high",
+        "intro": false,
+        "mapId": "seversk",
+        "mode": "steam",
+        "quick": false,
+        "streamed": true
+      },
+      "descriptor": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "graphics": {
+        "preset": "high",
+        "device": "deck",
+        "width": 1280,
+        "height": 800
+      },
+      "host": {
+        "processEpochMs": 1793579841283,
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191",
+        "node": "20.18.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "seed": null,
+        "cpuThrottle": 1,
+        "bootcpu": false,
+        "navigateEpochMs": 1793579841629
+      },
+      "metaIdentity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "2a72a0737403b5153a7ce813cd096217299e92d33066de2aa8332a2aa0df80ca"
+      },
+      "stdout": {
+        "originalPath": "/tmp/bird-landdistrict17b-1102/district7-2.stdout.log",
+        "bytes": 3435,
+        "sha256": "d73c69da00eb7c8fef23c87b08dc9fd0b41f2df9b2a69ce5795a4609b5dcbcec",
+        "deduplicated": true,
+        "reconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'"
+      }
+    },
+    {
+      "name": "district0-control",
+      "target": 0,
+      "rawPath": "/tmp/bird-landdistrict17b-1102/district0-control.json",
+      "rawBytes": 33122,
+      "rawSha256": "cdbbf5ac0ddd995fbcaba0931a58cd0002c86c199cf7ab9f97a20a2ee897d241",
+      "payload": {
+        "externalPath": "/private/tmp/bird-landdistrict17b-1102/district0-control.land",
+        "bytes": 74952828,
+        "sha256": "5c9de2b05148a3703d6e5967061300a57a3c84d9838211afd74c87e747aad668",
+        "actuallyStreamed": true,
+        "archived": false
+      },
+      "preLate": {
+        "phase": "city-pizzeria-before-late",
+        "at": 2667.2000000476837,
+        "district": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "lateWorkStarted": false
+      },
+      "current": {
+        "district": 0,
+        "pizzaIndex": 0,
+        "pizza": {
+          "x": 3127.602428674413,
+          "z": 2075.7340376573325,
+          "bx": 3110.816648917971,
+          "bz": 2073.230921741487
+        },
+        "samePizzeriaReference": true
+      },
+      "conditions": {
+        "adult": true,
+        "career": true,
+        "descriptor": {
+          "baseSeed": 24301,
+          "hookOwned": true,
+          "ordinaryAtImport": true,
+          "provider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "district": 0,
+        "editor": false,
+        "graphics": "high",
+        "intro": false,
+        "mapId": "seversk",
+        "mode": "steam",
+        "quick": false,
+        "streamed": true
+      },
+      "descriptor": {
+        "provider": "edl-owned-fnv1a-mulberry32-v1",
+        "ordinaryAtImport": true,
+        "hookOwned": true,
+        "baseSeed": 24301
+      },
+      "graphics": {
+        "preset": "high",
+        "device": "deck",
+        "width": 1280,
+        "height": 800
+      },
+      "host": {
+        "processEpochMs": 1793580055673,
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191",
+        "node": "20.18.3",
+        "platform": "darwin",
+        "arch": "arm64",
+        "seed": null,
+        "cpuThrottle": 1,
+        "bootcpu": false,
+        "navigateEpochMs": 1793580056024
+      },
+      "metaIdentity": {
+        "editsHash": "b6634c2b88dc68358aee22c1c9046b821ee55bbe9308f63ed747fd20a2357c32",
+        "flags": {
+          "contract": "land-package17b-v1",
+          "deferDraw": true,
+          "parameters": "{\"coverCell\":32,\"indexCell\":8,\"maskCell\":32,\"minWidth\":0.8,\"terrainG\":16,\"terrainNX\":764,\"terrainNZ\":581,\"terrainX0\":-6097,\"terrainZ0\":-4635}",
+          "rngProvider": "edl-owned-fnv1a-mulberry32-v1"
+        },
+        "mapHash": "feccf579eb6402d7cdf1f6f29288843bf792b645d0cb81c1006a2aeb0f8f13c3",
+        "mapId": "seversk",
+        "mode": "streamed-deferred",
+        "precleanHash": "c7ac523ca000f3baea4d6d0e94aa122a9bccd4cf813cdb0919ca459b3a1d4dd4",
+        "seed": 24301,
+        "sourceHash": "2a72a0737403b5153a7ce813cd096217299e92d33066de2aa8332a2aa0df80ca"
+      },
+      "stdout": {
+        "originalPath": "/tmp/bird-landdistrict17b-1102/district0-control.stdout.log",
+        "bytes": 3435,
+        "sha256": "c680db6dfaa768bcf45fc6fb8eeecbf6f649bb5ba1d93c3100a416cdd5e9a175",
+        "deduplicated": true,
+        "reconstruction": "UTF-8 JSON.stringify(raw.result)+'\\n'"
+      }
+    }
+  ],
+  "payloadPolicy": "No binary is archived. All5 external files read once sequentially with bounded streams for actual byte count/SHA; no decoder/renderer/build/source traversal.",
+  "sourceFingerprint": "2a72a0737403b5153a7ce813cd096217299e92d33066de2aa8332a2aa0df80ca",
+  "buildFingerprint": "8277c68c61fe4aff80c60af3b4b2c1b8a3ca7acec4db8827bb66857393a933c4",
+  "payloadSha256": "5c9de2b05148a3703d6e5967061300a57a3c84d9838211afd74c87e747aad668",
+  "payloadBytes": 74952828,
+  "sameWholePayloadAll5": true,
+  "differentDistrictPizzeriasObservedBeforeLate": true,
+  "limits": [
+    "CPU1 exports, not CPU3/physical Deck/latency comparison",
+    "Menu-only export; no Go/W or reader-cache proof",
+    "RNG0 is the recorded exporter counter; workerRngInstrumented=false",
+    "Source2a v1 receipt does not authorize reuse after future v2 source changes",
+    "Reference/freeze assertions ran in archived live eval; JSON audit cannot recreate object identity"
+  ]
+}

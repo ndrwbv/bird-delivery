@@ -1,0 +1,589 @@
+{
+  "version": 1,
+  "kind": "root-frozen-production-build-lightweight-inventory",
+  "capturedAt": "2026-11-02T01:07:18.824452+00:00",
+  "buildDir": "/tmp/bird-landcoverage-v2-final-1102/production-steam",
+  "realBuildDir": "/private/tmp/bird-landcoverage-v2-final-1102/production-steam",
+  "sourceFingerprintFromCatalog": "36e181620e38931f15cd1fb40cb296e1c8751cefc60332c28cc094a6e752d679",
+  "catalogBytes": 1375,
+  "catalogSha256": "562eea6bb6a116ae0b583c4d300b6c52a9863879623ff37bcf0d128d7e6a5192",
+  "files": [
+    {
+      "path": "carlab.html",
+      "bytes": 1347,
+      "mtimeNs": 1793581124236657578,
+      "contentSha256": null
+    },
+    {
+      "path": "icon-16.png",
+      "bytes": 778,
+      "mtimeNs": 1793581123185830171,
+      "contentSha256": null
+    },
+    {
+      "path": "icon-32.png",
+      "bytes": 2523,
+      "mtimeNs": 1793581123186184007,
+      "contentSha256": null
+    },
+    {
+      "path": "icon.png",
+      "bytes": 9870,
+      "mtimeNs": 1793581123187264762,
+      "contentSha256": null
+    },
+    {
+      "path": "index.html",
+      "bytes": 19236,
+      "mtimeNs": 1793581124236831829,
+      "contentSha256": null
+    },
+    {
+      "path": "manifest.webmanifest",
+      "bytes": 459,
+      "mtimeNs": 1793581123187647639,
+      "contentSha256": null
+    },
+    {
+      "path": "pad.html",
+      "bytes": 2140,
+      "mtimeNs": 1793581124236578827,
+      "contentSha256": null
+    },
+    {
+      "path": "privacy.html",
+      "bytes": 6670,
+      "mtimeNs": 1793581123193772170,
+      "contentSha256": null
+    },
+    {
+      "path": "sandbox.html",
+      "bytes": 1520,
+      "mtimeNs": 1793581124236852162,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/be-S040HCOM.js",
+      "bytes": 340154,
+      "mtimeNs": 1793581124231812678,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/brands-CS0AufFl.js",
+      "bytes": 6608,
+      "mtimeNs": 1793581124231665844,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/carlab-D0J6ts9U.js",
+      "bytes": 4845,
+      "mtimeNs": 1793581124231937387,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/de-BcbwU-Lh.js",
+      "bytes": 288549,
+      "mtimeNs": 1793581124231850678,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/en-BQJBvVwm.js",
+      "bytes": 558140,
+      "mtimeNs": 1793581124237459748,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/es-BCg-r20a.js",
+      "bytes": 285870,
+      "mtimeNs": 1793581124232641307,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/fr-C3ZL4-A1.js",
+      "bytes": 295317,
+      "mtimeNs": 1793581124232900684,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/game-BcuaQB8I.css",
+      "bytes": 252410,
+      "mtimeNs": 1793581124230261045,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/game-DxO52hQw.js",
+      "bytes": 6693491,
+      "mtimeNs": 1793581124244768619,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/index-BT_lyAkV.css",
+      "bytes": 78898,
+      "mtimeNs": 1793581124230352254,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/index-CsPFG6fw.js",
+      "bytes": 1944116,
+      "mtimeNs": 1793581124239822302,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/index-Da3NSRTx.js",
+      "bytes": 3759,
+      "mtimeNs": 1793581124231682677,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/index-DbQkWq3G.js",
+      "bytes": 4842,
+      "mtimeNs": 1793581124232006346,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/it-DRhlQ0nb.js",
+      "bytes": 285294,
+      "mtimeNs": 1793581124233117268,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/ja-hs9orTDF.js",
+      "bytes": 309549,
+      "mtimeNs": 1793581124233358103,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/kk-LNzSwJOI.js",
+      "bytes": 350353,
+      "mtimeNs": 1793581124233631354,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/landclean.worker-eLU8qVnL.js",
+      "bytes": 111863,
+      "mtimeNs": 1793581124235795157,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/modulepreload-polyfill-B5Qt9EMX.js",
+      "bytes": 711,
+      "mtimeNs": 1793581124231432176,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/orders.config-iIr8IAQs.js",
+      "bytes": 19285,
+      "mtimeNs": 1793581124231594677,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/pad-DHYEagai.js",
+      "bytes": 2747,
+      "mtimeNs": 1793581124231281092,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/padmenu--jHCnbA9.js",
+      "bytes": 7946,
+      "mtimeNs": 1793581124231578510,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/padmenu-DOFw7avD.css",
+      "bytes": 428,
+      "mtimeNs": 1793581124230150461,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/pl-DyPPIo7r.js",
+      "bytes": 281676,
+      "mtimeNs": 1793581124233873147,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/playername-3UM9DJra.css",
+      "bytes": 1434,
+      "mtimeNs": 1793581124232025888,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/playername-BeuYZOC6.js",
+      "bytes": 30060,
+      "mtimeNs": 1793581124231503968,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/preload-helper-Ct5FWWRu.js",
+      "bytes": 1234,
+      "mtimeNs": 1793581124231769428,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/pt-CMsqGB4H.js",
+      "bytes": 282624,
+      "mtimeNs": 1793581124234100940,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/sandbox-B3uuqu8o.css",
+      "bytes": 4709,
+      "mtimeNs": 1793581124231255259,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/sandbox-BCEDU6MC.js",
+      "bytes": 35248,
+      "mtimeNs": 1793581124231297759,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/steam-Cwzudoc2.js",
+      "bytes": 5838,
+      "mtimeNs": 1793581124231753344,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/steam-mock-BLAErFH-.js",
+      "bytes": 2302,
+      "mtimeNs": 1793581124235571864,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/tr-BkJwbZlQ.js",
+      "bytes": 278786,
+      "mtimeNs": 1793581124234355483,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/uk-CM1R9mRA.js",
+      "bytes": 340110,
+      "mtimeNs": 1793581124234605651,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/uz-CKwHV-_H.js",
+      "bytes": 282043,
+      "mtimeNs": 1793581124234850944,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/zh-CmaIi2cP.js",
+      "bytes": 274136,
+      "mtimeNs": 1793581124235086820,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/PROMPT_FOR_AGENT.md",
+      "bytes": 10694,
+      "mtimeNs": 1793581123120068169,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/README.md",
+      "bytes": 4223,
+      "mtimeNs": 1793581123120646714,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/family-dacha.webp",
+      "bytes": 73304,
+      "mtimeNs": 1793581123167261160,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/family-room.webp",
+      "bytes": 67820,
+      "mtimeNs": 1793581123168249790,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/gennady-chairman.webp",
+      "bytes": 166544,
+      "mtimeNs": 1793581123169864798,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/manifest.json",
+      "bytes": 3136,
+      "mtimeNs": 1793581123170209175,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/angry.png",
+      "bytes": 2308321,
+      "mtimeNs": 1793581123123825647,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/blink.png",
+      "bytes": 2313862,
+      "mtimeNs": 1793581123127582999,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/cutline.png",
+      "bytes": 18428,
+      "mtimeNs": 1793581123128411253,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/cutting_guide.png",
+      "bytes": 1840833,
+      "mtimeNs": 1793581123131770229,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/idle.png",
+      "bytes": 2317616,
+      "mtimeNs": 1793581123150899993,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/silhouette_mask.png",
+      "bytes": 7368,
+      "mtimeNs": 1793581123152297667,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/smile.png",
+      "bytes": 2313502,
+      "mtimeNs": 1793581123155819935,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/talk.png",
+      "bytes": 2314302,
+      "mtimeNs": 1793581123166261280,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/fullbody/angry.png",
+      "bytes": 1372719,
+      "mtimeNs": 1793581123136547128,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/fullbody/blink.png",
+      "bytes": 1372265,
+      "mtimeNs": 1793581123139049849,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/fullbody/idle.png",
+      "bytes": 1098480,
+      "mtimeNs": 1793581123141641613,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/fullbody/smile.png",
+      "bytes": 1372236,
+      "mtimeNs": 1793581123144031750,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/character/gennady/fullbody/talk.png",
+      "bytes": 1372494,
+      "mtimeNs": 1793581123147245100,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/optional/hallway_background_draft.png",
+      "bytes": 222072,
+      "mtimeNs": 1793581123172546229,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/optional/old_animation_demo.gif",
+      "bytes": 5157841,
+      "mtimeNs": 1793581123176868542,
+      "contentSha256": null
+    },
+    {
+      "path": "assets/dialogue/ZATO_Gennady_dialogue_assets/reference/approved_ui_reference.png",
+      "bytes": 2208256,
+      "mtimeNs": 1793581123180815604,
+      "contentSha256": null
+    },
+    {
+      "path": "brand/logo-1024.jpg",
+      "bytes": 126801,
+      "mtimeNs": 1793581123181835401,
+      "contentSha256": null
+    },
+    {
+      "path": "brand/logo-256.jpg",
+      "bytes": 18050,
+      "mtimeNs": 1793581123182386696,
+      "contentSha256": null
+    },
+    {
+      "path": "brand/logo-px.png",
+      "bytes": 4993,
+      "mtimeNs": 1793581123182824073,
+      "contentSha256": null
+    },
+    {
+      "path": "city-data/catalog.json",
+      "bytes": 1375,
+      "mtimeNs": 1793581124236426993,
+      "contentSha256": "562eea6bb6a116ae0b583c4d300b6c52a9863879623ff37bcf0d128d7e6a5192"
+    },
+    {
+      "path": "city-data/f6e2c6b18c6ec026bca34c910f0c142d0d4856cd9ee124a29421774a91fa5d41.land.gz",
+      "bytes": 34231572,
+      "mtimeNs": 1793581124258796024,
+      "contentSha256": null
+    },
+    {
+      "path": "fonts/OFL.txt",
+      "bytes": 4413,
+      "mtimeNs": 1793581123183198075,
+      "contentSha256": null
+    },
+    {
+      "path": "fonts/PressStart2P-Regular.ttf",
+      "bytes": 118204,
+      "mtimeNs": 1793581123184307122,
+      "contentSha256": null
+    },
+    {
+      "path": "fonts/RubikMonoOne-OFL.txt",
+      "bytes": 4462,
+      "mtimeNs": 1793581123184626957,
+      "contentSha256": null
+    },
+    {
+      "path": "fonts/RubikMonoOne-Regular.ttf",
+      "bytes": 141088,
+      "mtimeNs": 1793581123185594545,
+      "contentSha256": null
+    },
+    {
+      "path": "models/vaz2101/LICENSE.txt",
+      "bytes": 644,
+      "mtimeNs": 1793581123187989099,
+      "contentSha256": null
+    },
+    {
+      "path": "models/vaz2101/car.bin",
+      "bytes": 84204,
+      "mtimeNs": 1793581123188965938,
+      "contentSha256": null
+    },
+    {
+      "path": "models/vaz2101/car.json",
+      "bytes": 2688,
+      "mtimeNs": 1793581123189238272,
+      "contentSha256": null
+    },
+    {
+      "path": "models/vaz2101/car_lite.bin",
+      "bytes": 40508,
+      "mtimeNs": 1793581123190123902,
+      "contentSha256": null
+    },
+    {
+      "path": "models/vaz2101/car_lite.json",
+      "bytes": 698,
+      "mtimeNs": 1793581123190407320,
+      "contentSha256": null
+    },
+    {
+      "path": "models/vaz2101/kopeika_kopeika.png",
+      "bytes": 2904,
+      "mtimeNs": 1793581123190732613,
+      "contentSha256": null
+    },
+    {
+      "path": "models/vaz2107/LICENSE.txt",
+      "bytes": 706,
+      "mtimeNs": 1793581123190984948,
+      "contentSha256": null
+    },
+    {
+      "path": "models/vaz2107/bottom.png",
+      "bytes": 1497,
+      "mtimeNs": 1793581123191058073,
+      "contentSha256": null
+    },
+    {
+      "path": "models/vaz2107/car.bin",
+      "bytes": 257088,
+      "mtimeNs": 1793581123191984286,
+      "contentSha256": null
+    },
+    {
+      "path": "models/vaz2107/car.json",
+      "bytes": 3532,
+      "mtimeNs": 1793581123192147745,
+      "contentSha256": null
+    },
+    {
+      "path": "models/vaz2107/car_lite.bin",
+      "bytes": 112576,
+      "mtimeNs": 1793581123192775374,
+      "contentSha256": null
+    },
+    {
+      "path": "models/vaz2107/car_lite.json",
+      "bytes": 1458,
+      "mtimeNs": 1793581123192886708,
+      "contentSha256": null
+    },
+    {
+      "path": "models/vaz2107/carbody.png",
+      "bytes": 1265,
+      "mtimeNs": 1793581123192952750,
+      "contentSha256": null
+    },
+    {
+      "path": "models/vaz2107/details.png",
+      "bytes": 13678,
+      "mtimeNs": 1793581123193134417,
+      "contentSha256": null
+    },
+    {
+      "path": "models/vaz2107/details_transparent.png",
+      "bytes": 4335,
+      "mtimeNs": 1793581123193395168,
+      "contentSha256": null
+    },
+    {
+      "path": "models/vaz2107/interior.png",
+      "bytes": 1651,
+      "mtimeNs": 1793581123193466085,
+      "contentSha256": null
+    },
+    {
+      "path": "music/.gitkeep",
+      "bytes": 0,
+      "mtimeNs": 1793581123193562544,
+      "contentSha256": null
+    },
+    {
+      "path": "music/index.json",
+      "bytes": 3,
+      "mtimeNs": 1793581124236321743,
+      "contentSha256": null
+    },
+    {
+      "path": "sfx/.gitkeep",
+      "bytes": 0,
+      "mtimeNs": 1793581123193867421,
+      "contentSha256": null
+    },
+    {
+      "path": "sfx/index.json",
+      "bytes": 3,
+      "mtimeNs": 1793581124236298618,
+      "contentSha256": null
+    }
+  ],
+  "fileCount": 95,
+  "metadataInventorySha256": "e7c9a099f7a380c54c019bbf53a8e1864a3c4226829b519a8a8db9af186a2bee",
+  "hashScope": "canonical path/size/mtime metadata plus catalog content SHA; NOT a full build content fingerprint",
+  "captureTiming": "after first4 completed actual runs, while root was finishing additional d0 admissions",
+  "immutabilityProvenance": "root-attested new external Viteout34394 stayed unchanged during series; no independent full preflight content hash was captured",
+  "payloadContentsRead": false,
+  "largeAssetContentsRead": false
+}

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';import vm from 'node:vm';
 import {makeIdentity,makeManifest,checkReceipt,assertOrdinaryEDL,canonical} from '../src/game/landdata/land-package-key.js';
-import {createCatalog,lookupCatalog} from '../src/game/landdata/land-package-catalog.js';
+import {createCatalog,checkCatalog,lookupCatalog,PRODUCT_LAND_COVERAGE,assertProductCoverage} from '../src/game/landdata/land-package-catalog.js';
 import {makeSourceKey} from './land-package-source-key.mjs';
 import {createLandCover} from '../src/game/landcover.js';
 import {createLandMask} from '../src/game/landmask.js';
@@ -21,6 +21,28 @@ test('parameter key insertion order does not change codec identity',()=>{const o
 test('catalog owns records; caller mutation does not rewrite accepted configuration',()=>{const m=clone(manifest),e=clone(raw),c=createCatalog(m,[e]);m.parameters.minWidth=.9;e.bytes=999;assert.deepEqual(c,catalog);const hit=lookupCatalog(c,{manifest,precleanHash:h('d')});hit.entry.bytes=999;assert.deepEqual(c,catalog);});
 test('duplicate inputs, traversal/absolute paths and plain SHA/size disagreement reject',()=>{assert.throws(()=>createCatalog(manifest,[raw,raw]));for(const path of ['../x','/city-data/x','https://x/y','city-data/%2e%2e/x'])assert.throws(()=>createCatalog(manifest,[{...raw,path}]));assert.throws(()=>createCatalog(manifest,[{...raw,rawBytes:101}]));assert.throws(()=>createCatalog(manifest,[{...raw,rawSha256:h('f')}]));});
 test('gzip binds compressed transport and decoded content separately',()=>{const e={...raw,encoding:'gzip',path:'city-data/'+h('f')+'.land.gz',sha256:h('f'),bytes:40};assert.deepEqual(lookupCatalog(createCatalog(manifest,[e]),{manifest,precleanHash:h('d')}).entry,e);});
+const productRows=()=>PRODUCT_LAND_COVERAGE.map(slot=>({...slot,precleanHash:raw.precleanHash}));
+test('v2 exact product coverage owns rows, sorts slots and shares one exact entry',()=>{
+ const rows=productRows().reverse(),v2=createCatalog(manifest,[raw],{coverage:rows});
+ assert.equal(v2.version,2);assert.deepEqual(v2.coverage,productRows());assert.equal(v2.entries.length,1);
+ assert.deepEqual(assertProductCoverage(v2),v2);assert.deepEqual(checkCatalog(v2),v2);
+ rows[0].district=6;assert.deepEqual(v2.coverage,productRows());
+ assert.equal(Object.isFrozen(PRODUCT_LAND_COVERAGE),true);assert.equal(PRODUCT_LAND_COVERAGE.every(Object.isFrozen),true);
+ assert.equal(checkCatalog(catalog).version,1);assert.throws(()=>assertProductCoverage(catalog),/PRODUCT_COVERAGE/);
+});
+test('v2 missing, duplicate, malformed, foreign-reference and excessive coverage reject',()=>{
+ for(const rows of [[],null,Array(17).fill(productRows()[0]),[...productRows(),productRows()[0]],productRows().map((r,i)=>i? r:{...r,precleanHash:h('f')}),productRows().map((r,i)=>i? r:{...r,extra:true})])assert.throws(()=>createCatalog(manifest,[raw],{coverage:rows}));
+ for(const district of [-1,-0,8,3.5,'3',null,undefined])assert.throws(()=>createCatalog(manifest,[raw],{coverage:[{district,graphics:'high',precleanHash:raw.precleanHash}]}));
+ for(const graphics of ['low','HIGH','',null])assert.throws(()=>createCatalog(manifest,[raw],{coverage:[{district:0,graphics,precleanHash:raw.precleanHash}]}));
+ const full=createCatalog(manifest,[raw],{coverage:productRows()});
+ const {coverage,...missing}=full;assert.throws(()=>checkCatalog(missing));
+ assert.throws(()=>checkCatalog({...full,coverage:undefined}));assert.throws(()=>checkCatalog({...full,unexpected:0}));assert.throws(()=>checkCatalog({...catalog,coverage}));
+});
+test('generic known slots do not claim product support; product requires exactly four',()=>{
+ for(const rows of [productRows().slice(0,3),[...productRows(),{district:3,graphics:'mid',precleanHash:raw.precleanHash}],productRows().map((row,i)=>i===3?{...row,district:6}:row)]){
+  const c=createCatalog(manifest,[raw],{coverage:rows});assert.equal(c.version,2);assert.throws(()=>assertProductCoverage(c),/PRODUCT_COVERAGE/);
+ }
+});
 test('build/file hashes cannot leak into header manifest',()=>{for(const k of ['buildHash','fileSha256','runtime','query'])assert.throws(()=>makeIdentity({...manifest,[k]:h('f')},h('d')));});
 test('production identity is accepted by the unchanged real codec; different params fail decode',()=>{const cover=createLandCover(),green=createLandCover(),finalMask=createLandMask();finalMask.finish();const ST={built:false,supportReady:false,minWidth:.8,cleanedArea:0,fillTriangles:0,fillDraw:0,cleanTiles:0,maskTriangles:0,maskEdges:0};const state=captureResult({cover,green,finalMask,ST},{prepared:true,completed:true,deferDraw:true}),id=makeIdentity(manifest,h('d')),wire=encodeCheckpoint(state,id);assert.deepEqual(decodeCheckpoint(wire,id),state);const changed=clone(manifest);changed.parameters.minWidth=.9;assert.throws(()=>decodeCheckpoint(wire,makeIdentity(changed,h('d'))),/IDENTITY_MISMATCH/);});
 const files=[{path:'src/a.js',bytes:new TextEncoder().encode('export const x=1;\n'),text:true},{path:'src/raw.bin',bytes:new Uint8Array([0,13,255]),text:false}];
